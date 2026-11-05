@@ -1,0 +1,14 @@
+配信元の設定の参照先の付け替え:
+  説明: 端末の設定 `~/.config/dev-docs/settings.yaml` の project-index の行の `config` を、作業 PR の worktree から develop の worktree（`/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/develop/dev-docs.yaml`。無ければ作る）へ付け替え、dev-docs の管理の MCP の `reload` で読み直させる
+  タグ: [設定, 再読み込み]
+  実行者: planner
+  時期: マージの後
+  回数: 1 回限り
+  可逆: true
+  疎通確認: null
+  実行: null
+  確認: null
+  切り戻し: null
+  失敗時: 既定の対処を 1 回、2 回連続で失敗したら依頼元へ返す
+  確認方法: dev-docs の `describe` の一覧に project-index が write の権限で載り、`search_docs` で ARCH-1 が引ける
+  状態: "-"

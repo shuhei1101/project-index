@@ -20,7 +20,8 @@
 | フォルダ構成 | `src/project_index/`（パッケージ）・`plugins/project-index/`（プラグイン）・`tests/`・`dev/`・`docs/` を置く | 分類ごとの中身は shuhei1101/dev-docs#114 |
 | パッケージ | `pyproject.toml` で `project-index` を定義し、`project-index` コマンドを起動の入口にする | 依存は dev-docs の `pyproject.toml` のうち画面の依存（jinja2・playwright）を除いたもの |
 | プラグイン | `plugins/project-index/`（`hooks`・`skills`）と `.claude-plugin/marketplace.json` を置く | フック・スキルの中身は shuhei1101/dev-docs#114 |
-| データの保存先 | 端末の設定・状態のフォルダ・配信元の設定の既定のパスを非機能要件に記載する | 要件.md の `## 要望` の表 |
+| データの保存先 | 端末の設定・状態のフォルダ・配信元の設定の既定のパスを設定の設計書に記載する | 要件.md の `## 要望` の表 |
+| 配信元の設定 | 作業中は `dev-docs.yaml` の `default_ref` を作業ブランチにし、マージの前に `develop` へ戻す | 設定は `default_ref` のリビジョンから読まれ、develop にはまだ無いため |
 | 既存機能への影響 | なし（dev-docs の動作を変えない） | - |
 
 ## テスト結果
