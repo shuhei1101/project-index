@@ -7,7 +7,7 @@
 ## 背景
 
 [Issue #2](https://github.com/shuhei1101/project-index/issues/2) の要望。
-dev-docs が画面のサーバーと一緒に持っている、文書とソースコードの索引・検索・書き込みの MCP と配信元の読み込みを、別のプロジェクト project-index へ切り出すと決めた（D-150）。
+dev-docs が画面のサーバーと一緒に持っている、文書とソースコードの索引・検索・書き込みの MCP と配信元の読み込みを、別のプロジェクト project-index へ切り出すと決めた。
 リポジトリは初回 commit の `README.md` だけで、設計書も実装も無い。
 機能とコードを移す作業は [shuhei1101/dev-docs#114](https://github.com/shuhei1101/dev-docs/issues/114) で行う。
 
