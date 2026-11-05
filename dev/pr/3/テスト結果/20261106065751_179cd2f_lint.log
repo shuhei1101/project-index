@@ -1,0 +1,20 @@
+$ (rc=0; uv run ruff check . || rc=1; uv run ruff format --check . || rc=1; uv run pyright || rc=1; uv run complexipy src tests || rc=1; exit $rc)
+warning: Selection `PLC2701` has no effect because preview is not enabled.
+warning: Selection `PLW1514` has no effect because preview is not enabled.
+All checks passed!
+warning: Selection `PLC2701` has no effect because preview is not enabled.
+warning: Selection `PLW1514` has no effect because preview is not enabled.
+29 files already formatted
+0 errors, 0 warnings, 0 informations
+──────────────────────────────── 🐙 complexipy ─────────────────────────────────
+src/project_index/__main__.py
+    main 0  ✅  PASSED  
+
+tests/unit/project_index/test_main.py
+    test_main 0  ✅  PASSED  
+    test_main_when_unknown_argument 0  ✅  PASSED  
+    test_main_when_version 0  ✅  PASSED  
+
+All functions are within the allowed complexity.
+────────────────────────── 🎉 Analysis completed! 🎉 ───────────────────────────
+exit=0

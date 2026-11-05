@@ -1,0 +1,71 @@
+[project]
+name = "project-index"
+version = "0.1.0"
+description = "文書とソースコードの索引・検索・書き込みを提供するサービス"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pyright",
+    "ruff",
+    "complexipy",
+]
+
+[project.scripts]
+project-index = "project_index.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/project_index"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+# PLC2701・PLW1514 は preview の規則のため、preview のうち select に書いた規則だけを有効にする
+preview = true
+explicit-preview-rules = true
+select = [
+    "E", "F", "I", "B", "UP", "SIM", "RUF",
+    "N", "PLC2701",   # 命名と、他モジュールの _ 付きシンボルの import
+    "ANN", "TC",      # 型注釈と TYPE_CHECKING
+    "C901", "PLR2004",   # 複雑度とマジックナンバー
+    "G004", "T20", "LOG",   # logger への f-string・print・logging の使い方
+    "BLE001", "TRY002", "TRY400", "EM",   # 例外の捕まえ方・投げ方・出し方
+    "PLW1514",   # encoding の明示
+    "DTZ",   # 保存する日時はタイムゾーン付き
+    "ASYNC",   # async の中でブロックする処理を呼ばない
+    "S",   # セキュリティ（assert・シェル・pickle・yaml.load など）
+    "PT",   # pytest の書き方
+]
+ignore = [
+    "E501",   # 行長は formatter に任せる
+    "RUF001", "RUF002", "RUF003",   # 日本語の文字列 / docstring / コメントの全角記号を紛らわしい Unicode として指すため外す
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR2004"]   # テストの assert と期待値の数値は許す
+"dev/pr/**/*.py" = ["T20", "S603", "S607"]   # 反映作業のスクリプトは print で結果を出し、固定の引数で git を呼ぶ
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pyright]
+typeCheckingMode = "strict"
+pythonVersion = "3.14"
+
+[tool.complexipy]
+max-complexity-allowed = 15
+
+[tool.pytest]
+testpaths = ["tests"]
+addopts = ["-ra", "--import-mode=importlib", "-W", "error"]
+strict = true
