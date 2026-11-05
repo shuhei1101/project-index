@@ -2,8 +2,4 @@
 
 文書とソースコードの索引・検索・書き込みを提供するサービス。
 
-## 概要
-
-配信元（各リポジトリの規約・設計書・テンプレート・ソースコード）を読み込んで索引にし、検索・関連の追跡・変更の確認・書き込みを、MCP と API でほかのシステム（Claude Code のセッション・AI Monitor のエージェント・dev-docs の画面）へ提供する。
-
-dev-docs から切り出す（shuhei1101/dev-docs#114）。立ち上げ前。設計と実装は AI Monitor の流れで進める。
+ドキュメント: https://shuhei1101.github.io/project-index/
