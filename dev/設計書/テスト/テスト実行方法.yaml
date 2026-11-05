@@ -1,0 +1,37 @@
+title: テスト実行方法
+lead: project-index のテスト種別ごとの実行コマンドと前提。
+layers:
+  - name: 単体テスト（バック）
+    run_all: |-
+      ```bash
+      uv run pytest tests/unit/
+      ```
+    description: pytest で実行する。プロセスの外のもの（ネットワーク・常駐のサーバー）に依存しない。
+    prerequisites:
+      - 外部依存なし
+    run_one:
+      label: ファイル
+      command: |-
+        ```bash
+        uv run pytest {単体テストファイルパス}
+        ```
+    parallel: true
+  - name: 結合テスト（バック）
+    run_all: 未確定
+  - name: E2E テスト
+    run_all: 未確定
+  - name: 非機能要件テスト
+    run_all: 未確定
+  - name: 外部疎通テスト
+    run_all: 未確定
+  - name: lint
+    run_all: |-
+      ```bash
+      (rc=0; uv run ruff check . || rc=1; uv run ruff format --check . || rc=1; uv run pyright || rc=1; uv run complexipy src tests || rc=1; exit $rc)
+      ```
+    description: ruff で linter・formatter の check を、pyright（strict）で型検査を、complexipy で cognitive complexity を検査する。型検査と cognitive complexity はプロジェクト全体に回す。
+    prerequisites:
+      - 検査の設定は `pyproject.toml` が持つ
+id: TP-1
+prerequisites:
+  - Python 3.14 と uv（`uv sync` で開発の依存を入れておく）
