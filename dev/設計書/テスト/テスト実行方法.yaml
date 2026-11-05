@@ -25,7 +25,13 @@ layers:
   - name: 外部疎通テスト
     run_all: 未確定
   - name: lint
-    run_all: 未確定
+    run_all: |-
+      ```bash
+      (rc=0; uv run ruff check . || rc=1; uv run ruff format --check . || rc=1; uv run pyright || rc=1; uv run complexipy src tests || rc=1; exit $rc)
+      ```
+    description: ruff で linter・formatter の check を、pyright（strict）で型検査を、complexipy で cognitive complexity を検査する。型検査と cognitive complexity はプロジェクト全体に回す。
+    prerequisites:
+      - 検査の設定は `pyproject.toml` が持つ
 id: TP-1
 prerequisites:
   - Python 3.14 と uv（`uv sync` で開発の依存を入れておく）
