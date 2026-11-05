@@ -26,30 +26,54 @@ ADMIN_MCP = "http://127.0.0.1:8781/_admin/mcp/"
 RELOAD_TIMEOUT_SEC = 1800
 
 
-def ensure_develop_worktree(dry_run: bool) -> bool:
-    """develop の worktree が無ければ作り、develop に dev-docs.yaml があるかを返す。"""
-    # develop に配信元の設定が入っているか（作業 PR のマージの後でないと無い）
-    shown = subprocess.run(
-        ["git", "-C", str(CLONE), "cat-file", "-e", "origin/develop:dev-docs.yaml"],
-        check=False,
-        capture_output=True,
+def git(*args: str) -> subprocess.CompletedProcess[str]:
+    """project-index のクローンで git を実行する。"""
+    return subprocess.run(
+        ["git", "-C", str(CLONE), *args], check=False, capture_output=True, text=True
     )
-    if shown.returncode != 0:
+
+
+def sync_develop_worktree(dry_run: bool) -> bool:
+    """develop の worktree を origin/develop に揃え、そこに dev-docs.yaml があるかを返す。"""
+    # origin/develop に配信元の設定が入っているか（作業 PR のマージの後でないと無い）
+    if git("cat-file", "-e", "origin/develop:dev-docs.yaml").returncode != 0:
         print("develop の dev-docs.yaml: failed")
         return False
     print("develop の dev-docs.yaml: ok")
-    # worktree が既にあれば何もしない
-    if DEVELOP_WORKTREE.is_dir():
-        print("develop の worktree: skipped")
-        return True
-    if dry_run:
+    target = git("rev-parse", "origin/develop").stdout.strip()
+    # worktree が無い: 手元の develop を origin/develop へ合わせて作る
+    if not DEVELOP_WORKTREE.is_dir():
+        if not dry_run:
+            added = git("worktree", "add", "-B", "develop", str(DEVELOP_WORKTREE), "origin/develop")
+            if added.returncode != 0:
+                print("develop の worktree: failed")
+                return False
         print("develop の worktree: changed")
         return True
-    subprocess.run(
-        ["git", "-C", str(CLONE), "worktree", "add", str(DEVELOP_WORKTREE), "develop"],
-        check=True,
-    )
-    print("develop の worktree: changed")
+    # worktree がある: origin/develop まで早送りする
+    head = subprocess.run(
+        ["git", "-C", str(DEVELOP_WORKTREE), "rev-parse", "HEAD"],
+        check=False,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if head == target:
+        print("develop の worktree: skipped")
+    else:
+        if not dry_run:
+            merged = subprocess.run(
+                ["git", "-C", str(DEVELOP_WORKTREE), "merge", "--ff-only", "origin/develop"],
+                check=False,
+                capture_output=True,
+            )
+            if merged.returncode != 0:
+                print("develop の worktree: failed")
+                return False
+        print("develop の worktree: changed")
+    # 付け替え先の設定のファイルがあるか（dry-run で worktree を作っていないときは確かめない）
+    if not (DEVELOP_WORKTREE / "dev-docs.yaml").is_file() and not dry_run:
+        print("develop の worktree の dev-docs.yaml: failed")
+        return False
     return True
 
 
@@ -75,29 +99,12 @@ def call_reload() -> bool:
         return response.status == HTTPStatus.OK
 
 
-def main() -> int:
-    """前提確認 → 計画 → 適用の順に進め、failed があれば 1 を返す。"""
-    dry_run = len(sys.argv) > 1 and sys.argv[1] == "--dry-run"
-    # 前提確認
-    git_fetch = subprocess.run(
-        ["git", "-C", str(CLONE), "fetch", "origin", "develop"], check=False, capture_output=True
-    )
-    if not SETTINGS.is_file() or git_fetch.returncode != 0:
-        print("前提確認: failed")
-        return 1
-    current = SETTINGS.read_text(encoding="utf-8")
-    # 既に develop の worktree を指していれば何もしない
+def rewrite_settings(current: str, dry_run: bool) -> bool:
+    """端末の設定の参照先を develop の worktree へ書き換え、失敗したら False を返す。"""
+    # 既に develop の worktree を指していれば書き換えない
     if NEW_LINE in current and OLD_LINE not in current:
-        print("前提確認: ok")
         print("端末の設定の書き換え: skipped")
-        return 0
-    # 付け替える行がちょうど 1 つあるか
-    if current.count(OLD_LINE) != 1:
-        print("前提確認: failed")
-        return 1
-    print("前提確認: ok")
-    if not ensure_develop_worktree(dry_run):
-        return 1
+        return True
     # 計画（--dry-run もここを通る）
     updated = current.replace(OLD_LINE, NEW_LINE)
     sys.stdout.writelines(
@@ -110,8 +117,7 @@ def main() -> int:
     )
     if dry_run:
         print("端末の設定の書き換え: changed")
-        print("dev-docs の読み直し: changed")
-        return 0
+        return True
     # 適用（一時ファイル → 検証 → 退避 → 置き換え）
     with tempfile.NamedTemporaryFile(
         "w", encoding="utf-8", dir=SETTINGS.parent, delete=False
@@ -121,12 +127,36 @@ def main() -> int:
     if NEW_LINE not in tmp_path.read_text(encoding="utf-8"):
         tmp_path.unlink()
         print("検証: failed")
-        return 1
+        return False
     print("検証: ok")
     shutil.copy2(SETTINGS, BACKUP)
     tmp_path.replace(SETTINGS)
     print("端末の設定の書き換え: changed")
-    # 変更があったので 1 回だけ読み直させる
+    return True
+
+
+def main() -> int:
+    """前提確認 → 計画 → 適用の順に進め、failed があれば 1 を返す。"""
+    dry_run = len(sys.argv) > 1 and sys.argv[1] == "--dry-run"
+    # 前提確認: 端末の設定があり、origin/develop を取り込める
+    if not SETTINGS.is_file() or git("fetch", "origin", "develop").returncode != 0:
+        print("前提確認: failed")
+        return 1
+    current = SETTINGS.read_text(encoding="utf-8")
+    # 付け替える前の行がちょうど 1 つあるか、既に付け替え済みか
+    already = NEW_LINE in current and OLD_LINE not in current
+    if not already and current.count(OLD_LINE) != 1:
+        print("前提確認: failed")
+        return 1
+    print("前提確認: ok")
+    if not sync_develop_worktree(dry_run):
+        return 1
+    if not rewrite_settings(current, dry_run):
+        return 1
+    # 読み直しは書き換えの有無によらず行う（前回の読み直しが失敗していても取り戻せる）
+    if dry_run:
+        print("dev-docs の読み直し: changed")
+        return 0
     try:
         reloaded = call_reload()
     except OSError:
