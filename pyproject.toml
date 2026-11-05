@@ -29,6 +29,9 @@ line-length = 100
 target-version = "py314"
 
 [tool.ruff.lint]
+# PLC2701・PLW1514 は preview の規則のため、preview のうち select に書いた規則だけを有効にする
+preview = true
+explicit-preview-rules = true
 select = [
     "E", "F", "I", "B", "UP", "SIM", "RUF",
     "N", "PLC2701",   # 命名と、他モジュールの _ 付きシンボルの import
