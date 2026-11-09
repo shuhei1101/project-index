@@ -106,3 +106,13 @@ documents:
     schema: schemas/index.schema.yaml
     metadata:
       description: summary
+  - id: files_guide
+    title: 公開ドキュメントの Markdown
+    paths: ["docs/guide/files.yml"]
+    exclude: ["*.yaml", "*.yml", README.md, はじめに.md, 使い方.md, リファレンス.md]
+    schema: schemas/files.schema.yaml
+    records: files
+    body_file: path
+    metadata:
+      visibility: visibility
+      category: category
