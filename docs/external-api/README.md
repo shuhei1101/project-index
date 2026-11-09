@@ -1,4 +1,4 @@
-# 外部API
+# external-api
 
 連携している外部 API の一覧
 
