@@ -52,8 +52,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "PLR2004"]   # テストの assert と期待値の数値は許す
-"dev/pr/**/*.py" = ["T20", "S603", "S607"]   # 反映作業のスクリプトは print で結果を出し、固定の引数で git を呼ぶ
-"docs/pr/**/*.py" = ["T20", "S603", "S607"]
+"docs/pr/**/*.py" = ["T20", "S603", "S607"]   # 反映作業のスクリプトは print で結果を出し、固定の引数で git を呼ぶ
 
 [tool.ruff.format]
 quote-style = "double"
