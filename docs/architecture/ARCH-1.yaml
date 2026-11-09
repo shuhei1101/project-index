@@ -17,15 +17,12 @@ overview:
       kind: system
     - id: SET
       label: 端末の設定
-      shape: cylinder
       kind: store
     - id: STATE
       label: 状態のフォルダ
-      shape: cylinder
       kind: store
     - id: REPO
       label: 配信元のリポジトリ
-      shape: cylinder
       kind: external
     - id: GIT
       label: git
@@ -55,14 +52,13 @@ overview:
     - from: SRV
       to: GIT
       label: リビジョン
-  subgraphs:
-    - id: SYS
-      label: project-index
-      nodes:
-        - PLG
-        - SRV
-        - SET
-        - STATE
+  frame:
+    label: project-index
+    nodes:
+      - PLG
+      - SRV
+      - SET
+      - STATE
 repository:
   style: モノレポ
   repositories:
