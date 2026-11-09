@@ -1,0 +1,24 @@
+$ (rc=0; uv run ruff check . || rc=1; uv run ruff format --check . || rc=1; uv run pyright || rc=1; uv run complexipy src tests || rc=1; exit $rc)
+Using CPython 3.14.3
+Creating virtual environment at: .venv
+   Building project-index @ file:///mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/refactor-docs-merge-dev-into-docs
+      Built project-index @ file:///mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/refactor-docs-merge-dev-into-docs
+warning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.
+         If the cache and target directories are on different filesystems, hardlinking may not be supported.
+         If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.
+Installed 11 packages in 7m 17s
+All checks passed!
+31 files already formatted
+0 errors, 0 warnings, 0 informations
+──────────────────────────────── 🐙 complexipy ─────────────────────────────────
+src/project_index/__main__.py
+    main 0  ✅  PASSED  
+
+tests/unit/project_index/test_main.py
+    test_main 0  ✅  PASSED  
+    test_main_when_unknown_argument 0  ✅  PASSED  
+    test_main_when_version 0  ✅  PASSED  
+
+All functions are within the allowed complexity.
+────────────────────────── 🎉 Analysis completed! 🎉 ───────────────────────────
+exit=0

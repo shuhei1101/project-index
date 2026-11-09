@@ -1,0 +1,75 @@
+use_cases: []
+docs:
+  - page: docs/index.yaml
+    new: false
+    change: dev/index.yaml・dev/設計書/index.yaml の行をまとめ、行が種類のフォルダを指すようにする（README.md は生成し直す）
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-09T12:11:23.709402+00:00'
+  - page: docs/guide/変更履歴.md
+    new: true
+    change: docs/はじめに/変更履歴.md を移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-09T12:11:23.709402+00:00'
+  - page: docs/guide/files.yml
+    new: true
+    change: 'docs/guide/ の Markdown の分類と visibility: public を持つ'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-09T12:11:23.709402+00:00'
+  - page: docs/_theme/_data/nav.project.yml
+    new: false
+    change: 上タブを docs/guide/ の分類から作る
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-09T12:11:23.709402+00:00'
+  - page: docs/_config.yml
+    new: true
+    change: exclude に internal の種類のフォルダと pr/・mock/・generated/ を記載する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-09T12:11:23.709402+00:00'
+  - page: CLAUDE.md
+    new: false
+    change: ドキュメントの場所の案内を docs/ と schemas/ にし、使い方のリンクを docs/guide/ にする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-09T12:11:23.709402+00:00'
+  - page: dev/テンプレート/README.md
+    new: false
+    change: Schema を schemas/ へ移し、削除する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-09T12:11:23.709402+00:00'
+  - page: dev/README.md
+    new: false
+    change: docs/ へまとめ、削除する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-09T12:11:23.709402+00:00'
+  - page: docs/guide/index.yaml
+    new: true
+    change: docs/はじめに/・使い方/・リファレンス/ の目次をまとめる
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-09T12:11:23.709402+00:00'
+  - page: docs/guide/はじめに.md
+    new: true
+    change: 分類のトップページ（使い方.md・リファレンス.md も同じ形で作る）
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-09T12:11:23.709402+00:00'
+  - page: docs/pr/3/README.md
+    new: true
+    change: マージ済みの PR ドキュメント dev/pr/3/・dev/pr/5/ を docs/pr/ へ移す（中身は変えない）
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-09T12:58:36.135537+00:00'
+scope_out:
+  - item: この PR の PR ドキュメント dev/pr/13/ の docs/pr/ への移動
+    reason: '稼働中のモニターは ai-monitor#3307 のマージまで dev/pr/ を参照し、移動は #3307 の反映作業『open の作業 PR の PR ドキュメントの移動』が行う。マージ済みの dev/pr/3/・dev/pr/5/ はこの PR で移す'
+    plan: none
+  - item: 設計書の中身（記述）の書き換え
+    reason: 要望は置き場所と公開範囲の持ち方の移し替えだけで、設計書に dev/ を指す記述も無い。ai-monitor#3307 の変換 v0.4.0.py と同じ形への書き換え（ARCH-1・NFR-1・TP-1）はこの PR で行う
+    plan: none

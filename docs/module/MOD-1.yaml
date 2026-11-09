@@ -1,0 +1,20 @@
+title: 索引のサーバー / パッケージ
+lead: 索引のサーバーの Python パッケージ `project_index` のファイルの並びと、パッケージ全体の決まり。
+directory: |-
+  ```tree
+  pyproject.toml          パッケージ project-index の定義・起動の入口・検査の設定
+  .python-version         Python のバージョンの固定
+  src/
+  └── project_index/
+      ├── __init__.py     パッケージの宣言
+      └── __main__.py     project-index コマンドの入口
+  tests/
+  └── unit/
+      └── project_index/
+          └── test_main.py  __main__.py の単体テスト
+  ```
+notes:
+  分類の追加: 文書の MCP・管理の MCP・読み取りAPI・問い合わせ・書き込み・配信元と権限・索引・会話記録・スクリプトの実行のコードと、それを動かす依存（FastAPI・MCP・ruamel.yaml・jsonschema）は、shuhei1101/dev-docs#114 で移すときに `src/project_index/` の下へ分類ごとに加える
+  バージョン: パッケージのバージョンは `pyproject.toml` の `version` が持ち、実行中はインストールしたパッケージのメタデータを参照する。リリースのバージョンは `version.ini` とタグが持ち、パッケージのバージョンとは統一しない
+id: MOD-1
+visibility: internal

@@ -1,0 +1,19 @@
+title: 非機能要件
+lead: 外部の制約から逆算した project-index の決定値。
+requirements:
+  - id: NFR-1
+    name: 対応 OS
+    category: 動作環境
+    external_constraint: 未確定
+    source_kind: 未確定
+    value: 未確定
+    rationale: 手元の端末で常駐させる OS（WSL を含む）は、起動と常駐の仕組みを決めるモジュール構成設計で決める
+  - id: NFR-2
+    name: 通信
+    category: 動作環境
+    external_constraint: 未確定
+    source_kind: 未確定
+    value: 未確定
+    rationale: 待ち受けを同じ端末に限るか、別の端末からの接続を受けるかは、読み取りAPI と文書の MCP のインターフェースを移す shuhei1101/dev-docs#114 で決める
+id: NFR-1
+visibility: internal

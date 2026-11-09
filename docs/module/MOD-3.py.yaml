@@ -1,0 +1,51 @@
+title: 索引のサーバー / パッケージ / __main__.py
+lead: project-index コマンドの入口。引数を解釈して終了コードを返却する。
+functions:
+  - name: main
+    title: コマンドの入口
+    kind: 関数
+    container: project_index/__main__.py
+    usecase: 共通
+    role: 入口
+    summary: project-index コマンドの引数を解釈し、終了コードを返却する
+    scope: public
+    args:
+      - name: argv
+        title: 引数
+        type: list[str] | None
+        required: false
+        default: None
+        passing: positional
+        description: コマンドの引数。`None` のときは `sys.argv[1:]`
+    returns:
+      type: int
+      description: 終了コード
+    process: |-
+      1. `argparse` で `--version` を受けるパーサーを作る。バージョンはインストールしたパッケージ `project-index` のメタデータを参照し、`project-index {バージョン}` で標準出力に出す
+      2. `argv` を解釈する
+         - `--version` の場合、バージョンを出して終了コード 0 で終わる（`argparse` が `SystemExit` を送出する）
+         - 知らない引数の場合、使い方を標準エラーに出して終了コード 2 で終わる（`argparse` が `SystemExit` を送出する）
+      3. 引数が無い場合、使い方を標準出力に出して 0 を返却する
+    unit_tests:
+      - name: test_main
+        case: 正常
+        summary: 引数が無いときは使い方を出す
+        condition: '`argv` に空のリストを渡す'
+        mock: なし
+        expected: '0 を返却し、標準出力が `usage: project-index` で始まる'
+      - name: test_main_when_version
+        case: 正常
+        summary: '`--version` でバージョンを出す'
+        condition: '`argv` に `["--version"]` を渡す'
+        mock: なし
+        expected: 終了コード 0 の `SystemExit` が送出され、標準出力が `project-index {インストールしたパッケージのバージョン}`
+      - name: test_main_when_unknown_argument
+        case: 異常
+        summary: 知らない引数で使い方の誤りにする
+        condition: '`argv` に `["--unknown"]` を渡す'
+        mock: なし
+        expected: '終了コード 2 の `SystemExit` が送出され、標準エラーに `unrecognized arguments: --unknown` が出る'
+id: MOD-3
+visibility: internal
+test_files:
+  - tests/unit/project_index/test_main.py

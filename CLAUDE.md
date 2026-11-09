@@ -4,8 +4,8 @@
 
 ## ドキュメント
 
-実体は開発ドキュメント [dev/](./dev/) と公開ドキュメント [docs/](./docs/) にある。
-使い方は [使い方](./docs/使い方/)。
+実体は [docs/](./docs/) にあり、Schema は [schemas/](./schemas/) にある。
+使い方は [guide](./docs/guide/)。
 
 着手前に索引を引いて読む。
 
