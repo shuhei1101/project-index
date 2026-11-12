@@ -1,0 +1,134 @@
+id: MOD-116
+title: 索引のサーバー / 検索
+lead: |-
+  `search_docs` の処理。条件の木で文書を絞り、並べ替え・集計・量の上限をかけて、指定した項目だけを返す。
+  語で探す部分（`match_words`・`snippet_lines`）は語での検索も使う。
+directory: |-
+  ```text
+  src/project_index/features/search/
+  ├─ __init__.py   # 公開する型と関数の再エクスポート
+  ├─ types.py      # Condition / Group / OrderKey / Snippets / LineRange / SearchRequest / MatchWordsRequest / MatchWordsResult / Snippet / SnippetLine / BodyRange / Heading / SearchItem / GroupCount / SearchResult
+  ├─ fields.py     # field_values / known_fields / heading_lines（項目の値・計算項目・使える項目・見出しの行）
+  ├─ filters.py    # check_filter / match_filter / match_words / compile_regex / parse_compare_value
+  ├─ snippets.py   # split_lines / find_snippets / count_matches / snippet_lines（行の分割・抜粋の検索・当たった行の数・一致した箇所の抜き出し）
+  ├─ body_parts.py # select_ranges / join_ranges（本文の切り出し）
+  ├─ cursor.py     # encode_cursor / decode_cursor
+  ├─ render.py     # render_search_markdown
+  ├─ terms.py      # list_match_words / render_match_words_markdown（用語の一覧）
+  └─ service.py    # search_docs
+  ```
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      文書の検索 ..> 読む場所の解決
+      文書の検索 ..> 文書を集める
+      文書の検索 ..> 条件の確かめ
+      文書の検索 ..> 条件の照合
+      文書の検索 ..> 続きの位置
+      文書の検索 ..> 文書の検査 : on read
+      文書の検索 ..> 会話の記録 : 返し済み
+      文書の検索 ..> 検索の結果 : 返す
+      条件の確かめ ..> 使える項目
+      条件の照合 ..> 項目の値
+      条件の照合 ..> 比べる値の解釈
+      条件の照合 ..> 正規表現の組み立て
+      条件の確かめ ..> 正規表現の組み立て
+      文書の検索 ..> 抜粋の検索
+      文書の検索 ..> 当たった行の数 : @matches
+      文書の検索 ..> 本文の範囲の選択 : sections・lines
+      文書の検索 ..> 範囲の本文
+      本文の範囲の選択 ..> 見出しの行
+      本文の範囲の選択 ..> 行の分割
+      抜粋の検索 ..> 行の分割
+      当たった行の数 ..> 行の分割
+      抜粋の検索 ..> 正規表現の組み立て
+      当たった行の数 ..> 正規表現の組み立て
+      一致した箇所の抜き出し ..> 抜粋の検索
+      検索の結果の Markdown ..> 検索の結果
+      class 文書の検索 {
+        <<function>>
+      }
+      class 読む場所の解決 {
+        <<function>>
+      }
+      class 文書を集める {
+        <<method>>
+      }
+      class 条件の確かめ {
+        <<function>>
+      }
+      class 条件の照合 {
+        <<function>>
+      }
+      class 使える項目 {
+        <<function>>
+      }
+      class 項目の値 {
+        <<function>>
+      }
+      class 比べる値の解釈 {
+        <<function>>
+      }
+      class 正規表現の組み立て {
+        <<function>>
+      }
+      class 抜粋の検索 {
+        <<function>>
+      }
+      class 当たった行の数 {
+        <<function>>
+      }
+      class 行の分割 {
+        <<function>>
+      }
+      class 見出しの行 {
+        <<function>>
+      }
+      class 本文の範囲の選択 {
+        <<function>>
+      }
+      class 範囲の本文 {
+        <<function>>
+      }
+      class 一致した箇所の抜き出し {
+        <<function>>
+      }
+      class 続きの位置 {
+        <<function>>
+      }
+      class 文書の検査 {
+        <<class>>
+      }
+      class 会話の記録 {
+        <<class>>
+      }
+      class 検索の結果 {
+        +総件数: int
+        +文書: list
+      }
+      class 検索の結果の Markdown {
+        <<function>>
+      }
+      click 文書の検索 href "./MOD-55.py.yaml#文書の検索"
+      click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
+      click 文書を集める href "./MOD-29.py.yaml#文書を集める"
+      click 条件の確かめ href "./MOD-53.py.yaml#条件の確かめ"
+      click 条件の照合 href "./MOD-53.py.yaml#条件の照合"
+      click 文書の検査 href "./MOD-75.py.yaml#文書の検査"
+      click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
+      click 検索の結果 href "./MOD-58.py.yaml#検索の結果"
+      click 使える項目 href "./MOD-52.py.yaml#使える項目"
+      click 項目の値 href "./MOD-52.py.yaml#項目の値"
+      click 比べる値の解釈 href "./MOD-53.py.yaml#比べる値の解釈"
+      click 正規表現の組み立て href "./MOD-53.py.yaml#正規表現の組み立て"
+      click 抜粋の検索 href "./MOD-56.py.yaml#抜粋の検索"
+      click 当たった行の数 href "./MOD-56.py.yaml#当たった行の数"
+      click 本文の範囲の選択 href "./MOD-50.py.yaml#本文の範囲の選択"
+      click 範囲の本文 href "./MOD-50.py.yaml#範囲の本文"
+      click 見出しの行 href "./MOD-52.py.yaml#見出しの行"
+      click 行の分割 href "./MOD-56.py.yaml#行の分割"
+      click 一致した箇所の抜き出し href "./MOD-56.py.yaml#一致した箇所の抜き出し"
+      click 検索の結果の Markdown href "./MOD-54.py.yaml#検索の結果の Markdown"
+      click 続きの位置 href "./MOD-51.py.yaml#続きの位置を作る"

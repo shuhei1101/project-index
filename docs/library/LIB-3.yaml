@@ -1,0 +1,34 @@
+id: LIB-3
+title: "uvicorn"
+kind: "ライブラリ"
+version:
+  current: 0.54.0
+  latest: 0.54.0
+  checked_on: '2026-10-27'
+  source: pyproject.toml・uv.lock
+  pinning: pyproject.toml に下限、uv.lock で固定
+catalogs:
+- name: API
+  version: 0.54.0
+  entries:
+  - name: Config
+    kind: クラス
+    purpose: 待ち受けのアドレス（`127.0.0.1`）とポート（`PROJECT_INDEX_PORT`）を渡す
+  - name: Server
+    kind: クラス
+    purpose: '`project-index serve` でアプリを待ち受ける'
+lead: Python の ASGI サーバー。ASGI アプリを HTTP で待ち受ける。
+purl: pkg:pypi/uvicorn
+dependency_scope: 必須
+adoption: 採用
+upstream: Kludex/uvicorn
+license: BSD-3-Clause
+official_url: https://www.uvicorn.org/
+docs_url: https://www.uvicorn.org/settings/
+verification:
+  state: 済
+  date: '2026-10-27'
+  detail: Python 3.14 で `uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=...))` で2 つの MCP と HTTP の API を載せた fastapi のアプリを待ち受け、HTTP と Streamable HTTP の MCP のリクエストに応答することを確かめた
+selection:
+  candidates: mcp の依存として入るため、他の ASGI サーバーとは比べていない。
+  decision: mcp 2.3.0 の依存で入り、追加の依存が無いため。

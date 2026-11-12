@@ -1,0 +1,141 @@
+id: MOD-47
+title: 索引のサーバー / 関連 / service.py
+lead: '`trace_related` の関連のたどりと関連の候補。'
+test_files:
+- tests/unit/project_index/features/related/test_service.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      関連のたどり ..> 読む場所の解決
+      関連のたどり ..> 文書を集める
+      関連のたどり ..> 関連をたどる
+      関連のたどり ..> 関連の候補
+      関連のたどり ..> 会話の記録 : 返し済み
+      class 関連のたどり {
+        <<function>>
+      }
+      class 読む場所の解決 {
+        <<function>>
+      }
+      class 文書を集める {
+        <<method>>
+      }
+      class 関連をたどる {
+        <<function>>
+      }
+      class 関連の候補 {
+        <<function>>
+      }
+      class 会話の記録 {
+        <<class>>
+      }
+      click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
+      click 文書を集める href "./MOD-29.py.yaml#文書のストア"
+      click 関連をたどる href "./MOD-45.py.yaml#関連をたどる"
+      click 関連の候補 href "./MOD-48.py.yaml#関連の候補"
+      click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
+functions:
+- name: trace_related
+  title: 関連のたどり
+  kind: 関数
+  container: project_index/features/related/service.py
+  usecase: 関連
+  role: サービス
+  summary: '`trace_related` の要求を処理して関連のたどりの結果を返す'
+  scope: public
+  thread_safe: true
+  side_effects: 名前・概要文を返した相手を会話の記録に残す
+  args:
+  - name: request
+    title: 関連のたどりの要求
+    type: RelatedRequest
+    required: true
+    passing: positional
+    description: ツールの引数
+  - name: registry
+    title: 配信元の一覧
+    type: SourceRegistry
+    required: true
+    passing: injected
+    description: 配信中の配信元
+  - name: store
+    title: 文書のストア
+    type: DocumentStore
+    required: true
+    passing: injected
+    description: 文書を読む
+  - name: seen
+    title: 会話の記録
+    type: SeenStore
+    required: true
+    passing: injected
+    description: 返し済みの省略・閲覧と編集
+  returns:
+    type: RelatedResult
+    description: 関連のたどりの結果
+  process: |-
+    1. `from_ids` と `code_paths` の両方がある・どちらも無い場合、`InvalidArgumentError`（`from_ids` か `code_paths` のどちらか 1 つを指定してください）を送る
+    2. `depth` が 1 未満なら `InvalidArgumentError`、`DEPTH_MAX` を超えれば丸めて `notes` で知らせる
+    3. 読む場所を解き（読む場所の解決。`outside_scope` を渡す）、文書を集めて ID の辞書にする
+    4. 起点を決める
+       - `from_ids` の場合、無い ID があれば近い候補を添えた `DocumentNotFoundError`
+       - `code_paths` の場合、正規化したパスと `body_path` が同じ文書。文書の無いパスがあれば `DocumentNotFoundError`（`missing` にパス）
+    5. 関連をたどる。別の配信元の文書は、その配信元を読む場所の解決（同じ `cwd`・`outside_scope`）で解き、ID で引く（`SourceNotReadableError` など解けないときは `None`）
+    6. `repeat_seen` が `False` なら、会話の記録.返し済み（`related`）に当たる相手の名前・概要文を `SEEN_MARK` にする
+       - `SEEN_MARK` にしなかった相手は、その文書を読んだ場所で `path` を文書の場所（文書のストア.文書の場所）にし、`path` があれば `scope` を `summary` にする
+    7. `suggest` なら、起点の `body_path`（無ければ `path`）で一緒に変わったファイル（Git の配信元だけ）と、会話の記録.閲覧と編集を引き、関連の候補を選ぶ（`exclude` は起点とたどった文書）
+    8. 名前・概要文を返した相手を会話の記録に `related` で残す
+    9. 起点か相手を作業範囲の外の場所で読んだら結果の `outside_scope` を `True` にして返す
+  exceptions:
+  - name: InvalidArgumentError
+    condition: 起点の指定の誤り・`depth` が 1 未満
+    message: '`from_ids か code_paths のどちらか 1 つを指定してください`'
+  - name: DocumentNotFoundError
+    condition: 無い起点
+    message: '`文書がありません: {id}`'
+  - name: SourceNotReadableError
+    condition: 読む場所の解決が送る
+    message: '`{id} はこの作業場所（{cwd}）から参照できません`'
+  unit_tests:
+  - name: test_trace_related
+    case: 正常
+    summary: 起点からたどる
+    condition: '文書 1 → 文書 2 → 文書 3、`from_ids: [doc-1]`'
+    mock: なし（一時フォルダの配信元）
+    expected: 文書 2（深さ 1、`via.from` が doc-1）と文書 3（深さ 2）。どちらも `path` が文書の絶対パス、`scope` が `summary`
+  - name: test_trace_related_when_code_paths
+    case: 正常
+    summary: コードのパスから
+    condition: '`records`・`body_file` の行で、`code_paths: [src/a.py]`'
+    mock: なし
+    expected: '`src/a.py` を本文に持つ文書を起点にたどる'
+  - name: test_trace_related_when_seen
+    case: 正常
+    summary: 返し済みの相手
+    condition: '同じ `session_id` で 2 回、3 回目は `repeat_seen: true`'
+    mock: なし
+    expected: 2 回目の名前・概要文が `SEEN_MARK` で `path`・`scope` が `None`、3 回目は名前
+  - name: test_trace_related_when_depth_over
+    case: 正常
+    summary: 深さの丸め
+    condition: '`depth: 5`'
+    mock: なし
+    expected: '`notes` に 4 に丸めたこと'
+  - name: test_trace_related_when_both_given
+    case: 異常
+    summary: 起点の指定の誤り
+    condition: '`from_ids` と `code_paths` の両方'
+    mock: なし
+    expected: '`InvalidArgumentError`'
+    exception: 起点の指定の誤り・`depth` が 1 未満
+  - name: test_trace_related_when_missing
+    case: 異常
+    summary: 無い起点
+    condition: '`from_ids: [doc-9]`'
+    mock: なし
+    expected: '`DocumentNotFoundError` の `candidates` に近い ID'
+    exception: 無い起点
+refs:
+- IF-3#

@@ -6,15 +6,145 @@ directory: |-
   .python-version         Python のバージョンの固定
   src/
   └── project_index/
-      ├── __init__.py     パッケージの宣言
-      └── __main__.py     project-index コマンドの入口
+      ├── features/
+      │   ├── access/
+      │   │   ├── service.py
+      │   │   └── types.py
+      │   ├── admin/
+      │   │   ├── render.py
+      │   │   ├── service.py
+      │   │   └── types.py
+      │   ├── changes/
+      │   │   ├── compare.py
+      │   │   ├── render.py
+      │   │   ├── service.py
+      │   │   └── types.py
+      │   ├── convert/
+      │   │   ├── decisions.py
+      │   │   ├── service.py
+      │   │   └── types.py
+      │   ├── describe/
+      │   │   ├── render.py
+      │   │   ├── service.py
+      │   │   ├── source_checks.py
+      │   │   ├── types.py
+      │   │   └── warnings.py
+      │   ├── documents/
+      │   │   ├── aliases.py
+      │   │   ├── fields.py
+      │   │   ├── indexable.py
+      │   │   ├── loader.py
+      │   │   ├── schema.py
+      │   │   ├── store.py
+      │   │   └── types.py
+      │   ├── history/
+      │   │   ├── query.py
+      │   │   ├── snapshot.py
+      │   │   └── types.py
+      │   ├── lifecycle/
+      │   │   ├── control.py
+      │   │   ├── types.py
+      │   │   └── update.py
+      │   ├── migrate/
+      │   │   ├── service.py
+      │   │   ├── steps.py
+      │   │   └── types.py
+      │   ├── prompt_doc/
+      │   │   ├── cli.py
+      │   │   ├── markdown.py
+      │   │   ├── render.py
+      │   │   ├── runtime.py
+      │   │   └── types.py
+      │   ├── read/
+      │   │   ├── nav.py
+      │   │   ├── paths.py
+      │   │   ├── route.py
+      │   │   ├── search.py
+      │   │   ├── service.py
+      │   │   └── types.py
+      │   ├── related/
+      │   │   ├── graph.py
+      │   │   ├── render.py
+      │   │   ├── service.py
+      │   │   ├── suggest.py
+      │   │   └── types.py
+      │   ├── search/
+      │   │   ├── body_parts.py
+      │   │   ├── cursor.py
+      │   │   ├── fields.py
+      │   │   ├── filters.py
+      │   │   ├── render.py
+      │   │   ├── service.py
+      │   │   ├── snippets.py
+      │   │   ├── terms.py
+      │   │   └── types.py
+      │   ├── seen/
+      │   │   ├── store.py
+      │   │   └── types.py
+      │   ├── session_start/
+      │   │   ├── route.py
+      │   │   ├── service.py
+      │   │   └── types.py
+      │   ├── settings/
+      │   │   ├── query.py
+      │   │   ├── route.py
+      │   │   ├── service.py
+      │   │   └── types.py
+      │   ├── sources/
+      │   │   ├── merge.py
+      │   │   ├── registry.py
+      │   │   ├── schema_ref.py
+      │   │   ├── service.py
+      │   │   └── types.py
+      │   ├── validation/
+      │   │   ├── markdown.py
+      │   │   ├── rules.py
+      │   │   ├── scripts.py
+      │   │   └── service.py
+      │   └── write/
+      │       ├── apply.py
+      │       ├── hints.py
+      │       ├── ids.py
+      │       ├── locks.py
+      │       ├── placement.py
+      │       ├── service.py
+      │       └── types.py
+      ├── integrations/
+      │   ├── git.py
+      │   ├── mdmark.py
+      │   └── scripts.py
+      ├── server/
+      │   ├── mcp/
+      │   │   ├── admin.py
+      │   │   ├── docs.py
+      │   │   └── result.py
+      │   ├── app.py
+      │   ├── error_handlers.py
+      │   ├── lifespan.py
+      │   └── origin.py
+      ├── shared/
+      │   ├── api_model.py
+      │   ├── errors.py
+      │   ├── files.py
+      │   ├── hashing.py
+      │   ├── paths.py
+      │   ├── schema_check.py
+      │   ├── version.py
+      │   └── yaml_io.py
+      ├── __init__.py
+      ├── __main__.py
+      └── main.py
   tests/
-  └── unit/
-      └── project_index/
-          └── test_main.py  __main__.py の単体テスト
+  ├── unit/
+  │   └── project_index/  src/project_index/ と同じ並びの単体テスト
+  ├── integration/
+  │   ├── server/         読み取り API・端末の設定の API・MCP の結合テスト
+  │   └── plugin/         プラグインのフックの結合テスト
+  └── e2e/                単一・複合ユースケースの E2E テスト
   ```
 notes:
-  分類の追加: 文書の MCP・管理の MCP・読み取りAPI・問い合わせ・書き込み・配信元と権限・索引・会話記録・スクリプトの実行のコードと、それを動かす依存（FastAPI・MCP・ruamel.yaml・jsonschema）は、shuhei1101/dev-docs#114 で移すときに `src/project_index/` の下へ分類ごとに加える
+  分類: 分類ごとのファイルの並びと決まりは、分類ごとの束ねる設計書（MOD-105〜MOD-122・MOD-127）が持つ
+  移した元: shuhei1101/dev-docs の `src/dev_docs/` のうち、文書の MCP・管理の MCP・配信元の読み込みと検査・`converters[]` の実行・端末の設定・読み取り API の分類を移した。スキーマ駆動の Markdown への変換と画面の API・画面の配信は dev-docs に残す
   バージョン: パッケージのバージョンは `pyproject.toml` の `version` が持ち、実行中はインストールしたパッケージのメタデータを参照する。リリースのバージョンは `version.ini` とタグが持ち、パッケージのバージョンとは統一しない
 id: MOD-1
 visibility: internal

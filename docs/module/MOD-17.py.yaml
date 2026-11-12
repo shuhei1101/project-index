@@ -1,0 +1,146 @@
+id: MOD-17
+title: 索引のサーバー / 変換 / service.py
+lead: '`converters[]` の実行と結果の控え。'
+test_files:
+- tests/unit/project_index/features/convert/test_service.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      変換 ..> スクリプトの実行 : converters[]
+      変換 ..> 変換の結果 : 返す
+      class 変換 {
+        +変換する(読み書きの場所, 文書) 変換の結果
+        +控えを捨てる() None
+      }
+      class スクリプトの実行 {
+        <<function>>
+      }
+      class 変換の結果 {
+        +Markdown: str
+      }
+      click スクリプトの実行 href "./MOD-88.py.yaml#スクリプトの実行"
+      click 変換の結果 href "./MOD-18.py.yaml#変換の結果"
+classes:
+- name: ConvertService
+  title: 変換
+  container: project_index/features/convert/service.py
+  usecase: 文書の取得
+  role: サービス
+  summary: 文書の種類が指す `converters[]` のスクリプトで、文書を Markdown にする
+  description: '`converters[]` の結果は (配信元, 種類, 変換の ID, 文書のバージョン, `run` の値のハッシュ, project-index のバージョン（動いているバージョン）) を名前にしたファイルで `{state_dir}/converted` に控え、同じ文書・バージョンは 1 回だけ変換する。`converters[]` の行の `cache` が `False` の変換は控えを読まず書かず、要求のたびにスクリプトを動かす。'
+  kind: クラス
+  properties:
+  - name: cache_dir
+    title: 控えの場所
+    type: Path
+    access: 公開
+    description: '`{state_dir}/converted`'
+  - name: store
+    title: 文書のストア
+    type: DocumentStore
+    access: 公開
+    description: 種類のスキーマを引く
+  - name: timeout_sec
+    title: 制限時間
+    type: float
+    access: 公開
+    description: 端末の設定の `script_timeout_sec`
+  methods:
+  - name: convert
+    title: 変換する
+    summary: '`converters[]` を指す種類の 1 件の文書を Markdown にする'
+    kind: メソッド
+    scope: public
+    thread_safe: true
+    side_effects: '`converters[]` のスクリプトを動かす。`cache_dir` に書く'
+    args:
+    - name: target
+      title: 読み書きの場所
+      type: Target
+      required: true
+      passing: positional
+      description: スクリプトを動かす場所とスキーマを読む場所
+    - name: document
+      title: 文書
+      type: Document
+      required: true
+      passing: positional
+      description: 変換する文書
+    returns:
+      type: Converted
+      description: Markdown か変換の失敗
+    process: |-
+      1. 文書の行を引く（`target.source.table(document.kind)`）
+         - 行が `converter` を持たない場合、`ConverterNotDefinedError` を送出する
+      2. 行（`target.source.script("converters", converter)`）の `cache` が `True` で `cache_dir` の控えがあればそれを使う。無ければスクリプトの実行（`cwd=target.base`・`stdin` に文書の YAML・制限時間 `timeout_sec`・`at`。`at` は `target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`））の標準出力を使い、`cache` が `True` なら一時ファイルから置き換えて控える。控えが `CONVERT_CACHE_KEEP` を超えたら古いものを消す。`cache` が `False` なら控えを書かない
+         - `ScriptTimeoutError`・`ScriptFailedError`・実行できない `ScriptError` の場合、`reason` が `timeout`・`exit`・`not_runnable` の `ConvertFailure` を返す
+      3. スクリプトの標準出力を `markdown` にした `Converted` を返す
+
+      スキーマ駆動の Markdown への変換は持たない（dev-docs の画面のサーバーが持つ）。
+    unit_tests:
+    - name: test_convert_service_convert_when_converter_not_defined
+      case: 異常
+      summary: converters[] を指さない種類を断る
+      condition: '`converter` の無い YAML の行の文書'
+      mock: なし（一時フォルダの配信元）
+      expected: '`ConverterNotDefinedError` で、スクリプトを動かさない'
+      exception: 種類が converters[] を指さない
+    - name: test_convert_service_convert_when_converter
+      case: 正常
+      summary: スクリプトで変換し、2 回目は控えを使う
+      condition: '`converters[]` を指す行の同じ文書を 2 回'
+      mock: '`run_script`（`# 変換した` を返し、呼ばれた数を数える）'
+      expected: 2 回とも `# 変換した` で、スクリプトは 1 回だけ呼ばれる
+    - name: test_convert_service_convert_when_cache_disabled
+      case: 正常
+      summary: 'cache: false の変換は毎回スクリプトを動かし、控えを書かない'
+      condition: '`cache: false` の `converters[]` を指す行の同じ文書を 2 回'
+      mock: '`run_script`（`# 変換した` を返し、呼ばれた数を数える）'
+      expected: 2 回とも `# 変換した` で、スクリプトは 2 回呼ばれ、`cache_dir` にファイルが無い
+    - name: test_convert_service_convert_when_project_index_updated
+      case: 正常
+      summary: project-index のバージョンが変わったら変換し直す
+      condition: '`converters[]` を指す行の同じ文書を、`RUNNING_VERSION` を `0.1.0` と `0.2.0` にして 1 回ずつ'
+      mock: '`run_script`（呼ばれた数を数える）、`monkeypatch` で `RUNNING_VERSION`'
+      expected: スクリプトが 2 回呼ばれる
+    - name: test_convert_service_convert_when_default_ref
+      case: 正常
+      summary: '`default_ref` のスクリプトで変換する'
+      condition: クローン本体が `master` を checkout し、`develop`（`default_ref`）の変換スクリプトだけが `# develop` を出す。`ref` に `default_ref` の commit を入れた場所で変換する
+      mock: なし（一時フォルダの Git の配信元）
+      expected: '`markdown` が `# develop` で、ディスクの `master` のスクリプトの出力でない'
+      exception: '-'
+    - name: test_convert_service_convert_when_timeout
+      case: 異常
+      summary: 制限時間を超える
+      condition: '`timeout_sec=1` で 5 秒眠るスクリプト'
+      mock: なし
+      expected: '`failure.reason` が `timeout`、`script` がスクリプトの `run`、`detail` に 1 秒'
+      exception: 制限時間を超えた
+    exceptions:
+    - name: ConverterNotDefinedError
+      condition: 文書の種類の行が `converter` を持たない
+      message: '`{種類}: converters[] を指していない種類です`'
+      notes: '`ProjectIndexError` の子'
+  - name: clear
+    title: 控えを捨てる
+    summary: '`cache_dir` の控えを全て消す'
+    kind: メソッド
+    scope: public
+    thread_safe: true
+    side_effects: '`cache_dir` のファイルを消す'
+    returns:
+      type: None
+      description: '-'
+    process: 1. `cache_dir` の下のファイルを削除する（起動の『配信元の読み直し』が呼ぶ）
+constants:
+- name: CONVERT_CACHE_KEEP
+  title: 変換の結果を残す数
+  container: project_index/features/convert/service.py
+  usecase: 文書の取得
+  summary: '`{state_dir}/converted` に残すファイルの数。超えたら更新日時が古いものから消す'
+  value: '2000'
+refs:
+- IF-25#

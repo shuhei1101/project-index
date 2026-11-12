@@ -1,0 +1,617 @@
+id: MOD-58
+title: 索引のサーバー / 検索 / types.py
+lead: '`search_docs`・用語の一覧の要求と結果の型。'
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      文書の検索 ..> 続きの位置
+      文書の検索 ..> 検索の結果 : 返す
+      検索の結果の Markdown ..> 検索の結果
+      class 文書の検索 {
+        <<function>>
+      }
+      class 続きの位置 {
+        <<function>>
+      }
+      class 検索の結果 {
+        +総件数: int
+        +文書: list
+      }
+      class 検索の結果の Markdown {
+        <<function>>
+      }
+      click 文書の検索 href "./MOD-55.py.yaml#文書の検索"
+      click 検索の結果の Markdown href "./MOD-54.py.yaml#検索の結果の Markdown"
+data_models:
+- name: Condition
+  title: 条件
+  container: project_index/features/search/types.py
+  usecase: 検索
+  role: DTO
+  summary: 1 つの項目を比べる条件
+  description: '`pydantic.BaseModel`（`extra="forbid"`）。MCP の入力スキーマもこのモデルから作る。'
+  properties:
+  - name: field
+    title: 項目
+    type: str
+    access: 公開
+    description: メタデータのキー・種類ごとの項目のパス・`body`・`*`・計算項目
+  - name: op
+    title: 比べ方
+    type: Literal['eq', 'ne', 'prefix', 'suffix', 'contains', 'not_contains', 'regex', 'glob', 'gt', 'gte', 'lt', 'lte', 'exists', 'not_exists']
+    access: 公開
+    description: 比べ方。`regex` は値の各行に適用する（`^`・`$` は各行の先頭・末尾。値全体の先頭・末尾は `\A`・`\Z`）。`glob` は値全体に適用し、`**` は `/` をまたぎ、`*`・`?` は `/` をまたがない
+    notes: 説明は `Field(description=...)` で入力のスキーマに出す
+  - name: values
+    title: 値
+    type: list[str]
+    access: 公開
+    default: '[]'
+    description: '比べる値。`exists`・`not_exists` 以外では 1 つ以上'
+  - name: match
+    title: 複数の値の扱い
+    type: Literal['any', 'all']
+    access: 公開
+    default: '"any"'
+    description: '`values` を OR か AND で比べる'
+  - name: case_sensitive
+    title: 区別するか
+    type: bool
+    access: 公開
+    default: 'False'
+    description: '`False` は NFKC と `casefold` をした後に比べる（`regex` はパターンに正規化をかけず、`re.IGNORECASE` と NFKC にした値で比べる）'
+- name: Group
+  title: 条件のまとまり
+  container: project_index/features/search/types.py
+  usecase: 検索
+  role: DTO
+  summary: 条件を AND・OR でまとめるか、否定する
+  description: '`pydantic.BaseModel`（`extra="forbid"`）。`and`・`or`・`not` のどれか 1 つだけを持つ（Python の属性は `all_of`・`any_of`・`not_`、別名が `and`・`or`・`not`）。#16 の画面の `nav` のタグの式も同じスキーマで書く。'
+  properties:
+  - name: all_of
+    title: AND
+    type: list[Condition | Group] | None
+    access: 公開
+    default: None
+    description: 別名 `and`
+  - name: any_of
+    title: OR
+    type: list[Condition | Group] | None
+    access: 公開
+    default: None
+    description: 別名 `or`
+  - name: not_
+    title: NOT
+    type: Condition | Group | None
+    access: 公開
+    default: None
+    description: 別名 `not`。中の条件か束に該当しない文書に該当する
+- name: OrderKey
+  title: 並べ替えのキー
+  container: project_index/features/search/types.py
+  usecase: 検索
+  role: DTO
+  summary: 並べ替えの 1 つのキー
+  description: '`pydantic.BaseModel`（`extra="forbid"`）。'
+  properties:
+  - name: field
+    title: 項目
+    type: str
+    access: 公開
+    description: 並べる項目
+  - name: direction
+    title: 向き
+    type: Literal['asc', 'desc']
+    access: 公開
+    default: '"asc"'
+    description: 昇順か降順
+- name: Snippets
+  title: 一致した箇所
+  container: project_index/features/search/types.py
+  usecase: 検索
+  role: DTO
+  summary: 本文の代わりに条件に該当した行と前後の行だけを行番号つきで返却する指定
+  description: '`pydantic.BaseModel`（`extra="forbid"`）。各項目の説明は `Field(description=...)` で入力のスキーマに出す。'
+  properties:
+  - name: context_lines
+    title: 前後の行数
+    type: int
+    access: 公開
+    default: '1'
+    description: '`before`・`after` を省いたときの前と後ろの行の数（0〜10）'
+  - name: max_per_doc
+    title: 1 件の箇所の数
+    type: int
+    access: 公開
+    default: '3'
+    description: 1 つの文書で返却する箇所の数（1〜20）
+  - name: before
+    title: 前の行数
+    type: int | None
+    access: 公開
+    default: None
+    description: 該当した行の前に返却する行の数（`Field(ge=0)`）。`None` は `context_lines`
+  - name: after
+    title: 後ろの行数
+    type: int | None
+    access: 公開
+    default: None
+    description: 該当した行の後ろに返却する行の数（`Field(ge=0)`）。`None` は `context_lines`
+- name: SearchRequest
+  title: 検索の要求
+  container: project_index/features/search/types.py
+  usecase: 検索
+  role: DTO
+  summary: '`search_docs` の引数'
+  description: '`pydantic.BaseModel`（`extra="forbid"`）。キーの意味と既定値はインターフェース定義『文書の検索』の `request`。`limit` と `max_chars` は丸めるので型だけを確かめる。'
+  properties:
+  - name: source
+    title: 配信元
+    type: str | list[str] | None
+    access: 公開
+    default: None
+    description: '`*` も受ける'
+  - name: ref
+    title: リビジョン
+    type: str | None
+    access: 公開
+    default: None
+    description: 読むリビジョン
+  - name: worktree
+    title: ワークツリー
+    type: str | None
+    access: 公開
+    default: None
+    description: 読むワークツリー
+  - name: filter
+    title: 条件
+    type: Condition | Group | None
+    access: 公開
+    default: None
+    description: 条件の木
+  - name: term
+    title: 用語
+    type: str | None
+    access: 公開
+    default: None
+    description: '`alias_type` を持つ行の文書のうち、`name` か `aliases` がこの単語に一致する文書だけに絞る'
+  - name: view
+    title: 返す量
+    type: Literal['ids', 'summary', 'full', 'count']
+    access: 公開
+    default: '"summary"'
+    description: 返す量
+  - name: fields
+    title: 加える項目
+    type: list[str]
+    access: 公開
+    default: '[]'
+    description: 返す項目に加える
+  - name: exclude_fields
+    title: 除く項目
+    type: list[str]
+    access: 公開
+    default: '[]'
+    description: 返す項目から除く
+  - name: order_by
+    title: 並べ替え
+    type: list[OrderKey] | None
+    access: 公開
+    default: None
+    description: 先のキーが優先。`None`（渡していない）は `id` の昇順
+  - name: group_by
+    title: 集計の項目
+    type: str | None
+    access: 公開
+    default: None
+    description: 値ごとの件数を返す
+  - name: limit
+    title: 件数
+    type: int
+    access: 公開
+    default: LIMIT_DEFAULT
+    description: 返す件数
+  - name: cursor
+    title: 続きの位置
+    type: str | None
+    access: 公開
+    default: None
+    description: 前回の `next_cursor`
+  - name: skip
+    title: 飛ばす件数
+    type: int
+    access: 公開
+    default: '0'
+    description: 先頭から飛ばす件数
+  - name: max_chars
+    title: 文字数
+    type: int
+    access: 公開
+    default: MAX_CHARS_DEFAULT
+    description: 結果全体の文字数の上限
+  - name: max_chars_per_field
+    title: 項目の文字数
+    type: int | None
+    access: 公開
+    default: None
+    description: '`None` は `view` で決める（`FIELD_CHARS_DEFAULT`・`FIELD_CHARS_FULL`）'
+  - name: snippets
+    title: 一致した箇所
+    type: Snippets | None
+    access: 公開
+    default: None
+    description: 一致した行の前後だけを返す
+  - name: repeat_seen
+    title: 返し済みも返す
+    type: bool
+    access: 公開
+    default: 'False'
+    description: '`True` で会話の記録の省略をしない'
+  - name: format
+    title: 形式
+    type: Literal['markdown', 'json']
+    access: 公開
+    default: '"markdown"'
+    description: 返却する形式
+  - name: cwd
+    title: 作業場所
+    type: str | None
+    access: 公開
+    default: None
+    description: フックが入れる
+  - name: outside_scope
+    title: 作業範囲の外も読むか
+    type: bool
+    access: 公開
+    default: 'False'
+    description: '`True` のとき、`scope` に該当しない配信元を `outside_read` が真なら作業範囲の外（参考）として参照する（`source` が ID 1 つのときだけ有効）'
+  - name: session_id
+    title: セッションの ID
+    type: str | None
+    access: 公開
+    default: None
+    description: フックが入れる
+  - name: agent_id
+    title: エージェントの ID
+    type: str | None
+    access: 公開
+    default: None
+    description: フックが入れる
+  - name: sections
+    title: 返す節
+    type: list[str] | None
+    access: 公開
+    default: None
+    description: 'Markdown の本文から返却するセクションの見出しの文字列。`view: full` のときだけ。`lines` と同時に指定できない'
+  - name: lines
+    title: 返す行
+    type: LineRange | None
+    access: 公開
+    default: None
+    description: '本文から返却する行の範囲。`view: full` のときだけ。`sections` と同時に指定できない'
+- name: SearchItem
+  title: 検索の結果の文書
+  container: project_index/features/search/types.py
+  usecase: 検索
+  role: DTO
+  summary: 返す 1 件の文書の項目
+  description: '`dataclass(frozen=True)`。'
+  properties:
+  - name: id
+    title: 文書の ID
+    type: str
+    access: 公開
+    description: 文書の ID
+  - name: source
+    title: 配信元
+    type: str | None
+    access: 公開
+    description: 複数の配信元を指したときだけ
+  - name: values
+    title: 項目
+    type: dict[str, Any]
+    access: 公開
+    description: 返す項目 → 値（長い文字列は末尾を切って `…（残り {n} 文字）` を付けたもの）。`body` は返し済みなら `SEEN_MARK`
+  - name: snippets
+    title: 一致した箇所
+    type: list[Snippet]
+    access: 公開
+    default: '[]'
+    description: '`snippets` を指定したときだけ'
+  - name: path
+    title: 文書の場所
+    type: str | None
+    access: 公開
+    default: None
+    description: '文書の場所（文書のストア.文書の場所）。`view: ids`・`count`、`ref` を渡した呼び出し、返し済みの文書では `None`'
+  - name: scope
+    title: 返した範囲
+    type: Literal['full', 'section', 'summary'] | None
+    access: 公開
+    default: None
+    description: '`path` が `None` のときは `None`'
+  - name: ranges
+    title: 切り出した範囲
+    type: list[BodyRange] | None
+    access: 公開
+    default: None
+    description: '`sections`・`lines` で切り出した本文の行の範囲。`sections`・`lines` を渡さない呼び出しでは `None`。切り出す範囲が無ければ空の配列'
+  - name: total_lines
+    title: 本文の行数
+    type: int | None
+    access: 公開
+    default: None
+    description: 本文の全体の行数（行の分割の数）。`ranges` と同じ条件で持つ
+- name: GroupCount
+  title: 集計の行
+  container: project_index/features/search/types.py
+  usecase: 検索
+  role: DTO
+  summary: '`group_by` の値ごとの件数'
+  description: '`dataclass(frozen=True)`。'
+  properties:
+  - name: value
+    title: 値
+    type: str
+    access: 公開
+    description: 項目の値。値が無い文書は `（なし）`
+  - name: count
+    title: 件数
+    type: int
+    access: 公開
+    description: その値を持つ文書の数
+- name: SearchResult
+  title: 検索の結果
+  container: project_index/features/search/types.py
+  usecase: 検索
+  role: DTO
+  summary: '`search_docs` が返すもの'
+  description: '`dataclass(frozen=True)`。JSON にするときは `None` と空の項目を落とす。'
+  properties:
+  - name: total_count
+    title: 総件数
+    type: int
+    access: 公開
+    description: 条件に当たった数
+  - name: per_source
+    title: 配信元ごとの件数
+    type: dict[str, int]
+    access: 公開
+    description: 複数の配信元を指したときだけ中身を持つ
+  - name: returned
+    title: 返した件数
+    type: int
+    access: 公開
+    description: '`items` の数'
+  - name: next_cursor
+    title: 続きの位置
+    type: str | None
+    access: 公開
+    description: 続きがあるときだけ
+  - name: truncated
+    title: 打ち切ったか
+    type: bool
+    access: 公開
+    description: '`max_chars` で打ち切ったか'
+  - name: notes
+    title: 知らせ
+    type: list[str]
+    access: 公開
+    description: 丸めた・打ち切った・読めなかったファイル・読み取りの検査の警告と次の手
+  - name: groups
+    title: 集計
+    type: list[GroupCount]
+    access: 公開
+    description: '`group_by` のときだけ。件数の降順・値の昇順'
+  - name: items
+    title: 文書
+    type: list[SearchItem]
+    access: 公開
+    description: '`view: count` では空'
+  - name: view
+    title: 返す量
+    type: str
+    access: 公開
+    description: 描き方を決めるために要求の `view` を持つ
+  - name: source_label
+    title: 配信元の表示
+    type: str
+    access: 公開
+    default: '""'
+    description: Markdown の先頭の行に出す、読んだ配信元の ID（複数なら `,` で繋ぐ）。JSON には出さない
+  - name: outside_scope
+    title: 作業範囲の外から読んだか
+    type: bool
+    access: 公開
+    default: 'False'
+    description: 読んだ場所のどれかの `outside_scope` が `True`
+- name: SnippetLine
+  title: 抜粋の行
+  container: project_index/features/search/types.py
+  usecase: 検索
+  role: DTO
+  summary: 抜粋の 1 行
+  description: '`dataclass(frozen=True)`。'
+  properties:
+  - name: line
+    title: 行番号
+    type: int
+    access: 公開
+    description: 本文の行番号（1 始まり）
+  - name: text
+    title: 行
+    type: str
+    access: 公開
+    description: 行の文字列（改行を含まない）
+  - name: hit
+    title: 当たった行か
+    type: bool
+    access: 公開
+    description: '`False` は前後の行'
+- name: Snippet
+  title: 抜粋
+  container: project_index/features/search/types.py
+  usecase: 検索
+  role: DTO
+  summary: 重なる範囲をまとめた 1 つの抜粋
+  description: '`dataclass(frozen=True)`。'
+  properties:
+  - name: lines
+    title: 行
+    type: list[SnippetLine]
+    access: 公開
+    description: 本文の順の行
+- name: LineRange
+  title: 行の範囲の指定
+  container: project_index/features/search/types.py
+  usecase: 検索
+  role: DTO
+  summary: 本文から返却する行の範囲（`lines` の引数）
+  description: '`pydantic.BaseModel`（`extra="forbid"`）。1 未満の値は要求のモデルの検証で断る（`InvalidArgumentError: 引数が正しくありません` と `lines.offset` などのパス）。'
+  properties:
+  - name: offset
+    title: 最初の行
+    type: int
+    access: 公開
+    default: '1'
+    description: 返却する最初の行の行番号（1 始まり）。`Field(ge=1)`
+  - name: limit
+    title: 行の数
+    type: int | None
+    access: 公開
+    default: None
+    description: 返却する行の数。`None` は本文の末尾まで。`Field(ge=1)`
+  status: planned
+- name: BodyRange
+  title: 本文の範囲
+  container: project_index/features/search/types.py
+  usecase: 検索
+  role: DTO
+  summary: 本文の行の範囲 1 つ
+  description: '`dataclass(frozen=True)`。'
+  properties:
+  - name: start_line
+    title: 最初の行
+    type: int
+    access: 公開
+    description: 本文の行番号（1 始まり）
+  - name: end_line
+    title: 最後の行
+    type: int
+    access: 公開
+    description: 本文の行番号（1 始まり、この行を含む）
+  status: planned
+- name: Heading
+  title: 見出しの行
+  container: project_index/features/search/types.py
+  usecase: 検索
+  role: DTO
+  summary: Markdown の本文の見出し 1 つ
+  description: '`dataclass(frozen=True)`。'
+  properties:
+  - name: line
+    title: 行番号
+    type: int
+    access: 公開
+    description: 本文の行番号（1 始まり）
+  - name: level
+    title: 階層
+    type: int
+    access: 公開
+    description: '`#` の数（1〜6）'
+  - name: text
+    title: 見出しの文字列
+    type: str
+    access: 公開
+    description: '`#` と前後の空白、末尾の閉じの `#` を除いた文字列'
+  status: planned
+- name: MatchWordsRequest
+  title: 用語の一覧の要求
+  container: project_index/features/search/types.py
+  usecase: 用語の一覧
+  role: DTO
+  summary: '`list_match_words` の引数'
+  description: '`pydantic.BaseModel`（`extra="forbid"`）。キーの意味と既定値はインターフェース定義『用語の一覧』の `request`。'
+  properties:
+  - name: source
+    title: 配信元
+    type: str
+    access: 公開
+    description: 配信元の ID
+  - name: worktree
+    title: ワークツリー
+    type: str | None
+    access: 公開
+    default: None
+    description: 読むワークツリー
+  - name: format
+    title: 形式
+    type: Literal['markdown', 'json']
+    access: 公開
+    default: '"markdown"'
+    description: 返却する形式
+  - name: cwd
+    title: 作業場所
+    type: str | None
+    access: 公開
+    default: None
+    description: フックが入れる
+- name: MatchWordsResult
+  title: 用語の一覧の結果
+  container: project_index/features/search/types.py
+  usecase: 用語の一覧
+  role: DTO
+  summary: 照合する語の並び
+  description: '`dataclass(frozen=True, slots=True, kw_only=True)`。'
+  properties:
+  - name: words
+    title: 語
+    type: list[MatchWord]
+    access: 公開
+    default: '[]'
+    description: 照合する語の一覧の結果
+constants:
+- name: LIMIT_DEFAULT
+  title: 件数の既定
+  container: project_index/features/search/types.py
+  usecase: 検索
+  summary: '`limit` を省いたときの件数'
+  value: '20'
+- name: LIMIT_MAX
+  title: 件数の上限
+  container: project_index/features/search/types.py
+  usecase: 検索
+  summary: '`limit` の上限。超えた値は丸めて `notes` で知らせる'
+  value: '100'
+- name: MAX_CHARS_DEFAULT
+  title: 文字数の既定
+  container: project_index/features/search/types.py
+  usecase: 検索
+  summary: '`max_chars` を省いたときの結果全体の文字数'
+  value: '20000'
+- name: MAX_CHARS_LIMIT
+  title: 文字数の上限
+  container: project_index/features/search/types.py
+  usecase: 検索
+  summary: '`max_chars` の上限。超えた値は丸めて `notes` で知らせる'
+  value: '40000'
+- name: FIELD_CHARS_DEFAULT
+  title: 項目の文字数の既定
+  container: project_index/features/search/types.py
+  usecase: 検索
+  summary: '`max_chars_per_field` を省いたときの 1 項目の文字数'
+  value: '2000'
+- name: FIELD_CHARS_FULL
+  title: 本文込みの項目の文字数の既定
+  container: project_index/features/search/types.py
+  usecase: 検索
+  summary: '`view: full` で `max_chars_per_field` を省いたときの 1 項目の文字数'
+  value: '10000'
+- name: SUMMARY_FIELDS
+  title: 一覧の項目
+  container: project_index/features/search/types.py
+  usecase: 検索
+  summary: '`view: summary` で返す項目（`id`・`source` の後ろに並べる）'
+  value: '("kind", "name", "description", "@chars", "version")'

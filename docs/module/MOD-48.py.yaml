@@ -1,0 +1,99 @@
+id: MOD-48
+title: 索引のサーバー / 関連 / suggest.py
+lead: 関連の候補の提案。
+test_files:
+- tests/unit/project_index/features/related/test_suggest.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      関連のたどり ..> 関連の候補
+      関連の候補 ..> 一緒に変わったファイル
+      関連の候補 ..> 会話の記録 : 閲覧と編集
+      class 関連のたどり {
+        <<function>>
+      }
+      class 関連の候補 {
+        <<function>>
+      }
+      class 一緒に変わったファイル {
+        <<function>>
+      }
+      class 会話の記録 {
+        <<class>>
+      }
+      click 関連のたどり href "./MOD-47.py.yaml#関連のたどり"
+      click 一緒に変わったファイル href "./MOD-31.py.yaml#一緒に変わったファイル"
+      click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
+constants:
+- name: SIGNAL_WEIGHTS
+  title: 信号の重み
+  container: project_index/features/related/suggest.py
+  usecase: 関連
+  summary: 候補の順位の値に足す信号ごとの重み
+  entries:
+  - key: co_change
+    value: '1.0'
+    description: 起点と同じ commit で変わった回数を、最も多い候補を 1 にそろえた値に掛ける
+  - key: edited
+    value: '0.6'
+    description: この会話で編集した
+  - key: viewed
+    value: '0.3'
+    description: この会話で本文を返した
+functions:
+- name: suggest_related
+  title: 関連の候補
+  kind: 関数
+  container: project_index/features/related/suggest.py
+  usecase: 関連
+  role: 判定
+  summary: 同じ commit での変更と、この会話の編集・閲覧から関連の候補を選ぶ
+  scope: public
+  thread_safe: true
+  args:
+  - name: start
+    title: 起点
+    type: Sequence[Document]
+    required: true
+    passing: positional
+    description: 起点の文書
+  - name: documents
+    title: 配信元の文書
+    type: Sequence[Document]
+    required: true
+    passing: positional
+    description: 起点の配信元の文書
+  - name: exclude
+    title: 除く文書
+    type: Collection[str]
+    required: true
+    passing: keyword
+    description: 起点と、`related` で既に繋がる文書の ID
+  - name: co_changed
+    title: 一緒に変わったファイル
+    type: Mapping[str, int]
+    required: true
+    passing: keyword
+    description: 履歴の一緒に変わったファイルの結果（Git 管理外は空）
+  - name: activity
+    title: 閲覧と編集
+    type: Sequence[Activity]
+    required: true
+    passing: keyword
+    description: 会話の記録.閲覧と編集の結果
+  returns:
+    type: list[Suggestion]
+    description: 順位の値の降順・ID の昇順で `SUGGEST_COUNT` 件まで
+  process: |-
+    1. 一緒に変わったファイルを、`body_path`（無ければ `path`）がそのファイルの文書に結び付け、回数を最大の回数で割った値に `co_change` の重みを掛ける
+    2. 閲覧と編集の文書に `edited`・`viewed` の重みを足す
+    3. `exclude` の文書を除き、上位を返す
+  unit_tests:
+  - name: test_suggest_related
+    case: 正常
+    summary: 信号の和と除く文書
+    condition: 文書 4 が 2 回一緒に変わり、文書 5 を閲覧、文書 2 は `exclude`、文書 2 も一緒に変わった
+    mock: なし
+    expected: 文書 4（`co_change`、1.0）・文書 5（`viewed`、0.3）の順で、文書 2 は無い

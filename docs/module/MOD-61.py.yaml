@@ -1,0 +1,65 @@
+id: MOD-61
+title: 索引のサーバー / セッションの開始 / route.py
+lead: '`POST /_admin/session-start` のルート。読み取り API のスキーマ（`/_api/openapi.json`）に載せない。'
+test_files:
+- tests/unit/project_index/features/session_start/test_route.py
+functions:
+- name: build_session_start_router
+  title: セッションの開始のルーター
+  kind: 関数
+  container: project_index/features/session_start/route.py
+  usecase: セッションの開始
+  role: ルート
+  summary: '`POST /_admin/session-start` を持つルーターを作る'
+  description: |-
+    フックは Origin も Sec-Fetch-Site も送信しないため `require_same_origin` を掛けない。本文は `application/json` だけを受けるので、別のオリジンの画面からの要求は CORS の事前の問い合わせで止まる。
+    既存のハンドラーは `RequestValidationError` を 400 にするため、本文は `dict` で受け、検証の失敗を `ValidationFailedError`（422）で返す。
+    配信元を使わないため、配信元の読み込みを待たずに答える。
+  scope: public
+  is_async: false
+  thread_safe: true
+  args:
+  - name: handlers
+    title: 部品
+    type: Handlers
+    required: true
+    passing: positional
+    description: 起動時に作った部品
+  returns:
+    type: APIRouter
+    description: '`POST /_admin/session-start`（`include_in_schema=False`）を持つルーター'
+  process: |-
+    1. `POST /_admin/session-start` を登録する
+    2. 要求ごとに、本文を `SessionStartRequest.model_validate` で検証する
+       - 検証に失敗した場合、違反を `{キー}: {理由}` にして `ValidationFailedError` を送出する
+    3. 記録を削除し、応答にする（セッションの開始、`asyncio.to_thread`）
+  exceptions:
+  - name: ValidationFailedError
+    condition: '`session_id`・`reason` が無い、型が違う、`reason` が選択肢の外'
+    message: '`セッションの開始の入力に違反が {件数} 件あります`'
+  unit_tests:
+  - name: test_build_session_start_router
+    case: 正常
+    summary: 本文を検証して記録を削除する
+    condition: '`{"session_id": "s1", "reason": "clear"}` を `TestClient` で送信する'
+    mock: なし（一時ディレクトリの部品）
+    expected: 200 で `forgotten` が `true`
+  - name: test_build_session_start_router_when_invalid
+    case: 異常
+    summary: 入力の違反を 422 で返す
+    condition: '`reason` が `unknown`'
+    mock: なし
+    expected: 422 の Problem Details で `reason` の違反を含む
+    exception: 入力の違反
+  - name: test_build_session_start_router_when_schema
+    case: 正常
+    summary: 読み取り API のスキーマに載らない
+    condition: '`/_api/openapi.json` を取得する'
+    mock: なし
+    expected: '`paths` に `/_admin/session-start` が無い'
+  callers:
+  - MOD-90#functions[build_app]
+  callees:
+  - MOD-62#functions[start_session]
+refs:
+- IF-21#

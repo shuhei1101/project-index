@@ -1,0 +1,270 @@
+id: MOD-72
+title: 索引のサーバー / 検査 / markdown.py
+lead: スキーマで Markdown と宣言したキーのうち操作で変えた値を mdmark の点検に通し、描画時の書き方の警告を違反にする。
+test_files:
+- tests/unit/project_index/features/validation/test_markdown.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      Markdownの値の点検 ..> 変えたMarkdownの値
+      Markdownの値の点検 ..> Markdownの点検 : 値ごと
+      Markdownの値の点検 ..> Markdownの点検の結果 : 返す
+      変えたMarkdownの値 ..> Markdownの値
+      Markdownの点検の結果 ..> 点検できなかったキー
+      Markdownの点検の結果 ..> 違反
+      class Markdownの値の点検 {
+        <<function>>
+      }
+      class 変えたMarkdownの値 {
+        <<function>>
+      }
+      class Markdownの値 {
+        <<function>>
+      }
+      class Markdownの点検 {
+        <<function>>
+      }
+      class Markdownの点検の結果 {
+        <<dataclass>>
+      }
+      class 点検できなかったキー {
+        <<dataclass>>
+      }
+      class 違反 {
+        <<dataclass>>
+      }
+      click Markdownの点検 href "./MOD-87.py.yaml#Markdownの点検"
+      click 違反 href "./MOD-98.py.yaml#違反"
+data_models:
+- name: UncheckedKey
+  title: 点検できなかったキー
+  container: project_index/features/validation/markdown.py
+  usecase: 書き込み
+  role: DTO
+  summary: mdmark で点検できなかった Markdown のキーと理由
+  description: '`@dataclass(frozen=True, slots=True, kw_only=True)`。`write_docs` の `results[].unchecked` の要素になる。'
+  properties:
+  - name: path
+    title: 項目のパス
+    type: str
+    access: 公開
+    description: '`body`・`items[0].body` の形'
+  - name: reason
+    title: 理由
+    type: str
+    access: 公開
+    description: '`MdmarkUnavailableError.reason`'
+- name: MarkdownCheck
+  title: Markdownの点検の結果
+  container: project_index/features/validation/markdown.py
+  usecase: 書き込み
+  role: DTO
+  summary: 文書 1 件の Markdown の値の点検の違反と、点検できなかったキー
+  description: '`@dataclass(frozen=True, slots=True, kw_only=True)`。'
+  properties:
+  - name: violations
+    title: 違反
+    type: list[Violation]
+    access: 公開
+    description: 描画時の書き方の警告。並びは値のパスの順、同じ値の中は mdmark の出した順
+  - name: unchecked
+    title: 点検できなかったキー
+    type: list[UncheckedKey]
+    access: 公開
+    description: 値のパスの順
+  - name: stopped
+    title: 止めた理由
+    type: str | None
+    access: 公開
+    default: None
+    description: CLI が無い・制限時間を超えたときの理由。同じ書き込みの後の文書へ渡し、mdmark を呼ばずに点検できなかったキーにする
+constants:
+- name: MARKDOWN_MEDIA_TYPE
+  title: Markdownのメディアタイプ
+  container: project_index/features/validation/markdown.py
+  usecase: 書き込み
+  summary: スキーマの `contentMediaType` で Markdown を表す値
+  value: '"text/markdown"'
+- name: BLOCKING_KINDS
+  title: 書き込みを止める種類
+  container: project_index/features/validation/markdown.py
+  usecase: 書き込み
+  summary: 違反にする mdmark の種類（描画時の書き方の警告）
+  value: 'frozenset({"diagram_invalid", "syntax_warning"})'
+- name: MEDIA_TYPE_KEYWORD
+  title: メディアタイプのキーワード
+  container: project_index/features/validation/markdown.py
+  usecase: 書き込み
+  summary: 処理を差し替える JSON Schema のキーワードと、目印の誤りの `validator` の値
+  value: '"contentMediaType"'
+functions:
+- name: markdown_values
+  title: Markdownの値
+  kind: 関数
+  container: project_index/features/validation/markdown.py
+  usecase: 書き込み
+  role: 変換
+  summary: 文書の内容のうち、スキーマで `contentMediaType` が `MARKDOWN_MEDIA_TYPE` の文字列の値を項目のパスごとに返す
+  scope: public
+  thread_safe: true
+  args:
+  - name: data
+    title: 文書の内容
+    type: Mapping[str, Any]
+    required: true
+    passing: positional
+    description: 文書の内容（`records` の行は要素 1 つ）
+  - name: schema
+    title: スキーマ
+    type: Mapping[str, Any]
+    required: true
+    passing: positional
+    description: 文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）
+  returns:
+    type: dict[str, str]
+    description: 項目のパス（項目のパスへの変換の形）→ 値
+  process: |-
+    1. `schema` が空なら空の辞書を返す
+    2. 『スキーマの検査』と同じ検査器のクラス（`validator_for`、既定は Draft 2020-12）を、`contentMediaType` の処理を「値が `MARKDOWN_MEDIA_TYPE` で、当たった値が `str` なら目印の `ValidationError` を 1 つ出す」に差し替えて作る（`jsonschema.validators.extend`）
+       - `$ref`・`properties`・`items`・`allOf` をたどるのは jsonschema に任せる
+    3. 検査器の `iter_errors(data)` を最後まで回し、`validator` が `contentMediaType` の誤りの `absolute_path` を項目のパスへの変換で項目のパスにし、`instance` を値にして返す。`anyOf`・`oneOf` などにまとめられた誤りは `context` の中を再帰してたどる（ほかの誤りは捨てる）
+  unit_tests:
+  - name: test_markdown_values
+    case: 正常
+    summary: 入れ子と配列と参照をたどる
+    condition: '`properties.body` が `{"$ref": "#/$defs/md"}`（`$defs.md` が `{type: string, contentMediaType: text/markdown}`）、`properties.items.items.properties.note` が同じ参照、`properties.name` が `contentMediaType` を持たない文字列。値 `{body: a, items: [{note: b}], name: c}`'
+    mock: なし
+    expected: '`{"body": "a", "items[0].note": "b"}`'
+  - name: test_markdown_values_when_any_of
+    case: 正常
+    summary: anyOf の中のキー
+    condition: '`properties.body` が `{anyOf: [{type: string, contentMediaType: text/markdown}, {type: "null"}]}`、値 `{body: a}`'
+    mock: なし
+    expected: '`{"body": "a"}`'
+  - name: test_markdown_values_when_not_string
+    case: 正常
+    summary: 文字列でない値と無い値
+    condition: '`body` が `contentMediaType: text/markdown` で、値 `{body: 1}` と `{}`'
+    mock: なし
+    expected: どちらも `{}`
+- name: changed_markdown
+  title: 変えたMarkdownの値
+  kind: 関数
+  container: project_index/features/validation/markdown.py
+  usecase: 書き込み
+  role: 変換
+  summary: 操作の前と値が違う Markdown のキーの値を返す
+  scope: public
+  thread_safe: true
+  args:
+  - name: data
+    title: 操作の後の内容
+    type: Mapping[str, Any]
+    required: true
+    passing: positional
+    description: 書こうとしている文書の内容
+  - name: previous
+    title: 操作の前の内容
+    type: Mapping[str, Any] | None
+    required: true
+    passing: positional
+    description: '`create` は `None`'
+  - name: schema
+    title: スキーマ
+    type: Mapping[str, Any]
+    required: true
+    passing: positional
+    description: 文書に当てるスキーマ
+  returns:
+    type: dict[str, str]
+    description: 項目のパス → 値。項目のパスの順
+  process: |-
+    1. `data` の Markdown の値（Markdownの値）を引く
+    2. `previous` が `None` でなければ、`previous` の Markdown の値を引き、同じパスに同じ値があるものを除く
+    3. 項目のパスの順に並べて返す
+  unit_tests:
+  - name: test_changed_markdown
+    case: 正常
+    summary: 変えた値だけ
+    condition: '`body`・`lead` が Markdown のキーで、前 `{body: a, lead: x}`、後 `{body: b, lead: x}`'
+    mock: なし
+    expected: '`{"body": "b"}`'
+  - name: test_changed_markdown_when_create
+    case: 正常
+    summary: 新しい文書
+    condition: '`previous` が `None`、後 `{body: b, lead: x}`'
+    mock: なし
+    expected: '`{"body": "b", "lead": "x"}`'
+- name: check_markdown_values
+  title: Markdownの値の点検
+  kind: 関数
+  container: project_index/features/validation/markdown.py
+  usecase: 書き込み
+  role: 検証
+  summary: 値ごとに mdmark の点検を通し、描画時の書き方の警告を違反に、点検できなかった値を点検できなかったキーにする
+  scope: public
+  thread_safe: true
+  side_effects: mdmark の CLI を値ごとに起動する
+  args:
+  - name: values
+    title: 点検する値
+    type: Mapping[str, str]
+    required: true
+    passing: positional
+    description: 項目のパス → 値（変えたMarkdownの値）
+  - name: cwd
+    title: 実行する場所
+    type: Path
+    required: true
+    passing: keyword
+    description: '`target.base`'
+  - name: timeout_sec
+    title: 制限時間
+    type: float
+    required: true
+    passing: keyword
+    description: 端末の設定の `script_timeout_sec`
+  - name: stopped
+    title: 止めた理由
+    type: str | None
+    required: false
+    default: None
+    passing: keyword
+    description: 同じ書き込みの前の文書の `MarkdownCheck.stopped`
+  returns:
+    type: MarkdownCheck
+    description: 違反・点検できなかったキー・止めた理由
+  process: |-
+    1. `values` を順に回す
+       - `stopped` がある場合、mdmark を呼ばずに（パス, `stopped`）を点検できなかったキーにする
+       - Markdownの点検（`cwd`・`timeout_sec`）を呼び、種類が `BLOCKING_KINDS` のずれを、`path` がそのパス、`rule` が `mdmark の {種類}（{行} 行目）`、`fix` が内容の違反にする。ほかの種類のずれは捨てる
+       - `MdmarkUnavailableError` の場合、（パス, `reason`）を点検できなかったキーにする。`continuable` が `False` なら `stopped` を `reason` にする
+         - `[info]` mdmark で点検できなかった（パス・理由）
+    2. 違反・点検できなかったキー・`stopped` を返す
+  unit_tests:
+  - name: test_check_markdown_values
+    case: 正常
+    summary: 書き方の警告だけを違反にする
+    condition: '`{body: x}`。Markdownの点検が `diagram_invalid`（3 行目・A）と `unknown_mark`（1 行目・B）を返す'
+    mock: '`check_markdown`'
+    expected: '`violations` が `[Violation(path="body", rule="mdmark の diagram_invalid（3 行目）", fix="A")]`、`unchecked` が空、`stopped` が `None`'
+  - name: test_check_markdown_values_when_missing
+    case: 正常
+    summary: CLI が無いと残りを呼ばない
+    condition: '`{a: x, b: y}`。1 回目の Markdownの点検が `MdmarkUnavailableError`（`continuable=False`・理由 R）'
+    mock: '`check_markdown`（呼ばれた数を数える）'
+    expected: '`unchecked` が `a`・`b`（理由 R）、`stopped` が R、`check_markdown` は 1 回だけ'
+  - name: test_check_markdown_values_when_continuable
+    case: 正常
+    summary: 1 つの値だけ結果を出さない
+    condition: '`{a: x, b: y}`。`a` の点検だけが `MdmarkUnavailableError`（`continuable=True`）'
+    mock: '`check_markdown`'
+    expected: '`unchecked` が `a` だけ、`stopped` が `None`、`check_markdown` は 2 回'
+  - name: test_check_markdown_values_when_stopped
+    case: 正常
+    summary: 前の文書で止めた
+    condition: '`stopped` に R、`{a: x}`'
+    mock: '`check_markdown`'
+    expected: '`unchecked` が `a`（理由 R）、`check_markdown` は呼ばれない'

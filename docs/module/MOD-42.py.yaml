@@ -1,0 +1,356 @@
+id: MOD-42
+title: 索引のサーバー / プロンプトの文書の変換 / render.py
+lead: プロンプトの部品を Jinja2 で描画する。変数の値にパスを持たせて描画し、描画結果の値を区切りで囲む。
+test_files:
+- tests/unit/project_index/features/prompt_doc/test_render.py
+data_models:
+- name: TracedStr
+  title: パス付きの文字列
+  container: project_index/features/prompt_doc/render.py
+  usecase: プロンプトの文書の変換
+  role: 値オブジェクト
+  summary: 変数のパスを持つ `str`
+  description: '`str` を継承し `path` を持つ。比較・フィルターは `str` と同じに動き、`{{ }}` の出力だけを描画の環境の `finalize` が区切りで囲む。同じ形で `int` を継承する `TracedInt`、`float` を継承する `TracedFloat` を持つ（`bool` は継承できないため囲まない）。'
+  inherits: str
+  properties:
+  - name: path
+    title: パス
+    type: str
+    description: 変数の表と同じパス（`traits[].name` など）
+- name: CompiledPart
+  title: 部品のテンプレート
+  container: project_index/features/prompt_doc/render.py
+  usecase: プロンプトの文書の変換
+  role: DTO
+  summary: 部品 1 件の `when` と言語ごとの本文のテンプレート
+  description: '`dataclass(frozen=True, slots=True, kw_only=True)`。'
+  properties:
+  - name: part
+    title: 部品
+    type: PromptPart
+    description: 元の部品
+  - name: when
+    title: 使う条件
+    type: jinja2.environment.TemplateExpression | None
+    description: '`part.when`（`{{ }}` で囲んだ場合は外した式）を `env.compile_expression` したもの。`when` が無ければ `None`'
+  - name: texts
+    title: 本文
+    type: dict[str, jinja2.Template]
+    description: 言語 → `env.from_string(text)`
+constants:
+- name: ROLES
+  title: 役割の並び
+  container: project_index/features/prompt_doc/render.py
+  usecase: プロンプトの文書の変換
+  summary: '`kind: llm` のメッセージを並べる順'
+  value: ("system", "user", "assistant")
+- name: HOOK_TEXT_WARN_CHARS
+  title: フックの注入文の字数の注意
+  container: project_index/features/prompt_doc/render.py
+  usecase: プロンプトの文書の変換
+  summary: '`kind: hook` で描画した結果がこの字数を超えた組に `[!WARNING]` を出す'
+  value: '1000'
+- name: VALUE_MARK_PATTERN
+  title: 値の区切り
+  container: project_index/features/prompt_doc/render.py
+  usecase: プロンプトの文書の変換
+  summary: 描画結果の変数の値を囲む区切り（私用領域の文字 `` パス `` 値 ``）に当てる正規表現
+  value: re.compile("(?P<path>[^]*)(?P<value>[^]*)")
+- name: LLM_PART_SEPARATOR
+  title: 役割の本文の区切り
+  container: project_index/features/prompt_doc/render.py
+  usecase: プロンプトの文書の変換
+  summary: '`kind: llm` で同じ役割の部品の本文をつなぐ区切り'
+  value: '"\n\n"'
+- name: FLOW_QUOTE_PATTERN
+  title: フロー形式で引用符が要る文字
+  container: project_index/features/prompt_doc/render.py
+  usecase: プロンプトの文書の変換
+  summary: フローの区切り・コメント・キーの区切り・前後の空白・改行に当てる正規表現
+  value: 're.compile(r"[,\[\]{}#\n]|: |:$|^\s|\s$")'
+functions:
+- name: flatten_vars
+  title: 変数のパスの展開
+  kind: 関数
+  container: project_index/features/prompt_doc/render.py
+  usecase: プロンプトの文書の変換
+  role: 変換
+  summary: '`vars` を深さ優先で辿り、パスと定義の組にする'
+  scope: public
+  is_async: false
+  thread_safe: true
+  args:
+  - name: vars_
+    title: 変数
+    type: Mapping[str, PromptVar]
+    required: true
+    passing: positional
+    description: '`PromptDoc.vars` か入れ子の `properties`'
+  - name: prefix
+    title: パスの頭
+    type: str
+    required: false
+    default: '""'
+    passing: keyword
+    description: 親のパス（再帰で渡す）
+  returns:
+    type: list[tuple[str, PromptVar]]
+    description: 定義の順のパスと定義
+  process: |-
+    1. 変数ごとに `{prefix}{名前}` と定義を加える
+       - `type` が `array` で `items.properties` がある場合、`{パス}[].` を頭にして `items.properties` を辿る
+       - `properties` がある場合、`{パス}.` を頭にして辿る
+  unit_tests:
+  - name: test_flatten_vars
+    case: 正常
+    summary: 配列とオブジェクトを辿る
+    condition: '`character`（`properties` に `display_name`）と `traits`（`items.properties` に `name`）'
+    mock: なし
+    expected: パスが `character`・`character.display_name`・`traits`・`traits[].name` の順
+- name: build_environment
+  title: 描画の環境
+  kind: 関数
+  container: project_index/features/prompt_doc/render.py
+  usecase: プロンプトの文書の変換
+  role: 組み立て
+  summary: 部品を描画する Jinja2 の Environment を作る
+  scope: public
+  is_async: false
+  thread_safe: true
+  returns:
+    type: jinja2.Environment
+    description: 描画の環境
+  process: |-
+    1. `undefined=StrictUndefined`・`trim_blocks=True`・`lstrip_blocks=True`・`keep_trailing_newline=True`・`autoescape=False` で作る
+    2. `finalize` に、値が `path` を持つとき `{path}{値}` を、持たないとき値をそのまま返す関数を渡す
+  unit_tests:
+  - name: test_build_environment
+    case: 正常
+    summary: 未定義の変数を誤りにし、ブロックの改行を削る
+    condition: '`{% for x in xs %}\n- {{ x }}\n{% endfor %}\n` を `xs=["a"]` で描画し、`{{ y }}` を値なしで描画する'
+    mock: なし
+    expected: 1 つ目が `- a\n`、2 つ目が `jinja2.UndefinedError`
+  - name: test_build_environment_when_traced
+    case: 正常
+    summary: パス付きの値だけを区切りで囲む
+    condition: '`{{ a }}/{{ b }}` を `a=TracedStr("x", path="a")`・`b="y"` で描画する'
+    mock: なし
+    expected: '`ax/y`'
+- name: build_values
+  title: 例の組の値
+  kind: 関数
+  container: project_index/features/prompt_doc/render.py
+  usecase: プロンプトの文書の変換
+  role: 変換
+  summary: 例の組の値を `example` で埋め、型を確かめてパス付きの値にする
+  scope: public
+  is_async: false
+  thread_safe: true
+  args:
+  - name: vars_
+    title: 変数
+    type: Mapping[str, PromptVar]
+    required: true
+    passing: positional
+    description: '`PromptDoc.vars`'
+  - name: values
+    title: 組の値
+    type: Mapping[str, Any]
+    required: true
+    passing: positional
+    description: '`PromptExample.values`。「既定の例」は空'
+  returns:
+    type: tuple[dict[str, Any], list[str]]
+    description: パス付きの値と、型の合わない値の理由
+  process: |-
+    1. `values` に無い変数で `example` を持つものを `example` で埋める
+    2. 値を `vars_` の定義と並べて辿る（配列は `items`、オブジェクトは `properties`）
+       - `type` があり値が合わない場合、「`{パス}` は {type} ですが、`{値の YAML のフロー形式}` が入っています」を理由に加え、その値の下は辿らない（`integer`・`number` は `bool` を合わないとする）
+       - 定義のある `str`・`int`・`float` の値は `TracedStr`・`TracedInt`・`TracedFloat` に置き換える（配列の要素は `{パス}[]`）
+  unit_tests:
+  - name: test_build_values
+    case: 正常
+    summary: 省いた変数を example で埋め、パスを持たせる
+    condition: '`character.display_name`（`example: ひな`）と `traits`（`example` に 1 件）、`values` に `traits` だけ'
+    mock: なし
+    expected: '`character.display_name` が `path` が `character.display_name` の `ひな`、`traits[0].name` が `path` が `traits[].name` の値、理由が空'
+  - name: test_build_values_when_type_mismatch
+    case: 異常
+    summary: 型の合わない値
+    condition: '`traits`（`type: array`）に `oops`'
+    mock: なし
+    expected: 理由が `` `traits` は array ですが、`oops` が入っています `` の 1 件
+- name: compile_parts
+  title: 部品のテンプレート化
+  kind: 関数
+  container: project_index/features/prompt_doc/render.py
+  usecase: プロンプトの文書の変換
+  role: 変換
+  summary: 部品の本文と `when` をテンプレートにし、構文の誤りを集める
+  scope: public
+  is_async: false
+  thread_safe: true
+  args:
+  - name: doc
+    title: プロンプト
+    type: PromptDoc
+    required: true
+    passing: positional
+    description: 変換するプロンプト
+  - name: env
+    title: 描画の環境
+    type: jinja2.Environment
+    required: true
+    passing: keyword
+    description: 描画の環境（`build_environment`）
+  returns:
+    type: tuple[dict[str, CompiledPart], list[PartSyntaxError]]
+    description: 部品の `id` ごとのテンプレートと、構文の誤り
+  process: |-
+    1. 部品ごとに `when` を `env.compile_expression` で（前後の空白を除いて `{{` で始まり `}}` で終わる場合は、それを外した式を）、各言語の本文を `env.from_string` でテンプレートにする
+       - `jinja2.TemplateSyntaxError` の場合、その部品を結果から外し、`PartSyntaxError`（部品の `id`・場所・`lineno`・`message`）を加える
+  unit_tests:
+  - name: test_compile_parts
+    case: 正常
+    summary: 部品ごとにテンプレートにする
+    condition: '`when: logs` と `en`・`ja` の本文を持つ部品 `logs`'
+    mock: なし
+    expected: '`logs` のテンプレートに `when` と `en`・`ja` があり、誤りが空'
+  - name: test_compile_parts_when_syntax_error
+    case: 異常
+    summary: 構文の誤った本文
+    condition: 部品 `logs` の `en` の本文が `{% if logs %}` で `{% endif %}` が無い
+    mock: なし
+    expected: 結果に `logs` が無く、誤りが `part_id=logs`・`field=texts[en]`・`line` ありの 1 件
+  - name: test_compile_parts_when_condition_braced
+    case: 正常
+    summary: '`{{ }}` で囲んだ when'
+    condition: 部品 `logs` の `when` が `"{{ logs | length > 0 }}"`
+    mock: なし
+    expected: '`logs` の `when` が `logs=["a"]` で真・`logs=[]` で偽を返し、誤りが空'
+- name: render_example
+  title: 例の組の描画
+  kind: 関数
+  container: project_index/features/prompt_doc/render.py
+  usecase: プロンプトの文書の変換
+  role: 変換
+  summary: 例の組を 1 言語で描画し、メッセージ・使用しなかった部品・字数を返す
+  scope: public
+  is_async: false
+  thread_safe: true
+  args:
+  - name: doc
+    title: プロンプト
+    type: PromptDoc
+    required: true
+    passing: positional
+    description: 変換するプロンプト
+  - name: compiled
+    title: 部品のテンプレート
+    type: Mapping[str, CompiledPart]
+    required: true
+    passing: keyword
+    description: '`compile_parts` の結果'
+  - name: syntax_errors
+    title: 構文の誤り
+    type: Sequence[PartSyntaxError]
+    required: true
+    passing: keyword
+    description: '`compile_parts` の結果'
+  - name: values
+    title: 組の値
+    type: Mapping[str, Any]
+    required: true
+    passing: keyword
+    description: '`PromptExample.values`（「既定の例」は空）'
+  - name: lang
+    title: 言語
+    type: str
+    required: true
+    passing: keyword
+    description: 描画する言語
+  returns:
+    type: RenderedExample
+    description: 描画の結果
+  process: |-
+    1. 構文の誤りがある場合、「部品 `{id}` の {場所}（{行} 行目）: {理由}」を `problems` にして返す
+    2. 例の組の値（`build_values`）を作る
+       - 型の合わない値がある場合、その理由を `problems` にして返す
+    3. 部品を並び順に辿る
+       - `when` が偽の場合、`id` を `unused` に加える
+       - `lang` の本文が無い場合、`{id}（{lang} の本文なし）` を `unused` に加える
+       - それ以外は本文を描画する
+       - `jinja2.UndefinedError` の場合、「未定義の変数: {message}」を `problems` にして返す
+       - それ以外の例外（`jinja2.TemplateError`・`Exception`）の場合、「部品 `{id}` を描画できません: {例外の型}: {message}」を `problems` にして返す
+    4. `kind` が `llm` の場合、描画した本文を `role` ごとに `LLM_PART_SEPARATOR` でつなぎ、`ROLES` の順に空でないものをメッセージにする（`role` の無い部品は `ROLES` の後に役割なしのメッセージとして置く）。それ以外はつないで 1 件にする
+    5. メッセージの `marked` は描画したまま、`text` は `VALUE_MARK_PATTERN` を値だけに戻したものにし、`char_count` を `text` の字数の合計にする
+  unit_tests:
+  - name: test_render_example
+    case: 正常
+    summary: 既定の例を役割ごとに描画する
+    condition: '`kind: llm` で部品 `role`（system）・`now`（user）・`logs`（user、`when: logs`）、`values` が空で `logs` の `example` が 1 件、`lang=en`'
+    mock: なし
+    expected: メッセージが `system`・`user` の 2 件で、`user` の `text` にログがあり、`marked` のログが区切りで囲まれ、`unused` が空、`char_count` が `text` の字数の合計
+  - name: test_render_example_when_condition_false
+    case: 正常
+    summary: when が偽の部品を使わない
+    condition: '同じプロンプトで `values={"logs": []}`'
+    mock: なし
+    expected: '`unused` が `["logs"]`'
+  - name: test_render_example_when_hook
+    case: 正常
+    summary: フックは 1 件につなぐ
+    condition: '`kind: hook` で部品 2 件（`ja` だけ）'
+    mock: なし
+    expected: メッセージが `role=None` の 1 件で、本文が 2 件をつないだもの
+  - name: test_render_example_when_lang_missing
+    case: 正常
+    summary: その言語の本文が無い部品
+    condition: 部品 `note` が `en` だけで `lang=ja`
+    mock: なし
+    expected: '`unused` に `note（ja の本文なし）`'
+  - name: test_render_example_when_undefined
+    case: 異常
+    summary: 未定義の変数
+    condition: 本文が `{{ missing }}` で `vars` に `missing` が無い
+    mock: なし
+    expected: '`problems` に `missing` を含む 1 件で、`messages` が空'
+  - name: test_render_example_when_syntax_error
+    case: 異常
+    summary: 構文の誤った部品がある
+    condition: '`syntax_errors` に `logs` の 1 件'
+    mock: なし
+    expected: '`problems` に `logs` と行を含む 1 件で、`messages` が空'
+  - name: test_render_example_when_runtime_error
+    case: 異常
+    summary: 描画中の例外
+    condition: 本文が `{{ a + 1 }}` で、`a` が `type` なし・`example` が文字列
+    mock: なし
+    expected: '`problems` に `TypeError` を含む 1 件で、`messages` が空'
+- name: flow_yaml
+  title: YAML のフロー形式
+  kind: 関数
+  container: project_index/features/prompt_doc/render.py
+  usecase: プロンプトの文書の変換
+  role: 変換
+  summary: 値を YAML のフロー形式の 1 行にする
+  description: 'ruamel.yaml のフロー形式は配列の中のキーが 1 つの辞書を `[name: 好奇心]` と書くため、自前で組み立てる。'
+  scope: public
+  is_async: false
+  thread_safe: true
+  args:
+  - name: value
+    title: 値
+    type: Any
+    required: true
+    passing: positional
+    description: 変数の例・出力・型の合わない値
+  returns:
+    type: str
+    description: フロー形式の 1 行
+  process: |-
+    1. 辞書は `{キー: 値, ...}`、配列は `[値, ...]` にして中を再帰で組み立てる
+    2. スカラーは、`null`・真偽値・数は JSON の表記にする
+       - 文字列は、`FLOW_QUOTE_PATTERN` に当たらず YAML として読み戻して同じ文字列になる場合はそのまま、それ以外は JSON の文字列（`ensure_ascii=False`）にする
+  notes:
+    単体テスト: '`test_var_table`（配列の中の辞書）と `test_build_values_when_type_mismatch` で確かめる'

@@ -1,0 +1,186 @@
+id: MOD-39
+title: 索引のサーバー / 設定の移し替え / types.py
+lead: '`project-index migrate` の手順・対象・例外の型と終了コード。'
+data_models:
+- name: MigrationStep
+  title: 移し替えの手順
+  container: project_index/features/migrate/types.py
+  usecase: 設定の移し替え
+  role: DTO
+  summary: '`steps.yaml` の 1 行'
+  description: '`dataclass(frozen=True)`。`steps.yaml` は `steps:` の下に `op`・`path`・`to`・`value`・`match`・`take`・`description` を持つ行を並べる。'
+  properties:
+  - name: version
+    title: バージョン
+    type: str
+    description: 手順を当てた後の `version`（手順のフォルダ名）
+  - name: op
+    title: 操作
+    type: Literal['rename', 'add', 'delete', 'lift', 'unwrap']
+    description: キーの改名・既定値つきの追加・削除・値の引き上げ・値の取り出し
+  - name: path
+    title: キーのパス
+    type: str
+    description: ドットで結ぶ。配列の要素の子は `sources[].scope`。末尾の `*` は親の辞書の全てのキー
+  - name: to
+    title: 新しいキー
+    type: str | None
+    default: None
+    description: '`rename` では同じ親の下のキー名、`lift` では親の辞書を持つ辞書の下のキー名'
+  - name: value
+    title: 値
+    type: Any
+    default: None
+    description: '`add` では既定値（既にキーがあれば書き換えない）、`delete` では消す値（値が一致するときだけ消す）'
+  - name: description
+    title: 説明
+    type: str
+    description: '`--plan` に出す 1 行'
+  - name: match
+    title: 当てる値の条件
+    type: dict[str, Any] | None
+    default: None
+    description: '`lift`・`unwrap` で、値が辞書でこのキーと値を全て持つときだけ当てる。無ければ辞書の値に当てる'
+  - name: take
+    title: 取り出すキー
+    type: str | None
+    default: None
+    description: '`lift`・`unwrap` で、辞書の値から取り出すキー。`unwrap` で辞書がこのキーを持たないときは元のキー名を使う'
+  methods:
+  - name: destructive
+    title: 破壊的か
+    kind: メソッド
+    summary: 値を捨てる手順かを返す（`property`）
+    scope: public
+    returns:
+      type: bool
+      description: '`op` が `delete` で `value` が `None` なら `True`'
+    process: 1. `op == "delete" and value is None` を返す
+- name: MigrationTarget
+  title: 移し替えの対象
+  container: project_index/features/migrate/types.py
+  usecase: 設定の移し替え
+  role: DTO
+  summary: 移し替える設定のファイルと種類
+  description: '`dataclass(frozen=True)`。'
+  properties:
+  - name: kind
+    title: 種類
+    type: Literal['settings', 'project-index']
+    description: 端末の設定か配信元の設定か。手順のフォルダ名になる
+  - name: file
+    title: ファイル
+    type: Path
+    description: 書き換える YAML
+  - name: current
+    title: 読めるバージョン
+    type: str
+    description: '`SETTINGS_VERSION` か `SOURCE_CONFIG_VERSION`'
+classes:
+- name: MigrationError
+  title: 移し替えの失敗
+  container: project_index/features/migrate/types.py
+  usecase: 設定の移し替え
+  role: 例外
+  summary: '`project-index migrate` が終了コードに対応させる例外の基底'
+  description: '`Exception` を継承し、クラス属性 `exit_code` を持つ。メッセージは stderr にそのまま出す。'
+  inherits: Exception
+  properties:
+  - name: exit_code
+    title: 終了コード
+    type: ClassVar[int]
+    access: 公開
+    description: サブクラスごとの終了コード
+- name: MigrationConfigInvalidError
+  title: 対象の設定の違反
+  container: project_index/features/migrate/types.py
+  usecase: 設定の移し替え
+  role: 例外
+  summary: 対象の設定が無い・読めない・`version` が無い
+  inherits: MigrationError
+  properties:
+  - name: exit_code
+    title: 終了コード
+    type: ClassVar[int]
+    access: 公開
+    default: EXIT_CONFIG_INVALID
+    description: '2'
+- name: MigrationFailedError
+  title: 手順の失敗
+  container: project_index/features/migrate/types.py
+  usecase: 設定の移し替え
+  role: 例外
+  summary: 手順を当てられない、当てた結果が新しいスキーマに違反する、書く前にファイルが変わった
+  inherits: MigrationError
+  properties:
+  - name: exit_code
+    title: 終了コード
+    type: ClassVar[int]
+    access: 公開
+    default: EXIT_MIGRATION_FAILED
+    description: '4'
+- name: DestructiveStepBlockedError
+  title: 破壊的な手順での停止
+  container: project_index/features/migrate/types.py
+  usecase: 設定の移し替え
+  role: 例外
+  summary: 当てる手順に破壊的なものがあり `--allow-destructive` が無い
+  inherits: MigrationError
+  properties:
+  - name: exit_code
+    title: 終了コード
+    type: ClassVar[int]
+    access: 公開
+    default: EXIT_DESTRUCTIVE_BLOCKED
+    description: '5'
+- name: ConfigNewerError
+  title: 新しすぎる設定
+  container: project_index/features/migrate/types.py
+  usecase: 設定の移し替え
+  role: 例外
+  summary: 対象の `version` が読めるバージョンより新しい
+  inherits: MigrationError
+  properties:
+  - name: exit_code
+    title: 終了コード
+    type: ClassVar[int]
+    access: 公開
+    default: EXIT_CONFIG_NEWER
+    description: '6'
+constants:
+- name: MIGRATIONS_DIR
+  title: 手順の置き場所
+  container: project_index/features/migrate/types.py
+  usecase: 設定の移し替え
+  summary: パッケージの中の手順のフォルダ。`{MIGRATIONS_DIR}/{kind}/{バージョン}/steps.yaml` を `importlib.resources` で読む
+  value: "'migrations'"
+- name: STEPS_FILE
+  title: 手順のファイル名
+  container: project_index/features/migrate/types.py
+  usecase: 設定の移し替え
+  summary: バージョンごとの手順のファイル
+  value: "'steps.yaml'"
+- name: BACKUP_FORMAT
+  title: バックアップの名前
+  container: project_index/features/migrate/types.py
+  usecase: 設定の移し替え
+  summary: 対象と同じフォルダに置くバックアップのファイル名。時刻は `%Y%m%dT%H%M%S`
+  value: "'{name}.bak-{time}'"
+- name: EXIT_MIGRATION_FAILED
+  title: 手順の失敗の終了コード
+  container: project_index/features/migrate/types.py
+  usecase: 設定の移し替え
+  summary: 失敗して対象を書き換えなかった
+  value: '4'
+- name: EXIT_DESTRUCTIVE_BLOCKED
+  title: 破壊的な手順の終了コード
+  container: project_index/features/migrate/types.py
+  usecase: 設定の移し替え
+  summary: 破壊的な手順で止めた
+  value: '5'
+- name: EXIT_CONFIG_NEWER
+  title: 新しすぎる設定の終了コード
+  container: project_index/features/migrate/types.py
+  usecase: 設定の移し替え
+  summary: 対象の設定のバージョンが project-index より新しい
+  value: '6'

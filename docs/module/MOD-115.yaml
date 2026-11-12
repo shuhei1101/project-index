@@ -1,0 +1,52 @@
+id: MOD-115
+title: 索引のサーバー / 検査
+lead: |-
+  文書を種類のスキーマ・`ids.format`・`related.types`・配信元の `validators[]` で検査し、違反の並びを返す。
+  書き込みは違反があれば書かず、読み取りは違反を警告として添える。
+directory: |-
+  ```text
+  src/project_index/features/validation/
+  ├─ __init__.py   # 公開する型と関数の再エクスポート
+  ├─ rules.py      # check_schema / check_id_format / check_related
+  ├─ scripts.py    # parse_validator_output（validators[] の出力の解釈）
+  └─ service.py    # DocumentChecker（検査をまとめて通す・読み取りの結果のキャッシュ）
+  ```
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      文書の検査 ..> スキーマの検査
+      文書の検査 ..> IDの形の検査
+      文書の検査 ..> 関連の種類の検査
+      文書の検査 ..> スクリプトの実行 : validators[]
+      文書の検査 ..> 検査の出力の解釈
+      文書の検査 ..> 違反 : 返す
+      class 文書の検査 {
+        <<class>>
+      }
+      class スキーマの検査 {
+        <<function>>
+      }
+      class IDの形の検査 {
+        <<function>>
+      }
+      class 関連の種類の検査 {
+        <<function>>
+      }
+      class 検査の出力の解釈 {
+        <<function>>
+      }
+      class スクリプトの実行 {
+        <<function>>
+      }
+      class 違反 {
+        <<dataclass>>
+      }
+      click 文書の検査 href "./MOD-75.py.yaml#文書の検査"
+      click スキーマの検査 href "./MOD-73.py.yaml#スキーマの検査"
+      click IDの形の検査 href "./MOD-73.py.yaml#IDの形の検査"
+      click 関連の種類の検査 href "./MOD-73.py.yaml#関連の種類の検査"
+      click スクリプトの実行 href "./MOD-88.py.yaml#スクリプトの実行"
+      click 検査の出力の解釈 href "./MOD-74.py.yaml#検査の出力の解釈"
+      click 違反 href "./MOD-98.py.yaml#違反"

@@ -1,0 +1,48 @@
+id: LIB-7
+title: "mdmark"
+kind: "CLI"
+version:
+  current: master
+  latest: v0.10.0
+  checked_on: '2026-11-09'
+  source: https://cdn.jsdelivr.net/gh/shuhei1101/mdmark@master/
+  pinning: '固定しない。リリースのたびに `dist/` が入る master ブランチを読み、中身が変わるため integrity を付けない。jsDelivr は `@master` を CDN で 12 時間、ブラウザで 7 日キャッシュする（`cache-control: public, max-age=604800, s-maxage=43200`）。リリースをすぐ届けるときは purge.jsdelivr.net で CDN のキャッシュを削除する'
+catalogs:
+- name: コマンド
+  version: develop（mdmark#328 のマージ後）
+  entries:
+  - name: mdmark check --text
+    kind: コマンド
+    purpose: Markdown の文字列を、描画時の書き方の警告・知らない印・図の配置のずれで点検する
+    status: planned
+    description: '[mdmark#328](https://github.com/shuhei1101/mdmark/pull/328) で develop に入り、v0.9.0 の master には無い。npm のレジストリに公開されず、Node 24 以降で動く。設定ファイルを渡さないときは、起動したフォルダから上へ `mdmark.config.yaml` を探し、無ければ既定の設定で点検する'
+    params:
+    - name: --text
+      type: str
+      required: true
+      description: 点検する Markdown。`-` を渡すと標準入力から読む
+    - name: --config
+      type: str
+      required: false
+      default: なし（起動したフォルダから上へ `mdmark.config.yaml` を探す）
+      description: 使う設定ファイルのパス
+    returns:
+    - name: 標準出力
+      type: str
+      description: 'ずれ 1 つを `-:{行}: {種類}: {内容}` の 1 行で並べ、最後に `ずれ {件数} 件` の行を出す'
+      notes: 内容は、何が合わないかと直し方の日本語の 1 文。`diagram_invalid`・`syntax_warning` は描画時の書き方の警告と同じ文
+    - name: 終了コード
+      type: int
+      description: '`0` はずれが 0 件。`1` はずれが 1 件以上'
+      notes: 引数の誤りなどで点検しなかったときも `1` で、標準エラーに原因を出し、`ずれ {件数} 件` の行を出さない
+lead: Markdown を検査・描画するライブラリと CLI。project-index は、文書の書き込みで Markdown の値を `mdmark check --text` で点検するためだけに使う。
+dependency_scope: 必須
+adoption: 採用
+used_in:
+- src/project_index/integrations/mdmark.py
+upstream: shuhei1101/mdmark
+verification:
+  state: 済
+  date: '2026-11-09'
+  detail: 'v0.10.0 の master を jsDelivr から読み、画面の結合テストの環境の Chromium で、`テーブル設定` のボタン・ダイアログの `「{列名}」を隠す`・`「{列名}」を表示` のボタンと、隠した列があるときの読み上げ名 `テーブル設定（1 列を非表示）` を確認した。以下は v0.9.0 で確認した内容。`project-index serve` を起動し、Chromium で文書の画面を開いて、jsDelivr の `dist/index.js`（200）を読み込み、`dist/index.css` を置き、見出し・表・コードブロックが本文に描かれ、目次が出ることを確かめた。本文の文字列を選んでコメントを追加すると、`commentStore.save` が呼ばれ、コメントのパネルに見出しつきで並ぶ。`mount` は `commentStore.load({docId})`・`save({docId, comment})` を受け、`update` は Markdown の文字列を受ける。`comments` の機能は既定でオフのため、`config.features.comments` を `true` にして渡す。`v0.9.0` のタグに `dist/mount.js` は無い。v0.9.0 では、描く先の要素の幅が 48rem 未満のとき `.mdmark-content [id]` に `scroll-margin-block-start: calc(var(--mdmark-sticky-top, 0px) + 3.5rem)` が当たり、`side-toc`（右側の目次）の機能が既定でオンになる。E2E `test_利用者がコメントを渡す.py` の 4 件が v0.9.0 の master で pass する。CLI の `check --text` は未確認（v0.9.0 の master と develop の `dist/cli.js` は `--text` を持たず、develop の `src/cli/main.ts` を esbuild で束ねると依存（`ajv/dist/2020.js`）を解けないため、リリース前の CLI を動かせない。単体テストは同じ出力を返す偽の `mdmark` で確かめる）'
+official_url: https://github.com/shuhei1101/mdmark

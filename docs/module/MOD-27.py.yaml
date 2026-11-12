@@ -1,0 +1,360 @@
+id: MOD-27
+title: 索引のサーバー / 文書のストア / loader.py
+lead: ファイルの収集と、ファイルからの文書の作成。
+test_files:
+- tests/unit/project_index/features/documents/test_loader.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      文書のストア ..> ファイルの収集
+      文書のストア ..> ファイルの読み込み
+      ファイルの読み込み ..> メタデータの解決
+      メタデータのずれの確かめ ..> 索引に無いファイル
+      class メタデータのずれの確かめ {
+        <<function>>
+      }
+      class 索引に無いファイル {
+        <<function>>
+      }
+      class 文書のストア {
+        <<class>>
+      }
+      class ファイルの収集 {
+        <<function>>
+      }
+      class ファイルの読み込み {
+        <<function>>
+      }
+      class メタデータの解決 {
+        <<function>>
+      }
+      click メタデータのずれの確かめ href "./MOD-29.py.yaml#メタデータのずれの確かめ"
+      click 文書のストア href "./MOD-29.py.yaml#文書のストア"
+      click メタデータの解決 href "./MOD-25.py.yaml#メタデータの解決"
+functions:
+- name: collect_files
+  title: ファイルの収集
+  kind: 関数
+  container: project_index/features/documents/loader.py
+  usecase: 共通
+  role: 読み取り
+  summary: 文書の行に当たるファイルを配信元の直下から集める
+  scope: public
+  thread_safe: true
+  args:
+  - name: root
+    title: 読むフォルダ
+    type: Path
+    required: true
+    passing: positional
+    description: 配信元の直下に当たるフォルダ（作業ツリー・ワークツリー・リビジョンの書き出し）
+  - name: table
+    title: 文書の行
+    type: DocumentTable
+    required: true
+    passing: positional
+    description: 集める行（`paths`・`exclude`）
+  - name: files
+    title: たどったファイル
+    type: Sequence[str] | None
+    required: false
+    default: None
+    passing: keyword
+    description: '`walk_files(root)` で得たパス。渡されたらフォルダをたどらずにこれを使う。`None` はその場でたどる'
+  returns:
+    type: list[str]
+    description: '`root` からのパス（`/` 区切り）の昇順。重複は含まない'
+  process: |-
+    1. `files` があればそのパス、無ければ中をたどるファイルの列挙（`walk_files`）で `root` の配下のファイルを `root` からのパスで得る
+    2. 文書の行.行に当たるかが `True` のパスを加える
+    3. 昇順に並べて返す
+  unit_tests:
+  - name: test_collect_files
+    case: 正常
+    summary: glob で集める
+    condition: '`a/x.yaml`・`a/b/y.yaml`・`a/z.md`・`.git/c.yaml` を置き、`paths: ["a/**/*.yaml"]` の行'
+    mock: なし（`tmp_path`）
+    expected: '`["a/b/y.yaml", "a/x.yaml"]`'
+    exception: '-'
+  - name: test_collect_files_when_overlapping_patterns
+    case: 正常
+    summary: 重なる glob
+    condition: '`a/x.yaml` を置き、`paths: ["a/*.yaml", "**/x.yaml"]` の行'
+    mock: なし（`tmp_path`）
+    expected: '`["a/x.yaml"]`'
+    exception: '-'
+  - name: test_collect_files_when_excluded
+    case: 正常
+    summary: 除外の名前に当たるファイルを外す
+    condition: '`a/x.md`・`a/README.md`・`a/b/README.md` を置き、`paths: ["a/**/*.md"]`・`exclude: [README.md]` の行'
+    mock: なし（`tmp_path`）
+    expected: '`["a/x.md"]`'
+    exception: '-'
+  - name: test_collect_files_when_worktrees
+    case: 正常
+    summary: ワークツリーのフォルダをたどらない
+    condition: '`a/x.md`・`.claude/worktrees/wt/a/x.md`・`.claude/a.md` を置き、`paths: ["**/*.md"]` の行'
+    mock: なし（`tmp_path`）
+    expected: '`[".claude/a.md", "a/x.md"]`'
+    exception: '-'
+  - name: test_collect_files_when_files_given
+    case: 正常
+    summary: たどったファイルを使う
+    condition: '`a/x.yaml` を置き、`files=["a/x.yaml", "a/y.yaml"]`、`paths: ["a/*.yaml"]` の行'
+    mock: '`walk_files`（呼ばれないことを確かめる）'
+    expected: '`["a/x.yaml", "a/y.yaml"]` で、`walk_files` を呼ばない'
+- name: load_file
+  title: ファイルの読み込み
+  kind: 関数
+  container: project_index/features/documents/loader.py
+  usecase: 共通
+  role: 読み取り
+  summary: 1 つのファイルを読み、文書の行に従って 1 件以上の文書にする
+  scope: public
+  thread_safe: true
+  args:
+  - name: root
+    title: 読むフォルダ
+    type: Path
+    required: true
+    passing: positional
+    description: 配信元の直下に当たるフォルダ
+  - name: path
+    title: ファイル
+    type: str
+    required: true
+    passing: positional
+    description: '`root` からのパス'
+  - name: table
+    title: 文書の行
+    type: DocumentTable
+    required: true
+    passing: positional
+    description: ファイルが当たった文書の行
+  - name: source_id
+    title: 配信元の ID
+    type: str
+    required: true
+    passing: keyword
+    description: 文書に載せる配信元の ID
+  - name: dates
+    title: git の日時
+    type: Mapping[str, FileDates]
+    required: false
+    default: '{}'
+    passing: keyword
+    description: '`root` からのパス → 履歴の『ファイルの日時』。Git の管理外は空'
+  returns:
+    type: tuple[list[Document], list[LoadProblem]]
+    description: 作った文書と、文書にできなかった理由
+  process: |-
+    1. ファイルを UTF-8 で読む
+    2. 文字列からの文書の組み立てに渡し、その結果を返す
+  unit_tests:
+  - name: test_load_file_when_yaml
+    case: 正常
+    summary: YAML の 1 ファイル 1 文書
+    condition: '`rules/a.yaml` が `id: rule-a\ntitle: A\n`、行の `metadata` が `{name: title}`'
+    mock: なし（`tmp_path`）
+    expected: 1 件で、`id` が `rule-a`、`metadata.name` が `A`、`version` が内容の『内容のハッシュ』、`record_index` が `None`
+    exception: '-'
+  - name: test_load_file_when_records
+    case: 正常
+    summary: records と body_file
+    condition: '`src/files.yaml` が `files: [{path: a.py, tags: [x]}, {path: b.py}]`、`src/a.py`・`src/b.py` を置き、行は `records: files`・`body_file: path`'
+    mock: なし（`tmp_path`）
+    expected: 2 件で、`id` が `src/a.py`・`src/b.py`、`body` が各ファイルの内容、`body_path` が `src/a.py`・`src/b.py`、`record_index` が 0・1、`version` が要素の『値のハッシュ』
+    exception: '-'
+  - name: test_load_file_when_dates
+    case: 正常
+    summary: 日時の優先順位
+    condition: '`a.yaml` と `b.yaml` がどちらも `updated: 2026-01-02T00:00:00+09:00` を持ち、`dates` は `a.yaml` だけが `created` 2025-12-01・`updated` 2025-12-05。`c.yaml` はどちらも無い'
+    mock: なし（`tmp_path`）
+    expected: '`a.yaml` は 2025-12-01・2025-12-05、`b.yaml` は `created` が `None`・`updated` が 2026-01-02、`c.yaml` はどちらも `None`'
+    exception: '-'
+  - name: test_load_file_when_unreadable
+    case: 異常
+    summary: 読めない YAML
+    condition: '`a.yaml` が `a: [1`'
+    mock: なし（`tmp_path`）
+    expected: 文書は 0 件で、`LoadProblem` の `reason` が `unreadable`、`detail` に理由、`line`・`column` に行と列
+    exception: '-'
+  - name: test_load_file_when_missing_body_file
+    case: 異常
+    summary: 無い本文のファイル
+    condition: '`records` の要素が `{path: none.py}` と `{path: ../../x.py}`'
+    mock: なし（`tmp_path`）
+    expected: 文書は 0 件で、`missing_body_file` が 2 件
+    exception: '-'
+  - name: test_load_file_when_default_name
+    case: 正常
+    summary: 名前の既定
+    condition: '`rules/a.yaml` が `id: rule-a` だけ。`src/files.yaml` が `files: [{path: a.py}, {path: b.py, name: 部品 B}]`（行は `records: files`・`body_file: path`）。`list.yaml` が `items: [{x: 1}]`（行は `records: items`）'
+    mock: なし（`tmp_path`）
+    expected: '`metadata.name` が `a`（`rules/a.yaml`）、`a`・`部品 B`（`src`）、`list.yaml#0`（`list.yaml`）'
+    exception: '-'
+  - name: test_load_file_when_same_stem
+    case: 正常
+    summary: 同じ名前で拡張子の違うファイル
+    condition: '行 `src`（`records: files`・`body_file: path`）の `src/files.yaml` が `files: [{path: plan.ts}, {path: plan.css}]` で、`src/plan.ts`・`src/plan.css` を置く。行 `docs`（`records: files`・`body_file: path`）の `docs/files.yaml` が `files: [{path: index.md}]` で、`docs/index.md` が `# 目次`。行 `index`（`records` を持たない）が読む `docs/index.yaml` が `title: 目次`。それぞれの行で 3 つのファイルを読む'
+    mock: なし（`tmp_path`）
+    expected: '`id` が `src/plan.ts`・`src/plan.css`・`docs/index.md`・`docs/index.yaml` の 4 件で重ならず、`metadata.name` が `plan`・`plan`・`index`・`index`'
+    exception: '-'
+- name: documents_from_text
+  title: 文字列からの文書の組み立て
+  kind: 関数
+  container: project_index/features/documents/loader.py
+  usecase: 共通
+  role: 読み取り
+  summary: 1 つのファイルの内容の文字列を、文書の行に従って 1 件以上の文書にする
+  description: ファイルの読み込みと、書き込みが変更を当てた後の内容から検査用の文書を作るときと、変更の一覧が commit のファイルから文書を作るときに使う。
+  scope: public
+  thread_safe: true
+  args:
+  - name: text
+    title: 内容
+    type: str
+    required: true
+    passing: positional
+    description: ファイルの内容
+  - name: root
+    title: 読むフォルダ
+    type: Path
+    required: true
+    passing: positional
+    description: 配信元の直下に当たるフォルダ（`body_file` を解く）
+  - name: path
+    title: ファイル
+    type: str
+    required: true
+    passing: positional
+    description: '`root` からのパス'
+  - name: table
+    title: 文書の行
+    type: DocumentTable
+    required: true
+    passing: positional
+    description: ファイルが当たった文書の行
+  - name: source_id
+    title: 配信元の ID
+    type: str
+    required: true
+    passing: keyword
+    description: 文書に載せる配信元の ID
+  - name: dates
+    title: git の日時
+    type: Mapping[str, FileDates]
+    required: false
+    default: '{}'
+    passing: keyword
+    description: ファイルの読み込みと同じ
+  - name: read_body
+    title: 本文の読み方
+    type: Callable[[str], str | None] | None
+    required: false
+    default: None
+    passing: keyword
+    description: '`body_file` の本文を読む関数（`root` からのパスを受け、内容か、無ければ `None` を返す）。`None` は `root` のファイルを読む'
+  returns:
+    type: tuple[list[Document], list[LoadProblem]]
+    description: 作った文書と、文書にできなかった理由
+  process: |-
+    1. 『YAMLの読み込み』で読む
+       - `YamlLoadError` の場合、`unreadable` の `LoadProblem` だけを返す
+    2. `table.records` が無い場合、1 件の文書を作る
+       - 内容が辞書でない場合、`not_mapping` を返す
+       - 本文はファイルの内容。バージョンはファイルの内容の『内容のハッシュ』
+    3. `table.records` がある場合、『項目の取得』で配列を取り、要素ごとに文書を作る（配列が無ければ 0 件）
+       - 要素が辞書でない場合、その要素は `not_mapping` にして飛ばす
+       - `table.body_file` があれば、要素のその列のパスを YAML のファイルのフォルダから解き、`read_body`（`None` なら `root` のファイル）で読んで本文と `body_path` にする。無いファイル（`read_body` が `None` を返す）・`root` の外を指す場合、その要素は `missing_body_file` にして飛ばす
+       - `body_file` が無ければ、要素を YAML に書き出した文字列を本文にする
+       - バージョンは要素の『値のハッシュ』
+    4. 文書ごとに『メタデータの解決』を当てる
+    5. ID はメタデータの `id`。無ければ、`body_path` か `path` を拡張子付きのまま（`records` で `body_file` が無ければ末尾に `#{位置}`）にする
+       - メタデータの `name` が空なら、`body_path`（無ければ `path`）のファイル名から拡張子を除いた名前を入れる。`records` で `body_file` が無ければ ID を入れる
+    6. `created` / `updated` は、`dates` の `body_path`（無ければ `path`）の値、内容の同じ名前の項目（ISO 8601 の文字列か日時）の順に最初にある値を使う。どちらも無ければ `None`
+    7. 文書と理由を返す
+  unit_tests:
+  - name: test_documents_from_text_when_read_body
+    case: 正常
+    summary: '`body_file` の本文の読み方'
+    condition: '`records`・`body_file` の行の索引の YAML（要素の `body_file` が `a.md`）に、`a.md` を受けると `過去の本文` を返す `read_body` を渡す（`root` の `a.md` は `今の本文`）。もう 1 つは `a.md` に `None` を返す `read_body`'
+    mock: なし（`tmp_path`）
+    expected: 1 つ目は文書の `body` が `過去の本文`、`body_path` が `a.md`。2 つ目は文書が 0 件で、`missing_body_file` の `LoadProblem` が 1 件
+- name: unindexed_files
+  title: 索引に無いファイル
+  container: project_index/features/documents/loader.py
+  usecase: 起動
+  role: 読み取り
+  summary: 管理用の YAML のフォルダの配下にあって、どの行も指していないファイルを返す
+  kind: 関数
+  scope: public
+  thread_safe: true
+  args:
+  - name: root
+    title: 読むフォルダ
+    type: Path
+    required: true
+    passing: positional
+    description: 配信元の直下に当たるフォルダ
+  - name: index_path
+    title: 管理用の YAML
+    type: str
+    required: true
+    passing: positional
+    description: '`root` からの管理用の YAML のパス'
+  - name: body_paths
+    title: 指しているファイル
+    type: Collection[str]
+    required: true
+    passing: positional
+    description: その YAML から作った文書の `body_path`
+  - name: table
+    title: 文書の行
+    type: DocumentTable
+    required: true
+    passing: positional
+    description: 管理用の YAML を持つ行（`exclude`）
+  - name: files
+    title: たどったファイル
+    type: Sequence[str] | None
+    required: false
+    default: None
+    passing: keyword
+    description: '`walk_files(root)` で得たパス。渡されたら、そのうち `index_path` のフォルダの配下のパスを使う。`None` はその場でたどる'
+  returns:
+    type: list[str]
+    description: '`root` からのパスの昇順'
+  process: |-
+    1. `files` があればそのうち `index_path` のフォルダの配下のパス（フォルダが `root` なら全て）、無ければ中をたどるファイルの列挙（`walk_files`）で `index_path` のフォルダの配下のファイルを `root` からのパスで得る
+    2. `index_path` 自身と `body_paths` にあるパスと、文書の行.除外の名前に当たるかが `True` のパスと、除外の条件に当たるか（`is_excluded_file`）が `True` のパスを除き、昇順で返す
+  unit_tests:
+  - name: test_unindexed_files
+    case: 正常
+    summary: 配下の未記載のファイル
+    condition: '`src/files.yaml`・`src/a.py`・`src/d.py`・`src/sub/e.py`・`src/node_modules/x.js` を置き、`body_paths` が `[src/a.py]`'
+    mock: なし（`tmp_path`）
+    expected: '`["src/d.py", "src/sub/e.py"]`'
+    exception: '-'
+  - name: test_unindexed_files_when_excluded
+    case: 正常
+    summary: 除外の名前に当たるファイルは数えない
+    condition: '`src/files.yaml`・`src/a.py`・`src/README.md`・`src/d.py` を置き、`body_paths` が `[src/a.py]`、行の `exclude` が `[README.md]`'
+    mock: なし（`tmp_path`）
+    expected: '`["src/d.py"]`'
+    exception: '-'
+  - name: test_unindexed_files_when_matching_exclusion
+    case: 正常
+    summary: 除外の条件に当たるファイルは数えない
+    condition: '`src/files.yaml`・`src/a.py`・`src/d.py`・空の `src/pkg/__init__.py`・`src/uv.lock`・`src/vendor/v.py` を置き、`body_paths` が `[src/a.py]`'
+    mock: なし（`tmp_path`）
+    expected: '`["src/d.py"]`'
+    exception: '-'
+  - name: test_unindexed_files_when_files_given
+    case: 正常
+    summary: たどったファイルのうちフォルダの配下だけを見る
+    condition: '`src/files.yaml`・`src/a.py`・`src/d.py`・`docs/x.md` を置き、`files` にその 4 件、`body_paths` が `[src/a.py]`'
+    mock: '`walk_files`（呼ばれないことを確かめる）'
+    expected: '`["src/d.py"]` で、`walk_files` を呼ばない'

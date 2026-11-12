@@ -1,0 +1,271 @@
+id: MOD-80
+title: 索引のサーバー / 書き込み / apply.py
+lead: 項目の操作の適用と、共通のキーの列名への読み替え。
+test_files:
+- tests/unit/project_index/features/write/test_apply.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      文書の書き込み ..> オブジェクトの配列への書き戻し
+      文書の書き込み ..> 列名への読み替え
+      文書の書き込み ..> 操作を当てる
+      文書の削除 ..> 操作を当てる : related を外す
+      class 文書の書き込み {
+        <<function>>
+      }
+      class 文書の削除 {
+        <<function>>
+      }
+      class オブジェクトの配列への書き戻し {
+        <<function>>
+      }
+      class 列名への読み替え {
+        <<function>>
+      }
+      class 操作を当てる {
+        <<function>>
+      }
+      click 文書の書き込み href "./MOD-84.py.yaml#文書の書き込み"
+      click 文書の削除 href "./MOD-84.py.yaml#文書の削除"
+functions:
+- name: apply_operation
+  title: 操作を当てる
+  kind: 関数
+  container: project_index/features/write/apply.py
+  usecase: 書き込み
+  role: 変換
+  summary: 文書の内容に 1 件の操作を当てた新しい内容を返す
+  scope: public
+  thread_safe: true
+  args:
+  - name: current
+    title: 今の内容
+    type: Mapping[str, Any] | None
+    required: true
+    passing: positional
+    description: '`create` は `None`'
+  - name: operation
+    title: 操作
+    type: Operation
+    required: true
+    passing: positional
+    description: 当てる操作
+  returns:
+    type: dict[str, Any]
+    description: 新しい内容（`current` は書き換えない）
+  process: |-
+    1. `create`・`replace` は `data` の深いコピーを返す
+    2. `update` は `current` の深いコピーに順に当てる
+       - `set` の値は、オブジェクトなら今の値へ再帰でマージし、配列とスカラーは置き換える（項目の書き込み）
+       - `unset` は項目の削除。無い項目は飛ばす
+       - `add_to` は配列の末尾へ足す（無ければ作る。配列でなければ違反）
+       - `remove_from` は等しい要素を全て除く
+       - `text_edits` は文字列の項目の `old` を `new` にする。`replace_all` が `False` で一致が 1 か所でない場合は違反
+    3. 違反は `Violation`（`path` は `set.a.b`・`text_edits[0].old` など。`fix` に一致した数と、`replace_all` か前後の文字を含めること）を集めて `InvalidArgumentError` で送る
+  exceptions:
+  - name: InvalidArgumentError
+    condition: 配列でない項目への追加・削除、文字列でない項目への置き換え、`old` の一致が 1 か所でない
+    message: '`操作を適用できません`'
+  unit_tests:
+  - name: test_apply_operation
+    case: 正常
+    summary: 部分更新の組み合わせ
+    condition: '`{a: {b: 1, c: 2}, tags: [a, b], d: x}` に `set: {a: {b: 9}}`・`unset: [d]`・`add_to: {tags: [c]}`・`remove_from: {tags: [a]}`'
+    mock: なし
+    expected: '`{a: {b: 9, c: 2}, tags: [b, c]}`。`current` は変わらない'
+  - name: test_apply_operation_when_text_edit_ambiguous
+    case: 異常
+    summary: 一致が 2 か所
+    condition: '`description: "aXbXc"` に `{field: description, old: X, new: Y}`'
+    mock: なし
+    expected: '`InvalidArgumentError` の違反の `path` が `text_edits[0].old`、`fix` に `2`'
+    exception: '`old` の一致が 1 か所でない'
+  - name: test_apply_operation_when_replace
+    case: 正常
+    summary: 置き換え
+    condition: '`{a: 1, b: 2}` に `replace` の `data: {a: 3}`'
+    mock: なし
+    expected: '`{a: 3}`'
+- name: to_columns
+  title: 列名への読み替え
+  kind: 関数
+  container: project_index/features/write/apply.py
+  usecase: 書き込み
+  role: 変換
+  summary: 操作のキーのうち、種類の行の `metadata` に書いた共通のキーを列名へ読み替えた操作を返す
+  scope: public
+  thread_safe: true
+  args:
+  - name: operation
+    title: 操作
+    type: Operation
+    required: true
+    passing: positional
+    description: 読み替える操作
+  - name: table
+    title: 文書の行
+    type: DocumentTable
+    required: true
+    passing: positional
+    description: '`create` は `kind` の行、`update`・`replace` は文書の種類の行'
+  - name: index
+    title: 操作の添字
+    type: int
+    required: true
+    passing: keyword
+    description: 違反の `path` に付ける `operations` の位置
+  returns:
+    type: Operation
+    description: 読み替えた新しい操作（`operation` は書き換えない）
+  process: |-
+    1. `table.metadata` が空なら `operation` をそのまま返す
+    2. `set`・`add_to`・`remove_from` のキー、`unset` の要素、`text_edits[].field` の項目のパスは、先頭のキー（『項目のパスの分解』の最初の要素）が `metadata` のキーなら、そのキーを列名に置き換えたパスにする（`name.x` と `name: title` なら `title.x`、入れ子の列名は `.` でつなぐ）
+    3. `data` は、`metadata` のキーでないキーをそのまま複製し、`metadata` のキーの値を列名のパスへ『項目の書き込み』で入れた辞書にする
+    4. 読み替えたパスが、同じ操作の同じ項目（`set`・`data` など）の読み替えなかったキーと同じ列を指す場合、`path` が `operations[{index}].{項目}.{共通のキー}`、`rule` が `{共通のキー} と {列名} は同じ列を指します`、`fix` がどちらか 1 つだけを渡すことの違反で `InvalidArgumentError` を送る
+    5. 読み替えた操作を返す
+  exceptions:
+  - name: InvalidArgumentError
+    condition: 共通のキーとその列名を同じ操作に両方渡した
+    message: '`引数が正しくありません: {違反の数} 件`'
+  unit_tests:
+  - name: test_to_columns
+    case: 正常
+    summary: update の項目のパスを読み替える
+    condition: '`metadata` が `{name: title, description: meta.summary}`、`update` の `set: {name: A, tags: [x]}`・`unset: [description]`・`text_edits: [{field: name, old: a, new: b}]`'
+    mock: なし
+    expected: '`set` が `{title: A, tags: [x]}`、`unset` が `[meta.summary]`、`text_edits[0].field` が `title`。元の操作は変わらない'
+    exception: '-'
+  - name: test_to_columns_when_data
+    case: 正常
+    summary: create の data を列へ入れる
+    condition: '同じ `metadata` で `create` の `data: {name: A, description: d, tags: [x]}`'
+    mock: なし
+    expected: '`data` が `{title: A, meta: {summary: d}, tags: [x]}`'
+    exception: '-'
+  - name: test_to_columns_when_column_name
+    case: 正常
+    summary: 列名をそのまま渡す
+    condition: '同じ `metadata` で `set: {title: A}`、もう 1 つは `metadata` が空の行で `set: {name: A}`'
+    mock: なし
+    expected: どちらも `set` が渡したまま
+    exception: '-'
+  - name: test_to_columns_when_both
+    case: 異常
+    summary: 共通のキーと列名を両方渡す
+    condition: '同じ `metadata` で `index=2`、`set: {name: a, title: b}`'
+    mock: なし
+    expected: '`InvalidArgumentError` の違反の `path` が `operations[2].set.name`、`rule` に `title`'
+    exception: 共通のキーとその列名を同じ操作に両方渡した
+- name: expand_array_keys
+  title: オブジェクトの配列への書き戻し
+  kind: 関数
+  container: project_index/features/write/apply.py
+  usecase: 書き込み
+  role: 変換
+  summary: '`metadata` の列名が `[]`・`[{キー}]` を含む共通のキーへの操作を、オブジェクトの配列の列の置き換えにした操作を返す'
+  scope: public
+  thread_safe: true
+  args:
+  - name: operation
+    title: 操作
+    type: Operation
+    required: true
+    passing: positional
+    description: 書き戻す操作
+  - name: table
+    title: 文書の行
+    type: DocumentTable
+    required: true
+    passing: positional
+    description: '`create` は `kind` の行、`update`・`replace` は文書の種類の行'
+  - name: current
+    title: 今の内容
+    type: Mapping[str, Any] | None
+    required: true
+    passing: positional
+    description: '`update` は文書の今の内容。`create`・`replace` は `None`'
+  - name: index
+    title: 操作の添字
+    type: int
+    required: true
+    passing: keyword
+    description: 違反の `path` に付ける `operations` の位置
+  returns:
+    type: Operation
+    description: 書き戻した新しい操作（`operation` は書き換えない）
+  process: |-
+    1. `table.metadata` のうち、列名が `{配列}[].{項目}`（全ての要素のキー。例 `tags: tags[].name`）か `{配列}[{真偽値のキー}].{項目}`（選んだ要素のキー。例 `main_tags: tags[main].name`）の共通のキーを集める。無ければ `operation` をそのまま返す
+    2. `text_edits[].field` が集めたキーを指す場合、`path` が `operations[{index}].text_edits[{n}].field`、`rule` が `{共通のキー} は文字列の項目ではありません` の違反にする
+    3. `data`・`set`・`add_to`・`remove_from` の集めたキーの値が、要素が全て文字列のリストでない場合（オブジェクトの配列・文字列 1 つなど）、`path` が `operations[{index}].{項目}.{共通のキー}`、`rule` が `{共通のキー} は名前（文字列）の配列で指定します` の違反にする
+    4. 2・3 の違反があれば、操作を当てずに `InvalidArgumentError` で送る
+    5. 配列ごとに、元の配列を複製する。`update` は `current` の値、`create`・`replace` は `data` の列名の値（無ければ空の配列）
+    6. 全ての要素のキーへの操作を当てる
+       - `set` は渡した名前の並びで配列を作り直す。元からあった名前の要素は `main` を含む他のキーを保ち、無い名前は `{項目: 名前}` の要素にする
+       - `add_to` は配列に無い名前を `{項目: 名前}` の要素で末尾に追加する
+       - `remove_from` は項目が渡した名前の要素を削除する
+       - `unset` は配列の列を削除する
+       - `create`・`replace` の `data` の値は `set` と同じに当てる
+    7. 選んだ要素のキーへの操作を当てる
+       - `set` は渡した名前の要素の真偽値のキーを `true` にし、他の要素の真偽値のキーを削除する
+       - `add_to` は渡した名前の要素の真偽値のキーを `true` にする
+       - `remove_from` は渡した名前の要素の真偽値のキーを削除する（無い名前は飛ばす）
+       - `unset` は全ての要素の真偽値のキーを削除する
+       - `set`・`add_to`・`data` に配列に無い名前がある場合、`path` が `operations[{index}].{項目}.{共通のキー}`、`rule` が `{名前} は {全ての要素のキー} にありません` の違反にする
+    8. 7 の違反があれば `InvalidArgumentError` で送る
+    9. 集めたキーを各項目から除き、配列の列名へ作り直した配列を書く操作（`update` は `set`、`create`・`replace` は `data`。`unset` で列を削除したときは `unset`）にして返す
+  exceptions:
+  - name: InvalidArgumentError
+    condition: 集めたキーに名前（文字列）の配列でない値を渡した、選んだ要素のキーに配列に無い名前を渡した、または `text_edits` で指した
+    message: '`引数が正しくありません: {違反の数} 件`'
+  unit_tests:
+  - name: test_expand_array_keys
+    case: 正常
+    summary: 全ての要素のキーの追加・削除・置き換え
+    condition: '`metadata` が `{tags: tags[].name, main_tags: tags[main].name}`、今の内容が `{tags: [{name: a, main: true}, {name: b}]}`。`add_to: {tags: [c]}`・`remove_from: {tags: [b]}`・`set: {tags: [a, c, d]}` を別々に当てる'
+    mock: なし
+    expected: '`set.tags` がそれぞれ `[{name: a, main: true}, {name: b}, {name: c}]`・`[{name: a, main: true}]`・`[{name: a, main: true}, {name: c}, {name: d}]`'
+    exception: '-'
+  - name: test_expand_array_keys_when_main
+    case: 正常
+    summary: 選んだ要素のキーの操作
+    condition: '同じ `metadata`、今の内容が `{tags: [{name: a, main: true}, {name: c}, {name: d}]}`。`set: {main_tags: [c]}`・`add_to: {main_tags: [d]}`・`remove_from: {main_tags: [a]}`・`unset: [main_tags]` を別々に当てる'
+    mock: なし
+    expected: '`set.tags` の `main` が、`c` だけ・`a` と `d`・無し・無しになる'
+    exception: '-'
+  - name: test_expand_array_keys_when_create
+    case: 正常
+    summary: create の data
+    condition: '同じ `metadata` で `create` の `data: {name: r2, tags: [a, b], main_tags: [b]}`'
+    mock: なし
+    expected: '`data` が `{name: r2, tags: [{name: a}, {name: b, main: true}]}` で `main_tags` を持たない'
+    exception: '-'
+  - name: test_expand_array_keys_when_unknown_name
+    case: 異常
+    summary: 配列に無い名前
+    condition: '同じ `metadata` と今の内容で `index=1`、`set: {main_tags: [z]}`'
+    mock: なし
+    expected: '`InvalidArgumentError` の違反の `path` が `operations[1].set.main_tags`、`rule` に `z`'
+    exception: 集めたキーに名前（文字列）の配列でない値を渡した、選んだ要素のキーに配列に無い名前を渡した、または `text_edits` で指した
+  - name: test_expand_array_keys_when_plain
+    case: 正常
+    summary: '[] を使わない行'
+    condition: '`metadata` が `{name: title}` で `set: {tags: [x]}`'
+    mock: なし
+    expected: 渡した操作のまま
+    exception: '-'
+  - name: test_expand_array_keys_when_objects
+    case: 異常
+    summary: 要素が文字列でない配列
+    condition: '同じ `metadata` と今の内容で `index=2`。`create` の `data: {name: r2, tags: [{name: a, main: true}]}`・`add_to: {tags: [{name: c}]}`・`remove_from: {main_tags: [{name: a}]}` を別々に当てる'
+    mock: なし
+    expected: どれも `InvalidArgumentError` で、違反の `path` が `operations[2].data.tags`・`operations[2].add_to.tags`・`operations[2].remove_from.main_tags`、`rule` に `名前（文字列）の配列`。`TypeError` にならない
+    exception: 集めたキーに名前（文字列）の配列でない値を渡した、選んだ要素のキーに配列に無い名前を渡した、または `text_edits` で指した
+  - name: test_expand_array_keys_when_string
+    case: 異常
+    summary: 配列でなく文字列 1 つ
+    condition: '同じ `metadata` と今の内容で `index=0`。`set: {tags: a}`・`set: {main_tags: a}` を別々に当てる'
+    mock: なし
+    expected: どちらも `InvalidArgumentError` で、違反の `path` が `operations[0].set.tags`・`operations[0].set.main_tags`。`a` の 1 文字のタグを書かない
+    exception: 集めたキーに名前（文字列）の配列でない値を渡した、選んだ要素のキーに配列に無い名前を渡した、または `text_edits` で指した

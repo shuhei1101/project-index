@@ -1,0 +1,337 @@
+id: MOD-5
+title: プラグイン / セッション開始のフック / session_start.py
+lead: |-
+  SessionStart のフック。ポートにつながらなければ `project-index serve` を切り離して起動し、つながれば文脈を入れず、`/clear`・圧縮のときだけ `POST /_admin/session-start` で返し済みの記録の削除を依頼する。
+  Python 3.14 の標準ライブラリだけで書き、どの失敗でも終了コード 0 で戻る。
+test_files:
+- tests/unit/plugins/project_index/hooks/test_session_start.py
+directory: |-
+  ```text
+  plugins/project-index/
+  ├─ hooks/
+  │  ├─ hooks.json          # SessionStart（timeout 6）・PreToolUse（timeout 5）の登録
+  │  └─ session_start.py    # main / is_listening / read_clone / start_server / request_forget
+  ```
+constants:
+- name: DEFAULT_PORT
+  title: 既定のポート
+  container: hooks/session_start.py
+  usecase: 起動
+  summary: '`PROJECT_INDEX_PORT` が無いときのポート'
+  value: '8786'
+- name: DEFAULT_CONFIG_HOME
+  title: 設定の置き場の既定の親
+  container: hooks/session_start.py
+  usecase: 起動
+  summary: '`XDG_CONFIG_HOME` が無いか空の文字列か相対パスのときの設定の置き場の親'
+  value: '"~/.config"'
+- name: CONFIG_FILE
+  title: 端末の設定の相対パス
+  container: hooks/session_start.py
+  usecase: 起動
+  summary: 設定の置き場の親から端末の設定までの相対パス
+  value: '"project-index/settings.yaml"'
+- name: CONNECT_TIMEOUT_SEC
+  title: 接続の打ち切り
+  container: hooks/session_start.py
+  usecase: 起動
+  summary: ポートへの TCP 接続を打ち切る秒数
+  value: '0.5'
+- name: FORGET_TIMEOUT_SEC
+  title: 記録の削除の依頼の打ち切り
+  container: hooks/session_start.py
+  usecase: 起動
+  summary: '`POST /_admin/session-start` を打ち切る秒数（実装の後に応答の時間を測って決め直す）'
+  value: '3'
+- name: FORGET_REASONS
+  title: 記録の削除を依頼する理由
+  container: hooks/session_start.py
+  usecase: 起動
+  summary: '`POST /_admin/session-start` を呼ぶ `source`'
+  value: frozenset({'clear', 'compact'})
+- name: RECONNECT_GUIDE
+  title: 再接続の案内
+  container: hooks/session_start.py
+  usecase: 起動
+  summary: 起動したときに文脈に入れる文
+  value: '"project-index を起動しました。このセッションで文書の MCP を使用するには /mcp で project-index に再接続してください。"'
+functions:
+- name: main
+  title: フックの入口
+  container: hooks/session_start.py
+  usecase: 起動
+  role: 入口
+  summary: stdin の JSON を読み、サーバーを起動するか記録の削除を依頼して、入れる文があるときだけ `additionalContext` を標準出力に出す
+  kind: 関数
+  scope: public
+  is_async: false
+  side_effects: 標準出力に書く。サーバーのプロセスを起動することがある
+  returns:
+    type: int
+    description: 常に 0
+  process: |-
+    1. stdin を JSON として読み、`session_id`・`cwd`・`source`・`agent_id` を取る。ポートは `PROJECT_INDEX_PORT`（無ければ `DEFAULT_PORT`）
+       - JSON として読めない場合、何も出さず 0 を返す
+    2. ポートにつながるか確かめる（待ち受けの確かめ）
+    3. つながる場合、`source` が `FORGET_REASONS` で `session_id` があるときだけ記録の削除を依頼する（記録の削除の依頼。`reason` に `source`）。依頼しないときと依頼が成功したときは文を作らない
+       - `TimeoutError`、または `reason` が `TimeoutError` の `urllib.error.URLError` の場合、`project-index の返却済みの記録を削除できませんでした（{FORGET_TIMEOUT_SEC} 秒で打ち切りました）。前に返却した文書は repeat_seen: true で再取得できます。` を `additionalContext` にする
+       - そのほかの `OSError`・`ValueError` の場合、`project-index の返却済みの記録を削除できませんでした（{理由}）。前に返却した文書は repeat_seen: true で再取得できます。` を `additionalContext` にする
+    4. つながらない場合、端末の設定（端末の設定のパス）からクローンを読み（クローンの読み取り）、サーバーを起動し（サーバーの起動）、`RECONNECT_GUIDE` を `additionalContext` にする
+       - 端末の設定・`clone`・`{clone}/.venv/bin/python` のどれかが無い場合、`project-index を起動できませんでした（{無いもののパス}）。/project-index:global-setup で端末の設定を作ってください。` を `additionalContext` にする
+       - 起動が `OSError` の場合、理由を添えて同じ文を `additionalContext` にする
+    5. 文を作った場合だけ `{"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ...}}` を標準出力に出す。予期しない例外も含め 0 を返す
+  unit_tests:
+  - name: test_main_when_listening
+    case: 正常
+    summary: つながれば何も出さない
+    condition: 'stdin に `source: startup` の JSON'
+    mock: 待ち受けの確かめ（`True`）・記録の削除の依頼（呼ばれないことを確かめる）
+    expected: 0 を返し、標準出力が空で、記録の削除の依頼を呼ばない
+  - name: test_main_when_cleared
+    case: 正常
+    summary: '`/clear` の後は記録の削除を依頼し、何も出さない'
+    condition: 'stdin に `source: clear` と `session_id` の JSON'
+    mock: 待ち受けの確かめ（`True`）・記録の削除の依頼（呼ばれた引数を記録する）
+    expected: '0 を返し、標準出力が空で、記録の削除の依頼に `session_id`・`reason: clear` が渡り `cwd` が渡らない'
+  - name: test_main_when_down
+    case: 正常
+    summary: つながらなければ起動して案内する
+    condition: '`clone:` を持つ端末の設定と `{clone}/.venv/bin/python` がある'
+    mock: 待ち受けの確かめ（`False`）・サーバーの起動（呼ばれた引数を記録する）
+    expected: 0 を返し、起動がそのクローンで 1 回呼ばれ、`additionalContext` が `RECONNECT_GUIDE`
+  - name: test_main_when_config_missing
+    case: 異常
+    summary: 端末の設定が無ければ global-setup を案内する
+    condition: '`PROJECT_INDEX_CONFIG` が無いファイル'
+    mock: 待ち受けの確かめ（`False`）・サーバーの起動（呼ばれないことを確かめる）
+    expected: 0 を返し、`additionalContext` にパスと `/project-index:global-setup`。起動を呼ばない
+  - name: test_main_when_forget_failed
+    case: 異常
+    summary: 記録の削除を依頼できなければ repeat_seen を案内する
+    condition: 'stdin に `source: compact` と `session_id` の JSON'
+    mock: 待ち受けの確かめ（`True`）・記録の削除の依頼（`TimeoutError` を送出する）
+    expected: '0 を返し、`additionalContext` に `3 秒で打ち切りました` と `repeat_seen: true` の案内'
+  - name: test_main_when_input_unparsable
+    case: 異常
+    summary: 読めない入力では何も出さない
+    condition: stdin が `{`
+    mock: なし
+    expected: 0 を返し、標準出力が空
+  - name: test_main_when_forget_refused
+    case: 異常
+    summary: 打ち切り以外の失敗は秒数を入れない
+    condition: 'stdin に `source: clear` と `session_id` の JSON'
+    mock: 待ち受けの確かめ（`True`）・記録の削除の依頼（`reason` が `ConnectionRefusedError` の `urllib.error.URLError` を送出する）
+    expected: '0 を返し、`additionalContext` に理由と `repeat_seen: true` の案内があり、`秒で打ち切りました` が無い'
+- name: is_listening
+  title: 待ち受けの確かめ
+  container: hooks/session_start.py
+  usecase: 起動
+  role: 検証
+  summary: '`127.0.0.1:{port}` に TCP でつながるかを返す'
+  kind: 関数
+  scope: public
+  is_async: false
+  args:
+  - name: port
+    title: ポート
+    type: int
+    required: true
+    passing: positional
+    description: サーバーのポート
+  returns:
+    type: bool
+    description: つながれば `True`
+  process: |-
+    1. `socket.create_connection(("127.0.0.1", port), timeout=CONNECT_TIMEOUT_SEC)` でつなぎ、すぐに閉じて `True` を返す
+       - `OSError` の場合、`False` を返す
+  unit_tests:
+  - name: test_is_listening
+    case: 正常
+    summary: 待ち受けているポート
+    condition: テストが `listen` しているポート
+    mock: なし
+    expected: '`True`'
+  - name: test_is_listening_when_closed
+    case: 正常
+    summary: 待ち受けていないポート
+    condition: OS が払い出して閉じたポート
+    mock: なし
+    expected: '`False`'
+- name: config_path
+  title: 端末の設定のパス
+  container: hooks/session_start.py
+  usecase: 起動
+  role: 解決
+  summary: サーバーと同じ規則で端末の設定のパスを決める
+  kind: 関数
+  scope: public
+  is_async: false
+  args:
+  - name: env
+    title: 環境変数
+    type: Mapping[str, str]
+    required: true
+    passing: positional
+    description: '`os.environ`'
+  returns:
+    type: Path
+    description: '`~` を展開した端末の設定のパス'
+  process: |-
+    1. `PROJECT_INDEX_CONFIG` が空でなければ、その値の `~` を展開して返す
+    2. `XDG_CONFIG_HOME` が空でなく絶対パスならその値、そうでなければ `DEFAULT_CONFIG_HOME` の `~` を展開し、その下の `CONFIG_FILE` を返す
+  unit_tests:
+  - name: test_config_path
+    case: 正常
+    summary: PROJECT_INDEX_CONFIG が優先
+    condition: '`{"PROJECT_INDEX_CONFIG": "/tmp/x/settings.yaml", "XDG_CONFIG_HOME": "/tmp/c"}`'
+    mock: なし
+    expected: '`Path("/tmp/x/settings.yaml")`'
+  - name: test_config_path_when_xdg_config_home_set
+    case: 正常
+    summary: XDG_CONFIG_HOME の下
+    condition: '`{"XDG_CONFIG_HOME": "/tmp/c"}`'
+    mock: なし
+    expected: '`Path("/tmp/c/project-index/settings.yaml")`'
+  - name: test_config_path_when_unset_or_relative
+    case: 正常
+    summary: 未設定・空の文字列・相対パスは既定
+    condition: '`{}`・`{"XDG_CONFIG_HOME": ""}`・`{"XDG_CONFIG_HOME": "rel"}`（`HOME` を `/home/u` に monkeypatch）'
+    mock: なし
+    expected: どれも `Path("/home/u/.config/project-index/settings.yaml")`
+- name: read_clone
+  title: クローンの読み取り
+  container: hooks/session_start.py
+  usecase: 起動
+  role: 解決
+  summary: 端末の設定のトップレベルの `clone:` の行だけを読む
+  description: 標準ライブラリに YAML のパーサーが無いため、行を読む。
+  kind: 関数
+  scope: public
+  is_async: false
+  args:
+  - name: config
+    title: 端末の設定
+    type: Path
+    required: true
+    passing: positional
+    description: 端末の設定のパス（`~` を展開済み）
+  returns:
+    type: Path | None
+    description: '`~` を展開したクローンのパス。ファイルか行が無ければ `None`'
+  process: |-
+    1. ファイルを UTF-8 で読む
+       - `OSError` の場合、`None` を返す
+    2. 行頭が `clone:` の最初の行の値を取り、`#` 以降のコメントと前後の空白・引用符を外して `~` を展開する
+    3. 行が無いか値が空なら `None` を返す
+  unit_tests:
+  - name: test_read_clone
+    case: 正常
+    summary: 引用符と ~ を扱う
+    condition: '`clone: "~/project-index"  # クローン` の行と、字下げした `clone:` を持つ `sources` の行'
+    mock: なし
+    expected: ホームの下の `project-index`
+  - name: test_read_clone_when_missing
+    case: 正常
+    summary: 行かファイルが無い
+    condition: '`clone:` の無いファイルと、無いファイル'
+    mock: なし
+    expected: どちらも `None`
+- name: start_server
+  title: サーバーの起動
+  container: hooks/session_start.py
+  usecase: 起動
+  role: 外部との境界
+  summary: クローンの `.venv` で `project-index serve` を切り離して起動し、待たずに戻る
+  kind: 関数
+  scope: public
+  is_async: false
+  side_effects: プロセスを 1 つ起動する
+  args:
+  - name: clone
+    title: クローン
+    type: Path
+    required: true
+    passing: positional
+    description: project-index のクローン
+  returns:
+    type: None
+    description: なし
+  process: |-
+    1. `{clone}/.venv/bin/python` が無ければ `FileNotFoundError` を送出する
+    2. `subprocess.Popen([python, "-m", "project_index", "serve"], cwd=clone, start_new_session=True, stdin/stdout/stderr=DEVNULL)` を呼び、待たずに戻る（環境変数はフックのものを引き継ぐ）
+  exceptions:
+  - name: FileNotFoundError
+    condition: '`{clone}/.venv/bin/python` が無い'
+    message: パス
+  unit_tests:
+  - name: test_start_server
+    case: 正常
+    summary: 切り離して起動する
+    condition: '`.venv/bin/python` を受けた引数をファイルに書いて終わるスクリプトにした一時フォルダ'
+    mock: なし
+    expected: 戻った後にファイルが `-m project_index serve` になる
+  - name: test_start_server_when_no_venv
+    case: 異常
+    summary: .venv が無い
+    condition: 空のフォルダ
+    mock: なし
+    expected: '`FileNotFoundError`'
+    exception: FileNotFoundError
+- name: request_forget
+  title: 記録の削除の依頼
+  container: hooks/session_start.py
+  usecase: 起動
+  role: 外部との境界
+  summary: '`POST /_admin/session-start` を 1 回呼ぶ'
+  kind: 関数
+  scope: public
+  is_async: false
+  side_effects: サーバーがその会話の返し済みの記録を削除する
+  args:
+  - name: port
+    title: ポート
+    type: int
+    required: true
+    passing: positional
+    description: サーバーのポート
+  - name: payload
+    title: 本文
+    type: dict[str, str]
+    required: true
+    passing: positional
+    description: '`session_id`・`agent_id`（あれば）・`reason`'
+  returns:
+    type: None
+    description: なし
+  process: |-
+    1. `urllib.request.Request` で `http://127.0.0.1:{port}/_admin/session-start` に `Content-Type: application/json` で本文を POST し、`timeout=FORGET_TIMEOUT_SEC` で開く
+    2. 応答を JSON として読む
+       - 200 以外は `urllib.error.HTTPError`、打ち切りは `TimeoutError` のまま伝える
+       - 応答が JSON の辞書でない場合、`ValueError` を送出する
+  exceptions:
+  - name: urllib.error.URLError
+    condition: つながらない・200 以外を返した（`HTTPError`）
+    message: urllib の理由
+  - name: TimeoutError
+    condition: '`FORGET_TIMEOUT_SEC` で返らない'
+    message: urllib の理由
+  - name: ValueError
+    condition: 応答が JSON の辞書でない
+    message: '`応答を読み込めません`'
+  unit_tests:
+  - name: test_request_forget
+    case: 正常
+    summary: 本文を POST する
+    condition: '一時のポートの HTTP サーバーが `{"forgotten": true}` を返す'
+    mock: '`POST /_admin/session-start` を真似る HTTP サーバー'
+    expected: 例外を送出せず、サーバーが受けた本文が渡した `payload`
+  - name: test_request_forget_when_timeout
+    case: 異常
+    summary: '`FORGET_TIMEOUT_SEC` で打ち切る'
+    condition: '`FORGET_TIMEOUT_SEC` を 1 に差し替え、2 秒応答しない HTTP サーバー'
+    mock: 応答しない HTTP サーバー
+    expected: 2 秒以内に `TimeoutError`
+    exception: TimeoutError
+refs:
+- IF-19#

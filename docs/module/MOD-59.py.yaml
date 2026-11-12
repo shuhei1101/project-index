@@ -1,0 +1,339 @@
+id: MOD-59
+title: 索引のサーバー / 会話の記録 / store.py
+lead: 会話キーごとの返し済み・前回読んだ内容・閲覧と編集の SQLite への記録と読み出し。
+test_files:
+- tests/unit/project_index/features/seen/test_store.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      会話の記録 ..> 会話キー : 受ける
+      会話の記録 ..> 前回読んだ内容 : 返す
+      会話の記録 ..> 閲覧と編集 : 返す
+      class 会話の記録 {
+        +返し済み(会話キー, 配信元, 種類, バージョン) set
+        +返したことを記録する(会話キー, 配信元, 種類, 文書) None
+        +前回読んだ内容(会話キー, 配信元, ID) dict
+        +閲覧と編集を記録する(会話キー, 配信元, ID, 種類) None
+        +閲覧と編集(会話キー, 配信元) list
+        +会話の記録を消す(会話キー) int
+        +古い記録の削除() int
+      }
+      class 会話キー {
+        +セッションの ID: str
+        +エージェントの ID: str
+      }
+      class 前回読んだ内容 {
+        +ID: str
+        +バージョン: str
+        +内容: str
+      }
+      class 閲覧と編集 {
+        +ID: str
+        +種類: str
+        +日時: datetime
+      }
+      click 会話キー href "./MOD-60.py.yaml#会話キー"
+      click 前回読んだ内容 href "./MOD-60.py.yaml#前回読んだ内容"
+      click 閲覧と編集 href "./MOD-60.py.yaml#閲覧と編集"
+classes:
+- name: SeenStore
+  title: 会話の記録
+  container: project_index/features/seen/store.py
+  usecase: 共通
+  role: リポジトリ
+  summary: 会話キーごとの返し済み・前回読んだ内容・閲覧と編集を SQLite に読み書きする
+  description: |-
+    ファイルは `{state_dir}/seen.sqlite3`（起動の『部品の配線』が作る）。
+    接続は 1 つを `check_same_thread=False`・`journal_mode=WAL` で開き、`_lock` で 1 つずつ使う。
+    会話キーが `None` のときは、どのメソッドも何もせず空を返す。
+  kind: クラス
+  properties:
+  - name: path
+    title: ファイル
+    type: Path
+    access: 公開
+    description: SQLite のファイル
+  - name: retention_days
+    title: 保持日数
+    type: int
+    access: 公開
+    description: 端末の設定の `seen_retention_days`
+  - name: _conn
+    title: 接続
+    type: sqlite3.Connection
+    access: 内部 (_)
+    description: 生成時に開き、`SEEN_SCHEMA` で表を作る
+  - name: _lock
+    title: 排他
+    type: threading.Lock
+    access: 内部 (_)
+    description: '`_conn` を守る'
+  methods:
+  - name: returned
+    title: 返し済み
+    summary: 同じバージョンをこの会話で返し済みの文書の ID を返す
+    kind: メソッド
+    scope: public
+    thread_safe: true
+    args:
+    - name: key
+      title: 会話キー
+      type: SessionKey | None
+      required: true
+      passing: positional
+      description: 記録の単位
+    - name: source_id
+      title: 配信元の ID
+      type: str
+      required: true
+      passing: positional
+      description: 文書の配信元
+    - name: kind
+      title: 返した種類
+      type: ReturnKind
+      required: true
+      passing: positional
+      description: 本文か関連の相手か
+    - name: versions
+      title: バージョン
+      type: Mapping[str, str]
+      required: true
+      passing: positional
+      description: 文書の ID → 今のバージョン
+    returns:
+      type: set[str]
+      description: 記録のバージョンが今のバージョンと同じ ID
+    process: |-
+      1. `key` が `None` なら空の集合を返す
+      2. `returned` から、会話キー・配信元・種類が同じで `doc_id` が `versions` にある行を引き、`version` が同じ ID を返す
+    unit_tests:
+    - name: test_seen_store_returned
+      case: 正常
+      summary: 同じバージョンだけ返し済み
+      condition: '`doc-1@v1`・`doc-2@v1` を `body` で記録し、`{doc-1: v1, doc-2: v2}` を引く'
+      mock: なし（一時フォルダの SQLite）
+      expected: '`{"doc-1"}`'
+    - name: test_seen_store_returned_when_other_key
+      case: 正常
+      summary: 会話キーとサブエージェントを分ける
+      condition: '`SessionKey("s1")` で記録し、`SessionKey("s1", "a1")` と `SessionKey("s2")` と `None` で引く'
+      mock: なし
+      expected: どれも空の集合
+  - name: mark_returned
+    title: 返したことを記録する
+    summary: 返した文書のバージョンを記録し、本文なら内容と閲覧も記録する
+    kind: メソッド
+    scope: public
+    thread_safe: true
+    side_effects: '`returned`・`activity` の行を書く'
+    args:
+    - name: key
+      title: 会話キー
+      type: SessionKey | None
+      required: true
+      passing: positional
+      description: 記録の単位
+    - name: source_id
+      title: 配信元の ID
+      type: str
+      required: true
+      passing: positional
+      description: 文書の配信元
+    - name: kind
+      title: 返した種類
+      type: ReturnKind
+      required: true
+      passing: positional
+      description: 本文か関連の相手か
+    - name: documents
+      title: 返した文書
+      type: Sequence[Document]
+      required: true
+      passing: positional
+      description: 返した文書
+    returns:
+      type: None
+      description: '-'
+    process: |-
+      1. `key` が `None` か `documents` が空なら何もしない
+      2. 1 つのトランザクションで、文書ごとに `returned` の行を `INSERT OR REPLACE` する（`doc_kind` は `document.kind`、`at` は今の UTC の ISO 8601）
+         - `body` の場合、`content` に文書の `body`を入れ、`activity` に `viewed` の行を `INSERT OR REPLACE` する
+         - `related` の場合、`content` は `NULL`
+    unit_tests:
+    - name: test_seen_store_mark_returned
+      case: 正常
+      summary: 本文は内容と閲覧も残す
+      condition: '`doc-1` を `body`、`doc-2` を `related` で記録する'
+      mock: なし
+      expected: '`last_read` が `doc-1` だけを内容つきで返し、`activity` が `doc-1` の `viewed` だけを返す'
+  - name: last_read
+    title: 前回読んだ内容
+    summary: この会話で最後に本文を返したときの内容を返す
+    kind: メソッド
+    scope: public
+    thread_safe: true
+    args:
+    - name: key
+      title: 会話キー
+      type: SessionKey | None
+      required: true
+      passing: positional
+      description: 記録の単位
+    - name: source_id
+      title: 配信元の ID
+      type: str
+      required: true
+      passing: positional
+      description: 文書の配信元
+    returns:
+      type: dict[str, LastRead]
+      description: 文書の ID → 前回読んだ内容。記録が無ければ空
+    process: |-
+      1. `key` が `None` なら空の辞書を返す
+      2. `returned` から会話キー・配信元が同じで `kind` が `body` の行を引き、`LastRead` にする
+  - name: record_activity
+    title: 閲覧と編集を記録する
+    summary: 書いた文書を編集として記録する
+    kind: メソッド
+    scope: public
+    thread_safe: true
+    side_effects: '`activity` の行を書く'
+    args:
+    - name: key
+      title: 会話キー
+      type: SessionKey | None
+      required: true
+      passing: positional
+      description: 記録の単位
+    - name: source_id
+      title: 配信元の ID
+      type: str
+      required: true
+      passing: positional
+      description: 文書の配信元
+    - name: doc_ids
+      title: 文書の ID
+      type: Sequence[str]
+      required: true
+      passing: positional
+      description: 書いた文書
+    - name: kind
+      title: 種類
+      type: ActivityKind
+      required: true
+      passing: positional
+      description: '`write_docs` は `edited`'
+    returns:
+      type: None
+      description: '-'
+    process: 1. `key` が `None` でなければ、ID ごとに `activity` の行を `INSERT OR REPLACE` する
+  - name: activity
+    title: 閲覧と編集
+    summary: この会話で閲覧・編集した文書を返す
+    kind: メソッド
+    scope: public
+    thread_safe: true
+    args:
+    - name: key
+      title: 会話キー
+      type: SessionKey | None
+      required: true
+      passing: positional
+      description: 記録の単位
+    - name: source_id
+      title: 配信元の ID
+      type: str
+      required: true
+      passing: positional
+      description: 文書の配信元
+    returns:
+      type: list[Activity]
+      description: 新しい順。記録が無ければ空
+    process: 1. `key` が `None` なら空の並びを返し、そうでなければ `activity` の行を `at` の降順で返す
+    unit_tests:
+    - name: test_seen_store_activity
+      case: 正常
+      summary: 閲覧と編集を新しい順に返す
+      condition: '`doc-1` を `body` で返し、続けて `doc-2` を `edited` で記録する'
+      mock: なし
+      expected: '`doc-2`（`edited`）・`doc-1`（`viewed`）の順'
+  - name: forget
+    title: 会話の記録を消す
+    summary: 1 つの会話キーの記録を全て消す
+    description: '`/clear`・圧縮の後に SessionStart のフックが `POST /_admin/session-start` を通して呼ぶ（セッションの開始）。'
+    kind: メソッド
+    scope: public
+    thread_safe: true
+    side_effects: '`returned`・`activity` の行を消す'
+    args:
+    - name: key
+      title: 会話キー
+      type: SessionKey
+      required: true
+      passing: positional
+      description: 消す会話（`agent_id` が空ならサブエージェントの記録も消す）
+    returns:
+      type: int
+      description: 消した行の数
+    process: |-
+      1. `agent_id` が空なら `session_id` が同じ行を、そうでなければ会話キーが同じ行を、2 つの表から消す
+      2. 消した行の数を返す
+    unit_tests:
+    - name: test_seen_store_forget
+      case: 正常
+      summary: メインの会話を消すとサブエージェントも消える
+      condition: '`SessionKey("s1")`・`SessionKey("s1", "a1")`・`SessionKey("s2")` で記録し、`SessionKey("s1")` を消す'
+      mock: なし
+      expected: '`s2` の記録だけが残る'
+  - name: purge_expired
+    title: 古い記録の削除
+    summary: 保持日数を過ぎた会話の記録を消す
+    kind: メソッド
+    scope: public
+    thread_safe: true
+    side_effects: '`returned`・`activity` の行を消す'
+    args:
+    - name: now
+      title: 今
+      type: datetime | None
+      required: false
+      default: None
+      passing: keyword
+      description: 基準の日時（テスト用）。`None` は今の UTC
+    returns:
+      type: int
+      description: 消した行の数
+    process: |-
+      1. `now - retention_days 日` より前に最後の行がある会話キー（`session_id` の単位で、2 つの表の `at` の最大）を求める
+      2. その会話キーの行を 2 つの表から消し、数を返す
+    unit_tests:
+    - name: test_seen_store_purge_expired
+      case: 正常
+      summary: 保持日数を過ぎた会話だけ消す
+      condition: '`retention_days=7`、8 日前と 1 日前に記録した 2 つの会話'
+      mock: なし（`now` を渡す）
+      expected: 8 日前の会話だけが消え、1 を超える行の数を返す
+constants:
+- name: SEEN_SCHEMA
+  title: 記録の表の定義
+  container: project_index/features/seen/store.py
+  usecase: 共通
+  summary: 記録を置く 2 つの表の `CREATE TABLE IF NOT EXISTS`
+  value: |-
+    ```sql
+    CREATE TABLE IF NOT EXISTS returned (
+      session_id TEXT NOT NULL, agent_id TEXT NOT NULL, source_id TEXT NOT NULL,
+      kind TEXT NOT NULL, doc_id TEXT NOT NULL, version TEXT NOT NULL,
+      doc_kind TEXT NOT NULL, content TEXT, at TEXT NOT NULL,
+      PRIMARY KEY (session_id, agent_id, source_id, kind, doc_id));
+    CREATE TABLE IF NOT EXISTS activity (
+      session_id TEXT NOT NULL, agent_id TEXT NOT NULL, source_id TEXT NOT NULL,
+      doc_id TEXT NOT NULL, kind TEXT NOT NULL, at TEXT NOT NULL,
+      PRIMARY KEY (session_id, agent_id, source_id, doc_id, kind));
+    ```
+refs:
+- IF-2#
+- IF-4#
+- IF-3#

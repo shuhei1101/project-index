@@ -1,0 +1,160 @@
+id: MOD-77
+title: 索引のサーバー / 読み取り API / paths.py
+lead: 文書のページのパスと、読み取り API が読む場所。
+test_files:
+- tests/unit/project_index/features/read/test_paths.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      読み取り API の入口 ..> 読み取りの場所
+      文書の取得 ..> 文書のページの特定
+      class 読み取り API の入口 {
+        <<function>>
+      }
+      class 文書の取得 {
+        <<function>>
+      }
+      class 読み取りの場所 {
+        <<function>>
+      }
+      class 文書のページの特定 {
+        <<function>>
+      }
+      click 読み取り API の入口 href "./MOD-126.py.yaml#読み取り API の入口"
+      click 文書の取得 href "./MOD-125.py.yaml#文書の取得"
+functions:
+- name: page_path
+  title: 文書のページのパス
+  kind: 関数
+  container: project_index/features/read/paths.py
+  usecase: 文書の取得
+  role: 変換
+  summary: 文書を URL のパスにする
+  scope: public
+  thread_safe: true
+  args:
+  - name: document
+    title: 文書
+    type: Document
+    required: true
+    passing: positional
+    description: 文書
+  returns:
+    type: str
+    description: '`path` から拡張子を落とした形。`records` の文書は `{拡張子を落とした path}/{id}`'
+  process: 1. `PurePosixPath(path).with_suffix("")` にし、`record_index` があれば `/{id}` を続ける
+  unit_tests:
+  - name: test_page_path
+    case: 正常
+    summary: ファイルと records
+    condition: '`docs/a.yaml` の文書と、`docs/rules.yaml` の `records` の `r-1`'
+    mock: なし
+    expected: '`docs/a` と `docs/rules/r-1`'
+- name: find_page
+  title: 文書のページの特定
+  kind: 関数
+  container: project_index/features/read/paths.py
+  usecase: 文書の取得
+  role: 判定
+  summary: 文書のページのパスに当たる文書を探す
+  scope: public
+  thread_safe: true
+  args:
+  - name: documents
+    title: 文書
+    type: Sequence[Document]
+    required: true
+    passing: positional
+    description: 配信元の文書
+  - name: page
+    title: 文書のページのパス
+    type: str
+    required: true
+    passing: positional
+    description: 探すパス
+  returns:
+    type: Document | None
+    description: 無ければ `None`
+  process: |-
+    1. 文書のページのパスが `page` と同じ文書を返す
+    2. 無ければ、`path` か `body_path` が `page` と同じ最初の文書を返す（`try_convert` と同じ引き方）
+    3. どちらにも無ければ `None` を返す
+  unit_tests:
+  - name: test_find_page
+    case: 正常
+    summary: 文書のページのパスで当たる
+    condition: 文書のページのパスが `rules/a` の文書と `page` が `rules/a`
+    mock: なし
+    expected: その文書
+  - name: test_find_page_when_body_path
+    case: 正常
+    summary: 本文のファイルのパスで当たる
+    condition: '`path` が `notes/files.yaml`・`body_path` が `notes/b.md` の管理用の YAML の行の文書と `page` が `notes/b.md`'
+    mock: なし
+    expected: その文書
+  - name: test_find_page_when_missing
+    case: 正常
+    summary: どれにも当たらない
+    condition: '`page` が `no/such`'
+    mock: なし
+    expected: '`None`'
+- name: read_target
+  title: 読み取りの場所
+  kind: 関数
+  container: project_index/features/read/paths.py
+  usecase: 共通
+  role: 判定
+  summary: 配信元の ID とリビジョンから、読み取り API が読む場所を返す
+  scope: public
+  thread_safe: true
+  args:
+  - name: registry
+    title: 配信元の一覧
+    type: SourceRegistry
+    required: true
+    passing: injected
+    description: 配信中の配信元
+  - name: source_id
+    title: 配信元の ID
+    type: str
+    required: true
+    passing: positional
+    description: 開く配信元
+  - name: ref
+    title: リビジョン
+    type: str | None
+    required: true
+    passing: positional
+    description: '`ref`・`diff` の値'
+  returns:
+    type: tuple[Target, ResolvedRef | None]
+    description: 読む場所と、Git の配信元のとき解いたリビジョン
+  process: |-
+    1. 配信元を引く（配信元の一覧.引く。`UnknownSourceError`・`SourceNotServedError` はそのまま伝える）
+    2. Git 管理外の配信元は `ref` を無視し、`root` を `ref` なしで読む場所にする（`access` は `read`。画面は `127.0.0.1` だけで待ち受けるので作業場所の権限を見ない）
+    3. Git の配信元は、`ref`（無ければ `default_ref`）をリビジョンの解決で解き、`root` をその commit で読む場所にする（`Target.ref` と `Target.commit` に解いた commit を持たせる）
+  exceptions:
+  - name: UnknownSourceError
+    condition: 無い配信元
+    message: '`配信元がありません: {id}`'
+  - name: SourceNotServedError
+    condition: 配信していない配信元
+    message: '`{id} は配信していません`'
+  - name: RefNotFoundError
+    condition: 解決できないリビジョン
+    message: '`ref を解決できません: {value}`'
+  unit_tests:
+  - name: test_read_target
+    case: 正常
+    summary: 既定のリビジョン
+    condition: Git の配信元で `ref=None`
+    mock: なし（一時フォルダのリポジトリ）
+    expected: '`Target.ref` と `Target.commit` が `default_ref` の commit'
+  - name: test_read_target_when_not_git
+    case: 正常
+    summary: Git 管理外
+    condition: Git 管理外の配信元で `ref="main"`
+    mock: なし
+    expected: '`Target.ref` が `None` で、解いたリビジョンが `None`'

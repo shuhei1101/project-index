@@ -1,0 +1,25 @@
+id: LIB-9
+title: "alias-inject"
+kind: "ライブラリ"
+version:
+  current: v0.3.0
+  latest: v0.3.0
+  checked_on: '2026-10-31'
+  source: src/project_index/schemas/aliases.source.yaml
+  pinning: タグを指定して `schemas/aliases.schema.yaml` だけを複製し、取り込み元のタグを `aliases.source.yaml` に記録する（コードには依存しない）
+catalogs:
+- name: ファイル
+  version: v0.3.0
+  entries:
+  - name: schemas/aliases.schema.yaml
+    kind: スキーマ
+    purpose: エイリアスの元の行（`alias_type`・`metadata` のエイリアスのキー）の定義。project-index は `$defs.alias.properties.metadata.properties` のキーをエイリアスのキーの検証に使う
+lead: Claude Code のプロンプトに、YAML の文書から集めた用語・文書の別名・コマンドなどのエイリアスを差し込むプラグイン。エイリアスの元の行のスキーマ（`schemas/aliases.schema.yaml`）を正本として持つ。
+supplier: shuhei1101
+dependency_scope: 必須
+adoption: 採用
+used_in:
+- src/project_index/schemas/aliases.schema.yaml
+- src/project_index/features/documents/aliases.py
+upstream: shuhei1101/alias-inject
+official_url: https://github.com/shuhei1101/alias-inject

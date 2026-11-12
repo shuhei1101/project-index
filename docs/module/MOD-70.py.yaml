@@ -1,0 +1,632 @@
+id: MOD-70
+title: 索引のサーバー / 配信元 / service.py
+lead: 配信元の設定の読み込みと検証、スクリプトとバージョンの確かめ。
+test_files:
+- tests/unit/project_index/features/sources/test_service.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      配信元の一覧 ..> 配信元の読み込み : 行ごとに
+      配信元の読み込み ..> 設定のマージ : config の並び
+      配信元の読み込み ..> 配信元の設定の検証
+      配信元の読み込み ..> スクリプトの確かめ
+      配信元の読み込み ..> 設定のバージョンの比較
+      スクリプトの確かめ ..> 実行できるかの確かめ
+      配信元の読み込み ..> 配信中の配信元 : 作る
+      配信元の読み込み ..> 配信元の状態 : 作る
+      class 配信元の一覧 {
+        +読み直す(端末の設定) list
+        +引く(配信元の ID) 配信中の配信元
+        +配信中() list
+        +状態の一覧() list
+      }
+      class 配信元の読み込み {
+        <<function>>
+      }
+      class 設定のマージ {
+        <<function>>
+      }
+      class 配信元の設定の検証 {
+        <<function>>
+      }
+      class スクリプトの確かめ {
+        <<function>>
+      }
+      class 設定のバージョンの比較 {
+        <<function>>
+      }
+      class 実行できるかの確かめ {
+        <<function>>
+      }
+      class 配信中の配信元 {
+        +ID: str
+        +直下: Path
+      }
+      class 配信元の状態 {
+        +状態: str
+        +違反: list
+      }
+      click 配信元の一覧 href "./MOD-69.py.yaml#配信元の一覧"
+      click 設定のマージ href "./MOD-68.py.yaml#設定のマージ"
+      click 実行できるかの確かめ href "./MOD-88.py.yaml#実行できるかの確かめ"
+      click 配信中の配信元 href "./MOD-71.py.yaml#配信中の配信元"
+      click 配信元の状態 href "./MOD-71.py.yaml#配信元の状態"
+constants:
+- name: SOURCE_SCHEMA
+  title: 配信元の設定のスキーマ
+  container: project_index/features/sources/service.py
+  usecase: 共通
+  summary: 配布に同梱する配信元の設定のスキーマのパス（`importlib.resources` で引く）
+  value: '"schemas/project-index.schema.yaml"'
+functions:
+- name: validate_source_config
+  title: 配信元の設定の検証
+  kind: 関数
+  container: project_index/features/sources/service.py
+  usecase: 起動
+  role: 検証
+  summary: マージした設定をスキーマ・行の参照・ファイルの有無で確かめ、違反を全て返す
+  scope: public
+  thread_safe: true
+  args:
+  - name: value
+    title: 設定の値
+    type: dict[str, Any]
+    required: true
+    passing: positional
+    description: マージした値
+  - name: root
+    title: 配信元の直下
+    type: Path
+    required: true
+    passing: keyword
+    description: 相対パスを解くフォルダ
+  - name: lookup
+    title: 参照先の配信元の引き当て
+    type: SchemaRefLookup | None
+    required: false
+    default: None
+    passing: keyword
+    description: '`documents[].schema` がオブジェクトの行の参照先を引く。`None` は端末の設定のファイル（`config_path`）を読んで作る（端末の設定からの引き当て）'
+  returns:
+    type: list[Violation]
+    description: 違反の並び。無ければ空
+  process: |-
+    1. `SOURCE_SCHEMA` でスキーマの違反を全て集める（スキーマの違反）。スキーマの違反があれば、ここで返す
+    2. テーブル（`TABLE_KEYS`）ごとに `id` の重なりを確かめ、後の行の `{テーブル}[{n}].id` に違反を加える
+    3. 行の参照を確かめる。`documents[].validators[]`・`documents[].converter`・`documents[].after_write[]` が、それぞれ `validators[]`・`converters[]`・`generators[]` に無い ID を指す場合、その要素のパスに `存在しない ID` の違反を加える
+    4. `body_file` を `records` なしで書いた行は `documents[{n}].body_file` に違反を加える
+    5. `documents[].schema` のファイルが `root` の下に無いか YAML として読めない場合、そのキーに違反を加える（YAMLの読み込み）。スキーマは Draft 2020-12 の `check_schema` も通す
+       - `schema` がオブジェクトの行は、参照先のスキーマの読み取りで読み、`SchemaRefError` は `documents[{n}].schema` の違反（理由は例外の `rule`）にする。読めたスキーマは `check_schema` を通す
+    6. パス（`documents[].paths[]`・`schema`）が `..` で `root` の外を指す場合、その要素に違反を加える
+    7. 違反を返す
+  unit_tests:
+  - name: test_validate_source_config
+    case: 正常
+    summary: 違反が無い
+    condition: '`name` と yaml の行 1 つ（`schema` のファイルあり）'
+    mock: なし（一時フォルダ）
+    expected: 空
+  - name: test_validate_source_config_when_required_missing
+    case: 正常
+    summary: 必須のキーが無い
+    condition: '`documents[0]` に `paths` が無い'
+    mock: なし
+    expected: '`Violation(path="documents[0].paths", rule="必須のキーが無い")` だけ'
+  - name: test_validate_source_config_when_unknown_key
+    case: 正常
+    summary: 表に無いキー
+    condition: 最上位に `mcp`
+    mock: なし
+    expected: '`mcp` の `知らないキー`'
+  - name: test_validate_source_config_when_duplicate_id
+    case: 正常
+    summary: 行の ID が重なる
+    condition: '`documents` に `id: a` が 2 行'
+    mock: なし
+    expected: '`documents[1].id` の違反'
+  - name: test_validate_source_config_when_dangling_reference
+    case: 正常
+    summary: 無い ID を指す
+    condition: '`documents[0].validators: [nope]`、`validators` は空'
+    mock: なし
+    expected: '`documents[0].validators[0]` の `存在しない ID`'
+  - name: test_validate_source_config_when_schema_missing
+    case: 正常
+    summary: スキーマのファイルが無い
+    condition: '`documents[0].schema: schemas/none.yaml`'
+    mock: なし
+    expected: '`documents[0].schema` の違反'
+  - name: test_validate_source_config_when_schema_broken
+    case: 正常
+    summary: スキーマのファイルを YAML として読み込めない
+    condition: '`schemas/rule.schema.yaml` が `a: [`'
+    mock: なし
+    expected: '`documents[0].schema` の違反で、`rule` が `スキーマを YAML として読み込めない:` で始まる'
+  - name: test_validate_source_config_when_body_file_without_records
+    case: 正常
+    summary: '`records` の無い行が `body_file` を持つ'
+    condition: '`documents[0]` に `body_file: body` があり `records` が無い'
+    mock: なし
+    expected: '`documents[0].body_file` の違反で、`rule` が `records と一緒に記載してください`'
+  - name: test_validate_source_config_when_outside_root
+    case: 正常
+    summary: 配信元の外を指す
+    condition: '`documents[0].paths: [../x/*.md]`'
+    mock: なし
+    expected: '`documents[0].paths[0]` の違反'
+  - name: test_validate_source_config_when_exclude_has_slash
+    case: 正常
+    summary: 除外の名前に `/` を含む
+    condition: '`documents[0].exclude: [a/README.md]`'
+    mock: なし
+    expected: '`documents[0].exclude[0]` の違反'
+  - name: test_validate_source_config_when_legacy_keys
+    case: 正常
+    summary: 前の形式のキー
+    condition: '`documents[0]` に `type: yaml`・`defaults: [{paths: [a/**], tags: [x]}]`・`metadata: {name: {type: ref, field: title}}`'
+    mock: なし
+    expected: '`documents[0].type`・`documents[0].defaults` の `知らないキー` と、`documents[0].metadata.name` の違反'
+  - name: test_validate_source_config_when_tag_master
+    case: 正常
+    summary: タグのマスターを書いた
+    condition: '最上位に `tags: tags.yaml`（`tags.yaml` を置く）'
+    mock: なし
+    expected: '`tags` の `知らないキー` だけ'
+  - name: test_validate_source_config_when_nav_filter
+    case: 正常
+    summary: nav の auto の条件
+    condition: '`nav.tabs[0].items[0].auto` が `{filter: {field: tags, op: eq, values: [mcp]}}`（`document` なし）と、`{filter: {field: tags, op: like, values: [mcp]}}`'
+    mock: なし
+    expected: 1 つ目は違反が無く、2 つ目は `nav.tabs[0].items[0].auto.filter` の下のパスの違反
+  - name: test_validate_source_config_when_cache_outside_converters
+    case: 異常
+    summary: converters 以外の行の cache
+    condition: '`validators: [{id: v, run: [python3, scripts/v.py], cache: false}]`'
+    mock: なし
+    expected: '`validators[0].cache` の違反が 1 件'
+- name: check_scripts
+  title: スクリプトの確かめ
+  kind: 関数
+  container: project_index/features/sources/service.py
+  usecase: 起動
+  role: 検証
+  summary: 検査・変換・生成の行のコマンドを動かさずに確かめる
+  scope: public
+  thread_safe: true
+  args:
+  - name: config
+    title: 配信元の設定
+    type: SourceConfig
+    required: true
+    passing: positional
+    description: 検証を通した設定
+  - name: root
+    title: 配信元の直下
+    type: Path
+    required: true
+    passing: keyword
+    description: コマンドを実行する場所
+  returns:
+    type: list[Violation]
+    description: 確かめられなかった行の違反
+  process: |-
+    1. `validators[]`・`converters[]`・`generators[]` の行ごとに実行できるかを確かめる（実行できるかの確かめ）
+       - `ScriptNotFoundError` の場合、`{テーブル}[{n}]` のパスに、例外の理由を持つ違反を加える
+    2. 違反を返す
+  unit_tests:
+  - name: test_check_scripts
+    case: 正常
+    summary: 全て実行できる
+    condition: '`converters: [{id: c, run: [python3, scripts/c.py]}]`、`scripts/c.py` あり'
+    mock: なし（一時フォルダ）
+    expected: 空
+  - name: test_check_scripts_when_missing
+    case: 正常
+    summary: スクリプトが無い
+    condition: '`converters[0].run: [python3, scripts/none.py]`'
+    mock: なし
+    expected: '`converters[0]` の違反で、理由に `scripts/none.py`'
+- name: compare_config_version
+  title: 設定のバージョンの比較
+  kind: 関数
+  container: project_index/features/sources/service.py
+  usecase: 起動
+  role: 検証
+  summary: 配信元の設定のバージョンをサーバーの読めるバージョンと比べる
+  scope: public
+  args:
+  - name: version
+    title: 設定のバージョン
+    type: str
+    required: true
+    passing: positional
+    description: 設定の `version`
+  returns:
+    type: Literal['same', 'older', 'newer']
+    description: 設定のほうが同じ・古い・新しい
+  process: 1. 両方を整数にして `SOURCE_CONFIG_VERSION` と比べ、結果を返す（整数にならない値はスキーマの `pattern` で断っている）
+  unit_tests:
+  - name: test_compare_config_version
+    case: 正常
+    summary: 同じ・古い・新しい
+    condition: '`SOURCE_CONFIG_VERSION` を `"2"` に monkeypatch し、`"2"`・`"1"`・`"3"`'
+    mock: なし
+    expected: '`same`・`older`・`newer`'
+- name: load_source
+  title: 配信元の読み込み
+  kind: 関数
+  container: project_index/features/sources/service.py
+  usecase: 起動
+  role: サービス
+  summary: 端末の設定の 1 行から配信元の設定を読んで検証し、配信中の配信元と状態を作る
+  scope: public
+  thread_safe: true
+  args:
+  - name: entry
+    title: 配信元の行
+    type: SourceEntry
+    required: true
+    passing: positional
+    description: 端末の設定の `sources[]` の行
+  - name: index
+    title: 行の位置
+    type: int
+    required: true
+    passing: keyword
+    description: '`sources[]` の中の位置'
+  - name: lookup
+    title: 参照先の配信元の引き当て
+    type: SchemaRefLookup | None
+    required: false
+    default: None
+    passing: keyword
+    description: 読み直す端末の設定から作った引き当て（配信元の設定の検証へ渡す。`None` は端末の設定のファイルから作る）
+  returns:
+    type: tuple[ServedSource | None, SourceStatus]
+    description: 配信するときは配信中の配信元と `serving` の状態、配信しないときは `None` と `not_served` か `disabled` の状態
+  process: |-
+    1. `entry.enabled` が `False` の場合、`disabled` を返す（設定は読まない。ID は `entry.id`、無ければ `sources[{index}]`）
+    2. `entry.config` の各ファイルを順に読む（YAMLの読み込み）。先頭のファイルは、Git の配信元なら『default_ref の設定の読み込み』の内容を読み、commit を設定の commit にする（`ValidationFailedError` は違反を持つ `not_served` を返す）。2 つ目以降のファイルはディスクから読む
+       - 無い・読めない・辞書でない場合、`config[{n}]` のパスの違反を持つ `not_served` を返す
+    3. 読んだ値をマージする（設定のマージ）。`root` は先頭のファイルのフォルダにする
+    4. マージした値を検証する（配信元の設定の検証）
+       - 違反がある場合、その違反を持つ `not_served` を返す。設定の `version` を設定のバージョンの比較にかけて `older` なら、エラーログに `project-index migrate --source {先頭の設定のファイル}` で移し替えられることを足す
+    5. `SourceConfig` にする。設定の `enabled` が `False` の場合、`disabled` を返す
+    6. スクリプトを確かめる（スクリプトの確かめ。設定の commit がある場合は、そのリビジョンにスクリプトのファイルがあるか）
+       - 違反がある場合、その違反を持つ `not_served` を返す
+    7. 設定のバージョンを比べる（設定のバージョンの比較）
+       - `newer` の場合、`version` に「このサーバーより新しい設定」の違反を持つ `not_served` を返す
+       - `older` の場合、状態の `config_version` に `(設定, SOURCE_CONFIG_VERSION)` を入れる
+       - `[warning]` 配信元の設定のバージョンが古い（ID・設定のバージョン・サーバーが読めるバージョン）
+    8. `root` が Git の作業ツリーかとその直下を引く（履歴の『リポジトリの直下』）
+    9. 種類ごとのスキーマを読み（設定の commit がある場合はそのリビジョンのファイル。`schema_path` が `SchemaRef` の行は参照先のスキーマの読み取りの結果）、`worktrees` をメインのリポジトリの直下（Git でなければ `root`）からの絶対パスにして、`ServedSource` を作る。ID は `entry.id`、無ければ `config.name`。`outside_read` は `entry.outside_read`
+    10. `ServedSource` と `serving` を返す
+
+    違反で返すときは `[error]` 配信元を配信しない（違反ごとに `{id}: {パス}: {理由}`）を書く。
+  unit_tests:
+  - name: test_load_source
+    case: 正常
+    summary: 配信する
+    condition: Git の一時リポジトリの `project-index.yaml`（yaml の行 1 つ）、`entry.id` なし
+    mock: なし（一時フォルダで `git init`）
+    expected: '`ServedSource` の ID が設定の `name`、`is_git` が `True`、`schemas` に行の ID、状態が `serving`'
+  - name: test_load_source_when_merged
+    case: 正常
+    summary: 複数の YAML を重ねる
+    condition: '`config` が 2 つで、後が `description` を上書きする'
+    mock: なし
+    expected: '`config.description` が後の値、`root` が先頭のファイルのフォルダ'
+  - name: test_load_source_when_disabled
+    case: 正常
+    summary: 端末の設定で無効
+    condition: '`entry.enabled: false`、`config` は無いパス'
+    mock: なし
+    expected: '`None` と `disabled`（ファイルを読まない）'
+  - name: test_load_source_when_config_missing
+    case: 正常
+    summary: 設定のファイルが無い
+    condition: '`config: [/tmp/none.yaml]`'
+    mock: なし
+    expected: '`None` と `not_served`、違反のパスが `config[0]`'
+  - name: test_load_source_when_config_broken
+    case: 正常
+    summary: 設定のファイルを YAML として読み込めない
+    condition: '`project-index.yaml` が `name: [`'
+    mock: なし
+    expected: '`None` と `not_served`、違反のパスが `config[0]` で、`rule` が `YAML として読み込めない:` で始まる'
+  - name: test_load_source_when_invalid
+    case: 正常
+    summary: 検証に失敗する
+    condition: '`documents[0]` に `paths` が無い'
+    mock: なし
+    expected: '`None` と `not_served`、違反が `documents[0].paths`。エラーログに `{id}: documents[0].paths: 必須のキーが無い`'
+  - name: test_load_source_when_script_missing
+    case: 正常
+    summary: スクリプトが無い
+    condition: '`converters[0]` が無いファイルを指す'
+    mock: なし
+    expected: '`None` と `not_served`、違反が `converters[0]`'
+  - name: test_load_source_when_version_old
+    case: 正常
+    summary: 設定のバージョンが古い
+    condition: '`SOURCE_CONFIG_VERSION` を `"2"` に monkeypatch、設定は `version: "1"`'
+    mock: なし
+    expected: '`ServedSource` と `serving`、`config_version` が `("1", "2")`、警告のログが 1 行'
+  - name: test_load_source_when_not_git
+    case: 正常
+    summary: Git の管理外のフォルダ
+    condition: '`git init` していない一時フォルダ'
+    mock: なし
+    expected: '`is_git` が `False`、`repo_root` が `None`'
+  - name: test_load_source_when_legacy
+    case: 正常
+    summary: 前の形式の設定
+    condition: '`version: "1"` で `documents[0]` に `type: markdown` を持つ設定'
+    mock: なし
+    expected: '`None` と `not_served`、違反が `documents[0].type`。エラーログに `project-index migrate --source` と設定のファイルのパス'
+  - name: test_load_source_when_default_ref
+    case: 正常
+    summary: default_ref の設定とスキーマで組み立てる
+    condition: '`develop`（`default_ref`）に `kind_a` の行とスキーマを commit し、クローン本体は `master` を checkout'
+    mock: なし（一時フォルダで `git init`）
+    expected: '`config.documents` と `schemas` に `kind_a` があり、`config_commit` が `develop` の commit'
+  - name: test_load_source_when_worktree_config
+    case: 正常
+    summary: ワークツリーの設定でもメインから数える
+    condition: '`entry.config` が `.claude/worktrees/develop/project-index.yaml`、`worktrees: [.claude/worktrees/*]`'
+    mock: なし（一時フォルダで `git init` と `git worktree add`）
+    expected: '`worktree_globs` がクローン本体の直下の `.claude/worktrees/*`'
+  - name: test_load_source_when_converter_cache
+    case: 正常
+    summary: converters の行の cache を読む
+    condition: '`converters` に `cache: false` の行 `c1` と `cache` を書かない行 `c2`'
+    mock: なし（一時フォルダ）
+    expected: '`serving` で、`script("converters", "c1").cache` が `False`、`c2` が `True`'
+- name: read_default_ref_config
+  title: default_ref の設定の読み込み
+  kind: 関数
+  container: project_index/features/sources/service.py
+  usecase: 起動
+  role: 読み込み
+  summary: ディスクの先頭の設定から `default_ref` を読み、そのリビジョンの先頭の設定の内容と commit を返す
+  scope: public
+  thread_safe: true
+  args:
+  - name: first
+    title: 先頭の設定のファイル
+    type: Path
+    required: true
+    passing: positional
+    description: '`sources[].config` の先頭のファイル'
+  returns:
+    type: tuple[str, str] | None
+    description: （`default_ref` の commit, そのリビジョンの設定の内容）。先頭の設定を無視していれば内容はディスクの設定。Git の作業ツリーでなければ `None`
+  process: |-
+    1. `first` のフォルダのリポジトリの直下を引く（リポジトリの直下）。無ければ `None` を返す
+    2. ディスクの `first` を YAML として読み、`default_ref`（無ければスキーマの既定）を取る
+    3. `default_ref` を commit に解く（リビジョンの解決）。解けない場合、`default_ref` のパスの違反の `ValidationFailedError` を送る
+    4. その commit の `first` の相対パスのファイルを読む（リビジョンのファイル）
+       - 無く、`first` が無視されている場合（無視されているファイル）、ディスクの `first` の内容を使う
+       - 無く、無視されていない場合、`config[0]` のパスの違反の `ValidationFailedError` を送る
+    5. commit と内容を返す
+  exceptions:
+  - name: ValidationFailedError
+    condition: '`default_ref` が解けない、またはそのリビジョンに設定のファイルが無い'
+    message: '`{default_ref} を解けません` / `{default_ref} に {パス} がありません`'
+  unit_tests:
+  - name: test_read_default_ref_config
+    case: 正常
+    summary: 別のブランチを checkout していても default_ref を読む
+    condition: '`develop` に `kind_a` の行を足した設定を commit し、クローン本体は `master` を checkout'
+    mock: なし（一時フォルダで `git init`）
+    expected: '`develop` の commit と、`kind_a` を持つ設定の内容'
+    exception: '-'
+  - name: test_read_default_ref_config_when_not_git
+    case: 正常
+    summary: Git の管理外
+    condition: '`git init` していない一時フォルダの設定'
+    mock: なし
+    expected: '`None`'
+    exception: '-'
+  - name: test_read_default_ref_config_when_ref_missing
+    case: 異常
+    summary: default_ref が無い
+    condition: '`default_ref: none` の設定'
+    mock: なし
+    expected: '`ValidationFailedError` の違反のパスが `default_ref`'
+    exception: '`default_ref` が解けない'
+  - name: test_read_default_ref_config_when_ignored
+    case: 正常
+    summary: 無視されている先頭の設定はディスクから読む
+    condition: '`develop` に無く `.gitignore` した `project-index.local.yaml`（`default_ref: develop`）'
+    mock: なし（一時フォルダで `git init`）
+    expected: '`develop` の commit と、ディスクの `project-index.local.yaml` の内容'
+    exception: '-'
+  - name: test_read_default_ref_config_when_not_committed
+    case: 異常
+    summary: 無視していない先頭の設定が default_ref に無い
+    condition: '`develop` に無く `.gitignore` もしていない `project-index.yaml`'
+    mock: なし（一時フォルダで `git init`）
+    expected: '`ValidationFailedError` の違反のパスが `config[0]` で、`develop に project-index.yaml がありません`'
+    exception: そのリビジョンに設定のファイルが無い
+- name: load_source_at
+  title: 作業場所の配信元の読み込み
+  kind: 関数
+  container: project_index/features/sources/service.py
+  usecase: 説明
+  role: サービス
+  summary: 配信中の配信元の設定を、作業ツリーかワークツリーの同じ場所から読み直した配信元を作る
+  scope: public
+  thread_safe: true
+  args:
+  - name: source
+    title: 配信中の配信元
+    type: ServedSource
+    required: true
+    passing: positional
+    description: 読み直す配信元
+  - name: root
+    title: 読む場所の直下
+    type: Path
+    required: true
+    passing: positional
+    description: 作業ツリーかワークツリーの直下
+  returns:
+    type: ServedSource
+    description: '`root` の設定で作った配信元（ID・`scope_read`・`scope_write`・`outside_read` は `source` のまま）'
+  process: |-
+    1. `source.config_files` を `source.repo_root`（無ければ `source.root`）からの相対パスにし、`root` の下の同じパスにする
+       - `root` の下の同じパスにファイルが無く、元のファイルが無視されている場合（無視されているファイル）、元のファイル（クローン本体のディスク）を使う
+    2. 配信元の読み込みの手順 2〜6・8〜9 を、ディスクの設定・スキーマ・スクリプトで（`default_ref` を読まずに）、配信元の読み込みと同じ内部の関数で行う（設定のバージョンは比べない）
+       - 違反がある場合、その違反を持つ `ValidationFailedError` を送る
+    3. 作った配信元を返す
+  exceptions:
+  - name: ValidationFailedError
+    condition: '`root` の設定が無い・読めない・検証に通らない・スクリプトが無い'
+    message: '違反ごとに `{id}: {パス}: {理由}`（無い設定は `config[{n}]`）'
+  unit_tests:
+  - name: test_load_source_at
+    case: 正常
+    summary: ワークツリーの設定
+    condition: ワークツリーの `project-index.yaml` に `documents` の行を 1 つ足した
+    mock: なし（一時フォルダで `git init` と `git worktree add`）
+    expected: '`config.documents` に足した行があり、`root` がワークツリーの直下、ID はクローン本体の配信元のまま'
+  - name: test_load_source_at_when_config_missing
+    case: 異常
+    summary: 設定のファイルが無い
+    condition: ワークツリーで `project-index.yaml` を削除した
+    mock: なし
+    expected: '`ValidationFailedError` で違反のパスが `config[0]`'
+    exception: 設定が無い
+  - name: test_load_source_at_when_ignored_config
+    case: 正常
+    summary: 無視した先頭の設定はクローン本体のものを使う
+    condition: クローン本体の直下に `.gitignore` した `project-index.local.yaml` を先頭に持つ配信元を、`git worktree add` したワークツリーで読み直す
+    mock: なし（一時フォルダで `git init` と `git worktree add`）
+    expected: '`config_files` の先頭がクローン本体の `project-index.local.yaml` で、`root` がワークツリーの直下'
+    exception: '-'
+  - name: test_load_source_at_when_invalid
+    case: 異常
+    summary: 検証に通らない
+    condition: ワークツリーの `documents[0]` に `paths` が無い
+    mock: なし
+    expected: '`ValidationFailedError` で違反が `documents[0].paths`'
+    exception: 検証に通らない
+- name: assemble_source
+  title: 配信元の組み立て
+  kind: 関数
+  container: project_index/features/sources/service.py
+  usecase: 共通
+  role: 読み込み
+  summary: 設定のファイルを読み、マージ・検証・スクリプトの確かめをして配信中の配信元を作る
+  description: 内部の `_assemble` を公開にして名前を変える。端末の設定に無い配信元を管理の MCP の `check_project`・`try_convert` が同じ手順で組み立てるため。
+  scope: public
+  is_async: false
+  thread_safe: true
+  args:
+  - name: files
+    title: 設定のファイル
+    type: list[Path]
+    required: true
+    passing: positional
+    description: マージする順の `project-index.yaml`
+  - name: source_id
+    title: 配信元の ID
+    type: str | None
+    required: true
+    passing: keyword
+    description: '`None` は設定の `name`'
+  - name: scope_read
+    title: 読める範囲
+    type: list[str]
+    required: true
+    passing: keyword
+    description: 端末の設定の `scope.read`
+  - name: scope_write
+    title: 書ける範囲
+    type: list[str] | None
+    required: true
+    passing: keyword
+    description: '`None` は配信元のフォルダだけ'
+  - name: outside_read
+    title: 作業範囲の外から読めるか
+    type: bool
+    required: false
+    default: 'True'
+    passing: keyword
+    description: 端末の設定の `outside_read`
+  - name: root_override
+    title: 配信元のフォルダ
+    type: Path | None
+    default: None
+    passing: keyword
+    description: '`None` は先頭のファイルのフォルダ'
+  - name: lookup
+    title: 参照先の配信元の引き当て
+    type: SchemaRefLookup | None
+    default: None
+    passing: keyword
+    description: 配信元の設定の検証へ渡す（`None` は端末の設定のファイルから作る）
+  returns:
+    type: tuple[ServedSource | None, SourceConfig | None, list[Violation]]
+    description: 配信中の配信元・設定・違反。読めないか検証に失敗したら `(None, None, 違反)`、スクリプトの確かめに失敗したら `(None, 設定, 違反)`
+  process: |-
+    1. 設定のファイルを順に読む。無い・読めない・辞書でないファイルは違反にする
+    2. マージして検証する（`merge_configs`・`validate_source_config`）
+    3. 設定を作り、スクリプトを確かめる（`check_scripts`）
+    4. スキーマ・ワークツリーの glob を解いて配信中の配信元を作る
+  unit_tests:
+  - name: test_assemble_source
+    case: 正常
+    summary: '`root_override` のフォルダを配信元のフォルダにする'
+    condition: 別のフォルダに置いた設定と、配信元のフォルダを指す `root_override`
+    mock: なし（一時ディレクトリ）
+    expected: 配信元の `root` が `root_override`、違反が空
+  - name: test_assemble_source_when_script_missing
+    case: 正常
+    summary: スクリプトの確かめの失敗は設定を残す
+    condition: '`converters[0].run` が無いファイルを指す'
+    mock: なし
+    expected: '`(None, 設定, 違反 1 件)`'
+  callers:
+  - '#functions[load_source]'
+  - '#functions[load_source_at]'
+  - MOD-10#functions[_load_candidate]
+  callees:
+  - MOD-68#functions[merge_configs]
+  - '#functions[validate_source_config]'
+  - '#functions[check_scripts]'
+- name: source_schema_json
+  title: 配布のスキーマの生成
+  kind: 関数
+  container: project_index/features/sources/service.py
+  usecase: 共通
+  role: 変換
+  summary: 配信元の設定のスキーマを、配布する JSON Schema の文字列にする
+  description: 正本は `SOURCE_SCHEMA`。リポジトリの直下の `schemas/project-index.schema.json` はこの関数の結果を commit したもので、書き直すときは `uv run python -c "from project_index.features.sources.service import source_schema_json; print(source_schema_json(), end='')" > schemas/project-index.schema.json` を流す。
+  scope: public
+  thread_safe: true
+  returns:
+    type: str
+    description: '`SOURCE_SCHEMA` と同じ内容の JSON'
+  process: |-
+    1. `SOURCE_SCHEMA` を読む（YAMLの読み込み）
+    2. `json.dumps(値, ensure_ascii=False, indent=2)` に改行を 1 つ続けた文字列を返す
+  unit_tests:
+  - name: test_source_schema_json
+    case: 正常
+    summary: 配布のファイルと一致する
+    condition: リポジトリの直下の `schemas/project-index.schema.json`
+    mock: なし
+    expected: ファイルの中身と戻り値が同じ。違うときの失敗のメッセージに書き直しのコマンド
+  - name: test_source_schema_json_when_metadata
+    case: 正常
+    summary: 新しい形式の documents の行
+    condition: 戻り値を JSON として読む
+    mock: なし
+    expected: '`documents.items.properties` が `type`・`defaults` を持たず、`metadata.additionalProperties` が文字列、`alias_type` が `term`・`doc`・`command`・`url`・`skill`・`tool`・`path`・`env`・`avoid` の列挙、`required` が `id`・`paths`・`schema`'
+refs:
+- IF-15#

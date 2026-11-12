@@ -1,0 +1,75 @@
+id: MOD-83
+title: 索引のサーバー / 書き込み / placement.py
+lead: 新しい文書の置き場所。
+test_files:
+- tests/unit/project_index/features/write/test_placement.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      文書の書き込み ..> 新しい文書の置き場所
+      class 文書の書き込み {
+        <<function>>
+      }
+      class 新しい文書の置き場所 {
+        <<function>>
+      }
+      click 文書の書き込み href "./MOD-84.py.yaml#文書の書き込み"
+functions:
+- name: new_document_path
+  title: 新しい文書の置き場所
+  kind: 関数
+  container: project_index/features/write/placement.py
+  usecase: 書き込み
+  role: 判定
+  summary: '`create` の文書を書くファイルを、文書の行の `paths` の先頭から決める'
+  scope: public
+  thread_safe: true
+  args:
+  - name: table
+    title: 文書の行
+    type: DocumentTable
+    required: true
+    passing: positional
+    description: 作る種類の行
+  - name: doc_id
+    title: 文書の ID
+    type: str
+    required: true
+    passing: positional
+    description: 作る文書の ID
+  returns:
+    type: tuple[str, bool]
+    description: (配信元の直下からのパス, `records` の配列へ足すか)
+  process: |-
+    1. `records` がある場合、`paths[0]` が glob を含まなければ `(paths[0], True)` とし、含めば違反にする
+    2. `records` が無い場合、`paths[0]` の最後の段の `*` を `doc_id` に置き換え、`**/` を除いたパスにする（例 `docs/**/*.yaml` → `docs/{doc_id}.yaml`）。glob を含まないパスは違反にする
+    3. 決めたパスに文書の行.除外の名前に当たるかが `True` なら違反にする。当たらなければ返す
+    4. 違反は `path` が `operations[{i}].kind` の `InvalidArgumentError` で送る。置き場所を決められないときは `fix` が `documents[].paths の先頭を glob にしてください`、除外の名前に当たるときは `rule` が `配置先 {パス} が {kind} の exclude に該当します`、`fix` が `id を変えるか、documents[].exclude から削除してください`
+  exceptions:
+  - name: InvalidArgumentError
+    condition: 置き場所を決められない
+    message: '`{kind} の新しい文書の配置先を決められません`'
+  - name: InvalidArgumentError
+    condition: 置き場所のファイル名が `exclude` に当たる
+    message: '`配置先 {パス} が {kind} の exclude に該当します`'
+  unit_tests:
+  - name: test_new_document_path
+    case: 正常
+    summary: glob から決める
+    condition: '`paths: [docs/**/*.yaml]` と `paths: [data/list.yaml]`・`records: items`'
+    mock: なし
+    expected: '`("docs/sample-doc.yaml", False)` と `("data/list.yaml", True)`'
+  - name: test_new_document_path_when_excluded
+    case: 異常
+    summary: 置き場所が除外の名前に当たる
+    condition: '`paths: [docs/rule/*.yaml]`・`exclude: [index.yaml]` で `doc_id` が `index`'
+    mock: なし
+    expected: '`InvalidArgumentError` の違反の `path` が `kind`、`rule` に `docs/rule/index.yaml` を含む'
+  - name: test_new_document_path_when_records_excluded
+    case: 異常
+    summary: 管理用の YAML の名前が除外の名前に当たる
+    condition: '`paths: [src/files.yaml]`・`records: files`・`body_file: path`・`exclude: [files.yaml]`'
+    mock: なし
+    expected: '`InvalidArgumentError` の違反の `path` が `kind`、`rule` に `src/files.yaml` を含む'

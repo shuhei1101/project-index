@@ -1,0 +1,158 @@
+id: MOD-28
+title: 索引のサーバー / 文書のストア / schema.py
+lead: 種類のスキーマの `$ref` の解決と、`records` の行のスキーマ。
+test_files:
+- tests/unit/project_index/features/documents/test_schema.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      文書のストア ..> スキーマの参照の解決
+      class 文書のストア {
+        <<class>>
+      }
+      class スキーマの参照の解決 {
+        <<function>>
+      }
+      click 文書のストア href "./MOD-29.py.yaml#文書のストア"
+functions:
+- name: resolve_schema_refs
+  title: スキーマの参照の解決
+  kind: 関数
+  container: project_index/features/documents/schema.py
+  usecase: 共通
+  role: 変換
+  summary: 種類のスキーマの `$ref` を参照先の中身で置き換えたスキーマを返す
+  scope: public
+  args:
+  - name: schema
+    title: スキーマ
+    type: Mapping[str, Any]
+    required: true
+    passing: positional
+    description: 読んだ種類のスキーマ
+  - name: base
+    title: スキーマのファイル
+    type: Path | PurePosixPath
+    required: true
+    passing: positional
+    description: '相対の `$ref`（`共通.schema.yaml#/$defs/markdown` など）を解く基準のファイル。`read` を渡すときはリポジトリの直下からのパス'
+  - name: read
+    title: 読み取り
+    type: Callable[[str], str | None] | None
+    required: false
+    default: None
+    passing: keyword
+    description: リポジトリの直下からのパスのファイルの中身を返す関数（無ければ `None`）。`None` はディスクから読む
+  returns:
+    type: dict[str, Any]
+    description: '`$ref` を解いたスキーマ（`$defs` はそのまま残す）'
+  process: |-
+    1. `referencing.Registry` に `base` の URI でスキーマを載せ、参照先のファイルは `retrieve` で `base` のフォルダから『YAMLの読み込み』で読む（`read` があれば、`base` のフォルダからのパスを正規化して `read` で読む。`..` でリポジトリの直下より上を指す参照先は無いものとして扱う）
+    2. 値を先頭からたどり、`$ref` を持つオブジェクトは参照先の中身に、`$ref` 以外のキーを重ねたものに置き換えて続けてたどる
+    3. たどっている途中の `$ref` に戻る（循環する）場合、その `$ref` は解かずに残す
+       - `[warning]` スキーマの循環する参照を解かずに残した（ファイル・`$ref`）
+    4. 参照先が無い・読めない場合、その `$ref` は解かずに残す
+       - `[warning]` スキーマの参照を解けなかった（ファイル・`$ref`・理由）
+  unit_tests:
+  - name: test_resolve_schema_refs
+    case: 正常
+    summary: 同じファイルと別のファイルの参照
+    condition: '`properties.a` が `#/$defs/x`、`properties.b` が `共通.schema.yaml#/$defs/markdown` で `title: B` を重ねる'
+    mock: なし（`tmp_path`）
+    expected: '`a` が `$defs.x` の中身、`b` が `markdown` の中身に `title: B` を重ねたもの'
+  - name: test_resolve_schema_refs_when_cycle
+    case: 正常
+    summary: 循環する参照
+    condition: '`$defs.node.properties.children.items` が `#/$defs/node`'
+    mock: なし
+    expected: '`children.items` が `$ref` のまま残り、`[warning]` が 1 件'
+  - name: test_resolve_schema_refs_when_missing
+    case: 正常
+    summary: 参照先が無い
+    condition: '`無い.schema.yaml#/$defs/x`'
+    mock: なし
+    expected: '`$ref` のまま残り、`[warning]` が 1 件'
+  - name: test_resolve_schema_refs_when_read
+    case: 正常
+    summary: 読み取りの関数で参照先を読む
+    condition: '`base` が `schemas/note.schema.yaml`、`read` が辞書を引く関数で、`共通.schema.yaml#/$defs/x` と `../../out.schema.yaml#/$defs/y` を指す'
+    mock: なし
+    expected: '`x` は `read("schemas/共通.schema.yaml")` の中身に解け、リポジトリの外を指す `y` は `$ref` のまま残る'
+- name: startup_schema
+  title: 起動時のスキーマ
+  kind: 関数
+  container: project_index/features/documents/schema.py
+  usecase: 共通
+  role: 変換
+  summary: 配信元が起動時に読んだ行のスキーマを、`$ref` を解いて返す
+  description: 文書のストア・`check_project`・nav の描画が、行のスキーマを同じ読み方で引くために使う。
+  scope: public
+  args:
+  - name: source
+    title: 配信元
+    type: ServedSource
+    required: true
+    passing: positional
+    description: 配信中の配信元
+  - name: table
+    title: 文書の行
+    type: DocumentTable
+    required: true
+    passing: positional
+    description: 引く行
+  returns:
+    type: dict[str, Any]
+    description: '`$ref` を解いた行のスキーマ'
+  process: |-
+    1. `table.schema_path` が `SchemaRef` なら、`source.schemas[table.id]`（起動時に解いたもの）を返す
+    2. それ以外は、`source.schemas[table.id]` を基準 `source.root / table.schema_path` でスキーマの参照の解決にかけて返す
+  unit_tests:
+  - name: test_startup_schema
+    case: 正常
+    summary: 相対パスとほかの配信元の参照
+    condition: 相対パスの行（`$ref` を持つ）と、`SchemaRef` の行
+    mock: なし（`tmp_path`）
+    expected: 相対パスの行は `$ref` を解いたもの、`SchemaRef` の行は `source.schemas` のまま
+- name: records_item_schema
+  title: records の行の 1 行のスキーマ
+  container: project_index/features/documents/schema.py
+  usecase: 共通
+  role: 変換
+  summary: ファイル全体のスキーマから `records` の要素 1 つのスキーマを取り出す
+  description: 文書に当てるスキーマ（`row_schema`）と `check_project` の食い違いの検出が使う。
+  kind: 関数
+  scope: public
+  args:
+  - name: schema
+    title: スキーマ
+    type: Mapping[str, Any]
+    required: true
+    passing: positional
+    description: '`$ref` を解いた行のスキーマ'
+  - name: records
+    title: 要素のキー
+    type: str
+    required: true
+    passing: positional
+    description: 行の `records`
+  returns:
+    type: dict[str, Any] | None
+    description: '`properties.{records}.items`。辞書でない・無いときは `None`'
+  process: |-
+    1. `schema` の `properties` が辞書で、その `records` の値が辞書で、その `items` が辞書なら `items` を返す
+    2. それ以外は `None` を返す
+  unit_tests:
+  - name: test_records_item_schema
+    case: 正常
+    summary: 要素のスキーマを取り出す
+    condition: '`templates/files.schema.yaml` を読んだスキーマと `files`'
+    mock: なし
+    expected: '`required` が `[path]` の `items`'
+  - name: test_records_item_schema_when_missing
+    case: 正常
+    summary: 要素のスキーマが無い
+    condition: '`properties.files` が `{type: array}` だけのスキーマ、`properties` が無いスキーマ、`files` 以外の `records`'
+    mock: なし
+    expected: どれも `None`
