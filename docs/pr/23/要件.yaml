@@ -63,15 +63,21 @@ docs:
   - page: docs/interface
     new: false
     change: 全てのインターフェース定義の Mermaid を mdmark の図にし、文の表への置き換え・文の削除・`lead` の書き換え・パスの参照の ID への置き換えを行う
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T13:06:25.504118+00:00'
   - page: docs/scenario
     new: false
     change: 全てのシナリオの Mermaid を mdmark の図にし、文の表への置き換え・文の削除・`lead` の書き換えを行う
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T13:06:25.504118+00:00'
   - page: docs/module
     new: false
     change: 全てのモジュール構成の文の表への置き換え・文の削除・`lead` の書き換えを行う
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T13:06:25.504118+00:00'
   - page: docs/library
     new: false
     change: 外部ライブラリの `lead` を「何を定め、どんなときに参照するか」の 1 文にし、文を点検する
@@ -133,3 +139,6 @@ scope_out:
   - item: '`dev/pr/13/` の `docs/pr/13/` への移動'
     reason: '#15 で移した文書ではなく、完了した作業 PR の記録で、書き換えない'
     plan: none
+  - item: モジュール構成のクラス図（`diagrams[].diagram`）の `click ... href "./MOD-59.py.yaml#..."` のパスの参照（77 文書・406 件）の ID の参照への置き換え
+    reason: Mermaid の `click` の href は URL で、`id:` の参照を解く描画があるかが未確認。参照元の ai-monitor のモジュール構成もパスの href で書いている。今の判断は、描画の対応を確かめてから後続として切り出す（レビューで確定する）
+    plan: to_file
