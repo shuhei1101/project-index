@@ -1,10 +1,8 @@
 """`write_docs` のスキーマの違反に、違反した項目のスキーマの説明を添える。"""
-# pyright: reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
 import ast
-from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from jsonschema import FormatChecker
@@ -12,9 +10,12 @@ from jsonschema.validators import Draft202012Validator, validator_for
 
 from project_index.features.validation.rules import REQUIRED_MESSAGE, ROOT_PATH
 from project_index.features.write.types import WriteViolation
+from project_index.shared.narrowing import is_dict
 from project_index.shared.schema_check import format_path
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from jsonschema.exceptions import ValidationError
 
     from project_index.shared.errors import Violation
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
 HINT_KEYS = ("title", "description", "x-rules", "examples", "x-bad-examples")
 
 
-def _definition(error: ValidationError) -> Any:  # noqa: ANN401
+def _definition(error: ValidationError) -> object:
     """違反に添える定義を返す（`required` は無かったキーの定義、それ以外は違反した値に当てた定義）。"""
     if error.validator != "required":
         return error.schema
@@ -33,13 +34,14 @@ def _definition(error: ValidationError) -> Any:  # noqa: ANN401
         missing = str(ast.literal_eval(matched.group(1)))
     except ValueError, SyntaxError:
         return None
-    properties = error.schema.get("properties") if isinstance(error.schema, Mapping) else None
-    return properties.get(missing) if isinstance(properties, Mapping) else None
+    schema: object = error.schema
+    properties = schema.get("properties") if is_dict(schema) else None
+    return properties.get(missing) if is_dict(properties) else None
 
 
-def _hint(definition: Any) -> dict[str, Any] | None:  # noqa: ANN401
+def _hint(definition: object) -> dict[str, Any] | None:
     """定義から `HINT_KEYS` のうち持つキーだけを取り出す（1 つも無ければ `None`）。"""
-    if not isinstance(definition, Mapping):
+    if not is_dict(definition):
         return None
     hint = {key: definition[key] for key in HINT_KEYS if key in definition}
     return hint or None

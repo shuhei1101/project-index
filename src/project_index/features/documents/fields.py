@@ -1,17 +1,18 @@
 """文書の項目のパスの読み書きと、メタデータの解決。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, MutableMapping, Sequence, Set
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any
 
 from project_index.shared.errors import InvalidArgumentError, Violation
+from project_index.shared.narrowing import is_dict, is_list
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping, MutableMapping, Sequence, Set
+
     from project_index.features.documents.types import Document
     from project_index.features.sources.types import DocumentTable
 
@@ -82,44 +83,55 @@ def _plain_tokens(path: str, verb: str) -> list[str | int]:
     return [token for token in tokens if not isinstance(token, ArraySelector)]
 
 
-def _select(data: Any, tokens: Sequence[Token], default: Any) -> Any:  # noqa: ANN401
+def _select(data: object, tokens: Sequence[Token], default: object) -> object:
     """要素の選び方を含む並びをたどり、選んだ要素ごとの値の配列にする。"""
     for depth, token in enumerate(tokens):
         if not isinstance(token, ArraySelector):
             continue
-        found, current = _walk(data, tokens[:depth])  # type: ignore[arg-type]
-        if not found or not isinstance(current, list):
+        found, current = _walk(data, _plain(tokens[:depth]))
+        if not found or not is_list(current):
             return default
-        rest = tokens[depth + 1 :]
-        values: list[Any] = []
-        for element in current:
-            if token.key is not None and not (
-                isinstance(element, Mapping) and element.get(token.key)
-            ):
-                continue
-            if any(isinstance(item, ArraySelector) for item in rest):
-                picked = _select(element, rest, None)
-                if isinstance(picked, list):
-                    values.extend(picked)
-                continue
-            ok, value = _walk(element, rest)  # type: ignore[arg-type]
-            if ok:
-                values.append(value)
-        return values
-    found, value = _walk(data, tokens)  # type: ignore[arg-type]
+        return _select_elements(current, token, tokens[depth + 1 :])
+    found, value = _walk(data, _plain(tokens))
     return value if found else default
 
 
-def _walk(data: Any, tokens: Sequence[str | int]) -> tuple[bool, Any]:  # noqa: ANN401
+def _select_elements(
+    elements: list[object], token: ArraySelector, rest: Sequence[Token]
+) -> list[object]:
+    """配列の要素のうち選び方に当たる要素から、残りのパスの値を集める。"""
+    values: list[object] = []
+    for element in elements:
+        # `[{キー}]` は、そのキーが真の値を持つ辞書の要素だけを選ぶ
+        if token.key is not None and not (is_dict(element) and element.get(token.key)):
+            continue
+        # 残りのパスにも要素の選び方がある: 要素ごとに選んだ値を平らに並べる
+        if any(isinstance(item, ArraySelector) for item in rest):
+            picked = _select(element, rest, None)
+            if is_list(picked):
+                values.extend(picked)
+            continue
+        ok, value = _walk(element, _plain(rest))
+        if ok:
+            values.append(value)
+    return values
+
+
+def _plain(tokens: Sequence[Token]) -> list[str | int]:
+    """要素の選び方を含まない並びを、キーと位置の並びとして読む。"""
+    return [token for token in tokens if not isinstance(token, ArraySelector)]
+
+
+def _walk(data: object, tokens: Sequence[str | int]) -> tuple[bool, object]:
     """先頭からたどり、たどれたか・たどり着いた値を返す。"""
     current = data
     for token in tokens:
         if isinstance(token, int):
-            if not isinstance(current, list) or token >= len(current):
+            if not is_list(current) or token >= len(current):
                 return False, None
             current = current[token]
         else:
-            if not isinstance(current, Mapping) or token not in current:
+            if not is_dict(current) or token not in current:
                 return False, None
             current = current[token]
     return True, current
@@ -136,37 +148,48 @@ def _join(tokens: Sequence[str | int]) -> str:
     return text
 
 
-def get_field(data: Mapping[str, Any], path: str, *, default: Any = None) -> Any:  # noqa: ANN401
+def get_field(data: Mapping[str, Any], path: str, *, default: object = None) -> object:
     """項目のパスで指した値を返す。"""
     return _select(data, parse_field_path(path), default)
 
 
-def set_field(data: MutableMapping[str, Any], path: str, value: Any) -> None:  # noqa: ANN401, C901
+def set_field(data: MutableMapping[str, Any], path: str, value: object) -> None:
     """項目のパスで指した場所へ値を書く。"""
     tokens = _plain_tokens(path, "には書き込めません")
-    current: Any = data
+    current: object = data
     for depth, token in enumerate(tokens[:-1]):
-        following = tokens[depth + 1]
-        if isinstance(token, int):
-            if not isinstance(current, list):
-                raise _invalid(path, f"{path}: {_join(tokens[:depth])} は配列ではありません")
-            if token > len(current):
-                raise _invalid(
-                    path, f"{path}: 位置 {token} は配列の長さ {len(current)} を超えています"
-                )
-            if token == len(current):
-                current.append([] if isinstance(following, int) else {})
-            current = current[token]
-        else:
-            if not isinstance(current, MutableMapping):
-                raise _invalid(path, f"{path}: {_join(tokens[:depth])} は辞書ではありません")
-            if token not in current:
-                current[token] = [] if isinstance(following, int) else {}
-            current = current[token]
-    last = tokens[-1]
+        # 途中のキー・位置が無ければ、次のトークンに合わせて空の配列か辞書を作る
+        empty: object = [] if isinstance(tokens[depth + 1], int) else {}
+        current = _child(current, token, empty, path, tokens[:depth])
+    _put(current, tokens[-1], value, path, tokens[:-1])
+
+
+def _child(
+    current: object, token: str | int, empty: object, path: str, parents: Sequence[str | int]
+) -> object:
+    """`current` の `token` の値を返す。無ければ `empty` を置いてから返す。"""
+    if isinstance(token, int):
+        if not is_list(current):
+            raise _invalid(path, f"{path}: {_join(parents)} は配列ではありません")
+        if token > len(current):
+            raise _invalid(path, f"{path}: 位置 {token} は配列の長さ {len(current)} を超えています")
+        if token == len(current):
+            current.append(empty)
+        return current[token]
+    if not is_dict(current):
+        raise _invalid(path, f"{path}: {_join(parents)} は辞書ではありません")
+    if token not in current:
+        current[token] = empty
+    return current[token]
+
+
+def _put(
+    current: object, last: str | int, value: object, path: str, parents: Sequence[str | int]
+) -> None:
+    """`current` の `last` へ値を書く（配列の末尾の次の位置は追加）。"""
     if isinstance(last, int):
-        if not isinstance(current, list):
-            raise _invalid(path, f"{path}: {_join(tokens[:-1])} は配列ではありません")
+        if not is_list(current):
+            raise _invalid(path, f"{path}: {_join(parents)} は配列ではありません")
         if last > len(current):
             raise _invalid(path, f"{path}: 位置 {last} は配列の長さ {len(current)} を超えています")
         if last == len(current):
@@ -174,8 +197,8 @@ def set_field(data: MutableMapping[str, Any], path: str, value: Any) -> None:  #
         else:
             current[last] = value
         return
-    if not isinstance(current, MutableMapping):
-        raise _invalid(path, f"{path}: {_join(tokens[:-1])} は辞書ではありません")
+    if not is_dict(current):
+        raise _invalid(path, f"{path}: {_join(parents)} は辞書ではありません")
     current[last] = value
 
 
@@ -187,11 +210,11 @@ def delete_field(data: MutableMapping[str, Any], path: str) -> bool:
         return False
     last = tokens[-1]
     if isinstance(last, int):
-        if not isinstance(parent, list) or last >= len(parent):
+        if not is_list(parent) or last >= len(parent):
             return False
         del parent[last]
         return True
-    if not isinstance(parent, MutableMapping) or last not in parent:
+    if not is_dict(parent) or last not in parent:
         return False
     del parent[last]
     return True
@@ -218,20 +241,21 @@ def missing_ref_fields(data: Mapping[str, Any], table: DocumentTable) -> list[tu
 
 def unresolved_related(metadata: Mapping[str, Any], ids: Set[str]) -> list[str]:
     """`related` のうち、`to` が配信元の文書の ID の集合に無い関連の `to` を返す。"""
-    rows = metadata.get("related")
+    rows: object = metadata.get("related")
     # related が配列でない: 照合する関連が無い
-    if not isinstance(rows, list):
+    if not is_list(rows):
         return []
     unresolved: list[str] = []
     for row in rows:
         # 文字列の to を持たない要素は関連の行ではない（related_links と同じ読み方）
-        if not isinstance(row, dict) or not isinstance(row.get("to"), str):
+        to = row.get("to") if is_dict(row) else None
+        if not is_dict(row) or not isinstance(to, str):
             continue
         # 文字列の source を持つ関連は別の配信元を指すので照合しない
         if isinstance(row.get("source"), str):
             continue
-        if row["to"] not in ids:
-            unresolved.append(row["to"])
+        if to not in ids:
+            unresolved.append(to)
     return unresolved
 
 

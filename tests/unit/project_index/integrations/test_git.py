@@ -64,6 +64,23 @@ def test_run_git_when_timeout(
     assert all(process.poll() is not None for process in started)
 
 
+def test_run_git_when_timeout_given(
+    git_repo: Callable[..., Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """指定した待ち時間の上限を超える（異常系）。"""
+    # 準備
+    root = git_repo({"a.yaml": "a: 1\n"})
+    monkeypatch.setenv("GIT_EDITOR", "sleep 1; true")
+    monkeypatch.setenv("GIT_AUTHOR_NAME", "tester")
+    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "tester@example.com")
+    monkeypatch.setenv("GIT_COMMITTER_NAME", "tester")
+    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "tester@example.com")
+    # 実行・検証
+    with pytest.raises(GitError, match=r"0\.1 秒を超えたため止めました") as exc_info:
+        run_git(["commit", "--allow-empty"], cwd=root, timeout=0.1)
+    assert exc_info.value.timed_out is True
+
+
 def test_repo_root(git_repo: Callable[..., Path]) -> None:
     """リポジトリの中のフォルダ（正常系）。"""
     # 準備

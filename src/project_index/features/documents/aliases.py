@@ -1,12 +1,11 @@
 """エイリアスのキーの検証と、照合する語の一覧。"""
-# pyright: reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
 import functools
 import unicodedata
 from importlib import resources
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from project_index.features.documents.types import (
     AliasCollection,
@@ -15,6 +14,7 @@ from project_index.features.documents.types import (
     MatchWord,
 )
 from project_index.shared.errors import Violation
+from project_index.shared.narrowing import is_dict, is_list
 from project_index.shared.yaml_io import load_yaml
 
 if TYPE_CHECKING:
@@ -39,16 +39,20 @@ ALIAS_LIST_KEYS = ("aliases", "avoid")
 ENTRY_KEYS = ("id", "name", "aliases", "description", "avoid")
 
 
-def _read(path: str) -> Any:  # noqa: ANN401
-    """配布に同梱したファイルを YAML として読む。"""
-    return load_yaml(resources.files("project_index").joinpath(path).read_text(encoding="utf-8"))
+def _read(path: str) -> dict[str, Any]:
+    """配布に同梱した、最上位が辞書の YAML のファイルを読む。"""
+    value = load_yaml(resources.files("project_index").joinpath(path).read_text(encoding="utf-8"))
+    if not is_dict(value):
+        msg = f"{path} の最上位が辞書ではありません"
+        raise TypeError(msg)
+    # YAML から読んだ辞書のキーは文字列として扱う
+    return cast("dict[str, Any]", value)
 
 
 @functools.cache
 def alias_schema() -> dict[str, Any]:
     """同梱した alias-inject のエイリアスのスキーマを返す。"""
-    schema: dict[str, Any] = _read(ALIAS_SCHEMA_PATH)
-    return schema
+    return _read(ALIAS_SCHEMA_PATH)
 
 
 def alias_schema_version() -> str:
@@ -61,30 +65,32 @@ def _alias_keys() -> list[str]:
     return list(alias_schema()["$defs"]["alias"]["properties"]["metadata"]["properties"])
 
 
-def _empty(value: Any) -> bool:  # noqa: ANN401
+def _empty(value: object) -> bool:
     """値が無いか空文字か。"""
     return value is None or value == ""
 
 
-def _type_rule(key: str, value: Any) -> str | None:  # noqa: ANN401
+def _type_rule(key: str, value: object) -> str | None:
     """エイリアスのキーの値の型の誤りを返す。"""
     if key in ALIAS_LIST_KEYS:
         if isinstance(value, str):
             return None
-        if isinstance(value, list) and value and all(isinstance(item, str) for item in value):
+        if is_list(value) and value and all(isinstance(item, str) for item in value):
             return None
         return "文字列か文字列の並びではありません"
     if key == "related":
-        if isinstance(value, list) and all(
-            isinstance(item, str) or (isinstance(item, dict) and isinstance(item.get("to"), str))
-            for item in value
-        ):
+        if is_list(value) and all(_is_related_item(item) for item in value):
             return None
         return "related の要素は文書の ID か to を持つ辞書です"
     if key == "port":
         valid = isinstance(value, (int, str)) and not isinstance(value, bool)
         return None if valid else "整数か文字列ではありません"
     return None if isinstance(value, str) else "文字列ではありません"
+
+
+def _is_related_item(item: object) -> bool:
+    """`related` の要素が文書の ID か、`to` を持つ辞書か。"""
+    return isinstance(item, str) or (is_dict(item) and isinstance(item.get("to"), str))
 
 
 def check_alias_document(document: Document) -> list[Violation]:
@@ -113,9 +119,11 @@ def check_alias_document(document: Document) -> list[Violation]:
     return violations
 
 
-def _as_list(value: Any) -> list[str]:  # noqa: ANN401
-    """文字列 1 つを要素 1 つの並びにする。"""
-    return [value] if isinstance(value, str) else list(value)
+def _as_list(value: object) -> list[str]:
+    """文字列 1 つを要素 1 つの並びにする（検証を通った文字列の並びはそのまま）。"""
+    if isinstance(value, str):
+        return [value]
+    return [item for item in value if isinstance(item, str)] if is_list(value) else []
 
 
 def collect_aliases(source: ServedSource, documents: Sequence[Document]) -> AliasCollection:

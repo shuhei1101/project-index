@@ -1,4 +1,3 @@
-# pyright: reportUnknownLambdaType=warning
 from __future__ import annotations
 
 import json
@@ -171,7 +170,7 @@ def make_handlers(make_terminal_config: Callable[..., TerminalConfig]) -> Callab
             {
                 "terminal": make_terminal_config(),
                 "settings_lock": threading.Lock(),
-                "reload_sources": lambda terminal: [],
+                "reload_sources": _no_reload,
             }
         )
         values.update(overrides)
@@ -537,3 +536,8 @@ def make_records_nav_source_dir(
         return root / "project-index.yaml"
 
     return _make
+
+
+def _no_reload(terminal: object) -> list[object]:
+    """配信元を読み直さない偽物。"""
+    return []

@@ -30,10 +30,16 @@ from project_index.shared.errors import (
     DocumentNotFoundError,
     ValidationFailedError,
 )
-from project_index.shared.yaml_io import load_yaml
+from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+
+def load_yaml(text: str) -> Any:
+    """形の分かっている YAML の文字列を読む。"""
+    return load_yaml_value(text)
+
 
 BROKEN_CONFIG = "name: {name}\ndocuments:\n  - id: rules\n    schema: schemas/rule.schema.yaml\n"
 NOTES_CONFIG = (

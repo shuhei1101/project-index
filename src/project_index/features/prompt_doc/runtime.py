@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import jinja2
 from pydantic import ValidationError
@@ -18,6 +18,7 @@ from project_index.features.prompt_doc.render import (
     render_example,
 )
 from project_index.features.prompt_doc.types import PromptDoc, PromptInvalidError, PromptProblem
+from project_index.shared.narrowing import is_dict
 from project_index.shared.schema_check import format_path, schema_violations
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
 
@@ -99,6 +100,31 @@ def _schema_reason(violation: Violation) -> str:
     return violation.rule
 
 
+def _read_prompt(
+    file: Path, *, directory: Path, schema: Mapping[str, Any], registry: Registry[Any]
+) -> tuple[PromptDoc | None, list[tuple[str, str]]]:
+    """YAML として読み、スキーマ・id・モデルで検査したプロンプトか、(パス, 理由) の並びを返す。"""
+    # YAML として読む
+    try:
+        value = load_yaml(file.read_text(encoding="utf-8"), file=str(file))
+    except (OSError, YamlLoadError) as error:
+        return None, [(WHOLE_FILE_PATH, str(error))]
+    # スキーマで検査する
+    violations = schema_violations(schema, value, registry=registry)
+    if violations:
+        return None, [(item.path, _schema_reason(item)) for item in violations]
+    # id がフォルダからのパスと同じか
+    expected_id = file.relative_to(directory).with_suffix("").as_posix()
+    if not is_dict(value) or value.get("id") != expected_id:
+        return None, [("id", f"ファイルのパス {expected_id} と違います")]
+    try:
+        return PromptDoc.model_validate(value), []
+    except ValidationError as error:
+        return None, [
+            (format_path(item["loc"]) or WHOLE_FILE_PATH, item["msg"]) for item in error.errors()
+        ]
+
+
 def _check_file(
     file: Path,
     *,
@@ -112,26 +138,9 @@ def _check_file(
     def problem(path: str, reason: str) -> PromptProblem:
         return PromptProblem(file=file, path=path, reason=reason)
 
-    # YAML として読む
-    try:
-        value = load_yaml(file.read_text(encoding="utf-8"), file=str(file))
-    except (OSError, YamlLoadError) as error:
-        return None, [problem(WHOLE_FILE_PATH, str(error))]
-    # スキーマで検査する
-    violations = schema_violations(schema, value, registry=registry)
-    if violations:
-        return None, [problem(item.path, _schema_reason(item)) for item in violations]
-    # id がフォルダからのパスと同じか
-    expected_id = file.relative_to(directory).with_suffix("").as_posix()
-    if value["id"] != expected_id:
-        return None, [problem("id", f"ファイルのパス {expected_id} と違います")]
-    try:
-        doc = PromptDoc.model_validate(value)
-    except ValidationError as error:
-        return None, [
-            problem(format_path(item["loc"]) or WHOLE_FILE_PATH, item["msg"])
-            for item in error.errors()
-        ]
+    doc, found = _read_prompt(file, directory=directory, schema=schema, registry=registry)
+    if doc is None:
+        return None, [problem(path, reason) for path, reason in found]
     # 部品をテンプレートにする
     compiled, syntax_errors = compile_parts(doc, env=env)
     if syntax_errors:
@@ -151,7 +160,8 @@ def _check_file(
 
 def load_prompts(directory: Path, *, required: Collection[str]) -> PromptSet:
     """フォルダのプロンプトの YAML を全て読んで検査し、描画できる一式にする。"""
-    schema = load_yaml(PROMPT_SCHEMA_PATH.read_text(encoding="utf-8"))
+    # 同梱したスキーマの最上位は、キーが文字列の辞書
+    schema = cast("dict[str, Any]", load_yaml(PROMPT_SCHEMA_PATH.read_text(encoding="utf-8")))
     registry = _schema_registry()
     env = build_environment()
     prompts: dict[str, LoadedPrompt] = {}

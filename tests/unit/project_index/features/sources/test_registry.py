@@ -1,4 +1,3 @@
-# pyright: reportUnknownArgumentType=warning, reportUnknownLambdaType=warning
 from __future__ import annotations
 
 import asyncio
@@ -44,9 +43,11 @@ def test_source_registry_reload(
         ),
         (None, make_status("c", 2, "disabled")),
     ]
-    monkeypatch.setattr(
-        registry_module, "load_source", lambda entry, *, index, lookup=None: results[index]
-    )
+
+    def fake_load(entry: object, *, index: int, lookup: object = None) -> object:
+        return results[index]
+
+    monkeypatch.setattr(registry_module, "load_source", fake_load)
     terminal = make_terminal_config(
         sources=[make_entry(f"/tmp/{name}/project-index.yaml", source_id=name) for name in "abc"]
     )
@@ -66,12 +67,12 @@ def test_source_registry_reload_when_duplicate_name(
     make_status: Callable[..., SourceStatus],
 ) -> None:
     """既定の ID が重なる（正常系）。"""
+
     # 準備
-    monkeypatch.setattr(
-        registry_module,
-        "load_source",
-        lambda entry, *, index, lookup=None: (make_served_source(id="a"), make_status("a", index)),
-    )
+    def fake_load(entry: object, *, index: int, lookup: object = None) -> object:
+        return make_served_source(id="a"), make_status("a", index)
+
+    monkeypatch.setattr(registry_module, "load_source", fake_load)
     terminal = make_terminal_config(
         sources=[make_entry("/tmp/x/project-index.yaml"), make_entry("/tmp/y/project-index.yaml")]
     )
@@ -380,9 +381,11 @@ def test_source_registry_load(
         (make_served_source(id="b"), make_status("b", 1)),
         (None, make_status("c", 2, "disabled")),
     ]
-    monkeypatch.setattr(
-        registry_module, "load_source", lambda entry, *, index, lookup: results[index]
-    )
+
+    def fake_load(entry: object, *, index: int, lookup: object) -> object:
+        return results[index]
+
+    monkeypatch.setattr(registry_module, "load_source", fake_load)
     terminal = make_terminal_config(sources=_entries(make_entry, "a", "b", "c"))
     registry = SourceRegistry(loading=True)
     # 実行

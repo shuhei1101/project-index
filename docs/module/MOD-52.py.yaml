@@ -143,3 +143,28 @@ functions:
         mock: なし
         expected: '`Heading(1, 1, "a")`・`Heading(3, 2, "b")`・`Heading(7, 3, "d")`（`c` を含まない）'
     status: planned
+  - name: as_datetime
+    title: 日時への変換
+    kind: 関数
+    container: project_index/features/search/fields.py
+    usecase: 検索
+    role: 変換
+    summary: 日時・日付・ISO 8601 の文字列を日時にする
+    scope: public
+    thread_safe: true
+    args:
+      - name: value
+        title: 値
+        type: object
+        required: true
+        passing: positional
+        description: 項目の値
+    returns:
+      type: datetime | None
+      description: 日時。日時にできない値は `None`
+    process: |-
+      1. 値の型で変換する
+         - `datetime` の場合、そのまま返す
+         - `date` の場合、その日の 0 時を端末のタイムゾーンの日時にして返す
+         - `str` の場合、`datetime.fromisoformat` で読んで返す。読めなければ `None` を返す
+         - それ以外の場合、`None` を返す

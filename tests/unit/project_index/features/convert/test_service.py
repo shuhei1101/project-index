@@ -1,4 +1,3 @@
-# pyright: reportUnknownLambdaType=warning
 from __future__ import annotations
 
 import sys
@@ -28,11 +27,14 @@ if TYPE_CHECKING:
 
 def _service(tmp_path: Path, schema: dict[str, Any], timeout_sec: float = 10) -> ConvertService:
     """決めたスキーマを返す文書のストアの偽物で、変換を作る。"""
-    store = SimpleNamespace(
-        schema=lambda target, kind: schema,
-        row_schema=lambda target, kind: schema,
-        load=lambda target: LoadResult(),
-    )
+
+    def fixed_schema(target: object, kind: str) -> dict[str, Any]:
+        return schema
+
+    def empty_load(target: object) -> LoadResult:
+        return LoadResult()
+
+    store = SimpleNamespace(schema=fixed_schema, row_schema=fixed_schema, load=empty_load)
     return ConvertService(tmp_path / "converted", store, timeout_sec)  # type: ignore[arg-type]
 
 

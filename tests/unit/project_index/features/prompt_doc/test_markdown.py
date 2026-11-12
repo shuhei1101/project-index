@@ -22,7 +22,13 @@ from project_index.features.prompt_doc.types import (
     RenderedExample,
     RenderedMessage,
 )
-from project_index.shared.yaml_io import load_yaml
+from project_index.shared.yaml_io import load_yaml as load_yaml_value
+
+
+def load_yaml(text: str) -> Any:
+    """形の分かっている YAML の文字列を読む。"""
+    return load_yaml_value(text)
+
 
 # 描画結果の変数の値を囲む区切り（`VALUE_MARK_PATTERN` が当てる私用領域の文字）
 MARK_START = ""

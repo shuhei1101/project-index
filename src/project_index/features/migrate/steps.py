@@ -1,12 +1,10 @@
 """パッケージに入れた移し替えの手順を読み、メモリの上の YAML に当てる。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 from importlib import resources
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from ruamel.yaml.comments import CommentedMap
 
@@ -16,7 +14,11 @@ from project_index.features.migrate.types import (
     MigrationFailedError,
     MigrationStep,
 )
+from project_index.shared.narrowing import is_dict, is_list
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
+
+if TYPE_CHECKING:
+    from importlib.resources.abc import Traversable
 
 OPERATIONS = ("rename", "add", "delete", "lift", "unwrap")
 ARRAY_SUFFIX = "[]"
@@ -42,7 +44,7 @@ def load_steps(
     return steps
 
 
-def _read_version(file: Any, version: str) -> list[MigrationStep]:  # noqa: ANN401
+def _read_version(file: Traversable, version: str) -> list[MigrationStep]:
     """1 つのバージョンの `steps.yaml` を手順にする。"""
     label = f"{version}/{STEPS_FILE}"
     try:
@@ -50,35 +52,42 @@ def _read_version(file: Any, version: str) -> list[MigrationStep]:  # noqa: ANN4
     except (OSError, YamlLoadError) as error:
         msg = f"{label}: {error}"
         raise MigrationFailedError(msg) from error
-    rows = value.get("steps") if isinstance(value, dict) else None
-    if not isinstance(rows, list):
+    rows = value.get("steps") if is_dict(value) else None
+    if not is_list(rows):
         msg = f"{label}: steps の並びがありません"
         raise MigrationFailedError(msg)
-    steps: list[MigrationStep] = []
-    for row in rows:
-        # 操作は選択肢の中だけ。改名と引き上げは新しいキーを持ち、引き上げは取り出すキーも持つ
-        if not isinstance(row, dict) or row.get("op") not in OPERATIONS:
-            msg = f"{label}: op は {'・'.join(OPERATIONS)} のどれかです"
-            raise MigrationFailedError(msg)
-        if row["op"] in ("rename", "lift") and not row.get("to"):
-            msg = f"{label}: {row['op']} には to が要ります（{row.get('path')}）"
-            raise MigrationFailedError(msg)
-        if row["op"] == "lift" and not row.get("take"):
-            msg = f"{label}: lift には take が要ります（{row.get('path')}）"
-            raise MigrationFailedError(msg)
-        steps.append(
-            MigrationStep(
-                version=version,
-                op=row["op"],
-                path=str(row.get("path", "")),
-                description=str(row.get("description", "")),
-                to=row.get("to"),
-                value=row.get("value"),
-                match=row.get("match"),
-                take=row.get("take"),
-            )
-        )
-    return steps
+    return [_step_of(row, label, version) for row in rows]
+
+
+def _step_of(row: object, label: str, version: str) -> MigrationStep:
+    """`steps.yaml` の 1 行を手順にする。"""
+    # 操作は選択肢の中だけ。改名と引き上げは新しいキーを持ち、引き上げは取り出すキーも持つ
+    op = row.get("op") if is_dict(row) else None
+    if not is_dict(row) or op not in OPERATIONS:
+        msg = f"{label}: op は {'・'.join(OPERATIONS)} のどれかです"
+        raise MigrationFailedError(msg)
+    if op in ("rename", "lift") and not row.get("to"):
+        msg = f"{label}: {op} には to が要ります（{row.get('path')}）"
+        raise MigrationFailedError(msg)
+    if op == "lift" and not row.get("take"):
+        msg = f"{label}: lift には take が要ります（{row.get('path')}）"
+        raise MigrationFailedError(msg)
+    match = row.get("match")
+    return MigrationStep(
+        version=version,
+        op=op,
+        path=str(row.get("path", "")),
+        description=str(row.get("description", "")),
+        to=_optional_str(row.get("to")),
+        value=row.get("value"),
+        match=cast("dict[str, Any]", match) if is_dict(match) else None,
+        take=_optional_str(row.get("take")),
+    )
+
+
+def _optional_str(value: object) -> str | None:
+    """値があれば文字列にする。"""
+    return None if value is None else str(value)
 
 
 @dataclass(frozen=True)
@@ -94,20 +103,21 @@ def _parents(data: CommentedMap, parts: list[str]) -> list[_Parent]:
     """キーのパスの末尾の手前までをたどり、末尾のキーを持つ親の辞書を集める。"""
     parents = [_Parent(data)]
     for part in parts:
-        next_parents: list[_Parent] = []
-        for parent in parents:
-            # `{キー}[]` は配列の要素ごとにたどる
-            key = part.removesuffix(ARRAY_SUFFIX)
-            child = parent.node.get(key)
-            if part.endswith(ARRAY_SUFFIX):
-                if isinstance(child, list):
-                    next_parents.extend(
-                        _Parent(item) for item in child if isinstance(item, CommentedMap)
-                    )
-            elif isinstance(child, CommentedMap):
-                next_parents.append(_Parent(child, parent.node, key))
-        parents = next_parents
+        parents = [child for parent in parents for child in _children(parent, part)]
     return parents
+
+
+def _children(parent: _Parent, part: str) -> list[_Parent]:
+    """親の辞書の 1 つのキーの先の辞書を返す（`{キー}[]` は配列の要素の辞書ごと）。"""
+    key = part.removesuffix(ARRAY_SUFFIX)
+    child = parent.node.get(key)
+    if part.endswith(ARRAY_SUFFIX):
+        return (
+            [_Parent(item) for item in child if isinstance(item, CommentedMap)]
+            if is_list(child)
+            else []
+        )
+    return [_Parent(child, parent.node, key)] if isinstance(child, CommentedMap) else []
 
 
 def _rename(parent: CommentedMap, step: MigrationStep, key: str) -> None:
@@ -124,9 +134,9 @@ def _rename(parent: CommentedMap, step: MigrationStep, key: str) -> None:
         parent.ca.items[to] = comment
 
 
-def _matches(value: Any, step: MigrationStep) -> bool:  # noqa: ANN401
+def _matches(value: object, step: MigrationStep) -> bool:
     """値が辞書で、`match` のキーと値を全て持つか（`match` が無ければ辞書なら当たる）。"""
-    if not isinstance(value, Mapping):
+    if not is_dict(value):
         return False
     return all(key in value and value[key] == item for key, item in (step.match or {}).items())
 

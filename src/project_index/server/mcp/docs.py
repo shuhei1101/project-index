@@ -1,5 +1,4 @@
 """文書の MCP の組み立て。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning
 
 from __future__ import annotations
 
@@ -43,6 +42,7 @@ from project_index.server.mcp.result import (
     tool_prompt_id,
 )
 from project_index.shared.errors import ProjectIndexError
+from project_index.shared.narrowing import is_list
 
 if TYPE_CHECKING:
     from project_index.main import Handlers
@@ -66,7 +66,7 @@ __all__ = [
 
 def _signature(model: type[BaseModel]) -> inspect.Signature:
     """要求のモデルのフィールドを、ツールの入力のスキーマにするキーワード引数にする。"""
-    parameters = []
+    parameters: list[inspect.Parameter] = []
     for name, info in model.model_fields.items():
         annotation: Any = info.annotation
         extras: dict[str, Any] = {}
@@ -103,7 +103,7 @@ def _register(
 ) -> None:
     """要求のモデルを引数に持つツールを 1 つ登録する（呼ぶ前に要求が指す配信元の読み込みを待つ）。"""
 
-    async def tool(**arguments: Any) -> CallToolResult:  # noqa: ANN401
+    async def tool(**arguments: object) -> CallToolResult:
         try:
             request = model(**arguments)
             await wait_sources(request)
@@ -133,12 +133,12 @@ def _register(
 
 def _wait_target(request: BaseModel) -> dict[str, Any]:
     """要求のモデルから、待つ配信元の行を決める指す行の待ちの引数を作る。"""
-    source = getattr(request, "source", None)
-    if source == "*" or (isinstance(source, list) and "*" in source):
+    source: object = getattr(request, "source", None)
+    if source == "*" or (is_list(source) and "*" in source):
         return {"every": True}
     if isinstance(source, str):
         return {"ids": [source]}
-    if isinstance(source, list):
+    if is_list(source):
         return {"ids": list(source)}
     # 作業範囲の外の一覧は、全ての配信元の説明を並べる
     if getattr(request, "outside_scope", False):

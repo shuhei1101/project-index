@@ -3,11 +3,17 @@ from __future__ import annotations
 import dataclasses
 from typing import TYPE_CHECKING, Any
 
-from project_index.shared.yaml_io import load_yaml
+from project_index.shared.yaml_io import load_yaml as load_yaml_value
 from tests.integration.server.conftest import sample_config, sample_files
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+
+def load_yaml(text: str) -> Any:
+    """形の分かっている YAML の文字列を読む。"""
+    return load_yaml_value(text)
+
 
 ORIGIN = {"Origin": "http://127.0.0.1:8786"}
 SETTINGS_EXTRA = "# 取り込みの保持日数（コメントは保つ）\nseen_retention_days: 5\n"

@@ -1,0 +1,1115 @@
+# yaml-language-server: $schema=../schemas/files.schema.yaml
+files:
+- path: conftest.py
+  name: テスト全体の共通の準備
+  description: git のリポジトリの作成と commit・ファイルの書き込みのフィクスチャを受け持ち、テストの共通の準備を修正するときに参照する。
+  tags:
+  - topic:テスト補助
+  - tool:pytest
+- path: integration/plugin/conftest.py
+  name: プラグインの結合テストの共通の準備
+  description: フックの実行・空きポート・文脈を返すサーバーのフィクスチャを受け持ち、プラグインの結合テストの準備を修正するときに参照する。
+  tags:
+  - topic:テスト補助
+  - tool:pytest
+- path: integration/plugin/test_pre_tool_use.py
+  name: ツール実行前のフックの結合テスト
+  description: '`hooks/pre_tool_use.py` の結合テストを受け持ち、ツール実行前のフックの振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-20
+    type: tests
+- path: integration/plugin/test_session_start.py
+  name: セッション開始のフックの結合テスト
+  description: '`hooks/session_start.py` の結合テストを受け持ち、セッション開始のフックの振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-19
+    type: tests
+- path: integration/server/conftest.py
+  name: 索引のサーバーの結合テストの共通の準備
+  description: 配信元の設定・文書・管理用の YAML の見本とサーバーの起動のフィクスチャを受け持ち、索引のサーバーの結合テストの準備を修正するときに参照する。
+  tags:
+  - topic:テスト補助
+  - tool:pytest
+- path: integration/server/test_add_settings_source.py
+  name: 端末の設定の配信元の 1 行の追加の結合テスト
+  description: '`add_settings_source` の結合テストを受け持ち、端末の設定の配信元の 1 行の追加の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-32
+    type: tests
+- path: integration/server/test_check_project.py
+  name: 配信元の検査の結合テスト
+  description: '`check_project` の結合テストを受け持ち、配信元の検査の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-12
+    type: tests
+- path: integration/server/test_delete_docs.py
+  name: 文書の削除の結合テスト
+  description: '`delete_docs` の結合テストを受け持ち、文書の削除の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-7
+    type: tests
+- path: integration/server/test_describe.py
+  name: 配信元の説明の結合テスト
+  description: '`describe` の結合テストを受け持ち、配信元の説明の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-1
+    type: tests
+- path: integration/server/test_files.py
+  name: 載せるファイルの一覧の結合テスト
+  description: '`files` の結合テストを受け持ち、載せるファイルの一覧の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-17
+    type: tests
+- path: integration/server/test_get_decision.py
+  name: 検討事項の文書の取得の結合テスト
+  description: '`get_decision` の結合テストを受け持ち、検討事項の文書の取得の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-27
+    type: tests
+- path: integration/server/test_get_document.py
+  name: 文書の取得の結合テスト
+  description: '`get_document` の結合テストを受け持ち、文書の取得の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-25
+    type: tests
+- path: integration/server/test_get_settings_sources.py
+  name: 端末の設定の取得の結合テスト
+  description: '`get_settings_sources` の結合テストを受け持ち、端末の設定の取得の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-30
+    type: tests
+- path: integration/server/test_get_source_config.py
+  name: 配信元の設定の取得の結合テスト
+  description: '`get_source_config` の結合テストを受け持ち、配信元の設定の取得の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-23
+    type: tests
+- path: integration/server/test_get_status.py
+  name: 状態の取得の結合テスト
+  description: '`status` の結合テストを受け持ち、状態の取得の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-8
+    type: tests
+- path: integration/server/test_list_changes.py
+  name: 変更の一覧の結合テスト
+  description: '`list_changes` の結合テストを受け持ち、変更の一覧の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-4
+    type: tests
+- path: integration/server/test_list_decisions.py
+  name: 検討事項の ID の一覧の結合テスト
+  description: '`list_decisions` の結合テストを受け持ち、検討事項の ID の一覧の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-26
+    type: tests
+- path: integration/server/test_list_documents.py
+  name: 文書の一覧の結合テスト
+  description: '`list_documents` の結合テストを受け持ち、文書の一覧の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-24
+    type: tests
+- path: integration/server/test_list_match_words.py
+  name: 用語の一覧の結合テスト
+  description: '`list_match_words` の結合テストを受け持ち、用語の一覧の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-5
+    type: tests
+- path: integration/server/test_list_refs.py
+  name: リビジョンの一覧の結合テスト
+  description: '`list_refs` の結合テストを受け持ち、リビジョンの一覧の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-29
+    type: tests
+- path: integration/server/test_list_sources.py
+  name: 配信元の一覧と状態の結合テスト
+  description: '`list_sources` の結合テストを受け持ち、配信元の一覧と状態の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-22
+    type: tests
+- path: integration/server/test_migrate.py
+  name: 設定の移し替えの結合テスト
+  description: '`migrate` の結合テストを受け持ち、設定の移し替えの振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-16
+    type: tests
+- path: integration/server/test_prompt_doc.py
+  name: プロンプトの文書の変換の結合テスト
+  description: '`prompt-doc` の結合テストを受け持ち、プロンプトの文書の変換の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-18
+    type: tests
+- path: integration/server/test_put_settings_sources.py
+  name: 端末の設定の保存の結合テスト
+  description: '`put_settings_sources` の結合テストを受け持ち、端末の設定の保存の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-31
+    type: tests
+- path: integration/server/test_reload.py
+  name: 設定の読み直しの結合テスト
+  description: '`reload` の結合テストを受け持ち、設定の読み直しの振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-9
+    type: tests
+- path: integration/server/test_restart.py
+  name: 再起動の結合テスト
+  description: '`restart` の結合テストを受け持ち、再起動の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-10
+    type: tests
+- path: integration/server/test_search_docs.py
+  name: 文書の検索の結合テスト
+  description: '`search_docs` の結合テストを受け持ち、文書の検索の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-2
+    type: tests
+- path: integration/server/test_search_page.py
+  name: 語での検索の結合テスト
+  description: '`search_page` の結合テストを受け持ち、語での検索の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-28
+    type: tests
+- path: integration/server/test_serve.py
+  name: 起動の結合テスト
+  description: '`serve` の結合テストを受け持ち、起動の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-15
+    type: tests
+- path: integration/server/test_session_start.py
+  name: セッションの開始の結合テスト
+  description: '`post_session_start` の結合テストを受け持ち、セッションの開始の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-21
+    type: tests
+- path: integration/server/test_trace_related.py
+  name: 関連のたどりの結合テスト
+  description: '`trace_related` の結合テストを受け持ち、関連のたどりの振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-3
+    type: tests
+- path: integration/server/test_try_convert.py
+  name: 試しの変換の結合テスト
+  description: '`try_convert` の結合テストを受け持ち、試しの変換の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-13
+    type: tests
+- path: integration/server/test_update.py
+  name: 更新の結合テスト
+  description: '`update` の結合テストを受け持ち、更新の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-11
+    type: tests
+- path: integration/server/test_write_docs.py
+  name: 文書の書き込みの結合テスト
+  description: '`write_docs` の結合テストを受け持ち、文書の書き込みの振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-6
+    type: tests
+- path: integration/server/test_write_nav.py
+  name: 画面の構成の書き込みの結合テスト
+  description: '`write_nav` の結合テストを受け持ち、画面の構成の書き込みの振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-14
+    type: tests
+- path: unit/plugins/project_index/hooks/conftest.py
+  name: フックの単体テストの共通の準備
+  description: フックのスクリプトの読み込みと文脈を返すサーバーのフィクスチャを受け持ち、フックの単体テストの準備を修正するときに参照する。
+  tags:
+  - topic:テスト補助
+  - tool:pytest
+- path: unit/plugins/project_index/hooks/test_pre_tool_use.py
+  name: PreToolUse のフックの単体テスト
+  description: ツール実行前のフックの pre_tool_use.py の単体テストを受け持ち、ツール実行前のフックの pre_tool_use.py のテストを修正するときに参照する。
+  tags:
+  - topic:ツール実行前のフック
+  - tool:pytest
+  related:
+  - to: plugins/project-index/hooks/pre_tool_use.py
+    type: tests
+- path: unit/plugins/project_index/hooks/test_session_start.py
+  name: SessionStart のフックの単体テスト
+  description: セッション開始のフックの session_start.py の単体テストを受け持ち、セッション開始のフックの session_start.py のテストを修正するときに参照する。
+  tags:
+  - topic:セッション開始のフック
+  - tool:pytest
+  related:
+  - to: plugins/project-index/hooks/session_start.py
+    type: tests
+- path: unit/project_index/conftest.py
+  name: 索引のサーバーの単体テストの共通の準備
+  description: 端末の設定・配信元の行・配信中の配信元・部品の見本を作るフィクスチャを受け持ち、索引のサーバーの単体テストの準備を修正するときに参照する。
+  tags:
+  - topic:テスト補助
+  - tool:pytest
+- path: unit/project_index/features/access/test_service.py
+  name: 作業場所からの権限と、MCP の引数からの読み書きする場所の解決の単体テスト
+  description: 権限と作業場所の service.py の単体テストを受け持ち、権限と作業場所の service.py のテストを修正するときに参照する。
+  tags:
+  - topic:権限と作業場所
+  - tool:pytest
+  related:
+  - to: src/project_index/features/access/service.py
+    type: tests
+- path: unit/project_index/features/admin/test_render.py
+  name: '管理の MCP の `format: markdown` の応答の文の単体テスト'
+  description: 管理の render.py の単体テストを受け持ち、管理の render.py のテストを修正するときに参照する。
+  tags:
+  - topic:管理
+  - tool:pytest
+  related:
+  - to: src/project_index/features/admin/render.py
+    type: tests
+- path: unit/project_index/features/admin/test_service.py
+  name: 管理の MCP の `status`・`reload`・`check_project`・`try_convert` の中身の単体テスト
+  description: 管理の service.py の単体テストを受け持ち、管理の service.py のテストを修正するときに参照する。
+  tags:
+  - topic:管理
+  - tool:pytest
+  related:
+  - to: src/project_index/features/admin/service.py
+    type: tests
+- path: unit/project_index/features/changes/test_compare.py
+  name: 変わったキー・差分の行・語の出現数の比べ方の単体テスト
+  description: 変更の compare.py の単体テストを受け持ち、変更の compare.py のテストを修正するときに参照する。
+  tags:
+  - topic:変更
+  - tool:pytest
+  related:
+  - to: src/project_index/features/changes/compare.py
+    type: tests
+- path: unit/project_index/features/changes/test_render.py
+  name: '`list_changes` の結果の Markdownの単体テスト'
+  description: 変更の render.py の単体テストを受け持ち、変更の render.py のテストを修正するときに参照する。
+  tags:
+  - topic:変更
+  - tool:pytest
+  related:
+  - to: src/project_index/features/changes/render.py
+    type: tests
+- path: unit/project_index/features/changes/test_service.py
+  name: '`list_changes` の区間か前回読んだ時点からの変わった文書と差分の単体テスト'
+  description: 変更の service.py の単体テストを受け持ち、変更の service.py のテストを修正するときに参照する。
+  tags:
+  - topic:変更
+  - tool:pytest
+  related:
+  - to: src/project_index/features/changes/service.py
+    type: tests
+- path: unit/project_index/features/convert/test_decisions.py
+  name: 配信元の `decisions.folders` から検討事項の文書を探す処理の単体テスト
+  description: 変換の decisions.py の単体テストを受け持ち、変換の decisions.py のテストを修正するときに参照する。
+  tags:
+  - topic:変換
+  - tool:pytest
+  related:
+  - to: src/project_index/features/convert/decisions.py
+    type: tests
+- path: unit/project_index/features/convert/test_service.py
+  name: '`converters[]` の実行と結果の控えの単体テスト'
+  description: 変換の service.py の単体テストを受け持ち、変換の service.py のテストを修正するときに参照する。
+  tags:
+  - topic:変換
+  - tool:pytest
+  related:
+  - to: src/project_index/features/convert/service.py
+    type: tests
+- path: unit/project_index/features/describe/test_render.py
+  name: '`describe` の結果の Markdownの単体テスト'
+  description: 説明の render.py の単体テストを受け持ち、説明の render.py のテストを修正するときに参照する。
+  tags:
+  - topic:説明
+  - tool:pytest
+  related:
+  - to: src/project_index/features/describe/render.py
+    type: tests
+- path: unit/project_index/features/describe/test_service.py
+  name: '`describe` の使える配信元・説明書と種類・種類のスキーマの単体テスト'
+  description: 説明の service.py の単体テストを受け持ち、説明の service.py のテストを修正するときに参照する。
+  tags:
+  - topic:説明
+  - tool:pytest
+  related:
+  - to: src/project_index/features/describe/service.py
+    type: tests
+- path: unit/project_index/features/describe/test_source_checks.py
+  name: 配信元ごとの検査（同期のずれ・エイリアスのキーの違反・`nav` の警告）の結果を `describe` の警告に渡す処理の単体テスト
+  description: 説明の source_checks.py の単体テストを受け持ち、説明の source_checks.py のテストを修正するときに参照する。
+  tags:
+  - topic:説明
+  - tool:pytest
+  related:
+  - to: src/project_index/features/describe/source_checks.py
+    type: tests
+- path: unit/project_index/features/describe/test_warnings.py
+  name: 引数なしの `describe` に添える警告（使える配信元の同期のずれ・古い設定と、配信していない配信元）の単体テスト
+  description: 説明の warnings.py の単体テストを受け持ち、説明の warnings.py のテストを修正するときに参照する。
+  tags:
+  - topic:説明
+  - tool:pytest
+  related:
+  - to: src/project_index/features/describe/warnings.py
+    type: tests
+- path: unit/project_index/features/documents/test_aliases.py
+  name: エイリアスのキーの検証と、用語の収集・照合の単体テスト
+  description: 文書のストアの aliases.py の単体テストを受け持ち、文書のストアの aliases.py のテストを修正するときに参照する。
+  tags:
+  - topic:文書のストア
+  - tool:pytest
+  related:
+  - to: src/project_index/features/documents/aliases.py
+    type: tests
+- path: unit/project_index/features/documents/test_fields.py
+  name: 項目のパスの解釈と、項目の値の取得・設定・削除・メタデータの解決の単体テスト
+  description: 文書のストアの fields.py の単体テストを受け持ち、文書のストアの fields.py のテストを修正するときに参照する。
+  tags:
+  - topic:文書のストア
+  - tool:pytest
+  related:
+  - to: src/project_index/features/documents/fields.py
+    type: tests
+- path: unit/project_index/features/documents/test_indexable.py
+  name: たどるフォルダと、管理用の YAML に記載するファイルの判定の単体テスト
+  description: 文書のストアの indexable.py の単体テストを受け持ち、文書のストアの indexable.py のテストを修正するときに参照する。
+  tags:
+  - topic:文書のストア
+  - tool:pytest
+  related:
+  - to: src/project_index/features/documents/indexable.py
+    type: tests
+- path: unit/project_index/features/documents/test_loader.py
+  name: ファイルの収集と、ファイルからの文書の作成の単体テスト
+  description: 文書のストアの loader.py の単体テストを受け持ち、文書のストアの loader.py のテストを修正するときに参照する。
+  tags:
+  - topic:文書のストア
+  - tool:pytest
+  related:
+  - to: src/project_index/features/documents/loader.py
+    type: tests
+- path: unit/project_index/features/documents/test_schema.py
+  name: 種類のスキーマの `$ref` の解決と、`records` の行のスキーマの単体テスト
+  description: 文書のストアの schema.py の単体テストを受け持ち、文書のストアの schema.py のテストを修正するときに参照する。
+  tags:
+  - topic:文書のストア
+  - tool:pytest
+  related:
+  - to: src/project_index/features/documents/schema.py
+    type: tests
+- path: unit/project_index/features/documents/test_store.py
+  name: 文書のキャッシュ・ID の引き当て・種類のスキーマ・文書の場所と、メタデータのずれの確かめの単体テスト
+  description: 文書のストアの store.py の単体テストを受け持ち、文書のストアの store.py のテストを修正するときに参照する。
+  tags:
+  - topic:文書のストア
+  - tool:pytest
+  related:
+  - to: src/project_index/features/documents/store.py
+    type: tests
+- path: unit/project_index/features/history/test_query.py
+  name: git によるリビジョンの解決・一覧・変わったファイル・ファイルの日時・ワークツリーの一覧の単体テスト
+  description: 履歴の query.py の単体テストを受け持ち、履歴の query.py のテストを修正するときに参照する。
+  tags:
+  - topic:履歴
+  - tool:pytest
+  related:
+  - to: src/project_index/features/history/query.py
+    type: tests
+- path: unit/project_index/features/history/test_snapshot.py
+  name: リビジョンの書き出しの単体テスト
+  description: 履歴の snapshot.py の単体テストを受け持ち、履歴の snapshot.py のテストを修正するときに参照する。
+  tags:
+  - topic:履歴
+  - tool:pytest
+  related:
+  - to: src/project_index/features/history/snapshot.py
+    type: tests
+- path: unit/project_index/features/lifecycle/test_control.py
+  name: 再起動の要求での uvicorn の停止と、停止の後に `run_serve` が同じプロセスを置き換えるかの判定の単体テスト
+  description: 再起動と更新の control.py の単体テストを受け持ち、再起動と更新の control.py のテストを修正するときに参照する。
+  tags:
+  - topic:再起動と更新
+  - tool:pytest
+  related:
+  - to: src/project_index/features/lifecycle/control.py
+    type: tests
+- path: unit/project_index/features/lifecycle/test_update.py
+  name: 端末の設定の `clone` を更新し、移し替えが要らなければ再起動を要求する処理の単体テスト
+  description: 再起動と更新の update.py の単体テストを受け持ち、再起動と更新の update.py のテストを修正するときに参照する。
+  tags:
+  - topic:再起動と更新
+  - tool:pytest
+  related:
+  - to: src/project_index/features/lifecycle/update.py
+    type: tests
+- path: unit/project_index/features/migrate/test_service.py
+  name: '`project-index migrate` の対象と適用する手順を決め、バックアップを取ってから 1 回だけ書き込む処理の単体テスト'
+  description: 設定の移し替えの service.py の単体テストを受け持ち、設定の移し替えの service.py のテストを修正するときに参照する。
+  tags:
+  - topic:設定の移し替え
+  - tool:pytest
+  related:
+  - to: src/project_index/features/migrate/service.py
+    type: tests
+- path: unit/project_index/features/migrate/test_steps.py
+  name: パッケージに入れた移し替えの手順を、メモリの上の YAML に 1 つずつ適用する処理の単体テスト
+  description: 設定の移し替えの steps.py の単体テストを受け持ち、設定の移し替えの steps.py のテストを修正するときに参照する。
+  tags:
+  - topic:設定の移し替え
+  - tool:pytest
+  related:
+  - to: src/project_index/features/migrate/steps.py
+    type: tests
+- path: unit/project_index/features/prompt_doc/conftest.py
+  name: プロンプトの文書の変換の単体テストの共通の準備
+  description: 変換するプロンプトの YAML の見本のフィクスチャを受け持ち、プロンプトの文書の変換の単体テストの準備を修正するときに参照する。
+  tags:
+  - topic:テスト補助
+  - tool:pytest
+- path: unit/project_index/features/prompt_doc/test_cli.py
+  name: '`project-index prompt-doc` の処理の単体テスト'
+  description: プロンプトの文書の変換の cli.py の単体テストを受け持ち、プロンプトの文書の変換の cli.py のテストを修正するときに参照する。
+  tags:
+  - topic:プロンプトの文書の変換
+  - tool:pytest
+  related:
+  - to: src/project_index/features/prompt_doc/cli.py
+    type: tests
+- path: unit/project_index/features/prompt_doc/test_markdown.py
+  name: プロンプトの YAML を読み、変数の表・テンプレート・例の組のセクションを持つ mdmark の Markdown にする処理の単体テスト
+  description: プロンプトの文書の変換の markdown.py の単体テストを受け持ち、プロンプトの文書の変換の markdown.py のテストを修正するときに参照する。
+  tags:
+  - topic:プロンプトの文書の変換
+  - tool:pytest
+  related:
+  - to: src/project_index/features/prompt_doc/markdown.py
+    type: tests
+- path: unit/project_index/features/prompt_doc/test_render.py
+  name: プロンプトの部品を Jinja2 で描画する処理の単体テスト
+  description: プロンプトの文書の変換の render.py の単体テストを受け持ち、プロンプトの文書の変換の render.py のテストを修正するときに参照する。
+  tags:
+  - topic:プロンプトの文書の変換
+  - tool:pytest
+  related:
+  - to: src/project_index/features/prompt_doc/render.py
+    type: tests
+- path: unit/project_index/features/prompt_doc/test_runtime.py
+  name: 起動時にプロンプトの YAML を検査して MCP の instructions・ツールの description を描画する処理の単体テスト
+  description: プロンプトの文書の変換の runtime.py の単体テストを受け持ち、プロンプトの文書の変換の runtime.py のテストを修正するときに参照する。
+  tags:
+  - topic:プロンプトの文書の変換
+  - tool:pytest
+  related:
+  - to: src/project_index/features/prompt_doc/runtime.py
+    type: tests
+- path: unit/project_index/features/read/conftest.py
+  name: 読み取り API の単体テストの共通の準備
+  description: 読み取り API の表示の環境を作るフィクスチャを受け持ち、読み取り API の単体テストの準備を修正するときに参照する。
+  tags:
+  - topic:テスト補助
+  - tool:pytest
+- path: unit/project_index/features/read/test_nav.py
+  name: '`nav` の `auto` に該当する文書の数・`filter` の検証・警告（管理の MCP と配信元の説明が使う）の単体テスト'
+  description: 読み取り APIの nav.py の単体テストを受け持ち、読み取り APIの nav.py のテストを修正するときに参照する。
+  tags:
+  - topic:読み取りAPI
+  - tool:pytest
+  related:
+  - to: src/project_index/features/read/nav.py
+    type: tests
+- path: unit/project_index/features/read/test_paths.py
+  name: 文書のページのパスと、読み取り API が読む場所の単体テスト
+  description: 読み取り APIの paths.py の単体テストを受け持ち、読み取り APIの paths.py のテストを修正するときに参照する。
+  tags:
+  - topic:読み取りAPI
+  - tool:pytest
+  related:
+  - to: src/project_index/features/read/paths.py
+    type: tests
+- path: unit/project_index/features/read/test_route.py
+  name: 読み取り API のルーター（`/sources` の下）の単体テスト
+  description: 読み取り APIの route.py の単体テストを受け持ち、読み取り APIの route.py のテストを修正するときに参照する。
+  tags:
+  - topic:読み取りAPI
+  - tool:pytest
+  related:
+  - to: src/project_index/features/read/route.py
+    type: tests
+- path: unit/project_index/features/read/test_search.py
+  name: 語での検索の単体テスト
+  description: 読み取り APIの search.py の単体テストを受け持ち、読み取り APIの search.py のテストを修正するときに参照する。
+  tags:
+  - topic:読み取りAPI
+  - tool:pytest
+  related:
+  - to: src/project_index/features/read/search.py
+    type: tests
+- path: unit/project_index/features/read/test_service.py
+  name: 読み取り API の配信元の設定・文書の一覧・文書の取得・検討事項の取得の単体テスト
+  description: 読み取り APIの service.py の単体テストを受け持ち、読み取り APIの service.py のテストを修正するときに参照する。
+  tags:
+  - topic:読み取りAPI
+  - tool:pytest
+  related:
+  - to: src/project_index/features/read/service.py
+    type: tests
+- path: unit/project_index/features/related/test_graph.py
+  name: 関連の取り出しとたどりの単体テスト
+  description: 関連の graph.py の単体テストを受け持ち、関連の graph.py のテストを修正するときに参照する。
+  tags:
+  - topic:関連
+  - tool:pytest
+  related:
+  - to: src/project_index/features/related/graph.py
+    type: tests
+- path: unit/project_index/features/related/test_service.py
+  name: '`trace_related` の関連のたどりと関連の候補の単体テスト'
+  description: 関連の service.py の単体テストを受け持ち、関連の service.py のテストを修正するときに参照する。
+  tags:
+  - topic:関連
+  - tool:pytest
+  related:
+  - to: src/project_index/features/related/service.py
+    type: tests
+- path: unit/project_index/features/related/test_suggest.py
+  name: 関連の候補の提案の単体テスト
+  description: 関連の suggest.py の単体テストを受け持ち、関連の suggest.py のテストを修正するときに参照する。
+  tags:
+  - topic:関連
+  - tool:pytest
+  related:
+  - to: src/project_index/features/related/suggest.py
+    type: tests
+- path: unit/project_index/features/search/test_body_parts.py
+  name: 本文の切り出しの単体テスト
+  description: 検索の body_parts.py の単体テストを受け持ち、検索の body_parts.py のテストを修正するときに参照する。
+  tags:
+  - topic:検索
+  - tool:pytest
+  related:
+  - to: src/project_index/features/search/body_parts.py
+    type: tests
+- path: unit/project_index/features/search/test_cursor.py
+  name: 続きのカーソルの作成と解読の単体テスト
+  description: 検索の cursor.py の単体テストを受け持ち、検索の cursor.py のテストを修正するときに参照する。
+  tags:
+  - topic:検索
+  - tool:pytest
+  related:
+  - to: src/project_index/features/search/cursor.py
+    type: tests
+- path: unit/project_index/features/search/test_fields.py
+  name: 項目の値・計算項目・使える項目・見出しの行の単体テスト
+  description: 検索の fields.py の単体テストを受け持ち、検索の fields.py のテストを修正するときに参照する。
+  tags:
+  - topic:検索
+  - tool:pytest
+  related:
+  - to: src/project_index/features/search/fields.py
+    type: tests
+- path: unit/project_index/features/search/test_filters.py
+  name: 条件の木の確かめと照合・語の照合・正規表現・比べる値の解釈の単体テスト
+  description: 検索の filters.py の単体テストを受け持ち、検索の filters.py のテストを修正するときに参照する。
+  tags:
+  - topic:検索
+  - tool:pytest
+  related:
+  - to: src/project_index/features/search/filters.py
+    type: tests
+- path: unit/project_index/features/search/test_render.py
+  name: '`search_docs` の結果の Markdownの単体テスト'
+  description: 検索の render.py の単体テストを受け持ち、検索の render.py のテストを修正するときに参照する。
+  tags:
+  - topic:検索
+  - tool:pytest
+  related:
+  - to: src/project_index/features/search/render.py
+    type: tests
+- path: unit/project_index/features/search/test_service.py
+  name: '`search_docs` の条件の木・並べ替え・集計・量の上限の単体テスト'
+  description: 検索の service.py の単体テストを受け持ち、検索の service.py のテストを修正するときに参照する。
+  tags:
+  - topic:検索
+  - tool:pytest
+  related:
+  - to: src/project_index/features/search/service.py
+    type: tests
+- path: unit/project_index/features/search/test_snippets.py
+  name: 行の分割・抜粋の検索・当たった行の数・一致した箇所の抜き出しの単体テスト
+  description: 検索の snippets.py の単体テストを受け持ち、検索の snippets.py のテストを修正するときに参照する。
+  tags:
+  - topic:検索
+  - tool:pytest
+  related:
+  - to: src/project_index/features/search/snippets.py
+    type: tests
+- path: unit/project_index/features/search/test_terms.py
+  name: 用語の一覧と、その Markdownの単体テスト
+  description: 検索の terms.py の単体テストを受け持ち、検索の terms.py のテストを修正するときに参照する。
+  tags:
+  - topic:検索
+  - tool:pytest
+  related:
+  - to: src/project_index/features/search/terms.py
+    type: tests
+- path: unit/project_index/features/seen/test_store.py
+  name: 会話キーごとの返し済み・前回読んだ内容・閲覧と編集の SQLite への記録と読み出しの単体テスト
+  description: 会話の記録の store.py の単体テストを受け持ち、会話の記録の store.py のテストを修正するときに参照する。
+  tags:
+  - topic:会話の記録
+  - tool:pytest
+  related:
+  - to: src/project_index/features/seen/store.py
+    type: tests
+- path: unit/project_index/features/seen/test_types.py
+  name: 会話の記録の会話キー・前回読んだ内容・閲覧と編集の記録の型の単体テスト
+  description: 会話の記録の types.py の単体テストを受け持ち、会話の記録の types.py のテストを修正するときに参照する。
+  tags:
+  - topic:会話の記録
+  - tool:pytest
+  related:
+  - to: src/project_index/features/seen/types.py
+    type: tests
+- path: unit/project_index/features/session_start/test_route.py
+  name: '`POST /_admin/session-start` のルートの単体テスト'
+  description: セッションの開始の route.py の単体テストを受け持ち、セッションの開始の route.py のテストを修正するときに参照する。
+  tags:
+  - topic:セッションの開始
+  - tool:pytest
+  related:
+  - to: src/project_index/features/session_start/route.py
+    type: tests
+- path: unit/project_index/features/session_start/test_service.py
+  name: '`/clear`・圧縮の後に、その会話の返し済みの記録を削除する処理の単体テスト'
+  description: セッションの開始の service.py の単体テストを受け持ち、セッションの開始の service.py のテストを修正するときに参照する。
+  tags:
+  - topic:セッションの開始
+  - tool:pytest
+  related:
+  - to: src/project_index/features/session_start/service.py
+    type: tests
+- path: unit/project_index/features/settings/test_query.py
+  name: 端末の設定の場所・読み込みと検証・待ち受けのポートの単体テスト
+  description: 端末の設定の query.py の単体テストを受け持ち、端末の設定の query.py のテストを修正するときに参照する。
+  tags:
+  - topic:端末の設定
+  - tool:pytest
+  related:
+  - to: src/project_index/features/settings/query.py
+    type: tests
+- path: unit/project_index/features/settings/test_route.py
+  name: 端末の設定のルーター（`GET`・`PUT`・`POST /settings/sources`）の単体テスト
+  description: 端末の設定の route.py の単体テストを受け持ち、端末の設定の route.py のテストを修正するときに参照する。
+  tags:
+  - topic:端末の設定
+  - tool:pytest
+  related:
+  - to: src/project_index/features/settings/route.py
+    type: tests
+- path: unit/project_index/features/settings/test_service.py
+  name: '`sources[]` の保存の単体テスト'
+  description: 端末の設定の service.py の単体テストを受け持ち、端末の設定の service.py のテストを修正するときに参照する。
+  tags:
+  - topic:端末の設定
+  - tool:pytest
+  related:
+  - to: src/project_index/features/settings/service.py
+    type: tests
+- path: unit/project_index/features/sources/test_merge.py
+  name: 設定の YAML のマージの単体テスト
+  description: 配信元の merge.py の単体テストを受け持ち、配信元の merge.py のテストを修正するときに参照する。
+  tags:
+  - topic:配信元
+  - tool:pytest
+  related:
+  - to: src/project_index/features/sources/merge.py
+    type: tests
+- path: unit/project_index/features/sources/test_registry.py
+  name: 配信する配信元の一覧と読み直しの単体テスト
+  description: 配信元の registry.py の単体テストを受け持ち、配信元の registry.py のテストを修正するときに参照する。
+  tags:
+  - topic:配信元
+  - tool:pytest
+  related:
+  - to: src/project_index/features/sources/registry.py
+    type: tests
+- path: unit/project_index/features/sources/test_schema_ref.py
+  name: '`documents[].schema` でほかの配信元のリビジョンのスキーマを指す参照の型と、その読み取りの単体テスト'
+  description: 配信元の schema_ref.py の単体テストを受け持ち、配信元の schema_ref.py のテストを修正するときに参照する。
+  tags:
+  - topic:配信元
+  - tool:pytest
+  related:
+  - to: src/project_index/features/sources/schema_ref.py
+    type: tests
+- path: unit/project_index/features/sources/test_service.py
+  name: 配信元の設定の読み込みと検証、スクリプトとバージョンの確かめの単体テスト
+  description: 配信元の service.py の単体テストを受け持ち、配信元の service.py のテストを修正するときに参照する。
+  tags:
+  - topic:配信元
+  - tool:pytest
+  related:
+  - to: src/project_index/features/sources/service.py
+    type: tests
+- path: unit/project_index/features/sources/test_types.py
+  name: 配信元の設定・文書の行・スクリプト・配信中の配信元・状態の型の単体テスト
+  description: 配信元の types.py の単体テストを受け持ち、配信元の types.py のテストを修正するときに参照する。
+  tags:
+  - topic:配信元
+  - tool:pytest
+  related:
+  - to: src/project_index/features/sources/types.py
+    type: tests
+- path: unit/project_index/features/validation/test_markdown.py
+  name: スキーマで Markdown と宣言したキーのうち操作で変えた値を mdmark で点検し、描画時の記載方法の警告を違反にする処理の単体テスト
+  description: 検査の markdown.py の単体テストを受け持ち、検査の markdown.py のテストを修正するときに参照する。
+  tags:
+  - topic:検査
+  - tool:pytest
+  related:
+  - to: src/project_index/features/validation/markdown.py
+    type: tests
+- path: unit/project_index/features/validation/test_rules.py
+  name: スキーマ・ID の形・関連の種類の検査の単体テスト
+  description: 検査の rules.py の単体テストを受け持ち、検査の rules.py のテストを修正するときに参照する。
+  tags:
+  - topic:検査
+  - tool:pytest
+  related:
+  - to: src/project_index/features/validation/rules.py
+    type: tests
+- path: unit/project_index/features/validation/test_scripts.py
+  name: '`validators[]` の出力の解釈の単体テスト'
+  description: 検査の scripts.py の単体テストを受け持ち、検査の scripts.py のテストを修正するときに参照する。
+  tags:
+  - topic:検査
+  - tool:pytest
+  related:
+  - to: src/project_index/features/validation/scripts.py
+    type: tests
+- path: unit/project_index/features/validation/test_service.py
+  name: 検査をまとめて実行する処理と、読み取りの結果のキャッシュの単体テスト
+  description: 検査の service.py の単体テストを受け持ち、検査の service.py のテストを修正するときに参照する。
+  tags:
+  - topic:検査
+  - tool:pytest
+  related:
+  - to: src/project_index/features/validation/service.py
+    type: tests
+- path: unit/project_index/features/write/test_apply.py
+  name: 項目の操作の適用と、共通のキーの列名への読み替えの単体テスト
+  description: 書き込みの apply.py の単体テストを受け持ち、書き込みの apply.py のテストを修正するときに参照する。
+  tags:
+  - topic:書き込み
+  - tool:pytest
+  related:
+  - to: src/project_index/features/write/apply.py
+    type: tests
+- path: unit/project_index/features/write/test_hints.py
+  name: '`write_docs` のスキーマの違反に、違反した項目のスキーマの説明を添える処理の単体テスト'
+  description: 書き込みの hints.py の単体テストを受け持ち、書き込みの hints.py のテストを修正するときに参照する。
+  tags:
+  - topic:書き込み
+  - tool:pytest
+  related:
+  - to: src/project_index/features/write/hints.py
+    type: tests
+- path: unit/project_index/features/write/test_ids.py
+  name: '`ids.format` からの ID の生成の単体テスト'
+  description: 書き込みの ids.py の単体テストを受け持ち、書き込みの ids.py のテストを修正するときに参照する。
+  tags:
+  - topic:書き込み
+  - tool:pytest
+  related:
+  - to: src/project_index/features/write/ids.py
+    type: tests
+- path: unit/project_index/features/write/test_locks.py
+  name: 配信元ごとの書き込みの排他の単体テスト
+  description: 書き込みの locks.py の単体テストを受け持ち、書き込みの locks.py のテストを修正するときに参照する。
+  tags:
+  - topic:書き込み
+  - tool:pytest
+  related:
+  - to: src/project_index/features/write/locks.py
+    type: tests
+- path: unit/project_index/features/write/test_placement.py
+  name: 新しい文書の置き場所の単体テスト
+  description: 書き込みの placement.py の単体テストを受け持ち、書き込みの placement.py のテストを修正するときに参照する。
+  tags:
+  - topic:書き込み
+  - tool:pytest
+  related:
+  - to: src/project_index/features/write/placement.py
+    type: tests
+- path: unit/project_index/features/write/test_service.py
+  name: '`write_docs`・`delete_docs` の操作の適用・検査・書き換えと、バージョンの確かめの単体テスト'
+  description: 書き込みの service.py の単体テストを受け持ち、書き込みの service.py のテストを修正するときに参照する。
+  tags:
+  - topic:書き込み
+  - tool:pytest
+  related:
+  - to: src/project_index/features/write/service.py
+    type: tests
+- path: unit/project_index/integrations/test_git.py
+  name: git の実行と、リポジトリの直下の解決の単体テスト
+  description: 履歴の git.py の単体テストを受け持ち、履歴の git.py のテストを修正するときに参照する。
+  tags:
+  - topic:履歴
+  - tool:pytest
+  related:
+  - to: src/project_index/integrations/git.py
+    type: tests
+- path: unit/project_index/integrations/test_mdmark.py
+  name: mdmark の CLI の `check --text -` で Markdown の文字列を点検し、出力をずれの並びにする処理の単体テスト
+  description: スクリプトの実行の mdmark.py の単体テストを受け持ち、スクリプトの実行の mdmark.py のテストを修正するときに参照する。
+  tags:
+  - topic:スクリプトの実行
+  - tool:pytest
+  related:
+  - to: src/project_index/integrations/mdmark.py
+    type: tests
+- path: unit/project_index/integrations/test_scripts.py
+  name: '`validators[]`・`converters[]`・`generators[]` のスクリプトの制限時間つきの実行と、実行できるかの確かめの単体テスト'
+  description: スクリプトの実行の scripts.py の単体テストを受け持ち、スクリプトの実行の scripts.py のテストを修正するときに参照する。
+  tags:
+  - topic:スクリプトの実行
+  - tool:pytest
+  related:
+  - to: src/project_index/integrations/scripts.py
+    type: tests
+- path: unit/project_index/server/mcp/test_admin.py
+  name: 管理の MCP の組み立て（ツールの登録）の単体テスト
+  description: 文書のMCPの admin.py の単体テストを受け持ち、文書のMCPの admin.py のテストを修正するときに参照する。
+  tags:
+  - topic:文書のMCP
+  - tool:pytest
+  related:
+  - to: src/project_index/server/mcp/admin.py
+    type: tests
+- path: unit/project_index/server/mcp/test_docs.py
+  name: 文書の MCP の組み立て（ツールの登録）の単体テスト
+  description: 文書のMCPの docs.py の単体テストを受け持ち、文書のMCPの docs.py のテストを修正するときに参照する。
+  tags:
+  - topic:文書のMCP
+  - tool:pytest
+  related:
+  - to: src/project_index/server/mcp/docs.py
+    type: tests
+- path: unit/project_index/server/mcp/test_result.py
+  name: ツールの結果・エラーの変換と、2 つの MCP のツール名とプロンプトの IDの単体テスト
+  description: 文書のMCPの result.py の単体テストを受け持ち、文書のMCPの result.py のテストを修正するときに参照する。
+  tags:
+  - topic:文書のMCP
+  - tool:pytest
+  related:
+  - to: src/project_index/server/mcp/result.py
+    type: tests
+- path: unit/project_index/server/test_app.py
+  name: ルートと MCP のマウントをまとめたアプリの組み立ての単体テスト
+  description: 起動の app.py の単体テストを受け持ち、起動の app.py のテストを修正するときに参照する。
+  tags:
+  - topic:起動
+  - tool:pytest
+  related:
+  - to: src/project_index/server/app.py
+    type: tests
+- path: unit/project_index/server/test_error_handlers.py
+  name: 例外の problem+json への変換の単体テスト
+  description: 起動の error_handlers.py の単体テストを受け持ち、起動の error_handlers.py のテストを修正するときに参照する。
+  tags:
+  - topic:起動
+  - tool:pytest
+  related:
+  - to: src/project_index/server/error_handlers.py
+    type: tests
+- path: unit/project_index/server/test_lifespan.py
+  name: MCP のセッションの管理と、記録の削除の単体テスト
+  description: 起動の lifespan.py の単体テストを受け持ち、起動の lifespan.py のテストを修正するときに参照する。
+  tags:
+  - topic:起動
+  - tool:pytest
+  related:
+  - to: src/project_index/server/lifespan.py
+    type: tests
+- path: unit/project_index/server/test_origin.py
+  name: 端末の設定の API への、ブラウザからの別のオリジンの書き込みの確認の単体テスト
+  description: 共通の origin.py の単体テストを受け持ち、共通の origin.py のテストを修正するときに参照する。
+  tags:
+  - topic:共通
+  - tool:pytest
+  related:
+  - to: src/project_index/server/origin.py
+    type: tests
+- path: unit/project_index/shared/test_errors.py
+  name: '`ProjectIndexError` と、MCP・読み取り API が返すエラーの階層の単体テスト'
+  description: 共通の errors.py の単体テストを受け持ち、共通の errors.py のテストを修正するときに参照する。
+  tags:
+  - topic:共通
+  - tool:pytest
+  related:
+  - to: src/project_index/shared/errors.py
+    type: tests
+- path: unit/project_index/shared/test_files.py
+  name: 一時ファイルからのファイルの置き換えの単体テスト
+  description: 共通の files.py の単体テストを受け持ち、共通の files.py のテストを修正するときに参照する。
+  tags:
+  - topic:共通
+  - tool:pytest
+  related:
+  - to: src/project_index/shared/files.py
+    type: tests
+- path: unit/project_index/shared/test_hashing.py
+  name: 内容のハッシュ（文書のバージョン）の単体テスト
+  description: 共通の hashing.py の単体テストを受け持ち、共通の hashing.py のテストを修正するときに参照する。
+  tags:
+  - topic:共通
+  - tool:pytest
+  related:
+  - to: src/project_index/shared/hashing.py
+    type: tests
+- path: unit/project_index/shared/test_narrowing.py
+  name: YAML・JSON から読んだ値の辞書・配列への絞り込みの単体テスト
+  description: 共通の narrowing.py の単体テストを受け持ち、共通の narrowing.py のテストを修正するときに参照する。
+  tags:
+  - topic:共通
+  - tool:pytest
+  related:
+  - to: src/project_index/shared/narrowing.py
+    type: tests
+- path: unit/project_index/shared/test_paths.py
+  name: 作業場所の glob の照合とパスの正規化の単体テスト
+  description: 共通の paths.py の単体テストを受け持ち、共通の paths.py のテストを修正するときに参照する。
+  tags:
+  - topic:共通
+  - tool:pytest
+  related:
+  - to: src/project_index/shared/paths.py
+    type: tests
+- path: unit/project_index/shared/test_schema_check.py
+  name: JSON Schema の違反を、項目のパスつきの `Violation` にする処理の単体テスト
+  description: 共通の schema_check.py の単体テストを受け持ち、共通の schema_check.py のテストを修正するときに参照する。
+  tags:
+  - topic:共通
+  - tool:pytest
+  related:
+  - to: src/project_index/shared/schema_check.py
+    type: tests
+- path: unit/project_index/shared/test_yaml_io.py
+  name: YAML の読み込みと、往復編集の読み書きの単体テスト
+  description: 共通の yaml_io.py の単体テストを受け持ち、共通の yaml_io.py のテストを修正するときに参照する。
+  tags:
+  - topic:共通
+  - tool:pytest
+  related:
+  - to: src/project_index/shared/yaml_io.py
+    type: tests
+- path: unit/project_index/test_main.py
+  name: '`project-index` コマンドの引数の組み立てと mainの単体テスト'
+  description: 入口の __main__.py の単体テストを受け持ち、入口の __main__.py のテストを修正するときに参照する。
+  tags:
+  - topic:入口
+  - tool:pytest
+  related:
+  - to: src/project_index/__main__.py
+    type: tests
+- path: unit/project_index/test_serve.py
+  name: '`project-index serve`・`project-index migrate` の部品の配線と、配信元の読み直しの単体テスト'
+  description: 起動の main.py の単体テストを受け持ち、起動の main.py のテストを修正するときに参照する。
+  tags:
+  - topic:起動
+  - tool:pytest
+  related:
+  - to: src/project_index/main.py
+    type: tests

@@ -1,0 +1,8 @@
+$ (rc=0; uv run ruff check . || rc=1; uv run ruff format --check . || rc=1; uv run pyright || rc=1; uv run complexipy src tests || rc=1; exit $rc)
+All checks passed!
+313 files already formatted
+0 errors, 0 warnings, 0 informations
+──────────────────────────────── 🐙 complexipy ─────────────────────────────────
+All functions are within the allowed complexity.
+────────────────────────── 🎉 Analysis completed! 🎉 ───────────────────────────
+exit=0

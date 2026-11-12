@@ -30,7 +30,7 @@ from project_index.main import (
     run_migrate,
     run_serve,
 )
-from project_index.shared.yaml_io import load_yaml
+from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
     import threading
@@ -39,6 +39,11 @@ if TYPE_CHECKING:
 
     from project_index.features.settings.types import SourceEntry, TerminalConfig
     from project_index.features.sources.types import ServedSource, SourceStatus
+
+
+def load_yaml(text: str) -> Any:
+    """形の分かっている YAML の文字列を読む。"""
+    return load_yaml_value(text)
 
 
 def _free_port() -> int:
@@ -443,9 +448,9 @@ def test_reload_sources(
     result = reload_sources(
         make_terminal_config(),
         registry=registry,  # type: ignore[arg-type]
-        store=_Recorder("store", calls),
-        checker=_Recorder("checker", calls),
-        converter=_Recorder("converter", calls),
+        store=_Recorder("store", calls),  # type: ignore[arg-type]
+        checker=_Recorder("checker", calls),  # type: ignore[arg-type]
+        converter=_Recorder("converter", calls),  # type: ignore[arg-type]
         checks=SourceChecks(),
     )
     # 検証
@@ -892,9 +897,9 @@ def test_reload_changed_sources(
     result = reload_changed_sources(
         make_terminal_config(),
         registry=registry,  # type: ignore[arg-type]
-        store=_Recorder("store", calls),
-        checker=_Recorder("checker", calls),
-        converter=_Recorder("converter", calls),
+        store=_Recorder("store", calls),  # type: ignore[arg-type]
+        checker=_Recorder("checker", calls),  # type: ignore[arg-type]
+        converter=_Recorder("converter", calls),  # type: ignore[arg-type]
         checks=SourceChecks(),
     )
     # 検証

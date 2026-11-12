@@ -79,27 +79,30 @@ class DocumentChecker:
             )
         violations.extend(check_related(document.metadata, source.config.related_types))
         for validator_id in table.validators:
-            entry = source.script("validators", validator_id)
-            if on not in entry.on:
-                continue
-            key = (source.id, document.kind, validator_id, document.version)
-            if on == "read":
-                with self._lock:
-                    cached = self._read_cache.get(key)
-                    if cached is not None:
-                        self._read_cache.move_to_end(key)
-                if cached is not None:
-                    violations.extend(cached)
-                    continue
-            found, ran = self._run_validator(target, document, validator_id)
-            violations.extend(found)
-            # 動かせなかった結果は控えない
-            if on == "read" and ran:
-                with self._lock:
-                    self._read_cache[key] = found
-                    while len(self._read_cache) > VALIDATOR_ON_READ_CACHE:
-                        self._read_cache.popitem(last=False)
+            if on in source.script("validators", validator_id).on:
+                violations.extend(self._validate(target, document, validator_id, on=on))
         return violations
+
+    def _validate(
+        self, target: Target, document: Document, validator_id: str, *, on: Literal["read", "write"]
+    ) -> list[Violation]:
+        """`validators[]` の 1 行を通す（読み取りの結果は文書のバージョンごとに控える）。"""
+        key = (target.source.id, document.kind, validator_id, document.version)
+        if on == "read":
+            with self._lock:
+                cached = self._read_cache.get(key)
+                if cached is not None:
+                    self._read_cache.move_to_end(key)
+            if cached is not None:
+                return cached
+        found, ran = self._run_validator(target, document, validator_id)
+        # 動かせなかった結果は控えない
+        if on == "read" and ran:
+            with self._lock:
+                self._read_cache[key] = found
+                while len(self._read_cache) > VALIDATOR_ON_READ_CACHE:
+                    self._read_cache.popitem(last=False)
+        return found
 
     def check_markdown(
         self,
