@@ -86,7 +86,7 @@ def test_read_target(
     target, resolved = read_target("sample", None, registry=make_registry(source))
     # 検証
     assert isinstance(target, Target)
-    assert target.ref == commit
+    assert target.ref == "develop"
     assert target.commit == commit
     assert resolved is not None
     assert resolved.commit == commit
