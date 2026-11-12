@@ -1,0 +1,401 @@
+$ uv run pytest tests/unit/
+........................................................................ [  8%]
+........................................................................ [ 17%]
+........................................................................ [ 25%]
+.............................................F.......................... [ 34%]
+........................................................................ [ 42%]
+.........................FF...F....FFFFFFFF..F.......F.................. [ 51%]
+........................................................................ [ 59%]
+........................................................................ [ 68%]
+........................................................................ [ 76%]
+........................................................................ [ 85%]
+........................................................................ [ 93%]
+.......................................................                  [100%]
+=================================== FAILURES ===================================
+_______________ test_document_store_row_schema_when_records_defs _______________
+
+document_store = <project_index.features.documents.store.DocumentStore object at 0x7ec59e8956d0>
+tmp_path = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7878/test_document_store_row_schema2')
+make_source_config = <function make_source_config.<locals>._make at 0x7ec59e8d2cf0>
+make_served_source = <function make_served_source.<locals>._make at 0x7ec59e8d24b0>
+make_target = <function make_target.<locals>._make at 0x7ec59e8d1e80>
+
+    def test_document_store_row_schema_when_records_defs(
+        document_store: DocumentStore,
+        tmp_path: Path,
+        make_source_config: Callable[..., SourceConfig],
+        make_served_source: Callable[..., ServedSource],
+        make_target: Callable[..., Target],
+    ) -> None:
+        """records の行は最上位の $defs を残す（正常系）。"""
+        # 準備（files の要素が、自分を指す循環する定義 node を参照する）
+        node = {"type": "object", "properties": {"children": {"items": {"$ref": "#/$defs/node"}}}}
+        notes_schema = {
+            "type": "object",
+            "properties": {"files": {"type": "array", "items": {"$ref": "#/$defs/node"}}},
+            "$defs": {"node": node},
+        }
+        source = _row_schema_source(
+            tmp_path / "ws", notes_schema, make_source_config, make_served_source
+        )
+        # 実行
+        result = document_store.row_schema(make_target(source), "notes")
+        # 検証
+>       assert result["$defs"] == {"node": node}
+               ^^^^^^^^^^^^^^^
+E       KeyError: '$defs'
+
+tests/unit/project_index/features/documents/test_store.py:737: KeyError
+------------------------------ Captured log call -------------------------------
+WARNING  project_index.features.documents.schema:schema.py:130 スキーマの循環する参照を解かずに残した（/tmp/pytest-of-shuhei2441/pytest-7878/test_document_store_row_schema2/ws/schemas/files.schema.yaml・#/$defs/node）
+__________________________ test_find_page_when_doc_id __________________________
+
+make_document = <function make_document.<locals>._make at 0x7ec59c0f6560>
+
+    def test_find_page_when_doc_id(make_document: Callable[..., Document]) -> None:
+        """文書の ID で行の文書を選ぶ（正常系）。"""
+        # 準備
+        first = make_document(id="term-1", path="terms.yaml", record_index=0)
+        second = make_document(id="term-2", path="terms.yaml", record_index=1)
+        # 実行
+>       chosen = find_page([first, second], "terms.yaml", doc_id="term-2")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: find_page() got an unexpected keyword argument 'doc_id'
+
+tests/unit/project_index/features/read/test_paths.py:73: TypeError
+______________________ test_find_page_when_doc_id_missing ______________________
+
+make_document = <function make_document.<locals>._make at 0x7ec59c0f5c70>
+
+    def test_find_page_when_doc_id_missing(make_document: Callable[..., Document]) -> None:
+        """文書の ID が一致しない（正常系）。"""
+        # 準備
+        first = make_document(id="term-1", path="terms.yaml", record_index=0)
+        second = make_document(id="term-2", path="terms.yaml", record_index=1)
+        # 実行
+>       unknown_id = find_page([first, second], "terms.yaml", doc_id="no-such")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: find_page() got an unexpected keyword argument 'doc_id'
+
+tests/unit/project_index/features/read/test_paths.py:86: TypeError
+_____________________ test_build_read_router_when_queries ______________________
+
+make_view_env = <function make_view_env.<locals>._make at 0x7ec59d2a8040>
+
+    def test_build_read_router_when_queries(make_view_env: Callable[..., SimpleNamespace]) -> None:
+        """追加したクエリを service に渡す（正常系）。"""
+        # 準備
+        env = make_view_env(
+            {
+                "schemas/rule.schema.yaml": "type: object\n",
+                "schemas/terms.schema.yaml": "type: object\n",
+                "docs/a.yaml": "id: a\nname: A\n",
+                "terms.yaml": "terms:\n  - id: term-1\n    name: alpha\n  - id: term-2\n    name: beta\n",
+            },
+            tables=[
+                DocumentTable(
+                    id="rules", paths=["docs/*.yaml"], schema_path="schemas/rule.schema.yaml"
+                ),
+                DocumentTable(
+                    id="terms",
+                    paths=["terms.yaml"],
+                    schema_path="schemas/terms.schema.yaml",
+                    records="terms",
+                ),
+            ],
+        )
+        client = _client(env.handlers)
+        # 実行
+        config = client.get("/sources/sample/config?schemas=true").json()
+        documents = client.get("/sources/sample/docs?values=true").json()
+        document = client.get("/sources/sample/docs/terms.yaml?id=term-2").json()
+        search = client.get("/sources/sample/search?q=beta").json()
+        # 検証
+>       assert config["schemas"] == {"rules": {"type": "object"}, "terms": {}}
+               ^^^^^^^^^^^^^^^^^
+E       KeyError: 'schemas'
+
+tests/unit/project_index/features/read/test_route.py:91: KeyError
+________________________ test_search_words_when_record _________________________
+
+make_document = <function make_document.<locals>._make at 0x7ec58ffa8bf0>
+
+    def test_search_words_when_record(make_document: Callable[..., Document]) -> None:
+        """行の文書の ID とファイルのパスを返す（正常系）。"""
+        # 準備
+        first = make_document(id="term-1", path="terms.yaml", record_index=0, body="name: alpha\n")
+        second = make_document(id="term-2", path="terms.yaml", record_index=1, body="name: beta\n")
+        # 実行
+        result = search_words([first, second], "beta", 20)
+        # 検証
+        assert result.total_count == 1
+>       assert result.items[0].id == "term-2"
+               ^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/read/test_search.py:37: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = SearchItem(path='terms/term-2', name='文書 1', snippets=['name: beta'])
+item = 'id'
+
+    def __getattr__(self, item: str) -> Any:
+        private_attributes = object.__getattribute__(self, '__private_attributes__')
+        if item in private_attributes:
+            attribute = private_attributes[item]
+            if hasattr(attribute, '__get__'):
+                return attribute.__get__(self, type(self))  # type: ignore
+    
+            try:
+                # Note: self.__pydantic_private__ cannot be None if self.__private_attributes__ has items
+                return self.__pydantic_private__[item]  # type: ignore
+            except KeyError as exc:
+                raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from exc
+        else:
+            # `__pydantic_extra__` can fail to be set if the model is not yet fully initialized.
+            # See `BaseModel.__repr_args__` for more details
+            try:
+                pydantic_extra = object.__getattribute__(self, '__pydantic_extra__')
+            except AttributeError:
+                pydantic_extra = None
+    
+            if pydantic_extra and item in pydantic_extra:
+                return pydantic_extra[item]
+            else:
+                if hasattr(self.__class__, item):
+                    return super().__getattribute__(item)  # Raises AttributeError if appropriate
+                else:
+                    # this is the current error
+>                   raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E                   AttributeError: 'SearchItem' object has no attribute 'id'
+
+.venv/lib/python3.14/site-packages/pydantic/main.py:1110: AttributeError
+____________________________ test_get_source_config ____________________________
+
+make_view_env = <function make_view_env.<locals>._make at 0x7ec58fe11900>
+
+    def test_get_source_config(make_view_env: Callable[..., SimpleNamespace]) -> None:
+        """画面が使うキーだけを返す（正常系）。"""
+        # 準備
+        nav = {"tabs": [{"title": "規約", "items": [{"auto": {"document": "rules"}}]}]}
+        env = make_view_env(
+            converters=[ScriptEntry(id="c", run=["python3", "scripts/c.py"])],
+            nav=nav,
+            decision_folders=["tmp/a"],
+        )
+        # 実行
+>       response = get_source_config(_target(env), store=env.handlers.store)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: get_source_config() got an unexpected keyword argument 'store'
+
+tests/unit/project_index/features/read/test_service.py:100: TypeError
+___________________ test_get_source_config_when_no_decisions ___________________
+
+make_view_env = <function make_view_env.<locals>._make at 0x7ec58fe11f30>
+
+    def test_get_source_config_when_no_decisions(
+        make_view_env: Callable[..., SimpleNamespace],
+    ) -> None:
+        """decisions を持たない（正常系）。"""
+        # 準備
+        env = make_view_env()
+        # 実行
+>       response = get_source_config(_target(env), store=env.handlers.store)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: get_source_config() got an unexpected keyword argument 'store'
+
+tests/unit/project_index/features/read/test_service.py:119: TypeError
+__________________ test_get_source_config_when_diff[written] ___________________
+
+make_view_env = <function make_view_env.<locals>._make at 0x7ec58fe13110>
+diff_ignore_keys = ['updated', 'rev']
+expected = {'ignore_keys': ['updated', 'rev']}
+
+    @pytest.mark.parametrize(
+        ("diff_ignore_keys", "expected"),
+        [
+            pytest.param(["updated", "rev"], {"ignore_keys": ["updated", "rev"]}, id="written"),
+            pytest.param(None, {"ignore_keys": ["updated"]}, id="default"),
+        ],
+    )
+    def test_get_source_config_when_diff(
+        make_view_env: Callable[..., SimpleNamespace],
+        diff_ignore_keys: list[str] | None,
+        expected: dict[str, list[str]],
+    ) -> None:
+        """diff の値と既定の値（正常系）。"""
+        # 準備
+        env = make_view_env(diff_ignore_keys=diff_ignore_keys)
+        # 実行
+>       response = get_source_config(_target(env), store=env.handlers.store)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: get_source_config() got an unexpected keyword argument 'store'
+
+tests/unit/project_index/features/read/test_service.py:140: TypeError
+__________________ test_get_source_config_when_diff[default] ___________________
+
+make_view_env = <function make_view_env.<locals>._make at 0x7ec58fe641a0>
+diff_ignore_keys = None, expected = {'ignore_keys': ['updated']}
+
+    @pytest.mark.parametrize(
+        ("diff_ignore_keys", "expected"),
+        [
+            pytest.param(["updated", "rev"], {"ignore_keys": ["updated", "rev"]}, id="written"),
+            pytest.param(None, {"ignore_keys": ["updated"]}, id="default"),
+        ],
+    )
+    def test_get_source_config_when_diff(
+        make_view_env: Callable[..., SimpleNamespace],
+        diff_ignore_keys: list[str] | None,
+        expected: dict[str, list[str]],
+    ) -> None:
+        """diff の値と既定の値（正常系）。"""
+        # 準備
+        env = make_view_env(diff_ignore_keys=diff_ignore_keys)
+        # 実行
+>       response = get_source_config(_target(env), store=env.handlers.store)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: get_source_config() got an unexpected keyword argument 'store'
+
+tests/unit/project_index/features/read/test_service.py:140: TypeError
+_____________________ test_get_source_config_when_schemas ______________________
+
+make_view_env = <function make_view_env.<locals>._make at 0x7ec58fe119b0>
+
+    def test_get_source_config_when_schemas(make_view_env: Callable[..., SimpleNamespace]) -> None:
+        """行ごとの種類のスキーマを返す（正常系）。"""
+        # 準備
+        env = make_view_env(SCHEMA_FILES, tables=SCHEMA_TABLES)
+        target = _target(env)
+        # 実行
+>       response = get_source_config(target, store=env.handlers.store, schemas=True)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: get_source_config() got an unexpected keyword argument 'store'
+
+tests/unit/project_index/features/read/test_service.py:151: TypeError
+_____________________________ test_list_documents ______________________________
+
+make_view_env = <function make_view_env.<locals>._make at 0x7ec58fe101a0>
+
+    def test_list_documents(make_view_env: Callable[..., SimpleNamespace]) -> None:
+        """行の順に並べる（正常系）。"""
+        # 準備
+        env = make_view_env(NOTES_FILES, tables=NOTES_TABLES)
+        # 実行
+        response = list_documents(_target(env), store=env.handlers.store)
+        # 検証
+        assert [item.kind for item in response.documents] == ["rules", "notes"]
+        assert response.documents[0].body_path is None
+        assert response.documents[1].body_path == "notes/guide.md"
+>       assert response.documents[0].version != ""
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/read/test_service.py:170: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = DocumentListItem(id='a', path='docs/a.yaml', kind='rules', name='A', description=None, tags=[], visibility=None, body_path=None)
+item = 'version'
+
+    def __getattr__(self, item: str) -> Any:
+        private_attributes = object.__getattribute__(self, '__private_attributes__')
+        if item in private_attributes:
+            attribute = private_attributes[item]
+            if hasattr(attribute, '__get__'):
+                return attribute.__get__(self, type(self))  # type: ignore
+    
+            try:
+                # Note: self.__pydantic_private__ cannot be None if self.__private_attributes__ has items
+                return self.__pydantic_private__[item]  # type: ignore
+            except KeyError as exc:
+                raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from exc
+        else:
+            # `__pydantic_extra__` can fail to be set if the model is not yet fully initialized.
+            # See `BaseModel.__repr_args__` for more details
+            try:
+                pydantic_extra = object.__getattribute__(self, '__pydantic_extra__')
+            except AttributeError:
+                pydantic_extra = None
+    
+            if pydantic_extra and item in pydantic_extra:
+                return pydantic_extra[item]
+            else:
+                if hasattr(self.__class__, item):
+                    return super().__getattribute__(item)  # Raises AttributeError if appropriate
+                else:
+                    # this is the current error
+>                   raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E                   AttributeError: 'DocumentListItem' object has no attribute 'version'
+
+.venv/lib/python3.14/site-packages/pydantic/main.py:1110: AttributeError
+_______________________ test_list_documents_when_values ________________________
+
+make_view_env = <function make_view_env.<locals>._make at 0x7ec58fe13110>
+
+    def test_list_documents_when_values(make_view_env: Callable[..., SimpleNamespace]) -> None:
+        """値を求めたときだけ値を入れる（正常系）。"""
+        # 準備
+        env = make_view_env(NOTES_FILES, tables=NOTES_TABLES)
+        # 実行
+>       response = list_documents(_target(env), store=env.handlers.store, values=True)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: list_documents() got an unexpected keyword argument 'values'
+
+tests/unit/project_index/features/read/test_service.py:180: TypeError
+________________________ test_get_document_when_doc_id _________________________
+
+make_view_env = <function make_view_env.<locals>._make at 0x7ec58fffee50>
+
+    def test_get_document_when_doc_id(make_view_env: Callable[..., SimpleNamespace]) -> None:
+        """文書の ID で行の文書を選ぶ（正常系）。"""
+        # 準備
+        env = make_view_env(TERMS_FILES, tables=TERMS_TABLES)
+        # 実行
+>       response = get_document(
+            _target(env),
+            "terms.yaml",
+            doc_id="term-2",
+            store=env.handlers.store,
+            converter=env.handlers.converter,
+        )
+E       TypeError: get_document() got an unexpected keyword argument 'doc_id'
+
+tests/unit/project_index/features/read/test_service.py:228: TypeError
+___________________ test_get_document_when_doc_id_not_found ____________________
+
+make_view_env = <function make_view_env.<locals>._make at 0x7ec58ffe9010>
+
+    def test_get_document_when_doc_id_not_found(
+        make_view_env: Callable[..., SimpleNamespace],
+    ) -> None:
+        """文書の ID が一致しない（異常系）。"""
+        # 準備
+        env = make_view_env(TERMS_FILES, tables=TERMS_TABLES)
+        target = _target(env)
+        # 実行・検証
+        with pytest.raises(DocumentNotFoundError, match=r"terms\.yaml"):
+>           get_document(
+                target,
+                "terms.yaml",
+                doc_id="no-such",
+                store=env.handlers.store,
+                converter=env.handlers.converter,
+            )
+E           TypeError: get_document() got an unexpected keyword argument 'doc_id'
+
+tests/unit/project_index/features/read/test_service.py:356: TypeError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/documents/test_store.py::test_document_store_row_schema_when_records_defs
+FAILED tests/unit/project_index/features/read/test_paths.py::test_find_page_when_doc_id
+FAILED tests/unit/project_index/features/read/test_paths.py::test_find_page_when_doc_id_missing
+FAILED tests/unit/project_index/features/read/test_route.py::test_build_read_router_when_queries
+FAILED tests/unit/project_index/features/read/test_search.py::test_search_words_when_record
+FAILED tests/unit/project_index/features/read/test_service.py::test_get_source_config
+FAILED tests/unit/project_index/features/read/test_service.py::test_get_source_config_when_no_decisions
+FAILED tests/unit/project_index/features/read/test_service.py::test_get_source_config_when_diff[written]
+FAILED tests/unit/project_index/features/read/test_service.py::test_get_source_config_when_diff[default]
+FAILED tests/unit/project_index/features/read/test_service.py::test_get_source_config_when_schemas
+FAILED tests/unit/project_index/features/read/test_service.py::test_list_documents
+FAILED tests/unit/project_index/features/read/test_service.py::test_list_documents_when_values
+FAILED tests/unit/project_index/features/read/test_service.py::test_get_document_when_doc_id
+FAILED tests/unit/project_index/features/read/test_service.py::test_get_document_when_doc_id_not_found
+14 failed, 833 passed in 79.41s (0:01:19)
+exit=1
