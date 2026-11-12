@@ -14,6 +14,8 @@ flows:
       - name: 端末の設定
         description: '`PROJECT_INDEX_CONFIG` が指す一時フォルダの `settings.yaml`。`sources` に 2 行'
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant U as クライアント
@@ -31,6 +33,8 @@ flows:
         T-->>U: 配信元を標準出力に出す
         T->>T: 配信元ごとの検査の警告をログに書く
       ```
+
+      <!-- /map -->
     expected:
       - '`127.0.0.1` で待ち受け、`0.0.0.0` では待ち受けない'
       - '`/sources/sample/docs` と `/sources/notes/docs` が 200 を返す'
@@ -48,6 +52,8 @@ flows:
       - name: 端末の設定
         description: sample の `config` が `[project-index.yaml, project-index.local.yaml]`
     flow: |-
+      <!-- map: {"title": "正常系（設定の YAML を重ねる）"} -->
+
       ```mermaid
       sequenceDiagram
         participant U as クライアント
@@ -59,6 +65,8 @@ flows:
         T->>T: 同じキーを上書きし、documents を id で行ごとに上書き・追加する
         T-->>U: sample を配信する
       ```
+
+      <!-- /map -->
     expected:
       - '`describe(source: sample)` の説明が後の YAML の `description` になる'
       - '`id` が同じ `documents[]` の行は後の YAML の `paths` の文書だけを返す'
@@ -73,6 +81,8 @@ flows:
         description: '`version` がサーバーが読めるバージョンより古く、今のスキーマは満たす配信元'
         notes: id `old`
     flow: |-
+      <!-- map: {"title": "正常系（設定のバージョンが古い）"} -->
+
       ```mermaid
       sequenceDiagram
         participant U as クライアント
@@ -82,6 +92,8 @@ flows:
         T->>T: old の設定の version をサーバーが読めるバージョンと比べる
         T-->>U: old を配信し、警告のログを残す
       ```
+
+      <!-- /map -->
     expected:
       - '`/sources/old/docs` が 200 を返す'
       - 警告のログに old の id・設定のバージョン・サーバーが読めるバージョンがある
@@ -100,6 +112,8 @@ flows:
       - name: 端末の設定
         description: '`sources` に sample・broken・noscript の 3 行'
     flow: |-
+      <!-- map: {"title": "正常系（配信元の検証に失敗する）"} -->
+
       ```mermaid
       sequenceDiagram
         participant U as クライアント
@@ -110,6 +124,8 @@ flows:
         T->>T: 2 つを配信せず、エラーログに残す
         T-->>U: sample だけを配信する
       ```
+
+      <!-- /map -->
     expected:
       - '`/sources/broken/docs` と `/sources/noscript/docs` が 404、`/sources/sample/docs` と `/mcp` は応答する'
       - 'エラーログに `broken: documents[0].paths: 必須のキーが無い` と、noscript の `converters[0]` とスクリプトが見つからない理由がある'
@@ -123,6 +139,8 @@ flows:
       - name: 端末の設定
         description: '`sources[0]` に必須のキー `config` が無く、`port` が文字列'
     flow: |-
+      <!-- map: {"title": "異常系（端末の設定が違反する・TerminalConfigInvalidError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant U as クライアント
@@ -132,6 +150,8 @@ flows:
         T->>T: 端末の設定の検証に失敗する
         T-->>U: 違反を標準エラーに出して終わる
       ```
+
+      <!-- /map -->
     expected:
       - 終了コードが 2 で、ポートを待ち受けない
       - '標準エラーに `{ファイル}: sources[0].config` と `{ファイル}: port` の違反が両方並ぶ'
@@ -145,6 +165,8 @@ flows:
       - name: 使用中のポート
         description: テストが先に待ち受けたポートを `PROJECT_INDEX_PORT` に入れる
     flow: |-
+      <!-- map: {"title": "異常系（ポートが使用中・PortInUseError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant U as クライアント
@@ -154,6 +176,8 @@ flows:
         T->>T: ポートで待ち受けられない
         T-->>U: ポートと PROJECT_INDEX_PORT を標準エラーに出して終わる
       ```
+
+      <!-- /map -->
     expected:
       - 終了コードが 3
       - 標準エラーに使用中のポートの番号と、`PROJECT_INDEX_PORT` で変えられることが出る
@@ -171,6 +195,8 @@ flows:
         description: 'sample の `src/files.yaml` が `a.py` と `c.py` の 2 行を持ち、`src/` には `a.py` と `d.py`、`src/sub/e.py` を置く。行 `src` は `records: files`・`body_file: path`。`a.py` の行が `related: [{to: src/z.py, type: tests}]` を持つ'
         notes: '`c.py` はファイルが無い行、`d.py` と `sub/e.py` は索引に無いファイル、`src/z.py` はどの文書にも該当しない関連'
     flow: |-
+      <!-- map: {"title": "正常系（メタデータと管理用の YAML がずれている）"} -->
+
       ```mermaid
       sequenceDiagram
         participant U as クライアント
@@ -182,6 +208,8 @@ flows:
         T->>T: 配信元を渡して件数を求める
         T-->>U: sample を配信し、件数を警告のログに残す
       ```
+
+      <!-- /map -->
     expected:
       - '`/sources/sample/docs` が 200 を返す'
       - 警告のログに sample の行 `rules` の `metadata` の列の欠け 1 件（`name` の `title`）がある
@@ -202,6 +230,8 @@ flows:
         description: '`sources` に sample と legacy の 2 行'
         notes: '-'
     flow: |-
+      <!-- map: {"title": "正常系（前の形式の配信元）"} -->
+
       ```mermaid
       sequenceDiagram
         participant U as クライアント
@@ -212,6 +242,8 @@ flows:
         T->>T: legacy を配信せず、違反と移し替えの案内をエラーログに残す
         T-->>U: sample だけを配信する
       ```
+
+      <!-- /map -->
     expected:
       - '`/sources/legacy/docs` が 404、`/sources/sample/docs` は応答する'
       - 'エラーログに `legacy: tags`・`legacy: documents[0].type`・`legacy: documents[1].type`・`legacy: documents[1].defaults`・`legacy: documents[1].metadata.name` の違反がある'
@@ -230,6 +262,8 @@ flows:
         description: '`/mcp` と `/_admin/mcp` へ MCP の initialize を POST する'
         notes: HTTP のクライアントはリダイレクトを追従しない
     flow: |-
+      <!-- map: {"title": "正常系（MCP の入口をスラッシュ無しで呼ぶ）"} -->
+
       ```mermaid
       sequenceDiagram
         participant U as クライアント
@@ -244,6 +278,8 @@ flows:
         T->>A: /_admin/mcp/ と同じ入口へ届ける
         A-->>U: 200
       ```
+
+      <!-- /map -->
     expected:
       - '`/mcp` への initialize が 307 を挟まずに 200 を返し、`serverInfo` を持つ'
       - '`/_admin/mcp` への initialize が 307 を挟まずに 200 を返し、`serverInfo` を持つ'
@@ -263,6 +299,8 @@ flows:
         description: sample の `.claude/worktrees/develop`（`develop` を checkout）
         notes: '`worktrees` は既定（`[./.claude/worktrees/*]`）'
     flow: |-
+      <!-- map: {"title": "正常系（設定とスキーマを default_ref から読む）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as テスト
@@ -278,6 +316,8 @@ flows:
         S->>G: default_ref の commit を確かめ、変わっていれば組み立て直す
         S-->>C: 種類の一覧
       ```
+
+      <!-- /map -->
     expected:
       - '起動直後の `describe(source: sample)` の種類の一覧に `kind_a` が載る'
       - '`kind_b` を commit した後の `describe(source: sample)` で、`reload` をしなくても `kind_a`・`kind_b` が載る'
@@ -298,6 +338,8 @@ flows:
       - name: 端末の設定
         description: '`sources[].config` が `project-index.local.yaml` の 1 つだけ'
     flow: |-
+      <!-- map: {"title": "正常系（.gitignore した設定を先頭に置く）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as テスト
@@ -310,6 +352,8 @@ flows:
         S->>G: ディスクの project-index.local.yaml と、develop のスキーマを読む
         S-->>C: 配信を始める
       ```
+
+      <!-- /map -->
     expected:
       - '`describe(source: sample)` の種類の一覧に `kind_a` が載る'
       - '`documents[].schema` のスキーマを `develop` から読む'
@@ -326,6 +370,8 @@ flows:
       - name: 端末の設定
         description: '`sources` に sample と uncommitted の 2 行'
     flow: |-
+      <!-- map: {"title": "正常系（先頭の設定が default_ref に無く無視もしていない）"} -->
+
       ```mermaid
       sequenceDiagram
         participant U as クライアント
@@ -336,6 +382,8 @@ flows:
         T->>T: uncommitted を配信せず、エラーログに残す
         T-->>U: sample だけを配信する
       ```
+
+      <!-- /map -->
     expected:
       - '`/sources/uncommitted/docs` が 404、`/sources/sample/docs` は応答する'
       - 'エラーログに `uncommitted: config[0]: develop に project-index.yaml がありません` がある'
@@ -353,6 +401,8 @@ flows:
       - name: 上書き
         description: 2 回目は端末の設定に `state_dir` を書き、`PROJECT_INDEX_STATE_DIR` に別の一時フォルダを入れる。3 回目は `state_dir` と `PROJECT_INDEX_STATE_DIR` を外し、`XDG_STATE_HOME` に相対パス `rel` を入れる
     flow: |-
+      <!-- map: {"title": "正常系（XDG の環境変数で置き場を決める）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as テスト
@@ -367,6 +417,8 @@ flows:
         C->>S: 3 回目の起動（XDG_STATE_HOME が相対パス）
         S->>FS: ログを $HOME/.local/state/project-index/logs に書く
       ```
+
+      <!-- /map -->
     expected:
       - 1 回目の起動で `/sources/sample/docs` が 200 を返し、ログが `$XDG_STATE_HOME/project-index/logs` にできる
       - 2 回目の起動のログが `$PROJECT_INDEX_STATE_DIR/logs` にでき、端末の設定の `state_dir` には書かない
@@ -382,6 +434,8 @@ flows:
       - name: 0 件に当たる nav の条件
         description: sample の `nav` に、`auto` の `filter` が `tags が none` のタブ `none` を置く
     flow: |-
+      <!-- map: {"title": "正常系（エイリアスのキーと nav の条件を警告する）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as テスト
@@ -392,6 +446,8 @@ flows:
         S->>S: nav の auto の条件に当たる文書を数える
         S-->>C: 警告のログと配信の開始
       ```
+
+      <!-- /map -->
     expected:
       - 警告のログに、違反した文書のパスと `aliases` が文字列か文字列の並びでないことが出る
       - 警告のログに、タブ `none` と条件が出る
@@ -408,6 +464,8 @@ flows:
       - name: プロンプトの YAML
         description: リポジトリに同梱したままの YAML
     flow: |-
+      <!-- map: {"title": "正常系（MCP の文をプロンプトの YAML から読む）"} -->
+
       ```mermaid
       sequenceDiagram
         participant U as クライアント
@@ -422,6 +480,8 @@ flows:
         U->>T: POST /_admin/mcp（tools/list）
         T-->>U: ツールの description
       ```
+
+      <!-- /map -->
     expected:
       - 文書の MCP の instructions が、使う場面・grep と Read が向く場面・ツールの順序・タグの付け方を持ち、4,096 字以内
       - 文書の MCP の 7 つのツールの description が、それぞれの YAML を描画した文と同じ
@@ -438,6 +498,8 @@ flows:
         description: プロンプトの YAML の置き場所をテストの一時フォルダへ向け、`search_docs` のツールの YAML から必須のキー `kind` を削除する
         notes: '`PROJECT_INDEX_PROMPTS_DIR` に一時フォルダを入れる'
     flow: |-
+      <!-- map: {"title": "異常系（プロンプトの YAML が違反する・PromptInvalidError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant U as クライアント
@@ -447,6 +509,8 @@ flows:
         T->>T: プロンプトの YAML の検査に失敗する
         T-->>U: 違反を標準エラーに出して終わる
       ```
+
+      <!-- /map -->
     expected:
       - 終了コードが 4 で、ポートを待ち受けない
       - 標準エラーに `search_docs` の YAML のパスと `kind` の違反がある
@@ -461,6 +525,8 @@ flows:
         description: 配信元 sample の 1 行
         notes: '-'
     flow: |-
+      <!-- map: {"title": "正常系（配信元を読む間に要求が届く）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -473,6 +539,8 @@ flows:
         T->>T: 配信元を読み終える
         T-->>C: 200（sample の文書）
       ```
+
+      <!-- /map -->
     expected:
       - 合図を出す前に、待ち受けのポートへの接続が通る
       - '`GET /sources/sample/docs` は合図を出すまで答えず、出した後に 200 を返す'
@@ -487,6 +555,8 @@ flows:
         description: 配信元 sample・notes の 2 行（この順）
         notes: '-'
     flow: |-
+      <!-- map: {"title": "正常系（読み込み済みの配信元への要求は、他の配信元の読み込みを待たない）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -505,6 +575,8 @@ flows:
         T->>T: notes を読み終える
         T-->>C: notes の文書
       ```
+
+      <!-- /map -->
     expected:
       - '合図を出す前に、`source: sample` の `search_docs` が sample の文書を返す'
       - 合図を出す前に、`GET /sources/sample/docs` が 200 を返す
@@ -524,6 +596,8 @@ flows:
         description: 配信元 a・b・c の 3 行（この順）
         notes: '-'
     flow: |-
+      <!-- map: {"title": "正常系（待っている要求が指す配信元を先に読み込む）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -537,6 +611,8 @@ flows:
         T->>T: a・c・b の順に読み込む
         T-->>C: c の文書
       ```
+
+      <!-- /map -->
     expected:
       - 読み込んだ配信元の順が a・c・b
       - '`source: c` の `search_docs` が、b を読み込む前に c の文書を返す'
@@ -551,6 +627,8 @@ flows:
         description: 配信元 broken・sample の 2 行（この順。どちらも `id` を持つ）
         notes: '-'
     flow: |-
+      <!-- map: {"title": "異常系（ある行の読み込みが例外で止まる・SourceNotServedError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -566,6 +644,8 @@ flows:
         C->>T: status
         T-->>C: loading: false・broken が not_served・sample が serving
       ```
+
+      <!-- /map -->
     expected:
       - '`source: broken` の `search_docs` が待ち続けずに `SourceNotServedError` を返す'
       - '`source: sample` の `search_docs` が sample の文書を返す'
@@ -586,6 +666,8 @@ flows:
       - name: 端末の設定
         description: '`sources` に sample・schemas の 2 行（参照する側が先）'
     flow: |-
+      <!-- map: {"title": "正常系（ほかの配信元のスキーマを参照する）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -597,11 +679,13 @@ flows:
         T->>G: v1 の note.schema.yaml を読む
         T-->>C: sample を配信する
       ```
+
+      <!-- /map -->
     expected:
       - '`/sources/sample/docs` が応答し、`/sources/schemas/docs` が 404'
       - '`describe(source: sample, kind: note)` が v1 のスキーマを返す'
     test: test_normal_when_schema_from_other_source
-lead: 端末の設定を読み、検証に通った配信元を 1 プロセス・1 ポートで読み取り API・`/mcp`・`/_admin/mcp` に配信し始める。
+lead: 端末の設定を読み、検証に合格した配信元を 1 プロセス・1 ポートで配信する `project-index serve` の入出力を定め、起動を修正するときに参照する。
 identifier: serve
 permissions: なし
 idempotent: false

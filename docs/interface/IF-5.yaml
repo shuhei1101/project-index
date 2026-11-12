@@ -17,6 +17,8 @@ flows:
       - name: 入力
         description: '`source: sample`。`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -26,6 +28,8 @@ flows:
         T->>T: alias_type を持つ行の文書のうちスキーマに通るものを集める
         T-->>C: 語と文書の ID の一覧
       ```
+
+      <!-- /map -->
     expected:
       - '`words` に `作業範囲`（`name`）・`scope`・`担当範囲`（`alias`）が、文書「作業範囲」の ID とともに並ぶ'
       - 「壊れた用語」の語は `words` に載らない
@@ -38,6 +42,8 @@ flows:
       - name: 用語の種類の無い配信元
         description: '`alias_type` を持つ行が無い配信元 `plain`'
     flow: |-
+      <!-- map: {"title": "正常系（用語の種類が無い）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -46,6 +52,8 @@ flows:
         C->>T: source: plain
         T-->>C: 空の一覧
       ```
+
+      <!-- /map -->
     expected:
       - '`words` が空で、エラーにしない'
     test: test_normal_when_no_alias_type
@@ -59,6 +67,8 @@ flows:
       - name: 入力
         description: '`source: other`。`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "異常系（作業範囲に当たらない・SourceNotReadableError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -68,6 +78,8 @@ flows:
         T->>T: scope に cwd が当たらない
         T-->>C: SourceNotReadableError
       ```
+
+      <!-- /map -->
     expected:
       - '`SourceNotReadableError` で、今の作業場所から使える配信元の一覧を添える'
     test: test_error_when_source_not_readable
@@ -79,6 +91,8 @@ flows:
       - name: 配信元
         description: '`enabled: false` の配信元 off'
     flow: |-
+      <!-- map: {"title": "異常系（配信していない配信元・SourceNotServedError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -87,10 +101,12 @@ flows:
         C->>T: source: off
         T-->>C: SourceNotServedError
       ```
+
+      <!-- /map -->
     expected:
       - '`SourceNotServedError` を返す'
     test: test_error_when_source_not_served
-lead: 配信元の `alias_type` を持つ行の文書から、照合する語（`name` と `aliases`）を、指す文書の ID とともに返す。
+lead: '`alias_type` を持つ行の文書から照合する語と指す文書の ID を返却する `list_match_words` の入出力を定め、`list_match_words` を修正するときに参照する。'
 identifier: list_match_words
 permissions: その配信元の `scope.read` か `scope.write` に `cwd` が当たること
 idempotent: true

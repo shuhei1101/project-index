@@ -12,6 +12,8 @@ flows:
       - name: 上流
         description: クローンより 1 つ新しい commit（バージョンを上げ、移し替えの手順は無い）を bare リポジトリに置く
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -25,6 +27,8 @@ flows:
         T-->>C: updated・migration_needed: false・restarting
         T->>T: 起動し直す
       ```
+
+      <!-- /map -->
     expected:
       - '`updated: true`・`migration_needed: false`・`restarting: true`'
       - クローンの HEAD が上流の commit と同じ
@@ -38,6 +42,8 @@ flows:
       - name: 上流
         description: クローンと同じ commit
     flow: |-
+      <!-- map: {"title": "正常系（新しい commit が無い）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -48,6 +54,8 @@ flows:
         T->>G: git pull --ff-only
         T-->>C: updated: false・restarting: false
       ```
+
+      <!-- /map -->
     expected:
       - '`updated: false`・`restarting: false`・`version` が `previous_version` と同じ'
       - プロセスが起動し直さない（ログの起動の行が増えない）
@@ -60,6 +68,8 @@ flows:
       - name: 上流
         description: 端末の設定の `version` を上げる移し替えの手順を持つ commit
     flow: |-
+      <!-- map: {"title": "正常系（移し替えが要る）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -71,6 +81,8 @@ flows:
         T-->>G: migrate --plan
         T-->>C: migration_needed: true・restarting: false
       ```
+
+      <!-- /map -->
     expected:
       - '`updated: true`・`migration_needed: true`・`restarting: false`'
       - 端末の設定が変わらない
@@ -84,6 +96,8 @@ flows:
       - name: クローン
         description: 上流と分岐した commit を 1 つ積んでおく
     flow: |-
+      <!-- map: {"title": "異常系（取り込みに失敗する・UpdateFailedError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -94,6 +108,8 @@ flows:
         T->>G: git pull --ff-only（失敗）
         T-->>C: isError（失敗したコマンドと stderr）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で `git pull --ff-only` と stderr を返す'
       - クローンの HEAD が変わらない
@@ -108,6 +124,8 @@ flows:
         description: '`script_timeout_sec` の間眠る変換スクリプトを持つ配信元で `try_convert` を呼び、続けて `restart` を呼んでおく'
         notes: 停止の待ちを長くするため
     flow: |-
+      <!-- map: {"title": "異常系（再起動の途中で呼ばれる・RestartInProgressError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -116,11 +134,13 @@ flows:
         C->>T: 引数なし
         T-->>C: isError（RestartInProgressError）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で再起動の途中であることを返す'
       - クローンの HEAD が変わらない
     test: test_error_when_restart_in_progress
-lead: project-index のクローンで `git pull --ff-only` と `uv sync` を実行し、設定の移し替えが要らなければ再起動する。
+lead: クローンを `git pull --ff-only` と `uv sync` で更新して再起動する管理の MCP の `update` の入出力を定め、`update` を修正するときに参照する。
 identifier: update
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true

@@ -12,6 +12,8 @@ flows:
       - name: 配信元
         description: 検証に通る sample（管理用の YAML に無いファイル 1 件）と、`documents[0].paths` が無い broken
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -22,6 +24,8 @@ flows:
         T->>T: 配信元ごとの状態と、検査の最後の同期の件数を読む
         T-->>C: アドレス・バージョン・配信元の表
       ```
+
+      <!-- /map -->
     expected:
       - '`version` が配布のメタデータのバージョンと同じ'
       - sample が `serving`、`sync.unindexed_files` が 1
@@ -38,6 +42,8 @@ flows:
         description: sample の 1 行
         notes: '-'
     flow: |-
+      <!-- map: {"title": "正常系（配信元を読み込んでいる）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -49,6 +55,8 @@ flows:
         C->>T: format: json
         T-->>C: loading: false・sample が serving
       ```
+
+      <!-- /map -->
     expected:
       - '合図の前の `status` が読み込みを待たずに `loading: true` と空の `sources` を返す'
       - 合図の前の markdown に、読み込み中であることと、読み込みが終わっていない配信元を指す文書の MCP の呼び出しが待たされることが出る
@@ -64,6 +72,8 @@ flows:
         description: 検証に通る sample（管理用の YAML に無いファイル 1 件）の 1 行
         notes: '-'
     flow: |-
+      <!-- map: {"title": "正常系（配信元の検査が済んでいない）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -75,13 +85,15 @@ flows:
         C->>T: format: json
         T-->>C: sample が serving・sync.unindexed_files: 1
       ```
+
+      <!-- /map -->
     expected:
       - '合図の前の `status` が検査を待たずに、sample を `serving`・`sync: null` で返す'
       - 合図の前の markdown の索引の同期の列に、検査中であることが出る
       - '合図の後の `status` の `sync.unindexed_files` が 1'
       - '`status` を 2 回呼んでも、`check_sync` を呼んだ回数は起動の後の検査の 1 回のまま'
     test: test_normal_when_checking
-lead: 待ち受けのアドレス・project-index のバージョン・端末の設定・配信元ごとの状態を返す。
+lead: 待ち受けのアドレス・バージョン・端末の設定・配信元ごとの状態を返却する管理の MCP の `status` の入出力を定め、`status` を修正するときに参照する。
 identifier: status
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true

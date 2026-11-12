@@ -12,6 +12,8 @@ flows:
       - name: 端末の設定
         description: sample の 1 行で起動した後、notes の行を追加して保存する
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -23,6 +25,8 @@ flows:
         T->>T: 配信元の一覧を差し替える
         T-->>C: added・removed・not_served
       ```
+
+      <!-- /map -->
     expected:
       - '`added` が `[notes]`、`removed` と `not_served` が空'
       - '読み直した後の `search_docs(source: notes)` が文書を返す'
@@ -36,6 +40,8 @@ flows:
       - name: 配信元
         description: 配信中の sample の `project-index.yaml` から `documents[0].paths` を消す
     flow: |-
+      <!-- map: {"title": "正常系（検証に失敗する配信元がある）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -45,6 +51,8 @@ flows:
         T->>T: sample の検証に失敗し、配信から外す
         T-->>C: not_served に sample
       ```
+
+      <!-- /map -->
     expected:
       - '`not_served` に sample と `documents[0].paths` の違反がある'
       - '`search_docs(source: sample)` が `SourceNotServedError` を返す'
@@ -57,6 +65,8 @@ flows:
       - name: 端末の設定
         description: 起動後に `sources[0].config` を消す
     flow: |-
+      <!-- map: {"title": "異常系（端末の設定が壊れている・TerminalConfigInvalidError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -65,11 +75,13 @@ flows:
         C->>T: 引数なし
         T-->>C: isError（端末の設定の違反）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で `sources[0].config` の違反を返す'
       - 'その後の `search_docs(source: sample)` が文書を返す'
     test: test_error_when_terminal_config_invalid
-lead: 端末の設定と配信元の設定を読み直し、追加・削除・配信できなくなった配信元を返す。
+lead: 端末の設定と配信元の設定を読み直す管理の MCP の `reload` の入出力を定め、`reload` を修正するときに参照する。
 identifier: reload
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true

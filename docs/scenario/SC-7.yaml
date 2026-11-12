@@ -12,6 +12,8 @@ scenarios:
         description: sample を配信している project-index
         notes: '`cwd` は sample のクローン本体。`worktree` にワークツリー x のパスを渡す'
     flow: |-
+      <!-- map: {"title": "正常シナリオ"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -27,6 +29,8 @@ scenarios:
         M->>WT: 一時ファイルに書いてから置き換える
         M-->>A: 新しい version と差分
       ```
+
+      <!-- /map -->
     expected:
       - '結果が `applied: true` で、文書 1 の `status` が `updated`、`version` が書き込み前と違う'
       - ワークツリー x の文書 1 の YAML が `set` の値になり、他の項目は変わらない
@@ -45,6 +49,8 @@ scenarios:
         description: sample を配信している project-index
         notes: '`worktree` にワークツリー x のパスを渡す'
     flow: |-
+      <!-- map: {"title": "正常シナリオ（文書を作る）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -58,6 +64,8 @@ scenarios:
         M->>WT: generators のスクリプトを流す
         M-->>A: 作った文書の id と version
       ```
+
+      <!-- /map -->
     expected:
       - 結果の `status` が `created` で、`id` と `version` を返す
       - ワークツリー x の `documents[].paths` に当たる場所に新しい YAML ができる
@@ -72,6 +80,8 @@ scenarios:
         description: 正常シナリオと同じ sample を配信している project-index
         notes: '`dry_run: true`'
     flow: |-
+      <!-- map: {"title": "正常シナリオ（試しに書く）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -81,6 +91,8 @@ scenarios:
         M->>M: 本番と同じ検証とバージョンの確認
         M-->>A: 書いた場合の結果と差分
       ```
+
+      <!-- /map -->
     expected:
       - 結果に差分があり、`applied` が `false`
       - ワークツリー x のファイルは変わらない
@@ -96,6 +108,8 @@ scenarios:
         description: sample と memo を配信している project-index
         notes: '`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "正常シナリオ（Git 管理外の配信元に書く）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -108,6 +122,8 @@ scenarios:
         M->>MF: YAML を書く
         M-->>A: id と version
       ```
+
+      <!-- /map -->
     expected:
       - memo のフォルダに新しい YAML ができ、メタデータの `created`・`updated` に書いた日時が入る
       - 続けて update したとき、`updated` だけが新しい日時になり、`created` は変わらない
@@ -123,6 +139,8 @@ scenarios:
         description: sample を配信している project-index
         notes: '`on_referenced: unlink`'
     flow: |-
+      <!-- map: {"title": "正常シナリオ（参照も外して消す）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -134,6 +152,8 @@ scenarios:
         M->>WT: 文書 1 を書き換え、文書 2 のファイルを消す
         M-->>A: 消した文書と参照を外した文書
       ```
+
+      <!-- /map -->
     expected:
       - ワークツリー x の文書 2 のファイルが無い
       - 文書 1 の `related` に文書 2 が無い
@@ -147,6 +167,8 @@ scenarios:
         description: 正常シナリオと同じ sample を配信している project-index
         notes: '`operations` は 2 件。0 番目は通る update、1 番目はスキーマの必須の項目を `unset` する update。`atomic` は既定（`true`）。`unset` する項目のスキーマは `title`・`description`・`examples` を持ち、`x-rules` を持たない'
     flow: |-
+      <!-- map: {"title": "異常シナリオ（検査に通らない）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -156,6 +178,8 @@ scenarios:
         M->>M: 全ての操作を当ててから検査し、1 番目が通らない
         M-->>A: エラー（添字 1・違反したパス・決まり・直し方・違反した項目のスキーマの説明）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、添字 1 の違反のパス・決まり・直し方を返す'
       - 違反に、`unset` した項目のスキーマの `title`・`description`・`examples` が添えられ、`x-rules` とスキーマのほかの項目は返さない
@@ -173,6 +197,8 @@ scenarios:
         description: sample を配信している project-index
         notes: '`operations` は 2 件。0 番目は通る update、1 番目は文書 1 の `body` に定義の誤った図の部品（`<!-- flow -->` の中の壊れた JSON）を `set` する update。`atomic` は既定（`true`）'
     flow: |-
+      <!-- map: {"title": "異常シナリオ（Markdown の値に mdmark の警告がある）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -185,6 +211,8 @@ scenarios:
         MD-->>M: 書き方の警告
         M-->>A: エラー（添字 1・body のパス・警告）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、添字 1 の違反として `body` のパスと、mdmark の描画時の書き方の警告と同じ文言を返す'
       - 0 番目の文書も文書 1 も書き換わらない
@@ -202,6 +230,8 @@ scenarios:
         description: sample を配信している project-index
         notes: '文書 1 の `body` に定義の誤った図の部品（`<!-- flow -->` の中の壊れた JSON）を `set` する update 1 件'
     flow: |-
+      <!-- map: {"title": "正常シナリオ（mdmark の CLI が無い）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -214,6 +244,8 @@ scenarios:
         M->>WT: 一時ファイルに書いてから置き換える
         M-->>A: 新しい version と差分、点検できなかった理由
       ```
+
+      <!-- /map -->
     expected:
       - '結果が `applied: true` で、文書 1 の `status` が `updated`'
       - ワークツリー x の文書 1 の `body` が `set` の値になる
@@ -230,6 +262,8 @@ scenarios:
         description: sample と notes を配信している project-index
         notes: '`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "異常シナリオ（書き込めない配信元を指す）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -239,6 +273,8 @@ scenarios:
         M->>M: notes の scope.write に cwd が当たらない
         M-->>A: エラー（notes は読み取りだけ。今の作業場所から使える配信元の一覧）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、notes には書き込めないことと、今の作業場所から使える配信元の一覧を返す'
       - notes のフォルダのファイルは変わらない
@@ -252,6 +288,8 @@ scenarios:
         description: 正常シナリオと同じ sample を配信している project-index
         notes: '`cwd` は sample のクローン本体。`worktree` を渡さない'
     flow: |-
+      <!-- map: {"title": "異常シナリオ（書く先がクローン本体）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -261,6 +299,8 @@ scenarios:
         M->>M: Git の配信元で、書く先がクローン本体になる
         M-->>A: エラー（クローン本体には書かない。worktree でワークツリーを指すこと）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、クローン本体には書かないことと、`worktree` でワークツリーを指すことを返す'
       - sample のクローン本体のファイルは変わらない
@@ -275,6 +315,8 @@ scenarios:
         description: sample を配信している project-index
         notes: '`on_referenced` は既定（`fail`）'
     flow: |-
+      <!-- map: {"title": "異常シナリオ（参照されている文書を消す）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -284,6 +326,8 @@ scenarios:
         M->>M: 文書 1 の related が文書 2 を指している
         M-->>A: エラー（参照元の id と on_referenced: unlink）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、参照元の文書 1 の `id` と `on_referenced: unlink` で消せることを返す'
       - 文書 2 のファイルも文書 1 も変わらない
@@ -300,6 +344,8 @@ scenarios:
         description: sample を配信している project-index
         notes: '`worktree` にワークツリー x のパスを渡す'
     flow: |-
+      <!-- map: {"title": "異常シナリオ（置き場所が除外の名前に当たる）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -310,6 +356,8 @@ scenarios:
         M->>M: 置き場所 docs/rule/index.yaml のファイル名が rule の exclude に当たる
         M-->>A: エラー（添字 0・置き場所が exclude に当たること・直し方）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、添字 0 の `kind` の違反として、置き場所 `docs/rule/index.yaml` が行 `rule` の `exclude` に当たることと直し方を返す'
       - ワークツリー x の `docs/rule/index.yaml` は変わらない（無ければ作られない）
@@ -329,6 +377,8 @@ scenarios:
         description: sample を配信している project-index
         notes: '`worktree` にワークツリー x のパスを渡す'
     flow: |-
+      <!-- map: {"title": "正常シナリオ（共通のキー名で書く）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -344,6 +394,8 @@ scenarios:
         M->>WT: name の値を title 列に持つ YAML を書く
         M-->>A: 作った文書の id と version
       ```
+
+      <!-- /map -->
     expected:
       - update の後、ワークツリー x の d1 の `title` が `set` の `name` の値になり、`name` 列ができない
       - 次の `search_docs` が d1 の `name` として書いた値を返す
@@ -361,6 +413,8 @@ scenarios:
         description: sample を配信している project-index
         notes: '`cwd` は sample のワークツリー'
     flow: |-
+      <!-- map: {"title": "正常シナリオ（オブジェクトの配列のタグを書く）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -378,6 +432,8 @@ scenarios:
         M->>F: name が 運用 の要素に main: true を付け、mcp の main を外す
         M-->>A: 書いた文書の version
       ```
+
+      <!-- /map -->
     expected:
       - '`add_to` の後、文書 1 の `tags` が `{name: テスト}` を `main` なしで持つ'
       - '`remove_from` の後、`name` が `設計` の要素が無い'
@@ -401,6 +457,8 @@ scenarios:
         description: sample を配信している project-index
         notes: '`worktree` にワークツリー x のパスを渡す'
     flow: |-
+      <!-- map: {"title": "正常シナリオ（変更していない項目の引用符を保つ）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -414,12 +472,14 @@ scenarios:
         M->>WT: 文書 2 の related から文書 3 を外して書き換え、文書 3 のファイルを消す
         M-->>A: 消した文書と参照を外した文書
       ```
+
+      <!-- /map -->
     expected:
       - '文書 1 の YAML の、`set` で変えた行以外の行が書き込み前の文字列と一致し、`description: ''2020-12''` と `name: "A: b"` の引用符が残る'
       - 文書 2 の YAML の、`related` の文書 3 の行以外の行が書き込み前の文字列と一致する
       - '`write_docs` の結果の差分に、`set` で変えた項目の行だけが出る'
     test: test_normal_when_quotes_preserved
-lead: エージェントが文書の MCP の `write_docs`・`delete_docs` で、作業ツリーの YAML の文書を検査に通してから作る・直す・消す。
+lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 issue: 14
 primary_actor: エージェント（Claude Code）
 stakeholders:

@@ -12,6 +12,8 @@ flows:
       - name: サンプルの配信元
         description: 文書 2 の本文だけが含む語を持つ sample
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -22,6 +24,8 @@ flows:
         E-->>ST: 文書を読む
         E-->>C: 200 文書 2 と一致した箇所
       ```
+
+      <!-- /map -->
     expected:
       - '`totalCount` が 1 で、`items` が文書 2 だけ'
       - '`snippets` に語を含む行がある'
@@ -35,6 +39,8 @@ flows:
       - name: 入力
         description: '`q` が空と、201 文字'
     flow: |-
+      <!-- map: {"title": "異常系（語の誤り・400）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -43,6 +49,8 @@ flows:
         C->>E: q: 空
         E-->>C: 400 problem+json（q の違反）
       ```
+
+      <!-- /map -->
     expected:
       - どちらも 400 で、`errors[0].path` が `q`、`reason` に空か長すぎることがある
     test: test_error_when_query_invalid
@@ -54,6 +62,8 @@ flows:
       - name: 入力
         description: '`/sources/unknown/search?q=a` と `/sources/sample/search?q=a&ref=no-such-branch`'
     flow: |-
+      <!-- map: {"title": "異常系（無い配信元・リビジョン・404）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -62,11 +72,13 @@ flows:
         C->>E: source: unknown
         E-->>C: 404 problem+json（無い配信元）
       ```
+
+      <!-- /map -->
     expected:
       - '`unknown` が 404 で、`detail` に無いのが配信元であることがある'
       - '`no-such-branch` が 404 で、`detail` に解決できなかったリビジョンがある'
     test: test_error_when_not_found
-lead: dev-docs の画面のサーバーが画面の検索で呼ぶ。語を含む文書と一致した箇所を返す。
+lead: 単語を含む文書と一致した箇所を返却する読み取り API の入出力を定め、画面の検索を修正するときに参照する。
 identifier: search_page
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true

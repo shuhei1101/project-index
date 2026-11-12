@@ -12,6 +12,8 @@ flows:
       - name: サンプルの配信元
         description: 種類 `design`（`converters[]` を指さない）の YAML の文書 `design/D-1.yaml` を `main` に持つ sample
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -22,6 +24,8 @@ flows:
         E->>S: default_ref の文書を読み込む
         E-->>C: 200 値・スキーマ・メタデータ
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、`value` が YAML を読み込んだ値、`schema` が種類 `design` のスキーマ（`$ref` を解いた形）
       - '`metadata` が `id`・`kind`・`name`・`description`・`tags`・`visibility` を持つ'
@@ -36,6 +40,8 @@ flows:
       - name: サンプルの配信元
         description: 正常系と同じ sample。最新の commit で `design/D-1.yaml` の `title` を変えた
     flow: |-
+      <!-- map: {"title": "正常系（リビジョンを指す）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -44,6 +50,8 @@ flows:
         C->>E: GET /sources/sample/docs/design/D-1.yaml?ref={親の commit}
         E-->>C: 200 親の commit の値
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、`ref` が親の commit、`value.title` が変える前の値
     test: test_normal_when_ref_given
@@ -55,6 +63,8 @@ flows:
       - name: サンプルの配信元
         description: '`files.yaml` の行（`path: guide.md`）が Markdown `guide.md` を本文に持つ sample'
     flow: |-
+      <!-- map: {"title": "正常系（本文のファイルのパスで引く）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -63,6 +73,8 @@ flows:
         C->>E: GET /sources/sample/docs/guide.md
         E-->>C: 200 行の値・本文
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、`value` が `files.yaml` の行の値、`body` が `guide.md` の本文の文字列、`bodyPath` が `guide.md`
     test: test_normal_when_body_path_given
@@ -74,6 +86,8 @@ flows:
       - name: 変換を持つ配信元
         description: '`converters[]` を指す種類 `prompt` の文書 `prompts/a.yaml` と、スクリプトが終了コード 1 で終わる文書 `prompts/broken.yaml` を持つ sample'
     flow: |-
+      <!-- map: {"title": "正常系（変換のスクリプトを指す種類）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -89,6 +103,8 @@ flows:
         X-->>E: 終了コード 1
         E-->>C: 200 conversionError
       ```
+
+      <!-- /map -->
     expected:
       - '`a.yaml` は 200 で、`markdown` がスクリプトの標準出力、`conversionError` が `null`'
       - '`broken.yaml` は 200 で、`conversionError` にスクリプトのパスと終了コード・標準エラー、`markdown` が `null`'
@@ -102,6 +118,8 @@ flows:
       - name: 入力
         description: '`/sources/unknown/docs/a.yaml`・`/sources/sample/docs/design/D-1.yaml?ref=no-such-branch`・`/sources/sample/docs/no/such.yaml`'
     flow: |-
+      <!-- map: {"title": "異常系（無い配信元・リビジョン・文書・404）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -110,12 +128,14 @@ flows:
         C->>E: GET /sources/sample/docs/no/such.yaml
         E-->>C: 404 problem+json
       ```
+
+      <!-- /map -->
     expected:
       - 無い配信元は 404 で `missing` が `source`、配信していない配信元は `not_served` と `errors[]`
       - 無いリビジョンは 404 で `missing` が `ref`
       - 無い文書は 404 で `missing` が `doc`
     test: test_error_when_not_found
-lead: 指定のリビジョンの文書の値・種類のスキーマ・メタデータを返す。管理用の YAML の行の文書は本文の文字列と本文のファイルのパスも返し、`converters[]` を指す種類はスクリプトが出した Markdown か変換の失敗を返す。
+lead: 指定のリビジョンの文書の値・種類のスキーマ・メタデータ・変換の結果を返却する読み取り API の入出力を定め、文書の取得を修正するときに参照する。
 identifier: get_document
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true

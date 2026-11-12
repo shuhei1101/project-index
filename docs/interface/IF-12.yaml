@@ -15,6 +15,8 @@ flows:
         description: 'sample の行 `src`（`records: files`・`body_file: path`）。`schema` は `templates/files.schema.yaml` のコピー'
         notes: '`/project-index:setup` が作る組み合わせ'
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -25,6 +27,8 @@ flows:
         T-->>F: project-index.yaml・管理用の YAML・スクリプトを読む
         T-->>C: 違反・設定のバージョン・同期の件数
       ```
+
+      <!-- /map -->
     expected:
       - '`violations` と `missing_paths` と `script_errors` が空（行 `src` の `schema` も違反にしない）'
       - '`version_state` が `current`'
@@ -39,6 +43,8 @@ flows:
       - name: config
         description: '`documents[0].paths` を持たない YAML の文字列'
     flow: |-
+      <!-- map: {"title": "正常系（違反がある）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -47,6 +53,8 @@ flows:
         C->>T: path・config
         T-->>C: violations
       ```
+
+      <!-- /map -->
     expected:
       - '`violations` に `documents[0].paths` と理由がある'
       - '`path` の `project-index.yaml` の中身ではなく `config` を検査している'
@@ -59,6 +67,8 @@ flows:
       - name: フォルダ
         description: '`dev-docs.yaml` だけを持つ配信元のフォルダ'
     flow: |-
+      <!-- map: {"title": "正常系（移行の間の dev-docs.yaml を読む）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -70,6 +80,8 @@ flows:
         T->>F: dev-docs.yaml を読む
         T-->>C: 違反・設定のバージョンの新旧・索引の同期の件数
       ```
+
+      <!-- /map -->
     expected:
       - '`dev-docs.yaml` を検査した結果を、`project-index.yaml` と同じ形で返す'
       - 同じフォルダに `project-index.yaml` を置くと、`dev-docs.yaml` は読まない
@@ -82,6 +94,8 @@ flows:
       - name: フォルダ
         description: 空の一時フォルダ
     flow: |-
+      <!-- map: {"title": "異常系（設定が無い・ConfigNotFoundError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -90,6 +104,8 @@ flows:
         C->>T: path
         T-->>C: isError（ConfigNotFoundError）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で `project-index.yaml` が無いことと、探したパスを返す'
     test: test_error_when_config_not_found
@@ -101,6 +117,8 @@ flows:
       - name: config
         description: インデントが崩れた YAML の文字列
     flow: |-
+      <!-- map: {"title": "異常系（YAML として読めない・ConfigParseError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -109,6 +127,8 @@ flows:
         C->>T: path・config
         T-->>C: isError（ConfigParseError）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で読めなかった行と理由を返す'
     test: test_error_when_config_unparsable
@@ -120,6 +140,8 @@ flows:
       - name: config
         description: '`version: "1"` で、`documents[0]` が `paths`・`schema`・`type: markdown`・`defaults: [{paths: [docs/**], tags: [doc]}]`、`documents[1]` が `paths`・`schema`・`metadata: {name: {type: ref, field: title}}` を持つ YAML の文字列'
     flow: |-
+      <!-- map: {"title": "正常系（前の形式の設定）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -129,6 +151,8 @@ flows:
         T->>T: 新しいバージョンのスキーマで検証する
         T-->>C: violations・version_state
       ```
+
+      <!-- /map -->
     expected:
       - '`violations` に `documents[0].type`・`documents[0].defaults`・`documents[1].metadata.name` がそれぞれ理由と一緒にある'
       - '`version_state` が `old` で、`config_version` が `1`'
@@ -145,6 +169,8 @@ flows:
         description: '`src/` に `a.py`・`b.py`・空の `pkg/__init__.py`・`uv.lock`・`logo.png`（先頭に NUL バイト）を置く'
         notes: '`a.py`・`b.py` だけが除外の条件に当たらない'
     flow: |-
+      <!-- map: {"title": "正常系（除外の条件に当たるファイルを数えない）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -156,6 +182,8 @@ flows:
         T->>T: 除外の条件に当たるファイルを外す
         T-->>C: 同期の件数と内訳
       ```
+
+      <!-- /map -->
     expected:
       - '`sync.unindexed_files` が 2'
       - '`sync.items` が `src/a.py`・`src/b.py` の 2 件だけで、`src/pkg/__init__.py`・`src/uv.lock`・`src/logo.png` を含まない'
@@ -171,6 +199,8 @@ flows:
         description: sample の `nav` に、`auto` の `filter` が `tags が none` のタブ `none` を置く
         notes: どの文書にもタグ `none` を付けない
     flow: |-
+      <!-- map: {"title": "正常系（エイリアスのキーと nav の条件を点検する）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -183,6 +213,8 @@ flows:
         T->>T: nav の auto の条件に当たる文書を数える
         T-->>C: 違反・警告・取り込んだスキーマのバージョン
       ```
+
+      <!-- /map -->
     expected:
       - '`violations` に、`doc` が違反した文書のパスで `aliases` が文字列か文字列の並びでないことの違反が 1 件ある'
       - '`warnings` に、タブ `none` の条件が 0 件に当たる警告が 1 件ある'
@@ -197,6 +229,8 @@ flows:
         description: '`project-index.yaml` の `documents[0]`（`paths: [files.yaml]`・`records: files`・`body_file: path`）の `schema` が、最上位で `files` を必須にし `files` の `items` を定めないスキーマを指すフォルダ'
         notes: 管理用の YAML は `files[]` に `a.md` の 1 行
     flow: |-
+      <!-- map: {"title": "正常系（records の行のスキーマが行に合わない）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -208,6 +242,8 @@ flows:
         T->>T: records の行の schema から properties.files.items を取り出せない
         T-->>C: violations（documents[0].schema）
       ```
+
+      <!-- /map -->
     expected:
       - '`violations` に `documents[0].schema` があり、`rule` にスキーマが `properties.files.items` を定めないことがある'
       - 結果は配信中の配信元の状態に反映しない
@@ -248,6 +284,8 @@ flows:
       - name: 配信元
         description: '`documents[0].schema: {source: schemas, path: schemas/note.schema.yaml, ref: v1}` を持つ Git 管理外のフォルダ'
     flow: |-
+      <!-- map: {"title": "正常系（ほかの配信元のスキーマを参照する）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -258,6 +296,8 @@ flows:
         T->>G: v1 を commit に解き、note.schema.yaml と common.schema.yaml を読む
         T-->>C: 違反・設定のバージョン・同期の件数
       ```
+
+      <!-- /map -->
     expected:
       - '`violations` が空（作業ツリーの壊れた `note.schema.yaml` を読まない）'
     test: test_normal_when_schema_from_other_source
@@ -271,6 +311,8 @@ flows:
       - name: 配信元
         description: '`documents[0]` は `source: nothing`（端末の設定に無い）、`documents[1]` は `ref: v9`（無いタグ）、`documents[2]` は `path: schemas/none.schema.yaml`（v1 に無いファイル）で schemas を指す Git 管理外のフォルダ'
     flow: |-
+      <!-- map: {"title": "正常系（参照先のスキーマが見つからない）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -281,11 +323,13 @@ flows:
         T->>G: 行ごとに参照先を解く
         T-->>C: violations（documents[0].schema・documents[1].schema・documents[2].schema）
       ```
+
+      <!-- /map -->
     expected:
       - '`violations` に `documents[0].schema`（配信元 `nothing` が端末の設定に無い）・`documents[1].schema`（schemas に `v9` が無い）・`documents[2].schema`（`v1` に `schemas/none.schema.yaml` が無い）が理由と一緒にある'
       - 結果は配信中の配信元の状態に反映しない
     test: test_normal_when_schema_ref_not_found
-lead: 配信元の `project-index.yaml` と管理用の YAML・スクリプトを検証し、違反・設定のバージョンの新旧・索引の同期の件数を返す。端末の設定に無い配信元も検査できる。
+lead: 配信元の設定・管理用の YAML・スクリプトを検証する管理の MCP の `check_project` の入出力を定め、`check_project` を修正するときに参照する。
 identifier: check_project
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true

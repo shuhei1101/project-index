@@ -12,6 +12,8 @@ flows:
       - name: サンプルの配信元
         description: 種類 `design` の YAML 2 件と、管理用の YAML `files.yaml` の行の文書 1 件を `main` に持つ sample
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -20,6 +22,8 @@ flows:
         C->>E: GET /sources/sample/docs
         E-->>C: 200 文書の一覧
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、`ref` が `main`、`documents` に 3 件が並ぶ
       - 各要素が `id`・`path`・`kind`・`name`・`description`・`tags`・`visibility` を持ち、行の文書は `bodyPath` を持つ
@@ -32,6 +36,8 @@ flows:
       - name: サンプルの配信元
         description: 正常系と同じ sample。最新の commit で文書を 1 件追加した
     flow: |-
+      <!-- map: {"title": "正常系（リビジョンを指す）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -40,6 +46,8 @@ flows:
         C->>E: GET /sources/sample/docs?ref={親の commit}
         E-->>C: 200 親の commit の文書の一覧
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、`documents` に追加した文書が無い
     test: test_normal_when_ref_given
@@ -51,6 +59,8 @@ flows:
       - name: 入力
         description: '`/sources/unknown/docs` と `/sources/sample/docs?ref=no-such-branch`'
     flow: |-
+      <!-- map: {"title": "異常系（無い配信元・リビジョン・404）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -59,11 +69,13 @@ flows:
         C->>E: GET /sources/sample/docs?ref=no-such-branch
         E-->>C: 404 problem+json
       ```
+
+      <!-- /map -->
     expected:
       - 無い配信元は 404 で `missing` が `source`
       - 無いリビジョンは 404 で `missing` が `ref`、`detail` にリビジョンの名前 `no-such-branch` がある
     test: test_error_when_not_found
-lead: 指定のリビジョンの文書の一覧（ID・パス・種類・メタデータ）を返す。
+lead: 指定のリビジョンの文書の一覧を返却する読み取り API の入出力を定め、文書の一覧を修正するときに参照する。
 identifier: list_documents
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true

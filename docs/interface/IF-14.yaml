@@ -15,6 +15,8 @@ flows:
       - name: 入力
         description: 1 回目は `add`（タブ `mcp`、`auto` の `filter` が `tags が mcp`）。2 回目は `update`（タブ `mcp` の `value.items` を、`filter` が `tags が 設計` の `auto` 1 つに置き換える）
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -29,6 +31,8 @@ flows:
         T->>F: nav を書く
         T-->>C: nav・counts
       ```
+
+      <!-- /map -->
     expected:
       - 1 回目の後、`project-index.yaml` の `nav` にタブ `mcp` が加わり、`counts` のその `auto` が 2（文書 1・文書 3）
       - 2 回目の後、タブ `mcp` の `filter` が `tags が 設計` になり、`counts` が 2（文書 2・文書 3）
@@ -44,6 +48,8 @@ flows:
         description: '`add`（タブ `none`、`auto` の `filter` が `tags が none`）'
         notes: どの文書にもタグ `none` を付けない
     flow: |-
+      <!-- map: {"title": "正常系（0 件の条件を書く）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -54,6 +60,8 @@ flows:
         T->>F: nav を書く
         T-->>C: nav・counts・warnings
       ```
+
+      <!-- /map -->
     expected:
       - '`project-index.yaml` の `nav` にタブ `none` が加わる'
       - '`counts` のその `auto` が 0'
@@ -67,6 +75,8 @@ flows:
       - name: 入力
         description: '`add`（タブ `bad`、`filter` の `op` が無い値 `like`）'
     flow: |-
+      <!-- map: {"title": "異常系（検証に通らない・NavInvalidError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -76,6 +86,8 @@ flows:
         T->>T: check_filter に通らない
         T-->>C: NavInvalidError
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、`op` のキーのパスと `like` が使えないことを返す'
       - '`project-index.yaml` は書き換わらない'
@@ -88,6 +100,8 @@ flows:
       - name: 入力
         description: '`update`（タブ `missing`）'
     flow: |-
+      <!-- map: {"title": "異常系（無いタブ・InvalidArgumentError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -96,6 +110,8 @@ flows:
         C->>T: update タブ missing
         T-->>C: InvalidArgumentError
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、今のタブの名前の一覧を返す'
       - '`project-index.yaml` は書き換わらない'
@@ -108,6 +124,8 @@ flows:
       - name: 入力
         description: '`path` に `project-index.yaml` の無い一時フォルダ'
     flow: |-
+      <!-- map: {"title": "異常系（設定が無い・ConfigNotFoundError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -116,6 +134,8 @@ flows:
         C->>T: path
         T-->>C: ConfigNotFoundError
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で `project-index.yaml` が無いことを返す'
     test: test_error_when_config_missing
@@ -127,6 +147,8 @@ flows:
       - name: 入力
         description: '`path` の `project-index.yaml` の途中の行を壊す'
     flow: |-
+      <!-- map: {"title": "異常系（YAML として読めない・ConfigParseError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -135,6 +157,8 @@ flows:
         C->>T: path
         T-->>C: ConfigParseError
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で壊した行と理由を返す'
     test: test_error_when_config_unparsable
@@ -150,6 +174,8 @@ flows:
       - name: 入力
         description: '1 回目は sample へ `update`（タブ `mcp`、`item: auto`）。2 回目は `path` が `base` で `add`（タブ `x`）'
     flow: |-
+      <!-- map: {"title": "異常系（group でない項目を指す・InvalidArgumentError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -161,6 +187,8 @@ flows:
         T->>T: 後に重ねた local が nav を持つ
         T-->>C: InvalidArgumentError
       ```
+
+      <!-- /map -->
     expected:
       - '1 回目は `isError: true` で、タブ `mcp` の group の名前の一覧（空）を返す'
       - '2 回目は `isError: true` で、`local/project-index.yaml` のパスを返す'
@@ -176,6 +204,8 @@ flows:
         description: "`add`（タブ `folders`、`auto` が `{document: sample, group_by: '@folder'}`）"
         notes: sample の文書は 3 件
     flow: |-
+      <!-- map: {"title": "正常系（フォルダで束ねる auto を書く）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -187,12 +217,14 @@ flows:
         T->>F: nav を書く
         T-->>C: nav・counts
       ```
+
+      <!-- /map -->
     expected:
       - "`project-index.yaml` の `nav` にタブ `folders` が加わり、その `auto` の `group_by` が `'@folder'`"
       - '`counts` のその `auto` が 3'
       - '`warnings` が空'
     test: test_normal_when_group_by_folder
-lead: 配信元の `project-index.yaml` の `nav` だけを、タブ・項目の追加・修正・削除で書き換える。書いた後の `nav` をスキーマと `check_filter` で検証し、`auto` の条件に当たる文書の数を返す。
+lead: 配信元の `project-index.yaml` の `nav` だけを書き換える管理の MCP の `write_nav` の入出力を定め、`write_nav` を修正するときに参照する。
 identifier: write_nav
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: false

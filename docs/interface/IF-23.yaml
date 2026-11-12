@@ -12,6 +12,8 @@ flows:
       - name: サンプルの配信元
         description: '`nav`・`documents[]`・`decisions.folders`・`github` を持つ `project-index.yaml` の sample'
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -20,6 +22,8 @@ flows:
         C->>E: GET /sources/sample/config
         E-->>C: 200 nav・documents・decisions・github
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、`nav`・`documents`・`decisions.folders`・`github` が `project-index.yaml` の値と同じ
       - 端末の設定の `config` を重ねた配信元は、重ねた後の値を返す
@@ -32,6 +36,8 @@ flows:
       - name: 入力
         description: '`/sources/unknown/config`'
     flow: |-
+      <!-- map: {"title": "異常系（無い配信元・404）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -40,11 +46,13 @@ flows:
         C->>E: GET /sources/unknown/config
         E-->>C: 404 problem+json
       ```
+
+      <!-- /map -->
     expected:
       - 404 で、`missing` が `source`、`detail` に配信元 `unknown` がある
       - 配信していない配信元は `missing` が `not_served` で、`errors[]` に外した理由がある
     test: test_error_when_source_not_found
-lead: 配信元の設定のうち、画面が使うキー（`nav`・`documents[]`・`decisions.folders`・`github`）を返す。
+lead: 配信元の設定のうち画面が使用するキーを返却する読み取り API の入出力を定め、配信元の設定の取得を修正するときに参照する。
 identifier: get_source_config
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true

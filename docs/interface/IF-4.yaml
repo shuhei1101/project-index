@@ -16,6 +16,8 @@ flows:
         description: 文書 1 の `name` を変えた commit
         notes: 親の commit を `from`、その commit を `to` に渡す
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -28,6 +30,8 @@ flows:
         C->>T: 同じ区間, view: full
         T-->>C: 差分の行
       ```
+
+      <!-- /map -->
     expected:
       - 先頭に解決した 2 つの commit と日時がある
       - 変わった文書が文書 1 だけで、`change` が `modified`、`keys` が `name`
@@ -42,6 +46,8 @@ flows:
       - name: 変更の commit
         description: 正常系と同じ。親の commit と変更の commit の間の日時を `from`、変更の commit を先頭に持つブランチ名を `to` に渡す
     flow: |-
+      <!-- map: {"title": "正常系（日時とブランチで区間を指す）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -51,6 +57,8 @@ flows:
         T->>T: 日時をその時点の最後の commit、ブランチを先頭の commit に解決する
         T-->>C: 解決した commit と変わった文書
       ```
+
+      <!-- /map -->
     expected:
       - '`range.from` が親の commit、`range.to` が変更の commit になる'
       - 変わった文書が正常系と同じになる
@@ -63,6 +71,8 @@ flows:
       - name: 読んだ記録
         description: '`session_id: s1` で文書 1 と文書 2 を `view: full` で読んだ後、文書 1 だけを `write_docs` で変えた状態'
     flow: |-
+      <!-- map: {"title": "正常系（前回読んだ時点から）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -74,6 +84,8 @@ flows:
         T->>T: 今の内容と比べる
         T-->>C: 読んだ後に変わった文書
       ```
+
+      <!-- /map -->
     expected:
       - 文書 1 だけを、変わったキーつきで返す
       - 文書 2 は返さない
@@ -88,6 +100,8 @@ flows:
       - name: 入力
         description: '`from: no-such-branch`'
     flow: |-
+      <!-- map: {"title": "異常系（無いリビジョン・RefNotFoundError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -96,6 +110,8 @@ flows:
         C->>T: from: no-such-branch
         T-->>C: isError（解決できなかった引数と値）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、`from` の `no-such-branch` を解決できなかったことを返す'
       - 差分を返さない
@@ -108,6 +124,8 @@ flows:
       - name: 入力
         description: '`session_id: s2`（何も読んでいない会話）で `from` を省く'
     flow: |-
+      <!-- map: {"title": "異常系（前回読んだ記録が無い・LastReadNotFoundError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -116,6 +134,8 @@ flows:
         C->>T: view: summary, session_id: s2
         T-->>C: isError（前回読んだ時点が無い、from を渡すこと）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、この会話で読んだ記録が無いことと `from` を渡すことを返す'
     test: test_error_when_last_read_not_found
@@ -130,6 +150,8 @@ flows:
       - name: 入力
         description: '1 回目は `source: notes, from: HEAD~1`、2 回目は `to` だけ'
     flow: |-
+      <!-- map: {"title": "異常系（引数の誤り・InvalidArgumentError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -138,6 +160,8 @@ flows:
         C->>T: source: notes, from: HEAD~1
         T-->>C: isError（Git 管理外の配信元には区間を指せない）
       ```
+
+      <!-- /map -->
     expected:
       - '1 回目が `isError: true` で、notes は Git 管理外で `from`・`to` を使えないことを返す'
       - '2 回目が `isError: true` で、`to` には `from` が要ることを返す'
@@ -152,6 +176,8 @@ flows:
         description: '`scope.read` が other のフォルダだけの配信元'
         notes: id `other`
     flow: |-
+      <!-- map: {"title": "異常系（読めない配信元・SourceNotReadableError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -160,6 +186,8 @@ flows:
         C->>T: source: other, from: HEAD~1
         T-->>C: isError（読めない配信元と、使える配信元の一覧）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、other を読めないことと使える配信元の一覧を返す'
       - '`source: *` は other を対象に含めない'
@@ -175,6 +203,8 @@ flows:
       - name: 入力
         description: '`contains: {value: 廃止予定}`、`format: json`。他の呼び出しは期待値のとおり'
     flow: |-
+      <!-- map: {"title": "正常系（語が入った・消えた）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -186,6 +216,8 @@ flows:
         T->>T: 文書ごとに語の出現数を比べる
         T-->>C: 文書 1 と、入った区間（commit 1）・消えた区間（commit 3）
       ```
+
+      <!-- /map -->
     expected:
       - 変わった文書が文書 1 だけで、`change` が `unchanged`
       - '文書 1 の `contains_changes` が 2 要素で、`{kind: added, to.commit: commit 1, count_before: 0, count_after: 1}`、`{kind: removed, to.commit: commit 3, count_before: 1, count_after: 0}` の順（commit 2 は含まない）'
@@ -206,6 +238,8 @@ flows:
       - name: 入力
         description: '`source: other`, `from: HEAD~1`, `outside_scope: true`。`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "正常系（作業範囲の外を参考に読む）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -217,12 +251,14 @@ flows:
         T->>L: cwd と other を残す
         T-->>C: 作業範囲の外（参考）、文書 1 の変更
       ```
+
+      <!-- /map -->
     expected:
       - 先頭の行に「作業範囲の外（参考）」があり、文書 1 を `modified` で返す
       - 要求のログに sample のクローン本体のパスと `other` が残る
       - '`outside_read: false` の other では `SourceNotReadableError` を返す'
     test: test_normal_when_outside_scope
-lead: 区間（commit・日時・ブランチ・タグ）か、この会話で前回読んだ時点から今までに変わった文書・変わったキー・差分の行を返す。
+lead: 区間か前回参照した時点から変わった文書・キー・差分の行を返却する `list_changes` の入出力を定め、`list_changes` を修正するときに参照する。
 identifier: list_changes
 permissions: 対象の配信元の `scope.read` か `scope.write` に `cwd` が当たること
 idempotent: true

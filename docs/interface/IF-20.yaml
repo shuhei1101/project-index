@@ -12,6 +12,8 @@ flows:
       - name: 入力
         description: '`agent_id` を持ち、`tool_input` に別の `cwd` を入れた JSON'
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as Claude Code
@@ -20,6 +22,8 @@ flows:
         C->>H: stdin（tool_input・session_id・cwd・agent_id）
         H-->>C: updatedInput（終了コード 0）
       ```
+
+      <!-- /map -->
     expected:
       - '`updatedInput` の `cwd`・`session_id`・`agent_id` がフックの入力の値'
       - 元の `tool_input` の他のキーが変わらない
@@ -33,6 +37,8 @@ flows:
       - name: 入力
         description: JSON でない文字列
     flow: |-
+      <!-- map: {"title": "正常系（入力が読めない）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as Claude Code
@@ -41,10 +47,12 @@ flows:
         C->>H: stdin（壊れた JSON）
         H-->>C: 出力なし（終了コード 0）
       ```
+
+      <!-- /map -->
     expected:
       - stdout が空で終了コード 0
     test: test_normal_when_input_unparsable
-lead: 文書の MCP のツールの呼び出しの入力に `cwd`・`session_id`・`agent_id` を入れて返す。入力は stdin の JSON。
+lead: 文書の MCP の呼び出しに `cwd`・`session_id`・`agent_id` を入れる PreToolUse のフックの入出力を定め、ツール実行前のフックを修正するときに参照する。
 identifier: hooks/pre_tool_use.py
 permissions: 利用者の権限で動く
 idempotent: true

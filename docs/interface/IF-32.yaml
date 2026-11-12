@@ -14,6 +14,8 @@ flows:
       - name: 入力
         description: extra の行（`id`・`config`・`scope.read`）
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -25,6 +27,8 @@ flows:
         E->>F: sources の末尾に追加し、配信元を読み直す
         E-->>C: 201 added
       ```
+
+      <!-- /map -->
     expected:
       - 201 で、`result` が `added`、`sources` に読み直した後の状態がある
       - '`settings.yaml` の `sources` が sample・extra の順で、sample の行と他のキー・コメントは変わらない'
@@ -39,6 +43,8 @@ flows:
       - name: 入力
         description: extra と同じ内容の行と、extra と id が同じで `config` が違う行
     flow: |-
+      <!-- map: {"title": "異常系（同じ id の行がある・409）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -49,6 +55,8 @@ flows:
         C->>E: extra と config が違う行
         E-->>C: 409 same: false
       ```
+
+      <!-- /map -->
     expected:
       - 1 回目は 409 で `same` が `true`、2 回目は 409 で `same` が `false`
       - '`settings.yaml` が変わらない'
@@ -61,6 +69,8 @@ flows:
       - name: 入力
         description: '`id` が `Sample Docs` の行'
     flow: |-
+      <!-- map: {"title": "異常系（スキーマに通らない・422）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -69,11 +79,13 @@ flows:
         C->>E: id が Sample Docs の行
         E-->>C: 422 errors
       ```
+
+      <!-- /map -->
     expected:
       - 422 で、`errors[]` に `sources[1].id` のパスと理由がある
       - '`settings.yaml` が変わらない'
     test: test_error_when_schema_invalid
-lead: 端末の設定へ配信元の行を 1 行追加する。同じ id の行があれば追加せずに、内容が同じかを返す。
+lead: 端末の設定へ配信元の行を 1 行追加する端末の設定の API の入出力を定め、配信元の 1 行の追加を修正するときに参照する。
 identifier: add_settings_source
 permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ'
 idempotent: false

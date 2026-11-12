@@ -11,6 +11,8 @@ scenarios:
       - name: 端末の設定
         description: '`sources` に sample と notes の 2 行'
     flow: |-
+      <!-- map: {"title": "正常シナリオ"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -25,6 +27,8 @@ scenarios:
         U->>AD: status
         AD-->>U: 新しいバージョンと配信中の配信元
       ```
+
+      <!-- /map -->
     expected:
       - '`update` が新しいバージョンを返す'
       - 再起動の後の `status` が新しいバージョンを返し、`sample` と `notes` を配信している
@@ -38,6 +42,8 @@ scenarios:
         description: 正常シナリオと同じ
         notes: 新しいバージョンが端末の設定のキーを 1 つ改名する移し替えの手順を持つ
     flow: |-
+      <!-- map: {"title": "正常シナリオ（端末の設定が古くなる）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -54,6 +60,8 @@ scenarios:
         MG-->>U: 当てた手順
         U->>AD: restart
       ```
+
+      <!-- /map -->
     expected:
       - '`update` が移し替えが要ることを返し、project-index は再起動しない'
       - '`migrate --plan` は端末の設定を変えず、当てる手順を返す'
@@ -69,6 +77,8 @@ scenarios:
         description: 移し替えの手順を 2 つ持つ新しいバージョン
         notes: 2 つ目の手順が例外を出す
     flow: |-
+      <!-- map: {"title": "異常シナリオ（移し替えの手順が失敗する）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -81,6 +91,8 @@ scenarios:
         MG->>CF: バックアップから戻す
         MG-->>U: 失敗した手順と理由
       ```
+
+      <!-- /map -->
     expected:
       - 端末の設定が `migrate` の前と同じ中身になる
       - 0 以外の終了コードで終わり、標準エラーに失敗した手順の名前と理由が出る
@@ -92,6 +104,8 @@ scenarios:
       - name: project-index のクローン
         description: 上流の新しい commit と同じファイルを手元で書き換え、commit していないクローン
     flow: |-
+      <!-- map: {"title": "異常シナリオ（クローンを更新できない）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -102,6 +116,8 @@ scenarios:
         AD->>DD: クローンで git pull が失敗する
         AD-->>U: git のエラー
       ```
+
+      <!-- /map -->
     expected:
       - '`update` が git のエラーを返す'
       - project-index は再起動せず、`status` が前のバージョンを返す
@@ -118,6 +134,8 @@ scenarios:
         description: '`version: "1"` の `project-index.yaml` を持ち、最上位にタグのマスター `tags: tags.yaml`、`documents[0]` が `type: yaml`・`metadata: {name: {type: ref, field: title}}` を持つ配信元'
         notes: 機械的に移せる設定だけを持つ。`tags.yaml` を置く
     flow: |-
+      <!-- map: {"title": "正常シナリオ（配信元の設定が古くなる）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -132,6 +150,8 @@ scenarios:
         MG->>SC: バックアップを取り、type を消し、ref の metadata を列名の文字列にし、tags を消し、version を書き換える
         MG-->>U: 当てた手順
       ```
+
+      <!-- /map -->
     expected:
       - '`migrate --source --plan` は `project-index.yaml` を変えず、当てる手順と、`tags` の削除が破壊的な手順であることを返す'
       - '`--allow-destructive` を付けない `migrate --source` は `project-index.yaml` を変えず、終了コード 5 で終わる'
@@ -150,6 +170,8 @@ scenarios:
         description: '`version: "1"` の `project-index.yaml` を持ち、`documents[0]` が `type: yaml`・`metadata: {name: {type: ref, field: title}}`、`documents[1]` が `type: markdown`・`defaults: [{paths: [docs/**], tags: [doc]}]` を持つ配信元'
         notes: '`documents[1]` は機械的に移せない'
     flow: |-
+      <!-- map: {"title": "異常シナリオ（配信元の設定に移せない設定がある）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -159,12 +181,14 @@ scenarios:
         MG->>MG: 手順を当てた結果を新しいスキーマで検証し、違反が残る
         MG-->>U: 違反と、/project-index:setup で移す案内
       ```
+
+      <!-- /map -->
     expected:
       - '`project-index.yaml` が `migrate` の前と同じ中身になる'
       - 0 以外の終了コードで終わる
       - 標準エラーに `documents[1].type`（Markdown の範囲）と `documents[1].defaults` の違反と、`/project-index:setup` で移す案内が出る
     test: test_error_when_source_config_unmigratable
-lead: 利用者が管理の MCP の `update` で project-index のクローンを新しいバージョンにし、端末の設定が古くなったら `project-index migrate` で移し替える。
+lead: 利用者が管理の MCP の `update` で project-index を更新し、古くなった設定を `project-index migrate` で移し替えるシナリオを定め、更新の流れを変えるときに参照する。
 issue: 14
 primary_actor: 利用者
 stakeholders:

@@ -14,6 +14,8 @@ flows:
         description: '`source: startup` と `session_id`・`cwd` の JSON を stdin に渡す'
         notes: '`resume`・`fork` も同じ'
     flow: |-
+      <!-- map: {"title": "正常系（待ち受けている）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as Claude Code
@@ -24,6 +26,8 @@ flows:
         H-->>S: ポートへの接続
         H-->>C: 出力なし（終了コード 0）
       ```
+
+      <!-- /map -->
     expected:
       - stdout が空
       - Mock が HTTP の要求を受けていない
@@ -38,6 +42,8 @@ flows:
       - name: 入力
         description: '`source: clear` と `session_id`・`cwd` の JSON を stdin に渡す'
     flow: |-
+      <!-- map: {"title": "正常系（/clear の後）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as Claude Code
@@ -50,6 +56,8 @@ flows:
         A-->>H: forgotten
         H-->>C: 出力なし（終了コード 0）
       ```
+
+      <!-- /map -->
     expected:
       - stdout が空
       - 'Mock が受けた本文が `session_id`・`reason: clear` の JSON で、`cwd` を持たない'
@@ -65,6 +73,8 @@ flows:
       - name: ポート
         description: 空いているポートを `PROJECT_INDEX_PORT` に渡す
     flow: |-
+      <!-- map: {"title": "正常系（落ちている）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as Claude Code
@@ -77,6 +87,8 @@ flows:
         H->>S: 切り離して起動する
         H-->>C: additionalContext（再接続の案内）
       ```
+
+      <!-- /map -->
     expected:
       - Mock が `-m project_index serve` を受けている
       - '`additionalContext` が `/mcp` の再接続の案内'
@@ -93,6 +105,8 @@ flows:
       - name: ポート
         description: 空いているポートを `PROJECT_INDEX_PORT` に渡す
     flow: |-
+      <!-- map: {"title": "正常系（XDG_CONFIG_HOME の下の端末の設定）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as Claude Code
@@ -105,6 +119,8 @@ flows:
         H->>S: 切り離して起動する
         H-->>C: additionalContext（再接続の案内）
       ```
+
+      <!-- /map -->
     expected:
       - '`$XDG_CONFIG_HOME/project-index/settings.yaml` の `clone` の Mock が `-m project_index serve` を受けている'
       - '`XDG_CONFIG_HOME` が相対パスの 2 回目は、`HOME` の下の `.config/project-index/settings.yaml` の `clone` の Mock が受けている'
@@ -120,6 +136,8 @@ flows:
       - name: ポート
         description: 空いているポート
     flow: |-
+      <!-- map: {"title": "正常系（端末の設定が無い）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as Claude Code
@@ -129,6 +147,8 @@ flows:
         H->>H: ポートにつながらず、端末の設定も無い
         H-->>C: additionalContext（理由と global-setup の案内）
       ```
+
+      <!-- /map -->
     expected:
       - 終了コード 0
       - '`additionalContext` に端末の設定のパスと `/project-index:global-setup` がある'
@@ -143,6 +163,8 @@ flows:
       - name: 入力
         description: '`source: compact` と `session_id`・`cwd` の JSON'
     flow: |-
+      <!-- map: {"title": "正常系（記録の削除を依頼できない）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as Claude Code
@@ -154,12 +176,14 @@ flows:
         H->>H: FORGET_TIMEOUT_SEC 秒で打ち切る
         H-->>C: additionalContext（削除できなかったこと・打ち切った秒数と repeat_seen の案内）
       ```
+
+      <!-- /map -->
     expected:
       - '`FORGET_TIMEOUT_SEC` + 1 秒以内に終了コード 0 で戻る'
       - '`additionalContext` に返却済みの記録を削除できなかったこと、打ち切った秒数（`FORGET_TIMEOUT_SEC`）と、前に返却した文書は `repeat_seen: true` で再取得できる旨がある'
       - プロセスを起動していない
     test: test_normal_when_forget_failed
-lead: ポートにつながらなければ `project-index serve` を切り離して起動し、再接続の案内か起動できない理由を文脈に入れる。つながったときは文脈を入れず、`/clear`・圧縮のときだけ `POST /_admin/session-start` で返し済みの記録の削除を依頼する。入力は stdin の JSON と環境変数。
+lead: サーバーの起動と返却済みの記録の削除の依頼をする SessionStart のフックの入出力を定め、セッション開始のフックを修正するときに参照する。
 identifier: hooks/session_start.py
 permissions: 利用者の権限で動く
 idempotent: true
@@ -248,7 +272,7 @@ constraints:
     constraint: '`127.0.0.1:${PROJECT_INDEX_PORT}` への TCP 接続を 0.5 秒で打ち切る'
   - item: 端末の設定のパス
     constraint: '`PROJECT_INDEX_CONFIG`、無ければ `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`。`XDG_CONFIG_HOME` が空の文字列か相対パスなら未設定として扱う'
-    notes: docs/interface/開発ドキュメントサーバー/起動 の `端末の設定と状態の置き場` と同じ規則。フックはサーバーのパッケージを import しないため、同じ規則を持つ
+    notes: '[起動](id:IF-15) の `端末の設定と状態の置き場` と同じ規則を、サーバーのパッケージを import せずに持つ'
   - item: 端末の設定の読み方
     constraint: トップレベルの `clone:` の行だけを読む（`~` を展開し、引用符を外す）
     notes: 標準ライブラリに YAML のパーサーが無いため
@@ -265,5 +289,5 @@ constraints:
     constraint: どの失敗でも終了コード 0 で戻り、セッションを止めない
   - item: 配信元を読み込んでいるサーバー
     constraint: 待ち受けているサーバーが配信元を読み込んでいる間も、`POST /_admin/session-start` は読み込みを待たずに答える。フックの流れは `正常系（待ち受けている）`・`正常系（/clear の後）` と同じ
-    notes: docs/interface/開発ドキュメントサーバー/セッションの開始 の `正常系（配信元を読み込んでいる）`
+    notes: '[セッションの開始](id:IF-21#flows[正常系（配信元を読み込んでいる）])'
 test_file: tests/integration/plugin/test_session_start.py

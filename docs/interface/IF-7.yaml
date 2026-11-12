@@ -15,6 +15,8 @@ flows:
       - name: 入力
         description: '`worktree` にワークツリー x、`targets` に文書 2 と読んだときの `version`'
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -26,6 +28,8 @@ flows:
         T->>WT: 文書 2 のファイルを削除する
         T-->>C: deleted
       ```
+
+      <!-- /map -->
     expected:
       - '`applied: true` で、文書 2 の `status` が `deleted`'
       - ワークツリー x の文書 2 のファイルが無く、クローン本体の文書 2 は残る
@@ -41,6 +45,8 @@ flows:
       - name: 入力
         description: '`targets` に文書 2、`on_referenced: unlink`'
     flow: |-
+      <!-- map: {"title": "正常系（参照も外して消す）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -52,6 +58,8 @@ flows:
         T->>WT: 文書 1 を書き換え、文書 2 のファイルを削除する
         T-->>C: deleted と参照を外した文書
       ```
+
+      <!-- /map -->
     expected:
       - ワークツリー x の文書 2 のファイルが無い
       - 文書 1 の `related` に文書 2 が無い
@@ -65,6 +73,8 @@ flows:
       - name: 入力
         description: '正常系（参照も外して消す）と同じ引数と `dry_run: true`'
     flow: |-
+      <!-- map: {"title": "正常系（試しに消す）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -74,6 +84,8 @@ flows:
         T->>T: 本番と同じ確認
         T-->>C: applied: false、消す文書と参照を外す文書
       ```
+
+      <!-- /map -->
     expected:
       - '`applied` が `false` で、`results` と `unlinked` を返す'
       - ワークツリー x のファイルは変わらない
@@ -88,6 +100,8 @@ flows:
       - name: 入力
         description: '`targets` に文書 2。`on_referenced` は既定'
     flow: |-
+      <!-- map: {"title": "異常系（参照されている・DocumentReferencedError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -97,6 +111,8 @@ flows:
         T->>T: 文書 1 の related が文書 2 を指している
         T-->>C: isError（参照元の id と on_referenced: unlink）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、参照元の文書 1 の `id` と `on_referenced: unlink` で消せることを返す'
       - 文書 2 のファイルも文書 1 も変わらない
@@ -109,6 +125,8 @@ flows:
       - name: 直接編集
         description: 文書 2 を読んで `version` を持った後、ワークツリー x の文書 2 の YAML をテストが書き換える
     flow: |-
+      <!-- map: {"title": "異常系（読んだ後に変わった・VersionMismatchError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -118,6 +136,8 @@ flows:
         T->>T: 今のバージョンと違う
         T-->>C: isError（今のバージョン）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、今のバージョンを返す'
       - 文書 2 のファイルが残る
@@ -131,6 +151,8 @@ flows:
         description: '`scope.write` を持たない Git 管理外の配信元'
         notes: id `notes`
     flow: |-
+      <!-- map: {"title": "異常系（書き込めない配信元・SourceNotWritableError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -139,6 +161,8 @@ flows:
         C->>T: source: notes, targets: notes の文書
         T-->>C: isError（notes は読み取りだけ、使える配信元の一覧）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、notes に書き込めないことと使える配信元の一覧を返す'
       - notes のファイルが残る
@@ -151,6 +175,8 @@ flows:
       - name: 入力
         description: '`cwd` は sample のクローン本体で、`worktree` を渡さない'
     flow: |-
+      <!-- map: {"title": "異常系（消す先がクローン本体・TargetIsCloneError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -159,6 +185,8 @@ flows:
         C->>T: targets: 文書 2
         T-->>C: isError（クローン本体からは消さない、worktree を指すこと）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、クローン本体からは消さないことと `worktree` を指すことを返す'
       - クローン本体の文書 2 が残る
@@ -172,6 +200,8 @@ flows:
         description: Git 管理外の配信元で、種類の `documents[].writable` が `false`
         notes: id `memo`。`scope.write` は sample のフォルダ
     flow: |-
+      <!-- map: {"title": "異常系（削除を許していない種類・DeleteNotAllowedError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -181,6 +211,8 @@ flows:
         T->>T: 種類の writable が削除を許していない
         T-->>C: isError（削除を許していない種類と documents[].writable のパス）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、種類の id と `documents[].writable` が削除を許していないことを返す'
       - memo のファイルが残る
@@ -193,6 +225,8 @@ flows:
       - name: 入力
         description: '`targets` に `doc-9`'
     flow: |-
+      <!-- map: {"title": "異常系（無い文書・DocumentNotFoundError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -201,6 +235,8 @@ flows:
         C->>T: targets: doc-9
         T-->>C: isError（見つからない ID と近い ID の候補）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、`doc-9` と近い ID の候補を返す'
     test: test_error_when_document_not_found
@@ -214,6 +250,8 @@ flows:
       - name: 入力
         description: '`targets` に文書 2、`on_referenced: unlink`'
     flow: |-
+      <!-- map: {"title": "正常系（参照を外した文書の引用符を保つ）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -225,10 +263,12 @@ flows:
         T->>WT: 文書 1 を書き換え、文書 2 のファイルを削除する
         T-->>C: deleted と参照を外した文書
       ```
+
+      <!-- /map -->
     expected:
       - '文書 1 の YAML の、`related` の文書 2 の行以外の行が書き込み前の文字列と一致し、`description: ''2020-12''` と `name: "A: b"` が残る'
     test: test_normal_when_unlink_quotes_preserved
-lead: 文書を配列で受けて物理削除する。他の文書の `related` から参照されているときは断るか、参照も外して消す。
+lead: 文書を物理削除し、`related` からの参照を拒否するか除外する `delete_docs` の入出力を定め、`delete_docs` を修正するときに参照する。
 identifier: delete_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーだけ。Git 管理外の配信元は種類の `documents[].writable` が削除を許すこと
 idempotent: false

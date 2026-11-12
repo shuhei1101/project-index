@@ -12,6 +12,8 @@ flows:
       - name: 端末の設定
         description: 配信元 sample の 1 行
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -25,6 +27,8 @@ flows:
         C->>S: status
         S-->>C: 待ち受けのアドレス・配信元
       ```
+
+      <!-- /map -->
     expected:
       - 応答の `pid` が子プロセスの PID と同じ
       - '`/mcp` の接続を張ったまま `restart` を呼んでも、起動し直した子プロセスがポートの確かめで止まらず待ち受ける'
@@ -40,6 +44,8 @@ flows:
         description: '`script_timeout_sec` の間眠る変換スクリプトを持つ配信元で `try_convert` を呼んでおく'
         notes: 停止の待ちを長くするため
     flow: |-
+      <!-- map: {"title": "異常系（再起動の途中で呼ばれる・RestartInProgressError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -50,11 +56,13 @@ flows:
         C->>T: 2 回目
         T-->>C: isError（RestartInProgressError）
       ```
+
+      <!-- /map -->
     expected:
       - '2 回目が `isError: true` で再起動の途中であることを返す'
       - 起動し直すのは 1 回だけ（ログの起動の行が 1 つ増える）
     test: test_error_when_restart_in_progress
-lead: 応答を返してからサーバーを止め、同じプロセス ID・同じ環境変数で `project-index serve` を起動し直す。
+lead: 応答の後に同じプロセス ID で `project-index serve` を起動し直す管理の MCP の `restart` の入出力を定め、`restart` を修正するときに参照する。
 identifier: restart
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: false

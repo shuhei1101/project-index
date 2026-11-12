@@ -12,6 +12,8 @@ flows:
       - name: サンプルの配信元
         description: '`decisions.folders` の 1 つ目のフォルダにだけ `.mindstella/docs/D-1.md` を置いた sample'
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -20,6 +22,8 @@ flows:
         C->>E: GET /sources/sample/decisions/D-1
         E-->>C: 200 本文
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、`body` が `D-1.md` の本文（変換しない）、`folder` が 1 つ目のフォルダ
     test: test_normal
@@ -31,6 +35,8 @@ flows:
       - name: サンプルの配信元
         description: '`D-2.md` を 2 つのフォルダに置き、`D-3.md` はどのフォルダにも置かない sample'
     flow: |-
+      <!-- map: {"title": "異常系（1 つに決まらない・無い・404）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -41,6 +47,8 @@ flows:
         C->>E: GET /sources/sample/decisions/D-3
         E-->>C: 404 not_found
       ```
+
+      <!-- /map -->
     expected:
       - '`D-2` は 404 で、`missing` が `doc`、`reason` が `ambiguous`、`folders` に 2 つのフォルダ'
       - '`D-3` は 404 で、`missing` が `doc`、`reason` が `not_found`'
@@ -53,6 +61,8 @@ flows:
       - name: 入力
         description: '`/sources/sample/decisions/..%2Fsecret`'
     flow: |-
+      <!-- map: {"title": "異常系（ID の形式に当たらない・404）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -61,10 +71,12 @@ flows:
         C->>E: GET /sources/sample/decisions/..%2Fsecret
         E-->>C: 404 problem+json
       ```
+
+      <!-- /map -->
     expected:
       - 404 で、ファイルを読まない
     test: test_error_when_id_invalid
-lead: '`decisions.folders` のうちちょうど 1 つのフォルダにある検討事項の文書の本文を返す。'
+lead: '`decisions.folders` の 1 つのフォルダにある検討事項の文書の本文を返却する読み取り API の入出力を定め、検討事項の文書の取得を修正するときに参照する。'
 identifier: get_decision
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true

@@ -15,6 +15,8 @@ flows:
       - name: 入力
         description: '`cwd` に sample のクローン本体を入れ、`source` を省く'
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -26,6 +28,8 @@ flows:
         T-->>ST: 文書を読む
         T-->>C: 総件数と id・name・description・chars・version の表
       ```
+
+      <!-- /map -->
     expected:
       - '先頭に `sample: 該当 2 件・返却した 2 件` がある'
       - 表に 2 件が `id` 昇順で並び、各行に `version` がある
@@ -41,6 +45,8 @@ flows:
       - name: 入力
         description: '`filter` は `id` が文書 2・文書 1 の順、`view: full`'
     flow: |-
+      <!-- map: {"title": "正常系（本文を返す）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -51,6 +57,8 @@ flows:
         T-->>ST: 文書を読む
         T-->>C: <document> で包んだ 2 件の YAML
       ```
+
+      <!-- /map -->
     expected:
       - 文書 2・文書 1 の順に、それぞれの YAML が `<document path="{sample のクローン本体}/{文書のパス}" scope="full">` で包まれて返る
       - '`format: json` では文書のオブジェクトの配列を structuredContent と text の両方に入れ、各項目の直下（`values` の外）に `path`（文書の絶対パス）と `scope: full` がある'
@@ -69,6 +77,8 @@ flows:
       - name: 入力
         description: '`view: count`, `group_by: tags`'
     flow: |-
+      <!-- map: {"title": "正常系（件数と集計）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -78,6 +88,8 @@ flows:
         T->>T: タグを正規化してまとめ、文書ごとに 1 件と数える
         T-->>C: 総件数とタグごとの件数
       ```
+
+      <!-- /map -->
     expected:
       - '`total_count` が 2'
       - '`groups` が `a: 2`・`b: 1` で、`Ａ` の行が無い（文書 2 の `a`・`Ａ` を 1 件と数え、付いている文書が多い `a` の表記で返す）'
@@ -93,6 +105,8 @@ flows:
       - name: 入力
         description: '`order_by: [{updated, desc}, {@chars, asc}]`, `limit: 150`、2 回目は `max_chars: 500`'
     flow: |-
+      <!-- map: {"title": "正常系（並べ替えと上限）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -103,6 +117,8 @@ flows:
         C->>T: 同じ引数と max_chars: 500
         T-->>C: 打ち切った結果と next_cursor
       ```
+
+      <!-- /map -->
     expected:
       - 1 回目が 100 件を `updated` の降順、同じ日時は文字数の昇順で返し、`notes` に `limit` を 100 に丸めたことがある
       - '2 回目が `truncated: true` と `next_cursor` を返し、`notes` に `fields` を絞るか `view: ids` で取り直すことがある'
@@ -122,6 +138,8 @@ flows:
       - name: 入力
         description: '`source: *`、`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "正常系（複数の配信元）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -131,6 +149,8 @@ flows:
         T->>T: scope.read に当たる sample と notes を対象にする
         T-->>C: 各行に source が付いた結果と配信元ごとの総件数
       ```
+
+      <!-- /map -->
     expected:
       - 結果の各行に `source`（sample か notes）が付く
       - 総件数を配信元ごとに返す
@@ -146,6 +166,8 @@ flows:
       - name: 入力
         description: 1 回目は `worktree` に x のパス、2 回目は `cwd` を x の中にして `worktree` を省く
     flow: |-
+      <!-- map: {"title": "正常系（ワークツリー）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -157,6 +179,8 @@ flows:
         T-->>WT: 同じ相対パスの設定と文書を読む
         T-->>C: ワークツリーの文書 1
       ```
+
+      <!-- /map -->
     expected:
       - どちらの呼び出しもワークツリーの文書 1 の `name` を返す
       - '`cwd` がクローン本体で `worktree` を省くと、クローン本体の文書 1 を返す'
@@ -170,6 +194,8 @@ flows:
       - name: 入力
         description: '`session_id: s1` で文書 1 を `view: full` で 2 回呼び、3 回目は `repeat_seen: true`'
     flow: |-
+      <!-- map: {"title": "正常系（返し済みの本文）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -185,6 +211,8 @@ flows:
         C->>T: 同じ引数と repeat_seen: true
         T-->>C: 文書 1 の本文
       ```
+
+      <!-- /map -->
     expected:
       - 2 回目の本文が `（この会話で返却済み）` だけになり、`<document>` に属性が無く、json の項目に `path`・`scope` が無い
       - 3 回目は本文を返す
@@ -200,6 +228,8 @@ flows:
       - name: 壊れた YAML
         description: 文書 1 のファイルを YAML として読めない内容にする
     flow: |-
+      <!-- map: {"title": "正常系（読めないファイルがある）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -210,6 +240,8 @@ flows:
         T-->>ST: 文書を読み、文書 1 のファイルを読めない
         T-->>C: 文書 2 と、読めなかったファイルの知らせ
       ```
+
+      <!-- /map -->
     expected:
       - 結果に文書 2 があり、文書 1 は無い
       - '`notes` に文書 1 のファイルのパスと、読めなかった行と列がある'
@@ -225,6 +257,8 @@ flows:
       - name: 入力
         description: '`source: other`、`cwd` は sample のクローン本体。2 回目は `cwd` を省く'
     flow: |-
+      <!-- map: {"title": "異常系（読めない配信元・SourceNotReadableError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -234,6 +268,8 @@ flows:
         T->>T: other の scope に cwd が当たらない
         T-->>C: isError（読めない配信元と、使える配信元の一覧）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、other を読めないことと、今の作業場所から使える配信元の一覧（`describe()` と同じ）を返す'
       - other の文書を返さない
@@ -248,6 +284,8 @@ flows:
         description: '`documents[0]` に必須のキー `paths` が無い配信元。`scope.read` は sample のフォルダ'
         notes: id `broken`
     flow: |-
+      <!-- map: {"title": "異常系（配信していない配信元・SourceNotServedError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -256,6 +294,8 @@ flows:
         C->>T: source: broken
         T-->>C: isError（配信していない配信元、違反したキーのパスと理由）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、broken を配信していないことと `documents[0].paths` の違反を返す'
     test: test_error_when_source_not_served
@@ -267,6 +307,8 @@ flows:
       - name: 入力
         description: '`worktree` に、`worktrees` に当たらない一時フォルダのパス'
     flow: |-
+      <!-- map: {"title": "異常系（ワークツリーに当たらない・WorktreeNotMatchedError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -275,6 +317,8 @@ flows:
         C->>T: worktree: 当たらないパス
         T-->>C: isError（渡したパスと worktrees の値）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、渡したパスと sample の `worktrees` の値を返す'
     test: test_error_when_worktree_not_matched
@@ -286,6 +330,8 @@ flows:
       - name: 入力
         description: 1 回目は `filter.field` にスキーマに無い `nme`、2 回目は数値の項目に `gt` で `abc`
     flow: |-
+      <!-- map: {"title": "異常系（知らない項目・InvalidArgumentError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -295,6 +341,8 @@ flows:
         T->>T: 項目を配信元のスキーマと照らす
         T-->>C: isError（項目のパス・期待する型・実際の値・describe の案内）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、`filter.field` のパス・`nme` と、`describe(source, kind)` でスキーマを見ることを返す'
       - 2 回目は期待する型（数値）と実際の値 `abc` を返す
@@ -308,6 +356,8 @@ flows:
       - name: 入力
         description: '`ref: no-such-branch`'
     flow: |-
+      <!-- map: {"title": "異常系（無いリビジョン・RefNotFoundError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -316,6 +366,8 @@ flows:
         C->>T: ref: no-such-branch
         T-->>C: isError（解決できなかった ref）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、`ref` の `no-such-branch` を解決できなかったことを返す'
       - Git 管理外の配信元に `ref` を渡すと、`ref` を使えないことを返す
@@ -336,6 +388,8 @@ flows:
         description: '`filter` は `id` が `src/a.py`、`view: full`、`format: json`。2 回目は `view: summary` で全件'
         notes: '-'
     flow: |-
+      <!-- map: {"title": "正常系（管理用の YAML の文書）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -347,6 +401,8 @@ flows:
         T->>T: 行の列から共通のメタデータを取り、name が空なら body_file のファイル名にする
         T-->>C: src/a.py の本文と、path・scope を持つ項目
       ```
+
+      <!-- /map -->
     expected:
       - 項目の `id` が `src/a.py`、`values.name` が `a`、`values.tags` が `code` と `auth`、`values.path` が `a.py` になる
       - 項目の直下の `path` が `{sample のクローン本体}/src/a.py`、`scope` が `full` になる
@@ -364,6 +420,8 @@ flows:
         description: '`filter` は `body` の `regex` `^## `、`view: full`、`snippets: {before: 0, after: 1}`。2 回目は同じ引数で `format: json`。3 回目は `filter` を `body` の `contains` `手順`、`snippets: {context_lines: 1}`。4 回目は `filter` を `body` の `regex` `\A\S`（`case_sensitive` は省く）'
         notes: '`^## ` は 3 行目にだけ当たり、8 行目（行の途中の `## `）には当たらない'
     flow: |-
+      <!-- map: {"title": "正常系（正規表現と抜粋）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -375,6 +433,8 @@ flows:
         T->>T: 本文の各行に正規表現を当て、当たった行と後ろ 1 行を行番号つきで切り出す
         T-->>C: <document> の中の 3:## 手順 と 4-{4 行目}
       ```
+
+      <!-- /map -->
     expected:
       - 結果が文書 1 だけで、`<document>` の中に `3:## 手順` と `4-{4 行目}` があり、2 行目と 8 行目は無い
       - '`format: json` の `items[0].snippets` が 1 要素で、`lines` が `{line: 3, text: "## 手順", hit: true}` と `{line: 4, hit: false}`'
@@ -395,6 +455,8 @@ flows:
         description: '`filter` は `and[body の contains 検索, not(@path の glob notes/archive/**)]`、`fields: [@matches]`、`order_by: [{@matches, desc}]`、`format: json`。他の呼び出しは期待値のとおり'
         notes: '-'
     flow: |-
+      <!-- map: {"title": "正常系（当たった数で並べる）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -406,6 +468,8 @@ flows:
         T->>T: not の下を除いた本文の条件で、文書ごとに当たった行を数える
         T-->>C: a（@matches 3）・b（@matches 1）
       ```
+
+      <!-- /map -->
     expected:
       - 結果が `notes/a.md`（`values.@matches` 3）・`notes/b.md`（同 1）の順で、`notes/archive/c.md` が無い
       - '`not` を外すと a（3）・c（2）・b（1）の順になる'
@@ -426,6 +490,8 @@ flows:
         description: '`session_id: s1`、`filter` は `id` が `notes/a.md`、`view: full`、`format: json`。1 回目 `sections: [決まったこと]`、2 回目 `lines: {offset: 3, limit: 2}`、3 回目はどちらも省く'
         notes: '-'
     flow: |-
+      <!-- map: {"title": "正常系（本文の一部）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -440,6 +506,8 @@ flows:
         T->>SD: 全文を返した文書を記録する
         T-->>C: 全文（scope: full）
       ```
+
+      <!-- /map -->
     expected:
       - '1 回目の `values.body` が 6〜8 行目だけで、`scope` が `section`、`ranges` が `[{start_line: 6, end_line: 8}]`、`total_lines` が 10'
       - '2 回目の `values.body` が 3〜4 行目だけで、`ranges` が `[{start_line: 3, end_line: 4}]`'
@@ -461,6 +529,8 @@ flows:
       - name: 入力
         description: '1 回目は `filter` が `kind` が `rule`、2 回目は `kind` が `index`。どちらも `view: summary`'
     flow: |-
+      <!-- map: {"title": "正常系（除外の名前に当たるファイル）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -473,6 +543,8 @@ flows:
         C->>T: filter（kind が index）
         T-->>C: rule-index
       ```
+
+      <!-- /map -->
     expected:
       - 1 回目が `a` と `Rb` の 2 件だけを返す
       - 2 回目が `rule-index` の 1 件を返し、その `kind` が `index` になる
@@ -492,6 +564,8 @@ flows:
         description: '`filter` は `name` の `eq` `決定 1`、`view: summary`、`format: json`。2 回目は `filter` を `title` の `eq` `決定 1`'
         notes: '-'
     flow: |-
+      <!-- map: {"title": "正常系（列名の違う種類を共通のキーで引く）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -503,6 +577,8 @@ flows:
         T->>T: metadata の対応で name を title 列、description を meta.summary 列から取る
         T-->>C: d1（values.name・values.description）
       ```
+
+      <!-- /map -->
     expected:
       - 1 回目が `d1` の 1 件を返し、`values.name` が `決定 1`、`values.description` が `要約 1` になる
       - 2 回目（列名 `title` で絞る）も `d1` を返す
@@ -518,6 +594,8 @@ flows:
       - name: 入力
         description: '`source: other`, `outside_scope: true`, `view: full`。`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "正常系（作業範囲の外を参考に読む）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -531,6 +609,8 @@ flows:
         T->>L: cwd と other を残す
         T-->>C: 作業範囲の外（参考）、文書 2 件の本文
       ```
+
+      <!-- /map -->
     expected:
       - 先頭の行に「作業範囲の外（参考）」があり、other の文書 2 件を返す
       - 各文書の `<document>` に `outside_scope="true"` が付く
@@ -548,6 +628,8 @@ flows:
       - name: 入力
         description: '`source: other`, `outside_scope: true`。`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "異常系（作業範囲の外の参照を断る・SourceNotReadableError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -557,6 +639,8 @@ flows:
         T->>T: scope に cwd が当たらず、outside_read が偽
         T-->>C: isError（読めない配信元）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、other を読めないことを返す'
       - '`fix` が `outside_scope: true` を案内しない'
@@ -575,6 +659,8 @@ flows:
       - name: 入力
         description: '`term: 担当範囲`'
     flow: |-
+      <!-- map: {"title": "正常系（用語で引く）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -584,6 +670,8 @@ flows:
         T->>T: alias_type を持つ行の文書の name・aliases を正規化して比べる
         T-->>C: 文書「作業範囲」
       ```
+
+      <!-- /map -->
     expected:
       - 文書「作業範囲」だけを返し、文書 1 は返さない
       - '`term: 作業範囲`・`term: SCOPE` も同じ文書を返す'
@@ -601,6 +689,8 @@ flows:
       - name: 入力
         description: '`filter` が `tags` の `eq` `mcp`'
     flow: |-
+      <!-- map: {"title": "正常系（オブジェクトの配列のタグ）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -610,13 +700,15 @@ flows:
         T->>T: tags[].name で各要素の name を取り出し、正規化して比べる
         T-->>C: 文書 1・文書 2
       ```
+
+      <!-- /map -->
     expected:
       - '`tags` が `mcp` の条件で文書 1・文書 2 を返す'
       - '`main_tags` が `mcp` の条件で文書 1 だけを返す'
       - '`view: count, group_by: tags` が `MCP` 2・`設計` 2 を返す（`mcp`・`MCP` は 1 つにまとめ、表記は同数なので値の昇順で先の `MCP`）'
       - '`fields: [tags, main_tags]` が文書 1 で `tags: [mcp, 設計]`・`main_tags: [mcp]` を返す'
     test: test_normal_when_tags_are_objects
-lead: '条件に該当する文書を、指定した項目・量・順で返却する。ID で絞れば取得、`view: summary` で一覧、`view: count` で件数、`group_by` で集計になる。'
+lead: '条件に該当する文書の取得・一覧・件数・集計を返却する `search_docs` の入出力を定め、`search_docs` を修正するときに参照する。'
 identifier: search_docs
 permissions: 対象の配信元の `scope.read` か `scope.write` に `cwd` が当たること
 idempotent: true

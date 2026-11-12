@@ -12,6 +12,8 @@ flows:
       - name: 端末の設定
         description: 検証に通る sample、`project-index.yaml` の `documents[0]` に必須のキー `paths` が無い broken、`enabled` が `false` の archive の 3 行
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -20,6 +22,8 @@ flows:
         C->>E: GET /sources
         E-->>C: 200 配信元ごとの状態
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、`sources` に sample（`serving`）・broken（`not_served`）・archive（`disabled`）が端末の設定の順に並ぶ
       - broken の `errors` に `documents[0].paths` のパスと理由がある
@@ -32,6 +36,8 @@ flows:
       - name: 端末の設定
         description: '`sources: []`'
     flow: |-
+      <!-- map: {"title": "正常系（配信元が無い）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -40,10 +46,12 @@ flows:
         C->>E: GET /sources
         E-->>C: 200 空の一覧
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、`sources` が空
     test: test_normal_when_no_source
-lead: 配信元ごとの ID・状態（配信中・配信していない・無効）・配信していない理由を返す。
+lead: 配信元ごとの ID・状態・配信していない理由を返却する読み取り API の入出力を定め、配信元の一覧と状態を修正するときに参照する。
 identifier: list_sources
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true

@@ -11,6 +11,8 @@ scenarios:
       - name: project-index
         description: sample を端末の設定に並べて起動した project-index
     flow: |-
+      <!-- map: {"title": "正常シナリオ"} -->
+
       ```mermaid
       sequenceDiagram
         participant DD as dev-docs の画面のサーバー
@@ -39,6 +41,8 @@ scenarios:
         DD->>PI: 検討事項 D-1 の文書を取得する
         PI-->>DD: D-1 の文書の本文
       ```
+
+      <!-- /map -->
     expected:
       - 配信元の一覧が sample を配信中として返却する
       - 配信元の設定が、`project-index.yaml` の `nav`・`documents[]`・`decisions.folders`・`github` を返却する
@@ -62,6 +66,8 @@ scenarios:
       - name: project-index
         description: sample を端末の設定に並べて起動した project-index
     flow: |-
+      <!-- map: {"title": "正常シナリオ（変換のスクリプトを指す種類の文書）"} -->
+
       ```mermaid
       sequenceDiagram
         participant DD as dev-docs の画面のサーバー
@@ -73,6 +79,8 @@ scenarios:
         DD->>PI: sample の文書 4 を取得する
         PI-->>DD: 変換の失敗（スクリプトと理由）
       ```
+
+      <!-- /map -->
     expected:
       - 文書 3 の取得が、変換のスクリプトが出した Markdown とメタデータを返却する
       - 文書 4 の取得が、変換の失敗に変換のスクリプトと失敗の理由を入れて返却する
@@ -91,6 +99,8 @@ scenarios:
       - name: project-index
         description: sample と broken を端末の設定に並べて起動した project-index
     flow: |-
+      <!-- map: {"title": "異常シナリオ（配信していない配信元を指す）"} -->
+
       ```mermaid
       sequenceDiagram
         participant DD as dev-docs の画面のサーバー
@@ -107,6 +117,8 @@ scenarios:
         DD->>PI: sample の文書 1 を取得する
         PI-->>DD: 文書の値
       ```
+
+      <!-- /map -->
     expected:
       - 配信元の一覧が broken を配信していない配信元として、違反したキーのパスと理由つきで返却する
       - broken の文書の取得・リビジョンの一覧・単語での検索が、配信していない配信元として 404 を返却する
@@ -122,6 +134,8 @@ scenarios:
       - name: project-index
         description: sample を端末の設定に並べて起動した project-index
     flow: |-
+      <!-- map: {"title": "異常シナリオ（無いリビジョンを指す）"} -->
+
       ```mermaid
       sequenceDiagram
         participant DD as dev-docs の画面のサーバー
@@ -132,6 +146,8 @@ scenarios:
         DD->>PI: sample の文書の一覧を、無いブランチ名を指して取得する
         PI-->>DD: 無いリビジョンのエラー
       ```
+
+      <!-- /map -->
     expected:
       - 文書の取得と文書の一覧が、指したリビジョンが無いことをリビジョンの名前つきでエラーとして返却する
       - sample のフォルダのファイルとブランチは変わらない
@@ -146,6 +162,8 @@ scenarios:
       - name: project-index
         description: sample を端末の設定に並べて起動した project-index
     flow: |-
+      <!-- map: {"title": "異常シナリオ（無い文書のパスを指す）"} -->
+
       ```mermaid
       sequenceDiagram
         participant DD as dev-docs の画面のサーバー
@@ -154,6 +172,8 @@ scenarios:
         DD->>PI: sample の範囲に無いパスの文書を取得する
         PI-->>DD: 404（文書が無い）
       ```
+
+      <!-- /map -->
     expected:
       - 文書の取得が、文書が無いことを 404 で返却する
     test: test_error_when_path_not_found
@@ -167,6 +187,8 @@ scenarios:
       - name: project-index
         description: sample を端末の設定に並べて起動した project-index
     flow: |-
+      <!-- map: {"title": "異常シナリオ（検討事項の文書が 1 つに決まらない）"} -->
+
       ```mermaid
       sequenceDiagram
         participant DD as dev-docs の画面のサーバー
@@ -179,12 +201,14 @@ scenarios:
         DD->>PI: 検討事項 D-3 の文書を取得する
         PI-->>DD: 404（文書が無い）
       ```
+
+      <!-- /map -->
     expected:
       - 検討事項の ID の一覧が、`D-2` を当たるフォルダの数 2 で返却する
       - D-2 の取得が、文書が 1 つに決まらないことを、文書のある 2 つのフォルダつきでエラーとして返却する
       - D-3 の取得が、文書が無いことを 404 で返却する
     test: test_error_when_decision_not_unique
-lead: dev-docs の画面のサーバーが読み取り API で、配信元の一覧と状態・配信元の設定・文書の一覧・文書・検討事項の ID の一覧と文書・単語での検索の結果・リビジョンの一覧を取得する。
+lead: dev-docs の画面のサーバーが読み取り API で配信元と文書を取得するシナリオを定め、画面のサーバーからの読み取りの流れを変えるときに参照する。
 issue: 14
 visibility: internal
 primary_actor: dev-docs の画面のサーバー

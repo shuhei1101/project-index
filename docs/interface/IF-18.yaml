@@ -13,6 +13,8 @@ flows:
         description: 'A-42 の例 2（`kind: llm`、`lang: en`、各部品の `texts[]` に `en`・`ja`、`examples[]` に組 `no-logs`、`output` あり）'
         notes: 部品 `logs` は `when` でログがあるときだけ描く。部品 `role` の `en` の本文に `<rules>` を含める
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -24,6 +26,8 @@ flows:
         M->>M: 既定の例と no-logs を Jinja2 で描画する
         M-->>C: Markdown（終了コード 0）
       ```
+
+      <!-- /map -->
     expected:
       - 終了コードが 0
       - '`name` の見出しのあとに `kind`・`lang` のバッジ、`description`、タグと出力の行がある'
@@ -44,6 +48,8 @@ flows:
       - name: フックのプロンプト
         description: 'A-42 の例 1（`kind: hook`、`lang: ja`、各部品の `texts[]` は `ja` だけ）'
     flow: |-
+      <!-- map: {"title": "正常系（言語が 1 つ）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -52,6 +58,8 @@ flows:
         C->>M: 標準入力にフックのプロンプト
         M-->>C: 言語のタブの無い Markdown（終了コード 0）
       ```
+
+      <!-- /map -->
     expected:
       - 終了コードが 0
       - '`<!-- tabs:` が無く、各セクションに `ja` の本文だけがある'
@@ -67,6 +75,8 @@ flows:
         description: 正常系のプロンプトの `examples[]` に、`traits` に文字列を入れた組 `broken` を加える
         notes: '`values: {traits: oops}`'
     flow: |-
+      <!-- map: {"title": "正常系（描画できない組がある）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -76,6 +86,8 @@ flows:
         M->>M: broken の値の型を確かめる
         M-->>C: broken を注意書きにした Markdown（終了コード 0）
       ```
+
+      <!-- /map -->
     expected:
       - 終了コードが 0
       - '`broken` のセクションの各言語のタブに `[!CAUTION]` があり、`traits` と型が合わない理由が載る'
@@ -90,6 +102,8 @@ flows:
         description: 正常系（言語が 1 つ）のプロンプトの `examples[]` に、描画した結果が 1,000 字を超える組 `many-sources` を加える
         notes: 配信元 20 件
     flow: |-
+      <!-- map: {"title": "正常系（字数が上限を超える組がある）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -99,6 +113,8 @@ flows:
         M->>M: 組ごとに描画して字数を数える
         M-->>C: many-sources に注意を付けた Markdown（終了コード 0）
       ```
+
+      <!-- /map -->
     expected:
       - 終了コードが 0
       - '`many-sources` のセクションに字数と 1,000 字を超えたことの `[!WARNING]` があり、描画結果も出ている'
@@ -113,6 +129,8 @@ flows:
         description: YAML として読めない文字列
         notes: '`name: [` のように括弧を閉じない'
     flow: |-
+      <!-- map: {"title": "異常系（YAML として読めない・PromptYamlError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -121,6 +139,8 @@ flows:
         C->>M: 標準入力に読めない YAML
         M-->>C: stderr に理由（終了コード 1）
       ```
+
+      <!-- /map -->
     expected:
       - 終了コードが 1
       - 標準出力が空で、標準エラーに YAML を読めない理由がある
@@ -133,6 +153,8 @@ flows:
       - name: 標準入力
         description: 正常系のプロンプトから `parts` を除いた YAML
     flow: |-
+      <!-- map: {"title": "異常系（変換に使うキーが無い・InvalidPrompt）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -141,6 +163,8 @@ flows:
         C->>M: 標準入力に parts の無いプロンプト
         M-->>C: stderr にキーのパス（終了コード 1）
       ```
+
+      <!-- /map -->
     expected:
       - 終了コードが 1
       - 標準出力が空で、標準エラーに `parts` と、それが無いことがある
@@ -153,6 +177,8 @@ flows:
       - name: LLM のプロンプト
         description: 正常系のプロンプトの部品 `logs` の本文から `{% endif %}` を外す
     flow: |-
+      <!-- map: {"title": "正常系（構文の誤った部品がある）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -162,12 +188,14 @@ flows:
         M->>M: 部品ごとにテンプレートにする
         M-->>C: logs を注意書きにした Markdown（終了コード 0）
       ```
+
+      <!-- /map -->
     expected:
       - 終了コードが 0
       - 部品 `logs` のセクションと「既定の例」「ログが無い」のセクションに `[!CAUTION]` があり、`logs`・行・構文の誤りの理由が載る
       - 変数の表と `logs` 以外の部品のセクションは正常系と同じに出ている
     test: test_normal_when_part_syntax_invalid
-lead: 標準入力のプロンプトの YAML 1 件（キーは knowledge の `schemas/prompt.schema.yaml`）を、変数の表・テンプレート・例の組ごとの描画のセクションを持つ Markdown にして標準出力に出す。配信元の `converters[].run` から呼ぶ。
+lead: プロンプトの YAML を変数の表・テンプレート・例の描画を持つ Markdown にする `project-index prompt-doc` の入出力を定め、プロンプトの文書の変換を修正するときに参照する。
 identifier: prompt-doc
 permissions: 制限なし（標準入力だけを読む）
 idempotent: true

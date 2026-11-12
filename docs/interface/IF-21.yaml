@@ -12,6 +12,8 @@ flows:
       - name: 返し済みの記録
         description: 同じ `session_id` で `search_docs` を呼び、文書を 1 件返した状態
     flow: |-
+      <!-- map: {"title": "正常系（/clear の後）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -22,6 +24,8 @@ flows:
         T->>M: session_id の記録を削除する
         T-->>C: forgotten: true
       ```
+
+      <!-- /map -->
     expected:
       - '`forgotten` が `true`'
       - 同じ `session_id` で続けて呼んだ `search_docs` が、前に返した文書の本文を省かずに返す
@@ -34,6 +38,8 @@ flows:
       - name: 返し済みの記録
         description: 同じ `session_id` で `search_docs` を呼び、文書を 1 件返した状態
     flow: |-
+      <!-- map: {"title": "正常系（記録を削除しない理由）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -42,6 +48,8 @@ flows:
         C->>T: session_id・reason: resume
         T-->>C: forgotten: false
       ```
+
+      <!-- /map -->
     expected:
       - '`forgotten` が `false`'
       - 同じ `session_id` で続けて呼んだ `search_docs` が、前に返した文書の本文を `（この会話で返却済み）` にする
@@ -53,6 +61,8 @@ flows:
         description: 配信元の読み込み（`load_source`）を、テストが合図を出すまで止めるものに差し替える
         notes: 合図は `threading.Event`
     flow: |-
+      <!-- map: {"title": "正常系（配信元を読み込んでいる）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -61,6 +71,8 @@ flows:
         C->>T: session_id・reason: compact
         T-->>C: forgotten: true
       ```
+
+      <!-- /map -->
     expected:
       - 合図を出す前に 200 を返す
       - '`forgotten` が `true`'
@@ -73,6 +85,8 @@ flows:
       - name: 入力
         description: '`reason: restart` と `session_id`'
     flow: |-
+      <!-- map: {"title": "異常系（入力が不正・422）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -81,11 +95,13 @@ flows:
         C->>T: session_id・reason: restart
         T-->>C: 422（Problem Details）
       ```
+
+      <!-- /map -->
     expected:
       - 422 で `reason` の違反を返す
       - 同じ `session_id` の返し済みの記録が残っている
     test: test_error_when_input_invalid
-lead: SessionStart のフックが `/clear`・圧縮の後に呼び、そのセッションの返し済みの記録を削除する。文脈の文は返さない。
+lead: '`/clear`・圧縮の後にセッションの返却済みの記録を削除する `POST /_admin/session-start` の入出力を定め、セッションの開始の処理を修正するときに参照する。'
 identifier: post_session_start
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true

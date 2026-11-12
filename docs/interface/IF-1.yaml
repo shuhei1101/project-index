@@ -14,6 +14,8 @@ flows:
       - name: 入力
         description: 引数なし。`cwd` は sample のクローン本体
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -23,6 +25,8 @@ flows:
         T->>T: 各配信元の scope に cwd を照らす
         T-->>C: 作業場所と、使える配信元の表
       ```
+
+      <!-- /map -->
     expected:
       - 先頭に作業場所と、sample のクローン本体であることがある
       - sample を `write（作業中）`、notes を `read` として返す
@@ -38,6 +42,8 @@ flows:
       - name: 入力
         description: 引数なし。`cwd` は sample のクローン本体
     flow: |-
+      <!-- map: {"title": "正常系（使える配信元の警告）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -48,6 +54,8 @@ flows:
         T->>T: 検証で外した配信元を集める
         T-->>C: 作業場所と使える配信元の表、注意の一覧
       ```
+
+      <!-- /map -->
     expected:
       - 使える配信元の表の後に「注意」の見出しと、sample の管理用の YAML に無いファイル 1 件・old の設定が古いこと（`project-index migrate` の案内）・broken を配信していないこと（理由のキーのパス）の行がある
       - '`format: json` の `warnings` が同じ 3 件の文を持つ'
@@ -63,6 +71,8 @@ flows:
       - name: 入力
         description: 引数なし。`cwd` はどの配信元の `scope` にも当たらない一時フォルダ
     flow: |-
+      <!-- map: {"title": "正常系（使える配信元が無い）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -73,6 +83,8 @@ flows:
         T->>T: 検証で外した配信元を集める
         T-->>C: 作業場所、setup の案内、注意の一覧
       ```
+
+      <!-- /map -->
     expected:
       - 配信元の表の代わりに、使える配信元が無いことと `/project-index:setup` で配信元にできることの行がある
       - 「注意」の見出しの下に、broken を配信していないこと（理由のキーのパス）の行がある
@@ -88,6 +100,8 @@ flows:
       - name: 入力
         description: '`write_docs` で memo の `src` の行に `extra0.py` を作り、引数なしの `describe` を呼ぶ。`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "正常系（書き込みの後の警告）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -102,6 +116,8 @@ flows:
         C->>T: 引数なし（検査を終えた後）
         T-->>C: memo の警告が無い
       ```
+
+      <!-- /map -->
     expected:
       - 書き込みの前の引数なしの一覧に、memo の管理用の YAML に無いファイル 1 件の警告がある
       - 裏の検査を終えた後の引数なしの一覧に、memo の警告が無い
@@ -116,6 +132,8 @@ flows:
       - name: 入力
         description: '`source: sample`'
     flow: |-
+      <!-- map: {"title": "正常系（配信元の説明書）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -126,6 +144,8 @@ flows:
         T-->>CF: マージした設定を読む
         T-->>C: 説明書と種類の表
       ```
+
+      <!-- /map -->
     expected:
       - '`instructions` の本文がそのままある'
       - 種類の表に sample の種類の `id` と説明がある
@@ -140,6 +160,8 @@ flows:
       - name: 入力
         description: '`source: sample`, `kind` は sample の種類'
     flow: |-
+      <!-- map: {"title": "正常系（種類のスキーマ）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -150,6 +172,8 @@ flows:
         T-->>ST: 種類のスキーマを読む
         T-->>C: 共通のキーと列名の対応と、スキーマの YAML
       ```
+
+      <!-- /map -->
     expected:
       - 種類のスキーマのファイルと同じ YAML を返す
       - スキーマの前に、`name` → `title`・`description` → `meta.summary` の対応の表がある
@@ -167,6 +191,8 @@ flows:
       - name: 入力
         description: '`source: sample`, `kind: note`（sample の行は `schema: {source: schemas, path: schemas/note.schema.yaml, ref: v1}`）'
     flow: |-
+      <!-- map: {"title": "正常系（ほかの配信元のスキーマ）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -177,6 +203,8 @@ flows:
         T-->>G: v1 の note.schema.yaml と common.schema.yaml
         T-->>C: v1 のスキーマ
       ```
+
+      <!-- /map -->
     expected:
       - 返すスキーマに、`common.schema.yaml` の定義が v1 の内容で入り、`extra` が無い
       - '`worktree` を渡しても、参照したリビジョンのスキーマを返す'
@@ -189,6 +217,8 @@ flows:
       - name: 入力
         description: '`source: other`、`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "異常系（読めない配信元・SourceNotReadableError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -197,6 +227,8 @@ flows:
         C->>T: source: other
         T-->>C: isError（読めない配信元と、使える配信元の一覧）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、other を読めないことと、引数なしと同じ配信元の一覧を返す'
       - other の説明書を返さない
@@ -210,6 +242,8 @@ flows:
         description: '`documents[0].paths` が無い配信元。`scope.read` は sample のフォルダ'
         notes: id `broken`
     flow: |-
+      <!-- map: {"title": "異常系（配信していない配信元・SourceNotServedError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -218,6 +252,8 @@ flows:
         C->>T: source: broken
         T-->>C: isError（配信していない配信元、違反したキーのパスと理由）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、broken を配信していないことと `documents[0].paths` の違反を返す'
       - 引数なしの一覧に broken が出ない
@@ -230,6 +266,8 @@ flows:
       - name: 入力
         description: '`source: sample`, `kind: no-such-kind`'
     flow: |-
+      <!-- map: {"title": "異常系（知らない種類・UnknownKindError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -238,6 +276,8 @@ flows:
         C->>T: source: sample, kind: no-such-kind
         T-->>C: isError（知らない種類と、種類の一覧）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、`no-such-kind` と sample の種類の一覧を返す'
     test: test_error_when_unknown_kind
@@ -251,6 +291,8 @@ flows:
       - name: 入力
         description: '`source: other`, `outside_scope: true`。`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "正常系（作業範囲の外を参考に読む）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -262,6 +304,8 @@ flows:
         T->>L: cwd と other を残す
         T-->>C: 作業範囲の外（参考）、説明書と種類の表
       ```
+
+      <!-- /map -->
     expected:
       - 先頭の行に「作業範囲の外（参考）」があり、other の説明書と種類の表が続く
       - '`format: json` の `outside_scope` が `true`'
@@ -279,6 +323,8 @@ flows:
       - name: 入力
         description: '`source: other`, `outside_scope: true`。`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "異常系（作業範囲の外の参照を断る・SourceNotReadableError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -288,6 +334,8 @@ flows:
         T->>T: scope に cwd が当たらず、outside_read が偽
         T-->>C: isError（読めない配信元）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、other を読めないことを返す'
       - '`fix` が `outside_scope: true` を案内しない'
@@ -304,6 +352,8 @@ flows:
       - name: 入力
         description: '`outside_scope: true`（`source` なし）。`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "正常系（作業範囲の外で読める配信元の一覧）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -314,6 +364,8 @@ flows:
         T->>T: scope に当たらず outside_read が真の配信元を集める
         T-->>C: 作業場所と使える配信元の表、作業範囲の外（参考）で読める配信元の表
       ```
+
+      <!-- /map -->
     expected:
       - 作業場所と使える配信元の表は、引数なしの正常系と同じ（sample・notes）
       - 続けて「作業範囲の外（参考）」の見出しと、other の ID と `description` の行を持つ表がある
@@ -335,6 +387,8 @@ flows:
       - name: 入力
         description: '`source: sample`。`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "正常系（ブランチとワークツリー）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -345,13 +399,15 @@ flows:
         T->>G: ブランチ・タグとワークツリーの一覧を引く
         T-->>C: 説明書と種類の表、ブランチ・タグ、ワークツリーの表
       ```
+
+      <!-- /map -->
     expected:
       - '`refs.branches` に `develop`・`feat/x` がある'
       - '`refs.tags` に `v0.1.0` がある'
       - '`worktrees` に `.claude/worktrees/x` の絶対パスと `branch: feat/x` があり、`../outside` は無い'
       - Git 管理外の配信元では `refs`・`worktrees` を返さない
     test: test_normal_when_refs_and_worktrees
-lead: '引数の数で、使える配信元の一覧・配信元の説明書と種類の一覧・種類のスキーマを返す。`source` を省いた `outside_scope: true` では、作業範囲の外で読める配信元の一覧も返す。'
+lead: '引数の数で配信元の一覧・説明書と種類・種類のスキーマを返却する `describe` の入出力を定め、`describe` を修正するときに参照する。'
 identifier: describe
 permissions: 引数なしは不要。`source` を渡すときはその配信元の `scope.read` か `scope.write` に `cwd` が当たること
 idempotent: true

@@ -15,6 +15,8 @@ scenarios:
         description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
         notes: '`sources` に sample と notes の 2 行'
     flow: |-
+      <!-- map: {"title": "正常シナリオ"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -31,6 +33,8 @@ scenarios:
         DD->>DD: 127.0.0.1:8786 で待ち受ける
         DD-->>U: 待ち受けたアドレスと配信している配信元を標準出力に出す
       ```
+
+      <!-- /map -->
     expected:
       - '`127.0.0.1:8786` で待ち受け、`0.0.0.0` では待ち受けない'
       - 読み取り API の sample の文書の取得と読み取り API の notes の文書の取得が 200 を返す
@@ -49,6 +53,8 @@ scenarios:
         description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
         notes: sample の `config` が `[project-index.yaml, project-index.local.yaml]` の順
     flow: |-
+      <!-- map: {"title": "正常シナリオ（設定の YAML を重ねる）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -61,6 +67,8 @@ scenarios:
         DD->>DD: マージした設定をスキーマで検証する
         DD-->>U: sample を配信する
       ```
+
+      <!-- /map -->
     expected:
       - '`describe(source: sample)` の説明が後の YAML の `description` になる'
       - '`id` が同じ `documents[]` の行は後の YAML の `paths` の文書を返し、前の YAML だけにある `paths` の文書は返さない'
@@ -77,6 +85,8 @@ scenarios:
         description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
         notes: '`sources` に old の 1 行'
     flow: |-
+      <!-- map: {"title": "正常シナリオ（設定のバージョンが古い）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -87,6 +97,8 @@ scenarios:
         DD->>DD: 古い設定の配信元として状態に持つ
         DD-->>U: old を配信する
       ```
+
+      <!-- /map -->
     expected:
       - 読み取り API の old の文書の取得が 200 を返す
       - 警告のログに old の id・設定のバージョン・サーバーが読めるバージョンが残る
@@ -107,6 +119,8 @@ scenarios:
         description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
         notes: '`sources` に sample と broken の 2 行'
     flow: |-
+      <!-- map: {"title": "異常シナリオ（設定の検証に失敗する）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -118,6 +132,8 @@ scenarios:
         DD->>DD: broken を配信せず、エラーログに残す
         DD-->>U: sample だけを配信する
       ```
+
+      <!-- /map -->
     expected:
       - 読み取り API の broken の文書の取得が 404 を返し、読み取り API の sample の文書の取得と `/mcp` は応答する
       - 'エラーログに `broken: documents[0].paths: 必須のキーが無い` の形で、配信元の id・違反したキーのパス・理由が残る'
@@ -137,6 +153,8 @@ scenarios:
         description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
         notes: '`sources` に sample と noscript の 2 行'
     flow: |-
+      <!-- map: {"title": "異常シナリオ（スクリプトを実行できない）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -147,6 +165,8 @@ scenarios:
         DD->>DD: noscript を配信せず、エラーログに残す
         DD-->>U: sample だけを配信する
       ```
+
+      <!-- /map -->
     expected:
       - 読み取り API の noscript の文書の取得が 404 を返し、読み取り API の sample の文書の取得は応答する
       - エラーログに noscript の id・`converters[0]` のキーのパス・スクリプトが見つからない理由が残る
@@ -159,6 +179,8 @@ scenarios:
         description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
         notes: '`sources[0]` に必須のキー `config` が無く、`port` が整数でない'
     flow: |-
+      <!-- map: {"title": "異常シナリオ（端末の設定がスキーマに違反する）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -168,6 +190,8 @@ scenarios:
         DD->>DD: 端末の設定の検証に失敗する
         DD-->>U: 違反を標準エラーに出して終わる
       ```
+
+      <!-- /map -->
     expected:
       - プロセスが 0 以外の終了コードで終わり、ポートを待ち受けない
       - '標準エラーに `{ファイル}: sources[0].config: 必須のキーが無い` の形で違反が全て並ぶ'
@@ -183,6 +207,8 @@ scenarios:
         description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
         notes: '`sources` に検証に通る 1 行'
     flow: |-
+      <!-- map: {"title": "異常シナリオ（ポートが使用中）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -192,6 +218,8 @@ scenarios:
         DD->>DD: ポートで待ち受けられない
         DD-->>U: ポートと PROJECT_INDEX_PORT を標準エラーに出して終わる
       ```
+
+      <!-- /map -->
     expected:
       - プロセスが 0 以外の終了コードで終わる
       - 標準エラーに使用中のポートの番号と、`PROJECT_INDEX_PORT` で変えられることが出る
@@ -211,6 +239,8 @@ scenarios:
         description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
         notes: '`sources` に sample の 1 行'
     flow: |-
+      <!-- map: {"title": "正常シナリオ（文書のメタデータと管理用の YAML がずれている）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -226,6 +256,8 @@ scenarios:
         DD->>DD: 件数を警告のログに残す（配信元の状態には持たない）
         DD-->>U: sample を配信する
       ```
+
+      <!-- /map -->
     expected:
       - 読み取り API の sample の文書の取得が 200 を返す
       - 警告のログに sample の id と、行 `rules` の `metadata` の列の欠け 1 件（`name` の `title`）が残る
@@ -243,6 +275,8 @@ scenarios:
         description: '`clone` がテスト用のクローン、`sources` に sample（読み書き）と notes（読み取りだけ）の 2 行'
         notes: project-index は待ち受けていない。ポート 8786 が空き
     flow: |-
+      <!-- map: {"title": "正常シナリオ（SessionStart で起動する）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -258,6 +292,8 @@ scenarios:
         U->>CC: /mcp でつなぎ直す
         CC->>DD: /mcp のツールの一覧を取る
       ```
+
+      <!-- /map -->
     expected:
       - フックが 0 の終了コードで戻り、セッションの文脈に `/mcp` の再接続の案内が入る
       - '`127.0.0.1:8786` を待ち受ける project-index のプロセスが 1 つだけあり、セッションを終えても残る'
@@ -274,6 +310,8 @@ scenarios:
         description: '`$XDG_CONFIG_HOME/project-index/settings.yaml`。`clone` がテスト用のクローン、`sources` に sample の 1 行'
         notes: project-index は待ち受けていない。ポート 8786 が空き
     flow: |-
+      <!-- map: {"title": "正常シナリオ（SessionStart で XDG_CONFIG_HOME の下の端末の設定から起動する）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -290,6 +328,8 @@ scenarios:
         U->>CC: /mcp でつなぎ直す
         CC->>DD: /mcp のツールの一覧を取る
       ```
+
+      <!-- /map -->
     expected:
       - フックが 0 の終了コードで戻り、セッションの文脈に `/mcp` の再接続の案内が入る
       - '`127.0.0.1:8786` を待ち受ける project-index のプロセスが 1 つだけあり、端末の設定の `clone` のクローンから起動している'
@@ -302,6 +342,8 @@ scenarios:
       - name: project-index
         description: SessionStart で起動する正常シナリオと同じ端末の設定で待ち受けている project-index
     flow: |-
+      <!-- map: {"title": "正常シナリオ（待ち受けているサーバーがあるときは文脈を注入しない）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -315,6 +357,8 @@ scenarios:
         HK-->>CC: 文脈を追加せずに戻る
         CC->>DD: /mcp につながる
       ```
+
+      <!-- /map -->
     expected:
       - フックが 0 の終了コードで戻り、セッションの文脈に project-index の配信元の一覧・使い方・警告・再接続の案内が入らない
       - project-index のプロセスは増えない
@@ -326,6 +370,8 @@ scenarios:
       - name: Claude Code の設定の場所
         description: env の `PROJECT_INDEX_CONFIG` が無いファイルを指す
     flow: |-
+      <!-- map: {"title": "異常シナリオ（SessionStart で起動できない）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -337,6 +383,8 @@ scenarios:
         HK->>HK: ポートにつながらず、端末の設定を読めない
         HK-->>CC: 0 の終了コードで戻り、理由と /project-index:global-setup の案内を文脈に追加する
       ```
+
+      <!-- /map -->
     expected:
       - フックが 0 の終了コードで戻り、セッションは続く
       - セッションの文脈に、端末の設定を読めなかった理由と `/project-index:global-setup` の案内が入る
@@ -357,6 +405,8 @@ scenarios:
         description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
         notes: '`sources` に sample と legacy の 2 行'
     flow: |-
+      <!-- map: {"title": "異常シナリオ（配信元の設定が前の形式）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -368,6 +418,8 @@ scenarios:
         DD->>DD: legacy を配信せず、違反と設定のバージョンが古いことをエラーログに残す
         DD-->>U: sample だけを配信する
       ```
+
+      <!-- /map -->
     expected:
       - 読み取り API の legacy の文書の取得が 404 を返し、読み取り API の sample の文書の取得は応答する
       - エラーログに legacy の id と、`tags`・`documents[0].type`・`documents[1].type`・`documents[1].defaults`・`documents[1].metadata.name` のそれぞれの違反が残る
@@ -386,6 +438,8 @@ scenarios:
         description: sample の `.claude/worktrees/develop`（`develop` を checkout）
         notes: 配信元の設定の `worktrees` は既定（`[./.claude/worktrees/*]`）
     flow: |-
+      <!-- map: {"title": "正常シナリオ（設定とスキーマを default_ref から読む）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -402,6 +456,8 @@ scenarios:
         S->>G: default_ref の commit を確かめ、変わっていれば組み立て直す
         S-->>U: 種類の一覧（kind_a・kind_b を含む）
       ```
+
+      <!-- /map -->
     expected:
       - 'クローン本体が `master` のままでも、起動直後の `describe(source: sample)` の種類の一覧に `kind_a` が載る'
       - '`documents[].schema` のスキーマを `develop` から読む'
@@ -422,6 +478,8 @@ scenarios:
       - name: 端末の設定
         description: '`sources[].config` が `project-index.local.yaml` の 1 つだけを指す'
     flow: |-
+      <!-- map: {"title": "正常シナリオ（.gitignore した設定を先頭に置く）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -436,6 +494,8 @@ scenarios:
         S->>S: 配信元を組み立てる
         S-->>U: sample を配信する
       ```
+
+      <!-- /map -->
     expected:
       - '`describe(source: sample)` の種類の一覧に `kind_a` が載る'
       - '`documents[].schema` のスキーマを `develop` から読む'
@@ -455,6 +515,8 @@ scenarios:
         description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
         notes: '`sources` に sample と uncommitted の 2 行'
     flow: |-
+      <!-- map: {"title": "異常シナリオ（先頭の設定が default_ref に無く無視もしていない）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -465,6 +527,8 @@ scenarios:
         DD->>DD: uncommitted を配信せず、エラーログに残す
         DD-->>U: sample だけを配信する
       ```
+
+      <!-- /map -->
     expected:
       - 読み取り API の uncommitted の文書の取得が 404 を返し、読み取り API の sample の文書の取得は応答する
       - 'エラーログに `uncommitted: config[0]: develop に project-index.yaml がありません` が残る'
@@ -481,6 +545,8 @@ scenarios:
       - name: 状態の置き場の上書き
         description: 2 回目の起動だけ `PROJECT_INDEX_STATE_DIR` に別の一時フォルダを入れる
     flow: |-
+      <!-- map: {"title": "正常シナリオ（XDG の環境変数で置き場を決める）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -495,6 +561,8 @@ scenarios:
         DD->>FS: 状態とログを PROJECT_INDEX_STATE_DIR に書く
         DD-->>U: sample を配信する
       ```
+
+      <!-- /map -->
     expected:
       - 1 回目の起動で読み取り API の sample の文書の取得が 200 を返す
       - 1 回目の起動のログが `$XDG_STATE_HOME/project-index/logs` にでき、`~/.local/state/project-index` には書かない
@@ -509,6 +577,8 @@ scenarios:
       - name: 0 件に当たる nav の条件
         description: sample の `nav` に、どの文書にも付いていないタグ `none` を `auto` の `filter`（`tags` が `none`）に記載したタブを置く
     flow: |-
+      <!-- map: {"title": "正常シナリオ（エイリアスのキーと nav の条件を検証する）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -519,13 +589,15 @@ scenarios:
         S->>S: nav の auto の条件に当たる文書を数える
         S-->>U: 警告（エイリアスのキーの違反・0 件の条件）と配信の開始
       ```
+
+      <!-- /map -->
     expected:
       - 起動時の警告に、違反した文書のパスとエイリアスのキーの違反の内容が出る
       - 起動時の警告に、0 件に当たる `nav` のタブと条件が出る
       - 警告があっても配信を始める
       - 違反した文書は `search_docs` の `term`・`list_match_words` に載らない
     test: test_normal_when_alias_and_nav_warned
-lead: 利用者が `project-index serve` を実行し、端末の設定に並べた配信元を 1 プロセス・1 ポートで配信し始める。
+lead: 利用者が `project-index serve` で端末の設定の配信元を配信し始めるシナリオを定め、起動の流れを変えるときに参照する。
 issue: 14
 primary_actor: 利用者
 stakeholders:

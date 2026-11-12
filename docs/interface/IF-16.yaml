@@ -14,6 +14,8 @@ flows:
       - name: 端末の設定
         description: '`version: "1"` で改名前のキーを持つ'
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -28,6 +30,8 @@ flows:
         M->>F: 手順を当てて version を書き換える
         M-->>C: 当てた手順とバックアップのパス（終了コード 0）
       ```
+
+      <!-- /map -->
     expected:
       - '`--plan` が手順を 1 行出し、端末の設定が変わらない'
       - 適用の後、端末の設定の `version` が `"2"` で、キーが改名され、他の値が変わらない
@@ -42,6 +46,8 @@ flows:
       - name: 端末の設定
         description: 正常系と同じ
     flow: |-
+      <!-- map: {"title": "正常系（バージョンだけを記録する）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -52,6 +58,8 @@ flows:
         M->>F: version だけを書き換える
         M-->>C: 終了コード 0
       ```
+
+      <!-- /map -->
     expected:
       - '`version` が `"2"` で、改名前のキーがそのまま残る'
     test: test_normal_when_record_only
@@ -64,6 +72,8 @@ flows:
         description: '`version: "1"` の `project-index.yaml` を持つ sample。最上位にタグのマスター `tags: tags.yaml` を持ち、`documents[0]` が `type: yaml`・`metadata: {name: {type: ref, field: title}, alias_type: {type: custom, value: term}}` を持つ'
         notes: '`tags.yaml` を置く'
     flow: |-
+      <!-- map: {"title": "正常系（配信元の設定）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -74,6 +84,8 @@ flows:
         M->>F: バックアップを取り、手順を当てる
         M-->>C: 終了コード 0
       ```
+
+      <!-- /map -->
     expected:
       - '`project-index.yaml` の `version` が `"3"`'
       - '`documents[0]` が `type` を持たず、`metadata` が `{name: title}`、行の `alias_type` が `term` になる'
@@ -88,6 +100,8 @@ flows:
       - name: 端末の設定
         description: '`version` のキーを持たない'
     flow: |-
+      <!-- map: {"title": "異常系（設定が読めない・ConfigInvalid）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -96,6 +110,8 @@ flows:
         C->>M: フラグなし
         M-->>C: 違反（終了コード 2）
       ```
+
+      <!-- /map -->
     expected:
       - 終了コード 2 で stderr に `version` が無いことを出す
       - 端末の設定が変わらず、バックアップも作らない
@@ -108,6 +124,8 @@ flows:
       - name: 移し替えの手順
         description: 必須のキーを消す誤った手順（破壊的でないと宣言する）
     flow: |-
+      <!-- map: {"title": "異常系（手順が失敗する・MigrationFailed）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -120,6 +138,8 @@ flows:
         M->>F: バックアップから戻す
         M-->>C: 失敗した手順と理由（終了コード 4）
       ```
+
+      <!-- /map -->
     expected:
       - 終了コード 4 で stderr に失敗した手順と違反したキーを出す
       - 端末の設定の中身が適用前と同じ
@@ -132,6 +152,8 @@ flows:
       - name: 移し替えの手順
         description: キーを削除する破壊的な手順
     flow: |-
+      <!-- map: {"title": "異常系（破壊的な手順がある・DestructiveStepBlocked）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -140,6 +162,8 @@ flows:
         C->>M: フラグなし
         M-->>C: 破壊的な手順（終了コード 5）
       ```
+
+      <!-- /map -->
     expected:
       - 終了コード 5 で stderr に破壊的な手順を出す
       - 端末の設定が変わらず、バックアップも作らない
@@ -153,6 +177,8 @@ flows:
       - name: 端末の設定
         description: '`version: "99"`'
     flow: |-
+      <!-- map: {"title": "異常系（設定が新しい・ConfigNewer）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -161,6 +187,8 @@ flows:
         C->>M: フラグなし
         M-->>C: project-index の更新の案内（終了コード 6）
       ```
+
+      <!-- /map -->
     expected:
       - 終了コード 6 で stderr に project-index の更新の案内を出す
       - 端末の設定が変わらない
@@ -173,6 +201,8 @@ flows:
       - name: 配信元
         description: '`version: "1"` の `project-index.yaml` を持つ sample。`documents[0]` が `type: yaml`・`metadata: {name: {type: ref, field: title}}`、`documents[1]` が `type: markdown`・`defaults: [{paths: [docs/**], tags: [doc]}]`、`documents[2]` が `metadata: {tags: {type: custom, value: [x]}}` を持つ'
     flow: |-
+      <!-- map: {"title": "異常系（配信元の設定に移せない設定がある・MigrationFailed）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -183,11 +213,13 @@ flows:
         M->>M: 手順を当てた結果を新しいスキーマで検証し、違反が残る
         M-->>C: 違反と /project-index:setup の案内（終了コード 4）
       ```
+
+      <!-- /map -->
     expected:
       - 終了コード 4 で stderr に `documents[1].type`・`documents[1].defaults`・`documents[2].metadata.tags` の違反と、`/project-index:setup` で管理用の YAML へ移す案内を出す
       - '`project-index.yaml` の中身が適用前と同じ（`documents[0]` も書き換わらない）'
     test: test_error_when_source_config_unmigratable
-lead: 端末の設定か配信元の `project-index.yaml` の `version` を project-index が読めるバージョンと比べ、移し替えの手順を古い順に当てる。
+lead: 端末の設定か配信元の設定の `version` を比べて移し替えの手順を適用する `project-index migrate` の入出力を定め、設定の移し替えを修正するときに参照する。
 identifier: migrate
 permissions: 対象の設定ファイルを書き換えられる利用者
 idempotent: true

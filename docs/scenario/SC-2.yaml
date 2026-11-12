@@ -16,6 +16,8 @@ scenarios:
         description: テスト用の一時フォルダの `settings.yaml`
         notes: ファイルは無い。場所の質問にこのパスを答える（既定の `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml` と違う場所）
     flow: |-
+      <!-- map: {"title": "正常シナリオ"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -35,6 +37,8 @@ scenarios:
         SK->>DD: /mcp につながり、ツールの一覧を取る
         SK-->>U: 作ったもの・つながった結果・mdmark の CLI の入れ方と、次に /project-index:setup を実行する案内を出す
       ```
+
+      <!-- /map -->
     expected:
       - '端末の設定の `settings.yaml` が、`version` に project-index のバージョン、`clone` に引数のパス、`sources: []` を持ち、端末の設定のスキーマの検証に通る'
       - Claude Code の設定の場所の `settings.json` の env の `PROJECT_INDEX_CONFIG` が、その `settings.yaml` の絶対パスを指す。env のほかのキーは変わらない
@@ -53,6 +57,8 @@ scenarios:
         description: '`version` が project-index と同じで、必須のキー `clone` が無い `settings.yaml`'
         notes: '`sources` に配信元 sample の 1 行を持つ'
     flow: |-
+      <!-- map: {"title": "正常シナリオ（端末の設定に足りないキーがある）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -67,6 +73,8 @@ scenarios:
         SK->>CF: clone を書き足す
         SK-->>U: 書き足したキーと、つながった結果を出す
       ```
+
+      <!-- /map -->
     expected:
       - 利用者への質問は `clone` の 1 つだけで、端末の設定の場所は聞かない
       - '`settings.yaml` に `clone` が入り、`sources` の sample の行とほかのキーの値は変わらない'
@@ -82,6 +90,8 @@ scenarios:
       - name: project-index のクローン
         description: 正常シナリオと同じ
     flow: |-
+      <!-- map: {"title": "正常シナリオ（XDG_CONFIG_HOME の下に作る）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -98,6 +108,8 @@ scenarios:
         SK->>DD: /mcp につながり、ツールの一覧を取る
         SK-->>U: 作ったもの・つながった結果を出す
       ```
+
+      <!-- /map -->
     expected:
       - '端末の設定が `$XDG_CONFIG_HOME/project-index/settings.yaml` にでき、`~/.config/project-index` は変わらない'
       - 既定の場所なので、Claude Code の設定の場所の `settings.json` の env に `PROJECT_INDEX_CONFIG` が無い
@@ -113,6 +125,8 @@ scenarios:
         description: '`version` が project-index より 1 つ前のバージョンの `settings.yaml`'
         notes: そのバージョンからの移し替えの手順がキーを 1 つ改名する（破壊的な手順を持たない）
     flow: |-
+      <!-- map: {"title": "正常シナリオ（端末の設定が古い）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -130,6 +144,8 @@ scenarios:
         SK->>CF: スキーマで検証する
         SK-->>U: 当てた手順と、つながった結果を出す
       ```
+
+      <!-- /map -->
     expected:
       - '`settings.yaml` の `version` が project-index のバージョンになり、改名したキーが新しい名前で元の値を持つ'
       - 当てる前の `settings.yaml` のバックアップがあり、中身が当てる前と同じ
@@ -144,6 +160,8 @@ scenarios:
       - name: 端末の設定
         description: '`version` が project-index より新しいバージョンの `settings.yaml`'
     flow: |-
+      <!-- map: {"title": "異常シナリオ（端末の設定が新しい）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -154,11 +172,13 @@ scenarios:
         SK->>CF: version を project-index のバージョンと比べる（設定が新しい）
         SK-->>U: project-index の更新を案内して止まる
       ```
+
+      <!-- /map -->
     expected:
       - '`settings.yaml` と、Claude Code の設定の場所の `settings.json` は変わらない'
       - スキルの応答に、設定のバージョン・project-index のバージョンと、管理の MCP の `update` で project-index を更新する案内がある
     test: test_error_when_terminal_config_newer
-lead: 利用者が `/project-index:global-setup` で、端末に project-index のクローン・依存・端末の設定・Claude Code の env を用意し、`/mcp` につながることを確かめる。
+lead: 利用者が `/project-index:global-setup` で端末に project-index を用意して `/mcp` に接続するまでのシナリオを定め、導入の流れを変えるときに参照する。
 issue: 14
 primary_actor: 利用者
 stakeholders:

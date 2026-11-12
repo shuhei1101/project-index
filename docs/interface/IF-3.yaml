@@ -15,6 +15,8 @@ flows:
       - name: 入力
         description: '`from_ids: [文書 1]`、`direction: out`'
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -25,6 +27,8 @@ flows:
         T-->>ST: 文書 1 から related を深さ 2 までたどる
         T-->>C: 文書 2（深さ 1）と文書 3（深さ 2）
       ```
+
+      <!-- /map -->
     expected:
       - 文書 2 を深さ 1、文書 3 を深さ 2 で返す
       - 各行にたどった `related` の元と関係の種類がある
@@ -41,6 +45,8 @@ flows:
       - name: 入力
         description: '`from_ids: [文書 3]`、`direction: in`、`depth: 4`'
     flow: |-
+      <!-- map: {"title": "正常系（逆向きにたどる）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -50,6 +56,8 @@ flows:
         T->>T: 文書 3 を指す文書をたどり、一度たどった文書は飛ばす
         T-->>C: 文書 2 と文書 1
       ```
+
+      <!-- /map -->
     expected:
       - 文書 2 を深さ 1、文書 1 を深さ 2 で返し、同じ文書を 2 回返さない
       - '`depth: 5` では 4 に丸め、`notes` で知らせる'
@@ -64,6 +72,8 @@ flows:
       - name: 入力
         description: '`code_paths: [src/a.py]`'
     flow: |-
+      <!-- map: {"title": "正常系（コードのパスから）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -73,6 +83,8 @@ flows:
         T->>T: src/a.py を本文に持つ文書を起点にする
         T-->>C: 文書 1 と、その先の文書 2
       ```
+
+      <!-- /map -->
     expected:
       - 文書 1 を深さ 1、文書 2 を深さ 2 で返す
     test: test_normal_when_code_paths
@@ -88,6 +100,8 @@ flows:
       - name: 入力
         description: '`from_ids: [文書 1]`、`suggest: true`、`session_id: s1`'
     flow: |-
+      <!-- map: {"title": "正常系（関連の候補）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -100,6 +114,8 @@ flows:
         T-->>SD: 同じ会話で編集・閲覧した文書を読む
         T-->>C: たどった文書と、上位 3 件の候補
       ```
+
+      <!-- /map -->
     expected:
       - '`suggestions` に文書 4（`co_change`）と文書 5（`viewed`）がある'
       - '`related` ですでに繋がる文書 2 は候補に入らない'
@@ -113,6 +129,8 @@ flows:
       - name: 入力
         description: '`session_id: s1` で正常系と同じ呼び出しを 2 回、3 回目は `repeat_seen: true`'
     flow: |-
+      <!-- map: {"title": "正常系（返し済みの相手）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -125,6 +143,8 @@ flows:
         C->>T: 同じ引数
         T-->>C: ID と（この会話で返却済み）
       ```
+
+      <!-- /map -->
     expected:
       - 2 回目の文書 2・3 の `name`・`description` が `（この会話で返却済み）` になり、json の項目に `path`・`scope` が無い
       - 3 回目は名前と概要文を返す
@@ -137,6 +157,8 @@ flows:
       - name: 入力
         description: '1 回目は `from_ids: [doc-9]`、2 回目は `code_paths: [src/none.py]`'
     flow: |-
+      <!-- map: {"title": "異常系（無い起点・DocumentNotFoundError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -145,6 +167,8 @@ flows:
         C->>T: from_ids: doc-9
         T-->>C: isError（見つからない ID と近い候補）
       ```
+
+      <!-- /map -->
     expected:
       - '1 回目が `isError: true` で、`doc-9` と近い ID の候補を返す'
       - '2 回目が `isError: true` で、`src/none.py` を本文に持つ文書が無いことを返す'
@@ -157,6 +181,8 @@ flows:
       - name: 入力
         description: 1 回目は両方、2 回目はどちらも渡さない
     flow: |-
+      <!-- map: {"title": "異常系（起点の指定の誤り・InvalidArgumentError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -165,6 +191,8 @@ flows:
         C->>T: from_ids と code_paths
         T-->>C: isError（どちらか 1 つを渡すこと）
       ```
+
+      <!-- /map -->
     expected:
       - 'どちらの呼び出しも `isError: true` で、`from_ids` か `code_paths` のどちらか 1 つを渡すことを返す'
     test: test_error_when_invalid_argument
@@ -177,6 +205,8 @@ flows:
         description: '`scope.read` が other のフォルダだけの配信元'
         notes: id `other`
     flow: |-
+      <!-- map: {"title": "異常系（読めない配信元・SourceNotReadableError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -185,6 +215,8 @@ flows:
         C->>T: source: other, from_ids: other の文書
         T-->>C: isError（読めない配信元と、使える配信元の一覧）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、other を読めないことと使える配信元の一覧を返す'
     test: test_error_when_source_not_readable
@@ -198,6 +230,8 @@ flows:
       - name: 入力
         description: '`source: other`, `from_ids: [文書 1]`, `outside_scope: true`。`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "正常系（作業範囲の外を参考にたどる）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -209,12 +243,14 @@ flows:
         T->>L: cwd と other を残す
         T-->>C: 作業範囲の外（参考）、文書 2
       ```
+
+      <!-- /map -->
     expected:
       - 先頭の行に「作業範囲の外（参考）」があり、文書 2 を返す
       - 要求のログに sample のクローン本体のパスと `other` が残る
       - '`outside_read: false` の other では `SourceNotReadableError` を返す'
     test: test_normal_when_outside_scope
-lead: 起点の文書かコードのパスから `related` をたどって関連する文書を返す。`suggest` で、まだ `related` に無い関連の候補も返す。
+lead: '`related` をたどって関連する文書と関連の候補を返却する `trace_related` の入出力を定め、`trace_related` を修正するときに参照する。'
 identifier: trace_related
 permissions: 対象の配信元の `scope.read` か `scope.write` に `cwd` が当たること。たどった先が読めない配信元の文書なら、その文書は ID だけを返す
 idempotent: true

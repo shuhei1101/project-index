@@ -13,6 +13,8 @@ flows:
         description: '`project-index.yaml` も管理用の YAML も無い一時フォルダ。`src/` に `a.py`・`b.py`・空の `pkg/__init__.py`・`uv.lock`・`logo.png`（先頭に NUL バイト）を置き、ワークツリーのファイル `.claude/worktrees/wt/src/c.py` を置く'
         notes: '`a.py`・`b.py` だけが除外の条件・辿らないフォルダに当たらない。`--paths` は `**`'
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -24,6 +26,8 @@ flows:
         M->>M: 除外の条件に当たるファイルを外す
         M-->>C: 載せるファイルのパス（終了コード 0）
       ```
+
+      <!-- /map -->
     expected:
       - 標準出力が `src/a.py`・`src/b.py` の 2 行だけで、`.claude/worktrees/wt/src/c.py` を含まない
       - 終了コードが 0
@@ -38,6 +42,8 @@ flows:
         description: 正常系と同じ
         notes: '`--exclude b.py` を渡す'
     flow: |-
+      <!-- map: {"title": "正常系（除外するファイル名を渡す）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -46,6 +52,8 @@ flows:
         C->>M: --root {フォルダ} --paths src/** --exclude b.py
         M-->>C: 載せるファイルのパス（終了コード 0）
       ```
+
+      <!-- /map -->
     expected:
       - 標準出力が `src/a.py` の 1 行だけ
     test: test_normal_when_exclude_given
@@ -57,6 +65,8 @@ flows:
       - name: 引数
         description: '`--root` に存在しないパス'
     flow: |-
+      <!-- map: {"title": "異常系（フォルダが無い・RootNotFound）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -65,11 +75,13 @@ flows:
         C->>M: --root {無いパス} --paths src/**
         M-->>C: stderr に渡したパス（終了コード 2）
       ```
+
+      <!-- /map -->
     expected:
       - 終了コードが 2
       - 標準出力が空で、stderr に渡したパスがある
     test: test_error_when_root_not_found
-lead: 範囲の glob に当たるファイルのうち、除外の条件に当たらないもの（管理用の YAML に載せるファイル）を返す。`project-index.yaml` の有無に依らず呼べる。
+lead: 範囲の glob のうち管理用の YAML に記載するファイルを返却する `project-index files` の入出力を定め、記載するファイルの判定を修正するときに参照する。
 identifier: files
 permissions: 配信元のフォルダを読める利用者
 idempotent: true
