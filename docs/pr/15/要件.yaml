@@ -233,10 +233,10 @@ scope_out:
     plan: '#7'
   - item: このリポジトリの直下の配信元の設定 `dev-docs.yaml` の `project-index.yaml` への改名
     reason: '今の各リポジトリの `dev-docs.yaml` の移行方法は、この作業 PR のインターフェース定義設計で決める（Issue #14 の書き換え）。移行の間は両方を探す案ならそれぞれの作業で改名でき、改名だけにする案なら反映作業としてこの作業 PR に取り込む。決まるまではその時点の判断としてスコープ外に置き、レビューで確定する'
-    plan: to_file
+    plan: '#16'
   - item: 'dev-docs から移した文書への、置き場所・`id`・書き方の決まり（dev-docs の #7・#74・#95）の適用'
     reason: shuhei1101/dev-docs#114 の扱いの判断で、移す文書の範囲が決まってから別に起票すると決まった。この作業 PR はこのリポジトリの今の決まりで書く
-    plan: to_file
+    plan: '#18'
   - item: 配信元の設定の paths[] の基準のフォルダを、設定ファイルのフォルダ以外に指定する
     reason: 移した後のコードに対して行う変更。この作業 PR は今の dev-docs の振る舞いのまま移す
     plan: '#6'
@@ -248,10 +248,10 @@ scope_out:
     plan: '#11'
   - item: 呼ぶ側のリポジトリ（AI Monitor・knowledge・rule-inject・alias-inject）の、文書の MCP・管理の MCP のツールの完全名の書き換え
     reason: 別のリポジトリの変更。確認ログのとおりリポジトリごとに起票し、shuhei1101/dev-docs#163 のマージと同じ時期に入れる。完全名はこの作業 PR のプラグインが決めるため、この作業 PR がマージされなければ成り立たない
-    plan: to_file
+    plan: shuhei1101/ai-monitor#3387・shuhei1101/knowledge#276・shuhei1101/rule-inject#158・shuhei1101/alias-inject#76
   - item: dev-docs から移した処理の lint の既存の違反（ruff の `# noqa`・pyright のファイルごとの Unknown 系の warning 指定・complexipy のスナップショット `complexipy-snapshot.json`）を解消してベースラインを外す
     reason: dev-docs はこのリポジトリより緩い lint の設定で書かれており、移した処理の構造の書き換え（cognitive complexity が上限を超える 41 関数の分割など）は移した後のコードに対して行う変更。この作業 PR は今の dev-docs の振る舞いのまま移し、既存の違反を規約『設計原則』の「既存の Python のリポジトリは warn から始める」に沿ってベースラインに載せ、新しい違反だけを失敗にする
-    plan: to_file
+    plan: '#17'
 use_cases:
   - kind: composite
     scenario: docs/scenario/SC-1.yaml
