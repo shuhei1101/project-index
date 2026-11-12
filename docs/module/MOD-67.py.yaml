@@ -1,6 +1,6 @@
 id: MOD-67
 title: 索引のサーバー / 端末の設定 / types.py
-lead: 端末の設定と、端末の設定の API の `sources[]` の要求と結果の型を受け持ち、端末の設定の types.py を修正するときに参照する。
+lead: 端末の設定と、端末の設定の API の `sources[]` の要求と結果の型。
 diagrams:
   - name: 全体
     diagram: |-
@@ -42,7 +42,7 @@ data_models:
     usecase: 端末の設定
     role: DTO
     summary: 端末の設定の `sources[]` の 1 行
-    description: '`pydantic.BaseModel`（`extra="forbid"`）。端末の設定の保存の要求の `sources[]` もこの形。'
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。端末の設定の保存の要求の `sources[]` もこの形。要求で行に含めなかったキーは `model_fields_set` に入らない（配信元の保存がファイルの値で埋める）'
     properties:
       - name: id
         title: 配信元の ID
@@ -80,7 +80,7 @@ data_models:
     usecase: 端末の設定
     role: DTO
     summary: 検証を通して既定値を埋めた端末の設定
-    description: '`pydantic.BaseModel`（`frozen=True`）。キーの意味と既定値は [shuhei1101/dev-docs#3 汎用の開発ドキュメントサーバーを作る](https://github.com/shuhei1101/dev-docs/issues/3) の資料 A-25 のキー一覧。'
+    description: '`pydantic.BaseModel`（`frozen=True`）。キーの意味と既定値は Issue #3 の資料 A-25 のキー一覧。'
     properties:
       - name: file
         title: 設定のファイル
@@ -210,6 +210,11 @@ data_models:
         access: 公開
         default: None
         description: '`{config, server}`。設定のバージョンが古いときだけ'
+      - name: outside_read
+        title: 作業範囲の外から読めるか
+        type: bool
+        access: 公開
+        description: 行の `outside_read`
   - name: SettingsSourcesView
     title: 端末の設定の取得の応答
     container: project_index/features/settings/types.py

@@ -78,3 +78,21 @@ def test_normal_when_pending_reload(
         ("fresh", "pending_reload"),
         ("sample", "serving"),
     ]
+
+
+def test_normal_when_outside_read_false(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """端末の設定の outside_read を行の outsideRead で返す（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    extra = make_source("extra", outside_read=False)
+    env = make_server(sample, extra)
+    # 実行
+    response = env.client.get("/settings/sources")
+    # 検証
+    assert response.status_code == 200
+    assert {row["id"]: row["outsideRead"] for row in response.json()["sources"]} == {
+        "sample": True,
+        "extra": False,
+    }

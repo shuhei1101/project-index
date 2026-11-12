@@ -11,8 +11,6 @@ scenarios:
       - name: project-index
         description: 端末の設定で起動した project-index
     flow: |-
-      <!-- map: {"title": "正常シナリオ"} -->
-
       ```mermaid
       sequenceDiagram
         participant DD as dev-docs の画面のサーバー
@@ -26,8 +24,6 @@ scenarios:
         PI->>CF: settings.yaml を書き換え、配信元を読み直す
         PI-->>DD: 保存した sources と、読み直した後の配信元の状態
       ```
-
-      <!-- /map -->
     expected:
       - 取得が sample と extra の行を、どちらも配信中の状態つきで返却する
       - 保存の応答が、sample だけの sources と、sample を配信中とする状態を返却する
@@ -51,8 +47,6 @@ scenarios:
       - name: project-index
         description: 端末の設定で起動した project-index
     flow: |-
-      <!-- map: {"title": "正常シナリオ（配信元を追加する）"} -->
-
       ```mermaid
       sequenceDiagram
         participant DD as dev-docs の画面のサーバー
@@ -64,8 +58,6 @@ scenarios:
         PI->>CF: settings.yaml を書き換え、配信元を読み直す
         PI-->>DD: 保存した sources と、読み直した後の配信元の状態
       ```
-
-      <!-- /map -->
     expected:
       - 保存の応答が、sample と extra を配信中とする状態を返却する
       - '`settings.yaml` の `sources` に extra の行が追加され、sample の行は変わらない'
@@ -85,8 +77,6 @@ scenarios:
       - name: project-index
         description: 端末の設定で起動した project-index
     flow: |-
-      <!-- map: {"title": "正常シナリオ（1 行を追加する）"} -->
-
       ```mermaid
       sequenceDiagram
         participant DD as dev-docs の画面のサーバー
@@ -98,8 +88,6 @@ scenarios:
         PI->>CF: settings.yaml の sources の末尾に extra の行を追加し、配信元を読み直す
         PI-->>DD: 追加した
       ```
-
-      <!-- /map -->
     expected:
       - 応答が、行を追加したことを返却する
       - '`settings.yaml` の `sources` が sample・extra の順に並び、sample の行は変わらない'
@@ -115,8 +103,6 @@ scenarios:
       - name: project-index
         description: 端末の設定で起動した project-index
     flow: |-
-      <!-- map: {"title": "正常シナリオ（同じ id の行がある）"} -->
-
       ```mermaid
       sequenceDiagram
         participant DD as dev-docs の画面のサーバー
@@ -127,8 +113,6 @@ scenarios:
         DD->>PI: extra と id が同じで config が違う行を 1 行追加する
         PI-->>DD: 同じ id の行があり、内容が違う
       ```
-
-      <!-- /map -->
     expected:
       - 1 回目の応答が、同じ id の行があり内容も同じであることを返却する
       - 2 回目の応答が、同じ id の行があり内容が違うことを返却する
@@ -144,8 +128,6 @@ scenarios:
       - name: project-index
         description: 端末の設定で起動した project-index
     flow: |-
-      <!-- map: {"title": "正常シナリオ（配信を止める）"} -->
-
       ```mermaid
       sequenceDiagram
         participant DD as dev-docs の画面のサーバー
@@ -156,8 +138,6 @@ scenarios:
         PI->>CF: settings.yaml を書き換え、配信元を読み直す
         PI-->>DD: extra を無効とする状態
       ```
-
-      <!-- /map -->
     expected:
       - '`settings.yaml` の extra の行の `enabled` が `false` になる'
       - 保存の応答の状態で extra が無効になる
@@ -179,8 +159,6 @@ scenarios:
       - name: project-index
         description: sample・broken・legacy・archive を端末の設定に並べて起動した project-index
     flow: |-
-      <!-- map: {"title": "正常シナリオ（配信していない配信元がある）"} -->
-
       ```mermaid
       sequenceDiagram
         participant DD as dev-docs の画面のサーバー
@@ -189,8 +167,6 @@ scenarios:
         DD->>PI: 端末の設定の配信元を取得する
         PI-->>DD: 配信元ごとの行と状態
       ```
-
-      <!-- /map -->
     expected:
       - sample と legacy を配信中として返却する
       - broken を配信していない状態で、起動時の検証で除外した理由（`documents[0]` に必須のキー `paths` が無い）つきで返却する
@@ -210,8 +186,6 @@ scenarios:
       - name: project-index
         description: 端末の設定で起動した project-index
     flow: |-
-      <!-- map: {"title": "正常シナリオ（追加した配信元が検証に通らない）"} -->
-
       ```mermaid
       sequenceDiagram
         participant DD as dev-docs の画面のサーバー
@@ -223,8 +197,6 @@ scenarios:
         PI->>PI: 配信元を読み直し、起動時と同じ検証で broken を配信から除外する
         PI-->>DD: broken を配信していないとする状態
       ```
-
-      <!-- /map -->
     expected:
       - '`settings.yaml` の `sources` に broken の行が追加される'
       - 保存の応答の状態で、broken が配信していない状態で、検証で除外した理由（`documents[0]` に必須のキー `paths` が無い）つきで返却される
@@ -240,8 +212,6 @@ scenarios:
       - name: project-index
         description: 端末の設定で起動した project-index
     flow: |-
-      <!-- map: {"title": "異常シナリオ（保存がスキーマに通らない）"} -->
-
       ```mermaid
       sequenceDiagram
         participant DD as dev-docs の画面のサーバー
@@ -251,8 +221,6 @@ scenarios:
         PI->>PI: スキーマで検証する
         PI-->>DD: 422（違反したキーのパスと理由）
       ```
-
-      <!-- /map -->
     expected:
       - 応答が 422 で、id と scope.read の違反をキーのパスと理由つきで返却する
       - '`settings.yaml` が変わらず、読み取り API の sample の文書の取得は応答する'
@@ -270,8 +238,6 @@ scenarios:
       - name: project-index
         description: 端末の設定で起動した project-index
     flow: |-
-      <!-- map: {"title": "異常シナリオ（別のオリジンから書き込む）"} -->
-
       ```mermaid
       sequenceDiagram
         participant OP as 別のオリジンの送信
@@ -280,15 +246,43 @@ scenarios:
         OP->>PI: 端末の設定の保存を送信する
         PI-->>OP: 403 で断る
       ```
-
-      <!-- /map -->
     expected:
       - 応答が 403
       - '`settings.yaml` が変わらず、読み取り API の sample の文書の取得は応答する'
     test: test_error_when_cross_origin
     notes:
       画面のサーバーからの呼び出し: dev-docs の画面のサーバーはサーバーの側から呼ぶため `Origin` を持たない。断る条件はインターフェース定義設計で決める
-lead: dev-docs の画面のサーバーが端末の設定の API で配信元を変更し、再起動せずに配信へ反映するシナリオを定め、端末の設定の配信元の変更の流れを変えるときに参照する。
+  - name: 正常シナリオ（送信しなかったキーを残す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す一時フォルダの `settings.yaml`'
+        notes: '`sources` に sample と、`outside_read: false` と `scope.read` に extra のフォルダだけを記載した extra の 2 行'
+      - name: project-index
+        description: 端末の設定で起動した project-index
+      - name: 範囲の外の作業場所
+        description: extra の `scope.read` に該当しない一時フォルダ
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant DD as dev-docs の画面のサーバー
+        participant PI as project-index（端末の設定の API）
+        participant CF as 端末の設定
+
+        DD->>PI: 端末の設定の配信元を取得する
+        PI-->>DD: sample と extra の行（extra は作業範囲の外から参照できない）
+        DD->>PI: sample の enabled を false にし、どちらの行にも outside_read を含めない sources を保存する
+        PI->>CF: 送信しなかったキーをファイルの今の値で残して settings.yaml を書き換え、配信元を読み直す
+        PI-->>DD: sample を無効とする状態
+      ```
+    expected:
+      - 取得が extra の行を、作業範囲の外から参照できない（`outsideRead` が `false`）として返却する
+      - '`settings.yaml` の sample の行の `enabled` が `false` になる'
+      - '`settings.yaml` の extra の行に `outside_read: false` が残る'
+      - '保存した後も、extra の範囲の外の作業場所から `outside_scope: true` で extra の文書を参照できない'
+    test: test_normal_when_unsent_keys_kept
+lead: dev-docs の画面のサーバーが端末の設定の API で、端末の設定の配信元を取得し、追加・変更・停止・削除した後の配信元を丸ごと保存するか 1 行を追加して、project-index を再起動せずに配信へ反映する。
 issue: 14
 visibility: internal
 primary_actor: dev-docs の画面のサーバー
@@ -300,7 +294,7 @@ stakeholders:
 trigger: dev-docs の画面のサーバーが、利用者の設定画面の操作（開く・保存する）を受けて端末の設定の API を呼ぶ
 preconditions:
   - project-index が待ち受け、端末の設定に配信元が並んでいる
-success_guarantee: 保存した sources だけが `settings.yaml` に書き込まれ、読み直した後の配信元の状態が応答と文書の MCP・読み取り API に反映される。
+success_guarantee: 保存した sources だけが `settings.yaml` に書き込まれ（送信した行に含めなかったキーは、ファイルの同じ配信元の行の今の値で残る）、読み直した後の配信元の状態が応答と文書の MCP・読み取り API に反映される。
 minimal_guarantee: スキーマに合格しない保存と、別のオリジンからの保存は `settings.yaml` を書き換えない。配信元のフォルダのファイルは変えない。他の配信元の配信は止まらない。
 frequency: 配信元を追加・停止・削除するとき
 priority: 中
