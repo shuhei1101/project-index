@@ -30,7 +30,7 @@ def _place(result: SourceListResult) -> str:
     return f"作業場所: {workplace.cwd}（{workplace.source_id} の{kind}）"
 
 
-def render_describe_markdown(  # noqa: C901
+def render_describe_markdown(
     result: SourceListResult | SourceGuideResult | KindSchemaResult,
 ) -> str:
     """`format: markdown` の本文を作る。"""

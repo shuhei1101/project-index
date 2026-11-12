@@ -1,12 +1,11 @@
 """`documents[].schema` でほかの配信元のリビジョンのスキーマを指す参照と、その読み取り。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel, ConfigDict
 
@@ -14,6 +13,7 @@ from project_index.features.documents.schema import resolve_schema_refs
 from project_index.features.history.query import read_file_at, resolve_ref
 from project_index.integrations.git import repo_root
 from project_index.shared.errors import RefNotFoundError
+from project_index.shared.narrowing import is_dict
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
 
 if TYPE_CHECKING:
@@ -57,7 +57,7 @@ def _config_name(config: Path) -> str | None:
         value = load_yaml(config.read_text(encoding="utf-8"), file=str(config))
     except OSError, UnicodeDecodeError, YamlLoadError:
         return None
-    name = value.get("name") if isinstance(value, dict) else None
+    name = value.get("name") if is_dict(value) else None
     return name if isinstance(name, str) else None
 
 
@@ -99,7 +99,7 @@ def read_schema_ref(ref: SchemaRef, *, lookup: SchemaRefLookup) -> RefSchema:
     except YamlLoadError as error:
         msg = f"{ref.path} を読み込めません"
         raise SchemaRefError(msg) from error
-    if not isinstance(raw, dict):
+    if not is_dict(raw):
         msg = f"{ref.path} を読み込めません"
         raise SchemaRefError(msg)
     # 同じ commit のファイルを読み、読めなかったパスを控える
@@ -111,7 +111,8 @@ def read_schema_ref(ref: SchemaRef, *, lookup: SchemaRefLookup) -> RefSchema:
             missing.append(path)
         return found
 
-    schema = resolve_schema_refs(raw, PurePosixPath(ref.path), read=read)
+    # YAML から読んだ辞書のキーは文字列として扱う
+    schema = resolve_schema_refs(cast("dict[str, Any]", raw), PurePosixPath(ref.path), read=read)
     # `$ref` の参照先がそのリビジョンに無ければ誤りにする
     if missing:
         msg = f"{ref.ref} に {missing[0]} がありません"

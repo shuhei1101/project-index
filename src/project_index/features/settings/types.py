@@ -35,7 +35,7 @@ class SourceEntry(BaseModel):
 
     @field_validator("config", mode="before")
     @classmethod
-    def _as_list(cls, value: Any) -> Any:  # noqa: ANN401
+    def _as_list(cls, value: Any) -> Any:
         """文字列 1 つで書かれたときも配列にする。"""
         return [value] if isinstance(value, str) else value
 

@@ -4,7 +4,6 @@ Usage:
 # Claude Code が stdin に SessionStart の入力の JSON を渡して実行する
 python3 session_start.py
 """
-# pyright: reportUnknownArgumentType=warning
 
 from __future__ import annotations
 

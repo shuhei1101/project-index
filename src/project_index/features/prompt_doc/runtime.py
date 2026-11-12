@@ -18,6 +18,7 @@ from project_index.features.prompt_doc.render import (
     render_example,
 )
 from project_index.features.prompt_doc.types import PromptDoc, PromptInvalidError, PromptProblem
+from project_index.shared.narrowing import is_dict
 from project_index.shared.schema_check import format_path, schema_violations
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
 
@@ -103,7 +104,7 @@ def _check_file(
     file: Path,
     *,
     directory: Path,
-    schema: Mapping[str, Any],
+    schema: object,
     registry: Registry[Any],
     env: jinja2.Environment,
 ) -> tuple[LoadedPrompt | None, list[PromptProblem]]:
@@ -123,7 +124,7 @@ def _check_file(
         return None, [problem(item.path, _schema_reason(item)) for item in violations]
     # id がフォルダからのパスと同じか
     expected_id = file.relative_to(directory).with_suffix("").as_posix()
-    if value["id"] != expected_id:
+    if not is_dict(value) or value.get("id") != expected_id:
         return None, [problem("id", f"ファイルのパス {expected_id} と違います")]
     try:
         doc = PromptDoc.model_validate(value)

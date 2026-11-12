@@ -54,7 +54,9 @@ class SnapshotStore:
             temp.mkdir(parents=True)
             try:
                 data = run_git(["archive", "--format=tar", commit], cwd=repo_root, binary=True)
-                assert isinstance(data, bytes)  # noqa: S101
+                if not isinstance(data, bytes):
+                    msg = "git archive の出力がバイト列ではありません"
+                    raise RuntimeError(msg)
                 with tarfile.open(fileobj=io.BytesIO(data)) as archive:
                     archive.extractall(temp, filter="data")
             except GitError:

@@ -1,5 +1,4 @@
 """管理の MCP の `status`・`reload`・`check_project`・`try_convert`・`write_nav` の中身。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
@@ -10,7 +9,7 @@ import os
 import tempfile
 from collections.abc import Mapping, MutableMapping
 from dataclasses import replace
-from datetime import date
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -70,6 +69,7 @@ from project_index.shared.errors import (
     Violation,
 )
 from project_index.shared.files import replace_file
+from project_index.shared.narrowing import is_dict
 from project_index.shared.paths import normalize_path
 from project_index.shared.version import RUNNING_VERSION
 from project_index.shared.yaml_io import YamlLoadError, dump_roundtrip, load_roundtrip, load_yaml
@@ -214,9 +214,7 @@ def _load_candidate(
         value = load_yaml(text, file=str(config_file))
     except YamlLoadError as error:
         raise ConfigParseError(message=str(error), line=error.line, column=error.column) from error
-    config_version = (
-        str(value["version"]) if isinstance(value, dict) and "version" in value else None
-    )
+    config_version = str(value["version"]) if is_dict(value) and "version" in value else None
     # 書く前の設定は、使い捨てのフォルダに書いて読む（相対パスは配信元のフォルダから解く）
     with tempfile.TemporaryDirectory() as directory:
         file = config_file
@@ -473,7 +471,7 @@ def _find_group(
     return items, found
 
 
-def _apply_nav_operation(nav: dict[str, Any], operation: NavOperation, index: int) -> None:  # noqa: C901
+def _apply_nav_operation(nav: dict[str, Any], operation: NavOperation, index: int) -> None:
     """`nav` の複製に操作 1 件を当てる。"""
     if operation.op in ("add", "update") and operation.value is None:
         raise _nav_invalid_argument(index, f"{operation.op} には value が要ります")
@@ -497,7 +495,9 @@ def _apply_nav_operation(nav: dict[str, Any], operation: NavOperation, index: in
         if group is not None:
             parent = group.setdefault("items", [])
         parent, group = _find_group(parent, name, index)
-    assert group is not None  # noqa: S101
+    if group is None:
+        msg = "nav の項目が見つかりません"
+        raise RuntimeError(msg)
     if operation.op == "add":
         children: list[Any] = group.setdefault("items", [])
         if "group" in value and any(item.get("group") == value["group"] for item in children):
@@ -609,7 +609,9 @@ def write_nav(request: WriteNavRequest, *, handlers: Handlers) -> WriteNavResult
             violations=nav_violations,
         )
     replace_file(config_file, text)
-    counts = nav_auto_counts(nav, documents, fields=fields, today=date.today())  # noqa: DTZ011
+    counts = nav_auto_counts(
+        nav, documents, fields=fields, today=datetime.now(UTC).astimezone().date()
+    )
     return WriteNavResult(
         path=str(config_file),
         nav=dump_roundtrip(CommentedMap(nav)),

@@ -60,7 +60,7 @@ def _co_changed(target: Target, start: list[Document]) -> dict[str, int]:
     }
 
 
-def trace_related(  # noqa: C901
+def trace_related(
     request: RelatedRequest,
     *,
     registry: SourceRegistry,

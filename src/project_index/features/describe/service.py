@@ -1,5 +1,4 @@
 """`describe` の処理。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning
 
 from __future__ import annotations
 
@@ -96,7 +95,7 @@ def describe(
         target = dataclasses.replace(target, source=load_source_at(target.source, target.worktree))
     source = target.source
     if request.kind is None:
-        kinds = []
+        kinds: list[KindSummary] = []
         for table in source.config.documents:
             if not table.enabled:
                 continue

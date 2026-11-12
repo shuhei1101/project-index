@@ -1,5 +1,4 @@
 """`search_docs` の処理。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
@@ -87,7 +86,7 @@ def _body_conditions(node: Condition | Group | None) -> list[Condition]:
     return [node] if node.field in (BODY, "*") else []
 
 
-def _sort_value(hit: _Hit, field: str) -> Any:  # noqa: ANN401
+def _sort_value(hit: _Hit, field: str) -> Any:
     """並べ替えに使う値（比べられる型にそろえる。値が無ければ `None`）。"""
     if field == MATCHES:
         return float(hit.matches)
@@ -153,14 +152,14 @@ def _groups(hits: Sequence[_Hit], field: str) -> list[GroupCount]:
     return sorted(groups, key=lambda group: (-group.count, group.value))
 
 
-def _cut(value: Any, limit: int) -> Any:  # noqa: ANN401
+def _cut(value: Any, limit: int) -> Any:
     """長い文字列を末尾で切り、残りの文字数を添える。"""
     if isinstance(value, str) and len(value) > limit:
         return f"{value[:limit]}…（残り {len(value) - limit} 文字）"
     return value
 
 
-def _field_value(document: Document, field: str) -> Any:  # noqa: ANN401
+def _field_value(document: Document, field: str) -> Any:
     """項目の値を返す（配列の項目と複数の値は配列、無ければ `None`）。"""
     values = field_values(document, field)
     if not values:
@@ -239,7 +238,7 @@ def _cut_body(
     return join_ranges(lines, ranges), ranges, len(lines)
 
 
-def search_docs(  # noqa: C901
+def search_docs(
     request: SearchRequest,
     *,
     registry: SourceRegistry,
@@ -249,7 +248,7 @@ def search_docs(  # noqa: C901
     today: date | None = None,
 ) -> SearchResult:
     """`search_docs` の要求を処理して検索の結果を返す。"""
-    today = today or date.today()  # noqa: DTZ011
+    today = today or datetime.now(UTC).astimezone().date()
     notes: list[str] = []
     targets = resolve_read_targets(
         registry=registry,

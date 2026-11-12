@@ -1,13 +1,11 @@
 """プロンプトの部品を Jinja2 で描画する（変数の値にパスを持たせ、描画結果の値を区切りで囲む）。"""
-# pyright: reportUnknownVariableType=warning
 
 from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import jinja2
 from jinja2.environment import TemplateExpression
@@ -22,7 +20,11 @@ from project_index.features.prompt_doc.types import (
     Role,
     VarType,
 )
+from project_index.shared.narrowing import is_dict, is_list
 from project_index.shared.yaml_io import load_yaml
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping, Sequence
 
 # `kind: llm` のメッセージを並べる順
 ROLES: tuple[Role, ...] = ("system", "user", "assistant")
@@ -70,6 +72,15 @@ class TracedFloat(float):
 
 
 TRACED_TYPES = (TracedStr, TracedInt, TracedFloat)
+# 部品の描画で、テンプレートの誤りと値の操作（属性・キー・位置・型・計算）が送る例外
+RENDER_ERRORS = (
+    jinja2.TemplateError,
+    AttributeError,
+    LookupError,
+    TypeError,
+    ValueError,
+    ArithmeticError,
+)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -81,7 +92,7 @@ class CompiledPart:
     texts: dict[str, jinja2.Template]
 
 
-def _flow_scalar(value: Any) -> str:  # noqa: ANN401
+def _flow_scalar(value: object) -> str:
     """スカラーをフロー形式の中で読み戻せる 1 語にする。"""
     if value is None or isinstance(value, bool | int | float):
         return json.dumps(value)
@@ -92,12 +103,14 @@ def _flow_scalar(value: Any) -> str:  # noqa: ANN401
     return json.dumps(text, ensure_ascii=False)
 
 
-def flow_yaml(value: Any) -> str:  # noqa: ANN401
+def flow_yaml(value: object) -> str:
     """値を YAML のフロー形式の 1 行にする。"""
-    if isinstance(value, Mapping):
+    if is_dict(value):
         return "{" + ", ".join(f"{_flow_scalar(k)}: {flow_yaml(v)}" for k, v in value.items()) + "}"
-    if isinstance(value, list | tuple):
-        return "[" + ", ".join(flow_yaml(item) for item in value) + "]"
+    if is_list(value) or isinstance(value, tuple):
+        # isinstance で絞った tuple は要素の型が Unknown になるため、object の並びとして読む
+        items = cast("Iterable[object]", value)
+        return "[" + ", ".join(flow_yaml(item) for item in items) + "]"
     return _flow_scalar(value)
 
 
@@ -118,7 +131,7 @@ def flatten_vars(
     return result
 
 
-def _finalize(value: Any) -> Any:  # noqa: ANN401
+def _finalize(value: object) -> object:
     """パス付きの値だけを区切りで囲む。"""
     if isinstance(value, TRACED_TYPES):
         return f"\ue000{value.path}\ue001{value}\ue002"
@@ -137,7 +150,7 @@ def build_environment() -> jinja2.Environment:
     )
 
 
-def _matches(value: Any, type_: VarType) -> bool:  # noqa: ANN401
+def _matches(value: object, type_: VarType) -> bool:
     """値が定義の型に合うかを返す（`bool` は `integer`・`number` に合わない）。"""
     if type_ == "string":
         return isinstance(value, str)
@@ -152,13 +165,31 @@ def _matches(value: Any, type_: VarType) -> bool:  # noqa: ANN401
     return isinstance(value, dict)
 
 
-def _trace(value: Any, var: PromptVar, path: str, problems: list[str]) -> Any:  # noqa: ANN401
+def _trace(value: object, var: PromptVar, path: str, problems: list[str]) -> object:
     """値を定義と並べて辿り、型を確かめてパス付きの値にする。"""
     # 型が合わない: 理由を加え、その下は辿らない
     if var.type is not None and not _matches(value, var.type):
         problems.append(f"`{path}` は {var.type} ですが、`{flow_yaml(value)}` が入っています")
         return value
-    # bool は継承できないため囲まない
+    # 配列: 要素の定義があれば `{パス}[]` で辿る
+    if is_list(value):
+        items = var.items
+        if items is None:
+            return value
+        return [_trace(item, items, f"{path}[]", problems) for item in value]
+    # オブジェクト: 定義のあるキーだけを `{パス}.{キー}` で辿る
+    if is_dict(value):
+        return {
+            key: _trace(item, var.properties[key], f"{path}.{key}", problems)
+            if isinstance(key, str) and key in var.properties
+            else item
+            for key, item in value.items()
+        }
+    return _traced_scalar(value, path)
+
+
+def _traced_scalar(value: object, path: str) -> object:
+    """文字列・整数・小数をパス付きの値にする（bool は継承できないため囲まない）。"""
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -167,20 +198,6 @@ def _trace(value: Any, var: PromptVar, path: str, problems: list[str]) -> Any:  
         return TracedInt(value, path=path)
     if isinstance(value, float):
         return TracedFloat(value, path=path)
-    # 配列: 要素の定義があれば `{パス}[]` で辿る
-    if isinstance(value, list):
-        if var.items is None:
-            return value
-        items = var.items
-        return [_trace(item, items, f"{path}[]", problems) for item in value]
-    # オブジェクト: 定義のあるキーだけを `{パス}.{キー}` で辿る
-    if isinstance(value, dict):
-        return {
-            key: _trace(item, var.properties[key], f"{path}.{key}", problems)
-            if key in var.properties
-            else item
-            for key, item in value.items()
-        }
     return value
 
 
@@ -316,8 +333,8 @@ def render_example(
             rendered.append((part.role, template.render(**traced)))
         except jinja2.UndefinedError as error:
             return _failed([f"未定義の変数: {error.message}"])
-        # 描画中のどの例外も、組の注意書きにして他の組の描画を続ける
-        except Exception as error:  # noqa: BLE001
+        # 描画中のテンプレートと値の操作の例外は、組の注意書きにして他の組の描画を続ける
+        except RENDER_ERRORS as error:
             return _failed([f"部品 `{part.id}` を描画できません: {type(error).__name__}: {error}"])
     messages = _messages(doc, rendered)
     return RenderedExample(

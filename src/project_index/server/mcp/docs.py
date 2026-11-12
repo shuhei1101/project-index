@@ -1,5 +1,4 @@
 """文書の MCP の組み立て。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning
 
 from __future__ import annotations
 
@@ -103,7 +102,7 @@ def _register(
 ) -> None:
     """要求のモデルを引数に持つツールを 1 つ登録する（呼ぶ前に要求が指す配信元の読み込みを待つ）。"""
 
-    async def tool(**arguments: Any) -> CallToolResult:  # noqa: ANN401
+    async def tool(**arguments: Any) -> CallToolResult:
         try:
             request = model(**arguments)
             await wait_sources(request)

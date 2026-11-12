@@ -259,9 +259,9 @@ def reload_sources(
     terminal: TerminalConfig,
     *,
     registry: SourceRegistry,
-    store: Any,  # noqa: ANN401
-    checker: Any,  # noqa: ANN401
-    converter: Any,  # noqa: ANN401
+    store: Any,
+    checker: Any,
+    converter: Any,
     checks: SourceChecks,
 ) -> list[SourceStatus]:
     """配信元の一覧を読み直し、配信元の内容を控えた部品の控えを捨てる。"""
@@ -275,9 +275,9 @@ def reload_sources(
 def discard_source_caches(
     sources: list[ServedSource],
     *,
-    store: Any,  # noqa: ANN401
-    checker: Any,  # noqa: ANN401
-    converter: Any,  # noqa: ANN401
+    store: Any,
+    checker: Any,
+    converter: Any,
     checks: SourceChecks,
 ) -> None:
     """配信元の内容を控えた部品の控えを捨て、渡した配信元ごとのずれと警告をログに書く。"""
@@ -287,7 +287,7 @@ def discard_source_caches(
     check_sources(sources, store=store, checks=checks)
 
 
-def check_sources(sources: list[ServedSource], *, store: Any, checks: SourceChecks) -> None:  # noqa: ANN401
+def check_sources(sources: list[ServedSource], *, store: Any, checks: SourceChecks) -> None:
     """渡した配信元ごとに検査して結果を持たせ、ずれと警告をログに書く。"""
     for source in sources:
         # 検査の結果を控えに持たせ、`describe` の警告が読めるようにする

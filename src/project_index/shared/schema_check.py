@@ -1,16 +1,17 @@
 """JSON Schema の違反を、項目のパスつきの `Violation` にする。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from jsonschema import Draft202012Validator
 
 from project_index.shared.errors import Violation
+from project_index.shared.narrowing import is_dict, is_list
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Iterator
+
     from jsonschema.exceptions import ValidationError
     from referencing import Registry
 
@@ -26,26 +27,28 @@ def format_path(parts: Iterable[str | int]) -> str:
     return result
 
 
-def _as_list(value: Any) -> list[str]:  # noqa: ANN401
+def _as_list(value: object) -> list[str]:
     """`required` の値を文字列の並びとして読む。"""
-    return [str(item) for item in value] if isinstance(value, list) else []
+    return [str(item) for item in value] if is_list(value) else []
 
 
 def _from_error(error: ValidationError) -> list[Violation]:
     """jsonschema の誤り 1 つを違反の並びにする（必須のキーと知らないキーは 1 キーずつ）。"""
     base = list(error.absolute_path)
-    if error.validator == "required" and isinstance(error.instance, dict):
+    instance: object = error.instance
+    if error.validator == "required" and is_dict(instance):
         return [
             Violation(path=format_path([*base, key]), rule="必須のキーが無い")
             for key in _as_list(error.validator_value)
-            if key not in error.instance
+            if key not in instance
         ]
-    if error.validator == "additionalProperties" and isinstance(error.instance, dict):
-        schema = error.schema
-        known = set(schema.get("properties", {})) if isinstance(schema, Mapping) else set()
+    if error.validator == "additionalProperties" and is_dict(instance):
+        schema: object = error.schema
+        properties = schema.get("properties") if is_dict(schema) else None
+        known: set[object] = set(properties) if is_dict(properties) else set()
         return [
-            Violation(path=format_path([*base, key]), rule="知らないキー")
-            for key in error.instance
+            Violation(path=format_path([*base, str(key)]), rule="知らないキー")
+            for key in instance
             if key not in known
         ]
     path = format_path(base) or "$"
@@ -57,21 +60,33 @@ def _from_error(error: ValidationError) -> list[Violation]:
 
 
 def schema_violations(
-    schema: Mapping[str, Any],
-    value: Any,  # noqa: ANN401
+    schema: object,
+    value: object,
     *,
     registry: Registry[Any] | None = None,
 ) -> list[Violation]:
     """スキーマの違反を全て集める（`registry` は別のファイルを `$ref` で指すスキーマの解決先）。"""
+    if not is_dict(schema):
+        msg = "スキーマが辞書ではありません"
+        raise TypeError(msg)
+    keyed = cast("dict[str, Any]", schema)
     validator = (
-        Draft202012Validator(dict(schema))
+        Draft202012Validator(keyed)
         if registry is None
-        else Draft202012Validator(dict(schema), registry=registry)
+        else Draft202012Validator(keyed, registry=registry)
     )
     errors = sorted(
-        validator.iter_errors(value), key=lambda item: list(map(str, item.absolute_path))
+        _iter_errors(validator, value), key=lambda item: list(map(str, item.absolute_path))
     )
     violations: list[Violation] = []
     for error in errors:
         violations.extend(_from_error(error))
     return violations
+
+
+def _iter_errors(validator: Draft202012Validator, value: object) -> list[ValidationError]:
+    """検査器の誤りを並べる。"""
+    # 型スタブの iter_errors は、引数を JSON の値の型に限る多重定義と、型の無い多重定義を持つ。
+    # YAML から読んだ値は型が決まらないため、型の無い呼び出しとして扱う
+    iterate: Callable[[object], Iterator[ValidationError]] = cast("Any", validator).iter_errors
+    return list(iterate(value))

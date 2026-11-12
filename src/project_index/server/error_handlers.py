@@ -1,5 +1,4 @@
 """例外から RFC 9457 の problem+json への変換。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
@@ -12,6 +11,7 @@ from pydantic.alias_generators import to_camel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from project_index.shared.errors import InvalidArgumentError, ProjectIndexError
+from project_index.shared.narrowing import is_dict, is_list
 from project_index.shared.schema_check import format_path
 
 if TYPE_CHECKING:
@@ -27,12 +27,14 @@ BAD_REQUEST = 400
 NOT_PARSEABLE_PARTS = ("body", "query", "path")
 
 
-def _camelize(value: Any) -> Any:  # noqa: ANN401
+def _camelize(value: object) -> object:
     """入れ子のキーを camelCase にする（値が全て配列の辞書は文書の ID などの索引なのでキーを保つ）。"""
-    if isinstance(value, dict):
-        keep = bool(value) and all(isinstance(item, list) for item in value.values())
-        return {(key if keep else to_camel(key)): _camelize(item) for key, item in value.items()}
-    if isinstance(value, list):
+    if is_dict(value):
+        keep = bool(value) and all(is_list(item) for item in value.values())
+        return {
+            (key if keep else to_camel(str(key))): _camelize(item) for key, item in value.items()
+        }
+    if is_list(value):
         return [_camelize(item) for item in value]
     return value
 
@@ -75,12 +77,14 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(ProjectIndexError)
     async def project_index_error(request: Request, error: Exception) -> Response:
-        assert isinstance(error, ProjectIndexError)  # noqa: S101
+        if not isinstance(error, ProjectIndexError):
+            raise error
         return problem_of(error)
 
     @app.exception_handler(RequestValidationError)
     async def request_invalid(request: Request, error: Exception) -> Response:
-        assert isinstance(error, RequestValidationError)  # noqa: S101
+        if not isinstance(error, RequestValidationError):
+            raise error
         errors = [
             {
                 "path": format_path(
@@ -101,7 +105,8 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error(request: Request, error: Exception) -> Response:
-        assert isinstance(error, StarletteHTTPException)  # noqa: S101
+        if not isinstance(error, StarletteHTTPException):
+            raise error
         # 例外のヘッダー（405 の `Allow` など）は応答に載せる
         return _problem(
             "HttpError",

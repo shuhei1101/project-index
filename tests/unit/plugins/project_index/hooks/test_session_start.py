@@ -1,4 +1,3 @@
-# pyright: reportUnknownArgumentType=warning, reportUnknownLambdaType=warning
 from __future__ import annotations
 
 import io

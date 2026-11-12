@@ -4,7 +4,6 @@ Usage:
 # Claude Code が stdin に PreToolUse の入力の JSON を渡して実行する
 python3 pre_tool_use.py
 """
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning
 
 from __future__ import annotations
 

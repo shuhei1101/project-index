@@ -1,9 +1,10 @@
 """検索の結果の Markdown。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
+
+from project_index.shared.narrowing import is_list
 
 if TYPE_CHECKING:
     from project_index.features.search.types import SearchItem, SearchResult, Snippet
@@ -22,11 +23,11 @@ def _title(name: str) -> str:
     return COLUMN_TITLES.get(name, name.removeprefix("@"))
 
 
-def _cell(value: Any) -> str:  # noqa: ANN401
+def _cell(value: object) -> str:
     """表のセルの文字列にする。"""
     if value is None:
         return ""
-    if isinstance(value, list):
+    if is_list(value):
         return ARRAY_JOINER.join(str(item) for item in value)
     return str(value).replace("|", "\\|").replace("\n", "<br>")
 

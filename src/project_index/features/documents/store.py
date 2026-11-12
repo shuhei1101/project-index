@@ -1,5 +1,4 @@
 """文書のキャッシュと ID の引き当て。"""
-# pyright: reportUnknownArgumentType=warning
 
 from __future__ import annotations
 
@@ -8,7 +7,7 @@ import hashlib
 import logging
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from project_index.features.access.types import Target
 from project_index.features.documents.aliases import collect_aliases
@@ -25,6 +24,7 @@ from project_index.features.history.query import file_dates, resolve_ref
 from project_index.features.history.types import FileDates
 from project_index.integrations.git import GitError, run_git
 from project_index.shared.errors import DocumentNotFoundError
+from project_index.shared.narrowing import is_dict
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
 
 if TYPE_CHECKING:
@@ -121,7 +121,9 @@ class DocumentStore:
         """`ref` を持つ読む場所の commit を返す（`commit` が無いときだけ解く）。"""
         if target.commit is not None:
             return target.commit
-        assert target.ref is not None  # noqa: S101
+        if target.ref is None:
+            msg = "読む場所に ref がありません"
+            raise RuntimeError(msg)
         source = target.source
         repo_root = source.repo_root or source.root
         return resolve_ref(repo_root, target.ref, date_base=source.config.default_ref).commit
@@ -401,9 +403,10 @@ class DocumentStore:
             raw = load_yaml(path.read_text(encoding="utf-8"), file=str(path))
         except OSError, UnicodeDecodeError, YamlLoadError:
             return startup_schema(source, table)
-        if not isinstance(raw, dict):
+        if not is_dict(raw):
             return startup_schema(source, table)
-        resolved = resolve_schema_refs(raw, path)
+        # YAML から読んだ辞書のキーは文字列として扱う
+        resolved = resolve_schema_refs(cast("dict[str, Any]", raw), path)
         with self._lock:
             self._schemas[path] = (stat.st_mtime_ns, stat.st_size, resolved)
         return resolved
@@ -426,9 +429,9 @@ class DocumentStore:
             raw = load_yaml(path.read_text(encoding="utf-8"), file=str(path))
         except OSError, UnicodeDecodeError, YamlLoadError:
             return resolve_schema_refs(startup, base)
-        if not isinstance(raw, dict):
+        if not is_dict(raw):
             return resolve_schema_refs(startup, base)
-        resolved = resolve_schema_refs(raw, path)
+        resolved = resolve_schema_refs(cast("dict[str, Any]", raw), path)
         with self._lock:
             self._revision_schemas[key] = resolved
         return resolved

@@ -1,34 +1,37 @@
 """項目の操作を当てる。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
 import copy
 import re
-from collections.abc import Iterable, Mapping, MutableMapping
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 from project_index.features.documents.fields import delete_field, get_field, set_field
 from project_index.shared.errors import InvalidArgumentError, Violation
+from project_index.shared.narrowing import is_dict, is_list
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping, MutableMapping
+
     from project_index.features.sources.types import DocumentTable
-    from project_index.features.write.types import Operation
+    from project_index.features.write.types import Operation, TextEdit
 
 
-def _merge(target: MutableMapping[str, Any], value: Mapping[str, Any]) -> None:
+def _merge(target: dict[object, object], value: dict[object, object]) -> None:
     """オブジェクトは今の値へ再帰でマージし、配列とスカラーは置き換える。"""
     for key, item in value.items():
-        if isinstance(item, Mapping) and isinstance(target.get(key), MutableMapping):
-            _merge(target[key], item)
+        existing = target.get(key)
+        if is_dict(item) and is_dict(existing):
+            _merge(existing, item)
         else:
             target[key] = copy.deepcopy(item)
 
 
-def _set(content: MutableMapping[str, Any], path: str, value: Any) -> None:  # noqa: ANN401
+def _set(content: MutableMapping[str, Any], path: str, value: object) -> None:
     """項目のパスへ値を入れる（オブジェクトなら今の値へマージする）。"""
     existing = get_field(content, path)
-    if isinstance(value, Mapping) and isinstance(existing, MutableMapping):
+    if is_dict(value) and is_dict(existing):
         _merge(existing, value)
     else:
         set_field(content, path, copy.deepcopy(value))
@@ -39,10 +42,11 @@ def _violation(path: str, rule: str, fix: str = "") -> Violation:
     return Violation(path=path, rule=rule, fix=fix)
 
 
-def apply_operation(current: Mapping[str, Any] | None, operation: Operation) -> dict[str, Any]:  # noqa: C901
+def apply_operation(current: Mapping[str, Any] | None, operation: Operation) -> dict[str, Any]:
     """文書の内容に 1 件の操作を当てた新しい内容を返す。"""
     if operation.op in ("create", "replace"):
         return copy.deepcopy(operation.data or {})
+    # 往復編集の内容（CommentedMap）は型を保ったまま複製する
     content = cast("dict[str, Any]", copy.deepcopy(current if current is not None else {}))
     violations: list[Violation] = []
     for path, value in operation.set.items():
@@ -54,26 +58,49 @@ def apply_operation(current: Mapping[str, Any] | None, operation: Operation) -> 
             )
     for path in operation.unset:
         delete_field(content, path)
-    for path, values in operation.add_to.items():
+    violations.extend(_add_to(content, operation.add_to))
+    violations.extend(_remove_from(content, operation.remove_from))
+    violations.extend(_text_edits(content, operation.text_edits))
+    if violations:
+        raise InvalidArgumentError(message="操作を適用できません", violations=violations)
+    return content
+
+
+def _add_to(content: dict[str, Any], add_to: Mapping[str, list[Any]]) -> list[Violation]:
+    """配列の項目へ値を追加する（項目が無ければ空の配列を作る）。"""
+    violations: list[Violation] = []
+    for path, values in add_to.items():
         existing = get_field(content, path)
         if existing is None:
             set_field(content, path, [])
             existing = get_field(content, path)
-        if not isinstance(existing, list):
+        if not is_list(existing):
             violations.append(_violation(f"add_to.{path}", "配列ではない項目へは追加できません"))
             continue
         existing.extend(copy.deepcopy(item) for item in values)
-    for path, values in operation.remove_from.items():
+    return violations
+
+
+def _remove_from(content: dict[str, Any], remove_from: Mapping[str, list[Any]]) -> list[Violation]:
+    """配列の項目から値を削除する（項目が無ければ何もしない）。"""
+    violations: list[Violation] = []
+    for path, values in remove_from.items():
         existing = get_field(content, path)
         if existing is None:
             continue
-        if not isinstance(existing, list):
+        if not is_list(existing):
             violations.append(
                 _violation(f"remove_from.{path}", "配列ではない項目からは削除できません")
             )
             continue
         existing[:] = [item for item in existing if item not in values]
-    for index, edit in enumerate(operation.text_edits):
+    return violations
+
+
+def _text_edits(content: dict[str, Any], edits: list[TextEdit]) -> list[Violation]:
+    """文字列の項目の一部を置き換える。"""
+    violations: list[Violation] = []
+    for index, edit in enumerate(edits):
         text = get_field(content, edit.field)
         prefix = f"text_edits[{index}]"
         if not isinstance(text, str):
@@ -82,6 +109,7 @@ def apply_operation(current: Mapping[str, Any] | None, operation: Operation) -> 
             )
             continue
         count = text.count(edit.old) if edit.old else 0
+        # 一致が無いか、replace_all を付けずに複数に一致した: 置き換える箇所が決まらない
         if count == 0 or (count > 1 and not edit.replace_all):
             violations.append(
                 _violation(
@@ -93,9 +121,7 @@ def apply_operation(current: Mapping[str, Any] | None, operation: Operation) -> 
             )
             continue
         set_field(content, edit.field, text.replace(edit.old, edit.new))
-    if violations:
-        raise InvalidArgumentError(message="操作を適用できません", violations=violations)
-    return content
+    return violations
 
 
 HEAD_PATTERN = re.compile(r"^([^.\[\]]+)(.*)$")
@@ -152,14 +178,19 @@ def to_columns(operation: Operation, table: DocumentTable, *, index: int) -> Ope
     }
     if operation.data is not None:
         _check_overlap(operation.data, metadata, item="data", index=index)
-        data: dict[str, Any] = {}
-        for key, value in operation.data.items():
-            if key in metadata:
-                set_field(data, metadata[key], copy.deepcopy(value))
-            else:
-                data[key] = copy.deepcopy(value)
-        update["data"] = data
+        update["data"] = _data_to_columns(operation.data, metadata)
     return operation.model_copy(update=update)
+
+
+def _data_to_columns(data: Mapping[str, Any], metadata: Mapping[str, str]) -> dict[str, Any]:
+    """`data` の共通のキーを列名のパスへ書き直した内容を返す。"""
+    result: dict[str, Any] = {}
+    for key, value in data.items():
+        if key in metadata:
+            set_field(result, metadata[key], copy.deepcopy(value))
+        else:
+            result[key] = copy.deepcopy(value)
+    return result
 
 
 ALL_KEY_PATTERN = re.compile(r"^(?P<array>[^\[\]]+)\[\]\.(?P<item>[^.\[\]]+)$")
@@ -182,24 +213,35 @@ def _array_keys(
     return all_keys, selected_keys
 
 
-def _original(operation: Operation, current: Mapping[str, Any] | None, array: str) -> list[Any]:
+def _original(
+    operation: Operation, current: Mapping[str, Any] | None, array: str
+) -> list[dict[object, object]]:
     """書き戻す前の配列の複製（`update` は今の内容、`create`・`replace` は `data` の列名の値）。"""
     source = current if operation.op == "update" else operation.data
     value = get_field(source, array) if source is not None else None
-    if not isinstance(value, list) or not all(isinstance(item, Mapping) for item in value):
+    if not is_list(value):
         return []
-    return copy.deepcopy(value)
+    elements = [item for item in value if is_dict(item)]
+    if len(elements) != len(value):
+        return []
+    return copy.deepcopy(elements)
 
 
-def _rebuild(elements: list[Any], item: str, names: Iterable[Any]) -> list[Any]:
+def _rebuild(
+    elements: list[dict[object, object]], item: str, names: Iterable[object]
+) -> list[dict[object, object]]:
     """渡した名前の並びで配列を作り直す（元からあった名前の要素は他のキーを保つ）。"""
     by_name = {element.get(item): element for element in elements}
     return [by_name.get(name, {item: name}) for name in names]
 
 
 def _apply_all_key(
-    elements: list[Any], item: str, key: str, operation: Operation, data: Mapping[str, Any]
-) -> tuple[list[Any], bool]:
+    elements: list[dict[object, object]],
+    item: str,
+    key: str,
+    operation: Operation,
+    data: Mapping[str, Any],
+) -> tuple[list[dict[object, object]], bool]:
     """全ての要素のキーへの操作を当て、配列と列を削除したかを返す。"""
     if key in data:
         elements = _rebuild(elements, item, data[key])
@@ -217,8 +259,45 @@ def _apply_all_key(
     return elements, key in operation.unset
 
 
-def _apply_selected_key(  # noqa: C901
-    elements: list[Any],
+def _mark(elements: list[dict[object, object]], flag: str, item: str, chosen: set[object]) -> None:
+    """選んだ名前の要素だけに真偽値のキーを立て、他の要素からは削除する。"""
+    for element in elements:
+        if element.get(item) in chosen:
+            element[flag] = True
+        else:
+            element.pop(flag, None)
+
+
+def _known(
+    names: Iterable[object], by_name: Mapping[object, object], where: str, problem: _Problem
+) -> tuple[list[object], list[Violation]]:
+    """配列にある名前と、配列に無い名前の違反を返す。"""
+    found: list[object] = []
+    violations: list[Violation] = []
+    for name in names:
+        if name in by_name:
+            found.append(name)
+        else:
+            violations.append(
+                Violation(
+                    path=f"operations[{problem.index}].{where}.{problem.key}",
+                    rule=f"{name} は {problem.label} にありません",
+                )
+            )
+    return found, violations
+
+
+@dataclass(frozen=True)
+class _Problem:
+    """選んだ要素のキーの違反に記載する、操作の位置・キー・配列の名前。"""
+
+    index: int
+    key: str
+    label: str
+
+
+def _apply_selected_key(
+    elements: list[dict[object, object]],
     names_of: tuple[str, str],
     key: str,
     operation: Operation,
@@ -230,50 +309,71 @@ def _apply_selected_key(  # noqa: C901
     """選んだ要素のキーへの操作を配列へ当て、配列に無い名前の違反を返す。"""
     flag, item = names_of
     by_name = {element.get(item): element for element in elements}
+    problem = _Problem(index=index, key=key, label=label)
     violations: list[Violation] = []
-
-    def known(names: Iterable[Any], where: str) -> list[Any]:
-        found = []
-        for name in names:
-            if name in by_name:
-                found.append(name)
-            else:
-                violations.append(
-                    Violation(
-                        path=f"operations[{index}].{where}.{key}",
-                        rule=f"{name} は {label} にありません",
-                    )
-                )
-        return found
-
-    if key in data:
-        chosen = set(known(data[key], "data"))
-        for element in elements:
-            if element.get(item) in chosen:
-                element[flag] = True
-            else:
-                element.pop(flag, None)
-    if key in operation.set:
-        chosen = set(known(operation.set[key], "set"))
-        for element in elements:
-            if element.get(item) in chosen:
-                element[flag] = True
-            else:
-                element.pop(flag, None)
+    # data・set は渡した名前の要素だけを選び直す
+    for where, values in (("data", data), ("set", operation.set)):
+        if key in values:
+            chosen, missing = _known(values[key], by_name, where, problem)
+            violations.extend(missing)
+            _mark(elements, flag, item, set(chosen))
     if key in operation.add_to:
-        for name in known(operation.add_to[key], "add_to"):
+        chosen, missing = _known(operation.add_to[key], by_name, "add_to", problem)
+        violations.extend(missing)
+        for name in chosen:
             by_name[name][flag] = True
     if key in operation.remove_from:
         for name in operation.remove_from[key]:
             if name in by_name:
                 by_name[name].pop(flag, None)
     if key in operation.unset:
-        for element in elements:
-            element.pop(flag, None)
+        _mark(elements, flag, item, set())
     return violations
 
 
-def expand_array_keys(  # noqa: C901
+def _name_violations(
+    operation: Operation, data: Mapping[str, Any], collected: set[str], *, index: int
+) -> list[Violation]:
+    """集めたキーへの文字列の置き換えと、名前（文字列）の配列でない値を違反にする。"""
+    violations = [
+        Violation(
+            path=f"operations[{index}].text_edits[{number}].field",
+            rule=f"{edit.field} は文字列の項目ではありません",
+        )
+        for number, edit in enumerate(operation.text_edits)
+        if edit.field in collected
+    ]
+    for field, values in (
+        ("data", data),
+        ("set", operation.set),
+        ("add_to", operation.add_to),
+        ("remove_from", operation.remove_from),
+    ):
+        violations.extend(
+            Violation(
+                path=f"operations[{index}].{field}.{key}",
+                rule=f"{key} は名前（文字列）の配列で指定します",
+            )
+            for key, value in values.items()
+            if key in collected and not _is_names(value)
+        )
+    return violations
+
+
+def _is_names(value: object) -> bool:
+    """値が名前（文字列）の配列か。"""
+    return is_list(value) and all(isinstance(name, str) for name in value)
+
+
+def _raise_if(violations: list[Violation]) -> None:
+    """違反があれば `InvalidArgumentError` を送る。"""
+    if violations:
+        raise InvalidArgumentError(
+            message=f"引数が正しくありません: {len(violations)} 件", violations=violations
+        )
+
+
+def expand_array_keys(
     operation: Operation, table: DocumentTable, current: Mapping[str, Any] | None, *, index: int
 ) -> Operation:
     """列名が `[]`・`[{キー}]` を含む共通のキーへの操作を、オブジェクトの配列の列の置き換えにした操作を返す。"""
@@ -289,35 +389,9 @@ def expand_array_keys(  # noqa: C901
         | set(operation.unset)
         | set(data)
     ) & collected
-    violations = [
-        Violation(
-            path=f"operations[{index}].text_edits[{number}].field",
-            rule=f"{edit.field} は文字列の項目ではありません",
-        )
-        for number, edit in enumerate(operation.text_edits)
-        if edit.field in collected
-    ]
     # 集めたキーの値が名前（文字列）の配列でなければ、操作を当てる前に違反にする
-    for field, values in (
-        ("data", data),
-        ("set", operation.set),
-        ("add_to", operation.add_to),
-        ("remove_from", operation.remove_from),
-    ):
-        violations.extend(
-            Violation(
-                path=f"operations[{index}].{field}.{key}",
-                rule=f"{key} は名前（文字列）の配列で指定します",
-            )
-            for key, value in values.items()
-            if key in collected
-            and not (isinstance(value, list) and all(isinstance(name, str) for name in value))
-        )
-    if violations:
-        raise InvalidArgumentError(
-            message=f"引数が正しくありません: {len(violations)} 件", violations=violations
-        )
-    arrays: dict[str, list[Any]] = {}
+    _raise_if(_name_violations(operation, data, collected, index=index))
+    arrays: dict[str, list[dict[object, object]]] = {}
     unset_arrays: set[str] = set()
     for key in sorted(used & set(all_keys), key=list(all_keys).index):
         array, item = all_keys[key]
@@ -325,6 +399,7 @@ def expand_array_keys(  # noqa: C901
         arrays[array], removed = _apply_all_key(elements, item, key, operation, data)
         if removed:
             unset_arrays.add(array)
+    violations: list[Violation] = []
     for key in sorted(used & set(selected_keys), key=list(selected_keys).index):
         array, flag, item = selected_keys[key]
         elements = arrays.setdefault(array, _original(operation, current, array))
@@ -337,28 +412,43 @@ def expand_array_keys(  # noqa: C901
                 elements, (flag, item), key, operation, data, label=label, index=index
             )
         )
-    if violations:
-        raise InvalidArgumentError(
-            message=f"引数が正しくありません: {len(violations)} 件", violations=violations
-        )
+    _raise_if(violations)
     if not arrays:
         return operation
+    return operation.model_copy(
+        update=_array_update(operation, data, collected, arrays, unset_arrays)
+    )
+
+
+def _array_update(
+    operation: Operation,
+    data: Mapping[str, Any],
+    collected: set[str],
+    arrays: dict[str, list[dict[object, object]]],
+    unset_arrays: set[str],
+) -> dict[str, Any]:
+    """集めたキーを除いた操作に、書き戻した配列の列の置き換えを足した更新を作る。"""
+    update_set = _without(operation.set, collected)
+    unset = [k for k in operation.unset if k not in collected]
     update: dict[str, Any] = {
-        "set": {k: v for k, v in operation.set.items() if k not in collected},
-        "add_to": {k: v for k, v in operation.add_to.items() if k not in collected},
-        "remove_from": {k: v for k, v in operation.remove_from.items() if k not in collected},
-        "unset": [k for k in operation.unset if k not in collected],
+        "set": update_set,
+        "add_to": _without(operation.add_to, collected),
+        "remove_from": _without(operation.remove_from, collected),
+        "unset": unset,
     }
+    kept = {array: elements for array, elements in arrays.items() if array not in unset_arrays}
+    # update は列の置き換えか削除、create・replace は data へ書き戻す
     if operation.op == "update":
-        for array, elements in arrays.items():
-            if array in unset_arrays:
-                update["unset"].append(array)
-            else:
-                update["set"][array] = elements
-    else:
-        rebuilt = {k: copy.deepcopy(v) for k, v in data.items() if k not in collected}
-        for array, elements in arrays.items():
-            if array not in unset_arrays:
-                set_field(rebuilt, array, elements)
-        update["data"] = rebuilt
-    return operation.model_copy(update=update)
+        unset.extend(array for array in arrays if array in unset_arrays)
+        update_set.update(kept)
+        return update
+    rebuilt = copy.deepcopy(_without(data, collected))
+    for array, elements in kept.items():
+        set_field(rebuilt, array, elements)
+    update["data"] = rebuilt
+    return update
+
+
+def _without[V](values: Mapping[str, V], keys: set[str]) -> dict[str, V]:
+    """`keys` のキーを除いた辞書を返す。"""
+    return {key: value for key, value in values.items() if key not in keys}

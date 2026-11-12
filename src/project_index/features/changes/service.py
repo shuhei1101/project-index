@@ -1,11 +1,10 @@
 """`list_changes` の処理。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
 import re
 from dataclasses import replace
-from datetime import date
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from project_index.features.access.service import resolve_read_targets
@@ -184,7 +183,9 @@ def _range_documents(
     source = target.source
     repo_root = source.repo_root or source.root
     default_ref = source.config.default_ref
-    assert request.from_ is not None  # noqa: S101
+    if request.from_ is None:
+        msg = "区間の始点がありません"
+        raise RuntimeError(msg)
     start = resolve_ref(repo_root, request.from_, date_base=default_ref, argument="from")
     end = (
         resolve_ref(repo_root, request.to, date_base=default_ref, argument="to")
@@ -216,7 +217,9 @@ def _word_change(
         count_before = count_occurrences(old.body, query) if old else 0
         count_after = count_occurrences(new.body, query) if new else 0
         judged = new or old
-        assert judged is not None  # noqa: S101
+        if judged is None:
+            msg = "比べる文書がありません"
+            raise RuntimeError(msg)
         last_seen[doc_id] = judged
         if count_before != count_after:
             found.setdefault(doc_id, []).append(
@@ -230,7 +233,7 @@ def _word_change(
             )
 
 
-def _commit_point(commit: str, moment: Any) -> RangePoint:  # noqa: ANN401
+def _commit_point(commit: str, moment: Any) -> RangePoint:
     """commit の端（`input` を空にして、commit（短縮）と日時を持つ）を作る。"""
     return RangePoint("", commit[:SHORT_COMMIT], moment)
 
@@ -275,7 +278,7 @@ def _word_changes_in_range(
     return found, last_seen
 
 
-def list_changes(  # noqa: C901
+def list_changes(
     request: ChangesRequest,
     *,
     registry: SourceRegistry,
@@ -400,7 +403,9 @@ def list_changes(  # noqa: C901
                 continue
             keys = list(values)
             judged = new or old or word_documents[doc_id]
-            if not match_filter(request.filter, judged, fields=fields, today=date.today()):  # noqa: DTZ011
+            if not match_filter(
+                request.filter, judged, fields=fields, today=datetime.now(UTC).astimezone().date()
+            ):
                 continue
             diff = (
                 diff_lines(old.body if old else "", new.body if new else "")

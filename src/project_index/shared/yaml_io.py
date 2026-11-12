@@ -1,14 +1,16 @@
 """YAML の読み込みと往復編集の読み書き。"""
-# pyright: reportUnknownMemberType=warning
 
 from __future__ import annotations
 
 from io import StringIO
-from typing import Any
+from typing import TYPE_CHECKING
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 from ruamel.yaml.error import MarkedYAMLError
+
+if TYPE_CHECKING:
+    from ruamel.yaml.main import Representer
 
 YAML_WIDTH = 4096
 YAML_INDENT = {"mapping": 2, "sequence": 4, "offset": 2}
@@ -51,7 +53,7 @@ def _error_from(error: Exception, file: str | None, text: str) -> YamlLoadError:
     return YamlLoadError(reason, file=file, line=line, column=mark.column + 1)
 
 
-def load_yaml(text: str, *, file: str | None = None) -> Any:  # noqa: ANN401
+def load_yaml(text: str, *, file: str | None = None) -> object:
     """YAML の文字列を素の値で読む。"""
     yaml = YAML(typ="safe", pure=True)
     try:
@@ -89,7 +91,7 @@ def dump_roundtrip(doc: CommentedMap) -> str:
     return stream.getvalue()
 
 
-def _represent_str(representer: Any, data: str) -> Any:  # noqa: ANN401
+def _represent_str(representer: Representer, data: str) -> object:
     """改行を含む引用符なしの文字列をブロックのリテラル（`|-`）で書く。"""
     if "\n" in data:
         return representer.represent_scalar("tag:yaml.org,2002:str", data, style="|")

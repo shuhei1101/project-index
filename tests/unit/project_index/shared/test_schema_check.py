@@ -1,4 +1,3 @@
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 from __future__ import annotations
 
 from jsonschema import Draft202012Validator

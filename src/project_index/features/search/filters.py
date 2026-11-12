@@ -44,7 +44,7 @@ def _midnight(day: date) -> datetime:
     return datetime(day.year, day.month, day.day, tzinfo=UTC)
 
 
-def parse_compare_value(value: str, field_type: str, *, today: date) -> Any:  # noqa: ANN401
+def parse_compare_value(value: str, field_type: str, *, today: date) -> Any:
     """条件の値を項目の型で解釈する。"""
     try:
         if field_type == "date":
@@ -123,7 +123,9 @@ def _check_condition(condition: Condition, path: str, fields: Mapping[str, str])
                 )
         elif condition.op in COMPARE_OPS and condition.field in fields:
             try:
-                parse_compare_value(value, fields[condition.field], today=date.today())  # noqa: DTZ011
+                parse_compare_value(
+                    value, fields[condition.field], today=datetime.now(UTC).astimezone().date()
+                )
             except ValueError as error:
                 violations.append(
                     Violation(
@@ -189,7 +191,7 @@ def _check_body_range(request: SearchRequest) -> list[Violation]:
     return violations
 
 
-def _text(value: Any) -> str:  # noqa: ANN401
+def _text(value: Any) -> str:
     """比べる値を文字列にする。"""
     if isinstance(value, datetime):
         return value.isoformat()
@@ -198,7 +200,7 @@ def _text(value: Any) -> str:  # noqa: ANN401
     return str(value)
 
 
-def _comparable(value: Any, field_type: str) -> Any:  # noqa: ANN401
+def _comparable(value: Any, field_type: str) -> Any:
     """文書の値を項目の型にそろえる（そろえられなければ `None`）。"""
     try:
         if field_type == "date":

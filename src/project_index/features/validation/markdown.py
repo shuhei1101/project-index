@@ -1,22 +1,22 @@
 """変えた Markdown の値を mdmark の点検に通し、描画時の書き方の警告を違反にする。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from jsonschema import Draft202012Validator
+from jsonschema import validators as jsonschema_validators
 from jsonschema.exceptions import ValidationError
-from jsonschema.validators import extend, validator_for
+from jsonschema.validators import validator_for
 
 from project_index.integrations.mdmark import MdmarkUnavailableError, check_markdown
 from project_index.shared.errors import Violation
 from project_index.shared.schema_check import format_path
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator, Mapping
+    from collections.abc import Callable, Iterable, Iterator, Mapping
     from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,20 @@ logger = logging.getLogger(__name__)
 MARKDOWN_MEDIA_TYPE = "text/markdown"
 BLOCKING_KINDS = frozenset({"diagram_invalid", "syntax_warning"})
 MEDIA_TYPE_KEYWORD = "contentMediaType"
+
+
+class _Validator(Protocol):
+    """`extend` で作った検査器のうち使うメソッド。"""
+
+    def iter_errors(self, instance: object) -> Iterator[ValidationError]:
+        """値の誤りを並べる。"""
+        ...
+
+
+# 型スタブの `extend` は型を持たないため、検査器の型を返す関数として読む
+_EXTEND: Callable[..., Callable[[dict[str, Any]], _Validator]] = vars(jsonschema_validators)[
+    "extend"
+]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -45,9 +59,9 @@ class MarkdownCheck:
 
 
 def _mark_markdown(
-    validator: Any,  # noqa: ANN401
-    value: Any,  # noqa: ANN401
-    instance: Any,  # noqa: ANN401
+    validator: object,
+    value: object,
+    instance: object,
     schema: Mapping[str, Any],
 ) -> Iterator[ValidationError]:
     """`contentMediaType` が Markdown の文字列の位置に、目印の誤りを出す。"""
@@ -70,7 +84,7 @@ def markdown_values(data: Mapping[str, Any], schema: Mapping[str, Any]) -> dict[
         return {}
     base = validator_for(dict(schema), default=Draft202012Validator)
     # contentMediaType の処理だけを目印を出す処理に差し替える
-    marker_class = extend(base, validators={MEDIA_TYPE_KEYWORD: _mark_markdown})  # type: ignore[no-untyped-call]
+    marker_class = _EXTEND(base, validators={MEDIA_TYPE_KEYWORD: _mark_markdown})
     validator = marker_class(dict(schema))
     # 目印は文字列の値にだけ出すので、instance は str
     return {

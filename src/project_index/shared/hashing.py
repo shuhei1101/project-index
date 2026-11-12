@@ -15,7 +15,7 @@ def content_hash(data: str | bytes) -> str:
     return hashlib.sha256(raw).hexdigest()[:VERSION_LENGTH]
 
 
-def value_hash(value: Any) -> str:  # noqa: ANN401
+def value_hash(value: Any) -> str:
     """項目の値を正規化した JSON にしてハッシュを取る。"""
     text = json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str)
     return content_hash(text)
