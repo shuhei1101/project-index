@@ -1,64 +1,64 @@
 id: MOD-13
 title: 索引のサーバー / 変更 / render.py
-lead: '`list_changes` の結果の Markdown。'
+lead: '`list_changes` の結果の Markdown を受け持ち、変更の render.py を修正するときに参照する。'
 test_files:
-- tests/unit/project_index/features/changes/test_render.py
+  - tests/unit/project_index/features/changes/test_render.py
 functions:
-- name: render_changes_markdown
-  title: 変更の結果の Markdown
-  kind: 関数
-  container: project_index/features/changes/render.py
-  usecase: 変更
-  role: 変換
-  summary: '`format: markdown` の本文を作る'
-  scope: public
-  thread_safe: true
-  args:
-  - name: result
-    title: 変更の結果
-    type: ChangesResult
-    required: true
-    passing: positional
-    description: 描く結果
-  - name: source_label
-    title: 配信元の表示
-    type: str
-    required: true
-    passing: keyword
-    description: 先頭の行に出す配信元
-  returns:
-    type: str
-    description: Markdown
-  process: |-
-    1. `outside_scope` が `True` なら先頭に `作業範囲の外（参考）` の行を置く
-    2. 次の行に `{配信元}: {始点}（{日時}）→ {終点}（{日時}）・変わった文書 {total_count} 件` を置く（始点・終点は commit、無ければ渡した値）
-    3. `| id | 変更 | 変わったキー |` の表を置く。`contains_changes` を持つ文書があれば `単語の増減` の列を加え、区間ごとに `{kind} {後の端の commit（無ければ渡した値）}` を `・` で並べる
-    4. 差分の行があれば、文書ごとに `## {id}` と ```diff のかたまりを置く。`path` を持つ文書は ```diff のかたまりを `<document path="{path}" scope="section">` と `</document>` で包む
-    5. `notes` と `next_cursor` を検索と同じに置く
-  unit_tests:
-  - name: test_render_changes_markdown
-    case: 正常
-    summary: 区間と表
-    condition: 文書 1 が `modified` の結果
-    mock: なし
-    expected: '`sample: 3f2a9c1（...）→ 8b1d4e0（...）・変わった文書 1 件` と表の行 `| doc-1 | modified | name |`'
-  - name: test_render_changes_markdown_when_location
-    case: 正常
-    summary: 場所を持つ差分を包む
-    condition: '`diff` を持つ 2 件で、文書 1 は `path`・`scope: section` を持ち、文書 2 は `path` が `None`'
-    mock: なし
-    expected: 文書 1 の差分だけが `<document path="{path}" scope="section">` で包まれる
-    exception: '-'
-  - name: test_render_changes_markdown_when_contains
-    case: 正常
-    summary: 単語の増減の列
-    condition: 文書 1 が `unchanged` で、`contains_changes` が commit `3f2a9c1` の `added` と commit `8b1d4e0` の `removed`
-    mock: なし
-    expected: 表の見出しに `単語の増減` があり、文書 1 の行が `\| doc-1 \| unchanged \|  \| added 3f2a9c1・removed 8b1d4e0 \|`
-  - name: test_render_changes_markdown_when_outside_scope
-    case: 正常
-    summary: 作業範囲の外の表示
-    condition: '`outside_scope: true` の結果'
-    mock: なし
-    expected: 先頭の行が `作業範囲の外（参考）`
-    exception: '-'
+  - name: render_changes_markdown
+    title: 変更の結果の Markdown
+    kind: 関数
+    container: project_index/features/changes/render.py
+    usecase: 変更
+    role: 変換
+    summary: '`format: markdown` の本文を作る'
+    scope: public
+    thread_safe: true
+    args:
+      - name: result
+        title: 変更の結果
+        type: ChangesResult
+        required: true
+        passing: positional
+        description: 描く結果
+      - name: source_label
+        title: 配信元の表示
+        type: str
+        required: true
+        passing: keyword
+        description: 先頭の行に出す配信元
+    returns:
+      type: str
+      description: Markdown
+    process: |-
+      1. `outside_scope` が `True` なら先頭に `作業範囲の外（参考）` の行を置く
+      2. 次の行に `{配信元}: {始点}（{日時}）→ {終点}（{日時}）・変わった文書 {total_count} 件` を置く（始点・終点は commit、無ければ渡した値）
+      3. `| id | 変更 | 変わったキー |` の表を置く。`contains_changes` を持つ文書があれば `単語の増減` の列を加え、区間ごとに `{kind} {後の端の commit（無ければ渡した値）}` を `・` で並べる
+      4. 差分の行があれば、文書ごとに `## {id}` と ```diff のかたまりを置く。`path` を持つ文書は ```diff のかたまりを `<document path="{path}" scope="section">` と `</document>` で包む
+      5. `notes` と `next_cursor` を検索と同じに置く
+    unit_tests:
+      - name: test_render_changes_markdown
+        case: 正常
+        summary: 区間と表
+        condition: 文書 1 が `modified` の結果
+        mock: なし
+        expected: '`sample: 3f2a9c1（...）→ 8b1d4e0（...）・変わった文書 1 件` と表の行 `| doc-1 | modified | name |`'
+      - name: test_render_changes_markdown_when_location
+        case: 正常
+        summary: 場所を持つ差分を包む
+        condition: '`diff` を持つ 2 件で、文書 1 は `path`・`scope: section` を持ち、文書 2 は `path` が `None`'
+        mock: なし
+        expected: 文書 1 の差分だけが `<document path="{path}" scope="section">` で包まれる
+        exception: '-'
+      - name: test_render_changes_markdown_when_contains
+        case: 正常
+        summary: 単語の増減の列
+        condition: 文書 1 が `unchanged` で、`contains_changes` が commit `3f2a9c1` の `added` と commit `8b1d4e0` の `removed`
+        mock: なし
+        expected: 表の見出しに `単語の増減` があり、文書 1 の行が `\| doc-1 \| unchanged \|  \| added 3f2a9c1・removed 8b1d4e0 \|`
+      - name: test_render_changes_markdown_when_outside_scope
+        case: 正常
+        summary: 作業範囲の外の表示
+        condition: '`outside_scope: true` の結果'
+        mock: なし
+        expected: 先頭の行が `作業範囲の外（参考）`
+        exception: '-'

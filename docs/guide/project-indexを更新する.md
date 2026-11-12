@@ -23,7 +23,6 @@ update と project-index migrate で project-index を更新し、端末の設�
 ## 端末の設定を移し替える
 
 `update` が `migration_needed: true` を返したときの手順です。
-新しいバージョンが端末の設定の書き方を変えているので、移し替えてから再起動します。
 
 <!-- steps -->
 

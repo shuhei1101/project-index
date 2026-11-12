@@ -4,266 +4,290 @@ entry:
   kind: trigger
   value: Claude Code の SessionStart（startup・resume・clear・compact・fork）
 flows:
-- name: 正常系（待ち受けている）
-  summary: つながったサーバーには何も依頼せず、文脈を入れずに戻る
-  setup:
-  - name: Mock
-    description: 受けた要求を記録する HTTP サーバーを一時のポートで立てる
-    notes: '`PROJECT_INDEX_PORT` にそのポートを渡す'
-  - name: 入力
-    description: '`source: startup` と `session_id`・`cwd` の JSON を stdin に渡す'
-    notes: '`resume`・`fork` も同じ'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as Claude Code
-      participant H as セッション開始のフック
-      participant S as project-index
+  - name: 正常系（待ち受けている）
+    summary: つながったサーバーには何も依頼せず、文脈を入れずに戻る
+    setup:
+      - name: Mock
+        description: 受けた要求を記録する HTTP サーバーを一時のポートで立てる
+        notes: '`PROJECT_INDEX_PORT` にそのポートを渡す'
+      - name: 入力
+        description: '`source: startup` と `session_id`・`cwd` の JSON を stdin に渡す'
+        notes: '`resume`・`fork` も同じ'
+    flow: |-
+      <!-- map: {"title": "正常系（待ち受けている）"} -->
 
-      C->>H: stdin（session_id・cwd・source）
-      H-->>S: ポートへの接続
-      H-->>C: 出力なし（終了コード 0）
-    ```
-  expected:
-  - stdout が空
-  - Mock が HTTP の要求を受けていない
-  - 終了コード 0、プロセスを起動していない
-  test: test_normal_when_server_listening
-- name: 正常系（/clear の後）
-  summary: '`source` が `clear`・`compact` のとき、`POST /_admin/session-start` で返し済みの記録の削除を依頼し、文脈を入れずに戻る'
-  setup:
-  - name: Mock
-    description: '`POST /_admin/session-start` を真似る HTTP サーバーを一時のポートで立て、`forgotten: true` を返す'
-    notes: '`PROJECT_INDEX_PORT` にそのポートを渡す'
-  - name: 入力
-    description: '`source: clear` と `session_id`・`cwd` の JSON を stdin に渡す'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as Claude Code
-      participant H as セッション開始のフック
-      participant A as POST /_admin/session-start
+      ```mermaid
+      sequenceDiagram
+        participant C as Claude Code
+        participant H as セッション開始のフック
+        participant S as project-index
 
-      C->>H: stdin（session_id・cwd・source: clear）
-      H-->>A: ポートへの接続
-      H->>A: POST（session_id・agent_id・reason）
-      A-->>H: forgotten
-      H-->>C: 出力なし（終了コード 0）
-    ```
-  expected:
-  - stdout が空
-  - 'Mock が受けた本文が `session_id`・`reason: clear` の JSON で、`cwd` を持たない'
-  - 終了コード 0、プロセスを起動していない
-  test: test_normal_when_cleared
-- name: 正常系（落ちている）
-  summary: つながらなければ `project-index serve` を切り離して起動し、再接続を案内する
-  setup:
-  - name: Mock
-    description: '`{clone}/.venv/bin/python` を、受けた引数をファイルに書いて終わるスクリプトに差し替える'
-  - name: 端末の設定
-    description: '`clone:` にその一時フォルダを持つ `settings.yaml` を `PROJECT_INDEX_CONFIG` で指す'
-  - name: ポート
-    description: 空いているポートを `PROJECT_INDEX_PORT` に渡す
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as Claude Code
-      participant H as セッション開始のフック
-      participant S as project-index serve
+        C->>H: stdin（session_id・cwd・source）
+        H-->>S: ポートへの接続
+        H-->>C: 出力なし（終了コード 0）
+      ```
 
-      C->>H: stdin
-      H->>H: ポートにつながらない
-      H-->>H: 端末の設定の clone を読む
-      H->>S: 切り離して起動する
-      H-->>C: additionalContext（再接続の案内）
-    ```
-  expected:
-  - Mock が `-m project_index serve` を受けている
-  - '`additionalContext` が `/mcp` の再接続の案内'
-  - フックが起動したプロセスの終了を待たずに終了コード 0 で戻る
-  test: test_normal_when_server_down
-- name: 正常系（XDG_CONFIG_HOME の下の端末の設定）
-  summary: '`PROJECT_INDEX_CONFIG` が無ければ `XDG_CONFIG_HOME` の下の端末の設定の `clone` で起動する'
-  setup:
-  - name: Mock
-    description: '`{clone}/.venv/bin/python` を、受けた引数をファイルに書いて終わるスクリプトに差し替える'
-  - name: 端末の設定
-    description: '`clone:` にその一時フォルダを持つ `settings.yaml` を `$XDG_CONFIG_HOME/project-index/` に置き、`PROJECT_INDEX_CONFIG` を外す'
-    notes: 2 回目は `XDG_CONFIG_HOME` に相対パスを入れ、`HOME` の下の `.config/project-index/settings.yaml` に別の `clone:` を置く
-  - name: ポート
-    description: 空いているポートを `PROJECT_INDEX_PORT` に渡す
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as Claude Code
-      participant H as セッション開始のフック
-      participant S as project-index serve
+      <!-- /map -->
+    expected:
+      - stdout が空
+      - Mock が HTTP の要求を受けていない
+      - 終了コード 0、プロセスを起動していない
+    test: test_normal_when_server_listening
+  - name: 正常系（/clear の後）
+    summary: '`source` が `clear`・`compact` のとき、`POST /_admin/session-start` で返し済みの記録の削除を依頼し、文脈を入れずに戻る'
+    setup:
+      - name: Mock
+        description: '`POST /_admin/session-start` を真似る HTTP サーバーを一時のポートで立て、`forgotten: true` を返す'
+        notes: '`PROJECT_INDEX_PORT` にそのポートを渡す'
+      - name: 入力
+        description: '`source: clear` と `session_id`・`cwd` の JSON を stdin に渡す'
+    flow: |-
+      <!-- map: {"title": "正常系（/clear の後）"} -->
 
-      C->>H: stdin
-      H->>H: ポートにつながらない
-      H-->>H: $XDG_CONFIG_HOME/project-index/settings.yaml の clone を読む
-      H->>S: 切り離して起動する
-      H-->>C: additionalContext（再接続の案内）
-    ```
-  expected:
-  - '`$XDG_CONFIG_HOME/project-index/settings.yaml` の `clone` の Mock が `-m project_index serve` を受けている'
-  - '`XDG_CONFIG_HOME` が相対パスの 2 回目は、`HOME` の下の `.config/project-index/settings.yaml` の `clone` の Mock が受けている'
-  - フックが終了コード 0 で戻る
-  test: test_normal_when_xdg_config_home_set
-- name: 正常系（端末の設定が無い）
-  summary: 起動できない理由と `/project-index:global-setup` の案内を文脈に入れ、終了コード 0 で戻る
-  setup:
-  - name: Mock
-    description: なし
-  - name: 端末の設定
-    description: '`PROJECT_INDEX_CONFIG` が無いファイルを指す'
-  - name: ポート
-    description: 空いているポート
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as Claude Code
-      participant H as セッション開始のフック
+      ```mermaid
+      sequenceDiagram
+        participant C as Claude Code
+        participant H as セッション開始のフック
+        participant A as POST /_admin/session-start
 
-      C->>H: stdin
-      H->>H: ポートにつながらず、端末の設定も無い
-      H-->>C: additionalContext（理由と global-setup の案内）
-    ```
-  expected:
-  - 終了コード 0
-  - '`additionalContext` に端末の設定のパスと `/project-index:global-setup` がある'
-  - プロセスを起動していない
-  test: test_normal_when_terminal_config_missing
-- name: 正常系（記録の削除を依頼できない）
-  summary: '`POST /_admin/session-start` が `FORGET_TIMEOUT_SEC` 秒で返らないか 200 以外のとき、削除できなかったことと理由・`repeat_seen` の案内を文脈に入れて終了コード 0 で戻る'
-  setup:
-  - name: Mock
-    description: 接続は受けるが `POST /_admin/session-start` に `FORGET_TIMEOUT_SEC` より長く応答しない HTTP サーバー
-    notes: テストは `FORGET_TIMEOUT_SEC` を短くしてよい
-  - name: 入力
-    description: '`source: compact` と `session_id`・`cwd` の JSON'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as Claude Code
-      participant H as セッション開始のフック
-      participant A as POST /_admin/session-start
+        C->>H: stdin（session_id・cwd・source: clear）
+        H-->>A: ポートへの接続
+        H->>A: POST（session_id・agent_id・reason）
+        A-->>H: forgotten
+        H-->>C: 出力なし（終了コード 0）
+      ```
 
-      C->>H: stdin（source: compact）
-      H->>A: POST（session_id・reason）
-      H->>H: FORGET_TIMEOUT_SEC 秒で打ち切る
-      H-->>C: additionalContext（削除できなかったこと・打ち切った秒数と repeat_seen の案内）
-    ```
-  expected:
-  - '`FORGET_TIMEOUT_SEC` + 1 秒以内に終了コード 0 で戻る'
-  - '`additionalContext` に返却済みの記録を削除できなかったこと、打ち切った秒数（`FORGET_TIMEOUT_SEC`）と、前に返却した文書は `repeat_seen: true` で再取得できる旨がある'
-  - プロセスを起動していない
-  test: test_normal_when_forget_failed
-lead: ポートにつながらなければ `project-index serve` を切り離して起動し、再接続の案内か起動できない理由を文脈に入れる。つながったときは文脈を入れず、`/clear`・圧縮のときだけ `POST /_admin/session-start` で返し済みの記録の削除を依頼する。入力は stdin の JSON と環境変数。
+      <!-- /map -->
+    expected:
+      - stdout が空
+      - 'Mock が受けた本文が `session_id`・`reason: clear` の JSON で、`cwd` を持たない'
+      - 終了コード 0、プロセスを起動していない
+    test: test_normal_when_cleared
+  - name: 正常系（落ちている）
+    summary: つながらなければ `project-index serve` を切り離して起動し、再接続を案内する
+    setup:
+      - name: Mock
+        description: '`{clone}/.venv/bin/python` を、受けた引数をファイルに書いて終わるスクリプトに差し替える'
+      - name: 端末の設定
+        description: '`clone:` にその一時フォルダを持つ `settings.yaml` を `PROJECT_INDEX_CONFIG` で指す'
+      - name: ポート
+        description: 空いているポートを `PROJECT_INDEX_PORT` に渡す
+    flow: |-
+      <!-- map: {"title": "正常系（落ちている）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as Claude Code
+        participant H as セッション開始のフック
+        participant S as project-index serve
+
+        C->>H: stdin
+        H->>H: ポートにつながらない
+        H-->>H: 端末の設定の clone を読む
+        H->>S: 切り離して起動する
+        H-->>C: additionalContext（再接続の案内）
+      ```
+
+      <!-- /map -->
+    expected:
+      - Mock が `-m project_index serve` を受けている
+      - '`additionalContext` が `/mcp` の再接続の案内'
+      - フックが起動したプロセスの終了を待たずに終了コード 0 で戻る
+    test: test_normal_when_server_down
+  - name: 正常系（XDG_CONFIG_HOME の下の端末の設定）
+    summary: '`PROJECT_INDEX_CONFIG` が無ければ `XDG_CONFIG_HOME` の下の端末の設定の `clone` で起動する'
+    setup:
+      - name: Mock
+        description: '`{clone}/.venv/bin/python` を、受けた引数をファイルに書いて終わるスクリプトに差し替える'
+      - name: 端末の設定
+        description: '`clone:` にその一時フォルダを持つ `settings.yaml` を `$XDG_CONFIG_HOME/project-index/` に置き、`PROJECT_INDEX_CONFIG` を外す'
+        notes: 2 回目は `XDG_CONFIG_HOME` に相対パスを入れ、`HOME` の下の `.config/project-index/settings.yaml` に別の `clone:` を置く
+      - name: ポート
+        description: 空いているポートを `PROJECT_INDEX_PORT` に渡す
+    flow: |-
+      <!-- map: {"title": "正常系（XDG_CONFIG_HOME の下の端末の設定）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as Claude Code
+        participant H as セッション開始のフック
+        participant S as project-index serve
+
+        C->>H: stdin
+        H->>H: ポートにつながらない
+        H-->>H: $XDG_CONFIG_HOME/project-index/settings.yaml の clone を読む
+        H->>S: 切り離して起動する
+        H-->>C: additionalContext（再接続の案内）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`$XDG_CONFIG_HOME/project-index/settings.yaml` の `clone` の Mock が `-m project_index serve` を受けている'
+      - '`XDG_CONFIG_HOME` が相対パスの 2 回目は、`HOME` の下の `.config/project-index/settings.yaml` の `clone` の Mock が受けている'
+      - フックが終了コード 0 で戻る
+    test: test_normal_when_xdg_config_home_set
+  - name: 正常系（端末の設定が無い）
+    summary: 起動できない理由と `/project-index:global-setup` の案内を文脈に入れ、終了コード 0 で戻る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が無いファイルを指す'
+      - name: ポート
+        description: 空いているポート
+    flow: |-
+      <!-- map: {"title": "正常系（端末の設定が無い）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as Claude Code
+        participant H as セッション開始のフック
+
+        C->>H: stdin
+        H->>H: ポートにつながらず、端末の設定も無い
+        H-->>C: additionalContext（理由と global-setup の案内）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コード 0
+      - '`additionalContext` に端末の設定のパスと `/project-index:global-setup` がある'
+      - プロセスを起動していない
+    test: test_normal_when_terminal_config_missing
+  - name: 正常系（記録の削除を依頼できない）
+    summary: '`POST /_admin/session-start` が `FORGET_TIMEOUT_SEC` 秒で返らないか 200 以外のとき、削除できなかったことと理由・`repeat_seen` の案内を文脈に入れて終了コード 0 で戻る'
+    setup:
+      - name: Mock
+        description: 接続は受けるが `POST /_admin/session-start` に `FORGET_TIMEOUT_SEC` より長く応答しない HTTP サーバー
+        notes: テストは `FORGET_TIMEOUT_SEC` を短くしてよい
+      - name: 入力
+        description: '`source: compact` と `session_id`・`cwd` の JSON'
+    flow: |-
+      <!-- map: {"title": "正常系（記録の削除を依頼できない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as Claude Code
+        participant H as セッション開始のフック
+        participant A as POST /_admin/session-start
+
+        C->>H: stdin（source: compact）
+        H->>A: POST（session_id・reason）
+        H->>H: FORGET_TIMEOUT_SEC 秒で打ち切る
+        H-->>C: additionalContext（削除できなかったこと・打ち切った秒数と repeat_seen の案内）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`FORGET_TIMEOUT_SEC` + 1 秒以内に終了コード 0 で戻る'
+      - '`additionalContext` に返却済みの記録を削除できなかったこと、打ち切った秒数（`FORGET_TIMEOUT_SEC`）と、前に返却した文書は `repeat_seen: true` で再取得できる旨がある'
+      - プロセスを起動していない
+    test: test_normal_when_forget_failed
+lead: サーバーの起動と返却済みの記録の削除の依頼をする SessionStart のフックの入出力を定め、セッション開始のフックを修正するときに参照する。
 identifier: hooks/session_start.py
 permissions: 利用者の権限で動く
 idempotent: true
 side_effects: サーバーが待ち受けていなければ `project-index serve` のプロセスを 1 つ起動する。`clear`・`compact` ではサーバーがそのセッションの返し済みの記録を削除する
 callers:
-- SC-4#scenarios[正常シナリオ（SessionStart で起動する）]
-- SC-4#scenarios[正常シナリオ（待ち受けているサーバーがあるときは文脈を注入しない）]
-- SC-4#scenarios[異常シナリオ（SessionStart で起動できない）]
-- SC-4#scenarios[正常シナリオ（SessionStart で XDG_CONFIG_HOME の下の端末の設定から起動する）]
+  - SC-4#scenarios[正常シナリオ（SessionStart で起動する）]
+  - SC-4#scenarios[正常シナリオ（待ち受けているサーバーがあるときは文脈を注入しない）]
+  - SC-4#scenarios[異常シナリオ（SessionStart で起動できない）]
+  - SC-4#scenarios[正常シナリオ（SessionStart で XDG_CONFIG_HOME の下の端末の設定から起動する）]
 exclusivity: 同時に開いた複数のセッションがどれも起動してもよい。後から起動した `project-index serve` はポートが使用中（終了コード 3）で止まり、待ち受けるのは 1 つだけ
 request:
-- name: session_id
-  type: str
-  required: true
-  location: argument
-  description: Claude Code のセッション ID
-  notes: stdin の JSON
-- name: cwd
-  type: str
-  required: true
-  location: argument
-  description: セッションの作業場所
-  notes: stdin の JSON
-- name: source
-  type: Literal['startup', 'resume', 'clear', 'compact', 'fork']
-  required: true
-  location: argument
-  description: セッションが始まった理由
-  notes: stdin の JSON
-- name: agent_id
-  type: str
-  required: false
-  default: なし（メインのセッション）
-  location: argument
-  description: サブエージェントの ID
-  notes: stdin の JSON
-- name: PROJECT_INDEX_PORT
-  type: int
-  required: false
-  default: '`8786`'
-  description: サーバーのポート
-  notes: 環境変数
-- name: PROJECT_INDEX_CONFIG
-  type: str
-  required: false
-  default: '`${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`'
-  description: 端末の設定のパス
-  notes: 環境変数
-- name: XDG_CONFIG_HOME
-  type: str
-  required: false
-  default: '`~/.config`'
-  description: '`PROJECT_INDEX_CONFIG` が無いときに端末の設定を探すフォルダの親'
-  notes: 環境変数。空の文字列か相対パスは未設定として扱う
+  - name: session_id
+    type: str
+    required: true
+    location: argument
+    description: Claude Code のセッション ID
+    notes: stdin の JSON
+  - name: cwd
+    type: str
+    required: true
+    location: argument
+    description: セッションの作業場所
+    notes: stdin の JSON
+  - name: source
+    type: Literal['startup', 'resume', 'clear', 'compact', 'fork']
+    required: true
+    location: argument
+    description: セッションが始まった理由
+    notes: stdin の JSON
+  - name: agent_id
+    type: str
+    required: false
+    default: なし（メインのセッション）
+    location: argument
+    description: サブエージェントの ID
+    notes: stdin の JSON
+  - name: PROJECT_INDEX_PORT
+    type: int
+    required: false
+    default: '`8786`'
+    description: サーバーのポート
+    notes: 環境変数
+  - name: PROJECT_INDEX_CONFIG
+    type: str
+    required: false
+    default: '`${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`'
+    description: 端末の設定のパス
+    notes: 環境変数
+  - name: XDG_CONFIG_HOME
+    type: str
+    required: false
+    default: '`~/.config`'
+    description: '`PROJECT_INDEX_CONFIG` が無いときに端末の設定を探すフォルダの親'
+    notes: 環境変数。空の文字列か相対パスは未設定として扱う
 request_example: |-
   ```json
   {"session_id": "8f1c...", "cwd": "/home/u/repo/sample/.claude/worktrees/x", "source": "startup", "hook_event_name": "SessionStart"}
   ```
 response:
-- name: hookSpecificOutput.hookEventName
-  type: Literal['SessionStart']
-  description: 常に `SessionStart`
-- name: hookSpecificOutput.additionalContext
-  type: str
-  description: 起動したときは `/mcp` の再接続の案内。起動できないとき・記録の削除を依頼できないときは理由と次の手。つながって記録の削除が要らないか成功したときは出力しない
-- name: 終了コード
-  type: int
-  description: 常に 0
+  - name: hookSpecificOutput.hookEventName
+    type: Literal['SessionStart']
+    description: 常に `SessionStart`
+  - name: hookSpecificOutput.additionalContext
+    type: str
+    description: 起動したときは `/mcp` の再接続の案内。起動できないとき・記録の削除を依頼できないときは理由と次の手。つながって記録の削除が要らないか成功したときは出力しない
+  - name: 終了コード
+    type: int
+    description: 常に 0
 response_example: |-
   ```json
   {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "project-index を起動しました。このセッションで文書の MCP を使用するには /mcp で project-index に再接続してください。"}}
   ```
 exceptions:
-- name: なし（正常終了）
-  condition: 文脈を入れずに戻った、または起動して再接続を案内した
-- name: なし（起動できない）
-  condition: 端末の設定が無い・`clone` が無い・`{clone}/.venv/bin/python` が無い
-  notes: 終了コード 0 で、理由と `/project-index:global-setup` の案内を文脈に入れる
-- name: なし（記録の削除を依頼できない）
-  condition: '`clear`・`compact` でつながったが `POST /_admin/session-start` がタイムアウト・200 以外になった'
-  notes: '終了コード 0 で、理由と `repeat_seen: true` で再取得できる案内を文脈に入れる。打ち切ったときは打ち切った秒数も入れる'
+  - name: なし（正常終了）
+    condition: 文脈を入れずに戻った、または起動して再接続を案内した
+  - name: なし（起動できない）
+    condition: 端末の設定が無い・`clone` が無い・`{clone}/.venv/bin/python` が無い
+    notes: 終了コード 0 で、理由と `/project-index:global-setup` の案内を文脈に入れる
+  - name: なし（記録の削除を依頼できない）
+    condition: '`clear`・`compact` でつながったが `POST /_admin/session-start` がタイムアウト・200 以外になった'
+    notes: '終了コード 0 で、理由と `repeat_seen: true` で再取得できる案内を文脈に入れる。打ち切ったときは打ち切った秒数も入れる'
 constraints:
-- item: 言語
-  constraint: Python 3.14 の標準ライブラリだけ。`uv` を前提にしない
-- item: 接続の確かめ
-  constraint: '`127.0.0.1:${PROJECT_INDEX_PORT}` への TCP 接続を 0.5 秒で打ち切る'
-- item: 端末の設定のパス
-  constraint: '`PROJECT_INDEX_CONFIG`、無ければ `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`。`XDG_CONFIG_HOME` が空の文字列か相対パスなら未設定として扱う'
-  notes: docs/interface/開発ドキュメントサーバー/起動 の `端末の設定と状態の置き場` と同じ規則。フックはサーバーのパッケージを import しないため、同じ規則を持つ
-- item: 端末の設定の読み方
-  constraint: トップレベルの `clone:` の行だけを読む（`~` を展開し、引用符を外す）
-  notes: 標準ライブラリに YAML のパーサーが無いため
-- item: 起動
-  constraint: '`{clone}/.venv/bin/python -m project_index serve` を `start_new_session=True`・入出力を `DEVNULL` で起動し、待たずに戻る'
-  notes: 'shuhei1101/dev-docs#9 の PoC のとおり'
-- item: 記録の削除の依頼
-  constraint: '`source` が `clear`・`compact` で `session_id` があるときだけ、`urllib.request` で `POST /_admin/session-start` に JSON（`session_id`・`agent_id`・`reason` に `source`）を 1 回送信し、`FORGET_TIMEOUT_SEC`（3 秒）で打ち切る。`startup`・`resume`・`fork` では HTTP の要求を送信しない'
-  notes: サーバーはメモリの記録を削除するだけで配信元を読まないため、文脈の描画の 11 秒を引き継がない仮の値。規約『資源の値の決め方』の下流を待つタイムアウトとして、実装の後に応答の時間を測って決め直す
-- item: タイムアウト
-  constraint: '`hooks.json` の `timeout` は 6 秒'
-  notes: 内側の待ちの合計 3.5 秒（接続 0.5 秒 + 記録の削除の依頼 3 秒）に 50% を乗せて切り上げた値（規約『資源の値の決め方』の入れ子の待ち）。`FORGET_TIMEOUT_SEC` を決め直したら合わせて決め直す
-- item: 失敗の扱い
-  constraint: どの失敗でも終了コード 0 で戻り、セッションを止めない
-- item: 配信元を読み込んでいるサーバー
-  constraint: 待ち受けているサーバーが配信元を読み込んでいる間も、`POST /_admin/session-start` は読み込みを待たずに答える。フックの流れは `正常系（待ち受けている）`・`正常系（/clear の後）` と同じ
-  notes: docs/interface/開発ドキュメントサーバー/セッションの開始 の `正常系（配信元を読み込んでいる）`
+  - item: 言語
+    constraint: Python 3.14 の標準ライブラリだけ。`uv` を前提にしない
+  - item: 接続の確かめ
+    constraint: '`127.0.0.1:${PROJECT_INDEX_PORT}` への TCP 接続を 0.5 秒で打ち切る'
+  - item: 端末の設定のパス
+    constraint: '`PROJECT_INDEX_CONFIG`、無ければ `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`。`XDG_CONFIG_HOME` が空の文字列か相対パスなら未設定として扱う'
+    notes: '[起動](id:IF-15) の `端末の設定と状態の置き場` と同じ規則を、サーバーのパッケージを import せずに持つ'
+  - item: 端末の設定の読み方
+    constraint: トップレベルの `clone:` の行だけを読む（`~` を展開し、引用符を外す）
+    notes: 標準ライブラリに YAML のパーサーが無いため
+  - item: 起動
+    constraint: '`{clone}/.venv/bin/python -m project_index serve` を `start_new_session=True`・入出力を `DEVNULL` で起動し、待たずに戻る'
+    notes: 'shuhei1101/dev-docs#9 の PoC のとおり'
+  - item: 記録の削除の依頼
+    constraint: '`source` が `clear`・`compact` で `session_id` があるときだけ、`urllib.request` で `POST /_admin/session-start` に JSON（`session_id`・`agent_id`・`reason` に `source`）を 1 回送信し、`FORGET_TIMEOUT_SEC`（3 秒）で打ち切る。`startup`・`resume`・`fork` では HTTP の要求を送信しない'
+    notes: サーバーはメモリの記録を削除するだけで配信元を読まないため、文脈の描画の 11 秒を引き継がない仮の値。規約『資源の値の決め方』の下流を待つタイムアウトとして、実装の後に応答の時間を測って決め直す
+  - item: タイムアウト
+    constraint: '`hooks.json` の `timeout` は 6 秒'
+    notes: 内側の待ちの合計 3.5 秒（接続 0.5 秒 + 記録の削除の依頼 3 秒）に 50% を乗せて切り上げた値（規約『資源の値の決め方』の入れ子の待ち）。`FORGET_TIMEOUT_SEC` を決め直したら合わせて決め直す
+  - item: 失敗の扱い
+    constraint: どの失敗でも終了コード 0 で戻り、セッションを止めない
+  - item: 配信元を読み込んでいるサーバー
+    constraint: 待ち受けているサーバーが配信元を読み込んでいる間も、`POST /_admin/session-start` は読み込みを待たずに答える。フックの流れは `正常系（待ち受けている）`・`正常系（/clear の後）` と同じ
+    notes: '[セッションの開始](id:IF-21#flows[正常系（配信元を読み込んでいる）])'
 test_file: tests/integration/plugin/test_session_start.py

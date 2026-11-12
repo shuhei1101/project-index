@@ -1,233 +1,233 @@
 id: MOD-14
 title: 索引のサーバー / 変更 / service.py
-lead: '`list_changes` の区間か前回読んだ時点からの変わった文書と差分。'
+lead: '`list_changes` の区間か前回読んだ時点からの変わった文書と差分を受け持ち、変更の service.py を修正するときに参照する。'
 test_files:
-- tests/unit/project_index/features/changes/test_service.py
+  - tests/unit/project_index/features/changes/test_service.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      変更の一覧 ..> 読む場所の解決
-      変更の一覧 ..> リビジョンの解決 : from・to
-      変更の一覧 ..> 変わったファイル
-      変更の一覧 ..> 区間の commit : contains
-      変更の一覧 ..> リビジョンのファイル
-      変更の一覧 ..> 会話の記録 : 前回読んだ内容
-      変更の一覧 ..> 文字列からの文書の組み立て
-      変更の一覧 ..> 条件の照合
-      変更の一覧 ..> 変わったキー
-      変更の一覧 ..> 差分の行
-      変更の一覧 ..> 語の出現数 : contains
-      変更の一覧 ..> 変更の結果 : 返す
-      class 変更の一覧 {
-        <<function>>
-      }
-      class 読む場所の解決 {
-        <<function>>
-      }
-      class リビジョンの解決 {
-        <<function>>
-      }
-      class 変わったファイル {
-        <<function>>
-      }
-      class 区間の commit {
-        <<function>>
-      }
-      class リビジョンのファイル {
-        <<function>>
-      }
-      class 会話の記録 {
-        <<class>>
-      }
-      class 文字列からの文書の組み立て {
-        <<function>>
-      }
-      class 条件の照合 {
-        <<function>>
-      }
-      class 変わったキー {
-        <<function>>
-      }
-      class 差分の行 {
-        <<function>>
-      }
-      class 語の出現数 {
-        <<function>>
-      }
-      class 変更の結果 {
-        +区間
-        +文書: list
-      }
-      click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
-      click リビジョンの解決 href "./MOD-31.py.yaml#リビジョンの解決"
-      click 変わったファイル href "./MOD-31.py.yaml#変わったファイル"
-      click 区間の commit href "./MOD-31.py.yaml#区間の commit"
-      click リビジョンのファイル href "./MOD-31.py.yaml#リビジョンのファイル"
-      click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
-      click 文字列からの文書の組み立て href "./MOD-27.py.yaml#文字列からの文書の組み立て"
-      click 条件の照合 href "./MOD-53.py.yaml#条件の照合"
-      click 変わったキー href "./MOD-12.py.yaml#変わったキー"
-      click 差分の行 href "./MOD-12.py.yaml#差分の行"
-      click 語の出現数 href "./MOD-12.py.yaml#語の出現数"
-      click 変更の結果 href "./MOD-15.py.yaml#変更の結果"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        変更の一覧 ..> 読む場所の解決
+        変更の一覧 ..> リビジョンの解決 : from・to
+        変更の一覧 ..> 変わったファイル
+        変更の一覧 ..> 区間の commit : contains
+        変更の一覧 ..> リビジョンのファイル
+        変更の一覧 ..> 会話の記録 : 前回読んだ内容
+        変更の一覧 ..> 文字列からの文書の組み立て
+        変更の一覧 ..> 条件の照合
+        変更の一覧 ..> 変わったキー
+        変更の一覧 ..> 差分の行
+        変更の一覧 ..> 語の出現数 : contains
+        変更の一覧 ..> 変更の結果 : 返す
+        class 変更の一覧 {
+          <<function>>
+        }
+        class 読む場所の解決 {
+          <<function>>
+        }
+        class リビジョンの解決 {
+          <<function>>
+        }
+        class 変わったファイル {
+          <<function>>
+        }
+        class 区間の commit {
+          <<function>>
+        }
+        class リビジョンのファイル {
+          <<function>>
+        }
+        class 会話の記録 {
+          <<class>>
+        }
+        class 文字列からの文書の組み立て {
+          <<function>>
+        }
+        class 条件の照合 {
+          <<function>>
+        }
+        class 変わったキー {
+          <<function>>
+        }
+        class 差分の行 {
+          <<function>>
+        }
+        class 語の出現数 {
+          <<function>>
+        }
+        class 変更の結果 {
+          +区間
+          +文書: list
+        }
+        click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
+        click リビジョンの解決 href "./MOD-31.py.yaml#リビジョンの解決"
+        click 変わったファイル href "./MOD-31.py.yaml#変わったファイル"
+        click 区間の commit href "./MOD-31.py.yaml#区間の commit"
+        click リビジョンのファイル href "./MOD-31.py.yaml#リビジョンのファイル"
+        click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
+        click 文字列からの文書の組み立て href "./MOD-27.py.yaml#文字列からの文書の組み立て"
+        click 条件の照合 href "./MOD-53.py.yaml#条件の照合"
+        click 変わったキー href "./MOD-12.py.yaml#変わったキー"
+        click 差分の行 href "./MOD-12.py.yaml#差分の行"
+        click 語の出現数 href "./MOD-12.py.yaml#語の出現数"
+        click 変更の結果 href "./MOD-15.py.yaml#変更の結果"
 functions:
-- name: list_changes
-  title: 変更の一覧
-  kind: 関数
-  container: project_index/features/changes/service.py
-  usecase: 変更
-  role: サービス
-  summary: '`list_changes` の要求を処理して変更の結果を返す'
-  scope: public
-  thread_safe: true
-  args:
-  - name: request
-    title: 変更の一覧の要求
-    type: ChangesRequest
-    required: true
-    passing: positional
-    description: ツールの引数
-  - name: registry
-    title: 配信元の一覧
-    type: SourceRegistry
-    required: true
-    passing: injected
-    description: 配信中の配信元
-  - name: store
-    title: 文書のストア
-    type: DocumentStore
-    required: true
-    passing: injected
-    description: 今の文書を読む
-  - name: seen
-    title: 会話の記録
-    type: SeenStore
-    required: true
-    passing: injected
-    description: 前回読んだ内容
-  returns:
-    type: ChangesResult
-    description: 変更の結果
-  process: |-
-    1. `to` があって `from_` が無い場合、`InvalidArgumentError`（`to` には `from` が要ります）を送る
-    2. `contains.regex` が真で `contains.value` を `compile_regex` で読めない場合、`InvalidArgumentError`（`path` は `contains.value`、`rule` は `正規表現として読み込めません（{エラー}）`）を送る
-    3. 読む場所を解く（読む場所の解決。`ref` は渡さず、`outside_scope` を渡す。結果の `outside_scope` は読んだ場所のどれかが作業範囲の外なら `True`）。`from_` があり Git 管理外の配信元を含む場合、`InvalidArgumentError` を送る
-    4. 配信元ごとに前と後の文書を作る
-       - `from_` がある場合、始点・終点をリビジョンの解決（`argument` は `from`・`to`）で commit にし、2 つの commit（終点が無ければ作業ツリー）の間の前後の文書を作る。文書の行に当たる変わったファイル（`enabled` の行を上から見て、文書の行.行に当たるかが `True` の最初の行）ごとに、前はリビジョンのファイル、後は終点の commit のリビジョンのファイルか作業ツリーのファイルを、文字列からの文書の組み立てで文書にする（この組み立ては次の `contains` の commit ごとの比較でも使う）。`body_file` の本文は、ファイルと同じ端（前は始点の commit、後は終点の commit のリビジョンのファイルか作業ツリーのファイル）から読む（文字列からの文書の組み立ての `read_body`）。変わったファイルが今の文書（文書のストア.読み込み）の `body_path` に当たる場合、その文書の索引のファイル（`path`）も変わったファイルに加える
-       - `from_` が無い場合、会話の記録.前回読んだ内容を引く（会話キーが無い・全ての配信元で空なら `LastReadNotFoundError`）。前は記録の内容（`doc_kind` の行が `records` を持つなら、今の文書の `data`・メタデータに記録の内容を `body` にした文書を作る（`body_file` を持たない行は、記録の内容を YAML として読んだ辞書を `data` にする。読めなければ今の `data`）。今の文書が無ければ記録の内容だけを `body` にした文書にする。それ以外の行は文字列からの文書の組み立てにかける）、後は今の文書（文書のストア.ID で引く。無ければ消した）
-    5. `contains` がある場合、文書ごとに語の増減を集める
-       - `from_` がある場合、区間の commit（`to` が無ければ終点は作業ツリーの `HEAD`）の commit ごとに、親とその commit の間の前後の文書を作り、両方の文書の本文（`Document.body`）の語の出現数が違う文書へ `ContainsChange` を足す。`to` が無い場合、最後に `HEAD` と作業ツリーの間も比べる（後の端は `RangePoint(WORKTREE_LABEL)`）
-       - `from_` が無い場合、前と後の文書の出現数が違う文書へ、区間の端と同じ端の `ContainsChange` を 1 つ足す
-       - 出現数が増えたら `added`、減ったら `removed`。文書が無い側の数は 0
-    6. ID で突き合わせ、前にだけある文書を `deleted`、後にだけある文書を `added`、両方にあって変わったキー（無視するキーは `diff_ignore_keys`、`body_path` のある文書は `body` も 1 つのキーとして比べる）が空でない文書を `modified` にする。`contains` がある場合は語の増減を持つ文書だけを残し、`added`・`deleted`・`modified` のどれにも当たらない文書を `unchanged` にする
-    7. `filter` があれば、後の文書（無ければ前の文書、両方に無ければ語の増減を比べたときに最後に見た文書）を条件の照合にかけ、当たる文書だけを残す（条件の確かめは検索と同じで、使える項目は文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）から作る）
-    8. 配信元の順・`id` の昇順に並べ、検索と同じ `limit` の丸め・続きの位置・`max_chars` の打ち切りをする
-    9. `view` が `full` の場合、前と後の本文の差分の行を入れる
-    10. `to` が無く（終点が今の作業ツリー）、`deleted` でない文書は、`path` を後の文書の場所（文書のストア.文書の場所）にし、`scope` を `view` が `full` なら `section`、それ以外は `summary` にする
-    11. 区間の端を入れて返す
-  exceptions:
-  - name: RefNotFoundError
-    condition: '`from`・`to` を解決できない'
-    message: '`{argument} の {value} を解決できません`'
-  - name: LastReadNotFoundError
-    condition: '`from` を省き、この会話で本文を読んだ記録が無い'
-    message: '`この会話で参照した記録がありません。from を指定してください`'
-  - name: InvalidArgumentError
-    condition: Git 管理外の配信元への区間・`from` の無い `to`・知らない項目・正規表現として読めない `contains.value`
-    message: '`引数が正しくありません: {違反の数} 件`'
-  - name: SourceNotReadableError
-    condition: 読む場所の解決が送る
-    message: '`{id} はこの作業場所（{cwd}）から参照できません`'
-  unit_tests:
-  - name: test_list_changes
-    case: 正常
-    summary: 2 つの commit の間
-    condition: '文書 1 の `name` を変えた commit とその親を `from`・`to` に、`view: full`'
-    mock: なし（一時フォルダの git リポジトリ）
-    expected: '`range` に 2 つの commit と日時、`items` が文書 1 だけで `modified`・`keys: [name]`、`diff` に `-`・`+` の行。`to` を渡したため `path`・`scope` が `None`'
-  - name: test_list_changes_when_last_read
-    case: 正常
-    summary: 前回読んだ時点から
-    condition: '`search_docs` で本文を返した後、文書 1 のファイルを直接書き換えて `from` を省く'
-    mock: なし
-    expected: '`range.from.input` が `前回読んだ時点`、`items` が文書 1 だけで、`path` が文書 1 の絶対パス、`scope` が `summary`'
-  - name: test_list_changes_when_added_and_deleted
-    case: 正常
-    summary: 足した文書と消した文書
-    condition: 区間の中で文書 3 を足し、文書 2 を消す
-    mock: なし
-    expected: 文書 2 が `deleted`、文書 3 が `added`。`to` を省いたとき、文書 2 は `path` が `None`、文書 3 は `path` を持つ
-  - name: test_list_changes_when_no_last_read
-    case: 異常
-    summary: 読んだ記録が無い
-    condition: '`session_id` のある新しい会話で `from` を省く'
-    mock: なし
-    expected: '`LastReadNotFoundError`'
-    exception: '`from` を省き、この会話で本文を読んだ記録が無い'
-  - name: test_list_changes_when_to_without_from
-    case: 異常
-    summary: '`from` の無い `to`'
-    condition: '`to: HEAD` だけ'
-    mock: なし
-    expected: '`InvalidArgumentError` の違反の `path` が `to`'
-    exception: Git 管理外の配信元への区間・`from` の無い `to`・知らない項目・正規表現として読めない `contains.value`
-  - name: test_list_changes_when_contains
-    case: 正常
-    summary: 語が入って消えた文書
-    condition: 'commit 1 で文書 1 に `廃止予定` を追加、commit 2 で文書 2 の `name` を変えて文書 1 の `廃止予定` を含む行を書き換え（出現数は同じ）、commit 3 で文書 1 から `廃止予定` を削除して commit 1 の親と同じ内容に戻す。commit 1 の親を `from`、commit 3 を `to`、`contains: {value: 廃止予定}`'
-    mock: なし（一時フォルダの git リポジトリ）
-    expected: '`items` が文書 1 だけで `unchanged`、`contains_changes` が `added`（`to.commit` が commit 1、数 0 → 1）と `removed`（`to.commit` が commit 3、数 1 → 0）の順'
-  - name: test_list_changes_when_contains_regex
-    case: 正常
-    summary: 正規表現の語
-    condition: '`test_list_changes_when_contains` と同じ commit で `contains: {value: 廃止.定, regex: true}`'
-    mock: なし（一時フォルダの git リポジトリ）
-    expected: '`test_list_changes_when_contains` と同じ結果'
-  - name: test_list_changes_when_contains_merge
-    case: 正常
-    summary: マージ commit を見ない
-    condition: ブランチの commit で文書 2 に `廃止予定` を追加し、`--no-ff` でマージした区間
-    mock: なし（一時フォルダの git リポジトリ）
-    expected: 文書 2 の `contains_changes` がブランチの commit の `added` 1 要素だけ
-  - name: test_list_changes_when_contains_worktree
-    case: 正常
-    summary: 作業ツリーの区間
-    condition: '`test_list_changes_when_contains` の commit の後、作業ツリーで文書 1 に `廃止予定` を戻し、`to` を省く'
-    mock: なし（一時フォルダの git リポジトリ）
-    expected: 文書 1 の `contains_changes` の最後が `added` で、`to.input` が `作業ツリー`
-  - name: test_list_changes_when_contains_last_read
-    case: 正常
-    summary: 前回読んだ時点からの語
-    condition: '`search_docs` で文書 1 の本文を返した後、文書 1 のファイルに `廃止予定` を追加して `from` を省き `contains: {value: 廃止予定}`'
-    mock: なし
-    expected: 文書 1 の `contains_changes` が `added` の 1 要素で、`from_`・`to` が `range_from`・`range_to` と同じ
-  - name: test_list_changes_when_invalid_regex
-    case: 異常
-    summary: 読めない正規表現
-    condition: '`contains: {value: "(", regex: true}`'
-    mock: なし
-    expected: '`InvalidArgumentError` の違反の `path` が `contains.value`'
-    exception: Git 管理外の配信元への区間・`from` の無い `to`・知らない項目・正規表現として読めない `contains.value`
-  - name: test_list_changes_when_excluded
-    case: 正常
-    summary: 除外の名前に当たるファイルは次の行へ進む
-    condition: '行 `rule`（`paths: [docs/rule/*.md]`・`exclude: [README.md]`）と行 `index`（`paths: [docs/**/README.md]`）。区間の中で `docs/rule/README.md` を足す'
-    mock: なし（一時フォルダの git リポジトリ）
-    expected: '`items` が `docs/rule/README.md` の文書 1 件だけで、`kind` が `index`・`added`'
-    exception: '-'
-  - name: test_list_changes_when_contains_body_file
-    case: 正常
-    summary: '`body_file` の文書の語'
-    condition: '`records`・`body_file` の行（索引 `index.yaml` の要素が `a.md` を指す）で、commit 1 で `a.md` だけに `廃止予定` を追加、commit 2 で索引に `b.md`（語を含まない）を指す要素を追加、commit 3 で `b.md` に `廃止予定` を追加。commit 1 の親を `from`、commit 3 を `to`、`contains: {value: 廃止予定}`'
-    mock: なし（一時フォルダの git リポジトリ）
-    expected: '`a` の `contains_changes` が commit 1 の `added` 1 要素だけ、`b` の `contains_changes` が commit 3 の `added` 1 要素だけ（commit 2 では返らない）'
-  - name: test_list_changes_when_last_read_body_file
-    case: 正常
-    summary: 前回読んだ Markdown の本文の変化
-    condition: '`records: files`・`body_file: path` の行で `.md` を指す文書 2 件を読んだ後、片方の `.md` の本文だけを書き換えて `from_` を省いて呼ぶ'
-    mock: なし（一時ディレクトリの配信元と会話の記録）
-    expected: 書き換えた文書だけが `modified` で、変えていない文書は返らない
+  - name: list_changes
+    title: 変更の一覧
+    kind: 関数
+    container: project_index/features/changes/service.py
+    usecase: 変更
+    role: サービス
+    summary: '`list_changes` の要求を処理して変更の結果を返す'
+    scope: public
+    thread_safe: true
+    args:
+      - name: request
+        title: 変更の一覧の要求
+        type: ChangesRequest
+        required: true
+        passing: positional
+        description: ツールの引数
+      - name: registry
+        title: 配信元の一覧
+        type: SourceRegistry
+        required: true
+        passing: injected
+        description: 配信中の配信元
+      - name: store
+        title: 文書のストア
+        type: DocumentStore
+        required: true
+        passing: injected
+        description: 今の文書を読む
+      - name: seen
+        title: 会話の記録
+        type: SeenStore
+        required: true
+        passing: injected
+        description: 前回読んだ内容
+    returns:
+      type: ChangesResult
+      description: 変更の結果
+    process: |-
+      1. `to` があって `from_` が無い場合、`InvalidArgumentError`（`to` には `from` が要ります）を送る
+      2. `contains.regex` が真で `contains.value` を `compile_regex` で読めない場合、`InvalidArgumentError`（`path` は `contains.value`、`rule` は `正規表現として読み込めません（{エラー}）`）を送る
+      3. 読む場所を解く（読む場所の解決。`ref` は渡さず、`outside_scope` を渡す。結果の `outside_scope` は読んだ場所のどれかが作業範囲の外なら `True`）。`from_` があり Git 管理外の配信元を含む場合、`InvalidArgumentError` を送る
+      4. 配信元ごとに前と後の文書を作る
+         - `from_` がある場合、始点・終点をリビジョンの解決（`argument` は `from`・`to`）で commit にし、2 つの commit（終点が無ければ作業ツリー）の間の前後の文書を作る。文書の行に当たる変わったファイル（`enabled` の行を上から見て、文書の行.行に当たるかが `True` の最初の行）ごとに、前はリビジョンのファイル、後は終点の commit のリビジョンのファイルか作業ツリーのファイルを、文字列からの文書の組み立てで文書にする（この組み立ては次の `contains` の commit ごとの比較でも使う）。`body_file` の本文は、ファイルと同じ端（前は始点の commit、後は終点の commit のリビジョンのファイルか作業ツリーのファイル）から読む（文字列からの文書の組み立ての `read_body`）。変わったファイルが今の文書（文書のストア.読み込み）の `body_path` に当たる場合、その文書の索引のファイル（`path`）も変わったファイルに加える
+         - `from_` が無い場合、会話の記録.前回読んだ内容を引く（会話キーが無い・全ての配信元で空なら `LastReadNotFoundError`）。前は記録の内容（`doc_kind` の行が `records` を持つなら、今の文書の `data`・メタデータに記録の内容を `body` にした文書を作る（`body_file` を持たない行は、記録の内容を YAML として読んだ辞書を `data` にする。読めなければ今の `data`）。今の文書が無ければ記録の内容だけを `body` にした文書にする。それ以外の行は文字列からの文書の組み立てにかける）、後は今の文書（文書のストア.ID で引く。無ければ消した）
+      5. `contains` がある場合、文書ごとに語の増減を集める
+         - `from_` がある場合、区間の commit（`to` が無ければ終点は作業ツリーの `HEAD`）の commit ごとに、親とその commit の間の前後の文書を作り、両方の文書の本文（`Document.body`）の語の出現数が違う文書へ `ContainsChange` を足す。`to` が無い場合、最後に `HEAD` と作業ツリーの間も比べる（後の端は `RangePoint(WORKTREE_LABEL)`）
+         - `from_` が無い場合、前と後の文書の出現数が違う文書へ、区間の端と同じ端の `ContainsChange` を 1 つ足す
+         - 出現数が増えたら `added`、減ったら `removed`。文書が無い側の数は 0
+      6. ID で突き合わせ、前にだけある文書を `deleted`、後にだけある文書を `added`、両方にあって変わったキー（無視するキーは `diff_ignore_keys`、`body_path` のある文書は `body` も 1 つのキーとして比べる）が空でない文書を `modified` にする。`contains` がある場合は語の増減を持つ文書だけを残し、`added`・`deleted`・`modified` のどれにも当たらない文書を `unchanged` にする
+      7. `filter` があれば、後の文書（無ければ前の文書、両方に無ければ語の増減を比べたときに最後に見た文書）を条件の照合にかけ、当たる文書だけを残す（条件の確かめは検索と同じで、使える項目は文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）から作る）
+      8. 配信元の順・`id` の昇順に並べ、検索と同じ `limit` の丸め・続きの位置・`max_chars` の打ち切りをする
+      9. `view` が `full` の場合、前と後の本文の差分の行を入れる
+      10. `to` が無く（終点が今の作業ツリー）、`deleted` でない文書は、`path` を後の文書の場所（文書のストア.文書の場所）にし、`scope` を `view` が `full` なら `section`、それ以外は `summary` にする
+      11. 区間の端を入れて返す
+    exceptions:
+      - name: RefNotFoundError
+        condition: '`from`・`to` を解決できない'
+        message: '`{argument} の {value} を解決できません`'
+      - name: LastReadNotFoundError
+        condition: '`from` を省き、この会話で本文を読んだ記録が無い'
+        message: '`この会話で参照した記録がありません。from を指定してください`'
+      - name: InvalidArgumentError
+        condition: Git 管理外の配信元への区間・`from` の無い `to`・知らない項目・正規表現として読めない `contains.value`
+        message: '`引数が正しくありません: {違反の数} 件`'
+      - name: SourceNotReadableError
+        condition: 読む場所の解決が送る
+        message: '`{id} はこの作業場所（{cwd}）から参照できません`'
+    unit_tests:
+      - name: test_list_changes
+        case: 正常
+        summary: 2 つの commit の間
+        condition: '文書 1 の `name` を変えた commit とその親を `from`・`to` に、`view: full`'
+        mock: なし（一時フォルダの git リポジトリ）
+        expected: '`range` に 2 つの commit と日時、`items` が文書 1 だけで `modified`・`keys: [name]`、`diff` に `-`・`+` の行。`to` を渡したため `path`・`scope` が `None`'
+      - name: test_list_changes_when_last_read
+        case: 正常
+        summary: 前回読んだ時点から
+        condition: '`search_docs` で本文を返した後、文書 1 のファイルを直接書き換えて `from` を省く'
+        mock: なし
+        expected: '`range.from.input` が `前回読んだ時点`、`items` が文書 1 だけで、`path` が文書 1 の絶対パス、`scope` が `summary`'
+      - name: test_list_changes_when_added_and_deleted
+        case: 正常
+        summary: 足した文書と消した文書
+        condition: 区間の中で文書 3 を足し、文書 2 を消す
+        mock: なし
+        expected: 文書 2 が `deleted`、文書 3 が `added`。`to` を省いたとき、文書 2 は `path` が `None`、文書 3 は `path` を持つ
+      - name: test_list_changes_when_no_last_read
+        case: 異常
+        summary: 読んだ記録が無い
+        condition: '`session_id` のある新しい会話で `from` を省く'
+        mock: なし
+        expected: '`LastReadNotFoundError`'
+        exception: '`from` を省き、この会話で本文を読んだ記録が無い'
+      - name: test_list_changes_when_to_without_from
+        case: 異常
+        summary: '`from` の無い `to`'
+        condition: '`to: HEAD` だけ'
+        mock: なし
+        expected: '`InvalidArgumentError` の違反の `path` が `to`'
+        exception: Git 管理外の配信元への区間・`from` の無い `to`・知らない項目・正規表現として読めない `contains.value`
+      - name: test_list_changes_when_contains
+        case: 正常
+        summary: 語が入って消えた文書
+        condition: 'commit 1 で文書 1 に `廃止予定` を追加、commit 2 で文書 2 の `name` を変えて文書 1 の `廃止予定` を含む行を書き換え（出現数は同じ）、commit 3 で文書 1 から `廃止予定` を削除して commit 1 の親と同じ内容に戻す。commit 1 の親を `from`、commit 3 を `to`、`contains: {value: 廃止予定}`'
+        mock: なし（一時フォルダの git リポジトリ）
+        expected: '`items` が文書 1 だけで `unchanged`、`contains_changes` が `added`（`to.commit` が commit 1、数 0 → 1）と `removed`（`to.commit` が commit 3、数 1 → 0）の順'
+      - name: test_list_changes_when_contains_regex
+        case: 正常
+        summary: 正規表現の語
+        condition: '`test_list_changes_when_contains` と同じ commit で `contains: {value: 廃止.定, regex: true}`'
+        mock: なし（一時フォルダの git リポジトリ）
+        expected: '`test_list_changes_when_contains` と同じ結果'
+      - name: test_list_changes_when_contains_merge
+        case: 正常
+        summary: マージ commit を見ない
+        condition: ブランチの commit で文書 2 に `廃止予定` を追加し、`--no-ff` でマージした区間
+        mock: なし（一時フォルダの git リポジトリ）
+        expected: 文書 2 の `contains_changes` がブランチの commit の `added` 1 要素だけ
+      - name: test_list_changes_when_contains_worktree
+        case: 正常
+        summary: 作業ツリーの区間
+        condition: '`test_list_changes_when_contains` の commit の後、作業ツリーで文書 1 に `廃止予定` を戻し、`to` を省く'
+        mock: なし（一時フォルダの git リポジトリ）
+        expected: 文書 1 の `contains_changes` の最後が `added` で、`to.input` が `作業ツリー`
+      - name: test_list_changes_when_contains_last_read
+        case: 正常
+        summary: 前回読んだ時点からの語
+        condition: '`search_docs` で文書 1 の本文を返した後、文書 1 のファイルに `廃止予定` を追加して `from` を省き `contains: {value: 廃止予定}`'
+        mock: なし
+        expected: 文書 1 の `contains_changes` が `added` の 1 要素で、`from_`・`to` が `range_from`・`range_to` と同じ
+      - name: test_list_changes_when_invalid_regex
+        case: 異常
+        summary: 読めない正規表現
+        condition: '`contains: {value: "(", regex: true}`'
+        mock: なし
+        expected: '`InvalidArgumentError` の違反の `path` が `contains.value`'
+        exception: Git 管理外の配信元への区間・`from` の無い `to`・知らない項目・正規表現として読めない `contains.value`
+      - name: test_list_changes_when_excluded
+        case: 正常
+        summary: 除外の名前に当たるファイルは次の行へ進む
+        condition: '行 `rule`（`paths: [docs/rule/*.md]`・`exclude: [README.md]`）と行 `index`（`paths: [docs/**/README.md]`）。区間の中で `docs/rule/README.md` を足す'
+        mock: なし（一時フォルダの git リポジトリ）
+        expected: '`items` が `docs/rule/README.md` の文書 1 件だけで、`kind` が `index`・`added`'
+        exception: '-'
+      - name: test_list_changes_when_contains_body_file
+        case: 正常
+        summary: '`body_file` の文書の語'
+        condition: '`records`・`body_file` の行（索引 `index.yaml` の要素が `a.md` を指す）で、commit 1 で `a.md` だけに `廃止予定` を追加、commit 2 で索引に `b.md`（語を含まない）を指す要素を追加、commit 3 で `b.md` に `廃止予定` を追加。commit 1 の親を `from`、commit 3 を `to`、`contains: {value: 廃止予定}`'
+        mock: なし（一時フォルダの git リポジトリ）
+        expected: '`a` の `contains_changes` が commit 1 の `added` 1 要素だけ、`b` の `contains_changes` が commit 3 の `added` 1 要素だけ（commit 2 では返らない）'
+      - name: test_list_changes_when_last_read_body_file
+        case: 正常
+        summary: 前回読んだ Markdown の本文の変化
+        condition: '`records: files`・`body_file: path` の行で `.md` を指す文書 2 件を読んだ後、片方の `.md` の本文だけを書き換えて `from_` を省いて呼ぶ'
+        mock: なし（一時ディレクトリの配信元と会話の記録）
+        expected: 書き換えた文書だけが `modified` で、変えていない文書は返らない
 refs:
-- IF-4#
+  - IF-4#

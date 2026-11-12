@@ -1,178 +1,178 @@
 id: MOD-60
 title: 索引のサーバー / 会話の記録 / types.py
-lead: 会話の記録の会話キー・前回読んだ内容・閲覧と編集の記録の型。
+lead: 会話の記録の会話キー・前回読んだ内容・閲覧と編集の記録の型を受け持ち、会話の記録の types.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/features/seen/test_types.py
+  - tests/unit/project_index/features/seen/test_types.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      会話の記録 ..> 会話キー : 受ける
-      会話の記録 ..> 前回読んだ内容 : 返す
-      会話の記録 ..> 閲覧と編集 : 返す
-      class 会話の記録 {
-        +返し済み(会話キー, 配信元, 種類, バージョン) set
-        +返したことを記録する(会話キー, 配信元, 種類, 文書) None
-        +前回読んだ内容(会話キー, 配信元, ID) dict
-        +閲覧と編集を記録する(会話キー, 配信元, ID, 種類) None
-        +閲覧と編集(会話キー, 配信元) list
-        +会話の記録を消す(会話キー) int
-        +古い記録の削除() int
-      }
-      class 会話キー {
-        +セッションの ID: str
-        +エージェントの ID: str
-      }
-      class 前回読んだ内容 {
-        +ID: str
-        +バージョン: str
-        +内容: str
-      }
-      class 閲覧と編集 {
-        +ID: str
-        +種類: str
-        +日時: datetime
-      }
-      click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        会話の記録 ..> 会話キー : 受ける
+        会話の記録 ..> 前回読んだ内容 : 返す
+        会話の記録 ..> 閲覧と編集 : 返す
+        class 会話の記録 {
+          +返し済み(会話キー, 配信元, 種類, バージョン) set
+          +返したことを記録する(会話キー, 配信元, 種類, 文書) None
+          +前回読んだ内容(会話キー, 配信元, ID) dict
+          +閲覧と編集を記録する(会話キー, 配信元, ID, 種類) None
+          +閲覧と編集(会話キー, 配信元) list
+          +会話の記録を消す(会話キー) int
+          +古い記録の削除() int
+        }
+        class 会話キー {
+          +セッションの ID: str
+          +エージェントの ID: str
+        }
+        class 前回読んだ内容 {
+          +ID: str
+          +バージョン: str
+          +内容: str
+        }
+        class 閲覧と編集 {
+          +ID: str
+          +種類: str
+          +日時: datetime
+        }
+        click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
 data_models:
-- name: SessionKey
-  title: 会話キー
-  container: project_index/features/seen/types.py
-  usecase: 共通
-  role: 値オブジェクト
-  summary: 記録を分ける会話の単位
-  description: '`dataclass(frozen=True)`。サブエージェントはメインの会話と別に記録する。'
-  properties:
-  - name: session_id
-    title: セッションの ID
-    type: str
-    access: 公開
-    description: フックが入れる `session_id`
-  - name: agent_id
-    title: エージェントの ID
-    type: str
-    access: 公開
-    default: '""'
-    description: フックが入れる `agent_id`。メインの会話は空
-  methods:
-  - name: of
-    title: 引数から作る
-    kind: メソッド
-    description: '`classmethod`。'
-    summary: ツールの引数から会話キーを作る
-    scope: public
-    args:
-    - name: session_id
-      title: セッションの ID
-      type: str | None
-      required: true
-      passing: positional
-      description: ツールの引数
-    - name: agent_id
-      title: エージェントの ID
-      type: str | None
-      required: true
-      passing: positional
-      description: ツールの引数
-    returns:
-      type: SessionKey | None
-      description: '`session_id` が無ければ `None`（記録も省略もしない）'
-    process: 1. `session_id` が空なら `None`、そうでなければ `agent_id` の `None` を空にした会話キーを返す
-    unit_tests:
-    - name: test_session_key_of
-      case: 正常
-      summary: 会話キーを作る
-      condition: '`("s1", None)` と `(None, "a1")`'
-      mock: なし
-      expected: '`SessionKey("s1", "")` と `None`'
-- name: LastRead
-  title: 前回読んだ内容
-  container: project_index/features/seen/types.py
-  usecase: 変更
-  role: DTO
-  summary: この会話で最後に本文を返したときの文書
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: doc_id
-    title: 文書の ID
-    type: str
-    access: 公開
-    description: 文書の ID
-  - name: version
-    title: バージョン
-    type: str
-    access: 公開
-    description: 返したときのバージョン
-  - name: doc_kind
-    title: 文書の種類
-    type: str
-    access: 公開
-    description: '`documents[].id`（内容を YAML として読むか Markdown として読むかを決める）'
-  - name: content
-    title: 内容
-    type: str
-    access: 公開
-    description: 返したときの文書の `body`
-  - name: read_at
-    title: 読んだ日時
-    type: datetime
-    access: 公開
-    description: 返した日時（UTC）
-- name: Activity
-  title: 閲覧と編集
-  container: project_index/features/seen/types.py
-  usecase: 関連
-  role: DTO
-  summary: 会話の中で文書を閲覧・編集したこと
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: doc_id
-    title: 文書の ID
-    type: str
-    access: 公開
-    description: 文書の ID
-  - name: kind
-    title: 種類
-    type: ActivityKind
-    access: 公開
-    description: 閲覧か編集か
-  - name: at
-    title: 日時
-    type: datetime
-    access: 公開
-    description: 最後に閲覧・編集した日時（UTC）
+  - name: SessionKey
+    title: 会話キー
+    container: project_index/features/seen/types.py
+    usecase: 共通
+    role: 値オブジェクト
+    summary: 記録を分ける会話の単位
+    description: '`dataclass(frozen=True)`。サブエージェントはメインの会話と別に記録する。'
+    properties:
+      - name: session_id
+        title: セッションの ID
+        type: str
+        access: 公開
+        description: フックが入れる `session_id`
+      - name: agent_id
+        title: エージェントの ID
+        type: str
+        access: 公開
+        default: '""'
+        description: フックが入れる `agent_id`。メインの会話は空
+    methods:
+      - name: of
+        title: 引数から作る
+        kind: メソッド
+        description: '`classmethod`。'
+        summary: ツールの引数から会話キーを作る
+        scope: public
+        args:
+          - name: session_id
+            title: セッションの ID
+            type: str | None
+            required: true
+            passing: positional
+            description: ツールの引数
+          - name: agent_id
+            title: エージェントの ID
+            type: str | None
+            required: true
+            passing: positional
+            description: ツールの引数
+        returns:
+          type: SessionKey | None
+          description: '`session_id` が無ければ `None`（記録も省略もしない）'
+        process: 1. `session_id` が空なら `None`、そうでなければ `agent_id` の `None` を空にした会話キーを返す
+        unit_tests:
+          - name: test_session_key_of
+            case: 正常
+            summary: 会話キーを作る
+            condition: '`("s1", None)` と `(None, "a1")`'
+            mock: なし
+            expected: '`SessionKey("s1", "")` と `None`'
+  - name: LastRead
+    title: 前回読んだ内容
+    container: project_index/features/seen/types.py
+    usecase: 変更
+    role: DTO
+    summary: この会話で最後に本文を返したときの文書
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: doc_id
+        title: 文書の ID
+        type: str
+        access: 公開
+        description: 文書の ID
+      - name: version
+        title: バージョン
+        type: str
+        access: 公開
+        description: 返したときのバージョン
+      - name: doc_kind
+        title: 文書の種類
+        type: str
+        access: 公開
+        description: '`documents[].id`（内容を YAML として読むか Markdown として読むかを決める）'
+      - name: content
+        title: 内容
+        type: str
+        access: 公開
+        description: 返したときの文書の `body`
+      - name: read_at
+        title: 読んだ日時
+        type: datetime
+        access: 公開
+        description: 返した日時（UTC）
+  - name: Activity
+    title: 閲覧と編集
+    container: project_index/features/seen/types.py
+    usecase: 関連
+    role: DTO
+    summary: 会話の中で文書を閲覧・編集したこと
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: doc_id
+        title: 文書の ID
+        type: str
+        access: 公開
+        description: 文書の ID
+      - name: kind
+        title: 種類
+        type: ActivityKind
+        access: 公開
+        description: 閲覧か編集か
+      - name: at
+        title: 日時
+        type: datetime
+        access: 公開
+        description: 最後に閲覧・編集した日時（UTC）
 enums:
-- name: ReturnKind
-  title: 返した種類
-  container: project_index/features/seen/types.py
-  usecase: 共通
-  summary: 何を返したか
-  description: '`Literal` の型エイリアス。'
-  values:
-  - value: body
-    title: 本文
-    description: '`search_docs` の本文（`view: full` か `fields` に `body`）'
-  - value: related
-    title: 関連の相手
-    description: '`trace_related` の名前と概要文'
-- name: ActivityKind
-  title: 閲覧と編集の種類
-  container: project_index/features/seen/types.py
-  usecase: 共通
-  summary: 関連の候補の信号
-  description: '`Literal` の型エイリアス。'
-  values:
-  - value: viewed
-    title: 閲覧
-    description: 本文を返した
-  - value: edited
-    title: 編集
-    description: '`write_docs` で書いた'
+  - name: ReturnKind
+    title: 返した種類
+    container: project_index/features/seen/types.py
+    usecase: 共通
+    summary: 何を返したか
+    description: '`Literal` の型エイリアス。'
+    values:
+      - value: body
+        title: 本文
+        description: '`search_docs` の本文（`view: full` か `fields` に `body`）'
+      - value: related
+        title: 関連の相手
+        description: '`trace_related` の名前と概要文'
+  - name: ActivityKind
+    title: 閲覧と編集の種類
+    container: project_index/features/seen/types.py
+    usecase: 共通
+    summary: 関連の候補の信号
+    description: '`Literal` の型エイリアス。'
+    values:
+      - value: viewed
+        title: 閲覧
+        description: 本文を返した
+      - value: edited
+        title: 編集
+        description: '`write_docs` で書いた'
 constants:
-- name: SEEN_MARK
-  title: 返し済みの文言
-  container: project_index/features/seen/types.py
-  usecase: 共通
-  summary: 返し済みの本文・名前・概要文の代わりに返す文言
-  value: '"（この会話で返却済み）"'
+  - name: SEEN_MARK
+    title: 返し済みの文言
+    container: project_index/features/seen/types.py
+    usecase: 共通
+    summary: 返し済みの本文・名前・概要文の代わりに返す文言
+    value: '"（この会話で返却済み）"'

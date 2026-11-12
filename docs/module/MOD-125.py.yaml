@@ -1,291 +1,291 @@
 id: MOD-125
 title: 索引のサーバー / 読み取り API / service.py
-lead: 読み取り API の配信元の設定・文書の一覧・文書の取得・検討事項の取得。
+lead: 読み取り API の配信元の設定・文書の一覧・文書の取得・検討事項の取得を受け持ち、読み取り API の service.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/features/read/test_service.py
+  - tests/unit/project_index/features/read/test_service.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      読み取り API の入口 ..> 配信元の設定の取得
-      読み取り API の入口 ..> 文書の一覧
-      読み取り API の入口 ..> 文書の取得
-      読み取り API の入口 ..> 検討事項の ID の一覧
-      読み取り API の入口 ..> 検討事項の文書の取得
-      文書の取得 ..> 文書のページの特定
-      文書の取得 ..> 変換
-      検討事項の ID の一覧 ..> 検討事項の文書を探す
-      検討事項の文書の取得 ..> 検討事項の文書を探す
-      class 読み取り API の入口 {
-        <<function>>
-      }
-      class 配信元の設定の取得 {
-        <<function>>
-      }
-      class 文書の一覧 {
-        <<function>>
-      }
-      class 文書の取得 {
-        <<function>>
-      }
-      class 検討事項の ID の一覧 {
-        <<function>>
-      }
-      class 検討事項の文書の取得 {
-        <<function>>
-      }
-      class 文書のページの特定 {
-        <<function>>
-      }
-      class 変換 {
-        <<class>>
-      }
-      class 検討事項の文書を探す {
-        <<function>>
-      }
-      click 読み取り API の入口 href "./MOD-126.py.yaml#読み取り API の入口"
-      click 文書のページの特定 href "./MOD-77.py.yaml#文書のページの特定"
-      click 変換 href "./MOD-17.py.yaml#変換"
-      click 検討事項の文書を探す href "./MOD-16.py.yaml#検討事項の文書を探す"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        読み取り API の入口 ..> 配信元の設定の取得
+        読み取り API の入口 ..> 文書の一覧
+        読み取り API の入口 ..> 文書の取得
+        読み取り API の入口 ..> 検討事項の ID の一覧
+        読み取り API の入口 ..> 検討事項の文書の取得
+        文書の取得 ..> 文書のページの特定
+        文書の取得 ..> 変換
+        検討事項の ID の一覧 ..> 検討事項の文書を探す
+        検討事項の文書の取得 ..> 検討事項の文書を探す
+        class 読み取り API の入口 {
+          <<function>>
+        }
+        class 配信元の設定の取得 {
+          <<function>>
+        }
+        class 文書の一覧 {
+          <<function>>
+        }
+        class 文書の取得 {
+          <<function>>
+        }
+        class 検討事項の ID の一覧 {
+          <<function>>
+        }
+        class 検討事項の文書の取得 {
+          <<function>>
+        }
+        class 文書のページの特定 {
+          <<function>>
+        }
+        class 変換 {
+          <<class>>
+        }
+        class 検討事項の文書を探す {
+          <<function>>
+        }
+        click 読み取り API の入口 href "./MOD-126.py.yaml#読み取り API の入口"
+        click 文書のページの特定 href "./MOD-77.py.yaml#文書のページの特定"
+        click 変換 href "./MOD-17.py.yaml#変換"
+        click 検討事項の文書を探す href "./MOD-16.py.yaml#検討事項の文書を探す"
 functions:
-- name: get_source_config
-  title: 配信元の設定の取得
-  kind: 関数
-  container: project_index/features/read/service.py
-  usecase: 配信元の設定の取得
-  role: サービス
-  summary: 配信元の設定のうち、`nav`・`documents[]`（スクリプトのコマンドを除く）・`decisions.folders`・`github` を返す
-  scope: public
-  args:
-  - name: source
-    title: 配信元
-    type: Source
-    required: true
-    passing: positional
-    description: 読み取りの場所が解決した配信元
-  returns:
-    type: SourceConfigResponse
-    description: 配信元の設定の応答
-  process: |-
-    1. 重ねた後の配信元の設定（`source.config`）から `nav`・`documents`・`decisions`・`github` を取り出す
-    2. `documents[]` の各行から `validators`・`converters`・`generators` のコマンドを除く
-    3. `decisions` が無ければ `{folders: []}` にする
-  unit_tests:
-  - name: test_get_source_config
-    case: 正常
-    summary: 画面が使うキーだけを返す
-    condition: '`nav`・`documents[]`・`decisions.folders`・`github`・`converters[]` を持つ配信元'
-    mock: なし（一時フォルダの配信元）
-    expected: '4 つのキーを返し、`converters[]` のコマンドを含まない'
-  - name: test_get_source_config_when_no_decisions
-    case: 正常
-    summary: decisions を持たない
-    condition: '`decisions` の無い配信元'
-    mock: なし
-    expected: '`decisions.folders` が空'
-- name: list_documents
-  title: 文書の一覧
-  kind: 関数
-  container: project_index/features/read/service.py
-  usecase: 文書の一覧
-  role: サービス
-  summary: 読み取りの場所の文書の ID・パス・種類・メタデータを、`documents[]` の行の順に返す
-  scope: public
-  args:
-  - name: target
-    title: 読み取りの場所
-    type: Target
-    required: true
-    passing: positional
-    description: 読み取りの場所（`read_target`）が返したもの
-  - name: store
-    title: 文書のストア
-    type: DocumentStore
-    required: true
-    passing: injected
-    description: 文書を読み込む
-  returns:
-    type: DocumentListResponse
-    description: 文書の一覧の応答
-  process: |-
-    1. `store.load(target)` で文書を読み込む
-    2. 文書ごとに `id`・`path`・`kind`・メタデータ（`name`・`description`・`tags`・`visibility`）・`body_path` を `DocumentListItem` にする
-    3. `documents[]` の行の順、行の中はパスの順に並べ、`ref` に解決したリビジョンの名前を入れて返す
-  unit_tests:
-  - name: test_list_documents
-    case: 正常
-    summary: 行の順に並べる
-    condition: 種類 `design` の YAML 2 件と、`files.yaml` の行の文書 1 件
-    mock: なし（一時フォルダの配信元）
-    expected: 3 件が行の順に並び、行の文書だけが `body_path` を持つ
-- name: get_document
-  title: 文書の取得
-  kind: 関数
-  container: project_index/features/read/service.py
-  usecase: 文書の取得
-  role: サービス
-  summary: パスの文書の値・種類のスキーマ・メタデータを返し、`converters[]` を指す種類だけ変換する
-  scope: public
-  args:
-  - name: target
-    title: 読み取りの場所
-    type: Target
-    required: true
-    passing: positional
-    description: 読み取りの場所（`read_target`）が返したもの
-  - name: path
-    title: パス
-    type: str
-    required: true
-    passing: positional
-    description: 文書のファイルか本文のファイルのパス
-  - name: store
-    title: 文書のストア
-    type: DocumentStore
-    required: true
-    passing: injected
-    description: 文書と種類のスキーマを読む
-  - name: converter
-    title: 変換
-    type: ConvertService
-    required: true
-    passing: injected
-    description: '`converters[]` を指す種類の変換'
-  returns:
-    type: DocumentValueResponse
-    description: 文書の取得の応答
-  process: |-
-    1. `store.load(target)` の文書から、`path` の文書を引く（文書のページの特定。文書のファイル、無ければ本文のファイルが `path` と同じ最初の文書）
-       - 無い場合、`DocumentNotFoundError` を送出する
-    2. 文書の値・種類のスキーマ（`store.row_schema(target, kind)` の `$ref` を解いた形）・メタデータ・本文と本文のファイルのパス（管理用の YAML の行の文書だけ）を集める
-       - YAML として読み込めない文書は、`value` を `None` にし、ファイルのパスと行と列を `conversion_error` に入れる
-    3. 文書の種類の行が `converter` を持つ場合だけ、`converter.convert(target, document)` の `markdown` か `failure` を入れる
-    4. `updated_at` に、Git の配信元はそのリビジョンでファイルを最後に変えた commit の日時、Git 管理外の配信元はファイルの更新日時を入れる
-  exceptions:
-  - name: DocumentNotFoundError
-    condition: '`path` の文書が無い'
-    message: '`{path}: 文書がありません`'
-    notes: '入口が 404（`missing: doc`）にする'
-  unit_tests:
-  - name: test_get_document
-    case: 正常
-    summary: 値とスキーマを返し、変換しない
-    condition: '`converters[]` を指さない種類の YAML の文書'
-    mock: なし（一時フォルダの配信元）
-    expected: '`value` が YAML の値、`schema` が種類のスキーマ、`markdown` が `None` で、`ConvertService.convert` を呼ばない'
-  - name: test_get_document_when_body_path
-    case: 正常
-    summary: 本文のファイルのパスで引く
-    condition: '`files.yaml` の行が `guide.md` を本文に持つ配信元で、`path` が `guide.md`'
-    mock: なし
-    expected: '`value` が行の値、`body` が `guide.md` の本文、`body_path` が `guide.md`'
-  - name: test_get_document_when_converter
-    case: 正常
-    summary: converters[] を指す種類はスクリプトの Markdown を返す
-    condition: '`converters[]` を指す種類の文書'
-    mock: '`ConvertService.convert`（`# 変換した` を返す偽物）'
-    expected: '`markdown` が `# 変換した`'
-  - name: test_get_document_when_yaml_broken
-    case: 正常
-    summary: YAML を読み込めない文書
-    condition: 読み込めない YAML の文書
-    mock: なし
-    expected: '`value` が `None` で、`conversion_error` にファイルのパスと行と列'
-  - name: test_get_document_when_not_found
-    case: 異常
-    summary: 無いパス
-    condition: '`path` が `no/such.yaml`'
-    mock: なし
-    expected: '`DocumentNotFoundError`'
-    exception: 文書が無い
-- name: list_decisions
-  title: 検討事項の ID の一覧
-  kind: 関数
-  container: project_index/features/read/service.py
-  usecase: 検討事項の ID の一覧
-  role: サービス
-  summary: '`decisions.folders` にある検討事項の ID と、ID ごとに当たるフォルダの数を返す'
-  scope: public
-  args:
-  - name: source
-    title: 配信元
-    type: Source
-    required: true
-    passing: positional
-    description: 読み取りの場所が解決した配信元
-  returns:
-    type: list[DecisionItem]
-    description: ID の順に並べた一覧
-  process: |-
-    1. 検討事項の文書を探す（`find_decisions`）で、フォルダごとに `DECISION_ID` に当たるファイル名の ID を集める
-    2. ID ごとにフォルダの数を数え、ID の順に返す
-  unit_tests:
-  - name: test_list_decisions
-    case: 正常
-    summary: フォルダの数を数える
-    condition: 1 つ目のフォルダに `D-1`・`D-2`、2 つ目に `D-2` を置く
-    mock: なし（一時フォルダ）
-    expected: '`D-1` が 1、`D-2` が 2'
-- name: get_decision
-  title: 検討事項の文書の取得
-  kind: 関数
-  container: project_index/features/read/service.py
-  usecase: 検討事項の文書の取得
-  role: サービス
-  summary: '`decisions.folders` のうちちょうど 1 つのフォルダにある検討事項の文書の本文を返す'
-  scope: public
-  args:
-  - name: source
-    title: 配信元
-    type: Source
-    required: true
-    passing: positional
-    description: 読み取りの場所が解決した配信元
-  - name: decision_id
-    title: 検討事項の ID
-    type: str
-    required: true
-    passing: positional
-    description: 検討事項の ID
-  returns:
-    type: DecisionResponse
-    description: 検討事項の文書の応答
-  process: |-
-    1. `decision_id` が `DECISION_ID` に当たらなければ `DecisionNotFoundError`（`reason` は `not_found`）を送出する
-    2. 検討事項の文書を探す（`find_decisions`）で、`{フォルダ}/DECISION_DOCS_DIR/{ID}.md` があるフォルダを集める
-       - 0 個の場合、`DecisionNotFoundError`（`reason` は `not_found`）を送出する
-       - 2 個以上の場合、`DecisionNotFoundError`（`reason` は `ambiguous`、`folders` に当たったフォルダ）を送出する
-    3. ファイルを UTF-8 で読み、変換せずに `body` に入れて返す
-  exceptions:
-  - name: DecisionNotFoundError
-    condition: ID の形式に当たらない、当たるフォルダが 0 個か 2 個以上
-    message: '`{ID}: 検討事項の文書が 1 つに決まりません`'
-    notes: '`ProjectIndexError` の子。入口が 404（`missing: doc`・`reason`・`folders`）にする'
-  unit_tests:
-  - name: test_get_decision
-    case: 正常
-    summary: 1 つのフォルダにある文書を返す
-    condition: 1 つ目のフォルダにだけ `D-1.md`
-    mock: なし（一時フォルダ）
-    expected: '`body` が `D-1.md` の本文、`folder` が 1 つ目のフォルダ'
-  - name: test_get_decision_when_ambiguous
-    case: 異常
-    summary: 2 つのフォルダにある
-    condition: '`D-2.md` を 2 つのフォルダに置く'
-    mock: なし
-    expected: '`DecisionNotFoundError` で `reason` が `ambiguous`、`folders` が 2 つ'
-    exception: 1 つに決まらない
-  - name: test_get_decision_when_invalid_id
-    case: 異常
-    summary: 形式に当たらない ID
-    condition: '`decision_id` が `../secret`'
-    mock: なし
-    expected: '`DecisionNotFoundError` で、ファイルを読まない'
-    exception: 形式に当たらない
+  - name: get_source_config
+    title: 配信元の設定の取得
+    kind: 関数
+    container: project_index/features/read/service.py
+    usecase: 配信元の設定の取得
+    role: サービス
+    summary: 配信元の設定のうち、`nav`・`documents[]`（スクリプトのコマンドを除く）・`decisions.folders`・`github` を返す
+    scope: public
+    args:
+      - name: source
+        title: 配信元
+        type: Source
+        required: true
+        passing: positional
+        description: 読み取りの場所が解決した配信元
+    returns:
+      type: SourceConfigResponse
+      description: 配信元の設定の応答
+    process: |-
+      1. 重ねた後の配信元の設定（`source.config`）から `nav`・`documents`・`decisions`・`github` を取り出す
+      2. `documents[]` の各行から `validators`・`converters`・`generators` のコマンドを除く
+      3. `decisions` が無ければ `{folders: []}` にする
+    unit_tests:
+      - name: test_get_source_config
+        case: 正常
+        summary: 画面が使うキーだけを返す
+        condition: '`nav`・`documents[]`・`decisions.folders`・`github`・`converters[]` を持つ配信元'
+        mock: なし（一時フォルダの配信元）
+        expected: '4 つのキーを返し、`converters[]` のコマンドを含まない'
+      - name: test_get_source_config_when_no_decisions
+        case: 正常
+        summary: decisions を持たない
+        condition: '`decisions` の無い配信元'
+        mock: なし
+        expected: '`decisions.folders` が空'
+  - name: list_documents
+    title: 文書の一覧
+    kind: 関数
+    container: project_index/features/read/service.py
+    usecase: 文書の一覧
+    role: サービス
+    summary: 読み取りの場所の文書の ID・パス・種類・メタデータを、`documents[]` の行の順に返す
+    scope: public
+    args:
+      - name: target
+        title: 読み取りの場所
+        type: Target
+        required: true
+        passing: positional
+        description: 読み取りの場所（`read_target`）が返したもの
+      - name: store
+        title: 文書のストア
+        type: DocumentStore
+        required: true
+        passing: injected
+        description: 文書を読み込む
+    returns:
+      type: DocumentListResponse
+      description: 文書の一覧の応答
+    process: |-
+      1. `store.load(target)` で文書を読み込む
+      2. 文書ごとに `id`・`path`・`kind`・メタデータ（`name`・`description`・`tags`・`visibility`）・`body_path` を `DocumentListItem` にする
+      3. `documents[]` の行の順、行の中はパスの順に並べ、`ref` に解決したリビジョンの名前を入れて返す
+    unit_tests:
+      - name: test_list_documents
+        case: 正常
+        summary: 行の順に並べる
+        condition: 種類 `design` の YAML 2 件と、`files.yaml` の行の文書 1 件
+        mock: なし（一時フォルダの配信元）
+        expected: 3 件が行の順に並び、行の文書だけが `body_path` を持つ
+  - name: get_document
+    title: 文書の取得
+    kind: 関数
+    container: project_index/features/read/service.py
+    usecase: 文書の取得
+    role: サービス
+    summary: パスの文書の値・種類のスキーマ・メタデータを返し、`converters[]` を指す種類だけ変換する
+    scope: public
+    args:
+      - name: target
+        title: 読み取りの場所
+        type: Target
+        required: true
+        passing: positional
+        description: 読み取りの場所（`read_target`）が返したもの
+      - name: path
+        title: パス
+        type: str
+        required: true
+        passing: positional
+        description: 文書のファイルか本文のファイルのパス
+      - name: store
+        title: 文書のストア
+        type: DocumentStore
+        required: true
+        passing: injected
+        description: 文書と種類のスキーマを読む
+      - name: converter
+        title: 変換
+        type: ConvertService
+        required: true
+        passing: injected
+        description: '`converters[]` を指す種類の変換'
+    returns:
+      type: DocumentValueResponse
+      description: 文書の取得の応答
+    process: |-
+      1. `store.load(target)` の文書から、`path` の文書を引く（文書のページの特定。文書のファイル、無ければ本文のファイルが `path` と同じ最初の文書）
+         - 無い場合、`DocumentNotFoundError` を送出する
+      2. 文書の値・種類のスキーマ（`store.row_schema(target, kind)` の `$ref` を解いた形）・メタデータ・本文と本文のファイルのパス（管理用の YAML の行の文書だけ）を集める
+         - YAML として読み込めない文書は、`value` を `None` にし、ファイルのパスと行と列を `conversion_error` に入れる
+      3. 文書の種類の行が `converter` を持つ場合だけ、`converter.convert(target, document)` の `markdown` か `failure` を入れる
+      4. `updated_at` に、Git の配信元はそのリビジョンでファイルを最後に変えた commit の日時、Git 管理外の配信元はファイルの更新日時を入れる
+    exceptions:
+      - name: DocumentNotFoundError
+        condition: '`path` の文書が無い'
+        message: '`{path}: 文書がありません`'
+        notes: '入口が 404（`missing: doc`）にする'
+    unit_tests:
+      - name: test_get_document
+        case: 正常
+        summary: 値とスキーマを返し、変換しない
+        condition: '`converters[]` を指さない種類の YAML の文書'
+        mock: なし（一時フォルダの配信元）
+        expected: '`value` が YAML の値、`schema` が種類のスキーマ、`markdown` が `None` で、`ConvertService.convert` を呼ばない'
+      - name: test_get_document_when_body_path
+        case: 正常
+        summary: 本文のファイルのパスで引く
+        condition: '`files.yaml` の行が `guide.md` を本文に持つ配信元で、`path` が `guide.md`'
+        mock: なし
+        expected: '`value` が行の値、`body` が `guide.md` の本文、`body_path` が `guide.md`'
+      - name: test_get_document_when_converter
+        case: 正常
+        summary: converters[] を指す種類はスクリプトの Markdown を返す
+        condition: '`converters[]` を指す種類の文書'
+        mock: '`ConvertService.convert`（`# 変換した` を返す偽物）'
+        expected: '`markdown` が `# 変換した`'
+      - name: test_get_document_when_yaml_broken
+        case: 正常
+        summary: YAML を読み込めない文書
+        condition: 読み込めない YAML の文書
+        mock: なし
+        expected: '`value` が `None` で、`conversion_error` にファイルのパスと行と列'
+      - name: test_get_document_when_not_found
+        case: 異常
+        summary: 無いパス
+        condition: '`path` が `no/such.yaml`'
+        mock: なし
+        expected: '`DocumentNotFoundError`'
+        exception: 文書が無い
+  - name: list_decisions
+    title: 検討事項の ID の一覧
+    kind: 関数
+    container: project_index/features/read/service.py
+    usecase: 検討事項の ID の一覧
+    role: サービス
+    summary: '`decisions.folders` にある検討事項の ID と、ID ごとに当たるフォルダの数を返す'
+    scope: public
+    args:
+      - name: source
+        title: 配信元
+        type: Source
+        required: true
+        passing: positional
+        description: 読み取りの場所が解決した配信元
+    returns:
+      type: list[DecisionItem]
+      description: ID の順に並べた一覧
+    process: |-
+      1. 検討事項の文書を探す（`find_decisions`）で、フォルダごとに `DECISION_ID` に当たるファイル名の ID を集める
+      2. ID ごとにフォルダの数を数え、ID の順に返す
+    unit_tests:
+      - name: test_list_decisions
+        case: 正常
+        summary: フォルダの数を数える
+        condition: 1 つ目のフォルダに `D-1`・`D-2`、2 つ目に `D-2` を置く
+        mock: なし（一時フォルダ）
+        expected: '`D-1` が 1、`D-2` が 2'
+  - name: get_decision
+    title: 検討事項の文書の取得
+    kind: 関数
+    container: project_index/features/read/service.py
+    usecase: 検討事項の文書の取得
+    role: サービス
+    summary: '`decisions.folders` のうちちょうど 1 つのフォルダにある検討事項の文書の本文を返す'
+    scope: public
+    args:
+      - name: source
+        title: 配信元
+        type: Source
+        required: true
+        passing: positional
+        description: 読み取りの場所が解決した配信元
+      - name: decision_id
+        title: 検討事項の ID
+        type: str
+        required: true
+        passing: positional
+        description: 検討事項の ID
+    returns:
+      type: DecisionResponse
+      description: 検討事項の文書の応答
+    process: |-
+      1. `decision_id` が `DECISION_ID` に当たらなければ `DecisionNotFoundError`（`reason` は `not_found`）を送出する
+      2. 検討事項の文書を探す（`find_decisions`）で、`{フォルダ}/DECISION_DOCS_DIR/{ID}.md` があるフォルダを集める
+         - 0 個の場合、`DecisionNotFoundError`（`reason` は `not_found`）を送出する
+         - 2 個以上の場合、`DecisionNotFoundError`（`reason` は `ambiguous`、`folders` に当たったフォルダ）を送出する
+      3. ファイルを UTF-8 で読み、変換せずに `body` に入れて返す
+    exceptions:
+      - name: DecisionNotFoundError
+        condition: ID の形式に当たらない、当たるフォルダが 0 個か 2 個以上
+        message: '`{ID}: 検討事項の文書が 1 つに決まりません`'
+        notes: '`ProjectIndexError` の子。入口が 404（`missing: doc`・`reason`・`folders`）にする'
+    unit_tests:
+      - name: test_get_decision
+        case: 正常
+        summary: 1 つのフォルダにある文書を返す
+        condition: 1 つ目のフォルダにだけ `D-1.md`
+        mock: なし（一時フォルダ）
+        expected: '`body` が `D-1.md` の本文、`folder` が 1 つ目のフォルダ'
+      - name: test_get_decision_when_ambiguous
+        case: 異常
+        summary: 2 つのフォルダにある
+        condition: '`D-2.md` を 2 つのフォルダに置く'
+        mock: なし
+        expected: '`DecisionNotFoundError` で `reason` が `ambiguous`、`folders` が 2 つ'
+        exception: 1 つに決まらない
+      - name: test_get_decision_when_invalid_id
+        case: 異常
+        summary: 形式に当たらない ID
+        condition: '`decision_id` が `../secret`'
+        mock: なし
+        expected: '`DecisionNotFoundError` で、ファイルを読まない'
+        exception: 形式に当たらない
 refs:
-- IF-23#
-- IF-24#
-- IF-25#
-- IF-26#
-- IF-27#
+  - IF-23#
+  - IF-24#
+  - IF-25#
+  - IF-26#
+  - IF-27#

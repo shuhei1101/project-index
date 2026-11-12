@@ -8,22 +8,22 @@ version:
   source: pyproject.toml・uv.lock
   pinning: pyproject.toml に下限 `>=4.26.0`（mcp の `>=4.20.0` の範囲の中）、uv.lock で固定
 catalogs:
-- name: API
-  version: 4.26.0
-  entries:
-  - name: Draft202012Validator
-    kind: クラス
-    purpose: 文書・端末の設定・`project-index.yaml` を Draft 2020-12 で検証する
-  - name: Draft202012Validator.iter_errors
-    kind: 関数
-    purpose: 違反を全て取り、違反したキーのパス（`json_path`）と理由（`message`）を返す
-  - name: referencing.Registry
-    kind: クラス
-    purpose: スキーマを `$id` で登録し、ファイルをまたぐ `$ref` を解決する
-  - name: referencing.Resource.from_contents
-    kind: 関数
-    purpose: '`$schema` から仕様を判定してスキーマを登録できる形にする'
-lead: Python の JSON Schema の検証のライブラリ。Draft 2020-12 に対応し、`referencing` でスキーマ間の `$ref` を解決する。
+  - name: API
+    version: 4.26.0
+    entries:
+      - name: Draft202012Validator
+        kind: クラス
+        purpose: 文書・端末の設定・`project-index.yaml` を Draft 2020-12 で検証する
+      - name: Draft202012Validator.iter_errors
+        kind: 関数
+        purpose: 違反を全て取り、違反したキーのパス（`json_path`）と理由（`message`）を返す
+      - name: referencing.Registry
+        kind: クラス
+        purpose: スキーマを `$id` で登録し、ファイルをまたぐ `$ref` を解決する
+      - name: referencing.Resource.from_contents
+        kind: 関数
+        purpose: '`$schema` から仕様を判定してスキーマを登録できる形にする'
+lead: 文書と設定を JSON Schema で検証して違反をキーのパスと理由つきで返却する jsonschema の利用方法を定め、スキーマの検証を修正するときに参照する。
 purl: pkg:pypi/jsonschema
 dependency_scope: 必須
 adoption: 採用
@@ -45,5 +45,5 @@ install: |-
   uv add --dev types-jsonschema
   ```
 limitations:
-- item: '`$schema` の無いスキーマ'
-  content: '`Resource.from_contents` が仕様を判定できず例外にする。登録するスキーマに `$schema` を持たせる'
+  - item: '`$schema` の無いスキーマ'
+    content: '`Resource.from_contents` が仕様を判定できず例外にする。登録するスキーマに `$schema` を持たせる'

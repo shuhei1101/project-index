@@ -1,85 +1,85 @@
 id: MOD-54
 title: 索引のサーバー / 検索 / render.py
-lead: '`search_docs` の結果の Markdown。'
+lead: '`search_docs` の結果の Markdown を受け持ち、検索の render.py を修正するときに参照する。'
 test_files:
-- tests/unit/project_index/features/search/test_render.py
+  - tests/unit/project_index/features/search/test_render.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      検索の結果の Markdown ..> 検索の結果
-      class 検索の結果 {
-        +総件数: int
-        +文書: list
-      }
-      class 検索の結果の Markdown {
-        <<function>>
-      }
-      click 検索の結果 href "./MOD-58.py.yaml#検索の結果"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        検索の結果の Markdown ..> 検索の結果
+        class 検索の結果 {
+          +総件数: int
+          +文書: list
+        }
+        class 検索の結果の Markdown {
+          <<function>>
+        }
+        click 検索の結果 href "./MOD-58.py.yaml#検索の結果"
 functions:
-- name: render_search_markdown
-  title: 検索の結果の Markdown
-  kind: 関数
-  container: project_index/features/search/render.py
-  usecase: 検索
-  role: 変換
-  summary: '`format: markdown` の本文を作る'
-  scope: public
-  thread_safe: true
-  args:
-  - name: result
-    title: 検索の結果
-    type: SearchResult
-    required: true
-    passing: positional
-    description: 描く結果
-  - name: source_label
-    title: 配信元の表示
-    type: str
-    required: true
-    passing: keyword
-    description: 先頭の行に出す配信元の ID（複数なら `,` で繋ぐ）
-  returns:
-    type: str
-    description: Markdown
-  process: |-
-    1. `outside_scope` が `True` なら先頭に `作業範囲の外（参考）` の行を置く
-    2. 次の行に `{配信元}: 該当 {total_count} 件・返却した {returned} 件` を置く（複数の配信元は配信元ごとの件数も添える）
-    3. `groups` があれば `| 値 | 件数 |` の表を置く
-    4. `view` が `full` の場合、文書ごとに `<document path="{path}" scope="{scope}">`（`path` が `None` なら属性の無い `<document>`。`outside_scope` が `True` なら `outside_scope="true"` の属性を加える）と `</document>` で包み、中に項目の箇条書きと本文を置く。`total_lines` を持つ文書は、`<document>` の前の行に `{id}: {start_line}-{end_line} 行目 / 全 {total_lines} 行` を置く（範囲が複数なら `{start_line}-{end_line} 行目` を `・` で並べ、空なら `{id}: 返却する行なし / 全 {total_lines} 行`）。抜粋は、当たった行を `{行番号}:{行}`、前後の行を `{行番号}-{行}` で出し、抜粋の間に `--` の行を置く。それ以外は項目を列にした表にする（列名は項目の名前。`@chars` は `chars`）
-    5. `notes` があれば末尾に `> ` の行で並べ、`next_cursor` があれば `続き: cursor={next_cursor}` を置く
-  unit_tests:
-  - name: test_render_search_markdown
-    case: 正常
-    summary: 一覧の表
-    condition: '`view: summary` の 2 件'
-    mock: なし
-    expected: '`sample: 該当 2 件・返却した 2 件` の行と、`| id | kind | name | description | chars | version |` の表'
-  - name: test_render_search_markdown_when_full
-    case: 正常
-    summary: 場所と範囲を属性にする
-    condition: '`view: full` で `path`・`scope: full` を持つ項目と、`path` が `None` の項目'
-    mock: なし
-    expected: 1 件目が `<document path="{path}" scope="full">`、2 件目が属性の無い `<document>` で包まれる
-    exception: '-'
-  - name: test_render_search_markdown_when_snippets
-    case: 正常
-    summary: 抜粋の書式
-    condition: '`view: full` で抜粋 2 つ（`(3, "## a", True)`・`(4, "b", False)` と `(9, "## c", True)`）を持つ項目'
-    mock: なし
-    expected: '`<document>` の中に `3:## a`・`4-b`・`--`・`9:## c` の順の行'
-    exception: '-'
-  - name: test_render_search_markdown_when_ranges
-    case: 正常
-    summary: 切り出した範囲の行
-    condition: '`view: full` で `ranges: [BodyRange(6, 8)]`・`total_lines: 10` の `notes/a` と、`ranges: [BodyRange(1, 2), BodyRange(5, 5)]`・`total_lines: 5` の `notes/b`'
-    mock: なし
-    expected: '`<document` の前の行が `notes/a: 6-8 行目 / 全 10 行` と `notes/b: 1-2 行目・5-5 行目 / 全 5 行`'
-  - name: test_render_search_markdown_when_outside_scope
-    case: 正常
-    summary: 作業範囲の外の表示
-    condition: '`outside_scope: true` の `view: full` の結果'
-    mock: なし
-    expected: 先頭の行が `作業範囲の外（参考）`、`<document>` に `outside_scope="true"`
-    exception: '-'
+  - name: render_search_markdown
+    title: 検索の結果の Markdown
+    kind: 関数
+    container: project_index/features/search/render.py
+    usecase: 検索
+    role: 変換
+    summary: '`format: markdown` の本文を作る'
+    scope: public
+    thread_safe: true
+    args:
+      - name: result
+        title: 検索の結果
+        type: SearchResult
+        required: true
+        passing: positional
+        description: 描く結果
+      - name: source_label
+        title: 配信元の表示
+        type: str
+        required: true
+        passing: keyword
+        description: 先頭の行に出す配信元の ID（複数なら `,` で繋ぐ）
+    returns:
+      type: str
+      description: Markdown
+    process: |-
+      1. `outside_scope` が `True` なら先頭に `作業範囲の外（参考）` の行を置く
+      2. 次の行に `{配信元}: 該当 {total_count} 件・返却した {returned} 件` を置く（複数の配信元は配信元ごとの件数も添える）
+      3. `groups` があれば `| 値 | 件数 |` の表を置く
+      4. `view` が `full` の場合、文書ごとに `<document path="{path}" scope="{scope}">`（`path` が `None` なら属性の無い `<document>`。`outside_scope` が `True` なら `outside_scope="true"` の属性を加える）と `</document>` で包み、中に項目の箇条書きと本文を置く。`total_lines` を持つ文書は、`<document>` の前の行に `{id}: {start_line}-{end_line} 行目 / 全 {total_lines} 行` を置く（範囲が複数なら `{start_line}-{end_line} 行目` を `・` で並べ、空なら `{id}: 返却する行なし / 全 {total_lines} 行`）。抜粋は、当たった行を `{行番号}:{行}`、前後の行を `{行番号}-{行}` で出し、抜粋の間に `--` の行を置く。それ以外は項目を列にした表にする（列名は項目の名前。`@chars` は `chars`）
+      5. `notes` があれば末尾に `> ` の行で並べ、`next_cursor` があれば `続き: cursor={next_cursor}` を置く
+    unit_tests:
+      - name: test_render_search_markdown
+        case: 正常
+        summary: 一覧の表
+        condition: '`view: summary` の 2 件'
+        mock: なし
+        expected: '`sample: 該当 2 件・返却した 2 件` の行と、`| id | kind | name | description | chars | version |` の表'
+      - name: test_render_search_markdown_when_full
+        case: 正常
+        summary: 場所と範囲を属性にする
+        condition: '`view: full` で `path`・`scope: full` を持つ項目と、`path` が `None` の項目'
+        mock: なし
+        expected: 1 件目が `<document path="{path}" scope="full">`、2 件目が属性の無い `<document>` で包まれる
+        exception: '-'
+      - name: test_render_search_markdown_when_snippets
+        case: 正常
+        summary: 抜粋の書式
+        condition: '`view: full` で抜粋 2 つ（`(3, "## a", True)`・`(4, "b", False)` と `(9, "## c", True)`）を持つ項目'
+        mock: なし
+        expected: '`<document>` の中に `3:## a`・`4-b`・`--`・`9:## c` の順の行'
+        exception: '-'
+      - name: test_render_search_markdown_when_ranges
+        case: 正常
+        summary: 切り出した範囲の行
+        condition: '`view: full` で `ranges: [BodyRange(6, 8)]`・`total_lines: 10` の `notes/a` と、`ranges: [BodyRange(1, 2), BodyRange(5, 5)]`・`total_lines: 5` の `notes/b`'
+        mock: なし
+        expected: '`<document` の前の行が `notes/a: 6-8 行目 / 全 10 行` と `notes/b: 1-2 行目・5-5 行目 / 全 5 行`'
+      - name: test_render_search_markdown_when_outside_scope
+        case: 正常
+        summary: 作業範囲の外の表示
+        condition: '`outside_scope: true` の `view: full` の結果'
+        mock: なし
+        expected: 先頭の行が `作業範囲の外（参考）`、`<document>` に `outside_scope="true"`
+        exception: '-'

@@ -8,25 +8,25 @@ version:
   source: pyproject.toml・uv.lock
   pinning: pyproject.toml に下限、uv.lock で固定
 catalogs:
-- name: API
-  version: 0.162.0
-  entries:
-  - name: FastAPI
-    kind: クラス
-    purpose: 読み取り API・端末の設定の API・MCP をまとめる ASGI アプリ。`lifespan` で MCP のセッション管理を起動する
-  - name: FastAPI.mount
-    kind: 関数
-    purpose: '`/mcp`・`/_admin/mcp` に MCP の ASGI アプリを載せる'
-  - name: FastAPI.middleware
-    kind: 関数
-    purpose: 端末の設定の API への別のオリジンからの書き込みを断るミドルウェアを登録する
-  - name: FastAPI(generate_unique_id_function=...)
-    kind: 引数
-    purpose: OpenAPI の operationId を `read-{name}`・`settings-{name}` にする（orval が生成する関数の名前になる）
-  - name: FastAPI.exception_handler / StarletteHTTPException
-    kind: 関数 / クラス
-    purpose: 当たらないパス・メソッドの 404・405 を含め、例外を problem+json にする
-lead: Starlette の上に作られた ASGI の Web フレームワーク。引数の型ヒントからリクエストを検証して受け取る。
+  - name: API
+    version: 0.162.0
+    entries:
+      - name: FastAPI
+        kind: クラス
+        purpose: 読み取り API・端末の設定の API・MCP をまとめる ASGI アプリ。`lifespan` で MCP のセッション管理を起動する
+      - name: FastAPI.mount
+        kind: 関数
+        purpose: '`/mcp`・`/_admin/mcp` に MCP の ASGI アプリを載せる'
+      - name: FastAPI.middleware
+        kind: 関数
+        purpose: 端末の設定の API への別のオリジンからの書き込みを断るミドルウェアを登録する
+      - name: FastAPI(generate_unique_id_function=...)
+        kind: 引数
+        purpose: OpenAPI の operationId を `read-{name}`・`settings-{name}` にする（orval が生成する関数の名前になる）
+      - name: FastAPI.exception_handler / StarletteHTTPException
+        kind: 関数 / クラス
+        purpose: 当たらないパス・メソッドの 404・405 を含め、例外を problem+json にする
+lead: 読み取り API・端末の設定の API・MCP を 1 つのアプリにまとめる fastapi の利用方法を定め、HTTP のルート・例外の変換・MCP のマウントを修正するときに参照する。
 purl: pkg:pypi/fastapi
 dependency_scope: 必須
 adoption: 採用
@@ -47,5 +47,5 @@ install: |-
   uv add 'fastapi>=0.162.0'
   ```
 limitations:
-- item: マウントしたアプリの lifespan
-  content: 実行されない。親の `lifespan` で MCP の `session_manager.run()` に入る
+  - item: マウントしたアプリの lifespan
+    content: 実行されない。親の `lifespan` で MCP の `session_manager.run()` に入る

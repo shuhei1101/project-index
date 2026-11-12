@@ -4,121 +4,133 @@ entry:
   kind: endpoint
   value: GET `/sources/{source}/refs`
 flows:
-- name: 正常系
-  summary: ブランチ・タグ・最近の commit を返す
-  setup:
-  - name: Mock
-    description: なし（一時フォルダに配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
-  - name: サンプルの配信元
-    description: commit 2 つ・タグ 1 つ・ワークツリーのブランチ 1 つを持つ sample
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant E as GET /sources/{source}/refs
-      participant G as sample の Git の履歴
+  - name: 正常系
+    summary: ブランチ・タグ・最近の commit を返す
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+      - name: サンプルの配信元
+        description: commit 2 つ・タグ 1 つ・ワークツリーのブランチ 1 つを持つ sample
+    flow: |-
+      <!-- map: {"title": "正常系"} -->
 
-      C->>E: GET /sources/sample/refs
-      E-->>G: ブランチ・タグ・最近の commit を読む
-      E-->>C: 200 リビジョンの一覧
-    ```
-  expected:
-  - '`branches` に `default_ref` とワークツリーのブランチがある'
-  - '`tags` にタグが 1 つある'
-  - '`commits` が新しい順に 2 つ並ぶ'
-  test: test_normal
-- name: 正常系（Git 管理外の配信元）
-  summary: 'Git 管理外の配信元は `git: false` を返す'
-  setup:
-  - name: Mock
-    description: なし
-  - name: 読み取りだけの配信元
-    description: Git 管理外のフォルダ
-    notes: id `notes`
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant E as GET /sources/{source}/refs
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/refs
+        participant G as sample の Git の履歴
 
-      C->>E: GET /sources/notes/refs
-      E-->>C: 200 git: false
-    ```
-  expected:
-  - '`git` が `false` で、`branches`・`tags`・`commits` が空'
-  test: test_normal_when_non_git_source
-- name: 異常系（無い配信元・404）
-  summary: 無い配信元・配信していない配信元を断る
-  setup:
-  - name: Mock
-    description: なし
-  - name: 入力
-    description: '`/sources/unknown/refs`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant E as GET /sources/{source}/refs
+        C->>E: GET /sources/sample/refs
+        E-->>G: ブランチ・タグ・最近の commit を読む
+        E-->>C: 200 リビジョンの一覧
+      ```
 
-      C->>E: GET /sources/unknown/refs
-      E-->>C: 404 problem+json
-    ```
-  expected:
-  - 404 で、`detail` に無いのが配信元 `unknown` であることがある
-  test: test_error_when_source_not_found
-lead: dev-docs の画面のサーバーがリビジョンの切り替えで呼ぶ。配信元のブランチ・タグ・最近の commit を返す。
+      <!-- /map -->
+    expected:
+      - '`branches` に `default_ref` とワークツリーのブランチがある'
+      - '`tags` にタグが 1 つある'
+      - '`commits` が新しい順に 2 つ並ぶ'
+    test: test_normal
+  - name: 正常系（Git 管理外の配信元）
+    summary: 'Git 管理外の配信元は `git: false` を返す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 読み取りだけの配信元
+        description: Git 管理外のフォルダ
+        notes: id `notes`
+    flow: |-
+      <!-- map: {"title": "正常系（Git 管理外の配信元）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/refs
+
+        C->>E: GET /sources/notes/refs
+        E-->>C: 200 git: false
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`git` が `false` で、`branches`・`tags`・`commits` が空'
+    test: test_normal_when_non_git_source
+  - name: 異常系（無い配信元・404）
+    summary: 無い配信元・配信していない配信元を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`/sources/unknown/refs`'
+    flow: |-
+      <!-- map: {"title": "異常系（無い配信元・404）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/refs
+
+        C->>E: GET /sources/unknown/refs
+        E-->>C: 404 problem+json
+      ```
+
+      <!-- /map -->
+    expected:
+      - 404 で、`detail` に無いのが配信元 `unknown` であることがある
+    test: test_error_when_source_not_found
+lead: 配信元のブランチ・タグ・最近の commit を返却する読み取り API の入出力を定め、リビジョンの一覧を修正するときに参照する。
 identifier: list_refs
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true
 side_effects: なし
 exclusivity: 読み取りだけで排他しない
 request:
-- name: source
-  type: str
-  required: true
-  location: path
-  description: 配信元の ID
-- name: commits
-  type: int
-  required: false
-  default: '`20`'
-  location: query
-  description: 返す最近の commit の数
-  constraints: 0〜100
+  - name: source
+    type: str
+    required: true
+    location: path
+    description: 配信元の ID
+  - name: commits
+    type: int
+    required: false
+    default: '`20`'
+    location: query
+    description: 返す最近の commit の数
+    constraints: 0〜100
 request_example: |-
   ```text
   GET /sources/sample/refs?commits=10
   ```
 response:
-- name: git
-  type: bool
-  description: Git の配信元か
-  notes: '`false` のときは他の配列が空'
-- name: defaultRef
-  type: str
-  description: 配信元の `default_ref`
-- name: branches[].name
-  type: str
-  description: ブランチ名（ワークツリーのブランチを含む）
-- name: branches[].commit
-  type: str
-  description: 先頭の commit（短縮）
-- name: tags[].name
-  type: str
-  description: タグ名
-- name: tags[].commit
-  type: str
-  description: 指す commit（短縮）
-- name: commits[].commit
-  type: str
-  description: '`default_ref` の最近の commit（短縮）'
-- name: commits[].date
-  type: str
-  format: date-time
-  description: commit の日時
-- name: commits[].subject
-  type: str
-  description: commit のメッセージの 1 行目
+  - name: git
+    type: bool
+    description: Git の配信元か
+    notes: '`false` のときは他の配列が空'
+  - name: defaultRef
+    type: str
+    description: 配信元の `default_ref`
+  - name: branches[].name
+    type: str
+    description: ブランチ名（ワークツリーのブランチを含む）
+  - name: branches[].commit
+    type: str
+    description: 先頭の commit（短縮）
+  - name: tags[].name
+    type: str
+    description: タグ名
+  - name: tags[].commit
+    type: str
+    description: 指す commit（短縮）
+  - name: commits[].commit
+    type: str
+    description: '`default_ref` の最近の commit（短縮）'
+  - name: commits[].date
+    type: str
+    format: date-time
+    description: commit の日時
+  - name: commits[].subject
+    type: str
+    description: commit のメッセージの 1 行目
 response_example: |-
   ```json
   {"git": true, "defaultRef": "main",
@@ -127,20 +139,20 @@ response_example: |-
    "commits": [{"commit": "8b1d4e0", "date": "2026-10-26T11:30:00+09:00", "subject": "docs: 文書 1 の名前を変える"}]}
   ```
 status_codes:
-- code: '200'
-  condition: '返した（Git 管理外の配信元は `git: false` で 200）'
-- code: '404'
-  condition: 配信元が無い・配信していない
+  - code: '200'
+    condition: '返した（Git 管理外の配信元は `git: false` で 200）'
+  - code: '404'
+    condition: 配信元が無い・配信していない
 error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）
 constraints:
-- item: 件数
-  constraint: '`commits` は最大 100'
-- item: 認可
-  constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
-- item: タイムアウト
-  constraint: 制限なし
-- item: JSON のキー
-  constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名は変えない
-- item: operationId
-  constraint: '`{tag}-{関数名}` の `view-list_refs`'
+  - item: 件数
+    constraint: '`commits` は最大 100'
+  - item: 認可
+    constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
+  - item: タイムアウト
+    constraint: 制限なし
+  - item: JSON のキー
+    constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名は変えない
+  - item: operationId
+    constraint: '`{tag}-{関数名}` の `view-list_refs`'
 test_file: tests/integration/server/test_list_refs.py

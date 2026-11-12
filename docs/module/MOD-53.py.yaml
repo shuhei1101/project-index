@@ -1,307 +1,307 @@
 id: MOD-53
 title: 索引のサーバー / 検索 / filters.py
-lead: 条件の木の確かめと照合・語の照合・正規表現・比べる値の解釈。
+lead: 条件の木の確かめと照合・語の照合・正規表現・比べる値の解釈を受け持ち、検索の filters.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/features/search/test_filters.py
+  - tests/unit/project_index/features/search/test_filters.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      文書の検索 ..> 条件の確かめ
-      文書の検索 ..> 条件の照合
-      条件の確かめ ..> 使える項目
-      条件の照合 ..> 項目の値
-      条件の照合 ..> 比べる値の解釈
-      条件の照合 ..> 正規表現の組み立て
-      条件の確かめ ..> 正規表現の組み立て
-      抜粋の検索 ..> 正規表現の組み立て
-      当たった行の数 ..> 正規表現の組み立て
-      class 文書の検索 {
-        <<function>>
-      }
-      class 条件の確かめ {
-        <<function>>
-      }
-      class 条件の照合 {
-        <<function>>
-      }
-      class 使える項目 {
-        <<function>>
-      }
-      class 項目の値 {
-        <<function>>
-      }
-      class 比べる値の解釈 {
-        <<function>>
-      }
-      class 正規表現の組み立て {
-        <<function>>
-      }
-      class 抜粋の検索 {
-        <<function>>
-      }
-      class 当たった行の数 {
-        <<function>>
-      }
-      click 文書の検索 href "./MOD-55.py.yaml#文書の検索"
-      click 使える項目 href "./MOD-52.py.yaml#使える項目"
-      click 項目の値 href "./MOD-52.py.yaml#項目の値"
-      click 抜粋の検索 href "./MOD-56.py.yaml#抜粋の検索"
-      click 当たった行の数 href "./MOD-56.py.yaml#当たった行の数"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        文書の検索 ..> 条件の確かめ
+        文書の検索 ..> 条件の照合
+        条件の確かめ ..> 使える項目
+        条件の照合 ..> 項目の値
+        条件の照合 ..> 比べる値の解釈
+        条件の照合 ..> 正規表現の組み立て
+        条件の確かめ ..> 正規表現の組み立て
+        抜粋の検索 ..> 正規表現の組み立て
+        当たった行の数 ..> 正規表現の組み立て
+        class 文書の検索 {
+          <<function>>
+        }
+        class 条件の確かめ {
+          <<function>>
+        }
+        class 条件の照合 {
+          <<function>>
+        }
+        class 使える項目 {
+          <<function>>
+        }
+        class 項目の値 {
+          <<function>>
+        }
+        class 比べる値の解釈 {
+          <<function>>
+        }
+        class 正規表現の組み立て {
+          <<function>>
+        }
+        class 抜粋の検索 {
+          <<function>>
+        }
+        class 当たった行の数 {
+          <<function>>
+        }
+        click 文書の検索 href "./MOD-55.py.yaml#文書の検索"
+        click 使える項目 href "./MOD-52.py.yaml#使える項目"
+        click 項目の値 href "./MOD-52.py.yaml#項目の値"
+        click 抜粋の検索 href "./MOD-56.py.yaml#抜粋の検索"
+        click 当たった行の数 href "./MOD-56.py.yaml#当たった行の数"
 functions:
-- name: check_filter
-  title: 条件の確かめ
-  kind: 関数
-  container: project_index/features/search/filters.py
-  usecase: 検索
-  role: 検証
-  summary: 条件・並べ替え・集計の項目と値、本文の範囲の引数が使えるかを確かめる
-  scope: public
-  thread_safe: true
-  args:
-  - name: request
-    title: 検索の要求
-    type: SearchRequest
-    required: true
-    passing: positional
-    description: 確かめる要求
-  - name: fields
-    title: 使える項目
-    type: Mapping[str, str]
-    required: true
-    passing: positional
-    description: 使える項目の結果
-  returns:
-    type: list[Violation]
-    description: 違反。項目のパスは引数のパス（`filter.and[1].field`・`filter.not.field`）
-  process: |-
-    1. 条件の木を `and`・`or`・`not` の下までたどり、`field` が `fields` に無い・`exists` 以外で `values` が空・`regex` が正規表現にならない（正規表現の組み立て）・`gt` などで値が項目の型に合わない（比べる値の解釈）を違反にする。`fix` には近い項目（`difflib.get_close_matches`）か期待する型
-    2. `field` が `@matches` の条件を違反にする（`rule`: `@matches は条件に使用できません`、`fix`: `fields か order_by に指定してください`）
-    3. `Group` が `and`・`or`・`not` のうち 1 つだけを持たないものを違反にする（`rule`: `and・or・not のどれか 1 つだけを持ってください`）
-    4. `order_by[].field` が `fields` に無いもの、`group_by` が `fields` に無いか `@matches` のものを違反にする
-    5. `sections` と `lines` を両方持つ場合、`sections` のパスで違反にする（`rule`: `sections と lines は同時に指定できません`）
-    6. `view` が `full` 以外で `sections`・`lines` を持つ場合、そのパスで違反にする（`rule`: `view: full のときだけ指定できます`）
-  unit_tests:
-  - name: test_check_filter_when_group_keys
-    case: 異常
-    summary: 束のキーが 2 つ
-    condition: '`{and: [{field: name, op: eq, values: [a]}], not: {field: tags, op: eq, values: [x]}}`'
-    mock: なし
-    expected: 違反が 1 件で、`path` が `filter`、`rule` が `and・or・not のどれか 1 つだけを持ってください`
-  - name: test_check_filter_when_not_child
-    case: 異常
-    summary: '`not` の下の知らない項目'
-    condition: '`{not: {field: nmae, op: eq, values: [x]}}`'
-    mock: なし
-    expected: 違反の `path` が `filter.not.field`
-  - name: test_check_filter_when_matches
-    case: 異常
-    summary: '`@matches` を条件に使う'
-    condition: '`filter: {field: "@matches", op: gt, values: ["1"]}` と、`order_by: [{field: "@matches"}]` だけの要求'
-    mock: なし
-    expected: 1 つ目は違反の `path` が `filter.field`、2 つ目は違反が無い
-  - name: test_check_filter_when_body_range
-    case: 異常
-    summary: 本文の範囲の引数の組み合わせ
-    condition: '`view: full` で `sections: [a]` と `lines: {offset: 1}` を両方と、`view: summary` で `sections: [a]`'
-    mock: なし
-    expected: '1 つ目は違反の `path` が `sections`、2 つ目は `path` が `sections` で `rule` が `view: full のときだけ指定できます`'
-- name: parse_compare_value
-  title: 比べる値の解釈
-  kind: 関数
-  container: project_index/features/search/filters.py
-  usecase: 検索
-  role: 変換
-  summary: 条件の値を項目の型で解釈する
-  scope: public
-  thread_safe: true
-  args:
-  - name: value
-    title: 値
-    type: str
-    required: true
-    passing: positional
-    description: 条件の値
-  - name: field_type
-    title: 項目の型
-    type: str
-    required: true
-    passing: positional
-    description: 使える項目の型
-  - name: today
-    title: 今日
-    type: date
-    required: true
-    passing: keyword
-    description: '`today`・`-7d` の基準'
-  returns:
-    type: Any
-    description: '`date` は `datetime`（UTC）、`number` は `float`、それ以外は文字列'
-  process: |-
-    1. `date` の場合、`today` は今日の 0 時、`-{n}d`・`+{n}d` は今日から `n` 日、それ以外は `datetime.fromisoformat`（タイムゾーンが無ければ UTC）
-    2. `number` の場合、`float`
-    3. 解釈できない場合、`ValueError` を送る
-  exceptions:
-  - name: ValueError
-    condition: 型に合わない値
-    message: '`{value} を {field_type} として読み込めません`'
-  unit_tests:
-  - name: test_parse_compare_value
-    case: 正常
-    summary: 日付の相対の値
-    condition: '`today=2026-10-28` で `today`・`-7d`・`2026-10-01`'
-    mock: なし
-    expected: 10-28・10-21・10-01 の 0 時（UTC）
-  - name: test_parse_compare_value_when_invalid
-    case: 異常
-    summary: 読めない値
-    condition: '`("x", "number")`'
-    mock: なし
-    expected: '`ValueError`'
-    exception: 型に合わない値
-- name: match_filter
-  title: 条件の照合
-  kind: 関数
-  container: project_index/features/search/filters.py
-  usecase: 検索
-  role: 判定
-  summary: 文書が条件の木に当たるかを判定する
-  scope: public
-  thread_safe: true
-  args:
-  - name: node
-    title: 条件
-    type: Condition | Group | None
-    required: true
-    passing: positional
-    description: '`None` は全てに当たる'
-  - name: document
-    title: 文書
-    type: Document
-    required: true
-    passing: positional
-    description: 判定する文書
-  - name: fields
-    title: 使える項目
-    type: Mapping[str, str]
-    required: true
-    passing: keyword
-    description: 値を解釈する型
-  - name: today
-    title: 今日
-    type: date
-    required: true
-    passing: keyword
-    description: 日付の相対の値の基準
-  returns:
-    type: bool
-    description: 当たるか
-  process: |-
-    1. `Group` は `all_of` なら全て、`any_of` ならどれかが当たるとき、`not_` なら中が当たらないとき `True`
-    2. `Condition` は項目の値を引き、`values` の各値と比べる（`match` が `any` ならどれか、`all` なら全て）
-       - `exists`・`not_exists` は値の並びが空でないか
-       - `eq`・`ne`・`prefix`・`suffix`・`contains`・`not_contains` は、値の並びのどれかとの文字列の比較（`case_sensitive` が `False` なら両方を NFKC と `casefold`）。`ne`・`not_contains` は値の並びのどれとも当たらないとき `True`
-       - `regex` は正規表現の組み立ての `search`。`case_sensitive` が `False` なら文書の値を NFKC にして比べる（パターンには正規化をかけない）
-       - `glob` は値の並びのどれかに `PurePosixPath(値).full_match(パターン)` を当てる（`**` は `/` をまたぎ、`*`・`?` はまたがない）。`case_sensitive` が `False` なら値とパターンの両方を NFKC と `casefold` にしてから当てる
-       - `gt`・`gte`・`lt`・`lte` は比べる値の解釈で型をそろえて比べ、解釈できない文書の値は当たらない
-  unit_tests:
-  - name: test_match_filter
-    case: 正常
-    summary: AND と OR の入れ子
-    condition: '`{and: [{field: tags, op: eq, values: [mcp]}, {or: [{field: name, op: contains, values: [ＭＣＰ]}, {field: updated, op: gte, values: [-7d]}]}]}`'
-    mock: なし
-    expected: '`tags: [mcp]` で `name` が `mcp の決まり` の文書が `True`、`tags: [x]` の文書が `False`'
-  - name: test_match_filter_when_match_all
-    case: 正常
-    summary: 複数の値の AND
-    condition: '`{field: tags, op: eq, values: [a, b], match: all}`'
-    mock: なし
-    expected: '`tags: [a, b, c]` が `True`、`tags: [a]` が `False`'
-  - name: test_match_filter_when_case_sensitive
-    case: 正常
-    summary: 区別する
-    condition: '`{field: name, op: eq, values: [Doc], case_sensitive: true}`'
-    mock: なし
-    expected: '`name: doc` が `False`'
-  - name: test_match_filter_when_regex_lines
-    case: 正常
-    summary: 正規表現は各行に当たる
-    condition: '`{field: body, op: regex, values: ["^## "]}` と `{field: body, op: regex, values: ["\\A## "]}`'
-    mock: なし
-    expected: 本文 `# x\n## y` の文書が 1 つ目で `True`、2 つ目で `False`
-  - name: test_match_filter_when_not
-    case: 正常
-    summary: 束の否定と入れ子
-    condition: '`{and: [{field: tags, op: eq, values: [a]}, {not: {or: [{field: name, op: eq, values: [x]}, {field: name, op: eq, values: [y]}]}}]}`'
-    mock: なし
-    expected: '`tags: [a]`・`name: z` が `True`、`tags: [a]`・`name: y` が `False`'
-  - name: test_match_filter_when_glob
-    case: 正常
-    summary: パスの glob
-    condition: '`{field: "@path", op: glob, values: ["notes/*.md"]}` と `{field: "@path", op: glob, values: ["NOTES/**"]}`'
-    mock: なし
-    expected: 1 つ目は `notes/a.md` が `True`、`notes/archive/c.md` が `False`。2 つ目（`case_sensitive` を省く）はどちらも `True`
-- name: match_words
-  title: 語の照合
-  kind: 関数
-  container: project_index/features/search/filters.py
-  usecase: 語での検索
-  role: 判定
-  summary: 空白で区切った語を全て含む文書かを判定する（語での検索）
-  scope: public
-  thread_safe: true
-  args:
-  - name: document
-    title: 文書
-    type: Document
-    required: true
-    passing: positional
-    description: 判定する文書
-  - name: words
-    title: 語
-    type: Sequence[str]
-    required: true
-    passing: positional
-    description: NFKC と `casefold` をした語
-  returns:
-    type: bool
-    description: 全ての語が `*` の値か ID のどれかに含まれるか
-  process: 1. `*` の値と ID を NFKC と `casefold` をして改行で繋ぎ、全ての語を含むかを返す
-- name: compile_regex
-  title: 正規表現の組み立て
-  kind: 関数
-  container: project_index/features/search/filters.py
-  usecase: 検索
-  role: 変換
-  summary: '`regex` の値を、各行に当たる正規表現にする'
-  scope: public
-  thread_safe: true
-  args:
-  - name: value
-    title: 値
-    type: str
-    required: true
-    passing: positional
-    description: 条件の `values` の 1 つ
-  - name: case_sensitive
-    title: 区別するか
-    type: bool
-    required: true
-    passing: keyword
-    description: 条件の `case_sensitive`
-  returns:
-    type: re.Pattern[str]
-    description: コンパイルした正規表現
-  process: 1. フラグを `re.MULTILINE` にし、`case_sensitive` が `False` なら `re.IGNORECASE` を加えて `re.compile(value, flags)` を返す（`re.error` はそのまま送る）
-  exceptions:
-  - name: re.error
-    condition: 正規表現にならない値
-    message: '`re` の既定'
-  unit_tests:
-  - name: test_compile_regex
-    case: 正常
-    summary: 各行と大文字小文字
-    condition: '`compile_regex("^b", case_sensitive=False)` と `compile_regex("^B", case_sensitive=True)` を `a\nb` に `search`'
-    mock: なし
-    expected: 1 つ目が当たり、2 つ目は当たらない
+  - name: check_filter
+    title: 条件の確かめ
+    kind: 関数
+    container: project_index/features/search/filters.py
+    usecase: 検索
+    role: 検証
+    summary: 条件・並べ替え・集計の項目と値、本文の範囲の引数が使えるかを確かめる
+    scope: public
+    thread_safe: true
+    args:
+      - name: request
+        title: 検索の要求
+        type: SearchRequest
+        required: true
+        passing: positional
+        description: 確かめる要求
+      - name: fields
+        title: 使える項目
+        type: Mapping[str, str]
+        required: true
+        passing: positional
+        description: 使える項目の結果
+    returns:
+      type: list[Violation]
+      description: 違反。項目のパスは引数のパス（`filter.and[1].field`・`filter.not.field`）
+    process: |-
+      1. 条件の木を `and`・`or`・`not` の下までたどり、`field` が `fields` に無い・`exists` 以外で `values` が空・`regex` が正規表現にならない（正規表現の組み立て）・`gt` などで値が項目の型に合わない（比べる値の解釈）を違反にする。`fix` には近い項目（`difflib.get_close_matches`）か期待する型
+      2. `field` が `@matches` の条件を違反にする（`rule`: `@matches は条件に使用できません`、`fix`: `fields か order_by に指定してください`）
+      3. `Group` が `and`・`or`・`not` のうち 1 つだけを持たないものを違反にする（`rule`: `and・or・not のどれか 1 つだけを持ってください`）
+      4. `order_by[].field` が `fields` に無いもの、`group_by` が `fields` に無いか `@matches` のものを違反にする
+      5. `sections` と `lines` を両方持つ場合、`sections` のパスで違反にする（`rule`: `sections と lines は同時に指定できません`）
+      6. `view` が `full` 以外で `sections`・`lines` を持つ場合、そのパスで違反にする（`rule`: `view: full のときだけ指定できます`）
+    unit_tests:
+      - name: test_check_filter_when_group_keys
+        case: 異常
+        summary: 束のキーが 2 つ
+        condition: '`{and: [{field: name, op: eq, values: [a]}], not: {field: tags, op: eq, values: [x]}}`'
+        mock: なし
+        expected: 違反が 1 件で、`path` が `filter`、`rule` が `and・or・not のどれか 1 つだけを持ってください`
+      - name: test_check_filter_when_not_child
+        case: 異常
+        summary: '`not` の下の知らない項目'
+        condition: '`{not: {field: nmae, op: eq, values: [x]}}`'
+        mock: なし
+        expected: 違反の `path` が `filter.not.field`
+      - name: test_check_filter_when_matches
+        case: 異常
+        summary: '`@matches` を条件に使う'
+        condition: '`filter: {field: "@matches", op: gt, values: ["1"]}` と、`order_by: [{field: "@matches"}]` だけの要求'
+        mock: なし
+        expected: 1 つ目は違反の `path` が `filter.field`、2 つ目は違反が無い
+      - name: test_check_filter_when_body_range
+        case: 異常
+        summary: 本文の範囲の引数の組み合わせ
+        condition: '`view: full` で `sections: [a]` と `lines: {offset: 1}` を両方と、`view: summary` で `sections: [a]`'
+        mock: なし
+        expected: '1 つ目は違反の `path` が `sections`、2 つ目は `path` が `sections` で `rule` が `view: full のときだけ指定できます`'
+  - name: parse_compare_value
+    title: 比べる値の解釈
+    kind: 関数
+    container: project_index/features/search/filters.py
+    usecase: 検索
+    role: 変換
+    summary: 条件の値を項目の型で解釈する
+    scope: public
+    thread_safe: true
+    args:
+      - name: value
+        title: 値
+        type: str
+        required: true
+        passing: positional
+        description: 条件の値
+      - name: field_type
+        title: 項目の型
+        type: str
+        required: true
+        passing: positional
+        description: 使える項目の型
+      - name: today
+        title: 今日
+        type: date
+        required: true
+        passing: keyword
+        description: '`today`・`-7d` の基準'
+    returns:
+      type: Any
+      description: '`date` は `datetime`（UTC）、`number` は `float`、それ以外は文字列'
+    process: |-
+      1. `date` の場合、`today` は今日の 0 時、`-{n}d`・`+{n}d` は今日から `n` 日、それ以外は `datetime.fromisoformat`（タイムゾーンが無ければ UTC）
+      2. `number` の場合、`float`
+      3. 解釈できない場合、`ValueError` を送る
+    exceptions:
+      - name: ValueError
+        condition: 型に合わない値
+        message: '`{value} を {field_type} として読み込めません`'
+    unit_tests:
+      - name: test_parse_compare_value
+        case: 正常
+        summary: 日付の相対の値
+        condition: '`today=2026-10-28` で `today`・`-7d`・`2026-10-01`'
+        mock: なし
+        expected: 10-28・10-21・10-01 の 0 時（UTC）
+      - name: test_parse_compare_value_when_invalid
+        case: 異常
+        summary: 読めない値
+        condition: '`("x", "number")`'
+        mock: なし
+        expected: '`ValueError`'
+        exception: 型に合わない値
+  - name: match_filter
+    title: 条件の照合
+    kind: 関数
+    container: project_index/features/search/filters.py
+    usecase: 検索
+    role: 判定
+    summary: 文書が条件の木に当たるかを判定する
+    scope: public
+    thread_safe: true
+    args:
+      - name: node
+        title: 条件
+        type: Condition | Group | None
+        required: true
+        passing: positional
+        description: '`None` は全てに当たる'
+      - name: document
+        title: 文書
+        type: Document
+        required: true
+        passing: positional
+        description: 判定する文書
+      - name: fields
+        title: 使える項目
+        type: Mapping[str, str]
+        required: true
+        passing: keyword
+        description: 値を解釈する型
+      - name: today
+        title: 今日
+        type: date
+        required: true
+        passing: keyword
+        description: 日付の相対の値の基準
+    returns:
+      type: bool
+      description: 当たるか
+    process: |-
+      1. `Group` は `all_of` なら全て、`any_of` ならどれかが当たるとき、`not_` なら中が当たらないとき `True`
+      2. `Condition` は項目の値を引き、`values` の各値と比べる（`match` が `any` ならどれか、`all` なら全て）
+         - `exists`・`not_exists` は値の並びが空でないか
+         - `eq`・`ne`・`prefix`・`suffix`・`contains`・`not_contains` は、値の並びのどれかとの文字列の比較（`case_sensitive` が `False` なら両方を NFKC と `casefold`）。`ne`・`not_contains` は値の並びのどれとも当たらないとき `True`
+         - `regex` は正規表現の組み立ての `search`。`case_sensitive` が `False` なら文書の値を NFKC にして比べる（パターンには正規化をかけない）
+         - `glob` は値の並びのどれかに `PurePosixPath(値).full_match(パターン)` を当てる（`**` は `/` をまたぎ、`*`・`?` はまたがない）。`case_sensitive` が `False` なら値とパターンの両方を NFKC と `casefold` にしてから当てる
+         - `gt`・`gte`・`lt`・`lte` は比べる値の解釈で型をそろえて比べ、解釈できない文書の値は当たらない
+    unit_tests:
+      - name: test_match_filter
+        case: 正常
+        summary: AND と OR の入れ子
+        condition: '`{and: [{field: tags, op: eq, values: [mcp]}, {or: [{field: name, op: contains, values: [ＭＣＰ]}, {field: updated, op: gte, values: [-7d]}]}]}`'
+        mock: なし
+        expected: '`tags: [mcp]` で `name` が `mcp の決まり` の文書が `True`、`tags: [x]` の文書が `False`'
+      - name: test_match_filter_when_match_all
+        case: 正常
+        summary: 複数の値の AND
+        condition: '`{field: tags, op: eq, values: [a, b], match: all}`'
+        mock: なし
+        expected: '`tags: [a, b, c]` が `True`、`tags: [a]` が `False`'
+      - name: test_match_filter_when_case_sensitive
+        case: 正常
+        summary: 区別する
+        condition: '`{field: name, op: eq, values: [Doc], case_sensitive: true}`'
+        mock: なし
+        expected: '`name: doc` が `False`'
+      - name: test_match_filter_when_regex_lines
+        case: 正常
+        summary: 正規表現は各行に当たる
+        condition: '`{field: body, op: regex, values: ["^## "]}` と `{field: body, op: regex, values: ["\\A## "]}`'
+        mock: なし
+        expected: 本文 `# x\n## y` の文書が 1 つ目で `True`、2 つ目で `False`
+      - name: test_match_filter_when_not
+        case: 正常
+        summary: 束の否定と入れ子
+        condition: '`{and: [{field: tags, op: eq, values: [a]}, {not: {or: [{field: name, op: eq, values: [x]}, {field: name, op: eq, values: [y]}]}}]}`'
+        mock: なし
+        expected: '`tags: [a]`・`name: z` が `True`、`tags: [a]`・`name: y` が `False`'
+      - name: test_match_filter_when_glob
+        case: 正常
+        summary: パスの glob
+        condition: '`{field: "@path", op: glob, values: ["notes/*.md"]}` と `{field: "@path", op: glob, values: ["NOTES/**"]}`'
+        mock: なし
+        expected: 1 つ目は `notes/a.md` が `True`、`notes/archive/c.md` が `False`。2 つ目（`case_sensitive` を省く）はどちらも `True`
+  - name: match_words
+    title: 語の照合
+    kind: 関数
+    container: project_index/features/search/filters.py
+    usecase: 語での検索
+    role: 判定
+    summary: 空白で区切った語を全て含む文書かを判定する（語での検索）
+    scope: public
+    thread_safe: true
+    args:
+      - name: document
+        title: 文書
+        type: Document
+        required: true
+        passing: positional
+        description: 判定する文書
+      - name: words
+        title: 語
+        type: Sequence[str]
+        required: true
+        passing: positional
+        description: NFKC と `casefold` をした語
+    returns:
+      type: bool
+      description: 全ての語が `*` の値か ID のどれかに含まれるか
+    process: 1. `*` の値と ID を NFKC と `casefold` をして改行で繋ぎ、全ての語を含むかを返す
+  - name: compile_regex
+    title: 正規表現の組み立て
+    kind: 関数
+    container: project_index/features/search/filters.py
+    usecase: 検索
+    role: 変換
+    summary: '`regex` の値を、各行に当たる正規表現にする'
+    scope: public
+    thread_safe: true
+    args:
+      - name: value
+        title: 値
+        type: str
+        required: true
+        passing: positional
+        description: 条件の `values` の 1 つ
+      - name: case_sensitive
+        title: 区別するか
+        type: bool
+        required: true
+        passing: keyword
+        description: 条件の `case_sensitive`
+    returns:
+      type: re.Pattern[str]
+      description: コンパイルした正規表現
+    process: 1. フラグを `re.MULTILINE` にし、`case_sensitive` が `False` なら `re.IGNORECASE` を加えて `re.compile(value, flags)` を返す（`re.error` はそのまま送る）
+    exceptions:
+      - name: re.error
+        condition: 正規表現にならない値
+        message: '`re` の既定'
+    unit_tests:
+      - name: test_compile_regex
+        case: 正常
+        summary: 各行と大文字小文字
+        condition: '`compile_regex("^b", case_sensitive=False)` と `compile_regex("^B", case_sensitive=True)` を `a\nb` に `search`'
+        mock: なし
+        expected: 1 つ目が当たり、2 つ目は当たらない

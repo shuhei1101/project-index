@@ -1,110 +1,110 @@
 id: MOD-34
 title: 索引のサーバー / 再起動と更新 / control.py
-lead: 再起動の要求を受けて uvicorn を止め、止まった後に `run_serve` が同じプロセスを置き換えるかを持つ。
+lead: 再起動の要求での uvicorn の停止と、停止の後に `run_serve` が同じプロセスを置き換えるかの判定を受け持ち、再起動と更新の control.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/features/lifecycle/test_control.py
+  - tests/unit/project_index/features/lifecycle/test_control.py
 classes:
-- name: RestartControl
-  title: 再起動の制御
-  container: project_index/features/lifecycle/control.py
-  usecase: 再起動
-  role: 制御
-  summary: 再起動の要求を 1 回だけ受け、uvicorn に停止を伝える
-  description: '`build_handlers` が 1 つ作り、`run_serve` が uvicorn の `Server` を `attach` する。`update` は `update_lock` を取っている間、他の `update` を断る。'
-  properties:
-  - name: _server
-    title: uvicorn のサーバー
-    type: uvicorn.Server | None
-    access: 内部 (_)
-    default: None
-    description: '`attach` で渡されたサーバー'
-  - name: _requested
-    title: 要求済み
-    type: bool
-    access: 内部 (_)
-    default: 'False'
-    description: 再起動を要求されたら `True`
-  - name: _lock
-    title: 要求のロック
-    type: threading.Lock
-    access: 内部 (_)
-    description: '`_requested` の読み書きを守る'
-  - name: update_lock
-    title: 更新のロック
-    type: threading.Lock
-    access: 公開
-    description: '`update_clone` が非ブロッキングで取る'
-  methods:
-  - name: attach
-    title: サーバーの取り付け
-    kind: メソッド
-    summary: 停止を伝える uvicorn のサーバーを控える
-    scope: public
-    is_async: false
-    thread_safe: false
-    args:
-    - name: server
-      title: uvicorn のサーバー
-      type: uvicorn.Server
-      required: true
-      passing: positional
-      description: '`run_serve` が作ったサーバー'
-    returns:
-      type: None
-      description: なし
-    process: 1. `_server` に控える
-    unit_tests:
-    - name: test_attach
-      case: 正常
-      summary: 取り付けたサーバーに停止を伝える
-      condition: '`attach` の後に `request`'
-      mock: uvicorn のサーバー（`should_exit` を持つスタブ）
-      expected: スタブの `should_exit` が `True`
-  - name: request
-    title: 再起動の要求
-    kind: メソッド
-    summary: 再起動を要求済みにし、uvicorn に停止を伝える
-    description: uvicorn は `should_exit` を見て待ち受けを閉じ、処理中の要求を `timeout_graceful_shutdown` まで待つため、呼んだツールの応答は返ってから止まる。
-    scope: public
-    is_async: false
-    thread_safe: true
-    side_effects: '`_server.should_exit` を `True` にする'
-    returns:
-      type: RestartResult
-      description: 'プロセス ID と `restarting: True`'
-    process: |-
-      1. `_lock` の中で `_requested` を確かめる
-         - `True` の場合、`RestartInProgressError` を送出する
-      2. `_requested` を `True` にし、`_server` があれば `should_exit` を `True` にする
-         - `[INFO]` 再起動を始める（pid）
-    exceptions:
-    - name: RestartInProgressError
-      condition: 前の要求の再起動がまだ終わっていない
-      message: '`再起動の途中です`（`next_steps` に `/mcp` でつなぎ直して `status` を呼ぶことを示す）'
-    unit_tests:
-    - name: test_request
-      case: 正常
-      summary: 停止を伝えて結果を返す
-      condition: 未要求の制御
-      mock: uvicorn のサーバー（スタブ）
-      expected: '戻り値の `pid` が `os.getpid()` で `restarting` が `True`、制御の `requested` が `True`'
-    - name: test_request_when_in_progress
-      case: 異常
-      summary: 2 回目の要求を断る
-      condition: '`request` を 2 回呼ぶ'
-      mock: uvicorn のサーバー（スタブ）
-      expected: 2 回目が `RestartInProgressError`
-      exception: 再起動の途中
-  - name: requested
-    title: 要求済みか
-    kind: メソッド
-    summary: 再起動を要求されたかを返す（`property`）
-    scope: public
-    is_async: false
-    thread_safe: true
-    returns:
-      type: bool
-      description: '`_requested`'
-    process: 1. `_lock` の中で `_requested` を返す
-    callers:
-    - MOD-89#functions[run_serve]
+  - name: RestartControl
+    title: 再起動の制御
+    container: project_index/features/lifecycle/control.py
+    usecase: 再起動
+    role: 制御
+    summary: 再起動の要求を 1 回だけ受け、uvicorn に停止を伝える
+    description: '`build_handlers` が 1 つ作り、`run_serve` が uvicorn の `Server` を `attach` する。`update` は `update_lock` を取っている間、他の `update` を断る。'
+    properties:
+      - name: _server
+        title: uvicorn のサーバー
+        type: uvicorn.Server | None
+        access: 内部 (_)
+        default: None
+        description: '`attach` で渡されたサーバー'
+      - name: _requested
+        title: 要求済み
+        type: bool
+        access: 内部 (_)
+        default: 'False'
+        description: 再起動を要求されたら `True`
+      - name: _lock
+        title: 要求のロック
+        type: threading.Lock
+        access: 内部 (_)
+        description: '`_requested` の読み書きを守る'
+      - name: update_lock
+        title: 更新のロック
+        type: threading.Lock
+        access: 公開
+        description: '`update_clone` が非ブロッキングで取る'
+    methods:
+      - name: attach
+        title: サーバーの取り付け
+        kind: メソッド
+        summary: 停止を伝える uvicorn のサーバーを控える
+        scope: public
+        is_async: false
+        thread_safe: false
+        args:
+          - name: server
+            title: uvicorn のサーバー
+            type: uvicorn.Server
+            required: true
+            passing: positional
+            description: '`run_serve` が作ったサーバー'
+        returns:
+          type: None
+          description: なし
+        process: 1. `_server` に控える
+        unit_tests:
+          - name: test_attach
+            case: 正常
+            summary: 取り付けたサーバーに停止を伝える
+            condition: '`attach` の後に `request`'
+            mock: uvicorn のサーバー（`should_exit` を持つスタブ）
+            expected: スタブの `should_exit` が `True`
+      - name: request
+        title: 再起動の要求
+        kind: メソッド
+        summary: 再起動を要求済みにし、uvicorn に停止を伝える
+        description: uvicorn は `should_exit` を見て待ち受けを閉じ、処理中の要求を `timeout_graceful_shutdown` まで待つため、呼んだツールの応答は返ってから止まる。
+        scope: public
+        is_async: false
+        thread_safe: true
+        side_effects: '`_server.should_exit` を `True` にする'
+        returns:
+          type: RestartResult
+          description: 'プロセス ID と `restarting: True`'
+        process: |-
+          1. `_lock` の中で `_requested` を確かめる
+             - `True` の場合、`RestartInProgressError` を送出する
+          2. `_requested` を `True` にし、`_server` があれば `should_exit` を `True` にする
+             - `[INFO]` 再起動を始める（pid）
+        exceptions:
+          - name: RestartInProgressError
+            condition: 前の要求の再起動がまだ終わっていない
+            message: '`再起動の途中です`（`next_steps` に `/mcp` でつなぎ直して `status` を呼ぶことを示す）'
+        unit_tests:
+          - name: test_request
+            case: 正常
+            summary: 停止を伝えて結果を返す
+            condition: 未要求の制御
+            mock: uvicorn のサーバー（スタブ）
+            expected: '戻り値の `pid` が `os.getpid()` で `restarting` が `True`、制御の `requested` が `True`'
+          - name: test_request_when_in_progress
+            case: 異常
+            summary: 2 回目の要求を断る
+            condition: '`request` を 2 回呼ぶ'
+            mock: uvicorn のサーバー（スタブ）
+            expected: 2 回目が `RestartInProgressError`
+            exception: 再起動の途中
+      - name: requested
+        title: 要求済みか
+        kind: メソッド
+        summary: 再起動を要求されたかを返す（`property`）
+        scope: public
+        is_async: false
+        thread_safe: true
+        returns:
+          type: bool
+          description: '`_requested`'
+        process: 1. `_lock` の中で `_requested` を返す
+        callers:
+          - MOD-89#functions[run_serve]
