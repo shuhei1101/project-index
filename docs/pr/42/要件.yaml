@@ -12,6 +12,9 @@ scope_out:
   - item: knowledge の LAY-72-1 を回避策で直接修正した内容の見直し
     reason: knowledge#291 で検査を通して確認済みで、この不具合の修正と関わらないため
     plan: none
+  - item: 参照先の別のファイル（common.schema.yaml など）の中で循環する `#/$defs/...` の参照の解決
+    reason: 解かずに残した参照は最上位のスキーマの $defs を指す形になり、参照先を取り違える。#36 の事象とは別で、この作業 PR がマージされなくても同じ内容で成り立つため切り出した
+    plan: '#44'
 use_cases:
   - kind: single
     scenario: docs/scenario/SC-6.yaml
