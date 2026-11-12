@@ -175,13 +175,15 @@ def test_list_documents(make_view_env: Callable[..., SimpleNamespace]) -> None:
     """行の順に並べる（正常系）。"""
     # 準備
     env = make_view_env(NOTES_FILES, tables=NOTES_TABLES)
+    target = _target(env)
+    versions = [found.version for found in env.handlers.store.load(target).documents]
     # 実行
-    response = list_documents(_target(env), store=env.handlers.store)
+    response = list_documents(target, store=env.handlers.store)
     # 検証
     assert [item.kind for item in response.documents] == ["rules", "notes"]
     assert response.documents[0].body_path is None
     assert response.documents[1].body_path == "notes/guide.md"
-    assert response.documents[0].version != ""
+    assert [item.version for item in response.documents] == versions
     assert response.documents[0].value is None
     assert response.documents[1].value is None
 
