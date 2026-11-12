@@ -66,4 +66,7 @@ scope_out:
   - item: 固定の引数で子プロセスを起動する `S603`・`S606`、定数のテーブル名で SQL を組む `S608`、localhost の URL を開く `S310`、Markdown を出す Jinja の `autoescape=False` の `S701` の `# noqa`
     reason: 'その時点の判断: 入力を受けない箇所への検査の誤検出で、消すにはコードを変えるか検査を避ける書き方になるため、理由のコメントを付けて残す。残すかはモジュール構成設計のレビューで確定する'
     plan: none
+  - item: '`prompt_doc/types.py` の `InvalidPrompt` の `# noqa: N818` と、セッション開始のフックの最上位の `except Exception` の `# noqa: BLE001`'
+    reason: '`InvalidPrompt` はインターフェース定義『プロンプトの文書の変換』が持つ名前で、改名すると入出力が変わる。フックはどの失敗でも終了コード 0 で戻ることを設計書が決めている。理由のコメントを付けて残す'
+    plan: none
 docs: []
