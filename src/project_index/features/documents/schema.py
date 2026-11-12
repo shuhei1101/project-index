@@ -88,6 +88,8 @@ class _Resolver:
     def __init__(self, read: ReadText | None) -> None:
         self._read = read
         self._files: dict[str, object] = {}
+        # 最上位の `$defs` の定義を解いている途中か（途中の循環は警告しない）
+        self._in_defs = False
 
     def _load(self, path: PurePath) -> object:
         """参照先のファイルを読む（`read` が無ければディスクから）。"""
@@ -118,10 +120,14 @@ class _Resolver:
         if not is_dict(defs):
             return defs
         # 定義を自分自身への参照をたどる途中として解き、自分へ戻る `#/$defs/{名前}` だけを残す
-        return {
-            name: self.resolve(item, current, document, (f"{current}#/$defs/{name}",))
-            for name, item in defs.items()
-        }
+        self._in_defs = True
+        try:
+            return {
+                name: self.resolve(item, current, document, (f"{current}#/$defs/{name}",))
+                for name, item in defs.items()
+            }
+        finally:
+            self._in_defs = False
 
     def _resolve_ref(
         self,
@@ -136,7 +142,9 @@ class _Resolver:
         target_path = _target(current, location, posix=self._read is not None)
         identity = f"{target_path}#{fragment}"
         if identity in stack:
-            logger.warning("スキーマの循環する参照を解かずに残した（%s・%s）", current, ref)
+            # 循環する参照は解かずに残す（`$defs` の定義の中の循環は、定義の外からたどった側で警告する）
+            if not self._in_defs:
+                logger.warning("スキーマの循環する参照を解かずに残した（%s・%s）", current, ref)
             return dict(value)
         try:
             target_doc = document if not location else self._load(target_path)
