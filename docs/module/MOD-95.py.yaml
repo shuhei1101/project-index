@@ -130,7 +130,7 @@ functions:
   args:
   - name: result
     title: 結果
-    type: Any
+    type: T
     required: true
     passing: positional
     description: サービスの結果（dataclass）
@@ -142,7 +142,7 @@ functions:
     description: 要求の `format`
   - name: render
     title: Markdown の組み立て
-    type: Callable[[Any], str] | None
+    type: 'Callable[[T], str] | None'
     required: true
     passing: positional
     description: '`render_*_markdown`。`None` は常に JSON（書き込み・削除）'

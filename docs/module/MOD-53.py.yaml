@@ -136,7 +136,7 @@ functions:
     passing: keyword
     description: '`today`・`-7d` の基準'
   returns:
-    type: Any
+    type: 'datetime | float | str'
     description: '`date` は `datetime`（UTC）、`number` は `float`、それ以外は文字列'
   process: |-
     1. `date` の場合、`today` は今日の 0 時、`-{n}d`・`+{n}d` は今日から `n` 日、それ以外は `datetime.fromisoformat`（タイムゾーンが無ければ UTC）

@@ -123,13 +123,13 @@ functions:
     description: ドット記法・`[n]`・`[]`・`[{キー}]`
   - name: default
     title: 無いときの値
-    type: Any
+    type: object
     required: false
     default: None
     passing: keyword
     description: 途中のキーが無い・位置が範囲の外・型が辞書や配列でないときに返す値
   returns:
-    type: Any
+    type: object
     description: 指した値か `default`。パスが `ArraySelector` を含むときは、選んだ要素ごとに残りのパスをたどった値の配列（たどれない要素は除く）
   process: |-
     1. 『項目のパスの分解』で分ける
@@ -187,7 +187,7 @@ functions:
     description: ドット記法と `[n]`
   - name: value
     title: 値
-    type: Any
+    type: object
     required: true
     passing: positional
     description: 書く値
