@@ -686,6 +686,7 @@ flows:
         description: なし
       - name: 参照先の無いスキーマ
         description: 'sample の種類のスキーマの `$defs.entry.properties.summary` が、無いファイル `missing.schema.yaml#/$defs/summary` を指す。最上位の `properties.entries.items` は `#/$defs/entry`'
+        notes: 文書 1 は `entries` に `summary` を持つ要素を持つ（検査が `$defs.entry` の参照へ当たる）
       - name: 入力
         description: '`worktree` にワークツリー x のパス、文書 1 の `update`（`expected_version` と `text_edits` 1 件）'
     flow: |-
@@ -958,7 +959,7 @@ constraints:
   - item: スキーマの参照の解決
     constraint: '種類のスキーマの `$ref` は、最上位の `$defs` の中の相対パスの `$ref` を含めて、スキーマのファイルのフォルダを基準に解決してから検査に当てる。循環する参照は `#/$defs/...` のまま検査に当てる'
   - item: 解決できないスキーマの参照
-    constraint: '種類のスキーマの `$ref` を解決できない文書への操作は、解決できなかった `$ref` とスキーマのファイルのパスを決まりにした違反として `ValidationFailedError` で返す'
+    constraint: '種類のスキーマの `$ref` を解決できない文書への操作は、解決できなかった `$ref` とスキーマのファイルのパスを決まりにした違反として、`atomic: true` は `ValidationFailedError`、`atomic: false` は `results[].status` の `failed` で返す'
 refs:
   - SC-7#scenarios[正常シナリオ]
   - SC-9#scenarios[異常シナリオ（読んだ後に変わった文書へ書き込む）]

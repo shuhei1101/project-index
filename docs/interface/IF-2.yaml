@@ -742,6 +742,7 @@ flows:
         description: なし
       - name: 参照先の無いスキーマ
         description: 'sample の種類のスキーマの `$defs.entry.properties.summary` が、無いファイル `missing.schema.yaml#/$defs/summary` を指す。最上位の `properties.entries.items` は `#/$defs/entry`'
+        notes: 文書 1 は `entries` に `summary` を持つ要素を持つ（検査が `$defs.entry` の参照へ当たる）
     flow: |-
       <!-- map: {"title": "正常系（スキーマの参照を解決できない）"} -->
 
