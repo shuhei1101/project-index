@@ -1,0 +1,31 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-12.yaml
+    impact: changed
+    detail: 配信元の行を 1 行ずつ変更・削除する流れと、取得したときのバージョンが古い書き換え（丸ごとの保存を含む）を断る流れを加える。1 行の追加にもバージョンの照合を加える
+    depends_on: []
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: following
+    detail: 画面のサーバーの保存と端末のほかのプロセスの 1 行の書き換えが重なったとき、後から書いた側が断られて取得し直す流れを連鎖に加えるかを、単一ユースケースの変更に合わせて決める
+    depends_on:
+      - docs/scenario/SC-12.yaml
+docs:
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: 端末の設定の API に、1 行の変更・削除のエンドポイント、取得の応答のバージョン、書き換えの要求のバージョンと 409 を追加する
+    status: todo
+  - page: docs/architecture/ARCH-1.yaml
+    new: false
+    change: 外部システムの dev-docs の画面のサーバーの用途と契約のインターフェース定義の範囲を、追加する 1 行の変更・削除に合わせる
+    status: todo
+scope_out:
+  - item: dev-docs の設定の画面で、取得したバージョンを保存の要求に含めて送信し、409 を受けたときに取得し直す
+    reason: 設定の画面は dev-docs に残り、project-index は画面を持たない。この作業 PR のバージョンの設計を前提にするため、マージ提案の前に shuhei1101/dev-docs へ起票する（本文に、バージョンを送信しない保存の扱いと、この変更が入った後に着手する順番を記載する）
+    plan: to_file
+  - item: dev-docs の設定の画面で、配信元の行の outside_read を表示・変更する
+    reason: '設定の画面は dev-docs に残る。取得の応答の outsideRead は #14・#9 で入っているが、画面の作業はバージョンの送信と同じフォームを変えるため、上の行とまとめて起票するかをレビューで決める'
+    plan: to_file
+  - item: 端末のほかのプロセスの呼び出しを、端末だけで読めるトークンで受ける
+    reason: '#14 で移した require_same_origin は Origin も Sec-Fetch-Site も無い要求をサーバーの側からの呼び出しとして受け、NFR-1 の通信（127.0.0.1 でだけ待ち受け、認証を持たない）で認可を持たない。このまま端末のほかのプロセスから呼べるため、トークンを足さないと判断した。確定はインターフェース定義設計のレビューで行う'
+    plan: none
