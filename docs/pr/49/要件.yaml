@@ -1,0 +1,26 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: changed
+    detail: 画面のサーバーが文書の一覧で全ての文書の値とバージョンを 1 回で受け取り、管理用の YAML の行の文書を文書の ID で 1 つに選んで取得し、検索の結果から文書の ID で文書を引き、配信元の設定で差分の無視するキーと解いた種類のスキーマを受け取る
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-1.yaml
+    impact: run_only
+    detail: 読み取り API で文書を読む流れの記述は変わらないが、文書の一覧・文書の取得・検索・配信元の設定の応答が変わるため回帰を確かめる
+    depends_on: []
+docs:
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: エンドポイントの表の `config`・`docs`・`docs/{path}`・`search` の行に、追加するクエリと応答（値とバージョン・文書の ID の指定・検索の結果の文書の ID・`diff` と解いたスキーマ）を書き足す
+    status: todo
+scope_out:
+  - item: 別のファイルの中で循環する `#/$defs` の参照の解決
+    reason: 配信元の設定で返す解いたスキーマは、今の `resolve_schema_refs` の結果をそのまま使う。循環する参照の解き方は別の不具合として起票済み
+    plan: '#44'
+  - item: dev-docs の画面のサーバーの付け替え口の接続先を本物の読み取り API へ変える作業
+    reason: 使う側の別のリポジトリの作業で、shuhei1101/dev-docs#183 が担う
+    plan: none
+  - item: 文書の MCP（`search_docs` 等）の応答への同じ入出力の追加
+    reason: 要望は読み取り API の 4 つのエンドポイントだけで、文書の MCP は既に文書の ID とバージョンを返している
+    plan: none
