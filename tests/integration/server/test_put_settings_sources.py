@@ -223,3 +223,23 @@ def test_normal_when_sent_keys_override(
     assert response.status_code == 200
     assert "outside_read" not in rows[1]
     assert {row["id"]: row["outsideRead"] for row in listed.json()["sources"]}["extra"] is True
+
+
+UNKNOWN_KEY_EXTRA = "# MindStella の設定\nmindstella:\n  threads: 3  # 同時に動かす数\n"
+
+
+def test_normal_when_unknown_top_level_key_kept(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """最上位の知らないキーを違反にせずに保存し、ファイルの値とコメントを残して警告で返す（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    env = make_server(sample, settings_extra=UNKNOWN_KEY_EXTRA)
+    # 実行
+    response = env.client.put("/settings/sources", json={"sources": [_row(sample)]})
+    # 検証
+    body = response.json()
+    assert response.status_code == 200
+    assert [(row["id"], row["status"]) for row in body["sources"]] == [("sample", "serving")]
+    assert [warning["path"] for warning in body["warnings"]] == ["mindstella"]
+    assert UNKNOWN_KEY_EXTRA in env.settings_path.read_text(encoding="utf-8")

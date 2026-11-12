@@ -240,3 +240,23 @@ def test_error_when_config_newer(
     assert code == 6
     assert "project-index を更新してください" in capsys.readouterr().err
     assert settings.read_text(encoding="utf-8") == text
+
+
+@pytest.mark.usefixtures("versions_2")
+def test_normal_when_terminal_config_has_unknown_top_level_key(
+    settings_file: Path, write_steps: Callable[..., None]
+) -> None:
+    """最上位の知らないキーを持つ古い端末の設定にも手順を当て、知らないキーの値を残す（正常系）。"""
+    # 準備
+    settings_file.write_text(SETTINGS_V1 + "mindstella:\n  threads: 3\n", encoding="utf-8")
+    write_steps("settings", "2", [RENAME_LOG_DIR])
+    # 実行
+    code = main(["migrate"])
+    # 検証
+    assert code == 0
+    assert load_yaml(settings_file.read_text(encoding="utf-8")) == {
+        "version": "2",
+        "clone": "/x",
+        "state_dir": "/logs",
+        "mindstella": {"threads": 3},
+    }
