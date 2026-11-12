@@ -12,20 +12,14 @@ use_cases:
 docs:
   - page: docs/guide/文書のMCP.md
     new: false
-    change: 共通の引数の表の `cwd`・`worktree` の行を、インターフェース定義設計で決めた `cwd` の扱いに揃える
-    status: todo
-  - page: docs/guide/コアコンセプト-配信元と権限.md
-    new: false
-    change: '`## ワークツリーへの読み替え` の `cwd` と `worktree` の説明を、インターフェース定義設計で決めた `cwd` の扱いに揃える（変わらなければ変更しない）'
-    status: todo
-  - page: docs/guide/コアコンセプト-プラグイン.md
-    new: false
-    change: '`## 作業場所の受け渡し` の上書きの説明を、インターフェース定義設計で決めた `cwd` の扱いに揃える（案 A では変更しない）'
-    status: todo
+    change: 共通の引数の表の `cwd` の行に、フックが上書きして指定した値は使わないことと `worktree` でワークツリーを指すことを、エラーの表の TargetIsCloneError の行にクローン本体のパスを書く
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T23:38:10.288053+00:00'
 scope_out:
-  - item: write_docs 以外の文書の MCP のツール（search_docs・describe など）の cwd の説明
-    reason: 全てのツールが同じフックで cwd を上書きされるため、要望に含めるか判断が分かれる。ツールの cwd の説明は共通の入力の型で持つ見込みで、設計で同じ型の箇所として含めるかを決める
-    plan: to_file
   - item: 管理の MCP（project-index-admin）のツール
     reason: IF-20 の制約で管理の MCP にはフックを当てず、cwd を持たない
+    plan: none
+  - item: PreToolUse のフックがエージェントの入れた cwd を残す変更
+    reason: IF-20 の制約「上書き」は作業場所を偽って scope の外を書き換えさせないために置いており、ワークツリーを指す手段は worktree がある
     plan: none
