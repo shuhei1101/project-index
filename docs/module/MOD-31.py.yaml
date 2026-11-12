@@ -449,15 +449,15 @@ functions:
       description: 取り出した一時フォルダ（リポジトリの直下と同じ相対パスでファイルを置く）
     process: |-
       1. `tempfile.TemporaryDirectory` を作る
-      2. `archive --format=tar {commit} -- {paths}` を `binary=True` で呼び、`tarfile` の `filter="data"` で一時フォルダへ展開する
+      2. `archive --format=tar {commit} -- {paths}` を `binary=True`・`timeout=GIT_ARCHIVE_TIMEOUT_SEC` で呼び、`tarfile` の `filter="data"` で一時フォルダへ展開する
       3. 一時フォルダを渡し、抜けるときに削除する
     unit_tests:
       - name: test_export_paths_at
         case: 正常
         summary: commit のフォルダを取り出す
         condition: '`scripts/a.py` を commit した後に作業ツリーで書き換えた一時リポジトリ'
-        mock: なし（一時フォルダで `git init`）
-        expected: 取り出した `scripts/a.py` が commit の内容で、抜けた後に一時フォルダが無い
+        mock: gitの実行（呼び出しを記録する包み）。一時フォルダで `git init`
+        expected: 取り出した `scripts/a.py` が commit の内容で、抜けた後に一時フォルダが無く、`git archive` に指定した `timeout` が `GIT_ARCHIVE_TIMEOUT_SEC`
         exception: '-'
   - name: list_commits
     title: 区間の commit
