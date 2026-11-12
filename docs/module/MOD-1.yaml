@@ -6,6 +6,7 @@ directory: |-
   .python-version         Python のバージョンの固定
   typings/                pyright が読む型スタブ（ruamel.yaml の CommentedMap・YAML の使用する型）
   src/
+  ├── files.yaml          src/ のコードの管理用の YAML（配信元の設定の `src` の行）
   └── project_index/
       ├── features/
       │   ├── access/
@@ -137,6 +138,7 @@ directory: |-
       ├── __main__.py
       └── main.py
   tests/
+  ├── files.yaml          テストの管理用の YAML（配信元の設定の `tests` の行）
   ├── unit/
   │   └── project_index/  src/project_index/ と同じ並びの単体テスト
   ├── integration/

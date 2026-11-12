@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../schemas/files.schema.yaml
+files:
+- path: hooks/pre_tool_use.py
+  name: PreToolUse のフック
+  description: PreToolUse のフックを受け持ち、ツール実行前のフックの pre_tool_use.py を修正するときに参照する。
+  tags:
+  - topic:ツール実行前のフック
+  related:
+  - to: MOD-4
+    type: implements
+- path: hooks/session_start.py
+  name: SessionStart のフック
+  description: SessionStart のフックを受け持ち、セッション開始のフックの session_start.py を修正するときに参照する。
+  tags:
+  - topic:セッション開始のフック
+  related:
+  - to: MOD-5
+    type: implements
