@@ -1,0 +1,144 @@
+docs:
+  - page: docs/architecture/ARCH-1.yaml
+    new: false
+    change: 読み取り API の利用者（dev-docs の画面のサーバー）の用途に、端末の設定の取得・保存と 2 つのリビジョンの差分を加え、索引のサーバーの役割に端末の設定の書き込みを加える
+    status: todo
+  - page: docs/config/CFG-1.yaml
+    new: false
+    change: 移した端末の設定（`state_dir`・`port` など）と配信元の設定のキーを書き、shuhei1101/dev-docs#114 で移すとした注記を外す。今の各リポジトリの `dev-docs.yaml` の扱いを shuhei1101/dev-docs#163 の決定どおりに書く
+    status: todo
+  - page: docs/nonfunctional/NFR-1.yaml
+    new: false
+    change: 通信（NFR-2）の値を読み取り API と文書の MCP のインターフェース定義で決めて書き、#119 の 3 つの要求の所要時間の値を加える
+    status: todo
+  - page: docs/dev-command/CMD-1.yaml
+    new: false
+    change: 依存の追加の確認の記録と、起動・停止・管理作業のコマンドを書く
+    status: todo
+  - page: docs/test-procedure/TP-1.yaml
+    new: false
+    change: 結合テスト（バック）の実行コマンドと前提を書く。E2E テストの実行コマンドは E2E テスト作成で決めて書く
+    status: todo
+  - page: docs/library/LIB-1.yaml
+    new: true
+    change: fastapi（読み取り API の待ち受け）。dev-docs の LIB-155-3 のうち移す処理が使う部分を移す
+    status: todo
+  - page: docs/library/LIB-2.yaml
+    new: true
+    change: mcp（文書の MCP・管理の MCP）。dev-docs の LIB-155-8 から移す
+    status: todo
+  - page: docs/library/LIB-3.yaml
+    new: true
+    change: uvicorn（待ち受け）。dev-docs の LIB-155-27 から移す
+    status: todo
+  - page: docs/library/LIB-4.yaml
+    new: true
+    change: ruamel.yaml（YAML の読み書き）。dev-docs の LIB-155-17 から移す
+    status: todo
+  - page: docs/library/LIB-5.yaml
+    new: true
+    change: jsonschema（配信元のスキーマの検査）。dev-docs の LIB-155-5 から移す
+    status: todo
+  - page: docs/library/LIB-6.yaml
+    new: true
+    change: pydantic（MCP のツールの入力の検査）。dev-docs の LIB-155-13 から移す
+    status: todo
+  - page: docs/library/LIB-7.yaml
+    new: true
+    change: mdmark（変換の Markdown の点検）。dev-docs の LIB-155-9 から移す。jinja2・alias-inject を含め、移す処理が使うライブラリはモジュール構成設計で確定し、行を増減する
+    status: todo
+  - page: docs/library/index.yaml
+    new: false
+    change: 追加した外部ライブラリの行を加える
+    status: todo
+  - page: docs/guide/はじめに.md
+    new: false
+    change: project-index と dev-docs の役割の分担と、コアコンセプトのページの行を加える
+    status: todo
+  - page: docs/guide/コアコンセプト-配信元と権限.md
+    new: true
+    change: 配信元・端末の設定・権限（read・write）と作業範囲の外の参照の仕組みを書く。dev-docs の同名のページから索引の側の内容を移す
+    status: todo
+  - page: docs/guide/使い方.md
+    new: false
+    change: 追加した使い方のページの行を加える
+    status: todo
+  - page: docs/guide/project-indexを入れる.md
+    new: true
+    change: global-setup で project-index を入れ、文書の MCP につながることを確かめる手順を書く
+    status: todo
+  - page: docs/guide/配信元を配信する.md
+    new: true
+    change: setup で配信元を端末の設定に並べる手順と、配信元の設定 `project-index.yaml`・`project-index.local.yaml` の書き方を書く
+    status: todo
+  - page: docs/guide/リファレンス.md
+    new: false
+    change: 追加したリファレンスのページの行を加える
+    status: todo
+  - page: docs/guide/文書のMCP.md
+    new: true
+    change: 文書の MCP のツールの一覧と入出力を書く。dev-docs の同名のページから移す
+    status: todo
+  - page: docs/guide/管理のMCP.md
+    new: true
+    change: 移した管理の MCP のツールの一覧と入出力を書く
+    status: todo
+  - page: docs/guide/読み取りAPI.md
+    new: true
+    change: 読み取り API・端末の設定の API のエンドポイントと入出力を書く
+    status: todo
+  - page: docs/guide/設定.md
+    new: true
+    change: 端末の設定と配信元の設定のキーを書く
+    status: todo
+  - page: docs/guide/用語集.md
+    new: true
+    change: 配信元・端末の設定・配信元の設定・作業範囲などの用語を書く
+    status: todo
+  - page: docs/guide/files.yml
+    new: false
+    change: 追加した使い方のページの行を加える
+    status: todo
+  - page: docs/guide/README.md
+    new: false
+    change: 追加した使い方のページの行を目次に加える
+    status: todo
+  - page: README.md
+    new: false
+    change: 入れ方と、文書の MCP・読み取り API を提供することを書く
+    status: todo
+  - page: CLAUDE.md
+    new: false
+    change: リポジトリの構成の説明に、移した `src/project_index/`・`plugins/project-index/`・`templates/`・`content/` を加える
+    status: todo
+scope_out:
+  - item: dev-docs から移した機能の除外と、dev-docs の画面のサーバーの付け替え
+    reason: dev-docs のリポジトリの変更で、shuhei1101/dev-docs#163 が担う
+    plan: none
+  - item: dev-docs の画面のサーバーを本物の project-index の読み取り API へつなぐ作業
+    reason: 規約『複数リポジトリのAPI契約』で、利用する側が本物へつなぐ作業は別の Issue にする。shuhei1101/dev-docs#164 が担う
+    plan: none
+  - item: 画面の API のうち、画面の配信・表の列の設定・API のスキーマ・画面のサーバーの更新と再起動（dev-docs の IF-155-3・7・13・18・21）
+    reason: dev-docs の画面のサーバーに残る機能。残す境界は shuhei1101/dev-docs#163 のインターフェース定義設計で決まり、移すと決まったものはこの作業 PR のインターフェース定義設計で取り込む
+    plan: none
+  - item: 端末の設定の配信元を 1 行ずつ版を照合して追加・変更・削除する API
+    reason: 'この作業 PR は今の dev-docs と同じ丸ごとの取得・保存を移す。行ごとの API は #10 が担う'
+    plan: '#10'
+  - item: フォルダ構成の設計書（layout）の作成
+    reason: '#7 が担う。この作業 PR で増えるフォルダはモジュール構成の束ねる設計書（MOD-1・MOD-2）の directory に書く'
+    plan: '#7'
+  - item: このリポジトリの直下の配信元の設定 `dev-docs.yaml` の `project-index.yaml` への改名
+    reason: 今の各リポジトリの `dev-docs.yaml` の移行方法は shuhei1101/dev-docs#163 のインターフェース定義設計で決まる。移行の間は両方を探す案ならそれぞれの作業で改名でき、改名だけにする案なら反映作業としてこの作業 PR に取り込む。決まるまではその時点の判断としてスコープ外に置き、レビューで確定する
+    plan: to_file
+  - item: 'dev-docs から移した文書への、置き場所・`id`・書き方の決まり（dev-docs の #7・#74・#95）の適用'
+    reason: shuhei1101/dev-docs#114 の扱いの判断で、移す文書の範囲が決まってから別に起票すると決まった。この作業 PR はこのリポジトリの今の決まりで書く
+    plan: to_file
+  - item: 配信元の設定の paths[] の基準のフォルダを、設定ファイルのフォルダ以外に指定する
+    reason: 移した後のコードに対して行う変更。この作業 PR は今の dev-docs の振る舞いのまま移す
+    plan: '#6'
+  - item: '設定の画面で配信元を保存すると、ほかの行の outside_read: false が消える不具合'
+    reason: 移した後のコードに対して行う修正。この作業 PR は今の dev-docs の振る舞いのまま移す
+    plan: '#9'
+  - item: 端末の設定の最上位の知らないキーを警告として返して読み込みを続ける
+    reason: 移した後のコードに対して行う変更。この作業 PR は今の dev-docs の振る舞いのまま移す
+    plan: '#11'
