@@ -636,7 +636,6 @@ flows:
   - '`search_docs(source: brain)` が `docs/knowhow/a.yaml`・`content/node-docs/shared/b.yaml` の文書を返却し、`docs/design/c.yaml` を返却しない'
   - 返した文書のパスが repo の直下からの相対パス（`docs/knowhow/a.yaml`）
   - '`describe(source: brain, kind: note)` が設定ファイルのフォルダの `note.schema.yaml` を返却する'
-  - '`paths_base` を省いた配信元は、設定ファイルのフォルダを基準に配信する（既存の正常系のまま）'
   test: test_normal_when_paths_base_set
   decisions:
   - D-189
@@ -647,7 +646,6 @@ flows:
     description: なし（`project-index serve` を子プロセスで起動し、空きポートを `PROJECT_INDEX_PORT` に入れる）
   - name: 端末の設定
     description: '`sources` に sample の 1 行。最上位に知らないキー `mindstella`（入れ子の値を持つ）と `prot`（`port` の打ち間違い）を持つ'
-    notes: '`port` は書かない'
   flow: |-
     ```mermaid
     sequenceDiagram
@@ -666,7 +664,6 @@ flows:
   - '`/sources/sample/docs` が 200 を返却する'
   - 警告のログに、端末の設定のファイルと知らないキーのパス `mindstella`・`prot` がある
   - 引数なしの `describe()` の `warnings` に、知らないキーのパス `mindstella`・`prot` を持つ 1 件がある
-  - '`PROJECT_INDEX_PORT` を外して起動すると、`prot` の値ではなく既定の 8786 で待ち受ける'
   test: test_normal_when_terminal_config_has_unknown_top_level_key
   decisions:
   - D-308
