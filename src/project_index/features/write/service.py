@@ -365,7 +365,7 @@ def _run_generators(
                 entry = target.source.script("generators", generator_id)
                 run_script(
                     entry.run,
-                    cwd=target.base,
+                    cwd=target.config_base,
                     args=[str(path) for path in paths],
                     timeout_sec=timeout_sec,
                 )

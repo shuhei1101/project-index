@@ -39,6 +39,7 @@ from project_index.integrations.git import is_ignored, main_repo_root
 from project_index.integrations.git import repo_root as git_repo_root
 from project_index.integrations.scripts import ScriptNotFoundError, check_runnable
 from project_index.shared.errors import ProjectIndexError, ValidationFailedError, Violation
+from project_index.shared.paths import normalize_path
 from project_index.shared.schema_check import schema_violations
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
 
@@ -150,7 +151,7 @@ def validate_source_config(
     value: dict[str, Any], *, root: Path, lookup: SchemaRefLookup | None = None
 ) -> list[Violation]:
     """マージした設定をスキーマ・行の参照・ファイルの有無で確かめ、違反を全て返す。"""
-    return _validate(value, _disk_reader(root), _ref_reader(lookup))
+    return _validate(value, _disk_reader(root), _ref_reader(lookup), root)
 
 
 def _schema_violation(
@@ -173,7 +174,9 @@ def _schema_violation(
     return _check_schema(key_path, schema)
 
 
-def _validate(value: dict[str, Any], read_text: ReadText, read_ref: ReadRef) -> list[Violation]:  # noqa: C901
+def _validate(  # noqa: C901
+    value: dict[str, Any], read_text: ReadText, read_ref: ReadRef, config_root: Path
+) -> list[Violation]:
     """配信元の設定の検証を、ファイルを `read_text` で読んで行う。"""
     violations = schema_violations(_source_schema(), value)
     # スキーマの違反があれば、ここで返す
@@ -232,7 +235,40 @@ def _validate(value: dict[str, Any], read_text: ReadText, read_ref: ReadRef) -> 
         found = _schema_violation(read_text, read_ref, index, row["schema"])
         if found is not None:
             violations.append(found)
+    # paths の基準のフォルダが範囲の中か
+    _, base_violations = _resolve_paths_base(
+        value.get("paths_base"), config_root, git_repo_root(config_root)
+    )
+    violations.extend(base_violations)
     return violations
+
+
+def _resolve_paths_base(
+    value: str | None, config_root: Path, repo_root: Path | None
+) -> tuple[Path, list[Violation]]:
+    """`paths_base` を設定ファイルのフォルダから解き、範囲を確かめて基準のフォルダを返す。"""
+    # 省いた設定: 設定ファイルのフォルダを基準にする
+    if value is None:
+        return config_root, []
+    base = normalize_path(config_root / value)
+    violations: list[Violation] = []
+    # 無いフォルダ
+    if not base.is_dir():
+        violations.append(Violation(path="paths_base", rule=f"フォルダがありません: {value}"))
+    # 設定ファイルのフォルダの下や横: 上のフォルダだけを基準にできる
+    if not config_root.is_relative_to(base):
+        violations.append(
+            Violation(
+                path="paths_base",
+                rule=f"設定ファイルのフォルダかそれより上のフォルダを指してください: {value}",
+            )
+        )
+    # Git の配信元でリポジトリの直下より上: default_ref の commit から読めない
+    if repo_root is not None and not base.is_relative_to(repo_root):
+        violations.append(Violation(path="paths_base", rule=f"リポジトリの外を指しています: {value}"))
+    if violations:
+        return config_root, violations
+    return base, []
 
 
 def _check_schema_file(read_text: ReadText, key_path: str, relative: str) -> Violation | None:
@@ -296,7 +332,7 @@ def build_source_config(value: dict[str, Any]) -> SourceConfig:
     github = value.get("github", {})
     decisions = value.get("decisions", {})
     options: dict[str, Any] = {}
-    for key in ("version", "enabled", "default_ref", "visibility", "worktrees", "nav"):
+    for key in ("version", "enabled", "default_ref", "paths_base", "visibility", "worktrees", "nav"):
         if key in value:
             options[key] = value[key]
     if "types" in related:
@@ -466,7 +502,7 @@ def _assemble(
     read_text = _commit_reader(root, top, commit) if top and commit else _disk_reader(root)
     merged = merge_configs(values)
     read_ref = _ref_reader(lookup)
-    violations = _validate(merged, read_text, read_ref)
+    violations = _validate(merged, read_text, read_ref, root)
     if violations:
         return None, None, violations
     config = build_source_config(merged)
@@ -478,6 +514,8 @@ def _assemble(
         return None, config, violations
     main_root = main_repo_root(root) if top is not None else None
     base = main_root or top or root
+    # 文書の基準のフォルダ（範囲は検証で確かめてある）。設定ファイルのフォルダはそこからの相対パスで持つ
+    docs_root, _ = _resolve_paths_base(config.paths_base, root, top)
     schemas = {
         row.id: load_yaml(read_text(row.schema_path) or "")
         if isinstance(row.schema_path, str)
@@ -487,7 +525,7 @@ def _assemble(
     }
     served = ServedSource(
         id=source_id or config.name,
-        root=root,
+        root=docs_root,
         config_files=files,
         config=config,
         is_git=top is not None,
@@ -499,6 +537,7 @@ def _assemble(
         main_root=main_root,
         config_commit=commit,
         outside_read=outside_read,
+        config_dir=PurePosixPath(root.relative_to(docs_root).as_posix()),
     )
     return served, config, []
 
@@ -619,7 +658,9 @@ def load_source_at(source: ServedSource, root: Path) -> ServedSource:
             files.append(file)
             continue
         files.append(target)
-    relative_root = source.root.relative_to(base) if source.root.is_relative_to(base) else Path()
+    # 設定ファイルのフォルダを、作業ツリー・ワークツリーの同じ場所に置き換える
+    config_root = source.config_root
+    relative_root = config_root.relative_to(base) if config_root.is_relative_to(base) else Path()
     served, _, violations = assemble_source(
         files,
         source_id=source.id,

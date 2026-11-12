@@ -372,14 +372,14 @@ def try_convert(request: TryConvertRequest, *, handlers: Handlers) -> TryConvert
             violations=[*candidate.violations, *candidate.script_violations],
             next_steps=["check_project で違反を確認してください"],
         )
-    # 配信元の外を指すファイルは断る
-    file = normalize_path(candidate.root / request.file)
-    if not file.is_relative_to(candidate.root):
+    # 配信元の外を指すファイルは断る（文書のパスは基準のフォルダから解く）
+    file = normalize_path(source.root / request.file)
+    if not file.is_relative_to(source.root):
         raise DocumentNotFoundError(
             message=f"{request.file}: 配信元の外です", missing=[request.file]
         )
     # ファイルが範囲に当たり、除外に当たらない最初の文書の行を引く
-    relative = file.relative_to(candidate.root).as_posix()
+    relative = file.relative_to(source.root).as_posix()
     table = next(
         (row for row in source.config.documents if row.enabled and row.matches(relative)), None
     )
@@ -387,7 +387,7 @@ def try_convert(request: TryConvertRequest, *, handlers: Handlers) -> TryConvert
         message=f"{request.file}: 文書の種類の範囲に該当する文書がありません",
         missing=[request.file],
     )
-    target = Target(source, candidate.root, None, None, "read")
+    target = Target(source, source.root, None, None, "read")
     if table is None:
         # 当たる行が無ければ、本文のファイルが `file` の文書を持つ最初の行を引く
         table = next(

@@ -55,6 +55,8 @@ class TerminalConfig(BaseModel):
     sources: list[SourceEntry] = Field(default_factory=list[SourceEntry])
     seen_retention_days: int = 7
     script_timeout_sec: int = 30
+    # スキーマの properties に無い最上位のキー（ファイルの順）。値は持たない
+    unknown_keys: list[str] = Field(default_factory=list[str])
 
 
 class SettingsSourcesRequest(ApiModel):
@@ -107,14 +109,25 @@ class SettingsSourceStatus(ApiModel):
     config_version: SourceConfigVersion | None = None
 
 
+class SettingsWarning(ApiModel):
+    """端末の設定の API の応答の `warnings[]` の 1 件。"""
+
+    path: str
+    reason: str
+
+
 class SettingsSourcesResponse(ApiModel):
     """再読み込みした後の配信元ごとの状態。"""
 
     sources: list[SettingsSourceStatus]
+    # 端末の設定の最上位の知らないキーの警告
+    warnings: list[SettingsWarning] = Field(default_factory=list[SettingsWarning])
 
     @classmethod
-    def from_statuses(cls, statuses: list[SourceStatus]) -> SettingsSourcesResponse:
-        """配信元の状態の並びから作る。"""
+    def from_statuses(
+        cls, statuses: list[SourceStatus], warnings: list[SettingsWarning] | None = None
+    ) -> SettingsSourcesResponse:
+        """配信元の状態の並びと警告から作る。"""
         items: list[SettingsSourceStatus] = []
         for status in statuses:
             item = SettingsSourceStatus(
@@ -130,7 +143,7 @@ class SettingsSourcesResponse(ApiModel):
                 config, server = status.config_version
                 item.config_version = SourceConfigVersion(config=config, server=server)
             items.append(item)
-        return cls(sources=items)
+        return cls(sources=items, warnings=list(warnings or []))
 
 
 class SettingsSourceAddResponse(ApiModel):
@@ -139,6 +152,7 @@ class SettingsSourceAddResponse(ApiModel):
     result: Literal["added", "exists"]
     same: bool | None = None
     sources: list[SettingsSourceStatus] = Field(default_factory=list[SettingsSourceStatus])
+    warnings: list[SettingsWarning] = Field(default_factory=list[SettingsWarning])
 
 
 class SettingsSourceRow(ApiModel):
@@ -159,6 +173,7 @@ class SettingsSourcesView(ApiModel):
 
     settings_path: str
     sources: list[SettingsSourceRow]
+    warnings: list[SettingsWarning] = Field(default_factory=list[SettingsWarning])
 
 
 @dataclass(kw_only=True)

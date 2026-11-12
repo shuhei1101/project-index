@@ -21,7 +21,12 @@ from project_index.features.lifecycle.control import RestartControl
 from project_index.features.lifecycle.types import SERVE_ARGV, SHUTDOWN_WAIT_FACTOR
 from project_index.features.prompt_doc.runtime import PromptSet, load_prompts, prompts_dir
 from project_index.features.prompt_doc.types import PromptInvalidError
-from project_index.features.settings.query import config_path, listen_port, load_terminal_config
+from project_index.features.settings.query import (
+    config_path,
+    listen_port,
+    load_terminal_config,
+    log_unknown_keys,
+)
 from project_index.features.settings.types import TerminalConfig, TerminalConfigInvalidError
 from project_index.features.sources.registry import SourceRegistry
 from project_index.features.sources.types import ServedSource, SourceStatus
@@ -127,6 +132,7 @@ def run_serve(args: argparse.Namespace) -> int:
         _report_invalid(error)
         return EXIT_CONFIG_INVALID
     log_handlers = _setup_logging(terminal.log_dir)
+    log_unknown_keys(terminal)
     try:
         try:
             check_port(terminal.bind, port)
@@ -236,6 +242,11 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
         )
         # 端末の設定の API が起動時の一覧ではなく保存した一覧を返すよう、起動時の端末の設定の一覧を差し替える
         terminal.sources[:] = new_terminal.sources
+        # 引数なしの describe と端末の設定の API が、読み直した端末の設定の知らないキーを返すよう差し替える
+        terminal.unknown_keys[:] = new_terminal.unknown_keys
+        # 起動時の配信元の読み込みは起動の端末の設定のままで、知らないキーは起動のときに書いている
+        if new_terminal is not terminal:
+            log_unknown_keys(new_terminal)
         return statuses
 
     return Handlers(

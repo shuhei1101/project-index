@@ -62,6 +62,12 @@ def collect_warnings(
     # 端末の設定のバージョンが古い（使える配信元が無くても載せる）
     if version_state(terminal.version, SETTINGS_VERSION) == "old":
         warnings.append(_old_version(TERMINAL_LABEL, terminal.version, SETTINGS_VERSION))
+    # 端末の設定の最上位の知らないキー（使える配信元が無くても載せる）
+    if terminal.unknown_keys:
+        warnings.append(
+            f"{TERMINAL_LABEL}: {terminal.file} に project-index が知らないキーがあります"
+            f"（{', '.join(terminal.unknown_keys)}）。値は使用しません"
+        )
     warnings.extend(config_warnings)
     # 検証で外した配信元（使える配信元かによらない）
     for status in registry.statuses():

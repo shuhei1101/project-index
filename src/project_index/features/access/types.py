@@ -42,6 +42,11 @@ class Target:
     outside_scope: bool = False
     commit: str | None = None
 
+    @property
+    def config_base(self) -> Path:
+        """読む場所の中の設定ファイルのフォルダを返す（ワークツリーでも同じ相対位置）。"""
+        return self.base / self.source.config_dir
+
 
 def script_at(target: Target) -> tuple[Path, str] | None:
     """クローン本体で動かすスクリプトを取り出す commit（クローン本体と `config_commit`）を返す。"""

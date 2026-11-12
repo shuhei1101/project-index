@@ -139,7 +139,7 @@ def startup_schema(source: ServedSource, table: DocumentTable) -> dict[str, Any]
     # ほかの配信元の参照は、起動時に参照先のリビジョンで `$ref` まで解いてある
     if not isinstance(table.schema_path, str):
         return dict(startup)
-    return resolve_schema_refs(startup, source.root / table.schema_path)
+    return resolve_schema_refs(startup, source.config_root / table.schema_path)
 
 
 def records_item_schema(schema: Mapping[str, Any], records: str) -> dict[str, Any] | None:

@@ -385,10 +385,12 @@ class DocumentStore:
         ):
             return startup_schema(source, table)
         startup = source.schemas.get(kind, {})
-        base = source.root / table.schema_path
+        # スキーマは設定ファイルのフォルダからの相対パスなので、root からの相対パスにして読む
+        schema_path = source.config_path(table.schema_path)
+        base = source.root / schema_path
         if target.ref is not None:
-            return self._revision_schema(target, table.schema_path, startup, base)
-        path = self.read_root(target) / table.schema_path
+            return self._revision_schema(target, schema_path, startup, base)
+        path = self.read_root(target) / schema_path
         try:
             stat = path.stat()
         except OSError:
