@@ -40,7 +40,8 @@ TERMINAL = TerminalConfig(
 @pytest.fixture(autouse=True)
 def no_warnings(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
     """偽の配信元で警告を求めないよう、本物の配信元を使うテスト以外では警告の収集を空にする。"""
-    if request.node.name != "test_describe_when_warned":
+    # 本物の配信元を使用するテスト以外か（keywords はテスト関数の名前を持つ）
+    if "test_describe_when_warned" not in request.keywords:
         monkeypatch.setattr(
             "project_index.features.describe.service.collect_warnings", _no_warnings
         )
