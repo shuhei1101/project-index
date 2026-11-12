@@ -108,6 +108,59 @@ def test_normal_when_body_path_given(
     assert body["bodyPath"] == "notes/guide.md"
 
 
+TERMS_CONFIG = (
+    "name: sample\n"
+    "default_ref: main\n"
+    "documents:\n"
+    "  - id: terms\n"
+    "    paths: [terms.yaml]\n"
+    "    schema: schemas/terms.schema.yaml\n"
+    "    records: terms\n"
+)
+TERMS_SCHEMA = (
+    "type: object\n"
+    "properties:\n"
+    "  terms:\n"
+    "    type: array\n"
+    "    items:\n"
+    "      $ref: '#/$defs/term'\n"
+    "$defs:\n"
+    "  term:\n"
+    "    type: object\n"
+    "    properties:\n"
+    "      id:\n"
+    "        type: string\n"
+)
+TERMS = "terms:\n  - id: term-1\n    name: alpha\n  - id: term-2\n    name: beta\n"
+
+
+def terms_files() -> dict[str, str]:
+    """`body_file` の無い `records` の行 `term-1`・`term-2` を持つ配信元のファイル一式を返す。"""
+    return {
+        "project-index.yaml": TERMS_CONFIG,
+        "schemas/terms.schema.yaml": TERMS_SCHEMA,
+        "terms.yaml": TERMS,
+    }
+
+
+def test_normal_when_id_given(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """1 つの管理用の YAML の中の行の文書を、文書の ID で 1 つに選ぶ（正常系）。"""
+    # 準備
+    env = make_server(make_source("sample", terms_files(), branch="main"))
+    # 実行
+    chosen = env.client.get("/sources/sample/docs/terms.yaml", params={"id": "term-2"})
+    default = env.client.get("/sources/sample/docs/terms.yaml")
+    # 検証
+    body = chosen.json()
+    assert chosen.status_code == 200
+    assert body["value"] == {"id": "term-2", "name": "beta"}
+    assert body["metadata"]["id"] == "term-2"
+    assert body["schema"]["$defs"]["term"]["properties"]["id"] == {"type": "string"}
+    assert default.json()["metadata"]["id"] == "term-1"
+
+
 def test_normal_when_converter_kind(
     make_source: Callable[..., Any], make_server: Callable[..., Any], tmp_path: Path
 ) -> None:
@@ -158,9 +211,11 @@ def test_error_when_not_found(
         "/sources/sample/docs/design/D-1.yaml", params={"ref": "no-such-branch"}
     )
     no_doc = env.client.get("/sources/sample/docs/no/such.yaml")
+    no_id = env.client.get("/sources/sample/docs/design/D-1.yaml", params={"id": "no-such-id"})
     # 検証
     assert (unknown.status_code, unknown.json()["missing"]) == (404, "source")
     assert (not_served.status_code, not_served.json()["missing"]) == (404, "not_served")
     assert not_served.json()["errors"]
     assert (no_ref.status_code, no_ref.json()["missing"]) == (404, "ref")
     assert (no_doc.status_code, no_doc.json()["missing"]) == (404, "doc")
+    assert (no_id.status_code, no_id.json()["missing"]) == (404, "doc")
