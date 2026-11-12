@@ -101,9 +101,8 @@ functions:
       5. `documents[].schema` のファイルが設定ファイルのフォルダの下に無いか YAML として読めない場合、そのキーに違反を加える（YAMLの読み込み）。スキーマは Draft 2020-12 の `check_schema` も通す
          - `schema` がオブジェクトの行は、参照先のスキーマの読み取りで読み、`SchemaRefError` は `documents[{n}].schema` の違反（理由は例外の `rule`）にする。読めたスキーマは `check_schema` を通す
       6. パス（`documents[].paths[]`・`schema`）が `..` で外（`paths[]` は基準のフォルダ、`schema` は設定ファイルのフォルダ）を指す場合、その要素に違反を加える
-      7. 違反を返す
-
-      `paths_base` の検証は、フォルダを解く必要があるため『paths の基準のフォルダの解決』が行う。
+      7. `paths_base` を『paths の基準のフォルダの解決』（`config_root` は `root`、`repo_root` は `root` の履歴の『リポジトリの直下』）にかけ、違反を加える
+      8. 違反を返す
     unit_tests:
       - name: test_validate_source_config
         case: 正常
@@ -195,6 +194,12 @@ functions:
         condition: '`paths_base: ../..`、`documents[0].paths: [docs/*.yaml, ../outside/*.yaml]`'
         mock: なし
         expected: '`documents[0].paths[1]` の違反 1 つで、`rule` が `配信元の外を指しています: ../outside/*.yaml`'
+      - name: test_validate_source_config_when_paths_base_and_paths_invalid
+        case: 正常
+        summary: paths_base と paths の違反を並べる
+        condition: '`root` の下に `sub` がある配信元で、`paths_base: sub`・`documents[0].paths: [docs/*.yaml, ../outside/*.yaml]`'
+        mock: なし（一時フォルダ）
+        expected: '`documents[0].paths[1]` と `paths_base` の 2 つの違反'
   - name: check_scripts
     title: スクリプトの確かめ
     kind: 関数
@@ -309,8 +314,7 @@ functions:
          - `newer` の場合、`version` に「このサーバーより新しい設定」の違反を持つ `not_served` を返す
          - `older` の場合、状態の `config_version` に `(設定, SOURCE_CONFIG_VERSION)` を入れる
          - `[warning]` 配信元の設定のバージョンが古い（ID・設定のバージョン・サーバーが読めるバージョン）
-      8. 設定ファイルのフォルダが Git の作業ツリーかとその直下を引く（履歴の『リポジトリの直下』）。『paths の基準のフォルダの解決』で `root` を決める
-         - 違反がある場合、その違反を持つ `not_served` を返す
+      8. 設定ファイルのフォルダが Git の作業ツリーかとその直下を引く（履歴の『リポジトリの直下』）。『paths の基準のフォルダの解決』で `root` を決める（範囲の違反は手順 4 の検証で返している）
       9. 種類ごとのスキーマを設定ファイルのフォルダから読み（設定の commit がある場合はそのリビジョンのファイル。`schema_path` が `SchemaRef` の行は参照先のスキーマの読み取りの結果）、`worktrees` をメインのリポジトリの直下（Git でなければ設定ファイルのフォルダ）からの絶対パスにして、`ServedSource` を作る。`config_dir` は `root` から設定ファイルのフォルダへの相対パス、`scope_write` が無ければ `[str(設定ファイルのフォルダ)]`。ID は `entry.id`、無ければ `config.name`。`outside_read` は `entry.outside_read`
       10. `ServedSource` と `serving` を返す
 
@@ -604,7 +608,7 @@ functions:
       1. 設定のファイルを順に読む。無い・読めない・辞書でないファイルは違反にする
       2. マージして検証する（`merge_configs`・`validate_source_config`）
       3. 設定を作り、スクリプトを確かめる（`check_scripts`）
-      4. paths の基準のフォルダを解く（『paths の基準のフォルダの解決』。違反があれば返す）
+      4. paths の基準のフォルダを解く（『paths の基準のフォルダの解決』。範囲の違反は手順 2 の検証で返している）
       5. スキーマ・ワークツリーの glob を解いて配信中の配信元を作る
 
       `root_override` は設定ファイルのフォルダを置き換える（作業ツリー・ワークツリーの同じ場所で読み直すとき）。
