@@ -255,12 +255,19 @@ functions:
         default: None
         passing: keyword
         description: 状態の置き場を決める環境変数。`None` なら `os.environ`
+      - name: text
+        title: 本文
+        type: str | None
+        required: false
+        default: None
+        passing: keyword
+        description: 既に参照した `settings.yaml` の本文（端末の設定の内容の読み込みが返した本文）。`None` ならファイルを読む
     returns:
       type: TerminalConfig
       description: 既定値を埋めた端末の設定
     process: |-
-      1. ファイルを UTF-8 で読む
-         - 無い場合、`TerminalConfigInvalidError` を送る
+      1. `text` が渡された場合はそれを本文にし、無ければファイルを UTF-8 で読む
+         - ファイルが無い場合、`TerminalConfigInvalidError` を送る
       2. YAML として読む（YAMLの読み込み）
          - 読めない場合、行と列を `Violation` にして `TerminalConfigInvalidError` を送る
       3. 端末の設定の値を検証する（端末の設定の検証）
@@ -310,6 +317,12 @@ functions:
         mock: なし
         expected: '`TerminalConfigInvalidError` の違反に `sources[0].config` と `port` の 2 つ'
         exception: スキーマに違反する
+      - name: test_load_terminal_config_when_text_given
+        case: 正常
+        summary: 渡した本文から端末の設定を作る
+        condition: ファイルとは違う `sources` を持つ本文を `text` に渡す
+        mock: なし（一時フォルダ）
+        expected: '`sources` が渡した本文の行で、`file` は `path`'
   - name: validate_terminal_config
     title: 端末の設定の検証
     kind: 関数
