@@ -198,6 +198,32 @@ def test_save_sources_when_no_same_row(
     assert "outside_read" not in row
 
 
+def test_save_sources_when_current_row_invalid(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """ファイルに読めない行があっても送った行で保存する（正常系）。"""
+    # 準備
+    reload, calls = fake_reload
+    path = tmp_path / "settings.yaml"
+    path.write_text(
+        'version: "1"\n'
+        "clone: /tmp/clone\n"
+        "sources:\n"
+        "  - id: extra\n"
+        "    config: /tmp/extra/project-index.yaml\n"
+        "    outside-read: false\n",
+        encoding="utf-8",
+    )
+    sent = SourceEntry.model_validate({"id": "extra", "config": "/tmp/extra/project-index.yaml"})
+    # 実行
+    save_sources([sent], path=path, reload=reload, lock=threading.Lock())
+    # 検証
+    row = load_yaml(path.read_text(encoding="utf-8"))["sources"][0]
+    assert row == {"id": "extra", "config": ["/tmp/extra/project-index.yaml"]}
+    assert len(calls) == 1
+
+
 def test_save_sources_when_invalid(
     settings_path: Path,
     fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
