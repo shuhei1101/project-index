@@ -235,11 +235,13 @@ def _validate(  # noqa: C901
         found = _schema_violation(read_text, read_ref, index, row["schema"])
         if found is not None:
             violations.append(found)
-    # paths の基準のフォルダが範囲の中か
-    _, base_violations = _resolve_paths_base(
-        value.get("paths_base"), config_root, git_repo_root(config_root)
-    )
-    violations.extend(base_violations)
+    # paths の基準のフォルダが範囲の中か（省いた設定は確かめることが無い）
+    paths_base = value.get("paths_base")
+    if paths_base is not None:
+        _, base_violations = _resolve_paths_base(
+            paths_base, config_root, git_repo_root(config_root)
+        )
+        violations.extend(base_violations)
     return violations
 
 
