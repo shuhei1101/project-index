@@ -649,6 +649,63 @@ flows:
     expected:
       - '`write_docs` の `description` が「範囲のファイルを作成・削除・改名したら、管理用の YAML の行を修正する」を含む'
     test: test_normal_when_tool_description
+  - name: 正常系（$defs の中の相対パスの参照）
+    summary: 種類のスキーマの `$defs` の中にある相対パスの `$ref` を解決して検査し、部分更新を書き込む
+    setup:
+      - name: Mock
+        description: なし
+      - name: 参照を持つスキーマ
+        description: 'sample の種類のスキーマが `$defs.entry` を持ち、`$defs.entry` は `summary` を `common.schema.yaml#/$defs/summary`（同じフォルダの別のファイル）で、`children.items` を `#/$defs/entry`（循環する参照）で指す。最上位の `properties.entries.items` は `#/$defs/entry`'
+        notes: 文書 1 は `entries` に入れ子の `children` を持ち、スキーマに合う
+      - name: 入力
+        description: '`worktree` にワークツリー x のパス、文書 1 の `update`（`expected_version` と `text_edits` 1 件）'
+    flow: |-
+      <!-- map: {"title": "正常系（$defs の中の相対パスの参照）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: operations: update 文書 1・text_edits
+        T->>T: $defs の中の common.schema.yaml の参照を解決し、変更を当てた文書を検査する
+        T->>WT: 一時ファイルに書いてから置き換える
+        T-->>C: applied: true、新しい version と差分
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`applied: true` で、文書 1 の `status` が `updated`'
+      - ワークツリー x の文書 1 に `text_edits` の変更が入る
+    test: test_normal_when_relative_ref_in_defs
+  - name: 異常系（スキーマの参照を解決できない・ValidationFailedError）
+    summary: 種類のスキーマの `$ref` を解決できないときは、解決できなかった参照を違反として返し、何も書かない
+    setup:
+      - name: Mock
+        description: なし
+      - name: 参照先の無いスキーマ
+        description: 'sample の種類のスキーマの `$defs.entry.properties.summary` が、無いファイル `missing.schema.yaml#/$defs/summary` を指す。最上位の `properties.entries.items` は `#/$defs/entry`'
+      - name: 入力
+        description: '`worktree` にワークツリー x のパス、文書 1 の `update`（`expected_version` と `text_edits` 1 件）'
+    flow: |-
+      <!-- map: {"title": "異常系（スキーマの参照を解決できない・ValidationFailedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: operations: update 文書 1・text_edits
+        T->>T: 変更を当てた文書を検査し、missing.schema.yaml の参照を解決できない
+        T-->>C: isError（添字 0・解決できなかった参照とスキーマのファイル）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、添字 0 の違反の決まりに、解決できなかった `$ref`（`missing.schema.yaml#/$defs/summary`）とスキーマのファイルのパスが入る'
+      - ワークツリー x の文書 1 は書き換わらない
+    test: test_error_when_schema_ref_unresolvable
 lead: 文書の作成・部分更新・置き換えを検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 identifier: write_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーにだけ書く
@@ -833,7 +890,7 @@ exceptions:
   - name: なし（正常終了）
     condition: '全ての操作を書いた（`atomic: false` で一部が失敗したときも、失敗分を `failed` として返して正常終了）'
   - name: ValidationFailedError
-    condition: '変更を当てた後の文書がスキーマか `validators[]` に通らないか、変えた Markdown のキーの値に mdmark の描画時の書き方の警告がある（`atomic: true`）'
+    condition: '変更を当てた後の文書がスキーマか `validators[]` に通らないか、種類のスキーマの `$ref` を解決できないか、変えた Markdown のキーの値に mdmark の描画時の書き方の警告がある（`atomic: true`）'
     notes: '違反ごとの添字・パス・決まり・直し方を添える。スキーマの違反には、違反した項目のスキーマの説明（`schema`）も添える'
   - name: SourceNotWritableError
     condition: '`cwd` が配信元の `scope.write` に当たらない'
@@ -898,6 +955,10 @@ constraints:
     notes: 'スキーマの全文は返さない。同じ応答で同じ定義を指す違反が続くときも、違反ごとに添える'
   - item: 当てるスキーマ
     constraint: '`documents[].schema` でほかの配信元を指す種類は、参照したリビジョンのスキーマで検査する（読み方は配信元の検査の制約「ほかの配信元のスキーマの参照」）'
+  - item: スキーマの参照の解決
+    constraint: '種類のスキーマの `$ref` は、最上位の `$defs` の中の相対パスの `$ref` を含めて、スキーマのファイルのフォルダを基準に解決してから検査に当てる。循環する参照は `#/$defs/...` のまま検査に当てる'
+  - item: 解決できないスキーマの参照
+    constraint: '種類のスキーマの `$ref` を解決できない文書への操作は、解決できなかった `$ref` とスキーマのファイルのパスを決まりにした違反として `ValidationFailedError` で返す'
 refs:
   - SC-7#scenarios[正常シナリオ]
   - SC-9#scenarios[異常シナリオ（読んだ後に変わった文書へ書き込む）]
