@@ -15,6 +15,7 @@ def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]
     env = make_server(source)
     # 実行
     response = env.client.get("/settings/sources")
+    again = env.client.get("/settings/sources")
     env.rewrite_settings()
     empty = env.client.get("/settings/sources")
     # 検証
@@ -24,6 +25,8 @@ def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]
     assert [(row["id"], row["status"]) for row in body["sources"]] == [("sample", "serving")]
     assert body["sources"][0]["config"] == [str(source.config[0])]
     assert body["sources"][0]["scope"]["read"] == [str(source.folder)]
+    assert len(body["version"]) == 6
+    assert again.json()["version"] == body["version"]
     assert empty.status_code == 200
     assert empty.json()["sources"] == []
 

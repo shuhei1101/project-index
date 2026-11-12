@@ -29,6 +29,7 @@ def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]
     extra = make_source("extra")
     env = make_server(sample, settings_extra=SETTINGS_EXTRA)
     before = load_yaml(env.settings_path.read_text(encoding="utf-8"))["sources"][0]
+    served = env.handlers.registry.get("sample")
     # 実行
     response = env.client.post("/settings/sources", json={"source": _row(extra)}, headers=ORIGIN)
     # 検証
@@ -45,6 +46,9 @@ def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]
     assert rows[0] == before
     assert SETTINGS_EXTRA in text
     assert env.client.get("/sources/extra/docs").status_code == 200
+    assert body["version"] == env.client.get("/settings/sources").json()["version"]
+    assert env.handlers.registry.get("sample") is served
+    assert env.client.get("/sources/sample/docs").status_code == 200
 
 
 def test_error_when_same_id_exists(
@@ -86,4 +90,28 @@ def test_error_when_schema_invalid(
     # 検証
     assert response.status_code == 422
     assert any(error["path"] == "sources[1].id" for error in response.json()["errors"])
+    assert env.settings_path.read_text(encoding="utf-8") == before
+
+
+def test_error_when_version_outdated(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """取得した後に書き換えられた端末の設定への追加を断る（異常系）。"""
+    # 準備
+    extra = make_source("extra")
+    env = make_server(make_source("sample"))
+    version = env.client.get("/settings/sources").json()["version"]
+    with env.settings_path.open("a", encoding="utf-8") as file:
+        file.write("# memo\n")
+    edited = env.client.get("/settings/sources").json()["version"]
+    before = env.settings_path.read_text(encoding="utf-8")
+    # 実行
+    response = env.client.post(
+        "/settings/sources",
+        json={"expectedVersion": version, "source": _row(extra)},
+        headers=ORIGIN,
+    )
+    # 検証
+    assert response.status_code == 409
+    assert response.json()["current"] == edited
     assert env.settings_path.read_text(encoding="utf-8") == before
