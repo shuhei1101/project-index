@@ -1,0 +1,1 @@
+# 配信元の設定の files_guide の行の exclude から管理用の YAML に当たる *.yml を外す
