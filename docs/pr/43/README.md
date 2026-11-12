@@ -1,0 +1,1 @@
+# PreToolUse のフックの出力に permissionDecision を付け、auto モードで書き換えた呼び出しが拒否されないようにする
