@@ -40,5 +40,7 @@
 | [端末の設定の取得](./IF-30.yaml) | 端末の設定の取得（GET /settings/sources） |
 | [端末の設定の保存](./IF-31.yaml) | 端末の設定の保存（PUT /settings/sources） |
 | [端末の設定の配信元の 1 行の追加](./IF-32.yaml) | 端末の設定の配信元の 1 行の追加（POST /settings/sources） |
+| [端末の設定の配信元の 1 行の変更](./IF-33.yaml) | 端末の設定の配信元の 1 行の変更（PATCH /settings/sources/{id}） |
+| [端末の設定の配信元の 1 行の削除](./IF-34.yaml) | 端末の設定の配信元の 1 行の削除（DELETE /settings/sources/{id}） |
 
 <!-- /table -->
