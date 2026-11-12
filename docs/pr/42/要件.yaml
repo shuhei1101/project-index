@@ -1,0 +1,23 @@
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: エラーの表に、スキーマの参照を解決できないときのエラーの行を追加する
+    status: todo
+scope_out:
+  - item: shuhei1101/dev-docs 側の同じ処理の修正
+    reason: 該当のコードは shuhei1101/dev-docs#114 で project-index へ移り、dev-docs の Issue（shuhei1101/dev-docs#168）はこの Issue へ移したため
+    plan: none
+  - item: knowledge の LAY-72-1 を回避策で直接修正した内容の見直し
+    reason: knowledge#291 で検査を通して確認済みで、この不具合の修正と関わらないため
+    plan: none
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: run_only
+    detail: スキーマの $defs に相対パスの参照を持つ種類の文書を調べられるようになる。流れは変わらないが、検索・取得のスキーマの扱いを変えるため E2E の対象にする
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: run_only
+    detail: スキーマの $defs に相対パスの参照を持つ種類の文書を部分更新できるようになる。流れは変わらないが、書き込みの検査を変えるため E2E の対象にする
+    depends_on: []
