@@ -1,0 +1,69 @@
+use_cases:
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: run_only
+    detail: 配信元の文書を読み書きする流れ全体の処理を整理するため、振る舞いが変わらないことを確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-2.yaml
+    impact: run_only
+    detail: セッション開始のフックを整理するため、入れた後に接続できることを確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-3.yaml
+    impact: run_only
+    detail: 更新と設定の移し替えの処理を整理するため、振る舞いが変わらないことを確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: run_only
+    detail: 起動と配信元の読み込みの処理を整理するため、振る舞いが変わらないことを確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: run_only
+    detail: 配信元の検査と管理用の YAML の処理を整理するため、振る舞いが変わらないことを確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: run_only
+    detail: 説明・検索・関連のたどりの処理を整理するため、返る文書が変わらないことを確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: run_only
+    detail: 書き込みと削除の処理を整理するため、振る舞いが変わらないことを確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-8.yaml
+    impact: run_only
+    detail: 変更の一覧の処理を整理するため、返る変更が変わらないことを確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-9.yaml
+    impact: run_only
+    detail: 文書の読み直しと会話の記録の処理を整理するため、振る舞いが変わらないことを確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: run_only
+    detail: 配信元の検査・試しの変換の処理を整理するため、振る舞いが変わらないことを確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: run_only
+    detail: 読み取りの処理を整理するため、画面のサーバーが受け取る内容が変わらないことを確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-12.yaml
+    impact: run_only
+    detail: 端末の設定の検証の処理を整理するため、振る舞いが変わらないことを確かめる
+    depends_on: []
+scope_out:
+  - item: '`pyproject.toml` の `per-file-ignores`（コマンドの入口とフックの `T20`、ルート・MCP の `TC`、`tests/**` の `S101` など）'
+    reason: 結果を標準出力へ出す・注釈の型を実行時に引く・テストの assert という、ファイルの役割で決まる除外で、移した処理の違反のベースラインではない
+    plan: none
+  - item: 固定の引数で子プロセスを起動する `S603`・`S606`、定数のテーブル名で SQL を組む `S608`、localhost の URL を開く `S310`、Markdown を出す Jinja の `autoescape=False` の `S701` の `# noqa`
+    reason: 'その時点の判断: 入力を受けない箇所への検査の誤検出で、消すにはコードを変えるか検査を避ける書き方になるため、理由のコメントを付けて残す。残すかはモジュール構成設計のレビューで確定する'
+    plan: none
+docs: []
