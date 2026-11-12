@@ -87,5 +87,41 @@ requirements:
     measurement: '`project-index serve` を子プロセスで起動してから、待ち受けのポートへの TCP の接続が通るまでの時間'
     rationale: 待ち受けの前に残るのは import と端末の設定・プロンプトの YAML の読み込みだけで、dev-docs の負荷のある端末の計測で約 8 秒。配信元の読み込みと検査は待ち受けの後に回すため含めない。60 秒に対して計測値の 2 倍強を決定値にする
     status: planned
+    verification:
+      device: WSL2 の Ubuntu（Windows 11）
+      version: Linux 6.6.87.2-microsoft-standard-WSL2
+      date: '2026-11-12'
+      result: 合格
+  - id: NFR-9
+    name: 作業範囲の外の配信元の検索の所要時間
+    english_name: outside_scope_search_time
+    category: 性能
+    external_constraint: Claude Code の MCP のツールの呼び出しの時間切れ。shuhei1101/dev-docs#119 では 1 分を超えた呼び出しが時間切れになった
+    source_kind: 実行基盤の制限
+    source: https://github.com/shuhei1101/dev-docs/issues/119
+    value: '10'
+    unit: 秒
+    measurement: '配信元 `ai-monitor`（1,212 文書）を作業範囲の外（`outside_scope: true`）に配置し、`/mcp` へ `search_docs` の 3 つの要求（name に `planner` を含む・`limit: 3`、`view: count`、body の正規表現 `(?i)changelog`・`limit: 5`）を HTTP で送信し、応答までの時間を測る'
+    breakdown:
+      - part: dev-docs#119 の計測（修正前）
+        value: 56.1 / 85.3 / 53.8 秒
+        notes: 1,467 文書。文書ごとに default_ref を git で繰り返し解決していた
+      - part: 移した後の初回
+        value: 30.72 秒
+        notes: 1 つ目の要求。default_ref の commit の文書を初めて読み込む分を含む
+      - part: 移した後の 2 回目以降
+        value: 2.47 / 2.23 / 2.75 秒
+        notes: 同じ commit の文書を読み込んだ後の 3 つの要求
+      - part: アプリの決定値
+        value: '10'
+        notes: 2 回目以降の最大 2.75 秒の 3 倍強
+    rationale: 1 回の要求の中で ref の解決とスキーマの読み込みを繰り返さないため、読み込んだ後の要求は文書の数によらず数秒で返る。初回の読み込みは default_ref の commit が変わったときだけで、時間切れの 1 分より短い
+    overflow: 超えても止めない。時間切れになった呼び出しは Claude Code の側で失敗になる
+    verification:
+      device: WSL2 の Ubuntu（Windows 11）
+      version: Linux 6.6.87.2-microsoft-standard-WSL2
+      date: '2026-11-12'
+      result: 合格
+    status: planned
 id: NFR-1
 visibility: internal
