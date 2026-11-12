@@ -28,7 +28,7 @@ def test_attach_schema_hints() -> None:
     """違反した項目の説明だけを添える（正常系）。"""
     # 準備
     data = {"count": "3"}
-    violations = check_schema(data, SCHEMA)
+    violations = check_schema(data, SCHEMA, schema_file="schemas/note.schema.yaml")
     # 実行
     result = attach_schema_hints(violations, schema=SCHEMA, data=data)
     # 検証
@@ -42,13 +42,30 @@ def test_attach_schema_hints_when_rules() -> None:
     """`x-rules`・`x-bad-examples` も添える（正常系）。"""
     # 準備
     data = {"name": "a", "status": 1}
-    violations = check_schema(data, SCHEMA)
+    violations = check_schema(data, SCHEMA, schema_file="schemas/note.schema.yaml")
     # 実行
     result = attach_schema_hints(violations, schema=SCHEMA, data=data)
     # 検証
     assert [item.schema for item in result] == [
         {"x-rules": ["current か draft にする"], "x-bad-examples": ["済"]}
     ]
+
+
+def test_attach_schema_hints_when_unresolvable() -> None:
+    """解決できない参照（正常系）。"""
+    # 準備
+    schema = {"properties": {"a": {"$ref": "missing.schema.yaml#/$defs/x"}}}
+    data = {"a": 1}
+    violations = [
+        Violation(
+            path="$",
+            rule="スキーマの参照 missing.schema.yaml#/$defs/x を解決できません（schemas/note.schema.yaml）",
+        )
+    ]
+    # 実行
+    result = attach_schema_hints(violations, schema=schema, data=data)
+    # 検証
+    assert [(item.path, item.schema) for item in result] == [("$", None)]
 
 
 def test_attach_schema_hints_when_not_schema() -> None:

@@ -14,7 +14,7 @@ def test_check_schema() -> None:
     # 準備
     schema = {"type": "object", "required": ["id"]}
     # 実行
-    result = check_schema({"id": "a"}, schema)
+    result = check_schema({"id": "a"}, schema, schema_file="schemas/note.schema.yaml")
     # 検証
     assert result == []
 
@@ -28,17 +28,29 @@ def test_check_schema_when_violations() -> None:
         "properties": {"items": {"type": "array", "items": {"type": "integer"}}},
     }
     # 実行
-    result = check_schema({"items": [1, "x"]}, schema)
+    result = check_schema({"items": [1, "x"]}, schema, schema_file="schemas/note.schema.yaml")
     # 検証
     assert [violation.path for violation in result] == ["$", "items[1]"]
     assert "id" in result[0].fix
     assert "integer" in result[1].fix
 
 
+def test_check_schema_when_unresolvable() -> None:
+    """解決できない参照（正常系）。"""
+    # 準備
+    schema = {"properties": {"a": {"$ref": "missing.schema.yaml#/$defs/x"}}}
+    # 実行
+    result = check_schema({"a": 1}, schema, schema_file="schemas/note.schema.yaml")
+    # 検証
+    assert [violation.path for violation in result] == ["$"]
+    assert "missing.schema.yaml#/$defs/x" in result[0].rule
+    assert "schemas/note.schema.yaml" in result[0].rule
+
+
 def test_check_schema_when_empty() -> None:
     """スキーマが無い（正常系）。"""
     # 実行
-    result = check_schema({"anything": 1}, {})
+    result = check_schema({"anything": 1}, {}, schema_file="schemas/note.schema.yaml")
     # 検証
     assert result == []
 
