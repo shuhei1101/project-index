@@ -7,7 +7,7 @@ scenarios:
     description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが読み取り API を HTTP で呼ぶ）
   - name: サンプルの配信元
     description: 文書の種類を 1 つ（スキーマと YAML 2 件）と、`nav`・`decisions.folders`・`github` を持つ `project-index.yaml` を持つ git リポジトリ。`default_ref` は `main`
-    notes: id `sample`。文書 1 を変えた commit が `main` の最新で、その親の commit では文書 1 の `title` が違う。`decisions.folders` の 1 つのフォルダに検討事項の文書 `D-1` を置く
+    notes: id `sample`。文書 1 を変えた commit が `main` の最新で、その親の commit では文書 1 の `title` が違う。`decisions.folders` の 1 つのフォルダに検討事項の文書 `D-1` を置く。管理用の YAML `files.yaml` の行の文書として Markdown `guide.md` を置く
   - name: project-index
     description: sample を端末の設定に並べて起動した project-index
   flow: |-
@@ -32,6 +32,10 @@ scenarios:
       PI-->>DD: ブランチ・タグ・最近の commit
       DD->>PI: sample の文書を単語で検索する
       PI-->>DD: 当たった文書と一致した箇所
+      DD->>PI: 本文のファイル guide.md のパスを指して文書を取得する
+      PI-->>DD: 行の値・メタデータ・本文の文字列・本文のファイルのパス
+      DD->>PI: sample の検討事項の ID の一覧を取得する
+      PI-->>DD: D-1 と、当たるフォルダの数 1
       DD->>PI: 検討事項 D-1 の文書を取得する
       PI-->>DD: D-1 の文書の本文
     ```
@@ -43,6 +47,8 @@ scenarios:
   - 親の commit を指した文書 1 の取得が、親の commit の `title` の値を返却する
   - リビジョンの一覧が `main` と、文書 1 を変えた commit を含む最近の commit を返却する
   - 単語での検索が、その単語を含む sample の文書と一致した箇所を返却する
+  - '`guide.md` のパスを指した文書の取得が、`files.yaml` の行の値・メタデータと、`guide.md` の本文の文字列・本文のファイルのパスを返却する'
+  - 検討事項の ID の一覧が、`D-1` を当たるフォルダの数 1 で返却する
   - 検討事項の文書の取得が、D-1 の文書の本文を返却する
   - 読み取り API の呼び出しは、sample のフォルダのファイルを変えない
   test: test_normal
@@ -166,16 +172,19 @@ scenarios:
       participant DD as dev-docs の画面のサーバー
       participant PI as project-index（読み取り API）
 
+      DD->>PI: sample の検討事項の ID の一覧を取得する
+      PI-->>DD: D-2 と、当たるフォルダの数 2
       DD->>PI: 検討事項 D-2 の文書を取得する
       PI-->>DD: 1 つに決まらないエラー（2 つのフォルダ）
       DD->>PI: 検討事項 D-3 の文書を取得する
       PI-->>DD: 404（文書が無い）
     ```
   expected:
+  - 検討事項の ID の一覧が、`D-2` を当たるフォルダの数 2 で返却する
   - D-2 の取得が、文書が 1 つに決まらないことを、文書のある 2 つのフォルダつきでエラーとして返却する
   - D-3 の取得が、文書が無いことを 404 で返却する
   test: test_error_when_decision_not_unique
-lead: dev-docs の画面のサーバーが読み取り API で、配信元の一覧と状態・配信元の設定・文書の一覧・文書・検討事項の文書・単語での検索の結果・リビジョンの一覧を取得する。
+lead: dev-docs の画面のサーバーが読み取り API で、配信元の一覧と状態・配信元の設定・文書の一覧・文書・検討事項の ID の一覧と文書・単語での検索の結果・リビジョンの一覧を取得する。
 issue: 14
 visibility: internal
 primary_actor: dev-docs の画面のサーバー

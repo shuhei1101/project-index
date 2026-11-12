@@ -10,7 +10,7 @@ stakeholders:
   - name: エージェント（Claude Code）
     interest: 1 つの文書の MCP で、今の作業場所から使用できる配信元の文書を検索して参照し、作業ツリーの YAML を検査に合格させてから書き換えられる
   - name: dev-docs の画面のサーバー
-    interest: 配信元の一覧と状態・配信元の設定・文書の一覧・文書・検討事項の文書・検索の結果・リビジョンの一覧を読み取り API で取得し、端末の設定の配信元を端末の設定の API で保存できる
+    interest: 配信元の一覧と状態・配信元の設定・文書の一覧・文書・検討事項の ID の一覧と文書・検索の結果・リビジョンの一覧を読み取り API で取得し、端末の設定の配信元を端末の設定の API で保存できる
   - name: 各配信元
     interest: サーバーのコードもプラグインも持たず、配信元の設定（`project-index.yaml`）・スキーマ・検査と変換のスクリプトだけで配信される
 trigger: 利用者が project-index のプラグインを入れ、`/project-index:global-setup` を実行する
@@ -37,7 +37,7 @@ scenarios:
         description: '`PROJECT_INDEX_CONFIG` が指す場所（テスト用の一時フォルダの `settings.yaml`）'
         notes: ファイルは無い。S0 が作成する
       - name: サンプルの配信元
-        description: 文書の種類を 1 つ（スキーマと YAML 2 件）と `project-index.yaml` を持つ git リポジトリと、そのワークツリー（`.claude/worktrees/x`）
+        description: 文書の種類を 1 つ（スキーマと YAML 2 件）と、`converters[]` を指す種類の文書 1 件と、`project-index.yaml` を持つ git リポジトリと、そのワークツリー（`.claude/worktrees/x`）
         notes: id `sample`。S1 の `/project-index:setup` で `scope.read`・`scope.write` に sample のフォルダを回答する
       - name: 読み取りだけの配信元
         description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
@@ -82,7 +82,7 @@ scenarios:
       - '`PROJECT_INDEX_PORT` を待ち受ける project-index のプロセスが 1 つだけある'
       - sample のワークツリーで始めたセッションの文脈に、project-index の配信元の一覧・使い方・警告が入らない
       - 端末の設定の `sources` に sample と notes の行があり、`check_project` が違反と索引の同期の件数を 0 で返却する
-      - '`try_convert` が sample の文書を変換した Markdown を返却し、sample のフォルダは変わらない'
+      - '`try_convert` が sample の `converters[]` を指す種類の文書を、変換のスクリプトが出した Markdown で返却し、sample のフォルダは変わらない'
       - 管理の MCP の `status` が `sample` と `notes` を配信中として返却する
       - 文書の MCP のツールは `describe`・`search_docs`・`trace_related`・`list_changes`・`list_match_words`・`write_docs`・`delete_docs` の 7 つで、配信元を追加しても変わらない
       - sample のワークツリーで呼んだ `describe` が、使用できる配信元として `sample`（読み書き）と `notes`（読み取りだけ）を返却する

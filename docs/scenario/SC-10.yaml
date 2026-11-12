@@ -6,7 +6,7 @@ scenarios:
   - name: Mock
     description: なし（実環境で実行）
   - name: サンプルの配信元
-    description: 配信中の配信元 sample（Git 管理外のフォルダ）
+    description: 配信中の配信元 sample（Git 管理外のフォルダ）。`converters[]` を指す種類の文書を持つ
     notes: '`project-index.yaml` の `description` を書き換えておく'
   flow: |-
     ```mermaid
@@ -17,8 +17,8 @@ scenarios:
 
       A->>AD: check_project（sample のパス）
       AD-->>A: 違反 0 件・索引の同期の件数・設定のバージョンの新旧
-      A->>AD: try_convert（sample の文書）
-      AD-->>A: 変換した Markdown
+      A->>AD: try_convert（sample の converters[] を指す種類の文書）
+      AD-->>A: 変換のスクリプトが出した Markdown
       A->>AD: reload
       AD-->>A: 読み直した配信元
       A->>DM: describe
@@ -26,7 +26,7 @@ scenarios:
     ```
   expected:
   - '`check_project` が違反と索引の同期の件数を 0 で返す'
-  - '`try_convert` が sample の文書を変換した Markdown を返し、sample のフォルダは変わらない'
+  - '`try_convert` が sample の `converters[]` を指す種類の文書を、変換のスクリプトが出した Markdown で返し、sample のフォルダは変わらない'
   - '`reload` の後の `describe` が書き換えた `description` を返す'
   - '`reload` の前後で `/mcp` のセッションが切れない'
   test: test_normal
