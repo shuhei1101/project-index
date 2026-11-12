@@ -1,11 +1,11 @@
 docs:
   - page: docs/architecture/ARCH-1.yaml
     new: false
-    change: '読み取り API の利用者（dev-docs の画面のサーバー）の用途を Issue #14 の表（配信元の設定・文書の一覧・検討事項の文書・端末の設定の取得と保存・1 行の追加を含む）に合わせ、索引のサーバーの役割に端末の設定の書き込みを加える'
+    change: '読み取り API の利用者（dev-docs の画面のサーバー）の用途を Issue #14 の表（配信元の設定・文書の一覧・検討事項の ID の一覧と文書・端末の設定の取得と保存・1 行の追加を含む）に合わせ、索引のサーバーの役割に端末の設定の書き込みを加える'
     status: todo
   - page: docs/config/CFG-1.yaml
     new: false
-    change: 移した端末の設定（`state_dir`・`port` など）と配信元の設定のキーを書き、shuhei1101/dev-docs#114 で移すとした注記を外す。今の各リポジトリの `dev-docs.yaml` の扱いを shuhei1101/dev-docs#163 の決定どおりに書く
+    change: 移した端末の設定（`state_dir`・`port` など）と配信元の設定のキーを書き、shuhei1101/dev-docs#114 で移すとした注記を外す。今の各リポジトリの `dev-docs.yaml` の扱いを、この作業 PR のインターフェース定義設計の決定どおりに書く
     status: todo
   - page: docs/nonfunctional/NFR-1.yaml
     new: false
@@ -128,7 +128,7 @@ scope_out:
     reason: '#7 が担う。この作業 PR で増えるフォルダはモジュール構成の束ねる設計書（MOD-1・MOD-2）の directory に書く'
     plan: '#7'
   - item: このリポジトリの直下の配信元の設定 `dev-docs.yaml` の `project-index.yaml` への改名
-    reason: 今の各リポジトリの `dev-docs.yaml` の移行方法は shuhei1101/dev-docs#163 のインターフェース定義設計で決まる。移行の間は両方を探す案ならそれぞれの作業で改名でき、改名だけにする案なら反映作業としてこの作業 PR に取り込む。決まるまではその時点の判断としてスコープ外に置き、レビューで確定する
+    reason: '今の各リポジトリの `dev-docs.yaml` の移行方法は、この作業 PR のインターフェース定義設計で決める（Issue #14 の書き換え）。移行の間は両方を探す案ならそれぞれの作業で改名でき、改名だけにする案なら反映作業としてこの作業 PR に取り込む。決まるまではその時点の判断としてスコープ外に置き、レビューで確定する'
     plan: to_file
   - item: 'dev-docs から移した文書への、置き場所・`id`・書き方の決まり（dev-docs の #7・#74・#95）の適用'
     reason: shuhei1101/dev-docs#114 の扱いの判断で、移す文書の範囲が決まってから別に起票すると決まった。この作業 PR はこのリポジトリの今の決まりで書く
