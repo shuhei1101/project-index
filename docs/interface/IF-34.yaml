@@ -52,8 +52,9 @@ status_codes:
   - code: '409'
     condition: '`expectedVersion` が今の端末の設定の内容のバージョンと違う'
     notes: 拡張メンバー `current` に今の内容のバージョンを入れる
-  - code: '422'
+  - code: '400'
     condition: '`expectedVersion` が無い'
+    notes: 要求の型の検証の失敗。起動の『例外の変換の登録』が `InvalidArgumentError` の problem+json にする
 error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`・`current`）
 constraints:
   - item: オリジンの確認
@@ -164,7 +165,7 @@ flows:
       - 404 で、extra の行が無いことを返却する
       - '`settings.yaml` が変わらない'
     test: test_error_when_row_not_found
-  - name: 異常系（内容のバージョンが無い・422）
+  - name: 異常系（内容のバージョンが無い・400）
     summary: '`expectedVersion` が無い削除を断る'
     setup:
       - name: Mock
@@ -172,7 +173,7 @@ flows:
       - name: 端末の設定
         description: '`sources` に sample と extra の 2 行'
     flow: |-
-      <!-- map: {"title": "異常系（内容のバージョンが無い・422）"} -->
+      <!-- map: {"title": "異常系（内容のバージョンが無い・400）"} -->
 
       ```mermaid
       sequenceDiagram
@@ -180,12 +181,12 @@ flows:
         participant E as DELETE /settings/sources/extra
 
         C->>E: クエリなし
-        E-->>C: 422 problem+json
+        E-->>C: 400 problem+json
       ```
 
       <!-- /map -->
     expected:
-      - 422 を返却する
+      - 400 を返却する
       - '`settings.yaml` が変わらない'
     test: test_error_when_version_missing
   - name: 異常系（別のオリジン・403）

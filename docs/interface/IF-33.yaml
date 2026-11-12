@@ -87,8 +87,11 @@ status_codes:
     condition: '`expectedVersion` が今の端末の設定の内容のバージョンと違う'
     notes: 拡張メンバー `current` に今の内容のバージョンを入れる
   - code: '422'
-    condition: '`expectedVersion` が無い、`source` に `id` か知らないキーがある、`id` を省いた行の `config` を配信元の ID が変わる設定へ変える、変更後の端末の設定がスキーマに通らない'
+    condition: '`id` を省いた行の `config` を配信元の ID が変わる設定へ変える、変更後の端末の設定がスキーマに通らない'
     notes: '`errors[]` に違反したキーのパスと理由を全て並べる'
+  - code: '400'
+    condition: '`expectedVersion` が無い、`source` に `id` か知らないキーがある'
+    notes: 要求の型の検証の失敗。起動の『例外の変換の登録』が `InvalidArgumentError` の problem+json にし、`errors[]` にキーのパスと理由を並べる
 error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`・`current`）
 constraints:
   - item: オリジンの確認
@@ -176,7 +179,7 @@ flows:
 
       <!-- /map -->
     expected:
-      - 200 で、notes が `disabled`
+      - 200 で、notes の行が `disabled`（無効の行は配信元の設定を読まないため、状態の `id` は `sources[1]`）
       - '`settings.yaml` の notes の行に `enabled: false` が入り、`id` は書き足されない'
     test: test_normal_when_row_without_id
   - name: 異常系（内容のバージョンが古い・409）
@@ -237,14 +240,14 @@ flows:
       - '`settings.yaml` が変わらない'
     test: test_error_when_row_not_found
   - name: 異常系（スキーマに通らない・422）
-    summary: 内容のバージョンが無い変更と、配信元の ID が変わる変更と、変更後がスキーマに通らない変更を断る
+    summary: 配信元の ID が変わる変更と、変更後がスキーマに通らない変更を断る
     setup:
       - name: Mock
         description: なし
       - name: 端末の設定
         description: '`sources` に sample と extra と、`id` を省いた notes の 3 行'
       - name: 入力
-        description: '`expectedVersion` が無い要求と、`scope.read` に空の文字列を含む要求と、`source` に `id` を含む要求と、`id` を省いた notes の行の `config` を `name` が `memo` の設定へ変える要求'
+        description: '`scope.read` に空の文字列を含む要求と、`id` を省いた notes の行の `config` を `name` が `memo` の設定へ変える要求'
     flow: |-
       <!-- map: {"title": "異常系（スキーマに通らない・422）"} -->
 
@@ -259,7 +262,7 @@ flows:
 
       <!-- /map -->
     expected:
-      - 4 つとも 422 で、`errors` に違反したキーのパスと理由がある
+      - 2 つとも 422 で、`errors` に違反したキーのパスと理由がある
       - '`settings.yaml` が変わらない'
     test: test_error_when_schema_invalid
   - name: 異常系（別のオリジン・403）
@@ -286,5 +289,31 @@ flows:
       - 403 を返却する
       - '`settings.yaml` が変わらない'
     test: test_error_when_cross_origin
+  - name: 異常系（引数の誤り・400）
+    summary: 内容のバージョンが無い変更と、`source` に `id` を含む変更を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample と extra の 2 行'
+      - name: 入力
+        description: '`expectedVersion` が無い要求と、`source` に `id` を含む要求'
+    flow: |-
+      <!-- map: {"title": "異常系（引数の誤り・400）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as PATCH /settings/sources/extra
+
+        C->>E: 型に合わない要求
+        E-->>C: 400 problem+json（違反したキーと理由）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 2 つとも 400 で、`errors` に違反したキーのパスと理由がある
+      - '`settings.yaml` が変わらない'
+    test: test_error_when_argument_invalid
 test_file: tests/integration/server/test_patch_settings_source.py
 id: IF-33
