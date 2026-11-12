@@ -2,3 +2,25 @@ summary: 単一 / 複合ユースケースの業務フロー設計（E2E テス�
 items:
 - page: SC-1.yaml
   summary: project-index を入れて配信元を登録し、文書を文書の MCP と読み取り API で読み書きするまでの流れ
+- page: SC-2.yaml
+  summary: '`/project-index:global-setup` の端末の設定・env の用意と、2 回目以降のバージョンの確認'
+- page: SC-3.yaml
+  summary: '`update` での更新と `project-index migrate` での端末の設定の移し替え'
+- page: SC-4.yaml
+  summary: '`project-index serve` の待ち受けと配信元ごとの起動時の検証、SessionStart のフックでの起動'
+- page: SC-5.yaml
+  summary: '`/project-index:setup` での配信元の登録と、2 回目以降の管理用の YAML の突き合わせ'
+- page: SC-6.yaml
+  summary: '`describe`・`search_docs`・`trace_related` と、権限・ワークツリー・横断検索・1 セッション 1 回'
+- page: SC-7.yaml
+  summary: '`write_docs`・`delete_docs` と、検査・書き込む作業ツリー・参照されている文書の削除'
+- page: SC-8.yaml
+  summary: '`list_changes` の区間の解決と変わった文書・差分の行'
+- page: SC-9.yaml
+  summary: 直接編集した YAML の読み直しと、読んだ後に変わった文書への書き込み
+- page: SC-10.yaml
+  summary: '`check_project`・`try_convert` での確認と `reload` での反映'
+- page: SC-11.yaml
+  summary: 読み取り API での配信元の一覧・文書・差分・検索・リビジョンの一覧の取得
+- page: SC-12.yaml
+  summary: 端末の設定の API での配信元の取得と、追加・停止・削除した後の保存

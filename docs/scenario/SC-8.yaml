@@ -1,0 +1,147 @@
+id: SC-8
+title: "変更をレビューする"
+scenarios:
+- name: 正常シナリオ
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+    notes: '-'
+  - name: サンプルの配信元
+    description: 文書の種類を 1 つ（スキーマと YAML 2 件）と `project-index.yaml` を持つ git リポジトリと、そのワークツリー（`.claude/worktrees/x`）
+    notes: id `sample`
+  - name: 変更の commit
+    description: ワークツリー x で文書 1 の `name` を `write_docs` で変え、`git commit` した commit
+    notes: 親の commit と、その commit の 2 つを使う
+  - name: project-index
+    description: sample を配信している project-index
+    notes: '`cwd` は sample のクローン本体'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      actor R as レビュアー
+      participant M as 文書の MCP（/mcp）
+      participant G as sample の Git の履歴
+
+      R->>M: list_changes(from: 親の commit, to: 変更の commit, view: summary)
+      M->>G: 区間を commit に解決し、両端の文書を読む
+      M-->>R: 解決した commit と日時、変わった文書と変わったキー
+      R->>M: list_changes(同じ区間, view: full)
+      M-->>R: git と同じ + - の差分の行
+    ```
+  expected:
+  - '`view: summary` が先頭に解決した 2 つの commit と日時を返し、変わった文書として文書 1 だけを、変わったキー `name` つきで返す'
+  - '`view: full` が `name` の前後の値を `-`・`+` の行で返す'
+  test: test_normal
+- name: 正常シナリオ（日時とブランチで区間を指す）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行）
+  - name: 変更の commit
+    description: 正常シナリオと同じ、文書 1 を変えた commit
+    notes: 親の commit と変更の commit の間の日時を `from` に、ワークツリーのブランチ名を `to` に渡す
+  - name: project-index
+    description: sample を配信している project-index
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      actor R as レビュアー
+      participant M as 文書の MCP（/mcp）
+
+      R->>M: list_changes(from: 日時, to: ブランチ名, view: summary)
+      M->>M: 日時をその時点の最後の commit、ブランチをその先頭の commit に解決する
+      M-->>R: 解決した commit と日時、変わった文書
+    ```
+  expected:
+  - 先頭に、`from` を親の commit、`to` を変更の commit に解決した結果を返す
+  - 変わった文書が正常シナリオと同じになる
+  test: test_normal_when_range_by_date_and_branch
+- name: 正常シナリオ（前回読んだ時点から）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。`session_id` はテストが引数に入れる）
+  - name: 読んだ記録
+    description: 同じ `session_id` で、文書 1 と文書 2 を `search_docs` で読んだ後、文書 1 だけを `write_docs` で変えた状態
+    notes: '`session_id` は `s1`'
+  - name: project-index
+    description: sample を配信している project-index
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      actor R as エージェント
+      participant M as 文書の MCP（/mcp）
+
+      R->>M: list_changes(view: summary)
+      M->>M: from と to を省いたので、この会話で前回読んだ時点から今までを比べる
+      M-->>R: 読んだ後に変わった文書
+    ```
+  expected:
+  - 文書 1 だけを、変わったキーつきで返す
+  - 文書 2 は返さない
+  - 別の `session_id` で呼ぶと、前回読んだ時点が無いことと `from` を渡すことを返す
+  test: test_normal_when_since_last_read
+- name: 異常シナリオ（無いリビジョンを指す）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行）
+  - name: project-index
+    description: sample を配信している project-index
+    notes: '`from` に sample に無いブランチ名 `no-such-branch` を渡す'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      actor R as レビュアー
+      participant M as 文書の MCP（/mcp）
+
+      R->>M: list_changes(from: no-such-branch)
+      M->>M: from を commit に解決できない
+      M-->>R: エラー（解決できなかった引数と値）
+    ```
+  expected:
+  - '`isError: true` で、`from` の `no-such-branch` を解決できなかったことを返す'
+  - 差分を返さない
+  test: test_error_when_ref_not_found
+- name: 正常シナリオ（語が入った・消えた変更を引く）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+    notes: '-'
+  - name: 語の commit
+    description: ワークツリー x で 3 つの commit を順に積む。commit 1 は文書 1 の `description` に語 `廃止予定` を追加し、commit 2 は文書 2 の `name` を変え、commit 3 は文書 1 から `廃止予定` を削除する
+    notes: commit 1 の親を `from`、commit 3 を `to` に渡す
+  - name: project-index
+    description: sample を配信している project-index
+    notes: '`cwd` は sample のクローン本体'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      actor R as レビュアー
+      participant M as 文書の MCP（/mcp）
+      participant G as sample の Git の履歴
+
+      R->>M: list_changes(from: commit 1 の親, to: commit 3, contains: 廃止予定)
+      M->>G: 区間の中の commit ごとに、文書の前後で語の出現数を比べる
+      M-->>R: 語が入った・消えた文書 1 と、語が入った区間・消えた区間
+    ```
+  expected:
+  - 文書 1 だけを返し、文書 2 を返さない
+  - 文書 1 に、語が入った区間（commit 1 の親から commit 1）と消えた区間（commit 2 から commit 3）を返す
+  - '`contains` を渡さない同じ区間の呼び出しは、区間の両端で変わった文書 2 だけを返す（今と同じ）'
+  test: test_normal_when_contains
+lead: レビュアー（エージェント・利用者）が、文書の MCP の `list_changes` で、区間の間に変わった文書と項目を確かめる。
+issue: 14
+primary_actor: レビュアー（エージェント・利用者）
+stakeholders:
+- name: レビュアーのエージェント
+  interest: YAML の git の差分を読まずに、どの文書のどの項目が変わったかを引ける
+trigger: エージェントが書き込んだ変更を commit した後、レビューを始める
+preconditions:
+- project-index が起動し、Git の配信元を配信している
+- 配信元に、文書を変えた commit がある
+success_guarantee: 区間（commit・日時・ブランチ・タグ）を commit に解決し、その間に変わった文書・変わったキー・差分の行を返す。
+minimal_guarantee: 解決できない区間は、差分を返さずにどの値を解決できなかったかを返す。
+frequency: レビューのたび
+priority: 高
+refs:
+- SC-1#scenarios[正常シナリオ]
+- SC-7#scenarios[正常シナリオ]
+test_file: tests/e2e/単一ユースケース/test_変更をレビューする.py
