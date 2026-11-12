@@ -185,6 +185,60 @@ def test_add_source_when_same_id(
     assert calls == []
 
 
+def _unnamed_settings(tmp_path: Path) -> tuple[Path, Path]:
+    """`name: sample` の配信元の設定と、それを `id` を省略して指す行を持つ端末の設定を書く。"""
+    config = tmp_path / "sample" / "project-index.yaml"
+    config.parent.mkdir()
+    config.write_text('version: "3"\nname: sample\n', encoding="utf-8")
+    path = tmp_path / "settings.yaml"
+    path.write_text(
+        f'version: "1"\nclone: /tmp/clone\nsources:\n  - config: [{config}]\n',
+        encoding="utf-8",
+    )
+    return path, config
+
+
+def test_add_source_when_same_name(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """id を省略した行どうしは設定の name で照合する（正常系）。"""
+    # 準備
+    path, config = _unnamed_settings(tmp_path)
+    before = path.read_text(encoding="utf-8")
+    reload, calls = fake_reload
+    # 実行
+    result = add_source(make_entry(str(config)), path=path, reload=reload, lock=threading.Lock())
+    # 検証
+    assert (result.result, result.same) == ("exists", True)
+    assert path.read_text(encoding="utf-8") == before
+    assert calls == []
+
+
+def test_add_source_when_id_matches_name(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """id を書いた行を、id を省略した既存の行の name と照合する（正常系）。"""
+    # 準備
+    path, config = _unnamed_settings(tmp_path)
+    before = path.read_text(encoding="utf-8")
+    reload, calls = fake_reload
+    # 実行
+    result = add_source(
+        make_entry(str(config), source_id="sample"),
+        path=path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
+    # 検証
+    assert (result.result, result.same) == ("exists", False)
+    assert path.read_text(encoding="utf-8") == before
+    assert calls == []
+
+
 def test_add_source_when_invalid(
     settings_path: Path,
     fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],

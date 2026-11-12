@@ -12,6 +12,7 @@ from project_index.features.sources.service import (
     assemble_source,
     check_scripts,
     compare_config_version,
+    entry_source_id,
     load_source,
     load_source_at,
     validate_source_config,
@@ -261,6 +262,32 @@ def test_compare_config_version(monkeypatch: pytest.MonkeyPatch) -> None:
     newer = compare_config_version("3")
     # 検証
     assert (same, older, newer) == ("same", "older", "newer")
+
+
+@pytest.mark.parametrize(
+    ("source_id", "files", "expected"),
+    [
+        pytest.param("given", {"a.yaml": "name: sample\n"}, "given", id="id"),
+        pytest.param(
+            None, {"a.yaml": "name: sample\n", "b.yaml": "name: local\n"}, "local", id="name"
+        ),
+        pytest.param(None, {}, None, id="missing"),
+    ],
+)
+def test_entry_source_id(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_entry: Callable[..., SourceEntry],
+    source_id: str | None,
+    files: dict[str, str],
+    expected: str | None,
+) -> None:
+    """id か、無ければ重ねた設定の name を返す（正常系）。"""
+    # 準備
+    write_files(tmp_path, files)
+    entry = make_entry([str(tmp_path / "a.yaml"), str(tmp_path / "b.yaml")], source_id=source_id)
+    # 実行・検証
+    assert entry_source_id(entry) == expected
 
 
 def test_load_source(
