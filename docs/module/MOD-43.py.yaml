@@ -1,6 +1,6 @@
 id: MOD-43
 title: 索引のサーバー / プロンプトの文書の変換 / runtime.py
-lead: サーバーが起動のときに `content/prompts/` のプロンプトの YAML を読んで検査し、MCP の instructions・ツールの description を描画する処理を受け持ち、プロンプトの文書の変換の runtime.py を修正するときに参照する。
+lead: 起動時にプロンプトの YAML を検査して MCP の instructions・ツールの description を描画する処理を受け持ち、プロンプトの文書の変換の runtime.py を修正するときに参照する。
 test_files:
   - tests/unit/project_index/features/prompt_doc/test_runtime.py
 data_models:
@@ -248,4 +248,6 @@ functions:
         mock: なし
         expected: 送らず、どの部品の本文にも `MUST`・`必ず`・`禁止` が無く、`mcp/docs/instructions` を描画した文が 4,096 字以内
 notes:
-  決まり: 画面用のマーカーは付けない。
+  決まり: |-
+    読むのは `content/prompts/` のプロンプトの YAML。
+    画面用のマーカーは付けない。

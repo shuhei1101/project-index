@@ -1,7 +1,7 @@
 id: MOD-122
 title: 索引のサーバー / 関連
 lead: |-
-  関連の分類の構成図・ファイルの並び・決まりを定め、関連のファイルを追加・移動するときに参照する。
+  `trace_related` の `related` のたどりと関連の候補の提案を受け持つ関連の分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
 directory: |-
   ```text
   src/project_index/features/related/
@@ -59,6 +59,5 @@ diagrams:
         click 一緒に変わったファイル href "./MOD-31.py.yaml#一緒に変わったファイル"
 notes:
   受け持つこと: |-
-    `trace_related` の処理。
     起点の文書かコードのパスから、メタデータの `related` を深さと向きの指定でたどる。
     `suggest` では、同じ commit での変更と会話の中の編集・閲覧から、まだ `related` に無い関連の候補を返す。

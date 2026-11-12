@@ -1,7 +1,7 @@
 id: MOD-112
 title: 索引のサーバー / 文書のMCP
 lead: |-
-  文書の MCP の分類の構成図・ファイルの並び・決まりを定め、文書の MCP のファイルを追加・移動するときに参照する。
+  文書の MCP（`/mcp`）と管理の MCP（`/_admin/mcp`）を組み立てる文書の MCP の分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
 directory: |-
   ```text
   src/project_index/server/mcp/
@@ -146,5 +146,4 @@ diagrams:
         click 検査の文 href "./MOD-9.py.yaml#検査の文"
 notes:
   受け持つこと: |-
-    文書の MCP（`/mcp`）と管理の MCP（`/_admin/mcp`）の組み立て。
     各ツールの引数を要求のモデルで受け、サービスを呼んで `format` の形式で返し、`ProjectIndexError` を `isError` の結果にする。

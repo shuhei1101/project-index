@@ -1,7 +1,7 @@
 id: MOD-115
 title: 索引のサーバー / 検査
 lead: |-
-  検査の分類の構成図・ファイルの並び・決まりを定め、検査のファイルを追加・移動するときに参照する。
+  文書を種類のスキーマ・`ids.format`・`related.types`・`validators[]` で検査し、違反を返却する検査の分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
 directory: |-
   ```text
   src/project_index/features/validation/
@@ -51,5 +51,4 @@ diagrams:
         click 違反 href "./MOD-98.py.yaml#違反"
 notes:
   受け持つこと: |-
-    文書を種類のスキーマ・`ids.format`・`related.types`・配信元の `validators[]` で検査し、違反の並びを返す。
     書き込みは違反があれば書かず、読み取りは違反を警告として添える。

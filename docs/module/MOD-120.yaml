@@ -1,7 +1,7 @@
 id: MOD-120
 title: 索引のサーバー / 起動
 lead: |-
-  起動の分類の構成図・ファイルの並び・決まりを定め、起動のファイルを追加・移動するときに参照する。
+  `project-index serve`・`migrate` で部品を配線し、API と MCP を 1 つのアプリで待ち受ける起動の分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
 directory: |-
   ```text
   src/project_index/
@@ -141,7 +141,6 @@ diagrams:
         click 移し替えの適用 href "./MOD-37.py.yaml#移し替えの適用"
 notes:
   受け持つこと: |-
-    `project-index serve` と `project-index migrate` の処理。
-    端末の設定と配信元を読み、部品を配線して、読み取り API・文書の MCP・管理の MCP・セッションの開始を 1 つのアプリとして待ち受ける。
+    待ち受けるのは、読み取り API・文書の MCP・管理の MCP・セッションの開始。
     再起動を要求されて止まったときは、同じプロセスを `serve` で置き換える。
     例外から problem+json への変換もここで登録する。

@@ -1,7 +1,7 @@
 id: MOD-109
 title: 索引のサーバー / 変換
 lead: |-
-  変換の分類の構成図・ファイルの並び・決まりを定め、変換のファイルを追加・移動するときに参照する。
+  `converters[]` を指す種類の文書を、配信元のスクリプトで Markdown にする変換の分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
 directory: |-
   ```text
   src/project_index/features/convert/
@@ -36,6 +36,6 @@ diagrams:
         click 変換の結果 href "./MOD-18.py.yaml#変換の結果"
 notes:
   受け持つこと: |-
-    `converters[]` を指す種類の文書を、配信元のスクリプトで Markdown にし、結果を控える。
+    変換の結果を控える。
     スキーマ駆動の Markdown への変換は dev-docs の画面のサーバーが持つ。
     検討事項の文書を探す処理もここに置く。
