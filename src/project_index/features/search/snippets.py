@@ -1,5 +1,4 @@
 """抜粋の検索と、一致した箇所の抜き出し。"""
-# pyright: reportUnknownLambdaType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
@@ -12,7 +11,7 @@ from project_index.features.search.filters import compile_regex, normalize
 from project_index.features.search.types import BodyRange, Condition, Snippet, SnippetLine
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
 TEXT_OPS = ("eq", "prefix", "suffix", "contains")
 
@@ -48,9 +47,14 @@ def _regex_hits(lines: list[str], condition: Condition) -> set[int]:
     return hits
 
 
+def _same(text: str) -> str:
+    """文字列をそのまま返す（大文字小文字を区別する比べ方）。"""
+    return text
+
+
 def _text_hits(lines: list[str], condition: Condition) -> set[int]:
     """`eq`・`prefix`・`suffix`・`contains` の条件に値を含む行の番号（0 始まり）を集める。"""
-    fold = (lambda text: text) if condition.case_sensitive else normalize
+    fold: Callable[[str], str] = _same if condition.case_sensitive else normalize
     wanted = [fold(value) for value in condition.values]
     return {index for index, line in enumerate(lines) if any(word in fold(line) for word in wanted)}
 
@@ -69,6 +73,21 @@ def _hit_lines(lines: list[str], conditions: Sequence[Condition]) -> set[int]:
 def count_matches(text: str, conditions: Sequence[Condition]) -> int:
     """本文のうち、条件のどれかに当たった行の数を返す（同じ行が複数の条件に当たっても 1）。"""
     return len(_hit_lines(split_lines(text), conditions))
+
+
+def _spans(
+    hits: set[int], bounds: list[tuple[int, int]], *, before: int, after: int, last: int
+) -> list[list[int]]:
+    """当たった行ごとに前後の範囲を、その行を含む範囲の中に切り詰めて作り、重なる範囲は 1 つにまとめる。"""
+    spans: list[list[int]] = []
+    for index in sorted(hits):
+        low, high = next((low, high) for low, high in bounds if low <= index <= high)
+        start, end = max(index - before, low), min(index + after, high, last)
+        if spans and start <= spans[-1][1]:
+            spans[-1][1] = max(spans[-1][1], end)
+        else:
+            spans.append([start, end])
+    return spans
 
 
 def find_snippets(
@@ -91,15 +110,7 @@ def find_snippets(
     )
     # 範囲の外の当たりは捨てる
     hits = {index for index in hits if any(low <= index <= high for low, high in bounds)}
-    # 当たった行ごとに前後の範囲を、その行を含む範囲の中に切り詰めて作り、重なる範囲は 1 つにまとめる
-    spans: list[list[int]] = []
-    for index in sorted(hits):
-        low, high = next((low, high) for low, high in bounds if low <= index <= high)
-        start, end = max(index - before, low), min(index + after, high, len(lines) - 1)
-        if spans and start <= spans[-1][1]:
-            spans[-1][1] = max(spans[-1][1], end)
-        else:
-            spans.append([start, end])
+    spans = _spans(hits, bounds, before=before, after=after, last=len(lines) - 1)
     return [
         Snippet(
             lines=[

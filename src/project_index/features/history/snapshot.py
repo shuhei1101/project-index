@@ -59,7 +59,9 @@ class SnapshotStore:
                     binary=True,
                     timeout=GIT_ARCHIVE_TIMEOUT_SEC,
                 )
-                assert isinstance(data, bytes)  # noqa: S101
+                if not isinstance(data, bytes):
+                    msg = "git archive の出力がバイト列ではありません"
+                    raise RuntimeError(msg)
                 with tarfile.open(fileobj=io.BytesIO(data)) as archive:
                     archive.extractall(temp, filter="data")
             except GitError:

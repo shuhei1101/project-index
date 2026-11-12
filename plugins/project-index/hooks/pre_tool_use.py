@@ -4,13 +4,12 @@ Usage:
 # Claude Code が stdin に PreToolUse の入力の JSON を渡して実行する
 python3 pre_tool_use.py
 """
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning
 
 from __future__ import annotations
 
 import json
 import sys
-from typing import Any
+from typing import Any, cast
 
 # フックの入力から `tool_input` へ上書きで入れるキー
 INJECTED_KEYS = ("cwd", "session_id", "agent_id")
@@ -33,11 +32,16 @@ def build_updated_input(event: dict[str, Any]) -> dict[str, Any]:
 def main() -> int:
     """stdin の JSON を読み、書き換えた入力を標準出力に出す。"""
     try:
-        event = json.load(sys.stdin)
+        loaded: object = json.load(sys.stdin)
     except ValueError:
         return 0
-    # 辞書でない入力と、`tool_input` が辞書でない入力は変えずに戻す
-    if not isinstance(event, dict) or not isinstance(event.get("tool_input"), dict):
+    # 辞書でない入力は変えずに戻す
+    if not isinstance(loaded, dict):
+        return 0
+    # JSON の辞書のキーは文字列
+    event = cast("dict[str, Any]", loaded)
+    # `tool_input` が辞書でない入力は変えずに戻す
+    if not isinstance(event.get("tool_input"), dict):
         return 0
     output = {
         "hookSpecificOutput": {

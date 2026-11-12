@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
@@ -126,7 +126,7 @@ def nav_warnings(
     nav = source.config.nav
     if not nav:
         return []
-    today = today or date.today()  # noqa: DTZ011
+    today = today or datetime.now(UTC).astimezone().date()
     target = Target(source, source.root, None, None, "read")
     documents = store.load(target).documents
     fields = known_fields(

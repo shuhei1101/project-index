@@ -1,4 +1,3 @@
-# pyright: reportUnknownArgumentType=warning, reportUnknownLambdaType=warning
 from __future__ import annotations
 
 import sys
@@ -19,13 +18,19 @@ from project_index.features.sources.types import (
 from project_index.features.validation import service as service_module
 from project_index.features.validation.markdown import MarkdownCheck
 from project_index.features.validation.service import DocumentChecker
-from project_index.shared.yaml_io import load_yaml
+from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from project_index.features.access.types import Target
     from project_index.features.documents.types import Document
+
+
+def load_yaml(text: str) -> Any:
+    """形の分かっている YAML の文字列を読む。"""
+    return load_yaml_value(text)
+
 
 SCHEMA = {"type": "object", "required": ["name"]}
 
@@ -40,9 +45,11 @@ def _script(violations: list[Any], exit_code: int = 0) -> list[str]:
 
 def _checker(schema: dict[str, Any]) -> DocumentChecker:
     """決めたスキーマを返す文書のストアの偽物で、文書の検査を作る。"""
-    store = SimpleNamespace(
-        schema=lambda target, kind: schema, row_schema=lambda target, kind: schema
-    )
+
+    def fixed_schema(target: object, kind: str) -> dict[str, Any]:
+        return schema
+
+    store = SimpleNamespace(schema=fixed_schema, row_schema=fixed_schema)
     return DocumentChecker(store, timeout_sec=10)  # type: ignore[arg-type]
 
 
@@ -236,9 +243,11 @@ def test_document_checker_check_markdown_when_unchanged(
     # 準備
     target = make_checked_target([], row_validators=[])
     calls: list[Any] = []
-    monkeypatch.setattr(
-        service_module, "check_markdown_values", lambda *args, **kwargs: calls.append(args)
-    )
+
+    def record(*args: Any, **kwargs: Any) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr(service_module, "check_markdown_values", record)
     document = make_document(data={"body": "a"})
     # 実行
     result = _checker(MARKDOWN_SCHEMA).check_markdown(target, document, previous={"body": "a"})

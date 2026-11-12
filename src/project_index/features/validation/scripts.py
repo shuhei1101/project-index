@@ -1,12 +1,11 @@
 """`validators[]` の出力の解釈。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
 import json
-from typing import Any
 
 from project_index.shared.errors import Violation
+from project_index.shared.narrowing import is_dict, is_list
 
 ROOT_PATH = "$"
 
@@ -18,14 +17,14 @@ def parse_validator_output(stdout: str, *, validator_id: str) -> list[Violation]
         return []
     prefix = f"{validator_id}: "
     try:
-        items: Any = json.loads(text)
+        items: object = json.loads(text)
     except json.JSONDecodeError:
         items = None
-    if not isinstance(items, list):
+    if not is_list(items):
         return [Violation(path=ROOT_PATH, rule=f"{prefix}出力が違反の配列の JSON ではありません")]
     violations: list[Violation] = []
     for item in items:
-        if isinstance(item, dict):
+        if is_dict(item):
             rule = item.get("rule") or item.get("message") or ""
             violations.append(
                 Violation(

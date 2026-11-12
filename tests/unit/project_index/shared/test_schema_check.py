@@ -1,11 +1,18 @@
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 from __future__ import annotations
+
+from typing import Any
 
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
 from project_index.shared.errors import Violation
-from project_index.shared.schema_check import _as_list, _from_error, format_path, schema_violations
+from project_index.shared.schema_check import (
+    _as_list,
+    _from_error,
+    _iter_errors,
+    format_path,
+    schema_violations,
+)
 
 
 def test_format_path() -> None:
@@ -61,8 +68,8 @@ def test_as_list_when_not_list() -> None:
 def test_from_error_when_required() -> None:
     """必須のキーが無い誤りは無いキーごと（正常系）。"""
     # 準備
-    schema = {"properties": {"s": {"required": ["a", "b"]}}}
-    [error] = Draft202012Validator(schema).iter_errors({"s": {"a": 1}})
+    schema: dict[str, Any] = {"properties": {"s": {"required": ["a", "b"]}}}
+    [error] = _iter_errors(Draft202012Validator(schema), {"s": {"a": 1}})
     # 実行
     result = _from_error(error)
     # 検証
@@ -72,8 +79,8 @@ def test_from_error_when_required() -> None:
 def test_from_error_when_additional_properties() -> None:
     """知らないキーの誤りはキーごと（正常系）。"""
     # 準備
-    schema = {"properties": {"a": {}}, "additionalProperties": False}
-    [error] = Draft202012Validator(schema).iter_errors({"a": 1, "x": 2})
+    schema: dict[str, Any] = {"properties": {"a": {}}, "additionalProperties": False}
+    [error] = _iter_errors(Draft202012Validator(schema), {"a": 1, "x": 2})
     # 実行
     result = _from_error(error)
     # 検証
@@ -83,8 +90,8 @@ def test_from_error_when_additional_properties() -> None:
 def test_from_error_when_type() -> None:
     """型の誤り（正常系）。"""
     # 準備
-    schema = {"properties": {"a": {"type": "string"}}}
-    [error] = Draft202012Validator(schema).iter_errors({"a": 1})
+    schema: dict[str, Any] = {"properties": {"a": {"type": "string"}}}
+    [error] = _iter_errors(Draft202012Validator(schema), {"a": 1})
     # 実行
     result = _from_error(error)
     # 検証
@@ -94,8 +101,8 @@ def test_from_error_when_type() -> None:
 def test_from_error_when_enum() -> None:
     """列挙の誤り（最上位）（正常系）。"""
     # 準備
-    schema = {"enum": ["x", "y"]}
-    [error] = Draft202012Validator(schema).iter_errors("z")
+    schema: dict[str, Any] = {"enum": ["x", "y"]}
+    [error] = _iter_errors(Draft202012Validator(schema), "z")
     # 実行
     result = _from_error(error)
     # 検証
@@ -105,8 +112,8 @@ def test_from_error_when_enum() -> None:
 def test_from_error_when_other() -> None:
     """その他の誤りは誤りの message（正常系）。"""
     # 準備
-    schema = {"minimum": 1}
-    [error] = Draft202012Validator(schema).iter_errors(0)
+    schema: dict[str, Any] = {"minimum": 1}
+    [error] = _iter_errors(Draft202012Validator(schema), 0)
     # 実行
     result = _from_error(error)
     # 検証
@@ -116,7 +123,7 @@ def test_from_error_when_other() -> None:
 def test_schema_violations() -> None:
     """違反が無い（正常系）。"""
     # 準備
-    schema = {"type": "object"}
+    schema: dict[str, Any] = {"type": "object"}
     # 実行
     result = schema_violations(schema, {})
     # 検証
@@ -126,7 +133,7 @@ def test_schema_violations() -> None:
 def test_schema_violations_when_many() -> None:
     """違反を全て集め、項目のパスの順に並べる（正常系）。"""
     # 準備
-    schema = {"properties": {"a": {"type": "string"}, "b": {"type": "string"}}}
+    schema: dict[str, Any] = {"properties": {"a": {"type": "string"}, "b": {"type": "string"}}}
     # 実行
     result = schema_violations(schema, {"b": 1, "a": 1})
     # 検証
@@ -142,8 +149,8 @@ def test_schema_violations_when_registry() -> None:
             "$defs": {"name": {"type": "string"}},
         }
     )
-    registry: Registry[object] = Registry().with_resource("common.json", common)
-    schema = {"$ref": "common.json#/$defs/name"}
+    registry: Registry[object] = Registry[object]().with_resource("common.json", common)
+    schema: dict[str, Any] = {"$ref": "common.json#/$defs/name"}
     # 実行
     result = schema_violations(schema, 1, registry=registry)
     # 検証

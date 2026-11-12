@@ -1,10 +1,9 @@
 """`project-index migrate` の対象の決定・手順の一覧・適用。"""
-# pyright: reportUnknownArgumentType=warning
 
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
@@ -79,11 +78,12 @@ def plan_migration(target: MigrationTarget) -> tuple[CommentedMap, list[Migratio
     return data, load_steps(target.kind, mine=version, current=target.current)
 
 
-def _violations(target: MigrationTarget, value: dict[str, Any]) -> list[Violation]:
+def _violations(target: MigrationTarget, value: object) -> list[Violation]:
     """当てた結果を、対象の種類の新しいスキーマで確かめる。"""
     if target.kind == "settings":
         return validate_terminal_config(value)
-    return validate_source_config(value, root=target.file.parent)
+    # 辞書でない値も、配信元の設定のスキーマの検査が違反にする
+    return validate_source_config(cast("dict[str, Any]", value), root=target.file.parent)
 
 
 def apply_migration(

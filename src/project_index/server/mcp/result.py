@@ -1,5 +1,4 @@
 """ツールの結果とエラーの変換。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
@@ -8,7 +7,7 @@ import json
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
 from pydantic import ValidationError
@@ -18,9 +17,12 @@ from project_index.features.changes.types import ChangesResult, ContainsChange
 from project_index.features.related.types import RelatedItem
 from project_index.features.search.types import SearchItem, SnippetLine
 from project_index.features.write.types import DeleteResult
+from project_index.shared.narrowing import is_dict, is_list
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable
+
+    from _typeshed import DataclassInstance
 
     from project_index.shared.errors import ProjectIndexError
 
@@ -82,7 +84,7 @@ def mcp_prompt_ids() -> list[str]:
 DESCRIBE_HINT = "describe で使用方法（使用できる配信元・種類・スキーマ）を確認してください"
 
 
-def _fields(value: Any) -> dict[str, Any]:  # noqa: ANN401
+def _fields(value: DataclassInstance) -> dict[str, Any]:
     """dataclass のフィールドを、JSON に出さない内部のフィールドを除いて辞書にする。"""
     return {
         item.name: getattr(value, item.name)
@@ -91,46 +93,75 @@ def _fields(value: Any) -> dict[str, Any]:  # noqa: ANN401
     }
 
 
-def _plain(value: Any) -> Any:  # noqa: ANN401, C901
+def _changes(value: ChangesResult) -> object:
+    """区間の端を `range` の下にまとめる。"""
+    data = _fields(value)
+    data["range"] = {"from": data.pop("range_from"), "to": data.pop("range_to")}
+    return _plain(data)
+
+
+def _related(value: RelatedItem) -> object:
+    """たどった関連を `via` の下にまとめる。"""
+    data = _fields(value)
+    data["via"] = {
+        "from": data.pop("via_from"),
+        "type": data.pop("via_type"),
+        "direction": data.pop("via_direction"),
+    }
+    return _plain(data)
+
+
+def _deleted(value: DeleteResult) -> object:
+    """参照を外した文書を `id`・`version` の辞書の並びにする。"""
+    data = _fields(value)
+    data["unlinked"] = [{"id": doc_id, "version": version} for doc_id, version in value.unlinked]
+    return _plain(data)
+
+
+def _contains(value: ContainsChange) -> object:
+    """区間の始点のキーを `from` にする。"""
+    data = _fields(value)
+    data["from"] = data.pop("from_")
+    return _plain(data)
+
+
+def _search_item(value: SearchItem) -> object:
+    """検索の結果の 1 件。返す行が無くても、切り出したことが分かるよう `ranges: []` を出す。"""
+    data = _plain(_fields(value))
+    if value.ranges is not None and is_dict(data):
+        data["ranges"] = [_plain(item) for item in value.ranges]
+    return data
+
+
+def _snippet_line(value: SnippetLine) -> object:
+    """空の行も `line`・`text`・`hit` を全て出す。"""
+    return {"line": value.line, "text": value.text, "hit": value.hit}
+
+
+# 形を変えて出す結果の型と、その変換
+_SHAPES: tuple[tuple[type[Any], Callable[[Any], object]], ...] = (
+    (ChangesResult, _changes),
+    (RelatedItem, _related),
+    (DeleteResult, _deleted),
+    (ContainsChange, _contains),
+    (SearchItem, _search_item),
+    (SnippetLine, _snippet_line),
+)
+
+
+def _plain(value: object) -> object:
     """結果を JSON にできる辞書・配列・文字列にする（`None` と空の値は落とす）。"""
-    if isinstance(value, ChangesResult):
-        data = _fields(value)
-        data["range"] = {"from": data.pop("range_from"), "to": data.pop("range_to")}
-        return _plain(data)
-    if isinstance(value, RelatedItem):
-        data = _fields(value)
-        data["via"] = {
-            "from": data.pop("via_from"),
-            "type": data.pop("via_type"),
-            "direction": data.pop("via_direction"),
-        }
-        return _plain(data)
-    if isinstance(value, DeleteResult):
-        data = _fields(value)
-        data["unlinked"] = [
-            {"id": doc_id, "version": version} for doc_id, version in value.unlinked
-        ]
-        return _plain(data)
-    if isinstance(value, ContainsChange):
-        data = _fields(value)
-        data["from"] = data.pop("from_")
-        return _plain(data)
-    if isinstance(value, SearchItem):
-        data = _plain(_fields(value))
-        if value.ranges is not None:
-            # 返す行が無くても、切り出したことが分かるよう `ranges: []` を出す
-            data["ranges"] = [_plain(item) for item in value.ranges]
-        return data
-    if isinstance(value, SnippetLine):
-        # 空の行も `line`・`text`・`hit` を全て出す
-        return {"line": value.line, "text": value.text, "hit": value.hit}
+    for kind, shape in _SHAPES:
+        if isinstance(value, kind):
+            return shape(value)
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         return _plain(_fields(value))
-    if isinstance(value, dict):
-        cleaned = {str(key): _plain(item) for key, item in value.items() if item is not None}
-        return {key: item for key, item in cleaned.items() if item not in ("", [], {})}
-    if isinstance(value, list | tuple):
-        return [_plain(item) for item in value]
+    if is_dict(value):
+        return _plain_dict(value)
+    if is_list(value) or isinstance(value, tuple):
+        # isinstance で絞った tuple は要素の型が Unknown になるため、object の並びとして読む
+        items = cast("Iterable[object]", value)
+        return [_plain(item) for item in items]
     if isinstance(value, datetime):
         return value.isoformat()
     if isinstance(value, Path):
@@ -138,10 +169,16 @@ def _plain(value: Any) -> Any:  # noqa: ANN401, C901
     return value
 
 
-def to_tool_result(
-    result: Any,  # noqa: ANN401
+def _plain_dict(value: dict[object, object]) -> dict[str, object]:
+    """辞書の値を再帰で直し、`None` と空の値（`""`・`[]`・`{}`）のキーを落とす。"""
+    cleaned = {str(key): _plain(item) for key, item in value.items() if item is not None}
+    return {key: item for key, item in cleaned.items() if item not in ("", [], {})}
+
+
+def to_tool_result[T](
+    result: T,
     fmt: Literal["markdown", "json"],
-    render: Callable[[Any], str] | None,
+    render: Callable[[T], str] | None,
 ) -> CallToolResult:
     """サービスの結果を `format` に合わせて MCP の `CallToolResult` にする。"""
     if fmt == "markdown" and render is not None:
@@ -151,7 +188,7 @@ def to_tool_result(
     return CallToolResult(content=[TextContent(type="text", text=text)], structured_content=data)
 
 
-def _yaml(value: dict[str, Any]) -> str:
+def _yaml(value: object) -> str:
     """辞書を YAML の文字列にする。"""
     yaml = YAML(typ="safe", pure=True)
     yaml.default_flow_style = False

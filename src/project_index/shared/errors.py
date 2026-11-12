@@ -1,5 +1,4 @@
 """索引のサーバーのエラーの階層。"""
-# pyright: reportUnknownVariableType=warning
 
 from __future__ import annotations
 
@@ -7,6 +6,8 @@ import dataclasses
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, ClassVar, Literal
+
+from project_index.shared.narrowing import is_dict, is_list
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -47,13 +48,13 @@ class ProjectIndexError(Exception):
         return result
 
 
-def _plain(value: Any) -> Any:  # noqa: ANN401
+def _plain(value: object) -> object:
     """違反と権限の dataclass を辞書に、パスを文字列にし、配列と辞書は中身を再帰で直す。"""
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         return dataclasses.asdict(value)
-    if isinstance(value, list):
+    if is_list(value):
         return [_plain(item) for item in value]
-    if isinstance(value, dict):
+    if is_dict(value):
         return {key: _plain(item) for key, item in value.items()}
     if isinstance(value, Path):
         return str(value)

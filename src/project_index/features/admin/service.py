@@ -1,5 +1,4 @@
 """管理の MCP の `status`・`reload`・`check_project`・`try_convert`・`write_nav` の中身。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
@@ -10,7 +9,7 @@ import os
 import tempfile
 from collections.abc import Mapping, MutableMapping
 from dataclasses import replace
-from datetime import date
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -70,11 +69,15 @@ from project_index.shared.errors import (
     Violation,
 )
 from project_index.shared.files import replace_file
+from project_index.shared.narrowing import is_dict
 from project_index.shared.paths import normalize_path
 from project_index.shared.version import RUNNING_VERSION
 from project_index.shared.yaml_io import YamlLoadError, dump_roundtrip, load_roundtrip, load_yaml
 
 if TYPE_CHECKING:
+    from project_index.features.convert.types import Converted
+    from project_index.features.documents.types import Document
+    from project_index.features.sources.types import DocumentTable
     from project_index.main import Handlers
 
 logger = logging.getLogger(__name__)
@@ -214,9 +217,7 @@ def _load_candidate(
         value = load_yaml(text, file=str(config_file))
     except YamlLoadError as error:
         raise ConfigParseError(message=str(error), line=error.line, column=error.column) from error
-    config_version = (
-        str(value["version"]) if isinstance(value, dict) and "version" in value else None
-    )
+    config_version = str(value["version"]) if is_dict(value) and "version" in value else None
     # 書く前の設定は、使い捨てのフォルダに書いて読む（相対パスは配信元のフォルダから解く）
     with tempfile.TemporaryDirectory() as directory:
         file = config_file
@@ -359,6 +360,39 @@ def _records_schema_violations(source: ServedSource) -> list[Violation]:
     return violations
 
 
+def _body_file_table(handlers: Handlers, target: Target, relative: str) -> DocumentTable | None:
+    """本文のファイルが `relative` の文書を持つ、最初の有効な文書の行を返す。"""
+    return next(
+        (
+            row
+            for row in target.source.config.documents
+            if row.enabled
+            and row.body_file is not None
+            and any(
+                document.body_path == relative
+                for document in handlers.store.load(target, kinds=[row.id]).documents
+            )
+        ),
+        None,
+    )
+
+
+def _convert_once(handlers: Handlers, target: Target, documents: list[Document]) -> list[Converted]:
+    """配信中の変換の控えを汚さないよう、使い捨てのフォルダを控えの場所にして変換する。"""
+    with tempfile.TemporaryDirectory() as directory:
+        converter = ConvertService(
+            Path(directory), handlers.store, handlers.terminal.script_timeout_sec
+        )
+        converted = [converter.convert(target, document) for document in documents]
+    for item in converted:
+        if item.failure is not None:
+            raise ConvertScriptError(
+                message=f"{item.failure.reason}: {item.failure.detail}",
+                script=item.failure.script or "",
+            )
+    return converted
+
+
 def try_convert(request: TryConvertRequest, *, handlers: Handlers) -> TryConvertResult:
     """指した配信元のファイルを、配信元の変換で Markdown にする。"""
     candidate = _load_candidate(
@@ -388,21 +422,8 @@ def try_convert(request: TryConvertRequest, *, handlers: Handlers) -> TryConvert
         missing=[request.file],
     )
     target = Target(source, candidate.root, None, None, "read")
-    if table is None:
-        # 当たる行が無ければ、本文のファイルが `file` の文書を持つ最初の行を引く
-        table = next(
-            (
-                row
-                for row in source.config.documents
-                if row.enabled
-                and row.body_file is not None
-                and any(
-                    document.body_path == relative
-                    for document in handlers.store.load(target, kinds=[row.id]).documents
-                )
-            ),
-            None,
-        )
+    # 当たる行が無ければ、本文のファイルが `file` の文書を持つ最初の行を引く
+    table = table or _body_file_table(handlers, target, relative)
     if table is None:
         raise not_matched
     # 変換を持たない種類は Markdown にしない
@@ -417,18 +438,7 @@ def try_convert(request: TryConvertRequest, *, handlers: Handlers) -> TryConvert
     ]
     if not documents:
         raise not_matched
-    # 配信中の変換の控えを汚さないよう、使い捨てのフォルダを控えの場所にして変換する
-    with tempfile.TemporaryDirectory() as directory:
-        converter = ConvertService(
-            Path(directory), handlers.store, handlers.terminal.script_timeout_sec
-        )
-        converted = [converter.convert(target, document) for document in documents]
-    for item in converted:
-        if item.failure is not None:
-            raise ConvertScriptError(
-                message=f"{item.failure.reason}: {item.failure.detail}",
-                script=item.failure.script or "",
-            )
+    converted = _convert_once(handlers, target, documents)
     return TryConvertResult(
         kind=table.id,
         converter=source.script("converters", table.converter).run[-1],
@@ -473,31 +483,17 @@ def _find_group(
     return items, found
 
 
-def _apply_nav_operation(nav: dict[str, Any], operation: NavOperation, index: int) -> None:  # noqa: C901
+def _apply_nav_operation(nav: dict[str, Any], operation: NavOperation, index: int) -> None:
     """`nav` の複製に操作 1 件を当てる。"""
     if operation.op in ("add", "update") and operation.value is None:
         raise _nav_invalid_argument(index, f"{operation.op} には value が要ります")
     tabs: list[MutableMapping[str, Any]] = nav.setdefault("tabs", [])
     value = copy.deepcopy(operation.value or {})
+    # item が無い操作はタブ、ある操作は group に当てる
     if operation.item is None:
-        if operation.op == "add":
-            if any(tab.get("title") == operation.tab for tab in tabs):
-                raise _nav_invalid_argument(index, f"タブ {operation.tab} は既にあります")
-            tabs.append(value)
-            return
-        tab = _find_tab(tabs, operation.tab, index)
-        if operation.op == "update":
-            tab.update(value)
-        else:
-            tabs.remove(tab)
+        _apply_tab_operation(tabs, operation, value, index)
         return
-    parent: list[Any] = _find_tab(tabs, operation.tab, index).setdefault("items", [])
-    group: MutableMapping[str, Any] | None = None
-    for name in operation.item.split(NAV_ITEM_SEPARATOR):
-        if group is not None:
-            parent = group.setdefault("items", [])
-        parent, group = _find_group(parent, name, index)
-    assert group is not None  # noqa: S101
+    parent, group = _nested_group(_find_tab(tabs, operation.tab, index), operation.item, index)
     if operation.op == "add":
         children: list[Any] = group.setdefault("items", [])
         if "group" in value and any(item.get("group") == value["group"] for item in children):
@@ -507,6 +503,41 @@ def _apply_nav_operation(nav: dict[str, Any], operation: NavOperation, index: in
         group.update(value)
     else:
         parent.remove(group)
+
+
+def _apply_tab_operation(
+    tabs: list[MutableMapping[str, Any]],
+    operation: NavOperation,
+    value: dict[str, Any],
+    index: int,
+) -> None:
+    """タブを追加・修正・削除する。"""
+    if operation.op == "add":
+        if any(tab.get("title") == operation.tab for tab in tabs):
+            raise _nav_invalid_argument(index, f"タブ {operation.tab} は既にあります")
+        tabs.append(value)
+        return
+    tab = _find_tab(tabs, operation.tab, index)
+    if operation.op == "update":
+        tab.update(value)
+    else:
+        tabs.remove(tab)
+
+
+def _nested_group(
+    tab: MutableMapping[str, Any], item: str, index: int
+) -> tuple[list[Any], MutableMapping[str, Any]]:
+    """`{group} > {group}` の名前の並びで入れ子の group をたどり、親の並びとその group を返す。"""
+    parent: list[Any] = tab.setdefault("items", [])
+    group: MutableMapping[str, Any] | None = None
+    for name in item.split(NAV_ITEM_SEPARATOR):
+        if group is not None:
+            parent = group.setdefault("items", [])
+        parent, group = _find_group(parent, name, index)
+    if group is None:
+        msg = "nav の項目が見つかりません"
+        raise RuntimeError(msg)
+    return parent, group
 
 
 def _overlaid_nav(handlers: Handlers, config_file: Path) -> Path | None:
@@ -609,7 +640,9 @@ def write_nav(request: WriteNavRequest, *, handlers: Handlers) -> WriteNavResult
             violations=nav_violations,
         )
     replace_file(config_file, text)
-    counts = nav_auto_counts(nav, documents, fields=fields, today=date.today())  # noqa: DTZ011
+    counts = nav_auto_counts(
+        nav, documents, fields=fields, today=datetime.now(UTC).astimezone().date()
+    )
     return WriteNavResult(
         path=str(config_file),
         nav=dump_roundtrip(CommentedMap(nav)),

@@ -1,52 +1,72 @@
 """内容の比較。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
 import difflib
 import unicodedata
-from collections.abc import Collection, Mapping
 from typing import TYPE_CHECKING, Any
 
 from project_index.features.search.filters import compile_regex, normalize
+from project_index.shared.narrowing import is_dict, is_list
 
 if TYPE_CHECKING:
+    from collections.abc import Collection, Mapping
+
     from project_index.features.changes.types import ContainsQuery
 
 MATCH_KEYS = ("id", "name")
 GAP_LINE = "…"
 
 
-def _match_key(items: list[Any]) -> str | None:
+def _match_key(items: list[object]) -> str | None:
     """要素を突き合わせるキー（全ての要素が持つ `id` か `name`）を返す。"""
-    if not items or not all(isinstance(item, Mapping) for item in items):
+    mappings = [item for item in items if is_dict(item)]
+    if not items or len(mappings) != len(items):
         return None
     for key in MATCH_KEYS:
-        values = [item.get(key) for item in items]
+        values = [item.get(key) for item in mappings]
         if all(value is not None for value in values) and len(set(map(str, values))) == len(values):
             return key
     return None
 
 
-def _walk(before: Any, after: Any, path: str, found: dict[str, tuple[Any, Any]]) -> None:  # noqa: ANN401
+def _walk(before: object, after: object, path: str, found: dict[str, tuple[Any, Any]]) -> None:
     """2 つの値を再帰で比べ、違うパスを `found` に入れる。"""
-    if isinstance(before, Mapping) and isinstance(after, Mapping):
-        keys = [*after, *(key for key in before if key not in after)]
-        for key in keys:
-            _walk(before.get(key), after.get(key), f"{path}.{key}" if path else str(key), found)
+    if is_dict(before) and is_dict(after):
+        _walk_dicts(before, after, path, found)
         return
-    if isinstance(before, list) and isinstance(after, list):
-        key = _match_key([*before, *after]) if before or after else None
-        # 前後のどちらかが空でも、残る側のキーで突き合わせられる
-        key = key or _match_key(before) or _match_key(after)
-        if key is not None:
-            by_before = {str(item[key]): item for item in before}
-            by_after = {str(item[key]): item for item in after}
-            for name in [*by_after, *(name for name in by_before if name not in by_after)]:
-                _walk(by_before.get(name), by_after.get(name), f"{path}[{name}]", found)
-            return
+    if is_list(before) and is_list(after) and _walk_lists(before, after, path, found):
+        return
     if before != after:
         found[path] = (before, after)
+
+
+def _walk_dicts(
+    before: dict[object, object],
+    after: dict[object, object],
+    path: str,
+    found: dict[str, tuple[Any, Any]],
+) -> None:
+    """2 つの辞書をキーごとに比べる（後のキーの順、前にだけあるキーは後ろ）。"""
+    keys = [*after, *(key for key in before if key not in after)]
+    for key in keys:
+        _walk(before.get(key), after.get(key), f"{path}.{key}" if path else str(key), found)
+
+
+def _walk_lists(
+    before: list[object], after: list[object], path: str, found: dict[str, tuple[Any, Any]]
+) -> bool:
+    """2 つの配列を要素のキーで突き合わせて比べる。突き合わせるキーが無ければ `False`。"""
+    key = _match_key([*before, *after]) if before or after else None
+    # 前後のどちらかが空でも、残る側のキーで突き合わせられる
+    key = key or _match_key(before) or _match_key(after)
+    if key is None:
+        return False
+    by_before = {str(item[key]): item for item in before if is_dict(item)}
+    by_after = {str(item[key]): item for item in after if is_dict(item)}
+    for name in [*by_after, *(name for name in by_before if name not in by_after)]:
+        _walk(by_before.get(name), by_after.get(name), f"{path}[{name}]", found)
+    return True
 
 
 def changed_keys(
