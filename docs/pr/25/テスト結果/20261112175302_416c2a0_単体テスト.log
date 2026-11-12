@@ -1,0 +1,20 @@
+$ uv run pytest tests/unit/project_index/shared/test_narrowing.py
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/chore-lint-remove-migrated-baseline
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 0 items / 1 error
+
+==================================== ERRORS ====================================
+______ ERROR collecting tests/unit/project_index/shared/test_narrowing.py ______
+ImportError while importing test module '/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/chore-lint-remove-migrated-baseline/tests/unit/project_index/shared/test_narrowing.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/shared/test_narrowing.py:6: in <module>
+    from project_index.shared.narrowing import is_dict, is_list
+E   ModuleNotFoundError: No module named 'project_index.shared.narrowing'
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/shared/test_narrowing.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+=============================== 1 error in 6.91s ===============================
