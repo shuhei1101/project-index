@@ -94,7 +94,7 @@ functions:
       type: list[Violation]
       description: 違反の並び。無ければ空
     process: |-
-      1. `SOURCE_SCHEMA` でスキーマの違反を全て集める（スキーマの違反）。スキーマの違反があれば、ここで返す
+      1. `SOURCE_SCHEMA` でスキーマの違反を全て集める（スキーマの違反）。スキーマは最上位に `paths_base`（文字列）を持つ。スキーマの違反があれば、ここで返す
       2. テーブル（`TABLE_KEYS`）ごとに `id` の重なりを確かめ、後の行の `{テーブル}[{n}].id` に違反を加える
       3. 行の参照を確かめる。`documents[].validators[]`・`documents[].converter`・`documents[].after_write[]` が、それぞれ `validators[]`・`converters[]`・`generators[]` に無い ID を指す場合、その要素のパスに `存在しない ID` の違反を加える
       4. `body_file` を `records` なしで書いた行は `documents[{n}].body_file` に違反を加える
@@ -403,7 +403,7 @@ functions:
       - name: test_load_source_when_paths_base_invalid
         case: 正常
         summary: paths の基準のフォルダが範囲の外
-        condition: '`paths_base` が `sub`（設定ファイルのフォルダの下）の行と、`../../../..`（リポジトリの直下より上）の行'
+        condition: '`paths_base` が `sub`（設定ファイルのフォルダの下。`sub` はある）の行と、`../../../..`（リポジトリの直下より上）の行'
         mock: なし（一時フォルダで `git init`）
         expected: どちらも `None` と `not_served`。違反のパスが `paths_base` で、理由はそれぞれ設定ファイルのフォルダかその上を指す必要があること・リポジトリの外を指していること
   - name: read_default_ref_config
@@ -720,6 +720,8 @@ functions:
     process: |-
       1. `SOURCE_SCHEMA` を読む（YAMLの読み込み）
       2. `json.dumps(値, ensure_ascii=False, indent=2)` に改行を 1 つ続けた文字列を返す
+
+      `SOURCE_SCHEMA` にキーを加えたときは、配布する `schemas/project-index.schema.json` をこの関数の出力で作り直す（`test_source_schema_json` が一致を確かめる）
     unit_tests:
       - name: test_source_schema_json
         case: 正常
