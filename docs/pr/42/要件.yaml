@@ -15,6 +15,9 @@ scope_out:
   - item: 参照先の別のファイル（common.schema.yaml など）の中で循環する `#/$defs/...` の参照の解決
     reason: 解かずに残した参照は最上位のスキーマの $defs を指す形になり、参照先を取り違える。#36 の事象とは別で、この作業 PR がマージされなくても同じ内容で成り立つため切り出した
     plan: '#44'
+  - item: tests/unit/project_index/features/describe/test_service.py の pyright の reportUnknownMemberType 2 件
+    reason: テスト実行方法の lint 層（pyright strict を全体に回す）から外れる既存の違反で、base ブランチでも出る。今回の要望に含まれない
+    plan: '#45'
 use_cases:
   - kind: single
     scenario: docs/scenario/SC-6.yaml
