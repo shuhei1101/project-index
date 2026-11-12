@@ -7,7 +7,15 @@ from tests.integration.server.conftest import FILES_SCHEMA_TEMPLATE
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-DESIGN_SCHEMA = "type: object\nproperties:\n  id:\n    type: string\n  title:\n    type: string\n"
+DESIGN_SCHEMA = (
+    "type: object\n"
+    "properties:\n"
+    "  id:\n"
+    "    type: string\n"
+    "  title:\n"
+    "    $ref: common.schema.yaml#/$defs/text\n"
+)
+COMMON_SCHEMA = "$defs:\n  text:\n    type: string\n"
 CONFIG = (
     "name: sample\n"
     "default_ref: main\n"
@@ -28,6 +36,7 @@ def main_files() -> dict[str, str]:
     return {
         "project-index.yaml": CONFIG,
         "schemas/design.schema.yaml": DESIGN_SCHEMA,
+        "schemas/common.schema.yaml": COMMON_SCHEMA,
         "schemas/files.schema.yaml": FILES_SCHEMA_TEMPLATE.read_text(encoding="utf-8"),
         "design/D-1.yaml": "id: D-1\nname: 設計 1\ndescription: 1 件目\ntags: [a]\ntitle: 最初\n",
         "design/D-2.yaml": "id: D-2\nname: 設計 2\ntitle: 2 件目\n",

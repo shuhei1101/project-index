@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from tests.integration.server.test_list_documents import main_files
@@ -34,16 +35,27 @@ CONVERT_PROMPT = (
 )
 
 
-def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]) -> None:
+def test_normal(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    commit_all: Callable[..., str],
+    run_git: Callable[..., str],
+) -> None:
     """文書の値・種類のスキーマ・メタデータを返す（正常系）。"""
-    # 準備
-    env = make_server(make_source("sample", main_files(), branch="main"))
+    # 準備（D-1 を変えた commit の後に、D-1 を変えない commit を積む）
+    source = make_source("sample", main_files(), branch="main")
+    commit_all(
+        source.folder, {"design/D-2.yaml": "id: D-2\nname: 設計 2\ntitle: 後\n"}, "docs: D-2"
+    )
+    changed_at = run_git(source.folder, "log", "-1", "--format=%cI", "--", "design/D-1.yaml")
+    env = make_server(source)
     # 実行
     response = env.client.get("/sources/sample/docs/design/D-1.yaml")
     # 検証
     body = response.json()
     assert response.status_code == 200
     assert body["value"]["title"] == "最初"
+    # `$ref` を解いた形
     assert body["schema"]["properties"]["title"] == {"type": "string"}
     assert body["metadata"]["id"] == "D-1"
     assert body["metadata"]["kind"] == "design"
@@ -53,7 +65,7 @@ def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]
     assert body["conversionError"] is None
     assert body["body"] is None
     assert body["bodyPath"] is None
-    assert body["updatedAt"]
+    assert datetime.fromisoformat(body["updatedAt"]) == datetime.fromisoformat(changed_at.strip())
 
 
 def test_normal_when_ref_given(
@@ -130,18 +142,25 @@ def test_normal_when_converter_kind(
 
 
 def test_error_when_not_found(
-    make_source: Callable[..., Any], make_server: Callable[..., Any]
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
 ) -> None:
-    """無い配信元・解決できないリビジョン・無い文書を断る（異常系）。"""
+    """無い配信元・配信していない配信元・解決できないリビジョン・無い文書を断る（異常系）。"""
     # 準備
-    env = make_server(make_source("sample", main_files(), branch="main"))
+    broken_config = "name: broken\ndocuments:\n  - id: sample\n"
+    broken = make_source("broken", sample_file_set(**{"project-index.yaml": broken_config}))
+    env = make_server(make_source("sample", main_files(), branch="main"), broken)
     # 実行
     unknown = env.client.get("/sources/unknown/docs/a.yaml")
+    not_served = env.client.get("/sources/broken/docs/a.yaml")
     no_ref = env.client.get(
         "/sources/sample/docs/design/D-1.yaml", params={"ref": "no-such-branch"}
     )
     no_doc = env.client.get("/sources/sample/docs/no/such.yaml")
     # 検証
     assert (unknown.status_code, unknown.json()["missing"]) == (404, "source")
+    assert (not_served.status_code, not_served.json()["missing"]) == (404, "not_served")
+    assert not_served.json()["errors"]
     assert (no_ref.status_code, no_ref.json()["missing"]) == (404, "ref")
     assert (no_doc.status_code, no_doc.json()["missing"]) == (404, "doc")
