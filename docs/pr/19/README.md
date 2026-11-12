@@ -1,0 +1,1 @@
+# リポジトリの直下の配信元の設定 dev-docs.yaml を project-index.yaml へ改名する
