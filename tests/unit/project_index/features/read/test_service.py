@@ -144,8 +144,22 @@ def test_get_source_config_when_diff(
 
 def test_get_source_config_when_schemas(make_view_env: Callable[..., SimpleNamespace]) -> None:
     """行ごとの種類のスキーマを返す（正常系）。"""
-    # 準備
-    env = make_view_env(SCHEMA_FILES, tables=SCHEMA_TABLES)
+    # 準備（起動時に読んだ種類のスキーマを持つ配信元）
+    env = make_view_env(
+        SCHEMA_FILES,
+        tables=SCHEMA_TABLES,
+        schemas={
+            "design": {
+                "type": "object",
+                "properties": {"title": {"$ref": "#/$defs/title"}},
+                "$defs": {"title": {"type": "string"}},
+            },
+            "files_guide": {
+                "type": "object",
+                "properties": {"files": {"type": "array", "items": {"required": ["path"]}}},
+            },
+        },
+    )
     target = _target(env)
     # 実行
     response = get_source_config(target, store=env.handlers.store, schemas=True)

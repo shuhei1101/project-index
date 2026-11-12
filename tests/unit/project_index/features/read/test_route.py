@@ -80,6 +80,7 @@ def test_build_read_router_when_queries(make_view_env: Callable[..., SimpleNames
                 records="terms",
             ),
         ],
+        schemas={"rules": {"type": "object"}, "terms": {"type": "object"}},
     )
     client = _client(env.handlers)
     # 実行
