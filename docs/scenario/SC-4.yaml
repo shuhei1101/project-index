@@ -1,547 +1,631 @@
 id: SC-4
 title: "起動する"
 scenarios:
-- name: 正常シナリオ
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`project-index serve` を子プロセスで起動する）
-  - name: サンプルの配信元
-    description: 文書の種類を 1 つ（スキーマと YAML 2 件）と `project-index.yaml` を持つ git リポジトリ
-    notes: id `sample`
-  - name: 読み取りだけの配信元
-    description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
-    notes: id `notes`
-  - name: 端末の設定
-    description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
-    notes: '`sources` に sample と notes の 2 行'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant DD as project-index
-      participant CF as 端末の設定・配信元の設定
+  - name: 正常シナリオ
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`project-index serve` を子プロセスで起動する）
+      - name: サンプルの配信元
+        description: 文書の種類を 1 つ（スキーマと YAML 2 件）と `project-index.yaml` を持つ git リポジトリ
+        notes: id `sample`
+      - name: 読み取りだけの配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
+        notes: id `notes`
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample と notes の 2 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
+        participant CF as 端末の設定・配信元の設定
 
-      U->>DD: project-index serve
-      DD->>CF: 端末の設定を読み、スキーマで検証する
-      loop sources の各行
-        DD->>CF: config の YAML を上から順に読んでマージする
-        DD->>DD: マージした設定をスキーマで検証し、検査・変換・生成のスクリプトを実行できるか確かめる
-        DD->>DD: 読み取り API と文書の MCP の配信元に加える
-      end
-      DD->>DD: 127.0.0.1:8786 で待ち受ける
-      DD-->>U: 待ち受けたアドレスと配信している配信元を標準出力に出す
-    ```
-  expected:
-  - '`127.0.0.1:8786` で待ち受け、`0.0.0.0` では待ち受けない'
-  - 読み取り API の sample の文書の取得と読み取り API の notes の文書の取得が 200 を返す
-  - '`/mcp` のツールが `search_docs`・`write_docs`・`delete_docs`・`describe`・`list_changes`・`trace_related`・`list_match_words` の 7 つ'
-  - '`/_admin/mcp` のツールが `status`・`reload`・`restart`・`update`・`check_project`・`try_convert`・`write_nav` の 7 つ'
-  - 標準出力に待ち受けたアドレスと、配信している配信元の id（sample・notes）が出る
-  test: test_normal
-- name: 正常シナリオ（設定の YAML を重ねる）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: サンプルの配信元
-    description: '`project-index.yaml` と、その環境だけの設定の YAML（`project-index.local.yaml`）を持つ git リポジトリ'
-    notes: 後の YAML が `description` を上書きし、`documents[]` に `id` が同じ行（`paths` を変える）と新しい行を 1 つずつ持つ
-  - name: 端末の設定
-    description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
-    notes: sample の `config` が `[project-index.yaml, project-index.local.yaml]` の順
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant DD as project-index
-      participant CF as 配信元の設定
+        U->>DD: project-index serve
+        DD->>CF: 端末の設定を読み、スキーマで検証する
+        loop sources の各行
+          DD->>CF: config の YAML を上から順に読んでマージする
+          DD->>DD: マージした設定をスキーマで検証し、検査・変換・生成のスクリプトを実行できるか確かめる
+          DD->>DD: 読み取り API と文書の MCP の配信元に加える
+        end
+        DD->>DD: 127.0.0.1:8786 で待ち受ける
+        DD-->>U: 待ち受けたアドレスと配信している配信元を標準出力に出す
+      ```
+    expected:
+      - '`127.0.0.1:8786` で待ち受け、`0.0.0.0` では待ち受けない'
+      - 読み取り API の sample の文書の取得と読み取り API の notes の文書の取得が 200 を返す
+      - '`/mcp` のツールが `search_docs`・`write_docs`・`delete_docs`・`describe`・`list_changes`・`trace_related`・`list_match_words` の 7 つ'
+      - '`/_admin/mcp` のツールが `status`・`reload`・`restart`・`update`・`check_project`・`try_convert`・`write_nav` の 7 つ'
+      - 標準出力に待ち受けたアドレスと、配信している配信元の id（sample・notes）が出る
+    test: test_normal
+  - name: 正常シナリオ（設定の YAML を重ねる）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: サンプルの配信元
+        description: '`project-index.yaml` と、その環境だけの設定の YAML（`project-index.local.yaml`）を持つ git リポジトリ'
+        notes: 後の YAML が `description` を上書きし、`documents[]` に `id` が同じ行（`paths` を変える）と新しい行を 1 つずつ持つ
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: sample の `config` が `[project-index.yaml, project-index.local.yaml]` の順
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
+        participant CF as 配信元の設定
 
-      U->>DD: project-index serve
-      DD->>CF: project-index.yaml を読む
-      DD->>CF: project-index.local.yaml を読み、同じキーを上書きし、documents を id で行ごとに上書き・追加する
-      DD->>DD: マージした設定をスキーマで検証する
-      DD-->>U: sample を配信する
-    ```
-  expected:
-  - '`describe(source: sample)` の説明が後の YAML の `description` になる'
-  - '`id` が同じ `documents[]` の行は後の YAML の `paths` の文書を返し、前の YAML だけにある `paths` の文書は返さない'
-  - 後の YAML で追加した `documents[]` の行の文書を `search_docs` が返す
-  test: test_normal_when_configs_merged
-- name: 正常シナリオ（設定のバージョンが古い）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: 古い配信元
-    description: '`version` がサーバーが読めるバージョンより古い `project-index.yaml` を持つ配信元'
-    notes: id `old`。マージした設定は今のスキーマを満たす
-  - name: 端末の設定
-    description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
-    notes: '`sources` に old の 1 行'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant DD as project-index
+        U->>DD: project-index serve
+        DD->>CF: project-index.yaml を読む
+        DD->>CF: project-index.local.yaml を読み、同じキーを上書きし、documents を id で行ごとに上書き・追加する
+        DD->>DD: マージした設定をスキーマで検証する
+        DD-->>U: sample を配信する
+      ```
+    expected:
+      - '`describe(source: sample)` の説明が後の YAML の `description` になる'
+      - '`id` が同じ `documents[]` の行は後の YAML の `paths` の文書を返し、前の YAML だけにある `paths` の文書は返さない'
+      - 後の YAML で追加した `documents[]` の行の文書を `search_docs` が返す
+    test: test_normal_when_configs_merged
+  - name: 正常シナリオ（設定のバージョンが古い）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 古い配信元
+        description: '`version` がサーバーが読めるバージョンより古い `project-index.yaml` を持つ配信元'
+        notes: id `old`。マージした設定は今のスキーマを満たす
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に old の 1 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
 
-      U->>DD: project-index serve
-      DD->>DD: old の設定の version をサーバーが読めるバージョンと比べる
-      DD->>DD: 古い設定の配信元として状態に持つ
-      DD-->>U: old を配信する
-    ```
-  expected:
-  - 読み取り API の old の文書の取得が 200 を返す
-  - 警告のログに old の id・設定のバージョン・サーバーが読めるバージョンが残る
-  test: test_normal_when_config_version_old
-  notes:
-    知らせる経路: '古い設定の配信元は、管理の MCP の `check_project` と、『エージェントが調べる』の正常シナリオ（instructions の調査の案内を受け取る）の引数なしの `describe()` の警告でも知らせる。'
-- name: 異常シナリオ（設定の検証に失敗する）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: サンプルの配信元
-    description: 検証に通る配信元
-    notes: id `sample`
-  - name: 壊れた配信元
-    description: '`project-index.yaml` がスキーマに違反する配信元'
-    notes: id `broken`。`documents[]` の必須のキー `paths` が無い
-  - name: 端末の設定
-    description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
-    notes: '`sources` に sample と broken の 2 行'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant DD as project-index
+        U->>DD: project-index serve
+        DD->>DD: old の設定の version をサーバーが読めるバージョンと比べる
+        DD->>DD: 古い設定の配信元として状態に持つ
+        DD-->>U: old を配信する
+      ```
+    expected:
+      - 読み取り API の old の文書の取得が 200 を返す
+      - 警告のログに old の id・設定のバージョン・サーバーが読めるバージョンが残る
+    test: test_normal_when_config_version_old
+    notes:
+      知らせる経路: '古い設定の配信元は、管理の MCP の `check_project` と、『エージェントが調べる』の正常シナリオ（instructions の調査の案内を受け取る）の引数なしの `describe()` の警告でも知らせる。'
+  - name: 異常シナリオ（設定の検証に失敗する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: サンプルの配信元
+        description: 検証に通る配信元
+        notes: id `sample`
+      - name: 壊れた配信元
+        description: '`project-index.yaml` がスキーマに違反する配信元'
+        notes: id `broken`。`documents[]` の必須のキー `paths` が無い
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample と broken の 2 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
 
-      U->>DD: project-index serve
-      DD->>DD: sample の設定を検証して配信元に加える
-      DD->>DD: broken の設定の検証に失敗する
-      DD->>DD: broken を配信せず、エラーログに残す
-      DD-->>U: sample だけを配信する
-    ```
-  expected:
-  - 読み取り API の broken の文書の取得が 404 を返し、読み取り API の sample の文書の取得と `/mcp` は応答する
-  - 'エラーログに `broken: documents[0].paths: 必須のキーが無い` の形で、配信元の id・違反したキーのパス・理由が残る'
-  - '`/_admin/mcp` に MCP のセッションを張れる'
-  test: test_error_when_source_config_invalid
-- name: 異常シナリオ（スクリプトを実行できない）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: サンプルの配信元
-    description: 検証に通る配信元
-    notes: id `sample`
-  - name: スクリプトの無い配信元
-    description: '`converters[]` が無いファイルを指す配信元'
-    notes: id `noscript`
-  - name: 端末の設定
-    description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
-    notes: '`sources` に sample と noscript の 2 行'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant DD as project-index
+        U->>DD: project-index serve
+        DD->>DD: sample の設定を検証して配信元に加える
+        DD->>DD: broken の設定の検証に失敗する
+        DD->>DD: broken を配信せず、エラーログに残す
+        DD-->>U: sample だけを配信する
+      ```
+    expected:
+      - 読み取り API の broken の文書の取得が 404 を返し、読み取り API の sample の文書の取得と `/mcp` は応答する
+      - 'エラーログに `broken: documents[0].paths: 必須のキーが無い` の形で、配信元の id・違反したキーのパス・理由が残る'
+      - '`/_admin/mcp` に MCP のセッションを張れる'
+    test: test_error_when_source_config_invalid
+  - name: 異常シナリオ（スクリプトを実行できない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: サンプルの配信元
+        description: 検証に通る配信元
+        notes: id `sample`
+      - name: スクリプトの無い配信元
+        description: '`converters[]` が無いファイルを指す配信元'
+        notes: id `noscript`
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample と noscript の 2 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
 
-      U->>DD: project-index serve
-      DD->>DD: noscript の converters のスクリプトを実行できるか確かめ、失敗する
-      DD->>DD: noscript を配信せず、エラーログに残す
-      DD-->>U: sample だけを配信する
-    ```
-  expected:
-  - 読み取り API の noscript の文書の取得が 404 を返し、読み取り API の sample の文書の取得は応答する
-  - エラーログに noscript の id・`converters[0]` のキーのパス・スクリプトが見つからない理由が残る
-  test: test_error_when_script_not_executable
-- name: 異常シナリオ（端末の設定がスキーマに違反する）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: 端末の設定
-    description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
-    notes: '`sources[0]` に必須のキー `config` が無く、`port` が整数でない'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant DD as project-index
+        U->>DD: project-index serve
+        DD->>DD: noscript の converters のスクリプトを実行できるか確かめ、失敗する
+        DD->>DD: noscript を配信せず、エラーログに残す
+        DD-->>U: sample だけを配信する
+      ```
+    expected:
+      - 読み取り API の noscript の文書の取得が 404 を返し、読み取り API の sample の文書の取得は応答する
+      - エラーログに noscript の id・`converters[0]` のキーのパス・スクリプトが見つからない理由が残る
+    test: test_error_when_script_not_executable
+  - name: 異常シナリオ（端末の設定がスキーマに違反する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources[0]` に必須のキー `config` が無く、`port` が整数でない'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
 
-      U->>DD: project-index serve
-      DD->>DD: 端末の設定の検証に失敗する
-      DD-->>U: 違反を標準エラーに出して終わる
-    ```
-  expected:
-  - プロセスが 0 以外の終了コードで終わり、ポートを待ち受けない
-  - '標準エラーに `{ファイル}: sources[0].config: 必須のキーが無い` の形で違反が全て並ぶ'
-  test: test_error_when_terminal_config_invalid
-- name: 異常シナリオ（ポートが使用中）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: 使用中のポート
-    description: テストが先に待ち受けたポート
-    notes: '`PROJECT_INDEX_PORT` にそのポートを入れる'
-  - name: 端末の設定
-    description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
-    notes: '`sources` に検証に通る 1 行'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant DD as project-index
+        U->>DD: project-index serve
+        DD->>DD: 端末の設定の検証に失敗する
+        DD-->>U: 違反を標準エラーに出して終わる
+      ```
+    expected:
+      - プロセスが 0 以外の終了コードで終わり、ポートを待ち受けない
+      - '標準エラーに `{ファイル}: sources[0].config: 必須のキーが無い` の形で違反が全て並ぶ'
+    test: test_error_when_terminal_config_invalid
+  - name: 異常シナリオ（ポートが使用中）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 使用中のポート
+        description: テストが先に待ち受けたポート
+        notes: '`PROJECT_INDEX_PORT` にそのポートを入れる'
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に検証に通る 1 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
 
-      U->>DD: project-index serve
-      DD->>DD: ポートで待ち受けられない
-      DD-->>U: ポートと PROJECT_INDEX_PORT を標準エラーに出して終わる
-    ```
-  expected:
-  - プロセスが 0 以外の終了コードで終わる
-  - 標準エラーに使用中のポートの番号と、`PROJECT_INDEX_PORT` で変えられることが出る
-  test: test_error_when_port_in_use
-- name: 正常シナリオ（文書のメタデータと管理用の YAML がずれている）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-    notes: '-'
-  - name: 列の欠けた文書
-    description: '配信元 sample の文書の行 `rules` が `metadata: {name: title}` を持ち、2 件のうち 1 件に `title` が無い'
-    notes: '`metadata` に書いていないキー（同じ名前の列）の欠けは数えない'
-  - name: ずれた管理用の YAML
-    description: 'sample の `src/files.yaml` が `a.py` と `c.py` の 2 行を持ち、`src/` には `a.py` と `d.py` を置く。行 `src` は `records: files`・`body_file: path`。`a.py` の行は `related: [{to: src/z.py, type: tests}]` を持つ'
-    notes: '`c.py` はファイルが無い行、`d.py` は索引に無いファイル、`src/z.py` はどの文書の ID にも当たらない関連先'
-  - name: 端末の設定
-    description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
-    notes: '`sources` に sample の 1 行'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant DD as project-index
-      participant ST as 配信元の文書
+        U->>DD: project-index serve
+        DD->>DD: ポートで待ち受けられない
+        DD-->>U: ポートと PROJECT_INDEX_PORT を標準エラーに出して終わる
+      ```
+    expected:
+      - プロセスが 0 以外の終了コードで終わる
+      - 標準エラーに使用中のポートの番号と、`PROJECT_INDEX_PORT` で変えられることが出る
+    test: test_error_when_port_in_use
+  - name: 正常シナリオ（文書のメタデータと管理用の YAML がずれている）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: 列の欠けた文書
+        description: '配信元 sample の文書の行 `rules` が `metadata: {name: title}` を持ち、2 件のうち 1 件に `title` が無い'
+        notes: '`metadata` に書いていないキー（同じ名前の列）の欠けは数えない'
+      - name: ずれた管理用の YAML
+        description: 'sample の `src/files.yaml` が `a.py` と `c.py` の 2 行を持ち、`src/` には `a.py` と `d.py` を置く。行 `src` は `records: files`・`body_file: path`。`a.py` の行は `related: [{to: src/z.py, type: tests}]` を持つ'
+        notes: '`c.py` はファイルが無い行、`d.py` は索引に無いファイル、`src/z.py` はどの文書の ID にも当たらない関連先'
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample の 1 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
+        participant ST as 配信元の文書
 
-      U->>DD: project-index serve
-      DD->>DD: sample の設定を検証して配信元に加える
-      DD->>ST: 文書を読む
-      DD->>DD: metadata に書いた列が無い文書を数える
-      DD->>DD: 管理用の YAML のフォルダの配下で files に無いファイルを数え、読み込みの missing_body_file を数える
-      DD->>DD: 全ての文書の ID の集合を 1 回作り、related の to が集合に無い行を数える
-      DD->>DD: 件数を警告のログに残す（配信元の状態には持たない）
-      DD-->>U: sample を配信する
-    ```
-  expected:
-  - 読み取り API の sample の文書の取得が 200 を返す
-  - 警告のログに sample の id と、行 `rules` の `metadata` の列の欠け 1 件（`name` の `title`）が残る
-  - 警告のログに行 `src` の索引に無いファイル 1 件（`src/d.py`）とファイルが無い行 1 件（`c.py`）が残る
-  - '警告のログにどの文書にも該当しない関連 1 件（`src: src/a.py: src/z.py`）が残る'
-  - '`search_docs` が `title` の無い文書も返し、その `name` はファイル名から拡張子を除いた名前になる'
-  test: test_normal_when_metadata_out_of_sync
-- name: 正常シナリオ（SessionStart で起動する）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。Claude Code は `claude -p` で動かす）
-  - name: Claude Code の設定の場所
-    description: '`CLAUDE_CONFIG_DIR` が指すテスト用の一時フォルダ。プラグイン `project-index` をユーザースコープに入れ、env の `PROJECT_INDEX_CONFIG` が端末の設定を指す'
-  - name: 端末の設定
-    description: '`clone` がテスト用のクローン、`sources` に sample（読み書き）と notes（読み取りだけ）の 2 行'
-    notes: project-index は待ち受けていない。ポート 8786 が空き
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant CC as Claude Code
-      participant HK as SessionStart のフック
-      participant DD as project-index
+        U->>DD: project-index serve
+        DD->>DD: sample の設定を検証して配信元に加える
+        DD->>ST: 文書を読む
+        DD->>DD: metadata に書いた列が無い文書を数える
+        DD->>DD: 管理用の YAML のフォルダの配下で files に無いファイルを数え、読み込みの missing_body_file を数える
+        DD->>DD: 全ての文書の ID の集合を 1 回作り、related の to が集合に無い行を数える
+        DD->>DD: 件数を警告のログに残す（配信元の状態には持たない）
+        DD-->>U: sample を配信する
+      ```
+    expected:
+      - 読み取り API の sample の文書の取得が 200 を返す
+      - 警告のログに sample の id と、行 `rules` の `metadata` の列の欠け 1 件（`name` の `title`）が残る
+      - 警告のログに行 `src` の索引に無いファイル 1 件（`src/d.py`）とファイルが無い行 1 件（`c.py`）が残る
+      - '警告のログにどの文書にも該当しない関連 1 件（`src: src/a.py: src/z.py`）が残る'
+      - '`search_docs` が `title` の無い文書も返し、その `name` はファイル名から拡張子を除いた名前になる'
+    test: test_normal_when_metadata_out_of_sync
+  - name: 正常シナリオ（SessionStart で起動する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かす）
+      - name: Claude Code の設定の場所
+        description: '`CLAUDE_CONFIG_DIR` が指すテスト用の一時フォルダ。プラグイン `project-index` をユーザースコープに入れ、env の `PROJECT_INDEX_CONFIG` が端末の設定を指す'
+      - name: 端末の設定
+        description: '`clone` がテスト用のクローン、`sources` に sample（読み書き）と notes（読み取りだけ）の 2 行'
+        notes: project-index は待ち受けていない。ポート 8786 が空き
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant CC as Claude Code
+        participant HK as SessionStart のフック
+        participant DD as project-index
 
-      U->>CC: sample のワークツリーでセッションを始める
-      CC->>HK: SessionStart
-      HK->>DD: ポートにつながるか確かめる（つながらない）
-      HK->>DD: 端末の設定の clone で project-index serve を切り離して起動する
-      HK-->>CC: 待たずに戻り、/mcp の再接続の案内を文脈に追加する
-      U->>CC: /mcp でつなぎ直す
-      CC->>DD: /mcp のツールの一覧を取る
-    ```
-  expected:
-  - フックが 0 の終了コードで戻り、セッションの文脈に `/mcp` の再接続の案内が入る
-  - '`127.0.0.1:8786` を待ち受ける project-index のプロセスが 1 つだけあり、セッションを終えても残る'
-  - つなぎ直した後、`/mcp` のツールが 7 つ返る
-  test: test_normal_when_started_by_session_start
-- name: 正常シナリオ（SessionStart で XDG_CONFIG_HOME の下の端末の設定から起動する）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。Claude Code は `claude -p` で動かす）
-  - name: Claude Code の設定の場所
-    description: '`CLAUDE_CONFIG_DIR` が指すテスト用の一時フォルダ。プラグイン `project-index` をユーザースコープに入れ、env に `PROJECT_INDEX_CONFIG` が無い'
-    notes: '`claude -p` を動かす環境の `XDG_CONFIG_HOME` にテスト用の一時フォルダを入れる'
-  - name: 端末の設定
-    description: '`$XDG_CONFIG_HOME/project-index/settings.yaml`。`clone` がテスト用のクローン、`sources` に sample の 1 行'
-    notes: project-index は待ち受けていない。ポート 8786 が空き
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant CC as Claude Code
-      participant HK as SessionStart のフック
-      participant DD as project-index
+        U->>CC: sample のワークツリーでセッションを始める
+        CC->>HK: SessionStart
+        HK->>DD: ポートにつながるか確かめる（つながらない）
+        HK->>DD: 端末の設定の clone で project-index serve を切り離して起動する
+        HK-->>CC: 待たずに戻り、/mcp の再接続の案内を文脈に追加する
+        U->>CC: /mcp でつなぎ直す
+        CC->>DD: /mcp のツールの一覧を取る
+      ```
+    expected:
+      - フックが 0 の終了コードで戻り、セッションの文脈に `/mcp` の再接続の案内が入る
+      - '`127.0.0.1:8786` を待ち受ける project-index のプロセスが 1 つだけあり、セッションを終えても残る'
+      - つなぎ直した後、`/mcp` のツールが 7 つ返る
+    test: test_normal_when_started_by_session_start
+  - name: 正常シナリオ（SessionStart で XDG_CONFIG_HOME の下の端末の設定から起動する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かす）
+      - name: Claude Code の設定の場所
+        description: '`CLAUDE_CONFIG_DIR` が指すテスト用の一時フォルダ。プラグイン `project-index` をユーザースコープに入れ、env に `PROJECT_INDEX_CONFIG` が無い'
+        notes: '`claude -p` を動かす環境の `XDG_CONFIG_HOME` にテスト用の一時フォルダを入れる'
+      - name: 端末の設定
+        description: '`$XDG_CONFIG_HOME/project-index/settings.yaml`。`clone` がテスト用のクローン、`sources` に sample の 1 行'
+        notes: project-index は待ち受けていない。ポート 8786 が空き
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant CC as Claude Code
+        participant HK as SessionStart のフック
+        participant DD as project-index
 
-      U->>CC: sample のワークツリーでセッションを始める
-      CC->>HK: SessionStart
-      HK->>DD: ポートにつながるか確かめる（つながらない）
-      HK->>HK: $XDG_CONFIG_HOME/project-index/settings.yaml の clone を読む
-      HK->>DD: clone で project-index serve を切り離して起動する
-      HK-->>CC: 待たずに戻り、/mcp の再接続の案内を文脈に追加する
-      U->>CC: /mcp でつなぎ直す
-      CC->>DD: /mcp のツールの一覧を取る
-    ```
-  expected:
-  - フックが 0 の終了コードで戻り、セッションの文脈に `/mcp` の再接続の案内が入る
-  - '`127.0.0.1:8786` を待ち受ける project-index のプロセスが 1 つだけあり、端末の設定の `clone` のクローンから起動している'
-  - つなぎ直した後、`/mcp` のツールが 7 つ返る
-  test: test_normal_when_started_by_session_start_with_xdg_config_home
-- name: 正常シナリオ（待ち受けているサーバーがあるときは文脈を注入しない）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。Claude Code は `claude -p` で動かす）
-  - name: project-index
-    description: SessionStart で起動する正常シナリオと同じ端末の設定で待ち受けている project-index
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant CC as Claude Code
-      participant HK as SessionStart のフック
-      participant DD as project-index
+        U->>CC: sample のワークツリーでセッションを始める
+        CC->>HK: SessionStart
+        HK->>DD: ポートにつながるか確かめる（つながらない）
+        HK->>HK: $XDG_CONFIG_HOME/project-index/settings.yaml の clone を読む
+        HK->>DD: clone で project-index serve を切り離して起動する
+        HK-->>CC: 待たずに戻り、/mcp の再接続の案内を文脈に追加する
+        U->>CC: /mcp でつなぎ直す
+        CC->>DD: /mcp のツールの一覧を取る
+      ```
+    expected:
+      - フックが 0 の終了コードで戻り、セッションの文脈に `/mcp` の再接続の案内が入る
+      - '`127.0.0.1:8786` を待ち受ける project-index のプロセスが 1 つだけあり、端末の設定の `clone` のクローンから起動している'
+      - つなぎ直した後、`/mcp` のツールが 7 つ返る
+    test: test_normal_when_started_by_session_start_with_xdg_config_home
+  - name: 正常シナリオ（待ち受けているサーバーがあるときは文脈を注入しない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かす）
+      - name: project-index
+        description: SessionStart で起動する正常シナリオと同じ端末の設定で待ち受けている project-index
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant CC as Claude Code
+        participant HK as SessionStart のフック
+        participant DD as project-index
 
-      U->>CC: sample のワークツリーでセッションを始める
-      CC->>HK: SessionStart
-      HK->>DD: ポートにつながる
-      HK-->>CC: 文脈を追加せずに戻る
-      CC->>DD: /mcp につながる
-    ```
-  expected:
-  - フックが 0 の終了コードで戻り、セッションの文脈に project-index の配信元の一覧・使い方・警告・再接続の案内が入らない
-  - project-index のプロセスは増えない
-  test: test_normal_when_listening_server_not_injected
-- name: 異常シナリオ（SessionStart で起動できない）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。Claude Code は `claude -p` で動かす）
-  - name: Claude Code の設定の場所
-    description: env の `PROJECT_INDEX_CONFIG` が無いファイルを指す
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant CC as Claude Code
-      participant HK as SessionStart のフック
+        U->>CC: sample のワークツリーでセッションを始める
+        CC->>HK: SessionStart
+        HK->>DD: ポートにつながる
+        HK-->>CC: 文脈を追加せずに戻る
+        CC->>DD: /mcp につながる
+      ```
+    expected:
+      - フックが 0 の終了コードで戻り、セッションの文脈に project-index の配信元の一覧・使い方・警告・再接続の案内が入らない
+      - project-index のプロセスは増えない
+    test: test_normal_when_listening_server_not_injected
+  - name: 異常シナリオ（SessionStart で起動できない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かす）
+      - name: Claude Code の設定の場所
+        description: env の `PROJECT_INDEX_CONFIG` が無いファイルを指す
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant CC as Claude Code
+        participant HK as SessionStart のフック
 
-      U->>CC: セッションを始める
-      CC->>HK: SessionStart
-      HK->>HK: ポートにつながらず、端末の設定を読めない
-      HK-->>CC: 0 の終了コードで戻り、理由と /project-index:global-setup の案内を文脈に追加する
-    ```
-  expected:
-  - フックが 0 の終了コードで戻り、セッションは続く
-  - セッションの文脈に、端末の設定を読めなかった理由と `/project-index:global-setup` の案内が入る
-  - project-index のプロセスは起動しない
-  test: test_error_when_session_start_cannot_start
-- name: 異常シナリオ（配信元の設定が前の形式）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-    notes: '-'
-  - name: サンプルの配信元
-    description: 検証に通る配信元
-    notes: id `sample`
-  - name: 前の形式の配信元
-    description: '`version: "1"` の `project-index.yaml` を持ち、最上位にタグのマスター `tags: tags.yaml` を持ち、`documents[0]` が `paths`・`schema`・`type: markdown`、`documents[1]` が `paths`・`schema`・`type: yaml`・`metadata: {name: {type: ref, field: title}}`・`defaults: [{paths: [docs/**], tags: [doc]}]` を持つ配信元'
-    notes: id `legacy`。`tags.yaml` は置く。違反は `tags`・`type`・`defaults`・オブジェクトの `metadata` だけになる
-  - name: 端末の設定
-    description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
-    notes: '`sources` に sample と legacy の 2 行'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant DD as project-index
+        U->>CC: セッションを始める
+        CC->>HK: SessionStart
+        HK->>HK: ポートにつながらず、端末の設定を読めない
+        HK-->>CC: 0 の終了コードで戻り、理由と /project-index:global-setup の案内を文脈に追加する
+      ```
+    expected:
+      - フックが 0 の終了コードで戻り、セッションは続く
+      - セッションの文脈に、端末の設定を読めなかった理由と `/project-index:global-setup` の案内が入る
+      - project-index のプロセスは起動しない
+    test: test_error_when_session_start_cannot_start
+  - name: 異常シナリオ（配信元の設定が前の形式）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: サンプルの配信元
+        description: 検証に通る配信元
+        notes: id `sample`
+      - name: 前の形式の配信元
+        description: '`version: "1"` の `project-index.yaml` を持ち、最上位にタグのマスター `tags: tags.yaml` を持ち、`documents[0]` が `paths`・`schema`・`type: markdown`、`documents[1]` が `paths`・`schema`・`type: yaml`・`metadata: {name: {type: ref, field: title}}`・`defaults: [{paths: [docs/**], tags: [doc]}]` を持つ配信元'
+        notes: id `legacy`。`tags.yaml` は置く。違反は `tags`・`type`・`defaults`・オブジェクトの `metadata` だけになる
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample と legacy の 2 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
 
-      U->>DD: project-index serve
-      DD->>DD: sample の設定を検証して配信元に加える
-      DD->>DD: legacy の設定が tags・type・defaults・オブジェクトの metadata で検証に失敗する
-      DD->>DD: legacy を配信せず、違反と設定のバージョンが古いことをエラーログに残す
-      DD-->>U: sample だけを配信する
-    ```
-  expected:
-  - 読み取り API の legacy の文書の取得が 404 を返し、読み取り API の sample の文書の取得は応答する
-  - エラーログに legacy の id と、`tags`・`documents[0].type`・`documents[1].type`・`documents[1].defaults`・`documents[1].metadata.name` のそれぞれの違反が残る
-  - エラーログに、legacy の設定のバージョンが古く `project-index migrate --source` で移し替えられることが残る
-  test: test_error_when_source_config_legacy
-- name: 正常シナリオ（設定とスキーマを default_ref から読む）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: default_ref のブランチ
-    description: sample の `develop` ブランチに、文書の種類 `kind_a` を加えた `project-index.yaml` とそのスキーマを commit する
-    notes: '`project-index.yaml` の `default_ref` は `develop`。クローン本体は `master` を checkout したままで、`master` の `project-index.yaml` は `kind_a` を持たない'
-  - name: 端末の設定
-    description: '`sources[].config` が sample のクローン本体の `project-index.yaml` を指す'
-  - name: ワークツリー
-    description: sample の `.claude/worktrees/develop`（`develop` を checkout）
-    notes: 配信元の設定の `worktrees` は既定（`[./.claude/worktrees/*]`）
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant S as project-index のサーバー
-      participant G as sample のリポジトリ
+        U->>DD: project-index serve
+        DD->>DD: sample の設定を検証して配信元に加える
+        DD->>DD: legacy の設定が tags・type・defaults・オブジェクトの metadata で検証に失敗する
+        DD->>DD: legacy を配信せず、違反と設定のバージョンが古いことをエラーログに残す
+        DD-->>U: sample だけを配信する
+      ```
+    expected:
+      - 読み取り API の legacy の文書の取得が 404 を返し、読み取り API の sample の文書の取得は応答する
+      - エラーログに legacy の id と、`tags`・`documents[0].type`・`documents[1].type`・`documents[1].defaults`・`documents[1].metadata.name` のそれぞれの違反が残る
+      - エラーログに、legacy の設定のバージョンが古く `project-index migrate --source` で移し替えられることが残る
+    test: test_error_when_source_config_legacy
+  - name: 正常シナリオ（設定とスキーマを default_ref から読む）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: default_ref のブランチ
+        description: sample の `develop` ブランチに、文書の種類 `kind_a` を加えた `project-index.yaml` とそのスキーマを commit する
+        notes: '`project-index.yaml` の `default_ref` は `develop`。クローン本体は `master` を checkout したままで、`master` の `project-index.yaml` は `kind_a` を持たない'
+      - name: 端末の設定
+        description: '`sources[].config` が sample のクローン本体の `project-index.yaml` を指す'
+      - name: ワークツリー
+        description: sample の `.claude/worktrees/develop`（`develop` を checkout）
+        notes: 配信元の設定の `worktrees` は既定（`[./.claude/worktrees/*]`）
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant S as project-index のサーバー
+        participant G as sample のリポジトリ
 
-      U->>S: 起動する
-      S->>G: ディスクの project-index.yaml の default_ref を読む
-      S->>G: develop の project-index.yaml とスキーマを読む
-      S->>S: develop の設定で配信元を組み立てる
-      S-->>U: 配信を始める
-      U->>G: develop に文書の種類 kind_b を commit する
-      U->>S: describe(source: sample)
-      S->>G: default_ref の commit を確かめ、変わっていれば組み立て直す
-      S-->>U: 種類の一覧（kind_a・kind_b を含む）
-    ```
-  expected:
-  - 'クローン本体が `master` のままでも、起動直後の `describe(source: sample)` の種類の一覧に `kind_a` が載る'
-  - '`documents[].schema` のスキーマを `develop` から読む'
-  - '`develop` に `kind_b` を commit した後の `describe(source: sample)` で、`reload` をしなくても種類の一覧に `kind_a`・`kind_b` が載る'
-  - '`worktrees[]` の相対パスをメインのリポジトリの直下から数え、ワークツリー `.claude/worktrees/develop` に当たる'
-  - Git でない配信元はディスクの設定を読む
-  test: test_normal_when_config_read_from_default_ref
-- name: 正常シナリオ（.gitignore した設定を先頭に置く）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: default_ref のブランチ
-    description: sample の `develop` ブランチに、文書の種類 `kind_a` のスキーマを commit する
-    notes: クローン本体は `master` を checkout したままで、`master` は `kind_a` のスキーマを持たない
-  - name: Git 管理外の設定
-    description: sample のクローン本体の直下に `.gitignore` した `project-index.local.yaml` を置く
-    notes: '`default_ref: develop` と、`kind_a` の `documents[]` の行を持つ。どのブランチにも commit しない'
-  - name: 端末の設定
-    description: '`sources[].config` が `project-index.local.yaml` の 1 つだけを指す'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant S as project-index のサーバー
-      participant G as sample のリポジトリ
+        U->>S: 起動する
+        S->>G: ディスクの project-index.yaml の default_ref を読む
+        S->>G: develop の project-index.yaml とスキーマを読む
+        S->>S: develop の設定で配信元を組み立てる
+        S-->>U: 配信を始める
+        U->>G: develop に文書の種類 kind_b を commit する
+        U->>S: describe(source: sample)
+        S->>G: default_ref の commit を確かめ、変わっていれば組み立て直す
+        S-->>U: 種類の一覧（kind_a・kind_b を含む）
+      ```
+    expected:
+      - 'クローン本体が `master` のままでも、起動直後の `describe(source: sample)` の種類の一覧に `kind_a` が載る'
+      - '`documents[].schema` のスキーマを `develop` から読む'
+      - '`develop` に `kind_b` を commit した後の `describe(source: sample)` で、`reload` をしなくても種類の一覧に `kind_a`・`kind_b` が載る'
+      - '`worktrees[]` の相対パスをメインのリポジトリの直下から数え、ワークツリー `.claude/worktrees/develop` に当たる'
+      - Git でない配信元はディスクの設定を読む
+    test: test_normal_when_config_read_from_default_ref
+  - name: 正常シナリオ（.gitignore した設定を先頭に置く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: default_ref のブランチ
+        description: sample の `develop` ブランチに、文書の種類 `kind_a` のスキーマを commit する
+        notes: クローン本体は `master` を checkout したままで、`master` は `kind_a` のスキーマを持たない
+      - name: Git 管理外の設定
+        description: sample のクローン本体の直下に `.gitignore` した `project-index.local.yaml` を置く
+        notes: '`default_ref: develop` と、`kind_a` の `documents[]` の行を持つ。どのブランチにも commit しない'
+      - name: 端末の設定
+        description: '`sources[].config` が `project-index.local.yaml` の 1 つだけを指す'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant S as project-index のサーバー
+        participant G as sample のリポジトリ
 
-      U->>S: 起動する
-      S->>G: develop に project-index.local.yaml があるか確かめる（無い）
-      S->>G: project-index.local.yaml が .gitignore で無視されているか確かめる（無視されている）
-      S->>G: ディスクの project-index.local.yaml を読む
-      S->>G: develop のスキーマを読む
-      S->>S: 配信元を組み立てる
-      S-->>U: sample を配信する
-    ```
-  expected:
-  - '`describe(source: sample)` の種類の一覧に `kind_a` が載る'
-  - '`documents[].schema` のスキーマを `develop` から読む'
-  - 配信元のフォルダが `project-index.local.yaml` のフォルダ（クローン本体の直下）になる
-  test: test_normal_when_ignored_config_first
-- name: 異常シナリオ（先頭の設定が default_ref に無く無視もしていない）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: サンプルの配信元
-    description: 検証に通る配信元
-    notes: id `sample`
-  - name: commit していない設定
-    description: 配信元 `uncommitted` のクローン本体に、`.gitignore` していない `project-index.yaml` を置き、どのブランチにも commit しない
-    notes: '`default_ref` は `develop`。`uncommitted` に `develop` ブランチがあり、`develop` は `project-index.yaml` を持たない'
-  - name: 端末の設定
-    description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
-    notes: '`sources` に sample と uncommitted の 2 行'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant DD as project-index
+        U->>S: 起動する
+        S->>G: develop に project-index.local.yaml があるか確かめる（無い）
+        S->>G: project-index.local.yaml が .gitignore で無視されているか確かめる（無視されている）
+        S->>G: ディスクの project-index.local.yaml を読む
+        S->>G: develop のスキーマを読む
+        S->>S: 配信元を組み立てる
+        S-->>U: sample を配信する
+      ```
+    expected:
+      - '`describe(source: sample)` の種類の一覧に `kind_a` が載る'
+      - '`documents[].schema` のスキーマを `develop` から読む'
+      - 配信元のフォルダが `project-index.local.yaml` のフォルダ（クローン本体の直下）になる
+    test: test_normal_when_ignored_config_first
+  - name: 異常シナリオ（先頭の設定が default_ref に無く無視もしていない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: サンプルの配信元
+        description: 検証に通る配信元
+        notes: id `sample`
+      - name: commit していない設定
+        description: 配信元 `uncommitted` のクローン本体に、`.gitignore` していない `project-index.yaml` を置き、どのブランチにも commit しない
+        notes: '`default_ref` は `develop`。`uncommitted` に `develop` ブランチがあり、`develop` は `project-index.yaml` を持たない'
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample と uncommitted の 2 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
 
-      U->>DD: project-index serve
-      DD->>DD: uncommitted の develop に project-index.yaml が無く、.gitignore でも無視されていない
-      DD->>DD: uncommitted を配信せず、エラーログに残す
-      DD-->>U: sample だけを配信する
-    ```
-  expected:
-  - 読み取り API の uncommitted の文書の取得が 404 を返し、読み取り API の sample の文書の取得は応答する
-  - 'エラーログに `uncommitted: config[0]: develop に project-index.yaml がありません` が残る'
-  test: test_error_when_first_config_not_committed
-- name: 正常シナリオ（XDG の環境変数で置き場を決める）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: 環境変数
-    description: '`PROJECT_INDEX_CONFIG` を設定せず、`XDG_CONFIG_HOME`・`XDG_STATE_HOME` にテスト用の一時フォルダを入れる'
-  - name: 端末の設定
-    description: '`$XDG_CONFIG_HOME/project-index/settings.yaml`'
-    notes: '`sources` に sample の 1 行。`state_dir`・`log_dir` を持たない'
-  - name: 状態の置き場の上書き
-    description: 2 回目の起動だけ `PROJECT_INDEX_STATE_DIR` に別の一時フォルダを入れる
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant DD as project-index
-      participant FS as ディスク
+        U->>DD: project-index serve
+        DD->>DD: uncommitted の develop に project-index.yaml が無く、.gitignore でも無視されていない
+        DD->>DD: uncommitted を配信せず、エラーログに残す
+        DD-->>U: sample だけを配信する
+      ```
+    expected:
+      - 読み取り API の uncommitted の文書の取得が 404 を返し、読み取り API の sample の文書の取得は応答する
+      - 'エラーログに `uncommitted: config[0]: develop に project-index.yaml がありません` が残る'
+    test: test_error_when_first_config_not_committed
+  - name: 正常シナリオ（XDG の環境変数で置き場を決める）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 環境変数
+        description: '`PROJECT_INDEX_CONFIG` を設定せず、`XDG_CONFIG_HOME`・`XDG_STATE_HOME` にテスト用の一時フォルダを入れる'
+      - name: 端末の設定
+        description: '`$XDG_CONFIG_HOME/project-index/settings.yaml`'
+        notes: '`sources` に sample の 1 行。`state_dir`・`log_dir` を持たない'
+      - name: 状態の置き場の上書き
+        description: 2 回目の起動だけ `PROJECT_INDEX_STATE_DIR` に別の一時フォルダを入れる
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
+        participant FS as ディスク
 
-      U->>DD: project-index serve
-      DD->>FS: $XDG_CONFIG_HOME/project-index/settings.yaml を読む
-      DD->>FS: 状態とログを $XDG_STATE_HOME/project-index に書く
-      DD-->>U: sample を配信する
-      U->>DD: PROJECT_INDEX_STATE_DIR を入れて project-index serve
-      DD->>FS: 状態とログを PROJECT_INDEX_STATE_DIR に書く
-      DD-->>U: sample を配信する
-    ```
-  expected:
-  - 1 回目の起動で読み取り API の sample の文書の取得が 200 を返す
-  - 1 回目の起動のログが `$XDG_STATE_HOME/project-index/logs` にでき、`~/.local/state/project-index` には書かない
-  - 2 回目の起動のログが `$PROJECT_INDEX_STATE_DIR/logs` にでき、`$XDG_STATE_HOME/project-index` には書かない
-  test: test_normal_when_xdg_dirs_set
-- name: 正常シナリオ（エイリアスのキーと nav の条件を検証する）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: エイリアスのキーの違反
-    description: sample の `alias_type` を持つ行の文書 1 件の `aliases` を数値（文字列でも文字列の並びでもない）にする
-  - name: 0 件に当たる nav の条件
-    description: sample の `nav` に、どの文書にも付いていないタグ `none` を `auto` の `filter`（`tags` が `none`）に記載したタブを置く
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant S as project-index のサーバー
+        U->>DD: project-index serve
+        DD->>FS: $XDG_CONFIG_HOME/project-index/settings.yaml を読む
+        DD->>FS: 状態とログを $XDG_STATE_HOME/project-index に書く
+        DD-->>U: sample を配信する
+        U->>DD: PROJECT_INDEX_STATE_DIR を入れて project-index serve
+        DD->>FS: 状態とログを PROJECT_INDEX_STATE_DIR に書く
+        DD-->>U: sample を配信する
+      ```
+    expected:
+      - 1 回目の起動で読み取り API の sample の文書の取得が 200 を返す
+      - 1 回目の起動のログが `$XDG_STATE_HOME/project-index/logs` にでき、`~/.local/state/project-index` には書かない
+      - 2 回目の起動のログが `$PROJECT_INDEX_STATE_DIR/logs` にでき、`$XDG_STATE_HOME/project-index` には書かない
+    test: test_normal_when_xdg_dirs_set
+  - name: 正常シナリオ（エイリアスのキーと nav の条件を検証する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: エイリアスのキーの違反
+        description: sample の `alias_type` を持つ行の文書 1 件の `aliases` を数値（文字列でも文字列の並びでもない）にする
+      - name: 0 件に当たる nav の条件
+        description: sample の `nav` に、どの文書にも付いていないタグ `none` を `auto` の `filter`（`tags` が `none`）に記載したタブを置く
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant S as project-index のサーバー
 
-      U->>S: 起動する
-      S->>S: alias_type を持つ行の文書の metadata のエイリアスのキーを取り込んだスキーマで検証する
-      S->>S: nav の auto の条件に当たる文書を数える
-      S-->>U: 警告（エイリアスのキーの違反・0 件の条件）と配信の開始
-    ```
-  expected:
-  - 起動時の警告に、違反した文書のパスとエイリアスのキーの違反の内容が出る
-  - 起動時の警告に、0 件に当たる `nav` のタブと条件が出る
-  - 警告があっても配信を始める
-  - 違反した文書は `search_docs` の `term`・`list_match_words` に載らない
-  test: test_normal_when_alias_and_nav_warned
+        U->>S: 起動する
+        S->>S: alias_type を持つ行の文書の metadata のエイリアスのキーを取り込んだスキーマで検証する
+        S->>S: nav の auto の条件に当たる文書を数える
+        S-->>U: 警告（エイリアスのキーの違反・0 件の条件）と配信の開始
+      ```
+    expected:
+      - 起動時の警告に、違反した文書のパスとエイリアスのキーの違反の内容が出る
+      - 起動時の警告に、0 件に当たる `nav` のタブと条件が出る
+      - 警告があっても配信を始める
+      - 違反した文書は `search_docs` の `term`・`list_match_words` に載らない
+    test: test_normal_when_alias_and_nav_warned
+  - name: 正常シナリオ（paths の基準のフォルダを指定する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: ノードの配信元
+        description: 'git リポジトリ repo の `content/node-docs/brain/project-index.yaml`。`paths_base: ../../..`（repo の直下）を持ち、`documents[0].paths` が `[docs/knowhow/*.yaml, content/node-docs/shared/*.yaml]`'
+        notes: id `brain`。スキーマは `content/node-docs/brain/` の下に配置し、設定ファイルのフォルダからの相対パスで指す
+      - name: repo の文書
+        description: '`docs/knowhow/a.yaml`・`content/node-docs/shared/b.yaml` と、`paths` に該当しない `docs/design/c.yaml`'
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に brain の 1 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
+        participant CF as 配信元の設定
+
+        U->>DD: project-index serve
+        DD->>CF: content/node-docs/brain/project-index.yaml を参照する
+        DD->>DD: paths_base を設定ファイルのフォルダから解き、repo の直下を paths の基準のフォルダにする
+        DD->>DD: documents の paths を基準のフォルダから解き、スキーマは設定ファイルのフォルダから解く
+        DD-->>U: brain を配信する
+      ```
+    expected:
+      - '`search_docs(source: brain)` が `docs/knowhow/a.yaml` と `content/node-docs/shared/b.yaml` の文書を返却し、`docs/design/c.yaml` の文書は返却しない'
+      - 返却した文書のパスが、基準のフォルダ（repo の直下）からの相対パスになる
+      - '`paths_base` を省いた配信元は、今と同じく設定ファイルのフォルダを基準に配信する'
+    test: test_normal_when_paths_base_set
+    decisions:
+      - D-189
+  - name: 正常シナリオ（端末の設定の最上位に知らないキーがある）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample の 1 行。最上位に project-index が知らないキー `mindstella`（入れ子の値を持つ）と `prot`（`port` の打ち間違い）を持つ'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        actor A as エージェント
+        participant DD as project-index
+
+        U->>DD: project-index serve
+        DD->>DD: 端末の設定をスキーマで検証し、最上位の知らないキーのパスを集める
+        DD->>DD: 知らないキーのパスを警告のログに残す
+        DD-->>U: sample を配信する
+        A->>DD: describe()
+        DD-->>A: 使用できる配信元と、知らないキーの警告
+      ```
+    expected:
+      - 読み取り API の sample の文書の取得が 200 を返却する
+      - 警告のログに、端末の設定のファイルと知らないキーのパス `mindstella`・`prot` が残る
+      - 引数なしの `describe()` の警告に、知らないキーのパス `mindstella`・`prot` が載る
+      - '`prot` の値は使用せず、`port` の既定で待ち受ける'
+    test: test_normal_when_terminal_config_has_unknown_top_level_key
+    decisions:
+      - D-308
+  - name: 異常シナリオ（配信元の行に知らないキーがある）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources[0]` に知らないキー `enable`（`enabled` の打ち間違い）を持つ'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
+
+        U->>DD: project-index serve
+        DD->>DD: 端末の設定の検証に失敗する
+        DD-->>U: 違反を標準エラーに出して終わる
+      ```
+    expected:
+      - プロセスが 0 以外の終了コードで終わり、ポートを待ち受けない
+      - '標準エラーに `{ファイル}: sources[0].enable` のパスと理由が出る'
+    test: test_error_when_source_row_has_unknown_key
+    decisions:
+      - D-308
 lead: 利用者が `project-index serve` を実行し、端末の設定に並べた配信元を 1 プロセス・1 ポートで配信し始める。
 issue: 14
 primary_actor: 利用者
 stakeholders:
-- name: 利用者
-  interest: 1 つのコマンドで全ての配信元が配信され、配信できなかった配信元とその理由が分かる
-- name: エージェント（Claude Code）
-  interest: 起動の後、`/mcp` の 1 つにつなげば使える配信元の文書を読める
+  - name: 利用者
+    interest: 1 つのコマンドで全ての配信元が配信され、配信できなかった配信元とその理由が分かる
+  - name: エージェント（Claude Code）
+    interest: 起動の後、`/mcp` の 1 つにつなげば使える配信元の文書を読める
 trigger: '利用者が `project-index serve` を実行するか、ポートにつながらないときに SessionStart のフックが切り離して起動する'
 preconditions:
-- '`PROJECT_INDEX_CONFIG`（既定 `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`）に端末の設定がある'
-- '`PROJECT_INDEX_PORT`（既定 8786）のポートが空いている'
+  - '`PROJECT_INDEX_CONFIG`（既定 `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`）に端末の設定がある'
+  - '`PROJECT_INDEX_PORT`（既定 8786）のポートが空いている'
 success_guarantee: 検証に通った配信元が読み取り API と `/mcp` の文書の MCP で読める。`/mcp` のツールは配信元の数によらず 7 つ。
 minimal_guarantee: 検証に失敗した配信元があっても、他の配信元と `/_admin/mcp` は配信する。失敗した配信元の id・違反したキーのパス・理由がエラーログに残る。
 frequency: 端末の起動ごと・project-index の更新ごと
 priority: 高
 refs:
-- SC-1#scenarios[正常シナリオ]
-- SC-1#scenarios[異常シナリオ（配信できない配信元がある）]
+  - SC-1#scenarios[正常シナリオ]
+  - SC-1#scenarios[異常シナリオ（配信できない配信元がある）]
 test_file: tests/e2e/単一ユースケース/test_起動する.py
