@@ -2,282 +2,282 @@ id: MOD-44
 title: 索引のサーバー / プロンプトの文書の変換 / types.py
 lead: '`project-index prompt-doc` が読むプロンプトの YAML のモデルと、描画の結果・例外の型。モデルは変換に使うキーだけを持ち、他のキーは読み捨てる。サーバーが起動のときに読むプロンプトの違反の型も持つ。'
 data_models:
-- name: PromptVar
-  title: 変数の定義
-  container: project_index/features/prompt_doc/types.py
-  usecase: プロンプトの文書の変換
-  role: DTO
-  summary: '`vars` の 1 件（入れ子の `items`・`properties` を含む）'
-  description: 'Pydantic の `BaseModel`（`extra="ignore"`）。`example` が無いことと `example: null` を分けるため、`model_fields_set` で有無を見る。'
-  properties:
-  - name: type
-    title: 型
-    type: Literal['string', 'integer', 'number', 'boolean', 'array', 'object'] | None
-    default: None
-    description: 値の型。無ければ型を確かめない
-  - name: required
-    title: 必須
-    type: bool
-    default: 'False'
-    description: 変数の表の必須の列
-  - name: description
-    title: 説明
-    type: str
-    default: '""'
-    description: 変数の表・ツールチップに出す
-  - name: example
-    title: 例
-    type: Any
-    default: None
-    description: 「既定の例」と、組で省いた変数の値
-  - name: source
-    title: 出典
-    type: str | None
-    default: None
-    description: 変数の表の出典の列
-  - name: items
-    title: 要素の定義
-    type: PromptVar | None
-    default: None
-    description: '`type: array` の要素'
-  - name: properties
-    title: キーの定義
-    type: dict[str, PromptVar]
-    default: '{}'
-    description: '`type: object` のキー'
-- name: PromptText
-  title: 部品の本文
-  container: project_index/features/prompt_doc/types.py
-  usecase: プロンプトの文書の変換
-  role: DTO
-  summary: 部品の 1 言語の本文
-  description: Pydantic の `BaseModel`（`extra="ignore"`）。
-  properties:
-  - name: lang
-    title: 言語
-    type: str
-    description: 言語のタグ（`en`・`ja` など）
-  - name: text
-    title: 本文
-    type: str
-    description: Jinja2 の構文で書いた本文
-- name: PromptPart
-  title: 部品
-  container: project_index/features/prompt_doc/types.py
-  usecase: プロンプトの文書の変換
-  role: DTO
-  summary: '`parts` の 1 件'
-  description: Pydantic の `BaseModel`（`extra="ignore"`）。
-  properties:
-  - name: id
-    title: ID
-    type: str
-    description: セクションの見出しと、使用しなかった部品の名前
-  - name: role
-    title: 役割
-    type: Literal['system', 'user', 'assistant'] | None
-    default: None
-    description: '`kind: llm` のメッセージの分け方'
-  - name: tags
-    title: タグ
-    type: list[str]
-    default: '[]'
-    description: バッジに出す
-  - name: when
-    title: 使う条件
-    type: str | None
-    default: None
-    description: Jinja2 の式。偽なら部品を使わない
-  - name: texts
-    title: 本文
-    type: list[PromptText]
-    description: 言語ごとの本文（1 件以上）
-- name: PromptExample
-  title: 例の組
-  container: project_index/features/prompt_doc/types.py
-  usecase: プロンプトの文書の変換
-  role: DTO
-  summary: '`examples` の 1 件'
-  description: Pydantic の `BaseModel`（`extra="ignore"`）。
-  properties:
-  - name: name
-    title: 名前
-    type: str
-    description: セクションの見出し
-  - name: values
-    title: 値
-    type: dict[str, Any]
-    default: '{}'
-    description: 変数の値。無い変数は `example` で埋める
-- name: PromptDoc
-  title: プロンプト
-  container: project_index/features/prompt_doc/types.py
-  usecase: プロンプトの文書の変換
-  role: DTO
-  summary: プロンプトの YAML 1 件のうち変換に使うキー
-  description: Pydantic の `BaseModel`（`extra="ignore"`）。キーは knowledge の `schemas/prompt.schema.yaml` に合わせる。
-  properties:
-  - name: name
-    title: 名前
-    type: str
-    description: 見出し
-  - name: description
-    title: 説明
-    type: str
-    default: '""'
-    description: 見出しの下の段落
-  - name: kind
-    title: 種類
-    type: Literal['llm', 'hook', 'instructions', 'tool']
-    description: '`llm` はメッセージに分け、`hook` は字数の注意を出す'
-  - name: lang
-    title: 注入する言語
-    type: str
-    description: バッジ・タブの先頭・字数の行
-  - name: tags
-    title: タグ
-    type: list[str]
-    default: '[]'
-    description: タグの行
-  - name: output
-    title: 出力
-    type: Any
-    default: None
-    description: 出力の行に YAML のフロー形式で出す
-  - name: vars
-    title: 変数
-    type: dict[str, PromptVar]
-    default: '{}'
-    description: 変数の表・ツールチップ・既定の例
-  - name: parts
+  - name: PromptVar
+    title: 変数の定義
+    container: project_index/features/prompt_doc/types.py
+    usecase: プロンプトの文書の変換
+    role: DTO
+    summary: '`vars` の 1 件（入れ子の `items`・`properties` を含む）'
+    description: 'Pydantic の `BaseModel`（`extra="ignore"`）。`example` が無いことと `example: null` を分けるため、`model_fields_set` で有無を見る。'
+    properties:
+      - name: type
+        title: 型
+        type: Literal['string', 'integer', 'number', 'boolean', 'array', 'object'] | None
+        default: None
+        description: 値の型。無ければ型を確かめない
+      - name: required
+        title: 必須
+        type: bool
+        default: 'False'
+        description: 変数の表の必須の列
+      - name: description
+        title: 説明
+        type: str
+        default: '""'
+        description: 変数の表・ツールチップに出す
+      - name: example
+        title: 例
+        type: Any
+        default: None
+        description: 「既定の例」と、組で省いた変数の値
+      - name: source
+        title: 出典
+        type: str | None
+        default: None
+        description: 変数の表の出典の列
+      - name: items
+        title: 要素の定義
+        type: PromptVar | None
+        default: None
+        description: '`type: array` の要素'
+      - name: properties
+        title: キーの定義
+        type: dict[str, PromptVar]
+        default: '{}'
+        description: '`type: object` のキー'
+  - name: PromptText
+    title: 部品の本文
+    container: project_index/features/prompt_doc/types.py
+    usecase: プロンプトの文書の変換
+    role: DTO
+    summary: 部品の 1 言語の本文
+    description: Pydantic の `BaseModel`（`extra="ignore"`）。
+    properties:
+      - name: lang
+        title: 言語
+        type: str
+        description: 言語のタグ（`en`・`ja` など）
+      - name: text
+        title: 本文
+        type: str
+        description: Jinja2 の構文で書いた本文
+  - name: PromptPart
     title: 部品
-    type: list[PromptPart]
-    description: 並び順に描画する（キーは必須。件数の下限は設けない）
-  - name: examples
+    container: project_index/features/prompt_doc/types.py
+    usecase: プロンプトの文書の変換
+    role: DTO
+    summary: '`parts` の 1 件'
+    description: Pydantic の `BaseModel`（`extra="ignore"`）。
+    properties:
+      - name: id
+        title: ID
+        type: str
+        description: セクションの見出しと、使用しなかった部品の名前
+      - name: role
+        title: 役割
+        type: Literal['system', 'user', 'assistant'] | None
+        default: None
+        description: '`kind: llm` のメッセージの分け方'
+      - name: tags
+        title: タグ
+        type: list[str]
+        default: '[]'
+        description: バッジに出す
+      - name: when
+        title: 使う条件
+        type: str | None
+        default: None
+        description: Jinja2 の式。偽なら部品を使わない
+      - name: texts
+        title: 本文
+        type: list[PromptText]
+        description: 言語ごとの本文（1 件以上）
+  - name: PromptExample
     title: 例の組
-    type: list[PromptExample]
-    default: '[]'
-    description: 既定の例の後に並べる組
-- name: RenderedMessage
-  title: 描画したメッセージ
-  container: project_index/features/prompt_doc/types.py
-  usecase: プロンプトの文書の変換
-  role: DTO
-  summary: 例の組を 1 言語で描画した本文 1 件
-  description: '`dataclass(frozen=True, slots=True, kw_only=True)`。'
-  properties:
-  - name: role
-    title: 役割
-    type: Literal['system', 'user', 'assistant'] | None
-    description: '`kind: llm` の役割。それ以外は `None`'
-  - name: text
-    title: 本文
-    type: str
-    description: 注入する文字列と同じ本文（字数を数える）
-  - name: marked
-    title: マーカー付きの本文
-    type: str
-    description: 変数の値を `VALUE_MARK_PATTERN` の区切りで囲んだ本文（エスケープ前）
-- name: RenderedExample
-  title: 描画した例の組
-  container: project_index/features/prompt_doc/types.py
-  usecase: プロンプトの文書の変換
-  role: DTO
-  summary: 例の組を 1 言語で描画した結果
-  description: '`dataclass(frozen=True, slots=True, kw_only=True)`。`problems` があるときは `messages` が空。'
-  properties:
-  - name: messages
-    title: メッセージ
-    type: list[RenderedMessage]
-    description: '`kind: llm` は役割ごと（`ROLES` の順）、それ以外は 1 件'
-  - name: unused
-    title: 使用しなかった部品
-    type: list[str]
-    description: '`when` が偽か、その言語の本文が無い部品の `id`'
-  - name: char_count
-    title: 字数
-    type: int
-    description: '`messages` の `text` の字数の合計'
-  - name: problems
-    title: 描画できない理由
-    type: list[str]
-    description: 型の合わない値・未定義の変数・構文の誤った部品の理由。空なら描画できた
-- name: PartSyntaxError
-  title: 部品の構文の誤り
-  container: project_index/features/prompt_doc/types.py
-  usecase: プロンプトの文書の変換
-  role: DTO
-  summary: テンプレートにできなかった部品の本文か `when` 1 件
-  description: '`dataclass(frozen=True, slots=True, kw_only=True)`。'
-  properties:
-  - name: part_id
-    title: 部品
-    type: str
-    description: 部品の `id`
-  - name: field
-    title: 場所
-    type: str
-    description: '`when` か `texts[{lang}]`'
-  - name: line
-    title: 行
-    type: int | None
-    description: '`TemplateSyntaxError.lineno`'
-  - name: message
-    title: 理由
-    type: str
-    description: '`TemplateSyntaxError.message`'
-- name: PromptProblem
-  title: プロンプトの違反
-  container: project_index/features/prompt_doc/types.py
-  usecase: プロンプトの読み込み
-  role: DTO
-  summary: 起動のときに読んだプロンプトの YAML の違反 1 件
-  description: '`dataclass(frozen=True, slots=True, kw_only=True)`。'
-  properties:
-  - name: file
-    title: ファイル
-    type: Path
-    description: 違反した YAML の絶対パス。無いファイルはあるはずのパス
-  - name: path
-    title: キーのパス
-    type: str
-    description: 違反したキーのパス（`parts[0].texts[0].text` など）。ファイル全体の違反は `$`
-  - name: reason
-    title: 理由
-    type: str
-    description: 違反の理由
+    container: project_index/features/prompt_doc/types.py
+    usecase: プロンプトの文書の変換
+    role: DTO
+    summary: '`examples` の 1 件'
+    description: Pydantic の `BaseModel`（`extra="ignore"`）。
+    properties:
+      - name: name
+        title: 名前
+        type: str
+        description: セクションの見出し
+      - name: values
+        title: 値
+        type: dict[str, Any]
+        default: '{}'
+        description: 変数の値。無い変数は `example` で埋める
+  - name: PromptDoc
+    title: プロンプト
+    container: project_index/features/prompt_doc/types.py
+    usecase: プロンプトの文書の変換
+    role: DTO
+    summary: プロンプトの YAML 1 件のうち変換に使うキー
+    description: Pydantic の `BaseModel`（`extra="ignore"`）。キーは knowledge の `schemas/prompt.schema.yaml` に合わせる。
+    properties:
+      - name: name
+        title: 名前
+        type: str
+        description: 見出し
+      - name: description
+        title: 説明
+        type: str
+        default: '""'
+        description: 見出しの下の段落
+      - name: kind
+        title: 種類
+        type: Literal['llm', 'hook', 'instructions', 'tool']
+        description: '`llm` はメッセージに分け、`hook` は字数の注意を出す'
+      - name: lang
+        title: 注入する言語
+        type: str
+        description: バッジ・タブの先頭・字数の行
+      - name: tags
+        title: タグ
+        type: list[str]
+        default: '[]'
+        description: タグの行
+      - name: output
+        title: 出力
+        type: Any
+        default: None
+        description: 出力の行に YAML のフロー形式で出す
+      - name: vars
+        title: 変数
+        type: dict[str, PromptVar]
+        default: '{}'
+        description: 変数の表・ツールチップ・既定の例
+      - name: parts
+        title: 部品
+        type: list[PromptPart]
+        description: 並び順に描画する（キーは必須。件数の下限は設けない）
+      - name: examples
+        title: 例の組
+        type: list[PromptExample]
+        default: '[]'
+        description: 既定の例の後に並べる組
+  - name: RenderedMessage
+    title: 描画したメッセージ
+    container: project_index/features/prompt_doc/types.py
+    usecase: プロンプトの文書の変換
+    role: DTO
+    summary: 例の組を 1 言語で描画した本文 1 件
+    description: '`dataclass(frozen=True, slots=True, kw_only=True)`。'
+    properties:
+      - name: role
+        title: 役割
+        type: Literal['system', 'user', 'assistant'] | None
+        description: '`kind: llm` の役割。それ以外は `None`'
+      - name: text
+        title: 本文
+        type: str
+        description: 注入する文字列と同じ本文（字数を数える）
+      - name: marked
+        title: マーカー付きの本文
+        type: str
+        description: 変数の値を `VALUE_MARK_PATTERN` の区切りで囲んだ本文（エスケープ前）
+  - name: RenderedExample
+    title: 描画した例の組
+    container: project_index/features/prompt_doc/types.py
+    usecase: プロンプトの文書の変換
+    role: DTO
+    summary: 例の組を 1 言語で描画した結果
+    description: '`dataclass(frozen=True, slots=True, kw_only=True)`。`problems` があるときは `messages` が空。'
+    properties:
+      - name: messages
+        title: メッセージ
+        type: list[RenderedMessage]
+        description: '`kind: llm` は役割ごと（`ROLES` の順）、それ以外は 1 件'
+      - name: unused
+        title: 使用しなかった部品
+        type: list[str]
+        description: '`when` が偽か、その言語の本文が無い部品の `id`'
+      - name: char_count
+        title: 字数
+        type: int
+        description: '`messages` の `text` の字数の合計'
+      - name: problems
+        title: 描画できない理由
+        type: list[str]
+        description: 型の合わない値・未定義の変数・構文の誤った部品の理由。空なら描画できた
+  - name: PartSyntaxError
+    title: 部品の構文の誤り
+    container: project_index/features/prompt_doc/types.py
+    usecase: プロンプトの文書の変換
+    role: DTO
+    summary: テンプレートにできなかった部品の本文か `when` 1 件
+    description: '`dataclass(frozen=True, slots=True, kw_only=True)`。'
+    properties:
+      - name: part_id
+        title: 部品
+        type: str
+        description: 部品の `id`
+      - name: field
+        title: 場所
+        type: str
+        description: '`when` か `texts[{lang}]`'
+      - name: line
+        title: 行
+        type: int | None
+        description: '`TemplateSyntaxError.lineno`'
+      - name: message
+        title: 理由
+        type: str
+        description: '`TemplateSyntaxError.message`'
+  - name: PromptProblem
+    title: プロンプトの違反
+    container: project_index/features/prompt_doc/types.py
+    usecase: プロンプトの読み込み
+    role: DTO
+    summary: 起動のときに読んだプロンプトの YAML の違反 1 件
+    description: '`dataclass(frozen=True, slots=True, kw_only=True)`。'
+    properties:
+      - name: file
+        title: ファイル
+        type: Path
+        description: 違反した YAML の絶対パス。無いファイルはあるはずのパス
+      - name: path
+        title: キーのパス
+        type: str
+        description: 違反したキーのパス（`parts[0].texts[0].text` など）。ファイル全体の違反は `$`
+      - name: reason
+        title: 理由
+        type: str
+        description: 違反の理由
 classes:
-- name: PromptDocError
-  title: プロンプトの文書の変換の失敗
-  container: project_index/features/prompt_doc/types.py
-  usecase: プロンプトの文書の変換
-  role: 例外
-  summary: '`project-index prompt-doc` が終了コード 1 で終える例外の基底'
-  description: '`Exception` を継承する。メッセージは標準エラーにそのまま出す。'
-  inherits: Exception
-  kind: クラス
-- name: PromptYamlError
-  title: 読めない YAML
-  container: project_index/features/prompt_doc/types.py
-  usecase: プロンプトの文書の変換
-  role: 例外
-  summary: 標準入力が YAML として読めない
-  inherits: PromptDocError
-  kind: クラス
-- name: InvalidPrompt
-  title: 変換に使うキーの誤り
-  container: project_index/features/prompt_doc/types.py
-  usecase: プロンプトの文書の変換
-  role: 例外
-  summary: 変換に使うキーが無いか型が違う
-  inherits: PromptDocError
-  kind: クラス
-- name: PromptInvalidError
-  title: プロンプトの YAML の違反
-  container: project_index/features/prompt_doc/types.py
-  usecase: プロンプトの読み込み
-  role: 例外
-  summary: 起動のときに読むプロンプトの YAML が無い・読めない・スキーマに違反する・描画できない
-  description: '`problems: list[PromptProblem]` を持つ。`project-index serve` は違反ごとに `{file}: {path}: {reason}` を標準エラーに出し、終了コード 4 で終える。'
-  inherits: Exception
-  kind: クラス
+  - name: PromptDocError
+    title: プロンプトの文書の変換の失敗
+    container: project_index/features/prompt_doc/types.py
+    usecase: プロンプトの文書の変換
+    role: 例外
+    summary: '`project-index prompt-doc` が終了コード 1 で終える例外の基底'
+    description: '`Exception` を継承する。メッセージは標準エラーにそのまま出す。'
+    inherits: Exception
+    kind: クラス
+  - name: PromptYamlError
+    title: 読めない YAML
+    container: project_index/features/prompt_doc/types.py
+    usecase: プロンプトの文書の変換
+    role: 例外
+    summary: 標準入力が YAML として読めない
+    inherits: PromptDocError
+    kind: クラス
+  - name: InvalidPrompt
+    title: 変換に使うキーの誤り
+    container: project_index/features/prompt_doc/types.py
+    usecase: プロンプトの文書の変換
+    role: 例外
+    summary: 変換に使うキーが無いか型が違う
+    inherits: PromptDocError
+    kind: クラス
+  - name: PromptInvalidError
+    title: プロンプトの YAML の違反
+    container: project_index/features/prompt_doc/types.py
+    usecase: プロンプトの読み込み
+    role: 例外
+    summary: 起動のときに読むプロンプトの YAML が無い・読めない・スキーマに違反する・描画できない
+    description: '`problems: list[PromptProblem]` を持つ。`project-index serve` は違反ごとに `{file}: {path}: {reason}` を標準エラーに出し、終了コード 4 で終える。'
+    inherits: Exception
+    kind: クラス

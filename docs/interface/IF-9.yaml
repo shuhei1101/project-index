@@ -4,120 +4,120 @@ entry:
   kind: mcp_tool
   value: reload
 flows:
-- name: 正常系
-  summary: 端末の設定に追加した配信元の配信を始める
-  setup:
-  - name: Mock
-    description: なし（project-index のアプリをテストのクライアントで呼ぶ）
-  - name: 端末の設定
-    description: sample の 1 行で起動した後、notes の行を追加して保存する
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as reload
-      participant CF as 端末の設定・配信元の設定
+  - name: 正常系
+    summary: 端末の設定に追加した配信元の配信を始める
+    setup:
+      - name: Mock
+        description: なし（project-index のアプリをテストのクライアントで呼ぶ）
+      - name: 端末の設定
+        description: sample の 1 行で起動した後、notes の行を追加して保存する
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as reload
+        participant CF as 端末の設定・配信元の設定
 
-      C->>T: 引数なし
-      T-->>CF: 端末の設定と配信元の設定を読む
-      T->>T: 配信元の一覧を差し替える
-      T-->>C: added・removed・not_served
-    ```
-  expected:
-  - '`added` が `[notes]`、`removed` と `not_served` が空'
-  - '読み直した後の `search_docs(source: notes)` が文書を返す'
-  - 読み直す前に張った `/mcp` のセッションで、続けて `describe` を呼べる
-  test: test_normal
-- name: 正常系（検証に失敗する配信元がある）
-  summary: 配信元の設定を壊して読み直すと、その配信元を外して返す
-  setup:
-  - name: Mock
-    description: なし
-  - name: 配信元
-    description: 配信中の sample の `project-index.yaml` から `documents[0].paths` を消す
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as reload
+        C->>T: 引数なし
+        T-->>CF: 端末の設定と配信元の設定を読む
+        T->>T: 配信元の一覧を差し替える
+        T-->>C: added・removed・not_served
+      ```
+    expected:
+      - '`added` が `[notes]`、`removed` と `not_served` が空'
+      - '読み直した後の `search_docs(source: notes)` が文書を返す'
+      - 読み直す前に張った `/mcp` のセッションで、続けて `describe` を呼べる
+    test: test_normal
+  - name: 正常系（検証に失敗する配信元がある）
+    summary: 配信元の設定を壊して読み直すと、その配信元を外して返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 配信元
+        description: 配信中の sample の `project-index.yaml` から `documents[0].paths` を消す
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as reload
 
-      C->>T: 引数なし
-      T->>T: sample の検証に失敗し、配信から外す
-      T-->>C: not_served に sample
-    ```
-  expected:
-  - '`not_served` に sample と `documents[0].paths` の違反がある'
-  - '`search_docs(source: sample)` が `SourceNotServedError` を返す'
-  test: test_normal_when_source_becomes_invalid
-- name: 異常系（端末の設定が壊れている・TerminalConfigInvalidError）
-  summary: 端末の設定がスキーマに違反すると、配信元の一覧を変えずに断る
-  setup:
-  - name: Mock
-    description: なし
-  - name: 端末の設定
-    description: 起動後に `sources[0].config` を消す
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as reload
+        C->>T: 引数なし
+        T->>T: sample の検証に失敗し、配信から外す
+        T-->>C: not_served に sample
+      ```
+    expected:
+      - '`not_served` に sample と `documents[0].paths` の違反がある'
+      - '`search_docs(source: sample)` が `SourceNotServedError` を返す'
+    test: test_normal_when_source_becomes_invalid
+  - name: 異常系（端末の設定が壊れている・TerminalConfigInvalidError）
+    summary: 端末の設定がスキーマに違反すると、配信元の一覧を変えずに断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: 起動後に `sources[0].config` を消す
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as reload
 
-      C->>T: 引数なし
-      T-->>C: isError（端末の設定の違反）
-    ```
-  expected:
-  - '`isError: true` で `sources[0].config` の違反を返す'
-  - 'その後の `search_docs(source: sample)` が文書を返す'
-  test: test_error_when_terminal_config_invalid
+        C->>T: 引数なし
+        T-->>C: isError（端末の設定の違反）
+      ```
+    expected:
+      - '`isError: true` で `sources[0].config` の違反を返す'
+      - 'その後の `search_docs(source: sample)` が文書を返す'
+    test: test_error_when_terminal_config_invalid
 lead: 端末の設定と配信元の設定を読み直し、追加・削除・配信できなくなった配信元を返す。
 identifier: reload
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true
 side_effects: 配信元の一覧を差し替え、文書・検査・変換の控えを捨てる
 callers:
-- SC-5#scenarios[正常シナリオ]
-- SC-10#scenarios[正常シナリオ]
-- SC-5#scenarios[正常シナリオ（.gitignore した設定を指して追加する）]
+  - SC-5#scenarios[正常シナリオ]
+  - SC-10#scenarios[正常シナリオ]
+  - SC-5#scenarios[正常シナリオ（.gitignore した設定を指して追加する）]
 exclusivity: 端末の設定の保存と同じロック（`settings_lock`）で一度に 1 つだけ読み直す
 request:
-- name: format
-  type: Literal['markdown', 'json']
-  required: false
-  default: '`markdown`'
-  location: argument
-  description: 返却する形式
+  - name: format
+    type: Literal['markdown', 'json']
+    required: false
+    default: '`markdown`'
+    location: argument
+    description: 返却する形式
 request_example: |-
   ```json
   {}
   ```
 response:
-- name: added[]
-  type: str
-  description: 新しく配信を始めた配信元の ID
-- name: removed[]
-  type: str
-  description: 端末の設定から無くなって配信をやめた配信元の ID
-- name: not_served[].id
-  type: str
-  description: 検証に失敗して配信していない配信元の ID
-- name: not_served[].errors[]
-  type: str
-  description: '`{キーのパス}: {理由}`'
-- name: sources[]
-  type: list[SourceState]
-  description: 読み直した後の配信元ごとの状態
-  notes: '`status` の `sources[]` と同じスキーマ'
+  - name: added[]
+    type: str
+    description: 新しく配信を始めた配信元の ID
+  - name: removed[]
+    type: str
+    description: 端末の設定から無くなって配信をやめた配信元の ID
+  - name: not_served[].id
+    type: str
+    description: 検証に失敗して配信していない配信元の ID
+  - name: not_served[].errors[]
+    type: str
+    description: '`{キーのパス}: {理由}`'
+  - name: sources[]
+    type: list[SourceState]
+    description: 読み直した後の配信元ごとの状態
+    notes: '`status` の `sources[]` と同じスキーマ'
 exceptions:
-- name: なし（正常終了）
-  condition: 読み直せた（検証に失敗した配信元があっても、外して正常終了）
-- name: TerminalConfigInvalidError
-  condition: 端末の設定が無い・スキーマに違反する
-  notes: '`isError: true` で違反を全て返す。配信元の一覧は読み直す前のまま'
+  - name: なし（正常終了）
+    condition: 読み直せた（検証に失敗した配信元があっても、外して正常終了）
+  - name: TerminalConfigInvalidError
+    condition: 端末の設定が無い・スキーマに違反する
+    notes: '`isError: true` で違反を全て返す。配信元の一覧は読み直す前のまま'
 constraints:
-- item: セッション
-  constraint: 読み直しの前後で `/mcp`・`/_admin/mcp` の接続を切らない
-- item: 読み直す対象
-  constraint: 端末の設定の `sources` と各配信元の設定。`bind`・`port`・`state_dir` など反映が `restart` のキーは読み直さない
-- item: タイムアウト
-  constraint: 制限なし（スクリプトの確かめは配信元ごとに `script_timeout_sec` で打ち切る）
+  - item: セッション
+    constraint: 読み直しの前後で `/mcp`・`/_admin/mcp` の接続を切らない
+  - item: 読み直す対象
+    constraint: 端末の設定の `sources` と各配信元の設定。`bind`・`port`・`state_dir` など反映が `restart` のキーは読み直さない
+  - item: タイムアウト
+    constraint: 制限なし（スクリプトの確かめは配信元ごとに `script_timeout_sec` で打ち切る）
 test_file: tests/integration/server/test_reload.py

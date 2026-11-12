@@ -2,67 +2,67 @@ id: MOD-35
 title: 索引のサーバー / 再起動と更新 / types.py
 lead: 管理の MCP の `restart`・`update` の結果の型と定数。
 data_models:
-- name: RestartResult
-  title: 再起動の結果
-  container: project_index/features/lifecycle/types.py
-  usecase: 再起動
-  role: DTO
-  summary: '`restart` の結果'
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: pid
-    title: プロセス ID
-    type: int
-    description: 起動し直した後も変わらないプロセス ID
-  - name: restarting
-    title: 起動し直すか
-    type: bool
-    default: 'True'
-    description: 常に `True`
-- name: UpdateResult
-  title: 更新の結果
-  container: project_index/features/lifecycle/types.py
-  usecase: 更新
-  role: DTO
-  summary: '`update` の結果'
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: previous_version
-    title: 更新する前のバージョン
-    type: str
-    description: 動いているプロセスの配布のメタデータのバージョン
-  - name: version
-    title: 更新した後のバージョン
-    type: str
-    description: クローンの `pyproject.toml` の `project.version`
-  - name: updated
-    title: 取り込んだか
-    type: bool
-    description: '`git pull` で HEAD が変わったら `True`'
-  - name: migration_needed
-    title: 移し替えが要るか
-    type: bool
-    description: '`migrate --plan` の標準出力が空でなければ `True`'
-  - name: restarting
-    title: 起動し直すか
-    type: bool
-    description: '`updated` で `migration_needed` でなければ `True`'
+  - name: RestartResult
+    title: 再起動の結果
+    container: project_index/features/lifecycle/types.py
+    usecase: 再起動
+    role: DTO
+    summary: '`restart` の結果'
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: pid
+        title: プロセス ID
+        type: int
+        description: 起動し直した後も変わらないプロセス ID
+      - name: restarting
+        title: 起動し直すか
+        type: bool
+        default: 'True'
+        description: 常に `True`
+  - name: UpdateResult
+    title: 更新の結果
+    container: project_index/features/lifecycle/types.py
+    usecase: 更新
+    role: DTO
+    summary: '`update` の結果'
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: previous_version
+        title: 更新する前のバージョン
+        type: str
+        description: 動いているプロセスの配布のメタデータのバージョン
+      - name: version
+        title: 更新した後のバージョン
+        type: str
+        description: クローンの `pyproject.toml` の `project.version`
+      - name: updated
+        title: 取り込んだか
+        type: bool
+        description: '`git pull` で HEAD が変わったら `True`'
+      - name: migration_needed
+        title: 移し替えが要るか
+        type: bool
+        description: '`migrate --plan` の標準出力が空でなければ `True`'
+      - name: restarting
+        title: 起動し直すか
+        type: bool
+        description: '`updated` で `migration_needed` でなければ `True`'
 constants:
-- name: COMMAND_TIMEOUT_SEC
-  title: 更新のコマンドの打ち切り
-  container: project_index/features/lifecycle/types.py
-  usecase: 更新
-  summary: '`git pull`・`uv sync`・`migrate --plan` それぞれの打ち切りの秒数（未実測。結合テストで測って見直す）'
-  value: '300'
-- name: SHUTDOWN_WAIT_FACTOR
-  title: 停止の待ちの倍率
-  container: project_index/features/lifecycle/types.py
-  usecase: 再起動
-  summary: 処理中の要求を待つ上限を `script_timeout_sec` の何倍にするか
-  value: '1.5'
-- name: SERVE_ARGV
-  title: 起動し直すコマンドの引数
-  container: project_index/features/lifecycle/types.py
-  usecase: 再起動
-  summary: '`os.execv` に渡す `sys.executable` の後ろの引数'
-  value: ('-m', 'project_index', 'serve')
+  - name: COMMAND_TIMEOUT_SEC
+    title: 更新のコマンドの打ち切り
+    container: project_index/features/lifecycle/types.py
+    usecase: 更新
+    summary: '`git pull`・`uv sync`・`migrate --plan` それぞれの打ち切りの秒数（未実測。結合テストで測って見直す）'
+    value: '300'
+  - name: SHUTDOWN_WAIT_FACTOR
+    title: 停止の待ちの倍率
+    container: project_index/features/lifecycle/types.py
+    usecase: 再起動
+    summary: 処理中の要求を待つ上限を `script_timeout_sec` の何倍にするか
+    value: '1.5'
+  - name: SERVE_ARGV
+    title: 起動し直すコマンドの引数
+    container: project_index/features/lifecycle/types.py
+    usecase: 再起動
+    summary: '`os.execv` に渡す `sys.executable` の後ろの引数'
+    value: ('-m', 'project_index', 'serve')

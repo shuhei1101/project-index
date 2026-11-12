@@ -4,7 +4,7 @@ lead: |-
   PreToolUse のフック。文書の MCP のツールの入力に `cwd`・`session_id`・`agent_id` を上書きで入れ、`updatedInput` で返す。
   Python 3.14 の標準ライブラリだけで書き、常に終了コード 0 で戻る。
 test_files:
-- tests/unit/plugins/project_index/hooks/test_pre_tool_use.py
+  - tests/unit/plugins/project_index/hooks/test_pre_tool_use.py
 directory: |-
   ```text
   plugins/project-index/
@@ -12,79 +12,79 @@ directory: |-
      └─ pre_tool_use.py     # main / build_updated_input
   ```
 constants:
-- name: INJECTED_KEYS
-  title: 入れるキー
-  container: hooks/pre_tool_use.py
-  usecase: ツールの呼び出し
-  summary: フックの入力から `tool_input` へ上書きで入れるキー
-  value: ("cwd", "session_id", "agent_id")
+  - name: INJECTED_KEYS
+    title: 入れるキー
+    container: hooks/pre_tool_use.py
+    usecase: ツールの呼び出し
+    summary: フックの入力から `tool_input` へ上書きで入れるキー
+    value: ("cwd", "session_id", "agent_id")
 functions:
-- name: main
-  title: フックの入口
-  container: hooks/pre_tool_use.py
-  usecase: ツールの呼び出し
-  role: 入口
-  summary: stdin の JSON を読み、書き換えた入力を標準出力に出す
-  kind: 関数
-  scope: public
-  is_async: false
-  side_effects: 標準出力に書く
-  returns:
-    type: int
-    description: 常に 0
-  process: |-
-    1. stdin を JSON として読む
-       - 読めない・辞書でない・`tool_input` が辞書でない場合、何も出さず 0 を返す
-    2. 書き換えた入力を作り（入力の書き換え）、`{"hookSpecificOutput": {"hookEventName": "PreToolUse", "updatedInput": ...}}` を標準出力に出す。`permissionDecision` は出さない
-    3. 0 を返す
-  unit_tests:
-  - name: test_main
-    case: 正常
-    summary: 書き換えた入力を返す
-    condition: '`agent_id` を持ち、`tool_input` に別の `cwd` を入れた JSON'
-    mock: なし（stdin・stdout を差し替える）
-    expected: 0 を返し、`updatedInput` の `cwd` がフックの入力の値で、出力に `permissionDecision` が無い
-  - name: test_main_when_input_unparsable
-    case: 異常
-    summary: 読めない入力では何も出さない
-    condition: stdin が `not json`
-    mock: なし
-    expected: 0 を返し、標準出力が空
-- name: build_updated_input
-  title: 入力の書き換え
-  container: hooks/pre_tool_use.py
-  usecase: ツールの呼び出し
-  role: 変換
-  summary: '`tool_input` のコピーに `INJECTED_KEYS` の値を上書きで入れる'
-  kind: 関数
-  scope: public
-  is_async: false
-  args:
-  - name: event
-    title: フックの入力
-    type: dict[str, Any]
-    required: true
-    passing: positional
-    description: stdin の JSON
-  returns:
-    type: dict[str, Any]
-    description: 書き換えた入力
-  process: |-
-    1. `tool_input` をコピーする
-    2. `INJECTED_KEYS` のうち `event` に空でない文字列であるキーを、その値で上書きする。`agent_id` が無ければコピーに入っている `agent_id` を取り除く
-    3. コピーを返す
-  unit_tests:
-  - name: test_build_updated_input
-    case: 正常
-    summary: エージェントが入れた値を上書きする
-    condition: '`tool_input` が `{query: 起動, cwd: /other, session_id: x}`、フックの入力の `cwd` が `/repo`、`session_id` が `s1`、`agent_id` が `a1`'
-    mock: なし
-    expected: '`{query: 起動, cwd: /repo, session_id: s1, agent_id: a1}`。元の `tool_input` は変わらない'
-  - name: test_build_updated_input_when_no_agent
-    case: 正常
-    summary: メインのセッションでは agent_id を入れない
-    condition: 'フックの入力に `agent_id` が無く、`tool_input` に `agent_id: fake`'
-    mock: なし
-    expected: 戻り値に `agent_id` が無い
+  - name: main
+    title: フックの入口
+    container: hooks/pre_tool_use.py
+    usecase: ツールの呼び出し
+    role: 入口
+    summary: stdin の JSON を読み、書き換えた入力を標準出力に出す
+    kind: 関数
+    scope: public
+    is_async: false
+    side_effects: 標準出力に書く
+    returns:
+      type: int
+      description: 常に 0
+    process: |-
+      1. stdin を JSON として読む
+         - 読めない・辞書でない・`tool_input` が辞書でない場合、何も出さず 0 を返す
+      2. 書き換えた入力を作り（入力の書き換え）、`{"hookSpecificOutput": {"hookEventName": "PreToolUse", "updatedInput": ...}}` を標準出力に出す。`permissionDecision` は出さない
+      3. 0 を返す
+    unit_tests:
+      - name: test_main
+        case: 正常
+        summary: 書き換えた入力を返す
+        condition: '`agent_id` を持ち、`tool_input` に別の `cwd` を入れた JSON'
+        mock: なし（stdin・stdout を差し替える）
+        expected: 0 を返し、`updatedInput` の `cwd` がフックの入力の値で、出力に `permissionDecision` が無い
+      - name: test_main_when_input_unparsable
+        case: 異常
+        summary: 読めない入力では何も出さない
+        condition: stdin が `not json`
+        mock: なし
+        expected: 0 を返し、標準出力が空
+  - name: build_updated_input
+    title: 入力の書き換え
+    container: hooks/pre_tool_use.py
+    usecase: ツールの呼び出し
+    role: 変換
+    summary: '`tool_input` のコピーに `INJECTED_KEYS` の値を上書きで入れる'
+    kind: 関数
+    scope: public
+    is_async: false
+    args:
+      - name: event
+        title: フックの入力
+        type: dict[str, Any]
+        required: true
+        passing: positional
+        description: stdin の JSON
+    returns:
+      type: dict[str, Any]
+      description: 書き換えた入力
+    process: |-
+      1. `tool_input` をコピーする
+      2. `INJECTED_KEYS` のうち `event` に空でない文字列であるキーを、その値で上書きする。`agent_id` が無ければコピーに入っている `agent_id` を取り除く
+      3. コピーを返す
+    unit_tests:
+      - name: test_build_updated_input
+        case: 正常
+        summary: エージェントが入れた値を上書きする
+        condition: '`tool_input` が `{query: 起動, cwd: /other, session_id: x}`、フックの入力の `cwd` が `/repo`、`session_id` が `s1`、`agent_id` が `a1`'
+        mock: なし
+        expected: '`{query: 起動, cwd: /repo, session_id: s1, agent_id: a1}`。元の `tool_input` は変わらない'
+      - name: test_build_updated_input_when_no_agent
+        case: 正常
+        summary: メインのセッションでは agent_id を入れない
+        condition: 'フックの入力に `agent_id` が無く、`tool_input` に `agent_id: fake`'
+        mock: なし
+        expected: 戻り値に `agent_id` が無い
 refs:
-- IF-20#
+  - IF-20#

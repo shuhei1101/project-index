@@ -2,114 +2,114 @@ id: MOD-32
 title: 索引のサーバー / 履歴 / snapshot.py
 lead: リビジョンの書き出し。
 test_files:
-- tests/unit/project_index/features/history/test_snapshot.py
+  - tests/unit/project_index/features/history/test_snapshot.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      リビジョンの書き出し ..> gitの実行 : git archive
-      class gitの実行 {
-        <<function>>
-      }
-      class リビジョンの書き出し {
-        +書き出す(リポジトリ, commit) Path
-      }
-      click gitの実行 href "./MOD-86.py.yaml#gitの実行"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        リビジョンの書き出し ..> gitの実行 : git archive
+        class gitの実行 {
+          <<function>>
+        }
+        class リビジョンの書き出し {
+          +書き出す(リポジトリ, commit) Path
+        }
+        click gitの実行 href "./MOD-86.py.yaml#gitの実行"
 classes:
-- name: SnapshotStore
-  title: リビジョンの書き出し
-  container: project_index/features/history/snapshot.py
-  usecase: 共通
-  role: キャッシュ
-  summary: commit のファイルを `state_dir` の下に書き出し、同じ commit は書き出したフォルダを返す
-  description: |-
-    書き出し先は `{dir}/{repo_root の SHA-256 の先頭 12 桁}/{commit}/`。書き出し中は `{commit}.tmp` に書いてから名前を変えるので、出来上がったフォルダだけが見える。
-    commit は変わらないので、書き出したフォルダを書き換えない。
-  kind: クラス
-  properties:
-  - name: dir
-    title: 書き出しの置き場所
-    type: Path
-    access: 公開
-    description: '`{state_dir}/snapshots`'
-  - name: keep
-    title: 残す数
-    type: int
-    access: 公開
-    default: SNAPSHOT_KEEP
-    description: リポジトリごとに残す書き出しの数。超えたら使った時刻が古いものから削除する
-  - name: _locks
-    title: commit ごとの排他
-    type: dict[Path, threading.Lock]
-    access: 内部 (_)
-    description: 同じ commit の書き出しを 1 回にする
-  methods:
-  - name: checkout
-    title: 書き出す
-    kind: メソッド
-    summary: commit のファイルを書き出したフォルダを返す
-    scope: public
-    thread_safe: true
-    side_effects: '`dir` の下にフォルダを作る・削除する。使ったフォルダの更新日時を今にする'
-    args:
-    - name: repo_root
-      title: リポジトリの直下
-      type: Path
-      required: true
-      passing: positional
-      description: クローンの直下
-    - name: commit
-      title: commit
-      type: str
-      required: true
-      passing: positional
-      description: 解いた commit の完全な SHA
-    returns:
-      type: Path
-      description: リポジトリの直下に当たる書き出しのフォルダ
-    process: |-
-      1. 書き出し先があれば更新日時を今にして返す
-      2. commit ごとの排他を取り、取った後にもう一度書き出し先を確かめる
-      3. `{commit}.tmp` を空にして作り、`git archive --format=tar {commit}` の出力を `tarfile`（`filter="data"`）で展開する（gitの実行）
-      4. `{commit}.tmp` を `{commit}` に名前を変える
-         - `[info]` リビジョンを書き出した（リポジトリ・commit・ファイル数）
-      5. リポジトリの書き出しが `keep` を超えたら、更新日時が古いものから `shutil.rmtree` する（今書き出したものは残す）
-      6. 書き出し先を返す
-    exceptions:
-    - name: GitError
-      condition: '`git archive` が失敗する'
-      message: git の標準エラー
-      notes: '`{commit}.tmp` を削除してから伝える'
-    unit_tests:
-    - name: test_snapshot_store_checkout
-      case: 正常
-      summary: commit の内容を書き出す
-      condition: '`a.yaml` を 2 回 commit した一時リポジトリの 1 つ目の commit'
-      mock: なし（一時フォルダで `git init`）
-      expected: 返したフォルダの `a.yaml` が 1 つ目の内容、`.tmp` が残らない
-    - name: test_snapshot_store_checkout_when_cached
-      case: 正常
-      summary: 2 回目は git を呼ばない
-      condition: 同じ commit で 2 回
-      mock: gitの実行（呼ばれた回数を数える包み）
-      expected: '`git archive` は 1 回だけ'
-    - name: test_snapshot_store_checkout_when_concurrent
-      case: 正常
-      summary: 同時の書き出しは 1 回
-      condition: 同じ commit を 4 スレッドから同時に
-      mock: gitの実行（数える包み）
-      expected: 全て同じフォルダ、`git archive` は 1 回
-    - name: test_snapshot_store_checkout_when_over_keep
-      case: 正常
-      summary: 古い書き出しを削除する
-      condition: '`keep=2` で 3 つの commit を順に'
-      mock: なし
-      expected: 最初の commit のフォルダが無く、後の 2 つが残る
+  - name: SnapshotStore
+    title: リビジョンの書き出し
+    container: project_index/features/history/snapshot.py
+    usecase: 共通
+    role: キャッシュ
+    summary: commit のファイルを `state_dir` の下に書き出し、同じ commit は書き出したフォルダを返す
+    description: |-
+      書き出し先は `{dir}/{repo_root の SHA-256 の先頭 12 桁}/{commit}/`。書き出し中は `{commit}.tmp` に書いてから名前を変えるので、出来上がったフォルダだけが見える。
+      commit は変わらないので、書き出したフォルダを書き換えない。
+    kind: クラス
+    properties:
+      - name: dir
+        title: 書き出しの置き場所
+        type: Path
+        access: 公開
+        description: '`{state_dir}/snapshots`'
+      - name: keep
+        title: 残す数
+        type: int
+        access: 公開
+        default: SNAPSHOT_KEEP
+        description: リポジトリごとに残す書き出しの数。超えたら使った時刻が古いものから削除する
+      - name: _locks
+        title: commit ごとの排他
+        type: dict[Path, threading.Lock]
+        access: 内部 (_)
+        description: 同じ commit の書き出しを 1 回にする
+    methods:
+      - name: checkout
+        title: 書き出す
+        kind: メソッド
+        summary: commit のファイルを書き出したフォルダを返す
+        scope: public
+        thread_safe: true
+        side_effects: '`dir` の下にフォルダを作る・削除する。使ったフォルダの更新日時を今にする'
+        args:
+          - name: repo_root
+            title: リポジトリの直下
+            type: Path
+            required: true
+            passing: positional
+            description: クローンの直下
+          - name: commit
+            title: commit
+            type: str
+            required: true
+            passing: positional
+            description: 解いた commit の完全な SHA
+        returns:
+          type: Path
+          description: リポジトリの直下に当たる書き出しのフォルダ
+        process: |-
+          1. 書き出し先があれば更新日時を今にして返す
+          2. commit ごとの排他を取り、取った後にもう一度書き出し先を確かめる
+          3. `{commit}.tmp` を空にして作り、`git archive --format=tar {commit}` の出力を `tarfile`（`filter="data"`）で展開する（gitの実行）
+          4. `{commit}.tmp` を `{commit}` に名前を変える
+             - `[info]` リビジョンを書き出した（リポジトリ・commit・ファイル数）
+          5. リポジトリの書き出しが `keep` を超えたら、更新日時が古いものから `shutil.rmtree` する（今書き出したものは残す）
+          6. 書き出し先を返す
+        exceptions:
+          - name: GitError
+            condition: '`git archive` が失敗する'
+            message: git の標準エラー
+            notes: '`{commit}.tmp` を削除してから伝える'
+        unit_tests:
+          - name: test_snapshot_store_checkout
+            case: 正常
+            summary: commit の内容を書き出す
+            condition: '`a.yaml` を 2 回 commit した一時リポジトリの 1 つ目の commit'
+            mock: なし（一時フォルダで `git init`）
+            expected: 返したフォルダの `a.yaml` が 1 つ目の内容、`.tmp` が残らない
+          - name: test_snapshot_store_checkout_when_cached
+            case: 正常
+            summary: 2 回目は git を呼ばない
+            condition: 同じ commit で 2 回
+            mock: gitの実行（呼ばれた回数を数える包み）
+            expected: '`git archive` は 1 回だけ'
+          - name: test_snapshot_store_checkout_when_concurrent
+            case: 正常
+            summary: 同時の書き出しは 1 回
+            condition: 同じ commit を 4 スレッドから同時に
+            mock: gitの実行（数える包み）
+            expected: 全て同じフォルダ、`git archive` は 1 回
+          - name: test_snapshot_store_checkout_when_over_keep
+            case: 正常
+            summary: 古い書き出しを削除する
+            condition: '`keep=2` で 3 つの commit を順に'
+            mock: なし
+            expected: 最初の commit のフォルダが無く、後の 2 つが残る
 constants:
-- name: SNAPSHOT_KEEP
-  title: 残す書き出しの数
-  container: project_index/features/history/snapshot.py
-  usecase: 共通
-  summary: リポジトリごとに残すリビジョンの書き出しの数
-  value: '20'
+  - name: SNAPSHOT_KEEP
+    title: 残す書き出しの数
+    container: project_index/features/history/snapshot.py
+    usecase: 共通
+    summary: リポジトリごとに残すリビジョンの書き出しの数
+    value: '20'

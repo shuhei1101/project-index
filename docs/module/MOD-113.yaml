@@ -19,72 +19,72 @@ directory: |
   └─ aliases.source.yaml   # 取り込み元のリポジトリ・タグ・パス
   ```
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      文書のストア ..> ファイルの収集
-      文書のストア ..> ファイルの読み込み
-      文書のストア ..> 文書 : 返す
-      文書のストア ..> 読み込みの結果 : 返す
-      ファイルの読み込み ..> メタデータの解決
-      文書のストア ..> スキーマの参照の解決
-      メタデータの解決 ..> 項目の取得
-      読み込みの結果 o-- 文書
-      読み込みの結果 o-- 読めなかったファイル
-      メタデータのずれの確かめ ..> 文書のストア
-      メタデータのずれの確かめ ..> metadataの列の欠け
-      メタデータのずれの確かめ ..> 索引に無いファイル
-      メタデータのずれの確かめ ..> メタデータのずれ : 返す
-      class メタデータのずれの確かめ {
-        <<function>>
-      }
-      class metadataの列の欠け {
-        <<function>>
-      }
-      class 索引に無いファイル {
-        <<function>>
-      }
-      class メタデータのずれ {
-        <<dataclass>>
-      }
-      class 文書のストア {
-        <<class>>
-      }
-      class スキーマの参照の解決 {
-        <<function>>
-      }
-      class ファイルの収集 {
-        <<function>>
-      }
-      class ファイルの読み込み {
-        <<function>>
-      }
-      class メタデータの解決 {
-        <<function>>
-      }
-      class 項目の取得 {
-        <<function>>
-      }
-      class 文書 {
-        <<dataclass>>
-      }
-      class 読み込みの結果 {
-        <<dataclass>>
-      }
-      class 読めなかったファイル {
-        <<dataclass>>
-      }
-      click 文書のストア href "./MOD-29.py.yaml#文書のストア"
-      click ファイルの収集 href "./MOD-27.py.yaml#ファイルの収集"
-      click ファイルの読み込み href "./MOD-27.py.yaml#ファイルの読み込み"
-      click 文書 href "./MOD-30.py.yaml#文書"
-      click 読み込みの結果 href "./MOD-30.py.yaml#読み込みの結果"
-      click メタデータの解決 href "./MOD-25.py.yaml#メタデータの解決"
-      click スキーマの参照の解決 href "./MOD-28.py.yaml#スキーマの参照の解決"
-      click 項目の取得 href "./MOD-25.py.yaml#項目の取得"
-      click 読めなかったファイル href "./MOD-30.py.yaml#読めなかったファイル"
-      click メタデータのずれの確かめ href "./MOD-29.py.yaml#メタデータのずれの確かめ"
-      click metadataの列の欠け href "./MOD-25.py.yaml#metadataの列の欠け"
-      click 索引に無いファイル href "./MOD-27.py.yaml#索引に無いファイル"
-      click メタデータのずれ href "./MOD-30.py.yaml#メタデータのずれ"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        文書のストア ..> ファイルの収集
+        文書のストア ..> ファイルの読み込み
+        文書のストア ..> 文書 : 返す
+        文書のストア ..> 読み込みの結果 : 返す
+        ファイルの読み込み ..> メタデータの解決
+        文書のストア ..> スキーマの参照の解決
+        メタデータの解決 ..> 項目の取得
+        読み込みの結果 o-- 文書
+        読み込みの結果 o-- 読めなかったファイル
+        メタデータのずれの確かめ ..> 文書のストア
+        メタデータのずれの確かめ ..> metadataの列の欠け
+        メタデータのずれの確かめ ..> 索引に無いファイル
+        メタデータのずれの確かめ ..> メタデータのずれ : 返す
+        class メタデータのずれの確かめ {
+          <<function>>
+        }
+        class metadataの列の欠け {
+          <<function>>
+        }
+        class 索引に無いファイル {
+          <<function>>
+        }
+        class メタデータのずれ {
+          <<dataclass>>
+        }
+        class 文書のストア {
+          <<class>>
+        }
+        class スキーマの参照の解決 {
+          <<function>>
+        }
+        class ファイルの収集 {
+          <<function>>
+        }
+        class ファイルの読み込み {
+          <<function>>
+        }
+        class メタデータの解決 {
+          <<function>>
+        }
+        class 項目の取得 {
+          <<function>>
+        }
+        class 文書 {
+          <<dataclass>>
+        }
+        class 読み込みの結果 {
+          <<dataclass>>
+        }
+        class 読めなかったファイル {
+          <<dataclass>>
+        }
+        click 文書のストア href "./MOD-29.py.yaml#文書のストア"
+        click ファイルの収集 href "./MOD-27.py.yaml#ファイルの収集"
+        click ファイルの読み込み href "./MOD-27.py.yaml#ファイルの読み込み"
+        click 文書 href "./MOD-30.py.yaml#文書"
+        click 読み込みの結果 href "./MOD-30.py.yaml#読み込みの結果"
+        click メタデータの解決 href "./MOD-25.py.yaml#メタデータの解決"
+        click スキーマの参照の解決 href "./MOD-28.py.yaml#スキーマの参照の解決"
+        click 項目の取得 href "./MOD-25.py.yaml#項目の取得"
+        click 読めなかったファイル href "./MOD-30.py.yaml#読めなかったファイル"
+        click メタデータのずれの確かめ href "./MOD-29.py.yaml#メタデータのずれの確かめ"
+        click metadataの列の欠け href "./MOD-25.py.yaml#metadataの列の欠け"
+        click 索引に無いファイル href "./MOD-27.py.yaml#索引に無いファイル"
+        click メタデータのずれ href "./MOD-30.py.yaml#メタデータのずれ"

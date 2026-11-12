@@ -2,233 +2,233 @@ id: MOD-24
 title: 索引のサーバー / 文書のストア / aliases.py
 lead: エイリアスのキーの検証と、用語の収集・照合。
 test_files:
-- tests/unit/project_index/features/documents/test_aliases.py
+  - tests/unit/project_index/features/documents/test_aliases.py
 constants:
-- name: ALIAS_SCHEMA_PATH
-  title: 取り込んだエイリアスのスキーマ
-  container: project_index/features/documents/aliases.py
-  usecase: 共通
-  summary: 配布に同梱する alias-inject の「エイリアスの元の行」のスキーマのパス（`importlib.resources` で引く）。alias-inject の `schemas/aliases.schema.yaml` を書き換えずに置く
-  value: '"schemas/aliases.schema.yaml"'
-- name: ALIAS_SOURCE_PATH
-  title: エイリアスのスキーマの取り込み元
-  container: project_index/features/documents/aliases.py
-  usecase: 共通
-  summary: 取り込み元を記録したファイルのパス。`repository`（`shuhei1101/alias-inject`）・`tag`（`v0.3.0`）・`path`（`schemas/aliases.schema.yaml`）を持つ。スキーマを取り込み直すときに一緒に書き換える
-  value: '"schemas/aliases.source.yaml"'
-- name: ALIAS_REQUIRED_KEYS
-  title: 引用の種類ごとの必須のキー
-  container: project_index/features/documents/aliases.py
-  usecase: 共通
-  summary: 取り込んだスキーマの `metadata` の各キーの説明に書かれた必須を、引用の種類ごとに並べたもの。`env` の `("url", "port")` は 1 つ以上が必須
-  value: '{"term": ("id", "name", "description"), "doc": ("id", "name", "description"), "command": ("id", "name", "command"), "url": ("id", "name", "url"), "skill": ("id", "name", "skill"), "tool": ("id", "name", "tool"), "path": ("id", "name", "path"), "env": ("id", "name", ("url", "port")), "avoid": ("id", "name", "replacement")}'
-- name: ALIAS_LIST_KEYS
-  title: 文字列か文字列の並びのキー
-  container: project_index/features/documents/aliases.py
-  usecase: 共通
-  summary: 値に文字列か文字列の並びを許すエイリアスのキー。返すときは文字列 1 つを要素 1 つの並びにする
-  value: ("aliases", "avoid")
+  - name: ALIAS_SCHEMA_PATH
+    title: 取り込んだエイリアスのスキーマ
+    container: project_index/features/documents/aliases.py
+    usecase: 共通
+    summary: 配布に同梱する alias-inject の「エイリアスの元の行」のスキーマのパス（`importlib.resources` で引く）。alias-inject の `schemas/aliases.schema.yaml` を書き換えずに置く
+    value: '"schemas/aliases.schema.yaml"'
+  - name: ALIAS_SOURCE_PATH
+    title: エイリアスのスキーマの取り込み元
+    container: project_index/features/documents/aliases.py
+    usecase: 共通
+    summary: 取り込み元を記録したファイルのパス。`repository`（`shuhei1101/alias-inject`）・`tag`（`v0.3.0`）・`path`（`schemas/aliases.schema.yaml`）を持つ。スキーマを取り込み直すときに一緒に書き換える
+    value: '"schemas/aliases.source.yaml"'
+  - name: ALIAS_REQUIRED_KEYS
+    title: 引用の種類ごとの必須のキー
+    container: project_index/features/documents/aliases.py
+    usecase: 共通
+    summary: 取り込んだスキーマの `metadata` の各キーの説明に書かれた必須を、引用の種類ごとに並べたもの。`env` の `("url", "port")` は 1 つ以上が必須
+    value: '{"term": ("id", "name", "description"), "doc": ("id", "name", "description"), "command": ("id", "name", "command"), "url": ("id", "name", "url"), "skill": ("id", "name", "skill"), "tool": ("id", "name", "tool"), "path": ("id", "name", "path"), "env": ("id", "name", ("url", "port")), "avoid": ("id", "name", "replacement")}'
+  - name: ALIAS_LIST_KEYS
+    title: 文字列か文字列の並びのキー
+    container: project_index/features/documents/aliases.py
+    usecase: 共通
+    summary: 値に文字列か文字列の並びを許すエイリアスのキー。返すときは文字列 1 つを要素 1 つの並びにする
+    value: ("aliases", "avoid")
 functions:
-- name: alias_schema
-  title: 取り込んだエイリアスのスキーマ
-  kind: 関数
-  container: project_index/features/documents/aliases.py
-  usecase: 共通
-  role: 読み込み
-  summary: 同梱した `ALIAS_SCHEMA_PATH` を YAML として読んで返す
-  scope: public
-  thread_safe: true
-  returns:
-    type: dict[str, Any]
-    description: スキーマ（`functools.cache` で 1 回だけ読む）
-  process: |-
-    1. `importlib.resources.files("project_index") / ALIAS_SCHEMA_PATH` を YAML として読む（YAMLの読み込み）
-    2. 返す
-  unit_tests:
-  - name: test_alias_schema
-    case: 正常
-    summary: 同梱したスキーマ
-    condition: 引数なし
-    mock: なし
-    expected: '`$defs.alias.properties.metadata.properties` に `name`・`aliases`・`description`・`avoid`・`replacement` があり、`$defs.alias.properties.alias_type` の `enum` が 9 個'
-- name: alias_schema_version
-  title: エイリアスのスキーマの取り込み元のタグ
-  kind: 関数
-  container: project_index/features/documents/aliases.py
-  usecase: 配信元の検査
-  role: 読み込み
-  summary: '`ALIAS_SOURCE_PATH` の `tag` を返す'
-  scope: public
-  thread_safe: true
-  returns:
-    type: str
-    description: 取り込み元のタグ（`v0.3.0`）
-  process: 1. `importlib.resources.files("project_index") / ALIAS_SOURCE_PATH` を YAML として読み、`tag` を返す
-  unit_tests:
-  - name: test_alias_schema_version
-    case: 正常
-    summary: 取り込み元のタグ
-    condition: 引数なし
-    mock: なし
-    expected: '`v0.3.0`'
-- name: check_alias_document
-  title: エイリアスのキーの検証
-  kind: 関数
-  container: project_index/features/documents/aliases.py
-  usecase: 共通
-  role: 検証
-  summary: '`alias_type` を持つ行の文書 1 件のエイリアスのキーの値を、取り込んだスキーマのキーと引用の種類の必須で検証する'
-  scope: public
-  thread_safe: true
-  args:
-  - name: document
-    title: 文書
-    type: Document
-    required: true
-    passing: positional
-    description: '`metadata` に `alias_type` を持つ文書'
-  returns:
-    type: list[Violation]
-    description: 違反。`path` はエイリアスのキー、`doc` は文書のパス（配信元の直下から）
-  process: |-
-    1. 取り込んだエイリアスのスキーマの `$defs.alias.properties.metadata.properties` のキーをエイリアスのキーにする
-    2. `ALIAS_REQUIRED_KEYS` の `metadata["alias_type"]` のキーごとに、値が無いか空文字なら `必須のキーが無い` の違反を加える。組（`("url", "port")`）は全て無いときに、組の先頭のキーのパスで `{キー} のどれか 1 つが要ります` の違反を加える
-    3. 値を持つエイリアスのキーごとに型を確かめる
-       - `ALIAS_LIST_KEYS` は文字列か、空でない文字列の並びでなければ `文字列か文字列の並びではありません`
-       - `related` は並びで、要素が文字列か `to` を文字列で持つ辞書でなければ `related の要素は文書の ID か to を持つ辞書です`
-       - `port` は整数か文字列でなければ `整数か文字列ではありません`
-       - それ以外のキーは文字列でなければ `文字列ではありません`
-    4. 違反を返す
-  unit_tests:
-  - name: test_check_alias_document
-    case: 正常
-    summary: 通る用語
-    condition: '`alias_type: term`・`name: 作業範囲`・`aliases: [scope, 担当範囲]`・`description` あり'
-    mock: なし
-    expected: 違反が空
-  - name: test_check_alias_document_when_aliases_number
-    case: 異常
-    summary: 別名が数値
-    condition: '`alias_type: term`・`aliases: 3`'
-    mock: なし
-    expected: 違反が 1 件で、`path` が `aliases`、`rule` が `文字列か文字列の並びではありません`、`doc` が文書のパス
-  - name: test_check_alias_document_when_required_missing
-    case: 異常
-    summary: 引用の種類の必須が無い
-    condition: '`alias_type: command` で `command` が無い文書と、`alias_type: env` で `url`・`port` が無い文書'
-    mock: なし
-    expected: 1 つ目は `path` が `command` の `必須のキーが無い`、2 つ目は `path` が `url` の `url・port のどれか 1 つが要ります`
-  - name: test_check_alias_document_when_aliases_string
-    case: 正常
-    summary: 別名が文字列
-    condition: '`alias_type: doc`・`aliases: settings`・`description` あり'
-    mock: なし
-    expected: 違反が空
-- name: collect_aliases
-  title: エイリアスの集め
-  kind: 関数
-  container: project_index/features/documents/aliases.py
-  usecase: 共通
-  role: 変換
-  summary: 文書のうち `alias_type` を持つ行の文書を検証し、通った文書のエイリアスと違反を返す
-  scope: public
-  thread_safe: true
-  args:
-  - name: source
-    title: 配信中の配信元
-    type: ServedSource
-    required: true
-    passing: positional
-    description: documents の行の `alias_type` を読む
-  - name: documents
-    title: 文書
-    type: Sequence[Document]
-    required: true
-    passing: positional
-    description: 集めた文書
-  returns:
-    type: AliasCollection
-    description: エイリアスと違反
-  process: |-
-    1. 有効な documents の行に `alias_type` を持つ行があるかを `has_alias_rows` にする
-    2. `metadata` に `alias_type` を持つ文書ごとにエイリアスのキーの検証をする
-       - 違反があれば `violations` に加え、エイリアスにしない
-       - 違反が無ければ `ALIAS_LIST_KEYS` の文字列を要素 1 つの並びにし、`AliasEntry` にして `entries` に加える（`extra` は取り込んだスキーマの `metadata` のキーのうち `AliasEntry` の項目以外で値を持つもの）
-    3. `AliasCollection` を返す
-  unit_tests:
-  - name: test_collect_aliases
-    case: 正常
-    summary: 用語と文書の別名と違反
-    condition: '`alias_type: term` の行の「作業範囲」（`aliases: [scope, 担当範囲]`・`avoid: [担当領域]`）と「壊れた用語」（`aliases: 3`）、`alias_type: doc` の行の「設定のリファレンス」（`aliases: settings`）、`alias_type` の無い行の文書'
-    mock: なし
-    expected: '`entries` が 2 件（作業範囲の `avoid` が `[担当領域]`、設定のリファレンスの `aliases` が `[settings]` で `avoid` が `None`）、`violations` が 1 件で `doc` が壊れた用語のパス、`has_alias_rows` が `True`'
-  - name: test_collect_aliases_when_no_alias_rows
-    case: 正常
-    summary: エイリアスの行が無い
-    condition: '`alias_type` を持つ行が無い配信元'
-    mock: なし
-    expected: '`entries`・`violations` が空で、`has_alias_rows` が `False`'
-- name: match_words
-  title: 照合する語の一覧
-  kind: 関数
-  container: project_index/features/documents/aliases.py
-  usecase: 用語の一覧
-  role: 変換
-  summary: エイリアスから、照合する語（`name` と `aliases`）を指す文書の ID とともに並べる
-  scope: public
-  thread_safe: true
-  args:
-  - name: entries
-    title: エイリアス
-    type: Sequence[AliasEntry]
-    required: true
-    passing: positional
-    description: エイリアスの集めの `entries`
-  returns:
-    type: list[MatchWord]
-    description: エイリアスの順に、`name`、`aliases` の順で並べた語
-  process: |-
-    1. エイリアスごとに `name` を `kind: name`、`aliases` の各要素を `kind: alias` の照合する語にする
-    2. 並べて返す
-  unit_tests:
-  - name: test_match_words
-    case: 正常
-    summary: 名前と別名
-    condition: '「作業範囲」（`aliases: [scope, 担当範囲]`）のエイリアス 1 件'
-    mock: なし
-    expected: '`作業範囲`（`name`）・`scope`（`alias`）・`担当範囲`（`alias`）の順で、`id` がどれも作業範囲の ID'
-- name: term_ids
-  title: 用語に当たる文書の ID
-  kind: 関数
-  container: project_index/features/documents/aliases.py
-  usecase: 検索
-  role: 判定
-  summary: '`name` か `aliases` が用語に一致するエイリアスの文書の ID を返す'
-  scope: public
-  thread_safe: true
-  args:
-  - name: entries
-    title: エイリアス
-    type: Sequence[AliasEntry]
-    required: true
-    passing: positional
-    description: エイリアスの集めの `entries`
-  - name: term
-    title: 用語
-    type: str
-    required: true
-    passing: positional
-    description: '`search_docs` の `term`'
-  returns:
-    type: set[str]
-    description: 当たった文書の ID
-  process: |-
-    1. 用語と各エイリアスの照合する語を、条件の比較と同じ正規化（NFKC と `casefold`）にする
-    2. 完全一致する語を持つエイリアスの `id` を集めて返す
-  unit_tests:
-  - name: test_term_ids
-    case: 正常
-    summary: 正規化した完全一致
-    condition: '「作業範囲」（`aliases: [scope, 担当範囲]`）のエイリアスに、`担当範囲`・`SCOPE`・`担当` を順に渡す'
-    mock: なし
-    expected: 1 つ目と 2 つ目は作業範囲の ID、3 つ目は空
+  - name: alias_schema
+    title: 取り込んだエイリアスのスキーマ
+    kind: 関数
+    container: project_index/features/documents/aliases.py
+    usecase: 共通
+    role: 読み込み
+    summary: 同梱した `ALIAS_SCHEMA_PATH` を YAML として読んで返す
+    scope: public
+    thread_safe: true
+    returns:
+      type: dict[str, Any]
+      description: スキーマ（`functools.cache` で 1 回だけ読む）
+    process: |-
+      1. `importlib.resources.files("project_index") / ALIAS_SCHEMA_PATH` を YAML として読む（YAMLの読み込み）
+      2. 返す
+    unit_tests:
+      - name: test_alias_schema
+        case: 正常
+        summary: 同梱したスキーマ
+        condition: 引数なし
+        mock: なし
+        expected: '`$defs.alias.properties.metadata.properties` に `name`・`aliases`・`description`・`avoid`・`replacement` があり、`$defs.alias.properties.alias_type` の `enum` が 9 個'
+  - name: alias_schema_version
+    title: エイリアスのスキーマの取り込み元のタグ
+    kind: 関数
+    container: project_index/features/documents/aliases.py
+    usecase: 配信元の検査
+    role: 読み込み
+    summary: '`ALIAS_SOURCE_PATH` の `tag` を返す'
+    scope: public
+    thread_safe: true
+    returns:
+      type: str
+      description: 取り込み元のタグ（`v0.3.0`）
+    process: 1. `importlib.resources.files("project_index") / ALIAS_SOURCE_PATH` を YAML として読み、`tag` を返す
+    unit_tests:
+      - name: test_alias_schema_version
+        case: 正常
+        summary: 取り込み元のタグ
+        condition: 引数なし
+        mock: なし
+        expected: '`v0.3.0`'
+  - name: check_alias_document
+    title: エイリアスのキーの検証
+    kind: 関数
+    container: project_index/features/documents/aliases.py
+    usecase: 共通
+    role: 検証
+    summary: '`alias_type` を持つ行の文書 1 件のエイリアスのキーの値を、取り込んだスキーマのキーと引用の種類の必須で検証する'
+    scope: public
+    thread_safe: true
+    args:
+      - name: document
+        title: 文書
+        type: Document
+        required: true
+        passing: positional
+        description: '`metadata` に `alias_type` を持つ文書'
+    returns:
+      type: list[Violation]
+      description: 違反。`path` はエイリアスのキー、`doc` は文書のパス（配信元の直下から）
+    process: |-
+      1. 取り込んだエイリアスのスキーマの `$defs.alias.properties.metadata.properties` のキーをエイリアスのキーにする
+      2. `ALIAS_REQUIRED_KEYS` の `metadata["alias_type"]` のキーごとに、値が無いか空文字なら `必須のキーが無い` の違反を加える。組（`("url", "port")`）は全て無いときに、組の先頭のキーのパスで `{キー} のどれか 1 つが要ります` の違反を加える
+      3. 値を持つエイリアスのキーごとに型を確かめる
+         - `ALIAS_LIST_KEYS` は文字列か、空でない文字列の並びでなければ `文字列か文字列の並びではありません`
+         - `related` は並びで、要素が文字列か `to` を文字列で持つ辞書でなければ `related の要素は文書の ID か to を持つ辞書です`
+         - `port` は整数か文字列でなければ `整数か文字列ではありません`
+         - それ以外のキーは文字列でなければ `文字列ではありません`
+      4. 違反を返す
+    unit_tests:
+      - name: test_check_alias_document
+        case: 正常
+        summary: 通る用語
+        condition: '`alias_type: term`・`name: 作業範囲`・`aliases: [scope, 担当範囲]`・`description` あり'
+        mock: なし
+        expected: 違反が空
+      - name: test_check_alias_document_when_aliases_number
+        case: 異常
+        summary: 別名が数値
+        condition: '`alias_type: term`・`aliases: 3`'
+        mock: なし
+        expected: 違反が 1 件で、`path` が `aliases`、`rule` が `文字列か文字列の並びではありません`、`doc` が文書のパス
+      - name: test_check_alias_document_when_required_missing
+        case: 異常
+        summary: 引用の種類の必須が無い
+        condition: '`alias_type: command` で `command` が無い文書と、`alias_type: env` で `url`・`port` が無い文書'
+        mock: なし
+        expected: 1 つ目は `path` が `command` の `必須のキーが無い`、2 つ目は `path` が `url` の `url・port のどれか 1 つが要ります`
+      - name: test_check_alias_document_when_aliases_string
+        case: 正常
+        summary: 別名が文字列
+        condition: '`alias_type: doc`・`aliases: settings`・`description` あり'
+        mock: なし
+        expected: 違反が空
+  - name: collect_aliases
+    title: エイリアスの集め
+    kind: 関数
+    container: project_index/features/documents/aliases.py
+    usecase: 共通
+    role: 変換
+    summary: 文書のうち `alias_type` を持つ行の文書を検証し、通った文書のエイリアスと違反を返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: source
+        title: 配信中の配信元
+        type: ServedSource
+        required: true
+        passing: positional
+        description: documents の行の `alias_type` を読む
+      - name: documents
+        title: 文書
+        type: Sequence[Document]
+        required: true
+        passing: positional
+        description: 集めた文書
+    returns:
+      type: AliasCollection
+      description: エイリアスと違反
+    process: |-
+      1. 有効な documents の行に `alias_type` を持つ行があるかを `has_alias_rows` にする
+      2. `metadata` に `alias_type` を持つ文書ごとにエイリアスのキーの検証をする
+         - 違反があれば `violations` に加え、エイリアスにしない
+         - 違反が無ければ `ALIAS_LIST_KEYS` の文字列を要素 1 つの並びにし、`AliasEntry` にして `entries` に加える（`extra` は取り込んだスキーマの `metadata` のキーのうち `AliasEntry` の項目以外で値を持つもの）
+      3. `AliasCollection` を返す
+    unit_tests:
+      - name: test_collect_aliases
+        case: 正常
+        summary: 用語と文書の別名と違反
+        condition: '`alias_type: term` の行の「作業範囲」（`aliases: [scope, 担当範囲]`・`avoid: [担当領域]`）と「壊れた用語」（`aliases: 3`）、`alias_type: doc` の行の「設定のリファレンス」（`aliases: settings`）、`alias_type` の無い行の文書'
+        mock: なし
+        expected: '`entries` が 2 件（作業範囲の `avoid` が `[担当領域]`、設定のリファレンスの `aliases` が `[settings]` で `avoid` が `None`）、`violations` が 1 件で `doc` が壊れた用語のパス、`has_alias_rows` が `True`'
+      - name: test_collect_aliases_when_no_alias_rows
+        case: 正常
+        summary: エイリアスの行が無い
+        condition: '`alias_type` を持つ行が無い配信元'
+        mock: なし
+        expected: '`entries`・`violations` が空で、`has_alias_rows` が `False`'
+  - name: match_words
+    title: 照合する語の一覧
+    kind: 関数
+    container: project_index/features/documents/aliases.py
+    usecase: 用語の一覧
+    role: 変換
+    summary: エイリアスから、照合する語（`name` と `aliases`）を指す文書の ID とともに並べる
+    scope: public
+    thread_safe: true
+    args:
+      - name: entries
+        title: エイリアス
+        type: Sequence[AliasEntry]
+        required: true
+        passing: positional
+        description: エイリアスの集めの `entries`
+    returns:
+      type: list[MatchWord]
+      description: エイリアスの順に、`name`、`aliases` の順で並べた語
+    process: |-
+      1. エイリアスごとに `name` を `kind: name`、`aliases` の各要素を `kind: alias` の照合する語にする
+      2. 並べて返す
+    unit_tests:
+      - name: test_match_words
+        case: 正常
+        summary: 名前と別名
+        condition: '「作業範囲」（`aliases: [scope, 担当範囲]`）のエイリアス 1 件'
+        mock: なし
+        expected: '`作業範囲`（`name`）・`scope`（`alias`）・`担当範囲`（`alias`）の順で、`id` がどれも作業範囲の ID'
+  - name: term_ids
+    title: 用語に当たる文書の ID
+    kind: 関数
+    container: project_index/features/documents/aliases.py
+    usecase: 検索
+    role: 判定
+    summary: '`name` か `aliases` が用語に一致するエイリアスの文書の ID を返す'
+    scope: public
+    thread_safe: true
+    args:
+      - name: entries
+        title: エイリアス
+        type: Sequence[AliasEntry]
+        required: true
+        passing: positional
+        description: エイリアスの集めの `entries`
+      - name: term
+        title: 用語
+        type: str
+        required: true
+        passing: positional
+        description: '`search_docs` の `term`'
+    returns:
+      type: set[str]
+      description: 当たった文書の ID
+    process: |-
+      1. 用語と各エイリアスの照合する語を、条件の比較と同じ正規化（NFKC と `casefold`）にする
+      2. 完全一致する語を持つエイリアスの `id` を集めて返す
+    unit_tests:
+      - name: test_term_ids
+        case: 正常
+        summary: 正規化した完全一致
+        condition: '「作業範囲」（`aliases: [scope, 担当範囲]`）のエイリアスに、`担当範囲`・`SCOPE`・`担当` を順に渡す'
+        mock: なし
+        expected: 1 つ目と 2 つ目は作業範囲の ID、3 つ目は空

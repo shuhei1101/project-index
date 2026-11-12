@@ -2,179 +2,179 @@ id: MOD-20
 title: 索引のサーバー / 説明 / service.py
 lead: '`describe` の使える配信元・説明書と種類・種類のスキーマ。'
 test_files:
-- tests/unit/project_index/features/describe/test_service.py
+  - tests/unit/project_index/features/describe/test_service.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      配信元の説明 ..> 作業場所の説明 : 引数なし
-      配信元の説明 ..> 使える配信元 : 引数なし
-      配信元の説明 ..> 作業範囲の外で読める配信元 : 引数なしの outside_scope
-      配信元の説明 ..> 警告の収集 : 引数なし
-      配信元の説明 ..> 読む場所の解決 : source
-      配信元の説明 ..> 作業場所の配信元の読み込み : 作業ツリー・ワークツリー
-      配信元の説明 ..> 文書の行を引く : kind
-      class 配信元の説明 {
-        <<function>>
-      }
-      class 作業場所の説明 {
-        <<function>>
-      }
-      class 使える配信元 {
-        <<function>>
-      }
-      class 作業範囲の外で読める配信元 {
-        <<function>>
-      }
-      class 警告の収集 {
-        <<function>>
-      }
-      class 読む場所の解決 {
-        <<function>>
-      }
-      class 作業場所の配信元の読み込み {
-        <<function>>
-      }
-      class 文書の行を引く {
-        <<method>>
-      }
-      click 作業場所の説明 href "./MOD-7.py.yaml#作業場所の説明"
-      click 使える配信元 href "./MOD-7.py.yaml#使える配信元"
-      click 作業範囲の外で読める配信元 href "./MOD-7.py.yaml#作業範囲の外で読める配信元"
-      click 警告の収集 href "./MOD-23.py.yaml#警告の収集"
-      click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
-      click 作業場所の配信元の読み込み href "./MOD-70.py.yaml#作業場所の配信元の読み込み"
-      click 文書の行を引く href "./MOD-71.py.yaml#配信中の配信元"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        配信元の説明 ..> 作業場所の説明 : 引数なし
+        配信元の説明 ..> 使える配信元 : 引数なし
+        配信元の説明 ..> 作業範囲の外で読める配信元 : 引数なしの outside_scope
+        配信元の説明 ..> 警告の収集 : 引数なし
+        配信元の説明 ..> 読む場所の解決 : source
+        配信元の説明 ..> 作業場所の配信元の読み込み : 作業ツリー・ワークツリー
+        配信元の説明 ..> 文書の行を引く : kind
+        class 配信元の説明 {
+          <<function>>
+        }
+        class 作業場所の説明 {
+          <<function>>
+        }
+        class 使える配信元 {
+          <<function>>
+        }
+        class 作業範囲の外で読める配信元 {
+          <<function>>
+        }
+        class 警告の収集 {
+          <<function>>
+        }
+        class 読む場所の解決 {
+          <<function>>
+        }
+        class 作業場所の配信元の読み込み {
+          <<function>>
+        }
+        class 文書の行を引く {
+          <<method>>
+        }
+        click 作業場所の説明 href "./MOD-7.py.yaml#作業場所の説明"
+        click 使える配信元 href "./MOD-7.py.yaml#使える配信元"
+        click 作業範囲の外で読める配信元 href "./MOD-7.py.yaml#作業範囲の外で読める配信元"
+        click 警告の収集 href "./MOD-23.py.yaml#警告の収集"
+        click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
+        click 作業場所の配信元の読み込み href "./MOD-70.py.yaml#作業場所の配信元の読み込み"
+        click 文書の行を引く href "./MOD-71.py.yaml#配信中の配信元"
 functions:
-- name: describe
-  title: 配信元の説明
-  kind: 関数
-  container: project_index/features/describe/service.py
-  usecase: 説明
-  role: サービス
-  summary: '`describe` の要求を処理して結果を返す'
-  scope: public
-  thread_safe: true
-  args:
-  - name: request
-    title: 説明の要求
-    type: DescribeRequest
-    required: true
-    passing: positional
-    description: ツールの引数
-  - name: registry
-    title: 配信元の一覧
-    type: SourceRegistry
-    required: true
-    passing: injected
-    description: 配信中の配信元
-  - name: store
-    title: 文書のストア
-    type: DocumentStore
-    required: true
-    passing: injected
-    description: 種類のスキーマを読む
-  - name: terminal
-    title: 端末の設定
-    type: TerminalConfig
-    required: true
-    passing: injected
-    description: 引数なしのときに設定のバージョンを比べる
-  - name: checks
-    title: 配信元の検査の控え
-    type: SourceChecks
-    required: true
-    passing: injected
-    description: 引数なしのときに警告の元にする
-  returns:
-    type: SourceListResult | SourceGuideResult | KindSchemaResult
-    description: 引数の数で決まる結果
-  process: |-
-    1. `kind` があって `source` が無い場合、`InvalidArgumentError`（`kind` には `source` が要ります）を送る
-    2. `source` が無い場合、作業場所の説明と使える配信元を返す（使える配信元が 0 件でも返す）。`outside_scope` が `True` なら、作業範囲の外で読める配信元（作業範囲の外で読める配信元）を `OutsideSource` にして `outside_sources` に入れる（0 件は空のリスト）。`False` なら `outside_sources` は `None`。警告（警告の収集）を `warnings` に入れる。文書を読まないので要求のログには残さない
-    3. `source` がある場合、読む場所を解く（読む場所の解決。`source`・`worktree`・`cwd`・`outside_scope`。結果の `outside_scope` は場所の `outside_scope`）。作業中の配信元の作業ツリーかワークツリーを読むときは、その場所の設定を読み直した配信元を使う（作業場所の配信元の読み込み）
-    4. `kind` が無い場合、`instructions` と、有効な文書の行ごとの種類の概要（スキーマは文書のストア.種類のスキーマ）を返す。Git の配信元は、リビジョンの一覧（`commits=0`）のブランチとタグの名前を `refs`、ワークツリーの一覧を `worktrees` に入れる
-    5. `kind` がある場合、文書の行を引き（無ければ `UnknownKindError`）、`target.base` の `schema` のファイルの内容と読んだスキーマ、行の `metadata` を返す。`schema_path` が `SchemaRef` の行は、ファイルの内容の代わりに起動時のスキーマを YAML にしたものを返す
-  exceptions:
-  - name: InvalidArgumentError
-    condition: '`source` の無い `kind`'
-    message: '`kind には source が要ります`'
-  - name: SourceNotReadableError
-    condition: 読む場所の解決が送る
-    message: '`{id} はこの作業場所（{cwd}）から参照できません`'
-  - name: SourceNotServedError
-    condition: 配信していない配信元を指した
-    message: '`{id} は配信していません`'
-  - name: ValidationFailedError
-    condition: 作業場所の配信元の読み込みが送る（作業ツリーかワークツリーの設定が無い・検証に通らない）
-    message: '違反ごとに `{id}: {パス}: {理由}`'
-  - name: UnknownKindError
-    condition: '`kind` が配信元の種類に無い'
-    message: '`{source}: 種類 {kind} はありません`'
-  unit_tests:
-  - name: test_describe
-    case: 正常
-    summary: 使える配信元の一覧
-    condition: '`cwd` が sample のクローン本体で、notes は `scope.read` に当たり、other は当たらない'
-    mock: なし（一時フォルダの配信元）
-    expected: '`workplace` が sample のクローン本体、`sources` が sample（write・作業中）と notes（read）で、other が無い。`outside_sources` が `None`、`warnings` が空'
-  - name: test_describe_when_warned
-    case: 正常
-    summary: 使える配信元の警告を添える
-    condition: '`cwd` が sample のクローン本体で、sample の管理用の YAML に無いファイルが 1 件ある'
-    mock: なし（一時フォルダの配信元）
-    expected: '`warnings` が sample の管理用の YAML に無いファイル 1 件の文'
-  - name: test_describe_when_outside_list
-    case: 正常
-    summary: 作業範囲の外で読める配信元の一覧
-    condition: '`source` なし・`outside_scope: true`、`cwd` が sample のクローン本体で、notes は `scope.read` に当たり、other は当たらず `outside_read` が真、closed は当たらず `outside_read` が偽'
-    mock: なし（一時フォルダの配信元）
-    expected: '`sources` が引数なしと同じ（sample・notes）、`outside_sources` が other の 1 件（`id`・`description`）'
-  - name: test_describe_when_outside_list_empty
-    case: 正常
-    summary: 作業範囲の外で読める配信元が無い
-    condition: '`source` なし・`outside_scope: true`、sample と notes だけを配信'
-    mock: なし
-    expected: '`outside_sources` が空のリスト'
-  - name: test_describe_when_source
-    case: 正常
-    summary: 説明書と種類
-    condition: '`source: sample`'
-    mock: なし
-    expected: '`instructions` が設定の値、`kinds` に sample の種類とスキーマの `description`'
-  - name: test_describe_when_kind
-    case: 正常
-    summary: 種類のスキーマ
-    condition: '`source: sample`・`kind: sample`'
-    mock: なし
-    expected: '`schema_text` がスキーマのファイルと同じ文字列、`metadata` が行の `metadata`'
-  - name: test_describe_when_unknown_kind
-    case: 異常
-    summary: 知らない種類
-    condition: '`kind: no-such-kind`'
-    mock: なし
-    expected: '`UnknownKindError` の `kinds` に sample の種類'
-    exception: '`kind` が配信元の種類に無い'
-  - name: test_describe_when_worktree
-    case: 正常
-    summary: ワークツリーの設定で説明する
-    condition: '`cwd` が sample のワークツリーで、ワークツリーの `project-index.yaml` の `instructions` を書き換えた'
-    mock: なし（一時フォルダで `git worktree add`）
-    expected: '`instructions` がワークツリーの値'
-  - name: test_describe_when_worktree_config_invalid
-    case: 異常
-    summary: ワークツリーの設定が検証に通らない
-    condition: '`cwd` が sample のワークツリーで、ワークツリーの `documents[0]` に `paths` が無い'
-    mock: なし
-    expected: '`ValidationFailedError` で違反が `documents[0].paths`'
-    exception: 作業場所の配信元の読み込みが送る
-  - name: test_describe_when_refs_and_worktrees
-    case: 正常
-    summary: ブランチとワークツリー
-    condition: Git の配信元 sample（ブランチ `develop`・`feat/x`、タグ `v0.1.0`、ワークツリー `.claude/worktrees/x`）の `source` だけ
-    mock: なし（一時フォルダで `git init`）
-    expected: '`refs.branches` に `develop`・`feat/x`、`refs.tags` に `v0.1.0`、`worktrees[0].branch` が `feat/x`'
-    exception: '-'
+  - name: describe
+    title: 配信元の説明
+    kind: 関数
+    container: project_index/features/describe/service.py
+    usecase: 説明
+    role: サービス
+    summary: '`describe` の要求を処理して結果を返す'
+    scope: public
+    thread_safe: true
+    args:
+      - name: request
+        title: 説明の要求
+        type: DescribeRequest
+        required: true
+        passing: positional
+        description: ツールの引数
+      - name: registry
+        title: 配信元の一覧
+        type: SourceRegistry
+        required: true
+        passing: injected
+        description: 配信中の配信元
+      - name: store
+        title: 文書のストア
+        type: DocumentStore
+        required: true
+        passing: injected
+        description: 種類のスキーマを読む
+      - name: terminal
+        title: 端末の設定
+        type: TerminalConfig
+        required: true
+        passing: injected
+        description: 引数なしのときに設定のバージョンを比べる
+      - name: checks
+        title: 配信元の検査の控え
+        type: SourceChecks
+        required: true
+        passing: injected
+        description: 引数なしのときに警告の元にする
+    returns:
+      type: SourceListResult | SourceGuideResult | KindSchemaResult
+      description: 引数の数で決まる結果
+    process: |-
+      1. `kind` があって `source` が無い場合、`InvalidArgumentError`（`kind` には `source` が要ります）を送る
+      2. `source` が無い場合、作業場所の説明と使える配信元を返す（使える配信元が 0 件でも返す）。`outside_scope` が `True` なら、作業範囲の外で読める配信元（作業範囲の外で読める配信元）を `OutsideSource` にして `outside_sources` に入れる（0 件は空のリスト）。`False` なら `outside_sources` は `None`。警告（警告の収集）を `warnings` に入れる。文書を読まないので要求のログには残さない
+      3. `source` がある場合、読む場所を解く（読む場所の解決。`source`・`worktree`・`cwd`・`outside_scope`。結果の `outside_scope` は場所の `outside_scope`）。作業中の配信元の作業ツリーかワークツリーを読むときは、その場所の設定を読み直した配信元を使う（作業場所の配信元の読み込み）
+      4. `kind` が無い場合、`instructions` と、有効な文書の行ごとの種類の概要（スキーマは文書のストア.種類のスキーマ）を返す。Git の配信元は、リビジョンの一覧（`commits=0`）のブランチとタグの名前を `refs`、ワークツリーの一覧を `worktrees` に入れる
+      5. `kind` がある場合、文書の行を引き（無ければ `UnknownKindError`）、`target.base` の `schema` のファイルの内容と読んだスキーマ、行の `metadata` を返す。`schema_path` が `SchemaRef` の行は、ファイルの内容の代わりに起動時のスキーマを YAML にしたものを返す
+    exceptions:
+      - name: InvalidArgumentError
+        condition: '`source` の無い `kind`'
+        message: '`kind には source が要ります`'
+      - name: SourceNotReadableError
+        condition: 読む場所の解決が送る
+        message: '`{id} はこの作業場所（{cwd}）から参照できません`'
+      - name: SourceNotServedError
+        condition: 配信していない配信元を指した
+        message: '`{id} は配信していません`'
+      - name: ValidationFailedError
+        condition: 作業場所の配信元の読み込みが送る（作業ツリーかワークツリーの設定が無い・検証に通らない）
+        message: '違反ごとに `{id}: {パス}: {理由}`'
+      - name: UnknownKindError
+        condition: '`kind` が配信元の種類に無い'
+        message: '`{source}: 種類 {kind} はありません`'
+    unit_tests:
+      - name: test_describe
+        case: 正常
+        summary: 使える配信元の一覧
+        condition: '`cwd` が sample のクローン本体で、notes は `scope.read` に当たり、other は当たらない'
+        mock: なし（一時フォルダの配信元）
+        expected: '`workplace` が sample のクローン本体、`sources` が sample（write・作業中）と notes（read）で、other が無い。`outside_sources` が `None`、`warnings` が空'
+      - name: test_describe_when_warned
+        case: 正常
+        summary: 使える配信元の警告を添える
+        condition: '`cwd` が sample のクローン本体で、sample の管理用の YAML に無いファイルが 1 件ある'
+        mock: なし（一時フォルダの配信元）
+        expected: '`warnings` が sample の管理用の YAML に無いファイル 1 件の文'
+      - name: test_describe_when_outside_list
+        case: 正常
+        summary: 作業範囲の外で読める配信元の一覧
+        condition: '`source` なし・`outside_scope: true`、`cwd` が sample のクローン本体で、notes は `scope.read` に当たり、other は当たらず `outside_read` が真、closed は当たらず `outside_read` が偽'
+        mock: なし（一時フォルダの配信元）
+        expected: '`sources` が引数なしと同じ（sample・notes）、`outside_sources` が other の 1 件（`id`・`description`）'
+      - name: test_describe_when_outside_list_empty
+        case: 正常
+        summary: 作業範囲の外で読める配信元が無い
+        condition: '`source` なし・`outside_scope: true`、sample と notes だけを配信'
+        mock: なし
+        expected: '`outside_sources` が空のリスト'
+      - name: test_describe_when_source
+        case: 正常
+        summary: 説明書と種類
+        condition: '`source: sample`'
+        mock: なし
+        expected: '`instructions` が設定の値、`kinds` に sample の種類とスキーマの `description`'
+      - name: test_describe_when_kind
+        case: 正常
+        summary: 種類のスキーマ
+        condition: '`source: sample`・`kind: sample`'
+        mock: なし
+        expected: '`schema_text` がスキーマのファイルと同じ文字列、`metadata` が行の `metadata`'
+      - name: test_describe_when_unknown_kind
+        case: 異常
+        summary: 知らない種類
+        condition: '`kind: no-such-kind`'
+        mock: なし
+        expected: '`UnknownKindError` の `kinds` に sample の種類'
+        exception: '`kind` が配信元の種類に無い'
+      - name: test_describe_when_worktree
+        case: 正常
+        summary: ワークツリーの設定で説明する
+        condition: '`cwd` が sample のワークツリーで、ワークツリーの `project-index.yaml` の `instructions` を書き換えた'
+        mock: なし（一時フォルダで `git worktree add`）
+        expected: '`instructions` がワークツリーの値'
+      - name: test_describe_when_worktree_config_invalid
+        case: 異常
+        summary: ワークツリーの設定が検証に通らない
+        condition: '`cwd` が sample のワークツリーで、ワークツリーの `documents[0]` に `paths` が無い'
+        mock: なし
+        expected: '`ValidationFailedError` で違反が `documents[0].paths`'
+        exception: 作業場所の配信元の読み込みが送る
+      - name: test_describe_when_refs_and_worktrees
+        case: 正常
+        summary: ブランチとワークツリー
+        condition: Git の配信元 sample（ブランチ `develop`・`feat/x`、タグ `v0.1.0`、ワークツリー `.claude/worktrees/x`）の `source` だけ
+        mock: なし（一時フォルダで `git init`）
+        expected: '`refs.branches` に `develop`・`feat/x`、`refs.tags` に `v0.1.0`、`worktrees[0].branch` が `feat/x`'
+        exception: '-'
 refs:
-- IF-1#
+  - IF-1#

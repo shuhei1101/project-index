@@ -2,59 +2,59 @@ id: MOD-62
 title: 索引のサーバー / セッションの開始 / service.py
 lead: '`/clear`・圧縮の後に、その会話の返し済みの記録を削除する。'
 test_files:
-- tests/unit/project_index/features/session_start/test_service.py
+  - tests/unit/project_index/features/session_start/test_service.py
 functions:
-- name: start_session
-  title: セッションの開始
-  kind: 関数
-  container: project_index/features/session_start/service.py
-  usecase: セッションの開始
-  role: サービス
-  summary: '`reason` が `FORGET_REASONS` なら、その会話キーの返し済みの記録を削除する'
-  scope: public
-  is_async: false
-  thread_safe: true
-  side_effects: '`reason` が `FORGET_REASONS` なら、その会話キーの返し済みの記録を削除する'
-  args:
-  - name: request
-    title: 要求
-    type: SessionStartRequest
-    required: true
-    passing: positional
-    description: 検証済みの本文
-  - name: seen
-    title: 会話の記録
-    type: SeenStore
-    required: true
-    passing: keyword
-    description: '`handlers.seen`'
-  returns:
-    type: SessionStartResponse
-    description: 記録を削除したか
-  process: |-
-    1. `reason` が `FORGET_REASONS` に無い場合、`forgotten` を `False` にして返す（以降の手順は実行しない）
-    2. `SessionKey.of(session_id, agent_id)` の記録を削除し、`forgotten` を `True` にして返す（`SeenStore.forget`）
-       - `[INFO]` 返し済みの記録を削除した（セッション ID・件数）
-  unit_tests:
-  - name: test_start_session_when_cleared
-    case: 正常
-    summary: '`/clear` の後は返し済みの記録を削除する'
-    condition: '`reason` が `clear`、`session_id` の記録がある'
-    mock: なし（一時ディレクトリの `SeenStore`）
-    expected: '`forgotten` が `True`、その会話キーの記録が 0 件'
-  - name: test_start_session_when_compacted
-    case: 正常
-    summary: 圧縮の後も削除する
-    condition: '`reason` が `compact`、`session_id`・`agent_id` の記録がある'
-    mock: なし
-    expected: '`forgotten` が `True`、その会話キーの記録が 0 件で、同じ `session_id` のメインのセッションの記録は残る'
-  - name: test_start_session_when_resumed
-    case: 正常
-    summary: 再開では記録を削除しない
-    condition: '`reason` が `resume`、`session_id` の記録がある'
-    mock: なし
-    expected: '`forgotten` が `False`、記録が残る'
-  callers:
-  - MOD-61#functions[build_session_start_router]
+  - name: start_session
+    title: セッションの開始
+    kind: 関数
+    container: project_index/features/session_start/service.py
+    usecase: セッションの開始
+    role: サービス
+    summary: '`reason` が `FORGET_REASONS` なら、その会話キーの返し済みの記録を削除する'
+    scope: public
+    is_async: false
+    thread_safe: true
+    side_effects: '`reason` が `FORGET_REASONS` なら、その会話キーの返し済みの記録を削除する'
+    args:
+      - name: request
+        title: 要求
+        type: SessionStartRequest
+        required: true
+        passing: positional
+        description: 検証済みの本文
+      - name: seen
+        title: 会話の記録
+        type: SeenStore
+        required: true
+        passing: keyword
+        description: '`handlers.seen`'
+    returns:
+      type: SessionStartResponse
+      description: 記録を削除したか
+    process: |-
+      1. `reason` が `FORGET_REASONS` に無い場合、`forgotten` を `False` にして返す（以降の手順は実行しない）
+      2. `SessionKey.of(session_id, agent_id)` の記録を削除し、`forgotten` を `True` にして返す（`SeenStore.forget`）
+         - `[INFO]` 返し済みの記録を削除した（セッション ID・件数）
+    unit_tests:
+      - name: test_start_session_when_cleared
+        case: 正常
+        summary: '`/clear` の後は返し済みの記録を削除する'
+        condition: '`reason` が `clear`、`session_id` の記録がある'
+        mock: なし（一時ディレクトリの `SeenStore`）
+        expected: '`forgotten` が `True`、その会話キーの記録が 0 件'
+      - name: test_start_session_when_compacted
+        case: 正常
+        summary: 圧縮の後も削除する
+        condition: '`reason` が `compact`、`session_id`・`agent_id` の記録がある'
+        mock: なし
+        expected: '`forgotten` が `True`、その会話キーの記録が 0 件で、同じ `session_id` のメインのセッションの記録は残る'
+      - name: test_start_session_when_resumed
+        case: 正常
+        summary: 再開では記録を削除しない
+        condition: '`reason` が `resume`、`session_id` の記録がある'
+        mock: なし
+        expected: '`forgotten` が `False`、記録が残る'
+    callers:
+      - MOD-61#functions[build_session_start_router]
 refs:
-- IF-21#
+  - IF-21#

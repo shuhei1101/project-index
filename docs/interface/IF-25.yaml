@@ -4,188 +4,188 @@ entry:
   kind: endpoint
   value: GET `/sources/{source}/docs/{path}`
 flows:
-- name: 正常系
-  summary: 文書の値・種類のスキーマ・メタデータを返す
-  setup:
-  - name: Mock
-    description: なし（一時フォルダに配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
-  - name: サンプルの配信元
-    description: 種類 `design`（`converters[]` を指さない）の YAML の文書 `design/D-1.yaml` を `main` に持つ sample
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant E as GET /sources/{source}/docs/{path}
-      participant S as sample
+  - name: 正常系
+    summary: 文書の値・種類のスキーマ・メタデータを返す
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+      - name: サンプルの配信元
+        description: 種類 `design`（`converters[]` を指さない）の YAML の文書 `design/D-1.yaml` を `main` に持つ sample
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs/{path}
+        participant S as sample
 
-      C->>E: GET /sources/sample/docs/design/D-1.yaml
-      E->>S: default_ref の文書を読み込む
-      E-->>C: 200 値・スキーマ・メタデータ
-    ```
-  expected:
-  - 200 で、`value` が YAML を読み込んだ値、`schema` が種類 `design` のスキーマ（`$ref` を解いた形）
-  - '`metadata` が `id`・`kind`・`name`・`description`・`tags`・`visibility` を持つ'
-  - '`markdown`・`conversionError`・`body`・`bodyPath` が `null`'
-  - '`updatedAt` が文書を最後に変えた commit の日時'
-  test: test_normal
-- name: 正常系（リビジョンを指す）
-  summary: '`ref` の文書の値を返す'
-  setup:
-  - name: Mock
-    description: なし
-  - name: サンプルの配信元
-    description: 正常系と同じ sample。最新の commit で `design/D-1.yaml` の `title` を変えた
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant E as GET /sources/{source}/docs/{path}
+        C->>E: GET /sources/sample/docs/design/D-1.yaml
+        E->>S: default_ref の文書を読み込む
+        E-->>C: 200 値・スキーマ・メタデータ
+      ```
+    expected:
+      - 200 で、`value` が YAML を読み込んだ値、`schema` が種類 `design` のスキーマ（`$ref` を解いた形）
+      - '`metadata` が `id`・`kind`・`name`・`description`・`tags`・`visibility` を持つ'
+      - '`markdown`・`conversionError`・`body`・`bodyPath` が `null`'
+      - '`updatedAt` が文書を最後に変えた commit の日時'
+    test: test_normal
+  - name: 正常系（リビジョンを指す）
+    summary: '`ref` の文書の値を返す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: サンプルの配信元
+        description: 正常系と同じ sample。最新の commit で `design/D-1.yaml` の `title` を変えた
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs/{path}
 
-      C->>E: GET /sources/sample/docs/design/D-1.yaml?ref={親の commit}
-      E-->>C: 200 親の commit の値
-    ```
-  expected:
-  - 200 で、`ref` が親の commit、`value.title` が変える前の値
-  test: test_normal_when_ref_given
-- name: 正常系（本文のファイルのパスで引く）
-  summary: 管理用の YAML の行の文書を、本文のファイルのパスで引く
-  setup:
-  - name: Mock
-    description: なし
-  - name: サンプルの配信元
-    description: '`files.yaml` の行（`path: guide.md`）が Markdown `guide.md` を本文に持つ sample'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant E as GET /sources/{source}/docs/{path}
+        C->>E: GET /sources/sample/docs/design/D-1.yaml?ref={親の commit}
+        E-->>C: 200 親の commit の値
+      ```
+    expected:
+      - 200 で、`ref` が親の commit、`value.title` が変える前の値
+    test: test_normal_when_ref_given
+  - name: 正常系（本文のファイルのパスで引く）
+    summary: 管理用の YAML の行の文書を、本文のファイルのパスで引く
+    setup:
+      - name: Mock
+        description: なし
+      - name: サンプルの配信元
+        description: '`files.yaml` の行（`path: guide.md`）が Markdown `guide.md` を本文に持つ sample'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs/{path}
 
-      C->>E: GET /sources/sample/docs/guide.md
-      E-->>C: 200 行の値・本文
-    ```
-  expected:
-  - 200 で、`value` が `files.yaml` の行の値、`body` が `guide.md` の本文の文字列、`bodyPath` が `guide.md`
-  test: test_normal_when_body_path_given
-- name: 正常系（変換のスクリプトを指す種類）
-  summary: '`converters[]` を指す種類は、スクリプトが出した Markdown を返す'
-  setup:
-  - name: Mock
-    description: なし
-  - name: 変換を持つ配信元
-    description: '`converters[]` を指す種類 `prompt` の文書 `prompts/a.yaml` と、スクリプトが終了コード 1 で終わる文書 `prompts/broken.yaml` を持つ sample'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant E as GET /sources/{source}/docs/{path}
-      participant X as converters[] のスクリプト
+        C->>E: GET /sources/sample/docs/guide.md
+        E-->>C: 200 行の値・本文
+      ```
+    expected:
+      - 200 で、`value` が `files.yaml` の行の値、`body` が `guide.md` の本文の文字列、`bodyPath` が `guide.md`
+    test: test_normal_when_body_path_given
+  - name: 正常系（変換のスクリプトを指す種類）
+    summary: '`converters[]` を指す種類は、スクリプトが出した Markdown を返す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 変換を持つ配信元
+        description: '`converters[]` を指す種類 `prompt` の文書 `prompts/a.yaml` と、スクリプトが終了コード 1 で終わる文書 `prompts/broken.yaml` を持つ sample'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs/{path}
+        participant X as converters[] のスクリプト
 
-      C->>E: GET /sources/sample/docs/prompts/a.yaml
-      E->>X: 文書を標準入力に渡して動かす
-      X-->>E: Markdown
-      E-->>C: 200 markdown
-      C->>E: GET /sources/sample/docs/prompts/broken.yaml
-      E->>X: 文書を標準入力に渡して動かす
-      X-->>E: 終了コード 1
-      E-->>C: 200 conversionError
-    ```
-  expected:
-  - '`a.yaml` は 200 で、`markdown` がスクリプトの標準出力、`conversionError` が `null`'
-  - '`broken.yaml` は 200 で、`conversionError` にスクリプトのパスと終了コード・標準エラー、`markdown` が `null`'
-  - 2 回目の `a.yaml` の取得は、変換の結果の控えから返し、スクリプトを動かさない
-  test: test_normal_when_converter_kind
-- name: 異常系（無い配信元・リビジョン・文書・404）
-  summary: 無い配信元・配信していない配信元・解決できないリビジョン・無い文書を断る
-  setup:
-  - name: Mock
-    description: なし
-  - name: 入力
-    description: '`/sources/unknown/docs/a.yaml`・`/sources/sample/docs/design/D-1.yaml?ref=no-such-branch`・`/sources/sample/docs/no/such.yaml`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant E as GET /sources/{source}/docs/{path}
+        C->>E: GET /sources/sample/docs/prompts/a.yaml
+        E->>X: 文書を標準入力に渡して動かす
+        X-->>E: Markdown
+        E-->>C: 200 markdown
+        C->>E: GET /sources/sample/docs/prompts/broken.yaml
+        E->>X: 文書を標準入力に渡して動かす
+        X-->>E: 終了コード 1
+        E-->>C: 200 conversionError
+      ```
+    expected:
+      - '`a.yaml` は 200 で、`markdown` がスクリプトの標準出力、`conversionError` が `null`'
+      - '`broken.yaml` は 200 で、`conversionError` にスクリプトのパスと終了コード・標準エラー、`markdown` が `null`'
+      - 2 回目の `a.yaml` の取得は、変換の結果の控えから返し、スクリプトを動かさない
+    test: test_normal_when_converter_kind
+  - name: 異常系（無い配信元・リビジョン・文書・404）
+    summary: 無い配信元・配信していない配信元・解決できないリビジョン・無い文書を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`/sources/unknown/docs/a.yaml`・`/sources/sample/docs/design/D-1.yaml?ref=no-such-branch`・`/sources/sample/docs/no/such.yaml`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs/{path}
 
-      C->>E: GET /sources/sample/docs/no/such.yaml
-      E-->>C: 404 problem+json
-    ```
-  expected:
-  - 無い配信元は 404 で `missing` が `source`、配信していない配信元は `not_served` と `errors[]`
-  - 無いリビジョンは 404 で `missing` が `ref`
-  - 無い文書は 404 で `missing` が `doc`
-  test: test_error_when_not_found
+        C->>E: GET /sources/sample/docs/no/such.yaml
+        E-->>C: 404 problem+json
+      ```
+    expected:
+      - 無い配信元は 404 で `missing` が `source`、配信していない配信元は `not_served` と `errors[]`
+      - 無いリビジョンは 404 で `missing` が `ref`
+      - 無い文書は 404 で `missing` が `doc`
+    test: test_error_when_not_found
 lead: 指定のリビジョンの文書の値・種類のスキーマ・メタデータを返す。管理用の YAML の行の文書は本文の文字列と本文のファイルのパスも返し、`converters[]` を指す種類はスクリプトが出した Markdown か変換の失敗を返す。
 identifier: get_document
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true
 side_effects: '`converters[]` の行の `cache` が `true` のとき、状態のフォルダに変換の結果の控えを書く'
 callers:
-- SC-11#scenarios[正常シナリオ]
-- SC-11#scenarios[正常シナリオ（変換のスクリプトを指す種類の文書）]
-- SC-11#scenarios[異常シナリオ（無いリビジョンを指す）]
-- SC-11#scenarios[異常シナリオ（無い文書のパスを指す）]
-- SC-11#scenarios[異常シナリオ（配信していない配信元を指す）]
-- SC-12#scenarios[正常シナリオ]
-- SC-4#scenarios[正常シナリオ]
+  - SC-11#scenarios[正常シナリオ]
+  - SC-11#scenarios[正常シナリオ（変換のスクリプトを指す種類の文書）]
+  - SC-11#scenarios[異常シナリオ（無いリビジョンを指す）]
+  - SC-11#scenarios[異常シナリオ（無い文書のパスを指す）]
+  - SC-11#scenarios[異常シナリオ（配信していない配信元を指す）]
+  - SC-12#scenarios[正常シナリオ]
+  - SC-4#scenarios[正常シナリオ]
 exclusivity: 読み取りだけで排他しない
 request:
-- name: source
-  type: str
-  required: true
-  location: path
-  description: 配信元の ID
-- name: path
-  type: str
-  required: true
-  location: path
-  description: 文書のファイルか本文のファイルのパス（配信元の直下から、拡張子つき）
-- name: ref
-  type: str
-  required: false
-  default: 配信元の `default_ref`
-  location: query
-  description: リビジョン（ブランチ・コミット・タグ）
+  - name: source
+    type: str
+    required: true
+    location: path
+    description: 配信元の ID
+  - name: path
+    type: str
+    required: true
+    location: path
+    description: 文書のファイルか本文のファイルのパス（配信元の直下から、拡張子つき）
+  - name: ref
+    type: str
+    required: false
+    default: 配信元の `default_ref`
+    location: query
+    description: リビジョン（ブランチ・コミット・タグ）
 request_example: |-
   ```text
   GET /sources/sample/docs/design/D-1.yaml?ref=main
   ```
 response:
-- name: source
-  type: str
-  description: 配信元の ID
-- name: ref
-  type: str
-  description: 解決したリビジョンの名前
-- name: path
-  type: str
-  description: 文書のファイルのパス
-- name: value
-  type: dict | None
-  description: 文書の値（YAML を読み込んだもの、行の文書は行の値）
-  notes: YAML を読み込めないときは `null` で、`conversionError` に理由
-- name: schema
-  type: dict | None
-  description: 種類のスキーマ（`$ref` を解いた形）
-- name: metadata
-  type: DocumentMetadata
-  description: '`id`・`kind`・`name`・`description`・`tags`・`visibility`'
-- name: body
-  type: str | None
-  description: 本文の文字列（管理用の YAML の行の文書だけ）
-- name: bodyPath
-  type: str | None
-  description: 本文のファイルのパス（管理用の YAML の行の文書だけ）
-- name: markdown
-  type: str | None
-  description: '`converters[]` のスクリプトが出した Markdown（`converters[]` を指す種類だけ）'
-- name: conversionError
-  type: ConversionError | None
-  description: 変換に失敗したときの種類・スクリプトのパス・原因。YAML を読み込めないときはファイルのパスと行と列
-- name: updatedAt
-  type: str
-  format: date-time
-  description: 文書のファイルの更新日時。Git の配信元はそのリビジョンでファイルを最後に変えた commit の日時
+  - name: source
+    type: str
+    description: 配信元の ID
+  - name: ref
+    type: str
+    description: 解決したリビジョンの名前
+  - name: path
+    type: str
+    description: 文書のファイルのパス
+  - name: value
+    type: dict | None
+    description: 文書の値（YAML を読み込んだもの、行の文書は行の値）
+    notes: YAML を読み込めないときは `null` で、`conversionError` に理由
+  - name: schema
+    type: dict | None
+    description: 種類のスキーマ（`$ref` を解いた形）
+  - name: metadata
+    type: DocumentMetadata
+    description: '`id`・`kind`・`name`・`description`・`tags`・`visibility`'
+  - name: body
+    type: str | None
+    description: 本文の文字列（管理用の YAML の行の文書だけ）
+  - name: bodyPath
+    type: str | None
+    description: 本文のファイルのパス（管理用の YAML の行の文書だけ）
+  - name: markdown
+    type: str | None
+    description: '`converters[]` のスクリプトが出した Markdown（`converters[]` を指す種類だけ）'
+  - name: conversionError
+    type: ConversionError | None
+    description: 変換に失敗したときの種類・スクリプトのパス・原因。YAML を読み込めないときはファイルのパスと行と列
+  - name: updatedAt
+    type: str
+    format: date-time
+    description: 文書のファイルの更新日時。Git の配信元はそのリビジョンでファイルを最後に変えた commit の日時
 response_example: |-
   ```json
   {"source": "sample", "ref": "main", "path": "design/D-1.yaml",
@@ -196,29 +196,29 @@ response_example: |-
    "updatedAt": "2026-11-12T10:30:00+09:00"}
   ```
 status_codes:
-- code: '200'
-  condition: 返した（変換に失敗したとき・YAML を読み込めないときも `conversionError` を入れて 200）
-- code: '404'
-  condition: 配信元が無い・配信していない、リビジョンを解決できない、文書が無い
-  notes: '`missing`（`source`・`not_served`・`ref`・`doc`）と値、配信していない配信元は `errors[]` に外した理由'
+  - code: '200'
+    condition: 返した（変換に失敗したとき・YAML を読み込めないときも `conversionError` を入れて 200）
+  - code: '404'
+    condition: 配信元が無い・配信していない、リビジョンを解決できない、文書が無い
+    notes: '`missing`（`source`・`not_served`・`ref`・`doc`）と値、配信していない配信元は `errors[]` に外した理由'
 error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）
 constraints:
-- item: 変換の分担
-  constraint: '`converters[]` を指さない種類は変換せずに値を返す。スキーマ駆動の Markdown への変換（図・ER 図・本文の id のリンク・検討事項のリンク）は dev-docs の画面のサーバーが持つ'
-- item: 文書の引き方
-  constraint: '`path` が文書のファイルのパスに当たる文書、無ければ本文のファイルのパスが `path` と同じ最初の文書を返す'
-  notes: 管理の MCP の `try_convert` と同じ引き方
-- item: 変換の制限時間
-  constraint: '`converters[]` のスクリプトを制限時間で止める'
-  decided_by: NFR-1#requirements[スクリプトの制限時間]
-- item: 変換の結果の控え
-  constraint: '`converters[]` の行の `cache` が `true`（既定）なら、控えがあればスクリプトを動かさずに返し、無ければ動かして控えを書く。`false` なら控えを読まず書かず、要求のたびにスクリプトを動かす'
-  notes: '控えのキーは本文の外のファイルを含まない。本文の外のファイルを読む変換は `cache: false` にする'
-- item: 読み直し
-  constraint: ファイルの更新日時か大きさが変わった文書は、次の要求で読み直す
-- item: 認可
-  constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
-  decided_by: NFR-1#requirements[通信]
-- item: JSON のキー
-  constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名と、`value`・`schema` の中身は変えない
+  - item: 変換の分担
+    constraint: '`converters[]` を指さない種類は変換せずに値を返す。スキーマ駆動の Markdown への変換（図・ER 図・本文の id のリンク・検討事項のリンク）は dev-docs の画面のサーバーが持つ'
+  - item: 文書の引き方
+    constraint: '`path` が文書のファイルのパスに当たる文書、無ければ本文のファイルのパスが `path` と同じ最初の文書を返す'
+    notes: 管理の MCP の `try_convert` と同じ引き方
+  - item: 変換の制限時間
+    constraint: '`converters[]` のスクリプトを制限時間で止める'
+    decided_by: NFR-1#requirements[スクリプトの制限時間]
+  - item: 変換の結果の控え
+    constraint: '`converters[]` の行の `cache` が `true`（既定）なら、控えがあればスクリプトを動かさずに返し、無ければ動かして控えを書く。`false` なら控えを読まず書かず、要求のたびにスクリプトを動かす'
+    notes: '控えのキーは本文の外のファイルを含まない。本文の外のファイルを読む変換は `cache: false` にする'
+  - item: 読み直し
+    constraint: ファイルの更新日時か大きさが変わった文書は、次の要求で読み直す
+  - item: 認可
+    constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
+    decided_by: NFR-1#requirements[通信]
+  - item: JSON のキー
+    constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名と、`value`・`schema` の中身は変えない
 test_file: tests/integration/server/test_get_document.py

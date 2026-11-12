@@ -2,157 +2,157 @@ id: MOD-124
 title: 索引のサーバー / 配信元 / schema_ref.py
 lead: '`documents[].schema` でほかの配信元のリビジョンのスキーマを指す参照の型と、その読み取り。'
 classes:
-- name: SchemaRef
-  title: ほかの配信元のスキーマの参照
-  container: project_index/features/sources/schema_ref.py
-  usecase: 起動
-  role: 値オブジェクト
-  summary: '`documents[].schema` のオブジェクトの書き方'
-  description: pydantic のモデル（`frozen=True`・`extra="forbid"`）。
-  properties:
-  - name: source
-    title: 配信元の ID
-    type: str
-    access: 公開
-    description: 端末の設定の `sources[]` の行の ID（`id` が無い行は、その行の先頭の設定の `name`）
-  - name: path
-    title: パス
-    type: str
-    access: 公開
-    description: 参照先のリポジトリの直下からのスキーマのパス
-  - name: ref
-    title: リビジョン
-    type: str
-    access: 公開
-    description: タグか commit
-- name: RefSchema
-  title: 読んだ参照先のスキーマ
-  container: project_index/features/sources/schema_ref.py
-  usecase: 起動
-  role: DTO
-  summary: 参照を解いて読んだスキーマと、読んだ commit
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: schema
-    title: スキーマ
-    type: dict[str, Any]
-    access: 公開
-    description: '`$ref` を同じ commit のファイルで解いたスキーマ'
-  - name: commit
-    title: commit
-    type: str
-    access: 公開
-    description: '`ref` を解いた commit'
-- name: SchemaRefError
-  title: 参照先のスキーマを読めない
-  container: project_index/features/sources/schema_ref.py
-  usecase: 起動
-  role: 例外
-  summary: 参照先の配信元・リビジョン・パスのどれかが見つからない
-  description: '`Exception` の派生。`rule` に違反の理由を持ち、呼び出し側が `documents[{番号}].schema` の違反にする。'
-  properties:
-  - name: rule
-    title: 理由
-    type: str
-    access: 公開
-    description: 違反の理由
-function_types:
-- name: SchemaRefLookup
-  title: 参照先の配信元の引き当て
-  container: project_index/features/sources/schema_ref.py
-  usecase: 起動
-  role: 関数型
-  summary: 配信元の ID から、その配信元の先頭の設定のファイルを返す
-  args:
-  - name: source_id
-    title: 配信元の ID
-    type: str
-    required: true
-    passing: positional
-    description: '`SchemaRef.source`'
-  returns:
-    type: Path | None
-    description: 先頭の設定のファイル。端末の設定に無ければ `None`
-functions:
-- name: terminal_lookup
-  title: 端末の設定からの引き当て
-  kind: 関数
-  container: project_index/features/sources/schema_ref.py
-  usecase: 起動
-  role: アダプター
-  summary: 端末の設定の `sources[]` から、配信元の ID → 先頭の設定のファイルの引き当てを作る
-  scope: public
-  args:
-  - name: terminal
-    title: 端末の設定
-    type: TerminalConfig
-    required: true
-    passing: positional
-    description: 読んだ端末の設定
-  returns:
-    type: SchemaRefLookup
-    description: 引き当ての関数
-  process: |-
-    1. `sources[]` の行ごとに、`id` があればその値、無ければ先頭の設定のファイルの `name`（YAMLの読み込み。読めない行は飛ばす）を ID にし、ID → 先頭の設定のファイルの辞書を作る（`enabled` によらず全ての行）
-    2. 辞書を引く関数を返す
-  unit_tests:
-  - name: test_terminal_lookup
-    case: 正常
-    summary: '`id` の無い行は設定の `name` で引ける'
-    condition: '`id: a` の行と、`id` が無く設定の `name` が `b` の行'
-    mock: なし（`tmp_path`）
-    expected: '`a`・`b` がそれぞれの設定のファイルを返し、`c` は `None`'
-- name: read_schema_ref
-  title: 参照先のスキーマの読み取り
-  kind: 関数
-  container: project_index/features/sources/schema_ref.py
-  usecase: 起動
-  role: 読み込み
-  summary: 参照先の配信元のリポジトリから、`ref` を commit に解いたリビジョンのスキーマを読み、同じ commit の中で `$ref` を解く
-  scope: public
-  thread_safe: true
-  args:
-  - name: ref
-    title: 参照
-    type: SchemaRef
-    required: true
-    passing: positional
-    description: '`documents[].schema` のオブジェクト'
-  - name: lookup
-    title: 引き当て
-    type: SchemaRefLookup
-    required: true
-    passing: keyword
-    description: 配信元の ID の引き当て
-  returns:
-    type: RefSchema
-    description: 読んだスキーマと commit
-  process: |-
-    1. `lookup(ref.source)` で設定のファイルを引く。`None` なら `SchemaRefError`（`配信元 {source} が端末の設定にありません`）
-    2. 設定のファイルのフォルダのリポジトリの直下を引く（リポジトリの直下）。Git でなければ `SchemaRefError`（`配信元 {source} は Git のリポジトリではありません`）
-    3. `ref.ref` を commit に解く（`resolve_ref`）。解けなければ `SchemaRefError`（`配信元 {source} に {ref} がありません`）
-    4. その commit の `ref.path` を読む（`read_file_at`）。無い・YAML として読めない・辞書でないなら `SchemaRefError`（`{ref} に {path} がありません` か `{path} を読み込めません`）
-    5. `resolve_schema_refs` に、基準を `ref.path`、読み取りを同じ commit のファイルを読む関数にして渡し、`$ref` を解く。解けない `$ref` があれば `SchemaRefError`（`{ref} に {$ref の参照先} がありません`）
-    6. `RefSchema` を返す
-  exceptions:
+  - name: SchemaRef
+    title: ほかの配信元のスキーマの参照
+    container: project_index/features/sources/schema_ref.py
+    usecase: 起動
+    role: 値オブジェクト
+    summary: '`documents[].schema` のオブジェクトの書き方'
+    description: pydantic のモデル（`frozen=True`・`extra="forbid"`）。
+    properties:
+      - name: source
+        title: 配信元の ID
+        type: str
+        access: 公開
+        description: 端末の設定の `sources[]` の行の ID（`id` が無い行は、その行の先頭の設定の `name`）
+      - name: path
+        title: パス
+        type: str
+        access: 公開
+        description: 参照先のリポジトリの直下からのスキーマのパス
+      - name: ref
+        title: リビジョン
+        type: str
+        access: 公開
+        description: タグか commit
+  - name: RefSchema
+    title: 読んだ参照先のスキーマ
+    container: project_index/features/sources/schema_ref.py
+    usecase: 起動
+    role: DTO
+    summary: 参照を解いて読んだスキーマと、読んだ commit
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: schema
+        title: スキーマ
+        type: dict[str, Any]
+        access: 公開
+        description: '`$ref` を同じ commit のファイルで解いたスキーマ'
+      - name: commit
+        title: commit
+        type: str
+        access: 公開
+        description: '`ref` を解いた commit'
   - name: SchemaRefError
-    condition: 配信元・Git のリポジトリ・リビジョン・パス・`$ref` の参照先のどれかが無い
-    message: 手順ごとの理由
-  unit_tests:
-  - name: test_read_schema_ref
-    case: 正常
-    summary: タグのスキーマを読む
-    condition: タグ `v1` の後の commit で `note.schema.yaml` と、`$ref` で指す `common.schema.yaml` を書き換え、作業ツリーはその commit
-    mock: なし（`tmp_path` で `git init`）
-    expected: '`schema` が v1 の内容で `$ref` を解いたもの、`commit` が v1 の commit'
-  - name: test_read_schema_ref_when_not_found
-    case: 異常
-    summary: 参照先が見つからない
-    condition: 端末の設定に無い配信元・Git でない配信元・無いタグ・無いパス・無い `$ref` の参照先をそれぞれ指す
-    mock: なし（`tmp_path`）
-    expected: どれも `SchemaRefError` で、手順ごとの理由
-    exception: 参照先が見つからない
+    title: 参照先のスキーマを読めない
+    container: project_index/features/sources/schema_ref.py
+    usecase: 起動
+    role: 例外
+    summary: 参照先の配信元・リビジョン・パスのどれかが見つからない
+    description: '`Exception` の派生。`rule` に違反の理由を持ち、呼び出し側が `documents[{番号}].schema` の違反にする。'
+    properties:
+      - name: rule
+        title: 理由
+        type: str
+        access: 公開
+        description: 違反の理由
+function_types:
+  - name: SchemaRefLookup
+    title: 参照先の配信元の引き当て
+    container: project_index/features/sources/schema_ref.py
+    usecase: 起動
+    role: 関数型
+    summary: 配信元の ID から、その配信元の先頭の設定のファイルを返す
+    args:
+      - name: source_id
+        title: 配信元の ID
+        type: str
+        required: true
+        passing: positional
+        description: '`SchemaRef.source`'
+    returns:
+      type: Path | None
+      description: 先頭の設定のファイル。端末の設定に無ければ `None`
+functions:
+  - name: terminal_lookup
+    title: 端末の設定からの引き当て
+    kind: 関数
+    container: project_index/features/sources/schema_ref.py
+    usecase: 起動
+    role: アダプター
+    summary: 端末の設定の `sources[]` から、配信元の ID → 先頭の設定のファイルの引き当てを作る
+    scope: public
+    args:
+      - name: terminal
+        title: 端末の設定
+        type: TerminalConfig
+        required: true
+        passing: positional
+        description: 読んだ端末の設定
+    returns:
+      type: SchemaRefLookup
+      description: 引き当ての関数
+    process: |-
+      1. `sources[]` の行ごとに、`id` があればその値、無ければ先頭の設定のファイルの `name`（YAMLの読み込み。読めない行は飛ばす）を ID にし、ID → 先頭の設定のファイルの辞書を作る（`enabled` によらず全ての行）
+      2. 辞書を引く関数を返す
+    unit_tests:
+      - name: test_terminal_lookup
+        case: 正常
+        summary: '`id` の無い行は設定の `name` で引ける'
+        condition: '`id: a` の行と、`id` が無く設定の `name` が `b` の行'
+        mock: なし（`tmp_path`）
+        expected: '`a`・`b` がそれぞれの設定のファイルを返し、`c` は `None`'
+  - name: read_schema_ref
+    title: 参照先のスキーマの読み取り
+    kind: 関数
+    container: project_index/features/sources/schema_ref.py
+    usecase: 起動
+    role: 読み込み
+    summary: 参照先の配信元のリポジトリから、`ref` を commit に解いたリビジョンのスキーマを読み、同じ commit の中で `$ref` を解く
+    scope: public
+    thread_safe: true
+    args:
+      - name: ref
+        title: 参照
+        type: SchemaRef
+        required: true
+        passing: positional
+        description: '`documents[].schema` のオブジェクト'
+      - name: lookup
+        title: 引き当て
+        type: SchemaRefLookup
+        required: true
+        passing: keyword
+        description: 配信元の ID の引き当て
+    returns:
+      type: RefSchema
+      description: 読んだスキーマと commit
+    process: |-
+      1. `lookup(ref.source)` で設定のファイルを引く。`None` なら `SchemaRefError`（`配信元 {source} が端末の設定にありません`）
+      2. 設定のファイルのフォルダのリポジトリの直下を引く（リポジトリの直下）。Git でなければ `SchemaRefError`（`配信元 {source} は Git のリポジトリではありません`）
+      3. `ref.ref` を commit に解く（`resolve_ref`）。解けなければ `SchemaRefError`（`配信元 {source} に {ref} がありません`）
+      4. その commit の `ref.path` を読む（`read_file_at`）。無い・YAML として読めない・辞書でないなら `SchemaRefError`（`{ref} に {path} がありません` か `{path} を読み込めません`）
+      5. `resolve_schema_refs` に、基準を `ref.path`、読み取りを同じ commit のファイルを読む関数にして渡し、`$ref` を解く。解けない `$ref` があれば `SchemaRefError`（`{ref} に {$ref の参照先} がありません`）
+      6. `RefSchema` を返す
+    exceptions:
+      - name: SchemaRefError
+        condition: 配信元・Git のリポジトリ・リビジョン・パス・`$ref` の参照先のどれかが無い
+        message: 手順ごとの理由
+    unit_tests:
+      - name: test_read_schema_ref
+        case: 正常
+        summary: タグのスキーマを読む
+        condition: タグ `v1` の後の commit で `note.schema.yaml` と、`$ref` で指す `common.schema.yaml` を書き換え、作業ツリーはその commit
+        mock: なし（`tmp_path` で `git init`）
+        expected: '`schema` が v1 の内容で `$ref` を解いたもの、`commit` が v1 の commit'
+      - name: test_read_schema_ref_when_not_found
+        case: 異常
+        summary: 参照先が見つからない
+        condition: 端末の設定に無い配信元・Git でない配信元・無いタグ・無いパス・無い `$ref` の参照先をそれぞれ指す
+        mock: なし（`tmp_path`）
+        expected: どれも `SchemaRefError` で、手順ごとの理由
+        exception: 参照先が見つからない
 refs:
-- IF-12#constraints[ほかの配信元のスキーマの参照]
+  - IF-12#constraints[ほかの配信元のスキーマの参照]
 test_files:
-- tests/unit/project_index/features/sources/test_schema_ref.py
+  - tests/unit/project_index/features/sources/test_schema_ref.py

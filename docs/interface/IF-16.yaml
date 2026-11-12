@@ -4,265 +4,265 @@ entry:
   kind: operation
   value: '`project-index migrate`（CLI）'
 flows:
-- name: 正常系
-  summary: 古い端末の設定に手順を当て、バックアップを残して `version` を上げる
-  setup:
-  - name: Mock
-    description: 手順の置き場所をテスト用のフォルダに、`SETTINGS_VERSION`・`SOURCE_CONFIG_VERSION` を `2` に monkeypatch で差し替え、`main(["migrate", ...])` を同じプロセスで呼ぶ。端末の設定は一時フォルダに置き `PROJECT_INDEX_CONFIG` で指す
-  - name: 移し替えの手順
-    description: テスト用の手順のフォルダに、`version` 1 → 2 でキーを改名する手順を 1 つ置く
-  - name: 端末の設定
-    description: '`version: "1"` で改名前のキーを持つ'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant M as project-index migrate
-      participant F as 端末の設定
+  - name: 正常系
+    summary: 古い端末の設定に手順を当て、バックアップを残して `version` を上げる
+    setup:
+      - name: Mock
+        description: 手順の置き場所をテスト用のフォルダに、`SETTINGS_VERSION`・`SOURCE_CONFIG_VERSION` を `2` に monkeypatch で差し替え、`main(["migrate", ...])` を同じプロセスで呼ぶ。端末の設定は一時フォルダに置き `PROJECT_INDEX_CONFIG` で指す
+      - name: 移し替えの手順
+        description: テスト用の手順のフォルダに、`version` 1 → 2 でキーを改名する手順を 1 つ置く
+      - name: 端末の設定
+        description: '`version: "1"` で改名前のキーを持つ'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index migrate
+        participant F as 端末の設定
 
-      C->>M: --plan
-      M-->>F: version を読む
-      M-->>C: 当てる手順の一覧（終了コード 0）
-      C->>M: フラグなし
-      M->>F: バックアップを取る
-      M->>F: 手順を当てて version を書き換える
-      M-->>C: 当てた手順とバックアップのパス（終了コード 0）
-    ```
-  expected:
-  - '`--plan` が手順を 1 行出し、端末の設定が変わらない'
-  - 適用の後、端末の設定の `version` が `"2"` で、キーが改名され、他の値が変わらない
-  - バックアップの中身が適用前の端末の設定と同じ
-  - もう一度適用すると当てる手順が無く終了コード 0 で、ファイルが変わらない
-  test: test_normal
-- name: 正常系（バージョンだけを記録する）
-  summary: '`--record` で手順を当てずに `version` だけを書き換える'
-  setup:
-  - name: Mock
-    description: 正常系と同じ差し替え
-  - name: 端末の設定
-    description: 正常系と同じ
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant M as project-index migrate
-      participant F as 端末の設定
+        C->>M: --plan
+        M-->>F: version を読む
+        M-->>C: 当てる手順の一覧（終了コード 0）
+        C->>M: フラグなし
+        M->>F: バックアップを取る
+        M->>F: 手順を当てて version を書き換える
+        M-->>C: 当てた手順とバックアップのパス（終了コード 0）
+      ```
+    expected:
+      - '`--plan` が手順を 1 行出し、端末の設定が変わらない'
+      - 適用の後、端末の設定の `version` が `"2"` で、キーが改名され、他の値が変わらない
+      - バックアップの中身が適用前の端末の設定と同じ
+      - もう一度適用すると当てる手順が無く終了コード 0 で、ファイルが変わらない
+    test: test_normal
+  - name: 正常系（バージョンだけを記録する）
+    summary: '`--record` で手順を当てずに `version` だけを書き換える'
+    setup:
+      - name: Mock
+        description: 正常系と同じ差し替え
+      - name: 端末の設定
+        description: 正常系と同じ
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index migrate
+        participant F as 端末の設定
 
-      C->>M: --record
-      M->>F: version だけを書き換える
-      M-->>C: 終了コード 0
-    ```
-  expected:
-  - '`version` が `"2"` で、改名前のキーがそのまま残る'
-  test: test_normal_when_record_only
-- name: 正常系（配信元の設定）
-  summary: '`--source` と `--allow-destructive` で配信元の `project-index.yaml` に手順を当てる'
-  setup:
-  - name: Mock
-    description: 正常系と同じ差し替え
-  - name: 配信元
-    description: '`version: "1"` の `project-index.yaml` を持つ sample。最上位にタグのマスター `tags: tags.yaml` を持ち、`documents[0]` が `type: yaml`・`metadata: {name: {type: ref, field: title}, alias_type: {type: custom, value: term}}` を持つ'
-    notes: '`tags.yaml` を置く'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant M as project-index migrate
-      participant F as project-index.yaml
+        C->>M: --record
+        M->>F: version だけを書き換える
+        M-->>C: 終了コード 0
+      ```
+    expected:
+      - '`version` が `"2"` で、改名前のキーがそのまま残る'
+    test: test_normal_when_record_only
+  - name: 正常系（配信元の設定）
+    summary: '`--source` と `--allow-destructive` で配信元の `project-index.yaml` に手順を当てる'
+    setup:
+      - name: Mock
+        description: 正常系と同じ差し替え
+      - name: 配信元
+        description: '`version: "1"` の `project-index.yaml` を持つ sample。最上位にタグのマスター `tags: tags.yaml` を持ち、`documents[0]` が `type: yaml`・`metadata: {name: {type: ref, field: title}, alias_type: {type: custom, value: term}}` を持つ'
+        notes: '`tags.yaml` を置く'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index migrate
+        participant F as project-index.yaml
 
-      C->>M: --source --allow-destructive
-      M->>F: バックアップを取り、手順を当てる
-      M-->>C: 終了コード 0
-    ```
-  expected:
-  - '`project-index.yaml` の `version` が `"3"`'
-  - '`documents[0]` が `type` を持たず、`metadata` が `{name: title}`、行の `alias_type` が `term` になる'
-  - '`tags` が無くなり、`tags.yaml` は残る'
-  - 端末の設定が変わらない
-  test: test_normal_when_source_config
-- name: 異常系（設定が読めない・ConfigInvalid）
-  summary: '`version` の無い設定は移し替えずに終了コード 2 で止める'
-  setup:
-  - name: Mock
-    description: 正常系と同じ差し替え
-  - name: 端末の設定
-    description: '`version` のキーを持たない'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant M as project-index migrate
+        C->>M: --source --allow-destructive
+        M->>F: バックアップを取り、手順を当てる
+        M-->>C: 終了コード 0
+      ```
+    expected:
+      - '`project-index.yaml` の `version` が `"3"`'
+      - '`documents[0]` が `type` を持たず、`metadata` が `{name: title}`、行の `alias_type` が `term` になる'
+      - '`tags` が無くなり、`tags.yaml` は残る'
+      - 端末の設定が変わらない
+    test: test_normal_when_source_config
+  - name: 異常系（設定が読めない・ConfigInvalid）
+    summary: '`version` の無い設定は移し替えずに終了コード 2 で止める'
+    setup:
+      - name: Mock
+        description: 正常系と同じ差し替え
+      - name: 端末の設定
+        description: '`version` のキーを持たない'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index migrate
 
-      C->>M: フラグなし
-      M-->>C: 違反（終了コード 2）
-    ```
-  expected:
-  - 終了コード 2 で stderr に `version` が無いことを出す
-  - 端末の設定が変わらず、バックアップも作らない
-  test: test_error_when_config_invalid
-- name: 異常系（手順が失敗する・MigrationFailed）
-  summary: 当てた結果が新しいスキーマに違反すると、バックアップから戻して終了コード 4 で止める
-  setup:
-  - name: Mock
-    description: 正常系と同じ差し替え
-  - name: 移し替えの手順
-    description: 必須のキーを消す誤った手順（破壊的でないと宣言する）
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant M as project-index migrate
-      participant F as 端末の設定
+        C->>M: フラグなし
+        M-->>C: 違反（終了コード 2）
+      ```
+    expected:
+      - 終了コード 2 で stderr に `version` が無いことを出す
+      - 端末の設定が変わらず、バックアップも作らない
+    test: test_error_when_config_invalid
+  - name: 異常系（手順が失敗する・MigrationFailed）
+    summary: 当てた結果が新しいスキーマに違反すると、バックアップから戻して終了コード 4 で止める
+    setup:
+      - name: Mock
+        description: 正常系と同じ差し替え
+      - name: 移し替えの手順
+        description: 必須のキーを消す誤った手順（破壊的でないと宣言する）
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index migrate
+        participant F as 端末の設定
 
-      C->>M: フラグなし
-      M->>F: バックアップを取る
-      M->>M: 手順を当てる（スキーマに違反）
-      M->>F: バックアップから戻す
-      M-->>C: 失敗した手順と理由（終了コード 4）
-    ```
-  expected:
-  - 終了コード 4 で stderr に失敗した手順と違反したキーを出す
-  - 端末の設定の中身が適用前と同じ
-  test: test_error_when_step_fails
-- name: 異常系（破壊的な手順がある・DestructiveStepBlocked）
-  summary: 破壊的な手順を `--allow-destructive` なしで当てようとすると、触らずに終了コード 5 で止める
-  setup:
-  - name: Mock
-    description: 正常系と同じ差し替え
-  - name: 移し替えの手順
-    description: キーを削除する破壊的な手順
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant M as project-index migrate
+        C->>M: フラグなし
+        M->>F: バックアップを取る
+        M->>M: 手順を当てる（スキーマに違反）
+        M->>F: バックアップから戻す
+        M-->>C: 失敗した手順と理由（終了コード 4）
+      ```
+    expected:
+      - 終了コード 4 で stderr に失敗した手順と違反したキーを出す
+      - 端末の設定の中身が適用前と同じ
+    test: test_error_when_step_fails
+  - name: 異常系（破壊的な手順がある・DestructiveStepBlocked）
+    summary: 破壊的な手順を `--allow-destructive` なしで当てようとすると、触らずに終了コード 5 で止める
+    setup:
+      - name: Mock
+        description: 正常系と同じ差し替え
+      - name: 移し替えの手順
+        description: キーを削除する破壊的な手順
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index migrate
 
-      C->>M: フラグなし
-      M-->>C: 破壊的な手順（終了コード 5）
-    ```
-  expected:
-  - 終了コード 5 で stderr に破壊的な手順を出す
-  - 端末の設定が変わらず、バックアップも作らない
-  - '`--allow-destructive` を付けると終了コード 0 で当てる'
-  test: test_error_when_destructive_step_blocked
-- name: 異常系（設定が新しい・ConfigNewer）
-  summary: project-index より新しい `version` の設定は移し替えずに終了コード 6 で止める
-  setup:
-  - name: Mock
-    description: 正常系と同じ差し替え
-  - name: 端末の設定
-    description: '`version: "99"`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant M as project-index migrate
+        C->>M: フラグなし
+        M-->>C: 破壊的な手順（終了コード 5）
+      ```
+    expected:
+      - 終了コード 5 で stderr に破壊的な手順を出す
+      - 端末の設定が変わらず、バックアップも作らない
+      - '`--allow-destructive` を付けると終了コード 0 で当てる'
+    test: test_error_when_destructive_step_blocked
+  - name: 異常系（設定が新しい・ConfigNewer）
+    summary: project-index より新しい `version` の設定は移し替えずに終了コード 6 で止める
+    setup:
+      - name: Mock
+        description: 正常系と同じ差し替え
+      - name: 端末の設定
+        description: '`version: "99"`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index migrate
 
-      C->>M: フラグなし
-      M-->>C: project-index の更新の案内（終了コード 6）
-    ```
-  expected:
-  - 終了コード 6 で stderr に project-index の更新の案内を出す
-  - 端末の設定が変わらない
-  test: test_error_when_config_newer
-- name: 異常系（配信元の設定に移せない設定がある・MigrationFailed）
-  summary: 機械的に移せない設定を持つ配信元の設定は書き換えず、違反と `/project-index:setup` の案内を出して終了コード 4 で止める
-  setup:
-  - name: Mock
-    description: 正常系と同じ差し替え
-  - name: 配信元
-    description: '`version: "1"` の `project-index.yaml` を持つ sample。`documents[0]` が `type: yaml`・`metadata: {name: {type: ref, field: title}}`、`documents[1]` が `type: markdown`・`defaults: [{paths: [docs/**], tags: [doc]}]`、`documents[2]` が `metadata: {tags: {type: custom, value: [x]}}` を持つ'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant M as project-index migrate
-      participant F as project-index.yaml
+        C->>M: フラグなし
+        M-->>C: project-index の更新の案内（終了コード 6）
+      ```
+    expected:
+      - 終了コード 6 で stderr に project-index の更新の案内を出す
+      - 端末の設定が変わらない
+    test: test_error_when_config_newer
+  - name: 異常系（配信元の設定に移せない設定がある・MigrationFailed）
+    summary: 機械的に移せない設定を持つ配信元の設定は書き換えず、違反と `/project-index:setup` の案内を出して終了コード 4 で止める
+    setup:
+      - name: Mock
+        description: 正常系と同じ差し替え
+      - name: 配信元
+        description: '`version: "1"` の `project-index.yaml` を持つ sample。`documents[0]` が `type: yaml`・`metadata: {name: {type: ref, field: title}}`、`documents[1]` が `type: markdown`・`defaults: [{paths: [docs/**], tags: [doc]}]`、`documents[2]` が `metadata: {tags: {type: custom, value: [x]}}` を持つ'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index migrate
+        participant F as project-index.yaml
 
-      C->>M: --source --allow-destructive
-      M->>M: 手順を当てた結果を新しいスキーマで検証し、違反が残る
-      M-->>C: 違反と /project-index:setup の案内（終了コード 4）
-    ```
-  expected:
-  - 終了コード 4 で stderr に `documents[1].type`・`documents[1].defaults`・`documents[2].metadata.tags` の違反と、`/project-index:setup` で管理用の YAML へ移す案内を出す
-  - '`project-index.yaml` の中身が適用前と同じ（`documents[0]` も書き換わらない）'
-  test: test_error_when_source_config_unmigratable
+        C->>M: --source --allow-destructive
+        M->>M: 手順を当てた結果を新しいスキーマで検証し、違反が残る
+        M-->>C: 違反と /project-index:setup の案内（終了コード 4）
+      ```
+    expected:
+      - 終了コード 4 で stderr に `documents[1].type`・`documents[1].defaults`・`documents[2].metadata.tags` の違反と、`/project-index:setup` で管理用の YAML へ移す案内を出す
+      - '`project-index.yaml` の中身が適用前と同じ（`documents[0]` も書き換わらない）'
+    test: test_error_when_source_config_unmigratable
 lead: 端末の設定か配信元の `project-index.yaml` の `version` を project-index が読めるバージョンと比べ、移し替えの手順を古い順に当てる。
 identifier: migrate
 permissions: 対象の設定ファイルを書き換えられる利用者
 idempotent: true
 side_effects: 適用では対象の設定ファイルを書き換え、同じフォルダに `{ファイル名}.bak-{時刻}` を残す。`--plan` は書き換えない
 callers:
-- SC-3#scenarios[正常シナリオ（端末の設定が古くなる）]
-- SC-3#scenarios[正常シナリオ（配信元の設定が古くなる）]
+  - SC-3#scenarios[正常シナリオ（端末の設定が古くなる）]
+  - SC-3#scenarios[正常シナリオ（配信元の設定が古くなる）]
 exclusivity: 端末の設定は動いているサーバーと同じファイルを書き換えるため、適用は書き換えの前後でファイルの中身を比べ、変わっていたら書かずに失敗とする
 request:
-- name: --plan
-  type: flag
-  required: false
-  default: なし（適用する）
-  location: argument
-  description: 当てる手順の一覧を出して終わる。書き換えない
-- name: --record
-  type: flag
-  required: false
-  default: なし
-  location: argument
-  description: 手順を当てず、`version` だけを今のバージョンに書き換える
-  notes: 利用者が手で移し替えたときに使う。`--plan` とは併用しない
-- name: --source
-  type: str
-  required: false
-  default: なし（`PROJECT_INDEX_CONFIG` が指す端末の設定）
-  location: argument
-  description: 配信元の `project-index.yaml` のパス。渡すとその配信元の設定を対象にする
-- name: --allow-destructive
-  type: flag
-  required: false
-  default: なし（破壊的な手順があれば止める）
-  location: argument
-  description: キーの削除など、値を捨てる手順も適用する
+  - name: --plan
+    type: flag
+    required: false
+    default: なし（適用する）
+    location: argument
+    description: 当てる手順の一覧を出して終わる。書き換えない
+  - name: --record
+    type: flag
+    required: false
+    default: なし
+    location: argument
+    description: 手順を当てず、`version` だけを今のバージョンに書き換える
+    notes: 利用者が手で移し替えたときに使う。`--plan` とは併用しない
+  - name: --source
+    type: str
+    required: false
+    default: なし（`PROJECT_INDEX_CONFIG` が指す端末の設定）
+    location: argument
+    description: 配信元の `project-index.yaml` のパス。渡すとその配信元の設定を対象にする
+  - name: --allow-destructive
+    type: flag
+    required: false
+    default: なし（破壊的な手順があれば止める）
+    location: argument
+    description: キーの削除など、値を捨てる手順も適用する
 request_example: |-
   ```bash
   project-index migrate --plan
   project-index migrate --source ~/repo/sample/project-index.yaml
   ```
 response:
-- name: 標準出力
-  type: str
-  description: '`--plan` は当てる手順を 1 行ずつ（`{バージョン}: {手順の説明}`。破壊的な手順には `[destructive]`）。適用は当てた手順とバックアップのパス'
-- name: 終了コード
-  type: int
-  description: 0 正常（当てる手順が無いときも 0）・2 設定の違反・4 失敗して書き換えなかった・5 破壊的な手順で止めた・6 設定のバージョンが project-index より新しい
-  notes: 2 は `project-index serve` の EXIT_CONFIG_INVALID と同じ値。3 は `serve` のポートが使用中に使っているため使わない
+  - name: 標準出力
+    type: str
+    description: '`--plan` は当てる手順を 1 行ずつ（`{バージョン}: {手順の説明}`。破壊的な手順には `[destructive]`）。適用は当てた手順とバックアップのパス'
+  - name: 終了コード
+    type: int
+    description: 0 正常（当てる手順が無いときも 0）・2 設定の違反・4 失敗して書き換えなかった・5 破壊的な手順で止めた・6 設定のバージョンが project-index より新しい
+    notes: 2 は `project-index serve` の EXIT_CONFIG_INVALID と同じ値。3 は `serve` のポートが使用中に使っているため使わない
 exceptions:
-- name: なし（正常終了）
-  condition: 手順を当て終えた、または当てる手順が無い（終了コード 0）
-- name: ConfigInvalid
-  condition: 対象の設定が無い・YAML として読めない・`version` が無い（終了コード 2）
-- name: MigrationFailed
-  condition: 手順の途中で失敗した、または当てた結果が新しいバージョンのスキーマに違反した（終了コード 4）
-  notes: 全ての手順を当てて新しいスキーマで検証してから書き込むため、ファイルには触らない。失敗した手順と理由を stderr に出す
-- name: DestructiveStepBlocked
-  condition: 当てる手順に破壊的なものがあり、`--allow-destructive` が無い（終了コード 5）
-  notes: ファイルに触らず、破壊的な手順を stderr に出す
-- name: ConfigNewer
-  condition: 対象の `version` が project-index が読めるバージョンより新しい（終了コード 6）
-  notes: project-index の更新を案内する
+  - name: なし（正常終了）
+    condition: 手順を当て終えた、または当てる手順が無い（終了コード 0）
+  - name: ConfigInvalid
+    condition: 対象の設定が無い・YAML として読めない・`version` が無い（終了コード 2）
+  - name: MigrationFailed
+    condition: 手順の途中で失敗した、または当てた結果が新しいバージョンのスキーマに違反した（終了コード 4）
+    notes: 全ての手順を当てて新しいスキーマで検証してから書き込むため、ファイルには触らない。失敗した手順と理由を stderr に出す
+  - name: DestructiveStepBlocked
+    condition: 当てる手順に破壊的なものがあり、`--allow-destructive` が無い（終了コード 5）
+    notes: ファイルに触らず、破壊的な手順を stderr に出す
+  - name: ConfigNewer
+    condition: 対象の `version` が project-index が読めるバージョンより新しい（終了コード 6）
+    notes: project-index の更新を案内する
 constraints:
-- item: 手順の置き場所
-  constraint: '`src/project_index/migrations/{settings|project-index}/{バージョン}/steps.yaml`。パッケージに同梱し、`importlib.resources` で読む'
-- item: 当てる順
-  constraint: 対象の `version` より新しく、project-index が読めるバージョン以下の手順を古い順に全て当てる。途中で止めず、全て当ててから 1 回だけ書き込む
-- item: バックアップ
-  constraint: 適用の前に必ず取る。成功しても消さない
-- item: 反映
-  constraint: 動いているサーバーには反映しない。利用者が続けて `restart`（配信元の設定だけなら `reload`）を呼ぶ
-- item: タイムアウト
-  constraint: 制限なし
-- item: 配信元の設定の 1 → 2 の手順
-  constraint: '`type: yaml` を削除し、`metadata` の `{type: ref, field: X}` を列名の文字列 `X` に、`metadata.alias_type` の `{type: custom, value: X}` を行の `alias_type: X` にする。`type: markdown`・`defaults[]`・`alias_type` 以外の `custom` は書き換えず、新しいスキーマの違反として MigrationFailed にする。どの手順も破壊的ではない'
-- item: 配信元の設定の 2 → 3 の手順
-  constraint: 最上位の `tags`（タグのマスター）を、`value` を持たない `delete` で削除する。値を捨てる破壊的な手順で、`--allow-destructive` が要る。マスターのファイルは削除しない
-  notes: '破壊的かは手順で決まるため、`tags` を持たない設定でも `version: "2"` 以前から移すには `--allow-destructive` が要る'
+  - item: 手順の置き場所
+    constraint: '`src/project_index/migrations/{settings|project-index}/{バージョン}/steps.yaml`。パッケージに同梱し、`importlib.resources` で読む'
+  - item: 当てる順
+    constraint: 対象の `version` より新しく、project-index が読めるバージョン以下の手順を古い順に全て当てる。途中で止めず、全て当ててから 1 回だけ書き込む
+  - item: バックアップ
+    constraint: 適用の前に必ず取る。成功しても消さない
+  - item: 反映
+    constraint: 動いているサーバーには反映しない。利用者が続けて `restart`（配信元の設定だけなら `reload`）を呼ぶ
+  - item: タイムアウト
+    constraint: 制限なし
+  - item: 配信元の設定の 1 → 2 の手順
+    constraint: '`type: yaml` を削除し、`metadata` の `{type: ref, field: X}` を列名の文字列 `X` に、`metadata.alias_type` の `{type: custom, value: X}` を行の `alias_type: X` にする。`type: markdown`・`defaults[]`・`alias_type` 以外の `custom` は書き換えず、新しいスキーマの違反として MigrationFailed にする。どの手順も破壊的ではない'
+  - item: 配信元の設定の 2 → 3 の手順
+    constraint: 最上位の `tags`（タグのマスター）を、`value` を持たない `delete` で削除する。値を捨てる破壊的な手順で、`--allow-destructive` が要る。マスターのファイルは削除しない
+    notes: '破壊的かは手順で決まるため、`tags` を持たない設定でも `version: "2"` 以前から移すには `--allow-destructive` が要る'
 test_file: tests/integration/server/test_migrate.py

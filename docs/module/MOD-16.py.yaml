@@ -2,78 +2,78 @@ id: MOD-16
 title: 索引のサーバー / 変換 / decisions.py
 lead: 配信元の `decisions.folders` から検討事項の文書を探す。
 test_files:
-- tests/unit/project_index/features/convert/test_decisions.py
+  - tests/unit/project_index/features/convert/test_decisions.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      検討事項の ID の一覧 ..> 検討事項の文書を探す
-      検討事項の文書の取得 ..> 検討事項の文書を探す
-      class 検討事項の文書を探す {
-        <<function>>
-      }
-      class 検討事項の ID の一覧 {
-        <<function>>
-      }
-      class 検討事項の文書の取得 {
-        <<function>>
-      }
-      click 検討事項の ID の一覧 href "./MOD-125.py.yaml#検討事項の ID の一覧"
-      click 検討事項の文書の取得 href "./MOD-125.py.yaml#検討事項の文書の取得"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        検討事項の ID の一覧 ..> 検討事項の文書を探す
+        検討事項の文書の取得 ..> 検討事項の文書を探す
+        class 検討事項の文書を探す {
+          <<function>>
+        }
+        class 検討事項の ID の一覧 {
+          <<function>>
+        }
+        class 検討事項の文書の取得 {
+          <<function>>
+        }
+        click 検討事項の ID の一覧 href "./MOD-125.py.yaml#検討事項の ID の一覧"
+        click 検討事項の文書の取得 href "./MOD-125.py.yaml#検討事項の文書の取得"
 constants:
-- name: DECISION_ID
-  title: 検討事項の ID の形式
-  container: project_index/features/convert/decisions.py
-  usecase: 文書の取得
-  summary: 検討事項の ID に適用する正規表現（AI Monitor の `共通.schema.yaml` の `decision` の `pattern` と同じ）
-  value: '`re.compile(r"^[A-Z]+-[0-9]+$")`'
-- name: DECISION_DOCS_DIR
-  title: 検討事項の文書のフォルダ
-  container: project_index/features/convert/decisions.py
-  usecase: 文書の取得
-  summary: 話し合いの記録のフォルダの中で、検討事項の文書（`{ID}.md`）を配置するフォルダ
-  value: '`".mindstella/docs"`'
+  - name: DECISION_ID
+    title: 検討事項の ID の形式
+    container: project_index/features/convert/decisions.py
+    usecase: 文書の取得
+    summary: 検討事項の ID に適用する正規表現（AI Monitor の `共通.schema.yaml` の `decision` の `pattern` と同じ）
+    value: '`re.compile(r"^[A-Z]+-[0-9]+$")`'
+  - name: DECISION_DOCS_DIR
+    title: 検討事項の文書のフォルダ
+    container: project_index/features/convert/decisions.py
+    usecase: 文書の取得
+    summary: 話し合いの記録のフォルダの中で、検討事項の文書（`{ID}.md`）を配置するフォルダ
+    value: '`".mindstella/docs"`'
 functions:
-- name: find_decisions
-  title: 検討事項の文書を探す
-  kind: 関数
-  container: project_index/features/convert/decisions.py
-  usecase: 文書の取得
-  role: 読み込み
-  summary: 配信元の `decisions.folders` のうち、ちょうど 1 つのフォルダに文書がある検討事項の ID と、その文書のパスを返却する
-  scope: public
-  thread_safe: true
-  args:
-  - name: source
-    title: 配信元
-    type: ServedSource
-    required: true
-    passing: positional
-    description: 配信している配信元
-  returns:
-    type: dict[str, Path]
-    description: 検討事項の ID → 文書のファイルの絶対パス。`decisions.folders` が空なら空
-  process: |-
-    1. 起点を `source.main_root`、無ければ `source.repo_root`、無ければ `source.root` にする
-    2. `decision_folders` の各フォルダを、絶対パスはそのまま、相対パスは起点と結合し、`{フォルダ}/{DECISION_DOCS_DIR}` の直下の `*.md` のうち拡張子を落とした名前が `DECISION_ID` に該当するファイルを集める（フォルダが無ければ飛ばす）
-    3. ID ごとに該当したフォルダの数を数え、ちょうど 1 つの ID だけをそのファイルのパスで返却する
-  unit_tests:
-  - name: test_find_decisions
-    case: 正常
-    summary: 1 つのフォルダにだけある ID を返却する
-    condition: '`decision_folders` が `[tmp/a, tmp/b]`。`tmp/a` に `D-1.md`・`D-2.md`、`tmp/b` に `D-2.md`・`notes.md`、`tmp/c` は無い'
-    mock: なし（一時フォルダ）
-    expected: '`{"D-1": tmp/a の D-1.md}` だけ（`D-2` と `notes` は含まない）'
-  - name: test_find_decisions_when_absolute_and_worktree
-    case: 正常
-    summary: 絶対パスと、ワークツリーから配信している配信元
-    condition: '`main_root` がメインのリポジトリ、`root` がワークツリー。`decision_folders` に相対パス 1 つと絶対パス 1 つ'
-    mock: なし（一時フォルダ）
-    expected: 相対パスはメインのリポジトリから、絶対パスはそのまま探した ID が返却される
-  - name: test_find_decisions_when_no_folders
-    case: 正常
-    summary: '`decisions.folders` が無い'
-    condition: '`decision_folders` が空'
-    mock: なし
-    expected: 空の辞書
+  - name: find_decisions
+    title: 検討事項の文書を探す
+    kind: 関数
+    container: project_index/features/convert/decisions.py
+    usecase: 文書の取得
+    role: 読み込み
+    summary: 配信元の `decisions.folders` のうち、ちょうど 1 つのフォルダに文書がある検討事項の ID と、その文書のパスを返却する
+    scope: public
+    thread_safe: true
+    args:
+      - name: source
+        title: 配信元
+        type: ServedSource
+        required: true
+        passing: positional
+        description: 配信している配信元
+    returns:
+      type: dict[str, Path]
+      description: 検討事項の ID → 文書のファイルの絶対パス。`decisions.folders` が空なら空
+    process: |-
+      1. 起点を `source.main_root`、無ければ `source.repo_root`、無ければ `source.root` にする
+      2. `decision_folders` の各フォルダを、絶対パスはそのまま、相対パスは起点と結合し、`{フォルダ}/{DECISION_DOCS_DIR}` の直下の `*.md` のうち拡張子を落とした名前が `DECISION_ID` に該当するファイルを集める（フォルダが無ければ飛ばす）
+      3. ID ごとに該当したフォルダの数を数え、ちょうど 1 つの ID だけをそのファイルのパスで返却する
+    unit_tests:
+      - name: test_find_decisions
+        case: 正常
+        summary: 1 つのフォルダにだけある ID を返却する
+        condition: '`decision_folders` が `[tmp/a, tmp/b]`。`tmp/a` に `D-1.md`・`D-2.md`、`tmp/b` に `D-2.md`・`notes.md`、`tmp/c` は無い'
+        mock: なし（一時フォルダ）
+        expected: '`{"D-1": tmp/a の D-1.md}` だけ（`D-2` と `notes` は含まない）'
+      - name: test_find_decisions_when_absolute_and_worktree
+        case: 正常
+        summary: 絶対パスと、ワークツリーから配信している配信元
+        condition: '`main_root` がメインのリポジトリ、`root` がワークツリー。`decision_folders` に相対パス 1 つと絶対パス 1 つ'
+        mock: なし（一時フォルダ）
+        expected: 相対パスはメインのリポジトリから、絶対パスはそのまま探した ID が返却される
+      - name: test_find_decisions_when_no_folders
+        case: 正常
+        summary: '`decisions.folders` が無い'
+        condition: '`decision_folders` が空'
+        mock: なし
+        expected: 空の辞書

@@ -2,377 +2,377 @@ id: MOD-79
 title: 索引のサーバー / 読み取り API / types.py
 lead: 読み取り API の要求と応答のデータモデル。
 data_models:
-- name: NavTab
-  title: 種類のタブ
-  container: project_index/features/read/types.py
-  usecase: 文書の取得
-  role: DTO
-  summary: 上のタブ 1 つとそのサイドバー
-  description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。配信元の設定の `nav` のタブ。'
-  properties:
-  - name: title
-    title: タブの名前
-    type: str
-    access: 公開
-    description: '`nav.tabs[].title`。nav が無ければ文書の行の `title`（無ければ `id`）'
-  - name: items
+  - name: NavTab
+    title: 種類のタブ
+    container: project_index/features/read/types.py
+    usecase: 文書の取得
+    role: DTO
+    summary: 上のタブ 1 つとそのサイドバー
+    description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。配信元の設定の `nav` のタブ。'
+    properties:
+      - name: title
+        title: タブの名前
+        type: str
+        access: 公開
+        description: '`nav.tabs[].title`。nav が無ければ文書の行の `title`（無ければ `id`）'
+      - name: items
+        title: サイドバーの項目
+        type: list[NavItem]
+        access: 公開
+        description: 見出しと文書の入れ子
+  - name: SearchItem
+    title: 語での検索の結果の文書
+    container: project_index/features/read/types.py
+    usecase: 語での検索
+    role: DTO
+    summary: '`items[]` の 1 件'
+    description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。'
+    properties:
+      - name: path
+        title: 文書のページのパス
+        type: str
+        access: 公開
+        description: '文書の取得の `path` に渡す形'
+      - name: name
+        title: 名前
+        type: str
+        access: 公開
+        description: メタデータの `name`（空なら文書のストアがファイル名か ID を入れたもの）
+      - name: snippets
+        title: 一致した箇所
+        type: list[str]
+        access: 公開
+        description: '`SNIPPETS_PER_DOC` 件まで'
+  - name: SearchResult
+    title: 語での検索の結果
+    container: project_index/features/read/types.py
+    usecase: 語での検索
+    role: DTO
+    summary: GET `/sources/{source}/search` の応答
+    description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。'
+    properties:
+      - name: total_count
+        title: 総件数
+        type: int
+        access: 公開
+        description: 一致した文書の数
+      - name: items
+        title: 文書
+        type: list[SearchItem]
+        access: 公開
+        description: '`limit` 件まで'
+  - name: NavItem
     title: サイドバーの項目
-    type: list[NavItem]
-    access: 公開
-    description: 見出しと文書の入れ子
-- name: SearchItem
-  title: 語での検索の結果の文書
-  container: project_index/features/read/types.py
-  usecase: 語での検索
-  role: DTO
-  summary: '`items[]` の 1 件'
-  description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。'
-  properties:
-  - name: path
-    title: 文書のページのパス
-    type: str
-    access: 公開
-    description: '文書の取得の `path` に渡す形'
-  - name: name
-    title: 名前
-    type: str
-    access: 公開
-    description: メタデータの `name`（空なら文書のストアがファイル名か ID を入れたもの）
-  - name: snippets
-    title: 一致した箇所
-    type: list[str]
-    access: 公開
-    description: '`SNIPPETS_PER_DOC` 件まで'
-- name: SearchResult
-  title: 語での検索の結果
-  container: project_index/features/read/types.py
-  usecase: 語での検索
-  role: DTO
-  summary: GET `/sources/{source}/search` の応答
-  description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。'
-  properties:
-  - name: total_count
-    title: 総件数
-    type: int
-    access: 公開
-    description: 一致した文書の数
-  - name: items
-    title: 文書
-    type: list[SearchItem]
-    access: 公開
-    description: '`limit` 件まで'
-- name: NavItem
-  title: サイドバーの項目
-  container: project_index/features/read/types.py
-  usecase: 文書の取得
-  role: DTO
-  summary: サイドバーの見出しか文書の 1 行
-  description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。配信元の設定の `nav` の項目。'
-  properties:
-  - name: kind
-    title: 項目の種類
-    type: Literal['group', 'page']
-    access: 公開
-    description: '`group` は見出し、`page` は文書'
-  - name: title
-    title: 名前
-    type: str
-    access: 公開
-    description: '`title` の上書きか、見出しの名前・文書のメタデータの `name`（空なら文書のストアがファイル名か ID を入れたもの）'
-  - name: path
-    title: 文書のページのパス
-    type: str | None
-    access: 公開
-    default: None
-    description: '`page` の文書のページのパス。`group` は `None`'
-  - name: items
-    title: 入れ子の項目
-    type: list[NavItem]
-    access: 公開
-    default: '[]'
-    description: '`group` の下の項目（`group` の入れ子と `auto` の `group_by`）。`page` は空'
-- name: ConversionError
-  title: 変換の失敗の応答
-  container: project_index/features/read/types.py
-  usecase: 文書の取得
-  role: DTO
-  summary: 文書の取得の `conversion_error`
-  description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。変換の『変換の失敗』と同じフィールドを持つ。'
-  properties:
-  - name: reason
-    title: 理由
-    type: Literal['timeout', 'exit', 'not_runnable', 'invalid_yaml']
-    access: 公開
-    description: 制限時間を超えた・0 以外で終わった・実行できない・YAML を読めない
-  - name: kind
-    title: 種類
-    type: str
-    access: 公開
-    description: 文書の行の ID
-  - name: script
-    title: スクリプト
-    type: str | None
-    access: 公開
-    default: None
-    description: '`converters[].run` を空白で繋いだもの。YAML を読めないときは `None`'
-  - name: detail
-    title: 詳細
-    type: str
-    access: 公開
-    description: 制限時間の秒数・終了コードと標準エラーの末尾・読めなかった理由
-  - name: file
-    title: ファイル
-    type: str | None
-    access: 公開
-    default: None
-    description: YAML を読めないときのファイルのパス（配信元の直下から）
-  - name: line
-    title: 行
-    type: int | None
-    access: 公開
-    default: None
-    description: YAML を読めないときの行（1 始まり）
-  - name: column
-    title: 列
-    type: int | None
-    access: 公開
-    default: None
-    description: YAML を読めないときの列（1 始まり）
-- name: GitHubTarget
-  title: 起票先
-  container: project_index/features/read/types.py
-  usecase: 文書の取得
-  role: DTO
-  summary: 文書の取得の `github`
-  description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。'
-  properties:
-  - name: repository
-    title: GitHub のリポジトリ
-    type: str
-    access: 公開
-    description: 配信元の `github_repository`（`owner/name`）
-  - name: issue_labels
-    title: 起票のラベル
-    type: list[str]
-    access: 公開
-    description: 配信元の `github_issue_labels`
-- name: NavAutoCount
-  title: nav の条件の数
-  container: project_index/features/read/types.py
-  usecase: 画面の構成の書き込み
-  role: DTO
-  summary: '`nav` の `auto` 1 つと、その条件に当たる文書の数'
-  description: '`dataclass(frozen=True, slots=True, kw_only=True)`。'
-  properties:
-  - name: path
-    title: キーのパス
-    type: str
-    access: 公開
-    description: '`auto` のキーのパス（`nav.tabs[2].items[0].auto`）'
-  - name: tab
-    title: タブの名前
-    type: str
-    access: 公開
-    description: '`auto` を持つタブの `title`'
-  - name: filter
-    title: 条件
-    type: dict[str, Any] | None
-    access: 公開
-    description: '`auto.filter`。無ければ `None`'
-  - name: count
-    title: 文書の数
-    type: int
-    access: 公開
-    description: '`auto` の `document` と `filter` に当たる文書の数'
-- name: SourceConfigResponse
-  title: 配信元の設定の応答
-  container: project_index/features/read/types.py
-  usecase: 読み取り API
-  role: DTO
-  summary: 配信元の設定の取得（IF-23）の応答
-  properties:
-  - name: nav
-    title: nav
-    type: list[dict] | None
-    access: 公開
-    description: 配信元の設定の `nav`
-  - name: documents
-    title: documents
-    type: list[dict]
-    access: 公開
-    description: 配信元の設定の `documents[]`（スクリプトのコマンドを除く）
-  - name: decisions
-    title: decisions
-    type: dict
-    access: 公開
-    description: '`folders` を持つ'
-  - name: github
-    title: github
-    type: GitHubTarget | None
-    access: 公開
-    description: GitHub のリポジトリと起票のラベル
-- name: DocumentListItem
-  title: 文書の一覧の要素
-  container: project_index/features/read/types.py
-  usecase: 読み取り API
-  role: DTO
-  summary: 文書の一覧（IF-24）の 1 件
-  properties:
-  - name: id
-    title: ID
-    type: str
-    access: 公開
-    description: 文書の ID
-  - name: path
-    title: パス
-    type: str
-    access: 公開
-    description: 文書のファイルのパス
-  - name: kind
-    title: 種類
-    type: str
-    access: 公開
-    description: '`documents[].id`'
-  - name: name
-    title: 名前
-    type: str
-    access: 公開
-    description: 共通のキー `name`
-  - name: description
-    title: 概要
-    type: str | None
-    access: 公開
-    description: 共通のキー `description`
-  - name: tags
-    title: タグ
-    type: list[str]
-    access: 公開
-    description: タグ
-  - name: visibility
-    title: 公開範囲
-    type: str | None
-    access: 公開
-    description: 公開範囲
-  - name: body_path
-    title: 本文のファイルのパス
-    type: str | None
-    access: 公開
-    description: 管理用の YAML の行の文書だけ
-- name: DocumentListResponse
-  title: 文書の一覧の応答
-  container: project_index/features/read/types.py
-  usecase: 読み取り API
-  role: DTO
-  summary: 文書の一覧（IF-24）の応答
-  properties:
-  - name: ref
-    title: リビジョン
-    type: str
-    access: 公開
-    description: 解決したリビジョンの名前
-  - name: documents
-    title: 文書
-    type: list[DocumentListItem]
-    access: 公開
-    description: 文書の並び
-- name: DocumentValueResponse
-  title: 文書の取得の応答
-  container: project_index/features/read/types.py
-  usecase: 読み取り API
-  role: DTO
-  summary: 文書の取得（IF-25）の応答
-  properties:
-  - name: source
-    title: 配信元の ID
-    type: str
-    access: 公開
-    description: 配信元の ID
-  - name: ref
-    title: リビジョン
-    type: str
-    access: 公開
-    description: 解決したリビジョンの名前
-  - name: path
-    title: パス
-    type: str
-    access: 公開
-    description: 文書のファイルのパス
-  - name: value
-    title: 値
-    type: dict | None
-    access: 公開
-    description: 文書の値。YAML を読み込めないときは `None`
-  - name: schema
-    title: スキーマ
-    type: dict | None
-    access: 公開
-    description: 種類のスキーマ（`$ref` を解いた形）
-  - name: metadata
-    title: メタデータ
-    type: DocumentListItem
-    access: 公開
-    description: '`id`・`kind`・`name`・`description`・`tags`・`visibility`'
-  - name: body
-    title: 本文
-    type: str | None
-    access: 公開
-    description: 管理用の YAML の行の文書の本文
-  - name: body_path
-    title: 本文のファイルのパス
-    type: str | None
-    access: 公開
-    description: 管理用の YAML の行の文書だけ
-  - name: markdown
-    title: Markdown
-    type: str | None
-    access: 公開
-    description: '`converters[]` のスクリプトが出した Markdown'
-  - name: conversion_error
-    title: 変換の失敗
-    type: ConversionError | None
-    access: 公開
-    description: 変換に失敗したとき・YAML を読み込めないとき
-  - name: updated_at
-    title: 更新日時
-    type: str
-    access: 公開
-    description: 文書のファイルを最後に変えた日時
-- name: DecisionItem
-  title: 検討事項の ID の一覧の要素
-  container: project_index/features/read/types.py
-  usecase: 読み取り API
-  role: DTO
-  summary: 検討事項の ID の一覧（IF-26）の 1 件
-  properties:
-  - name: id
-    title: ID
-    type: str
-    access: 公開
-    description: 検討事項の ID
-  - name: folders
-    title: フォルダの数
-    type: int
-    access: 公開
-    description: その ID の文書があるフォルダの数
-- name: DecisionResponse
-  title: 検討事項の文書の応答
-  container: project_index/features/read/types.py
-  usecase: 読み取り API
-  role: DTO
-  summary: 検討事項の文書の取得（IF-27）の応答
-  properties:
-  - name: id
-    title: ID
-    type: str
-    access: 公開
-    description: 検討事項の ID
-  - name: folder
-    title: フォルダ
-    type: str
-    access: 公開
-    description: 文書のあったフォルダ
-  - name: body
-    title: 本文
-    type: str
-    access: 公開
-    description: 文書の本文（変換しない）
+    container: project_index/features/read/types.py
+    usecase: 文書の取得
+    role: DTO
+    summary: サイドバーの見出しか文書の 1 行
+    description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。配信元の設定の `nav` の項目。'
+    properties:
+      - name: kind
+        title: 項目の種類
+        type: Literal['group', 'page']
+        access: 公開
+        description: '`group` は見出し、`page` は文書'
+      - name: title
+        title: 名前
+        type: str
+        access: 公開
+        description: '`title` の上書きか、見出しの名前・文書のメタデータの `name`（空なら文書のストアがファイル名か ID を入れたもの）'
+      - name: path
+        title: 文書のページのパス
+        type: str | None
+        access: 公開
+        default: None
+        description: '`page` の文書のページのパス。`group` は `None`'
+      - name: items
+        title: 入れ子の項目
+        type: list[NavItem]
+        access: 公開
+        default: '[]'
+        description: '`group` の下の項目（`group` の入れ子と `auto` の `group_by`）。`page` は空'
+  - name: ConversionError
+    title: 変換の失敗の応答
+    container: project_index/features/read/types.py
+    usecase: 文書の取得
+    role: DTO
+    summary: 文書の取得の `conversion_error`
+    description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。変換の『変換の失敗』と同じフィールドを持つ。'
+    properties:
+      - name: reason
+        title: 理由
+        type: Literal['timeout', 'exit', 'not_runnable', 'invalid_yaml']
+        access: 公開
+        description: 制限時間を超えた・0 以外で終わった・実行できない・YAML を読めない
+      - name: kind
+        title: 種類
+        type: str
+        access: 公開
+        description: 文書の行の ID
+      - name: script
+        title: スクリプト
+        type: str | None
+        access: 公開
+        default: None
+        description: '`converters[].run` を空白で繋いだもの。YAML を読めないときは `None`'
+      - name: detail
+        title: 詳細
+        type: str
+        access: 公開
+        description: 制限時間の秒数・終了コードと標準エラーの末尾・読めなかった理由
+      - name: file
+        title: ファイル
+        type: str | None
+        access: 公開
+        default: None
+        description: YAML を読めないときのファイルのパス（配信元の直下から）
+      - name: line
+        title: 行
+        type: int | None
+        access: 公開
+        default: None
+        description: YAML を読めないときの行（1 始まり）
+      - name: column
+        title: 列
+        type: int | None
+        access: 公開
+        default: None
+        description: YAML を読めないときの列（1 始まり）
+  - name: GitHubTarget
+    title: 起票先
+    container: project_index/features/read/types.py
+    usecase: 文書の取得
+    role: DTO
+    summary: 文書の取得の `github`
+    description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。'
+    properties:
+      - name: repository
+        title: GitHub のリポジトリ
+        type: str
+        access: 公開
+        description: 配信元の `github_repository`（`owner/name`）
+      - name: issue_labels
+        title: 起票のラベル
+        type: list[str]
+        access: 公開
+        description: 配信元の `github_issue_labels`
+  - name: NavAutoCount
+    title: nav の条件の数
+    container: project_index/features/read/types.py
+    usecase: 画面の構成の書き込み
+    role: DTO
+    summary: '`nav` の `auto` 1 つと、その条件に当たる文書の数'
+    description: '`dataclass(frozen=True, slots=True, kw_only=True)`。'
+    properties:
+      - name: path
+        title: キーのパス
+        type: str
+        access: 公開
+        description: '`auto` のキーのパス（`nav.tabs[2].items[0].auto`）'
+      - name: tab
+        title: タブの名前
+        type: str
+        access: 公開
+        description: '`auto` を持つタブの `title`'
+      - name: filter
+        title: 条件
+        type: dict[str, Any] | None
+        access: 公開
+        description: '`auto.filter`。無ければ `None`'
+      - name: count
+        title: 文書の数
+        type: int
+        access: 公開
+        description: '`auto` の `document` と `filter` に当たる文書の数'
+  - name: SourceConfigResponse
+    title: 配信元の設定の応答
+    container: project_index/features/read/types.py
+    usecase: 読み取り API
+    role: DTO
+    summary: 配信元の設定の取得（IF-23）の応答
+    properties:
+      - name: nav
+        title: nav
+        type: list[dict] | None
+        access: 公開
+        description: 配信元の設定の `nav`
+      - name: documents
+        title: documents
+        type: list[dict]
+        access: 公開
+        description: 配信元の設定の `documents[]`（スクリプトのコマンドを除く）
+      - name: decisions
+        title: decisions
+        type: dict
+        access: 公開
+        description: '`folders` を持つ'
+      - name: github
+        title: github
+        type: GitHubTarget | None
+        access: 公開
+        description: GitHub のリポジトリと起票のラベル
+  - name: DocumentListItem
+    title: 文書の一覧の要素
+    container: project_index/features/read/types.py
+    usecase: 読み取り API
+    role: DTO
+    summary: 文書の一覧（IF-24）の 1 件
+    properties:
+      - name: id
+        title: ID
+        type: str
+        access: 公開
+        description: 文書の ID
+      - name: path
+        title: パス
+        type: str
+        access: 公開
+        description: 文書のファイルのパス
+      - name: kind
+        title: 種類
+        type: str
+        access: 公開
+        description: '`documents[].id`'
+      - name: name
+        title: 名前
+        type: str
+        access: 公開
+        description: 共通のキー `name`
+      - name: description
+        title: 概要
+        type: str | None
+        access: 公開
+        description: 共通のキー `description`
+      - name: tags
+        title: タグ
+        type: list[str]
+        access: 公開
+        description: タグ
+      - name: visibility
+        title: 公開範囲
+        type: str | None
+        access: 公開
+        description: 公開範囲
+      - name: body_path
+        title: 本文のファイルのパス
+        type: str | None
+        access: 公開
+        description: 管理用の YAML の行の文書だけ
+  - name: DocumentListResponse
+    title: 文書の一覧の応答
+    container: project_index/features/read/types.py
+    usecase: 読み取り API
+    role: DTO
+    summary: 文書の一覧（IF-24）の応答
+    properties:
+      - name: ref
+        title: リビジョン
+        type: str
+        access: 公開
+        description: 解決したリビジョンの名前
+      - name: documents
+        title: 文書
+        type: list[DocumentListItem]
+        access: 公開
+        description: 文書の並び
+  - name: DocumentValueResponse
+    title: 文書の取得の応答
+    container: project_index/features/read/types.py
+    usecase: 読み取り API
+    role: DTO
+    summary: 文書の取得（IF-25）の応答
+    properties:
+      - name: source
+        title: 配信元の ID
+        type: str
+        access: 公開
+        description: 配信元の ID
+      - name: ref
+        title: リビジョン
+        type: str
+        access: 公開
+        description: 解決したリビジョンの名前
+      - name: path
+        title: パス
+        type: str
+        access: 公開
+        description: 文書のファイルのパス
+      - name: value
+        title: 値
+        type: dict | None
+        access: 公開
+        description: 文書の値。YAML を読み込めないときは `None`
+      - name: schema
+        title: スキーマ
+        type: dict | None
+        access: 公開
+        description: 種類のスキーマ（`$ref` を解いた形）
+      - name: metadata
+        title: メタデータ
+        type: DocumentListItem
+        access: 公開
+        description: '`id`・`kind`・`name`・`description`・`tags`・`visibility`'
+      - name: body
+        title: 本文
+        type: str | None
+        access: 公開
+        description: 管理用の YAML の行の文書の本文
+      - name: body_path
+        title: 本文のファイルのパス
+        type: str | None
+        access: 公開
+        description: 管理用の YAML の行の文書だけ
+      - name: markdown
+        title: Markdown
+        type: str | None
+        access: 公開
+        description: '`converters[]` のスクリプトが出した Markdown'
+      - name: conversion_error
+        title: 変換の失敗
+        type: ConversionError | None
+        access: 公開
+        description: 変換に失敗したとき・YAML を読み込めないとき
+      - name: updated_at
+        title: 更新日時
+        type: str
+        access: 公開
+        description: 文書のファイルを最後に変えた日時
+  - name: DecisionItem
+    title: 検討事項の ID の一覧の要素
+    container: project_index/features/read/types.py
+    usecase: 読み取り API
+    role: DTO
+    summary: 検討事項の ID の一覧（IF-26）の 1 件
+    properties:
+      - name: id
+        title: ID
+        type: str
+        access: 公開
+        description: 検討事項の ID
+      - name: folders
+        title: フォルダの数
+        type: int
+        access: 公開
+        description: その ID の文書があるフォルダの数
+  - name: DecisionResponse
+    title: 検討事項の文書の応答
+    container: project_index/features/read/types.py
+    usecase: 読み取り API
+    role: DTO
+    summary: 検討事項の文書の取得（IF-27）の応答
+    properties:
+      - name: id
+        title: ID
+        type: str
+        access: 公開
+        description: 検討事項の ID
+      - name: folder
+        title: フォルダ
+        type: str
+        access: 公開
+        description: 文書のあったフォルダ
+      - name: body
+        title: 本文
+        type: str
+        access: 公開
+        description: 文書の本文（変換しない）

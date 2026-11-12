@@ -10,36 +10,36 @@ directory: |-
   └─ service.py    # describe
   ```
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      配信元の説明 ..> 作業場所の説明 : 引数なし
-      配信元の説明 ..> 使える配信元 : 引数なし
-      配信元の説明 ..> 読む場所の解決 : source
-      配信元の説明 ..> 作業場所の配信元の読み込み : 作業ツリー・ワークツリー
-      配信元の説明 ..> 文書の行を引く : kind
-      class 配信元の説明 {
-        <<function>>
-      }
-      class 作業場所の説明 {
-        <<function>>
-      }
-      class 使える配信元 {
-        <<function>>
-      }
-      class 読む場所の解決 {
-        <<function>>
-      }
-      class 作業場所の配信元の読み込み {
-        <<function>>
-      }
-      class 文書の行を引く {
-        <<method>>
-      }
-      click 配信元の説明 href "./MOD-20.py.yaml#配信元の説明"
-      click 作業場所の説明 href "./MOD-7.py.yaml#作業場所の説明"
-      click 使える配信元 href "./MOD-7.py.yaml#使える配信元"
-      click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
-      click 作業場所の配信元の読み込み href "./MOD-70.py.yaml#作業場所の配信元の読み込み"
-      click 文書の行を引く href "./MOD-71.py.yaml#文書の行を引く"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        配信元の説明 ..> 作業場所の説明 : 引数なし
+        配信元の説明 ..> 使える配信元 : 引数なし
+        配信元の説明 ..> 読む場所の解決 : source
+        配信元の説明 ..> 作業場所の配信元の読み込み : 作業ツリー・ワークツリー
+        配信元の説明 ..> 文書の行を引く : kind
+        class 配信元の説明 {
+          <<function>>
+        }
+        class 作業場所の説明 {
+          <<function>>
+        }
+        class 使える配信元 {
+          <<function>>
+        }
+        class 読む場所の解決 {
+          <<function>>
+        }
+        class 作業場所の配信元の読み込み {
+          <<function>>
+        }
+        class 文書の行を引く {
+          <<method>>
+        }
+        click 配信元の説明 href "./MOD-20.py.yaml#配信元の説明"
+        click 作業場所の説明 href "./MOD-7.py.yaml#作業場所の説明"
+        click 使える配信元 href "./MOD-7.py.yaml#使える配信元"
+        click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
+        click 作業場所の配信元の読み込み href "./MOD-70.py.yaml#作業場所の配信元の読み込み"
+        click 文書の行を引く href "./MOD-71.py.yaml#文書の行を引く"

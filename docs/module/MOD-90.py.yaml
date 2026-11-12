@@ -2,207 +2,207 @@ id: MOD-90
 title: 索引のサーバー / 起動 / app.py
 lead: ルートと MCP のマウントをまとめたアプリの組み立て。
 test_files:
-- tests/unit/project_index/server/test_app.py
+  - tests/unit/project_index/server/test_app.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      待ち受けの開始 ..> アプリの組み立て
-      アプリの組み立て ..> 文書の MCP の組み立て
-      アプリの組み立て ..> 管理の MCP の組み立て
-      アプリの組み立て ..> 端末の設定の入口
-      アプリの組み立て ..> 読み取り API の入口
-      アプリの組み立て ..> セッションの開始のルーター
-      アプリの組み立て ..> 例外の変換の登録
-      アプリの組み立て ..> 操作の識別子
-      アプリの組み立て ..> アプリの寿命
-      アプリの組み立て ..> MCPのパスの補い : 取り付ける
-      class 待ち受けの開始 {
-        <<function>>
-      }
-      class アプリの組み立て {
-        <<function>>
-      }
-      class MCPのパスの補い {
-        +__call__(scope, receive, send) None
-      }
-      class 文書の MCP の組み立て {
-        <<function>>
-      }
-      class 管理の MCP の組み立て {
-        <<function>>
-      }
-      class 端末の設定の入口 {
-        <<function>>
-      }
-      class 読み取り API の入口 {
-        <<function>>
-      }
-      class セッションの開始のルーター {
-        <<function>>
-      }
-      class 例外の変換の登録 {
-        <<function>>
-      }
-      class 操作の識別子 {
-        <<function>>
-      }
-      class アプリの寿命 {
-        <<function>>
-      }
-      click 待ち受けの開始 href "./MOD-89.py.yaml#待ち受けの開始"
-      click 文書の MCP の組み立て href "./MOD-94.py.yaml#文書の MCP の組み立て"
-      click 管理の MCP の組み立て href "./MOD-93.py.yaml#管理の MCP の組み立て"
-      click 端末の設定の入口 href "./MOD-65.py.yaml#端末の設定の入口"
-      click 読み取り API の入口 href "./MOD-126.py.yaml#読み取り API の入口"
-      click セッションの開始のルーター href "./MOD-61.py.yaml#セッションの開始のルーター"
-      click 例外の変換の登録 href "./MOD-91.py.yaml#例外の変換の登録"
-      click アプリの寿命 href "./MOD-92.py.yaml#アプリの寿命"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        待ち受けの開始 ..> アプリの組み立て
+        アプリの組み立て ..> 文書の MCP の組み立て
+        アプリの組み立て ..> 管理の MCP の組み立て
+        アプリの組み立て ..> 端末の設定の入口
+        アプリの組み立て ..> 読み取り API の入口
+        アプリの組み立て ..> セッションの開始のルーター
+        アプリの組み立て ..> 例外の変換の登録
+        アプリの組み立て ..> 操作の識別子
+        アプリの組み立て ..> アプリの寿命
+        アプリの組み立て ..> MCPのパスの補い : 取り付ける
+        class 待ち受けの開始 {
+          <<function>>
+        }
+        class アプリの組み立て {
+          <<function>>
+        }
+        class MCPのパスの補い {
+          +__call__(scope, receive, send) None
+        }
+        class 文書の MCP の組み立て {
+          <<function>>
+        }
+        class 管理の MCP の組み立て {
+          <<function>>
+        }
+        class 端末の設定の入口 {
+          <<function>>
+        }
+        class 読み取り API の入口 {
+          <<function>>
+        }
+        class セッションの開始のルーター {
+          <<function>>
+        }
+        class 例外の変換の登録 {
+          <<function>>
+        }
+        class 操作の識別子 {
+          <<function>>
+        }
+        class アプリの寿命 {
+          <<function>>
+        }
+        click 待ち受けの開始 href "./MOD-89.py.yaml#待ち受けの開始"
+        click 文書の MCP の組み立て href "./MOD-94.py.yaml#文書の MCP の組み立て"
+        click 管理の MCP の組み立て href "./MOD-93.py.yaml#管理の MCP の組み立て"
+        click 端末の設定の入口 href "./MOD-65.py.yaml#端末の設定の入口"
+        click 読み取り API の入口 href "./MOD-126.py.yaml#読み取り API の入口"
+        click セッションの開始のルーター href "./MOD-61.py.yaml#セッションの開始のルーター"
+        click 例外の変換の登録 href "./MOD-91.py.yaml#例外の変換の登録"
+        click アプリの寿命 href "./MOD-92.py.yaml#アプリの寿命"
 classes:
-- name: SlashlessMcpPathMiddleware
-  title: MCP のパスの補い
-  container: project_index/server/app.py
-  usecase: 起動
-  role: ASGI のミドルウェア
-  summary: スラッシュ無しの MCP のパスへの要求を、ルーティングの前に末尾にスラッシュを付けたパスへ書き換え、マウントした MCP へ届ける
-  description: Starlette のマウントは `/mcp/...` にだけ当たり、`/mcp` は読み取り API のルートに当たらず POST が 405 になる。画面の配信が無くても末尾のスラッシュへの 307 になるため、ルーティングの前でパスを補う
-  kind: クラス
-  properties:
-  - name: app
-    title: 次の ASGI アプリ
-    type: ASGIApp
-    access: 内部 (_)
-    description: 書き換えた要求を渡す先
-  - name: paths
-    title: 補うパス
-    type: frozenset[str]
-    access: 内部 (_)
-    description: 末尾にスラッシュを付けるパス（`DOCS_MCP_PATH`・`ADMIN_MCP_PATH`）
-  methods:
-  - name: __call__
-    title: 要求の受け渡し
-    kind: メソッド
-    summary: パスが `paths` のどれかと一致する HTTP の要求だけ、末尾にスラッシュを付けて次のアプリへ渡す
-    scope: public
-    is_async: true
-    args:
-    - name: scope
-      type: Scope
-      required: true
-      passing: positional
-      description: ASGI の scope
-    - name: receive
-      type: Receive
-      required: true
-      passing: positional
-      description: ASGI の receive
-    - name: send
-      type: Send
-      required: true
-      passing: positional
-      description: ASGI の send
-    returns:
-      type: None
-      description: なし
-    process: |-
-      1. `scope["type"]` が `http` で、`scope["path"]` が `paths` のどれかと一致するとき、`path` の末尾に `/`、`raw_path` の末尾に `b"/"` を付けた scope のコピーを作る（受け取った scope は書き換えない）
-      2. scope（書き換えたときはそのコピー）と `receive`・`send` を次のアプリへ渡す
-    unit_tests:
-    - name: test_slashless_mcp_path_middleware
-      case: 正常
-      summary: スラッシュ無しの MCP のパスにスラッシュを補う
-      condition: '`paths=("/mcp", "/_admin/mcp")` で、`type: http` の `path` が `/mcp` と `/_admin/mcp` の scope を渡す'
-      mock: 次のアプリ（受け取った scope を控える偽物）
-      expected: '次のアプリが受け取った `path` が `/mcp/`・`/_admin/mcp/`、`raw_path` が `b"/mcp/"`・`b"/_admin/mcp/"`。渡した元の scope の `path` は変わらない'
-    - name: test_slashless_mcp_path_middleware_when_other_path
-      case: 正常
-      summary: 他のパスと HTTP でない要求はそのまま渡す
-      condition: '`path` が `/mcp/`・`/mcpx`・`/sample/mcp` の HTTP の scope と、`type: lifespan` の scope を渡す'
-      mock: 次のアプリ（受け取った scope を控える偽物）
-      expected: 次のアプリが受け取った scope が渡した scope そのもの
+  - name: SlashlessMcpPathMiddleware
+    title: MCP のパスの補い
+    container: project_index/server/app.py
+    usecase: 起動
+    role: ASGI のミドルウェア
+    summary: スラッシュ無しの MCP のパスへの要求を、ルーティングの前に末尾にスラッシュを付けたパスへ書き換え、マウントした MCP へ届ける
+    description: Starlette のマウントは `/mcp/...` にだけ当たり、`/mcp` は読み取り API のルートに当たらず POST が 405 になる。画面の配信が無くても末尾のスラッシュへの 307 になるため、ルーティングの前でパスを補う
+    kind: クラス
+    properties:
+      - name: app
+        title: 次の ASGI アプリ
+        type: ASGIApp
+        access: 内部 (_)
+        description: 書き換えた要求を渡す先
+      - name: paths
+        title: 補うパス
+        type: frozenset[str]
+        access: 内部 (_)
+        description: 末尾にスラッシュを付けるパス（`DOCS_MCP_PATH`・`ADMIN_MCP_PATH`）
+    methods:
+      - name: __call__
+        title: 要求の受け渡し
+        kind: メソッド
+        summary: パスが `paths` のどれかと一致する HTTP の要求だけ、末尾にスラッシュを付けて次のアプリへ渡す
+        scope: public
+        is_async: true
+        args:
+          - name: scope
+            type: Scope
+            required: true
+            passing: positional
+            description: ASGI の scope
+          - name: receive
+            type: Receive
+            required: true
+            passing: positional
+            description: ASGI の receive
+          - name: send
+            type: Send
+            required: true
+            passing: positional
+            description: ASGI の send
+        returns:
+          type: None
+          description: なし
+        process: |-
+          1. `scope["type"]` が `http` で、`scope["path"]` が `paths` のどれかと一致するとき、`path` の末尾に `/`、`raw_path` の末尾に `b"/"` を付けた scope のコピーを作る（受け取った scope は書き換えない）
+          2. scope（書き換えたときはそのコピー）と `receive`・`send` を次のアプリへ渡す
+        unit_tests:
+          - name: test_slashless_mcp_path_middleware
+            case: 正常
+            summary: スラッシュ無しの MCP のパスにスラッシュを補う
+            condition: '`paths=("/mcp", "/_admin/mcp")` で、`type: http` の `path` が `/mcp` と `/_admin/mcp` の scope を渡す'
+            mock: 次のアプリ（受け取った scope を控える偽物）
+            expected: '次のアプリが受け取った `path` が `/mcp/`・`/_admin/mcp/`、`raw_path` が `b"/mcp/"`・`b"/_admin/mcp/"`。渡した元の scope の `path` は変わらない'
+          - name: test_slashless_mcp_path_middleware_when_other_path
+            case: 正常
+            summary: 他のパスと HTTP でない要求はそのまま渡す
+            condition: '`path` が `/mcp/`・`/mcpx`・`/sample/mcp` の HTTP の scope と、`type: lifespan` の scope を渡す'
+            mock: 次のアプリ（受け取った scope を控える偽物）
+            expected: 次のアプリが受け取った scope が渡した scope そのもの
 constants:
-- name: DOCS_MCP_PATH
-  title: 文書の MCP のパス
-  container: project_index/server/app.py
-  usecase: 起動
-  summary: 文書の MCP をマウントするパス
-  value: '"/mcp"'
-- name: ADMIN_MCP_PATH
-  title: 管理の MCP のパス
-  container: project_index/server/app.py
-  usecase: 起動
-  summary: 管理の MCP をマウントするパス
-  value: '"/_admin/mcp"'
+  - name: DOCS_MCP_PATH
+    title: 文書の MCP のパス
+    container: project_index/server/app.py
+    usecase: 起動
+    summary: 文書の MCP をマウントするパス
+    value: '"/mcp"'
+  - name: ADMIN_MCP_PATH
+    title: 管理の MCP のパス
+    container: project_index/server/app.py
+    usecase: 起動
+    summary: 管理の MCP をマウントするパス
+    value: '"/_admin/mcp"'
 functions:
-- name: build_app
-  title: アプリの組み立て
-  kind: 関数
-  container: project_index/server/app.py
-  usecase: 起動
-  role: 合成の起点
-  summary: 読み取り API・端末の設定の API・文書の MCP・管理の MCP・セッションの開始を 1 つの FastAPI のアプリにまとめる
-  scope: public
-  args:
-  - name: handlers
-    title: 配線済みの関数
-    type: Handlers
-    required: true
-    passing: positional
-    description: 部品の配線の結果
-  returns:
-    type: fastapi.FastAPI
-    description: 組み立てたアプリ
-  process: |-
-    1. 文書の MCP と管理の MCP を組み立てる（文書の MCP の組み立て・管理の MCP の組み立て）
-    2. 2 つの MCP と会話の記録を渡して寿命を作り（アプリの寿命）、`FastAPI(lifespan=..., docs_url=None, redoc_url=None, openapi_url=None, generate_unique_id_function=route_operation_id)` を作る（操作の識別子）
-    3. 例外の変換を登録する（例外の変換の登録）
-    4. `DOCS_MCP_PATH` に文書の MCP、`ADMIN_MCP_PATH` に管理の MCP の `streamable_http_app(streamable_http_path="/", stateless_http=True, json_response=True)` をマウントする
-    5. `app.add_middleware(SlashlessMcpPathMiddleware, paths=(DOCS_MCP_PATH, ADMIN_MCP_PATH))` で、スラッシュ無しの MCP のパスをルーティングの前に補う（MCP のパスの補い）
-    6. 読み取り API の入口・端末の設定の入口・セッションの開始（セッションの開始のルーター）のルーターを登録する
-    7. アプリを返す
-  unit_tests:
-  - name: test_build_app
-    case: 正常
-    summary: 入口を全て持つ
-    condition: 配線済みの関数を渡して `TestClient` で GET `/sources` と GET `/settings/sources`
-    mock: 配線済みの関数（配信元が空の偽物）
-    expected: どちらも 200 で、アプリのルートに `/sources/{source}/docs/{path}`・`/settings/sources`（GET・PUT・POST）・`/mcp`・`/_admin/mcp` のマウントと `POST /_admin/session-start` があり、`POST /_admin/session-context` と画面の配信のルートが無い
-  - name: test_build_app_when_mcp_without_slash
-    case: 正常
-    summary: スラッシュ無しの MCP のパスへの POST をリダイレクトせずに MCP が受ける
-    condition: 'MCP が受け付けるホストを `base_url` にしてリダイレクトを追従しない `TestClient` で、`/mcp`・`/_admin/mcp` へ MCP の initialize を POST する'
-    mock: 配線済みの関数（配信元が空の偽物）
-    expected: '`/mcp`・`/_admin/mcp` が 200 で本文の `result.serverInfo` を持ち、405・307 にならない'
-- name: route_operation_id
-  title: 操作の識別子
-  kind: 関数
-  container: project_index/server/app.py
-  usecase: 起動
-  role: 入口
-  summary: OpenAPI の operationId をルートのタグと名前から作る
-  scope: public
-  args:
-  - name: route
-    title: ルート
-    type: fastapi.routing.APIRoute
-    required: true
-    passing: positional
-    description: 識別子を作るルート
-  returns:
-    type: str
-    description: '`{route.tags[0]}-{route.name}`（タグが無いときは `route.name`）'
-  process: 1. ルートの最初のタグと `name` を `-` で結んで返す。タグが無いときは `name` だけを返す
-  unit_tests:
-  - name: test_route_operation_id
-    case: 正常
-    summary: タグと名前を結ぶ
-    condition: '`tags=["view"]`・`name="get_document"` のルート'
-    mock: なし
-    expected: '`view-get_document`'
-  - name: test_route_operation_id_when_no_tag
-    case: 正常
-    summary: タグが無いと名前だけ
-    condition: '`tags=[]`・`name="x"` のルート'
-    mock: なし
-    expected: '`x`'
+  - name: build_app
+    title: アプリの組み立て
+    kind: 関数
+    container: project_index/server/app.py
+    usecase: 起動
+    role: 合成の起点
+    summary: 読み取り API・端末の設定の API・文書の MCP・管理の MCP・セッションの開始を 1 つの FastAPI のアプリにまとめる
+    scope: public
+    args:
+      - name: handlers
+        title: 配線済みの関数
+        type: Handlers
+        required: true
+        passing: positional
+        description: 部品の配線の結果
+    returns:
+      type: fastapi.FastAPI
+      description: 組み立てたアプリ
+    process: |-
+      1. 文書の MCP と管理の MCP を組み立てる（文書の MCP の組み立て・管理の MCP の組み立て）
+      2. 2 つの MCP と会話の記録を渡して寿命を作り（アプリの寿命）、`FastAPI(lifespan=..., docs_url=None, redoc_url=None, openapi_url=None, generate_unique_id_function=route_operation_id)` を作る（操作の識別子）
+      3. 例外の変換を登録する（例外の変換の登録）
+      4. `DOCS_MCP_PATH` に文書の MCP、`ADMIN_MCP_PATH` に管理の MCP の `streamable_http_app(streamable_http_path="/", stateless_http=True, json_response=True)` をマウントする
+      5. `app.add_middleware(SlashlessMcpPathMiddleware, paths=(DOCS_MCP_PATH, ADMIN_MCP_PATH))` で、スラッシュ無しの MCP のパスをルーティングの前に補う（MCP のパスの補い）
+      6. 読み取り API の入口・端末の設定の入口・セッションの開始（セッションの開始のルーター）のルーターを登録する
+      7. アプリを返す
+    unit_tests:
+      - name: test_build_app
+        case: 正常
+        summary: 入口を全て持つ
+        condition: 配線済みの関数を渡して `TestClient` で GET `/sources` と GET `/settings/sources`
+        mock: 配線済みの関数（配信元が空の偽物）
+        expected: どちらも 200 で、アプリのルートに `/sources/{source}/docs/{path}`・`/settings/sources`（GET・PUT・POST）・`/mcp`・`/_admin/mcp` のマウントと `POST /_admin/session-start` があり、`POST /_admin/session-context` と画面の配信のルートが無い
+      - name: test_build_app_when_mcp_without_slash
+        case: 正常
+        summary: スラッシュ無しの MCP のパスへの POST をリダイレクトせずに MCP が受ける
+        condition: 'MCP が受け付けるホストを `base_url` にしてリダイレクトを追従しない `TestClient` で、`/mcp`・`/_admin/mcp` へ MCP の initialize を POST する'
+        mock: 配線済みの関数（配信元が空の偽物）
+        expected: '`/mcp`・`/_admin/mcp` が 200 で本文の `result.serverInfo` を持ち、405・307 にならない'
+  - name: route_operation_id
+    title: 操作の識別子
+    kind: 関数
+    container: project_index/server/app.py
+    usecase: 起動
+    role: 入口
+    summary: OpenAPI の operationId をルートのタグと名前から作る
+    scope: public
+    args:
+      - name: route
+        title: ルート
+        type: fastapi.routing.APIRoute
+        required: true
+        passing: positional
+        description: 識別子を作るルート
+    returns:
+      type: str
+      description: '`{route.tags[0]}-{route.name}`（タグが無いときは `route.name`）'
+    process: 1. ルートの最初のタグと `name` を `-` で結んで返す。タグが無いときは `name` だけを返す
+    unit_tests:
+      - name: test_route_operation_id
+        case: 正常
+        summary: タグと名前を結ぶ
+        condition: '`tags=["view"]`・`name="get_document"` のルート'
+        mock: なし
+        expected: '`view-get_document`'
+      - name: test_route_operation_id_when_no_tag
+        case: 正常
+        summary: タグが無いと名前だけ
+        condition: '`tags=[]`・`name="x"` のルート'
+        mock: なし
+        expected: '`x`'

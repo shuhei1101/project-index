@@ -4,410 +4,410 @@ entry:
   kind: mcp_tool
   value: '`list_changes`'
 flows:
-- name: 正常系
-  summary: 2 つの commit の間に変わった文書とキー、差分の行を返す
-  setup:
-  - name: Mock
-    description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
-  - name: サンプルの配信元
-    description: 文書の種類を 1 つ（スキーマと YAML 2 件）と `project-index.yaml` を持つ git リポジトリ
-    notes: id `sample`
-  - name: 変更の commit
-    description: 文書 1 の `name` を変えた commit
-    notes: 親の commit を `from`、その commit を `to` に渡す
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as list_changes
-      participant G as sample の Git の履歴
+  - name: 正常系
+    summary: 2 つの commit の間に変わった文書とキー、差分の行を返す
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+      - name: サンプルの配信元
+        description: 文書の種類を 1 つ（スキーマと YAML 2 件）と `project-index.yaml` を持つ git リポジトリ
+        notes: id `sample`
+      - name: 変更の commit
+        description: 文書 1 の `name` を変えた commit
+        notes: 親の commit を `from`、その commit を `to` に渡す
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as list_changes
+        participant G as sample の Git の履歴
 
-      C->>T: from: 親の commit, to: 変更の commit, view: summary
-      T-->>G: 区間を commit に解決し、両端の文書を読む
-      T-->>C: 解決した commit と日時、変わった文書とキー
-      C->>T: 同じ区間, view: full
-      T-->>C: 差分の行
-    ```
-  expected:
-  - 先頭に解決した 2 つの commit と日時がある
-  - 変わった文書が文書 1 だけで、`change` が `modified`、`keys` が `name`
-  - '`view: full` が `name` の前後の値を `-`・`+` の行で返す'
-  - '`to` を渡したため、json の項目に `path`・`scope` が無く、markdown の差分を `<document>` で包まない'
-  test: test_normal
-- name: 正常系（日時とブランチで区間を指す）
-  summary: 日時とブランチ名を commit に解決して比べる
-  setup:
-  - name: Mock
-    description: なし
-  - name: 変更の commit
-    description: 正常系と同じ。親の commit と変更の commit の間の日時を `from`、変更の commit を先頭に持つブランチ名を `to` に渡す
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as list_changes
+        C->>T: from: 親の commit, to: 変更の commit, view: summary
+        T-->>G: 区間を commit に解決し、両端の文書を読む
+        T-->>C: 解決した commit と日時、変わった文書とキー
+        C->>T: 同じ区間, view: full
+        T-->>C: 差分の行
+      ```
+    expected:
+      - 先頭に解決した 2 つの commit と日時がある
+      - 変わった文書が文書 1 だけで、`change` が `modified`、`keys` が `name`
+      - '`view: full` が `name` の前後の値を `-`・`+` の行で返す'
+      - '`to` を渡したため、json の項目に `path`・`scope` が無く、markdown の差分を `<document>` で包まない'
+    test: test_normal
+  - name: 正常系（日時とブランチで区間を指す）
+    summary: 日時とブランチ名を commit に解決して比べる
+    setup:
+      - name: Mock
+        description: なし
+      - name: 変更の commit
+        description: 正常系と同じ。親の commit と変更の commit の間の日時を `from`、変更の commit を先頭に持つブランチ名を `to` に渡す
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as list_changes
 
-      C->>T: from: 日時, to: ブランチ名
-      T->>T: 日時をその時点の最後の commit、ブランチを先頭の commit に解決する
-      T-->>C: 解決した commit と変わった文書
-    ```
-  expected:
-  - '`range.from` が親の commit、`range.to` が変更の commit になる'
-  - 変わった文書が正常系と同じになる
-  test: test_normal_when_range_by_date_and_branch
-- name: 正常系（前回読んだ時点から）
-  summary: '`from` を省き、この会話で前回読んだ内容と今の内容を比べる'
-  setup:
-  - name: Mock
-    description: なし（`state_dir` は一時フォルダ）
-  - name: 読んだ記録
-    description: '`session_id: s1` で文書 1 と文書 2 を `view: full` で読んだ後、文書 1 だけを `write_docs` で変えた状態'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as list_changes
-      participant SD as state_dir
+        C->>T: from: 日時, to: ブランチ名
+        T->>T: 日時をその時点の最後の commit、ブランチを先頭の commit に解決する
+        T-->>C: 解決した commit と変わった文書
+      ```
+    expected:
+      - '`range.from` が親の commit、`range.to` が変更の commit になる'
+      - 変わった文書が正常系と同じになる
+    test: test_normal_when_range_by_date_and_branch
+  - name: 正常系（前回読んだ時点から）
+    summary: '`from` を省き、この会話で前回読んだ内容と今の内容を比べる'
+    setup:
+      - name: Mock
+        description: なし（`state_dir` は一時フォルダ）
+      - name: 読んだ記録
+        description: '`session_id: s1` で文書 1 と文書 2 を `view: full` で読んだ後、文書 1 だけを `write_docs` で変えた状態'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as list_changes
+        participant SD as state_dir
 
-      C->>T: view: summary, session_id: s1
-      T-->>SD: 前回返した内容を読む
-      T->>T: 今の内容と比べる
-      T-->>C: 読んだ後に変わった文書
-    ```
-  expected:
-  - 文書 1 だけを、変わったキーつきで返す
-  - 文書 2 は返さない
-  - Git 管理外の配信元でも同じように比べられる
-  - '`format: json` の文書 1 の項目に `path`（文書 1 の絶対パス）と `scope: summary` があり、`view: full` では `scope` が `section` になる'
-  test: test_normal_when_since_last_read
-- name: 異常系（無いリビジョン・RefNotFoundError）
-  summary: 解決できない区間を断る
-  setup:
-  - name: Mock
-    description: なし
-  - name: 入力
-    description: '`from: no-such-branch`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as list_changes
+        C->>T: view: summary, session_id: s1
+        T-->>SD: 前回返した内容を読む
+        T->>T: 今の内容と比べる
+        T-->>C: 読んだ後に変わった文書
+      ```
+    expected:
+      - 文書 1 だけを、変わったキーつきで返す
+      - 文書 2 は返さない
+      - Git 管理外の配信元でも同じように比べられる
+      - '`format: json` の文書 1 の項目に `path`（文書 1 の絶対パス）と `scope: summary` があり、`view: full` では `scope` が `section` になる'
+    test: test_normal_when_since_last_read
+  - name: 異常系（無いリビジョン・RefNotFoundError）
+    summary: 解決できない区間を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`from: no-such-branch`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as list_changes
 
-      C->>T: from: no-such-branch
-      T-->>C: isError（解決できなかった引数と値）
-    ```
-  expected:
-  - '`isError: true` で、`from` の `no-such-branch` を解決できなかったことを返す'
-  - 差分を返さない
-  test: test_error_when_ref_not_found
-- name: 異常系（前回読んだ記録が無い・LastReadNotFoundError）
-  summary: 読んだ記録の無い会話で `from` を省くと断る
-  setup:
-  - name: Mock
-    description: なし
-  - name: 入力
-    description: '`session_id: s2`（何も読んでいない会話）で `from` を省く'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as list_changes
+        C->>T: from: no-such-branch
+        T-->>C: isError（解決できなかった引数と値）
+      ```
+    expected:
+      - '`isError: true` で、`from` の `no-such-branch` を解決できなかったことを返す'
+      - 差分を返さない
+    test: test_error_when_ref_not_found
+  - name: 異常系（前回読んだ記録が無い・LastReadNotFoundError）
+    summary: 読んだ記録の無い会話で `from` を省くと断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`session_id: s2`（何も読んでいない会話）で `from` を省く'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as list_changes
 
-      C->>T: view: summary, session_id: s2
-      T-->>C: isError（前回読んだ時点が無い、from を渡すこと）
-    ```
-  expected:
-  - '`isError: true` で、この会話で読んだ記録が無いことと `from` を渡すことを返す'
-  test: test_error_when_last_read_not_found
-- name: 異常系（引数の誤り・InvalidArgumentError）
-  summary: Git 管理外の配信元への区間の指定と、`from` の無い `to` を断る
-  setup:
-  - name: Mock
-    description: なし
-  - name: 読み取りだけの配信元
-    description: Git 管理外のフォルダ。`scope.read` は sample のフォルダ
-    notes: id `notes`
-  - name: 入力
-    description: '1 回目は `source: notes, from: HEAD~1`、2 回目は `to` だけ'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as list_changes
+        C->>T: view: summary, session_id: s2
+        T-->>C: isError（前回読んだ時点が無い、from を渡すこと）
+      ```
+    expected:
+      - '`isError: true` で、この会話で読んだ記録が無いことと `from` を渡すことを返す'
+    test: test_error_when_last_read_not_found
+  - name: 異常系（引数の誤り・InvalidArgumentError）
+    summary: Git 管理外の配信元への区間の指定と、`from` の無い `to` を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 読み取りだけの配信元
+        description: Git 管理外のフォルダ。`scope.read` は sample のフォルダ
+        notes: id `notes`
+      - name: 入力
+        description: '1 回目は `source: notes, from: HEAD~1`、2 回目は `to` だけ'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as list_changes
 
-      C->>T: source: notes, from: HEAD~1
-      T-->>C: isError（Git 管理外の配信元には区間を指せない）
-    ```
-  expected:
-  - '1 回目が `isError: true` で、notes は Git 管理外で `from`・`to` を使えないことを返す'
-  - '2 回目が `isError: true` で、`to` には `from` が要ることを返す'
-  - '`contains.value` が空の呼び出しと、`contains.regex: true` で `value` が `(` の呼び出しは、それぞれ `isError: true` で引数のパスと理由を返す'
-  test: test_error_when_invalid_argument
-- name: 異常系（読めない配信元・SourceNotReadableError）
-  summary: '`scope` に当たらない配信元の変更を返さない'
-  setup:
-  - name: Mock
-    description: なし
-  - name: 読めない配信元
-    description: '`scope.read` が other のフォルダだけの配信元'
-    notes: id `other`
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as list_changes
+        C->>T: source: notes, from: HEAD~1
+        T-->>C: isError（Git 管理外の配信元には区間を指せない）
+      ```
+    expected:
+      - '1 回目が `isError: true` で、notes は Git 管理外で `from`・`to` を使えないことを返す'
+      - '2 回目が `isError: true` で、`to` には `from` が要ることを返す'
+      - '`contains.value` が空の呼び出しと、`contains.regex: true` で `value` が `(` の呼び出しは、それぞれ `isError: true` で引数のパスと理由を返す'
+    test: test_error_when_invalid_argument
+  - name: 異常系（読めない配信元・SourceNotReadableError）
+    summary: '`scope` に当たらない配信元の変更を返さない'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 読めない配信元
+        description: '`scope.read` が other のフォルダだけの配信元'
+        notes: id `other`
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as list_changes
 
-      C->>T: source: other, from: HEAD~1
-      T-->>C: isError（読めない配信元と、使える配信元の一覧）
-    ```
-  expected:
-  - '`isError: true` で、other を読めないことと使える配信元の一覧を返す'
-  - '`source: *` は other を対象に含めない'
-  test: test_error_when_source_not_readable
-- name: 正常系（語が入った・消えた）
-  summary: '`contains` で、区間の中で語の出現数が変わった文書と、入った・消えた区間を返す'
-  setup:
-  - name: Mock
-    description: なし
-  - name: 語の commit
-    description: sample に 3 つの commit を積む。commit 1 は文書 1 の `description` に `廃止予定` を追加、commit 2 は文書 2 の `name` を変更して文書 1 の `廃止予定` を含む行を書き換え（出現数は同じ）、commit 3 は文書 1 から `廃止予定` を削除して `description` を commit 1 の親と同じに戻す
-    notes: commit 1 の親を `from`、commit 3 を `to` に渡す
-  - name: 入力
-    description: '`contains: {value: 廃止予定}`、`format: json`。他の呼び出しは期待値のとおり'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as list_changes
-      participant G as sample の Git の履歴
+        C->>T: source: other, from: HEAD~1
+        T-->>C: isError（読めない配信元と、使える配信元の一覧）
+      ```
+    expected:
+      - '`isError: true` で、other を読めないことと使える配信元の一覧を返す'
+      - '`source: *` は other を対象に含めない'
+    test: test_error_when_source_not_readable
+  - name: 正常系（語が入った・消えた）
+    summary: '`contains` で、区間の中で語の出現数が変わった文書と、入った・消えた区間を返す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 語の commit
+        description: sample に 3 つの commit を積む。commit 1 は文書 1 の `description` に `廃止予定` を追加、commit 2 は文書 2 の `name` を変更して文書 1 の `廃止予定` を含む行を書き換え（出現数は同じ）、commit 3 は文書 1 から `廃止予定` を削除して `description` を commit 1 の親と同じに戻す
+        notes: commit 1 の親を `from`、commit 3 を `to` に渡す
+      - name: 入力
+        description: '`contains: {value: 廃止予定}`、`format: json`。他の呼び出しは期待値のとおり'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as list_changes
+        participant G as sample の Git の履歴
 
-      C->>T: from: commit 1 の親, to: commit 3, contains: {value: 廃止予定}
-      T-->>G: 区間の commit を並べ、commit ごとに親との文書を読む
-      T->>T: 文書ごとに語の出現数を比べる
-      T-->>C: 文書 1 と、入った区間（commit 1）・消えた区間（commit 3）
-    ```
-  expected:
-  - 変わった文書が文書 1 だけで、`change` が `unchanged`
-  - '文書 1 の `contains_changes` が 2 要素で、`{kind: added, to.commit: commit 1, count_before: 0, count_after: 1}`、`{kind: removed, to.commit: commit 3, count_before: 1, count_after: 0}` の順（commit 2 は含まない）'
-  - '`contains` を省くと、変わった文書が文書 2 だけになり `contains_changes` を持たない'
-  - '`contains: {value: 廃止.定, regex: true}` も同じ結果になる'
-  - '`format: markdown` の表に、文書 1 の語が入った・消えた commit がある'
-  - '前回読んだ時点から比べる呼び出し（文書 1 を読んだ後に `廃止予定` を追加）では、`contains_changes` が `kind: added` の 1 要素で `from`・`to` が `range` と同じ'
-  - ブランチで文書 2 に `廃止予定` を追加し、`--no-ff` でマージした区間では、文書 2 の `contains_changes` がブランチの commit の `added` 1 要素だけ（マージ commit を含まない）
-  - 'commit 3 の後に作業ツリーで文書 1 に `廃止予定` を戻し、`to` を省いて呼ぶと、文書 1 の `contains_changes` の最後に `{kind: added, to: 作業ツリー}` が加わる'
-  test: test_normal_when_contains
-- name: 正常系（作業範囲の外を参考に読む）
-  summary: '`outside_scope: true` で、`scope` に当たらない配信元の変更を作業範囲の外（参考）として返す'
-  setup:
-  - name: Mock
-    description: なし
-  - name: 配信元
-    description: sample と、最後の commit で文書 1 を変えた Git の配信元 other（`scope.read` は other のフォルダだけ。端末の設定の `outside_read` は書かない）
-  - name: 入力
-    description: '`source: other`, `from: HEAD~1`, `outside_scope: true`。`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as list_changes
-      participant L as 要求のログ
+        C->>T: from: commit 1 の親, to: commit 3, contains: {value: 廃止予定}
+        T-->>G: 区間の commit を並べ、commit ごとに親との文書を読む
+        T->>T: 文書ごとに語の出現数を比べる
+        T-->>C: 文書 1 と、入った区間（commit 1）・消えた区間（commit 3）
+      ```
+    expected:
+      - 変わった文書が文書 1 だけで、`change` が `unchanged`
+      - '文書 1 の `contains_changes` が 2 要素で、`{kind: added, to.commit: commit 1, count_before: 0, count_after: 1}`、`{kind: removed, to.commit: commit 3, count_before: 1, count_after: 0}` の順（commit 2 は含まない）'
+      - '`contains` を省くと、変わった文書が文書 2 だけになり `contains_changes` を持たない'
+      - '`contains: {value: 廃止.定, regex: true}` も同じ結果になる'
+      - '`format: markdown` の表に、文書 1 の語が入った・消えた commit がある'
+      - '前回読んだ時点から比べる呼び出し（文書 1 を読んだ後に `廃止予定` を追加）では、`contains_changes` が `kind: added` の 1 要素で `from`・`to` が `range` と同じ'
+      - ブランチで文書 2 に `廃止予定` を追加し、`--no-ff` でマージした区間では、文書 2 の `contains_changes` がブランチの commit の `added` 1 要素だけ（マージ commit を含まない）
+      - 'commit 3 の後に作業ツリーで文書 1 に `廃止予定` を戻し、`to` を省いて呼ぶと、文書 1 の `contains_changes` の最後に `{kind: added, to: 作業ツリー}` が加わる'
+    test: test_normal_when_contains
+  - name: 正常系（作業範囲の外を参考に読む）
+    summary: '`outside_scope: true` で、`scope` に当たらない配信元の変更を作業範囲の外（参考）として返す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 配信元
+        description: sample と、最後の commit で文書 1 を変えた Git の配信元 other（`scope.read` は other のフォルダだけ。端末の設定の `outside_read` は書かない）
+      - name: 入力
+        description: '`source: other`, `from: HEAD~1`, `outside_scope: true`。`cwd` は sample のクローン本体'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as list_changes
+        participant L as 要求のログ
 
-      C->>T: source: other, from: HEAD~1, outside_scope: true
-      T->>T: scope に cwd が当たらず、outside_read が真
-      T->>L: cwd と other を残す
-      T-->>C: 作業範囲の外（参考）、文書 1 の変更
-    ```
-  expected:
-  - 先頭の行に「作業範囲の外（参考）」があり、文書 1 を `modified` で返す
-  - 要求のログに sample のクローン本体のパスと `other` が残る
-  - '`outside_read: false` の other では `SourceNotReadableError` を返す'
-  test: test_normal_when_outside_scope
+        C->>T: source: other, from: HEAD~1, outside_scope: true
+        T->>T: scope に cwd が当たらず、outside_read が真
+        T->>L: cwd と other を残す
+        T-->>C: 作業範囲の外（参考）、文書 1 の変更
+      ```
+    expected:
+      - 先頭の行に「作業範囲の外（参考）」があり、文書 1 を `modified` で返す
+      - 要求のログに sample のクローン本体のパスと `other` が残る
+      - '`outside_read: false` の other では `SourceNotReadableError` を返す'
+    test: test_normal_when_outside_scope
 lead: 区間（commit・日時・ブランチ・タグ）か、この会話で前回読んだ時点から今までに変わった文書・変わったキー・差分の行を返す。
 identifier: list_changes
 permissions: 対象の配信元の `scope.read` か `scope.write` に `cwd` が当たること
 idempotent: true
 side_effects: なし
 callers:
-- SC-8#scenarios[正常シナリオ]
+  - SC-8#scenarios[正常シナリオ]
 exclusivity: '読み取りだけで排他しない（`readOnlyHint: true`）'
 request:
-- name: source
-  type: str | list[str]
-  required: false
-  default: なし（作業中の配信元）
-  location: argument
-  description: 配信元の ID
-  notes: 配列か `*`（読める全配信元）も受ける
-- name: worktree
-  type: str
-  required: false
-  default: なし（`cwd` がワークツリーの中ならそのワークツリー）
-  location: argument
-  description: '`to` を省いたときに今の内容を読むワークツリーのパス'
-- name: from
-  type: str
-  required: false
-  default: なし（この会話で前回読んだ時点）
-  location: argument
-  description: 区間の始点（commit・日時・ブランチ・タグ）
-  constraints: Git 管理外の配信元では渡せない
-  notes: 日時はその時点の最後の commit に解決する
-- name: to
-  type: str
-  required: false
-  default: なし（今の作業ツリー）
-  location: argument
-  description: 区間の終点
-  constraints: '`from` を渡したときだけ'
-- name: filter
-  type: Group | Condition
-  required: false
-  default: なし（全件）
-  location: argument
-  description: '`search_docs` と同じ条件で、対象の文書を絞る'
-- name: view
-  type: Literal['summary', 'full']
-  required: false
-  default: '`summary`'
-  location: argument
-  description: '`summary` は変わった文書と変わったキー、`full` は差分の行まで'
-- name: limit
-  type: int
-  required: false
-  default: '`20`'
-  location: argument
-  description: 返す文書の数
-  constraints: 1〜100
-- name: cursor
-  type: str
-  required: false
-  default: なし
-  location: argument
-  description: 前回の `next_cursor`
-- name: max_chars
-  type: int
-  required: false
-  default: '`20000`'
-  location: argument
-  description: 結果全体の文字数の上限
-  constraints: 上限 40,000
-- name: format
-  type: Literal['markdown', 'json']
-  required: false
-  default: '`markdown`'
-  location: argument
-  description: 返却する形式
-- name: cwd
-  type: str
-  required: false
-  default: なし（どの `scope` にも当たらない）
-  location: argument
-  description: 作業場所
-  notes: フックが入れる
-- name: session_id
-  type: str
-  required: false
-  default: なし（前回読んだ時点が無い）
-  location: argument
-  description: 会話キー
-  notes: フックが入れる
-- name: agent_id
-  type: str
-  required: false
-  default: なし（メインの会話）
-  location: argument
-  description: 会話キー（サブエージェント）
-  notes: フックが入れる
-- name: contains
-  type: '{value: str, regex: bool, case_sensitive: bool}'
-  required: false
-  default: なし（語で絞らない）
-  location: argument
-  description: 単語の出現数が変わった文書だけを返却し、単語が入った・消えた区間を添える
-  notes: 当て方は制約の「語の当て方」。`filter` と同時に渡すと両方に当たる文書を返す
-  status: planned
-- name: contains.value
-  type: str
-  required: true
-  location: argument
-  description: 探す単語か正規表現
-  constraints: 空文字は渡せない
-  status: planned
-- name: contains.regex
-  type: bool
-  required: false
-  default: '`false`'
-  location: argument
-  description: '`value` を正規表現として適用するか'
-  notes: '`git log -S --pickaxe-regex` と同じく、当たった数を比べる'
-  status: planned
-- name: contains.case_sensitive
-  type: bool
-  required: false
-  default: '`false`'
-  location: argument
-  description: 大文字小文字と全角半角（NFKC）を区別するか
-  notes: '`search_docs` の条件の `case_sensitive` と同じ'
-  status: planned
-- name: outside_scope
-  type: bool
-  required: false
-  default: '`false`'
-  location: argument
-  description: '`true` のとき、`cwd` が `scope` に該当しない配信元も、端末の設定の `sources[].outside_read` が真なら作業範囲の外（参考）として参照する'
-  constraints: '`source` に ID を 1 つ渡したときだけ効く'
-  notes: '`format: markdown` は先頭の行に「作業範囲の外（参考）」を出し、`format: json` は `outside_scope: true` を返す。外から読んだ呼び出しは作業場所と配信元の ID を要求のログに残す'
-  status: planned
+  - name: source
+    type: str | list[str]
+    required: false
+    default: なし（作業中の配信元）
+    location: argument
+    description: 配信元の ID
+    notes: 配列か `*`（読める全配信元）も受ける
+  - name: worktree
+    type: str
+    required: false
+    default: なし（`cwd` がワークツリーの中ならそのワークツリー）
+    location: argument
+    description: '`to` を省いたときに今の内容を読むワークツリーのパス'
+  - name: from
+    type: str
+    required: false
+    default: なし（この会話で前回読んだ時点）
+    location: argument
+    description: 区間の始点（commit・日時・ブランチ・タグ）
+    constraints: Git 管理外の配信元では渡せない
+    notes: 日時はその時点の最後の commit に解決する
+  - name: to
+    type: str
+    required: false
+    default: なし（今の作業ツリー）
+    location: argument
+    description: 区間の終点
+    constraints: '`from` を渡したときだけ'
+  - name: filter
+    type: Group | Condition
+    required: false
+    default: なし（全件）
+    location: argument
+    description: '`search_docs` と同じ条件で、対象の文書を絞る'
+  - name: view
+    type: Literal['summary', 'full']
+    required: false
+    default: '`summary`'
+    location: argument
+    description: '`summary` は変わった文書と変わったキー、`full` は差分の行まで'
+  - name: limit
+    type: int
+    required: false
+    default: '`20`'
+    location: argument
+    description: 返す文書の数
+    constraints: 1〜100
+  - name: cursor
+    type: str
+    required: false
+    default: なし
+    location: argument
+    description: 前回の `next_cursor`
+  - name: max_chars
+    type: int
+    required: false
+    default: '`20000`'
+    location: argument
+    description: 結果全体の文字数の上限
+    constraints: 上限 40,000
+  - name: format
+    type: Literal['markdown', 'json']
+    required: false
+    default: '`markdown`'
+    location: argument
+    description: 返却する形式
+  - name: cwd
+    type: str
+    required: false
+    default: なし（どの `scope` にも当たらない）
+    location: argument
+    description: 作業場所
+    notes: フックが入れる
+  - name: session_id
+    type: str
+    required: false
+    default: なし（前回読んだ時点が無い）
+    location: argument
+    description: 会話キー
+    notes: フックが入れる
+  - name: agent_id
+    type: str
+    required: false
+    default: なし（メインの会話）
+    location: argument
+    description: 会話キー（サブエージェント）
+    notes: フックが入れる
+  - name: contains
+    type: '{value: str, regex: bool, case_sensitive: bool}'
+    required: false
+    default: なし（語で絞らない）
+    location: argument
+    description: 単語の出現数が変わった文書だけを返却し、単語が入った・消えた区間を添える
+    notes: 当て方は制約の「語の当て方」。`filter` と同時に渡すと両方に当たる文書を返す
+    status: planned
+  - name: contains.value
+    type: str
+    required: true
+    location: argument
+    description: 探す単語か正規表現
+    constraints: 空文字は渡せない
+    status: planned
+  - name: contains.regex
+    type: bool
+    required: false
+    default: '`false`'
+    location: argument
+    description: '`value` を正規表現として適用するか'
+    notes: '`git log -S --pickaxe-regex` と同じく、当たった数を比べる'
+    status: planned
+  - name: contains.case_sensitive
+    type: bool
+    required: false
+    default: '`false`'
+    location: argument
+    description: 大文字小文字と全角半角（NFKC）を区別するか
+    notes: '`search_docs` の条件の `case_sensitive` と同じ'
+    status: planned
+  - name: outside_scope
+    type: bool
+    required: false
+    default: '`false`'
+    location: argument
+    description: '`true` のとき、`cwd` が `scope` に該当しない配信元も、端末の設定の `sources[].outside_read` が真なら作業範囲の外（参考）として参照する'
+    constraints: '`source` に ID を 1 つ渡したときだけ効く'
+    notes: '`format: markdown` は先頭の行に「作業範囲の外（参考）」を出し、`format: json` は `outside_scope: true` を返す。外から読んだ呼び出しは作業場所と配信元の ID を要求のログに残す'
+    status: planned
 request_example: |-
   ```json
   {"source": "sample", "from": "3f2a9c1", "to": "feat/x", "view": "summary"}
   ```
 response:
-- name: range.from
-  type: '{input: str, commit: str, date: str}'
-  description: 始点に渡した値と、解決した commit と日時
-  notes: 前回読んだ時点と比べたときは `前回読んだ時点`
-- name: range.to
-  type: '{input: str, commit: str, date: str}'
-  description: 終点に渡した値と、解決した commit と日時
-  notes: 今の作業ツリーのときは `作業ツリー`
-- name: total_count
-  type: int
-  description: 変わった文書の総件数
-- name: next_cursor
-  type: str
-  description: 続きがあるときだけ
-- name: items[].id
-  type: str
-  description: 文書の ID
-- name: items[].change
-  type: Literal['added', 'modified', 'deleted', 'unchanged']
-  description: 変更の種類。`unchanged` は `contains` を渡し、区間の中で語が入って消えて両端の内容が同じ文書だけ
-- name: items[].keys
-  type: list[str]
-  description: 変わったキーのパス
-- name: items[].diff
-  type: str
-  description: git と同じ `+`・`-` の差分の行
-  notes: '`view: full` のときだけ'
-- name: truncated
-  type: bool
-  description: '`max_chars` で打ち切ったか'
-- name: notes
-  type: list[str]
-  description: 丸めた・打ち切った知らせと次の手
-- name: items[].path
-  type: str
-  description: 変わった文書の今の場所。`search_docs` の `items[].path` と同じ決め方の絶対パス
-  notes: '終点が今の作業ツリーのときだけ持つ。`to` を渡した呼び出しと `change: deleted` の文書では持たない'
-- name: items[].scope
-  type: Literal['section', 'summary']
-  description: '返した範囲。`view: full` の差分の行は `section`、`view: summary` は `summary`'
-  notes: '`items[].path` と同じ条件で持たない。`format: markdown` の `view: full` は、`path` を持つ文書の差分だけを `<document path="..." scope="section">` で包む'
-- name: items[].contains_changes
-  type: "list[{kind: Literal['added', 'removed'], from: {commit: str, date: str}, to: {commit: str, date: str}, count_before: int, count_after: int}]"
-  description: 語の出現数が増えた（`added`）・減った（`removed`）区間。古い順
-  notes: '`contains` を渡したときだけ。`to` を省いた呼び出しの HEAD と作業ツリーの区間は、`to` が `range.to` と同じ `作業ツリー`（commit を持たない）。前回読んだ時点と比べた呼び出しは比べた区間全体の 1 要素で、`from`・`to` は `range` と同じ値'
+  - name: range.from
+    type: '{input: str, commit: str, date: str}'
+    description: 始点に渡した値と、解決した commit と日時
+    notes: 前回読んだ時点と比べたときは `前回読んだ時点`
+  - name: range.to
+    type: '{input: str, commit: str, date: str}'
+    description: 終点に渡した値と、解決した commit と日時
+    notes: 今の作業ツリーのときは `作業ツリー`
+  - name: total_count
+    type: int
+    description: 変わった文書の総件数
+  - name: next_cursor
+    type: str
+    description: 続きがあるときだけ
+  - name: items[].id
+    type: str
+    description: 文書の ID
+  - name: items[].change
+    type: Literal['added', 'modified', 'deleted', 'unchanged']
+    description: 変更の種類。`unchanged` は `contains` を渡し、区間の中で語が入って消えて両端の内容が同じ文書だけ
+  - name: items[].keys
+    type: list[str]
+    description: 変わったキーのパス
+  - name: items[].diff
+    type: str
+    description: git と同じ `+`・`-` の差分の行
+    notes: '`view: full` のときだけ'
+  - name: truncated
+    type: bool
+    description: '`max_chars` で打ち切ったか'
+  - name: notes
+    type: list[str]
+    description: 丸めた・打ち切った知らせと次の手
+  - name: items[].path
+    type: str
+    description: 変わった文書の今の場所。`search_docs` の `items[].path` と同じ決め方の絶対パス
+    notes: '終点が今の作業ツリーのときだけ持つ。`to` を渡した呼び出しと `change: deleted` の文書では持たない'
+  - name: items[].scope
+    type: Literal['section', 'summary']
+    description: '返した範囲。`view: full` の差分の行は `section`、`view: summary` は `summary`'
+    notes: '`items[].path` と同じ条件で持たない。`format: markdown` の `view: full` は、`path` を持つ文書の差分だけを `<document path="..." scope="section">` で包む'
+  - name: items[].contains_changes
+    type: "list[{kind: Literal['added', 'removed'], from: {commit: str, date: str}, to: {commit: str, date: str}, count_before: int, count_after: int}]"
+    description: 語の出現数が増えた（`added`）・減った（`removed`）区間。古い順
+    notes: '`contains` を渡したときだけ。`to` を省いた呼び出しの HEAD と作業ツリーの区間は、`to` が `range.to` と同じ `作業ツリー`（commit を持たない）。前回読んだ時点と比べた呼び出しは比べた区間全体の 1 要素で、`from`・`to` は `range` と同じ値'
 response_example: |-
   ```markdown
   sample: 3f2a9c1（2026-10-26 10:00）→ 8b1d4e0（2026-10-26 11:30）・変わった文書 1 件
@@ -418,38 +418,38 @@ response_example: |-
   ```
 response_notes: '`format: json` では変わったキーと前後の値を返す。'
 exceptions:
-- name: なし（正常終了）
-  condition: 区間を解決して比べた（変わった文書が 0 件のときも正常終了）
-- name: RefNotFoundError
-  condition: '`from`・`to` を commit に解決できない'
-  notes: 解決できなかった引数と値を添える
-- name: LastReadNotFoundError
-  condition: '`from` を省いたが、この会話で本文を読んだ記録が無い'
-  notes: '`from` を渡すことを添える'
-- name: InvalidArgumentError
-  condition: 'Git 管理外の配信元に `from`・`to` を渡した、`from` 無しで `to` を渡した、`filter` に知らない項目を渡した、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない'
-- name: SourceNotReadableError
-  condition: '`cwd` が配信元の `scope.read`・`scope.write` に当たらない（`outside_scope: true` のときは、加えて `outside_read` が偽）'
-  notes: '`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に読めることを添える'
+  - name: なし（正常終了）
+    condition: 区間を解決して比べた（変わった文書が 0 件のときも正常終了）
+  - name: RefNotFoundError
+    condition: '`from`・`to` を commit に解決できない'
+    notes: 解決できなかった引数と値を添える
+  - name: LastReadNotFoundError
+    condition: '`from` を省いたが、この会話で本文を読んだ記録が無い'
+    notes: '`from` を渡すことを添える'
+  - name: InvalidArgumentError
+    condition: 'Git 管理外の配信元に `from`・`to` を渡した、`from` 無しで `to` を渡した、`filter` に知らない項目を渡した、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない'
+  - name: SourceNotReadableError
+    condition: '`cwd` が配信元の `scope.read`・`scope.write` に当たらない（`outside_scope: true` のときは、加えて `outside_read` が偽）'
+    notes: '`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に読めることを添える'
 constraints:
-- item: 件数
-  constraint: '`limit` は最大 100'
-- item: 文字数
-  constraint: '`max_chars` は最大 40,000。達したら `truncated` と `next_cursor` を返す'
-- item: 注釈
-  constraint: '`readOnlyHint: true`'
-- item: 前回読んだ時点
-  constraint: '`search_docs` が `state_dir` に記録した、文書ごとの最後に返した内容と比べる。`/clear`・圧縮の後はフックが記録を捨てる'
-- item: タイムアウト
-  constraint: 制限なし
-- item: 配信元・ワークツリーの解決
-  constraint: '`search_docs` と同じ（配信していない配信元・当たらないワークツリーのエラーも同じ）'
-  notes: 共通の処理で解決するため、結合テストは [文書の検索](id:IF-2) が持つ
-- item: 語の当て方
-  constraint: '区間の中の commit（`git log {from}..{to}` が並べる commit のうち、親が 2 つ以上のマージ commit を除く）ごとに、その commit と親の文書の内容で語の出現数（正規表現なら当たった数）を比べ、数が変わった commit を返す。`to` を省いた呼び出しは `{from}..HEAD` の commit に加え、HEAD と今の作業ツリーを最後の区間として比べる。文書の内容は `search_docs` の `view: full` が返す本文で、`records` の文書も 1 件ずつ比べる'
-  notes: '`git log -S`（正規表現は `--pickaxe-regex`）と同じ当て方で、マージ commit も見ない。語を含む行を書き換えただけで出現数が同じ commit、マージの競合の解消で入った語は返さない'
+  - item: 件数
+    constraint: '`limit` は最大 100'
+  - item: 文字数
+    constraint: '`max_chars` は最大 40,000。達したら `truncated` と `next_cursor` を返す'
+  - item: 注釈
+    constraint: '`readOnlyHint: true`'
+  - item: 前回読んだ時点
+    constraint: '`search_docs` が `state_dir` に記録した、文書ごとの最後に返した内容と比べる。`/clear`・圧縮の後はフックが記録を捨てる'
+  - item: タイムアウト
+    constraint: 制限なし
+  - item: 配信元・ワークツリーの解決
+    constraint: '`search_docs` と同じ（配信していない配信元・当たらないワークツリーのエラーも同じ）'
+    notes: 共通の処理で解決するため、結合テストは [文書の検索](id:IF-2) が持つ
+  - item: 語の当て方
+    constraint: '区間の中の commit（`git log {from}..{to}` が並べる commit のうち、親が 2 つ以上のマージ commit を除く）ごとに、その commit と親の文書の内容で語の出現数（正規表現なら当たった数）を比べ、数が変わった commit を返す。`to` を省いた呼び出しは `{from}..HEAD` の commit に加え、HEAD と今の作業ツリーを最後の区間として比べる。文書の内容は `search_docs` の `view: full` が返す本文で、`records` の文書も 1 件ずつ比べる'
+    notes: '`git log -S`（正規表現は `--pickaxe-regex`）と同じ当て方で、マージ commit も見ない。語を含む行を書き換えただけで出現数が同じ commit、マージの競合の解消で入った語は返さない'
 refs:
-- SC-8#scenarios[正常シナリオ]
-- SC-8#scenarios[正常シナリオ（前回読んだ時点から）]
-- SC-8#scenarios[正常シナリオ（語が入った・消えた変更を引く）]
+  - SC-8#scenarios[正常シナリオ]
+  - SC-8#scenarios[正常シナリオ（前回読んだ時点から）]
+  - SC-8#scenarios[正常シナリオ（語が入った・消えた変更を引く）]
 test_file: tests/integration/server/test_list_changes.py

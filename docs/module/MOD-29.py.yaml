@@ -2,597 +2,597 @@ id: MOD-29
 title: 索引のサーバー / 文書のストア / store.py
 lead: 文書のキャッシュ・ID の引き当て・種類のスキーマ・文書の場所と、メタデータのずれの確かめ。
 test_files:
-- tests/unit/project_index/features/documents/test_store.py
+  - tests/unit/project_index/features/documents/test_store.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      文書のストア ..> ファイルの収集
-      文書のストア ..> ファイルの読み込み
-      文書のストア ..> 文書 : 返す
-      文書のストア ..> 読み込みの結果 : 返す
-      文書のストア ..> スキーマの参照の解決
-      メタデータのずれの確かめ ..> 文書のストア
-      メタデータのずれの確かめ ..> metadataの列の欠け
-      メタデータのずれの確かめ ..> 索引に無いファイル
-      メタデータのずれの確かめ ..> メタデータのずれ : 返す
-      class メタデータのずれの確かめ {
-        <<function>>
-      }
-      class metadataの列の欠け {
-        <<function>>
-      }
-      class 索引に無いファイル {
-        <<function>>
-      }
-      class メタデータのずれ {
-        <<dataclass>>
-      }
-      class 文書のストア {
-        <<class>>
-      }
-      class スキーマの参照の解決 {
-        <<function>>
-      }
-      class ファイルの収集 {
-        <<function>>
-      }
-      class ファイルの読み込み {
-        <<function>>
-      }
-      class 文書 {
-        <<dataclass>>
-      }
-      class 読み込みの結果 {
-        <<dataclass>>
-      }
-      click metadataの列の欠け href "./MOD-25.py.yaml#metadataの列の欠け"
-      click 索引に無いファイル href "./MOD-27.py.yaml#索引に無いファイル"
-      click メタデータのずれ href "./MOD-30.py.yaml#メタデータのずれ"
-      click スキーマの参照の解決 href "./MOD-28.py.yaml#スキーマの参照の解決"
-      click ファイルの収集 href "./MOD-27.py.yaml#ファイルの収集"
-      click ファイルの読み込み href "./MOD-27.py.yaml#ファイルの読み込み"
-      click 文書 href "./MOD-30.py.yaml#文書"
-      click 読み込みの結果 href "./MOD-30.py.yaml#読み込みの結果"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        文書のストア ..> ファイルの収集
+        文書のストア ..> ファイルの読み込み
+        文書のストア ..> 文書 : 返す
+        文書のストア ..> 読み込みの結果 : 返す
+        文書のストア ..> スキーマの参照の解決
+        メタデータのずれの確かめ ..> 文書のストア
+        メタデータのずれの確かめ ..> metadataの列の欠け
+        メタデータのずれの確かめ ..> 索引に無いファイル
+        メタデータのずれの確かめ ..> メタデータのずれ : 返す
+        class メタデータのずれの確かめ {
+          <<function>>
+        }
+        class metadataの列の欠け {
+          <<function>>
+        }
+        class 索引に無いファイル {
+          <<function>>
+        }
+        class メタデータのずれ {
+          <<dataclass>>
+        }
+        class 文書のストア {
+          <<class>>
+        }
+        class スキーマの参照の解決 {
+          <<function>>
+        }
+        class ファイルの収集 {
+          <<function>>
+        }
+        class ファイルの読み込み {
+          <<function>>
+        }
+        class 文書 {
+          <<dataclass>>
+        }
+        class 読み込みの結果 {
+          <<dataclass>>
+        }
+        click metadataの列の欠け href "./MOD-25.py.yaml#metadataの列の欠け"
+        click 索引に無いファイル href "./MOD-27.py.yaml#索引に無いファイル"
+        click メタデータのずれ href "./MOD-30.py.yaml#メタデータのずれ"
+        click スキーマの参照の解決 href "./MOD-28.py.yaml#スキーマの参照の解決"
+        click ファイルの収集 href "./MOD-27.py.yaml#ファイルの収集"
+        click ファイルの読み込み href "./MOD-27.py.yaml#ファイルの読み込み"
+        click 文書 href "./MOD-30.py.yaml#文書"
+        click 読み込みの結果 href "./MOD-30.py.yaml#読み込みの結果"
 classes:
-- name: DocumentStore
-  title: 文書のストア
-  container: project_index/features/documents/store.py
-  usecase: 共通
-  role: キャッシュ
-  summary: 読む場所（`Target`）ごとに文書を集め、ファイルごとに結果をキャッシュする
-  description: |-
-    キャッシュのキーはファイルの絶対パスと文書の行の ID。更新日時（`st_mtime_ns`）と大きさが変わったファイルだけを読み直す。
-    `ref` を持つ読む場所は、ファイルの blob の SHA と日時をキーの照合に使い、commit をまたいで変わらないファイルの結果を使い回す（`_revision_files`）。
-    配信元の読み直しで文書の行が変わったときは、行の内容がキーに含まれないので、起動の設定の読み直しで `clear` を呼ぶ。
-  kind: クラス
-  properties:
-  - name: snapshots
-    title: リビジョンの書き出し
-    type: SnapshotStore
-    access: 公開
-    description: '`ref` のある `Target` を読むときに使う'
-  - name: _files
-    title: ファイルのキャッシュ
-    type: dict[tuple[Path, str], tuple[int, int, list[Document], list[LoadProblem], tuple[tuple[str, int, int], ...]]]
-    access: 内部 (_)
-    description: (絶対パス, 文書の行の ID) → (更新日時, 大きさ, 文書, 理由, 文書が指す本文のファイルの (パス, 更新日時, 大きさ) のパスの順の並び)
-  - name: _schemas
-    title: スキーマのキャッシュ
-    type: dict[Path, tuple[int, int, dict[str, Any]]]
-    access: 内部 (_)
-    description: スキーマの絶対パス → (更新日時, 大きさ, 読んだスキーマ)。ワークツリーの読む場所が使う
-  - name: _revision_schemas
-    title: リビジョンのスキーマのキャッシュ
-    type: dict[tuple[Path, str, str], dict[str, Any]]
-    access: 内部 (_)
-    description: (`repo_root`, 解いた commit, スキーマのファイルの `repo_root` からの相対パス) → `$ref` を解いたスキーマ。commit のファイルは書き換わらないので、ファイルの `stat` を取らずに引く。相対パスは `source.root.relative_to(repo_root) / table.schema_path` で、同じリポジトリの `root` の違う配信元を分ける
-  - name: _dates
-    title: 日時のキャッシュ
-    type: dict[tuple[Path, str, str], dict[str, FileDates]]
-    access: 内部 (_)
-    description: (作業ツリー, 解いた commit, 配信元の `root` の `repo_root` からの相対パス) → 配信元の直下からのパスに直した履歴の『ファイルの日時』の結果。commit が変わればキーが変わり、同じリポジトリの `root` の違う配信元を分ける
-  - name: _revision_files
-    title: リビジョンのファイルのキャッシュ
-    type: dict[tuple[Path, str, str, str, str], tuple[str, tuple[tuple[str, str], ...], tuple[tuple[str, FileDates | None], ...], list[Document], list[LoadProblem]]]
-    access: 内部 (_)
-    description: |-
-      (`repo_root`, 配信元の ID, ファイルの `repo_root` からの相対パス, 文書の行の ID, 文書の行の定義のハッシュ) → (ファイルの blob の SHA, 文書が指す本文のファイルの (パス, blob の SHA) のパスの順の並び, ファイルと本文のファイルの (パス, 日時) の並び, 文書, 理由)。
-      `ref` を持つ読む場所が使い、commit をまたいで、blob と日時の変わらないファイルの読み込みを使い回す。
-      中身は commit の blob と文書の行の定義で決まり古くならないので、`clear` では空にしない。
-      文書の行の定義のハッシュは `DocumentTable` の全ての項目の `repr` の SHA-256 で、`paths`・`metadata` などが変われば別のキーになる
-  - name: _trees
-    title: commit のファイルの blob のキャッシュ
-    type: dict[tuple[Path, str], dict[str, str]]
-    access: 内部 (_)
-    description: (`repo_root`, 解いた commit) → `repo_root` からの相対パス → blob の SHA。`TREE_KEEP` 件を超えたら古く入れたものから捨てる。commit の中身は変わらないので、`clear` では空にしない
-  - name: _lock
-    title: 排他
-    type: threading.Lock
-    access: 内部 (_)
-    description: キャッシュの辞書の読み書きを守る（ファイルの読み込みはロックの外で行う）
-  methods:
-  - name: load
-    title: 文書を集める
-    summary: 読む場所の文書を、文書の行ごとに集めて返す
-    kind: メソッド
-    scope: public
-    thread_safe: true
-    side_effects: キャッシュを更新する。`ref` があればリビジョンを書き出す
-    args:
-    - name: target
-      title: 読む場所
-      type: Target
-      required: true
-      passing: positional
-      description: 権限と作業場所の『読む場所の解決』の結果
-    - name: kinds
-      title: 種類
-      type: Sequence[str] | None
-      required: false
-      default: None
-      passing: keyword
-      description: 絞る文書の行の ID。`None` は有効な全ての行
-    - name: files
-      title: たどったファイル
-      type: Sequence[str] | None
-      required: false
-      default: None
-      passing: keyword
-      description: 読むフォルダを `walk_files` でたどったパス。呼び出し元が既にたどったときに渡す。`None` は `load` が 1 回だけたどる
-    returns:
-      type: LoadResult
-      description: 集めた文書と読めなかったファイル
-    process: |-
-      1. 読むフォルダを決める
-         - `target.ref` が `None` の場合、`target.base`
-         - `target.ref` がある場合、読む場所の commit（下の「読む場所の commit」）を `snapshots.checkout` で書き出し、その下に `source.root` の `repo_root` からの相対パスをつなぐ
-      2. 文書の行を決める。`kinds` があれば `source.table` で引き（無い種類は `UnknownKindError`）、無ければ `enabled` の全ての行
-      3. Git の配信元の場合、履歴の『ファイルの日時』を `_dates` から作業ツリー・commit・配信元の `root` の `repo_root` からの相対パスで引く。無ければ、作業ツリー（ワークツリーか `repo_root`）と commit（`ref` があれば読む場所の commit、無ければ作業ツリーの `HEAD` を解いた SHA）で呼び、配信元の直下からのパスに直して控える
-      4. 読むフォルダのファイルを、`files` が無ければ `walk_files` で 1 回だけたどって得る。行ごとにそのパスを渡して『ファイルの収集』でファイルを集める
-         - `target.ref` が `None` の場合、ファイルごとに `stat` を取る。`_files` の更新日時と大きさが同じで、理由に `missing_body_file` が無く、本文のファイルの (パス, 更新日時, 大きさ) も同じなら控えた結果を使い、それ以外は『ファイルの読み込み』で読んで `_files` を置き換える
-         - `target.ref` がある場合、読む場所の commit のファイルの blob の SHA を `_trees` から引く（無ければ `git ls-tree -r --full-tree {commit}` を 1 回だけ起動して控える）。`_revision_files` の blob の SHA が同じで、理由に `missing_body_file` が無く、本文のファイルの (パス, blob の SHA) と、ファイルと本文のファイルの日時（手順 3）も同じなら控えた結果を使い、それ以外は『ファイルの読み込み』で読んで `_revision_files` を置き換える。blob の SHA が無いファイルは読まない
-      5. 収集で当たらなかった `_files` のキーのうち、読むフォルダの下にあるものを削除する（削除されたファイル）。
-         `target.ref` がある場合は、読んだ行ごとに、`_revision_files` のキーのうち `repo_root`・配信元の ID・行の ID が同じで、今回の commit のファイルに当たらないもの、または行の定義のハッシュが違うものを削除する（`_revision_files` を今の commit と行の定義のファイルの数に抑える）
-      6. 行の順に文書を並べ、先に現れた ID を残して、後に現れた同じ ID の文書を `duplicate_id` にする（`detail` に ID と先の文書のファイル）
-      7. `LoadResult` を返す
-
-      読む場所の commit は、`target.commit` があればそのまま使い、無ければ `target.ref` を履歴の『リビジョンの解決』（`date_base` は配信元の `default_ref`）で解く。
-      1 回の `load` の中では、手順 1 と手順 3 で同じ commit を使い、解き直さない。
-    exceptions:
-    - name: UnknownKindError
-      condition: '`kinds` に有効な文書の行に無い種類がある'
-      message: 配信元の『文書の行を引く』のまま
-    - name: RefNotFoundError
-      condition: '`target.commit` が無く、`target.ref` を commit に解けない'
-      message: 履歴の『リビジョンの解決』のまま
-    unit_tests:
-    - name: test_document_store_load
-      case: 正常
-      summary: 行ごとに集める
-      condition: '行 `rules`（`rules/*.yaml`）と `notes`（`notes/files.yaml` の `records: files`・`body_file: path` で `.md`）に 2 件ずつ、Git の管理外の配信元'
-      mock: なし（`tmp_path`）
-      expected: '`rules` の 2 件、`notes` の 2 件の順で、`problems` が空'
-      exception: '-'
-    - name: test_document_store_load_when_cached
-      case: 正常
-      summary: 変わったファイルだけ読み直す
-      condition: 2 回呼ぶ間に `rules/a.yaml` だけを書き換える
-      mock: '`load_file`（本物を包んで呼ばれたパスを記録する）'
-      expected: 2 回目に `load_file` が呼ばれたのは `rules/a.yaml` だけで、結果に書き換えた内容が載る
-      exception: '-'
-    - name: test_document_store_load_when_deleted
-      case: 正常
-      summary: 削除されたファイル
-      condition: 2 回呼ぶ間に `rules/b.yaml` を削除する
-      mock: なし（`tmp_path`）
-      expected: 2 回目の結果に `rules/b.yaml` の文書が無い
-      exception: '-'
-    - name: test_document_store_load_when_duplicate_id
-      case: 正常
-      summary: 重なった ID
-      condition: '`rules/a.yaml` と `rules/b.yaml` がどちらも `id: x`'
-      mock: なし（`tmp_path`）
-      expected: 文書は `rules/a.yaml` の 1 件で、`problems` に `rules/b.yaml` の `duplicate_id`
-      exception: '-'
-    - name: test_document_store_load_when_ref
-      case: 正常
-      summary: 過去のリビジョン
-      condition: Git の配信元で `rules/a.yaml` を commit した後、作業ツリーで書き換え、`ref` に最初の commit を渡す
-      mock: なし（`tmp_path` に `git init`）
-      expected: commit した内容を返し、`updated` が commit の日時
-      exception: '-'
-    - name: test_document_store_load_when_commit
-      case: 正常
-      summary: 解いた commit を持つ読む場所は解き直さない
-      condition: test_document_store_load_when_ref と同じ配信元で、書き換えた `rules/a.yaml` を `develop` へ 2 つ目の commit として積み、`ref` に `develop`、`commit` に最初の commit を持つ読む場所
-      mock: 履歴の『リビジョンの解決』（本物を包んで呼ばれた回数を記録する）
-      expected: 最初の commit の内容を返し、リビジョンの解決が呼ばれない
-    - name: test_document_store_load_when_revision_reused
-      case: 正常
-      summary: 新しい commit でも変わったファイルだけ読み直す
-      condition: Git の配信元で `rules/a.yaml`・`rules/b.yaml` を commit し、最初の commit を持つ読む場所で `load` した後、`rules/a.yaml` だけを書き換えた 2 つ目の commit を持つ読む場所で `load` する
-      mock: '`load_file`（本物を包んで呼ばれたパスを記録する）'
-      expected: 2 回目に `load_file` が呼ばれたのは `rules/a.yaml` だけで、`rules/a.yaml` の文書が書き換えた内容と 2 つ目の commit の日時、`rules/b.yaml` の文書が最初の内容を返す
-    - name: test_document_store_load_when_revision_reused_after_clear
-      case: 正常
-      summary: 配信元の組み立て直しの後も変わったファイルだけ読み直す
-      condition: test_document_store_load_when_revision_reused と同じ配信元で、最初の commit を持つ読む場所で `load` し、`clear` を呼んだ後、`rules/a.yaml` だけを書き換えた 2 つ目の commit を持つ読む場所で `load` する
-      mock: '`load_file`（本物を包んで呼ばれたパスを記録する）'
-      expected: 2 回目に `load_file` が呼ばれたのは `rules/a.yaml` だけ
-    - name: test_document_store_load_when_revision_table_changed
-      case: 正常
-      summary: 文書の行の定義が変われば読み直す
-      condition: 'Git の配信元で `rules/a.yaml`（`title` を持つ）を commit し、同じ commit を持つ読む場所で、行 `rules` の `metadata` を `{}` にした配信元と `{name: title}` にした配信元で順に `load` する'
-      mock: '`load_file`（本物を包んで呼ばれたパスを記録する）'
-      expected: 2 回とも `load_file` が `rules/a.yaml` で呼ばれ、2 回目の文書の `name` が `title` の値
-    - name: test_document_store_load_when_dates_shared_repo
-      case: 正常
-      summary: 同じリポジトリで root の違う配信元の日時を取り違えない
-      condition: 1 つのリポジトリの `docs/` と `dev/` を `root` にした配信元 2 つが、それぞれ `rules/a.yaml` を別の commit で持つ。同じ commit を持つ読む場所で、順に `load` する
-      mock: なし（`tmp_path` に `git init`）
-      expected: それぞれの文書の `updated` が、その配信元の `rules/a.yaml` を commit した日時
-    - name: test_document_store_load_when_unknown_kind
-      case: 異常
-      summary: 無い種類
-      condition: '`kinds=["x"]`'
-      mock: なし
-      expected: '`UnknownKindError`'
-      exception: '`kinds` に有効な文書の行に無い種類がある'
-    - name: test_document_store_load_when_many_tables
-      case: 正常
-      summary: 行がいくつあってもフォルダを 1 回だけたどる
-      condition: 行 `rules`・`notes`・`src` の 3 つを持つ配信元
-      mock: '`walk_files`（本物を包んで呼ばれた回数を記録する）'
-      expected: '`walk_files` が 1 回だけ呼ばれ、3 行の文書を返す'
-  - name: get
-    title: ID で引く
-    summary: ID の並びの順に文書を返す
-    kind: メソッド
-    scope: public
-    thread_safe: true
-    args:
-    - name: target
-      title: 読む場所
-      type: Target
-      required: true
-      passing: positional
-      description: 読む場所
-    - name: ids
-      title: 文書の ID
-      type: Sequence[str]
-      required: true
-      passing: positional
-      description: 引く ID の並び
-    - name: kinds
-      title: 種類
-      type: Sequence[str] | None
-      required: false
-      default: None
-      passing: keyword
-      description: 絞る文書の行の ID
-    returns:
-      type: list[Document]
-      description: '`ids` の順の文書（同じ ID を 2 回渡すと 2 回返す）'
-    process: |-
-      1. `load` で文書を集め、ID → 文書の辞書を作る
-      2. `ids` の順に引く
-      3. 無い ID がある場合、ID ごとに `difflib.get_close_matches`（`n=CANDIDATE_COUNT`、`cutoff=CANDIDATE_CUTOFF`）で近い ID を引き、`DocumentNotFoundError` を送る
-      4. 文書の並びを返す
-    exceptions:
-    - name: DocumentNotFoundError
-      condition: 無い ID がある
-      message: '`{source}: 文書 {missing} はありません`。`candidates` に無い ID ごとの近い ID'
-    - name: UnknownKindError
-      condition: '`kinds` に無い種類がある'
-      message: '`load` のまま'
-    unit_tests:
-    - name: test_document_store_get
-      case: 正常
-      summary: 渡した順
-      condition: '`a`・`b` があり、`["b", "a"]`'
-      mock: なし（`tmp_path`）
-      expected: '`b`・`a` の順'
-      exception: '-'
-    - name: test_document_store_get_when_missing
-      case: 異常
-      summary: 無い ID と近い候補
-      condition: '`rule-auth` があり、`["rule-auht", "zzz"]`'
-      mock: なし（`tmp_path`）
-      expected: '`DocumentNotFoundError` の `missing` が 2 件、`candidates["rule-auht"]` が `["rule-auth"]`、`candidates["zzz"]` が空'
-      exception: 無い ID がある
-  - name: schema
-    title: 種類のスキーマ
-    summary: 読む場所に合わせた種類のスキーマを返す
-    kind: メソッド
-    scope: public
-    thread_safe: true
-    args:
-    - name: target
-      title: 読む場所
-      type: Target
-      required: true
-      passing: positional
-      description: 読む場所
-    - name: kind
-      title: 種類
-      type: str
-      required: true
-      passing: positional
-      description: 文書の行の ID
-    returns:
-      type: dict[str, Any]
-      description: JSON Schema
-    process: |-
-      1. `source.table(kind)` で行を引く
-      2. `target.ref` と `target.worktree` がどちらも `None` の場合と、行の `schema_path` が `SchemaRef` の場合、起動時のスキーマを返す（読む場所によらず参照したリビジョンのスキーマ）
-      3. `target.ref` がある場合、`repo_root`・読む場所の commit（`load` と同じ）・スキーマのファイルの `repo_root` からの相対パスで `_revision_schemas` を引き、当たればそのまま返す（リビジョンの書き出しとファイルの `stat` をしない）。
-         当たらなければ、`load` と同じ読むフォルダの `schema_path` を『YAMLの読み込み』で読み、`$ref` を解いた結果を `_revision_schemas` に控える
-         - ファイルが無い・読めない場合、手順 2 のスキーマを使い、控えない
-      4. ワークツリーの場合、読むフォルダの `schema_path` を `_schemas` から引き、更新日時か大きさが違えば『YAMLの読み込み』で読み直す
-         - ファイルが無い・読めない場合、手順 2 のスキーマを使う
-      5. `$ref` を解いたスキーマを返す（スキーマの参照の解決。基準は手順 2〜4 で使った `schema_path`）。ワークツリーで解いた結果は `_schemas` に控える
-    exceptions:
-    - name: UnknownKindError
-      condition: '`kind` が有効な文書の行に無い'
-      message: 配信元の『文書の行を引く』のまま
-    unit_tests:
-    - name: test_document_store_schema_when_worktree
-      case: 正常
-      summary: ワークツリーのスキーマ
-      condition: ワークツリーで `schemas/rule.schema.yaml` の `required` を書き換えた
-      mock: なし（`tmp_path`）
-      expected: 書き換えたスキーマを返し、クローン本体では起動時のスキーマを返す
-      exception: '-'
-    - name: test_document_store_schema_when_ref
-      case: 正常
-      summary: '`$ref` を解いて返す'
-      condition: '`schemas/rule.schema.yaml` の `properties.body` が `共通.schema.yaml#/$defs/markdown`'
-      mock: なし（`tmp_path`）
-      expected: '`properties.body` が `$ref` を持たず `markdown` の中身'
-      exception: '-'
-    - name: test_document_store_schema_when_revision
-      case: 正常
-      summary: リビジョンのスキーマは commit で控える
-      condition: Git の配信元で `schemas/rule.schema.yaml` を commit した後、作業ツリーで `required` を書き換え、`commit` に最初の commit を持つ読む場所で 2 回呼ぶ
-      mock: '`snapshots.checkout`（本物を包んで呼ばれた回数を記録する）'
-      expected: 2 回とも commit した `required` のスキーマを返し、`snapshots.checkout` が 1 回だけ呼ばれる
-    - name: test_document_store_schema_when_revision_shared_repo
-      case: 正常
-      summary: 同じリポジトリで root の違う配信元のスキーマを取り違えない
-      condition: 1 つのリポジトリの `docs/` と `dev/` を `root` にした配信元 2 つが、どちらも種類 `rule` を持ち、`schemas/rule.schema.yaml` の `required` が違う。同じ commit を持つ読む場所で、順に `schema` を呼ぶ
-      mock: なし（`tmp_path` に `git init`）
-      expected: それぞれの配信元の `required` のスキーマを返す
-  - name: row_schema
-    title: 文書に当てるスキーマ
-    summary: 文書 1 件の内容に当てるスキーマを返す。`records` を持つ行は 1 行のスキーマ
-    description: 検査・変換・検索と変更の項目の一覧が、`schema` の代わりに呼ぶ。
-    kind: メソッド
-    scope: public
-    thread_safe: true
-    args:
-    - name: target
-      title: 読む場所
-      type: Target
-      required: true
-      passing: positional
-      description: 読む場所
-    - name: kind
-      title: 種類
-      type: str
-      required: true
-      passing: positional
-      description: 文書の行の ID
-    returns:
-      type: dict[str, Any]
-      description: JSON Schema。`records` の行で 1 行のスキーマを取り出せないときは空の辞書
-    process: |-
-      1. `schema(target, kind)` で種類のスキーマを得る
-      2. 行の `records` が `None` の場合、そのまま返す
-      3. `records` がある場合、records の行の 1 行のスキーマ（`records_item_schema`）を返す。`None` なら空の辞書を返す
-    exceptions:
-    - name: UnknownKindError
-      condition: '`kind` が有効な文書の行に無い'
-      message: '`schema` のまま'
-    unit_tests:
-    - name: test_document_store_row_schema
-      case: 正常
-      summary: ファイル 1 つが 1 文書の行はそのまま
-      condition: 行 `rules`（`records` なし）
-      mock: なし（`tmp_path`）
-      expected: '`schema` と同じスキーマ'
-    - name: test_document_store_row_schema_when_records
-      case: 正常
-      summary: records の行は 1 行のスキーマ
-      condition: '行 `notes`（`records: files`）の `schema` が `templates/files.schema.yaml` のコピー'
-      mock: なし（`tmp_path`）
-      expected: '`required` が `[path]` の `files` の `items`'
-    - name: test_document_store_row_schema_when_items_missing
-      case: 正常
-      summary: 1 行のスキーマを取り出せない
-      condition: 行 `notes` の `schema` が `properties.files.items` を持たない
-      mock: なし（`tmp_path`）
-      expected: 空の辞書
-    - name: test_document_store_row_schema_when_many_documents
-      case: 正常
-      summary: 文書の数だけ呼んでも git を文書の数だけ起動しない
-      condition: Git の配信元で行 `rules` の文書 50 件を commit し、`ref` に `develop`、`commit` に解いた commit を持つ読む場所で `load` した後、文書ごとに `row_schema` を呼ぶ
-      mock: '`run_git`（本物を包んで呼ばれた回数を記録する）'
-      expected: '`row_schema` の 50 回の呼び出しで `run_git` が呼ばれない'
-  - name: invalidate
-    title: キャッシュを捨てる
-    summary: 書き込んだファイルのキャッシュを捨てる
-    description: 更新日時の分解能より短い間に同じ大きさで書き換えたときも、書き込みの直後の読み取りで古い内容を返さないように、書き込みが呼ぶ。
-    kind: メソッド
-    scope: public
-    thread_safe: true
-    side_effects: '`_files` と `_schemas` から該当のキーを削除する'
-    args:
-    - name: paths
-      title: ファイル
-      type: Iterable[Path]
-      required: true
-      passing: positional
-      description: 書き込んだ・削除したファイルの絶対パス
-    returns:
-      type: None
-      description: '-'
-    process: 1. 渡されたパスを持つ `_files` のキー（全ての文書の行）と `_schemas` のキーを削除する
-    unit_tests:
-    - name: test_document_store_invalidate
-      case: 正常
-      summary: 同じ大きさ・同じ更新日時の書き換え
-      condition: '`load` の後、`rules/a.yaml` を同じ大きさで書き換えて `os.utime` で更新日時を戻し、`invalidate` してから `load`'
-      mock: なし（`tmp_path`）
-      expected: 書き換えた内容を返す
-      exception: '-'
-  - name: clear
-    title: 全て捨てる
-    summary: 全てのキャッシュを捨てる
-    kind: メソッド
-    scope: public
-    thread_safe: true
-    side_effects: '`_files`・`_schemas`・`_revision_schemas`・`_dates` を空にする（`_revision_files`・`_trees` は残す）'
-    returns:
-      type: None
-      description: '-'
-    process: |-
-      1. `_files`・`_schemas`・`_revision_schemas`・`_dates` を空にする（起動の『配信元の読み直し』と『配信元の控えの破棄』が呼ぶ）
-      2. `_revision_files`・`_trees` は、commit の blob と文書の行の定義で中身が決まり古くならないので残す
-  - name: location
-    title: 文書の場所
-    summary: 文書のファイルの絶対パスを返す。リビジョンを読んだ文書は返さない
-    kind: メソッド
-    scope: public
-    thread_safe: true
-    args:
-    - name: target
-      title: 読む場所
-      type: Target
-      required: true
-      passing: positional
-      description: 文書を読んだ場所
-    - name: document
-      title: 文書
-      type: Document
-      required: true
-      passing: positional
-      description: '`target` から読んだ文書'
-    returns:
-      type: str | None
-      description: 絶対パス。`target.ref` があるときは `None`
-    process: |-
-      1. `target.ref` がある場合、`None` を返す
-      2. 読むフォルダ（`read_root(target)`。ワークツリーはワークツリーの中）と `document.body_path`（無ければ `document.path`）を結んだ絶対パスを文字列で返す
-    unit_tests:
-    - name: test_document_store_location
-      case: 正常
-      summary: 作業ツリーと body_file
-      condition: '`ref` の無い読む場所で、`path` が `rules/a.yaml` の文書と `body_path` が `src/a.py` の文書'
-      mock: なし（`tmp_path`）
-      expected: '`{tmp_path}/rules/a.yaml` と `{tmp_path}/src/a.py`'
-      exception: '-'
-    - name: test_document_store_location_when_worktree
-      case: 正常
-      summary: ワークツリー
-      condition: '`worktree` を持つ読む場所'
-      mock: なし
-      expected: ワークツリーの中の絶対パス
-      exception: '-'
-    - name: test_document_store_location_when_ref
-      case: 正常
-      summary: リビジョン
-      condition: '`ref` を持つ読む場所'
-      mock: なし
-      expected: '`None`'
-      exception: '-'
-constants:
-- name: CANDIDATE_COUNT
-  title: 近い ID の候補の数
-  container: project_index/features/documents/store.py
-  usecase: 共通
-  summary: 無い ID ごとに添える近い ID の数の上限
-  value: '5'
-- name: TREE_KEEP
-  title: 控える commit の blob の数
-  container: project_index/features/documents/store.py
-  usecase: 共通
-  summary: '`_trees` に控える (`repo_root`, commit) の上限。リビジョンの書き出しの `SNAPSHOT_KEEP` と同じ値にする'
-  value: '20'
-- name: CANDIDATE_CUTOFF
-  title: 近さの下限
-  container: project_index/features/documents/store.py
-  usecase: 共通
-  summary: 近い ID とみなす `difflib.get_close_matches` の `cutoff`
-  value: '0.6'
-functions:
-- name: check_sync
-  title: メタデータのずれの確かめ
-  container: project_index/features/documents/store.py
-  usecase: 起動
-  role: サービス
-  summary: 配信元のクローン本体の文書を読み、`metadata` の列の欠け・管理用の YAML のずれ・当たらない関連・エイリアスのキーの違反を求める
-  description: 起動時と読み直しのときに呼ぶ。#4 の `check_project` も呼ばれるたびにこの関数で求め直す。
-  kind: 関数
-  scope: public
-  thread_safe: true
-  args:
-  - name: store
+  - name: DocumentStore
     title: 文書のストア
-    type: DocumentStore
-    required: true
-    passing: injected
-    description: 文書を読む
-  - name: source
-    title: 配信中の配信元
-    type: ServedSource
-    required: true
-    passing: positional
-    description: 確かめる配信元
-  returns:
-    type: SyncReport
-    description: ずれの並び（ずれが無ければ空）
-  process: |-
-    1. `source.root` を `walk_files` で 1 回だけたどり、そのパスを `files` に渡して `Target(source, source.root, None, None, "read")` で文書を集める（文書のストア.文書を集める）
-    2. 文書ごとに、その行で metadataの列の欠けを求め、`{行の id}: {文書の id}: {キー}（{列名}）` で `missing_refs` に加える
-    3. `records` と `body_file` を持つ行ごとに、行に当たる管理用の YAML（手順 1 のパスを渡したファイルの収集）ごとに、その YAML から作った文書の `body_path` と行と手順 1 のパスを渡して索引に無いファイルを求め、`{行の id}: {パス}` で `unindexed_files` に加える
-    4. 手順 1 の `problems` のうち `reason` が `missing_body_file` のものを `{path}: {detail}` で `missing_body_files` に加える
-    5. 手順 1 の文書の ID の集合を 1 回だけ作り、文書ごとに当たらない関連を求めて `{行の id}: {文書の id}: {to}` で `unresolved_related` に加える
-    6. 手順 1 の文書でエイリアスの集めをし、`violations` を `alias_violations` にする
-    7. `SyncReport` を返す
-  unit_tests:
-  - name: test_check_sync
-    case: 正常
-    summary: 3 種のずれ
-    condition: '行 `rules` が `metadata: {name: title}` で 2 件中 1 件に `title` が無い。行 `src` の `src/files.yaml` が `a.py`・`c.py` を持ち、`src/` に `a.py`・`d.py` を置く'
-    mock: なし（一時フォルダの配信元）
-    expected: '`missing_refs` が 1 件（`name` の `title`）、`unindexed_files` が `["src: src/d.py"]`、`missing_body_files` が 1 件（`c.py`）'
-    exception: '-'
-  - name: test_check_sync_when_clean
-    case: 正常
-    summary: ずれが無い
-    condition: 全ての文書に `title` があり、管理用の YAML とファイルがそろう
-    mock: なし
-    expected: 4 つの並びが空
-    exception: '-'
-  - name: test_check_sync_when_alias_violation
-    case: 正常
-    summary: エイリアスのキーの違反
-    condition: '`alias_type: term` の行の文書 1 件の `aliases` が `3`'
-    mock: なし（一時フォルダの配信元）
-    expected: '`alias_violations` が 1 件で、`doc` がその文書のパス'
-    exception: '-'
-  - name: test_check_sync_when_walked_once
-    case: 正常
-    summary: 配信元のフォルダを 1 回だけたどる
-    condition: test_check_sync と同じ配信元（行 `rules`・`src`）
-    mock: '`walk_files`（本物を包んで呼ばれた回数を記録する）'
-    expected: '`walk_files` が 1 回だけ呼ばれ、結果が test_check_sync と同じ'
-  - name: test_check_sync_when_related_unresolved
-    case: 正常
-    summary: どの文書にも該当しない関連
-    condition: '行 `src` の `src/files.yaml` が `a.py`（`related: [{to: src/b.py}, {to: src/z.py}, {to: other-doc, source: other}]`）・`b.py` を持ち、`src/a.py`・`src/b.py` を置く'
-    mock: なし（一時フォルダの配信元）
-    expected: '`unresolved_related` が `["src: src/a.py: src/z.py"]`'
-    exception: '-'
+    container: project_index/features/documents/store.py
+    usecase: 共通
+    role: キャッシュ
+    summary: 読む場所（`Target`）ごとに文書を集め、ファイルごとに結果をキャッシュする
+    description: |-
+      キャッシュのキーはファイルの絶対パスと文書の行の ID。更新日時（`st_mtime_ns`）と大きさが変わったファイルだけを読み直す。
+      `ref` を持つ読む場所は、ファイルの blob の SHA と日時をキーの照合に使い、commit をまたいで変わらないファイルの結果を使い回す（`_revision_files`）。
+      配信元の読み直しで文書の行が変わったときは、行の内容がキーに含まれないので、起動の設定の読み直しで `clear` を呼ぶ。
+    kind: クラス
+    properties:
+      - name: snapshots
+        title: リビジョンの書き出し
+        type: SnapshotStore
+        access: 公開
+        description: '`ref` のある `Target` を読むときに使う'
+      - name: _files
+        title: ファイルのキャッシュ
+        type: dict[tuple[Path, str], tuple[int, int, list[Document], list[LoadProblem], tuple[tuple[str, int, int], ...]]]
+        access: 内部 (_)
+        description: (絶対パス, 文書の行の ID) → (更新日時, 大きさ, 文書, 理由, 文書が指す本文のファイルの (パス, 更新日時, 大きさ) のパスの順の並び)
+      - name: _schemas
+        title: スキーマのキャッシュ
+        type: dict[Path, tuple[int, int, dict[str, Any]]]
+        access: 内部 (_)
+        description: スキーマの絶対パス → (更新日時, 大きさ, 読んだスキーマ)。ワークツリーの読む場所が使う
+      - name: _revision_schemas
+        title: リビジョンのスキーマのキャッシュ
+        type: dict[tuple[Path, str, str], dict[str, Any]]
+        access: 内部 (_)
+        description: (`repo_root`, 解いた commit, スキーマのファイルの `repo_root` からの相対パス) → `$ref` を解いたスキーマ。commit のファイルは書き換わらないので、ファイルの `stat` を取らずに引く。相対パスは `source.root.relative_to(repo_root) / table.schema_path` で、同じリポジトリの `root` の違う配信元を分ける
+      - name: _dates
+        title: 日時のキャッシュ
+        type: dict[tuple[Path, str, str], dict[str, FileDates]]
+        access: 内部 (_)
+        description: (作業ツリー, 解いた commit, 配信元の `root` の `repo_root` からの相対パス) → 配信元の直下からのパスに直した履歴の『ファイルの日時』の結果。commit が変わればキーが変わり、同じリポジトリの `root` の違う配信元を分ける
+      - name: _revision_files
+        title: リビジョンのファイルのキャッシュ
+        type: dict[tuple[Path, str, str, str, str], tuple[str, tuple[tuple[str, str], ...], tuple[tuple[str, FileDates | None], ...], list[Document], list[LoadProblem]]]
+        access: 内部 (_)
+        description: |-
+          (`repo_root`, 配信元の ID, ファイルの `repo_root` からの相対パス, 文書の行の ID, 文書の行の定義のハッシュ) → (ファイルの blob の SHA, 文書が指す本文のファイルの (パス, blob の SHA) のパスの順の並び, ファイルと本文のファイルの (パス, 日時) の並び, 文書, 理由)。
+          `ref` を持つ読む場所が使い、commit をまたいで、blob と日時の変わらないファイルの読み込みを使い回す。
+          中身は commit の blob と文書の行の定義で決まり古くならないので、`clear` では空にしない。
+          文書の行の定義のハッシュは `DocumentTable` の全ての項目の `repr` の SHA-256 で、`paths`・`metadata` などが変われば別のキーになる
+      - name: _trees
+        title: commit のファイルの blob のキャッシュ
+        type: dict[tuple[Path, str], dict[str, str]]
+        access: 内部 (_)
+        description: (`repo_root`, 解いた commit) → `repo_root` からの相対パス → blob の SHA。`TREE_KEEP` 件を超えたら古く入れたものから捨てる。commit の中身は変わらないので、`clear` では空にしない
+      - name: _lock
+        title: 排他
+        type: threading.Lock
+        access: 内部 (_)
+        description: キャッシュの辞書の読み書きを守る（ファイルの読み込みはロックの外で行う）
+    methods:
+      - name: load
+        title: 文書を集める
+        summary: 読む場所の文書を、文書の行ごとに集めて返す
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        side_effects: キャッシュを更新する。`ref` があればリビジョンを書き出す
+        args:
+          - name: target
+            title: 読む場所
+            type: Target
+            required: true
+            passing: positional
+            description: 権限と作業場所の『読む場所の解決』の結果
+          - name: kinds
+            title: 種類
+            type: Sequence[str] | None
+            required: false
+            default: None
+            passing: keyword
+            description: 絞る文書の行の ID。`None` は有効な全ての行
+          - name: files
+            title: たどったファイル
+            type: Sequence[str] | None
+            required: false
+            default: None
+            passing: keyword
+            description: 読むフォルダを `walk_files` でたどったパス。呼び出し元が既にたどったときに渡す。`None` は `load` が 1 回だけたどる
+        returns:
+          type: LoadResult
+          description: 集めた文書と読めなかったファイル
+        process: |-
+          1. 読むフォルダを決める
+             - `target.ref` が `None` の場合、`target.base`
+             - `target.ref` がある場合、読む場所の commit（下の「読む場所の commit」）を `snapshots.checkout` で書き出し、その下に `source.root` の `repo_root` からの相対パスをつなぐ
+          2. 文書の行を決める。`kinds` があれば `source.table` で引き（無い種類は `UnknownKindError`）、無ければ `enabled` の全ての行
+          3. Git の配信元の場合、履歴の『ファイルの日時』を `_dates` から作業ツリー・commit・配信元の `root` の `repo_root` からの相対パスで引く。無ければ、作業ツリー（ワークツリーか `repo_root`）と commit（`ref` があれば読む場所の commit、無ければ作業ツリーの `HEAD` を解いた SHA）で呼び、配信元の直下からのパスに直して控える
+          4. 読むフォルダのファイルを、`files` が無ければ `walk_files` で 1 回だけたどって得る。行ごとにそのパスを渡して『ファイルの収集』でファイルを集める
+             - `target.ref` が `None` の場合、ファイルごとに `stat` を取る。`_files` の更新日時と大きさが同じで、理由に `missing_body_file` が無く、本文のファイルの (パス, 更新日時, 大きさ) も同じなら控えた結果を使い、それ以外は『ファイルの読み込み』で読んで `_files` を置き換える
+             - `target.ref` がある場合、読む場所の commit のファイルの blob の SHA を `_trees` から引く（無ければ `git ls-tree -r --full-tree {commit}` を 1 回だけ起動して控える）。`_revision_files` の blob の SHA が同じで、理由に `missing_body_file` が無く、本文のファイルの (パス, blob の SHA) と、ファイルと本文のファイルの日時（手順 3）も同じなら控えた結果を使い、それ以外は『ファイルの読み込み』で読んで `_revision_files` を置き換える。blob の SHA が無いファイルは読まない
+          5. 収集で当たらなかった `_files` のキーのうち、読むフォルダの下にあるものを削除する（削除されたファイル）。
+             `target.ref` がある場合は、読んだ行ごとに、`_revision_files` のキーのうち `repo_root`・配信元の ID・行の ID が同じで、今回の commit のファイルに当たらないもの、または行の定義のハッシュが違うものを削除する（`_revision_files` を今の commit と行の定義のファイルの数に抑える）
+          6. 行の順に文書を並べ、先に現れた ID を残して、後に現れた同じ ID の文書を `duplicate_id` にする（`detail` に ID と先の文書のファイル）
+          7. `LoadResult` を返す
+
+          読む場所の commit は、`target.commit` があればそのまま使い、無ければ `target.ref` を履歴の『リビジョンの解決』（`date_base` は配信元の `default_ref`）で解く。
+          1 回の `load` の中では、手順 1 と手順 3 で同じ commit を使い、解き直さない。
+        exceptions:
+          - name: UnknownKindError
+            condition: '`kinds` に有効な文書の行に無い種類がある'
+            message: 配信元の『文書の行を引く』のまま
+          - name: RefNotFoundError
+            condition: '`target.commit` が無く、`target.ref` を commit に解けない'
+            message: 履歴の『リビジョンの解決』のまま
+        unit_tests:
+          - name: test_document_store_load
+            case: 正常
+            summary: 行ごとに集める
+            condition: '行 `rules`（`rules/*.yaml`）と `notes`（`notes/files.yaml` の `records: files`・`body_file: path` で `.md`）に 2 件ずつ、Git の管理外の配信元'
+            mock: なし（`tmp_path`）
+            expected: '`rules` の 2 件、`notes` の 2 件の順で、`problems` が空'
+            exception: '-'
+          - name: test_document_store_load_when_cached
+            case: 正常
+            summary: 変わったファイルだけ読み直す
+            condition: 2 回呼ぶ間に `rules/a.yaml` だけを書き換える
+            mock: '`load_file`（本物を包んで呼ばれたパスを記録する）'
+            expected: 2 回目に `load_file` が呼ばれたのは `rules/a.yaml` だけで、結果に書き換えた内容が載る
+            exception: '-'
+          - name: test_document_store_load_when_deleted
+            case: 正常
+            summary: 削除されたファイル
+            condition: 2 回呼ぶ間に `rules/b.yaml` を削除する
+            mock: なし（`tmp_path`）
+            expected: 2 回目の結果に `rules/b.yaml` の文書が無い
+            exception: '-'
+          - name: test_document_store_load_when_duplicate_id
+            case: 正常
+            summary: 重なった ID
+            condition: '`rules/a.yaml` と `rules/b.yaml` がどちらも `id: x`'
+            mock: なし（`tmp_path`）
+            expected: 文書は `rules/a.yaml` の 1 件で、`problems` に `rules/b.yaml` の `duplicate_id`
+            exception: '-'
+          - name: test_document_store_load_when_ref
+            case: 正常
+            summary: 過去のリビジョン
+            condition: Git の配信元で `rules/a.yaml` を commit した後、作業ツリーで書き換え、`ref` に最初の commit を渡す
+            mock: なし（`tmp_path` に `git init`）
+            expected: commit した内容を返し、`updated` が commit の日時
+            exception: '-'
+          - name: test_document_store_load_when_commit
+            case: 正常
+            summary: 解いた commit を持つ読む場所は解き直さない
+            condition: test_document_store_load_when_ref と同じ配信元で、書き換えた `rules/a.yaml` を `develop` へ 2 つ目の commit として積み、`ref` に `develop`、`commit` に最初の commit を持つ読む場所
+            mock: 履歴の『リビジョンの解決』（本物を包んで呼ばれた回数を記録する）
+            expected: 最初の commit の内容を返し、リビジョンの解決が呼ばれない
+          - name: test_document_store_load_when_revision_reused
+            case: 正常
+            summary: 新しい commit でも変わったファイルだけ読み直す
+            condition: Git の配信元で `rules/a.yaml`・`rules/b.yaml` を commit し、最初の commit を持つ読む場所で `load` した後、`rules/a.yaml` だけを書き換えた 2 つ目の commit を持つ読む場所で `load` する
+            mock: '`load_file`（本物を包んで呼ばれたパスを記録する）'
+            expected: 2 回目に `load_file` が呼ばれたのは `rules/a.yaml` だけで、`rules/a.yaml` の文書が書き換えた内容と 2 つ目の commit の日時、`rules/b.yaml` の文書が最初の内容を返す
+          - name: test_document_store_load_when_revision_reused_after_clear
+            case: 正常
+            summary: 配信元の組み立て直しの後も変わったファイルだけ読み直す
+            condition: test_document_store_load_when_revision_reused と同じ配信元で、最初の commit を持つ読む場所で `load` し、`clear` を呼んだ後、`rules/a.yaml` だけを書き換えた 2 つ目の commit を持つ読む場所で `load` する
+            mock: '`load_file`（本物を包んで呼ばれたパスを記録する）'
+            expected: 2 回目に `load_file` が呼ばれたのは `rules/a.yaml` だけ
+          - name: test_document_store_load_when_revision_table_changed
+            case: 正常
+            summary: 文書の行の定義が変われば読み直す
+            condition: 'Git の配信元で `rules/a.yaml`（`title` を持つ）を commit し、同じ commit を持つ読む場所で、行 `rules` の `metadata` を `{}` にした配信元と `{name: title}` にした配信元で順に `load` する'
+            mock: '`load_file`（本物を包んで呼ばれたパスを記録する）'
+            expected: 2 回とも `load_file` が `rules/a.yaml` で呼ばれ、2 回目の文書の `name` が `title` の値
+          - name: test_document_store_load_when_dates_shared_repo
+            case: 正常
+            summary: 同じリポジトリで root の違う配信元の日時を取り違えない
+            condition: 1 つのリポジトリの `docs/` と `dev/` を `root` にした配信元 2 つが、それぞれ `rules/a.yaml` を別の commit で持つ。同じ commit を持つ読む場所で、順に `load` する
+            mock: なし（`tmp_path` に `git init`）
+            expected: それぞれの文書の `updated` が、その配信元の `rules/a.yaml` を commit した日時
+          - name: test_document_store_load_when_unknown_kind
+            case: 異常
+            summary: 無い種類
+            condition: '`kinds=["x"]`'
+            mock: なし
+            expected: '`UnknownKindError`'
+            exception: '`kinds` に有効な文書の行に無い種類がある'
+          - name: test_document_store_load_when_many_tables
+            case: 正常
+            summary: 行がいくつあってもフォルダを 1 回だけたどる
+            condition: 行 `rules`・`notes`・`src` の 3 つを持つ配信元
+            mock: '`walk_files`（本物を包んで呼ばれた回数を記録する）'
+            expected: '`walk_files` が 1 回だけ呼ばれ、3 行の文書を返す'
+      - name: get
+        title: ID で引く
+        summary: ID の並びの順に文書を返す
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        args:
+          - name: target
+            title: 読む場所
+            type: Target
+            required: true
+            passing: positional
+            description: 読む場所
+          - name: ids
+            title: 文書の ID
+            type: Sequence[str]
+            required: true
+            passing: positional
+            description: 引く ID の並び
+          - name: kinds
+            title: 種類
+            type: Sequence[str] | None
+            required: false
+            default: None
+            passing: keyword
+            description: 絞る文書の行の ID
+        returns:
+          type: list[Document]
+          description: '`ids` の順の文書（同じ ID を 2 回渡すと 2 回返す）'
+        process: |-
+          1. `load` で文書を集め、ID → 文書の辞書を作る
+          2. `ids` の順に引く
+          3. 無い ID がある場合、ID ごとに `difflib.get_close_matches`（`n=CANDIDATE_COUNT`、`cutoff=CANDIDATE_CUTOFF`）で近い ID を引き、`DocumentNotFoundError` を送る
+          4. 文書の並びを返す
+        exceptions:
+          - name: DocumentNotFoundError
+            condition: 無い ID がある
+            message: '`{source}: 文書 {missing} はありません`。`candidates` に無い ID ごとの近い ID'
+          - name: UnknownKindError
+            condition: '`kinds` に無い種類がある'
+            message: '`load` のまま'
+        unit_tests:
+          - name: test_document_store_get
+            case: 正常
+            summary: 渡した順
+            condition: '`a`・`b` があり、`["b", "a"]`'
+            mock: なし（`tmp_path`）
+            expected: '`b`・`a` の順'
+            exception: '-'
+          - name: test_document_store_get_when_missing
+            case: 異常
+            summary: 無い ID と近い候補
+            condition: '`rule-auth` があり、`["rule-auht", "zzz"]`'
+            mock: なし（`tmp_path`）
+            expected: '`DocumentNotFoundError` の `missing` が 2 件、`candidates["rule-auht"]` が `["rule-auth"]`、`candidates["zzz"]` が空'
+            exception: 無い ID がある
+      - name: schema
+        title: 種類のスキーマ
+        summary: 読む場所に合わせた種類のスキーマを返す
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        args:
+          - name: target
+            title: 読む場所
+            type: Target
+            required: true
+            passing: positional
+            description: 読む場所
+          - name: kind
+            title: 種類
+            type: str
+            required: true
+            passing: positional
+            description: 文書の行の ID
+        returns:
+          type: dict[str, Any]
+          description: JSON Schema
+        process: |-
+          1. `source.table(kind)` で行を引く
+          2. `target.ref` と `target.worktree` がどちらも `None` の場合と、行の `schema_path` が `SchemaRef` の場合、起動時のスキーマを返す（読む場所によらず参照したリビジョンのスキーマ）
+          3. `target.ref` がある場合、`repo_root`・読む場所の commit（`load` と同じ）・スキーマのファイルの `repo_root` からの相対パスで `_revision_schemas` を引き、当たればそのまま返す（リビジョンの書き出しとファイルの `stat` をしない）。
+             当たらなければ、`load` と同じ読むフォルダの `schema_path` を『YAMLの読み込み』で読み、`$ref` を解いた結果を `_revision_schemas` に控える
+             - ファイルが無い・読めない場合、手順 2 のスキーマを使い、控えない
+          4. ワークツリーの場合、読むフォルダの `schema_path` を `_schemas` から引き、更新日時か大きさが違えば『YAMLの読み込み』で読み直す
+             - ファイルが無い・読めない場合、手順 2 のスキーマを使う
+          5. `$ref` を解いたスキーマを返す（スキーマの参照の解決。基準は手順 2〜4 で使った `schema_path`）。ワークツリーで解いた結果は `_schemas` に控える
+        exceptions:
+          - name: UnknownKindError
+            condition: '`kind` が有効な文書の行に無い'
+            message: 配信元の『文書の行を引く』のまま
+        unit_tests:
+          - name: test_document_store_schema_when_worktree
+            case: 正常
+            summary: ワークツリーのスキーマ
+            condition: ワークツリーで `schemas/rule.schema.yaml` の `required` を書き換えた
+            mock: なし（`tmp_path`）
+            expected: 書き換えたスキーマを返し、クローン本体では起動時のスキーマを返す
+            exception: '-'
+          - name: test_document_store_schema_when_ref
+            case: 正常
+            summary: '`$ref` を解いて返す'
+            condition: '`schemas/rule.schema.yaml` の `properties.body` が `共通.schema.yaml#/$defs/markdown`'
+            mock: なし（`tmp_path`）
+            expected: '`properties.body` が `$ref` を持たず `markdown` の中身'
+            exception: '-'
+          - name: test_document_store_schema_when_revision
+            case: 正常
+            summary: リビジョンのスキーマは commit で控える
+            condition: Git の配信元で `schemas/rule.schema.yaml` を commit した後、作業ツリーで `required` を書き換え、`commit` に最初の commit を持つ読む場所で 2 回呼ぶ
+            mock: '`snapshots.checkout`（本物を包んで呼ばれた回数を記録する）'
+            expected: 2 回とも commit した `required` のスキーマを返し、`snapshots.checkout` が 1 回だけ呼ばれる
+          - name: test_document_store_schema_when_revision_shared_repo
+            case: 正常
+            summary: 同じリポジトリで root の違う配信元のスキーマを取り違えない
+            condition: 1 つのリポジトリの `docs/` と `dev/` を `root` にした配信元 2 つが、どちらも種類 `rule` を持ち、`schemas/rule.schema.yaml` の `required` が違う。同じ commit を持つ読む場所で、順に `schema` を呼ぶ
+            mock: なし（`tmp_path` に `git init`）
+            expected: それぞれの配信元の `required` のスキーマを返す
+      - name: row_schema
+        title: 文書に当てるスキーマ
+        summary: 文書 1 件の内容に当てるスキーマを返す。`records` を持つ行は 1 行のスキーマ
+        description: 検査・変換・検索と変更の項目の一覧が、`schema` の代わりに呼ぶ。
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        args:
+          - name: target
+            title: 読む場所
+            type: Target
+            required: true
+            passing: positional
+            description: 読む場所
+          - name: kind
+            title: 種類
+            type: str
+            required: true
+            passing: positional
+            description: 文書の行の ID
+        returns:
+          type: dict[str, Any]
+          description: JSON Schema。`records` の行で 1 行のスキーマを取り出せないときは空の辞書
+        process: |-
+          1. `schema(target, kind)` で種類のスキーマを得る
+          2. 行の `records` が `None` の場合、そのまま返す
+          3. `records` がある場合、records の行の 1 行のスキーマ（`records_item_schema`）を返す。`None` なら空の辞書を返す
+        exceptions:
+          - name: UnknownKindError
+            condition: '`kind` が有効な文書の行に無い'
+            message: '`schema` のまま'
+        unit_tests:
+          - name: test_document_store_row_schema
+            case: 正常
+            summary: ファイル 1 つが 1 文書の行はそのまま
+            condition: 行 `rules`（`records` なし）
+            mock: なし（`tmp_path`）
+            expected: '`schema` と同じスキーマ'
+          - name: test_document_store_row_schema_when_records
+            case: 正常
+            summary: records の行は 1 行のスキーマ
+            condition: '行 `notes`（`records: files`）の `schema` が `templates/files.schema.yaml` のコピー'
+            mock: なし（`tmp_path`）
+            expected: '`required` が `[path]` の `files` の `items`'
+          - name: test_document_store_row_schema_when_items_missing
+            case: 正常
+            summary: 1 行のスキーマを取り出せない
+            condition: 行 `notes` の `schema` が `properties.files.items` を持たない
+            mock: なし（`tmp_path`）
+            expected: 空の辞書
+          - name: test_document_store_row_schema_when_many_documents
+            case: 正常
+            summary: 文書の数だけ呼んでも git を文書の数だけ起動しない
+            condition: Git の配信元で行 `rules` の文書 50 件を commit し、`ref` に `develop`、`commit` に解いた commit を持つ読む場所で `load` した後、文書ごとに `row_schema` を呼ぶ
+            mock: '`run_git`（本物を包んで呼ばれた回数を記録する）'
+            expected: '`row_schema` の 50 回の呼び出しで `run_git` が呼ばれない'
+      - name: invalidate
+        title: キャッシュを捨てる
+        summary: 書き込んだファイルのキャッシュを捨てる
+        description: 更新日時の分解能より短い間に同じ大きさで書き換えたときも、書き込みの直後の読み取りで古い内容を返さないように、書き込みが呼ぶ。
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        side_effects: '`_files` と `_schemas` から該当のキーを削除する'
+        args:
+          - name: paths
+            title: ファイル
+            type: Iterable[Path]
+            required: true
+            passing: positional
+            description: 書き込んだ・削除したファイルの絶対パス
+        returns:
+          type: None
+          description: '-'
+        process: 1. 渡されたパスを持つ `_files` のキー（全ての文書の行）と `_schemas` のキーを削除する
+        unit_tests:
+          - name: test_document_store_invalidate
+            case: 正常
+            summary: 同じ大きさ・同じ更新日時の書き換え
+            condition: '`load` の後、`rules/a.yaml` を同じ大きさで書き換えて `os.utime` で更新日時を戻し、`invalidate` してから `load`'
+            mock: なし（`tmp_path`）
+            expected: 書き換えた内容を返す
+            exception: '-'
+      - name: clear
+        title: 全て捨てる
+        summary: 全てのキャッシュを捨てる
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        side_effects: '`_files`・`_schemas`・`_revision_schemas`・`_dates` を空にする（`_revision_files`・`_trees` は残す）'
+        returns:
+          type: None
+          description: '-'
+        process: |-
+          1. `_files`・`_schemas`・`_revision_schemas`・`_dates` を空にする（起動の『配信元の読み直し』と『配信元の控えの破棄』が呼ぶ）
+          2. `_revision_files`・`_trees` は、commit の blob と文書の行の定義で中身が決まり古くならないので残す
+      - name: location
+        title: 文書の場所
+        summary: 文書のファイルの絶対パスを返す。リビジョンを読んだ文書は返さない
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        args:
+          - name: target
+            title: 読む場所
+            type: Target
+            required: true
+            passing: positional
+            description: 文書を読んだ場所
+          - name: document
+            title: 文書
+            type: Document
+            required: true
+            passing: positional
+            description: '`target` から読んだ文書'
+        returns:
+          type: str | None
+          description: 絶対パス。`target.ref` があるときは `None`
+        process: |-
+          1. `target.ref` がある場合、`None` を返す
+          2. 読むフォルダ（`read_root(target)`。ワークツリーはワークツリーの中）と `document.body_path`（無ければ `document.path`）を結んだ絶対パスを文字列で返す
+        unit_tests:
+          - name: test_document_store_location
+            case: 正常
+            summary: 作業ツリーと body_file
+            condition: '`ref` の無い読む場所で、`path` が `rules/a.yaml` の文書と `body_path` が `src/a.py` の文書'
+            mock: なし（`tmp_path`）
+            expected: '`{tmp_path}/rules/a.yaml` と `{tmp_path}/src/a.py`'
+            exception: '-'
+          - name: test_document_store_location_when_worktree
+            case: 正常
+            summary: ワークツリー
+            condition: '`worktree` を持つ読む場所'
+            mock: なし
+            expected: ワークツリーの中の絶対パス
+            exception: '-'
+          - name: test_document_store_location_when_ref
+            case: 正常
+            summary: リビジョン
+            condition: '`ref` を持つ読む場所'
+            mock: なし
+            expected: '`None`'
+            exception: '-'
+constants:
+  - name: CANDIDATE_COUNT
+    title: 近い ID の候補の数
+    container: project_index/features/documents/store.py
+    usecase: 共通
+    summary: 無い ID ごとに添える近い ID の数の上限
+    value: '5'
+  - name: TREE_KEEP
+    title: 控える commit の blob の数
+    container: project_index/features/documents/store.py
+    usecase: 共通
+    summary: '`_trees` に控える (`repo_root`, commit) の上限。リビジョンの書き出しの `SNAPSHOT_KEEP` と同じ値にする'
+    value: '20'
+  - name: CANDIDATE_CUTOFF
+    title: 近さの下限
+    container: project_index/features/documents/store.py
+    usecase: 共通
+    summary: 近い ID とみなす `difflib.get_close_matches` の `cutoff`
+    value: '0.6'
+functions:
+  - name: check_sync
+    title: メタデータのずれの確かめ
+    container: project_index/features/documents/store.py
+    usecase: 起動
+    role: サービス
+    summary: 配信元のクローン本体の文書を読み、`metadata` の列の欠け・管理用の YAML のずれ・当たらない関連・エイリアスのキーの違反を求める
+    description: 起動時と読み直しのときに呼ぶ。#4 の `check_project` も呼ばれるたびにこの関数で求め直す。
+    kind: 関数
+    scope: public
+    thread_safe: true
+    args:
+      - name: store
+        title: 文書のストア
+        type: DocumentStore
+        required: true
+        passing: injected
+        description: 文書を読む
+      - name: source
+        title: 配信中の配信元
+        type: ServedSource
+        required: true
+        passing: positional
+        description: 確かめる配信元
+    returns:
+      type: SyncReport
+      description: ずれの並び（ずれが無ければ空）
+    process: |-
+      1. `source.root` を `walk_files` で 1 回だけたどり、そのパスを `files` に渡して `Target(source, source.root, None, None, "read")` で文書を集める（文書のストア.文書を集める）
+      2. 文書ごとに、その行で metadataの列の欠けを求め、`{行の id}: {文書の id}: {キー}（{列名}）` で `missing_refs` に加える
+      3. `records` と `body_file` を持つ行ごとに、行に当たる管理用の YAML（手順 1 のパスを渡したファイルの収集）ごとに、その YAML から作った文書の `body_path` と行と手順 1 のパスを渡して索引に無いファイルを求め、`{行の id}: {パス}` で `unindexed_files` に加える
+      4. 手順 1 の `problems` のうち `reason` が `missing_body_file` のものを `{path}: {detail}` で `missing_body_files` に加える
+      5. 手順 1 の文書の ID の集合を 1 回だけ作り、文書ごとに当たらない関連を求めて `{行の id}: {文書の id}: {to}` で `unresolved_related` に加える
+      6. 手順 1 の文書でエイリアスの集めをし、`violations` を `alias_violations` にする
+      7. `SyncReport` を返す
+    unit_tests:
+      - name: test_check_sync
+        case: 正常
+        summary: 3 種のずれ
+        condition: '行 `rules` が `metadata: {name: title}` で 2 件中 1 件に `title` が無い。行 `src` の `src/files.yaml` が `a.py`・`c.py` を持ち、`src/` に `a.py`・`d.py` を置く'
+        mock: なし（一時フォルダの配信元）
+        expected: '`missing_refs` が 1 件（`name` の `title`）、`unindexed_files` が `["src: src/d.py"]`、`missing_body_files` が 1 件（`c.py`）'
+        exception: '-'
+      - name: test_check_sync_when_clean
+        case: 正常
+        summary: ずれが無い
+        condition: 全ての文書に `title` があり、管理用の YAML とファイルがそろう
+        mock: なし
+        expected: 4 つの並びが空
+        exception: '-'
+      - name: test_check_sync_when_alias_violation
+        case: 正常
+        summary: エイリアスのキーの違反
+        condition: '`alias_type: term` の行の文書 1 件の `aliases` が `3`'
+        mock: なし（一時フォルダの配信元）
+        expected: '`alias_violations` が 1 件で、`doc` がその文書のパス'
+        exception: '-'
+      - name: test_check_sync_when_walked_once
+        case: 正常
+        summary: 配信元のフォルダを 1 回だけたどる
+        condition: test_check_sync と同じ配信元（行 `rules`・`src`）
+        mock: '`walk_files`（本物を包んで呼ばれた回数を記録する）'
+        expected: '`walk_files` が 1 回だけ呼ばれ、結果が test_check_sync と同じ'
+      - name: test_check_sync_when_related_unresolved
+        case: 正常
+        summary: どの文書にも該当しない関連
+        condition: '行 `src` の `src/files.yaml` が `a.py`（`related: [{to: src/b.py}, {to: src/z.py}, {to: other-doc, source: other}]`）・`b.py` を持ち、`src/a.py`・`src/b.py` を置く'
+        mock: なし（一時フォルダの配信元）
+        expected: '`unresolved_related` が `["src: src/a.py: src/z.py"]`'
+        exception: '-'

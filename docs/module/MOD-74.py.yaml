@@ -2,70 +2,70 @@ id: MOD-74
 title: 索引のサーバー / 検査 / scripts.py
 lead: '`validators[]` の出力の解釈。'
 test_files:
-- tests/unit/project_index/features/validation/test_scripts.py
+  - tests/unit/project_index/features/validation/test_scripts.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      文書の検査 ..> 検査の出力の解釈
-      class 文書の検査 {
-        <<class>>
-      }
-      class 検査の出力の解釈 {
-        <<function>>
-      }
-      click 文書の検査 href "./MOD-75.py.yaml#文書の検査"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        文書の検査 ..> 検査の出力の解釈
+        class 文書の検査 {
+          <<class>>
+        }
+        class 検査の出力の解釈 {
+          <<function>>
+        }
+        click 文書の検査 href "./MOD-75.py.yaml#文書の検査"
 functions:
-- name: parse_validator_output
-  title: 検査の出力の解釈
-  kind: 関数
-  container: project_index/features/validation/scripts.py
-  usecase: 共通
-  role: 変換
-  summary: '`validators[]` の標準出力の JSON を違反の並びにする'
-  scope: public
-  thread_safe: true
-  args:
-  - name: stdout
-    title: 標準出力
-    type: str
-    required: true
-    passing: positional
-    description: スクリプトの標準出力
-  - name: validator_id
-    title: 検査の ID
-    type: str
-    required: true
-    passing: keyword
-    description: 決まりに添える `validators[].id`
-  returns:
-    type: list[Violation]
-    description: 違反。空の出力と `[]` は合格
-  process: |-
-    1. 前後の空白を除いて空なら空の並びを返す
-    2. JSON として読む。配列でない・読めない場合、`path` が `$`、`rule` が `{validator_id}: 出力が違反の配列の JSON ではありません` の違反 1 件を返す
-    3. 要素ごとに `path`（無ければ `$`）・`rule`（無ければ `message`）・`fix` を取り、`rule` の頭に `{validator_id}: ` を付けた `Violation` にする。文字列の要素は `rule` だけの違反にする
-    4. 並びを返す
-  unit_tests:
-  - name: test_parse_validator_output
-    case: 正常
-    summary: 違反の配列
-    condition: '`[{"path": "links[0]", "rule": "無いリンク先", "fix": "x"}, "本文が空"]`、`validator_id="check-links"`'
-    mock: なし
-    expected: '2 件で、`rule` が `check-links: 無いリンク先` と `check-links: 本文が空`、2 件目の `path` が `$`'
-    exception: '-'
-  - name: test_parse_validator_output_when_empty
-    case: 正常
-    summary: 合格
-    condition: '`""` と `"[]\n"`'
-    mock: なし
-    expected: どちらも空の並び
-    exception: '-'
-  - name: test_parse_validator_output_when_invalid
-    case: 正常
-    summary: JSON でない出力
-    condition: '`ok`'
-    mock: なし
-    expected: 1 件で、`rule` に「配列の JSON ではありません」
-    exception: '-'
+  - name: parse_validator_output
+    title: 検査の出力の解釈
+    kind: 関数
+    container: project_index/features/validation/scripts.py
+    usecase: 共通
+    role: 変換
+    summary: '`validators[]` の標準出力の JSON を違反の並びにする'
+    scope: public
+    thread_safe: true
+    args:
+      - name: stdout
+        title: 標準出力
+        type: str
+        required: true
+        passing: positional
+        description: スクリプトの標準出力
+      - name: validator_id
+        title: 検査の ID
+        type: str
+        required: true
+        passing: keyword
+        description: 決まりに添える `validators[].id`
+    returns:
+      type: list[Violation]
+      description: 違反。空の出力と `[]` は合格
+    process: |-
+      1. 前後の空白を除いて空なら空の並びを返す
+      2. JSON として読む。配列でない・読めない場合、`path` が `$`、`rule` が `{validator_id}: 出力が違反の配列の JSON ではありません` の違反 1 件を返す
+      3. 要素ごとに `path`（無ければ `$`）・`rule`（無ければ `message`）・`fix` を取り、`rule` の頭に `{validator_id}: ` を付けた `Violation` にする。文字列の要素は `rule` だけの違反にする
+      4. 並びを返す
+    unit_tests:
+      - name: test_parse_validator_output
+        case: 正常
+        summary: 違反の配列
+        condition: '`[{"path": "links[0]", "rule": "無いリンク先", "fix": "x"}, "本文が空"]`、`validator_id="check-links"`'
+        mock: なし
+        expected: '2 件で、`rule` が `check-links: 無いリンク先` と `check-links: 本文が空`、2 件目の `path` が `$`'
+        exception: '-'
+      - name: test_parse_validator_output_when_empty
+        case: 正常
+        summary: 合格
+        condition: '`""` と `"[]\n"`'
+        mock: なし
+        expected: どちらも空の並び
+        exception: '-'
+      - name: test_parse_validator_output_when_invalid
+        case: 正常
+        summary: JSON でない出力
+        condition: '`ok`'
+        mock: なし
+        expected: 1 件で、`rule` に「配列の JSON ではありません」
+        exception: '-'

@@ -11,37 +11,37 @@ directory: |-
   └─ store.py      # SeenStore（SQLite への記録と読み出し）
   ```
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      会話の記録 ..> 会話キー : 受ける
-      会話の記録 ..> 前回読んだ内容 : 返す
-      会話の記録 ..> 閲覧と編集 : 返す
-      class 会話の記録 {
-        +返し済み(会話キー, 配信元, 種類, バージョン) set
-        +返したことを記録する(会話キー, 配信元, 種類, 文書) None
-        +前回読んだ内容(会話キー, 配信元, ID) dict
-        +閲覧と編集を記録する(会話キー, 配信元, ID, 種類) None
-        +閲覧と編集(会話キー, 配信元) list
-        +会話の記録を消す(会話キー) int
-        +古い記録の削除() int
-      }
-      class 会話キー {
-        +セッションの ID: str
-        +エージェントの ID: str
-      }
-      class 前回読んだ内容 {
-        +ID: str
-        +バージョン: str
-        +内容: str
-      }
-      class 閲覧と編集 {
-        +ID: str
-        +種類: str
-        +日時: datetime
-      }
-      click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
-      click 会話キー href "./MOD-60.py.yaml#会話キー"
-      click 前回読んだ内容 href "./MOD-60.py.yaml#前回読んだ内容"
-      click 閲覧と編集 href "./MOD-60.py.yaml#閲覧と編集"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        会話の記録 ..> 会話キー : 受ける
+        会話の記録 ..> 前回読んだ内容 : 返す
+        会話の記録 ..> 閲覧と編集 : 返す
+        class 会話の記録 {
+          +返し済み(会話キー, 配信元, 種類, バージョン) set
+          +返したことを記録する(会話キー, 配信元, 種類, 文書) None
+          +前回読んだ内容(会話キー, 配信元, ID) dict
+          +閲覧と編集を記録する(会話キー, 配信元, ID, 種類) None
+          +閲覧と編集(会話キー, 配信元) list
+          +会話の記録を消す(会話キー) int
+          +古い記録の削除() int
+        }
+        class 会話キー {
+          +セッションの ID: str
+          +エージェントの ID: str
+        }
+        class 前回読んだ内容 {
+          +ID: str
+          +バージョン: str
+          +内容: str
+        }
+        class 閲覧と編集 {
+          +ID: str
+          +種類: str
+          +日時: datetime
+        }
+        click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
+        click 会話キー href "./MOD-60.py.yaml#会話キー"
+        click 前回読んだ内容 href "./MOD-60.py.yaml#前回読んだ内容"
+        click 閲覧と編集 href "./MOD-60.py.yaml#閲覧と編集"

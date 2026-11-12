@@ -2,54 +2,54 @@ id: MOD-92
 title: 索引のサーバー / 起動 / lifespan.py
 lead: MCP のセッションの管理と、記録の削除。
 test_files:
-- tests/unit/project_index/server/test_lifespan.py
+  - tests/unit/project_index/server/test_lifespan.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      アプリの組み立て ..> アプリの寿命
-      class アプリの組み立て {
-        <<function>>
-      }
-      class アプリの寿命 {
-        <<function>>
-      }
-      click アプリの組み立て href "./MOD-90.py.yaml#アプリの組み立て"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        アプリの組み立て ..> アプリの寿命
+        class アプリの組み立て {
+          <<function>>
+        }
+        class アプリの寿命 {
+          <<function>>
+        }
+        click アプリの組み立て href "./MOD-90.py.yaml#アプリの組み立て"
 functions:
-- name: build_lifespan
-  title: アプリの寿命
-  kind: 関数
-  container: project_index/server/lifespan.py
-  usecase: 起動
-  role: 寿命
-  summary: マウントした MCP のセッションの管理を親のアプリの寿命で動かし、起動時に古い会話の記録を削除する
-  scope: public
-  args:
-  - name: mcps
-    title: MCP
-    type: Sequence[MCPServer]
-    required: true
-    passing: positional
-    description: 文書の MCP と管理の MCP
-  - name: seen
-    title: 会話の記録
-    type: SeenStore
-    required: true
-    passing: keyword
-    description: 保持日数を過ぎた記録を削除する
-  returns:
-    type: Callable[[FastAPI], AbstractAsyncContextManager[None]]
-    description: FastAPI の `lifespan` に渡す関数
-  process: |-
-    1. 返す関数は、`contextlib.AsyncExitStack` に各 MCP の `session_manager.run()` を入れる（マウントした子のアプリの寿命は動かないため）
-    2. 会話の記録の古い記録を `asyncio.to_thread` で削除する（会話の記録.古い記録の削除）
-       - `[info]` 古い会話の記録を削除した（件数）
-    3. `yield` し、止まるときにスタックを閉じる
-  unit_tests:
-  - name: test_build_lifespan
-    case: 正常
-    summary: MCP のセッションの管理を動かす
-    condition: 2 つの MCP を渡して寿命に入る
-    mock: MCP（`session_manager.run()` が入った・出たを記録する偽物）・会話の記録（偽物）
-    expected: 入ると 2 つとも run が入り、古い記録の削除が 1 回呼ばれ、出ると 2 つとも出る
+  - name: build_lifespan
+    title: アプリの寿命
+    kind: 関数
+    container: project_index/server/lifespan.py
+    usecase: 起動
+    role: 寿命
+    summary: マウントした MCP のセッションの管理を親のアプリの寿命で動かし、起動時に古い会話の記録を削除する
+    scope: public
+    args:
+      - name: mcps
+        title: MCP
+        type: Sequence[MCPServer]
+        required: true
+        passing: positional
+        description: 文書の MCP と管理の MCP
+      - name: seen
+        title: 会話の記録
+        type: SeenStore
+        required: true
+        passing: keyword
+        description: 保持日数を過ぎた記録を削除する
+    returns:
+      type: Callable[[FastAPI], AbstractAsyncContextManager[None]]
+      description: FastAPI の `lifespan` に渡す関数
+    process: |-
+      1. 返す関数は、`contextlib.AsyncExitStack` に各 MCP の `session_manager.run()` を入れる（マウントした子のアプリの寿命は動かないため）
+      2. 会話の記録の古い記録を `asyncio.to_thread` で削除する（会話の記録.古い記録の削除）
+         - `[info]` 古い会話の記録を削除した（件数）
+      3. `yield` し、止まるときにスタックを閉じる
+    unit_tests:
+      - name: test_build_lifespan
+        case: 正常
+        summary: MCP のセッションの管理を動かす
+        condition: 2 つの MCP を渡して寿命に入る
+        mock: MCP（`session_manager.run()` が入った・出たを記録する偽物）・会話の記録（偽物）
+        expected: 入ると 2 つとも run が入り、古い記録の削除が 1 回呼ばれ、出ると 2 つとも出る

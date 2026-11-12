@@ -2,96 +2,96 @@ id: MOD-101
 title: 索引のサーバー / 共通 / paths.py
 lead: 作業場所の glob の照合とパスの正規化。
 test_files:
-- tests/unit/project_index/shared/test_paths.py
+  - tests/unit/project_index/shared/test_paths.py
 functions:
-- name: match_glob
-  title: globの照合
-  kind: 関数
-  container: project_index/shared/paths.py
-  usecase: 共通
-  role: 照合
-  summary: 作業場所のパスが `scope` の glob の 1 つに当たるかを返す
-  scope: public
-  thread_safe: true
-  args:
-  - name: path
-    title: パス
-    type: Path
-    required: true
-    passing: positional
-    description: 照らすパス（絶対パス）
-  - name: patterns
-    title: globの並び
-    type: Sequence[str]
-    required: true
-    passing: positional
-    description: '`scope.read`・`scope.write`・`worktrees` の値'
-  - name: base
-    title: 相対パスの基準
-    type: Path | None
-    required: false
-    default: None
-    passing: keyword
-    description: 相対パスの glob を解く基準（配信元の直下）。`None` なら相対パスの glob は当たらない
-  returns:
-    type: bool
-    description: どれかに当たれば `True`
-  process: |-
-    1. パスを『パスの正規化』にかける
-    2. glob ごとに、`~` を展開し、相対パスなら `base` と結合して正規化する
-    3. `**` を含む glob は 0 個以上のフォルダに、`*` は 1 つのフォルダ名の中だけに当たるとして照らす（`PurePosixPath.full_match`）。`/**` で終わる glob はそのフォルダ自身にも当たる
-    4. 1 つでも当たれば `True`
-  callees:
-  - MOD-101#functions[normalize_path]
-  unit_tests:
-  - name: test_match_glob
-    case: 正常
-    summary: '`/**` の無いパスはそのフォルダだけ'
-    condition: '`/r/a` と `/r/a/b` を `["/r/a"]` に'
-    mock: なし
-    expected: '`/r/a` は `True`、`/r/a/b` は `False`'
-  - name: test_match_glob_when_recursive
-    case: 正常
-    summary: '`/**` は自分と中に当たる'
-    condition: '`/r/a` と `/r/a/b/c` を `["/r/a/**"]` に'
-    mock: なし
-    expected: どちらも `True`
-  - name: test_match_glob_when_relative
-    case: 正常
-    summary: 相対パスを基準で解く
-    condition: '`/r/.claude/worktrees/x` を `["./.claude/worktrees/*"]`、`base=/r` に'
-    mock: なし
-    expected: '`True`'
-  - name: test_match_glob_when_relative_without_base
-    case: 正常
-    summary: 基準が無い相対パス
-    condition: 同じパスと glob、`base=None`
-    mock: なし
-    expected: '`False`'
-- name: normalize_path
-  title: パスの正規化
-  kind: 関数
-  container: project_index/shared/paths.py
-  usecase: 共通
-  role: 変換
-  summary: '`~` の展開・`..` の解決・末尾の `/` の除去をした絶対パスにする'
-  scope: public
-  thread_safe: true
-  args:
-  - name: path
-    title: パス
-    type: str | Path
-    required: true
-    passing: positional
-    description: 正規化するパス
-  returns:
-    type: Path
-    description: 絶対パス。シンボリックリンクは解かない
-  process: 1. `expanduser` で `~` を展開し、`os.path.abspath` で `..` を解いた `Path` を返す
-  unit_tests:
-  - name: test_normalize_path
-    case: 正常
-    summary: '`..` と末尾の `/` を除く'
-    condition: '`/r/a/../b/`'
-    mock: なし
-    expected: '`Path("/r/b")`'
+  - name: match_glob
+    title: globの照合
+    kind: 関数
+    container: project_index/shared/paths.py
+    usecase: 共通
+    role: 照合
+    summary: 作業場所のパスが `scope` の glob の 1 つに当たるかを返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: path
+        title: パス
+        type: Path
+        required: true
+        passing: positional
+        description: 照らすパス（絶対パス）
+      - name: patterns
+        title: globの並び
+        type: Sequence[str]
+        required: true
+        passing: positional
+        description: '`scope.read`・`scope.write`・`worktrees` の値'
+      - name: base
+        title: 相対パスの基準
+        type: Path | None
+        required: false
+        default: None
+        passing: keyword
+        description: 相対パスの glob を解く基準（配信元の直下）。`None` なら相対パスの glob は当たらない
+    returns:
+      type: bool
+      description: どれかに当たれば `True`
+    process: |-
+      1. パスを『パスの正規化』にかける
+      2. glob ごとに、`~` を展開し、相対パスなら `base` と結合して正規化する
+      3. `**` を含む glob は 0 個以上のフォルダに、`*` は 1 つのフォルダ名の中だけに当たるとして照らす（`PurePosixPath.full_match`）。`/**` で終わる glob はそのフォルダ自身にも当たる
+      4. 1 つでも当たれば `True`
+    callees:
+      - MOD-101#functions[normalize_path]
+    unit_tests:
+      - name: test_match_glob
+        case: 正常
+        summary: '`/**` の無いパスはそのフォルダだけ'
+        condition: '`/r/a` と `/r/a/b` を `["/r/a"]` に'
+        mock: なし
+        expected: '`/r/a` は `True`、`/r/a/b` は `False`'
+      - name: test_match_glob_when_recursive
+        case: 正常
+        summary: '`/**` は自分と中に当たる'
+        condition: '`/r/a` と `/r/a/b/c` を `["/r/a/**"]` に'
+        mock: なし
+        expected: どちらも `True`
+      - name: test_match_glob_when_relative
+        case: 正常
+        summary: 相対パスを基準で解く
+        condition: '`/r/.claude/worktrees/x` を `["./.claude/worktrees/*"]`、`base=/r` に'
+        mock: なし
+        expected: '`True`'
+      - name: test_match_glob_when_relative_without_base
+        case: 正常
+        summary: 基準が無い相対パス
+        condition: 同じパスと glob、`base=None`
+        mock: なし
+        expected: '`False`'
+  - name: normalize_path
+    title: パスの正規化
+    kind: 関数
+    container: project_index/shared/paths.py
+    usecase: 共通
+    role: 変換
+    summary: '`~` の展開・`..` の解決・末尾の `/` の除去をした絶対パスにする'
+    scope: public
+    thread_safe: true
+    args:
+      - name: path
+        title: パス
+        type: str | Path
+        required: true
+        passing: positional
+        description: 正規化するパス
+    returns:
+      type: Path
+      description: 絶対パス。シンボリックリンクは解かない
+    process: 1. `expanduser` で `~` を展開し、`os.path.abspath` で `..` を解いた `Path` を返す
+    unit_tests:
+      - name: test_normalize_path
+        case: 正常
+        summary: '`..` と末尾の `/` を除く'
+        condition: '`/r/a/../b/`'
+        mock: なし
+        expected: '`Path("/r/b")`'

@@ -2,91 +2,91 @@ id: MOD-57
 title: 索引のサーバー / 検索 / terms.py
 lead: 用語の一覧と、その Markdown。
 test_files:
-- tests/unit/project_index/features/search/test_terms.py
+  - tests/unit/project_index/features/search/test_terms.py
 functions:
-- name: list_match_words
-  title: 用語の一覧
-  kind: 関数
-  container: project_index/features/search/terms.py
-  usecase: 用語の一覧
-  role: サービス
-  summary: '`alias_type` を持つ行の文書から、照合する語を指す文書の ID とともに返す'
-  scope: public
-  thread_safe: true
-  args:
-  - name: request
-    title: 用語の一覧の要求
-    type: MatchWordsRequest
-    required: true
-    passing: positional
-    description: ツールの引数
-  - name: registry
-    title: 配信元の一覧
-    type: SourceRegistry
-    required: true
-    passing: injected
-    description: 配信中の配信元
-  - name: store
-    title: 文書のストア
-    type: DocumentStore
-    required: true
-    passing: injected
-    description: 文書を読む
-  returns:
-    type: MatchWordsResult
-    description: 照合する語の並び
-  process: |-
-    1. 読む場所を解く（読む場所の解決。`source`・`worktree`・`cwd`）
-    2. 文書を集める（文書のストア.文書を集める）
-    3. エイリアスの集め（文書のストア）をし、`entries` で照合する語の一覧を作って返す（`alias_type` を持つ行が無い配信元は空）
-  exceptions:
-  - name: SourceNotReadableError
-    condition: 読む場所の解決が送る
-    message: '`{id} はこの作業場所（{cwd}）から参照できません`'
-  - name: SourceNotServedError
-    condition: 読む場所の解決が送る
-    message: '`{id} は配信していません`'
-  unit_tests:
-  - name: test_list_match_words
-    case: 正常
-    summary: 用語の語と違反した文書の除外
-    condition: '「作業範囲」（`aliases: [scope, 担当範囲]`）と「壊れた用語」（`aliases: 3`）を持つ sample'
-    mock: なし（一時フォルダの配信元）
-    expected: '`words` が `作業範囲`・`scope`・`担当範囲` の 3 件で、壊れた用語の語が無い'
-    exception: '-'
-  - name: test_list_match_words_when_no_alias_rows
-    case: 正常
-    summary: 用語の種類が無い
-    condition: '`alias_type` を持つ行が無い配信元'
-    mock: なし（一時フォルダの配信元）
-    expected: '`words` が空'
-    exception: '-'
-- name: render_match_words_markdown
-  title: 用語の一覧の文
-  kind: 関数
-  container: project_index/features/search/terms.py
-  usecase: 用語の一覧
-  role: 表示
-  summary: 用語の一覧の結果を `| 単語 | 文書 | 種類 |` の表にする
-  scope: public
-  thread_safe: true
-  args:
-  - name: result
-    title: 用語の一覧の結果
-    type: MatchWordsResult
-    required: true
-    passing: positional
-    description: 用語の一覧の戻り値
-  returns:
-    type: str
-    description: Markdown。語が無ければ `用語はありません`
-  process: |-
-    1. 語が無ければ `用語はありません` を返す
-    2. `| 単語 | 文書 | 種類 |` の表に語ごとの行を並べて返す
-  unit_tests:
-  - name: test_render_match_words_markdown
-    case: 正常
-    summary: 表と空
-    condition: 語 3 件と、空の結果
-    mock: なし
-    expected: インターフェース定義の返り値例と同じ表と、`用語はありません`
+  - name: list_match_words
+    title: 用語の一覧
+    kind: 関数
+    container: project_index/features/search/terms.py
+    usecase: 用語の一覧
+    role: サービス
+    summary: '`alias_type` を持つ行の文書から、照合する語を指す文書の ID とともに返す'
+    scope: public
+    thread_safe: true
+    args:
+      - name: request
+        title: 用語の一覧の要求
+        type: MatchWordsRequest
+        required: true
+        passing: positional
+        description: ツールの引数
+      - name: registry
+        title: 配信元の一覧
+        type: SourceRegistry
+        required: true
+        passing: injected
+        description: 配信中の配信元
+      - name: store
+        title: 文書のストア
+        type: DocumentStore
+        required: true
+        passing: injected
+        description: 文書を読む
+    returns:
+      type: MatchWordsResult
+      description: 照合する語の並び
+    process: |-
+      1. 読む場所を解く（読む場所の解決。`source`・`worktree`・`cwd`）
+      2. 文書を集める（文書のストア.文書を集める）
+      3. エイリアスの集め（文書のストア）をし、`entries` で照合する語の一覧を作って返す（`alias_type` を持つ行が無い配信元は空）
+    exceptions:
+      - name: SourceNotReadableError
+        condition: 読む場所の解決が送る
+        message: '`{id} はこの作業場所（{cwd}）から参照できません`'
+      - name: SourceNotServedError
+        condition: 読む場所の解決が送る
+        message: '`{id} は配信していません`'
+    unit_tests:
+      - name: test_list_match_words
+        case: 正常
+        summary: 用語の語と違反した文書の除外
+        condition: '「作業範囲」（`aliases: [scope, 担当範囲]`）と「壊れた用語」（`aliases: 3`）を持つ sample'
+        mock: なし（一時フォルダの配信元）
+        expected: '`words` が `作業範囲`・`scope`・`担当範囲` の 3 件で、壊れた用語の語が無い'
+        exception: '-'
+      - name: test_list_match_words_when_no_alias_rows
+        case: 正常
+        summary: 用語の種類が無い
+        condition: '`alias_type` を持つ行が無い配信元'
+        mock: なし（一時フォルダの配信元）
+        expected: '`words` が空'
+        exception: '-'
+  - name: render_match_words_markdown
+    title: 用語の一覧の文
+    kind: 関数
+    container: project_index/features/search/terms.py
+    usecase: 用語の一覧
+    role: 表示
+    summary: 用語の一覧の結果を `| 単語 | 文書 | 種類 |` の表にする
+    scope: public
+    thread_safe: true
+    args:
+      - name: result
+        title: 用語の一覧の結果
+        type: MatchWordsResult
+        required: true
+        passing: positional
+        description: 用語の一覧の戻り値
+    returns:
+      type: str
+      description: Markdown。語が無ければ `用語はありません`
+    process: |-
+      1. 語が無ければ `用語はありません` を返す
+      2. `| 単語 | 文書 | 種類 |` の表に語ごとの行を並べて返す
+    unit_tests:
+      - name: test_render_match_words_markdown
+        case: 正常
+        summary: 表と空
+        condition: 語 3 件と、空の結果
+        mock: なし
+        expected: インターフェース定義の返り値例と同じ表と、`用語はありません`

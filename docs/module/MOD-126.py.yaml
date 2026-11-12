@@ -2,103 +2,103 @@ id: MOD-126
 title: 索引のサーバー / 読み取り API / route.py
 lead: 読み取り API のルーター（`/sources` の下）。
 test_files:
-- tests/unit/project_index/features/read/test_route.py
+  - tests/unit/project_index/features/read/test_route.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      読み取り API の入口 ..> 読み取りの場所
-      読み取り API の入口 ..> 配信元の設定の取得
-      読み取り API の入口 ..> 文書の一覧
-      読み取り API の入口 ..> 文書の取得
-      読み取り API の入口 ..> 検討事項の ID の一覧
-      読み取り API の入口 ..> 検討事項の文書の取得
-      読み取り API の入口 ..> 語での検索
-      読み取り API の入口 ..> リビジョンの一覧
-      class 読み取り API の入口 {
-        <<function>>
-      }
-      class 読み取りの場所 {
-        <<function>>
-      }
-      class 配信元の設定の取得 {
-        <<function>>
-      }
-      class 文書の一覧 {
-        <<function>>
-      }
-      class 文書の取得 {
-        <<function>>
-      }
-      class 検討事項の ID の一覧 {
-        <<function>>
-      }
-      class 検討事項の文書の取得 {
-        <<function>>
-      }
-      class 語での検索 {
-        <<function>>
-      }
-      class リビジョンの一覧 {
-        <<function>>
-      }
-      click 読み取りの場所 href "./MOD-77.py.yaml#読み取りの場所"
-      click 配信元の設定の取得 href "./MOD-125.py.yaml#配信元の設定の取得"
-      click 文書の一覧 href "./MOD-125.py.yaml#文書の一覧"
-      click 文書の取得 href "./MOD-125.py.yaml#文書の取得"
-      click 検討事項の ID の一覧 href "./MOD-125.py.yaml#検討事項の ID の一覧"
-      click 検討事項の文書の取得 href "./MOD-125.py.yaml#検討事項の文書の取得"
-      click 語での検索 href "./MOD-78.py.yaml#語での検索"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        読み取り API の入口 ..> 読み取りの場所
+        読み取り API の入口 ..> 配信元の設定の取得
+        読み取り API の入口 ..> 文書の一覧
+        読み取り API の入口 ..> 文書の取得
+        読み取り API の入口 ..> 検討事項の ID の一覧
+        読み取り API の入口 ..> 検討事項の文書の取得
+        読み取り API の入口 ..> 語での検索
+        読み取り API の入口 ..> リビジョンの一覧
+        class 読み取り API の入口 {
+          <<function>>
+        }
+        class 読み取りの場所 {
+          <<function>>
+        }
+        class 配信元の設定の取得 {
+          <<function>>
+        }
+        class 文書の一覧 {
+          <<function>>
+        }
+        class 文書の取得 {
+          <<function>>
+        }
+        class 検討事項の ID の一覧 {
+          <<function>>
+        }
+        class 検討事項の文書の取得 {
+          <<function>>
+        }
+        class 語での検索 {
+          <<function>>
+        }
+        class リビジョンの一覧 {
+          <<function>>
+        }
+        click 読み取りの場所 href "./MOD-77.py.yaml#読み取りの場所"
+        click 配信元の設定の取得 href "./MOD-125.py.yaml#配信元の設定の取得"
+        click 文書の一覧 href "./MOD-125.py.yaml#文書の一覧"
+        click 文書の取得 href "./MOD-125.py.yaml#文書の取得"
+        click 検討事項の ID の一覧 href "./MOD-125.py.yaml#検討事項の ID の一覧"
+        click 検討事項の文書の取得 href "./MOD-125.py.yaml#検討事項の文書の取得"
+        click 語での検索 href "./MOD-78.py.yaml#語での検索"
 functions:
-- name: build_read_router
-  title: 読み取り API の入口
-  kind: 関数
-  container: project_index/features/read/route.py
-  usecase: 共通
-  role: 入口
-  summary: 配信元の一覧と状態・配信元の設定・文書の一覧と取得・検討事項・語での検索・リビジョンの一覧のルートを持つ `APIRouter` を作る
-  scope: public
-  args:
-  - name: handlers
-    title: 配線済みの関数
-    type: Handlers
-    required: true
-    passing: positional
-    description: 起動の『配線済みの関数』。配信元の一覧・文書のストア・変換を引く
-  returns:
-    type: fastapi.APIRouter
-    description: 8 つのルートを持つルーター
-  process: |-
-    1. 配信元を指すルートは、先頭で要求が指す配信元の行の読み込みを待つ（起動.配信元の読み込みの単位）
-    2. GET `/sources` は、配信元の一覧の状態を `id`・`status`・`errors` で返す
-    3. GET `/sources/{source}/config` は、読み取りの場所（`read_target`、`ref` なし）の配信元で配信元の設定の取得を呼ぶ
-    4. GET `/sources/{source}/docs` は、読み取りの場所（`ref` はクエリ）で文書の一覧を呼ぶ
-    5. GET `/sources/{source}/docs/{path:path}` は、読み取りの場所で文書の取得を `asyncio.to_thread` で呼ぶ
-    6. GET `/sources/{source}/decisions` と `/sources/{source}/decisions/{id}` は、検討事項の ID の一覧と検討事項の文書の取得を呼ぶ
-    7. GET `/sources/{source}/search` は、語での検索を呼ぶ（クエリ `q`・`ref`・`limit`）
-    8. GET `/sources/{source}/refs` は、配信元のリビジョンの一覧（`commits` はクエリ）を返す
-    9. `UnknownSourceError`・`SourceNotServedError`・`RefNotFoundError`・`DocumentNotFoundError`・`DecisionNotFoundError` は例外の変換で 404 の problem+json（`missing` と値）になる
-    10. ルーターは `APIRouter(tags=["read"])` にする。各ルートの `name` は、`list_sources`・`get_source_config`・`list_documents`・`get_document`・`list_decisions`・`get_decision`・`search_words`・`list_refs`
-  unit_tests:
-  - name: test_build_read_router
-    case: 正常
-    summary: 8 つのルートが応える
-    condition: 配信元 sample を持つ配線済みの関数で、8 つのルートを GET
-    mock: 配線済みの関数（一時フォルダの配信元）
-    expected: どれも 200 で、各インターフェース定義の応答のキーを camelCase で持つ
-  - name: test_build_read_router_when_not_found
-    case: 異常
-    summary: 無い配信元・リビジョン・文書を 404 にする
-    condition: '`/sources/unknown/docs`・`/sources/sample/docs?ref=no-such`・`/sources/sample/docs/no/such.yaml`'
-    mock: 配線済みの関数（一時フォルダの配信元）
-    expected: どれも 404 の problem+json で、`missing` が `source`・`ref`・`doc`
+  - name: build_read_router
+    title: 読み取り API の入口
+    kind: 関数
+    container: project_index/features/read/route.py
+    usecase: 共通
+    role: 入口
+    summary: 配信元の一覧と状態・配信元の設定・文書の一覧と取得・検討事項・語での検索・リビジョンの一覧のルートを持つ `APIRouter` を作る
+    scope: public
+    args:
+      - name: handlers
+        title: 配線済みの関数
+        type: Handlers
+        required: true
+        passing: positional
+        description: 起動の『配線済みの関数』。配信元の一覧・文書のストア・変換を引く
+    returns:
+      type: fastapi.APIRouter
+      description: 8 つのルートを持つルーター
+    process: |-
+      1. 配信元を指すルートは、先頭で要求が指す配信元の行の読み込みを待つ（起動.配信元の読み込みの単位）
+      2. GET `/sources` は、配信元の一覧の状態を `id`・`status`・`errors` で返す
+      3. GET `/sources/{source}/config` は、読み取りの場所（`read_target`、`ref` なし）の配信元で配信元の設定の取得を呼ぶ
+      4. GET `/sources/{source}/docs` は、読み取りの場所（`ref` はクエリ）で文書の一覧を呼ぶ
+      5. GET `/sources/{source}/docs/{path:path}` は、読み取りの場所で文書の取得を `asyncio.to_thread` で呼ぶ
+      6. GET `/sources/{source}/decisions` と `/sources/{source}/decisions/{id}` は、検討事項の ID の一覧と検討事項の文書の取得を呼ぶ
+      7. GET `/sources/{source}/search` は、語での検索を呼ぶ（クエリ `q`・`ref`・`limit`）
+      8. GET `/sources/{source}/refs` は、配信元のリビジョンの一覧（`commits` はクエリ）を返す
+      9. `UnknownSourceError`・`SourceNotServedError`・`RefNotFoundError`・`DocumentNotFoundError`・`DecisionNotFoundError` は例外の変換で 404 の problem+json（`missing` と値）になる
+      10. ルーターは `APIRouter(tags=["read"])` にする。各ルートの `name` は、`list_sources`・`get_source_config`・`list_documents`・`get_document`・`list_decisions`・`get_decision`・`search_words`・`list_refs`
+    unit_tests:
+      - name: test_build_read_router
+        case: 正常
+        summary: 8 つのルートが応える
+        condition: 配信元 sample を持つ配線済みの関数で、8 つのルートを GET
+        mock: 配線済みの関数（一時フォルダの配信元）
+        expected: どれも 200 で、各インターフェース定義の応答のキーを camelCase で持つ
+      - name: test_build_read_router_when_not_found
+        case: 異常
+        summary: 無い配信元・リビジョン・文書を 404 にする
+        condition: '`/sources/unknown/docs`・`/sources/sample/docs?ref=no-such`・`/sources/sample/docs/no/such.yaml`'
+        mock: 配線済みの関数（一時フォルダの配信元）
+        expected: どれも 404 の problem+json で、`missing` が `source`・`ref`・`doc`
 refs:
-- IF-22#
-- IF-23#
-- IF-24#
-- IF-25#
-- IF-26#
-- IF-27#
-- IF-28#
-- IF-29#
+  - IF-22#
+  - IF-23#
+  - IF-24#
+  - IF-25#
+  - IF-26#
+  - IF-27#
+  - IF-28#
+  - IF-29#

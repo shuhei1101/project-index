@@ -9,57 +9,57 @@ directory: |-
   └─ service.py    # access_of / available_sources / describe_workplace / resolve_read_targets / resolve_write_target
   ```
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      読む場所の解決 ..> 作業中の配信元
-      読む場所の解決 ..> 権限の判定
-      読む場所の解決 ..> ワークツリーの解決
-      書く場所の解決 ..> 作業中の配信元
-      書く場所の解決 ..> 権限の判定
-      書く場所の解決 ..> ワークツリーの解決
-      使える配信元 ..> 権限の判定
-      作業場所の説明 ..> 作業中の配信元
-      権限の判定 ..> ワークツリーの解決
-      権限の判定 ..> globの照合
-      読む場所の解決 ..> 読み書きの場所 : 返す
-      書く場所の解決 ..> 読み書きの場所 : 返す
-      class 読む場所の解決 {
-        <<function>>
-      }
-      class 書く場所の解決 {
-        <<function>>
-      }
-      class 使える配信元 {
-        <<function>>
-      }
-      class 作業場所の説明 {
-        <<function>>
-      }
-      class 作業中の配信元 {
-        <<function>>
-      }
-      class 権限の判定 {
-        <<function>>
-      }
-      class ワークツリーの解決 {
-        <<function>>
-      }
-      class globの照合 {
-        <<function>>
-      }
-      class 読み書きの場所 {
-        +配信元: ServedSource
-        +直下: Path
-        +リビジョン: str
-      }
-      click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
-      click 作業中の配信元 href "./MOD-7.py.yaml#作業中の配信元"
-      click 権限の判定 href "./MOD-7.py.yaml#権限の判定"
-      click ワークツリーの解決 href "./MOD-7.py.yaml#ワークツリーの解決"
-      click 書く場所の解決 href "./MOD-7.py.yaml#書く場所の解決"
-      click 使える配信元 href "./MOD-7.py.yaml#使える配信元"
-      click 作業場所の説明 href "./MOD-7.py.yaml#作業場所の説明"
-      click globの照合 href "./MOD-101.py.yaml#globの照合"
-      click 読み書きの場所 href "./MOD-8.py.yaml#読み書きの場所"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        読む場所の解決 ..> 作業中の配信元
+        読む場所の解決 ..> 権限の判定
+        読む場所の解決 ..> ワークツリーの解決
+        書く場所の解決 ..> 作業中の配信元
+        書く場所の解決 ..> 権限の判定
+        書く場所の解決 ..> ワークツリーの解決
+        使える配信元 ..> 権限の判定
+        作業場所の説明 ..> 作業中の配信元
+        権限の判定 ..> ワークツリーの解決
+        権限の判定 ..> globの照合
+        読む場所の解決 ..> 読み書きの場所 : 返す
+        書く場所の解決 ..> 読み書きの場所 : 返す
+        class 読む場所の解決 {
+          <<function>>
+        }
+        class 書く場所の解決 {
+          <<function>>
+        }
+        class 使える配信元 {
+          <<function>>
+        }
+        class 作業場所の説明 {
+          <<function>>
+        }
+        class 作業中の配信元 {
+          <<function>>
+        }
+        class 権限の判定 {
+          <<function>>
+        }
+        class ワークツリーの解決 {
+          <<function>>
+        }
+        class globの照合 {
+          <<function>>
+        }
+        class 読み書きの場所 {
+          +配信元: ServedSource
+          +直下: Path
+          +リビジョン: str
+        }
+        click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
+        click 作業中の配信元 href "./MOD-7.py.yaml#作業中の配信元"
+        click 権限の判定 href "./MOD-7.py.yaml#権限の判定"
+        click ワークツリーの解決 href "./MOD-7.py.yaml#ワークツリーの解決"
+        click 書く場所の解決 href "./MOD-7.py.yaml#書く場所の解決"
+        click 使える配信元 href "./MOD-7.py.yaml#使える配信元"
+        click 作業場所の説明 href "./MOD-7.py.yaml#作業場所の説明"
+        click globの照合 href "./MOD-101.py.yaml#globの照合"
+        click 読み書きの場所 href "./MOD-8.py.yaml#読み書きの場所"

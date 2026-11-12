@@ -1,592 +1,592 @@
 id: SC-5
 title: "配信元を追加する"
 scenarios:
-- name: 正常シナリオ
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
-  - name: project-index
-    description: '端末の設定（`sources: []`）で待ち受けている project-index'
-  - name: サンプルの配信元
-    description: 文書の種類を 1 つ（スキーマと YAML 2 件）と `project-index.yaml` を持つ git リポジトリ
-    notes: 引数に渡すパス。id `sample`
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant SK as setup のスキル
-      participant AD as 管理の MCP
-      participant CF as 端末の設定
+  - name: 正常シナリオ
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
+      - name: project-index
+        description: '端末の設定（`sources: []`）で待ち受けている project-index'
+      - name: サンプルの配信元
+        description: 文書の種類を 1 つ（スキーマと YAML 2 件）と `project-index.yaml` を持つ git リポジトリ
+        notes: 引数に渡すパス。id `sample`
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant AD as 管理の MCP
+        participant CF as 端末の設定
 
-      U->>SK: /project-index:setup {sample のパス}
-      SK->>AD: check_project（sample のパス）
-      AD-->>SK: 設定のバージョンの新旧（同じ）・違反 0 件・索引の同期の件数
-      SK->>U: scope.write・scope.read を既定の値つきで聞く
-      U-->>SK: 既定の値（scope.write は sample のパス、scope.read は {path}/**）
-      SK-->>U: 書き込む行を表で示して確かめる
-      U-->>SK: 了承
-      SK->>CF: sources に sample の行を書く
-      SK->>AD: reload
-      SK-->>U: 追加した配信元と check_project の結果を出す
-    ```
-  expected:
-  - 端末の設定の `sources` に sample の行があり、`scope.write` が sample のパス、`scope.read` が `{sample のパス}/**` になっている
-  - '`check_project` が違反と索引の同期の件数を 0 で返す'
-  - sample のフォルダで呼んだ `describe` が `sample`（読み書き）を返す
-  - '`reload` の前後で `/mcp` のセッションが切れず、ツールは 7 つのまま'
-  - スキルの応答に、書き込んだ行の表と `check_project` の結果がある
-  test: test_normal
-- name: 正常シナリオ（YAML でない範囲を加える）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-    notes: '-'
-  - name: project-index
-    description: 正常シナリオと同じ
-    notes: '-'
-  - name: Markdown を持つ配信元
-    description: '`docs/` に Markdown 2 件と、ベンダーのコードの Markdown `docs/vendor/lib.md` を持ち、ワークツリーの Markdown `.claude/worktrees/wt/docs/a.md` を置き、`project-index.yaml` も管理用の YAML も無い git リポジトリ'
-    notes: 範囲の質問に既定の `**/*.md` を答える
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant SK as setup のスキル
-      participant CL as project-index の CLI
-      participant FS as 配信元のフォルダ
-      participant AD as 管理の MCP
-      participant CF as 端末の設定
+        U->>SK: /project-index:setup {sample のパス}
+        SK->>AD: check_project（sample のパス）
+        AD-->>SK: 設定のバージョンの新旧（同じ）・違反 0 件・索引の同期の件数
+        SK->>U: scope.write・scope.read を既定の値つきで聞く
+        U-->>SK: 既定の値（scope.write は sample のパス、scope.read は {path}/**）
+        SK-->>U: 書き込む行を表で示して確かめる
+        U-->>SK: 了承
+        SK->>CF: sources に sample の行を書く
+        SK->>AD: reload
+        SK-->>U: 追加した配信元と check_project の結果を出す
+      ```
+    expected:
+      - 端末の設定の `sources` に sample の行があり、`scope.write` が sample のパス、`scope.read` が `{sample のパス}/**` になっている
+      - '`check_project` が違反と索引の同期の件数を 0 で返す'
+      - sample のフォルダで呼んだ `describe` が `sample`（読み書き）を返す
+      - '`reload` の前後で `/mcp` のセッションが切れず、ツールは 7 つのまま'
+      - スキルの応答に、書き込んだ行の表と `check_project` の結果がある
+    test: test_normal
+  - name: 正常シナリオ（YAML でない範囲を加える）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: project-index
+        description: 正常シナリオと同じ
+        notes: '-'
+      - name: Markdown を持つ配信元
+        description: '`docs/` に Markdown 2 件と、ベンダーのコードの Markdown `docs/vendor/lib.md` を持ち、ワークツリーの Markdown `.claude/worktrees/wt/docs/a.md` を置き、`project-index.yaml` も管理用の YAML も無い git リポジトリ'
+        notes: 範囲の質問に既定の `**/*.md` を答える
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant CL as project-index の CLI
+        participant FS as 配信元のフォルダ
+        participant AD as 管理の MCP
+        participant CF as 端末の設定
 
-      U->>SK: /project-index:setup {配信元のパス}
-      SK->>FS: project-index.yaml が無いことを確かめる（バージョンの比較を飛ばす）
-      SK->>U: scope・範囲・仮のメタデータを聞く
-      U-->>SK: 既定の値
-      SK->>CL: project-index files --root {配信元のパス} --paths **/*.md
-      CL-->>SK: 載せるファイル（docs/vendor/ と .claude/worktrees/ の下を含まない）
-      SK-->>U: project-index.yaml・管理用の YAML・sources の行を表で示して確かめる
-      U-->>SK: 了承
-      SK->>FS: 雛形から project-index.yaml を作る（1 行目にクローンのバージョンのタグのスキーマの行。管理用の YAML を読む documents の行。records: files）
-      SK->>FS: templates/files.schema.yaml に沿って管理用の YAML を書く
-      SK->>AD: check_project（配信元のパス）
-      AD-->>SK: 違反 0 件・索引の同期の件数 0
-      SK->>CF: sources に行を書く
-      SK->>AD: reload
-      SK-->>U: 追加した配信元と結果を出す
-    ```
-  expected:
-  - 配信元に `project-index.yaml` と管理用の YAML ができ、管理用の YAML に Markdown 2 件の行が仮のメタデータつきで並ぶ
-  - '`project-index.yaml` の 1 行目が `# yaml-language-server: $schema=https://raw.githubusercontent.com/shuhei1101/project-index/v{クローンのバージョン}/schemas/project-index.schema.json` で、`documents[]` の行が `type` を持たない'
-  - 管理用の YAML の行が `templates/files.schema.yaml` の検証に通る
-  - '`reload` の後、`search_docs` が Markdown 2 件を返す'
-  - "`reload` の後の `search_docs` の `notes` に、スキーマの違反（`'files' is a required property` など）が付かない"
-  - 範囲から `.git`・`node_modules`・`.claude/worktrees` の下のファイルは除かれる
-  - 管理用の YAML に `docs/vendor/lib.md` の行は無い（初回の setup でも除外の条件が当たる）
-  test: test_normal_when_non_yaml_range
-- name: 正常シナリオ（2 回目以降）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: 登録済みの配信元
-    description: YAML でない範囲の正常シナリオを済ませた配信元
-    notes: その後に Markdown を 1 件追加・1 件削除し、1 件を `git mv` で改名して commit する。その commit でワークツリーを作る（クローン本体には `write_docs` で書き込めない）
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant SK as setup のスキル
-      participant DM as 文書の MCP
-      participant AD as 管理の MCP
+        U->>SK: /project-index:setup {配信元のパス}
+        SK->>FS: project-index.yaml が無いことを確かめる（バージョンの比較を飛ばす）
+        SK->>U: scope・範囲・仮のメタデータを聞く
+        U-->>SK: 既定の値
+        SK->>CL: project-index files --root {配信元のパス} --paths **/*.md
+        CL-->>SK: 載せるファイル（docs/vendor/ と .claude/worktrees/ の下を含まない）
+        SK-->>U: project-index.yaml・管理用の YAML・sources の行を表で示して確かめる
+        U-->>SK: 了承
+        SK->>FS: 雛形から project-index.yaml を作る（1 行目にクローンのバージョンのタグのスキーマの行。管理用の YAML を読む documents の行。records: files）
+        SK->>FS: templates/files.schema.yaml に沿って管理用の YAML を書く
+        SK->>AD: check_project（配信元のパス）
+        AD-->>SK: 違反 0 件・索引の同期の件数 0
+        SK->>CF: sources に行を書く
+        SK->>AD: reload
+        SK-->>U: 追加した配信元と結果を出す
+      ```
+    expected:
+      - 配信元に `project-index.yaml` と管理用の YAML ができ、管理用の YAML に Markdown 2 件の行が仮のメタデータつきで並ぶ
+      - '`project-index.yaml` の 1 行目が `# yaml-language-server: $schema=https://raw.githubusercontent.com/shuhei1101/project-index/v{クローンのバージョン}/schemas/project-index.schema.json` で、`documents[]` の行が `type` を持たない'
+      - 管理用の YAML の行が `templates/files.schema.yaml` の検証に通る
+      - '`reload` の後、`search_docs` が Markdown 2 件を返す'
+      - "`reload` の後の `search_docs` の `notes` に、スキーマの違反（`'files' is a required property` など）が付かない"
+      - 範囲から `.git`・`node_modules`・`.claude/worktrees` の下のファイルは除かれる
+      - 管理用の YAML に `docs/vendor/lib.md` の行は無い（初回の setup でも除外の条件が当たる）
+    test: test_normal_when_non_yaml_range
+  - name: 正常シナリオ（2 回目以降）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 登録済みの配信元
+        description: YAML でない範囲の正常シナリオを済ませた配信元
+        notes: その後に Markdown を 1 件追加・1 件削除し、1 件を `git mv` で改名して commit する。その commit でワークツリーを作る（クローン本体には `write_docs` で書き込めない）
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant DM as 文書の MCP
+        participant AD as 管理の MCP
 
-      U->>SK: 配信元のワークツリーで /project-index:setup
-      SK->>SK: 既にある sources の行と管理用の YAML を読む
-      SK->>SK: 範囲のファイルと管理用の YAML の行を突き合わせる（Git はリネームを検出する）
-      SK-->>U: 追加・削除・改名の行を表で示して確かめる
-      U-->>SK: 了承
-      SK->>DM: write_docs（管理用の YAML の行を直す）
-      SK->>AD: check_project
-      SK->>AD: reload
-      SK-->>U: 直した行と結果を出す
-    ```
-  expected:
-  - 管理用の YAML に追加したファイルの行が増え、削除したファイルの行が消える
-  - 改名したファイルの行は、パスだけが新しくなり、メタデータは元の値を保つ
-  - scope・範囲の質問はしない
-  - '`check_project` が索引の同期の件数を 0 で返す'
-  test: test_normal_when_rerun
-- name: 正常シナリオ（Git 管理外の配信元の 2 回目以降）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: 登録済みの Git 管理外の配信元
-    description: Markdown を持つ Git 管理外のフォルダを登録した後、1 件を中身を変えずに改名する
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant SK as setup のスキル
-      participant DM as 文書の MCP
+        U->>SK: 配信元のワークツリーで /project-index:setup
+        SK->>SK: 既にある sources の行と管理用の YAML を読む
+        SK->>SK: 範囲のファイルと管理用の YAML の行を突き合わせる（Git はリネームを検出する）
+        SK-->>U: 追加・削除・改名の行を表で示して確かめる
+        U-->>SK: 了承
+        SK->>DM: write_docs（管理用の YAML の行を直す）
+        SK->>AD: check_project
+        SK->>AD: reload
+        SK-->>U: 直した行と結果を出す
+      ```
+    expected:
+      - 管理用の YAML に追加したファイルの行が増え、削除したファイルの行が消える
+      - 改名したファイルの行は、パスだけが新しくなり、メタデータは元の値を保つ
+      - scope・範囲の質問はしない
+      - '`check_project` が索引の同期の件数を 0 で返す'
+    test: test_normal_when_rerun
+  - name: 正常シナリオ（Git 管理外の配信元の 2 回目以降）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 登録済みの Git 管理外の配信元
+        description: Markdown を持つ Git 管理外のフォルダを登録した後、1 件を中身を変えずに改名する
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant DM as 文書の MCP
 
-      U->>SK: /project-index:setup {配信元のパス}
-      SK->>SK: 消えた行のファイルと新しいファイルを内容のハッシュで突き合わせる
-      SK-->>U: 改名の行を表で示して確かめる
-      U-->>SK: 了承
-      SK->>DM: write_docs（行のパスを直す）
-      SK-->>U: 直した行を出す
-    ```
-  expected:
-  - 改名したファイルの行は、パスだけが新しくなり、メタデータは元の値を保つ
-  test: test_normal_when_rerun_outside_git
-- name: 異常シナリオ（配信元の設定が検証に通らない）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: 壊れた配信元
-    description: '`project-index.yaml` がスキーマに違反するフォルダ'
-    notes: '`documents[]` の必須のキー `paths` が無い'
-  - name: 端末の設定
-    description: '`sources` に sample の 1 行'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant SK as setup のスキル
-      participant AD as 管理の MCP
+        U->>SK: /project-index:setup {配信元のパス}
+        SK->>SK: 消えた行のファイルと新しいファイルを内容のハッシュで突き合わせる
+        SK-->>U: 改名の行を表で示して確かめる
+        U-->>SK: 了承
+        SK->>DM: write_docs（行のパスを直す）
+        SK-->>U: 直した行を出す
+      ```
+    expected:
+      - 改名したファイルの行は、パスだけが新しくなり、メタデータは元の値を保つ
+    test: test_normal_when_rerun_outside_git
+  - name: 異常シナリオ（配信元の設定が検証に通らない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 壊れた配信元
+        description: '`project-index.yaml` がスキーマに違反するフォルダ'
+        notes: '`documents[]` の必須のキー `paths` が無い'
+      - name: 端末の設定
+        description: '`sources` に sample の 1 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant AD as 管理の MCP
 
-      U->>SK: /project-index:setup {壊れた配信元のパス}
-      SK->>U: scope・範囲を聞き、表で確かめる
-      U-->>SK: 了承
-      SK->>AD: check_project
-      AD-->>SK: 違反（キーのパスと理由）
-      SK-->>U: 違反を示して止まる
-    ```
-  expected:
-  - 端末の設定は変わらず、sample の配信は続く
-  - スキルの応答に `documents[0].paths` と理由が出る
-  test: test_error_when_source_config_invalid
-- name: 正常シナリオ（スキーマの行のタグが古い）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-    notes: '-'
-  - name: 登録済みの配信元
-    description: '`project-index.yaml` の 1 行目のスキーマの行のタグが、クローンのバージョンより古い配信元'
-    notes: タグは `v0.0.1`
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant SK as setup のスキル
-      participant FS as 配信元のフォルダ
-      participant AD as 管理の MCP
+        U->>SK: /project-index:setup {壊れた配信元のパス}
+        SK->>U: scope・範囲を聞き、表で確かめる
+        U-->>SK: 了承
+        SK->>AD: check_project
+        AD-->>SK: 違反（キーのパスと理由）
+        SK-->>U: 違反を示して止まる
+      ```
+    expected:
+      - 端末の設定は変わらず、sample の配信は続く
+      - スキルの応答に `documents[0].paths` と理由が出る
+    test: test_error_when_source_config_invalid
+  - name: 正常シナリオ（スキーマの行のタグが古い）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: 登録済みの配信元
+        description: '`project-index.yaml` の 1 行目のスキーマの行のタグが、クローンのバージョンより古い配信元'
+        notes: タグは `v0.0.1`
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant FS as 配信元のフォルダ
+        participant AD as 管理の MCP
 
-      U->>SK: /project-index:setup {配信元のパス}
-      SK->>FS: project-index.yaml の 1 行目のスキーマの行を読む
-      SK->>SK: タグをクローンのバージョンと比べる
-      SK-->>U: スキーマの行の書き換えを候補の表で示して確かめる
-      U-->>SK: 了承
-      SK->>FS: 1 行目をクローンのバージョンのタグのスキーマの行にする
-      SK->>AD: check_project
-      SK-->>U: 書き換えた行と結果を出す
-    ```
-  expected:
-  - '`project-index.yaml` の 1 行目のタグが `v{クローンのバージョン}` になり、2 行目以降は変わらない'
-  - '`check_project` が違反を 0 件で返す'
-  test: test_normal_when_schema_line_outdated
-- name: 正常シナリオ（スキーマの行が無い）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-    notes: '-'
-  - name: 登録済みの配信元
-    description: '`project-index.yaml` の 1 行目にスキーマの行が無い配信元'
-    notes: '-'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant SK as setup のスキル
-      participant FS as 配信元のフォルダ
-      participant AD as 管理の MCP
+        U->>SK: /project-index:setup {配信元のパス}
+        SK->>FS: project-index.yaml の 1 行目のスキーマの行を読む
+        SK->>SK: タグをクローンのバージョンと比べる
+        SK-->>U: スキーマの行の書き換えを候補の表で示して確かめる
+        U-->>SK: 了承
+        SK->>FS: 1 行目をクローンのバージョンのタグのスキーマの行にする
+        SK->>AD: check_project
+        SK-->>U: 書き換えた行と結果を出す
+      ```
+    expected:
+      - '`project-index.yaml` の 1 行目のタグが `v{クローンのバージョン}` になり、2 行目以降は変わらない'
+      - '`check_project` が違反を 0 件で返す'
+    test: test_normal_when_schema_line_outdated
+  - name: 正常シナリオ（スキーマの行が無い）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: 登録済みの配信元
+        description: '`project-index.yaml` の 1 行目にスキーマの行が無い配信元'
+        notes: '-'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant FS as 配信元のフォルダ
+        participant AD as 管理の MCP
 
-      U->>SK: /project-index:setup {配信元のパス}
-      SK->>FS: project-index.yaml の 1 行目を読み、スキーマの行が無いことを確かめる
-      SK-->>U: スキーマの行の追加を候補の表で示して確かめる
-      U-->>SK: 了承
-      SK->>FS: クローンのバージョンのタグのスキーマの行を 1 行目に入れる
-      SK->>AD: check_project
-      SK-->>U: 追加した行と結果を出す
-    ```
-  expected:
-  - '`project-index.yaml` の 1 行目が `v{クローンのバージョン}` のタグのスキーマの行になり、元の 1 行目以降はそのまま続く'
-  - '`check_project` が違反を 0 件で返す'
-  test: test_normal_when_schema_line_missing
-- name: 正常シナリオ（移せなかった設定を移す）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-    notes: '-'
-  - name: 移せない設定を持つ配信元
-    description: '`version: "1"` の `project-index.yaml` の `documents[0]` が `type: markdown`・`paths: [docs/**/*.md]`・`defaults: [{paths: [docs/**], tags: [doc]}]` を持ち、`docs/` にフロントマターで `name` を持つ Markdown 2 件を置く配信元'
-    notes: '`project-index migrate --source` が違反で止まった後の状態'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant SK as setup のスキル
-      participant AD as 管理の MCP
-      participant FS as 配信元のフォルダ
+        U->>SK: /project-index:setup {配信元のパス}
+        SK->>FS: project-index.yaml の 1 行目を読み、スキーマの行が無いことを確かめる
+        SK-->>U: スキーマの行の追加を候補の表で示して確かめる
+        U-->>SK: 了承
+        SK->>FS: クローンのバージョンのタグのスキーマの行を 1 行目に入れる
+        SK->>AD: check_project
+        SK-->>U: 追加した行と結果を出す
+      ```
+    expected:
+      - '`project-index.yaml` の 1 行目が `v{クローンのバージョン}` のタグのスキーマの行になり、元の 1 行目以降はそのまま続く'
+      - '`check_project` が違反を 0 件で返す'
+    test: test_normal_when_schema_line_missing
+  - name: 正常シナリオ（移せなかった設定を移す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: 移せない設定を持つ配信元
+        description: '`version: "1"` の `project-index.yaml` の `documents[0]` が `type: markdown`・`paths: [docs/**/*.md]`・`defaults: [{paths: [docs/**], tags: [doc]}]` を持ち、`docs/` にフロントマターで `name` を持つ Markdown 2 件を置く配信元'
+        notes: '`project-index migrate --source` が違反で止まった後の状態'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant AD as 管理の MCP
+        participant FS as 配信元のフォルダ
 
-      U->>SK: /project-index:setup {配信元のパス}
-      SK->>AD: check_project
-      AD-->>SK: 設定のバージョンが古いことと、documents[0] の type・defaults の違反
-      SK->>FS: 範囲の Markdown のフロントマターと defaults の値を読む
-      SK-->>U: 管理用の YAML の行と、書き換えた documents の行を候補の表で示して確かめる
-      U-->>SK: 了承
-      SK->>FS: 管理用の YAML を書き、documents[0] を管理用の YAML を読む行にし、version とスキーマの行を新しくする
-      SK->>FS: Markdown からフロントマターを消す
-      SK->>AD: check_project
-      SK->>AD: reload
-      SK-->>U: 移した行と結果を出す
-    ```
-  expected:
-  - '管理用の YAML に Markdown 2 件の行が並び、各行がフロントマターの `name` と `defaults` の `tags: [doc]` を持つ'
-  - '`documents[0]` が `type`・`defaults` を持たず、`records: files`・`body_file: path` で管理用の YAML を読む行になる'
-  - '`project-index.yaml` の `version` が新しいバージョンになり、1 行目が `v{クローンのバージョン}` のタグのスキーマの行になる'
-  - Markdown 2 件がフロントマターを持たず、本文は変わらない
-  - '`check_project` が違反を 0 件で返し、`reload` の後の `search_docs` が 2 件を元の `name` で返す'
-  test: test_normal_when_source_config_unmigratable
-- name: 正常シナリオ（除外の条件と関連の候補）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-    notes: '-'
-  - name: 設計書を配信している配信元
-    description: '`project-index.yaml` が設計書の行 `design`（YAML の文書。`design/repo.yaml` が id `design/repo` と `implementation: src/tasks/repo.py` を持つ）と、管理用の YAML を読む行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`）を持ち、端末の設定に登録済みの git リポジトリ。`src/files.yaml` は `files: []`'
-    notes: '`project-index.yaml` は `related.types[]` を書かない'
-  - name: 範囲のファイル
-    description: '`src/` に `tasks/repo.py`・`tasks/test_repo.py`・空の `tasks/__init__.py`・`uv.lock`・`logo.png` を置き commit する。その commit でワークツリーを作る'
-    notes: 実装のパスを持つ設計書の質問に、種類 `design`・キー `implementation` を答える
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant SK as setup のスキル
-      participant CL as project-index の CLI
-      participant DM as 文書の MCP
-      participant AD as 管理の MCP
+        U->>SK: /project-index:setup {配信元のパス}
+        SK->>AD: check_project
+        AD-->>SK: 設定のバージョンが古いことと、documents[0] の type・defaults の違反
+        SK->>FS: 範囲の Markdown のフロントマターと defaults の値を読む
+        SK-->>U: 管理用の YAML の行と、書き換えた documents の行を候補の表で示して確かめる
+        U-->>SK: 了承
+        SK->>FS: 管理用の YAML を書き、documents[0] を管理用の YAML を読む行にし、version とスキーマの行を新しくする
+        SK->>FS: Markdown からフロントマターを消す
+        SK->>AD: check_project
+        SK->>AD: reload
+        SK-->>U: 移した行と結果を出す
+      ```
+    expected:
+      - '管理用の YAML に Markdown 2 件の行が並び、各行がフロントマターの `name` と `defaults` の `tags: [doc]` を持つ'
+      - '`documents[0]` が `type`・`defaults` を持たず、`records: files`・`body_file: path` で管理用の YAML を読む行になる'
+      - '`project-index.yaml` の `version` が新しいバージョンになり、1 行目が `v{クローンのバージョン}` のタグのスキーマの行になる'
+      - Markdown 2 件がフロントマターを持たず、本文は変わらない
+      - '`check_project` が違反を 0 件で返し、`reload` の後の `search_docs` が 2 件を元の `name` で返す'
+    test: test_normal_when_source_config_unmigratable
+  - name: 正常シナリオ（除外の条件と関連の候補）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: 設計書を配信している配信元
+        description: '`project-index.yaml` が設計書の行 `design`（YAML の文書。`design/repo.yaml` が id `design/repo` と `implementation: src/tasks/repo.py` を持つ）と、管理用の YAML を読む行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`）を持ち、端末の設定に登録済みの git リポジトリ。`src/files.yaml` は `files: []`'
+        notes: '`project-index.yaml` は `related.types[]` を書かない'
+      - name: 範囲のファイル
+        description: '`src/` に `tasks/repo.py`・`tasks/test_repo.py`・空の `tasks/__init__.py`・`uv.lock`・`logo.png` を置き commit する。その commit でワークツリーを作る'
+        notes: 実装のパスを持つ設計書の質問に、種類 `design`・キー `implementation` を答える
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant CL as project-index の CLI
+        participant DM as 文書の MCP
+        participant AD as 管理の MCP
 
-      U->>SK: 配信元のワークツリーで /project-index:setup
-      SK->>CL: project-index files --root {配信元のパス} --paths src/**
-      CL-->>SK: 載せるファイル（除外の条件に当たるファイルは含まない）
-      SK->>SK: 載せるファイルのうち管理用の YAML に行が無いものを追加する行にする
-      SK->>U: 実装のパスを持つ設計書の種類とキーを聞く（既定は無し）
-      U-->>SK: 種類 design、キー implementation
-      SK->>DM: search_docs(filter: kind が design, format: json)
-      DM-->>SK: design/repo（implementation は src/tasks/repo.py）
-      SK->>SK: テストに tests、キーの値とパスが一致するコードに implements の候補を付ける
-      SK-->>U: 追加する行と関連の候補を表で示して確かめる
-      U-->>SK: 了承
-      SK->>DM: write_docs（管理用の YAML の行を追加する）
-      SK->>AD: check_project
-      AD-->>SK: 違反 0 件・索引の同期の件数 0
-      SK->>AD: reload
-      SK-->>U: 追加した行と結果を出す
-    ```
-  expected:
-  - 管理用の YAML に `tasks/repo.py` と `tasks/test_repo.py` の 2 行だけが並び、`tasks/__init__.py`・`uv.lock`・`logo.png` の行は無い
-  - '`tasks/repo.py` の行が `related: [{to: design/repo, type: implements}]` を持つ'
-  - '`tasks/test_repo.py` の行が `related: [{to: src/tasks/repo.py, type: tests}]` を持つ（`to` は関連先のファイルの配信元の直下からのパスで、拡張子を含む）'
-  - 確認の表に `implements`・`tests` の候補が出る
-  - '`check_project` が違反と索引の同期の件数を 0 で返す（除外した 3 件を索引に無いファイルとして数えず、付けた関連の `to` はどれも文書に当たる）'
-  - '`reload` の後、`design/repo` を起点にした `direction: in` の `trace_related` が `src/tasks/repo.py` を返す'
-  test: test_normal_when_excluded_and_related_candidates
-- name: 正常シナリオ（content/prompts/ を見つける）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
-  - name: プロンプトを持つ配信元
-    description: '登録済みの配信元。直下の `content/prompts/` に A-42 の例 2 のプロンプト（`kind: llm`）、`plugins/sample/`（`.claude-plugin/plugin.json` を持つ）の `content/prompts/` に例 1 のプロンプト（`kind: hook`）を置き、`project-index.yaml` にプロンプトの documents の行は無い'
-    notes: id `sample`
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant SK as setup のスキル
-      participant FS as 配信元のフォルダ
-      participant AD as 管理の MCP
+        U->>SK: 配信元のワークツリーで /project-index:setup
+        SK->>CL: project-index files --root {配信元のパス} --paths src/**
+        CL-->>SK: 載せるファイル（除外の条件に当たるファイルは含まない）
+        SK->>SK: 載せるファイルのうち管理用の YAML に行が無いものを追加する行にする
+        SK->>U: 実装のパスを持つ設計書の種類とキーを聞く（既定は無し）
+        U-->>SK: 種類 design、キー implementation
+        SK->>DM: search_docs(filter: kind が design, format: json)
+        DM-->>SK: design/repo（implementation は src/tasks/repo.py）
+        SK->>SK: テストに tests、キーの値とパスが一致するコードに implements の候補を付ける
+        SK-->>U: 追加する行と関連の候補を表で示して確かめる
+        U-->>SK: 了承
+        SK->>DM: write_docs（管理用の YAML の行を追加する）
+        SK->>AD: check_project
+        AD-->>SK: 違反 0 件・索引の同期の件数 0
+        SK->>AD: reload
+        SK-->>U: 追加した行と結果を出す
+      ```
+    expected:
+      - 管理用の YAML に `tasks/repo.py` と `tasks/test_repo.py` の 2 行だけが並び、`tasks/__init__.py`・`uv.lock`・`logo.png` の行は無い
+      - '`tasks/repo.py` の行が `related: [{to: design/repo, type: implements}]` を持つ'
+      - '`tasks/test_repo.py` の行が `related: [{to: src/tasks/repo.py, type: tests}]` を持つ（`to` は関連先のファイルの配信元の直下からのパスで、拡張子を含む）'
+      - 確認の表に `implements`・`tests` の候補が出る
+      - '`check_project` が違反と索引の同期の件数を 0 で返す（除外した 3 件を索引に無いファイルとして数えず、付けた関連の `to` はどれも文書に当たる）'
+      - '`reload` の後、`design/repo` を起点にした `direction: in` の `trace_related` が `src/tasks/repo.py` を返す'
+    test: test_normal_when_excluded_and_related_candidates
+  - name: 正常シナリオ（content/prompts/ を見つける）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
+      - name: プロンプトを持つ配信元
+        description: '登録済みの配信元。直下の `content/prompts/` に A-42 の例 2 のプロンプト（`kind: llm`）、`plugins/sample/`（`.claude-plugin/plugin.json` を持つ）の `content/prompts/` に例 1 のプロンプト（`kind: hook`）を置き、`project-index.yaml` にプロンプトの documents の行は無い'
+        notes: id `sample`
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant FS as 配信元のフォルダ
+        participant AD as 管理の MCP
 
-      U->>SK: /project-index:setup {sample のパス}
-      SK->>FS: 直下とプラグインのルートの content/prompts/ を探す
-      FS-->>SK: content/prompts/ と plugins/sample/content/prompts/
-      SK-->>U: 見つけたフォルダごとの documents の行（paths・schema・converter・metadata）と、プロンプトのスキーマ・converters[]・nav の行を候補の表で示して確かめる
-      U-->>SK: 了承
-      SK->>FS: プロンプトのスキーマを置き、project-index.yaml に候補の行を書く
-      SK->>AD: check_project
-      SK->>AD: reload
-      SK-->>U: 書いた行と結果を出す
-    ```
-  expected:
-  - '`project-index.yaml` の documents に、`paths` が `content/prompts/**/*.yaml` の行と `plugins/sample/content/prompts/**/*.yaml` の行があり、どちらも `schema`・`converter`・`metadata`（`name`・`description`・`tags`）を持つ'
-  - '`nav` に、プロンプトの行を `auto` で並べ `group_by: kind` で種類ごとにまとめる項目がある'
-  - '`check_project` が違反を 0 件で返す'
-  - '`reload` の後の `search_docs` が 2 件のプロンプトを YAML の `name` で返す'
-  test: test_normal_when_prompt_folder_found
-- name: 正常シナリオ（content/prompts/ の行が既にある）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: プロンプトの行を持つ配信元
-    description: '`正常シナリオ（content/prompts/ を見つける）` を終えた後の sample'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant SK as setup のスキル
-      participant FS as 配信元のフォルダ
-      participant AD as 管理の MCP
+        U->>SK: /project-index:setup {sample のパス}
+        SK->>FS: 直下とプラグインのルートの content/prompts/ を探す
+        FS-->>SK: content/prompts/ と plugins/sample/content/prompts/
+        SK-->>U: 見つけたフォルダごとの documents の行（paths・schema・converter・metadata）と、プロンプトのスキーマ・converters[]・nav の行を候補の表で示して確かめる
+        U-->>SK: 了承
+        SK->>FS: プロンプトのスキーマを置き、project-index.yaml に候補の行を書く
+        SK->>AD: check_project
+        SK->>AD: reload
+        SK-->>U: 書いた行と結果を出す
+      ```
+    expected:
+      - '`project-index.yaml` の documents に、`paths` が `content/prompts/**/*.yaml` の行と `plugins/sample/content/prompts/**/*.yaml` の行があり、どちらも `schema`・`converter`・`metadata`（`name`・`description`・`tags`）を持つ'
+      - '`nav` に、プロンプトの行を `auto` で並べ `group_by: kind` で種類ごとにまとめる項目がある'
+      - '`check_project` が違反を 0 件で返す'
+      - '`reload` の後の `search_docs` が 2 件のプロンプトを YAML の `name` で返す'
+    test: test_normal_when_prompt_folder_found
+  - name: 正常シナリオ（content/prompts/ の行が既にある）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: プロンプトの行を持つ配信元
+        description: '`正常シナリオ（content/prompts/ を見つける）` を終えた後の sample'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant FS as 配信元のフォルダ
+        participant AD as 管理の MCP
 
-      U->>SK: /project-index:setup {sample のパス}
-      SK->>FS: 直下とプラグインのルートの content/prompts/ を探す
-      SK->>FS: project-index.yaml の documents の paths と比べる
-      SK->>AD: check_project
-      SK-->>U: プロンプトの行の候補を出さずに結果を出す
-    ```
-  expected:
-  - プロンプトの documents の行の候補が出ない
-  - '`project-index.yaml` が変わらない'
-  test: test_normal_when_prompt_row_exists
-- name: 正常シナリオ（メインのリポジトリを指して追加する）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: 配信元にするリポジトリ
-    description: '`project-index.yaml` の `default_ref` が `develop` で、`.claude/worktrees/develop` に `develop` を checkout した Git のリポジトリ'
-    notes: '`worktrees` は `[./.claude/worktrees/*]`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant S as project-index のサーバー
-      participant G as 配信元のリポジトリ
+        U->>SK: /project-index:setup {sample のパス}
+        SK->>FS: 直下とプラグインのルートの content/prompts/ を探す
+        SK->>FS: project-index.yaml の documents の paths と比べる
+        SK->>AD: check_project
+        SK-->>U: プロンプトの行の候補を出さずに結果を出す
+      ```
+    expected:
+      - プロンプトの documents の行の候補が出ない
+      - '`project-index.yaml` が変わらない'
+    test: test_normal_when_prompt_row_exists
+  - name: 正常シナリオ（メインのリポジトリを指して追加する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 配信元にするリポジトリ
+        description: '`project-index.yaml` の `default_ref` が `develop` で、`.claude/worktrees/develop` に `develop` を checkout した Git のリポジトリ'
+        notes: '`worktrees` は `[./.claude/worktrees/*]`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant S as project-index のサーバー
+        participant G as 配信元のリポジトリ
 
-      U->>S: 端末の設定の sources[].config にメインのリポジトリの project-index.yaml を書き、reload する
-      S->>G: default_ref の project-index.yaml で組み立てる
-      S->>G: git rev-parse --git-common-dir の親から worktrees[] を数える
-      S-->>U: 配信の開始（ワークツリーの一覧に .claude/worktrees/develop）
-    ```
-  expected:
-  - '`describe(source)` のワークツリーの一覧に `.claude/worktrees/develop` が載る'
-  - 端末の設定が `outside_read` を書かないとき、既定の `true` として扱う
-  - 端末の設定の `outside_read` が真偽値でないと、端末の設定のスキーマの違反として断る
-  test: test_normal_when_main_repository_registered
-- name: 正常シナリオ（ワークツリーを指して追加する）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: 配信元にするリポジトリ
-    description: '`.claude/worktrees/develop`（`develop` を checkout）と `.claude/worktrees/x`（`feat/x` を checkout）の 2 つのワークツリーを持つ Git のリポジトリ'
-    notes: '`worktrees` は `[./.claude/worktrees/*]`'
-  - name: 端末の設定
-    description: '`sources[].config` が `.claude/worktrees/develop/project-index.yaml` を指す'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant S as project-index のサーバー
-      participant G as 配信元のリポジトリ
+        U->>S: 端末の設定の sources[].config にメインのリポジトリの project-index.yaml を書き、reload する
+        S->>G: default_ref の project-index.yaml で組み立てる
+        S->>G: git rev-parse --git-common-dir の親から worktrees[] を数える
+        S-->>U: 配信の開始（ワークツリーの一覧に .claude/worktrees/develop）
+      ```
+    expected:
+      - '`describe(source)` のワークツリーの一覧に `.claude/worktrees/develop` が載る'
+      - 端末の設定が `outside_read` を書かないとき、既定の `true` として扱う
+      - 端末の設定の `outside_read` が真偽値でないと、端末の設定のスキーマの違反として断る
+    test: test_normal_when_main_repository_registered
+  - name: 正常シナリオ（ワークツリーを指して追加する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 配信元にするリポジトリ
+        description: '`.claude/worktrees/develop`（`develop` を checkout）と `.claude/worktrees/x`（`feat/x` を checkout）の 2 つのワークツリーを持つ Git のリポジトリ'
+        notes: '`worktrees` は `[./.claude/worktrees/*]`'
+      - name: 端末の設定
+        description: '`sources[].config` が `.claude/worktrees/develop/project-index.yaml` を指す'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant S as project-index のサーバー
+        participant G as 配信元のリポジトリ
 
-      U->>S: reload する
-      S->>G: git rev-parse --git-common-dir の親（メインのリポジトリの直下）から worktrees[] を数える
-      S-->>U: 配信の開始
-      U->>S: describe(source)
-      S-->>U: ワークツリーの一覧（.claude/worktrees/develop・.claude/worktrees/x）
-    ```
-  expected:
-  - '`describe(source)` のワークツリーの一覧に `.claude/worktrees/x` が載る'
-  - '`describe(source)` のワークツリーの一覧に `.claude/worktrees/develop` が載る'
-  - '`worktree` に `.claude/worktrees/x` のパスを渡した `search_docs` が、そのワークツリーの文書を返す'
-  test: test_normal_when_worktree_config_registered
-- name: 正常シナリオ（.gitignore した設定を指して追加する）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: 配信元にするリポジトリ
-    description: '`develop` に文書とスキーマを commit し、`project-index.yaml` を持たない Git のリポジトリ。メインのリポジトリの直下に `.gitignore` した `project-index.local.yaml` を置く'
-    notes: '`project-index.local.yaml` の `default_ref` は `develop`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant S as project-index のサーバー
-      participant G as 配信元のリポジトリ
+        U->>S: reload する
+        S->>G: git rev-parse --git-common-dir の親（メインのリポジトリの直下）から worktrees[] を数える
+        S-->>U: 配信の開始
+        U->>S: describe(source)
+        S-->>U: ワークツリーの一覧（.claude/worktrees/develop・.claude/worktrees/x）
+      ```
+    expected:
+      - '`describe(source)` のワークツリーの一覧に `.claude/worktrees/x` が載る'
+      - '`describe(source)` のワークツリーの一覧に `.claude/worktrees/develop` が載る'
+      - '`worktree` に `.claude/worktrees/x` のパスを渡した `search_docs` が、そのワークツリーの文書を返す'
+    test: test_normal_when_worktree_config_registered
+  - name: 正常シナリオ（.gitignore した設定を指して追加する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 配信元にするリポジトリ
+        description: '`develop` に文書とスキーマを commit し、`project-index.yaml` を持たない Git のリポジトリ。メインのリポジトリの直下に `.gitignore` した `project-index.local.yaml` を置く'
+        notes: '`project-index.local.yaml` の `default_ref` は `develop`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant S as project-index のサーバー
+        participant G as 配信元のリポジトリ
 
-      U->>S: 端末の設定の sources[].config に project-index.local.yaml を書き、reload する
-      S->>G: project-index.local.yaml が develop に無く、.gitignore で無視されていると確かめる
-      S->>G: ディスクの project-index.local.yaml と、develop の文書・スキーマで組み立てる
-      S-->>U: 配信の開始
-    ```
-  expected:
-  - '`reload` の後、`describe(source)` がその配信元を返し、エラーが無い'
-  - '`search_docs` が `develop` に commit した文書を返す'
-  test: test_normal_when_ignored_config_registered
-- name: 異常シナリオ（records の行のスキーマが行に合わない）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: 食い違う配信元
-    description: '`project-index.yaml` の行 `docs`（`paths: [files.yaml]`・`records: files`・`body_file: path`）の `schema` が、管理用の YAML の行の項目を定めないスキーマを指すフォルダ'
-    notes: スキーマは最上位で `files` を必須にし、`files` の要素（`items`）を定めない。管理用の YAML は `files[]` に `a.md` の 1 行
-  - name: 端末の設定
-    description: '`sources` に sample の 1 行'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant SK as setup のスキル
-      participant AD as 管理の MCP
+        U->>S: 端末の設定の sources[].config に project-index.local.yaml を書き、reload する
+        S->>G: project-index.local.yaml が develop に無く、.gitignore で無視されていると確かめる
+        S->>G: ディスクの project-index.local.yaml と、develop の文書・スキーマで組み立てる
+        S-->>U: 配信の開始
+      ```
+    expected:
+      - '`reload` の後、`describe(source)` がその配信元を返し、エラーが無い'
+      - '`search_docs` が `develop` に commit した文書を返す'
+    test: test_normal_when_ignored_config_registered
+  - name: 異常シナリオ（records の行のスキーマが行に合わない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 食い違う配信元
+        description: '`project-index.yaml` の行 `docs`（`paths: [files.yaml]`・`records: files`・`body_file: path`）の `schema` が、管理用の YAML の行の項目を定めないスキーマを指すフォルダ'
+        notes: スキーマは最上位で `files` を必須にし、`files` の要素（`items`）を定めない。管理用の YAML は `files[]` に `a.md` の 1 行
+      - name: 端末の設定
+        description: '`sources` に sample の 1 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant AD as 管理の MCP
 
-      U->>SK: /project-index:setup {食い違う配信元のパス}
-      SK->>U: scope・範囲を聞き、表で確かめる
-      U-->>SK: 了承
-      SK->>AD: check_project
-      AD-->>SK: 違反（documents[0].schema と、records と食い違う理由）
-      SK-->>U: 違反を示して止まる
-    ```
-  expected:
-  - 端末の設定は変わらず、sample の配信は続く
-  - スキルの応答に `documents[0].schema` と、スキーマが `records` の行に合わない理由が出る
-  test: test_error_when_records_schema_mismatch
-- name: 正常シナリオ（2 回目以降で行の exclude に当たるファイルがある）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-    notes: '-'
-  - name: 管理用の YAML を 2 行持つ配信元
-    description: '`project-index.yaml` が、管理用の YAML を読む行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`・`exclude: [README.md]`）と行 `tools`（`paths: [tools/files.yaml]`・`records: files`・`body_file: path`。`exclude` なし）を持ち、端末の設定に登録済みの git リポジトリ'
-    notes: 2 つの管理用の YAML は、どちらも今あるファイルを全て行に持つ
-  - name: 追加したファイル
-    description: '`src/README.md`・`src/new.py`・`tools/README.md` を追加して commit し、その commit でワークツリーを作る'
-    notes: '`src/README.md` は行 `src` の `exclude` に当たり、`tools/README.md` はどの行の `exclude` にも当たらない'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant SK as setup のスキル
-      participant CL as project-index の CLI
-      participant DM as 文書の MCP
-      participant AD as 管理の MCP
+        U->>SK: /project-index:setup {食い違う配信元のパス}
+        SK->>U: scope・範囲を聞き、表で確かめる
+        U-->>SK: 了承
+        SK->>AD: check_project
+        AD-->>SK: 違反（documents[0].schema と、records と食い違う理由）
+        SK-->>U: 違反を示して止まる
+      ```
+    expected:
+      - 端末の設定は変わらず、sample の配信は続く
+      - スキルの応答に `documents[0].schema` と、スキーマが `records` の行に合わない理由が出る
+    test: test_error_when_records_schema_mismatch
+  - name: 正常シナリオ（2 回目以降で行の exclude に当たるファイルがある）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: 管理用の YAML を 2 行持つ配信元
+        description: '`project-index.yaml` が、管理用の YAML を読む行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`・`exclude: [README.md]`）と行 `tools`（`paths: [tools/files.yaml]`・`records: files`・`body_file: path`。`exclude` なし）を持ち、端末の設定に登録済みの git リポジトリ'
+        notes: 2 つの管理用の YAML は、どちらも今あるファイルを全て行に持つ
+      - name: 追加したファイル
+        description: '`src/README.md`・`src/new.py`・`tools/README.md` を追加して commit し、その commit でワークツリーを作る'
+        notes: '`src/README.md` は行 `src` の `exclude` に当たり、`tools/README.md` はどの行の `exclude` にも当たらない'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant CL as project-index の CLI
+        participant DM as 文書の MCP
+        participant AD as 管理の MCP
 
-      U->>SK: 配信元のワークツリーで /project-index:setup
-      SK->>SK: 既にある sources の行と管理用の YAML を読む
-      SK->>CL: project-index files --root {配信元のパス} --paths src/** --exclude README.md
-      CL-->>SK: 行 src の載せるファイル
-      SK->>CL: project-index files --root {配信元のパス} --paths tools/**
-      CL-->>SK: 行 tools の載せるファイル
-      SK->>SK: 行ごとに、載せるファイルと管理用の YAML の行を突き合わせる
-      SK-->>U: 追加の行を表で示して確かめる
-      U-->>SK: 了承
-      SK->>DM: write_docs（管理用の YAML の行を追加する）
-      SK->>AD: check_project
-      AD-->>SK: 索引の同期の件数 0
-      SK->>AD: reload
-      SK-->>U: 追加した行と結果を出す
-    ```
-  expected:
-  - 確認の表の追加の行が `src/new.py` と `tools/README.md` の 2 つで、`src/README.md` は出ない
-  - '`src/files.yaml` に `new.py` の行が追加され、`README.md` の行は無い'
-  - '`tools/files.yaml` に `README.md` の行が追加される'
-  - '`check_project` が索引の同期の件数を 0 で返す'
-  test: test_normal_when_rerun_with_row_exclude
-- name: 正常シナリオ（ほかの配信元のスキーマを参照する）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
-  - name: スキーマの配信元
-    description: 種類のスキーマ `schemas/note.schema.yaml` と、そこから `$ref` で指す `schemas/common.schema.yaml` と、`project-index.yaml` を持つ git リポジトリ。`project-index.yaml` は検証に通り、配信中
-    notes: id `schemas`。タグ `v1` の後の commit で `note.schema.yaml` に必須のキー `owner` を、`common.schema.yaml` の定義に項目 `extra` を追加し、作業ツリーはその commit
-  - name: サンプルの配信元
-    description: '`documents[0].schema` で、スキーマの配信元の `schemas/note.schema.yaml` をリビジョン `v1` で指す Git 管理外のフォルダ'
-    notes: id `sample`。文書は `owner` を持たない
-  - name: project-index
-    description: 端末の設定の `sources` に schemas の 1 行を持つ project-index
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      actor A as エージェント
-      participant SK as setup のスキル
-      participant AD as 管理の MCP
-      participant CF as 端末の設定
-      participant DM as 文書の MCP
-      participant SG as schemas のリポジトリ
+        U->>SK: 配信元のワークツリーで /project-index:setup
+        SK->>SK: 既にある sources の行と管理用の YAML を読む
+        SK->>CL: project-index files --root {配信元のパス} --paths src/** --exclude README.md
+        CL-->>SK: 行 src の載せるファイル
+        SK->>CL: project-index files --root {配信元のパス} --paths tools/**
+        CL-->>SK: 行 tools の載せるファイル
+        SK->>SK: 行ごとに、載せるファイルと管理用の YAML の行を突き合わせる
+        SK-->>U: 追加の行を表で示して確かめる
+        U-->>SK: 了承
+        SK->>DM: write_docs（管理用の YAML の行を追加する）
+        SK->>AD: check_project
+        AD-->>SK: 索引の同期の件数 0
+        SK->>AD: reload
+        SK-->>U: 追加した行と結果を出す
+      ```
+    expected:
+      - 確認の表の追加の行が `src/new.py` と `tools/README.md` の 2 つで、`src/README.md` は出ない
+      - '`src/files.yaml` に `new.py` の行が追加され、`README.md` の行は無い'
+      - '`tools/files.yaml` に `README.md` の行が追加される'
+      - '`check_project` が索引の同期の件数を 0 で返す'
+    test: test_normal_when_rerun_with_row_exclude
+  - name: 正常シナリオ（ほかの配信元のスキーマを参照する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
+      - name: スキーマの配信元
+        description: 種類のスキーマ `schemas/note.schema.yaml` と、そこから `$ref` で指す `schemas/common.schema.yaml` と、`project-index.yaml` を持つ git リポジトリ。`project-index.yaml` は検証に通り、配信中
+        notes: id `schemas`。タグ `v1` の後の commit で `note.schema.yaml` に必須のキー `owner` を、`common.schema.yaml` の定義に項目 `extra` を追加し、作業ツリーはその commit
+      - name: サンプルの配信元
+        description: '`documents[0].schema` で、スキーマの配信元の `schemas/note.schema.yaml` をリビジョン `v1` で指す Git 管理外のフォルダ'
+        notes: id `sample`。文書は `owner` を持たない
+      - name: project-index
+        description: 端末の設定の `sources` に schemas の 1 行を持つ project-index
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        actor A as エージェント
+        participant SK as setup のスキル
+        participant AD as 管理の MCP
+        participant CF as 端末の設定
+        participant DM as 文書の MCP
+        participant SG as schemas のリポジトリ
 
-      U->>SK: /project-index:setup {sample のパス}
-      SK->>AD: check_project（sample のパス）
-      AD->>SG: v1 の note.schema.yaml と common.schema.yaml を読む
-      AD-->>SK: 違反 0 件
-      SK->>U: scope.write・scope.read を既定の値つきで聞く
-      U-->>SK: 既定の値
-      SK-->>U: 書き込む行を表で示して確かめる
-      U-->>SK: 了承
-      SK->>CF: sources に sample の行を書く
-      SK->>AD: reload
-      SK-->>U: 追加した配信元と check_project の結果を出す
-      A->>DM: describe(source: sample, kind: note)
-      DM-->>A: v1 のスキーマ
-      A->>DM: write_docs（owner を持たない文書を作る）
-      DM-->>A: 新しいバージョン
-    ```
-  expected:
-  - '`check_project` が違反を 0 件で返す'
-  - 端末の設定の `sources` に sample の行がある
-  - '`describe(source: sample, kind: note)` が返すスキーマに、`common.schema.yaml` の `$ref` が v1 の内容で解かれて入り、`owner` と `extra` が無い'
-  - '`owner` を持たない文書の `write_docs` が通り、sample の作業ツリーに文書ができる'
-  - スキーマの配信元の作業ツリーのファイルは変わらない
-  test: test_normal_when_schema_from_other_source
-- name: 異常シナリオ（参照先のスキーマが見つからない）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
-  - name: スキーマの配信元
-    description: 正常シナリオ（ほかの配信元のスキーマを参照する）と同じ schemas
-  - name: サンプルの配信元
-    description: '`documents[0].schema` で、スキーマの配信元の `schemas/note.schema.yaml` を、無いリビジョン `v9` で指す Git 管理外のフォルダ'
-  - name: 端末の設定
-    description: '`sources` に schemas の 1 行'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant SK as setup のスキル
-      participant AD as 管理の MCP
+        U->>SK: /project-index:setup {sample のパス}
+        SK->>AD: check_project（sample のパス）
+        AD->>SG: v1 の note.schema.yaml と common.schema.yaml を読む
+        AD-->>SK: 違反 0 件
+        SK->>U: scope.write・scope.read を既定の値つきで聞く
+        U-->>SK: 既定の値
+        SK-->>U: 書き込む行を表で示して確かめる
+        U-->>SK: 了承
+        SK->>CF: sources に sample の行を書く
+        SK->>AD: reload
+        SK-->>U: 追加した配信元と check_project の結果を出す
+        A->>DM: describe(source: sample, kind: note)
+        DM-->>A: v1 のスキーマ
+        A->>DM: write_docs（owner を持たない文書を作る）
+        DM-->>A: 新しいバージョン
+      ```
+    expected:
+      - '`check_project` が違反を 0 件で返す'
+      - 端末の設定の `sources` に sample の行がある
+      - '`describe(source: sample, kind: note)` が返すスキーマに、`common.schema.yaml` の `$ref` が v1 の内容で解かれて入り、`owner` と `extra` が無い'
+      - '`owner` を持たない文書の `write_docs` が通り、sample の作業ツリーに文書ができる'
+      - スキーマの配信元の作業ツリーのファイルは変わらない
+    test: test_normal_when_schema_from_other_source
+  - name: 異常シナリオ（参照先のスキーマが見つからない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
+      - name: スキーマの配信元
+        description: 正常シナリオ（ほかの配信元のスキーマを参照する）と同じ schemas
+      - name: サンプルの配信元
+        description: '`documents[0].schema` で、スキーマの配信元の `schemas/note.schema.yaml` を、無いリビジョン `v9` で指す Git 管理外のフォルダ'
+      - name: 端末の設定
+        description: '`sources` に schemas の 1 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant AD as 管理の MCP
 
-      U->>SK: /project-index:setup {sample のパス}
-      SK->>U: scope・範囲を聞き、表で確かめる
-      U-->>SK: 了承
-      SK->>AD: check_project
-      AD-->>SK: 違反（キーのパスと理由）
-      SK-->>U: 違反を示して止まる
-    ```
-  expected:
-  - 端末の設定は変わらず、schemas の配信は続く
-  - スキルの応答に `documents[0].schema` と、リビジョン `v9` が見つからない理由が出る
-  test: test_error_when_schema_ref_not_found
+        U->>SK: /project-index:setup {sample のパス}
+        SK->>U: scope・範囲を聞き、表で確かめる
+        U-->>SK: 了承
+        SK->>AD: check_project
+        AD-->>SK: 違反（キーのパスと理由）
+        SK-->>U: 違反を示して止まる
+      ```
+    expected:
+      - 端末の設定は変わらず、schemas の配信は続く
+      - スキルの応答に `documents[0].schema` と、リビジョン `v9` が見つからない理由が出る
+    test: test_error_when_schema_ref_not_found
 lead: 利用者が `/project-index:setup [path]` で、フォルダを配信元として端末の設定に並べ、文書の MCP で読めるようにする。2 回目以降は範囲のファイルの増減・改名を管理用の YAML に合わせる。
 issue: 14
 primary_actor: 利用者
 stakeholders:
-- name: 利用者
-  interest: どの作業場所から読み書きできるかを質問に答えるだけで決められ、書き込む前に内容を表で確かめられる
-- name: エージェント（Claude Code）
-  interest: 追加した配信元を、セッションを張り直さずに `describe` と `search_docs` で使える
+  - name: 利用者
+    interest: どの作業場所から読み書きできるかを質問に答えるだけで決められ、書き込む前に内容を表で確かめられる
+  - name: エージェント（Claude Code）
+    interest: 追加した配信元を、セッションを張り直さずに `describe` と `search_docs` で使える
 trigger: 利用者が `/project-index:setup [path]` を実行する（path を省くと今の作業場所）
 preconditions:
-- '`/project-index:global-setup` を済ませ、project-index が待ち受けている'
-- path のフォルダが YAML の文書とそのスキーマを持つ（git リポジトリか Git 管理外のフォルダ）
+  - '`/project-index:global-setup` を済ませ、project-index が待ち受けている'
+  - path のフォルダが YAML の文書とそのスキーマを持つ（git リポジトリか Git 管理外のフォルダ）
 success_guarantee: 端末の設定の `sources` に配信元の行があり、`check_project` が違反を返さない。`reload` の後、`scope.read` に当たる作業場所の `describe` がその配信元を返す。
 minimal_guarantee: '`check_project` が違反を返したときと、利用者が確認の表を断ったときは、端末の設定を書き換えない。既にある配信元の配信は止まらない。'
 frequency: 配信元ごとに 1 回。範囲のファイルを大きく増減・改名したとき
 priority: 高
 refs:
-- SC-1#scenarios[正常シナリオ]
+  - SC-1#scenarios[正常シナリオ]
 test_file: tests/e2e/単一ユースケース/test_配信元を追加する.py

@@ -2,86 +2,86 @@ id: MOD-23
 title: 索引のサーバー / 説明 / warnings.py
 lead: '引数なしの `describe` に添える警告（使える配信元の同期のずれ・古い設定と、配信していない配信元）。'
 test_files:
-- tests/unit/project_index/features/describe/test_warnings.py
+  - tests/unit/project_index/features/describe/test_warnings.py
 functions:
-- name: collect_warnings
-  title: 警告の収集
-  kind: 関数
-  container: project_index/features/describe/warnings.py
-  usecase: 説明
-  role: 組み立て
-  summary: 使える配信元の同期のずれ・古い設定と、端末の設定の古さ・配信していない配信元を警告の文にする
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: available
-    title: 使える配信元
-    type: list[SourceAccess]
-    required: true
-    passing: positional
-    description: '`available_sources` の結果（0 件もある）'
-  - name: registry
-    title: 配信元の一覧
-    type: SourceRegistry
-    required: true
-    passing: keyword
-    description: 配信中の配信元と配信の状態
-  - name: checks
-    title: 配信元の検査の控え
-    type: SourceChecks
-    required: true
-    passing: keyword
-    description: 配信元ごとの最後の検査の結果を読む（配信元のファイルはたどらない）
-  - name: terminal
-    title: 端末の設定
-    type: TerminalConfig
-    required: true
-    passing: keyword
-    description: 設定のバージョンを比べる
-  returns:
-    type: list[str]
-    description: 警告の文
-  process: |-
-    1. 使える配信元ごとに最後の検査の結果を読み（配信元の検査の控え.結果の取得。`None` の配信元は同期のずれ・エイリアス・nav を飛ばす）、件数が 0 でない並びごとに `{id}: {並びの名前}が {件数} 件あります（check_project で確認できます）` を加える
-    2. 使える配信元の設定のバージョンが `old` なら `{id}: 設定のバージョンが古い（{設定}・読み込める {現在}）。project-index migrate で移し替えます` を加える（バージョンの新旧）
-    3. 端末の設定のバージョンが `old` なら同じ形の文を加える（使える配信元が 0 件でも加える）
-    4. 使える配信元ごとに、`alias_violations` が 0 件でなければ `{id}: エイリアスのキーの違反が {件数} 件あります（check_project で確認できます）` を加え、nav の警告（読み取り API）ごとに `{id}: {path}: {rule}` を加える
-    5. `not_served` の配信元ごとに `{id}: 配信していません（{先頭の理由}）。check_project で確認できます` を加える（使える配信元が 0 件でも加える）
-  unit_tests:
-  - name: test_collect_warnings
-    case: 正常
-    summary: 同期のずれ・古い設定・配信していない配信元を並べる
-    condition: 使える配信元 a（ファイルが無い行 2 件・当たらない関連 1 件・古い設定）、`not_served` の b
-    mock: なし（検査の結果は配信元の検査の控えに流してから渡す）
-    expected: 警告が 4 件（a のファイルが無い行・a の当たらない関連・a の古い設定・b の配信していない）
-  - name: test_collect_warnings_when_unavailable_source
-    case: 正常
-    summary: 使えない配信元の同期のずれは載せない
-    condition: 配信中だが `available` に無い配信元に同期のずれ 1 件
-    mock: なし
-    expected: 警告が空
-  - name: test_collect_warnings_when_alias_and_nav
-    case: 正常
-    summary: エイリアスのキーの違反と nav の警告
-    condition: 使える配信元 a に、`aliases` が `3` の用語の文書 1 件と、どの文書にも当たらない `auto` の条件 1 つ
-    mock: なし
-    expected: 警告が 2 件（a のエイリアスのキーの違反 1 件・a の nav の条件）
-  - name: test_collect_warnings_when_unchecked
-    case: 正常
-    summary: まだ検査していない配信元は、同期のずれを載せない
-    condition: 使える配信元 a（管理用の YAML に無いファイル 1 件）を、配信元の検査の控えに流さずに渡す
-    mock: なし
-    expected: 警告が空
-  - name: test_collect_warnings_when_no_source_available
-    case: 正常
-    summary: 使える配信元が無くても、端末の設定の古さと配信していない配信元を載せる
-    condition: '`available` が空、端末の設定のバージョンが古い、`not_served` の b'
-    mock: なし
-    expected: 警告が 2 件（端末の設定の古い設定・b の配信していない）
-  callers:
-  - MOD-20#functions[describe]
-  callees:
-  - MOD-10#functions[version_state]
+  - name: collect_warnings
+    title: 警告の収集
+    kind: 関数
+    container: project_index/features/describe/warnings.py
+    usecase: 説明
+    role: 組み立て
+    summary: 使える配信元の同期のずれ・古い設定と、端末の設定の古さ・配信していない配信元を警告の文にする
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: available
+        title: 使える配信元
+        type: list[SourceAccess]
+        required: true
+        passing: positional
+        description: '`available_sources` の結果（0 件もある）'
+      - name: registry
+        title: 配信元の一覧
+        type: SourceRegistry
+        required: true
+        passing: keyword
+        description: 配信中の配信元と配信の状態
+      - name: checks
+        title: 配信元の検査の控え
+        type: SourceChecks
+        required: true
+        passing: keyword
+        description: 配信元ごとの最後の検査の結果を読む（配信元のファイルはたどらない）
+      - name: terminal
+        title: 端末の設定
+        type: TerminalConfig
+        required: true
+        passing: keyword
+        description: 設定のバージョンを比べる
+    returns:
+      type: list[str]
+      description: 警告の文
+    process: |-
+      1. 使える配信元ごとに最後の検査の結果を読み（配信元の検査の控え.結果の取得。`None` の配信元は同期のずれ・エイリアス・nav を飛ばす）、件数が 0 でない並びごとに `{id}: {並びの名前}が {件数} 件あります（check_project で確認できます）` を加える
+      2. 使える配信元の設定のバージョンが `old` なら `{id}: 設定のバージョンが古い（{設定}・読み込める {現在}）。project-index migrate で移し替えます` を加える（バージョンの新旧）
+      3. 端末の設定のバージョンが `old` なら同じ形の文を加える（使える配信元が 0 件でも加える）
+      4. 使える配信元ごとに、`alias_violations` が 0 件でなければ `{id}: エイリアスのキーの違反が {件数} 件あります（check_project で確認できます）` を加え、nav の警告（読み取り API）ごとに `{id}: {path}: {rule}` を加える
+      5. `not_served` の配信元ごとに `{id}: 配信していません（{先頭の理由}）。check_project で確認できます` を加える（使える配信元が 0 件でも加える）
+    unit_tests:
+      - name: test_collect_warnings
+        case: 正常
+        summary: 同期のずれ・古い設定・配信していない配信元を並べる
+        condition: 使える配信元 a（ファイルが無い行 2 件・当たらない関連 1 件・古い設定）、`not_served` の b
+        mock: なし（検査の結果は配信元の検査の控えに流してから渡す）
+        expected: 警告が 4 件（a のファイルが無い行・a の当たらない関連・a の古い設定・b の配信していない）
+      - name: test_collect_warnings_when_unavailable_source
+        case: 正常
+        summary: 使えない配信元の同期のずれは載せない
+        condition: 配信中だが `available` に無い配信元に同期のずれ 1 件
+        mock: なし
+        expected: 警告が空
+      - name: test_collect_warnings_when_alias_and_nav
+        case: 正常
+        summary: エイリアスのキーの違反と nav の警告
+        condition: 使える配信元 a に、`aliases` が `3` の用語の文書 1 件と、どの文書にも当たらない `auto` の条件 1 つ
+        mock: なし
+        expected: 警告が 2 件（a のエイリアスのキーの違反 1 件・a の nav の条件）
+      - name: test_collect_warnings_when_unchecked
+        case: 正常
+        summary: まだ検査していない配信元は、同期のずれを載せない
+        condition: 使える配信元 a（管理用の YAML に無いファイル 1 件）を、配信元の検査の控えに流さずに渡す
+        mock: なし
+        expected: 警告が空
+      - name: test_collect_warnings_when_no_source_available
+        case: 正常
+        summary: 使える配信元が無くても、端末の設定の古さと配信していない配信元を載せる
+        condition: '`available` が空、端末の設定のバージョンが古い、`not_served` の b'
+        mock: なし
+        expected: 警告が 2 件（端末の設定の古い設定・b の配信していない）
+    callers:
+      - MOD-20#functions[describe]
+    callees:
+      - MOD-10#functions[version_state]
 refs:
-- IF-1#
+  - IF-1#

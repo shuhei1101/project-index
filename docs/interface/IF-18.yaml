@@ -4,233 +4,233 @@ entry:
   kind: operation
   value: '`project-index prompt-doc`（CLI）'
 flows:
-- name: 正常系
-  summary: LLM の呼び出しのプロンプト（`en`・`ja`）を、変数の表・部品・例の組のセクションにした Markdown を出す
-  setup:
-  - name: Mock
-    description: なし（`main(["prompt-doc"])` を同じプロセスで呼び、標準入力を差し替える）
-  - name: LLM のプロンプト
-    description: 'A-42 の例 2（`kind: llm`、`lang: en`、各部品の `texts[]` に `en`・`ja`、`examples[]` に組 `no-logs`、`output` あり）'
-    notes: 部品 `logs` は `when` でログがあるときだけ描く。部品 `role` の `en` の本文に `<rules>` を含める
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant M as project-index prompt-doc
+  - name: 正常系
+    summary: LLM の呼び出しのプロンプト（`en`・`ja`）を、変数の表・部品・例の組のセクションにした Markdown を出す
+    setup:
+      - name: Mock
+        description: なし（`main(["prompt-doc"])` を同じプロセスで呼び、標準入力を差し替える）
+      - name: LLM のプロンプト
+        description: 'A-42 の例 2（`kind: llm`、`lang: en`、各部品の `texts[]` に `en`・`ja`、`examples[]` に組 `no-logs`、`output` あり）'
+        notes: 部品 `logs` は `when` でログがあるときだけ描く。部品 `role` の `en` の本文に `<rules>` を含める
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index prompt-doc
 
-      C->>M: 標準入力に LLM のプロンプト
-      M->>M: 変数の表を作る
-      M->>M: 部品ごとのセクションに本文を置く
-      M->>M: 既定の例と no-logs を Jinja2 で描画する
-      M-->>C: Markdown（終了コード 0）
-    ```
-  expected:
-  - 終了コードが 0
-  - '`name` の見出しのあとに `kind`・`lang` のバッジ、`description`、タグと出力の行がある'
-  - 変数の表に `character.display_name`・`traits[].name` のパスの行があり、列が変数・型・必須・例・説明・出典
-  - '`## テンプレート` に部品ごとの `###` のセクションがあり、`role`・`tags`・`when` のバッジと、`{{ character.display_name }}` に `data-hint`（`character.display_name`・表示名・`string`・ひな）の付いた本文がある'
-  - '`## 例` に「既定の例」と「ログが無い」の `###` のセクションがあり、「ログが無い」の前に `<!-- section: closed -->` がある'
-  - 各組が `system`・`user` のメッセージに分かれ、使用しなかった部品（既定の例は `no-logs`、ログが無いは `logs`）と `注入する本文（en）` の字数の行がある
-  - 各セクションの言語のタブが `en`・`ja` の順で、`group=lang` を持ち、タブ名に「注入」「訳」が付かない
-  - 描画結果の変数の値がマーカーと `data-hint` の要素で囲まれている
-  - '`[!WARNING]` と `[!CAUTION]` が無い'
-  - 部品 `role` の本文と描画結果の `<rules>` が Markdown の中で `&lt;rules&gt;` になり、字数の行はエスケープ前の文字数
-  test: test_normal
-- name: 正常系（言語が 1 つ）
-  summary: 言語が `ja` だけのフックの注入文は、言語のタブを置かずに出す
-  setup:
-  - name: Mock
-    description: 正常系と同じ
-  - name: フックのプロンプト
-    description: 'A-42 の例 1（`kind: hook`、`lang: ja`、各部品の `texts[]` は `ja` だけ）'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant M as project-index prompt-doc
+        C->>M: 標準入力に LLM のプロンプト
+        M->>M: 変数の表を作る
+        M->>M: 部品ごとのセクションに本文を置く
+        M->>M: 既定の例と no-logs を Jinja2 で描画する
+        M-->>C: Markdown（終了コード 0）
+      ```
+    expected:
+      - 終了コードが 0
+      - '`name` の見出しのあとに `kind`・`lang` のバッジ、`description`、タグと出力の行がある'
+      - 変数の表に `character.display_name`・`traits[].name` のパスの行があり、列が変数・型・必須・例・説明・出典
+      - '`## テンプレート` に部品ごとの `###` のセクションがあり、`role`・`tags`・`when` のバッジと、`{{ character.display_name }}` に `data-hint`（`character.display_name`・表示名・`string`・ひな）の付いた本文がある'
+      - '`## 例` に「既定の例」と「ログが無い」の `###` のセクションがあり、「ログが無い」の前に `<!-- section: closed -->` がある'
+      - 各組が `system`・`user` のメッセージに分かれ、使用しなかった部品（既定の例は `no-logs`、ログが無いは `logs`）と `注入する本文（en）` の字数の行がある
+      - 各セクションの言語のタブが `en`・`ja` の順で、`group=lang` を持ち、タブ名に「注入」「訳」が付かない
+      - 描画結果の変数の値がマーカーと `data-hint` の要素で囲まれている
+      - '`[!WARNING]` と `[!CAUTION]` が無い'
+      - 部品 `role` の本文と描画結果の `<rules>` が Markdown の中で `&lt;rules&gt;` になり、字数の行はエスケープ前の文字数
+    test: test_normal
+  - name: 正常系（言語が 1 つ）
+    summary: 言語が `ja` だけのフックの注入文は、言語のタブを置かずに出す
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: フックのプロンプト
+        description: 'A-42 の例 1（`kind: hook`、`lang: ja`、各部品の `texts[]` は `ja` だけ）'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index prompt-doc
 
-      C->>M: 標準入力にフックのプロンプト
-      M-->>C: 言語のタブの無い Markdown（終了コード 0）
-    ```
-  expected:
-  - 終了コードが 0
-  - '`<!-- tabs:` が無く、各セクションに `ja` の本文だけがある'
-  - 描画結果がメッセージに分かれず 1 つの本文で出る
-  - '`[!WARNING]` が無い'
-  test: test_normal_when_single_language
-- name: 正常系（描画できない組がある）
-  summary: 型の合わない値の組だけを注意書きにし、他の組は描画する
-  setup:
-  - name: Mock
-    description: 正常系と同じ
-  - name: LLM のプロンプト
-    description: 正常系のプロンプトの `examples[]` に、`traits` に文字列を入れた組 `broken` を加える
-    notes: '`values: {traits: oops}`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant M as project-index prompt-doc
+        C->>M: 標準入力にフックのプロンプト
+        M-->>C: 言語のタブの無い Markdown（終了コード 0）
+      ```
+    expected:
+      - 終了コードが 0
+      - '`<!-- tabs:` が無く、各セクションに `ja` の本文だけがある'
+      - 描画結果がメッセージに分かれず 1 つの本文で出る
+      - '`[!WARNING]` が無い'
+    test: test_normal_when_single_language
+  - name: 正常系（描画できない組がある）
+    summary: 型の合わない値の組だけを注意書きにし、他の組は描画する
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: LLM のプロンプト
+        description: 正常系のプロンプトの `examples[]` に、`traits` に文字列を入れた組 `broken` を加える
+        notes: '`values: {traits: oops}`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index prompt-doc
 
-      C->>M: 標準入力に broken を含むプロンプト
-      M->>M: broken の値の型を確かめる
-      M-->>C: broken を注意書きにした Markdown（終了コード 0）
-    ```
-  expected:
-  - 終了コードが 0
-  - '`broken` のセクションの各言語のタブに `[!CAUTION]` があり、`traits` と型が合わない理由が載る'
-  - 「既定の例」「ログが無い」のセクションと変数の表・テンプレートは描画されている
-  test: test_normal_when_example_invalid
-- name: 正常系（字数が上限を超える組がある）
-  summary: フックの注入文で 1,000 字を超えた組に字数の注意を出す
-  setup:
-  - name: Mock
-    description: 正常系と同じ
-  - name: フックのプロンプト
-    description: 正常系（言語が 1 つ）のプロンプトの `examples[]` に、描画した結果が 1,000 字を超える組 `many-sources` を加える
-    notes: 配信元 20 件
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant M as project-index prompt-doc
+        C->>M: 標準入力に broken を含むプロンプト
+        M->>M: broken の値の型を確かめる
+        M-->>C: broken を注意書きにした Markdown（終了コード 0）
+      ```
+    expected:
+      - 終了コードが 0
+      - '`broken` のセクションの各言語のタブに `[!CAUTION]` があり、`traits` と型が合わない理由が載る'
+      - 「既定の例」「ログが無い」のセクションと変数の表・テンプレートは描画されている
+    test: test_normal_when_example_invalid
+  - name: 正常系（字数が上限を超える組がある）
+    summary: フックの注入文で 1,000 字を超えた組に字数の注意を出す
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: フックのプロンプト
+        description: 正常系（言語が 1 つ）のプロンプトの `examples[]` に、描画した結果が 1,000 字を超える組 `many-sources` を加える
+        notes: 配信元 20 件
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index prompt-doc
 
-      C->>M: 標準入力に many-sources を含むプロンプト
-      M->>M: 組ごとに描画して字数を数える
-      M-->>C: many-sources に注意を付けた Markdown（終了コード 0）
-    ```
-  expected:
-  - 終了コードが 0
-  - '`many-sources` のセクションに字数と 1,000 字を超えたことの `[!WARNING]` があり、描画結果も出ている'
-  - 「既定の例」のセクションには `[!WARNING]` が無い
-  test: test_normal_when_hook_text_too_long
-- name: 異常系（YAML として読めない・PromptYamlError）
-  summary: 読めない YAML は終了コード 1 で終える
-  setup:
-  - name: Mock
-    description: 正常系と同じ
-  - name: 標準入力
-    description: YAML として読めない文字列
-    notes: '`name: [` のように括弧を閉じない'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant M as project-index prompt-doc
+        C->>M: 標準入力に many-sources を含むプロンプト
+        M->>M: 組ごとに描画して字数を数える
+        M-->>C: many-sources に注意を付けた Markdown（終了コード 0）
+      ```
+    expected:
+      - 終了コードが 0
+      - '`many-sources` のセクションに字数と 1,000 字を超えたことの `[!WARNING]` があり、描画結果も出ている'
+      - 「既定の例」のセクションには `[!WARNING]` が無い
+    test: test_normal_when_hook_text_too_long
+  - name: 異常系（YAML として読めない・PromptYamlError）
+    summary: 読めない YAML は終了コード 1 で終える
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 標準入力
+        description: YAML として読めない文字列
+        notes: '`name: [` のように括弧を閉じない'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index prompt-doc
 
-      C->>M: 標準入力に読めない YAML
-      M-->>C: stderr に理由（終了コード 1）
-    ```
-  expected:
-  - 終了コードが 1
-  - 標準出力が空で、標準エラーに YAML を読めない理由がある
-  test: test_error_when_yaml_unreadable
-- name: 異常系（変換に使うキーが無い・InvalidPrompt）
-  summary: '`parts` の無いプロンプトは終了コード 1 で終える'
-  setup:
-  - name: Mock
-    description: 正常系と同じ
-  - name: 標準入力
-    description: 正常系のプロンプトから `parts` を除いた YAML
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant M as project-index prompt-doc
+        C->>M: 標準入力に読めない YAML
+        M-->>C: stderr に理由（終了コード 1）
+      ```
+    expected:
+      - 終了コードが 1
+      - 標準出力が空で、標準エラーに YAML を読めない理由がある
+    test: test_error_when_yaml_unreadable
+  - name: 異常系（変換に使うキーが無い・InvalidPrompt）
+    summary: '`parts` の無いプロンプトは終了コード 1 で終える'
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 標準入力
+        description: 正常系のプロンプトから `parts` を除いた YAML
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index prompt-doc
 
-      C->>M: 標準入力に parts の無いプロンプト
-      M-->>C: stderr にキーのパス（終了コード 1）
-    ```
-  expected:
-  - 終了コードが 1
-  - 標準出力が空で、標準エラーに `parts` と、それが無いことがある
-  test: test_error_when_required_key_missing
-- name: 正常系（構文の誤った部品がある）
-  summary: Jinja2 の構文が誤った部品だけを注意書きにし、変数の表と他の部品は出す
-  setup:
-  - name: Mock
-    description: 正常系と同じ
-  - name: LLM のプロンプト
-    description: 正常系のプロンプトの部品 `logs` の本文から `{% endif %}` を外す
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant M as project-index prompt-doc
+        C->>M: 標準入力に parts の無いプロンプト
+        M-->>C: stderr にキーのパス（終了コード 1）
+      ```
+    expected:
+      - 終了コードが 1
+      - 標準出力が空で、標準エラーに `parts` と、それが無いことがある
+    test: test_error_when_required_key_missing
+  - name: 正常系（構文の誤った部品がある）
+    summary: Jinja2 の構文が誤った部品だけを注意書きにし、変数の表と他の部品は出す
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: LLM のプロンプト
+        description: 正常系のプロンプトの部品 `logs` の本文から `{% endif %}` を外す
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index prompt-doc
 
-      C->>M: 標準入力に logs の構文が誤ったプロンプト
-      M->>M: 部品ごとにテンプレートにする
-      M-->>C: logs を注意書きにした Markdown（終了コード 0）
-    ```
-  expected:
-  - 終了コードが 0
-  - 部品 `logs` のセクションと「既定の例」「ログが無い」のセクションに `[!CAUTION]` があり、`logs`・行・構文の誤りの理由が載る
-  - 変数の表と `logs` 以外の部品のセクションは正常系と同じに出ている
-  test: test_normal_when_part_syntax_invalid
+        C->>M: 標準入力に logs の構文が誤ったプロンプト
+        M->>M: 部品ごとにテンプレートにする
+        M-->>C: logs を注意書きにした Markdown（終了コード 0）
+      ```
+    expected:
+      - 終了コードが 0
+      - 部品 `logs` のセクションと「既定の例」「ログが無い」のセクションに `[!CAUTION]` があり、`logs`・行・構文の誤りの理由が載る
+      - 変数の表と `logs` 以外の部品のセクションは正常系と同じに出ている
+    test: test_normal_when_part_syntax_invalid
 lead: 標準入力のプロンプトの YAML 1 件（キーは knowledge の `schemas/prompt.schema.yaml`）を、変数の表・テンプレート・例の組ごとの描画のセクションを持つ Markdown にして標準出力に出す。配信元の `converters[].run` から呼ぶ。
 identifier: prompt-doc
 permissions: 制限なし（標準入力だけを読む）
 idempotent: true
 side_effects: なし（ファイルを書き換えない）
 callers:
-- SC-5#scenarios[正常シナリオ（content/prompts/ を見つける）]
-- SC-11#scenarios[正常シナリオ（変換のスクリプトを指す種類の文書）]
+  - SC-5#scenarios[正常シナリオ（content/prompts/ を見つける）]
+  - SC-11#scenarios[正常シナリオ（変換のスクリプトを指す種類の文書）]
 exclusivity: 読み取りだけで排他しない
 request:
-- name: 標準入力
-  type: str
-  required: true
-  location: argument
-  description: プロンプトの YAML 1 件（UTF-8）
-  notes: 引数・オプションは持たない。`converters[].run` の約束（標準入力に文書の YAML）のまま
+  - name: 標準入力
+    type: str
+    required: true
+    location: argument
+    description: プロンプトの YAML 1 件（UTF-8）
+    notes: 引数・オプションは持たない。`converters[].run` の約束（標準入力に文書の YAML）のまま
 request_example: |-
   ```bash
   project-index prompt-doc < content/prompts/node/reflection.yaml
   ```
 response:
-- name: 標準出力
-  type: str
-  description: mdmark で描く Markdown。見出し（`name`）・`kind` と `lang` のバッジ・`description`・タグと出力の行のあとに、`## 変数`・`## テンプレート`・`## 例` のセクションを並べる
-  notes: '部品と例の組は `###` のセクション。例の組の 2 つ目以降は `<!-- section: closed -->`'
-- name: 終了コード
-  type: int
-  description: 0 正常（描画できない組・字数を超えた組があっても 0）・1 YAML として読めないか、変換に使うキーが無い・型が違う
-  notes: 引数の誤りは argparse の 2
+  - name: 標準出力
+    type: str
+    description: mdmark で描く Markdown。見出し（`name`）・`kind` と `lang` のバッジ・`description`・タグと出力の行のあとに、`## 変数`・`## テンプレート`・`## 例` のセクションを並べる
+    notes: '部品と例の組は `###` のセクション。例の組の 2 つ目以降は `<!-- section: closed -->`'
+  - name: 終了コード
+    type: int
+    description: 0 正常（描画できない組・字数を超えた組があっても 0）・1 YAML として読めないか、変換に使うキーが無い・型が違う
+    notes: 引数の誤りは argparse の 2
 exceptions:
-- name: なし（正常終了）
-  condition: Markdown を出し終えた（終了コード 0）
-- name: PromptYamlError
-  condition: 標準入力が YAML として読めない（終了コード 1）
-  notes: 標準エラーに読めない理由を出し、標準出力には何も出さない。読み取り API は変換の失敗（`exit`）として返す
-- name: InvalidPrompt
-  condition: 変換に使うキー（`name`・`kind`・`lang`・`parts[].texts[]` など）が無いか型が違う（終了コード 1）
-  notes: 標準エラーにキーのパスと理由を出し、標準出力には何も出さない
+  - name: なし（正常終了）
+    condition: Markdown を出し終えた（終了コード 0）
+  - name: PromptYamlError
+    condition: 標準入力が YAML として読めない（終了コード 1）
+    notes: 標準エラーに読めない理由を出し、標準出力には何も出さない。読み取り API は変換の失敗（`exit`）として返す
+  - name: InvalidPrompt
+    condition: 変換に使うキー（`name`・`kind`・`lang`・`parts[].texts[]` など）が無いか型が違う（終了コード 1）
+    notes: 標準エラーにキーのパスと理由を出し、標準出力には何も出さない
 constraints:
-- item: 変数の表のパス
-  constraint: '`vars` を深さ優先で辿り、配列の要素は `{名前}[].{キー}`、オブジェクトのキーは `{名前}.{キー}` で 1 行にする。列は変数・型・必須・例・説明・出典'
-- item: 言語のタブ
-  constraint: '各 `###` のセクションに `<!-- tabs: group=lang -->` を置き、タブ名は言語のタグだけにする。注入する言語（`lang`）を先頭に並べる。全ての部品の言語が 1 つだけの文書はタブを置かず中身だけを出す'
-  notes: 注入する言語はバッジと字数の行（`注入する本文（{lang}）`）で示す
-- item: 描画
-  constraint: 'Jinja2 の `StrictUndefined`・`trim_blocks`・`lstrip_blocks` の Environment で、`when` が真の部品を並び順に描画してつなぐ。`kind: llm` は `role` ごとのメッセージに分ける'
-  notes: プロンプトを実際に描画する側と同じ設定にし、字数を注入文と揃える
-- item: 例の組の値
-  constraint: 「既定の例」は各変数の `example`、`examples[]` の組は `values` に無い変数を `example` で埋める。値は `vars` の `type`・`items`・`properties` で型を確かめる
-- item: 描画できない組
-  constraint: 未定義の変数・型の合わない値・描画中の例外の組は、その組のセクションに `[!CAUTION]` の注意書きで変数のパスと理由を出し、他の組は描画する
-- item: 字数の注意
-  constraint: '`kind: hook` で描画した結果が 1,000 字を超えた組のセクションに `[!WARNING]` を出す'
-  notes: '1,000 字は shuhei1101/dev-docs#47 の値で、定数で持つ'
-- item: 変数のツールチップ
-  constraint: テンプレートの本文の `{{ 変数 }}` と、例の描画結果の変数の値を `data-hint`（変数のパス・説明・型・例）付きの要素にし、描画結果の値はマーカーで囲む
-  notes: mdmark は埋め込みの HTML の `style`・`tabindex` を落とすため、見た目は dev-docs の文書の画面の CSS で当てる
-- item: タイムアウト
-  constraint: '`script_timeout_sec` の中で終わる'
-  decided_by: NFR-1#requirements[スクリプトの制限時間]
-- item: HTML のエスケープ
-  constraint: 埋め込みの HTML に入れるテンプレートの本文・描画結果の文字列・`data-hint` の値は、HTML としてエスケープしてから要素を挟む。字数は、エスケープとマーカーを入れる前の描画結果で数える
-  notes: mdmark は埋め込みの HTML の未知のタグ（`<instructions>` など）を落とす。Jinja2 の描画は `autoescape` を使わず、注入文と同じ文字列を作ってからエスケープする
-- item: 構文の誤った部品
-  constraint: 部品の本文か `when` の式が Jinja2 の構文として誤っているときは、その部品のセクションと全ての例の組のセクションに `[!CAUTION]` で部品の `id`・行・理由を出し、変数の表と他の部品のセクションは出して終了コード 0 で終える
-  notes: 例の組はその部品を含めた注入文を作れないため、描画結果を出さず注意書きだけにする
+  - item: 変数の表のパス
+    constraint: '`vars` を深さ優先で辿り、配列の要素は `{名前}[].{キー}`、オブジェクトのキーは `{名前}.{キー}` で 1 行にする。列は変数・型・必須・例・説明・出典'
+  - item: 言語のタブ
+    constraint: '各 `###` のセクションに `<!-- tabs: group=lang -->` を置き、タブ名は言語のタグだけにする。注入する言語（`lang`）を先頭に並べる。全ての部品の言語が 1 つだけの文書はタブを置かず中身だけを出す'
+    notes: 注入する言語はバッジと字数の行（`注入する本文（{lang}）`）で示す
+  - item: 描画
+    constraint: 'Jinja2 の `StrictUndefined`・`trim_blocks`・`lstrip_blocks` の Environment で、`when` が真の部品を並び順に描画してつなぐ。`kind: llm` は `role` ごとのメッセージに分ける'
+    notes: プロンプトを実際に描画する側と同じ設定にし、字数を注入文と揃える
+  - item: 例の組の値
+    constraint: 「既定の例」は各変数の `example`、`examples[]` の組は `values` に無い変数を `example` で埋める。値は `vars` の `type`・`items`・`properties` で型を確かめる
+  - item: 描画できない組
+    constraint: 未定義の変数・型の合わない値・描画中の例外の組は、その組のセクションに `[!CAUTION]` の注意書きで変数のパスと理由を出し、他の組は描画する
+  - item: 字数の注意
+    constraint: '`kind: hook` で描画した結果が 1,000 字を超えた組のセクションに `[!WARNING]` を出す'
+    notes: '1,000 字は shuhei1101/dev-docs#47 の値で、定数で持つ'
+  - item: 変数のツールチップ
+    constraint: テンプレートの本文の `{{ 変数 }}` と、例の描画結果の変数の値を `data-hint`（変数のパス・説明・型・例）付きの要素にし、描画結果の値はマーカーで囲む
+    notes: mdmark は埋め込みの HTML の `style`・`tabindex` を落とすため、見た目は dev-docs の文書の画面の CSS で当てる
+  - item: タイムアウト
+    constraint: '`script_timeout_sec` の中で終わる'
+    decided_by: NFR-1#requirements[スクリプトの制限時間]
+  - item: HTML のエスケープ
+    constraint: 埋め込みの HTML に入れるテンプレートの本文・描画結果の文字列・`data-hint` の値は、HTML としてエスケープしてから要素を挟む。字数は、エスケープとマーカーを入れる前の描画結果で数える
+    notes: mdmark は埋め込みの HTML の未知のタグ（`<instructions>` など）を落とす。Jinja2 の描画は `autoescape` を使わず、注入文と同じ文字列を作ってからエスケープする
+  - item: 構文の誤った部品
+    constraint: 部品の本文か `when` の式が Jinja2 の構文として誤っているときは、その部品のセクションと全ての例の組のセクションに `[!CAUTION]` で部品の `id`・行・理由を出し、変数の表と他の部品のセクションは出して終了コード 0 で終える
+    notes: 例の組はその部品を含めた注入文を作れないため、描画結果を出さず注意書きだけにする
 test_file: tests/integration/server/test_prompt_doc.py

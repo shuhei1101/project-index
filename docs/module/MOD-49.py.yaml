@@ -2,252 +2,252 @@ id: MOD-49
 title: 索引のサーバー / 関連 / types.py
 lead: '`trace_related` の要求と結果の型。'
 data_models:
-- name: RelatedRequest
-  title: 関連のたどりの要求
-  container: project_index/features/related/types.py
-  usecase: 関連
-  role: DTO
-  summary: '`trace_related` の引数'
-  description: '`pydantic.BaseModel`（`extra="forbid"`）。キーの意味と既定値はインターフェース定義『関連のたどり』の `request`。`depth` は丸めるので型だけを確かめる。'
-  properties:
-  - name: source
-    title: 配信元
-    type: str | None
-    access: 公開
-    default: None
-    description: 起点の配信元
-  - name: ref
-    title: リビジョン
-    type: str | None
-    access: 公開
-    default: None
-    description: 読むリビジョン
-  - name: worktree
-    title: ワークツリー
-    type: str | None
-    access: 公開
-    default: None
-    description: 読むワークツリー
-  - name: from_ids
-    title: 起点の文書
-    type: list[str] | None
-    access: 公開
-    default: None
-    description: '`code_paths` とどちらか 1 つ'
-  - name: code_paths
-    title: 起点のコードのパス
-    type: list[str] | None
-    access: 公開
-    default: None
-    description: 配信元の直下からのパス
-  - name: depth
-    title: 深さ
-    type: int
-    access: 公開
-    default: DEPTH_DEFAULT
-    description: たどる深さ
-  - name: direction
-    title: 向き
-    type: Literal['out', 'in', 'both']
-    access: 公開
-    default: '"both"'
-    description: たどる向き
-  - name: suggest
-    title: 候補を返すか
-    type: bool
-    access: 公開
-    default: 'False'
-    description: '`True` で関連の候補を返す'
-  - name: repeat_seen
-    title: 返し済みも返す
-    type: bool
-    access: 公開
-    default: 'False'
-    description: '`True` で名前・概要文を省かない'
-  - name: format
-    title: 形式
-    type: Literal['markdown', 'json']
-    access: 公開
-    default: '"markdown"'
-    description: 返却する形式
-  - name: cwd
-    title: 作業場所
-    type: str | None
-    access: 公開
-    default: None
-    description: フックが入れる
-  - name: outside_scope
-    title: 作業範囲の外も読むか
-    type: bool
-    access: 公開
-    default: 'False'
-    description: '`True` のとき、`scope` に該当しない配信元を `outside_read` が真なら作業範囲の外（参考）として参照する（`source` が ID 1 つのときだけ有効）'
-  - name: session_id
-    title: セッションの ID
-    type: str | None
-    access: 公開
-    default: None
-    description: フックが入れる
-  - name: agent_id
-    title: エージェントの ID
-    type: str | None
-    access: 公開
-    default: None
-    description: フックが入れる
-- name: RelatedLink
-  title: 関連の行
-  container: project_index/features/related/types.py
-  usecase: 関連
-  role: DTO
-  summary: メタデータの `related` の 1 行
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: to
-    title: 相手
-    type: str
-    access: 公開
-    description: 相手の文書の ID
-  - name: type
-    title: 関係の種類
-    type: str
-    access: 公開
-    description: '`related.types` の語'
-  - name: source
-    title: 相手の配信元
-    type: str | None
-    access: 公開
-    description: 別の配信元の文書を指すときだけ
-- name: RelatedItem
-  title: たどった文書
-  container: project_index/features/related/types.py
-  usecase: 関連
-  role: DTO
-  summary: たどった 1 件の文書
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: id
-    title: 文書の ID
-    type: str
-    access: 公開
-    description: たどった文書
-  - name: source
-    title: 配信元
-    type: str | None
-    access: 公開
-    description: 起点と違う配信元のときだけ
-  - name: depth
-    title: 深さ
-    type: int
-    access: 公開
-    description: 起点からの深さ（1 始まり）
-  - name: via_from
-    title: たどった元
-    type: str
-    access: 公開
-    description: JSON では `via.from`
-  - name: via_type
-    title: 関係の種類
-    type: str
-    access: 公開
-    description: JSON では `via.type`
-  - name: via_direction
-    title: 向き
-    type: Literal['out', 'in']
-    access: 公開
-    description: JSON では `via.direction`
-  - name: name
-    title: 名前
-    type: str
-    access: 公開
-    description: 返し済みなら `SEEN_MARK`
-  - name: description
-    title: 概要文
-    type: str
-    access: 公開
-    description: 返し済みなら `SEEN_MARK`
-  - name: path
-    title: 文書の場所
-    type: str | None
-    access: 公開
-    description: たどった文書の場所（文書のストア.文書の場所）。`ref` を渡した呼び出し、返し済みの相手、読めない配信元の文書では `None`
-  - name: scope
-    title: 返した範囲
-    type: Literal['summary'] | None
-    access: 公開
-    description: '`path` があれば `summary`、無ければ `None`'
-- name: Suggestion
-  title: 関連の候補
-  container: project_index/features/related/types.py
-  usecase: 関連
-  role: DTO
-  summary: まだ `related` に無い関連の候補
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: id
-    title: 文書の ID
-    type: str
-    access: 公開
-    description: 候補の文書
-  - name: signals
-    title: 信号
-    type: list[Literal['co_change', 'edited', 'viewed']]
-    access: 公開
-    description: 候補にした信号
-  - name: score
-    title: 順位の値
-    type: float
-    access: 公開
-    description: 信号の重みの和（小数 2 桁に丸める）
-- name: RelatedResult
-  title: 関連のたどりの結果
-  container: project_index/features/related/types.py
-  usecase: 関連
-  role: DTO
-  summary: '`trace_related` が返すもの'
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: start
-    title: 起点
-    type: list[str]
-    access: 公開
-    description: 起点の文書の ID
-  - name: items
+  - name: RelatedRequest
+    title: 関連のたどりの要求
+    container: project_index/features/related/types.py
+    usecase: 関連
+    role: DTO
+    summary: '`trace_related` の引数'
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。キーの意味と既定値はインターフェース定義『関連のたどり』の `request`。`depth` は丸めるので型だけを確かめる。'
+    properties:
+      - name: source
+        title: 配信元
+        type: str | None
+        access: 公開
+        default: None
+        description: 起点の配信元
+      - name: ref
+        title: リビジョン
+        type: str | None
+        access: 公開
+        default: None
+        description: 読むリビジョン
+      - name: worktree
+        title: ワークツリー
+        type: str | None
+        access: 公開
+        default: None
+        description: 読むワークツリー
+      - name: from_ids
+        title: 起点の文書
+        type: list[str] | None
+        access: 公開
+        default: None
+        description: '`code_paths` とどちらか 1 つ'
+      - name: code_paths
+        title: 起点のコードのパス
+        type: list[str] | None
+        access: 公開
+        default: None
+        description: 配信元の直下からのパス
+      - name: depth
+        title: 深さ
+        type: int
+        access: 公開
+        default: DEPTH_DEFAULT
+        description: たどる深さ
+      - name: direction
+        title: 向き
+        type: Literal['out', 'in', 'both']
+        access: 公開
+        default: '"both"'
+        description: たどる向き
+      - name: suggest
+        title: 候補を返すか
+        type: bool
+        access: 公開
+        default: 'False'
+        description: '`True` で関連の候補を返す'
+      - name: repeat_seen
+        title: 返し済みも返す
+        type: bool
+        access: 公開
+        default: 'False'
+        description: '`True` で名前・概要文を省かない'
+      - name: format
+        title: 形式
+        type: Literal['markdown', 'json']
+        access: 公開
+        default: '"markdown"'
+        description: 返却する形式
+      - name: cwd
+        title: 作業場所
+        type: str | None
+        access: 公開
+        default: None
+        description: フックが入れる
+      - name: outside_scope
+        title: 作業範囲の外も読むか
+        type: bool
+        access: 公開
+        default: 'False'
+        description: '`True` のとき、`scope` に該当しない配信元を `outside_read` が真なら作業範囲の外（参考）として参照する（`source` が ID 1 つのときだけ有効）'
+      - name: session_id
+        title: セッションの ID
+        type: str | None
+        access: 公開
+        default: None
+        description: フックが入れる
+      - name: agent_id
+        title: エージェントの ID
+        type: str | None
+        access: 公開
+        default: None
+        description: フックが入れる
+  - name: RelatedLink
+    title: 関連の行
+    container: project_index/features/related/types.py
+    usecase: 関連
+    role: DTO
+    summary: メタデータの `related` の 1 行
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: to
+        title: 相手
+        type: str
+        access: 公開
+        description: 相手の文書の ID
+      - name: type
+        title: 関係の種類
+        type: str
+        access: 公開
+        description: '`related.types` の語'
+      - name: source
+        title: 相手の配信元
+        type: str | None
+        access: 公開
+        description: 別の配信元の文書を指すときだけ
+  - name: RelatedItem
     title: たどった文書
-    type: list[RelatedItem]
-    access: 公開
-    description: 深さの昇順・たどった順
-  - name: suggestions
+    container: project_index/features/related/types.py
+    usecase: 関連
+    role: DTO
+    summary: たどった 1 件の文書
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: id
+        title: 文書の ID
+        type: str
+        access: 公開
+        description: たどった文書
+      - name: source
+        title: 配信元
+        type: str | None
+        access: 公開
+        description: 起点と違う配信元のときだけ
+      - name: depth
+        title: 深さ
+        type: int
+        access: 公開
+        description: 起点からの深さ（1 始まり）
+      - name: via_from
+        title: たどった元
+        type: str
+        access: 公開
+        description: JSON では `via.from`
+      - name: via_type
+        title: 関係の種類
+        type: str
+        access: 公開
+        description: JSON では `via.type`
+      - name: via_direction
+        title: 向き
+        type: Literal['out', 'in']
+        access: 公開
+        description: JSON では `via.direction`
+      - name: name
+        title: 名前
+        type: str
+        access: 公開
+        description: 返し済みなら `SEEN_MARK`
+      - name: description
+        title: 概要文
+        type: str
+        access: 公開
+        description: 返し済みなら `SEEN_MARK`
+      - name: path
+        title: 文書の場所
+        type: str | None
+        access: 公開
+        description: たどった文書の場所（文書のストア.文書の場所）。`ref` を渡した呼び出し、返し済みの相手、読めない配信元の文書では `None`
+      - name: scope
+        title: 返した範囲
+        type: Literal['summary'] | None
+        access: 公開
+        description: '`path` があれば `summary`、無ければ `None`'
+  - name: Suggestion
     title: 関連の候補
-    type: list[Suggestion]
-    access: 公開
-    description: '`suggest` のときだけ。順位の値の降順'
-  - name: notes
-    title: 知らせ
-    type: list[str]
-    access: 公開
-    description: 丸めた・読めなかった文書の知らせ
-  - name: outside_scope
-    title: 作業範囲の外から読んだか
-    type: bool
-    access: 公開
-    default: 'False'
-    description: 読んだ場所のどれかの `outside_scope` が `True`
+    container: project_index/features/related/types.py
+    usecase: 関連
+    role: DTO
+    summary: まだ `related` に無い関連の候補
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: id
+        title: 文書の ID
+        type: str
+        access: 公開
+        description: 候補の文書
+      - name: signals
+        title: 信号
+        type: list[Literal['co_change', 'edited', 'viewed']]
+        access: 公開
+        description: 候補にした信号
+      - name: score
+        title: 順位の値
+        type: float
+        access: 公開
+        description: 信号の重みの和（小数 2 桁に丸める）
+  - name: RelatedResult
+    title: 関連のたどりの結果
+    container: project_index/features/related/types.py
+    usecase: 関連
+    role: DTO
+    summary: '`trace_related` が返すもの'
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: start
+        title: 起点
+        type: list[str]
+        access: 公開
+        description: 起点の文書の ID
+      - name: items
+        title: たどった文書
+        type: list[RelatedItem]
+        access: 公開
+        description: 深さの昇順・たどった順
+      - name: suggestions
+        title: 関連の候補
+        type: list[Suggestion]
+        access: 公開
+        description: '`suggest` のときだけ。順位の値の降順'
+      - name: notes
+        title: 知らせ
+        type: list[str]
+        access: 公開
+        description: 丸めた・読めなかった文書の知らせ
+      - name: outside_scope
+        title: 作業範囲の外から読んだか
+        type: bool
+        access: 公開
+        default: 'False'
+        description: 読んだ場所のどれかの `outside_scope` が `True`
 constants:
-- name: DEPTH_DEFAULT
-  title: 深さの既定
-  container: project_index/features/related/types.py
-  usecase: 関連
-  summary: '`depth` を省いたときの深さ'
-  value: '2'
-- name: DEPTH_MAX
-  title: 深さの上限
-  container: project_index/features/related/types.py
-  usecase: 関連
-  summary: '`depth` の上限。超えた値は丸めて `notes` で知らせる'
-  value: '4'
-- name: SUGGEST_COUNT
-  title: 候補の数
-  container: project_index/features/related/types.py
-  usecase: 関連
-  summary: 返す関連の候補の数
-  value: '3'
+  - name: DEPTH_DEFAULT
+    title: 深さの既定
+    container: project_index/features/related/types.py
+    usecase: 関連
+    summary: '`depth` を省いたときの深さ'
+    value: '2'
+  - name: DEPTH_MAX
+    title: 深さの上限
+    container: project_index/features/related/types.py
+    usecase: 関連
+    summary: '`depth` の上限。超えた値は丸めて `notes` で知らせる'
+    value: '4'
+  - name: SUGGEST_COUNT
+    title: 候補の数
+    container: project_index/features/related/types.py
+    usecase: 関連
+    summary: 返す関連の候補の数
+    value: '3'

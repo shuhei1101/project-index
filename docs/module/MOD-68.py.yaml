@@ -2,76 +2,76 @@ id: MOD-68
 title: 索引のサーバー / 配信元 / merge.py
 lead: 設定の YAML のマージ。
 test_files:
-- tests/unit/project_index/features/sources/test_merge.py
+  - tests/unit/project_index/features/sources/test_merge.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      配信元の読み込み ..> 設定のマージ : config の並び
-      class 配信元の読み込み {
-        <<function>>
-      }
-      class 設定のマージ {
-        <<function>>
-      }
-      click 配信元の読み込み href "./MOD-70.py.yaml#配信元の読み込み"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        配信元の読み込み ..> 設定のマージ : config の並び
+        class 配信元の読み込み {
+          <<function>>
+        }
+        class 設定のマージ {
+          <<function>>
+        }
+        click 配信元の読み込み href "./MOD-70.py.yaml#配信元の読み込み"
 constants:
-- name: TABLE_KEYS
-  title: テーブルのキー
-  container: project_index/features/sources/merge.py
-  usecase: 共通
-  summary: マージで `id` ごとに行を重ねる最上位のキー
-  value: frozenset({"documents", "validators", "converters", "generators"})
+  - name: TABLE_KEYS
+    title: テーブルのキー
+    container: project_index/features/sources/merge.py
+    usecase: 共通
+    summary: マージで `id` ごとに行を重ねる最上位のキー
+    value: frozenset({"documents", "validators", "converters", "generators"})
 functions:
-- name: merge_configs
-  title: 設定のマージ
-  kind: 関数
-  container: project_index/features/sources/merge.py
-  usecase: 起動
-  role: 変換
-  summary: 配信元の設定の YAML の値を上から順に重ねる
-  scope: public
-  thread_safe: true
-  args:
-  - name: values
-    title: 設定の値
-    type: Sequence[dict[str, Any]]
-    required: true
-    passing: positional
-    description: '`sources[].config` の順に読んだ値'
-  returns:
-    type: dict[str, Any]
-    description: 重ねた値（引数は書き換えない）
-  process: |-
-    1. 先頭の値の深いコピーを結果にし、続く値を順に重ねる
-    2. 重ねるときはキーごとに次のように扱う
-       - 最上位の `TABLE_KEYS` のキーは、`id` が同じ行を後の行で置き換え、新しい `id` の行を末尾に追加する（並びは先に現れた順）。`id` を持たない行はそのまま追加し、検証で誤りにする
-       - 両方が辞書の値は、キーごとに再帰して重ねる
-       - それ以外（値・値の配列・形の違う値）は後の値で置き換える
-    3. 重ねた値を返す
-  unit_tests:
-  - name: test_merge_configs
-    case: 正常
-    summary: 値を上書きしテーブルを行ごとに重ねる
-    condition: '`[{description: a, documents: [{id: x, paths: [a/*]}]}, {description: b, documents: [{id: x, paths: [b/*]}, {id: y, paths: [c]}]}]`'
-    mock: なし
-    expected: '`description` が `b`、`documents` が `x`（`paths: [b/*]`）・`y` の順'
-  - name: test_merge_configs_when_nested_object
-    case: 正常
-    summary: オブジェクトを再帰で重ねる
-    condition: '`[{visibility: {key: v, public: [p]}}, {visibility: {public: [q]}}]`'
-    mock: なし
-    expected: '`visibility` が `{key: v, public: [q]}`'
-  - name: test_merge_configs_when_value_array
-    case: 正常
-    summary: 値の配列は置き換える
-    condition: '`[{worktrees: [a, b]}, {worktrees: [c]}]`'
-    mock: なし
-    expected: '`worktrees` が `[c]`'
-  - name: test_merge_configs_when_single
-    case: 正常
-    summary: 1 つだけはそのまま
-    condition: 値 1 つ
-    mock: なし
-    expected: 同じ値で、引数とは別のオブジェクト
+  - name: merge_configs
+    title: 設定のマージ
+    kind: 関数
+    container: project_index/features/sources/merge.py
+    usecase: 起動
+    role: 変換
+    summary: 配信元の設定の YAML の値を上から順に重ねる
+    scope: public
+    thread_safe: true
+    args:
+      - name: values
+        title: 設定の値
+        type: Sequence[dict[str, Any]]
+        required: true
+        passing: positional
+        description: '`sources[].config` の順に読んだ値'
+    returns:
+      type: dict[str, Any]
+      description: 重ねた値（引数は書き換えない）
+    process: |-
+      1. 先頭の値の深いコピーを結果にし、続く値を順に重ねる
+      2. 重ねるときはキーごとに次のように扱う
+         - 最上位の `TABLE_KEYS` のキーは、`id` が同じ行を後の行で置き換え、新しい `id` の行を末尾に追加する（並びは先に現れた順）。`id` を持たない行はそのまま追加し、検証で誤りにする
+         - 両方が辞書の値は、キーごとに再帰して重ねる
+         - それ以外（値・値の配列・形の違う値）は後の値で置き換える
+      3. 重ねた値を返す
+    unit_tests:
+      - name: test_merge_configs
+        case: 正常
+        summary: 値を上書きしテーブルを行ごとに重ねる
+        condition: '`[{description: a, documents: [{id: x, paths: [a/*]}]}, {description: b, documents: [{id: x, paths: [b/*]}, {id: y, paths: [c]}]}]`'
+        mock: なし
+        expected: '`description` が `b`、`documents` が `x`（`paths: [b/*]`）・`y` の順'
+      - name: test_merge_configs_when_nested_object
+        case: 正常
+        summary: オブジェクトを再帰で重ねる
+        condition: '`[{visibility: {key: v, public: [p]}}, {visibility: {public: [q]}}]`'
+        mock: なし
+        expected: '`visibility` が `{key: v, public: [q]}`'
+      - name: test_merge_configs_when_value_array
+        case: 正常
+        summary: 値の配列は置き換える
+        condition: '`[{worktrees: [a, b]}, {worktrees: [c]}]`'
+        mock: なし
+        expected: '`worktrees` が `[c]`'
+      - name: test_merge_configs_when_single
+        case: 正常
+        summary: 1 つだけはそのまま
+        condition: 値 1 つ
+        mock: なし
+        expected: 同じ値で、引数とは別のオブジェクト

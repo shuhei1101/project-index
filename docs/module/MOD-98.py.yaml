@@ -2,147 +2,147 @@ id: MOD-98
 title: 索引のサーバー / 共通 / errors.py
 lead: '`ProjectIndexError` と、MCP・読み取り API が返すエラーの階層。'
 test_files:
-- tests/unit/project_index/shared/test_errors.py
+  - tests/unit/project_index/shared/test_errors.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      索引のサーバーのエラー <|-- 読めない配信元
-      索引のサーバーのエラー <|-- 書き込めない配信元
-      索引のサーバーのエラー <|-- 配信していない配信元
-      索引のサーバーのエラー <|-- 引数の誤り
-      索引のサーバーのエラー <|-- 検査の不合格
-      索引のサーバーのエラー <|-- バージョンの不一致
-      class 索引のサーバーのエラー {
-        +エラーの名前: str
-        +本文: str
-        +次の手: list
-      }
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        索引のサーバーのエラー <|-- 読めない配信元
+        索引のサーバーのエラー <|-- 書き込めない配信元
+        索引のサーバーのエラー <|-- 配信していない配信元
+        索引のサーバーのエラー <|-- 引数の誤り
+        索引のサーバーのエラー <|-- 検査の不合格
+        索引のサーバーのエラー <|-- バージョンの不一致
+        class 索引のサーバーのエラー {
+          +エラーの名前: str
+          +本文: str
+          +次の手: list
+        }
 data_models:
-- name: Violation
-  title: 違反
-  container: project_index/shared/errors.py
-  usecase: 共通
-  role: DTO
-  summary: 違反 1 件の項目のパス・決まり・直し方
-  description: '`@dataclass(frozen=True, slots=True, kw_only=True)`。検査・設定の検証・書き込みの失敗が返す違反の 1 件。'
-  properties:
-  - name: path
-    title: 項目のパス
-    type: str
-    access: 公開
-    description: 違反した項目のパス（`documents[0].paths`・`operations[1].set.name` の形）
-    example: documents[0].paths
-  - name: rule
-    title: 決まり
-    type: str
-    access: 公開
-    description: 違反した決まり（必須のキーが無い・型が違う・検査の名前など）
-    example: 必須のキーが無い
-  - name: fix
-    title: 直し方
-    type: str
-    access: 公開
-    default: '""'
-    description: 直し方の案内。分からないときは空
-  - name: index
-    title: 操作の添字
-    type: int | None
-    access: 公開
-    default: None
-    description: '`write_docs` の `operations` の添字。操作に結び付かない違反は `None`'
-  - name: doc
-    title: 文書のパス
-    type: str | None
-    access: 公開
-    default: None
-    description: 違反した文書のパス（配信元の直下から）。エイリアスのキーの違反だけが持ち、設定のキーの違反は `None`
+  - name: Violation
+    title: 違反
+    container: project_index/shared/errors.py
+    usecase: 共通
+    role: DTO
+    summary: 違反 1 件の項目のパス・決まり・直し方
+    description: '`@dataclass(frozen=True, slots=True, kw_only=True)`。検査・設定の検証・書き込みの失敗が返す違反の 1 件。'
+    properties:
+      - name: path
+        title: 項目のパス
+        type: str
+        access: 公開
+        description: 違反した項目のパス（`documents[0].paths`・`operations[1].set.name` の形）
+        example: documents[0].paths
+      - name: rule
+        title: 決まり
+        type: str
+        access: 公開
+        description: 違反した決まり（必須のキーが無い・型が違う・検査の名前など）
+        example: 必須のキーが無い
+      - name: fix
+        title: 直し方
+        type: str
+        access: 公開
+        default: '""'
+        description: 直し方の案内。分からないときは空
+      - name: index
+        title: 操作の添字
+        type: int | None
+        access: 公開
+        default: None
+        description: '`write_docs` の `operations` の添字。操作に結び付かない違反は `None`'
+      - name: doc
+        title: 文書のパス
+        type: str | None
+        access: 公開
+        default: None
+        description: 違反した文書のパス（配信元の直下から）。エイリアスのキーの違反だけが持ち、設定のキーの違反は `None`
 classes:
-- name: ProjectIndexError
-  title: 索引のサーバーのエラー
-  container: project_index/shared/errors.py
-  usecase: 共通
-  role: 例外
-  summary: MCP の `isError` と読み取り API の problem+json に変換するエラーの基底
-  kind: クラス
-  inherits: Exception
-  description: |-
-    文書の MCP はこの例外を `isError: true` の本文に、読み取り API は RFC 9457 の problem+json に変換する（文書の MCP の『ツールのエラーの変換』・起動の『例外の変換の登録』）。
-    下の表の子クラスはどれもこの基底を継承し、プロパティを足さない限り `name` と `message` だけを持つ。
+  - name: ProjectIndexError
+    title: 索引のサーバーのエラー
+    container: project_index/shared/errors.py
+    usecase: 共通
+    role: 例外
+    summary: MCP の `isError` と読み取り API の problem+json に変換するエラーの基底
+    kind: クラス
+    inherits: Exception
+    description: |-
+      文書の MCP はこの例外を `isError: true` の本文に、読み取り API は RFC 9457 の problem+json に変換する（文書の MCP の『ツールのエラーの変換』・起動の『例外の変換の登録』）。
+      下の表の子クラスはどれもこの基底を継承し、プロパティを足さない限り `name` と `message` だけを持つ。
 
-    | 子クラス | 論理名 | 追加のプロパティ | HTTP |
-    | --- | --- | --- | --- |
-    | `UnknownSourceError` | 無い配信元 | `source_id` | 404 |
-    | `SourceNotReadableError` | 読めない配信元 | `available: list[SourceAccess]` | 403 |
-    | `SourceNotWritableError` | 書き込めない配信元 | `available: list[SourceAccess]` | 403 |
-    | `SourceNotServedError` | 配信していない配信元 | `violations: list[Violation]`・`disabled: bool` | 404 |
-    | `WorktreeNotMatchedError` | ワークツリーに当たらない | `given: str`・`patterns: list[str]` | 400 |
-    | `TargetIsCloneError` | 書く先がクローン本体 | `clone: str` | 409 |
-    | `InvalidArgumentError` | 引数の誤り | `violations: list[Violation]` | 400 |
-    | `NavInvalidError` | 画面の構成の違反 | `violations: list[Violation]` | 400 |
-    | `RefNotFoundError` | 無いリビジョン | `argument: str`・`value: str` | 404 |
-    | `UnknownKindError` | 知らない種類 | `kinds: list[str]` | 400 |
-    | `DocumentNotFoundError` | 無い文書 | `missing: list[str]`・`candidates: dict[str, list[str]]` | 404 |
-    | `ValidationFailedError` | 検査の不合格 | `violations: list[Violation]` | 422 |
-    | `VersionMismatchError` | バージョンの不一致 | `doc_id: str`・`current: str`・`diff: str` | 409 |
-    | `DocumentReferencedError` | 参照されている | `doc_id: str`・`referrers: list[str]` | 409 |
-    | `DeleteNotAllowedError` | 削除を許していない種類 | `kind: str` | 403 |
-    | `LastReadNotFoundError` | 前回読んだ記録が無い | - | 400 |
-    | `CrossOriginError` | 別のオリジンからの要求 | - | 403 |
-    | `ConfigNotFoundError` | 配信元の設定が無い | `path: str` | 404 |
-    | `ConfigParseError` | 配信元の設定が読めない | `line: int \| None`・`column: int \| None` | 400 |
-    | `ConvertScriptError` | 変換スクリプトの失敗 | `script: str` | 422 |
-    | `ConverterNotDefinedError` | 種類が `converters[]` を指さない | `kind: str` | 400 |
-    | `DecisionNotFoundError` | 検討事項の文書が 1 つに決まらない | `reason: Literal['not_found', 'ambiguous']`・`folders: list[str]` | 404 |
-    | `RestartInProgressError` | 再起動か更新の途中 | - | 409 |
-    | `UpdateFailedError` | 更新のコマンドの失敗 | `command: list[str]`・`stderr: str` | 500 |
+      | 子クラス | 論理名 | 追加のプロパティ | HTTP |
+      | --- | --- | --- | --- |
+      | `UnknownSourceError` | 無い配信元 | `source_id` | 404 |
+      | `SourceNotReadableError` | 読めない配信元 | `available: list[SourceAccess]` | 403 |
+      | `SourceNotWritableError` | 書き込めない配信元 | `available: list[SourceAccess]` | 403 |
+      | `SourceNotServedError` | 配信していない配信元 | `violations: list[Violation]`・`disabled: bool` | 404 |
+      | `WorktreeNotMatchedError` | ワークツリーに当たらない | `given: str`・`patterns: list[str]` | 400 |
+      | `TargetIsCloneError` | 書く先がクローン本体 | `clone: str` | 409 |
+      | `InvalidArgumentError` | 引数の誤り | `violations: list[Violation]` | 400 |
+      | `NavInvalidError` | 画面の構成の違反 | `violations: list[Violation]` | 400 |
+      | `RefNotFoundError` | 無いリビジョン | `argument: str`・`value: str` | 404 |
+      | `UnknownKindError` | 知らない種類 | `kinds: list[str]` | 400 |
+      | `DocumentNotFoundError` | 無い文書 | `missing: list[str]`・`candidates: dict[str, list[str]]` | 404 |
+      | `ValidationFailedError` | 検査の不合格 | `violations: list[Violation]` | 422 |
+      | `VersionMismatchError` | バージョンの不一致 | `doc_id: str`・`current: str`・`diff: str` | 409 |
+      | `DocumentReferencedError` | 参照されている | `doc_id: str`・`referrers: list[str]` | 409 |
+      | `DeleteNotAllowedError` | 削除を許していない種類 | `kind: str` | 403 |
+      | `LastReadNotFoundError` | 前回読んだ記録が無い | - | 400 |
+      | `CrossOriginError` | 別のオリジンからの要求 | - | 403 |
+      | `ConfigNotFoundError` | 配信元の設定が無い | `path: str` | 404 |
+      | `ConfigParseError` | 配信元の設定が読めない | `line: int \| None`・`column: int \| None` | 400 |
+      | `ConvertScriptError` | 変換スクリプトの失敗 | `script: str` | 422 |
+      | `ConverterNotDefinedError` | 種類が `converters[]` を指さない | `kind: str` | 400 |
+      | `DecisionNotFoundError` | 検討事項の文書が 1 つに決まらない | `reason: Literal['not_found', 'ambiguous']`・`folders: list[str]` | 404 |
+      | `RestartInProgressError` | 再起動か更新の途中 | - | 409 |
+      | `UpdateFailedError` | 更新のコマンドの失敗 | `command: list[str]`・`stderr: str` | 500 |
 
-    `SourceAccess` は権限と作業場所の『使える配信元』。
-  properties:
-  - name: name
-    title: エラーの名前
-    type: str
-    access: 公開
-    description: クラスの名前（`SourceNotReadableError` など）。MCP の本文の先頭と problem+json の `type` の末尾に出す
-  - name: message
-    title: 本文
-    type: str
-    access: 公開
-    description: 原因を 1〜2 文で書いた本文
-  - name: next_steps
-    title: 次の手
-    type: list[str]
-    access: 公開
-    default: '[]'
-    description: 呼び出し側が次にできること（`describe()` で使える配信元を見る・`worktree` を渡す など）
-  - name: status
-    title: HTTP のステータス
-    type: int
-    access: 公開
-    description: 読み取り API で返すステータス（説明の表の HTTP の列）。クラスの属性で持つ
-  methods:
-  - name: details
-    title: 詳細
-    kind: メソッド
-    summary: 子クラスが持つ追加のプロパティを辞書で返す
-    scope: public
-    returns:
-      type: dict[str, Any]
-      description: 追加のプロパティ名 → 値。`Violation` と `SourceAccess` は辞書にする
-    process: |-
-      1. `dataclasses.fields` で子クラスの追加のプロパティを並べ、名前 → 値の辞書にして返す
-      2. 値が `Violation`・`SourceAccess` のときは `dataclasses.asdict` で辞書にする
-    unit_tests:
-    - name: test_project_index_error_details
-      case: 正常
-      summary: 追加のプロパティを辞書にする
-      condition: '`SourceNotServedError(violations=[Violation(path="documents[0].paths", rule="必須のキーが無い")], disabled=False)`'
-      mock: なし
-      expected: '`{"violations": [{"path": "documents[0].paths", "rule": "必須のキーが無い", "fix": "", "index": None, "doc": None}], "disabled": False}`'
-    - name: test_project_index_error_details_when_no_extra
-      case: 正常
-      summary: 追加のプロパティが無い
-      condition: '`LastReadNotFoundError(message="…")`'
-      mock: なし
-      expected: '`{}`'
+      `SourceAccess` は権限と作業場所の『使える配信元』。
+    properties:
+      - name: name
+        title: エラーの名前
+        type: str
+        access: 公開
+        description: クラスの名前（`SourceNotReadableError` など）。MCP の本文の先頭と problem+json の `type` の末尾に出す
+      - name: message
+        title: 本文
+        type: str
+        access: 公開
+        description: 原因を 1〜2 文で書いた本文
+      - name: next_steps
+        title: 次の手
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: 呼び出し側が次にできること（`describe()` で使える配信元を見る・`worktree` を渡す など）
+      - name: status
+        title: HTTP のステータス
+        type: int
+        access: 公開
+        description: 読み取り API で返すステータス（説明の表の HTTP の列）。クラスの属性で持つ
+    methods:
+      - name: details
+        title: 詳細
+        kind: メソッド
+        summary: 子クラスが持つ追加のプロパティを辞書で返す
+        scope: public
+        returns:
+          type: dict[str, Any]
+          description: 追加のプロパティ名 → 値。`Violation` と `SourceAccess` は辞書にする
+        process: |-
+          1. `dataclasses.fields` で子クラスの追加のプロパティを並べ、名前 → 値の辞書にして返す
+          2. 値が `Violation`・`SourceAccess` のときは `dataclasses.asdict` で辞書にする
+        unit_tests:
+          - name: test_project_index_error_details
+            case: 正常
+            summary: 追加のプロパティを辞書にする
+            condition: '`SourceNotServedError(violations=[Violation(path="documents[0].paths", rule="必須のキーが無い")], disabled=False)`'
+            mock: なし
+            expected: '`{"violations": [{"path": "documents[0].paths", "rule": "必須のキーが無い", "fix": "", "index": None, "doc": None}], "disabled": False}`'
+          - name: test_project_index_error_details_when_no_extra
+            case: 正常
+            summary: 追加のプロパティが無い
+            condition: '`LastReadNotFoundError(message="…")`'
+            mock: なし
+            expected: '`{}`'

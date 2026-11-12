@@ -2,348 +2,348 @@ id: MOD-41
 title: 索引のサーバー / プロンプトの文書の変換 / markdown.py
 lead: プロンプトの YAML を読み、変数の表・テンプレート・例の組のセクションを持つ mdmark の Markdown にする。
 test_files:
-- tests/unit/project_index/features/prompt_doc/test_markdown.py
+  - tests/unit/project_index/features/prompt_doc/test_markdown.py
 constants:
-- name: LANG_TAB_GROUP
-  title: 言語のタブの組
-  container: project_index/features/prompt_doc/markdown.py
-  usecase: プロンプトの文書の変換
-  summary: 全てのセクションの言語のタブを揃えて切り替える mdmark の `group`
-  value: '"lang"'
-- name: EXPR_PATTERN
-  title: 式のパターン
-  container: project_index/features/prompt_doc/markdown.py
-  usecase: プロンプトの文書の変換
-  summary: テンプレートの本文の `{{ 式 }}` に当てる正規表現
-  value: re.compile(r"\{\{-?\s*(.*?)\s*-?\}\}")
-- name: FOR_PATTERN
-  title: ループのパターン
-  container: project_index/features/prompt_doc/markdown.py
-  usecase: プロンプトの文書の変換
-  summary: '`{% for 変数 in 配列 %}` のループの変数と配列に当てる正規表現'
-  value: re.compile(r"\{%-?\s*for\s+(\w+)\s+in\s+([\w.]+)")
+  - name: LANG_TAB_GROUP
+    title: 言語のタブの組
+    container: project_index/features/prompt_doc/markdown.py
+    usecase: プロンプトの文書の変換
+    summary: 全てのセクションの言語のタブを揃えて切り替える mdmark の `group`
+    value: '"lang"'
+  - name: EXPR_PATTERN
+    title: 式のパターン
+    container: project_index/features/prompt_doc/markdown.py
+    usecase: プロンプトの文書の変換
+    summary: テンプレートの本文の `{{ 式 }}` に当てる正規表現
+    value: re.compile(r"\{\{-?\s*(.*?)\s*-?\}\}")
+  - name: FOR_PATTERN
+    title: ループのパターン
+    container: project_index/features/prompt_doc/markdown.py
+    usecase: プロンプトの文書の変換
+    summary: '`{% for 変数 in 配列 %}` のループの変数と配列に当てる正規表現'
+    value: re.compile(r"\{%-?\s*for\s+(\w+)\s+in\s+([\w.]+)")
 functions:
-- name: convert_prompt
-  title: プロンプトの文書の変換
-  kind: 関数
-  container: project_index/features/prompt_doc/markdown.py
-  usecase: プロンプトの文書の変換
-  role: サービス
-  summary: プロンプトの YAML の文字列を読み、Markdown を返す
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: text
-    title: YAML
-    type: str
-    required: true
-    passing: positional
-    description: 標準入力で受けたプロンプトの YAML
-  returns:
-    type: str
-    description: mdmark の Markdown
-  process: |-
-    1. YAML を読む（共通の `load_yaml`）
-       - `YamlLoadError` の場合、`PromptYamlError` を送出する
-    2. `PromptDoc.model_validate` で読む
-       - `pydantic.ValidationError` の場合、誤りごとに `{キーのパス}: {理由}` を改行でつないだ `InvalidPrompt` を送出する（キーのパスは `loc` を `.` と `[n]` でつなぐ）
-    3. プロンプトの Markdown（`prompt_to_markdown`）を返す
-  exceptions:
-  - name: PromptYamlError
-    condition: YAML として読めない
-    message: '`YAML を読み込めません: {行}:{列}: {理由}`'
-  - name: InvalidPrompt
-    condition: 変換に使うキーが無いか型が違う（YAML が辞書でないときも）
-    message: '`{キーのパス}: {理由}`（誤りごとに 1 行）'
-  unit_tests:
-  - name: test_convert_prompt
-    case: 正常
-    summary: LLM のプロンプトを変換する
-    condition: A-42 の例 2 の YAML
-    mock: なし
-    expected: '`# {name}` で始まり、`## 変数`・`## テンプレート`・`## 例` をこの順に含む'
-    exception: '-'
-  - name: test_convert_prompt_when_yaml_unreadable
-    case: 異常
-    summary: 読めない YAML
-    condition: '`name: [`'
-    mock: なし
-    expected: '`PromptYamlError` で、メッセージに行と列がある'
-    exception: YAML として読めない
-  - name: test_convert_prompt_when_required_key_missing
-    case: 異常
-    summary: parts が無い
-    condition: A-42 の例 2 から `parts` を除いた YAML
-    mock: なし
-    expected: '`InvalidPrompt` で、メッセージが `parts:` で始まる'
-    exception: 変換に使うキーが無いか型が違う
-  - name: test_convert_prompt_when_texts_invalid
-    case: 異常
-    summary: 入れ子のキーの型が違う
-    condition: '`parts[0].texts` が文字列'
-    mock: なし
-    expected: '`InvalidPrompt` で、メッセージに `parts[0].texts` がある'
-    exception: 変換に使うキーが無いか型が違う
-  callers:
-  - MOD-40#functions[run_prompt_doc]
-- name: prompt_to_markdown
-  title: プロンプトの Markdown
-  kind: 関数
-  container: project_index/features/prompt_doc/markdown.py
-  usecase: プロンプトの文書の変換
-  role: 変換
-  summary: 見出し・変数の表・テンプレート・例の組のセクションを並べる
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: doc
-    title: プロンプト
-    type: PromptDoc
-    required: true
-    passing: positional
-    description: 読んだプロンプト
-  returns:
-    type: str
-    description: mdmark の Markdown
-  process: |-
-    1. 見出しを置く: `# {name}`、`kind`・`lang` のバッジ、`description` の段落、`tags` があればタグの行、`output` があれば出力の行（YAML のフロー形式）
-    2. `## 変数` に変数の表（`var_table`）を置く
-    3. 描画の環境（`build_environment`）と部品のテンプレート（`compile_parts`）を作る
-    4. `## テンプレート` に部品ごとの `### {id}` を置き、`role`・`tags`・`when` のバッジの後に言語ごとの本文（`template_html` を `<!-- html -->` で囲む）を言語のタブ（`lang_tabs`）で置く
-       - 構文の誤りのある部品は、該当する言語のタブ（`when` の誤りは全ての言語のタブ）の本文の前に `[!CAUTION]` で場所・行・理由を置く
-       - その言語の本文が無い部品は「{lang} の本文はありません。」を置く
-    5. `## 例` に「既定の例」と `examples` の組ごとの `### {名前}` を置き（2 つ目以降は見出しの後に `<!-- section: closed -->`）、言語ごとの描画の結果（`render_example` を `example_body` で Markdown にする）を言語のタブで置く
-  unit_tests:
-  - name: test_prompt_to_markdown
-    case: 正常
-    summary: 見出しとセクションの並び
-    condition: A-42 の例 2（`examples` に `no-logs`）
-    mock: なし
-    expected: '`badge:kind: llm`・`badge:lang: en` があり、`### 既定の例` の後の `### ログが無い` の直後に `<!-- section: closed -->`、部品ごとの `###` が `parts` の順'
-  - name: test_prompt_to_markdown_when_part_syntax_invalid
-    case: 正常
-    summary: 構文の誤った部品だけを注意書きにする
-    condition: 部品 `logs` の本文から `{% endif %}` を外す
-    mock: なし
-    expected: '`### logs` と各例の組のセクションに `[!CAUTION]` があり、他の部品のセクションと変数の表はある'
-- name: var_table
-  title: 変数の表
-  kind: 関数
-  container: project_index/features/prompt_doc/markdown.py
-  usecase: プロンプトの文書の変換
-  role: 変換
-  summary: 変数のパスごとの行を持つ表の Markdown を作る
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: vars_
-    title: 変数
-    type: Mapping[str, PromptVar]
-    required: true
-    passing: positional
-    description: '`PromptDoc.vars`'
-  returns:
-    type: list[str]
-    description: 表の行
-  process: |-
-    1. 列を変数・型・必須・例・説明・出典にする
-    2. 変数のパスの展開（`flatten_vars`）の順に 1 行ずつ置く。例は YAML のフロー形式の 1 行、必須は `✅`、無い値は `-`。セルの `|` と改行はエスケープする
-  unit_tests:
-  - name: test_var_table
-    case: 正常
-    summary: 入れ子のパスと例
-    condition: '`traits`（`items.properties` に `name`、`example` に 1 件）'
-    mock: なし
-    expected: 見出しの行が `\| 変数 \| 型 \| 必須 \| 例 \| 説明 \| 出典 \|`、`traits[].name` の行があり、`traits` の例がフロー形式の 1 行
-- name: template_html
-  title: テンプレートの本文の HTML
-  kind: 関数
-  container: project_index/features/prompt_doc/markdown.py
-  usecase: プロンプトの文書の変換
-  role: 変換
-  summary: 部品の本文をエスケープし、`{{ 変数 }}` に `data-hint` を付けた `<pre>` にする
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: text
-    title: 本文
-    type: str
-    required: true
-    passing: positional
-    description: 部品の 1 言語の本文
-  - name: paths
-    title: 変数の定義
-    type: Mapping[str, PromptVar]
-    required: true
-    passing: keyword
-    description: パス → 定義（`flatten_vars`）
-  returns:
-    type: str
-    description: '`<pre><code>…</code></pre>`'
-  process: |-
-    1. `FOR_PATTERN` でループの変数 → 配列の名前を集める
-    2. `EXPR_PATTERN` の式ごとに、式の前の文字列を `html.escape` し、式の先頭の変数のパスを解く（ループの変数は `{配列}[]` に読み替える）
-       - パスが定義にある場合（`logs[]` のように `[]` で終わり定義に無いパスは、配列の `items` の定義を使う）、エスケープした式を `<span data-hint="{ヒント}">` で囲む。ヒントは `{説明}（型: {type}、例: {example のフロー形式}）` をエスケープしたもの
-       - 無い場合、エスケープした式だけを置く
-    3. 残りをエスケープしてつなぎ、`<pre><code>` で囲む
-  unit_tests:
-  - name: test_template_html
-    case: 正常
-    summary: 変数にヒントを付ける
-    condition: '`こんにちは {{ character.display_name }}`、`character.display_name` の説明が「表示名」・`type: string`・`example: ひな`'
-    mock: なし
-    expected: '`<span data-hint="表示名（型: string、例: ひな）">{{ character.display_name }}</span>` を含む'
-  - name: test_template_html_when_loop_variable
-    case: 正常
-    summary: ループの変数を配列の要素のパスに読み替える
-    condition: '`{% for t in traits %}{{ t.name }}{% endfor %}`、`traits[].name` の定義がある'
-    mock: なし
-    expected: '`{{ t.name }}` に `traits[].name` の説明の `data-hint` が付く'
-  - name: test_template_html_when_html_in_text
-    case: 正常
-    summary: 本文のタグをエスケープする
-    condition: '`<rules>a < b</rules>`'
-    mock: なし
-    expected: '`&lt;rules&gt;a &lt; b&lt;/rules&gt;` を含む'
-- name: example_body
-  title: 例の組の中身
-  kind: 関数
-  container: project_index/features/prompt_doc/markdown.py
-  usecase: プロンプトの文書の変換
-  role: 変換
-  summary: 例の組を 1 言語で描画した結果を Markdown の行にする
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: rendered
-    title: 描画の結果
-    type: RenderedExample
-    required: true
-    passing: positional
-    description: '`render_example` の結果'
-  - name: doc
-    title: プロンプト
-    type: PromptDoc
-    required: true
-    passing: keyword
-    description: '`kind`・`lang` を引く'
-  - name: lang
-    title: 言語
-    type: str
-    required: true
-    passing: keyword
-    description: 描画した言語
-  - name: paths
-    title: 変数の定義
-    type: Mapping[str, PromptVar]
-    required: true
-    passing: keyword
-    description: パス → 定義（マーカーのツールチップ）
-  returns:
-    type: list[str]
-    description: タブの中身の行
-  process: |-
-    1. `problems` がある場合、`[!CAUTION]` に「この組は描画できません。」と理由の箇条書きを置いて返す
-    2. `kind` が `hook` で `char_count` が `HOOK_TEXT_WARN_CHARS` を超える場合、`[!WARNING]` に字数と上限を置く
-    3. メッセージごとに、`role` があれば `**{role}**` の行を置き、`marked` を `html.escape` してから `VALUE_MARK_PATTERN` を `<mark data-hint="{ヒント}">{値}</mark>`（ヒントは `{パス}: {説明}` をエスケープしたもの。説明は `template_html` と同じく、定義に無い `[]` で終わるパスは配列の `items` から引く）に置き換えた `<pre><code>` を `<!-- html -->` で囲んで置く
-    4. `{字数の見出し}: {char_count:,} 字 / 使用しなかった部品: {unused か なし}` の行を置く。字数の見出しは、`lang` が注入する言語なら `注入する本文（{lang}）`、それ以外は `{lang} の本文`
-  unit_tests:
-  - name: test_example_body
-    case: 正常
-    summary: 役割ごとの本文と字数の行
-    condition: '`system`・`user` の 2 件、`user` の `marked` に `<rules>` と区切りで囲んだ `ひな`（`character.display_name`）、区切りで囲んだ `ruby` の値（説明が `"読み"`）、`lang` が注入する言語'
-    mock: なし
-    expected: '`**system**`・`**user**` の行、`&lt;rules&gt;`、`<mark data-hint="character.display_name: 表示名">ひな</mark>`、`ruby` の `data-hint` の `&quot;読み&quot;`、`注入する本文（en）: {エスケープ前の字数} 字` の行がある'
-  - name: test_example_body_when_problems
-    case: 正常
-    summary: 描画できない組
-    condition: '`problems` に 1 件'
-    mock: なし
-    expected: '`> [!CAUTION]` と理由があり、`<pre>` が無い'
-  - name: test_example_body_when_hook_over_limit
-    case: 正常
-    summary: フックの字数が上限を超える
-    condition: '`kind: hook`、`char_count` が 1001'
-    mock: なし
-    expected: '`> [!WARNING]` に `1,001` と `1,000` があり、本文もある'
-  - name: test_example_body_when_hook_at_limit
-    case: 正常
-    summary: 字数がちょうど上限
-    condition: '`kind: hook`、`char_count` が 1000'
-    mock: なし
-    expected: '`[!WARNING]` が無い'
-- name: lang_tabs
-  title: 言語のタブ
-  kind: 関数
-  container: project_index/features/prompt_doc/markdown.py
-  usecase: プロンプトの文書の変換
-  role: 変換
-  summary: 言語ごとの中身を言語のタブに並べる（言語が 1 つなら中身だけ）
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
+  - name: convert_prompt
+    title: プロンプトの文書の変換
+    kind: 関数
+    container: project_index/features/prompt_doc/markdown.py
+    usecase: プロンプトの文書の変換
+    role: サービス
+    summary: プロンプトの YAML の文字列を読み、Markdown を返す
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: text
+        title: YAML
+        type: str
+        required: true
+        passing: positional
+        description: 標準入力で受けたプロンプトの YAML
+    returns:
+      type: str
+      description: mdmark の Markdown
+    process: |-
+      1. YAML を読む（共通の `load_yaml`）
+         - `YamlLoadError` の場合、`PromptYamlError` を送出する
+      2. `PromptDoc.model_validate` で読む
+         - `pydantic.ValidationError` の場合、誤りごとに `{キーのパス}: {理由}` を改行でつないだ `InvalidPrompt` を送出する（キーのパスは `loc` を `.` と `[n]` でつなぐ）
+      3. プロンプトの Markdown（`prompt_to_markdown`）を返す
+    exceptions:
+      - name: PromptYamlError
+        condition: YAML として読めない
+        message: '`YAML を読み込めません: {行}:{列}: {理由}`'
+      - name: InvalidPrompt
+        condition: 変換に使うキーが無いか型が違う（YAML が辞書でないときも）
+        message: '`{キーのパス}: {理由}`（誤りごとに 1 行）'
+    unit_tests:
+      - name: test_convert_prompt
+        case: 正常
+        summary: LLM のプロンプトを変換する
+        condition: A-42 の例 2 の YAML
+        mock: なし
+        expected: '`# {name}` で始まり、`## 変数`・`## テンプレート`・`## 例` をこの順に含む'
+        exception: '-'
+      - name: test_convert_prompt_when_yaml_unreadable
+        case: 異常
+        summary: 読めない YAML
+        condition: '`name: [`'
+        mock: なし
+        expected: '`PromptYamlError` で、メッセージに行と列がある'
+        exception: YAML として読めない
+      - name: test_convert_prompt_when_required_key_missing
+        case: 異常
+        summary: parts が無い
+        condition: A-42 の例 2 から `parts` を除いた YAML
+        mock: なし
+        expected: '`InvalidPrompt` で、メッセージが `parts:` で始まる'
+        exception: 変換に使うキーが無いか型が違う
+      - name: test_convert_prompt_when_texts_invalid
+        case: 異常
+        summary: 入れ子のキーの型が違う
+        condition: '`parts[0].texts` が文字列'
+        mock: なし
+        expected: '`InvalidPrompt` で、メッセージに `parts[0].texts` がある'
+        exception: 変換に使うキーが無いか型が違う
+    callers:
+      - MOD-40#functions[run_prompt_doc]
+  - name: prompt_to_markdown
+    title: プロンプトの Markdown
+    kind: 関数
+    container: project_index/features/prompt_doc/markdown.py
+    usecase: プロンプトの文書の変換
+    role: 変換
+    summary: 見出し・変数の表・テンプレート・例の組のセクションを並べる
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: doc
+        title: プロンプト
+        type: PromptDoc
+        required: true
+        passing: positional
+        description: 読んだプロンプト
+    returns:
+      type: str
+      description: mdmark の Markdown
+    process: |-
+      1. 見出しを置く: `# {name}`、`kind`・`lang` のバッジ、`description` の段落、`tags` があればタグの行、`output` があれば出力の行（YAML のフロー形式）
+      2. `## 変数` に変数の表（`var_table`）を置く
+      3. 描画の環境（`build_environment`）と部品のテンプレート（`compile_parts`）を作る
+      4. `## テンプレート` に部品ごとの `### {id}` を置き、`role`・`tags`・`when` のバッジの後に言語ごとの本文（`template_html` を `<!-- html -->` で囲む）を言語のタブ（`lang_tabs`）で置く
+         - 構文の誤りのある部品は、該当する言語のタブ（`when` の誤りは全ての言語のタブ）の本文の前に `[!CAUTION]` で場所・行・理由を置く
+         - その言語の本文が無い部品は「{lang} の本文はありません。」を置く
+      5. `## 例` に「既定の例」と `examples` の組ごとの `### {名前}` を置き（2 つ目以降は見出しの後に `<!-- section: closed -->`）、言語ごとの描画の結果（`render_example` を `example_body` で Markdown にする）を言語のタブで置く
+    unit_tests:
+      - name: test_prompt_to_markdown
+        case: 正常
+        summary: 見出しとセクションの並び
+        condition: A-42 の例 2（`examples` に `no-logs`）
+        mock: なし
+        expected: '`badge:kind: llm`・`badge:lang: en` があり、`### 既定の例` の後の `### ログが無い` の直後に `<!-- section: closed -->`、部品ごとの `###` が `parts` の順'
+      - name: test_prompt_to_markdown_when_part_syntax_invalid
+        case: 正常
+        summary: 構文の誤った部品だけを注意書きにする
+        condition: 部品 `logs` の本文から `{% endif %}` を外す
+        mock: なし
+        expected: '`### logs` と各例の組のセクションに `[!CAUTION]` があり、他の部品のセクションと変数の表はある'
+  - name: var_table
+    title: 変数の表
+    kind: 関数
+    container: project_index/features/prompt_doc/markdown.py
+    usecase: プロンプトの文書の変換
+    role: 変換
+    summary: 変数のパスごとの行を持つ表の Markdown を作る
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: vars_
+        title: 変数
+        type: Mapping[str, PromptVar]
+        required: true
+        passing: positional
+        description: '`PromptDoc.vars`'
+    returns:
+      type: list[str]
+      description: 表の行
+    process: |-
+      1. 列を変数・型・必須・例・説明・出典にする
+      2. 変数のパスの展開（`flatten_vars`）の順に 1 行ずつ置く。例は YAML のフロー形式の 1 行、必須は `✅`、無い値は `-`。セルの `|` と改行はエスケープする
+    unit_tests:
+      - name: test_var_table
+        case: 正常
+        summary: 入れ子のパスと例
+        condition: '`traits`（`items.properties` に `name`、`example` に 1 件）'
+        mock: なし
+        expected: 見出しの行が `\| 変数 \| 型 \| 必須 \| 例 \| 説明 \| 出典 \|`、`traits[].name` の行があり、`traits` の例がフロー形式の 1 行
+  - name: template_html
+    title: テンプレートの本文の HTML
+    kind: 関数
+    container: project_index/features/prompt_doc/markdown.py
+    usecase: プロンプトの文書の変換
+    role: 変換
+    summary: 部品の本文をエスケープし、`{{ 変数 }}` に `data-hint` を付けた `<pre>` にする
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: text
+        title: 本文
+        type: str
+        required: true
+        passing: positional
+        description: 部品の 1 言語の本文
+      - name: paths
+        title: 変数の定義
+        type: Mapping[str, PromptVar]
+        required: true
+        passing: keyword
+        description: パス → 定義（`flatten_vars`）
+    returns:
+      type: str
+      description: '`<pre><code>…</code></pre>`'
+    process: |-
+      1. `FOR_PATTERN` でループの変数 → 配列の名前を集める
+      2. `EXPR_PATTERN` の式ごとに、式の前の文字列を `html.escape` し、式の先頭の変数のパスを解く（ループの変数は `{配列}[]` に読み替える）
+         - パスが定義にある場合（`logs[]` のように `[]` で終わり定義に無いパスは、配列の `items` の定義を使う）、エスケープした式を `<span data-hint="{ヒント}">` で囲む。ヒントは `{説明}（型: {type}、例: {example のフロー形式}）` をエスケープしたもの
+         - 無い場合、エスケープした式だけを置く
+      3. 残りをエスケープしてつなぎ、`<pre><code>` で囲む
+    unit_tests:
+      - name: test_template_html
+        case: 正常
+        summary: 変数にヒントを付ける
+        condition: '`こんにちは {{ character.display_name }}`、`character.display_name` の説明が「表示名」・`type: string`・`example: ひな`'
+        mock: なし
+        expected: '`<span data-hint="表示名（型: string、例: ひな）">{{ character.display_name }}</span>` を含む'
+      - name: test_template_html_when_loop_variable
+        case: 正常
+        summary: ループの変数を配列の要素のパスに読み替える
+        condition: '`{% for t in traits %}{{ t.name }}{% endfor %}`、`traits[].name` の定義がある'
+        mock: なし
+        expected: '`{{ t.name }}` に `traits[].name` の説明の `data-hint` が付く'
+      - name: test_template_html_when_html_in_text
+        case: 正常
+        summary: 本文のタグをエスケープする
+        condition: '`<rules>a < b</rules>`'
+        mock: なし
+        expected: '`&lt;rules&gt;a &lt; b&lt;/rules&gt;` を含む'
+  - name: example_body
+    title: 例の組の中身
+    kind: 関数
+    container: project_index/features/prompt_doc/markdown.py
+    usecase: プロンプトの文書の変換
+    role: 変換
+    summary: 例の組を 1 言語で描画した結果を Markdown の行にする
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: rendered
+        title: 描画の結果
+        type: RenderedExample
+        required: true
+        passing: positional
+        description: '`render_example` の結果'
+      - name: doc
+        title: プロンプト
+        type: PromptDoc
+        required: true
+        passing: keyword
+        description: '`kind`・`lang` を引く'
+      - name: lang
+        title: 言語
+        type: str
+        required: true
+        passing: keyword
+        description: 描画した言語
+      - name: paths
+        title: 変数の定義
+        type: Mapping[str, PromptVar]
+        required: true
+        passing: keyword
+        description: パス → 定義（マーカーのツールチップ）
+    returns:
+      type: list[str]
+      description: タブの中身の行
+    process: |-
+      1. `problems` がある場合、`[!CAUTION]` に「この組は描画できません。」と理由の箇条書きを置いて返す
+      2. `kind` が `hook` で `char_count` が `HOOK_TEXT_WARN_CHARS` を超える場合、`[!WARNING]` に字数と上限を置く
+      3. メッセージごとに、`role` があれば `**{role}**` の行を置き、`marked` を `html.escape` してから `VALUE_MARK_PATTERN` を `<mark data-hint="{ヒント}">{値}</mark>`（ヒントは `{パス}: {説明}` をエスケープしたもの。説明は `template_html` と同じく、定義に無い `[]` で終わるパスは配列の `items` から引く）に置き換えた `<pre><code>` を `<!-- html -->` で囲んで置く
+      4. `{字数の見出し}: {char_count:,} 字 / 使用しなかった部品: {unused か なし}` の行を置く。字数の見出しは、`lang` が注入する言語なら `注入する本文（{lang}）`、それ以外は `{lang} の本文`
+    unit_tests:
+      - name: test_example_body
+        case: 正常
+        summary: 役割ごとの本文と字数の行
+        condition: '`system`・`user` の 2 件、`user` の `marked` に `<rules>` と区切りで囲んだ `ひな`（`character.display_name`）、区切りで囲んだ `ruby` の値（説明が `"読み"`）、`lang` が注入する言語'
+        mock: なし
+        expected: '`**system**`・`**user**` の行、`&lt;rules&gt;`、`<mark data-hint="character.display_name: 表示名">ひな</mark>`、`ruby` の `data-hint` の `&quot;読み&quot;`、`注入する本文（en）: {エスケープ前の字数} 字` の行がある'
+      - name: test_example_body_when_problems
+        case: 正常
+        summary: 描画できない組
+        condition: '`problems` に 1 件'
+        mock: なし
+        expected: '`> [!CAUTION]` と理由があり、`<pre>` が無い'
+      - name: test_example_body_when_hook_over_limit
+        case: 正常
+        summary: フックの字数が上限を超える
+        condition: '`kind: hook`、`char_count` が 1001'
+        mock: なし
+        expected: '`> [!WARNING]` に `1,001` と `1,000` があり、本文もある'
+      - name: test_example_body_when_hook_at_limit
+        case: 正常
+        summary: 字数がちょうど上限
+        condition: '`kind: hook`、`char_count` が 1000'
+        mock: なし
+        expected: '`[!WARNING]` が無い'
+  - name: lang_tabs
+    title: 言語のタブ
+    kind: 関数
+    container: project_index/features/prompt_doc/markdown.py
+    usecase: プロンプトの文書の変換
+    role: 変換
+    summary: 言語ごとの中身を言語のタブに並べる（言語が 1 つなら中身だけ）
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: languages
+        title: 言語
+        type: Sequence[str]
+        required: true
+        passing: positional
+        description: 注入する言語を先頭にした、部品の本文に出る言語（`languages`）
+      - name: body_of
+        title: 中身
+        type: Callable[[str], list[str]]
+        required: true
+        passing: positional
+        description: 言語 → タブの中身の行
+    returns:
+      type: list[str]
+      description: 行
+    process: |-
+      1. 言語が 1 つの場合、その言語の中身だけを返す
+      2. `<!-- tabs: group={LANG_TAB_GROUP} -->` の後に、言語ごとに `#### {言語}` と中身を置き、`<!-- /tabs -->` で閉じる
+    unit_tests:
+      - name: test_lang_tabs
+        case: 正常
+        summary: 言語が 2 つ
+        condition: '`["en", "ja"]`'
+        mock: なし
+        expected: '`<!-- tabs: group=lang -->`・`#### en`・`#### ja`・`<!-- /tabs -->` がこの順にある'
+      - name: test_lang_tabs_when_single_language
+        case: 正常
+        summary: 言語が 1 つ
+        condition: '`["ja"]`'
+        mock: なし
+        expected: '`<!-- tabs:` も `####` も無く、中身だけ'
   - name: languages
-    title: 言語
-    type: Sequence[str]
-    required: true
-    passing: positional
-    description: 注入する言語を先頭にした、部品の本文に出る言語（`languages`）
-  - name: body_of
-    title: 中身
-    type: Callable[[str], list[str]]
-    required: true
-    passing: positional
-    description: 言語 → タブの中身の行
-  returns:
-    type: list[str]
-    description: 行
-  process: |-
-    1. 言語が 1 つの場合、その言語の中身だけを返す
-    2. `<!-- tabs: group={LANG_TAB_GROUP} -->` の後に、言語ごとに `#### {言語}` と中身を置き、`<!-- /tabs -->` で閉じる
-  unit_tests:
-  - name: test_lang_tabs
-    case: 正常
-    summary: 言語が 2 つ
-    condition: '`["en", "ja"]`'
-    mock: なし
-    expected: '`<!-- tabs: group=lang -->`・`#### en`・`#### ja`・`<!-- /tabs -->` がこの順にある'
-  - name: test_lang_tabs_when_single_language
-    case: 正常
-    summary: 言語が 1 つ
-    condition: '`["ja"]`'
-    mock: なし
-    expected: '`<!-- tabs:` も `####` も無く、中身だけ'
-- name: languages
-  title: 言語の並び
-  kind: 関数
-  container: project_index/features/prompt_doc/markdown.py
-  usecase: プロンプトの文書の変換
-  role: 変換
-  summary: 部品の本文に出る言語を、注入する言語を先頭にして並べる
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: doc
-    title: プロンプト
-    type: PromptDoc
-    required: true
-    passing: positional
-    description: 読んだプロンプト
-  returns:
-    type: list[str]
-    description: '`lang` を先頭に、部品の `texts` に出る順'
-  process: 1. `doc.lang` を先頭に置き、部品の `texts` の `lang` を出る順に重なりなく続ける
-  unit_tests:
-  - name: test_languages
-    case: 正常
-    summary: 注入する言語を先頭にする
-    condition: '`lang: en`、部品の `texts` が `ja`・`en` の順'
-    mock: なし
-    expected: '`["en", "ja"]`'
+    title: 言語の並び
+    kind: 関数
+    container: project_index/features/prompt_doc/markdown.py
+    usecase: プロンプトの文書の変換
+    role: 変換
+    summary: 部品の本文に出る言語を、注入する言語を先頭にして並べる
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: doc
+        title: プロンプト
+        type: PromptDoc
+        required: true
+        passing: positional
+        description: 読んだプロンプト
+    returns:
+      type: list[str]
+      description: '`lang` を先頭に、部品の `texts` に出る順'
+    process: 1. `doc.lang` を先頭に置き、部品の `texts` の `lang` を出る順に重なりなく続ける
+    unit_tests:
+      - name: test_languages
+        case: 正常
+        summary: 注入する言語を先頭にする
+        condition: '`lang: en`、部品の `texts` が `ja`・`en` の順'
+        mock: なし
+        expected: '`["en", "ja"]`'

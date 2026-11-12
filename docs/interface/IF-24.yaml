@@ -4,118 +4,118 @@ entry:
   kind: endpoint
   value: GET `/sources/{source}/docs`
 flows:
-- name: 正常系
-  summary: 指定のリビジョンの文書の ID・パス・種類・メタデータを返す
-  setup:
-  - name: Mock
-    description: なし（一時フォルダに配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
-  - name: サンプルの配信元
-    description: 種類 `design` の YAML 2 件と、管理用の YAML `files.yaml` の行の文書 1 件を `main` に持つ sample
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant E as GET /sources/{source}/docs
+  - name: 正常系
+    summary: 指定のリビジョンの文書の ID・パス・種類・メタデータを返す
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+      - name: サンプルの配信元
+        description: 種類 `design` の YAML 2 件と、管理用の YAML `files.yaml` の行の文書 1 件を `main` に持つ sample
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs
 
-      C->>E: GET /sources/sample/docs
-      E-->>C: 200 文書の一覧
-    ```
-  expected:
-  - 200 で、`ref` が `main`、`documents` に 3 件が並ぶ
-  - 各要素が `id`・`path`・`kind`・`name`・`description`・`tags`・`visibility` を持ち、行の文書は `bodyPath` を持つ
-  test: test_normal
-- name: 正常系（リビジョンを指す）
-  summary: '`ref` の文書の一覧を返す'
-  setup:
-  - name: Mock
-    description: なし
-  - name: サンプルの配信元
-    description: 正常系と同じ sample。最新の commit で文書を 1 件追加した
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant E as GET /sources/{source}/docs
+        C->>E: GET /sources/sample/docs
+        E-->>C: 200 文書の一覧
+      ```
+    expected:
+      - 200 で、`ref` が `main`、`documents` に 3 件が並ぶ
+      - 各要素が `id`・`path`・`kind`・`name`・`description`・`tags`・`visibility` を持ち、行の文書は `bodyPath` を持つ
+    test: test_normal
+  - name: 正常系（リビジョンを指す）
+    summary: '`ref` の文書の一覧を返す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: サンプルの配信元
+        description: 正常系と同じ sample。最新の commit で文書を 1 件追加した
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs
 
-      C->>E: GET /sources/sample/docs?ref={親の commit}
-      E-->>C: 200 親の commit の文書の一覧
-    ```
-  expected:
-  - 200 で、`documents` に追加した文書が無い
-  test: test_normal_when_ref_given
-- name: 異常系（無い配信元・リビジョン・404）
-  summary: 無い配信元・配信していない配信元・解決できないリビジョンを断る
-  setup:
-  - name: Mock
-    description: なし
-  - name: 入力
-    description: '`/sources/unknown/docs` と `/sources/sample/docs?ref=no-such-branch`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant E as GET /sources/{source}/docs
+        C->>E: GET /sources/sample/docs?ref={親の commit}
+        E-->>C: 200 親の commit の文書の一覧
+      ```
+    expected:
+      - 200 で、`documents` に追加した文書が無い
+    test: test_normal_when_ref_given
+  - name: 異常系（無い配信元・リビジョン・404）
+    summary: 無い配信元・配信していない配信元・解決できないリビジョンを断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`/sources/unknown/docs` と `/sources/sample/docs?ref=no-such-branch`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs
 
-      C->>E: GET /sources/sample/docs?ref=no-such-branch
-      E-->>C: 404 problem+json
-    ```
-  expected:
-  - 無い配信元は 404 で `missing` が `source`
-  - 無いリビジョンは 404 で `missing` が `ref`、`detail` にリビジョンの名前 `no-such-branch` がある
-  test: test_error_when_not_found
+        C->>E: GET /sources/sample/docs?ref=no-such-branch
+        E-->>C: 404 problem+json
+      ```
+    expected:
+      - 無い配信元は 404 で `missing` が `source`
+      - 無いリビジョンは 404 で `missing` が `ref`、`detail` にリビジョンの名前 `no-such-branch` がある
+    test: test_error_when_not_found
 lead: 指定のリビジョンの文書の一覧（ID・パス・種類・メタデータ）を返す。
 identifier: list_documents
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true
 side_effects: なし
 callers:
-- SC-11#scenarios[正常シナリオ]
-- SC-11#scenarios[異常シナリオ（無いリビジョンを指す）]
+  - SC-11#scenarios[正常シナリオ]
+  - SC-11#scenarios[異常シナリオ（無いリビジョンを指す）]
 exclusivity: 読み取りだけで排他しない
 request:
-- name: source
-  type: str
-  required: true
-  location: path
-  description: 配信元の ID
-- name: ref
-  type: str
-  required: false
-  default: 配信元の `default_ref`
-  location: query
-  description: リビジョン（ブランチ・コミット・タグ）
+  - name: source
+    type: str
+    required: true
+    location: path
+    description: 配信元の ID
+  - name: ref
+    type: str
+    required: false
+    default: 配信元の `default_ref`
+    location: query
+    description: リビジョン（ブランチ・コミット・タグ）
 request_example: |-
   ```text
   GET /sources/sample/docs?ref=main
   ```
 response:
-- name: ref
-  type: str
-  description: 解決したリビジョンの名前
-- name: documents[].id
-  type: str
-  description: 文書の ID
-- name: documents[].path
-  type: str
-  description: 文書のファイルのパス（配信元の直下から、拡張子つき）
-- name: documents[].kind
-  type: str
-  description: 種類（`documents[].id`）
-- name: documents[].name
-  type: str
-  description: 名前（共通のキー `name`）
-- name: documents[].description
-  type: str | None
-  description: 概要（共通のキー `description`）
-- name: documents[].tags
-  type: list[str]
-  description: タグ
-- name: documents[].visibility
-  type: str | None
-  description: 公開範囲
-- name: documents[].bodyPath
-  type: str | None
-  description: 本文のファイルのパス（管理用の YAML の行の文書だけ）
+  - name: ref
+    type: str
+    description: 解決したリビジョンの名前
+  - name: documents[].id
+    type: str
+    description: 文書の ID
+  - name: documents[].path
+    type: str
+    description: 文書のファイルのパス（配信元の直下から、拡張子つき）
+  - name: documents[].kind
+    type: str
+    description: 種類（`documents[].id`）
+  - name: documents[].name
+    type: str
+    description: 名前（共通のキー `name`）
+  - name: documents[].description
+    type: str | None
+    description: 概要（共通のキー `description`）
+  - name: documents[].tags
+    type: list[str]
+    description: タグ
+  - name: documents[].visibility
+    type: str | None
+    description: 公開範囲
+  - name: documents[].bodyPath
+    type: str | None
+    description: 本文のファイルのパス（管理用の YAML の行の文書だけ）
 response_example: |-
   ```json
   {"ref": "main", "documents": [
@@ -124,18 +124,18 @@ response_example: |-
   ]}
   ```
 status_codes:
-- code: '200'
-  condition: 返した（文書が 0 件でも 200）
-- code: '404'
-  condition: 配信元が無い・配信していない、リビジョンを解決できない
-  notes: '`missing`（`source`・`not_served`・`ref`）と値'
+  - code: '200'
+    condition: 返した（文書が 0 件でも 200）
+  - code: '404'
+    condition: 配信元が無い・配信していない、リビジョンを解決できない
+    notes: '`missing`（`source`・`not_served`・`ref`）と値'
 error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）
 constraints:
-- item: 並び
-  constraint: '`documents[]` の行の順、行の中はパスの順'
-- item: 認可
-  constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
-  decided_by: NFR-1#requirements[通信]
-- item: JSON のキー
-  constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名は変えない
+  - item: 並び
+    constraint: '`documents[]` の行の順、行の中はパスの順'
+  - item: 認可
+    constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
+    decided_by: NFR-1#requirements[通信]
+  - item: JSON のキー
+    constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名は変えない
 test_file: tests/integration/server/test_list_documents.py

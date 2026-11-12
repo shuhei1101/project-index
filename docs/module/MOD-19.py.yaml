@@ -2,73 +2,73 @@ id: MOD-19
 title: 索引のサーバー / 説明 / render.py
 lead: '`describe` の結果の Markdown。'
 test_files:
-- tests/unit/project_index/features/describe/test_render.py
+  - tests/unit/project_index/features/describe/test_render.py
 functions:
-- name: render_describe_markdown
-  title: 説明の Markdown
-  kind: 関数
-  container: project_index/features/describe/render.py
-  usecase: 説明
-  role: 変換
-  summary: '`format: markdown` の本文を作る'
-  scope: public
-  thread_safe: true
-  args:
-  - name: result
-    title: 結果
-    type: SourceListResult | SourceGuideResult | KindSchemaResult
-    required: true
-    passing: positional
-    description: 描く結果
-  returns:
-    type: str
-    description: Markdown
-  process: |-
-    1. 配信元の説明書と種類のスキーマは、`outside_scope` が `True` なら先頭に `作業範囲の外（参考）` の行を置く
-    2. 使える配信元の一覧は、`作業場所: {cwd}（{配信元} のクローン本体 / ワークツリー）` の行と `| source | 権限 | description |` の表（作業中の配信元は権限に `（作業中）`）。`outside_sources` が `None` でなければ、空行・`作業範囲の外（参考）` の行・`| source | description |` の表を続ける（0 件は表の代わりに `なし` の行）。使える配信元が 0 件のときは、表の代わりに `使用できる配信元はありません。配信元にするときは /project-index:setup を実行します。` の行を置く。`warnings` が空でなければ、空行・`注意:` の行・警告ごとに `- {警告}` の行を続ける
-    3. 配信元の説明書は、`instructions` をそのまま置き、`| kind | description |` の表を続ける。`refs` があれば `ブランチ: {,で繋いだ名前}`・`タグ: {同じ}` の行、`worktrees` があれば `| ワークツリー | ブランチ |` の表を続ける
-    4. 種類のスキーマは、`metadata` が空でなければ `| 共通のキー | 列名 |` の表を置き、```yaml でスキーマの YAML を囲む
-  unit_tests:
-  - name: test_render_describe_markdown
-    case: 正常
-    summary: 一覧の表
-    condition: sample（write・作業中）と notes（read）
-    mock: なし
-    expected: '`| sample | write（作業中） | ... |` と `| notes | read | ... |` の行'
-  - name: test_render_describe_markdown_when_outside_sources
-    case: 正常
-    summary: 作業範囲の外で読める配信元の表
-    condition: sample（write・作業中）と、`outside_sources` に other
-    mock: なし
-    expected: 使える配信元の表の後ろに `作業範囲の外（参考）` の行と `| other | ... |` の行があり、`outside_sources` が `None` の一覧には `作業範囲の外（参考）` の行が無い
-  - name: test_render_describe_markdown_when_outside_sources_empty
-    case: 正常
-    summary: 作業範囲の外で読める配信元が 0 件
-    condition: '`outside_sources` が空のリスト'
-    mock: なし
-    expected: '`作業範囲の外（参考）` の行の次が `なし` の行で、`| source | description |` の表が無い'
-  - name: test_render_describe_markdown_when_warnings
-    case: 正常
-    summary: 注意の一覧
-    condition: sample（write・作業中）と、`warnings` に 1 件
-    mock: なし
-    expected: 表の後に `注意:` の行と `- {警告}` の行があり、`warnings` が空の一覧には `注意:` の行が無い
-  - name: test_render_describe_markdown_when_no_source
-    case: 正常
-    summary: 使える配信元が無い
-    condition: '`sources` が空、`warnings` に 1 件'
-    mock: なし
-    expected: '`| source | 権限 | description |` の表が無く、`/project-index:setup` の行と `注意:` の行がある'
-  - name: test_render_describe_markdown_when_metadata
-    case: 正常
-    summary: メタデータの対応の表
-    condition: '`metadata` が `{name: title}` の種類のスキーマ'
-    mock: なし
-    expected: '`| name | title |` の行が YAML のコードブロックの前にある'
-  - name: test_render_describe_markdown_when_outside_scope
-    case: 正常
-    summary: 作業範囲の外の表示
-    condition: '`outside_scope: true` の配信元の説明書'
-    mock: なし
-    expected: 先頭の行が `作業範囲の外（参考）`
-    exception: '-'
+  - name: render_describe_markdown
+    title: 説明の Markdown
+    kind: 関数
+    container: project_index/features/describe/render.py
+    usecase: 説明
+    role: 変換
+    summary: '`format: markdown` の本文を作る'
+    scope: public
+    thread_safe: true
+    args:
+      - name: result
+        title: 結果
+        type: SourceListResult | SourceGuideResult | KindSchemaResult
+        required: true
+        passing: positional
+        description: 描く結果
+    returns:
+      type: str
+      description: Markdown
+    process: |-
+      1. 配信元の説明書と種類のスキーマは、`outside_scope` が `True` なら先頭に `作業範囲の外（参考）` の行を置く
+      2. 使える配信元の一覧は、`作業場所: {cwd}（{配信元} のクローン本体 / ワークツリー）` の行と `| source | 権限 | description |` の表（作業中の配信元は権限に `（作業中）`）。`outside_sources` が `None` でなければ、空行・`作業範囲の外（参考）` の行・`| source | description |` の表を続ける（0 件は表の代わりに `なし` の行）。使える配信元が 0 件のときは、表の代わりに `使用できる配信元はありません。配信元にするときは /project-index:setup を実行します。` の行を置く。`warnings` が空でなければ、空行・`注意:` の行・警告ごとに `- {警告}` の行を続ける
+      3. 配信元の説明書は、`instructions` をそのまま置き、`| kind | description |` の表を続ける。`refs` があれば `ブランチ: {,で繋いだ名前}`・`タグ: {同じ}` の行、`worktrees` があれば `| ワークツリー | ブランチ |` の表を続ける
+      4. 種類のスキーマは、`metadata` が空でなければ `| 共通のキー | 列名 |` の表を置き、```yaml でスキーマの YAML を囲む
+    unit_tests:
+      - name: test_render_describe_markdown
+        case: 正常
+        summary: 一覧の表
+        condition: sample（write・作業中）と notes（read）
+        mock: なし
+        expected: '`| sample | write（作業中） | ... |` と `| notes | read | ... |` の行'
+      - name: test_render_describe_markdown_when_outside_sources
+        case: 正常
+        summary: 作業範囲の外で読める配信元の表
+        condition: sample（write・作業中）と、`outside_sources` に other
+        mock: なし
+        expected: 使える配信元の表の後ろに `作業範囲の外（参考）` の行と `| other | ... |` の行があり、`outside_sources` が `None` の一覧には `作業範囲の外（参考）` の行が無い
+      - name: test_render_describe_markdown_when_outside_sources_empty
+        case: 正常
+        summary: 作業範囲の外で読める配信元が 0 件
+        condition: '`outside_sources` が空のリスト'
+        mock: なし
+        expected: '`作業範囲の外（参考）` の行の次が `なし` の行で、`| source | description |` の表が無い'
+      - name: test_render_describe_markdown_when_warnings
+        case: 正常
+        summary: 注意の一覧
+        condition: sample（write・作業中）と、`warnings` に 1 件
+        mock: なし
+        expected: 表の後に `注意:` の行と `- {警告}` の行があり、`warnings` が空の一覧には `注意:` の行が無い
+      - name: test_render_describe_markdown_when_no_source
+        case: 正常
+        summary: 使える配信元が無い
+        condition: '`sources` が空、`warnings` に 1 件'
+        mock: なし
+        expected: '`| source | 権限 | description |` の表が無く、`/project-index:setup` の行と `注意:` の行がある'
+      - name: test_render_describe_markdown_when_metadata
+        case: 正常
+        summary: メタデータの対応の表
+        condition: '`metadata` が `{name: title}` の種類のスキーマ'
+        mock: なし
+        expected: '`| name | title |` の行が YAML のコードブロックの前にある'
+      - name: test_render_describe_markdown_when_outside_scope
+        case: 正常
+        summary: 作業範囲の外の表示
+        condition: '`outside_scope: true` の配信元の説明書'
+        mock: なし
+        expected: 先頭の行が `作業範囲の外（参考）`
+        exception: '-'

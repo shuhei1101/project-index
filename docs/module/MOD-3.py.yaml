@@ -2,121 +2,121 @@ id: MOD-3
 title: 索引のサーバー / 入口 / __main__.py
 lead: '`project-index` コマンドの引数の組み立てと main。'
 test_files:
-- tests/unit/project_index/test_main.py
+  - tests/unit/project_index/test_main.py
 constants:
-- name: PROG
-  title: コマンド名
-  container: project_index/__main__.py
-  usecase: 共通
-  summary: ヘルプとバージョンの表示に使うコマンド名
-  value: '"project-index"'
+  - name: PROG
+    title: コマンド名
+    container: project_index/__main__.py
+    usecase: 共通
+    summary: ヘルプとバージョンの表示に使うコマンド名
+    value: '"project-index"'
 functions:
-- name: build_parser
-  title: 引数の組み立て
-  kind: 関数
-  container: project_index/__main__.py
-  usecase: 共通
-  role: 入口
-  scope: public
-  summary: '`--version` とサブコマンドの登録先を持つ引数の解析器を作る'
-  returns:
-    type: argparse.ArgumentParser
-    description: '`prog` が `PROG` の解析器'
-  process: |-
-    1. `prog` を `PROG` にして解析器を作る
-    2. `--version` を足す。表示は `{PROG} {バージョン}` で、バージョンは `DIST_NAME` の配布のメタデータから引く（`importlib.metadata.version`。`uv sync` で配布を入れた環境で動かす前提で、入っていないときの `PackageNotFoundError` はそのまま伝える）
-    3. サブコマンドの登録先を `dest="cmd"`・`required=True` で作る。各サブコマンドは `handler`（`argparse.Namespace` を受けて終了コードを返す関数）を既定値に持つ
-       - `serve` を登録する。引数は持たず（設定は環境変数で渡す）、`handler` は起動の『待ち受けの開始』（`main.run_serve`）
-       - `migrate` を登録する。`--plan` と `--record` は排他のグループ（`store_true`）、`--source`（配信元の `project-index.yaml` のパス、既定 `None`）、`--allow-destructive`（`store_true`）を持ち、`handler` は起動の『設定の移し替えの実行』（`main.run_migrate`）
-       - `files` を登録する。`--root`（必須）、`--paths`（必須・`action="append"`）、`--exclude`（`action="append"`、既定 `[]`）を持ち、`handler` は起動の『載せるファイルの一覧の実行』（`main.run_files`）
-       - `prompt-doc` を登録する。引数は持たず（標準入力を読む）、`handler` はプロンプトの文書の変換の『プロンプトの文書の変換の実行』（`features.prompt_doc.cli.run_prompt_doc`）
-    4. 解析器を返す
-  unit_tests:
-  - name: test_build_parser
-    case: 正常
-    summary: コマンド名が project-index になる
-    condition: 引数なしで呼ぶ
-    mock: なし
-    expected: 戻り値の `prog` が `"project-index"`
-  - name: test_build_parser_when_serve
-    case: 正常
-    summary: serve の処理を引く
-    condition: '`["serve"]` を解析する'
-    mock: なし
-    expected: '`cmd` が `"serve"`、`handler` が `project_index.main.run_serve`'
-  - name: test_build_parser_when_migrate
-    case: 正常
-    summary: migrate の引数と処理を引く
-    condition: '`["migrate", "--plan", "--source", "/tmp/a/project-index.yaml"]` を解析する'
-    mock: なし
-    expected: '`cmd` が `"migrate"`、`plan` が `True`、`record`・`allow_destructive` が `False`、`source` が `/tmp/a/project-index.yaml`、`handler` が `project_index.main.run_migrate`'
-  - name: test_build_parser_when_plan_and_record
-    case: 異常
-    summary: --plan と --record は同時に渡せない
-    condition: '`["migrate", "--plan", "--record"]` を解析する'
-    mock: なし
-    expected: '`SystemExit` のコードが 2'
-  - name: test_build_parser_when_files
-    case: 正常
-    summary: files の引数と処理を引く
-    condition: '`["files", "--root", "/tmp/a", "--paths", "src/**", "--paths", "docs/**"]` を解析する'
-    mock: なし
-    expected: '`cmd` が `"files"`、`root` が `/tmp/a`、`paths` が `["src/**", "docs/**"]`、`exclude` が `[]`、`handler` が `project_index.main.run_files`'
-  - name: test_build_parser_when_prompt_doc
-    case: 正常
-    summary: prompt-doc の処理を引く
-    condition: '`["prompt-doc"]` を解析する'
-    mock: なし
-    expected: '`cmd` が `"prompt-doc"`、`handler` が `project_index.features.prompt_doc.cli.run_prompt_doc`'
-- name: main
-  title: 入口
-  kind: 関数
-  container: project_index/__main__.py
-  usecase: 共通
-  role: 入口
-  scope: public
-  summary: 引数を解析し、選ばれたサブコマンドの処理を呼んで終了コードを返す
-  args:
-  - name: argv
-    title: 引数の並び
-    type: list[str] | None
-    required: false
-    default: None
-    passing: positional
-    description: 解析する引数。`None` のときは `sys.argv[1:]`
-  args_example: |-
-    ```python
-    main(["--version"])
-    ```
-  returns:
-    type: int
-    description: サブコマンドの処理が返した終了コード
-  process: |-
-    1. 引数を解析する（引数の組み立て）
-       - `--version` の場合、`project-index {バージョン}` を標準出力へ出して `SystemExit(0)` で終わる
-       - `--help` の場合、使い方とサブコマンドの一覧を標準出力へ出して `SystemExit(0)` で終わる
-       - サブコマンドが無い・知らない場合、使い方と誤りを標準エラーへ出して `SystemExit(2)` で終わる
-    2. 解析結果の `handler` を呼び、その終了コードを返す
-  callees:
-  - MOD-3#functions[build_parser]
-  unit_tests:
-  - name: test_main_when_version
-    case: 正常
-    summary: バージョンを出す
-    condition: '`["--version"]`'
-    mock: なし（`uv sync` で入れた project-index の配布のメタデータを読む）
-    expected: '`SystemExit` のコードが 0、標準出力が `project-index {pyproject.toml の version}`'
-  - name: test_main_when_help
-    case: 正常
-    summary: 使い方を出す
-    condition: '`["--help"]`'
-    mock: なし
-    expected: '`SystemExit` のコードが 0、標準出力が `usage: project-index` で始まる'
-  - name: test_main_when_no_command
-    case: 異常
-    summary: サブコマンドが無い
-    condition: '`[]`'
-    mock: なし
-    expected: '`SystemExit` のコードが 2、標準エラーに `cmd` が要る旨が出る'
+  - name: build_parser
+    title: 引数の組み立て
+    kind: 関数
+    container: project_index/__main__.py
+    usecase: 共通
+    role: 入口
+    scope: public
+    summary: '`--version` とサブコマンドの登録先を持つ引数の解析器を作る'
+    returns:
+      type: argparse.ArgumentParser
+      description: '`prog` が `PROG` の解析器'
+    process: |-
+      1. `prog` を `PROG` にして解析器を作る
+      2. `--version` を足す。表示は `{PROG} {バージョン}` で、バージョンは `DIST_NAME` の配布のメタデータから引く（`importlib.metadata.version`。`uv sync` で配布を入れた環境で動かす前提で、入っていないときの `PackageNotFoundError` はそのまま伝える）
+      3. サブコマンドの登録先を `dest="cmd"`・`required=True` で作る。各サブコマンドは `handler`（`argparse.Namespace` を受けて終了コードを返す関数）を既定値に持つ
+         - `serve` を登録する。引数は持たず（設定は環境変数で渡す）、`handler` は起動の『待ち受けの開始』（`main.run_serve`）
+         - `migrate` を登録する。`--plan` と `--record` は排他のグループ（`store_true`）、`--source`（配信元の `project-index.yaml` のパス、既定 `None`）、`--allow-destructive`（`store_true`）を持ち、`handler` は起動の『設定の移し替えの実行』（`main.run_migrate`）
+         - `files` を登録する。`--root`（必須）、`--paths`（必須・`action="append"`）、`--exclude`（`action="append"`、既定 `[]`）を持ち、`handler` は起動の『載せるファイルの一覧の実行』（`main.run_files`）
+         - `prompt-doc` を登録する。引数は持たず（標準入力を読む）、`handler` はプロンプトの文書の変換の『プロンプトの文書の変換の実行』（`features.prompt_doc.cli.run_prompt_doc`）
+      4. 解析器を返す
+    unit_tests:
+      - name: test_build_parser
+        case: 正常
+        summary: コマンド名が project-index になる
+        condition: 引数なしで呼ぶ
+        mock: なし
+        expected: 戻り値の `prog` が `"project-index"`
+      - name: test_build_parser_when_serve
+        case: 正常
+        summary: serve の処理を引く
+        condition: '`["serve"]` を解析する'
+        mock: なし
+        expected: '`cmd` が `"serve"`、`handler` が `project_index.main.run_serve`'
+      - name: test_build_parser_when_migrate
+        case: 正常
+        summary: migrate の引数と処理を引く
+        condition: '`["migrate", "--plan", "--source", "/tmp/a/project-index.yaml"]` を解析する'
+        mock: なし
+        expected: '`cmd` が `"migrate"`、`plan` が `True`、`record`・`allow_destructive` が `False`、`source` が `/tmp/a/project-index.yaml`、`handler` が `project_index.main.run_migrate`'
+      - name: test_build_parser_when_plan_and_record
+        case: 異常
+        summary: --plan と --record は同時に渡せない
+        condition: '`["migrate", "--plan", "--record"]` を解析する'
+        mock: なし
+        expected: '`SystemExit` のコードが 2'
+      - name: test_build_parser_when_files
+        case: 正常
+        summary: files の引数と処理を引く
+        condition: '`["files", "--root", "/tmp/a", "--paths", "src/**", "--paths", "docs/**"]` を解析する'
+        mock: なし
+        expected: '`cmd` が `"files"`、`root` が `/tmp/a`、`paths` が `["src/**", "docs/**"]`、`exclude` が `[]`、`handler` が `project_index.main.run_files`'
+      - name: test_build_parser_when_prompt_doc
+        case: 正常
+        summary: prompt-doc の処理を引く
+        condition: '`["prompt-doc"]` を解析する'
+        mock: なし
+        expected: '`cmd` が `"prompt-doc"`、`handler` が `project_index.features.prompt_doc.cli.run_prompt_doc`'
+  - name: main
+    title: 入口
+    kind: 関数
+    container: project_index/__main__.py
+    usecase: 共通
+    role: 入口
+    scope: public
+    summary: 引数を解析し、選ばれたサブコマンドの処理を呼んで終了コードを返す
+    args:
+      - name: argv
+        title: 引数の並び
+        type: list[str] | None
+        required: false
+        default: None
+        passing: positional
+        description: 解析する引数。`None` のときは `sys.argv[1:]`
+    args_example: |-
+      ```python
+      main(["--version"])
+      ```
+    returns:
+      type: int
+      description: サブコマンドの処理が返した終了コード
+    process: |-
+      1. 引数を解析する（引数の組み立て）
+         - `--version` の場合、`project-index {バージョン}` を標準出力へ出して `SystemExit(0)` で終わる
+         - `--help` の場合、使い方とサブコマンドの一覧を標準出力へ出して `SystemExit(0)` で終わる
+         - サブコマンドが無い・知らない場合、使い方と誤りを標準エラーへ出して `SystemExit(2)` で終わる
+      2. 解析結果の `handler` を呼び、その終了コードを返す
+    callees:
+      - MOD-3#functions[build_parser]
+    unit_tests:
+      - name: test_main_when_version
+        case: 正常
+        summary: バージョンを出す
+        condition: '`["--version"]`'
+        mock: なし（`uv sync` で入れた project-index の配布のメタデータを読む）
+        expected: '`SystemExit` のコードが 0、標準出力が `project-index {pyproject.toml の version}`'
+      - name: test_main_when_help
+        case: 正常
+        summary: 使い方を出す
+        condition: '`["--help"]`'
+        mock: なし
+        expected: '`SystemExit` のコードが 0、標準出力が `usage: project-index` で始まる'
+      - name: test_main_when_no_command
+        case: 異常
+        summary: サブコマンドが無い
+        condition: '`[]`'
+        mock: なし
+        expected: '`SystemExit` のコードが 2、標準エラーに `cmd` が要る旨が出る'
 notes:
   サブコマンド: サブコマンドは `serve`・`migrate`・`files`・`prompt-doc` で、処理は起動の『待ち受けの開始』・『設定の移し替えの実行』・『載せるファイルの一覧の実行』と、プロンプトの文書の変換の『プロンプトの文書の変換の実行』が持つ。`__main__.py` は `if __name__ == "__main__":` で `sys.exit(main())` を呼ぶ。

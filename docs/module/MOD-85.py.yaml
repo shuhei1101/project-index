@@ -2,331 +2,331 @@ id: MOD-85
 title: 索引のサーバー / 書き込み / types.py
 lead: '`write_docs`・`delete_docs` の要求と結果の型。'
 data_models:
-- name: TextEdit
-  title: 文字列の置き換え
-  container: project_index/features/write/types.py
-  usecase: 書き込み
-  role: DTO
-  summary: 文字列の項目の一部を置き換える操作
-  description: '`pydantic.BaseModel`（`extra="forbid"`）。'
-  properties:
-  - name: field
-    title: 項目
-    type: str
-    access: 公開
-    description: 文字列の項目のパス
-  - name: old
-    title: 置き換える前
-    type: str
-    access: 公開
-    description: 空の文字列は受けない
-  - name: new
-    title: 置き換えた後
-    type: str
-    access: 公開
-    description: 置き換えた後の文字列
-  - name: replace_all
-    title: 全て置き換えるか
-    type: bool
-    access: 公開
-    default: 'False'
-    description: '`False` のときは `old` が 1 か所だけ一致すること'
-- name: Operation
-  title: 書き込みの操作
-  container: project_index/features/write/types.py
-  usecase: 書き込み
-  role: DTO
-  summary: '`write_docs` の `operations` の 1 件'
-  description: '`pydantic.BaseModel`（`extra="forbid"`）。`op` ごとの必須のキーは書き込みが確かめ、添字つきの違反にする。'
-  properties:
-  - name: op
-    title: 操作
-    type: Literal['create', 'update', 'replace']
-    access: 公開
-    description: 作る・部分更新・置き換え
-  - name: kind
-    title: 種類
-    type: str | None
-    access: 公開
-    default: None
-    description: '`create` で必須'
-  - name: id
-    title: 文書の ID
-    type: str | None
-    access: 公開
-    default: None
-    description: '`update`・`replace` で必須。`create` で省くと `ids.format` から作る'
-  - name: expected_version
-    title: 読んだときのバージョン
-    type: str | dict[str, str] | None
-    access: 公開
-    default: None
-    description: '`update`・`replace` で必須。`update` は項目のパス → 値のハッシュも受ける'
-  - name: data
-    title: 全項目
-    type: dict[str, Any] | None
-    access: 公開
-    default: None
-    description: '`create`・`replace` で必須'
-  - name: set
-    title: 入れる値
-    type: dict[str, Any]
-    access: 公開
-    default: '{}'
-    description: 項目のパス → 値（`update` だけ）
-  - name: unset
-    title: 消す項目
-    type: list[str]
-    access: 公開
-    default: '[]'
-    description: '`update` だけ'
-  - name: add_to
-    title: 配列への追加
-    type: dict[str, list[Any]]
-    access: 公開
-    default: '{}'
-    description: '`update` だけ'
-  - name: remove_from
-    title: 配列からの削除
-    type: dict[str, list[Any]]
-    access: 公開
-    default: '{}'
-    description: '`update` だけ'
-  - name: text_edits
+  - name: TextEdit
     title: 文字列の置き換え
-    type: list[TextEdit]
-    access: 公開
-    default: '[]'
-    description: '`update` だけ'
-- name: WriteRequest
-  title: 書き込みの要求
-  container: project_index/features/write/types.py
-  usecase: 書き込み
-  role: DTO
-  summary: '`write_docs` の引数'
-  description: '`pydantic.BaseModel`（`extra="forbid"`）。キーの意味はインターフェース定義『文書の書き込み』の `request`。'
-  properties:
-  - name: source
-    title: 配信元
-    type: str | None
-    access: 公開
-    default: None
-    description: '`None` は作業中の配信元'
-  - name: worktree
-    title: ワークツリー
-    type: str | None
-    access: 公開
-    default: None
-    description: 書くワークツリー
-  - name: operations
-    title: 操作
-    type: list[Operation]
-    access: 公開
-    description: 並べた順に当てる
-  - name: atomic
-    title: まとめて書くか
-    type: bool
-    access: 公開
-    default: 'True'
-    description: '`True` は 1 件でも失敗したら何も書かない'
-  - name: dry_run
-    title: 試しに書くか
-    type: bool
-    access: 公開
-    default: 'False'
-    description: '`True` は書かずに結果と差分を返す'
-  - name: cwd
-    title: 作業場所
-    type: str | None
-    access: 公開
-    default: None
-    description: フックが入れる
-  - name: session_id
-    title: セッションの ID
-    type: str | None
-    access: 公開
-    default: None
-    description: フックが入れる
-  - name: agent_id
-    title: エージェントの ID
-    type: str | None
-    access: 公開
-    default: None
-    description: フックが入れる
-- name: WriteViolation
-  title: 書き込みの違反
-  container: project_index/features/write/types.py
-  usecase: 書き込み
-  role: DTO
-  summary: スキーマの説明を持てる書き込みの違反
-  description: '`Violation` の派生の `dataclass`（`kw_only=True`）。`ValidationFailedError` と `WriteResultItem.errors` にそのまま入れ、JSON にするときは `None` の項目を落とす。'
-  properties:
-  - name: schema
-    title: スキーマの説明
-    type: dict[str, Any] | None
-    access: 公開
-    default: None
-    description: 違反した項目のスキーマの定義から取り出した `title`・`description`・`x-rules`・`examples`・`x-bad-examples` のうち持つもの
-- name: WriteResultItem
-  title: 書き込みの結果の行
-  container: project_index/features/write/types.py
-  usecase: 書き込み
-  role: DTO
-  summary: 操作 1 件の結果
-  description: '`dataclass(frozen=True)`。JSON にするときは `None` の項目を落とす。'
-  properties:
-  - name: index
-    title: 添字
-    type: int
-    access: 公開
-    description: '`operations` の添字'
-  - name: id
-    title: 文書の ID
-    type: str | None
-    access: 公開
-    description: 作れなかった ID は `None`
-  - name: status
-    title: 結果
-    type: Literal['created', 'updated', 'replaced', 'failed']
-    access: 公開
-    description: 操作の結果
-  - name: version
-    title: バージョン
-    type: str | None
-    access: 公開
-    default: None
-    description: 書いた後のバージョン（`failed` は `None`）
-  - name: diff
-    title: 差分
-    type: str | None
-    access: 公開
-    default: None
-    description: '`updated`・`replaced` と `dry_run` のとき'
-  - name: errors
-    title: 違反
-    type: list[Violation]
-    access: 公開
-    default: '[]'
-    description: '`failed` のときだけ'
-  - name: unchecked
-    title: 点検できなかったキー
-    type: list[UncheckedKey]
-    access: 公開
-    default: '[]'
-    description: mdmark で点検できなかった Markdown のキーと理由（検査.点検できなかったキー）。`failed` では空。空の並びは JSON に出さない
-- name: WriteResult
-  title: 書き込みの結果
-  container: project_index/features/write/types.py
-  usecase: 書き込み
-  role: DTO
-  summary: '`write_docs` が返すもの'
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: applied
-    title: 書いたか
-    type: bool
-    access: 公開
-    description: 1 件以上をファイルへ書いたか
-  - name: results
-    title: 結果
-    type: list[WriteResultItem]
-    access: 公開
-    description: '`operations` の順'
-- name: DeleteTarget
-  title: 消す文書
-  container: project_index/features/write/types.py
-  usecase: 書き込み
-  role: DTO
-  summary: '`delete_docs` の `targets` の 1 件'
-  description: '`pydantic.BaseModel`（`extra="forbid"`）。'
-  properties:
-  - name: id
-    title: 文書の ID
-    type: str
-    access: 公開
-    description: 消す文書
-  - name: expected_version
-    title: 読んだときのバージョン
-    type: str
-    access: 公開
-    description: 読んだときのバージョン
-- name: DeleteRequest
-  title: 削除の要求
-  container: project_index/features/write/types.py
-  usecase: 書き込み
-  role: DTO
-  summary: '`delete_docs` の引数'
-  description: '`pydantic.BaseModel`（`extra="forbid"`）。キーの意味はインターフェース定義『文書の削除』の `request`。'
-  properties:
-  - name: source
-    title: 配信元
-    type: str | None
-    access: 公開
-    default: None
-    description: '`None` は作業中の配信元'
-  - name: worktree
-    title: ワークツリー
-    type: str | None
-    access: 公開
-    default: None
-    description: 消すワークツリー
-  - name: targets
+    container: project_index/features/write/types.py
+    usecase: 書き込み
+    role: DTO
+    summary: 文字列の項目の一部を置き換える操作
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。'
+    properties:
+      - name: field
+        title: 項目
+        type: str
+        access: 公開
+        description: 文字列の項目のパス
+      - name: old
+        title: 置き換える前
+        type: str
+        access: 公開
+        description: 空の文字列は受けない
+      - name: new
+        title: 置き換えた後
+        type: str
+        access: 公開
+        description: 置き換えた後の文字列
+      - name: replace_all
+        title: 全て置き換えるか
+        type: bool
+        access: 公開
+        default: 'False'
+        description: '`False` のときは `old` が 1 か所だけ一致すること'
+  - name: Operation
+    title: 書き込みの操作
+    container: project_index/features/write/types.py
+    usecase: 書き込み
+    role: DTO
+    summary: '`write_docs` の `operations` の 1 件'
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。`op` ごとの必須のキーは書き込みが確かめ、添字つきの違反にする。'
+    properties:
+      - name: op
+        title: 操作
+        type: Literal['create', 'update', 'replace']
+        access: 公開
+        description: 作る・部分更新・置き換え
+      - name: kind
+        title: 種類
+        type: str | None
+        access: 公開
+        default: None
+        description: '`create` で必須'
+      - name: id
+        title: 文書の ID
+        type: str | None
+        access: 公開
+        default: None
+        description: '`update`・`replace` で必須。`create` で省くと `ids.format` から作る'
+      - name: expected_version
+        title: 読んだときのバージョン
+        type: str | dict[str, str] | None
+        access: 公開
+        default: None
+        description: '`update`・`replace` で必須。`update` は項目のパス → 値のハッシュも受ける'
+      - name: data
+        title: 全項目
+        type: dict[str, Any] | None
+        access: 公開
+        default: None
+        description: '`create`・`replace` で必須'
+      - name: set
+        title: 入れる値
+        type: dict[str, Any]
+        access: 公開
+        default: '{}'
+        description: 項目のパス → 値（`update` だけ）
+      - name: unset
+        title: 消す項目
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: '`update` だけ'
+      - name: add_to
+        title: 配列への追加
+        type: dict[str, list[Any]]
+        access: 公開
+        default: '{}'
+        description: '`update` だけ'
+      - name: remove_from
+        title: 配列からの削除
+        type: dict[str, list[Any]]
+        access: 公開
+        default: '{}'
+        description: '`update` だけ'
+      - name: text_edits
+        title: 文字列の置き換え
+        type: list[TextEdit]
+        access: 公開
+        default: '[]'
+        description: '`update` だけ'
+  - name: WriteRequest
+    title: 書き込みの要求
+    container: project_index/features/write/types.py
+    usecase: 書き込み
+    role: DTO
+    summary: '`write_docs` の引数'
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。キーの意味はインターフェース定義『文書の書き込み』の `request`。'
+    properties:
+      - name: source
+        title: 配信元
+        type: str | None
+        access: 公開
+        default: None
+        description: '`None` は作業中の配信元'
+      - name: worktree
+        title: ワークツリー
+        type: str | None
+        access: 公開
+        default: None
+        description: 書くワークツリー
+      - name: operations
+        title: 操作
+        type: list[Operation]
+        access: 公開
+        description: 並べた順に当てる
+      - name: atomic
+        title: まとめて書くか
+        type: bool
+        access: 公開
+        default: 'True'
+        description: '`True` は 1 件でも失敗したら何も書かない'
+      - name: dry_run
+        title: 試しに書くか
+        type: bool
+        access: 公開
+        default: 'False'
+        description: '`True` は書かずに結果と差分を返す'
+      - name: cwd
+        title: 作業場所
+        type: str | None
+        access: 公開
+        default: None
+        description: フックが入れる
+      - name: session_id
+        title: セッションの ID
+        type: str | None
+        access: 公開
+        default: None
+        description: フックが入れる
+      - name: agent_id
+        title: エージェントの ID
+        type: str | None
+        access: 公開
+        default: None
+        description: フックが入れる
+  - name: WriteViolation
+    title: 書き込みの違反
+    container: project_index/features/write/types.py
+    usecase: 書き込み
+    role: DTO
+    summary: スキーマの説明を持てる書き込みの違反
+    description: '`Violation` の派生の `dataclass`（`kw_only=True`）。`ValidationFailedError` と `WriteResultItem.errors` にそのまま入れ、JSON にするときは `None` の項目を落とす。'
+    properties:
+      - name: schema
+        title: スキーマの説明
+        type: dict[str, Any] | None
+        access: 公開
+        default: None
+        description: 違反した項目のスキーマの定義から取り出した `title`・`description`・`x-rules`・`examples`・`x-bad-examples` のうち持つもの
+  - name: WriteResultItem
+    title: 書き込みの結果の行
+    container: project_index/features/write/types.py
+    usecase: 書き込み
+    role: DTO
+    summary: 操作 1 件の結果
+    description: '`dataclass(frozen=True)`。JSON にするときは `None` の項目を落とす。'
+    properties:
+      - name: index
+        title: 添字
+        type: int
+        access: 公開
+        description: '`operations` の添字'
+      - name: id
+        title: 文書の ID
+        type: str | None
+        access: 公開
+        description: 作れなかった ID は `None`
+      - name: status
+        title: 結果
+        type: Literal['created', 'updated', 'replaced', 'failed']
+        access: 公開
+        description: 操作の結果
+      - name: version
+        title: バージョン
+        type: str | None
+        access: 公開
+        default: None
+        description: 書いた後のバージョン（`failed` は `None`）
+      - name: diff
+        title: 差分
+        type: str | None
+        access: 公開
+        default: None
+        description: '`updated`・`replaced` と `dry_run` のとき'
+      - name: errors
+        title: 違反
+        type: list[Violation]
+        access: 公開
+        default: '[]'
+        description: '`failed` のときだけ'
+      - name: unchecked
+        title: 点検できなかったキー
+        type: list[UncheckedKey]
+        access: 公開
+        default: '[]'
+        description: mdmark で点検できなかった Markdown のキーと理由（検査.点検できなかったキー）。`failed` では空。空の並びは JSON に出さない
+  - name: WriteResult
+    title: 書き込みの結果
+    container: project_index/features/write/types.py
+    usecase: 書き込み
+    role: DTO
+    summary: '`write_docs` が返すもの'
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: applied
+        title: 書いたか
+        type: bool
+        access: 公開
+        description: 1 件以上をファイルへ書いたか
+      - name: results
+        title: 結果
+        type: list[WriteResultItem]
+        access: 公開
+        description: '`operations` の順'
+  - name: DeleteTarget
     title: 消す文書
-    type: list[DeleteTarget]
-    access: 公開
-    description: 消す文書
-  - name: on_referenced
-    title: 参照されているとき
-    type: Literal['fail', 'unlink']
-    access: 公開
-    default: '"fail"'
-    description: '`unlink` は参照元の `related` からも外す'
-  - name: atomic
-    title: まとめて消すか
-    type: bool
-    access: 公開
-    default: 'True'
-    description: 書き込みと同じ
-  - name: dry_run
-    title: 試しに消すか
-    type: bool
-    access: 公開
-    default: 'False'
-    description: 書き込みと同じ
-  - name: cwd
-    title: 作業場所
-    type: str | None
-    access: 公開
-    default: None
-    description: フックが入れる
-- name: DeleteResult
-  title: 削除の結果
-  container: project_index/features/write/types.py
-  usecase: 書き込み
-  role: DTO
-  summary: '`delete_docs` が返すもの'
-  description: '`dataclass(frozen=True)`。`results[].status` は `deleted` か `failed`。'
-  properties:
-  - name: applied
-    title: 消したか
-    type: bool
-    access: 公開
-    description: 1 件以上を消したか
-  - name: results
-    title: 結果
-    type: list[WriteResultItem]
-    access: 公開
-    description: '`targets` の順（`status` は `deleted`・`failed`）'
-  - name: unlinked
-    title: 参照を外した文書
-    type: list[tuple[str, str]]
-    access: 公開
-    default: '[]'
-    description: (ID, 外した後のバージョン)。JSON では `{id, version}`
+    container: project_index/features/write/types.py
+    usecase: 書き込み
+    role: DTO
+    summary: '`delete_docs` の `targets` の 1 件'
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。'
+    properties:
+      - name: id
+        title: 文書の ID
+        type: str
+        access: 公開
+        description: 消す文書
+      - name: expected_version
+        title: 読んだときのバージョン
+        type: str
+        access: 公開
+        description: 読んだときのバージョン
+  - name: DeleteRequest
+    title: 削除の要求
+    container: project_index/features/write/types.py
+    usecase: 書き込み
+    role: DTO
+    summary: '`delete_docs` の引数'
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。キーの意味はインターフェース定義『文書の削除』の `request`。'
+    properties:
+      - name: source
+        title: 配信元
+        type: str | None
+        access: 公開
+        default: None
+        description: '`None` は作業中の配信元'
+      - name: worktree
+        title: ワークツリー
+        type: str | None
+        access: 公開
+        default: None
+        description: 消すワークツリー
+      - name: targets
+        title: 消す文書
+        type: list[DeleteTarget]
+        access: 公開
+        description: 消す文書
+      - name: on_referenced
+        title: 参照されているとき
+        type: Literal['fail', 'unlink']
+        access: 公開
+        default: '"fail"'
+        description: '`unlink` は参照元の `related` からも外す'
+      - name: atomic
+        title: まとめて消すか
+        type: bool
+        access: 公開
+        default: 'True'
+        description: 書き込みと同じ
+      - name: dry_run
+        title: 試しに消すか
+        type: bool
+        access: 公開
+        default: 'False'
+        description: 書き込みと同じ
+      - name: cwd
+        title: 作業場所
+        type: str | None
+        access: 公開
+        default: None
+        description: フックが入れる
+  - name: DeleteResult
+    title: 削除の結果
+    container: project_index/features/write/types.py
+    usecase: 書き込み
+    role: DTO
+    summary: '`delete_docs` が返すもの'
+    description: '`dataclass(frozen=True)`。`results[].status` は `deleted` か `failed`。'
+    properties:
+      - name: applied
+        title: 消したか
+        type: bool
+        access: 公開
+        description: 1 件以上を消したか
+      - name: results
+        title: 結果
+        type: list[WriteResultItem]
+        access: 公開
+        description: '`targets` の順（`status` は `deleted`・`failed`）'
+      - name: unlinked
+        title: 参照を外した文書
+        type: list[tuple[str, str]]
+        access: 公開
+        default: '[]'
+        description: (ID, 外した後のバージョン)。JSON では `{id, version}`
 constants:
-- name: OPERATIONS_MAX
-  title: 1 回の操作の上限
-  container: project_index/features/write/types.py
-  usecase: 書き込み
-  summary: '`operations`・`targets` の件数の上限'
-  value: '50'
+  - name: OPERATIONS_MAX
+    title: 1 回の操作の上限
+    container: project_index/features/write/types.py
+    usecase: 書き込み
+    summary: '`operations`・`targets` の件数の上限'
+    value: '50'

@@ -2,60 +2,60 @@ id: MOD-99
 title: 索引のサーバー / 共通 / files.py
 lead: 一時ファイルからのファイルの置き換え。
 test_files:
-- tests/unit/project_index/shared/test_files.py
+  - tests/unit/project_index/shared/test_files.py
 functions:
-- name: replace_file
-  title: ファイルの置き換え
-  kind: 関数
-  container: project_index/shared/files.py
-  usecase: 共通
-  role: 書き込み
-  summary: 同じフォルダの一時ファイルに書いてから置き換え、読み手に書きかけの内容を見せない
-  scope: public
-  side_effects: '`path` を書き換える。フォルダが無ければ作る'
-  args:
-  - name: path
-    title: 書く先
-    type: Path
-    required: true
-    passing: positional
-    description: 置き換えるファイルの絶対パス
-  - name: content
-    title: 内容
-    type: str
-    required: true
-    passing: positional
-    description: 書く文字列（UTF-8、改行は `\n` のまま）
-  returns:
-    type: None
-    description: 何も返さない
-  process: |-
-    1. `path` の親フォルダを `mkdir(parents=True, exist_ok=True)` で作る
-    2. 同じフォルダに `tempfile.NamedTemporaryFile(delete=False, prefix=".{名前}.", suffix=".tmp")` で一時ファイルを作り、`content` を書いて `flush` と `os.fsync` をする
-    3. 既に `path` があれば、そのパーミッションを一時ファイルへ写す
-    4. `os.replace` で `path` に置き換える
-       - 書き込みか置き換えで `OSError` が起きた場合、一時ファイルを削除してからそのまま送る
-  exceptions:
-  - name: OSError
-    condition: 書き込みか置き換えに失敗する
-    message: OS の誤りのまま
-  unit_tests:
-  - name: test_replace_file
-    case: 正常
-    summary: 内容とパーミッションを保って置き換える
-    condition: 'パーミッション 0600 の既存のファイルへ `"a: 1\n"`'
-    mock: なし（一時フォルダ）
-    expected: '内容が `a: 1\n`、パーミッションが 0600、フォルダに `.tmp` のファイルが残らない'
-  - name: test_replace_file_when_new_folder
-    case: 正常
-    summary: フォルダを作る
-    condition: 無いフォルダの下のパス
-    mock: なし
-    expected: フォルダとファイルができる
-  - name: test_replace_file_when_replace_fails
-    case: 異常
-    summary: 置き換えに失敗すると一時ファイルを残さない
-    condition: 任意の内容
-    mock: '`os.replace`（`OSError` を送る）'
-    expected: '`OSError` が伝わり、元のファイルは変わらず、`.tmp` のファイルが残らない'
-    exception: 書き込みか置き換えに失敗する
+  - name: replace_file
+    title: ファイルの置き換え
+    kind: 関数
+    container: project_index/shared/files.py
+    usecase: 共通
+    role: 書き込み
+    summary: 同じフォルダの一時ファイルに書いてから置き換え、読み手に書きかけの内容を見せない
+    scope: public
+    side_effects: '`path` を書き換える。フォルダが無ければ作る'
+    args:
+      - name: path
+        title: 書く先
+        type: Path
+        required: true
+        passing: positional
+        description: 置き換えるファイルの絶対パス
+      - name: content
+        title: 内容
+        type: str
+        required: true
+        passing: positional
+        description: 書く文字列（UTF-8、改行は `\n` のまま）
+    returns:
+      type: None
+      description: 何も返さない
+    process: |-
+      1. `path` の親フォルダを `mkdir(parents=True, exist_ok=True)` で作る
+      2. 同じフォルダに `tempfile.NamedTemporaryFile(delete=False, prefix=".{名前}.", suffix=".tmp")` で一時ファイルを作り、`content` を書いて `flush` と `os.fsync` をする
+      3. 既に `path` があれば、そのパーミッションを一時ファイルへ写す
+      4. `os.replace` で `path` に置き換える
+         - 書き込みか置き換えで `OSError` が起きた場合、一時ファイルを削除してからそのまま送る
+    exceptions:
+      - name: OSError
+        condition: 書き込みか置き換えに失敗する
+        message: OS の誤りのまま
+    unit_tests:
+      - name: test_replace_file
+        case: 正常
+        summary: 内容とパーミッションを保って置き換える
+        condition: 'パーミッション 0600 の既存のファイルへ `"a: 1\n"`'
+        mock: なし（一時フォルダ）
+        expected: '内容が `a: 1\n`、パーミッションが 0600、フォルダに `.tmp` のファイルが残らない'
+      - name: test_replace_file_when_new_folder
+        case: 正常
+        summary: フォルダを作る
+        condition: 無いフォルダの下のパス
+        mock: なし
+        expected: フォルダとファイルができる
+      - name: test_replace_file_when_replace_fails
+        case: 異常
+        summary: 置き換えに失敗すると一時ファイルを残さない
+        condition: 任意の内容
+        mock: '`os.replace`（`OSError` を送る）'
+        expected: '`OSError` が伝わり、元のファイルは変わらず、`.tmp` のファイルが残らない'
+        exception: 書き込みか置き換えに失敗する

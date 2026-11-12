@@ -4,63 +4,63 @@ entry:
   kind: mcp_tool
   value: restart
 flows:
-- name: 正常系
-  summary: 応答を返した後に起動し直し、同じプロセス ID で待ち受ける
-  setup:
-  - name: Mock
-    description: なし（一時フォルダの端末の設定で `project-index serve` を子プロセスとして起動する）
-  - name: 端末の設定
-    description: 配信元 sample の 1 行
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as restart
-      participant S as project-index serve
+  - name: 正常系
+    summary: 応答を返した後に起動し直し、同じプロセス ID で待ち受ける
+    setup:
+      - name: Mock
+        description: なし（一時フォルダの端末の設定で `project-index serve` を子プロセスとして起動する）
+      - name: 端末の設定
+        description: 配信元 sample の 1 行
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as restart
+        participant S as project-index serve
 
-      C->>T: 引数なし
-      T-->>C: pid・restarting
-      T->>S: 処理中の要求を待って止める
-      S->>S: 同じプロセスで起動し直す
-      C->>S: status
-      S-->>C: 待ち受けのアドレス・配信元
-    ```
-  expected:
-  - 応答の `pid` が子プロセスの PID と同じ
-  - '`/mcp` の接続を張ったまま `restart` を呼んでも、起動し直した子プロセスがポートの確かめで止まらず待ち受ける'
-  - 起動し直した後の `status` の `pid` が同じで、`loading` が `false` になった後に sample が `serving`
-  - 起動し直した後に `/mcp` を張り直すと呼べる
-  test: test_normal
-- name: 異常系（再起動の途中で呼ばれる・RestartInProgressError）
-  summary: 停止を待っている間に 2 回目の `restart` を呼ぶと断る
-  setup:
-  - name: Mock
-    description: なし
-  - name: 処理中の要求
-    description: '`script_timeout_sec` の間眠る変換スクリプトを持つ配信元で `try_convert` を呼んでおく'
-    notes: 停止の待ちを長くするため
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as restart
+        C->>T: 引数なし
+        T-->>C: pid・restarting
+        T->>S: 処理中の要求を待って止める
+        S->>S: 同じプロセスで起動し直す
+        C->>S: status
+        S-->>C: 待ち受けのアドレス・配信元
+      ```
+    expected:
+      - 応答の `pid` が子プロセスの PID と同じ
+      - '`/mcp` の接続を張ったまま `restart` を呼んでも、起動し直した子プロセスがポートの確かめで止まらず待ち受ける'
+      - 起動し直した後の `status` の `pid` が同じで、`loading` が `false` になった後に sample が `serving`
+      - 起動し直した後に `/mcp` を張り直すと呼べる
+    test: test_normal
+  - name: 異常系（再起動の途中で呼ばれる・RestartInProgressError）
+    summary: 停止を待っている間に 2 回目の `restart` を呼ぶと断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 処理中の要求
+        description: '`script_timeout_sec` の間眠る変換スクリプトを持つ配信元で `try_convert` を呼んでおく'
+        notes: 停止の待ちを長くするため
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as restart
 
-      C->>T: 1 回目
-      T-->>C: restarting
-      C->>T: 2 回目
-      T-->>C: isError（RestartInProgressError）
-    ```
-  expected:
-  - '2 回目が `isError: true` で再起動の途中であることを返す'
-  - 起動し直すのは 1 回だけ（ログの起動の行が 1 つ増える）
-  test: test_error_when_restart_in_progress
+        C->>T: 1 回目
+        T-->>C: restarting
+        C->>T: 2 回目
+        T-->>C: isError（RestartInProgressError）
+      ```
+    expected:
+      - '2 回目が `isError: true` で再起動の途中であることを返す'
+      - 起動し直すのは 1 回だけ（ログの起動の行が 1 つ増える）
+    test: test_error_when_restart_in_progress
 lead: 応答を返してからサーバーを止め、同じプロセス ID・同じ環境変数で `project-index serve` を起動し直す。
 identifier: restart
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: false
 side_effects: 待ち受けを止めて起動し直す。`/mcp`・`/_admin/mcp` の接続は切れる
 callers:
-- SC-3#scenarios[正常シナリオ（端末の設定が古くなる）]
+  - SC-3#scenarios[正常シナリオ（端末の設定が古くなる）]
 exclusivity: 再起動を始めた後の呼び出しは `RestartInProgressError` で断る
 request: []
 request_example: |-
@@ -68,36 +68,36 @@ request_example: |-
   {}
   ```
 response:
-- name: pid
-  type: int
-  description: 起動し直した後も変わらないプロセス ID
-- name: restarting
-  type: bool
-  description: 常に `true`
+  - name: pid
+    type: int
+    description: 起動し直した後も変わらないプロセス ID
+  - name: restarting
+    type: bool
+    description: 常に `true`
 response_example: |-
   ```json
   {"pid": 4242, "restarting": true}
   ```
 response_notes: 応答を返し終えてから停止を始める。再起動の結果は、つなぎ直した後の `status` で確かめる。
 exceptions:
-- name: なし（正常終了）
-  condition: 再起動を始めた
-- name: RestartInProgressError
-  condition: 前の `restart`・`update` の再起動がまだ終わっていない
-  notes: '`isError: true`'
+  - name: なし（正常終了）
+    condition: 再起動を始めた
+  - name: RestartInProgressError
+    condition: 前の `restart`・`update` の再起動がまだ終わっていない
+    notes: '`isError: true`'
 constraints:
-- item: 停止の待ち
-  constraint: 処理中の要求を待つ上限は `script_timeout_sec` の 1.5 倍。過ぎたら残りの要求を切って止める
-  notes: スクリプトの実行が一番長い要求になるため
-- item: 起動し直す方法
-  constraint: uvicorn の停止の後、`os.execv(sys.executable, [sys.executable, "-m", "project_index", "serve"])` で同じプロセスを置き換える
-  notes: SessionStart のフックで切り離して起動したプロセスのまま続くため、親を持たないまま残らない。起動し直した後は『起動』の待ち受けまでの順番に従い、配信元を読む前に待ち受ける
-- item: 起動に失敗したとき
-  constraint: '`project-index serve` の終了コードで止まり、次のセッションの SessionStart のフックが起動し直す'
-- item: タイムアウト
-  constraint: 制限なし
-- item: 接続できない時間
-  constraint: 応答を返してから接続を受け付け直すまでを、非機能要件の決定値以内にする
-  decided_by: NFR-1#requirements[起動から接続を受け付けるまでの時間]
-  notes: 停止の待ち（処理中の要求）は含めない
+  - item: 停止の待ち
+    constraint: 処理中の要求を待つ上限は `script_timeout_sec` の 1.5 倍。過ぎたら残りの要求を切って止める
+    notes: スクリプトの実行が一番長い要求になるため
+  - item: 起動し直す方法
+    constraint: uvicorn の停止の後、`os.execv(sys.executable, [sys.executable, "-m", "project_index", "serve"])` で同じプロセスを置き換える
+    notes: SessionStart のフックで切り離して起動したプロセスのまま続くため、親を持たないまま残らない。起動し直した後は『起動』の待ち受けまでの順番に従い、配信元を読む前に待ち受ける
+  - item: 起動に失敗したとき
+    constraint: '`project-index serve` の終了コードで止まり、次のセッションの SessionStart のフックが起動し直す'
+  - item: タイムアウト
+    constraint: 制限なし
+  - item: 接続できない時間
+    constraint: 応答を返してから接続を受け付け直すまでを、非機能要件の決定値以内にする
+    decided_by: NFR-1#requirements[起動から接続を受け付けるまでの時間]
+    notes: 停止の待ち（処理中の要求）は含めない
 test_file: tests/integration/server/test_restart.py

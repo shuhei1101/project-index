@@ -2,550 +2,550 @@ id: MOD-71
 title: 索引のサーバー / 配信元 / types.py
 lead: 配信元の設定・文書の行・スクリプト・配信中の配信元・状態の型。
 test_files:
-- tests/unit/project_index/features/sources/test_types.py
+  - tests/unit/project_index/features/sources/test_types.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      配信元の読み込み ..> 配信中の配信元 : 作る
-      配信元の読み込み ..> 配信元の状態 : 作る
-      配信中の配信元 o-- 配信元の設定
-      配信元の設定 o-- 文書の行
-      配信元の設定 o-- スクリプトの行
-      class 配信元の読み込み {
-        <<function>>
-      }
-      class 配信中の配信元 {
-        +ID: str
-        +直下: Path
-      }
-      class 配信元の状態 {
-        +状態: str
-        +違反: list
-      }
-      class 配信元の設定 {
-        +名前: str
-        +文書: list
-      }
-      class 文書の行 {
-        +ID: str
-        +ファイル: list
-        +除外する名前: list
-        +行に当たるか(ファイルのパス) bool
-      }
-      class スクリプトの行 {
-        +ID: str
-        +コマンド: list
-      }
-      click 配信元の読み込み href "./MOD-70.py.yaml#配信元の読み込み"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        配信元の読み込み ..> 配信中の配信元 : 作る
+        配信元の読み込み ..> 配信元の状態 : 作る
+        配信中の配信元 o-- 配信元の設定
+        配信元の設定 o-- 文書の行
+        配信元の設定 o-- スクリプトの行
+        class 配信元の読み込み {
+          <<function>>
+        }
+        class 配信中の配信元 {
+          +ID: str
+          +直下: Path
+        }
+        class 配信元の状態 {
+          +状態: str
+          +違反: list
+        }
+        class 配信元の設定 {
+          +名前: str
+          +文書: list
+        }
+        class 文書の行 {
+          +ID: str
+          +ファイル: list
+          +除外する名前: list
+          +行に当たるか(ファイルのパス) bool
+        }
+        class スクリプトの行 {
+          +ID: str
+          +コマンド: list
+        }
+        click 配信元の読み込み href "./MOD-70.py.yaml#配信元の読み込み"
 data_models:
-- name: DocumentTable
-  title: 文書の行
-  container: project_index/features/sources/types.py
-  usecase: 共通
-  role: DTO
-  summary: 配信元の設定の `documents[]` の 1 行（同じ形式・スキーマ・検査で扱う文書のまとまり）
-  description: '`pydantic.BaseModel`（`frozen=True`）。既定値は Issue #3 の資料 A-25 の `documents[]` のキー一覧。行の ID は MCP の `kind` になる。'
-  properties:
-  - name: id
-    title: 文書の行の ID
-    type: str
-    access: 公開
-    description: 主キー
-  - name: paths
-    title: ファイル
-    type: list[str]
-    access: 公開
-    description: ファイルのパスか glob の並び
-  - name: title
-    title: 名前
-    type: str | None
-    access: 公開
-    default: None
-    description: 画面・MCP に出す名前
-  - name: enabled
-    title: 配信するか
-    type: bool
-    access: 公開
-    default: 'True'
-    description: '`False` で配信も検索もしない'
-  - name: schema_path
-    title: スキーマ
-    type: str | SchemaRef
-    access: 公開
-    description: '`schema` の値（pydantic の属性と重なるので `alias="schema"`）。全ての行で必須。文字列は配信元の直下からの相対パス、`SchemaRef` はほかの配信元のリビジョンのスキーマ'
-  - name: validators
-    title: 検査
-    type: list[str]
-    access: 公開
-    default: '[]'
-    description: 通す `validators[].id`
-  - name: converter
-    title: 変換
-    type: str | None
-    access: 公開
-    default: None
-    description: 使う `converters[].id`。`None` は既定の変換
-  - name: writable
-    title: 書き込めるか
-    type: bool | None
-    access: 公開
-    default: None
-    description: '`None` は `True`（`is_writable` が解く）'
-  - name: after_write
-    title: 書き込み後の生成
-    type: list[str]
-    access: 公開
-    default: '[]'
-    description: 書いた後に走らせる `generators[].id`
-  - name: search
-    title: 検索に入れるか
-    type: bool
-    access: 公開
-    default: 'True'
-    description: '`False` で検索の対象にしない'
-  - name: records
-    title: 文書にする配列
-    type: str | None
-    access: 公開
-    default: None
-    description: ファイルの中のこの配列の各要素を 1 件の文書にする
-  - name: body_file
-    title: 本文のファイルの列
-    type: str | None
-    access: 公開
-    default: None
-    description: '`records` の各要素で本文のファイルのパスを持つ列'
-  - name: metadata
-    title: メタデータの対応
-    type: dict[str, str]
-    access: 公開
-    default: '{}'
-    description: 共通のキー → 列名（入れ子の列は `.` でつないだパス）。書かれていないキーは同じ名前の列
-  - name: exclude
-    title: 除外する名前
-    type: list[str]
-    access: 公開
-    default: '[]'
-    description: '`paths` に当たったファイルのうち、ファイル名（最後の段）が当たれば行の文書にしない glob の並び'
-  - name: alias_type
-    title: 引用の種類
-    type: str | None
-    access: 公開
-    default: None
-    description: alias-inject の引用の種類。行の全文書のメタデータの `alias_type` になる
-  methods:
-  - name: excludes
-    title: 除外の名前に当たるか
-    kind: メソッド
-    scope: public
-    summary: ファイル名が `exclude` のどれかに当たるかを返す
-    args:
-    - name: path
-      title: ファイルのパス
-      type: str
-      required: true
-      passing: positional
-      description: 配信元の直下からのパス（`/` 区切り）
-    returns:
-      type: bool
-      description: 当たれば `True`
-    process: 1. `PurePosixPath(PurePosixPath(path).name)` が `exclude` のどれかに `full_match` で当たれば `True` を返す（`*` は名前の中だけに当たる）
-    unit_tests:
-    - name: test_document_table_excludes
-      case: 正常
-      summary: ファイル名で当てる
-      condition: '`exclude: [README.md, "_*.yaml"]` で `docs/a/README.md`・`docs/_x.yaml`・`docs/README.md/a.md`'
-      mock: なし
-      expected: '`True`・`True`・`False`'
-      exception: '-'
-  - name: matches
-    title: 行に当たるか
-    kind: メソッド
-    scope: public
-    summary: ファイルがこの行の文書になるか（`paths` に当たり、除外の名前に当たらない）を返す
-    description: '`paths` で行を判定する箇所（ファイルの収集・変更の一覧・文書のページ）は全てこのメソッドで判定する。新しい文書の置き場所は `excludes` で判定する。'
-    args:
-    - name: path
-      title: ファイルのパス
-      type: str
-      required: true
-      passing: positional
-      description: 配信元の直下からのパス（`/` 区切り）
-    returns:
-      type: bool
-      description: 行の文書になれば `True`
-    process: 1. `PurePosixPath(path)` が `paths` のどれかに `full_match` で当たり（`**` は 0 個以上のフォルダ、`*` は 1 つの名前の中だけ）、除外の名前に当たるかが `False` なら `True` を返す
-    unit_tests:
-    - name: test_document_table_matches
-      case: 正常
-      summary: paths に当たる
-      condition: '`paths: [docs/**/*.md]`・`exclude: []` で `docs/a/b.md`'
-      mock: なし
-      expected: '`True`'
-      exception: '-'
-    - name: test_document_table_matches_when_excluded
-      case: 正常
-      summary: 除外の名前に当たる
-      condition: '`paths: [docs/**/*.md]`・`exclude: [README.md]` で `docs/a/README.md` と `docs/a/b.md`'
-      mock: なし
-      expected: '`False` と `True`'
-      exception: '-'
-    - name: test_document_table_matches_when_outside_paths
-      case: 正常
-      summary: paths に当たらない
-      condition: '`paths: [docs/*.md]` で `src/a.md`'
-      mock: なし
-      expected: '`False`'
-      exception: '-'
-- name: ScriptEntry
-  title: スクリプトの行
-  container: project_index/features/sources/types.py
-  usecase: 共通
-  role: DTO
-  summary: '`validators[]`・`converters[]`・`generators[]` の 1 行'
-  description: '`pydantic.BaseModel`（`frozen=True`）。'
-  properties:
-  - name: id
-    title: ID
-    type: str
-    access: 公開
-    description: 主キー
-  - name: run
-    title: コマンド
-    type: list[str]
-    access: 公開
-    description: 配信元の直下で実行するコマンド
-  - name: 'on'
-    title: 通す時点
-    type: list[Literal['read', 'write']]
-    access: 公開
-    default: '["write"]'
-    description: '`validators[]` だけが使う'
-  - name: cache
-    title: 変換の結果の控え
-    type: bool
-    access: 公開
-    default: 'True'
-    description: '`converters[]` だけが使う。`False` の行の変換は控えを読まず書かない'
-- name: SourceConfig
-  title: 配信元の設定
-  container: project_index/features/sources/types.py
-  usecase: 共通
-  role: DTO
-  summary: マージして検証を通した配信元の設定
-  description: '`pydantic.BaseModel`（`frozen=True`）。キーの意味と既定値は Issue #3 の資料 A-25 のキー一覧。ドットを含むキー（`ids.format`・`related.types`・`diff.ignore_keys`・`github.repository`・`github.issue_labels`）は入れ子のモデルで持つ。'
-  properties:
-  - name: version
-    title: 設定のバージョン
-    type: str
-    access: 公開
-    default: SOURCE_CONFIG_VERSION
-    description: 設定を書いたときのスキーマのバージョン
-  - name: name
-    title: 配信元の名前
-    type: str
-    access: 公開
-    description: '`sources[].id` の既定'
-  - name: enabled
-    title: 配信するか
-    type: bool
-    access: 公開
-    default: 'True'
-    description: 端末の設定の `sources[].enabled` と両方が `True` のときだけ配信する
-  - name: default_ref
-    title: 既定のリビジョン
-    type: str
-    access: 公開
-    default: '"develop"'
-    description: リビジョンを指さないときに読むリビジョン
-  - name: visibility
-    title: 公開範囲
-    type: dict[str, Any] | None
-    access: 公開
-    default: None
-    description: Pages に出す文書の条件
-  - name: worktrees
-    title: ワークツリーの場所
-    type: list[str]
-    access: 公開
-    default: '["./.claude/worktrees/*"]'
-    description: ワークツリーの glob
-  - name: documents
-    title: 文書
-    type: list[DocumentTable]
-    access: 公開
-    description: 配信する文書の行
-  - name: validators
-    title: 検査
-    type: list[ScriptEntry]
-    access: 公開
-    default: '[]'
-    description: 検査のスクリプト
-  - name: converters
-    title: 変換
-    type: list[ScriptEntry]
-    access: 公開
-    default: '[]'
-    description: 変換のスクリプト
-  - name: generators
-    title: 生成
-    type: list[ScriptEntry]
-    access: 公開
-    default: '[]'
-    description: 書き込み後の生成のスクリプト
-  - name: nav
-    title: 画面の構成
-    type: dict[str, Any] | None
-    access: 公開
-    default: None
-    description: タブとサイドバー。`None` は dev-docs の画面のサーバーが文書の行ごとにタブを作る
-  - name: ids_format
-    title: ID の付け方
-    type: str | None
-    access: 公開
-    default: None
-    description: '`ids.format`'
-  - name: related_types
-    title: 関連の種類
-    type: list[str]
-    access: 公開
-    default: '["references", "depends_on", "see_also", "implements", "tests"]'
-    description: '`related.types`'
-  - name: diff_ignore_keys
-    title: 差分で無視するキー
-    type: list[str]
-    access: 公開
-    default: '["updated"]'
-    description: '`diff.ignore_keys`'
-  - name: github_repository
-    title: GitHub のリポジトリ
-    type: str | None
-    access: 公開
-    default: None
-    description: '`github.repository`（`owner/name`）。`None` の配信元は画面で Issue を作成するボタンを出さない'
-  - name: github_issue_labels
-    title: 起票のラベル
-    type: list[str]
-    access: 公開
-    default: '[]'
-    description: '`github.issue_labels`。Issue の作成画面の URL の `labels` に渡す'
-  - name: decision_folders
-    title: 話し合いの記録のフォルダ
-    type: list[str]
-    access: 公開
-    default: '[]'
-    description: '`decisions.folders`。設計書の `decisions` の検討事項の文書を探すフォルダ'
-  - name: description
-    title: 配信元の説明
-    type: str
-    access: 公開
-    default: '""'
-    description: '`describe()` に出す 1 文'
-  - name: instructions
-    title: 説明書
-    type: str
-    access: 公開
-    default: '""'
-    description: '`describe(source)` で返す使い方'
-- name: ServedSource
-  title: 配信中の配信元
-  container: project_index/features/sources/types.py
-  usecase: 共通
-  role: DTO
-  summary: 検証を通した 1 つの配信元と、読み書きに要る解いた値
-  description: '`dataclass(frozen=True)`。読み直しでは作り直し、書き換えない。'
-  properties:
-  - name: id
-    title: 配信元の ID
-    type: str
-    access: 公開
-    description: '`sources[].id`、無ければ設定の `name`'
-  - name: root
-    title: 配信元の直下
-    type: Path
-    access: 公開
-    description: 先頭の設定の YAML のフォルダ（クローン本体か Git の管理外のフォルダ）
-  - name: config_files
-    title: 設定のファイル
-    type: list[Path]
-    access: 公開
-    description: マージした YAML の並び
-  - name: config
+  - name: DocumentTable
+    title: 文書の行
+    container: project_index/features/sources/types.py
+    usecase: 共通
+    role: DTO
+    summary: 配信元の設定の `documents[]` の 1 行（同じ形式・スキーマ・検査で扱う文書のまとまり）
+    description: '`pydantic.BaseModel`（`frozen=True`）。既定値は Issue #3 の資料 A-25 の `documents[]` のキー一覧。行の ID は MCP の `kind` になる。'
+    properties:
+      - name: id
+        title: 文書の行の ID
+        type: str
+        access: 公開
+        description: 主キー
+      - name: paths
+        title: ファイル
+        type: list[str]
+        access: 公開
+        description: ファイルのパスか glob の並び
+      - name: title
+        title: 名前
+        type: str | None
+        access: 公開
+        default: None
+        description: 画面・MCP に出す名前
+      - name: enabled
+        title: 配信するか
+        type: bool
+        access: 公開
+        default: 'True'
+        description: '`False` で配信も検索もしない'
+      - name: schema_path
+        title: スキーマ
+        type: str | SchemaRef
+        access: 公開
+        description: '`schema` の値（pydantic の属性と重なるので `alias="schema"`）。全ての行で必須。文字列は配信元の直下からの相対パス、`SchemaRef` はほかの配信元のリビジョンのスキーマ'
+      - name: validators
+        title: 検査
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: 通す `validators[].id`
+      - name: converter
+        title: 変換
+        type: str | None
+        access: 公開
+        default: None
+        description: 使う `converters[].id`。`None` は既定の変換
+      - name: writable
+        title: 書き込めるか
+        type: bool | None
+        access: 公開
+        default: None
+        description: '`None` は `True`（`is_writable` が解く）'
+      - name: after_write
+        title: 書き込み後の生成
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: 書いた後に走らせる `generators[].id`
+      - name: search
+        title: 検索に入れるか
+        type: bool
+        access: 公開
+        default: 'True'
+        description: '`False` で検索の対象にしない'
+      - name: records
+        title: 文書にする配列
+        type: str | None
+        access: 公開
+        default: None
+        description: ファイルの中のこの配列の各要素を 1 件の文書にする
+      - name: body_file
+        title: 本文のファイルの列
+        type: str | None
+        access: 公開
+        default: None
+        description: '`records` の各要素で本文のファイルのパスを持つ列'
+      - name: metadata
+        title: メタデータの対応
+        type: dict[str, str]
+        access: 公開
+        default: '{}'
+        description: 共通のキー → 列名（入れ子の列は `.` でつないだパス）。書かれていないキーは同じ名前の列
+      - name: exclude
+        title: 除外する名前
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: '`paths` に当たったファイルのうち、ファイル名（最後の段）が当たれば行の文書にしない glob の並び'
+      - name: alias_type
+        title: 引用の種類
+        type: str | None
+        access: 公開
+        default: None
+        description: alias-inject の引用の種類。行の全文書のメタデータの `alias_type` になる
+    methods:
+      - name: excludes
+        title: 除外の名前に当たるか
+        kind: メソッド
+        scope: public
+        summary: ファイル名が `exclude` のどれかに当たるかを返す
+        args:
+          - name: path
+            title: ファイルのパス
+            type: str
+            required: true
+            passing: positional
+            description: 配信元の直下からのパス（`/` 区切り）
+        returns:
+          type: bool
+          description: 当たれば `True`
+        process: 1. `PurePosixPath(PurePosixPath(path).name)` が `exclude` のどれかに `full_match` で当たれば `True` を返す（`*` は名前の中だけに当たる）
+        unit_tests:
+          - name: test_document_table_excludes
+            case: 正常
+            summary: ファイル名で当てる
+            condition: '`exclude: [README.md, "_*.yaml"]` で `docs/a/README.md`・`docs/_x.yaml`・`docs/README.md/a.md`'
+            mock: なし
+            expected: '`True`・`True`・`False`'
+            exception: '-'
+      - name: matches
+        title: 行に当たるか
+        kind: メソッド
+        scope: public
+        summary: ファイルがこの行の文書になるか（`paths` に当たり、除外の名前に当たらない）を返す
+        description: '`paths` で行を判定する箇所（ファイルの収集・変更の一覧・文書のページ）は全てこのメソッドで判定する。新しい文書の置き場所は `excludes` で判定する。'
+        args:
+          - name: path
+            title: ファイルのパス
+            type: str
+            required: true
+            passing: positional
+            description: 配信元の直下からのパス（`/` 区切り）
+        returns:
+          type: bool
+          description: 行の文書になれば `True`
+        process: 1. `PurePosixPath(path)` が `paths` のどれかに `full_match` で当たり（`**` は 0 個以上のフォルダ、`*` は 1 つの名前の中だけ）、除外の名前に当たるかが `False` なら `True` を返す
+        unit_tests:
+          - name: test_document_table_matches
+            case: 正常
+            summary: paths に当たる
+            condition: '`paths: [docs/**/*.md]`・`exclude: []` で `docs/a/b.md`'
+            mock: なし
+            expected: '`True`'
+            exception: '-'
+          - name: test_document_table_matches_when_excluded
+            case: 正常
+            summary: 除外の名前に当たる
+            condition: '`paths: [docs/**/*.md]`・`exclude: [README.md]` で `docs/a/README.md` と `docs/a/b.md`'
+            mock: なし
+            expected: '`False` と `True`'
+            exception: '-'
+          - name: test_document_table_matches_when_outside_paths
+            case: 正常
+            summary: paths に当たらない
+            condition: '`paths: [docs/*.md]` で `src/a.md`'
+            mock: なし
+            expected: '`False`'
+            exception: '-'
+  - name: ScriptEntry
+    title: スクリプトの行
+    container: project_index/features/sources/types.py
+    usecase: 共通
+    role: DTO
+    summary: '`validators[]`・`converters[]`・`generators[]` の 1 行'
+    description: '`pydantic.BaseModel`（`frozen=True`）。'
+    properties:
+      - name: id
+        title: ID
+        type: str
+        access: 公開
+        description: 主キー
+      - name: run
+        title: コマンド
+        type: list[str]
+        access: 公開
+        description: 配信元の直下で実行するコマンド
+      - name: 'on'
+        title: 通す時点
+        type: list[Literal['read', 'write']]
+        access: 公開
+        default: '["write"]'
+        description: '`validators[]` だけが使う'
+      - name: cache
+        title: 変換の結果の控え
+        type: bool
+        access: 公開
+        default: 'True'
+        description: '`converters[]` だけが使う。`False` の行の変換は控えを読まず書かない'
+  - name: SourceConfig
     title: 配信元の設定
-    type: SourceConfig
-    access: 公開
-    description: マージして検証した設定
-  - name: is_git
-    title: Git の配信元か
-    type: bool
-    access: 公開
-    description: '`root` が Git の作業ツリーの中か。`False` のときはリビジョンを使えない'
-  - name: repo_root
-    title: リポジトリの直下
-    type: Path | None
-    access: 公開
-    description: Git の配信元のとき、クローンの直下（`root` がリポジトリの中のフォルダのときに違う）
-  - name: main_root
-    title: メインのリポジトリの直下
-    type: Path | None
-    access: 公開
-    description: Git の配信元のとき、`git rev-parse --git-common-dir` の親。`worktrees` はここから数える
-    default: None
-  - name: config_commit
-    title: 設定の commit
-    type: str | None
-    access: 公開
-    description: '`default_ref` から設定を読んだときの commit。Git でない配信元は `None`'
-    default: None
-  - name: scope_read
-    title: 読める作業場所
-    type: list[str]
-    access: 公開
-    description: '`sources[].scope.read`'
-  - name: scope_write
-    title: 読み書きできる作業場所
-    type: list[str]
-    access: 公開
-    description: '`sources[].scope.write`。無ければ `[str(root)]`'
-  - name: outside_read
-    title: 作業範囲の外から読めるか
-    type: bool
-    access: 公開
-    description: '`sources[].outside_read`'
-    default: 'True'
-  - name: worktree_globs
-    title: ワークツリーの glob
-    type: list[str]
-    access: 公開
-    description: 設定の `worktrees` を `main_root`（Git でなければ `root`）からの絶対パスにしたもの
-  - name: schemas
-    title: 種類のスキーマ
-    type: dict[str, dict[str, Any]]
-    access: 公開
-    description: '`documents[].id` → 読んだスキーマ（配信元の直下のファイルを起動時に読む。作業中のワークツリーを読むときは文書のストアが読み直す）。`schema_path` が `SchemaRef` の行は、参照先のスキーマの読み取りで `$ref` まで解いたスキーマ'
-  methods:
-  - name: table
-    title: 文書の行を引く
-    kind: メソッド
-    summary: 種類から文書の行を引く
-    scope: public
-    args:
-    - name: kind
-      title: 種類
-      type: str
-      required: true
-      passing: positional
-      description: '`documents[].id`'
-    returns:
-      type: DocumentTable
-      description: 有効な文書の行
-    process: |-
-      1. `enabled` の文書の行から `id` が `kind` の行を返す
-         - 無い場合、有効な行の ID を `kinds` に載せた `UnknownKindError` を送る
-    exceptions:
-    - name: UnknownKindError
-      condition: '`kind` が有効な文書の行に無い'
-      message: '`{source}: 種類 {kind} はありません`'
-    unit_tests:
-    - name: test_served_source_table
-      case: 正常
-      summary: 行を引く
-      condition: '`documents` に `rules`・`notes`、`table("notes")`'
-      mock: なし
-      expected: '`notes` の行'
-    - name: test_served_source_table_when_unknown
-      case: 異常
-      summary: 無い種類
-      condition: '`table("x")`、`notes` は `enabled: false`'
-      mock: なし
-      expected: '`UnknownKindError` の `kinds` が `["rules"]`'
-      exception: 無い種類
-  - name: script
-    title: スクリプトを引く
-    kind: メソッド
-    summary: 検査・変換・生成の行を ID で引く
-    scope: public
-    args:
-    - name: table
-      title: 表
-      type: Literal['validators', 'converters', 'generators']
-      required: true
-      passing: positional
-      description: 引く表
-    - name: script_id
-      title: ID
-      type: str
-      required: true
-      passing: positional
-      description: 行の ID
-    returns:
-      type: ScriptEntry
-      description: その行（参照は検証で確かめてあるので必ずある）
-    process: 1. `config` の `table` の表から `id` が `script_id` の行を返す
-- name: SourceStatus
-  title: 配信元の状態
-  container: project_index/features/sources/types.py
-  usecase: 共通
-  role: DTO
-  summary: 端末の設定の 1 行が配信中か、外したならその理由
-  description: '`dataclass(frozen=True)`。端末の設定の取得・保存・起動のログが使う。'
-  properties:
-  - name: id
-    title: 配信元の ID
-    type: str
-    access: 公開
-    description: '`sources[].id`。設定を読めず `id` も無いときは `sources[{n}]`'
-  - name: index
-    title: 行の位置
-    type: int
-    access: 公開
-    description: '`sources[]` の中の 0 始まりの位置'
-  - name: status
-    title: 状態
-    type: SourceStatusKind
-    access: 公開
-    description: 配信中・検証で外した・無効
-  - name: errors
-    title: 違反
-    type: list[Violation]
-    access: 公開
-    default: '[]'
-    description: '`not_served` のときの理由。パスは設定のキーのパス（`documents[0].paths`）'
-  - name: config_version
-    title: 設定のバージョン
-    type: tuple[str, str] | None
-    access: 公開
-    default: None
-    description: 設定のバージョンがサーバーの読めるバージョンより古いとき、`(設定, サーバー)`
-  - name: config
-    title: 配信元の設定のパス
-    type: tuple[str, ...]
-    access: 公開
-    default: ()
-    description: 読み直したときの行の `config`。端末の設定の取得が行と状態を突き合わせる
+    container: project_index/features/sources/types.py
+    usecase: 共通
+    role: DTO
+    summary: マージして検証を通した配信元の設定
+    description: '`pydantic.BaseModel`（`frozen=True`）。キーの意味と既定値は Issue #3 の資料 A-25 のキー一覧。ドットを含むキー（`ids.format`・`related.types`・`diff.ignore_keys`・`github.repository`・`github.issue_labels`）は入れ子のモデルで持つ。'
+    properties:
+      - name: version
+        title: 設定のバージョン
+        type: str
+        access: 公開
+        default: SOURCE_CONFIG_VERSION
+        description: 設定を書いたときのスキーマのバージョン
+      - name: name
+        title: 配信元の名前
+        type: str
+        access: 公開
+        description: '`sources[].id` の既定'
+      - name: enabled
+        title: 配信するか
+        type: bool
+        access: 公開
+        default: 'True'
+        description: 端末の設定の `sources[].enabled` と両方が `True` のときだけ配信する
+      - name: default_ref
+        title: 既定のリビジョン
+        type: str
+        access: 公開
+        default: '"develop"'
+        description: リビジョンを指さないときに読むリビジョン
+      - name: visibility
+        title: 公開範囲
+        type: dict[str, Any] | None
+        access: 公開
+        default: None
+        description: Pages に出す文書の条件
+      - name: worktrees
+        title: ワークツリーの場所
+        type: list[str]
+        access: 公開
+        default: '["./.claude/worktrees/*"]'
+        description: ワークツリーの glob
+      - name: documents
+        title: 文書
+        type: list[DocumentTable]
+        access: 公開
+        description: 配信する文書の行
+      - name: validators
+        title: 検査
+        type: list[ScriptEntry]
+        access: 公開
+        default: '[]'
+        description: 検査のスクリプト
+      - name: converters
+        title: 変換
+        type: list[ScriptEntry]
+        access: 公開
+        default: '[]'
+        description: 変換のスクリプト
+      - name: generators
+        title: 生成
+        type: list[ScriptEntry]
+        access: 公開
+        default: '[]'
+        description: 書き込み後の生成のスクリプト
+      - name: nav
+        title: 画面の構成
+        type: dict[str, Any] | None
+        access: 公開
+        default: None
+        description: タブとサイドバー。`None` は dev-docs の画面のサーバーが文書の行ごとにタブを作る
+      - name: ids_format
+        title: ID の付け方
+        type: str | None
+        access: 公開
+        default: None
+        description: '`ids.format`'
+      - name: related_types
+        title: 関連の種類
+        type: list[str]
+        access: 公開
+        default: '["references", "depends_on", "see_also", "implements", "tests"]'
+        description: '`related.types`'
+      - name: diff_ignore_keys
+        title: 差分で無視するキー
+        type: list[str]
+        access: 公開
+        default: '["updated"]'
+        description: '`diff.ignore_keys`'
+      - name: github_repository
+        title: GitHub のリポジトリ
+        type: str | None
+        access: 公開
+        default: None
+        description: '`github.repository`（`owner/name`）。`None` の配信元は画面で Issue を作成するボタンを出さない'
+      - name: github_issue_labels
+        title: 起票のラベル
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: '`github.issue_labels`。Issue の作成画面の URL の `labels` に渡す'
+      - name: decision_folders
+        title: 話し合いの記録のフォルダ
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: '`decisions.folders`。設計書の `decisions` の検討事項の文書を探すフォルダ'
+      - name: description
+        title: 配信元の説明
+        type: str
+        access: 公開
+        default: '""'
+        description: '`describe()` に出す 1 文'
+      - name: instructions
+        title: 説明書
+        type: str
+        access: 公開
+        default: '""'
+        description: '`describe(source)` で返す使い方'
+  - name: ServedSource
+    title: 配信中の配信元
+    container: project_index/features/sources/types.py
+    usecase: 共通
+    role: DTO
+    summary: 検証を通した 1 つの配信元と、読み書きに要る解いた値
+    description: '`dataclass(frozen=True)`。読み直しでは作り直し、書き換えない。'
+    properties:
+      - name: id
+        title: 配信元の ID
+        type: str
+        access: 公開
+        description: '`sources[].id`、無ければ設定の `name`'
+      - name: root
+        title: 配信元の直下
+        type: Path
+        access: 公開
+        description: 先頭の設定の YAML のフォルダ（クローン本体か Git の管理外のフォルダ）
+      - name: config_files
+        title: 設定のファイル
+        type: list[Path]
+        access: 公開
+        description: マージした YAML の並び
+      - name: config
+        title: 配信元の設定
+        type: SourceConfig
+        access: 公開
+        description: マージして検証した設定
+      - name: is_git
+        title: Git の配信元か
+        type: bool
+        access: 公開
+        description: '`root` が Git の作業ツリーの中か。`False` のときはリビジョンを使えない'
+      - name: repo_root
+        title: リポジトリの直下
+        type: Path | None
+        access: 公開
+        description: Git の配信元のとき、クローンの直下（`root` がリポジトリの中のフォルダのときに違う）
+      - name: main_root
+        title: メインのリポジトリの直下
+        type: Path | None
+        access: 公開
+        description: Git の配信元のとき、`git rev-parse --git-common-dir` の親。`worktrees` はここから数える
+        default: None
+      - name: config_commit
+        title: 設定の commit
+        type: str | None
+        access: 公開
+        description: '`default_ref` から設定を読んだときの commit。Git でない配信元は `None`'
+        default: None
+      - name: scope_read
+        title: 読める作業場所
+        type: list[str]
+        access: 公開
+        description: '`sources[].scope.read`'
+      - name: scope_write
+        title: 読み書きできる作業場所
+        type: list[str]
+        access: 公開
+        description: '`sources[].scope.write`。無ければ `[str(root)]`'
+      - name: outside_read
+        title: 作業範囲の外から読めるか
+        type: bool
+        access: 公開
+        description: '`sources[].outside_read`'
+        default: 'True'
+      - name: worktree_globs
+        title: ワークツリーの glob
+        type: list[str]
+        access: 公開
+        description: 設定の `worktrees` を `main_root`（Git でなければ `root`）からの絶対パスにしたもの
+      - name: schemas
+        title: 種類のスキーマ
+        type: dict[str, dict[str, Any]]
+        access: 公開
+        description: '`documents[].id` → 読んだスキーマ（配信元の直下のファイルを起動時に読む。作業中のワークツリーを読むときは文書のストアが読み直す）。`schema_path` が `SchemaRef` の行は、参照先のスキーマの読み取りで `$ref` まで解いたスキーマ'
+    methods:
+      - name: table
+        title: 文書の行を引く
+        kind: メソッド
+        summary: 種類から文書の行を引く
+        scope: public
+        args:
+          - name: kind
+            title: 種類
+            type: str
+            required: true
+            passing: positional
+            description: '`documents[].id`'
+        returns:
+          type: DocumentTable
+          description: 有効な文書の行
+        process: |-
+          1. `enabled` の文書の行から `id` が `kind` の行を返す
+             - 無い場合、有効な行の ID を `kinds` に載せた `UnknownKindError` を送る
+        exceptions:
+          - name: UnknownKindError
+            condition: '`kind` が有効な文書の行に無い'
+            message: '`{source}: 種類 {kind} はありません`'
+        unit_tests:
+          - name: test_served_source_table
+            case: 正常
+            summary: 行を引く
+            condition: '`documents` に `rules`・`notes`、`table("notes")`'
+            mock: なし
+            expected: '`notes` の行'
+          - name: test_served_source_table_when_unknown
+            case: 異常
+            summary: 無い種類
+            condition: '`table("x")`、`notes` は `enabled: false`'
+            mock: なし
+            expected: '`UnknownKindError` の `kinds` が `["rules"]`'
+            exception: 無い種類
+      - name: script
+        title: スクリプトを引く
+        kind: メソッド
+        summary: 検査・変換・生成の行を ID で引く
+        scope: public
+        args:
+          - name: table
+            title: 表
+            type: Literal['validators', 'converters', 'generators']
+            required: true
+            passing: positional
+            description: 引く表
+          - name: script_id
+            title: ID
+            type: str
+            required: true
+            passing: positional
+            description: 行の ID
+        returns:
+          type: ScriptEntry
+          description: その行（参照は検証で確かめてあるので必ずある）
+        process: 1. `config` の `table` の表から `id` が `script_id` の行を返す
+  - name: SourceStatus
+    title: 配信元の状態
+    container: project_index/features/sources/types.py
+    usecase: 共通
+    role: DTO
+    summary: 端末の設定の 1 行が配信中か、外したならその理由
+    description: '`dataclass(frozen=True)`。端末の設定の取得・保存・起動のログが使う。'
+    properties:
+      - name: id
+        title: 配信元の ID
+        type: str
+        access: 公開
+        description: '`sources[].id`。設定を読めず `id` も無いときは `sources[{n}]`'
+      - name: index
+        title: 行の位置
+        type: int
+        access: 公開
+        description: '`sources[]` の中の 0 始まりの位置'
+      - name: status
+        title: 状態
+        type: SourceStatusKind
+        access: 公開
+        description: 配信中・検証で外した・無効
+      - name: errors
+        title: 違反
+        type: list[Violation]
+        access: 公開
+        default: '[]'
+        description: '`not_served` のときの理由。パスは設定のキーのパス（`documents[0].paths`）'
+      - name: config_version
+        title: 設定のバージョン
+        type: tuple[str, str] | None
+        access: 公開
+        default: None
+        description: 設定のバージョンがサーバーの読めるバージョンより古いとき、`(設定, サーバー)`
+      - name: config
+        title: 配信元の設定のパス
+        type: tuple[str, ...]
+        access: 公開
+        default: ()
+        description: 読み直したときの行の `config`。端末の設定の取得が行と状態を突き合わせる
 enums:
-- name: SourceStatusKind
-  title: 配信元の状態の種類
-  container: project_index/features/sources/types.py
-  usecase: 共通
-  summary: 配信元の状態
-  description: '`Literal` の型エイリアス。'
-  values:
-  - value: serving
-    title: 配信中
-    description: 検証を通って配信している
-  - value: not_served
-    title: 配信していない
-    description: 起動時か読み直しの検証で外した
-  - value: disabled
-    title: 無効
-    description: '端末の設定か配信元の設定で `enabled: false`'
+  - name: SourceStatusKind
+    title: 配信元の状態の種類
+    container: project_index/features/sources/types.py
+    usecase: 共通
+    summary: 配信元の状態
+    description: '`Literal` の型エイリアス。'
+    values:
+      - value: serving
+        title: 配信中
+        description: 検証を通って配信している
+      - value: not_served
+        title: 配信していない
+        description: 起動時か読み直しの検証で外した
+      - value: disabled
+        title: 無効
+        description: '端末の設定か配信元の設定で `enabled: false`'
 constants:
-- name: SOURCE_CONFIG_VERSION
-  title: 配信元の設定の読めるバージョン
-  container: project_index/features/sources/types.py
-  usecase: 共通
-  summary: このサーバーが読める配信元の設定の `version`（整数の文字列。大きいほど新しい）
-  value: '"3"'
+  - name: SOURCE_CONFIG_VERSION
+    title: 配信元の設定の読めるバージョン
+    container: project_index/features/sources/types.py
+    usecase: 共通
+    summary: このサーバーが読める配信元の設定の `version`（整数の文字列。大きいほど新しい）
+    value: '"3"'

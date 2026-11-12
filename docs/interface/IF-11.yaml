@@ -4,130 +4,130 @@ entry:
   kind: mcp_tool
   value: update
 flows:
-- name: 正常系
-  summary: 新しい commit を取り込み、依存を入れ直して起動し直す
-  setup:
-  - name: Mock
-    description: なし（一時フォルダに bare リポジトリと project-index のクローンを作る）
-  - name: 上流
-    description: クローンより 1 つ新しい commit（バージョンを上げ、移し替えの手順は無い）を bare リポジトリに置く
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as update
-      participant G as project-index のクローン
+  - name: 正常系
+    summary: 新しい commit を取り込み、依存を入れ直して起動し直す
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに bare リポジトリと project-index のクローンを作る）
+      - name: 上流
+        description: クローンより 1 つ新しい commit（バージョンを上げ、移し替えの手順は無い）を bare リポジトリに置く
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as update
+        participant G as project-index のクローン
 
-      C->>T: 引数なし
-      T->>G: git pull --ff-only
-      T->>G: uv sync
-      T-->>G: migrate --plan
-      T-->>C: updated・migration_needed: false・restarting
-      T->>T: 起動し直す
-    ```
-  expected:
-  - '`updated: true`・`migration_needed: false`・`restarting: true`'
-  - クローンの HEAD が上流の commit と同じ
-  - 起動し直した後の `status` の `version` が新しいバージョン
-  test: test_normal
-- name: 正常系（新しい commit が無い）
-  summary: 上流に新しい commit が無いと、何も変えずに返す
-  setup:
-  - name: Mock
-    description: なし
-  - name: 上流
-    description: クローンと同じ commit
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as update
-      participant G as project-index のクローン
+        C->>T: 引数なし
+        T->>G: git pull --ff-only
+        T->>G: uv sync
+        T-->>G: migrate --plan
+        T-->>C: updated・migration_needed: false・restarting
+        T->>T: 起動し直す
+      ```
+    expected:
+      - '`updated: true`・`migration_needed: false`・`restarting: true`'
+      - クローンの HEAD が上流の commit と同じ
+      - 起動し直した後の `status` の `version` が新しいバージョン
+    test: test_normal
+  - name: 正常系（新しい commit が無い）
+    summary: 上流に新しい commit が無いと、何も変えずに返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 上流
+        description: クローンと同じ commit
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as update
+        participant G as project-index のクローン
 
-      C->>T: 引数なし
-      T->>G: git pull --ff-only
-      T-->>C: updated: false・restarting: false
-    ```
-  expected:
-  - '`updated: false`・`restarting: false`・`version` が `previous_version` と同じ'
-  - プロセスが起動し直さない（ログの起動の行が増えない）
-  test: test_normal_when_up_to_date
-- name: 正常系（移し替えが要る）
-  summary: 新しいバージョンに移し替えの手順があると、再起動せずに返す
-  setup:
-  - name: Mock
-    description: なし
-  - name: 上流
-    description: 端末の設定の `version` を上げる移し替えの手順を持つ commit
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as update
-      participant G as project-index のクローン
+        C->>T: 引数なし
+        T->>G: git pull --ff-only
+        T-->>C: updated: false・restarting: false
+      ```
+    expected:
+      - '`updated: false`・`restarting: false`・`version` が `previous_version` と同じ'
+      - プロセスが起動し直さない（ログの起動の行が増えない）
+    test: test_normal_when_up_to_date
+  - name: 正常系（移し替えが要る）
+    summary: 新しいバージョンに移し替えの手順があると、再起動せずに返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 上流
+        description: 端末の設定の `version` を上げる移し替えの手順を持つ commit
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as update
+        participant G as project-index のクローン
 
-      C->>T: 引数なし
-      T->>G: git pull --ff-only・uv sync
-      T-->>G: migrate --plan
-      T-->>C: migration_needed: true・restarting: false
-    ```
-  expected:
-  - '`updated: true`・`migration_needed: true`・`restarting: false`'
-  - 端末の設定が変わらない
-  - 動いているプロセスの `status` の `version` は前のバージョンのまま
-  test: test_normal_when_migration_needed
-- name: 異常系（取り込みに失敗する・UpdateFailedError）
-  summary: fast-forward できないと、クローンに触らず再起動もしない
-  setup:
-  - name: Mock
-    description: なし
-  - name: クローン
-    description: 上流と分岐した commit を 1 つ積んでおく
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as update
-      participant G as project-index のクローン
+        C->>T: 引数なし
+        T->>G: git pull --ff-only・uv sync
+        T-->>G: migrate --plan
+        T-->>C: migration_needed: true・restarting: false
+      ```
+    expected:
+      - '`updated: true`・`migration_needed: true`・`restarting: false`'
+      - 端末の設定が変わらない
+      - 動いているプロセスの `status` の `version` は前のバージョンのまま
+    test: test_normal_when_migration_needed
+  - name: 異常系（取り込みに失敗する・UpdateFailedError）
+    summary: fast-forward できないと、クローンに触らず再起動もしない
+    setup:
+      - name: Mock
+        description: なし
+      - name: クローン
+        description: 上流と分岐した commit を 1 つ積んでおく
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as update
+        participant G as project-index のクローン
 
-      C->>T: 引数なし
-      T->>G: git pull --ff-only（失敗）
-      T-->>C: isError（失敗したコマンドと stderr）
-    ```
-  expected:
-  - '`isError: true` で `git pull --ff-only` と stderr を返す'
-  - クローンの HEAD が変わらない
-  - プロセスが起動し直さない
-  test: test_error_when_pull_fails
-- name: 異常系（再起動の途中で呼ばれる・RestartInProgressError）
-  summary: '`restart` の停止を待っている間に `update` を呼ぶと、クローンに触らずに断る'
-  setup:
-  - name: Mock
-    description: なし
-  - name: 処理中の要求
-    description: '`script_timeout_sec` の間眠る変換スクリプトを持つ配信元で `try_convert` を呼び、続けて `restart` を呼んでおく'
-    notes: 停止の待ちを長くするため
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as update
+        C->>T: 引数なし
+        T->>G: git pull --ff-only（失敗）
+        T-->>C: isError（失敗したコマンドと stderr）
+      ```
+    expected:
+      - '`isError: true` で `git pull --ff-only` と stderr を返す'
+      - クローンの HEAD が変わらない
+      - プロセスが起動し直さない
+    test: test_error_when_pull_fails
+  - name: 異常系（再起動の途中で呼ばれる・RestartInProgressError）
+    summary: '`restart` の停止を待っている間に `update` を呼ぶと、クローンに触らずに断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 処理中の要求
+        description: '`script_timeout_sec` の間眠る変換スクリプトを持つ配信元で `try_convert` を呼び、続けて `restart` を呼んでおく'
+        notes: 停止の待ちを長くするため
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as update
 
-      C->>T: 引数なし
-      T-->>C: isError（RestartInProgressError）
-    ```
-  expected:
-  - '`isError: true` で再起動の途中であることを返す'
-  - クローンの HEAD が変わらない
-  test: test_error_when_restart_in_progress
+        C->>T: 引数なし
+        T-->>C: isError（RestartInProgressError）
+      ```
+    expected:
+      - '`isError: true` で再起動の途中であることを返す'
+      - クローンの HEAD が変わらない
+    test: test_error_when_restart_in_progress
 lead: project-index のクローンで `git pull --ff-only` と `uv sync` を実行し、設定の移し替えが要らなければ再起動する。
 identifier: update
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true
 side_effects: project-index のクローンの作業ツリーと `.venv` を書き換える。新しい commit があり移し替えが要らないときは `restart` と同じく起動し直す
 callers:
-- SC-3#scenarios[正常シナリオ]
-- SC-3#scenarios[正常シナリオ（端末の設定が古くなる）]
+  - SC-3#scenarios[正常シナリオ]
+  - SC-3#scenarios[正常シナリオ（端末の設定が古くなる）]
 exclusivity: '`restart` と同じく、再起動を始めた後の呼び出しは `RestartInProgressError` で断る。更新の途中の 2 回目も同じ例外で断る'
 request: []
 request_example: |-
@@ -135,46 +135,46 @@ request_example: |-
   {}
   ```
 response:
-- name: previous_version
-  type: str
-  description: 更新する前の project-index のバージョン
-- name: version
-  type: str
-  description: 更新した後のクローンのバージョン
-  notes: '`updated: false` のときは `previous_version` と同じ'
-- name: updated
-  type: bool
-  description: 新しい commit を取り込んだか
-- name: migration_needed
-  type: bool
-  description: 新しいバージョンで端末の設定の移し替えが要るか（新しいコードの `project-index migrate --plan` で判定する）
-  notes: '`true` のときは再起動しない'
-- name: restarting
-  type: bool
-  description: 応答の後に起動し直すか
+  - name: previous_version
+    type: str
+    description: 更新する前の project-index のバージョン
+  - name: version
+    type: str
+    description: 更新した後のクローンのバージョン
+    notes: '`updated: false` のときは `previous_version` と同じ'
+  - name: updated
+    type: bool
+    description: 新しい commit を取り込んだか
+  - name: migration_needed
+    type: bool
+    description: 新しいバージョンで端末の設定の移し替えが要るか（新しいコードの `project-index migrate --plan` で判定する）
+    notes: '`true` のときは再起動しない'
+  - name: restarting
+    type: bool
+    description: 応答の後に起動し直すか
 response_example: |-
   ```json
   {"previous_version": "0.2.0", "version": "0.3.0", "updated": true, "migration_needed": false, "restarting": true}
   ```
 response_notes: '配信できなかった配信元と、配信元の設定のバージョンの新旧は、起動し直した後の `status` の `version_state` で確かめる。`migration_needed: true` のときは、利用者が `project-index migrate` を実行してから `restart` を呼ぶ。'
 exceptions:
-- name: なし（正常終了）
-  condition: 新しい commit が無い、または取り込んで依存を入れ直せた
-- name: UpdateFailedError
-  condition: '`git pull --ff-only` か `uv sync` が 0 以外で終わった'
-  notes: '`isError: true` で失敗したコマンドと stderr を返す。再起動しない'
-- name: RestartInProgressError
-  condition: 再起動か更新がまだ終わっていない
-  notes: '`isError: true`'
+  - name: なし（正常終了）
+    condition: 新しい commit が無い、または取り込んで依存を入れ直せた
+  - name: UpdateFailedError
+    condition: '`git pull --ff-only` か `uv sync` が 0 以外で終わった'
+    notes: '`isError: true` で失敗したコマンドと stderr を返す。再起動しない'
+  - name: RestartInProgressError
+    condition: 再起動か更新がまだ終わっていない
+    notes: '`isError: true`'
 constraints:
-- item: クローンの場所
-  constraint: 端末の設定の `clone`
-- item: 移し替えの要否
-  constraint: '`uv sync` の後に `{clone}/.venv/bin/python -m project_index migrate --plan` を実行し、当てる手順があれば要るとする'
-  notes: 新しいバージョンのコードで判定するため、動いているプロセスでは判定しない
-- item: コマンドのタイムアウト
-  constraint: '`git pull`・`uv sync`・`migrate --plan` はそれぞれ 300 秒で打ち切り、`UpdateFailedError` にする'
-  notes: 未実測。結合テストで測って見直す
-- item: 作業ツリーの変更
-  constraint: クローンに commit していない変更があって `git pull --ff-only` が失敗したときも、変更に触らず `UpdateFailedError` を返す
+  - item: クローンの場所
+    constraint: 端末の設定の `clone`
+  - item: 移し替えの要否
+    constraint: '`uv sync` の後に `{clone}/.venv/bin/python -m project_index migrate --plan` を実行し、当てる手順があれば要るとする'
+    notes: 新しいバージョンのコードで判定するため、動いているプロセスでは判定しない
+  - item: コマンドのタイムアウト
+    constraint: '`git pull`・`uv sync`・`migrate --plan` はそれぞれ 300 秒で打ち切り、`UpdateFailedError` にする'
+    notes: 未実測。結合テストで測って見直す
+  - item: 作業ツリーの変更
+    constraint: クローンに commit していない変更があって `git pull --ff-only` が失敗したときも、変更に触らず `UpdateFailedError` を返す
 test_file: tests/integration/server/test_update.py

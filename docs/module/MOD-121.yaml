@@ -15,76 +15,76 @@ directory: |-
   └─ project-index.schema.yaml   # 配信元の設定のスキーマ（JSON Schema 2020-12）
   ```
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      配信元の一覧 ..> 配信元の読み込み : 行ごとに
-      配信元の読み込み ..> 設定のマージ : config の並び
-      配信元の読み込み ..> 配信元の設定の検証
-      配信元の読み込み ..> スクリプトの確かめ
-      配信元の読み込み ..> 設定のバージョンの比較
-      スクリプトの確かめ ..> 実行できるかの確かめ
-      配信元の読み込み ..> 配信中の配信元 : 作る
-      配信元の読み込み ..> 配信元の状態 : 作る
-      配信中の配信元 o-- 配信元の設定
-      配信元の設定 o-- 文書の行
-      配信元の設定 o-- スクリプトの行
-      class 配信元の一覧 {
-        +読み直す(端末の設定) list
-        +引く(配信元の ID) 配信中の配信元
-        +配信中() list
-        +状態の一覧() list
-      }
-      class 配信元の読み込み {
-        <<function>>
-      }
-      class 設定のマージ {
-        <<function>>
-      }
-      class 配信元の設定の検証 {
-        <<function>>
-      }
-      class スクリプトの確かめ {
-        <<function>>
-      }
-      class 設定のバージョンの比較 {
-        <<function>>
-      }
-      class 実行できるかの確かめ {
-        <<function>>
-      }
-      class 配信中の配信元 {
-        +ID: str
-        +直下: Path
-      }
-      class 配信元の状態 {
-        +状態: str
-        +違反: list
-      }
-      class 配信元の設定 {
-        +名前: str
-        +文書: list
-      }
-      class 文書の行 {
-        +ID: str
-        +ファイル: list
-        +除外する名前: list
-        +行に当たるか(ファイルのパス) bool
-      }
-      class スクリプトの行 {
-        +ID: str
-        +コマンド: list
-      }
-      click 配信元の一覧 href "./MOD-69.py.yaml#配信元の一覧"
-      click 配信元の読み込み href "./MOD-70.py.yaml#配信元の読み込み"
-      click 設定のマージ href "./MOD-68.py.yaml#設定のマージ"
-      click 配信元の設定の検証 href "./MOD-70.py.yaml#配信元の設定の検証"
-      click スクリプトの確かめ href "./MOD-70.py.yaml#スクリプトの確かめ"
-      click 設定のバージョンの比較 href "./MOD-70.py.yaml#設定のバージョンの比較"
-      click 実行できるかの確かめ href "./MOD-88.py.yaml#実行できるかの確かめ"
-      click 配信中の配信元 href "./MOD-71.py.yaml#配信中の配信元"
-      click 配信元の状態 href "./MOD-71.py.yaml#配信元の状態"
-      click 配信元の設定 href "./MOD-71.py.yaml#配信元の設定"
-      click 文書の行 href "./MOD-71.py.yaml#文書の行"
-      click スクリプトの行 href "./MOD-71.py.yaml#スクリプトの行"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        配信元の一覧 ..> 配信元の読み込み : 行ごとに
+        配信元の読み込み ..> 設定のマージ : config の並び
+        配信元の読み込み ..> 配信元の設定の検証
+        配信元の読み込み ..> スクリプトの確かめ
+        配信元の読み込み ..> 設定のバージョンの比較
+        スクリプトの確かめ ..> 実行できるかの確かめ
+        配信元の読み込み ..> 配信中の配信元 : 作る
+        配信元の読み込み ..> 配信元の状態 : 作る
+        配信中の配信元 o-- 配信元の設定
+        配信元の設定 o-- 文書の行
+        配信元の設定 o-- スクリプトの行
+        class 配信元の一覧 {
+          +読み直す(端末の設定) list
+          +引く(配信元の ID) 配信中の配信元
+          +配信中() list
+          +状態の一覧() list
+        }
+        class 配信元の読み込み {
+          <<function>>
+        }
+        class 設定のマージ {
+          <<function>>
+        }
+        class 配信元の設定の検証 {
+          <<function>>
+        }
+        class スクリプトの確かめ {
+          <<function>>
+        }
+        class 設定のバージョンの比較 {
+          <<function>>
+        }
+        class 実行できるかの確かめ {
+          <<function>>
+        }
+        class 配信中の配信元 {
+          +ID: str
+          +直下: Path
+        }
+        class 配信元の状態 {
+          +状態: str
+          +違反: list
+        }
+        class 配信元の設定 {
+          +名前: str
+          +文書: list
+        }
+        class 文書の行 {
+          +ID: str
+          +ファイル: list
+          +除外する名前: list
+          +行に当たるか(ファイルのパス) bool
+        }
+        class スクリプトの行 {
+          +ID: str
+          +コマンド: list
+        }
+        click 配信元の一覧 href "./MOD-69.py.yaml#配信元の一覧"
+        click 配信元の読み込み href "./MOD-70.py.yaml#配信元の読み込み"
+        click 設定のマージ href "./MOD-68.py.yaml#設定のマージ"
+        click 配信元の設定の検証 href "./MOD-70.py.yaml#配信元の設定の検証"
+        click スクリプトの確かめ href "./MOD-70.py.yaml#スクリプトの確かめ"
+        click 設定のバージョンの比較 href "./MOD-70.py.yaml#設定のバージョンの比較"
+        click 実行できるかの確かめ href "./MOD-88.py.yaml#実行できるかの確かめ"
+        click 配信中の配信元 href "./MOD-71.py.yaml#配信中の配信元"
+        click 配信元の状態 href "./MOD-71.py.yaml#配信元の状態"
+        click 配信元の設定 href "./MOD-71.py.yaml#配信元の設定"
+        click 文書の行 href "./MOD-71.py.yaml#文書の行"
+        click スクリプトの行 href "./MOD-71.py.yaml#スクリプトの行"

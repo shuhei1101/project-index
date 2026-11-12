@@ -2,293 +2,293 @@ id: MOD-30
 title: 索引のサーバー / 文書のストア / types.py
 lead: 文書・読み込みの誤りと結果・同期のずれ・エイリアスの型。
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      文書のストア ..> 文書 : 返す
-      文書のストア ..> 読み込みの結果 : 返す
-      読み込みの結果 o-- 文書
-      読み込みの結果 o-- 読めなかったファイル
-      メタデータのずれの確かめ ..> メタデータのずれ : 返す
-      class メタデータのずれの確かめ {
-        <<function>>
-      }
-      class メタデータのずれ {
-        <<dataclass>>
-      }
-      class 文書のストア {
-        <<class>>
-      }
-      class 文書 {
-        <<dataclass>>
-      }
-      class 読み込みの結果 {
-        <<dataclass>>
-      }
-      class 読めなかったファイル {
-        <<dataclass>>
-      }
-      click メタデータのずれの確かめ href "./MOD-29.py.yaml#メタデータのずれの確かめ"
-      click 文書のストア href "./MOD-29.py.yaml#文書のストア"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        文書のストア ..> 文書 : 返す
+        文書のストア ..> 読み込みの結果 : 返す
+        読み込みの結果 o-- 文書
+        読み込みの結果 o-- 読めなかったファイル
+        メタデータのずれの確かめ ..> メタデータのずれ : 返す
+        class メタデータのずれの確かめ {
+          <<function>>
+        }
+        class メタデータのずれ {
+          <<dataclass>>
+        }
+        class 文書のストア {
+          <<class>>
+        }
+        class 文書 {
+          <<dataclass>>
+        }
+        class 読み込みの結果 {
+          <<dataclass>>
+        }
+        class 読めなかったファイル {
+          <<dataclass>>
+        }
+        click メタデータのずれの確かめ href "./MOD-29.py.yaml#メタデータのずれの確かめ"
+        click 文書のストア href "./MOD-29.py.yaml#文書のストア"
 data_models:
-- name: Document
-  title: 文書
-  container: project_index/features/documents/types.py
-  usecase: 共通
-  role: DTO
-  summary: ファイル 1 つか `records` の要素 1 つから作った 1 件の文書
-  description: '`dataclass(frozen=True)`。`data` は読み込みの結果を共有するので、書き換えるときは複製してから書き換える。'
-  properties:
-  - name: id
-    title: 文書の ID
-    type: str
-    access: 公開
-    description: メタデータの `id`。無ければ文書のファイルの配信元の直下からのパスから拡張子を除いた値
-  - name: kind
-    title: 種類
-    type: str
-    access: 公開
-    description: 文書の行の ID（`documents[].id`）
-  - name: source_id
-    title: 配信元の ID
-    type: str
-    access: 公開
-    description: '`ServedSource.id`'
-  - name: path
-    title: ファイル
-    type: str
-    access: 公開
-    description: 文書を持つファイルの配信元の直下からのパス（`/` 区切り）
-  - name: record_index
-    title: 要素の位置
-    type: int | None
-    access: 公開
-    description: '`records` の配列の中の位置。ファイル 1 つで 1 件の文書は `None`'
-  - name: data
-    title: 内容
-    type: dict[str, Any]
-    access: 公開
-    description: ファイルか要素の内容
-  - name: body
-    title: 本文
-    type: str
-    access: 公開
-    description: ファイルの内容か、要素を YAML に書き出した文字列。`body_file` のある要素は指したファイルの内容
-  - name: body_path
-    title: 本文のファイル
-    type: str | None
-    access: 公開
-    description: '`body_file` が指したファイルの配信元の直下からのパス。無ければ `None`'
-  - name: metadata
-    title: メタデータ
-    type: dict[str, Any]
-    access: 公開
-    description: '`metadata` の列名の対応で取った共通のキーの値（`METADATA_KEYS` のうち値のあるキー。`alias_type` は行の属性があればその値）'
-  - name: version
-    title: バージョン
-    type: str
-    access: 公開
-    description: ファイル 1 つの文書はファイルの内容の『内容のハッシュ』、`records` の要素は要素の『値のハッシュ』
-  - name: created
-    title: 作成日時
-    type: datetime | None
-    access: 公開
-    description: git の最初の commit の日時、無ければ文書の `created` の項目。どちらも無ければ `None`（並べ替えの末尾）
-  - name: updated
-    title: 更新日時
-    type: datetime | None
-    access: 公開
-    description: git の最後の commit の日時、無ければ文書の `updated` の項目。どちらも無ければ `None`（並べ替えの末尾）
-- name: LoadProblem
-  title: 読めなかったファイル
-  container: project_index/features/documents/types.py
-  usecase: 共通
-  role: DTO
-  summary: 文書にできなかったファイルと理由
-  description: '`dataclass(frozen=True)`。検索・画面は `notes` と画面の知らせに出し、処理は止めない。'
-  properties:
-  - name: path
-    title: ファイル
-    type: str
-    access: 公開
-    description: 配信元の直下からのパス
-  - name: reason
-    title: 理由
-    type: Literal['unreadable', 'duplicate_id', 'missing_body_file', 'not_mapping']
-    access: 公開
-    description: '`unreadable` は YAML として読めない、`duplicate_id` は先に読んだ文書と ID が重なる、`missing_body_file` は `body_file` の指すファイルが無い、`not_mapping` は文書にする値が辞書でない'
-  - name: detail
-    title: 詳細
-    type: str
-    access: 公開
-    description: '`YamlLoadError` の位置と理由、重なった ID と先の文書のファイルなど'
-  - name: line
-    title: 行
-    type: int | None
-    access: 公開
-    default: None
-    description: '`unreadable` のときの `YamlLoadError.line`'
-  - name: column
-    title: 列
-    type: int | None
-    access: 公開
-    default: None
-    description: '`unreadable` のときの `YamlLoadError.column`'
-- name: LoadResult
-  title: 読み込みの結果
-  container: project_index/features/documents/types.py
-  usecase: 共通
-  role: DTO
-  summary: 読めた文書と読めなかったファイル
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: documents
+  - name: Document
     title: 文書
-    type: list[Document]
-    access: 公開
-    description: '`documents[]` の行の順、行の中はファイルのパスの昇順、ファイルの中は要素の順'
-  - name: problems
+    container: project_index/features/documents/types.py
+    usecase: 共通
+    role: DTO
+    summary: ファイル 1 つか `records` の要素 1 つから作った 1 件の文書
+    description: '`dataclass(frozen=True)`。`data` は読み込みの結果を共有するので、書き換えるときは複製してから書き換える。'
+    properties:
+      - name: id
+        title: 文書の ID
+        type: str
+        access: 公開
+        description: メタデータの `id`。無ければ文書のファイルの配信元の直下からのパスから拡張子を除いた値
+      - name: kind
+        title: 種類
+        type: str
+        access: 公開
+        description: 文書の行の ID（`documents[].id`）
+      - name: source_id
+        title: 配信元の ID
+        type: str
+        access: 公開
+        description: '`ServedSource.id`'
+      - name: path
+        title: ファイル
+        type: str
+        access: 公開
+        description: 文書を持つファイルの配信元の直下からのパス（`/` 区切り）
+      - name: record_index
+        title: 要素の位置
+        type: int | None
+        access: 公開
+        description: '`records` の配列の中の位置。ファイル 1 つで 1 件の文書は `None`'
+      - name: data
+        title: 内容
+        type: dict[str, Any]
+        access: 公開
+        description: ファイルか要素の内容
+      - name: body
+        title: 本文
+        type: str
+        access: 公開
+        description: ファイルの内容か、要素を YAML に書き出した文字列。`body_file` のある要素は指したファイルの内容
+      - name: body_path
+        title: 本文のファイル
+        type: str | None
+        access: 公開
+        description: '`body_file` が指したファイルの配信元の直下からのパス。無ければ `None`'
+      - name: metadata
+        title: メタデータ
+        type: dict[str, Any]
+        access: 公開
+        description: '`metadata` の列名の対応で取った共通のキーの値（`METADATA_KEYS` のうち値のあるキー。`alias_type` は行の属性があればその値）'
+      - name: version
+        title: バージョン
+        type: str
+        access: 公開
+        description: ファイル 1 つの文書はファイルの内容の『内容のハッシュ』、`records` の要素は要素の『値のハッシュ』
+      - name: created
+        title: 作成日時
+        type: datetime | None
+        access: 公開
+        description: git の最初の commit の日時、無ければ文書の `created` の項目。どちらも無ければ `None`（並べ替えの末尾）
+      - name: updated
+        title: 更新日時
+        type: datetime | None
+        access: 公開
+        description: git の最後の commit の日時、無ければ文書の `updated` の項目。どちらも無ければ `None`（並べ替えの末尾）
+  - name: LoadProblem
     title: 読めなかったファイル
-    type: list[LoadProblem]
-    access: 公開
-    description: ファイルのパスの昇順
-- name: SyncReport
-  title: メタデータのずれ
-  container: project_index/features/documents/types.py
-  usecase: 起動
-  role: DTO
-  summary: 1 つの配信元の `metadata` の列の欠けと、管理用の YAML とファイルのずれ
-  description: '`dataclass(frozen=True)`。配信元の状態には持たず、求めるたびに作る。'
-  properties:
-  - name: source_id
-    title: 配信元の ID
-    type: str
-    access: 公開
-    description: '`ServedSource.id`'
-  - name: missing_refs
-    title: '`metadata` の列の欠け'
-    type: list[str]
-    access: 公開
-    default: '[]'
-    description: '`{行の id}: {文書の id}: {キー}（{列名}）` の並び。`metadata` に書いた列だけを数える'
-  - name: unindexed_files
-    title: 索引に無いファイル
-    type: list[str]
-    access: 公開
-    default: '[]'
-    description: '`{行の id}: {ファイルのパス}` の並び'
-  - name: missing_body_files
-    title: ファイルが無い行
-    type: list[str]
-    access: 公開
-    default: '[]'
-    description: '読み込みの `missing_body_file` の `LoadProblem` の `{path}: {detail}` の並び'
-  - name: alias_violations
-    title: エイリアスのキーの違反
-    type: list[Violation]
-    access: 公開
-    default: '[]'
-    description: エイリアスの集めの違反（`doc` に文書のパス）
-  - name: unresolved_related
-    title: 当たらない関連
-    type: list[str]
-    access: 公開
-    default: '[]'
-    description: '`{行の id}: {文書の id}: {to}` の並び。`source` を持たない `related[].to` が配信元のどの文書の ID にも当たらないもの'
-- name: AliasEntry
-  title: エイリアス
-  container: project_index/features/documents/types.py
-  usecase: 共通
-  role: DTO
-  summary: '`alias_type` を持つ行の文書 1 件のエイリアスのキーの値'
-  description: '`dataclass(frozen=True, slots=True, kw_only=True)`。エイリアスのキーの検証に通った文書だけから作る。'
-  properties:
-  - name: id
-    title: 文書の ID
-    type: str
-    access: 公開
-    description: 用語の文書の ID
-  - name: name
-    title: 名前
-    type: str
-    access: 公開
-    description: 共通のキー `name`
-  - name: aliases
-    title: 別名
-    type: list[str]
-    access: 公開
-    default: '[]'
-    description: '`aliases` を並びにしたもの。無ければ空'
-  - name: description
-    title: 説明
-    type: str | None
-    access: 公開
-    default: None
-    description: 共通のキー `description`
-  - name: alias_type
-    title: 引用の種類
-    type: Literal['term', 'doc', 'command', 'url', 'skill', 'tool', 'path', 'env', 'avoid']
-    access: 公開
-    description: 行の `alias_type`
-  - name: avoid
-    title: やめた言い方
-    type: list[str] | None
-    access: 公開
-    default: None
-    description: '`avoid` を並びにしたもの。持たない文書は `None`'
-  - name: extra
-    title: ほかのエイリアスのキー
-    type: dict[str, Any]
-    access: 公開
-    default: '{}'
-    description: 取り込んだスキーマの `metadata` のキーのうち上の項目以外で値を持つもの（`related`・`command`・`cwd`・`url`・`skill`・`tool`・`path`・`port`・`replacement`）
-- name: MatchWord
-  title: 照合する語
-  container: project_index/features/documents/types.py
-  usecase: 用語の一覧
-  role: DTO
-  summary: 照合する語と、語が指す文書の ID
-  description: '`dataclass(frozen=True, slots=True, kw_only=True)`。'
-  properties:
-  - name: word
-    title: 語
-    type: str
-    access: 公開
-    description: 文書の `name` か `aliases` の 1 要素
-  - name: id
-    title: 文書の ID
-    type: str
-    access: 公開
-    description: 語が指す文書の ID
-  - name: kind
-    title: 語の出所
-    type: Literal['name', 'alias']
-    access: 公開
-    description: '`name` から来たか `aliases` から来たか'
-- name: AliasCollection
-  title: エイリアスの集め
-  container: project_index/features/documents/types.py
-  usecase: 共通
-  role: DTO
-  summary: 検証に通ったエイリアスと違反
-  description: '`dataclass(frozen=True, slots=True, kw_only=True)`。'
-  properties:
-  - name: entries
+    container: project_index/features/documents/types.py
+    usecase: 共通
+    role: DTO
+    summary: 文書にできなかったファイルと理由
+    description: '`dataclass(frozen=True)`。検索・画面は `notes` と画面の知らせに出し、処理は止めない。'
+    properties:
+      - name: path
+        title: ファイル
+        type: str
+        access: 公開
+        description: 配信元の直下からのパス
+      - name: reason
+        title: 理由
+        type: Literal['unreadable', 'duplicate_id', 'missing_body_file', 'not_mapping']
+        access: 公開
+        description: '`unreadable` は YAML として読めない、`duplicate_id` は先に読んだ文書と ID が重なる、`missing_body_file` は `body_file` の指すファイルが無い、`not_mapping` は文書にする値が辞書でない'
+      - name: detail
+        title: 詳細
+        type: str
+        access: 公開
+        description: '`YamlLoadError` の位置と理由、重なった ID と先の文書のファイルなど'
+      - name: line
+        title: 行
+        type: int | None
+        access: 公開
+        default: None
+        description: '`unreadable` のときの `YamlLoadError.line`'
+      - name: column
+        title: 列
+        type: int | None
+        access: 公開
+        default: None
+        description: '`unreadable` のときの `YamlLoadError.column`'
+  - name: LoadResult
+    title: 読み込みの結果
+    container: project_index/features/documents/types.py
+    usecase: 共通
+    role: DTO
+    summary: 読めた文書と読めなかったファイル
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: documents
+        title: 文書
+        type: list[Document]
+        access: 公開
+        description: '`documents[]` の行の順、行の中はファイルのパスの昇順、ファイルの中は要素の順'
+      - name: problems
+        title: 読めなかったファイル
+        type: list[LoadProblem]
+        access: 公開
+        description: ファイルのパスの昇順
+  - name: SyncReport
+    title: メタデータのずれ
+    container: project_index/features/documents/types.py
+    usecase: 起動
+    role: DTO
+    summary: 1 つの配信元の `metadata` の列の欠けと、管理用の YAML とファイルのずれ
+    description: '`dataclass(frozen=True)`。配信元の状態には持たず、求めるたびに作る。'
+    properties:
+      - name: source_id
+        title: 配信元の ID
+        type: str
+        access: 公開
+        description: '`ServedSource.id`'
+      - name: missing_refs
+        title: '`metadata` の列の欠け'
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: '`{行の id}: {文書の id}: {キー}（{列名}）` の並び。`metadata` に書いた列だけを数える'
+      - name: unindexed_files
+        title: 索引に無いファイル
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: '`{行の id}: {ファイルのパス}` の並び'
+      - name: missing_body_files
+        title: ファイルが無い行
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: '読み込みの `missing_body_file` の `LoadProblem` の `{path}: {detail}` の並び'
+      - name: alias_violations
+        title: エイリアスのキーの違反
+        type: list[Violation]
+        access: 公開
+        default: '[]'
+        description: エイリアスの集めの違反（`doc` に文書のパス）
+      - name: unresolved_related
+        title: 当たらない関連
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: '`{行の id}: {文書の id}: {to}` の並び。`source` を持たない `related[].to` が配信元のどの文書の ID にも当たらないもの'
+  - name: AliasEntry
     title: エイリアス
-    type: list[AliasEntry]
-    access: 公開
-    default: '[]'
-    description: 検証に通った文書のエイリアス（文書を渡した順）
-  - name: violations
-    title: 違反
-    type: list[Violation]
-    access: 公開
-    default: '[]'
-    description: 検証に通らなかった文書の違反（`doc` に文書のパス）
-  - name: has_alias_rows
-    title: エイリアスの行があるか
-    type: bool
-    access: 公開
-    default: 'False'
-    description: 有効な documents の行に `alias_type` を持つ行があるか
+    container: project_index/features/documents/types.py
+    usecase: 共通
+    role: DTO
+    summary: '`alias_type` を持つ行の文書 1 件のエイリアスのキーの値'
+    description: '`dataclass(frozen=True, slots=True, kw_only=True)`。エイリアスのキーの検証に通った文書だけから作る。'
+    properties:
+      - name: id
+        title: 文書の ID
+        type: str
+        access: 公開
+        description: 用語の文書の ID
+      - name: name
+        title: 名前
+        type: str
+        access: 公開
+        description: 共通のキー `name`
+      - name: aliases
+        title: 別名
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: '`aliases` を並びにしたもの。無ければ空'
+      - name: description
+        title: 説明
+        type: str | None
+        access: 公開
+        default: None
+        description: 共通のキー `description`
+      - name: alias_type
+        title: 引用の種類
+        type: Literal['term', 'doc', 'command', 'url', 'skill', 'tool', 'path', 'env', 'avoid']
+        access: 公開
+        description: 行の `alias_type`
+      - name: avoid
+        title: やめた言い方
+        type: list[str] | None
+        access: 公開
+        default: None
+        description: '`avoid` を並びにしたもの。持たない文書は `None`'
+      - name: extra
+        title: ほかのエイリアスのキー
+        type: dict[str, Any]
+        access: 公開
+        default: '{}'
+        description: 取り込んだスキーマの `metadata` のキーのうち上の項目以外で値を持つもの（`related`・`command`・`cwd`・`url`・`skill`・`tool`・`path`・`port`・`replacement`）
+  - name: MatchWord
+    title: 照合する語
+    container: project_index/features/documents/types.py
+    usecase: 用語の一覧
+    role: DTO
+    summary: 照合する語と、語が指す文書の ID
+    description: '`dataclass(frozen=True, slots=True, kw_only=True)`。'
+    properties:
+      - name: word
+        title: 語
+        type: str
+        access: 公開
+        description: 文書の `name` か `aliases` の 1 要素
+      - name: id
+        title: 文書の ID
+        type: str
+        access: 公開
+        description: 語が指す文書の ID
+      - name: kind
+        title: 語の出所
+        type: Literal['name', 'alias']
+        access: 公開
+        description: '`name` から来たか `aliases` から来たか'
+  - name: AliasCollection
+    title: エイリアスの集め
+    container: project_index/features/documents/types.py
+    usecase: 共通
+    role: DTO
+    summary: 検証に通ったエイリアスと違反
+    description: '`dataclass(frozen=True, slots=True, kw_only=True)`。'
+    properties:
+      - name: entries
+        title: エイリアス
+        type: list[AliasEntry]
+        access: 公開
+        default: '[]'
+        description: 検証に通った文書のエイリアス（文書を渡した順）
+      - name: violations
+        title: 違反
+        type: list[Violation]
+        access: 公開
+        default: '[]'
+        description: 検証に通らなかった文書の違反（`doc` に文書のパス）
+      - name: has_alias_rows
+        title: エイリアスの行があるか
+        type: bool
+        access: 公開
+        default: 'False'
+        description: 有効な documents の行に `alias_type` を持つ行があるか

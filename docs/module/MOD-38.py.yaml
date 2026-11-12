@@ -2,7 +2,7 @@ id: MOD-38
 title: 索引のサーバー / 設定の移し替え / steps.py
 lead: パッケージに入れた移し替えの手順を読み、メモリの上の YAML に 1 つずつ当てる。ファイルには書かない。
 test_files:
-- tests/unit/project_index/features/migrate/test_steps.py
+  - tests/unit/project_index/features/migrate/test_steps.py
 directory: |-
   ```text
   src/project_index/migrations/
@@ -12,159 +12,159 @@ directory: |-
       └── 3/steps.yaml                  # tags（タグのマスター）の削除（value を持たない delete。破壊的）
   ```
 functions:
-- name: load_steps
-  title: 手順の読み込み
-  kind: 関数
-  container: project_index/features/migrate/steps.py
-  usecase: 設定の移し替え
-  role: 読み込み
-  summary: 対象のバージョンより新しく読めるバージョン以下の手順を古い順に読む
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: kind
-    title: 種類
-    type: Literal['settings', 'project-index']
-    required: true
-    passing: positional
-    description: 手順のフォルダ名
-  - name: mine
-    title: 対象のバージョン
-    type: str
-    required: true
-    passing: keyword
-    description: 対象の `version`
-  - name: current
-    title: 読めるバージョン
-    type: str
-    required: true
-    passing: keyword
-    description: project-index が読めるバージョン
-  returns:
-    type: list[MigrationStep]
-    description: 当てる順の手順。当てるものが無ければ空
-  process: |-
-    1. `importlib.resources.files("project_index") / MIGRATIONS_DIR / kind` の直下のフォルダのうち、名前が整数で `mine` より大きく `current` 以下のものを整数の順に並べる
-       - フォルダが無い場合、空を返す
-    2. 各フォルダの `STEPS_FILE` を読み、`steps` の行ごとに `MigrationStep` を作る（`load_yaml`）
-       - `op` が選択肢の外、`rename`・`lift` に `to` が無い、`lift` に `take` が無い場合、`MigrationFailedError` を送出する
-  exceptions:
-  - name: MigrationFailedError
-    condition: 手順のファイルが読めない、`op` が選択肢の外、`rename`・`lift` に `to` が無い、`lift` に `take` が無い
-    message: '`{バージョン}/steps.yaml: {理由}`'
-  unit_tests:
-  - name: test_load_steps
-    case: 正常
-    summary: 範囲のバージョンの手順を古い順に読む
-    condition: 手順のフォルダ `2`・`3`・`10`、`mine` が `2`、`current` が `10`
-    mock: 手順の置き場所（一時ディレクトリを `monkeypatch` で差し替える）
-    expected: '`3` の手順の後に `10` の手順'
-  - name: test_load_steps_when_none
-    case: 正常
-    summary: 当てる手順が無い
-    condition: '`mine` と `current` が同じ'
-    mock: 手順の置き場所
-    expected: 空
-  - name: test_load_steps_when_invalid_op
-    case: 異常
-    summary: 知らない操作
-    condition: '`op: copy` の行'
-    mock: 手順の置き場所
-    expected: '`MigrationFailedError`'
-    exception: 操作が選択肢の外
-  callers:
-  - MOD-37#functions[plan_migration]
-- name: apply_step
-  title: 手順の適用
-  kind: 関数
-  container: project_index/features/migrate/steps.py
-  usecase: 設定の移し替え
-  role: 変換
-  summary: メモリの上の YAML に 1 つの手順を当てる
-  scope: public
-  is_async: false
-  thread_safe: false
-  side_effects: '`data` を書き換える'
-  args:
-  - name: data
-    title: 設定
-    type: CommentedMap
-    required: true
-    passing: positional
-    description: '`load_roundtrip` で読んだ対象'
-  - name: step
-    title: 手順
-    type: MigrationStep
-    required: true
-    passing: positional
-    description: 当てる手順
-  returns:
-    type: None
-    description: なし
-  process: |-
-    1. `path` を `.` で分け、末尾の手前までをたどって親の辞書を集める。`{キー}[]` は配列の要素ごとにたどる（`lift` のために、親の辞書を持つ辞書も控える）
-       - 途中のキーが無い親は飛ばす
-    2. 親ごとに、末尾のキー（`*` なら親の全てのキー）へ操作を当てる
-       - `rename` の場合、キーがあれば同じ位置で `to` に改名する。`to` が既にあれば `MigrationFailedError` を送出する
-       - `add` の場合、キーが無ければ `value` を末尾に追加する
-       - `delete` の場合、キーがあれば削除する。`value` があるときは値が `value` と等しいときだけ削除する
-       - `lift` の場合、値が `match` に当たる辞書なら、親の辞書を持つ辞書の `to` に値の `take` を置き、キーを削除する。親の辞書が空になったら親の辞書も削除する。`to` が既にあれば `MigrationFailedError` を送出する
-       - `unwrap` の場合、値が `match` に当たる辞書なら、値を辞書の `take` の値（無ければキー名）に置き換える
-  exceptions:
-  - name: MigrationFailedError
-    condition: '`rename`・`lift` の `to` が既にある'
-    message: '`{バージョン}: {path} を {to} に改名できません（{to} があります）`'
-  unit_tests:
-  - name: test_apply_step_when_rename
-    case: 正常
-    summary: 同じ位置で改名し、コメントを残す
-    condition: '`sources[].scope` を `access` に改名する。`sources` は 2 行で、キーの上にコメントがある'
-    mock: なし
-    expected: 2 行とも `access` になり、`dump_roundtrip` の結果にコメントが残る
-  - name: test_apply_step_when_add
-    case: 正常
-    summary: 無いキーだけを追加する
-    condition: '`log_level` を `info` で追加する手順を、キーが無い設定と `debug` の設定に当てる'
-    mock: なし
-    expected: 無い方は `info`、ある方は `debug` のまま
-  - name: test_apply_step_when_delete
-    case: 正常
-    summary: キーを削除する
-    condition: '`legacy` を削除する手順'
-    mock: なし
-    expected: '`legacy` が無い'
-  - name: test_apply_step_when_rename_conflict
-    case: 異常
-    summary: 改名先が既にある
-    condition: '`a` と `b` を持つ設定に `a` → `b` の改名'
-    mock: なし
-    expected: '`MigrationFailedError`'
-    exception: 改名先がある
-  - name: test_apply_step_when_delete_value
-    case: 正常
-    summary: 値が一致するときだけ削除する
-    condition: '`documents[].type` を値 `yaml` で削除する手順を、`type: yaml` の行と `type: markdown` の行に当てる'
-    mock: なし
-    expected: '`yaml` の行だけ `type` が無く、`markdown` の行はそのまま'
-  - name: test_apply_step_when_lift
-    case: 正常
-    summary: 値を行へ引き上げる
-    condition: '`documents[].metadata.alias_type` を `match: {type: custom}`・`take: value`・`to: alias_type` で引き上げる手順を、`metadata` が `alias_type: {type: custom, value: term}` だけの行と、`name` も持つ行に当てる'
-    mock: なし
-    expected: '両方の行に `alias_type: term` があり、前の行は `metadata` が無く、後の行は `metadata` に `name` だけが残る'
-  - name: test_apply_step_when_unwrap
-    case: 正常
-    summary: 辞書の値を列名にする
-    condition: '`documents[].metadata.*` を `match: {type: ref}`・`take: field` で取り出す手順を、`name: {type: ref, field: title}`・`summary: {type: ref}`・`tags: {type: custom, value: [a]}` の `metadata` に当てる'
-    mock: なし
-    expected: '`name: title`・`summary: summary` になり、`tags` はそのまま'
-  - name: test_apply_step_when_lift_conflict
-    case: 異常
-    summary: 引き上げ先が既にある
-    condition: '`alias_type` を既に持つ行に `lift` の手順'
-    mock: なし
-    expected: '`MigrationFailedError`'
-    exception: 改名先がある
-  callers:
-  - MOD-37#functions[apply_migration]
+  - name: load_steps
+    title: 手順の読み込み
+    kind: 関数
+    container: project_index/features/migrate/steps.py
+    usecase: 設定の移し替え
+    role: 読み込み
+    summary: 対象のバージョンより新しく読めるバージョン以下の手順を古い順に読む
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: kind
+        title: 種類
+        type: Literal['settings', 'project-index']
+        required: true
+        passing: positional
+        description: 手順のフォルダ名
+      - name: mine
+        title: 対象のバージョン
+        type: str
+        required: true
+        passing: keyword
+        description: 対象の `version`
+      - name: current
+        title: 読めるバージョン
+        type: str
+        required: true
+        passing: keyword
+        description: project-index が読めるバージョン
+    returns:
+      type: list[MigrationStep]
+      description: 当てる順の手順。当てるものが無ければ空
+    process: |-
+      1. `importlib.resources.files("project_index") / MIGRATIONS_DIR / kind` の直下のフォルダのうち、名前が整数で `mine` より大きく `current` 以下のものを整数の順に並べる
+         - フォルダが無い場合、空を返す
+      2. 各フォルダの `STEPS_FILE` を読み、`steps` の行ごとに `MigrationStep` を作る（`load_yaml`）
+         - `op` が選択肢の外、`rename`・`lift` に `to` が無い、`lift` に `take` が無い場合、`MigrationFailedError` を送出する
+    exceptions:
+      - name: MigrationFailedError
+        condition: 手順のファイルが読めない、`op` が選択肢の外、`rename`・`lift` に `to` が無い、`lift` に `take` が無い
+        message: '`{バージョン}/steps.yaml: {理由}`'
+    unit_tests:
+      - name: test_load_steps
+        case: 正常
+        summary: 範囲のバージョンの手順を古い順に読む
+        condition: 手順のフォルダ `2`・`3`・`10`、`mine` が `2`、`current` が `10`
+        mock: 手順の置き場所（一時ディレクトリを `monkeypatch` で差し替える）
+        expected: '`3` の手順の後に `10` の手順'
+      - name: test_load_steps_when_none
+        case: 正常
+        summary: 当てる手順が無い
+        condition: '`mine` と `current` が同じ'
+        mock: 手順の置き場所
+        expected: 空
+      - name: test_load_steps_when_invalid_op
+        case: 異常
+        summary: 知らない操作
+        condition: '`op: copy` の行'
+        mock: 手順の置き場所
+        expected: '`MigrationFailedError`'
+        exception: 操作が選択肢の外
+    callers:
+      - MOD-37#functions[plan_migration]
+  - name: apply_step
+    title: 手順の適用
+    kind: 関数
+    container: project_index/features/migrate/steps.py
+    usecase: 設定の移し替え
+    role: 変換
+    summary: メモリの上の YAML に 1 つの手順を当てる
+    scope: public
+    is_async: false
+    thread_safe: false
+    side_effects: '`data` を書き換える'
+    args:
+      - name: data
+        title: 設定
+        type: CommentedMap
+        required: true
+        passing: positional
+        description: '`load_roundtrip` で読んだ対象'
+      - name: step
+        title: 手順
+        type: MigrationStep
+        required: true
+        passing: positional
+        description: 当てる手順
+    returns:
+      type: None
+      description: なし
+    process: |-
+      1. `path` を `.` で分け、末尾の手前までをたどって親の辞書を集める。`{キー}[]` は配列の要素ごとにたどる（`lift` のために、親の辞書を持つ辞書も控える）
+         - 途中のキーが無い親は飛ばす
+      2. 親ごとに、末尾のキー（`*` なら親の全てのキー）へ操作を当てる
+         - `rename` の場合、キーがあれば同じ位置で `to` に改名する。`to` が既にあれば `MigrationFailedError` を送出する
+         - `add` の場合、キーが無ければ `value` を末尾に追加する
+         - `delete` の場合、キーがあれば削除する。`value` があるときは値が `value` と等しいときだけ削除する
+         - `lift` の場合、値が `match` に当たる辞書なら、親の辞書を持つ辞書の `to` に値の `take` を置き、キーを削除する。親の辞書が空になったら親の辞書も削除する。`to` が既にあれば `MigrationFailedError` を送出する
+         - `unwrap` の場合、値が `match` に当たる辞書なら、値を辞書の `take` の値（無ければキー名）に置き換える
+    exceptions:
+      - name: MigrationFailedError
+        condition: '`rename`・`lift` の `to` が既にある'
+        message: '`{バージョン}: {path} を {to} に改名できません（{to} があります）`'
+    unit_tests:
+      - name: test_apply_step_when_rename
+        case: 正常
+        summary: 同じ位置で改名し、コメントを残す
+        condition: '`sources[].scope` を `access` に改名する。`sources` は 2 行で、キーの上にコメントがある'
+        mock: なし
+        expected: 2 行とも `access` になり、`dump_roundtrip` の結果にコメントが残る
+      - name: test_apply_step_when_add
+        case: 正常
+        summary: 無いキーだけを追加する
+        condition: '`log_level` を `info` で追加する手順を、キーが無い設定と `debug` の設定に当てる'
+        mock: なし
+        expected: 無い方は `info`、ある方は `debug` のまま
+      - name: test_apply_step_when_delete
+        case: 正常
+        summary: キーを削除する
+        condition: '`legacy` を削除する手順'
+        mock: なし
+        expected: '`legacy` が無い'
+      - name: test_apply_step_when_rename_conflict
+        case: 異常
+        summary: 改名先が既にある
+        condition: '`a` と `b` を持つ設定に `a` → `b` の改名'
+        mock: なし
+        expected: '`MigrationFailedError`'
+        exception: 改名先がある
+      - name: test_apply_step_when_delete_value
+        case: 正常
+        summary: 値が一致するときだけ削除する
+        condition: '`documents[].type` を値 `yaml` で削除する手順を、`type: yaml` の行と `type: markdown` の行に当てる'
+        mock: なし
+        expected: '`yaml` の行だけ `type` が無く、`markdown` の行はそのまま'
+      - name: test_apply_step_when_lift
+        case: 正常
+        summary: 値を行へ引き上げる
+        condition: '`documents[].metadata.alias_type` を `match: {type: custom}`・`take: value`・`to: alias_type` で引き上げる手順を、`metadata` が `alias_type: {type: custom, value: term}` だけの行と、`name` も持つ行に当てる'
+        mock: なし
+        expected: '両方の行に `alias_type: term` があり、前の行は `metadata` が無く、後の行は `metadata` に `name` だけが残る'
+      - name: test_apply_step_when_unwrap
+        case: 正常
+        summary: 辞書の値を列名にする
+        condition: '`documents[].metadata.*` を `match: {type: ref}`・`take: field` で取り出す手順を、`name: {type: ref, field: title}`・`summary: {type: ref}`・`tags: {type: custom, value: [a]}` の `metadata` に当てる'
+        mock: なし
+        expected: '`name: title`・`summary: summary` になり、`tags` はそのまま'
+      - name: test_apply_step_when_lift_conflict
+        case: 異常
+        summary: 引き上げ先が既にある
+        condition: '`alias_type` を既に持つ行に `lift` の手順'
+        mock: なし
+        expected: '`MigrationFailedError`'
+        exception: 改名先がある
+    callers:
+      - MOD-37#functions[apply_migration]

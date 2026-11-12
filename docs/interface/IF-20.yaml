@@ -4,118 +4,118 @@ entry:
   kind: trigger
   value: Claude Code の PreToolUse（matcher `mcp__plugin_project-index_project-index__.*`）
 flows:
-- name: 正常系
-  summary: '`tool_input` に作業場所とセッションを入れて `updatedInput` で返す'
-  setup:
-  - name: Mock
-    description: なし（フックを子プロセスとして実行する）
-  - name: 入力
-    description: '`agent_id` を持ち、`tool_input` に別の `cwd` を入れた JSON'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as Claude Code
-      participant H as ツール実行前のフック
+  - name: 正常系
+    summary: '`tool_input` に作業場所とセッションを入れて `updatedInput` で返す'
+    setup:
+      - name: Mock
+        description: なし（フックを子プロセスとして実行する）
+      - name: 入力
+        description: '`agent_id` を持ち、`tool_input` に別の `cwd` を入れた JSON'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as Claude Code
+        participant H as ツール実行前のフック
 
-      C->>H: stdin（tool_input・session_id・cwd・agent_id）
-      H-->>C: updatedInput（終了コード 0）
-    ```
-  expected:
-  - '`updatedInput` の `cwd`・`session_id`・`agent_id` がフックの入力の値'
-  - 元の `tool_input` の他のキーが変わらない
-  - 出力に `permissionDecision` が無い
-  test: test_normal
-- name: 正常系（入力が読めない）
-  summary: stdin が JSON として読めなければ何も出さず終了コード 0 で戻る
-  setup:
-  - name: Mock
-    description: なし
-  - name: 入力
-    description: JSON でない文字列
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as Claude Code
-      participant H as ツール実行前のフック
+        C->>H: stdin（tool_input・session_id・cwd・agent_id）
+        H-->>C: updatedInput（終了コード 0）
+      ```
+    expected:
+      - '`updatedInput` の `cwd`・`session_id`・`agent_id` がフックの入力の値'
+      - 元の `tool_input` の他のキーが変わらない
+      - 出力に `permissionDecision` が無い
+    test: test_normal
+  - name: 正常系（入力が読めない）
+    summary: stdin が JSON として読めなければ何も出さず終了コード 0 で戻る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: JSON でない文字列
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as Claude Code
+        participant H as ツール実行前のフック
 
-      C->>H: stdin（壊れた JSON）
-      H-->>C: 出力なし（終了コード 0）
-    ```
-  expected:
-  - stdout が空で終了コード 0
-  test: test_normal_when_input_unparsable
+        C->>H: stdin（壊れた JSON）
+        H-->>C: 出力なし（終了コード 0）
+      ```
+    expected:
+      - stdout が空で終了コード 0
+    test: test_normal_when_input_unparsable
 lead: 文書の MCP のツールの呼び出しの入力に `cwd`・`session_id`・`agent_id` を入れて返す。入力は stdin の JSON。
 identifier: hooks/pre_tool_use.py
 permissions: 利用者の権限で動く
 idempotent: true
 side_effects: なし
 callers:
-- SC-6#scenarios[正常シナリオ]
-- SC-7#scenarios[正常シナリオ]
+  - SC-6#scenarios[正常シナリオ]
+  - SC-7#scenarios[正常シナリオ]
 exclusivity: 状態を持たず排他しない
 request:
-- name: tool_name
-  type: str
-  required: true
-  location: argument
-  description: 呼ばれるツールの名前
-- name: tool_input
-  type: dict
-  required: true
-  location: argument
-  description: ツールへの入力
-- name: session_id
-  type: str
-  required: true
-  location: argument
-  description: Claude Code のセッション ID
-- name: cwd
-  type: str
-  required: true
-  location: argument
-  description: セッションの作業場所
-- name: agent_id
-  type: str
-  required: false
-  default: なし（`tool_input` に入れない）
-  location: argument
-  description: サブエージェントの ID
+  - name: tool_name
+    type: str
+    required: true
+    location: argument
+    description: 呼ばれるツールの名前
+  - name: tool_input
+    type: dict
+    required: true
+    location: argument
+    description: ツールへの入力
+  - name: session_id
+    type: str
+    required: true
+    location: argument
+    description: Claude Code のセッション ID
+  - name: cwd
+    type: str
+    required: true
+    location: argument
+    description: セッションの作業場所
+  - name: agent_id
+    type: str
+    required: false
+    default: なし（`tool_input` に入れない）
+    location: argument
+    description: サブエージェントの ID
 request_example: |-
   ```json
   {"tool_name": "mcp__plugin_project-index_project-index__search_docs", "tool_input": {"query": "起動"}, "session_id": "8f1c...", "cwd": "/home/u/repo/sample/.claude/worktrees/x", "hook_event_name": "PreToolUse"}
   ```
 response:
-- name: hookSpecificOutput.hookEventName
-  type: Literal['PreToolUse']
-  description: 常に `PreToolUse`
-- name: hookSpecificOutput.updatedInput
-  type: dict
-  description: '`tool_input` に `cwd`・`session_id`・`agent_id`（あれば）を上書きで入れたもの'
-- name: 終了コード
-  type: int
-  description: 常に 0
+  - name: hookSpecificOutput.hookEventName
+    type: Literal['PreToolUse']
+    description: 常に `PreToolUse`
+  - name: hookSpecificOutput.updatedInput
+    type: dict
+    description: '`tool_input` に `cwd`・`session_id`・`agent_id`（あれば）を上書きで入れたもの'
+  - name: 終了コード
+    type: int
+    description: 常に 0
 response_example: |-
   ```json
   {"hookSpecificOutput": {"hookEventName": "PreToolUse", "updatedInput": {"query": "起動", "cwd": "/home/u/repo/sample/.claude/worktrees/x", "session_id": "8f1c..."}}}
   ```
 exceptions:
-- name: なし（正常終了）
-  condition: 入力を書き換えて返した
-- name: なし（入力が読めない）
-  condition: stdin が JSON として読めない、または `tool_input` が無い
-  notes: 何も出さず終了コード 0 で戻り、入力を変えない
+  - name: なし（正常終了）
+    condition: 入力を書き換えて返した
+  - name: なし（入力が読めない）
+    condition: stdin が JSON として読めない、または `tool_input` が無い
+    notes: 何も出さず終了コード 0 で戻り、入力を変えない
 constraints:
-- item: 言語
-  constraint: Python 3.14 の標準ライブラリだけ
-- item: 当てるツール
-  constraint: 文書の MCP（`project-index`）のツールだけ。管理の MCP（`project-index-admin`）のツールには当てない
-- item: 上書き
-  constraint: エージェントが入れた `cwd`・`session_id`・`agent_id` はフックの値で上書きする
-  notes: 作業場所を偽って `scope` の外を書き換えさせないため
-- item: 許可の判定
-  constraint: '`permissionDecision` を返さず、利用者の許可の設定を変えない'
-  notes: 'Claude Code 2.1.312 で、`permissionDecision` を返さず `updatedInput` だけを返すと入力が書き換わり、deny のルールもフックの後に効くことを確かめた'
-- item: タイムアウト
-  constraint: '`hooks.json` の `timeout` は 5 秒'
-  notes: 外への通信が無く Python の起動だけで終わるため
+  - item: 言語
+    constraint: Python 3.14 の標準ライブラリだけ
+  - item: 当てるツール
+    constraint: 文書の MCP（`project-index`）のツールだけ。管理の MCP（`project-index-admin`）のツールには当てない
+  - item: 上書き
+    constraint: エージェントが入れた `cwd`・`session_id`・`agent_id` はフックの値で上書きする
+    notes: 作業場所を偽って `scope` の外を書き換えさせないため
+  - item: 許可の判定
+    constraint: '`permissionDecision` を返さず、利用者の許可の設定を変えない'
+    notes: 'Claude Code 2.1.312 で、`permissionDecision` を返さず `updatedInput` だけを返すと入力が書き換わり、deny のルールもフックの後に効くことを確かめた'
+  - item: タイムアウト
+    constraint: '`hooks.json` の `timeout` は 5 秒'
+    notes: 外への通信が無く Python の起動だけで終わるため
 test_file: tests/integration/plugin/test_pre_tool_use.py

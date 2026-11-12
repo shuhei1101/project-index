@@ -2,68 +2,68 @@ id: MOD-123
 title: 索引のサーバー / 書き込み / hints.py
 lead: '`write_docs` のスキーマの違反に、違反した項目のスキーマの説明を添える。'
 constants:
-- name: HINT_KEYS
-  title: 添えるスキーマのキー
-  container: project_index/features/write/hints.py
-  usecase: 書き込み
-  summary: 違反へ添えるスキーマの定義のキー（この順で並べる）
-  value: '("title", "description", "x-rules", "examples", "x-bad-examples")'
+  - name: HINT_KEYS
+    title: 添えるスキーマのキー
+    container: project_index/features/write/hints.py
+    usecase: 書き込み
+    summary: 違反へ添えるスキーマの定義のキー（この順で並べる）
+    value: '("title", "description", "x-rules", "examples", "x-bad-examples")'
 functions:
-- name: attach_schema_hints
-  title: スキーマの説明の添付
-  kind: 関数
-  container: project_index/features/write/hints.py
-  usecase: 書き込み
-  role: 変換
-  summary: 文書の検査の違反のうちスキーマの違反に、違反した項目のスキーマの定義から `HINT_KEYS` のキーを取り出して添える
-  scope: public
-  args:
-  - name: violations
-    title: 違反
-    type: list[Violation]
-    required: true
-    passing: positional
-    description: 文書の検査.検査するの違反
-  - name: schema
-    title: スキーマ
-    type: Mapping[str, Any]
-    required: true
-    passing: keyword
-    description: 文書に当てたスキーマ（文書のストア.文書に当てるスキーマ。`$ref` を解いたもの）
-  - name: data
-    title: 文書の内容
-    type: Mapping[str, Any]
-    required: true
-    passing: keyword
-    description: 検査した文書の `data`
-  returns:
-    type: list[WriteViolation]
-    description: 違反の並び（順は変えない）。スキーマの違反で添えるキーがあるものは `schema` を持つ
-  process: |-
-    1. 文書の検査のスキーマの検査と同じ検査器（`validator_for`・`FormatChecker`）で `data` の違反を全て引く
-    2. 違反ごとに、スキーマの検査と同じ `path`（`format_path(absolute_path)`、空なら `$`）と `rule`（`message`）を組にし、添える定義を決める。`required` の違反は `error.schema.properties` の無かったキーの定義、それ以外は `error.schema`
-    3. 定義から `HINT_KEYS` のうち持つキーだけを取り出す。1 つも持たなければ添えない
-    4. `violations` の各違反を、`path` と `rule` が一致する組の取り出しを `schema` に入れた `WriteViolation` にする（一致しない違反は `schema` を持たない）
-  unit_tests:
-  - name: test_attach_schema_hints
-    case: 正常
-    summary: 違反した項目の説明だけを添える
-    condition: '`title`・`description`・`examples` を持ち `x-rules` を持たない必須のキー `name` を消した内容と、`type: integer` だけを持つ `count` に文字列を入れた内容'
-    mock: なし
-    expected: '`name` の違反の `schema` が `title`・`description`・`examples` だけを持ち、`count` の違反は `schema` を持たない'
-  - name: test_attach_schema_hints_when_rules
-    case: 正常
-    summary: '`x-rules`・`x-bad-examples` も添える'
-    condition: '`x-rules`・`x-bad-examples` を持つ項目の型を違える'
-    mock: なし
-    expected: '`schema` に `x-rules`・`x-bad-examples` が入る'
-  - name: test_attach_schema_hints_when_not_schema
-    case: 正常
-    summary: スキーマの違反でないものには添えない
-    condition: '`ids.format` と `validators[]` の違反'
-    mock: なし
-    expected: どれも `schema` を持たない
+  - name: attach_schema_hints
+    title: スキーマの説明の添付
+    kind: 関数
+    container: project_index/features/write/hints.py
+    usecase: 書き込み
+    role: 変換
+    summary: 文書の検査の違反のうちスキーマの違反に、違反した項目のスキーマの定義から `HINT_KEYS` のキーを取り出して添える
+    scope: public
+    args:
+      - name: violations
+        title: 違反
+        type: list[Violation]
+        required: true
+        passing: positional
+        description: 文書の検査.検査するの違反
+      - name: schema
+        title: スキーマ
+        type: Mapping[str, Any]
+        required: true
+        passing: keyword
+        description: 文書に当てたスキーマ（文書のストア.文書に当てるスキーマ。`$ref` を解いたもの）
+      - name: data
+        title: 文書の内容
+        type: Mapping[str, Any]
+        required: true
+        passing: keyword
+        description: 検査した文書の `data`
+    returns:
+      type: list[WriteViolation]
+      description: 違反の並び（順は変えない）。スキーマの違反で添えるキーがあるものは `schema` を持つ
+    process: |-
+      1. 文書の検査のスキーマの検査と同じ検査器（`validator_for`・`FormatChecker`）で `data` の違反を全て引く
+      2. 違反ごとに、スキーマの検査と同じ `path`（`format_path(absolute_path)`、空なら `$`）と `rule`（`message`）を組にし、添える定義を決める。`required` の違反は `error.schema.properties` の無かったキーの定義、それ以外は `error.schema`
+      3. 定義から `HINT_KEYS` のうち持つキーだけを取り出す。1 つも持たなければ添えない
+      4. `violations` の各違反を、`path` と `rule` が一致する組の取り出しを `schema` に入れた `WriteViolation` にする（一致しない違反は `schema` を持たない）
+    unit_tests:
+      - name: test_attach_schema_hints
+        case: 正常
+        summary: 違反した項目の説明だけを添える
+        condition: '`title`・`description`・`examples` を持ち `x-rules` を持たない必須のキー `name` を消した内容と、`type: integer` だけを持つ `count` に文字列を入れた内容'
+        mock: なし
+        expected: '`name` の違反の `schema` が `title`・`description`・`examples` だけを持ち、`count` の違反は `schema` を持たない'
+      - name: test_attach_schema_hints_when_rules
+        case: 正常
+        summary: '`x-rules`・`x-bad-examples` も添える'
+        condition: '`x-rules`・`x-bad-examples` を持つ項目の型を違える'
+        mock: なし
+        expected: '`schema` に `x-rules`・`x-bad-examples` が入る'
+      - name: test_attach_schema_hints_when_not_schema
+        case: 正常
+        summary: スキーマの違反でないものには添えない
+        condition: '`ids.format` と `validators[]` の違反'
+        mock: なし
+        expected: どれも `schema` を持たない
 refs:
-- IF-6#constraints[違反へ添えるスキーマの説明]
+  - IF-6#constraints[違反へ添えるスキーマの説明]
 test_files:
-- tests/unit/project_index/features/write/test_hints.py
+  - tests/unit/project_index/features/write/test_hints.py

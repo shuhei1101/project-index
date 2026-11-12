@@ -14,47 +14,47 @@ directory: |-
   └─ service.py    # trace_related
   ```
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      関連のたどり ..> 読む場所の解決
-      関連のたどり ..> 文書を集める
-      関連のたどり ..> 関連をたどる
-      関連のたどり ..> 関連の候補
-      関連のたどり ..> 会話の記録 : 返し済み
-      関連をたどる ..> 関連の行
-      関連の候補 ..> 一緒に変わったファイル
-      関連の候補 ..> 会話の記録 : 閲覧と編集
-      class 関連のたどり {
-        <<function>>
-      }
-      class 読む場所の解決 {
-        <<function>>
-      }
-      class 文書を集める {
-        <<method>>
-      }
-      class 関連をたどる {
-        <<function>>
-      }
-      class 関連の行 {
-        <<function>>
-      }
-      class 関連の候補 {
-        <<function>>
-      }
-      class 一緒に変わったファイル {
-        <<function>>
-      }
-      class 会話の記録 {
-        <<class>>
-      }
-      click 関連のたどり href "./MOD-47.py.yaml#関連のたどり"
-      click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
-      click 文書を集める href "./MOD-29.py.yaml#文書を集める"
-      click 関連をたどる href "./MOD-45.py.yaml#関連をたどる"
-      click 関連の候補 href "./MOD-48.py.yaml#関連の候補"
-      click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
-      click 関連の行 href "./MOD-45.py.yaml#関連の行"
-      click 一緒に変わったファイル href "./MOD-31.py.yaml#一緒に変わったファイル"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        関連のたどり ..> 読む場所の解決
+        関連のたどり ..> 文書を集める
+        関連のたどり ..> 関連をたどる
+        関連のたどり ..> 関連の候補
+        関連のたどり ..> 会話の記録 : 返し済み
+        関連をたどる ..> 関連の行
+        関連の候補 ..> 一緒に変わったファイル
+        関連の候補 ..> 会話の記録 : 閲覧と編集
+        class 関連のたどり {
+          <<function>>
+        }
+        class 読む場所の解決 {
+          <<function>>
+        }
+        class 文書を集める {
+          <<method>>
+        }
+        class 関連をたどる {
+          <<function>>
+        }
+        class 関連の行 {
+          <<function>>
+        }
+        class 関連の候補 {
+          <<function>>
+        }
+        class 一緒に変わったファイル {
+          <<function>>
+        }
+        class 会話の記録 {
+          <<class>>
+        }
+        click 関連のたどり href "./MOD-47.py.yaml#関連のたどり"
+        click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
+        click 文書を集める href "./MOD-29.py.yaml#文書を集める"
+        click 関連をたどる href "./MOD-45.py.yaml#関連をたどる"
+        click 関連の候補 href "./MOD-48.py.yaml#関連の候補"
+        click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
+        click 関連の行 href "./MOD-45.py.yaml#関連の行"
+        click 一緒に変わったファイル href "./MOD-31.py.yaml#一緒に変わったファイル"

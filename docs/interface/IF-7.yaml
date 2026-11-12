@@ -4,284 +4,284 @@ entry:
   kind: mcp_tool
   value: '`delete_docs`'
 flows:
-- name: 正常系
-  summary: 参照されていない文書をワークツリーから消す
-  setup:
-  - name: Mock
-    description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
-  - name: サンプルの配信元
-    description: 文書の種類を 1 つ（スキーマと YAML 2 件。どちらも `related` を持たない）と `project-index.yaml` を持つ git リポジトリと、そのワークツリー（`.claude/worktrees/x`）
-    notes: id `sample`
-  - name: 入力
-    description: '`worktree` にワークツリー x、`targets` に文書 2 と読んだときの `version`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as delete_docs
-      participant WT as ワークツリー x
+  - name: 正常系
+    summary: 参照されていない文書をワークツリーから消す
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+      - name: サンプルの配信元
+        description: 文書の種類を 1 つ（スキーマと YAML 2 件。どちらも `related` を持たない）と `project-index.yaml` を持つ git リポジトリと、そのワークツリー（`.claude/worktrees/x`）
+        notes: id `sample`
+      - name: 入力
+        description: '`worktree` にワークツリー x、`targets` に文書 2 と読んだときの `version`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
+        participant WT as ワークツリー x
 
-      C->>T: targets: 文書 2
-      T->>T: 排他ロックを取り、バージョンと参照を確かめる
-      T->>WT: 文書 2 のファイルを削除する
-      T-->>C: deleted
-    ```
-  expected:
-  - '`applied: true` で、文書 2 の `status` が `deleted`'
-  - ワークツリー x の文書 2 のファイルが無く、クローン本体の文書 2 は残る
-  - 次の `search_docs` がワークツリー x の文書 2 を返さない
-  test: test_normal
-- name: 正常系（参照も外して消す）
-  summary: '`on_referenced: unlink` で参照元の `related` から外して消す'
-  setup:
-  - name: Mock
-    description: なし
-  - name: 参照されている文書
-    description: ワークツリー x の文書 2。文書 1 の `related` が文書 2 を指す
-  - name: 入力
-    description: '`targets` に文書 2、`on_referenced: unlink`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as delete_docs
-      participant WT as ワークツリー x
+        C->>T: targets: 文書 2
+        T->>T: 排他ロックを取り、バージョンと参照を確かめる
+        T->>WT: 文書 2 のファイルを削除する
+        T-->>C: deleted
+      ```
+    expected:
+      - '`applied: true` で、文書 2 の `status` が `deleted`'
+      - ワークツリー x の文書 2 のファイルが無く、クローン本体の文書 2 は残る
+      - 次の `search_docs` がワークツリー x の文書 2 を返さない
+    test: test_normal
+  - name: 正常系（参照も外して消す）
+    summary: '`on_referenced: unlink` で参照元の `related` から外して消す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 参照されている文書
+        description: ワークツリー x の文書 2。文書 1 の `related` が文書 2 を指す
+      - name: 入力
+        description: '`targets` に文書 2、`on_referenced: unlink`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
+        participant WT as ワークツリー x
 
-      C->>T: targets: 文書 2, on_referenced: unlink
-      T->>T: 文書 1 の related から文書 2 を外した文書を検査に通す
-      T->>WT: 文書 1 を書き換え、文書 2 のファイルを削除する
-      T-->>C: deleted と参照を外した文書
-    ```
-  expected:
-  - ワークツリー x の文書 2 のファイルが無い
-  - 文書 1 の `related` に文書 2 が無い
-  - '`unlinked` が文書 1 の `id` と新しい `version` を返す'
-  test: test_normal_when_unlink
-- name: 正常系（試しに消す）
-  summary: '`dry_run: true` で消した場合の結果だけを返す'
-  setup:
-  - name: Mock
-    description: なし
-  - name: 入力
-    description: '正常系（参照も外して消す）と同じ引数と `dry_run: true`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as delete_docs
+        C->>T: targets: 文書 2, on_referenced: unlink
+        T->>T: 文書 1 の related から文書 2 を外した文書を検査に通す
+        T->>WT: 文書 1 を書き換え、文書 2 のファイルを削除する
+        T-->>C: deleted と参照を外した文書
+      ```
+    expected:
+      - ワークツリー x の文書 2 のファイルが無い
+      - 文書 1 の `related` に文書 2 が無い
+      - '`unlinked` が文書 1 の `id` と新しい `version` を返す'
+    test: test_normal_when_unlink
+  - name: 正常系（試しに消す）
+    summary: '`dry_run: true` で消した場合の結果だけを返す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '正常系（参照も外して消す）と同じ引数と `dry_run: true`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
 
-      C->>T: targets: 文書 2, on_referenced: unlink, dry_run: true
-      T->>T: 本番と同じ確認
-      T-->>C: applied: false、消す文書と参照を外す文書
-    ```
-  expected:
-  - '`applied` が `false` で、`results` と `unlinked` を返す'
-  - ワークツリー x のファイルは変わらない
-  test: test_normal_when_dry_run
-- name: 異常系（参照されている・DocumentReferencedError）
-  summary: '参照されている文書を `on_referenced: fail` で消すと断る'
-  setup:
-  - name: Mock
-    description: なし
-  - name: 参照されている文書
-    description: 正常系（参照も外して消す）と同じ
-  - name: 入力
-    description: '`targets` に文書 2。`on_referenced` は既定'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as delete_docs
+        C->>T: targets: 文書 2, on_referenced: unlink, dry_run: true
+        T->>T: 本番と同じ確認
+        T-->>C: applied: false、消す文書と参照を外す文書
+      ```
+    expected:
+      - '`applied` が `false` で、`results` と `unlinked` を返す'
+      - ワークツリー x のファイルは変わらない
+    test: test_normal_when_dry_run
+  - name: 異常系（参照されている・DocumentReferencedError）
+    summary: '参照されている文書を `on_referenced: fail` で消すと断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 参照されている文書
+        description: 正常系（参照も外して消す）と同じ
+      - name: 入力
+        description: '`targets` に文書 2。`on_referenced` は既定'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
 
-      C->>T: targets: 文書 2
-      T->>T: 文書 1 の related が文書 2 を指している
-      T-->>C: isError（参照元の id と on_referenced: unlink）
-    ```
-  expected:
-  - '`isError: true` で、参照元の文書 1 の `id` と `on_referenced: unlink` で消せることを返す'
-  - 文書 2 のファイルも文書 1 も変わらない
-  test: test_error_when_referenced
-- name: 異常系（読んだ後に変わった・VersionMismatchError）
-  summary: 読んだ後に直接編集された文書を消さない
-  setup:
-  - name: Mock
-    description: なし
-  - name: 直接編集
-    description: 文書 2 を読んで `version` を持った後、ワークツリー x の文書 2 の YAML をテストが書き換える
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as delete_docs
+        C->>T: targets: 文書 2
+        T->>T: 文書 1 の related が文書 2 を指している
+        T-->>C: isError（参照元の id と on_referenced: unlink）
+      ```
+    expected:
+      - '`isError: true` で、参照元の文書 1 の `id` と `on_referenced: unlink` で消せることを返す'
+      - 文書 2 のファイルも文書 1 も変わらない
+    test: test_error_when_referenced
+  - name: 異常系（読んだ後に変わった・VersionMismatchError）
+    summary: 読んだ後に直接編集された文書を消さない
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直接編集
+        description: 文書 2 を読んで `version` を持った後、ワークツリー x の文書 2 の YAML をテストが書き換える
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
 
-      C->>T: targets: 文書 2・読んだときの expected_version
-      T->>T: 今のバージョンと違う
-      T-->>C: isError（今のバージョン）
-    ```
-  expected:
-  - '`isError: true` で、今のバージョンを返す'
-  - 文書 2 のファイルが残る
-  test: test_error_when_version_mismatch
-- name: 異常系（書き込めない配信元・SourceNotWritableError）
-  summary: '`scope.write` に当たらない作業場所からの削除を断る'
-  setup:
-  - name: Mock
-    description: なし
-  - name: 読み取りだけの配信元
-    description: '`scope.write` を持たない Git 管理外の配信元'
-    notes: id `notes`
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as delete_docs
+        C->>T: targets: 文書 2・読んだときの expected_version
+        T->>T: 今のバージョンと違う
+        T-->>C: isError（今のバージョン）
+      ```
+    expected:
+      - '`isError: true` で、今のバージョンを返す'
+      - 文書 2 のファイルが残る
+    test: test_error_when_version_mismatch
+  - name: 異常系（書き込めない配信元・SourceNotWritableError）
+    summary: '`scope.write` に当たらない作業場所からの削除を断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 読み取りだけの配信元
+        description: '`scope.write` を持たない Git 管理外の配信元'
+        notes: id `notes`
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
 
-      C->>T: source: notes, targets: notes の文書
-      T-->>C: isError（notes は読み取りだけ、使える配信元の一覧）
-    ```
-  expected:
-  - '`isError: true` で、notes に書き込めないことと使える配信元の一覧を返す'
-  - notes のファイルが残る
-  test: test_error_when_source_not_writable
-- name: 異常系（消す先がクローン本体・TargetIsCloneError）
-  summary: Git の配信元のクローン本体からは消さない
-  setup:
-  - name: Mock
-    description: なし
-  - name: 入力
-    description: '`cwd` は sample のクローン本体で、`worktree` を渡さない'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as delete_docs
+        C->>T: source: notes, targets: notes の文書
+        T-->>C: isError（notes は読み取りだけ、使える配信元の一覧）
+      ```
+    expected:
+      - '`isError: true` で、notes に書き込めないことと使える配信元の一覧を返す'
+      - notes のファイルが残る
+    test: test_error_when_source_not_writable
+  - name: 異常系（消す先がクローン本体・TargetIsCloneError）
+    summary: Git の配信元のクローン本体からは消さない
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`cwd` は sample のクローン本体で、`worktree` を渡さない'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
 
-      C->>T: targets: 文書 2
-      T-->>C: isError（クローン本体からは消さない、worktree を指すこと）
-    ```
-  expected:
-  - '`isError: true` で、クローン本体からは消さないことと `worktree` を指すことを返す'
-  - クローン本体の文書 2 が残る
-  test: test_error_when_target_is_clone
-- name: 異常系（削除を許していない種類・DeleteNotAllowedError）
-  summary: Git 管理外の配信元で `writable` が削除を許さない種類の文書を消さない
-  setup:
-  - name: Mock
-    description: なし
-  - name: 書ける配信元
-    description: Git 管理外の配信元で、種類の `documents[].writable` が `false`
-    notes: id `memo`。`scope.write` は sample のフォルダ
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as delete_docs
+        C->>T: targets: 文書 2
+        T-->>C: isError（クローン本体からは消さない、worktree を指すこと）
+      ```
+    expected:
+      - '`isError: true` で、クローン本体からは消さないことと `worktree` を指すことを返す'
+      - クローン本体の文書 2 が残る
+    test: test_error_when_target_is_clone
+  - name: 異常系（削除を許していない種類・DeleteNotAllowedError）
+    summary: Git 管理外の配信元で `writable` が削除を許さない種類の文書を消さない
+    setup:
+      - name: Mock
+        description: なし
+      - name: 書ける配信元
+        description: Git 管理外の配信元で、種類の `documents[].writable` が `false`
+        notes: id `memo`。`scope.write` は sample のフォルダ
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
 
-      C->>T: source: memo, targets: memo の文書
-      T->>T: 種類の writable が削除を許していない
-      T-->>C: isError（削除を許していない種類と documents[].writable のパス）
-    ```
-  expected:
-  - '`isError: true` で、種類の id と `documents[].writable` が削除を許していないことを返す'
-  - memo のファイルが残る
-  test: test_error_when_delete_not_allowed
-- name: 異常系（無い文書・DocumentNotFoundError）
-  summary: 無い `id` の削除を断る
-  setup:
-  - name: Mock
-    description: なし
-  - name: 入力
-    description: '`targets` に `doc-9`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as delete_docs
+        C->>T: source: memo, targets: memo の文書
+        T->>T: 種類の writable が削除を許していない
+        T-->>C: isError（削除を許していない種類と documents[].writable のパス）
+      ```
+    expected:
+      - '`isError: true` で、種類の id と `documents[].writable` が削除を許していないことを返す'
+      - memo のファイルが残る
+    test: test_error_when_delete_not_allowed
+  - name: 異常系（無い文書・DocumentNotFoundError）
+    summary: 無い `id` の削除を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`targets` に `doc-9`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
 
-      C->>T: targets: doc-9
-      T-->>C: isError（見つからない ID と近い ID の候補）
-    ```
-  expected:
-  - '`isError: true` で、`doc-9` と近い ID の候補を返す'
-  test: test_error_when_document_not_found
-- name: 正常系（参照を外した文書の引用符を保つ）
-  summary: '`on_referenced: unlink` で書き換えた参照元の文書の、変更していない項目の引用符の種類を元のまま書き出す'
-  setup:
-  - name: Mock
-    description: なし
-  - name: 引用符を持つ参照元
-    description: 'ワークツリー x の文書 1 が、単一引用符の値（`description: ''2020-12''`）と、`: ` を含む二重引用符の値（`name: "A: b"`）を持ち、`related` が文書 2 を指す'
-  - name: 入力
-    description: '`targets` に文書 2、`on_referenced: unlink`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as delete_docs
-      participant WT as ワークツリー x
+        C->>T: targets: doc-9
+        T-->>C: isError（見つからない ID と近い ID の候補）
+      ```
+    expected:
+      - '`isError: true` で、`doc-9` と近い ID の候補を返す'
+    test: test_error_when_document_not_found
+  - name: 正常系（参照を外した文書の引用符を保つ）
+    summary: '`on_referenced: unlink` で書き換えた参照元の文書の、変更していない項目の引用符の種類を元のまま書き出す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 引用符を持つ参照元
+        description: 'ワークツリー x の文書 1 が、単一引用符の値（`description: ''2020-12''`）と、`: ` を含む二重引用符の値（`name: "A: b"`）を持ち、`related` が文書 2 を指す'
+      - name: 入力
+        description: '`targets` に文書 2、`on_referenced: unlink`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
+        participant WT as ワークツリー x
 
-      C->>T: targets: 文書 2, on_referenced: unlink
-      T->>T: 引用符の種類を保って文書 1 を読み、related から文書 2 を外す
-      T->>WT: 文書 1 を書き換え、文書 2 のファイルを削除する
-      T-->>C: deleted と参照を外した文書
-    ```
-  expected:
-  - '文書 1 の YAML の、`related` の文書 2 の行以外の行が書き込み前の文字列と一致し、`description: ''2020-12''` と `name: "A: b"` が残る'
-  test: test_normal_when_unlink_quotes_preserved
+        C->>T: targets: 文書 2, on_referenced: unlink
+        T->>T: 引用符の種類を保って文書 1 を読み、related から文書 2 を外す
+        T->>WT: 文書 1 を書き換え、文書 2 のファイルを削除する
+        T-->>C: deleted と参照を外した文書
+      ```
+    expected:
+      - '文書 1 の YAML の、`related` の文書 2 の行以外の行が書き込み前の文字列と一致し、`description: ''2020-12''` と `name: "A: b"` が残る'
+    test: test_normal_when_unlink_quotes_preserved
 lead: 文書を配列で受けて物理削除する。他の文書の `related` から参照されているときは断るか、参照も外して消す。
 identifier: delete_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーだけ。Git 管理外の配信元は種類の `documents[].writable` が削除を許すこと
 idempotent: false
 side_effects: '作業ツリー（Git 管理外の配信元はそのフォルダ）の文書のファイルを削除する。`on_referenced: unlink` のときは参照元の文書の `related` も書き換える。`generators[]` を流す。'
 callers:
-- SC-7#scenarios[正常シナリオ（参照も外して消す）]
-- SC-7#scenarios[正常シナリオ（変更していない項目の引用符を保つ）]
+  - SC-7#scenarios[正常シナリオ（参照も外して消す）]
+  - SC-7#scenarios[正常シナリオ（変更していない項目の引用符を保つ）]
 exclusivity: '`write_docs` と同じ配信元ごとの排他ロックの中で行う'
 request:
-- name: source
-  type: str
-  required: false
-  default: なし（作業中の配信元）
-  location: argument
-  description: 配信元の ID
-- name: worktree
-  type: str
-  required: false
-  default: なし（`cwd` がワークツリーの中ならそのワークツリー）
-  location: argument
-  description: 消すワークツリーのパス
-  constraints: 配信元の設定の `worktrees` に当たるパスだけ
-- name: targets
-  type: 'list[{id: str, expected_version: str}]'
-  required: true
-  location: argument
-  description: 消す文書と、読んだときのバージョン
-  constraints: 1〜50 件
-- name: on_referenced
-  type: Literal['fail', 'unlink']
-  required: false
-  default: '`fail`'
-  location: argument
-  description: 他の文書の `related` から参照されているとき。`unlink` は参照も外す
-- name: atomic
-  type: bool
-  required: false
-  default: '`true`'
-  location: argument
-  description: '`write_docs` と同じ'
-- name: dry_run
-  type: bool
-  required: false
-  default: '`false`'
-  location: argument
-  description: '`write_docs` と同じ'
-- name: cwd
-  type: str
-  required: false
-  default: なし（どの `scope.write` にも当たらない）
-  location: argument
-  description: 作業場所
-  notes: フックが入れる
+  - name: source
+    type: str
+    required: false
+    default: なし（作業中の配信元）
+    location: argument
+    description: 配信元の ID
+  - name: worktree
+    type: str
+    required: false
+    default: なし（`cwd` がワークツリーの中ならそのワークツリー）
+    location: argument
+    description: 消すワークツリーのパス
+    constraints: 配信元の設定の `worktrees` に当たるパスだけ
+  - name: targets
+    type: 'list[{id: str, expected_version: str}]'
+    required: true
+    location: argument
+    description: 消す文書と、読んだときのバージョン
+    constraints: 1〜50 件
+  - name: on_referenced
+    type: Literal['fail', 'unlink']
+    required: false
+    default: '`fail`'
+    location: argument
+    description: 他の文書の `related` から参照されているとき。`unlink` は参照も外す
+  - name: atomic
+    type: bool
+    required: false
+    default: '`true`'
+    location: argument
+    description: '`write_docs` と同じ'
+  - name: dry_run
+    type: bool
+    required: false
+    default: '`false`'
+    location: argument
+    description: '`write_docs` と同じ'
+  - name: cwd
+    type: str
+    required: false
+    default: なし（どの `scope.write` にも当たらない）
+    location: argument
+    description: 作業場所
+    notes: フックが入れる
 request_example: |-
   ```json
   {
@@ -291,30 +291,30 @@ request_example: |-
   }
   ```
 response:
-- name: applied
-  type: bool
-  description: 1 件以上を消したか
-  notes: '`dry_run: true` のときは常に `false`'
-- name: results[].index
-  type: int
-  description: '`targets` の添字'
-- name: results[].id
-  type: str
-  description: 文書の ID
-- name: results[].status
-  type: Literal['deleted', 'failed']
-  description: 結果
-- name: results[].errors
-  type: 'list[{path: str, rule: str, fix: str}]'
-  description: 失敗の理由と直し方
-  notes: '`failed` のときだけ'
-- name: unlinked[].id
-  type: str
-  description: 参照を外した文書の ID
-  notes: '`on_referenced: unlink` のときだけ'
-- name: unlinked[].version
-  type: str
-  description: 参照を外した後のバージョン
+  - name: applied
+    type: bool
+    description: 1 件以上を消したか
+    notes: '`dry_run: true` のときは常に `false`'
+  - name: results[].index
+    type: int
+    description: '`targets` の添字'
+  - name: results[].id
+    type: str
+    description: 文書の ID
+  - name: results[].status
+    type: Literal['deleted', 'failed']
+    description: 結果
+  - name: results[].errors
+    type: 'list[{path: str, rule: str, fix: str}]'
+    description: 失敗の理由と直し方
+    notes: '`failed` のときだけ'
+  - name: unlinked[].id
+    type: str
+    description: 参照を外した文書の ID
+    notes: '`on_referenced: unlink` のときだけ'
+  - name: unlinked[].version
+    type: str
+    description: 参照を外した後のバージョン
 response_example: |-
   ```json
   {"applied": true,
@@ -323,35 +323,35 @@ response_example: |-
   ```
 response_notes: '`format` によらず JSON を返し、structuredContent と text に同じ JSON を入れる。Git の配信元で消した文書は Git で戻せる。'
 exceptions:
-- name: なし（正常終了）
-  condition: '全ての文書を消した（`atomic: false` で一部が失敗したときも、失敗分を `failed` として返して正常終了）'
-- name: DocumentReferencedError
-  condition: '`on_referenced: fail` で、消す文書が他の文書の `related` から参照されている'
-  notes: '参照元の ID と `on_referenced: unlink` を添える'
-- name: VersionMismatchError
-  condition: '`expected_version` が今のバージョンと違う'
-- name: SourceNotWritableError
-  condition: '`cwd` が配信元の `scope.write` に当たらない'
-- name: TargetIsCloneError
-  condition: Git の配信元で、消す先がクローン本体になる
-- name: DeleteNotAllowedError
-  condition: Git 管理外の配信元で、種類の `documents[].writable` が削除を許していない
-- name: DocumentNotFoundError
-  condition: '`targets[].id` の文書が無い'
-  notes: 見つからなかった ID と近い ID の候補を添える
+  - name: なし（正常終了）
+    condition: '全ての文書を消した（`atomic: false` で一部が失敗したときも、失敗分を `failed` として返して正常終了）'
+  - name: DocumentReferencedError
+    condition: '`on_referenced: fail` で、消す文書が他の文書の `related` から参照されている'
+    notes: '参照元の ID と `on_referenced: unlink` を添える'
+  - name: VersionMismatchError
+    condition: '`expected_version` が今のバージョンと違う'
+  - name: SourceNotWritableError
+    condition: '`cwd` が配信元の `scope.write` に当たらない'
+  - name: TargetIsCloneError
+    condition: Git の配信元で、消す先がクローン本体になる
+  - name: DeleteNotAllowedError
+    condition: Git 管理外の配信元で、種類の `documents[].writable` が削除を許していない
+  - name: DocumentNotFoundError
+    condition: '`targets[].id` の文書が無い'
+    notes: 見つからなかった ID と近い ID の候補を添える
 constraints:
-- item: 件数
-  constraint: 1 回の `targets` は最大 50 件
-- item: 削除の方式
-  constraint: 物理削除。参照を外した文書は `write_docs` と同じ検査に通してから、`write_docs` と同じく変更していない項目の引用符の種類を保って書く
-- item: 注釈
-  constraint: '`destructiveHint: true`'
-- item: 配信元・ワークツリーの解決
-  constraint: '`write_docs` と同じ（配信していない配信元・当たらないワークツリーのエラーも同じ）'
-  notes: 共通の処理で解決するため、結合テストは [文書の書き込み](id:IF-6) が持つ
-- item: タイムアウト
-  constraint: 制限なし
+  - item: 件数
+    constraint: 1 回の `targets` は最大 50 件
+  - item: 削除の方式
+    constraint: 物理削除。参照を外した文書は `write_docs` と同じ検査に通してから、`write_docs` と同じく変更していない項目の引用符の種類を保って書く
+  - item: 注釈
+    constraint: '`destructiveHint: true`'
+  - item: 配信元・ワークツリーの解決
+    constraint: '`write_docs` と同じ（配信していない配信元・当たらないワークツリーのエラーも同じ）'
+    notes: 共通の処理で解決するため、結合テストは [文書の書き込み](id:IF-6) が持つ
+  - item: タイムアウト
+    constraint: 制限なし
 refs:
-- SC-7#scenarios[正常シナリオ（参照も外して消す）]
-- SC-7#scenarios[異常シナリオ（参照されている文書を消す）]
+  - SC-7#scenarios[正常シナリオ（参照も外して消す）]
+  - SC-7#scenarios[異常シナリオ（参照されている文書を消す）]
 test_file: tests/integration/server/test_delete_docs.py

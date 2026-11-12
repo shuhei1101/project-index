@@ -2,59 +2,59 @@ id: MOD-40
 title: 索引のサーバー / プロンプトの文書の変換 / cli.py
 lead: '`project-index prompt-doc` の処理。標準入力を変換して標準出力に出し、失敗を終了コードにする。'
 test_files:
-- tests/unit/project_index/features/prompt_doc/test_cli.py
+  - tests/unit/project_index/features/prompt_doc/test_cli.py
 constants:
-- name: EXIT_PROMPT_INVALID
-  title: 変換できないときの終了コード
-  container: project_index/features/prompt_doc/cli.py
-  usecase: プロンプトの文書の変換
-  summary: YAML として読めないか、変換に使うキーが無い・型が違うときの終了コード
-  value: '1'
+  - name: EXIT_PROMPT_INVALID
+    title: 変換できないときの終了コード
+    container: project_index/features/prompt_doc/cli.py
+    usecase: プロンプトの文書の変換
+    summary: YAML として読めないか、変換に使うキーが無い・型が違うときの終了コード
+    value: '1'
 functions:
-- name: run_prompt_doc
-  title: プロンプトの文書の変換の実行
-  container: project_index/features/prompt_doc/cli.py
-  usecase: プロンプトの文書の変換
-  role: 入口
-  summary: 標準入力のプロンプトの YAML を Markdown にして標準出力に出す
-  kind: 関数
-  scope: public
-  is_async: false
-  thread_safe: true
-  side_effects: 標準入力を読み、標準出力・標準エラーに書く
-  args:
-  - name: args
-    title: 解析結果
-    type: argparse.Namespace
-    required: true
-    passing: positional
-    description: '`prompt-doc` の解析結果（引数は持たない）'
-  returns:
-    type: int
-    description: 終了コード。出し終えたとき 0
-  process: |-
-    1. 標準入力を UTF-8 で全て読む
-    2. プロンプトの文書の変換（`convert_prompt`）を呼ぶ
-       - `PromptDocError` の場合、メッセージを標準エラーに出して `EXIT_PROMPT_INVALID` を返す（標準出力には何も出さない）
-    3. Markdown を標準出力に出して 0 を返す
-  exceptions:
-  - name: なし（終了コード 1）
-    condition: YAML として読めないか、変換に使うキーが無い・型が違う（インターフェース定義の `PromptYamlError`・`InvalidPrompt`）
-    message: 例外のメッセージ
-  unit_tests:
-  - name: test_run_prompt_doc
-    case: 正常
-    summary: 変換した Markdown を出す
-    condition: 標準入力に A-42 の例 1
-    mock: なし（`monkeypatch` で `sys.stdin`、`capsys`）
-    expected: 0 を返し、標準出力が `# {name}` で始まり、標準エラーが空
-    exception: '-'
-  - name: test_run_prompt_doc_when_invalid
-    case: 異常
-    summary: 変換できない YAML
-    condition: '標準入力に `name: [`'
-    mock: なし（`monkeypatch` で `sys.stdin`、`capsys`）
-    expected: 1 を返し、標準出力が空で、標準エラーに読めない理由
-    exception: なし（終了コード 1）
-  refs:
-  - MOD-41#functions[convert_prompt]
+  - name: run_prompt_doc
+    title: プロンプトの文書の変換の実行
+    container: project_index/features/prompt_doc/cli.py
+    usecase: プロンプトの文書の変換
+    role: 入口
+    summary: 標準入力のプロンプトの YAML を Markdown にして標準出力に出す
+    kind: 関数
+    scope: public
+    is_async: false
+    thread_safe: true
+    side_effects: 標準入力を読み、標準出力・標準エラーに書く
+    args:
+      - name: args
+        title: 解析結果
+        type: argparse.Namespace
+        required: true
+        passing: positional
+        description: '`prompt-doc` の解析結果（引数は持たない）'
+    returns:
+      type: int
+      description: 終了コード。出し終えたとき 0
+    process: |-
+      1. 標準入力を UTF-8 で全て読む
+      2. プロンプトの文書の変換（`convert_prompt`）を呼ぶ
+         - `PromptDocError` の場合、メッセージを標準エラーに出して `EXIT_PROMPT_INVALID` を返す（標準出力には何も出さない）
+      3. Markdown を標準出力に出して 0 を返す
+    exceptions:
+      - name: なし（終了コード 1）
+        condition: YAML として読めないか、変換に使うキーが無い・型が違う（インターフェース定義の `PromptYamlError`・`InvalidPrompt`）
+        message: 例外のメッセージ
+    unit_tests:
+      - name: test_run_prompt_doc
+        case: 正常
+        summary: 変換した Markdown を出す
+        condition: 標準入力に A-42 の例 1
+        mock: なし（`monkeypatch` で `sys.stdin`、`capsys`）
+        expected: 0 を返し、標準出力が `# {name}` で始まり、標準エラーが空
+        exception: '-'
+      - name: test_run_prompt_doc_when_invalid
+        case: 異常
+        summary: 変換できない YAML
+        condition: '標準入力に `name: [`'
+        mock: なし（`monkeypatch` で `sys.stdin`、`capsys`）
+        expected: 1 を返し、標準出力が空で、標準エラーに読めない理由
+        exception: なし（終了コード 1）
+    refs:
+      - MOD-41#functions[convert_prompt]

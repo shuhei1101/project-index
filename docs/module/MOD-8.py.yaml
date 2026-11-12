@@ -2,136 +2,136 @@ id: MOD-8
 title: 索引のサーバー / 権限と作業場所 / types.py
 lead: 配信元の権限・作業場所・読み書きする場所・権限のレベルの型。
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      読む場所の解決 ..> 読み書きの場所 : 返す
-      書く場所の解決 ..> 読み書きの場所 : 返す
-      class 読む場所の解決 {
-        <<function>>
-      }
-      class 書く場所の解決 {
-        <<function>>
-      }
-      class 読み書きの場所 {
-        +配信元: ServedSource
-        +直下: Path
-        +リビジョン: str
-        +解いた commit: str
-      }
-      click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
-      click 書く場所の解決 href "./MOD-7.py.yaml#書く場所の解決"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        読む場所の解決 ..> 読み書きの場所 : 返す
+        書く場所の解決 ..> 読み書きの場所 : 返す
+        class 読む場所の解決 {
+          <<function>>
+        }
+        class 書く場所の解決 {
+          <<function>>
+        }
+        class 読み書きの場所 {
+          +配信元: ServedSource
+          +直下: Path
+          +リビジョン: str
+          +解いた commit: str
+        }
+        click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
+        click 書く場所の解決 href "./MOD-7.py.yaml#書く場所の解決"
 data_models:
-- name: SourceAccess
-  title: 使える配信元
-  container: project_index/features/access/types.py
-  usecase: 共通
-  role: DTO
-  summary: 今の作業場所から使える配信元 1 つと権限
-  description: '`dataclass(frozen=True)`。`describe()` の一覧と、権限のエラーに添える一覧に使う。'
-  properties:
-  - name: source_id
-    title: 配信元の ID
-    type: str
-    access: 公開
-    description: '`sources[].id`'
-  - name: access
-    title: 権限
-    type: AccessLevel
-    access: 公開
-    description: 読み取りか読み書き
-  - name: current
-    title: 作業中か
-    type: bool
-    access: 公開
-    description: 作業中の配信元か
-  - name: description
-    title: 配信元の説明
-    type: str
-    access: 公開
-    description: 配信元の設定の `description`
-- name: Workplace
-  title: 作業場所
-  container: project_index/features/access/types.py
-  usecase: 共通
-  role: DTO
-  summary: 作業場所がどの配信元のクローン本体かワークツリーか
-  description: '`dataclass(frozen=True)`。`describe()` の `workplace` の行を作る。'
-  properties:
-  - name: cwd
+  - name: SourceAccess
+    title: 使える配信元
+    container: project_index/features/access/types.py
+    usecase: 共通
+    role: DTO
+    summary: 今の作業場所から使える配信元 1 つと権限
+    description: '`dataclass(frozen=True)`。`describe()` の一覧と、権限のエラーに添える一覧に使う。'
+    properties:
+      - name: source_id
+        title: 配信元の ID
+        type: str
+        access: 公開
+        description: '`sources[].id`'
+      - name: access
+        title: 権限
+        type: AccessLevel
+        access: 公開
+        description: 読み取りか読み書き
+      - name: current
+        title: 作業中か
+        type: bool
+        access: 公開
+        description: 作業中の配信元か
+      - name: description
+        title: 配信元の説明
+        type: str
+        access: 公開
+        description: 配信元の設定の `description`
+  - name: Workplace
     title: 作業場所
-    type: Path | None
-    access: 公開
-    description: 正規化した `cwd`。渡されなければ `None`
-  - name: source_id
-    title: 作業中の配信元
-    type: str | None
-    access: 公開
-    description: 作業中の配信元の ID。無ければ `None`
-  - name: worktree
-    title: ワークツリー
-    type: Path | None
-    access: 公開
-    description: '`cwd` が入っているワークツリー。クローン本体や Git の管理外なら `None`'
-- name: Target
-  title: 読み書きの場所
-  container: project_index/features/access/types.py
-  usecase: 共通
-  role: DTO
-  summary: 1 つの配信元をどこから読み書きするか
-  description: |-
-    `dataclass(frozen=True)`。`ref` が `None` のときは `base` のファイルをそのまま読み、`ref` があるときは履歴の『リビジョンの書き出し』が作ったフォルダを読む。
-    `ref` を持つ場所は、作るときに `ref` を commit へ解いて `commit` に持たせ、1 回の要求の中で解き直さない。
-  properties:
-  - name: source
-    title: 配信元
-    type: ServedSource
-    access: 公開
-    description: 配信中の配信元
-  - name: base
-    title: 配信元の直下
-    type: Path
-    access: 公開
-    description: 文書の相対パスを解くフォルダ。ワークツリーでは、クローンの `repo_root` から `root` への相対パスをワークツリーにつないだフォルダ
-  - name: ref
-    title: リビジョン
-    type: str | None
-    access: 公開
-    description: 読むリビジョン。`None` は作業ツリー（Git の管理外はフォルダ）
-  - name: worktree
-    title: ワークツリー
-    type: Path | None
-    access: 公開
-    description: 読み書きするワークツリー。クローン本体・Git の管理外は `None`
-  - name: access
-    title: 権限
-    type: AccessLevel
-    access: 公開
-    description: この作業場所からの権限
-  - name: outside_scope
-    title: 作業範囲の外か
-    type: bool
-    access: 公開
-    default: 'False'
-    description: '`cwd` が `scope` に当たらない配信元を `outside_scope` で読む場所。`access` は `read`'
-  - name: commit
-    title: 解いた commit
-    type: str | None
-    access: 公開
-    default: None
-    description: '`ref` を履歴の『リビジョンの解決』で解いた commit の SHA。`ref` が `None` の場所は `None`。`ref` を持ち `commit` が `None` の場所は、文書のストアが読むときに 1 回解く'
+    container: project_index/features/access/types.py
+    usecase: 共通
+    role: DTO
+    summary: 作業場所がどの配信元のクローン本体かワークツリーか
+    description: '`dataclass(frozen=True)`。`describe()` の `workplace` の行を作る。'
+    properties:
+      - name: cwd
+        title: 作業場所
+        type: Path | None
+        access: 公開
+        description: 正規化した `cwd`。渡されなければ `None`
+      - name: source_id
+        title: 作業中の配信元
+        type: str | None
+        access: 公開
+        description: 作業中の配信元の ID。無ければ `None`
+      - name: worktree
+        title: ワークツリー
+        type: Path | None
+        access: 公開
+        description: '`cwd` が入っているワークツリー。クローン本体や Git の管理外なら `None`'
+  - name: Target
+    title: 読み書きの場所
+    container: project_index/features/access/types.py
+    usecase: 共通
+    role: DTO
+    summary: 1 つの配信元をどこから読み書きするか
+    description: |-
+      `dataclass(frozen=True)`。`ref` が `None` のときは `base` のファイルをそのまま読み、`ref` があるときは履歴の『リビジョンの書き出し』が作ったフォルダを読む。
+      `ref` を持つ場所は、作るときに `ref` を commit へ解いて `commit` に持たせ、1 回の要求の中で解き直さない。
+    properties:
+      - name: source
+        title: 配信元
+        type: ServedSource
+        access: 公開
+        description: 配信中の配信元
+      - name: base
+        title: 配信元の直下
+        type: Path
+        access: 公開
+        description: 文書の相対パスを解くフォルダ。ワークツリーでは、クローンの `repo_root` から `root` への相対パスをワークツリーにつないだフォルダ
+      - name: ref
+        title: リビジョン
+        type: str | None
+        access: 公開
+        description: 読むリビジョン。`None` は作業ツリー（Git の管理外はフォルダ）
+      - name: worktree
+        title: ワークツリー
+        type: Path | None
+        access: 公開
+        description: 読み書きするワークツリー。クローン本体・Git の管理外は `None`
+      - name: access
+        title: 権限
+        type: AccessLevel
+        access: 公開
+        description: この作業場所からの権限
+      - name: outside_scope
+        title: 作業範囲の外か
+        type: bool
+        access: 公開
+        default: 'False'
+        description: '`cwd` が `scope` に当たらない配信元を `outside_scope` で読む場所。`access` は `read`'
+      - name: commit
+        title: 解いた commit
+        type: str | None
+        access: 公開
+        default: None
+        description: '`ref` を履歴の『リビジョンの解決』で解いた commit の SHA。`ref` が `None` の場所は `None`。`ref` を持ち `commit` が `None` の場所は、文書のストアが読むときに 1 回解く'
 enums:
-- name: AccessLevel
-  title: 権限
-  container: project_index/features/access/types.py
-  usecase: 共通
-  summary: 作業場所からの配信元の権限
-  description: '`Literal` の型エイリアス。'
-  values:
-  - value: read
-    title: 読み取り
-    description: '`scope.read` だけに当たる'
-  - value: write
-    title: 読み書き
-    description: '`scope.write` に当たる（読むこともできる）'
+  - name: AccessLevel
+    title: 権限
+    container: project_index/features/access/types.py
+    usecase: 共通
+    summary: 作業場所からの配信元の権限
+    description: '`Literal` の型エイリアス。'
+    values:
+      - value: read
+        title: 読み取り
+        description: '`scope.read` だけに当たる'
+      - value: write
+        title: 読み書き
+        description: '`scope.write` に当たる（読むこともできる）'
