@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -538,3 +538,18 @@ def test_resolve_read_targets_when_not_readable_guides_outside(
     with pytest.raises(SourceNotReadableError, match="other はこの作業場所") as exc_info:
         resolve_read_targets(registry=registry, source="other", cwd="/r")
     assert len([step for step in exc_info.value.next_steps if "outside_scope: true" in step]) == 1
+
+
+def test_current_source_when_paths_base_set(
+    make_served_source: Callable[..., ServedSource],
+) -> None:
+    """基準のフォルダが上でも設定ファイルのフォルダで判定する（正常系）。"""
+    # 準備
+    brain = make_served_source(
+        id="brain", root=Path("/r"), config_dir=PurePosixPath("content/node-docs/brain")
+    )
+    repo = make_served_source(id="repo", root=Path("/r"))
+    # 実行
+    result = current_source([brain, repo], Path("/r"))
+    # 検証
+    assert result == (repo, None)
