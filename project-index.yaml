@@ -116,3 +116,23 @@ documents:
     metadata:
       visibility: visibility
       category: category
+  - id: src
+    title: 索引のサーバーのコード
+    paths: [src/files.yaml]
+    exclude: ["*.schema.yaml", aliases.source.yaml, steps.yaml]
+    schema: schemas/files.schema.yaml
+    records: files
+    body_file: path
+  - id: tests
+    title: テスト
+    paths: [tests/files.yaml]
+    schema: schemas/files.schema.yaml
+    records: files
+    body_file: path
+  - id: plugin
+    title: プラグインのフックのコード
+    paths: [plugins/project-index/files.yaml]
+    exclude: ["*.json", "*.md"]
+    schema: schemas/files.schema.yaml
+    records: files
+    body_file: path

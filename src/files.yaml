@@ -1,0 +1,834 @@
+# yaml-language-server: $schema=../schemas/files.schema.yaml
+files:
+- path: project_index/__init__.py
+  name: 索引のサーバー / 入口 / __init__.py
+  description: インストール済みのパッケージからバージョンを引くときの配布名を受け持ち、入口の __init__.py を修正するときに参照する。
+  tags:
+  - topic:入口
+  related:
+  - to: MOD-6
+    type: implements
+- path: project_index/__main__.py
+  name: 索引のサーバー / 入口 / __main__.py
+  description: '`project-index` コマンドの引数の組み立てと main を受け持ち、入口の __main__.py を修正するときに参照する。'
+  tags:
+  - topic:入口
+  related:
+  - to: MOD-3
+    type: implements
+- path: project_index/features/access/service.py
+  name: 索引のサーバー / 権限と作業場所 / service.py
+  description: 作業場所からの権限と、MCP の引数からの読み書きする場所の解決を受け持ち、権限と作業場所の service.py を修正するときに参照する。
+  tags:
+  - topic:権限と作業場所
+  related:
+  - to: MOD-7
+    type: implements
+- path: project_index/features/access/types.py
+  name: 索引のサーバー / 権限と作業場所 / types.py
+  description: 配信元の権限・作業場所・読み書きする場所・権限のレベルの型を受け持ち、権限と作業場所の types.py を修正するときに参照する。
+  tags:
+  - topic:権限と作業場所
+  related:
+  - to: MOD-8
+    type: implements
+- path: project_index/features/admin/render.py
+  name: 索引のサーバー / 管理 / render.py
+  description: '管理の MCP の `format: markdown` の応答の文を組み立てる処理を受け持ち、管理の render.py を修正するときに参照する。'
+  tags:
+  - topic:管理
+  related:
+  - to: MOD-9
+    type: implements
+- path: project_index/features/admin/service.py
+  name: 索引のサーバー / 管理 / service.py
+  description: 管理の MCP の `status`・`reload`・`check_project`・`try_convert` の中身を受け持ち、管理の service.py を修正するときに参照する。
+  tags:
+  - topic:管理
+  related:
+  - to: MOD-10
+    type: implements
+- path: project_index/features/admin/types.py
+  name: 索引のサーバー / 管理の操作 / types.py
+  description: 管理の MCP の `status`・`reload`・`check_project`・`try_convert` の要求と結果の型を受け持ち、管理の操作の types.py を修正するときに参照する。
+  tags:
+  - topic:管理の操作
+  related:
+  - to: MOD-11
+    type: implements
+- path: project_index/features/changes/compare.py
+  name: 索引のサーバー / 変更 / compare.py
+  description: 変わったキー・差分の行・語の出現数の比べ方を受け持ち、変更の compare.py を修正するときに参照する。
+  tags:
+  - topic:変更
+  related:
+  - to: MOD-12
+    type: implements
+- path: project_index/features/changes/render.py
+  name: 索引のサーバー / 変更 / render.py
+  description: '`list_changes` の結果の Markdown を受け持ち、変更の render.py を修正するときに参照する。'
+  tags:
+  - topic:変更
+  related:
+  - to: MOD-13
+    type: implements
+- path: project_index/features/changes/service.py
+  name: 索引のサーバー / 変更 / service.py
+  description: '`list_changes` の区間か前回読んだ時点からの変わった文書と差分を受け持ち、変更の service.py を修正するときに参照する。'
+  tags:
+  - topic:変更
+  related:
+  - to: MOD-14
+    type: implements
+- path: project_index/features/changes/types.py
+  name: 索引のサーバー / 変更 / types.py
+  description: '`list_changes` の要求と結果の型を受け持ち、変更の types.py を修正するときに参照する。'
+  tags:
+  - topic:変更
+  related:
+  - to: MOD-15
+    type: implements
+- path: project_index/features/convert/decisions.py
+  name: 索引のサーバー / 変換 / decisions.py
+  description: 配信元の `decisions.folders` から検討事項の文書を探す処理を受け持ち、変換の decisions.py を修正するときに参照する。
+  tags:
+  - topic:変換
+  related:
+  - to: MOD-16
+    type: implements
+- path: project_index/features/convert/service.py
+  name: 索引のサーバー / 変換 / service.py
+  description: '`converters[]` の実行と結果の控えを受け持ち、変換の service.py を修正するときに参照する。'
+  tags:
+  - topic:変換
+  related:
+  - to: MOD-17
+    type: implements
+- path: project_index/features/convert/types.py
+  name: 索引のサーバー / 変換 / types.py
+  description: 変換の結果と変換の失敗のデータモデルを受け持ち、変換の types.py を修正するときに参照する。
+  tags:
+  - topic:変換
+  related:
+  - to: MOD-18
+    type: implements
+- path: project_index/features/describe/render.py
+  name: 索引のサーバー / 説明 / render.py
+  description: '`describe` の結果の Markdown を受け持ち、説明の render.py を修正するときに参照する。'
+  tags:
+  - topic:説明
+  related:
+  - to: MOD-19
+    type: implements
+- path: project_index/features/describe/service.py
+  name: 索引のサーバー / 説明 / service.py
+  description: '`describe` の使える配信元・説明書と種類・種類のスキーマを受け持ち、説明の service.py を修正するときに参照する。'
+  tags:
+  - topic:説明
+  related:
+  - to: MOD-20
+    type: implements
+- path: project_index/features/describe/source_checks.py
+  name: 索引のサーバー / 説明 / source_checks.py
+  description: 配信元ごとの検査（同期のずれ・エイリアスのキーの違反・`nav` の警告）の結果を `describe` の警告に渡す処理を受け持ち、説明の source_checks.py を修正するときに参照する。
+  tags:
+  - topic:説明
+  related:
+  - to: MOD-21
+    type: implements
+- path: project_index/features/describe/types.py
+  name: 索引のサーバー / 説明 / types.py
+  description: '`describe` の要求と結果の型を受け持ち、説明の types.py を修正するときに参照する。'
+  tags:
+  - topic:説明
+  related:
+  - to: MOD-22
+    type: implements
+- path: project_index/features/describe/warnings.py
+  name: 索引のサーバー / 説明 / warnings.py
+  description: 引数なしの `describe` に添える警告（使える配信元の同期のずれ・古い設定と、配信していない配信元）を受け持ち、説明の warnings.py を修正するときに参照する。
+  tags:
+  - topic:説明
+  related:
+  - to: MOD-23
+    type: implements
+- path: project_index/features/documents/aliases.py
+  name: 索引のサーバー / 文書のストア / aliases.py
+  description: エイリアスのキーの検証と、用語の収集・照合を受け持ち、文書のストアの aliases.py を修正するときに参照する。
+  tags:
+  - topic:文書のストア
+  related:
+  - to: MOD-24
+    type: implements
+- path: project_index/features/documents/fields.py
+  name: 索引のサーバー / 文書のストア / fields.py
+  description: 項目のパスの解釈と、項目の値の取得・設定・削除・メタデータの解決を受け持ち、文書のストアの fields.py を修正するときに参照する。
+  tags:
+  - topic:文書のストア
+  related:
+  - to: MOD-25
+    type: implements
+- path: project_index/features/documents/indexable.py
+  name: 索引のサーバー / 文書のストア / indexable.py
+  description: たどるフォルダと、管理用の YAML に記載するファイルの判定を受け持ち、文書のストアの indexable.py を修正するときに参照する。
+  tags:
+  - topic:文書のストア
+  related:
+  - to: MOD-26
+    type: implements
+- path: project_index/features/documents/loader.py
+  name: 索引のサーバー / 文書のストア / loader.py
+  description: ファイルの収集と、ファイルからの文書の作成を受け持ち、文書のストアの loader.py を修正するときに参照する。
+  tags:
+  - topic:文書のストア
+  related:
+  - to: MOD-27
+    type: implements
+- path: project_index/features/documents/schema.py
+  name: 索引のサーバー / 文書のストア / schema.py
+  description: 種類のスキーマの `$ref` の解決と、`records` の行のスキーマを受け持ち、文書のストアの schema.py を修正するときに参照する。
+  tags:
+  - topic:文書のストア
+  related:
+  - to: MOD-28
+    type: implements
+- path: project_index/features/documents/store.py
+  name: 索引のサーバー / 文書のストア / store.py
+  description: 文書のキャッシュ・ID の引き当て・種類のスキーマ・文書の場所と、メタデータのずれの確かめを受け持ち、文書のストアの store.py を修正するときに参照する。
+  tags:
+  - topic:文書のストア
+  related:
+  - to: MOD-29
+    type: implements
+- path: project_index/features/documents/types.py
+  name: 索引のサーバー / 文書のストア / types.py
+  description: 文書・読み込みの誤りと結果・同期のずれ・エイリアスの型を受け持ち、文書のストアの types.py を修正するときに参照する。
+  tags:
+  - topic:文書のストア
+  related:
+  - to: MOD-30
+    type: implements
+- path: project_index/features/history/query.py
+  name: 索引のサーバー / 履歴 / query.py
+  description: git によるリビジョンの解決・一覧・変わったファイル・ファイルの日時・ワークツリーの一覧を受け持ち、履歴の query.py を修正するときに参照する。
+  tags:
+  - topic:履歴
+  related:
+  - to: MOD-31
+    type: implements
+- path: project_index/features/history/snapshot.py
+  name: 索引のサーバー / 履歴 / snapshot.py
+  description: リビジョンの書き出しを受け持ち、履歴の snapshot.py を修正するときに参照する。
+  tags:
+  - topic:履歴
+  related:
+  - to: MOD-32
+    type: implements
+- path: project_index/features/history/types.py
+  name: 索引のサーバー / 履歴 / types.py
+  description: リビジョン・変わったファイル・ファイルの日時・commit・ワークツリーの型を受け持ち、履歴の types.py を修正するときに参照する。
+  tags:
+  - topic:履歴
+  related:
+  - to: MOD-33
+    type: implements
+- path: project_index/features/lifecycle/control.py
+  name: 索引のサーバー / 再起動と更新 / control.py
+  description: 再起動の要求での uvicorn の停止と、停止の後に `run_serve` が同じプロセスを置き換えるかの判定を受け持ち、再起動と更新の control.py を修正するときに参照する。
+  tags:
+  - topic:再起動と更新
+  related:
+  - to: MOD-34
+    type: implements
+- path: project_index/features/lifecycle/types.py
+  name: 索引のサーバー / 再起動と更新 / types.py
+  description: 管理の MCP の `restart`・`update` の結果の型と定数を受け持ち、再起動と更新の types.py を修正するときに参照する。
+  tags:
+  - topic:再起動と更新
+  related:
+  - to: MOD-35
+    type: implements
+- path: project_index/features/lifecycle/update.py
+  name: 索引のサーバー / 再起動と更新 / update.py
+  description: 端末の設定の `clone` を更新し、移し替えが要らなければ再起動を要求する処理を受け持ち、再起動と更新の update.py を修正するときに参照する。
+  tags:
+  - topic:再起動と更新
+  related:
+  - to: MOD-36
+    type: implements
+- path: project_index/features/migrate/service.py
+  name: 索引のサーバー / 設定の移し替え / service.py
+  description: '`project-index migrate` の対象と適用する手順を決め、バックアップを取ってから 1 回だけ書き込む処理を受け持ち、設定の移し替えの service.py を修正するときに参照する。'
+  tags:
+  - topic:設定の移し替え
+  related:
+  - to: MOD-37
+    type: implements
+- path: project_index/features/migrate/steps.py
+  name: 索引のサーバー / 設定の移し替え / steps.py
+  description: パッケージに入れた移し替えの手順を、メモリの上の YAML に 1 つずつ適用する処理を受け持ち、設定の移し替えの steps.py を修正するときに参照する。
+  tags:
+  - topic:設定の移し替え
+  related:
+  - to: MOD-38
+    type: implements
+- path: project_index/features/migrate/types.py
+  name: 索引のサーバー / 設定の移し替え / types.py
+  description: '`project-index migrate` の手順・対象・例外の型と終了コードを受け持ち、設定の移し替えの types.py を修正するときに参照する。'
+  tags:
+  - topic:設定の移し替え
+  related:
+  - to: MOD-39
+    type: implements
+- path: project_index/features/prompt_doc/cli.py
+  name: 索引のサーバー / プロンプトの文書の変換 / cli.py
+  description: '`project-index prompt-doc` の処理を受け持ち、プロンプトの文書の変換の cli.py を修正するときに参照する。'
+  tags:
+  - topic:プロンプトの文書の変換
+  related:
+  - to: MOD-40
+    type: implements
+- path: project_index/features/prompt_doc/markdown.py
+  name: 索引のサーバー / プロンプトの文書の変換 / markdown.py
+  description: プロンプトの YAML を読み、変数の表・テンプレート・例の組のセクションを持つ mdmark の Markdown にする処理を受け持ち、プロンプトの文書の変換の markdown.py を修正するときに参照する。
+  tags:
+  - topic:プロンプトの文書の変換
+  related:
+  - to: MOD-41
+    type: implements
+- path: project_index/features/prompt_doc/render.py
+  name: 索引のサーバー / プロンプトの文書の変換 / render.py
+  description: プロンプトの部品を Jinja2 で描画する処理を受け持ち、プロンプトの文書の変換の render.py を修正するときに参照する。
+  tags:
+  - topic:プロンプトの文書の変換
+  related:
+  - to: MOD-42
+    type: implements
+- path: project_index/features/prompt_doc/runtime.py
+  name: 索引のサーバー / プロンプトの文書の変換 / runtime.py
+  description: 起動時にプロンプトの YAML を検査して MCP の instructions・ツールの description を描画する処理を受け持ち、プロンプトの文書の変換の runtime.py を修正するときに参照する。
+  tags:
+  - topic:プロンプトの文書の変換
+  related:
+  - to: MOD-43
+    type: implements
+- path: project_index/features/prompt_doc/types.py
+  name: 索引のサーバー / プロンプトの文書の変換 / types.py
+  description: '`project-index prompt-doc` が読むプロンプトの YAML のモデルと、描画の結果・例外の型を受け持ち、プロンプトの文書の変換の types.py を修正するときに参照する。'
+  tags:
+  - topic:プロンプトの文書の変換
+  related:
+  - to: MOD-44
+    type: implements
+- path: project_index/features/read/nav.py
+  name: 索引のサーバー / 読み取り API / nav.py
+  description: '`nav` の `auto` に該当する文書の数・`filter` の検証・警告（管理の MCP と配信元の説明が使う）を受け持ち、読み取り API の nav.py を修正するときに参照する。'
+  tags:
+  - topic:読み取りAPI
+  related:
+  - to: MOD-76
+    type: implements
+- path: project_index/features/read/paths.py
+  name: 索引のサーバー / 読み取り API / paths.py
+  description: 文書のページのパスと、読み取り API が読む場所を受け持ち、読み取り API の paths.py を修正するときに参照する。
+  tags:
+  - topic:読み取りAPI
+  related:
+  - to: MOD-77
+    type: implements
+- path: project_index/features/read/route.py
+  name: 索引のサーバー / 読み取り API / route.py
+  description: 読み取り API のルーター（`/sources` の下）を受け持ち、読み取り API の route.py を修正するときに参照する。
+  tags:
+  - topic:読み取りAPI
+  related:
+  - to: MOD-126
+    type: implements
+- path: project_index/features/read/search.py
+  name: 索引のサーバー / 読み取り API / search.py
+  description: 語での検索を受け持ち、読み取り API の search.py を修正するときに参照する。
+  tags:
+  - topic:読み取りAPI
+  related:
+  - to: MOD-78
+    type: implements
+- path: project_index/features/read/service.py
+  name: 索引のサーバー / 読み取り API / service.py
+  description: 読み取り API の配信元の設定・文書の一覧・文書の取得・検討事項の取得を受け持ち、読み取り API の service.py を修正するときに参照する。
+  tags:
+  - topic:読み取りAPI
+  related:
+  - to: MOD-125
+    type: implements
+- path: project_index/features/read/types.py
+  name: 索引のサーバー / 読み取り API / types.py
+  description: 読み取り API の要求と応答のデータモデルを受け持ち、読み取り API の types.py を修正するときに参照する。
+  tags:
+  - topic:読み取りAPI
+  related:
+  - to: MOD-79
+    type: implements
+- path: project_index/features/related/graph.py
+  name: 索引のサーバー / 関連 / graph.py
+  description: 関連の取り出しとたどりを受け持ち、関連の graph.py を修正するときに参照する。
+  tags:
+  - topic:関連
+  related:
+  - to: MOD-45
+    type: implements
+- path: project_index/features/related/render.py
+  name: 索引のサーバー / 関連 / render.py
+  description: '`trace_related` の結果の Markdown を受け持ち、関連の render.py を修正するときに参照する。'
+  tags:
+  - topic:関連
+  related:
+  - to: MOD-46
+    type: implements
+- path: project_index/features/related/service.py
+  name: 索引のサーバー / 関連 / service.py
+  description: '`trace_related` の関連のたどりと関連の候補を受け持ち、関連の service.py を修正するときに参照する。'
+  tags:
+  - topic:関連
+  related:
+  - to: MOD-47
+    type: implements
+- path: project_index/features/related/suggest.py
+  name: 索引のサーバー / 関連 / suggest.py
+  description: 関連の候補の提案を受け持ち、関連の suggest.py を修正するときに参照する。
+  tags:
+  - topic:関連
+  related:
+  - to: MOD-48
+    type: implements
+- path: project_index/features/related/types.py
+  name: 索引のサーバー / 関連 / types.py
+  description: '`trace_related` の要求と結果の型を受け持ち、関連の types.py を修正するときに参照する。'
+  tags:
+  - topic:関連
+  related:
+  - to: MOD-49
+    type: implements
+- path: project_index/features/search/body_parts.py
+  name: 索引のサーバー / 検索 / body_parts.py
+  description: 本文の切り出しを受け持ち、検索の body_parts.py を修正するときに参照する。
+  tags:
+  - topic:検索
+  related:
+  - to: MOD-50
+    type: implements
+- path: project_index/features/search/cursor.py
+  name: 索引のサーバー / 検索 / cursor.py
+  description: 続きのカーソルの作成と解読を受け持ち、検索の cursor.py を修正するときに参照する。
+  tags:
+  - topic:検索
+  related:
+  - to: MOD-51
+    type: implements
+- path: project_index/features/search/fields.py
+  name: 索引のサーバー / 検索 / fields.py
+  description: 項目の値・計算項目・使える項目・見出しの行を受け持ち、検索の fields.py を修正するときに参照する。
+  tags:
+  - topic:検索
+  related:
+  - to: MOD-52
+    type: implements
+- path: project_index/features/search/filters.py
+  name: 索引のサーバー / 検索 / filters.py
+  description: 条件の木の確かめと照合・語の照合・正規表現・比べる値の解釈を受け持ち、検索の filters.py を修正するときに参照する。
+  tags:
+  - topic:検索
+  related:
+  - to: MOD-53
+    type: implements
+- path: project_index/features/search/render.py
+  name: 索引のサーバー / 検索 / render.py
+  description: '`search_docs` の結果の Markdown を受け持ち、検索の render.py を修正するときに参照する。'
+  tags:
+  - topic:検索
+  related:
+  - to: MOD-54
+    type: implements
+- path: project_index/features/search/service.py
+  name: 索引のサーバー / 検索 / service.py
+  description: '`search_docs` の条件の木・並べ替え・集計・量の上限を受け持ち、検索の service.py を修正するときに参照する。'
+  tags:
+  - topic:検索
+  related:
+  - to: MOD-55
+    type: implements
+- path: project_index/features/search/snippets.py
+  name: 索引のサーバー / 検索 / snippets.py
+  description: 行の分割・抜粋の検索・当たった行の数・一致した箇所の抜き出しを受け持ち、検索の snippets.py を修正するときに参照する。
+  tags:
+  - topic:検索
+  related:
+  - to: MOD-56
+    type: implements
+- path: project_index/features/search/terms.py
+  name: 索引のサーバー / 検索 / terms.py
+  description: 用語の一覧と、その Markdown を受け持ち、検索の terms.py を修正するときに参照する。
+  tags:
+  - topic:検索
+  related:
+  - to: MOD-57
+    type: implements
+- path: project_index/features/search/types.py
+  name: 索引のサーバー / 検索 / types.py
+  description: '`search_docs`・用語の一覧の要求と結果の型を受け持ち、検索の types.py を修正するときに参照する。'
+  tags:
+  - topic:検索
+  related:
+  - to: MOD-58
+    type: implements
+- path: project_index/features/seen/store.py
+  name: 索引のサーバー / 会話の記録 / store.py
+  description: 会話キーごとの返し済み・前回読んだ内容・閲覧と編集の SQLite への記録と読み出しを受け持ち、会話の記録の store.py を修正するときに参照する。
+  tags:
+  - topic:会話の記録
+  related:
+  - to: MOD-59
+    type: implements
+- path: project_index/features/seen/types.py
+  name: 索引のサーバー / 会話の記録 / types.py
+  description: 会話の記録の会話キー・前回読んだ内容・閲覧と編集の記録の型を受け持ち、会話の記録の types.py を修正するときに参照する。
+  tags:
+  - topic:会話の記録
+  related:
+  - to: MOD-60
+    type: implements
+- path: project_index/features/session_start/route.py
+  name: 索引のサーバー / セッションの開始 / route.py
+  description: '`POST /_admin/session-start` のルートを受け持ち、セッションの開始の route.py を修正するときに参照する。'
+  tags:
+  - topic:セッションの開始
+  related:
+  - to: MOD-61
+    type: implements
+- path: project_index/features/session_start/service.py
+  name: 索引のサーバー / セッションの開始 / service.py
+  description: '`/clear`・圧縮の後に、その会話の返し済みの記録を削除する処理を受け持ち、セッションの開始の service.py を修正するときに参照する。'
+  tags:
+  - topic:セッションの開始
+  related:
+  - to: MOD-62
+    type: implements
+- path: project_index/features/session_start/types.py
+  name: 索引のサーバー / セッションの開始 / types.py
+  description: '`POST /_admin/session-start` の本文と応答の型と、返し済みの記録を削除する理由を受け持ち、セッションの開始の types.py を修正するときに参照する。'
+  tags:
+  - topic:セッションの開始
+  related:
+  - to: MOD-63
+    type: implements
+- path: project_index/features/settings/query.py
+  name: 索引のサーバー / 端末の設定 / query.py
+  description: 端末の設定の場所・読み込みと検証・待ち受けのポートを受け持ち、端末の設定の query.py を修正するときに参照する。
+  tags:
+  - topic:端末の設定
+  related:
+  - to: MOD-64
+    type: implements
+- path: project_index/features/settings/route.py
+  name: 索引のサーバー / 端末の設定 / route.py
+  description: 端末の設定のルーター（`GET`・`PUT`・`POST /settings/sources`）を受け持ち、端末の設定の route.py を修正するときに参照する。
+  tags:
+  - topic:端末の設定
+  related:
+  - to: MOD-65
+    type: implements
+- path: project_index/features/settings/service.py
+  name: 索引のサーバー / 端末の設定 / service.py
+  description: '`sources[]` の保存を受け持ち、端末の設定の service.py を修正するときに参照する。'
+  tags:
+  - topic:端末の設定
+  related:
+  - to: MOD-66
+    type: implements
+- path: project_index/features/settings/types.py
+  name: 索引のサーバー / 端末の設定 / types.py
+  description: 端末の設定と、端末の設定の API の `sources[]` の要求と結果の型を受け持ち、端末の設定の types.py を修正するときに参照する。
+  tags:
+  - topic:端末の設定
+  related:
+  - to: MOD-67
+    type: implements
+- path: project_index/features/sources/merge.py
+  name: 索引のサーバー / 配信元 / merge.py
+  description: 設定の YAML のマージを受け持ち、配信元の merge.py を修正するときに参照する。
+  tags:
+  - topic:配信元
+  related:
+  - to: MOD-68
+    type: implements
+- path: project_index/features/sources/registry.py
+  name: 索引のサーバー / 配信元 / registry.py
+  description: 配信する配信元の一覧と読み直しを受け持ち、配信元の registry.py を修正するときに参照する。
+  tags:
+  - topic:配信元
+  related:
+  - to: MOD-69
+    type: implements
+- path: project_index/features/sources/schema_ref.py
+  name: 索引のサーバー / 配信元 / schema_ref.py
+  description: '`documents[].schema` でほかの配信元のリビジョンのスキーマを指す参照の型と、その読み取りを受け持ち、配信元の schema_ref.py を修正するときに参照する。'
+  tags:
+  - topic:配信元
+  related:
+  - to: MOD-124
+    type: implements
+- path: project_index/features/sources/service.py
+  name: 索引のサーバー / 配信元 / service.py
+  description: 配信元の設定の読み込みと検証、スクリプトとバージョンの確かめを受け持ち、配信元の service.py を修正するときに参照する。
+  tags:
+  - topic:配信元
+  related:
+  - to: MOD-70
+    type: implements
+- path: project_index/features/sources/types.py
+  name: 索引のサーバー / 配信元 / types.py
+  description: 配信元の設定・文書の行・スクリプト・配信中の配信元・状態の型を受け持ち、配信元の types.py を修正するときに参照する。
+  tags:
+  - topic:配信元
+  related:
+  - to: MOD-71
+    type: implements
+- path: project_index/features/validation/markdown.py
+  name: 索引のサーバー / 検査 / markdown.py
+  description: スキーマで Markdown と宣言したキーのうち操作で変えた値を mdmark で点検し、描画時の記載方法の警告を違反にする処理を受け持ち、検査の markdown.py を修正するときに参照する。
+  tags:
+  - topic:検査
+  related:
+  - to: MOD-72
+    type: implements
+- path: project_index/features/validation/rules.py
+  name: 索引のサーバー / 検査 / rules.py
+  description: スキーマ・ID の形・関連の種類の検査を受け持ち、検査の rules.py を修正するときに参照する。
+  tags:
+  - topic:検査
+  related:
+  - to: MOD-73
+    type: implements
+- path: project_index/features/validation/scripts.py
+  name: 索引のサーバー / 検査 / scripts.py
+  description: '`validators[]` の出力の解釈を受け持ち、検査の scripts.py を修正するときに参照する。'
+  tags:
+  - topic:検査
+  related:
+  - to: MOD-74
+    type: implements
+- path: project_index/features/validation/service.py
+  name: 索引のサーバー / 検査 / service.py
+  description: 検査をまとめて実行する処理と、読み取りの結果のキャッシュを受け持ち、検査の service.py を修正するときに参照する。
+  tags:
+  - topic:検査
+  related:
+  - to: MOD-75
+    type: implements
+- path: project_index/features/write/apply.py
+  name: 索引のサーバー / 書き込み / apply.py
+  description: 項目の操作の適用と、共通のキーの列名への読み替えを受け持ち、書き込みの apply.py を修正するときに参照する。
+  tags:
+  - topic:書き込み
+  related:
+  - to: MOD-80
+    type: implements
+- path: project_index/features/write/hints.py
+  name: 索引のサーバー / 書き込み / hints.py
+  description: '`write_docs` のスキーマの違反に、違反した項目のスキーマの説明を添える処理を受け持ち、書き込みの hints.py を修正するときに参照する。'
+  tags:
+  - topic:書き込み
+  related:
+  - to: MOD-123
+    type: implements
+- path: project_index/features/write/ids.py
+  name: 索引のサーバー / 書き込み / ids.py
+  description: '`ids.format` からの ID の生成を受け持ち、書き込みの ids.py を修正するときに参照する。'
+  tags:
+  - topic:書き込み
+  related:
+  - to: MOD-81
+    type: implements
+- path: project_index/features/write/locks.py
+  name: 索引のサーバー / 書き込み / locks.py
+  description: 配信元ごとの書き込みの排他を受け持ち、書き込みの locks.py を修正するときに参照する。
+  tags:
+  - topic:書き込み
+  related:
+  - to: MOD-82
+    type: implements
+- path: project_index/features/write/placement.py
+  name: 索引のサーバー / 書き込み / placement.py
+  description: 新しい文書の置き場所を受け持ち、書き込みの placement.py を修正するときに参照する。
+  tags:
+  - topic:書き込み
+  related:
+  - to: MOD-83
+    type: implements
+- path: project_index/features/write/service.py
+  name: 索引のサーバー / 書き込み / service.py
+  description: '`write_docs`・`delete_docs` の操作の適用・検査・書き換えと、バージョンの確かめを受け持ち、書き込みの service.py を修正するときに参照する。'
+  tags:
+  - topic:書き込み
+  related:
+  - to: MOD-84
+    type: implements
+- path: project_index/features/write/types.py
+  name: 索引のサーバー / 書き込み / types.py
+  description: '`write_docs`・`delete_docs` の要求と結果の型を受け持ち、書き込みの types.py を修正するときに参照する。'
+  tags:
+  - topic:書き込み
+  related:
+  - to: MOD-85
+    type: implements
+- path: project_index/integrations/git.py
+  name: 索引のサーバー / 履歴 / git.py
+  description: git の実行と、リポジトリの直下の解決を受け持ち、履歴の git.py を修正するときに参照する。
+  tags:
+  - topic:履歴
+  related:
+  - to: MOD-86
+    type: implements
+- path: project_index/integrations/mdmark.py
+  name: 索引のサーバー / スクリプトの実行 / mdmark.py
+  description: mdmark の CLI の `check --text -` で Markdown の文字列を点検し、出力をずれの並びにする処理を受け持ち、スクリプトの実行の mdmark.py を修正するときに参照する。
+  tags:
+  - topic:スクリプトの実行
+  related:
+  - to: MOD-87
+    type: implements
+- path: project_index/integrations/scripts.py
+  name: 索引のサーバー / スクリプトの実行 / scripts.py
+  description: '`validators[]`・`converters[]`・`generators[]` のスクリプトの制限時間つきの実行と、実行できるかの確かめを受け持ち、スクリプトの実行の scripts.py を修正するときに参照する。'
+  tags:
+  - topic:スクリプトの実行
+  related:
+  - to: MOD-88
+    type: implements
+- path: project_index/main.py
+  name: 索引のサーバー / 起動 / main.py
+  description: '`project-index serve`・`project-index migrate` の部品の配線と、配信元の読み直しを受け持ち、起動の main.py を修正するときに参照する。'
+  tags:
+  - topic:起動
+  related:
+  - to: MOD-89
+    type: implements
+- path: project_index/server/app.py
+  name: 索引のサーバー / 起動 / app.py
+  description: ルートと MCP のマウントをまとめたアプリの組み立てを受け持ち、起動の app.py を修正するときに参照する。
+  tags:
+  - topic:起動
+  related:
+  - to: MOD-90
+    type: implements
+- path: project_index/server/error_handlers.py
+  name: 索引のサーバー / 起動 / error_handlers.py
+  description: 例外の problem+json への変換を受け持ち、起動の error_handlers.py を修正するときに参照する。
+  tags:
+  - topic:起動
+  related:
+  - to: MOD-91
+    type: implements
+- path: project_index/server/lifespan.py
+  name: 索引のサーバー / 起動 / lifespan.py
+  description: MCP のセッションの管理と、記録の削除を受け持ち、起動の lifespan.py を修正するときに参照する。
+  tags:
+  - topic:起動
+  related:
+  - to: MOD-92
+    type: implements
+- path: project_index/server/mcp/admin.py
+  name: 索引のサーバー / 文書のMCP / admin.py
+  description: 管理の MCP の組み立て（ツールの登録）を受け持ち、文書の MCP の admin.py を修正するときに参照する。
+  tags:
+  - topic:文書のMCP
+  related:
+  - to: MOD-93
+    type: implements
+- path: project_index/server/mcp/docs.py
+  name: 索引のサーバー / 文書のMCP / docs.py
+  description: 文書の MCP の組み立て（ツールの登録）を受け持ち、文書の MCP の docs.py を修正するときに参照する。
+  tags:
+  - topic:文書のMCP
+  related:
+  - to: MOD-94
+    type: implements
+- path: project_index/server/mcp/result.py
+  name: 索引のサーバー / 文書のMCP / result.py
+  description: ツールの結果・エラーの変換と、2 つの MCP のツール名とプロンプトの ID を受け持ち、文書の MCP の result.py を修正するときに参照する。
+  tags:
+  - topic:文書のMCP
+  related:
+  - to: MOD-95
+    type: implements
+- path: project_index/server/origin.py
+  name: 索引のサーバー / 共通 / origin.py
+  description: 端末の設定の API への、ブラウザからの別のオリジンの書き込みの確認を受け持ち、共通の origin.py を修正するときに参照する。
+  tags:
+  - topic:共通
+  related:
+  - to: MOD-96
+    type: implements
+- path: project_index/shared/api_model.py
+  name: 索引のサーバー / 共通 / api_model.py
+  description: 読み取り API の DTO の基底（キーは camelCase）を受け持ち、共通の api_model.py を修正するときに参照する。
+  tags:
+  - topic:共通
+  related:
+  - to: MOD-97
+    type: implements
+- path: project_index/shared/errors.py
+  name: 索引のサーバー / 共通 / errors.py
+  description: '`ProjectIndexError` と、MCP・読み取り API が返すエラーの階層を受け持ち、共通の errors.py を修正するときに参照する。'
+  tags:
+  - topic:共通
+  related:
+  - to: MOD-98
+    type: implements
+- path: project_index/shared/files.py
+  name: 索引のサーバー / 共通 / files.py
+  description: 一時ファイルからのファイルの置き換えを受け持ち、共通の files.py を修正するときに参照する。
+  tags:
+  - topic:共通
+  related:
+  - to: MOD-99
+    type: implements
+- path: project_index/shared/hashing.py
+  name: 索引のサーバー / 共通 / hashing.py
+  description: 内容のハッシュ（文書のバージョン）を受け持ち、共通の hashing.py を修正するときに参照する。
+  tags:
+  - topic:共通
+  related:
+  - to: MOD-100
+    type: implements
+- path: project_index/shared/paths.py
+  name: 索引のサーバー / 共通 / paths.py
+  description: 作業場所の glob の照合とパスの正規化を受け持ち、共通の paths.py を修正するときに参照する。
+  tags:
+  - topic:共通
+  related:
+  - to: MOD-101
+    type: implements
+- path: project_index/shared/schema_check.py
+  name: 索引のサーバー / 共通 / schema_check.py
+  description: JSON Schema の違反を、項目のパスつきの `Violation` にする処理を受け持ち、共通の schema_check.py を修正するときに参照する。
+  tags:
+  - topic:共通
+  related:
+  - to: MOD-102
+    type: implements
+- path: project_index/shared/version.py
+  name: 索引のサーバー / 共通 / version.py
+  description: 動いているプロセスが起動した時点の project-index のバージョンを受け持ち、共通の version.py を修正するときに参照する。
+  tags:
+  - topic:共通
+  related:
+  - to: MOD-103
+    type: implements
+- path: project_index/shared/yaml_io.py
+  name: 索引のサーバー / 共通 / yaml_io.py
+  description: YAML の読み込みと、往復編集の読み書きを受け持ち、共通の yaml_io.py を修正するときに参照する。
+  tags:
+  - topic:共通
+  related:
+  - to: MOD-104
+    type: implements
