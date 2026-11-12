@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from project_index.features.access.types import AccessLevel, SourceAccess, Target, Workplace
 from project_index.features.history.query import resolve_ref
+from project_index.features.sources.service import load_source_at
 from project_index.shared.errors import (
     InvalidArgumentError,
     SourceNotReadableError,
@@ -295,4 +296,8 @@ def resolve_write_target(
             clone=str(clone),
             next_steps=["worktree 引数にワークツリーのパスを指定してください"],
         )
+    # ワークツリーへ書くか
+    if wt is not None:
+        # 書く: 種類・置き場所をそのワークツリーの設定で参照するため、配信元を読み直す
+        item = load_source_at(item, wt)
     return Target(item, _base_of(item, wt), None, wt, "write")
