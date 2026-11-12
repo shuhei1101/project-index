@@ -35,6 +35,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
     from pathlib import Path
 
+    from ruamel.yaml.comments import CommentedMap
+
     from project_index.features.sources.types import SourceStatus
 
 logger = logging.getLogger(__name__)
@@ -154,7 +156,7 @@ def _apply_patch(entry: SourceEntry, patch: SourcePatch) -> SourceEntry:
 
 
 def _write_and_reload(
-    document: object,
+    document: CommentedMap,
     path: Path,
     reload: Callable[[TerminalConfig], list[SourceStatus]],
 ) -> SourceWriteResult:
@@ -242,7 +244,9 @@ def patch_source(
         text, current = read_settings_file(path)
         _check_version(current, expected_version)
         document = load_roundtrip(text, file=str(path))
-        rows: list[object] = list(cast("Mapping[str, list[object] | None]", document).get("sources") or [])
+        rows: list[object] = list(
+            cast("Mapping[str, list[object] | None]", document).get("sources") or []
+        )
         index, entry = _find_row(rows, source_id)
         patched = _apply_patch(entry, patch)
         # id を省いた行の配信元の ID が変わる: 読み直す配信元が 1 つに決まらないため断る
@@ -283,7 +287,9 @@ def delete_source(
         text, current = read_settings_file(path)
         _check_version(current, expected_version)
         document = load_roundtrip(text, file=str(path))
-        rows: list[object] = list(cast("Mapping[str, list[object] | None]", document).get("sources") or [])
+        rows: list[object] = list(
+            cast("Mapping[str, list[object] | None]", document).get("sources") or []
+        )
         index, _ = _find_row(rows, source_id)
         del rows[index]
         document["sources"] = rows

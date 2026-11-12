@@ -348,7 +348,9 @@ class SourceRegistry:
             with self._waiters_lock:
                 self._rows = list(terminal.sources)
                 self._rows_done = [threading.Event() for _ in self._rows]
-            logger.info("変わった行の配信元を読み直した（読んだ行: %s・配信中: %s）", loaded, list(sources))
+            logger.info(
+                "変わった行の配信元を読み直した（読んだ行: %s・配信中: %s）", loaded, list(sources)
+            )
             return statuses
 
     @staticmethod
