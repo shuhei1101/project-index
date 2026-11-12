@@ -89,7 +89,7 @@ scenarios:
         PI-->>DD: 追加した
       ```
     expected:
-      - 応答が、行を追加したことを返却する
+      - 応答が、行を追加したことと、extra の配信元の状態と、書き換えた後の端末の設定のバージョンを返却する
       - '`settings.yaml` の `sources` が sample・extra の順に並び、sample の行は変わらない'
       - project-index を再起動せずに、読み取り API の extra の文書の取得が文書を返却する
     test: test_normal_when_one_row_added
@@ -282,7 +282,159 @@ scenarios:
       - '`settings.yaml` の extra の行に `outside_read: false` が残る'
       - '保存した後も、extra の範囲の外の作業場所から `outside_scope: true` で extra の文書を参照できない'
     test: test_normal_when_unsent_keys_kept
-lead: dev-docs の画面のサーバーが端末の設定の API で、端末の設定の配信元を取得し、追加・変更・停止・削除した後の配信元を丸ごと保存するか 1 行を追加して、project-index を再起動せずに配信へ反映する。
+  - name: 正常シナリオ（1 行を変更する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。端末のほかのプロセスの代わりにテストのコードが `Origin` も `Sec-Fetch-Site` も持たない HTTP で端末の設定の API を呼ぶ）
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す一時フォルダの `settings.yaml`'
+        notes: '`sources` に sample と、`scope.read` に extra のフォルダだけを記載した extra の 2 行'
+      - name: project-index
+        description: 端末の設定で起動した project-index
+      - name: 範囲の外の作業場所
+        description: extra の `scope.read` に該当しない一時フォルダ
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant OP as 端末のほかのプロセス
+        participant PI as project-index（端末の設定の API）
+        participant CF as 端末の設定
+
+        OP->>PI: 端末の設定の配信元を取得する
+        PI-->>OP: sample と extra の行と、端末の設定のバージョン
+        OP->>PI: 取得したバージョンを添えて、extra の行の outside_read を false に変更する
+        PI->>PI: バージョンを照合し、変更後の端末の設定をスキーマで検証する
+        PI->>CF: extra の行だけを書き換え、extra の配信元だけを読み直す
+        PI-->>OP: extra の配信元の状態と、書き換えた後のバージョン
+      ```
+    expected:
+      - 応答が、extra を配信中とする状態と、取得したバージョンと違う新しいバージョンを返却する
+      - '`settings.yaml` の extra の行に `outside_read: false` が入り、extra の行の `scope.read` と sample の行は変わらない'
+      - 'project-index を再起動せずに、範囲の外の作業場所から `outside_scope: true` で extra の文書を参照できなくなる'
+      - 変更の前後で、読み取り API の sample の文書の取得が応答する
+    test: test_normal_when_one_row_changed
+  - name: 正常シナリオ（1 行を削除する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。端末のほかのプロセスの代わりにテストのコードが HTTP で呼ぶ）
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す一時フォルダの `settings.yaml`'
+        notes: '`sources` に sample と extra の 2 行'
+      - name: project-index
+        description: 端末の設定で起動した project-index
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant OP as 端末のほかのプロセス
+        participant PI as project-index（端末の設定の API）
+        participant CF as 端末の設定
+
+        OP->>PI: 端末の設定の配信元を取得する
+        PI-->>OP: sample と extra の行と、端末の設定のバージョン
+        OP->>PI: 取得したバージョンを添えて、extra の行を削除する
+        PI->>PI: バージョンを照合する
+        PI->>CF: extra の行だけを削除し、extra を配信から除外する
+        PI-->>OP: 削除したことと、書き換えた後のバージョン
+      ```
+    expected:
+      - 応答が、行を削除したことと、取得したバージョンと違う新しいバージョンを返却する
+      - '`settings.yaml` の `sources` が sample の行だけになり、sample の行と他のキー・コメントは変わらない'
+      - extra のフォルダのファイルは変わらない
+      - project-index を再起動せずに、読み取り API の extra の文書の取得が 404 を返却し、sample の文書の取得は応答する
+    test: test_normal_when_one_row_deleted
+  - name: 異常シナリオ（取得した後にほかの書き換えが入った）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。dev-docs の画面のサーバーと端末のほかのプロセスの代わりに、テストのコードが HTTP で呼ぶ）
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す一時フォルダの `settings.yaml`'
+        notes: '`sources` に sample の 1 行'
+      - name: 追加する配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ git リポジトリ。端末の設定にはまだ無い
+        notes: id `extra`
+      - name: project-index
+        description: 端末の設定で起動した project-index
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant DD as dev-docs の画面のサーバー
+        participant OP as 端末のほかのプロセス
+        participant PI as project-index（端末の設定の API）
+        participant CF as 端末の設定
+
+        DD->>PI: 端末の設定の配信元を取得する
+        PI-->>DD: sample の行と、端末の設定のバージョン
+        OP->>PI: 取得したバージョンを添えて、extra の行を 1 行追加する
+        PI->>CF: sources の末尾に extra の行を追加する
+        PI-->>OP: 追加した
+        DD->>PI: 最初に取得したバージョンを添えて、sample だけの sources を保存する
+        PI->>PI: バージョンを照合し、古いので書き換えない
+        PI-->>DD: 409（今のバージョン）
+        DD->>PI: 端末の設定の配信元を取得し直す
+        PI-->>DD: sample と extra の行と、今のバージョン
+      ```
+    expected:
+      - 保存の応答が 409 で、extra を追加した後のバージョンを返却する
+      - '`settings.yaml` の `sources` に extra の行が残り、読み取り API の extra の文書の取得が文書を返却する'
+      - 取得し直しが sample と extra の行と、409 で返却したバージョンを返却する
+    test: test_error_when_version_outdated
+  - name: 異常シナリオ（利用者が端末の設定を手で書き換えた）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。端末のほかのプロセスの代わりにテストのコードが HTTP で呼ぶ）
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す一時フォルダの `settings.yaml`'
+        notes: '`sources` に sample と extra の 2 行'
+      - name: 手での書き換え
+        description: 取得の後に、テストのコードが `settings.yaml` の末尾へコメントを 1 行追記する
+        notes: 配信元の行は変えない
+      - name: project-index
+        description: 端末の設定で起動した project-index
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant OP as 端末のほかのプロセス
+        participant PI as project-index（端末の設定の API）
+        participant CF as 端末の設定
+
+        OP->>PI: 端末の設定の配信元を取得する
+        PI-->>OP: sample と extra の行と、端末の設定のバージョン
+        Note over CF: 利用者が settings.yaml を手で書き換える
+        OP->>PI: 取得したバージョンを添えて、extra の行を削除する
+        PI->>CF: 今のバージョンを求める
+        PI-->>OP: 409（今のバージョン）
+      ```
+    expected:
+      - 削除の応答が 409 で、取得したバージョンと違う今のバージョンを返却する
+      - '`settings.yaml` が手で書き換えた内容のままで、extra の行が残る'
+    test: test_error_when_file_edited_by_hand
+  - name: 異常シナリオ（指した行が無い）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。端末のほかのプロセスの代わりにテストのコードが HTTP で呼ぶ）
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す一時フォルダの `settings.yaml`'
+        notes: '`sources` に sample の 1 行'
+      - name: project-index
+        description: 端末の設定で起動した project-index
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant OP as 端末のほかのプロセス
+        participant PI as project-index（端末の設定の API）
+
+        OP->>PI: 端末の設定の配信元を取得する
+        PI-->>OP: sample の行と、端末の設定のバージョン
+        OP->>PI: 取得したバージョンを添えて、extra の行を変更する
+        PI-->>OP: 404
+        OP->>PI: 取得したバージョンを添えて、extra の行を削除する
+        PI-->>OP: 404
+      ```
+    expected:
+      - 変更と削除の応答がどちらも 404 で、extra の行が無いことを返却する
+      - '`settings.yaml` が変わらない'
+    test: test_error_when_row_not_found
+lead: dev-docs の画面のサーバーが端末の設定の API で、端末の設定の配信元を取得し、追加・変更・停止・削除した後の配信元を丸ごと保存するか 1 行ずつ追加・変更・削除して、project-index を再起動せずに配信へ反映する。
 issue: 14
 visibility: internal
 primary_actor: dev-docs の画面のサーバー
@@ -291,11 +443,13 @@ stakeholders:
     interest: '`settings.yaml` を手で開かずに、dev-docs の設定画面で配信元を追加・停止・削除でき、配信元のフォルダの文書は消えない'
   - name: dev-docs の画面のサーバー
     interest: 端末の設定を自分で持たずに、project-index と同じ配信元の一覧を参照・更新できる
-trigger: dev-docs の画面のサーバーが、利用者の設定画面の操作（開く・保存する）を受けて端末の設定の API を呼ぶ
+  - name: 端末のほかのプロセス
+    interest: 自分の使用する配信元の行だけを、ほかの行と画面の保存を壊さずに 1 行ずつ追加・変更・削除でき、同時に書き換えられたときに気づける
+trigger: dev-docs の画面のサーバーが、利用者の設定画面の操作（開く・保存する）を受けて端末の設定の API を呼ぶ。または、端末のほかのプロセスが自分の使用する配信元の行を 1 行ずつ書き換える
 preconditions:
   - project-index が待ち受け、端末の設定に配信元が並んでいる
 success_guarantee: 保存した sources だけが `settings.yaml` に書き込まれ（送信した行に含めなかったキーは、ファイルの同じ配信元の行の今の値で残る）、読み直した後の配信元の状態が応答と文書の MCP・読み取り API に反映される。
-minimal_guarantee: スキーマに合格しない保存と、別のオリジンからの保存は `settings.yaml` を書き換えない。配信元のフォルダのファイルは変えない。他の配信元の配信は止まらない。
+minimal_guarantee: スキーマに合格しない保存、別のオリジンからの保存、取得した後にほかの書き換えが入ったバージョンでの書き換えは `settings.yaml` を書き換えない。配信元のフォルダのファイルは変えない。他の配信元の配信は止まらない。
 frequency: 配信元を追加・停止・削除するとき
 priority: 中
 refs:

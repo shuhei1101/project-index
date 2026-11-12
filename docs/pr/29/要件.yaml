@@ -6,8 +6,8 @@ use_cases:
     depends_on: []
   - kind: composite
     scenario: docs/scenario/SC-1.yaml
-    impact: following
-    detail: 画面のサーバーの保存と端末のほかのプロセスの 1 行の書き換えが重なったとき、後から書いた側が断られて取得し直す流れを連鎖に加えるかを、単一ユースケースの変更に合わせて決める
+    impact: run_only
+    detail: 連鎖の端末の設定の配信元を変える工程は取得してから保存するままで、連鎖は変わらない。保存にバージョンの照合が入るため、通しで壊れていないことを確認する
     depends_on:
       - docs/scenario/SC-12.yaml
 docs:
