@@ -142,3 +142,9 @@ scope_out:
   - item: 端末の設定の最上位の知らないキーを警告として返して読み込みを続ける
     reason: 移した後のコードに対して行う変更。この作業 PR は今の dev-docs の振る舞いのまま移す
     plan: '#11'
+use_cases:
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: new
+    detail: 利用者が project-index を入れて配信元を登録し、エージェントと dev-docs の画面のサーバーがその配信元の文書を読み書きする流れを、dev-docs の複合ユースケース（SC-155-13）の索引の側から移す
+    depends_on: []
