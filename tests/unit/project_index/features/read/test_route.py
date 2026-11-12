@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from project_index.features.read.route import build_read_router
+from project_index.features.sources.types import DocumentTable
 from project_index.server.error_handlers import register_error_handlers
 
 if TYPE_CHECKING:
@@ -56,6 +57,44 @@ def test_build_read_router(make_view_env: Callable[..., SimpleNamespace]) -> Non
     assert responses["/sources/sample/decisions"].json()["decisions"] == [
         {"id": "D-1", "folders": 1}
     ]
+
+
+def test_build_read_router_when_queries(make_view_env: Callable[..., SimpleNamespace]) -> None:
+    """追加したクエリを service に渡す（正常系）。"""
+    # 準備
+    env = make_view_env(
+        {
+            "schemas/rule.schema.yaml": "type: object\n",
+            "schemas/terms.schema.yaml": "type: object\n",
+            "docs/a.yaml": "id: a\nname: A\n",
+            "terms.yaml": "terms:\n  - id: term-1\n    name: alpha\n  - id: term-2\n    name: beta\n",
+        },
+        tables=[
+            DocumentTable(
+                id="rules", paths=["docs/*.yaml"], schema_path="schemas/rule.schema.yaml"
+            ),
+            DocumentTable(
+                id="terms",
+                paths=["terms.yaml"],
+                schema_path="schemas/terms.schema.yaml",
+                records="terms",
+            ),
+        ],
+    )
+    client = _client(env.handlers)
+    # 実行
+    config = client.get("/sources/sample/config?schemas=true").json()
+    documents = client.get("/sources/sample/docs?values=true").json()
+    document = client.get("/sources/sample/docs/terms.yaml?id=term-2").json()
+    search = client.get("/sources/sample/search?q=beta").json()
+    # 検証
+    assert config["schemas"] == {"rules": {"type": "object"}, "terms": {}}
+    assert config["diff"] == {"ignore_keys": ["updated"]}
+    assert documents["documents"][0]["value"] == {"id": "a", "name": "A"}
+    assert "version" in documents["documents"][0]
+    assert document["metadata"]["id"] == "term-2"
+    assert search["items"][0]["id"] == "term-2"
+    assert search["items"][0]["filePath"] == "terms.yaml"
 
 
 @pytest.mark.parametrize(

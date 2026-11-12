@@ -37,6 +37,48 @@ NOTES_FILES = {
     "notes/files.yaml": "files:\n  - path: guide.md\n",
     "notes/guide.md": "# Guide\n",
 }
+TERMS_TABLES = [
+    DocumentTable(
+        id="terms", paths=["terms.yaml"], schema_path="schemas/terms.schema.yaml", records="terms"
+    ),
+]
+TERMS_FILES = {
+    "schemas/terms.schema.yaml": "type: object\n",
+    "terms.yaml": "terms:\n  - id: term-1\n    name: alpha\n  - id: term-2\n    name: beta\n",
+}
+SCHEMA_TABLES = [
+    DocumentTable(id="design", paths=["design/*.yaml"], schema_path="schemas/design.schema.yaml"),
+    DocumentTable(
+        id="files_guide",
+        paths=["files.yaml"],
+        schema_path="schemas/files.schema.yaml",
+        records="files",
+        body_file="path",
+    ),
+]
+SCHEMA_FILES = {
+    "schemas/design.schema.yaml": (
+        "type: object\n"
+        "properties:\n"
+        "  title:\n"
+        "    $ref: '#/$defs/title'\n"
+        "$defs:\n"
+        "  title:\n"
+        "    type: string\n"
+    ),
+    "schemas/files.schema.yaml": (
+        "type: object\n"
+        "properties:\n"
+        "  files:\n"
+        "    type: array\n"
+        "    items:\n"
+        "      type: object\n"
+        "      required: [path]\n"
+    ),
+    "design/d-1.yaml": "id: d-1\ntitle: D\n",
+    "files.yaml": "files:\n  - path: guide.md\n",
+    "guide.md": "# Guide\n",
+}
 
 
 def _target(env: SimpleNamespace) -> Target:
@@ -55,12 +97,14 @@ def test_get_source_config(make_view_env: Callable[..., SimpleNamespace]) -> Non
         decision_folders=["tmp/a"],
     )
     # 実行
-    response = get_source_config(env.source)
+    response = get_source_config(_target(env), store=env.handlers.store)
     # 検証
     dumped = response.model_dump()
     assert dumped["nav"] == nav
     assert dumped["decisions"] == {"folders": ["tmp/a"]}
     assert [row["id"] for row in dumped["documents"]] == ["rules"]
+    assert dumped["diff"] == {"ignore_keys": ["updated"]}
+    assert dumped["schemas"] is None
     assert "converters" not in dumped
     assert "python3" not in str(dumped)
 
@@ -72,9 +116,45 @@ def test_get_source_config_when_no_decisions(
     # 準備
     env = make_view_env()
     # 実行
-    response = get_source_config(env.source)
+    response = get_source_config(_target(env), store=env.handlers.store)
     # 検証
     assert response.decisions == {"folders": []}
+
+
+@pytest.mark.parametrize(
+    ("diff_ignore_keys", "expected"),
+    [
+        pytest.param(["updated", "rev"], {"ignore_keys": ["updated", "rev"]}, id="written"),
+        pytest.param(None, {"ignore_keys": ["updated"]}, id="default"),
+    ],
+)
+def test_get_source_config_when_diff(
+    make_view_env: Callable[..., SimpleNamespace],
+    diff_ignore_keys: list[str] | None,
+    expected: dict[str, list[str]],
+) -> None:
+    """diff の値と既定の値（正常系）。"""
+    # 準備
+    env = make_view_env(diff_ignore_keys=diff_ignore_keys)
+    # 実行
+    response = get_source_config(_target(env), store=env.handlers.store)
+    # 検証
+    assert response.diff == expected
+
+
+def test_get_source_config_when_schemas(make_view_env: Callable[..., SimpleNamespace]) -> None:
+    """行ごとの種類のスキーマを返す（正常系）。"""
+    # 準備
+    env = make_view_env(SCHEMA_FILES, tables=SCHEMA_TABLES)
+    target = _target(env)
+    # 実行
+    response = get_source_config(target, store=env.handlers.store, schemas=True)
+    # 検証
+    assert response.schemas is not None
+    assert list(response.schemas) == ["design", "files_guide"]
+    assert response.schemas["design"] == env.handlers.store.row_schema(target, "design")
+    assert response.schemas["design"]["properties"]["title"] == {"type": "string"}
+    assert response.schemas["files_guide"] == env.handlers.store.row_schema(target, "files_guide")
 
 
 def test_list_documents(make_view_env: Callable[..., SimpleNamespace]) -> None:
@@ -87,6 +167,20 @@ def test_list_documents(make_view_env: Callable[..., SimpleNamespace]) -> None:
     assert [item.kind for item in response.documents] == ["rules", "notes"]
     assert response.documents[0].body_path is None
     assert response.documents[1].body_path == "notes/guide.md"
+    assert response.documents[0].version != ""
+    assert response.documents[0].value is None
+    assert response.documents[1].value is None
+
+
+def test_list_documents_when_values(make_view_env: Callable[..., SimpleNamespace]) -> None:
+    """値を求めたときだけ値を入れる（正常系）。"""
+    # 準備
+    env = make_view_env(NOTES_FILES, tables=NOTES_TABLES)
+    # 実行
+    response = list_documents(_target(env), store=env.handlers.store, values=True)
+    # 検証
+    assert response.documents[0].value == {"id": "a", "name": "A"}
+    assert response.documents[1].value == {"path": "guide.md"}
 
 
 def test_get_document(
@@ -124,6 +218,24 @@ def test_get_document_when_body_path(make_view_env: Callable[..., SimpleNamespac
     assert response.value == {"path": "guide.md"}
     assert response.body == "# Guide\n"
     assert response.body_path == "notes/guide.md"
+
+
+def test_get_document_when_doc_id(make_view_env: Callable[..., SimpleNamespace]) -> None:
+    """文書の ID で行の文書を選ぶ（正常系）。"""
+    # 準備
+    env = make_view_env(TERMS_FILES, tables=TERMS_TABLES)
+    # 実行
+    response = get_document(
+        _target(env),
+        "terms.yaml",
+        doc_id="term-2",
+        store=env.handlers.store,
+        converter=env.handlers.converter,
+    )
+    # 検証
+    assert response.value == {"id": "term-2", "name": "beta"}
+    assert response.metadata is not None
+    assert response.metadata.id == "term-2"
 
 
 def test_get_document_when_converter(
@@ -230,3 +342,21 @@ def test_get_decision_when_invalid_id(make_view_env: Callable[..., SimpleNamespa
     with pytest.raises(DecisionNotFoundError) as exc_info:
         get_decision(env.source, "../secret")
     assert exc_info.value.reason == "not_found"
+
+
+def test_get_document_when_doc_id_not_found(
+    make_view_env: Callable[..., SimpleNamespace],
+) -> None:
+    """文書の ID が一致しない（異常系）。"""
+    # 準備
+    env = make_view_env(TERMS_FILES, tables=TERMS_TABLES)
+    target = _target(env)
+    # 実行・検証
+    with pytest.raises(DocumentNotFoundError, match=r"terms\.yaml"):
+        get_document(
+            target,
+            "terms.yaml",
+            doc_id="no-such",
+            store=env.handlers.store,
+            converter=env.handlers.converter,
+        )

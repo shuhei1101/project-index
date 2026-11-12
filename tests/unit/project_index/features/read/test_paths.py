@@ -64,6 +64,32 @@ def test_find_page_when_missing(make_document: Callable[..., Document]) -> None:
     assert result is None
 
 
+def test_find_page_when_doc_id(make_document: Callable[..., Document]) -> None:
+    """文書の ID で行の文書を選ぶ（正常系）。"""
+    # 準備
+    first = make_document(id="term-1", path="terms.yaml", record_index=0)
+    second = make_document(id="term-2", path="terms.yaml", record_index=1)
+    # 実行
+    chosen = find_page([first, second], "terms.yaml", doc_id="term-2")
+    default = find_page([first, second], "terms.yaml")
+    # 検証
+    assert chosen is second
+    assert default is first
+
+
+def test_find_page_when_doc_id_missing(make_document: Callable[..., Document]) -> None:
+    """文書の ID が一致しない（正常系）。"""
+    # 準備
+    first = make_document(id="term-1", path="terms.yaml", record_index=0)
+    second = make_document(id="term-2", path="terms.yaml", record_index=1)
+    # 実行
+    unknown_id = find_page([first, second], "terms.yaml", doc_id="no-such")
+    page = find_page([first, second], "terms/term-2", doc_id="term-2")
+    # 検証
+    assert unknown_id is None
+    assert page is None
+
+
 def test_read_target(
     git_repo: Callable[..., Path],
     run_git: Callable[..., str],
