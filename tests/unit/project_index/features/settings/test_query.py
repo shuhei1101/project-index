@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
-
-import logging
 
 import pytest
 
@@ -329,7 +328,7 @@ def test_unknown_top_level_keys() -> None:
 def test_unknown_top_level_keys_when_none() -> None:
     """知らないキーが無い（正常系）。"""
     # 準備
-    value = {"version": "1", "clone": "/c", "sources": []}
+    value: dict[str, object] = {"version": "1", "clone": "/c", "sources": []}
     # 実行
     result = unknown_top_level_keys(value)
     # 検証

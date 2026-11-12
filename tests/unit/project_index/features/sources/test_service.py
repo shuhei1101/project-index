@@ -962,6 +962,7 @@ def test_validate_source_config_when_paths_base_and_paths_invalid(source_root: P
     # 検証
     assert sorted(v.path for v in result) == ["documents[0].paths[1]", "paths_base"]
 
+
 def test_load_source_when_paths_base_set(
     git_repo: Callable[..., Path],
     brain_files: dict[str, str],
@@ -988,9 +989,7 @@ def test_load_source_when_paths_base_set(
         pytest.param(
             "sub", "設定ファイルのフォルダかそれより上のフォルダを指してください: sub", id="below"
         ),
-        pytest.param(
-            "../../../..", "リポジトリの外を指しています: ../../../..", id="outside_repo"
-        ),
+        pytest.param("../../../..", "リポジトリの外を指しています: ../../../..", id="outside_repo"),
     ],
 )
 def test_load_source_when_paths_base_invalid(

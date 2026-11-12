@@ -1027,9 +1027,7 @@ def test_store_schema_when_paths_base_set(
     head = run_git(repo, "rev-parse", "HEAD").strip()
     worktree = tmp_path / "wt"
     run_git(repo, "worktree", "add", "-b", "feat/x", str(worktree))
-    documents = [
-        DocumentTable(id="notes", paths=["docs/*.yaml"], schema_path="note.schema.yaml")
-    ]
+    documents = [DocumentTable(id="notes", paths=["docs/*.yaml"], schema_path="note.schema.yaml")]
     source = make_served_source(
         root=repo,
         config_dir=PurePosixPath("content/node-docs/brain"),
