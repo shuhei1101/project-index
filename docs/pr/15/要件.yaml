@@ -14,11 +14,15 @@ docs:
   - page: docs/nonfunctional/NFR-1.yaml
     new: false
     change: 通信（NFR-2）の値を読み取り API と文書の MCP のインターフェース定義で決めて書き、#119 の 3 つの要求の所要時間の値を加える
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T04:50:02.553701+00:00'
   - page: docs/dev-command/CMD-1.yaml
     new: false
     change: 依存の追加の確認の記録と、起動・停止・管理作業のコマンドを書く
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T04:50:02.553701+00:00'
   - page: docs/test-procedure/TP-1.yaml
     new: false
     change: 結合テスト（バック）の実行コマンドと前提を書く。E2E テストの実行コマンドは E2E テスト作成で決めて書く
@@ -242,6 +246,9 @@ scope_out:
     plan: '#11'
   - item: 呼ぶ側のリポジトリ（AI Monitor・knowledge・rule-inject・alias-inject）の、文書の MCP・管理の MCP のツールの完全名の書き換え
     reason: 別のリポジトリの変更。確認ログのとおりリポジトリごとに起票し、shuhei1101/dev-docs#163 のマージと同じ時期に入れる。完全名はこの作業 PR のプラグインが決めるため、この作業 PR がマージされなければ成り立たない
+    plan: to_file
+  - item: dev-docs から移した処理の lint の既存の違反（ruff の `# noqa`・pyright のファイルごとの Unknown 系の warning 指定・complexipy のスナップショット `complexipy-snapshot.json`）を解消してベースラインを外す
+    reason: dev-docs はこのリポジトリより緩い lint の設定で書かれており、移した処理の構造の書き換え（cognitive complexity が上限を超える 41 関数の分割など）は移した後のコードに対して行う変更。この作業 PR は今の dev-docs の振る舞いのまま移し、既存の違反を規約『設計原則』の「既存の Python のリポジトリは warn から始める」に沿ってベースラインに載せ、新しい違反だけを失敗にする
     plan: to_file
 use_cases:
   - kind: composite
