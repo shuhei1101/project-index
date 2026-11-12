@@ -2,454 +2,454 @@ id: MOD-11
 title: 索引のサーバー / 管理の操作 / types.py
 lead: 管理の MCP の `status`・`reload`・`check_project`・`try_convert` の要求と結果の型。
 data_models:
-- name: SyncCounts
-  title: 索引の同期の件数
-  container: project_index/features/admin/types.py
-  usecase: 共通
-  role: DTO
-  summary: 文書のストアの『メタデータのずれ』の 4 つの並びの件数
-  description: '`dataclass(frozen=True)`。`of(report)` で `SyncReport` から作る。'
-  properties:
-  - name: missing_refs
-    title: '`metadata` の列の欠け'
-    type: int
-    description: '`SyncReport.missing_refs` の件数'
-  - name: unindexed_files
-    title: 索引に無いファイル
-    type: int
-    description: '`SyncReport.unindexed_files` の件数'
-  - name: missing_body_files
-    title: ファイルが無い行
-    type: int
-    description: '`SyncReport.missing_body_files` の件数'
-  - name: unresolved_related
-    title: 当たらない関連
-    type: int
-    description: '`SyncReport.unresolved_related` の件数'
-- name: SyncItem
-  title: 同期のずれの内訳
-  container: project_index/features/admin/types.py
-  usecase: 配信元の検査
-  role: DTO
-  summary: ずれ 1 件の種類と値
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: kind
-    title: 種類
-    type: Literal['missing_refs', 'unindexed_files', 'missing_body_files', 'unresolved_related']
-    description: どの並びのずれか
-  - name: path
-    title: パス
-    type: str
-    description: '`SyncReport` の並びの要素の文字列（`{種類}: {パス}` など）'
-- name: SourceState
-  title: 配信元の状態の行
-  container: project_index/features/admin/types.py
-  usecase: 状態の取得
-  role: DTO
-  summary: '`status` と `reload` が返す配信元 1 つの状態'
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: id
-    title: 配信元の ID
-    type: str
-    description: '`SourceStatus.id`'
-  - name: status
-    title: 状態
-    type: SourceStatusKind
-    description: 配信中・検証で外した・無効
-  - name: errors
-    title: 配信しない理由
-    type: list[str]
-    description: '`{キーのパス}: {理由}`。`not_served` のときだけ'
-  - name: config_version
-    title: 配信元の設定のバージョン
-    type: str | None
-    description: 配信中なら `config.version`。それ以外は `None`
-  - name: version_state
-    title: バージョンの新旧
-    type: VersionState | None
-    description: 配信中のときだけ
-  - name: sync
+  - name: SyncCounts
     title: 索引の同期の件数
-    type: SyncCounts | None
-    description: 配信中のときだけ
-- name: TerminalState
-  title: 端末の設定の状態
-  container: project_index/features/admin/types.py
-  usecase: 状態の取得
-  role: DTO
-  summary: 読んだ端末の設定のパスとバージョンの新旧
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: file
-    title: 設定のファイル
-    type: str
-    description: '`TerminalConfig.file`'
-  - name: version_state
-    title: バージョンの新旧
-    type: VersionState
-    description: '`TerminalConfig.version` と `SETTINGS_VERSION` の比較'
-- name: ServerStatus
-  title: サーバーの状態
-  container: project_index/features/admin/types.py
-  usecase: 状態の取得
-  role: DTO
-  summary: '`status` の結果'
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: address
-    title: 待ち受けの URL
-    type: str
-    description: '`http://{bind}:{port}/`'
-  - name: version
-    title: project-index のバージョン
-    type: str
-    description: 配布のメタデータのバージョン
-  - name: pid
-    title: プロセス ID
-    type: int
-    description: '`os.getpid()`'
-  - name: terminal
-    title: 端末の設定
-    type: TerminalState
-    description: 端末の設定の状態
-  - name: sources
-    title: 配信元
-    type: list[SourceState]
-    description: '`sources[]` の順'
-  - name: loading
-    title: 読み込み中
-    type: bool
-    description: 配信元の初回の読み込みが終わっていないとき `True`（その間は `sources` が空）
-- name: NotServedItem
-  title: 配信していない配信元
-  container: project_index/features/admin/types.py
-  usecase: 設定の読み直し
-  role: DTO
-  summary: 検証に失敗した配信元の ID と理由
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: id
-    title: 配信元の ID
-    type: str
-    description: '`SourceStatus.id`'
-  - name: errors
-    title: 理由
-    type: list[str]
-    description: '`{キーのパス}: {理由}`'
-- name: ReloadResult
-  title: 読み直しの結果
-  container: project_index/features/admin/types.py
-  usecase: 設定の読み直し
-  role: DTO
-  summary: '`reload` の結果'
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: added
-    title: 配信を始めた配信元
-    type: list[str]
-    description: 読み直す前に配信していなかった `serving` の ID
-  - name: removed
-    title: 配信をやめた配信元
-    type: list[str]
-    description: 読み直す前に `serving` で、読み直した後に `serving` でない ID
-  - name: not_served
+    container: project_index/features/admin/types.py
+    usecase: 共通
+    role: DTO
+    summary: 文書のストアの『メタデータのずれ』の 4 つの並びの件数
+    description: '`dataclass(frozen=True)`。`of(report)` で `SyncReport` から作る。'
+    properties:
+      - name: missing_refs
+        title: '`metadata` の列の欠け'
+        type: int
+        description: '`SyncReport.missing_refs` の件数'
+      - name: unindexed_files
+        title: 索引に無いファイル
+        type: int
+        description: '`SyncReport.unindexed_files` の件数'
+      - name: missing_body_files
+        title: ファイルが無い行
+        type: int
+        description: '`SyncReport.missing_body_files` の件数'
+      - name: unresolved_related
+        title: 当たらない関連
+        type: int
+        description: '`SyncReport.unresolved_related` の件数'
+  - name: SyncItem
+    title: 同期のずれの内訳
+    container: project_index/features/admin/types.py
+    usecase: 配信元の検査
+    role: DTO
+    summary: ずれ 1 件の種類と値
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: kind
+        title: 種類
+        type: Literal['missing_refs', 'unindexed_files', 'missing_body_files', 'unresolved_related']
+        description: どの並びのずれか
+      - name: path
+        title: パス
+        type: str
+        description: '`SyncReport` の並びの要素の文字列（`{種類}: {パス}` など）'
+  - name: SourceState
+    title: 配信元の状態の行
+    container: project_index/features/admin/types.py
+    usecase: 状態の取得
+    role: DTO
+    summary: '`status` と `reload` が返す配信元 1 つの状態'
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: id
+        title: 配信元の ID
+        type: str
+        description: '`SourceStatus.id`'
+      - name: status
+        title: 状態
+        type: SourceStatusKind
+        description: 配信中・検証で外した・無効
+      - name: errors
+        title: 配信しない理由
+        type: list[str]
+        description: '`{キーのパス}: {理由}`。`not_served` のときだけ'
+      - name: config_version
+        title: 配信元の設定のバージョン
+        type: str | None
+        description: 配信中なら `config.version`。それ以外は `None`
+      - name: version_state
+        title: バージョンの新旧
+        type: VersionState | None
+        description: 配信中のときだけ
+      - name: sync
+        title: 索引の同期の件数
+        type: SyncCounts | None
+        description: 配信中のときだけ
+  - name: TerminalState
+    title: 端末の設定の状態
+    container: project_index/features/admin/types.py
+    usecase: 状態の取得
+    role: DTO
+    summary: 読んだ端末の設定のパスとバージョンの新旧
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: file
+        title: 設定のファイル
+        type: str
+        description: '`TerminalConfig.file`'
+      - name: version_state
+        title: バージョンの新旧
+        type: VersionState
+        description: '`TerminalConfig.version` と `SETTINGS_VERSION` の比較'
+  - name: ServerStatus
+    title: サーバーの状態
+    container: project_index/features/admin/types.py
+    usecase: 状態の取得
+    role: DTO
+    summary: '`status` の結果'
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: address
+        title: 待ち受けの URL
+        type: str
+        description: '`http://{bind}:{port}/`'
+      - name: version
+        title: project-index のバージョン
+        type: str
+        description: 配布のメタデータのバージョン
+      - name: pid
+        title: プロセス ID
+        type: int
+        description: '`os.getpid()`'
+      - name: terminal
+        title: 端末の設定
+        type: TerminalState
+        description: 端末の設定の状態
+      - name: sources
+        title: 配信元
+        type: list[SourceState]
+        description: '`sources[]` の順'
+      - name: loading
+        title: 読み込み中
+        type: bool
+        description: 配信元の初回の読み込みが終わっていないとき `True`（その間は `sources` が空）
+  - name: NotServedItem
     title: 配信していない配信元
-    type: list[NotServedItem]
-    description: 読み直した後の `not_served`
-  - name: sources
-    title: 配信元
-    type: list[SourceState]
-    description: 読み直した後の状態（`status` と同じ作り）
-- name: ScriptErrorItem
-  title: スクリプトの確かめの失敗
-  container: project_index/features/admin/types.py
-  usecase: 配信元の検査
-  role: DTO
-  summary: 実行できないスクリプト 1 つ
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: script
-    title: スクリプト
-    type: str
-    description: '`run` を空白でつないだ文字列'
-  - name: reason
-    title: 理由
-    type: str
-    description: 実行できない理由
-- name: CheckProjectRequest
-  title: 配信元の検査の要求
-  container: project_index/features/admin/types.py
-  usecase: 配信元の検査
-  role: DTO
-  summary: '`check_project` の引数'
-  description: '`pydantic.BaseModel`（`extra="forbid"`）。'
-  properties:
-  - name: path
-    title: 配信元の場所
-    type: str
-    description: 配信元のフォルダか `project-index.yaml` の絶対パス
-  - name: config
-    title: 書く前の設定
-    type: str | None
-    default: None
-    description: '`project-index.yaml` の中身（YAML の文字列）。`None` はファイルを読み込む'
-  - name: format
-    title: 返却する形式
-    type: Literal['markdown', 'json']
-    default: "'markdown'"
-    description: '`markdown` は `render_check` の文、`json` は結果の辞書'
-- name: CheckProjectResult
-  title: 配信元の検査の結果
-  container: project_index/features/admin/types.py
-  usecase: 配信元の検査
-  role: DTO
-  summary: '`check_project` の結果'
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: path
-    title: 配信元のフォルダ
-    type: str
-    description: 検査したフォルダ
-  - name: registered_id
-    title: 登録済みの ID
-    type: str | None
-    description: 端末の設定に同じフォルダの配信元があればその ID
-  - name: config_version
-    title: 設定のバージョン
-    type: str | None
-    description: '`version` の値'
-  - name: version_state
-    title: バージョンの新旧
-    type: VersionState | None
-    description: '`version` が読めたとき'
-  - name: violations
-    title: 違反
-    type: list[Violation]
-    description: 配信元の設定の検証の違反と、エイリアスのキーの違反（`doc` に文書のパス）
-  - name: missing_paths
-    title: 無いパス
-    type: list[str]
-    description: 当たるファイルが 1 つも無い `documents[].paths[]`
-  - name: script_errors
-    title: スクリプトの失敗
-    type: list[ScriptErrorItem]
-    description: スクリプトの確かめの失敗
-  - name: sync
-    title: 索引の同期
-    type: CheckSync | None
-    description: 違反もスクリプトの失敗も無く、文書を読めたとき
-  - name: warnings
-    title: 警告
-    type: list[Violation]
-    access: 公開
-    default: '[]'
-    description: nav の警告
-  - name: alias_schema_version
-    title: エイリアスのスキーマのバージョン
-    type: str
-    access: 公開
-    description: エイリアスのスキーマの取り込み元のタグ
-    default: '""'
-- name: TryConvertRequest
-  title: 試しの変換の要求
-  container: project_index/features/admin/types.py
-  usecase: 試しの変換
-  role: DTO
-  summary: '`try_convert` の引数'
-  description: '`pydantic.BaseModel`（`extra="forbid"`）。'
-  properties:
-  - name: path
-    title: 配信元の場所
-    type: str
-    description: 配信元のフォルダか `project-index.yaml` の絶対パス
-  - name: file
-    title: ファイル
-    type: str
-    description: 配信元からの相対パス
-  - name: config
-    title: 書く前の設定
-    type: str | None
-    default: None
-    description: '`project-index.yaml` の中身（YAML の文字列）。`None` はファイルを読み込む'
-- name: TryConvertResult
-  title: 試しの変換の結果
-  container: project_index/features/admin/types.py
-  usecase: 試しの変換
-  role: DTO
-  summary: '`try_convert` の結果'
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: kind
-    title: 種類
-    type: str
-    description: 当たった `documents[].id`
-  - name: converter
-    title: 使った変換
-    type: str
-    description: '`builtin:markdown` か、変換の `run` の最後の要素（スクリプトのパス）'
-  - name: markdown
-    title: Markdown
-    type: str
-    description: 変換した Markdown。文書が複数なら `\n\n---\n\n` でつなぐ
-- name: CandidateSource
-  title: 検査する配信元
-  container: project_index/features/admin/types.py
-  usecase: 配信元の検査
-  role: DTO
-  summary: 端末の設定によらずパスから読んだ配信元と、読んだときの違反
-  description: '`dataclass(frozen=True)`。`check_project`・`try_convert` が作る。'
-  properties:
-  - name: root
-    title: 配信元のフォルダ
-    type: Path
-    description: '`project-index.yaml` のあるフォルダ'
-  - name: config_version
-    title: 設定のバージョン
-    type: str | None
-    description: '`version` の値'
-  - name: violations
-    title: 違反
-    type: list[Violation]
-    description: 検証の違反
-  - name: script_violations
-    title: スクリプトの違反
-    type: list[Violation]
-    description: 配信元の『スクリプトの確かめ』の違反
-  - name: source
-    title: 配信元
-    type: ServedSource | None
-    description: 検証に通ったときだけ（ID は設定の `name`、`scope_write` は `[root]`）
-- name: CheckSync
-  title: 検査の索引の同期
-  container: project_index/features/admin/types.py
-  usecase: 配信元の検査
-  role: DTO
-  summary: 同期の件数と、先頭 `SYNC_ITEMS_LIMIT` 件までの内訳
-  description: '`dataclass(frozen=True)`。`SyncCounts` を継承する。'
-  inherits: SyncCounts
-  properties:
-  - name: items
-    title: 内訳
-    type: list[SyncItem]
-    description: '`missing_refs`・`unindexed_files`・`missing_body_files`・`unresolved_related` の順に並べ、先頭 `SYNC_ITEMS_LIMIT` 件まで'
-- name: FormatRequest
-  title: 返却する形式の指定
-  container: project_index/features/admin/types.py
-  usecase: 共通
-  role: DTO
-  summary: '`status`・`reload` の引数'
-  description: '`pydantic.BaseModel`（`extra="forbid"`）。'
-  properties:
-  - name: format
-    title: 返却する形式
-    type: Literal['markdown', 'json']
-    default: "'markdown'"
-    description: '`markdown` は `render_status`・`render_reload` の文、`json` は結果の辞書'
-- name: NavOperation
-  title: 画面の構成の操作
-  container: project_index/features/admin/types.py
-  usecase: 画面の構成の書き込み
-  role: DTO
-  summary: '`write_nav` の `operations` の 1 件'
-  description: '`pydantic.BaseModel`（`extra="forbid"`）。'
-  properties:
-  - name: op
-    title: 操作
-    type: Literal['add', 'update', 'remove']
-    access: 公開
-    description: 追加・修正・削除
-  - name: tab
-    title: タブ
-    type: str
-    access: 公開
-    description: 対象のタブの名前（`nav.tabs[].title`）
-  - name: item
-    title: 項目
-    type: str | None
-    access: 公開
-    default: None
-    description: タブの中の `group` の名前。入れ子は ` > ` で区切る。`None` はタブそのもの
-  - name: value
-    title: 中身
-    type: dict[str, Any] | None
-    access: 公開
-    default: None
-    description: タブか項目の中身（`nav` と同じ書式）。`add`・`update` で必須
-- name: WriteNavRequest
-  title: 画面の構成の書き込みの要求
-  container: project_index/features/admin/types.py
-  usecase: 画面の構成の書き込み
-  role: DTO
-  summary: '`write_nav` の引数'
-  description: '`pydantic.BaseModel`（`extra="forbid"`）。'
-  properties:
-  - name: path
-    title: 配信元の場所
-    type: str
-    access: 公開
-    description: 配信元のフォルダか `project-index.yaml` の絶対パス
-  - name: operations
-    title: 操作
-    type: list[NavOperation]
-    access: 公開
-    description: 並べた順に適用する操作（1 件以上）
-  - name: format
-    title: 返却する形式
-    type: Literal['markdown', 'json']
-    access: 公開
-    default: "'markdown'"
-    description: '`markdown` は `render_write_nav` の文、`json` は結果の辞書'
-- name: WriteNavResult
-  title: 画面の構成の書き込みの結果
-  container: project_index/features/admin/types.py
-  usecase: 画面の構成の書き込み
-  role: DTO
-  summary: 書いた `nav` と条件ごとの文書の数・警告
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: path
-    title: 書いたファイル
-    type: str
-    access: 公開
-    description: 書き換えた `project-index.yaml` のパス
-  - name: nav
-    title: 画面の構成
-    type: str
-    access: 公開
-    description: 書いた後の `nav`（YAML のまま）
-  - name: counts
-    title: 文書の数
-    type: list[NavAutoCount]
-    access: 公開
-    description: nav の条件の数えの結果
-  - name: warnings
-    title: 警告
-    type: list[Violation]
-    access: 公開
-    description: '`count` が 0 の `auto` の警告（nav の警告と同じ文）'
+    container: project_index/features/admin/types.py
+    usecase: 設定の読み直し
+    role: DTO
+    summary: 検証に失敗した配信元の ID と理由
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: id
+        title: 配信元の ID
+        type: str
+        description: '`SourceStatus.id`'
+      - name: errors
+        title: 理由
+        type: list[str]
+        description: '`{キーのパス}: {理由}`'
+  - name: ReloadResult
+    title: 読み直しの結果
+    container: project_index/features/admin/types.py
+    usecase: 設定の読み直し
+    role: DTO
+    summary: '`reload` の結果'
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: added
+        title: 配信を始めた配信元
+        type: list[str]
+        description: 読み直す前に配信していなかった `serving` の ID
+      - name: removed
+        title: 配信をやめた配信元
+        type: list[str]
+        description: 読み直す前に `serving` で、読み直した後に `serving` でない ID
+      - name: not_served
+        title: 配信していない配信元
+        type: list[NotServedItem]
+        description: 読み直した後の `not_served`
+      - name: sources
+        title: 配信元
+        type: list[SourceState]
+        description: 読み直した後の状態（`status` と同じ作り）
+  - name: ScriptErrorItem
+    title: スクリプトの確かめの失敗
+    container: project_index/features/admin/types.py
+    usecase: 配信元の検査
+    role: DTO
+    summary: 実行できないスクリプト 1 つ
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: script
+        title: スクリプト
+        type: str
+        description: '`run` を空白でつないだ文字列'
+      - name: reason
+        title: 理由
+        type: str
+        description: 実行できない理由
+  - name: CheckProjectRequest
+    title: 配信元の検査の要求
+    container: project_index/features/admin/types.py
+    usecase: 配信元の検査
+    role: DTO
+    summary: '`check_project` の引数'
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。'
+    properties:
+      - name: path
+        title: 配信元の場所
+        type: str
+        description: 配信元のフォルダか `project-index.yaml` の絶対パス
+      - name: config
+        title: 書く前の設定
+        type: str | None
+        default: None
+        description: '`project-index.yaml` の中身（YAML の文字列）。`None` はファイルを読み込む'
+      - name: format
+        title: 返却する形式
+        type: Literal['markdown', 'json']
+        default: "'markdown'"
+        description: '`markdown` は `render_check` の文、`json` は結果の辞書'
+  - name: CheckProjectResult
+    title: 配信元の検査の結果
+    container: project_index/features/admin/types.py
+    usecase: 配信元の検査
+    role: DTO
+    summary: '`check_project` の結果'
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: path
+        title: 配信元のフォルダ
+        type: str
+        description: 検査したフォルダ
+      - name: registered_id
+        title: 登録済みの ID
+        type: str | None
+        description: 端末の設定に同じフォルダの配信元があればその ID
+      - name: config_version
+        title: 設定のバージョン
+        type: str | None
+        description: '`version` の値'
+      - name: version_state
+        title: バージョンの新旧
+        type: VersionState | None
+        description: '`version` が読めたとき'
+      - name: violations
+        title: 違反
+        type: list[Violation]
+        description: 配信元の設定の検証の違反と、エイリアスのキーの違反（`doc` に文書のパス）
+      - name: missing_paths
+        title: 無いパス
+        type: list[str]
+        description: 当たるファイルが 1 つも無い `documents[].paths[]`
+      - name: script_errors
+        title: スクリプトの失敗
+        type: list[ScriptErrorItem]
+        description: スクリプトの確かめの失敗
+      - name: sync
+        title: 索引の同期
+        type: CheckSync | None
+        description: 違反もスクリプトの失敗も無く、文書を読めたとき
+      - name: warnings
+        title: 警告
+        type: list[Violation]
+        access: 公開
+        default: '[]'
+        description: nav の警告
+      - name: alias_schema_version
+        title: エイリアスのスキーマのバージョン
+        type: str
+        access: 公開
+        description: エイリアスのスキーマの取り込み元のタグ
+        default: '""'
+  - name: TryConvertRequest
+    title: 試しの変換の要求
+    container: project_index/features/admin/types.py
+    usecase: 試しの変換
+    role: DTO
+    summary: '`try_convert` の引数'
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。'
+    properties:
+      - name: path
+        title: 配信元の場所
+        type: str
+        description: 配信元のフォルダか `project-index.yaml` の絶対パス
+      - name: file
+        title: ファイル
+        type: str
+        description: 配信元からの相対パス
+      - name: config
+        title: 書く前の設定
+        type: str | None
+        default: None
+        description: '`project-index.yaml` の中身（YAML の文字列）。`None` はファイルを読み込む'
+  - name: TryConvertResult
+    title: 試しの変換の結果
+    container: project_index/features/admin/types.py
+    usecase: 試しの変換
+    role: DTO
+    summary: '`try_convert` の結果'
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: kind
+        title: 種類
+        type: str
+        description: 当たった `documents[].id`
+      - name: converter
+        title: 使った変換
+        type: str
+        description: '変換の `run` の最後の要素（スクリプトのパス）'
+      - name: markdown
+        title: Markdown
+        type: str
+        description: 変換した Markdown。文書が複数なら `\n\n---\n\n` でつなぐ
+  - name: CandidateSource
+    title: 検査する配信元
+    container: project_index/features/admin/types.py
+    usecase: 配信元の検査
+    role: DTO
+    summary: 端末の設定によらずパスから読んだ配信元と、読んだときの違反
+    description: '`dataclass(frozen=True)`。`check_project`・`try_convert` が作る。'
+    properties:
+      - name: root
+        title: 配信元のフォルダ
+        type: Path
+        description: '`project-index.yaml` のあるフォルダ'
+      - name: config_version
+        title: 設定のバージョン
+        type: str | None
+        description: '`version` の値'
+      - name: violations
+        title: 違反
+        type: list[Violation]
+        description: 検証の違反
+      - name: script_violations
+        title: スクリプトの違反
+        type: list[Violation]
+        description: 配信元の『スクリプトの確かめ』の違反
+      - name: source
+        title: 配信元
+        type: ServedSource | None
+        description: 検証に通ったときだけ（ID は設定の `name`、`scope_write` は `[root]`）
+  - name: CheckSync
+    title: 検査の索引の同期
+    container: project_index/features/admin/types.py
+    usecase: 配信元の検査
+    role: DTO
+    summary: 同期の件数と、先頭 `SYNC_ITEMS_LIMIT` 件までの内訳
+    description: '`dataclass(frozen=True)`。`SyncCounts` を継承する。'
+    inherits: SyncCounts
+    properties:
+      - name: items
+        title: 内訳
+        type: list[SyncItem]
+        description: '`missing_refs`・`unindexed_files`・`missing_body_files`・`unresolved_related` の順に並べ、先頭 `SYNC_ITEMS_LIMIT` 件まで'
+  - name: FormatRequest
+    title: 返却する形式の指定
+    container: project_index/features/admin/types.py
+    usecase: 共通
+    role: DTO
+    summary: '`status`・`reload` の引数'
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。'
+    properties:
+      - name: format
+        title: 返却する形式
+        type: Literal['markdown', 'json']
+        default: "'markdown'"
+        description: '`markdown` は `render_status`・`render_reload` の文、`json` は結果の辞書'
+  - name: NavOperation
+    title: 画面の構成の操作
+    container: project_index/features/admin/types.py
+    usecase: 画面の構成の書き込み
+    role: DTO
+    summary: '`write_nav` の `operations` の 1 件'
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。'
+    properties:
+      - name: op
+        title: 操作
+        type: Literal['add', 'update', 'remove']
+        access: 公開
+        description: 追加・修正・削除
+      - name: tab
+        title: タブ
+        type: str
+        access: 公開
+        description: 対象のタブの名前（`nav.tabs[].title`）
+      - name: item
+        title: 項目
+        type: str | None
+        access: 公開
+        default: None
+        description: タブの中の `group` の名前。入れ子は ` > ` で区切る。`None` はタブそのもの
+      - name: value
+        title: 中身
+        type: dict[str, Any] | None
+        access: 公開
+        default: None
+        description: タブか項目の中身（`nav` と同じ書式）。`add`・`update` で必須
+  - name: WriteNavRequest
+    title: 画面の構成の書き込みの要求
+    container: project_index/features/admin/types.py
+    usecase: 画面の構成の書き込み
+    role: DTO
+    summary: '`write_nav` の引数'
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。'
+    properties:
+      - name: path
+        title: 配信元の場所
+        type: str
+        access: 公開
+        description: 配信元のフォルダか `project-index.yaml` の絶対パス
+      - name: operations
+        title: 操作
+        type: list[NavOperation]
+        access: 公開
+        description: 並べた順に適用する操作（1 件以上）
+      - name: format
+        title: 返却する形式
+        type: Literal['markdown', 'json']
+        access: 公開
+        default: "'markdown'"
+        description: '`markdown` は `render_write_nav` の文、`json` は結果の辞書'
+  - name: WriteNavResult
+    title: 画面の構成の書き込みの結果
+    container: project_index/features/admin/types.py
+    usecase: 画面の構成の書き込み
+    role: DTO
+    summary: 書いた `nav` と条件ごとの文書の数・警告
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: path
+        title: 書いたファイル
+        type: str
+        access: 公開
+        description: 書き換えた `project-index.yaml` のパス
+      - name: nav
+        title: 画面の構成
+        type: str
+        access: 公開
+        description: 書いた後の `nav`（YAML のまま）
+      - name: counts
+        title: 文書の数
+        type: list[NavAutoCount]
+        access: 公開
+        description: nav の条件の数えの結果
+      - name: warnings
+        title: 警告
+        type: list[Violation]
+        access: 公開
+        description: '`count` が 0 の `auto` の警告（nav の警告と同じ文）'
 enums:
-- name: VersionState
-  title: 設定のバージョンの新旧
-  container: project_index/features/admin/types.py
-  usecase: 共通
-  summary: 設定の `version` と project-index が読めるバージョンの比較
-  description: '`Literal` の型エイリアス。'
-  values:
-  - value: current
-    title: 同じ
-    description: project-index が読めるバージョンと同じ
-  - value: old
-    title: 古い
-    description: 移し替えで上げられる
-  - value: newer
-    title: 新しい
-    description: project-index の更新が要る
+  - name: VersionState
+    title: 設定のバージョンの新旧
+    container: project_index/features/admin/types.py
+    usecase: 共通
+    summary: 設定の `version` と project-index が読めるバージョンの比較
+    description: '`Literal` の型エイリアス。'
+    values:
+      - value: current
+        title: 同じ
+        description: project-index が読めるバージョンと同じ
+      - value: old
+        title: 古い
+        description: 移し替えで上げられる
+      - value: newer
+        title: 新しい
+        description: project-index の更新が要る
 constants:
-- name: SYNC_ITEMS_LIMIT
-  title: 同期の内訳の上限
-  container: project_index/features/admin/types.py
-  usecase: 配信元の検査
-  summary: '`check_project` が返す同期のずれの内訳の件数'
-  value: '50'
+  - name: SYNC_ITEMS_LIMIT
+    title: 同期の内訳の上限
+    container: project_index/features/admin/types.py
+    usecase: 配信元の検査
+    summary: '`check_project` が返す同期のずれの内訳の件数'
+    value: '50'
