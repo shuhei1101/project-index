@@ -51,6 +51,7 @@ requirements:
     unit: 件
     overflow: 100 を超えた値は 100 に丸め、`notes` で知らせる。黙って切り捨てない
     rationale: エージェントの文脈に載せる量を抑えるため。`search_docs`・`list_changes` の `limit` の上限で、既定は 20。dev-docs の値をそのまま移す
+    status: planned
   - id: NFR-6
     name: 結果全体の文字数の上限
     english_name: result_max_chars
@@ -61,6 +62,7 @@ requirements:
     unit: 文字
     overflow: 上限を超える手前で打ち切り、`truncated` と、続きを取る `next_cursor` を返す
     rationale: エージェントの文脈に載せる量を抑えるため。`search_docs`・`list_changes` の `max_chars` の上限で、既定は 20,000。dev-docs の値をそのまま移す
+    status: planned
   - id: NFR-7
     name: 1 回の操作の件数の上限
     english_name: operations_max
@@ -71,6 +73,7 @@ requirements:
     unit: 件
     overflow: 50 件を超える要求は `InvalidArgumentError` で断り、何も書かない
     rationale: 1 回の書き込み・削除で配信元の排他を握る時間と、検査の実行の時間を抑えるため。`write_docs` の `operations`・`delete_docs` の `targets` の件数の上限。dev-docs の値をそのまま移す
+    status: planned
   - id: NFR-8
     name: 起動から接続を受け付けるまでの時間
     english_name: listen_start_time
