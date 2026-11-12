@@ -1,0 +1,27 @@
+$ uv run pytest tests/unit/ -q -p no:cacheprovider
+make_registry = <function make_registry.<locals>._make at 0x7dd08dd7cca0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7dd08daa3920>
+
+    def test_resolve_write_target_when_worktree_config_invalid(
+        sample: ServedSource, make_registry: Callable[..., Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """ワークツリーの設定が検証に通らない（異常系）。"""
+        # 準備
+        registry = make_registry(sample)
+        error = ValidationFailedError(message="sample: project-index.yaml: required")
+    
+        def fake_load_source_at(source: ServedSource, root: Path) -> ServedSource:
+            raise error
+    
+        monkeypatch.setattr(service_module, "load_source_at", fake_load_source_at, raising=False)
+        # 実行・検証
+>       with pytest.raises(ValidationFailedError) as exc_info:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValidationFailedError
+
+tests/unit/project_index/features/access/test_service.py:608: Failed
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/access/test_service.py::test_resolve_write_target_when_worktree_config
+FAILED tests/unit/project_index/features/access/test_service.py::test_resolve_write_target_when_worktree_config_invalid
+2 failed, 834 passed in 170.72s (0:02:50)
+

@@ -291,6 +291,7 @@ request:
     location: argument
     description: 消すワークツリーのパス
     constraints: 配信元の設定の `worktrees` に当たるパスだけ
+    notes: 種類・置き場所は、そのワークツリーの `project-index.yaml` で読み直した配信元の設定で参照する
   - name: targets
     type: 'list[{id: str, expected_version: str}]'
     required: true
