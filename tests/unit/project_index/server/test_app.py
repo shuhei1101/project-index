@@ -7,11 +7,13 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
+
 from project_index.server import app as app_module
 from project_index.server.app import build_app, route_operation_id
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
     from starlette.types import Message, Receive, Scope, Send
 
@@ -57,17 +59,21 @@ def _pass_through(scope: Scope) -> list[Scope]:
     return received
 
 
-def _handlers(make_mcp_handlers: Callable[..., Any], make_registry: Callable[..., Any]) -> Any:
-    """配信元が空の配線済みの関数を作る。"""
-    return make_mcp_handlers(registry=make_registry())
-
-
 def test_build_app(
-    make_mcp_handlers: Callable[..., Any], make_registry: Callable[..., Any]
+    tmp_path: Path,
+    make_mcp_handlers: Callable[..., Any],
+    make_registry: Callable[..., Any],
+    make_terminal_config: Callable[..., Any],
 ) -> None:
     """入口を全て持つ（正常系）。"""
-    # 準備
-    app = build_app(_handlers(make_mcp_handlers, make_registry))
+    # 準備（配信元が空の端末の設定を置く）
+    settings_file = tmp_path / "settings.yaml"
+    settings_file.write_text('version: "1"\nclone: /tmp/clone\nsources: []\n', encoding="utf-8")
+    app = build_app(
+        make_mcp_handlers(
+            registry=make_registry(), terminal=make_terminal_config(file=settings_file)
+        )
+    )
     client = TestClient(app)
     # 実行
     sources = client.get("/sources")
@@ -76,7 +82,10 @@ def test_build_app(
     mounted = [getattr(route, "path", "") for route in app.routes]
     assert sources.status_code == 200
     assert settings.status_code == 200
-    assert "/sources/{source}/docs/{path:path}" in mounted
+    # include したルーターは app.routes に展開されないため、要求でルートの有無を確かめる
+    document = client.get("/sources/unknown/docs/a.yaml")
+    assert document.status_code == 404
+    assert document.json()["missing"] == "source"
     assert "/openapi.json" not in mounted
     assert "/mcp" in mounted
     assert "/_admin/mcp" in mounted

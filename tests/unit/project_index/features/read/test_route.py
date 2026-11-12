@@ -5,11 +5,13 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
 from project_index.features.read.route import build_read_router
 from project_index.server.error_handlers import register_error_handlers
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
     from types import SimpleNamespace
 
 
@@ -65,11 +67,16 @@ def test_build_read_router(make_view_env: Callable[..., SimpleNamespace]) -> Non
     ],
 )
 def test_build_read_router_when_not_found(
-    make_view_env: Callable[..., SimpleNamespace], path: str, missing: str
+    make_view_env: Callable[..., SimpleNamespace],
+    git_repo: Callable[..., Path],
+    path: str,
+    missing: str,
 ) -> None:
     """無い配信元・リビジョン・文書を 404 にする（異常系）。"""
-    # 準備
-    client = _client(make_view_env().handlers)
+    # 準備（リビジョンを解決できる git の配信元）
+    root = git_repo({"docs/a.yaml": "id: a\nname: A\n"}, name="sample")
+    env = make_view_env(root=root, is_git=True, repo_root=root)
+    client = _client(env.handlers)
     # 実行
     response = client.get(path)
     # 検証

@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
+
 from project_index.features.read.paths import read_target
 from project_index.features.read.service import (
     get_decision,
@@ -92,10 +93,14 @@ def test_get_document(
     make_view_env: Callable[..., SimpleNamespace], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """値とスキーマを返し、変換しない（正常系）。"""
-    # 準備
-    env = make_view_env(NOTES_FILES, tables=NOTES_TABLES)
+    # 準備（起動時に読んだ種類のスキーマを持つ配信元）
+    env = make_view_env(NOTES_FILES, tables=NOTES_TABLES, schemas={"rules": {"type": "object"}})
     calls: list[object] = []
-    monkeypatch.setattr(env.handlers.converter, "convert", lambda *args: calls.append(args))
+
+    def record(*args: object) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr(env.handlers.converter, "convert", record)
     # 実行
     response = get_document(
         _target(env), "docs/a.yaml", store=env.handlers.store, converter=env.handlers.converter
@@ -127,11 +132,11 @@ def test_get_document_when_converter(
     """converters[] を指す種類はスクリプトの Markdown を返す（正常系）。"""
     # 準備
     env = make_view_env(converters=[ScriptEntry(id="c", run=["python3", "scripts/c.py"])])
-    monkeypatch.setattr(
-        env.handlers.converter,
-        "convert",
-        lambda target, document: SimpleNamespace(markdown="# 変換した\n", failure=None),
-    )
+
+    def fake_convert(target: object, document: object) -> SimpleNamespace:
+        return SimpleNamespace(markdown="# 変換した\n", failure=None)
+
+    monkeypatch.setattr(env.handlers.converter, "convert", fake_convert)
     # 実行
     response = get_document(
         _target(env), "docs/a.yaml", store=env.handlers.store, converter=env.handlers.converter
