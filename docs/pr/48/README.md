@@ -1,8 +1,8 @@
-# describe の単体テストの fixture の request.node に型を付け、pyright の reportUnknownMemberType を解消する
+# describe の単体テストの fixture で型の付いた request.keywords からテスト名を判定し、pyright の reportUnknownMemberType を解消する
 
 ## 概要
 
-describe の単体テストの fixture `no_warnings` が参照する `request.node.name` の型の違反を解消し、develop で `pyright` を違反 0 件で合格させる。
+describe の単体テストの fixture `no_warnings` の `request.node.name` の型の違反を、型の付いた `request.keywords` での判定に修正して解消し、develop で `pyright` を違反 0 件で合格させる。
 
 ## 背景
 
