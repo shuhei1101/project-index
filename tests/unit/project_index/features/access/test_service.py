@@ -26,6 +26,7 @@ from project_index.shared.errors import (
     SourceNotReadableError,
     SourceNotWritableError,
     TargetIsCloneError,
+    ValidationFailedError,
     WorktreeNotMatchedError,
 )
 
@@ -396,10 +397,17 @@ def test_resolve_read_targets_when_ref_on_folder(
     assert [v.path for v in exc_info.value.violations] == ["ref"]
 
 
-def test_resolve_write_target(sample: ServedSource, make_registry: Callable[..., Any]) -> None:
+def test_resolve_write_target(
+    sample: ServedSource, make_registry: Callable[..., Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """ワークツリーへ書く（正常系）。"""
     # 準備
     registry = make_registry(sample)
+
+    def keep_source(source: ServedSource, _root: Path) -> ServedSource:
+        return source
+
+    monkeypatch.setattr(service_module, "load_source_at", keep_source)
     # 実行
     result = resolve_write_target(registry=registry, cwd="/r/.claude/worktrees/x/docs")
     # 検証
@@ -538,3 +546,69 @@ def test_resolve_read_targets_when_not_readable_guides_outside(
     with pytest.raises(SourceNotReadableError, match="other はこの作業場所") as exc_info:
         resolve_read_targets(registry=registry, source="other", cwd="/r")
     assert len([step for step in exc_info.value.next_steps if "outside_scope: true" in step]) == 1
+
+
+def test_resolve_write_target_when_worktree_config(
+    sample: ServedSource,
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ワークツリーの設定で読み直した配信元を使う（正常系）。"""
+    # 準備
+    registry = make_registry(sample)
+    reloaded = make_served_source(id="sample", root=Path("/r/.claude/worktrees/x"))
+    calls: list[tuple[ServedSource, Path]] = []
+
+    def fake_load_source_at(source: ServedSource, root: Path) -> ServedSource:
+        calls.append((source, root))
+        return reloaded
+
+    monkeypatch.setattr(service_module, "load_source_at", fake_load_source_at)
+    # 実行
+    result = resolve_write_target(
+        registry=registry, worktree="/r/.claude/worktrees/x", cwd="/r/.claude/worktrees/x"
+    )
+    # 検証
+    assert result.source is reloaded
+    assert calls == [(sample, Path("/r/.claude/worktrees/x"))]
+
+
+def test_resolve_write_target_when_folder_not_reloaded(
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Git の管理外は読み直さない（正常系）。"""
+    # 準備
+    notes = make_served_source(id="notes", root=Path("/n"), is_git=False, scope_write=["/c"])
+    registry = make_registry(notes)
+
+    def fail_load_source_at(source: ServedSource, root: Path) -> ServedSource:
+        pytest.fail(f"load_source_at が呼ばれた: {source.id} {root}")
+
+    monkeypatch.setattr(service_module, "load_source_at", fail_load_source_at)
+    # 実行
+    result = resolve_write_target(registry=registry, source="notes", cwd="/c")
+    # 検証
+    assert result.source is notes
+
+
+def test_resolve_write_target_when_worktree_config_invalid(
+    sample: ServedSource, make_registry: Callable[..., Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ワークツリーの設定が検証に通らない（異常系）。"""
+    # 準備
+    registry = make_registry(sample)
+    error = ValidationFailedError(message="sample: project-index.yaml: required")
+
+    def fake_load_source_at(source: ServedSource, root: Path) -> ServedSource:
+        raise error
+
+    monkeypatch.setattr(service_module, "load_source_at", fake_load_source_at)
+    # 実行・検証
+    with pytest.raises(ValidationFailedError) as exc_info:
+        resolve_write_target(
+            registry=registry, worktree="/r/.claude/worktrees/x", cwd="/r/.claude/worktrees/x"
+        )
+    assert exc_info.value is error

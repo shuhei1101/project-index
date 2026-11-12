@@ -1,0 +1,25 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: none
+    detail: エージェントが文書を調べる流れは変わらない。フックが作業場所とセッションを入れる結果も変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: none
+    detail: エージェントが文書を書き込む流れは変わらない。フックが作業場所とセッションを入れる結果も変わらない
+    depends_on: []
+docs:
+  - page: docs/guide/コアコンセプト-プラグイン.md
+    new: false
+    change: '`## 作業場所の受け渡し` の「フックは許可の判定を返さず、利用者の許可の設定を変えません」を、フックが許可（`allow`）を返し、設定の deny・ask のルールは引き続き効く内容へ直す'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T19:46:36.563496+00:00'
+scope_out:
+  - item: SessionStart のフック（`session_start.py`）の出力
+    reason: permissionDecision は PreToolUse の出力の決まりで、SessionStart のフックは許可の判定を返さない
+    plan: none
+  - item: 管理の MCP（`project-index-admin`）のツールへのフックの適用
+    reason: IF-20 の制約で管理の MCP には当てないと決まっており、要望に含まれない
+    plan: none

@@ -33,6 +33,16 @@ data_models:
         type: str
         access: 公開
         description: '文書の取得の `path` に渡す形'
+      - name: id
+        title: 文書の ID
+        type: str
+        access: 公開
+        description: '文書の取得の `id` に渡す値'
+      - name: file_path
+        title: 文書のファイルのパス
+        type: str
+        access: 公開
+        description: '文書の一覧の `documents[].path` と同じ形。`id` と組で文書の取得の `path` に渡す'
       - name: name
         title: 名前
         type: str
@@ -211,6 +221,16 @@ data_models:
         type: GitHubTarget | None
         access: 公開
         description: GitHub のリポジトリと起票のラベル
+      - name: diff
+        title: diff
+        type: dict[str, list[str]]
+        access: 公開
+        description: '`ignore_keys` を持つ（配信元の設定の `diff`。中のキー名は camelCase にしない）'
+      - name: schemas
+        title: 種類のスキーマ
+        type: dict[str, dict] | None
+        access: 公開
+        description: '`documents[].id` ごとの文書に当てるスキーマ（`row_schema`）。`schemas` を求めたときだけ入れ、それ以外は `None`'
   - name: DocumentListItem
     title: 文書の一覧の要素
     container: project_index/features/read/types.py
@@ -258,6 +278,24 @@ data_models:
         type: str | None
         access: 公開
         description: 管理用の YAML の行の文書だけ
+  - name: DocumentListEntry
+    title: 文書の一覧の値つきの要素
+    container: project_index/features/read/types.py
+    usecase: 読み取り API
+    role: DTO
+    summary: 文書の一覧（IF-24）の 1 件。文書の一覧の要素にバージョンと値を加える
+    description: '文書の一覧の要素（`DocumentListItem`）を継承する。文書の取得の `metadata` は `DocumentListItem` のままにし、バージョンと値を持たせない。'
+    properties:
+      - name: version
+        title: バージョン
+        type: str
+        access: 公開
+        description: 文書のストアが付けた文書の `version`
+      - name: value
+        title: 値
+        type: dict | None
+        access: 公開
+        description: 文書の値。値を求めたときだけ入れ、それ以外は `None`
   - name: DocumentListResponse
     title: 文書の一覧の応答
     container: project_index/features/read/types.py
@@ -272,7 +310,7 @@ data_models:
         description: 解決したリビジョンの名前
       - name: documents
         title: 文書
-        type: list[DocumentListItem]
+        type: list[DocumentListEntry]
         access: 公開
         description: 文書の並び
   - name: DocumentValueResponse

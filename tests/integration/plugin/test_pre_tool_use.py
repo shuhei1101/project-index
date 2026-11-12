@@ -29,7 +29,8 @@ def test_normal(run_hook: Callable[..., Any]) -> None:
         "session_id": "s1",
         "agent_id": "a1",
     }
-    assert "permissionDecision" not in specific
+    assert specific["permissionDecision"] == "allow"
+    assert specific["permissionDecisionReason"] == "文書の MCP の入力に作業場所とセッションを入れた"
 
 
 def test_normal_when_input_unparsable(run_hook: Callable[..., Any]) -> None:

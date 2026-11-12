@@ -70,8 +70,31 @@ def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]
         "tags": ["a"],
         "visibility": None,
         "bodyPath": None,
+        "version": first["version"],
+        "value": None,
     }
+    assert isinstance(first["version"], str)
+    assert first["version"]
     assert body["documents"][2]["bodyPath"] == "notes/guide.md"
+
+
+def test_normal_when_values_requested(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """`values` を指したときだけ、各文書の値を返す（正常系）。"""
+    # 準備
+    env = make_server(make_source("sample", main_files(), branch="main"))
+    # 実行
+    response = env.client.get("/sources/sample/docs", params={"values": "true"})
+    first = env.client.get("/sources/sample/docs/design/D-1.yaml")
+    row = env.client.get("/sources/sample/docs/notes/guide.md")
+    # 検証
+    documents = response.json()["documents"]
+    assert response.status_code == 200
+    assert documents[0]["value"] == first.json()["value"]
+    assert documents[0]["value"]["title"] == "最初"
+    assert documents[2]["value"] == row.json()["value"]
+    assert documents[2]["value"] == {"path": "guide.md", "name": "手引き"}
 
 
 def test_normal_when_ref_given(
@@ -84,15 +107,26 @@ def test_normal_when_ref_given(
     # 準備
     source = make_source("sample", main_files(), branch="main")
     parent = run_git(source.folder, "rev-parse", "HEAD").strip()
-    commit_all(source.folder, {"design/D-3.yaml": "id: D-3\nname: 設計 3\n"}, "docs: 追加")
+    commit_all(
+        source.folder,
+        {
+            "design/D-3.yaml": "id: D-3\nname: 設計 3\n",
+            "design/D-1.yaml": "id: D-1\nname: 設計 1\ndescription: 1 件目\ntags: [a]\ntitle: 変えた\n",
+        },
+        "docs: 追加",
+    )
     env = make_server(source)
     # 実行
     response = env.client.get("/sources/sample/docs", params={"ref": parent})
+    latest = env.client.get("/sources/sample/docs")
     # 検証
-    paths = [row["path"] for row in response.json()["documents"]]
+    old = {row["path"]: row["version"] for row in response.json()["documents"]}
+    new = {row["path"]: row["version"] for row in latest.json()["documents"]}
     assert response.status_code == 200
-    assert "design/D-3.yaml" not in paths
-    assert "design/D-1.yaml" in paths
+    assert "design/D-3.yaml" not in old
+    assert "design/D-1.yaml" in old
+    assert old["design/D-2.yaml"] == new["design/D-2.yaml"]
+    assert old["design/D-1.yaml"] != new["design/D-1.yaml"]
 
 
 def test_error_when_not_found(

@@ -74,13 +74,21 @@ functions:
         required: true
         passing: positional
         description: 探すパス
+      - name: doc_id
+        title: 文書の ID
+        type: str | None
+        required: false
+        default: None
+        passing: keyword
+        description: 文書の取得の `id`。指すと、`path` か `body_path` が `page` と同じ文書の中から文書の ID で選ぶ
     returns:
       type: Document | None
       description: 無ければ `None`
     process: |-
-      1. 文書のページのパスが `page` と同じ文書を返す
-      2. 無ければ、`path` か `body_path` が `page` と同じ最初の文書を返す（`try_convert` と同じ引き方）
-      3. どちらにも無ければ `None` を返す
+      1. `doc_id` を指した場合、`path` か `body_path` が `page` と同じで、文書の ID が `doc_id` と同じ最初の文書を返し、無ければ `None` を返す（以降の手順は実行しない）
+      2. 文書のページのパスが `page` と同じ文書を返す
+      3. 無ければ、`path` か `body_path` が `page` と同じ最初の文書を返す（`try_convert` と同じ引き方）
+      4. どちらにも無ければ `None` を返す
     unit_tests:
       - name: test_find_page
         case: 正常
@@ -100,6 +108,18 @@ functions:
         condition: '`page` が `no/such`'
         mock: なし
         expected: '`None`'
+      - name: test_find_page_when_doc_id
+        case: 正常
+        summary: 文書の ID で行の文書を選ぶ
+        condition: '`path` が `terms.yaml` で `body_path` の無い行の文書 `term-1`・`term-2` と、`page` が `terms.yaml`・`doc_id` が `term-2`'
+        mock: なし
+        expected: '`term-2` の文書。`doc_id` を省くと `term-1`'
+      - name: test_find_page_when_doc_id_missing
+        case: 正常
+        summary: 文書の ID が一致しない
+        condition: '`page` が `terms.yaml`・`doc_id` が `no-such`、`page` が `terms/term-2`（文書のページのパス）・`doc_id` が `term-2`'
+        mock: なし
+        expected: どちらも `None`
   - name: read_target
     title: 読み取りの場所
     kind: 関数

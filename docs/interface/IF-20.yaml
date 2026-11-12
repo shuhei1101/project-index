@@ -5,7 +5,7 @@ entry:
   value: Claude Code の PreToolUse（matcher `mcp__plugin_project-index_project-index__.*`）
 flows:
   - name: 正常系
-    summary: '`tool_input` に作業場所とセッションを入れて `updatedInput` で返す'
+    summary: '`tool_input` に作業場所とセッションを入れて `updatedInput` で返し、`permissionDecision` で許可する'
     setup:
       - name: Mock
         description: なし（フックを子プロセスとして実行する）
@@ -20,14 +20,14 @@ flows:
         participant H as ツール実行前のフック
 
         C->>H: stdin（tool_input・session_id・cwd・agent_id）
-        H-->>C: updatedInput（終了コード 0）
+        H-->>C: permissionDecision allow・updatedInput（終了コード 0）
       ```
 
       <!-- /map -->
     expected:
       - '`updatedInput` の `cwd`・`session_id`・`agent_id` がフックの入力の値'
       - 元の `tool_input` の他のキーが変わらない
-      - 出力に `permissionDecision` が無い
+      - 出力の `permissionDecision` が `allow` で、`permissionDecisionReason` を持つ
     test: test_normal
   - name: 正常系（入力が読めない）
     summary: stdin が JSON として読めなければ何も出さず終了コード 0 で戻る
@@ -96,6 +96,12 @@ response:
   - name: hookSpecificOutput.hookEventName
     type: Literal['PreToolUse']
     description: 常に `PreToolUse`
+  - name: hookSpecificOutput.permissionDecision
+    type: Literal['allow']
+    description: 常に `allow`
+  - name: hookSpecificOutput.permissionDecisionReason
+    type: str
+    description: 常に `文書の MCP の入力に作業場所とセッションを入れた`
   - name: hookSpecificOutput.updatedInput
     type: dict
     description: '`tool_input` に `cwd`・`session_id`・`agent_id`（あれば）を上書きで入れたもの'
@@ -104,7 +110,7 @@ response:
     description: 常に 0
 response_example: |-
   ```json
-  {"hookSpecificOutput": {"hookEventName": "PreToolUse", "updatedInput": {"query": "起動", "cwd": "/home/u/repo/sample/.claude/worktrees/x", "session_id": "8f1c..."}}}
+  {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow", "permissionDecisionReason": "文書の MCP の入力に作業場所とセッションを入れた", "updatedInput": {"query": "起動", "cwd": "/home/u/repo/sample/.claude/worktrees/x", "session_id": "8f1c..."}}}
   ```
 exceptions:
   - name: なし（正常終了）
@@ -121,8 +127,8 @@ constraints:
     constraint: エージェントが入れた `cwd`・`session_id`・`agent_id` はフックの値で上書きする
     notes: 作業場所を偽って `scope` の外を書き換えさせないため
   - item: 許可の判定
-    constraint: '`permissionDecision` を返さず、利用者の許可の設定を変えない'
-    notes: 'Claude Code 2.1.312 で、`permissionDecision` を返さず `updatedInput` だけを返すと入力が書き換わり、deny のルールもフックの後に効くことを確かめた'
+    constraint: '`permissionDecision` に `allow` を返す。設定の deny・ask のルールは、フックの返却によらず評価される'
+    notes: 'auto モードでは、`permissionDecision` なしで `updatedInput` を返すと書き換えた呼び出しが拒否されうる（https://code.claude.com/docs/en/hooks）。当てるツールが文書の MCP のツールだけなので、`allow` で省く確認もそのツールに限られる'
   - item: タイムアウト
     constraint: '`hooks.json` の `timeout` は 5 秒'
     notes: 外への通信が無く Python の起動だけで終わるため
