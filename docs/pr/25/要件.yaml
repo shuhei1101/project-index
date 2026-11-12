@@ -69,4 +69,7 @@ scope_out:
   - item: '`prompt_doc/types.py` の `InvalidPrompt` の `# noqa: N818` と、セッション開始のフックの最上位の `except Exception` の `# noqa: BLE001`'
     reason: '`InvalidPrompt` はインターフェース定義『プロンプトの文書の変換』が持つ名前で、改名すると入出力が変わる。フックはどの失敗でも終了コード 0 で戻ることを設計書が決めている。理由のコメントを付けて残す'
     plan: none
+  - item: '`prompt_doc/render.py` の部品の描画の `except Exception` の `# noqa: BLE001`'
+    reason: 利用者のテンプレートをサンドボックスで動かさないため送出される例外を絞れず、どの例外も組の注意書きにして他の組の描画を続けることを設計書『プロンプトの文書の変換 / render.py』が決めている。理由のコメントを付けて残す
+    plan: none
 docs: []

@@ -72,15 +72,6 @@ class TracedFloat(float):
 
 
 TRACED_TYPES = (TracedStr, TracedInt, TracedFloat)
-# 部品の描画で、テンプレートの誤りと値の操作（属性・キー・位置・型・計算）が送る例外
-RENDER_ERRORS = (
-    jinja2.TemplateError,
-    AttributeError,
-    LookupError,
-    TypeError,
-    ValueError,
-    ArithmeticError,
-)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -333,8 +324,8 @@ def render_example(
             rendered.append((part.role, template.render(**traced)))
         except jinja2.UndefinedError as error:
             return _failed([f"未定義の変数: {error.message}"])
-        # 描画中のテンプレートと値の操作の例外は、組の注意書きにして他の組の描画を続ける
-        except RENDER_ERRORS as error:
+        # 描画中のどの例外も、組の注意書きにして他の組の描画を続ける（利用者のテンプレートはサンドボックスで動かさず、送る例外を絞れない）
+        except Exception as error:  # noqa: BLE001
             return _failed([f"部品 `{part.id}` を描画できません: {type(error).__name__}: {error}"])
     messages = _messages(doc, rendered)
     return RenderedExample(
