@@ -136,7 +136,7 @@ functions:
     description: '`write`・`read`、どちらにも当たらなければ `None`'
   process: |-
     1. `cwd` が `None` の場合、`None` を返す
-    2. `cwd` が配信元のワークツリーの中なら（ワークツリーの解決）、照らすパスを `root` に置き換える
+    2. `cwd` が配信元のワークツリーの中なら（ワークツリーの解決）、照らすパスを `config_root`（設定ファイルのフォルダ）に置き換える
     3. `scope_write` のどれかに当たれば `write`、`scope_read` のどれかに当たれば `read`、どちらにも当たらなければ `None` を返す（globの照合）
   unit_tests:
   - name: test_access_of_when_write
@@ -190,7 +190,7 @@ functions:
     description: 作業中の配信元と、`cwd` が入っているワークツリー。無ければ `None`
   process: |-
     1. `cwd` が `None` なら `None` を返す
-    2. 配信元ごとに、`cwd` がワークツリーの中ならそのワークツリーの `base`（読み書きの場所の `base` と同じつなぎ方）を、そうでなければ `root` を候補にし、候補が `cwd` 自身かその親なら配信元を拾う
+    2. 配信元ごとに、`cwd` がワークツリーの中ならそのワークツリーの中の設定ファイルのフォルダ（読み書きの場所の `base` と同じつなぎ方に `config_dir` をつなぐ）を、そうでなければ `config_root`（設定ファイルのフォルダ）を候補にし、候補が `cwd` 自身かその親なら配信元を拾う
     3. 拾った配信元のうち候補のパスが一番深い（部品の数が多い）ものを返す。同じ深さは `sources` の先のもの
   unit_tests:
   - name: test_current_source
@@ -211,6 +211,12 @@ functions:
     condition: '`cwd` が `/other`'
     mock: なし
     expected: '`None`'
+  - name: test_current_source_when_paths_base_set
+    case: 正常
+    summary: 基準のフォルダが上でも設定ファイルのフォルダで判定する
+    condition: 配信元 brain（`root` が repo の直下、`config_dir` が `content/node-docs/brain`）と配信元 repo（`root` が repo の直下）、`cwd` が repo の直下
+    mock: なし
+    expected: repo を返す（brain の候補は `content/node-docs/brain` で、`cwd` の親でない）
 - name: available_sources
   title: 使える配信元
   kind: 関数

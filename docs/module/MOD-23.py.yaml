@@ -45,7 +45,7 @@ functions:
   process: |-
     1. 使える配信元ごとに最後の検査の結果を読み（配信元の検査の控え.結果の取得。`None` の配信元は同期のずれ・エイリアス・nav を飛ばす）、件数が 0 でない並びごとに `{id}: {並びの名前}が {件数} 件あります（check_project で確認できます）` を加える
     2. 使える配信元の設定のバージョンが `old` なら `{id}: 設定のバージョンが古い（{設定}・読み込める {現在}）。project-index migrate で移し替えます` を加える（バージョンの新旧）
-    3. 端末の設定のバージョンが `old` なら同じ形の文を加える（使える配信元が 0 件でも加える）
+    3. 端末の設定のバージョンが `old` なら同じ形の文を加える（使える配信元が 0 件でも加える）。端末の設定の `unknown_keys` が空でなければ `端末の設定: {ファイル} に project-index が知らないキーがあります（{キーを , でつないだもの}）。値は使用しません` を加える（使える配信元が 0 件でも加える）
     4. 使える配信元ごとに、`alias_violations` が 0 件でなければ `{id}: エイリアスのキーの違反が {件数} 件あります（check_project で確認できます）` を加え、nav の警告（読み取り API）ごとに `{id}: {path}: {rule}` を加える
     5. `not_served` の配信元ごとに `{id}: 配信していません（{先頭の理由}）。check_project で確認できます` を加える（使える配信元が 0 件でも加える）
   unit_tests:
@@ -79,6 +79,12 @@ functions:
     condition: '`available` が空、端末の設定のバージョンが古い、`not_served` の b'
     mock: なし
     expected: 警告が 2 件（端末の設定の古い設定・b の配信していない）
+  - name: test_collect_warnings_when_unknown_top_level_key
+    case: 正常
+    summary: 端末の設定の知らないキーを 1 件にまとめて載せる
+    condition: '`available` が空、端末の設定の `unknown_keys` が `["mindstella", "prot"]`'
+    mock: なし
+    expected: 警告が 1 件で、端末の設定のファイルと `mindstella, prot` を持つ
   callers:
   - MOD-20#functions[describe]
   callees:

@@ -93,6 +93,12 @@ constants:
   usecase: 端末の設定
   summary: このサーバーが読める端末の設定の `version`
   value: '"1"'
+- name: UNKNOWN_KEY_REASON
+  title: 知らないキーの警告の理由
+  container: project_index/features/settings/query.py
+  usecase: 端末の設定
+  summary: 端末の設定の API の `warnings[].reason`
+  value: '"project-index が知らないキーです。値は使用せず、ファイルに残します"'
 functions:
 - name: xdg_base_dir
   title: XDG の置き場の親
@@ -265,7 +271,8 @@ functions:
        - 読めない場合、行と列を `Violation` にして `TerminalConfigInvalidError` を送る
     3. 端末の設定の値を検証する（端末の設定の検証）
        - 違反が 1 つでもある場合、全ての違反を載せた `TerminalConfigInvalidError` を送る
-    4. `TerminalConfig` を作る。`state_dir` は端末の設定の `state_dir` と `env` から決め（状態の置き場）、`log_dir` は『パスの正規化』にかけ、無ければ `{state_dir}/logs` にする
+    4. 最上位の知らないキーを集める（最上位の知らないキー）
+    5. `TerminalConfig` を作る。`unknown_keys` に手順 4 のキーを入れる。`state_dir` は端末の設定の `state_dir` と `env` から決め（状態の置き場）、`log_dir` は『パスの正規化』にかけ、無ければ `{state_dir}/logs` にする
   exceptions:
   - name: TerminalConfigInvalidError
     condition: ファイルが無い
@@ -310,6 +317,19 @@ functions:
     mock: なし
     expected: '`TerminalConfigInvalidError` の違反に `sources[0].config` と `port` の 2 つ'
     exception: スキーマに違反する
+  - name: test_load_terminal_config_when_unknown_top_level_key
+    case: 正常
+    summary: 最上位の知らないキーを読み飛ばす
+    condition: '最上位に `mindstella: {threads: 3}` と `prot: 9000` を持ち、`port` を書かない設定'
+    mock: なし（一時フォルダ）
+    expected: 例外を送らず、`unknown_keys` が `["mindstella", "prot"]`、`port` が 8786
+  - name: test_load_terminal_config_when_unknown_row_key
+    case: 異常
+    summary: 行の知らないキーは今どおり違反
+    condition: '`sources[0]` に知らないキー `enable` を持つ設定'
+    mock: なし
+    expected: '`TerminalConfigInvalidError` の違反に `sources[0].enable`'
+    exception: スキーマに違反する
 - name: validate_terminal_config
   title: 端末の設定の検証
   kind: 関数
@@ -330,7 +350,7 @@ functions:
     type: list[Violation]
     description: 違反の並び。無ければ空
   process: |-
-    1. `SETTINGS_SCHEMA` を読み、スキーマの違反を全て集める（スキーマの違反）
+    1. `SETTINGS_SCHEMA` を読み、スキーマの違反を全て集める（スキーマの違反）。スキーマは最上位の知らないキーを違反にしない（`sources[]` の行と `scope` は違反にする）
     2. `sources[].id` が行の間で重なる場合、後の行の `sources[{n}].id` に重複の違反を加える（`id` を省いた行はここでは比べず、配信元の読み込みで比べる）
     3. `scope.read`・`scope.write` に空の文字列がある場合、その要素のパスに違反を加える
     4. `version` が `SETTINGS_VERSION` より新しい場合、`version` に「このサーバーより新しい設定」の違反を加える
@@ -359,6 +379,98 @@ functions:
     condition: '`version: "2"`'
     mock: なし
     expected: '`version` の違反'
+  - name: test_validate_terminal_config_when_unknown_top_level_key
+    case: 正常
+    summary: 最上位の知らないキーは違反にしない
+    condition: '必須のキーと、最上位に `mindstella: {threads: 3}` を持つ設定'
+    mock: なし
+    expected: 空
+- name: unknown_top_level_keys
+  title: 最上位の知らないキー
+  kind: 関数
+  container: project_index/features/settings/query.py
+  usecase: 端末の設定
+  role: 読み取り
+  summary: 端末の設定の値の最上位の、スキーマの `properties` に無いキーをファイルの順に返す
+  scope: public
+  args:
+  - name: value
+    title: 設定の値
+    type: dict[str, Any]
+    required: true
+    passing: positional
+    description: YAML として読んだ端末の設定
+  returns:
+    type: list[str]
+    description: 知らないキーの名前（キーのパス）の並び。無ければ空
+  process: |-
+    1. `SETTINGS_SCHEMA` の最上位の `properties` のキーの集合を作る
+    2. `value` のキーのうち、集合に無いものをファイルの順に返す
+  unit_tests:
+  - name: test_unknown_top_level_keys
+    case: 正常
+    summary: 知らないキーをファイルの順に返す
+    condition: '`{version: "1", mindstella: {...}, clone: /c, prot: 9000}`'
+    mock: なし
+    expected: '`["mindstella", "prot"]`'
+  - name: test_unknown_top_level_keys_when_none
+    case: 正常
+    summary: 知らないキーが無い
+    condition: '`{version: "1", clone: /c, sources: []}`'
+    mock: なし
+    expected: 空
+- name: unknown_key_warnings
+  title: 知らないキーの警告
+  kind: 関数
+  container: project_index/features/settings/query.py
+  usecase: 端末の設定
+  role: 変換
+  summary: 端末の設定の知らないキーを、端末の設定の API の警告の並びにする
+  scope: public
+  args:
+  - name: config
+    title: 端末の設定
+    type: TerminalConfig
+    required: true
+    passing: positional
+    description: 読んだ端末の設定
+  returns:
+    type: list[SettingsWarning]
+    description: キーごとの警告。知らないキーが無ければ空
+  process: 1. `config.unknown_keys` の各キーを、`path` がそのキー、`reason` が `UNKNOWN_KEY_REASON` の `SettingsWarning` にして返す
+  unit_tests:
+  - name: test_unknown_key_warnings
+    case: 正常
+    summary: キーごとの警告
+    condition: '`unknown_keys` が `["mindstella"]`'
+    mock: なし
+    expected: '`path` が `mindstella`、`reason` が `UNKNOWN_KEY_REASON` の 1 件。`unknown_keys` が空なら空'
+- name: log_unknown_keys
+  title: 知らないキーのログ
+  kind: 関数
+  container: project_index/features/settings/query.py
+  usecase: 起動
+  role: 記録
+  summary: 端末の設定の知らないキーを警告のログに書く
+  scope: public
+  args:
+  - name: config
+    title: 端末の設定
+    type: TerminalConfig
+    required: true
+    passing: positional
+    description: 読んだ端末の設定
+  returns:
+    type: None
+    description: なし
+  process: 1. `config.unknown_keys` が空でなければ、`[warning]` 端末の設定に project-index が知らないキーがある（`config.file`・キーのパスを `, ` でつないだもの）を書く
+  unit_tests:
+  - name: test_log_unknown_keys
+    case: 正常
+    summary: 知らないキーを警告のログに書く
+    condition: '`unknown_keys` が `["mindstella", "prot"]`'
+    mock: なし（`caplog`）
+    expected: '`WARNING` の 1 行に、設定のファイルのパスと `mindstella, prot`。`unknown_keys` が空なら書かない'
 - name: listen_port
   title: 待ち受けのポート
   kind: 関数
@@ -411,3 +523,9 @@ functions:
     mock: なし
     expected: '`TerminalConfigInvalidError`'
     exception: '`PROJECT_INDEX_PORT` が整数でない'
+  - name: test_listen_port_when_unknown_key_like_port
+    case: 正常
+    summary: 打ち間違いのキーの値を使わない
+    condition: '最上位に `prot: 9000` を持ち `port` を書かない設定を端末の設定の読み込みで読み、環境変数なし'
+    mock: なし（一時フォルダ）
+    expected: '8786'

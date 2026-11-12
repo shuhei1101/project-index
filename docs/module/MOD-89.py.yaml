@@ -228,7 +228,7 @@ functions:
   process: |-
     1. 端末の設定のパスを決め（端末の設定のパス）、端末の設定を読み（端末の設定の読み込み）、待ち受けのポートを決める（待ち受けのポート）
        - `TerminalConfigInvalidError` の場合、違反ごとに `{ファイル}: {パス}: {理由}`（違反が無ければ例外の本文）を標準エラーに出し、`EXIT_CONFIG_INVALID` を返す
-    2. `log_dir` を作り、`logging` を設定する。ログは標準エラーと `{log_dir}/project-index.log`（`RotatingFileHandler`）に書く
+    2. `log_dir` を作り、`logging` を設定する。ログは標準エラーと `{log_dir}/project-index.log`（`RotatingFileHandler`）に書く。端末の設定の知らないキーを警告のログに書く（知らないキーのログ）
     3. ポートで待ち受けられるか確かめる（ポートの確かめ）
        - `PortInUseError` の場合、`{bind}:{port} は使用中です。PROJECT_INDEX_PORT で別のポートを指定できます` を標準エラーに出し、`EXIT_PORT_IN_USE` を返す
     4. 部品を配線し（部品の配線）、アプリを組み立てる（アプリの組み立て）
@@ -357,7 +357,7 @@ functions:
     1. プロンプトの一式を読む（`load_prompts(prompts_dir(os.environ), required=mcp_prompt_ids())`）。`PromptInvalidError` はそのまま送る
     2. `state_dir` を作る
     3. 配信元の一覧・リビジョンの書き出し（`{state_dir}/snapshots`）・文書のストア・変換（`{state_dir}/converted`、制限時間は `script_timeout_sec`）・会話の記録（`{state_dir}/seen.sqlite3`、保持日数は `seen_retention_days`）・文書の検査（制限時間は `script_timeout_sec`）・配信元ごとの排他・再起動の制御を作る。配信元の一覧は `loading=True` で作り、組み立て直した配信元を 1 つ受け取って『配信元の控えの破棄』をこれらの部品で呼ぶ関数を `on_rebuilt` に渡す
-    4. 『配信元の読み直し』をこれらの部品で束ねた関数を作る（呼ぶのは配信元の読み込みの開始と配信元の保存）
+    4. 『配信元の読み直し』をこれらの部品で束ねた関数を作る（呼ぶのは配信元の読み込みの開始と配信元の保存）。関数は、読み直した後に起動時の端末の設定の `sources` と `unknown_keys` を新しい端末の設定の値に差し替え、新しい端末の設定の知らないキーを警告のログに書く（知らないキーのログ）
     5. プロンプトの一式・これらの部品・手順 4 の関数を持つ `Handlers` を返す
   exceptions:
   - name: PromptInvalidError
@@ -390,6 +390,12 @@ functions:
     mock: なし
     expected: '`PromptInvalidError` を送り、`state_dir` ができない'
     exception: プロンプトの YAML が違反する
+  - name: test_build_handlers_when_unknown_key_reloaded
+    case: 正常
+    summary: 読み直しで知らないキーを差し替える
+    condition: 知らないキーの無い端末の設定で配線し、`mindstella` を持つ端末の設定で `reload_sources` を呼ぶ
+    mock: なし（一時フォルダ）
+    expected: '`handlers.terminal.unknown_keys` が `["mindstella"]` で、警告のログに `mindstella`'
 - name: reload_sources
   title: 配信元の読み直し
   kind: 関数

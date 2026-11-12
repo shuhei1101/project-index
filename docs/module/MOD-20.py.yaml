@@ -95,7 +95,7 @@ functions:
     2. `source` が無い場合、作業場所の説明と使える配信元を返す（使える配信元が 0 件でも返す）。`outside_scope` が `True` なら、作業範囲の外で読める配信元（作業範囲の外で読める配信元）を `OutsideSource` にして `outside_sources` に入れる（0 件は空のリスト）。`False` なら `outside_sources` は `None`。警告（警告の収集）を `warnings` に入れる。文書を読まないので要求のログには残さない
     3. `source` がある場合、読む場所を解く（読む場所の解決。`source`・`worktree`・`cwd`・`outside_scope`。結果の `outside_scope` は場所の `outside_scope`）。作業中の配信元の作業ツリーかワークツリーを読むときは、その場所の設定を読み直した配信元を使う（作業場所の配信元の読み込み）
     4. `kind` が無い場合、`instructions` と、有効な文書の行ごとの種類の概要（スキーマは文書のストア.種類のスキーマ）を返す。Git の配信元は、リビジョンの一覧（`commits=0`）のブランチとタグの名前を `refs`、ワークツリーの一覧を `worktrees` に入れる
-    5. `kind` がある場合、文書の行を引き（無ければ `UnknownKindError`）、`target.base` の `schema` のファイルの内容と読んだスキーマ、行の `metadata` を返す。`schema_path` が `SchemaRef` の行は、ファイルの内容の代わりに起動時のスキーマを YAML にしたものを返す
+    5. `kind` がある場合、文書の行を引き（無ければ `UnknownKindError`）、`target.config_base`（設定ファイルのフォルダ）の `schema` のファイルの内容と読んだスキーマ、行の `metadata` を返す。`schema_path` が `SchemaRef` の行は、ファイルの内容の代わりに起動時のスキーマを YAML にしたものを返す
   exceptions:
   - name: InvalidArgumentError
     condition: '`source` の無い `kind`'
