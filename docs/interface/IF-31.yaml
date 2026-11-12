@@ -114,6 +114,35 @@ flows:
   - '`settings.yaml` の `sources` に broken の行がある'
   - '`/sources/broken/docs` が 404、`/sources/sample/docs` が 200 を返す'
   test: test_normal_when_added_source_invalid
+- name: 正常系（端末の設定の最上位に知らないキーがある）
+  summary: 最上位の知らないキーを違反にせずに保存し、ファイルの値とコメントを残して警告で返却する
+  setup:
+  - name: Mock
+    description: なし
+  - name: 端末の設定
+    description: '`sources` に sample の 1 行。最上位に知らないキー `mindstella`（入れ子の値とコメントを持つ）を持つ'
+  - name: 入力
+    description: '`Origin` を持たない要求で、sample の 1 行'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as PUT /settings/sources
+      participant CF as 端末の設定
+
+      C->>E: sources: sample
+      E->>E: 保存後の端末の設定をスキーマで検証する（mindstella は違反にしない）
+      E->>CF: settings.yaml の sources を書き換える
+      E->>E: 配信元を読み直す
+      E-->>C: 200 配信元ごとの状態と警告
+    ```
+  expected:
+  - 200 で、sample が `serving`
+  - '`warnings` に `path` が `mindstella` の 1 件がある'
+  - '`settings.yaml` の `mindstella` の値とコメントが保存の前と変わらない'
+  test: test_normal_when_unknown_top_level_key_kept
+  decisions:
+  - D-308
 - name: 異常系（別のオリジン・403）
   summary: ブラウザからの別のオリジンの保存を断る
   setup:
@@ -231,12 +260,20 @@ response:
   type: 'list[{path: str, reason: str}]'
   description: 検証で除外した理由
   notes: '`not_served` のときだけ'
+- name: warnings[].path
+  type: str
+  description: 端末の設定の最上位の知らないキーのパス
+  notes: 知らないキーが無いときは `warnings` が空の配列
+- name: warnings[].reason
+  type: str
+  description: project-index が知らないキーで、値を使わずにファイルに残すこと
 response_example: |-
   ```json
   {"sources": [
     {"id": "sample", "status": "serving"},
     {"id": "extra", "status": "serving"}
-  ]}
+  ],
+  "warnings": []}
   ```
 response_notes: 配信元の設定が検証に通らない配信元も、端末の設定がスキーマに通れば保存し、`not_served` として返す。
 status_codes:
@@ -245,7 +282,7 @@ status_codes:
 - code: '403'
   condition: project-index と別のオリジンの `Origin` を持つ要求か、`Origin` が無く `Sec-Fetch-Site` が `cross-site`・`same-site` の要求
 - code: '422'
-  condition: 保存後の端末の設定がスキーマに通らない
+  condition: 保存後の端末の設定がスキーマに通らない（最上位の知らないキーは違反にしない）
   notes: '`errors[]` に違反したキーのパスと理由を全て並べる'
 error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）。検証の違反は `errors[]` に `{path, reason}` で並べる（`path` は `sources[1].id` の形）
 constraints:
@@ -254,6 +291,8 @@ constraints:
   notes: 'ブラウザが別のオリジンから送る書き込みを断るため。dev-docs の画面のサーバーはブラウザの要求を受けてからサーバーの側で呼ぶため、`Origin` を持たない'
 - item: 書き込みの範囲
   constraint: '`settings.yaml` の `sources` だけを書き換え、他のキーとコメントを保つ。一時ファイルに書いてから置き換える'
+- item: 端末の設定の知らないキー
+  constraint: 起動の制約「端末の設定の知らないキー」と同じ。最上位の知らないキーを `warnings[]` で返却し、違反にしない
 - item: 読み直しの検証
   constraint: 起動時と同じ検証（スキーマ・スクリプトを実行できるか）
 - item: 認可

@@ -29,6 +29,34 @@ flows:
   - 201 で、`result` が `added`、`sources` に読み直した後の状態がある
   - '`settings.yaml` の `sources` が sample・extra の順で、sample の行と他のキー・コメントは変わらない'
   test: test_normal
+- name: 正常系（端末の設定の最上位に知らないキーがある）
+  summary: 最上位の知らないキーを違反にせずに 1 行を追加し、ファイルの値とコメントを残して警告で返却する
+  setup:
+  - name: Mock
+    description: なし
+  - name: 端末の設定
+    description: '`sources` に sample の 1 行。最上位に知らないキー `mindstella`（入れ子の値とコメントを持つ）を持つ'
+  - name: 入力
+    description: extra の行（`id`・`config`・`scope.read`）
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /settings/sources
+      participant F as settings.yaml
+
+      C->>E: extra の行
+      E->>E: 追加後の端末の設定をスキーマで検証する（mindstella は違反にしない）
+      E->>F: sources の末尾に追加し、配信元を読み直す
+      E-->>C: 201 added と警告
+    ```
+  expected:
+  - 201 で、`result` が `added`
+  - '`warnings` に `path` が `mindstella` の 1 件がある'
+  - '`settings.yaml` の `mindstella` の値とコメントが追加の前と変わらない'
+  test: test_normal_when_unknown_top_level_key_kept
+  decisions:
+  - D-308
 - name: 異常系（同じ id の行がある・409）
   summary: 同じ id の行があれば追加せず、内容が同じかを返す
   setup:
@@ -81,6 +109,7 @@ side_effects: '`settings.yaml` の `sources` の末尾に 1 行追加し、配�
 callers:
 - SC-12#scenarios[正常シナリオ（1 行を追加する）]
 - SC-12#scenarios[正常シナリオ（同じ id の行がある）]
+- SC-12#scenarios[正常シナリオ（端末の設定の最上位に知らないキーがある）]
 exclusivity: 端末の設定の書き込みは、端末の設定の保存と同じ排他で 1 つずつ
 request:
 - name: source
@@ -105,9 +134,16 @@ response:
 - name: sources[].status
   type: Literal['serving', 'not_served', 'disabled']
   description: 読み直した後の状態
+- name: warnings[].path
+  type: str
+  description: 端末の設定の最上位の知らないキーのパス
+  notes: 知らないキーが無いときは `warnings` が空の配列
+- name: warnings[].reason
+  type: str
+  description: project-index が知らないキーで、値を使わずにファイルに残すこと
 response_example: |-
   ```json
-  {"result": "added", "same": null, "sources": [{"id": "sample", "status": "serving"}, {"id": "extra", "status": "serving"}]}
+  {"result": "added", "same": null, "sources": [{"id": "sample", "status": "serving"}, {"id": "extra", "status": "serving"}], "warnings": []}
   ```
 status_codes:
 - code: '201'
@@ -117,7 +153,7 @@ status_codes:
 - code: '409'
   condition: 同じ id の行がある（`result` が `exists`、`same` に内容が同じか）
 - code: '422'
-  condition: 追加後の端末の設定がスキーマに通らない
+  condition: 追加後の端末の設定がスキーマに通らない（最上位の知らないキーは違反にしない）
   notes: '`errors[]` に違反したキーのパスと理由を全て並べる'
 error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）
 constraints:
@@ -127,6 +163,8 @@ constraints:
   constraint: 行のキーと値を比べる。既定の値と同じ値を書いたキーと、書かないキーは同じとみなす
 - item: 書き込みの範囲
   constraint: '`settings.yaml` の `sources` だけを書き換え、他のキーとコメントを保つ。一時ファイルに書いてから置き換える'
+- item: 端末の設定の知らないキー
+  constraint: 起動の制約「端末の設定の知らないキー」と同じ。最上位の知らないキーを `warnings[]` で返却し、違反にしない
 - item: 認可
   constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
   decided_by: NFR-1#requirements[通信]
