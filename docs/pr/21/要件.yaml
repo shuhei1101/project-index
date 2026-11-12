@@ -12,7 +12,7 @@ use_cases:
   - kind: single
     scenario: docs/scenario/SC-10.yaml
     impact: changed
-    detail: '#6: 基準のフォルダを指定した配信元の設定を check_project で確かめ、reload で配信に入れる。基準のフォルダの外を指す paths[] は違反で返る'
+    detail: '#6: 基準のフォルダを指定した配信元の設定を check_project で確かめる。範囲の外を指す paths_base・paths[] は違反で返る。#11: 端末の設定の最上位に知らないキーがあっても reload で読み直せる'
     depends_on: []
   - kind: single
     scenario: docs/scenario/SC-6.yaml
@@ -23,6 +23,11 @@ use_cases:
     scenario: docs/scenario/SC-1.yaml
     impact: run_only
     detail: 配信元の読み込みと端末の設定の読み込みを変えるため、読み書きの流れ全体が続くかを確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-3.yaml
+    impact: run_only
+    detail: '#11: 端末の設定の移し替えの検証が最上位の知らないキーを断らなくなるため、移し替えの流れが壊れないかを確かめる'
     depends_on: []
 docs:
   - page: docs/guide/設定.md
@@ -51,7 +56,7 @@ docs:
     status: todo
 scope_out:
   - item: 端末の設定の sources[] の行と scope の知らないキーを警告にすること
-    reason: D-308 で行と scope は今どおり断ると決めた（最上位に限るかは TH-676 で利用者に確認中と本文にあるため、単一ユースケース設計のレビューで確定する）
+    reason: D-308 で行と scope は今どおり断ると決め、最上位に限ることは TH-676 で利用者が了承した
     plan: none
   - item: 配信元の設定 project-index.yaml の知らないキーの扱い
     reason: '#11 は端末の設定だけを対象にし、配信元の設定は今どおり断る'

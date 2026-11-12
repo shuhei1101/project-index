@@ -157,7 +157,7 @@ scenarios:
         description: なし（実環境で実行）
       - name: 端末の設定
         description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
-        notes: '`sources[0]` に必須のキー `config` が無く、`port` が整数でない'
+        notes: '`sources[0]` に必須のキー `config` が無く、`port` が整数でない。`sources[0]` に知らないキー `enable`（`enabled` の打ち間違い）を持つ'
     flow: |-
       ```mermaid
       sequenceDiagram
@@ -171,7 +171,10 @@ scenarios:
     expected:
       - プロセスが 0 以外の終了コードで終わり、ポートを待ち受けない
       - '標準エラーに `{ファイル}: sources[0].config: 必須のキーが無い` の形で違反が全て並ぶ'
+      - 標準エラーの違反に、知らないキーのパス `sources[0].enable` が含まれる
     test: test_error_when_terminal_config_invalid
+    decisions:
+      - D-308
   - name: 異常シナリオ（ポートが使用中）
     setup:
       - name: Mock
@@ -553,7 +556,6 @@ scenarios:
     expected:
       - '`search_docs(source: brain)` が `docs/knowhow/a.yaml` と `content/node-docs/shared/b.yaml` の文書を返却し、`docs/design/c.yaml` の文書は返却しない'
       - 返却した文書のパスが、基準のフォルダ（repo の直下）からの相対パスになる
-      - '`paths_base` を省いた配信元は、今と同じく設定ファイルのフォルダを基準に配信する'
     test: test_normal_when_paths_base_set
     decisions:
       - D-189
@@ -584,29 +586,6 @@ scenarios:
       - 引数なしの `describe()` の警告に、知らないキーのパス `mindstella`・`prot` が載る
       - '`prot` の値は使用せず、`port` の既定で待ち受ける'
     test: test_normal_when_terminal_config_has_unknown_top_level_key
-    decisions:
-      - D-308
-  - name: 異常シナリオ（配信元の行に知らないキーがある）
-    setup:
-      - name: Mock
-        description: なし（実環境で実行）
-      - name: 端末の設定
-        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
-        notes: '`sources[0]` に知らないキー `enable`（`enabled` の打ち間違い）を持つ'
-    flow: |-
-      ```mermaid
-      sequenceDiagram
-        actor U as 利用者
-        participant DD as project-index
-
-        U->>DD: project-index serve
-        DD->>DD: 端末の設定の検証に失敗する
-        DD-->>U: 違反を標準エラーに出して終わる
-      ```
-    expected:
-      - プロセスが 0 以外の終了コードで終わり、ポートを待ち受けない
-      - '標準エラーに `{ファイル}: sources[0].enable` のパスと理由が出る'
-    test: test_error_when_source_row_has_unknown_key
     decisions:
       - D-308
 lead: 利用者が `project-index serve` を実行し、端末の設定に並べた配信元を 1 プロセス・1 ポートで配信し始める。
