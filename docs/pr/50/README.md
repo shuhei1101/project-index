@@ -1,0 +1,1 @@
+# write_docs で worktree を省き cwd にワークツリーを指定すると TargetIsCloneError が返る不具合を直す
