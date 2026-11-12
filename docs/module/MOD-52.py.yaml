@@ -1,145 +1,145 @@
 id: MOD-52
 title: 索引のサーバー / 検索 / fields.py
-lead: 項目の値・計算項目・使える項目・見出しの行。
+lead: 項目の値・計算項目・使える項目・見出しの行を受け持ち、検索の fields.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/features/search/test_fields.py
+  - tests/unit/project_index/features/search/test_fields.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      条件の確かめ ..> 使える項目
-      条件の照合 ..> 項目の値
-      本文の範囲の選択 ..> 見出しの行
-      class 条件の確かめ {
-        <<function>>
-      }
-      class 条件の照合 {
-        <<function>>
-      }
-      class 使える項目 {
-        <<function>>
-      }
-      class 項目の値 {
-        <<function>>
-      }
-      class 見出しの行 {
-        <<function>>
-      }
-      class 本文の範囲の選択 {
-        <<function>>
-      }
-      click 条件の確かめ href "./MOD-53.py.yaml#条件の確かめ"
-      click 条件の照合 href "./MOD-53.py.yaml#条件の照合"
-      click 本文の範囲の選択 href "./MOD-50.py.yaml#本文の範囲の選択"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        条件の確かめ ..> 使える項目
+        条件の照合 ..> 項目の値
+        本文の範囲の選択 ..> 見出しの行
+        class 条件の確かめ {
+          <<function>>
+        }
+        class 条件の照合 {
+          <<function>>
+        }
+        class 使える項目 {
+          <<function>>
+        }
+        class 項目の値 {
+          <<function>>
+        }
+        class 見出しの行 {
+          <<function>>
+        }
+        class 本文の範囲の選択 {
+          <<function>>
+        }
+        click 条件の確かめ href "./MOD-53.py.yaml#条件の確かめ"
+        click 条件の照合 href "./MOD-53.py.yaml#条件の照合"
+        click 本文の範囲の選択 href "./MOD-50.py.yaml#本文の範囲の選択"
 constants:
-- name: COMPUTED_FIELDS
-  title: 計算項目
-  container: project_index/features/search/fields.py
-  usecase: 検索
-  summary: 文書から計算する項目
-  value: '("@chars", "@path", "@sections", "@matches")'
-- name: DATE_FIELDS
-  title: 日時の項目
-  container: project_index/features/search/fields.py
-  usecase: 検索
-  summary: 値を日時として比べ、空なら並べ替えの末尾にする項目
-  value: '("created", "updated")'
+  - name: COMPUTED_FIELDS
+    title: 計算項目
+    container: project_index/features/search/fields.py
+    usecase: 検索
+    summary: 文書から計算する項目
+    value: '("@chars", "@path", "@sections", "@matches")'
+  - name: DATE_FIELDS
+    title: 日時の項目
+    container: project_index/features/search/fields.py
+    usecase: 検索
+    summary: 値を日時として比べ、空なら並べ替えの末尾にする項目
+    value: '("created", "updated")'
 functions:
-- name: field_values
-  title: 項目の値
-  kind: 関数
-  container: project_index/features/search/fields.py
-  usecase: 検索
-  role: 読み取り
-  summary: 文書から項目の値を引き、比べられる値の並びにする
-  scope: public
-  thread_safe: true
-  args:
-  - name: document
-    title: 文書
-    type: Document
-    required: true
-    passing: positional
-    description: 引く文書
-  - name: field
-    title: 項目
-    type: str
-    required: true
-    passing: positional
-    description: 項目
-  returns:
-    type: list[Any]
-    description: 値の並び。配列の項目は要素、値が無ければ空
-  process: |-
-    1. 項目で引き方を決める
-       - `id`・`kind` の場合、文書の属性
-       - `created`・`updated` の場合、文書の日時（無ければ空）
-       - メタデータのキー（`METADATA_KEYS`）の場合、`document.metadata`
-       - `body` の場合、本文
-       - `*` の場合、`data` の全ての文字列の葉と本文
-       - `@chars` は本文の文字数、`@path` は `document.path`（`records` の行は `{path}#{record_index}`）、`@sections` は Markdownの本文かが `True` の文書なら本文の見出しの文字列、それ以外は `data` の最上位のキーの並び
-       - `@matches` は条件で決まり文書だけでは決まらないので、値を持たない（文書の検索が当たった行の数で数える）
-       - それ以外は `data` を項目の取得で引く
-    2. 値が配列なら要素を、`None` なら空、それ以外は 1 要素の並びを返す
-  unit_tests:
-  - name: test_field_values
-    case: 正常
-    summary: 項目の種類ごとの値
-    condition: '`tags: [a, b]`・`data.owner.name: x`・本文 `# 見出し`'
-    mock: なし
-    expected: '`tags` が `[a, b]`、`owner.name` が `[x]`、`@chars` が本文の文字数、`missing` が `[]`'
-- name: known_fields
-  title: 使える項目
-  kind: 関数
-  container: project_index/features/search/fields.py
-  usecase: 検索
-  role: 読み取り
-  summary: 配信元の種類のスキーマから、条件・並べ替え・集計に使える項目の一覧を作る
-  scope: public
-  thread_safe: true
-  args:
-  - name: schemas
-    title: 種類のスキーマ
-    type: Iterable[Mapping[str, Any]]
-    required: true
-    passing: positional
-    description: 読む文書に当てるスキーマ（`records` の行は 1 行のスキーマ）
-  returns:
-    type: dict[str, str]
-    description: 項目のパス → 型（`string`・`number`・`boolean`・`array`・`object`・`date`）
-  process: |-
-    1. `id`・`kind`・`created`・`updated`・`METADATA_KEYS`・`body`・`*`・`COMPUTED_FIELDS` を入れる
-    2. スキーマの `properties` を再帰でたどり、`a.b` のパスと `type`（`format: date`・`date-time` は `date`）を足す。配列の要素の `properties` は `a.b` の形で足す
-    3. 型の食い違う同じパスは `string` にする
-- name: heading_lines
-  title: 見出しの行
-  kind: 関数
-  container: project_index/features/search/fields.py
-  usecase: 検索
-  role: 読み取り
-  summary: Markdown の行の並びから、見出しの行番号・階層・文字列を集める（コードブロックの中は除く）
-  description: '`@sections` の見出しの文字列（内部の `_headings`）もこの関数で作る。`HEADING` は `#` の並びを名前つきのグループで取り、階層にする。'
-  scope: public
-  thread_safe: true
-  args:
-  - name: lines
-    title: 行
-    type: Sequence[str]
-    required: true
-    passing: positional
-    description: 本文の行の並び
-  returns:
-    type: list[Heading]
-    description: 本文の先頭からの見出し
-  process: |-
-    1. 行を先頭からたどり、`FENCE` に当たる行でコードブロックの内外を切り替える
-    2. コードブロックの外で `HEADING` に当たる行を、行番号（1 始まり）・`#` の数・見出しの文字列の `Heading` にする
-  unit_tests:
-  - name: test_heading_lines
-    case: 正常
-    summary: 階層とコードブロック
-    condition: '`["# a", "", "## b ##", "```", "## c", "```", "### d"]`'
-    mock: なし
-    expected: '`Heading(1, 1, "a")`・`Heading(3, 2, "b")`・`Heading(7, 3, "d")`（`c` を含まない）'
-  status: planned
+  - name: field_values
+    title: 項目の値
+    kind: 関数
+    container: project_index/features/search/fields.py
+    usecase: 検索
+    role: 読み取り
+    summary: 文書から項目の値を引き、比べられる値の並びにする
+    scope: public
+    thread_safe: true
+    args:
+      - name: document
+        title: 文書
+        type: Document
+        required: true
+        passing: positional
+        description: 引く文書
+      - name: field
+        title: 項目
+        type: str
+        required: true
+        passing: positional
+        description: 項目
+    returns:
+      type: list[Any]
+      description: 値の並び。配列の項目は要素、値が無ければ空
+    process: |-
+      1. 項目で引き方を決める
+         - `id`・`kind` の場合、文書の属性
+         - `created`・`updated` の場合、文書の日時（無ければ空）
+         - メタデータのキー（`METADATA_KEYS`）の場合、`document.metadata`
+         - `body` の場合、本文
+         - `*` の場合、`data` の全ての文字列の葉と本文
+         - `@chars` は本文の文字数、`@path` は `document.path`（`records` の行は `{path}#{record_index}`）、`@sections` は Markdownの本文かが `True` の文書なら本文の見出しの文字列、それ以外は `data` の最上位のキーの並び
+         - `@matches` は条件で決まり文書だけでは決まらないので、値を持たない（文書の検索が当たった行の数で数える）
+         - それ以外は `data` を項目の取得で引く
+      2. 値が配列なら要素を、`None` なら空、それ以外は 1 要素の並びを返す
+    unit_tests:
+      - name: test_field_values
+        case: 正常
+        summary: 項目の種類ごとの値
+        condition: '`tags: [a, b]`・`data.owner.name: x`・本文 `# 見出し`'
+        mock: なし
+        expected: '`tags` が `[a, b]`、`owner.name` が `[x]`、`@chars` が本文の文字数、`missing` が `[]`'
+  - name: known_fields
+    title: 使える項目
+    kind: 関数
+    container: project_index/features/search/fields.py
+    usecase: 検索
+    role: 読み取り
+    summary: 配信元の種類のスキーマから、条件・並べ替え・集計に使える項目の一覧を作る
+    scope: public
+    thread_safe: true
+    args:
+      - name: schemas
+        title: 種類のスキーマ
+        type: Iterable[Mapping[str, Any]]
+        required: true
+        passing: positional
+        description: 読む文書に当てるスキーマ（`records` の行は 1 行のスキーマ）
+    returns:
+      type: dict[str, str]
+      description: 項目のパス → 型（`string`・`number`・`boolean`・`array`・`object`・`date`）
+    process: |-
+      1. `id`・`kind`・`created`・`updated`・`METADATA_KEYS`・`body`・`*`・`COMPUTED_FIELDS` を入れる
+      2. スキーマの `properties` を再帰でたどり、`a.b` のパスと `type`（`format: date`・`date-time` は `date`）を足す。配列の要素の `properties` は `a.b` の形で足す
+      3. 型の食い違う同じパスは `string` にする
+  - name: heading_lines
+    title: 見出しの行
+    kind: 関数
+    container: project_index/features/search/fields.py
+    usecase: 検索
+    role: 読み取り
+    summary: Markdown の行の並びから、見出しの行番号・階層・文字列を集める（コードブロックの中は除く）
+    description: '`@sections` の見出しの文字列（内部の `_headings`）もこの関数で作る。`HEADING` は `#` の並びを名前つきのグループで取り、階層にする。'
+    scope: public
+    thread_safe: true
+    args:
+      - name: lines
+        title: 行
+        type: Sequence[str]
+        required: true
+        passing: positional
+        description: 本文の行の並び
+    returns:
+      type: list[Heading]
+      description: 本文の先頭からの見出し
+    process: |-
+      1. 行を先頭からたどり、`FENCE` に当たる行でコードブロックの内外を切り替える
+      2. コードブロックの外で `HEADING` に当たる行を、行番号（1 始まり）・`#` の数・見出しの文字列の `Heading` にする
+    unit_tests:
+      - name: test_heading_lines
+        case: 正常
+        summary: 階層とコードブロック
+        condition: '`["# a", "", "## b ##", "```", "## c", "```", "### d"]`'
+        mock: なし
+        expected: '`Heading(1, 1, "a")`・`Heading(3, 2, "b")`・`Heading(7, 3, "d")`（`c` を含まない）'
+    status: planned

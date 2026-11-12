@@ -1,166 +1,166 @@
 id: MOD-33
 title: 索引のサーバー / 履歴 / types.py
-lead: リビジョン・変わったファイル・ファイルの日時・commit・ワークツリーの型。
+lead: リビジョン・変わったファイル・ファイルの日時・commit・ワークツリーの型を受け持ち、履歴の types.py を修正するときに参照する。
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      リビジョンの解決 ..> 解いたリビジョン : 返す
-      区間の commit ..> 区間の commit と親 : 返す
-      class リビジョンの解決 {
-        <<function>>
-      }
-      class 区間の commit {
-        <<function>>
-      }
-      class 解いたリビジョン {
-        +渡した値: str
-        +commit: str
-        +日時: datetime
-      }
-      class 区間の commit と親 {
-        +commit: str
-        +親: str
-      }
-      click リビジョンの解決 href "./MOD-31.py.yaml#リビジョンの解決"
-      click 区間の commit href "./MOD-31.py.yaml#区間の commit"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        リビジョンの解決 ..> 解いたリビジョン : 返す
+        区間の commit ..> 区間の commit と親 : 返す
+        class リビジョンの解決 {
+          <<function>>
+        }
+        class 区間の commit {
+          <<function>>
+        }
+        class 解いたリビジョン {
+          +渡した値: str
+          +commit: str
+          +日時: datetime
+        }
+        class 区間の commit と親 {
+          +commit: str
+          +親: str
+        }
+        click リビジョンの解決 href "./MOD-31.py.yaml#リビジョンの解決"
+        click 区間の commit href "./MOD-31.py.yaml#区間の commit"
 data_models:
-- name: ResolvedRef
-  title: 解いたリビジョン
-  container: project_index/features/history/types.py
-  usecase: 共通
-  role: DTO
-  summary: 渡されたリビジョンと、解いた commit とその日時
-  description: '`dataclass(frozen=True)`。`list_changes` の `range.from`・`range.to` になる。'
-  properties:
-  - name: input
-    title: 渡した値
-    type: str
-    access: 公開
-    description: ブランチ・タグ・commit・日時
-  - name: commit
-    title: commit
-    type: str
-    access: 公開
-    description: 完全な SHA
-  - name: date
-    title: 日時
-    type: datetime
-    access: 公開
-    description: commit の日時（タイムゾーン付き）
-- name: RefList
-  title: リビジョンの一覧
-  container: project_index/features/history/types.py
-  usecase: リビジョンの一覧
-  role: DTO
-  summary: GET `/sources/{source}/refs` の応答
-  description: '`pydantic.BaseModel`。フィールドはインターフェース定義『リビジョンの一覧』のレスポンス。'
-  properties:
-  - name: git
-    title: Git の配信元か
-    type: bool
-    access: 公開
-    description: '`False` のときは配列が空'
-  - name: default_ref
-    title: 既定のリビジョン
-    type: str
-    access: 公開
-    description: 配信元の `default_ref`
-  - name: branches
-    title: ブランチ
-    type: list[NamedRef]
-    access: 公開
-    description: '`{name, commit}`（commit は 7 桁）'
-  - name: tags
-    title: タグ
-    type: list[NamedRef]
-    access: 公開
-    description: '`{name, commit}`'
-  - name: commits
-    title: 最近の commit
-    type: list[CommitSummary]
-    access: 公開
-    description: '`{commit, date, subject}`'
-- name: FileChange
-  title: 変わったファイル
-  container: project_index/features/history/types.py
-  usecase: 変更を調べる
-  role: DTO
-  summary: 区間で変わったファイル 1 つ
-  description: '`dataclass(frozen=True)`。名前の変更は削除と追加の 2 つにする（`--no-renames`）。'
-  properties:
-  - name: path
-    title: パス
-    type: str
-    access: 公開
-    description: リポジトリの直下からのパス（`/` 区切り）
-  - name: change
-    title: 変更の種類
-    type: Literal['added', 'modified', 'deleted']
-    access: 公開
-    description: git の `A`・`M`・`D`。`T`（種類の変更）は `modified`
-- name: FileDates
-  title: ファイルの日時
-  container: project_index/features/history/types.py
-  usecase: 共通
-  role: DTO
-  summary: ファイルが最初に入った commit と最後に変わった commit の日時
-  description: '`dataclass(frozen=True)`。文書の `created`・`updated` の既定になる。'
-  properties:
-  - name: created
-    title: 作った日時
-    type: datetime
-    access: 公開
-    description: 最初の commit の日時
-  - name: updated
-    title: 更新日時
-    type: datetime
-    access: 公開
-    description: 最後の commit の日時
-- name: CommitStep
-  title: 区間の commit と親
-  container: project_index/features/history/types.py
-  usecase: 変更を調べる
-  role: DTO
-  summary: 区間の中の commit 1 つと、最初の親
-  description: '`dataclass(frozen=True)`。`list_changes` の `contains` が commit ごとに親と比べる単位。'
-  properties:
-  - name: commit
-    title: commit
-    type: str
-    access: 公開
-    description: commit（全桁）
-  - name: date
-    title: 日時
-    type: datetime
-    access: 公開
-    description: commit の日時（`%cI`）
-  - name: parent
-    title: 親
-    type: str
-    access: 公開
-    description: 最初の親の commit（全桁）
-  - name: parent_date
-    title: 親の日時
-    type: datetime
-    access: 公開
-    description: 最初の親の commit の日時
-  status: planned
-- name: WorktreeInfo
-  title: ワークツリーの情報
-  container: project_index/features/history/types.py
-  usecase: 説明
-  role: DTO
-  summary: ワークツリーのパスと checkout しているブランチ
-  properties:
-  - name: path
-    title: パス
-    type: str
-    access: 公開
-    description: ワークツリーの絶対パス
-  - name: branch
-    title: ブランチ
-    type: str | None
-    access: 公開
-    description: checkout しているブランチ。detached HEAD は `None`
+  - name: ResolvedRef
+    title: 解いたリビジョン
+    container: project_index/features/history/types.py
+    usecase: 共通
+    role: DTO
+    summary: 渡されたリビジョンと、解いた commit とその日時
+    description: '`dataclass(frozen=True)`。`list_changes` の `range.from`・`range.to` になる。'
+    properties:
+      - name: input
+        title: 渡した値
+        type: str
+        access: 公開
+        description: ブランチ・タグ・commit・日時
+      - name: commit
+        title: commit
+        type: str
+        access: 公開
+        description: 完全な SHA
+      - name: date
+        title: 日時
+        type: datetime
+        access: 公開
+        description: commit の日時（タイムゾーン付き）
+  - name: RefList
+    title: リビジョンの一覧
+    container: project_index/features/history/types.py
+    usecase: リビジョンの一覧
+    role: DTO
+    summary: GET `/sources/{source}/refs` の応答
+    description: '`pydantic.BaseModel`。フィールドはインターフェース定義『リビジョンの一覧』のレスポンス。'
+    properties:
+      - name: git
+        title: Git の配信元か
+        type: bool
+        access: 公開
+        description: '`False` のときは配列が空'
+      - name: default_ref
+        title: 既定のリビジョン
+        type: str
+        access: 公開
+        description: 配信元の `default_ref`
+      - name: branches
+        title: ブランチ
+        type: list[NamedRef]
+        access: 公開
+        description: '`{name, commit}`（commit は 7 桁）'
+      - name: tags
+        title: タグ
+        type: list[NamedRef]
+        access: 公開
+        description: '`{name, commit}`'
+      - name: commits
+        title: 最近の commit
+        type: list[CommitSummary]
+        access: 公開
+        description: '`{commit, date, subject}`'
+  - name: FileChange
+    title: 変わったファイル
+    container: project_index/features/history/types.py
+    usecase: 変更を調べる
+    role: DTO
+    summary: 区間で変わったファイル 1 つ
+    description: '`dataclass(frozen=True)`。名前の変更は削除と追加の 2 つにする（`--no-renames`）。'
+    properties:
+      - name: path
+        title: パス
+        type: str
+        access: 公開
+        description: リポジトリの直下からのパス（`/` 区切り）
+      - name: change
+        title: 変更の種類
+        type: Literal['added', 'modified', 'deleted']
+        access: 公開
+        description: git の `A`・`M`・`D`。`T`（種類の変更）は `modified`
+  - name: FileDates
+    title: ファイルの日時
+    container: project_index/features/history/types.py
+    usecase: 共通
+    role: DTO
+    summary: ファイルが最初に入った commit と最後に変わった commit の日時
+    description: '`dataclass(frozen=True)`。文書の `created`・`updated` の既定になる。'
+    properties:
+      - name: created
+        title: 作った日時
+        type: datetime
+        access: 公開
+        description: 最初の commit の日時
+      - name: updated
+        title: 更新日時
+        type: datetime
+        access: 公開
+        description: 最後の commit の日時
+  - name: CommitStep
+    title: 区間の commit と親
+    container: project_index/features/history/types.py
+    usecase: 変更を調べる
+    role: DTO
+    summary: 区間の中の commit 1 つと、最初の親
+    description: '`dataclass(frozen=True)`。`list_changes` の `contains` が commit ごとに親と比べる単位。'
+    properties:
+      - name: commit
+        title: commit
+        type: str
+        access: 公開
+        description: commit（全桁）
+      - name: date
+        title: 日時
+        type: datetime
+        access: 公開
+        description: commit の日時（`%cI`）
+      - name: parent
+        title: 親
+        type: str
+        access: 公開
+        description: 最初の親の commit（全桁）
+      - name: parent_date
+        title: 親の日時
+        type: datetime
+        access: 公開
+        description: 最初の親の commit の日時
+    status: planned
+  - name: WorktreeInfo
+    title: ワークツリーの情報
+    container: project_index/features/history/types.py
+    usecase: 説明
+    role: DTO
+    summary: ワークツリーのパスと checkout しているブランチ
+    properties:
+      - name: path
+        title: パス
+        type: str
+        access: 公開
+        description: ワークツリーの絶対パス
+      - name: branch
+        title: ブランチ
+        type: str | None
+        access: 公開
+        description: checkout しているブランチ。detached HEAD は `None`

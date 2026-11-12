@@ -1,601 +1,603 @@
 id: MOD-10
 title: 索引のサーバー / 管理 / service.py
-lead: 管理の MCP の `status`・`reload`・`check_project`・`try_convert` の中身。配信中の部品（`Handlers`）を読むだけで、`reload_config` 以外は配信元の状態を変えない。
+lead: 管理の MCP の `status`・`reload`・`check_project`・`try_convert` の中身を受け持ち、管理の service.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/features/admin/test_service.py
+  - tests/unit/project_index/features/admin/test_service.py
 functions:
-- name: get_status
-  title: 状態の取得
-  kind: 関数
-  container: project_index/features/admin/service.py
-  usecase: 状態の取得
-  role: サービス
-  summary: 待ち受けのアドレス・バージョン・配信元ごとの状態を返す
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: handlers
-    title: 部品
-    type: Handlers
-    required: true
-    passing: positional
-    description: 起動時に作った部品
-  - name: env
-    title: 環境変数
-    type: Mapping[str, str]
-    required: true
-    passing: keyword
-    description: '`PROJECT_INDEX_PORT` を引く環境変数（入口は `os.environ`）'
-  returns:
-    type: ServerStatus
-    description: サーバーの状態
-  process: |-
-    1. アドレスを `http://{terminal.bind}:{ポート}/` にする（待ち受けのポートの決定）
-    2. バージョンを 起動時に読んだ値（動いているバージョン。更新で配布のメタデータが入れ替わっても変わらない）、プロセス ID を `os.getpid()` で得る
-    3. 端末の設定の `version` を `SETTINGS_VERSION` と比べる（バージョンの新旧）
-    4. 配信元の一覧が読み込み中（`registry.loading`）なら、`loading` を `True`、`sources` を空にする。そうでなければ `loading` を `False` にし、配信元ごとの状態を作る（配信元の状態の一覧）
-  exceptions:
-  - name: TerminalConfigInvalidError
-    condition: '`PROJECT_INDEX_PORT` がポートの範囲の外'
-    message: 待ち受けのポートの決定のメッセージ
-  unit_tests:
-  - name: test_get_status
-    case: 正常
-    summary: 配信中・検証で外した・無効の配信元を並べる
-    condition: 配信元 3 つ（`serving` で索引に無いファイル 1 件・`not_served`・`disabled`）、`env` は空
-    mock: なし（一時ディレクトリの配信元）
-    expected: '`address` が `http://127.0.0.1:{port}/`、`sources` が 3 件で `serving` だけ `sync.unindexed_files` が 1（配信元の検査の控えに検査の結果を入れてから呼ぶ）'
-  - name: test_get_status_when_port_env
-    case: 正常
-    summary: '`PROJECT_INDEX_PORT` のポートをアドレスに使う'
-    condition: '`env` が `{"PROJECT_INDEX_PORT": "8799"}`'
-    mock: なし
-    expected: '`address` が `http://127.0.0.1:8799/`'
-  - name: test_get_status_when_loading
-    case: 正常
-    summary: 読み込み中は配信元を待たずに返す
-    condition: '`SourceRegistry(loading=True)` でまだ読み直していない配信元の一覧を持つ `Handlers`'
-    mock: なし
-    expected: 待たずに戻り、`loading` が `True`、`sources` が空
-  callers:
-  - MOD-93#functions[build_admin_mcp]
-  callees:
-  - '#functions[_source_states]'
-  - '#functions[version_state]'
-- name: reload_config
-  title: 設定の読み直し
-  kind: 関数
-  container: project_index/features/admin/service.py
-  usecase: 設定の読み直し
-  role: サービス
-  summary: 端末の設定と配信元の設定を読み直し、前後の差を返す
-  scope: public
-  is_async: false
-  thread_safe: true
-  side_effects: 配信元の一覧を入れ替え、文書・検査・変換の控えを捨てる（`handlers.reload_sources`）
-  args:
-  - name: handlers
-    title: 部品
-    type: Handlers
-    required: true
-    passing: positional
-    description: 起動時に作った部品
-  returns:
-    type: ReloadResult
-    description: 読み直しの結果
-  process: |-
-    1. `handlers.settings_lock` を取る（端末の設定の保存と同じロック）
-    2. 読み直す前の `serving` の ID を控える（`handlers.registry.statuses()`）
-    3. `handlers.terminal.file` を読む（端末の設定の読み込み）
-    4. 配信元を読み直す（`handlers.reload_sources`）
-    5. 読み直した後の `serving` の ID と比べ、`added`・`removed`・`not_served` を作る
-    6. 配信元ごとの状態を作る（配信元の状態の一覧）
-       - `[INFO]` 読み直した（追加・削除・配信していない件数）
-  exceptions:
-  - name: TerminalConfigInvalidError
-    condition: 端末の設定が無い・スキーマに違反する（配信元の一覧は読み直す前のまま）
-    message: 端末の設定の読み込みのメッセージ
-  unit_tests:
-  - name: test_reload_config
-    case: 正常
-    summary: 追加・削除・配信していない配信元を返す
-    condition: 起動時は `a`・`b` が `serving`。端末の設定を `b`・`c`（配信可）・`d`（必須のキーが無い）に書き換える
-    mock: なし（一時ディレクトリ）
-    expected: '`added` が `[c]`、`removed` が `[a]`、`not_served` が `d` の 1 件'
-  - name: test_reload_config_when_invalid
-    case: 異常
-    summary: 端末の設定が違反する
-    condition: 端末の設定の `port` を文字列にする
-    mock: なし
-    expected: '`TerminalConfigInvalidError`。`handlers.registry.statuses()` は呼ぶ前と同じ'
-    exception: 端末の設定が違反する
-  callers:
-  - MOD-93#functions[build_admin_mcp]
-  callees:
-  - '#functions[_source_states]'
-- name: check_project
-  title: 配信元の検査
-  kind: 関数
-  container: project_index/features/admin/service.py
-  usecase: 配信元の検査
-  role: サービス
-  summary: 端末の設定に無い配信元も含め、設定・スクリプト・索引の同期を検査する
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: request
-    title: 要求
-    type: CheckProjectRequest
-    required: true
-    passing: positional
-    description: 配信元の指定
-  - name: handlers
-    title: 部品
-    type: Handlers
-    required: true
-    passing: keyword
-    description: 端末の設定と文書のストアを使う
-  returns:
-    type: CheckProjectResult
-    description: 検査の結果
-  process: |-
-    1. 配信元を読む（検査する配信元の読み込み）
-    2. 端末の設定の `sources[]` のうち、`config` の先頭のファイルのフォルダが `root` と同じ行の ID を `registered_id` にする
-    3. `config_version` があれば新旧を求める（バージョンの新旧）
-    4. 取り得た値に応じて分ける
-       - `violations` がある場合、`missing_paths`・`script_errors` を空、`sync` を `None` にして返す
-       - 配信元を組み立てられた場合、`records` を持つ有効な行ごとに、`$ref` を解いた行のスキーマ（起動時のスキーマ）から records の行の 1 行のスキーマ（`records_item_schema`）を引く。`None` なら `path` が `documents[{番号}].schema`、`rule` が `records: {records} の行のスキーマに properties.{records}.items がありません` の違反を `violations` に入れ、`missing_paths`・`script_errors` を空、`sync` を `None` にして返す
-       - `script_violations` がある場合、`script_errors` に入れ、`sync` を `None` にする
-    5. `documents[].paths[]` のうち、そのパターンだけに絞った行（`exclude` は元の行のまま）で当たるファイルが無いものを `missing_paths` にする（`collect_files`）
-    6. `source` があれば、索引の同期を求めて件数と先頭 `SYNC_ITEMS_LIMIT` 件の内訳にする（`check_sync`）。`alias_violations` を `violations` に加え、nav の警告（読み取り API）を `warnings` にする
-    7. `alias_schema_version` はエイリアスのスキーマの取り込み元のタグ（文書のストア）にする
-  unit_tests:
-  - name: test_check_project
-    case: 正常
-    summary: 違反が無い配信元の同期の件数と内訳を返す
-    condition: 端末の設定に登録済みの配信元。管理用の YAML に無いファイル 1 件
-    mock: なし（一時ディレクトリ）
-    expected: '`registered_id` が登録した ID、`violations` が空、`sync.unindexed_files` が 1 で `sync.items` が 1 件'
-  - name: test_check_project_when_violations
-    case: 正常
-    summary: 違反があれば違反だけを返す
-    condition: '`config` に `documents[0].paths` が無い設定'
-    mock: なし
-    expected: '`violations` が 1 件以上、`sync` が `None`、`missing_paths` が空'
-  - name: test_check_project_when_script_missing
-    case: 正常
-    summary: 動かないスクリプトを `script_errors` に入れる
-    condition: '`converters[0].run` が無いファイルを指す'
-    mock: なし
-    expected: '`script_errors` が 1 件で `script` がそのコマンド、`sync` が `None`'
-  - name: test_check_project_when_missing_paths
-    case: 正常
-    summary: 当たるファイルが無い範囲を返す
-    condition: '`documents[0].paths` が `notes/*.md` で `notes/` が空'
-    mock: なし
-    expected: "`missing_paths` が `['notes/*.md']`"
-  - name: test_check_project_when_items_over_limit
-    case: 正常
-    summary: 内訳を上限で切り、件数は全件を数える
-    condition: 管理用の YAML に無いファイル 51 件
-    mock: なし
-    expected: '`sync.unindexed_files` が 51、`sync.items` が 50 件'
-  - name: test_check_project_when_alias_and_nav
-    case: 正常
-    summary: エイリアスのキーの違反と nav の警告
-    condition: '`alias_type: term` の行の文書 1 件の `aliases` が `3`、`nav` に `auto` の `filter` が `tags が none` のタブ `none`'
-    mock: なし（一時ディレクトリ）
-    expected: '`violations` に `doc` がその文書のパスの違反が 1 件、`warnings` にタブ `none` の警告が 1 件、`alias_schema_version` が `v0.3.0`'
-    exception: '-'
-  - name: test_check_project_when_records_schema_mismatch
-    case: 正常
-    summary: records の行のスキーマが 1 行のスキーマを持たなければ違反にする
-    condition: '`documents[0]` が `records: files` で、`schema` が `properties.files.items` を持たないスキーマ'
-    mock: なし
-    expected: '`violations` が 1 件で `path` が `documents[0].schema`、`sync` が `None`'
-  - name: test_check_project_when_records_schema
-    case: 正常
-    summary: setup が作る組み合わせは違反にしない
-    condition: '`documents[0]` が `records: files` で、`schema` が `templates/files.schema.yaml` のコピー'
-    mock: なし
-    expected: '`violations` が空'
-  callers:
-  - MOD-93#functions[build_admin_mcp]
-  callees:
-  - '#functions[_load_candidate]'
-  - '#functions[version_state]'
-- name: write_nav
-  title: 画面の構成の書き込み
-  kind: 関数
-  container: project_index/features/admin/service.py
-  usecase: 画面の構成の書き込み
-  role: サービス
-  summary: '`project-index.yaml` の `nav` のタブと group をタブ・group の名前で指して追加・修正・削除する'
-  scope: public
-  thread_safe: false
-  side_effects: '`project-index.yaml` の `nav` のキーを書き換える（ほかのキーとコメントは残す）'
-  args:
-  - name: request
-    title: 要求
-    type: WriteNavRequest
-    required: true
-    passing: positional
-    description: 書く配信元と操作
-  - name: handlers
-    title: 部品
-    type: Handlers
-    required: true
-    passing: keyword
-    description: 端末の設定と文書のストアを使う
-  returns:
-    type: WriteNavResult
-    description: 書いた `nav` と条件ごとの文書の数・警告
-  process: |-
-    1. `path` が `.yaml` で終わればそのフォルダ、そうでなければ `path` を `root` にし、設定のファイル（`{root}/CONFIG_FILE`、無ければ `{root}/LEGACY_CONFIG_FILE`）を往復編集で読む（`load_roundtrip`）。どちらも無ければ `ConfigNotFoundError`、YAML として読めなければ `ConfigParseError`
-    2. 端末の設定の `sources[]` のうち `config` の先頭のファイルが同じ `project-index.yaml` の行で、2 つ目以降のファイルが `nav` を持つ場合、`nav` を持つファイルのパスを `rule` に添えた `InvalidArgumentError` を送る（重ねた設定の `nav` が配信に出るため）
-    3. `nav`（無ければ `{tabs: []}`）の複製に操作を順に当てる。タブは `title`、項目は `item` を ` > ` で分けた `group` の名前でたどる
-       - `add` は、`item` が無ければタブの並びの末尾に `value` のタブ、あれば指した group の `items` の末尾に `value` の項目を加える。同じ名前のタブ・group があれば `InvalidArgumentError`
-       - `update` は指したタブか group に `value` のキーだけを重ね、`remove` は指したタブか group を除く
-       - 指したタブ・group が無い、`item` が `group` でない項目に当たる、`add`・`update` で `value` が無い場合、今のタブ・group の名前を添えた `InvalidArgumentError` を送る（`path` は `operations[{n}]`）
-    4. 書いた後の `nav` を検証する。`nav` を置き換えた設定で `SOURCE_SCHEMA` の `nav` の下の違反と、`root` の配信元を組み立てて（`assemble_source`。`lookup` はサーバーの端末の設定から作った引き当て）集めた文書と、有効な文書の行ごとの文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）から作った使える項目での nav の条件の確かめの違反があれば、`NavInvalidError` を送り、ファイルを書き換えない
-    5. 往復編集の `nav` のキーだけを置き換えて書く（`dump_roundtrip`・`replace_file`）
-    6. nav の条件の数えを 4 の文書で求め、`count` が 0 の `auto` を nav の警告と同じ文の `warnings` にする
-    7. `WriteNavResult` を返す（`nav` は書いた `nav` を YAML にした文字列）
-  exceptions:
-  - name: ConfigNotFoundError
-    condition: '`path` に `project-index.yaml` も `dev-docs.yaml` も無い'
-    message: '`配信元の設定がありません: {path}`'
-  - name: ConfigParseError
-    condition: '`project-index.yaml` が YAML として読めない'
-    message: '`配信元の設定を読み込めません: {path}`'
-  - name: InvalidArgumentError
-    condition: 指したタブ・group が無い・group でない項目を指す・同じ名前がある・`value` が無い・重ねた設定が `nav` を持つ
-    message: '`引数が正しくありません: {違反の数} 件`'
-  - name: NavInvalidError
-    condition: 書いた後の `nav` がスキーマか nav の条件の確かめに通らない
-    message: '`画面の構成が正しくありません: {違反の数} 件`'
-  unit_tests:
-  - name: test_write_nav
-    case: 正常
-    summary: タブを足して group を直す
-    condition: '`nav` にタブ `設計`（group `MCP`）を持つ配信元に、`add`（タブ `mcp`、`value: {title: mcp, items: [{auto: {filter: tags が mcp}}]}`）と `update`（タブ `設計`・`item: MCP`・`value: {title: MCP のツール}`）'
-    mock: なし（一時ディレクトリ）
-    expected: '`project-index.yaml` の `nav` が 2 つのタブで group の名前が `MCP のツール`、ほかのキーとコメントが変わらない。`counts` が 1 件で `count` が `tags: [mcp]` の文書の数'
-    exception: '-'
-  - name: test_write_nav_when_zero_count
-    case: 正常
-    summary: 0 件の条件も書いて警告する
-    condition: '`add` で `auto: {filter: tags が none}` のタブ `none`'
-    mock: なし（一時ディレクトリ）
-    expected: 書いたうえで `warnings` にタブ `none` の警告が 1 件
-    exception: '-'
-  - name: test_write_nav_when_invalid_filter
-    case: 異常
-    summary: 使えない条件
-    condition: '`add` で `auto: {filter: {field: nmae, op: eq, values: [x]}}`'
-    mock: なし（一時ディレクトリ）
-    expected: '`NavInvalidError` の違反の `path` が `nav.tabs[{n}].items[0].auto.filter.field` で、ファイルが変わらない'
-    exception: 書いた後の `nav` が条件の確かめに通らない
-  - name: test_write_nav_when_records_filter
-    case: 正常
-    summary: records の行の 1 行の項目の条件を書ける
-    condition: '行 `notes`（`records: files`、`schema` が `templates/files.schema.yaml` のコピーの `files.items.properties` に `owner: {type: string}` を追加したもの）に要素 `{path: a.md, owner: alice}` を持つ配信元に、`add` で `auto: {document: notes, filter: {field: owner, op: eq, values: [alice]}}` のタブ `files`'
-    mock: なし（一時ディレクトリ）
-    expected: '`NavInvalidError` を送らずに書き、`counts` の `count` が 1、`warnings` が空'
-    exception: '-'
-  - name: test_write_nav_when_missing_tab
-    case: 異常
-    summary: 無いタブ
-    condition: '`remove` でタブ `none`'
-    mock: なし（一時ディレクトリ）
-    expected: '`InvalidArgumentError` の違反の `path` が `operations[0]` で、`fix` に今のタブの名前'
-    exception: 指したタブ・group が無い
-  - name: test_write_nav_when_overlaid_nav
-    case: 異常
-    summary: 重ねた設定が nav を持つ
-    condition: 端末の設定の `sources[].config` が `[project-index.yaml, local.yaml]` で、`local.yaml` が `nav` を持つ
-    mock: なし（一時ディレクトリ）
-    expected: '`InvalidArgumentError`'
-    exception: 重ねた設定が `nav` を持つ
-- name: try_convert
-  title: 試しの変換
-  kind: 関数
-  container: project_index/features/admin/service.py
-  usecase: 試しの変換
-  role: サービス
-  summary: 指した配信元のファイルを、その種類の `converters[]` のスクリプトで Markdown にする
-  description: 配信中の変換の控えを汚さないよう、一時フォルダを控えの場所にした使い捨ての `ConvertService` で変換する。
-  scope: public
-  is_async: false
-  thread_safe: true
-  side_effects: 一時フォルダを作って削除する。変換スクリプトを実行する
-  args:
-  - name: request
-    title: 要求
-    type: TryConvertRequest
-    required: true
-    passing: positional
-    description: 配信元とファイルの指定
-  - name: handlers
-    title: 部品
-    type: Handlers
-    required: true
-    passing: keyword
-    description: 文書のストアと `script_timeout_sec` を使う
-  returns:
-    type: TryConvertResult
-    description: 変換の結果
-  process: |-
-    1. 配信元を読む（検査する配信元の読み込み）
-       - `source` が `None` の場合、`ValidationFailedError` を送出する
-    2. `root / file` を正規化し、`root` の外なら `DocumentNotFoundError` を送出する
-    3. `documents[]` の有効な行のうち `file` がその行の文書になる最初の行を引く（`DocumentTable.matches`）
-       - 当たる行が無い場合、`body_file` を持つ有効な行を上から読み、`body_path` が `file` の文書を持つ最初の行を引く（`DocumentStore.load`）
-       - それでも当たる行が無い場合、`DocumentNotFoundError` を送出する
-    4. その種類の文書を読み、`path` か `body_path` が `file` の文書だけを残す（`DocumentStore.load`）
-       - 残らない場合、`DocumentNotFoundError` を送出する
-    5. 文書の行が `converter` を持たなければ `ConverterNotDefinedError` を送出する
-    6. 一時フォルダを控えの場所にした `ConvertService` で文書ごとに変換する（`ConvertService.convert`）
-       - 変換が `failure` を返した場合、`ConvertScriptError` を送出する
-    7. 文書が複数なら Markdown を `\n\n---\n\n` でつなぐ
-    8. `converter` を変換の行の `run` の最後の要素にする
-  exceptions:
-  - name: ValidationFailedError
-    condition: 配信元の設定に違反か動かないスクリプトがある
-    message: '`{パス}: 配信元の設定に違反が {件数} 件あります`（`next_steps` に `check_project` を示す）'
-  - name: DocumentNotFoundError
-    condition: '`file` が配信元の外を指す'
-    message: '`{file}: 配信元の外です`'
-  - name: DocumentNotFoundError
-    condition: どの文書の種類の範囲にも当たらない、またはファイルが無い
-    message: '`{file}: 文書の種類の範囲に該当する文書がありません`'
-  - name: ConverterNotDefinedError
-    condition: '`file` の文書の種類が `converters[]` を指さない'
-    message: '`{種類}: converters[] を指していない種類です`（`next_steps` に読み取り API の文書の取得を示す）'
-  - name: ConvertScriptError
-    condition: 変換スクリプトが 0 以外で終わった、または `script_timeout_sec` を超えた
-    message: '`ConvertFailure` の理由（終了コードと stderr の末尾）'
-  unit_tests:
-  - name: test_try_convert_when_converter_not_defined
-    case: 異常
-    summary: 変換を持たない種類を断る
-    condition: '`body_file` が `docs/a.md` の文書を持つ、`converter` の無い行に当たる `docs/a.md`'
-    mock: なし（一時ディレクトリ）
-    expected: '`ConverterNotDefinedError`'
-    exception: 種類が converters[] を指さない
-  - name: test_try_convert_when_script
-    case: 正常
-    summary: 配信元の変換スクリプトで変換する
-    condition: '`converter` が `python scripts/convert.py` の行に当たる YAML のファイル'
-    mock: なし（一時ディレクトリのスクリプト）
-    expected: '`converter` が `scripts/convert.py`、`markdown` がスクリプトの標準出力。`handlers.converter` の控えの場所にファイルが無い'
-  - name: test_try_convert_when_outside
-    case: 異常
-    summary: 配信元の外を指す
-    condition: '`file` が `../other.md`'
-    mock: なし
-    expected: '`DocumentNotFoundError`'
-    exception: 配信元の外
-  - name: test_try_convert_when_not_matched
-    case: 異常
-    summary: どの種類にも当たらない
-    condition: '`file` が `README.txt`'
-    mock: なし
-    expected: '`DocumentNotFoundError`'
-    exception: 当たる文書が無い
-  - name: test_try_convert_when_script_failed
-    case: 異常
-    summary: 変換スクリプトが失敗する
-    condition: 変換スクリプトが終了コード 1 で終わる
-    mock: なし
-    expected: '`ConvertScriptError`'
-    exception: 変換スクリプトの失敗
-  - name: test_try_convert_when_invalid_config
-    case: 異常
-    summary: 配信元の設定が違反する
-    condition: '`config` に `name` が無い設定'
-    mock: なし
-    expected: '`ValidationFailedError`'
-    exception: 配信元の設定の違反
-  callers:
-  - MOD-93#functions[build_admin_mcp]
-  callees:
-  - '#functions[_load_candidate]'
-- name: _load_candidate
-  title: 検査する配信元の読み込み
-  kind: 関数
-  container: project_index/features/admin/service.py
-  usecase: 配信元の検査
-  role: 読み込み
-  summary: パスか書く前の設定の文字列から、端末の設定によらず配信元を組み立てる
-  scope: internal
-  is_async: false
-  thread_safe: true
-  side_effects: '`config` を渡したとき、一時フォルダに `project-index.yaml` を書いて読み、読んだ後に削除する'
-  args:
-  - name: path
-    title: 配信元の場所
-    type: str
-    required: true
-    passing: positional
-    description: 配信元のフォルダか `project-index.yaml` の絶対パス
-  - name: config
-    title: 書く前の設定
-    type: str | None
-    required: true
-    passing: keyword
-    description: '`None` はファイルを読む'
-  returns:
-    type: CandidateSource
-    description: 検査する配信元
-  process: |-
-    1. `path` が `.yaml` で終わればそのフォルダ、そうでなければ `path` を `root` にし、設定のファイルを `{root}/CONFIG_FILE`、無ければ `{root}/LEGACY_CONFIG_FILE` にする（設定の探し方）
-    2. `config` に応じて設定の文字列を決める
-       - `config` がある場合、`config` を使う
-       - 設定のファイルが無い場合、`ConfigNotFoundError` を送出する
-       - それ以外の場合、設定のファイルを UTF-8 で読む
-    3. 文字列を YAML として読み、辞書なら `version` を文字列にして `config_version` にする（`load_yaml`）
-       - 読めない場合、`ConfigParseError` を送出する
-    4. `config` がある場合、一時フォルダに `project-index.yaml` を書き、そのファイルを読む対象にする
-    5. 配信元を組み立てる（`assemble_source`、`root_override` は `root`、`scope_read` は空、`scope_write` は `None`、`lookup` はサーバーの端末の設定から作った引き当て（端末の設定からの引き当て））
-    6. 戻り値を分ける
-       - 設定が `None` の場合、違反を `violations` に入れる
-       - 設定があり配信元が `None` の場合、違反を `script_violations` に入れる
-  exceptions:
-  - name: ConfigNotFoundError
-    condition: '`config` を渡さず、`{root}/project-index.yaml` も `{root}/dev-docs.yaml` も無い'
-    message: '`{パス}: project-index.yaml がありません`（`next_steps` に `/project-index:setup` を示す）'
-  - name: ConfigParseError
-    condition: 設定の文字列が YAML として読めない
-    message: '`YamlLoadError` の行・列・理由'
-  unit_tests:
-  - name: test_load_candidate
-    case: 正常
-    summary: フォルダから設定を読む
-    condition: 検証に通る `project-index.yaml` を置いたフォルダ
-    mock: なし（一時ディレクトリ）
-    expected: '`source.id` が設定の `name`、`source.root` がフォルダ、`violations` が空'
-  - name: test_load_candidate_when_config_text
-    case: 正常
-    summary: 書く前の設定の相対パスを配信元のフォルダから解く
-    condition: '`project-index.yaml` の無いフォルダと、`documents[0].schema` に相対パスを持つ `config`'
-    mock: なし
-    expected: '`source.root` がフォルダ、フォルダに `project-index.yaml` が作られていない'
-  - name: test_load_candidate_when_not_found
-    case: 異常
-    summary: 設定が無い
-    condition: 空のフォルダ、`config` は `None`
-    mock: なし
-    expected: '`ConfigNotFoundError`'
-    exception: 設定が無い
-  - name: test_load_candidate_when_parse_error
-    case: 異常
-    summary: YAML として読めない
-    condition: '`config` が `name: [`'
-    mock: なし
-    expected: '`ConfigParseError`'
-    exception: YAML として読めない
-  - name: test_load_candidate_when_legacy_config
-    case: 正常
-    summary: '移行の間の `dev-docs.yaml` を読む'
-    condition: '`dev-docs.yaml` だけを置いたフォルダ'
-    mock: なし（一時フォルダ）
-    expected: '`dev-docs.yaml` を読んだ配信元を返す。同じフォルダに `project-index.yaml` を置くと `project-index.yaml` を読む'
-  callers:
-  - '#functions[check_project]'
-  - '#functions[try_convert]'
-  callees:
-  - MOD-70#functions[assemble_source]
-- name: _source_states
-  title: 配信元の状態の一覧
-  kind: 関数
-  container: project_index/features/admin/service.py
-  usecase: 状態の取得
-  role: 組み立て
-  summary: 登録簿の状態を配信元の状態の行にする
-  scope: internal
-  is_async: false
-  thread_safe: true
-  args:
-  - name: handlers
-    title: 部品
-    type: Handlers
-    required: true
-    passing: positional
-    description: 登録簿と配信元の検査の控えを使う
-  returns:
-    type: list[SourceState]
-    description: '`sources[]` の順の配信元の状態'
-  process: |-
-    1. `handlers.registry.statuses()` の行ごとに作る
-       - `serving` の場合、`registry.served()` の同じ ID の配信元（`default_ref` の commit を確かめない） の `config.version` を `config_version` にし、新旧を求め（バージョンの新旧）、`handlers.checks.get(id)` の最後の検査の結果があればその `report` から索引の同期の件数を作る。検査の結果が無ければ `sync` を `None` にする。配信元のファイルはたどらない（`check_sync` を呼ばない）
-       - `not_served` の場合、`errors` を `{path}: {rule}` の文字列にし、他は `None` にする
-       - `disabled` の場合、`errors` を空、他は `None` にする
-  unit_tests:
-  - name: test_source_states
-    case: 正常
-    summary: 状態ごとに持つ値を分ける
-    condition: '`serving`（古い設定）・`not_served`・`disabled` の 3 行'
-    mock: なし
-    expected: '`serving` の行だけ `version_state` が `old` で `sync` を持ち、`not_served` の行の `errors` が `{path}: {rule}`'
-  - name: test_source_states_when_not_checked
-    case: 正常
-    summary: 検査が済んでいない配信元は同期の件数を持たず、ファイルをたどらない
-    condition: '`serving` の 1 行で、配信元の検査の控えに結果が無い。`check_sync` を呼ぶと失敗する偽物に差し替える'
-    mock: '`check_sync`（呼ばれたら `AssertionError` を送る偽物）'
-    expected: '`serving` の行の `sync` が `None` で、`check_sync` が呼ばれない'
-  - name: test_source_states_without_refresh
-    case: 正常
-    summary: 配信元ごとの `default_ref` の commit を確かめず、いま配信中の組を読む
-    condition: '`serving` の 1 行で、`registry.get` を呼ぶと失敗する偽物に差し替える'
-    mock: '`registry.get`（呼ばれたら `AssertionError` を送る偽物）'
-    expected: '`serving` の行の `config_version` が配信中の配信元の設定のバージョンで、`registry.get` が呼ばれない'
-  callers:
-  - '#functions[get_status]'
-  - '#functions[reload_config]'
-  callees:
-  - '#functions[version_state]'
-- name: version_state
-  title: バージョンの新旧
-  kind: 関数
-  container: project_index/features/admin/service.py
-  usecase: 共通
-  role: 変換
-  summary: 設定のバージョンを project-index が読めるバージョンと比べる
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: mine
-    title: 設定のバージョン
-    type: str
-    required: true
-    passing: positional
-    description: 設定の `version`
-  - name: current
-    title: 読めるバージョン
-    type: str
-    required: true
-    passing: positional
-    description: '`SETTINGS_VERSION` か `SOURCE_CONFIG_VERSION`'
-  returns:
-    type: VersionState
-    description: 同じなら `current`、小さいなら `old`、大きいなら `newer`
-  process: 1. 両方を整数にして比べる
-  exceptions:
-  - name: ValueError
-    condition: どちらかが整数にできない
-    message: 標準のメッセージ
-  unit_tests:
-  - name: test_version_state
-    case: 正常
-    summary: 同じ・古い・新しいを分ける
-    condition: '`("1", "1")`・`("1", "2")`・`("3", "2")`'
-    mock: なし
-    expected: '`current`・`old`・`newer`'
-  - name: test_version_state_when_not_integer
-    case: 異常
-    summary: 整数でない
-    condition: '`("a", "1")`'
-    mock: なし
-    expected: '`ValueError`'
-    exception: 整数にできない
-  callers:
-  - '#functions[get_status]'
-  - '#functions[check_project]'
-  - '#functions[_source_states]'
+  - name: get_status
+    title: 状態の取得
+    kind: 関数
+    container: project_index/features/admin/service.py
+    usecase: 状態の取得
+    role: サービス
+    summary: 待ち受けのアドレス・バージョン・配信元ごとの状態を返す
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: handlers
+        title: 部品
+        type: Handlers
+        required: true
+        passing: positional
+        description: 起動時に作った部品
+      - name: env
+        title: 環境変数
+        type: Mapping[str, str]
+        required: true
+        passing: keyword
+        description: '`PROJECT_INDEX_PORT` を引く環境変数（入口は `os.environ`）'
+    returns:
+      type: ServerStatus
+      description: サーバーの状態
+    process: |-
+      1. アドレスを `http://{terminal.bind}:{ポート}/` にする（待ち受けのポートの決定）
+      2. バージョンを 起動時に読んだ値（動いているバージョン。更新で配布のメタデータが入れ替わっても変わらない）、プロセス ID を `os.getpid()` で得る
+      3. 端末の設定の `version` を `SETTINGS_VERSION` と比べる（バージョンの新旧）
+      4. 配信元の一覧が読み込み中（`registry.loading`）なら、`loading` を `True`、`sources` を空にする。そうでなければ `loading` を `False` にし、配信元ごとの状態を作る（配信元の状態の一覧）
+    exceptions:
+      - name: TerminalConfigInvalidError
+        condition: '`PROJECT_INDEX_PORT` がポートの範囲の外'
+        message: 待ち受けのポートの決定のメッセージ
+    unit_tests:
+      - name: test_get_status
+        case: 正常
+        summary: 配信中・検証で外した・無効の配信元を並べる
+        condition: 配信元 3 つ（`serving` で索引に無いファイル 1 件・`not_served`・`disabled`）、`env` は空
+        mock: なし（一時ディレクトリの配信元）
+        expected: '`address` が `http://127.0.0.1:{port}/`、`sources` が 3 件で `serving` だけ `sync.unindexed_files` が 1（配信元の検査の控えに検査の結果を入れてから呼ぶ）'
+      - name: test_get_status_when_port_env
+        case: 正常
+        summary: '`PROJECT_INDEX_PORT` のポートをアドレスに使う'
+        condition: '`env` が `{"PROJECT_INDEX_PORT": "8799"}`'
+        mock: なし
+        expected: '`address` が `http://127.0.0.1:8799/`'
+      - name: test_get_status_when_loading
+        case: 正常
+        summary: 読み込み中は配信元を待たずに返す
+        condition: '`SourceRegistry(loading=True)` でまだ読み直していない配信元の一覧を持つ `Handlers`'
+        mock: なし
+        expected: 待たずに戻り、`loading` が `True`、`sources` が空
+    callers:
+      - MOD-93#functions[build_admin_mcp]
+    callees:
+      - '#functions[_source_states]'
+      - '#functions[version_state]'
+  - name: reload_config
+    title: 設定の読み直し
+    kind: 関数
+    container: project_index/features/admin/service.py
+    usecase: 設定の読み直し
+    role: サービス
+    summary: 端末の設定と配信元の設定を読み直し、前後の差を返す
+    scope: public
+    is_async: false
+    thread_safe: true
+    side_effects: 配信元の一覧を入れ替え、文書・検査・変換の控えを捨てる（`handlers.reload_sources`）
+    args:
+      - name: handlers
+        title: 部品
+        type: Handlers
+        required: true
+        passing: positional
+        description: 起動時に作った部品
+    returns:
+      type: ReloadResult
+      description: 読み直しの結果
+    process: |-
+      1. `handlers.settings_lock` を取る（端末の設定の保存と同じロック）
+      2. 読み直す前の `serving` の ID を控える（`handlers.registry.statuses()`）
+      3. `handlers.terminal.file` を読む（端末の設定の読み込み）
+      4. 配信元を読み直す（`handlers.reload_sources`）
+      5. 読み直した後の `serving` の ID と比べ、`added`・`removed`・`not_served` を作る
+      6. 配信元ごとの状態を作る（配信元の状態の一覧）
+         - `[INFO]` 読み直した（追加・削除・配信していない件数）
+    exceptions:
+      - name: TerminalConfigInvalidError
+        condition: 端末の設定が無い・スキーマに違反する（配信元の一覧は読み直す前のまま）
+        message: 端末の設定の読み込みのメッセージ
+    unit_tests:
+      - name: test_reload_config
+        case: 正常
+        summary: 追加・削除・配信していない配信元を返す
+        condition: 起動時は `a`・`b` が `serving`。端末の設定を `b`・`c`（配信可）・`d`（必須のキーが無い）に書き換える
+        mock: なし（一時ディレクトリ）
+        expected: '`added` が `[c]`、`removed` が `[a]`、`not_served` が `d` の 1 件'
+      - name: test_reload_config_when_invalid
+        case: 異常
+        summary: 端末の設定が違反する
+        condition: 端末の設定の `port` を文字列にする
+        mock: なし
+        expected: '`TerminalConfigInvalidError`。`handlers.registry.statuses()` は呼ぶ前と同じ'
+        exception: 端末の設定が違反する
+    callers:
+      - MOD-93#functions[build_admin_mcp]
+    callees:
+      - '#functions[_source_states]'
+  - name: check_project
+    title: 配信元の検査
+    kind: 関数
+    container: project_index/features/admin/service.py
+    usecase: 配信元の検査
+    role: サービス
+    summary: 端末の設定に無い配信元も含め、設定・スクリプト・索引の同期を検査する
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: request
+        title: 要求
+        type: CheckProjectRequest
+        required: true
+        passing: positional
+        description: 配信元の指定
+      - name: handlers
+        title: 部品
+        type: Handlers
+        required: true
+        passing: keyword
+        description: 端末の設定と文書のストアを使う
+    returns:
+      type: CheckProjectResult
+      description: 検査の結果
+    process: |-
+      1. 配信元を読む（検査する配信元の読み込み）
+      2. 端末の設定の `sources[]` のうち、`config` の先頭のファイルのフォルダが `root` と同じ行の ID を `registered_id` にする
+      3. `config_version` があれば新旧を求める（バージョンの新旧）
+      4. 取り得た値に応じて分ける
+         - `violations` がある場合、`missing_paths`・`script_errors` を空、`sync` を `None` にして返す
+         - 配信元を組み立てられた場合、`records` を持つ有効な行ごとに、`$ref` を解いた行のスキーマ（起動時のスキーマ）から records の行の 1 行のスキーマ（`records_item_schema`）を引く。`None` なら `path` が `documents[{番号}].schema`、`rule` が `records: {records} の行のスキーマに properties.{records}.items がありません` の違反を `violations` に入れ、`missing_paths`・`script_errors` を空、`sync` を `None` にして返す
+         - `script_violations` がある場合、`script_errors` に入れ、`sync` を `None` にする
+      5. `documents[].paths[]` のうち、そのパターンだけに絞った行（`exclude` は元の行のまま）で当たるファイルが無いものを `missing_paths` にする（`collect_files`）
+      6. `source` があれば、索引の同期を求めて件数と先頭 `SYNC_ITEMS_LIMIT` 件の内訳にする（`check_sync`）。`alias_violations` を `violations` に加え、nav の警告（読み取り API）を `warnings` にする
+      7. `alias_schema_version` はエイリアスのスキーマの取り込み元のタグ（文書のストア）にする
+    unit_tests:
+      - name: test_check_project
+        case: 正常
+        summary: 違反が無い配信元の同期の件数と内訳を返す
+        condition: 端末の設定に登録済みの配信元。管理用の YAML に無いファイル 1 件
+        mock: なし（一時ディレクトリ）
+        expected: '`registered_id` が登録した ID、`violations` が空、`sync.unindexed_files` が 1 で `sync.items` が 1 件'
+      - name: test_check_project_when_violations
+        case: 正常
+        summary: 違反があれば違反だけを返す
+        condition: '`config` に `documents[0].paths` が無い設定'
+        mock: なし
+        expected: '`violations` が 1 件以上、`sync` が `None`、`missing_paths` が空'
+      - name: test_check_project_when_script_missing
+        case: 正常
+        summary: 動かないスクリプトを `script_errors` に入れる
+        condition: '`converters[0].run` が無いファイルを指す'
+        mock: なし
+        expected: '`script_errors` が 1 件で `script` がそのコマンド、`sync` が `None`'
+      - name: test_check_project_when_missing_paths
+        case: 正常
+        summary: 当たるファイルが無い範囲を返す
+        condition: '`documents[0].paths` が `notes/*.md` で `notes/` が空'
+        mock: なし
+        expected: "`missing_paths` が `['notes/*.md']`"
+      - name: test_check_project_when_items_over_limit
+        case: 正常
+        summary: 内訳を上限で切り、件数は全件を数える
+        condition: 管理用の YAML に無いファイル 51 件
+        mock: なし
+        expected: '`sync.unindexed_files` が 51、`sync.items` が 50 件'
+      - name: test_check_project_when_alias_and_nav
+        case: 正常
+        summary: エイリアスのキーの違反と nav の警告
+        condition: '`alias_type: term` の行の文書 1 件の `aliases` が `3`、`nav` に `auto` の `filter` が `tags が none` のタブ `none`'
+        mock: なし（一時ディレクトリ）
+        expected: '`violations` に `doc` がその文書のパスの違反が 1 件、`warnings` にタブ `none` の警告が 1 件、`alias_schema_version` が `v0.3.0`'
+        exception: '-'
+      - name: test_check_project_when_records_schema_mismatch
+        case: 正常
+        summary: records の行のスキーマが 1 行のスキーマを持たなければ違反にする
+        condition: '`documents[0]` が `records: files` で、`schema` が `properties.files.items` を持たないスキーマ'
+        mock: なし
+        expected: '`violations` が 1 件で `path` が `documents[0].schema`、`sync` が `None`'
+      - name: test_check_project_when_records_schema
+        case: 正常
+        summary: setup が作る組み合わせは違反にしない
+        condition: '`documents[0]` が `records: files` で、`schema` が `templates/files.schema.yaml` のコピー'
+        mock: なし
+        expected: '`violations` が空'
+    callers:
+      - MOD-93#functions[build_admin_mcp]
+    callees:
+      - '#functions[_load_candidate]'
+      - '#functions[version_state]'
+  - name: write_nav
+    title: 画面の構成の書き込み
+    kind: 関数
+    container: project_index/features/admin/service.py
+    usecase: 画面の構成の書き込み
+    role: サービス
+    summary: '`project-index.yaml` の `nav` のタブと group をタブ・group の名前で指して追加・修正・削除する'
+    scope: public
+    thread_safe: false
+    side_effects: '`project-index.yaml` の `nav` のキーを書き換える（ほかのキーとコメントは残す）'
+    args:
+      - name: request
+        title: 要求
+        type: WriteNavRequest
+        required: true
+        passing: positional
+        description: 書く配信元と操作
+      - name: handlers
+        title: 部品
+        type: Handlers
+        required: true
+        passing: keyword
+        description: 端末の設定と文書のストアを使う
+    returns:
+      type: WriteNavResult
+      description: 書いた `nav` と条件ごとの文書の数・警告
+    process: |-
+      1. `path` が `.yaml` で終わればそのフォルダ、そうでなければ `path` を `root` にし、設定のファイル（`{root}/CONFIG_FILE`、無ければ `{root}/LEGACY_CONFIG_FILE`）を往復編集で読む（`load_roundtrip`）。どちらも無ければ `ConfigNotFoundError`、YAML として読めなければ `ConfigParseError`
+      2. 端末の設定の `sources[]` のうち `config` の先頭のファイルが同じ `project-index.yaml` の行で、2 つ目以降のファイルが `nav` を持つ場合、`nav` を持つファイルのパスを `rule` に添えた `InvalidArgumentError` を送る（重ねた設定の `nav` が配信に出るため）
+      3. `nav`（無ければ `{tabs: []}`）の複製に操作を順に当てる。タブは `title`、項目は `item` を ` > ` で分けた `group` の名前でたどる
+         - `add` は、`item` が無ければタブの並びの末尾に `value` のタブ、あれば指した group の `items` の末尾に `value` の項目を加える。同じ名前のタブ・group があれば `InvalidArgumentError`
+         - `update` は指したタブか group に `value` のキーだけを重ね、`remove` は指したタブか group を除く
+         - 指したタブ・group が無い、`item` が `group` でない項目に当たる、`add`・`update` で `value` が無い場合、今のタブ・group の名前を添えた `InvalidArgumentError` を送る（`path` は `operations[{n}]`）
+      4. 書いた後の `nav` を検証する。`nav` を置き換えた設定で `SOURCE_SCHEMA` の `nav` の下の違反と、`root` の配信元を組み立てて（`assemble_source`。`lookup` はサーバーの端末の設定から作った引き当て）集めた文書と、有効な文書の行ごとの文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）から作った使える項目での nav の条件の確かめの違反があれば、`NavInvalidError` を送り、ファイルを書き換えない
+      5. 往復編集の `nav` のキーだけを置き換えて書く（`dump_roundtrip`・`replace_file`）
+      6. nav の条件の数えを 4 の文書で求め、`count` が 0 の `auto` を nav の警告と同じ文の `warnings` にする
+      7. `WriteNavResult` を返す（`nav` は書いた `nav` を YAML にした文字列）
+    exceptions:
+      - name: ConfigNotFoundError
+        condition: '`path` に `project-index.yaml` も `dev-docs.yaml` も無い'
+        message: '`配信元の設定がありません: {path}`'
+      - name: ConfigParseError
+        condition: '`project-index.yaml` が YAML として読めない'
+        message: '`配信元の設定を読み込めません: {path}`'
+      - name: InvalidArgumentError
+        condition: 指したタブ・group が無い・group でない項目を指す・同じ名前がある・`value` が無い・重ねた設定が `nav` を持つ
+        message: '`引数が正しくありません: {違反の数} 件`'
+      - name: NavInvalidError
+        condition: 書いた後の `nav` がスキーマか nav の条件の確かめに通らない
+        message: '`画面の構成が正しくありません: {違反の数} 件`'
+    unit_tests:
+      - name: test_write_nav
+        case: 正常
+        summary: タブを足して group を直す
+        condition: '`nav` にタブ `設計`（group `MCP`）を持つ配信元に、`add`（タブ `mcp`、`value: {title: mcp, items: [{auto: {filter: tags が mcp}}]}`）と `update`（タブ `設計`・`item: MCP`・`value: {title: MCP のツール}`）'
+        mock: なし（一時ディレクトリ）
+        expected: '`project-index.yaml` の `nav` が 2 つのタブで group の名前が `MCP のツール`、ほかのキーとコメントが変わらない。`counts` が 1 件で `count` が `tags: [mcp]` の文書の数'
+        exception: '-'
+      - name: test_write_nav_when_zero_count
+        case: 正常
+        summary: 0 件の条件も書いて警告する
+        condition: '`add` で `auto: {filter: tags が none}` のタブ `none`'
+        mock: なし（一時ディレクトリ）
+        expected: 書いたうえで `warnings` にタブ `none` の警告が 1 件
+        exception: '-'
+      - name: test_write_nav_when_invalid_filter
+        case: 異常
+        summary: 使えない条件
+        condition: '`add` で `auto: {filter: {field: nmae, op: eq, values: [x]}}`'
+        mock: なし（一時ディレクトリ）
+        expected: '`NavInvalidError` の違反の `path` が `nav.tabs[{n}].items[0].auto.filter.field` で、ファイルが変わらない'
+        exception: 書いた後の `nav` が条件の確かめに通らない
+      - name: test_write_nav_when_records_filter
+        case: 正常
+        summary: records の行の 1 行の項目の条件を書ける
+        condition: '行 `notes`（`records: files`、`schema` が `templates/files.schema.yaml` のコピーの `files.items.properties` に `owner: {type: string}` を追加したもの）に要素 `{path: a.md, owner: alice}` を持つ配信元に、`add` で `auto: {document: notes, filter: {field: owner, op: eq, values: [alice]}}` のタブ `files`'
+        mock: なし（一時ディレクトリ）
+        expected: '`NavInvalidError` を送らずに書き、`counts` の `count` が 1、`warnings` が空'
+        exception: '-'
+      - name: test_write_nav_when_missing_tab
+        case: 異常
+        summary: 無いタブ
+        condition: '`remove` でタブ `none`'
+        mock: なし（一時ディレクトリ）
+        expected: '`InvalidArgumentError` の違反の `path` が `operations[0]` で、`fix` に今のタブの名前'
+        exception: 指したタブ・group が無い
+      - name: test_write_nav_when_overlaid_nav
+        case: 異常
+        summary: 重ねた設定が nav を持つ
+        condition: 端末の設定の `sources[].config` が `[project-index.yaml, local.yaml]` で、`local.yaml` が `nav` を持つ
+        mock: なし（一時ディレクトリ）
+        expected: '`InvalidArgumentError`'
+        exception: 重ねた設定が `nav` を持つ
+  - name: try_convert
+    title: 試しの変換
+    kind: 関数
+    container: project_index/features/admin/service.py
+    usecase: 試しの変換
+    role: サービス
+    summary: 指した配信元のファイルを、その種類の `converters[]` のスクリプトで Markdown にする
+    description: 配信中の変換の控えを汚さないよう、一時フォルダを控えの場所にした使い捨ての `ConvertService` で変換する。
+    scope: public
+    is_async: false
+    thread_safe: true
+    side_effects: 一時フォルダを作って削除する。変換スクリプトを実行する
+    args:
+      - name: request
+        title: 要求
+        type: TryConvertRequest
+        required: true
+        passing: positional
+        description: 配信元とファイルの指定
+      - name: handlers
+        title: 部品
+        type: Handlers
+        required: true
+        passing: keyword
+        description: 文書のストアと `script_timeout_sec` を使う
+    returns:
+      type: TryConvertResult
+      description: 変換の結果
+    process: |-
+      1. 配信元を読む（検査する配信元の読み込み）
+         - `source` が `None` の場合、`ValidationFailedError` を送出する
+      2. `root / file` を正規化し、`root` の外なら `DocumentNotFoundError` を送出する
+      3. `documents[]` の有効な行のうち `file` がその行の文書になる最初の行を引く（`DocumentTable.matches`）
+         - 当たる行が無い場合、`body_file` を持つ有効な行を上から読み、`body_path` が `file` の文書を持つ最初の行を引く（`DocumentStore.load`）
+         - それでも当たる行が無い場合、`DocumentNotFoundError` を送出する
+      4. その種類の文書を読み、`path` か `body_path` が `file` の文書だけを残す（`DocumentStore.load`）
+         - 残らない場合、`DocumentNotFoundError` を送出する
+      5. 文書の行が `converter` を持たなければ `ConverterNotDefinedError` を送出する
+      6. 一時フォルダを控えの場所にした `ConvertService` で文書ごとに変換する（`ConvertService.convert`）
+         - 変換が `failure` を返した場合、`ConvertScriptError` を送出する
+      7. 文書が複数なら Markdown を `\n\n---\n\n` でつなぐ
+      8. `converter` を変換の行の `run` の最後の要素にする
+    exceptions:
+      - name: ValidationFailedError
+        condition: 配信元の設定に違反か動かないスクリプトがある
+        message: '`{パス}: 配信元の設定に違反が {件数} 件あります`（`next_steps` に `check_project` を示す）'
+      - name: DocumentNotFoundError
+        condition: '`file` が配信元の外を指す'
+        message: '`{file}: 配信元の外です`'
+      - name: DocumentNotFoundError
+        condition: どの文書の種類の範囲にも当たらない、またはファイルが無い
+        message: '`{file}: 文書の種類の範囲に該当する文書がありません`'
+      - name: ConverterNotDefinedError
+        condition: '`file` の文書の種類が `converters[]` を指さない'
+        message: '`{種類}: converters[] を指していない種類です`（`next_steps` に読み取り API の文書の取得を示す）'
+      - name: ConvertScriptError
+        condition: 変換スクリプトが 0 以外で終わった、または `script_timeout_sec` を超えた
+        message: '`ConvertFailure` の理由（終了コードと stderr の末尾）'
+    unit_tests:
+      - name: test_try_convert_when_converter_not_defined
+        case: 異常
+        summary: 変換を持たない種類を断る
+        condition: '`body_file` が `docs/a.md` の文書を持つ、`converter` の無い行に当たる `docs/a.md`'
+        mock: なし（一時ディレクトリ）
+        expected: '`ConverterNotDefinedError`'
+        exception: 種類が converters[] を指さない
+      - name: test_try_convert_when_script
+        case: 正常
+        summary: 配信元の変換スクリプトで変換する
+        condition: '`converter` が `python scripts/convert.py` の行に当たる YAML のファイル'
+        mock: なし（一時ディレクトリのスクリプト）
+        expected: '`converter` が `scripts/convert.py`、`markdown` がスクリプトの標準出力。`handlers.converter` の控えの場所にファイルが無い'
+      - name: test_try_convert_when_outside
+        case: 異常
+        summary: 配信元の外を指す
+        condition: '`file` が `../other.md`'
+        mock: なし
+        expected: '`DocumentNotFoundError`'
+        exception: 配信元の外
+      - name: test_try_convert_when_not_matched
+        case: 異常
+        summary: どの種類にも当たらない
+        condition: '`file` が `README.txt`'
+        mock: なし
+        expected: '`DocumentNotFoundError`'
+        exception: 当たる文書が無い
+      - name: test_try_convert_when_script_failed
+        case: 異常
+        summary: 変換スクリプトが失敗する
+        condition: 変換スクリプトが終了コード 1 で終わる
+        mock: なし
+        expected: '`ConvertScriptError`'
+        exception: 変換スクリプトの失敗
+      - name: test_try_convert_when_invalid_config
+        case: 異常
+        summary: 配信元の設定が違反する
+        condition: '`config` に `name` が無い設定'
+        mock: なし
+        expected: '`ValidationFailedError`'
+        exception: 配信元の設定の違反
+    callers:
+      - MOD-93#functions[build_admin_mcp]
+    callees:
+      - '#functions[_load_candidate]'
+  - name: _load_candidate
+    title: 検査する配信元の読み込み
+    kind: 関数
+    container: project_index/features/admin/service.py
+    usecase: 配信元の検査
+    role: 読み込み
+    summary: パスか書く前の設定の文字列から、端末の設定によらず配信元を組み立てる
+    scope: internal
+    is_async: false
+    thread_safe: true
+    side_effects: '`config` を渡したとき、一時フォルダに `project-index.yaml` を書いて読み、読んだ後に削除する'
+    args:
+      - name: path
+        title: 配信元の場所
+        type: str
+        required: true
+        passing: positional
+        description: 配信元のフォルダか `project-index.yaml` の絶対パス
+      - name: config
+        title: 書く前の設定
+        type: str | None
+        required: true
+        passing: keyword
+        description: '`None` はファイルを読む'
+    returns:
+      type: CandidateSource
+      description: 検査する配信元
+    process: |-
+      1. `path` が `.yaml` で終わればそのフォルダ、そうでなければ `path` を `root` にし、設定のファイルを `{root}/CONFIG_FILE`、無ければ `{root}/LEGACY_CONFIG_FILE` にする（設定の探し方）
+      2. `config` に応じて設定の文字列を決める
+         - `config` がある場合、`config` を使う
+         - 設定のファイルが無い場合、`ConfigNotFoundError` を送出する
+         - それ以外の場合、設定のファイルを UTF-8 で読む
+      3. 文字列を YAML として読み、辞書なら `version` を文字列にして `config_version` にする（`load_yaml`）
+         - 読めない場合、`ConfigParseError` を送出する
+      4. `config` がある場合、一時フォルダに `project-index.yaml` を書き、そのファイルを読む対象にする
+      5. 配信元を組み立てる（`assemble_source`、`root_override` は `root`、`scope_read` は空、`scope_write` は `None`、`lookup` はサーバーの端末の設定から作った引き当て（端末の設定からの引き当て））
+      6. 戻り値を分ける
+         - 設定が `None` の場合、違反を `violations` に入れる
+         - 設定があり配信元が `None` の場合、違反を `script_violations` に入れる
+    exceptions:
+      - name: ConfigNotFoundError
+        condition: '`config` を渡さず、`{root}/project-index.yaml` も `{root}/dev-docs.yaml` も無い'
+        message: '`{パス}: project-index.yaml がありません`（`next_steps` に `/project-index:setup` を示す）'
+      - name: ConfigParseError
+        condition: 設定の文字列が YAML として読めない
+        message: '`YamlLoadError` の行・列・理由'
+    unit_tests:
+      - name: test_load_candidate
+        case: 正常
+        summary: フォルダから設定を読む
+        condition: 検証に通る `project-index.yaml` を置いたフォルダ
+        mock: なし（一時ディレクトリ）
+        expected: '`source.id` が設定の `name`、`source.root` がフォルダ、`violations` が空'
+      - name: test_load_candidate_when_config_text
+        case: 正常
+        summary: 書く前の設定の相対パスを配信元のフォルダから解く
+        condition: '`project-index.yaml` の無いフォルダと、`documents[0].schema` に相対パスを持つ `config`'
+        mock: なし
+        expected: '`source.root` がフォルダ、フォルダに `project-index.yaml` が作られていない'
+      - name: test_load_candidate_when_not_found
+        case: 異常
+        summary: 設定が無い
+        condition: 空のフォルダ、`config` は `None`
+        mock: なし
+        expected: '`ConfigNotFoundError`'
+        exception: 設定が無い
+      - name: test_load_candidate_when_parse_error
+        case: 異常
+        summary: YAML として読めない
+        condition: '`config` が `name: [`'
+        mock: なし
+        expected: '`ConfigParseError`'
+        exception: YAML として読めない
+      - name: test_load_candidate_when_legacy_config
+        case: 正常
+        summary: '移行の間の `dev-docs.yaml` を読む'
+        condition: '`dev-docs.yaml` だけを置いたフォルダ'
+        mock: なし（一時フォルダ）
+        expected: '`dev-docs.yaml` を読んだ配信元を返す。同じフォルダに `project-index.yaml` を置くと `project-index.yaml` を読む'
+    callers:
+      - '#functions[check_project]'
+      - '#functions[try_convert]'
+    callees:
+      - MOD-70#functions[assemble_source]
+  - name: _source_states
+    title: 配信元の状態の一覧
+    kind: 関数
+    container: project_index/features/admin/service.py
+    usecase: 状態の取得
+    role: 組み立て
+    summary: 登録簿の状態を配信元の状態の行にする
+    scope: internal
+    is_async: false
+    thread_safe: true
+    args:
+      - name: handlers
+        title: 部品
+        type: Handlers
+        required: true
+        passing: positional
+        description: 登録簿と配信元の検査の控えを使う
+    returns:
+      type: list[SourceState]
+      description: '`sources[]` の順の配信元の状態'
+    process: |-
+      1. `handlers.registry.statuses()` の行ごとに作る
+         - `serving` の場合、`registry.served()` の同じ ID の配信元（`default_ref` の commit を確かめない） の `config.version` を `config_version` にし、新旧を求め（バージョンの新旧）、`handlers.checks.get(id)` の最後の検査の結果があればその `report` から索引の同期の件数を作る。検査の結果が無ければ `sync` を `None` にする。配信元のファイルはたどらない（`check_sync` を呼ばない）
+         - `not_served` の場合、`errors` を `{path}: {rule}` の文字列にし、他は `None` にする
+         - `disabled` の場合、`errors` を空、他は `None` にする
+    unit_tests:
+      - name: test_source_states
+        case: 正常
+        summary: 状態ごとに持つ値を分ける
+        condition: '`serving`（古い設定）・`not_served`・`disabled` の 3 行'
+        mock: なし
+        expected: '`serving` の行だけ `version_state` が `old` で `sync` を持ち、`not_served` の行の `errors` が `{path}: {rule}`'
+      - name: test_source_states_when_not_checked
+        case: 正常
+        summary: 検査が済んでいない配信元は同期の件数を持たず、ファイルをたどらない
+        condition: '`serving` の 1 行で、配信元の検査の控えに結果が無い。`check_sync` を呼ぶと失敗する偽物に差し替える'
+        mock: '`check_sync`（呼ばれたら `AssertionError` を送る偽物）'
+        expected: '`serving` の行の `sync` が `None` で、`check_sync` が呼ばれない'
+      - name: test_source_states_without_refresh
+        case: 正常
+        summary: 配信元ごとの `default_ref` の commit を確かめず、いま配信中の組を読む
+        condition: '`serving` の 1 行で、`registry.get` を呼ぶと失敗する偽物に差し替える'
+        mock: '`registry.get`（呼ばれたら `AssertionError` を送る偽物）'
+        expected: '`serving` の行の `config_version` が配信中の配信元の設定のバージョンで、`registry.get` が呼ばれない'
+    callers:
+      - '#functions[get_status]'
+      - '#functions[reload_config]'
+    callees:
+      - '#functions[version_state]'
+  - name: version_state
+    title: バージョンの新旧
+    kind: 関数
+    container: project_index/features/admin/service.py
+    usecase: 共通
+    role: 変換
+    summary: 設定のバージョンを project-index が読めるバージョンと比べる
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: mine
+        title: 設定のバージョン
+        type: str
+        required: true
+        passing: positional
+        description: 設定の `version`
+      - name: current
+        title: 読めるバージョン
+        type: str
+        required: true
+        passing: positional
+        description: '`SETTINGS_VERSION` か `SOURCE_CONFIG_VERSION`'
+    returns:
+      type: VersionState
+      description: 同じなら `current`、小さいなら `old`、大きいなら `newer`
+    process: 1. 両方を整数にして比べる
+    exceptions:
+      - name: ValueError
+        condition: どちらかが整数にできない
+        message: 標準のメッセージ
+    unit_tests:
+      - name: test_version_state
+        case: 正常
+        summary: 同じ・古い・新しいを分ける
+        condition: '`("1", "1")`・`("1", "2")`・`("3", "2")`'
+        mock: なし
+        expected: '`current`・`old`・`newer`'
+      - name: test_version_state_when_not_integer
+        case: 異常
+        summary: 整数でない
+        condition: '`("a", "1")`'
+        mock: なし
+        expected: '`ValueError`'
+        exception: 整数にできない
+    callers:
+      - '#functions[get_status]'
+      - '#functions[check_project]'
+      - '#functions[_source_states]'
 constants:
-- name: CONFIG_FILE
-  title: 配信元の設定のファイル名
-  container: project_index/features/admin/service.py
-  usecase: 配信元の検査
-  summary: フォルダを渡したときに探す配信元の設定のファイル名
-  value: '"project-index.yaml"'
-- name: LEGACY_CONFIG_FILE
-  title: 移行の間の配信元の設定のファイル名
-  container: project_index/features/admin/service.py
-  usecase: 配信元の検査
-  summary: '`CONFIG_FILE` が無いときに探す、今の各リポジトリのファイル名。各リポジトリが改名し終えたら除く'
-  value: '"dev-docs.yaml"'
+  - name: CONFIG_FILE
+    title: 配信元の設定のファイル名
+    container: project_index/features/admin/service.py
+    usecase: 配信元の検査
+    summary: フォルダを渡したときに探す配信元の設定のファイル名
+    value: '"project-index.yaml"'
+  - name: LEGACY_CONFIG_FILE
+    title: 移行の間の配信元の設定のファイル名
+    container: project_index/features/admin/service.py
+    usecase: 配信元の検査
+    summary: '`CONFIG_FILE` が無いときに探す、今の各リポジトリのファイル名。各リポジトリが改名し終えたら除く'
+    value: '"dev-docs.yaml"'
+notes:
+  決まり: 配信中の部品（`Handlers`）を読むだけで、`reload_config` 以外は配信元の状態を変えない。

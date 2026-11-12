@@ -1,0 +1,144 @@
+use_cases:
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: none
+    detail: シナリオの流れと期待値は変わらず、図と文の表し方だけが変わる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-2.yaml
+    impact: none
+    detail: シナリオの流れと期待値は変わらず、図と文の表し方だけが変わる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-3.yaml
+    impact: none
+    detail: シナリオの流れと期待値は変わらず、図と文の表し方だけが変わる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: none
+    detail: シナリオの流れと期待値は変わらず、図と文の表し方だけが変わる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: none
+    detail: シナリオの流れと期待値は変わらず、図と文の表し方だけが変わる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: none
+    detail: シナリオの流れと期待値は変わらず、図と文の表し方だけが変わる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: none
+    detail: シナリオの流れと期待値は変わらず、図と文の表し方だけが変わる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-8.yaml
+    impact: none
+    detail: シナリオの流れと期待値は変わらず、図と文の表し方だけが変わる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-9.yaml
+    impact: none
+    detail: シナリオの流れと期待値は変わらず、図と文の表し方だけが変わる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: none
+    detail: シナリオの流れと期待値は変わらず、図と文の表し方だけが変わる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: none
+    detail: シナリオの流れと期待値は変わらず、図と文の表し方だけが変わる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-12.yaml
+    impact: none
+    detail: シナリオの流れと期待値は変わらず、図と文の表し方だけが変わる
+    depends_on: []
+docs:
+  - page: docs/interface
+    new: false
+    change: 全てのインターフェース定義の Mermaid を mdmark の図にし、文の表への置き換え・文の削除・`lead` の書き換え・パスの参照の ID への置き換えを行う
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T13:06:25.504118+00:00'
+  - page: docs/scenario
+    new: false
+    change: 全てのシナリオの Mermaid を mdmark の図にし、文の表への置き換え・文の削除・`lead` の書き換えを行う
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T13:06:25.504118+00:00'
+  - page: docs/module
+    new: false
+    change: 全てのモジュール構成の文の表への置き換え・文の削除・`lead` の書き換えを行う
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T13:06:25.504118+00:00'
+  - page: docs/library
+    new: false
+    change: 外部ライブラリの `lead` を「何を定め、どんなときに参照するか」の 1 文にし、文を点検する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T12:31:16.446890+00:00'
+  - page: docs/architecture/ARCH-1.yaml
+    new: false
+    change: '`lead` の書き換えと文の点検'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T12:31:16.446890+00:00'
+  - page: docs/nonfunctional
+    new: false
+    change: '`lead` の書き換えと文の点検'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T12:31:16.446890+00:00'
+  - page: docs/config
+    new: false
+    change: '`lead` の書き換えと文の点検'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T12:31:16.446890+00:00'
+  - page: docs/dev-command
+    new: false
+    change: '`lead` の書き換えと文の点検'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T12:31:16.446890+00:00'
+  - page: docs/test-procedure
+    new: false
+    change: '`lead` の書き換えと文の点検'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T12:31:16.446890+00:00'
+  - page: docs/guide
+    new: false
+    change: 公開ドキュメントの Mermaid（3 ファイル）を mdmark の図にし、文の表への置き換え・文の削除・生の文字の Issue 番号のタイトル付きのリンクへの置き換えを行う
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T11:29:16.678384+00:00'
+scope_out:
+  - item: 文書へのタグ・エイリアス・用語の付与（A-5 の「一緒に行う改善」）
+    reason: '判断が分かれている。`dev-docs.yaml` の `documents[].metadata` が `tags` を持たず、設計書のスキーマ（`schemas/`）も `tags` を持たないため、付与には設定とスキーマの変更が要る。`dev-docs.yaml` は #16 で `project-index.yaml` へ改名中で、同じファイルを変える。今の判断は、この PR の後続として切り出す（レビューで確定する）'
+    plan: '#30'
+  - item: 管理用の YAML のコード・テストの行への設計書への `related`（`implements`・`tests`）の付与
+    reason: 配信元の `documents[]` にコード・テストの行が無く、管理用の YAML の行を新しく作る配信元の設定の変更になる。文書の書き換えとは目的が違う
+    plan: '#24'
+  - item: 各種類の `README.md` の設計書へのパスのリンク
+    reason: '`index.yaml` から生成する目次で、ファイルへのリンクとして正しいため対応しない'
+    plan: none
+  - item: '`docs/guide/変更履歴.md` の v0.1.0 の行の `dev/pr/3/` へのリンク'
+    reason: タグ v0.1.0 の時点のファイルを指すリンクで、今も辿れるため対応しない
+    plan: none
+  - item: '`content/prompts/`・`templates/` への決まりの適用'
+    reason: MCP の説明文と、ほかのリポジトリへコピーする雛形で、このリポジトリ自身の文書ではない（#18 の task-planner の判断）
+    plan: none
+  - item: '`dev/pr/13/` の `docs/pr/13/` への移動'
+    reason: '#15 で移した文書ではなく、完了した作業 PR の記録で、書き換えない'
+    plan: none
+  - item: モジュール構成のクラス図（`diagrams[].diagram`）の `click ... href "./MOD-59.py.yaml#..."` のパスの参照（77 文書・406 件）の ID の参照への置き換え
+    reason: Mermaid の `click` の href は URL で、`id:` の参照を解く描画があるかが未確認。参照元の ai-monitor のモジュール構成もパスの href で書いている。今の判断は、描画の対応を確かめてから後続として切り出す（レビューで確定する）
+    plan: '#31'

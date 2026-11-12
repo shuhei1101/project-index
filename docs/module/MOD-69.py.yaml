@@ -1,407 +1,407 @@
 id: MOD-69
 title: 索引のサーバー / 配信元 / registry.py
-lead: 配信する配信元の一覧と読み直し。
+lead: 配信する配信元の一覧と読み直しを受け持ち、配信元の registry.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/features/sources/test_registry.py
+  - tests/unit/project_index/features/sources/test_registry.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      配信元の一覧 ..> 配信元の読み込み : 行ごとに
-      class 配信元の一覧 {
-        +読み直す(端末の設定) list
-        +行ごとに読み込む(端末の設定) None
-        +指す行の待ち(ID・作業場所・全て) None
-        +引く(配信元の ID) 配信中の配信元
-        +配信中() list
-        +状態の一覧() list
-      }
-      class 配信元の読み込み {
-        <<function>>
-      }
-      click 配信元の読み込み href "./MOD-70.py.yaml#配信元の読み込み"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        配信元の一覧 ..> 配信元の読み込み : 行ごとに
+        class 配信元の一覧 {
+          +読み直す(端末の設定) list
+          +行ごとに読み込む(端末の設定) None
+          +指す行の待ち(ID・作業場所・全て) None
+          +引く(配信元の ID) 配信中の配信元
+          +配信中() list
+          +状態の一覧() list
+        }
+        class 配信元の読み込み {
+          <<function>>
+        }
+        click 配信元の読み込み href "./MOD-70.py.yaml#配信元の読み込み"
 classes:
-- name: SourceRegistry
-  title: 配信元の一覧
-  container: project_index/features/sources/registry.py
-  usecase: 共通
-  role: レジストリ
-  summary: 配信中の配信元と状態を持ち、読み直しで一覧ごと差し替える
-  description: |-
-    一覧は `dict[str, ServedSource]` と `list[SourceStatus]` の組を 1 つの属性で持ち、読み直しは新しい組を作り終えてから属性を入れ替える。
-    読む側は入れ替えの前後どちらかの組だけを見るので、ロックを取らない。読み直し同士は `_reload_lock` で順にする。
-    起動の読み込み（`load`）は行ごとに読み込み、読み込み終えた行を組に加えて入れ替える。要求は指す行の読み込みだけを待つ（インターフェース定義『起動』の配信元の読み込みの単位）。
-  kind: クラス
-  properties:
-  - name: _snapshot
-    title: 一覧
-    type: tuple[dict[str, ServedSource], list[SourceStatus]]
-    access: 内部 (_)
-    default: ({}, [])
-    description: 配信中の配信元（ID → 配信元）と、`sources[]` の順の状態
-  - name: _reload_lock
-    title: 読み直しの排他
-    type: threading.Lock
-    access: 内部 (_)
-    description: 読み直しを 1 つずつにする
-  - name: _entries
-    title: 行の控え
-    type: dict[str, tuple[SourceEntry, int]]
-    access: 内部 (_)
-    default: '{}'
-    description: 配信中の ID → 読んだ端末の設定の行と位置。`default_ref` が進んだときの組み立て直しに使う
-  - name: _on_rebuilt
-    title: 組み立て直した後の処理
-    type: Callable[[ServedSource], None] | None
-    access: 内部 (_)
-    default: None
-    description: 初期化の引数 `on_rebuilt` で受け取り、`get` が配信元を組み立て直して差し替えた後に、新しい配信元を渡して呼ぶ。`None` なら呼ばない
-  - name: _ready
-    title: 読み込みの済み
-    type: threading.Event
-    access: 内部 (_)
-    description: 全ての行の初回の読み込みが終わったか。初期化の引数 `loading` が `True` なら立てずに作り、`False`（既定）なら立てて作る。`load` が全ての行を読み込もうとし終えたときと、`reload` が終わるとき（例外で止まったときも）に立てる
-  - name: _rows
-    title: 端末の設定の行
-    type: list[SourceEntry]
-    access: 内部 (_)
-    default: '[]'
-    description: '`load`・`reload` が受け取った端末の設定の `sources[]`。指す行を決めるのに使う'
-  - name: _rows_done
-    title: 行の読み込みの済み
-    type: list[threading.Event]
-    access: 内部 (_)
-    default: '[]'
-    description: '`_rows` と同じ順の、行ごとの読み込みが終わったか（例外で止まった行も立てる）。`load` が立てずに作り、`reload` は全て立てる'
-  - name: _requested
-    title: 先に読み込む行
-    type: list[int]
-    access: 内部 (_)
-    default: '[]'
-    description: 待っている要求が指す行の位置を、届いた順に並べる。`_waiters_lock` を持って足し引きする
-  - name: _on_waiting
-    title: 待ちを受け取った後の処理
-    type: Callable[[], None] | None
-    access: 内部 (_)
-    default: None
-    description: 初期化の引数 `on_waiting` で受け取り、`wait_for` が読み込みの済んでいない行の待ちを受け取って `_requested` に足した後に呼ぶ。`None` なら呼ばない（テストが待ちの受け取りを確かめる）
-  - name: _waiters
-    title: 読み込みの待ち手
-    type: list[tuple[asyncio.AbstractEventLoop, asyncio.Future[None], frozenset[int]]]
-    access: 内部 (_)
-    default: '[]'
-    description: '`wait_for`・`wait_loaded` が待っているイベントループと Future と、待っている行の位置。`_waiters_lock`（`threading.Lock`）を持って足し引きする'
-  methods:
-  - name: reload
-    title: 読み直す
-    kind: メソッド
-    summary: 端末の設定の全行を読み直し、一覧を差し替える
-    scope: public
-    thread_safe: true
-    side_effects: 一覧を入れ替える
-    args:
-    - name: terminal
-      title: 端末の設定
-      type: TerminalConfig
-      required: true
-      passing: positional
-      description: 読んだ端末の設定
-    returns:
-      type: list[SourceStatus]
-      description: '`sources[]` の順の状態'
-    process: |-
-      1. `_reload_lock` を取る
-      2. 端末の設定から参照先の配信元の引き当てを作り（端末の設定からの引き当て）、`sources[]` の行ごとに配信元を読む（配信元の読み込み。引き当てを渡す）
-      3. 配信する配信元の ID が先の行と重なる場合（`id` を省いて設定の `name` が同じなど）、後の行を `sources[{n}].id` の重複の違反を持つ `not_served` にする
-      4. 新しい組を作り、`_snapshot` を入れ替える
-         - `[info]` 配信元を読み直した（配信中の ID の並び・外した数）
-      5. `_rows` を `sources[]` に替え、`_rows_done` を行の数だけ立てて作り、`_ready` を立て、`_waiters_lock` を持って `_waiters` を取り出して空にし、待ち手ごとに `loop.call_soon_threadsafe` で Future を済ませて（済んだ Future と閉じたループは飛ばす）、状態を返す
-         - 手順 2〜4 で例外が起きた場合も `_ready` を立てて待ち手を済ませてから送り直す（`_snapshot` は入れ替えない）
-    unit_tests:
-    - name: test_source_registry_reload
-      case: 正常
-      summary: 状態を行の順に返す
-      condition: '`sources` に配信できる行・検証に失敗する行・無効の行'
-      mock: 配信元の読み込み（行ごとに決めた結果を返す偽物）
-      expected: 状態が `serving`・`not_served`・`disabled` の順で、`served()` は 1 つ
-    - name: test_source_registry_reload_when_duplicate_name
-      case: 正常
-      summary: 既定の ID が重なる
-      condition: '`id` を省いた 2 行の設定の `name` がどちらも `a`'
-      mock: 配信元の読み込み（偽物）
-      expected: 後の行が `not_served` で違反が `sources[1].id`、`rule` が `a は既に使用されています`
-    - name: test_source_registry_reload_when_reading
-      case: 正常
-      summary: 読み直しの間は古い一覧で応える
-      condition: 読み込みの偽物が `threading.Event` で止まっている間に別のスレッドから `get("a")`
-      mock: 配信元の読み込み（止められる偽物）
-      expected: '`get` が待たずに古い配信元を返し、読み直しの後は新しい配信元を返す'
-    - name: test_source_registry_reload_when_loading
-      case: 正常
-      summary: 初回の読み込みまで wait_loaded を待たせ、スレッドは持たない
-      condition: '`SourceRegistry(loading=True)`。読み込みの偽物が `threading.Event` で止まっている間に、イベントループで `wait_loaded()` を 2 つ待たせ、別のスレッドで `reload` を流す'
-      mock: 配信元の読み込み（止められる偽物）
-      expected: 合図の前は `loading` が `True` で `wait_loaded()` が済まず、`statuses()`・`served()` は待たずに空を返す。合図の後は `wait_loaded()` が 2 つとも済み、`get` が配信元を、`served` が 1 つを返し、`loading` が `False`
-    - name: test_source_registry_reload_when_failed
-      case: 異常
-      summary: 読み込みが例外で止まっても待ちを解く
-      condition: '`SourceRegistry(loading=True)`。`wait_loaded()` を 1 つ待たせ、読み込みの偽物が `RuntimeError` を送る'
-      mock: 配信元の読み込み（例外を送る偽物）
-      expected: '`reload` が `RuntimeError` を送り、`wait_loaded()` が済み、`loading` が `False` で `served()` が空を返す'
-  - name: load
-    title: 行ごとに読み込む
-    kind: メソッド
-    summary: 起動のときに、端末の設定の行を 1 つずつ読み込み、読み込み終えた行から配信する
-    description: 起動の裏のスレッドが 1 回だけ呼ぶ。行の読み込み（配信元の読み込み）は `_reload_lock` の外で行い、組の入れ替えだけを `_reload_lock` の中で行う
-    scope: public
-    thread_safe: true
-    side_effects: 一覧を行ごとに入れ替える。待っている要求の待ちを解く
-    args:
-    - name: terminal
-      title: 端末の設定
-      type: TerminalConfig
-      required: true
-      passing: positional
-      description: 読んだ端末の設定
-    returns:
-      type: None
-      description: なし
-    process: |-
-      1. `_waiters_lock` を持って `_rows` を `sources[]` にし、`_rows_done` を行の数だけ立てずに作る。続けて `terminal_lookup(terminal)` でほかの配信元のスキーマの参照先の引き当てを作り、`_reload_lock` を持って `_lookup` に持たせる
-      2. 読み込みの済んでいない行が無くなるまで、次の行を選んで読み込む
-         - 次の行は、`_requested` の先頭から見て読み込みの済んでいない最初の行。無ければ、読み込みの済んでいない行のうち位置が一番小さい行
-         - 行を配信元の読み込み（`lookup` に手順 1 の引き当て）で読む。例外の場合、`[error]` 配信元の行の読み込みに失敗した（行の位置・例外のスタックトレース）を書き、状態を `not_served`・ID を行の `id`（無ければ `sources[{n}]`）・違反を `Violation(path="sources[{n}]", rule="読み込みに失敗しました（{例外の型}: {本文}）", fix="エラーログを確かめ、reload で読み直してください")` にする
-      3. 読み込んだ行ごとに `_reload_lock` を取り、今の組に行を加えた新しい組を作って `_snapshot` と `_entries` を入れ替える。状態は行の位置の順に並べる
-         - 配信する配信元の ID が、先の位置の行の配信中の ID と重なる場合、その行を `sources[{n}].id` の重複の違反を持つ `not_served` にする
-         - 後の位置の行が先に読み込まれて同じ ID で配信中の場合、その後の行を同じ違反の `not_served` に替え、この行を配信する
-      4. 行の `_rows_done` を立て、`_waiters_lock` を持って、待っている行が全て済んだ待ち手を `_waiters` から取り出し、`loop.call_soon_threadsafe` で Future を済ませる（済んだ Future と閉じたループは飛ばす）
-      5. 全ての行を読み込もうとし終えたら `[info]` 配信元を読み直した（配信中の ID の並び・外した数）を書き、`_ready` を立てて残りの待ち手を全て済ませる
-         - 手順 1〜4 で、行の読み込み以外の例外が起きた場合も、全ての `_rows_done` と `_ready` を立てて待ち手を全て済ませてから送り直す
-    unit_tests:
-    - name: test_source_registry_load
-      case: 正常
-      summary: 行ごとに読み込み、全ての行を読み込むと読み込み中が終わる
-      condition: '`SourceRegistry(loading=True)`。`sources` に配信できる 2 行と無効の 1 行'
-      mock: 配信元の読み込み（行ごとに決めた結果を返す偽物）
-      expected: '`load` の後に `loading` が `False`、`statuses()` が行の順に 3 つ、`served()` が 2 つ'
-    - name: test_source_registry_load_when_schema_ref
-      case: 正常
-      summary: 行ごとの読み込みに、端末の設定から作ったほかの配信元の引き当てを渡す
-      condition: '`SourceRegistry(loading=True)`。`sources` に `id` が a・b の 2 行'
-      mock: 配信元の読み込み（受け取った `lookup` を記録する偽物）
-      expected: 2 行の読み込みが同じ `lookup` を受け取り、`lookup("b")` が b の行の先頭の設定のパス、`lookup("missing")` が `None`
-    - name: test_source_registry_load_when_lookup_failed
-      case: 異常
-      summary: 引き当ての作成が例外で止まっても、待ちを解いて読み込み中を終える
-      condition: '`SourceRegistry(loading=True)` を `wait_loaded()` で待っている間に、`terminal_lookup` が例外を送る `load`'
-      mock: '`terminal_lookup`（例外を送る偽物）'
-      expected: '`wait_loaded()` が済み、`loading` が `False`、`load` が例外を送り直す'
-      exception: 引き当ての作成の例外
-    - name: test_source_registry_load_when_row_loading
-      case: 正常
-      summary: 読み込んだ行は、他の行の読み込み中でも引ける
-      condition: '`SourceRegistry(loading=True)`。2 行目の読み込みの偽物が `threading.Event` で止まっている間に、別のスレッドから `get("a")`'
-      mock: 配信元の読み込み（2 行目だけ止められる偽物）
-      expected: '`get("a")` が待たずに 1 行目の配信元を返し、`loading` が `True`'
-    - name: test_source_registry_load_when_requested
-      case: 正常
-      summary: 待っている要求が指す行を先に読み込む
-      condition: '`SourceRegistry(loading=True, on_waiting=...)`。行 a・b・c で、a の読み込みの偽物が止まっている間に、イベントループで `wait_for(ids=["c"])` を待たせ、`on_waiting` が呼ばれてから a を進める'
-      mock: 配信元の読み込み（読んだ行の順を記録し、a だけ止められる偽物）
-      expected: 読んだ行の順が a・c・b で、`wait_for` が b を読む前に済む
-    - name: test_source_registry_load_when_row_failed
-      case: 異常
-      summary: 行の読み込みが例外で止まっても、その行を配信せずに残りの行を読み込む
-      condition: '`SourceRegistry(loading=True)`。行 broken（`id` あり）・sample で、broken の読み込みの偽物が `RuntimeError` を送る。broken を `wait_for(ids=["broken"])` で待たせる'
-      mock: 配信元の読み込み（broken だけ例外を送る偽物）
-      expected: '`wait_for` が済み、`get("broken")` が `SourceNotServedError`（違反の `path` が `sources[0]`）を送り、`get("sample")` が配信元を返し、`loading` が `False`'
-      exception: 行の読み込みの例外
-    - name: test_source_registry_load_when_duplicate_loaded_later
-      case: 正常
-      summary: 後の行が先に読み込まれて ID が重なる
-      condition: 3 行の設定の 2・3 行目が `id` を省き `name` がどちらも `a`。1 行目の読み込みを止めている間に、3 行目の scope に当たる作業場所で `wait_for` を呼び、3 行目を 2 行目より先に読み込ませる
-      mock: 配信元の読み込み（偽物）
-      expected: 読み込みの順が 1・3・2 行目で、全ての行を読み込んだ後に、2 行目が `serving`、3 行目が `not_served` で違反が `sources[2].id`。`get("a")` が 2 行目の配信元を返す
-  - name: wait_for
-    title: 指す行の待ち
-    kind: メソッド
-    summary: 要求が指す配信元の行の読み込みだけを、スレッドを持たずに待つ
-    description: 配信元を指す非同期の入口（文書の MCP・読み取り API）が、`asyncio.to_thread` でサービスを呼ぶ前に待つ。待っている行を `_requested` に足し、`load` に先に読み込ませる
-    scope: public
-    is_async: true
-    thread_safe: true
-    args:
-    - name: ids
-      title: 配信元の ID
-      type: Sequence[str] | None
-      required: false
-      default: None
-      passing: keyword
-      description: 要求が指す配信元の ID
-    - name: cwd
-      title: 作業場所
-      type: str | None
-      required: false
-      default: None
-      passing: keyword
-      description: '`ids` を省いたときに、端末の設定の `scope` で指す行を決める作業場所'
-    - name: every
-      title: 全ての行
-      type: bool
-      required: false
-      default: 'False'
-      passing: keyword
-      description: '`True` なら全ての行を待つ（`wait_loaded` と同じ）'
-    returns:
-      type: None
-      description: 指す行の読み込みが終わったら戻る
-    process: |-
-      1. `_ready` が立っていれば戻る
-      2. 待つ行を決める
-         - `every` が `True` なら全ての行
-         - `ids` を渡した場合、ID ごとに、`id` がその ID の行。その ID の行が無ければ、`id` を持たない行の全て（読み込むまで ID が決まらない）
-         - `cwd` を渡した場合、`cwd` を正規化したパスが行の `scope.write` か `scope.read` のパターンに当たる行。当たる行が無ければ全ての行（ワークツリーの照合は設定を読み込むまでできない）
-         - どれも渡さない場合、待たずに戻る
-      3. 動いているイベントループで Future を作り、`_waiters_lock` を持って待つ行から読み込みの済んだ行を除く。残りが無ければ戻る。残りがあれば、残りの行を `_requested` に足し（既にある行は足さない）、`_waiters` に入れる
-      4. `_on_waiting` があれば呼ぶ
-      5. Future を await する。取り消された場合、`_waiters` から外して送り直す
-    unit_tests:
-    - name: test_source_registry_wait_for
-      case: 正常
-      summary: 指す行の読み込みだけを待つ
-      condition: '`SourceRegistry(loading=True)`。行 a・b で、b の読み込みの偽物が止まっている間に `wait_for(ids=["a"])` と `wait_for(ids=["b"])`'
-      mock: 配信元の読み込み（b だけ止められる偽物）
-      expected: '`ids=["a"]` は a を読み込んだ後に済み、`ids=["b"]` は合図を出すまで済まない'
-    - name: test_source_registry_wait_for_when_cwd
-      case: 正常
-      summary: 作業場所が scope に当たる行を待つ
-      condition: '行 a（`scope.read` が `/w/a/**`）・b（`scope.read` が `/w/b/**`）で、b の読み込みの偽物が止まっている間に `wait_for(cwd="/w/a/x")` と `wait_for(cwd="/w/c")`'
-      mock: 配信元の読み込み（b だけ止められる偽物）
-      expected: '`cwd="/w/a/x"` は a を読み込んだ後に済み、当たる行が無い `cwd="/w/c"` は合図を出すまで済まない'
-    - name: test_source_registry_wait_for_when_id_less_row
-      case: 正常
-      summary: ID を持たない行は、ID で指す要求でも待つ
-      condition: '行 a（`id` あり）・`id` を持たない行（設定の `name` が `n`）で、2 行目の読み込みの偽物が止まっている間に `wait_for(ids=["n"])`'
-      mock: 配信元の読み込み（2 行目だけ止められる偽物）
-      expected: 合図を出すまで済まず、出した後に済んで `get("n")` が配信元を返す
-    - name: test_source_registry_wait_for_when_cancelled
-      case: 正常
-      summary: 取り消された待ちを外す
-      condition: '`wait_for(ids=["b"])` を待たせた Task を取り消す'
-      mock: 配信元の読み込み（止められる偽物）
-      expected: '`CancelledError` を送り、`_waiters` が空'
-  - name: get
-    title: 引く
-    kind: メソッド
-    summary: 配信中の配信元を ID で引く
-    scope: public
-    thread_safe: true
-    args:
-    - name: source_id
-      title: 配信元の ID
-      type: str
-      required: true
-      passing: positional
-      description: 引く ID
-    returns:
-      type: ServedSource
-      description: 配信中の配信元
-    description: '`load` の間にまだ読み込んでいない行の ID を引いた場合、その行の読み込みを待つ（スレッドを止める）。非同期の入口は先に `wait_for` で待ち、イベントループのスレッドで止まらないようにする'
-    process: |-
-      1. 読み込み中で、ID が `_snapshot` に無く、その ID を指す行（`wait_for` の手順 2 と同じ決め方）に読み込みの済んでいない行がある場合、`_waiters_lock` を持ってその行を `_requested` に足し、行の `_rows_done` を待つ
-      2. 待たずに `_snapshot` を 1 回だけ読み、配信中にあれば、設定の commit を持つ配信元は `default_ref` を commit に解いて比べる。違う場合、`_reload_lock` を取ってその行だけを配信元の読み込みで読み直し、`_snapshot` のその配信元と状態を差し替え、`_reload_lock` を持ったまま `_on_rebuilt` を新しい配信元で呼んでから返す（`[info]` default_ref が進んだので配信元を組み立て直した（ID・前と後の commit））。同じなら配信中の配信元を返す
-      3. 状態の一覧にその ID が `not_served` か `disabled` である場合、`SourceNotServedError`（`violations` に状態の違反、`disabled` に無効か）を送る
-      4. どちらにも無い場合、`UnknownSourceError` を送る
-    exceptions:
-    - name: SourceNotServedError
-      condition: 検証で外したか無効の配信元
-      message: '`{id} は配信していません（{理由}）`'
-    - name: UnknownSourceError
-      condition: 端末の設定に無い ID
-      message: '`配信元 {id} はありません`'
-    unit_tests:
-    - name: test_source_registry_get
-      case: 正常
-      summary: 配信中を引く
-      condition: '`a` が配信中'
-      mock: なし（`_snapshot` を直に入れる）
-      expected: '`a` の配信元'
-    - name: test_source_registry_get_when_not_served
-      case: 異常
-      summary: 外した配信元
-      condition: '`b` が `not_served`'
-      mock: なし
-      expected: '`SourceNotServedError` の `violations` が `b` の違反、`disabled` が `False`'
-      exception: 検証で外した
-    - name: test_source_registry_get_when_unknown
-      case: 異常
-      summary: 無い配信元
-      condition: '`get("z")`'
-      mock: なし
-      expected: '`UnknownSourceError`'
-      exception: 無い ID
-    - name: test_source_registry_get_when_default_ref_moved
-      case: 正常
-      summary: default_ref が進んだら組み立て直す
-      condition: '`a` を読んだ後に `default_ref` へ設定の行を足す commit を積む'
-      mock: なし（一時フォルダで `git init`）
-      expected: '`get("a")` が足した行を持つ配信元を返し、2 回目の `get` は読み直さない'
-      exception: '-'
-    - name: test_source_registry_get_when_default_ref_moved_with_on_rebuilt
-      case: 正常
-      summary: 組み立て直した後の処理を呼ぶ
-      condition: '`on_rebuilt` に呼ばれた配信元を記録する関数を渡し、`a` を読んだ後に `default_ref` へ設定の行を足す commit を積む'
-      mock: なし（一時フォルダで `git init`）
-      expected: '`get("a")` の後に `on_rebuilt` が新しい配信元で 1 回呼ばれ、2 回目の `get` では呼ばれない'
-      exception: '-'
-    - name: test_source_registry_get_when_row_loading
-      case: 正常
-      summary: 読み込んでいない行の ID を引くと、その行の読み込みを待つ
-      condition: '`SourceRegistry(loading=True)`。行 a・b で、`load` が a の読み込みで止まっている間に、別のスレッドから `get("b")`'
-      mock: 配信元の読み込み（a だけ止められる偽物）
-      expected: '`get("b")` が a を進めるまで戻らず、進めた後に b の配信元を返す。読んだ行の順が a・b'
-      exception: '-'
-  - name: served
-    title: 配信中
-    kind: メソッド
-    summary: 配信中の配信元を `sources[]` の順に返す
-    scope: public
-    thread_safe: true
-    returns:
-      type: list[ServedSource]
-      description: 配信中の配信元
-    process: 1. 待たずに `_snapshot` を 1 回だけ読み、状態の順に `serving` の配信元を返す
-  - name: statuses
-    title: 状態の一覧
-    kind: メソッド
-    summary: '`sources[]` の順の状態を返す'
-    scope: public
-    thread_safe: true
-    returns:
-      type: list[SourceStatus]
-      description: 状態の並び
-    process: 1. 待たずに `_snapshot` の状態を返す（初回の読み込みの間は空）
-  - name: loading
-    title: 読み込み中
-    summary: 全ての行の初回の読み込みが終わっていないかを待たずに返す
-    description: '`@property`。'
-    kind: メソッド
-    scope: public
-    thread_safe: true
-    returns:
-      type: bool
-      description: '`_ready` が立っていないとき `True`'
-    process: 1. `_ready` が立っていなければ `True` を返す
-  - name: wait_loaded
-    title: 読み込みの待ち
-    summary: 全ての行の初回の読み込みが終わるまで、スレッドを持たずに待つ
-    description: 全ての配信元を扱う非同期の入口（端末の設定の API・管理の MCP の `status` 以外のツール）が、`asyncio.to_thread` でサービスを呼ぶ前に待つ。`served` は待たない
-    kind: メソッド
-    scope: public
-    is_async: true
-    thread_safe: true
-    returns:
-      type: None
-      description: 読み込みが終わったら戻る
-    process: 1. 指す行の待ち（`every=True`）を await する
+  - name: SourceRegistry
+    title: 配信元の一覧
+    container: project_index/features/sources/registry.py
+    usecase: 共通
+    role: レジストリ
+    summary: 配信中の配信元と状態を持ち、読み直しで一覧ごと差し替える
+    description: |-
+      一覧は `dict[str, ServedSource]` と `list[SourceStatus]` の組を 1 つの属性で持ち、読み直しは新しい組を作り終えてから属性を入れ替える。
+      読む側は入れ替えの前後どちらかの組だけを見るので、ロックを取らない。読み直し同士は `_reload_lock` で順にする。
+      起動の読み込み（`load`）は行ごとに読み込み、読み込み終えた行を組に加えて入れ替える。要求は指す行の読み込みだけを待つ（インターフェース定義『起動』の配信元の読み込みの単位）。
+    kind: クラス
+    properties:
+      - name: _snapshot
+        title: 一覧
+        type: tuple[dict[str, ServedSource], list[SourceStatus]]
+        access: 内部 (_)
+        default: ({}, [])
+        description: 配信中の配信元（ID → 配信元）と、`sources[]` の順の状態
+      - name: _reload_lock
+        title: 読み直しの排他
+        type: threading.Lock
+        access: 内部 (_)
+        description: 読み直しを 1 つずつにする
+      - name: _entries
+        title: 行の控え
+        type: dict[str, tuple[SourceEntry, int]]
+        access: 内部 (_)
+        default: '{}'
+        description: 配信中の ID → 読んだ端末の設定の行と位置。`default_ref` が進んだときの組み立て直しに使う
+      - name: _on_rebuilt
+        title: 組み立て直した後の処理
+        type: Callable[[ServedSource], None] | None
+        access: 内部 (_)
+        default: None
+        description: 初期化の引数 `on_rebuilt` で受け取り、`get` が配信元を組み立て直して差し替えた後に、新しい配信元を渡して呼ぶ。`None` なら呼ばない
+      - name: _ready
+        title: 読み込みの済み
+        type: threading.Event
+        access: 内部 (_)
+        description: 全ての行の初回の読み込みが終わったか。初期化の引数 `loading` が `True` なら立てずに作り、`False`（既定）なら立てて作る。`load` が全ての行を読み込もうとし終えたときと、`reload` が終わるとき（例外で止まったときも）に立てる
+      - name: _rows
+        title: 端末の設定の行
+        type: list[SourceEntry]
+        access: 内部 (_)
+        default: '[]'
+        description: '`load`・`reload` が受け取った端末の設定の `sources[]`。指す行を決めるのに使う'
+      - name: _rows_done
+        title: 行の読み込みの済み
+        type: list[threading.Event]
+        access: 内部 (_)
+        default: '[]'
+        description: '`_rows` と同じ順の、行ごとの読み込みが終わったか（例外で止まった行も立てる）。`load` が立てずに作り、`reload` は全て立てる'
+      - name: _requested
+        title: 先に読み込む行
+        type: list[int]
+        access: 内部 (_)
+        default: '[]'
+        description: 待っている要求が指す行の位置を、届いた順に並べる。`_waiters_lock` を持って足し引きする
+      - name: _on_waiting
+        title: 待ちを受け取った後の処理
+        type: Callable[[], None] | None
+        access: 内部 (_)
+        default: None
+        description: 初期化の引数 `on_waiting` で受け取り、`wait_for` が読み込みの済んでいない行の待ちを受け取って `_requested` に足した後に呼ぶ。`None` なら呼ばない（テストが待ちの受け取りを確かめる）
+      - name: _waiters
+        title: 読み込みの待ち手
+        type: list[tuple[asyncio.AbstractEventLoop, asyncio.Future[None], frozenset[int]]]
+        access: 内部 (_)
+        default: '[]'
+        description: '`wait_for`・`wait_loaded` が待っているイベントループと Future と、待っている行の位置。`_waiters_lock`（`threading.Lock`）を持って足し引きする'
+    methods:
+      - name: reload
+        title: 読み直す
+        kind: メソッド
+        summary: 端末の設定の全行を読み直し、一覧を差し替える
+        scope: public
+        thread_safe: true
+        side_effects: 一覧を入れ替える
+        args:
+          - name: terminal
+            title: 端末の設定
+            type: TerminalConfig
+            required: true
+            passing: positional
+            description: 読んだ端末の設定
+        returns:
+          type: list[SourceStatus]
+          description: '`sources[]` の順の状態'
+        process: |-
+          1. `_reload_lock` を取る
+          2. 端末の設定から参照先の配信元の引き当てを作り（端末の設定からの引き当て）、`sources[]` の行ごとに配信元を読む（配信元の読み込み。引き当てを渡す）
+          3. 配信する配信元の ID が先の行と重なる場合（`id` を省いて設定の `name` が同じなど）、後の行を `sources[{n}].id` の重複の違反を持つ `not_served` にする
+          4. 新しい組を作り、`_snapshot` を入れ替える
+             - `[info]` 配信元を読み直した（配信中の ID の並び・外した数）
+          5. `_rows` を `sources[]` に替え、`_rows_done` を行の数だけ立てて作り、`_ready` を立て、`_waiters_lock` を持って `_waiters` を取り出して空にし、待ち手ごとに `loop.call_soon_threadsafe` で Future を済ませて（済んだ Future と閉じたループは飛ばす）、状態を返す
+             - 手順 2〜4 で例外が起きた場合も `_ready` を立てて待ち手を済ませてから送り直す（`_snapshot` は入れ替えない）
+        unit_tests:
+          - name: test_source_registry_reload
+            case: 正常
+            summary: 状態を行の順に返す
+            condition: '`sources` に配信できる行・検証に失敗する行・無効の行'
+            mock: 配信元の読み込み（行ごとに決めた結果を返す偽物）
+            expected: 状態が `serving`・`not_served`・`disabled` の順で、`served()` は 1 つ
+          - name: test_source_registry_reload_when_duplicate_name
+            case: 正常
+            summary: 既定の ID が重なる
+            condition: '`id` を省いた 2 行の設定の `name` がどちらも `a`'
+            mock: 配信元の読み込み（偽物）
+            expected: 後の行が `not_served` で違反が `sources[1].id`、`rule` が `a は既に使用されています`
+          - name: test_source_registry_reload_when_reading
+            case: 正常
+            summary: 読み直しの間は古い一覧で応える
+            condition: 読み込みの偽物が `threading.Event` で止まっている間に別のスレッドから `get("a")`
+            mock: 配信元の読み込み（止められる偽物）
+            expected: '`get` が待たずに古い配信元を返し、読み直しの後は新しい配信元を返す'
+          - name: test_source_registry_reload_when_loading
+            case: 正常
+            summary: 初回の読み込みまで wait_loaded を待たせ、スレッドは持たない
+            condition: '`SourceRegistry(loading=True)`。読み込みの偽物が `threading.Event` で止まっている間に、イベントループで `wait_loaded()` を 2 つ待たせ、別のスレッドで `reload` を流す'
+            mock: 配信元の読み込み（止められる偽物）
+            expected: 合図の前は `loading` が `True` で `wait_loaded()` が済まず、`statuses()`・`served()` は待たずに空を返す。合図の後は `wait_loaded()` が 2 つとも済み、`get` が配信元を、`served` が 1 つを返し、`loading` が `False`
+          - name: test_source_registry_reload_when_failed
+            case: 異常
+            summary: 読み込みが例外で止まっても待ちを解く
+            condition: '`SourceRegistry(loading=True)`。`wait_loaded()` を 1 つ待たせ、読み込みの偽物が `RuntimeError` を送る'
+            mock: 配信元の読み込み（例外を送る偽物）
+            expected: '`reload` が `RuntimeError` を送り、`wait_loaded()` が済み、`loading` が `False` で `served()` が空を返す'
+      - name: load
+        title: 行ごとに読み込む
+        kind: メソッド
+        summary: 起動のときに、端末の設定の行を 1 つずつ読み込み、読み込み終えた行から配信する
+        description: 起動の裏のスレッドが 1 回だけ呼ぶ。行の読み込み（配信元の読み込み）は `_reload_lock` の外で行い、組の入れ替えだけを `_reload_lock` の中で行う
+        scope: public
+        thread_safe: true
+        side_effects: 一覧を行ごとに入れ替える。待っている要求の待ちを解く
+        args:
+          - name: terminal
+            title: 端末の設定
+            type: TerminalConfig
+            required: true
+            passing: positional
+            description: 読んだ端末の設定
+        returns:
+          type: None
+          description: なし
+        process: |-
+          1. `_waiters_lock` を持って `_rows` を `sources[]` にし、`_rows_done` を行の数だけ立てずに作る。続けて `terminal_lookup(terminal)` でほかの配信元のスキーマの参照先の引き当てを作り、`_reload_lock` を持って `_lookup` に持たせる
+          2. 読み込みの済んでいない行が無くなるまで、次の行を選んで読み込む
+             - 次の行は、`_requested` の先頭から見て読み込みの済んでいない最初の行。無ければ、読み込みの済んでいない行のうち位置が一番小さい行
+             - 行を配信元の読み込み（`lookup` に手順 1 の引き当て）で読む。例外の場合、`[error]` 配信元の行の読み込みに失敗した（行の位置・例外のスタックトレース）を書き、状態を `not_served`・ID を行の `id`（無ければ `sources[{n}]`）・違反を `Violation(path="sources[{n}]", rule="読み込みに失敗しました（{例外の型}: {本文}）", fix="エラーログを確かめ、reload で読み直してください")` にする
+          3. 読み込んだ行ごとに `_reload_lock` を取り、今の組に行を加えた新しい組を作って `_snapshot` と `_entries` を入れ替える。状態は行の位置の順に並べる
+             - 配信する配信元の ID が、先の位置の行の配信中の ID と重なる場合、その行を `sources[{n}].id` の重複の違反を持つ `not_served` にする
+             - 後の位置の行が先に読み込まれて同じ ID で配信中の場合、その後の行を同じ違反の `not_served` に替え、この行を配信する
+          4. 行の `_rows_done` を立て、`_waiters_lock` を持って、待っている行が全て済んだ待ち手を `_waiters` から取り出し、`loop.call_soon_threadsafe` で Future を済ませる（済んだ Future と閉じたループは飛ばす）
+          5. 全ての行を読み込もうとし終えたら `[info]` 配信元を読み直した（配信中の ID の並び・外した数）を書き、`_ready` を立てて残りの待ち手を全て済ませる
+             - 手順 1〜4 で、行の読み込み以外の例外が起きた場合も、全ての `_rows_done` と `_ready` を立てて待ち手を全て済ませてから送り直す
+        unit_tests:
+          - name: test_source_registry_load
+            case: 正常
+            summary: 行ごとに読み込み、全ての行を読み込むと読み込み中が終わる
+            condition: '`SourceRegistry(loading=True)`。`sources` に配信できる 2 行と無効の 1 行'
+            mock: 配信元の読み込み（行ごとに決めた結果を返す偽物）
+            expected: '`load` の後に `loading` が `False`、`statuses()` が行の順に 3 つ、`served()` が 2 つ'
+          - name: test_source_registry_load_when_schema_ref
+            case: 正常
+            summary: 行ごとの読み込みに、端末の設定から作ったほかの配信元の引き当てを渡す
+            condition: '`SourceRegistry(loading=True)`。`sources` に `id` が a・b の 2 行'
+            mock: 配信元の読み込み（受け取った `lookup` を記録する偽物）
+            expected: 2 行の読み込みが同じ `lookup` を受け取り、`lookup("b")` が b の行の先頭の設定のパス、`lookup("missing")` が `None`
+          - name: test_source_registry_load_when_lookup_failed
+            case: 異常
+            summary: 引き当ての作成が例外で止まっても、待ちを解いて読み込み中を終える
+            condition: '`SourceRegistry(loading=True)` を `wait_loaded()` で待っている間に、`terminal_lookup` が例外を送る `load`'
+            mock: '`terminal_lookup`（例外を送る偽物）'
+            expected: '`wait_loaded()` が済み、`loading` が `False`、`load` が例外を送り直す'
+            exception: 引き当ての作成の例外
+          - name: test_source_registry_load_when_row_loading
+            case: 正常
+            summary: 読み込んだ行は、他の行の読み込み中でも引ける
+            condition: '`SourceRegistry(loading=True)`。2 行目の読み込みの偽物が `threading.Event` で止まっている間に、別のスレッドから `get("a")`'
+            mock: 配信元の読み込み（2 行目だけ止められる偽物）
+            expected: '`get("a")` が待たずに 1 行目の配信元を返し、`loading` が `True`'
+          - name: test_source_registry_load_when_requested
+            case: 正常
+            summary: 待っている要求が指す行を先に読み込む
+            condition: '`SourceRegistry(loading=True, on_waiting=...)`。行 a・b・c で、a の読み込みの偽物が止まっている間に、イベントループで `wait_for(ids=["c"])` を待たせ、`on_waiting` が呼ばれてから a を進める'
+            mock: 配信元の読み込み（読んだ行の順を記録し、a だけ止められる偽物）
+            expected: 読んだ行の順が a・c・b で、`wait_for` が b を読む前に済む
+          - name: test_source_registry_load_when_row_failed
+            case: 異常
+            summary: 行の読み込みが例外で止まっても、その行を配信せずに残りの行を読み込む
+            condition: '`SourceRegistry(loading=True)`。行 broken（`id` あり）・sample で、broken の読み込みの偽物が `RuntimeError` を送る。broken を `wait_for(ids=["broken"])` で待たせる'
+            mock: 配信元の読み込み（broken だけ例外を送る偽物）
+            expected: '`wait_for` が済み、`get("broken")` が `SourceNotServedError`（違反の `path` が `sources[0]`）を送り、`get("sample")` が配信元を返し、`loading` が `False`'
+            exception: 行の読み込みの例外
+          - name: test_source_registry_load_when_duplicate_loaded_later
+            case: 正常
+            summary: 後の行が先に読み込まれて ID が重なる
+            condition: 3 行の設定の 2・3 行目が `id` を省き `name` がどちらも `a`。1 行目の読み込みを止めている間に、3 行目の scope に当たる作業場所で `wait_for` を呼び、3 行目を 2 行目より先に読み込ませる
+            mock: 配信元の読み込み（偽物）
+            expected: 読み込みの順が 1・3・2 行目で、全ての行を読み込んだ後に、2 行目が `serving`、3 行目が `not_served` で違反が `sources[2].id`。`get("a")` が 2 行目の配信元を返す
+      - name: wait_for
+        title: 指す行の待ち
+        kind: メソッド
+        summary: 要求が指す配信元の行の読み込みだけを、スレッドを持たずに待つ
+        description: 配信元を指す非同期の入口（文書の MCP・読み取り API）が、`asyncio.to_thread` でサービスを呼ぶ前に待つ。待っている行を `_requested` に足し、`load` に先に読み込ませる
+        scope: public
+        is_async: true
+        thread_safe: true
+        args:
+          - name: ids
+            title: 配信元の ID
+            type: Sequence[str] | None
+            required: false
+            default: None
+            passing: keyword
+            description: 要求が指す配信元の ID
+          - name: cwd
+            title: 作業場所
+            type: str | None
+            required: false
+            default: None
+            passing: keyword
+            description: '`ids` を省いたときに、端末の設定の `scope` で指す行を決める作業場所'
+          - name: every
+            title: 全ての行
+            type: bool
+            required: false
+            default: 'False'
+            passing: keyword
+            description: '`True` なら全ての行を待つ（`wait_loaded` と同じ）'
+        returns:
+          type: None
+          description: 指す行の読み込みが終わったら戻る
+        process: |-
+          1. `_ready` が立っていれば戻る
+          2. 待つ行を決める
+             - `every` が `True` なら全ての行
+             - `ids` を渡した場合、ID ごとに、`id` がその ID の行。その ID の行が無ければ、`id` を持たない行の全て（読み込むまで ID が決まらない）
+             - `cwd` を渡した場合、`cwd` を正規化したパスが行の `scope.write` か `scope.read` のパターンに当たる行。当たる行が無ければ全ての行（ワークツリーの照合は設定を読み込むまでできない）
+             - どれも渡さない場合、待たずに戻る
+          3. 動いているイベントループで Future を作り、`_waiters_lock` を持って待つ行から読み込みの済んだ行を除く。残りが無ければ戻る。残りがあれば、残りの行を `_requested` に足し（既にある行は足さない）、`_waiters` に入れる
+          4. `_on_waiting` があれば呼ぶ
+          5. Future を await する。取り消された場合、`_waiters` から外して送り直す
+        unit_tests:
+          - name: test_source_registry_wait_for
+            case: 正常
+            summary: 指す行の読み込みだけを待つ
+            condition: '`SourceRegistry(loading=True)`。行 a・b で、b の読み込みの偽物が止まっている間に `wait_for(ids=["a"])` と `wait_for(ids=["b"])`'
+            mock: 配信元の読み込み（b だけ止められる偽物）
+            expected: '`ids=["a"]` は a を読み込んだ後に済み、`ids=["b"]` は合図を出すまで済まない'
+          - name: test_source_registry_wait_for_when_cwd
+            case: 正常
+            summary: 作業場所が scope に当たる行を待つ
+            condition: '行 a（`scope.read` が `/w/a/**`）・b（`scope.read` が `/w/b/**`）で、b の読み込みの偽物が止まっている間に `wait_for(cwd="/w/a/x")` と `wait_for(cwd="/w/c")`'
+            mock: 配信元の読み込み（b だけ止められる偽物）
+            expected: '`cwd="/w/a/x"` は a を読み込んだ後に済み、当たる行が無い `cwd="/w/c"` は合図を出すまで済まない'
+          - name: test_source_registry_wait_for_when_id_less_row
+            case: 正常
+            summary: ID を持たない行は、ID で指す要求でも待つ
+            condition: '行 a（`id` あり）・`id` を持たない行（設定の `name` が `n`）で、2 行目の読み込みの偽物が止まっている間に `wait_for(ids=["n"])`'
+            mock: 配信元の読み込み（2 行目だけ止められる偽物）
+            expected: 合図を出すまで済まず、出した後に済んで `get("n")` が配信元を返す
+          - name: test_source_registry_wait_for_when_cancelled
+            case: 正常
+            summary: 取り消された待ちを外す
+            condition: '`wait_for(ids=["b"])` を待たせた Task を取り消す'
+            mock: 配信元の読み込み（止められる偽物）
+            expected: '`CancelledError` を送り、`_waiters` が空'
+      - name: get
+        title: 引く
+        kind: メソッド
+        summary: 配信中の配信元を ID で引く
+        scope: public
+        thread_safe: true
+        args:
+          - name: source_id
+            title: 配信元の ID
+            type: str
+            required: true
+            passing: positional
+            description: 引く ID
+        returns:
+          type: ServedSource
+          description: 配信中の配信元
+        description: '`load` の間にまだ読み込んでいない行の ID を引いた場合、その行の読み込みを待つ（スレッドを止める）。非同期の入口は先に `wait_for` で待ち、イベントループのスレッドで止まらないようにする'
+        process: |-
+          1. 読み込み中で、ID が `_snapshot` に無く、その ID を指す行（`wait_for` の手順 2 と同じ決め方）に読み込みの済んでいない行がある場合、`_waiters_lock` を持ってその行を `_requested` に足し、行の `_rows_done` を待つ
+          2. 待たずに `_snapshot` を 1 回だけ読み、配信中にあれば、設定の commit を持つ配信元は `default_ref` を commit に解いて比べる。違う場合、`_reload_lock` を取ってその行だけを配信元の読み込みで読み直し、`_snapshot` のその配信元と状態を差し替え、`_reload_lock` を持ったまま `_on_rebuilt` を新しい配信元で呼んでから返す（`[info]` default_ref が進んだので配信元を組み立て直した（ID・前と後の commit））。同じなら配信中の配信元を返す
+          3. 状態の一覧にその ID が `not_served` か `disabled` である場合、`SourceNotServedError`（`violations` に状態の違反、`disabled` に無効か）を送る
+          4. どちらにも無い場合、`UnknownSourceError` を送る
+        exceptions:
+          - name: SourceNotServedError
+            condition: 検証で外したか無効の配信元
+            message: '`{id} は配信していません（{理由}）`'
+          - name: UnknownSourceError
+            condition: 端末の設定に無い ID
+            message: '`配信元 {id} はありません`'
+        unit_tests:
+          - name: test_source_registry_get
+            case: 正常
+            summary: 配信中を引く
+            condition: '`a` が配信中'
+            mock: なし（`_snapshot` を直に入れる）
+            expected: '`a` の配信元'
+          - name: test_source_registry_get_when_not_served
+            case: 異常
+            summary: 外した配信元
+            condition: '`b` が `not_served`'
+            mock: なし
+            expected: '`SourceNotServedError` の `violations` が `b` の違反、`disabled` が `False`'
+            exception: 検証で外した
+          - name: test_source_registry_get_when_unknown
+            case: 異常
+            summary: 無い配信元
+            condition: '`get("z")`'
+            mock: なし
+            expected: '`UnknownSourceError`'
+            exception: 無い ID
+          - name: test_source_registry_get_when_default_ref_moved
+            case: 正常
+            summary: default_ref が進んだら組み立て直す
+            condition: '`a` を読んだ後に `default_ref` へ設定の行を足す commit を積む'
+            mock: なし（一時フォルダで `git init`）
+            expected: '`get("a")` が足した行を持つ配信元を返し、2 回目の `get` は読み直さない'
+            exception: '-'
+          - name: test_source_registry_get_when_default_ref_moved_with_on_rebuilt
+            case: 正常
+            summary: 組み立て直した後の処理を呼ぶ
+            condition: '`on_rebuilt` に呼ばれた配信元を記録する関数を渡し、`a` を読んだ後に `default_ref` へ設定の行を足す commit を積む'
+            mock: なし（一時フォルダで `git init`）
+            expected: '`get("a")` の後に `on_rebuilt` が新しい配信元で 1 回呼ばれ、2 回目の `get` では呼ばれない'
+            exception: '-'
+          - name: test_source_registry_get_when_row_loading
+            case: 正常
+            summary: 読み込んでいない行の ID を引くと、その行の読み込みを待つ
+            condition: '`SourceRegistry(loading=True)`。行 a・b で、`load` が a の読み込みで止まっている間に、別のスレッドから `get("b")`'
+            mock: 配信元の読み込み（a だけ止められる偽物）
+            expected: '`get("b")` が a を進めるまで戻らず、進めた後に b の配信元を返す。読んだ行の順が a・b'
+            exception: '-'
+      - name: served
+        title: 配信中
+        kind: メソッド
+        summary: 配信中の配信元を `sources[]` の順に返す
+        scope: public
+        thread_safe: true
+        returns:
+          type: list[ServedSource]
+          description: 配信中の配信元
+        process: 1. 待たずに `_snapshot` を 1 回だけ読み、状態の順に `serving` の配信元を返す
+      - name: statuses
+        title: 状態の一覧
+        kind: メソッド
+        summary: '`sources[]` の順の状態を返す'
+        scope: public
+        thread_safe: true
+        returns:
+          type: list[SourceStatus]
+          description: 状態の並び
+        process: 1. 待たずに `_snapshot` の状態を返す（初回の読み込みの間は空）
+      - name: loading
+        title: 読み込み中
+        summary: 全ての行の初回の読み込みが終わっていないかを待たずに返す
+        description: '`@property`。'
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        returns:
+          type: bool
+          description: '`_ready` が立っていないとき `True`'
+        process: 1. `_ready` が立っていなければ `True` を返す
+      - name: wait_loaded
+        title: 読み込みの待ち
+        summary: 全ての行の初回の読み込みが終わるまで、スレッドを持たずに待つ
+        description: 全ての配信元を扱う非同期の入口（端末の設定の API・管理の MCP の `status` 以外のツール）が、`asyncio.to_thread` でサービスを呼ぶ前に待つ。`served` は待たない
+        kind: メソッド
+        scope: public
+        is_async: true
+        thread_safe: true
+        returns:
+          type: None
+          description: 読み込みが終わったら戻る
+        process: 1. 指す行の待ち（`every=True`）を await する

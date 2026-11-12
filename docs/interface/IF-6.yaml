@@ -15,6 +15,8 @@ flows:
       - name: 入力
         description: '`worktree` にワークツリー x のパス、文書 1 の `update`（`expected_version` と `set: {name}`）'
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -28,6 +30,8 @@ flows:
         T->>WT: 一時ファイルに書いてから置き換える
         T-->>C: applied: true、新しい version と差分
       ```
+
+      <!-- /map -->
     expected:
       - '`applied: true` で、文書 1 の `status` が `updated`、`version` が書き込み前と違う'
       - ワークツリー x の文書 1 の `name` が `set` の値になり、他の項目は変わらない
@@ -44,6 +48,8 @@ flows:
       - name: 入力
         description: '`create`・`kind`・`data`。`id` は省く'
     flow: |-
+      <!-- map: {"title": "正常系（文書を作る）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -57,6 +63,8 @@ flows:
         T->>WT: generators のスクリプトを流す
         T-->>C: 作った文書の id と version
       ```
+
+      <!-- /map -->
     expected:
       - '`status` が `created` で、`ids.format` に合う `id` と `version` を返す'
       - ワークツリー x の `documents[].paths` に当たる場所に新しい YAML ができる
@@ -70,6 +78,8 @@ flows:
       - name: 入力
         description: 文書 1 に `unset`（任意の項目）・`add_to`（`tags` に `c`）・`remove_from`（`tags` から `a`）・`text_edits`（`description` の一部）を持つ `update`、文書 2 に `replace`
     flow: |-
+      <!-- map: {"title": "正常系（項目の操作を組み合わせる）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -81,6 +91,8 @@ flows:
         T->>WT: 2 つの YAML を書く
         T-->>C: updated と replaced
       ```
+
+      <!-- /map -->
     expected:
       - 文書 1 の任意の項目が無く、`tags` が `b`・`c` になり、`description` の一部だけが置き換わる
       - 文書 2 が `data` の全項目と同じになり、`data` に無い項目は残らない
@@ -93,6 +105,8 @@ flows:
       - name: 入力
         description: '正常系と同じ `update` と `dry_run: true`'
     flow: |-
+      <!-- map: {"title": "正常系（試しに書く）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -102,6 +116,8 @@ flows:
         T->>T: 本番と同じ検証とバージョンの確認
         T-->>C: applied: false と差分
       ```
+
+      <!-- /map -->
     expected:
       - '`applied` が `false` で、`results[0].diff` に差分がある'
       - ワークツリー x のファイルは変わらない
@@ -114,6 +130,8 @@ flows:
       - name: 入力
         description: '0 番目は通る `update`、1 番目はスキーマの必須の項目を `unset` する `update`。`atomic: false`'
     flow: |-
+      <!-- map: {"title": "正常系（一部だけ書く）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -125,6 +143,8 @@ flows:
         T->>WT: 0 番目だけを書く
         T-->>C: 0 番目は updated、1 番目は failed と違反
       ```
+
+      <!-- /map -->
     expected:
       - '`applied: true` で、`results[0].status` が `updated`、`results[1].status` が `failed`'
       - '`results[1].errors` に違反したパス・決まり・直し方がある'
@@ -141,6 +161,8 @@ flows:
       - name: 入力
         description: '`source: memo` の `create`、続けて同じ文書の `update`'
     flow: |-
+      <!-- map: {"title": "正常系（Git 管理外の配信元に書く）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -152,6 +174,8 @@ flows:
         T->>MF: YAML を書く
         T-->>C: id と version
       ```
+
+      <!-- /map -->
     expected:
       - memo のフォルダに新しい YAML ができ、`created`・`updated` に書いた日時が入る
       - 続けての `update` で `updated` だけが新しい日時になり、`created` は変わらない
@@ -166,6 +190,8 @@ flows:
       - name: 入力
         description: 文書 1 の `body` に `<!-- flow -->` を含む値を `set` する update 1 件
     flow: |-
+      <!-- map: {"title": "正常系（mdmark を使えない）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -178,6 +204,8 @@ flows:
         T->>WT: 一時ファイルに書いてから置き換える
         T-->>C: applied: true、results[0].unchecked（body・理由）
       ```
+
+      <!-- /map -->
     expected:
       - '1 回目も 2 回目も `applied: true` で、`results[0].status` が `updated`、ワークツリー x の文書 1 の `body` が `set` の値になる'
       - '1 回目の `results[0].unchecked` が `[{path: body, reason: ...}]` で、`reason` に mdmark の CLI が見つからないことが入る'
@@ -192,6 +220,8 @@ flows:
         description: 正常系（一部だけ書く）と同じ 2 件で、`atomic` は既定（`true`）。1 番目の操作は、加えて項目 `count` に文字列を `set` する
         notes: '`unset` する項目のスキーマは `title`・`description`・`examples` を持ち、`x-rules` を持たない。`count` のスキーマは `type: integer` だけを持つ'
     flow: |-
+      <!-- map: {"title": "異常系（検査に通らない・ValidationFailedError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -201,6 +231,8 @@ flows:
         T->>T: 全ての操作を当ててから検査し、1 番目が通らない
         T-->>C: isError（添字 1・違反したパス・決まり・直し方・違反した項目のスキーマの説明）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、添字 1 の 2 件の違反のパス・決まり・直し方を返す'
       - '`unset` した項目の違反の `schema` に `title`・`description`・`examples` が入り、`x-rules` とスキーマのほかの項目は入らない'
@@ -218,6 +250,8 @@ flows:
       - name: 入力
         description: '2 件。0 番目は通る update、1 番目は文書 1 の `body` に `<!-- flow -->` を含む値を `set` する update。`atomic` は既定（`true`）'
     flow: |-
+      <!-- map: {"title": "異常系（Markdown の値に mdmark の警告がある・ValidationFailedError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -230,6 +264,8 @@ flows:
         MD-->>T: -:3: diagram_invalid: {内容}、ずれ 1 件、終了コード 1
         T-->>C: isError（添字 1・body のパス・mdmark の種類と行・内容）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、添字 1 の違反として、パス `body`、決まり `mdmark の diagram_invalid（3 行目）`、直し方に mdmark の内容を返す'
       - 0 番目の文書も文書 1 も書き換わらない
@@ -247,6 +283,8 @@ flows:
       - name: 入力
         description: '`source: notes` の `update`、`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "異常系（書き込めない配信元・SourceNotWritableError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -256,6 +294,8 @@ flows:
         T->>T: notes の scope.write に cwd が当たらない
         T-->>C: isError（notes は読み取りだけ、使える配信元の一覧）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、notes に書き込めないことと、今の作業場所から使える配信元の一覧を返す'
       - notes のフォルダのファイルは変わらない
@@ -268,6 +308,8 @@ flows:
       - name: 入力
         description: '`cwd` は sample のクローン本体で、`worktree` を渡さない `update`'
     flow: |-
+      <!-- map: {"title": "異常系（書く先がクローン本体・TargetIsCloneError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -277,6 +319,8 @@ flows:
         T->>T: 書く先がクローン本体になる
         T-->>C: isError（クローン本体には書かない、worktree でワークツリーを指すこと）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、クローン本体には書かないことと、`worktree` でワークツリーを指すことを返す'
       - sample のクローン本体のファイルは変わらない
@@ -291,6 +335,8 @@ flows:
       - name: 入力
         description: 読んだときの `expected_version` での `update`
     flow: |-
+      <!-- map: {"title": "異常系（読んだ後に変わった・VersionMismatchError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -302,6 +348,8 @@ flows:
         T->>T: 今のバージョンと expected_version が違う
         T-->>C: isError（今のバージョンと差分、読み直して呼び直すこと）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、今のバージョン・読んだときとの差分・読み直して呼び直すことを返す'
       - 文書 1 の YAML は直接編集した内容のまま
@@ -315,6 +363,8 @@ flows:
       - name: 入力
         description: '`kind: no-such-kind` の `create`'
     flow: |-
+      <!-- map: {"title": "異常系（知らない種類・UnknownKindError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -323,6 +373,8 @@ flows:
         C->>T: operations: create・kind: no-such-kind
         T-->>C: isError（知らない種類と、配信元の種類の一覧）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、`no-such-kind` と sample の種類の一覧を返す'
       - ファイルは増えない
@@ -335,6 +387,8 @@ flows:
       - name: 入力
         description: '`id: doc-l`（文書 1 の ID の綴り違い）の `update`'
     flow: |-
+      <!-- map: {"title": "異常系（無い文書・DocumentNotFoundError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -343,6 +397,8 @@ flows:
         C->>T: operations: update・id: doc-l
         T-->>C: isError（見つからない ID と近い ID の候補）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、`doc-l` と近い ID の候補 `doc-1` を返す'
     test: test_error_when_document_not_found
@@ -354,6 +410,8 @@ flows:
       - name: 入力
         description: 1 回目は 51 件の `operations`、2 回目は `expected_version` の無い `update`、3 回目は 2 か所に一致する `old` の `text_edits`
     flow: |-
+      <!-- map: {"title": "異常系（引数の誤り・InvalidArgumentError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -364,6 +422,8 @@ flows:
         C->>T: operations: expected_version の無い update
         T-->>C: isError（operations[0].expected_version が必須）
       ```
+
+      <!-- /map -->
     expected:
       - 1 回目が上限 50 件を超えたことを返す
       - 2 回目が `operations[0].expected_version` が必須であることを返す
@@ -379,6 +439,8 @@ flows:
         description: '`documents[0].paths` が無い配信元。`scope.write` は sample のフォルダ'
         notes: id `broken`
     flow: |-
+      <!-- map: {"title": "異常系（配信していない配信元・SourceNotServedError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -387,6 +449,8 @@ flows:
         C->>T: source: broken
         T-->>C: isError（配信していない配信元、違反したキーのパスと理由）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、broken を配信していないことと `documents[0].paths` の違反を返す'
     test: test_error_when_source_not_served
@@ -398,6 +462,8 @@ flows:
       - name: 入力
         description: '`worktree` に `worktrees` に当たらない一時フォルダのパス'
     flow: |-
+      <!-- map: {"title": "異常系（ワークツリーに当たらない・WorktreeNotMatchedError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -406,6 +472,8 @@ flows:
         C->>T: worktree: 当たらないパス
         T-->>C: isError（渡したパスと worktrees の値）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、渡したパスと sample の `worktrees` の値を返す'
       - 一時フォルダにファイルを書かない
@@ -421,6 +489,8 @@ flows:
         description: '`operations` は `create`・`kind: rule`・`id: index` の 1 件。`worktree` にワークツリー x'
         notes: 置き場所は `docs/rule/index.yaml` になる
     flow: |-
+      <!-- map: {"title": "異常系（置き場所が除外の名前に当たる・InvalidArgumentError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -430,6 +500,8 @@ flows:
         T->>T: 置き場所 docs/rule/index.yaml のファイル名が exclude に当たる
         T-->>C: isError（operations[0].kind・置き場所が exclude に当たる）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、違反の `path` が `operations[0].kind`、決まりに置き場所 `docs/rule/index.yaml` が行 `rule` の `exclude` に当たること、`fix` に `id` を変えるか `exclude` から外すことを返す'
       - ワークツリー x に `docs/rule/index.yaml` が作られない
@@ -449,6 +521,8 @@ flows:
         description: '1 回目は `update`（`id: d1`・`set: {name: 新しい名前}`）。2 回目は `create`（`kind: decisions`・`data` に `name: 決定 2`）。3 回目は `update`（`set: {title: 別の名前}`）。4 回目は `update`（`set: {name: a, title: b}`）'
         notes: '-'
     flow: |-
+      <!-- map: {"title": "正常系（共通のキー名で書く）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -464,6 +538,8 @@ flows:
         T->>WT: title 列に値を持つ YAML を書く
         T-->>C: status created
       ```
+
+      <!-- /map -->
     expected:
       - 1 回目の `diff` が `title` の行だけを書き換え、d1 に `name` 列ができない
       - '2 回目に作った YAML が `title: 決定 2` を持ち、`name` 列を持たない'
@@ -481,6 +557,8 @@ flows:
       - name: 入力
         description: '1 回目は `update`（`id: r1`・`add_to: {tags: [c]}`）。2 回目は `update`（`remove_from: {tags: [b]}`）。3 回目は `update`（`set: {tags: [a, c, d]}`）。4 回目は `update`（`set: {main_tags: [c]}`）。5 回目は `update`（`set: {main_tags: [z]}`）。6 回目は `update`（`add_to: {main_tags: [d]}`）。7 回目は `update`（`remove_from: {main_tags: [c]}`）。8 回目は `update`（`unset: [main_tags]`）。9 回目は `create`（`kind: rules`・`data: {id: r2, tags: [{name: a, main: true}]}`）。10 回目は `update`（`set: {tags: a}`）。11 回目は `update`（`add_to: {tags: [{name: c}]}`）'
     flow: |-
+      <!-- map: {"title": "正常系（オブジェクトの配列のタグを書く）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -504,6 +582,8 @@ flows:
         C->>T: update r1・add_to {tags: [{name: c}]}
         T-->>C: isError（operations[0].add_to.tags は名前の配列で渡す）
       ```
+
+      <!-- /map -->
     expected:
       - '1 回目の後の r1 の `tags` が `[{name: a, main: true}, {name: b}, {name: c}]`'
       - '2 回目の後の r1 の `tags` が `[{name: a, main: true}, {name: c}]`'
@@ -527,6 +607,8 @@ flows:
       - name: 入力
         description: '`update`（`id`: 文書 1・`set: {weight: 2}`）'
     flow: |-
+      <!-- map: {"title": "正常系（変更していない項目の引用符を保つ）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -538,6 +620,8 @@ flows:
         T->>WT: 文書 1 を書き換える
         T-->>C: status updated・diff
       ```
+
+      <!-- /map -->
     expected:
       - '書き換えた文書 1 の YAML の、`weight` の行以外の行が書き込み前の文字列と一致し、`description: ''2020-12''` と `name: "A: b"` が残る'
       - '`results[0].diff` が `weight` の行の `-`・`+` だけを持つ'
@@ -550,6 +634,8 @@ flows:
       - name: サンプルの配信元
         description: 正常系と同じ sample
     flow: |-
+      <!-- map: {"title": "正常系（ツールの説明）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -558,10 +644,12 @@ flows:
         C->>M: tools/list
         M-->>C: ツールの一覧と説明
       ```
+
+      <!-- /map -->
     expected:
       - '`write_docs` の `description` が「範囲のファイルを作成・削除・改名したら、管理用の YAML の行を修正する」を含む'
     test: test_normal_when_tool_description
-lead: 文書の作成・部分更新・置き換えを配列で受け、変更を当てた後の文書を配信元のスキーマと `validators[]` に通してから書き込む。project-index は commit しない。
+lead: 文書の作成・部分更新・置き換えを検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 identifier: write_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーにだけ書く
 idempotent: false

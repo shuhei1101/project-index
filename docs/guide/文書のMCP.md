@@ -91,7 +91,7 @@ rule-inject は、この `path` と `scope` で文書を既読にします。
 次の文書には `path`・`scope` を載せません。
 `markdown` の `<document>` は属性の無い包みになり、`json` の項目は `path`・`scope` を持ちません。
 
-- `ref` を渡して読んだ文書。既読は今のルールの本文を読んだことを表すため
+- `ref` を渡して読んだ文書
 - `list_changes` で `to` を渡したときの文書、`change` が `deleted` の文書
 - 返し済みにした文書
 - `view: ids`・`view: count` の結果と、読めない配信元の文書
@@ -199,19 +199,7 @@ YAML として読めないファイルがあっても、そのファイルを除
 使われているタグは `group_by: tags` で件数つきで引けます。
 配信元をまたいで引くときは `source: "*"` を渡します。
 
-タグの付け方は次のとおりで、`instructions` のタグの行と同じです。
-
-```text
-タグ:
-- 付ける前に `search_docs` の `group_by="tags"` で使われているタグを見て、同じ意味のタグを使い回す
-- 複合語は単語まで分けてタグにする（`エラー処理` は `topic:エラー` と `action:処理`）
-- 動作は `action:`、題材は `topic:`、道具は `tool:` で始める
-- 配信元にタグの規約があれば、`describe(source)` の説明書に従う
-```
-
-タグを `{name, main}` のオブジェクトの配列で持つ種類は、行の `metadata` に `tags: tags[].name` と書くと各要素の `name` を `tags` として扱います。
-`main_tags: tags[main].name` と書くと、`main` が真の要素の `name` を共通のキー `main_tags` として扱います。
-どちらも `filter`・`group_by`・`fields` で他の共通のキーと同じように使え、`fields` は文字列の配列で返します。
+タグの付け方と、タグを `{name, main}` のオブジェクトの配列で持つ種類の読み方は [文書のメタデータ](./コアコンセプト-文書のメタデータ.md) にあります。
 
 ### 抜粋
 

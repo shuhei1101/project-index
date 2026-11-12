@@ -11,6 +11,8 @@ documents の行は、`project-index.yaml` の `documents[]` の 1 行です。
 
 ## 判定フローチャート
 
+<!-- map: {"title": "documents の行の判定"} -->
+
 ```mermaid
 flowchart TD
   START([文書を 1 件、documents の行に入れたい])
@@ -37,6 +39,8 @@ flowchart TD
   Q5 -->|YES| R1
   Q5 -->|NO| R2
 ```
+
+<!-- /map -->
 
 - **※1 種類**: 文書が説明する対象の種類（規約・シナリオ・設計書 など）。`describe(source)` の `kinds[]` の名前（行の `title`・スキーマの `title`）と比べる
 - **※2 形式**: YAML の 1 ファイルが 1 文書か、配列の各要素が 1 文書か（`records`）、本文が別のファイルか（`body_file`）。ソースコードなど YAML でない文書は管理用の YAML の `files[]` の 1 行として扱い、`records: files`・`body_file: path` の行が形式に合う行になる
