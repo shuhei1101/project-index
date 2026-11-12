@@ -596,9 +596,9 @@ functions:
       - name: test_resolve_write_target_when_worktree_config
         case: 正常
         summary: ワークツリーの設定で読み直した配信元を使う
-        condition: '`worktree` に sample のワークツリーを指定し、ワークツリーの設定は登録済みの配信元に無い種類 `term` を持ち、種類 `note` を持たない'
+        condition: '`worktree` に sample のワークツリーを指定する'
         mock: 配信元の一覧（偽物）・作業場所の配信元の読み込み（ワークツリーの設定の配信元を返す偽物）
-        expected: '`source` がワークツリーの設定の配信元で、`source.table("term")` が引け、`source.table("note")` が `UnknownKindError` を送る。作業場所の配信元の読み込みが sample とそのワークツリーで 1 回呼ばれる'
+        expected: '`source` が作業場所の配信元の読み込みの返した配信元そのもので、作業場所の配信元の読み込みが sample とそのワークツリーで 1 回呼ばれる'
       - name: test_resolve_write_target_when_folder_not_reloaded
         case: 正常
         summary: Git の管理外は読み直さない
