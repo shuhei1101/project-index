@@ -518,6 +518,16 @@ def _declared_version(files: list[Path]) -> str | None:
     return version if isinstance(version, str) and version.isdecimal() else None
 
 
+def entry_source_id(entry: SourceEntry) -> str | None:
+    """端末の設定の 1 行が指す配信元の ID（`id`、無ければディスクの設定を重ねた `name`）を返す。"""
+    if entry.id is not None:
+        return entry.id
+    # 読めない設定のファイルは飛ばし、読めたファイルだけを重ねる
+    values, _ = _read_configs([Path(item).expanduser() for item in entry.config])
+    name = merge_configs(values).get("name") if values else None
+    return name if isinstance(name, str) else None
+
+
 def load_source(
     entry: SourceEntry, *, index: int, lookup: SchemaRefLookup | None = None
 ) -> tuple[ServedSource | None, SourceStatus]:

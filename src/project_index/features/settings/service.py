@@ -14,6 +14,7 @@ from project_index.features.settings.types import (
     TerminalConfig,
     TerminalConfigInvalidError,
 )
+from project_index.features.sources.service import entry_source_id
 from project_index.shared.files import replace_file
 from project_index.shared.yaml_io import dump_roundtrip, load_roundtrip
 
@@ -91,14 +92,14 @@ def add_source(
         current_rows = cast("Mapping[str, list[object] | None]", document).get("sources")
         rows: list[object] = list(current_rows or [])
         row = _to_yaml_row(source)
-        # 同じ id の行がある: 既定値を書かない形にそろえて比べ、ファイルは書かない
-        if source.id is not None:
+        # 同じ実効の id（`id`、無ければ設定の `name`）の行がある: 既定値を書かない形にそろえて比べ、ファイルは書かない
+        source_id = entry_source_id(source)
+        if source_id is not None:
             for existing in rows:
-                if (
-                    isinstance(existing, Mapping)
-                    and cast("Mapping[str, object]", existing).get("id") == source.id
-                ):
-                    current = SourceEntry.model_validate(json.loads(json.dumps(existing)))
+                if not isinstance(existing, Mapping):
+                    continue
+                current = SourceEntry.model_validate(json.loads(json.dumps(existing)))
+                if entry_source_id(current) == source_id:
                     return SourceAddResult(result="exists", same=_to_yaml_row(current) == row)
         document["sources"] = [*rows, row]
         # 加えた後を検証し、違反があれば書かない
