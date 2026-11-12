@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import jinja2
 from pydantic import ValidationError
@@ -101,7 +101,7 @@ def _schema_reason(violation: Violation) -> str:
 
 
 def _read_prompt(
-    file: Path, *, directory: Path, schema: object, registry: Registry[Any]
+    file: Path, *, directory: Path, schema: Mapping[str, Any], registry: Registry[Any]
 ) -> tuple[PromptDoc | None, list[tuple[str, str]]]:
     """YAML として読み、スキーマ・id・モデルで検査したプロンプトか、(パス, 理由) の並びを返す。"""
     # YAML として読む
@@ -129,7 +129,7 @@ def _check_file(
     file: Path,
     *,
     directory: Path,
-    schema: object,
+    schema: Mapping[str, Any],
     registry: Registry[Any],
     env: jinja2.Environment,
 ) -> tuple[LoadedPrompt | None, list[PromptProblem]]:
@@ -160,7 +160,8 @@ def _check_file(
 
 def load_prompts(directory: Path, *, required: Collection[str]) -> PromptSet:
     """フォルダのプロンプトの YAML を全て読んで検査し、描画できる一式にする。"""
-    schema = load_yaml(PROMPT_SCHEMA_PATH.read_text(encoding="utf-8"))
+    # 同梱したスキーマの最上位は、キーが文字列の辞書
+    schema = cast("dict[str, Any]", load_yaml(PROMPT_SCHEMA_PATH.read_text(encoding="utf-8")))
     registry = _schema_registry()
     env = build_environment()
     prompts: dict[str, LoadedPrompt] = {}

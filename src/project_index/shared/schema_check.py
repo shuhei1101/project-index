@@ -10,7 +10,7 @@ from project_index.shared.errors import Violation
 from project_index.shared.narrowing import is_dict, is_list
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Iterator
+    from collections.abc import Callable, Iterable, Iterator, Mapping
 
     from jsonschema.exceptions import ValidationError
     from referencing import Registry
@@ -64,16 +64,13 @@ def _from_error(error: ValidationError) -> list[Violation]:
 
 
 def schema_violations(
-    schema: object,
+    schema: Mapping[str, Any],
     value: object,
     *,
     registry: Registry[Any] | None = None,
 ) -> list[Violation]:
     """スキーマの違反を全て集める（`registry` は別のファイルを `$ref` で指すスキーマの解決先）。"""
-    if not is_dict(schema):
-        msg = "スキーマが辞書ではありません"
-        raise TypeError(msg)
-    keyed = cast("dict[str, Any]", schema)
+    keyed = dict(schema)
     validator = (
         Draft202012Validator(keyed)
         if registry is None

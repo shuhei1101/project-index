@@ -62,10 +62,11 @@ __all__ = [
 ]
 
 
-def _source_schema() -> object:
+def _source_schema() -> dict[str, Any]:
     """配布に同梱した配信元の設定のスキーマを読む。"""
     text = resources.files("project_index").joinpath(SOURCE_SCHEMA).read_text(encoding="utf-8")
-    return load_yaml(text)
+    # 同梱したスキーマの最上位は、キーが文字列の辞書
+    return cast("dict[str, Any]", load_yaml(text))
 
 
 def _as_schema(value: object) -> dict[str, Any]:

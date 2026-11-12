@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from importlib import resources
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from project_index.features.settings.types import (
     SourceEntry,
@@ -61,10 +61,11 @@ def state_dir_path(value: str | None, env: Mapping[str, str]) -> Path:
     return xdg_base_dir(env, XDG_STATE_HOME_ENV, DEFAULT_STATE_HOME) / STATE_SUBDIR
 
 
-def _settings_schema() -> object:
+def _settings_schema() -> dict[str, Any]:
     """配布に同梱した端末の設定のスキーマを読む。"""
     text = resources.files("project_index").joinpath(SETTINGS_SCHEMA).read_text(encoding="utf-8")
-    return load_yaml(text)
+    # 同梱したスキーマの最上位は、キーが文字列の辞書
+    return cast("dict[str, Any]", load_yaml(text))
 
 
 def validate_terminal_config(value: object) -> list[Violation]:
