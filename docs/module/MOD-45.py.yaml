@@ -1,111 +1,111 @@
 id: MOD-45
 title: 索引のサーバー / 関連 / graph.py
-lead: 関連の取り出しとたどり。
+lead: 関連の取り出しとたどりを受け持ち、関連の graph.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/features/related/test_graph.py
+  - tests/unit/project_index/features/related/test_graph.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      関連のたどり ..> 関連をたどる
-      関連をたどる ..> 関連の行
-      class 関連のたどり {
-        <<function>>
-      }
-      class 関連をたどる {
-        <<function>>
-      }
-      class 関連の行 {
-        <<function>>
-      }
-      click 関連のたどり href "./MOD-47.py.yaml#関連のたどり"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        関連のたどり ..> 関連をたどる
+        関連をたどる ..> 関連の行
+        class 関連のたどり {
+          <<function>>
+        }
+        class 関連をたどる {
+          <<function>>
+        }
+        class 関連の行 {
+          <<function>>
+        }
+        click 関連のたどり href "./MOD-47.py.yaml#関連のたどり"
 functions:
-- name: related_links
-  title: 関連の行
-  kind: 関数
-  container: project_index/features/related/graph.py
-  usecase: 関連
-  role: 読み取り
-  summary: 文書のメタデータの `related` を関連の行の並びにする
-  scope: public
-  thread_safe: true
-  args:
-  - name: document
-    title: 文書
-    type: Document
-    required: true
-    passing: positional
-    description: 読む文書
-  returns:
-    type: list[RelatedLink]
-    description: 形の合わない行（辞書でない・`to` が無い）は除く
-  process: 1. `metadata["related"]` の各行から `to`・`type`（無ければ空）・`source` を取り、関連の行にする
-- name: walk_related
-  title: 関連をたどる
-  kind: 関数
-  container: project_index/features/related/graph.py
-  usecase: 関連
-  role: 判定
-  summary: 起点から幅優先で `related` をたどり、たどった文書を深さつきで返す
-  scope: public
-  thread_safe: true
-  args:
-  - name: start
-    title: 起点
-    type: Sequence[Document]
-    required: true
-    passing: positional
-    description: 起点の文書
-  - name: documents
-    title: 配信元の文書
-    type: Mapping[str, Document]
-    required: true
-    passing: positional
-    description: ID → 起点の配信元の文書
-  - name: depth
-    title: 深さ
-    type: int
-    required: true
-    passing: keyword
-    description: 1〜`DEPTH_MAX`
-  - name: direction
-    title: 向き
-    type: Literal['out', 'in', 'both']
-    required: true
-    passing: keyword
-    description: たどる向き
-  - name: resolve_other
-    title: 別の配信元の文書を引く
-    type: Callable[[str, str], Document | None]
-    required: true
-    passing: keyword
-    description: (配信元の ID, 文書の ID) → 文書。読めない・無いときは `None`
-  returns:
-    type: tuple[list[tuple[Document, int, str, str, Literal['out', 'in']]], list[str]]
-    description: ((文書, 深さ, 元の ID, 関係の種類, 向き) の並び, 読めなかった相手の知らせ)
-  process: |-
-    1. 起点の ID を訪れた集合に入れる
-    2. 深さ 1 から `depth` まで、前の深さの文書ごとに次をたどる。訪れた文書は飛ばす（循環を防ぐ）
-       - `out` は関連の行の `to`。`source` があれば別の配信元の文書を引き、引けなければ `{source}:{to} は参照できないので除きました` を知らせる。同じ配信元に無い ID は `{to} がありません` を知らせる
-       - `in` は、同じ配信元の文書のうち、関連の行の `to` がその文書の ID で `source` の無い行を持つ文書（逆引きの辞書を 1 回だけ作る）
-    3. たどった順の並びと知らせを返す
-  unit_tests:
-  - name: test_walk_related
-    case: 正常
-    summary: 深さと向き
-    condition: 文書 1 → 文書 2 → 文書 3 の `related`、起点 文書 1、`depth=2`・`out`
-    mock: なし
-    expected: 文書 2（深さ 1）・文書 3（深さ 2）。`depth=1` では文書 2 だけ
-  - name: test_walk_related_when_cycle
-    case: 正常
-    summary: 循環
-    condition: 文書 1 ⇄ 文書 2 の `related`、起点 文書 2、`in`・`depth=4`
-    mock: なし
-    expected: 文書 1 を深さ 1 で 1 回だけ返す
-  - name: test_walk_related_when_other_source
-    case: 正常
-    summary: 読めない別の配信元
-    condition: '`related: [{to: x, type: references, source: other}]`、`resolve_other` が `None`'
-    mock: なし
-    expected: たどった文書が空で、知らせに `other:x`
+  - name: related_links
+    title: 関連の行
+    kind: 関数
+    container: project_index/features/related/graph.py
+    usecase: 関連
+    role: 読み取り
+    summary: 文書のメタデータの `related` を関連の行の並びにする
+    scope: public
+    thread_safe: true
+    args:
+      - name: document
+        title: 文書
+        type: Document
+        required: true
+        passing: positional
+        description: 読む文書
+    returns:
+      type: list[RelatedLink]
+      description: 形の合わない行（辞書でない・`to` が無い）は除く
+    process: 1. `metadata["related"]` の各行から `to`・`type`（無ければ空）・`source` を取り、関連の行にする
+  - name: walk_related
+    title: 関連をたどる
+    kind: 関数
+    container: project_index/features/related/graph.py
+    usecase: 関連
+    role: 判定
+    summary: 起点から幅優先で `related` をたどり、たどった文書を深さつきで返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: start
+        title: 起点
+        type: Sequence[Document]
+        required: true
+        passing: positional
+        description: 起点の文書
+      - name: documents
+        title: 配信元の文書
+        type: Mapping[str, Document]
+        required: true
+        passing: positional
+        description: ID → 起点の配信元の文書
+      - name: depth
+        title: 深さ
+        type: int
+        required: true
+        passing: keyword
+        description: 1〜`DEPTH_MAX`
+      - name: direction
+        title: 向き
+        type: Literal['out', 'in', 'both']
+        required: true
+        passing: keyword
+        description: たどる向き
+      - name: resolve_other
+        title: 別の配信元の文書を引く
+        type: Callable[[str, str], Document | None]
+        required: true
+        passing: keyword
+        description: (配信元の ID, 文書の ID) → 文書。読めない・無いときは `None`
+    returns:
+      type: tuple[list[tuple[Document, int, str, str, Literal['out', 'in']]], list[str]]
+      description: ((文書, 深さ, 元の ID, 関係の種類, 向き) の並び, 読めなかった相手の知らせ)
+    process: |-
+      1. 起点の ID を訪れた集合に入れる
+      2. 深さ 1 から `depth` まで、前の深さの文書ごとに次をたどる。訪れた文書は飛ばす（循環を防ぐ）
+         - `out` は関連の行の `to`。`source` があれば別の配信元の文書を引き、引けなければ `{source}:{to} は参照できないので除きました` を知らせる。同じ配信元に無い ID は `{to} がありません` を知らせる
+         - `in` は、同じ配信元の文書のうち、関連の行の `to` がその文書の ID で `source` の無い行を持つ文書（逆引きの辞書を 1 回だけ作る）
+      3. たどった順の並びと知らせを返す
+    unit_tests:
+      - name: test_walk_related
+        case: 正常
+        summary: 深さと向き
+        condition: 文書 1 → 文書 2 → 文書 3 の `related`、起点 文書 1、`depth=2`・`out`
+        mock: なし
+        expected: 文書 2（深さ 1）・文書 3（深さ 2）。`depth=1` では文書 2 だけ
+      - name: test_walk_related_when_cycle
+        case: 正常
+        summary: 循環
+        condition: 文書 1 ⇄ 文書 2 の `related`、起点 文書 2、`in`・`depth=4`
+        mock: なし
+        expected: 文書 1 を深さ 1 で 1 回だけ返す
+      - name: test_walk_related_when_other_source
+        case: 正常
+        summary: 読めない別の配信元
+        condition: '`related: [{to: x, type: references, source: other}]`、`resolve_other` が `None`'
+        mock: なし
+        expected: たどった文書が空で、知らせに `other:x`

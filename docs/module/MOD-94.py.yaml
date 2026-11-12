@@ -1,174 +1,174 @@
 id: MOD-94
 title: 索引のサーバー / 文書のMCP / docs.py
-lead: 文書の MCP の組み立て（ツールの登録）。
+lead: 文書の MCP の組み立て（ツールの登録）を受け持ち、文書の MCP の docs.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/server/mcp/test_docs.py
+  - tests/unit/project_index/server/mcp/test_docs.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      文書の MCP の組み立て ..> ツールの結果
-      文書の MCP の組み立て ..> ツールのエラーの変換
-      文書の MCP の組み立て ..> 文書の検索
-      文書の MCP の組み立て ..> 文書の書き込み
-      文書の MCP の組み立て ..> 文書の削除
-      文書の MCP の組み立て ..> 変更の一覧
-      文書の MCP の組み立て ..> 関連のたどり
-      文書の MCP の組み立て ..> 配信元の説明
-      文書の MCP の組み立て ..> ツールのプロンプトの ID
-      class ツールのプロンプトの ID {
-        <<function>>
-      }
-      class 文書の MCP の組み立て {
-        <<function>>
-      }
-      class ツールの結果 {
-        <<function>>
-      }
-      class ツールのエラーの変換 {
-        <<function>>
-      }
-      class 文書の検索 {
-        <<function>>
-      }
-      class 文書の書き込み {
-        <<function>>
-      }
-      class 文書の削除 {
-        <<function>>
-      }
-      class 変更の一覧 {
-        <<function>>
-      }
-      class 関連のたどり {
-        <<function>>
-      }
-      class 配信元の説明 {
-        <<function>>
-      }
-      click ツールのプロンプトの ID href "./MOD-95.py.yaml#ツールのプロンプトの ID"
-      click ツールの結果 href "./MOD-95.py.yaml#ツールの結果"
-      click ツールのエラーの変換 href "./MOD-95.py.yaml#ツールのエラーの変換"
-      click 文書の検索 href "./MOD-55.py.yaml#文書の検索"
-      click 文書の書き込み href "./MOD-84.py.yaml#文書の書き込み"
-      click 文書の削除 href "./MOD-84.py.yaml#文書の削除"
-      click 変更の一覧 href "./MOD-14.py.yaml#変更の一覧"
-      click 関連のたどり href "./MOD-47.py.yaml#関連のたどり"
-      click 配信元の説明 href "./MOD-20.py.yaml#配信元の説明"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        文書の MCP の組み立て ..> ツールの結果
+        文書の MCP の組み立て ..> ツールのエラーの変換
+        文書の MCP の組み立て ..> 文書の検索
+        文書の MCP の組み立て ..> 文書の書き込み
+        文書の MCP の組み立て ..> 文書の削除
+        文書の MCP の組み立て ..> 変更の一覧
+        文書の MCP の組み立て ..> 関連のたどり
+        文書の MCP の組み立て ..> 配信元の説明
+        文書の MCP の組み立て ..> ツールのプロンプトの ID
+        class ツールのプロンプトの ID {
+          <<function>>
+        }
+        class 文書の MCP の組み立て {
+          <<function>>
+        }
+        class ツールの結果 {
+          <<function>>
+        }
+        class ツールのエラーの変換 {
+          <<function>>
+        }
+        class 文書の検索 {
+          <<function>>
+        }
+        class 文書の書き込み {
+          <<function>>
+        }
+        class 文書の削除 {
+          <<function>>
+        }
+        class 変更の一覧 {
+          <<function>>
+        }
+        class 関連のたどり {
+          <<function>>
+        }
+        class 配信元の説明 {
+          <<function>>
+        }
+        click ツールのプロンプトの ID href "./MOD-95.py.yaml#ツールのプロンプトの ID"
+        click ツールの結果 href "./MOD-95.py.yaml#ツールの結果"
+        click ツールのエラーの変換 href "./MOD-95.py.yaml#ツールのエラーの変換"
+        click 文書の検索 href "./MOD-55.py.yaml#文書の検索"
+        click 文書の書き込み href "./MOD-84.py.yaml#文書の書き込み"
+        click 文書の削除 href "./MOD-84.py.yaml#文書の削除"
+        click 変更の一覧 href "./MOD-14.py.yaml#変更の一覧"
+        click 関連のたどり href "./MOD-47.py.yaml#関連のたどり"
+        click 配信元の説明 href "./MOD-20.py.yaml#配信元の説明"
 constants:
-- name: DOCS_MCP_NAME
-  title: 文書の MCP の名前
-  container: project_index/server/mcp/docs.py
-  usecase: 共通
-  summary: '`initialize` で返すサーバーの名前'
-  value: '"project-index"'
+  - name: DOCS_MCP_NAME
+    title: 文書の MCP の名前
+    container: project_index/server/mcp/docs.py
+    usecase: 共通
+    summary: '`initialize` で返すサーバーの名前'
+    value: '"project-index"'
 functions:
-- name: build_docs_mcp
-  title: 文書の MCP の組み立て
-  kind: 関数
-  container: project_index/server/mcp/docs.py
-  usecase: 共通
-  role: 入口
-  summary: 7 つのツールを持つ文書の MCP を作る
-  scope: public
-  args:
-  - name: handlers
-    title: 配線済みの関数
-    type: Handlers
-    required: true
-    passing: positional
-    description: 起動の『配線済みの関数』
-  returns:
-    type: mcp.server.mcpserver.MCPServer
-    description: 文書の MCP（`stateless_http`・`json_response` はアプリの組み立てが `streamable_http_app()` の引数で渡す）
-  process: |-
-    1. `MCPServer(DOCS_MCP_NAME, instructions=handlers.prompts.render(DOCS_INSTRUCTIONS_PROMPT_ID))` を作る
-    2. `DOCS_TOOL_NAMES` のツールを、`description` を `handlers.prompts.render(tool_prompt_id("docs", 名前))` にして `TOOL_ANNOTATIONS` の注釈で登録する。引数はインターフェース定義の `request` をキーワード引数で受ける（`list_changes` の `from` は `from_: Annotated[str | None, Field(validation_alias="from")]` で受け、ツールの入力のスキーマでは `from` を出す。`alias` は関数の呼び出しで `TypeError` になるため使わない）
-       - 要求のモデルのフィールドが `description` を持つ場合、その説明を入力のスキーマの項目の説明に出す（`Annotated[型, Field(description=...)]`）
-       - 今のツールの説明（`search_docs`・`write_docs`・`list_changes` の引数の説明の文と `trace_related` の説明を含む）は、削らずに各ツールの YAML へ移す
-       - 引数の型の誤り・`Literal` に無い値は、SDK が関数を呼ぶ前に `isError` の結果にする。入力のスキーマに無いキーは SDK が捨てる
-    3. 各ツールは次の順で処理する
-       - 引数で要求のモデル（`SearchRequest` など）を作る
-       - 要求が指す配信元を決め（指す配信元の決定）、`await handlers.registry.wait_for(...)` でその行の読み込みだけを待つ（初期化とツールの一覧は待たない）
-       - サービスを `asyncio.to_thread` で呼ぶ（引数は `handlers` の属性）
-       - `write_docs`・`delete_docs` の結果の `applied` が `True` の場合、`cwd` から書ける配信元を裏で検査し直す（配信元の検査の控え.裏での検査の流し直し）
-       - 結果をツールの結果にする（`write_docs`・`delete_docs` の `render` は `None`。`search_docs` は `functools.partial(render_search_markdown, source_label=result.source_label)`、`list_changes` は `functools.partial(render_changes_markdown, source_label=request.source or "作業中の配信元")`、`list_match_words` は用語の一覧の文を渡す）
-       - `ProjectIndexError` と `pydantic.ValidationError` はツールのエラーの変換の `CallToolResult(is_error=True)` をそのまま返す。それ以外の例外は `[error]` ツールの処理に失敗した（ツール名・例外）を書いて MCP の既定に任せる
-    4. 作った MCP を返す
-  unit_tests:
-  - name: test_build_docs_mcp
-    case: 正常
-    summary: ツールと注釈
-    condition: '`list_tools` を呼ぶ'
-    mock: 配線済みの関数（偽物）
-    expected: 7 つのツールが並び、`list_match_words` の `readOnlyHint` が `True`、`delete_docs` の `destructiveHint` が `True`、`search_docs` の `readOnlyHint` が `True`
-  - name: test_build_docs_mcp_when_call
-    case: 正常
-    summary: サービスへの受け渡し
-    condition: '`search_docs(source="sample", format="json")` を呼ぶ'
-    mock: '`search_docs`（結果を返す偽物）'
-    expected: サービスに `SearchRequest(source="sample")` が渡り、`structuredContent` を返す
-  - name: test_build_docs_mcp_when_error
-    case: 正常
-    summary: エラーの変換
-    condition: サービスが `UnknownKindError` を送る
-    mock: '`write_docs`（送る偽物）'
-    expected: '`isError` が `True`'
-  - name: test_build_docs_mcp_when_descriptions
-    case: 正常
-    summary: ツールの説明をプロンプトの YAML から描画する
-    condition: '`list_tools` を呼ぶ'
-    mock: 配線済みの関数（偽物。`prompts` は同梱した YAML を読んだ一式）
-    expected: '7 つのツールの説明がそれぞれ `prompts.render(tool_prompt_id("docs", 名前))` と同じ。`search_docs` の説明に `not`・`glob`・`@matches`・`sections`・`lines`・`describe(source, kind)`・`group_by: tags`、`list_changes` の説明に `contains`、`write_docs` の説明に `describe(source, kind)`、`trace_related` の説明に `implements` があり、入力のスキーマの `sections`・`lines`・`contains` の項目が `description` を持つ'
-  - name: test_build_docs_mcp_when_instructions
-    case: 正常
-    summary: instructions をプロンプトの YAML から描画する
-    condition: '`initialize` を呼ぶ'
-    mock: 配線済みの関数（偽物。`prompts` は同梱した YAML を読んだ一式）
-    expected: '`instructions` が `prompts.render(DOCS_INSTRUCTIONS_PROMPT_ID)` と同じで、`grep`・`action:`・`topic:`・`tool:` を含む'
-  - name: test_build_docs_mcp_when_loading
-    case: 正常
-    summary: ツールの呼び出しは指す配信元の読み込みを待ち、スレッドを持たない
-    condition: '`SourceRegistry(loading=True)` のまま `search_docs(source="sample")` を 13 本並べて呼び、`tools/list` を呼ぶ。その後 `reload` する'
-    mock: なし（一時フォルダの配信元）
-    expected: '`reload` の前に `tools/list` が答え、`search_docs` はまだ答えない（既定の executor のスレッドを使っていない）。`reload` の後に 13 本とも結果を返す'
-- name: _wait_target
-  title: 指す配信元の決定
-  kind: 関数
-  container: project_index/server/mcp/docs.py
-  usecase: 共通
-  role: 変換
-  summary: 要求のモデルから、待つ配信元の行を決める指す行の待ちの引数を作る
-  scope: internal
-  args:
-  - name: request
-    title: 要求
-    type: BaseModel
-    required: true
-    passing: positional
-    description: 文書の MCP のツールの要求のモデル（`source`・`cwd`・`worktree`・`outside_scope` を持つものだけを見る）
-  returns:
-    type: dict[str, Any]
-    description: 指す行の待ちのキーワード引数（`ids`・`cwd`・`every` のどれか 1 つ）
-  process: |-
-    1. `source` が `"*"` か、並びが `"*"` を含む場合、`every=True`
-    2. `source` が文字列か並びの場合、`ids` にその ID を並べる
-    3. `source` が無く、`outside_scope` が `True` の場合（作業範囲の外の一覧）、`every=True`
-    4. `source` が無い場合、`cwd` に `worktree` か `cwd` を入れる（どちらも無ければ空の引数にし、待たない）
-  unit_tests:
-  - name: test_wait_target
-    case: 正常
-    summary: 要求ごとの待つ行の決め方
-    condition: '`SearchRequest(source="a")`・`SearchRequest(source=["a", "*"])`・`DescribeRequest(outside_scope=True)`・`WriteRequest(cwd="/w/a", operations=[])`・`DescribeRequest()`'
-    mock: なし
-    expected: '`{"ids": ["a"]}`・`{"every": True}`・`{"every": True}`・`{"cwd": "/w/a"}`・`{}`'
+  - name: build_docs_mcp
+    title: 文書の MCP の組み立て
+    kind: 関数
+    container: project_index/server/mcp/docs.py
+    usecase: 共通
+    role: 入口
+    summary: 7 つのツールを持つ文書の MCP を作る
+    scope: public
+    args:
+      - name: handlers
+        title: 配線済みの関数
+        type: Handlers
+        required: true
+        passing: positional
+        description: 起動の『配線済みの関数』
+    returns:
+      type: mcp.server.mcpserver.MCPServer
+      description: 文書の MCP（`stateless_http`・`json_response` はアプリの組み立てが `streamable_http_app()` の引数で渡す）
+    process: |-
+      1. `MCPServer(DOCS_MCP_NAME, instructions=handlers.prompts.render(DOCS_INSTRUCTIONS_PROMPT_ID))` を作る
+      2. `DOCS_TOOL_NAMES` のツールを、`description` を `handlers.prompts.render(tool_prompt_id("docs", 名前))` にして `TOOL_ANNOTATIONS` の注釈で登録する。引数はインターフェース定義の `request` をキーワード引数で受ける（`list_changes` の `from` は `from_: Annotated[str | None, Field(validation_alias="from")]` で受け、ツールの入力のスキーマでは `from` を出す。`alias` は関数の呼び出しで `TypeError` になるため使わない）
+         - 要求のモデルのフィールドが `description` を持つ場合、その説明を入力のスキーマの項目の説明に出す（`Annotated[型, Field(description=...)]`）
+         - 今のツールの説明（`search_docs`・`write_docs`・`list_changes` の引数の説明の文と `trace_related` の説明を含む）は、削らずに各ツールの YAML へ移す
+         - 引数の型の誤り・`Literal` に無い値は、SDK が関数を呼ぶ前に `isError` の結果にする。入力のスキーマに無いキーは SDK が捨てる
+      3. 各ツールは次の順で処理する
+         - 引数で要求のモデル（`SearchRequest` など）を作る
+         - 要求が指す配信元を決め（指す配信元の決定）、`await handlers.registry.wait_for(...)` でその行の読み込みだけを待つ（初期化とツールの一覧は待たない）
+         - サービスを `asyncio.to_thread` で呼ぶ（引数は `handlers` の属性）
+         - `write_docs`・`delete_docs` の結果の `applied` が `True` の場合、`cwd` から書ける配信元を裏で検査し直す（配信元の検査の控え.裏での検査の流し直し）
+         - 結果をツールの結果にする（`write_docs`・`delete_docs` の `render` は `None`。`search_docs` は `functools.partial(render_search_markdown, source_label=result.source_label)`、`list_changes` は `functools.partial(render_changes_markdown, source_label=request.source or "作業中の配信元")`、`list_match_words` は用語の一覧の文を渡す）
+         - `ProjectIndexError` と `pydantic.ValidationError` はツールのエラーの変換の `CallToolResult(is_error=True)` をそのまま返す。それ以外の例外は `[error]` ツールの処理に失敗した（ツール名・例外）を書いて MCP の既定に任せる
+      4. 作った MCP を返す
+    unit_tests:
+      - name: test_build_docs_mcp
+        case: 正常
+        summary: ツールと注釈
+        condition: '`list_tools` を呼ぶ'
+        mock: 配線済みの関数（偽物）
+        expected: 7 つのツールが並び、`list_match_words` の `readOnlyHint` が `True`、`delete_docs` の `destructiveHint` が `True`、`search_docs` の `readOnlyHint` が `True`
+      - name: test_build_docs_mcp_when_call
+        case: 正常
+        summary: サービスへの受け渡し
+        condition: '`search_docs(source="sample", format="json")` を呼ぶ'
+        mock: '`search_docs`（結果を返す偽物）'
+        expected: サービスに `SearchRequest(source="sample")` が渡り、`structuredContent` を返す
+      - name: test_build_docs_mcp_when_error
+        case: 正常
+        summary: エラーの変換
+        condition: サービスが `UnknownKindError` を送る
+        mock: '`write_docs`（送る偽物）'
+        expected: '`isError` が `True`'
+      - name: test_build_docs_mcp_when_descriptions
+        case: 正常
+        summary: ツールの説明をプロンプトの YAML から描画する
+        condition: '`list_tools` を呼ぶ'
+        mock: 配線済みの関数（偽物。`prompts` は同梱した YAML を読んだ一式）
+        expected: '7 つのツールの説明がそれぞれ `prompts.render(tool_prompt_id("docs", 名前))` と同じ。`search_docs` の説明に `not`・`glob`・`@matches`・`sections`・`lines`・`describe(source, kind)`・`group_by: tags`、`list_changes` の説明に `contains`、`write_docs` の説明に `describe(source, kind)`、`trace_related` の説明に `implements` があり、入力のスキーマの `sections`・`lines`・`contains` の項目が `description` を持つ'
+      - name: test_build_docs_mcp_when_instructions
+        case: 正常
+        summary: instructions をプロンプトの YAML から描画する
+        condition: '`initialize` を呼ぶ'
+        mock: 配線済みの関数（偽物。`prompts` は同梱した YAML を読んだ一式）
+        expected: '`instructions` が `prompts.render(DOCS_INSTRUCTIONS_PROMPT_ID)` と同じで、`grep`・`action:`・`topic:`・`tool:` を含む'
+      - name: test_build_docs_mcp_when_loading
+        case: 正常
+        summary: ツールの呼び出しは指す配信元の読み込みを待ち、スレッドを持たない
+        condition: '`SourceRegistry(loading=True)` のまま `search_docs(source="sample")` を 13 本並べて呼び、`tools/list` を呼ぶ。その後 `reload` する'
+        mock: なし（一時フォルダの配信元）
+        expected: '`reload` の前に `tools/list` が答え、`search_docs` はまだ答えない（既定の executor のスレッドを使っていない）。`reload` の後に 13 本とも結果を返す'
+  - name: _wait_target
+    title: 指す配信元の決定
+    kind: 関数
+    container: project_index/server/mcp/docs.py
+    usecase: 共通
+    role: 変換
+    summary: 要求のモデルから、待つ配信元の行を決める指す行の待ちの引数を作る
+    scope: internal
+    args:
+      - name: request
+        title: 要求
+        type: BaseModel
+        required: true
+        passing: positional
+        description: 文書の MCP のツールの要求のモデル（`source`・`cwd`・`worktree`・`outside_scope` を持つものだけを見る）
+    returns:
+      type: dict[str, Any]
+      description: 指す行の待ちのキーワード引数（`ids`・`cwd`・`every` のどれか 1 つ）
+    process: |-
+      1. `source` が `"*"` か、並びが `"*"` を含む場合、`every=True`
+      2. `source` が文字列か並びの場合、`ids` にその ID を並べる
+      3. `source` が無く、`outside_scope` が `True` の場合（作業範囲の外の一覧）、`every=True`
+      4. `source` が無い場合、`cwd` に `worktree` か `cwd` を入れる（どちらも無ければ空の引数にし、待たない）
+    unit_tests:
+      - name: test_wait_target
+        case: 正常
+        summary: 要求ごとの待つ行の決め方
+        condition: '`SearchRequest(source="a")`・`SearchRequest(source=["a", "*"])`・`DescribeRequest(outside_scope=True)`・`WriteRequest(cwd="/w/a", operations=[])`・`DescribeRequest()`'
+        mock: なし
+        expected: '`{"ids": ["a"]}`・`{"every": True}`・`{"every": True}`・`{"cwd": "/w/a"}`・`{}`'
 refs:
-- IF-2#
-- IF-6#
-- IF-7#
-- IF-4#
-- IF-3#
-- IF-1#
+  - IF-2#
+  - IF-6#
+  - IF-7#
+  - IF-4#
+  - IF-3#
+  - IF-1#
 notes:
   trace_related のツールの説明: '`content/prompts/mcp/docs/tools/trace-related.yaml` は「起点の文書やコードのパスから、related をたどって関連する文書を返す。設計書を起点に direction: in で呼ぶと、via.type が implements の文書がその設計書を実装するコード、コードを起点にすると tests の文書がそのテストになる。」を持つ（インターフェース定義『関連のたどり』の `direction` の補足）'

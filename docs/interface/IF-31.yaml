@@ -17,6 +17,8 @@ flows:
       - name: 入力
         description: '`Origin` を持たない要求で、sample と extra の 2 行'
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -29,6 +31,8 @@ flows:
         E->>E: 配信元を読み直す
         E-->>C: 200 配信元ごとの状態
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、sample と extra が `serving`
       - '`settings.yaml` の `sources` に extra の行があり、sample の行・他のキー・コメントは変わらない'
@@ -45,6 +49,8 @@ flows:
       - name: 入力
         description: 'extra の行を `enabled: false` にした 2 行'
     flow: |-
+      <!-- map: {"title": "正常系（配信を止める）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -56,6 +62,8 @@ flows:
         E->>E: 配信元を読み直す
         E-->>C: 200（extra は disabled）
       ```
+
+      <!-- /map -->
     expected:
       - extra が `disabled`
       - '`settings.yaml` の extra の行の `enabled` が `false`'
@@ -71,6 +79,8 @@ flows:
       - name: 入力
         description: sample の 1 行だけ
     flow: |-
+      <!-- map: {"title": "正常系（配信元を削除する）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -82,6 +92,8 @@ flows:
         E->>E: 配信元を読み直す
         E-->>C: 200（sample だけ）
       ```
+
+      <!-- /map -->
     expected:
       - '`settings.yaml` の `sources` に extra の行が無く、sample の行は変わらない'
       - extra のフォルダのファイルは変わらない
@@ -98,6 +110,8 @@ flows:
       - name: 入力
         description: sample と broken の 2 行
     flow: |-
+      <!-- map: {"title": "正常系（追加した配信元が検証に通らない）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -109,6 +123,8 @@ flows:
         E->>E: 読み直し、起動時と同じ検証で broken を外す
         E-->>C: 200（broken は not_served）
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、broken が `not_served`、`errors` に `documents[0].paths` がある
       - '`settings.yaml` の `sources` に broken の行がある'
@@ -151,6 +167,8 @@ flows:
       - name: 入力
         description: '`Origin: http://127.0.0.1:9999` で、スキーマに通る `sources`'
     flow: |-
+      <!-- map: {"title": "異常系（別のオリジン・403）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -159,6 +177,8 @@ flows:
         C->>E: Origin: 別のオリジン
         E-->>C: 403
       ```
+
+      <!-- /map -->
     expected:
       - 403 を返す
       - '`settings.yaml` が変わらず、`/sources/sample/docs` は 200 を返す'
@@ -172,6 +192,8 @@ flows:
       - name: 入力
         description: 2 行目の `id` が `Sample Docs`、`scope.read` が空の文字列を含む
     flow: |-
+      <!-- map: {"title": "異常系（スキーマに通らない・422）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -181,6 +203,8 @@ flows:
         E->>E: スキーマで検証して失敗する
         E-->>C: 422 problem+json（違反したキーと理由）
       ```
+
+      <!-- /map -->
     expected:
       - 422 で、`errors` に `sources[1].id` と `sources[1].scope.read` がそれぞれの理由つきである
       - '`settings.yaml` が変わらず、`/sources/sample/docs` は 200 を返す'
@@ -196,6 +220,8 @@ flows:
       - name: 入力
         description: 'sample の行を `enabled: false` にした 2 行。どちらの行にも `outside_read` と `scope.write` を含めない'
     flow: |-
+      <!-- map: {"title": "正常系（送信しなかったキーを残す）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -207,6 +233,8 @@ flows:
         E->>E: 配信元を読み直す
         E-->>C: 200（sample は disabled）
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、sample が `disabled`、extra が `serving`
       - '`settings.yaml` の sample の行の `enabled` が `false`'
@@ -223,6 +251,8 @@ flows:
       - name: 入力
         description: 'extra の行に `outside_read: true` を含めた 2 行'
     flow: |-
+      <!-- map: {"title": "正常系（送信したキーを優先する）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -234,11 +264,13 @@ flows:
         E->>E: 配信元を読み直す
         E-->>C: 200
       ```
+
+      <!-- /map -->
     expected:
       - '`settings.yaml` の extra の行に `outside_read` が無い'
       - '`GET /settings/sources` が返す extra の行の `outsideRead` が `true`'
     test: test_normal_when_sent_keys_override
-lead: 'dev-docs の画面のサーバーが設定画面での配信元の追加・編集・削除の後の `sources[]` を丸ごと送信する。スキーマに通ったときだけ `settings.yaml` を書き換え、配信元を読み直す。'
+lead: '`sources[]` を丸ごと受けて端末の設定を書き換え、配信元を読み直す端末の設定の API の入出力を定め、端末の設定の保存を修正するときに参照する。'
 identifier: put_settings_sources
 permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ'
 idempotent: true

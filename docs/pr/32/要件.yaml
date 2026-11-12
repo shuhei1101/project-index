@@ -1,0 +1,49 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: none
+    detail: このリポジトリの配信元で設計書から実装・テストを辿れるようになるが、調べる流れそのものは変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: none
+    detail: このリポジトリの配信元の設定に行を加えるが、設定を変えて配信に入れる流れは変わらない
+    depends_on: []
+docs:
+  - page: src/files.yaml
+    new: true
+    change: project_index/ 配下の .py の行と、モジュール構成の設計書への implements
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T15:07:11.149392+00:00'
+  - page: tests/files.yaml
+    new: true
+    change: テストの .py の行と、テストするコード・インターフェース定義への tests
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T15:07:11.149392+00:00'
+  - page: plugins/project-index/files.yaml
+    new: true
+    change: hooks/ の .py の行と、MOD-4・MOD-5 への implements
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T15:07:11.149392+00:00'
+  - page: project-index.yaml
+    new: false
+    change: documents[] に src・tests・plugin の行を加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T15:07:11.149392+00:00'
+scope_out:
+  - item: src/project_index/ の .py でない配布物（migrations の steps.yaml・schemas の YAML）の管理用の YAML の行
+    reason: 対応するモジュール構成の設計書が無く、implements・tests を張る相手が無い。src の行の exclude の *.schema.yaml・aliases.source.yaml・steps.yaml で索引に無いファイルの警告から外す。この判断はレビューで確定する
+    plan: none
+  - item: 設計書の無いコードへのモジュール構成の設計書の追加
+    reason: 管理用の YAML を作った結果、src/project_index/・plugins/project-index/hooks/ の .py でモジュール構成の設計書が無いファイルは 0 件だった。設計書を持たないのはテストの conftest.py だけで、モジュール構成の対象でない
+    plan: none
+  - item: plugins/project-index/ の .py でない配布物（.mcp.json・plugin.json・hooks.json・skills の SKILL.md）の管理用の YAML の行
+    reason: 対応するモジュール構成の設計書が無く、implements・tests を張る相手が無い。plugin の行の exclude の *.json・*.md で索引に無いファイルの警告から外す
+    plan: none
+  - item: project-index.yaml の files_guide の行の exclude の *.yml が管理用の YAML files.yml 自身に該当し、公開ドキュメントの Markdown が配信されない
+    reason: '#33 を起点にした #34 の commit 657030e で解消済み（この PR へ取り込み済み）'
+    plan: none

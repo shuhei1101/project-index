@@ -11,7 +11,7 @@ import tarfile
 import threading
 from typing import TYPE_CHECKING
 
-from project_index.integrations.git import GitError, run_git
+from project_index.integrations.git import GIT_ARCHIVE_TIMEOUT_SEC, GitError, run_git
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -53,8 +53,15 @@ class SnapshotStore:
             shutil.rmtree(temp, ignore_errors=True)
             temp.mkdir(parents=True)
             try:
-                data = run_git(["archive", "--format=tar", commit], cwd=repo_root, binary=True)
-                assert isinstance(data, bytes)  # noqa: S101
+                data = run_git(
+                    ["archive", "--format=tar", commit],
+                    cwd=repo_root,
+                    binary=True,
+                    timeout=GIT_ARCHIVE_TIMEOUT_SEC,
+                )
+                if not isinstance(data, bytes):
+                    msg = "git archive の出力がバイト列ではありません"
+                    raise RuntimeError(msg)
                 with tarfile.open(fileobj=io.BytesIO(data)) as archive:
                     archive.extractall(temp, filter="data")
             except GitError:

@@ -1,4 +1,3 @@
-# pyright: reportUnknownArgumentType=warning, reportUnknownLambdaType=warning
 from __future__ import annotations
 
 import threading
@@ -108,7 +107,7 @@ def _gated_check_sync(
         return _report(source.id, number)
 
     monkeypatch.setattr(source_checks_module, "check_sync", fake_check_sync)
-    monkeypatch.setattr(source_checks_module, "nav_warnings", lambda store, source: [])
+    monkeypatch.setattr(source_checks_module, "nav_warnings", _no_nav_warnings)
     return calls, first_started
 
 
@@ -160,3 +159,8 @@ def test_source_checks_refresh_later_when_running(
     assert calls == [1, 2]
     assert held is not None
     assert len(held.report.unindexed_files) == 2
+
+
+def _no_nav_warnings(store: object, source: object) -> list[object]:
+    """nav の警告を出さない偽物。"""
+    return []

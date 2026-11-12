@@ -1,355 +1,355 @@
 id: MOD-67
 title: 索引のサーバー / 端末の設定 / types.py
-lead: 端末の設定と、端末の設定の API の `sources[]` の要求と結果の型。
+lead: 端末の設定と、端末の設定の API の `sources[]` の要求と結果の型を受け持ち、端末の設定の types.py を修正するときに参照する。
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      端末の設定の読み込み ..> 端末の設定 : 返す
-      class 端末の設定の読み込み {
-        <<function>>
-      }
-      class 端末の設定 {
-        +配信元: list
-        +状態の置き場所: Path
-      }
-      click 端末の設定の読み込み href "./MOD-64.py.yaml#端末の設定の読み込み"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        端末の設定の読み込み ..> 端末の設定 : 返す
+        class 端末の設定の読み込み {
+          <<function>>
+        }
+        class 端末の設定 {
+          +配信元: list
+          +状態の置き場所: Path
+        }
+        click 端末の設定の読み込み href "./MOD-64.py.yaml#端末の設定の読み込み"
 data_models:
-- name: SourceScope
-  title: 配信元の権限の範囲
-  container: project_index/features/settings/types.py
-  usecase: 端末の設定
-  role: DTO
-  summary: '`sources[].scope` の `read`・`write`'
-  description: '`pydantic.BaseModel`（`extra="forbid"`）。'
-  properties:
-  - name: read
-    title: 読める作業場所
-    type: list[str]
-    access: 公開
-    default: '[]'
-    description: この配信元を読める作業場所の glob
-  - name: write
-    title: 読み書きできる作業場所
-    type: list[str] | None
-    access: 公開
-    default: None
-    description: この配信元を読み書きできる作業場所の glob。`None` は配信元のフォルダだけ（配信元の『配信元の読み込み』が解く）
-- name: SourceEntry
-  title: 配信元の行
-  container: project_index/features/settings/types.py
-  usecase: 端末の設定
-  role: DTO
-  summary: 端末の設定の `sources[]` の 1 行
-  description: '`pydantic.BaseModel`（`extra="forbid"`）。端末の設定の保存の要求の `sources[]` もこの形。要求で行に含めなかったキーは `model_fields_set` に入らない（配信元の保存がファイルの値で埋める）'
-  properties:
-  - name: id
-    title: 配信元の ID
-    type: str | None
-    access: 公開
-    default: None
-    description: 主キー。`None` は配信元の設定の `name`（配信元の『配信元の読み込み』が解く）
-    notes: 英小文字・数字・`-` だけ（スキーマの `pattern`）
-  - name: config
-    title: 配信元の設定のパス
-    type: list[str]
-    access: 公開
-    description: 配信元の設定の YAML の絶対パスの並び。文字列 1 つで書かれたときも配列にする（`field_validator`）
-  - name: enabled
-    title: 配信するか
-    type: bool
-    access: 公開
-    default: 'True'
-    description: '`False` で行を消さずに配信を止める'
-  - name: scope
-    title: 権限の範囲
-    type: SourceScope
-    access: 公開
-    default: SourceScope()
-    description: 読める・読み書きできる作業場所
-  - name: outside_read
-    title: 作業範囲の外から読めるか
-    type: bool
-    access: 公開
-    default: 'True'
-    description: '`False` で、`scope` に当たらない作業場所から `outside_scope: true` で読むのを断る'
-- name: TerminalConfig
-  title: 端末の設定
-  container: project_index/features/settings/types.py
-  usecase: 端末の設定
-  role: DTO
-  summary: 検証を通して既定値を埋めた端末の設定
-  description: '`pydantic.BaseModel`（`frozen=True`）。キーの意味と既定値は Issue #3 の資料 A-25 のキー一覧。'
-  properties:
-  - name: file
-    title: 設定のファイル
-    type: Path
-    access: 公開
-    description: 読んだ `settings.yaml` の絶対パス
-  - name: version
-    title: 設定のバージョン
-    type: str
-    access: 公開
-    description: '`version` の値'
-  - name: clone
-    title: クローンの場所
-    type: Path
-    access: 公開
-    description: project-index のクローン（フックが使う。サーバーは読むだけ）
-  - name: port
-    title: 待ち受けのポート
-    type: int
-    access: 公開
-    default: '8786'
-    description: 非機能要件の `listen_port`
-  - name: bind
-    title: 待ち受けのアドレス
-    type: str
-    access: 公開
-    default: '"127.0.0.1"'
-    description: 非機能要件の `bind_address`
-  - name: sources
-    title: 配信元
-    type: list[SourceEntry]
-    access: 公開
-    default: '[]'
-    description: 配信元のテーブル
-  - name: state_dir
-    title: 状態の置き場所
-    type: Path
-    access: 公開
-    default: '`PROJECT_INDEX_STATE_DIR` → 端末の設定の `state_dir` → `${XDG_STATE_HOME:-~/.local/state}/project-index`'
-    description: 会話の記録・変換の結果・リビジョンの書き出し・表の列の設定を置くフォルダ（`~` を展開した絶対パス）
-  - name: log_dir
-    title: ログの置き場所
-    type: Path
-    access: 公開
-    default: '{state_dir}/logs'
-    description: 検証の失敗と警告のログを書くフォルダ
-  - name: seen_retention_days
-    title: 返し済みの記録の保持日数
-    type: int
-    access: 公開
-    default: '7'
-    description: この日数を過ぎた会話の記録を消す
-  - name: script_timeout_sec
-    title: スクリプトの制限時間
-    type: int
-    access: 公開
-    default: 非機能要件の `script_timeout` の決定値
-    description: 検査・変換・生成のスクリプト 1 回の上限（秒）
-  - name: unknown_keys
-    title: 最上位の知らないキー
-    type: list[str]
-    access: 公開
-    default: '[]'
-    description: スキーマの `properties` に無い最上位のキー（ファイルの順）。値は持たない
-- name: SettingsSourcesRequest
-  title: 配信元の保存の要求
-  container: project_index/features/settings/types.py
-  usecase: 端末の設定
-  role: DTO
-  summary: PUT `/settings/sources` の本文
-  description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。型の合わない本文は FastAPI が 422 にする前に、起動の『例外の変換の登録』で problem+json の `errors[]` に揃える。'
-  properties:
-  - name: sources
-    title: 配信元
-    type: list[SourceEntry]
-    access: 公開
-    description: 保存する `sources[]` の全行
-- name: SettingsWarning
-  title: 端末の設定の警告
-  container: project_index/features/settings/types.py
-  usecase: 端末の設定
-  role: DTO
-  summary: 端末の設定の API の応答の `warnings[]` の 1 件
-  description: 共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。
-  properties:
-  - name: path
-    title: キーのパス
-    type: str
-    access: 公開
-    description: 端末の設定の最上位の知らないキー
-  - name: reason
-    title: 理由
-    type: str
-    access: 公開
-    description: '`UNKNOWN_KEY_REASON`'
-- name: SettingsSourcesResponse
-  title: 配信元の保存の応答
-  container: project_index/features/settings/types.py
-  usecase: 端末の設定
-  role: DTO
-  summary: 再読み込みした後の配信元ごとの状態
-  description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。`from_statuses(statuses, warnings=[])` で配信元の状態の並びと警告から作る。'
-  properties:
-  - name: sources
-    title: 配信元
-    type: list[SourceStatusItem]
-    access: 公開
-    description: '`id`・`status`（`serving` / `not_served` / `disabled`）・`errors[]`（`{path, reason}`。`not_served` のときだけ）・`config_version`（`{config, server}`。設定のバージョンが古いときだけ）'
-  - name: warnings
-    title: 警告
-    type: list[SettingsWarning]
-    access: 公開
-    description: 端末の設定の最上位の知らないキーの警告。無ければ空
-- name: SettingsSourceRow
-  title: 配信元の行と状態
-  container: project_index/features/settings/types.py
-  usecase: 端末の設定の取得
-  role: DTO
-  summary: 端末の設定の取得の `sources[]` の 1 行
-  description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。'
-  properties:
-  - name: id
-    title: 配信元の ID
-    type: str | None
-    access: 公開
-    description: 配信元の状態の `id`（行で省いたときは配信元の設定の `name`）。`pending_reload` の行は行の `id`（省いたときは `None`）
-  - name: config
-    title: 配信元の設定のパス
-    type: list[str]
-    access: 公開
-    description: 行の `config`
-  - name: enabled
-    title: 配信するか
-    type: bool
-    access: 公開
-    description: 行の `enabled`
-  - name: scope
-    title: 権限の範囲
-    type: SourceScope
-    access: 公開
-    description: 行の `scope`
-  - name: status
-    title: 状態
-    type: Literal['serving', 'not_served', 'disabled', 'pending_reload']
-    access: 公開
-    description: 配信元の状態の `status`。当たる配信元の状態が無い行（読み直していない行）は `pending_reload`
-  - name: errors
-    title: 除外した理由
-    type: list[dict[str, str]]
-    access: 公開
-    default: '[]'
-    description: '`{path, reason}`。`not_served` のときだけ'
-  - name: config_version
-    title: 設定のバージョン
-    type: dict[str, str] | None
-    access: 公開
-    default: None
-    description: '`{config, server}`。設定のバージョンが古いときだけ'
-  - name: outside_read
-    title: 作業範囲の外から読めるか
-    type: bool
-    access: 公開
-    description: 行の `outside_read`
-- name: SettingsSourcesView
-  title: 端末の設定の取得の応答
-  container: project_index/features/settings/types.py
-  usecase: 端末の設定の取得
-  role: DTO
-  summary: GET `/settings/sources` の応答
-  description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。'
-  properties:
-  - name: settings_path
-    title: 端末の設定のパス
-    type: str
-    access: 公開
-    description: 端末の設定の `file`
-  - name: sources
-    title: 配信元
-    type: list[SettingsSourceRow]
-    access: 公開
-    description: '`sources[]` の行の順'
-  - name: warnings
-    title: 警告
-    type: list[SettingsWarning]
-    access: 公開
-    description: 端末の設定の最上位の知らないキーの警告。無ければ空
-- name: SettingsSourceAddRequest
-  title: 1 行の追加の要求
-  container: project_index/features/settings/types.py
-  usecase: 端末の設定の配信元の 1 行の追加
-  role: DTO
-  summary: POST `/settings/sources` の本文
-  description: 共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。
-  properties:
-  - name: source
+  - name: SourceScope
+    title: 配信元の権限の範囲
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定
+    role: DTO
+    summary: '`sources[].scope` の `read`・`write`'
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。'
+    properties:
+      - name: read
+        title: 読める作業場所
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: この配信元を読める作業場所の glob
+      - name: write
+        title: 読み書きできる作業場所
+        type: list[str] | None
+        access: 公開
+        default: None
+        description: この配信元を読み書きできる作業場所の glob。`None` は配信元のフォルダだけ（配信元の『配信元の読み込み』が解く）
+  - name: SourceEntry
     title: 配信元の行
-    type: SettingsSourceRow
-    access: 公開
-    description: 追加する行
-- name: SourceAddResult
-  title: 1 行の追加の結果
-  container: project_index/features/settings/types.py
-  usecase: 端末の設定の配信元の 1 行の追加
-  role: DTO
-  summary: 配信元の 1 行の追加の戻り値
-  description: '`dataclass(frozen=True)`'
-  properties:
-  - name: result
-    title: 結果
-    type: Literal['added', 'exists']
-    access: 公開
-    description: 追加したか、同じ id の行があったか
-  - name: same
-    title: 内容が同じか
-    type: bool | None
-    access: 公開
-    description: '`exists` のときだけ'
-  - name: statuses
-    title: 配信元の状態
-    type: list[SourceStatus]
-    access: 公開
-    description: '`added` のとき、読み直した後の状態'
-- name: SettingsSourceAddResponse
-  title: 1 行の追加の応答
-  container: project_index/features/settings/types.py
-  usecase: 端末の設定の配信元の 1 行の追加
-  role: DTO
-  summary: POST `/settings/sources` の応答
-  description: 共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。
-  properties:
-  - name: result
-    title: 結果
-    type: Literal['added', 'exists']
-    access: 公開
-    description: 追加したか、同じ id の行があったか
-  - name: same
-    title: 内容が同じか
-    type: bool | None
-    access: 公開
-    description: '`exists` のときだけ'
-  - name: sources
-    title: 配信元の状態
-    type: list[SourceStatusItem]
-    access: 公開
-    description: '`added` のとき、読み直した後の状態'
-  - name: warnings
-    title: 警告
-    type: list[SettingsWarning]
-    access: 公開
-    description: 端末の設定の最上位の知らないキーの警告。無ければ空
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定
+    role: DTO
+    summary: 端末の設定の `sources[]` の 1 行
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。端末の設定の保存の要求の `sources[]` もこの形。要求で行に含めなかったキーは `model_fields_set` に入らない（配信元の保存がファイルの値で埋める）'
+    properties:
+      - name: id
+        title: 配信元の ID
+        type: str | None
+        access: 公開
+        default: None
+        description: 主キー。`None` は配信元の設定の `name`（配信元の『配信元の読み込み』が解く）
+        notes: 英小文字・数字・`-` だけ（スキーマの `pattern`）
+      - name: config
+        title: 配信元の設定のパス
+        type: list[str]
+        access: 公開
+        description: 配信元の設定の YAML の絶対パスの並び。文字列 1 つで書かれたときも配列にする（`field_validator`）
+      - name: enabled
+        title: 配信するか
+        type: bool
+        access: 公開
+        default: 'True'
+        description: '`False` で行を消さずに配信を止める'
+      - name: scope
+        title: 権限の範囲
+        type: SourceScope
+        access: 公開
+        default: SourceScope()
+        description: 読める・読み書きできる作業場所
+      - name: outside_read
+        title: 作業範囲の外から読めるか
+        type: bool
+        access: 公開
+        default: 'True'
+        description: '`False` で、`scope` に当たらない作業場所から `outside_scope: true` で読むのを断る'
+  - name: TerminalConfig
+    title: 端末の設定
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定
+    role: DTO
+    summary: 検証を通して既定値を埋めた端末の設定
+    description: '`pydantic.BaseModel`（`frozen=True`）。キーの意味と既定値は [shuhei1101/dev-docs#3 汎用の開発ドキュメントサーバーを作る](https://github.com/shuhei1101/dev-docs/issues/3) の資料 A-25 のキー一覧。'
+    properties:
+      - name: file
+        title: 設定のファイル
+        type: Path
+        access: 公開
+        description: 読んだ `settings.yaml` の絶対パス
+      - name: version
+        title: 設定のバージョン
+        type: str
+        access: 公開
+        description: '`version` の値'
+      - name: clone
+        title: クローンの場所
+        type: Path
+        access: 公開
+        description: project-index のクローン（フックが使う。サーバーは読むだけ）
+      - name: port
+        title: 待ち受けのポート
+        type: int
+        access: 公開
+        default: '8786'
+        description: 非機能要件の `listen_port`
+      - name: bind
+        title: 待ち受けのアドレス
+        type: str
+        access: 公開
+        default: '"127.0.0.1"'
+        description: 非機能要件の `bind_address`
+      - name: sources
+        title: 配信元
+        type: list[SourceEntry]
+        access: 公開
+        default: '[]'
+        description: 配信元のテーブル
+      - name: state_dir
+        title: 状態の置き場所
+        type: Path
+        access: 公開
+        default: '`PROJECT_INDEX_STATE_DIR` → 端末の設定の `state_dir` → `${XDG_STATE_HOME:-~/.local/state}/project-index`'
+        description: 会話の記録・変換の結果・リビジョンの書き出し・表の列の設定を置くフォルダ（`~` を展開した絶対パス）
+      - name: log_dir
+        title: ログの置き場所
+        type: Path
+        access: 公開
+        default: '{state_dir}/logs'
+        description: 検証の失敗と警告のログを書くフォルダ
+      - name: seen_retention_days
+        title: 返し済みの記録の保持日数
+        type: int
+        access: 公開
+        default: '7'
+        description: この日数を過ぎた会話の記録を消す
+      - name: script_timeout_sec
+        title: スクリプトの制限時間
+        type: int
+        access: 公開
+        default: 非機能要件の `script_timeout` の決定値
+        description: 検査・変換・生成のスクリプト 1 回の上限（秒）
+      - name: unknown_keys
+        title: 最上位の知らないキー
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: スキーマの `properties` に無い最上位のキー（ファイルの順）。値は持たない
+  - name: SettingsSourcesRequest
+    title: 配信元の保存の要求
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定
+    role: DTO
+    summary: PUT `/settings/sources` の本文
+    description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。型の合わない本文は FastAPI が 422 にする前に、起動の『例外の変換の登録』で problem+json の `errors[]` に揃える。'
+    properties:
+      - name: sources
+        title: 配信元
+        type: list[SourceEntry]
+        access: 公開
+        description: 保存する `sources[]` の全行
+  - name: SettingsWarning
+    title: 端末の設定の警告
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定
+    role: DTO
+    summary: 端末の設定の API の応答の `warnings[]` の 1 件
+    description: 共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。
+    properties:
+      - name: path
+        title: キーのパス
+        type: str
+        access: 公開
+        description: 端末の設定の最上位の知らないキー
+      - name: reason
+        title: 理由
+        type: str
+        access: 公開
+        description: '`UNKNOWN_KEY_REASON`'
+  - name: SettingsSourcesResponse
+    title: 配信元の保存の応答
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定
+    role: DTO
+    summary: 再読み込みした後の配信元ごとの状態
+    description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。`from_statuses(statuses, warnings=[])` で配信元の状態の並びと警告から作る。'
+    properties:
+      - name: sources
+        title: 配信元
+        type: list[SourceStatusItem]
+        access: 公開
+        description: '`id`・`status`（`serving` / `not_served` / `disabled`）・`errors[]`（`{path, reason}`。`not_served` のときだけ）・`config_version`（`{config, server}`。設定のバージョンが古いときだけ）'
+      - name: warnings
+        title: 警告
+        type: list[SettingsWarning]
+        access: 公開
+        description: 端末の設定の最上位の知らないキーの警告。無ければ空
+  - name: SettingsSourceRow
+    title: 配信元の行と状態
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定の取得
+    role: DTO
+    summary: 端末の設定の取得の `sources[]` の 1 行
+    description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。'
+    properties:
+      - name: id
+        title: 配信元の ID
+        type: str | None
+        access: 公開
+        description: 配信元の状態の `id`（行で省いたときは配信元の設定の `name`）。`pending_reload` の行は行の `id`（省いたときは `None`）
+      - name: config
+        title: 配信元の設定のパス
+        type: list[str]
+        access: 公開
+        description: 行の `config`
+      - name: enabled
+        title: 配信するか
+        type: bool
+        access: 公開
+        description: 行の `enabled`
+      - name: scope
+        title: 権限の範囲
+        type: SourceScope
+        access: 公開
+        description: 行の `scope`
+      - name: status
+        title: 状態
+        type: Literal['serving', 'not_served', 'disabled', 'pending_reload']
+        access: 公開
+        description: 配信元の状態の `status`。当たる配信元の状態が無い行（読み直していない行）は `pending_reload`
+      - name: errors
+        title: 除外した理由
+        type: list[dict[str, str]]
+        access: 公開
+        default: '[]'
+        description: '`{path, reason}`。`not_served` のときだけ'
+      - name: config_version
+        title: 設定のバージョン
+        type: dict[str, str] | None
+        access: 公開
+        default: None
+        description: '`{config, server}`。設定のバージョンが古いときだけ'
+      - name: outside_read
+        title: 作業範囲の外から読めるか
+        type: bool
+        access: 公開
+        description: 行の `outside_read`
+  - name: SettingsSourcesView
+    title: 端末の設定の取得の応答
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定の取得
+    role: DTO
+    summary: GET `/settings/sources` の応答
+    description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。'
+    properties:
+      - name: settings_path
+        title: 端末の設定のパス
+        type: str
+        access: 公開
+        description: 端末の設定の `file`
+      - name: sources
+        title: 配信元
+        type: list[SettingsSourceRow]
+        access: 公開
+        description: '`sources[]` の行の順'
+      - name: warnings
+        title: 警告
+        type: list[SettingsWarning]
+        access: 公開
+        description: 端末の設定の最上位の知らないキーの警告。無ければ空
+  - name: SettingsSourceAddRequest
+    title: 1 行の追加の要求
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定の配信元の 1 行の追加
+    role: DTO
+    summary: POST `/settings/sources` の本文
+    description: 共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。
+    properties:
+      - name: source
+        title: 配信元の行
+        type: SettingsSourceRow
+        access: 公開
+        description: 追加する行
+  - name: SourceAddResult
+    title: 1 行の追加の結果
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定の配信元の 1 行の追加
+    role: DTO
+    summary: 配信元の 1 行の追加の戻り値
+    description: '`dataclass(frozen=True)`'
+    properties:
+      - name: result
+        title: 結果
+        type: Literal['added', 'exists']
+        access: 公開
+        description: 追加したか、同じ id の行があったか
+      - name: same
+        title: 内容が同じか
+        type: bool | None
+        access: 公開
+        description: '`exists` のときだけ'
+      - name: statuses
+        title: 配信元の状態
+        type: list[SourceStatus]
+        access: 公開
+        description: '`added` のとき、読み直した後の状態'
+  - name: SettingsSourceAddResponse
+    title: 1 行の追加の応答
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定の配信元の 1 行の追加
+    role: DTO
+    summary: POST `/settings/sources` の応答
+    description: 共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。
+    properties:
+      - name: result
+        title: 結果
+        type: Literal['added', 'exists']
+        access: 公開
+        description: 追加したか、同じ id の行があったか
+      - name: same
+        title: 内容が同じか
+        type: bool | None
+        access: 公開
+        description: '`exists` のときだけ'
+      - name: sources
+        title: 配信元の状態
+        type: list[SourceStatusItem]
+        access: 公開
+        description: '`added` のとき、読み直した後の状態'
+      - name: warnings
+        title: 警告
+        type: list[SettingsWarning]
+        access: 公開
+        description: 端末の設定の最上位の知らないキーの警告。無ければ空
 classes:
-- name: TerminalConfigInvalidError
-  title: 端末の設定の違反
-  container: project_index/features/settings/types.py
-  usecase: 端末の設定
-  role: 例外
-  summary: 端末の設定が無い・YAML として読めない・スキーマに違反することを、違反の並びで表す
-  description: '`ProjectIndexError` の子で HTTP 422。起動では標準エラーに違反ごとに `{file}: {path}: {rule}` を出して終了コード 2 で終わり、読み取り API では problem+json の `errors[]`（`{path, reason}`）にする。'
-  kind: クラス
-  inherits: ProjectIndexError
-  properties:
-  - name: file
-    title: 設定のファイル
-    type: Path
-    access: 公開
-    description: 端末の設定のパス
-  - name: violations
-    title: 違反
-    type: list[Violation]
-    access: 公開
-    default: '[]'
-    description: 違反の並び。ファイルが無いときは空
+  - name: TerminalConfigInvalidError
+    title: 端末の設定の違反
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定
+    role: 例外
+    summary: 端末の設定が無い・YAML として読めない・スキーマに違反することを、違反の並びで表す
+    description: '`ProjectIndexError` の子で HTTP 422。起動では標準エラーに違反ごとに `{file}: {path}: {rule}` を出して終了コード 2 で終わり、読み取り API では problem+json の `errors[]`（`{path, reason}`）にする。'
+    kind: クラス
+    inherits: ProjectIndexError
+    properties:
+      - name: file
+        title: 設定のファイル
+        type: Path
+        access: 公開
+        description: 端末の設定のパス
+      - name: violations
+        title: 違反
+        type: list[Violation]
+        access: 公開
+        default: '[]'
+        description: 違反の並び。ファイルが無いときは空

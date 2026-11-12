@@ -1,5 +1,4 @@
 """`write_docs`・`delete_docs` の処理。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
@@ -28,6 +27,7 @@ from project_index.features.write.types import (
     OPERATIONS_MAX,
     DeleteRequest,
     DeleteResult,
+    DeleteTarget,
     Operation,
     WriteRequest,
     WriteResult,
@@ -45,10 +45,11 @@ from project_index.shared.errors import (
 )
 from project_index.shared.files import replace_file
 from project_index.shared.hashing import value_hash
+from project_index.shared.narrowing import is_dict, is_list
 from project_index.shared.yaml_io import dump_roundtrip, load_roundtrip
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, MutableMapping
     from pathlib import Path
 
     from project_index.features.seen.store import SeenStore
@@ -211,7 +212,9 @@ def _prefixed(index: int, error: ProjectIndexError) -> list[Violation]:
     ]
 
 
-def _stamp(content: Any, op: str, now: datetime, old: Mapping[str, Any] | None) -> None:  # noqa: ANN401
+def _stamp(
+    content: MutableMapping[str, Any], op: str, now: datetime, old: Mapping[str, Any] | None
+) -> None:
     """Git 管理外の配信元では `created`・`updated` を入れる。"""
     stamp = now.isoformat()
     if op == "create":
@@ -222,24 +225,47 @@ def _stamp(content: Any, op: str, now: datetime, old: Mapping[str, Any] | None) 
     set_field(content, "updated", stamp)
 
 
+def _records(file_map: CommentedMap, records: str) -> list[object]:
+    """ファイルの内容から `records` の配列を返す。"""
+    rows = get_field(file_map, records)
+    if not is_list(rows):
+        msg = f"{records} が配列ではありません"
+        raise RuntimeError(msg)
+    return rows
+
+
 def _content_for(
     table: DocumentTable, text: str, document: Document | None, path: str
-) -> tuple[Any, Any]:
+) -> tuple[CommentedMap, CommentedMap]:
     """ファイルの内容から、操作を当てる対象（辞書）と、書き戻すための入れ物を返す。"""
     file_map = load_roundtrip(text, file=path)
-    if table.records is not None and document is not None:
-        records = get_field(file_map, table.records)
-        return records[document.record_index], file_map
+    if table.records is not None and document is not None and document.record_index is not None:
+        record = _records(file_map, table.records)[document.record_index]
+        if not isinstance(record, CommentedMap):
+            msg = f"{path} の {table.records} の要素が辞書ではありません"
+            raise RuntimeError(msg)
+        return record, file_map
     return file_map, file_map
 
 
-def _finish(table: DocumentTable, content: Any, container: Any, document: Document | None) -> str:  # noqa: ANN401
+def _finish(
+    table: DocumentTable,
+    content: Mapping[str, Any],
+    container: CommentedMap | None,
+    document: Document | None,
+) -> str:
     """操作を当てた内容を、ファイルの内容の文字列にする。"""
-    if table.records is not None and document is not None and container is not None:
-        records = get_field(container, table.records)
-        records[document.record_index] = content
+    if (
+        table.records is not None
+        and document is not None
+        and document.record_index is not None
+        and container is not None
+    ):
+        _records(container, table.records)[document.record_index] = content
         return dump_roundtrip(container)
-    return dump_roundtrip(content)
+    return dump_roundtrip(
+        CommentedMap(content) if not isinstance(content, CommentedMap) else content
+    )
 
 
 def _apply_existing(
@@ -276,12 +302,12 @@ def _apply_create(
     if append:
         text = session.text(path) if session.exists(path) else ""
         file_map = load_roundtrip(text, file=path) if text else CommentedMap()
-        assert table.records is not None  # noqa: S101
-        records = get_field(file_map, table.records)
-        if records is None:
+        if table.records is None:
+            msg = "文書の行に records がありません"
+            raise RuntimeError(msg)
+        if get_field(file_map, table.records) is None:
             set_field(file_map, table.records, [])
-            records = get_field(file_map, table.records)
-        records.append(data)
+        _records(file_map, table.records).append(data)
         return path, dump_roundtrip(file_map), True
     if session.exists(path):
         raise _invalid(
@@ -378,6 +404,32 @@ def _run_generators(
                 )
 
 
+def _atomic_error(failures: list[tuple[int, ProjectIndexError]]) -> ProjectIndexError:
+    """まとめて当てる要求で失敗した操作があるときに送る例外を作る。"""
+    first = failures[0][1]
+    # 検査の不合格: 全ての操作の違反を添字つきのパスでまとめる
+    if isinstance(first, ValidationFailedError):
+        violations = [
+            violation
+            for index, error in failures
+            if isinstance(error, ValidationFailedError)
+            for violation in _prefixed(index, error)
+        ]
+        return ValidationFailedError(
+            message=f"検査に通らない操作があります: {len(violations)} 件",
+            violations=violations,
+            next_steps=["違反を修正してから再実行してください"],
+        )
+    # 引数の誤り: 最初に失敗した操作の違反を、添字つきのパスにして送る
+    if isinstance(first, InvalidArgumentError):
+        return InvalidArgumentError(
+            message=first.message,
+            violations=_prefixed(failures[0][0], first),
+            next_steps=first.next_steps,
+        )
+    return first
+
+
 def write_docs(
     request: WriteRequest,
     *,
@@ -423,27 +475,7 @@ def write_docs(
             written_ids.append(item[0].id or "")
             written_tables.append(item[1])
         if failures and request.atomic:
-            first = failures[0][1]
-            if isinstance(first, ValidationFailedError):
-                violations = [
-                    violation
-                    for index, error in failures
-                    if isinstance(error, ValidationFailedError)
-                    for violation in _prefixed(index, error)
-                ]
-                raise ValidationFailedError(
-                    message=f"検査に通らない操作があります: {len(violations)} 件",
-                    violations=violations,
-                    next_steps=["違反を修正してから再実行してください"],
-                )
-            # 最初に失敗した操作の違反を、添字つきのパスにして送る
-            if isinstance(first, InvalidArgumentError):
-                raise InvalidArgumentError(
-                    message=first.message,
-                    violations=_prefixed(failures[0][0], first),
-                    next_steps=first.next_steps,
-                )
-            raise first
+            raise _atomic_error(failures)
         succeeded = [item for item in results if item.status != "failed"]
         if request.dry_run or not succeeded:
             return WriteResult(applied=False, results=results)
@@ -451,6 +483,56 @@ def write_docs(
         _run_generators(target, _unique(written_tables), touched, timeout_sec)
         seen.record_activity(key, source.id, [i for i in written_ids if i], "edited")
         return WriteResult(applied=True, results=results)
+
+
+def _writable(table: DocumentTable, path: str) -> DocumentTable:
+    """書き込みを許す種類の行を返す（許さなければ `InvalidArgumentError`）。"""
+    if not table.is_writable:
+        raise _invalid(
+            [
+                Violation(
+                    path=path,
+                    rule=f"{table.id} は書き込みを許していません",
+                    fix="documents[].writable を確認してください",
+                )
+            ]
+        )
+    return table
+
+
+def _new_id(
+    session: _Session,
+    operation: Operation,
+    table: DocumentTable,
+    columns: Mapping[str, Any],
+    created_ids: set[str],
+) -> str:
+    """作る文書の ID を決める（指定が無ければ `ids.format` で作る）。"""
+    source = session.target.source
+    doc_id = operation.id or columns.get("id")
+    if doc_id is None:
+        if source.config.ids_format is None:
+            raise _invalid(
+                [
+                    Violation(
+                        path="id",
+                        rule="id が要ります（ids.format が無いため作れません）",
+                        fix="id を指定するか、project-index.yaml に ids.format を設定してください",
+                    )
+                ]
+            )
+        doc_id = generate_id(
+            source.config.ids_format,
+            kind=table.id,
+            data=columns,
+            existing={*session.docs, *created_ids},
+        )
+    doc_id = str(doc_id)
+    if doc_id in session.docs or doc_id in created_ids:
+        raise _invalid(
+            [Violation(path="id", rule=f"{doc_id} は既にあります", fix="別の ID にしてください")]
+        )
+    return doc_id
 
 
 def _apply_one(
@@ -463,97 +545,81 @@ def _apply_one(
     now: datetime,
 ) -> tuple[WriteResultItem, DocumentTable]:
     """操作 1 件を当てて検査し、通れば控える。"""
-    source = session.target.source
     if operation.op == "create":
-        assert operation.kind is not None  # noqa: S101
-        table = source.table(operation.kind)
-        if not table.is_writable:
-            raise _invalid(
-                [
-                    Violation(
-                        path="kind",
-                        rule=f"{table.id} は書き込みを許していません",
-                        fix="documents[].writable を確認してください",
-                    )
-                ]
-            )
-        operation = expand_array_keys(operation, table, None, index=index)
-        operation = to_columns(operation, table, index=index)
-        data = operation.data or {}
-        columns = resolve_metadata(data, table)
-        doc_id = operation.id or columns.get("id")
-        if doc_id is None:
-            if source.config.ids_format is None:
-                raise _invalid(
-                    [
-                        Violation(
-                            path="id",
-                            rule="id が要ります（ids.format が無いため作れません）",
-                            fix="id を指定するか、project-index.yaml に ids.format を設定してください",
-                        )
-                    ]
-                )
-            doc_id = generate_id(
-                source.config.ids_format,
-                kind=table.id,
-                data=columns,
-                existing={*session.docs, *created_ids},
-            )
-        doc_id = str(doc_id)
-        if doc_id in session.docs or doc_id in created_ids:
-            raise _invalid(
-                [
-                    Violation(
-                        path="id", rule=f"{doc_id} は既にあります", fix="別の ID にしてください"
-                    )
-                ]
-            )
-        path, text, appended = _apply_create(session, operation, table, doc_id, now)
-        index_in_file = (
-            len(get_field(load_roundtrip(text), table.records or "")) - 1 if appended else None
-        )
-        document, unchecked = _check_and_commit(
-            session,
-            checker,
-            table,
-            path,
-            text,
-            index=index_in_file,
-            doc_id=doc_id,
-            new=True,
-            previous=None,
-        )
-        created_ids.add(document.id)
-        return (
-            WriteResultItem(
-                index=index,
-                id=document.id,
-                status="created",
-                version=document.version,
-                diff=diff_lines("", document.body),
-                unchecked=unchecked,
-            ),
-            table,
-        )
-    assert operation.id is not None  # noqa: S101
+        return _apply_create_one(session, checker, operation, index, created_ids, now)
+    return _apply_existing_one(session, checker, operation, index, last_reads, now)
+
+
+def _apply_create_one(
+    session: _Session,
+    checker: DocumentChecker,
+    operation: Operation,
+    index: int,
+    created_ids: set[str],
+    now: datetime,
+) -> tuple[WriteResultItem, DocumentTable]:
+    """`create` 1 件を当てて検査し、通れば控える。"""
+    if operation.kind is None:
+        msg = "create に kind がありません"
+        raise RuntimeError(msg)
+    table = _writable(session.target.source.table(operation.kind), "kind")
+    operation = expand_array_keys(operation, table, None, index=index)
+    operation = to_columns(operation, table, index=index)
+    doc_id = _new_id(
+        session, operation, table, resolve_metadata(operation.data or {}, table), created_ids
+    )
+    path, text, appended = _apply_create(session, operation, table, doc_id, now)
+    # 配列へ追加した文書は、配列の末尾の要素
+    index_in_file = (
+        len(_records(load_roundtrip(text), table.records or "")) - 1 if appended else None
+    )
+    document, unchecked = _check_and_commit(
+        session,
+        checker,
+        table,
+        path,
+        text,
+        index=index_in_file,
+        doc_id=doc_id,
+        new=True,
+        previous=None,
+    )
+    created_ids.add(document.id)
+    return (
+        WriteResultItem(
+            index=index,
+            id=document.id,
+            status="created",
+            version=document.version,
+            diff=diff_lines("", document.body),
+            unchecked=unchecked,
+        ),
+        table,
+    )
+
+
+def _apply_existing_one(
+    session: _Session,
+    checker: DocumentChecker,
+    operation: Operation,
+    index: int,
+    last_reads: Mapping[str, LastRead],
+    now: datetime,
+) -> tuple[WriteResultItem, DocumentTable]:
+    """`update`・`replace` 1 件を当てて検査し、通れば控える。"""
+    if operation.id is None:
+        msg = "操作に id がありません"
+        raise RuntimeError(msg)
     existing = session.docs.get(operation.id)
     if existing is None:
         raise not_found_error(session.source_id, [operation.id], list(session.docs))
-    table = source.table(existing.kind)
-    if not table.is_writable:
-        raise _invalid(
-            [
-                Violation(
-                    path="id",
-                    rule=f"{table.id} は書き込みを許していません",
-                    fix="documents[].writable を確認してください",
-                )
-            ]
-        )
+    table = _writable(session.target.source.table(existing.kind), "id")
     current = existing.data if operation.op == "update" else None
     operation = expand_array_keys(operation, table, current, index=index)
     operation = to_columns(operation, table, index=index)
-    assert operation.expected_version is not None  # noqa: S101
+    if operation.expected_version is None:
+        msg = "操作に expected_version がありません"
+        raise RuntimeError(msg)
     check_version(existing, operation.expected_version, last_read=last_reads.get(existing.id))
     path, text = _apply_existing(session, operation, existing, table, now)
     new_document, unchecked = _check_and_commit(
@@ -580,17 +646,22 @@ def _apply_one(
     )
 
 
+def _points_to(row: object, ids: set[str]) -> bool:
+    """関連の行が、`source` を持たずに `ids` のどれかを `to` で指すか。"""
+    if not is_dict(row):
+        return False
+    to = row.get("to")
+    return isinstance(to, str) and to in ids and "source" not in row
+
+
 def _referrers(session: _Session, doc_id: str, leaving: set[str]) -> list[Document]:
     """残る文書のうち、`related` の `to` が消す文書の ID で `source` の無い行を持つ文書を返す。"""
     found: list[Document] = []
     for document in session.docs.values():
         if document.id in leaving:
             continue
-        rows = document.metadata.get("related")
-        if isinstance(rows, list) and any(
-            isinstance(row, dict) and row.get("to") == doc_id and "source" not in row
-            for row in rows
-        ):
+        rows: object = document.metadata.get("related")
+        if is_list(rows) and any(_points_to(row, {doc_id}) for row in rows):
             found.append(document)
     return found
 
@@ -602,12 +673,10 @@ def _unlink(session: _Session, referrer: Document, removed: set[str]) -> tuple[s
     text = session.text(referrer.path)
     current, container = _content_for(table, text, referrer, referrer.path)
     rows = get_field(current, column)
-    assert isinstance(rows, list)  # noqa: S101
-    rows[:] = [
-        row
-        for row in rows
-        if not (isinstance(row, dict) and row.get("to") in removed and "source" not in row)
-    ]
+    if not is_list(rows):
+        msg = "related の列が配列ではありません"
+        raise RuntimeError(msg)
+    rows[:] = [row for row in rows if not _points_to(row, removed)]
     return referrer.path, _finish(table, current, container, referrer)
 
 
@@ -623,13 +692,63 @@ def _remove_documents(session: _Session, documents: list[Document]) -> None:
             session.commit(document.path, None, source.table(document.kind))
     for document in records:
         table = source.table(document.kind)
-        assert table.records is not None  # noqa: S101
+        if table.records is None:
+            msg = "文書の行に records がありません"
+            raise RuntimeError(msg)
         file_map = load_roundtrip(session.text(document.path), file=document.path)
-        del get_field(file_map, table.records)[document.record_index]
+        del _records(file_map, table.records)[document.record_index or 0]
         session.commit(document.path, dump_roundtrip(file_map), table)
 
 
-def delete_docs(  # noqa: C901
+def _delete_target(
+    session: _Session, item: DeleteTarget, leaving: set[str], on_referenced: str
+) -> tuple[Document, list[Document]]:
+    """消す文書と、その文書を参照している文書を返す（消せなければ例外を送る）。"""
+    source = session.target.source
+    document = session.docs.get(item.id)
+    if document is None:
+        raise not_found_error(session.source_id, [item.id], list(session.docs))
+    table = source.table(document.kind)
+    if not source.is_git and not table.is_writable:
+        raise DeleteNotAllowedError(
+            message=f"{table.id} は削除を許していません（documents[].writable）",
+            kind=table.id,
+        )
+    check_version(document, item.expected_version, last_read=None)
+    referrers = _referrers(session, item.id, leaving)
+    if referrers and on_referenced == "fail":
+        names = ", ".join(referrer.id for referrer in referrers)
+        raise DocumentReferencedError(
+            message=f"{item.id} は {names} から参照されています",
+            doc_id=item.id,
+            referrers=[referrer.id for referrer in referrers],
+            next_steps=["on_referenced に unlink を指定すると、参照も除外して削除できます"],
+        )
+    return document, referrers
+
+
+def _apply_unlinks(
+    session: _Session, checker: DocumentChecker, unlink_plan: Mapping[str, set[str]]
+) -> None:
+    """参照元の `related` から消す文書を指す行を除き、検査に通れば控える。"""
+    target = session.target
+    for referrer_id, removed in unlink_plan.items():
+        referrer = session.docs[referrer_id]
+        table = target.source.table(referrer.kind)
+        path, text = _unlink(session, referrer, removed)
+        changed = _new_document(
+            session.build(path, text, table), referrer.record_index, referrer.id
+        )
+        violations = checker.check(target, changed, on="write")
+        if violations:
+            raise ValidationFailedError(
+                message=f"検査に通らない操作があります: {len(violations)} 件",
+                violations=violations,
+            )
+        session.commit(path, text, table)
+
+
+def delete_docs(
     request: DeleteRequest,
     *,
     registry: SourceRegistry,
@@ -662,29 +781,7 @@ def delete_docs(  # noqa: C901
         unlink_plan: dict[str, set[str]] = {}
         for index, item in enumerate(request.targets):
             try:
-                document = session.docs.get(item.id)
-                if document is None:
-                    raise not_found_error(session.source_id, [item.id], list(session.docs))
-                table = source.table(document.kind)
-                if not source.is_git and not table.is_writable:
-                    raise DeleteNotAllowedError(
-                        message=f"{table.id} は削除を許していません（documents[].writable）",
-                        kind=table.id,
-                    )
-                check_version(document, item.expected_version, last_read=None)
-                referrers = _referrers(session, item.id, leaving)
-                if referrers and request.on_referenced == "fail":
-                    names = ", ".join(referrer.id for referrer in referrers)
-                    raise DocumentReferencedError(
-                        message=f"{item.id} は {names} から参照されています",
-                        doc_id=item.id,
-                        referrers=[referrer.id for referrer in referrers],
-                        next_steps=[
-                            "on_referenced に unlink を指定すると、参照も除外して削除できます"
-                        ],
-                    )
-                for referrer in referrers:
-                    unlink_plan.setdefault(referrer.id, set()).add(item.id)
+                document, referrers = _delete_target(session, item, leaving, request.on_referenced)
             except ProjectIndexError as error:
                 failures.append((index, error))
                 results.append(
@@ -693,24 +790,13 @@ def delete_docs(  # noqa: C901
                     )
                 )
                 continue
+            for referrer in referrers:
+                unlink_plan.setdefault(referrer.id, set()).add(item.id)
             accepted.append(document)
             results.append(WriteResultItem(index=index, id=item.id, status="deleted"))
         if failures and request.atomic:
             raise failures[0][1]
-        for referrer_id, removed in unlink_plan.items():
-            referrer = session.docs[referrer_id]
-            table = source.table(referrer.kind)
-            path, text = _unlink(session, referrer, removed)
-            changed = _new_document(
-                session.build(path, text, table), referrer.record_index, referrer.id
-            )
-            violations = checker.check(target, changed, on="write")
-            if violations:
-                raise ValidationFailedError(
-                    message=f"検査に通らない操作があります: {len(violations)} 件",
-                    violations=violations,
-                )
-            session.commit(path, text, table)
+        _apply_unlinks(session, checker, unlink_plan)
         # 参照を外した文書と、外した後のバージョン
         unlinked = [(referrer_id, session.docs[referrer_id].version) for referrer_id in unlink_plan]
         if request.dry_run or not accepted:

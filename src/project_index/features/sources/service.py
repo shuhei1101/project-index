@@ -1,5 +1,4 @@
 """配信元の読み込みと検証。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
@@ -10,7 +9,7 @@ import tempfile
 from collections.abc import Callable
 from importlib import resources
 from pathlib import Path, PurePosixPath
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from jsonschema.exceptions import SchemaError
 from jsonschema.validators import Draft202012Validator
@@ -39,6 +38,7 @@ from project_index.integrations.git import is_ignored, main_repo_root
 from project_index.integrations.git import repo_root as git_repo_root
 from project_index.integrations.scripts import ScriptNotFoundError, check_runnable
 from project_index.shared.errors import ProjectIndexError, ValidationFailedError, Violation
+from project_index.shared.narrowing import is_dict
 from project_index.shared.paths import normalize_path
 from project_index.shared.schema_check import schema_violations
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
@@ -66,8 +66,13 @@ __all__ = [
 def _source_schema() -> dict[str, Any]:
     """配布に同梱した配信元の設定のスキーマを読む。"""
     text = resources.files("project_index").joinpath(SOURCE_SCHEMA).read_text(encoding="utf-8")
-    schema: dict[str, Any] = load_yaml(text)
-    return schema
+    # 同梱したスキーマの最上位は、キーが文字列の辞書
+    return cast("dict[str, Any]", load_yaml(text))
+
+
+def _as_schema(value: object) -> dict[str, Any]:
+    """読んだスキーマを、キーを文字列とする辞書として返す（辞書でなければ空の辞書）。"""
+    return cast("dict[str, Any]", value) if is_dict(value) else {}
 
 
 def source_schema_json() -> str:
@@ -158,7 +163,7 @@ def _schema_violation(
     read_text: ReadText,
     read_ref: ReadRef,
     index: int,
-    value: Any,  # noqa: ANN401
+    value: object,
 ) -> Violation | None:
     """行の `schema` が読めて JSON Schema として正しいかを確かめる。"""
     key_path = f"documents[{index}].schema"
@@ -168,13 +173,13 @@ def _schema_violation(
         return found if found is not None else _check_schema_file(read_text, key_path, value)
     # オブジェクトはほかの配信元のリビジョンのスキーマを読む
     try:
-        schema = read_ref(SchemaRef(**value)).schema
+        schema = read_ref(SchemaRef.model_validate(value)).schema
     except SchemaRefError as error:
         return Violation(path=key_path, rule=error.rule)
     return _check_schema(key_path, schema)
 
 
-def _validate(  # noqa: C901
+def _validate(
     value: dict[str, Any], read_text: ReadText, read_ref: ReadRef, config_root: Path
 ) -> list[Violation]:
     """配信元の設定の検証を、ファイルを `read_text` で読んで行う。"""
@@ -187,55 +192,68 @@ def _validate(  # noqa: C901
     tables = {"documents": documents}
     tables.update({name: value.get(name, []) for name in SCRIPT_TABLES})
     for name, rows in tables.items():
-        seen: set[str] = set()
-        for index, row in enumerate(rows):
-            if row["id"] in seen:
-                violations.append(
-                    Violation(path=f"{name}[{index}].id", rule=f"ID が重なっています: {row['id']}")
-                )
-            seen.add(row["id"])
-    # 行の参照が、無い ID を指していないか
+        violations.extend(_duplicate_ids(name, rows))
     ids = {name: {row["id"] for row in value.get(name, [])} for name in SCRIPT_TABLES}
-    references = (
-        ("validators", "validators"),
-        ("converter", "converters"),
-        ("after_write", "generators"),
-    )
     for index, row in enumerate(documents):
-        for key, table in references:
-            refs = row.get(key, [])
-            targets = [refs] if isinstance(refs, str) else refs
-            for position, ref in enumerate(targets):
-                if ref not in ids[table]:
-                    path = f"documents[{index}].{key}"
-                    if key != "converter":
-                        path += f"[{position}]"
-                    violations.append(
-                        Violation(
-                            path=path,
-                            rule="存在しない ID",
-                            fix=f"{table}[] の ID を指してください: {ref}",
-                        )
-                    )
-        if "body_file" in row and "records" not in row:
-            violations.append(
-                Violation(
-                    path=f"documents[{index}].body_file", rule="records と一緒に記載してください"
-                )
-            )
-        # ファイルの有無と配信元の外を指すパス
-        for position, pattern in enumerate(row["paths"]):
-            if _outside_root(pattern):
-                violations.append(
-                    Violation(
-                        path=f"documents[{index}].paths[{position}]",
-                        rule=f"配信元の外を指しています: {pattern}",
-                    )
-                )
+        violations.extend(_document_row_violations(index, row, ids))
         found = _schema_violation(read_text, read_ref, index, row["schema"])
         if found is not None:
             violations.append(found)
     violations.extend(_paths_base_violations(value.get("paths_base"), config_root))
+    return violations
+
+
+def _duplicate_ids(name: str, rows: list[dict[str, Any]]) -> list[Violation]:
+    """テーブルの行の ID の重なりを違反にする。"""
+    violations: list[Violation] = []
+    seen: set[str] = set()
+    for index, row in enumerate(rows):
+        if row["id"] in seen:
+            violations.append(
+                Violation(path=f"{name}[{index}].id", rule=f"ID が重なっています: {row['id']}")
+            )
+        seen.add(row["id"])
+    return violations
+
+
+# `documents[]` の行の参照のキーと、参照先のテーブル
+REFERENCES = (
+    ("validators", "validators"),
+    ("converter", "converters"),
+    ("after_write", "generators"),
+)
+
+
+def _document_row_violations(
+    index: int, row: dict[str, Any], ids: dict[str, set[str]]
+) -> list[Violation]:
+    """`documents[]` の 1 行の、無い ID への参照・`body_file` の単独の記載・配信元の外を指すパスを違反にする。"""
+    violations: list[Violation] = []
+    for key, table in REFERENCES:
+        refs = row.get(key, [])
+        targets = [refs] if isinstance(refs, str) else refs
+        for position, ref in enumerate(targets):
+            if ref in ids[table]:
+                continue
+            # converter は 1 つの ID、それ以外は ID の配列
+            path = f"documents[{index}].{key}" + ("" if key == "converter" else f"[{position}]")
+            violations.append(
+                Violation(
+                    path=path, rule="存在しない ID", fix=f"{table}[] の ID を指してください: {ref}"
+                )
+            )
+    if "body_file" in row and "records" not in row:
+        violations.append(
+            Violation(path=f"documents[{index}].body_file", rule="records と一緒に記載してください")
+        )
+    violations.extend(
+        Violation(
+            path=f"documents[{index}].paths[{position}]",
+            rule=f"配信元の外を指しています: {pattern}",
+        )
+        for position, pattern in enumerate(row["paths"])
+        if _outside_root(pattern)
+    )
     return violations
 
 
@@ -282,10 +300,11 @@ def _check_schema_file(read_text: ReadText, key_path: str, relative: str) -> Vio
     return _check_schema(key_path, load_yaml(read_text(relative) or ""))
 
 
-def _check_schema(key_path: str, schema: Any) -> Violation | None:  # noqa: ANN401
+def _check_schema(key_path: str, schema: object) -> Violation | None:
     """スキーマが JSON Schema（Draft 2020-12）として正しいかを確かめる。"""
     try:
-        Draft202012Validator.check_schema(schema)
+        # 辞書・真偽値でない値も、メタスキーマの検査に渡して SchemaError の理由を得る
+        Draft202012Validator.check_schema(cast("Any", schema))
     except SchemaError as error:
         return Violation(path=key_path, rule=f"スキーマが正しくありません: {error.message}")
     return None
@@ -306,20 +325,33 @@ def check_scripts(config: SourceConfig, *, root: Path) -> list[Violation]:
 def _check_scripts_at(config: SourceConfig, root: Path, repo: Path, commit: str) -> list[Violation]:
     """スクリプトのファイルが commit にあるかを、そのリビジョンから取り出したフォルダで確かめる。"""
     prefix = PurePosixPath(root.relative_to(repo).as_posix()) if root.is_relative_to(repo) else None
-    folders: set[str] = set()
-    for table in SCRIPT_TABLES:
-        for row in getattr(config, table):
-            for item in row.run:
-                if prefix is None or item.startswith(("-", "/")):
-                    continue
-                relative = (prefix / item).as_posix()
-                if read_file_at(repo, commit, relative) is not None:
-                    folders.add(PurePosixPath(relative).parent.as_posix())
+    folders = _script_folders(config, prefix, repo, commit)
     if not folders:
         with tempfile.TemporaryDirectory() as empty:
             return check_scripts(config, root=Path(empty))
     with export_paths_at(repo, commit, sorted(folders)) as exported:
         return check_scripts(config, root=exported / (prefix or PurePosixPath()).as_posix())
+
+
+def _script_folders(
+    config: SourceConfig, prefix: PurePosixPath | None, repo: Path, commit: str
+) -> set[str]:
+    """行のコマンドの引数のうち、commit にあるファイルを持つフォルダを集める。"""
+    if prefix is None:
+        return set()
+    # オプション（`-` で始まる）と絶対パスはファイルを指さない
+    relatives = [
+        (prefix / item).as_posix()
+        for table in SCRIPT_TABLES
+        for row in getattr(config, table)
+        for item in row.run
+        if not item.startswith(("-", "/"))
+    ]
+    return {
+        PurePosixPath(relative).parent.as_posix()
+        for relative in relatives
+        if read_file_at(repo, commit, relative) is not None
+    }
 
 
 def compare_config_version(version: str) -> Literal["same", "older", "newer"]:
@@ -424,10 +456,10 @@ def _read_configs(
         except YamlLoadError as error:
             violations.append(Violation(path=path, rule=f"YAML として読み込めない: {error}"))
             continue
-        if not isinstance(value, dict):
+        if not is_dict(value):
             violations.append(Violation(path=path, rule=f"最上位が辞書ではない: {file}"))
             continue
-        values.append(value)
+        values.append(cast("dict[str, Any]", value))
     return values, violations
 
 
@@ -450,9 +482,8 @@ def read_default_ref_config(first: Path) -> tuple[str, str] | None:
         value = load_yaml(first.read_text(encoding="utf-8"), file=str(first))
     except OSError, YamlLoadError:
         value = None
-    default_ref = SourceConfig.default_ref
-    if isinstance(value, dict) and isinstance(value.get("default_ref"), str):
-        default_ref = value["default_ref"]
+    configured = value.get("default_ref") if is_dict(value) else None
+    default_ref = configured if isinstance(configured, str) else SourceConfig.default_ref
     try:
         commit = resolve_ref(top, default_ref, date_base=default_ref, argument="default_ref").commit
     except ProjectIndexError as error:
@@ -530,13 +561,7 @@ def _assemble(
     base = main_root or top or root
     # 文書の基準のフォルダ（範囲は検証で確かめてある）。設定ファイルのフォルダはそこからの相対パスで持つ
     docs_root, _ = _resolve_paths_base(config.paths_base, root, top)
-    schemas = {
-        row.id: load_yaml(read_text(row.schema_path) or "")
-        if isinstance(row.schema_path, str)
-        # ほかの配信元の参照は、検証で読んだ（`$ref` まで解いた）スキーマを使う
-        else read_ref(row.schema_path).schema
-        for row in config.documents
-    }
+    schemas = _row_schemas(config, read_text, read_ref)
     served = ServedSource(
         id=source_id or config.name,
         root=docs_root,
@@ -554,6 +579,18 @@ def _assemble(
         config_dir=PurePosixPath(root.relative_to(docs_root).as_posix()),
     )
     return served, config, []
+
+
+def _row_schemas(
+    config: SourceConfig, read_text: ReadText, read_ref: ReadRef
+) -> dict[str, dict[str, Any]]:
+    """種類の行ごとのスキーマを読む（ほかの配信元の参照は、検証で読んだ `$ref` まで解いたスキーマ）。"""
+    return {
+        row.id: _as_schema(load_yaml(read_text(row.schema_path) or ""))
+        if isinstance(row.schema_path, str)
+        else read_ref(row.schema_path).schema
+        for row in config.documents
+    }
 
 
 def _log_violations(source_id: str, violations: list[Violation]) -> None:
@@ -626,7 +663,9 @@ def load_source(
         return None, SourceStatus(
             id=source_id, index=index, status="not_served", errors=violations, config=config_files
         )
-    assert served is not None and config is not None  # noqa: PT018, S101
+    if served is None or config is None:
+        msg = "配信元の設定が読めていません"
+        raise RuntimeError(msg)
     # 配信元の設定で無効
     if not config.enabled:
         return None, SourceStatus(id=source_id, index=index, status="disabled", config=config_files)

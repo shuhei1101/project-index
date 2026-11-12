@@ -1,70 +1,70 @@
 id: MOD-100
 title: 索引のサーバー / 共通 / hashing.py
-lead: 内容のハッシュ（文書のバージョン）。
+lead: 内容のハッシュ（文書のバージョン）を受け持ち、共通の hashing.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/shared/test_hashing.py
+  - tests/unit/project_index/shared/test_hashing.py
 constants:
-- name: VERSION_LENGTH
-  title: バージョンの長さ
-  container: project_index/shared/hashing.py
-  usecase: 共通
-  summary: 文書のバージョン（内容のハッシュ）の 16 進の桁数
-  value: '6'
-  reason: 文書のバージョンは同じ文書の前後を比べるだけに使い、6 桁で取り違えが起きない。インターフェース定義の例（`9d0e11`）と揃える
+  - name: VERSION_LENGTH
+    title: バージョンの長さ
+    container: project_index/shared/hashing.py
+    usecase: 共通
+    summary: 文書のバージョン（内容のハッシュ）の 16 進の桁数
+    value: '6'
+    reason: 文書のバージョンは同じ文書の前後を比べるだけに使い、6 桁で取り違えが起きない。インターフェース定義の例（`9d0e11`）と揃える
 functions:
-- name: content_hash
-  title: 内容のハッシュ
-  kind: 関数
-  container: project_index/shared/hashing.py
-  usecase: 共通
-  role: 計算
-  summary: 内容の SHA-256 の先頭 `VERSION_LENGTH` 桁を文書のバージョンにする
-  scope: public
-  thread_safe: true
-  args:
-  - name: data
-    title: 内容
-    type: str | bytes
-    required: true
-    passing: positional
-    description: ハッシュを取る内容。文字列は UTF-8 にする
-  returns:
-    type: str
-    description: 16 進の小文字 `VERSION_LENGTH` 桁
-  process: 1. 文字列なら UTF-8 のバイト列にし、SHA-256 の 16 進の先頭 `VERSION_LENGTH` 桁を返す
-  unit_tests:
-  - name: test_content_hash
-    case: 正常
-    summary: 文字列とバイト列で同じ
-    condition: '`"a"` と `b"a"`'
-    mock: なし
-    expected: どちらも `ca9781`
-- name: value_hash
-  title: 値のハッシュ
-  kind: 関数
-  container: project_index/shared/hashing.py
-  usecase: 共通
-  role: 計算
-  summary: 項目の値を正規化した JSON にしてハッシュを取る（項目ごとのバージョン）
-  scope: public
-  thread_safe: true
-  args:
-  - name: value
-    title: 値
-    type: Any
-    required: true
-    passing: positional
-    description: 素の値
-  returns:
-    type: str
-    description: 『内容のハッシュ』と同じ桁の 16 進
-  process: |-
-    1. キーを並べ替え、`ensure_ascii=False`・区切りに空白を入れない JSON にする
-    2. その文字列の『内容のハッシュ』を返す（内容のハッシュ）
-  unit_tests:
-  - name: test_value_hash
-    case: 正常
-    summary: キーの順によらない
-    condition: '`{"a": 1, "b": 2}` と `{"b": 2, "a": 1}`'
-    mock: なし
-    expected: 同じ値
+  - name: content_hash
+    title: 内容のハッシュ
+    kind: 関数
+    container: project_index/shared/hashing.py
+    usecase: 共通
+    role: 計算
+    summary: 内容の SHA-256 の先頭 `VERSION_LENGTH` 桁を文書のバージョンにする
+    scope: public
+    thread_safe: true
+    args:
+      - name: data
+        title: 内容
+        type: str | bytes
+        required: true
+        passing: positional
+        description: ハッシュを取る内容。文字列は UTF-8 にする
+    returns:
+      type: str
+      description: 16 進の小文字 `VERSION_LENGTH` 桁
+    process: 1. 文字列なら UTF-8 のバイト列にし、SHA-256 の 16 進の先頭 `VERSION_LENGTH` 桁を返す
+    unit_tests:
+      - name: test_content_hash
+        case: 正常
+        summary: 文字列とバイト列で同じ
+        condition: '`"a"` と `b"a"`'
+        mock: なし
+        expected: どちらも `ca9781`
+  - name: value_hash
+    title: 値のハッシュ
+    kind: 関数
+    container: project_index/shared/hashing.py
+    usecase: 共通
+    role: 計算
+    summary: 項目の値を正規化した JSON にしてハッシュを取る（項目ごとのバージョン）
+    scope: public
+    thread_safe: true
+    args:
+      - name: value
+        title: 値
+        type: object
+        required: true
+        passing: positional
+        description: 素の値
+    returns:
+      type: str
+      description: 『内容のハッシュ』と同じ桁の 16 進
+    process: |-
+      1. キーを並べ替え、`ensure_ascii=False`・区切りに空白を入れない JSON にする
+      2. その文字列の『内容のハッシュ』を返す（内容のハッシュ）
+    unit_tests:
+      - name: test_value_hash
+        case: 正常
+        summary: キーの順によらない
+        condition: '`{"a": 1, "b": 2}` と `{"b": 2, "a": 1}`'
+        mock: なし
+        expected: 同じ値

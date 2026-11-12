@@ -40,13 +40,19 @@ from project_index.shared.errors import (
     Violation,
 )
 from project_index.shared.hashing import content_hash, value_hash
-from project_index.shared.yaml_io import load_yaml
+from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from project_index.features.access.types import Target
     from project_index.features.documents.types import Document
+
+
+def load_yaml(text: str) -> Any:
+    """形の分かっている YAML の文字列を読む。"""
+    return load_yaml_value(text)
+
 
 DOC_1 = "id: doc-1\nname: 文書 1\n"
 DOC_2 = "id: doc-2\nname: 文書 2\n"

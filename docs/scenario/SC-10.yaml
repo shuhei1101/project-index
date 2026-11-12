@@ -9,6 +9,8 @@ scenarios:
         description: 配信中の配信元 sample（Git 管理外のフォルダ）。`converters[]` を指す種類の文書を持つ
         notes: '`project-index.yaml` の `description` を書き換えておく'
     flow: |-
+      <!-- map: {"title": "正常シナリオ"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as 利用者・エージェント
@@ -24,6 +26,8 @@ scenarios:
         A->>DM: describe
         DM-->>A: 新しい description
       ```
+
+      <!-- /map -->
     expected:
       - '`check_project` が違反と索引の同期の件数を 0 で返す'
       - '`try_convert` が sample の `converters[]` を指す種類の文書を、変換のスクリプトが出した Markdown で返し、sample のフォルダは変わらない'
@@ -38,6 +42,8 @@ scenarios:
         description: '`version` がサーバーが読めるバージョンより古い `project-index.yaml` を持つ配信元'
         notes: id `old`
     flow: |-
+      <!-- map: {"title": "正常シナリオ（設定のバージョンが古い）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as 利用者・エージェント
@@ -46,6 +52,8 @@ scenarios:
         A->>AD: check_project（old のパス）
         AD-->>A: 違反 0 件と、設定が古いこと
       ```
+
+      <!-- /map -->
     expected:
       - '`check_project` が old の設定のバージョンとサーバーが読めるバージョンを、古い設定として返す'
     test: test_normal_when_config_version_old
@@ -57,6 +65,8 @@ scenarios:
         description: 配信中の配信元 sample
         notes: '`project-index.yaml` から `documents[0].paths` を消しておく'
     flow: |-
+      <!-- map: {"title": "異常シナリオ（変えた設定が検証に通らない）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as 利用者・エージェント
@@ -68,6 +78,8 @@ scenarios:
         A->>DM: search_docs（source: sample）
         DM-->>A: 変える前の設定での文書
       ```
+
+      <!-- /map -->
     expected:
       - '`check_project` が `documents[0].paths` と理由を返す'
       - '`reload` を呼ぶまで sample は変える前の設定で配信される'
@@ -80,6 +92,8 @@ scenarios:
         description: 配信中の配信元 sample
         notes: 変換スクリプトを 0 以外の終了コードで終わるように書き換えておく
     flow: |-
+      <!-- map: {"title": "異常シナリオ（変換スクリプトが失敗する）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as 利用者・エージェント
@@ -88,6 +102,8 @@ scenarios:
         A->>AD: try_convert（sample の文書）
         AD-->>A: スクリプトの終了コードと標準エラー
       ```
+
+      <!-- /map -->
     expected:
       - '`try_convert` がエラーとしてスクリプトの終了コードと標準エラーを返す'
       - sample のフォルダと配信は変わらない
@@ -102,6 +118,8 @@ scenarios:
         description: sample を配信している project-index
         notes: '`cwd` は sample のワークツリー'
     flow: |-
+      <!-- map: {"title": "正常シナリオ（管理の MCP で nav を書く）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -122,6 +140,8 @@ scenarios:
         AM->>F: nav を書く
         AM-->>A: 書いた nav と、0 件に当たる警告
       ```
+
+      <!-- /map -->
     expected:
       - ワークツリーの `project-index.yaml` の `nav` にタブ `mcp` が加わり、`auto` の `filter` が `tags` が `mcp` になる
       - 1 回目の応答の条件に当たる文書の数が 2（文書 1・文書 3）
@@ -137,6 +157,8 @@ scenarios:
       - name: エイリアスのキーの違反と 0 件の条件
         description: 起動するの正常シナリオ（エイリアスのキーと nav の条件を検証する）と同じ違反と条件を、sample のワークツリーで書く
     flow: |-
+      <!-- map: {"title": "正常シナリオ（エイリアスのキーと nav の条件を点検する）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -146,6 +168,8 @@ scenarios:
         AM->>AM: エイリアスのキーを取り込んだスキーマで検証し、nav の条件に当たる文書を数える
         AM-->>A: 違反と警告の一覧
       ```
+
+      <!-- /map -->
     expected:
       - '`check_project` が、エイリアスのキーの違反を文書のパスとともに返す'
       - '`check_project` が、0 件に当たる `nav` の条件を警告として返す'
@@ -162,6 +186,8 @@ scenarios:
         description: sample を配信している project-index
         notes: '`cwd` は sample のクローン本体'
     flow: |-
+      <!-- map: {"title": "正常シナリオ（スクリプトを default_ref から動かす）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as エージェント
@@ -176,6 +202,8 @@ scenarios:
         S->>G: default_ref のスクリプトで変換する
         S-->>U: develop の文字が付いた本文
       ```
+
+      <!-- /map -->
     expected:
       - '`search_docs` の文書 1 の `notes` に違反 `develop-rule` が出る'
       - 変換した本文の先頭に `develop` の文字が付く
@@ -190,6 +218,8 @@ scenarios:
         description: sample の `.claude/worktrees/x`。変換スクリプトを、本文の先頭に `worktree-x` の文字を加えるように書き換えて commit していない
         notes: 配信元の設定の `worktrees` は既定（`[./.claude/worktrees/*]`）
     flow: |-
+      <!-- map: {"title": "正常シナリオ（ワークツリーのスクリプトを動かす）"} -->
+
       ```mermaid
       sequenceDiagram
         actor U as 利用者
@@ -203,6 +233,8 @@ scenarios:
         U->>S: 読み取り API で変換を使う文書を取得する
         S-->>U: default_ref のスクリプトで変換した develop の文字が付いた本文
       ```
+
+      <!-- /map -->
     expected:
       - ワークツリー x のパスを渡した `try_convert` の本文の先頭に `worktree-x` の文字が付き、`develop` の文字は付かない
       - 読み取り API の文書の取得（ワークツリーを指さない）は `develop` の文字が付いた本文を返す
@@ -218,6 +250,8 @@ scenarios:
         description: '`documents[0].schema` で schemas の `schemas/note.schema.yaml` をリビジョン `v1` で指して配信中の、Git 管理外のフォルダの sample'
         notes: '`project-index.yaml` の `documents[0].schema` のリビジョンを `v2` に書き換えておく'
     flow: |-
+      <!-- map: {"title": "正常シナリオ（参照するスキーマのリビジョンを上げる）"} -->
+
       ```mermaid
       sequenceDiagram
         actor A as 利用者・エージェント
@@ -234,6 +268,8 @@ scenarios:
         A->>DM: write_docs（owner を持たない文書を作る）
         DM-->>A: エラー（owner が無い違反）
       ```
+
+      <!-- /map -->
     expected:
       - '`reload` の前の `describe` は `owner` の無い v1 のスキーマを返す'
       - '`reload` の後の `describe` は `owner` を必須にした v2 のスキーマを返す'
@@ -294,7 +330,7 @@ scenarios:
     test: test_normal_when_reloaded_with_unknown_top_level_key
     decisions:
       - D-308
-lead: 利用者かエージェントが配信元の設定・スキーマ・検査と変換のスクリプトを変え、管理の MCP の `check_project`・`try_convert` で確かめてから `reload` で配信に入れる。
+lead: 利用者かエージェントが配信元の設定・スキーマ・スクリプトを変え、管理の MCP で確認してから `reload` で配信に入れるシナリオを定め、設定の変更の流れを変えるときに参照する。
 issue: 14
 primary_actor: 利用者・エージェント（Claude Code）
 stakeholders:

@@ -1,244 +1,246 @@
 id: MOD-9
 title: 索引のサーバー / 管理 / render.py
-lead: '管理の MCP の `format: markdown` の応答の文を組み立てる。値は service.py の結果をそのまま使い、計算しない。'
+lead: '管理の MCP の `format: markdown` の応答の文を組み立てる処理を受け持ち、管理の render.py を修正するときに参照する。'
 test_files:
-- tests/unit/project_index/features/admin/test_render.py
+  - tests/unit/project_index/features/admin/test_render.py
 functions:
-- name: render_status
-  title: 状態の文
-  kind: 関数
-  container: project_index/features/admin/render.py
-  usecase: 状態の取得
-  role: 表示
-  summary: サーバーの状態を Markdown にする
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: status
-    title: サーバーの状態
-    type: ServerStatus
-    required: true
-    passing: positional
-    description: '`get_status` の結果'
-  returns:
-    type: str
-    description: Markdown
-  returns_example: |-
-    ```markdown
-    http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
-    端末の設定: /home/u/.config/project-index/settings.yaml（current）
-    | source | 状態 | 設定のバージョン | 索引の同期 |
-    | --- | --- | --- | --- |
-    | sample | serving | 1（current） | 0 |
-    | broken | not_served（documents[0].paths: 必須のキーが無い） | - | - |
-    ```
-  process: |-
-    1. 1 行目に `{address} project-index {version}（pid {pid}）`、2 行目に `端末の設定: {file}（{version_state}）` を置く
-    2. 配信元ごとに表の行を作る（配信元の行）
-       - `loading` が `True` の場合、表の代わりに `配信元: 読み込み中（読み込みが終わっていない配信元を指す文書の MCP の呼び出しは待たされます）` を置く
-       - 配信元が 0 件の場合、表の代わりに `配信元: なし` を置く
-  unit_tests:
-  - name: test_render_status
-    case: 正常
-    summary: 配信元の表を組み立てる
-    condition: '`serving` と `not_served` の 2 行'
-    mock: なし
-    expected: 返り値例と同じ文
-  - name: test_render_status_when_no_sources
-    case: 正常
-    summary: 配信元が無い
-    condition: '`sources` が空'
-    mock: なし
-    expected: '3 行目が `配信元: なし`'
-  - name: test_render_status_when_loading
-    case: 正常
-    summary: 読み込み中
-    condition: '`loading` が `True`、`sources` が空'
-    mock: なし
-    expected: '3 行目が `配信元: 読み込み中（読み込みが終わっていない配信元を指す文書の MCP の呼び出しは待たされます）`'
-  callers:
-  - MOD-93#functions[build_admin_mcp]
-  callees:
-  - '#functions[_source_row]'
-- name: render_reload
-  title: 読み直しの文
-  kind: 関数
-  container: project_index/features/admin/render.py
-  usecase: 設定の読み直し
-  role: 表示
-  summary: 読み直しの結果を Markdown にする
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: result
-    title: 読み直しの結果
-    type: ReloadResult
-    required: true
-    passing: positional
-    description: '`reload_config` の結果'
-  returns:
-    type: str
-    description: Markdown
-  returns_example: |-
-    ```markdown
-    追加: c
-    削除: a
-    配信していない: d（name: 必須のキーが無い）
-    | source | 状態 | 設定のバージョン | 索引の同期 |
-    | --- | --- | --- | --- |
-    | b | serving | 1（current） | 0 |
-    ```
-  process: |-
-    1. `追加`・`削除`・`配信していない` の 3 行を置く。空の並びは `なし`
-    2. 配信元ごとに表の行を作る（配信元の行）
-  unit_tests:
-  - name: test_render_reload
-    case: 正常
-    summary: 差と配信元の表を組み立てる
-    condition: 追加 1・削除 1・配信していない 1
-    mock: なし
-    expected: 返り値例と同じ文
-  - name: test_render_reload_when_no_change
-    case: 正常
-    summary: 差が無い
-    condition: '`added`・`removed`・`not_served` が空'
-    mock: なし
-    expected: '3 行が `追加: なし`・`削除: なし`・`配信していない: なし`'
-  callers:
-  - MOD-93#functions[build_admin_mcp]
-  callees:
-  - '#functions[_source_row]'
-- name: render_check
-  title: 検査の文
-  kind: 関数
-  container: project_index/features/admin/render.py
-  usecase: 配信元の検査
-  role: 表示
-  summary: 配信元の検査の結果を Markdown にする
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: result
-    title: 検査の結果
-    type: CheckProjectResult
-    required: true
-    passing: positional
-    description: '`check_project` の結果'
-  returns:
-    type: str
-    description: Markdown
-  returns_example: |-
-    ```markdown
-    /home/u/repo/sample（登録済み: sample）
-    設定のバージョン: 1（current）
-    違反: なし
-    索引の同期: 管理用の YAML に無いファイル 1 件
-    - unindexed_files: docs/memo.md
-    ```
-  process: |-
-    1. 1 行目に `{path}`。`registered_id` があれば `（登録済み: {id}）`、無ければ `（未登録）` を続ける
-    2. `設定のバージョン: {config_version}（{version_state}）` を置く。読めなければ `-`
-    3. `違反` を置く。あれば件数を書き、`- {path}: {rule}`（`doc` があれば `- {doc}: {path}: {rule}`）を並べる。続けて `警告` があれば件数と同じ書式の内訳を並べる。`alias_schema_version` が空でなければ `エイリアスのスキーマ: {alias_schema_version}` を置く
-    4. `missing_paths`・`script_errors` があれば、`無いパス`・`スクリプトの失敗` の件数と内訳を並べる
-    5. `sync` があれば `索引の同期` に 0 でない件数を並べ、`- {kind}: {path}` の内訳を続ける。全て 0 なら `索引の同期: ずれなし`。内訳が件数より少なければ `（先頭 {件数} 件）` を添える
-  unit_tests:
-  - name: test_render_check
-    case: 正常
-    summary: 同期のずれを内訳つきで並べる
-    condition: 登録済み・違反なし・管理用の YAML に無いファイル 1 件
-    mock: なし
-    expected: 返り値例と同じ文
-  - name: test_render_check_when_violations
-    case: 正常
-    summary: 違反を並べ、同期の行を置かない
-    condition: 未登録・違反 2 件・`sync` が `None`
-    mock: なし
-    expected: '1 行目に `（未登録）`、`違反: 2 件` の下に 2 行、`索引の同期` の行が無い'
-  - name: test_render_check_when_items_truncated
-    case: 正常
-    summary: 内訳を切ったことを示す
-    condition: '`sync.unindexed_files` が 51、`sync.items` が 50 件'
-    mock: なし
-    expected: '`（先頭 50 件）` を含む'
-  callers:
-  - MOD-93#functions[build_admin_mcp]
-- name: _source_row
-  title: 配信元の行
-  kind: 関数
-  container: project_index/features/admin/render.py
-  usecase: 共通
-  role: 表示
-  summary: 配信元の状態を表の 1 行にする
-  scope: internal
-  is_async: false
-  thread_safe: true
-  args:
-  - name: state
-    title: 配信元の状態
-    type: SourceState
-    required: true
-    passing: positional
-    description: 1 つの配信元
-  returns:
-    type: str
-    description: '`| {id} | {状態} | {設定のバージョン} | {索引の同期} |`'
-  process: |-
-    1. 状態を書く。`not_served` は `errors` を `、` でつないで括弧で添える
-    2. 設定のバージョンは `{config_version}（{version_state}）`、無ければ `-`
-    3. 索引の同期は 3 つの件数の合計。`serving` で `sync` が無ければ `検査中`、それ以外で `sync` が無ければ `-`
-  unit_tests:
-  - name: test_source_row
-    case: 正常
-    summary: 配信中の行に合計を書く
-    condition: '`serving`、`sync` が 1・2・0'
-    mock: なし
-    expected: '`| sample | serving | 1（current） | 3 |`'
-  - name: test_source_row_when_not_served
-    case: 正常
-    summary: 配信しない理由を添える
-    condition: '`not_served`、`errors` 2 件'
-    mock: なし
-    expected: 状態の列が `not_served（{1 件目}、{2 件目}）`、残りの列が `-`
-  - name: test_source_row_when_checking
-    case: 正常
-    summary: 検査が済んでいない配信中の行
-    condition: '`serving`、`sync` が `None`'
-    mock: なし
-    expected: '`| sample | serving | 1（current） | 検査中 |`'
-  callers:
-  - '#functions[render_status]'
-  - '#functions[render_reload]'
-- name: render_write_nav
-  title: 画面の構成の書き込みの文
-  kind: 関数
-  container: project_index/features/admin/render.py
-  usecase: 画面の構成の書き込み
-  role: 表示
-  summary: 画面の構成の書き込みの結果を Markdown にする
-  scope: public
-  thread_safe: true
-  args:
-  - name: result
-    title: 書き込みの結果
-    type: WriteNavResult
-    required: true
-    passing: positional
-    description: '`write_nav` の結果'
-  returns:
-    type: str
-    description: Markdown
-  process: |-
-    1. 1 行目に `{path} の nav を書き込みました` を置く
-    2. `| 条件 | タブ | 文書の数 |` の表に `counts` を並べる
-    3. `warnings` があれば `警告: {件数} 件` と `- {path}: {rule}` を並べる
-    4. `nav` を `yaml` のコードブロックで続ける
-  unit_tests:
-  - name: test_render_write_nav
-    case: 正常
-    summary: 数と警告
-    condition: '`counts` が 2 件（うち 1 件が 0）、`warnings` が 1 件'
-    mock: なし
-    expected: '表に 2 行、`警告: 1 件` の下に 1 行、末尾に `nav` のコードブロック'
+  - name: render_status
+    title: 状態の文
+    kind: 関数
+    container: project_index/features/admin/render.py
+    usecase: 状態の取得
+    role: 表示
+    summary: サーバーの状態を Markdown にする
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: status
+        title: サーバーの状態
+        type: ServerStatus
+        required: true
+        passing: positional
+        description: '`get_status` の結果'
+    returns:
+      type: str
+      description: Markdown
+    returns_example: |-
+      ```markdown
+      http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
+      端末の設定: /home/u/.config/project-index/settings.yaml（current）
+      | source | 状態 | 設定のバージョン | 索引の同期 |
+      | --- | --- | --- | --- |
+      | sample | serving | 1（current） | 0 |
+      | broken | not_served（documents[0].paths: 必須のキーが無い） | - | - |
+      ```
+    process: |-
+      1. 1 行目に `{address} project-index {version}（pid {pid}）`、2 行目に `端末の設定: {file}（{version_state}）` を置く
+      2. 配信元ごとに表の行を作る（配信元の行）
+         - `loading` が `True` の場合、表の代わりに `配信元: 読み込み中（読み込みが終わっていない配信元を指す文書の MCP の呼び出しは待たされます）` を置く
+         - 配信元が 0 件の場合、表の代わりに `配信元: なし` を置く
+    unit_tests:
+      - name: test_render_status
+        case: 正常
+        summary: 配信元の表を組み立てる
+        condition: '`serving` と `not_served` の 2 行'
+        mock: なし
+        expected: 返り値例と同じ文
+      - name: test_render_status_when_no_sources
+        case: 正常
+        summary: 配信元が無い
+        condition: '`sources` が空'
+        mock: なし
+        expected: '3 行目が `配信元: なし`'
+      - name: test_render_status_when_loading
+        case: 正常
+        summary: 読み込み中
+        condition: '`loading` が `True`、`sources` が空'
+        mock: なし
+        expected: '3 行目が `配信元: 読み込み中（読み込みが終わっていない配信元を指す文書の MCP の呼び出しは待たされます）`'
+    callers:
+      - MOD-93#functions[build_admin_mcp]
+    callees:
+      - '#functions[_source_row]'
+  - name: render_reload
+    title: 読み直しの文
+    kind: 関数
+    container: project_index/features/admin/render.py
+    usecase: 設定の読み直し
+    role: 表示
+    summary: 読み直しの結果を Markdown にする
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: result
+        title: 読み直しの結果
+        type: ReloadResult
+        required: true
+        passing: positional
+        description: '`reload_config` の結果'
+    returns:
+      type: str
+      description: Markdown
+    returns_example: |-
+      ```markdown
+      追加: c
+      削除: a
+      配信していない: d（name: 必須のキーが無い）
+      | source | 状態 | 設定のバージョン | 索引の同期 |
+      | --- | --- | --- | --- |
+      | b | serving | 1（current） | 0 |
+      ```
+    process: |-
+      1. `追加`・`削除`・`配信していない` の 3 行を置く。空の並びは `なし`
+      2. 配信元ごとに表の行を作る（配信元の行）
+    unit_tests:
+      - name: test_render_reload
+        case: 正常
+        summary: 差と配信元の表を組み立てる
+        condition: 追加 1・削除 1・配信していない 1
+        mock: なし
+        expected: 返り値例と同じ文
+      - name: test_render_reload_when_no_change
+        case: 正常
+        summary: 差が無い
+        condition: '`added`・`removed`・`not_served` が空'
+        mock: なし
+        expected: '3 行が `追加: なし`・`削除: なし`・`配信していない: なし`'
+    callers:
+      - MOD-93#functions[build_admin_mcp]
+    callees:
+      - '#functions[_source_row]'
+  - name: render_check
+    title: 検査の文
+    kind: 関数
+    container: project_index/features/admin/render.py
+    usecase: 配信元の検査
+    role: 表示
+    summary: 配信元の検査の結果を Markdown にする
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: result
+        title: 検査の結果
+        type: CheckProjectResult
+        required: true
+        passing: positional
+        description: '`check_project` の結果'
+    returns:
+      type: str
+      description: Markdown
+    returns_example: |-
+      ```markdown
+      /home/u/repo/sample（登録済み: sample）
+      設定のバージョン: 1（current）
+      違反: なし
+      索引の同期: 管理用の YAML に無いファイル 1 件
+      - unindexed_files: docs/memo.md
+      ```
+    process: |-
+      1. 1 行目に `{path}`。`registered_id` があれば `（登録済み: {id}）`、無ければ `（未登録）` を続ける
+      2. `設定のバージョン: {config_version}（{version_state}）` を置く。読めなければ `-`
+      3. `違反` を置く。あれば件数を書き、`- {path}: {rule}`（`doc` があれば `- {doc}: {path}: {rule}`）を並べる。続けて `警告` があれば件数と同じ書式の内訳を並べる。`alias_schema_version` が空でなければ `エイリアスのスキーマ: {alias_schema_version}` を置く
+      4. `missing_paths`・`script_errors` があれば、`無いパス`・`スクリプトの失敗` の件数と内訳を並べる
+      5. `sync` があれば `索引の同期` に 0 でない件数を並べ、`- {kind}: {path}` の内訳を続ける。全て 0 なら `索引の同期: ずれなし`。内訳が件数より少なければ `（先頭 {件数} 件）` を添える
+    unit_tests:
+      - name: test_render_check
+        case: 正常
+        summary: 同期のずれを内訳つきで並べる
+        condition: 登録済み・違反なし・管理用の YAML に無いファイル 1 件
+        mock: なし
+        expected: 返り値例と同じ文
+      - name: test_render_check_when_violations
+        case: 正常
+        summary: 違反を並べ、同期の行を置かない
+        condition: 未登録・違反 2 件・`sync` が `None`
+        mock: なし
+        expected: '1 行目に `（未登録）`、`違反: 2 件` の下に 2 行、`索引の同期` の行が無い'
+      - name: test_render_check_when_items_truncated
+        case: 正常
+        summary: 内訳を切ったことを示す
+        condition: '`sync.unindexed_files` が 51、`sync.items` が 50 件'
+        mock: なし
+        expected: '`（先頭 50 件）` を含む'
+    callers:
+      - MOD-93#functions[build_admin_mcp]
+  - name: _source_row
+    title: 配信元の行
+    kind: 関数
+    container: project_index/features/admin/render.py
+    usecase: 共通
+    role: 表示
+    summary: 配信元の状態を表の 1 行にする
+    scope: internal
+    is_async: false
+    thread_safe: true
+    args:
+      - name: state
+        title: 配信元の状態
+        type: SourceState
+        required: true
+        passing: positional
+        description: 1 つの配信元
+    returns:
+      type: str
+      description: '`| {id} | {状態} | {設定のバージョン} | {索引の同期} |`'
+    process: |-
+      1. 状態を書く。`not_served` は `errors` を `、` でつないで括弧で添える
+      2. 設定のバージョンは `{config_version}（{version_state}）`、無ければ `-`
+      3. 索引の同期は 3 つの件数の合計。`serving` で `sync` が無ければ `検査中`、それ以外で `sync` が無ければ `-`
+    unit_tests:
+      - name: test_source_row
+        case: 正常
+        summary: 配信中の行に合計を書く
+        condition: '`serving`、`sync` が 1・2・0'
+        mock: なし
+        expected: '`| sample | serving | 1（current） | 3 |`'
+      - name: test_source_row_when_not_served
+        case: 正常
+        summary: 配信しない理由を添える
+        condition: '`not_served`、`errors` 2 件'
+        mock: なし
+        expected: 状態の列が `not_served（{1 件目}、{2 件目}）`、残りの列が `-`
+      - name: test_source_row_when_checking
+        case: 正常
+        summary: 検査が済んでいない配信中の行
+        condition: '`serving`、`sync` が `None`'
+        mock: なし
+        expected: '`| sample | serving | 1（current） | 検査中 |`'
+    callers:
+      - '#functions[render_status]'
+      - '#functions[render_reload]'
+  - name: render_write_nav
+    title: 画面の構成の書き込みの文
+    kind: 関数
+    container: project_index/features/admin/render.py
+    usecase: 画面の構成の書き込み
+    role: 表示
+    summary: 画面の構成の書き込みの結果を Markdown にする
+    scope: public
+    thread_safe: true
+    args:
+      - name: result
+        title: 書き込みの結果
+        type: WriteNavResult
+        required: true
+        passing: positional
+        description: '`write_nav` の結果'
+    returns:
+      type: str
+      description: Markdown
+    process: |-
+      1. 1 行目に `{path} の nav を書き込みました` を置く
+      2. `| 条件 | タブ | 文書の数 |` の表に `counts` を並べる
+      3. `warnings` があれば `警告: {件数} 件` と `- {path}: {rule}` を並べる
+      4. `nav` を `yaml` のコードブロックで続ける
+    unit_tests:
+      - name: test_render_write_nav
+        case: 正常
+        summary: 数と警告
+        condition: '`counts` が 2 件（うち 1 件が 0）、`warnings` が 1 件'
+        mock: なし
+        expected: '表に 2 行、`警告: 1 件` の下に 1 行、末尾に `nav` のコードブロック'
+notes:
+  決まり: 値は service.py の結果をそのまま使い、計算しない。

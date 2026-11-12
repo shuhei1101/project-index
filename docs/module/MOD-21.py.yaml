@@ -1,136 +1,136 @@
 id: MOD-21
 title: 索引のサーバー / 説明 / source_checks.py
-lead: 配信元ごとの検査（同期のずれ・エイリアスのキーの違反・`nav` の警告）の結果を持ち、`describe` の警告に渡す。
+lead: 配信元ごとの検査（同期のずれ・エイリアスのキーの違反・`nav` の警告）の結果を `describe` の警告に渡す処理を受け持ち、説明の source_checks.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/features/describe/test_source_checks.py
+  - tests/unit/project_index/features/describe/test_source_checks.py
 data_models:
-- name: SourceCheck
-  title: 配信元の検査の結果
-  container: project_index/features/describe/source_checks.py
-  usecase: 説明
-  role: DTO
-  summary: 1 つの配信元の同期のずれと `nav` の警告
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: report
-    title: 同期のずれ
-    type: SyncReport
-    description: '`check_sync` の結果'
-  - name: nav
-    title: nav の警告
-    type: list[Violation]
-    description: '`nav_warnings` の結果'
+  - name: SourceCheck
+    title: 配信元の検査の結果
+    container: project_index/features/describe/source_checks.py
+    usecase: 説明
+    role: DTO
+    summary: 1 つの配信元の同期のずれと `nav` の警告
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: report
+        title: 同期のずれ
+        type: SyncReport
+        description: '`check_sync` の結果'
+      - name: nav
+        title: nav の警告
+        type: list[Violation]
+        description: '`nav_warnings` の結果'
 classes:
-- name: SourceChecks
-  title: 配信元の検査の控え
-  container: project_index/features/describe/source_checks.py
-  usecase: 説明
-  role: 状態
-  summary: 配信元の ID ごとに最後の検査の結果を持つ
-  description: 起動のときに 1 つだけ作り、`Handlers.checks` に持たせる。結果・始めた順の番号・裏で検査している配信元・やり直しの要求は 1 つのロックで読み書きする。
-  methods:
-  - name: refresh
-    title: 検査の流し直し
-    summary: 配信元を検査し、結果を持って返す
-    kind: メソッド
-    scope: public
-    thread_safe: true
-    side_effects: その配信元の結果を置き換える
-    args:
-    - name: store
-      title: 文書のストア
-      type: DocumentStore
-      required: true
-      passing: positional
-      description: 配信元の文書を読む
-    - name: source
-      title: 配信元
-      type: ServedSource
-      required: true
-      passing: positional
-      description: 検査する配信元
-    returns:
-      type: SourceCheck
-      description: 検査の結果
-    process: |-
-      1. ロックを取り、配信元の ID の始めた順の番号を 1 つ進めて控える
-      2. 同期のずれ（`check_sync`）と `nav` の警告（`nav_warnings`）を求める（ロックの外）
-      3. ロックを取り、控えた番号が持っている結果の番号より新しいときだけ結果を置き換え、求めた結果を返す
-    unit_tests:
-    - name: test_source_checks_refresh
-      case: 正常
-      summary: 検査して結果を持つ
-      condition: 管理用の YAML に無いファイルが 1 件ある配信元 sample
-      mock: なし（一時フォルダの配信元）
-      expected: 返した結果と `get("sample")` の `report.unindexed_files` が 1 件
-  - name: get
-    title: 結果の取得
-    summary: 配信元の ID の最後の検査の結果を返す
-    kind: メソッド
-    scope: public
-    thread_safe: true
-    args:
-    - name: source_id
-      title: 配信元の ID
-      type: str
-      required: true
-      passing: positional
-      description: 配信元の ID
-    returns:
-      type: SourceCheck | None
-      description: まだ検査していなければ `None`
-    unit_tests:
-    - name: test_source_checks_refresh_when_older_finished_later
-      case: 正常
-      summary: 後に始めた検査の結果を、先に始めて後に終わった検査で上書きしない
-      condition: 1 回目の検査を合図まで止め、その間に 2 回目の検査を終えてから 1 回目を終える
-      mock: '`check_sync`（呼んだ順に別の結果を返し、1 回目だけ合図まで止める）'
-      expected: '`get("sample")` が 2 回目の結果'
-    - name: test_source_checks_get_when_unchecked
-      case: 正常
-      summary: 検査していない配信元
-      condition: 何も検査していない
-      mock: なし
-      expected: '`None`'
-  - name: refresh_later
-    title: 裏での検査の流し直し
-    summary: 配信元を裏のスレッドで検査し直し、待たずに戻る
-    kind: メソッド
-    scope: public
-    thread_safe: true
-    side_effects: 裏で検査していない配信元ごとにスレッドを 1 つ起動する
-    args:
-    - name: store
-      title: 文書のストア
-      type: DocumentStore
-      required: true
-      passing: positional
-      description: 配信元の文書を読む
-    - name: sources
-      title: 配信元
-      type: list[ServedSource]
-      required: true
-      passing: positional
-      description: 検査し直す配信元
-    returns:
-      type: list[threading.Thread]
-      description: 起動したスレッド（裏で検査中の配信元の分は含まない）
-    process: |-
-      1. ロックを取り、配信元ごとに、裏で検査中ならやり直しの要求を立てて飛ばし、そうでなければ検査中にする
-      2. 検査中にした配信元ごとに daemon のスレッドを起動して返す。スレッドは検査の流し直しを呼び、終えた後にロックを取って、やり直しの要求があれば要求を下ろしてもう 1 回流し、無ければ検査中を解いて終える
-         - 検査が例外を送った場合、`[ERROR]` 配信元の検査に失敗した（配信元の ID）をログに書き、やり直しの要求の扱いは同じにする
-    unit_tests:
-    - name: test_source_checks_refresh_later
-      case: 正常
-      summary: 裏で検査し直す
-      condition: 配信元 sample を渡し、返したスレッドを `join` する
-      mock: なし
-      expected: '`get("sample")` が結果を返す'
-    - name: test_source_checks_refresh_later_when_running
-      case: 正常
-      summary: 裏で検査中に要求されたら、スレッドを増やさず 1 回だけ流し直す
-      condition: 1 回目の検査を合図まで止め、その間に `refresh_later` を 2 回呼んでから合図を出す
-      mock: '`check_sync`（呼んだ回数を数え、1 回目だけ合図まで止める）'
-      expected: 2 回目と 3 回目の `refresh_later` が空のリストを返し、`check_sync` を呼んだ回数が 2 で、`get("sample")` が 2 回目の検査の結果
+  - name: SourceChecks
+    title: 配信元の検査の控え
+    container: project_index/features/describe/source_checks.py
+    usecase: 説明
+    role: 状態
+    summary: 配信元の ID ごとに最後の検査の結果を持つ
+    description: 起動のときに 1 つだけ作り、`Handlers.checks` に持たせる。結果・始めた順の番号・裏で検査している配信元・やり直しの要求は 1 つのロックで読み書きする。
+    methods:
+      - name: refresh
+        title: 検査の流し直し
+        summary: 配信元を検査し、結果を持って返す
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        side_effects: その配信元の結果を置き換える
+        args:
+          - name: store
+            title: 文書のストア
+            type: DocumentStore
+            required: true
+            passing: positional
+            description: 配信元の文書を読む
+          - name: source
+            title: 配信元
+            type: ServedSource
+            required: true
+            passing: positional
+            description: 検査する配信元
+        returns:
+          type: SourceCheck
+          description: 検査の結果
+        process: |-
+          1. ロックを取り、配信元の ID の始めた順の番号を 1 つ進めて控える
+          2. 同期のずれ（`check_sync`）と `nav` の警告（`nav_warnings`）を求める（ロックの外）
+          3. ロックを取り、控えた番号が持っている結果の番号より新しいときだけ結果を置き換え、求めた結果を返す
+        unit_tests:
+          - name: test_source_checks_refresh
+            case: 正常
+            summary: 検査して結果を持つ
+            condition: 管理用の YAML に無いファイルが 1 件ある配信元 sample
+            mock: なし（一時フォルダの配信元）
+            expected: 返した結果と `get("sample")` の `report.unindexed_files` が 1 件
+      - name: get
+        title: 結果の取得
+        summary: 配信元の ID の最後の検査の結果を返す
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        args:
+          - name: source_id
+            title: 配信元の ID
+            type: str
+            required: true
+            passing: positional
+            description: 配信元の ID
+        returns:
+          type: SourceCheck | None
+          description: まだ検査していなければ `None`
+        unit_tests:
+          - name: test_source_checks_refresh_when_older_finished_later
+            case: 正常
+            summary: 後に始めた検査の結果を、先に始めて後に終わった検査で上書きしない
+            condition: 1 回目の検査を合図まで止め、その間に 2 回目の検査を終えてから 1 回目を終える
+            mock: '`check_sync`（呼んだ順に別の結果を返し、1 回目だけ合図まで止める）'
+            expected: '`get("sample")` が 2 回目の結果'
+          - name: test_source_checks_get_when_unchecked
+            case: 正常
+            summary: 検査していない配信元
+            condition: 何も検査していない
+            mock: なし
+            expected: '`None`'
+      - name: refresh_later
+        title: 裏での検査の流し直し
+        summary: 配信元を裏のスレッドで検査し直し、待たずに戻る
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        side_effects: 裏で検査していない配信元ごとにスレッドを 1 つ起動する
+        args:
+          - name: store
+            title: 文書のストア
+            type: DocumentStore
+            required: true
+            passing: positional
+            description: 配信元の文書を読む
+          - name: sources
+            title: 配信元
+            type: list[ServedSource]
+            required: true
+            passing: positional
+            description: 検査し直す配信元
+        returns:
+          type: list[threading.Thread]
+          description: 起動したスレッド（裏で検査中の配信元の分は含まない）
+        process: |-
+          1. ロックを取り、配信元ごとに、裏で検査中ならやり直しの要求を立てて飛ばし、そうでなければ検査中にする
+          2. 検査中にした配信元ごとに daemon のスレッドを起動して返す。スレッドは検査の流し直しを呼び、終えた後にロックを取って、やり直しの要求があれば要求を下ろしてもう 1 回流し、無ければ検査中を解いて終える
+             - 検査が例外を送った場合、`[ERROR]` 配信元の検査に失敗した（配信元の ID）をログに書き、やり直しの要求の扱いは同じにする
+        unit_tests:
+          - name: test_source_checks_refresh_later
+            case: 正常
+            summary: 裏で検査し直す
+            condition: 配信元 sample を渡し、返したスレッドを `join` する
+            mock: なし
+            expected: '`get("sample")` が結果を返す'
+          - name: test_source_checks_refresh_later_when_running
+            case: 正常
+            summary: 裏で検査中に要求されたら、スレッドを増やさず 1 回だけ流し直す
+            condition: 1 回目の検査を合図まで止め、その間に `refresh_later` を 2 回呼んでから合図を出す
+            mock: '`check_sync`（呼んだ回数を数え、1 回目だけ合図まで止める）'
+            expected: 2 回目と 3 回目の `refresh_later` が空のリストを返し、`check_sync` を呼んだ回数が 2 で、`get("sample")` が 2 回目の検査の結果
 refs:
-- IF-1#
+  - IF-1#

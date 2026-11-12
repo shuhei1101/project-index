@@ -1,4 +1,3 @@
-# pyright: reportUnknownArgumentType=warning, reportUnknownLambdaType=warning
 from __future__ import annotations
 
 import io
@@ -51,7 +50,7 @@ def test_main_when_listening(
     def fake_forget(port: int, payload: dict[str, str]) -> None:
         requested.append((port, payload))
 
-    monkeypatch.setattr(hook, "is_listening", lambda port: True)
+    monkeypatch.setattr(hook, "is_listening", _port_open)
     monkeypatch.setattr(hook, "request_forget", fake_forget)
     _stdin(
         monkeypatch,
@@ -78,7 +77,7 @@ def test_main_when_cleared(
     def fake_forget(port: int, payload: dict[str, str]) -> None:
         requested.append((port, payload))
 
-    monkeypatch.setattr(hook, "is_listening", lambda port: True)
+    monkeypatch.setattr(hook, "is_listening", _port_open)
     monkeypatch.setattr(hook, "request_forget", fake_forget)
     monkeypatch.setenv("PROJECT_INDEX_PORT", "8799")
     _stdin(
@@ -108,7 +107,7 @@ def test_main_when_down(
     config = tmp_path / "settings.yaml"
     config.write_text(f'version: "1"\nclone: {clone}\n', encoding="utf-8")
     started: list[Path] = []
-    monkeypatch.setattr(hook, "is_listening", lambda port: False)
+    monkeypatch.setattr(hook, "is_listening", _port_closed)
     monkeypatch.setattr(hook, "start_server", started.append)
     monkeypatch.setenv("PROJECT_INDEX_CONFIG", str(config))
     _stdin(
@@ -135,7 +134,7 @@ def test_main_when_config_missing(
     hook = load_hook("session_start")
     config = tmp_path / "missing.yaml"
     started: list[Path] = []
-    monkeypatch.setattr(hook, "is_listening", lambda port: False)
+    monkeypatch.setattr(hook, "is_listening", _port_closed)
     monkeypatch.setattr(hook, "start_server", started.append)
     monkeypatch.setenv("PROJECT_INDEX_CONFIG", str(config))
     _stdin(
@@ -165,7 +164,7 @@ def test_main_when_forget_failed(
         msg = "timed out"
         raise TimeoutError(msg)
 
-    monkeypatch.setattr(hook, "is_listening", lambda port: True)
+    monkeypatch.setattr(hook, "is_listening", _port_open)
     monkeypatch.setattr(hook, "request_forget", failing_forget)
     _stdin(
         monkeypatch,
@@ -208,7 +207,7 @@ def test_main_when_forget_refused(
     def refused_forget(port: int, payload: dict[str, str]) -> None:
         raise urllib.error.URLError(ConnectionRefusedError(111, "Connection refused"))
 
-    monkeypatch.setattr(hook, "is_listening", lambda port: True)
+    monkeypatch.setattr(hook, "is_listening", _port_open)
     monkeypatch.setattr(hook, "request_forget", refused_forget)
     _stdin(
         monkeypatch,
@@ -372,3 +371,13 @@ def test_request_forget_when_timeout(
         hook.request_forget(server.port, payload)
     # 検証
     assert time.monotonic() - started < 2
+
+
+def _port_open(port: int) -> bool:
+    """ポートが待ち受けている偽物。"""
+    return True
+
+
+def _port_closed(port: int) -> bool:
+    """ポートが待ち受けていない偽物。"""
+    return False

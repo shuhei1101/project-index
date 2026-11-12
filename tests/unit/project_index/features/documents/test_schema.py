@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -10,10 +10,16 @@ from project_index.features.documents import schema as schema_module
 from project_index.features.documents.schema import resolve_schema_refs, startup_schema
 from project_index.features.sources.schema_ref import SchemaRef
 from project_index.features.sources.types import DocumentTable, ServedSource, SourceConfig
-from project_index.shared.yaml_io import load_yaml
+from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+
+def load_yaml(text: str) -> Any:
+    """形の分かっている YAML の文字列を読む。"""
+    return load_yaml_value(text)
+
 
 FILES_SCHEMA_TEMPLATE = Path(__file__).parents[5] / "templates" / "files.schema.yaml"
 

@@ -21,6 +21,7 @@ from project_index.features.prompt_doc.types import (
     InvalidPrompt,
     PartSyntaxError,
     PromptDoc,
+    PromptPart,
     PromptVar,
     PromptYamlError,
     RenderedExample,
@@ -84,27 +85,7 @@ def prompt_to_markdown(doc: PromptDoc) -> str:
     # テンプレート: 部品ごとのセクションに言語のタブを置く
     lines += ["## テンプレート", ""]
     for part in doc.parts:
-        lines += [f"### {part.id}", ""]
-        badges = _part_badges(part.role, part.tags, part.when)
-        if badges:
-            lines += [badges, ""]
-        part_errors = [error for error in syntax_errors if error.part_id == part.id]
-        texts = {text.lang: text.text for text in part.texts}
-
-        def template_body(
-            lang: str,
-            texts: dict[str, str] = texts,
-            part_errors: list[PartSyntaxError] = part_errors,
-        ) -> list[str]:
-            """部品の 1 言語の本文（構文の誤りの注意書きを前に置く）。"""
-            # when の誤りは全ての言語、本文の誤りはその言語のタブに出す
-            errors = [e for e in part_errors if e.field in ("when", f"texts[{lang}]")]
-            body = [line for error in errors for line in (*_syntax_caution(error), "")]
-            if lang not in texts:
-                return [*body, f"{lang} の本文はありません。"]
-            return [*body, *_html_block(template_html(texts[lang], paths=paths))]
-
-        lines += [*lang_tabs(langs, template_body), ""]
+        lines += _template_section(part, langs, syntax_errors, paths)
     # 例: 既定の例と examples の組を並べる（2 つ目以降は閉じて始める）
     lines += ["## 例", ""]
     groups: list[tuple[str, Mapping[str, Any]]] = [(DEFAULT_EXAMPLE_NAME, {})]
@@ -123,6 +104,32 @@ def prompt_to_markdown(doc: PromptDoc) -> str:
 
         lines += [*lang_tabs(langs, example_tab), ""]
     return "\n".join(lines).rstrip("\n") + "\n"
+
+
+def _template_section(
+    part: PromptPart,
+    langs: list[str],
+    syntax_errors: list[PartSyntaxError],
+    paths: dict[str, PromptVar],
+) -> list[str]:
+    """部品 1 件の見出し・バッジと、言語ごとのタブの本文の行を作る。"""
+    lines = [f"### {part.id}", ""]
+    badges = _part_badges(part.role, part.tags, part.when)
+    if badges:
+        lines += [badges, ""]
+    part_errors = [error for error in syntax_errors if error.part_id == part.id]
+    texts = {text.lang: text.text for text in part.texts}
+
+    def template_body(lang: str) -> list[str]:
+        """部品の 1 言語の本文（構文の誤りの注意書きを前に置く）。"""
+        # when の誤りは全ての言語、本文の誤りはその言語のタブに出す
+        errors = [e for e in part_errors if e.field in ("when", f"texts[{lang}]")]
+        body = [line for error in errors for line in (*_syntax_caution(error), "")]
+        if lang not in texts:
+            return [*body, f"{lang} の本文はありません。"]
+        return [*body, *_html_block(template_html(texts[lang], paths=paths))]
+
+    return [*lines, *lang_tabs(langs, template_body), ""]
 
 
 def _header(doc: PromptDoc) -> list[str]:

@@ -1,90 +1,90 @@
 id: MOD-65
 title: 索引のサーバー / 端末の設定 / route.py
-lead: 端末の設定のルーター（`GET`・`PUT`・`POST /settings/sources`）。
+lead: 端末の設定のルーター（`GET`・`PUT`・`POST /settings/sources`）を受け持ち、端末の設定の route.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/features/settings/test_route.py
+  - tests/unit/project_index/features/settings/test_route.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      端末の設定の入口 ..> 配信元の保存 : PUT
-      端末の設定の入口 ..> 同じオリジンの確認 : PUT の前
-      class 端末の設定の入口 {
-        <<function>>
-      }
-      class 配信元の保存 {
-        <<function>>
-      }
-      class 同じオリジンの確認 {
-        <<function>>
-      }
-      click 配信元の保存 href "./MOD-66.py.yaml#配信元の保存"
-      click 同じオリジンの確認 href "./MOD-96.py.yaml#同じオリジンの確認"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        端末の設定の入口 ..> 配信元の保存 : PUT
+        端末の設定の入口 ..> 同じオリジンの確認 : PUT の前
+        class 端末の設定の入口 {
+          <<function>>
+        }
+        class 配信元の保存 {
+          <<function>>
+        }
+        class 同じオリジンの確認 {
+          <<function>>
+        }
+        click 配信元の保存 href "./MOD-66.py.yaml#配信元の保存"
+        click 同じオリジンの確認 href "./MOD-96.py.yaml#同じオリジンの確認"
 functions:
-- name: build_settings_router
-  title: 端末の設定の入口
-  kind: 関数
-  container: project_index/features/settings/route.py
-  usecase: 共通
-  role: 入口
-  summary: 端末の設定の取得・保存・1 行の追加のルートを持つ `APIRouter` を作る
-  scope: public
-  args:
-  - name: handlers
-    title: 配線済みの関数
-    type: Handlers
-    required: true
-    passing: positional
-    description: 起動の『配線済みの関数』。端末の設定・配信元の状態・`reload_sources`・`settings_lock` を引く
-  returns:
-    type: fastapi.APIRouter
-    description: 3 つのルートを持つルーター
-  process: |-
-    1. 両方のルートは、先頭で `await handlers.registry.wait_loaded()` を呼び、配信元の初回の読み込みが終わるまで待つ（起動.待ち受けまでの順番）
-    2. GET `/settings/sources` は、`handlers.terminal.file` を `settings_path` にし、`sources[]` の各行に、`config`（行に `id` があれば `id` も）が同じ配信元の状態の `id`・`status`・`errors`・`config_version` を重ねた（行の `config`・`enabled`・`scope`・`outside_read` はそのまま返す）（1 つの状態は 1 行にだけ重ねる。当たる状態が無い行は `status` を `pending_reload`・`id` を行の `id` にする） `SettingsSourcesView` を返す（配信元の一覧.状態の一覧）。`sources[]` は `handlers.terminal.file` を端末の設定の読み込みで読み直した値（配信元の保存の後も新しい行を返す）。`warnings` は読み直した端末の設定の知らないキーの警告（知らないキーの警告）
-    3. PUT `/settings/sources` は、同じオリジンの確認を依存に持ち（同じオリジンの確認）、本文を `SettingsSourcesRequest` で受けて『配信元の保存』を `reload=handlers.reload_sources`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼び、`SettingsSourcesResponse` を返す（配信元の保存）。`warnings` は保存の後の `handlers.terminal`（読み直しで差し替わる）の知らないキーの警告
-       - `TerminalConfigInvalidError` は例外の変換で 422 の problem+json になる
-    4. POST `/settings/sources` は、同じオリジンの確認を依存に持ち、本文を `SettingsSourceAddRequest` で受けて『配信元の 1 行の追加』を `reload=handlers.reload_sources`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼ぶ。`added` は 201、`exists` は 409 で `SettingsSourceAddResponse` を返す。`warnings` は PUT と同じ
-    5. ルーターは `APIRouter(tags=["settings"])` にする。各ルートの `name`（`operation_id` は渡さず、アプリの組み立てが operationId を `settings-{name}` にする）は、GET が `get_settings_sources`、PUT が `put_settings_sources`、POST が `add_settings_source`
-  unit_tests:
-  - name: test_build_settings_router_when_get
-    case: 正常
-    summary: 行に状態を重ねる
-    condition: GET `/settings/sources`、状態は `serving` 1 つと `not_served` 1 つ
-    mock: 配線済みの関数（偽物）
-    expected: '200 で `settingsPath` と `sources` の 2 行、`not_served` の行に `errors`。`outside_read: false` の行の `outsideRead` が `false`'
-  - name: test_build_settings_router_when_put
-    case: 正常
-    summary: 保存して状態を返す
-    condition: 'PUT `/settings/sources` を `Sec-Fetch-Site: same-origin` で'
-    mock: 配線済みの関数（`save_sources` が状態を返す偽物）
-    expected: 200 で `sources[].status`。`save_sources` に送った行が渡る
-  - name: test_build_settings_router_when_pending_reload
-    case: 正常
-    summary: 読み直していない行を pending_reload で返す
-    condition: GET `/settings/sources`、ファイルは状態より行が 1 つ多く、既存の 2 行の並びが状態と逆
-    mock: 配線済みの関数（偽物）
-    expected: 200 でファイルの順に 3 行。追加した行は `pending_reload`、他の 2 行は自分の `config` の状態
-  - name: test_build_settings_router_when_loading
-    case: 正常
-    summary: 読み込みが終わるまで待ってから行に状態を重ねる
-    condition: GET `/settings/sources` を、registry が `loading=True` のまま送り、応答の前に読み込みを終える
-    mock: 配線済みの関数（偽物。registry は `SourceRegistry(loading=True)`）
-    expected: 読み込みが終わるまで応答しない。終えた後に 200 で、各行に読み込んだ配信元の状態が重なる（`pending_reload` にならない）
-  - name: test_build_settings_router_when_post
-    case: 正常
-    summary: 1 行を追加して 201、同じ id は 409
-    condition: 'POST `/settings/sources` を `Origin` なしで 2 回（2 回目は同じ id）'
-    mock: 配線済みの関数（`add_source` が `added`・`exists` を返す偽物）
-    expected: 1 回目は 201 で `result` が `added`、2 回目は 409 で `result` が `exists` と `same`
-  - name: test_build_settings_router_when_unknown_top_level_key
-    case: 正常
-    summary: 知らないキーの警告を返す
-    condition: 端末の設定の最上位に `mindstella` を持ち、GET・PUT・POST `/settings/sources` を送る
-    mock: 配線済みの関数（偽物。`handlers.terminal.unknown_keys` は `["mindstella"]`）
-    expected: '3 つの応答の `warnings` が `[{"path": "mindstella", "reason": UNKNOWN_KEY_REASON}]`'
+  - name: build_settings_router
+    title: 端末の設定の入口
+    kind: 関数
+    container: project_index/features/settings/route.py
+    usecase: 共通
+    role: 入口
+    summary: 端末の設定の取得・保存・1 行の追加のルートを持つ `APIRouter` を作る
+    scope: public
+    args:
+      - name: handlers
+        title: 配線済みの関数
+        type: Handlers
+        required: true
+        passing: positional
+        description: 起動の『配線済みの関数』。端末の設定・配信元の状態・`reload_sources`・`settings_lock` を引く
+    returns:
+      type: fastapi.APIRouter
+      description: 3 つのルートを持つルーター
+    process: |-
+      1. 両方のルートは、先頭で `await handlers.registry.wait_loaded()` を呼び、配信元の初回の読み込みが終わるまで待つ（起動.待ち受けまでの順番）
+      2. GET `/settings/sources` は、`handlers.terminal.file` を `settings_path` にし、`sources[]` の各行に、`config`（行に `id` があれば `id` も）が同じ配信元の状態の `id`・`status`・`errors`・`config_version` を重ねた（行の `config`・`enabled`・`scope`・`outside_read` はそのまま返す）（1 つの状態は 1 行にだけ重ねる。当たる状態が無い行は `status` を `pending_reload`・`id` を行の `id` にする） `SettingsSourcesView` を返す（配信元の一覧.状態の一覧）。`sources[]` は `handlers.terminal.file` を端末の設定の読み込みで読み直した値（配信元の保存の後も新しい行を返す）。`warnings` は読み直した端末の設定の知らないキーの警告（知らないキーの警告）
+      3. PUT `/settings/sources` は、同じオリジンの確認を依存に持ち（同じオリジンの確認）、本文を `SettingsSourcesRequest` で受けて『配信元の保存』を `reload=handlers.reload_sources`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼び、`SettingsSourcesResponse` を返す（配信元の保存）。`warnings` は保存の後の `handlers.terminal`（読み直しで差し替わる）の知らないキーの警告
+         - `TerminalConfigInvalidError` は例外の変換で 422 の problem+json になる
+      4. POST `/settings/sources` は、同じオリジンの確認を依存に持ち、本文を `SettingsSourceAddRequest` で受けて『配信元の 1 行の追加』を `reload=handlers.reload_sources`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼ぶ。`added` は 201、`exists` は 409 で `SettingsSourceAddResponse` を返す。`warnings` は PUT と同じ
+      5. ルーターは `APIRouter(tags=["settings"])` にする。各ルートの `name`（`operation_id` は渡さず、アプリの組み立てが operationId を `settings-{name}` にする）は、GET が `get_settings_sources`、PUT が `put_settings_sources`、POST が `add_settings_source`
+    unit_tests:
+      - name: test_build_settings_router_when_get
+        case: 正常
+        summary: 行に状態を重ねる
+        condition: GET `/settings/sources`、状態は `serving` 1 つと `not_served` 1 つ
+        mock: 配線済みの関数（偽物）
+        expected: '200 で `settingsPath` と `sources` の 2 行、`not_served` の行に `errors`。`outside_read: false` の行の `outsideRead` が `false`'
+      - name: test_build_settings_router_when_put
+        case: 正常
+        summary: 保存して状態を返す
+        condition: 'PUT `/settings/sources` を `Sec-Fetch-Site: same-origin` で'
+        mock: 配線済みの関数（`save_sources` が状態を返す偽物）
+        expected: 200 で `sources[].status`。`save_sources` に送った行が渡る
+      - name: test_build_settings_router_when_pending_reload
+        case: 正常
+        summary: 読み直していない行を pending_reload で返す
+        condition: GET `/settings/sources`、ファイルは状態より行が 1 つ多く、既存の 2 行の並びが状態と逆
+        mock: 配線済みの関数（偽物）
+        expected: 200 でファイルの順に 3 行。追加した行は `pending_reload`、他の 2 行は自分の `config` の状態
+      - name: test_build_settings_router_when_loading
+        case: 正常
+        summary: 読み込みが終わるまで待ってから行に状態を重ねる
+        condition: GET `/settings/sources` を、registry が `loading=True` のまま送り、応答の前に読み込みを終える
+        mock: 配線済みの関数（偽物。registry は `SourceRegistry(loading=True)`）
+        expected: 読み込みが終わるまで応答しない。終えた後に 200 で、各行に読み込んだ配信元の状態が重なる（`pending_reload` にならない）
+      - name: test_build_settings_router_when_post
+        case: 正常
+        summary: 1 行を追加して 201、同じ id は 409
+        condition: 'POST `/settings/sources` を `Origin` なしで 2 回（2 回目は同じ id）'
+        mock: 配線済みの関数（`add_source` が `added`・`exists` を返す偽物）
+        expected: 1 回目は 201 で `result` が `added`、2 回目は 409 で `result` が `exists` と `same`
+      - name: test_build_settings_router_when_unknown_top_level_key
+        case: 正常
+        summary: 知らないキーの警告を返す
+        condition: 端末の設定の最上位に `mindstella` を持ち、GET・PUT・POST `/settings/sources` を送る
+        mock: 配線済みの関数（偽物。`handlers.terminal.unknown_keys` は `["mindstella"]`）
+        expected: '3 つの応答の `warnings` が `[{"path": "mindstella", "reason": UNKNOWN_KEY_REASON}]`'
 refs:
-- IF-30#
-- IF-31#
-- IF-32#
+  - IF-30#
+  - IF-31#
+  - IF-32#

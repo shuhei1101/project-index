@@ -1,18 +1,19 @@
 """検索で使う項目の値と使える項目。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
 from project_index.features.documents.fields import METADATA_KEYS, get_field, is_markdown_body
 from project_index.features.search.types import Heading
 from project_index.shared.errors import InvalidArgumentError
+from project_index.shared.narrowing import is_dict, is_list
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Mapping, Sequence
+
     from project_index.features.documents.types import Document
 
 COMPUTED_FIELDS = ("@chars", "@path", "@sections", "@matches")
@@ -25,13 +26,13 @@ FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
 SCHEMA_TYPES = {"string", "number", "boolean", "array", "object"}
 
 
-def _leaves(value: Any) -> list[str]:  # noqa: ANN401
+def _leaves(value: object) -> list[str]:
     """入れ子の値から文字列の葉を集める。"""
     if isinstance(value, str):
         return [value]
-    if isinstance(value, Mapping):
+    if is_dict(value):
         return [leaf for item in value.values() for leaf in _leaves(item)]
-    if isinstance(value, list):
+    if is_list(value):
         return [leaf for item in value for leaf in _leaves(item)]
     return []
 
@@ -55,30 +56,38 @@ def _headings(body: str) -> list[str]:
     return [heading.text for heading in heading_lines(body.splitlines())]
 
 
-def _raw_values(document: Document, field: str) -> Any:  # noqa: ANN401, C901
+def _path(document: Document) -> str:
+    """文書の場所（`records` の行は `{path}#{record_index}`）。"""
+    suffix = "" if document.record_index is None else f"#{document.record_index}"
+    return f"{document.path}{suffix}"
+
+
+def _sections(document: Document) -> list[str]:
+    """Markdown の本文なら見出しの文字列、それ以外は `data` の最上位のキーの並び。"""
+    return _headings(document.body) if is_markdown_body(document) else list(document.data)
+
+
+# 文書の属性・計算で値を決める項目（`@matches` は条件で決まり文書だけでは決まらないので値を持たない）
+_COMPUTED: dict[str, Callable[[Document], object]] = {
+    "id": lambda document: document.id,
+    "kind": lambda document: document.kind,
+    "version": lambda document: document.version,
+    "created": lambda document: document.created,
+    "updated": lambda document: document.updated,
+    "body": lambda document: document.body,
+    "*": lambda document: [*_leaves(document.data), document.body],
+    "@chars": lambda document: len(document.body),
+    "@path": _path,
+    "@matches": lambda _: None,
+    "@sections": _sections,
+}
+
+
+def _raw_values(document: Document, field: str) -> object:
     """項目の値を、配列のまま引く。"""
-    if field == "id":
-        return document.id
-    if field == "kind":
-        return document.kind
-    if field == "version":
-        return document.version
-    if field in DATE_FIELDS:
-        return getattr(document, field)
-    if field == "body":
-        return document.body
-    if field == "*":
-        return [*_leaves(document.data), document.body]
-    if field == "@chars":
-        return len(document.body)
-    if field == "@path":
-        suffix = "" if document.record_index is None else f"#{document.record_index}"
-        return f"{document.path}{suffix}"
-    if field == "@matches":
-        # 条件で決まり文書だけでは決まらないので、値を持たない（検索が当たった行の数で数える）
-        return None
-    if field == "@sections":
-        return _headings(document.body) if is_markdown_body(document) else list(document.data)
+    computed = _COMPUTED.get(field)
+    if computed is not None:
+        return computed(document)
     if field in METADATA_KEYS:
         return document.metadata.get(field)
     try:
@@ -92,7 +101,7 @@ def field_values(document: Document, field: str) -> list[Any]:
     value = _raw_values(document, field)
     if value is None:
         return []
-    return list(value) if isinstance(value, list) else [value]
+    return list(value) if is_list(value) else [value]
 
 
 def _base_fields() -> dict[str, str]:
@@ -112,44 +121,44 @@ def _base_fields() -> dict[str, str]:
     return fields
 
 
-def _schema_type(schema: Mapping[str, Any]) -> str:
+def _schema_type(schema: dict[object, object]) -> str:
     """スキーマの `type` と `format` から項目の型を決める。"""
     if schema.get("format") in ("date", "date-time"):
         return "date"
     declared = schema.get("type")
-    if isinstance(declared, list):
+    if is_list(declared):
         declared = next((item for item in declared if item != "null"), "string")
     if declared == "integer":
         return "number"
-    return declared if declared in SCHEMA_TYPES else "string"
+    return declared if isinstance(declared, str) and declared in SCHEMA_TYPES else "string"
 
 
-def _walk(schema: Mapping[str, Any], prefix: str, fields: dict[str, str]) -> None:
+def _walk(schema: object, prefix: str, fields: dict[str, str]) -> None:
     """スキーマの `properties` を再帰でたどり、項目のパスと型を足す。"""
+    if not is_dict(schema):
+        return
     properties = schema.get("properties")
-    if isinstance(properties, Mapping):
+    if is_dict(properties):
         for key, sub in properties.items():
-            if not isinstance(sub, Mapping):
+            if not is_dict(sub):
                 continue
             path = f"{prefix}{key}"
             declared = _schema_type(sub)
             # 型の食い違う同じパスは string にする
             fields[path] = declared if fields.get(path, declared) == declared else "string"
             _walk(sub, f"{path}.", fields)
-    items = schema.get("items")
-    if isinstance(items, Mapping):
-        _walk(items, prefix, fields)
+    _walk(schema.get("items"), prefix, fields)
 
 
 def known_fields(schemas: Iterable[Mapping[str, Any]]) -> dict[str, str]:
     """配信元の種類のスキーマから、条件・並べ替え・集計に使える項目の一覧を作る。"""
     fields = _base_fields()
     for schema in schemas:
-        _walk(schema, "", fields)
+        _walk(dict(schema), "", fields)
     return fields
 
 
-def as_datetime(value: Any) -> datetime | None:  # noqa: ANN401
+def as_datetime(value: object) -> datetime | None:
     """日時・日付・ISO 8601 の文字列を日時にする。"""
     if isinstance(value, datetime):
         return value

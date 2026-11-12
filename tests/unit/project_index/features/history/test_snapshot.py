@@ -1,4 +1,3 @@
-# pyright: reportUnknownArgumentType=warning, reportUnknownLambdaType=warning
 from __future__ import annotations
 
 import time
@@ -29,6 +28,22 @@ def archive_calls(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
     return calls
 
 
+@pytest.fixture
+def archive_timeouts(monkeypatch: pytest.MonkeyPatch) -> list[object]:
+    """`git archive` に指定した `timeout` を記録する包みを差し込み、記録した値を返却する。"""
+    timeouts: list[object] = []
+    real = snapshot_module.run_git
+
+    def recording(args: Any, **kwargs: Any) -> Any:
+        # git archive の呼び出しだけ、指定した timeout（指定が無ければ None）を記録する
+        if list(args)[:1] == ["archive"]:
+            timeouts.append(kwargs.get("timeout"))
+        return real(args, **kwargs)
+
+    monkeypatch.setattr(snapshot_module, "run_git", recording)
+    return timeouts
+
+
 def test_snapshot_store_checkout(
     tmp_path: Path,
     git_repo: Callable[..., Path],
@@ -53,6 +68,7 @@ def test_snapshot_store_checkout_when_cached(
     git_repo: Callable[..., Path],
     run_git: Callable[..., str],
     archive_calls: list[list[str]],
+    archive_timeouts: list[object],
 ) -> None:
     """2 回目は git を呼ばない（正常系）。"""
     # 準備
@@ -66,6 +82,7 @@ def test_snapshot_store_checkout_when_cached(
     assert [call for call in archive_calls if call[0] == "archive"] == [
         ["archive", "--format=tar", commit]
     ]
+    assert archive_timeouts == [20]
 
 
 def test_snapshot_store_checkout_when_concurrent(
@@ -81,7 +98,11 @@ def test_snapshot_store_checkout_when_concurrent(
     store = SnapshotStore(tmp_path / "snapshots")
     # 実行
     with ThreadPoolExecutor(max_workers=4) as executor:
-        results = list(executor.map(lambda _: store.checkout(root, commit), range(4)))
+
+        def checkout(_: int) -> Path:
+            return store.checkout(root, commit)
+
+        results = list(executor.map(checkout, range(4)))
     # 検証
     assert len(set(results)) == 1
     assert len([call for call in archive_calls if call[0] == "archive"]) == 1

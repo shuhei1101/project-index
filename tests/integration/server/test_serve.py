@@ -29,13 +29,19 @@ from project_index.server.mcp.result import (
     mcp_prompt_ids,
     tool_prompt_id,
 )
-from project_index.shared.yaml_io import load_yaml
+from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     import pytest
     from pydantic import BaseModel
+
+
+def load_yaml(text: str) -> Any:
+    """形の分かっている YAML の文字列を読む。"""
+    return load_yaml_value(text)
+
 
 BROKEN_CONFIG = "name: broken\ndocuments:\n  - id: sample\n    schema: schemas/sample.schema.yaml\n"
 TOOL_NAMES = [

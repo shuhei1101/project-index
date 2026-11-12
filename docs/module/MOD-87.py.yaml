@@ -1,217 +1,217 @@
 id: MOD-87
 title: 索引のサーバー / スクリプトの実行 / mdmark.py
-lead: mdmark の CLI の `check --text -` で Markdown の文字列を点検し、出力をずれの並びにする。
+lead: mdmark の CLI の `check --text -` で Markdown の文字列を点検し、出力をずれの並びにする処理を受け持ち、スクリプトの実行の mdmark.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/integrations/test_mdmark.py
+  - tests/unit/project_index/integrations/test_mdmark.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      Markdownの点検 ..> スクリプトの実行
-      Markdownの点検 ..> 点検の出力の解釈
-      Markdownの点検 ..> mdmarkのずれ : 返す
-      Markdownの点検 ..> mdmarkを使えない : 送る
-      点検の出力の解釈 ..> mdmarkのずれ : 返す
-      class Markdownの点検 {
-        <<function>>
-      }
-      class 点検の出力の解釈 {
-        <<function>>
-      }
-      class スクリプトの実行 {
-        <<function>>
-      }
-      class mdmarkのずれ {
-        <<dataclass>>
-      }
-      class mdmarkを使えない {
-        <<exception>>
-      }
-      click スクリプトの実行 href "./MOD-88.py.yaml#スクリプトの実行"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        Markdownの点検 ..> スクリプトの実行
+        Markdownの点検 ..> 点検の出力の解釈
+        Markdownの点検 ..> mdmarkのずれ : 返す
+        Markdownの点検 ..> mdmarkを使えない : 送る
+        点検の出力の解釈 ..> mdmarkのずれ : 返す
+        class Markdownの点検 {
+          <<function>>
+        }
+        class 点検の出力の解釈 {
+          <<function>>
+        }
+        class スクリプトの実行 {
+          <<function>>
+        }
+        class mdmarkのずれ {
+          <<dataclass>>
+        }
+        class mdmarkを使えない {
+          <<exception>>
+        }
+        click スクリプトの実行 href "./MOD-88.py.yaml#スクリプトの実行"
 data_models:
-- name: MdmarkFinding
-  title: mdmarkのずれ
-  container: project_index/integrations/mdmark.py
-  usecase: 書き込み
-  role: DTO
-  summary: '`mdmark check --text -` が出したずれの 1 行'
-  description: '`@dataclass(frozen=True, slots=True, kw_only=True)`。'
-  properties:
-  - name: line
-    title: 行
-    type: int
-    access: 公開
-    description: 点検した文字列の中の行の番号（1 始まり）
-  - name: kind
-    title: 種類
-    type: str
-    access: 公開
-    description: mdmark の種類（`diagram_invalid`・`syntax_warning`・`unknown_mark` など）
-  - name: message
-    title: 内容
-    type: str
-    access: 公開
-    description: 何が合わないかと直し方の 1 文
+  - name: MdmarkFinding
+    title: mdmarkのずれ
+    container: project_index/integrations/mdmark.py
+    usecase: 書き込み
+    role: DTO
+    summary: '`mdmark check --text -` が出したずれの 1 行'
+    description: '`@dataclass(frozen=True, slots=True, kw_only=True)`。'
+    properties:
+      - name: line
+        title: 行
+        type: int
+        access: 公開
+        description: 点検した文字列の中の行の番号（1 始まり）
+      - name: kind
+        title: 種類
+        type: str
+        access: 公開
+        description: mdmark の種類（`diagram_invalid`・`syntax_warning`・`unknown_mark` など）
+      - name: message
+        title: 内容
+        type: str
+        access: 公開
+        description: 何が合わないかと直し方の 1 文
 classes:
-- name: MdmarkUnavailableError
-  title: mdmarkを使えない
-  container: project_index/integrations/mdmark.py
-  usecase: 書き込み
-  role: 例外
-  summary: mdmark の CLI で点検を終えられなかったことを表す
-  kind: クラス
-  inherits: Exception
-  properties:
-  - name: reason
-    title: 理由
-    type: str
-    access: 公開
-    description: '`results[].unchecked` に入れる理由の文'
-  - name: continuable
-    title: 残りを続けるか
-    type: bool
-    access: 公開
-    description: '`False` は CLI が見つからない・制限時間を超えたときで、同じ書き込みの残りの値も呼ばない。`True` は 1 つの値の点検が結果を出さずに終わったとき'
+  - name: MdmarkUnavailableError
+    title: mdmarkを使えない
+    container: project_index/integrations/mdmark.py
+    usecase: 書き込み
+    role: 例外
+    summary: mdmark の CLI で点検を終えられなかったことを表す
+    kind: クラス
+    inherits: Exception
+    properties:
+      - name: reason
+        title: 理由
+        type: str
+        access: 公開
+        description: '`results[].unchecked` に入れる理由の文'
+      - name: continuable
+        title: 残りを続けるか
+        type: bool
+        access: 公開
+        description: '`False` は CLI が見つからない・制限時間を超えたときで、同じ書き込みの残りの値も呼ばない。`True` は 1 つの値の点検が結果を出さずに終わったとき'
 constants:
-- name: MDMARK_CHECK_RUN
-  title: 点検のコマンド
-  container: project_index/integrations/mdmark.py
-  usecase: 書き込み
-  summary: '`PATH` の mdmark で標準入力の Markdown を点検するコマンド'
-  value: '("mdmark", "check", "--text", "-")'
-- name: FINDING_PATTERN
-  title: ずれの行の形
-  container: project_index/integrations/mdmark.py
-  usecase: 書き込み
-  summary: '`-:{行}: {種類}: {内容}` の行に当てる正規表現'
-  value: '`^-:(\d+): ([a-z_]+): (.*)$`'
-- name: SUMMARY_PATTERN
-  title: 件数の行の形
-  container: project_index/integrations/mdmark.py
-  usecase: 書き込み
-  summary: 最後の `ずれ {件数} 件` の行に当てる正規表現
-  value: '`^ずれ (\d+) 件$`'
+  - name: MDMARK_CHECK_RUN
+    title: 点検のコマンド
+    container: project_index/integrations/mdmark.py
+    usecase: 書き込み
+    summary: '`PATH` の mdmark で標準入力の Markdown を点検するコマンド'
+    value: '("mdmark", "check", "--text", "-")'
+  - name: FINDING_PATTERN
+    title: ずれの行の形
+    container: project_index/integrations/mdmark.py
+    usecase: 書き込み
+    summary: '`-:{行}: {種類}: {内容}` の行に当てる正規表現'
+    value: '`^-:(\d+): ([a-z_]+): (.*)$`'
+  - name: SUMMARY_PATTERN
+    title: 件数の行の形
+    container: project_index/integrations/mdmark.py
+    usecase: 書き込み
+    summary: 最後の `ずれ {件数} 件` の行に当てる正規表現
+    value: '`^ずれ (\d+) 件$`'
 functions:
-- name: check_markdown
-  title: Markdownの点検
-  kind: 関数
-  container: project_index/integrations/mdmark.py
-  usecase: 書き込み
-  role: 外部実行
-  summary: Markdown の文字列を `mdmark check --text -` に通し、ずれの並びを返す
-  scope: public
-  thread_safe: true
-  side_effects: 子プロセスを起動する
-  args:
-  - name: text
-    title: Markdown
-    type: str
-    required: true
-    passing: positional
-    description: 点検する値
-  - name: cwd
-    title: 実行する場所
-    type: Path
-    required: true
-    passing: keyword
-    description: 書き込む配信元の作業ツリーの直下（`mdmark.config.yaml` を上へ探す起点）
-  - name: timeout_sec
-    title: 制限時間
-    type: float
-    required: true
-    passing: keyword
-    description: 端末の設定の `script_timeout_sec`
-  args_example: |-
-    ```python
-    findings = check_markdown(body, cwd=target.base, timeout_sec=30)
-    ```
-  returns:
-    type: list[MdmarkFinding]
-    description: ずれ。0 件なら空の並び（種類で絞らない）
-  process: |-
-    1. `MDMARK_CHECK_RUN` をスクリプトの実行（`cwd`・`stdin=text`・`timeout_sec`）で動かす（スクリプトの実行）
-       - `ScriptNotFoundError` の場合、`MdmarkUnavailableError`（`continuable=False`）を送る
-       - `ScriptTimeoutError` の場合、`MdmarkUnavailableError`（`continuable=False`）を送る
-       - `ScriptFailedError` の場合、標準出力を点検の出力の解釈にかける。`None` なら `MdmarkUnavailableError`（`continuable=True`）を送る
-    2. 終了コード 0 なら空の並びを返す
-    3. 解釈したずれを返す
-  exceptions:
-  - name: MdmarkUnavailableError
-    condition: mdmark の CLI が `PATH` に無い
-    message: '`mdmark の CLI が PATH に見つかりません`'
-  - name: MdmarkUnavailableError
-    condition: 制限時間を超えた
-    message: '`mdmark の点検が制限時間（{timeout_sec} 秒）を超えました`'
-  - name: MdmarkUnavailableError
-    condition: 終了コード 1 で、最後の行が `ずれ {件数} 件` でない
-    message: '`mdmark の点検が結果を出さずに終了コード {code} で終わりました: {標準エラーの末尾}`'
-  unit_tests:
-  - name: test_check_markdown
-    case: 正常
-    summary: ずれが無い
-    condition: 'PATH の先頭に、標準入力を読んで `ずれ 0 件` を出し終了コード 0 で終わる `mdmark` のスクリプトを置く'
-    mock: '`monkeypatch` で `PATH` を一時フォルダにする'
-    expected: 空の並び。スクリプトが受けた引数が `check --text -` で、標準入力が `text`
-  - name: test_check_markdown_when_findings
-    case: 正常
-    summary: ずれがある
-    condition: '`-:3: diagram_invalid: A` と `-:1: unknown_mark: B` と `ずれ 2 件` を出して終了コード 1 で終わるスクリプト'
-    mock: '`monkeypatch` で `PATH` を一時フォルダにする'
-    expected: '`[MdmarkFinding(line=3, kind="diagram_invalid", message="A"), MdmarkFinding(line=1, kind="unknown_mark", message="B")]`'
-  - name: test_check_markdown_when_missing
-    case: 異常
-    summary: CLI が無い
-    condition: '`PATH` に `mdmark` が無い'
-    mock: '`monkeypatch` で `PATH` を空のフォルダにする'
-    expected: '`MdmarkUnavailableError` で、`continuable` が `False`'
-    exception: mdmark の CLI が `PATH` に無い
-  - name: test_check_markdown_when_timeout
-    case: 異常
-    summary: 制限時間を超える
-    condition: '`sleep 5` するスクリプトを `timeout_sec=0.2` で'
-    mock: '`monkeypatch` で `PATH` を一時フォルダにする'
-    expected: '`MdmarkUnavailableError` で、`continuable` が `False`'
-    exception: 制限時間を超えた
-  - name: test_check_markdown_when_no_summary
-    case: 異常
-    summary: 結果を出さずに終わる
-    condition: 標準エラーに `unknown option --text` を出し、標準出力を出さずに終了コード 1 で終わるスクリプト
-    mock: '`monkeypatch` で `PATH` を一時フォルダにする'
-    expected: '`MdmarkUnavailableError` で、`continuable` が `True`、`reason` に `unknown option --text` がある'
-    exception: 終了コード 1 で、最後の行が `ずれ {件数} 件` でない
-- name: parse_check_output
-  title: 点検の出力の解釈
-  kind: 関数
-  container: project_index/integrations/mdmark.py
-  usecase: 書き込み
-  role: 変換
-  summary: '`mdmark check --text -` の標準出力をずれの並びにする'
-  scope: public
-  thread_safe: true
-  args:
-  - name: stdout
-    title: 標準出力
-    type: str
-    required: true
-    passing: positional
-    description: mdmark の標準出力
-  returns:
-    type: list[MdmarkFinding] | None
-    description: ずれの並び。最後の空でない行が `SUMMARY_PATTERN` に当たらないときは `None`
-  process: |-
-    1. 空でない行の最後が `SUMMARY_PATTERN` に当たらなければ `None` を返す
-    2. 残りの行のうち `FINDING_PATTERN` に当たる行を、出た順に `MdmarkFinding` にして返す（当たらない行は読まない）
-  unit_tests:
-  - name: test_parse_check_output
-    case: 正常
-    summary: ずれと件数の行
-    condition: '`"-:3: diagram_invalid: 図の定義を読めません: x\nずれ 1 件\n"`'
-    mock: なし
-    expected: '`[MdmarkFinding(line=3, kind="diagram_invalid", message="図の定義を読めません: x")]`（内容の中の `: ` を切らない）'
-  - name: test_parse_check_output_when_no_summary
-    case: 正常
-    summary: 件数の行が無い
-    condition: '`"-:3: diagram_invalid: x\n"`'
-    mock: なし
-    expected: '`None`'
+  - name: check_markdown
+    title: Markdownの点検
+    kind: 関数
+    container: project_index/integrations/mdmark.py
+    usecase: 書き込み
+    role: 外部実行
+    summary: Markdown の文字列を `mdmark check --text -` に通し、ずれの並びを返す
+    scope: public
+    thread_safe: true
+    side_effects: 子プロセスを起動する
+    args:
+      - name: text
+        title: Markdown
+        type: str
+        required: true
+        passing: positional
+        description: 点検する値
+      - name: cwd
+        title: 実行する場所
+        type: Path
+        required: true
+        passing: keyword
+        description: 書き込む配信元の作業ツリーの直下（`mdmark.config.yaml` を上へ探す起点）
+      - name: timeout_sec
+        title: 制限時間
+        type: float
+        required: true
+        passing: keyword
+        description: 端末の設定の `script_timeout_sec`
+    args_example: |-
+      ```python
+      findings = check_markdown(body, cwd=target.base, timeout_sec=30)
+      ```
+    returns:
+      type: list[MdmarkFinding]
+      description: ずれ。0 件なら空の並び（種類で絞らない）
+    process: |-
+      1. `MDMARK_CHECK_RUN` をスクリプトの実行（`cwd`・`stdin=text`・`timeout_sec`）で動かす（スクリプトの実行）
+         - `ScriptNotFoundError` の場合、`MdmarkUnavailableError`（`continuable=False`）を送る
+         - `ScriptTimeoutError` の場合、`MdmarkUnavailableError`（`continuable=False`）を送る
+         - `ScriptFailedError` の場合、標準出力を点検の出力の解釈にかける。`None` なら `MdmarkUnavailableError`（`continuable=True`）を送る
+      2. 終了コード 0 なら空の並びを返す
+      3. 解釈したずれを返す
+    exceptions:
+      - name: MdmarkUnavailableError
+        condition: mdmark の CLI が `PATH` に無い
+        message: '`mdmark の CLI が PATH に見つかりません`'
+      - name: MdmarkUnavailableError
+        condition: 制限時間を超えた
+        message: '`mdmark の点検が制限時間（{timeout_sec} 秒）を超えました`'
+      - name: MdmarkUnavailableError
+        condition: 終了コード 1 で、最後の行が `ずれ {件数} 件` でない
+        message: '`mdmark の点検が結果を出さずに終了コード {code} で終わりました: {標準エラーの末尾}`'
+    unit_tests:
+      - name: test_check_markdown
+        case: 正常
+        summary: ずれが無い
+        condition: 'PATH の先頭に、標準入力を読んで `ずれ 0 件` を出し終了コード 0 で終わる `mdmark` のスクリプトを置く'
+        mock: '`monkeypatch` で `PATH` を一時フォルダにする'
+        expected: 空の並び。スクリプトが受けた引数が `check --text -` で、標準入力が `text`
+      - name: test_check_markdown_when_findings
+        case: 正常
+        summary: ずれがある
+        condition: '`-:3: diagram_invalid: A` と `-:1: unknown_mark: B` と `ずれ 2 件` を出して終了コード 1 で終わるスクリプト'
+        mock: '`monkeypatch` で `PATH` を一時フォルダにする'
+        expected: '`[MdmarkFinding(line=3, kind="diagram_invalid", message="A"), MdmarkFinding(line=1, kind="unknown_mark", message="B")]`'
+      - name: test_check_markdown_when_missing
+        case: 異常
+        summary: CLI が無い
+        condition: '`PATH` に `mdmark` が無い'
+        mock: '`monkeypatch` で `PATH` を空のフォルダにする'
+        expected: '`MdmarkUnavailableError` で、`continuable` が `False`'
+        exception: mdmark の CLI が `PATH` に無い
+      - name: test_check_markdown_when_timeout
+        case: 異常
+        summary: 制限時間を超える
+        condition: '`sleep 5` するスクリプトを `timeout_sec=0.2` で'
+        mock: '`monkeypatch` で `PATH` を一時フォルダにする'
+        expected: '`MdmarkUnavailableError` で、`continuable` が `False`'
+        exception: 制限時間を超えた
+      - name: test_check_markdown_when_no_summary
+        case: 異常
+        summary: 結果を出さずに終わる
+        condition: 標準エラーに `unknown option --text` を出し、標準出力を出さずに終了コード 1 で終わるスクリプト
+        mock: '`monkeypatch` で `PATH` を一時フォルダにする'
+        expected: '`MdmarkUnavailableError` で、`continuable` が `True`、`reason` に `unknown option --text` がある'
+        exception: 終了コード 1 で、最後の行が `ずれ {件数} 件` でない
+  - name: parse_check_output
+    title: 点検の出力の解釈
+    kind: 関数
+    container: project_index/integrations/mdmark.py
+    usecase: 書き込み
+    role: 変換
+    summary: '`mdmark check --text -` の標準出力をずれの並びにする'
+    scope: public
+    thread_safe: true
+    args:
+      - name: stdout
+        title: 標準出力
+        type: str
+        required: true
+        passing: positional
+        description: mdmark の標準出力
+    returns:
+      type: list[MdmarkFinding] | None
+      description: ずれの並び。最後の空でない行が `SUMMARY_PATTERN` に当たらないときは `None`
+    process: |-
+      1. 空でない行の最後が `SUMMARY_PATTERN` に当たらなければ `None` を返す
+      2. 残りの行のうち `FINDING_PATTERN` に当たる行を、出た順に `MdmarkFinding` にして返す（当たらない行は読まない）
+    unit_tests:
+      - name: test_parse_check_output
+        case: 正常
+        summary: ずれと件数の行
+        condition: '`"-:3: diagram_invalid: 図の定義を読めません: x\nずれ 1 件\n"`'
+        mock: なし
+        expected: '`[MdmarkFinding(line=3, kind="diagram_invalid", message="図の定義を読めません: x")]`（内容の中の `: ` を切らない）'
+      - name: test_parse_check_output_when_no_summary
+        case: 正常
+        summary: 件数の行が無い
+        condition: '`"-:3: diagram_invalid: x\n"`'
+        mock: なし
+        expected: '`None`'

@@ -4,7 +4,6 @@ Usage:
 # Claude Code が stdin に SessionStart の入力の JSON を渡して実行する
 python3 session_start.py
 """
-# pyright: reportUnknownArgumentType=warning
 
 from __future__ import annotations
 
@@ -16,7 +15,7 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -164,15 +163,17 @@ def _context(event: dict[str, Any]) -> str | None:
 def main() -> int:
     """stdin の JSON を読み、サーバーを起動するか記録の削除を依頼して、入れる文だけを出す。"""
     try:
-        event = json.load(sys.stdin)
+        loaded: object = json.load(sys.stdin)
     except ValueError:
         return 0
-    if not isinstance(event, dict):
+    if not isinstance(loaded, dict):
         return 0
+    # JSON の辞書のキーは文字列
+    event = cast("dict[str, Any]", loaded)
     try:
         context = _context(event)
+    # フックはどの失敗でも終了コード 0 で戻り、セッションを止めない（失敗は文脈に書く）
     except Exception as error:  # noqa: BLE001
-        # どの失敗でもセッションを止めない
         context = f"project-index のフックが失敗しました（{error}）。"
     if context is None:
         return 0

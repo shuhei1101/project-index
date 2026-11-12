@@ -1,5 +1,4 @@
 """文書の検査の決まり。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
@@ -11,6 +10,7 @@ from jsonschema import FormatChecker
 from jsonschema.validators import Draft202012Validator, validator_for
 
 from project_index.shared.errors import Violation
+from project_index.shared.narrowing import is_dict, is_list
 from project_index.shared.schema_check import format_path
 
 if TYPE_CHECKING:
@@ -34,13 +34,11 @@ def _schema_fix(error: ValidationError) -> str:
         except ValueError, SyntaxError:
             missing = ""
         return f"キー {missing} を追加してください" if missing else ""
-    value: Any = error.validator_value
+    value: object = error.validator_value
     if error.validator == "enum":
-        allowed = ", ".join(str(item) for item in value)
-        return f"次のどれかにしてください: {allowed}"
+        return f"次のどれかにしてください: {_listed(value)}"
     if error.validator == "type":
-        expected = value
-        expected_text = ", ".join(expected) if isinstance(expected, list) else str(expected)
+        expected_text = _listed(value)
         return f"型を {expected_text} にしてください"
     return ""
 
@@ -98,17 +96,22 @@ def check_id_format(doc_id: str, fmt: str | None, *, kind: str) -> list[Violatio
     ]
 
 
+def _listed(value: object) -> str:
+    """配列は要素を `, ` でつなぎ、それ以外は文字列にする。"""
+    return ", ".join(map(str, value)) if is_list(value) else str(value)
+
+
 def check_related(metadata: Mapping[str, Any], types: Sequence[str]) -> list[Violation]:
     """メタデータの `related` の各行が `to` と `related.types` の語の `type` を持つかを確かめる。"""
     if "related" not in metadata:
         return []
-    related = metadata["related"]
-    if not isinstance(related, list):
+    related: object = metadata["related"]
+    if not is_list(related):
         return [Violation(path="related", rule="配列にしてください")]
     violations: list[Violation] = []
     for index, row in enumerate(related):
         prefix = f"related[{index}]"
-        if not isinstance(row, dict):
+        if not is_dict(row):
             violations.append(
                 Violation(path=prefix, rule="辞書（to と type を持つ）にしてください")
             )

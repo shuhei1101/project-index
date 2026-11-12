@@ -1,12 +1,11 @@
 """端末の設定の読み込み。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
 import logging
 import os
 from importlib import resources
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from project_index.features.settings.types import (
     SettingsWarning,
@@ -15,12 +14,13 @@ from project_index.features.settings.types import (
     TerminalConfigInvalidError,
 )
 from project_index.shared.errors import Violation
+from project_index.shared.narrowing import is_dict, is_list
 from project_index.shared.paths import normalize_path
 from project_index.shared.schema_check import schema_violations
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Iterable, Mapping
     from pathlib import Path
 
 DEFAULT_CONFIG_HOME = "~/.config"
@@ -69,48 +69,19 @@ def state_dir_path(value: str | None, env: Mapping[str, str]) -> Path:
 def _settings_schema() -> dict[str, Any]:
     """配布に同梱した端末の設定のスキーマを読む。"""
     text = resources.files("project_index").joinpath(SETTINGS_SCHEMA).read_text(encoding="utf-8")
-    schema: dict[str, Any] = load_yaml(text)
-    return schema
+    # 同梱したスキーマの最上位は、キーが文字列の辞書
+    return cast("dict[str, Any]", load_yaml(text))
 
 
-def validate_terminal_config(value: Any) -> list[Violation]:  # noqa: ANN401, C901
+def validate_terminal_config(value: object) -> list[Violation]:
     """端末の設定の値をスキーマと行の間の決まりで確かめ、違反を全て返す。"""
     violations = schema_violations(_settings_schema(), value)
-    if not isinstance(value, dict):
+    if not is_dict(value):
         return violations
     sources = value.get("sources")
-    if isinstance(sources, list):
-        seen: set[str] = set()
-        for index, row in enumerate(sources):
-            if not isinstance(row, dict):
-                continue
-            # 行の ID が先の行と重なる（id を省いた行は配信元の読み込みで比べる）
-            row_id = row.get("id")
-            if isinstance(row_id, str):
-                if row_id in seen:
-                    violations.append(
-                        Violation(
-                            path=f"sources[{index}].id",
-                            rule=f"{row_id} は既に使用されています",
-                            fix="別の ID にしてください",
-                        )
-                    )
-                seen.add(row_id)
-            # 作業場所の glob に空の文字列がある
-            scope = row.get("scope")
-            if isinstance(scope, dict):
-                for key in ("read", "write"):
-                    globs = scope.get(key)
-                    if not isinstance(globs, list):
-                        continue
-                    for position, glob in enumerate(globs):
-                        if glob == "":
-                            violations.append(
-                                Violation(
-                                    path=f"sources[{index}].scope.{key}[{position}]",
-                                    rule="空の文字列は記載できません",
-                                )
-                            )
+    if is_list(sources):
+        violations.extend(_duplicate_ids(sources))
+        violations.extend(_empty_globs(sources))
     # 読めるバージョンより新しい設定
     version = value.get("version")
     if isinstance(version, str) and version.isdigit() and int(version) > int(SETTINGS_VERSION):
@@ -118,10 +89,52 @@ def validate_terminal_config(value: Any) -> list[Violation]:  # noqa: ANN401, C9
     return violations
 
 
-def unknown_top_level_keys(value: dict[str, Any]) -> list[str]:
+def _duplicate_ids(sources: list[object]) -> list[Violation]:
+    """行の ID が先の行と重なる違反を集める（id を省いた行は配信元の読み込みで比べる）。"""
+    violations: list[Violation] = []
+    seen: set[str] = set()
+    for index, row in enumerate(sources):
+        row_id = row.get("id") if is_dict(row) else None
+        if not isinstance(row_id, str):
+            continue
+        if row_id in seen:
+            violations.append(
+                Violation(
+                    path=f"sources[{index}].id",
+                    rule=f"{row_id} は既に使用されています",
+                    fix="別の ID にしてください",
+                )
+            )
+        seen.add(row_id)
+    return violations
+
+
+def _empty_globs(sources: list[object]) -> list[Violation]:
+    """作業場所の glob にある空の文字列の違反を集める。"""
+    violations: list[Violation] = []
+    for index, row in enumerate(sources):
+        scope = row.get("scope") if is_dict(row) else None
+        if not is_dict(scope):
+            continue
+        for key in ("read", "write"):
+            globs = scope.get(key)
+            if not is_list(globs):
+                continue
+            violations.extend(
+                Violation(
+                    path=f"sources[{index}].scope.{key}[{position}]",
+                    rule="空の文字列は記載できません",
+                )
+                for position, glob in enumerate(globs)
+                if glob == ""
+            )
+    return violations
+
+
+def unknown_top_level_keys(value: Iterable[object]) -> list[str]:
     """端末の設定の値の最上位の、スキーマの `properties` に無いキーをファイルの順に返す。"""
     known = set(_settings_schema()["properties"])
-    return [key for key in value if key not in known]
+    return [str(key) for key in value if key not in known]
 
 
 def unknown_key_warnings(config: TerminalConfig) -> list[SettingsWarning]:
@@ -159,24 +172,36 @@ def load_terminal_config(path: Path, *, env: Mapping[str, str] | None = None) ->
             message=f"{path}: 端末の設定に違反が {len(violations)} 件あります",
             violations=violations,
         )
-    value = value or {}
-    state_dir = state_dir_path(value.get("state_dir"), os.environ if env is None else env)
-    log_dir = normalize_path(value["log_dir"]) if "log_dir" in value else state_dir / "logs"
-    values: dict[str, Any] = {
-        key: value[key]
-        for key in ("port", "bind", "seen_retention_days", "script_timeout_sec")
-        if key in value
-    }
-    return TerminalConfig(
-        file=path,
-        unknown_keys=unknown_top_level_keys(value),
-        version=value["version"],
-        clone=normalize_path(value["clone"]),
-        state_dir=state_dir,
-        log_dir=log_dir,
-        sources=[SourceEntry.model_validate(row) for row in value.get("sources", [])],
-        **values,
+    # スキーマを通った設定は辞書（空のファイルは空の辞書として扱う）
+    data: dict[object, object] = value if is_dict(value) else {}
+    state_value = data.get("state_dir")
+    state_dir = state_dir_path(
+        state_value if isinstance(state_value, str) else None, os.environ if env is None else env
     )
+    log_value = data.get("log_dir")
+    log_dir = normalize_path(str(log_value)) if "log_dir" in data else state_dir / "logs"
+    values = {
+        key: data[key]
+        for key in ("port", "bind", "seen_retention_days", "script_timeout_sec")
+        if key in data
+    }
+    return TerminalConfig.model_validate(
+        {
+            "file": path,
+            "unknown_keys": unknown_top_level_keys(data),
+            "version": data["version"],
+            "clone": normalize_path(str(data["clone"])),
+            "state_dir": state_dir,
+            "log_dir": log_dir,
+            "sources": [SourceEntry.model_validate(row) for row in _rows(data.get("sources"))],
+            **values,
+        }
+    )
+
+
+def _rows(value: object) -> list[object]:
+    """`sources` の値を行の並びにする（無ければ空）。"""
+    return value if is_list(value) else []
 
 
 def listen_port(config: TerminalConfig, env: Mapping[str, str]) -> int:

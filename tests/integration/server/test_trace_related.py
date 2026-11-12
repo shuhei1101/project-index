@@ -3,12 +3,18 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from project_index.shared.yaml_io import load_yaml
+from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     import pytest
+
+
+def load_yaml(text: str) -> Any:
+    """形の分かっている YAML の文字列を読む。"""
+    return load_yaml_value(text)
+
 
 SEEN_MARK = "（この会話で返却済み）"
 OUTSIDE_LINE = "作業範囲の外（参考）"

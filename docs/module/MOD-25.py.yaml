@@ -1,461 +1,461 @@
 id: MOD-25
 title: 索引のサーバー / 文書のストア / fields.py
-lead: 項目のパスの解釈と、項目の値の取得・設定・削除・メタデータの解決。
+lead: 項目のパスの解釈と、項目の値の取得・設定・削除・メタデータの解決を受け持ち、文書のストアの fields.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/features/documents/test_fields.py
+  - tests/unit/project_index/features/documents/test_fields.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      ファイルの読み込み ..> メタデータの解決
-      メタデータの解決 ..> 項目の取得
-      メタデータのずれの確かめ ..> metadataの列の欠け
-      class メタデータのずれの確かめ {
-        <<function>>
-      }
-      class metadataの列の欠け {
-        <<function>>
-      }
-      class ファイルの読み込み {
-        <<function>>
-      }
-      class メタデータの解決 {
-        <<function>>
-      }
-      class 項目の取得 {
-        <<function>>
-      }
-      click メタデータのずれの確かめ href "./MOD-29.py.yaml#メタデータのずれの確かめ"
-      click ファイルの読み込み href "./MOD-27.py.yaml#ファイルの読み込み"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        ファイルの読み込み ..> メタデータの解決
+        メタデータの解決 ..> 項目の取得
+        メタデータのずれの確かめ ..> metadataの列の欠け
+        class メタデータのずれの確かめ {
+          <<function>>
+        }
+        class metadataの列の欠け {
+          <<function>>
+        }
+        class ファイルの読み込み {
+          <<function>>
+        }
+        class メタデータの解決 {
+          <<function>>
+        }
+        class 項目の取得 {
+          <<function>>
+        }
+        click メタデータのずれの確かめ href "./MOD-29.py.yaml#メタデータのずれの確かめ"
+        click ファイルの読み込み href "./MOD-27.py.yaml#ファイルの読み込み"
 data_models:
-- name: ArraySelector
-  title: 要素の選び方
-  container: project_index/features/documents/fields.py
-  usecase: 共通
-  role: 値オブジェクト
-  summary: 項目のパスの `[]`・`[{キー}]` が表す、配列から選ぶ要素
-  properties:
-  - name: key
-    title: 真偽値のキー
-    type: str | None
-    access: 公開
-    description: '`None` は全ての要素（`[]`）。文字列は、そのキーの値が真の辞書の要素（`[main]`）'
+  - name: ArraySelector
+    title: 要素の選び方
+    container: project_index/features/documents/fields.py
+    usecase: 共通
+    role: 値オブジェクト
+    summary: 項目のパスの `[]`・`[{キー}]` が表す、配列から選ぶ要素
+    properties:
+      - name: key
+        title: 真偽値のキー
+        type: str | None
+        access: 公開
+        description: '`None` は全ての要素（`[]`）。文字列は、そのキーの値が真の辞書の要素（`[main]`）'
 constants:
-- name: METADATA_KEYS
-  title: 共通のキー
-  container: project_index/features/documents/fields.py
-  usecase: 共通
-  summary: '`documents[].metadata` で列名を対応づける共通のキー（エイリアスのキーを含む）'
-  value: ("id", "name", "description", "tags", "main_tags", "related", "status", "alias_type", "aliases", "command", "cwd", "url", "avoid", "skill", "tool", "path", "port", "replacement")
+  - name: METADATA_KEYS
+    title: 共通のキー
+    container: project_index/features/documents/fields.py
+    usecase: 共通
+    summary: '`documents[].metadata` で列名を対応づける共通のキー（エイリアスのキーを含む）'
+    value: ("id", "name", "description", "tags", "main_tags", "related", "status", "alias_type", "aliases", "command", "cwd", "url", "avoid", "skill", "tool", "path", "port", "replacement")
 functions:
-- name: parse_field_path
-  title: 項目のパスの分解
-  kind: 関数
-  container: project_index/features/documents/fields.py
-  usecase: 共通
-  role: 変換
-  summary: ドット記法・`[n]`・`[]`・`[{キー}]` の項目のパスを、キー・位置・要素の選び方の並びにする
-  scope: public
-  thread_safe: true
-  args:
-  - name: path
-    title: 項目のパス
-    type: str
-    required: true
-    passing: positional
-    description: '`a.b[0].c`・`tags[].name`・`tags[main].name` の形の項目のパス'
-  returns:
-    type: list[str | int | ArraySelector]
-    description: 辞書のキーは `str`、配列の位置は `int`、`[]`・`[{キー}]` は `ArraySelector`
-  process: |-
-    1. `.` で区切り、各区切りの末尾の `[...]` を切り出す（`b[0][1]` は `b`・`0`・`1`）
-    2. `[n]` は位置、`[]` は `ArraySelector(key=None)`、`[{キー}]`（英字で始まる英数字と `_`）は `ArraySelector(key={キー})` にする
-    3. 空のキー・閉じていない `[`・位置にもキーにも当たらない中身がある場合、`InvalidArgumentError` を送る
-    4. 並びを返す
-  exceptions:
-  - name: InvalidArgumentError
-    condition: パスの書式が誤っている
-    message: 項目のパス {path} の記載方法が誤っています（例 `a.b[0].c`・`tags[].name`・`tags[main].name`）
-  unit_tests:
-  - name: test_parse_field_path
-    case: 正常
-    summary: キーと位置
-    condition: '`a.b[0][1].c`'
-    mock: なし
-    expected: '`["a", "b", 0, 1, "c"]`'
-    exception: '-'
-  - name: test_parse_field_path_when_selector
-    case: 正常
-    summary: 全ての要素と真偽値のキーで選ぶ要素
-    condition: '`tags[].name` と `tags[main].name`'
-    mock: なし
-    expected: '`["tags", ArraySelector(key=None), "name"]` と `["tags", ArraySelector(key="main"), "name"]`'
-    exception: '-'
-  - name: test_parse_field_path_when_invalid
-    case: 異常
-    summary: 空のキー
-    condition: '`a..b` と `a[x-y]`'
-    mock: なし
-    expected: どちらも `InvalidArgumentError` で、`violations[0].path` が渡したパス
-    exception: パスの書式が誤っている
-- name: get_field
-  title: 項目の取得
-  kind: 関数
-  container: project_index/features/documents/fields.py
-  usecase: 共通
-  role: 読み取り
-  summary: 項目のパスで指した値を返す
-  scope: public
-  thread_safe: true
-  args:
-  - name: data
-    title: 内容
-    type: Mapping[str, Any]
-    required: true
-    passing: positional
-    description: 文書の内容
-  - name: path
-    title: 項目のパス
-    type: str
-    required: true
-    passing: positional
-    description: ドット記法・`[n]`・`[]`・`[{キー}]`
-  - name: default
-    title: 無いときの値
-    type: Any
-    required: false
-    default: None
-    passing: keyword
-    description: 途中のキーが無い・位置が範囲の外・型が辞書や配列でないときに返す値
-  returns:
-    type: Any
-    description: 指した値か `default`。パスが `ArraySelector` を含むときは、選んだ要素ごとに残りのパスをたどった値の配列（たどれない要素は除く）
-  process: |-
-    1. 『項目のパスの分解』で分ける
-    2. 先頭からたどり、キーは辞書から、位置は配列から引く。たどれない場合は `default` を返す
-    3. `ArraySelector` に当たった場合、値が配列でなければ `default` を返す。配列なら、`key` が `None` は全ての要素、`key` があればそのキーの値が真の辞書の要素を選び、要素ごとに残りのパスをたどった値を並べた配列を返す（残りのパスに `ArraySelector` があれば、その配列を平らにつなぐ）
-    4. たどり着いた値を返す
-  exceptions:
-  - name: InvalidArgumentError
-    condition: パスの書式が誤っている
-    message: 『項目のパスの分解』のまま
-  unit_tests:
-  - name: test_get_field
-    case: 正常
-    summary: 入れ子と位置
-    condition: '`{"a": {"b": [{"c": 1}]}}` を `a.b[0].c`'
-    mock: なし
-    expected: '`1`'
-    exception: '-'
-  - name: test_get_field_when_missing
-    case: 正常
-    summary: たどれない
-    condition: 同じ内容を `a.x`・`a.b[3].c`・`a.b.c`
-    mock: なし
-    expected: どれも `None`
-    exception: '-'
-  - name: test_get_field_when_selector
-    case: 正常
-    summary: 要素を選んで取り出す
-    condition: '`{"tags": [{"name": "a", "main": true}, {"name": "b"}, "c"]}` を `tags[].name` と `tags[main].name`、`{"tags": "x"}` を `tags[].name`'
-    mock: なし
-    expected: '`["a", "b"]`・`["a"]`・`None`'
-    exception: '-'
-- name: set_field
-  title: 項目の書き込み
-  kind: 関数
-  container: project_index/features/documents/fields.py
-  usecase: 共通
-  role: 書き込み
-  summary: 項目のパスで指した場所へ値を書く
-  scope: public
-  thread_safe: false
-  side_effects: '`data` を書き換える'
-  args:
-  - name: data
-    title: 内容
-    type: MutableMapping[str, Any]
-    required: true
-    passing: positional
-    description: 書き換える内容（往復編集の `CommentedMap` も受ける）
-  - name: path
-    title: 項目のパス
-    type: str
-    required: true
-    passing: positional
-    description: ドット記法と `[n]`
-  - name: value
-    title: 値
-    type: Any
-    required: true
-    passing: positional
-    description: 書く値
-  returns:
-    type: None
-    description: '-'
-  process: |-
-    1. 『項目のパスの分解』で分ける。`ArraySelector` を含む場合、`InvalidArgumentError` を送る
-    2. 最後の手前までたどり、途中のキーが無ければ空の辞書を作って進む
-    3. 途中の値が辞書でない（キーのとき）・配列でない（位置のとき）場合、`InvalidArgumentError` を送る
-    4. 位置が配列の長さと同じなら末尾へ追加し、長さより大きければ `InvalidArgumentError` を送る
-    5. 最後のキーか位置へ値を書く
-  exceptions:
-  - name: InvalidArgumentError
-    condition: 途中の値の型が合わない
-    message: '{path}: {途中のパス} は {辞書 / 配列} ではありません'
-  - name: InvalidArgumentError
-    condition: 位置が配列の長さを超える
-    message: '{path}: 位置 {n} は配列の長さ {length} を超えています'
-  - name: InvalidArgumentError
-    condition: パスが `[]`・`[{キー}]` を含む
-    message: '{path}: `[]`・`[{キー}]` を含む項目のパスには書き込めません'
-  unit_tests:
-  - name: test_set_field
-    case: 正常
-    summary: 途中の辞書を作る
-    condition: '`{}` へ `a.b.c` = `1`'
-    mock: なし
-    expected: '`{"a": {"b": {"c": 1}}}`'
-    exception: '-'
-  - name: test_set_field_when_append
-    case: 正常
-    summary: 末尾へ追加
-    condition: '`{"a": [1]}` へ `a[1]` = `2`'
-    mock: なし
-    expected: '`{"a": [1, 2]}`'
-    exception: '-'
-  - name: test_set_field_when_type_mismatch
-    case: 異常
-    summary: 途中が文字列
-    condition: '`{"a": "x"}` へ `a.b` = `1`'
-    mock: なし
-    expected: '`InvalidArgumentError`'
-    exception: 途中の値の型が合わない
-  - name: test_set_field_when_out_of_range
-    case: 異常
-    summary: 飛んだ位置
-    condition: '`{"a": [1]}` へ `a[3]` = `2`'
-    mock: なし
-    expected: '`InvalidArgumentError`'
-    exception: 位置が配列の長さを超える
-  - name: test_set_field_when_selector
-    case: 異常
-    summary: 要素の選び方を含むパス
-    condition: '`{"tags": []}` へ `tags[].name` = `a`'
-    mock: なし
-    expected: '`InvalidArgumentError`'
-    exception: パスが `[]`・`[{キー}]` を含む
-- name: delete_field
-  title: 項目の削除
-  kind: 関数
-  container: project_index/features/documents/fields.py
-  usecase: 共通
-  role: 書き込み
-  summary: 項目のパスで指した値を削除する
-  scope: public
-  thread_safe: false
-  side_effects: '`data` を書き換える'
-  args:
-  - name: data
-    title: 内容
-    type: MutableMapping[str, Any]
-    required: true
-    passing: positional
-    description: 書き換える内容
-  - name: path
-    title: 項目のパス
-    type: str
-    required: true
-    passing: positional
-    description: ドット記法と `[n]`
-  returns:
-    type: bool
-    description: 削除したら `True`、指した値が無ければ `False`
-  process: |-
-    1. 『項目のパスの分解』で分ける。`ArraySelector` を含む場合、`InvalidArgumentError` を送る
-    2. 最後の手前までたどり、たどれない場合は `False` を返す
-    3. 最後がキーなら辞書から、位置なら配列から削除して `True` を返す
-  exceptions:
-  - name: InvalidArgumentError
-    condition: パスの書式が誤っている
-    message: 『項目のパスの分解』のまま
-  - name: InvalidArgumentError
-    condition: パスが `[]`・`[{キー}]` を含む
-    message: '{path}: `[]`・`[{キー}]` を含む項目のパスは削除できません'
-  unit_tests:
-  - name: test_delete_field
-    case: 正常
-    summary: キーと位置
-    condition: '`{"a": {"b": 1}, "c": [1, 2]}` から `a.b` と `c[0]`'
-    mock: なし
-    expected: 'どちらも `True` で、`{"a": {}, "c": [2]}`'
-    exception: '-'
-  - name: test_delete_field_when_missing
-    case: 正常
-    summary: 無い値
-    condition: '`{}` から `a.b`'
-    mock: なし
-    expected: '`False` で内容は変わらない'
-    exception: '-'
-- name: resolve_metadata
-  title: メタデータの解決
-  kind: 関数
-  container: project_index/features/documents/fields.py
-  usecase: 共通
-  role: 変換
-  summary: 文書の行の `metadata` の対応で、文書の内容から共通のキーの値を取る
-  scope: public
-  thread_safe: true
-  args:
-  - name: data
-    title: 内容
-    type: Mapping[str, Any]
-    required: true
-    passing: positional
-    description: 文書の内容
-  - name: table
-    title: 文書の行
-    type: DocumentTable
-    required: true
-    passing: positional
-    description: 文書の行
-  returns:
-    type: dict[str, Any]
-    description: 共通のキー → 値。値が無いキーは含まない
-  process: |-
-    1. `METADATA_KEYS` のキーごとに、`table.metadata` の列名（書かれていないキーは同じ名前の列）の値を『項目の取得』で取る。列名が `[]`・`[{キー}]` を含むときは選んだ要素の値の配列になる（`tags: tags[].name`・`main_tags: tags[main].name`）
-    2. `table.alias_type` がある場合、`alias_type` の値をその値にする
-    3. 値が `None` のキーを除いて返す
-  unit_tests:
-  - name: test_resolve_metadata
-    case: 正常
-    summary: 列名の対応と同じ名前の列
-    condition: '`metadata` が `{name: title}`、行の `alias_type` が `term`、内容が `{"id": "a", "title": "A", "tags": ["x"]}`'
-    mock: なし
-    expected: '`{"id": "a", "name": "A", "tags": ["x"], "alias_type": "term"}`'
-    exception: '-'
-  - name: test_resolve_metadata_when_nested_field
-    case: 正常
-    summary: 入れ子の列
-    condition: '`metadata` が `{description: meta.summary}`、内容が `{"meta": {"summary": "s"}}`'
-    mock: なし
-    expected: '`description` が `s`'
-    exception: '-'
-  - name: test_resolve_metadata_when_object_array
-    case: 正常
-    summary: オブジェクトの配列のタグ
-    condition: '`metadata` が `{tags: tags[].name, main_tags: tags[main].name}`、内容が `{"tags": [{"name": "mcp", "main": true}, {"name": "設計"}]}`'
-    mock: なし
-    expected: '`tags` が `["mcp", "設計"]`、`main_tags` が `["mcp"]`'
-    exception: '-'
-- name: missing_ref_fields
-  title: 'metadataの列の欠け'
-  container: project_index/features/documents/fields.py
-  usecase: 起動
-  role: 判定
-  summary: 文書の行の `metadata` に書いた列のうち、文書の内容に値が無い列を返す
-  kind: 関数
-  scope: public
-  thread_safe: true
-  args:
-  - name: data
-    title: 内容
-    type: Mapping[str, Any]
-    required: true
-    passing: positional
-    description: 文書の内容
-  - name: table
-    title: 文書の行
-    type: DocumentTable
-    required: true
-    passing: positional
-    description: 文書の行
-  returns:
-    type: list[tuple[str, str]]
-    description: 値が無い `(メタデータのキー, 列名)` の並び（`table.metadata` の順）
-  process: |-
-    1. `table.metadata` の対応を順に見る（書いていないキーの同じ名前の列は見ない）
-    2. 『項目の取得』で列名の値が `None` なら、そのキーと列名を加える
-    3. 並びを返す
-  unit_tests:
-  - name: test_missing_ref_fields
-    case: 正常
-    summary: metadata に書いた列だけを数える
-    condition: '`metadata` が `{name: title, description: summary}`、内容が `{"summary": "s"}`（`tags` も無い）'
-    mock: なし
-    expected: '`[("name", "title")]`'
-    exception: '-'
-- name: is_markdown_body
-  title: Markdownの本文か
-  kind: 関数
-  container: project_index/features/documents/fields.py
-  usecase: 共通
-  role: 判定
-  summary: 文書の本文が Markdown のファイルかを返す
-  description: 変換・検索の `sections`・`@sections` が、本文を Markdown として扱うかをこの関数で決める。
-  scope: public
-  thread_safe: true
-  args:
-  - name: document
-    title: 文書
-    type: Document
-    required: true
-    passing: positional
-    description: 調べる文書
-  returns:
-    type: bool
-    description: '`body_path` の拡張子が `.md` なら `True`'
-  process: 1. `document.body_path` があり、`PurePosixPath(body_path).suffix.lower()` が `.md` なら `True`、それ以外は `False` を返す
-  unit_tests:
-  - name: test_is_markdown_body
-    case: 正常
-    summary: 本文のファイルの拡張子
-    condition: '`body_path` が `docs/a.md`・`docs/B.MD`・`src/a.py`・`None`（`path` は `docs/x.md`）'
-    mock: なし
-    expected: '`True`・`True`・`False`・`False`'
-    exception: '-'
-- name: unresolved_related
-  title: 当たらない関連
-  container: project_index/features/documents/fields.py
-  usecase: 起動
-  role: 判定
-  summary: 文書の `related` のうち、`to` が配信元の文書の ID の集合に無い関連の `to` を返す
-  kind: 関数
-  scope: public
-  thread_safe: true
-  args:
-  - name: metadata
-    title: メタデータ
-    type: Mapping[str, Any]
-    required: true
-    passing: positional
-    description: 文書の解決済みのメタデータ（`Document.metadata`）
-  - name: ids
-    title: 文書の ID の集合
-    type: AbstractSet[str]
-    required: true
-    passing: positional
-    description: 配信元の全ての文書の ID
-  returns:
-    type: list[str]
-    description: 当たらない `to` の並び（`related` の順）
-  process: |-
-    1. `metadata` の `related` が配列でなければ空の並びを返す
-    2. 要素ごとに、文字列の `to` を持ち、文字列の `source` を持たない要素だけを見て（`source` が無い・`null` の要素を同じ配信元への関連として扱う。`related_links` と同じ読み方）、`to` が `ids` に無ければ加える
-    3. 並びを返す
-  unit_tests:
-  - name: test_unresolved_related
-    case: 正常
-    summary: source を持たない関連だけを照合する
-    condition: '`related` が `[{to: src/b.py}, {to: src/z.py}, {to: other-doc, source: other}, {to: src/y.py, source: null}, {type: tests}]`、`ids` が `{src/a.py, src/b.py}`'
-    mock: なし
-    expected: '`["src/z.py", "src/y.py"]`'
-    exception: '-'
-  - name: test_unresolved_related_when_not_list
-    case: 正常
-    summary: related が配列でない
-    condition: '`related` が無いメタデータと、`related` が文字列のメタデータ'
-    mock: なし
-    expected: どちらも `[]`
-    exception: '-'
+  - name: parse_field_path
+    title: 項目のパスの分解
+    kind: 関数
+    container: project_index/features/documents/fields.py
+    usecase: 共通
+    role: 変換
+    summary: ドット記法・`[n]`・`[]`・`[{キー}]` の項目のパスを、キー・位置・要素の選び方の並びにする
+    scope: public
+    thread_safe: true
+    args:
+      - name: path
+        title: 項目のパス
+        type: str
+        required: true
+        passing: positional
+        description: '`a.b[0].c`・`tags[].name`・`tags[main].name` の形の項目のパス'
+    returns:
+      type: list[str | int | ArraySelector]
+      description: 辞書のキーは `str`、配列の位置は `int`、`[]`・`[{キー}]` は `ArraySelector`
+    process: |-
+      1. `.` で区切り、各区切りの末尾の `[...]` を切り出す（`b[0][1]` は `b`・`0`・`1`）
+      2. `[n]` は位置、`[]` は `ArraySelector(key=None)`、`[{キー}]`（英字で始まる英数字と `_`）は `ArraySelector(key={キー})` にする
+      3. 空のキー・閉じていない `[`・位置にもキーにも当たらない中身がある場合、`InvalidArgumentError` を送る
+      4. 並びを返す
+    exceptions:
+      - name: InvalidArgumentError
+        condition: パスの書式が誤っている
+        message: 項目のパス {path} の記載方法が誤っています（例 `a.b[0].c`・`tags[].name`・`tags[main].name`）
+    unit_tests:
+      - name: test_parse_field_path
+        case: 正常
+        summary: キーと位置
+        condition: '`a.b[0][1].c`'
+        mock: なし
+        expected: '`["a", "b", 0, 1, "c"]`'
+        exception: '-'
+      - name: test_parse_field_path_when_selector
+        case: 正常
+        summary: 全ての要素と真偽値のキーで選ぶ要素
+        condition: '`tags[].name` と `tags[main].name`'
+        mock: なし
+        expected: '`["tags", ArraySelector(key=None), "name"]` と `["tags", ArraySelector(key="main"), "name"]`'
+        exception: '-'
+      - name: test_parse_field_path_when_invalid
+        case: 異常
+        summary: 空のキー
+        condition: '`a..b` と `a[x-y]`'
+        mock: なし
+        expected: どちらも `InvalidArgumentError` で、`violations[0].path` が渡したパス
+        exception: パスの書式が誤っている
+  - name: get_field
+    title: 項目の取得
+    kind: 関数
+    container: project_index/features/documents/fields.py
+    usecase: 共通
+    role: 読み取り
+    summary: 項目のパスで指した値を返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: data
+        title: 内容
+        type: Mapping[str, Any]
+        required: true
+        passing: positional
+        description: 文書の内容
+      - name: path
+        title: 項目のパス
+        type: str
+        required: true
+        passing: positional
+        description: ドット記法・`[n]`・`[]`・`[{キー}]`
+      - name: default
+        title: 無いときの値
+        type: object
+        required: false
+        default: None
+        passing: keyword
+        description: 途中のキーが無い・位置が範囲の外・型が辞書や配列でないときに返す値
+    returns:
+      type: object
+      description: 指した値か `default`。パスが `ArraySelector` を含むときは、選んだ要素ごとに残りのパスをたどった値の配列（たどれない要素は除く）
+    process: |-
+      1. 『項目のパスの分解』で分ける
+      2. 先頭からたどり、キーは辞書から、位置は配列から引く。たどれない場合は `default` を返す
+      3. `ArraySelector` に当たった場合、値が配列でなければ `default` を返す。配列なら、`key` が `None` は全ての要素、`key` があればそのキーの値が真の辞書の要素を選び、要素ごとに残りのパスをたどった値を並べた配列を返す（残りのパスに `ArraySelector` があれば、その配列を平らにつなぐ）
+      4. たどり着いた値を返す
+    exceptions:
+      - name: InvalidArgumentError
+        condition: パスの書式が誤っている
+        message: 『項目のパスの分解』のまま
+    unit_tests:
+      - name: test_get_field
+        case: 正常
+        summary: 入れ子と位置
+        condition: '`{"a": {"b": [{"c": 1}]}}` を `a.b[0].c`'
+        mock: なし
+        expected: '`1`'
+        exception: '-'
+      - name: test_get_field_when_missing
+        case: 正常
+        summary: たどれない
+        condition: 同じ内容を `a.x`・`a.b[3].c`・`a.b.c`
+        mock: なし
+        expected: どれも `None`
+        exception: '-'
+      - name: test_get_field_when_selector
+        case: 正常
+        summary: 要素を選んで取り出す
+        condition: '`{"tags": [{"name": "a", "main": true}, {"name": "b"}, "c"]}` を `tags[].name` と `tags[main].name`、`{"tags": "x"}` を `tags[].name`'
+        mock: なし
+        expected: '`["a", "b"]`・`["a"]`・`None`'
+        exception: '-'
+  - name: set_field
+    title: 項目の書き込み
+    kind: 関数
+    container: project_index/features/documents/fields.py
+    usecase: 共通
+    role: 書き込み
+    summary: 項目のパスで指した場所へ値を書く
+    scope: public
+    thread_safe: false
+    side_effects: '`data` を書き換える'
+    args:
+      - name: data
+        title: 内容
+        type: MutableMapping[str, Any]
+        required: true
+        passing: positional
+        description: 書き換える内容（往復編集の `CommentedMap` も受ける）
+      - name: path
+        title: 項目のパス
+        type: str
+        required: true
+        passing: positional
+        description: ドット記法と `[n]`
+      - name: value
+        title: 値
+        type: object
+        required: true
+        passing: positional
+        description: 書く値
+    returns:
+      type: None
+      description: '-'
+    process: |-
+      1. 『項目のパスの分解』で分ける。`ArraySelector` を含む場合、`InvalidArgumentError` を送る
+      2. 最後の手前までたどり、途中のキーが無ければ空の辞書を作って進む
+      3. 途中の値が辞書でない（キーのとき）・配列でない（位置のとき）場合、`InvalidArgumentError` を送る
+      4. 位置が配列の長さと同じなら末尾へ追加し、長さより大きければ `InvalidArgumentError` を送る
+      5. 最後のキーか位置へ値を書く
+    exceptions:
+      - name: InvalidArgumentError
+        condition: 途中の値の型が合わない
+        message: '{path}: {途中のパス} は {辞書 / 配列} ではありません'
+      - name: InvalidArgumentError
+        condition: 位置が配列の長さを超える
+        message: '{path}: 位置 {n} は配列の長さ {length} を超えています'
+      - name: InvalidArgumentError
+        condition: パスが `[]`・`[{キー}]` を含む
+        message: '{path}: `[]`・`[{キー}]` を含む項目のパスには書き込めません'
+    unit_tests:
+      - name: test_set_field
+        case: 正常
+        summary: 途中の辞書を作る
+        condition: '`{}` へ `a.b.c` = `1`'
+        mock: なし
+        expected: '`{"a": {"b": {"c": 1}}}`'
+        exception: '-'
+      - name: test_set_field_when_append
+        case: 正常
+        summary: 末尾へ追加
+        condition: '`{"a": [1]}` へ `a[1]` = `2`'
+        mock: なし
+        expected: '`{"a": [1, 2]}`'
+        exception: '-'
+      - name: test_set_field_when_type_mismatch
+        case: 異常
+        summary: 途中が文字列
+        condition: '`{"a": "x"}` へ `a.b` = `1`'
+        mock: なし
+        expected: '`InvalidArgumentError`'
+        exception: 途中の値の型が合わない
+      - name: test_set_field_when_out_of_range
+        case: 異常
+        summary: 飛んだ位置
+        condition: '`{"a": [1]}` へ `a[3]` = `2`'
+        mock: なし
+        expected: '`InvalidArgumentError`'
+        exception: 位置が配列の長さを超える
+      - name: test_set_field_when_selector
+        case: 異常
+        summary: 要素の選び方を含むパス
+        condition: '`{"tags": []}` へ `tags[].name` = `a`'
+        mock: なし
+        expected: '`InvalidArgumentError`'
+        exception: パスが `[]`・`[{キー}]` を含む
+  - name: delete_field
+    title: 項目の削除
+    kind: 関数
+    container: project_index/features/documents/fields.py
+    usecase: 共通
+    role: 書き込み
+    summary: 項目のパスで指した値を削除する
+    scope: public
+    thread_safe: false
+    side_effects: '`data` を書き換える'
+    args:
+      - name: data
+        title: 内容
+        type: MutableMapping[str, Any]
+        required: true
+        passing: positional
+        description: 書き換える内容
+      - name: path
+        title: 項目のパス
+        type: str
+        required: true
+        passing: positional
+        description: ドット記法と `[n]`
+    returns:
+      type: bool
+      description: 削除したら `True`、指した値が無ければ `False`
+    process: |-
+      1. 『項目のパスの分解』で分ける。`ArraySelector` を含む場合、`InvalidArgumentError` を送る
+      2. 最後の手前までたどり、たどれない場合は `False` を返す
+      3. 最後がキーなら辞書から、位置なら配列から削除して `True` を返す
+    exceptions:
+      - name: InvalidArgumentError
+        condition: パスの書式が誤っている
+        message: 『項目のパスの分解』のまま
+      - name: InvalidArgumentError
+        condition: パスが `[]`・`[{キー}]` を含む
+        message: '{path}: `[]`・`[{キー}]` を含む項目のパスは削除できません'
+    unit_tests:
+      - name: test_delete_field
+        case: 正常
+        summary: キーと位置
+        condition: '`{"a": {"b": 1}, "c": [1, 2]}` から `a.b` と `c[0]`'
+        mock: なし
+        expected: 'どちらも `True` で、`{"a": {}, "c": [2]}`'
+        exception: '-'
+      - name: test_delete_field_when_missing
+        case: 正常
+        summary: 無い値
+        condition: '`{}` から `a.b`'
+        mock: なし
+        expected: '`False` で内容は変わらない'
+        exception: '-'
+  - name: resolve_metadata
+    title: メタデータの解決
+    kind: 関数
+    container: project_index/features/documents/fields.py
+    usecase: 共通
+    role: 変換
+    summary: 文書の行の `metadata` の対応で、文書の内容から共通のキーの値を取る
+    scope: public
+    thread_safe: true
+    args:
+      - name: data
+        title: 内容
+        type: Mapping[str, Any]
+        required: true
+        passing: positional
+        description: 文書の内容
+      - name: table
+        title: 文書の行
+        type: DocumentTable
+        required: true
+        passing: positional
+        description: 文書の行
+    returns:
+      type: dict[str, Any]
+      description: 共通のキー → 値。値が無いキーは含まない
+    process: |-
+      1. `METADATA_KEYS` のキーごとに、`table.metadata` の列名（書かれていないキーは同じ名前の列）の値を『項目の取得』で取る。列名が `[]`・`[{キー}]` を含むときは選んだ要素の値の配列になる（`tags: tags[].name`・`main_tags: tags[main].name`）
+      2. `table.alias_type` がある場合、`alias_type` の値をその値にする
+      3. 値が `None` のキーを除いて返す
+    unit_tests:
+      - name: test_resolve_metadata
+        case: 正常
+        summary: 列名の対応と同じ名前の列
+        condition: '`metadata` が `{name: title}`、行の `alias_type` が `term`、内容が `{"id": "a", "title": "A", "tags": ["x"]}`'
+        mock: なし
+        expected: '`{"id": "a", "name": "A", "tags": ["x"], "alias_type": "term"}`'
+        exception: '-'
+      - name: test_resolve_metadata_when_nested_field
+        case: 正常
+        summary: 入れ子の列
+        condition: '`metadata` が `{description: meta.summary}`、内容が `{"meta": {"summary": "s"}}`'
+        mock: なし
+        expected: '`description` が `s`'
+        exception: '-'
+      - name: test_resolve_metadata_when_object_array
+        case: 正常
+        summary: オブジェクトの配列のタグ
+        condition: '`metadata` が `{tags: tags[].name, main_tags: tags[main].name}`、内容が `{"tags": [{"name": "mcp", "main": true}, {"name": "設計"}]}`'
+        mock: なし
+        expected: '`tags` が `["mcp", "設計"]`、`main_tags` が `["mcp"]`'
+        exception: '-'
+  - name: missing_ref_fields
+    title: 'metadataの列の欠け'
+    container: project_index/features/documents/fields.py
+    usecase: 起動
+    role: 判定
+    summary: 文書の行の `metadata` に書いた列のうち、文書の内容に値が無い列を返す
+    kind: 関数
+    scope: public
+    thread_safe: true
+    args:
+      - name: data
+        title: 内容
+        type: Mapping[str, Any]
+        required: true
+        passing: positional
+        description: 文書の内容
+      - name: table
+        title: 文書の行
+        type: DocumentTable
+        required: true
+        passing: positional
+        description: 文書の行
+    returns:
+      type: list[tuple[str, str]]
+      description: 値が無い `(メタデータのキー, 列名)` の並び（`table.metadata` の順）
+    process: |-
+      1. `table.metadata` の対応を順に見る（書いていないキーの同じ名前の列は見ない）
+      2. 『項目の取得』で列名の値が `None` なら、そのキーと列名を加える
+      3. 並びを返す
+    unit_tests:
+      - name: test_missing_ref_fields
+        case: 正常
+        summary: metadata に書いた列だけを数える
+        condition: '`metadata` が `{name: title, description: summary}`、内容が `{"summary": "s"}`（`tags` も無い）'
+        mock: なし
+        expected: '`[("name", "title")]`'
+        exception: '-'
+  - name: is_markdown_body
+    title: Markdownの本文か
+    kind: 関数
+    container: project_index/features/documents/fields.py
+    usecase: 共通
+    role: 判定
+    summary: 文書の本文が Markdown のファイルかを返す
+    description: 変換・検索の `sections`・`@sections` が、本文を Markdown として扱うかをこの関数で決める。
+    scope: public
+    thread_safe: true
+    args:
+      - name: document
+        title: 文書
+        type: Document
+        required: true
+        passing: positional
+        description: 調べる文書
+    returns:
+      type: bool
+      description: '`body_path` の拡張子が `.md` なら `True`'
+    process: 1. `document.body_path` があり、`PurePosixPath(body_path).suffix.lower()` が `.md` なら `True`、それ以外は `False` を返す
+    unit_tests:
+      - name: test_is_markdown_body
+        case: 正常
+        summary: 本文のファイルの拡張子
+        condition: '`body_path` が `docs/a.md`・`docs/B.MD`・`src/a.py`・`None`（`path` は `docs/x.md`）'
+        mock: なし
+        expected: '`True`・`True`・`False`・`False`'
+        exception: '-'
+  - name: unresolved_related
+    title: 当たらない関連
+    container: project_index/features/documents/fields.py
+    usecase: 起動
+    role: 判定
+    summary: 文書の `related` のうち、`to` が配信元の文書の ID の集合に無い関連の `to` を返す
+    kind: 関数
+    scope: public
+    thread_safe: true
+    args:
+      - name: metadata
+        title: メタデータ
+        type: Mapping[str, Any]
+        required: true
+        passing: positional
+        description: 文書の解決済みのメタデータ（`Document.metadata`）
+      - name: ids
+        title: 文書の ID の集合
+        type: AbstractSet[str]
+        required: true
+        passing: positional
+        description: 配信元の全ての文書の ID
+    returns:
+      type: list[str]
+      description: 当たらない `to` の並び（`related` の順）
+    process: |-
+      1. `metadata` の `related` が配列でなければ空の並びを返す
+      2. 要素ごとに、文字列の `to` を持ち、文字列の `source` を持たない要素だけを見て（`source` が無い・`null` の要素を同じ配信元への関連として扱う。`related_links` と同じ読み方）、`to` が `ids` に無ければ加える
+      3. 並びを返す
+    unit_tests:
+      - name: test_unresolved_related
+        case: 正常
+        summary: source を持たない関連だけを照合する
+        condition: '`related` が `[{to: src/b.py}, {to: src/z.py}, {to: other-doc, source: other}, {to: src/y.py, source: null}, {type: tests}]`、`ids` が `{src/a.py, src/b.py}`'
+        mock: なし
+        expected: '`["src/z.py", "src/y.py"]`'
+        exception: '-'
+      - name: test_unresolved_related_when_not_list
+        case: 正常
+        summary: related が配列でない
+        condition: '`related` が無いメタデータと、`related` が文字列のメタデータ'
+        mock: なし
+        expected: どちらも `[]`
+        exception: '-'

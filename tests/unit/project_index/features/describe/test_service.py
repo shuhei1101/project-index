@@ -1,4 +1,3 @@
-# pyright: reportUnknownArgumentType=warning, reportUnknownLambdaType=warning
 from __future__ import annotations
 
 from pathlib import Path
@@ -43,7 +42,7 @@ def no_warnings(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch)
     """偽の配信元で警告を求めないよう、本物の配信元を使うテスト以外では警告の収集を空にする。"""
     if request.node.name != "test_describe_when_warned":
         monkeypatch.setattr(
-            "project_index.features.describe.service.collect_warnings", lambda *args, **kwargs: []
+            "project_index.features.describe.service.collect_warnings", _no_warnings
         )
 
 
@@ -318,3 +317,8 @@ def test_describe_when_refs_and_worktrees(
     assert result.refs["tags"] == ["v0.1.0"]
     assert result.worktrees is not None
     assert result.worktrees[0].branch == "feat/x"
+
+
+def _no_warnings(*args: Any, **kwargs: Any) -> list[str]:
+    """警告を集めない偽物。"""
+    return []

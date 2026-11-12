@@ -1,5 +1,4 @@
 """文書のキャッシュと ID の引き当て。"""
-# pyright: reportUnknownArgumentType=warning
 
 from __future__ import annotations
 
@@ -8,7 +7,7 @@ import hashlib
 import logging
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from project_index.features.access.types import Target
 from project_index.features.documents.aliases import collect_aliases
@@ -25,6 +24,7 @@ from project_index.features.history.query import file_dates, resolve_ref
 from project_index.features.history.types import FileDates
 from project_index.integrations.git import GitError, run_git
 from project_index.shared.errors import DocumentNotFoundError
+from project_index.shared.narrowing import is_dict
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
 
 if TYPE_CHECKING:
@@ -121,7 +121,9 @@ class DocumentStore:
         """`ref` を持つ読む場所の commit を返す（`commit` が無いときだけ解く）。"""
         if target.commit is not None:
             return target.commit
-        assert target.ref is not None  # noqa: S101
+        if target.ref is None:
+            msg = "読む場所に ref がありません"
+            raise RuntimeError(msg)
         source = target.source
         repo_root = source.repo_root or source.root
         return resolve_ref(repo_root, target.ref, date_base=source.config.default_ref).commit
@@ -262,6 +264,27 @@ class DocumentStore:
             paths = sorted({d.body_path for d in found if d.body_path is not None})
             return tuple((path, blobs.get(from_repo(path), "")) for path in paths)
 
+        def read(
+            path: str, key: _RevisionKey, blob: str
+        ) -> tuple[list[Document], list[LoadProblem]]:
+            """控えが新しければ控えを、古ければファイルを読み直して控える。"""
+            with self._lock:
+                cached = self._revision_files.get(key)
+            if cached is not None and _revision_fresh(
+                cached, blob, body_blobs(cached[3]), _date_stamps(path, cached[3], dates)
+            ):
+                return cached[3], cached[4]
+            found, issues = load_file(root, path, table, source_id=source.id, dates=dates)
+            with self._lock:
+                self._revision_files[key] = (
+                    blob,
+                    body_blobs(found),
+                    _date_stamps(path, found, dates),
+                    found,
+                    issues,
+                )
+            return found, issues
+
         documents: list[Document] = []
         problems: list[LoadProblem] = []
         seen: set[str] = set()
@@ -271,40 +294,38 @@ class DocumentStore:
             if blob is None:
                 continue
             seen.add(relative)
-            key = (repo_root, source.id, relative, table.id, table_hash)
-            with self._lock:
-                cached = self._revision_files.get(key)
-            if (
-                cached is not None
-                and cached[0] == blob
-                and not any(issue.reason == "missing_body_file" for issue in cached[4])
-                and cached[1] == body_blobs(cached[3])
-                and cached[2] == _date_stamps(path, cached[3], dates)
-            ):
-                found, issues = cached[3], cached[4]
-            else:
-                found, issues = load_file(root, path, table, source_id=source.id, dates=dates)
-                with self._lock:
-                    self._revision_files[key] = (
-                        blob,
-                        body_blobs(found),
-                        _date_stamps(path, found, dates),
-                        found,
-                        issues,
-                    )
+            found, issues = read(path, (repo_root, source.id, relative, table.id, table_hash), blob)
             documents.extend(found)
             problems.extend(issues)
         # 今の commit に無いファイルと、行の定義が変わった結果を捨てる
+        self._discard_revisions((repo_root, source.id), table.id, seen, table_hash)
+        return documents, problems
+
+    def _discard_revisions(
+        self, owner: tuple[Path, str], table_id: str, seen: set[str], table_hash: str
+    ) -> None:
+        """配信元の行の控えのうち、読んだファイルに無いものと行の定義が変わったものを捨てる。"""
         with self._lock:
             for key in [
                 key
                 for key in self._revision_files
-                if key[:2] == (repo_root, source.id)
-                and key[3] == table.id
+                if key[:2] == owner
+                and key[3] == table_id
                 and (key[2] not in seen or key[4] != table_hash)
             ]:
                 del self._revision_files[key]
-        return documents, problems
+
+    def _discard_files(
+        self, root: Path, kind_ids: set[str], seen_keys: set[tuple[Path, str]]
+    ) -> None:
+        """作業ツリーから消えたファイルの控えを捨てる。"""
+        with self._lock:
+            for key in [
+                key
+                for key in self._files
+                if key[1] in kind_ids and key not in seen_keys and key[0].is_relative_to(root)
+            ]:
+                del self._files[key]
 
     def load(
         self,
@@ -338,28 +359,8 @@ class DocumentStore:
             documents.extend(found)
             problems.extend(issues)
         # 削除されたファイルのキャッシュを捨てる
-        with self._lock:
-            for key in [
-                key
-                for key in self._files
-                if key[1] in kind_ids and key not in seen_keys and key[0].is_relative_to(root)
-            ]:
-                del self._files[key]
-        first: dict[str, Document] = {}
-        unique: list[Document] = []
-        for document in documents:
-            earlier = first.get(document.id)
-            if earlier is None:
-                first[document.id] = document
-                unique.append(document)
-            else:
-                problems.append(
-                    LoadProblem(
-                        path=document.path,
-                        reason="duplicate_id",
-                        detail=f"ID {document.id} は先の文書（{earlier.path}）と重なります",
-                    )
-                )
+        self._discard_files(root, kind_ids, seen_keys)
+        unique = _unique(documents, problems)
         problems.sort(key=lambda problem: problem.path)
         for problem in problems:
             logger.debug("%s: %s: %s", target.source.id, problem.path, problem.reason)
@@ -403,9 +404,10 @@ class DocumentStore:
             raw = load_yaml(path.read_text(encoding="utf-8"), file=str(path))
         except OSError, UnicodeDecodeError, YamlLoadError:
             return startup_schema(source, table)
-        if not isinstance(raw, dict):
+        if not is_dict(raw):
             return startup_schema(source, table)
-        resolved = resolve_schema_refs(raw, path)
+        # YAML から読んだ辞書のキーは文字列として扱う
+        resolved = resolve_schema_refs(cast("dict[str, Any]", raw), path)
         with self._lock:
             self._schemas[path] = (stat.st_mtime_ns, stat.st_size, resolved)
         return resolved
@@ -428,9 +430,9 @@ class DocumentStore:
             raw = load_yaml(path.read_text(encoding="utf-8"), file=str(path))
         except OSError, UnicodeDecodeError, YamlLoadError:
             return resolve_schema_refs(startup, base)
-        if not isinstance(raw, dict):
+        if not is_dict(raw):
             return resolve_schema_refs(startup, base)
-        resolved = resolve_schema_refs(raw, path)
+        resolved = resolve_schema_refs(cast("dict[str, Any]", raw), path)
         with self._lock:
             self._revision_schemas[key] = resolved
         return resolved
@@ -463,6 +465,56 @@ class DocumentStore:
             self._dates.clear()
 
 
+def _revision_fresh(
+    cached: _CachedRevisionFile, blob: str, bodies: _BodyBlobs, stamps: _DateStamps
+) -> bool:
+    """リビジョンのファイルの控えが、blob・本文の blob・日時とも変わらず、本文のファイルの欠けも無いか。"""
+    return (
+        cached[0] == blob
+        and not any(issue.reason == "missing_body_file" for issue in cached[4])
+        and cached[1] == bodies
+        and cached[2] == stamps
+    )
+
+
+def _unique(documents: list[Document], problems: list[LoadProblem]) -> list[Document]:
+    """ID が先の文書と重なる文書を除き、重なりを `problems` に足す。"""
+    first: dict[str, Document] = {}
+    unique: list[Document] = []
+    for document in documents:
+        earlier = first.get(document.id)
+        if earlier is None:
+            first[document.id] = document
+            unique.append(document)
+            continue
+        problems.append(
+            LoadProblem(
+                path=document.path,
+                reason="duplicate_id",
+                detail=f"ID {document.id} は先の文書（{earlier.path}）と重なります",
+            )
+        )
+    return unique
+
+
+def _unindexed(
+    source: ServedSource, table: DocumentTable, documents: list[Document], files: list[str]
+) -> list[str]:
+    """`records`・`body_file` の行の索引ごとに、索引に無い本文のファイルを集める。"""
+    unindexed: list[str] = []
+    for index_path in collect_files(source.root, table, files=files):
+        body_paths = {
+            document.body_path
+            for document in documents
+            if document.kind == table.id and document.path == index_path and document.body_path
+        }
+        unindexed.extend(
+            f"{table.id}: {path}"
+            for path in unindexed_files(source.root, index_path, body_paths, table, files=files)
+        )
+    return unindexed
+
+
 def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
     """配信元の文書を読み、`metadata` の列の欠け・管理用の YAML のずれ・当たらない関連・エイリアスのキーの違反を求める。"""
     # 配信元のフォルダは 1 回だけたどり、文書の収集と索引に無いファイルの検出で使い回す
@@ -473,20 +525,12 @@ def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
         for document in result.documents
         for key, field in missing_ref_fields(document.data, source.table(document.kind))
     ]
-    unindexed: list[str] = []
-    for table in source.config.documents:
-        if not table.enabled or table.records is None or table.body_file is None:
-            continue
-        for index_path in collect_files(source.root, table, files=files):
-            body_paths = {
-                document.body_path
-                for document in result.documents
-                if document.kind == table.id and document.path == index_path and document.body_path
-            }
-            unindexed.extend(
-                f"{table.id}: {path}"
-                for path in unindexed_files(source.root, index_path, body_paths, table, files=files)
-            )
+    unindexed = [
+        line
+        for table in source.config.documents
+        if table.enabled and table.records is not None and table.body_file is not None
+        for line in _unindexed(source, table, result.documents, files)
+    ]
     missing_body_files = [
         f"{problem.path}: {problem.detail}"
         for problem in result.problems

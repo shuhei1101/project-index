@@ -1,5 +1,5 @@
 title: 非機能要件
-lead: 外部の制約から逆算した project-index の決定値。
+lead: 外部の制約から逆算した project-index の決定値（待ち受け・上限・所要時間）を定め、これらの値を決める・変えるときに参照する。
 requirements:
   - id: NFR-1
     name: 対応 OS
@@ -24,7 +24,7 @@ requirements:
     category: 動作環境
     external_constraint: 制限なし
     source_kind: ユーザー要望
-    source: 設定の設計書 CFG-1 の `PROJECT_INDEX_PORT`
+    source: '設定の設計書『設定: 索引のサーバー』の `PROJECT_INDEX_PORT`'
     value: '8786'
     overflow: 使用中のときは起動を止め、ポートと `PROJECT_INDEX_PORT` で変えられることを出す。確かめる時点は起動時
     rationale: 文書の MCP・管理の MCP・読み取り API を 1 つのポートで待ち受ける。`.mcp.json` も同じ値を読むため `PROJECT_INDEX_PORT` で上書きする。dev-docs の画面のサーバーの 8781 と重ならない番号

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from project_index.features.admin.types import (
         CheckProjectResult,
+        CheckSync,
         ReloadResult,
         ServerStatus,
         SourceState,
@@ -91,14 +92,7 @@ def render_check(result: CheckProjectResult) -> str:
         else f"{result.config_version}（{result.version_state}）"
     )
     lines = [f"{result.path}（{registered}）", f"設定のバージョン: {version}"]
-    if result.violations:
-        lines.append(f"違反: {len(result.violations)} 件")
-        lines.extend(_violation_line(item) for item in result.violations)
-    else:
-        lines.append("違反: なし")
-    if result.warnings:
-        lines.append(f"警告: {len(result.warnings)} 件")
-        lines.extend(_violation_line(item) for item in result.warnings)
+    lines.extend(_violation_lines(result))
     if result.alias_schema_version:
         lines.append(f"エイリアスのスキーマ: {result.alias_schema_version}")
     if result.missing_paths:
@@ -108,18 +102,34 @@ def render_check(result: CheckProjectResult) -> str:
         lines.append(f"スクリプトの失敗: {len(result.script_errors)} 件")
         lines.extend(f"- {item.script}: {item.reason}" for item in result.script_errors)
     if result.sync is not None:
-        counts = {
-            "missing_refs": result.sync.missing_refs,
-            "unindexed_files": result.sync.unindexed_files,
-            "missing_body_files": result.sync.missing_body_files,
-            "unresolved_related": result.sync.unresolved_related,
-        }
-        gaps = [f"{SYNC_LABELS[kind]} {count} 件" for kind, count in counts.items() if count]
-        lines.append(f"索引の同期: {'、'.join(gaps) if gaps else 'ずれなし'}")
-        lines.extend(f"- {item.kind}: {item.path}" for item in result.sync.items)
-        if len(result.sync.items) < sum(counts.values()):
-            lines.append(f"（先頭 {len(result.sync.items)} 件）")
+        lines.extend(_sync_lines(result.sync))
     return "\n".join(lines)
+
+
+def _violation_lines(result: CheckProjectResult) -> list[str]:
+    """違反（無ければ「なし」）と警告の件数と行を作る。"""
+    lines = [f"違反: {len(result.violations)} 件" if result.violations else "違反: なし"]
+    lines.extend(_violation_line(item) for item in result.violations)
+    if result.warnings:
+        lines.append(f"警告: {len(result.warnings)} 件")
+        lines.extend(_violation_line(item) for item in result.warnings)
+    return lines
+
+
+def _sync_lines(sync: CheckSync) -> list[str]:
+    """索引の同期のずれの件数と、ずれの項目（先頭だけのときはその旨）の行を作る。"""
+    counts = {
+        "missing_refs": sync.missing_refs,
+        "unindexed_files": sync.unindexed_files,
+        "missing_body_files": sync.missing_body_files,
+        "unresolved_related": sync.unresolved_related,
+    }
+    gaps = [f"{SYNC_LABELS[kind]} {count} 件" for kind, count in counts.items() if count]
+    lines = [f"索引の同期: {'、'.join(gaps) if gaps else 'ずれなし'}"]
+    lines.extend(f"- {item.kind}: {item.path}" for item in sync.items)
+    if len(sync.items) < sum(counts.values()):
+        lines.append(f"（先頭 {len(sync.items)} 件）")
+    return lines
 
 
 def render_write_nav(result: WriteNavResult) -> str:

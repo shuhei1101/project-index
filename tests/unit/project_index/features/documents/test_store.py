@@ -17,13 +17,19 @@ from project_index.features.history.snapshot import SnapshotStore
 from project_index.features.sources.types import DocumentTable, ServedSource, SourceConfig
 from project_index.integrations import git as git_module
 from project_index.shared.errors import DocumentNotFoundError, UnknownKindError
-from project_index.shared.yaml_io import load_yaml
+from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from project_index.features.access.types import Target
     from project_index.features.documents.types import Document
+
+
+def load_yaml(text: str) -> Any:
+    """形の分かっている YAML の文字列を読む。"""
+    return load_yaml_value(text)
+
 
 OCT_01 = "2026-10-01T12:00:00+09:00"
 

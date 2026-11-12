@@ -1,298 +1,321 @@
 id: MOD-86
 title: 索引のサーバー / 履歴 / git.py
-lead: git の実行と、リポジトリの直下の解決。
+lead: git の実行と、リポジトリの直下の解決を受け持ち、履歴の git.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/integrations/test_git.py
+  - tests/unit/project_index/integrations/test_git.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      リビジョンの解決 ..> gitの実行
-      リビジョンの一覧 ..> gitの実行
-      変わったファイル ..> gitの実行
-      区間の commit ..> gitの実行
-      ファイルの日時 ..> gitの実行
-      一緒に変わったファイル ..> gitの実行
-      リビジョンのファイル ..> gitの実行
-      リポジトリの直下 ..> gitの実行
-      リビジョンの書き出し ..> gitの実行 : git archive
-      gitの実行 ..> gitの失敗 : 送る
-      class gitの実行 {
-        <<function>>
-      }
-      class リポジトリの直下 {
-        <<function>>
-      }
-      class リビジョンの解決 {
-        <<function>>
-      }
-      class リビジョンの一覧 {
-        <<function>>
-      }
-      class 変わったファイル {
-        <<function>>
-      }
-      class 区間の commit {
-        <<function>>
-      }
-      class ファイルの日時 {
-        <<function>>
-      }
-      class 一緒に変わったファイル {
-        <<function>>
-      }
-      class リビジョンのファイル {
-        <<function>>
-      }
-      class リビジョンの書き出し {
-        +書き出す(リポジトリ, commit) Path
-      }
-      class gitの失敗 {
-        +終了コード: int
-      }
-      click リビジョンの解決 href "./MOD-31.py.yaml#リビジョンの解決"
-      click リビジョンの一覧 href "./MOD-31.py.yaml#リビジョンの一覧"
-      click 変わったファイル href "./MOD-31.py.yaml#変わったファイル"
-      click 区間の commit href "./MOD-31.py.yaml#区間の commit"
-      click ファイルの日時 href "./MOD-31.py.yaml#ファイルの日時"
-      click 一緒に変わったファイル href "./MOD-31.py.yaml#一緒に変わったファイル"
-      click リビジョンのファイル href "./MOD-31.py.yaml#リビジョンのファイル"
-      click リビジョンの書き出し href "./MOD-32.py.yaml#リビジョンの書き出し"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        リビジョンの解決 ..> gitの実行
+        リビジョンの一覧 ..> gitの実行
+        変わったファイル ..> gitの実行
+        区間の commit ..> gitの実行
+        ファイルの日時 ..> gitの実行
+        一緒に変わったファイル ..> gitの実行
+        リビジョンのファイル ..> gitの実行
+        リポジトリの直下 ..> gitの実行
+        リビジョンの書き出し ..> gitの実行 : git archive
+        gitの実行 ..> gitの失敗 : 送る
+        class gitの実行 {
+          <<function>>
+        }
+        class リポジトリの直下 {
+          <<function>>
+        }
+        class リビジョンの解決 {
+          <<function>>
+        }
+        class リビジョンの一覧 {
+          <<function>>
+        }
+        class 変わったファイル {
+          <<function>>
+        }
+        class 区間の commit {
+          <<function>>
+        }
+        class ファイルの日時 {
+          <<function>>
+        }
+        class 一緒に変わったファイル {
+          <<function>>
+        }
+        class リビジョンのファイル {
+          <<function>>
+        }
+        class リビジョンの書き出し {
+          +書き出す(リポジトリ, commit) Path
+        }
+        class gitの失敗 {
+          +終了コード: int
+        }
+        click リビジョンの解決 href "./MOD-31.py.yaml#リビジョンの解決"
+        click リビジョンの一覧 href "./MOD-31.py.yaml#リビジョンの一覧"
+        click 変わったファイル href "./MOD-31.py.yaml#変わったファイル"
+        click 区間の commit href "./MOD-31.py.yaml#区間の commit"
+        click ファイルの日時 href "./MOD-31.py.yaml#ファイルの日時"
+        click 一緒に変わったファイル href "./MOD-31.py.yaml#一緒に変わったファイル"
+        click リビジョンのファイル href "./MOD-31.py.yaml#リビジョンのファイル"
+        click リビジョンの書き出し href "./MOD-32.py.yaml#リビジョンの書き出し"
 classes:
-- name: GitError
-  title: gitの失敗
-  container: project_index/integrations/git.py
-  usecase: 共通
-  role: 例外
-  summary: git が 0 以外で終わったか待ち時間の上限を超えたことを、引数・終了コード・標準エラーで表す
-  kind: クラス
-  inherits: Exception
-  properties:
-  - name: args_
-    title: 引数
-    type: list[str]
-    access: 公開
-    description: git に渡した引数（`git` を含まない）
-  - name: returncode
-    title: 終了コード
-    type: int
-    access: 公開
-    description: git の終了コード
-  - name: stderr
-    title: 標準エラー
-    type: str
-    access: 公開
-    description: 標準エラーの末尾 `STDERR_TAIL_LINES` 行
-  - name: timed_out
-    title: 待ち時間の超過
-    type: bool
-    access: 公開
-    default: 'False'
-    description: '`GIT_TIMEOUT_SEC` を超えて止めたか。`True` のとき `returncode` は `-1`'
+  - name: GitError
+    title: gitの失敗
+    container: project_index/integrations/git.py
+    usecase: 共通
+    role: 例外
+    summary: git が 0 以外で終わったか待ち時間の上限を超えたことを、引数・終了コード・標準エラーで表す
+    kind: クラス
+    inherits: Exception
+    properties:
+      - name: args_
+        title: 引数
+        type: list[str]
+        access: 公開
+        description: git に渡した引数（`git` を含まない）
+      - name: returncode
+        title: 終了コード
+        type: int
+        access: 公開
+        description: git の終了コード
+      - name: stderr
+        title: 標準エラー
+        type: str
+        access: 公開
+        description: 標準エラーの末尾 `STDERR_TAIL_LINES` 行
+      - name: timed_out
+        title: 待ち時間の超過
+        type: bool
+        access: 公開
+        default: 'False'
+        description: '待ち時間の上限を超えて止めたか。`True` のとき `returncode` は `-1`'
 constants:
-- name: GIT_TIMEOUT_SEC
-  title: git の待ち時間の上限
-  container: project_index/integrations/git.py
-  usecase: 共通
-  summary: git を 1 回呼んで待つ秒数の上限
-  value: '8'
-  notes:
-    導き方: 規約『資源の値の決め方』の下流を待つタイムアウト。project-index のクローン（WSL の `/mnt/c` の下）で各 30 回測った最長は `git archive HEAD` が 5.2 秒、`git log --name-status -n 500` が 4.4 秒。最長を p99.9 の代わりに置き、その 50% の余裕を足して切り上げた。実装後に p99.9 を測り直す
-- name: GIT_ENV
-  title: git の環境変数
-  container: project_index/integrations/git.py
-  usecase: 共通
-  summary: git を呼ぶときに重ねる環境変数（対話と言語で出力が変わらないようにする）
-  entries:
-  - key: GIT_TERMINAL_PROMPT
-    value: '"0"'
-  - key: LC_ALL
-    value: '"C"'
-  - key: GIT_OPTIONAL_LOCKS
-    value: '"0"'
+  - name: GIT_TIMEOUT_SEC
+    title: git の待ち時間の上限
+    container: project_index/integrations/git.py
+    usecase: 共通
+    summary: git を 1 回呼んで待つ秒数の上限（`timeout` を指定しない呼び出し）
+    value: '8'
+    notes:
+      導き方: 規約『資源の値の決め方』の下流を待つタイムアウト。project-index のクローン（WSL の `/mnt/c` の下）で各 30 回測った最長は `git archive HEAD` が 5.2 秒、`git log --name-status -n 500` が 4.4 秒。最長を p99.9 の代わりに置き、その 50% の余裕を足して切り上げた。実装後に p99.9 を測り直す。端末の負荷が高い間（load average 14〜16・8 コア）に、配信元の文書を読み込む経路の git を各 30 回測った最長（中央値）は、`git log --format=%x00%cI --name-only --no-renames {commit}` が 1.7 秒（0.6 秒）、`git ls-tree -r -z --full-tree {commit}` が 1.2 秒（0.4 秒）、`git rev-parse --verify --quiet {ref}^{commit}` が 0.2 秒（0.1 秒）。最長に 50% の余裕を追加しても 8 秒に収まる
+  - name: GIT_ENV
+    title: git の環境変数
+    container: project_index/integrations/git.py
+    usecase: 共通
+    summary: git を呼ぶときに重ねる環境変数（対話と言語で出力が変わらないようにする）
+    entries:
+      - key: GIT_TERMINAL_PROMPT
+        value: '"0"'
+      - key: LC_ALL
+        value: '"C"'
+      - key: GIT_OPTIONAL_LOCKS
+        value: '"0"'
+  - name: GIT_ARCHIVE_TIMEOUT_SEC
+    title: git archive の待ち時間の上限
+    container: project_index/integrations/git.py
+    usecase: 共通
+    summary: リビジョンの書き出し・取り出しの `git archive` を待つ秒数の上限
+    value: '20'
+    notes:
+      導き方: 規約『資源の値の決め方』の下流を待つタイムアウト。端末の負荷が高い間（load average 15〜21・8 コア）に project-index のクローン（WSL の `/mnt/c` の下）で `git archive --format=tar {develop の commit}` を 30 回測った最長は 12.3 秒（中央値 7.5 秒）。最長を p99.9 の代わりにし、その 50% の余裕を追加して切り上げた。外側の待ちは Claude Code の MCP のツールの呼び出しの時間切れ 1 分。内側の待ちが最も重なる `list_changes` の区間指定（`from`・`to` のどちらも書き出していない commit）では、`git archive` 2 回（20 秒 × 2）と `resolve_ref`・`file_dates`・`ls-tree` の各 `GIT_TIMEOUT_SEC` の上限の合計が 1 分を超えうる。超えた呼び出しは Claude Code の側で失敗になり、書き出し済みの commit は再実行で書き出さない
 functions:
-- name: run_git
-  title: gitの実行
-  kind: 関数
-  container: project_index/integrations/git.py
-  usecase: 共通
-  role: 外部の呼び出し
-  summary: git を子プロセスで 1 回呼び、標準出力を返す
-  scope: public
-  thread_safe: true
-  args:
-  - name: args
-    title: 引数
-    type: Sequence[str]
-    required: true
-    passing: positional
-    description: git に渡す引数（`git` を含まない）
-  - name: cwd
-    title: 実行する場所
-    type: Path
-    required: true
-    passing: keyword
-    description: git を実行するフォルダ
-  - name: binary
-    title: バイナリで返すか
-    type: bool
-    required: false
-    default: 'False'
-    passing: keyword
-    description: '`True` で標準出力を `bytes` のまま返す（`git archive`・`git show`）'
-  returns:
-    type: str | bytes
-    description: 標準出力（`binary` が `False` なら UTF-8 で読んだ文字列）
-  process: |-
-    1. `["git", *args]` を `subprocess.run(cwd=cwd, env={**os.environ, **GIT_ENV}, stdin=DEVNULL, capture_output=True, timeout=GIT_TIMEOUT_SEC)` で実行する
-       - `subprocess.TimeoutExpired` の場合（`subprocess.run` が子プロセスを止める）、`timed_out=True` の `GitError` を送る
-       - `[warning]` git が待ち時間の上限を超えた（引数・`cwd`・秒数）
-    2. 終了コードが 0 以外の場合、`GitError` を送る
-    3. 標準出力を返す
-  exceptions:
-  - name: GitError
-    condition: git が 0 以外で終わる
-    message: '`git {args}: {標準エラーの末尾}`'
-  - name: GitError
-    condition: '`GIT_TIMEOUT_SEC` を超える'
-    message: '`git {args}: {GIT_TIMEOUT_SEC} 秒を超えたため止めました`'
-  unit_tests:
-  - name: test_run_git
-    case: 正常
-    summary: 標準出力を返す
-    condition: 一時リポジトリで `["rev-parse", "--is-inside-work-tree"]`
-    mock: なし
-    expected: '`"true\n"`'
-  - name: test_run_git_when_failed
-    case: 異常
-    summary: 失敗を例外にする
-    condition: '`["rev-parse", "nope"]`'
-    mock: なし
-    expected: '`GitError` の `returncode` が 0 以外、`stderr` に `nope`'
-    exception: git が 0 以外で終わる
-  - name: test_run_git_when_timeout
-    case: 異常
-    summary: 待ち時間の上限を超える
-    condition: '`GIT_TIMEOUT_SEC` を `0.1` に monkeypatch し、`GIT_EDITOR` で 1 秒止まる `["commit", "--allow-empty"]`'
-    mock: なし
-    expected: '`GitError` の `timed_out` が `True`、git のプロセスが残らない'
-    exception: '`GIT_TIMEOUT_SEC` を超える'
-- name: repo_root
-  title: リポジトリの直下
-  kind: 関数
-  container: project_index/integrations/git.py
-  usecase: 起動
-  role: 読み取り
-  summary: フォルダが Git の作業ツリーの中なら、その直下を返す
-  scope: public
-  thread_safe: true
-  args:
-  - name: path
-    title: フォルダ
-    type: Path
-    required: true
-    passing: positional
-    description: 確かめるフォルダ
-  returns:
-    type: Path | None
-    description: 作業ツリーの直下。Git の管理外なら `None`
-  process: |-
-    1. `rev-parse --show-toplevel` を呼ぶ（gitの実行）
-       - `GitError` の場合、`None` を返す
-    2. 出力の末尾の改行を除いて正規化したパスを返す
-  unit_tests:
-  - name: test_repo_root
-    case: 正常
-    summary: リポジトリの中のフォルダ
-    condition: 一時リポジトリの `docs/`
-    mock: なし
-    expected: 一時リポジトリの直下
-  - name: test_repo_root_when_not_git
-    case: 正常
-    summary: Git の管理外
-    condition: '`git init` していない一時フォルダ'
-    mock: なし
-    expected: '`None`'
-- name: main_repo_root
-  title: メインのリポジトリの直下
-  kind: 関数
-  container: project_index/integrations/git.py
-  usecase: 共通
-  role: 読み取り
-  summary: ワークツリーの中からでも、メインのリポジトリ（クローン本体）の直下を返す
-  scope: public
-  thread_safe: true
-  args:
-  - name: path
-    title: フォルダ
-    type: Path
-    required: true
-    passing: positional
-    description: 確かめるフォルダ
-  returns:
-    type: Path | None
-    description: '`git rev-parse --git-common-dir` の親。Git の作業ツリーでなければ `None`'
-  process: |-
-    1. `rev-parse --path-format=absolute --git-common-dir` を呼ぶ（gitの実行）
-       - `GitError` の場合、`None` を返す
-    2. 出力の末尾の改行を除いたパスの親を正規化して返す
-  unit_tests:
-  - name: test_main_repo_root
-    case: 正常
-    summary: クローン本体とワークツリー
-    condition: 一時リポジトリの直下と、`git worktree add` したワークツリーの中のフォルダ
-    mock: なし（一時フォルダで `git init`）
-    expected: どちらもクローン本体の直下
-    exception: '-'
-  - name: test_main_repo_root_when_not_git
-    case: 正常
-    summary: Git の管理外
-    condition: '`git init` していない一時フォルダ'
-    mock: なし
-    expected: '`None`'
-    exception: '-'
-- name: is_ignored
-  title: 無視されているファイル
-  kind: 関数
-  container: project_index/integrations/git.py
-  usecase: 共通
-  role: 読み取り
-  summary: ファイルが `.gitignore` などで無視されているかを返す
-  scope: public
-  thread_safe: true
-  args:
-  - name: path
-    title: ファイル
-    type: Path
-    required: true
-    passing: positional
-    description: 確かめるファイルの絶対パス
-  - name: top
+  - name: run_git
+    title: gitの実行
+    kind: 関数
+    container: project_index/integrations/git.py
+    usecase: 共通
+    role: 外部の呼び出し
+    summary: git を子プロセスで 1 回呼び、標準出力を返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: args
+        title: 引数
+        type: Sequence[str]
+        required: true
+        passing: positional
+        description: git に渡す引数（`git` を含まない）
+      - name: cwd
+        title: 実行する場所
+        type: Path
+        required: true
+        passing: keyword
+        description: git を実行するフォルダ
+      - name: binary
+        title: バイナリで返すか
+        type: bool
+        required: false
+        default: 'False'
+        passing: keyword
+        description: '`True` で標準出力を `bytes` のまま返す（`git archive`・`git show`）'
+      - name: timeout
+        title: 待ち時間の上限
+        type: float | None
+        required: false
+        default: None
+        passing: keyword
+        description: git を待つ秒数の上限。`None` で `GIT_TIMEOUT_SEC`
+    returns:
+      type: str | bytes
+      description: 標準出力（`binary` が `False` なら UTF-8 で読んだ文字列）
+    process: |-
+      1. 待ち時間の上限を `timeout`（`None` の場合は `GIT_TIMEOUT_SEC`）にする
+      2. `["git", *args]` を `subprocess.run(cwd=cwd, env={**os.environ, **GIT_ENV}, stdin=DEVNULL, capture_output=True, timeout={上限})` で実行する
+         - `subprocess.TimeoutExpired` の場合（`subprocess.run` が子プロセスを止める）、`timed_out=True` の `GitError` を送る
+         - `[warning]` git が待ち時間の上限を超えた（引数・`cwd`・秒数）
+      3. 終了コードが 0 以外の場合、`GitError` を送る
+      4. 標準出力を返す
+    exceptions:
+      - name: GitError
+        condition: git が 0 以外で終わる
+        message: '`git {args}: {標準エラーの末尾}`'
+      - name: GitError
+        condition: '待ち時間の上限を超える'
+        message: '`git {args}: {上限} 秒を超えたため止めました`'
+    unit_tests:
+      - name: test_run_git
+        case: 正常
+        summary: 標準出力を返す
+        condition: 一時リポジトリで `["rev-parse", "--is-inside-work-tree"]`
+        mock: なし
+        expected: '`"true\n"`'
+      - name: test_run_git_when_failed
+        case: 異常
+        summary: 失敗を例外にする
+        condition: '`["rev-parse", "nope"]`'
+        mock: なし
+        expected: '`GitError` の `returncode` が 0 以外、`stderr` に `nope`'
+        exception: git が 0 以外で終わる
+      - name: test_run_git_when_timeout
+        case: 異常
+        summary: 待ち時間の上限を超える
+        condition: '`GIT_TIMEOUT_SEC` を `0.1` に monkeypatch し、`GIT_EDITOR` で 1 秒止まる `["commit", "--allow-empty"]`'
+        mock: なし
+        expected: '`GitError` の `timed_out` が `True`、git のプロセスが残らない'
+        exception: '待ち時間の上限を超える'
+      - name: test_run_git_when_timeout_given
+        case: 異常
+        summary: 指定した待ち時間の上限を超える
+        condition: '`timeout=0.1` を指定し、`GIT_EDITOR` で 1 秒止まる `["commit", "--allow-empty"]`'
+        mock: なし
+        expected: '`GitError` の `timed_out` が `True`、メッセージに `0.1 秒`'
+        exception: 待ち時間の上限を超える
+  - name: repo_root
     title: リポジトリの直下
-    type: Path
-    required: true
-    passing: positional
-    description: '`repo_root` が返した直下'
-  returns:
-    type: bool
-    description: 無視されていれば `True`
-  process: |-
-    1. `top` で `check-ignore -q -- {path の top からの相対パス}` を呼ぶ（gitの実行）
-    2. 終了コード 0 なら `True` を返す
-       - `GitError` の場合（無視されていない終了コード 1 と、失敗の 128）、`False` を返す
-  unit_tests:
-  - name: test_is_ignored
-    case: 正常
-    summary: 無視されている
-    condition: '`.gitignore` に `project-index.local.yaml` を書いた一時リポジトリの `project-index.local.yaml`'
-    mock: なし（一時フォルダで `git init`）
-    expected: '`True`'
-    exception: '-'
-  - name: test_is_ignored_when_not_ignored
-    case: 正常
-    summary: 無視されていない
-    condition: '`.gitignore` に書いていない、commit していない `project-index.yaml`'
-    mock: なし（一時フォルダで `git init`）
-    expected: '`False`'
-    exception: '-'
+    kind: 関数
+    container: project_index/integrations/git.py
+    usecase: 起動
+    role: 読み取り
+    summary: フォルダが Git の作業ツリーの中なら、その直下を返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: path
+        title: フォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: 確かめるフォルダ
+    returns:
+      type: Path | None
+      description: 作業ツリーの直下。Git の管理外なら `None`
+    process: |-
+      1. `rev-parse --show-toplevel` を呼ぶ（gitの実行）
+         - `GitError` の場合、`None` を返す
+      2. 出力の末尾の改行を除いて正規化したパスを返す
+    unit_tests:
+      - name: test_repo_root
+        case: 正常
+        summary: リポジトリの中のフォルダ
+        condition: 一時リポジトリの `docs/`
+        mock: なし
+        expected: 一時リポジトリの直下
+      - name: test_repo_root_when_not_git
+        case: 正常
+        summary: Git の管理外
+        condition: '`git init` していない一時フォルダ'
+        mock: なし
+        expected: '`None`'
+  - name: main_repo_root
+    title: メインのリポジトリの直下
+    kind: 関数
+    container: project_index/integrations/git.py
+    usecase: 共通
+    role: 読み取り
+    summary: ワークツリーの中からでも、メインのリポジトリ（クローン本体）の直下を返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: path
+        title: フォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: 確かめるフォルダ
+    returns:
+      type: Path | None
+      description: '`git rev-parse --git-common-dir` の親。Git の作業ツリーでなければ `None`'
+    process: |-
+      1. `rev-parse --path-format=absolute --git-common-dir` を呼ぶ（gitの実行）
+         - `GitError` の場合、`None` を返す
+      2. 出力の末尾の改行を除いたパスの親を正規化して返す
+    unit_tests:
+      - name: test_main_repo_root
+        case: 正常
+        summary: クローン本体とワークツリー
+        condition: 一時リポジトリの直下と、`git worktree add` したワークツリーの中のフォルダ
+        mock: なし（一時フォルダで `git init`）
+        expected: どちらもクローン本体の直下
+        exception: '-'
+      - name: test_main_repo_root_when_not_git
+        case: 正常
+        summary: Git の管理外
+        condition: '`git init` していない一時フォルダ'
+        mock: なし
+        expected: '`None`'
+        exception: '-'
+  - name: is_ignored
+    title: 無視されているファイル
+    kind: 関数
+    container: project_index/integrations/git.py
+    usecase: 共通
+    role: 読み取り
+    summary: ファイルが `.gitignore` などで無視されているかを返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: path
+        title: ファイル
+        type: Path
+        required: true
+        passing: positional
+        description: 確かめるファイルの絶対パス
+      - name: top
+        title: リポジトリの直下
+        type: Path
+        required: true
+        passing: positional
+        description: '`repo_root` が返した直下'
+    returns:
+      type: bool
+      description: 無視されていれば `True`
+    process: |-
+      1. `top` で `check-ignore -q -- {path の top からの相対パス}` を呼ぶ（gitの実行）
+      2. 終了コード 0 なら `True` を返す
+         - `GitError` の場合（無視されていない終了コード 1 と、失敗の 128）、`False` を返す
+    unit_tests:
+      - name: test_is_ignored
+        case: 正常
+        summary: 無視されている
+        condition: '`.gitignore` に `project-index.local.yaml` を書いた一時リポジトリの `project-index.local.yaml`'
+        mock: なし（一時フォルダで `git init`）
+        expected: '`True`'
+        exception: '-'
+      - name: test_is_ignored_when_not_ignored
+        case: 正常
+        summary: 無視されていない
+        condition: '`.gitignore` に書いていない、commit していない `project-index.yaml`'
+        mock: なし（一時フォルダで `git init`）
+        expected: '`False`'
+        exception: '-'

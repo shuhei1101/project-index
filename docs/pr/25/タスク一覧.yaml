@@ -1,0 +1,85 @@
+tasks:
+  - process: 初期構築
+    status: skipped
+    reason: 既存リポジトリのため対象外
+    updated_by: planner
+    updated_at: '2026-11-12T08:04:19.260301+00:00'
+  - process: リバースエンジニアリング
+    status: skipped
+    reason: 設計書が揃っているため対象外
+    updated_by: planner
+    updated_at: '2026-11-12T08:04:19.260301+00:00'
+  - process: 方針決め
+    status: skipped
+    reason: 方針決めの依頼でないため対象外
+    updated_by: planner
+    updated_at: '2026-11-12T08:04:19.260301+00:00'
+  - process: PoC 検証
+    status: skipped
+    reason: 既存のコードの修正だけで、未検証の技術機構に依存しない
+    updated_by: planner
+    updated_at: '2026-11-12T08:04:19.260301+00:00'
+  - process: 複合ユースケース設計
+    status: skipped
+    reason: 振る舞いを変えないため、業務フローは変わらない
+    updated_by: planner
+    updated_at: '2026-11-12T08:04:19.260301+00:00'
+  - process: デザインスタイル選定
+    status: skipped
+    reason: 画面が無い
+    updated_by: planner
+    updated_at: '2026-11-12T08:04:19.260301+00:00'
+  - process: 画面一覧・画面遷移
+    status: skipped
+    reason: 画面が無い
+    updated_by: planner
+    updated_at: '2026-11-12T08:04:19.260301+00:00'
+  - process: 単一ユースケース設計
+    status: skipped
+    reason: 振る舞いを変えないため、利用者の操作は変わらない
+    updated_by: planner
+    updated_at: '2026-11-12T08:04:19.260301+00:00'
+  - process: モック作成
+    status: skipped
+    reason: 画面が無い
+    updated_by: planner
+    updated_at: '2026-11-12T08:04:19.260301+00:00'
+  - process: インターフェース定義設計
+    status: skipped
+    reason: MCP のツール・API・コマンドの入出力を変えない
+    updated_by: planner
+    updated_at: '2026-11-12T08:04:19.260301+00:00'
+  - process: 部品設計
+    status: skipped
+    reason: 画面が無い
+    updated_by: planner
+    updated_at: '2026-11-12T08:04:19.260301+00:00'
+  - process: 画面設計
+    status: skipped
+    reason: 画面が無い
+    updated_by: planner
+    updated_at: '2026-11-12T08:04:19.260301+00:00'
+  - process: モジュール構成設計
+    status: done
+    note: cognitive complexity の 41 関数の分割・ANN401 の型・N818 の例外名・フックの BLE001 の扱いを、該当するモジュール構成の設計書に反映する
+    updated_by: planner
+    updated_at: '2026-11-12T08:23:11.329978+00:00'
+  - process: ドキュメント修正
+    status: skipped
+    reason: 設計書のほかに更新するドキュメントが無い（開発コマンド・テスト実行方法の lint のコマンドは変わらない）
+    updated_by: planner
+    updated_at: '2026-11-12T08:04:19.260301+00:00'
+  - process: 単体テスト作成
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T08:53:45.028742+00:00'
+    note: 追加した『共通 / narrowing.py』の `is_dict`・`is_list` の単体テストだけを作る。既存の単体テストは期待値を変えずに全 pass させて確認する
+  - process: 実装
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T15:07:12.126183+00:00'
+  - process: 結合テスト作成
+    status: skipped
+    reason: 振る舞いを変えないため、既存の結合テストを期待値を変えずに全 pass させて確認する
+    updated_by: planner
+    updated_at: '2026-11-12T08:04:19.260301+00:00'

@@ -1,16 +1,16 @@
 """文書のファイルの収集と読み込み。"""
-# pyright: reportUnknownArgumentType=warning, reportUnknownVariableType=warning
 
 from __future__ import annotations
 
 import posixpath
 from datetime import date, datetime, time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from project_index.features.documents.fields import get_field, resolve_metadata
 from project_index.features.documents.indexable import is_excluded_file, walk_files
 from project_index.features.documents.types import Document, LoadProblem
 from project_index.shared.hashing import content_hash, value_hash
+from project_index.shared.narrowing import is_dict, is_list
 from project_index.shared.yaml_io import YamlLoadError, dump_roundtrip, load_yaml
 
 if TYPE_CHECKING:
@@ -32,7 +32,7 @@ def collect_files(
     return sorted({path for path in candidates if table.matches(path)})
 
 
-def _as_datetime(value: Any) -> datetime | None:  # noqa: ANN401
+def _as_datetime(value: object) -> datetime | None:
     """ISO 8601 の文字列・日時・日付を日時にする。"""
     if isinstance(value, datetime):
         return value
@@ -57,7 +57,7 @@ def _timestamps(data: Mapping[str, Any], key: str, file_dates: FileDates | None)
 def _body_file(
     root: Path,
     path: str,
-    value: Any,  # noqa: ANN401
+    value: object,
     read_body: Callable[[str], str | None] | None = None,
 ) -> tuple[str, str] | None:
     """`body_file` が指すファイルの `root` からのパスと内容を返す（無い・外を指すなら `None`）。"""
@@ -145,14 +145,16 @@ def documents_from_text(
                 column=error.column,
             )
         ]
+    if not is_dict(loaded):
+        return [], [
+            LoadProblem(path=path, reason="not_mapping", detail="最上位が辞書ではありません")
+        ]
+    # YAML から読んだ辞書のキーは文字列として扱う
+    data = cast("dict[str, Any]", loaded)
     if table.records is None:
-        if not isinstance(loaded, dict):
-            return [], [
-                LoadProblem(path=path, reason="not_mapping", detail="最上位が辞書ではありません")
-            ]
         return [
             _build(
-                data=loaded,
+                data=data,
                 body=text,
                 body_path=None,
                 index=None,
@@ -161,33 +163,43 @@ def documents_from_text(
                 **common,
             )
         ], []
-    if not isinstance(loaded, dict):
-        return [], [
-            LoadProblem(path=path, reason="not_mapping", detail="最上位が辞書ではありません")
-        ]
-    records = get_field(loaded, table.records)
+    return _record_documents(data, table.records, root, common, read_body)
+
+
+def _record_documents(
+    loaded: dict[str, Any],
+    records_key: str,
+    root: Path,
+    common: dict[str, Any],
+    read_body: Callable[[str], str | None] | None,
+) -> tuple[list[Document], list[LoadProblem]]:
+    """`records` の配列の要素ごとに文書を作る。"""
+    path: str = common["path"]
+    table: DocumentTable = common["table"]
+    records = get_field(loaded, records_key)
     documents: list[Document] = []
     problems: list[LoadProblem] = []
-    for index, record in enumerate(records if isinstance(records, list) else []):
-        if not isinstance(record, dict):
+    for index, record in enumerate(records if is_list(records) else []):
+        if not is_dict(record):
             problems.append(
                 LoadProblem(
                     path=path,
                     reason="not_mapping",
-                    detail=f"{table.records}[{index}] が辞書ではありません",
+                    detail=f"{records_key}[{index}] が辞書ではありません",
                 )
             )
             continue
+        data = cast("dict[str, Any]", record)
         body_path: str | None = None
         if table.body_file is not None:
-            value = get_field(record, table.body_file)
+            value = get_field(data, table.body_file)
             found = _body_file(root, path, value, read_body)
             if found is None:
                 problems.append(
                     LoadProblem(
                         path=path,
                         reason="missing_body_file",
-                        detail=f"{table.records}[{index}] の {table.body_file}（{value}）が指すファイルがありません",
+                        detail=f"{records_key}[{index}] の {table.body_file}（{value}）が指すファイルがありません",
                     )
                 )
                 continue
@@ -198,7 +210,7 @@ def documents_from_text(
             fallback_id = f"{path}#{index}"
         documents.append(
             _build(
-                data=record,
+                data=data,
                 body=body,
                 body_path=body_path,
                 index=index,

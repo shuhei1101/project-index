@@ -1,211 +1,211 @@
 id: MOD-102
 title: 索引のサーバー / 共通 / schema_check.py
-lead: JSON Schema の違反を、項目のパスつきの `Violation` にする。
+lead: JSON Schema の違反を、項目のパスつきの `Violation` にする処理を受け持ち、共通の schema_check.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/shared/test_schema_check.py
+  - tests/unit/project_index/shared/test_schema_check.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      スキーマの違反 ..> 誤りの違反への変換 : 誤りごと
-      誤りの違反への変換 ..> 項目のパスへの変換
-      誤りの違反への変換 ..> 必須のキーの読み込み
-      誤りの違反への変換 ..> 違反 : 返す
-      class スキーマの違反 {
-        <<function>>
-      }
-      class 誤りの違反への変換 {
-        <<function>>
-      }
-      class 項目のパスへの変換 {
-        <<function>>
-      }
-      class 必須のキーの読み込み {
-        <<function>>
-      }
-      click 違反 href "./MOD-98.py.yaml#違反"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        スキーマの違反 ..> 誤りの違反への変換 : 誤りごと
+        誤りの違反への変換 ..> 項目のパスへの変換
+        誤りの違反への変換 ..> 必須のキーの読み込み
+        誤りの違反への変換 ..> 違反 : 返す
+        class スキーマの違反 {
+          <<function>>
+        }
+        class 誤りの違反への変換 {
+          <<function>>
+        }
+        class 項目のパスへの変換 {
+          <<function>>
+        }
+        class 必須のキーの読み込み {
+          <<function>>
+        }
+        click 違反 href "./MOD-98.py.yaml#違反"
 functions:
-- name: format_path
-  title: 項目のパスへの変換
-  kind: 関数
-  container: project_index/shared/schema_check.py
-  usecase: 共通
-  role: 変換
-  summary: キーと添字の並びを `sources[0].config` の形の項目のパスにする
-  scope: public
-  thread_safe: true
-  args:
-  - name: parts
-    title: キーと添字
-    type: Iterable[str | int]
-    required: true
-    passing: positional
-    description: 根から順のキー（`str`）と配列の添字（`int`）。jsonschema の `absolute_path` など
-  returns:
-    type: str
-    description: 項目のパス。`parts` が空なら空文字
-  process: |-
-    1. 先頭から順に、添字は `[{n}]`、キーは先頭なら `{key}`、2 つ目以降なら `.{key}` を後ろへつなぐ
-    2. つないだ文字列を返す
-  unit_tests:
-  - name: test_format_path
-    case: 正常
-    summary: キーと添字をつなぐ
-    condition: '`["sources", 0, "config"]`'
-    mock: なし
-    expected: '`"sources[0].config"`'
-  - name: test_format_path_when_index_first
-    case: 正常
-    summary: 先頭が添字
-    condition: '`[0, "id"]`'
-    mock: なし
-    expected: '`"[0].id"`'
-  - name: test_format_path_when_empty
-    case: 正常
-    summary: 空の並び
-    condition: '`[]`'
-    mock: なし
-    expected: '`""`'
-- name: _as_list
-  title: 必須のキーの読み込み
-  kind: 関数
-  container: project_index/shared/schema_check.py
-  usecase: 共通
-  role: 変換
-  summary: '`required` の値を文字列の並びとして読む'
-  scope: internal
-  thread_safe: true
-  args:
-  - name: value
-    title: 値
-    type: Any
-    required: true
-    passing: positional
-    description: 誤りの `validator_value`（`required` の値）
-  returns:
-    type: list[str]
-    description: 要素を文字列にした並び。配列でなければ空
-  process: 1. 配列なら要素を文字列にした並びを、配列でなければ空の並びを返す
-  unit_tests:
-  - name: test_as_list
-    case: 正常
-    summary: 配列の要素を文字列にする
-    condition: '`["a", 1]`'
-    mock: なし
-    expected: '`["a", "1"]`'
-  - name: test_as_list_when_not_list
-    case: 正常
-    summary: 配列でない
-    condition: '`"a"`'
-    mock: なし
-    expected: '`[]`'
-- name: _from_error
-  title: 誤りの違反への変換
-  kind: 関数
-  container: project_index/shared/schema_check.py
-  usecase: 共通
-  role: 変換
-  summary: jsonschema の誤り 1 つを違反の並びにする（必須のキーが無い誤りと知らないキーの誤りは 1 キーずつ）
-  scope: internal
-  thread_safe: true
-  args:
-  - name: error
-    title: 誤り
-    type: ValidationError
-    required: true
-    passing: positional
-    description: jsonschema の検査器が返した誤り
-  returns:
-    type: list[Violation]
-    description: 誤りから作った違反
-  process: |-
-    1. `validator` が `required` で値が辞書の場合、`required` のキーのうち値に無いキーごとに、`absolute_path` にそのキーをつないだ項目のパスと `必須のキーが無い` の `Violation` を返す（必須のキーの読み込み・項目のパスへの変換）
-    2. `validator` が `additionalProperties` で値が辞書の場合、誤りのスキーマの `properties` に無いキーごとに、そのキーをつないだ項目のパスと `知らないキー` の `Violation` を返す（項目のパスへの変換）
-    3. それ以外は `absolute_path` を項目のパス（空なら `$`）にし（項目のパスへの変換）、`Violation` を 1 件返す。`rule` は、`type` なら `型が違う（期待: {validator_value}）`、`enum` なら `次のどれかにする: {validator_value}`、ほかは誤りの `message`
-  unit_tests:
-  - name: test_from_error_when_required
-    case: 正常
-    summary: 必須のキーが無い誤りは無いキーごと
-    condition: 'スキーマ `{"properties": {"s": {"required": ["a", "b"]}}}`、値 `{"s": {"a": 1}}` の誤り'
-    mock: なし
-    expected: '`[Violation(path="s.b", rule="必須のキーが無い")]`'
-  - name: test_from_error_when_additional_properties
-    case: 正常
-    summary: 知らないキーの誤りはキーごと
-    condition: 'スキーマ `{"properties": {"a": {}}, "additionalProperties": false}`、値 `{"a": 1, "x": 2}` の誤り'
-    mock: なし
-    expected: '`[Violation(path="x", rule="知らないキー")]`'
-  - name: test_from_error_when_type
-    case: 正常
-    summary: 型の誤り
-    condition: 'スキーマ `{"properties": {"a": {"type": "string"}}}`、値 `{"a": 1}` の誤り'
-    mock: なし
-    expected: '`[Violation(path="a", rule="型が違う（期待: string）")]`'
-  - name: test_from_error_when_enum
-    case: 正常
-    summary: 列挙の誤り（最上位）
-    condition: 'スキーマ `{"enum": ["x", "y"]}`、値 `"z"` の誤り'
-    mock: なし
-    expected: "`[Violation(path=\"$\", rule=\"次のどれかにする: ['x', 'y']\")]`"
-  - name: test_from_error_when_other
-    case: 正常
-    summary: その他の誤りは誤りの message
-    condition: 'スキーマ `{"minimum": 1}`、値 `0` の誤り'
-    mock: なし
-    expected: '`path` が `$`、`rule` が誤りの `message` の 1 件'
-- name: schema_violations
-  title: スキーマの違反
-  kind: 関数
-  container: project_index/shared/schema_check.py
-  usecase: 共通
-  role: 検査
-  summary: 値の JSON Schema（Draft 2020-12）の違反を全て集め、項目のパスつきの `Violation` にする
-  scope: public
-  thread_safe: true
-  args:
-  - name: schema
-    title: スキーマ
-    type: Mapping[str, Any]
-    required: true
-    passing: positional
-    description: 検査に使う JSON Schema
-  - name: value
-    title: 値
-    type: Any
-    required: true
-    passing: positional
-    description: 検査する値
-  - name: registry
-    title: 参照の解決先
-    type: Registry[Any] | None
-    required: false
-    default: None
-    passing: keyword
-    description: 別のファイルを `$ref` で指すスキーマの解決先
-  returns:
-    type: list[Violation]
-    description: 違反の並び。無ければ空
-  process: |-
-    1. `Draft202012Validator` を作る（`registry` があれば渡す）
-    2. `iter_errors` で誤りを全て取り、`absolute_path` を文字列にした並びの順に並べる
-    3. 誤りごとに違反の並びにしてつなぎ（誤りの違反への変換）、返す
-  unit_tests:
-  - name: test_schema_violations
-    case: 正常
-    summary: 違反が無い
-    condition: 'スキーマ `{"type": "object"}`、値 `{}`'
-    mock: なし
-    expected: '`[]`'
-  - name: test_schema_violations_when_many
-    case: 正常
-    summary: 違反を全て集め、項目のパスの順に並べる
-    condition: 'スキーマ `{"properties": {"a": {"type": "string"}, "b": {"type": "string"}}}`、値 `{"b": 1, "a": 1}`'
-    mock: なし
-    expected: 違反の `path` が `["a", "b"]`
-  - name: test_schema_violations_when_registry
-    case: 正常
-    summary: 別のファイルを `$ref` で指すスキーマ
-    condition: 'スキーマ `{"$ref": "common.json#/$defs/name"}`、`common.json` に `{"$defs": {"name": {"type": "string"}}}`（`$schema` は Draft 2020-12）を登録した `registry`、値 `1`'
-    mock: なし
-    expected: '`[Violation(path="$", rule="型が違う（期待: string）")]`'
+  - name: format_path
+    title: 項目のパスへの変換
+    kind: 関数
+    container: project_index/shared/schema_check.py
+    usecase: 共通
+    role: 変換
+    summary: キーと添字の並びを `sources[0].config` の形の項目のパスにする
+    scope: public
+    thread_safe: true
+    args:
+      - name: parts
+        title: キーと添字
+        type: Iterable[str | int]
+        required: true
+        passing: positional
+        description: 根から順のキー（`str`）と配列の添字（`int`）。jsonschema の `absolute_path` など
+    returns:
+      type: str
+      description: 項目のパス。`parts` が空なら空文字
+    process: |-
+      1. 先頭から順に、添字は `[{n}]`、キーは先頭なら `{key}`、2 つ目以降なら `.{key}` を後ろへつなぐ
+      2. つないだ文字列を返す
+    unit_tests:
+      - name: test_format_path
+        case: 正常
+        summary: キーと添字をつなぐ
+        condition: '`["sources", 0, "config"]`'
+        mock: なし
+        expected: '`"sources[0].config"`'
+      - name: test_format_path_when_index_first
+        case: 正常
+        summary: 先頭が添字
+        condition: '`[0, "id"]`'
+        mock: なし
+        expected: '`"[0].id"`'
+      - name: test_format_path_when_empty
+        case: 正常
+        summary: 空の並び
+        condition: '`[]`'
+        mock: なし
+        expected: '`""`'
+  - name: _as_list
+    title: 必須のキーの読み込み
+    kind: 関数
+    container: project_index/shared/schema_check.py
+    usecase: 共通
+    role: 変換
+    summary: '`required` の値を文字列の並びとして読む'
+    scope: internal
+    thread_safe: true
+    args:
+      - name: value
+        title: 値
+        type: object
+        required: true
+        passing: positional
+        description: 誤りの `validator_value`（`required` の値）
+    returns:
+      type: list[str]
+      description: 要素を文字列にした並び。配列でなければ空
+    process: 1. 配列なら要素を文字列にした並びを、配列でなければ空の並びを返す
+    unit_tests:
+      - name: test_as_list
+        case: 正常
+        summary: 配列の要素を文字列にする
+        condition: '`["a", 1]`'
+        mock: なし
+        expected: '`["a", "1"]`'
+      - name: test_as_list_when_not_list
+        case: 正常
+        summary: 配列でない
+        condition: '`"a"`'
+        mock: なし
+        expected: '`[]`'
+  - name: _from_error
+    title: 誤りの違反への変換
+    kind: 関数
+    container: project_index/shared/schema_check.py
+    usecase: 共通
+    role: 変換
+    summary: jsonschema の誤り 1 つを違反の並びにする（必須のキーが無い誤りと知らないキーの誤りは 1 キーずつ）
+    scope: internal
+    thread_safe: true
+    args:
+      - name: error
+        title: 誤り
+        type: ValidationError
+        required: true
+        passing: positional
+        description: jsonschema の検査器が返した誤り
+    returns:
+      type: list[Violation]
+      description: 誤りから作った違反
+    process: |-
+      1. `validator` が `required` で値が辞書の場合、`required` のキーのうち値に無いキーごとに、`absolute_path` にそのキーをつないだ項目のパスと `必須のキーが無い` の `Violation` を返す（必須のキーの読み込み・項目のパスへの変換）
+      2. `validator` が `additionalProperties` で値が辞書の場合、誤りのスキーマの `properties` に無いキーごとに、そのキーをつないだ項目のパスと `知らないキー` の `Violation` を返す（項目のパスへの変換）
+      3. それ以外は `absolute_path` を項目のパス（空なら `$`）にし（項目のパスへの変換）、`Violation` を 1 件返す。`rule` は、`type` なら `型が違う（期待: {validator_value}）`、`enum` なら `次のどれかにする: {validator_value}`、ほかは誤りの `message`
+    unit_tests:
+      - name: test_from_error_when_required
+        case: 正常
+        summary: 必須のキーが無い誤りは無いキーごと
+        condition: 'スキーマ `{"properties": {"s": {"required": ["a", "b"]}}}`、値 `{"s": {"a": 1}}` の誤り'
+        mock: なし
+        expected: '`[Violation(path="s.b", rule="必須のキーが無い")]`'
+      - name: test_from_error_when_additional_properties
+        case: 正常
+        summary: 知らないキーの誤りはキーごと
+        condition: 'スキーマ `{"properties": {"a": {}}, "additionalProperties": false}`、値 `{"a": 1, "x": 2}` の誤り'
+        mock: なし
+        expected: '`[Violation(path="x", rule="知らないキー")]`'
+      - name: test_from_error_when_type
+        case: 正常
+        summary: 型の誤り
+        condition: 'スキーマ `{"properties": {"a": {"type": "string"}}}`、値 `{"a": 1}` の誤り'
+        mock: なし
+        expected: '`[Violation(path="a", rule="型が違う（期待: string）")]`'
+      - name: test_from_error_when_enum
+        case: 正常
+        summary: 列挙の誤り（最上位）
+        condition: 'スキーマ `{"enum": ["x", "y"]}`、値 `"z"` の誤り'
+        mock: なし
+        expected: "`[Violation(path=\"$\", rule=\"次のどれかにする: ['x', 'y']\")]`"
+      - name: test_from_error_when_other
+        case: 正常
+        summary: その他の誤りは誤りの message
+        condition: 'スキーマ `{"minimum": 1}`、値 `0` の誤り'
+        mock: なし
+        expected: '`path` が `$`、`rule` が誤りの `message` の 1 件'
+  - name: schema_violations
+    title: スキーマの違反
+    kind: 関数
+    container: project_index/shared/schema_check.py
+    usecase: 共通
+    role: 検査
+    summary: 値の JSON Schema（Draft 2020-12）の違反を全て集め、項目のパスつきの `Violation` にする
+    scope: public
+    thread_safe: true
+    args:
+      - name: schema
+        title: スキーマ
+        type: Mapping[str, Any]
+        required: true
+        passing: positional
+        description: 検査に使う JSON Schema
+      - name: value
+        title: 値
+        type: object
+        required: true
+        passing: positional
+        description: 検査する値
+      - name: registry
+        title: 参照の解決先
+        type: Registry[Any] | None
+        required: false
+        default: None
+        passing: keyword
+        description: 別のファイルを `$ref` で指すスキーマの解決先
+    returns:
+      type: list[Violation]
+      description: 違反の並び。無ければ空
+    process: |-
+      1. `Draft202012Validator` を作る（`registry` があれば渡す）
+      2. `iter_errors` で誤りを全て取り、`absolute_path` を文字列にした並びの順に並べる
+      3. 誤りごとに違反の並びにしてつなぎ（誤りの違反への変換）、返す
+    unit_tests:
+      - name: test_schema_violations
+        case: 正常
+        summary: 違反が無い
+        condition: 'スキーマ `{"type": "object"}`、値 `{}`'
+        mock: なし
+        expected: '`[]`'
+      - name: test_schema_violations_when_many
+        case: 正常
+        summary: 違反を全て集め、項目のパスの順に並べる
+        condition: 'スキーマ `{"properties": {"a": {"type": "string"}, "b": {"type": "string"}}}`、値 `{"b": 1, "a": 1}`'
+        mock: なし
+        expected: 違反の `path` が `["a", "b"]`
+      - name: test_schema_violations_when_registry
+        case: 正常
+        summary: 別のファイルを `$ref` で指すスキーマ
+        condition: 'スキーマ `{"$ref": "common.json#/$defs/name"}`、`common.json` に `{"$defs": {"name": {"type": "string"}}}`（`$schema` は Draft 2020-12）を登録した `registry`、値 `1`'
+        mock: なし
+        expected: '`[Violation(path="$", rule="型が違う（期待: string）")]`'

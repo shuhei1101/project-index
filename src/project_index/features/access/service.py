@@ -198,7 +198,9 @@ def resolve_read_targets(
     targets: list[Target] = []
     for item, outside in sources:
         access = "read" if outside else access_of(item, path)
-        assert access is not None  # noqa: S101
+        if access is None:
+            msg = "読む場所の権限が決まっていません"
+            raise RuntimeError(msg)
         targets.append(_target_of(item, access, outside, ref, worktree, path, current))
     return targets
 
