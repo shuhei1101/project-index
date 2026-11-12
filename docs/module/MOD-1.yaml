@@ -4,6 +4,7 @@ directory: |-
   ```tree
   pyproject.toml          パッケージ project-index の定義・起動の入口・検査の設定
   .python-version         Python のバージョンの固定
+  typings/                pyright が読む型スタブ（ruamel.yaml の CommentedMap の型引数）
   src/
   └── project_index/
       ├── features/
@@ -127,6 +128,7 @@ directory: |-
       │   ├── errors.py
       │   ├── files.py
       │   ├── hashing.py
+      │   ├── narrowing.py
       │   ├── paths.py
       │   ├── schema_check.py
       │   ├── version.py
