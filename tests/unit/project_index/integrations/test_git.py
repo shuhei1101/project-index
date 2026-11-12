@@ -76,7 +76,7 @@ def test_run_git_when_timeout_given(
     monkeypatch.setenv("GIT_COMMITTER_NAME", "tester")
     monkeypatch.setenv("GIT_COMMITTER_EMAIL", "tester@example.com")
     # 実行・検証
-    with pytest.raises(GitError, match="0.1 秒を超えたため止めました") as exc_info:
+    with pytest.raises(GitError, match=r"0\.1 秒を超えたため止めました") as exc_info:
         run_git(["commit", "--allow-empty"], cwd=root, timeout=0.1)
     assert exc_info.value.timed_out is True
 
