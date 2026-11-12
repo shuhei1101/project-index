@@ -1,0 +1,1 @@
+# ソースコードとテストの管理用の YAML を配信元に加え、設計書への related（implements・tests）を張る
