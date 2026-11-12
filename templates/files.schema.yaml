@@ -1,0 +1,61 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: 管理用の YAML
+description: 'ソースコードなど YAML でない文書のメタデータを持つ YAML。文書の行の `records: files`・`body_file: path` で指す。行の `schema` にはこのファイル全体のスキーマを指し、1 行ずつの検査には `files.items` を適用する。'
+type: object
+required:
+  - files
+properties:
+  files:
+    type: array
+    title: 配信するファイル
+    description: 1 行が 1 つの文書。
+    items:
+      type: object
+      title: ファイルの行
+      required:
+        - path
+      properties:
+        path:
+          type: string
+          title: ファイルのパス
+          description: 管理用の YAML のフォルダからの相対パス。1 行 1 ファイルで記載し、glob は入れない。
+          minLength: 1
+        name:
+          type: string
+          title: 名前
+          description: '無ければファイル名から拡張子を除いた名前。何のファイルかを表す日本語の名詞句を入れる（例 `タスクのリポジトリ`）。クラス名・ファイル名の繰り返しは入れない。'
+        description:
+          type: string
+          title: 概要文
+          description: '1 文で「何を受け持つか」と「どんなときに参照するか」を入れる（例 `タスクの保存と取得を受け持つ。保存先や検索の条件を変えるときに参照する`）。関数の一覧・実装の手順は入れない。'
+        tags:
+          type: array
+          title: タグ
+          description: '`topic`（扱う概念）と `tool`（使用するライブラリ・外部サービス）の観点で入れる。`kind`・`scope`・状態・評価の単語は入れない。'
+          items:
+            type: string
+        related:
+          type: array
+          title: 関連
+          description: '`implements`（コード → 設計書。設計書と 1 対 1 の部分は必ず記載する）・`tests`（テスト → コード）・`see_also` を入れる。import で分かる依存と、逆向き（設計書 → コード）の関連は入れない。'
+          items:
+            type: object
+            required:
+              - to
+              - type
+            properties:
+              to:
+                type: string
+                title: 関連先の文書の ID
+                description: '関連先が `id` を持たないファイルなら、拡張子付きのパス（`src/a.py`）を入れる。'
+              type:
+                type: string
+                title: 関係の種類
+                description: '`implements`（コード → 設計書）・`tests`（テスト → コード）・`see_also` など。使用できる単語は配信元の設定の `related.types[]`（既定は `references`・`depends_on`・`see_also`・`implements`・`tests`）。'
+              source:
+                type: string
+                title: 関連先の配信元の ID
+        status:
+          type: string
+          title: 状態
+          description: '`deprecated` など、検索で除外したい状態だけを入れる。'

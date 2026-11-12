@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=../../../../../templates/prompt.schema.yaml
+id: mcp/admin/tools/check-project
+name: check_project の description
+description: 管理の MCP の check_project が何をするかを伝える
+kind: tool
+lang: ja
+parts:
+  - id: body
+    texts:
+      - lang: ja
+        text: |-
+          配信元の project-index.yaml と管理用の YAML・スクリプトを検査し、違反・設定のバージョンの新旧・索引の同期の件数を返却する。端末の設定に無い配信元も検査できる。

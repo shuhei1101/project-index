@@ -1,0 +1,12 @@
+# 端末の設定の雛形。/project-index:global-setup が `clone` を書き換えて ${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml にする
+version: "1"
+clone: /path/to/project-index
+sources: []
+# 配信元の行の例（/project-index:setup が記載する）
+# sources:
+#   - id: sample
+#     config: /path/to/sample/project-index.yaml
+#     scope:
+#       read: [/path/to/sample/**]
+#       write: [/path/to/sample]
+#     outside_read: true  # scope の外から outside_scope: true で参考として参照できるか

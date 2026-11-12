@@ -1,0 +1,16 @@
+steps:
+  - op: delete
+    path: documents[].type
+    value: yaml
+    description: documents[].type の yaml を削除する（文書の行は常に YAML を読み込む）
+  - op: lift
+    path: documents[].metadata.alias_type
+    to: alias_type
+    match: {type: custom}
+    take: value
+    description: metadata.alias_type の固定値を、行の alias_type へ移す
+  - op: unwrap
+    path: documents[].metadata.*
+    match: {type: ref}
+    take: field
+    description: metadata の ref を、読み込む列の名前の文字列にする

@@ -1,0 +1,331 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: プロンプト
+description: LLM の呼び出し・フックの注入文・MCP の instructions・ツールの description の本文を、部品の配列と変数の定義で記載する YAML。1 ファイル = 1 プロンプト。`x-` で始まるキーはどの階層にも配置でき、検査では無視する。
+type: object
+required:
+  - id
+  - name
+  - description
+  - kind
+  - lang
+  - parts
+properties:
+  id:
+    title: ID
+    description: プロンプトの識別子。`content/prompts/` からのファイルのパスから `.yaml` を除いたものと同じ。
+    type: string
+    pattern: ^[a-z0-9]+(-[a-z0-9]+)*(/[a-z0-9]+(-[a-z0-9]+)*)*$
+    examples:
+      - mcp/docs/instructions
+      - node/reflection
+  name:
+    title: 名前
+    description: 画面・検索に出す名前。
+    type: string
+    minLength: 1
+    examples:
+      - 文書の MCP の instructions
+  description:
+    title: 説明
+    description: 何のための文かを 1 文で。
+    type: string
+    minLength: 1
+    examples:
+      - 文書の MCP を使用する場面と grep・Read が向く場面を伝える
+  kind:
+    title: 種類
+    description: 文の種類。`llm` は LLM の呼び出し、`hook` はフックの注入文、`instructions` は MCP のサーバーの instructions、`tool` はツールの description。
+    type: string
+    enum:
+      - llm
+      - hook
+      - instructions
+      - tool
+    examples:
+      - hook
+  lang:
+    title: 注入する言語
+    description: 注入する言語（BCP 47 の言語タグ）。各部品の `texts[]` からこの言語の本文を選ぶ。
+    $ref: '#/$defs/lang'
+  tags:
+    title: タグ
+    description: 分類のタグ。
+    type: array
+    items:
+      type: string
+      minLength: 1
+    examples:
+      - - mcp
+        - instructions
+  vars:
+    title: 変数
+    description: 本文で使用する変数。変数名 → 変数の定義。本文で使用する変数は全てここに配置する。
+    type: object
+    patternProperties:
+      ^x-: true
+    additionalProperties:
+      $ref: '#/$defs/top_var'
+  examples:
+    title: サンプルの値の組
+    description: 名前付きのサンプルの値の組。画面で組ごとに描画した結果を出す。
+    type: array
+    items:
+      $ref: '#/$defs/example'
+  output:
+    title: 出力の形式
+    description: 期待する出力の形式。`kind` が `llm` のときだけ記載できる。
+    type: string
+    minLength: 1
+    examples:
+      - write_trait_changes を 1 回呼んで終える
+  parts:
+    title: 部品
+    description: 本文を組み立てる部品。`when` が真の部品だけを並び順に描画してつなぐ。
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/$defs/part'
+patternProperties:
+  ^x-: true
+additionalProperties: false
+allOf:
+  - if:
+      required:
+        - kind
+      properties:
+        kind:
+          const: llm
+    then:
+      properties:
+        parts:
+          items:
+            required:
+              - role
+    else:
+      not:
+        required:
+          - output
+      properties:
+        parts:
+          items:
+            not:
+              required:
+                - role
+$defs:
+  lang:
+    title: 言語
+    description: BCP 47 の言語タグ。
+    type: string
+    pattern: ^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$
+    examples:
+      - ja
+      - en
+  var:
+    title: 変数の定義
+    description: 変数 1 つの定義。JSON Schema のキーの一部に合わせ、`items`・`properties` の下に同じキーで何段でも入れ子にできる。`type` が `array` なら `items`、`object` なら `properties` を持つ。
+    type: object
+    required:
+      - type
+      - description
+    properties:
+      type:
+        title: 型
+        description: 値の型。
+        type: string
+        enum:
+          - string
+          - integer
+          - number
+          - boolean
+          - array
+          - object
+        examples:
+          - array
+      description:
+        title: 説明
+        description: 何が入るか。画面のツールチップに出す。
+        type: string
+        minLength: 1
+        examples:
+          - 作業場所から使用できる配信元
+      required:
+        title: 必須
+        description: 必須か。必須でない変数は、指定されなければ `default` か `None` になる。
+        type: boolean
+        default: false
+      example:
+        title: サンプルの値
+        description: '`type` に合うサンプルの値。ツールチップと既定の例に使用し、`examples[]` の組で省いた変数にも使用する。'
+        examples:
+          - knowledge
+      default:
+        title: 既定値
+        description: 指定されないときの値。`type` に合う値。
+        examples:
+          - []
+      enum:
+        title: 取りうる値
+        description: 取りうる値の一覧。`type` に合う値の配列。
+        type: array
+        minItems: 1
+        examples:
+          - - read
+            - read_write
+      source:
+        title: 値の出典
+        description: 値の出典。ツールチップに出す。
+        type: string
+        minLength: 1
+        examples:
+          - 端末の設定の sources[]
+      items:
+        title: 要素の定義
+        description: 配列の要素の定義。
+        $ref: '#/$defs/var'
+      properties:
+        title: キーごとの定義
+        description: オブジェクトのキー名 → 変数の定義。
+        type: object
+        patternProperties:
+          ^x-: true
+        additionalProperties:
+          $ref: '#/$defs/var'
+    patternProperties:
+      ^x-: true
+    additionalProperties: false
+    allOf:
+      - if:
+          required:
+            - type
+          properties:
+            type:
+              const: array
+        then:
+          required:
+            - items
+        else:
+          not:
+            required:
+              - items
+      - if:
+          required:
+            - type
+          properties:
+            type:
+              const: object
+        then:
+          required:
+            - properties
+        else:
+          not:
+            required:
+              - properties
+  top_var:
+    title: トップレベルの変数の定義
+    description: '`vars` の直下の変数の定義。`example` を必須にする。'
+    $ref: '#/$defs/var'
+    required:
+      - example
+  example:
+    title: サンプルの値の組
+    description: 画面でタブ 1 つに描画する値の組。
+    type: object
+    required:
+      - id
+      - name
+      - values
+    properties:
+      id:
+        title: ID
+        description: 組の識別子。
+        $ref: common.schema.yaml#/$defs/id
+        examples:
+          - no-source
+      name:
+        title: 名前
+        description: タブに出す名前。
+        type: string
+        minLength: 1
+        examples:
+          - 配信元が無い
+      values:
+        title: 値
+        description: この組で入れる値。変数名 → 値。省いた変数は `vars.{名前}.example` を使用する。
+        type: object
+        examples:
+          - sources: []
+    patternProperties:
+      ^x-: true
+    additionalProperties: false
+  part:
+    title: 部品
+    description: 本文を意味のまとまりごとに切った断片。
+    type: object
+    required:
+      - id
+      - texts
+    properties:
+      id:
+        title: ID
+        description: 部品の識別子。
+        $ref: common.schema.yaml#/$defs/id
+        examples:
+          - sources
+      role:
+        title: 追加先
+        description: どのメッセージに追加するか。`kind` が `llm` のとき必須で、それ以外では記載しない。
+        type: string
+        enum:
+          - system
+          - user
+          - assistant
+        examples:
+          - system
+      tags:
+        title: タグ
+        description: 部品の分類（役割・材料・してほしいこと など）。精度評価で部品を差し替えるときに使用する。
+        type: array
+        items:
+          type: string
+          minLength: 1
+        examples:
+          - - context
+      when:
+        title: 使用する条件
+        description: この部品を使用する条件。`vars` を使用する Jinja2 の式。無ければ常に使用する。
+        type: string
+        minLength: 1
+        examples:
+          - '{{ sources | length > 0 }}'
+      texts:
+        title: 本文
+        description: 言語ごとの本文。言語ごとに 1 件。トップレベルの `lang` の本文を注入し、ほかは画面で表示する。
+        type: array
+        minItems: 1
+        items:
+          $ref: '#/$defs/text'
+    patternProperties:
+      ^x-: true
+    additionalProperties: false
+  text:
+    title: 言語ごとの本文
+    description: 部品の本文 1 言語分。
+    type: object
+    required:
+      - lang
+      - text
+    properties:
+      lang:
+        title: 言語
+        description: 本文の言語（BCP 47 の言語タグ）。
+        $ref: '#/$defs/lang'
+      text:
+        title: 本文
+        description: Jinja2 で記載する本文。言語の間で使用する変数をそろえる。
+        type: string
+        minLength: 1
+        examples:
+          - 次の配信元を使用できます。
+    patternProperties:
+      ^x-: true
+    additionalProperties: false

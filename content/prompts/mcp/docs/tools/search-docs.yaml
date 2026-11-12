@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=../../../../../templates/prompt.schema.yaml
+id: mcp/docs/tools/search-docs
+name: search_docs の description
+description: 文書の MCP の search_docs が何をするか・いつ使用するか・いつ使用しないか・何を返却しないかを伝える
+kind: tool
+lang: ja
+parts:
+  - id: body
+    texts:
+      - lang: ja
+        text: |-
+          条件に該当する文書を、指定した項目・量・順で返却する。ID で絞れば取得、view: summary で一覧、view: count で件数、group_by で集計になる。op: regex は値の各行に適用する（値全体の先頭・末尾は \A・\Z）。snippets は本文の代わりに、該当した行と前後の行（before・after。省けば context_lines）を行番号つきで返却する。filter の not は中の条件か束に該当しない文書、op: glob は **・*・? のパターンに該当する。fields・order_by の @matches は文書ごとの本文の条件に該当した行の数。sections（Markdown の見出し）・lines（offset・limit）は view: full の本文の一部だけを返却する。fields・filter・order_by のキーには共通のキー（id・name・description・tags など）も使用できる。種類の列名との対応は describe(source, kind) で確認する。group_by は値を NFKC と casefold でまとめて数える。タグを付ける前に group_by: tags（配信元をまたぐときは source: "*"）で使用されているタグを確認し、同じ意味のタグを再利用する。
+          規約・設計書・テンプレートを、タグ・種類・名前・本文の単語で検索して参照するときに使用する。
+          関連をたどるときは trace_related、変わった文書を確認するときは list_changes を使用する。コードの識別子や配信の範囲の外のファイルは grep・Read で探す。
+          配信の範囲の外のファイルは返却しない。この会話で返却済みの同じバージョンの本文は返却せず、repeat_seen: true で再取得できる。

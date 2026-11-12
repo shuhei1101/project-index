@@ -1,0 +1,61 @@
+# yaml-language-server: $schema=../../../../templates/prompt.schema.yaml
+id: mcp/docs/instructions
+name: 文書の MCP の instructions
+description: 文書の MCP を使用する場面と grep・Read が向く場面、調べ方、ツールの順序、タグの付け方を伝える
+kind: instructions
+lang: ja
+parts:
+  - id: overview
+    texts:
+      - lang: ja
+        text: |
+          project-index は、配信元（規約・設計書・テンプレートなどの文書のまとまり）の文書を、メタデータと本文で検索・参照・書き込みする MCP です。
+          使用できる配信元と、その警告は、引数なしの `describe()` の一覧にあります。
+  - id: use-cases
+    texts:
+      - lang: ja
+        text: |
+
+          使用する場面:
+          - 規約・設計書・テンプレートを、タグ・種類・名前・本文の単語で検索して参照する: `search_docs`
+          - 設計書からそれを実装するコード・テストを、コードから設計書をたどる: `trace_related`
+          - 前回参照した後や 2 つのリビジョンの間に変わった文書を確認する: `list_changes`
+          - 配信元の文書を作る・書き換える（検査を通ったときだけ書き込む）: `write_docs`
+  - id: native-tools
+    texts:
+      - lang: ja
+        text: |
+
+          grep・Read が向く場面:
+          - コードの識別子・文字列の出現箇所を探す
+          - 配信の範囲の外のファイル（ソースコード・ログ・設定ファイル）を参照する
+          - パスの分かっている 1 つのファイルを丸ごと参照する
+          - 変更をコミットの単位で追う（`git log`・`git diff`）
+  - id: research
+    texts:
+      - lang: ja
+        text: |
+
+          調べ方:
+          - コードや不具合の調査も、設計書から参照し、設計書が指すコードを参照する
+          - 作業場所の外のリポジトリも、`source` に配信元の ID と `outside_scope: true` を指定すると、設計書から参照できる。参照できる配信元の ID は `describe(outside_scope: true)` で確認できる
+  - id: order
+    texts:
+      - lang: ja
+        text: |
+
+          使用方法:
+          - 始めに `describe(source)` で種類と記載方法を確認する
+          - 探すときは `search_docs`。配信元をまたぐときは `source="*"`、本文まで参照するときは `view="full"`
+          - 前回参照した後の変更は `list_changes` で確認する
+          - 範囲のファイルを作成・削除・改名したら、管理用の YAML の行を修正する
+  - id: tags
+    texts:
+      - lang: ja
+        text: |
+
+          タグ:
+          - 付ける前に `search_docs` の `group_by="tags"` で使用されているタグを確認し、同じ意味のタグを再利用する
+          - 複合語は単語まで分けてタグにする（`エラー処理` は `topic:エラー` と `action:処理`）
+          - 動作は `action:`、題材は `topic:`、道具は `tool:` で始める
+          - 配信元にタグの規約があれば、`describe(source)` の説明書に従う

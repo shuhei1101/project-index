@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=../../../../../templates/prompt.schema.yaml
+id: mcp/docs/tools/list-match-words
+name: list_match_words の description
+description: 文書の MCP の list_match_words が何をするか・いつ使用するか・いつ使用しないか・何を返却しないかを伝える
+kind: tool
+lang: ja
+parts:
+  - id: body
+    texts:
+      - lang: ja
+        text: |-
+          配信元の alias_type を持つ行の文書から、照合する単語（name と aliases）を、指す文書の ID とともに返却する。
+          文章の中の用語を、配信元の文書と照合するときに使用する。
+          単語で文書を探すときは search_docs を使用する。
+          文書の本文は返却しない。
