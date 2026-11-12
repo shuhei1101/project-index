@@ -4,79 +4,100 @@ entry:
   kind: endpoint
   value: GET `/settings/sources`
 flows:
-- name: 正常系
-  summary: 配信元の一覧を配信中で返す
-  setup:
-  - name: Mock
-    description: なし（一時フォルダに端末の設定と配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
-  - name: 端末の設定
-    description: '`sources` に sample の 1 行'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant E as GET /settings/sources
-      participant CF as 端末の設定
+  - name: 正常系
+    summary: 配信元の一覧を配信中で返す
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに端末の設定と配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+      - name: 端末の設定
+        description: '`sources` に sample の 1 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /settings/sources
+        participant CF as 端末の設定
 
-      C->>E: GET /settings/sources
-      E-->>CF: 端末の設定と配信元の状態を読む
-      E-->>C: 200
-    ```
-  expected:
-  - 200 で、`sources` に sample が `serving` で並ぶ
-  - '`settingsPath` に端末の設定のパス、sample の行に `config`・`scope` がある'
-  - 配信元が 0 件の端末の設定でも 200 で、`sources` が空
-  test: test_normal
-- name: 正常系（配信していない配信元がある）
-  summary: 配信していない・無効・設定が古い配信元を状態と理由つきで返す
-  setup:
-  - name: Mock
-    description: なし
-    notes: '-'
-  - name: 検証に失敗する配信元
-    description: '`documents[0]` に必須のキー `paths` が無い配信元'
-    notes: id `broken`
-  - name: 設定のバージョンが古い配信元
-    description: '`version` がサーバーが読めるバージョンより古い配信元'
-    notes: id `legacy`
-  - name: 無効の配信元
-    description: '端末の設定で `enabled: false` の配信元'
-    notes: id `archive`
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant E as GET /settings/sources
+        C->>E: GET /settings/sources
+        E-->>CF: 端末の設定と配信元の状態を読む
+        E-->>C: 200
+      ```
+    expected:
+      - 200 で、`sources` に sample が `serving` で並ぶ
+      - '`settingsPath` に端末の設定のパス、sample の行に `config`・`scope` がある'
+      - 配信元が 0 件の端末の設定でも 200 で、`sources` が空
+    test: test_normal
+  - name: 正常系（配信していない配信元がある）
+    summary: 配信していない・無効・設定が古い配信元を状態と理由つきで返す
+    setup:
+      - name: Mock
+        description: なし
+        notes: '-'
+      - name: 検証に失敗する配信元
+        description: '`documents[0]` に必須のキー `paths` が無い配信元'
+        notes: id `broken`
+      - name: 設定のバージョンが古い配信元
+        description: '`version` がサーバーが読めるバージョンより古い配信元'
+        notes: id `legacy`
+      - name: 無効の配信元
+        description: '端末の設定で `enabled: false` の配信元'
+        notes: id `archive`
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /settings/sources
 
-      C->>E: GET /settings/sources
-      E-->>C: 200（配信元ごとの状態）
-    ```
-  expected:
-  - sample と legacy が `serving`
-  - broken が `not_served` で、`errors` に `documents[0].paths` と必須のキーが無いことがある
-  - legacy の `configVersion` に設定のバージョンとサーバーが読めるバージョンがある
-  - archive が `disabled`
-  test: test_normal_when_source_not_served
-- name: 正常系（読み直していない行がある）
-  summary: 手で直して読み直していない行を `pending_reload` で返し、他の行は自分の状態で返す
-  setup:
-  - name: Mock
-    description: なし
-  - name: 端末の設定
-    description: sample と notes の 2 行で起動した後、ファイルを fresh・notes・sample の順に書き換え、読み直さない
-    notes: fresh は `id` を省いた新しい行
-  flow: |-
-    sequenceDiagram
-      participant C as クライアント
-      participant E as GET /settings/sources
+        C->>E: GET /settings/sources
+        E-->>C: 200（配信元ごとの状態）
+      ```
+    expected:
+      - sample と legacy が `serving`
+      - broken が `not_served` で、`errors` に `documents[0].paths` と必須のキーが無いことがある
+      - legacy の `configVersion` に設定のバージョンとサーバーが読めるバージョンがある
+      - archive が `disabled`
+    test: test_normal_when_source_not_served
+  - name: 正常系（読み直していない行がある）
+    summary: 手で直して読み直していない行を `pending_reload` で返し、他の行は自分の状態で返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: sample と notes の 2 行で起動した後、ファイルを fresh・notes・sample の順に書き換え、読み直さない
+        notes: fresh は `id` を省いた新しい行
+    flow: |-
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /settings/sources
 
-      C->>E: GET /settings/sources
-      E-->>C: 200（ファイルの行の順と状態）
-  expected:
-  - 200 で、`sources` がファイルの順（fresh・notes・sample）に並ぶ
-  - fresh が `pending_reload` で、`id` が `null`
-  - notes と sample がそれぞれ自分の `id` で `serving`
-  test: test_normal_when_pending_reload
+        C->>E: GET /settings/sources
+        E-->>C: 200（ファイルの行の順と状態）
+    expected:
+      - 200 で、`sources` がファイルの順（fresh・notes・sample）に並ぶ
+      - fresh が `pending_reload` で、`id` が `null`
+      - notes と sample がそれぞれ自分の `id` で `serving`
+    test: test_normal_when_pending_reload
+  - name: 正常系（作業範囲の外から参照できない配信元がある）
+    summary: 端末の設定の `outside_read` を行の `outsideRead` で返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample と extra の 2 行'
+        notes: 'extra の行だけに `outside_read: false`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /settings/sources
+
+        C->>E: GET /settings/sources
+        E-->>C: 200（行ごとの outsideRead）
+      ```
+    expected:
+      - 200 で、extra の行の `outsideRead` が `false`
+      - '`outside_read` を記載していない sample の行の `outsideRead` が `true`'
+    test: test_normal_when_outside_read_false
 lead: 'dev-docs の画面のサーバーが設定画面で呼ぶ。端末の設定の配信元の一覧と、配信元ごとの状態（配信中・配信していない・無効）を JSON で返す。'
 identifier: get_settings_sources
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
@@ -84,47 +105,47 @@ idempotent: true
 side_effects: なし
 exclusivity: 排他しない
 response:
-- name: settingsPath
-  type: str
-  description: '`PROJECT_INDEX_CONFIG` が指す端末の設定のパス'
-- name: sources[].id
-  type: str | None
-  description: 配信元の ID。`pending_reload` で `id` を省いた行は `null`
-- name: sources[].config
-  type: list[str]
-  description: 配信元の設定の YAML の配列
-- name: sources[].enabled
-  type: bool
-  description: 配信するか
-- name: sources[].scope
-  type: '{read: list[str], write: list[str] | None}'
-  description: 読める・書ける作業場所の glob
-  notes: '`write` を省いた行は `null`（既定値の配信元のフォルダだけから書ける）'
-- name: sources[].status
-  type: Literal['serving', 'not_served', 'disabled', 'pending_reload']
-  description: '配信中・起動時か読み直しの検証で外した・`enabled: false`・ファイルにあるが読み直していない行。行は `config`（`id` を書いた行は `id` も）が同じ配信元の状態と突き合わせる'
-- name: sources[].errors
-  type: 'list[{path: str, reason: str}]'
-  description: 検証で除外した理由
-  notes: '`not_served` のときだけ'
-- name: sources[].configVersion
-  type: '{config: str, server: str} | None'
-  description: 設定のバージョンとサーバーが読み込めるバージョン
-  notes: 設定のバージョンが古いときだけ
-- name: sources[].outsideRead
-  type: bool
-  description: '`scope` に当たらない作業場所からも `outside_scope: true` で作業範囲の外（参考）として読めるか（端末の設定の `outside_read`）'
-  notes: 書いていない行は `true`
+  - name: settingsPath
+    type: str
+    description: '`PROJECT_INDEX_CONFIG` が指す端末の設定のパス'
+  - name: sources[].id
+    type: str | None
+    description: 配信元の ID。`pending_reload` で `id` を省いた行は `null`
+  - name: sources[].config
+    type: list[str]
+    description: 配信元の設定の YAML の配列
+  - name: sources[].enabled
+    type: bool
+    description: 配信するか
+  - name: sources[].scope
+    type: '{read: list[str], write: list[str] | None}'
+    description: 読める・書ける作業場所の glob
+    notes: '`write` を省いた行は `null`（既定値の配信元のフォルダだけから書ける）'
+  - name: sources[].status
+    type: Literal['serving', 'not_served', 'disabled', 'pending_reload']
+    description: '配信中・起動時か読み直しの検証で外した・`enabled: false`・ファイルにあるが読み直していない行。行は `config`（`id` を書いた行は `id` も）が同じ配信元の状態と突き合わせる'
+  - name: sources[].errors
+    type: 'list[{path: str, reason: str}]'
+    description: 検証で除外した理由
+    notes: '`not_served` のときだけ'
+  - name: sources[].configVersion
+    type: '{config: str, server: str} | None'
+    description: 設定のバージョンとサーバーが読み込めるバージョン
+    notes: 設定のバージョンが古いときだけ
+  - name: sources[].outsideRead
+    type: bool
+    description: '`scope` に当たらない作業場所からも `outside_scope: true` で作業範囲の外（参考）として読めるか（端末の設定の `outside_read`）'
+    notes: 書いていない行は `true`
 status_codes:
-- code: '200'
-  condition: 返した（配信元が 0 件でも 200）
+  - code: '200'
+    condition: 返した（配信元が 0 件でも 200）
 constraints:
-- item: 認可
-  constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
-- item: 返すキー
-  constraint: '`sources[]` だけ。`port`・`bind`・`state_dir` など再起動が要るキーは返さない'
-- item: JSON のキー
-  constraint: レスポンスのキーは camelCase
-- item: operationId
-  constraint: '`{tag}-{関数名}` の `settings-get_settings_sources`'
+  - item: 認可
+    constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
+  - item: 返すキー
+    constraint: '`sources[]` だけ。`port`・`bind`・`state_dir` など再起動が要るキーは返さない'
+  - item: JSON のキー
+    constraint: レスポンスのキーは camelCase
+  - item: operationId
+    constraint: '`{tag}-{関数名}` の `settings-get_settings_sources`'
 test_file: tests/integration/server/test_get_settings_sources.py

@@ -151,6 +151,7 @@ class SettingsSourceRow(ApiModel):
     status: Literal["serving", "not_served", "disabled", "pending_reload"]
     errors: list[SourceViolation] = Field(default_factory=list[SourceViolation])
     config_version: SourceConfigVersion | None = None
+    outside_read: bool
 
 
 class SettingsSourcesView(ApiModel):

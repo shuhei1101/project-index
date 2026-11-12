@@ -54,7 +54,7 @@ def test_build_settings_router_when_get(
 ) -> None:
     """行に状態を重ねる（正常系）。"""
     # 準備
-    write_files(tmp_path, {"settings.yaml": SETTINGS})
+    write_files(tmp_path, {"settings.yaml": SETTINGS + "    outside_read: false\n"})
     statuses = [
         make_status("a", 0, config=("/tmp/a/project-index.yaml",)),
         make_status(
@@ -83,6 +83,8 @@ def test_build_settings_router_when_get(
     assert body["sources"][1]["errors"] == [
         {"path": "documents[0].paths", "reason": "必須のキーが無い"}
     ]
+    assert body["sources"][0]["outsideRead"] is True
+    assert body["sources"][1]["outsideRead"] is False
 
 
 def test_build_settings_router_when_pending_reload(
