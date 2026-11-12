@@ -47,13 +47,14 @@ functions:
         description: リポジトリの直下からのパスのファイルの中身を返す関数（無ければ `None`）。`None` はディスクから読む
     returns:
       type: dict[str, Any]
-      description: '`$ref` を解いたスキーマ（`$defs` はそのまま残す）'
+      description: '`$ref` を解いたスキーマ（最上位の `$defs` は、中の `$ref` を解いて残す）'
     process: |-
       1. `referencing.Registry` に `base` の URI でスキーマを載せ、参照先のファイルは `retrieve` で `base` のフォルダから『YAMLの読み込み』で読む（`read` があれば、`base` のフォルダからのパスを正規化して `read` で読む。`..` でリポジトリの直下より上を指す参照先は無いものとして扱う）
       2. 値を先頭からたどり、`$ref` を持つオブジェクトは参照先の中身に、`$ref` 以外のキーを重ねたものに置き換えて続けてたどる
-      3. たどっている途中の `$ref` に戻る（循環する）場合、その `$ref` は解かずに残す
+      3. 最上位の `$defs` は参照先として残し、各定義 `{名前}` の中の `$ref` を、たどっている途中の `$ref` に `{base}#/$defs/{名前}` を入れた状態から解く（自分自身へ戻る `#/$defs/{名前}` は解かずに残り、ほかのファイルを指す相対パスの `$ref` は解ける）
+      4. たどっている途中の `$ref` に戻る（循環する）場合、その `$ref` は解かずに残す
          - `[warning]` スキーマの循環する参照を解かずに残した（ファイル・`$ref`）
-      4. 参照先が無い・読めない場合、その `$ref` は解かずに残す
+      5. 参照先が無い・読めない場合、その `$ref` は解かずに残す
          - `[warning]` スキーマの参照を解けなかった（ファイル・`$ref`・理由）
     unit_tests:
       - name: test_resolve_schema_refs
@@ -68,6 +69,12 @@ functions:
         condition: '`$defs.node.properties.children.items` が `#/$defs/node`'
         mock: なし
         expected: '`children.items` が `$ref` のまま残り、`[warning]` が 1 件'
+      - name: test_resolve_schema_refs_when_relative_ref_in_defs
+        case: 正常
+        summary: '`$defs` の中の相対パスの参照と循環する参照'
+        condition: '`properties.entries.items` が `#/$defs/entry`、`$defs.entry.properties.summary` が `共通.schema.yaml#/$defs/summary`、`$defs.entry.properties.children.items` が `#/$defs/entry`'
+        mock: なし（`tmp_path`）
+        expected: '`$defs.entry.properties.summary` と `properties.entries.items.properties.summary` が `summary` の中身になり、`$defs.entry.properties.children.items` は `#/$defs/entry` のまま残る。返したスキーマのどこにも `共通.schema.yaml` を指す `$ref` が無い'
       - name: test_resolve_schema_refs_when_missing
         case: 正常
         summary: 参照先が無い

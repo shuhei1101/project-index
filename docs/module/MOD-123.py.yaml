@@ -41,6 +41,7 @@ functions:
       description: 違反の並び（順は変えない）。スキーマの違反で添えるキーがあるものは `schema` を持つ
     process: |-
       1. 文書の検査のスキーマの検査と同じ検査器（`validator_for`・`FormatChecker`）で `data` の違反を全て引く
+         - 引く途中で `referencing.exceptions.Unresolvable` が送出された場合、それまでに引いた違反だけで続ける（解決できない参照の違反は説明を持たない）
       2. 違反ごとに、スキーマの検査と同じ `path`（`format_path(absolute_path)`、空なら `$`）と `rule`（`message`）を組にし、添える定義を決める。`required` の違反は `error.schema.properties` の無かったキーの定義、それ以外は `error.schema`
       3. 定義から `HINT_KEYS` のうち持つキーだけを取り出す。1 つも持たなければ添えない
       4. `violations` の各違反を、`path` と `rule` が一致する組の取り出しを `schema` に入れた `WriteViolation` にする（一致しない違反は `schema` を持たない）
@@ -57,6 +58,12 @@ functions:
         condition: '`x-rules`・`x-bad-examples` を持つ項目の型を違える'
         mock: なし
         expected: '`schema` に `x-rules`・`x-bad-examples` が入る'
+      - name: test_attach_schema_hints_when_unresolvable
+        case: 正常
+        summary: 解決できない参照
+        condition: '`properties.a` が `{"$ref": "missing.schema.yaml#/$defs/x"}` のスキーマ、`{"a": 1}`、`rule` に解決できない参照を書いた `$` の違反 1 件'
+        mock: なし
+        expected: 例外を送出せず、違反が `schema` を持たない
       - name: test_attach_schema_hints_when_not_schema
         case: 正常
         summary: スキーマの違反でないものには添えない
