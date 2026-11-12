@@ -1,0 +1,45 @@
+id: LIB-8
+title: "jinja2"
+kind: "ライブラリ"
+version:
+  current: 3.1.6
+  latest: 3.1.6
+  checked_on: '2026-10-31'
+  source: pyproject.toml・uv.lock
+  pinning: pyproject.toml に下限 `>=3.1.6`、uv.lock で固定
+catalogs:
+- name: API
+  version: 3.1.6
+  entries:
+  - name: Environment
+    kind: クラス
+    purpose: '`undefined=StrictUndefined`・`trim_blocks=True`・`lstrip_blocks=True`・`autoescape=False` で部品の本文を描く環境を作る'
+  - name: Environment.from_string
+    kind: 関数
+    purpose: 部品の本文と `when` の式をテンプレートにする
+  - name: Template.render
+    kind: 関数
+    purpose: 例の組の値で本文を描く
+  - name: StrictUndefined
+    kind: クラス
+    purpose: 未定義の変数を `UndefinedError` にし、描画できない組として注意書きにする
+  - name: meta.find_undeclared_variables
+    kind: 関数
+    purpose: 部品の本文が使う最上位の変数名を引く
+lead: Python のテンプレートエンジン。`{{ 変数 }}`・`{% if %}`・`{% for %}` の構文で文字列を組み立てる。
+purl: pkg:pypi/jinja2
+dependency_scope: 必須
+adoption: 採用
+upstream: pallets/jinja
+license: BSD-3-Clause
+official_url: https://jinja.palletsprojects.com/
+docs_url: https://jinja.palletsprojects.com/en/stable/api/
+used_in:
+- src/project_index/features/prompt_doc/
+verification:
+  state: 済
+  date: '2026-10-31'
+  detail: pyproject.toml・uv.lock に 3.1.6 を追加し、`StrictUndefined`・`trim_blocks`・`lstrip_blocks`・`keep_trailing_newline`・`autoescape=False`・`finalize` の Environment で、`{% for %}` の描画が `- a\n` になること、未定義の変数が `UndefinedError` になること、`compile_expression` の式が真偽を返すこと、`meta.find_undeclared_variables` が最上位の変数名を返すことを確かめた
+selection:
+  candidates: 比べていない。
+  decision: プロンプトの部品の本文が Jinja2 の構文で書かれ（knowledge の `schemas/prompt.schema.yaml`）、プロンプトを実際に描画する側と同じエンジンで描かないと字数と描画結果がずれるため。

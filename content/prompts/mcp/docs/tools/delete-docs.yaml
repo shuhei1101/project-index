@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=../../../../../templates/prompt.schema.yaml
+id: mcp/docs/tools/delete-docs
+name: delete_docs の description
+description: 文書の MCP の delete_docs が何をするか・いつ使用するか・いつ使用しないか・何を返却しないかを伝える
+kind: tool
+lang: ja
+parts:
+  - id: body
+    texts:
+      - lang: ja
+        text: |-
+          文書を削除する。参照されている文書は on_referenced に従って断るか、参照も除外して削除する。
+          配信元の文書を削除するときに使用する。
+          文書の一部を書き換えるときは write_docs を使用する。
+          削除した文書の本文は返却しない。

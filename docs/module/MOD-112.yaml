@@ -1,0 +1,147 @@
+id: MOD-112
+title: 索引のサーバー / 文書のMCP
+lead: |-
+  文書の MCP（`/mcp`）と管理の MCP（`/_admin/mcp`）の組み立て。
+  各ツールの引数を要求のモデルで受け、サービスを呼んで `format` の形式で返し、`ProjectIndexError` を `isError` の結果にする。
+directory: |-
+  ```text
+  src/project_index/server/mcp/
+  ├─ __init__.py   # build_docs_mcp / build_admin_mcp の再エクスポート
+  ├─ docs.py       # build_docs_mcp（7 つのツールの登録）
+  ├─ admin.py      # build_admin_mcp（7 つのツールの登録）
+  └─ result.py     # to_tool_result / tool_error / TOOL_ANNOTATIONS / 2 つの MCP のツール名とプロンプトの ID
+
+  content/prompts/mcp/
+  ├─ docs/
+  │  ├─ instructions.yaml   # 文書の MCP の instructions（kind: instructions）
+  │  └─ tools/{ツール名}.yaml # 文書の MCP のツールの description（kind: tool。ツール名の _ を - にした名前）
+  └─ admin/
+     └─ tools/{ツール名}.yaml # 管理の MCP のツールの description（kind: tool）
+  ```
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      文書の MCP の組み立て ..> ツールの結果
+      文書の MCP の組み立て ..> ツールのエラーの変換
+      文書の MCP の組み立て ..> 文書の検索
+      文書の MCP の組み立て ..> 文書の書き込み
+      文書の MCP の組み立て ..> 文書の削除
+      文書の MCP の組み立て ..> 変更の一覧
+      文書の MCP の組み立て ..> 関連のたどり
+      文書の MCP の組み立て ..> 配信元の説明
+      ツールのエラーの変換 ..> 索引のサーバーのエラー
+      文書の MCP の組み立て ..> ツールのプロンプトの ID
+      管理の MCP の組み立て ..> ツールのプロンプトの ID
+      class ツールのプロンプトの ID {
+        <<function>>
+      }
+      class 文書の MCP の組み立て {
+        <<function>>
+      }
+      class 管理の MCP の組み立て {
+        <<function>>
+      }
+      class ツールの結果 {
+        <<function>>
+      }
+      class ツールのエラーの変換 {
+        <<function>>
+      }
+      class 文書の検索 {
+        <<function>>
+      }
+      class 文書の書き込み {
+        <<function>>
+      }
+      class 文書の削除 {
+        <<function>>
+      }
+      class 変更の一覧 {
+        <<function>>
+      }
+      class 関連のたどり {
+        <<function>>
+      }
+      class 配信元の説明 {
+        <<function>>
+      }
+      class 索引のサーバーのエラー {
+        <<class>>
+      }
+      click 文書の MCP の組み立て href "./MOD-94.py.yaml#文書の MCP の組み立て"
+      click ツールの結果 href "./MOD-95.py.yaml#ツールの結果"
+      click ツールのエラーの変換 href "./MOD-95.py.yaml#ツールのエラーの変換"
+      click 文書の検索 href "./MOD-55.py.yaml#文書の検索"
+      click 文書の書き込み href "./MOD-84.py.yaml#文書の書き込み"
+      click 文書の削除 href "./MOD-84.py.yaml#文書の削除"
+      click 変更の一覧 href "./MOD-14.py.yaml#変更の一覧"
+      click 関連のたどり href "./MOD-47.py.yaml#関連のたどり"
+      click 配信元の説明 href "./MOD-20.py.yaml#配信元の説明"
+      click 索引のサーバーのエラー href "./MOD-98.py.yaml#索引のサーバーのエラー"
+      click ツールのプロンプトの ID href "./MOD-95.py.yaml#ツールのプロンプトの ID"
+      click 管理の MCP の組み立て href "./MOD-93.py.yaml#管理の MCP の組み立て"
+- name: 管理の MCP
+  diagram: |-
+    classDiagram
+      direction TD
+      管理の MCP の組み立て ..> ツールの結果
+      管理の MCP の組み立て ..> ツールのエラーの変換
+      管理の MCP の組み立て ..> 状態の取得
+      管理の MCP の組み立て ..> 設定の読み直し
+      管理の MCP の組み立て ..> 配信元の検査
+      管理の MCP の組み立て ..> 試しの変換
+      管理の MCP の組み立て ..> 再起動の制御
+      管理の MCP の組み立て ..> クローンの更新
+      管理の MCP の組み立て ..> 状態の文
+      管理の MCP の組み立て ..> 読み直しの文
+      管理の MCP の組み立て ..> 検査の文
+      class 管理の MCP の組み立て {
+        <<function>>
+      }
+      class ツールの結果 {
+        <<function>>
+      }
+      class ツールのエラーの変換 {
+        <<function>>
+      }
+      class 状態の取得 {
+        <<function>>
+      }
+      class 設定の読み直し {
+        <<function>>
+      }
+      class 配信元の検査 {
+        <<function>>
+      }
+      class 試しの変換 {
+        <<function>>
+      }
+      class 再起動の制御 {
+        +再起動の要求() RestartResult
+      }
+      class クローンの更新 {
+        <<function>>
+      }
+      class 状態の文 {
+        <<function>>
+      }
+      class 読み直しの文 {
+        <<function>>
+      }
+      class 検査の文 {
+        <<function>>
+      }
+      click 管理の MCP の組み立て href "./MOD-93.py.yaml#管理の MCP の組み立て"
+      click ツールの結果 href "./MOD-95.py.yaml#ツールの結果"
+      click ツールのエラーの変換 href "./MOD-95.py.yaml#ツールのエラーの変換"
+      click 状態の取得 href "./MOD-10.py.yaml#状態の取得"
+      click 設定の読み直し href "./MOD-10.py.yaml#設定の読み直し"
+      click 配信元の検査 href "./MOD-10.py.yaml#配信元の検査"
+      click 試しの変換 href "./MOD-10.py.yaml#試しの変換"
+      click 再起動の制御 href "./MOD-34.py.yaml#再起動の制御"
+      click クローンの更新 href "./MOD-36.py.yaml#クローンの更新"
+      click 状態の文 href "./MOD-9.py.yaml#状態の文"
+      click 読み直しの文 href "./MOD-9.py.yaml#読み直しの文"
+      click 検査の文 href "./MOD-9.py.yaml#検査の文"

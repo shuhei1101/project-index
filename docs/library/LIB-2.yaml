@@ -1,0 +1,56 @@
+id: LIB-2
+title: "mcp"
+kind: "ライブラリ"
+version:
+  current: 2.3.0
+  latest: 2.3.0
+  checked_on: '2026-10-27'
+  source: pyproject.toml・uv.lock
+  pinning: pyproject.toml に下限、uv.lock で固定
+catalogs:
+- name: API
+  version: 2.3.0
+  entries:
+  - name: MCPServer
+    kind: クラス
+    purpose: 文書の MCP（`/mcp`）と管理の MCP（`/_admin/mcp`）のサーバー
+  - name: MCPServer.tool
+    kind: 関数
+    purpose: 関数をツールとして登録し、引数の型から入力スキーマを作る
+  - name: MCPServer.streamable_http_app
+    kind: 関数
+    purpose: Streamable HTTP の ASGI アプリを作る。`streamable_http_path="/"` でマウント先のパスをそのまま使う
+  - name: MCPServer.session_manager.run
+    kind: 関数
+    purpose: Streamable HTTP のセッション管理を起動する。親アプリの lifespan で入る
+  - name: ToolError
+    kind: クラス
+    purpose: '原因と次の手を本文にして `isError: true` で返す'
+  - name: streamable_http_client
+    kind: 関数
+    purpose: 結合テストで MCP を Streamable HTTP で呼ぶ
+lead: Model Context Protocol の公式の Python SDK。MCP のサーバーとクライアント、Streamable HTTP のトランスポートを持つ。
+purl: pkg:pypi/mcp
+dependency_scope: 必須
+adoption: 採用
+upstream: modelcontextprotocol/python-sdk
+license: MIT
+official_url: https://modelcontextprotocol.io/
+docs_url: https://github.com/modelcontextprotocol/python-sdk/tree/main/docs
+verification:
+  state: 済
+  date: '2026-10-27'
+  detail: 'Python 3.14 で `MCPServer` を 2 つ作り `streamable_http_app(streamable_http_path="/")` を fastapi の `/mcp`・`/_admin/mcp` にマウントし、`streamable_http_client` と `ClientSession` から呼んだ。`$defs` の `$ref` で自分を指す Pydantic のモデルを引数に持つツールの入力スキーマが `$ref` のまま返り、3 段の木で呼べた。`ToolError` を投げると `is_error: true` になった。フックの値の注入は PoC（#13）で確かめた'
+selection:
+  candidates: mcp 2.3.0・FastMCP 4.1.4 を比べた（[案のレビュー](https://github.com/shuhei1101/project-index/pull/12#discussion_r4389749135)）。
+  decision: 要件は公式の SDK だけで満たせ、PoC で確かめた再帰の入力スキーマのまま使えるため。FastMCP は既定で `$ref` を展開して書き換える。
+  consequences: starlette・uvicorn・pydantic・jsonschema・opentelemetry-api がこの依存で入る。
+install: |-
+  ```bash
+  uv add 'mcp>=2.3.0'
+  ```
+limitations:
+- item: Host の検査
+  content: 既定で localhost 以外の Host のリクエストを 421 で断る（DNS rebinding の対策）
+- item: 末尾のスラッシュ
+  content: '`/mcp` へのリクエストは `/mcp/` への 307 になる。SDK のクライアントは同じオリジンの 307 を追う'

@@ -1,0 +1,96 @@
+id: MOD-78
+title: 索引のサーバー / 読み取り API / search.py
+lead: 語での検索。
+test_files:
+- tests/unit/project_index/features/read/test_search.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      読み取り API の入口 ..> 語での検索
+      語での検索 ..> 語の照合
+      語での検索 ..> 一致した箇所の抜き出し
+      class 読み取り API の入口 {
+        <<function>>
+      }
+      class 語での検索 {
+        <<function>>
+      }
+      class 語の照合 {
+        <<function>>
+      }
+      class 一致した箇所の抜き出し {
+        <<function>>
+      }
+      click 読み取り API の入口 href "./MOD-126.py.yaml#読み取り API の入口"
+      click 語の照合 href "./MOD-53.py.yaml#語の照合"
+      click 一致した箇所の抜き出し href "./MOD-56.py.yaml#一致した箇所の抜き出し"
+constants:
+- name: SEARCH_QUERY_MAX
+  title: 検索の語の文字数の上限
+  container: project_index/features/read/search.py
+  usecase: 語での検索
+  summary: '`q` の文字数の上限'
+  value: '200'
+- name: SEARCH_LIMIT_DEFAULT
+  title: 語での検索の件数の既定
+  container: project_index/features/read/search.py
+  usecase: 語での検索
+  summary: '`limit` を省いたときの件数'
+  value: '20'
+- name: SEARCH_LIMIT_MAX
+  title: 語での検索の件数の上限
+  container: project_index/features/read/search.py
+  usecase: 語での検索
+  summary: '`limit` の上限'
+  value: '100'
+- name: SNIPPETS_PER_DOC
+  title: 文書ごとの一致した箇所の数
+  container: project_index/features/read/search.py
+  usecase: 語での検索
+  summary: '`items[].snippets` の上限'
+  value: '3'
+functions:
+- name: search_words
+  title: 語での検索
+  kind: 関数
+  container: project_index/features/read/search.py
+  usecase: 語での検索
+  role: サービス
+  summary: 語を全て含む文書と一致した箇所を返す
+  scope: public
+  thread_safe: true
+  args:
+  - name: documents
+    title: 文書
+    type: Sequence[Document]
+    required: true
+    passing: positional
+    description: '読む場所の文書（`search: false` の行の文書を除いたもの）'
+  - name: q
+    title: 検索する語
+    type: str
+    required: true
+    passing: positional
+    description: 1〜`SEARCH_QUERY_MAX` 文字（入口が確かめる）
+  - name: limit
+    title: 件数
+    type: int
+    required: true
+    passing: positional
+    description: 1〜`SEARCH_LIMIT_MAX`
+  returns:
+    type: SearchResult
+    description: 文書のページのパスの昇順
+  process: |-
+    1. `q` を NFKC と `casefold` をして空白で分ける
+    2. 語の照合に当たる文書を文書のページのパスの昇順に並べ、総件数を数える
+    3. 先頭から `limit` 件を、本文の一致した箇所の抜き出し（前後 1 行、`SNIPPETS_PER_DOC` 件）つきで返す
+  unit_tests:
+  - name: test_search_words
+    case: 正常
+    summary: 全ての語を含む文書だけ
+    condition: '`q="foo bar"`、foo と bar を含む文書 1 つと foo だけの文書 1 つ'
+    mock: なし
+    expected: '`total_count` が 1、`snippets` に foo か bar を含む行'

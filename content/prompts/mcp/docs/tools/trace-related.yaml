@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=../../../../../templates/prompt.schema.yaml
+id: mcp/docs/tools/trace-related
+name: trace_related の description
+description: 文書の MCP の trace_related が何をするか・いつ使用するか・いつ使用しないか・何を返却しないかを伝える
+kind: tool
+lang: ja
+parts:
+  - id: body
+    texts:
+      - lang: ja
+        text: |-
+          起点の文書やコードのパスから、related をたどって関連する文書を返却する。設計書を起点に direction: in で呼ぶと、via.type が implements の文書がその設計書を実装するコード、コードを起点にすると tests の文書がそのテストになる。
+          設計書から実装・テストを、コードから設計書をたどるときに使用する。
+          単語や条件で文書を探すときは search_docs を使用する。コードの中の呼び出し元は grep で探す。
+          関連の相手の本文は返却しない。この会話で返却済みの相手の名前・概要文は、repeat_seen: true で再取得できる。

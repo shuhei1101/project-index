@@ -1,0 +1,70 @@
+id: MOD-127
+title: 索引のサーバー / 読み取り API
+lead: |-
+  dev-docs の画面のサーバーなどが呼ぶ読み取り API（配信元の一覧と状態・配信元の設定・文書の一覧と取得・検討事項・語での検索・リビジョンの一覧）。
+  端末の設定の取得・保存・1 行の追加は端末の設定の入口が持つ。
+directory: |-
+  ```text
+  src/project_index/features/read/
+  ├─ __init__.py   # 公開する型と関数の再エクスポート
+  ├─ types.py      # NavTab / NavItem / NavAutoCount / ConversionError / GitHubTarget / SearchItem / SearchResult / SourceConfigResponse / DocumentListItem / DocumentListResponse / DocumentValueResponse / DecisionItem / DecisionResponse
+  ├─ paths.py      # page_path / find_page / read_target
+  ├─ nav.py        # nav_auto_counts / check_nav_filters / nav_warnings
+  ├─ search.py     # search_words
+  ├─ service.py    # get_source_config / list_documents / get_document / list_decisions / get_decision
+  └─ route.py      # build_read_router（/sources の下）
+  ```
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      読み取り API の入口 ..> 読み取りの場所
+      読み取り API の入口 ..> 配信元の設定の取得
+      読み取り API の入口 ..> 文書の一覧
+      読み取り API の入口 ..> 文書の取得
+      読み取り API の入口 ..> 検討事項の ID の一覧
+      読み取り API の入口 ..> 検討事項の文書の取得
+      読み取り API の入口 ..> 語での検索
+      文書の取得 ..> 文書のページの特定
+      文書の取得 ..> 変換
+      class 読み取り API の入口 {
+        <<function>>
+      }
+      class 読み取りの場所 {
+        <<function>>
+      }
+      class 配信元の設定の取得 {
+        <<function>>
+      }
+      class 文書の一覧 {
+        <<function>>
+      }
+      class 文書の取得 {
+        <<function>>
+      }
+      class 検討事項の ID の一覧 {
+        <<function>>
+      }
+      class 検討事項の文書の取得 {
+        <<function>>
+      }
+      class 語での検索 {
+        <<function>>
+      }
+      class 文書のページの特定 {
+        <<function>>
+      }
+      class 変換 {
+        <<class>>
+      }
+      click 読み取り API の入口 href "./MOD-126.py.yaml#読み取り API の入口"
+      click 読み取りの場所 href "./MOD-77.py.yaml#読み取りの場所"
+      click 配信元の設定の取得 href "./MOD-125.py.yaml#配信元の設定の取得"
+      click 文書の一覧 href "./MOD-125.py.yaml#文書の一覧"
+      click 文書の取得 href "./MOD-125.py.yaml#文書の取得"
+      click 検討事項の ID の一覧 href "./MOD-125.py.yaml#検討事項の ID の一覧"
+      click 検討事項の文書の取得 href "./MOD-125.py.yaml#検討事項の文書の取得"
+      click 語での検索 href "./MOD-78.py.yaml#語での検索"
+      click 文書のページの特定 href "./MOD-77.py.yaml#文書のページの特定"
+      click 変換 href "./MOD-17.py.yaml#変換"

@@ -1,0 +1,37 @@
+id: MOD-109
+title: 索引のサーバー / 変換
+lead: |-
+  `converters[]` を指す種類の文書を、配信元のスクリプトで Markdown にし、結果を控える。
+  スキーマ駆動の Markdown への変換は dev-docs の画面のサーバーが持つ。検討事項の文書を探す処理もここに置く。
+directory: |-
+  ```text
+  src/project_index/features/convert/
+  ├─ __init__.py   # 公開する型と関数の再エクスポート
+  ├─ types.py      # Converted / ConvertFailure
+  ├─ decisions.py  # find_decisions / DECISION_ID / DECISION_DOCS_DIR（検討事項の文書を探す）
+  └─ service.py    # ConvertService（converters[] の実行・結果の控え）
+  ```
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      変換 ..> スクリプトの実行 : converters[]
+      変換 ..> 変換の結果 : 返す
+      変換の結果 o-- 変換の失敗
+      class 変換 {
+        +変換する(読み書きの場所, 文書) 変換の結果
+        +控えを捨てる() None
+      }
+      class スクリプトの実行 {
+        <<function>>
+      }
+      class 変換の結果 {
+        +Markdown: str
+      }
+      class 変換の失敗 {
+        +理由: str
+      }
+      click 変換 href "./MOD-17.py.yaml#変換"
+      click スクリプトの実行 href "./MOD-88.py.yaml#スクリプトの実行"
+      click 変換の結果 href "./MOD-18.py.yaml#変換の結果"

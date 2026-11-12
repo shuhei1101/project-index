@@ -1,0 +1,111 @@
+id: SC-9
+title: "YAMLを直接編集した"
+scenarios:
+- name: 正常シナリオ
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。`session_id` はテストが引数に入れる）
+  - name: サンプルの配信元
+    description: 文書の種類を 1 つ（スキーマと YAML 2 件）と `project-index.yaml` を持つ git リポジトリと、そのワークツリー（`.claude/worktrees/x`）
+    notes: id `sample`
+  - name: 読んだ記録
+    description: '同じ `session_id` で文書 1 を `view: full` で読み、`version` を持っている状態'
+  - name: project-index
+    description: sample を配信している project-index
+    notes: '`worktree` にワークツリー x のパスを渡す'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      actor U as 利用者
+      actor A as エージェント
+      participant WT as ワークツリー x
+      participant M as 文書の MCP（/mcp）
+
+      U->>WT: 文書 1 の YAML をエディタで直して保存する
+      A->>M: search_docs(filter: id が文書 1, view: full)
+      M->>WT: ファイルが変わっているので読み直す
+      M->>M: 内容のハッシュが変わったので、返し済みとして省かない
+      M-->>A: 直した内容と新しい version
+    ```
+  expected:
+  - '`search_docs` が直接編集した内容を返し、`version` が読んだときと違う'
+  - 同じ会話で一度返した文書でも、本文を `（この会話で返却済み）` にしない
+  - 直接編集した内容を `default_ref` へ commit した後は、読み取り API で取得した文書 1 の値も直接編集した内容になる（読み取り API は `ref` を省くと `default_ref` の commit を読む）
+  - project-index を起動し直していない
+  test: test_normal
+- name: 異常シナリオ（読んだ後に変わった文書へ書き込む）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行）
+  - name: 読んだ記録
+    description: エージェントが文書 1 を読んだ後、利用者が文書 1 の YAML を直接編集した状態
+    notes: '`expected_version` に読んだときの `version` を渡す'
+  - name: project-index
+    description: 正常シナリオと同じ sample を配信している project-index
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      actor A as エージェント
+      participant M as 文書の MCP（/mcp）
+      participant WT as ワークツリー x
+
+      A->>M: write_docs(operations: update 文書 1・読んだときの expected_version)
+      M->>WT: 今の文書 1 を読む
+      M->>M: 今のバージョンと expected_version が違う
+      M-->>A: エラー（今のバージョンと差分、読み直して呼び直すこと）
+      A->>M: search_docs(filter: id が文書 1, view: full)
+      M-->>A: 直接編集した内容と今の version
+      A->>M: write_docs(operations: update 文書 1・今の expected_version)
+      M-->>A: 新しい version
+    ```
+  expected:
+  - '1 回目の `write_docs` が `isError: true` で、今のバージョン・読んだときとの差分・読み直して呼び直すことを返す'
+  - 1 回目の後、文書 1 の YAML は直接編集した内容のまま
+  - 読み直した `version` での `write_docs` は書き込め、直接編集した内容のうち `set` しなかった項目が残る
+  - '`delete_docs` も読んだときの `expected_version` では同じエラーを返し、消さない'
+  test: test_error_when_version_mismatch
+- name: 異常シナリオ（YAML を壊した）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行）
+  - name: 壊れた YAML
+    description: 利用者が文書 1 の YAML を、YAML として読めない内容に直接編集した状態
+    notes: 文書 2 はそのまま
+  - name: project-index
+    description: 正常シナリオと同じ sample を配信している project-index
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      actor A as エージェント
+      participant M as 文書の MCP（/mcp）
+      participant WT as ワークツリー x
+
+      A->>M: search_docs(view: summary)
+      M->>WT: 変わった文書 1 を読み直し、読めない
+      M-->>A: 文書 2 と、読めなかったファイルの知らせ
+    ```
+  expected:
+  - 結果に文書 2 があり、文書 1 は無い
+  - 結果の `notes` に、読めなかった文書 1 のファイルのパスと理由（行と列）がある
+  - 壊れた内容を `default_ref` へ commit した後は、読み取り API で取得した文書 1 のエラーに、読めなかったファイルのパスと理由が入る
+  test: test_error_when_yaml_broken
+lead: 利用者が文書の MCP を通さずに YAML を直接編集した後、エージェントの次の取得がバージョンを見て読み直した内容を返す。
+issue: 14
+primary_actor: 利用者
+stakeholders:
+- name: 利用者
+  interest: エディタで直した YAML が、サーバーを起動し直さずに読み取り API と文書の MCP に出る
+- name: エージェント（Claude Code）
+  interest: 読んだ後に変わった文書を古い内容のまま上書きしない
+trigger: 利用者が配信元の YAML をエディタで直接編集する
+preconditions:
+- project-index が起動し、配信元を配信している
+- エージェントが編集の前にその文書を `search_docs` で読んでいる
+success_guarantee: 次の取得が、変わったファイルを読み直した内容と新しいバージョンを返す。
+minimal_guarantee: 読んだときのバージョンでの書き込みは、直接編集した内容を上書きしない。読めなくなったファイルがあっても、他の文書は返る。
+frequency: 不定（利用者が手で直すとき）
+priority: 中
+refs:
+- SC-1#scenarios[正常シナリオ]
+- SC-6#scenarios[正常シナリオ]
+test_file: tests/e2e/単一ユースケース/test_YAMLを直接編集した.py

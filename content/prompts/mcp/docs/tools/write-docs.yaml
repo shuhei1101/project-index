@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=../../../../../templates/prompt.schema.yaml
+id: mcp/docs/tools/write-docs
+name: write_docs の description
+description: 文書の MCP の write_docs が何をするか・いつ使用するか・いつ使用しないか・何を返却しないかを伝える
+kind: tool
+lang: ja
+parts:
+  - id: body
+    texts:
+      - lang: ja
+        text: |-
+          文書を作成・部分更新・置換する。操作を全て適用した後の文書を検査し、合格したときだけ作業ツリーのファイルを書き換える（commit はしない）。変更した Markdown のキーの値は mdmark で点検し、描画時の記載方法の警告があれば書き込まない。mdmark を使用できないときは点検せずに書き込み、点検できなかったキーと理由を unchecked に返却する。範囲のファイルを作成・削除・改名したら、管理用の YAML の行を修正する。set・unset・add_to・remove_from・text_edits のキーには共通のキー（id・name・description・tags・alias_type など）も使用でき、種類の列名に変換して書き込む。対応は describe(source, kind) で確認する。
+          配信元の文書を作成・書き換えるときに使用する。書き込む前に describe(source, kind) で種類のスキーマを確認する。
+          文書を削除するときは delete_docs を使用する。配信の範囲の外のファイルは Edit・Write で編集する。
+          書き込んだ後の文書の本文は返却しない。

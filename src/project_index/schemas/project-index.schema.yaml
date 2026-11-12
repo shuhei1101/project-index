@@ -1,0 +1,308 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: 配信元の設定
+description: 配信元の設定 `project-index.yaml`（複数の YAML に分けたときはマージした結果）。
+type: object
+additionalProperties: false
+required:
+  - name
+properties:
+  version:
+    type: string
+    title: 設定のバージョン
+    pattern: ^[0-9]+$
+  name:
+    type: string
+    title: 配信元の名前
+    minLength: 1
+  enabled:
+    type: boolean
+    title: 配信するか
+  default_ref:
+    type: string
+    title: 既定のリビジョン
+    minLength: 1
+  visibility:
+    type: object
+    title: 公開範囲
+  worktrees:
+    type: array
+    title: ワークツリーの場所
+    items:
+      type: string
+      minLength: 1
+  decisions:
+    type: object
+    title: 検討事項
+    additionalProperties: false
+    properties:
+      folders:
+        type: array
+        title: 話し合いの記録のフォルダ
+        items:
+          type: string
+          minLength: 1
+  description:
+    type: string
+    title: 配信元の説明
+  instructions:
+    type: string
+    title: 説明書
+  ids:
+    type: object
+    title: ID の付け方
+    additionalProperties: false
+    properties:
+      format:
+        type: string
+        minLength: 1
+  related:
+    type: object
+    title: 関連
+    additionalProperties: false
+    properties:
+      types:
+        type: array
+        items:
+          type: string
+          minLength: 1
+  diff:
+    type: object
+    title: 差分
+    additionalProperties: false
+    properties:
+      ignore_keys:
+        type: array
+        items:
+          type: string
+  github:
+    type: object
+    title: GitHub
+    additionalProperties: false
+    properties:
+      repository:
+        type: string
+        pattern: ^[^/\s]+/[^/\s]+$
+      issue_labels:
+        type: array
+        items:
+          type: string
+  nav:
+    type: object
+    title: 画面の構成
+    additionalProperties: false
+    properties:
+      tabs:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - title
+            - items
+          properties:
+            title:
+              type: string
+              minLength: 1
+            items:
+              type: array
+              items:
+                $ref: "#/$defs/nav_item"
+  documents:
+    type: array
+    title: 配信する文書
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - paths
+        - schema
+      properties:
+        id:
+          type: string
+          minLength: 1
+        paths:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+        exclude:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            pattern: ^[^/]+$
+        title:
+          type: string
+        enabled:
+          type: boolean
+        schema:
+          description: この行の文書を検査する JSON Schema。文字列は配信元の直下からの相対パス、オブジェクトはほかの配信元のリビジョンのスキーマ
+          oneOf:
+            - type: string
+              minLength: 1
+            - type: object
+              additionalProperties: false
+              required:
+                - source
+                - path
+                - ref
+              properties:
+                source:
+                  description: 端末の設定の `sources[]` の行の ID
+                  type: string
+                  minLength: 1
+                path:
+                  description: 参照先のリポジトリの直下からのスキーマのパス
+                  type: string
+                  minLength: 1
+                ref:
+                  description: タグか commit
+                  type: string
+                  minLength: 1
+          examples:
+            - schemas/rule.schema.yaml
+            - source: knowledge
+              path: schemas/design/interface.schema.yaml
+              ref: v1.4.0
+        validators:
+          type: array
+          items:
+            type: string
+        converter:
+          type: string
+        writable:
+          type: boolean
+        after_write:
+          type: array
+          items:
+            type: string
+        search:
+          type: boolean
+        records:
+          type: string
+          minLength: 1
+        body_file:
+          type: string
+          minLength: 1
+        metadata:
+          type: object
+          title: 共通のキーと列名の対応
+          additionalProperties:
+            type: string
+            minLength: 1
+        alias_type:
+          enum: [term, doc, command, url, skill, tool, path, env, avoid]
+  validators:
+    $ref: "#/$defs/scripts"
+  converters:
+    $ref: "#/$defs/converters"
+  generators:
+    $ref: "#/$defs/scripts"
+$defs:
+  scripts:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - run
+      properties:
+        id:
+          type: string
+          minLength: 1
+        run:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        on:
+          type: array
+          items:
+            enum: [read, write]
+  converters:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - run
+      properties:
+        id:
+          type: string
+          minLength: 1
+        run:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        on:
+          type: array
+          items:
+            enum: [read, write]
+        cache:
+          description: "`false` の行の変換は、控えを読まず書かず、文書を開くたびにスクリプトを動かす"
+          type: boolean
+          default: true
+  nav_item:
+    type: object
+    properties:
+      items:
+        type: array
+        items:
+          $ref: "#/$defs/nav_item"
+      auto:
+        type: object
+        properties:
+          document:
+            type: string
+            minLength: 1
+          group_by:
+            type: string
+            minLength: 1
+            description: 項目のパスか、フォルダで束ねる '@folder'
+          filter:
+            $ref: "#/$defs/filter"
+  filter:
+    title: 条件
+    oneOf:
+      - $ref: "#/$defs/condition"
+      - $ref: "#/$defs/group"
+  condition:
+    type: object
+    additionalProperties: false
+    required:
+      - field
+      - op
+    properties:
+      field:
+        type: string
+        minLength: 1
+      op:
+        enum: [eq, ne, prefix, suffix, contains, not_contains, regex, glob, gt, gte, lt, lte, exists, not_exists]
+      values:
+        type: array
+        items:
+          type: string
+      match:
+        enum: [any, all]
+      case_sensitive:
+        type: boolean
+  group:
+    type: object
+    additionalProperties: false
+    minProperties: 1
+    properties:
+      and:
+        type: array
+        items:
+          $ref: "#/$defs/filter"
+      or:
+        type: array
+        items:
+          $ref: "#/$defs/filter"
+      not:
+        $ref: "#/$defs/filter"

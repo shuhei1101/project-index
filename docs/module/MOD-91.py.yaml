@@ -1,0 +1,81 @@
+id: MOD-91
+title: 索引のサーバー / 起動 / error_handlers.py
+lead: 例外の problem+json への変換。
+test_files:
+- tests/unit/project_index/server/test_error_handlers.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      アプリの組み立て ..> 例外の変換の登録
+      class アプリの組み立て {
+        <<function>>
+      }
+      class 例外の変換の登録 {
+        <<function>>
+      }
+      click アプリの組み立て href "./MOD-90.py.yaml#アプリの組み立て"
+constants:
+- name: PROBLEM_TYPE_BASE
+  title: problem+json の type の頭
+  container: project_index/server/error_handlers.py
+  usecase: 共通
+  summary: problem+json の `type` に置く URI の頭（末尾にエラーの名前を付ける）
+  value: '"urn:project-index:error:"'
+functions:
+- name: register_error_handlers
+  title: 例外の変換の登録
+  kind: 関数
+  container: project_index/server/error_handlers.py
+  usecase: 共通
+  role: 入口
+  summary: 読み取り API の例外を RFC 9457 の problem+json にするハンドラを登録する
+  scope: public
+  side_effects: アプリに例外のハンドラを登録する
+  args:
+  - name: app
+    title: アプリ
+    type: fastapi.FastAPI
+    required: true
+    passing: positional
+    description: 登録先
+  returns:
+    type: None
+    description: 何も返さない
+  process: |-
+    1. `ProjectIndexError` は、`application/problem+json` で `{type: PROBLEM_TYPE_BASE + name, title: name, status, detail: message, nextSteps: next_steps, ...details()}` を返す。`details()` の 1 段目のキーと入れ子のモデルのフィールド名を `pydantic.alias_generators.to_camel` で camelCase にする。`dict[str, ...]` の値のキー（`candidates` の文書の ID など）は変えない。`violations` を持つときは `errors[]`（`{path, reason}`、`reason` は `rule`）にも並べる
+    2. `RequestValidationError` は、400 で `type` が `InvalidArgumentError` の problem+json を返す。`errors[]` は誤りごとに `loc` の `body` を除いたパス（`sources[1].id` の形。項目のパスへの変換）と `msg`
+    3. `starlette.exceptions.HTTPException`（ルートの無いパスの 404 を含む）は、その `status_code` で `type` が `PROBLEM_TYPE_BASE + "HttpError"`、`detail` が例外の `detail` の problem+json を返す。例外が `headers`（405 の `Allow` など）を持てば、応答のヘッダーに載せる
+    4. これら以外の例外は FastAPI の既定の 500 に任せ、`[error]` 要求の処理に失敗した（メソッド・パス・例外）を書く
+  unit_tests:
+  - name: test_register_error_handlers
+    case: 正常
+    summary: ProjectIndexError を problem+json にする
+    condition: '`ValidationFailedError(violations=[Violation(path="name", rule="必須")])` を送る API のルートを POST'
+    mock: なし（テスト用のルート）
+    expected: '422、`Content-Type` が `application/problem+json`、`type` が `urn:project-index:error:ValidationFailedError`、`errors` が `[{path: name, reason: 必須}]`'
+  - name: test_register_error_handlers_when_request_invalid
+    case: 正常
+    summary: 本文の型の誤りを 400 にする
+    condition: '`hidden: "x"`（配列でない）を PUT'
+    mock: なし（テスト用のルート）
+    expected: 400、`errors[0].path` が `hidden`
+  - name: test_register_error_handlers_when_http_error
+    case: 正常
+    summary: ルートの無いパスを problem+json の 404 にする
+    condition: どのルートにも当たらない GET `/none`
+    mock: なし（テスト用のルート）
+    expected: 404、`Content-Type` が `application/problem+json`、`type` が `urn:project-index:error:HttpError`
+  - name: test_register_error_handlers_when_http_error_headers
+    case: 正常
+    summary: HTTPException のヘッダーを応答に載せる
+    condition: '`HTTPException(405, headers={"Allow": "GET"})` を送るルートを POST'
+    mock: なし（テスト用のルート）
+    expected: 405、`Content-Type` が `application/problem+json`、`Allow` が `GET`
+  - name: test_register_error_handlers_when_details_snake
+    case: 正常
+    summary: 詳細のキーを camelCase にする
+    condition: '`details()` が `{"settings_path": "x", "missing": {"source_id": "a"}, "candidates": {"tests/test_main": ["rule-auth"]}}` を返す `ProjectIndexError` を送るルートを GET'
+    mock: なし（テスト用のルート）
+    expected: 本文に `settingsPath`・`missing.sourceId`・`nextSteps` があり、snake_case のフィールド名が無い。`candidates` のキーは `tests/test_main` のまま

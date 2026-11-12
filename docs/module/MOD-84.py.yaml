@@ -1,0 +1,442 @@
+id: MOD-84
+title: 索引のサーバー / 書き込み / service.py
+lead: '`write_docs`・`delete_docs` の操作の適用・検査・書き換えと、バージョンの確かめ。'
+test_files:
+- tests/unit/project_index/features/write/test_service.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      文書の書き込み ..> 書く場所の解決
+      文書の書き込み ..> 配信元ごとの排他
+      文書の書き込み ..> 文書を集める
+      文書の書き込み ..> バージョンの確かめ
+      文書の書き込み ..> オブジェクトの配列への書き戻し
+      文書の書き込み ..> 列名への読み替え
+      文書の書き込み ..> 操作を当てる
+      文書の書き込み ..> IDを作る
+      文書の書き込み ..> 新しい文書の置き場所
+      文書の書き込み ..> 文字列からの文書の組み立て
+      文書の書き込み ..> 文書の検査
+      文書の書き込み ..> 文書の検査 : Markdownの値を点検する
+      文書の書き込み ..> ファイルの置き換え
+      文書の書き込み ..> スクリプトの実行 : generators[]
+      文書の書き込み ..> 会話の記録 : edited
+      文書の削除 ..> 書く場所の解決
+      文書の削除 ..> 配信元ごとの排他
+      文書の削除 ..> バージョンの確かめ
+      文書の削除 ..> 操作を当てる : related を外す
+      文書の削除 ..> 文書の検査
+      class 文書の書き込み {
+        <<function>>
+      }
+      class 文書の削除 {
+        <<function>>
+      }
+      class 書く場所の解決 {
+        <<function>>
+      }
+      class 配信元ごとの排他 {
+        +握る(配信元の ID) ContextManager
+      }
+      class 文書を集める {
+        <<method>>
+      }
+      class バージョンの確かめ {
+        <<function>>
+      }
+      class オブジェクトの配列への書き戻し {
+        <<function>>
+      }
+      class 列名への読み替え {
+        <<function>>
+      }
+      class 操作を当てる {
+        <<function>>
+      }
+      class IDを作る {
+        <<function>>
+      }
+      class 新しい文書の置き場所 {
+        <<function>>
+      }
+      class 文字列からの文書の組み立て {
+        <<function>>
+      }
+      class 文書の検査 {
+        <<class>>
+      }
+      class ファイルの置き換え {
+        <<function>>
+      }
+      class スクリプトの実行 {
+        <<function>>
+      }
+      class 会話の記録 {
+        <<class>>
+      }
+      click 書く場所の解決 href "./MOD-7.py.yaml#書く場所の解決"
+      click 配信元ごとの排他 href "./MOD-82.py.yaml#配信元ごとの排他"
+      click 文書を集める href "./MOD-29.py.yaml#文書のストア"
+      click オブジェクトの配列への書き戻し href "./MOD-80.py.yaml#オブジェクトの配列への書き戻し"
+      click 列名への読み替え href "./MOD-80.py.yaml#列名への読み替え"
+      click 操作を当てる href "./MOD-80.py.yaml#操作を当てる"
+      click IDを作る href "./MOD-81.py.yaml#IDを作る"
+      click 新しい文書の置き場所 href "./MOD-83.py.yaml#新しい文書の置き場所"
+      click 文字列からの文書の組み立て href "./MOD-27.py.yaml#文字列からの文書の組み立て"
+      click 文書の検査 href "./MOD-75.py.yaml#文書の検査"
+      click ファイルの置き換え href "./MOD-99.py.yaml#ファイルの置き換え"
+      click スクリプトの実行 href "./MOD-88.py.yaml#スクリプトの実行"
+      click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
+functions:
+- name: check_version
+  title: バージョンの確かめ
+  kind: 関数
+  container: project_index/features/write/service.py
+  usecase: 書き込み
+  role: 検証
+  summary: '`expected_version` が今の文書と同じかを確かめる'
+  scope: public
+  thread_safe: true
+  args:
+  - name: document
+    title: 今の文書
+    type: Document
+    required: true
+    passing: positional
+    description: 今の文書
+  - name: expected
+    title: 読んだときのバージョン
+    type: str | Mapping[str, str]
+    required: true
+    passing: positional
+    description: バージョンか、項目のパス → 値のハッシュ
+  - name: last_read
+    title: 前回読んだ内容
+    type: LastRead | None
+    required: true
+    passing: keyword
+    description: 差分を作る元（無ければ差分を空にする）
+  returns:
+    type: None
+    description: 同じなら何も返さない
+  process: |-
+    1. 文字列なら `document.version` と比べる。辞書なら項目ごとに今の値の値のハッシュと比べる
+    2. 違う場合、今のバージョンと、`last_read` があればその内容と今の本文の差分の行（変更.差分の行）を添えた `VersionMismatchError` を送る（`next_steps` に読み直して呼び直すこと）
+  exceptions:
+  - name: VersionMismatchError
+    condition: バージョンが違う
+    message: '`{id} は参照した後に変わっています（今のバージョン {version}）`'
+  unit_tests:
+  - name: test_check_version_when_fields
+    case: 正常
+    summary: 項目ごとのハッシュ
+    condition: '`name` だけを変えた文書に、`{description: 今の値のハッシュ}`'
+    mock: なし
+    expected: 送らない
+  - name: test_check_version_when_mismatch
+    case: 異常
+    summary: 違うバージョン
+    condition: 古いバージョンと、その内容の前回読んだ内容
+    mock: なし
+    expected: '`VersionMismatchError` の `current` が今のバージョン、`diff` に `-`・`+` の行'
+    exception: バージョンが違う
+- name: write_docs
+  title: 文書の書き込み
+  kind: 関数
+  container: project_index/features/write/service.py
+  usecase: 書き込み
+  role: サービス
+  summary: '`write_docs` の要求を処理して書き込みの結果を返す'
+  scope: public
+  thread_safe: true
+  side_effects: 作業ツリーのファイルを作る・書き換える。`generators[]` を動かす。会話の記録に編集を残す
+  args:
+  - name: request
+    title: 書き込みの要求
+    type: WriteRequest
+    required: true
+    passing: positional
+    description: ツールの引数
+  - name: registry
+    title: 配信元の一覧
+    type: SourceRegistry
+    required: true
+    passing: injected
+    description: 配信中の配信元
+  - name: store
+    title: 文書のストア
+    type: DocumentStore
+    required: true
+    passing: injected
+    description: 今の文書を読み、書いた後にキャッシュを捨てる
+  - name: checker
+    title: 文書の検査
+    type: DocumentChecker
+    required: true
+    passing: injected
+    description: 書き込みの検査
+  - name: seen
+    title: 会話の記録
+    type: SeenStore
+    required: true
+    passing: injected
+    description: 前回読んだ内容と編集の記録
+  - name: locks
+    title: 配信元ごとの排他
+    type: SourceLocks
+    required: true
+    passing: injected
+    description: 書き込みを 1 つずつにする
+  - name: timeout_sec
+    title: 制限時間
+    type: float
+    required: true
+    passing: keyword
+    description: '`generators[]` の制限時間（`script_timeout_sec`）'
+  - name: now
+    title: 今
+    type: datetime | None
+    required: false
+    default: None
+    passing: keyword
+    description: テスト用。`created`・`updated` に入れる日時
+  returns:
+    type: WriteResult
+    description: 書き込みの結果
+  process: |-
+    1. `operations` が 1〜`OPERATIONS_MAX` 件でない・`op` ごとの必須のキーが無い場合、添字つきの違反で `InvalidArgumentError` を送る
+    2. 書く場所を解く（書く場所の解決）
+    3. 配信元の排他を握る（配信元ごとの排他.握る）
+    4. 今の文書を集め（文書のストア.文書を集める）、ID → 文書の辞書にする。変更を当てるファイルは、パス → 往復編集の読み込みの内容で持つ
+    5. 操作を順に当てる。失敗した操作は `failed` の行にして次へ進む
+       - `create` の場合、種類の行を引き（無ければ `UnknownKindError`）、`writable` でなければ `documents[].writable` の違反にする。ID が無ければ IDを作る（`ids.format` も無ければ `id` が必須の違反）。ID が既にあれば違反。置き場所は新しい文書の置き場所。Git 管理外の配信元では `created`・`updated` に `now` を入れる
+       - `update`・`replace` の場合、文書が無ければ近い ID を添えた `DocumentNotFoundError`。バージョンの確かめ（前回読んだ内容は会話の記録）。Git 管理外の配信元では `updated` に `now` を入れ、`replace` は `created` を引き継ぐ
+       - 操作を、`create` は `kind` の行、`update`・`replace` は文書の種類の行で、オブジェクトの配列への書き戻し（`update` は今の内容を渡す）にかけてから列名への読み替えにかける。`create` の ID は行の `metadata.id` の列（無ければ `id`）に入れる
+       - 操作を当てる。`records` の文書は配列の要素を、それ以外はファイルの内容を置き換える
+       - 変更を当てた後のファイルの内容を往復編集の書き出しで文字列にし、文字列からの文書の組み立てで文書にして、文書の検査.検査する（`on="write"`、`create` は `new=True`）。違反はスキーマの説明の添付にかけ（スキーマは文書のストア.文書に当てるスキーマ）、添字を付けて `failed` の行に入れる。添字を付けるときは `schema` を保つ
+       - 検査するで違反が無ければ、文書の検査.Markdownの値を点検する（`previous` は `update`・`replace` が操作の前の文書の `data`、`create` が `None`。`stopped` は同じ呼び出しの前の点検が返した `stopped`）。違反は添字を付けて `failed` の行に入れ、点検できなかったキーは成功した行の `unchecked` に入れる。返った `stopped` を次の操作へ引き継ぐ
+       - 後の操作が同じファイルに当たるときは、当てた後の内容に重ねる
+    6. `atomic` が `True` で `failed` があれば、最初の失敗の例外（`ValidationFailedError` は全ての違反を、`InvalidArgumentError` はその操作の違反を添字つきで）を送り、何も書かない
+    7. 成功した行の `version` は組み立てた文書のバージョン、`diff` は今の本文との差分の行（変更.差分の行）にする
+    8. `dry_run` なら `applied=False` で返す
+    9. 変わったファイルをファイルの置き換えで書き、文書のストア.キャッシュを捨てる
+    10. 書いた種類の `after_write` の生成を、ID の重なりを除いて順にスクリプトの実行（`cwd=target.base`・引数に書いたファイルのパス・`timeout_sec`・`at`）で動かす。`at` は、`target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`）。`ScriptError` は `[warning]` 書き込み後の生成に失敗した（配信元・生成の ID・理由）を書き、結果は変えない
+    11. 会話の記録に書いた文書を `edited` で残す
+    12. `applied=True` で返す
+  exceptions:
+  - name: InvalidArgumentError
+    condition: 件数・必須のキー・`text_edits` の一致・共通のキーと列名の重なり
+    message: '`引数が正しくありません: {違反の数} 件`'
+  - name: ValidationFailedError
+    condition: '`atomic` で検査に通らない操作がある'
+    message: '`検査に通らない操作があります: {違反の数} 件`'
+  - name: VersionMismatchError
+    condition: '`atomic` でバージョンが違う'
+    message: '`{id} は参照した後に変わっています（今のバージョン {version}）`'
+  - name: DocumentNotFoundError
+    condition: '`atomic` で無い文書を指した'
+    message: '`文書がありません: {id}`'
+  - name: UnknownKindError
+    condition: '`create` の種類が無い'
+    message: '`{source}: 種類 {kind} はありません`'
+  - name: SourceNotWritableError
+    condition: 書く場所の解決が送る
+    message: '`{id} はこの作業場所（{cwd}）から書き込めません`'
+  - name: TargetIsCloneError
+    condition: 書く場所の解決が送る
+    message: '`{id} のクローン本体には書き込みません`'
+  unit_tests:
+  - name: test_write_docs
+    case: 正常
+    summary: ワークツリーへの部分更新
+    condition: 'ワークツリー x の `cwd` で、文書 1 に `set: {name: 新しい名前}`'
+    mock: なし（一時フォルダの配信元とワークツリー）
+    expected: '`applied` が `True`、`status` が `updated`、ワークツリー x のファイルの `name` だけが変わり、クローン本体と commit は変わらない'
+  - name: test_write_docs_when_create
+    case: 正常
+    summary: ID を作って生成を動かす
+    condition: '`ids.format: {kind}-{slug}`・`after_write: [index]` の行に `create`'
+    mock: なし
+    expected: '`status` が `created`、`id` が `sample-...`、置き場所にファイルができ、`index` の生成が 1 回動く'
+  - name: test_write_docs_when_dry_run
+    case: 正常
+    summary: 試しに書く
+    condition: '`dry_run: true` で `set`'
+    mock: なし
+    expected: '`applied` が `False`、`diff` があり、ファイルは変わらない'
+  - name: test_write_docs_when_partial
+    case: 正常
+    summary: 一部だけ書く
+    condition: '`atomic: false` で通る操作と、スキーマに通らない操作'
+    mock: なし
+    expected: 0 番目が `updated`、1 番目が `failed` で `errors` に違反、0 番目のファイルだけ変わる
+  - name: test_write_docs_when_not_git
+    case: 正常
+    summary: Git 管理外の日時
+    condition: Git 管理外の配信元に `create`、続けて `update`
+    mock: '`now` に 2 つの日時'
+    expected: '`created` は 1 つ目の日時のまま、`updated` が 2 つ目の日時'
+  - name: test_write_docs_when_invalid
+    case: 異常
+    summary: 検査に通らない
+    condition: '`atomic: true` で 1 番目がスキーマに通らない'
+    mock: なし
+    expected: '`ValidationFailedError` の違反の `index` が 1 で、スキーマの違反は `schema` を持つ。どのファイルも変わらない'
+    exception: '`atomic` で検査に通らない操作がある'
+  - name: test_write_docs_when_version_mismatch
+    case: 異常
+    summary: 読んだ後に変わった
+    condition: 読んだ後に直接編集した文書へ、読んだときのバージョンで `set`
+    mock: なし
+    expected: '`VersionMismatchError` の `diff` に直接編集した行、ファイルは直接編集したまま'
+    exception: '`atomic` でバージョンが違う'
+  - name: test_write_docs_when_too_many
+    case: 異常
+    summary: 件数の上限
+    condition: 51 件の操作
+    mock: なし
+    expected: '`InvalidArgumentError` の違反の `path` が `operations`'
+    exception: 件数・必須のキー・`text_edits` の一致
+  - name: test_write_docs_when_metadata_mapped
+    case: 正常
+    summary: 共通のキー名で元の列に書く
+    condition: '行 `decisions` が `metadata: {name: title}`。文書 `d1` に `set: {name: 新しい名前}`、続けて `create`（`data: {name: 決定 2}`）'
+    mock: なし
+    expected: '`d1` のファイルの `title` だけが変わり `name` の列が無い。作ったファイルが `title: 決定 2` を持ち `name` を持たない'
+    exception: '-'
+  - name: test_write_docs_when_mdmark_warning
+    case: 異常
+    summary: Markdown の値に書き方の警告がある
+    condition: '`body` が `contentMediaType: text/markdown` の種類。`atomic: true` で 0 番目は `name` の `set`、1 番目は `body` の `set`。文書の検査.Markdownの値を点検するが 1 番目に `diagram_invalid` の違反を返す'
+    mock: '`DocumentChecker.check_markdown`（0 番目は空、1 番目は違反）'
+    expected: '`ValidationFailedError` の違反の `path` が `operations[1].body`、どのファイルも変わらない'
+    exception: '`atomic` で検査に通らない操作がある'
+  - name: test_write_docs_when_mdmark_unavailable
+    case: 正常
+    summary: mdmark を使えない
+    condition: '`body` の `set` を 2 件。1 件目の点検が `stopped` に R を入れて点検できなかったキーを返す'
+    mock: '`DocumentChecker.check_markdown`（受けた `stopped` を控える）'
+    expected: '`applied` が `True`、両方の行の `unchecked` が `body`（理由 R）、2 件目の呼び出しの `stopped` が R'
+    exception: '-'
+  - name: test_write_docs_when_tags_are_objects
+    case: 正常
+    summary: オブジェクトの配列のタグへ書き戻す
+    condition: '行 `rules` が `metadata: {tags: tags[].name, main_tags: tags[main].name}`。`tags: [{name: a, main: true}, {name: b}]` の文書 `r1` に `add_to: {tags: [c]}`、続けて `set: {main_tags: [c]}`'
+    mock: なし
+    expected: '`r1` のファイルの `tags` が 1 回目の後に `[{name: a, main: true}, {name: b}, {name: c}]`、2 回目の後に `[{name: a}, {name: b}, {name: c, main: true}]`'
+    exception: '-'
+- name: delete_docs
+  title: 文書の削除
+  kind: 関数
+  container: project_index/features/write/service.py
+  usecase: 書き込み
+  role: サービス
+  summary: '`delete_docs` の要求を処理して削除の結果を返す'
+  scope: public
+  thread_safe: true
+  side_effects: 作業ツリーのファイルを消す。`unlink` のときは参照元の文書を書き換える。`generators[]` を動かす
+  args:
+  - name: request
+    title: 削除の要求
+    type: DeleteRequest
+    required: true
+    passing: positional
+    description: ツールの引数
+  - name: registry
+    title: 配信元の一覧
+    type: SourceRegistry
+    required: true
+    passing: injected
+    description: 配信中の配信元
+  - name: store
+    title: 文書のストア
+    type: DocumentStore
+    required: true
+    passing: injected
+    description: 今の文書を読む
+  - name: checker
+    title: 文書の検査
+    type: DocumentChecker
+    required: true
+    passing: injected
+    description: 参照を外した文書の検査
+  - name: locks
+    title: 配信元ごとの排他
+    type: SourceLocks
+    required: true
+    passing: injected
+    description: 削除を 1 つずつにする
+  - name: timeout_sec
+    title: 制限時間
+    type: float
+    required: true
+    passing: keyword
+    description: '`generators[]` の制限時間'
+  returns:
+    type: DeleteResult
+    description: 削除の結果
+  process: |-
+    1. `targets` が 1〜`OPERATIONS_MAX` 件でなければ `InvalidArgumentError` を送る
+    2. 書く場所を解き、配信元の排他を握り、今の文書を集める（文書の書き込みと同じ）
+    3. 対象ごとに確かめる。失敗した対象は `failed` の行にする
+       - 文書が無ければ近い ID を添えた `DocumentNotFoundError`
+       - Git 管理外の配信元で種類の行が `writable` でなければ `DeleteNotAllowedError`
+       - バージョンの確かめ（前回読んだ内容は無し）
+       - 同じ配信元の残る文書のうち、メタデータの `related` に `to` が消す文書の ID で `source` の無い行を持つ文書を集める。あれば `on_referenced` が `fail` なら参照元を添えた `DocumentReferencedError`、`unlink` なら参照元の `related` の列（種類の行の `metadata.related` の列名。無ければ `related`）からその行を除く操作を作る
+    4. `atomic` が `True` で `failed` があれば、最初の失敗の例外を送る
+    5. 参照を外した文書を文書の検査に通す（違反は `ValidationFailedError`）
+    6. `dry_run` なら `applied=False` で、`unlinked` に参照を外す文書と外した後のバージョンを入れて返す
+    7. ファイル 1 つの文書はファイルを消し、`records` の文書は配列から要素を除いてファイルを置き換える（`body_file` の指すファイルは消さない）。参照を外した文書を書き、文書のストア.キャッシュを捨てる
+    8. 消した種類の `after_write` の生成を、文書の書き込みと同じに動かす（引数は消したファイルのパス）
+    9. `applied=True` で、`unlinked` に参照を外した文書と新しいバージョンを入れて返す
+  exceptions:
+  - name: DocumentReferencedError
+    condition: '`on_referenced: fail` で参照されている'
+    message: '`{id} は {参照元} から参照されています`'
+  - name: DeleteNotAllowedError
+    condition: Git 管理外の配信元で `writable` でない種類
+    message: '`{kind} は削除を許していません（documents[].writable）`'
+  - name: VersionMismatchError
+    condition: バージョンが違う
+    message: '`{id} は参照した後に変わっています（今のバージョン {version}）`'
+  - name: DocumentNotFoundError
+    condition: 無い文書を指した
+    message: '`文書がありません: {id}`'
+  unit_tests:
+  - name: test_delete_docs
+    case: 正常
+    summary: ワークツリーから消す
+    condition: 参照されていない文書 2 を消す
+    mock: なし
+    expected: '`status` が `deleted`、ワークツリーのファイルが無く、クローン本体のファイルは残る'
+  - name: test_delete_docs_when_unlink
+    case: 正常
+    summary: 参照も外す
+    condition: '文書 1 の `related` が指す文書 2 を `on_referenced: unlink` で消す'
+    mock: なし
+    expected: 文書 2 のファイルが無く、文書 1 の `related` に文書 2 が無く、`unlinked` に文書 1 と新しいバージョン
+  - name: test_delete_docs_when_records
+    case: 正常
+    summary: 配列の要素を消す
+    condition: '`records` の行の 2 件目を消す'
+    mock: なし
+    expected: ファイルの配列が 1 件になり、`body_file` の指すファイルは残る
+  - name: test_delete_docs_when_referenced
+    case: 異常
+    summary: 参照されている
+    condition: '同じ削除を `on_referenced: fail` で'
+    mock: なし
+    expected: '`DocumentReferencedError` の `referrers` が文書 1、どのファイルも変わらない'
+    exception: '`on_referenced: fail` で参照されている'
+  - name: test_delete_docs_when_not_allowed
+    case: 異常
+    summary: 削除を許していない
+    condition: 'Git 管理外の配信元で `writable: false` の種類の文書'
+    mock: なし
+    expected: '`DeleteNotAllowedError` の `kind` が種類の ID'
+    exception: Git 管理外の配信元で `writable` でない種類
+refs:
+- IF-6#
+- IF-7#

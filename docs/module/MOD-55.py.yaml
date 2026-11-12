@@ -1,0 +1,304 @@
+id: MOD-55
+title: 索引のサーバー / 検索 / service.py
+lead: '`search_docs` の条件の木・並べ替え・集計・量の上限。'
+test_files:
+- tests/unit/project_index/features/search/test_service.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      文書の検索 ..> 読む場所の解決
+      文書の検索 ..> 文書を集める
+      文書の検索 ..> 条件の確かめ
+      文書の検索 ..> 条件の照合
+      文書の検索 ..> 続きの位置
+      文書の検索 ..> 文書の検査 : on read
+      文書の検索 ..> 会話の記録 : 返し済み
+      文書の検索 ..> 検索の結果 : 返す
+      文書の検索 ..> 抜粋の検索
+      文書の検索 ..> 当たった行の数 : @matches
+      文書の検索 ..> 本文の範囲の選択 : sections・lines
+      文書の検索 ..> 範囲の本文
+      class 文書の検索 {
+        <<function>>
+      }
+      class 読む場所の解決 {
+        <<function>>
+      }
+      class 文書を集める {
+        <<method>>
+      }
+      class 条件の確かめ {
+        <<function>>
+      }
+      class 条件の照合 {
+        <<function>>
+      }
+      class 抜粋の検索 {
+        <<function>>
+      }
+      class 当たった行の数 {
+        <<function>>
+      }
+      class 本文の範囲の選択 {
+        <<function>>
+      }
+      class 範囲の本文 {
+        <<function>>
+      }
+      class 続きの位置 {
+        <<function>>
+      }
+      class 文書の検査 {
+        <<class>>
+      }
+      class 会話の記録 {
+        <<class>>
+      }
+      class 検索の結果 {
+        +総件数: int
+        +文書: list
+      }
+      click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
+      click 文書を集める href "./MOD-29.py.yaml#文書のストア"
+      click 条件の確かめ href "./MOD-53.py.yaml#条件の確かめ"
+      click 条件の照合 href "./MOD-53.py.yaml#条件の照合"
+      click 抜粋の検索 href "./MOD-56.py.yaml#抜粋の検索"
+      click 当たった行の数 href "./MOD-56.py.yaml#当たった行の数"
+      click 本文の範囲の選択 href "./MOD-50.py.yaml#本文の範囲の選択"
+      click 範囲の本文 href "./MOD-50.py.yaml#範囲の本文"
+      click 続きの位置 href "./MOD-51.py.yaml#続きの位置を作る"
+      click 文書の検査 href "./MOD-75.py.yaml#文書の検査"
+      click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
+      click 検索の結果 href "./MOD-58.py.yaml#検索の結果"
+functions:
+- name: search_docs
+  title: 文書の検索
+  kind: 関数
+  container: project_index/features/search/service.py
+  usecase: 検索
+  role: サービス
+  summary: '`search_docs` の要求を処理して検索の結果を返す'
+  scope: public
+  thread_safe: true
+  side_effects: 本文を返した文書を会話の記録に残す（`sections`・`lines` を渡した呼び出しを除く）。読み取りの `validators[]` を動かす
+  args:
+  - name: request
+    title: 検索の要求
+    type: SearchRequest
+    required: true
+    passing: positional
+    description: ツールの引数
+  - name: registry
+    title: 配信元の一覧
+    type: SourceRegistry
+    required: true
+    passing: injected
+    description: 配信中の配信元
+  - name: store
+    title: 文書のストア
+    type: DocumentStore
+    required: true
+    passing: injected
+    description: 文書を読む
+  - name: checker
+    title: 文書の検査
+    type: DocumentChecker
+    required: true
+    passing: injected
+    description: 読み取りの `validators[]`
+  - name: seen
+    title: 会話の記録
+    type: SeenStore
+    required: true
+    passing: injected
+    description: 返し済みの省略と記録
+  - name: today
+    title: 今日
+    type: date | None
+    required: false
+    default: None
+    passing: keyword
+    description: テスト用。`None` は今日（ローカル）
+  returns:
+    type: SearchResult
+    description: 検索の結果
+  process: |-
+    1. 読む場所を解く（読む場所の解決。`source`・`ref`・`worktree`・`cwd`・`outside_scope`）。結果の `outside_scope` は読んだ場所のどれかが作業範囲の外なら `True`
+    2. 場所ごとに文書を集める（文書のストア.文書を集める）。`problems` は `notes` に `{path} を読み込めないので除きました（{detail}）` で足す
+    3. 有効な文書の行ごとの文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）で使える項目を作り、条件の確かめをする
+       - 違反がある場合、違反と `describe(source, kind)` でスキーマを見ることを添えた `InvalidArgumentError` を送る
+    4. `limit` が `LIMIT_MAX` を超えれば丸め、`max_chars` が `MAX_CHARS_LIMIT` を超えれば丸めて、それぞれ `notes` で知らせる。`limit` が 1 未満なら `InvalidArgumentError` を送る
+    5. 条件の照合で当たった文書を集め（`term` がある場合は、場所ごとにエイリアスの集め（文書のストア）をし、用語に当たる文書の ID（文書のストア）に入る文書だけを残す。`has_alias_rows` が `False` の場所は `{id}: alias_type を持つ documents の行が無いので term に該当する文書はありません` を `notes` に足す）、`total_count` と（複数の配信元なら）`per_source` を数える。読んだ配信元の ID を `,` で繋いで `source_label` にする
+    6. 条件の木から、`field` が `body`・`*` の条件を `and`・`or` の下だけたどって集める（`not` の下はたどらない。以下、本文の条件）
+    7. `fields` か `order_by` に `@matches` がある場合、当たった文書ごとに本文の全文と本文の条件で当たった行の数を数える（本文の条件が無ければ 0）
+    8. `group_by` がある場合、当たった文書の値ごとの件数を `groups` にする（配列は要素ごとに数え、値が無い文書は `（なし）`）
+       - 値は条件の比較と同じ `normalize`（NFKC と `casefold`）をした値でまとめ、1 つの文書の同じ値は 1 件と数える
+       - `value` は、まとめた元の表記のうち付いている文書が最も多いもの（同数なら値の昇順で先のもの）にする
+    9. `view` が `count` の場合、ここで返す
+    10. `order_by` のキーの順に並べる（`order_by` が `None` なら `id` の昇順。`@matches` は 7 で数えた数。日時の項目の空と値が無い文書は向きによらず末尾。同じ順位は配信元の順・`id` の昇順）。`order_by` が `None` で、`filter` が `id` の `eq` の条件 1 つのときは、その `values` の順に並べる
+    11. 始まりの位置を `skip` と、`cursor` があれば続きの位置を読む（指紋は要求のハッシュ）の和にし、`limit` 件を取り出す
+    12. 文書ごとに返す項目を作る
+        - `ids` は `id`、`summary` は `id` と `SUMMARY_FIELDS`、`full` はさらに `body` と全てのメタデータ。`fields` を足し `exclude_fields` を除く。`@matches` は 7 で数えた数
+        - 本文を返す場合、`repeat_seen` が `False` で `sections`・`lines` が無いなら、会話の記録.返し済みに当たる文書の `body` を `SEEN_MARK` にする
+        - `sections`・`lines` がある場合、本文を行の分割で分け、本文の範囲の選択で範囲を決める（Markdownの本文かが `False` の文書には `sections` を渡さず空の範囲にする）。`ranges` に範囲、`total_lines` に行数を入れ、本文を範囲の本文にする。`sections` で範囲が空の文書は、`False` の文書なら `{id}: YAML の文書は sections で切り出せません。lines を使用してください`、`True` の文書なら `{id}: sections に該当する見出しがありません（{sections}）` を `notes` に足す
+        - `snippets` がある場合、本文の条件で抜粋の検索をし（`before`・`after` は `None` なら `context_lines`、`max_count` は `max_per_doc`、`ranges` は切り出した範囲）、`body` を返さない
+        - 文字列の値が項目の文字数を超えたら切る（切り出した本文は切り出した後に切る）
+        - `view` が `summary`・`full` で `ref` が無く、`body` を `SEEN_MARK` にしていない場合、`path` を文書の場所（文書のストア.文書の場所）にし、`scope` を次のとおり決める。`body` を返さない（`snippets` も無い）なら `summary`、`snippets` を返すか `sections`・`lines` で切り出したか `body` を切ったか `records` の要素で `body_path` が無いなら `section`、それ以外は `full`
+    13. 返した文書を順に読み取りの検査（文書の検査.検査する、`on="read"`）にかけ、違反を `{id}: {rule}（{path}）` で `notes` に足す
+    14. 文書を足すごとに結果の文字数（抜粋は各行の `{行番号}:{行}` の文字数）を数え、`max_chars` を超える文書の手前で止める。止めたら `truncated` を `True` にし、`notes` に打ち切ったことと、`cursor` で続きを取るか `fields` を絞るか `view: ids` で取り直すことを足す
+    15. 返していない文書が残れば、続きの位置を作る（`next_cursor`）
+    16. `sections`・`lines` が無い場合、本文を返した文書（`SEEN_MARK` にしたものを除く）を会話の記録に `body` で残す（会話キーは `session_id`・`agent_id`）
+    17. 検索の結果を返す
+  exceptions:
+  - name: SourceNotReadableError
+    condition: 読む場所の解決が送る
+    message: '`{id} はこの作業場所（{cwd}）から参照できません`'
+  - name: SourceNotServedError
+    condition: 読む場所の解決が送る
+    message: '`{id} は配信していません`'
+  - name: WorktreeNotMatchedError
+    condition: 読む場所の解決が送る
+    message: '`{worktree} は {id} のワークツリーに該当しません`'
+  - name: RefNotFoundError
+    condition: 文書のストアが送る
+    message: '`ref {value} を解決できません`'
+  - name: InvalidArgumentError
+    condition: '知らない項目・型の合わない値・読めない `cursor`・`limit` が 1 未満・束のキーが 1 つでない・`@matches` を条件に使う・`sections` と `lines` を同時に渡す・`view: full` 以外で `sections`・`lines` を渡す'
+    message: '`引数が正しくありません: {違反の数} 件`'
+  unit_tests:
+  - name: test_search_docs
+    case: 正常
+    summary: 作業中の配信元の一覧
+    condition: '`cwd` が sample のクローンで、引数なし'
+    mock: なし（一時フォルダの配信元）
+    expected: '`total_count` が 2、`items` の `values` が `SUMMARY_FIELDS`、`id` の昇順'
+  - name: test_search_docs_when_full_and_seen
+    case: 正常
+    summary: 本文と返し済み
+    condition: '`view: full`・`session_id` ありで 2 回、3 回目は `repeat_seen: true`'
+    mock: なし
+    expected: 1 回目と 3 回目は本文で `scope` が `full`、2 回目は `SEEN_MARK` で `path`・`scope` が `None`
+  - name: test_search_docs_when_count_grouped
+    case: 正常
+    summary: 件数と集計
+    condition: '`view: count`・`group_by: tags`（`[a, b]`・`[a]`・無し）'
+    mock: なし
+    expected: '`items` が空、`groups` が `a: 2`・`b: 1`・`（なし）: 1`'
+  - name: test_search_docs_when_limited
+    case: 正常
+    summary: 上限と打ち切りと続き
+    condition: '`limit: 150` と、本文が 9,000 文字の文書 5 件を `view: full`・`max_chars: 20000`'
+    mock: なし
+    expected: '`notes` に 100 に丸めたこと、`returned` が 2、`truncated` が `True`、`next_cursor` で残りの 3 件のうち 2 件が返る'
+  - name: test_search_docs_when_order_by_dates
+    case: 正常
+    summary: 日時の空は末尾
+    condition: '`order_by: [{field: updated, direction: desc}]` で `updated` が無い文書を含む'
+    mock: なし
+    expected: 日時の降順の後ろに `updated` の無い文書
+  - name: test_search_docs_when_unreadable_file
+    case: 正常
+    summary: 読めないファイル
+    condition: 壊れた YAML を 1 つ含む配信元
+    mock: なし
+    expected: 残りの文書を返し、`notes` に壊れたファイルのパス
+  - name: test_search_docs_when_read_validator
+    case: 正常
+    summary: 読み取りの検査の警告
+    condition: '`on: [read]` の検査が違反を 1 件出す'
+    mock: なし
+    expected: 文書を返し、`notes` に違反
+  - name: test_search_docs_when_unknown_field
+    case: 異常
+    summary: 知らない項目
+    condition: '`{field: nmae, op: eq, values: [x]}`'
+    mock: なし
+    expected: '`InvalidArgumentError` の違反の `path` が `filter.field`、`fix` に `name`'
+    exception: 知らない項目
+  - name: test_search_docs_when_sources_all
+    case: 正常
+    summary: 全ての配信元
+    condition: '`source: "*"` で、sample と notes は読め、other は読めない'
+    mock: なし
+    expected: '`per_source` が sample と notes だけで、`items` に `source` がある'
+  - name: test_search_docs_when_id_values
+    case: 正常
+    summary: '`id` の `eq` の `values` の順'
+    condition: '`order_by` なしで `filter: {field: id, op: eq, values: [b, a]}`'
+    mock: なし
+    expected: '`items` の `id` が `b`・`a` の順'
+  - name: test_search_docs_when_id_values_and_order_by
+    case: 正常
+    summary: '`order_by` を明示した `id` の `eq`'
+    condition: '`order_by: [{field: id}]` と `filter: {field: id, op: eq, values: [b, a]}`'
+    mock: なし
+    expected: '`items` の `id` が `a`・`b` の順'
+  - name: test_search_docs_when_location
+    case: 正常
+    summary: 文書の場所と範囲
+    condition: '同じ配信元を `view: full`、`view: full`・`max_chars_per_field: 10`、`snippets` あり、`view: summary`、`view: ids`、`ref: HEAD` で呼ぶ。`body_file` の無い `records` の要素を含む'
+    mock: なし（一時フォルダの git リポジトリ）
+    expected: '`path` が文書の絶対パスで、`scope` が順に `full`（`records` の要素は `section`）・`section`・`section`・`summary`。`ids` と `ref` では `path`・`scope` が `None`'
+    exception: '-'
+  - name: test_search_docs_when_snippets_regex
+    case: 正常
+    summary: 正規表現で当てた文書の抜粋
+    condition: '本文の 2 行目が `# TODO x` の文書に `filter: {field: body, op: regex, values: ["^#\\s*TODO"]}`、`snippets: {before: 0, after: 0}`'
+    mock: なし
+    expected: '`items[0].snippets` が 1 つで、行が `(2, "# TODO x", True)`'
+    exception: '-'
+  - name: test_search_docs_when_ordered_by_matches
+    case: 正常
+    summary: 当たった数で並べる
+    condition: '`notes/a.md`（`検索` を含む行が 3 行）・`notes/b.md`（同 1 行）・`notes/archive/c.md`（同 2 行）に、`filter: {and: [{field: body, op: contains, values: [検索]}, {not: {field: "@path", op: glob, values: ["notes/archive/**"]}}]}`・`fields: ["@matches"]`・`order_by: [{field: "@matches", direction: desc}]`'
+    mock: なし
+    expected: '`items` が `notes/a.md`（`values["@matches"]` が 3）・`notes/b.md`（同 1）の順。`fields` に `@matches` を渡さない呼び出しの `values` は `@matches` を持たない'
+  - name: test_search_docs_when_matches_under_not
+    case: 正常
+    summary: '`not` の下の本文の条件は数えない'
+    condition: '同じ 3 件に `filter: {not: {and: [{field: body, op: contains, values: [検索]}, {field: tags, op: eq, values: [x]}]}}`・`fields: ["@matches"]`（`a` だけがタグ `x`）'
+    mock: なし
+    expected: '`items` が `b`・`c` で、`values["@matches"]` がどちらも 0'
+  - name: test_search_docs_when_part_of_body
+    case: 正常
+    summary: 本文の一部と返し済み
+    condition: '10 行の `notes/a.md`（6 行目 `## 決まったこと`、9 行目 `## 残り`）を `session_id: s1`・`view: full` で、`sections: [決まったこと]`、`lines: {offset: 3, limit: 2}`、どちらも無し、もう一度 `sections: [決まったこと]` の順に呼ぶ'
+    mock: なし
+    expected: '1 回目は `body` が 6〜8 行目で `scope` が `section`、`ranges` が `[BodyRange(6, 8)]`、`total_lines` が 10。2 回目は `ranges` が `[BodyRange(3, 4)]`。3 回目は全文を `scope: full` で返し `SEEN_MARK` にならず、`ranges`・`total_lines` が `None`。4 回目は返し済みでも 6〜8 行目を返す'
+  - name: test_search_docs_when_part_of_body_with_snippets
+    case: 正常
+    summary: 切り出した範囲の抜粋と当たる見出しの無い文書
+    condition: '同じ文書（7 行目と 2 行目に `検索`）に `filter: {field: body, op: contains, values: [検索]}`・`sections: [決まったこと]`・`snippets: {context_lines: 0}` と、YAML の文書と、`body_file` が `.md` を指す文書に `sections: [無い見出し]`'
+    mock: なし
+    expected: 1 つ目は抜粋が行番号 7 の 1 行だけ。2 つ目はどちらも `body` が空で `ranges` が `[]`、`notes` に YAML の文書と当たる見出しが無いことの 2 行
+  - name: test_search_docs_when_grouped_normalized
+    case: 正常
+    summary: 表記だけが違う値をまとめる
+    condition: '`view: count`・`group_by: tags`（`[mcp]`・`[MCP, mcp, 設計]`・`[ｍｃｐ]`）'
+    mock: なし
+    expected: '`groups` が `mcp: 3`・`設計: 1` だけ'
+    exception: '-'
+  - name: test_search_docs_when_grouped_tie
+    case: 正常
+    summary: 表記の文書の数が同じ
+    condition: '`view: count`・`group_by: status`（`Draft`・`draft`）'
+    mock: なし
+    expected: '`groups` が `Draft: 2` だけ（値の昇順で先の表記）'
+    exception: '-'
+  - name: test_search_docs_when_term
+    case: 正常
+    summary: 用語で引く
+    condition: '`alias_type: term` の行の「作業範囲」（`aliases: [scope, 担当範囲]`）を持つ配信元に `term: 担当範囲`、`term: SCOPE`、`term: 担当` と、`alias_type` の行が無い配信元に `term: 担当範囲`'
+    mock: なし（一時フォルダの配信元）
+    expected: 1 つ目と 2 つ目は作業範囲だけ、3 つ目は 0 件、4 つ目は 0 件で `notes` に `alias_type を持つ documents の行が無い` ことがある
+    exception: '-'
+  - name: test_search_when_records_fields
+    case: 正常
+    summary: records の行の要素の項目で絞り込む
+    condition: '行 `notes`（`records: files`、`schema` が `templates/files.schema.yaml` のコピーの `files.items.properties` に `owner: {type: string}` を追加したもの）に要素 `{path: a.md, owner: alice}`・`{path: b.md, owner: bob}`、`filter` が `owner = alice`'
+    mock: なし
+    expected: '`a.md` の要素 1 件で、`InvalidArgumentError` を送らない'
+refs:
+- IF-2#

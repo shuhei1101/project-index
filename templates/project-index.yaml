@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/shuhei1101/project-index/v{バージョン}/schemas/project-index.schema.json
+# 配信元に配置する project-index.yaml の雛形。/project-index:setup が 1 行目のタグと name・description・paths を書き換える
+# prompts の行と converters は content/prompts/ のプロンプトの雛形。/project-index:setup が content/prompts/ を見つけた配信元にだけ残す
+version: "3"
+name: sample
+description: 配信元の説明（1 文）
+documents:
+  - id: files
+    paths: [files.yaml]
+    title: ファイル
+    schema: schemas/files.schema.yaml
+    records: files
+    body_file: path
+# タグを {name, main} のオブジェクトの配列で持つ行は、metadata で取り出す
+#    metadata:
+#      tags: tags[].name
+#      main_tags: tags[main].name
+  - id: prompts
+    paths: [content/prompts/**/*.yaml]
+    title: プロンプト
+    schema: schemas/prompt.schema.yaml
+    converter: prompt-doc
+    metadata:
+      name: name
+      description: description
+      tags: tags
+converters:
+  - id: prompt-doc
+    run: [project-index, prompt-doc]
+# nav の auto は、search_docs の filter と同じ条件で並べる文書を絞れる
+# nav:
+#   tabs:
+#     - title: MCP
+#       items:
+#         - auto:
+#             document: files
+#             filter:
+#               and:
+#                 - {field: tags, op: eq, values: [mcp]}
+#                 - not: {field: tags, op: eq, values: [設計]}

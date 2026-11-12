@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=../../../../../templates/prompt.schema.yaml
+id: mcp/admin/tools/restart
+name: restart の description
+description: 管理の MCP の restart が何をするかを伝える
+kind: tool
+lang: ja
+parts:
+  - id: body
+    texts:
+      - lang: ja
+        text: |-
+          応答を返却してからサーバーを停止し、同じプロセス ID で project-index serve を再起動する。再起動の後は /mcp で再接続する。

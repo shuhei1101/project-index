@@ -1,0 +1,816 @@
+id: IF-6
+title: "文書の書き込み"
+entry:
+  kind: mcp_tool
+  value: '`write_docs`'
+flows:
+  - name: 正常系
+    summary: ワークツリーの文書を `set` で部分更新する
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+      - name: サンプルの配信元
+        description: 文書の種類を 1 つ（スキーマと YAML 2 件）と `project-index.yaml` を持つ git リポジトリと、そのワークツリー（`.claude/worktrees/x`）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: 入力
+        description: '`worktree` にワークツリー x のパス、文書 1 の `update`（`expected_version` と `set: {name}`）'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: worktree: x, operations: update 文書 1
+        T->>T: scope.write と、書く先がワークツリーであることを確かめる
+        T->>T: 排他ロックを取り、バージョンを比べる
+        T->>T: 変更を当てた文書をスキーマと validators に通す
+        T->>WT: 一時ファイルに書いてから置き換える
+        T-->>C: applied: true、新しい version と差分
+      ```
+    expected:
+      - '`applied: true` で、文書 1 の `status` が `updated`、`version` が書き込み前と違う'
+      - ワークツリー x の文書 1 の `name` が `set` の値になり、他の項目は変わらない
+      - sample のクローン本体のファイルは変わらない
+      - ワークツリー x の commit が増えていない
+    test: test_normal
+  - name: 正常系（文書を作る）
+    summary: '`create` で `ids.format` の ID の文書を作り、`generators[]` を流す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: サンプルの配信元
+        description: 正常系の sample に `ids.format`（`{kind}-{slug}`）と、文書の一覧を書き出す `generators[]` を加えたもの
+      - name: 入力
+        description: '`create`・`kind`・`data`。`id` は省く'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: operations: create・kind・data
+        T->>T: ids.format から id を作り、重複しないことを確かめる
+        T->>T: スキーマと validators に通す
+        T->>WT: kind の documents の置き場所に YAML を書く
+        T->>WT: generators のスクリプトを流す
+        T-->>C: 作った文書の id と version
+      ```
+    expected:
+      - '`status` が `created` で、`ids.format` に合う `id` と `version` を返す'
+      - ワークツリー x の `documents[].paths` に当たる場所に新しい YAML ができる
+      - '`generators[]` が書き出す文書の一覧に、作った文書の行が入る'
+    test: test_normal_when_create
+  - name: 正常系（項目の操作を組み合わせる）
+    summary: '`unset`・`add_to`・`remove_from`・`text_edits` と `replace` を当てる'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: 文書 1 に `unset`（任意の項目）・`add_to`（`tags` に `c`）・`remove_from`（`tags` から `a`）・`text_edits`（`description` の一部）を持つ `update`、文書 2 に `replace`
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: operations: update 文書 1, replace 文書 2
+        T->>T: 操作を順に当て、検査に通す
+        T->>WT: 2 つの YAML を書く
+        T-->>C: updated と replaced
+      ```
+    expected:
+      - 文書 1 の任意の項目が無く、`tags` が `b`・`c` になり、`description` の一部だけが置き換わる
+      - 文書 2 が `data` の全項目と同じになり、`data` に無い項目は残らない
+    test: test_normal_when_operations_combined
+  - name: 正常系（試しに書く）
+    summary: '`dry_run: true` で検証と差分だけを返す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '正常系と同じ `update` と `dry_run: true`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: operations: update 文書 1, dry_run: true
+        T->>T: 本番と同じ検証とバージョンの確認
+        T-->>C: applied: false と差分
+      ```
+    expected:
+      - '`applied` が `false` で、`results[0].diff` に差分がある'
+      - ワークツリー x のファイルは変わらない
+    test: test_normal_when_dry_run
+  - name: 正常系（一部だけ書く）
+    summary: '`atomic: false` で通る操作だけを書き、失敗を添字つきで返す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '0 番目は通る `update`、1 番目はスキーマの必須の項目を `unset` する `update`。`atomic: false`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: operations: 2 件, atomic: false
+        T->>T: 1 番目が検査に通らない
+        T->>WT: 0 番目だけを書く
+        T-->>C: 0 番目は updated、1 番目は failed と違反
+      ```
+    expected:
+      - '`applied: true` で、`results[0].status` が `updated`、`results[1].status` が `failed`'
+      - '`results[1].errors` に違反したパス・決まり・直し方がある'
+      - 文書 1 だけが書き換わる
+    test: test_normal_when_not_atomic
+  - name: 正常系（Git 管理外の配信元に書く）
+    summary: Git 管理外の配信元に書き、`created`・`updated` を付ける
+    setup:
+      - name: Mock
+        description: なし
+      - name: 書ける配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
+        notes: id `memo`。`scope.write` は sample のフォルダ
+      - name: 入力
+        description: '`source: memo` の `create`、続けて同じ文書の `update`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant MF as memo のフォルダ
+
+        C->>T: source: memo, operations: create
+        T->>T: スキーマと validators に通し、created・updated を付ける
+        T->>MF: YAML を書く
+        T-->>C: id と version
+      ```
+    expected:
+      - memo のフォルダに新しい YAML ができ、`created`・`updated` に書いた日時が入る
+      - 続けての `update` で `updated` だけが新しい日時になり、`created` は変わらない
+    test: test_normal_when_non_git_source
+  - name: 正常系（mdmark を使えない）
+    summary: mdmark の CLI が無いか点検を終えられないときは、点検せずに書き込み、点検できなかった理由を返す
+    setup:
+      - name: Mock
+        description: 1 回目は `PATH` に mdmark の CLI を置かない。2 回目は、終了コード 1 で `ずれ {件数} 件` の行を出さずに終わるスクリプトに差し替える
+      - name: Markdown のキーを持つ種類
+        description: 異常系（Markdown の値に mdmark の警告がある・ValidationFailedError）と同じ sample の種類
+      - name: 入力
+        description: 文書 1 の `body` に `<!-- flow -->` を含む値を `set` する update 1 件
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: operations: update 文書 1・set body
+        T->>T: スキーマと validators に通す
+        T->>T: mdmark の CLI が見つからず、body の点検を飛ばす
+        T->>WT: 一時ファイルに書いてから置き換える
+        T-->>C: applied: true、results[0].unchecked（body・理由）
+      ```
+    expected:
+      - '1 回目も 2 回目も `applied: true` で、`results[0].status` が `updated`、ワークツリー x の文書 1 の `body` が `set` の値になる'
+      - '1 回目の `results[0].unchecked` が `[{path: body, reason: ...}]` で、`reason` に mdmark の CLI が見つからないことが入る'
+      - '2 回目の `results[0].unchecked` の `reason` に、mdmark の点検が結果の行を出さずに終了コード 1 で終わったことと標準エラーの末尾が入る'
+    test: test_normal_when_mdmark_unavailable
+  - name: 異常系（検査に通らない・ValidationFailedError）
+    summary: 1 件でも検査に通らなければ何も書かない
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: 正常系（一部だけ書く）と同じ 2 件で、`atomic` は既定（`true`）。1 番目の操作は、加えて項目 `count` に文字列を `set` する
+        notes: '`unset` する項目のスキーマは `title`・`description`・`examples` を持ち、`x-rules` を持たない。`count` のスキーマは `type: integer` だけを持つ'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: operations: 2 件
+        T->>T: 全ての操作を当ててから検査し、1 番目が通らない
+        T-->>C: isError（添字 1・違反したパス・決まり・直し方・違反した項目のスキーマの説明）
+      ```
+    expected:
+      - '`isError: true` で、添字 1 の 2 件の違反のパス・決まり・直し方を返す'
+      - '`unset` した項目の違反の `schema` に `title`・`description`・`examples` が入り、`x-rules` とスキーマのほかの項目は入らない'
+      - '`count` の違反は `schema` のキーを持たない'
+      - 0 番目の文書も書き換わらない
+    test: test_error_when_validation_failed
+  - name: 異常系（Markdown の値に mdmark の警告がある・ValidationFailedError）
+    summary: 変えた Markdown のキーの値に mdmark の描画時の書き方の警告があれば何も書かない
+    setup:
+      - name: Mock
+        description: 'mdmark の CLI を、`check --text -` の標準入力に `<!-- flow -->` を含む値を受けると `-:3: diagram_invalid: {内容}` と `ずれ 1 件` を、`<!-- embed: x -->` だけを含む値を受けると `-:1: unknown_mark: {内容}` と `ずれ 1 件` を出して終了コード 1 で終わる、`PATH` の先頭に置いたスクリプトに差し替える'
+      - name: Markdown のキーを持つ種類
+        description: 'sample の種類のスキーマが、`contentMediaType: text/markdown` を持つキー `body` を持つ'
+        notes: 文書 1 の `body` は `<!-- flow -->` を含まない
+      - name: 入力
+        description: '2 件。0 番目は通る update、1 番目は文書 1 の `body` に `<!-- flow -->` を含む値を `set` する update。`atomic` は既定（`true`）'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant MD as mdmark の CLI
+
+        C->>T: operations: 2 件
+        T->>T: 全ての操作を当て、スキーマと validators に通す
+        T->>MD: check --text -（標準入力に文書 1 の body の値）
+        MD-->>T: -:3: diagram_invalid: {内容}、ずれ 1 件、終了コード 1
+        T-->>C: isError（添字 1・body のパス・mdmark の種類と行・内容）
+      ```
+    expected:
+      - '`isError: true` で、添字 1 の違反として、パス `body`、決まり `mdmark の diagram_invalid（3 行目）`、直し方に mdmark の内容を返す'
+      - 0 番目の文書も文書 1 も書き換わらない
+      - mdmark の CLI は 1 回だけ呼ばれる（0 番目の操作は Markdown のキーを変えない）
+      - '続けて文書 1 の `body` に `<!-- embed: x -->` だけを含む値を `set` する update は、mdmark が `unknown_mark` を返しても書き込まれ、`results[0].status` が `updated` になる'
+    test: test_error_when_mdmark_warning
+  - name: 異常系（書き込めない配信元・SourceNotWritableError）
+    summary: '`scope.write` に当たらない作業場所からの書き込みを断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 読み取りだけの配信元
+        description: Git 管理外のフォルダ。`scope.read` は sample のフォルダ、`scope.write` は持たない
+        notes: id `notes`
+      - name: 入力
+        description: '`source: notes` の `update`、`cwd` は sample のクローン本体'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: source: notes, operations: update
+        T->>T: notes の scope.write に cwd が当たらない
+        T-->>C: isError（notes は読み取りだけ、使える配信元の一覧）
+      ```
+    expected:
+      - '`isError: true` で、notes に書き込めないことと、今の作業場所から使える配信元の一覧を返す'
+      - notes のフォルダのファイルは変わらない
+    test: test_error_when_source_not_writable
+  - name: 異常系（書く先がクローン本体・TargetIsCloneError）
+    summary: Git の配信元のクローン本体には書かない
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`cwd` は sample のクローン本体で、`worktree` を渡さない `update`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: operations: update 文書 1
+        T->>T: 書く先がクローン本体になる
+        T-->>C: isError（クローン本体には書かない、worktree でワークツリーを指すこと）
+      ```
+    expected:
+      - '`isError: true` で、クローン本体には書かないことと、`worktree` でワークツリーを指すことを返す'
+      - sample のクローン本体のファイルは変わらない
+    test: test_error_when_target_is_clone
+  - name: 異常系（読んだ後に変わった・VersionMismatchError）
+    summary: 読んだときのバージョンでは、直接編集した内容を上書きしない
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直接編集
+        description: 文書 1 を読んで `version` を持った後、ワークツリー x の文書 1 の YAML をテストが書き換える
+      - name: 入力
+        description: 読んだときの `expected_version` での `update`
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: operations: update 文書 1・読んだときの expected_version
+        T->>WT: 今の文書 1 を読む
+        T->>T: 今のバージョンと expected_version が違う
+        T-->>C: isError（今のバージョンと差分、読み直して呼び直すこと）
+      ```
+    expected:
+      - '`isError: true` で、今のバージョン・読んだときとの差分・読み直して呼び直すことを返す'
+      - 文書 1 の YAML は直接編集した内容のまま
+      - 今のバージョンで呼び直すと書き込め、直接編集した内容のうち `set` しなかった項目が残る
+    test: test_error_when_version_mismatch
+  - name: 異常系（知らない種類・UnknownKindError）
+    summary: 配信元に無い `kind` の `create` を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`kind: no-such-kind` の `create`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: operations: create・kind: no-such-kind
+        T-->>C: isError（知らない種類と、配信元の種類の一覧）
+      ```
+    expected:
+      - '`isError: true` で、`no-such-kind` と sample の種類の一覧を返す'
+      - ファイルは増えない
+    test: test_error_when_unknown_kind
+  - name: 異常系（無い文書・DocumentNotFoundError）
+    summary: 無い `id` の `update` を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`id: doc-l`（文書 1 の ID の綴り違い）の `update`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: operations: update・id: doc-l
+        T-->>C: isError（見つからない ID と近い ID の候補）
+      ```
+    expected:
+      - '`isError: true` で、`doc-l` と近い ID の候補 `doc-1` を返す'
+    test: test_error_when_document_not_found
+  - name: 異常系（引数の誤り・InvalidArgumentError）
+    summary: 件数の上限・必須のキー・`text_edits` の一致を確かめる
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: 1 回目は 51 件の `operations`、2 回目は `expected_version` の無い `update`、3 回目は 2 か所に一致する `old` の `text_edits`
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: operations: 51 件
+        T-->>C: isError（上限 50 件）
+        C->>T: operations: expected_version の無い update
+        T-->>C: isError（operations[0].expected_version が必須）
+      ```
+    expected:
+      - 1 回目が上限 50 件を超えたことを返す
+      - 2 回目が `operations[0].expected_version` が必須であることを返す
+      - 3 回目が `old` の一致した数（2）と、`replace_all` か前後の文字を含めることを返す
+      - いずれもファイルを書き換えない
+    test: test_error_when_invalid_argument
+  - name: 異常系（配信していない配信元・SourceNotServedError）
+    summary: 起動時の検証で外した配信元への書き込みを断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 検証に失敗する配信元
+        description: '`documents[0].paths` が無い配信元。`scope.write` は sample のフォルダ'
+        notes: id `broken`
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: source: broken
+        T-->>C: isError（配信していない配信元、違反したキーのパスと理由）
+      ```
+    expected:
+      - '`isError: true` で、broken を配信していないことと `documents[0].paths` の違反を返す'
+    test: test_error_when_source_not_served
+  - name: 異常系（ワークツリーに当たらない・WorktreeNotMatchedError）
+    summary: '`worktrees` に当たらない `worktree` を断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`worktree` に `worktrees` に当たらない一時フォルダのパス'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: worktree: 当たらないパス
+        T-->>C: isError（渡したパスと worktrees の値）
+      ```
+    expected:
+      - '`isError: true` で、渡したパスと sample の `worktrees` の値を返す'
+      - 一時フォルダにファイルを書かない
+    test: test_error_when_worktree_not_matched
+  - name: 異常系（置き場所が除外の名前に当たる・InvalidArgumentError）
+    summary: '`create` で決めた置き場所のファイル名が行の `exclude[]` に当たるとき、何も書かずに断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 文書の行
+        description: 'sample の行 `rule`（`paths: [docs/rule/*.yaml]`・`exclude: [index.yaml]`）'
+      - name: 入力
+        description: '`operations` は `create`・`kind: rule`・`id: index` の 1 件。`worktree` にワークツリー x'
+        notes: 置き場所は `docs/rule/index.yaml` になる
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: operations: create・kind rule・id index
+        T->>T: 置き場所 docs/rule/index.yaml のファイル名が exclude に当たる
+        T-->>C: isError（operations[0].kind・置き場所が exclude に当たる）
+      ```
+    expected:
+      - '`isError: true` で、違反の `path` が `operations[0].kind`、決まりに置き場所 `docs/rule/index.yaml` が行 `rule` の `exclude` に当たること、`fix` に `id` を変えるか `exclude` から外すことを返す'
+      - ワークツリー x に `docs/rule/index.yaml` が作られない
+    test: test_error_when_placement_excluded
+    refs:
+      - SC-7#scenarios[異常シナリオ（置き場所が除外の名前に当たる）]
+  - name: 正常系（共通のキー名で書く）
+    summary: 共通のキー名で渡した値を、行の `metadata` の対応で元の列に書く
+    setup:
+      - name: Mock
+        description: なし
+        notes: '-'
+      - name: 列名の違う種類
+        description: ワークツリー x の `decisions/d1.yaml` が `title` の列を持ち、`name` の列を持たない
+        notes: '行 `decisions` は `paths: [decisions/*.yaml]`・`metadata: {name: title}`'
+      - name: 入力
+        description: '1 回目は `update`（`id: d1`・`set: {name: 新しい名前}`）。2 回目は `create`（`kind: decisions`・`data` に `name: 決定 2`）。3 回目は `update`（`set: {title: 別の名前}`）。4 回目は `update`（`set: {name: a, title: b}`）'
+        notes: '-'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: update d1・set {name: 新しい名前}
+        T->>T: metadata の対応で name を title へ読み替える
+        T->>T: スキーマと validators に通す
+        T->>WT: d1 の title を書き換える
+        T-->>C: status updated・diff
+        C->>T: create・kind decisions・data {name: 決定 2}
+        T->>WT: title 列に値を持つ YAML を書く
+        T-->>C: status created
+      ```
+    expected:
+      - 1 回目の `diff` が `title` の行だけを書き換え、d1 に `name` 列ができない
+      - '2 回目に作った YAML が `title: 決定 2` を持ち、`name` 列を持たない'
+      - 3 回目（列名をそのまま渡す）も d1 の `title` を書き換える
+      - 4 回目は `InvalidArgumentError` で、`name` と `title` が同じ列を指すことを返し、d1 を書き換えない
+    test: test_normal_when_metadata_mapped
+  - name: 正常系（オブジェクトの配列のタグを書く）
+    summary: '`tags[].name` の対応を持つ種類で、共通のキー `tags`・`main_tags` への操作をオブジェクトの配列へ書き戻す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: オブジェクトの配列のタグを持つ種類
+        description: 'ワークツリー x の `rules/r1.yaml` が `tags: [{name: a, main: true}, {name: b}]` を持つ'
+        notes: '行 `rules` は `metadata: {tags: tags[].name, main_tags: tags[main].name}`'
+      - name: 入力
+        description: '1 回目は `update`（`id: r1`・`add_to: {tags: [c]}`）。2 回目は `update`（`remove_from: {tags: [b]}`）。3 回目は `update`（`set: {tags: [a, c, d]}`）。4 回目は `update`（`set: {main_tags: [c]}`）。5 回目は `update`（`set: {main_tags: [z]}`）。6 回目は `update`（`add_to: {main_tags: [d]}`）。7 回目は `update`（`remove_from: {main_tags: [c]}`）。8 回目は `update`（`unset: [main_tags]`）。9 回目は `create`（`kind: rules`・`data: {id: r2, tags: [{name: a, main: true}]}`）。10 回目は `update`（`set: {tags: a}`）。11 回目は `update`（`add_to: {tags: [{name: c}]}`）'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: update r1・add_to {tags: [c]}
+        T->>T: tags[].name の対応で {name: c} の要素にする
+        T->>T: スキーマと validators に通す
+        T->>WT: r1.yaml を書き換える
+        T-->>C: status updated・diff
+        C->>T: update r1・set {main_tags: [c]}
+        T->>T: c の要素の main を true、他の要素の main を削除する
+        T->>WT: r1.yaml を書き換える
+        T-->>C: status updated・diff
+        C->>T: create r2・data {tags: [{name: a, main: true}]}
+        T->>T: tags の値が名前の配列でないことを違反にする
+        T-->>C: isError（operations[0].data.tags は名前の配列で渡す）
+        C->>T: update r1・set {tags: a}
+        T-->>C: isError（operations[0].set.tags は名前の配列で渡す）
+        C->>T: update r1・add_to {tags: [{name: c}]}
+        T-->>C: isError（operations[0].add_to.tags は名前の配列で渡す）
+      ```
+    expected:
+      - '1 回目の後の r1 の `tags` が `[{name: a, main: true}, {name: b}, {name: c}]`'
+      - '2 回目の後の r1 の `tags` が `[{name: a, main: true}, {name: c}]`'
+      - '3 回目の後の r1 の `tags` が `[{name: a, main: true}, {name: c}, {name: d}]`'
+      - '4 回目の後の r1 の `tags` が `[{name: a}, {name: c, main: true}, {name: d}]`'
+      - 5 回目は `InvalidArgumentError` で、`z` が `tags` に無いことを返し、r1 を書き換えない
+      - '6 回目の後の r1 の `tags` が `[{name: a}, {name: c, main: true}, {name: d, main: true}]`'
+      - '7 回目の後の r1 の `tags` が `[{name: a}, {name: c}, {name: d, main: true}]`'
+      - '8 回目の後の r1 の `tags` が `[{name: a}, {name: c}, {name: d}]`'
+      - 9 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].data.tags`、`rule` が名前（文字列）の配列で渡すことを示し、r2 を作らない
+      - 10 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].set.tags` で、r1 を書き換えない
+      - 11 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].add_to.tags` で、r1 を書き換えない
+    test: test_normal_when_tags_are_objects
+  - name: 正常系（変更していない項目の引用符を保つ）
+    summary: 書き換えた文書の、変更していない項目の引用符の種類を元のまま書き出す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 引用符を持つ文書
+        description: 'ワークツリー x の文書 1 が、単一引用符の値（`description: ''2020-12''`）、`: ` を含む二重引用符の値（`name: "A: b"`）、引用符なしの値（`weight: 1`）を持つ'
+      - name: 入力
+        description: '`update`（`id`: 文書 1・`set: {weight: 2}`）'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: update 文書 1・set {weight: 2}
+        T->>T: 引用符の種類を保って読み、変更を当てて検査に通す
+        T->>WT: 文書 1 を書き換える
+        T-->>C: status updated・diff
+      ```
+    expected:
+      - '書き換えた文書 1 の YAML の、`weight` の行以外の行が書き込み前の文字列と一致し、`description: ''2020-12''` と `name: "A: b"` が残る'
+      - '`results[0].diff` が `weight` の行の `-`・`+` だけを持つ'
+    test: test_normal_when_quotes_preserved
+  - name: 正常系（ツールの説明）
+    summary: ツールの説明に、範囲のファイルの作成・削除・改名で管理用の YAML の行を修正することを含める
+    setup:
+      - name: Mock
+        description: なし
+      - name: サンプルの配信元
+        description: 正常系と同じ sample
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as /mcp
+
+        C->>M: tools/list
+        M-->>C: ツールの一覧と説明
+      ```
+    expected:
+      - '`write_docs` の `description` が「範囲のファイルを作成・削除・改名したら、管理用の YAML の行を修正する」を含む'
+    test: test_normal_when_tool_description
+lead: 文書の作成・部分更新・置き換えを配列で受け、変更を当てた後の文書を配信元のスキーマと `validators[]` に通してから書き込む。project-index は commit しない。
+identifier: write_docs
+permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーにだけ書く
+idempotent: false
+side_effects: 作業ツリー（Git 管理外の配信元はそのフォルダ）の文書の YAML を作る・書き換える。`generators[]` のスクリプトを流して生成物を書き出す。Git 管理外の配信元ではメタデータの `created`・`updated` を付ける。
+callers:
+  - SC-7#scenarios[正常シナリオ]
+  - SC-7#scenarios[正常シナリオ（変更していない項目の引用符を保つ）]
+  - SC-7#scenarios[異常シナリオ（Markdown の値に mdmark の警告がある）]
+  - SC-7#scenarios[正常シナリオ（mdmark の CLI が無い）]
+exclusivity: 配信元ごとの排他ロックの中で、読み込み・バージョンの確認・検査・書き込みを行う。後から来た呼び出しはロックを待つ
+request:
+  - name: source
+    type: str
+    required: false
+    default: なし（作業中の配信元）
+    location: argument
+    description: 配信元の ID
+  - name: worktree
+    type: str
+    required: false
+    default: なし（`cwd` がワークツリーの中ならそのワークツリー）
+    location: argument
+    description: 書き込むワークツリーのパス
+    constraints: 配信元の設定の `worktrees` に当たるパスだけ
+  - name: operations
+    type: list[Operation]
+    required: true
+    location: argument
+    description: 並べた順に適用する操作
+    constraints: 1〜50 件
+  - name: operations[].op
+    type: Literal['create', 'update', 'replace']
+    required: true
+    location: argument
+    description: '`create` は新しい文書、`update` は部分更新、`replace` は全項目の置き換え'
+    notes: upsert は置かない
+  - name: operations[].kind
+    type: str
+    required: false
+    default: なし（`create` では必須）
+    location: argument
+    description: 種類（`documents[].id`）。スキーマと置き場所を決める
+  - name: operations[].id
+    type: str
+    required: false
+    default: なし（`update`・`replace` では必須。`create` で省くと `ids.format` から作る）
+    location: argument
+    description: 対象の文書の ID
+    constraints: '`ids.format` に合い、配信元の中で重複しない'
+  - name: operations[].expected_version
+    type: str | dict[str, str]
+    required: false
+    default: なし（`update`・`replace` では必須）
+    location: argument
+    description: 読んだときのバージョン
+    notes: '`update` では項目のパスごとのハッシュも受ける'
+  - name: operations[].data
+    type: dict
+    required: false
+    default: なし（`create`・`replace` では必須）
+    location: argument
+    description: 文書の全項目
+  - name: operations[].set
+    type: dict
+    required: false
+    default: なし
+    location: argument
+    description: 項目に値を入れる。オブジェクトは再帰的にマージし、配列と値は置き換える
+    notes: '`update` だけ'
+  - name: operations[].unset
+    type: list[str]
+    required: false
+    default: なし
+    location: argument
+    description: 消す項目のパス
+    notes: '`update` だけ'
+  - name: operations[].add_to
+    type: dict[str, list]
+    required: false
+    default: なし
+    location: argument
+    description: 配列の項目の末尾へ要素を追加する
+    notes: '`update` だけ'
+  - name: operations[].remove_from
+    type: dict[str, list]
+    required: false
+    default: なし
+    location: argument
+    description: 配列の項目から一致する要素を削除する
+    notes: '`update` だけ'
+  - name: operations[].text_edits
+    type: 'list[{field: str, old: str, new: str, replace_all: bool}]'
+    required: false
+    default: なし
+    location: argument
+    description: 文字列の項目の一部を置き換える
+    constraints: '`replace_all` が `false` のとき `old` が 1 か所だけ一致すること'
+    notes: '`update` だけ'
+  - name: atomic
+    type: bool
+    required: false
+    default: '`true`'
+    location: argument
+    description: '`true` は 1 件でも失敗したら何も書かない。`false` は成功分を書き、失敗分を添字つきで返す'
+  - name: dry_run
+    type: bool
+    required: false
+    default: '`false`'
+    location: argument
+    description: 本番と同じ検証・バージョンの確認・差分を返し、書き込まない
+  - name: cwd
+    type: str
+    required: false
+    default: なし（どの `scope.write` にも当たらない）
+    location: argument
+    description: 作業場所
+    notes: フックが入れる
+  - name: session_id
+    type: str
+    required: false
+    default: なし
+    location: argument
+    description: 会話キー
+    notes: フックが入れる
+  - name: agent_id
+    type: str
+    required: false
+    default: なし（メインの会話）
+    location: argument
+    description: 会話キー（サブエージェント）
+    notes: フックが入れる
+request_example: |-
+  ```json
+  {
+    "worktree": "/path/to/sample/.claude/worktrees/x",
+    "operations": [
+      {"op": "update", "id": "doc-1", "expected_version": "9d0e11", "set": {"name": "新しい名前"}},
+      {"op": "create", "kind": "sample", "data": {"name": "文書 3", "description": "3 件目"}}
+    ]
+  }
+  ```
+response:
+  - name: applied
+    type: bool
+    description: 1 件以上をファイルへ書いたか
+    notes: '`dry_run: true` のときは常に `false`'
+  - name: results[].index
+    type: int
+    description: '`operations` の添字'
+  - name: results[].id
+    type: str
+    description: 文書の ID
+  - name: results[].status
+    type: Literal['created', 'updated', 'replaced', 'failed']
+    description: 操作の結果
+  - name: results[].version
+    type: str
+    description: 書いた後のバージョン
+    notes: '`failed` では返さない'
+  - name: results[].diff
+    type: str
+    description: git と同じ `+`・`-` の差分の行
+    notes: '`updated`・`replaced` と `dry_run` のとき'
+  - name: results[].errors
+    type: 'list[{path: str, rule: str, fix: str, schema?: {title?: str, description?: str, x-rules?: list, examples?: list, x-bad-examples?: list}}]'
+    description: 違反ごとの項目のパス・決まり・直し方と、違反した項目のスキーマの説明
+    notes: '`failed` のときだけ。`schema` の中身は制約の「違反へ添えるスキーマの説明」'
+  - name: results[].unchecked
+    type: 'list[{path: str, reason: str}]'
+    description: mdmark の点検に通す Markdown のキーのうち、点検できなかったキーのパスと理由
+    notes: '点検できなかったキーがあるときだけ。`failed` では返さない'
+response_example: |-
+  ```json
+  {"applied": true, "results": [
+    {"index": 0, "id": "doc-1", "status": "updated", "version": "c1aa02", "diff": "- name: 文書 1\n+ name: 新しい名前"},
+    {"index": 1, "id": "sample-doc-3", "status": "created", "version": "7b2f90"}
+  ]}
+  ```
+response_notes: '`format` によらず JSON を返し、structuredContent と text に同じ JSON を入れる。'
+exceptions:
+  - name: なし（正常終了）
+    condition: '全ての操作を書いた（`atomic: false` で一部が失敗したときも、失敗分を `failed` として返して正常終了）'
+  - name: ValidationFailedError
+    condition: '変更を当てた後の文書がスキーマか `validators[]` に通らないか、変えた Markdown のキーの値に mdmark の描画時の書き方の警告がある（`atomic: true`）'
+    notes: '違反ごとの添字・パス・決まり・直し方を添える。スキーマの違反には、違反した項目のスキーマの説明（`schema`）も添える'
+  - name: SourceNotWritableError
+    condition: '`cwd` が配信元の `scope.write` に当たらない'
+    notes: 今の作業場所から使える配信元の一覧を添える
+  - name: TargetIsCloneError
+    condition: Git の配信元で、書く先がクローン本体になる
+    notes: '`worktree` でワークツリーを指すことを添える'
+  - name: VersionMismatchError
+    condition: '`expected_version` が今のバージョンと違う'
+    notes: 今のバージョンと差分、読み直して呼び直すことを添える
+  - name: UnknownKindError
+    condition: '`create` の `kind` が配信元の種類に無い'
+    notes: その配信元の種類の一覧を添える
+  - name: DocumentNotFoundError
+    condition: '`update`・`replace` の `id` の文書が無い'
+    notes: 見つからなかった ID と近い ID の候補を添える
+  - name: InvalidArgumentError
+    condition: 操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の置き場所のファイル名が行の `exclude[]` に当たる・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ
+  - name: SourceNotServedError
+    condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
+  - name: WorktreeNotMatchedError
+    condition: '`worktree` が配信元の `worktrees` に当たらない'
+constraints:
+  - item: 件数
+    constraint: 1 回の `operations` は最大 50 件
+  - item: 書き込みの方式
+    constraint: 一時ファイルに書いてから置き換える
+  - item: 変更していない項目の書き出し
+    constraint: 変更していない項目は、コメント・順序・字下げ・引用符の種類（単一引用符・二重引用符・引用符なし）を元のまま書き出す
+    notes: 改行を含む引用符なしの文字列だけをブロックのリテラル（`|-`）で書く
+  - item: 検査
+    constraint: 全ての操作を当ててから 1 回だけスキーマと `validators[]` に通し、通った文書の点検するキーの値を mdmark の点検に通す
+  - item: Markdown のキー
+    constraint: '種類のスキーマで `contentMediaType: text/markdown` を持つ文字列のキー。`$ref` の先・`properties`・`items` をたどり、配列の要素の中のキーも含める'
+    notes: '`contentMediaType` を持つキーが無い種類は、mdmark の CLI を呼ばない'
+  - item: 点検するキーの値
+    constraint: Markdown のキーのうち、操作を当てる前の文書と値が違うキーの値（`create` は値を持つ全ての Markdown のキー）。値が文字列でないキーは点検しない
+    notes: 変えていないキーの既存の警告では書き込みを止めない
+  - item: mdmark の点検の呼び出し
+    constraint: '`PATH` の `mdmark` を、点検する値ごとに `check --text -` で起動し、値を標準入力に渡す。制限時間は端末の設定の `script_timeout_sec`'
+    notes: 起動するフォルダは書き込む配信元の作業ツリーの直下（`mdmark.config.yaml` があればその設定で点検する）
+  - item: mdmark の点検の結果
+    constraint: '終了コード 0 はずれ無し。終了コード 1 で最後の行が `ずれ {件数} 件` のときは、`-:{行}: {種類}: {内容}` の行のうち種類が `diagram_invalid`・`syntax_warning`（描画時の書き方の警告）の行ごとに、パスをキーのパス、決まりを `mdmark の {種類}（{行} 行目）`、直し方を内容にした違反にする。ほかの種類の行（`unknown_mark`・`diagram_` で始まる配置のずれ・`missing_file`）では書き込みを止めない。それ以外（CLI が見つからない・制限時間を超えた・最後の行が `ずれ {件数} 件` でない）は点検できなかったとして `results[].unchecked` に理由を入れ、書き込みは止めない'
+    notes: 1 回の呼び出しの中で CLI が見つからなかった・制限時間を超えた後は、残りの値の点検も同じ理由で飛ばす
+  - item: commit
+    constraint: project-index は commit しない
+  - item: 注釈
+    constraint: '`readOnlyHint: false`・`destructiveHint: false`'
+  - item: タイムアウト
+    constraint: 制限なし（mdmark の点検は 1 回の起動ごとに `script_timeout_sec`）
+  - item: ツールの説明
+    constraint: 「範囲のファイルを作成・削除・改名したら、管理用の YAML の行を修正する」を含める
+    notes: D-163。索引へ反映するフックを置かないため
+  - item: 共通のキー名
+    constraint: '`data`・`set`・`add_to`・`remove_from` のキーと、`unset`・`text_edits[].field` の項目のパスの先頭のキーが、種類の行の `metadata` に書いた共通のキーなら、対応する列名（入れ子は `.` でつないだパス）へ読み替えてから当てる。列名をそのまま渡したキーと、`metadata` に書いていないキーは読み替えない'
+    notes: 共通のキーと列名を同じ操作に両方渡すと `InvalidArgumentError`
+  - item: オブジェクトの配列のタグの書き戻し
+    constraint: '行の `metadata` が `tags: tags[].name` のとき、`add_to: {tags: [x]}` は `{name: x}` の要素を末尾に追加し、`remove_from: {tags: [x]}` は `name` が `x` の要素を削除する。`set: {tags: [...]}` は渡した名前の並びで配列を置き換え、元からあった名前の要素は `main` を含む他のキーを保つ。`main_tags`（`tags[main].name`）は要素の `main` を書き換える。`set: {main_tags: [...]}` は渡した名前の要素の `main` を `true`、それ以外の要素の `main` を削除する。`add_to: {main_tags: [...]}` は渡した名前の要素に `main: true` を付け、`remove_from: {main_tags: [...]}` は渡した名前の要素の `main` を削除する。`unset: [main_tags]` は全ての要素の `main` を削除する'
+    notes: '`main_tags` の `set`・`add_to` に `tags` に無い名前を渡したときは `InvalidArgumentError` を返す。`remove_from` に無い名前を渡したときは何もしない。`tags`・`main_tags` の `data`・`set`・`add_to`・`remove_from` に名前（文字列）の配列でない値（オブジェクトの配列。`data`・`set` は文字列 1 つも）を渡したときは、配列へ書き戻さず `InvalidArgumentError` を返す'
+  - item: 違反へ添えるスキーマの説明
+    constraint: 'スキーマの違反（`validators[]` の違反・引数の誤りは除く）ごとに、違反した項目に当たるスキーマの定義から `title`・`description`・`x-rules`・`examples`・`x-bad-examples` のうちスキーマが持つキーだけを `schema` に入れる。`required` の違反は無かったキーの `properties` の定義、それ以外は違反した値に当てた定義（`$ref` を解いた後）から取る。どのキーも持たない項目は `schema` のキーを出さない'
+    notes: 'スキーマの全文は返さない。同じ応答で同じ定義を指す違反が続くときも、違反ごとに添える'
+  - item: 当てるスキーマ
+    constraint: '`documents[].schema` でほかの配信元を指す種類は、参照したリビジョンのスキーマで検査する（読み方は配信元の検査の制約「ほかの配信元のスキーマの参照」）'
+refs:
+  - SC-7#scenarios[正常シナリオ]
+  - SC-9#scenarios[異常シナリオ（読んだ後に変わった文書へ書き込む）]
+test_file: tests/integration/server/test_write_docs.py

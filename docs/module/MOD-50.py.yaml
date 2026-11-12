@@ -1,0 +1,122 @@
+id: MOD-50
+title: 索引のサーバー / 検索 / body_parts.py
+lead: 本文の切り出し。
+test_files:
+- tests/unit/project_index/features/search/test_body_parts.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      文書の検索 ..> 本文の範囲の選択 : sections・lines
+      文書の検索 ..> 範囲の本文
+      本文の範囲の選択 ..> 見出しの行
+      本文の範囲の選択 ..> 行の分割
+      class 文書の検索 {
+        <<function>>
+      }
+      class 行の分割 {
+        <<function>>
+      }
+      class 見出しの行 {
+        <<function>>
+      }
+      class 本文の範囲の選択 {
+        <<function>>
+      }
+      class 範囲の本文 {
+        <<function>>
+      }
+      click 文書の検索 href "./MOD-55.py.yaml#文書の検索"
+      click 行の分割 href "./MOD-56.py.yaml#行の分割"
+      click 見出しの行 href "./MOD-52.py.yaml#見出しの行"
+functions:
+- name: select_ranges
+  title: 本文の範囲の選択
+  kind: 関数
+  container: project_index/features/search/body_parts.py
+  usecase: 検索
+  role: 変換
+  summary: '`sections`・`lines` から、本文の切り出す行の範囲を決める'
+  scope: public
+  thread_safe: true
+  args:
+  - name: lines
+    title: 行
+    type: Sequence[str]
+    required: true
+    passing: positional
+    description: 本文の行の並び（行の分割の結果）
+  - name: sections
+    title: 返す節
+    type: Sequence[str] | None
+    required: true
+    passing: keyword
+    description: 要求の `sections`。Markdown の文書のときだけ渡す
+  - name: line_range
+    title: 返す行
+    type: LineRange | None
+    required: true
+    passing: keyword
+    description: 要求の `lines`
+  returns:
+    type: list[BodyRange]
+    description: 本文の先頭からの、重ならない範囲。当たるものが無ければ空
+  process: |-
+    1. `sections` がある場合、見出しの行を引き、文字列が `sections` のどれかと完全一致する見出しごとに、見出しの行から、次の同じか上の階層の見出しの前の行（無ければ本文の最後の行）までを範囲にする
+    2. `line_range` がある場合、`offset` から `limit` 行（`None` なら本文の最後の行）までを、本文の行数で切り詰めて範囲にする。`offset` が行数を超えれば空
+    3. 始まりの行の順に並べ、重なる範囲（親と子の節を両方渡したときなど）を 1 つにまとめて返す
+  unit_tests:
+  - name: test_select_ranges_when_sections
+    case: 正常
+    summary: 節の範囲
+    condition: 1 行目 `# a`、3 行目 `## 経緯`、6 行目 `## 決まったこと`、7 行目 `### 細目`、9 行目 `## 残り` の 10 行に、`sections=["決まったこと", "細目"]`
+    mock: なし
+    expected: '`[BodyRange(6, 8)]`（子の `細目` は親の範囲にまとめる）'
+  - name: test_select_ranges_when_lines
+    case: 正常
+    summary: 行の範囲と末尾
+    condition: 10 行に `LineRange(offset=3, limit=2)`、`LineRange(offset=8)`、`LineRange(offset=11)`
+    mock: なし
+    expected: '`[BodyRange(3, 4)]`・`[BodyRange(8, 10)]`・`[]`'
+  - name: test_select_ranges_when_no_heading
+    case: 正常
+    summary: 当たる見出しが無い
+    condition: '`sections=["無い見出し"]`'
+    mock: なし
+    expected: '`[]`'
+  status: planned
+- name: join_ranges
+  title: 範囲の本文
+  kind: 関数
+  container: project_index/features/search/body_parts.py
+  usecase: 検索
+  role: 変換
+  summary: 範囲の行をつないだ本文を作る
+  scope: public
+  thread_safe: true
+  args:
+  - name: lines
+    title: 行
+    type: Sequence[str]
+    required: true
+    passing: positional
+    description: 本文の行の並び
+  - name: ranges
+    title: 範囲
+    type: Sequence[BodyRange]
+    required: true
+    passing: positional
+    description: 本文の範囲の選択の結果
+  returns:
+    type: str
+    description: 範囲の行を先頭から `\n` でつないだ文字列。範囲が空なら空文字
+  process: 1. 範囲ごとに `start_line`〜`end_line` の行を取り出し、全ての行を `\n` でつなぐ
+  unit_tests:
+  - name: test_join_ranges
+    case: 正常
+    summary: 複数の範囲
+    condition: '`["a", "b", "c", "d"]` に `[BodyRange(1, 1), BodyRange(3, 4)]`'
+    mock: なし
+    expected: '`"a\nc\nd"`'
+  status: planned

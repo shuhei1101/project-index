@@ -1,0 +1,179 @@
+id: SC-2
+title: "project-indexを入れる"
+scenarios:
+- name: 正常シナリオ
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
+    notes: '`claude -p` を動かす環境の `PATH` に mdmark の CLI を置かない'
+  - name: Claude Code の設定の場所
+    description: '`CLAUDE_CONFIG_DIR` が指すテスト用の一時フォルダ。プラグイン `project-index` をこの場所のユーザースコープに入れておく'
+    notes: '`settings.json` の env に `PROJECT_INDEX_CONFIG` が無い'
+  - name: project-index のクローン
+    description: テスト用の一時フォルダにクローンした project-index
+    notes: 引数にこのパスを渡す。ポート 8786 が空き
+  - name: 端末の設定の場所
+    description: テスト用の一時フォルダの `settings.yaml`
+    notes: ファイルは無い。場所の質問にこのパスを答える（既定の `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml` と違う場所）
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      actor U as 利用者
+      participant SK as global-setup のスキル
+      participant CF as 端末の設定・Claude Code の設定
+      participant DD as project-index
+
+      U->>SK: /project-index:global-setup {クローンのパス}
+      SK->>CF: 端末の設定が無いことを確かめる
+      SK->>U: 端末の設定の場所を聞く
+      U-->>SK: テスト用の一時フォルダの settings.yaml
+      SK->>DD: クローンで依存を入れる（uv sync）
+      SK->>CF: 雛形から端末の設定を作る（version・clone・sources は空）
+      SK->>CF: 既定と違う場所なので settings.json の env に PROJECT_INDEX_CONFIG を書く
+      SK->>SK: PATH に mdmark の CLI が無いことを確かめる
+      SK->>DD: project-index serve を切り離して起動する
+      SK->>DD: /mcp につながり、ツールの一覧を取る
+      SK-->>U: 作ったもの・つながった結果・mdmark の CLI の入れ方と、次に /project-index:setup を実行する案内を出す
+    ```
+  expected:
+  - '端末の設定の `settings.yaml` が、`version` に project-index のバージョン、`clone` に引数のパス、`sources: []` を持ち、端末の設定のスキーマの検証に通る'
+  - Claude Code の設定の場所の `settings.json` の env の `PROJECT_INDEX_CONFIG` が、その `settings.yaml` の絶対パスを指す。env のほかのキーは変わらない
+  - '`127.0.0.1:8786` を待ち受ける project-index のプロセスが 1 つだけあり、`/mcp` のツールが 7 つ返る'
+  - スキルの最後の応答に、作った端末の設定のパスと `/project-index:setup` の案内がある
+  - スキルの最後の応答に、mdmark の CLI の入れ方（`npm install -g github:shuhei1101/mdmark`）の案内がある
+  - テストを流した端末の `~/.claude` と `~/.config/project-index` は変わらない
+  test: test_normal
+- name: 正常シナリオ（端末の設定に足りないキーがある）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行）
+  - name: Claude Code の設定の場所
+    description: 正常シナリオと同じ。env の `PROJECT_INDEX_CONFIG` が端末の設定を指す
+  - name: 端末の設定
+    description: '`version` が project-index と同じで、必須のキー `clone` が無い `settings.yaml`'
+    notes: '`sources` に配信元 sample の 1 行を持つ'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      actor U as 利用者
+      participant SK as global-setup のスキル
+      participant CF as 端末の設定
+
+      U->>SK: /project-index:global-setup
+      SK->>CF: 端末の設定を読み、clone が無いことを得る
+      SK->>U: 足りないキー clone だけを聞く
+      U-->>SK: クローンのパス
+      SK->>CF: 端末の設定の version を project-index のバージョンと比べる（同じ）
+      SK->>CF: clone を書き足す
+      SK-->>U: 書き足したキーと、つながった結果を出す
+    ```
+  expected:
+  - 利用者への質問は `clone` の 1 つだけで、端末の設定の場所は聞かない
+  - '`settings.yaml` に `clone` が入り、`sources` の sample の行とほかのキーの値は変わらない'
+  - env の `PROJECT_INDEX_CONFIG` は変わらない
+  test: test_normal_when_terminal_config_lacks_keys
+- name: 正常シナリオ（XDG_CONFIG_HOME の下に作る）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
+  - name: Claude Code の設定の場所
+    description: 正常シナリオと同じ。env に `PROJECT_INDEX_CONFIG` が無い
+    notes: '`claude -p` を動かす環境の `XDG_CONFIG_HOME` にテスト用の一時フォルダを入れる'
+  - name: project-index のクローン
+    description: 正常シナリオと同じ
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      actor U as 利用者
+      participant SK as global-setup のスキル
+      participant CF as 端末の設定・Claude Code の設定
+      participant DD as project-index
+
+      U->>SK: /project-index:global-setup {クローンのパス}
+      SK->>CF: $XDG_CONFIG_HOME/project-index/settings.yaml が無いことを確かめる
+      SK->>U: 端末の設定の場所を聞く（既定は $XDG_CONFIG_HOME/project-index/settings.yaml）
+      U-->>SK: 既定の場所
+      SK->>CF: 雛形から端末の設定を作る
+      SK->>DD: project-index serve を切り離して起動する
+      SK->>DD: /mcp につながり、ツールの一覧を取る
+      SK-->>U: 作ったもの・つながった結果を出す
+    ```
+  expected:
+  - '端末の設定が `$XDG_CONFIG_HOME/project-index/settings.yaml` にでき、`~/.config/project-index` は変わらない'
+  - 既定の場所なので、Claude Code の設定の場所の `settings.json` の env に `PROJECT_INDEX_CONFIG` が無い
+  - '`127.0.0.1:8786` を待ち受ける project-index のプロセスが 1 つだけあり、`/mcp` のツールが 7 つ返る'
+  test: test_normal_when_xdg_config_home_set
+- name: 正常シナリオ（端末の設定が古い）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行）
+  - name: Claude Code の設定の場所
+    description: '`CLAUDE_CONFIG_DIR` が指すテスト用の一時フォルダ。env の `PROJECT_INDEX_CONFIG` がテスト用の一時フォルダの端末の設定を指す'
+  - name: 端末の設定
+    description: '`version` が project-index より 1 つ前のバージョンの `settings.yaml`'
+    notes: そのバージョンからの移し替えの手順がキーを 1 つ改名する（破壊的な手順を持たない）
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      actor U as 利用者
+      participant SK as global-setup のスキル
+      participant DD as project-index migrate
+      participant CF as 端末の設定
+
+      U->>SK: /project-index:global-setup {クローンのパス}
+      SK->>CF: version を project-index のバージョンと比べる（設定が古い）
+      SK->>DD: project-index migrate --plan
+      DD-->>SK: 当てる手順の一覧（破壊的な手順なし）
+      SK-->>U: 当てる手順を示す
+      SK->>DD: project-index migrate
+      DD->>CF: バックアップを取り、手順を古い順に当て、version を書き換える
+      SK->>CF: スキーマで検証する
+      SK-->>U: 当てた手順と、つながった結果を出す
+    ```
+  expected:
+  - '`settings.yaml` の `version` が project-index のバージョンになり、改名したキーが新しい名前で元の値を持つ'
+  - 当てる前の `settings.yaml` のバックアップがあり、中身が当てる前と同じ
+  - 当てた手順がスキルの応答に並ぶ
+  test: test_normal_when_terminal_config_old
+- name: 異常シナリオ（端末の設定が新しい）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行）
+  - name: Claude Code の設定の場所
+    description: '`CLAUDE_CONFIG_DIR` が指すテスト用の一時フォルダ。env の `PROJECT_INDEX_CONFIG` がテスト用の一時フォルダの端末の設定を指す'
+  - name: 端末の設定
+    description: '`version` が project-index より新しいバージョンの `settings.yaml`'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      actor U as 利用者
+      participant SK as global-setup のスキル
+      participant CF as 端末の設定
+
+      U->>SK: /project-index:global-setup {クローンのパス}
+      SK->>CF: version を project-index のバージョンと比べる（設定が新しい）
+      SK-->>U: project-index の更新を案内して止まる
+    ```
+  expected:
+  - '`settings.yaml` と、Claude Code の設定の場所の `settings.json` は変わらない'
+  - スキルの応答に、設定のバージョン・project-index のバージョンと、管理の MCP の `update` で project-index を更新する案内がある
+  test: test_error_when_terminal_config_newer
+lead: 利用者が `/project-index:global-setup` で、端末に project-index のクローン・依存・端末の設定・Claude Code の env を用意し、`/mcp` につながることを確かめる。
+issue: 14
+primary_actor: 利用者
+stakeholders:
+- name: 利用者
+  interest: 設定ファイルと env を手で書かずに project-index を使えるようになる。入れ直しでも今の配信元の行を失わない
+- name: エージェント（Claude Code）
+  interest: 次のセッションから、どの作業場所でも `/mcp` につながる
+trigger: 利用者が `/project-index:global-setup [クローンのパス]` を実行する
+preconditions:
+- 端末に uv・git・Claude Code がある
+- プラグイン `project-index` をユーザースコープで入れてある
+success_guarantee: 端末の設定が project-index のバージョンの `version` とクローンの場所 `clone` を持ち、Claude Code の env の `PROJECT_INDEX_CONFIG` がその設定を指す。project-index が待ち受け、`/mcp` につながる。
+minimal_guarantee: 端末の設定が project-index より新しいときと、移し替えを断ったときは、端末の設定も env も書き換えない。既にある `sources` の行は消えない。
+frequency: 端末ごとに 1 回。入れ直し・端末の移行・project-index の更新のとき
+priority: 高
+refs:
+- SC-1#scenarios[正常シナリオ]
+test_file: tests/e2e/単一ユースケース/test_project-indexを入れる.py

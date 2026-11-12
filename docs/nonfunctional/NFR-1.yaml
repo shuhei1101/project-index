@@ -10,10 +10,118 @@ requirements:
     rationale: 手元の端末で常駐させる OS（WSL を含む）は、起動と常駐の仕組みを決めるモジュール構成設計で決める
   - id: NFR-2
     name: 通信
+    english_name: bind_address
+    category: セキュリティ
+    external_constraint: 利用者の手元だけで使う（認証を持たない）
+    source_kind: ユーザー要望
+    source: shuhei1101/dev-docs の非機能要件『待ち受けのアドレス』
+    value: 127.0.0.1
+    rationale: 文書の MCP・管理の MCP・読み取り API に認証が無く、書き込みも受けるため、他の端末から届かないアドレスで待ち受ける。dev-docs の画面のサーバーも同じ端末で動き、同じアドレスへつなぐ
+    status: planned
+  - id: NFR-3
+    name: 待ち受けのポート
+    english_name: listen_port
     category: 動作環境
-    external_constraint: 未確定
-    source_kind: 未確定
-    value: 未確定
-    rationale: 待ち受けを同じ端末に限るか、別の端末からの接続を受けるかは、読み取りAPI と文書の MCP のインターフェースを移す shuhei1101/dev-docs#114 で決める
+    external_constraint: 制限なし
+    source_kind: ユーザー要望
+    source: 設定の設計書 CFG-1 の `PROJECT_INDEX_PORT`
+    value: '8786'
+    overflow: 使用中のときは起動を止め、ポートと `PROJECT_INDEX_PORT` で変えられることを出す。確かめる時点は起動時
+    rationale: 文書の MCP・管理の MCP・読み取り API を 1 つのポートで待ち受ける。`.mcp.json` も同じ値を読むため `PROJECT_INDEX_PORT` で上書きする。dev-docs の画面のサーバーの 8781 と重ならない番号
+    status: planned
+  - id: NFR-4
+    name: スクリプトの制限時間
+    english_name: script_timeout
+    category: 耐障害
+    external_constraint: 制限なし
+    source_kind: 制限なし
+    source: shuhei1101/dev-docs の非機能要件『スクリプトの制限時間』
+    value: '30'
+    unit: 秒
+    overflow: 制限時間を超えたスクリプトを止め、検査・変換の失敗として返す
+    rationale: 検査・変換・生成のスクリプトは配信元の利用者が書くため、外部の上限は無い。dev-docs で使ってきた既定値をそのまま移す。端末の設定の `script_timeout_sec` で変えられる
+    status: planned
+  - id: NFR-5
+    name: 検索の件数の上限
+    english_name: search_limit
+    category: 性能
+    external_constraint: 制限なし
+    source_kind: 制限なし
+    value: '100'
+    unit: 件
+    overflow: 100 を超えた値は 100 に丸め、`notes` で知らせる。黙って切り捨てない
+    rationale: エージェントの文脈に載せる量を抑えるため。`search_docs`・`list_changes` の `limit` の上限で、既定は 20。dev-docs の値をそのまま移す
+    status: planned
+  - id: NFR-6
+    name: 結果全体の文字数の上限
+    english_name: result_max_chars
+    category: 性能
+    external_constraint: 制限なし
+    source_kind: 制限なし
+    value: '40000'
+    unit: 文字
+    overflow: 上限を超える手前で打ち切り、`truncated` と、続きを取る `next_cursor` を返す
+    rationale: エージェントの文脈に載せる量を抑えるため。`search_docs`・`list_changes` の `max_chars` の上限で、既定は 20,000。dev-docs の値をそのまま移す
+    status: planned
+  - id: NFR-7
+    name: 1 回の操作の件数の上限
+    english_name: operations_max
+    category: 性能
+    external_constraint: 制限なし
+    source_kind: 制限なし
+    value: '50'
+    unit: 件
+    overflow: 50 件を超える要求は `InvalidArgumentError` で断り、何も書かない
+    rationale: 1 回の書き込み・削除で配信元の排他を握る時間と、検査の実行の時間を抑えるため。`write_docs` の `operations`・`delete_docs` の `targets` の件数の上限。dev-docs の値をそのまま移す
+    status: planned
+  - id: NFR-8
+    name: 起動から接続を受け付けるまでの時間
+    english_name: listen_start_time
+    category: 可用性
+    external_constraint: 再起動のスクリプトが待ち受けを待つ上限 60 秒
+    source_kind: ユーザー要望
+    source: https://github.com/shuhei1101/dev-docs/issues/65
+    value: '20'
+    unit: 秒
+    overflow: 超えても起動は止めない。再起動のスクリプトが 60 秒で打ち切る
+    measurement: '`project-index serve` を子プロセスで起動してから、待ち受けのポートへの TCP の接続が通るまでの時間'
+    rationale: 待ち受けの前に残るのは import と端末の設定・プロンプトの YAML の読み込みだけで、dev-docs の負荷のある端末の計測で約 8 秒。配信元の読み込みと検査は待ち受けの後に回すため含めない。60 秒に対して計測値の 2 倍強を決定値にする
+    status: planned
+    verification:
+      device: WSL2 の Ubuntu（Windows 11）
+      version: Linux 6.6.87.2-microsoft-standard-WSL2
+      date: '2026-11-12'
+      result: 合格
+  - id: NFR-9
+    name: 作業範囲の外の配信元の検索の所要時間
+    english_name: outside_scope_search_time
+    category: 性能
+    external_constraint: Claude Code の MCP のツールの呼び出しの時間切れ。shuhei1101/dev-docs#119 では 1 分を超えた呼び出しが時間切れになった
+    source_kind: 実行基盤の制限
+    source: https://github.com/shuhei1101/dev-docs/issues/119
+    value: '10'
+    unit: 秒
+    measurement: '配信元 `ai-monitor`（1,212 文書）を作業範囲の外（`outside_scope: true`）に配置し、`/mcp` へ `search_docs` の 3 つの要求（name に `planner` を含む・`limit: 3`、`view: count`、body の正規表現 `(?i)changelog`・`limit: 5`）を HTTP で送信し、応答までの時間を測る'
+    breakdown:
+      - part: dev-docs#119 の計測（修正前）
+        value: 56.1 / 85.3 / 53.8 秒
+        notes: 1,467 文書。文書ごとに default_ref を git で繰り返し解決していた
+      - part: 移した後の初回
+        value: 30.72 秒
+        notes: 1 つ目の要求。default_ref の commit の文書を初めて読み込む分を含む
+      - part: 移した後の 2 回目以降
+        value: 2.47 / 2.23 / 2.75 秒
+        notes: 同じ commit の文書を読み込んだ後の 3 つの要求
+      - part: アプリの決定値
+        value: '10'
+        notes: 2 回目以降の最大 2.75 秒の 3 倍強
+    rationale: 1 回の要求の中で ref の解決とスキーマの読み込みを繰り返さないため、読み込んだ後の要求は文書の数によらず数秒で返る。初回の読み込みは default_ref の commit が変わったときだけで、時間切れの 1 分より短い
+    overflow: 超えても止めない。時間切れになった呼び出しは Claude Code の側で失敗になる
+    verification:
+      device: WSL2 の Ubuntu（Windows 11）
+      version: Linux 6.6.87.2-microsoft-standard-WSL2
+      date: '2026-11-12'
+      result: 合格
+    status: planned
 id: NFR-1
 visibility: internal

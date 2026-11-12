@@ -1,0 +1,188 @@
+id: MOD-73
+title: 索引のサーバー / 検査 / rules.py
+lead: スキーマ・ID の形・関連の種類の検査。
+test_files:
+- tests/unit/project_index/features/validation/test_rules.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      文書の検査 ..> スキーマの検査
+      文書の検査 ..> IDの形の検査
+      文書の検査 ..> 関連の種類の検査
+      class 文書の検査 {
+        <<class>>
+      }
+      class スキーマの検査 {
+        <<function>>
+      }
+      class IDの形の検査 {
+        <<function>>
+      }
+      class 関連の種類の検査 {
+        <<function>>
+      }
+      click 文書の検査 href "./MOD-75.py.yaml#文書の検査"
+constants:
+- name: SLUG_PATTERN
+  title: slug の形
+  container: project_index/features/validation/rules.py
+  usecase: 共通
+  summary: '`ids.format` の `{slug}` に当てる正規表現'
+  value: '"[a-z0-9]+(?:-[a-z0-9]+)*"'
+functions:
+- name: check_schema
+  title: スキーマの検査
+  kind: 関数
+  container: project_index/features/validation/rules.py
+  usecase: 共通
+  role: 検証
+  summary: 文書の内容を種類の JSON Schema で検査する
+  scope: public
+  thread_safe: true
+  args:
+  - name: data
+    title: 内容
+    type: Mapping[str, Any]
+    required: true
+    passing: positional
+    description: 文書の内容
+  - name: schema
+    title: スキーマ
+    type: Mapping[str, Any]
+    required: true
+    passing: positional
+    description: 文書のストアの『種類のスキーマ』。空の辞書は検査しない
+  returns:
+    type: list[Violation]
+    description: 違反。項目のパスの昇順
+  process: |-
+    1. `schema` が空なら空の並びを返す
+    2. `jsonschema.validators.validator_for` でスキーマの `$schema` に合う検査器を選び（無ければ Draft 2020-12）、`format_checker` を付けて `iter_errors` で全ての誤りを取る
+    3. 誤りごとに、`absolute_path` を `a.b[0]` の形の項目のパス（項目のパスへの変換。最上位は `$`）に、`message` を決まりにした `Violation` を作る。`fix` には `validator` が `required`・`enum`・`type` のとき、足りないキー・許す値・期待する型を書く
+    4. 項目のパスの昇順に並べて返す
+  unit_tests:
+  - name: test_check_schema
+    case: 正常
+    summary: 合格
+    condition: '`{"type": "object", "required": ["id"]}` に `{"id": "a"}`'
+    mock: なし
+    expected: 空の並び
+    exception: '-'
+  - name: test_check_schema_when_violations
+    case: 正常
+    summary: 違反のパスと直し方
+    condition: '`required: [id]` と `properties.items.items.type: integer` に `{"items": [1, "x"]}`'
+    mock: なし
+    expected: 2 件で、`$` の `fix` に `id`、`items[1]` の `fix` に `integer`
+    exception: '-'
+  - name: test_check_schema_when_empty
+    case: 正常
+    summary: スキーマが無い
+    condition: '`{}` に任意の内容'
+    mock: なし
+    expected: 空の並び
+    exception: '-'
+- name: check_id_format
+  title: IDの形の検査
+  kind: 関数
+  container: project_index/features/validation/rules.py
+  usecase: 共通
+  role: 検証
+  summary: 新しく作る文書の ID が `ids.format` に合うかを確かめる
+  scope: public
+  thread_safe: true
+  args:
+  - name: doc_id
+    title: 文書の ID
+    type: str
+    required: true
+    passing: positional
+    description: 作る文書の ID
+  - name: fmt
+    title: ID の付け方
+    type: str | None
+    required: true
+    passing: positional
+    description: '`SourceConfig.ids_format`。`None` は制約なし'
+  - name: kind
+    title: 種類
+    type: str
+    required: true
+    passing: keyword
+    description: 作る文書の行の ID（`{kind}` に当てる）
+  returns:
+    type: list[Violation]
+    description: 合えば空、合わなければ `id` の違反 1 件
+  process: |-
+    1. `fmt` が `None` なら空の並びを返す
+    2. `fmt` を正規表現にする。`{kind}` は `kind` をエスケープした文字列、`{slug}` は `SLUG_PATTERN`、それ以外の文字はエスケープしてそのまま。知らない `{...}` は `[^/]+` にする
+    3. `re.fullmatch` で合わなければ、`path` が `id`、`rule` が `ids.format`、`fix` が `{fmt} の形式にしてください（例 {kind を入れた例}）` の `Violation` を返す
+  unit_tests:
+  - name: test_check_id_format
+    case: 正常
+    summary: 合う ID
+    condition: '`rule-python-testing` を `{kind}-{slug}`、`kind="rule"`'
+    mock: なし
+    expected: 空の並び
+    exception: '-'
+  - name: test_check_id_format_when_mismatch
+    case: 正常
+    summary: 合わない ID
+    condition: '`Python_Testing` を同じ形で'
+    mock: なし
+    expected: 1 件で、`path` が `id`、`rule` が `ids.format`
+    exception: '-'
+  - name: test_check_id_format_when_none
+    case: 正常
+    summary: 制約なし
+    condition: 任意の ID を `fmt=None` で
+    mock: なし
+    expected: 空の並び
+    exception: '-'
+- name: check_related
+  title: 関連の種類の検査
+  kind: 関数
+  container: project_index/features/validation/rules.py
+  usecase: 共通
+  role: 検証
+  summary: メタデータの `related` の各行が `to`（相手の文書の ID）と `related.types` の語の `type` を持つかを確かめる
+  scope: public
+  thread_safe: true
+  args:
+  - name: metadata
+    title: メタデータ
+    type: Mapping[str, Any]
+    required: true
+    passing: positional
+    description: 文書のメタデータ
+  - name: types
+    title: 関連の種類
+    type: Sequence[str]
+    required: true
+    passing: positional
+    description: '`SourceConfig.related_types`'
+  returns:
+    type: list[Violation]
+    description: 違反。`related` が無ければ空
+  process: |-
+    1. `related` が無ければ空の並びを返す
+    2. 配列でなければ `related` の違反を返す
+    3. 行ごとに、辞書でない・`to` が文字列でない・`source`（別の配信元の文書を指すときの配信元の ID）が文字列でない行、`type` が `types` に無い行を `related[{n}].type` などの違反にする（`fix` に使える語の並び）
+    4. 違反を返す
+  unit_tests:
+  - name: test_check_related
+    case: 正常
+    summary: 知らない種類
+    condition: '`related: [{to: a, type: references}, {to: b, type: blocks}]`、`types` が既定'
+    mock: なし
+    expected: 1 件で、`path` が `related[1].type`、`fix` に `references, depends_on, see_also`
+    exception: '-'
+  - name: test_check_related_when_malformed
+    case: 正常
+    summary: 行の形の誤り
+    condition: '`related: ["a", {type: references}]`'
+    mock: なし
+    expected: '`related[0]` と `related[1].to` の 2 件'
+    exception: '-'

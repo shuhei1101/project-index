@@ -1,0 +1,167 @@
+title: project-indexで配信元の文書を読み書きする
+lead: 利用者が project-index を入れて端末の設定に配信元を並べ、エージェントが文書の MCP で、dev-docs の画面のサーバーが読み取り API で、その配信元の YAML の文書を読み書きする。設定・スクリプトの変更と project-index の更新を経ても配信が続く。
+issue: 14
+visibility: internal
+test_file: tests/e2e/複合ユースケース/test_project-indexで配信元の文書を読み書きする.py
+primary_actor: 利用者
+stakeholders:
+  - name: 利用者
+    interest: どの作業場所からどの配信元を読み書きできるかを端末の設定で決められる。dev-docs を入れずに project-index だけで、エージェントに文書の MCP を使用させられる
+  - name: エージェント（Claude Code）
+    interest: 1 つの文書の MCP で、今の作業場所から使用できる配信元の文書を検索して参照し、作業ツリーの YAML を検査に合格させてから書き換えられる
+  - name: dev-docs の画面のサーバー
+    interest: 配信元の一覧と状態・配信元の設定・文書の一覧・文書・検討事項の ID の一覧と文書・検索の結果・リビジョンの一覧を読み取り API で取得し、端末の設定の配信元を端末の設定の API で保存できる
+  - name: 各配信元
+    interest: サーバーのコードもプラグインも持たず、配信元の設定（`project-index.yaml`）・スキーマ・検査と変換のスクリプトだけで配信される
+trigger: 利用者が project-index のプラグインを入れ、`/project-index:global-setup` を実行する
+preconditions:
+  - 端末に uv・git・Claude Code がある
+  - project-index のマーケットプレースを追加し、プラグイン `project-index` をユーザースコープで入れてある
+  - 配信する配信元が、YAML の文書とそのスキーマを持つフォルダ（git リポジトリか Git 管理外のフォルダ）である
+success_guarantee: 端末の設定に並べた配信元の文書が、文書の MCP と読み取り API で読める。エージェントの書き込みは、`scope.write` に当たる作業場所から呼んだセッションの作業ツリーにだけ反映される。
+minimal_guarantee: 設定・スクリプトの検証に失敗した配信元があっても、他の配信元の配信と管理の MCP・読み取り API は止まらない。検査に合格しない書き込みと、`scope` に当たらない作業場所からの呼び出しは、ファイルを書き換えない。
+frequency: 導入は端末ごとに 1 回。起動はセッションごと。読み書きは作業のたび
+priority: 高
+scenarios:
+  - name: 正常シナリオ
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で実行し、dev-docs の画面のサーバーの代わりにテストのコードが読み取り API・端末の設定の API を HTTP で呼ぶ）
+      - name: Claude Code の設定の場所
+        description: '`CLAUDE_CONFIG_DIR` が指すテスト用の一時フォルダ。project-index のマーケットプレースとプラグイン `project-index` を、この場所のユーザースコープに入れておく'
+        notes: テストを実行した端末の `~/.claude` は変わらない。S0 の global-setup はこの場所の `settings.json` の env に `PROJECT_INDEX_CONFIG` を記載する
+      - name: project-index のクローン
+        description: テスト用の一時フォルダにクローンした project-index
+        notes: テスト用の空きポートを `PROJECT_INDEX_PORT` に入れる。S0 の `/project-index:global-setup` にこのパスを指定する
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す場所（テスト用の一時フォルダの `settings.yaml`）'
+        notes: ファイルは無い。S0 が作成する
+      - name: サンプルの配信元
+        description: 文書の種類を 1 つ（スキーマと YAML 2 件）と、`converters[]` を指す種類の文書 1 件と、`project-index.yaml` を持つ git リポジトリと、そのワークツリー（`.claude/worktrees/x`）
+        notes: id `sample`。S1 の `/project-index:setup` で `scope.read`・`scope.write` に sample のフォルダを回答する
+      - name: 読み取りだけの配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
+        notes: id `notes`。S1 の `/project-index:setup` で `scope.read` に sample のフォルダを回答し、`scope.write` は回答しない
+    flow: |-
+      ```mermaid
+      flowchart TD
+        subgraph P1["導入"]
+          S0["project-indexを入れる:正常シナリオ"]
+        end
+        subgraph P2["登録と起動"]
+          S1["配信元を追加する:正常シナリオ"]
+          S2["起動する:正常シナリオ（待ち受けているサーバーがあるときは文脈を注入しない）"]
+        end
+        subgraph P3["読み書き"]
+          S3["エージェントが調べる:正常シナリオ"]
+          S4["エージェントが書き込む:正常シナリオ"]
+          S5["変更をレビューする:正常シナリオ"]
+          S6["画面のサーバーが文書を読む:正常シナリオ"]
+        end
+        subgraph P4["保守"]
+          S7["YAMLを直接編集した:正常シナリオ"]
+          S8["設定・スクリプトを変える:正常シナリオ"]
+          S9["端末の設定の配信元を変える:正常シナリオ"]
+          S10["project-indexを更新する:正常シナリオ"]
+        end
+        S0 --> S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7 --> S8 --> S9 --> S10
+        click S0 "id:SC-2#scenarios[正常シナリオ]"
+        click S1 "id:SC-5#scenarios[正常シナリオ]"
+        click S2 "id:SC-4#scenarios[正常シナリオ（待ち受けているサーバーがあるときは文脈を注入しない）]"
+        click S3 "id:SC-6#scenarios[正常シナリオ]"
+        click S4 "id:SC-7#scenarios[正常シナリオ]"
+        click S5 "id:SC-8#scenarios[正常シナリオ]"
+        click S6 "id:SC-11#scenarios[正常シナリオ]"
+        click S7 "id:SC-9#scenarios[正常シナリオ]"
+        click S8 "id:SC-10#scenarios[正常シナリオ]"
+        click S9 "id:SC-12#scenarios[正常シナリオ]"
+        click S10 "id:SC-3#scenarios[正常シナリオ]"
+      ```
+    expected:
+      - '`PROJECT_INDEX_CONFIG` が指す `settings.yaml` が `version`・`clone` を持ち、Claude Code の設定の場所の `settings.json` の env に `PROJECT_INDEX_CONFIG` が入っている'
+      - '`PROJECT_INDEX_PORT` を待ち受ける project-index のプロセスが 1 つだけある'
+      - sample のワークツリーで始めたセッションの文脈に、project-index の配信元の一覧・使い方・警告が入らない
+      - 端末の設定の `sources` に sample と notes の行があり、`check_project` が違反と索引の同期の件数を 0 で返却する
+      - '`try_convert` が sample の `converters[]` を指す種類の文書を、変換のスクリプトが出した Markdown で返却し、sample のフォルダは変わらない'
+      - 管理の MCP の `status` が `sample` と `notes` を配信中として返却する
+      - 文書の MCP のツールは `describe`・`search_docs`・`trace_related`・`list_changes`・`list_match_words`・`write_docs`・`delete_docs` の 7 つで、配信元を追加しても変わらない
+      - sample のワークツリーで呼んだ `describe` が、使用できる配信元として `sample`（読み書き）と `notes`（読み取りだけ）を返却する
+      - 'sample のワークツリーで `source` を省いて呼んだ `search_docs` がワークツリーの文書を返却し、`source: *` が sample と notes の結果を各行の `source` つきで返却する'
+      - '`write_docs` の変更は sample のワークツリーの YAML だけに入り、sample のクローン本体は変わらない。project-index は commit しない（ワークツリーに増えた commit は、エージェントが commit した 1 件だけ）'
+      - '`notes` を指した `write_docs` は断られ、notes のフォルダは変わらない'
+      - '`list_changes` がエージェントの commit の変更を返却し、読み取り API でその commit と親の commit を指した文書の取得が、それぞれのリビジョンの値を返却する'
+      - 読み取り API の配信元の一覧が sample と notes を配信中として返却し、配信元の設定が sample の `nav` を、文書の取得が sample の文書の値・種類のスキーマ・メタデータを返却する
+      - 読み取り API の単語での検索が、エージェントが書き込んだ単語を含む sample の文書と一致した箇所を返却し、リビジョンの一覧がエージェントの commit を含む最近の commit を返却する
+      - 直接編集した YAML の内容と新しいバージョンを、次の `search_docs` が返却する
+      - '`project-index.yaml` で変えた配信元の説明が、`reload` の後の `describe` に出る'
+      - 端末の設定の API の取得が sample と notes の行を返却する
+      - 端末の設定の API で notes の行を除外して保存すると、応答の配信元の状態と、次の `describe` の使用できる配信元から notes が消える
+      - '`update` の後、`status` が新しいバージョンを返却し、`sample` を配信している'
+    test: test_normal
+    notes:
+      commit: S4 と S5 の間で、エージェントが `write_docs` の変更をワークツリーで `git commit` する。project-index は commit しない。
+      起動したセッション: S0 がサーバーを起動したそのセッションでは MCP の接続が間に合わず、`/mcp` でつなぎ直す。S2 は S1 の後に sample のワークツリーで始めた新しいセッションで、待ち受けているサーバーにつながる。
+    uses:
+      - SC-2#scenarios[正常シナリオ]
+      - SC-5#scenarios[正常シナリオ]
+      - SC-4#scenarios[正常シナリオ（待ち受けているサーバーがあるときは文脈を注入しない）]
+      - SC-6#scenarios[正常シナリオ]
+      - SC-7#scenarios[正常シナリオ]
+      - SC-8#scenarios[正常シナリオ]
+      - SC-11#scenarios[正常シナリオ]
+      - SC-9#scenarios[正常シナリオ]
+      - SC-10#scenarios[正常シナリオ]
+      - SC-12#scenarios[正常シナリオ]
+      - SC-3#scenarios[正常シナリオ]
+  - name: 異常シナリオ（配信できない配信元がある）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが読み取り API を HTTP で呼ぶ）
+      - name: project-index のクローン
+        description: テスト用の一時フォルダにクローンした project-index
+        notes: テスト用の空きポートを `PROJECT_INDEX_PORT` に入れる
+      - name: サンプルの配信元
+        description: 正常シナリオと同じ、検証に合格する配信元
+        notes: id `sample`
+      - name: 壊れた配信元
+        description: '`project-index.yaml` がスキーマに違反する配信元'
+        notes: id `broken`。`documents[]` の必須のキーが無い
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample と broken の 2 行'
+    flow: |-
+      ```mermaid
+      flowchart TD
+        subgraph P1["起動"]
+          S2["起動する:異常シナリオ（設定の検証に失敗する）"]
+        end
+        subgraph P2["読み書き"]
+          S3["エージェントが調べる:異常シナリオ（配信していない配信元を指す）"]
+          S6["画面のサーバーが文書を読む:異常シナリオ（配信していない配信元を指す）"]
+        end
+        subgraph P3["修正"]
+          S8["設定・スクリプトを変える:正常シナリオ"]
+        end
+        S2 --> S3 --> S6 --> S8
+        click S2 "id:SC-4#scenarios[異常シナリオ（設定の検証に失敗する）]"
+        click S3 "id:SC-6#scenarios[異常シナリオ（配信していない配信元を指す）]"
+        click S6 "id:SC-11#scenarios[異常シナリオ（配信していない配信元を指す）]"
+        click S8 "id:SC-10#scenarios[正常シナリオ]"
+      ```
+    expected:
+      - 起動の直後、読み取り API の配信元の一覧が broken を配信していない配信元として理由つきで返却し、sample の文書の取得と文書の MCP は応答する
+      - '`source: broken` を指した `search_docs` は配信していない配信元としてエラーを返却し、`source: sample` は文書を返却する'
+      - 読み取り API で broken の文書を取得すると、配信していない配信元として 404 を返却する
+      - 管理の MCP の `status` が broken を配信していない配信元として、違反したキーのパスと理由つきで返却する
+      - エラーログに broken の違反が残る
+      - 'broken の `project-index.yaml` を修正して `reload` した後、`source: broken` の `search_docs` と読み取り API の文書の取得が文書を返却する'
+      - '`reload` の前後で文書の MCP のセッションが切れない'
+    test: test_error_when_source_config_invalid
+    uses:
+      - SC-4#scenarios[異常シナリオ（設定の検証に失敗する）]
+      - SC-6#scenarios[異常シナリオ（配信していない配信元を指す）]
+      - SC-11#scenarios[異常シナリオ（配信していない配信元を指す）]
+      - SC-10#scenarios[正常シナリオ]
+notes:
+  移した元: shuhei1101/dev-docs の SC-155-13 のうち、索引の側（文書の MCP・管理の MCP・配信元の読み込み）の工程を移した。利用者が画面で参照する・コメントを指定する工程は dev-docs の画面のサーバーが持つ。
+id: SC-1

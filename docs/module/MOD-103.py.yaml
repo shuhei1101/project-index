@@ -1,0 +1,11 @@
+id: MOD-103
+title: 索引のサーバー / 共通 / version.py
+lead: 動いているプロセスが起動した時点の project-index のバージョン。
+constants:
+- name: RUNNING_VERSION
+  title: 動いているバージョン
+  container: project_index/shared/version.py
+  usecase: 共通
+  summary: プロセスがモジュールを読み込んだ時点の project-index のバージョン（`importlib.metadata.version(DIST_NAME)`）
+  value: version(DIST_NAME)
+  reason: 更新で配布のメタデータが入れ替わっても、動いているプロセスのバージョンが変わらないよう、読み込んだ時点の値を持つ

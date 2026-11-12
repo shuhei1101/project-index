@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=../../../../../templates/prompt.schema.yaml
+id: mcp/admin/tools/update
+name: update の description
+description: 管理の MCP の update が何をするかを伝える
+kind: tool
+lang: ja
+parts:
+  - id: body
+    texts:
+      - lang: ja
+        text: |-
+          project-index のクローンで git pull --ff-only と uv sync を実行し、設定の移し替えが要らなければ再起動する。

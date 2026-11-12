@@ -1,0 +1,127 @@
+id: IF-17
+title: "載せるファイルの一覧"
+entry:
+  kind: operation
+  value: '`project-index files`（CLI）'
+flows:
+- name: 正常系
+  summary: 除外の条件に当たるファイルを除いた一覧を出す
+  setup:
+  - name: Mock
+    description: なし（`main(["files", ...])` を同じプロセスで呼ぶ）
+  - name: 配信元のフォルダ
+    description: '`project-index.yaml` も管理用の YAML も無い一時フォルダ。`src/` に `a.py`・`b.py`・空の `pkg/__init__.py`・`uv.lock`・`logo.png`（先頭に NUL バイト）を置き、ワークツリーのファイル `.claude/worktrees/wt/src/c.py` を置く'
+    notes: '`a.py`・`b.py` だけが除外の条件・辿らないフォルダに当たらない。`--paths` は `**`'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant M as project-index files
+      participant F as 配信元のフォルダ
+
+      C->>M: --root {フォルダ} --paths **
+      M-->>F: glob に当たるファイルを集める
+      M->>M: 除外の条件に当たるファイルを外す
+      M-->>C: 載せるファイルのパス（終了コード 0）
+    ```
+  expected:
+  - 標準出力が `src/a.py`・`src/b.py` の 2 行だけで、`.claude/worktrees/wt/src/c.py` を含まない
+  - 終了コードが 0
+  - フォルダのファイルが変わらない
+  test: test_normal
+- name: 正常系（除外するファイル名を渡す）
+  summary: '`--exclude` に当たるファイルも外す'
+  setup:
+  - name: Mock
+    description: 正常系と同じ
+  - name: 配信元のフォルダ
+    description: 正常系と同じ
+    notes: '`--exclude b.py` を渡す'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant M as project-index files
+
+      C->>M: --root {フォルダ} --paths src/** --exclude b.py
+      M-->>C: 載せるファイルのパス（終了コード 0）
+    ```
+  expected:
+  - 標準出力が `src/a.py` の 1 行だけ
+  test: test_normal_when_exclude_given
+- name: 異常系（フォルダが無い・RootNotFound）
+  summary: '`--root` が無いと終了コード 2 で終える'
+  setup:
+  - name: Mock
+    description: 正常系と同じ
+  - name: 引数
+    description: '`--root` に存在しないパス'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant M as project-index files
+
+      C->>M: --root {無いパス} --paths src/**
+      M-->>C: stderr に渡したパス（終了コード 2）
+    ```
+  expected:
+  - 終了コードが 2
+  - 標準出力が空で、stderr に渡したパスがある
+  test: test_error_when_root_not_found
+lead: 範囲の glob に当たるファイルのうち、除外の条件に当たらないもの（管理用の YAML に載せるファイル）を返す。`project-index.yaml` の有無に依らず呼べる。
+identifier: files
+permissions: 配信元のフォルダを読める利用者
+idempotent: true
+side_effects: なし（ファイルを書き換えない）
+callers:
+- SC-5#scenarios[正常シナリオ（除外の条件と関連の候補）]
+- SC-5#scenarios[正常シナリオ（YAML でない範囲を加える）]
+exclusivity: 読み取りだけで排他しない
+request:
+- name: --root
+  type: str
+  required: true
+  location: argument
+  description: 配信元のフォルダのパス
+  notes: '-'
+- name: --paths
+  type: list[str]
+  required: true
+  location: argument
+  description: 範囲の glob（`--root` からの相対）。繰り返して渡せる
+  notes: '`documents[].paths` に書く値と同じ書き方'
+- name: --exclude
+  type: list[str]
+  required: false
+  default: なし（除外の条件だけで外す）
+  location: argument
+  description: 除外するファイル名の glob。繰り返して渡せる
+  notes: '`documents[].exclude[]` と同じ書き方'
+request_example: |-
+  ```bash
+  project-index files --root ~/repo/sample --paths 'src/**'
+  ```
+response:
+- name: 標準出力
+  type: str
+  description: 載せるファイルの `--root` からのパスを 1 行ずつ、パスの昇順で出す
+  notes: '-'
+- name: 終了コード
+  type: int
+  description: 0 正常（載せるファイルが 0 件のときも 0）・2 `--root` が無いかフォルダでない
+  notes: 2 は `project-index migrate` の設定の違反と同じ値
+exceptions:
+- name: なし（正常終了）
+  condition: 一覧を出し終えた（終了コード 0）
+- name: RootNotFound
+  condition: '`--root` が無いかフォルダでない（終了コード 2）'
+  notes: 渡したパスを stderr に出す
+constraints:
+- item: 除外の条件
+  constraint: 生成物・ロック・バイナリ・ベンダーのコード・再エクスポートや空の `__init__` だけのファイルを出さない。`check_project` の `unindexed_files` と同じ判定を使う
+  notes: 見分け方はモジュール構成『文書のストア / indexable.py』の `is_excluded_file`
+- item: 辿らないフォルダ
+  constraint: '`.git`・`node_modules`・`__pycache__`・`.venv`・`.claude/worktrees` とシンボリックリンク。文書の収集・`unindexed_files` と同じ'
+  notes: '`.claude/worktrees` は配信元の設定の `worktrees` の既定と同じ場所で、setup の範囲の既定でも除く'
+test_file: tests/integration/server/test_files.py

@@ -1,8 +1,256 @@
 summary: クラス・関数・データモデルの分割と依存
 items:
 - page: MOD-1.yaml
-  summary: 索引のサーバーの Python パッケージ project_index のファイルの並びと、パッケージ全体の決まり
+  summary: 索引のサーバーの Python パッケージ `project_index` のファイルの並びと、パッケージ全体の決まり。
 - page: MOD-2.yaml
-  summary: Claude Code のプラグイン project-index と、それを掲載するマーケットプレースのファイルの並び
+  summary: Claude Code のプラグイン project-index と、それを掲載するマーケットプレースのファイルの並び。
 - page: MOD-3.py.yaml
-  summary: project-index コマンドの入口
+  summary: '`project-index` コマンドの引数の組み立てと main。'
+- page: MOD-4.py.yaml
+  summary: PreToolUse のフック。文書の MCP のツールの入力に `cwd`・`session_id`・`agent_id` を上書きで入れ、`updatedInput` で返す。
+- page: MOD-5.py.yaml
+  summary: SessionStart のフック。ポートにつながらなければ `project-index serve` を切り離して起動し、つながれば文脈を入れず、`/clear`・圧縮のときだけ `POST /_admin/session-start` で返し済みの記録の削除を依頼する。
+- page: MOD-6.py.yaml
+  summary: インストール済みのパッケージからバージョンを引くときの配布名。
+- page: MOD-7.py.yaml
+  summary: 作業場所からの権限と、MCP の引数からの読み書きする場所の解決。
+- page: MOD-8.py.yaml
+  summary: 配信元の権限・作業場所・読み書きする場所・権限のレベルの型。
+- page: MOD-9.py.yaml
+  summary: '管理の MCP の `format: markdown` の応答の文を組み立てる。値は service.py の結果をそのまま使い、計算しない。'
+- page: MOD-10.py.yaml
+  summary: 管理の MCP の `status`・`reload`・`check_project`・`try_convert` の中身。配信中の部品（`Handlers`）を読むだけで、`reload_config` 以外は配信元の状態を変えない。
+- page: MOD-11.py.yaml
+  summary: 管理の MCP の `status`・`reload`・`check_project`・`try_convert` の要求と結果の型。
+- page: MOD-12.py.yaml
+  summary: 変わったキー・差分の行・語の出現数の比べ方。
+- page: MOD-13.py.yaml
+  summary: '`list_changes` の結果の Markdown。'
+- page: MOD-14.py.yaml
+  summary: '`list_changes` の区間か前回読んだ時点からの変わった文書と差分。'
+- page: MOD-15.py.yaml
+  summary: '`list_changes` の要求と結果の型。'
+- page: MOD-16.py.yaml
+  summary: 配信元の `decisions.folders` から検討事項の文書を探す。
+- page: MOD-17.py.yaml
+  summary: '`converters[]` の実行と結果の控え。'
+- page: MOD-18.py.yaml
+  summary: 変換の結果と変換の失敗のデータモデル。
+- page: MOD-19.py.yaml
+  summary: '`describe` の結果の Markdown。'
+- page: MOD-20.py.yaml
+  summary: '`describe` の使える配信元・説明書と種類・種類のスキーマ。'
+- page: MOD-21.py.yaml
+  summary: 配信元ごとの検査（同期のずれ・エイリアスのキーの違反・`nav` の警告）の結果を持ち、`describe` の警告に渡す。
+- page: MOD-22.py.yaml
+  summary: '`describe` の要求と結果の型。'
+- page: MOD-23.py.yaml
+  summary: 引数なしの `describe` に添える警告（使える配信元の同期のずれ・古い設定と、配信していない配信元）。
+- page: MOD-24.py.yaml
+  summary: エイリアスのキーの検証と、用語の収集・照合。
+- page: MOD-25.py.yaml
+  summary: 項目のパスの解釈と、項目の値の取得・設定・削除・メタデータの解決。
+- page: MOD-26.py.yaml
+  summary: たどるフォルダと、載せるファイルの判定。
+- page: MOD-27.py.yaml
+  summary: ファイルの収集と、ファイルからの文書の作成。
+- page: MOD-28.py.yaml
+  summary: 種類のスキーマの `$ref` の解決と、`records` の行のスキーマ。
+- page: MOD-29.py.yaml
+  summary: 文書のキャッシュ・ID の引き当て・種類のスキーマ・文書の場所と、メタデータのずれの確かめ。
+- page: MOD-30.py.yaml
+  summary: 文書・読み込みの誤りと結果・同期のずれ・エイリアスの型。
+- page: MOD-31.py.yaml
+  summary: git によるリビジョンの解決・一覧・変わったファイル・ファイルの日時・ワークツリーの一覧。
+- page: MOD-32.py.yaml
+  summary: リビジョンの書き出し。
+- page: MOD-33.py.yaml
+  summary: リビジョン・変わったファイル・ファイルの日時・commit・ワークツリーの型。
+- page: MOD-34.py.yaml
+  summary: 再起動の要求を受けて uvicorn を止め、止まった後に `run_serve` が同じプロセスを置き換えるかを持つ。
+- page: MOD-35.py.yaml
+  summary: 管理の MCP の `restart`・`update` の結果の型と定数。
+- page: MOD-36.py.yaml
+  summary: 端末の設定の `clone` を `git pull --ff-only`・`uv sync` で更新し、新しいコードで移し替えの要否を確かめて、要らなければ再起動を要求する。
+- page: MOD-37.py.yaml
+  summary: '`project-index migrate` の対象を決め、当てる手順を求め、バックアップを取ってから 1 回だけ書き込む。動いているサーバーには反映しない。'
+- page: MOD-38.py.yaml
+  summary: パッケージに入れた移し替えの手順を読み、メモリの上の YAML に 1 つずつ当てる。ファイルには書かない。
+- page: MOD-39.py.yaml
+  summary: '`project-index migrate` の手順・対象・例外の型と終了コード。'
+- page: MOD-40.py.yaml
+  summary: '`project-index prompt-doc` の処理。標準入力を変換して標準出力に出し、失敗を終了コードにする。'
+- page: MOD-41.py.yaml
+  summary: プロンプトの YAML を読み、変数の表・テンプレート・例の組のセクションを持つ mdmark の Markdown にする。
+- page: MOD-42.py.yaml
+  summary: プロンプトの部品を Jinja2 で描画する。変数の値にパスを持たせて描画し、描画結果の値を区切りで囲む。
+- page: MOD-43.py.yaml
+  summary: サーバーが起動のときに `content/prompts/` のプロンプトの YAML を読んで検査し、MCP の instructions・ツールの description を描画する。画面用のマーカーは付けない。
+- page: MOD-44.py.yaml
+  summary: '`project-index prompt-doc` が読むプロンプトの YAML のモデルと、描画の結果・例外の型。モデルは変換に使うキーだけを持ち、他のキーは読み捨てる。サーバーが起動のときに読むプロンプトの違反の型も持つ。'
+- page: MOD-45.py.yaml
+  summary: 関連の取り出しとたどり。
+- page: MOD-46.py.yaml
+  summary: '`trace_related` の結果の Markdown。'
+- page: MOD-47.py.yaml
+  summary: '`trace_related` の関連のたどりと関連の候補。'
+- page: MOD-48.py.yaml
+  summary: 関連の候補の提案。
+- page: MOD-49.py.yaml
+  summary: '`trace_related` の要求と結果の型。'
+- page: MOD-50.py.yaml
+  summary: 本文の切り出し。
+- page: MOD-51.py.yaml
+  summary: 続きのカーソルの作成と解読。
+- page: MOD-52.py.yaml
+  summary: 項目の値・計算項目・使える項目・見出しの行。
+- page: MOD-53.py.yaml
+  summary: 条件の木の確かめと照合・語の照合・正規表現・比べる値の解釈。
+- page: MOD-54.py.yaml
+  summary: '`search_docs` の結果の Markdown。'
+- page: MOD-55.py.yaml
+  summary: '`search_docs` の条件の木・並べ替え・集計・量の上限。'
+- page: MOD-56.py.yaml
+  summary: 行の分割・抜粋の検索・当たった行の数・一致した箇所の抜き出し。
+- page: MOD-57.py.yaml
+  summary: 用語の一覧と、その Markdown。
+- page: MOD-58.py.yaml
+  summary: '`search_docs`・用語の一覧の要求と結果の型。'
+- page: MOD-59.py.yaml
+  summary: 会話キーごとの返し済み・前回読んだ内容・閲覧と編集の SQLite への記録と読み出し。
+- page: MOD-60.py.yaml
+  summary: 会話の記録の会話キー・前回読んだ内容・閲覧と編集の記録の型。
+- page: MOD-61.py.yaml
+  summary: '`POST /_admin/session-start` のルート。'
+- page: MOD-62.py.yaml
+  summary: '`/clear`・圧縮の後に、その会話の返し済みの記録を削除する。'
+- page: MOD-63.py.yaml
+  summary: '`POST /_admin/session-start` の本文と応答の型と、返し済みの記録を削除する理由。'
+- page: MOD-64.py.yaml
+  summary: 端末の設定の場所・読み込みと検証・待ち受けのポート。
+- page: MOD-65.py.yaml
+  summary: 端末の設定のルーター（`GET`・`PUT`・`POST /settings/sources`）。
+- page: MOD-66.py.yaml
+  summary: '`sources[]` の保存。'
+- page: MOD-67.py.yaml
+  summary: 端末の設定と、端末の設定の API の `sources[]` の要求と結果の型。
+- page: MOD-68.py.yaml
+  summary: 設定の YAML のマージ。
+- page: MOD-69.py.yaml
+  summary: 配信する配信元の一覧と読み直し。
+- page: MOD-70.py.yaml
+  summary: 配信元の設定の読み込みと検証、スクリプトとバージョンの確かめ。
+- page: MOD-71.py.yaml
+  summary: 配信元の設定・文書の行・スクリプト・配信中の配信元・状態の型。
+- page: MOD-72.py.yaml
+  summary: スキーマで Markdown と宣言したキーのうち操作で変えた値を mdmark の点検に通し、描画時の書き方の警告を違反にする。
+- page: MOD-73.py.yaml
+  summary: スキーマ・ID の形・関連の種類の検査。
+- page: MOD-74.py.yaml
+  summary: '`validators[]` の出力の解釈。'
+- page: MOD-75.py.yaml
+  summary: 検査をまとめて通す処理と、読み取りの結果のキャッシュ。
+- page: MOD-76.py.yaml
+  summary: '`nav` の `auto` の当たる文書の数・`filter` の検証・警告（管理の MCP と配信元の説明が使う）。タブとサイドバーの組み立ては dev-docs の画面のサーバーが持つ。'
+- page: MOD-77.py.yaml
+  summary: 文書のページのパスと、読み取り API が読む場所。
+- page: MOD-78.py.yaml
+  summary: 語での検索。
+- page: MOD-79.py.yaml
+  summary: 読み取り API の要求と応答のデータモデル。
+- page: MOD-80.py.yaml
+  summary: 項目の操作の適用と、共通のキーの列名への読み替え。
+- page: MOD-81.py.yaml
+  summary: '`ids.format` からの ID の生成。'
+- page: MOD-82.py.yaml
+  summary: 配信元ごとの書き込みの排他。
+- page: MOD-83.py.yaml
+  summary: 新しい文書の置き場所。
+- page: MOD-84.py.yaml
+  summary: '`write_docs`・`delete_docs` の操作の適用・検査・書き換えと、バージョンの確かめ。'
+- page: MOD-85.py.yaml
+  summary: '`write_docs`・`delete_docs` の要求と結果の型。'
+- page: MOD-86.py.yaml
+  summary: git の実行と、リポジトリの直下の解決。
+- page: MOD-87.py.yaml
+  summary: mdmark の CLI の `check --text -` で Markdown の文字列を点検し、出力をずれの並びにする。
+- page: MOD-88.py.yaml
+  summary: '`validators[]`・`converters[]`・`generators[]` のスクリプトの制限時間つきの実行と、実行できるかの確かめ。'
+- page: MOD-89.py.yaml
+  summary: '`project-index serve`・`project-index migrate` の部品の配線と、配信元の読み直し。'
+- page: MOD-90.py.yaml
+  summary: ルートと MCP のマウントをまとめたアプリの組み立て。
+- page: MOD-91.py.yaml
+  summary: 例外の problem+json への変換。
+- page: MOD-92.py.yaml
+  summary: MCP のセッションの管理と、記録の削除。
+- page: MOD-93.py.yaml
+  summary: 管理の MCP の組み立て（ツールの登録）。
+- page: MOD-94.py.yaml
+  summary: 文書の MCP の組み立て（ツールの登録）。
+- page: MOD-95.py.yaml
+  summary: ツールの結果・エラーの変換と、2 つの MCP のツール名とプロンプトの ID。
+- page: MOD-96.py.yaml
+  summary: 端末の設定の API への、ブラウザからの別のオリジンの書き込みの確認。
+- page: MOD-97.py.yaml
+  summary: 読み取り API の DTO の基底（キーは camelCase）。
+- page: MOD-98.py.yaml
+  summary: '`ProjectIndexError` と、MCP・読み取り API が返すエラーの階層。'
+- page: MOD-99.py.yaml
+  summary: 一時ファイルからのファイルの置き換え。
+- page: MOD-100.py.yaml
+  summary: 内容のハッシュ（文書のバージョン）。
+- page: MOD-101.py.yaml
+  summary: 作業場所の glob の照合とパスの正規化。
+- page: MOD-102.py.yaml
+  summary: JSON Schema の違反を、項目のパスつきの `Violation` にする。
+- page: MOD-103.py.yaml
+  summary: 動いているプロセスが起動した時点の project-index のバージョン。
+- page: MOD-104.py.yaml
+  summary: YAML の読み込みと、往復編集の読み書き。
+- page: MOD-105.yaml
+  summary: 配信元の設定の `validators[]`・`converters[]`・`generators[]` のコマンドを、配信元の直下で子プロセスとして制限時間つきで動かす。
+- page: MOD-106.yaml
+  summary: 会話キー（`session_id`・`agent_id`）ごとに、返した文書の ID とバージョン・本文を返した時点の内容・閲覧と編集を `state_dir` の SQLite に記録する。
+- page: MOD-107.yaml
+  summary: '`project-index` コマンドの入口。引数を読み、バージョン・ヘルプを出すか、サブコマンドの処理へ渡す。'
+- page: MOD-108.yaml
+  summary: どの分類からも使う例外の階層・YAML の読み書き・内容のハッシュ・パスの照合と、端末の設定の API への書き込みの要求のオリジンの確認。
+- page: MOD-109.yaml
+  summary: '`converters[]` を指す種類の文書を、配信元のスクリプトで Markdown にし、結果を控える。'
+- page: MOD-110.yaml
+  summary: '`list_changes` の処理。区間（commit・日時・ブランチ・タグ）か、この会話で前回読んだ時点から今までに変わった文書・変わったキー・差分の行を返す。'
+- page: MOD-111.yaml
+  summary: git を子プロセスで呼び、リビジョン（ブランチ・タグ・commit・日時）の解決・一覧・変わったファイル・ファイルの日時を返す。
+- page: MOD-112.yaml
+  summary: 文書の MCP（`/mcp`）と管理の MCP（`/_admin/mcp`）の組み立て。
+- page: MOD-113.yaml
+  summary: 配信元の `documents[]` の行ごとにファイルを集め、ファイルか `records` の要素を 1 件の文書にして、メタデータ・バージョン・日時を付けて返す。
+- page: MOD-114.yaml
+  summary: '`write_docs`・`delete_docs` の処理。操作を全て当てた後の文書を検査に通し、通ったときだけ作業ツリー（Git 管理外の配信元はそのフォルダ）のファイルを書き換える。'
+- page: MOD-115.yaml
+  summary: 文書を種類のスキーマ・`ids.format`・`related.types`・配信元の `validators[]` で検査し、違反の並びを返す。
+- page: MOD-116.yaml
+  summary: '`search_docs` の処理。条件の木で文書を絞り、並べ替え・集計・量の上限をかけて、指定した項目だけを返す。'
+- page: MOD-117.yaml
+  summary: 作業場所（`cwd`）と配信元の `scope` を照らして使える配信元と権限を決め、MCP の引数（`source`・`ref`・`worktree`）から読み書きする場所を解く。
+- page: MOD-118.yaml
+  summary: 端末の設定 `settings.yaml` をスキーマで検証して読み、端末の設定の API に送られた `sources[]` を、他のキーとコメントを保って書き換える。
+- page: MOD-119.yaml
+  summary: '`describe` の処理。引数の数で、今の作業場所から使える配信元の一覧・配信元の説明書と種類の一覧・種類のスキーマを返す。'
+- page: MOD-120.yaml
+  summary: '`project-index serve` と `project-index migrate` の処理。端末の設定と配信元を読み、部品を配線して、読み取り API・文書の MCP・管理の MCP・セッションの開始を 1 つのアプリとして待ち受ける。'
+- page: MOD-121.yaml
+  summary: 端末の設定の `sources[]` の行ごとに、配信元の設定の YAML をマージして検証し、配信する配信元の一覧を作る。
+- page: MOD-122.yaml
+  summary: '`trace_related` の処理。起点の文書かコードのパスから、メタデータの `related` を深さと向きの指定でたどる。'
+- page: MOD-123.py.yaml
+  summary: '`write_docs` のスキーマの違反に、違反した項目のスキーマの説明を添える。'
+- page: MOD-124.py.yaml
+  summary: '`documents[].schema` でほかの配信元のリビジョンのスキーマを指す参照の型と、その読み取り。'
+- page: MOD-125.py.yaml
+  summary: 読み取り API の配信元の設定・文書の一覧・文書の取得・検討事項の取得。
+- page: MOD-126.py.yaml
+  summary: 読み取り API のルーター（`/sources` の下）。
+- page: MOD-127.yaml
+  summary: dev-docs の画面のサーバーなどが呼ぶ読み取り API（配信元の一覧と状態・配信元の設定・文書の一覧と取得・検討事項・語での検索・リビジョンの一覧）。

@@ -1,0 +1,52 @@
+id: LIB-6
+title: "pydantic"
+kind: "ライブラリ"
+version:
+  current: 2.14.1
+  latest: 2.14.1
+  checked_on: '2026-10-28'
+  source: pyproject.toml・uv.lock
+  pinning: pyproject.toml に下限 `>=2.14.1`、uv.lock で固定
+catalogs:
+- name: API
+  version: 2.14.1
+  entries:
+  - name: BaseModel
+    kind: クラス
+    purpose: MCP のツールの引数・読み取り API の本文を要求のモデルとして検証する
+  - name: ConfigDict
+    kind: クラス
+    purpose: '`extra="forbid"`・`populate_by_name` など要求のモデルの設定'
+  - name: Field
+    kind: 関数
+    purpose: '`from_` の別名 `from`・`schema_path` の別名 `schema` と既定値・範囲を付ける'
+  - name: field_validator
+    kind: 関数
+    purpose: 文字列 1 つで書かれた値を配列にするなどの前処理
+  - name: ValidationError
+    kind: クラス
+    purpose: 要求のモデルの検証の誤り。文書の MCP のツールのエラーの変換が `isError` の結果にする
+lead: 型ヒントから値の検証と変換を行う Python のデータ検証ライブラリ。
+purl: pkg:pypi/pydantic
+dependency_scope: 必須
+adoption: 採用
+upstream: pydantic/pydantic
+license: MIT
+official_url: https://docs.pydantic.dev/
+docs_url: https://docs.pydantic.dev/latest/api/base_model/
+used_in:
+- src/project_index/features/
+- src/project_index/server/mcp/
+verification:
+  state: 済
+  date: '2026-10-28'
+  detail: 'pydantic 2.14.1・mcp 2.3.0・Python 3.14 で、`ConfigDict(extra="forbid")` のモデルが余計なキーを `extra_forbidden` で弾くこと、`MCPServer` のツールの引数を `Annotated[str | None, Field(validation_alias="from")]` にすると入力のスキーマに `from` が出て関数には `from_` で渡ること、`Literal` の引数が `enum` になり外れた値が検証の誤りになることを確かめた'
+install: |-
+  ```bash
+  uv add 'pydantic>=2.14.1'
+  ```
+limitations:
+- item: ツールの引数の `alias`
+  content: mcp 2.3.0 は引数を `alias` の名前で関数へ渡すため、`Field(alias="from")` は関数の呼び出しで `TypeError` になる。`validation_alias` を使う
+- item: ツールの余計な引数
+  content: 'mcp 2.3.0 が関数の引数から作るモデルは `additionalProperties: false` を持たず、知らないキーを黙って捨てる'

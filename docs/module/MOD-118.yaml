@@ -1,0 +1,56 @@
+id: MOD-118
+title: 索引のサーバー / 端末の設定
+lead: |-
+  端末の設定 `settings.yaml` をスキーマで検証して読み、端末の設定の API に送られた `sources[]` を、他のキーとコメントを保って書き換える。
+  端末の設定の取得・保存の入口も持つ。
+directory: |-
+  ```text
+  src/project_index/features/settings/
+  ├─ __init__.py   # 公開する型と関数の再エクスポート
+  ├─ types.py      # TerminalConfig / SourceEntry / SourceScope / SettingsSourceRow / SettingsSourcesView / SettingsSourcesRequest / SettingsSourcesResponse
+  ├─ query.py      # config_path / load_terminal_config / listen_port
+  ├─ service.py    # save_sources
+  └─ route.py      # build_settings_router（GET・PUT /settings/sources）
+  schemas/
+  └─ settings.schema.yaml   # 端末の設定のスキーマ（JSON Schema 2020-12）
+  ```
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      端末の設定の入口 ..> 配信元の保存 : PUT
+      端末の設定の入口 ..> 同じオリジンの確認 : PUT の前
+      配信元の保存 ..> 端末の設定の検証 : 書く前
+      端末の設定の読み込み ..> 端末の設定の検証 : 読んだ後
+      配信元の保存 ..> 配信元の読み直し : 書いた後
+      端末の設定の読み込み ..> 端末の設定 : 返す
+      class 端末の設定の入口 {
+        <<function>>
+      }
+      class 配信元の保存 {
+        <<function>>
+      }
+      class 端末の設定の読み込み {
+        <<function>>
+      }
+      class 端末の設定の検証 {
+        <<function>>
+      }
+      class 同じオリジンの確認 {
+        <<function>>
+      }
+      class 配信元の読み直し {
+        <<function>>
+      }
+      class 端末の設定 {
+        +配信元: list
+        +状態の置き場所: Path
+      }
+      click 端末の設定の入口 href "./MOD-65.py.yaml#端末の設定の入口"
+      click 配信元の保存 href "./MOD-66.py.yaml#配信元の保存"
+      click 同じオリジンの確認 href "./MOD-96.py.yaml#同じオリジンの確認"
+      click 端末の設定の検証 href "./MOD-64.py.yaml#端末の設定の検証"
+      click 端末の設定の読み込み href "./MOD-64.py.yaml#端末の設定の読み込み"
+      click 配信元の読み直し href "./MOD-89.py.yaml#配信元の読み直し"
+      click 端末の設定 href "./MOD-67.py.yaml#端末の設定"

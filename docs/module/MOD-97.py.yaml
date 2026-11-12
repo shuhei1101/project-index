@@ -1,0 +1,11 @@
+id: MOD-97
+title: 索引のサーバー / 共通 / api_model.py
+lead: 読み取り API の DTO の基底（キーは camelCase）。
+data_models:
+- name: ApiModel
+  title: 読み取り API のモデル
+  container: project_index/shared/api_model.py
+  usecase: 共通
+  role: DTO
+  summary: 読み取り API の入出力の DTO の基底。JSON のキーを camelCase にする
+  description: '`pydantic.BaseModel` を継承し、`model_config = ConfigDict(alias_generator=to_camel, validate_by_name=True, serialize_by_alias=True)` を持つ（`to_camel` は `pydantic.alias_generators`）。読み取り API・端末の設定の API（`/sources`・`/settings/sources` の下）の要求の本文と応答の DTO だけが継承する。パス・クエリのパラメータ名と、端末の設定・配信元の設定の YAML を読むモデルは対象にしない。'

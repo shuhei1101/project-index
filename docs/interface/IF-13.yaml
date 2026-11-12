@@ -1,0 +1,220 @@
+id: IF-13
+title: "試しの変換"
+entry:
+  kind: mcp_tool
+  value: try_convert
+flows:
+  - name: 正常系
+    summary: 変換スクリプトで変換した Markdown を返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 配信元
+        description: 文書の種類 note と、その変換スクリプトを持つ sample
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as try_convert
+        participant F as 配信元のフォルダ
+
+        C->>T: path・file
+        T-->>F: project-index.yaml・ファイルを読む
+        T->>T: 変換スクリプトを実行する
+        T-->>C: kind・converter・markdown
+      ```
+    expected:
+      - '`kind` が `note`、`converter` が変換スクリプトのパス'
+      - '`markdown` がスクリプトの出力と同じ'
+      - 配信元のフォルダと変換の控えのフォルダが変わらない
+    test: test_normal
+  - name: 異常系（ファイルが範囲に無い・DocumentNotFoundError）
+    summary: どの文書の種類にも当たらないファイルを指すと断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: file
+        description: '`documents[].paths` の外にある `README.md`'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as try_convert
+
+        C->>T: path・file
+        T-->>C: isError（DocumentNotFoundError）
+      ```
+    expected:
+      - '`isError: true` で当たる文書の種類が無いことを返す'
+    test: test_error_when_document_not_found
+  - name: 異常系（変換を持たない種類・ConverterNotDefinedError）
+    summary: '`converters[]` を指さない種類の文書を指すと断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: file
+        description: '`converters[]` を指さない種類の YAML の文書'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as try_convert
+
+        C->>T: path・file
+        T-->>C: isError（ConverterNotDefinedError）
+      ```
+    expected:
+      - '`isError: true` で、文書の種類と、その種類が `converters[]` を指さないことを返す'
+      - 配信元のフォルダは変わらない
+    test: test_error_when_converter_not_defined
+  - name: 異常系（変換スクリプトが失敗する・ConvertScriptError）
+    summary: 変換スクリプトが 0 以外で終わると、終了コードと stderr を返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 変換スクリプト
+        description: stderr に 1 行を出して終了コード 1 で終わる
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as try_convert
+
+        C->>T: path・file
+        T->>T: 変換スクリプトを実行する（終了コード 1）
+        T-->>C: isError（ConvertScriptError）
+      ```
+    expected:
+      - '`isError: true` で終了コード 1 と stderr の行を返す'
+    test: test_error_when_convert_script_fails
+  - name: 異常系（設定が無い・ConfigNotFoundError）
+    summary: '`project-index.yaml` の無いフォルダを指すと断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: フォルダ
+        description: 空の一時フォルダ
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as try_convert
+
+        C->>T: path・file
+        T-->>C: isError（ConfigNotFoundError）
+      ```
+    expected:
+      - '`isError: true` で `project-index.yaml` が無いことを返す'
+    test: test_error_when_config_not_found
+  - name: 異常系（設定が違反する・ValidationFailedError）
+    summary: 違反のある設定では変換せず断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 配信元
+        description: 一時フォルダに `a.md` を置く
+        notes: '`config` に `name` の無い設定を渡す'
+    flow: |-
+      sequenceDiagram
+        participant C as クライアント
+        participant T as try_convert
+
+        C->>T: path・file・config
+        T-->>C: isError（ValidationFailedError）
+    expected:
+      - '`isError: true` で違反の件数と `check_project` の案内を返す'
+      - 配信元のフォルダが変わらない
+    test: test_error_when_invalid_config
+  - name: 異常系（設定が読めない・ConfigParseError）
+    summary: YAML として読めない設定では断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 配信元
+        description: 一時フォルダに `a.md` を置く
+        notes: '`config` に `name: [` を渡す'
+    flow: |-
+      sequenceDiagram
+        participant C as クライアント
+        participant T as try_convert
+
+        C->>T: path・file・config
+        T-->>C: isError（ConfigParseError）
+    expected:
+      - '`isError: true` で読めなかった行・列・理由を返す'
+    test: test_error_when_config_parse_error
+lead: 配信元の 1 つのファイルを、配信するときと同じ `converters[]` のスクリプトで Markdown にして返す。書き込まず、変換の控えも残さない。
+identifier: try_convert
+permissions: なし（`127.0.0.1` でだけ待ち受ける）
+idempotent: true
+side_effects: なし（変換スクリプトを実行するが、ファイルと変換の控えは書かない）
+callers:
+  - SC-10#scenarios[正常シナリオ]
+exclusivity: '読み取りだけで排他しない（`readOnlyHint: true`）'
+request:
+  - name: path
+    type: str
+    required: true
+    location: argument
+    description: 配信元のフォルダか、その `project-index.yaml` の絶対パス
+  - name: file
+    type: str
+    required: true
+    location: argument
+    description: 変換するファイルの配信元からの相対パス
+  - name: config
+    type: str
+    required: false
+    default: なし（`path` の `project-index.yaml` を読む）
+    location: argument
+    description: ファイルに書く前の `project-index.yaml` の中身（YAML の文字列）
+request_example: |-
+  ```json
+  {"path": "/home/u/repo/sample", "file": "docs/a.yaml"}
+  ```
+response:
+  - name: kind
+    type: str
+    description: 当たった文書の種類
+  - name: converter
+    type: str
+    description: 使用した変換スクリプトのパス
+  - name: markdown
+    type: str
+    description: 変換した Markdown
+response_example: |-
+  ```json
+  {"kind": "note", "converter": "scripts/convert_note.py", "markdown": "# A\n\n本文"}
+  ```
+exceptions:
+  - name: なし（正常終了）
+    condition: 変換できた
+  - name: DocumentNotFoundError
+    condition: '`file` が無い、またはどの文書の種類の範囲にも当たらない'
+    notes: '`isError: true`'
+  - name: ConverterNotDefinedError
+    condition: '`file` の文書の種類が `converters[]` を指さない'
+  - name: ConvertScriptError
+    condition: 変換スクリプトが 0 以外で終わった、または `script_timeout_sec` を超えた
+    notes: '`isError: true` で終了コードと stderr を返す'
+  - name: ConfigNotFoundError
+    condition: '`path` に `project-index.yaml` も `dev-docs.yaml` も無く、`config` も渡していない'
+    notes: '`isError: true`'
+  - name: ValidationFailedError
+    condition: 配信元の設定に違反か動かないスクリプトがある
+    notes: '`isError: true` で違反の件数を返し、`check_project` で確かめるよう示す'
+  - name: ConfigParseError
+    condition: '`project-index.yaml` か `config` が YAML として読めない'
+    notes: '`isError: true` で読めなかった行・列・理由を返す'
+constraints:
+  - item: 注釈
+    constraint: '`readOnlyHint: true`'
+  - item: 変換
+    constraint: '`converters[]` を指す種類の文書だけを、読み取り API の文書の取得と同じ関数で変換する。スキーマ駆動の Markdown への変換は持たない（dev-docs の画面のサーバーが持つ）'
+  - item: パス
+    constraint: '`file` が配信元のフォルダの外を指したら `DocumentNotFoundError`'
+  - item: タイムアウト
+    constraint: 変換スクリプトは `script_timeout_sec`
+  - item: 設定の探し方
+    constraint: '`path` がフォルダのときは `project-index.yaml` を探し、無ければ `dev-docs.yaml` を探す（今の各リポジトリが `project-index.yaml` へ改名するまでの移行の間）'
+test_file: tests/integration/server/test_try_convert.py

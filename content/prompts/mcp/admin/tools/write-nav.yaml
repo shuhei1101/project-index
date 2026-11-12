@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=../../../../../templates/prompt.schema.yaml
+id: mcp/admin/tools/write-nav
+name: write_nav の description
+description: 管理の MCP の write_nav が何をするかを伝える
+kind: tool
+lang: ja
+parts:
+  - id: body
+    texts:
+      - lang: ja
+        text: |-
+          配信元の project-index.yaml の nav だけを、タブ・項目の追加・修正・削除で書き換える。書き換えた後の nav をスキーマと check_filter で検証し、auto の条件に該当する文書の数を返却する。

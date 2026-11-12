@@ -1,0 +1,78 @@
+id: MOD-51
+title: 索引のサーバー / 検索 / cursor.py
+lead: 続きのカーソルの作成と解読。
+test_files:
+- tests/unit/project_index/features/search/test_cursor.py
+functions:
+- name: encode_cursor
+  title: 続きの位置を作る
+  kind: 関数
+  container: project_index/features/search/cursor.py
+  usecase: 共通
+  role: 変換
+  summary: 次の位置と要求の指紋を `next_cursor` の文字列にする
+  scope: public
+  thread_safe: true
+  args:
+  - name: offset
+    title: 位置
+    type: int
+    required: true
+    passing: positional
+    description: 次に返す文書の、並べ替えた後の位置
+  - name: fingerprint
+    title: 要求の指紋
+    type: str
+    required: true
+    passing: positional
+    description: '`cursor`・`limit`・`max_chars` を除いた要求の値のハッシュ'
+  returns:
+    type: str
+    description: '`{"o": offset, "f": fingerprint}` の JSON を URL セーフの Base64 にしたもの'
+  process: 1. JSON にして Base64 にする
+- name: decode_cursor
+  title: 続きの位置を読む
+  kind: 関数
+  container: project_index/features/search/cursor.py
+  usecase: 共通
+  role: 検証
+  summary: '`cursor` から位置を取り出し、要求が前回と同じかを確かめる'
+  scope: public
+  thread_safe: true
+  args:
+  - name: cursor
+    title: 続きの位置
+    type: str
+    required: true
+    passing: positional
+    description: 前回の `next_cursor`
+  - name: fingerprint
+    title: 要求の指紋
+    type: str
+    required: true
+    passing: positional
+    description: 今回の要求の指紋
+  returns:
+    type: int
+    description: 位置
+  process: |-
+    1. Base64 と JSON を読む。読めない場合、`InvalidArgumentError`（`cursor` を読めません）を送る
+    2. 指紋が違う場合、`InvalidArgumentError`（`cursor` は前回と同じ引数で渡してください）を送る
+  exceptions:
+  - name: InvalidArgumentError
+    condition: 読めない・前回と引数が違う
+    message: '`cursor は前回と同じ引数で指定してください`'
+  unit_tests:
+  - name: test_decode_cursor
+    case: 正常
+    summary: 往復
+    condition: '`encode_cursor(40, "f1")` を `"f1"` で読む'
+    mock: なし
+    expected: '40'
+  - name: test_decode_cursor_when_other_request
+    case: 異常
+    summary: 引数が違う
+    condition: 同じ `cursor` を `"f2"` で読む
+    mock: なし
+    expected: '`InvalidArgumentError` の違反の `path` が `cursor`'
+    exception: 前回と引数が違う

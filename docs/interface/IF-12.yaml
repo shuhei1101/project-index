@@ -1,0 +1,423 @@
+id: IF-12
+title: "配信元の検査"
+entry:
+  kind: mcp_tool
+  value: check_project
+flows:
+- name: 正常系
+  summary: 検証に通る配信元の違反 0 件と同期の件数を返す
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+  - name: 配信元
+    description: 検証に通る sample。管理用の YAML に無いファイル 1 件を置く
+  - name: 管理用の YAML の行
+    description: 'sample の行 `src`（`records: files`・`body_file: path`）。`schema` は `templates/files.schema.yaml` のコピー'
+    notes: '`/project-index:setup` が作る組み合わせ'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as check_project
+      participant F as 配信元のフォルダ
+
+      C->>T: path
+      T-->>F: project-index.yaml・管理用の YAML・スクリプトを読む
+      T-->>C: 違反・設定のバージョン・同期の件数
+    ```
+  expected:
+  - '`violations` と `missing_paths` と `script_errors` が空（行 `src` の `schema` も違反にしない）'
+  - '`version_state` が `current`'
+  - '`sync.unindexed_files` が 1 で、`sync.items` にそのパスがある'
+  - 配信元のフォルダのファイルが変わらない
+  test: test_normal
+- name: 正常系（違反がある）
+  summary: スキーマに違反する設定と、書く前の `config` の違反を返す
+  setup:
+  - name: Mock
+    description: なし
+  - name: config
+    description: '`documents[0].paths` を持たない YAML の文字列'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as check_project
+
+      C->>T: path・config
+      T-->>C: violations
+    ```
+  expected:
+  - '`violations` に `documents[0].paths` と理由がある'
+  - '`path` の `project-index.yaml` の中身ではなく `config` を検査している'
+  test: test_normal_when_config_has_violations
+- name: 正常系（移行の間の dev-docs.yaml を読む）
+  summary: '`project-index.yaml` が無く `dev-docs.yaml` があるフォルダは、`dev-docs.yaml` を検査する'
+  setup:
+  - name: Mock
+    description: なし
+  - name: フォルダ
+    description: '`dev-docs.yaml` だけを持つ配信元のフォルダ'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as check_project
+      participant F as 配信元のフォルダ
+
+      C->>T: path（フォルダ）
+      T->>F: project-index.yaml を探す（無い）
+      T->>F: dev-docs.yaml を読む
+      T-->>C: 違反・設定のバージョンの新旧・索引の同期の件数
+    ```
+  expected:
+  - '`dev-docs.yaml` を検査した結果を、`project-index.yaml` と同じ形で返す'
+  - 同じフォルダに `project-index.yaml` を置くと、`dev-docs.yaml` は読まない
+  test: test_normal_when_legacy_config_name
+- name: 異常系（設定が無い・ConfigNotFoundError）
+  summary: '`project-index.yaml` の無いフォルダを指すと断る'
+  setup:
+  - name: Mock
+    description: なし
+  - name: フォルダ
+    description: 空の一時フォルダ
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as check_project
+
+      C->>T: path
+      T-->>C: isError（ConfigNotFoundError）
+    ```
+  expected:
+  - '`isError: true` で `project-index.yaml` が無いことと、探したパスを返す'
+  test: test_error_when_config_not_found
+- name: 異常系（YAML として読めない・ConfigParseError）
+  summary: 読めない `config` を渡すと、行と理由を返して断る
+  setup:
+  - name: Mock
+    description: なし
+  - name: config
+    description: インデントが崩れた YAML の文字列
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as check_project
+
+      C->>T: path・config
+      T-->>C: isError（ConfigParseError）
+    ```
+  expected:
+  - '`isError: true` で読めなかった行と理由を返す'
+  test: test_error_when_config_unparsable
+- name: 正常系（前の形式の設定）
+  summary: 前の形式のキーを持つ設定の違反と、設定のバージョンが古いことを返す
+  setup:
+  - name: Mock
+    description: なし
+  - name: config
+    description: '`version: "1"` で、`documents[0]` が `paths`・`schema`・`type: markdown`・`defaults: [{paths: [docs/**], tags: [doc]}]`、`documents[1]` が `paths`・`schema`・`metadata: {name: {type: ref, field: title}}` を持つ YAML の文字列'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as check_project
+
+      C->>T: path・config
+      T->>T: 新しいバージョンのスキーマで検証する
+      T-->>C: violations・version_state
+    ```
+  expected:
+  - '`violations` に `documents[0].type`・`documents[0].defaults`・`documents[1].metadata.name` がそれぞれ理由と一緒にある'
+  - '`version_state` が `old` で、`config_version` が `1`'
+  test: test_normal_when_config_legacy
+- name: 正常系（除外の条件に当たるファイルを数えない）
+  summary: 除外の条件に当たるファイルを索引に無いファイルとして数えない
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+  - name: 配信元
+    description: '検証に通る sample。行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`）の `src/files.yaml` が `files: []`'
+    notes: '-'
+  - name: 範囲のファイル
+    description: '`src/` に `a.py`・`b.py`・空の `pkg/__init__.py`・`uv.lock`・`logo.png`（先頭に NUL バイト）を置く'
+    notes: '`a.py`・`b.py` だけが除外の条件に当たらない'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as check_project
+      participant F as 配信元のフォルダ
+
+      C->>T: path
+      T-->>F: 管理用の YAML とそのフォルダの配下のファイルを読む
+      T->>T: 除外の条件に当たるファイルを外す
+      T-->>C: 同期の件数と内訳
+    ```
+  expected:
+  - '`sync.unindexed_files` が 2'
+  - '`sync.items` が `src/a.py`・`src/b.py` の 2 件だけで、`src/pkg/__init__.py`・`src/uv.lock`・`src/logo.png` を含まない'
+  test: test_normal_when_files_excluded
+- name: 正常系（エイリアスのキーと nav の条件を点検する）
+  summary: エイリアスのキーの違反を文書のパスとともに、どの文書にも当たらない `nav` の条件を警告として返す
+  setup:
+  - name: Mock
+    description: なし
+  - name: エイリアスのキーの違反
+    description: sample の `alias_type` を持つ行の文書 1 件の `aliases` を数値（文字列でも文字列の並びでもない）にする
+  - name: 0 件に当たる nav の条件
+    description: sample の `nav` に、`auto` の `filter` が `tags が none` のタブ `none` を置く
+    notes: どの文書にもタグ `none` を付けない
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as check_project
+      participant F as 配信元のフォルダ
+
+      C->>T: path
+      T-->>F: project-index.yaml と文書を読む
+      T->>T: エイリアスのキーを取り込んだスキーマで検証する
+      T->>T: nav の auto の条件に当たる文書を数える
+      T-->>C: 違反・警告・取り込んだスキーマのバージョン
+    ```
+  expected:
+  - '`violations` に、`doc` が違反した文書のパスで `aliases` が文字列か文字列の並びでないことの違反が 1 件ある'
+  - '`warnings` に、タブ `none` の条件が 0 件に当たる警告が 1 件ある'
+  - '`alias_schema_version` が `v0.3.0`'
+  test: test_normal_when_alias_and_nav_checked
+- name: 正常系（records の行のスキーマが行に合わない）
+  summary: '`records` を持つ行の `schema` が `properties.{records}.items` を定めないとき、その行の `schema` を違反にする'
+  setup:
+  - name: Mock
+    description: なし
+  - name: 食い違う配信元
+    description: '`project-index.yaml` の `documents[0]`（`paths: [files.yaml]`・`records: files`・`body_file: path`）の `schema` が、最上位で `files` を必須にし `files` の `items` を定めないスキーマを指すフォルダ'
+    notes: 管理用の YAML は `files[]` に `a.md` の 1 行
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as check_project
+      participant F as 配信元のフォルダ
+
+      C->>T: path
+      T-->>F: project-index.yaml と行の schema を読む
+      T->>T: records の行の schema から properties.files.items を取り出せない
+      T-->>C: violations（documents[0].schema）
+    ```
+  expected:
+  - '`violations` に `documents[0].schema` があり、`rule` にスキーマが `properties.files.items` を定めないことがある'
+  - 結果は配信中の配信元の状態に反映しない
+  test: test_normal_when_records_schema_mismatch
+- name: 正常系（どの文書にも該当しない関連）
+  summary: '`related[].to` がどの文書の ID にも当たらない関連を、同期の件数と内訳で返す'
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+  - name: 配信元
+    description: '検証に通る sample。行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`）の `src/files.yaml` に `a.py`・`b.py` の 2 行。`src/a.py`・`src/b.py` を置く'
+  - name: 関連
+    description: '`a.py` の行が `related: [{to: src/b.py, type: tests}, {to: src/z.py, type: tests}, {to: other-doc, type: tests, source: other}]` を持つ'
+    notes: '`src/z.py` だけがどの文書の ID にも当たらない。`source` を持つ関連は照合しない'
+  flow: |-
+    sequenceDiagram
+      participant C as クライアント
+      participant T as check_project
+      participant F as 配信元のフォルダ
+
+      C->>T: path
+      T-->>F: 管理用の YAML と文書を読む
+      T->>T: 全ての文書の ID の集合を作る
+      T->>T: source を持たない related[].to を ID の集合と照合する
+      T-->>C: 同期の件数と内訳
+  expected:
+  - '`sync.unresolved_related` が 1'
+  - '`sync.items` に `src: src/a.py: src/z.py` があり、`src/b.py`・`other-doc` の関連を含まない'
+  test: test_normal_when_related_unresolved
+- name: 正常系（ほかの配信元のスキーマを参照する）
+  summary: '`documents[].schema` で指したほかの配信元のリビジョンのスキーマを読み、違反 0 件を返す'
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+  - name: スキーマの配信元
+    description: '`schemas/note.schema.yaml` と、そこから `$ref` で指す `schemas/common.schema.yaml` を持つ Git のリポジトリ。端末の設定の `sources` に行がある'
+    notes: id `schemas`。タグ `v1` の後の commit で `note.schema.yaml` を YAML として読めない内容に書き換え、作業ツリーはその commit
+  - name: 配信元
+    description: '`documents[0].schema: {source: schemas, path: schemas/note.schema.yaml, ref: v1}` を持つ Git 管理外のフォルダ'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as check_project
+      participant G as schemas のリポジトリ
+
+      C->>T: path
+      T->>G: v1 を commit に解き、note.schema.yaml と common.schema.yaml を読む
+      T-->>C: 違反・設定のバージョン・同期の件数
+    ```
+  expected:
+  - '`violations` が空（作業ツリーの壊れた `note.schema.yaml` を読まない）'
+  test: test_normal_when_schema_from_other_source
+- name: 正常系（参照先のスキーマが見つからない）
+  summary: '`documents[].schema` の参照先の配信元・リビジョン・パスが見つからないとき、`documents[{番号}].schema` の違反にする'
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+  - name: スキーマの配信元
+    description: 正常系（ほかの配信元のスキーマを参照する）と同じ schemas
+  - name: 配信元
+    description: '`documents[0]` は `source: nothing`（端末の設定に無い）、`documents[1]` は `ref: v9`（無いタグ）、`documents[2]` は `path: schemas/none.schema.yaml`（v1 に無いファイル）で schemas を指す Git 管理外のフォルダ'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as check_project
+      participant G as schemas のリポジトリ
+
+      C->>T: path
+      T->>G: 行ごとに参照先を解く
+      T-->>C: violations（documents[0].schema・documents[1].schema・documents[2].schema）
+    ```
+  expected:
+  - '`violations` に `documents[0].schema`（配信元 `nothing` が端末の設定に無い）・`documents[1].schema`（schemas に `v9` が無い）・`documents[2].schema`（`v1` に `schemas/none.schema.yaml` が無い）が理由と一緒にある'
+  - 結果は配信中の配信元の状態に反映しない
+  test: test_normal_when_schema_ref_not_found
+lead: 配信元の `project-index.yaml` と管理用の YAML・スクリプトを検証し、違反・設定のバージョンの新旧・索引の同期の件数を返す。端末の設定に無い配信元も検査できる。
+identifier: check_project
+permissions: なし（`127.0.0.1` でだけ待ち受ける）
+idempotent: true
+side_effects: なし（検査と確かめのスクリプトを実行するが、ファイルは書き換えない）
+callers:
+- SC-5#scenarios[正常シナリオ]
+- SC-10#scenarios[正常シナリオ]
+- SC-5#scenarios[正常シナリオ（除外の条件と関連の候補）]
+- SC-10#scenarios[正常シナリオ（エイリアスのキーと nav の条件を点検する）]
+exclusivity: '読み取りだけで排他しない（`readOnlyHint: true`）'
+request:
+- name: path
+  type: str
+  required: true
+  location: argument
+  description: 配信元のフォルダか、その `project-index.yaml` の絶対パス
+- name: config
+  type: str
+  required: false
+  default: なし（`path` の `project-index.yaml` を読む）
+  location: argument
+  description: ファイルに書く前の `project-index.yaml` の中身（YAML の文字列）
+  notes: setup が書く前の設定を確かめるため
+- name: format
+  type: Literal['markdown', 'json']
+  required: false
+  default: '`markdown`'
+  location: argument
+  description: 返却する形式
+request_example: |-
+  ```json
+  {"path": "/home/u/repo/sample"}
+  ```
+response:
+- name: path
+  type: str
+  description: 検査した配信元のフォルダ
+- name: registered_id
+  type: str | None
+  description: 端末の設定の `sources` に同じフォルダの行があればその ID
+- name: config_version
+  type: str | None
+  description: '`project-index.yaml` の `version`'
+- name: version_state
+  type: Literal['current', 'old', 'newer'] | None
+  description: project-index が読めるバージョンとの比較
+- name: violations[].path
+  type: str
+  description: 違反したキーのパス（`documents[0].paths`）
+- name: violations[].rule
+  type: str
+  description: 違反の理由
+- name: missing_paths[]
+  type: str
+  description: '`documents[].paths` などが指して無いフォルダ・ファイル'
+- name: script_errors[].script
+  type: str
+  description: 確かめに失敗したスクリプトのパス
+- name: script_errors[].reason
+  type: str
+  description: 終了コードと stderr の要約
+- name: sync.missing_refs
+  type: int
+  description: '種類の行の `metadata` に書いた列が無い文書の件数'
+- name: sync.unindexed_files
+  type: int
+  description: 管理用の YAML に無いファイルの件数。除外の条件（生成物・ロック・バイナリ・ベンダーのコード・再エクスポートや空の `__init__`）に当たるファイルは数えない
+- name: sync.missing_body_files
+  type: int
+  description: ファイルが無い行の件数
+- name: sync.items[]
+  type: list[SyncItem]
+  description: 件数の内訳（種類とパス）
+  notes: 先頭 50 件まで
+- name: violations[].doc
+  type: str | None
+  description: 違反した文書のパス。`alias_type` を持つ行の文書のエイリアスのキーを、取り込んだエイリアスのスキーマで検証した違反に入れる
+  notes: '`project-index.yaml` のキーの違反は `null`'
+- name: warnings[].path
+  type: str
+  description: 警告したキーのパス（`nav.tabs[2].items[0].auto.filter`）
+- name: warnings[].rule
+  type: str
+  description: 警告の理由。`nav` の `auto` の条件がどの文書にも当たらないときは、タブの名前と条件
+- name: alias_schema_version
+  type: str
+  description: 取り込んだエイリアスのスキーマの取り込み元のタグ（`shuhei1101/alias-inject` の `v0.3.0`）
+- name: sync.unresolved_related
+  type: int
+  description: '`related[].to` が配信元のどの文書の ID にも当たらない関連の件数。`source` を持つ関連は数えない'
+  notes: '`sync.items[]` の要素は `{行の id}: {文書の id}: {to}`'
+response_example: |-
+  ```markdown
+  /home/u/repo/sample（登録済み: sample）
+  設定のバージョン: 1（current）
+
+  違反: なし
+  索引の同期: 管理用の YAML に無いファイル 1 件
+  - unindexed_files: docs/memo.md
+  ```
+exceptions:
+- name: なし（正常終了）
+  condition: 検査できた（違反があっても正常終了で違反を返す）
+- name: ConfigNotFoundError
+  condition: '`path` に `project-index.yaml` も `dev-docs.yaml` も無く、`config` も渡していない'
+  notes: '`isError: true`'
+- name: ConfigParseError
+  condition: '`project-index.yaml` か `config` が YAML として読めない'
+  notes: '`isError: true` で行と理由を返す'
+constraints:
+- item: 注釈
+  constraint: '`readOnlyHint: true`'
+- item: 検査の内容
+  constraint: 起動・`reload` の配信元の検証と同じ関数を使う。結果は配信中の配信元の状態に反映しない。`records` を持つ行は、`schema` をファイル全体のスキーマとし、`properties.{records}.items` を取り出せない組み合わせを `documents[{番号}].schema` の違反にする
+- item: 件数の内訳
+  constraint: 先頭 50 件まで返し、件数は全件を数える
+- item: タイムアウト
+  constraint: スクリプトの確かめは `script_timeout_sec` で打ち切り、`script_errors` に入れる
+- item: 除外の条件
+  constraint: 生成物・ロック・バイナリ・ベンダーのコード・再エクスポートや空の `__init__` だけのファイルを `unindexed_files` に数えない。起動時の警告・状態の取得・`project-index files` も同じ判定を使う
+  notes: 見分け方はモジュール構成『文書のストア / indexable.py』の `is_excluded_file`。配信元固有の除外は `documents[].exclude[]`
+- item: nav の auto の group_by
+  constraint: "`group_by` の `'@folder'` は項目のパスとして検査せず、違反・警告にしない"
+- item: 当たらない関連の照合
+  constraint: 配信元の全ての文書の ID の集合を 1 回だけ作り、`source` を持たない `related[].to` をその集合と照合する。起動時の警告・状態の取得も同じ判定を使う
+  notes: '`source` を持つ関連は、別の配信元が同じ端末で配信されているとは限らないため照合しない'
+- item: ほかの配信元のスキーマの参照
+  constraint: '`documents[].schema` がオブジェクト（`source`・`path`・`ref`）の行は、端末の設定の `sources` の `source` の行が指す配信元のリポジトリから、`ref` を commit に解いたリビジョンの `path` のファイルを Git のオブジェクトとして読む。スキーマの中の相対の `$ref` も同じリポジトリの同じ commit のファイルで解く。参照先が `not_served`（検証で外した・`enabled: false`）でも、端末の設定に行があり Git のリポジトリなら読む'
+  notes: 参照先の作業ツリー・`default_ref` の今の内容は読まない。`ref` は配信元を組み立てるとき（起動・`reload`・`default_ref` の commit が変わったとき）に commit へ解き直す
+- item: 参照先のスキーマの違反
+  constraint: 参照先の配信元が端末の設定に無い・Git のリポジトリでない、`ref` を commit に解けない、そのリビジョンに `path` のファイルが無い・YAML として読めない・オブジェクトでない、`$ref` の参照先がそのリビジョンに無いときは、`documents[{番号}].schema` の違反にする
+- item: 設定の探し方
+  constraint: '`path` がフォルダのときは `project-index.yaml` を探し、無ければ `dev-docs.yaml` を探す（今の各リポジトリが `project-index.yaml` へ改名するまでの移行の間）'
+  notes: 端末の設定の `config` は名前によらず書いたファイルを読む
+test_file: tests/integration/server/test_check_project.py

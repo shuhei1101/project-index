@@ -1,0 +1,230 @@
+id: MOD-26
+title: 索引のサーバー / 文書のストア / indexable.py
+lead: たどるフォルダと、載せるファイルの判定。
+test_files:
+- tests/unit/project_index/features/documents/test_indexable.py
+constants:
+- name: SKIP_DIRS
+  title: たどらないフォルダ
+  container: project_index/features/documents/indexable.py
+  usecase: 共通
+  summary: ファイルをたどるときに中に入らないフォルダ名
+  value: frozenset({".git", "node_modules", "__pycache__", ".venv"})
+- name: SKIP_PATHS
+  title: たどらないパス
+  container: project_index/features/documents/indexable.py
+  usecase: 共通
+  summary: ファイルをたどるときに中に入らないフォルダの `root` からのパス（配信元の設定の `worktrees` の既定と同じ場所）
+  value: frozenset({".claude/worktrees"})
+- name: LOCK_FILES
+  title: ロックファイルの名前
+  container: project_index/features/documents/indexable.py
+  usecase: 共通
+  summary: 依存のロックファイルとみなすファイル名。末尾が `.lock` のファイルもロックとみなす
+  value: frozenset({"package-lock.json", "pnpm-lock.yaml", "go.sum", "bun.lockb", "npm-shrinkwrap.json"})
+- name: VENDOR_DIRS
+  title: ベンダー・生成物のフォルダ名
+  container: project_index/features/documents/indexable.py
+  usecase: 共通
+  summary: パスの途中にこの名前のフォルダがあるファイルを、ベンダーのコードか生成物とみなす
+  value: frozenset({"vendor", "third_party", "generated", "__generated__", "dist"})
+- name: GENERATED_SUFFIXES
+  title: 生成物のファイル名の末尾
+  container: project_index/features/documents/indexable.py
+  usecase: 共通
+  summary: ファイル名がこの末尾のファイルを生成物とみなす
+  value: ("_pb2.py", "_pb2_grpc.py", ".min.js", ".min.css", ".map")
+- name: BINARY_SNIFF_BYTES
+  title: バイナリの判定で読む長さ
+  container: project_index/features/documents/indexable.py
+  usecase: 共通
+  summary: 先頭のこのバイト数に NUL バイトがあればバイナリとみなす
+  value: '8192'
+functions:
+- name: walk_files
+  title: 中をたどるファイルの列挙
+  container: project_index/features/documents/indexable.py
+  usecase: 共通
+  role: 読み取り
+  summary: フォルダの配下のファイルを、たどらないフォルダを飛ばして `root` からのパスで返す
+  kind: 関数
+  scope: public
+  thread_safe: true
+  args:
+  - name: root
+    title: 読むフォルダ
+    type: Path
+    required: true
+    passing: positional
+    description: 配信元の直下に当たるフォルダ
+  - name: start
+    title: たどり始めるフォルダ
+    type: str
+    required: false
+    default: '"."'
+    passing: keyword
+    description: '`root` からのパス。このフォルダの配下だけをたどる'
+  returns:
+    type: Iterator[str]
+    description: '`root` からのパス（`/` 区切り）。順は `os.walk` のまま'
+  process: |-
+    1. `root / start` を `os.walk`（`followlinks=False`）でたどる。シンボリックリンクのフォルダには `os.walk` が入らないので、フォルダごとに `os.path.islink` を呼ばない
+    2. 各フォルダで、`SKIP_DIRS` の名前のフォルダ・`root` からのパスが `SKIP_PATHS` にあるフォルダをたどる先から外す
+    3. ファイルごとに `root` からのパスを作って返す
+  unit_tests:
+  - name: test_walk_files
+    case: 正常
+    summary: たどらないフォルダを飛ばす
+    condition: '`a/x.md`・`.git/c`・`node_modules/m.js`・`.claude/worktrees/wt/y.md`・`.claude/z.md` を置く'
+    mock: なし（`tmp_path`）
+    expected: 昇順にして `[".claude/z.md", "a/x.md"]`
+    exception: '-'
+  - name: test_walk_files_when_start_given
+    case: 正常
+    summary: 始めるフォルダの配下だけをたどる
+    condition: '`a/x.md`・`b/y.md` を置き、`start="a"`'
+    mock: なし（`tmp_path`）
+    expected: '`["a/x.md"]`'
+    exception: '-'
+  - name: test_walk_files_when_symlink_folder
+    case: 正常
+    summary: シンボリックリンクのフォルダをたどらない
+    condition: '`a/x.md` と、`a` を指すシンボリックリンク `l` を置く'
+    mock: なし（`tmp_path`）
+    expected: '`["a/x.md"]`'
+    exception: '-'
+- name: is_excluded_file
+  title: 除外の条件の判定
+  container: project_index/features/documents/indexable.py
+  usecase: 共通
+  role: 判定
+  summary: ファイルが管理用の YAML に載せない除外の条件（生成物・ロック・バイナリ・ベンダーのコード・再エクスポートや空の `__init__`）に当たるか
+  description: 配信元によらず同じ固定の判定を使う。配信元に固有の除外は `documents[].exclude[]` が担う。
+  kind: 関数
+  scope: public
+  thread_safe: true
+  args:
+  - name: root
+    title: 読むフォルダ
+    type: Path
+    required: true
+    passing: positional
+    description: 配信元の直下に当たるフォルダ
+  - name: path
+    title: ファイルのパス
+    type: str
+    required: true
+    passing: positional
+    description: '`root` からのパス'
+  returns:
+    type: bool
+    description: 除外の条件に当たれば `True`
+  process: |-
+    1. パスの途中のフォルダ名に `VENDOR_DIRS` のどれかがあれば `True`
+    2. ファイル名が `LOCK_FILES` にあるか、末尾が `.lock` なら `True`
+    3. ファイル名の末尾が `GENERATED_SUFFIXES` のどれかなら `True`
+    4. ファイルの先頭 `BINARY_SNIFF_BYTES` バイトを読み、NUL バイトがあれば `True`
+    5. ファイル名が `__init__.py` の場合、UTF-8 で読んで `ast.parse` し、文が空か、import 文・先頭の docstring・`__all__` への代入だけなら `True`
+    6. それ以外は `False`
+       - 手順 4・5 で `OSError` の場合、`False`（読めないファイルは読み込みの問題として別に出る）
+       - 手順 5 で `SyntaxError`・`UnicodeDecodeError` の場合、`False`
+  unit_tests:
+  - name: test_is_excluded_file_when_lock
+    case: 正常
+    summary: ロックファイル
+    condition: '`uv.lock`・`package-lock.json` を置く'
+    mock: なし（`tmp_path`）
+    expected: どちらも `True`
+    exception: '-'
+  - name: test_is_excluded_file_when_vendor
+    case: 正常
+    summary: ベンダー・生成物のフォルダの下
+    condition: '`src/vendor/a.py`・`web/dist/app.js` を置く'
+    mock: なし（`tmp_path`）
+    expected: どちらも `True`
+    exception: '-'
+  - name: test_is_excluded_file_when_generated_suffix
+    case: 正常
+    summary: 生成物のファイル名
+    condition: '`api_pb2.py`・`app.min.js` を置く'
+    mock: なし（`tmp_path`）
+    expected: どちらも `True`
+    exception: '-'
+  - name: test_is_excluded_file_when_binary
+    case: 正常
+    summary: NUL バイトを持つファイル
+    condition: 先頭に NUL バイトを持つ `logo.png` を置く
+    mock: なし（`tmp_path`）
+    expected: '`True`'
+    exception: '-'
+  - name: test_is_excluded_file_when_reexport_init
+    case: 正常
+    summary: 空・再エクスポートだけの `__init__.py`
+    condition: 空の `a/__init__.py` と、docstring・`from .x import y`・`__all__ = ["y"]` だけの `b/__init__.py` を置く
+    mock: なし（`tmp_path`）
+    expected: どちらも `True`
+    exception: '-'
+  - name: test_is_excluded_file_when_init_has_logic
+    case: 正常
+    summary: 処理を持つ `__init__.py` は載せる
+    condition: '`def f(): ...` を持つ `c/__init__.py` を置く'
+    mock: なし（`tmp_path`）
+    expected: '`False`'
+    exception: '-'
+  - name: test_is_excluded_file_when_source
+    case: 正常
+    summary: 通常のコードは載せる
+    condition: '`src/a.py`・`docs/a.md` を置く'
+    mock: なし（`tmp_path`）
+    expected: どちらも `False`
+    exception: '-'
+- name: indexable_files
+  title: 載せるファイルの一覧
+  container: project_index/features/documents/indexable.py
+  usecase: 載せるファイルの一覧
+  role: 読み取り
+  summary: 範囲の glob に当たるファイルのうち、除外の名前と除外の条件に当たらないものを返す
+  kind: 関数
+  scope: public
+  thread_safe: true
+  args:
+  - name: root
+    title: 読むフォルダ
+    type: Path
+    required: true
+    passing: positional
+    description: 配信元の直下に当たるフォルダ
+  - name: paths
+    title: 範囲
+    type: list[str]
+    required: true
+    passing: positional
+    description: '`root` からの glob（`documents[].paths` と同じ書き方）'
+  - name: exclude
+    title: 除外の名前
+    type: list[str]
+    required: false
+    default: '[]'
+    passing: keyword
+    description: ファイル名の glob（`documents[].exclude[]` と同じ書き方）
+  returns:
+    type: list[str]
+    description: '`root` からのパスの昇順'
+  process: |-
+    1. `paths`・`exclude` を持つ文書の行（`DocumentTable`。`id` は `files`、`schema_path` は空）を作り、ファイルの収集（`collect_files`）で集める
+    2. 除外の条件の判定（`is_excluded_file`）が `True` のパスを除いて返す
+  unit_tests:
+  - name: test_indexable_files
+    case: 正常
+    summary: 除外の条件に当たるファイルを除く
+    condition: '`src/a.py`・`src/b.py`・空の `src/pkg/__init__.py`・`src/uv.lock`・`.claude/worktrees/wt/src/c.py` を置き、`paths=["**"]`'
+    mock: なし（`tmp_path`）
+    expected: '`["src/a.py", "src/b.py"]`'
+    exception: '-'
+  - name: test_indexable_files_when_exclude_given
+    case: 正常
+    summary: 除外の名前に当たるファイルも除く
+    condition: '`src/a.py`・`src/b.py` を置き、`paths=["src/**"]`・`exclude=["b.py"]`'
+    mock: なし（`tmp_path`）
+    expected: '`["src/a.py"]`'
+    exception: '-'

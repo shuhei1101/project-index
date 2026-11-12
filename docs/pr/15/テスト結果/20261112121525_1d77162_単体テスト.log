@@ -1,0 +1,16 @@
+$ uv run pytest tests/unit/
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/feat-server-migrate-dev-docs-index
+configfile: pyproject.toml
+collected 24 items / 1 error
+
+==================================== ERRORS ====================================
+__________________ ERROR collecting tests/unit/project_index ___________________
+tests/unit/project_index/conftest.py:8: in <module>
+    from project_index.features.access.types import Target
+E   ModuleNotFoundError: No module named 'project_index.features'
+=========================== short test summary info ============================
+ERROR tests/unit/project_index - ModuleNotFoundError: No module named 'projec...
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+=============================== 1 error in 5.50s ===============================

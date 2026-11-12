@@ -1,0 +1,92 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: 端末の設定
+description: project-index の端末の設定 `settings.yaml`。
+type: object
+additionalProperties: false
+required:
+  - version
+  - clone
+properties:
+  version:
+    type: string
+    title: 設定のバージョン
+    description: 設定を記載したときのスキーマのバージョン（整数の文字列）。
+    pattern: ^[0-9]+$
+  clone:
+    type: string
+    title: クローンの場所
+    description: project-index のクローン。管理用プラグインのフックが `project-index serve` を起動する。
+    minLength: 1
+  port:
+    type: integer
+    title: 待ち受けのポート
+    description: 画面・文書の MCP・管理の MCP を待ち受ける 1 つのポート。
+    minimum: 1
+    maximum: 65535
+  bind:
+    type: string
+    title: 待ち受けのアドレス
+    minLength: 1
+  sources:
+    type: array
+    title: 配信元
+    description: 配信元のテーブル。1 行が 1 つの配信元。
+    items:
+      type: object
+      title: 配信元の行
+      additionalProperties: false
+      required:
+        - config
+      properties:
+        id:
+          type: string
+          title: 配信元の ID
+          description: 主キー。省略すると配信元の設定の `name`。
+          pattern: ^[a-z0-9-]+$
+        config:
+          type: [string, array]
+          title: 配信元の設定のパス
+          description: 配信元の設定の YAML の絶対パス。配列なら上から順にマージする。
+          minLength: 1
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+        enabled:
+          type: boolean
+          title: 配信するか
+        scope:
+          type: object
+          title: 権限の範囲
+          additionalProperties: false
+          properties:
+            read:
+              type: array
+              title: 読める作業場所
+              items:
+                type: string
+            write:
+              type: array
+              title: 読み書きできる作業場所
+              items:
+                type: string
+        outside_read:
+          type: boolean
+          title: 作業範囲の外から読めるか
+  state_dir:
+    type: string
+    title: 状態の置き場所
+    minLength: 1
+  log_dir:
+    type: string
+    title: ログの置き場所
+    minLength: 1
+  seen_retention_days:
+    type: integer
+    title: 返し済みの記録の保持日数
+    minimum: 1
+  script_timeout_sec:
+    type: integer
+    title: スクリプトの制限時間
+    description: 検査・変換・生成のスクリプト 1 回の上限（秒）。
+    minimum: 1

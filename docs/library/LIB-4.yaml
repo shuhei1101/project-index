@@ -1,0 +1,49 @@
+id: LIB-4
+title: "ruamel.yaml"
+kind: "ライブラリ"
+version:
+  current: 0.19.1
+  latest: 0.19.1
+  checked_on: '2026-10-27'
+  source: pyproject.toml・uv.lock
+  pinning: pyproject.toml に `==0.19.1`
+catalogs:
+- name: API
+  version: 0.19.1
+  entries:
+  - name: YAML
+    kind: クラス
+    purpose: rt モードで文書・端末の設定・`project-index.yaml` を読み書きする
+  - name: YAML.indent
+    kind: 関数
+    purpose: 書き出しのインデントを既存の書式に合わせる
+  - name: YAML.preserve_quotes
+    kind: 属性
+    purpose: 往復編集の読み込みと書き出しの両方の `YAML()` に設定し、引用符つきの文字列を引用符の種類を持つ文字列で読んで、同じ引用符で書き出す
+  - name: CommentedMap
+    kind: クラス
+    purpose: 読み込んだマッピング。コメントと順序を持ったまま値を書き換える
+lead: YAML 1.2 の読み書きのライブラリ。rt モードではコメント・キーの順序・クォートを保ったまま読み書きできる。
+purl: pkg:pypi/ruamel.yaml
+dependency_scope: 必須
+adoption: 採用
+license: MIT
+official_url: https://sourceforge.net/p/ruamel-yaml/code/
+docs_url: https://yaml.dev/doc/ruamel.yaml/
+verification:
+  state: 済
+  date: '2026-10-27'
+  detail: Python 3.14 で `YAML()`（rt）に `preserve_quotes = True` と `indent(mapping=2, sequence=4, offset=2)` を設定し、コメント・クォートつきの `sources[]` の値を 1 つ書き換えて、他の行のコメントとクォートが残ることと、書き換えずに書き戻すと入力と一致することを確かめた
+selection:
+  candidates: ruamel.yaml 0.19.1・StrictYAML 1.7.3 を比べた（[案のレビュー](https://github.com/shuhei1101/project-index/pull/12#discussion_r4389749135)）。
+  decision: 書き戻してもコメントを保てるのは ruamel.yaml だけのため。
+  consequences: rt モードだけを使う。インデントを既存の書式に合わせ、書き換えずに書き戻して差分が出ないことをテストで確かめる。
+install: |-
+  ```bash
+  uv add 'ruamel.yaml==0.19.1'
+  ```
+limitations:
+- item: 開発の場所
+  content: SourceForge で行われ、GitHub のリポジトリは無い
+- item: C 実装のローダー
+  content: '`ruamel.yaml.clib` ではコメントが残らない'

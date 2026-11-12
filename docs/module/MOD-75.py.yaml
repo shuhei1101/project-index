@@ -1,0 +1,238 @@
+id: MOD-75
+title: 索引のサーバー / 検査 / service.py
+lead: 検査をまとめて通す処理と、読み取りの結果のキャッシュ。
+test_files:
+- tests/unit/project_index/features/validation/test_service.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      文書の検査 ..> スキーマの検査
+      文書の検査 ..> IDの形の検査
+      文書の検査 ..> 関連の種類の検査
+      文書の検査 ..> スクリプトの実行 : validators[]
+      文書の検査 ..> 検査の出力の解釈
+      文書の検査 ..> 違反 : 返す
+      文書の検査 ..> 変えたMarkdownの値
+      文書の検査 ..> Markdownの値の点検
+      class 文書の検査 {
+        <<class>>
+      }
+      class スキーマの検査 {
+        <<function>>
+      }
+      class IDの形の検査 {
+        <<function>>
+      }
+      class 関連の種類の検査 {
+        <<function>>
+      }
+      class 検査の出力の解釈 {
+        <<function>>
+      }
+      class スクリプトの実行 {
+        <<function>>
+      }
+      class 違反 {
+        <<dataclass>>
+      }
+      class 変えたMarkdownの値 {
+        <<function>>
+      }
+      class Markdownの値の点検 {
+        <<function>>
+      }
+      click スキーマの検査 href "./MOD-73.py.yaml#スキーマの検査"
+      click IDの形の検査 href "./MOD-73.py.yaml#IDの形の検査"
+      click 関連の種類の検査 href "./MOD-73.py.yaml#関連の種類の検査"
+      click 検査の出力の解釈 href "./MOD-74.py.yaml#検査の出力の解釈"
+      click スクリプトの実行 href "./MOD-88.py.yaml#スクリプトの実行"
+      click 違反 href "./MOD-98.py.yaml#違反"
+      click 変えたMarkdownの値 href "./MOD-72.py.yaml#変えたMarkdownの値"
+      click Markdownの値の点検 href "./MOD-72.py.yaml#Markdownの値の点検"
+classes:
+- name: DocumentChecker
+  title: 文書の検査
+  container: project_index/features/validation/service.py
+  usecase: 共通
+  role: サービス
+  summary: 1 件の文書に全ての検査を通し、違反をまとめて返す
+  description: |-
+    読み取りの `validators[]` の結果は (配信元, 種類, 検査の ID, 文書のバージョン) で控え、同じ内容でスクリプトを動かし直さない。
+    書き込みの検査は控えず、毎回動かす。
+  kind: クラス
+  properties:
+  - name: store
+    title: 文書のストア
+    type: DocumentStore
+    access: 公開
+    description: 種類のスキーマを引く
+  - name: timeout_sec
+    title: 制限時間
+    type: float
+    access: 公開
+    description: 端末の設定の `script_timeout_sec`
+  - name: _read_cache
+    title: 読み取りの結果
+    type: OrderedDict[tuple[str, str, str, str], list[Violation]]
+    access: 内部 (_)
+    description: 上限は `VALIDATOR_ON_READ_CACHE`
+  - name: _lock
+    title: 排他
+    type: threading.Lock
+    access: 内部 (_)
+    description: '`_read_cache` を守る'
+  methods:
+  - name: check
+    title: 検査する
+    summary: スキーマ・ID の形・関連の種類・`validators[]` を順に通す
+    kind: メソッド
+    scope: public
+    thread_safe: true
+    side_effects: '`validators[]` のスクリプトを動かす'
+    args:
+    - name: target
+      title: 読み書きの場所
+      type: Target
+      required: true
+      passing: positional
+      description: スクリプトを動かす場所（`target.base`）とスキーマを読む場所
+    - name: document
+      title: 文書
+      type: Document
+      required: true
+      passing: positional
+      description: 検査する文書（書き込みでは、書こうとしている内容で作った文書）
+    - name: 'on'
+      title: 通す時点
+      type: Literal['read', 'write']
+      required: true
+      passing: keyword
+      description: '`validators[].on` と照らす'
+    - name: new
+      title: 新しい文書か
+      type: bool
+      required: false
+      default: 'False'
+      passing: keyword
+      description: '`True` のときだけ `ids.format` を確かめる'
+    returns:
+      type: list[Violation]
+      description: 違反。検査の順に並ぶ
+    process: |-
+      1. 文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）を `store.row_schema(target, kind)` で引いて『スキーマの検査』を通す（`records` の行は要素に 1 行のスキーマを、それ以外はファイルの内容に種類のスキーマを当てる）
+      2. `new` なら『IDの形の検査』を通す
+      3. 『関連の種類の検査』をメタデータに通す
+      4. 行の `validators` の ID ごとに `source.script("validators", id)` を引き、`on` が行の `on` にあるものだけを通す
+         - `on` が `read` の場合、`_read_cache` に控えがあればそれを使う
+         - スクリプトの実行の『スクリプトの実行』を `cwd=target.base`・`stdin`（`body`）・`timeout_sec`・`at` で呼び（`at` は `target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`））、『検査の出力の解釈』で違反にする
+         - `ScriptError` の場合、`path` が `$`、`rule` が `{id}: 検査を実行できませんでした（{メッセージ}）` の違反にする（控えない）
+      5. 違反を返す
+    unit_tests:
+    - name: test_document_checker_check
+      case: 正常
+      summary: 検査の順とまとめ
+      condition: スキーマ違反 1 件・知らない関連の種類 1 件・`validators` が 1 件の違反を出す文書を `on="write"`
+      mock: なし（検査は `sys.executable -c` のスクリプト）
+      expected: 3 件をスキーマ・関連・スクリプトの順で返す
+      exception: '-'
+    - name: test_document_checker_check_when_on_read
+      case: 正常
+      summary: 通す時点と控え
+      condition: '`on: [read]` の検査と `on: [write]` の検査を持つ行で、同じ文書を `on="read"` で 2 回'
+      mock: '`run_script`（呼ばれた数を数える）'
+      expected: '`read` の検査だけが 1 回呼ばれる'
+      exception: '-'
+    - name: test_document_checker_check_when_script_fails
+      case: 正常
+      summary: 検査が動かない
+      condition: 終了コード 1 で終わる検査
+      mock: なし
+      expected: 1 件で、`rule` に「検査を実行できませんでした」
+      exception: '-'
+    - name: test_document_checker_check_when_new
+      case: 正常
+      summary: 新しい文書の ID
+      condition: '`ids.format` が `{kind}-{slug}` で ID が `X`、`new=True` と `new=False`'
+      mock: なし
+      expected: '`new=True` だけ `id` の違反がある'
+      exception: '-'
+    - name: test_document_checker_check_when_records
+      case: 正常
+      summary: records の行の要素に 1 行のスキーマを当てる
+      condition: '行 `notes`（`records: files`、`schema` が `templates/files.schema.yaml` のコピー）の要素 `{path: a.md}` の文書を `on="read"`'
+      mock: なし
+      expected: 空の並び（`'files' is a required property` を返さない）
+      exception: '-'
+  - name: check_markdown
+    title: Markdownの値を点検する
+    summary: 書き込む文書の変えた Markdown の値を mdmark の点検に通す
+    kind: メソッド
+    scope: public
+    thread_safe: true
+    side_effects: mdmark の CLI を値ごとに起動する
+    args:
+    - name: target
+      title: 読み書きの場所
+      type: Target
+      required: true
+      passing: positional
+      description: mdmark を動かす場所（`target.base`）とスキーマを読む場所
+    - name: document
+      title: 文書
+      type: Document
+      required: true
+      passing: positional
+      description: 書こうとしている内容で作った文書（検査するで違反の無かったもの）
+    - name: previous
+      title: 操作の前の内容
+      type: Mapping[str, Any] | None
+      required: true
+      passing: keyword
+      description: 操作を当てる前の文書の `data`。`create` は `None`
+    - name: stopped
+      title: 止めた理由
+      type: str | None
+      required: false
+      default: None
+      passing: keyword
+      description: 同じ書き込みの前の文書の点検で止めた理由
+    returns:
+      type: MarkdownCheck
+      description: 違反・点検できなかったキー・止めた理由
+    process: |-
+      1. 文書に当てるスキーマを `store.row_schema(target, kind)` で引く
+      2. 変えたMarkdownの値（`document.data`・`previous`・スキーマ）を引く。空なら空の `MarkdownCheck`（`stopped` は引数のまま）を返す
+      3. Markdownの値の点検（`cwd=target.base`・`timeout_sec`・`stopped`）を返す
+    unit_tests:
+    - name: test_document_checker_check_markdown
+      case: 正常
+      summary: 変えた値だけを点検に渡す
+      condition: '`body` が `contentMediaType: text/markdown` の種類で、前 `{body: a}`、後 `{body: b}` の文書'
+      mock: '`check_markdown_values`（受けた値を控える）'
+      expected: '`{"body": "b"}` と `cwd=target.base` で呼ばれる'
+    - name: test_document_checker_check_markdown_when_unchanged
+      case: 正常
+      summary: Markdown の値を変えない
+      condition: '前も後も `{body: a}`'
+      mock: '`check_markdown_values`'
+      expected: 空の `MarkdownCheck` で、`check_markdown_values` は呼ばれない
+  - name: clear
+    title: 控えを捨てる
+    summary: 読み取りの結果の控えを捨てる
+    kind: メソッド
+    scope: public
+    thread_safe: true
+    side_effects: '`_read_cache` を空にする'
+    returns:
+      type: None
+      description: '-'
+    process: 1. `_read_cache` を空にする（起動の『配信元の読み直し』が呼ぶ）
+constants:
+- name: VALIDATOR_ON_READ_CACHE
+  title: 読み取りの検査の結果の数
+  container: project_index/features/validation/service.py
+  usecase: 共通
+  summary: 読み取りの `validators[]` の結果を控える件数の上限。超えたら使ったのが古いものから捨てる
+  value: '4096'

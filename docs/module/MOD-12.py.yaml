@@ -1,0 +1,163 @@
+id: MOD-12
+title: 索引のサーバー / 変更 / compare.py
+lead: 変わったキー・差分の行・語の出現数の比べ方。
+test_files:
+- tests/unit/project_index/features/changes/test_compare.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      変更の一覧 ..> 変わったキー
+      変更の一覧 ..> 差分の行
+      変更の一覧 ..> 語の出現数 : contains
+      語の出現数 ..> 正規表現の組み立て
+      class 変更の一覧 {
+        <<function>>
+      }
+      class 変わったキー {
+        <<function>>
+      }
+      class 差分の行 {
+        <<function>>
+      }
+      class 語の出現数 {
+        <<function>>
+      }
+      class 正規表現の組み立て {
+        <<function>>
+      }
+      click 変更の一覧 href "./MOD-14.py.yaml#変更の一覧"
+      click 正規表現の組み立て href "./MOD-53.py.yaml#正規表現の組み立て"
+functions:
+- name: changed_keys
+  title: 変わったキー
+  kind: 関数
+  container: project_index/features/changes/compare.py
+  usecase: 共通
+  role: 判定
+  summary: 2 つの内容を比べ、変わったキーのパスと前後の値を返す
+  scope: public
+  thread_safe: true
+  args:
+  - name: before
+    title: 前
+    type: Mapping[str, Any]
+    required: true
+    passing: positional
+    description: 前の内容（足した文書は空）
+  - name: after
+    title: 後
+    type: Mapping[str, Any]
+    required: true
+    passing: positional
+    description: 後の内容（消した文書は空）
+  - name: ignore
+    title: 無視するキー
+    type: Collection[str]
+    required: false
+    default: ()
+    passing: keyword
+    description: '`diff.ignore_keys`。最上位のキーの名前'
+  returns:
+    type: dict[str, tuple[Any, Any]]
+    description: キーのパス → (前の値, 後の値)。パスの出る順
+  process: |-
+    1. 辞書は両方のキーの和を、後の内容の順（前にだけあるキーは末尾）でたどる。`ignore` の最上位のキーは飛ばす
+    2. 両方が辞書なら再帰する
+    3. 両方がリストで、要素が全て `id` か `name` を持つ辞書なら、そのキーで要素を突き合わせて `a[{キー}].b` のパスで再帰する。それ以外のリストは丸ごと比べる
+    4. 値が違えば、そのパスと前後の値を入れる
+  unit_tests:
+  - name: test_changed_keys
+    case: 正常
+    summary: 入れ子と要素の突き合わせ
+    condition: '`{name: a, items: [{id: x, v: 1}], updated: d1}` と `{name: b, items: [{id: x, v: 2}], updated: d2}`、`ignore=["updated"]`'
+    mock: なし
+    expected: '`{"name": ("a", "b"), "items[x].v": (1, 2)}`'
+- name: diff_lines
+  title: 差分の行
+  kind: 関数
+  container: project_index/features/changes/compare.py
+  usecase: 共通
+  role: 変換
+  summary: 2 つの文字列の違う行を、git と同じ `-`・`+` の行にする
+  scope: public
+  thread_safe: true
+  args:
+  - name: before
+    title: 前
+    type: str
+    required: true
+    passing: positional
+    description: 前の文字列
+  - name: after
+    title: 後
+    type: str
+    required: true
+    passing: positional
+    description: 後の文字列
+  returns:
+    type: str
+    description: '`- {行}`・`+ {行}` の並び。違いが無ければ空'
+  process: |-
+    1. `difflib.unified_diff(n=0)` の結果から `---`・`+++` の行を除く
+    2. `@@` の行は 2 つ目以降のかたまりの区切りとして `…` の行にし、`-`・`+` の行は記号の後に空白を入れて並べる
+  unit_tests:
+  - name: test_diff_lines
+    case: 正常
+    summary: 変えた行
+    condition: '`"name: 文書 1\nx: 1\n"` と `"name: 新しい名前\nx: 1\n"`'
+    mock: なし
+    expected: '`"- name: 文書 1\n+ name: 新しい名前"`'
+- name: count_occurrences
+  title: 語の出現数
+  kind: 関数
+  container: project_index/features/changes/compare.py
+  usecase: 変更
+  role: 判定
+  summary: 文字列の中の語の出現数（正規表現なら当たった数）を返す
+  scope: public
+  thread_safe: true
+  args:
+  - name: text
+    title: 文字列
+    type: str
+    required: true
+    passing: positional
+    description: 文書の本文
+  - name: query
+    title: 語
+    type: ContainsQuery
+    required: true
+    passing: positional
+    description: '`list_changes` の `contains`'
+  returns:
+    type: int
+    description: 出現数
+  process: |-
+    1. `regex` が偽の場合、`case_sensitive` が真なら `text.count(value)`、偽なら両方を `normalize`（NFKC と `casefold`）にしてから数える
+    2. `regex` が真の場合、`compile_regex(value, case_sensitive=...)` の `finditer` の数を返す。区別しないときは `text` だけを NFKC にしてから当てる（検索の正規表現の条件と同じ）
+  exceptions:
+  - name: re.error
+    condition: '`value` が正規表現として読めない（呼び出し元が先に確かめる）'
+    message: re の既定
+  unit_tests:
+  - name: test_count_occurrences
+    case: 正常
+    summary: 大文字小文字と全角半角を区別しない
+    condition: '`"ＡＢＣ abc Abc"` と `{value: abc}`'
+    mock: なし
+    expected: '3'
+  - name: test_count_occurrences_when_case_sensitive
+    case: 正常
+    summary: 区別する
+    condition: '`"ＡＢＣ abc Abc"` と `{value: abc, case_sensitive: true}`'
+    mock: なし
+    expected: '1'
+  - name: test_count_occurrences_when_regex
+    case: 正常
+    summary: 正規表現の当たった数
+    condition: '`"廃止予定\n廃止の予定\n廃止予定"` と `{value: 廃止.定, regex: true}`'
+    mock: なし
+    expected: '2'
+  status: planned

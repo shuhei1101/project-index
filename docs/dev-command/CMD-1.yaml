@@ -38,10 +38,27 @@ categories:
       ```
     effects: '`pyproject.toml` と `uv.lock` を書き換える'
     verification:
-      state: 未確認
-      detail: 依存を書き換えるため、追加する依存が決まる shuhei1101/dev-docs#114 まで実行していない
+      state: 済
+      detail: 作業 PR の worktree で `uv add --dev httpx`（入っている依存）を実行し、解決が通って `pyproject.toml`・`uv.lock` に差分が出ないことを確認した
+      date: '2026-11-12'
   - name: 起動・停止
-    commands: 未確定
+    commands: |-
+      1. 端末の設定を指して索引のサーバーを起動する（待ち受けた後は停止の合図まで終わらないため、tmux のセッションで切り離す）
+
+      ```bash
+      tmux new-session -d -s project-index "PROJECT_INDEX_CONFIG={端末の設定} PROJECT_INDEX_PORT={ポート} uv run project-index serve"
+      ```
+
+      2. 停止する
+
+      ```bash
+      tmux kill-session -t project-index
+      ```
+    effects: 端末の設定の `state_dir` に会話の記録・リビジョンの書き出し・ログを記録する
+    verification:
+      state: 済
+      date: '2026-11-12'
+      detail: 作業 PR の worktree で配信元 `ai-monitor` を持つ端末の設定とポート 8796 で起動し、`/sources` が `serving` を返却して `/mcp` の `search_docs` が応えること、停止でポートが閉じることを確認した
   - name: テスト
     refs:
       - TP-1#
@@ -55,7 +72,22 @@ categories:
       - TP-1#layers[単体テスト（バック）]
       - TP-1#layers[lint]
   - name: 管理作業
-    commands: 未確定
+    commands: |-
+      1. 配信元の設定のバージョンを移し替える手順を確認する（`--plan` を除くと書き換える）
+
+      ```bash
+      uv run project-index migrate --plan --source {配信元の設定}
+      ```
+
+      2. 管理用の YAML に記載するファイルの一覧を出す
+
+      ```bash
+      uv run project-index files --root {配信元のフォルダ} --paths {範囲の glob}
+      ```
+    verification:
+      state: 済
+      date: '2026-11-12'
+      detail: 作業 PR の worktree で `migrate --plan --source dev-docs.yaml` が終了コード 0 で終わり、`files --root docs/guide --paths "*.md"` がファイル名を出すことを確認した
 id: CMD-1
 visibility: internal
 prerequisites:

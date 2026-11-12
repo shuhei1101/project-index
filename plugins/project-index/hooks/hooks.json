@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "_description": "project-index が落ちていれば起動し、/clear・圧縮のときは返し済みの記録の削除を依頼する",
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/session_start.py"
+            ],
+            "timeout": 6
+          }
+        ]
+      }
+    ],
+
+    "PreToolUse": [
+      {
+        "matcher": "mcp__plugin_project-index_project-index__.*",
+        "hooks": [
+          {
+            "_description": "文書の MCP のツールの入力に作業場所とセッションを入れる",
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/pre_tool_use.py"
+            ],
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

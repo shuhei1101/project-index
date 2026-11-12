@@ -1,0 +1,172 @@
+id: MOD-36
+title: 索引のサーバー / 再起動と更新 / update.py
+lead: 端末の設定の `clone` を `git pull --ff-only`・`uv sync` で更新し、新しいコードで移し替えの要否を確かめて、要らなければ再起動を要求する。
+test_files:
+- tests/unit/project_index/features/lifecycle/test_update.py
+functions:
+- name: update_clone
+  title: クローンの更新
+  kind: 関数
+  container: project_index/features/lifecycle/update.py
+  usecase: 更新
+  role: サービス
+  summary: クローンを更新し、移し替えが要らなければ再起動を要求する
+  scope: public
+  is_async: false
+  thread_safe: true
+  side_effects: クローンの commit と `.venv` を書き換える。再起動を要求する
+  args:
+  - name: clone
+    title: クローン
+    type: Path
+    required: true
+    passing: positional
+    description: 端末の設定の `clone`
+  - name: control
+    title: 再起動の制御
+    type: RestartControl
+    required: true
+    passing: keyword
+    description: '`handlers.restart`'
+  returns:
+    type: UpdateResult
+    description: 更新の結果
+  process: |-
+    1. `control.update_lock` を非ブロッキングで取る
+       - 取れない場合、または `control.requested` が `True` の場合、`RestartInProgressError` を送出する
+    2. 手順 3〜9 を `try` に入れ、`finally` で `update_lock` を放す（返す経路・`UpdateFailedError` の経路を含む）
+    3. `previous_version` を 起動時に読んだ値（動いているバージョン。更新で配布のメタデータが入れ替わっても変わらない） で得る
+    4. `git rev-parse HEAD` を実行して前の HEAD を控え、`git pull --ff-only` を実行する（コマンドの実行）
+       - `[INFO]` クローンを更新する（clone）
+    5. もう一度 `git rev-parse HEAD` を実行する
+       - 前の HEAD と同じ場合、`updated`・`migration_needed`・`restarting` を `False`、`version` を `previous_version` にして返す
+    6. `uv sync` を実行する（コマンドの実行）
+    7. `version` を `{clone}/pyproject.toml` の `project.version` から `tomllib` で読む
+    8. `{clone}/.venv/bin/python -m project_index migrate --plan` を実行し、標準出力が空でなければ `migration_needed` を `True` にする（コマンドの実行、終了コード 0 だけを成功とする）
+    9. `migration_needed` に応じて分ける
+       - `True` の場合、`restarting` を `False` にする
+         - `[WARNING]` 移し替えが要るため再起動しない（version）
+       - `False` の場合、再起動を要求し `restarting` を `True` にする（`RestartControl.request`）
+  exceptions:
+  - name: RestartInProgressError
+    condition: 他の `update` が進んでいる、または再起動を要求済み
+    message: '`再起動か更新の途中です`'
+  - name: UpdateFailedError
+    condition: コマンドの実行から伝わる
+    message: コマンドの実行のメッセージ
+  unit_tests:
+  - name: test_update_clone
+    case: 正常
+    summary: 取り込んで移し替えが要らなければ再起動を要求する
+    condition: HEAD が変わる。`migrate --plan` の標準出力が空。`pyproject.toml` の `version` が `0.3.0`
+    mock: '`subprocess.run`（コマンドごとの終了コードと標準出力）'
+    expected: '`version` が `0.3.0`、`updated`・`restarting` が `True`、`control.requested` が `True`。呼んだコマンドが `rev-parse`・`pull --ff-only`・`rev-parse`・`uv sync`・`migrate --plan` の順'
+  - name: test_update_clone_when_up_to_date
+    case: 正常
+    summary: 新しい commit が無ければ何もしない
+    condition: '`git pull` の前後で HEAD が同じ'
+    mock: '`subprocess.run`'
+    expected: '`updated`・`restarting` が `False`、`uv sync` を呼ばない、`control.requested` が `False`'
+  - name: test_update_clone_when_migration_needed
+    case: 正常
+    summary: 移し替えが要れば再起動しない
+    condition: '`migrate --plan` の標準出力が `2: rename ...`'
+    mock: '`subprocess.run`'
+    expected: '`migration_needed` が `True`、`restarting` が `False`、`control.requested` が `False`'
+  - name: test_update_clone_when_in_progress
+    case: 異常
+    summary: 再起動を要求済みなら断る
+    condition: '`control.request()` を呼んだ後'
+    mock: '`subprocess.run`（呼ばれないことを確かめる）'
+    expected: '`RestartInProgressError`。`subprocess.run` を呼ばない'
+    exception: 再起動の途中
+  - name: test_update_clone_when_up_to_date_then_again
+    case: 正常
+    summary: 新しい commit が無くて返した後にもう一度呼べる
+    condition: '`git pull` の前後で HEAD が同じ状態で 2 回呼ぶ'
+    mock: '`subprocess.run`'
+    expected: 2 回目も `RestartInProgressError` にならず、`updated` が `False`
+  - name: test_update_clone_when_failed_then_again
+    case: 異常
+    summary: 取り込みに失敗した後にもう一度呼べる
+    condition: 1 回目は `git pull --ff-only` が終了コード 1、2 回目は HEAD が同じ
+    mock: '`subprocess.run`（呼ぶごとに応答を変える）'
+    expected: 1 回目が `UpdateFailedError`、2 回目は `RestartInProgressError` にならず `updated` が `False`
+  callers:
+  - MOD-93#functions[build_admin_mcp]
+  callees:
+  - '#functions[_run]'
+- name: _run
+  title: コマンドの実行
+  kind: 関数
+  container: project_index/features/lifecycle/update.py
+  usecase: 更新
+  role: 実行
+  summary: クローンで 1 つのコマンドを打ち切りつきで実行する
+  scope: internal
+  is_async: false
+  thread_safe: true
+  side_effects: 子プロセスを実行する
+  args:
+  - name: argv
+    title: コマンド
+    type: list[str]
+    required: true
+    passing: positional
+    description: 実行するコマンドと引数
+  - name: cwd
+    title: 実行する場所
+    type: Path
+    required: true
+    passing: keyword
+    description: クローン
+  returns:
+    type: str
+    description: 標準出力
+  process: |-
+    1. `subprocess.run(argv, cwd=cwd, capture_output=True, text=True, timeout=COMMAND_TIMEOUT_SEC)` を実行する
+       - コマンドが見つからない場合、`UpdateFailedError` を送出する
+       - 打ち切った場合、`UpdateFailedError` を送出する
+       - 終了コードが 0 以外の場合、`UpdateFailedError` を送出する
+         - `[ERROR]` 更新のコマンドが失敗した（コマンド・終了コード・stderr の末尾）
+    2. 標準出力を返す
+  exceptions:
+  - name: UpdateFailedError
+    condition: コマンドが見つからない
+    message: '`{コマンド}: コマンドが見つかりません`'
+  - name: UpdateFailedError
+    condition: '`COMMAND_TIMEOUT_SEC` を超えた'
+    message: '`{コマンド}: {秒数} 秒で打ち切りました`'
+  - name: UpdateFailedError
+    condition: 終了コードが 0 以外
+    message: '`{コマンド}: 終了コード {コード}`（`command`・`stderr` を持つ）'
+  unit_tests:
+  - name: test_run
+    case: 正常
+    summary: 標準出力を返す
+    condition: 終了コード 0、標準出力 `abc`
+    mock: '`subprocess.run`'
+    expected: '`abc`。`timeout` に `COMMAND_TIMEOUT_SEC` が渡る'
+  - name: test_run_when_failed
+    case: 異常
+    summary: 終了コードが 0 以外
+    condition: '`git pull --ff-only` が終了コード 1、stderr `Not possible to fast-forward`'
+    mock: '`subprocess.run`'
+    expected: '`UpdateFailedError` で `command` が `git pull --ff-only`、`stderr` がその文'
+    exception: 終了コードが 0 以外
+  - name: test_run_when_timeout
+    case: 異常
+    summary: 打ち切る
+    condition: '`subprocess.run` が `TimeoutExpired` を送出する'
+    mock: '`subprocess.run`'
+    expected: '`UpdateFailedError`'
+    exception: 打ち切り
+  - name: test_run_when_not_found
+    case: 異常
+    summary: コマンドが無い
+    condition: '`subprocess.run` が `FileNotFoundError` を送出する'
+    mock: '`subprocess.run`'
+    expected: '`UpdateFailedError`'
+    exception: コマンドが見つからない
+  callers:
+  - '#functions[update_clone]'

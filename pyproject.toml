@@ -4,7 +4,15 @@ version = "0.1.0"
 description = "文書とソースコードの索引・検索・書き込みを提供するサービス"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "fastapi>=0.162.0",
+    "jinja2>=3.1.6",
+    "jsonschema>=4.26.0",
+    "mcp>=2.3.0",
+    "pydantic>=2.14.1",
+    "ruamel-yaml==0.19.1",
+    "uvicorn>=0.54.0",
+]
 
 [dependency-groups]
 dev = [
@@ -12,6 +20,8 @@ dev = [
     "pyright",
     "ruff",
     "complexipy",
+    "httpx>=0.28.1",
+    "types-jsonschema>=4.26.0.20261006",
 ]
 
 [project.scripts]
@@ -50,8 +60,27 @@ ignore = [
     "RUF001", "RUF002", "RUF003",   # 日本語の文字列 / docstring / コメントの全角記号を紛らわしい Unicode として指すため外す
 ]
 
+[tool.ruff.lint.flake8-type-checking]
+# pydantic・dataclass・FastAPI は注釈の型を実行時に引くため、TYPE_CHECKING へ移さない
+runtime-evaluated-base-classes = ["pydantic.BaseModel", "project_index.shared.api_model.ApiModel"]
+runtime-evaluated-decorators = ["dataclasses.dataclass", "pydantic.dataclasses.dataclass"]
+
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "PLR2004"]   # テストの assert と期待値の数値は許す
+"tests/**" = [
+    "S101", "PLR2004",   # テストの assert と期待値の数値は許す
+    "ANN401",   # 偽物の関数と fixture の可変長引数は Any で受ける
+    "S108",   # テストデータのパス文字列（ファイルは作らない）
+    "PLC2701",   # 設計書が単体テストを置く _ 付きの関数を import する
+    "S603", "S607",   # conftest が固定の引数で git を呼ぶ
+]
+# FastAPI のルート・依存と MCP のツールは、関数の注釈の型を実行時に引く
+"src/project_index/features/*/route.py" = ["TC"]
+"src/project_index/server/mcp/*.py" = ["TC"]
+"src/project_index/server/origin.py" = ["TC"]
+# コマンドの入口とフックは、結果を標準出力へ出す
+"src/project_index/main.py" = ["T20"]
+"src/project_index/features/prompt_doc/cli.py" = ["T20"]
+"plugins/project-index/hooks/*.py" = ["T20"]
 "docs/pr/**/*.py" = ["T20", "S603", "S607"]   # 反映作業のスクリプトは print で結果を出し、固定の引数で git を呼ぶ
 
 [tool.ruff.format]
@@ -61,6 +90,12 @@ indent-style = "space"
 [tool.pyright]
 typeCheckingMode = "strict"
 pythonVersion = "3.14"
+
+# 設計書が単体テストを置く _ 付きの関数・属性を、テストから呼ぶ
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+extraPaths = [".", "src"]
+reportPrivateUsage = false
 
 [tool.complexipy]
 max-complexity-allowed = 15

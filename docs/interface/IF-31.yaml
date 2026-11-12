@@ -1,0 +1,267 @@
+id: IF-31
+title: "端末の設定の保存"
+entry:
+  kind: endpoint
+  value: PUT `/settings/sources`
+flows:
+- name: 正常系
+  summary: 配信元を追加して保存し、再起動せずに配信する
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに端末の設定と配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+  - name: 端末の設定
+    description: '`sources` に sample の 1 行。別のキーとコメントを持つ'
+  - name: 追加する配信元
+    description: 文書の種類を 1 つと `project-index.yaml` を持つ git リポジトリ
+    notes: id `extra`
+  - name: 入力
+    description: '`Origin` を持たない要求で、sample と extra の 2 行'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as PUT /settings/sources
+      participant CF as 端末の設定
+
+      C->>E: sources: sample, extra
+      E->>E: オリジンを確かめ、保存後の端末の設定をスキーマで検証する
+      E->>CF: settings.yaml の sources を書き換える
+      E->>E: 配信元を読み直す
+      E-->>C: 200 配信元ごとの状態
+    ```
+  expected:
+  - 200 で、sample と extra が `serving`
+  - '`settings.yaml` の `sources` に extra の行があり、sample の行・他のキー・コメントは変わらない'
+  - 文字列で送った extra の `config` が、`settings.yaml` では要素 1 つの配列で書かれる
+  - 再起動せずに `/sources/extra/docs` が 200 を返し、`describe()` に extra が出る
+  test: test_normal
+- name: 正常系（配信を止める）
+  summary: '`enabled: false` で保存し、配信を止める'
+  setup:
+  - name: Mock
+    description: なし
+  - name: 端末の設定
+    description: '`sources` に sample と extra の 2 行'
+  - name: 入力
+    description: 'extra の行を `enabled: false` にした 2 行'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as PUT /settings/sources
+      participant CF as 端末の設定
+
+      C->>E: sources: sample, extra（enabled: false）
+      E->>CF: settings.yaml を書き換える
+      E->>E: 配信元を読み直す
+      E-->>C: 200（extra は disabled）
+    ```
+  expected:
+  - extra が `disabled`
+  - '`settings.yaml` の extra の行の `enabled` が `false`'
+  - '`/sources/extra/docs` が 404、`/sources/sample/docs` が 200 を返す'
+  test: test_normal_when_source_disabled
+- name: 正常系（配信元を削除する）
+  summary: 行を除いて保存し、配信元のフォルダは残す
+  setup:
+  - name: Mock
+    description: なし
+  - name: 端末の設定
+    description: '`sources` に sample と extra の 2 行'
+  - name: 入力
+    description: sample の 1 行だけ
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as PUT /settings/sources
+      participant CF as 端末の設定
+
+      C->>E: sources: sample
+      E->>CF: settings.yaml から extra の行を除く
+      E->>E: 配信元を読み直す
+      E-->>C: 200（sample だけ）
+    ```
+  expected:
+  - '`settings.yaml` の `sources` に extra の行が無く、sample の行は変わらない'
+  - extra のフォルダのファイルは変わらない
+  - '`/sources/extra/docs` が 404 を返す'
+  test: test_normal_when_source_deleted
+- name: 正常系（追加した配信元が検証に通らない）
+  summary: 端末の設定は保存し、読み直しの検証で配信元を外す
+  setup:
+  - name: Mock
+    description: なし
+  - name: 検証に失敗する配信元
+    description: '`documents[0]` に必須のキー `paths` が無い配信元'
+    notes: id `broken`
+  - name: 入力
+    description: sample と broken の 2 行
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as PUT /settings/sources
+      participant CF as 端末の設定
+
+      C->>E: sources: sample, broken
+      E->>CF: settings.yaml を書き換える
+      E->>E: 読み直し、起動時と同じ検証で broken を外す
+      E-->>C: 200（broken は not_served）
+    ```
+  expected:
+  - 200 で、broken が `not_served`、`errors` に `documents[0].paths` がある
+  - '`settings.yaml` の `sources` に broken の行がある'
+  - '`/sources/broken/docs` が 404、`/sources/sample/docs` が 200 を返す'
+  test: test_normal_when_added_source_invalid
+- name: 異常系（別のオリジン・403）
+  summary: ブラウザからの別のオリジンの保存を断る
+  setup:
+  - name: Mock
+    description: なし
+  - name: 入力
+    description: '`Origin: http://127.0.0.1:9999` で、スキーマに通る `sources`'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as PUT /settings/sources
+
+      C->>E: Origin: 別のオリジン
+      E-->>C: 403
+    ```
+  expected:
+  - 403 を返す
+  - '`settings.yaml` が変わらず、`/sources/sample/docs` は 200 を返す'
+  - '`Origin` が無く `Sec-Fetch-Site: cross-site` の要求も 403'
+  test: test_error_when_cross_origin
+- name: 異常系（スキーマに通らない・422）
+  summary: スキーマに通らない保存を断り、違反を全て返す
+  setup:
+  - name: Mock
+    description: なし
+  - name: 入力
+    description: 2 行目の `id` が `Sample Docs`、`scope.read` が空の文字列を含む
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as PUT /settings/sources
+
+      C->>E: sources: sample, 違反を含む行
+      E->>E: スキーマで検証して失敗する
+      E-->>C: 422 problem+json（違反したキーと理由）
+    ```
+  expected:
+  - 422 で、`errors` に `sources[1].id` と `sources[1].scope.read` がそれぞれの理由つきである
+  - '`settings.yaml` が変わらず、`/sources/sample/docs` は 200 を返す'
+  test: test_error_when_schema_invalid
+lead: 'dev-docs の画面のサーバーが設定画面での配信元の追加・編集・削除の後の `sources[]` を丸ごと送信する。スキーマに通ったときだけ `settings.yaml` を書き換え、配信元を読み直す。'
+identifier: put_settings_sources
+permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ'
+idempotent: true
+side_effects: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml` の `sources` を書き換え、配信元を読み直す。配信元のフォルダのファイルは変えない'
+exclusivity: 端末の設定の排他ロックの中で、検証・書き込み・読み直しを行う。読み直しの間の要求は、読み直す前の配信元で応える
+request:
+- name: sources
+  type: list[Source]
+  required: true
+  location: body
+  description: 保存する `sources[]` の全行。削除した行は含めない
+- name: sources[].id
+  type: str
+  required: false
+  default: 配信元の設定の `name`
+  location: body
+  description: 配信元の ID
+  constraints: 英小文字・数字・`-` だけ。行の間で重複しない
+- name: sources[].config
+  type: str | list[str]
+  required: true
+  location: body
+  description: 配信元の設定の YAML の絶対パス。文字列でも、`settings.yaml` には要素の数によらず配列で書く
+- name: sources[].enabled
+  type: bool
+  required: false
+  default: '`true`'
+  location: body
+  description: 配信するか
+- name: sources[].scope.read
+  type: list[str]
+  required: false
+  default: '`[]`'
+  location: body
+  description: この配信元を読める作業場所の glob
+  constraints: 空の文字列を含めない
+- name: sources[].scope.write
+  type: list[str]
+  required: false
+  default: 配信元のフォルダだけ
+  location: body
+  description: この配信元を読み書きできる作業場所の glob
+- name: Origin
+  type: str
+  required: false
+  default: なし（サーバーの側からの呼び出し）
+  location: header
+  description: 要求元のオリジン
+- name: sources[].outside_read
+  type: bool
+  required: false
+  default: '`true`'
+  location: body
+  description: '`scope` に当たらない作業場所からも `outside_scope: true` で作業範囲の外（参考）として読めるか'
+  notes: '`false` の配信元は `scope` の外から一切読めない'
+  status: planned
+request_example: |-
+  ```json
+  {"sources": [
+    {"id": "sample", "config": "/path/to/sample/project-index.yaml", "scope": {"read": ["/path/to/sample/**"]}},
+    {"id": "extra", "config": "/path/to/extra/project-index.yaml", "scope": {"read": ["/path/to/extra/**"]}}
+  ]}
+  ```
+response:
+- name: sources[].id
+  type: str
+  description: 配信元の ID
+- name: sources[].status
+  type: Literal['serving', 'not_served', 'disabled']
+  description: 再読み込みした後の状態
+- name: sources[].errors
+  type: 'list[{path: str, reason: str}]'
+  description: 検証で除外した理由
+  notes: '`not_served` のときだけ'
+response_example: |-
+  ```json
+  {"sources": [
+    {"id": "sample", "status": "serving"},
+    {"id": "extra", "status": "serving"}
+  ]}
+  ```
+response_notes: 配信元の設定が検証に通らない配信元も、端末の設定がスキーマに通れば保存し、`not_served` として返す。
+status_codes:
+- code: '200'
+  condition: 保存して配信元を読み直した（読み直しで外した配信元があっても 200）
+- code: '403'
+  condition: project-index と別のオリジンの `Origin` を持つ要求か、`Origin` が無く `Sec-Fetch-Site` が `cross-site`・`same-site` の要求
+- code: '422'
+  condition: 保存後の端末の設定がスキーマに通らない
+  notes: '`errors[]` に違反したキーのパスと理由を全て並べる'
+error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）。検証の違反は `errors[]` に `{path, reason}` で並べる（`path` は `sources[1].id` の形）
+constraints:
+- item: オリジンの確認
+  constraint: '`Origin` と `Sec-Fetch-Site` をどちらも持たない要求（dev-docs の画面のサーバーなど、サーバーの側からの呼び出し）と、`Origin` が project-index のオリジンと同じ要求だけを受ける'
+  notes: 'ブラウザが別のオリジンから送る書き込みを断るため。dev-docs の画面のサーバーはブラウザの要求を受けてからサーバーの側で呼ぶため、`Origin` を持たない'
+- item: 書き込みの範囲
+  constraint: '`settings.yaml` の `sources` だけを書き換え、他のキーとコメントを保つ。一時ファイルに書いてから置き換える'
+- item: 読み直しの検証
+  constraint: 起動時と同じ検証（スキーマ・スクリプトを実行できるか）
+- item: 認可
+  constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
+- item: タイムアウト
+  constraint: 制限なし
+- item: JSON のキー
+  constraint: リクエストの本文とレスポンスのキーは camelCase
+- item: operationId
+  constraint: '`{tag}-{関数名}` の `settings-put_settings_sources`'
+test_file: tests/integration/server/test_put_settings_sources.py

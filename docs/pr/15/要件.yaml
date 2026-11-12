@@ -1,0 +1,326 @@
+docs:
+  - page: docs/architecture/ARCH-1.yaml
+    new: false
+    change: '読み取り API の利用者（dev-docs の画面のサーバー）の用途を Issue #14 の表（配信元の設定・文書の一覧・検討事項の ID の一覧と文書・端末の設定の取得と保存・1 行の追加を含む）に合わせ、索引のサーバーの役割に端末の設定の書き込みを加える'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:07:48.916065+00:00'
+  - page: docs/config/CFG-1.yaml
+    new: false
+    change: 移した端末の設定（`state_dir`・`port` など）と配信元の設定のキーを書き、shuhei1101/dev-docs#114 で移すとした注記を外す。今の各リポジトリの `dev-docs.yaml` の扱いを、この作業 PR のインターフェース定義設計の決定どおりに書く
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/nonfunctional/NFR-1.yaml
+    new: false
+    change: 通信（NFR-2）の値を読み取り API と文書の MCP のインターフェース定義で決めて書き、#119 の 3 つの要求の所要時間の値を加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T04:50:02.553701+00:00'
+  - page: docs/dev-command/CMD-1.yaml
+    new: false
+    change: 依存の追加の確認の記録と、起動・停止・管理作業のコマンドを書く
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T04:50:02.553701+00:00'
+  - page: docs/test-procedure/TP-1.yaml
+    new: false
+    change: 結合テスト（バック）の実行コマンドと前提を書く。E2E テストの実行コマンドは E2E テスト作成で決めて書く
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T06:43:39.773168+00:00'
+  - page: docs/library/LIB-1.yaml
+    new: true
+    change: fastapi（読み取り API の待ち受け）。dev-docs の LIB-155-3 のうち移す処理が使う部分を移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:34:46.043336+00:00'
+  - page: docs/library/LIB-2.yaml
+    new: true
+    change: mcp（文書の MCP・管理の MCP）。dev-docs の LIB-155-8 から移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:34:46.043336+00:00'
+  - page: docs/library/LIB-3.yaml
+    new: true
+    change: uvicorn（待ち受け）。dev-docs の LIB-155-27 から移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:34:46.043336+00:00'
+  - page: docs/library/LIB-4.yaml
+    new: true
+    change: ruamel.yaml（YAML の読み書き）。dev-docs の LIB-155-17 から移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:34:46.043336+00:00'
+  - page: docs/library/LIB-5.yaml
+    new: true
+    change: jsonschema（配信元のスキーマの検査）。dev-docs の LIB-155-5 から移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:34:46.043336+00:00'
+  - page: docs/library/LIB-6.yaml
+    new: true
+    change: pydantic（MCP のツールの入力の検査）。dev-docs の LIB-155-13 から移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:34:46.043336+00:00'
+  - page: docs/library/LIB-7.yaml
+    new: true
+    change: mdmark（文書の書き込みで Markdown の値を点検する CLI）。dev-docs の LIB-155-9 のうち CLI の部分を移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:34:46.043336+00:00'
+  - page: docs/library/index.yaml
+    new: false
+    change: 追加した外部ライブラリの行を加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:34:46.043336+00:00'
+  - page: docs/guide/はじめに.md
+    new: false
+    change: コアコンセプトのページの行を加える（目次から生成。project-index と dev-docs の役割の分担は README.md に書く）
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/コアコンセプト-配信元と権限.md
+    new: true
+    change: 配信元・端末の設定・権限（read・write）と作業範囲の外の参照の仕組みを書く。dev-docs の同名のページから索引の側の内容を移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/使い方.md
+    new: false
+    change: 追加した使い方のページの行を加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/project-indexを入れる.md
+    new: true
+    change: global-setup で project-index を入れ、文書の MCP につながることを確かめる手順を書く
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/配信元を配信する.md
+    new: true
+    change: setup で配信元を端末の設定に並べる手順と、配信元の設定 `project-index.yaml`・`project-index.local.yaml` の書き方を書く
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/リファレンス.md
+    new: false
+    change: 追加したリファレンスのページの行を加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/文書のMCP.md
+    new: true
+    change: 文書の MCP のツールの一覧と入出力を書く。dev-docs の同名のページから移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/管理のMCP.md
+    new: true
+    change: 移した管理の MCP のツールの一覧と入出力を書く
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/読み取りAPI.md
+    new: true
+    change: 読み取り API・端末の設定の API のエンドポイントと入出力を書く
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/設定.md
+    new: true
+    change: 端末の設定と配信元の設定のキーを書く
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/用語集.md
+    new: true
+    change: 配信元・端末の設定・配信元の設定・作業範囲などの用語を書く
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/files.yml
+    new: false
+    change: 追加した使い方のページの行を加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/README.md
+    new: false
+    change: 追加した使い方のページの行を目次に加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: README.md
+    new: false
+    change: 入れ方と、文書の MCP・読み取り API を提供すること、dev-docs との役割の分担を書く
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: CLAUDE.md
+    new: false
+    change: リポジトリの構成の説明に、移した `src/project_index/`・`plugins/project-index/`・`templates/`・`content/` を加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/library/LIB-8.yaml
+    new: true
+    change: jinja2（プロンプトの文書の変換）。dev-docs の LIB-155-4 から移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:34:46.043336+00:00'
+  - page: docs/library/LIB-9.yaml
+    new: true
+    change: alias-inject（エイリアスのスキーマ）。dev-docs の LIB-155-1 から移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:34:46.043336+00:00'
+  - page: docs/guide/コアコンセプト-プラグイン.md
+    new: true
+    change: プラグインが配る .mcp.json・フック・スキルの仕組み。dev-docs の『コアコンセプト-管理用プラグイン』から移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/コアコンセプト-文書のメタデータ.md
+    new: true
+    change: メタデータの置き場所・列名の対応・管理用の YAML の仕組み。dev-docs の同名のページから移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/project-indexを更新する.md
+    new: true
+    change: update と project-index migrate で更新する手順。dev-docs の『dev-docsを更新する』から移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/新しく作るか修正するかの判定.md
+    new: true
+    change: dev-docs の同名の判定フローチャートを移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/documentsの行の判定.md
+    new: true
+    change: dev-docs の同名の判定フローチャートを移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/CLI.md
+    new: true
+    change: project-index serve・migrate・files・prompt-doc のサブコマンド。dev-docs の同名のページから移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+scope_out:
+  - item: dev-docs から移した機能の除外と、dev-docs の画面のサーバーの付け替え
+    reason: dev-docs のリポジトリの変更で、shuhei1101/dev-docs#163 が担う
+    plan: none
+  - item: dev-docs の画面のサーバーを本物の project-index の読み取り API へつなぐ作業
+    reason: 規約『複数リポジトリのAPI契約』で、利用する側が本物へつなぐ作業は別の Issue にする。shuhei1101/dev-docs#164 が担う
+    plan: none
+  - item: 画面の API のうち、画面の配信・表の列の設定・API のスキーマ（dev-docs の IF-155-3・18・21）
+    reason: dev-docs の画面のサーバーに残る機能。残す境界は shuhei1101/dev-docs#163 のインターフェース定義設計で決まり、移すと決まったものはこの作業 PR のインターフェース定義設計で取り込む。更新（IF-155-13）と再起動（IF-155-7）は 2 つのサーバーがそれぞれのクローンに対して持ち、project-index の分はこの作業 PR で移す（SC-3・SC-4）
+    plan: none
+  - item: 端末の設定の配信元を 1 行ずつ版を照合して追加・変更・削除する API
+    reason: 'この作業 PR は今の dev-docs と同じ丸ごとの取得・保存と、Issue #14 の表の 1 行の追加を提供する。版を照合する 1 行ずつの追加・変更・削除は #10 が担う'
+    plan: '#10'
+  - item: フォルダ構成の設計書（layout）の作成
+    reason: '#7 が担う。この作業 PR で増えるフォルダはモジュール構成の束ねる設計書（MOD-1・MOD-2）の directory に書く'
+    plan: '#7'
+  - item: このリポジトリの直下の配信元の設定 `dev-docs.yaml` の `project-index.yaml` への改名
+    reason: '今の各リポジトリの `dev-docs.yaml` の移行方法は、この作業 PR のインターフェース定義設計で決める（Issue #14 の書き換え）。移行の間は両方を探す案ならそれぞれの作業で改名でき、改名だけにする案なら反映作業としてこの作業 PR に取り込む。決まるまではその時点の判断としてスコープ外に置き、レビューで確定する'
+    plan: '#16'
+  - item: 'dev-docs から移した文書への、置き場所・`id`・書き方の決まり（dev-docs の #7・#74・#95）の適用'
+    reason: shuhei1101/dev-docs#114 の扱いの判断で、移す文書の範囲が決まってから別に起票すると決まった。この作業 PR はこのリポジトリの今の決まりで書く
+    plan: '#18'
+  - item: 配信元の設定の paths[] の基準のフォルダを、設定ファイルのフォルダ以外に指定する
+    reason: 移した後のコードに対して行う変更。この作業 PR は今の dev-docs の振る舞いのまま移す
+    plan: '#6'
+  - item: '設定の画面で配信元を保存すると、ほかの行の outside_read: false が消える不具合'
+    reason: 移した後のコードに対して行う修正。この作業 PR は今の dev-docs の振る舞いのまま移す
+    plan: '#9'
+  - item: 端末の設定の最上位の知らないキーを警告として返して読み込みを続ける
+    reason: 移した後のコードに対して行う変更。この作業 PR は今の dev-docs の振る舞いのまま移す
+    plan: '#11'
+  - item: 呼ぶ側のリポジトリ（AI Monitor・knowledge・rule-inject・alias-inject）の、文書の MCP・管理の MCP のツールの完全名の書き換え
+    reason: 別のリポジトリの変更。確認ログのとおりリポジトリごとに起票し、shuhei1101/dev-docs#163 のマージと同じ時期に入れる。完全名はこの作業 PR のプラグインが決めるため、この作業 PR がマージされなければ成り立たない
+    plan: shuhei1101/ai-monitor#3387・shuhei1101/knowledge#276・shuhei1101/rule-inject#158・shuhei1101/alias-inject#76
+  - item: dev-docs から移した処理の lint の既存の違反（ruff の `# noqa`・pyright のファイルごとの Unknown 系の warning 指定・complexipy のスナップショット `complexipy-snapshot.json`）を解消してベースラインを外す
+    reason: dev-docs はこのリポジトリより緩い lint の設定で書かれており、移した処理の構造の書き換え（cognitive complexity が上限を超える 41 関数の分割など）は移した後のコードに対して行う変更。この作業 PR は今の dev-docs の振る舞いのまま移し、既存の違反を規約『設計原則』の「既存の Python のリポジトリは warn から始める」に沿ってベースラインに載せ、新しい違反だけを失敗にする
+    plan: '#17'
+use_cases:
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: new
+    detail: 利用者が project-index を入れて配信元を登録し、エージェントと dev-docs の画面のサーバーがその配信元の文書を読み書きする流れを、dev-docs の複合ユースケース（SC-155-13）の索引の側から移す
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-2.yaml
+    impact: new
+    detail: 利用者が project-index を端末に入れ、文書の MCP につながることを確かめる（dev-docs の SC-155-2 から移す）
+    depends_on:
+      - docs/scenario/SC-1.yaml
+  - kind: single
+    scenario: docs/scenario/SC-3.yaml
+    impact: new
+    detail: 利用者が project-index を新しいバージョンにし、古くなった設定を移し替える（dev-docs の SC-155-3 から移す）
+    depends_on:
+      - docs/scenario/SC-1.yaml
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: new
+    detail: 利用者が project-index を起動し、端末の設定の配信元を配信し始める（dev-docs の SC-155-10 から移す）
+    depends_on:
+      - docs/scenario/SC-1.yaml
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: new
+    detail: 利用者がフォルダを配信元として登録する（dev-docs の SC-155-12 のうち設定画面を除く部分を移す）
+    depends_on:
+      - docs/scenario/SC-1.yaml
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: new
+    detail: エージェントが使用できる配信元の文書を検索して参照する（dev-docs の SC-155-5 から移す）
+    depends_on:
+      - docs/scenario/SC-1.yaml
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: new
+    detail: エージェントが文書を検査に合格させてから作成・修正・削除する（dev-docs の SC-155-4 から移す）
+    depends_on:
+      - docs/scenario/SC-1.yaml
+  - kind: single
+    scenario: docs/scenario/SC-8.yaml
+    impact: new
+    detail: レビュアーが区間の間に変わった文書と項目を確かめる（dev-docs の SC-155-8 から移す）
+    depends_on:
+      - docs/scenario/SC-1.yaml
+  - kind: single
+    scenario: docs/scenario/SC-9.yaml
+    impact: new
+    detail: 利用者が直接編集した文書を、エージェントが次の取得で参照し直す（dev-docs の SC-155-1 から移す）
+    depends_on:
+      - docs/scenario/SC-1.yaml
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: new
+    detail: 配信元の設定・スクリプトの変更を確かめてから配信に反映する（dev-docs の SC-155-9 から移す）
+    depends_on:
+      - docs/scenario/SC-1.yaml
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: new
+    detail: dev-docs の画面のサーバーが、配信元の一覧・文書・差分・検索の結果・リビジョンの一覧を取得する
+    depends_on:
+      - docs/scenario/SC-1.yaml
+  - kind: single
+    scenario: docs/scenario/SC-12.yaml
+    impact: new
+    detail: dev-docs の画面のサーバーが、端末の設定の配信元を取得し、追加・停止・削除した後の配信元を保存する（dev-docs の SC-155-11 と SC-155-12 の設定画面の部分を、API の利用者を主体にして移す）
+    depends_on:
+      - docs/scenario/SC-1.yaml

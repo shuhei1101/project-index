@@ -1,0 +1,244 @@
+id: MOD-56
+title: 索引のサーバー / 検索 / snippets.py
+lead: 行の分割・抜粋の検索・当たった行の数・一致した箇所の抜き出し。
+test_files:
+- tests/unit/project_index/features/search/test_snippets.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      文書の検索 ..> 抜粋の検索
+      文書の検索 ..> 当たった行の数 : @matches
+      本文の範囲の選択 ..> 行の分割
+      抜粋の検索 ..> 行の分割
+      当たった行の数 ..> 行の分割
+      抜粋の検索 ..> 正規表現の組み立て
+      当たった行の数 ..> 正規表現の組み立て
+      一致した箇所の抜き出し ..> 抜粋の検索
+      class 文書の検索 {
+        <<function>>
+      }
+      class 正規表現の組み立て {
+        <<function>>
+      }
+      class 抜粋の検索 {
+        <<function>>
+      }
+      class 当たった行の数 {
+        <<function>>
+      }
+      class 行の分割 {
+        <<function>>
+      }
+      class 本文の範囲の選択 {
+        <<function>>
+      }
+      class 一致した箇所の抜き出し {
+        <<function>>
+      }
+      click 文書の検索 href "./MOD-55.py.yaml#文書の検索"
+      click 正規表現の組み立て href "./MOD-53.py.yaml#正規表現の組み立て"
+      click 本文の範囲の選択 href "./MOD-50.py.yaml#本文の範囲の選択"
+functions:
+- name: snippet_lines
+  title: 一致した箇所の抜き出し
+  kind: 関数
+  container: project_index/features/search/snippets.py
+  usecase: 共通
+  role: 変換
+  summary: 本文から語を含む行と前後の行を抜き出す（語での検索）
+  scope: public
+  thread_safe: true
+  args:
+  - name: text
+    title: 本文
+    type: str
+    required: true
+    passing: positional
+    description: 抜き出す元
+  - name: words
+    title: 語
+    type: Sequence[str]
+    required: true
+    passing: positional
+    description: NFKC と `casefold` をした語
+  - name: context_lines
+    title: 前後の行数
+    type: int
+    required: true
+    passing: keyword
+    description: 添える行数
+  - name: max_count
+    title: 箇所の数
+    type: int
+    required: true
+    passing: keyword
+    description: 返す箇所の上限
+  returns:
+    type: list[str]
+    description: 箇所ごとに前後の行を改行で繋いだもの。重なる箇所は 1 つにまとめる
+  process: |-
+    1. 語を `values` にした `{field: body, op: contains}` の条件で抜粋の検索をする（`before`・`after` は `context_lines`）
+    2. 抜粋ごとに行の `text` を改行で繋いで返す
+  unit_tests:
+  - name: test_snippet_lines
+    case: 正常
+    summary: 前後の行と重なり
+    condition: 10 行のうち 3・4 行目に語、`context_lines=1`、`max_count=3`
+    mock: なし
+    expected: 2〜5 行目の 1 箇所
+- name: find_snippets
+  title: 抜粋の検索
+  kind: 関数
+  container: project_index/features/search/snippets.py
+  usecase: 共通
+  role: 変換
+  summary: 本文から条件に当たる行と前後の行を、行番号つきの抜粋にする
+  scope: public
+  thread_safe: true
+  args:
+  - name: text
+    title: 本文
+    type: str
+    required: true
+    passing: positional
+    description: 抜き出す元
+  - name: conditions
+    title: 条件
+    type: Sequence[Condition]
+    required: true
+    passing: positional
+    description: 抜粋を探す条件
+  - name: before
+    title: 前の行数
+    type: int
+    required: true
+    passing: keyword
+    description: 当たった行の前に添える行数
+  - name: after
+    title: 後ろの行数
+    type: int
+    required: true
+    passing: keyword
+    description: 当たった行の後ろに添える行数
+  - name: max_count
+    title: 抜粋の数
+    type: int
+    required: true
+    passing: keyword
+    description: 返す抜粋の上限
+  - name: ranges
+    title: 探す範囲
+    type: Sequence[BodyRange] | None
+    required: false
+    default: None
+    passing: keyword
+    description: '`sections`・`lines` で切り出した範囲。`None` は本文の全文'
+  returns:
+    type: list[Snippet]
+    description: 本文の先頭からの抜粋。重なる範囲は 1 つにまとめる
+  process: |-
+    1. 本文を行の分割で行に分ける。行番号は 1 始まり
+    2. 当たった行を集める（当たった行の数と共通の内部の関数 `_hit_lines`）
+       - `regex` は正規表現の組み立てで本文全体に `finditer` をかけ、当たった範囲の始まりの行から終わりの行までを当たった行にする。`case_sensitive` が `False` なら行ごとに NFKC をした本文にかける
+       - `eq`・`prefix`・`suffix`・`contains` は値を含む行（`case_sensitive` が `False` なら行と値に NFKC と `casefold`）
+       - それ以外の `op` は飛ばす
+    3. `ranges` がある場合、どれかの範囲の中の当たった行だけを残す
+    4. 当たった行ごとに前 `before`・後ろ `after` の範囲を作る。`ranges` がある場合は、その行を含む範囲の中に切り詰める
+    5. 重なる範囲をまとめ、先頭から `max_count` 個を `Snippet` にして返す（`hit` は当たった行か。行番号は本文の行番号）
+  unit_tests:
+  - name: test_find_snippets
+    case: 正常
+    summary: 正規表現は行の頭に当たる
+    condition: '3 行目が `## 手順`、8 行目が `a ## b` の本文に `{field: body, op: regex, values: ["^## "]}`、`before=0`・`after=1`・`max_count=3`'
+    mock: なし
+    expected: 1 つの抜粋で、行が `(3, "## 手順", True)`・`(4, …, False)`
+  - name: test_find_snippets_when_anchor
+    case: 正常
+    summary: 値全体の先頭
+    condition: '1 行目・3 行目が空白で始まらない本文に `{field: body, op: regex, values: ["\\A\\S"]}`、`before=0`・`after=0`'
+    mock: なし
+    expected: 行番号 1 の抜粋だけ
+  - name: test_find_snippets_when_overlap
+    case: 正常
+    summary: 重なりと上限
+    condition: '10 行のうち 3・4・9 行目に `foo` の本文に `{field: body, op: contains, values: [ＦＯＯ]}`、`before=1`・`after=1`・`max_count=1`'
+    mock: なし
+    expected: 2〜5 行目の 1 つの抜粋で、`hit` が 3・4 行目だけ `True`
+  - name: test_find_snippets_when_trailing_newline
+    case: 正常
+    summary: 末尾の改行と CRLF
+    condition: 本文 `a\r\nfoo\r\n` に `contains` の `foo`、`before=0`・`after=5`
+    mock: なし
+    expected: 行が `(2, "foo", True)` だけ
+  - name: test_find_snippets_when_ranges
+    case: 正常
+    summary: 切り出した範囲の中だけ
+    condition: 10 行のうち 2・7 行目に `foo` の本文に `contains` の `foo`、`before=2`・`after=2`、`ranges=[BodyRange(6, 8)]`
+    mock: なし
+    expected: 1 つの抜粋で、行番号が 6・7・8（2 行目と範囲の外の 5・9 行目を含まない）
+- name: split_lines
+  title: 行の分割
+  kind: 関数
+  container: project_index/features/search/snippets.py
+  usecase: 検索
+  role: 変換
+  summary: 本文を行に分ける（抜粋・当たった行の数・本文の切り出しが同じ行番号を使う）
+  description: 今の `_split_lines` を公開にする。`str.splitlines` は `\n` 以外の区切りでも分けて行番号がずれるので使わない。
+  scope: public
+  thread_safe: true
+  args:
+  - name: text
+    title: 本文
+    type: str
+    required: true
+    passing: positional
+    description: 分ける本文
+  returns:
+    type: list[str]
+    description: 行の並び（改行を含まない）
+  process: |-
+    1. `\n` で分け、行末の `\r` を除く
+    2. 本文が改行で終わる場合、最後の空の要素を除く
+  status: planned
+- name: count_matches
+  title: 当たった行の数
+  kind: 関数
+  container: project_index/features/search/snippets.py
+  usecase: 検索
+  role: 判定
+  summary: 本文のうち、条件のどれかに当たった行の数を返す（`@matches`）
+  scope: public
+  thread_safe: true
+  args:
+  - name: text
+    title: 本文
+    type: str
+    required: true
+    passing: positional
+    description: 数える本文の全文
+  - name: conditions
+    title: 条件
+    type: Sequence[Condition]
+    required: true
+    passing: positional
+    description: '`not` の下を除いた `body`・`*` の条件'
+  returns:
+    type: int
+    description: 当たった行の数。条件が空なら 0
+  process: 1. 本文を行の分割で分け、抜粋の検索と同じ `_hit_lines` で当たった行を集め、その数を返す（同じ行が複数の条件に当たっても 1 と数える）
+  unit_tests:
+  - name: test_count_matches
+    case: 正常
+    summary: 行の数と重なり
+    condition: 1・3・4 行目に `検索` を含み、4 行目は `^#` にも当たる本文に、`contains` の `検索` と `regex` の `^#`（4 行目だけが `#` で始まる）
+    mock: なし
+    expected: '3'
+  - name: test_count_matches_when_no_conditions
+    case: 正常
+    summary: 条件が無い
+    condition: 任意の本文と空の条件
+    mock: なし
+    expected: '0'
+  status: planned
