@@ -67,12 +67,15 @@ functions:
       description: 読み直した後の配信元ごとの状態（配信元の『配信元の状態』）
     process: |-
       1. `lock` を取る
-      2. 端末の設定を往復編集の形で読み（往復編集の読み込み）、`sources` だけを送られた行に置き換える。`config` は要素の数によらず配列で書く。既定値と同じキー（`enabled: true`・`outside_read: true`・空の `scope.read` など）は書かない
-      3. 置き換えた値を検証する（端末の設定の検証）
+      2. 端末の設定を往復編集の形で読み（往復編集の読み込み）、送られた行ごとに、ファイルの `sources` から配信元の ID（配信元の『行の配信元の ID』。`id`、無ければ設定の `name`）が同じ行を探す
+         - 見つかった場合、送られた行に含めなかったキー（`SourceEntry` の `model_fields_set` に無い `enabled`・`outside_read` と、`scope` を含めなかった行か `SourceScope` の `model_fields_set` に無い `scope.read`・`scope.write`）を、見つかった行の値で埋める
+         - ID が求まらない行と、同じ ID の行が無い行は埋めない（既定値のまま）
+      3. `sources` だけを埋めた後の行に置き換える。`config` は要素の数によらず配列で書く。既定値と同じキー（`enabled: true`・`outside_read: true`・空の `scope.read` など）は書かない
+      4. 置き換えた値を検証する（端末の設定の検証）
          - 違反がある場合、ファイルを書かずに `TerminalConfigInvalidError` を送る
-      4. 一時ファイルに書いてから置き換える（往復編集の書き出し・ファイルの置き換え）
+      5. 一時ファイルに書いてから置き換える（往復編集の書き出し・ファイルの置き換え）
          - `[info]` 端末の設定の sources を保存した（パス・行数）
-      5. 端末の設定を読み直し（端末の設定の読み込み）、`reload` で配信元を読み直して状態を返す（起動の『配信元の読み直し』）
+      6. 端末の設定を読み直し（端末の設定の読み込み）、`reload` で配信元を読み直して状態を返す（起動の『配信元の読み直し』）
     exceptions:
       - name: TerminalConfigInvalidError
         condition: 置き換えた後の端末の設定がスキーマに通らない
@@ -97,6 +100,24 @@ functions:
         condition: '`outside_read: false` の行'
         mock: 配信元の読み直し（偽物）
         expected: 'ファイルの行に `outside_read: false` がある'
+      - name: test_save_sources_when_unsent_keys
+        case: 正常
+        summary: 行に含めなかったキーをファイルの同じ配信元の行の値で埋める
+        condition: 'ファイルの extra の行に `enabled: false`・`outside_read: false`・`scope.read`・`scope.write`。送る extra の行は `id`・`config` と `scope.read` だけ'
+        mock: 配信元の読み直し（偽物）
+        expected: 'ファイルの extra の行に `enabled: false`・`outside_read: false`・元の `scope.write` が残り、`scope.read` は送った値'
+      - name: test_save_sources_when_sent_keys_override
+        case: 正常
+        summary: 行に含めたキーは送った値で書く
+        condition: 'ファイルの extra の行に `outside_read: false`。送る extra の行に `outside_read: true`'
+        mock: 配信元の読み直し（偽物）
+        expected: ファイルの extra の行に `outside_read` が無い
+      - name: test_save_sources_when_no_same_row
+        case: 正常
+        summary: ファイルに同じ配信元の行が無い行は埋めない
+        condition: 'ファイルの sample の行に `outside_read: false`。送る行は id が extra で `config` が同じ'
+        mock: 配信元の読み直し（偽物）
+        expected: ファイルの extra の行に `outside_read` が無い
       - name: test_save_sources_when_invalid
         case: 異常
         summary: 検証に通らない
