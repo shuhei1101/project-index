@@ -375,6 +375,7 @@ exceptions:
     condition: '`cwd` が配信元の `scope.write` に当たらない'
   - name: TargetIsCloneError
     condition: Git の配信元で、消す先がクローン本体になる
+    notes: クローン本体のパス（配信元の設定をワークツリーから読んでいても、ワークツリーの親のクローン本体）と、`worktree` でワークツリーを指すことを添える
   - name: DeleteNotAllowedError
     condition: Git 管理外の配信元で、種類の `documents[].writable` が削除を許していない
   - name: DocumentNotFoundError
