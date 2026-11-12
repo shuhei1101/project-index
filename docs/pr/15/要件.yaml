@@ -8,7 +8,9 @@ docs:
   - page: docs/config/CFG-1.yaml
     new: false
     change: 移した端末の設定（`state_dir`・`port` など）と配信元の設定のキーを書き、shuhei1101/dev-docs#114 で移すとした注記を外す。今の各リポジトリの `dev-docs.yaml` の扱いを、この作業 PR のインターフェース定義設計の決定どおりに書く
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
   - page: docs/nonfunctional/NFR-1.yaml
     new: false
     change: 通信（NFR-2）の値を読み取り API と文書の MCP のインターフェース定義で決めて書き、#119 の 3 つの要求の所要時間の値を加える
@@ -71,64 +73,94 @@ docs:
     updated_at: '2026-11-12T02:34:46.043336+00:00'
   - page: docs/guide/はじめに.md
     new: false
-    change: project-index と dev-docs の役割の分担と、コアコンセプトのページの行を加える
-    status: todo
+    change: コアコンセプトのページの行を加える（目次から生成。project-index と dev-docs の役割の分担は README.md に書く）
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
   - page: docs/guide/コアコンセプト-配信元と権限.md
     new: true
     change: 配信元・端末の設定・権限（read・write）と作業範囲の外の参照の仕組みを書く。dev-docs の同名のページから索引の側の内容を移す
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
   - page: docs/guide/使い方.md
     new: false
     change: 追加した使い方のページの行を加える
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
   - page: docs/guide/project-indexを入れる.md
     new: true
     change: global-setup で project-index を入れ、文書の MCP につながることを確かめる手順を書く
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
   - page: docs/guide/配信元を配信する.md
     new: true
     change: setup で配信元を端末の設定に並べる手順と、配信元の設定 `project-index.yaml`・`project-index.local.yaml` の書き方を書く
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
   - page: docs/guide/リファレンス.md
     new: false
     change: 追加したリファレンスのページの行を加える
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
   - page: docs/guide/文書のMCP.md
     new: true
     change: 文書の MCP のツールの一覧と入出力を書く。dev-docs の同名のページから移す
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
   - page: docs/guide/管理のMCP.md
     new: true
     change: 移した管理の MCP のツールの一覧と入出力を書く
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
   - page: docs/guide/読み取りAPI.md
     new: true
     change: 読み取り API・端末の設定の API のエンドポイントと入出力を書く
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
   - page: docs/guide/設定.md
     new: true
     change: 端末の設定と配信元の設定のキーを書く
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
   - page: docs/guide/用語集.md
     new: true
     change: 配信元・端末の設定・配信元の設定・作業範囲などの用語を書く
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
   - page: docs/guide/files.yml
     new: false
     change: 追加した使い方のページの行を加える
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
   - page: docs/guide/README.md
     new: false
     change: 追加した使い方のページの行を目次に加える
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
   - page: README.md
     new: false
-    change: 入れ方と、文書の MCP・読み取り API を提供することを書く
-    status: todo
+    change: 入れ方と、文書の MCP・読み取り API を提供すること、dev-docs との役割の分担を書く
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
   - page: CLAUDE.md
     new: false
     change: リポジトリの構成の説明に、移した `src/project_index/`・`plugins/project-index/`・`templates/`・`content/` を加える
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
   - page: docs/library/LIB-8.yaml
     new: true
     change: jinja2（プロンプトの文書の変換）。dev-docs の LIB-155-4 から移す
@@ -141,6 +173,42 @@ docs:
     status: done
     updated_by: planner
     updated_at: '2026-11-12T02:34:46.043336+00:00'
+  - page: docs/guide/コアコンセプト-プラグイン.md
+    new: true
+    change: プラグインが配る .mcp.json・フック・スキルの仕組み。dev-docs の『コアコンセプト-管理用プラグイン』から移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/コアコンセプト-文書のメタデータ.md
+    new: true
+    change: メタデータの置き場所・列名の対応・管理用の YAML の仕組み。dev-docs の同名のページから移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/project-indexを更新する.md
+    new: true
+    change: update と project-index migrate で更新する手順。dev-docs の『dev-docsを更新する』から移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/新しく作るか修正するかの判定.md
+    new: true
+    change: dev-docs の同名の判定フローチャートを移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/documentsの行の判定.md
+    new: true
+    change: dev-docs の同名の判定フローチャートを移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
+  - page: docs/guide/CLI.md
+    new: true
+    change: project-index serve・migrate・files・prompt-doc のサブコマンド。dev-docs の同名のページから移す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T02:52:01.812979+00:00'
 scope_out:
   - item: dev-docs から移した機能の除外と、dev-docs の画面のサーバーの付け替え
     reason: dev-docs のリポジトリの変更で、shuhei1101/dev-docs#163 が担う
