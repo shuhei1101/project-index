@@ -108,6 +108,96 @@ def test_save_sources_when_outside_read_false(
     assert "outside_read: false" in text
 
 
+def test_save_sources_when_unsent_keys(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """行に含めなかったキーをファイルの同じ配信元の行の値で埋める（正常系）。"""
+    # 準備
+    reload, _ = fake_reload
+    path = tmp_path / "settings.yaml"
+    path.write_text(
+        'version: "1"\n'
+        "clone: /tmp/clone\n"
+        "sources:\n"
+        "  - id: extra\n"
+        "    config: /tmp/extra/project-index.yaml\n"
+        "    enabled: false\n"
+        "    outside_read: false\n"
+        "    scope:\n"
+        "      read: [/tmp/old/**]\n"
+        "      write: [/tmp/write/**]\n",
+        encoding="utf-8",
+    )
+    sent = SourceEntry.model_validate(
+        {
+            "id": "extra",
+            "config": "/tmp/extra/project-index.yaml",
+            "scope": {"read": ["/tmp/new/**"]},
+        }
+    )
+    # 実行
+    save_sources([sent], path=path, reload=reload, lock=threading.Lock())
+    # 検証
+    row = load_yaml(path.read_text(encoding="utf-8"))["sources"][0]
+    assert row["enabled"] is False
+    assert row["outside_read"] is False
+    assert row["scope"] == {"read": ["/tmp/new/**"], "write": ["/tmp/write/**"]}
+
+
+def test_save_sources_when_sent_keys_override(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """行に含めたキーは送った値で書く（正常系）。"""
+    # 準備
+    reload, _ = fake_reload
+    path = tmp_path / "settings.yaml"
+    path.write_text(
+        'version: "1"\n'
+        "clone: /tmp/clone\n"
+        "sources:\n"
+        "  - id: extra\n"
+        "    config: /tmp/extra/project-index.yaml\n"
+        "    outside_read: false\n",
+        encoding="utf-8",
+    )
+    sent = SourceEntry.model_validate(
+        {"id": "extra", "config": "/tmp/extra/project-index.yaml", "outside_read": True}
+    )
+    # 実行
+    save_sources([sent], path=path, reload=reload, lock=threading.Lock())
+    # 検証
+    row = load_yaml(path.read_text(encoding="utf-8"))["sources"][0]
+    assert "outside_read" not in row
+
+
+def test_save_sources_when_no_same_row(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """ファイルに同じ配信元の行が無い行は埋めない（正常系）。"""
+    # 準備
+    reload, _ = fake_reload
+    path = tmp_path / "settings.yaml"
+    path.write_text(
+        'version: "1"\n'
+        "clone: /tmp/clone\n"
+        "sources:\n"
+        "  - id: sample\n"
+        "    config: /tmp/extra/project-index.yaml\n"
+        "    outside_read: false\n",
+        encoding="utf-8",
+    )
+    sent = SourceEntry.model_validate({"id": "extra", "config": "/tmp/extra/project-index.yaml"})
+    # 実行
+    save_sources([sent], path=path, reload=reload, lock=threading.Lock())
+    # 検証
+    row = load_yaml(path.read_text(encoding="utf-8"))["sources"][0]
+    assert row["id"] == "extra"
+    assert "outside_read" not in row
+
+
 def test_save_sources_when_invalid(
     settings_path: Path,
     fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
