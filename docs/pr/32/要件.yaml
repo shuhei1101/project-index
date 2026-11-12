@@ -28,7 +28,7 @@ docs:
     status: todo
 scope_out:
   - item: src/project_index/ の .py でない配布物（migrations の steps.yaml・schemas の YAML）の管理用の YAML の行
-    reason: 対応するモジュール構成の設計書が無く、implements・tests を張る相手が無い。src の行の exclude の *.yaml で索引に無いファイルの警告から外す。この判断はレビューで確定する
+    reason: 対応するモジュール構成の設計書が無く、implements・tests を張る相手が無い。src の行の exclude の *.schema.yaml・aliases.source.yaml・steps.yaml で索引に無いファイルの警告から外す。この判断はレビューで確定する
     plan: none
   - item: 設計書の無いコードへのモジュール構成の設計書の追加
     reason: 要望に含まれない。対応表に無いファイルは related を持たない行にとどめる
@@ -36,3 +36,6 @@ scope_out:
   - item: plugins/project-index/ の .py でない配布物（.mcp.json・plugin.json・hooks.json・skills の SKILL.md）の管理用の YAML の行
     reason: 対応するモジュール構成の設計書が無く、implements・tests を張る相手が無い。plugin の行の exclude の *.json・*.md で索引に無いファイルの警告から外す
     plan: none
+  - item: project-index.yaml の files_guide の行の exclude の *.yml が管理用の YAML files.yml 自身に該当し、公開ドキュメントの Markdown が配信されない
+    reason: 配信元の設定の行の exclude が管理用の YAML を読ませない不具合。今回の要望（ソースコード・テストの行の追加）に含まれない
+    plan: '#33'
