@@ -70,6 +70,38 @@ flows:
       - ワークツリー x の `documents[].paths` に当たる場所に新しい YAML ができる
       - '`generators[]` が書き出す文書の一覧に、作った文書の行が入る'
     test: test_normal_when_create
+  - name: 正常系（ワークツリーの設定に追加した種類で作る）
+    summary: ワークツリーの `project-index.yaml` にだけある種類の文書を、`worktree` を指定した `create` で作成する
+    setup:
+      - name: Mock
+        description: なし
+      - name: サンプルの配信元
+        description: 正常系の sample。ワークツリー x の `project-index.yaml` にだけ、種類 `term`（スキーマと置き場所の行）を追加して commit していない
+        notes: クローン本体の `project-index.yaml` に `term` は無い
+      - name: 入力
+        description: '`worktree` にワークツリー x のパス、`create`・`kind: term`・`data`'
+    flow: |-
+      <!-- map: {"title": "正常系（ワークツリーの設定に追加した種類で作る）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: worktree: x, operations: create・kind: term・data
+        T-->>WT: ワークツリーの project-index.yaml で配信元の設定を読み直す
+        T->>T: term のスキーマと validators に通す
+        T->>WT: term の documents の置き場所に YAML を作成する
+        T-->>C: 作成した文書の id と version
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`status` が `created` で、`id` と `version` を返却する'
+      - ワークツリー x の、ワークツリーの設定の `term` の `paths` に該当する場所に新しい YAML ができる
+      - sample のクローン本体のファイルは変わらない
+    test: test_normal_when_kind_added_in_worktree
   - name: 正常系（項目の操作を組み合わせる）
     summary: '`unset`・`add_to`・`remove_from`・`text_edits` と `replace` を当てる'
     setup:
@@ -674,6 +706,7 @@ request:
     location: argument
     description: 書き込むワークツリーのパス
     constraints: 配信元の設定の `worktrees` に当たるパスだけ
+    notes: 種類・置き場所は、そのワークツリーの `project-index.yaml` で読み直した配信元の設定で参照する
   - name: operations
     type: list[Operation]
     required: true
@@ -846,7 +879,7 @@ exceptions:
     notes: 今のバージョンと差分、読み直して呼び直すことを添える
   - name: UnknownKindError
     condition: '`create` の `kind` が配信元の種類に無い'
-    notes: その配信元の種類の一覧を添える
+    notes: その配信元の種類の一覧を添える。書く先がワークツリーのときは、ワークツリーの設定の種類で判定し、その一覧を添える
   - name: DocumentNotFoundError
     condition: '`update`・`replace` の `id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
