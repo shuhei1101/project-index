@@ -1,0 +1,941 @@
+$ uv run pytest tests/unit/ --continue-on-collection-errors
+........................................................FF.............. [  8%]
+...................................F.................................... [ 17%]
+.......................F................................................ [ 26%]
+.........................................................F.............. [ 35%]
+................................F....................................... [ 43%]
+........................................................................ [ 52%]
+....................................................................FF.. [ 61%]
+........................................................................ [ 70%]
+.....FFFFFFFFFFFF......FFFF............................................. [ 79%]
+........................................................................ [ 87%]
+........................................................................ [ 96%]
+..........................F                                              [100%]
+==================================== ERRORS ====================================
+__ ERROR collecting tests/unit/project_index/features/settings/test_query.py ___
+ImportError while importing test module '/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/chore-settings-source-paths-root-and-unknown-keys/tests/unit/project_index/features/settings/test_query.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/settings/test_query.py:10: in <module>
+    from project_index.features.settings.query import (
+E   ImportError: cannot import name 'UNKNOWN_KEY_REASON' from 'project_index.features.settings.query' (/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/chore-settings-source-paths-root-and-unknown-keys/src/project_index/features/settings/query.py)
+__ ERROR collecting tests/unit/project_index/features/settings/test_route.py ___
+ImportError while importing test module '/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/chore-settings-source-paths-root-and-unknown-keys/tests/unit/project_index/features/settings/test_route.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/settings/test_route.py:12: in <module>
+    from project_index.features.settings.query import UNKNOWN_KEY_REASON, load_terminal_config
+E   ImportError: cannot import name 'UNKNOWN_KEY_REASON' from 'project_index.features.settings.query' (/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/chore-settings-source-paths-root-and-unknown-keys/src/project_index/features/settings/query.py)
+=================================== FAILURES ===================================
+___________________ test_current_source_when_paths_base_set ____________________
+
+make_served_source = <function make_served_source.<locals>._make at 0x70ad24681590>
+
+    def test_current_source_when_paths_base_set(
+        make_served_source: Callable[..., ServedSource],
+    ) -> None:
+        """基準のフォルダが上でも設定ファイルのフォルダで判定する（正常系）。"""
+        # 準備
+>       brain = make_served_source(
+            id="brain", root=Path("/r"), config_dir=PurePosixPath("content/node-docs/brain")
+        )
+
+tests/unit/project_index/features/access/test_service.py:548: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+overrides = {'id': 'brain', 'config_dir': PurePosixPath('content/node-docs/brain')}
+
+    def _make(**overrides: Any) -> ServedSource:
+        root = overrides.pop("root", tmp_path / "sample")
+        values: dict[str, Any] = {
+            "id": "sample",
+            "root": root,
+            "config_files": [root / "project-index.yaml"],
+            "config": make_source_config(),
+            "is_git": False,
+            "repo_root": None,
+            "scope_read": [],
+            "scope_write": [str(root)],
+            "worktree_globs": [],
+            "schemas": {},
+        }
+        values.update(overrides)
+>       return ServedSource(**values)
+               ^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: ServedSource.__init__() got an unexpected keyword argument 'config_dir'. Did you mean 'config_files'?
+
+tests/unit/project_index/conftest.py:133: TypeError
+___________________________ test_target_config_base ____________________________
+
+make_served_source = <function make_served_source.<locals>._make at 0x70ad246824b0>
+
+    def test_target_config_base(make_served_source: Callable[..., ServedSource]) -> None:
+        """ワークツリーの中の設定ファイルのフォルダ（正常系）。"""
+        # 準備
+>       source = make_served_source(root=Path("/r"), config_dir=PurePosixPath("content/node-docs/brain"))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/access/test_types.py:17: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+overrides = {'config_dir': PurePosixPath('content/node-docs/brain')}
+
+    def _make(**overrides: Any) -> ServedSource:
+        root = overrides.pop("root", tmp_path / "sample")
+        values: dict[str, Any] = {
+            "id": "sample",
+            "root": root,
+            "config_files": [root / "project-index.yaml"],
+            "config": make_source_config(),
+            "is_git": False,
+            "repo_root": None,
+            "scope_read": [],
+            "scope_write": [str(root)],
+            "worktree_globs": [],
+            "schemas": {},
+        }
+        values.update(overrides)
+>       return ServedSource(**values)
+               ^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: ServedSource.__init__() got an unexpected keyword argument 'config_dir'. Did you mean 'config_files'?
+
+tests/unit/project_index/conftest.py:133: TypeError
+__________________ test_check_project_when_paths_base_invalid __________________
+
+tmp_path = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_check_project_when_paths_0')
+write_files = <function write_files.<locals>._write at 0x70ad242ada60>
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x70ad242addd0>
+
+    def test_check_project_when_paths_base_invalid(
+        tmp_path: Path,
+        write_files: Callable[[Path, dict[str, str]], None],
+        make_terminal_config: Callable[..., TerminalConfig],
+    ) -> None:
+        """paths_base と paths の範囲の違反（正常系）。"""
+        # 準備
+        write_files(
+            tmp_path / "brain",
+            {
+                "project-index.yaml": (
+                    "name: brain\n"
+                    "paths_base: sub\n"
+                    "documents:\n"
+                    "  - id: notes\n"
+                    "    paths: [docs/a/*.yaml, docs/b/*.yaml, ../outside/*.yaml]\n"
+                    "    schema: note.schema.yaml\n"
+                ),
+                "note.schema.yaml": "title: note\ntype: object\n",
+                "sub/.keep": "",
+            },
+        )
+        handlers = _handlers(make_terminal_config)
+        # 実行
+        result = check_project(CheckProjectRequest(path=str(tmp_path / "brain")), handlers=handlers)
+        # 検証
+>       assert sorted(violation.path for violation in result.violations) == [
+            "documents[0].paths[2]",
+            "paths_base",
+        ]
+E       AssertionError: assert ['paths_base'] == ['documents[0... 'paths_base']
+E         
+E         At index 0 diff: 'paths_base' != 'documents[0].paths[2]'
+E         Right contains one more item: 'paths_base'
+E         Use -v to get more diff
+
+tests/unit/project_index/features/admin/test_service.py:931: AssertionError
+_______________ test_collect_warnings_when_unknown_top_level_key _______________
+
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x70ad24ff01a0>
+
+    def test_collect_warnings_when_unknown_top_level_key(
+        make_terminal_config: Callable[..., TerminalConfig],
+    ) -> None:
+        """端末の設定の知らないキーを 1 件にまとめて載せる（正常系）。"""
+        # 準備
+        terminal = make_terminal_config(unknown_keys=["mindstella", "prot"])
+        handlers = _loaded_handlers(terminal)
+        # 実行
+        result = collect_warnings(
+            [], registry=handlers.registry, checks=handlers.checks, terminal=handlers.terminal
+        )
+        # 検証
+>       assert len(result) == 1
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tests/unit/project_index/features/describe/test_warnings.py:202: AssertionError
+____________________ test_store_schema_when_paths_base_set _____________________
+
+git_repo = <function git_repo.<locals>._create at 0x70ad250d1900>
+run_git = <function run_git.<locals>._run at 0x70ad250d10c0>
+tmp_path = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_store_schema_when_paths_b0')
+make_source_config = <function make_source_config.<locals>._make at 0x70ad250d22a0>
+make_served_source = <function make_served_source.<locals>._make at 0x70ad250e4670>
+make_target = <function make_target.<locals>._make at 0x70ad250e4930>
+document_store = <project_index.features.documents.store.DocumentStore object at 0x70ad25285250>
+
+    def test_store_schema_when_paths_base_set(
+        git_repo: Callable[..., Path],
+        run_git: Callable[..., str],
+        tmp_path: Path,
+        make_source_config: Callable[..., SourceConfig],
+        make_served_source: Callable[..., ServedSource],
+        make_target: Callable[..., Target],
+        document_store: DocumentStore,
+    ) -> None:
+        """基準のフォルダが上でもスキーマは設定ファイルのフォルダから読む（正常系）。"""
+        # 準備
+        repo = git_repo(
+            {"content/node-docs/brain/note.schema.yaml": "type: object\nrequired: [brain]\n"}
+        )
+        head = run_git(repo, "rev-parse", "HEAD").strip()
+        worktree = tmp_path / "wt"
+        run_git(repo, "worktree", "add", "-b", "feat/x", str(worktree))
+        documents = [
+            DocumentTable(id="notes", paths=["docs/*.yaml"], schema_path="note.schema.yaml")
+        ]
+>       source = make_served_source(
+            root=repo,
+            config_dir=PurePosixPath("content/node-docs/brain"),
+            config=make_source_config(documents=documents),
+            is_git=True,
+            repo_root=repo,
+            schemas={"notes": {"type": "object"}},
+        )
+
+tests/unit/project_index/features/documents/test_store.py:1033: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+overrides = {'config_dir': PurePosixPath('content/node-docs/brain'), 'config': SourceConfig(name='sample', version='3', enabled=Tr..._git': True, 'repo_root': PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_store_schema_when_paths_b0/repo'), ...}
+
+    def _make(**overrides: Any) -> ServedSource:
+        root = overrides.pop("root", tmp_path / "sample")
+        values: dict[str, Any] = {
+            "id": "sample",
+            "root": root,
+            "config_files": [root / "project-index.yaml"],
+            "config": make_source_config(),
+            "is_git": False,
+            "repo_root": None,
+            "scope_read": [],
+            "scope_write": [str(root)],
+            "worktree_globs": [],
+            "schemas": {},
+        }
+        values.update(overrides)
+>       return ServedSource(**values)
+               ^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: ServedSource.__init__() got an unexpected keyword argument 'config_dir'. Did you mean 'config_files'?
+
+tests/unit/project_index/conftest.py:133: TypeError
+_______________ test_apply_migration_when_unknown_top_level_key ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_apply_migration_when_unkn0')
+
+    @pytest.mark.usefixtures("settings_version_2")
+    def test_apply_migration_when_unknown_top_level_key(tmp_path: Path) -> None:
+        """最上位の知らないキーを残して移し替える（正常系）。"""
+        # 準備
+        path = tmp_path / "settings.yaml"
+        path.write_text(SETTINGS_V1 + "mindstella:\n  threads: 3\n", encoding="utf-8")
+        data = load_roundtrip(path.read_text(encoding="utf-8"))
+        steps = [_step("rename", "log_dir", to="state_dir")]
+        # 実行
+>       apply_migration(_target(path), data, steps, allow_destructive=False, now=NOW)
+
+tests/unit/project_index/features/migrate/test_service.py:232: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+target = MigrationTarget(kind='settings', file=PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_apply_migration_when_unkn0/settings.yaml'), current='2')
+data = {'version': '2', 'clone': '/x', 'state_dir': '/logs', 'mindstella': {'threads': 3}}
+steps = [MigrationStep(version='2', op='rename', path='log_dir', description='手順', to='state_dir', value=None, match=None, take=None)]
+allow_destructive = False
+now = datetime.datetime(2026, 10, 29, 12, 0, tzinfo=datetime.timezone.utc)
+
+    def apply_migration(
+        target: MigrationTarget,
+        data: CommentedMap,
+        steps: list[MigrationStep],
+        *,
+        allow_destructive: bool,
+        now: datetime,
+    ) -> Path:
+        """手順を全て当てて新しいスキーマで検証し、バックアップを取ってから 1 回だけ書き込む。"""
+        # 破壊的な手順は、許されたときだけ当てる
+        destructive = [step for step in steps if step.destructive]
+        if destructive and not allow_destructive:
+            lines = [f"{step.version}: {step.description}" for step in destructive]
+            raise DestructiveStepBlockedError(
+                "\n".join(["破壊的な手順があります", *lines, "--allow-destructive で適用できます"])
+            )
+        # 読んだ後にファイルが変わっていないかを、読んだ内容との比較とハッシュで確かめる
+        original = target.file.read_text(encoding="utf-8")
+        if dump_roundtrip(load_roundtrip(original)) != dump_roundtrip(data):
+            msg = f"{target.file}: 読み込んだ後に変わったため書き換えません"
+            raise MigrationFailedError(msg)
+        digest = content_hash(original)
+        for step in steps:
+            apply_step(data, step)
+        previous_version = str(data["version"])
+        data["version"] = DoubleQuotedScalarString(target.current)
+        text = dump_roundtrip(data)
+        violations = _violations(target, load_yaml(text))
+        # 当てた結果が新しいスキーマに違反するときは書かない
+        if violations:
+            lines = [f"{v.path}: {v.rule}" for v in violations]
+            if target.kind == "project-index":
+                lines.append(SETUP_GUIDE)
+>           raise MigrationFailedError("\n".join(lines))
+E           project_index.features.migrate.types.MigrationFailedError: mindstella: 知らないキー
+
+src/project_index/features/migrate/service.py:122: MigrationFailedError
+_________________ test_save_sources_when_unknown_top_level_key _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_save_sources_when_unknown0')
+fake_reload = (<function fake_reload.<locals>._reload at 0x70ad24283060>, [])
+make_entry = <function make_entry.<locals>._make at 0x70ad24283ed0>
+
+    def test_save_sources_when_unknown_top_level_key(
+        tmp_path: Path,
+        fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+        make_entry: Callable[..., SourceEntry],
+    ) -> None:
+        """最上位の知らないキーを残して保存する（正常系）。"""
+        # 準備
+        path = tmp_path / "settings.yaml"
+        path.write_text(UNKNOWN_KEY_TEXT, encoding="utf-8")
+        reload, _ = fake_reload
+        sources = [make_entry("/tmp/a/project-index.yaml", source_id="sample")]
+        # 実行
+>       save_sources(sources, path=path, reload=reload, lock=threading.Lock())
+
+tests/unit/project_index/features/settings/test_service.py:398: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/project_index/features/settings/service.py:119: in save_sources
+    _validate_or_raise(document, path)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+document = {'version': '1', 'clone': '/tmp/clone', 'mindstella': {'threads': 3}, 'sources': [{'id': 'sample', 'config': ['/tmp/a/project-index.yaml']}]}
+path = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_save_sources_when_unknown0/settings.yaml')
+
+    def _validate_or_raise(document: object, path: Path) -> None:
+        """書き換えた端末の設定を検証し、違反があれば `TerminalConfigInvalidError` を送る。"""
+        plain = json.loads(json.dumps(document, default=str))
+        violations = validate_terminal_config(plain)
+        if violations:
+>           raise TerminalConfigInvalidError(
+                file=path,
+                message=f"{path}: 端末の設定に違反が {len(violations)} 件あります",
+                violations=violations,
+            )
+E           project_index.features.settings.types.TerminalConfigInvalidError: /tmp/pytest-of-shuhei2441/pytest-7767/test_save_sources_when_unknown0/settings.yaml: 端末の設定に違反が 1 件あります
+
+src/project_index/features/settings/service.py:96: TerminalConfigInvalidError
+__________________ test_add_source_when_unknown_top_level_key __________________
+
+tmp_path = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_add_source_when_unknown_t0')
+fake_reload = (<function fake_reload.<locals>._reload at 0x70ad24281900>, [])
+make_entry = <function make_entry.<locals>._make at 0x70ad24280d50>
+
+    def test_add_source_when_unknown_top_level_key(
+        tmp_path: Path,
+        fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+        make_entry: Callable[..., SourceEntry],
+    ) -> None:
+        """最上位の知らないキーを残して 1 行を追加する（正常系）。"""
+        # 準備
+        path = tmp_path / "settings.yaml"
+        path.write_text(UNKNOWN_KEY_TEXT, encoding="utf-8")
+        reload, _ = fake_reload
+        entry = make_entry("/tmp/b/project-index.yaml", source_id="extra")
+        # 実行
+>       result = add_source(entry, path=path, reload=reload, lock=threading.Lock())
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/settings/test_service.py:416: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/project_index/features/settings/service.py:149: in add_source
+    _validate_or_raise(document, path)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+document = {'version': '1', 'clone': '/tmp/clone', 'mindstella': {'threads': 3}, 'sources': [{'config': '/tmp/a/project-index.yaml'}, {'id': 'extra', 'config': ['/tmp/b/project-index.yaml']}]}
+path = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_add_source_when_unknown_t0/settings.yaml')
+
+    def _validate_or_raise(document: object, path: Path) -> None:
+        """書き換えた端末の設定を検証し、違反があれば `TerminalConfigInvalidError` を送る。"""
+        plain = json.loads(json.dumps(document, default=str))
+        violations = validate_terminal_config(plain)
+        if violations:
+>           raise TerminalConfigInvalidError(
+                file=path,
+                message=f"{path}: 端末の設定に違反が {len(violations)} 件あります",
+                violations=violations,
+            )
+E           project_index.features.settings.types.TerminalConfigInvalidError: /tmp/pytest-of-shuhei2441/pytest-7767/test_add_source_when_unknown_t0/settings.yaml: 端末の設定に違反が 1 件あります
+
+src/project_index/features/settings/service.py:96: TerminalConfigInvalidError
+_____________ test_validate_source_config_when_paths_outside_base ______________
+
+source_root = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_validate_source_config_wh13/root')
+
+    def test_validate_source_config_when_paths_outside_base(source_root: Path) -> None:
+        """paths が基準のフォルダの外（正常系）。"""
+        # 準備
+        row = {
+            "id": "rules",
+            "paths": ["docs/*.yaml", "../outside/*.yaml"],
+            "schema": "schemas/rule.schema.yaml",
+        }
+        value = _config_value(paths_base="../..", documents=[row])
+        # 実行
+        result = validate_source_config(value, root=source_root)
+        # 検証
+>       assert [(v.path, v.rule) for v in result] == [
+            ("documents[0].paths[1]", "配信元の外を指しています: ../outside/*.yaml")
+        ]
+E       AssertionError: assert [('paths_base', '知らないキー')] == [('documents[...side/*.yaml')]
+E         
+E         At index 0 diff: ('paths_base', '知らないキー') != ('documents[0].paths[1]', '配信元の外を指しています: ../outside/*.yaml')
+E         Use -v to get more diff
+
+tests/unit/project_index/features/sources/test_service.py:945: AssertionError
+________ test_validate_source_config_when_paths_base_and_paths_invalid _________
+
+source_root = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_validate_source_config_wh14/root')
+
+    def test_validate_source_config_when_paths_base_and_paths_invalid(source_root: Path) -> None:
+        """paths_base と paths の違反を並べる（正常系）。"""
+        # 準備
+        (source_root / "sub").mkdir()
+        row = {
+            "id": "rules",
+            "paths": ["docs/*.yaml", "../outside/*.yaml"],
+            "schema": "schemas/rule.schema.yaml",
+        }
+        value = _config_value(paths_base="sub", documents=[row])
+        # 実行
+        result = validate_source_config(value, root=source_root)
+        # 検証
+>       assert sorted(v.path for v in result) == ["documents[0].paths[1]", "paths_base"]
+E       AssertionError: assert ['paths_base'] == ['documents[0... 'paths_base']
+E         
+E         At index 0 diff: 'paths_base' != 'documents[0].paths[1]'
+E         Right contains one more item: 'paths_base'
+E         Use -v to get more diff
+
+tests/unit/project_index/features/sources/test_service.py:963: AssertionError
+_____________________ test_load_source_when_paths_base_set _____________________
+
+git_repo = <function git_repo.<locals>._create at 0x70ad24591f30>
+brain_files = {'content/node-docs/brain/project-index.yaml': 'name: brain\npaths_base: ../../..\ndocuments:\n  - id: knowhow\n    pa...a.yaml': 'title: note\ntype: object\n', 'content/node-docs/brain/sub/.keep': '', 'docs/knowhow/a.yaml': 'id: a\n', ...}
+make_entry = <function make_entry.<locals>._make at 0x70ad24591e80>
+
+    def test_load_source_when_paths_base_set(
+        git_repo: Callable[..., Path],
+        brain_files: dict[str, str],
+        make_entry: Callable[..., SourceEntry],
+    ) -> None:
+        """paths の基準のフォルダを指定する（正常系）。"""
+        # 準備
+        repo = git_repo(brain_files)
+        entry = make_entry(str(repo / "content/node-docs/brain/project-index.yaml"))
+        # 実行
+        served, status = load_source(entry, index=0)
+        # 検証
+>       assert status.status == "serving"
+E       AssertionError: assert 'not_served' == 'serving'
+E         
+E         - serving
+E         + not_served
+
+tests/unit/project_index/features/sources/test_service.py:977: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    project_index.features.sources.service:service.py:509 sources[0]: paths_base: 知らないキー
+_______________ test_load_source_when_paths_base_invalid[below] ________________
+
+git_repo = <function git_repo.<locals>._create at 0x70ad24591900>
+brain_files = {'content/node-docs/brain/project-index.yaml': 'name: brain\npaths_base: ../../..\ndocuments:\n  - id: knowhow\n    pa...a.yaml': 'title: note\ntype: object\n', 'content/node-docs/brain/sub/.keep': '', 'docs/knowhow/a.yaml': 'id: a\n', ...}
+make_entry = <function make_entry.<locals>._make at 0x70ad24591590>
+paths_base = 'sub', rule = '設定ファイルのフォルダかそれより上のフォルダを指してください: sub'
+
+    @pytest.mark.parametrize(
+        ("paths_base", "rule"),
+        [
+            pytest.param(
+                "sub", "設定ファイルのフォルダかそれより上のフォルダを指してください: sub", id="below"
+            ),
+            pytest.param(
+                "../../../..", "リポジトリの外を指しています: ../../../..", id="outside_repo"
+            ),
+        ],
+    )
+    def test_load_source_when_paths_base_invalid(
+        git_repo: Callable[..., Path],
+        brain_files: dict[str, str],
+        make_entry: Callable[..., SourceEntry],
+        paths_base: str,
+        rule: str,
+    ) -> None:
+        """paths の基準のフォルダが範囲の外（正常系）。"""
+        # 準備
+        files = dict(brain_files)
+        files["content/node-docs/brain/project-index.yaml"] = BRAIN_CONFIG.replace(
+            "paths_base: ../../..", f"paths_base: {paths_base}"
+        )
+        repo = git_repo(files)
+        entry = make_entry(str(repo / "content/node-docs/brain/project-index.yaml"))
+        # 実行
+        served, status = load_source(entry, index=0)
+        # 検証
+        assert served is None
+        assert status.status == "not_served"
+>       assert [(v.path, v.rule) for v in status.errors] == [("paths_base", rule)]
+E       AssertionError: assert [('paths_base', '知らないキー')] == [('paths_base...してください: sub')]
+E         
+E         At index 0 diff: ('paths_base', '知らないキー') != ('paths_base', '設定ファイルのフォルダかそれより上のフォルダを指してください: sub')
+E         Use -v to get more diff
+
+tests/unit/project_index/features/sources/test_service.py:1016: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    project_index.features.sources.service:service.py:509 sources[0]: paths_base: 知らないキー
+____________ test_load_source_when_paths_base_invalid[outside_repo] ____________
+
+git_repo = <function git_repo.<locals>._create at 0x70ad246f2140>
+brain_files = {'content/node-docs/brain/project-index.yaml': 'name: brain\npaths_base: ../../..\ndocuments:\n  - id: knowhow\n    pa...a.yaml': 'title: note\ntype: object\n', 'content/node-docs/brain/sub/.keep': '', 'docs/knowhow/a.yaml': 'id: a\n', ...}
+make_entry = <function make_entry.<locals>._make at 0x70ad246f1c70>
+paths_base = '../../../..', rule = 'リポジトリの外を指しています: ../../../..'
+
+    @pytest.mark.parametrize(
+        ("paths_base", "rule"),
+        [
+            pytest.param(
+                "sub", "設定ファイルのフォルダかそれより上のフォルダを指してください: sub", id="below"
+            ),
+            pytest.param(
+                "../../../..", "リポジトリの外を指しています: ../../../..", id="outside_repo"
+            ),
+        ],
+    )
+    def test_load_source_when_paths_base_invalid(
+        git_repo: Callable[..., Path],
+        brain_files: dict[str, str],
+        make_entry: Callable[..., SourceEntry],
+        paths_base: str,
+        rule: str,
+    ) -> None:
+        """paths の基準のフォルダが範囲の外（正常系）。"""
+        # 準備
+        files = dict(brain_files)
+        files["content/node-docs/brain/project-index.yaml"] = BRAIN_CONFIG.replace(
+            "paths_base: ../../..", f"paths_base: {paths_base}"
+        )
+        repo = git_repo(files)
+        entry = make_entry(str(repo / "content/node-docs/brain/project-index.yaml"))
+        # 実行
+        served, status = load_source(entry, index=0)
+        # 検証
+        assert served is None
+        assert status.status == "not_served"
+>       assert [(v.path, v.rule) for v in status.errors] == [("paths_base", rule)]
+E       AssertionError: assert [('paths_base', '知らないキー')] == [('paths_base...../../../..')]
+E         
+E         At index 0 diff: ('paths_base', '知らないキー') != ('paths_base', 'リポジトリの外を指しています: ../../../..')
+E         Use -v to get more diff
+
+tests/unit/project_index/features/sources/test_service.py:1016: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    project_index.features.sources.service:service.py:509 sources[0]: paths_base: 知らないキー
+___________________ test_load_source_at_when_paths_base_set ____________________
+
+git_repo = <function git_repo.<locals>._create at 0x70ad246809e0>
+brain_files = {'content/node-docs/brain/project-index.yaml': 'name: brain\npaths_base: ../../..\ndocuments:\n  - id: knowhow\n    pa...a.yaml': 'title: note\ntype: object\n', 'content/node-docs/brain/sub/.keep': '', 'docs/knowhow/a.yaml': 'id: a\n', ...}
+make_entry = <function make_entry.<locals>._make at 0x70ad24680e00>
+run_git = <function run_git.<locals>._run at 0x70ad246f1590>
+tmp_path = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_load_source_at_when_paths0')
+
+    def test_load_source_at_when_paths_base_set(
+        git_repo: Callable[..., Path],
+        brain_files: dict[str, str],
+        make_entry: Callable[..., SourceEntry],
+        run_git: Callable[..., str],
+        tmp_path: Path,
+    ) -> None:
+        """ワークツリーでも基準のフォルダを解く（正常系）。"""
+        # 準備
+        repo = git_repo(brain_files)
+        served, _ = load_source(
+            make_entry(str(repo / "content/node-docs/brain/project-index.yaml")), index=0
+        )
+>       assert served is not None
+E       assert None is not None
+
+tests/unit/project_index/features/sources/test_service.py:1032: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    project_index.features.sources.service:service.py:509 sources[0]: paths_base: 知らないキー
+___________________________ test_resolve_paths_base ____________________________
+
+tmp_path = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_resolve_paths_base0')
+
+    def test_resolve_paths_base(tmp_path: Path) -> None:
+        """上のフォルダを基準にする（正常系）。"""
+        # 準備
+        repo = tmp_path / "repo"
+        config_root = repo / "a" / "b"
+        config_root.mkdir(parents=True)
+        # 実行
+>       result = service_module._resolve_paths_base("../..", config_root, repo)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.sources.service' has no attribute '_resolve_paths_base'
+
+tests/unit/project_index/features/sources/test_service.py:1049: AttributeError
+______________________ test_resolve_paths_base_when_unset ______________________
+
+tmp_path = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_resolve_paths_base_when_u0')
+
+    def test_resolve_paths_base_when_unset(tmp_path: Path) -> None:
+        """省いた設定（正常系）。"""
+        # 準備
+        config_root = tmp_path / "a"
+        config_root.mkdir()
+        # 実行
+>       result = service_module._resolve_paths_base(None, config_root, None)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.sources.service' has no attribute '_resolve_paths_base'
+
+tests/unit/project_index/features/sources/test_service.py:1060: AttributeError
+______________________ test_resolve_paths_base_when_below ______________________
+
+tmp_path = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_resolve_paths_base_when_b0')
+
+    def test_resolve_paths_base_when_below(tmp_path: Path) -> None:
+        """設定ファイルのフォルダの下（正常系）。"""
+        # 準備
+        repo = tmp_path / "repo"
+        config_root = repo / "a" / "b"
+        (config_root / "sub").mkdir(parents=True)
+        # 実行
+>       base, violations = service_module._resolve_paths_base("sub", config_root, repo)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.sources.service' has no attribute '_resolve_paths_base'
+
+tests/unit/project_index/features/sources/test_service.py:1072: AttributeError
+__________________ test_resolve_paths_base_when_outside_repo ___________________
+
+tmp_path = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_resolve_paths_base_when_o0')
+
+    def test_resolve_paths_base_when_outside_repo(tmp_path: Path) -> None:
+        """リポジトリの直下より上（正常系）。"""
+        # 準備
+        repo = tmp_path / "repo"
+        config_root = repo / "a" / "b"
+        config_root.mkdir(parents=True)
+        # 実行
+>       base, violations = service_module._resolve_paths_base("../../..", config_root, repo)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.sources.service' has no attribute '_resolve_paths_base'
+
+tests/unit/project_index/features/sources/test_service.py:1087: AttributeError
+_____________________ test_resolve_paths_base_when_not_git _____________________
+
+tmp_path = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_resolve_paths_base_when_n0')
+
+    def test_resolve_paths_base_when_not_git(tmp_path: Path) -> None:
+        """Git の管理外はリポジトリの範囲を確かめない（正常系）。"""
+        # 準備
+        config_root = tmp_path / "x" / "a" / "b"
+        config_root.mkdir(parents=True)
+        # 実行
+>       result = service_module._resolve_paths_base("../..", config_root, None)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.sources.service' has no attribute '_resolve_paths_base'
+
+tests/unit/project_index/features/sources/test_service.py:1101: AttributeError
+_____________________ test_resolve_paths_base_when_missing _____________________
+
+tmp_path = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_resolve_paths_base_when_m0')
+
+    def test_resolve_paths_base_when_missing(tmp_path: Path) -> None:
+        """無いフォルダ（正常系）。"""
+        # 準備
+        config_root = tmp_path / "a" / "b"
+        config_root.mkdir(parents=True)
+        # 実行
+>       _, violations = service_module._resolve_paths_base("../none", config_root, None)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.sources.service' has no attribute '_resolve_paths_base'
+
+tests/unit/project_index/features/sources/test_service.py:1112: AttributeError
+____________________ test_served_source_config_root[below] _____________________
+
+make_served_source = <function make_served_source.<locals>._make at 0x70ad24fd6560>
+config_dir = 'content/node-docs/brain'
+expected = PosixPath('/r/content/node-docs/brain')
+
+    @pytest.mark.parametrize(
+        ("config_dir", "expected"),
+        [
+            pytest.param("content/node-docs/brain", Path("/r/content/node-docs/brain"), id="below"),
+            pytest.param(".", Path("/r"), id="same"),
+        ],
+    )
+    def test_served_source_config_root(
+        make_served_source: Callable[..., ServedSource], config_dir: str, expected: Path
+    ) -> None:
+        """基準のフォルダの下の設定ファイルのフォルダ（正常系）。"""
+        # 準備
+>       source = make_served_source(root=Path("/r"), config_dir=PurePosixPath(config_dir))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/sources/test_types.py:128: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+overrides = {'config_dir': PurePosixPath('content/node-docs/brain')}
+
+    def _make(**overrides: Any) -> ServedSource:
+        root = overrides.pop("root", tmp_path / "sample")
+        values: dict[str, Any] = {
+            "id": "sample",
+            "root": root,
+            "config_files": [root / "project-index.yaml"],
+            "config": make_source_config(),
+            "is_git": False,
+            "repo_root": None,
+            "scope_read": [],
+            "scope_write": [str(root)],
+            "worktree_globs": [],
+            "schemas": {},
+        }
+        values.update(overrides)
+>       return ServedSource(**values)
+               ^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: ServedSource.__init__() got an unexpected keyword argument 'config_dir'. Did you mean 'config_files'?
+
+tests/unit/project_index/conftest.py:133: TypeError
+_____________________ test_served_source_config_root[same] _____________________
+
+make_served_source = <function make_served_source.<locals>._make at 0x70ad24fd5010>
+config_dir = '.', expected = PosixPath('/r')
+
+    @pytest.mark.parametrize(
+        ("config_dir", "expected"),
+        [
+            pytest.param("content/node-docs/brain", Path("/r/content/node-docs/brain"), id="below"),
+            pytest.param(".", Path("/r"), id="same"),
+        ],
+    )
+    def test_served_source_config_root(
+        make_served_source: Callable[..., ServedSource], config_dir: str, expected: Path
+    ) -> None:
+        """基準のフォルダの下の設定ファイルのフォルダ（正常系）。"""
+        # 準備
+>       source = make_served_source(root=Path("/r"), config_dir=PurePosixPath(config_dir))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/sources/test_types.py:128: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+overrides = {'config_dir': PurePosixPath('.')}
+
+    def _make(**overrides: Any) -> ServedSource:
+        root = overrides.pop("root", tmp_path / "sample")
+        values: dict[str, Any] = {
+            "id": "sample",
+            "root": root,
+            "config_files": [root / "project-index.yaml"],
+            "config": make_source_config(),
+            "is_git": False,
+            "repo_root": None,
+            "scope_read": [],
+            "scope_write": [str(root)],
+            "worktree_globs": [],
+            "schemas": {},
+        }
+        values.update(overrides)
+>       return ServedSource(**values)
+               ^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: ServedSource.__init__() got an unexpected keyword argument 'config_dir'. Did you mean 'config_files'?
+
+tests/unit/project_index/conftest.py:133: TypeError
+____________________ test_served_source_config_path[below] _____________________
+
+make_served_source = <function make_served_source.<locals>._make at 0x70ad24fd6ae0>
+config_dir = 'content/node-docs/brain'
+expected = 'content/node-docs/brain/note.schema.yaml'
+
+    @pytest.mark.parametrize(
+        ("config_dir", "expected"),
+        [
+            pytest.param(
+                "content/node-docs/brain", "content/node-docs/brain/note.schema.yaml", id="below"
+            ),
+            pytest.param(".", "note.schema.yaml", id="same"),
+        ],
+    )
+    def test_served_source_config_path(
+        make_served_source: Callable[..., ServedSource], config_dir: str, expected: str
+    ) -> None:
+        """設定ファイルのフォルダの下のスキーマ（正常系）。"""
+        # 準備
+>       source = make_served_source(root=Path("/r"), config_dir=PurePosixPath(config_dir))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/sources/test_types.py:149: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+overrides = {'config_dir': PurePosixPath('content/node-docs/brain')}
+
+    def _make(**overrides: Any) -> ServedSource:
+        root = overrides.pop("root", tmp_path / "sample")
+        values: dict[str, Any] = {
+            "id": "sample",
+            "root": root,
+            "config_files": [root / "project-index.yaml"],
+            "config": make_source_config(),
+            "is_git": False,
+            "repo_root": None,
+            "scope_read": [],
+            "scope_write": [str(root)],
+            "worktree_globs": [],
+            "schemas": {},
+        }
+        values.update(overrides)
+>       return ServedSource(**values)
+               ^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: ServedSource.__init__() got an unexpected keyword argument 'config_dir'. Did you mean 'config_files'?
+
+tests/unit/project_index/conftest.py:133: TypeError
+_____________________ test_served_source_config_path[same] _____________________
+
+make_served_source = <function make_served_source.<locals>._make at 0x70ad25048720>
+config_dir = '.', expected = 'note.schema.yaml'
+
+    @pytest.mark.parametrize(
+        ("config_dir", "expected"),
+        [
+            pytest.param(
+                "content/node-docs/brain", "content/node-docs/brain/note.schema.yaml", id="below"
+            ),
+            pytest.param(".", "note.schema.yaml", id="same"),
+        ],
+    )
+    def test_served_source_config_path(
+        make_served_source: Callable[..., ServedSource], config_dir: str, expected: str
+    ) -> None:
+        """設定ファイルのフォルダの下のスキーマ（正常系）。"""
+        # 準備
+>       source = make_served_source(root=Path("/r"), config_dir=PurePosixPath(config_dir))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/sources/test_types.py:149: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+overrides = {'config_dir': PurePosixPath('.')}
+
+    def _make(**overrides: Any) -> ServedSource:
+        root = overrides.pop("root", tmp_path / "sample")
+        values: dict[str, Any] = {
+            "id": "sample",
+            "root": root,
+            "config_files": [root / "project-index.yaml"],
+            "config": make_source_config(),
+            "is_git": False,
+            "repo_root": None,
+            "scope_read": [],
+            "scope_write": [str(root)],
+            "worktree_globs": [],
+            "schemas": {},
+        }
+        values.update(overrides)
+>       return ServedSource(**values)
+               ^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: ServedSource.__init__() got an unexpected keyword argument 'config_dir'. Did you mean 'config_files'?
+
+tests/unit/project_index/conftest.py:133: TypeError
+________________ test_build_handlers_when_unknown_key_reloaded _________________
+
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x70ad1f6a6a30>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x70ad1f6775b0>
+
+    def test_build_handlers_when_unknown_key_reloaded(
+        make_terminal_config: Callable[..., TerminalConfig],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """読み直しで知らないキーを差し替える（正常系）。"""
+        # 準備
+        terminal = make_terminal_config()
+        handlers = build_handlers(terminal)
+        new_terminal = make_terminal_config(unknown_keys=["mindstella"])
+        caplog.set_level(logging.WARNING)
+        # 実行
+        handlers.reload_sources(new_terminal)
+        # 検証
+>       assert handlers.terminal.unknown_keys == ["mindstella"]
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/test_serve.py:860: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = TerminalConfig(file=PosixPath('/tmp/pytest-of-shuhei2441/pytest-7767/test_build_handlers_when_unkno0/settings.yaml'), ...ndlers_when_unkno0/state/logs'), port=8786, bind='127.0.0.1', sources=[], seen_retention_days=7, script_timeout_sec=30)
+item = 'unknown_keys'
+
+    def __getattr__(self, item: str) -> Any:
+        private_attributes = object.__getattribute__(self, '__private_attributes__')
+        if item in private_attributes:
+            attribute = private_attributes[item]
+            if hasattr(attribute, '__get__'):
+                return attribute.__get__(self, type(self))  # type: ignore
+    
+            try:
+                # Note: self.__pydantic_private__ cannot be None if self.__private_attributes__ has items
+                return self.__pydantic_private__[item]  # type: ignore
+            except KeyError as exc:
+                raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from exc
+        else:
+            # `__pydantic_extra__` can fail to be set if the model is not yet fully initialized.
+            # See `BaseModel.__repr_args__` for more details
+            try:
+                pydantic_extra = object.__getattribute__(self, '__pydantic_extra__')
+            except AttributeError:
+                pydantic_extra = None
+    
+            if pydantic_extra and item in pydantic_extra:
+                return pydantic_extra[item]
+            else:
+                if hasattr(self.__class__, item):
+                    return super().__getattribute__(item)  # Raises AttributeError if appropriate
+                else:
+                    # this is the current error
+>                   raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E                   AttributeError: 'TerminalConfig' object has no attribute 'unknown_keys'
+
+.venv/lib/python3.14/site-packages/pydantic/main.py:1110: AttributeError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/access/test_service.py::test_current_source_when_paths_base_set
+FAILED tests/unit/project_index/features/access/test_types.py::test_target_config_base
+FAILED tests/unit/project_index/features/admin/test_service.py::test_check_project_when_paths_base_invalid
+FAILED tests/unit/project_index/features/describe/test_warnings.py::test_collect_warnings_when_unknown_top_level_key
+FAILED tests/unit/project_index/features/documents/test_store.py::test_store_schema_when_paths_base_set
+FAILED tests/unit/project_index/features/migrate/test_service.py::test_apply_migration_when_unknown_top_level_key
+FAILED tests/unit/project_index/features/settings/test_service.py::test_save_sources_when_unknown_top_level_key
+FAILED tests/unit/project_index/features/settings/test_service.py::test_add_source_when_unknown_top_level_key
+FAILED tests/unit/project_index/features/sources/test_service.py::test_validate_source_config_when_paths_outside_base
+FAILED tests/unit/project_index/features/sources/test_service.py::test_validate_source_config_when_paths_base_and_paths_invalid
+FAILED tests/unit/project_index/features/sources/test_service.py::test_load_source_when_paths_base_set
+FAILED tests/unit/project_index/features/sources/test_service.py::test_load_source_when_paths_base_invalid[below]
+FAILED tests/unit/project_index/features/sources/test_service.py::test_load_source_when_paths_base_invalid[outside_repo]
+FAILED tests/unit/project_index/features/sources/test_service.py::test_load_source_at_when_paths_base_set
+FAILED tests/unit/project_index/features/sources/test_service.py::test_resolve_paths_base
+FAILED tests/unit/project_index/features/sources/test_service.py::test_resolve_paths_base_when_unset
+FAILED tests/unit/project_index/features/sources/test_service.py::test_resolve_paths_base_when_below
+FAILED tests/unit/project_index/features/sources/test_service.py::test_resolve_paths_base_when_outside_repo
+FAILED tests/unit/project_index/features/sources/test_service.py::test_resolve_paths_base_when_not_git
+FAILED tests/unit/project_index/features/sources/test_service.py::test_resolve_paths_base_when_missing
+FAILED tests/unit/project_index/features/sources/test_types.py::test_served_source_config_root[below]
+FAILED tests/unit/project_index/features/sources/test_types.py::test_served_source_config_root[same]
+FAILED tests/unit/project_index/features/sources/test_types.py::test_served_source_config_path[below]
+FAILED tests/unit/project_index/features/sources/test_types.py::test_served_source_config_path[same]
+FAILED tests/unit/project_index/test_serve.py::test_build_handlers_when_unknown_key_reloaded
+ERROR tests/unit/project_index/features/settings/test_query.py
+ERROR tests/unit/project_index/features/settings/test_route.py
+25 failed, 794 passed, 2 errors in 136.22s (0:02:16)
+exit=1
