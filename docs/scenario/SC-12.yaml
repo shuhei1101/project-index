@@ -86,10 +86,10 @@ scenarios:
         DD->>PI: extra の行を 1 行追加する
         PI->>PI: スキーマで検証し、同じ id の行が無いことを確かめる
         PI->>CF: settings.yaml の sources の末尾に extra の行を追加し、配信元を読み直す
-        PI-->>DD: 追加した
+        PI-->>DD: 追加したことと、extra の配信元の状態と、書き換えた後の内容のバージョン
       ```
     expected:
-      - 応答が、行を追加したことと、extra の配信元の状態と、書き換えた後の端末の設定のバージョンを返却する
+      - 応答が、行を追加したことと、extra の配信元の状態と、書き換えた後の端末の設定の内容のバージョンを返却する
       - '`settings.yaml` の `sources` が sample・extra の順に並び、sample の行は変わらない'
       - project-index を再起動せずに、読み取り API の extra の文書の取得が文書を返却する
     test: test_normal_when_one_row_added
@@ -301,7 +301,7 @@ scenarios:
         participant CF as 端末の設定
 
         OP->>PI: 端末の設定の配信元を取得する
-        PI-->>OP: sample と extra の行と、端末の設定のバージョン
+        PI-->>OP: sample と extra の行と、端末の設定の内容のバージョン
         OP->>PI: 取得したバージョンを添えて、extra の行の outside_read を false に変更する
         PI->>PI: バージョンを照合し、変更後の端末の設定をスキーマで検証する
         PI->>CF: extra の行だけを書き換え、extra の配信元だけを読み直す
@@ -330,7 +330,7 @@ scenarios:
         participant CF as 端末の設定
 
         OP->>PI: 端末の設定の配信元を取得する
-        PI-->>OP: sample と extra の行と、端末の設定のバージョン
+        PI-->>OP: sample と extra の行と、端末の設定の内容のバージョン
         OP->>PI: 取得したバージョンを添えて、extra の行を削除する
         PI->>PI: バージョンを照合する
         PI->>CF: extra の行だけを削除し、extra を配信から除外する
@@ -363,7 +363,7 @@ scenarios:
         participant CF as 端末の設定
 
         DD->>PI: 端末の設定の配信元を取得する
-        PI-->>DD: sample の行と、端末の設定のバージョン
+        PI-->>DD: sample の行と、端末の設定の内容のバージョン
         OP->>PI: 取得したバージョンを添えて、extra の行を 1 行追加する
         PI->>CF: sources の末尾に extra の行を追加する
         PI-->>OP: 追加した
@@ -398,7 +398,7 @@ scenarios:
         participant CF as 端末の設定
 
         OP->>PI: 端末の設定の配信元を取得する
-        PI-->>OP: sample と extra の行と、端末の設定のバージョン
+        PI-->>OP: sample と extra の行と、端末の設定の内容のバージョン
         Note over CF: 利用者が settings.yaml を手で書き換える
         OP->>PI: 取得したバージョンを添えて、extra の行を削除する
         PI->>CF: 今のバージョンを求める
@@ -424,7 +424,7 @@ scenarios:
         participant PI as project-index（端末の設定の API）
 
         OP->>PI: 端末の設定の配信元を取得する
-        PI-->>OP: sample の行と、端末の設定のバージョン
+        PI-->>OP: sample の行と、端末の設定の内容のバージョン
         OP->>PI: 取得したバージョンを添えて、extra の行を変更する
         PI-->>OP: 404
         OP->>PI: 取得したバージョンを添えて、extra の行を削除する
@@ -448,9 +448,9 @@ stakeholders:
 trigger: dev-docs の画面のサーバーが、利用者の設定画面の操作（開く・保存する）を受けて端末の設定の API を呼ぶ。または、端末のほかのプロセスが自分の使用する配信元の行を 1 行ずつ書き換える
 preconditions:
   - project-index が待ち受け、端末の設定に配信元が並んでいる
-success_guarantee: 保存した sources だけが `settings.yaml` に書き込まれ（送信した行に含めなかったキーは、ファイルの同じ配信元の行の今の値で残る）、読み直した後の配信元の状態が応答と文書の MCP・読み取り API に反映される。
+success_guarantee: 保存した sources だけが `settings.yaml` に書き込まれ（送信した行に含めなかったキーは、ファイルの同じ配信元の行の今の値で残る）、1 行の変更・削除では指した 1 行だけが書き換わってほかの行はファイルの今の値のまま残り、読み直した後の配信元の状態が応答と文書の MCP・読み取り API に反映される。
 minimal_guarantee: スキーマに合格しない保存、別のオリジンからの保存、取得した後にほかの書き換えが入ったバージョンでの書き換えは `settings.yaml` を書き換えない。配信元のフォルダのファイルは変えない。他の配信元の配信は止まらない。
-frequency: 配信元を追加・停止・削除するとき
+frequency: 配信元を追加・停止・削除するとき。端末のほかのプロセスが自分の作業場所を作る・閉じる・削除するたび
 priority: 中
 refs:
   - SC-1#scenarios[正常シナリオ]

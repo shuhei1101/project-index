@@ -19,6 +19,12 @@ docs:
     new: false
     change: 外部システムの dev-docs の画面のサーバーの用途と契約のインターフェース定義の範囲を、追加する 1 行の変更・削除に合わせる
     status: todo
+  - page: docs/guide/用語集.md
+    new: false
+    change: バージョンの行を、端末の設定のファイルの内容のハッシュと端末の設定の API の expected_version に広げ、設定のバージョンと区別する呼び名を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T13:05:22.665389+00:00'
 scope_out:
   - item: dev-docs の設定の画面で、取得したバージョンを保存の要求に含めて送信し、409 を受けたときに取得し直す
     reason: 設定の画面は dev-docs に残り、project-index は画面を持たない。この作業 PR のバージョンの設計を前提にするため、マージ提案の前に shuhei1101/dev-docs へ起票する（本文に、バージョンを送信しない保存の扱いと、この変更が入った後に着手する順番を記載する）
