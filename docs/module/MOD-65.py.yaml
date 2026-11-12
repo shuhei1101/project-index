@@ -42,7 +42,7 @@ functions:
     description: 3 つのルートを持つルーター
   process: |-
     1. 両方のルートは、先頭で `await handlers.registry.wait_loaded()` を呼び、配信元の初回の読み込みが終わるまで待つ（起動.待ち受けまでの順番）
-    2. GET `/settings/sources` は、`handlers.terminal.file` を `settings_path` にし、`sources[]` の各行に、`config`（行に `id` があれば `id` も）が同じ配信元の状態の `id`・`status`・`errors`・`config_version` を重ねた（1 つの状態は 1 行にだけ重ねる。当たる状態が無い行は `status` を `pending_reload`・`id` を行の `id` にする） `SettingsSourcesView` を返す（配信元の一覧.状態の一覧）。`sources[]` は `handlers.terminal.file` を端末の設定の読み込みで読み直した値（配信元の保存の後も新しい行を返す）
+    2. GET `/settings/sources` は、`handlers.terminal.file` を `settings_path` にし、`sources[]` の各行に、`config`（行に `id` があれば `id` も）が同じ配信元の状態の `id`・`status`・`errors`・`config_version` を重ねた（行の `config`・`enabled`・`scope`・`outside_read` はそのまま返す）（1 つの状態は 1 行にだけ重ねる。当たる状態が無い行は `status` を `pending_reload`・`id` を行の `id` にする） `SettingsSourcesView` を返す（配信元の一覧.状態の一覧）。`sources[]` は `handlers.terminal.file` を端末の設定の読み込みで読み直した値（配信元の保存の後も新しい行を返す）
     3. PUT `/settings/sources` は、同じオリジンの確認を依存に持ち（同じオリジンの確認）、本文を `SettingsSourcesRequest` で受けて『配信元の保存』を `reload=handlers.reload_sources`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼び、`SettingsSourcesResponse` を返す（配信元の保存）
        - `TerminalConfigInvalidError` は例外の変換で 422 の problem+json になる
     4. POST `/settings/sources` は、同じオリジンの確認を依存に持ち、本文を `SettingsSourceAddRequest` で受けて『配信元の 1 行の追加』を `reload=handlers.reload_sources`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼ぶ。`added` は 201、`exists` は 409 で `SettingsSourceAddResponse` を返す
@@ -53,7 +53,7 @@ functions:
     summary: 行に状態を重ねる
     condition: GET `/settings/sources`、状態は `serving` 1 つと `not_served` 1 つ
     mock: 配線済みの関数（偽物）
-    expected: 200 で `settingsPath` と `sources` の 2 行、`not_served` の行に `errors`
+    expected: '200 で `settingsPath` と `sources` の 2 行、`not_served` の行に `errors`。`outside_read: false` の行の `outsideRead` が `false`'
   - name: test_build_settings_router_when_put
     case: 正常
     summary: 保存して状態を返す

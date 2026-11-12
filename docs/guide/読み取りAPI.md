@@ -43,3 +43,5 @@
 
 `PUT`・`POST` は、`Origin` と `Sec-Fetch-Site` を持たない要求（サーバーの側からの呼び出し）と、project-index と同じオリジンの要求だけを受け、ブラウザが別のオリジンから送る書き込みを 403 で断ります。
 保存は `settings.yaml` の `sources` だけを書き換え、他のキーとコメントを残します。
+`PUT` で行に含めなかったキー（`enabled`・`scope.read`・`scope.write`・`outside_read`）は、ファイルの同じ配信元の行（`id`、無ければ配信元の設定の `name` で照合します）の今の値で残ります。
+`GET` の行は、端末の設定の `outside_read` を `outsideRead` で返します。

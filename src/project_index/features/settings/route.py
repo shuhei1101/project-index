@@ -64,6 +64,7 @@ def _settings_view(handlers: Handlers) -> SettingsSourcesView:
                     enabled=entry.enabled,
                     scope=entry.scope,
                     status="pending_reload",
+                    outside_read=entry.outside_read,
                 )
             )
             continue
@@ -78,6 +79,7 @@ def _settings_view(handlers: Handlers) -> SettingsSourcesView:
                 status=item.status,
                 errors=item.errors,
                 config_version=item.config_version,
+                outside_read=entry.outside_read,
             )
         )
     return SettingsSourcesView(settings_path=str(terminal.file), sources=rows)
