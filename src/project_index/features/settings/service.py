@@ -7,6 +7,8 @@ import logging
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, cast
 
+from pydantic import ValidationError
+
 from project_index.features.settings.query import load_terminal_config, validate_terminal_config
 from project_index.features.settings.types import (
     SourceAddResult,
@@ -50,13 +52,17 @@ def _to_yaml_row(entry: SourceEntry) -> dict[str, Any]:
 
 
 def _current_entries(document: object) -> dict[str, SourceEntry]:
-    """ファイルの `sources` の行を、配信元の ID ごとに引ける形にする（ID が求まらない行は除く）。"""
+    """ファイルの `sources` の行を、配信元の ID ごとに引ける形にする（読めない行・ID が求まらない行は除く）。"""
     rows = cast("Mapping[str, list[object] | None]", document).get("sources") or []
     current: dict[str, SourceEntry] = {}
     for row in rows:
         if not isinstance(row, Mapping):
             continue
-        entry = SourceEntry.model_validate(json.loads(json.dumps(row)))
+        # スキーマに通らない行は、送られた行で置き換えれば直るため探す対象から除く
+        try:
+            entry = SourceEntry.model_validate(json.loads(json.dumps(row)))
+        except ValidationError:
+            continue
         source_id = entry_source_id(entry)
         if source_id is not None:
             current.setdefault(source_id, entry)
