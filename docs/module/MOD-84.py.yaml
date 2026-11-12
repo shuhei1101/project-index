@@ -252,25 +252,25 @@ functions:
         case: 正常
         summary: ワークツリーへの部分更新
         condition: 'ワークツリー x の `cwd` で、文書 1 に `set: {name: 新しい名前}`'
-        mock: なし（一時フォルダの配信元とワークツリー）
+        mock: なし（一時フォルダの配信元とワークツリー）・作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: '`applied` が `True`、`status` が `updated`、ワークツリー x のファイルの `name` だけが変わり、クローン本体と commit は変わらない'
       - name: test_write_docs_when_create
         case: 正常
         summary: ID を作って生成を動かす
         condition: '`ids.format: {kind}-{slug}`・`after_write: [index]` の行に `create`'
-        mock: なし
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: '`status` が `created`、`id` が `sample-...`、置き場所にファイルができ、`index` の生成が 1 回動く'
       - name: test_write_docs_when_dry_run
         case: 正常
         summary: 試しに書く
         condition: '`dry_run: true` で `set`'
-        mock: なし
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: '`applied` が `False`、`diff` があり、ファイルは変わらない'
       - name: test_write_docs_when_partial
         case: 正常
         summary: 一部だけ書く
         condition: '`atomic: false` で通る操作と、スキーマに通らない操作'
-        mock: なし
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: 0 番目が `updated`、1 番目が `failed` で `errors` に違反、0 番目のファイルだけ変わる
       - name: test_write_docs_when_not_git
         case: 正常
@@ -282,14 +282,14 @@ functions:
         case: 異常
         summary: 検査に通らない
         condition: '`atomic: true` で 1 番目がスキーマに通らない'
-        mock: なし
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: '`ValidationFailedError` の違反の `index` が 1 で、スキーマの違反は `schema` を持つ。どのファイルも変わらない'
         exception: '`atomic` で検査に通らない操作がある'
       - name: test_write_docs_when_version_mismatch
         case: 異常
         summary: 読んだ後に変わった
         condition: 読んだ後に直接編集した文書へ、読んだときのバージョンで `set`
-        mock: なし
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: '`VersionMismatchError` の `diff` に直接編集した行、ファイルは直接編集したまま'
         exception: '`atomic` でバージョンが違う'
       - name: test_write_docs_when_too_many
@@ -303,28 +303,28 @@ functions:
         case: 正常
         summary: 共通のキー名で元の列に書く
         condition: '行 `decisions` が `metadata: {name: title}`。文書 `d1` に `set: {name: 新しい名前}`、続けて `create`（`data: {name: 決定 2}`）'
-        mock: なし
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: '`d1` のファイルの `title` だけが変わり `name` の列が無い。作ったファイルが `title: 決定 2` を持ち `name` を持たない'
         exception: '-'
       - name: test_write_docs_when_mdmark_warning
         case: 異常
         summary: Markdown の値に書き方の警告がある
         condition: '`body` が `contentMediaType: text/markdown` の種類。`atomic: true` で 0 番目は `name` の `set`、1 番目は `body` の `set`。文書の検査.Markdownの値を点検するが 1 番目に `diagram_invalid` の違反を返す'
-        mock: '`DocumentChecker.check_markdown`（0 番目は空、1 番目は違反）'
+        mock: '`DocumentChecker.check_markdown`（0 番目は空、1 番目は違反）・作業場所の配信元の読み込み（受け取った配信元を返す偽物）'
         expected: '`ValidationFailedError` の違反の `path` が `operations[1].body`、どのファイルも変わらない'
         exception: '`atomic` で検査に通らない操作がある'
       - name: test_write_docs_when_mdmark_unavailable
         case: 正常
         summary: mdmark を使えない
         condition: '`body` の `set` を 2 件。1 件目の点検が `stopped` に R を入れて点検できなかったキーを返す'
-        mock: '`DocumentChecker.check_markdown`（受けた `stopped` を控える）'
+        mock: '`DocumentChecker.check_markdown`（受けた `stopped` を控える）・作業場所の配信元の読み込み（受け取った配信元を返す偽物）'
         expected: '`applied` が `True`、両方の行の `unchecked` が `body`（理由 R）、2 件目の呼び出しの `stopped` が R'
         exception: '-'
       - name: test_write_docs_when_tags_are_objects
         case: 正常
         summary: オブジェクトの配列のタグへ書き戻す
         condition: '行 `rules` が `metadata: {tags: tags[].name, main_tags: tags[main].name}`。`tags: [{name: a, main: true}, {name: b}]` の文書 `r1` に `add_to: {tags: [c]}`、続けて `set: {main_tags: [c]}`'
-        mock: なし
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: '`r1` のファイルの `tags` が 1 回目の後に `[{name: a, main: true}, {name: b}, {name: c}]`、2 回目の後に `[{name: a}, {name: b}, {name: c, main: true}]`'
         exception: '-'
   - name: delete_docs
@@ -409,25 +409,25 @@ functions:
         case: 正常
         summary: ワークツリーから消す
         condition: 参照されていない文書 2 を消す
-        mock: なし
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: '`status` が `deleted`、ワークツリーのファイルが無く、クローン本体のファイルは残る'
       - name: test_delete_docs_when_unlink
         case: 正常
         summary: 参照も外す
         condition: '文書 1 の `related` が指す文書 2 を `on_referenced: unlink` で消す'
-        mock: なし
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: 文書 2 のファイルが無く、文書 1 の `related` に文書 2 が無く、`unlinked` に文書 1 と新しいバージョン
       - name: test_delete_docs_when_records
         case: 正常
         summary: 配列の要素を消す
         condition: '`records` の行の 2 件目を消す'
-        mock: なし
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: ファイルの配列が 1 件になり、`body_file` の指すファイルは残る
       - name: test_delete_docs_when_referenced
         case: 異常
         summary: 参照されている
         condition: '同じ削除を `on_referenced: fail` で'
-        mock: なし
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: '`DocumentReferencedError` の `referrers` が文書 1、どのファイルも変わらない'
         exception: '`on_referenced: fail` で参照されている'
       - name: test_delete_docs_when_not_allowed
