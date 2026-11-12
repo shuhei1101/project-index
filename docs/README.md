@@ -17,5 +17,6 @@ project-index のドキュメント全体の目次
 | [dev-command](./dev-command/) | 開発で使用するコマンドの分類ごとの前提・順序・確認の記録 |
 | [test-procedure](./test-procedure/) | テスト種別ごとの実行方法 |
 | [guide](./guide/) | project-index の使い方（はじめに・使い方・リファレンス） |
+| [scenario](./scenario/) | 単一 / 複合ユースケースの業務フロー設計（E2E テストの元） |
 
 <!-- /table -->
