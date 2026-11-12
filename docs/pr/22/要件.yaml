@@ -1,0 +1,21 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-12.yaml
+    impact: changed
+    detail: 配信元を丸ごと保存したとき、画面が送らなかった行のキー（作業範囲の外から読めるか など）を、ファイルの今の値のまま残す
+    depends_on: []
+docs:
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: 端末の設定の API の `PUT /settings/sources` の説明に、送信されなかった行のキーをファイルの今の値で残すことを書き、`GET` の行に `outsideRead` を載せる
+    status: todo
+scope_out:
+  - item: dev-docs の設定の画面が保存のときに outside_read を送信する変更
+    reason: 画面は dev-docs に残る（dev-docs#114 の D-150）。サーバーが送信されなかったキーを残すので、画面を変えなくてもキーは消えない
+    plan: none
+  - item: 配信元を 1 行ずつ版を照合して追加・変更・削除する API
+    reason: 要望に含まれない。この PR の後続
+    plan: '#10'
+  - item: 端末の設定の最上位の知らないキーの扱い
+    reason: 要望に含まれない別の事象
+    plan: '#11'
