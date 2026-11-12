@@ -390,7 +390,7 @@ classes:
         process: |-
           1. `schema(target, kind)` で種類のスキーマを得る
           2. 行の `records` が `None` の場合、そのまま返す
-          3. `records` がある場合、records の行の 1 行のスキーマ（`records_item_schema`）を返す。`None` なら空の辞書を返す
+          3. `records` がある場合、records の行の 1 行のスキーマ（`records_item_schema`）に、種類のスキーマの最上位の `$defs`（あれば）を加えて返す。`None` なら空の辞書を返す
         exceptions:
           - name: UnknownKindError
             condition: '`kind` が有効な文書の行に無い'
@@ -408,6 +408,12 @@ classes:
             condition: '行 `notes`（`records: files`）の `schema` が `templates/files.schema.yaml` のコピー'
             mock: なし（`tmp_path`）
             expected: '`required` が `[path]` の `files` の `items`'
+          - name: test_document_store_row_schema_when_records_defs
+            case: 正常
+            summary: records の行は最上位の $defs を残す
+            condition: '行 `notes`（`records: files`）の `schema` が、`$defs` に自分を指す循環する定義 `node` を持ち、`files` の `items` が `$ref` で `node` を指す'
+            mock: なし（`tmp_path`）
+            expected: 返したスキーマが最上位の `$defs.node` を持ち、残った `#/$defs/node` の参照先がその中にある
           - name: test_document_store_row_schema_when_items_missing
             case: 正常
             summary: 1 行のスキーマを取り出せない

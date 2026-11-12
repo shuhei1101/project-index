@@ -86,7 +86,7 @@ functions:
     process: |-
       1. `q` を NFKC と `casefold` をして空白で分ける
       2. 語の照合に当たる文書を文書のページのパスの昇順に並べ、総件数を数える
-      3. 先頭から `limit` 件を、本文の一致した箇所の抜き出し（前後 1 行、`SNIPPETS_PER_DOC` 件）つきで返す
+      3. 先頭から `limit` 件を、文書のページのパス・文書の ID・文書のファイルのパス（`path`）・名前と、本文の一致した箇所の抜き出し（前後 1 行、`SNIPPETS_PER_DOC` 件）つきで返す
     unit_tests:
       - name: test_search_words
         case: 正常
@@ -94,3 +94,9 @@ functions:
         condition: '`q="foo bar"`、foo と bar を含む文書 1 つと foo だけの文書 1 つ'
         mock: なし
         expected: '`total_count` が 1、`snippets` に foo か bar を含む行'
+      - name: test_search_words_when_record
+        case: 正常
+        summary: 行の文書の ID とファイルのパスを返す
+        condition: '`q="beta"`、`path` が `terms.yaml` で `body_path` の無い行の文書 `term-1`（alpha）・`term-2`（beta）'
+        mock: なし
+        expected: '`items[0]` の `id` が `term-2`、`file_path` が `terms.yaml`、`path` が `terms/term-2`'
