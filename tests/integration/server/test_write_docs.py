@@ -194,9 +194,7 @@ def test_normal_when_kind_added_in_worktree(
     # 準備
     source, env, worktree = _setup(make_source, make_server, add_worktree)
     # ワークツリーの設定にだけ種類 term を追加し、commit しない
-    (worktree / "project-index.yaml").write_text(
-        sample_config_text(TERM_ROW), encoding="utf-8"
-    )
+    (worktree / "project-index.yaml").write_text(sample_config_text(TERM_ROW), encoding="utf-8")
     (worktree / "schemas" / "term.schema.yaml").write_text(TERM_SCHEMA, encoding="utf-8")
     # 実行
     result = env.call(
