@@ -1,0 +1,70 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: changed
+    detail: '#6: 配信元の設定で paths[] の基準のフォルダを指定した配信元を、そのフォルダを基準に配信し始める。#11: 端末の設定の最上位に知らないキーがあっても起動を続け、キーのパスを警告に残す'
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-12.yaml
+    impact: changed
+    detail: '#11: 端末の設定の最上位に知らないキーがあっても、配信元の取得・保存・1 行の追加ができ、知らないキーはファイルに残して警告で返す'
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: changed
+    detail: '#6: 基準のフォルダを指定した配信元の設定を check_project で確かめ、reload で配信に入れる。基準のフォルダの外を指す paths[] は違反で返る'
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: run_only
+    detail: describe の警告に端末の設定の知らないキーが加わりうるため、調べる流れが壊れないかを確かめる
+    depends_on: []
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: run_only
+    detail: 配信元の読み込みと端末の設定の読み込みを変えるため、読み書きの流れ全体が続くかを確かめる
+    depends_on: []
+docs:
+  - page: docs/guide/設定.md
+    new: false
+    change: '#6: project-index.yaml のキーの表へ paths[] の基準のフォルダを指定するキーを追加する。#11: 冒頭の「表に無いキーは誤り」を、端末の設定の最上位は警告にする旨へ書き換える'
+    status: todo
+  - page: docs/guide/コアコンセプト-配信元と権限.md
+    new: false
+    change: '#6: 「先頭のファイルのフォルダが配信元のフォルダ」の記述に、基準のフォルダを指定したときの解き方を追加する'
+    status: todo
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: '#6: 設定ファイルを配信元のフォルダの下に置いたまま、上のフォルダの文書を配信する手順を追加する。#11: 起動時の警告の表へ端末の設定の知らないキーの行を追加する'
+    status: todo
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: '#6: check_project の違反に基準のフォルダの外を指す paths[] を追加する。#11: status・reload の結果に知らないキーの警告が載る場合はその項目を追加する'
+    status: todo
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: '#11: 引数なしの describe の warnings[] に端末の設定の知らないキーの警告を追加する'
+    status: todo
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: '#11: 端末の設定の取得・保存・1 行の追加の応答に知らないキーの警告を追加する'
+    status: todo
+scope_out:
+  - item: 端末の設定の sources[] の行と scope の知らないキーを警告にすること
+    reason: D-308 で行と scope は今どおり断ると決めた（最上位に限るかは TH-676 で利用者に確認中と本文にあるため、単一ユースケース設計のレビューで確定する）
+    plan: none
+  - item: 配信元の設定 project-index.yaml の知らないキーの扱い
+    reason: '#11 は端末の設定だけを対象にし、配信元の設定は今どおり断る'
+    plan: none
+  - item: '画面で配信元を保存するとほかの行の outside_read: false が消える不具合'
+    reason: 行のキーの不具合で、最上位のキーを扱う今回の対応では直らない
+    plan: '#9'
+  - item: 端末の設定の配信元を 1 行ずつ版を照合して追加・変更・削除する API
+    reason: 要望に含まれない（#11 の関係として挙がるだけ）
+    plan: '#10'
+  - item: このリポジトリの直下の配信元の設定 dev-docs.yaml の改名
+    reason: 要望に含まれない
+    plan: '#16'
+  - item: aituber のブレインノードの配信元の設定の作成
+    reason: '#6 の後続で、aituber 側の作業。完了後に shuhei1101/aituber#84 へ着手できる旨を知らせる'
+    plan: none
