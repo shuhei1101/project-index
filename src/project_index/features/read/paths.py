@@ -48,6 +48,8 @@ def read_target(
     if not source.is_git or source.repo_root is None:
         return Target(source, source.root, None, None, "read"), None
     default_ref = source.config.default_ref
-    resolved = resolve_ref(source.repo_root, ref or default_ref, date_base=default_ref)
-    target = Target(source, source.root, resolved.commit, None, "read", commit=resolved.commit)
+    name = ref or default_ref
+    resolved = resolve_ref(source.repo_root, name, date_base=default_ref)
+    # `ref` は応答に出すリビジョンの名前、`commit` は 1 回だけ解いた commit
+    target = Target(source, source.root, name, None, "read", commit=resolved.commit)
     return target, resolved
