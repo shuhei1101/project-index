@@ -22,6 +22,14 @@ diagrams:
         }
         click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
         click 書く場所の解決 href "./MOD-7.py.yaml#書く場所の解決"
+constants:
+  - name: CWD_DESCRIPTION
+    title: 作業場所の引数の説明
+    container: project_index/features/access/types.py
+    usecase: 共通
+    summary: 文書の MCP のツールの入力のスキーマで、`cwd` の `description` に入れる文
+    value: '"作業場所。PreToolUse のフックがセッションの作業場所で上書きするため、指定しても使わない。ワークツリーを指すときは worktree を指定する"'
+    reason: フックが上書きする `cwd` をエージェントが指定してワークツリーを指そうとしないよう、全てのツールで同じ文を出す
 data_models:
   - name: SourceAccess
     title: 使える配信元
