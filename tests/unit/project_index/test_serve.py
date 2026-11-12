@@ -883,11 +883,11 @@ def test_reload_changed_sources(
     statuses = [make_status("a", 0), make_status("b", 1)]
     registry = _ChangedRegistry(calls, [a], [a, b], statuses)
     checked: list[list[str]] = []
-    monkeypatch.setattr(
-        main_module,
-        "check_sources",
-        lambda sources, *, store, checks: checked.append([source.id for source in sources]),
-    )
+
+    def fake_check_sources(sources: list[ServedSource], *, store: object, checks: object) -> None:
+        checked.append([source.id for source in sources])
+
+    monkeypatch.setattr(main_module, "check_sources", fake_check_sources)
     # 実行
     result = reload_changed_sources(
         make_terminal_config(),

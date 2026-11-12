@@ -616,7 +616,12 @@ def test_patch_source_when_id_changes(
     # 実行・検証
     with pytest.raises(TerminalConfigInvalidError) as caught:
         patch_source(
-            "notes", patch, expected_version=version, path=path, reload=reload, lock=threading.Lock()
+            "notes",
+            patch,
+            expected_version=version,
+            path=path,
+            reload=reload,
+            lock=threading.Lock(),
         )
     assert [violation.path for violation in caught.value.violations] == ["source.config"]
     assert path.read_text(encoding="utf-8") == before

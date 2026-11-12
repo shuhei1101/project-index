@@ -305,5 +305,5 @@ def test_read_settings_file_when_missing(tmp_path: Path) -> None:
     # 準備
     path = tmp_path / "missing.yaml"
     # 実行・検証
-    with pytest.raises(FileNotFoundError, match="missing.yaml"):
+    with pytest.raises(FileNotFoundError, match=r"missing\.yaml"):
         read_settings_file(path)
