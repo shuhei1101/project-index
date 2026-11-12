@@ -1,0 +1,35 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: none
+    detail: このリポジトリの配信元で設計書から実装・テストを辿れるようになるが、調べる流れそのものは変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: none
+    detail: このリポジトリの配信元の設定に行を加えるが、設定を変えて配信に入れる流れは変わらない
+    depends_on: []
+docs:
+  - page: src/files.yaml
+    new: true
+    change: project_index/ 配下の .py の行と、モジュール構成の設計書への implements
+    status: todo
+  - page: tests/files.yaml
+    new: true
+    change: テストの .py の行と、テストするコード・インターフェース定義への tests
+    status: todo
+  - page: plugins/project-index/files.yaml
+    new: true
+    change: hooks/ の .py の行と、MOD-4・MOD-5 への implements
+    status: todo
+  - page: project-index.yaml
+    new: false
+    change: documents[] に src・tests・plugin の行を加える
+    status: todo
+scope_out:
+  - item: src/project_index/ の .py でない配布物（migrations の steps.yaml・schemas の YAML）の管理用の YAML の行
+    reason: 対応するモジュール構成の設計書が無く、implements・tests を張る相手が無い。要望は設計書から実装・テストを辿ることで、この判断はレビューで確定する
+    plan: none
+  - item: 設計書の無いコードへのモジュール構成の設計書の追加
+    reason: 要望に含まれない。対応表に無いファイルは related を持たない行にとどめる
+    plan: to_file
