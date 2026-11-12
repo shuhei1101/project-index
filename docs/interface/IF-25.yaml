@@ -100,6 +100,7 @@ flows:
       <!-- /map -->
     expected:
       - 200 で、`value` が `term-2` の行の値、`metadata.id` が `term-2`
+      - '`schema` が `records` の要素 1 つのスキーマで、ファイル全体のスキーマの最上位の `$defs` を持つ'
       - '`id` を省いた `GET /sources/sample/docs/terms.yaml` は、最初の行の `term-1` を返す'
     test: test_normal_when_id_given
   - name: 正常系（変換のスクリプトを指す種類）
@@ -218,6 +219,7 @@ response:
   - name: schema
     type: dict | None
     description: 種類のスキーマ（`$ref` を解いた形）
+    notes: '`records` の行の文書は要素 1 つのスキーマに、ファイル全体のスキーマの最上位の `$defs` を加えたもの'
   - name: metadata
     type: DocumentMetadata
     description: '`id`・`kind`・`name`・`description`・`tags`・`visibility`'

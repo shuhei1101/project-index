@@ -37,7 +37,7 @@ flows:
         description: なし
       - name: スキーマの参照を持つ配信元
         description: 同じファイルの `$defs` の定義を `$ref` で指す種類 `design` のスキーマと、`records` の行の種類 `files_guide` を持つ sample
-        notes: 種類 `design` のスキーマの `$defs` の中に、自分を指す循環する定義 `node` を 1 つ持つ
+        notes: 種類 `design` のスキーマと種類 `files_guide` のスキーマ（`records` の要素の中）のそれぞれが、`$defs` の中に自分を指す循環する定義 `node` を 1 つ持つ
     flow: |-
       <!-- map: {"title": "正常系（解いたスキーマを求める）"} -->
 
@@ -54,7 +54,7 @@ flows:
     expected:
       - 200 で、`schemas` のキーが `documents[].id`（`design`・`files_guide`）
       - '`schemas.design` は循環しない `$ref` が参照先の定義に置き換わり、循環する定義 `node` の中の `$ref` が残り、最上位の `$defs` を持つ'
-      - '`schemas.files_guide` は `records` の要素 1 つのスキーマで、文書の取得の `schema` と同じ'
+      - '`schemas.files_guide` は `records` の要素 1 つのスキーマに、ファイル全体のスキーマの最上位の `$defs` を加えたもので、循環する定義 `node` の中の `$ref` の参照先が `$defs` にあり、文書の取得の `schema` と同じ'
     test: test_normal_when_schemas_requested
   - name: 異常系（無い配信元・404）
     summary: 無い配信元・配信していない配信元を断る
@@ -122,7 +122,7 @@ response:
     description: 配信元の設定の `diff.ignore_keys`（差分で無視するキー。書いていなければ既定の値 `["updated"]`）
   - name: schemas
     type: dict[str, dict] | None
-    description: '`documents[].id` ごとの種類のスキーマ（`$ref` を解いた形で、文書の取得の `schema` と同じ。`records` の行は要素 1 つのスキーマ）'
+    description: '`documents[].id` ごとの種類のスキーマ（`$ref` を解いた形で、文書の取得の `schema` と同じ。`records` の行は要素 1 つのスキーマに、ファイル全体のスキーマの最上位の `$defs` を加えたもの）'
     notes: '`schemas` が `true` のときだけ入れ、それ以外は `null`。解けない・循環する `$ref` はそのまま残し、最上位の `$defs` を残す'
 response_example: |-
   ```json

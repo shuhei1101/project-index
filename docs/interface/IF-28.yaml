@@ -30,7 +30,8 @@ flows:
       - '`totalCount` が 1 で、`items` が文書 2 だけ'
       - '`snippets` に語を含む行がある'
       - '`items[0].path` を `path` に渡した文書の取得が文書 2 を返す'
-      - '`items[0].id` が文書 2 の文書の ID'
+      - '`items[0].id` が文書 2 の文書の ID、`items[0].filePath` が文書 2 のファイルのパス'
+      - '`items[0].filePath` を `path` に、`items[0].id` を `id` に渡した文書の取得が文書 2 を返す'
     test: test_normal
   - name: 異常系（語の誤り・400）
     summary: 空の語と長すぎる語を断る
@@ -125,6 +126,9 @@ response:
   - name: items[].id
     type: str
     description: 文書の ID（文書の取得の `id` に渡す形）
+  - name: items[].filePath
+    type: str
+    description: 文書のファイルのパス（文書の一覧の `documents[].path` と同じ形。`id` と組で文書の取得の `path` に渡す）
   - name: items[].name
     type: str
     description: 文書の名前
@@ -135,7 +139,7 @@ response:
 response_example: |-
   ```json
   {"totalCount": 1, "items": [
-    {"path": "docs/doc-2", "id": "doc-2", "name": "文書 2", "snippets": ["…一覧のページングは…"]}
+    {"path": "docs/doc-2", "id": "doc-2", "filePath": "docs/doc-2.yaml", "name": "文書 2", "snippets": ["…一覧のページングは…"]}
   ]}
   ```
 status_codes:
