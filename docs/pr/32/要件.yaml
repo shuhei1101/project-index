@@ -39,8 +39,8 @@ scope_out:
     reason: 対応するモジュール構成の設計書が無く、implements・tests を張る相手が無い。src の行の exclude の *.schema.yaml・aliases.source.yaml・steps.yaml で索引に無いファイルの警告から外す。この判断はレビューで確定する
     plan: none
   - item: 設計書の無いコードへのモジュール構成の設計書の追加
-    reason: 要望に含まれない。対応表に無いファイルは related を持たない行にとどめる
-    plan: to_file
+    reason: 管理用の YAML を作った結果、src/project_index/・plugins/project-index/hooks/ の .py でモジュール構成の設計書が無いファイルは 0 件だった。設計書を持たないのはテストの conftest.py だけで、モジュール構成の対象でない
+    plan: none
   - item: plugins/project-index/ の .py でない配布物（.mcp.json・plugin.json・hooks.json・skills の SKILL.md）の管理用の YAML の行
     reason: 対応するモジュール構成の設計書が無く、implements・tests を張る相手が無い。plugin の行の exclude の *.json・*.md で索引に無いファイルの警告から外す
     plan: none
