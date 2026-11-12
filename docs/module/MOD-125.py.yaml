@@ -55,29 +55,56 @@ functions:
     container: project_index/features/read/service.py
     usecase: 配信元の設定の取得
     role: サービス
-    summary: 配信元の設定のうち、`nav`・`documents[]`（スクリプトのコマンドを除く）・`decisions.folders`・`github` を返す
+    summary: 配信元の設定のうち、`nav`・`documents[]`（スクリプトのコマンドを除く）・`decisions.folders`・`github`・`diff` と、求めたときだけ行ごとの種類のスキーマを返す
     scope: public
     args:
-      - name: source
-        title: 配信元
-        type: Source
+      - name: target
+        title: 読み取りの場所
+        type: Target
         required: true
         passing: positional
-        description: 読み取りの場所が解決した配信元
+        description: 読み取りの場所（`read_target`、`ref` なし）が返したもの
+      - name: store
+        title: 文書のストア
+        type: DocumentStore
+        required: true
+        passing: injected
+        description: 種類のスキーマを読む
+      - name: schemas
+        title: スキーマを求めるか
+        type: bool
+        required: false
+        default: 'False'
+        passing: keyword
+        description: '`True` のとき、`schemas` に行ごとの種類のスキーマを入れる'
     returns:
       type: SourceConfigResponse
       description: 配信元の設定の応答
     process: |-
-      1. 重ねた後の配信元の設定（`source.config`）から `nav`・`documents`・`decisions`・`github` を取り出す
+      1. 重ねた後の配信元の設定（`target.source.config`）から `nav`・`documents`・`decisions`・`github` を取り出す
       2. `documents[]` の各行から `validators`・`converters`・`generators` のコマンドを除く
       3. `decisions` が無ければ `{folders: []}` にする
+      4. `diff` に `{ignore_keys: 配信元の設定の diff_ignore_keys}` を入れる
+      5. `schemas` が `True` の場合、有効な `documents[]` の行ごとに `store.row_schema(target, 行の id)` を行の id をキーにして入れる。`False` なら `None` にする
     unit_tests:
       - name: test_get_source_config
         case: 正常
         summary: 画面が使うキーだけを返す
         condition: '`nav`・`documents[]`・`decisions.folders`・`github`・`converters[]` を持つ配信元'
         mock: なし（一時フォルダの配信元）
-        expected: '4 つのキーを返し、`converters[]` のコマンドを含まない'
+        expected: '`nav`・`documents`・`decisions`・`github`・`diff` を返し、`converters[]` のコマンドを含まず、`schemas` が `None`'
+      - name: test_get_source_config_when_diff
+        case: 正常
+        summary: diff の値と既定の値
+        condition: '`diff.ignore_keys` に `["updated", "rev"]` を書いた配信元と、`diff` を書いていない配信元'
+        mock: なし（一時フォルダの配信元）
+        expected: '`diff` が `{"ignore_keys": ["updated", "rev"]}` と `{"ignore_keys": ["updated"]}`'
+      - name: test_get_source_config_when_schemas
+        case: 正常
+        summary: 行ごとの種類のスキーマを返す
+        condition: '`$ref` を持つスキーマの種類 `design` と、`records: files` の種類 `files_guide` を持つ配信元で、`schemas` が `True`'
+        mock: なし（一時フォルダの配信元）
+        expected: '`schemas` のキーが `design`・`files_guide` で、値がそれぞれ `store.row_schema` と同じ'
       - name: test_get_source_config_when_no_decisions
         case: 正常
         summary: decisions を持たない
@@ -105,12 +132,19 @@ functions:
         required: true
         passing: injected
         description: 文書を読み込む
+      - name: values
+        title: 値を求めるか
+        type: bool
+        required: false
+        default: 'False'
+        passing: keyword
+        description: '`True` のとき、各要素の `value` に文書の値を入れる'
     returns:
       type: DocumentListResponse
       description: 文書の一覧の応答
     process: |-
       1. `store.load(target)` で文書を読み込む
-      2. 文書ごとに `id`・`path`・`kind`・メタデータ（`name`・`description`・`tags`・`visibility`）・`body_path` を `DocumentListItem` にする
+      2. 文書ごとに `id`・`path`・`kind`・メタデータ（`name`・`description`・`tags`・`visibility`）・`body_path`・`version` と、`values` が `True` のときだけ `value`（文書の `data`）を `DocumentListEntry` にする
       3. `documents[]` の行の順、行の中はパスの順に並べ、`ref` に解決したリビジョンの名前を入れて返す
     unit_tests:
       - name: test_list_documents
@@ -118,7 +152,13 @@ functions:
         summary: 行の順に並べる
         condition: 種類 `design` の YAML 2 件と、`files.yaml` の行の文書 1 件
         mock: なし（一時フォルダの配信元）
-        expected: 3 件が行の順に並び、行の文書だけが `body_path` を持つ
+        expected: 3 件が行の順に並び、行の文書だけが `body_path` を持ち、各要素が文書の `version` を持ち、`value` が `None`
+      - name: test_list_documents_when_values
+        case: 正常
+        summary: 値を求めたときだけ値を入れる
+        condition: 同じ配信元で `values` が `True`
+        mock: なし（一時フォルダの配信元）
+        expected: YAML の文書の `value` が YAML の値、行の文書の `value` が行の値
   - name: get_document
     title: 文書の取得
     kind: 関数
@@ -140,6 +180,13 @@ functions:
         required: true
         passing: positional
         description: 文書のファイルか本文のファイルのパス
+      - name: doc_id
+        title: 文書の ID
+        type: str | None
+        required: false
+        default: None
+        passing: keyword
+        description: 文書の取得の `id`
       - name: store
         title: 文書のストア
         type: DocumentStore
@@ -156,7 +203,7 @@ functions:
       type: DocumentValueResponse
       description: 文書の取得の応答
     process: |-
-      1. `store.load(target)` の文書から、`path` の文書を引く（文書のページの特定。文書のファイル、無ければ本文のファイルが `path` と同じ最初の文書）
+      1. `store.load(target)` の文書から、`path` の文書を引く（文書のページの特定。文書のファイル、無ければ本文のファイルが `path` と同じ最初の文書。`doc_id` を指したときは、そのうち文書の ID が `doc_id` と同じ文書）
          - 無い場合、`DocumentNotFoundError` を送出する
       2. 文書の値・種類のスキーマ（`store.row_schema(target, kind)` の `$ref` を解いた形）・メタデータ・本文と本文のファイルのパス（管理用の YAML の行の文書だけ）を集める
          - YAML として読み込めない文書は、`value` を `None` にし、ファイルのパスと行と列を `conversion_error` に入れる
@@ -180,6 +227,12 @@ functions:
         condition: '`files.yaml` の行が `guide.md` を本文に持つ配信元で、`path` が `guide.md`'
         mock: なし
         expected: '`value` が行の値、`body` が `guide.md` の本文、`body_path` が `guide.md`'
+      - name: test_get_document_when_doc_id
+        case: 正常
+        summary: 文書の ID で行の文書を選ぶ
+        condition: '`terms.yaml` に `body_file` の無い行 `term-1`・`term-2` を持つ配信元で、`path` が `terms.yaml`・`doc_id` が `term-2`'
+        mock: なし
+        expected: '`value` が `term-2` の行の値、`metadata.id` が `term-2`'
       - name: test_get_document_when_converter
         case: 正常
         summary: converters[] を指す種類はスクリプトの Markdown を返す
@@ -196,6 +249,13 @@ functions:
         case: 異常
         summary: 無いパス
         condition: '`path` が `no/such.yaml`'
+        mock: なし
+        expected: '`DocumentNotFoundError`'
+        exception: 文書が無い
+      - name: test_get_document_when_doc_id_not_found
+        case: 異常
+        summary: 文書の ID が一致しない
+        condition: '`path` が `terms.yaml`・`doc_id` が `no-such`'
         mock: なし
         expected: '`DocumentNotFoundError`'
         exception: 文書が無い

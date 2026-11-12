@@ -72,9 +72,9 @@ functions:
     process: |-
       1. 配信元を指すルートは、先頭で要求が指す配信元の行の読み込みを待つ（起動.配信元の読み込みの単位）
       2. GET `/sources` は、配信元の一覧の状態を `id`・`status`・`errors` で返す
-      3. GET `/sources/{source}/config` は、読み取りの場所（`read_target`、`ref` なし）の配信元で配信元の設定の取得を呼ぶ
-      4. GET `/sources/{source}/docs` は、読み取りの場所（`ref` はクエリ）で文書の一覧を呼ぶ
-      5. GET `/sources/{source}/docs/{path:path}` は、読み取りの場所で文書の取得を `asyncio.to_thread` で呼ぶ
+      3. GET `/sources/{source}/config` は、読み取りの場所（`read_target`、`ref` なし）で配信元の設定の取得を呼ぶ（クエリ `schemas` を `bool`、既定 `false` で渡す）
+      4. GET `/sources/{source}/docs` は、読み取りの場所（`ref` はクエリ）で文書の一覧を呼ぶ（クエリ `values` を `bool`、既定 `false` で渡す）
+      5. GET `/sources/{source}/docs/{path:path}` は、読み取りの場所で文書の取得を `asyncio.to_thread` で呼ぶ（クエリ `id` を `doc_id` に渡す）
       6. GET `/sources/{source}/decisions` と `/sources/{source}/decisions/{id}` は、検討事項の ID の一覧と検討事項の文書の取得を呼ぶ
       7. GET `/sources/{source}/search` は、語での検索を呼ぶ（クエリ `q`・`ref`・`limit`）
       8. GET `/sources/{source}/refs` は、配信元のリビジョンの一覧（`commits` はクエリ）を返す
@@ -87,6 +87,12 @@ functions:
         condition: 配信元 sample を持つ配線済みの関数で、8 つのルートを GET
         mock: 配線済みの関数（一時フォルダの配信元）
         expected: どれも 200 で、各インターフェース定義の応答のキーを camelCase で持つ
+      - name: test_build_read_router_when_queries
+        case: 正常
+        summary: 追加したクエリを service に渡す
+        condition: '`/sources/sample/config?schemas=true`・`/sources/sample/docs?values=true`・`/sources/sample/docs/terms.yaml?id=term-2`'
+        mock: 配線済みの関数（一時フォルダの配信元）
+        expected: '`schemas` が辞書、`documents[].value` が値、`metadata.id` が `term-2` で、`diff.ignore_keys`・`documents[].version`・`items[].filePath` のキーを持つ'
       - name: test_build_read_router_when_not_found
         case: 異常
         summary: 無い配信元・リビジョン・文書を 404 にする
