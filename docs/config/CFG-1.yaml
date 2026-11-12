@@ -1,12 +1,12 @@
 title: '設定: 索引のサーバー'
-lead: 索引のサーバーが参照する設定のファイルと環境変数の一覧。
+lead: 索引のサーバーが参照する設定のファイルと環境変数を定め、設定のキーや環境変数を追加・変更するときに参照する。
 files:
   - file: ${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml
     manages: 端末の設定（配信元の一覧と権限・`state_dir`・`log_dir`・`port`・`bind`・`seen_retention_days`・`script_timeout_sec`）
-    notes: git 管理外。場所は環境変数 `PROJECT_INDEX_CONFIG` で上書きする。キーの一覧は公開ドキュメント『設定』、型は MOD-67 の `TerminalConfig`
+    notes: git 管理外。場所は環境変数 `PROJECT_INDEX_CONFIG` で上書きする。キーの一覧は公開ドキュメント『設定』、型は [端末の設定の型](id:MOD-67) の `TerminalConfig`
   - file: project-index.yaml
     manages: 配信元の設定（文書の範囲・種類・参照するブランチ・検査と変換と生成のスクリプト・`nav`・`decisions`・`github`）
-    notes: 各リポジトリの直下に配置し、git で管理する。端末の設定の `config` でほかの名前も指定できる。管理の MCP にフォルダを渡したときは `project-index.yaml`、無ければ移行の間の `dev-docs.yaml` を探す（MOD-10 の `CONFIG_FILE`・`LEGACY_CONFIG_FILE`）
+    notes: 各リポジトリの直下に配置し、git で管理する。端末の設定の `config` でほかの名前も指定できる。管理の MCP にフォルダを渡したときは `project-index.yaml`、無ければ移行の間の `dev-docs.yaml` を探す（[管理の service.py](id:MOD-10) の `CONFIG_FILE`・`LEGACY_CONFIG_FILE`）
   - file: project-index.local.yaml
     manages: 配信元の設定の端末ごとの上書き
     notes: 各リポジトリの直下に配置し、`.gitignore` する

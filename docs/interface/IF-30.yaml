@@ -12,6 +12,8 @@ flows:
       - name: 端末の設定
         description: '`sources` に sample の 1 行'
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -22,6 +24,8 @@ flows:
         E-->>CF: 端末の設定と配信元の状態を読む
         E-->>C: 200
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、`sources` に sample が `serving` で並ぶ
       - '`settingsPath` に端末の設定のパス、sample の行に `config`・`scope` がある'
@@ -44,6 +48,8 @@ flows:
         description: '端末の設定で `enabled: false` の配信元'
         notes: id `archive`
     flow: |-
+      <!-- map: {"title": "正常系（配信していない配信元がある）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -52,6 +58,8 @@ flows:
         C->>E: GET /settings/sources
         E-->>C: 200（配信元ごとの状態）
       ```
+
+      <!-- /map -->
     expected:
       - sample と legacy が `serving`
       - broken が `not_served` で、`errors` に `documents[0].paths` と必須のキーが無いことがある
@@ -67,12 +75,16 @@ flows:
         description: sample と notes の 2 行で起動した後、ファイルを fresh・notes・sample の順に書き換え、読み直さない
         notes: fresh は `id` を省いた新しい行
     flow: |-
+      <!-- map: {"title": "正常系（読み直していない行がある）"} -->
+
       sequenceDiagram
         participant C as クライアント
         participant E as GET /settings/sources
 
         C->>E: GET /settings/sources
         E-->>C: 200（ファイルの行の順と状態）
+
+      <!-- /map -->
     expected:
       - 200 で、`sources` がファイルの順（fresh・notes・sample）に並ぶ
       - fresh が `pending_reload` で、`id` が `null`
@@ -87,6 +99,8 @@ flows:
         description: '`sources` に sample と extra の 2 行'
         notes: 'extra の行だけに `outside_read: false`'
     flow: |-
+      <!-- map: {"title": "正常系（作業範囲の外から参照できない配信元がある）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -95,11 +109,13 @@ flows:
         C->>E: GET /settings/sources
         E-->>C: 200（行ごとの outsideRead）
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、extra の行の `outsideRead` が `false`
       - '`outside_read` を記載していない sample の行の `outsideRead` が `true`'
     test: test_normal_when_outside_read_false
-lead: 'dev-docs の画面のサーバーが設定画面で呼ぶ。端末の設定の配信元の一覧と、配信元ごとの状態（配信中・配信していない・無効）を JSON で返す。'
+lead: '端末の設定の配信元と配信元ごとの状態を返却する端末の設定の API の入出力を定め、端末の設定の取得を修正するときに参照する。'
 identifier: get_settings_sources
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true

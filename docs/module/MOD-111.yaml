@@ -1,8 +1,7 @@
 id: MOD-111
 title: 索引のサーバー / 履歴
 lead: |-
-  git を子プロセスで呼び、リビジョン（ブランチ・タグ・commit・日時）の解決・一覧・変わったファイル・ファイルの日時を返す。
-  過去のリビジョンは `git archive` で `state_dir` に書き出し、作業ツリーと同じ読み方で読めるようにする。
+  git でリビジョンの解決・一覧・変わったファイルと日時の取得・過去のリビジョンの書き出しを受け持つ履歴の分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
 directory: |-
   ```text
   src/project_index/
@@ -15,74 +14,77 @@ directory: |-
      └─ snapshot.py          # SnapshotStore（リビジョンの書き出し）
   ```
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      リビジョンの解決 ..> gitの実行
-      リビジョンの一覧 ..> gitの実行
-      変わったファイル ..> gitの実行
-      区間の commit ..> gitの実行
-      ファイルの日時 ..> gitの実行
-      一緒に変わったファイル ..> gitの実行
-      リビジョンのファイル ..> gitの実行
-      リポジトリの直下 ..> gitの実行
-      リビジョンの書き出し ..> gitの実行 : git archive
-      リビジョンの解決 ..> 解いたリビジョン : 返す
-      区間の commit ..> 区間の commit と親 : 返す
-      gitの実行 ..> gitの失敗 : 送る
-      class gitの実行 {
-        <<function>>
-      }
-      class リポジトリの直下 {
-        <<function>>
-      }
-      class リビジョンの解決 {
-        <<function>>
-      }
-      class リビジョンの一覧 {
-        <<function>>
-      }
-      class 変わったファイル {
-        <<function>>
-      }
-      class 区間の commit {
-        <<function>>
-      }
-      class ファイルの日時 {
-        <<function>>
-      }
-      class 一緒に変わったファイル {
-        <<function>>
-      }
-      class リビジョンのファイル {
-        <<function>>
-      }
-      class リビジョンの書き出し {
-        +書き出す(リポジトリ, commit) Path
-      }
-      class 解いたリビジョン {
-        +渡した値: str
-        +commit: str
-        +日時: datetime
-      }
-      class 区間の commit と親 {
-        +commit: str
-        +親: str
-      }
-      class gitの失敗 {
-        +終了コード: int
-      }
-      click リビジョンの解決 href "./MOD-31.py.yaml#リビジョンの解決"
-      click gitの実行 href "./MOD-86.py.yaml#gitの実行"
-      click リビジョンの一覧 href "./MOD-31.py.yaml#リビジョンの一覧"
-      click 変わったファイル href "./MOD-31.py.yaml#変わったファイル"
-      click 区間の commit href "./MOD-31.py.yaml#区間の commit"
-      click ファイルの日時 href "./MOD-31.py.yaml#ファイルの日時"
-      click 一緒に変わったファイル href "./MOD-31.py.yaml#一緒に変わったファイル"
-      click リビジョンのファイル href "./MOD-31.py.yaml#リビジョンのファイル"
-      click リポジトリの直下 href "./MOD-86.py.yaml#リポジトリの直下"
-      click リビジョンの書き出し href "./MOD-32.py.yaml#リビジョンの書き出し"
-      click 解いたリビジョン href "./MOD-33.py.yaml#解いたリビジョン"
-      click 区間の commit と親 href "./MOD-33.py.yaml#区間の commit と親"
-      click gitの失敗 href "./MOD-86.py.yaml#gitの失敗"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        リビジョンの解決 ..> gitの実行
+        リビジョンの一覧 ..> gitの実行
+        変わったファイル ..> gitの実行
+        区間の commit ..> gitの実行
+        ファイルの日時 ..> gitの実行
+        一緒に変わったファイル ..> gitの実行
+        リビジョンのファイル ..> gitの実行
+        リポジトリの直下 ..> gitの実行
+        リビジョンの書き出し ..> gitの実行 : git archive
+        リビジョンの解決 ..> 解いたリビジョン : 返す
+        区間の commit ..> 区間の commit と親 : 返す
+        gitの実行 ..> gitの失敗 : 送る
+        class gitの実行 {
+          <<function>>
+        }
+        class リポジトリの直下 {
+          <<function>>
+        }
+        class リビジョンの解決 {
+          <<function>>
+        }
+        class リビジョンの一覧 {
+          <<function>>
+        }
+        class 変わったファイル {
+          <<function>>
+        }
+        class 区間の commit {
+          <<function>>
+        }
+        class ファイルの日時 {
+          <<function>>
+        }
+        class 一緒に変わったファイル {
+          <<function>>
+        }
+        class リビジョンのファイル {
+          <<function>>
+        }
+        class リビジョンの書き出し {
+          +書き出す(リポジトリ, commit) Path
+        }
+        class 解いたリビジョン {
+          +渡した値: str
+          +commit: str
+          +日時: datetime
+        }
+        class 区間の commit と親 {
+          +commit: str
+          +親: str
+        }
+        class gitの失敗 {
+          +終了コード: int
+        }
+        click リビジョンの解決 href "./MOD-31.py.yaml#リビジョンの解決"
+        click gitの実行 href "./MOD-86.py.yaml#gitの実行"
+        click リビジョンの一覧 href "./MOD-31.py.yaml#リビジョンの一覧"
+        click 変わったファイル href "./MOD-31.py.yaml#変わったファイル"
+        click 区間の commit href "./MOD-31.py.yaml#区間の commit"
+        click ファイルの日時 href "./MOD-31.py.yaml#ファイルの日時"
+        click 一緒に変わったファイル href "./MOD-31.py.yaml#一緒に変わったファイル"
+        click リビジョンのファイル href "./MOD-31.py.yaml#リビジョンのファイル"
+        click リポジトリの直下 href "./MOD-86.py.yaml#リポジトリの直下"
+        click リビジョンの書き出し href "./MOD-32.py.yaml#リビジョンの書き出し"
+        click 解いたリビジョン href "./MOD-33.py.yaml#解いたリビジョン"
+        click 区間の commit と親 href "./MOD-33.py.yaml#区間の commit と親"
+        click gitの失敗 href "./MOD-86.py.yaml#gitの失敗"
+notes:
+  受け持つこと: |-
+    過去のリビジョンは `git archive` で `state_dir` に書き出し、作業ツリーと同じ読み方で読めるようにする。

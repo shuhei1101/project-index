@@ -2,7 +2,7 @@ title: 端末の設定の配信元の 1 行の削除
 entry:
   kind: endpoint
   value: DELETE `/settings/sources/{id}`
-lead: 端末の設定の配信元の行を 1 行だけ削除し、その配信元を配信から除外する。取得した後に端末の設定が書き換えられていれば削除しない。
+lead: 端末の設定の配信元の行を 1 行だけ削除して配信から除外する端末の設定の API の入出力を定め、配信元の 1 行の削除を修正するときに参照する。
 identifier: delete_settings_source
 permissions: '`Origin` を持たない要求（サーバーの側や端末のほかのプロセスからの呼び出し）か、project-index と同じオリジンからの要求だけ'
 idempotent: false
@@ -85,6 +85,8 @@ flows:
         description: '`GET /settings/sources` で取得した `version`'
         notes: パスの `id` は `extra`
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -97,6 +99,8 @@ flows:
         E->>E: extra を配信から除外する
         E-->>C: 200（version・配信元ごとの状態）
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、`version` が `expectedVersion` と違う値で、`sources` に extra が無い
       - '`settings.yaml` の `sources` が sample の行だけで、sample の行・他のキー・コメントは変わらない'
@@ -115,6 +119,8 @@ flows:
       - name: 入力
         description: 取得した `version`
     flow: |-
+      <!-- map: {"title": "異常系（内容のバージョンが古い・409）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -125,6 +131,8 @@ flows:
         E-->>CF: 今の内容のバージョンを求めて照合する
         E-->>C: 409 problem+json（current）
       ```
+
+      <!-- /map -->
     expected:
       - 409 で、`current` がコメントを追記した後の内容のバージョン
       - '`settings.yaml` が追記した内容のままで、extra の行が残り、`/sources/extra/docs` が 200 を返却する'
@@ -140,6 +148,8 @@ flows:
         description: 取得した `version`
         notes: パスの `id` は `extra`
     flow: |-
+      <!-- map: {"title": "異常系（指した行が無い・404）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -148,6 +158,8 @@ flows:
         C->>E: expectedVersion
         E-->>C: 404 problem+json
       ```
+
+      <!-- /map -->
     expected:
       - 404 で、extra の行が無いことを返却する
       - '`settings.yaml` が変わらない'
@@ -160,6 +172,8 @@ flows:
       - name: 端末の設定
         description: '`sources` に sample と extra の 2 行'
     flow: |-
+      <!-- map: {"title": "異常系（内容のバージョンが無い・422）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -168,6 +182,8 @@ flows:
         C->>E: クエリなし
         E-->>C: 422 problem+json
       ```
+
+      <!-- /map -->
     expected:
       - 422 を返却する
       - '`settings.yaml` が変わらない'
@@ -180,6 +196,8 @@ flows:
       - name: 入力
         description: '`Origin: http://127.0.0.1:9999` で、取得した `version`'
     flow: |-
+      <!-- map: {"title": "異常系（別のオリジン・403）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -188,6 +206,8 @@ flows:
         C->>E: Origin: 別のオリジン
         E-->>C: 403
       ```
+
+      <!-- /map -->
     expected:
       - 403 を返却する
       - '`settings.yaml` が変わらない'

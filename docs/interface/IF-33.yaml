@@ -2,7 +2,7 @@ title: 端末の設定の配信元の 1 行の変更
 entry:
   kind: endpoint
   value: PATCH `/settings/sources/{id}`
-lead: 端末の設定の配信元の行を 1 行だけ、送信したキーで変更する。取得した後に端末の設定が書き換えられていれば変更しない。
+lead: 端末の設定の配信元の行を 1 行だけ送信したキーで変更する端末の設定の API の入出力を定め、配信元の 1 行の変更を修正するときに参照する。
 identifier: patch_settings_source
 permissions: '`Origin` を持たない要求（サーバーの側や端末のほかのプロセスからの呼び出し）か、project-index と同じオリジンからの要求だけ'
 idempotent: true
@@ -126,6 +126,8 @@ flows:
         description: '`GET /settings/sources` で取得した `version` と、`outside_read: false` だけの `source`'
         notes: パスの `id` は `extra`
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -138,6 +140,8 @@ flows:
         E->>E: extra の配信元だけを読み直す
         E-->>C: 200（version・配信元ごとの状態）
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、`version` が `expectedVersion` と違う値で、`sources` に extra が `serving` で並ぶ
       - '`settings.yaml` の extra の行に `outside_read: false` が入り、`scope.read`・`scope.write` は変わらない'
@@ -157,6 +161,8 @@ flows:
         description: '取得した `version` と、`enabled: false` だけの `source`'
         notes: パスの `id` は `notes`
     flow: |-
+      <!-- map: {"title": "正常系（id を省いた行を指す）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -167,6 +173,8 @@ flows:
         E->>CF: name が notes の行を書き換える
         E-->>C: 200（notes は disabled）
       ```
+
+      <!-- /map -->
     expected:
       - 200 で、notes が `disabled`
       - '`settings.yaml` の notes の行に `enabled: false` が入り、`id` は書き足されない'
@@ -183,6 +191,8 @@ flows:
       - name: 入力
         description: '取得した `version` と、`outside_read: false` だけの `source`'
     flow: |-
+      <!-- map: {"title": "異常系（内容のバージョンが古い・409）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -193,6 +203,8 @@ flows:
         E-->>CF: 今の内容のバージョンを求めて照合する
         E-->>C: 409 problem+json（current）
       ```
+
+      <!-- /map -->
     expected:
       - 409 で、`current` がコメントを追記した後の内容のバージョン
       - '`settings.yaml` が追記した内容のまま'
@@ -208,6 +220,8 @@ flows:
         description: '取得した `version` と `enabled: false`'
         notes: パスの `id` は `extra`
     flow: |-
+      <!-- map: {"title": "異常系（指した行が無い・404）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -216,6 +230,8 @@ flows:
         C->>E: expectedVersion, source: enabled false
         E-->>C: 404 problem+json
       ```
+
+      <!-- /map -->
     expected:
       - 404 で、extra の行が無いことを返却する
       - '`settings.yaml` が変わらない'
@@ -230,6 +246,8 @@ flows:
       - name: 入力
         description: '`expectedVersion` が無い要求と、`scope.read` に空の文字列を含む要求と、`source` に `id` を含む要求と、`id` を省いた notes の行の `config` を `name` が `memo` の設定へ変える要求'
     flow: |-
+      <!-- map: {"title": "異常系（スキーマに通らない・422）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -238,6 +256,8 @@ flows:
         C->>E: 違反を含む要求
         E-->>C: 422 problem+json（違反したキーと理由）
       ```
+
+      <!-- /map -->
     expected:
       - 4 つとも 422 で、`errors` に違反したキーのパスと理由がある
       - '`settings.yaml` が変わらない'
@@ -250,6 +270,8 @@ flows:
       - name: 入力
         description: '`Origin: http://127.0.0.1:9999` で、取得した `version` と `enabled: false`'
     flow: |-
+      <!-- map: {"title": "異常系（別のオリジン・403）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -258,6 +280,8 @@ flows:
         C->>E: Origin: 別のオリジン
         E-->>C: 403
       ```
+
+      <!-- /map -->
     expected:
       - 403 を返却する
       - '`settings.yaml` が変わらない'

@@ -1,655 +1,739 @@
 id: SC-6
 title: "エージェントが調べる"
 scenarios:
-- name: 正常シナリオ
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
-  - name: サンプルの配信元
-    description: 文書の種類を 1 つ（スキーマと YAML 2 件。片方の `related` がもう片方を指す）と `project-index.yaml` を持つ git リポジトリ
-    notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
-  - name: 読み取りだけの配信元
-    description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
-    notes: id `notes`。`scope.read` は sample のフォルダ
-  - name: project-index
-    description: 上の 2 つを配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant ST as 配信元の文書
+  - name: 正常シナリオ
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 文書の種類を 1 つ（スキーマと YAML 2 件。片方の `related` がもう片方を指す）と `project-index.yaml` を持つ git リポジトリ
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: 読み取りだけの配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
+        notes: id `notes`。`scope.read` は sample のフォルダ
+      - name: project-index
+        description: 上の 2 つを配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ"} -->
 
-      A->>M: describe()
-      M-->>A: 使える配信元の一覧（sample は読み書き、notes は読み取りだけ）
-      A->>M: describe(source: sample)
-      M-->>A: 説明書と種類の一覧
-      A->>M: search_docs(filter: kind が sample の種類, view: summary)
-      M->>M: source を省いたので作業中の配信元 sample を指し、scope.read を確かめる
-      M->>ST: 文書を読む
-      M-->>A: id・name・概要文・文字数・version の表と総件数
-      A->>M: search_docs(filter: id が文書 1, view: full)
-      M-->>A: 文書 1 の本文
-      A->>M: trace_related(from_ids: 文書 1)
-      M-->>A: 文書 1 から related でたどった文書 2
-    ```
-  expected:
-  - '`describe()` が sample を読み書き、notes を読み取りだけとして返す'
-  - '`describe(source: sample)` が説明書と種類の一覧を返す'
-  - '`source` を省いた `search_docs` が sample の 2 件を、総件数 2 と各行の `version` つきで返す'
-  - '`view: full` の `search_docs` が文書 1 の YAML を返す'
-  - '`view: full` の `search_docs` の文書 1 が `<document path="{sample のクローン本体}/{文書 1 のパス}" scope="full">` で包まれる'
-  - '`trace_related` が文書 1 の `related` の相手として文書 2 を返す'
-  test: test_normal
-- name: 正常シナリオ（複数の配信元を横断する）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
-  - name: project-index
-    description: 正常シナリオと同じ sample と notes を配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant ST as 配信元の文書
 
-      A->>M: search_docs(source: *, view: summary)
-      M->>M: scope.read に当たる配信元 sample と notes を対象にする
-      M-->>A: 両方の結果（各行に source、配信元ごとの総件数）
-    ```
-  expected:
-  - 結果の各行に `source`（sample か notes）が付く
-  - 総件数を配信元ごとに返す
-  - '`source: [sample]` は sample の行だけを返す'
-  test: test_normal_when_source_all
-- name: 正常シナリオ（ワークツリーを指す）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
-  - name: ワークツリー
-    description: sample の `.claude/worktrees/x`。文書 1 の `name` をクローン本体と変えてある
-    notes: 配信元の設定の `worktrees` は既定（`[./.claude/worktrees/*]`）
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant WT as ワークツリー x
+        A->>M: describe()
+        M-->>A: 使える配信元の一覧（sample は読み書き、notes は読み取りだけ）
+        A->>M: describe(source: sample)
+        M-->>A: 説明書と種類の一覧
+        A->>M: search_docs(filter: kind が sample の種類, view: summary)
+        M->>M: source を省いたので作業中の配信元 sample を指し、scope.read を確かめる
+        M->>ST: 文書を読む
+        M-->>A: id・name・概要文・文字数・version の表と総件数
+        A->>M: search_docs(filter: id が文書 1, view: full)
+        M-->>A: 文書 1 の本文
+        A->>M: trace_related(from_ids: 文書 1)
+        M-->>A: 文書 1 から related でたどった文書 2
+      ```
 
-      A->>M: search_docs(worktree: ワークツリー x のパス, filter: id が文書 1)
-      M->>M: worktree が worktrees に当たる
-      M->>WT: 同じ相対パスの設定と文書を読む
-      M-->>A: ワークツリーの文書 1
-    ```
-  expected:
-  - '`worktree` を渡した `search_docs` がワークツリーの文書 1 の `name` を返す'
-  - '`worktree` を渡した `view: full` の `search_docs` の `path` が、ワークツリー x の中の文書 1 の絶対パスになる'
-  - '`worktree` を省き `cwd` をワークツリー x の中にした `search_docs` も、ワークツリーの文書 1 を返す'
-  - '`worktree` も省き `cwd` がクローン本体の `search_docs` は、クローン本体の文書 1 を返す'
-  test: test_normal_when_worktree_given
-- name: 正常シナリオ（同じ本文を 2 回取る）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`session_id`・`agent_id` はテストが引数に入れる）
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`session_id` は `s1`、`agent_id` は空'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+      <!-- /map -->
+    expected:
+      - '`describe()` が sample を読み書き、notes を読み取りだけとして返す'
+      - '`describe(source: sample)` が説明書と種類の一覧を返す'
+      - '`source` を省いた `search_docs` が sample の 2 件を、総件数 2 と各行の `version` つきで返す'
+      - '`view: full` の `search_docs` が文書 1 の YAML を返す'
+      - '`view: full` の `search_docs` の文書 1 が `<document path="{sample のクローン本体}/{文書 1 のパス}" scope="full">` で包まれる'
+      - '`trace_related` が文書 1 の `related` の相手として文書 2 を返す'
+    test: test_normal
+  - name: 正常シナリオ（複数の配信元を横断する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+      - name: project-index
+        description: 正常シナリオと同じ sample と notes を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（複数の配信元を横断する）"} -->
 
-      A->>M: search_docs(filter: id が文書 1, view: full)
-      M->>M: 会話キーごとに返した文書の id とハッシュを記録する
-      M-->>A: 文書 1 の本文
-      A->>M: 同じ search_docs をもう一度
-      M-->>A: 文書 1 は（この会話で返却済み）
-      A->>M: search_docs(..., repeat_seen: true)
-      M-->>A: 文書 1 の本文
-    ```
-  expected:
-  - 2 回目の結果で文書 1 の本文が `（この会話で返却済み）` だけになる
-  - 2 回目の結果の文書 1 は `path`・`scope` を持たない
-  - '`repeat_seen: true` で本文を返す'
-  - '`session_id` を `s2` に変えた呼び出しは本文を返す'
-  - '`trace_related` の 2 回目は、関連の相手の名前・概要文を `（この会話で返却済み）` にする'
-  - '`view: summary` の一覧の各行の概要文は 2 回目も省かない'
-  test: test_normal_when_same_doc_twice
-- name: 異常シナリオ（読めない配信元を指す）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
-  - name: 別の配信元
-    description: 文書の種類を 1 つ持つ配信元
-    notes: id `other`。`scope.read` は other のフォルダだけ
-  - name: project-index
-    description: sample と other を配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
 
-      A->>M: search_docs(source: other)
-      M->>M: other の scope.read に cwd が当たらない
-      M-->>A: エラー（読めない配信元。今の作業場所から使える配信元の一覧）
-    ```
-  expected:
-  - '`isError: true` で、other を読めないことと、今の作業場所から使える配信元の一覧（`describe()` と同じ）を返す'
-  - 'エラーの直し方（`fix`）が、作業範囲の外を参考に読むときは `outside_scope: true` を渡すことを案内する'
-  - other の文書を返さない
-  - '`source: *` は other を対象に含めない'
-  - '`cwd` を持たない呼び出しは、どの配信元も読めないとして同じエラーを返す'
-  test: test_error_when_source_not_readable
-- name: 異常シナリオ（配信していない配信元を指す）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: project-index
-    description: sample と、起動時の検証に失敗した broken を端末の設定に持つ project-index
-    notes: '`cwd` は sample のクローン本体。broken の `scope.read` は sample のフォルダ'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+        A->>M: search_docs(source: *, view: summary)
+        M->>M: scope.read に当たる配信元 sample と notes を対象にする
+        M-->>A: 両方の結果（各行に source、配信元ごとの総件数）
+      ```
 
-      A->>M: search_docs(source: broken)
-      M-->>A: エラー（配信していない配信元。起動時の検証の違反）
-    ```
-  expected:
-  - '`isError: true` で、broken を配信していないことと、違反したキーのパス・理由を返す'
-  - '`source: sample` の `search_docs` は文書を返す'
-  test: test_error_when_source_not_served
-- name: 異常シナリオ（ワークツリーに当たらないパスを指す）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`worktree` に、`worktrees` に当たらない一時フォルダのパスを渡す'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+      <!-- /map -->
+    expected:
+      - 結果の各行に `source`（sample か notes）が付く
+      - 総件数を配信元ごとに返す
+      - '`source: [sample]` は sample の行だけを返す'
+    test: test_normal_when_source_all
+  - name: 正常シナリオ（ワークツリーを指す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+      - name: ワークツリー
+        description: sample の `.claude/worktrees/x`。文書 1 の `name` をクローン本体と変えてある
+        notes: 配信元の設定の `worktrees` は既定（`[./.claude/worktrees/*]`）
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（ワークツリーを指す）"} -->
 
-      A->>M: search_docs(worktree: 当たらないパス)
-      M->>M: worktree が sample の worktrees に当たらない
-      M-->>A: エラー（当たらないパスと worktrees の値）
-    ```
-  expected:
-  - '`isError: true` で、渡したパスと sample の `worktrees` の値を返す'
-  - 文書を返さない
-  test: test_error_when_worktree_not_matched
-- name: 正常シナリオ（管理用の YAML の文書を引く）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
-    notes: '-'
-  - name: 管理用の YAML
-    description: 'sample の `src/files.yaml`。`files[]` に `a.py`（`tags: [auth, code]`、`name` なし）・`b.py`（`name: 部品 B`）・`a.md`（`name` なし）の 3 行。`src/a.py`・`src/b.py`・`src/a.md` を置く'
-    notes: スキーマは `templates/files.schema.yaml`。`a.py` と `a.md` は同じフォルダの同じ名前で拡張子だけが違う
-  - name: 文書の行
-    description: 'sample の `project-index.yaml` の行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`）'
-    notes: '-'
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant ST as 配信元の文書
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
 
-      A->>M: search_docs(filter: tags が auth, view: summary)
-      M->>ST: src/files.yaml を読み、files の各行を 1 件の文書にする
-      M->>M: 行の列から共通のメタデータを取る。id が空なら body_file のパス、name が空なら body_file のファイル名
-      M-->>A: a の行（name は a、tags は code と auth）
-      A->>M: search_docs(filter: id が src/a.py, view: full)
-      M-->>A: src/a.py の内容を path と scope つきの document で包んだ本文
-      A->>M: search_docs(filter: id が src/a.py, view: full, format: json)
-      M-->>A: 項目の直下に path と scope を持つ JSON
-      A->>M: search_docs(filter: id が src/a.md, view: full)
-      M-->>A: src/a.md の内容の本文
-    ```
-  expected:
-  - '`tags` が `auth` の `search_docs` が id `src/a.py`（`body_file` が指すファイルの配信元の直下からのパス。拡張子を含む）の 1 件を返し、`name` が `a`、`tags` が `auth` と `code` になる'
-  - '`b` の `name` は `部品 B` のまま'
-  - '`view: full` の本文が `src/a.py` の内容で、`<document path="{sample のクローン本体}/src/a.py" scope="full">` で包まれる'
-  - '`format: json` の項目の直下（`id`・`source` と同じ階層で `values` の外）が `path`（`src/a.py` の絶対パス）と `scope: full` を持ち、`values.path` は管理用の YAML の `path` 列の値 `a.py` のまま'
-  - '同じフォルダの同じ名前の `a.md` の行は id `src/a.md` の別の文書になり、`view: full` の本文が `src/a.md` の内容になる。`name` は `a`'
-  - どの `search_docs` の応答の `notes` にも、スキーマの違反（`'files' is a required property` など）が付かない
-  test: test_normal_when_files_index
-- name: 正常シナリオ（当たった数で並べて絞る）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
-    notes: '-'
-  - name: Markdown の文書
-    description: sample の `notes/` に Markdown の文書を 3 件置き、`notes/files.yaml` の `files[]` に `a.md`・`b.md` の 2 行、`notes/archive/files.yaml` の `files[]` に `c.md` の 1 行を載せる。`a.md` は本文に語 `検索` を含む行を 3 行、`b.md` は 1 行、`archive/c.md` は 2 行持つ
-    notes: 'sample の `project-index.yaml` に行 `notes`（`paths: [notes/**/files.yaml]`・`records: files`・`body_file: path`）を持つ'
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+        A->>M: search_docs(worktree: ワークツリー x のパス, filter: id が文書 1)
+        M->>M: worktree が worktrees に当たる
+        M->>WT: 同じ相対パスの設定と文書を読む
+        M-->>A: ワークツリーの文書 1
+      ```
 
-      A->>M: search_docs(filter: and[body が 検索 を含む, not(@path が notes/archive/** に glob で当たる)], fields: [@matches], order_by: @matches の降順)
-      M->>M: 本文に 検索 を含み、notes/archive の下に無い文書に絞る
-      M->>M: 文書ごとに本文の条件に当たった行を数える
-      M-->>A: a（@matches 3）、b（@matches 1）の順
-    ```
-  expected:
-  - '`notes/a.md`・`notes/b.md` の 2 件だけを返し、`notes/archive/c.md` を返さない'
-  - 各行の `@matches` が a は 3、b は 1 で、その降順に並ぶ
-  - '`not` の条件を外した呼び出しは c も返し、a・c・b の順に並ぶ'
-  test: test_normal_when_ordered_by_matches
-- name: 正常シナリオ（本文の一部を読む）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`cwd`・`session_id` はテストが引数に入れる）
-    notes: '-'
-  - name: Markdown の文書
-    description: 正常シナリオ（当たった数で並べて絞る）と同じ `notes/a.md`。`## 決まったこと` と、その前後に別の `##` の見出しを持つ
-    notes: '-'
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`cwd` は sample のクローン本体。`session_id` は `s1`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+      <!-- /map -->
+    expected:
+      - '`worktree` を渡した `search_docs` がワークツリーの文書 1 の `name` を返す'
+      - '`worktree` を渡した `view: full` の `search_docs` の `path` が、ワークツリー x の中の文書 1 の絶対パスになる'
+      - '`worktree` を省き `cwd` をワークツリー x の中にした `search_docs` も、ワークツリーの文書 1 を返す'
+      - '`worktree` も省き `cwd` がクローン本体の `search_docs` は、クローン本体の文書 1 を返す'
+    test: test_normal_when_worktree_given
+  - name: 正常シナリオ（同じ本文を 2 回取る）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`session_id`・`agent_id` はテストが引数に入れる）
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`session_id` は `s1`、`agent_id` は空'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（同じ本文を 2 回取る）"} -->
 
-      A->>M: search_docs(filter: id が notes/a.md, view: full, sections: [決まったこと])
-      M-->>A: 決まったこと の節だけの本文（scope: section）
-      A->>M: search_docs(filter: id が notes/a.md, view: full, lines: offset 3, limit 2)
-      M-->>A: 3〜4 行目だけの本文（scope: section）
-      A->>M: search_docs(filter: id が notes/a.md, view: full)
-      M-->>A: 全文（scope: full）
-    ```
-  expected:
-  - 節の指定で、`## 決まったこと` の見出しから次の同じか上の階層の見出しの手前までを返し、`scope` が `section` になる
-  - 行の範囲の指定で 3〜4 行目だけを返し、`scope` が `section` になる
-  - '一部を返した後の全文の呼び出しは `（この会話で返却済み）` にならず、全文を `scope: full` で返す'
-  test: test_normal_when_part_of_body
-- name: 正常シナリオ（除外の名前に当たるファイルを外す）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
-    notes: '-'
-  - name: 文書
-    description: sample の `docs/rule/` に YAML の文書 `a.yaml`（id `a`）・`Rb.yaml`（id `Rb`）と目次 `index.yaml`（id `rule-index`）を置く
-    notes: '`Rb.yaml` は `R` で始まる文書'
-  - name: 文書の行
-    description: 'sample の `project-index.yaml` の行 `rule`（`paths: [docs/rule/*.yaml]`・`exclude: [index.yaml]`）と行 `index`（`paths: [docs/**/index.yaml]`）'
-    notes: '-'
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant ST as 配信元の文書
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
 
-      A->>M: search_docs(filter: kind が rule, view: summary)
-      M->>ST: rule の paths に当たり exclude に当たらないファイルを読む
-      M-->>A: a と Rb
-      A->>M: search_docs(filter: kind が index, view: summary)
-      M-->>A: rule-index
-    ```
-  expected:
-  - '`kind` が `rule` の `search_docs` が `a` と `Rb` の 2 件だけを返し、`rule-index` を返さない'
-  - '`kind` が `index` の `search_docs` が `rule-index` を返す'
-  test: test_normal_when_excluded_name
-- name: 正常シナリオ（列名の違う種類を共通のキーで引く）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
-    notes: '-'
-  - name: 文書
-    description: 'sample の `decisions/` に、名前を `title` 列、概要文を `meta.summary` 列に持つ YAML の文書 `d1.yaml`（`title: 設定の置き場所`）を置く'
-    notes: '`name`・`description` の列は持たない'
-  - name: 文書の行
-    description: 'sample の `project-index.yaml` の行 `decisions`（`paths: [decisions/*.yaml]`・`metadata: {name: title, description: meta.summary}`）'
-    notes: '-'
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant ST as 配信元の文書
+        A->>M: search_docs(filter: id が文書 1, view: full)
+        M->>M: 会話キーごとに返した文書の id とハッシュを記録する
+        M-->>A: 文書 1 の本文
+        A->>M: 同じ search_docs をもう一度
+        M-->>A: 文書 1 は（この会話で返却済み）
+        A->>M: search_docs(..., repeat_seen: true)
+        M-->>A: 文書 1 の本文
+      ```
 
-      A->>M: describe(source: sample, kind: decisions)
-      M-->>A: スキーマと、共通のキーと列名の対応（name は title、description は meta.summary）
-      A->>M: search_docs(filter: name が 設定の置き場所, view: summary)
-      M->>ST: decisions/d1.yaml を読む
-      M->>M: metadata の対応の列から name・description を取る
-      M-->>A: d1 の行（name と概要文）
-    ```
-  expected:
-  - '`describe(source: sample, kind: decisions)` が、`metadata` に書いた対応（`name` は `title`、`description` は `meta.summary`）と、書かない共通のキーは同じ名前の列であることを返す'
-  - '`name` が `設定の置き場所` の `search_docs` が d1 を返し、概要文が `meta.summary` の値になる'
-  test: test_normal_when_metadata_mapped
-- name: 正常シナリオ（設計書を実装するコードを引く）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
-    notes: '-'
-  - name: 設計書
-    description: sample の YAML の文書 `design/repo.yaml`（メタデータの `id` に `design/repo` を持つ。タスクのリポジトリの設計書）
-    notes: '-'
-  - name: 管理用の YAML
-    description: 'sample の `src/files.yaml`。`repo.py` の行が `related: [{to: design/repo, type: implements}]`、`test_repo.py` の行が `related: [{to: src/repo.py, type: tests}]` を持つ。`src/repo.py`・`src/test_repo.py` を置く'
-    notes: '-'
-  - name: 文書の行
-    description: 'sample の `project-index.yaml` の行 `design`（`paths: [design/*.yaml]`）と行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`）'
-    notes: '`related.types[]` を書かず、既定の関連の種類で検査する'
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant ST as 配信元の文書
+      <!-- /map -->
+    expected:
+      - 2 回目の結果で文書 1 の本文が `（この会話で返却済み）` だけになる
+      - 2 回目の結果の文書 1 は `path`・`scope` を持たない
+      - '`repeat_seen: true` で本文を返す'
+      - '`session_id` を `s2` に変えた呼び出しは本文を返す'
+      - '`trace_related` の 2 回目は、関連の相手の名前・概要文を `（この会話で返却済み）` にする'
+      - '`view: summary` の一覧の各行の概要文は 2 回目も省かない'
+    test: test_normal_when_same_doc_twice
+  - name: 異常シナリオ（読めない配信元を指す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+      - name: 別の配信元
+        description: 文書の種類を 1 つ持つ配信元
+        notes: id `other`。`scope.read` は other のフォルダだけ
+      - name: project-index
+        description: sample と other を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（読めない配信元を指す）"} -->
 
-      A->>M: trace_related(from_ids: design/repo, direction: in, depth: 1)
-      M->>ST: related で design/repo を指す文書を引く
-      M-->>A: src/repo.py（via.type は implements）
-      A->>M: trace_related(from_ids: src/repo.py, direction: in, depth: 1)
-      M-->>A: src/test_repo.py（via.type は tests）
-      A->>M: search_docs(filter: id が src/repo.py か src/test_repo.py, view: full)
-      M->>M: 読み取りの検査（related の type が既定の種類にあるか）
-      M-->>A: 2 件の本文（related の種類の違反なし）
-    ```
-  expected:
-  - '`design/repo` を起点にした `direction: in` の `trace_related` が `src/repo.py` の 1 件を返し、`via.type` が `implements` になる'
-  - '`src/repo.py` を起点にした `direction: in` の `trace_related` が `src/test_repo.py` の 1 件を返し、`via.type` が `tests` になる'
-  - '`search_docs` が `src/repo.py`・`src/test_repo.py` の 2 件を返し、`notes` に `related.types` の違反が付かない'
-  test: test_normal_when_implementing_code_traced
-- name: 正常シナリオ（使われているタグを数える）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
-    notes: '-'
-  - name: タグ
-    description: sample の文書 1 の `tags` を `[mcp]`、文書 2 を `[MCP, mcp, 設計]`、notes の文書 1 件を `[mcp]` にする
-    notes: 表記だけが違うタグ（`mcp`・`MCP`）を混ぜ、文書 2 には両方を付ける。sample・notes の `project-index.yaml` はタグのマスター（`tags`）を持たない
-  - name: project-index
-    description: 正常シナリオと同じ sample と notes を配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
 
-      A->>M: search_docs(source: *, view: count, group_by: tags)
-      M->>M: scope.read に当たる sample と notes の文書のタグを正規化（NFKC・大文字小文字）してまとめて数える
-      M-->>A: タグごとの件数（mcp 3、設計 1）
-      A->>M: search_docs(source: *, filter: tags が mcp, view: summary)
-      M-->>A: タグを付けた 3 件
-    ```
-  expected:
-  - '`group_by: tags` が、`mcp`・`MCP` を 1 つにまとめて件数 3 で返し（両方を付けた文書 2 は 1 件として数える）、表記は付いている文書が最も多い `mcp` になる'
-  - '`設計` が件数 1 で返り、件数の降順・値の昇順に並ぶ'
-  - '`tags` が `mcp` の `search_docs` が、文書 2 も含めて 3 件を返す'
-  test: test_normal_when_tags_grouped
-- name: 正常シナリオ（作業範囲の外を参考に読む）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
-  - name: 別の配信元
-    description: 文書の種類を 1 つと文書 2 件（片方の `related` がもう片方を指す）を持つ Git の配信元
-    notes: id `other`。`scope.read` は other のフォルダだけ。端末の設定の `outside_read` は書かない（既定 `true`）
-  - name: project-index
-    description: sample と other を配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant ST as other の文書
-      participant L as 要求のログ
+        A->>M: search_docs(source: other)
+        M->>M: other の scope.read に cwd が当たらない
+        M-->>A: エラー（読めない配信元。今の作業場所から使える配信元の一覧）
+      ```
 
-      A->>M: describe(outside_scope: true)
-      M-->>A: 作業範囲の外で読める配信元の一覧（other。作業範囲の外（参考））
-      A->>M: describe(source: other, outside_scope: true)
-      M->>M: other の scope.read に cwd が当たらず、outside_read が真
-      M-->>A: 説明書と種類の一覧（作業範囲の外（参考））
-      A->>M: search_docs(source: other, outside_scope: true, view: full)
-      M->>ST: 文書を読む
-      M->>L: 作業場所と配信元 other を残す
-      M-->>A: 文書の本文（作業範囲の外（参考））
-      A->>M: trace_related(source: other, from_ids: 文書 1, outside_scope: true)
-      M-->>A: 文書 2（作業範囲の外（参考））
-      A->>M: list_changes(source: other, from: 1 つ前の commit, outside_scope: true)
-      M-->>A: 変わった文書（作業範囲の外（参考））
-    ```
-  expected:
-  - '`source` を省いた `describe(outside_scope: true)` が、作業範囲の外で読める配信元として other を「作業範囲の外（参考）」の表示付きで返し、`scope` に当たる sample を外の一覧に含めない'
-  - '`outside_scope: true` の `describe`・`search_docs`・`trace_related`・`list_changes` が other の結果を返す'
-  - 返した文書・一覧の行に「作業範囲の外（参考）」の表示が付く
-  - 要求のログに、外から読んだ呼び出しの作業場所（`cwd`）と配信元 `other` が残る
-  - '`outside_scope` を省いた同じ呼び出しは、異常シナリオ（読めない配信元を指す）と同じエラーを返す'
-  - '`source: *` に `outside_scope: true` を渡しても、`scope.read` に当たらない other は対象に含めない'
-  - 引数なしの `describe()` は other を一覧に載せない
-  test: test_normal_when_outside_scope
-- name: 異常シナリオ（作業範囲の外の参照を断る配信元を指す）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
-  - name: 別の配信元
-    description: 正常シナリオ（作業範囲の外を参考に読む）と同じ other
-    notes: '端末の設定の other の行に `outside_read: false`'
-  - name: project-index
-    description: sample と other を配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、other を読めないことと、今の作業場所から使える配信元の一覧（`describe()` と同じ）を返す'
+      - 'エラーの直し方（`fix`）が、作業範囲の外を参考に読むときは `outside_scope: true` を渡すことを案内する'
+      - other の文書を返さない
+      - '`source: *` は other を対象に含めない'
+      - '`cwd` を持たない呼び出しは、どの配信元も読めないとして同じエラーを返す'
+    test: test_error_when_source_not_readable
+  - name: 異常シナリオ（配信していない配信元を指す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: project-index
+        description: sample と、起動時の検証に失敗した broken を端末の設定に持つ project-index
+        notes: '`cwd` は sample のクローン本体。broken の `scope.read` は sample のフォルダ'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（配信していない配信元を指す）"} -->
 
-      A->>M: search_docs(source: other, outside_scope: true)
-      M->>M: other の scope.read に cwd が当たらず、outside_read が偽
-      M-->>A: エラー（読めない配信元）
-      A->>M: describe(outside_scope: true)
-      M->>M: outside_read が偽の other をエラーにせず、作業範囲の外の一覧から除外する
-      M-->>A: 作業範囲の外で読める配信元の一覧（other を含まない）
-    ```
-  expected:
-  - '`isError: true` で、other を読めないことを返す'
-  - 'エラーの直し方（`fix`）が `outside_scope: true` を案内しない'
-  - other の文書を返さない
-  - '`source` を省いた `describe(outside_scope: true)` の作業範囲の外の一覧に other を載せない'
-  - 要求のログに外から読んだ記録を残さない
-  test: test_error_when_outside_read_disabled
-- name: 正常シナリオ（ブランチとワークツリーを引く）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
-  - name: ブランチとタグ
-    description: sample に `develop` ブランチと `v0.1.0` タグを作る
-    notes: '`project-index.yaml` の `default_ref` は `develop`'
-  - name: ワークツリー
-    description: sample の `.claude/worktrees/x`（ブランチ `feat/x` を checkout）
-    notes: 配信元の設定の `worktrees` は既定（`[./.claude/worktrees/*]`）
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant G as sample のリポジトリ
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
 
-      A->>M: describe(source: sample)
-      M->>G: ブランチ・タグと、worktrees に当たるワークツリーを引く
-      M-->>A: 説明書と種類の一覧、ブランチ・タグ、ワークツリーのパスと checkout しているブランチ
-      A->>M: search_docs(worktree: ワークツリー x のパス, filter: id が文書 1)
-      M-->>A: ワークツリーの文書 1
-    ```
-  expected:
-  - '`describe(source: sample)` がブランチ（`develop`・`feat/x` を含む）とタグ（`v0.1.0`）を返す'
-  - '`describe(source: sample)` がワークツリー x の絶対パスと、checkout しているブランチ `feat/x` を返す'
-  - 返したワークツリーのパスを `worktree` に渡した `search_docs` が、ワークツリーの文書 1 を返す
-  - 最近の commit は返さない
-  test: test_normal_when_describe_lists_refs_and_worktrees
-- name: 正常シナリオ（オブジェクトの配列のタグで絞る）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
-  - name: オブジェクトの配列のタグ
-    description: 'sample の種類の文書が `tags` を `{name, main}` のオブジェクトの配列で持つ。文書 1 は `[{name: mcp, main: true}, {name: 設計}]`、文書 2 は `[{name: MCP}, {name: 設計, main: true}]`'
-    notes: '`project-index.yaml` の documents の行の `metadata` に `tags: tags[].name` と、`main` が真の要素の `name` を共通のキー `main_tags` へ取り出す指定'
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+        A->>M: search_docs(source: broken)
+        M-->>A: エラー（配信していない配信元。起動時の検証の違反）
+      ```
 
-      A->>M: search_docs(filter: tags が mcp, view: summary)
-      M->>M: metadata の tags[].name で各要素の name を取り出し、正規化して比べる
-      M-->>A: 文書 1・文書 2
-      A->>M: search_docs(filter: main_tags が mcp, view: summary)
-      M-->>A: 文書 1
-      A->>M: search_docs(view: count, group_by: tags)
-      M-->>A: タグごとの件数（MCP 2、設計 2）
-    ```
-  expected:
-  - '`tags` が `mcp` の `search_docs` が、`MCP` を付けた文書 2 も含めて 2 件を返す'
-  - '`main_tags` が `mcp` の `search_docs` が、`main: true` で `mcp` を持つ文書 1 だけを返す'
-  - '`group_by: tags` が、オブジェクトの `name` を数えて `MCP` 2・`設計` 2 を返す（`mcp`・`MCP` は 1 つにまとめ、表記は同数なので値の昇順で先の `MCP`）'
-  - '`fields: [tags]` の `search_docs` が、文字列の配列（`[mcp, 設計]`）を返す'
-  - '`[]` を使わない `metadata` の配信元は今のまま引ける'
-  test: test_normal_when_tags_are_objects
-- name: 正常シナリオ（エイリアスの語で用語を引く）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
-  - name: 用語の種類
-    description: sample に用語の種類を加え、文書 `作業範囲` を置く。`name` は `作業範囲`、`aliases` は `[scope, 担当範囲]`
-    notes: '`project-index.yaml` の documents の行に `alias_type` を持ち、`metadata` のエイリアスのキーが alias-inject のスキーマに通る'
-  - name: 用語を含むほかの文書
-    description: sample の文書 1（`alias_type` を持たない行）の本文と `name` に `担当範囲` を含める
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、broken を配信していないことと、違反したキーのパス・理由を返す'
+      - '`source: sample` の `search_docs` は文書を返す'
+    test: test_error_when_source_not_served
+  - name: 異常シナリオ（ワークツリーに当たらないパスを指す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` に、`worktrees` に当たらない一時フォルダのパスを渡す'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（ワークツリーに当たらないパスを指す）"} -->
 
-      A->>M: search_docs(term: 担当範囲)
-      M->>M: alias_type を持つ行の文書の name と aliases に照合する
-      M-->>A: 文書「作業範囲」
-      A->>M: list_match_words(source: sample)
-      M-->>A: 照合する語の一覧（作業範囲・scope・担当範囲 と文書の id）
-    ```
-  expected:
-  - '`search_docs(term: 担当範囲)` が、`aliases` に持つ文書「作業範囲」を返す'
-  - '`search_docs(term: 作業範囲)`（`name` の語）も同じ文書を返す'
-  - '`search_docs(term: 担当範囲)` は `alias_type` を持たない行の文書を返さない（本文に `担当範囲` を含む sample の文書 1 を返さない）'
-  - '`list_match_words` が `name` と `aliases` の語を、指す文書の id とともに返す'
-  test: test_normal_when_term_matched_by_alias
-- name: 正常シナリオ（instructions の調査の案内を受け取る）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: project-index
-    description: sample と other を配信している project-index
-    notes: '`cwd` は sample のクローン本体。sample のワークツリーに、管理用の YAML の `files` に無いファイルを 1 件置く'
-  - name: 別の配信元
-    description: 作業範囲の外の配信元
-    notes: id `other`。`scope.read` は other のフォルダだけ
-  - name: 設定が古い配信元
-    description: '`project-index.yaml` の `version` がサーバーの読めるバージョンより古い配信元'
-    notes: id `old`。`scope.read` は sample のクローン本体を含む
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
 
-      A->>M: initialize
-      M-->>A: instructions（使える配信元の引き方・設計書から調べる案内・作業場所の外を参照する案内・タグの付け方）
-      A->>M: describe()
-      M-->>A: 使える配信元と警告
-    ```
-  expected:
-  - 文書の MCP の instructions のタグの行が、単語まで分けてタグにすること・`action:`・`topic:`・`tool:` の命名・配信元のタグの規約に従うこと・付ける前に `group_by="tags"` で使われているタグを見ることを案内する
-  - instructions が、使える配信元は引数なしの `describe()` で引けることを示し、SessionStart を参照しない
-  - instructions が、コードや不具合の調査も設計書から参照し、設計書が指すコードを参照することを案内する
-  - 'instructions が、作業場所の外のリポジトリも `source` と `outside_scope: true` で参照でき、外で読める配信元の ID は `describe(outside_scope: true)` で引けることを案内し、配信元の ID を固有の値で持たない'
-  - 引数なしの `describe()` が、sample の索引の同期の件数 1 と、old の設定が古いことの警告を返す
-  test: test_normal_when_research_guide_received
-- name: 正常シナリオ（MCP を使う場面の案内を受け取る）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: project-index
-    description: sample を配信している project-index
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+        A->>M: search_docs(worktree: 当たらないパス)
+        M->>M: worktree が sample の worktrees に当たらない
+        M-->>A: エラー（当たらないパスと worktrees の値）
+      ```
 
-      A->>M: initialize
-      M-->>A: instructions（使う場面・grep と Read が向く場面・ツールの順序）
-      A->>M: tools/list
-      M-->>A: ツールごとの description
-    ```
-  expected:
-  - instructions が、`search_docs`・`trace_related`・`list_changes`・`write_docs` を使う場面と、grep・Read が向く場面（コードの識別子・文字列の出現箇所、配信の範囲の外のファイル）を案内する
-  - instructions が、`describe(source)` で種類と書き方を確かめてから探す・書く順序を案内する
-  - instructions が 4,096 字以内に収まる
-  - 文書の MCP の各ツールの description が、何をする・いつ使う・いつ使わない・何を返さないを持つ
-  - instructions・description に `MUST`・`必ず`・`禁止` の語が無い
-  test: test_normal_when_usage_guide_received
-lead: エージェントが文書の MCP の `describe`・`search_docs`・`trace_related` で、今の作業場所から読める配信元の文書を探して読む。
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、渡したパスと sample の `worktrees` の値を返す'
+      - 文書を返さない
+    test: test_error_when_worktree_not_matched
+  - name: 正常シナリオ（管理用の YAML の文書を引く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+        notes: '-'
+      - name: 管理用の YAML
+        description: 'sample の `src/files.yaml`。`files[]` に `a.py`（`tags: [auth, code]`、`name` なし）・`b.py`（`name: 部品 B`）・`a.md`（`name` なし）の 3 行。`src/a.py`・`src/b.py`・`src/a.md` を置く'
+        notes: スキーマは `templates/files.schema.yaml`。`a.py` と `a.md` は同じフォルダの同じ名前で拡張子だけが違う
+      - name: 文書の行
+        description: 'sample の `project-index.yaml` の行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`）'
+        notes: '-'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（管理用の YAML の文書を引く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant ST as 配信元の文書
+
+        A->>M: search_docs(filter: tags が auth, view: summary)
+        M->>ST: src/files.yaml を読み、files の各行を 1 件の文書にする
+        M->>M: 行の列から共通のメタデータを取る。id が空なら body_file のパス、name が空なら body_file のファイル名
+        M-->>A: a の行（name は a、tags は code と auth）
+        A->>M: search_docs(filter: id が src/a.py, view: full)
+        M-->>A: src/a.py の内容を path と scope つきの document で包んだ本文
+        A->>M: search_docs(filter: id が src/a.py, view: full, format: json)
+        M-->>A: 項目の直下に path と scope を持つ JSON
+        A->>M: search_docs(filter: id が src/a.md, view: full)
+        M-->>A: src/a.md の内容の本文
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`tags` が `auth` の `search_docs` が id `src/a.py`（`body_file` が指すファイルの配信元の直下からのパス。拡張子を含む）の 1 件を返し、`name` が `a`、`tags` が `auth` と `code` になる'
+      - '`b` の `name` は `部品 B` のまま'
+      - '`view: full` の本文が `src/a.py` の内容で、`<document path="{sample のクローン本体}/src/a.py" scope="full">` で包まれる'
+      - '`format: json` の項目の直下（`id`・`source` と同じ階層で `values` の外）が `path`（`src/a.py` の絶対パス）と `scope: full` を持ち、`values.path` は管理用の YAML の `path` 列の値 `a.py` のまま'
+      - '同じフォルダの同じ名前の `a.md` の行は id `src/a.md` の別の文書になり、`view: full` の本文が `src/a.md` の内容になる。`name` は `a`'
+      - どの `search_docs` の応答の `notes` にも、スキーマの違反（`'files' is a required property` など）が付かない
+    test: test_normal_when_files_index
+  - name: 正常シナリオ（当たった数で並べて絞る）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+        notes: '-'
+      - name: Markdown の文書
+        description: sample の `notes/` に Markdown の文書を 3 件置き、`notes/files.yaml` の `files[]` に `a.md`・`b.md` の 2 行、`notes/archive/files.yaml` の `files[]` に `c.md` の 1 行を載せる。`a.md` は本文に語 `検索` を含む行を 3 行、`b.md` は 1 行、`archive/c.md` は 2 行持つ
+        notes: 'sample の `project-index.yaml` に行 `notes`（`paths: [notes/**/files.yaml]`・`records: files`・`body_file: path`）を持つ'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（当たった数で並べて絞る）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: search_docs(filter: and[body が 検索 を含む, not(@path が notes/archive/** に glob で当たる)], fields: [@matches], order_by: @matches の降順)
+        M->>M: 本文に 検索 を含み、notes/archive の下に無い文書に絞る
+        M->>M: 文書ごとに本文の条件に当たった行を数える
+        M-->>A: a（@matches 3）、b（@matches 1）の順
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`notes/a.md`・`notes/b.md` の 2 件だけを返し、`notes/archive/c.md` を返さない'
+      - 各行の `@matches` が a は 3、b は 1 で、その降順に並ぶ
+      - '`not` の条件を外した呼び出しは c も返し、a・c・b の順に並ぶ'
+    test: test_normal_when_ordered_by_matches
+  - name: 正常シナリオ（本文の一部を読む）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd`・`session_id` はテストが引数に入れる）
+        notes: '-'
+      - name: Markdown の文書
+        description: 正常シナリオ（当たった数で並べて絞る）と同じ `notes/a.md`。`## 決まったこと` と、その前後に別の `##` の見出しを持つ
+        notes: '-'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体。`session_id` は `s1`'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（本文の一部を読む）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: search_docs(filter: id が notes/a.md, view: full, sections: [決まったこと])
+        M-->>A: 決まったこと の節だけの本文（scope: section）
+        A->>M: search_docs(filter: id が notes/a.md, view: full, lines: offset 3, limit 2)
+        M-->>A: 3〜4 行目だけの本文（scope: section）
+        A->>M: search_docs(filter: id が notes/a.md, view: full)
+        M-->>A: 全文（scope: full）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 節の指定で、`## 決まったこと` の見出しから次の同じか上の階層の見出しの手前までを返し、`scope` が `section` になる
+      - 行の範囲の指定で 3〜4 行目だけを返し、`scope` が `section` になる
+      - '一部を返した後の全文の呼び出しは `（この会話で返却済み）` にならず、全文を `scope: full` で返す'
+    test: test_normal_when_part_of_body
+  - name: 正常シナリオ（除外の名前に当たるファイルを外す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+        notes: '-'
+      - name: 文書
+        description: sample の `docs/rule/` に YAML の文書 `a.yaml`（id `a`）・`Rb.yaml`（id `Rb`）と目次 `index.yaml`（id `rule-index`）を置く
+        notes: '`Rb.yaml` は `R` で始まる文書'
+      - name: 文書の行
+        description: 'sample の `project-index.yaml` の行 `rule`（`paths: [docs/rule/*.yaml]`・`exclude: [index.yaml]`）と行 `index`（`paths: [docs/**/index.yaml]`）'
+        notes: '-'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（除外の名前に当たるファイルを外す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant ST as 配信元の文書
+
+        A->>M: search_docs(filter: kind が rule, view: summary)
+        M->>ST: rule の paths に当たり exclude に当たらないファイルを読む
+        M-->>A: a と Rb
+        A->>M: search_docs(filter: kind が index, view: summary)
+        M-->>A: rule-index
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`kind` が `rule` の `search_docs` が `a` と `Rb` の 2 件だけを返し、`rule-index` を返さない'
+      - '`kind` が `index` の `search_docs` が `rule-index` を返す'
+    test: test_normal_when_excluded_name
+  - name: 正常シナリオ（列名の違う種類を共通のキーで引く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+        notes: '-'
+      - name: 文書
+        description: 'sample の `decisions/` に、名前を `title` 列、概要文を `meta.summary` 列に持つ YAML の文書 `d1.yaml`（`title: 設定の置き場所`）を置く'
+        notes: '`name`・`description` の列は持たない'
+      - name: 文書の行
+        description: 'sample の `project-index.yaml` の行 `decisions`（`paths: [decisions/*.yaml]`・`metadata: {name: title, description: meta.summary}`）'
+        notes: '-'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（列名の違う種類を共通のキーで引く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant ST as 配信元の文書
+
+        A->>M: describe(source: sample, kind: decisions)
+        M-->>A: スキーマと、共通のキーと列名の対応（name は title、description は meta.summary）
+        A->>M: search_docs(filter: name が 設定の置き場所, view: summary)
+        M->>ST: decisions/d1.yaml を読む
+        M->>M: metadata の対応の列から name・description を取る
+        M-->>A: d1 の行（name と概要文）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`describe(source: sample, kind: decisions)` が、`metadata` に書いた対応（`name` は `title`、`description` は `meta.summary`）と、書かない共通のキーは同じ名前の列であることを返す'
+      - '`name` が `設定の置き場所` の `search_docs` が d1 を返し、概要文が `meta.summary` の値になる'
+    test: test_normal_when_metadata_mapped
+  - name: 正常シナリオ（設計書を実装するコードを引く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+        notes: '-'
+      - name: 設計書
+        description: sample の YAML の文書 `design/repo.yaml`（メタデータの `id` に `design/repo` を持つ。タスクのリポジトリの設計書）
+        notes: '-'
+      - name: 管理用の YAML
+        description: 'sample の `src/files.yaml`。`repo.py` の行が `related: [{to: design/repo, type: implements}]`、`test_repo.py` の行が `related: [{to: src/repo.py, type: tests}]` を持つ。`src/repo.py`・`src/test_repo.py` を置く'
+        notes: '-'
+      - name: 文書の行
+        description: 'sample の `project-index.yaml` の行 `design`（`paths: [design/*.yaml]`）と行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`）'
+        notes: '`related.types[]` を書かず、既定の関連の種類で検査する'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（設計書を実装するコードを引く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant ST as 配信元の文書
+
+        A->>M: trace_related(from_ids: design/repo, direction: in, depth: 1)
+        M->>ST: related で design/repo を指す文書を引く
+        M-->>A: src/repo.py（via.type は implements）
+        A->>M: trace_related(from_ids: src/repo.py, direction: in, depth: 1)
+        M-->>A: src/test_repo.py（via.type は tests）
+        A->>M: search_docs(filter: id が src/repo.py か src/test_repo.py, view: full)
+        M->>M: 読み取りの検査（related の type が既定の種類にあるか）
+        M-->>A: 2 件の本文（related の種類の違反なし）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`design/repo` を起点にした `direction: in` の `trace_related` が `src/repo.py` の 1 件を返し、`via.type` が `implements` になる'
+      - '`src/repo.py` を起点にした `direction: in` の `trace_related` が `src/test_repo.py` の 1 件を返し、`via.type` が `tests` になる'
+      - '`search_docs` が `src/repo.py`・`src/test_repo.py` の 2 件を返し、`notes` に `related.types` の違反が付かない'
+    test: test_normal_when_implementing_code_traced
+  - name: 正常シナリオ（使われているタグを数える）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+        notes: '-'
+      - name: タグ
+        description: sample の文書 1 の `tags` を `[mcp]`、文書 2 を `[MCP, mcp, 設計]`、notes の文書 1 件を `[mcp]` にする
+        notes: 表記だけが違うタグ（`mcp`・`MCP`）を混ぜ、文書 2 には両方を付ける。sample・notes の `project-index.yaml` はタグのマスター（`tags`）を持たない
+      - name: project-index
+        description: 正常シナリオと同じ sample と notes を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（使われているタグを数える）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: search_docs(source: *, view: count, group_by: tags)
+        M->>M: scope.read に当たる sample と notes の文書のタグを正規化（NFKC・大文字小文字）してまとめて数える
+        M-->>A: タグごとの件数（mcp 3、設計 1）
+        A->>M: search_docs(source: *, filter: tags が mcp, view: summary)
+        M-->>A: タグを付けた 3 件
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`group_by: tags` が、`mcp`・`MCP` を 1 つにまとめて件数 3 で返し（両方を付けた文書 2 は 1 件として数える）、表記は付いている文書が最も多い `mcp` になる'
+      - '`設計` が件数 1 で返り、件数の降順・値の昇順に並ぶ'
+      - '`tags` が `mcp` の `search_docs` が、文書 2 も含めて 3 件を返す'
+    test: test_normal_when_tags_grouped
+  - name: 正常シナリオ（作業範囲の外を参考に読む）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+      - name: 別の配信元
+        description: 文書の種類を 1 つと文書 2 件（片方の `related` がもう片方を指す）を持つ Git の配信元
+        notes: id `other`。`scope.read` は other のフォルダだけ。端末の設定の `outside_read` は書かない（既定 `true`）
+      - name: project-index
+        description: sample と other を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（作業範囲の外を参考に読む）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant ST as other の文書
+        participant L as 要求のログ
+
+        A->>M: describe(outside_scope: true)
+        M-->>A: 作業範囲の外で読める配信元の一覧（other。作業範囲の外（参考））
+        A->>M: describe(source: other, outside_scope: true)
+        M->>M: other の scope.read に cwd が当たらず、outside_read が真
+        M-->>A: 説明書と種類の一覧（作業範囲の外（参考））
+        A->>M: search_docs(source: other, outside_scope: true, view: full)
+        M->>ST: 文書を読む
+        M->>L: 作業場所と配信元 other を残す
+        M-->>A: 文書の本文（作業範囲の外（参考））
+        A->>M: trace_related(source: other, from_ids: 文書 1, outside_scope: true)
+        M-->>A: 文書 2（作業範囲の外（参考））
+        A->>M: list_changes(source: other, from: 1 つ前の commit, outside_scope: true)
+        M-->>A: 変わった文書（作業範囲の外（参考））
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`source` を省いた `describe(outside_scope: true)` が、作業範囲の外で読める配信元として other を「作業範囲の外（参考）」の表示付きで返し、`scope` に当たる sample を外の一覧に含めない'
+      - '`outside_scope: true` の `describe`・`search_docs`・`trace_related`・`list_changes` が other の結果を返す'
+      - 返した文書・一覧の行に「作業範囲の外（参考）」の表示が付く
+      - 要求のログに、外から読んだ呼び出しの作業場所（`cwd`）と配信元 `other` が残る
+      - '`outside_scope` を省いた同じ呼び出しは、異常シナリオ（読めない配信元を指す）と同じエラーを返す'
+      - '`source: *` に `outside_scope: true` を渡しても、`scope.read` に当たらない other は対象に含めない'
+      - 引数なしの `describe()` は other を一覧に載せない
+    test: test_normal_when_outside_scope
+  - name: 異常シナリオ（作業範囲の外の参照を断る配信元を指す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+      - name: 別の配信元
+        description: 正常シナリオ（作業範囲の外を参考に読む）と同じ other
+        notes: '端末の設定の other の行に `outside_read: false`'
+      - name: project-index
+        description: sample と other を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（作業範囲の外の参照を断る配信元を指す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: search_docs(source: other, outside_scope: true)
+        M->>M: other の scope.read に cwd が当たらず、outside_read が偽
+        M-->>A: エラー（読めない配信元）
+        A->>M: describe(outside_scope: true)
+        M->>M: outside_read が偽の other をエラーにせず、作業範囲の外の一覧から除外する
+        M-->>A: 作業範囲の外で読める配信元の一覧（other を含まない）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、other を読めないことを返す'
+      - 'エラーの直し方（`fix`）が `outside_scope: true` を案内しない'
+      - other の文書を返さない
+      - '`source` を省いた `describe(outside_scope: true)` の作業範囲の外の一覧に other を載せない'
+      - 要求のログに外から読んだ記録を残さない
+    test: test_error_when_outside_read_disabled
+  - name: 正常シナリオ（ブランチとワークツリーを引く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+      - name: ブランチとタグ
+        description: sample に `develop` ブランチと `v0.1.0` タグを作る
+        notes: '`project-index.yaml` の `default_ref` は `develop`'
+      - name: ワークツリー
+        description: sample の `.claude/worktrees/x`（ブランチ `feat/x` を checkout）
+        notes: 配信元の設定の `worktrees` は既定（`[./.claude/worktrees/*]`）
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（ブランチとワークツリーを引く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant G as sample のリポジトリ
+
+        A->>M: describe(source: sample)
+        M->>G: ブランチ・タグと、worktrees に当たるワークツリーを引く
+        M-->>A: 説明書と種類の一覧、ブランチ・タグ、ワークツリーのパスと checkout しているブランチ
+        A->>M: search_docs(worktree: ワークツリー x のパス, filter: id が文書 1)
+        M-->>A: ワークツリーの文書 1
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`describe(source: sample)` がブランチ（`develop`・`feat/x` を含む）とタグ（`v0.1.0`）を返す'
+      - '`describe(source: sample)` がワークツリー x の絶対パスと、checkout しているブランチ `feat/x` を返す'
+      - 返したワークツリーのパスを `worktree` に渡した `search_docs` が、ワークツリーの文書 1 を返す
+      - 最近の commit は返さない
+    test: test_normal_when_describe_lists_refs_and_worktrees
+  - name: 正常シナリオ（オブジェクトの配列のタグで絞る）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+      - name: オブジェクトの配列のタグ
+        description: 'sample の種類の文書が `tags` を `{name, main}` のオブジェクトの配列で持つ。文書 1 は `[{name: mcp, main: true}, {name: 設計}]`、文書 2 は `[{name: MCP}, {name: 設計, main: true}]`'
+        notes: '`project-index.yaml` の documents の行の `metadata` に `tags: tags[].name` と、`main` が真の要素の `name` を共通のキー `main_tags` へ取り出す指定'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（オブジェクトの配列のタグで絞る）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: search_docs(filter: tags が mcp, view: summary)
+        M->>M: metadata の tags[].name で各要素の name を取り出し、正規化して比べる
+        M-->>A: 文書 1・文書 2
+        A->>M: search_docs(filter: main_tags が mcp, view: summary)
+        M-->>A: 文書 1
+        A->>M: search_docs(view: count, group_by: tags)
+        M-->>A: タグごとの件数（MCP 2、設計 2）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`tags` が `mcp` の `search_docs` が、`MCP` を付けた文書 2 も含めて 2 件を返す'
+      - '`main_tags` が `mcp` の `search_docs` が、`main: true` で `mcp` を持つ文書 1 だけを返す'
+      - '`group_by: tags` が、オブジェクトの `name` を数えて `MCP` 2・`設計` 2 を返す（`mcp`・`MCP` は 1 つにまとめ、表記は同数なので値の昇順で先の `MCP`）'
+      - '`fields: [tags]` の `search_docs` が、文字列の配列（`[mcp, 設計]`）を返す'
+      - '`[]` を使わない `metadata` の配信元は今のまま引ける'
+    test: test_normal_when_tags_are_objects
+  - name: 正常シナリオ（エイリアスの語で用語を引く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+      - name: 用語の種類
+        description: sample に用語の種類を加え、文書 `作業範囲` を置く。`name` は `作業範囲`、`aliases` は `[scope, 担当範囲]`
+        notes: '`project-index.yaml` の documents の行に `alias_type` を持ち、`metadata` のエイリアスのキーが alias-inject のスキーマに通る'
+      - name: 用語を含むほかの文書
+        description: sample の文書 1（`alias_type` を持たない行）の本文と `name` に `担当範囲` を含める
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（エイリアスの語で用語を引く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: search_docs(term: 担当範囲)
+        M->>M: alias_type を持つ行の文書の name と aliases に照合する
+        M-->>A: 文書「作業範囲」
+        A->>M: list_match_words(source: sample)
+        M-->>A: 照合する語の一覧（作業範囲・scope・担当範囲 と文書の id）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`search_docs(term: 担当範囲)` が、`aliases` に持つ文書「作業範囲」を返す'
+      - '`search_docs(term: 作業範囲)`（`name` の語）も同じ文書を返す'
+      - '`search_docs(term: 担当範囲)` は `alias_type` を持たない行の文書を返さない（本文に `担当範囲` を含む sample の文書 1 を返さない）'
+      - '`list_match_words` が `name` と `aliases` の語を、指す文書の id とともに返す'
+    test: test_normal_when_term_matched_by_alias
+  - name: 正常シナリオ（instructions の調査の案内を受け取る）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: project-index
+        description: sample と other を配信している project-index
+        notes: '`cwd` は sample のクローン本体。sample のワークツリーに、管理用の YAML の `files` に無いファイルを 1 件置く'
+      - name: 別の配信元
+        description: 作業範囲の外の配信元
+        notes: id `other`。`scope.read` は other のフォルダだけ
+      - name: 設定が古い配信元
+        description: '`project-index.yaml` の `version` がサーバーの読めるバージョンより古い配信元'
+        notes: id `old`。`scope.read` は sample のクローン本体を含む
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（instructions の調査の案内を受け取る）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: initialize
+        M-->>A: instructions（使える配信元の引き方・設計書から調べる案内・作業場所の外を参照する案内・タグの付け方）
+        A->>M: describe()
+        M-->>A: 使える配信元と警告
+      ```
+
+      <!-- /map -->
+    expected:
+      - 文書の MCP の instructions のタグの行が、単語まで分けてタグにすること・`action:`・`topic:`・`tool:` の命名・配信元のタグの規約に従うこと・付ける前に `group_by="tags"` で使われているタグを見ることを案内する
+      - instructions が、使える配信元は引数なしの `describe()` で引けることを示し、SessionStart を参照しない
+      - instructions が、コードや不具合の調査も設計書から参照し、設計書が指すコードを参照することを案内する
+      - 'instructions が、作業場所の外のリポジトリも `source` と `outside_scope: true` で参照でき、外で読める配信元の ID は `describe(outside_scope: true)` で引けることを案内し、配信元の ID を固有の値で持たない'
+      - 引数なしの `describe()` が、sample の索引の同期の件数 1 と、old の設定が古いことの警告を返す
+    test: test_normal_when_research_guide_received
+  - name: 正常シナリオ（MCP を使う場面の案内を受け取る）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: project-index
+        description: sample を配信している project-index
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（MCP を使う場面の案内を受け取る）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: initialize
+        M-->>A: instructions（使う場面・grep と Read が向く場面・ツールの順序）
+        A->>M: tools/list
+        M-->>A: ツールごとの description
+      ```
+
+      <!-- /map -->
+    expected:
+      - instructions が、`search_docs`・`trace_related`・`list_changes`・`write_docs` を使う場面と、grep・Read が向く場面（コードの識別子・文字列の出現箇所、配信の範囲の外のファイル）を案内する
+      - instructions が、`describe(source)` で種類と書き方を確かめてから探す・書く順序を案内する
+      - instructions が 4,096 字以内に収まる
+      - 文書の MCP の各ツールの description が、何をする・いつ使う・いつ使わない・何を返さないを持つ
+      - instructions・description に `MUST`・`必ず`・`禁止` の語が無い
+    test: test_normal_when_usage_guide_received
+lead: エージェントが文書の MCP で、作業場所から使用できる配信元の文書を探して参照するシナリオを定め、調査の流れを変えるときに参照する。
 issue: 14
 primary_actor: エージェント（Claude Code）
 stakeholders:
-- name: エージェント（Claude Code）
-  interest: 何も分からないところから、使える配信元・種類・文書を少ない文字数で順に絞って読める
-- name: 利用者
-  interest: '`scope.read` に当たらない作業場所から、その配信元の文書が読まれない'
+  - name: エージェント（Claude Code）
+    interest: 何も分からないところから、使える配信元・種類・文書を少ない文字数で順に絞って読める
+  - name: 利用者
+    interest: '`scope.read` に当たらない作業場所から、その配信元の文書が読まれない'
 trigger: エージェントが作業に要る文書を探す
 preconditions:
-- project-index が起動し、配信元を配信している
-- 呼び出しの引数に、フックが作業場所 `cwd` と会話キー `session_id`・`agent_id` を入れている
+  - project-index が起動し、配信元を配信している
+  - 呼び出しの引数に、フックが作業場所 `cwd` と会話キー `session_id`・`agent_id` を入れている
 success_guarantee: '`scope.read` に当たる配信元の文書だけが返る。同じ会話で同じバージョンの本文は 2 回返らない。'
 minimal_guarantee: '読めない配信元・配信していない配信元・誤った条件を指した呼び出しは、`isError: true` で原因と次の手を返し、他の配信元の文書を返さない。'
 frequency: 作業のたび
 priority: 高
 refs:
-- SC-1#scenarios[正常シナリオ]
-- SC-1#scenarios[異常シナリオ（配信できない配信元がある）]
+  - SC-1#scenarios[正常シナリオ]
+  - SC-1#scenarios[異常シナリオ（配信できない配信元がある）]
 test_file: tests/e2e/単一ユースケース/test_エージェントが調べる.py

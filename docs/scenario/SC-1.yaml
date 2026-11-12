@@ -1,5 +1,5 @@
 title: project-indexで配信元の文書を読み書きする
-lead: 利用者が project-index を入れて端末の設定に配信元を並べ、エージェントが文書の MCP で、dev-docs の画面のサーバーが読み取り API で、その配信元の YAML の文書を読み書きする。設定・スクリプトの変更と project-index の更新を経ても配信が続く。
+lead: 利用者が project-index を入れてから、エージェントと画面のサーバーが配信元の文書を参照・書き込みし、設定の変更と更新を経ても配信が続くまでの複合ユースケースを定め、全体の流れの E2E テストを変えるときに参照する。
 issue: 14
 visibility: internal
 test_file: tests/e2e/複合ユースケース/test_project-indexで配信元の文書を読み書きする.py
@@ -43,6 +43,8 @@ scenarios:
         description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
         notes: id `notes`。S1 の `/project-index:setup` で `scope.read` に sample のフォルダを回答し、`scope.write` は回答しない
     flow: |-
+      <!-- map: {"title": "正常シナリオ"} -->
+
       ```mermaid
       flowchart TD
         subgraph P1["導入"]
@@ -77,6 +79,8 @@ scenarios:
         click S9 "id:SC-12#scenarios[正常シナリオ]"
         click S10 "id:SC-3#scenarios[正常シナリオ]"
       ```
+
+      <!-- /map -->
     expected:
       - '`PROJECT_INDEX_CONFIG` が指す `settings.yaml` が `version`・`clone` を持ち、Claude Code の設定の場所の `settings.json` の env に `PROJECT_INDEX_CONFIG` が入っている'
       - '`PROJECT_INDEX_PORT` を待ち受ける project-index のプロセスが 1 つだけある'
@@ -130,6 +134,8 @@ scenarios:
         description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
         notes: '`sources` に sample と broken の 2 行'
     flow: |-
+      <!-- map: {"title": "異常シナリオ（配信できない配信元がある）"} -->
+
       ```mermaid
       flowchart TD
         subgraph P1["起動"]
@@ -148,6 +154,8 @@ scenarios:
         click S6 "id:SC-11#scenarios[異常シナリオ（配信していない配信元を指す）]"
         click S8 "id:SC-10#scenarios[正常シナリオ]"
       ```
+
+      <!-- /map -->
     expected:
       - 起動の直後、読み取り API の配信元の一覧が broken を配信していない配信元として理由つきで返却し、sample の文書の取得と文書の MCP は応答する
       - '`source: broken` を指した `search_docs` は配信していない配信元としてエラーを返却し、`source: sample` は文書を返却する'

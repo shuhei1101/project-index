@@ -4,138 +4,154 @@ entry:
   kind: endpoint
   value: POST /_admin/session-start
 flows:
-- name: 正常系（/clear の後）
-  summary: '`reason: clear` で呼ぶと、そのセッションの返し済みの記録を削除する'
-  setup:
-  - name: Mock
-    description: なし（project-index のアプリをテストのクライアントで呼ぶ）
-  - name: 返し済みの記録
-    description: 同じ `session_id` で `search_docs` を呼び、文書を 1 件返した状態
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as POST /_admin/session-start
-      participant M as 返し済みの記録
+  - name: 正常系（/clear の後）
+    summary: '`reason: clear` で呼ぶと、そのセッションの返し済みの記録を削除する'
+    setup:
+      - name: Mock
+        description: なし（project-index のアプリをテストのクライアントで呼ぶ）
+      - name: 返し済みの記録
+        description: 同じ `session_id` で `search_docs` を呼び、文書を 1 件返した状態
+    flow: |-
+      <!-- map: {"title": "正常系（/clear の後）"} -->
 
-      C->>T: session_id・reason: clear
-      T->>M: session_id の記録を削除する
-      T-->>C: forgotten: true
-    ```
-  expected:
-  - '`forgotten` が `true`'
-  - 同じ `session_id` で続けて呼んだ `search_docs` が、前に返した文書の本文を省かずに返す
-  test: test_normal_when_cleared
-- name: 正常系（記録を削除しない理由）
-  summary: '`reason` が `clear`・`compact` 以外のときは、記録を削除しない'
-  setup:
-  - name: Mock
-    description: なし
-  - name: 返し済みの記録
-    description: 同じ `session_id` で `search_docs` を呼び、文書を 1 件返した状態
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as POST /_admin/session-start
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as POST /_admin/session-start
+        participant M as 返し済みの記録
 
-      C->>T: session_id・reason: resume
-      T-->>C: forgotten: false
-    ```
-  expected:
-  - '`forgotten` が `false`'
-  - 同じ `session_id` で続けて呼んだ `search_docs` が、前に返した文書の本文を `（この会話で返却済み）` にする
-  test: test_normal_when_not_forget_reason
-- name: 正常系（配信元を読み込んでいる）
-  summary: 配信元の読み込みを待たずに、記録を削除して答える
-  setup:
-  - name: Mock
-    description: 配信元の読み込み（`load_source`）を、テストが合図を出すまで止めるものに差し替える
-    notes: 合図は `threading.Event`
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as POST /_admin/session-start
+        C->>T: session_id・reason: clear
+        T->>M: session_id の記録を削除する
+        T-->>C: forgotten: true
+      ```
 
-      C->>T: session_id・reason: compact
-      T-->>C: forgotten: true
-    ```
-  expected:
-  - 合図を出す前に 200 を返す
-  - '`forgotten` が `true`'
-  test: test_normal_when_loading
-- name: 異常系（入力が不正・422）
-  summary: '`reason` が選択肢の外か `session_id` が無いと 422 を返し、記録を削除しない'
-  setup:
-  - name: Mock
-    description: なし
-  - name: 入力
-    description: '`reason: restart` と `session_id`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as POST /_admin/session-start
+      <!-- /map -->
+    expected:
+      - '`forgotten` が `true`'
+      - 同じ `session_id` で続けて呼んだ `search_docs` が、前に返した文書の本文を省かずに返す
+    test: test_normal_when_cleared
+  - name: 正常系（記録を削除しない理由）
+    summary: '`reason` が `clear`・`compact` 以外のときは、記録を削除しない'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 返し済みの記録
+        description: 同じ `session_id` で `search_docs` を呼び、文書を 1 件返した状態
+    flow: |-
+      <!-- map: {"title": "正常系（記録を削除しない理由）"} -->
 
-      C->>T: session_id・reason: restart
-      T-->>C: 422（Problem Details）
-    ```
-  expected:
-  - 422 で `reason` の違反を返す
-  - 同じ `session_id` の返し済みの記録が残っている
-  test: test_error_when_input_invalid
-lead: SessionStart のフックが `/clear`・圧縮の後に呼び、そのセッションの返し済みの記録を削除する。文脈の文は返さない。
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as POST /_admin/session-start
+
+        C->>T: session_id・reason: resume
+        T-->>C: forgotten: false
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`forgotten` が `false`'
+      - 同じ `session_id` で続けて呼んだ `search_docs` が、前に返した文書の本文を `（この会話で返却済み）` にする
+    test: test_normal_when_not_forget_reason
+  - name: 正常系（配信元を読み込んでいる）
+    summary: 配信元の読み込みを待たずに、記録を削除して答える
+    setup:
+      - name: Mock
+        description: 配信元の読み込み（`load_source`）を、テストが合図を出すまで止めるものに差し替える
+        notes: 合図は `threading.Event`
+    flow: |-
+      <!-- map: {"title": "正常系（配信元を読み込んでいる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as POST /_admin/session-start
+
+        C->>T: session_id・reason: compact
+        T-->>C: forgotten: true
+      ```
+
+      <!-- /map -->
+    expected:
+      - 合図を出す前に 200 を返す
+      - '`forgotten` が `true`'
+    test: test_normal_when_loading
+  - name: 異常系（入力が不正・422）
+    summary: '`reason` が選択肢の外か `session_id` が無いと 422 を返し、記録を削除しない'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`reason: restart` と `session_id`'
+    flow: |-
+      <!-- map: {"title": "異常系（入力が不正・422）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as POST /_admin/session-start
+
+        C->>T: session_id・reason: restart
+        T-->>C: 422（Problem Details）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 422 で `reason` の違反を返す
+      - 同じ `session_id` の返し済みの記録が残っている
+    test: test_error_when_input_invalid
+lead: '`/clear`・圧縮の後にセッションの返却済みの記録を削除する `POST /_admin/session-start` の入出力を定め、セッションの開始の処理を修正するときに参照する。'
 identifier: post_session_start
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true
 side_effects: '`reason` が `clear`・`compact` のとき、`session_id`（と `agent_id`）の返し済みの記録を削除する'
 callers:
-- IF-19#flows[正常系（/clear の後）]
+  - IF-19#flows[正常系（/clear の後）]
 exclusivity: 返し済みの記録の削除は記録の書き込みと同じロックで行う
 request:
-- name: session_id
-  type: str
-  required: true
-  location: body
-  description: Claude Code のセッション ID
-- name: agent_id
-  type: str
-  required: false
-  default: なし（メインのセッション）
-  location: body
-  description: サブエージェントの ID
-- name: reason
-  type: Literal['startup', 'resume', 'clear', 'compact', 'fork']
-  required: true
-  location: body
-  description: SessionStart の入力の `source`
+  - name: session_id
+    type: str
+    required: true
+    location: body
+    description: Claude Code のセッション ID
+  - name: agent_id
+    type: str
+    required: false
+    default: なし（メインのセッション）
+    location: body
+    description: サブエージェントの ID
+  - name: reason
+    type: Literal['startup', 'resume', 'clear', 'compact', 'fork']
+    required: true
+    location: body
+    description: SessionStart の入力の `source`
 request_example: |-
   ```json
   {"session_id": "8f1c...", "reason": "clear"}
   ```
 response:
-- name: forgotten
-  type: bool
-  description: 返却済みの記録を削除したか
+  - name: forgotten
+    type: bool
+    description: 返却済みの記録を削除したか
 response_example: |-
   ```json
   {"forgotten": true}
   ```
 constraints:
-- item: 公開範囲
-  constraint: 管理の MCP のツールにしない。読み取り API にも載せない
-  notes: フックだけが呼ぶ操作で、エージェントのツール一覧に出さないため
-- item: 記録の削除
-  constraint: '`reason` が `clear`・`compact` のときだけ削除する。`startup`・`resume`・`fork` では削除しない'
-- item: タイムアウト
-  constraint: 制限なし（呼ぶ側のフックが `FORGET_TIMEOUT_SEC` 秒で打ち切る）
-- item: 配信元の読み込みの間
-  constraint: 配信元の読み込みを待たずに答える（起動の待ち受けまでの順番）
+  - item: 公開範囲
+    constraint: 管理の MCP のツールにしない。読み取り API にも載せない
+    notes: フックだけが呼ぶ操作で、エージェントのツール一覧に出さないため
+  - item: 記録の削除
+    constraint: '`reason` が `clear`・`compact` のときだけ削除する。`startup`・`resume`・`fork` では削除しない'
+  - item: タイムアウト
+    constraint: 制限なし（呼ぶ側のフックが `FORGET_TIMEOUT_SEC` 秒で打ち切る）
+  - item: 配信元の読み込みの間
+    constraint: 配信元の読み込みを待たずに答える（起動の待ち受けまでの順番）
 status_codes:
-- code: '200'
-  condition: '受け付けた（記録を削除しなかったときも `forgotten: false` で返す）'
-- code: '422'
-  condition: '`session_id` が無い、または `reason` が選択肢の外'
+  - code: '200'
+    condition: '受け付けた（記録を削除しなかったときも `forgotten: false` で返す）'
+  - code: '422'
+    condition: '`session_id` が無い、または `reason` が選択肢の外'
 error_format: 読み取り API と同じ RFC 9457 の Problem Details（`application/problem+json`）
 test_file: tests/integration/server/test_session_start.py

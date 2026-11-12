@@ -1,76 +1,76 @@
 id: MOD-96
 title: 索引のサーバー / 共通 / origin.py
-lead: 端末の設定の API への、ブラウザからの別のオリジンの書き込みの確認。
+lead: 端末の設定の API への、ブラウザからの別のオリジンの書き込みの確認を受け持ち、共通の origin.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/server/test_origin.py
+  - tests/unit/project_index/server/test_origin.py
 constants:
-- name: SAME_ORIGIN
-  title: 同じオリジン
-  container: project_index/server/origin.py
-  usecase: 共通
-  summary: '`Sec-Fetch-Site` で同じオリジンを表す値'
-  value: '"same-origin"'
+  - name: SAME_ORIGIN
+    title: 同じオリジン
+    container: project_index/server/origin.py
+    usecase: 共通
+    summary: '`Sec-Fetch-Site` で同じオリジンを表す値'
+    value: '"same-origin"'
 functions:
-- name: require_same_origin
-  title: 同じオリジンの確認
-  kind: 関数
-  container: project_index/server/origin.py
-  usecase: 共通
-  role: 依存
-  summary: '`Origin` か `Sec-Fetch-Site` を持つブラウザからの要求のうち、project-index と別のオリジンの書き込みを断る（FastAPI の依存）'
-  scope: public
-  args:
-  - name: request
-    title: 要求
-    type: fastapi.Request
-    required: true
-    passing: positional
-    description: 受けた要求
-  returns:
-    type: None
-    description: 同じオリジンなら何も返さない
-  process: |-
-    1. `Origin` があれば、要求の `scheme://host:port` と比べ、違えば `CrossOriginError` を送る
-    2. `Origin` が無く `Sec-Fetch-Site` があれば、`SAME_ORIGIN` でなければ `CrossOriginError` を送る
-    3. どちらも無い要求（サーバーの側からの呼び出し）は受ける
-  exceptions:
-  - name: CrossOriginError
-    condition: '`Origin` が project-index のオリジンと違う'
-    message: '`別のオリジン（{origin}）からの要求は受けません`'
-    notes: '`ProjectIndexError` の子で HTTP 403'
-  - name: CrossOriginError
-    condition: '`Origin` が無く、`Sec-Fetch-Site` が `same-origin` でない'
-    message: '`別のオリジンからの要求は受けません`'
-  unit_tests:
-  - name: test_require_same_origin
-    case: 正常
-    summary: 同じオリジン
-    condition: '`Origin: http://127.0.0.1:8786` を `http://127.0.0.1:8786/settings/sources` へ'
-    mock: なし（Starlette の Request を組み立てる）
-    expected: 送らない
-  - name: test_require_same_origin_when_fetch_site
-    case: 正常
-    summary: '`Origin` が無く `Sec-Fetch-Site` が same-origin'
-    condition: '`Sec-Fetch-Site: same-origin` だけ'
-    mock: なし
-    expected: 送らない
-  - name: test_require_same_origin_when_cross_origin
-    case: 異常
-    summary: 別のオリジン
-    condition: '`Origin: http://evil.example`'
-    mock: なし
-    expected: '`CrossOriginError`'
-    exception: '`Origin` が違う'
-  - name: test_require_same_origin_when_server_side
-    case: 正常
-    summary: どちらのヘッダーも無い（サーバーの側からの呼び出し）
-    condition: ヘッダーなし
-    mock: なし
-    expected: '送らない'
-  - name: test_require_same_origin_when_cross_site
-    case: 異常
-    summary: '`Origin` が無く `Sec-Fetch-Site` が cross-site'
-    condition: '`Sec-Fetch-Site: cross-site` だけ'
-    mock: なし
-    expected: '`CrossOriginError`'
-    exception: '`Sec-Fetch-Site` が same-origin でない'
+  - name: require_same_origin
+    title: 同じオリジンの確認
+    kind: 関数
+    container: project_index/server/origin.py
+    usecase: 共通
+    role: 依存
+    summary: '`Origin` か `Sec-Fetch-Site` を持つブラウザからの要求のうち、project-index と別のオリジンの書き込みを断る（FastAPI の依存）'
+    scope: public
+    args:
+      - name: request
+        title: 要求
+        type: fastapi.Request
+        required: true
+        passing: positional
+        description: 受けた要求
+    returns:
+      type: None
+      description: 同じオリジンなら何も返さない
+    process: |-
+      1. `Origin` があれば、要求の `scheme://host:port` と比べ、違えば `CrossOriginError` を送る
+      2. `Origin` が無く `Sec-Fetch-Site` があれば、`SAME_ORIGIN` でなければ `CrossOriginError` を送る
+      3. どちらも無い要求（サーバーの側からの呼び出し）は受ける
+    exceptions:
+      - name: CrossOriginError
+        condition: '`Origin` が project-index のオリジンと違う'
+        message: '`別のオリジン（{origin}）からの要求は受けません`'
+        notes: '`ProjectIndexError` の子で HTTP 403'
+      - name: CrossOriginError
+        condition: '`Origin` が無く、`Sec-Fetch-Site` が `same-origin` でない'
+        message: '`別のオリジンからの要求は受けません`'
+    unit_tests:
+      - name: test_require_same_origin
+        case: 正常
+        summary: 同じオリジン
+        condition: '`Origin: http://127.0.0.1:8786` を `http://127.0.0.1:8786/settings/sources` へ'
+        mock: なし（Starlette の Request を組み立てる）
+        expected: 送らない
+      - name: test_require_same_origin_when_fetch_site
+        case: 正常
+        summary: '`Origin` が無く `Sec-Fetch-Site` が same-origin'
+        condition: '`Sec-Fetch-Site: same-origin` だけ'
+        mock: なし
+        expected: 送らない
+      - name: test_require_same_origin_when_cross_origin
+        case: 異常
+        summary: 別のオリジン
+        condition: '`Origin: http://evil.example`'
+        mock: なし
+        expected: '`CrossOriginError`'
+        exception: '`Origin` が違う'
+      - name: test_require_same_origin_when_server_side
+        case: 正常
+        summary: どちらのヘッダーも無い（サーバーの側からの呼び出し）
+        condition: ヘッダーなし
+        mock: なし
+        expected: '送らない'
+      - name: test_require_same_origin_when_cross_site
+        case: 異常
+        summary: '`Origin` が無く `Sec-Fetch-Site` が cross-site'
+        condition: '`Sec-Fetch-Site: cross-site` だけ'
+        mock: なし
+        expected: '`CrossOriginError`'
+        exception: '`Sec-Fetch-Site` が same-origin でない'

@@ -1,8 +1,7 @@
 id: MOD-114
 title: 索引のサーバー / 書き込み
 lead: |-
-  `write_docs`・`delete_docs` の処理。操作を全て当てた後の文書を検査に通し、通ったときだけ作業ツリー（Git 管理外の配信元はそのフォルダ）のファイルを書き換える。
-  書き込み・削除は配信元ごとに 1 つずつ行い、commit はしない。
+  `write_docs`・`delete_docs` の操作を検査に合格させてから作業ツリーに書き込む書き込みの分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
 directory: |-
   ```text
   src/project_index/features/write/
@@ -15,90 +14,94 @@ directory: |-
   └─ service.py     # write_docs / delete_docs / check_version
   ```
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      文書の書き込み ..> 書く場所の解決
-      文書の書き込み ..> 配信元ごとの排他
-      文書の書き込み ..> 文書を集める
-      文書の書き込み ..> バージョンの確かめ
-      文書の書き込み ..> オブジェクトの配列への書き戻し
-      文書の書き込み ..> 列名への読み替え
-      文書の書き込み ..> 操作を当てる
-      文書の書き込み ..> IDを作る
-      文書の書き込み ..> 新しい文書の置き場所
-      文書の書き込み ..> 文字列からの文書の組み立て
-      文書の書き込み ..> 文書の検査
-      文書の書き込み ..> ファイルの置き換え
-      文書の書き込み ..> スクリプトの実行 : generators[]
-      文書の書き込み ..> 会話の記録 : edited
-      文書の削除 ..> 書く場所の解決
-      文書の削除 ..> 配信元ごとの排他
-      文書の削除 ..> バージョンの確かめ
-      文書の削除 ..> 操作を当てる : related を外す
-      文書の削除 ..> 文書の検査
-      class 文書の書き込み {
-        <<function>>
-      }
-      class 文書の削除 {
-        <<function>>
-      }
-      class 書く場所の解決 {
-        <<function>>
-      }
-      class 配信元ごとの排他 {
-        +握る(配信元の ID) ContextManager
-      }
-      class 文書を集める {
-        <<method>>
-      }
-      class バージョンの確かめ {
-        <<function>>
-      }
-      class オブジェクトの配列への書き戻し {
-        <<function>>
-      }
-      class 列名への読み替え {
-        <<function>>
-      }
-      class 操作を当てる {
-        <<function>>
-      }
-      class IDを作る {
-        <<function>>
-      }
-      class 新しい文書の置き場所 {
-        <<function>>
-      }
-      class 文字列からの文書の組み立て {
-        <<function>>
-      }
-      class 文書の検査 {
-        <<class>>
-      }
-      class ファイルの置き換え {
-        <<function>>
-      }
-      class スクリプトの実行 {
-        <<function>>
-      }
-      class 会話の記録 {
-        <<class>>
-      }
-      click 文書の書き込み href "./MOD-84.py.yaml#文書の書き込み"
-      click 書く場所の解決 href "./MOD-7.py.yaml#書く場所の解決"
-      click 配信元ごとの排他 href "./MOD-82.py.yaml#配信元ごとの排他"
-      click 文書を集める href "./MOD-29.py.yaml#文書を集める"
-      click バージョンの確かめ href "./MOD-84.py.yaml#バージョンの確かめ"
-      click オブジェクトの配列への書き戻し href "./MOD-80.py.yaml#オブジェクトの配列への書き戻し"
-      click 列名への読み替え href "./MOD-80.py.yaml#列名への読み替え"
-      click 操作を当てる href "./MOD-80.py.yaml#操作を当てる"
-      click IDを作る href "./MOD-81.py.yaml#IDを作る"
-      click 新しい文書の置き場所 href "./MOD-83.py.yaml#新しい文書の置き場所"
-      click 文字列からの文書の組み立て href "./MOD-27.py.yaml#文字列からの文書の組み立て"
-      click 文書の検査 href "./MOD-75.py.yaml#文書の検査"
-      click ファイルの置き換え href "./MOD-99.py.yaml#ファイルの置き換え"
-      click スクリプトの実行 href "./MOD-88.py.yaml#スクリプトの実行"
-      click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
-      click 文書の削除 href "./MOD-84.py.yaml#文書の削除"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        文書の書き込み ..> 書く場所の解決
+        文書の書き込み ..> 配信元ごとの排他
+        文書の書き込み ..> 文書を集める
+        文書の書き込み ..> バージョンの確かめ
+        文書の書き込み ..> オブジェクトの配列への書き戻し
+        文書の書き込み ..> 列名への読み替え
+        文書の書き込み ..> 操作を当てる
+        文書の書き込み ..> IDを作る
+        文書の書き込み ..> 新しい文書の置き場所
+        文書の書き込み ..> 文字列からの文書の組み立て
+        文書の書き込み ..> 文書の検査
+        文書の書き込み ..> ファイルの置き換え
+        文書の書き込み ..> スクリプトの実行 : generators[]
+        文書の書き込み ..> 会話の記録 : edited
+        文書の削除 ..> 書く場所の解決
+        文書の削除 ..> 配信元ごとの排他
+        文書の削除 ..> バージョンの確かめ
+        文書の削除 ..> 操作を当てる : related を外す
+        文書の削除 ..> 文書の検査
+        class 文書の書き込み {
+          <<function>>
+        }
+        class 文書の削除 {
+          <<function>>
+        }
+        class 書く場所の解決 {
+          <<function>>
+        }
+        class 配信元ごとの排他 {
+          +握る(配信元の ID) ContextManager
+        }
+        class 文書を集める {
+          <<method>>
+        }
+        class バージョンの確かめ {
+          <<function>>
+        }
+        class オブジェクトの配列への書き戻し {
+          <<function>>
+        }
+        class 列名への読み替え {
+          <<function>>
+        }
+        class 操作を当てる {
+          <<function>>
+        }
+        class IDを作る {
+          <<function>>
+        }
+        class 新しい文書の置き場所 {
+          <<function>>
+        }
+        class 文字列からの文書の組み立て {
+          <<function>>
+        }
+        class 文書の検査 {
+          <<class>>
+        }
+        class ファイルの置き換え {
+          <<function>>
+        }
+        class スクリプトの実行 {
+          <<function>>
+        }
+        class 会話の記録 {
+          <<class>>
+        }
+        click 文書の書き込み href "./MOD-84.py.yaml#文書の書き込み"
+        click 書く場所の解決 href "./MOD-7.py.yaml#書く場所の解決"
+        click 配信元ごとの排他 href "./MOD-82.py.yaml#配信元ごとの排他"
+        click 文書を集める href "./MOD-29.py.yaml#文書を集める"
+        click バージョンの確かめ href "./MOD-84.py.yaml#バージョンの確かめ"
+        click オブジェクトの配列への書き戻し href "./MOD-80.py.yaml#オブジェクトの配列への書き戻し"
+        click 列名への読み替え href "./MOD-80.py.yaml#列名への読み替え"
+        click 操作を当てる href "./MOD-80.py.yaml#操作を当てる"
+        click IDを作る href "./MOD-81.py.yaml#IDを作る"
+        click 新しい文書の置き場所 href "./MOD-83.py.yaml#新しい文書の置き場所"
+        click 文字列からの文書の組み立て href "./MOD-27.py.yaml#文字列からの文書の組み立て"
+        click 文書の検査 href "./MOD-75.py.yaml#文書の検査"
+        click ファイルの置き換え href "./MOD-99.py.yaml#ファイルの置き換え"
+        click スクリプトの実行 href "./MOD-88.py.yaml#スクリプトの実行"
+        click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
+        click 文書の削除 href "./MOD-84.py.yaml#文書の削除"
+notes:
+  受け持つこと: |-
+    Git 管理外の配信元はそのフォルダのファイルを書き換える。
+    書き込み・削除は配信元ごとに 1 つずつ行い、commit はしない。

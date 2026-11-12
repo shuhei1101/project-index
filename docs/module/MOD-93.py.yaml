@@ -1,144 +1,144 @@
 id: MOD-93
 title: 索引のサーバー / 文書のMCP / admin.py
-lead: 管理の MCP の組み立て（ツールの登録）。
+lead: 管理の MCP の組み立て（ツールの登録）を受け持ち、文書の MCP の admin.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/server/mcp/test_admin.py
+  - tests/unit/project_index/server/mcp/test_admin.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      管理の MCP の組み立て ..> ツールのプロンプトの ID
-      class ツールのプロンプトの ID {
-        <<function>>
-      }
-      class 管理の MCP の組み立て {
-        <<function>>
-      }
-      click ツールのプロンプトの ID href "./MOD-95.py.yaml#ツールのプロンプトの ID"
-- name: 管理の MCP
-  diagram: |-
-    classDiagram
-      direction TD
-      管理の MCP の組み立て ..> ツールの結果
-      管理の MCP の組み立て ..> ツールのエラーの変換
-      管理の MCP の組み立て ..> 状態の取得
-      管理の MCP の組み立て ..> 設定の読み直し
-      管理の MCP の組み立て ..> 配信元の検査
-      管理の MCP の組み立て ..> 試しの変換
-      管理の MCP の組み立て ..> 再起動の制御
-      管理の MCP の組み立て ..> クローンの更新
-      管理の MCP の組み立て ..> 状態の文
-      管理の MCP の組み立て ..> 読み直しの文
-      管理の MCP の組み立て ..> 検査の文
-      class 管理の MCP の組み立て {
-        <<function>>
-      }
-      class ツールの結果 {
-        <<function>>
-      }
-      class ツールのエラーの変換 {
-        <<function>>
-      }
-      class 状態の取得 {
-        <<function>>
-      }
-      class 設定の読み直し {
-        <<function>>
-      }
-      class 配信元の検査 {
-        <<function>>
-      }
-      class 試しの変換 {
-        <<function>>
-      }
-      class 再起動の制御 {
-        +再起動の要求() RestartResult
-      }
-      class クローンの更新 {
-        <<function>>
-      }
-      class 状態の文 {
-        <<function>>
-      }
-      class 読み直しの文 {
-        <<function>>
-      }
-      class 検査の文 {
-        <<function>>
-      }
-      click ツールの結果 href "./MOD-95.py.yaml#ツールの結果"
-      click ツールのエラーの変換 href "./MOD-95.py.yaml#ツールのエラーの変換"
-      click 状態の取得 href "./MOD-10.py.yaml#状態の取得"
-      click 設定の読み直し href "./MOD-10.py.yaml#設定の読み直し"
-      click 配信元の検査 href "./MOD-10.py.yaml#配信元の検査"
-      click 試しの変換 href "./MOD-10.py.yaml#試しの変換"
-      click 再起動の制御 href "./MOD-34.py.yaml#再起動の制御"
-      click クローンの更新 href "./MOD-36.py.yaml#クローンの更新"
-      click 状態の文 href "./MOD-9.py.yaml#状態の文"
-      click 読み直しの文 href "./MOD-9.py.yaml#読み直しの文"
-      click 検査の文 href "./MOD-9.py.yaml#検査の文"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        管理の MCP の組み立て ..> ツールのプロンプトの ID
+        class ツールのプロンプトの ID {
+          <<function>>
+        }
+        class 管理の MCP の組み立て {
+          <<function>>
+        }
+        click ツールのプロンプトの ID href "./MOD-95.py.yaml#ツールのプロンプトの ID"
+  - name: 管理の MCP
+    diagram: |-
+      classDiagram
+        direction TD
+        管理の MCP の組み立て ..> ツールの結果
+        管理の MCP の組み立て ..> ツールのエラーの変換
+        管理の MCP の組み立て ..> 状態の取得
+        管理の MCP の組み立て ..> 設定の読み直し
+        管理の MCP の組み立て ..> 配信元の検査
+        管理の MCP の組み立て ..> 試しの変換
+        管理の MCP の組み立て ..> 再起動の制御
+        管理の MCP の組み立て ..> クローンの更新
+        管理の MCP の組み立て ..> 状態の文
+        管理の MCP の組み立て ..> 読み直しの文
+        管理の MCP の組み立て ..> 検査の文
+        class 管理の MCP の組み立て {
+          <<function>>
+        }
+        class ツールの結果 {
+          <<function>>
+        }
+        class ツールのエラーの変換 {
+          <<function>>
+        }
+        class 状態の取得 {
+          <<function>>
+        }
+        class 設定の読み直し {
+          <<function>>
+        }
+        class 配信元の検査 {
+          <<function>>
+        }
+        class 試しの変換 {
+          <<function>>
+        }
+        class 再起動の制御 {
+          +再起動の要求() RestartResult
+        }
+        class クローンの更新 {
+          <<function>>
+        }
+        class 状態の文 {
+          <<function>>
+        }
+        class 読み直しの文 {
+          <<function>>
+        }
+        class 検査の文 {
+          <<function>>
+        }
+        click ツールの結果 href "./MOD-95.py.yaml#ツールの結果"
+        click ツールのエラーの変換 href "./MOD-95.py.yaml#ツールのエラーの変換"
+        click 状態の取得 href "./MOD-10.py.yaml#状態の取得"
+        click 設定の読み直し href "./MOD-10.py.yaml#設定の読み直し"
+        click 配信元の検査 href "./MOD-10.py.yaml#配信元の検査"
+        click 試しの変換 href "./MOD-10.py.yaml#試しの変換"
+        click 再起動の制御 href "./MOD-34.py.yaml#再起動の制御"
+        click クローンの更新 href "./MOD-36.py.yaml#クローンの更新"
+        click 状態の文 href "./MOD-9.py.yaml#状態の文"
+        click 読み直しの文 href "./MOD-9.py.yaml#読み直しの文"
+        click 検査の文 href "./MOD-9.py.yaml#検査の文"
 constants:
-- name: ADMIN_MCP_NAME
-  title: 管理の MCP の名前
-  container: project_index/server/mcp/admin.py
-  usecase: 共通
-  summary: '`initialize` で返すサーバーの名前'
-  value: '"project-index-admin"'
+  - name: ADMIN_MCP_NAME
+    title: 管理の MCP の名前
+    container: project_index/server/mcp/admin.py
+    usecase: 共通
+    summary: '`initialize` で返すサーバーの名前'
+    value: '"project-index-admin"'
 functions:
-- name: build_admin_mcp
-  title: 管理の MCP の組み立て
-  kind: 関数
-  container: project_index/server/mcp/admin.py
-  usecase: 共通
-  role: 入口
-  summary: '7 つのツールを持つ管理の MCP を作る'
-  scope: public
-  args:
-  - name: handlers
-    title: 配線済みの関数
-    type: Handlers
-    required: true
-    passing: positional
-    description: 起動の『配線済みの関数』
-  returns:
-    type: mcp.server.mcpserver.MCPServer
-    description: 管理の MCP
-  process: |-
-    1. `MCPServer(ADMIN_MCP_NAME)` を作る
-    2. `ADMIN_TOOL_NAMES` のツールを、`description` を `handlers.prompts.render(tool_prompt_id("admin", 名前))` にして `TOOL_ANNOTATIONS` の注釈で登録する（今の説明の文は各ツールの YAML へ移す）。引数はインターフェース定義の `request` をキーワード引数で受ける
-    3. 各ツールは次のサービスを `asyncio.to_thread` で呼び、結果をツールの結果にする。`status`・`restart` 以外は、呼ぶ前に `await handlers.registry.wait_loaded()` で配信元の読み込みを待つ
-       - `status`: 状態の取得（`env` は `os.environ`）。`render` は状態の文
-       - `reload`: 設定の読み直し。`render` は読み直しの文
-       - `restart`: 再起動の制御の再起動の要求（`handlers.restart.request()`）。`render` は `None`
-       - `update`: クローンの更新（クローンは端末の設定の `clone`、`control` は `handlers.restart`）。`render` は `None`
-       - `check_project`: 配信元の検査。`render` は検査の文
-       - `try_convert`: 試しの変換。`render` は `None`
-       - `write_nav`: 画面の構成の書き込み。`render` は画面の構成の書き込みの文
-       - `ProjectIndexError` と `pydantic.ValidationError` はツールのエラーの変換の結果を返す。それ以外の例外は `[error]` ツールの処理に失敗した（ツール名・例外）を書いて MCP の既定に任せる
-    4. 作った MCP を返す
-  unit_tests:
-  - name: test_build_admin_mcp
-    case: 正常
-    summary: ツールと注釈
-    condition: '`list_tools` を呼ぶ'
-    mock: 配線済みの関数（偽物）
-    expected: 7 つのツールが並び、`write_nav` の `destructiveHint` が `False`、`restart`・`update` の `destructiveHint` が `True`、`status`・`check_project`・`try_convert` の `readOnlyHint` が `True`
-  - name: test_build_admin_mcp_when_call
-    case: 正常
-    summary: サービスへの受け渡し
-    condition: '`check_project(path="/tmp/a", format="json")` を呼ぶ'
-    mock: 配信元の検査（結果を返す偽物）
-    expected: サービスに `CheckProjectRequest(path="/tmp/a")` が渡り、`structuredContent` を返す
-  - name: test_build_admin_mcp_when_restart_in_progress
-    case: 正常
-    summary: 再起動の途中をエラーにする
-    condition: '`restart` を 2 回呼ぶ'
-    mock: 再起動の制御（uvicorn のサーバーはスタブ）
-    expected: 1 回目の `restarting` が `True`、2 回目の `isError` が `True` で text が `RestartInProgressError` で始まる
-  - name: test_build_admin_mcp_when_descriptions
-    case: 正常
-    summary: ツールの説明をプロンプトの YAML から描画する
-    condition: '`list_tools` と `initialize` を呼ぶ'
-    mock: 配線済みの関数（偽物。`prompts` は同梱した YAML を読んだ一式）
-    expected: 7 つのツールの説明がそれぞれ `prompts.render(tool_prompt_id("admin", 名前))` と同じで、`instructions` が無い
+  - name: build_admin_mcp
+    title: 管理の MCP の組み立て
+    kind: 関数
+    container: project_index/server/mcp/admin.py
+    usecase: 共通
+    role: 入口
+    summary: '7 つのツールを持つ管理の MCP を作る'
+    scope: public
+    args:
+      - name: handlers
+        title: 配線済みの関数
+        type: Handlers
+        required: true
+        passing: positional
+        description: 起動の『配線済みの関数』
+    returns:
+      type: mcp.server.mcpserver.MCPServer
+      description: 管理の MCP
+    process: |-
+      1. `MCPServer(ADMIN_MCP_NAME)` を作る
+      2. `ADMIN_TOOL_NAMES` のツールを、`description` を `handlers.prompts.render(tool_prompt_id("admin", 名前))` にして `TOOL_ANNOTATIONS` の注釈で登録する（今の説明の文は各ツールの YAML へ移す）。引数はインターフェース定義の `request` をキーワード引数で受ける
+      3. 各ツールは次のサービスを `asyncio.to_thread` で呼び、結果をツールの結果にする。`status`・`restart` 以外は、呼ぶ前に `await handlers.registry.wait_loaded()` で配信元の読み込みを待つ
+         - `status`: 状態の取得（`env` は `os.environ`）。`render` は状態の文
+         - `reload`: 設定の読み直し。`render` は読み直しの文
+         - `restart`: 再起動の制御の再起動の要求（`handlers.restart.request()`）。`render` は `None`
+         - `update`: クローンの更新（クローンは端末の設定の `clone`、`control` は `handlers.restart`）。`render` は `None`
+         - `check_project`: 配信元の検査。`render` は検査の文
+         - `try_convert`: 試しの変換。`render` は `None`
+         - `write_nav`: 画面の構成の書き込み。`render` は画面の構成の書き込みの文
+         - `ProjectIndexError` と `pydantic.ValidationError` はツールのエラーの変換の結果を返す。それ以外の例外は `[error]` ツールの処理に失敗した（ツール名・例外）を書いて MCP の既定に任せる
+      4. 作った MCP を返す
+    unit_tests:
+      - name: test_build_admin_mcp
+        case: 正常
+        summary: ツールと注釈
+        condition: '`list_tools` を呼ぶ'
+        mock: 配線済みの関数（偽物）
+        expected: 7 つのツールが並び、`write_nav` の `destructiveHint` が `False`、`restart`・`update` の `destructiveHint` が `True`、`status`・`check_project`・`try_convert` の `readOnlyHint` が `True`
+      - name: test_build_admin_mcp_when_call
+        case: 正常
+        summary: サービスへの受け渡し
+        condition: '`check_project(path="/tmp/a", format="json")` を呼ぶ'
+        mock: 配信元の検査（結果を返す偽物）
+        expected: サービスに `CheckProjectRequest(path="/tmp/a")` が渡り、`structuredContent` を返す
+      - name: test_build_admin_mcp_when_restart_in_progress
+        case: 正常
+        summary: 再起動の途中をエラーにする
+        condition: '`restart` を 2 回呼ぶ'
+        mock: 再起動の制御（uvicorn のサーバーはスタブ）
+        expected: 1 回目の `restarting` が `True`、2 回目の `isError` が `True` で text が `RestartInProgressError` で始まる
+      - name: test_build_admin_mcp_when_descriptions
+        case: 正常
+        summary: ツールの説明をプロンプトの YAML から描画する
+        condition: '`list_tools` と `initialize` を呼ぶ'
+        mock: 配線済みの関数（偽物。`prompts` は同梱した YAML を読んだ一式）
+        expected: 7 つのツールの説明がそれぞれ `prompts.render(tool_prompt_id("admin", 名前))` と同じで、`instructions` が無い

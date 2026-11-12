@@ -1,5 +1,5 @@
 title: アーキテクチャ図
-lead: project-index のサブシステムと、利用するシステム・配信元との境界。
+lead: project-index のサブシステムと、利用するシステム・配信元との境界を定め、機能をどのサブシステムに配置するかを決めるときに参照する。
 overview:
   direction: LR
   nodes:
@@ -88,7 +88,7 @@ external_systems:
     protocol: HTTP（REST）
     notes:
       事前確認: 不要。受ける側で、こちらから費用や時間のかかる処理を始めない
-      契約: 入出力は IF-22〜IF-34 が持つ
+      契約: 入出力は読み取り API と端末の設定の API のインターフェース定義（[配信元の一覧と状態](id:IF-22) など）が持つ
   - name: git
     purpose: 配信元のリビジョンの解決と、過去のリビジョンのファイルの書き出し
     direction: 双方向

@@ -1,443 +1,503 @@
 id: SC-7
 title: "エージェントが書き込む"
 scenarios:
-- name: 正常シナリオ
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
-  - name: サンプルの配信元
-    description: 文書の種類を 1 つ（スキーマと YAML 2 件）と `project-index.yaml` を持つ git リポジトリと、そのワークツリー（`.claude/worktrees/x`）
-    notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`cwd` は sample のクローン本体。`worktree` にワークツリー x のパスを渡す'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant WT as ワークツリー x
+  - name: 正常シナリオ
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 文書の種類を 1 つ（スキーマと YAML 2 件）と `project-index.yaml` を持つ git リポジトリと、そのワークツリー（`.claude/worktrees/x`）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体。`worktree` にワークツリー x のパスを渡す'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ"} -->
 
-      A->>M: describe(source: sample, kind: 種類)
-      M-->>A: 種類のスキーマ
-      A->>M: write_docs(worktree: x, operations: update 文書 1・expected_version・set)
-      M->>M: scope.write と書く先がワークツリーであることを確かめる
-      M->>M: 配信元ごとの排他ロックを取り、バージョンを比べる
-      M->>M: 変更を当てた文書をスキーマと validators に通す
-      M->>WT: 一時ファイルに書いてから置き換える
-      M-->>A: 新しい version と差分
-    ```
-  expected:
-  - '結果が `applied: true` で、文書 1 の `status` が `updated`、`version` が書き込み前と違う'
-  - ワークツリー x の文書 1 の YAML が `set` の値になり、他の項目は変わらない
-  - sample のクローン本体のファイルは変わらない
-  - ワークツリー x の commit が増えていない（`git status` に文書 1 の変更が出る）
-  - 次の `search_docs` が書いた値と新しい `version` を返す
-  test: test_normal
-- name: 正常シナリオ（文書を作る）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: サンプルの配信元
-    description: 正常シナリオと同じ配信元に、`ids.format` と、文書の一覧を書き出す `generators[]` を足したもの
-    notes: '`ids.format` は `{kind}-{slug}`'
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`worktree` にワークツリー x のパスを渡す'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant WT as ワークツリー x
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
 
-      A->>M: write_docs(operations: create・kind・data)
-      M->>M: id が ids.format に合い、重複しないことを確かめる
-      M->>M: スキーマと validators に通す
-      M->>WT: kind の documents の置き場所に YAML を書く
-      M->>WT: generators のスクリプトを流す
-      M-->>A: 作った文書の id と version
-    ```
-  expected:
-  - 結果の `status` が `created` で、`id` と `version` を返す
-  - ワークツリー x の `documents[].paths` に当たる場所に新しい YAML ができる
-  - '`generators[]` が書き出す文書の一覧に、作った文書の行が入る'
-  - '`ids.format` に合わない `id` の create は、何も書かずに `id` の形の違反を返す'
-  test: test_normal_when_create
-- name: 正常シナリオ（試しに書く）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: project-index
-    description: 正常シナリオと同じ sample を配信している project-index
-    notes: '`dry_run: true`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+        A->>M: describe(source: sample, kind: 種類)
+        M-->>A: 種類のスキーマ
+        A->>M: write_docs(worktree: x, operations: update 文書 1・expected_version・set)
+        M->>M: scope.write と書く先がワークツリーであることを確かめる
+        M->>M: 配信元ごとの排他ロックを取り、バージョンを比べる
+        M->>M: 変更を当てた文書をスキーマと validators に通す
+        M->>WT: 一時ファイルに書いてから置き換える
+        M-->>A: 新しい version と差分
+      ```
 
-      A->>M: write_docs(operations: update 文書 1, dry_run: true)
-      M->>M: 本番と同じ検証とバージョンの確認
-      M-->>A: 書いた場合の結果と差分
-    ```
-  expected:
-  - 結果に差分があり、`applied` が `false`
-  - ワークツリー x のファイルは変わらない
-  test: test_normal_when_dry_run
-- name: 正常シナリオ（Git 管理外の配信元に書く）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: 書ける配信元
-    description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
-    notes: id `memo`。`scope.write` は sample のフォルダ
-  - name: project-index
-    description: sample と memo を配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant MF as memo のフォルダ
+      <!-- /map -->
+    expected:
+      - '結果が `applied: true` で、文書 1 の `status` が `updated`、`version` が書き込み前と違う'
+      - ワークツリー x の文書 1 の YAML が `set` の値になり、他の項目は変わらない
+      - sample のクローン本体のファイルは変わらない
+      - ワークツリー x の commit が増えていない（`git status` に文書 1 の変更が出る）
+      - 次の `search_docs` が書いた値と新しい `version` を返す
+    test: test_normal
+  - name: 正常シナリオ（文書を作る）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: サンプルの配信元
+        description: 正常シナリオと同じ配信元に、`ids.format` と、文書の一覧を書き出す `generators[]` を足したもの
+        notes: '`ids.format` は `{kind}-{slug}`'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` にワークツリー x のパスを渡す'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（文書を作る）"} -->
 
-      A->>M: write_docs(source: memo, operations: create)
-      M->>M: memo の scope.write に cwd が当たる
-      M->>M: スキーマと validators に通し、created・updated を付ける
-      M->>MF: YAML を書く
-      M-->>A: id と version
-    ```
-  expected:
-  - memo のフォルダに新しい YAML ができ、メタデータの `created`・`updated` に書いた日時が入る
-  - 続けて update したとき、`updated` だけが新しい日時になり、`created` は変わらない
-  - '`search_docs` の `order_by: updated` がその日時で並べる'
-  test: test_normal_when_non_git_source
-- name: 正常シナリオ（参照も外して消す）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: 参照されている文書
-    description: ワークツリー x の文書 2。文書 1 の `related` が文書 2 を指す
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`on_referenced: unlink`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant WT as ワークツリー x
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
 
-      A->>M: delete_docs(targets: 文書 2, on_referenced: unlink)
-      M->>M: 文書 1 の related から文書 2 を外した後の文書を検査に通す
-      M->>WT: 文書 1 を書き換え、文書 2 のファイルを消す
-      M-->>A: 消した文書と参照を外した文書
-    ```
-  expected:
-  - ワークツリー x の文書 2 のファイルが無い
-  - 文書 1 の `related` に文書 2 が無い
-  - 結果が参照を外した文書 1 の `id` と新しい `version` を返す
-  test: test_normal_when_delete_unlink
-- name: 異常シナリオ（検査に通らない）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: project-index
-    description: 正常シナリオと同じ sample を配信している project-index
-    notes: '`operations` は 2 件。0 番目は通る update、1 番目はスキーマの必須の項目を `unset` する update。`atomic` は既定（`true`）。`unset` する項目のスキーマは `title`・`description`・`examples` を持ち、`x-rules` を持たない'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+        A->>M: write_docs(operations: create・kind・data)
+        M->>M: id が ids.format に合い、重複しないことを確かめる
+        M->>M: スキーマと validators に通す
+        M->>WT: kind の documents の置き場所に YAML を書く
+        M->>WT: generators のスクリプトを流す
+        M-->>A: 作った文書の id と version
+      ```
 
-      A->>M: write_docs(operations: 2 件)
-      M->>M: 全ての操作を当ててから検査し、1 番目が通らない
-      M-->>A: エラー（添字 1・違反したパス・決まり・直し方・違反した項目のスキーマの説明）
-    ```
-  expected:
-  - '`isError: true` で、添字 1 の違反のパス・決まり・直し方を返す'
-  - 違反に、`unset` した項目のスキーマの `title`・`description`・`examples` が添えられ、`x-rules` とスキーマのほかの項目は返さない
-  - 0 番目の文書も書き換わらない
-  - '`atomic: false` では 0 番目だけを書き、1 番目を添字つきの失敗として返す'
-  test: test_error_when_validation_failed
-- name: 異常シナリオ（Markdown の値に mdmark の警告がある）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。端末に mdmark の CLI を用意する）
-  - name: Markdown のキーを持つ種類
-    description: sample の種類のスキーマが、Markdown と宣言したキー `body` を持つ
-    notes: 文書 1 の `body` は警告の出ない Markdown
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`operations` は 2 件。0 番目は通る update、1 番目は文書 1 の `body` に定義の誤った図の部品（`<!-- flow -->` の中の壊れた JSON）を `set` する update。`atomic` は既定（`true`）'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant MD as mdmark の CLI
+      <!-- /map -->
+    expected:
+      - 結果の `status` が `created` で、`id` と `version` を返す
+      - ワークツリー x の `documents[].paths` に当たる場所に新しい YAML ができる
+      - '`generators[]` が書き出す文書の一覧に、作った文書の行が入る'
+      - '`ids.format` に合わない `id` の create は、何も書かずに `id` の形の違反を返す'
+    test: test_normal_when_create
+  - name: 正常シナリオ（試しに書く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: project-index
+        description: 正常シナリオと同じ sample を配信している project-index
+        notes: '`dry_run: true`'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（試しに書く）"} -->
 
-      A->>M: write_docs(operations: 2 件)
-      M->>M: 全ての操作を当て、スキーマと validators に通す
-      M->>MD: 変えた Markdown のキーの値を点検に通す
-      MD-->>M: 書き方の警告
-      M-->>A: エラー（添字 1・body のパス・警告）
-    ```
-  expected:
-  - '`isError: true` で、添字 1 の違反として `body` のパスと、mdmark の描画時の書き方の警告と同じ文言を返す'
-  - 0 番目の文書も文書 1 も書き換わらない
-  - '`dry_run: true` でも同じ違反を返す'
-  - '`atomic: false` では 0 番目だけを書き、1 番目を添字つきの失敗として返す'
-  test: test_error_when_mdmark_warning
-- name: 正常シナリオ（mdmark の CLI が無い）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。project-index を起動する環境の `PATH` に mdmark の CLI を置かない）
-  - name: Markdown のキーを持つ種類
-    description: 異常シナリオ（Markdown の値に mdmark の警告がある）と同じ sample の種類
-    notes: 文書 1 の `body` を Markdown のキーとして持つ
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '文書 1 の `body` に定義の誤った図の部品（`<!-- flow -->` の中の壊れた JSON）を `set` する update 1 件'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant WT as ワークツリー x
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
 
-      A->>M: write_docs(operations: update 文書 1・set body)
-      M->>M: スキーマと validators に通す
-      M->>M: mdmark の CLI が見つからず、点検を飛ばす
-      M->>WT: 一時ファイルに書いてから置き換える
-      M-->>A: 新しい version と差分、点検できなかった理由
-    ```
-  expected:
-  - '結果が `applied: true` で、文書 1 の `status` が `updated`'
-  - ワークツリー x の文書 1 の `body` が `set` の値になる
-  - 結果に、mdmark の CLI が見つからず点検できなかったことが入る
-  test: test_normal_when_mdmark_unavailable
-- name: 異常シナリオ（書き込めない配信元を指す）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: 読み取りだけの配信元
-    description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
-    notes: id `notes`。`scope.read` は sample のフォルダ、`scope.write` は持たない
-  - name: project-index
-    description: sample と notes を配信している project-index
-    notes: '`cwd` は sample のクローン本体'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+        A->>M: write_docs(operations: update 文書 1, dry_run: true)
+        M->>M: 本番と同じ検証とバージョンの確認
+        M-->>A: 書いた場合の結果と差分
+      ```
 
-      A->>M: write_docs(source: notes, operations: update)
-      M->>M: notes の scope.write に cwd が当たらない
-      M-->>A: エラー（notes は読み取りだけ。今の作業場所から使える配信元の一覧）
-    ```
-  expected:
-  - '`isError: true` で、notes には書き込めないことと、今の作業場所から使える配信元の一覧を返す'
-  - notes のフォルダのファイルは変わらない
-  - '`delete_docs` も同じエラーを返す'
-  test: test_error_when_source_not_writable
-- name: 異常シナリオ（書く先がクローン本体）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: project-index
-    description: 正常シナリオと同じ sample を配信している project-index
-    notes: '`cwd` は sample のクローン本体。`worktree` を渡さない'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+      <!-- /map -->
+    expected:
+      - 結果に差分があり、`applied` が `false`
+      - ワークツリー x のファイルは変わらない
+    test: test_normal_when_dry_run
+  - name: 正常シナリオ（Git 管理外の配信元に書く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 書ける配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
+        notes: id `memo`。`scope.write` は sample のフォルダ
+      - name: project-index
+        description: sample と memo を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（Git 管理外の配信元に書く）"} -->
 
-      A->>M: write_docs(operations: update 文書 1)
-      M->>M: Git の配信元で、書く先がクローン本体になる
-      M-->>A: エラー（クローン本体には書かない。worktree でワークツリーを指すこと）
-    ```
-  expected:
-  - '`isError: true` で、クローン本体には書かないことと、`worktree` でワークツリーを指すことを返す'
-  - sample のクローン本体のファイルは変わらない
-  test: test_error_when_target_is_clone
-- name: 異常シナリオ（参照されている文書を消す）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: 参照されている文書
-    description: ワークツリー x の文書 2。文書 1 の `related` が文書 2 を指す
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`on_referenced` は既定（`fail`）'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant MF as memo のフォルダ
 
-      A->>M: delete_docs(targets: 文書 2)
-      M->>M: 文書 1 の related が文書 2 を指している
-      M-->>A: エラー（参照元の id と on_referenced: unlink）
-    ```
-  expected:
-  - '`isError: true` で、参照元の文書 1 の `id` と `on_referenced: unlink` で消せることを返す'
-  - 文書 2 のファイルも文書 1 も変わらない
-  test: test_error_when_delete_referenced
-- name: 異常シナリオ（置き場所が除外の名前に当たる）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-    notes: '-'
-  - name: 文書の行
-    description: 'sample の `project-index.yaml` の行 `rule`（`paths: [docs/rule/*.yaml]`・`exclude: [index.yaml]`）'
-    notes: '`docs/rule/index.yaml` は目次で、行 `rule` の文書ではない'
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`worktree` にワークツリー x のパスを渡す'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant WT as ワークツリー x
+        A->>M: write_docs(source: memo, operations: create)
+        M->>M: memo の scope.write に cwd が当たる
+        M->>M: スキーマと validators に通し、created・updated を付ける
+        M->>MF: YAML を書く
+        M-->>A: id と version
+      ```
 
-      A->>M: write_docs(operations: create・kind rule・id index)
-      M->>M: 置き場所 docs/rule/index.yaml のファイル名が rule の exclude に当たる
-      M-->>A: エラー（添字 0・置き場所が exclude に当たること・直し方）
-    ```
-  expected:
-  - '`isError: true` で、添字 0 の `kind` の違反として、置き場所 `docs/rule/index.yaml` が行 `rule` の `exclude` に当たることと直し方を返す'
-  - ワークツリー x の `docs/rule/index.yaml` は変わらない（無ければ作られない）
-  test: test_error_when_placement_excluded
-- name: 正常シナリオ（共通のキー名で書く）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-    notes: '-'
-  - name: 文書
-    description: ワークツリー x の `decisions/d1.yaml`。名前を `title` 列に持ち、`name` 列を持たない
-    notes: '-'
-  - name: 文書の行
-    description: 'sample の `project-index.yaml` の行 `decisions`（`paths: [decisions/*.yaml]`・`metadata: {name: title}`）'
-    notes: '-'
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`worktree` にワークツリー x のパスを渡す'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant WT as ワークツリー x
+      <!-- /map -->
+    expected:
+      - memo のフォルダに新しい YAML ができ、メタデータの `created`・`updated` に書いた日時が入る
+      - 続けて update したとき、`updated` だけが新しい日時になり、`created` は変わらない
+      - '`search_docs` の `order_by: updated` がその日時で並べる'
+    test: test_normal_when_non_git_source
+  - name: 正常シナリオ（参照も外して消す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 参照されている文書
+        description: ワークツリー x の文書 2。文書 1 の `related` が文書 2 を指す
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`on_referenced: unlink`'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（参照も外して消す）"} -->
 
-      A->>M: write_docs(operations: update d1・set name)
-      M->>M: metadata の対応で name を title 列へ読み替える
-      M->>M: スキーマと validators に通す
-      M->>WT: d1 の title を書き換える
-      M-->>A: 新しい version と差分
-      A->>M: write_docs(operations: create・kind decisions・data に name)
-      M->>WT: name の値を title 列に持つ YAML を書く
-      M-->>A: 作った文書の id と version
-    ```
-  expected:
-  - update の後、ワークツリー x の d1 の `title` が `set` の `name` の値になり、`name` 列ができない
-  - 次の `search_docs` が d1 の `name` として書いた値を返す
-  - create で作った YAML が `data` の `name` の値を `title` 列に持ち、`name` 列を持たない
-  - 列名 `title` をそのまま渡した update も、同じ `title` 列を書き換える
-  test: test_normal_when_metadata_mapped
-- name: 正常シナリオ（オブジェクトの配列のタグを書く）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行。`cwd` はテストが引数に入れる）
-  - name: オブジェクトの配列のタグ
-    description: 'sample の文書 1 が `tags` を `[{name: mcp, main: true}, {name: 設計}]` で持つ'
-    notes: '`metadata` に `tags: tags[].name` と、`main` が真の要素の `name` を `main_tags` へ取り出す指定'
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`cwd` は sample のワークツリー'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant F as 文書 1 の YAML
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
 
-      A->>M: write_docs(update 文書 1, add_to: tags に テスト, remove_from: tags から 設計)
-      M->>M: tags[].name の読み替えで、name が テスト の要素を加え、name が 設計 の要素を除く
-      M->>F: tags を [{name: mcp, main: true}, {name: テスト}] で書く
-      M-->>A: 書いた文書の version
-      A->>M: write_docs(update 文書 1, set: tags を [mcp, 運用])
-      M->>F: 残す mcp の要素はそのまま、運用 を {name: 運用} で加え、テスト を除く
-      M-->>A: 書いた文書の version
-      A->>M: write_docs(update 文書 1, set: main_tags を [運用])
-      M->>F: name が 運用 の要素に main: true を付け、mcp の main を外す
-      M-->>A: 書いた文書の version
-    ```
-  expected:
-  - '`add_to` の後、文書 1 の `tags` が `{name: テスト}` を `main` なしで持つ'
-  - '`remove_from` の後、`name` が `設計` の要素が無い'
-  - '`add_to`・`remove_from` の後も `{name: mcp, main: true}` の `main` が残る'
-  - '`set: tags` の後、`tags` が `[{name: mcp, main: true}, {name: 運用}]` になる'
-  - '`set: main_tags` の後、`tags` が `[{name: mcp}, {name: 運用, main: true}]` になる'
-  - '`tags` の各要素が `name` を持つオブジェクトのままで、文字列に置き換わらない'
-  test: test_normal_when_tags_are_objects
-- name: 正常シナリオ（変更していない項目の引用符を保つ）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-    notes: '-'
-  - name: 引用符を持つ文書
-    description: 'ワークツリー x の文書 1 と文書 2 が、単一引用符の値（`description: ''2020-12''`）、`: ` を含む二重引用符の値（`name: "A: b"`）、引用符なしの値（`weight: 1`）を持つ'
-    notes: '-'
-  - name: 参照されている文書
-    description: ワークツリー x の文書 3。文書 2 の `related` が文書 3 を指す
-    notes: '-'
-  - name: project-index
-    description: sample を配信している project-index
-    notes: '`worktree` にワークツリー x のパスを渡す'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor A as エージェント
-      participant M as 文書の MCP（/mcp）
-      participant WT as ワークツリー x
+        A->>M: delete_docs(targets: 文書 2, on_referenced: unlink)
+        M->>M: 文書 1 の related から文書 2 を外した後の文書を検査に通す
+        M->>WT: 文書 1 を書き換え、文書 2 のファイルを消す
+        M-->>A: 消した文書と参照を外した文書
+      ```
 
-      A->>M: write_docs(operations: update 文書 1・set weight)
-      M->>WT: 文書 1 を書き換える
-      M-->>A: 新しい version と差分
-      A->>M: delete_docs(targets: 文書 3, on_referenced: unlink)
-      M->>WT: 文書 2 の related から文書 3 を外して書き換え、文書 3 のファイルを消す
-      M-->>A: 消した文書と参照を外した文書
-    ```
-  expected:
-  - '文書 1 の YAML の、`set` で変えた行以外の行が書き込み前の文字列と一致し、`description: ''2020-12''` と `name: "A: b"` の引用符が残る'
-  - 文書 2 の YAML の、`related` の文書 3 の行以外の行が書き込み前の文字列と一致する
-  - '`write_docs` の結果の差分に、`set` で変えた項目の行だけが出る'
-  test: test_normal_when_quotes_preserved
-lead: エージェントが文書の MCP の `write_docs`・`delete_docs` で、作業ツリーの YAML の文書を検査に通してから作る・直す・消す。
+      <!-- /map -->
+    expected:
+      - ワークツリー x の文書 2 のファイルが無い
+      - 文書 1 の `related` に文書 2 が無い
+      - 結果が参照を外した文書 1 の `id` と新しい `version` を返す
+    test: test_normal_when_delete_unlink
+  - name: 異常シナリオ（検査に通らない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: project-index
+        description: 正常シナリオと同じ sample を配信している project-index
+        notes: '`operations` は 2 件。0 番目は通る update、1 番目はスキーマの必須の項目を `unset` する update。`atomic` は既定（`true`）。`unset` する項目のスキーマは `title`・`description`・`examples` を持ち、`x-rules` を持たない'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（検査に通らない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: write_docs(operations: 2 件)
+        M->>M: 全ての操作を当ててから検査し、1 番目が通らない
+        M-->>A: エラー（添字 1・違反したパス・決まり・直し方・違反した項目のスキーマの説明）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、添字 1 の違反のパス・決まり・直し方を返す'
+      - 違反に、`unset` した項目のスキーマの `title`・`description`・`examples` が添えられ、`x-rules` とスキーマのほかの項目は返さない
+      - 0 番目の文書も書き換わらない
+      - '`atomic: false` では 0 番目だけを書き、1 番目を添字つきの失敗として返す'
+    test: test_error_when_validation_failed
+  - name: 異常シナリオ（Markdown の値に mdmark の警告がある）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。端末に mdmark の CLI を用意する）
+      - name: Markdown のキーを持つ種類
+        description: sample の種類のスキーマが、Markdown と宣言したキー `body` を持つ
+        notes: 文書 1 の `body` は警告の出ない Markdown
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`operations` は 2 件。0 番目は通る update、1 番目は文書 1 の `body` に定義の誤った図の部品（`<!-- flow -->` の中の壊れた JSON）を `set` する update。`atomic` は既定（`true`）'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（Markdown の値に mdmark の警告がある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant MD as mdmark の CLI
+
+        A->>M: write_docs(operations: 2 件)
+        M->>M: 全ての操作を当て、スキーマと validators に通す
+        M->>MD: 変えた Markdown のキーの値を点検に通す
+        MD-->>M: 書き方の警告
+        M-->>A: エラー（添字 1・body のパス・警告）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、添字 1 の違反として `body` のパスと、mdmark の描画時の書き方の警告と同じ文言を返す'
+      - 0 番目の文書も文書 1 も書き換わらない
+      - '`dry_run: true` でも同じ違反を返す'
+      - '`atomic: false` では 0 番目だけを書き、1 番目を添字つきの失敗として返す'
+    test: test_error_when_mdmark_warning
+  - name: 正常シナリオ（mdmark の CLI が無い）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。project-index を起動する環境の `PATH` に mdmark の CLI を置かない）
+      - name: Markdown のキーを持つ種類
+        description: 異常シナリオ（Markdown の値に mdmark の警告がある）と同じ sample の種類
+        notes: 文書 1 の `body` を Markdown のキーとして持つ
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '文書 1 の `body` に定義の誤った図の部品（`<!-- flow -->` の中の壊れた JSON）を `set` する update 1 件'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（mdmark の CLI が無い）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: write_docs(operations: update 文書 1・set body)
+        M->>M: スキーマと validators に通す
+        M->>M: mdmark の CLI が見つからず、点検を飛ばす
+        M->>WT: 一時ファイルに書いてから置き換える
+        M-->>A: 新しい version と差分、点検できなかった理由
+      ```
+
+      <!-- /map -->
+    expected:
+      - '結果が `applied: true` で、文書 1 の `status` が `updated`'
+      - ワークツリー x の文書 1 の `body` が `set` の値になる
+      - 結果に、mdmark の CLI が見つからず点検できなかったことが入る
+    test: test_normal_when_mdmark_unavailable
+  - name: 異常シナリオ（書き込めない配信元を指す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 読み取りだけの配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
+        notes: id `notes`。`scope.read` は sample のフォルダ、`scope.write` は持たない
+      - name: project-index
+        description: sample と notes を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（書き込めない配信元を指す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: write_docs(source: notes, operations: update)
+        M->>M: notes の scope.write に cwd が当たらない
+        M-->>A: エラー（notes は読み取りだけ。今の作業場所から使える配信元の一覧）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、notes には書き込めないことと、今の作業場所から使える配信元の一覧を返す'
+      - notes のフォルダのファイルは変わらない
+      - '`delete_docs` も同じエラーを返す'
+    test: test_error_when_source_not_writable
+  - name: 異常シナリオ（書く先がクローン本体）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: project-index
+        description: 正常シナリオと同じ sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体。`worktree` を渡さない'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（書く先がクローン本体）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: write_docs(operations: update 文書 1)
+        M->>M: Git の配信元で、書く先がクローン本体になる
+        M-->>A: エラー（クローン本体には書かない。worktree でワークツリーを指すこと）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、クローン本体には書かないことと、`worktree` でワークツリーを指すことを返す'
+      - sample のクローン本体のファイルは変わらない
+    test: test_error_when_target_is_clone
+  - name: 異常シナリオ（参照されている文書を消す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 参照されている文書
+        description: ワークツリー x の文書 2。文書 1 の `related` が文書 2 を指す
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`on_referenced` は既定（`fail`）'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（参照されている文書を消す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: delete_docs(targets: 文書 2)
+        M->>M: 文書 1 の related が文書 2 を指している
+        M-->>A: エラー（参照元の id と on_referenced: unlink）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、参照元の文書 1 の `id` と `on_referenced: unlink` で消せることを返す'
+      - 文書 2 のファイルも文書 1 も変わらない
+    test: test_error_when_delete_referenced
+  - name: 異常シナリオ（置き場所が除外の名前に当たる）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: 文書の行
+        description: 'sample の `project-index.yaml` の行 `rule`（`paths: [docs/rule/*.yaml]`・`exclude: [index.yaml]`）'
+        notes: '`docs/rule/index.yaml` は目次で、行 `rule` の文書ではない'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` にワークツリー x のパスを渡す'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（置き場所が除外の名前に当たる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: write_docs(operations: create・kind rule・id index)
+        M->>M: 置き場所 docs/rule/index.yaml のファイル名が rule の exclude に当たる
+        M-->>A: エラー（添字 0・置き場所が exclude に当たること・直し方）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、添字 0 の `kind` の違反として、置き場所 `docs/rule/index.yaml` が行 `rule` の `exclude` に当たることと直し方を返す'
+      - ワークツリー x の `docs/rule/index.yaml` は変わらない（無ければ作られない）
+    test: test_error_when_placement_excluded
+  - name: 正常シナリオ（共通のキー名で書く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: 文書
+        description: ワークツリー x の `decisions/d1.yaml`。名前を `title` 列に持ち、`name` 列を持たない
+        notes: '-'
+      - name: 文書の行
+        description: 'sample の `project-index.yaml` の行 `decisions`（`paths: [decisions/*.yaml]`・`metadata: {name: title}`）'
+        notes: '-'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` にワークツリー x のパスを渡す'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（共通のキー名で書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: write_docs(operations: update d1・set name)
+        M->>M: metadata の対応で name を title 列へ読み替える
+        M->>M: スキーマと validators に通す
+        M->>WT: d1 の title を書き換える
+        M-->>A: 新しい version と差分
+        A->>M: write_docs(operations: create・kind decisions・data に name)
+        M->>WT: name の値を title 列に持つ YAML を書く
+        M-->>A: 作った文書の id と version
+      ```
+
+      <!-- /map -->
+    expected:
+      - update の後、ワークツリー x の d1 の `title` が `set` の `name` の値になり、`name` 列ができない
+      - 次の `search_docs` が d1 の `name` として書いた値を返す
+      - create で作った YAML が `data` の `name` の値を `title` 列に持ち、`name` 列を持たない
+      - 列名 `title` をそのまま渡した update も、同じ `title` 列を書き換える
+    test: test_normal_when_metadata_mapped
+  - name: 正常シナリオ（オブジェクトの配列のタグを書く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+      - name: オブジェクトの配列のタグ
+        description: 'sample の文書 1 が `tags` を `[{name: mcp, main: true}, {name: 設計}]` で持つ'
+        notes: '`metadata` に `tags: tags[].name` と、`main` が真の要素の `name` を `main_tags` へ取り出す指定'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のワークツリー'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（オブジェクトの配列のタグを書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant F as 文書 1 の YAML
+
+        A->>M: write_docs(update 文書 1, add_to: tags に テスト, remove_from: tags から 設計)
+        M->>M: tags[].name の読み替えで、name が テスト の要素を加え、name が 設計 の要素を除く
+        M->>F: tags を [{name: mcp, main: true}, {name: テスト}] で書く
+        M-->>A: 書いた文書の version
+        A->>M: write_docs(update 文書 1, set: tags を [mcp, 運用])
+        M->>F: 残す mcp の要素はそのまま、運用 を {name: 運用} で加え、テスト を除く
+        M-->>A: 書いた文書の version
+        A->>M: write_docs(update 文書 1, set: main_tags を [運用])
+        M->>F: name が 運用 の要素に main: true を付け、mcp の main を外す
+        M-->>A: 書いた文書の version
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`add_to` の後、文書 1 の `tags` が `{name: テスト}` を `main` なしで持つ'
+      - '`remove_from` の後、`name` が `設計` の要素が無い'
+      - '`add_to`・`remove_from` の後も `{name: mcp, main: true}` の `main` が残る'
+      - '`set: tags` の後、`tags` が `[{name: mcp, main: true}, {name: 運用}]` になる'
+      - '`set: main_tags` の後、`tags` が `[{name: mcp}, {name: 運用, main: true}]` になる'
+      - '`tags` の各要素が `name` を持つオブジェクトのままで、文字列に置き換わらない'
+    test: test_normal_when_tags_are_objects
+  - name: 正常シナリオ（変更していない項目の引用符を保つ）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: 引用符を持つ文書
+        description: 'ワークツリー x の文書 1 と文書 2 が、単一引用符の値（`description: ''2020-12''`）、`: ` を含む二重引用符の値（`name: "A: b"`）、引用符なしの値（`weight: 1`）を持つ'
+        notes: '-'
+      - name: 参照されている文書
+        description: ワークツリー x の文書 3。文書 2 の `related` が文書 3 を指す
+        notes: '-'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` にワークツリー x のパスを渡す'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（変更していない項目の引用符を保つ）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: write_docs(operations: update 文書 1・set weight)
+        M->>WT: 文書 1 を書き換える
+        M-->>A: 新しい version と差分
+        A->>M: delete_docs(targets: 文書 3, on_referenced: unlink)
+        M->>WT: 文書 2 の related から文書 3 を外して書き換え、文書 3 のファイルを消す
+        M-->>A: 消した文書と参照を外した文書
+      ```
+
+      <!-- /map -->
+    expected:
+      - '文書 1 の YAML の、`set` で変えた行以外の行が書き込み前の文字列と一致し、`description: ''2020-12''` と `name: "A: b"` の引用符が残る'
+      - 文書 2 の YAML の、`related` の文書 3 の行以外の行が書き込み前の文字列と一致する
+      - '`write_docs` の結果の差分に、`set` で変えた項目の行だけが出る'
+    test: test_normal_when_quotes_preserved
+lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 issue: 14
 primary_actor: エージェント（Claude Code）
 stakeholders:
-- name: エージェント（Claude Code）
-  interest: 変える項目だけを渡して、スキーマと検査に通る文書だけを書ける。通らないときは直し方が分かる
-- name: 利用者
-  interest: 書き込みが作業中のワークツリーと `scope.write` に当たる配信元にだけ入り、クローン本体は変わらない。project-index は commit しない
+  - name: エージェント（Claude Code）
+    interest: 変える項目だけを渡して、スキーマと検査に通る文書だけを書ける。通らないときは直し方が分かる
+  - name: 利用者
+    interest: 書き込みが作業中のワークツリーと `scope.write` に当たる配信元にだけ入り、クローン本体は変わらない。project-index は commit しない
 trigger: エージェントが文書を作る・直す・消す
 preconditions:
-- project-index が起動し、配信元を配信している
-- 呼び出しの引数に、フックが作業場所 `cwd` と会話キーを入れている
-- エージェントが直す文書を `search_docs` で読み、`version` を持っている
+  - project-index が起動し、配信元を配信している
+  - 呼び出しの引数に、フックが作業場所 `cwd` と会話キーを入れている
+  - エージェントが直す文書を `search_docs` で読み、`version` を持っている
 success_guarantee: 変更を当てた後の文書が配信元のスキーマと `validators[]` に通り、作業ツリー（Git 管理外の配信元はそのフォルダ）のファイルだけが書き換わる。新しいバージョンが返る。変えた Markdown の値は、mdmark の CLI を使えるときは点検に通っており、使えないとき（CLI が無い・制限時間を超えた）は点検できなかった理由が返る。
 minimal_guarantee: '検査に通らない書き込み、mdmark の警告がある Markdown の値の書き込み、`scope.write` に当たらない作業場所からの書き込み、クローン本体への書き込みは、ファイルを 1 つも書き換えない（`atomic: true` のときは他の操作も書かない）。'
 frequency: 作業のたび
 priority: 高
 refs:
-- SC-1#scenarios[正常シナリオ]
+  - SC-1#scenarios[正常シナリオ]
 notes:
   バージョンの不一致: 読んだ後に文書が変わっていたときの書き込みは、[YAMLを直接編集した](id:SC-9) の異常シナリオが持つ。
 test_file: tests/e2e/単一ユースケース/test_エージェントが書き込む.py

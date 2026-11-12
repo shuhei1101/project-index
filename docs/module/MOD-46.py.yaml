@@ -1,37 +1,37 @@
 id: MOD-46
 title: 索引のサーバー / 関連 / render.py
-lead: '`trace_related` の結果の Markdown。'
+lead: '`trace_related` の結果の Markdown を受け持ち、関連の render.py を修正するときに参照する。'
 functions:
-- name: render_related_markdown
-  title: 関連のたどりの結果の Markdown
-  kind: 関数
-  container: project_index/features/related/render.py
-  usecase: 関連
-  role: 変換
-  summary: '`format: markdown` の本文を作る'
-  scope: public
-  thread_safe: true
-  args:
-  - name: result
-    title: 結果
-    type: RelatedResult
-    required: true
-    passing: positional
-    description: 描く結果
-  returns:
-    type: str
-    description: Markdown
-  process: |-
-    1. `outside_scope` が `True` なら先頭に `作業範囲の外（参考）` の行を置く
-    2. 次の行に `{起点の ID を , で繋いだもの} から {件数} 件` を置く
-    3. `| id | 深さ | たどった関連 | name | description |` の表を置く（たどった関連は `{元} → {種類}`、`in` は `{元} ← {種類}`。別の配信元の文書は `id` を `{source}:{id}`）
-    4. 候補があれば `| 候補 | 信号 | 順位の値 |` の表と、採用するときは `write_docs` で `related` に追加することを置く
-    5. `notes` を `> ` の行で置く
-  unit_tests:
-  - name: test_render_related_markdown_when_outside_scope
-    case: 正常
-    summary: 作業範囲の外の表示
-    condition: '`outside_scope: true` の結果'
-    mock: なし
-    expected: 先頭の行が `作業範囲の外（参考）`
-    exception: '-'
+  - name: render_related_markdown
+    title: 関連のたどりの結果の Markdown
+    kind: 関数
+    container: project_index/features/related/render.py
+    usecase: 関連
+    role: 変換
+    summary: '`format: markdown` の本文を作る'
+    scope: public
+    thread_safe: true
+    args:
+      - name: result
+        title: 結果
+        type: RelatedResult
+        required: true
+        passing: positional
+        description: 描く結果
+    returns:
+      type: str
+      description: Markdown
+    process: |-
+      1. `outside_scope` が `True` なら先頭に `作業範囲の外（参考）` の行を置く
+      2. 次の行に `{起点の ID を , で繋いだもの} から {件数} 件` を置く
+      3. `| id | 深さ | たどった関連 | name | description |` の表を置く（たどった関連は `{元} → {種類}`、`in` は `{元} ← {種類}`。別の配信元の文書は `id` を `{source}:{id}`）
+      4. 候補があれば `| 候補 | 信号 | 順位の値 |` の表と、採用するときは `write_docs` で `related` に追加することを置く
+      5. `notes` を `> ` の行で置く
+    unit_tests:
+      - name: test_render_related_markdown_when_outside_scope
+        case: 正常
+        summary: 作業範囲の外の表示
+        condition: '`outside_scope: true` の結果'
+        mock: なし
+        expected: 先頭の行が `作業範囲の外（参考）`
+        exception: '-'
