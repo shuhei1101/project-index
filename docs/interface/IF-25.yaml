@@ -78,6 +78,30 @@ flows:
     expected:
       - 200 で、`value` が `files.yaml` の行の値、`body` が `guide.md` の本文の文字列、`bodyPath` が `guide.md`
     test: test_normal_when_body_path_given
+  - name: 正常系（文書の ID で行の文書を選ぶ）
+    summary: 1 つの管理用の YAML の中の行の文書を、文書の ID で 1 つに選ぶ
+    setup:
+      - name: Mock
+        description: なし
+      - name: サンプルの配信元
+        description: '`body_file` の無い `records` の行 `term-1`・`term-2` をこの順で持つ管理用の YAML `terms.yaml` を持つ sample'
+    flow: |-
+      <!-- map: {"title": "正常系（文書の ID で行の文書を選ぶ）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs/{path}
+
+        C->>E: GET /sources/sample/docs/terms.yaml?id=term-2
+        E-->>C: 200 term-2 の行の値
+      ```
+
+      <!-- /map -->
+    expected:
+      - 200 で、`value` が `term-2` の行の値、`metadata.id` が `term-2`
+      - '`id` を省いた `GET /sources/sample/docs/terms.yaml` は、最初の行の `term-1` を返す'
+    test: test_normal_when_id_given
   - name: 正常系（変換のスクリプトを指す種類）
     summary: '`converters[]` を指す種類は、スクリプトが出した Markdown を返す'
     setup:
@@ -116,7 +140,7 @@ flows:
       - name: Mock
         description: なし
       - name: 入力
-        description: '`/sources/unknown/docs/a.yaml`・`/sources/sample/docs/design/D-1.yaml?ref=no-such-branch`・`/sources/sample/docs/no/such.yaml`'
+        description: '`/sources/unknown/docs/a.yaml`・`/sources/sample/docs/design/D-1.yaml?ref=no-such-branch`・`/sources/sample/docs/no/such.yaml`・`/sources/sample/docs/design/D-1.yaml?id=no-such-id`'
     flow: |-
       <!-- map: {"title": "異常系（無い配信元・リビジョン・文書・404）"} -->
 
@@ -134,6 +158,7 @@ flows:
       - 無い配信元は 404 で `missing` が `source`、配信していない配信元は `not_served` と `errors[]`
       - 無いリビジョンは 404 で `missing` が `ref`
       - 無い文書は 404 で `missing` が `doc`
+      - '`path` の文書に `id` が一致する文書が無いときは 404 で `missing` が `doc`'
     test: test_error_when_not_found
 lead: 指定のリビジョンの文書の値・種類のスキーマ・メタデータ・変換の結果を返却する読み取り API の入出力を定め、文書の取得を修正するときに参照する。
 identifier: get_document
@@ -166,9 +191,15 @@ request:
     default: 配信元の `default_ref`
     location: query
     description: リビジョン（ブランチ・コミット・タグ）
+  - name: id
+    type: str
+    required: false
+    location: query
+    description: 文書の ID。`path` に該当する文書のうち、文書の ID が一致する文書を返す
 request_example: |-
   ```text
   GET /sources/sample/docs/design/D-1.yaml?ref=main
+  GET /sources/sample/docs/terms.yaml?id=term-2
   ```
 response:
   - name: source
@@ -226,7 +257,7 @@ constraints:
   - item: 変換の分担
     constraint: '`converters[]` を指さない種類は変換せずに値を返す。スキーマ駆動の Markdown への変換（図・ER 図・本文の id のリンク・検討事項のリンク）は dev-docs の画面のサーバーが持つ'
   - item: 文書の引き方
-    constraint: '`path` が文書のファイルのパスに当たる文書、無ければ本文のファイルのパスが `path` と同じ最初の文書を返す'
+    constraint: '`path` が文書のファイルのパスに当たる文書、無ければ本文のファイルのパスが `path` と同じ最初の文書を返す。`id` を指したときは、文書のファイルか本文のファイルのパスが `path` と同じ文書のうち、文書の ID が `id` と同じ文書を返す'
     notes: 管理の MCP の `try_convert` と同じ引き方
   - item: 変換の制限時間
     constraint: '`converters[]` のスクリプトを制限時間で止める'
