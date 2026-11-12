@@ -63,6 +63,8 @@ RULE_SCHEMA = (
     "        main: {type: boolean}\n"
 )
 RULE_DOC = "id: r1\nname: 規約 1\ntags:\n  - {name: a, main: true}\n  - {name: b}\n"
+TERM_ROW = "  - id: term\n    paths: [terms/*.yaml]\n    schema: schemas/term.schema.yaml\n"
+TERM_SCHEMA = "type: object\nrequired: [id, name]\nproperties:\n  id: {type: string}\n  name: {type: string}\n"
 
 
 def _version(path: Path) -> str:
@@ -180,6 +182,37 @@ def test_normal_when_create(
     assert item["version"]
     assert created.is_file()
     assert item["id"] in (worktree / "generated" / "list.txt").read_text(encoding="utf-8")
+
+
+def test_normal_when_kind_added_in_worktree(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """ワークツリーの設定に追加した種類で作る（正常系）。"""
+    # 準備
+    source, env, worktree = _setup(make_source, make_server, add_worktree)
+    # ワークツリーの設定にだけ種類 term を追加し、commit しない
+    (worktree / "project-index.yaml").write_text(
+        sample_config_text(TERM_ROW), encoding="utf-8"
+    )
+    (worktree / "schemas" / "term.schema.yaml").write_text(TERM_SCHEMA, encoding="utf-8")
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(source.folder),
+        worktree=str(worktree),
+        operations=[{"op": "create", "kind": "term", "id": "t1", "data": {"name": "用語 1"}}],
+    )
+    # 検証
+    item = result.data["results"][0]
+    assert not result.is_error
+    assert item["status"] == "created"
+    assert item["id"] == "t1"
+    assert item["version"]
+    assert (worktree / "terms" / "t1.yaml").is_file()
+    assert not (source.folder / "terms").exists()
 
 
 def test_normal_when_operations_combined(

@@ -407,7 +407,7 @@ def test_resolve_write_target(
     def keep_source(source: ServedSource, _root: Path) -> ServedSource:
         return source
 
-    monkeypatch.setattr(service_module, "load_source_at", keep_source, raising=False)
+    monkeypatch.setattr(service_module, "load_source_at", keep_source)
     # 実行
     result = resolve_write_target(registry=registry, cwd="/r/.claude/worktrees/x/docs")
     # 検証
@@ -564,7 +564,7 @@ def test_resolve_write_target_when_worktree_config(
         calls.append((source, root))
         return reloaded
 
-    monkeypatch.setattr(service_module, "load_source_at", fake_load_source_at, raising=False)
+    monkeypatch.setattr(service_module, "load_source_at", fake_load_source_at)
     # 実行
     result = resolve_write_target(
         registry=registry, worktree="/r/.claude/worktrees/x", cwd="/r/.claude/worktrees/x"
@@ -587,7 +587,7 @@ def test_resolve_write_target_when_folder_not_reloaded(
     def fail_load_source_at(source: ServedSource, root: Path) -> ServedSource:
         pytest.fail(f"load_source_at が呼ばれた: {source.id} {root}")
 
-    monkeypatch.setattr(service_module, "load_source_at", fail_load_source_at, raising=False)
+    monkeypatch.setattr(service_module, "load_source_at", fail_load_source_at)
     # 実行
     result = resolve_write_target(registry=registry, source="notes", cwd="/c")
     # 検証
@@ -605,7 +605,7 @@ def test_resolve_write_target_when_worktree_config_invalid(
     def fake_load_source_at(source: ServedSource, root: Path) -> ServedSource:
         raise error
 
-    monkeypatch.setattr(service_module, "load_source_at", fake_load_source_at, raising=False)
+    monkeypatch.setattr(service_module, "load_source_at", fake_load_source_at)
     # 実行・検証
     with pytest.raises(ValidationFailedError) as exc_info:
         resolve_write_target(
