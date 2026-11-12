@@ -1,0 +1,12 @@
+use_cases: []
+docs: []
+scope_out:
+  - item: project-index.yaml の 1 行目の `$schema` を `shuhei1101/project-index` の `schemas/project-index.schema.json` を指す行へ変える
+    reason: 改名の要望に含まれない。また、今あるタグ v0.1.0 は `schemas/project-index.schema.json` を持たず、指せるタグがまだ無い
+    plan: to_file
+  - item: IF-12・IF-13・IF-14・MOD-10 の移行の間の `dev-docs.yaml` の読み込みの削除
+    reason: ほかのリポジトリの配信元は改名を済ませておらず、移行の間の読み込みは残す
+    plan: none
+  - item: 過去の PR ドキュメント `dev/pr/13/` の `dev-docs.yaml` の記述
+    reason: 当時の作業の記録で、今のファイル名へ追随させない
+    plan: none
