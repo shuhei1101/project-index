@@ -16,8 +16,8 @@ scope_out:
     reason: 解かずに残した参照は最上位のスキーマの $defs を指す形になり、参照先を取り違える。#36 の事象とは別で、この作業 PR がマージされなくても同じ内容で成り立つため切り出した
     plan: '#44'
   - item: tests/unit/project_index/features/describe/test_service.py の pyright の reportUnknownMemberType 2 件
-    reason: テスト実行方法の lint 層（pyright strict を全体に回す）から外れる既存の違反で、base ブランチでも出る。今回の要望に含まれない
-    plan: '#45'
+    reason: develop の c2165c2（#48）で解消済み。取り込んだ後の lint で pyright の違反が 0 件になったことを確認した
+    plan: none
 use_cases:
   - kind: single
     scenario: docs/scenario/SC-6.yaml
