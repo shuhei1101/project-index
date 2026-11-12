@@ -252,7 +252,7 @@ functions:
         case: 正常
         summary: ワークツリーへの部分更新
         condition: 'ワークツリー x の `cwd` で、文書 1 に `set: {name: 新しい名前}`'
-        mock: なし（一時フォルダの配信元とワークツリー）・作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）。配信元とワークツリーは一時フォルダ
         expected: '`applied` が `True`、`status` が `updated`、ワークツリー x のファイルの `name` だけが変わり、クローン本体と commit は変わらない'
       - name: test_write_docs_when_create
         case: 正常
