@@ -80,7 +80,11 @@ def test_snapshot_store_checkout_when_concurrent(
     store = SnapshotStore(tmp_path / "snapshots")
     # 実行
     with ThreadPoolExecutor(max_workers=4) as executor:
-        results = list(executor.map(lambda _: store.checkout(root, commit), range(4)))
+
+        def checkout(_: int) -> Path:
+            return store.checkout(root, commit)
+
+        results = list(executor.map(checkout, range(4)))
     # 検証
     assert len(set(results)) == 1
     assert len([call for call in archive_calls if call[0] == "archive"]) == 1

@@ -108,7 +108,7 @@ def test_build_docs_mcp_when_error(
 
     monkeypatch.setattr(docs_module, "write_docs", failing_write_docs)
     mcp = build_docs_mcp(make_mcp_handlers())
-    arguments = {"operations": [{"op": "create", "kind": "x", "data": {}}]}
+    arguments: dict[str, Any] = {"operations": [{"op": "create", "kind": "x", "data": {}}]}
     # 実行
     result = asyncio.run(mcp.call_tool("write_docs", arguments))
     # 検証

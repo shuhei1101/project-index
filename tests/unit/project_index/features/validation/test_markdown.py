@@ -109,7 +109,11 @@ def test_check_markdown_values(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
         MdmarkFinding(line=3, kind="diagram_invalid", message="A"),
         MdmarkFinding(line=1, kind="unknown_mark", message="B"),
     ]
-    monkeypatch.setattr(markdown_module, "check_markdown", lambda text, **kwargs: findings)
+
+    def fake_check(text: str, **kwargs: Any) -> object:
+        return findings
+
+    monkeypatch.setattr(markdown_module, "check_markdown", fake_check)
     # 実行
     result = check_markdown_values({"body": "x"}, cwd=tmp_path, timeout_sec=10)
     # 検証

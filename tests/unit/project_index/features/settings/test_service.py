@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -11,13 +11,19 @@ from project_index.features.settings.types import (
     TerminalConfig,
     TerminalConfigInvalidError,
 )
-from project_index.shared.yaml_io import load_yaml
+from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
     from project_index.features.sources.types import SourceStatus
+
+
+def load_yaml(text: str) -> Any:
+    """形の分かっている YAML の文字列を読む。"""
+    return load_yaml_value(text)
+
 
 SETTINGS_TEXT = (
     'version: "1"\n'
