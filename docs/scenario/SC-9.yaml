@@ -30,7 +30,7 @@ scenarios:
   expected:
   - '`search_docs` が直接編集した内容を返し、`version` が読んだときと違う'
   - 同じ会話で一度返した文書でも、本文を `（この会話で返却済み）` にしない
-  - 直接編集した内容を `default_ref` へ commit した後は、読み取り API で取得した文書 1 の Markdown も直接編集した内容になる（読み取り API は `ref` を省くと `default_ref` の commit を読む）
+  - 直接編集した内容を `default_ref` へ commit した後は、読み取り API で取得した文書 1 の値も直接編集した内容になる（読み取り API は `ref` を省くと `default_ref` の commit を読む）
   - project-index を起動し直していない
   test: test_normal
 - name: 異常シナリオ（読んだ後に変わった文書へ書き込む）
@@ -87,7 +87,7 @@ scenarios:
   expected:
   - 結果に文書 2 があり、文書 1 は無い
   - 結果の `notes` に、読めなかった文書 1 のファイルのパスと理由（行と列）がある
-  - 壊れた内容を `default_ref` へ commit した後は、読み取り API で取得した文書 1 の変換の失敗 に、読めなかったファイルのパスと理由が入る
+  - 壊れた内容を `default_ref` へ commit した後は、読み取り API で取得した文書 1 のエラーに、読めなかったファイルのパスと理由が入る
   test: test_error_when_yaml_broken
 lead: 利用者が文書の MCP を通さずに YAML を直接編集した後、エージェントの次の取得がバージョンを見て読み直した内容を返す。
 issue: 14

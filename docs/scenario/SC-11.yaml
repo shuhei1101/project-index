@@ -6,8 +6,8 @@ scenarios:
   - name: Mock
     description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが読み取り API を HTTP で呼ぶ）
   - name: サンプルの配信元
-    description: 文書の種類を 1 つ（スキーマと YAML 2 件）と `project-index.yaml` を持つ git リポジトリ。`default_ref` は `main`
-    notes: id `sample`。文書 1 を変えた commit が `main` の最新で、その親の commit では文書 1 の `title` が違う
+    description: 文書の種類を 1 つ（スキーマと YAML 2 件）と、`nav`・`decisions.folders`・`github` を持つ `project-index.yaml` を持つ git リポジトリ。`default_ref` は `main`
+    notes: id `sample`。文書 1 を変えた commit が `main` の最新で、その親の commit では文書 1 の `title` が違う。`decisions.folders` の 1 つのフォルダに検討事項の文書 `D-1` を置く
   - name: project-index
     description: sample を端末の設定に並べて起動した project-index
   flow: |-
@@ -19,30 +19,39 @@ scenarios:
 
       DD->>PI: 配信元の一覧と状態を取得する
       PI-->>DD: sample が配信中
+      DD->>PI: sample の配信元の設定を取得する
+      PI-->>DD: nav・documents[]・decisions.folders・github
+      DD->>PI: sample の文書の一覧を取得する（リビジョンを省く）
+      PI-->>DD: 文書ごとの ID・パス・種類・メタデータ
       DD->>PI: sample の文書 1 を取得する（リビジョンを省く）
-      PI->>SRC: default_ref の文書 1 を読み込んで変換する
-      PI-->>DD: 変換した Markdown・メタデータ・画面の構成（nav）の元
+      PI->>SRC: default_ref の文書 1 を読み込む
+      PI-->>DD: 文書の値・種類のスキーマ・メタデータ
+      DD->>PI: 文書 1 を親の commit を指して取得する
+      PI-->>DD: 親の commit の文書の値
       DD->>PI: sample のリビジョンの一覧を取得する
       PI-->>DD: ブランチ・タグ・最近の commit
-      DD->>PI: 文書 1 の最新の commit と親の commit の差分を取得する
-      PI-->>DD: 変わった項目
       DD->>PI: sample の文書を単語で検索する
       PI-->>DD: 当たった文書と一致した箇所
+      DD->>PI: 検討事項 D-1 の文書を取得する
+      PI-->>DD: D-1 の文書の本文
     ```
   expected:
   - 配信元の一覧が sample を配信中として返却する
-  - 文書の取得が、`main` の文書 1 を変換した Markdown・メタデータ（ID・種類・名前・概要）・画面の構成（`nav`）の元を返却し、変換の失敗は空
+  - 配信元の設定が、`project-index.yaml` の `nav`・`documents[]`・`decisions.folders`・`github` を返却する
+  - 文書の一覧が、`main` の文書 2 件の ID・パス・種類・メタデータを返却する
+  - 文書 1 の取得が、`main` の文書 1 の値・種類のスキーマ・メタデータ（ID・種類・名前・概要）を返却する
+  - 親の commit を指した文書 1 の取得が、親の commit の `title` の値を返却する
   - リビジョンの一覧が `main` と、文書 1 を変えた commit を含む最近の commit を返却する
-  - 差分が、文書 1 の `title` を変わった項目として返却し、変わっていない項目を含まない
   - 単語での検索が、その単語を含む sample の文書と一致した箇所を返却する
+  - 検討事項の文書の取得が、D-1 の文書の本文を返却する
   - 読み取り API の呼び出しは、sample のフォルダのファイルを変えない
   test: test_normal
-- name: 正常シナリオ（変換に失敗する文書がある）
+- name: 正常シナリオ（変換のスクリプトを指す種類の文書）
   setup:
   - name: Mock
     description: なし（実環境で実行）
-  - name: サンプルの配信元
-    description: 正常シナリオと同じ配信元に、YAML として読めない文書 3 を `main` へ commit した状態
+  - name: 変換を持つ配信元
+    description: '`converters[]` を指す種類を持つ配信元。種類の文書 3 は変換のスクリプトが Markdown を出し、文書 4 は変換のスクリプトが失敗する'
     notes: id `sample`
   - name: project-index
     description: sample を端末の設定に並べて起動した project-index
@@ -53,19 +62,23 @@ scenarios:
       participant PI as project-index（読み取り API）
 
       DD->>PI: sample の文書 3 を取得する
-      PI-->>DD: 変換の失敗（ファイルのパスと理由）
-      DD->>PI: sample の文書 1 を取得する
-      PI-->>DD: 変換した Markdown
+      PI->>PI: converters[] のスクリプトで変換する
+      PI-->>DD: スクリプトが出した Markdown
+      DD->>PI: sample の文書 4 を取得する
+      PI-->>DD: 変換の失敗（スクリプトと理由）
     ```
   expected:
-  - 文書 3 の取得が、変換の失敗に読み込めなかったファイルのパスと理由を入れて返却する
-  - 文書 1 の取得は、文書 3 の失敗に関わらず変換した Markdown を返却する
-  - 配信元の一覧は sample を配信中として返却する
-  test: test_normal_when_conversion_failed
+  - 文書 3 の取得が、変換のスクリプトが出した Markdown とメタデータを返却する
+  - 文書 4 の取得が、変換の失敗に変換のスクリプトと失敗の理由を入れて返却する
+  - 文書 4 の失敗の後も、配信元の一覧は sample を配信中として返却する
+  test: test_normal_when_converter_kind
 - name: 異常シナリオ（配信していない配信元を指す）
   setup:
   - name: Mock
     description: なし（実環境で実行）
+  - name: サンプルの配信元
+    description: 正常シナリオと同じ配信元
+    notes: id `sample`
   - name: 壊れた配信元
     description: '`project-index.yaml` がスキーマに違反する配信元'
     notes: id `broken`。`documents[]` の必須のキーが無い
@@ -81,11 +94,17 @@ scenarios:
       PI-->>DD: broken は配信していない（理由つき）
       DD->>PI: broken の文書を取得する
       PI-->>DD: 404（配信していない配信元）
+      DD->>PI: broken のリビジョンの一覧を取得する
+      PI-->>DD: 404（配信していない配信元）
+      DD->>PI: broken の文書を単語で検索する
+      PI-->>DD: 404（配信していない配信元）
+      DD->>PI: sample の文書 1 を取得する
+      PI-->>DD: 文書の値
     ```
   expected:
   - 配信元の一覧が broken を配信していない配信元として、違反したキーのパスと理由つきで返却する
   - broken の文書の取得・リビジョンの一覧・単語での検索が、配信していない配信元として 404 を返却する
-  - sample の文書の取得は応答する
+  - sample の文書 1 の取得は文書の値を返却する
   test: test_error_when_source_not_served
 - name: 異常シナリオ（無いリビジョンを指す）
   setup:
@@ -104,9 +123,11 @@ scenarios:
 
       DD->>PI: sample の文書 1 を、無いブランチ名を指して取得する
       PI-->>DD: 無いリビジョンのエラー
+      DD->>PI: sample の文書の一覧を、無いブランチ名を指して取得する
+      PI-->>DD: 無いリビジョンのエラー
     ```
   expected:
-  - 文書の取得と差分が、指したリビジョンが無いことをリビジョンの名前つきでエラーとして返却する
+  - 文書の取得と文書の一覧が、指したリビジョンが無いことをリビジョンの名前つきでエラーとして返却する
   - sample のフォルダのファイルとブランチは変わらない
   test: test_error_when_ref_not_found
 - name: 異常シナリオ（無い文書のパスを指す）
@@ -130,23 +151,49 @@ scenarios:
   expected:
   - 文書の取得が、文書が無いことを 404 で返却する
   test: test_error_when_path_not_found
-lead: dev-docs の画面のサーバーが読み取り API で、配信元の一覧と状態・文書・2 つのリビジョンの差分・単語での検索の結果・リビジョンの一覧を取得する。
+- name: 異常シナリオ（検討事項の文書が 1 つに決まらない）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行）
+  - name: サンプルの配信元
+    description: 正常シナリオと同じ配信元に、`decisions.folders` の 2 つのフォルダへ同じ ID `D-2` の文書を置いた状態
+    notes: id `sample`。`D-3` の文書はどのフォルダにも無い
+  - name: project-index
+    description: sample を端末の設定に並べて起動した project-index
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（読み取り API）
+
+      DD->>PI: 検討事項 D-2 の文書を取得する
+      PI-->>DD: 1 つに決まらないエラー（2 つのフォルダ）
+      DD->>PI: 検討事項 D-3 の文書を取得する
+      PI-->>DD: 404（文書が無い）
+    ```
+  expected:
+  - D-2 の取得が、文書が 1 つに決まらないことを、文書のある 2 つのフォルダつきでエラーとして返却する
+  - D-3 の取得が、文書が無いことを 404 で返却する
+  test: test_error_when_decision_not_unique
+lead: dev-docs の画面のサーバーが読み取り API で、配信元の一覧と状態・配信元の設定・文書の一覧・文書・検討事項の文書・単語での検索の結果・リビジョンの一覧を取得する。
 issue: 14
 visibility: internal
 primary_actor: dev-docs の画面のサーバー
 stakeholders:
 - name: dev-docs の画面のサーバー
-  interest: 配信元の読み込み・変換・検索を自分で持たずに、利用者へ配信元の文書の画面を表示できる
+  interest: 配信元の読み込みと検索を自分で持たずに、取得した文書の値と種類のスキーマから利用者へ文書の画面を表示できる
 - name: 利用者
-  interest: 画面で読む文書・差分・検索の結果が、エージェントが文書の MCP で読む内容と同じになる
+  interest: 画面で読む文書・検索の結果が、エージェントが文書の MCP で読む内容と同じになる
 trigger: dev-docs の画面のサーバーが、利用者の画面の操作（文書を開く・リビジョンを切り替える・差分を開く・検索する）を受けて読み取り API を呼ぶ
 preconditions:
 - project-index が待ち受け、端末の設定に配信元が並んでいる
-success_guarantee: 読み取り API が、配信中の配信元の文書を文書の MCP と同じ読み込みと変換の結果で返却する。
+success_guarantee: 読み取り API が、配信中の配信元の文書を文書の MCP と同じ読み込みの結果で返却する。`converters[]` を指す種類の文書は、変換のスクリプトが出した Markdown を返却する。
 minimal_guarantee: 読み取り API の呼び出しは配信元のファイルを変えない。1 つの文書・配信元の失敗は、ほかの文書・配信元の取得を止めない。
 frequency: 利用者が画面を操作するたび
 priority: 高
 refs:
 - SC-1#scenarios[正常シナリオ]
 - SC-1#scenarios[異常シナリオ（配信できない配信元がある）]
+notes:
+  差分: 2 つのリビジョンの差分は、dev-docs の画面のサーバーが 2 つのリビジョンの文書の取得の結果から作る。
 test_file: tests/e2e/単一ユースケース/test_画面のサーバーが文書を読む.py

@@ -1,7 +1,7 @@
 docs:
   - page: docs/architecture/ARCH-1.yaml
     new: false
-    change: 読み取り API の利用者（dev-docs の画面のサーバー）の用途に、端末の設定の取得・保存と 2 つのリビジョンの差分を加え、索引のサーバーの役割に端末の設定の書き込みを加える
+    change: '読み取り API の利用者（dev-docs の画面のサーバー）の用途を Issue #14 の表（配信元の設定・文書の一覧・検討事項の文書・端末の設定の取得と保存・1 行の追加を含む）に合わせ、索引のサーバーの役割に端末の設定の書き込みを加える'
     status: todo
   - page: docs/config/CFG-1.yaml
     new: false
@@ -122,7 +122,7 @@ scope_out:
     reason: dev-docs の画面のサーバーに残る機能。残す境界は shuhei1101/dev-docs#163 のインターフェース定義設計で決まり、移すと決まったものはこの作業 PR のインターフェース定義設計で取り込む。更新（IF-155-13）と再起動（IF-155-7）は 2 つのサーバーがそれぞれのクローンに対して持ち、project-index の分はこの作業 PR で移す（SC-3・SC-4）
     plan: none
   - item: 端末の設定の配信元を 1 行ずつ版を照合して追加・変更・削除する API
-    reason: 'この作業 PR は今の dev-docs と同じ丸ごとの取得・保存を移す。行ごとの API は #10 が担う'
+    reason: 'この作業 PR は今の dev-docs と同じ丸ごとの取得・保存と、Issue #14 の表の 1 行の追加を提供する。版を照合する 1 行ずつの追加・変更・削除は #10 が担う'
     plan: '#10'
   - item: フォルダ構成の設計書（layout）の作成
     reason: '#7 が担う。この作業 PR で増えるフォルダはモジュール構成の束ねる設計書（MOD-1・MOD-2）の directory に書く'

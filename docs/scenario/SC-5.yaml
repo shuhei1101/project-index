@@ -584,7 +584,7 @@ preconditions:
 - '`/project-index:global-setup` を済ませ、project-index が待ち受けている'
 - path のフォルダが YAML の文書とそのスキーマを持つ（git リポジトリか Git 管理外のフォルダ）
 success_guarantee: 端末の設定の `sources` に配信元の行があり、`check_project` が違反を返さない。`reload` の後、`scope.read` に当たる作業場所の `describe` がその配信元を返す。
-minimal_guarantee: '`check_project` が違反を返したときと、利用者が確認の表を断ったとき、は、端末の設定を書き換えない。既にある配信元の配信は止まらない。'
+minimal_guarantee: '`check_project` が違反を返したときと、利用者が確認の表を断ったときは、端末の設定を書き換えない。既にある配信元の配信は止まらない。'
 frequency: 配信元ごとに 1 回。範囲のファイルを大きく増減・改名したとき
 priority: 高
 refs:

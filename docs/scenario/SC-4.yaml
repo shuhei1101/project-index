@@ -33,7 +33,7 @@ scenarios:
     ```
   expected:
   - '`127.0.0.1:8786` で待ち受け、`0.0.0.0` では待ち受けない'
-  - 読み取り API の sample の文書の取得 と 読み取り API の notes の文書の取得 が 200 を返す
+  - 読み取り API の sample の文書の取得と読み取り API の notes の文書の取得が 200 を返す
   - '`/mcp` のツールが `search_docs`・`write_docs`・`delete_docs`・`describe`・`list_changes`・`trace_related`・`list_match_words` の 7 つ'
   - '`/_admin/mcp` のツールが `status`・`reload`・`restart`・`update`・`check_project`・`try_convert`・`write_nav` の 7 つ'
   - 標準出力に待ち受けたアドレスと、配信している配信元の id（sample・notes）が出る
@@ -88,7 +88,7 @@ scenarios:
       DD-->>U: old を配信する
     ```
   expected:
-  - 読み取り API の old の文書の取得 が 200 を返す
+  - 読み取り API の old の文書の取得が 200 を返す
   - 警告のログに old の id・設定のバージョン・サーバーが読めるバージョンが残る
   test: test_normal_when_config_version_old
   notes:
@@ -119,7 +119,7 @@ scenarios:
       DD-->>U: sample だけを配信する
     ```
   expected:
-  - 読み取り API の broken の文書の取得 が 404 を返し、読み取り API の sample の文書の取得 と `/mcp` は応答する
+  - 読み取り API の broken の文書の取得が 404 を返し、読み取り API の sample の文書の取得と `/mcp` は応答する
   - 'エラーログに `broken: documents[0].paths: 必須のキーが無い` の形で、配信元の id・違反したキーのパス・理由が残る'
   - '`/_admin/mcp` に MCP のセッションを張れる'
   test: test_error_when_source_config_invalid
@@ -148,7 +148,7 @@ scenarios:
       DD-->>U: sample だけを配信する
     ```
   expected:
-  - 読み取り API の noscript の文書の取得 が 404 を返し、読み取り API の sample の文書の取得 は応答する
+  - 読み取り API の noscript の文書の取得が 404 を返し、読み取り API の sample の文書の取得は応答する
   - エラーログに noscript の id・`converters[0]` のキーのパス・スクリプトが見つからない理由が残る
   test: test_error_when_script_not_executable
 - name: 異常シナリオ（端末の設定がスキーマに違反する）
@@ -227,7 +227,7 @@ scenarios:
       DD-->>U: sample を配信する
     ```
   expected:
-  - 読み取り API の sample の文書の取得 が 200 を返す
+  - 読み取り API の sample の文書の取得が 200 を返す
   - 警告のログに sample の id と、行 `rules` の `metadata` の列の欠け 1 件（`name` の `title`）が残る
   - 警告のログに行 `src` の索引に無いファイル 1 件（`src/d.py`）とファイルが無い行 1 件（`c.py`）が残る
   - '警告のログにどの文書にも該当しない関連 1 件（`src: src/a.py: src/z.py`）が残る'
@@ -369,7 +369,7 @@ scenarios:
       DD-->>U: sample だけを配信する
     ```
   expected:
-  - 読み取り API の legacy の文書の取得 が 404 を返し、読み取り API の sample の文書の取得 は応答する
+  - 読み取り API の legacy の文書の取得が 404 を返し、読み取り API の sample の文書の取得は応答する
   - エラーログに legacy の id と、`tags`・`documents[0].type`・`documents[1].type`・`documents[1].defaults`・`documents[1].metadata.name` のそれぞれの違反が残る
   - エラーログに、legacy の設定のバージョンが古く `project-index migrate --source` で移し替えられることが残る
   test: test_error_when_source_config_legacy
@@ -466,7 +466,7 @@ scenarios:
       DD-->>U: sample だけを配信する
     ```
   expected:
-  - 読み取り API の uncommitted の文書の取得 が 404 を返し、読み取り API の sample の文書の取得 は応答する
+  - 読み取り API の uncommitted の文書の取得が 404 を返し、読み取り API の sample の文書の取得は応答する
   - 'エラーログに `uncommitted: config[0]: develop に project-index.yaml がありません` が残る'
   test: test_error_when_first_config_not_committed
 - name: 正常シナリオ（XDG の環境変数で置き場を決める）
@@ -496,7 +496,7 @@ scenarios:
       DD-->>U: sample を配信する
     ```
   expected:
-  - 1 回目の起動で 読み取り API の sample の文書の取得 が 200 を返す
+  - 1 回目の起動で読み取り API の sample の文書の取得が 200 を返す
   - 1 回目の起動のログが `$XDG_STATE_HOME/project-index/logs` にでき、`~/.local/state/project-index` には書かない
   - 2 回目の起動のログが `$PROJECT_INDEX_STATE_DIR/logs` にでき、`$XDG_STATE_HOME/project-index` には書かない
   test: test_normal_when_xdg_dirs_set
@@ -537,7 +537,7 @@ trigger: '利用者が `project-index serve` を実行するか、ポートに�
 preconditions:
 - '`PROJECT_INDEX_CONFIG`（既定 `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`）に端末の設定がある'
 - '`PROJECT_INDEX_PORT`（既定 8786）のポートが空いている'
-success_guarantee: 検証に通った配信元が 読み取り API と `/mcp` の文書の MCP で読める。`/mcp` のツールは配信元の数によらず 7 つ。
+success_guarantee: 検証に通った配信元が読み取り API と `/mcp` の文書の MCP で読める。`/mcp` のツールは配信元の数によらず 7 つ。
 minimal_guarantee: 検証に失敗した配信元があっても、他の配信元と `/_admin/mcp` は配信する。失敗した配信元の id・違反したキーのパス・理由がエラーログに残る。
 frequency: 端末の起動ごと・project-index の更新ごと
 priority: 高

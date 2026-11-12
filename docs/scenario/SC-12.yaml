@@ -35,6 +35,9 @@ scenarios:
   setup:
   - name: Mock
     description: なし（実環境で実行）
+  - name: サンプルの配信元
+    description: 文書の種類を 1 つと `project-index.yaml` を持つ git リポジトリ
+    notes: id `sample`
   - name: 追加する配信元
     description: 文書の種類を 1 つと `project-index.yaml` を持つ git リポジトリ。端末の設定にはまだ無い
     notes: id `extra`
@@ -61,6 +64,60 @@ scenarios:
   - '`settings.yaml` の extra の行の `config` が、要素 1 つの配列で記載される'
   - 'project-index を再起動せずに、読み取り API の extra の文書の取得と、文書の MCP の `source: extra` の `search_docs` が文書を返却する'
   test: test_normal_when_source_added
+- name: 正常シナリオ（1 行を追加する）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行）
+  - name: 追加する配信元
+    description: 文書の種類を 1 つと `project-index.yaml` を持つ git リポジトリ。端末の設定にはまだ無い
+    notes: id `extra`
+  - name: 端末の設定
+    description: '`PROJECT_INDEX_CONFIG` が指す一時フォルダの `settings.yaml`'
+    notes: '`sources` に sample の 1 行'
+  - name: project-index
+    description: 端末の設定で起動した project-index
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（端末の設定の API）
+      participant CF as 端末の設定
+
+      DD->>PI: extra の行を 1 行追加する
+      PI->>PI: スキーマで検証し、同じ id の行が無いことを確かめる
+      PI->>CF: settings.yaml の sources の末尾に extra の行を追加し、配信元を読み直す
+      PI-->>DD: 追加した
+    ```
+  expected:
+  - 応答が、行を追加したことを返却する
+  - '`settings.yaml` の `sources` が sample・extra の順に並び、sample の行は変わらない'
+  - project-index を再起動せずに、読み取り API の extra の文書の取得が文書を返却する
+  test: test_normal_when_one_row_added
+- name: 正常シナリオ（同じ id の行がある）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行）
+  - name: 端末の設定
+    description: '`PROJECT_INDEX_CONFIG` が指す一時フォルダの `settings.yaml`'
+    notes: '`sources` に sample と extra の 2 行'
+  - name: project-index
+    description: 端末の設定で起動した project-index
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（端末の設定の API）
+
+      DD->>PI: extra と同じ内容の行を 1 行追加する
+      PI-->>DD: 同じ id の行があり、内容も同じ
+      DD->>PI: extra と id が同じで config が違う行を 1 行追加する
+      PI-->>DD: 同じ id の行があり、内容が違う
+    ```
+  expected:
+  - 1 回目の応答が、同じ id の行があり内容も同じであることを返却する
+  - 2 回目の応答が、同じ id の行があり内容が違うことを返却する
+  - '`settings.yaml` が変わらない'
+  test: test_normal_when_same_id_exists
 - name: 正常シナリオ（配信を止める）
   setup:
   - name: Mock
@@ -195,7 +252,7 @@ scenarios:
   test: test_error_when_cross_origin
   notes:
     画面のサーバーからの呼び出し: dev-docs の画面のサーバーはサーバーの側から呼ぶため `Origin` を持たない。断る条件はインターフェース定義設計で決める
-lead: dev-docs の画面のサーバーが端末の設定の API で、端末の設定の配信元を取得し、追加・変更・停止・削除した後の配信元を丸ごと保存して、project-index を再起動せずに配信へ反映する。
+lead: dev-docs の画面のサーバーが端末の設定の API で、端末の設定の配信元を取得し、追加・変更・停止・削除した後の配信元を丸ごと保存するか 1 行を追加して、project-index を再起動せずに配信へ反映する。
 issue: 14
 visibility: internal
 primary_actor: dev-docs の画面のサーバー
