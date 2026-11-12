@@ -90,7 +90,7 @@ flows:
         participant WT as ワークツリー x
 
         C->>T: worktree: x, operations: create・kind: term・data
-        T-->>WT: ワークツリーの project-index.yaml で配信元の設定を読み直す
+        T->>WT: ワークツリーの project-index.yaml で配信元の設定を読み直す
         T->>T: term のスキーマと validators に通す
         T->>WT: term の documents の置き場所に YAML を作成する
         T-->>C: 作成した文書の id と version
