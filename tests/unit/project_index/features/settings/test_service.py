@@ -5,9 +5,18 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from project_index.features.settings.service import add_source, save_sources
+from project_index.features.settings.query import read_settings_file
+from project_index.features.settings.service import (
+    add_source,
+    delete_source,
+    patch_source,
+    save_sources,
+)
 from project_index.features.settings.types import (
+    SettingsVersionMismatchError,
     SourceEntry,
+    SourcePatch,
+    SourceRowNotFoundError,
     TerminalConfig,
     TerminalConfigInvalidError,
 )
@@ -70,7 +79,7 @@ def test_save_sources(
     assert "port: 8786  # ポート" in text
     assert len(calls) == 1
     assert len(calls[0].sources) == 2
-    assert [status.id for status in result] == ["a", "b"]
+    assert [status.id for status in result.statuses] == ["a", "b"]
 
 
 def test_save_sources_when_defaults(
@@ -369,4 +378,335 @@ def test_add_source_when_invalid(
     with pytest.raises(TerminalConfigInvalidError):
         add_source(entry, path=settings_path, reload=reload, lock=threading.Lock())
     assert settings_path.read_text(encoding="utf-8") == before
+    assert calls == []
+
+
+def test_save_sources_when_version_matched(
+    settings_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """内容のバージョンが一致すれば保存する（正常系）。"""
+    # 準備
+    reload, _ = fake_reload
+    _, version = read_settings_file(settings_path)
+    sources = [make_entry("/tmp/b/project-index.yaml", source_id="b")]
+    # 実行
+    result = save_sources(
+        sources,
+        expected_version=version,
+        path=settings_path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
+    # 検証
+    assert "/tmp/b/project-index.yaml" in settings_path.read_text(encoding="utf-8")
+    assert result.version == read_settings_file(settings_path)[1]
+    assert result.version != version
+
+
+def test_save_sources_when_version_outdated(
+    settings_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """内容のバージョンが古い（異常系）。"""
+    # 準備
+    reload, calls = fake_reload
+    _, old = read_settings_file(settings_path)
+    settings_path.write_text(SETTINGS_TEXT + "# memo\n", encoding="utf-8")
+    sources = [make_entry("/tmp/b/project-index.yaml", source_id="b")]
+    # 実行・検証
+    with pytest.raises(SettingsVersionMismatchError) as caught:
+        save_sources(
+            sources, expected_version=old, path=settings_path, reload=reload, lock=threading.Lock()
+        )
+    assert caught.value.current == read_settings_file(settings_path)[1]
+    assert settings_path.read_text(encoding="utf-8") == SETTINGS_TEXT + "# memo\n"
+    assert calls == []
+
+
+def test_add_source_when_version_outdated(
+    settings_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """内容のバージョンが古い（異常系）。"""
+    # 準備
+    reload, calls = fake_reload
+    _, old = read_settings_file(settings_path)
+    settings_path.write_text(SETTINGS_TEXT + "# memo\n", encoding="utf-8")
+    entry = make_entry("/tmp/b/project-index.yaml", source_id="b")
+    # 実行・検証
+    with pytest.raises(SettingsVersionMismatchError):
+        add_source(
+            entry, expected_version=old, path=settings_path, reload=reload, lock=threading.Lock()
+        )
+    assert settings_path.read_text(encoding="utf-8") == SETTINGS_TEXT + "# memo\n"
+    assert calls == []
+
+
+TWO_ROWS_TEXT = (
+    'version: "1"\n'
+    "clone: /tmp/clone\n"
+    "port: 8786  # ポート\n"
+    "sources:\n"
+    "  - id: sample\n"
+    "    config: [/tmp/sample/project-index.yaml]\n"
+    "  - id: extra\n"
+    "    config: [/tmp/extra/project-index.yaml]\n"
+    "    scope:\n"
+    "      read: [/tmp/extra/**]\n"
+    "      write: [/tmp/write/**]\n"
+)
+
+
+@pytest.fixture
+def two_rows_path(tmp_path: Path) -> Path:
+    """sample と extra の 2 行を持つ端末の設定を書いてパスを返す。"""
+    path = tmp_path / "settings.yaml"
+    path.write_text(TWO_ROWS_TEXT, encoding="utf-8")
+    return path
+
+
+def test_patch_source(
+    two_rows_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """送ったキーだけを重ねる（正常系）。"""
+    # 準備
+    reload, calls = fake_reload
+    _, version = read_settings_file(two_rows_path)
+    patch = SourcePatch.model_validate({"outside_read": False})
+    # 実行
+    result = patch_source(
+        "extra",
+        patch,
+        expected_version=version,
+        path=two_rows_path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
+    # 検証
+    text = two_rows_path.read_text(encoding="utf-8")
+    rows = load_yaml(text)["sources"]
+    assert rows[0] == {"id": "sample", "config": ["/tmp/sample/project-index.yaml"]}
+    assert rows[1]["outside_read"] is False
+    assert rows[1]["scope"] == {"read": ["/tmp/extra/**"], "write": ["/tmp/write/**"]}
+    assert "port: 8786  # ポート" in text
+    assert len(calls) == 1
+    assert result.version == read_settings_file(two_rows_path)[1]
+
+
+def test_patch_source_when_scope_write_null(
+    two_rows_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """scope.write に null を送ると既定に戻す（正常系）。"""
+    # 準備
+    reload, _ = fake_reload
+    _, version = read_settings_file(two_rows_path)
+    patch = SourcePatch.model_validate({"scope": {"write": None}})
+    # 実行
+    patch_source(
+        "extra",
+        patch,
+        expected_version=version,
+        path=two_rows_path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
+    # 検証
+    row = load_yaml(two_rows_path.read_text(encoding="utf-8"))["sources"][1]
+    assert row["scope"] == {"read": ["/tmp/extra/**"]}
+
+
+def _named_settings(tmp_path: Path) -> tuple[Path, Path]:
+    """`name: notes` と `name: memo` の配信元の設定と、notes を `id` を省いて指す行を持つ端末の設定を書く。"""
+    for name in ("notes", "memo"):
+        config = tmp_path / name / "project-index.yaml"
+        config.parent.mkdir()
+        config.write_text(f'version: "3"\nname: {name}\n', encoding="utf-8")
+    path = tmp_path / "settings.yaml"
+    path.write_text(
+        f'version: "1"\nclone: /tmp/clone\nsources:\n  - config: [{tmp_path / "notes" / "project-index.yaml"}]\n',
+        encoding="utf-8",
+    )
+    return path, tmp_path / "memo" / "project-index.yaml"
+
+
+def test_patch_source_when_row_without_id(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """id を省いた行を設定の name で指す（正常系）。"""
+    # 準備
+    reload, _ = fake_reload
+    path, _ = _named_settings(tmp_path)
+    _, version = read_settings_file(path)
+    patch = SourcePatch.model_validate({"enabled": False})
+    # 実行
+    patch_source(
+        "notes", patch, expected_version=version, path=path, reload=reload, lock=threading.Lock()
+    )
+    # 検証
+    row = load_yaml(path.read_text(encoding="utf-8"))["sources"][0]
+    assert row["enabled"] is False
+    assert "id" not in row
+
+
+def test_patch_source_when_version_outdated(
+    two_rows_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """内容のバージョンが古い（異常系）。"""
+    # 準備
+    reload, calls = fake_reload
+    _, old = read_settings_file(two_rows_path)
+    two_rows_path.write_text(TWO_ROWS_TEXT + "# memo\n", encoding="utf-8")
+    patch = SourcePatch.model_validate({"outside_read": False})
+    # 実行・検証
+    with pytest.raises(SettingsVersionMismatchError):
+        patch_source(
+            "extra",
+            patch,
+            expected_version=old,
+            path=two_rows_path,
+            reload=reload,
+            lock=threading.Lock(),
+        )
+    assert two_rows_path.read_text(encoding="utf-8") == TWO_ROWS_TEXT + "# memo\n"
+    assert calls == []
+
+
+def test_patch_source_when_not_found(
+    settings_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """指した行が無い（異常系）。"""
+    # 準備
+    reload, calls = fake_reload
+    _, version = read_settings_file(settings_path)
+    patch = SourcePatch.model_validate({"enabled": False})
+    # 実行・検証
+    with pytest.raises(SourceRowNotFoundError) as caught:
+        patch_source(
+            "extra",
+            patch,
+            expected_version=version,
+            path=settings_path,
+            reload=reload,
+            lock=threading.Lock(),
+        )
+    assert caught.value.source_id == "extra"
+    assert settings_path.read_text(encoding="utf-8") == SETTINGS_TEXT
+    assert calls == []
+
+
+def test_patch_source_when_id_changes(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """id を省いた行の配信元の ID が変わる（異常系）。"""
+    # 準備
+    reload, calls = fake_reload
+    path, memo = _named_settings(tmp_path)
+    before, version = read_settings_file(path)
+    patch = SourcePatch.model_validate({"config": str(memo)})
+    # 実行・検証
+    with pytest.raises(TerminalConfigInvalidError) as caught:
+        patch_source(
+            "notes", patch, expected_version=version, path=path, reload=reload, lock=threading.Lock()
+        )
+    assert [violation.path for violation in caught.value.violations] == ["source.config"]
+    assert path.read_text(encoding="utf-8") == before
+    assert calls == []
+
+
+def test_patch_source_when_invalid(
+    two_rows_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """重ねた後にスキーマに通らない（異常系）。"""
+    # 準備
+    reload, calls = fake_reload
+    _, version = read_settings_file(two_rows_path)
+    patch = SourcePatch.model_validate({"scope": {"read": [""]}})
+    # 実行・検証
+    with pytest.raises(TerminalConfigInvalidError):
+        patch_source(
+            "extra",
+            patch,
+            expected_version=version,
+            path=two_rows_path,
+            reload=reload,
+            lock=threading.Lock(),
+        )
+    assert two_rows_path.read_text(encoding="utf-8") == TWO_ROWS_TEXT
+    assert calls == []
+
+
+def test_delete_source(
+    two_rows_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """指した行だけを削除する（正常系）。"""
+    # 準備
+    reload, calls = fake_reload
+    _, version = read_settings_file(two_rows_path)
+    # 実行
+    result = delete_source(
+        "extra",
+        expected_version=version,
+        path=two_rows_path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
+    # 検証
+    text = two_rows_path.read_text(encoding="utf-8")
+    assert load_yaml(text)["sources"] == [
+        {"id": "sample", "config": ["/tmp/sample/project-index.yaml"]}
+    ]
+    assert "port: 8786  # ポート" in text
+    assert len(calls) == 1
+    assert [entry.id for entry in calls[0].sources] == ["sample"]
+    assert result.version == read_settings_file(two_rows_path)[1]
+
+
+def test_delete_source_when_version_outdated(
+    two_rows_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """内容のバージョンが古い（異常系）。"""
+    # 準備
+    reload, calls = fake_reload
+    _, old = read_settings_file(two_rows_path)
+    two_rows_path.write_text(TWO_ROWS_TEXT + "# memo\n", encoding="utf-8")
+    # 実行・検証
+    with pytest.raises(SettingsVersionMismatchError):
+        delete_source(
+            "extra", expected_version=old, path=two_rows_path, reload=reload, lock=threading.Lock()
+        )
+    assert two_rows_path.read_text(encoding="utf-8") == TWO_ROWS_TEXT + "# memo\n"
+    assert calls == []
+
+
+def test_delete_source_when_not_found(
+    settings_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """指した行が無い（異常系）。"""
+    # 準備
+    reload, calls = fake_reload
+    _, version = read_settings_file(settings_path)
+    # 実行・検証
+    with pytest.raises(SourceRowNotFoundError):
+        delete_source(
+            "extra",
+            expected_version=version,
+            path=settings_path,
+            reload=reload,
+            lock=threading.Lock(),
+        )
+    assert settings_path.read_text(encoding="utf-8") == SETTINGS_TEXT
     assert calls == []

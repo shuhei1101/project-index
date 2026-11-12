@@ -11,7 +11,13 @@ from fastapi.testclient import TestClient
 from project_index.features.settings import route as route_module
 from project_index.features.settings.query import load_terminal_config
 from project_index.features.settings.route import build_settings_router
-from project_index.features.settings.types import SourceAddResult, SourceEntry, TerminalConfig
+from project_index.features.settings.types import (
+    SourceAddResult,
+    SourceEntry,
+    SourcePatch,
+    SourceWriteResult,
+    TerminalConfig,
+)
 from project_index.features.sources.registry import SourceRegistry
 from project_index.shared.errors import Violation
 
@@ -138,9 +144,9 @@ def test_build_settings_router_when_put(
     # 準備
     saved: list[list[SourceEntry]] = []
 
-    def fake_save_sources(sources: list[SourceEntry], **kwargs: Any) -> list[SourceStatus]:
+    def fake_save_sources(sources: list[SourceEntry], **kwargs: Any) -> SourceWriteResult:
         saved.append(list(sources))
-        return [make_status("a", 0)]
+        return SourceWriteResult(statuses=[make_status("a", 0)], version="d4e5f6")
 
     monkeypatch.setattr(route_module, "save_sources", fake_save_sources)
     handlers = make_handlers(settings_lock=threading.Lock(), registry=SourceRegistry())
@@ -164,8 +170,10 @@ def test_build_settings_router_when_post(
     """1 行を追加して 201、同じ id は 409（正常系）。"""
     # 準備
     results = [
-        SourceAddResult(result="added", same=None, statuses=[make_status("a", 0)]),
-        SourceAddResult(result="exists", same=True, statuses=[]),
+        SourceAddResult(
+            result="added", same=None, statuses=[make_status("a", 0)], version="d4e5f6"
+        ),
+        SourceAddResult(result="exists", same=True, statuses=[], version="a1b2c3"),
     ]
 
     def fake_add_source(source: SourceEntry, **kwargs: Any) -> SourceAddResult:
@@ -223,3 +231,109 @@ def test_build_settings_router_when_loading(
     assert [(row["id"], row["status"]) for row in response.json()["sources"]] == [
         ("sample", "serving")
     ]
+
+
+def test_build_settings_router_when_get_version(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_handlers: Callable[..., Any],
+    make_terminal_config: Callable[..., TerminalConfig],
+) -> None:
+    """取得に内容のバージョンを返す（正常系）。"""
+    # 準備
+    write_files(tmp_path, {"settings.yaml": 'version: "1"\nclone: /tmp/clone\n'})
+    terminal = make_terminal_config(file=tmp_path / "settings.yaml")
+    handlers = make_handlers(terminal=terminal, registry=FakeRegistry([]))
+    app = FastAPI()
+    app.include_router(build_settings_router(handlers))
+    client = TestClient(app)
+    # 実行
+    response = client.get("/settings/sources")
+    # 検証
+    assert response.status_code == 200
+    assert response.json()["version"] == "fd1feb"
+
+
+def test_build_settings_router_when_patch(
+    make_handlers: Callable[..., Any],
+    make_status: Callable[..., SourceStatus],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """1 行を変更して状態と内容のバージョンを返す（正常系）。"""
+    # 準備
+    received: list[tuple[str, SourcePatch, str]] = []
+
+    def fake_patch_source(
+        source_id: str, patch: SourcePatch, *, expected_version: str, **kwargs: Any
+    ) -> SourceWriteResult:
+        received.append((source_id, patch, expected_version))
+        return SourceWriteResult(statuses=[make_status("extra", 0)], version="d4e5f6")
+
+    monkeypatch.setattr(route_module, "patch_source", fake_patch_source)
+    handlers = make_handlers(registry=SourceRegistry())
+    app = FastAPI()
+    app.include_router(build_settings_router(handlers))
+    client = TestClient(app)
+    body = {"expectedVersion": "a1b2c3", "source": {"outside_read": False}}
+    # 実行
+    response = client.patch("/settings/sources/extra", json=body)
+    # 検証
+    assert response.status_code == 200
+    assert response.json()["version"] == "d4e5f6"
+    assert response.json()["sources"][0]["status"] == "serving"
+    assert received[0][0] == "extra"
+    assert received[0][1].outside_read is False
+    assert received[0][2] == "a1b2c3"
+
+
+def test_build_settings_router_when_delete(
+    make_handlers: Callable[..., Any],
+    make_status: Callable[..., SourceStatus],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """1 行を削除して状態と内容のバージョンを返す（正常系）。"""
+    # 準備
+    received: list[tuple[str, str]] = []
+
+    def fake_delete_source(
+        source_id: str, *, expected_version: str, **kwargs: Any
+    ) -> SourceWriteResult:
+        received.append((source_id, expected_version))
+        return SourceWriteResult(statuses=[make_status("sample", 0)], version="d4e5f6")
+
+    monkeypatch.setattr(route_module, "delete_source", fake_delete_source)
+    handlers = make_handlers(registry=SourceRegistry())
+    app = FastAPI()
+    app.include_router(build_settings_router(handlers))
+    client = TestClient(app)
+    # 実行
+    response = client.delete("/settings/sources/extra?expectedVersion=a1b2c3")
+    # 検証
+    assert response.status_code == 200
+    assert response.json()["version"] == "d4e5f6"
+    assert response.json()["sources"][0]["id"] == "sample"
+    assert received == [("extra", "a1b2c3")]
+
+
+def test_build_settings_router_when_delete_without_version(
+    make_handlers: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """削除に expectedVersion が無い（異常系）。"""
+    # 準備
+    received: list[str] = []
+
+    def fake_delete_source(source_id: str, **kwargs: Any) -> SourceWriteResult:
+        received.append(source_id)
+        return SourceWriteResult(statuses=[], version="d4e5f6")
+
+    monkeypatch.setattr(route_module, "delete_source", fake_delete_source)
+    handlers = make_handlers(registry=SourceRegistry())
+    app = FastAPI()
+    app.include_router(build_settings_router(handlers))
+    client = TestClient(app)
+    # 実行
+    response = client.delete("/settings/sources/extra")
+    # 検証
+    assert response.status_code == 422
+    assert received == []

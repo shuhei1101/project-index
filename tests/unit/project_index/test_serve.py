@@ -25,6 +25,7 @@ from project_index.main import (
     PortInUseError,
     build_handlers,
     check_port,
+    reload_changed_sources,
     reload_sources,
     run_migrate,
     run_serve,
@@ -37,7 +38,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from project_index.features.settings.types import SourceEntry, TerminalConfig
-    from project_index.features.sources.types import SourceStatus
+    from project_index.features.sources.types import ServedSource, SourceStatus
 
 
 def _free_port() -> int:
@@ -842,3 +843,62 @@ def test_check_sources(
     assert check is not None
     assert len(check.report.unindexed_files) == 1
     assert cleared == []
+
+
+class _ChangedRegistry:
+    """`reload_changed` の前後で配信中の配信元を入れ替える配信元の一覧の偽物。"""
+
+    def __init__(
+        self,
+        calls: list[str],
+        before: list[ServedSource],
+        after: list[ServedSource],
+        statuses: list[SourceStatus],
+    ) -> None:
+        self._calls = calls
+        self._served = before
+        self._after = after
+        self._statuses = statuses
+
+    def reload_changed(self, terminal: TerminalConfig) -> list[SourceStatus]:
+        self._calls.append("registry.reload_changed")
+        self._served = self._after
+        return self._statuses
+
+    def served(self) -> list[ServedSource]:
+        return self._served
+
+
+def test_reload_changed_sources(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """変わった行を読み直してから、新しく読んだ配信元だけで控えを捨てる（正常系）。"""
+    # 準備
+    calls: list[str] = []
+    a = make_served_source(id="a")
+    b = make_served_source(id="b")
+    statuses = [make_status("a", 0), make_status("b", 1)]
+    registry = _ChangedRegistry(calls, [a], [a, b], statuses)
+    checked: list[list[str]] = []
+    monkeypatch.setattr(
+        main_module,
+        "check_sources",
+        lambda sources, *, store, checks: checked.append([source.id for source in sources]),
+    )
+    # 実行
+    result = reload_changed_sources(
+        make_terminal_config(),
+        registry=registry,  # type: ignore[arg-type]
+        store=_Recorder("store", calls),
+        checker=_Recorder("checker", calls),
+        converter=_Recorder("converter", calls),
+        checks=SourceChecks(),
+    )
+    # 検証
+    assert calls[0] == "registry.reload_changed"
+    assert sorted(calls[1:]) == ["checker.clear", "converter.clear", "store.clear"]
+    assert checked == [["b"]]
+    assert result == statuses

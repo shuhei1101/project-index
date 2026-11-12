@@ -772,3 +772,104 @@ def test_source_registry_get_when_row_loading(
     assert returned_before is False
     assert [source.id for source in results] == ["b"]
     assert loader.order == ["a", "b"]
+
+
+def test_source_registry_reload_changed(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """変わった行だけを読み込む（正常系）。"""
+    # 準備
+    loader = _Loader(make_served_source, make_status)
+    monkeypatch.setattr(registry_module, "load_source", loader)
+    registry = SourceRegistry()
+    registry.reload(make_terminal_config(sources=_entries(make_entry, "a", "b")))
+    before = registry.get("a")
+    changed = [
+        make_entry("/tmp/a/project-index.yaml", source_id="a"),
+        make_entry("/tmp/b/project-index.yaml", source_id="b", outside_read=False),
+    ]
+    loader.order.clear()
+    # 実行
+    statuses = registry.reload_changed(make_terminal_config(sources=changed))
+    # 検証
+    assert loader.order == ["b"]
+    assert registry.get("a") is before
+    assert [(status.id, status.index) for status in statuses] == [("a", 0), ("b", 1)]
+
+
+def test_source_registry_reload_changed_when_added(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """追加した行だけを読み込む（正常系）。"""
+    # 準備
+    loader = _Loader(make_served_source, make_status)
+    monkeypatch.setattr(registry_module, "load_source", loader)
+    registry = SourceRegistry()
+    registry.reload(make_terminal_config(sources=_entries(make_entry, "a")))
+    loader.order.clear()
+    # 実行
+    registry.reload_changed(make_terminal_config(sources=_entries(make_entry, "a", "c")))
+    # 検証
+    assert loader.order == ["c"]
+    assert sorted(source.id for source in registry.served()) == ["a", "c"]
+
+
+def test_source_registry_reload_changed_when_deleted(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """削除した行の配信元を除き、後ろの行の位置を詰める（正常系）。"""
+    # 準備
+    loader = _Loader(make_served_source, make_status)
+    monkeypatch.setattr(registry_module, "load_source", loader)
+    registry = SourceRegistry()
+    registry.reload(make_terminal_config(sources=_entries(make_entry, "a", "b", "c")))
+    loader.order.clear()
+    # 実行
+    statuses = registry.reload_changed(make_terminal_config(sources=_entries(make_entry, "a", "c")))
+    # 検証
+    assert loader.order == []
+    with pytest.raises(UnknownSourceError):
+        registry.get("b")
+    assert [(status.id, status.index) for status in statuses] == [("a", 0), ("c", 1)]
+
+
+def test_source_registry_reload_changed_when_not_served(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """配信していなかった行は値が同じでも読み直す（正常系）。"""
+    # 準備
+    order: list[str] = []
+    results: dict[str, LoadResult] = {
+        "a": (make_served_source(id="a"), make_status("a", 0)),
+        "broken": (None, make_status("broken", 1, "not_served")),
+    }
+
+    def fake_load(entry: SourceEntry, *, index: int, lookup: SchemaRefLookup) -> LoadResult:
+        order.append(str(entry.id))
+        return results[str(entry.id)]
+
+    monkeypatch.setattr(registry_module, "load_source", fake_load)
+    registry = SourceRegistry()
+    terminal = make_terminal_config(sources=_entries(make_entry, "a", "broken"))
+    registry.reload(terminal)
+    order.clear()
+    # 実行
+    registry.reload_changed(terminal)
+    # 検証
+    assert order == ["broken"]
