@@ -288,6 +288,36 @@ scenarios:
     test: test_normal_when_unknown_top_level_key_kept
     decisions:
       - D-308
+  - name: 正常シナリオ（送信しなかったキーを残す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す一時フォルダの `settings.yaml`'
+        notes: '`sources` に sample と、`outside_read: false` と `scope.read` に extra のフォルダだけを記載した extra の 2 行'
+      - name: project-index
+        description: 端末の設定で起動した project-index
+      - name: 範囲の外の作業場所
+        description: extra の `scope.read` に該当しない一時フォルダ
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant DD as dev-docs の画面のサーバー
+        participant PI as project-index（端末の設定の API）
+        participant CF as 端末の設定
+
+        DD->>PI: 端末の設定の配信元を取得する
+        PI-->>DD: sample と extra の行（extra は作業範囲の外から参照できない）
+        DD->>PI: sample の enabled を false にし、どちらの行にも outside_read を含めない sources を保存する
+        PI->>CF: 送信しなかったキーをファイルの今の値で残して settings.yaml を書き換え、配信元を読み直す
+        PI-->>DD: sample を無効とする状態
+      ```
+    expected:
+      - 取得が extra の行を、作業範囲の外から参照できない（`outsideRead` が `false`）として返却する
+      - '`settings.yaml` の sample の行の `enabled` が `false` になる'
+      - '`settings.yaml` の extra の行に `outside_read: false` が残る'
+      - '保存した後も、extra の範囲の外の作業場所から `outside_scope: true` で extra の文書を参照できない'
+    test: test_normal_when_unsent_keys_kept
 lead: dev-docs の画面のサーバーが端末の設定の API で、端末の設定の配信元を取得し、追加・変更・停止・削除した後の配信元を丸ごと保存するか 1 行を追加して、project-index を再起動せずに配信へ反映する。
 issue: 14
 visibility: internal
@@ -300,7 +330,7 @@ stakeholders:
 trigger: dev-docs の画面のサーバーが、利用者の設定画面の操作（開く・保存する）を受けて端末の設定の API を呼ぶ
 preconditions:
   - project-index が待ち受け、端末の設定に配信元が並んでいる
-success_guarantee: 保存した sources だけが `settings.yaml` に書き込まれ、読み直した後の配信元の状態が応答と文書の MCP・読み取り API に反映される。
+success_guarantee: 保存した sources だけが `settings.yaml` に書き込まれ（送信した行に含めなかったキーは、ファイルの同じ配信元の行の今の値で残る）、読み直した後の配信元の状態が応答と文書の MCP・読み取り API に反映される。
 minimal_guarantee: スキーマに合格しない保存と、別のオリジンからの保存は `settings.yaml` を書き換えない。配信元のフォルダのファイルは変えない。他の配信元の配信は止まらない。
 frequency: 配信元を追加・停止・削除するとき
 priority: 中
