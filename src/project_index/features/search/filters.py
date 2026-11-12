@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import difflib
+import operator
 import re
 import unicodedata
 from datetime import UTC, date, datetime, timedelta
@@ -44,7 +45,7 @@ def _midnight(day: date) -> datetime:
     return datetime(day.year, day.month, day.day, tzinfo=UTC)
 
 
-def parse_compare_value(value: str, field_type: str, *, today: date) -> Any:
+def parse_compare_value(value: str, field_type: str, *, today: date) -> datetime | float | str:
     """条件の値を項目の型で解釈する。"""
     try:
         if field_type == "date":
@@ -191,7 +192,7 @@ def _check_body_range(request: SearchRequest) -> list[Violation]:
     return violations
 
 
-def _text(value: Any) -> str:
+def _text(value: object) -> str:
     """比べる値を文字列にする。"""
     if isinstance(value, datetime):
         return value.isoformat()
@@ -200,19 +201,45 @@ def _text(value: Any) -> str:
     return str(value)
 
 
-def _comparable(value: Any, field_type: str) -> Any:
+def _comparable(value: object, field_type: str) -> datetime | float | str | None:
     """文書の値を項目の型にそろえる（そろえられなければ `None`）。"""
-    try:
-        if field_type == "date":
-            parsed = as_datetime(value)
-            if parsed is None:
-                return None
-            return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
-        if field_type == "number":
+    if field_type == "date":
+        parsed = as_datetime(value)
+        if parsed is None:
+            return None
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+    if field_type == "number":
+        # 数・真偽値・文字列のほかは数にできない
+        if not isinstance(value, int | float | str):
+            return None
+        try:
             return float(value)
-    except TypeError, ValueError:
-        return None
+        except ValueError:
+            return None
     return _text(value)
+
+
+def _same(text: str) -> str:
+    """文字列をそのまま返す（大文字小文字を区別する比べ方）。"""
+    return text
+
+
+# 否定の演算子と、その否定の元の演算子
+NEGATED = {"ne": "eq", "not_contains": "contains"}
+# 文字列の演算子ごとの判定（文書の値, 比べる値）
+TEXT_CHECKS: dict[str, Callable[[str, str], bool]] = {
+    "eq": operator.eq,
+    "prefix": str.startswith,
+    "suffix": str.endswith,
+    "contains": lambda text, wanted: wanted in text,
+}
+# 大小の演算子ごとの判定（文書の値, 比べる値）
+COMPARATORS: dict[str, Callable[[Any, Any], bool]] = {
+    "gt": operator.gt,
+    "gte": operator.ge,
+    "lt": operator.lt,
+    "lte": operator.le,
+}
 
 
 def _nfkc_unless(condition: Condition, text: str) -> str:
@@ -220,47 +247,37 @@ def _nfkc_unless(condition: Condition, text: str) -> str:
     return text if condition.case_sensitive else unicodedata.normalize("NFKC", text)
 
 
+def _test_compare(op: str, values: list[Any], expected: str, field_type: str, today: date) -> bool:
+    """`gt`・`gte`・`lt`・`lte` の比べる値 1 つが、文書の値のどれかに当たるかを返す。"""
+    target = parse_compare_value(expected, field_type, today=today)
+    for value in values:
+        current = _comparable(value, field_type)
+        # 文書の値と比べる値は、同じ項目の型でそろえてある
+        if current is not None and COMPARATORS[op](current, target):
+            return True
+    return False
+
+
 def _test(
     condition: Condition, values: list[Any], expected: str, field_type: str, today: date
 ) -> bool:
     """比べる値 1 つが、文書の値の並びのどれかに当たるかを返す。"""
     op = condition.op
-    fold: Callable[[str], str] = (lambda text: text) if condition.case_sensitive else normalize
     if op == "regex":
         pattern = compile_regex(expected, case_sensitive=condition.case_sensitive)
         # パターンには正規化をかけず、区別しないときは文書の値だけを NFKC にする
         return any(pattern.search(_nfkc_unless(condition, _text(value))) for value in values)
     if op in COMPARE_OPS:
-        target = parse_compare_value(expected, field_type, today=today)
-        for value in values:
-            current = _comparable(value, field_type)
-            if current is None:
-                continue
-            if (
-                (op == "gt" and current > target)
-                or (op == "gte" and current >= target)
-                or (op == "lt" and current < target)
-                or (op == "lte" and current <= target)
-            ):
-                return True
-        return False
+        return _test_compare(op, values, expected, field_type, today)
+    fold: Callable[[str], str] = _same if condition.case_sensitive else normalize
     wanted = fold(expected)
     texts = [fold(_text(value)) for value in values]
     if op == "glob":
         return any(PurePosixPath(text).full_match(wanted) for text in texts)
-    positive = (
-        op
-        if op in ("eq", "prefix", "suffix", "contains")
-        else {"ne": "eq", "not_contains": "contains"}[op]
-    )
-    checks: dict[str, Callable[[str], bool]] = {
-        "eq": lambda text: text == wanted,
-        "prefix": lambda text: text.startswith(wanted),
-        "suffix": lambda text: text.endswith(wanted),
-        "contains": lambda text: wanted in text,
-    }
-    found = any(checks[positive](text) for text in texts)
-    return not found if op in ("ne", "not_contains") else found
+    # ne・not_contains は eq・contains の否定
+    positive = NEGATED.get(op, op)
+    found = any(TEXT_CHECKS[positive](text, wanted) for text in texts)
+    return not found if op in NEGATED else found
 
 
 def _match_condition(

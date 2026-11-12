@@ -94,7 +94,7 @@ def _register(
 ) -> None:
     """要求のモデルを引数に持つツールを 1 つ登録する（`wait_loaded` があれば呼ぶ前に待つ）。"""
 
-    async def tool(**arguments: Any) -> CallToolResult:
+    async def tool(**arguments: object) -> CallToolResult:
         try:
             request = model(**arguments)
             if wait_loaded is not None:

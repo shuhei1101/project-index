@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any
 
 VERSION_LENGTH = 6
 
@@ -15,7 +14,7 @@ def content_hash(data: str | bytes) -> str:
     return hashlib.sha256(raw).hexdigest()[:VERSION_LENGTH]
 
 
-def value_hash(value: Any) -> str:
+def value_hash(value: object) -> str:
     """項目の値を正規化した JSON にしてハッシュを取る。"""
     text = json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str)
     return content_hash(text)

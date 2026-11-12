@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, ClassVar, Literal
+from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -35,7 +35,7 @@ class SourceEntry(BaseModel):
 
     @field_validator("config", mode="before")
     @classmethod
-    def _as_list(cls, value: Any) -> Any:
+    def _as_list(cls, value: object) -> object:
         """文字列 1 つで書かれたときも配列にする。"""
         return [value] if isinstance(value, str) else value
 

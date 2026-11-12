@@ -30,6 +30,10 @@ from project_index.server.mcp.result import mcp_prompt_ids
 if TYPE_CHECKING:
     import argparse
 
+    from project_index.features.convert.service import ConvertService
+    from project_index.features.documents.store import DocumentStore
+    from project_index.features.validation.service import DocumentChecker
+
 EXIT_CONFIG_INVALID = 2
 EXIT_PORT_IN_USE = 3
 EXIT_PROMPT_INVALID = 4
@@ -259,9 +263,9 @@ def reload_sources(
     terminal: TerminalConfig,
     *,
     registry: SourceRegistry,
-    store: Any,
-    checker: Any,
-    converter: Any,
+    store: DocumentStore,
+    checker: DocumentChecker,
+    converter: ConvertService,
     checks: SourceChecks,
 ) -> list[SourceStatus]:
     """配信元の一覧を読み直し、配信元の内容を控えた部品の控えを捨てる。"""
@@ -275,9 +279,9 @@ def reload_sources(
 def discard_source_caches(
     sources: list[ServedSource],
     *,
-    store: Any,
-    checker: Any,
-    converter: Any,
+    store: DocumentStore,
+    checker: DocumentChecker,
+    converter: ConvertService,
     checks: SourceChecks,
 ) -> None:
     """配信元の内容を控えた部品の控えを捨て、渡した配信元ごとのずれと警告をログに書く。"""
@@ -287,7 +291,9 @@ def discard_source_caches(
     check_sources(sources, store=store, checks=checks)
 
 
-def check_sources(sources: list[ServedSource], *, store: Any, checks: SourceChecks) -> None:
+def check_sources(
+    sources: list[ServedSource], *, store: DocumentStore, checks: SourceChecks
+) -> None:
     """渡した配信元ごとに検査して結果を持たせ、ずれと警告をログに書く。"""
     for source in sources:
         # 検査の結果を控えに持たせ、`describe` の警告が読めるようにする
