@@ -112,7 +112,7 @@ class ServedSource:
     config_commit: str | None = None
     outside_read: bool = True
     # `root` から先頭の設定の YAML のフォルダへの相対パス。`paths_base` を省いた配信元は `.`
-    config_dir: PurePosixPath = PurePosixPath()
+    config_dir: PurePosixPath = field(default_factory=PurePosixPath)
 
     @property
     def config_root(self) -> Path:

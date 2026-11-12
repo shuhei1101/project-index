@@ -59,15 +59,8 @@ def collect_warnings(
             f"{item.source_id}: {warning.path}: {warning.rule}" for warning in check.nav
         )
     warnings.extend(old_sources)
-    # 端末の設定のバージョンが古い（使える配信元が無くても載せる）
-    if version_state(terminal.version, SETTINGS_VERSION) == "old":
-        warnings.append(_old_version(TERMINAL_LABEL, terminal.version, SETTINGS_VERSION))
-    # 端末の設定の最上位の知らないキー（使える配信元が無くても載せる）
-    if terminal.unknown_keys:
-        warnings.append(
-            f"{TERMINAL_LABEL}: {terminal.file} に project-index が知らないキーがあります"
-            f"（{', '.join(terminal.unknown_keys)}）。値は使用しません"
-        )
+    # 端末の設定の警告（使える配信元が無くても載せる）
+    warnings.extend(_terminal_warnings(terminal))
     warnings.extend(config_warnings)
     # 検証で外した配信元（使える配信元かによらない）
     for status in registry.statuses():
@@ -77,6 +70,19 @@ def collect_warnings(
                 f"{status.id}: 配信していません（{first.path}: {first.rule}）。"
                 "check_project で確認できます"
             )
+    return warnings
+
+
+def _terminal_warnings(terminal: TerminalConfig) -> list[str]:
+    """端末の設定のバージョンが古いことと、最上位の知らないキーを警告の文にする。"""
+    warnings: list[str] = []
+    if version_state(terminal.version, SETTINGS_VERSION) == "old":
+        warnings.append(_old_version(TERMINAL_LABEL, terminal.version, SETTINGS_VERSION))
+    if terminal.unknown_keys:
+        warnings.append(
+            f"{TERMINAL_LABEL}: {terminal.file} に project-index が知らないキーがあります"
+            f"（{', '.join(terminal.unknown_keys)}）。値は使用しません"
+        )
     return warnings
 
 

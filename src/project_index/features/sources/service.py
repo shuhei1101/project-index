@@ -265,7 +265,9 @@ def _resolve_paths_base(
         )
     # Git の配信元でリポジトリの直下より上: default_ref の commit から読めない
     if repo_root is not None and not base.is_relative_to(repo_root):
-        violations.append(Violation(path="paths_base", rule=f"リポジトリの外を指しています: {value}"))
+        violations.append(
+            Violation(path="paths_base", rule=f"リポジトリの外を指しています: {value}")
+        )
     if violations:
         return config_root, violations
     return base, []
@@ -332,7 +334,15 @@ def build_source_config(value: dict[str, Any]) -> SourceConfig:
     github = value.get("github", {})
     decisions = value.get("decisions", {})
     options: dict[str, Any] = {}
-    for key in ("version", "enabled", "default_ref", "paths_base", "visibility", "worktrees", "nav"):
+    for key in (
+        "version",
+        "enabled",
+        "default_ref",
+        "paths_base",
+        "visibility",
+        "worktrees",
+        "nav",
+    ):
         if key in value:
             options[key] = value[key]
     if "types" in related:

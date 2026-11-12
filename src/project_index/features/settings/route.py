@@ -111,7 +111,9 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
             lock=handlers.settings_lock,
         )
         # 保存の後の読み直しで差し替わった端末の設定の知らないキーを警告にする
-        return SettingsSourcesResponse.from_statuses(statuses, unknown_key_warnings(handlers.terminal))
+        return SettingsSourcesResponse.from_statuses(
+            statuses, unknown_key_warnings(handlers.terminal)
+        )
 
     @router.post(
         "/settings/sources",
