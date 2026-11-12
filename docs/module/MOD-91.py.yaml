@@ -64,7 +64,7 @@ functions:
   - name: test_register_error_handlers_when_http_error
     case: 正常
     summary: ルートの無いパスを problem+json の 404 にする
-    condition: どのルートにも当たらない GET `/_api/none`
+    condition: どのルートにも当たらない GET `/none`
     mock: なし（テスト用のルート）
     expected: 404、`Content-Type` が `application/problem+json`、`type` が `urn:project-index:error:HttpError`
   - name: test_register_error_handlers_when_http_error_headers

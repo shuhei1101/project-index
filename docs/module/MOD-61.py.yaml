@@ -1,6 +1,6 @@
 id: MOD-61
 title: 索引のサーバー / セッションの開始 / route.py
-lead: '`POST /_admin/session-start` のルート。読み取り API のスキーマ（`/_api/openapi.json`）に載せない。'
+lead: '`POST /_admin/session-start` のルート。'
 test_files:
 - tests/unit/project_index/features/session_start/test_route.py
 functions:
@@ -27,7 +27,7 @@ functions:
     description: 起動時に作った部品
   returns:
     type: APIRouter
-    description: '`POST /_admin/session-start`（`include_in_schema=False`）を持つルーター'
+    description: '`POST /_admin/session-start` を持つルーター'
   process: |-
     1. `POST /_admin/session-start` を登録する
     2. 要求ごとに、本文を `SessionStartRequest.model_validate` で検証する
@@ -51,12 +51,6 @@ functions:
     mock: なし
     expected: 422 の Problem Details で `reason` の違反を含む
     exception: 入力の違反
-  - name: test_build_session_start_router_when_schema
-    case: 正常
-    summary: 読み取り API のスキーマに載らない
-    condition: '`/_api/openapi.json` を取得する'
-    mock: なし
-    expected: '`paths` に `/_admin/session-start` が無い'
   callers:
   - MOD-90#functions[build_app]
   callees:

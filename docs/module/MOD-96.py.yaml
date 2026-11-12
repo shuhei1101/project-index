@@ -45,7 +45,7 @@ functions:
   - name: test_require_same_origin
     case: 正常
     summary: 同じオリジン
-    condition: '`Origin: http://127.0.0.1:8786` を `http://127.0.0.1:8786/_api/...` へ'
+    condition: '`Origin: http://127.0.0.1:8786` を `http://127.0.0.1:8786/settings/sources` へ'
     mock: なし（Starlette の Request を組み立てる）
     expected: 送らない
   - name: test_require_same_origin_when_fetch_site

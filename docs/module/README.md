@@ -68,7 +68,7 @@
 | [索引のサーバー / 検索 / types.py](./MOD-58.py.yaml) | `search_docs`・用語の一覧の要求と結果の型。 |
 | [索引のサーバー / 会話の記録 / store.py](./MOD-59.py.yaml) | 会話キーごとの返し済み・前回読んだ内容・閲覧と編集の SQLite への記録と読み出し。 |
 | [索引のサーバー / 会話の記録 / types.py](./MOD-60.py.yaml) | 会話の記録の会話キー・前回読んだ内容・閲覧と編集の記録の型。 |
-| [索引のサーバー / セッションの開始 / route.py](./MOD-61.py.yaml) | `POST /_admin/session-start` のルート。読み取り API のスキーマ（`/_api/openapi.json`）に載せない。 |
+| [索引のサーバー / セッションの開始 / route.py](./MOD-61.py.yaml) | `POST /_admin/session-start` のルート。 |
 | [索引のサーバー / セッションの開始 / service.py](./MOD-62.py.yaml) | `/clear`・圧縮の後に、その会話の返し済みの記録を削除する。 |
 | [索引のサーバー / セッションの開始 / types.py](./MOD-63.py.yaml) | `POST /_admin/session-start` の本文と応答の型と、返し済みの記録を削除する理由。 |
 | [索引のサーバー / 端末の設定 / query.py](./MOD-64.py.yaml) | 端末の設定の場所・読み込みと検証・待ち受けのポート。 |
