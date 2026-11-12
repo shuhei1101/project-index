@@ -1,318 +1,318 @@
 id: MOD-15
 title: 索引のサーバー / 変更 / types.py
-lead: '`list_changes` の要求と結果の型。'
+lead: '`list_changes` の要求と結果の型を受け持ち、変更の types.py を修正するときに参照する。'
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      変更の一覧 ..> 変更の結果 : 返す
-      class 変更の一覧 {
-        <<function>>
-      }
-      class 変更の結果 {
-        +区間
-        +文書: list
-      }
-      click 変更の一覧 href "./MOD-14.py.yaml#変更の一覧"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        変更の一覧 ..> 変更の結果 : 返す
+        class 変更の一覧 {
+          <<function>>
+        }
+        class 変更の結果 {
+          +区間
+          +文書: list
+        }
+        click 変更の一覧 href "./MOD-14.py.yaml#変更の一覧"
 data_models:
-- name: ChangesRequest
-  title: 変更の一覧の要求
-  container: project_index/features/changes/types.py
-  usecase: 変更
-  role: DTO
-  summary: '`list_changes` の引数'
-  description: '`pydantic.BaseModel`（`extra="forbid"`）。キーの意味と既定値はインターフェース定義『変更の一覧』の `request`。`from` は Python の属性を `from_` にした別名。`limit`・`max_chars` の既定と上限は検索の定数を使う。'
-  properties:
-  - name: source
-    title: 配信元
-    type: str | list[str] | None
-    access: 公開
-    default: None
-    description: '`*` も受ける'
-  - name: worktree
-    title: ワークツリー
-    type: str | None
-    access: 公開
-    default: None
-    description: '`to` を省いたときに読むワークツリー'
-  - name: from_
-    title: 始点
-    type: str | None
-    access: 公開
-    default: None
-    description: 別名 `from`。`None` は前回読んだ時点
-  - name: to
-    title: 終点
-    type: str | None
-    access: 公開
-    default: None
-    description: '`None` は今の作業ツリー'
-  - name: filter
-    title: 条件
-    type: Condition | Group | None
-    access: 公開
-    default: None
-    description: 検索と同じ条件
-  - name: view
-    title: 返す量
-    type: Literal['summary', 'full']
-    access: 公開
-    default: '"summary"'
-    description: '`full` は差分の行まで'
-  - name: limit
-    title: 件数
-    type: int
-    access: 公開
-    default: LIMIT_DEFAULT
-    description: 返す文書の数
-  - name: cursor
-    title: 続きの位置
-    type: str | None
-    access: 公開
-    default: None
-    description: 前回の `next_cursor`
-  - name: max_chars
-    title: 文字数
-    type: int
-    access: 公開
-    default: MAX_CHARS_DEFAULT
-    description: 結果全体の文字数の上限
-  - name: format
-    title: 形式
-    type: Literal['markdown', 'json']
-    access: 公開
-    default: '"markdown"'
-    description: 返却する形式
-  - name: cwd
-    title: 作業場所
-    type: str | None
-    access: 公開
-    default: None
-    description: フックが入れる
-  - name: outside_scope
-    title: 作業範囲の外も読むか
-    type: bool
-    access: 公開
-    default: 'False'
-    description: '`True` のとき、`scope` に該当しない配信元を `outside_read` が真なら作業範囲の外（参考）として参照する（`source` が ID 1 つのときだけ有効）'
-  - name: session_id
-    title: セッションの ID
-    type: str | None
-    access: 公開
-    default: None
-    description: フックが入れる
-  - name: agent_id
-    title: エージェントの ID
-    type: str | None
-    access: 公開
-    default: None
-    description: フックが入れる
-  - name: contains
-    title: 語
-    type: ContainsQuery | None
-    access: 公開
-    default: None
-    description: 単語の出現数が変わった文書だけを返却する。`None` は単語で絞らない
-- name: RangePoint
-  title: 区間の端
-  container: project_index/features/changes/types.py
-  usecase: 変更
-  role: DTO
-  summary: 区間の始点か終点
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: input
-    title: 渡した値
-    type: str
-    access: 公開
-    description: 引数の値か `LAST_READ_LABEL`・`WORKTREE_LABEL`
-  - name: commit
-    title: commit
-    type: str | None
-    access: 公開
-    description: 解決した commit（短縮）。作業ツリー・前回読んだ時点は `None`
-  - name: date
-    title: 日時
-    type: datetime | None
-    access: 公開
-    description: commit の日時。前回読んだ時点は最も古い読んだ日時
-- name: ChangeItem
-  title: 変わった文書
-  container: project_index/features/changes/types.py
-  usecase: 変更
-  role: DTO
-  summary: 変わった文書 1 件
-  description: '`dataclass(frozen=True)`。'
-  properties:
-  - name: id
-    title: 文書の ID
-    type: str
-    access: 公開
-    description: 文書の ID
-  - name: source
-    title: 配信元
-    type: str | None
-    access: 公開
-    description: 複数の配信元を指したときだけ
-  - name: change
-    title: 変更の種類
-    type: Literal['added', 'modified', 'deleted', 'unchanged']
-    access: 公開
-    description: 足した・変えた・消した。`unchanged` は `contains` を渡し、区間の中で語が入って消えて両端の内容が同じ（両端に無い場合も含む）文書だけ
-  - name: keys
-    title: 変わったキー
-    type: list[str]
-    access: 公開
-    description: 変わったキーのパス
-  - name: values
-    title: 前後の値
-    type: dict[str, tuple[Any, Any]]
-    access: 公開
-    description: 'キーのパス → (前の値, 後の値)。`format: json` で返す'
-  - name: diff
-    title: 差分の行
-    type: str | None
-    access: 公開
-    default: None
-    description: '`view: full` のときだけ'
-  - name: path
-    title: 文書の場所
-    type: str | None
-    access: 公開
-    default: None
-    description: 変わった文書の今の場所（文書のストア.文書の場所）。終点が今の作業ツリーのときだけ持ち、`deleted` では `None`
-  - name: scope
-    title: 返した範囲
-    type: Literal['section', 'summary'] | None
-    access: 公開
-    default: None
-    description: '`view: full` は `section`、`view: summary` は `summary`。`path` が `None` のときは `None`'
-  - name: contains_changes
-    title: 語の増減
-    type: list[ContainsChange] | None
-    access: 公開
-    default: None
-    description: 語の出現数が変わった区間の古い順。`contains` を渡したときだけ
-- name: ChangesResult
-  title: 変更の結果
-  container: project_index/features/changes/types.py
-  usecase: 変更
-  role: DTO
-  summary: '`list_changes` が返すもの'
-  description: '`dataclass(frozen=True)`。複数の配信元を指したときの区間は配信元ごとに `notes` の先頭へ並べ、`range_from`・`range_to` は最初の配信元のもの。'
-  properties:
-  - name: range_from
-    title: 始点
-    type: RangePoint
-    access: 公開
-    description: JSON では `range.from`
-  - name: range_to
-    title: 終点
-    type: RangePoint
-    access: 公開
-    description: JSON では `range.to`
-  - name: total_count
-    title: 総件数
-    type: int
-    access: 公開
-    description: 変わった文書の数
-  - name: items
+  - name: ChangesRequest
+    title: 変更の一覧の要求
+    container: project_index/features/changes/types.py
+    usecase: 変更
+    role: DTO
+    summary: '`list_changes` の引数'
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。キーの意味と既定値はインターフェース定義『変更の一覧』の `request`。`from` は Python の属性を `from_` にした別名。`limit`・`max_chars` の既定と上限は検索の定数を使う。'
+    properties:
+      - name: source
+        title: 配信元
+        type: str | list[str] | None
+        access: 公開
+        default: None
+        description: '`*` も受ける'
+      - name: worktree
+        title: ワークツリー
+        type: str | None
+        access: 公開
+        default: None
+        description: '`to` を省いたときに読むワークツリー'
+      - name: from_
+        title: 始点
+        type: str | None
+        access: 公開
+        default: None
+        description: 別名 `from`。`None` は前回読んだ時点
+      - name: to
+        title: 終点
+        type: str | None
+        access: 公開
+        default: None
+        description: '`None` は今の作業ツリー'
+      - name: filter
+        title: 条件
+        type: Condition | Group | None
+        access: 公開
+        default: None
+        description: 検索と同じ条件
+      - name: view
+        title: 返す量
+        type: Literal['summary', 'full']
+        access: 公開
+        default: '"summary"'
+        description: '`full` は差分の行まで'
+      - name: limit
+        title: 件数
+        type: int
+        access: 公開
+        default: LIMIT_DEFAULT
+        description: 返す文書の数
+      - name: cursor
+        title: 続きの位置
+        type: str | None
+        access: 公開
+        default: None
+        description: 前回の `next_cursor`
+      - name: max_chars
+        title: 文字数
+        type: int
+        access: 公開
+        default: MAX_CHARS_DEFAULT
+        description: 結果全体の文字数の上限
+      - name: format
+        title: 形式
+        type: Literal['markdown', 'json']
+        access: 公開
+        default: '"markdown"'
+        description: 返却する形式
+      - name: cwd
+        title: 作業場所
+        type: str | None
+        access: 公開
+        default: None
+        description: フックが入れる
+      - name: outside_scope
+        title: 作業範囲の外も読むか
+        type: bool
+        access: 公開
+        default: 'False'
+        description: '`True` のとき、`scope` に該当しない配信元を `outside_read` が真なら作業範囲の外（参考）として参照する（`source` が ID 1 つのときだけ有効）'
+      - name: session_id
+        title: セッションの ID
+        type: str | None
+        access: 公開
+        default: None
+        description: フックが入れる
+      - name: agent_id
+        title: エージェントの ID
+        type: str | None
+        access: 公開
+        default: None
+        description: フックが入れる
+      - name: contains
+        title: 語
+        type: ContainsQuery | None
+        access: 公開
+        default: None
+        description: 単語の出現数が変わった文書だけを返却する。`None` は単語で絞らない
+  - name: RangePoint
+    title: 区間の端
+    container: project_index/features/changes/types.py
+    usecase: 変更
+    role: DTO
+    summary: 区間の始点か終点
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: input
+        title: 渡した値
+        type: str
+        access: 公開
+        description: 引数の値か `LAST_READ_LABEL`・`WORKTREE_LABEL`
+      - name: commit
+        title: commit
+        type: str | None
+        access: 公開
+        description: 解決した commit（短縮）。作業ツリー・前回読んだ時点は `None`
+      - name: date
+        title: 日時
+        type: datetime | None
+        access: 公開
+        description: commit の日時。前回読んだ時点は最も古い読んだ日時
+  - name: ChangeItem
     title: 変わった文書
-    type: list[ChangeItem]
-    access: 公開
-    description: 配信元の順・`id` の昇順
-  - name: next_cursor
-    title: 続きの位置
-    type: str | None
-    access: 公開
-    description: 続きがあるときだけ
-  - name: truncated
-    title: 打ち切ったか
-    type: bool
-    access: 公開
-    description: '`max_chars` で打ち切ったか'
-  - name: notes
-    title: 知らせ
-    type: list[str]
-    access: 公開
-    description: 丸めた・打ち切った知らせと次の手
-  - name: outside_scope
-    title: 作業範囲の外から読んだか
-    type: bool
-    access: 公開
-    default: 'False'
-    description: 読んだ場所のどれかの `outside_scope` が `True`
-- name: ContainsQuery
-  title: 変更の中身の単語
-  container: project_index/features/changes/types.py
-  usecase: 変更
-  role: DTO
-  summary: '`list_changes` の `contains`'
-  description: '`pydantic.BaseModel`（`extra="forbid"`）。`value` の空文字は `Field(min_length=1)` で弾く（ツールの引数の検証のエラーになる）。'
-  properties:
-  - name: value
-    title: 語
-    type: str
-    access: 公開
-    description: 探す単語か正規表現。1 文字以上
-  - name: regex
-    title: 正規表現
-    type: bool
-    access: 公開
-    default: 'False'
-    description: '`value` を正規表現として適用するか'
-  - name: case_sensitive
-    title: 区別する
-    type: bool
-    access: 公開
-    default: 'False'
-    description: 大文字小文字と全角半角（NFKC）を区別するか
-  status: planned
-- name: ContainsChange
-  title: 語の増減
-  container: project_index/features/changes/types.py
-  usecase: 変更
-  role: DTO
-  summary: 語の出現数が変わった区間 1 つ
-  description: '`dataclass(frozen=True)`。commit の端は `RangePoint` の `input` を空にし、commit（短縮）と日時を持つ。作業ツリーの端は `RangePoint(WORKTREE_LABEL)`。前回読んだ時点と比べた呼び出しは `range` と同じ端を持つ。'
-  properties:
-  - name: kind
-    title: 増減
-    type: Literal['added', 'removed']
-    access: 公開
-    description: 出現数が増えた（`added`）か減った（`removed`）か
-  - name: from_
-    title: 前
-    type: RangePoint
-    access: 公開
-    description: 区間の前の端（親の commit）。JSON では `from`
-  - name: to
-    title: 後
-    type: RangePoint
-    access: 公開
-    description: 区間の後の端（語が入った・消えた commit か作業ツリー）
-  - name: count_before
-    title: 前の数
-    type: int
-    access: 公開
-    description: 前の端の文書の出現数（文書が無ければ 0）
-  - name: count_after
-    title: 後の数
-    type: int
-    access: 公開
-    description: 後の端の文書の出現数（文書が無ければ 0）
-  status: planned
+    container: project_index/features/changes/types.py
+    usecase: 変更
+    role: DTO
+    summary: 変わった文書 1 件
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: id
+        title: 文書の ID
+        type: str
+        access: 公開
+        description: 文書の ID
+      - name: source
+        title: 配信元
+        type: str | None
+        access: 公開
+        description: 複数の配信元を指したときだけ
+      - name: change
+        title: 変更の種類
+        type: Literal['added', 'modified', 'deleted', 'unchanged']
+        access: 公開
+        description: 足した・変えた・消した。`unchanged` は `contains` を渡し、区間の中で語が入って消えて両端の内容が同じ（両端に無い場合も含む）文書だけ
+      - name: keys
+        title: 変わったキー
+        type: list[str]
+        access: 公開
+        description: 変わったキーのパス
+      - name: values
+        title: 前後の値
+        type: dict[str, tuple[Any, Any]]
+        access: 公開
+        description: 'キーのパス → (前の値, 後の値)。`format: json` で返す'
+      - name: diff
+        title: 差分の行
+        type: str | None
+        access: 公開
+        default: None
+        description: '`view: full` のときだけ'
+      - name: path
+        title: 文書の場所
+        type: str | None
+        access: 公開
+        default: None
+        description: 変わった文書の今の場所（文書のストア.文書の場所）。終点が今の作業ツリーのときだけ持ち、`deleted` では `None`
+      - name: scope
+        title: 返した範囲
+        type: Literal['section', 'summary'] | None
+        access: 公開
+        default: None
+        description: '`view: full` は `section`、`view: summary` は `summary`。`path` が `None` のときは `None`'
+      - name: contains_changes
+        title: 語の増減
+        type: list[ContainsChange] | None
+        access: 公開
+        default: None
+        description: 語の出現数が変わった区間の古い順。`contains` を渡したときだけ
+  - name: ChangesResult
+    title: 変更の結果
+    container: project_index/features/changes/types.py
+    usecase: 変更
+    role: DTO
+    summary: '`list_changes` が返すもの'
+    description: '`dataclass(frozen=True)`。複数の配信元を指したときの区間は配信元ごとに `notes` の先頭へ並べ、`range_from`・`range_to` は最初の配信元のもの。'
+    properties:
+      - name: range_from
+        title: 始点
+        type: RangePoint
+        access: 公開
+        description: JSON では `range.from`
+      - name: range_to
+        title: 終点
+        type: RangePoint
+        access: 公開
+        description: JSON では `range.to`
+      - name: total_count
+        title: 総件数
+        type: int
+        access: 公開
+        description: 変わった文書の数
+      - name: items
+        title: 変わった文書
+        type: list[ChangeItem]
+        access: 公開
+        description: 配信元の順・`id` の昇順
+      - name: next_cursor
+        title: 続きの位置
+        type: str | None
+        access: 公開
+        description: 続きがあるときだけ
+      - name: truncated
+        title: 打ち切ったか
+        type: bool
+        access: 公開
+        description: '`max_chars` で打ち切ったか'
+      - name: notes
+        title: 知らせ
+        type: list[str]
+        access: 公開
+        description: 丸めた・打ち切った知らせと次の手
+      - name: outside_scope
+        title: 作業範囲の外から読んだか
+        type: bool
+        access: 公開
+        default: 'False'
+        description: 読んだ場所のどれかの `outside_scope` が `True`
+  - name: ContainsQuery
+    title: 変更の中身の単語
+    container: project_index/features/changes/types.py
+    usecase: 変更
+    role: DTO
+    summary: '`list_changes` の `contains`'
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。`value` の空文字は `Field(min_length=1)` で弾く（ツールの引数の検証のエラーになる）。'
+    properties:
+      - name: value
+        title: 語
+        type: str
+        access: 公開
+        description: 探す単語か正規表現。1 文字以上
+      - name: regex
+        title: 正規表現
+        type: bool
+        access: 公開
+        default: 'False'
+        description: '`value` を正規表現として適用するか'
+      - name: case_sensitive
+        title: 区別する
+        type: bool
+        access: 公開
+        default: 'False'
+        description: 大文字小文字と全角半角（NFKC）を区別するか
+    status: planned
+  - name: ContainsChange
+    title: 語の増減
+    container: project_index/features/changes/types.py
+    usecase: 変更
+    role: DTO
+    summary: 語の出現数が変わった区間 1 つ
+    description: '`dataclass(frozen=True)`。commit の端は `RangePoint` の `input` を空にし、commit（短縮）と日時を持つ。作業ツリーの端は `RangePoint(WORKTREE_LABEL)`。前回読んだ時点と比べた呼び出しは `range` と同じ端を持つ。'
+    properties:
+      - name: kind
+        title: 増減
+        type: Literal['added', 'removed']
+        access: 公開
+        description: 出現数が増えた（`added`）か減った（`removed`）か
+      - name: from_
+        title: 前
+        type: RangePoint
+        access: 公開
+        description: 区間の前の端（親の commit）。JSON では `from`
+      - name: to
+        title: 後
+        type: RangePoint
+        access: 公開
+        description: 区間の後の端（語が入った・消えた commit か作業ツリー）
+      - name: count_before
+        title: 前の数
+        type: int
+        access: 公開
+        description: 前の端の文書の出現数（文書が無ければ 0）
+      - name: count_after
+        title: 後の数
+        type: int
+        access: 公開
+        description: 後の端の文書の出現数（文書が無ければ 0）
+    status: planned
 constants:
-- name: LAST_READ_LABEL
-  title: 前回読んだ時点の表示
-  container: project_index/features/changes/types.py
-  usecase: 変更
-  summary: '`from` を省いたときの `range.from.input`'
-  value: '"前回読んだ時点"'
-- name: WORKTREE_LABEL
-  title: 作業ツリーの表示
-  container: project_index/features/changes/types.py
-  usecase: 変更
-  summary: '`to` を省いたときの `range.to.input`'
-  value: '"作業ツリー"'
+  - name: LAST_READ_LABEL
+    title: 前回読んだ時点の表示
+    container: project_index/features/changes/types.py
+    usecase: 変更
+    summary: '`from` を省いたときの `range.from.input`'
+    value: '"前回読んだ時点"'
+  - name: WORKTREE_LABEL
+    title: 作業ツリーの表示
+    container: project_index/features/changes/types.py
+    usecase: 変更
+    summary: '`to` を省いたときの `range.to.input`'
+    value: '"作業ツリー"'

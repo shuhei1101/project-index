@@ -1,231 +1,233 @@
 id: MOD-37
 title: 索引のサーバー / 設定の移し替え / service.py
-lead: '`project-index migrate` の対象を決め、当てる手順を求め、バックアップを取ってから 1 回だけ書き込む。動いているサーバーには反映しない。'
+lead: '`project-index migrate` の対象と適用する手順を決め、バックアップを取ってから 1 回だけ書き込む処理を受け持ち、設定の移し替えの service.py を修正するときに参照する。'
 test_files:
-- tests/unit/project_index/features/migrate/test_service.py
+  - tests/unit/project_index/features/migrate/test_service.py
 functions:
-- name: resolve_target
-  title: 対象の決定
-  kind: 関数
-  container: project_index/features/migrate/service.py
-  usecase: 設定の移し替え
-  role: 解決
-  summary: '`--source` の有無で移し替える設定を決める'
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: source
-    title: 配信元の設定
-    type: str | None
-    required: true
-    passing: positional
-    description: '`--source` の値'
-  - name: env
-    title: 環境変数
-    type: Mapping[str, str]
-    required: true
-    passing: keyword
-    description: '`PROJECT_INDEX_CONFIG` を引く'
-  returns:
-    type: MigrationTarget
-    description: 移し替えの対象
-  process: |-
-    1. `source` に応じて分ける
-       - ある場合、`kind` を `project-index`、`file` を `source` を正規化したパス、`current` を `SOURCE_CONFIG_VERSION` にする
-       - 無い場合、`kind` を `settings`、`file` を `config_path(env)`、`current` を `SETTINGS_VERSION` にする
-  unit_tests:
-  - name: test_resolve_target
-    case: 正常
-    summary: 端末の設定を対象にする
-    condition: '`source` が `None`、`PROJECT_INDEX_CONFIG` が `/tmp/s.yaml`'
-    mock: なし
-    expected: '`kind` が `settings`、`file` が `/tmp/s.yaml`'
-  - name: test_resolve_target_when_source
-    case: 正常
-    summary: 配信元の設定を対象にする
-    condition: '`source` が `~/repo/a/project-index.yaml`'
-    mock: なし
-    expected: '`kind` が `project-index`、`file` が `~` を展開したパス'
-  callers:
-  - MOD-89#functions[run_migrate]
-- name: plan_migration
-  title: 当てる手順の一覧
-  kind: 関数
-  container: project_index/features/migrate/service.py
-  usecase: 設定の移し替え
-  role: サービス
-  summary: 対象の `version` を読み、当てる手順を求める
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: target
-    title: 対象
-    type: MigrationTarget
-    required: true
-    passing: positional
-    description: 移し替えの対象
-  returns:
-    type: tuple[CommentedMap, list[MigrationStep]]
-    description: 読んだ対象と、当てる順の手順
-  process: |-
-    1. `target.file` を読む（`load_roundtrip`）
-       - 無い・読めない・辞書でない・`version` が無い場合、`MigrationConfigInvalidError` を送出する
-    2. `version` を `target.current` と比べる（バージョンの新旧）
-       - `newer` の場合、`ConfigNewerError` を送出する
-       - `current` の場合、手順を空にして返す
-    3. 手順を読む（手順の読み込み）
-  exceptions:
-  - name: MigrationConfigInvalidError
-    condition: 対象が無い・ YAML として読めない・辞書でない・`version` が無い
-    message: '`{ファイル}: {理由}`'
-  - name: ConfigNewerError
-    condition: 対象の `version` が `target.current` より新しい
-    message: '`{ファイル}: 設定のバージョン {対象} が project-index で読み込める {現在} より新しい。project-index を更新してください`'
-  unit_tests:
-  - name: test_plan_migration
-    case: 正常
-    summary: 当てる手順を返す
-    condition: '`version: "1"` の対象、`current` が `2`、`2` の手順が 1 つ'
-    mock: 手順の置き場所
-    expected: 手順が 1 つ
-  - name: test_plan_migration_when_current
-    case: 正常
-    summary: 同じバージョンなら手順は空
-    condition: '`version` が `current` と同じ'
-    mock: なし
-    expected: 手順が空
-  - name: test_plan_migration_when_newer
-    case: 異常
-    summary: 新しすぎる設定
-    condition: '`version: "9"`、`current` が `1`'
-    mock: なし
-    expected: '`ConfigNewerError`'
-    exception: 新しすぎる設定
-  - name: test_plan_migration_when_no_version
-    case: 異常
-    summary: '`version` が無い'
-    condition: '`clone: ~/project-index` だけの対象'
-    mock: なし
-    expected: '`MigrationConfigInvalidError`'
-    exception: 対象の設定の違反
-  callers:
-  - MOD-89#functions[run_migrate]
-  callees:
-  - MOD-38#functions[load_steps]
-  - MOD-10#functions[version_state]
-- name: apply_migration
-  title: 移し替えの適用
-  kind: 関数
-  container: project_index/features/migrate/service.py
-  usecase: 設定の移し替え
-  role: サービス
-  summary: 手順を全て当てて新しいスキーマで検証し、バックアップを取ってから 1 回だけ書き込む
-  description: '`--record` は手順を空にして呼ぶ（`version` だけを書き換える）。'
-  scope: public
-  is_async: false
-  thread_safe: false
-  side_effects: バックアップを作り、対象を書き換える
-  args:
-  - name: target
-    title: 対象
-    type: MigrationTarget
-    required: true
-    passing: positional
-    description: 移し替えの対象
-  - name: data
-    title: 読んだ対象
-    type: CommentedMap
-    required: true
-    passing: positional
-    description: '`plan_migration` が読んだ内容'
-  - name: steps
-    title: 手順
-    type: list[MigrationStep]
-    required: true
-    passing: positional
-    description: 当てる順の手順
-  - name: allow_destructive
-    title: 破壊的な手順を許す
-    type: bool
-    required: true
-    passing: keyword
-    description: '`--allow-destructive`'
-  - name: now
-    title: 時刻
-    type: datetime
-    required: true
-    passing: keyword
-    description: バックアップの名前に使う時刻
-  returns:
-    type: Path
-    description: バックアップのパス
-  process: |-
-    1. 手順に破壊的なものがあり `allow_destructive` が `False` の場合、`DestructiveStepBlockedError` を送出する
-    2. ファイルを読み直して `data` と同じ内容かを比べ、ハッシュを控える（`content_hash`）
-       - 違う場合、`MigrationFailedError` を送出する
-    3. 手順を順に当てる（手順の適用）
-    4. `version` を `target.current` にする
-    5. 新しいスキーマで検証する（`settings` は `validate_terminal_config`、`project-index` は `validate_source_config`）
-       - 違反がある場合、`MigrationFailedError` を送出する（ファイルには書かない）。`project-index` は末尾に `手順で移せない設定です。/project-index:setup で移し替えてください` の行を置く
-    6. ファイルを読み直してハッシュを比べる
-       - 変わっている場合、`MigrationFailedError` を送出する
-    7. 同じフォルダに `BACKUP_FORMAT` の名前で元の内容を保存する
-    8. 対象を書き換える（`dump_roundtrip`・`replace_file`）
-       - `[INFO]` 設定を移し替えた（ファイル・前のバージョン・後のバージョン・バックアップ）
-  exceptions:
-  - name: DestructiveStepBlockedError
-    condition: 破壊的な手順があり `allow_destructive` が `False`
-    message: '破壊的な手順を `{バージョン}: {説明}` で 1 行ずつ並べ、`--allow-destructive` を案内する'
-  - name: MigrationFailedError
-    condition: 当てた結果が新しいスキーマに違反する
-    message: '違反を `{キーのパス}: {理由}` で 1 行ずつ並べる（`project-index` は `/project-index:setup` の案内を続ける）'
-  - name: MigrationFailedError
-    condition: 読んだ後に対象のファイルが変わった
-    message: '`{ファイル}: 読み込んだ後に変わったため書き換えません`'
-  unit_tests:
-  - name: test_apply_migration
-    case: 正常
-    summary: 手順を当ててバックアップを取る
-    condition: '`version: "1"` の端末の設定に `rename` 1 つ、`current` が `2`'
-    mock: 新しいスキーマの検証（違反なしを返す）
-    expected: '対象が改名後で `version: "2"`、バックアップが元の内容'
-  - name: test_apply_migration_when_record
-    case: 正常
-    summary: 手順が空なら `version` だけを書き換える
-    condition: 手順が空
-    mock: 新しいスキーマの検証
-    expected: '`version` だけが変わり、バックアップがある'
-  - name: test_apply_migration_when_destructive
-    case: 異常
-    summary: 破壊的な手順で止める
-    condition: '`delete` の手順、`allow_destructive` が `False`'
-    mock: なし
-    expected: '`DestructiveStepBlockedError`。対象もバックアップも書かない'
-    exception: 破壊的な手順
-  - name: test_apply_migration_when_invalid_result
-    case: 異常
-    summary: 新しいスキーマに違反する
-    condition: 当てた結果が必須のキーを欠く
-    mock: なし
-    expected: '`MigrationFailedError`。対象は元の内容のまま'
-    exception: 新しいスキーマの違反
-  - name: test_apply_migration_when_changed
-    case: 異常
-    summary: 読んだ後に変わったファイルを書かない
-    condition: '`plan_migration` の後に対象を別の内容で書き換える'
-    mock: 新しいスキーマの検証
-    expected: '`MigrationFailedError`。対象は書き換えた内容のまま'
-    exception: 読んだ後に変わった
-  - name: test_apply_migration_when_source_needs_setup
-    case: 異常
-    summary: 手順で移せない配信元の設定
-    condition: '`version: "1"` で `type: markdown` の行を持つ `project-index.yaml` に `2/steps.yaml` の手順'
-    mock: なし
-    expected: '`MigrationFailedError` のメッセージに `documents[0].type` の違反と `/project-index:setup`。対象は元の内容のまま'
-    exception: 新しいスキーマの違反
-  callers:
-  - MOD-89#functions[run_migrate]
-  callees:
-  - MOD-38#functions[apply_step]
+  - name: resolve_target
+    title: 対象の決定
+    kind: 関数
+    container: project_index/features/migrate/service.py
+    usecase: 設定の移し替え
+    role: 解決
+    summary: '`--source` の有無で移し替える設定を決める'
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: source
+        title: 配信元の設定
+        type: str | None
+        required: true
+        passing: positional
+        description: '`--source` の値'
+      - name: env
+        title: 環境変数
+        type: Mapping[str, str]
+        required: true
+        passing: keyword
+        description: '`PROJECT_INDEX_CONFIG` を引く'
+    returns:
+      type: MigrationTarget
+      description: 移し替えの対象
+    process: |-
+      1. `source` に応じて分ける
+         - ある場合、`kind` を `project-index`、`file` を `source` を正規化したパス、`current` を `SOURCE_CONFIG_VERSION` にする
+         - 無い場合、`kind` を `settings`、`file` を `config_path(env)`、`current` を `SETTINGS_VERSION` にする
+    unit_tests:
+      - name: test_resolve_target
+        case: 正常
+        summary: 端末の設定を対象にする
+        condition: '`source` が `None`、`PROJECT_INDEX_CONFIG` が `/tmp/s.yaml`'
+        mock: なし
+        expected: '`kind` が `settings`、`file` が `/tmp/s.yaml`'
+      - name: test_resolve_target_when_source
+        case: 正常
+        summary: 配信元の設定を対象にする
+        condition: '`source` が `~/repo/a/project-index.yaml`'
+        mock: なし
+        expected: '`kind` が `project-index`、`file` が `~` を展開したパス'
+    callers:
+      - MOD-89#functions[run_migrate]
+  - name: plan_migration
+    title: 当てる手順の一覧
+    kind: 関数
+    container: project_index/features/migrate/service.py
+    usecase: 設定の移し替え
+    role: サービス
+    summary: 対象の `version` を読み、当てる手順を求める
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: target
+        title: 対象
+        type: MigrationTarget
+        required: true
+        passing: positional
+        description: 移し替えの対象
+    returns:
+      type: tuple[CommentedMap, list[MigrationStep]]
+      description: 読んだ対象と、当てる順の手順
+    process: |-
+      1. `target.file` を読む（`load_roundtrip`）
+         - 無い・読めない・辞書でない・`version` が無い場合、`MigrationConfigInvalidError` を送出する
+      2. `version` を `target.current` と比べる（バージョンの新旧）
+         - `newer` の場合、`ConfigNewerError` を送出する
+         - `current` の場合、手順を空にして返す
+      3. 手順を読む（手順の読み込み）
+    exceptions:
+      - name: MigrationConfigInvalidError
+        condition: 対象が無い・ YAML として読めない・辞書でない・`version` が無い
+        message: '`{ファイル}: {理由}`'
+      - name: ConfigNewerError
+        condition: 対象の `version` が `target.current` より新しい
+        message: '`{ファイル}: 設定のバージョン {対象} が project-index で読み込める {現在} より新しい。project-index を更新してください`'
+    unit_tests:
+      - name: test_plan_migration
+        case: 正常
+        summary: 当てる手順を返す
+        condition: '`version: "1"` の対象、`current` が `2`、`2` の手順が 1 つ'
+        mock: 手順の置き場所
+        expected: 手順が 1 つ
+      - name: test_plan_migration_when_current
+        case: 正常
+        summary: 同じバージョンなら手順は空
+        condition: '`version` が `current` と同じ'
+        mock: なし
+        expected: 手順が空
+      - name: test_plan_migration_when_newer
+        case: 異常
+        summary: 新しすぎる設定
+        condition: '`version: "9"`、`current` が `1`'
+        mock: なし
+        expected: '`ConfigNewerError`'
+        exception: 新しすぎる設定
+      - name: test_plan_migration_when_no_version
+        case: 異常
+        summary: '`version` が無い'
+        condition: '`clone: ~/project-index` だけの対象'
+        mock: なし
+        expected: '`MigrationConfigInvalidError`'
+        exception: 対象の設定の違反
+    callers:
+      - MOD-89#functions[run_migrate]
+    callees:
+      - MOD-38#functions[load_steps]
+      - MOD-10#functions[version_state]
+  - name: apply_migration
+    title: 移し替えの適用
+    kind: 関数
+    container: project_index/features/migrate/service.py
+    usecase: 設定の移し替え
+    role: サービス
+    summary: 手順を全て当てて新しいスキーマで検証し、バックアップを取ってから 1 回だけ書き込む
+    description: '`--record` は手順を空にして呼ぶ（`version` だけを書き換える）。'
+    scope: public
+    is_async: false
+    thread_safe: false
+    side_effects: バックアップを作り、対象を書き換える
+    args:
+      - name: target
+        title: 対象
+        type: MigrationTarget
+        required: true
+        passing: positional
+        description: 移し替えの対象
+      - name: data
+        title: 読んだ対象
+        type: CommentedMap
+        required: true
+        passing: positional
+        description: '`plan_migration` が読んだ内容'
+      - name: steps
+        title: 手順
+        type: list[MigrationStep]
+        required: true
+        passing: positional
+        description: 当てる順の手順
+      - name: allow_destructive
+        title: 破壊的な手順を許す
+        type: bool
+        required: true
+        passing: keyword
+        description: '`--allow-destructive`'
+      - name: now
+        title: 時刻
+        type: datetime
+        required: true
+        passing: keyword
+        description: バックアップの名前に使う時刻
+    returns:
+      type: Path
+      description: バックアップのパス
+    process: |-
+      1. 手順に破壊的なものがあり `allow_destructive` が `False` の場合、`DestructiveStepBlockedError` を送出する
+      2. ファイルを読み直して `data` と同じ内容かを比べ、ハッシュを控える（`content_hash`）
+         - 違う場合、`MigrationFailedError` を送出する
+      3. 手順を順に当てる（手順の適用）
+      4. `version` を `target.current` にする
+      5. 新しいスキーマで検証する（`settings` は `validate_terminal_config`、`project-index` は `validate_source_config`）
+         - 違反がある場合、`MigrationFailedError` を送出する（ファイルには書かない）。`project-index` は末尾に `手順で移せない設定です。/project-index:setup で移し替えてください` の行を置く
+      6. ファイルを読み直してハッシュを比べる
+         - 変わっている場合、`MigrationFailedError` を送出する
+      7. 同じフォルダに `BACKUP_FORMAT` の名前で元の内容を保存する
+      8. 対象を書き換える（`dump_roundtrip`・`replace_file`）
+         - `[INFO]` 設定を移し替えた（ファイル・前のバージョン・後のバージョン・バックアップ）
+    exceptions:
+      - name: DestructiveStepBlockedError
+        condition: 破壊的な手順があり `allow_destructive` が `False`
+        message: '破壊的な手順を `{バージョン}: {説明}` で 1 行ずつ並べ、`--allow-destructive` を案内する'
+      - name: MigrationFailedError
+        condition: 当てた結果が新しいスキーマに違反する
+        message: '違反を `{キーのパス}: {理由}` で 1 行ずつ並べる（`project-index` は `/project-index:setup` の案内を続ける）'
+      - name: MigrationFailedError
+        condition: 読んだ後に対象のファイルが変わった
+        message: '`{ファイル}: 読み込んだ後に変わったため書き換えません`'
+    unit_tests:
+      - name: test_apply_migration
+        case: 正常
+        summary: 手順を当ててバックアップを取る
+        condition: '`version: "1"` の端末の設定に `rename` 1 つ、`current` が `2`'
+        mock: 新しいスキーマの検証（違反なしを返す）
+        expected: '対象が改名後で `version: "2"`、バックアップが元の内容'
+      - name: test_apply_migration_when_record
+        case: 正常
+        summary: 手順が空なら `version` だけを書き換える
+        condition: 手順が空
+        mock: 新しいスキーマの検証
+        expected: '`version` だけが変わり、バックアップがある'
+      - name: test_apply_migration_when_destructive
+        case: 異常
+        summary: 破壊的な手順で止める
+        condition: '`delete` の手順、`allow_destructive` が `False`'
+        mock: なし
+        expected: '`DestructiveStepBlockedError`。対象もバックアップも書かない'
+        exception: 破壊的な手順
+      - name: test_apply_migration_when_invalid_result
+        case: 異常
+        summary: 新しいスキーマに違反する
+        condition: 当てた結果が必須のキーを欠く
+        mock: なし
+        expected: '`MigrationFailedError`。対象は元の内容のまま'
+        exception: 新しいスキーマの違反
+      - name: test_apply_migration_when_changed
+        case: 異常
+        summary: 読んだ後に変わったファイルを書かない
+        condition: '`plan_migration` の後に対象を別の内容で書き換える'
+        mock: 新しいスキーマの検証
+        expected: '`MigrationFailedError`。対象は書き換えた内容のまま'
+        exception: 読んだ後に変わった
+      - name: test_apply_migration_when_source_needs_setup
+        case: 異常
+        summary: 手順で移せない配信元の設定
+        condition: '`version: "1"` で `type: markdown` の行を持つ `project-index.yaml` に `2/steps.yaml` の手順'
+        mock: なし
+        expected: '`MigrationFailedError` のメッセージに `documents[0].type` の違反と `/project-index:setup`。対象は元の内容のまま'
+        exception: 新しいスキーマの違反
+    callers:
+      - MOD-89#functions[run_migrate]
+    callees:
+      - MOD-38#functions[apply_step]
+notes:
+  決まり: 動いているサーバーには反映しない。

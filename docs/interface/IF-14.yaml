@@ -4,301 +4,333 @@ entry:
   kind: mcp_tool
   value: write_nav
 flows:
-- name: 正常系
-  summary: タブを追加し、書いた後の `nav` と条件に当たる文書の数を返す
-  setup:
-  - name: Mock
-    description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
-  - name: 文書のタグ
-    description: sample のワークツリー x の文書 1 の `tags` を `[mcp]`、文書 2 を `[設計]`、文書 3 を `[mcp, 設計]` にする
-    notes: '`project-index.yaml` は `nav` のほかに `description` とコメントを持つ'
-  - name: 入力
-    description: 1 回目は `add`（タブ `mcp`、`auto` の `filter` が `tags が mcp`）。2 回目は `update`（タブ `mcp` の `value.items` を、`filter` が `tags が 設計` の `auto` 1 つに置き換える）
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as write_nav
-      participant F as ワークツリーの project-index.yaml
+  - name: 正常系
+    summary: タブを追加し、書いた後の `nav` と条件に当たる文書の数を返す
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+      - name: 文書のタグ
+        description: sample のワークツリー x の文書 1 の `tags` を `[mcp]`、文書 2 を `[設計]`、文書 3 を `[mcp, 設計]` にする
+        notes: '`project-index.yaml` は `nav` のほかに `description` とコメントを持つ'
+      - name: 入力
+        description: 1 回目は `add`（タブ `mcp`、`auto` の `filter` が `tags が mcp`）。2 回目は `update`（タブ `mcp` の `value.items` を、`filter` が `tags が 設計` の `auto` 1 つに置き換える）
+    flow: |-
+      <!-- map: {"title": "正常系"} -->
 
-      C->>T: add タブ mcp
-      T->>T: 書いた後の nav をスキーマと check_filter で検証する
-      T->>F: nav を書く
-      T-->>C: nav・counts
-      C->>T: update タブ mcp
-      T->>F: nav を書く
-      T-->>C: nav・counts
-    ```
-  expected:
-  - 1 回目の後、`project-index.yaml` の `nav` にタブ `mcp` が加わり、`counts` のその `auto` が 2（文書 1・文書 3）
-  - 2 回目の後、タブ `mcp` の `filter` が `tags が 設計` になり、`counts` が 2（文書 2・文書 3）
-  - '`description` とコメントは書き換わらない'
-  - '`warnings` が空'
-  test: test_normal
-- name: 正常系（0 件の条件を書く）
-  summary: どの文書にも当たらない条件も書いたうえで警告を返す
-  setup:
-  - name: Mock
-    description: なし
-  - name: 入力
-    description: '`add`（タブ `none`、`auto` の `filter` が `tags が none`）'
-    notes: どの文書にもタグ `none` を付けない
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as write_nav
-      participant F as ワークツリーの project-index.yaml
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_nav
+        participant F as ワークツリーの project-index.yaml
 
-      C->>T: add タブ none
-      T->>F: nav を書く
-      T-->>C: nav・counts・warnings
-    ```
-  expected:
-  - '`project-index.yaml` の `nav` にタブ `none` が加わる'
-  - '`counts` のその `auto` が 0'
-  - '`warnings` にタブ `none` の条件が 0 件に当たる警告が 1 件ある'
-  test: test_normal_when_filter_matches_nothing
-- name: 異常系（検証に通らない・NavInvalidError）
-  summary: '`check_filter` に通らない条件を書かない'
-  setup:
-  - name: Mock
-    description: なし
-  - name: 入力
-    description: '`add`（タブ `bad`、`filter` の `op` が無い値 `like`）'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as write_nav
+        C->>T: add タブ mcp
+        T->>T: 書いた後の nav をスキーマと check_filter で検証する
+        T->>F: nav を書く
+        T-->>C: nav・counts
+        C->>T: update タブ mcp
+        T->>F: nav を書く
+        T-->>C: nav・counts
+      ```
 
-      C->>T: add タブ bad
-      T->>T: check_filter に通らない
-      T-->>C: NavInvalidError
-    ```
-  expected:
-  - '`isError: true` で、`op` のキーのパスと `like` が使えないことを返す'
-  - '`project-index.yaml` は書き換わらない'
-  test: test_error_when_nav_invalid
-- name: 異常系（無いタブ・InvalidArgumentError）
-  summary: 無いタブの修正を断る
-  setup:
-  - name: Mock
-    description: なし
-  - name: 入力
-    description: '`update`（タブ `missing`）'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as write_nav
+      <!-- /map -->
+    expected:
+      - 1 回目の後、`project-index.yaml` の `nav` にタブ `mcp` が加わり、`counts` のその `auto` が 2（文書 1・文書 3）
+      - 2 回目の後、タブ `mcp` の `filter` が `tags が 設計` になり、`counts` が 2（文書 2・文書 3）
+      - '`description` とコメントは書き換わらない'
+      - '`warnings` が空'
+    test: test_normal
+  - name: 正常系（0 件の条件を書く）
+    summary: どの文書にも当たらない条件も書いたうえで警告を返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`add`（タブ `none`、`auto` の `filter` が `tags が none`）'
+        notes: どの文書にもタグ `none` を付けない
+    flow: |-
+      <!-- map: {"title": "正常系（0 件の条件を書く）"} -->
 
-      C->>T: update タブ missing
-      T-->>C: InvalidArgumentError
-    ```
-  expected:
-  - '`isError: true` で、今のタブの名前の一覧を返す'
-  - '`project-index.yaml` は書き換わらない'
-  test: test_error_when_tab_missing
-- name: 異常系（設定が無い・ConfigNotFoundError）
-  summary: '`project-index.yaml` が無いフォルダを断る'
-  setup:
-  - name: Mock
-    description: なし
-  - name: 入力
-    description: '`path` に `project-index.yaml` の無い一時フォルダ'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as write_nav
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_nav
+        participant F as ワークツリーの project-index.yaml
 
-      C->>T: path
-      T-->>C: ConfigNotFoundError
-    ```
-  expected:
-  - '`isError: true` で `project-index.yaml` が無いことを返す'
-  test: test_error_when_config_missing
-- name: 異常系（YAML として読めない・ConfigParseError）
-  summary: 読めない `project-index.yaml` を断る
-  setup:
-  - name: Mock
-    description: なし
-  - name: 入力
-    description: '`path` の `project-index.yaml` の途中の行を壊す'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as write_nav
+        C->>T: add タブ none
+        T->>F: nav を書く
+        T-->>C: nav・counts・warnings
+      ```
 
-      C->>T: path
-      T-->>C: ConfigParseError
-    ```
-  expected:
-  - '`isError: true` で壊した行と理由を返す'
-  test: test_error_when_config_unparsable
-- name: 異常系（group でない項目を指す・InvalidArgumentError）
-  summary: 名前を持たない項目を `item` で指す操作と、後に重ねた設定が `nav` を持つ配信元への書き込みを断る
-  setup:
-  - name: Mock
-    description: なし
-  - name: auto を持つタブ
-    description: sample の `nav` のタブ `mcp` が `auto` の項目 1 つだけを持つ
-  - name: 重ねた設定
-    description: 端末の設定の配信元 layered の `config` が `[base/project-index.yaml, local/project-index.yaml]` で、`local/project-index.yaml` が `nav` を持つ
-  - name: 入力
-    description: '1 回目は sample へ `update`（タブ `mcp`、`item: auto`）。2 回目は `path` が `base` で `add`（タブ `x`）'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as write_nav
+      <!-- /map -->
+    expected:
+      - '`project-index.yaml` の `nav` にタブ `none` が加わる'
+      - '`counts` のその `auto` が 0'
+      - '`warnings` にタブ `none` の条件が 0 件に当たる警告が 1 件ある'
+    test: test_normal_when_filter_matches_nothing
+  - name: 異常系（検証に通らない・NavInvalidError）
+    summary: '`check_filter` に通らない条件を書かない'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`add`（タブ `bad`、`filter` の `op` が無い値 `like`）'
+    flow: |-
+      <!-- map: {"title": "異常系（検証に通らない・NavInvalidError）"} -->
 
-      C->>T: update タブ mcp・item auto
-      T-->>C: InvalidArgumentError
-      C->>T: path base・add タブ x
-      T->>T: 後に重ねた local が nav を持つ
-      T-->>C: InvalidArgumentError
-    ```
-  expected:
-  - '1 回目は `isError: true` で、タブ `mcp` の group の名前の一覧（空）を返す'
-  - '2 回目は `isError: true` で、`local/project-index.yaml` のパスを返す'
-  - どちらの `project-index.yaml` も書き換わらない
-  test: test_error_when_item_not_group
-- name: 正常系（フォルダで束ねる auto を書く）
-  summary: "`group_by: '@folder'` の `auto` を検証に通して書き、文書の数を返す"
-  setup:
-  - name: Mock
-    description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
-    notes: '-'
-  - name: 入力
-    description: "`add`（タブ `folders`、`auto` が `{document: sample, group_by: '@folder'}`）"
-    notes: sample の文書は 3 件
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant T as write_nav
-      participant F as ワークツリーの project-index.yaml
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_nav
 
-      C->>T: add タブ folders
-      T->>T: 書いた後の nav をスキーマと check_filter で検証する
-      T->>F: nav を書く
-      T-->>C: nav・counts
-    ```
-  expected:
-  - "`project-index.yaml` の `nav` にタブ `folders` が加わり、その `auto` の `group_by` が `'@folder'`"
-  - '`counts` のその `auto` が 3'
-  - '`warnings` が空'
-  test: test_normal_when_group_by_folder
-lead: 配信元の `project-index.yaml` の `nav` だけを、タブ・項目の追加・修正・削除で書き換える。書いた後の `nav` をスキーマと `check_filter` で検証し、`auto` の条件に当たる文書の数を返す。
+        C->>T: add タブ bad
+        T->>T: check_filter に通らない
+        T-->>C: NavInvalidError
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、`op` のキーのパスと `like` が使えないことを返す'
+      - '`project-index.yaml` は書き換わらない'
+    test: test_error_when_nav_invalid
+  - name: 異常系（無いタブ・InvalidArgumentError）
+    summary: 無いタブの修正を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`update`（タブ `missing`）'
+    flow: |-
+      <!-- map: {"title": "異常系（無いタブ・InvalidArgumentError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_nav
+
+        C->>T: update タブ missing
+        T-->>C: InvalidArgumentError
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、今のタブの名前の一覧を返す'
+      - '`project-index.yaml` は書き換わらない'
+    test: test_error_when_tab_missing
+  - name: 異常系（設定が無い・ConfigNotFoundError）
+    summary: '`project-index.yaml` が無いフォルダを断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`path` に `project-index.yaml` の無い一時フォルダ'
+    flow: |-
+      <!-- map: {"title": "異常系（設定が無い・ConfigNotFoundError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_nav
+
+        C->>T: path
+        T-->>C: ConfigNotFoundError
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で `project-index.yaml` が無いことを返す'
+    test: test_error_when_config_missing
+  - name: 異常系（YAML として読めない・ConfigParseError）
+    summary: 読めない `project-index.yaml` を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`path` の `project-index.yaml` の途中の行を壊す'
+    flow: |-
+      <!-- map: {"title": "異常系（YAML として読めない・ConfigParseError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_nav
+
+        C->>T: path
+        T-->>C: ConfigParseError
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で壊した行と理由を返す'
+    test: test_error_when_config_unparsable
+  - name: 異常系（group でない項目を指す・InvalidArgumentError）
+    summary: 名前を持たない項目を `item` で指す操作と、後に重ねた設定が `nav` を持つ配信元への書き込みを断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: auto を持つタブ
+        description: sample の `nav` のタブ `mcp` が `auto` の項目 1 つだけを持つ
+      - name: 重ねた設定
+        description: 端末の設定の配信元 layered の `config` が `[base/project-index.yaml, local/project-index.yaml]` で、`local/project-index.yaml` が `nav` を持つ
+      - name: 入力
+        description: '1 回目は sample へ `update`（タブ `mcp`、`item: auto`）。2 回目は `path` が `base` で `add`（タブ `x`）'
+    flow: |-
+      <!-- map: {"title": "異常系（group でない項目を指す・InvalidArgumentError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_nav
+
+        C->>T: update タブ mcp・item auto
+        T-->>C: InvalidArgumentError
+        C->>T: path base・add タブ x
+        T->>T: 後に重ねた local が nav を持つ
+        T-->>C: InvalidArgumentError
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目は `isError: true` で、タブ `mcp` の group の名前の一覧（空）を返す'
+      - '2 回目は `isError: true` で、`local/project-index.yaml` のパスを返す'
+      - どちらの `project-index.yaml` も書き換わらない
+    test: test_error_when_item_not_group
+  - name: 正常系（フォルダで束ねる auto を書く）
+    summary: "`group_by: '@folder'` の `auto` を検証に通して書き、文書の数を返す"
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+        notes: '-'
+      - name: 入力
+        description: "`add`（タブ `folders`、`auto` が `{document: sample, group_by: '@folder'}`）"
+        notes: sample の文書は 3 件
+    flow: |-
+      <!-- map: {"title": "正常系（フォルダで束ねる auto を書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_nav
+        participant F as ワークツリーの project-index.yaml
+
+        C->>T: add タブ folders
+        T->>T: 書いた後の nav をスキーマと check_filter で検証する
+        T->>F: nav を書く
+        T-->>C: nav・counts
+      ```
+
+      <!-- /map -->
+    expected:
+      - "`project-index.yaml` の `nav` にタブ `folders` が加わり、その `auto` の `group_by` が `'@folder'`"
+      - '`counts` のその `auto` が 3'
+      - '`warnings` が空'
+    test: test_normal_when_group_by_folder
+lead: 配信元の `project-index.yaml` の `nav` だけを書き換える管理の MCP の `write_nav` の入出力を定め、`write_nav` を修正するときに参照する。
 identifier: write_nav
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: false
 side_effects: '`path` の `project-index.yaml` の `nav` を書き換える（commit はしない）'
 callers:
-- SC-10#scenarios[正常シナリオ（管理の MCP で nav を書く）]
+  - SC-10#scenarios[正常シナリオ（管理の MCP で nav を書く）]
 exclusivity: 同じ `project-index.yaml` への書き込みは 1 つずつ行う
 request:
-- name: path
-  type: str
-  required: true
-  location: argument
-  description: 配信元のフォルダか、その `project-index.yaml` の絶対パス（作業中はワークツリー）
-- name: operations
-  type: list[NavOperation]
-  required: true
-  location: argument
-  description: 並べた順に適用する操作
-  constraints: 1 件以上
-- name: operations[].op
-  type: Literal['add', 'update', 'remove']
-  required: true
-  location: argument
-  description: 追加・修正・削除
-- name: operations[].tab
-  type: str
-  required: true
-  location: argument
-  description: 対象のタブの名前（`nav.tabs[].title`）
-- name: operations[].item
-  type: str
-  required: false
-  default: なし（タブそのものが対象）
-  location: argument
-  description: タブの中の `group` の項目の名前（`group` の値）。入れ子の group は `>` で区切る（`設計 > MCP`）
-  constraints: 名前を持たない `auto`・`page` の項目は指せない。それらは、入っている group かタブの `value.items` を置き換えて追加・修正・削除する
-  notes: '`add` のときは、最後の名前を作る group、それより前を追加先の group にする'
-- name: operations[].value
-  type: dict
-  required: false
-  default: なし（`remove` では持たない）
-  location: argument
-  description: タブか項目の中身（`project-index.yaml` の `nav` と同じ書式）。`update` は渡したキーだけを置き換える
-  constraints: '`add`・`update` で必須'
-- name: format
-  type: Literal['markdown', 'json']
-  required: false
-  default: '`markdown`'
-  location: argument
-  description: 返却する形式
+  - name: path
+    type: str
+    required: true
+    location: argument
+    description: 配信元のフォルダか、その `project-index.yaml` の絶対パス（作業中はワークツリー）
+  - name: operations
+    type: list[NavOperation]
+    required: true
+    location: argument
+    description: 並べた順に適用する操作
+    constraints: 1 件以上
+  - name: operations[].op
+    type: Literal['add', 'update', 'remove']
+    required: true
+    location: argument
+    description: 追加・修正・削除
+  - name: operations[].tab
+    type: str
+    required: true
+    location: argument
+    description: 対象のタブの名前（`nav.tabs[].title`）
+  - name: operations[].item
+    type: str
+    required: false
+    default: なし（タブそのものが対象）
+    location: argument
+    description: タブの中の `group` の項目の名前（`group` の値）。入れ子の group は `>` で区切る（`設計 > MCP`）
+    constraints: 名前を持たない `auto`・`page` の項目は指せない。それらは、入っている group かタブの `value.items` を置き換えて追加・修正・削除する
+    notes: '`add` のときは、最後の名前を作る group、それより前を追加先の group にする'
+  - name: operations[].value
+    type: dict
+    required: false
+    default: なし（`remove` では持たない）
+    location: argument
+    description: タブか項目の中身（`project-index.yaml` の `nav` と同じ書式）。`update` は渡したキーだけを置き換える
+    constraints: '`add`・`update` で必須'
+  - name: format
+    type: Literal['markdown', 'json']
+    required: false
+    default: '`markdown`'
+    location: argument
+    description: 返却する形式
 request_example: |-
   ```json
   {"path": "/home/u/repo/sample/.claude/worktrees/x", "operations": [{"op": "add", "tab": "mcp", "value": {"title": "mcp", "items": [{"auto": {"document": "docs", "filter": {"field": "tags", "op": "eq", "values": ["mcp"]}}}]}}]}
   ```
 response:
-- name: path
-  type: str
-  description: 書き換えた `project-index.yaml` のパス
-- name: nav
-  type: str
-  description: 書いた後の `nav`（YAML のまま）
-- name: counts[].path
-  type: str
-  description: '`auto` のキーのパス（`nav.tabs[2].items[0].auto`）'
-- name: counts[].count
-  type: int
-  description: その `auto` の条件に当たる文書の数
-- name: warnings[].path
-  type: str
-  description: 警告したキーのパス
-- name: warnings[].rule
-  type: str
-  description: 警告の理由。条件がどの文書にも当たらないときは、タブの名前と条件
-  notes: '`check_project` の `warnings[]` と同じ関数で求める'
+  - name: path
+    type: str
+    description: 書き換えた `project-index.yaml` のパス
+  - name: nav
+    type: str
+    description: 書いた後の `nav`（YAML のまま）
+  - name: counts[].path
+    type: str
+    description: '`auto` のキーのパス（`nav.tabs[2].items[0].auto`）'
+  - name: counts[].count
+    type: int
+    description: その `auto` の条件に当たる文書の数
+  - name: warnings[].path
+    type: str
+    description: 警告したキーのパス
+  - name: warnings[].rule
+    type: str
+    description: 警告の理由。条件がどの文書にも当たらないときは、タブの名前と条件
+    notes: '`check_project` の `warnings[]` と同じ関数で求める'
 exceptions:
-- name: なし（正常終了）
-  condition: 書けた（0 件に当たる条件も書いたうえで `warnings` に入れる）
-- name: NavInvalidError
-  condition: 書いた後の `nav` が `project-index.yaml` のスキーマか `check_filter` に通らない
-  notes: '`isError: true` で違反したキーのパスと理由を返し、ファイルを書き換えない'
-- name: InvalidArgumentError
-  condition: '`update`・`remove` で指したタブ・group が無い、`item` が group でない項目（`auto`・`page`）に当たる、`add` で同じ名前のタブ・group がある、`add`・`update` で `value` が無い、端末の設定の `sources[].config` で `path` より後に重ねた設定の YAML が `nav` を持つ'
-  notes: '`isError: true` で今のタブ・group の名前の一覧を添え、ファイルを書き換えない。重ねた設定の YAML が `nav` を持つときはそのファイルのパスを添える'
-- name: ConfigNotFoundError
-  condition: '`path` に `project-index.yaml` が無い'
-  notes: '`isError: true`'
-- name: ConfigParseError
-  condition: '`project-index.yaml` が YAML として読めない'
-  notes: '`isError: true` で行と理由を返す'
+  - name: なし（正常終了）
+    condition: 書けた（0 件に当たる条件も書いたうえで `warnings` に入れる）
+  - name: NavInvalidError
+    condition: 書いた後の `nav` が `project-index.yaml` のスキーマか `check_filter` に通らない
+    notes: '`isError: true` で違反したキーのパスと理由を返し、ファイルを書き換えない'
+  - name: InvalidArgumentError
+    condition: '`update`・`remove` で指したタブ・group が無い、`item` が group でない項目（`auto`・`page`）に当たる、`add` で同じ名前のタブ・group がある、`add`・`update` で `value` が無い、端末の設定の `sources[].config` で `path` より後に重ねた設定の YAML が `nav` を持つ'
+    notes: '`isError: true` で今のタブ・group の名前の一覧を添え、ファイルを書き換えない。重ねた設定の YAML が `nav` を持つときはそのファイルのパスを添える'
+  - name: ConfigNotFoundError
+    condition: '`path` に `project-index.yaml` が無い'
+    notes: '`isError: true`'
+  - name: ConfigParseError
+    condition: '`project-index.yaml` が YAML として読めない'
+    notes: '`isError: true` で行と理由を返す'
 constraints:
-- item: 書き換える範囲
-  constraint: '`nav` のキーだけを書き換え、ほかのキーとコメントはそのまま残す'
-- item: 書き込みの方式
-  constraint: 操作を全て当てた後の `nav` を 1 回だけ検証し、通ったときだけファイルを書き換える
-- item: 文書の数
-  constraint: '`counts` は書いた後の `nav` の全ての `auto` を、`path` のフォルダの文書で数える。`文書の取得` と同じ `match_filter` を使う'
-- item: 反映
-  constraint: 配信中の配信元には、`default_ref` へ commit された後の要求から入る
-- item: タイムアウト
-  constraint: 制限なし
-- item: 項目の指し方
-  constraint: 項目はタブの名前と group の名前でだけ指し、添字では指さない。同じ `operations` の前の `add`・`remove` で並びが変わっても指す先はずれない
-- item: 重ねた設定
-  constraint: 端末の設定の `sources[].config` で `path` の `project-index.yaml` より後に重ねた設定の YAML が `nav` を持つ配信元は、書いても配信に出ないため `InvalidArgumentError` で断る
-- item: auto の group_by
-  constraint: "`auto` の `group_by` は、項目のパスかフォルダで束ねる指定 `'@folder'` を受ける。`'@folder'` は項目のパスとして検査しない。`counts` は `group_by` によらず条件に当たる文書の数"
-- item: 設定の探し方
-  constraint: 書き込む先がフォルダのときは `project-index.yaml` を探し、無ければ `dev-docs.yaml` を探す（今の各リポジトリが `project-index.yaml` へ改名するまでの移行の間）
+  - item: 書き換える範囲
+    constraint: '`nav` のキーだけを書き換え、ほかのキーとコメントはそのまま残す'
+  - item: 書き込みの方式
+    constraint: 操作を全て当てた後の `nav` を 1 回だけ検証し、通ったときだけファイルを書き換える
+  - item: 文書の数
+    constraint: '`counts` は書いた後の `nav` の全ての `auto` を、`path` のフォルダの文書で数える。`文書の取得` と同じ `match_filter` を使う'
+  - item: 反映
+    constraint: 配信中の配信元には、`default_ref` へ commit された後の要求から入る
+  - item: タイムアウト
+    constraint: 制限なし
+  - item: 項目の指し方
+    constraint: 項目はタブの名前と group の名前でだけ指し、添字では指さない。同じ `operations` の前の `add`・`remove` で並びが変わっても指す先はずれない
+  - item: 重ねた設定
+    constraint: 端末の設定の `sources[].config` で `path` の `project-index.yaml` より後に重ねた設定の YAML が `nav` を持つ配信元は、書いても配信に出ないため `InvalidArgumentError` で断る
+  - item: auto の group_by
+    constraint: "`auto` の `group_by` は、項目のパスかフォルダで束ねる指定 `'@folder'` を受ける。`'@folder'` は項目のパスとして検査しない。`counts` は `group_by` によらず条件に当たる文書の数"
+  - item: 設定の探し方
+    constraint: 書き込む先がフォルダのときは `project-index.yaml` を探し、無ければ `dev-docs.yaml` を探す（今の各リポジトリが `project-index.yaml` へ改名するまでの移行の間）
 test_file: tests/integration/server/test_write_nav.py

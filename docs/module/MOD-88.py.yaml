@@ -1,257 +1,257 @@
 id: MOD-88
 title: 索引のサーバー / スクリプトの実行 / scripts.py
-lead: '`validators[]`・`converters[]`・`generators[]` のスクリプトの制限時間つきの実行と、実行できるかの確かめ。'
+lead: '`validators[]`・`converters[]`・`generators[]` のスクリプトの制限時間つきの実行と、実行できるかの確かめを受け持ち、スクリプトの実行の scripts.py を修正するときに参照する。'
 test_files:
-- tests/unit/project_index/integrations/test_scripts.py
+  - tests/unit/project_index/integrations/test_scripts.py
 data_models:
-- name: ScriptResult
-  title: スクリプトの結果
-  container: project_index/integrations/scripts.py
-  usecase: 共通
-  role: DTO
-  summary: 終了コード 0 で終えたスクリプトの標準出力と標準エラー
-  description: '`@dataclass(frozen=True, slots=True, kw_only=True)`。'
-  properties:
-  - name: stdout
-    title: 標準出力
-    type: str
-    access: 公開
-    description: UTF-8 で読んだ標準出力
-  - name: stderr
-    title: 標準エラー
-    type: str
-    access: 公開
-    description: UTF-8 で読んだ標準エラー（読めないバイトは置き換える）
+  - name: ScriptResult
+    title: スクリプトの結果
+    container: project_index/integrations/scripts.py
+    usecase: 共通
+    role: DTO
+    summary: 終了コード 0 で終えたスクリプトの標準出力と標準エラー
+    description: '`@dataclass(frozen=True, slots=True, kw_only=True)`。'
+    properties:
+      - name: stdout
+        title: 標準出力
+        type: str
+        access: 公開
+        description: UTF-8 で読んだ標準出力
+      - name: stderr
+        title: 標準エラー
+        type: str
+        access: 公開
+        description: UTF-8 で読んだ標準エラー（読めないバイトは置き換える）
 classes:
-- name: ScriptError
-  title: スクリプトの失敗
-  container: project_index/integrations/scripts.py
-  usecase: 共通
-  role: 例外
-  summary: スクリプトを動かせない・失敗したことを表す基底
-  kind: クラス
-  inherits: Exception
-  description: |-
-    子クラスは `ScriptNotFoundError`（コマンドが見つからない）・`ScriptTimeoutError`（制限時間を超えた）・`ScriptFailedError`（終了コードが 0 以外）。
-    呼び出し側（検査・変換・書き込み）は、この例外を変換の失敗か `Violation` に変える。
-  properties:
-  - name: run
-    title: コマンド
-    type: list[str]
-    access: 公開
-    description: 動かそうとしたコマンド
-  - name: reason
-    title: 原因
-    type: str
-    access: 公開
-    description: 画面と MCP に出す原因の文。`ScriptTimeoutError` は制限時間の秒数、`ScriptFailedError` は終了コードと標準エラーの末尾（`STDERR_TAIL_LINES` 行）を含む
-  - name: exit_code
-    title: 終了コード
-    type: int | None
-    access: 公開
-    default: None
-    description: '`ScriptFailedError` だけが持つ'
-  - name: stdout
-    title: 標準出力
-    type: str
-    access: 公開
-    default: '""'
-    description: '`ScriptFailedError` だけが持つ。検査のスクリプトは不合格でも標準出力に違反の JSON を出す'
+  - name: ScriptError
+    title: スクリプトの失敗
+    container: project_index/integrations/scripts.py
+    usecase: 共通
+    role: 例外
+    summary: スクリプトを動かせない・失敗したことを表す基底
+    kind: クラス
+    inherits: Exception
+    description: |-
+      子クラスは `ScriptNotFoundError`（コマンドが見つからない）・`ScriptTimeoutError`（制限時間を超えた）・`ScriptFailedError`（終了コードが 0 以外）。
+      呼び出し側（検査・変換・書き込み）は、この例外を変換の失敗か `Violation` に変える。
+    properties:
+      - name: run
+        title: コマンド
+        type: list[str]
+        access: 公開
+        description: 動かそうとしたコマンド
+      - name: reason
+        title: 原因
+        type: str
+        access: 公開
+        description: 画面と MCP に出す原因の文。`ScriptTimeoutError` は制限時間の秒数、`ScriptFailedError` は終了コードと標準エラーの末尾（`STDERR_TAIL_LINES` 行）を含む
+      - name: exit_code
+        title: 終了コード
+        type: int | None
+        access: 公開
+        default: None
+        description: '`ScriptFailedError` だけが持つ'
+      - name: stdout
+        title: 標準出力
+        type: str
+        access: 公開
+        default: '""'
+        description: '`ScriptFailedError` だけが持つ。検査のスクリプトは不合格でも標準出力に違反の JSON を出す'
 constants:
-- name: STDERR_TAIL_LINES
-  title: 標準エラーの末尾の行数
-  container: project_index/integrations/scripts.py
-  usecase: 共通
-  summary: 失敗の原因に載せる標準エラーの末尾の行数
-  value: '5'
-- name: KILL_GRACE_SEC
-  title: 止めるときの猶予
-  container: project_index/integrations/scripts.py
-  usecase: 共通
-  summary: 制限時間を超えたスクリプトに SIGTERM を送ってから SIGKILL まで待つ秒数
-  value: '2'
+  - name: STDERR_TAIL_LINES
+    title: 標準エラーの末尾の行数
+    container: project_index/integrations/scripts.py
+    usecase: 共通
+    summary: 失敗の原因に載せる標準エラーの末尾の行数
+    value: '5'
+  - name: KILL_GRACE_SEC
+    title: 止めるときの猶予
+    container: project_index/integrations/scripts.py
+    usecase: 共通
+    summary: 制限時間を超えたスクリプトに SIGTERM を送ってから SIGKILL まで待つ秒数
+    value: '2'
 functions:
-- name: run_script
-  title: スクリプトの実行
-  kind: 関数
-  container: project_index/integrations/scripts.py
-  usecase: 共通
-  role: 外部実行
-  summary: コマンドを配信元の直下で動かし、制限時間を超えたら止める
-  scope: public
-  thread_safe: true
-  side_effects: 子プロセスを起動する。スクリプトが書くファイルはスクリプト次第（生成は配信元のフォルダを書き換える）
-  args:
-  - name: run
-    title: コマンド
-    type: Sequence[str]
-    required: true
-    passing: positional
-    description: '`validators[].run` などの値'
-  - name: cwd
-    title: 実行する場所
-    type: Path
-    required: true
-    passing: keyword
-    description: 配信元の直下（ワークツリーを指したときはそのワークツリーの同じ相対パス）
-  - name: stdin
-    title: 標準入力
-    type: str
-    required: false
-    default: '""'
-    passing: keyword
-    description: 渡す文書の YAML
-  - name: args
-    title: 追加の引数
-    type: Sequence[str]
-    required: false
-    default: ()
-    passing: keyword
-    description: コマンドの後ろに付ける引数（生成に渡す書いた文書のパス）
-  - name: timeout_sec
-    title: 制限時間
-    type: float
-    required: true
-    passing: keyword
-    description: 端末の設定の `script_timeout_sec`
-  - name: at
-    title: スクリプトのリビジョン
-    type: tuple[Path, str] | None
-    required: false
-    default: None
-    passing: keyword
-    description: （リポジトリの直下, commit）。渡すと、`run` のうちそのリビジョンにあるファイルを取り出したものに置き換えて動かす
-  args_example: |-
-    ```python
-    run_script(["uv", "run", "python", "scripts/arch_to_md.py"], cwd=root, stdin=text, timeout_sec=30)
-    ```
-  returns:
-    type: ScriptResult
-    description: 終了コード 0 で終えたときの出力
-  process: |-
-    1. `at` がある場合、`run` の要素のうち `cwd` からの相対パスで commit にファイルがあるもののフォルダをリビジョンのフォルダの取り出しで取り出し、その要素を取り出したファイルの絶対パスに置き換える（抜けたら一時フォルダは削除される）。`cwd` は変えない
-    2. 『実行できるかの確かめ』でコマンドを解く（実行できるかの確かめ）
-    3. `subprocess.Popen` を `shell=False`・`cwd`・新しいプロセスグループで起動し、`stdin` を UTF-8 で渡して `timeout_sec` まで待つ
-       - 制限時間を超えた場合、プロセスグループに SIGTERM を送り、`KILL_GRACE_SEC` 秒待って残っていれば SIGKILL を送ってから `ScriptTimeoutError` を送る
-         - `[warning]` スクリプトを制限時間で止めた（コマンド・`cwd`・秒数）
-    4. 終了コードが 0 以外の場合、`ScriptFailedError` を送る
-    5. 標準出力と標準エラーを `ScriptResult` にして返す
-  exceptions:
-  - name: ScriptNotFoundError
-    condition: コマンドが見つからない（『実行できるかの確かめ』から伝わる）
-    message: '`コマンド {run[0]} が見つかりません`'
-  - name: ScriptTimeoutError
-    condition: 制限時間を超えた
-    message: '`制限時間（{timeout_sec} 秒）を超えたため、スクリプトを止めました。`'
-  - name: ScriptFailedError
-    condition: 終了コードが 0 以外
-    message: '`終了コード {code} で終わりました。\n{標準エラーの末尾}`'
-  unit_tests:
-  - name: test_run_script
-    case: 正常
-    summary: 標準入力を受けて標準出力を返す
-    condition: '`[sys.executable, "-c", "import sys; print(sys.stdin.read().upper())"]` に `abc`'
-    mock: なし（実際の子プロセス）
-    expected: '`stdout` が `ABC\n`'
-  - name: test_run_script_when_cwd
-    case: 正常
-    summary: 配信元の直下で動かす
-    condition: '`os.getcwd()` を出すコマンドを一時フォルダで'
-    mock: なし
-    expected: 標準出力が一時フォルダ
-  - name: test_run_script_when_timeout
-    case: 異常
-    summary: 制限時間を超える
-    condition: '`time.sleep(5)` するコマンドを `timeout_sec=0.2` で'
-    mock: なし
-    expected: '`ScriptTimeoutError` で、子プロセスが残らない'
-    exception: 制限時間を超えた
-  - name: test_run_script_when_failed
-    case: 異常
-    summary: 終了コードが 0 以外
-    condition: 標準エラーに 10 行出して終了コード 1 で終わるコマンド
-    mock: なし
-    expected: '`ScriptFailedError` で、`exit_code` が 1、`reason` に標準エラーの末尾 5 行だけがある'
-    exception: 終了コードが 0 以外
-  - name: test_run_script_when_at
-    case: 正常
-    summary: default_ref のスクリプトを動かす
-    condition: '`scripts/a.py` を `print("develop")` で commit した後、作業ツリーで `print("disk")` に書き換え、`at` に commit を渡す'
-    mock: なし（一時フォルダで `git init`）
-    expected: 標準出力が `develop`
-    exception: '-'
-- name: check_runnable
-  title: 実行できるかの確かめ
-  kind: 関数
-  container: project_index/integrations/scripts.py
-  usecase: 起動
-  role: 検証
-  summary: コマンドの先頭と、配信元の中のスクリプトのファイルがあるかを確かめる（動かさない）
-  scope: public
-  thread_safe: true
-  args:
-  - name: run
-    title: コマンド
-    type: Sequence[str]
-    required: true
-    passing: positional
-    description: 確かめるコマンド
-  - name: cwd
-    title: 実行する場所
-    type: Path
-    required: true
-    passing: keyword
-    description: 配信元の直下
-  returns:
-    type: list[str]
-    description: 解いたコマンド（先頭を絶対パスにしたもの）
-  process: |-
-    1. `run` が空の場合、`ScriptNotFoundError` を送る
-    2. 先頭が `/` を含む場合は `cwd` からのパスとして、含まない場合は `shutil.which` で解き、見つからなければサーバーを動かしている Python の環境の `bin`（`Path(sys.executable).parent`）で解き直す。それでも見つからなければ `ScriptNotFoundError` を送る（子プロセスの PATH は変えない）
-    3. 2 つ目以降の引数のうち、拡張子（`.py`・`.sh`・`.js`・`.ts`）を持ち `cwd` からの相対パスに見えるものが無い場合、`ScriptNotFoundError` を送る
-    4. 先頭を解いた絶対パスにしたコマンドを返す
-  exceptions:
-  - name: ScriptNotFoundError
-    condition: '`run` が空'
-    message: '`コマンドが空です`'
-  - name: ScriptNotFoundError
-    condition: 先頭のコマンドが見つからない
-    message: '`コマンド {run[0]} が見つかりません`'
-  - name: ScriptNotFoundError
-    condition: 引数のスクリプトのファイルが無い
-    message: '`スクリプト {path} が見つかりません`'
-  unit_tests:
-  - name: test_check_runnable
-    case: 正常
-    summary: PATH のコマンドとあるスクリプト
-    condition: '`["python3", "scripts/a.py"]`、`cwd` に `scripts/a.py` がある'
-    mock: なし（一時フォルダ）
-    expected: 先頭が `python3` の絶対パス
-  - name: test_check_runnable_when_empty
-    case: 異常
-    summary: コマンドが空
-    condition: '`[]`'
-    mock: なし
-    expected: '`ScriptNotFoundError`'
-    exception: '`run` が空'
-  - name: test_check_runnable_when_command_missing
-    case: 異常
-    summary: コマンドが無い
-    condition: '`["no-such-command-xyz"]`'
-    mock: なし
-    expected: '`ScriptNotFoundError`'
-    exception: 先頭のコマンドが見つからない
-  - name: test_check_runnable_when_script_missing
-    case: 異常
-    summary: スクリプトのファイルが無い
-    condition: '`["python3", "scripts/none.py"]`'
-    mock: なし
-    expected: '`ScriptNotFoundError` で、`scripts/none.py` が載る'
-    exception: 引数のスクリプトのファイルが無い
-  - name: test_check_runnable_when_server_env
-    case: 正常
-    summary: PATH に無いコマンドをサーバーの Python の環境から引く
-    condition: '`["project-index", "prompt-doc"]`、PATH に `project-index` が無く、`sys.executable` と同じフォルダに実行できる `project-index` がある'
-    mock: '`monkeypatch` で `PATH` を空のフォルダだけにし、`sys.executable` を一時フォルダの `bin/python` にする'
-    expected: 先頭が一時フォルダの `bin/project-index`、後ろが `prompt-doc`
-    exception: '-'
+  - name: run_script
+    title: スクリプトの実行
+    kind: 関数
+    container: project_index/integrations/scripts.py
+    usecase: 共通
+    role: 外部実行
+    summary: コマンドを配信元の直下で動かし、制限時間を超えたら止める
+    scope: public
+    thread_safe: true
+    side_effects: 子プロセスを起動する。スクリプトが書くファイルはスクリプト次第（生成は配信元のフォルダを書き換える）
+    args:
+      - name: run
+        title: コマンド
+        type: Sequence[str]
+        required: true
+        passing: positional
+        description: '`validators[].run` などの値'
+      - name: cwd
+        title: 実行する場所
+        type: Path
+        required: true
+        passing: keyword
+        description: 配信元の直下（ワークツリーを指したときはそのワークツリーの同じ相対パス）
+      - name: stdin
+        title: 標準入力
+        type: str
+        required: false
+        default: '""'
+        passing: keyword
+        description: 渡す文書の YAML
+      - name: args
+        title: 追加の引数
+        type: Sequence[str]
+        required: false
+        default: ()
+        passing: keyword
+        description: コマンドの後ろに付ける引数（生成に渡す書いた文書のパス）
+      - name: timeout_sec
+        title: 制限時間
+        type: float
+        required: true
+        passing: keyword
+        description: 端末の設定の `script_timeout_sec`
+      - name: at
+        title: スクリプトのリビジョン
+        type: tuple[Path, str] | None
+        required: false
+        default: None
+        passing: keyword
+        description: （リポジトリの直下, commit）。渡すと、`run` のうちそのリビジョンにあるファイルを取り出したものに置き換えて動かす
+    args_example: |-
+      ```python
+      run_script(["uv", "run", "python", "scripts/arch_to_md.py"], cwd=root, stdin=text, timeout_sec=30)
+      ```
+    returns:
+      type: ScriptResult
+      description: 終了コード 0 で終えたときの出力
+    process: |-
+      1. `at` がある場合、`run` の要素のうち `cwd` からの相対パスで commit にファイルがあるもののフォルダをリビジョンのフォルダの取り出しで取り出し、その要素を取り出したファイルの絶対パスに置き換える（抜けたら一時フォルダは削除される）。`cwd` は変えない
+      2. 『実行できるかの確かめ』でコマンドを解く（実行できるかの確かめ）
+      3. `subprocess.Popen` を `shell=False`・`cwd`・新しいプロセスグループで起動し、`stdin` を UTF-8 で渡して `timeout_sec` まで待つ
+         - 制限時間を超えた場合、プロセスグループに SIGTERM を送り、`KILL_GRACE_SEC` 秒待って残っていれば SIGKILL を送ってから `ScriptTimeoutError` を送る
+           - `[warning]` スクリプトを制限時間で止めた（コマンド・`cwd`・秒数）
+      4. 終了コードが 0 以外の場合、`ScriptFailedError` を送る
+      5. 標準出力と標準エラーを `ScriptResult` にして返す
+    exceptions:
+      - name: ScriptNotFoundError
+        condition: コマンドが見つからない（『実行できるかの確かめ』から伝わる）
+        message: '`コマンド {run[0]} が見つかりません`'
+      - name: ScriptTimeoutError
+        condition: 制限時間を超えた
+        message: '`制限時間（{timeout_sec} 秒）を超えたため、スクリプトを止めました。`'
+      - name: ScriptFailedError
+        condition: 終了コードが 0 以外
+        message: '`終了コード {code} で終わりました。\n{標準エラーの末尾}`'
+    unit_tests:
+      - name: test_run_script
+        case: 正常
+        summary: 標準入力を受けて標準出力を返す
+        condition: '`[sys.executable, "-c", "import sys; print(sys.stdin.read().upper())"]` に `abc`'
+        mock: なし（実際の子プロセス）
+        expected: '`stdout` が `ABC\n`'
+      - name: test_run_script_when_cwd
+        case: 正常
+        summary: 配信元の直下で動かす
+        condition: '`os.getcwd()` を出すコマンドを一時フォルダで'
+        mock: なし
+        expected: 標準出力が一時フォルダ
+      - name: test_run_script_when_timeout
+        case: 異常
+        summary: 制限時間を超える
+        condition: '`time.sleep(5)` するコマンドを `timeout_sec=0.2` で'
+        mock: なし
+        expected: '`ScriptTimeoutError` で、子プロセスが残らない'
+        exception: 制限時間を超えた
+      - name: test_run_script_when_failed
+        case: 異常
+        summary: 終了コードが 0 以外
+        condition: 標準エラーに 10 行出して終了コード 1 で終わるコマンド
+        mock: なし
+        expected: '`ScriptFailedError` で、`exit_code` が 1、`reason` に標準エラーの末尾 5 行だけがある'
+        exception: 終了コードが 0 以外
+      - name: test_run_script_when_at
+        case: 正常
+        summary: default_ref のスクリプトを動かす
+        condition: '`scripts/a.py` を `print("develop")` で commit した後、作業ツリーで `print("disk")` に書き換え、`at` に commit を渡す'
+        mock: なし（一時フォルダで `git init`）
+        expected: 標準出力が `develop`
+        exception: '-'
+  - name: check_runnable
+    title: 実行できるかの確かめ
+    kind: 関数
+    container: project_index/integrations/scripts.py
+    usecase: 起動
+    role: 検証
+    summary: コマンドの先頭と、配信元の中のスクリプトのファイルがあるかを確かめる（動かさない）
+    scope: public
+    thread_safe: true
+    args:
+      - name: run
+        title: コマンド
+        type: Sequence[str]
+        required: true
+        passing: positional
+        description: 確かめるコマンド
+      - name: cwd
+        title: 実行する場所
+        type: Path
+        required: true
+        passing: keyword
+        description: 配信元の直下
+    returns:
+      type: list[str]
+      description: 解いたコマンド（先頭を絶対パスにしたもの）
+    process: |-
+      1. `run` が空の場合、`ScriptNotFoundError` を送る
+      2. 先頭が `/` を含む場合は `cwd` からのパスとして、含まない場合は `shutil.which` で解き、見つからなければサーバーを動かしている Python の環境の `bin`（`Path(sys.executable).parent`）で解き直す。それでも見つからなければ `ScriptNotFoundError` を送る（子プロセスの PATH は変えない）
+      3. 2 つ目以降の引数のうち、拡張子（`.py`・`.sh`・`.js`・`.ts`）を持ち `cwd` からの相対パスに見えるものが無い場合、`ScriptNotFoundError` を送る
+      4. 先頭を解いた絶対パスにしたコマンドを返す
+    exceptions:
+      - name: ScriptNotFoundError
+        condition: '`run` が空'
+        message: '`コマンドが空です`'
+      - name: ScriptNotFoundError
+        condition: 先頭のコマンドが見つからない
+        message: '`コマンド {run[0]} が見つかりません`'
+      - name: ScriptNotFoundError
+        condition: 引数のスクリプトのファイルが無い
+        message: '`スクリプト {path} が見つかりません`'
+    unit_tests:
+      - name: test_check_runnable
+        case: 正常
+        summary: PATH のコマンドとあるスクリプト
+        condition: '`["python3", "scripts/a.py"]`、`cwd` に `scripts/a.py` がある'
+        mock: なし（一時フォルダ）
+        expected: 先頭が `python3` の絶対パス
+      - name: test_check_runnable_when_empty
+        case: 異常
+        summary: コマンドが空
+        condition: '`[]`'
+        mock: なし
+        expected: '`ScriptNotFoundError`'
+        exception: '`run` が空'
+      - name: test_check_runnable_when_command_missing
+        case: 異常
+        summary: コマンドが無い
+        condition: '`["no-such-command-xyz"]`'
+        mock: なし
+        expected: '`ScriptNotFoundError`'
+        exception: 先頭のコマンドが見つからない
+      - name: test_check_runnable_when_script_missing
+        case: 異常
+        summary: スクリプトのファイルが無い
+        condition: '`["python3", "scripts/none.py"]`'
+        mock: なし
+        expected: '`ScriptNotFoundError` で、`scripts/none.py` が載る'
+        exception: 引数のスクリプトのファイルが無い
+      - name: test_check_runnable_when_server_env
+        case: 正常
+        summary: PATH に無いコマンドをサーバーの Python の環境から引く
+        condition: '`["project-index", "prompt-doc"]`、PATH に `project-index` が無く、`sys.executable` と同じフォルダに実行できる `project-index` がある'
+        mock: '`monkeypatch` で `PATH` を空のフォルダだけにし、`sys.executable` を一時フォルダの `bin/python` にする'
+        expected: 先頭が一時フォルダの `bin/project-index`、後ろが `prompt-doc`
+        exception: '-'

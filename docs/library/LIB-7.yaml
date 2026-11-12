@@ -8,38 +8,38 @@ version:
   source: https://cdn.jsdelivr.net/gh/shuhei1101/mdmark@master/
   pinning: '固定しない。リリースのたびに `dist/` が入る master ブランチを読み、中身が変わるため integrity を付けない。jsDelivr は `@master` を CDN で 12 時間、ブラウザで 7 日キャッシュする（`cache-control: public, max-age=604800, s-maxage=43200`）。リリースをすぐ届けるときは purge.jsdelivr.net で CDN のキャッシュを削除する'
 catalogs:
-- name: コマンド
-  version: develop（mdmark#328 のマージ後）
-  entries:
-  - name: mdmark check --text
-    kind: コマンド
-    purpose: Markdown の文字列を、描画時の書き方の警告・知らない印・図の配置のずれで点検する
-    status: planned
-    description: '[mdmark#328](https://github.com/shuhei1101/mdmark/pull/328) で develop に入り、v0.9.0 の master には無い。npm のレジストリに公開されず、Node 24 以降で動く。設定ファイルを渡さないときは、起動したフォルダから上へ `mdmark.config.yaml` を探し、無ければ既定の設定で点検する'
-    params:
-    - name: --text
-      type: str
-      required: true
-      description: 点検する Markdown。`-` を渡すと標準入力から読む
-    - name: --config
-      type: str
-      required: false
-      default: なし（起動したフォルダから上へ `mdmark.config.yaml` を探す）
-      description: 使う設定ファイルのパス
-    returns:
-    - name: 標準出力
-      type: str
-      description: 'ずれ 1 つを `-:{行}: {種類}: {内容}` の 1 行で並べ、最後に `ずれ {件数} 件` の行を出す'
-      notes: 内容は、何が合わないかと直し方の日本語の 1 文。`diagram_invalid`・`syntax_warning` は描画時の書き方の警告と同じ文
-    - name: 終了コード
-      type: int
-      description: '`0` はずれが 0 件。`1` はずれが 1 件以上'
-      notes: 引数の誤りなどで点検しなかったときも `1` で、標準エラーに原因を出し、`ずれ {件数} 件` の行を出さない
-lead: Markdown を検査・描画するライブラリと CLI。project-index は、文書の書き込みで Markdown の値を `mdmark check --text` で点検するためだけに使う。
+  - name: コマンド
+    version: develop（mdmark#328 のマージ後）
+    entries:
+      - name: mdmark check --text
+        kind: コマンド
+        purpose: Markdown の文字列を、描画時の書き方の警告・知らない印・図の配置のずれで点検する
+        status: planned
+        description: '[mdmark#328](https://github.com/shuhei1101/mdmark/pull/328) で develop に入り、v0.9.0 の master には無い。npm のレジストリに公開されず、Node 24 以降で動く。設定ファイルを渡さないときは、起動したフォルダから上へ `mdmark.config.yaml` を探し、無ければ既定の設定で点検する'
+        params:
+          - name: --text
+            type: str
+            required: true
+            description: 点検する Markdown。`-` を渡すと標準入力から読む
+          - name: --config
+            type: str
+            required: false
+            default: なし（起動したフォルダから上へ `mdmark.config.yaml` を探す）
+            description: 使う設定ファイルのパス
+        returns:
+          - name: 標準出力
+            type: str
+            description: 'ずれ 1 つを `-:{行}: {種類}: {内容}` の 1 行で並べ、最後に `ずれ {件数} 件` の行を出す'
+            notes: 内容は、何が合わないかと直し方の日本語の 1 文。`diagram_invalid`・`syntax_warning` は描画時の書き方の警告と同じ文
+          - name: 終了コード
+            type: int
+            description: '`0` はずれが 0 件。`1` はずれが 1 件以上'
+            notes: 引数の誤りなどで点検しなかったときも `1` で、標準エラーに原因を出し、`ずれ {件数} 件` の行を出さない
+lead: 文書の書き込みで Markdown の値を点検する mdmark の CLI の利用方法を定め、書き込みの点検を修正するときに参照する。
 dependency_scope: 必須
 adoption: 採用
 used_in:
-- src/project_index/integrations/mdmark.py
+  - src/project_index/integrations/mdmark.py
 upstream: shuhei1101/mdmark
 verification:
   state: 済

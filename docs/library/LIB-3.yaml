@@ -8,16 +8,16 @@ version:
   source: pyproject.toml・uv.lock
   pinning: pyproject.toml に下限、uv.lock で固定
 catalogs:
-- name: API
-  version: 0.54.0
-  entries:
-  - name: Config
-    kind: クラス
-    purpose: 待ち受けのアドレス（`127.0.0.1`）とポート（`PROJECT_INDEX_PORT`）を渡す
-  - name: Server
-    kind: クラス
-    purpose: '`project-index serve` でアプリを待ち受ける'
-lead: Python の ASGI サーバー。ASGI アプリを HTTP で待ち受ける。
+  - name: API
+    version: 0.54.0
+    entries:
+      - name: Config
+        kind: クラス
+        purpose: 待ち受けのアドレス（`127.0.0.1`）とポート（`PROJECT_INDEX_PORT`）を渡す
+      - name: Server
+        kind: クラス
+        purpose: '`project-index serve` でアプリを待ち受ける'
+lead: アプリを HTTP で待ち受ける uvicorn の利用方法を定め、`project-index serve` の待ち受けを修正するときに参照する。
 purl: pkg:pypi/uvicorn
 dependency_scope: 必須
 adoption: 採用

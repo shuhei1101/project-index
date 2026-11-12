@@ -8,25 +8,25 @@ version:
   source: pyproject.toml・uv.lock
   pinning: pyproject.toml に下限 `>=2.14.1`、uv.lock で固定
 catalogs:
-- name: API
-  version: 2.14.1
-  entries:
-  - name: BaseModel
-    kind: クラス
-    purpose: MCP のツールの引数・読み取り API の本文を要求のモデルとして検証する
-  - name: ConfigDict
-    kind: クラス
-    purpose: '`extra="forbid"`・`populate_by_name` など要求のモデルの設定'
-  - name: Field
-    kind: 関数
-    purpose: '`from_` の別名 `from`・`schema_path` の別名 `schema` と既定値・範囲を付ける'
-  - name: field_validator
-    kind: 関数
-    purpose: 文字列 1 つで書かれた値を配列にするなどの前処理
-  - name: ValidationError
-    kind: クラス
-    purpose: 要求のモデルの検証の誤り。文書の MCP のツールのエラーの変換が `isError` の結果にする
-lead: 型ヒントから値の検証と変換を行う Python のデータ検証ライブラリ。
+  - name: API
+    version: 2.14.1
+    entries:
+      - name: BaseModel
+        kind: クラス
+        purpose: MCP のツールの引数・読み取り API の本文を要求のモデルとして検証する
+      - name: ConfigDict
+        kind: クラス
+        purpose: '`extra="forbid"`・`populate_by_name` など要求のモデルの設定'
+      - name: Field
+        kind: 関数
+        purpose: '`from_` の別名 `from`・`schema_path` の別名 `schema` と既定値・範囲を付ける'
+      - name: field_validator
+        kind: 関数
+        purpose: 文字列 1 つで書かれた値を配列にするなどの前処理
+      - name: ValidationError
+        kind: クラス
+        purpose: 要求のモデルの検証の誤り。文書の MCP のツールのエラーの変換が `isError` の結果にする
+lead: MCP のツールの引数と読み取り API の本文を検証する pydantic の利用方法を定め、要求のモデルを追加・修正するときに参照する。
 purl: pkg:pypi/pydantic
 dependency_scope: 必須
 adoption: 採用
@@ -35,8 +35,8 @@ license: MIT
 official_url: https://docs.pydantic.dev/
 docs_url: https://docs.pydantic.dev/latest/api/base_model/
 used_in:
-- src/project_index/features/
-- src/project_index/server/mcp/
+  - src/project_index/features/
+  - src/project_index/server/mcp/
 verification:
   state: 済
   date: '2026-10-28'
@@ -46,7 +46,7 @@ install: |-
   uv add 'pydantic>=2.14.1'
   ```
 limitations:
-- item: ツールの引数の `alias`
-  content: mcp 2.3.0 は引数を `alias` の名前で関数へ渡すため、`Field(alias="from")` は関数の呼び出しで `TypeError` になる。`validation_alias` を使う
-- item: ツールの余計な引数
-  content: 'mcp 2.3.0 が関数の引数から作るモデルは `additionalProperties: false` を持たず、知らないキーを黙って捨てる'
+  - item: ツールの引数の `alias`
+    content: mcp 2.3.0 は引数を `alias` の名前で関数へ渡すため、`Field(alias="from")` は関数の呼び出しで `TypeError` になる。`validation_alias` を使う
+  - item: ツールの余計な引数
+    content: 'mcp 2.3.0 が関数の引数から作るモデルは `additionalProperties: false` を持たず、知らないキーを黙って捨てる'

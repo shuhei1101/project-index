@@ -12,6 +12,8 @@ flows:
       - name: 配信元
         description: 文書の種類 note と、その変換スクリプトを持つ sample
     flow: |-
+      <!-- map: {"title": "正常系"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -23,6 +25,8 @@ flows:
         T->>T: 変換スクリプトを実行する
         T-->>C: kind・converter・markdown
       ```
+
+      <!-- /map -->
     expected:
       - '`kind` が `note`、`converter` が変換スクリプトのパス'
       - '`markdown` がスクリプトの出力と同じ'
@@ -36,6 +40,8 @@ flows:
       - name: file
         description: '`documents[].paths` の外にある `README.md`'
     flow: |-
+      <!-- map: {"title": "異常系（ファイルが範囲に無い・DocumentNotFoundError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -44,6 +50,8 @@ flows:
         C->>T: path・file
         T-->>C: isError（DocumentNotFoundError）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で当たる文書の種類が無いことを返す'
     test: test_error_when_document_not_found
@@ -55,6 +63,8 @@ flows:
       - name: file
         description: '`converters[]` を指さない種類の YAML の文書'
     flow: |-
+      <!-- map: {"title": "異常系（変換を持たない種類・ConverterNotDefinedError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -63,6 +73,8 @@ flows:
         C->>T: path・file
         T-->>C: isError（ConverterNotDefinedError）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で、文書の種類と、その種類が `converters[]` を指さないことを返す'
       - 配信元のフォルダは変わらない
@@ -75,6 +87,8 @@ flows:
       - name: 変換スクリプト
         description: stderr に 1 行を出して終了コード 1 で終わる
     flow: |-
+      <!-- map: {"title": "異常系（変換スクリプトが失敗する・ConvertScriptError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -84,6 +98,8 @@ flows:
         T->>T: 変換スクリプトを実行する（終了コード 1）
         T-->>C: isError（ConvertScriptError）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で終了コード 1 と stderr の行を返す'
     test: test_error_when_convert_script_fails
@@ -95,6 +111,8 @@ flows:
       - name: フォルダ
         description: 空の一時フォルダ
     flow: |-
+      <!-- map: {"title": "異常系（設定が無い・ConfigNotFoundError）"} -->
+
       ```mermaid
       sequenceDiagram
         participant C as クライアント
@@ -103,6 +121,8 @@ flows:
         C->>T: path・file
         T-->>C: isError（ConfigNotFoundError）
       ```
+
+      <!-- /map -->
     expected:
       - '`isError: true` で `project-index.yaml` が無いことを返す'
     test: test_error_when_config_not_found
@@ -143,7 +163,7 @@ flows:
     expected:
       - '`isError: true` で読めなかった行・列・理由を返す'
     test: test_error_when_config_parse_error
-lead: 配信元の 1 つのファイルを、配信するときと同じ `converters[]` のスクリプトで Markdown にして返す。書き込まず、変換の控えも残さない。
+lead: 配信元の 1 つのファイルを配信と同じ変換で Markdown にする管理の MCP の `try_convert` の入出力を定め、`try_convert` を修正するときに参照する。
 identifier: try_convert
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true

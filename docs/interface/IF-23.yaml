@@ -4,77 +4,85 @@ entry:
   kind: endpoint
   value: GET `/sources/{source}/config`
 flows:
-- name: 正常系
-  summary: 配信元の設定のうち、画面が使うキーを返す
-  setup:
-  - name: Mock
-    description: なし（一時フォルダに配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
-  - name: サンプルの配信元
-    description: '`nav`・`documents[]`・`decisions.folders`・`github` を持つ `project-index.yaml` の sample'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant E as GET /sources/{source}/config
+  - name: 正常系
+    summary: 配信元の設定のうち、画面が使うキーを返す
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+      - name: サンプルの配信元
+        description: '`nav`・`documents[]`・`decisions.folders`・`github` を持つ `project-index.yaml` の sample'
+    flow: |-
+      <!-- map: {"title": "正常系"} -->
 
-      C->>E: GET /sources/sample/config
-      E-->>C: 200 nav・documents・decisions・github
-    ```
-  expected:
-  - 200 で、`nav`・`documents`・`decisions.folders`・`github` が `project-index.yaml` の値と同じ
-  - 端末の設定の `config` を重ねた配信元は、重ねた後の値を返す
-  test: test_normal
-- name: 異常系（無い配信元・404）
-  summary: 無い配信元・配信していない配信元を断る
-  setup:
-  - name: Mock
-    description: なし
-  - name: 入力
-    description: '`/sources/unknown/config`'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      participant C as クライアント
-      participant E as GET /sources/{source}/config
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/config
 
-      C->>E: GET /sources/unknown/config
-      E-->>C: 404 problem+json
-    ```
-  expected:
-  - 404 で、`missing` が `source`、`detail` に配信元 `unknown` がある
-  - 配信していない配信元は `missing` が `not_served` で、`errors[]` に外した理由がある
-  test: test_error_when_source_not_found
-lead: 配信元の設定のうち、画面が使うキー（`nav`・`documents[]`・`decisions.folders`・`github`）を返す。
+        C->>E: GET /sources/sample/config
+        E-->>C: 200 nav・documents・decisions・github
+      ```
+
+      <!-- /map -->
+    expected:
+      - 200 で、`nav`・`documents`・`decisions.folders`・`github` が `project-index.yaml` の値と同じ
+      - 端末の設定の `config` を重ねた配信元は、重ねた後の値を返す
+    test: test_normal
+  - name: 異常系（無い配信元・404）
+    summary: 無い配信元・配信していない配信元を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`/sources/unknown/config`'
+    flow: |-
+      <!-- map: {"title": "異常系（無い配信元・404）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/config
+
+        C->>E: GET /sources/unknown/config
+        E-->>C: 404 problem+json
+      ```
+
+      <!-- /map -->
+    expected:
+      - 404 で、`missing` が `source`、`detail` に配信元 `unknown` がある
+      - 配信していない配信元は `missing` が `not_served` で、`errors[]` に外した理由がある
+    test: test_error_when_source_not_found
+lead: 配信元の設定のうち画面が使用するキーを返却する読み取り API の入出力を定め、配信元の設定の取得を修正するときに参照する。
 identifier: get_source_config
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true
 side_effects: なし
 callers:
-- SC-11#scenarios[正常シナリオ]
+  - SC-11#scenarios[正常シナリオ]
 exclusivity: 読み取りだけで排他しない
 request:
-- name: source
-  type: str
-  required: true
-  location: path
-  description: 配信元の ID
+  - name: source
+    type: str
+    required: true
+    location: path
+    description: 配信元の ID
 request_example: |-
   ```text
   GET /sources/sample/config
   ```
 response:
-- name: nav
-  type: list[NavTab] | None
-  description: 配信元の設定の `nav`（書いていなければ `null`）
-- name: documents
-  type: list[DocumentRow]
-  description: 配信元の設定の `documents[]`
-- name: decisions.folders
-  type: list[str]
-  description: 検討事項の文書のフォルダ（書いていなければ空）
-- name: github
-  type: GitHubTarget | None
-  description: GitHub のリポジトリと起票のラベル
+  - name: nav
+    type: list[NavTab] | None
+    description: 配信元の設定の `nav`（書いていなければ `null`）
+  - name: documents
+    type: list[DocumentRow]
+    description: 配信元の設定の `documents[]`
+  - name: decisions.folders
+    type: list[str]
+    description: 検討事項の文書のフォルダ（書いていなければ空）
+  - name: github
+    type: GitHubTarget | None
+    description: GitHub のリポジトリと起票のラベル
 response_example: |-
   ```json
   {"nav": [{"title": "設計書", "items": [{"auto": {"document": "design"}}]}],
@@ -83,18 +91,18 @@ response_example: |-
    "github": {"repository": "owner/sample", "labels": ["docs"]}}
   ```
 status_codes:
-- code: '200'
-  condition: 返した
-- code: '404'
-  condition: 配信元が無い・配信していない
-  notes: '`missing`（`source`・`not_served`）と値、配信していない配信元は `errors[]` に外した理由'
+  - code: '200'
+    condition: 返した
+  - code: '404'
+    condition: 配信元が無い・配信していない
+    notes: '`missing`（`source`・`not_served`）と値、配信していない配信元は `errors[]` に外した理由'
 error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）
 constraints:
-- item: 返すキー
-  constraint: '`nav`・`documents`・`decisions`・`github` だけを返し、`validators`・`converters`・`generators` のコマンドは返さない'
-- item: 認可
-  constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
-  decided_by: NFR-1#requirements[通信]
-- item: JSON のキー
-  constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名と、配信元の設定から写したキーの中身は変えない
+  - item: 返すキー
+    constraint: '`nav`・`documents`・`decisions`・`github` だけを返し、`validators`・`converters`・`generators` のコマンドは返さない'
+  - item: 認可
+    constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
+    decided_by: NFR-1#requirements[通信]
+  - item: JSON のキー
+    constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名と、配信元の設定から写したキーの中身は変えない
 test_file: tests/integration/server/test_get_source_config.py

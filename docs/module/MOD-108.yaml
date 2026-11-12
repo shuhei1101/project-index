@@ -1,6 +1,6 @@
 id: MOD-108
 title: 索引のサーバー / 共通
-lead: どの分類からも使う例外の階層・YAML の読み書き・内容のハッシュ・パスの照合と、端末の設定の API への書き込みの要求のオリジンの確認。
+lead: どの分類からも使用する例外の階層・YAML の読み書き・内容のハッシュ・パスの照合を受け持つ共通の分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
 directory: |-
   ```text
   src/project_index/
@@ -18,32 +18,33 @@ directory: |-
      └─ origin.py    # 端末の設定の API への別のオリジンの書き込みの確認
   ```
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      索引のサーバーのエラー <|-- 読めない配信元
-      索引のサーバーのエラー <|-- 書き込めない配信元
-      索引のサーバーのエラー <|-- 配信していない配信元
-      索引のサーバーのエラー <|-- 引数の誤り
-      索引のサーバーのエラー <|-- 検査の不合格
-      索引のサーバーのエラー <|-- バージョンの不一致
-      YAMLの読み込み ..> YAMLを読めない : 送る
-      往復編集の読み込み ..> YAMLを読めない : 送る
-      class 索引のサーバーのエラー {
-        +エラーの名前: str
-        +本文: str
-        +次の手: list
-      }
-      class YAMLの読み込み {
-        <<function>>
-      }
-      class 往復編集の読み込み {
-        <<function>>
-      }
-      click 索引のサーバーのエラー href "./MOD-98.py.yaml#索引のサーバーのエラー"
-      click YAMLの読み込み href "./MOD-104.py.yaml#YAMLの読み込み"
-      click YAMLを読めない href "./MOD-104.py.yaml#YAMLを読めない"
-      click 往復編集の読み込み href "./MOD-104.py.yaml#往復編集の読み込み"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        索引のサーバーのエラー <|-- 読めない配信元
+        索引のサーバーのエラー <|-- 書き込めない配信元
+        索引のサーバーのエラー <|-- 配信していない配信元
+        索引のサーバーのエラー <|-- 引数の誤り
+        索引のサーバーのエラー <|-- 検査の不合格
+        索引のサーバーのエラー <|-- バージョンの不一致
+        YAMLの読み込み ..> YAMLを読めない : 送る
+        往復編集の読み込み ..> YAMLを読めない : 送る
+        class 索引のサーバーのエラー {
+          +エラーの名前: str
+          +本文: str
+          +次の手: list
+        }
+        class YAMLの読み込み {
+          <<function>>
+        }
+        class 往復編集の読み込み {
+          <<function>>
+        }
+        click 索引のサーバーのエラー href "./MOD-98.py.yaml#索引のサーバーのエラー"
+        click YAMLの読み込み href "./MOD-104.py.yaml#YAMLの読み込み"
+        click YAMLを読めない href "./MOD-104.py.yaml#YAMLを読めない"
+        click 往復編集の読み込み href "./MOD-104.py.yaml#往復編集の読み込み"
 notes:
   例外の置き場所: どの分類の関数も、呼び出し側へ返す失敗は `shared/errors.py` の子クラスで送る。スクリプトの実行の失敗（スクリプトの実行の分類）と YAML を読めないことは、それぞれの分類の例外で送り、呼び出し側が `Violation` か本文の誤りに変える。
+  受け持つこと: 端末の設定の API への書き込みの要求のオリジンの確認も受け持つ。

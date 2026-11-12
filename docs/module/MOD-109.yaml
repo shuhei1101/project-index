@@ -1,8 +1,7 @@
 id: MOD-109
 title: 索引のサーバー / 変換
 lead: |-
-  `converters[]` を指す種類の文書を、配信元のスクリプトで Markdown にし、結果を控える。
-  スキーマ駆動の Markdown への変換は dev-docs の画面のサーバーが持つ。検討事項の文書を探す処理もここに置く。
+  `converters[]` を指す種類の文書を、配信元のスクリプトで Markdown にする変換の分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
 directory: |-
   ```text
   src/project_index/features/convert/
@@ -12,26 +11,31 @@ directory: |-
   └─ service.py    # ConvertService（converters[] の実行・結果の控え）
   ```
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      変換 ..> スクリプトの実行 : converters[]
-      変換 ..> 変換の結果 : 返す
-      変換の結果 o-- 変換の失敗
-      class 変換 {
-        +変換する(読み書きの場所, 文書) 変換の結果
-        +控えを捨てる() None
-      }
-      class スクリプトの実行 {
-        <<function>>
-      }
-      class 変換の結果 {
-        +Markdown: str
-      }
-      class 変換の失敗 {
-        +理由: str
-      }
-      click 変換 href "./MOD-17.py.yaml#変換"
-      click スクリプトの実行 href "./MOD-88.py.yaml#スクリプトの実行"
-      click 変換の結果 href "./MOD-18.py.yaml#変換の結果"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        変換 ..> スクリプトの実行 : converters[]
+        変換 ..> 変換の結果 : 返す
+        変換の結果 o-- 変換の失敗
+        class 変換 {
+          +変換する(読み書きの場所, 文書) 変換の結果
+          +控えを捨てる() None
+        }
+        class スクリプトの実行 {
+          <<function>>
+        }
+        class 変換の結果 {
+          +Markdown: str
+        }
+        class 変換の失敗 {
+          +理由: str
+        }
+        click 変換 href "./MOD-17.py.yaml#変換"
+        click スクリプトの実行 href "./MOD-88.py.yaml#スクリプトの実行"
+        click 変換の結果 href "./MOD-18.py.yaml#変換の結果"
+notes:
+  受け持つこと: |-
+    変換の結果を控える。
+    スキーマ駆動の Markdown への変換は dev-docs の画面のサーバーが持つ。
+    検討事項の文書を探す処理もここに置く。

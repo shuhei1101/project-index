@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -326,7 +326,27 @@ def test_list_worktrees(
     ]
 
 
-def test_export_paths_at(git_repo: Callable[..., Path], run_git: Callable[..., str]) -> None:
+@pytest.fixture
+def archive_timeouts(monkeypatch: pytest.MonkeyPatch) -> list[object]:
+    """`git archive` に指定した `timeout` を記録する包みを差し込み、記録した値を返却する。"""
+    from project_index.features.history import query as query_module
+
+    timeouts: list[object] = []
+    real = query_module.run_git
+
+    def recording(args: Any, **kwargs: Any) -> Any:
+        # git archive の呼び出しだけ、指定した timeout（指定が無ければ None）を記録する
+        if list(args)[:1] == ["archive"]:
+            timeouts.append(kwargs.get("timeout"))
+        return real(args, **kwargs)
+
+    monkeypatch.setattr(query_module, "run_git", recording)
+    return timeouts
+
+
+def test_export_paths_at(
+    git_repo: Callable[..., Path], run_git: Callable[..., str], archive_timeouts: list[object]
+) -> None:
     """commit のフォルダを取り出す（正常系）。"""
     from project_index.features.history.query import export_paths_at
 
@@ -340,3 +360,4 @@ def test_export_paths_at(git_repo: Callable[..., Path], run_git: Callable[..., s
     # 検証
     assert content == 'print("develop")\n'
     assert not exported.exists()
+    assert archive_timeouts == [20]

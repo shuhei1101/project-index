@@ -1,185 +1,209 @@
 id: SC-3
 title: "project-indexを更新する"
 scenarios:
-- name: 正常シナリオ
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: project-index のクローン
-    description: テスト用の bare リポジトリを上流にしたクローン
-    notes: 上流に 1 つ新しいバージョンの commit がある。端末の設定の移し替えの手順は無い
-  - name: 端末の設定
-    description: '`sources` に sample と notes の 2 行'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant AD as 管理の MCP
-      participant DD as project-index
+  - name: 正常シナリオ
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: project-index のクローン
+        description: テスト用の bare リポジトリを上流にしたクローン
+        notes: 上流に 1 つ新しいバージョンの commit がある。端末の設定の移し替えの手順は無い
+      - name: 端末の設定
+        description: '`sources` に sample と notes の 2 行'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ"} -->
 
-      U->>AD: update
-      AD->>DD: クローンで git pull
-      AD->>DD: 依存を入れ直す（uv sync）
-      AD-->>U: 新しいバージョン
-      AD->>DD: 再起動する
-      U->>AD: status
-      AD-->>U: 新しいバージョンと配信中の配信元
-    ```
-  expected:
-  - '`update` が新しいバージョンを返す'
-  - 再起動の後の `status` が新しいバージョンを返し、`sample` と `notes` を配信している
-  - '`127.0.0.1:8786` を待ち受ける project-index のプロセスが 1 つだけある'
-  test: test_normal
-- name: 正常シナリオ（端末の設定が古くなる）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: project-index のクローン
-    description: 正常シナリオと同じ
-    notes: 新しいバージョンが端末の設定のキーを 1 つ改名する移し替えの手順を持つ
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant AD as 管理の MCP
-      participant MG as project-index migrate
-      participant CF as 端末の設定
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant AD as 管理の MCP
+        participant DD as project-index
 
-      U->>AD: update
-      AD-->>U: 新しいバージョンと、移し替えが要ること（再起動しない）
-      U->>MG: project-index migrate --plan
-      MG-->>U: 当てる手順の一覧
-      U->>MG: project-index migrate
-      MG->>CF: バックアップを取り、手順を古い順に当て、version を書き換える
-      MG-->>U: 当てた手順
-      U->>AD: restart
-    ```
-  expected:
-  - '`update` が移し替えが要ることを返し、project-index は再起動しない'
-  - '`migrate --plan` は端末の設定を変えず、当てる手順を返す'
-  - '`migrate` の後、端末の設定の `version` が新しいバージョンになり、改名したキーが新しい名前で元の値を持つ'
-  - 当てる前の端末の設定のバックアップがある
-  - '`restart` の後、`status` が新しいバージョンを返し、`sample` と `notes` を配信している'
-  test: test_normal_when_terminal_config_old
-- name: 異常シナリオ（移し替えの手順が失敗する）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: project-index のクローン
-    description: 移し替えの手順を 2 つ持つ新しいバージョン
-    notes: 2 つ目の手順が例外を出す
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant MG as project-index migrate
-      participant CF as 端末の設定
+        U->>AD: update
+        AD->>DD: クローンで git pull
+        AD->>DD: 依存を入れ直す（uv sync）
+        AD-->>U: 新しいバージョン
+        AD->>DD: 再起動する
+        U->>AD: status
+        AD-->>U: 新しいバージョンと配信中の配信元
+      ```
 
-      U->>MG: project-index migrate
-      MG->>CF: バックアップを取り、1 つ目の手順を当てる
-      MG->>MG: 2 つ目の手順が失敗する
-      MG->>CF: バックアップから戻す
-      MG-->>U: 失敗した手順と理由
-    ```
-  expected:
-  - 端末の設定が `migrate` の前と同じ中身になる
-  - 0 以外の終了コードで終わり、標準エラーに失敗した手順の名前と理由が出る
-  test: test_error_when_migration_fails
-- name: 異常シナリオ（クローンを更新できない）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-  - name: project-index のクローン
-    description: 上流の新しい commit と同じファイルを手元で書き換え、commit していないクローン
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant AD as 管理の MCP
-      participant DD as project-index
+      <!-- /map -->
+    expected:
+      - '`update` が新しいバージョンを返す'
+      - 再起動の後の `status` が新しいバージョンを返し、`sample` と `notes` を配信している
+      - '`127.0.0.1:8786` を待ち受ける project-index のプロセスが 1 つだけある'
+    test: test_normal
+  - name: 正常シナリオ（端末の設定が古くなる）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: project-index のクローン
+        description: 正常シナリオと同じ
+        notes: 新しいバージョンが端末の設定のキーを 1 つ改名する移し替えの手順を持つ
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（端末の設定が古くなる）"} -->
 
-      U->>AD: update
-      AD->>DD: クローンで git pull が失敗する
-      AD-->>U: git のエラー
-    ```
-  expected:
-  - '`update` が git のエラーを返す'
-  - project-index は再起動せず、`status` が前のバージョンを返す
-  test: test_error_when_pull_fails
-- name: 正常シナリオ（配信元の設定が古くなる）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-    notes: '-'
-  - name: project-index のクローン
-    description: 正常シナリオと同じ
-    notes: 新しいバージョンが配信元の設定の移し替えの手順を持つ
-  - name: 前の形式の配信元
-    description: '`version: "1"` の `project-index.yaml` を持ち、最上位にタグのマスター `tags: tags.yaml`、`documents[0]` が `type: yaml`・`metadata: {name: {type: ref, field: title}}` を持つ配信元'
-    notes: 機械的に移せる設定だけを持つ。`tags.yaml` を置く
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant MG as project-index migrate
-      participant SC as 配信元の project-index.yaml
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant AD as 管理の MCP
+        participant MG as project-index migrate
+        participant CF as 端末の設定
 
-      U->>MG: project-index migrate --source {配信元の project-index.yaml} --plan
-      MG-->>U: 当てる手順の一覧（tags の削除は破壊的な手順）
-      U->>MG: project-index migrate --source {配信元の project-index.yaml}
-      MG-->>U: 破壊的な手順があるので当てずに止まる
-      U->>MG: project-index migrate --source {配信元の project-index.yaml} --allow-destructive
-      MG->>SC: バックアップを取り、type を消し、ref の metadata を列名の文字列にし、tags を消し、version を書き換える
-      MG-->>U: 当てた手順
-    ```
-  expected:
-  - '`migrate --source --plan` は `project-index.yaml` を変えず、当てる手順と、`tags` の削除が破壊的な手順であることを返す'
-  - '`--allow-destructive` を付けない `migrate --source` は `project-index.yaml` を変えず、終了コード 5 で終わる'
-  - '`--allow-destructive` を付けた `migrate --source` の後、`tags` が無くなり、`documents[0]` が `type` を持たず、`metadata` が `{name: title}` になる。`tags.yaml` は残る'
-  - '`version` が新しいバージョンになり、当てる前の `project-index.yaml` のバックアップがある'
-  test: test_normal_when_source_config_old
-- name: 異常シナリオ（配信元の設定に移せない設定がある）
-  setup:
-  - name: Mock
-    description: なし（実環境で実行）
-    notes: '-'
-  - name: project-index のクローン
-    description: 正常シナリオと同じ
-    notes: 新しいバージョンが配信元の設定の移し替えの手順を持つ
-  - name: 移せない設定を持つ配信元
-    description: '`version: "1"` の `project-index.yaml` を持ち、`documents[0]` が `type: yaml`・`metadata: {name: {type: ref, field: title}}`、`documents[1]` が `type: markdown`・`defaults: [{paths: [docs/**], tags: [doc]}]` を持つ配信元'
-    notes: '`documents[1]` は機械的に移せない'
-  flow: |-
-    ```mermaid
-    sequenceDiagram
-      actor U as 利用者
-      participant MG as project-index migrate
+        U->>AD: update
+        AD-->>U: 新しいバージョンと、移し替えが要ること（再起動しない）
+        U->>MG: project-index migrate --plan
+        MG-->>U: 当てる手順の一覧
+        U->>MG: project-index migrate
+        MG->>CF: バックアップを取り、手順を古い順に当て、version を書き換える
+        MG-->>U: 当てた手順
+        U->>AD: restart
+      ```
 
-      U->>MG: project-index migrate --source {配信元の project-index.yaml} --allow-destructive
-      MG->>MG: 手順を当てた結果を新しいスキーマで検証し、違反が残る
-      MG-->>U: 違反と、/project-index:setup で移す案内
-    ```
-  expected:
-  - '`project-index.yaml` が `migrate` の前と同じ中身になる'
-  - 0 以外の終了コードで終わる
-  - 標準エラーに `documents[1].type`（Markdown の範囲）と `documents[1].defaults` の違反と、`/project-index:setup` で移す案内が出る
-  test: test_error_when_source_config_unmigratable
-lead: 利用者が管理の MCP の `update` で project-index のクローンを新しいバージョンにし、端末の設定が古くなったら `project-index migrate` で移し替える。
+      <!-- /map -->
+    expected:
+      - '`update` が移し替えが要ることを返し、project-index は再起動しない'
+      - '`migrate --plan` は端末の設定を変えず、当てる手順を返す'
+      - '`migrate` の後、端末の設定の `version` が新しいバージョンになり、改名したキーが新しい名前で元の値を持つ'
+      - 当てる前の端末の設定のバックアップがある
+      - '`restart` の後、`status` が新しいバージョンを返し、`sample` と `notes` を配信している'
+    test: test_normal_when_terminal_config_old
+  - name: 異常シナリオ（移し替えの手順が失敗する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: project-index のクローン
+        description: 移し替えの手順を 2 つ持つ新しいバージョン
+        notes: 2 つ目の手順が例外を出す
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（移し替えの手順が失敗する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant MG as project-index migrate
+        participant CF as 端末の設定
+
+        U->>MG: project-index migrate
+        MG->>CF: バックアップを取り、1 つ目の手順を当てる
+        MG->>MG: 2 つ目の手順が失敗する
+        MG->>CF: バックアップから戻す
+        MG-->>U: 失敗した手順と理由
+      ```
+
+      <!-- /map -->
+    expected:
+      - 端末の設定が `migrate` の前と同じ中身になる
+      - 0 以外の終了コードで終わり、標準エラーに失敗した手順の名前と理由が出る
+    test: test_error_when_migration_fails
+  - name: 異常シナリオ（クローンを更新できない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: project-index のクローン
+        description: 上流の新しい commit と同じファイルを手元で書き換え、commit していないクローン
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（クローンを更新できない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant AD as 管理の MCP
+        participant DD as project-index
+
+        U->>AD: update
+        AD->>DD: クローンで git pull が失敗する
+        AD-->>U: git のエラー
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`update` が git のエラーを返す'
+      - project-index は再起動せず、`status` が前のバージョンを返す
+    test: test_error_when_pull_fails
+  - name: 正常シナリオ（配信元の設定が古くなる）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: project-index のクローン
+        description: 正常シナリオと同じ
+        notes: 新しいバージョンが配信元の設定の移し替えの手順を持つ
+      - name: 前の形式の配信元
+        description: '`version: "1"` の `project-index.yaml` を持ち、最上位にタグのマスター `tags: tags.yaml`、`documents[0]` が `type: yaml`・`metadata: {name: {type: ref, field: title}}` を持つ配信元'
+        notes: 機械的に移せる設定だけを持つ。`tags.yaml` を置く
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（配信元の設定が古くなる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant MG as project-index migrate
+        participant SC as 配信元の project-index.yaml
+
+        U->>MG: project-index migrate --source {配信元の project-index.yaml} --plan
+        MG-->>U: 当てる手順の一覧（tags の削除は破壊的な手順）
+        U->>MG: project-index migrate --source {配信元の project-index.yaml}
+        MG-->>U: 破壊的な手順があるので当てずに止まる
+        U->>MG: project-index migrate --source {配信元の project-index.yaml} --allow-destructive
+        MG->>SC: バックアップを取り、type を消し、ref の metadata を列名の文字列にし、tags を消し、version を書き換える
+        MG-->>U: 当てた手順
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`migrate --source --plan` は `project-index.yaml` を変えず、当てる手順と、`tags` の削除が破壊的な手順であることを返す'
+      - '`--allow-destructive` を付けない `migrate --source` は `project-index.yaml` を変えず、終了コード 5 で終わる'
+      - '`--allow-destructive` を付けた `migrate --source` の後、`tags` が無くなり、`documents[0]` が `type` を持たず、`metadata` が `{name: title}` になる。`tags.yaml` は残る'
+      - '`version` が新しいバージョンになり、当てる前の `project-index.yaml` のバックアップがある'
+    test: test_normal_when_source_config_old
+  - name: 異常シナリオ（配信元の設定に移せない設定がある）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: project-index のクローン
+        description: 正常シナリオと同じ
+        notes: 新しいバージョンが配信元の設定の移し替えの手順を持つ
+      - name: 移せない設定を持つ配信元
+        description: '`version: "1"` の `project-index.yaml` を持ち、`documents[0]` が `type: yaml`・`metadata: {name: {type: ref, field: title}}`、`documents[1]` が `type: markdown`・`defaults: [{paths: [docs/**], tags: [doc]}]` を持つ配信元'
+        notes: '`documents[1]` は機械的に移せない'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（配信元の設定に移せない設定がある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant MG as project-index migrate
+
+        U->>MG: project-index migrate --source {配信元の project-index.yaml} --allow-destructive
+        MG->>MG: 手順を当てた結果を新しいスキーマで検証し、違反が残る
+        MG-->>U: 違反と、/project-index:setup で移す案内
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`project-index.yaml` が `migrate` の前と同じ中身になる'
+      - 0 以外の終了コードで終わる
+      - 標準エラーに `documents[1].type`（Markdown の範囲）と `documents[1].defaults` の違反と、`/project-index:setup` で移す案内が出る
+    test: test_error_when_source_config_unmigratable
+lead: 利用者が管理の MCP の `update` で project-index を更新し、古くなった設定を `project-index migrate` で移し替えるシナリオを定め、更新の流れを変えるときに参照する。
 issue: 14
 primary_actor: 利用者
 stakeholders:
-- name: 利用者
-  interest: 1 つの操作で project-index を更新でき、端末の設定の移し替えは中身を確かめてから当てられる。失敗しても元に戻る
-- name: エージェント（Claude Code）
-  interest: 更新の後も、同じ配信元を `/mcp` で使える
+  - name: 利用者
+    interest: 1 つの操作で project-index を更新でき、端末の設定の移し替えは中身を確かめてから当てられる。失敗しても元に戻る
+  - name: エージェント（Claude Code）
+    interest: 更新の後も、同じ配信元を `/mcp` で使える
 trigger: 利用者が管理の MCP の `update` を呼ぶ
 preconditions:
-- project-index が待ち受けている
-- クローンの上流に新しいバージョンの commit がある
+  - project-index が待ち受けている
+  - クローンの上流に新しいバージョンの commit がある
 success_guarantee: project-index が新しいバージョンで待ち受け、端末の設定の `version` がそのバージョンになり、配信元を配信している。
 minimal_guarantee: '`git pull` に失敗したときは、前のバージョンのまま配信を続ける。移し替えの手順が失敗したときは、端末の設定をバックアップから戻す。'
 frequency: project-index の新しいバージョンが出るたび
 priority: 中
 refs:
-- SC-1#scenarios[正常シナリオ]
+  - SC-1#scenarios[正常シナリオ]
 test_file: tests/e2e/単一ユースケース/test_project-indexを更新する.py

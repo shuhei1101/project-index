@@ -22,7 +22,7 @@ from project_index.features.history.types import (
     ResolvedRef,
     WorktreeInfo,
 )
-from project_index.integrations.git import GitError, run_git
+from project_index.integrations.git import GIT_ARCHIVE_TIMEOUT_SEC, GitError, run_git
 from project_index.shared.errors import RefNotFoundError
 from project_index.shared.paths import match_glob
 
@@ -270,7 +270,12 @@ def list_worktrees(source: ServedSource) -> list[WorktreeInfo]:
 def export_paths_at(repo: Path, commit: str, paths: Sequence[str]) -> Generator[Path]:
     """commit のリビジョンのフォルダを一時フォルダへ取り出し、抜けるときに削除する。"""
     with tempfile.TemporaryDirectory() as directory:
-        output = run_git(["archive", "--format=tar", commit, "--", *paths], cwd=repo, binary=True)
+        output = run_git(
+            ["archive", "--format=tar", commit, "--", *paths],
+            cwd=repo,
+            binary=True,
+            timeout=GIT_ARCHIVE_TIMEOUT_SEC,
+        )
         data = output if isinstance(output, bytes) else output.encode("utf-8")
         with tarfile.open(fileobj=io.BytesIO(data)) as archive:
             archive.extractall(directory, filter="data")

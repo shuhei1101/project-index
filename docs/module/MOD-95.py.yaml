@@ -1,284 +1,284 @@
 id: MOD-95
 title: 索引のサーバー / 文書のMCP / result.py
-lead: ツールの結果・エラーの変換と、2 つの MCP のツール名とプロンプトの ID。
+lead: ツールの結果・エラーの変換と、2 つの MCP のツール名とプロンプトの ID を受け持ち、文書の MCP の result.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/server/mcp/test_result.py
+  - tests/unit/project_index/server/mcp/test_result.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      文書の MCP の組み立て ..> ツールの結果
-      文書の MCP の組み立て ..> ツールのエラーの変換
-      ツールのエラーの変換 ..> 索引のサーバーのエラー
-      文書の MCP の組み立て ..> ツールのプロンプトの ID
-      管理の MCP の組み立て ..> ツールのプロンプトの ID
-      class ツールのプロンプトの ID {
-        <<function>>
-      }
-      class 文書の MCP の組み立て {
-        <<function>>
-      }
-      class 管理の MCP の組み立て {
-        <<function>>
-      }
-      class ツールの結果 {
-        <<function>>
-      }
-      class ツールのエラーの変換 {
-        <<function>>
-      }
-      class 索引のサーバーのエラー {
-        <<class>>
-      }
-      click 文書の MCP の組み立て href "./MOD-94.py.yaml#文書の MCP の組み立て"
-      click 管理の MCP の組み立て href "./MOD-93.py.yaml#管理の MCP の組み立て"
-      click 索引のサーバーのエラー href "./MOD-98.py.yaml#索引のサーバーのエラー"
-- name: 管理の MCP
-  diagram: |-
-    classDiagram
-      direction TD
-      管理の MCP の組み立て ..> ツールの結果
-      管理の MCP の組み立て ..> ツールのエラーの変換
-      class 管理の MCP の組み立て {
-        <<function>>
-      }
-      class ツールの結果 {
-        <<function>>
-      }
-      class ツールのエラーの変換 {
-        <<function>>
-      }
-      click 管理の MCP の組み立て href "./MOD-93.py.yaml#管理の MCP の組み立て"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        文書の MCP の組み立て ..> ツールの結果
+        文書の MCP の組み立て ..> ツールのエラーの変換
+        ツールのエラーの変換 ..> 索引のサーバーのエラー
+        文書の MCP の組み立て ..> ツールのプロンプトの ID
+        管理の MCP の組み立て ..> ツールのプロンプトの ID
+        class ツールのプロンプトの ID {
+          <<function>>
+        }
+        class 文書の MCP の組み立て {
+          <<function>>
+        }
+        class 管理の MCP の組み立て {
+          <<function>>
+        }
+        class ツールの結果 {
+          <<function>>
+        }
+        class ツールのエラーの変換 {
+          <<function>>
+        }
+        class 索引のサーバーのエラー {
+          <<class>>
+        }
+        click 文書の MCP の組み立て href "./MOD-94.py.yaml#文書の MCP の組み立て"
+        click 管理の MCP の組み立て href "./MOD-93.py.yaml#管理の MCP の組み立て"
+        click 索引のサーバーのエラー href "./MOD-98.py.yaml#索引のサーバーのエラー"
+  - name: 管理の MCP
+    diagram: |-
+      classDiagram
+        direction TD
+        管理の MCP の組み立て ..> ツールの結果
+        管理の MCP の組み立て ..> ツールのエラーの変換
+        class 管理の MCP の組み立て {
+          <<function>>
+        }
+        class ツールの結果 {
+          <<function>>
+        }
+        class ツールのエラーの変換 {
+          <<function>>
+        }
+        click 管理の MCP の組み立て href "./MOD-93.py.yaml#管理の MCP の組み立て"
 constants:
-- name: TOOL_ANNOTATIONS
-  title: ツールの注釈
-  container: project_index/server/mcp/result.py
-  usecase: 共通
-  summary: ツールごとの `ToolAnnotations`
-  entries:
-  - key: search_docs
-    value: '`readOnlyHint=True`'
-    description: インターフェース定義『文書の検索』
-  - key: describe
-    value: '`readOnlyHint=True`'
-    description: インターフェース定義『配信元の説明』
-  - key: list_changes
-    value: '`readOnlyHint=True`'
-    description: インターフェース定義『変更の一覧』
-  - key: trace_related
-    value: '`readOnlyHint=True`'
-    description: インターフェース定義『関連のたどり』
-  - key: write_docs
-    value: '`readOnlyHint=False`・`destructiveHint=False`'
-    description: インターフェース定義『文書の書き込み』
-  - key: delete_docs
-    value: '`readOnlyHint=False`・`destructiveHint=True`'
-    description: インターフェース定義『文書の削除』
-  - key: list_match_words
-    value: '`readOnlyHint=True`'
-    description: インターフェース定義『用語の一覧』
-  - key: status
-    value: '`readOnlyHint=True`'
-    description: インターフェース定義『状態の取得』
-  - key: reload
-    value: '`readOnlyHint=False`・`destructiveHint=False`'
-    description: インターフェース定義『設定の読み直し』
-  - key: restart
-    value: '`readOnlyHint=False`・`destructiveHint=True`'
-    description: インターフェース定義『再起動』
-  - key: update
-    value: '`readOnlyHint=False`・`destructiveHint=True`'
-    description: インターフェース定義『更新』
-  - key: check_project
-    value: '`readOnlyHint=True`'
-    description: インターフェース定義『配信元の検査』
-  - key: try_convert
-    value: '`readOnlyHint=True`'
-    description: インターフェース定義『試しの変換』
-  - key: write_nav
-    value: '`readOnlyHint=False`・`destructiveHint=False`'
-    description: インターフェース定義『画面の構成の書き込み』
-- name: DOCS_TOOL_NAMES
-  title: 文書の MCP のツール名
-  container: project_index/server/mcp/result.py
-  usecase: 共通
-  summary: 文書の MCP が登録するツールの名前（登録の順）
-  value: ("search_docs", "describe", "list_changes", "trace_related", "write_docs", "delete_docs", "list_match_words")
-- name: ADMIN_TOOL_NAMES
-  title: 管理の MCP のツール名
-  container: project_index/server/mcp/result.py
-  usecase: 共通
-  summary: 管理の MCP が登録するツールの名前（登録の順）
-  value: ("status", "reload", "restart", "update", "check_project", "try_convert", "write_nav")
-- name: DOCS_INSTRUCTIONS_PROMPT_ID
-  title: 文書の MCP の instructions のプロンプト
-  container: project_index/server/mcp/result.py
-  usecase: 共通
-  summary: 文書の MCP の instructions を描画するプロンプトの ID
-  value: '"mcp/docs/instructions"'
+  - name: TOOL_ANNOTATIONS
+    title: ツールの注釈
+    container: project_index/server/mcp/result.py
+    usecase: 共通
+    summary: ツールごとの `ToolAnnotations`
+    entries:
+      - key: search_docs
+        value: '`readOnlyHint=True`'
+        description: インターフェース定義『文書の検索』
+      - key: describe
+        value: '`readOnlyHint=True`'
+        description: インターフェース定義『配信元の説明』
+      - key: list_changes
+        value: '`readOnlyHint=True`'
+        description: インターフェース定義『変更の一覧』
+      - key: trace_related
+        value: '`readOnlyHint=True`'
+        description: インターフェース定義『関連のたどり』
+      - key: write_docs
+        value: '`readOnlyHint=False`・`destructiveHint=False`'
+        description: インターフェース定義『文書の書き込み』
+      - key: delete_docs
+        value: '`readOnlyHint=False`・`destructiveHint=True`'
+        description: インターフェース定義『文書の削除』
+      - key: list_match_words
+        value: '`readOnlyHint=True`'
+        description: インターフェース定義『用語の一覧』
+      - key: status
+        value: '`readOnlyHint=True`'
+        description: インターフェース定義『状態の取得』
+      - key: reload
+        value: '`readOnlyHint=False`・`destructiveHint=False`'
+        description: インターフェース定義『設定の読み直し』
+      - key: restart
+        value: '`readOnlyHint=False`・`destructiveHint=True`'
+        description: インターフェース定義『再起動』
+      - key: update
+        value: '`readOnlyHint=False`・`destructiveHint=True`'
+        description: インターフェース定義『更新』
+      - key: check_project
+        value: '`readOnlyHint=True`'
+        description: インターフェース定義『配信元の検査』
+      - key: try_convert
+        value: '`readOnlyHint=True`'
+        description: インターフェース定義『試しの変換』
+      - key: write_nav
+        value: '`readOnlyHint=False`・`destructiveHint=False`'
+        description: インターフェース定義『画面の構成の書き込み』
+  - name: DOCS_TOOL_NAMES
+    title: 文書の MCP のツール名
+    container: project_index/server/mcp/result.py
+    usecase: 共通
+    summary: 文書の MCP が登録するツールの名前（登録の順）
+    value: ("search_docs", "describe", "list_changes", "trace_related", "write_docs", "delete_docs", "list_match_words")
+  - name: ADMIN_TOOL_NAMES
+    title: 管理の MCP のツール名
+    container: project_index/server/mcp/result.py
+    usecase: 共通
+    summary: 管理の MCP が登録するツールの名前（登録の順）
+    value: ("status", "reload", "restart", "update", "check_project", "try_convert", "write_nav")
+  - name: DOCS_INSTRUCTIONS_PROMPT_ID
+    title: 文書の MCP の instructions のプロンプト
+    container: project_index/server/mcp/result.py
+    usecase: 共通
+    summary: 文書の MCP の instructions を描画するプロンプトの ID
+    value: '"mcp/docs/instructions"'
 functions:
-- name: to_tool_result
-  title: ツールの結果
-  kind: 関数
-  container: project_index/server/mcp/result.py
-  usecase: 共通
-  role: 変換
-  summary: サービスの結果を `format` に合わせて MCP の `CallToolResult` にする
-  scope: public
-  thread_safe: true
-  args:
-  - name: result
-    title: 結果
-    type: T
-    required: true
-    passing: positional
-    description: サービスの結果（dataclass）
-  - name: fmt
-    title: 形式
-    type: Literal['markdown', 'json']
-    required: true
-    passing: positional
-    description: 要求の `format`
-  - name: render
-    title: Markdown の組み立て
-    type: 'Callable[[T], str] | None'
-    required: true
-    passing: positional
-    description: '`render_*_markdown`。`None` は常に JSON（書き込み・削除）'
-  returns:
-    type: mcp.types.CallToolResult
-    description: ツールの結果
-  process: |-
-    1. `fmt` が `markdown` で `render` がある場合、`content` に `render(result)` の text を 1 つ入れ、`structuredContent` を持たない結果を返す
-    2. それ以外は、結果を JSON にできる辞書にし（`dataclasses.asdict`、`None` のキーは落とす。`from_` などの別名は別名のキーで出す。`SnippetLine` は `text` が空でも `line`・`text`・`hit` を全て出す。`total_lines` を持つ検索の項目は `ranges` が空でも `ranges: []` を出す。`ContainsChange` は `from_` を `from` のキーで出し、commit の端は `input` が空なので `{commit, date}` になる）、`structuredContent` にその辞書を、`content` に同じ JSON の text を入れる
-  unit_tests:
-  - name: test_to_tool_result
-    case: 正常
-    summary: markdown
-    condition: '`fmt="markdown"`、`render` が `"# x"` を返す'
-    mock: なし
-    expected: '`content[0].text` が `"# x"`、`structuredContent` が無い'
-  - name: test_to_tool_result_when_json
-    case: 正常
-    summary: json
-    condition: '`fmt="json"`'
-    mock: なし
-    expected: '`structuredContent` と `json.loads(content[0].text)` が同じ'
-  - name: test_to_tool_result_when_location
-    case: 正常
-    summary: 場所と範囲は項目の直下
-    condition: '`fmt="json"` で、`path`・`scope: full`・`values: {path: a.py}` を持つ検索の項目と、`path`・`scope` が `None` の項目'
-    mock: なし
-    expected: 1 件目は `path`・`scope` が `values` の外にあり `values.path` が `a.py` のまま、2 件目は `path`・`scope` のキーを持たない
-    exception: '-'
-  - name: test_to_tool_result_when_snippet_empty_line
-    case: 正常
-    summary: 抜粋の空の行
-    condition: '`fmt="json"` で、抜粋の行に `SnippetLine(line=2, text="", hit=False)` を持つ検索の項目'
-    mock: なし
-    expected: '`snippets[0].lines` の要素が `{line: 2, text: "", hit: false}`'
-    exception: '-'
-  - name: test_to_tool_result_when_empty_ranges
-    case: 正常
-    summary: 返す行の無い本文の範囲
-    condition: '`fmt="json"` で、`ranges=[]`・`total_lines=10` の検索の項目と、`ranges`・`total_lines` が `None` の項目'
-    mock: なし
-    expected: '1 件目が `ranges: []`・`total_lines: 10` を持ち、2 件目は `ranges`・`total_lines` のキーを持たない'
-  - name: test_to_tool_result_when_contains_changes
-    case: 正常
-    summary: 語の増減の区間
-    condition: '`fmt="json"` で、`contains_changes` に commit の端の `added` と、`to` が `RangePoint(WORKTREE_LABEL)` の `removed` を持つ変更の項目'
-    mock: なし
-    expected: '1 つ目が `{kind: added, from: {commit, date}, to: {commit, date}, count_before, count_after}`（`from_`・`input` のキーを持たない）、2 つ目の `to` が `{input: 作業ツリー}`'
-- name: tool_error
-  title: ツールのエラーの変換
-  kind: 関数
-  container: project_index/server/mcp/result.py
-  usecase: 共通
-  role: 変換
-  summary: '`ProjectIndexError` と要求のモデルの検証の誤りを `isError: true` の結果にする'
-  scope: public
-  thread_safe: true
-  args:
-  - name: error
-    title: エラー
-    type: ProjectIndexError | pydantic.ValidationError
-    required: true
-    passing: positional
-    description: サービスか要求のモデルが送った例外
-  returns:
-    type: mcp.types.CallToolResult
-    description: '`isError: true` の結果'
-  process: |-
-    1. `ProjectIndexError` の場合、text の 1 行目を `{name}: {message}`、次に `details()` を YAML で、最後に `next_steps` を `- ` の行で並べる
-    2. `pydantic.ValidationError` の場合、`InvalidArgumentError` として、誤りごとに `{loc を . で繋いだパス}: {msg}` の行と、`describe` で使い方を見ることを並べる
-    3. どちらも `isError=True` で返す（`ToolError` は送らない。内容を text に残すため）
-  unit_tests:
-  - name: test_tool_error
-    case: 正常
-    summary: ProjectIndexError
-    condition: '`SourceNotReadableError(available=[...])`'
-    mock: なし
-    expected: '`isError` が `True`、text の 1 行目が `SourceNotReadableError: ...`、使える配信元の一覧を含む'
-  - name: test_tool_error_when_validation
-    case: 正常
-    summary: 引数の誤り
-    condition: '`SearchRequest(limit="x")` の検証の誤り'
-    mock: なし
-    expected: text に `limit:` の行と `describe` の案内
-- name: tool_prompt_id
-  title: ツールのプロンプトの ID
-  kind: 関数
-  container: project_index/server/mcp/result.py
-  usecase: 共通
-  role: 変換
-  summary: ツールの description を描画するプロンプトの ID を作る
-  scope: public
-  is_async: false
-  thread_safe: true
-  args:
-  - name: server
-    title: MCP
-    type: str
-    required: true
-    passing: positional
-    description: 文書の MCP は `docs`、管理の MCP は `admin`
-  - name: tool
-    title: ツール名
-    type: str
-    required: true
-    passing: positional
-    description: '`DOCS_TOOL_NAMES`・`ADMIN_TOOL_NAMES` の名前'
-  returns:
-    type: str
-    description: '`mcp/{server}/tools/{ツール名の _ を - にした名前}`'
-  process: 1. ツール名の `_` を `-` にして `mcp/{server}/tools/` に続ける（プロンプトの `id` は小文字とハイフンだけを許す）
-  unit_tests:
-  - name: test_tool_prompt_id
-    case: 正常
-    summary: ツール名をハイフンにする
-    condition: '`tool_prompt_id("docs", "search_docs")`'
-    mock: なし
-    expected: '`mcp/docs/tools/search-docs`'
-- name: mcp_prompt_ids
-  title: MCP のプロンプトの ID
-  kind: 関数
-  container: project_index/server/mcp/result.py
-  usecase: 共通
-  role: 変換
-  summary: 2 つの MCP が描画するプロンプトの ID を並べる（起動の `required` に渡す）
-  scope: public
-  is_async: false
-  thread_safe: true
-  returns:
-    type: list[str]
-    description: '`DOCS_INSTRUCTIONS_PROMPT_ID` と、両方の MCP のツールごとの `tool_prompt_id`'
-  process: 1. `DOCS_INSTRUCTIONS_PROMPT_ID`、`DOCS_TOOL_NAMES` の `tool_prompt_id("docs", …)`、`ADMIN_TOOL_NAMES` の `tool_prompt_id("admin", …)` をこの順に並べる
-  unit_tests:
-  - name: test_mcp_prompt_ids
-    case: 正常
-    summary: instructions と 14 のツール
-    condition: 引数なし
-    mock: なし
-    expected: 15 件で、先頭が `mcp/docs/instructions`、`mcp/admin/tools/check-project` を含む
+  - name: to_tool_result
+    title: ツールの結果
+    kind: 関数
+    container: project_index/server/mcp/result.py
+    usecase: 共通
+    role: 変換
+    summary: サービスの結果を `format` に合わせて MCP の `CallToolResult` にする
+    scope: public
+    thread_safe: true
+    args:
+      - name: result
+        title: 結果
+        type: T
+        required: true
+        passing: positional
+        description: サービスの結果（dataclass）
+      - name: fmt
+        title: 形式
+        type: Literal['markdown', 'json']
+        required: true
+        passing: positional
+        description: 要求の `format`
+      - name: render
+        title: Markdown の組み立て
+        type: 'Callable[[T], str] | None'
+        required: true
+        passing: positional
+        description: '`render_*_markdown`。`None` は常に JSON（書き込み・削除）'
+    returns:
+      type: mcp.types.CallToolResult
+      description: ツールの結果
+    process: |-
+      1. `fmt` が `markdown` で `render` がある場合、`content` に `render(result)` の text を 1 つ入れ、`structuredContent` を持たない結果を返す
+      2. それ以外は、結果を JSON にできる辞書にし（`dataclasses.asdict`、`None` のキーは落とす。`from_` などの別名は別名のキーで出す。`SnippetLine` は `text` が空でも `line`・`text`・`hit` を全て出す。`total_lines` を持つ検索の項目は `ranges` が空でも `ranges: []` を出す。`ContainsChange` は `from_` を `from` のキーで出し、commit の端は `input` が空なので `{commit, date}` になる）、`structuredContent` にその辞書を、`content` に同じ JSON の text を入れる
+    unit_tests:
+      - name: test_to_tool_result
+        case: 正常
+        summary: markdown
+        condition: '`fmt="markdown"`、`render` が `"# x"` を返す'
+        mock: なし
+        expected: '`content[0].text` が `"# x"`、`structuredContent` が無い'
+      - name: test_to_tool_result_when_json
+        case: 正常
+        summary: json
+        condition: '`fmt="json"`'
+        mock: なし
+        expected: '`structuredContent` と `json.loads(content[0].text)` が同じ'
+      - name: test_to_tool_result_when_location
+        case: 正常
+        summary: 場所と範囲は項目の直下
+        condition: '`fmt="json"` で、`path`・`scope: full`・`values: {path: a.py}` を持つ検索の項目と、`path`・`scope` が `None` の項目'
+        mock: なし
+        expected: 1 件目は `path`・`scope` が `values` の外にあり `values.path` が `a.py` のまま、2 件目は `path`・`scope` のキーを持たない
+        exception: '-'
+      - name: test_to_tool_result_when_snippet_empty_line
+        case: 正常
+        summary: 抜粋の空の行
+        condition: '`fmt="json"` で、抜粋の行に `SnippetLine(line=2, text="", hit=False)` を持つ検索の項目'
+        mock: なし
+        expected: '`snippets[0].lines` の要素が `{line: 2, text: "", hit: false}`'
+        exception: '-'
+      - name: test_to_tool_result_when_empty_ranges
+        case: 正常
+        summary: 返す行の無い本文の範囲
+        condition: '`fmt="json"` で、`ranges=[]`・`total_lines=10` の検索の項目と、`ranges`・`total_lines` が `None` の項目'
+        mock: なし
+        expected: '1 件目が `ranges: []`・`total_lines: 10` を持ち、2 件目は `ranges`・`total_lines` のキーを持たない'
+      - name: test_to_tool_result_when_contains_changes
+        case: 正常
+        summary: 語の増減の区間
+        condition: '`fmt="json"` で、`contains_changes` に commit の端の `added` と、`to` が `RangePoint(WORKTREE_LABEL)` の `removed` を持つ変更の項目'
+        mock: なし
+        expected: '1 つ目が `{kind: added, from: {commit, date}, to: {commit, date}, count_before, count_after}`（`from_`・`input` のキーを持たない）、2 つ目の `to` が `{input: 作業ツリー}`'
+  - name: tool_error
+    title: ツールのエラーの変換
+    kind: 関数
+    container: project_index/server/mcp/result.py
+    usecase: 共通
+    role: 変換
+    summary: '`ProjectIndexError` と要求のモデルの検証の誤りを `isError: true` の結果にする'
+    scope: public
+    thread_safe: true
+    args:
+      - name: error
+        title: エラー
+        type: ProjectIndexError | pydantic.ValidationError
+        required: true
+        passing: positional
+        description: サービスか要求のモデルが送った例外
+    returns:
+      type: mcp.types.CallToolResult
+      description: '`isError: true` の結果'
+    process: |-
+      1. `ProjectIndexError` の場合、text の 1 行目を `{name}: {message}`、次に `details()` を YAML で、最後に `next_steps` を `- ` の行で並べる
+      2. `pydantic.ValidationError` の場合、`InvalidArgumentError` として、誤りごとに `{loc を . で繋いだパス}: {msg}` の行と、`describe` で使い方を見ることを並べる
+      3. どちらも `isError=True` で返す（`ToolError` は送らない。内容を text に残すため）
+    unit_tests:
+      - name: test_tool_error
+        case: 正常
+        summary: ProjectIndexError
+        condition: '`SourceNotReadableError(available=[...])`'
+        mock: なし
+        expected: '`isError` が `True`、text の 1 行目が `SourceNotReadableError: ...`、使える配信元の一覧を含む'
+      - name: test_tool_error_when_validation
+        case: 正常
+        summary: 引数の誤り
+        condition: '`SearchRequest(limit="x")` の検証の誤り'
+        mock: なし
+        expected: text に `limit:` の行と `describe` の案内
+  - name: tool_prompt_id
+    title: ツールのプロンプトの ID
+    kind: 関数
+    container: project_index/server/mcp/result.py
+    usecase: 共通
+    role: 変換
+    summary: ツールの description を描画するプロンプトの ID を作る
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: server
+        title: MCP
+        type: str
+        required: true
+        passing: positional
+        description: 文書の MCP は `docs`、管理の MCP は `admin`
+      - name: tool
+        title: ツール名
+        type: str
+        required: true
+        passing: positional
+        description: '`DOCS_TOOL_NAMES`・`ADMIN_TOOL_NAMES` の名前'
+    returns:
+      type: str
+      description: '`mcp/{server}/tools/{ツール名の _ を - にした名前}`'
+    process: 1. ツール名の `_` を `-` にして `mcp/{server}/tools/` に続ける（プロンプトの `id` は小文字とハイフンだけを許す）
+    unit_tests:
+      - name: test_tool_prompt_id
+        case: 正常
+        summary: ツール名をハイフンにする
+        condition: '`tool_prompt_id("docs", "search_docs")`'
+        mock: なし
+        expected: '`mcp/docs/tools/search-docs`'
+  - name: mcp_prompt_ids
+    title: MCP のプロンプトの ID
+    kind: 関数
+    container: project_index/server/mcp/result.py
+    usecase: 共通
+    role: 変換
+    summary: 2 つの MCP が描画するプロンプトの ID を並べる（起動の `required` に渡す）
+    scope: public
+    is_async: false
+    thread_safe: true
+    returns:
+      type: list[str]
+      description: '`DOCS_INSTRUCTIONS_PROMPT_ID` と、両方の MCP のツールごとの `tool_prompt_id`'
+    process: 1. `DOCS_INSTRUCTIONS_PROMPT_ID`、`DOCS_TOOL_NAMES` の `tool_prompt_id("docs", …)`、`ADMIN_TOOL_NAMES` の `tool_prompt_id("admin", …)` をこの順に並べる
+    unit_tests:
+      - name: test_mcp_prompt_ids
+        case: 正常
+        summary: instructions と 14 のツール
+        condition: 引数なし
+        mock: なし
+        expected: 15 件で、先頭が `mcp/docs/instructions`、`mcp/admin/tools/check-project` を含む

@@ -1,44 +1,44 @@
 id: MOD-63
 title: 索引のサーバー / セッションの開始 / types.py
-lead: '`POST /_admin/session-start` の本文と応答の型と、返し済みの記録を削除する理由。'
+lead: '`POST /_admin/session-start` の本文と応答の型と、返し済みの記録を削除する理由を受け持ち、セッションの開始の types.py を修正するときに参照する。'
 data_models:
-- name: SessionStartRequest
-  title: セッションの開始の要求
-  container: project_index/features/session_start/types.py
-  usecase: セッションの開始
-  role: DTO
-  summary: SessionStart のフックが送信する本文
-  description: '`pydantic.BaseModel`（`extra="ignore"`）。フックの入力に増えたキーを断らないため、知らないキーは捨てる。'
-  properties:
-  - name: session_id
-    title: セッション ID
-    type: str
-    description: Claude Code のセッション ID
-  - name: agent_id
-    title: サブエージェントの ID
-    type: str | None
-    default: None
-    description: メインのセッションは `None`
-  - name: reason
-    title: 始まった理由
-    type: Literal['startup', 'resume', 'clear', 'compact', 'fork']
-    description: SessionStart の入力の `source`
-- name: SessionStartResponse
-  title: セッションの開始の応答
-  container: project_index/features/session_start/types.py
-  usecase: セッションの開始
-  role: DTO
-  summary: 返却済みの記録を削除したか
-  description: '`pydantic.BaseModel`。'
-  properties:
-  - name: forgotten
-    title: 記録を削除したか
-    type: bool
-    description: 返却済みの記録を削除したら `True`
+  - name: SessionStartRequest
+    title: セッションの開始の要求
+    container: project_index/features/session_start/types.py
+    usecase: セッションの開始
+    role: DTO
+    summary: SessionStart のフックが送信する本文
+    description: '`pydantic.BaseModel`（`extra="ignore"`）。フックの入力に増えたキーを断らないため、知らないキーは捨てる。'
+    properties:
+      - name: session_id
+        title: セッション ID
+        type: str
+        description: Claude Code のセッション ID
+      - name: agent_id
+        title: サブエージェントの ID
+        type: str | None
+        default: None
+        description: メインのセッションは `None`
+      - name: reason
+        title: 始まった理由
+        type: Literal['startup', 'resume', 'clear', 'compact', 'fork']
+        description: SessionStart の入力の `source`
+  - name: SessionStartResponse
+    title: セッションの開始の応答
+    container: project_index/features/session_start/types.py
+    usecase: セッションの開始
+    role: DTO
+    summary: 返却済みの記録を削除したか
+    description: '`pydantic.BaseModel`。'
+    properties:
+      - name: forgotten
+        title: 記録を削除したか
+        type: bool
+        description: 返却済みの記録を削除したら `True`
 constants:
-- name: FORGET_REASONS
-  title: 記録を削除する理由
-  container: project_index/features/session_start/types.py
-  usecase: セッションの開始
-  summary: 返し済みの記録を削除する `reason`
-  value: frozenset({'clear', 'compact'})
+  - name: FORGET_REASONS
+    title: 記録を削除する理由
+    container: project_index/features/session_start/types.py
+    usecase: セッションの開始
+    summary: 返し済みの記録を削除する `reason`
+    value: frozenset({'clear', 'compact'})
