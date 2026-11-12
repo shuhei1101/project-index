@@ -1,63 +1,63 @@
 id: MOD-128
 title: 索引のサーバー / 共通 / narrowing.py
-lead: YAML・JSON から読んだ型の決まっていない値を、辞書・配列として絞り込む。
+lead: YAML・JSON から読んだ型の決まっていない値を辞書・配列として絞り込む処理を受け持ち、共通の narrowing.py を修正するときに参照する。
 test_files:
-- tests/unit/project_index/shared/test_narrowing.py
+  - tests/unit/project_index/shared/test_narrowing.py
 functions:
-- name: is_dict
-  title: 辞書の判定
-  kind: 関数
-  container: project_index/shared/narrowing.py
-  usecase: 共通
-  role: 判定
-  summary: 値が辞書かを判定し、真なら値を `dict[object, object]` に絞り込む
-  scope: public
-  thread_safe: true
-  args:
-  - name: value
-    title: 値
-    type: object
-    required: true
-    passing: positional
-    description: YAML・JSON から読んだ値
-  returns:
-    type: TypeIs[dict[object, object]]
-    description: 辞書なら `True`
-  process: 1. `isinstance(value, dict)` を返す
-  unit_tests:
-  - name: test_is_dict
-    case: 正常
-    summary: 辞書と辞書でない値
-    condition: '`{"a": 1}`・`CommentedMap()`・`[1]`・`"a"`・`None`'
-    mock: なし
-    expected: 辞書の 2 つだけ `True`
-- name: is_list
-  title: 配列の判定
-  kind: 関数
-  container: project_index/shared/narrowing.py
-  usecase: 共通
-  role: 判定
-  summary: 値が配列かを判定し、真なら値を `list[object]` に絞り込む
-  scope: public
-  thread_safe: true
-  args:
-  - name: value
-    title: 値
-    type: object
-    required: true
-    passing: positional
-    description: YAML・JSON から読んだ値
-  returns:
-    type: TypeIs[list[object]]
-    description: 配列なら `True`
-  process: 1. `isinstance(value, list)` を返す
-  unit_tests:
-  - name: test_is_list
-    case: 正常
-    summary: 配列と配列でない値
-    condition: '`[1]`・`CommentedSeq()`・`(1,)`・`{"a": 1}`・`None`'
-    mock: なし
-    expected: 配列の 2 つだけ `True`
+  - name: is_dict
+    title: 辞書の判定
+    kind: 関数
+    container: project_index/shared/narrowing.py
+    usecase: 共通
+    role: 判定
+    summary: 値が辞書かを判定し、真なら値を `dict[object, object]` に絞り込む
+    scope: public
+    thread_safe: true
+    args:
+      - name: value
+        title: 値
+        type: object
+        required: true
+        passing: positional
+        description: YAML・JSON から読んだ値
+    returns:
+      type: TypeIs[dict[object, object]]
+      description: 辞書なら `True`
+    process: 1. `isinstance(value, dict)` を返す
+    unit_tests:
+      - name: test_is_dict
+        case: 正常
+        summary: 辞書と辞書でない値
+        condition: '`{"a": 1}`・`CommentedMap()`・`[1]`・`"a"`・`None`'
+        mock: なし
+        expected: 辞書の 2 つだけ `True`
+  - name: is_list
+    title: 配列の判定
+    kind: 関数
+    container: project_index/shared/narrowing.py
+    usecase: 共通
+    role: 判定
+    summary: 値が配列かを判定し、真なら値を `list[object]` に絞り込む
+    scope: public
+    thread_safe: true
+    args:
+      - name: value
+        title: 値
+        type: object
+        required: true
+        passing: positional
+        description: YAML・JSON から読んだ値
+    returns:
+      type: TypeIs[list[object]]
+      description: 配列なら `True`
+    process: 1. `isinstance(value, list)` を返す
+    unit_tests:
+      - name: test_is_list
+        case: 正常
+        summary: 配列と配列でない値
+        condition: '`[1]`・`CommentedSeq()`・`(1,)`・`{"a": 1}`・`None`'
+        mock: なし
+        expected: 配列の 2 つだけ `True`
 notes:
   使いどころ: |-
     pyright（strict）は、型の決まっていない値（`object`・`Any`）を `isinstance(value, dict)` で絞ると `dict[Unknown, Unknown]` にし、`reportUnknown...` の違反になる。
