@@ -13,19 +13,27 @@ docs:
   - page: src/files.yaml
     new: true
     change: project_index/ 配下の .py の行と、モジュール構成の設計書への implements
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T15:07:11.149392+00:00'
   - page: tests/files.yaml
     new: true
     change: テストの .py の行と、テストするコード・インターフェース定義への tests
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T15:07:11.149392+00:00'
   - page: plugins/project-index/files.yaml
     new: true
     change: hooks/ の .py の行と、MOD-4・MOD-5 への implements
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T15:07:11.149392+00:00'
   - page: project-index.yaml
     new: false
     change: documents[] に src・tests・plugin の行を加える
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T15:07:11.149392+00:00'
 scope_out:
   - item: src/project_index/ の .py でない配布物（migrations の steps.yaml・schemas の YAML）の管理用の YAML の行
     reason: 対応するモジュール構成の設計書が無く、implements・tests を張る相手が無い。src の行の exclude の *.schema.yaml・aliases.source.yaml・steps.yaml で索引に無いファイルの警告から外す。この判断はレビューで確定する
