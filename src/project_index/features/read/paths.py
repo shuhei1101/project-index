@@ -24,12 +24,24 @@ def page_path(document: Document) -> str:
     return path
 
 
-def find_page(documents: Sequence[Document], page: str) -> Document | None:
+def find_page(
+    documents: Sequence[Document], page: str, *, doc_id: str | None = None
+) -> Document | None:
     """文書のページのパスに当たる文書を探す。
 
     無ければ、文書のファイルか本文のファイルのパスが `page` と同じ最初の文書を返す
     （呼び出し側が本文の相対リンクを本文のファイルのパスで解決して渡すため）。
+    `doc_id` を指したときは、文書のファイルか本文のファイルのパスが `page` と同じ文書から ID で選ぶ。
     """
+    if doc_id is not None:
+        return next(
+            (
+                document
+                for document in documents
+                if page in (document.path, document.body_path) and document.id == doc_id
+            ),
+            None,
+        )
     found = next((document for document in documents if page_path(document) == page), None)
     if found is not None:
         return found
