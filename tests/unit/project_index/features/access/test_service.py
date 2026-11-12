@@ -403,9 +403,11 @@ def test_resolve_write_target(
     """ワークツリーへ書く（正常系）。"""
     # 準備
     registry = make_registry(sample)
-    monkeypatch.setattr(
-        service_module, "load_source_at", lambda source, _root: source, raising=False
-    )
+
+    def keep_source(source: ServedSource, _root: Path) -> ServedSource:
+        return source
+
+    monkeypatch.setattr(service_module, "load_source_at", keep_source, raising=False)
     # 実行
     result = resolve_write_target(registry=registry, cwd="/r/.claude/worktrees/x/docs")
     # 検証

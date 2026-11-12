@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from project_index.features.access import service as access_service
 from project_index.features.documents.store import DocumentStore
 from project_index.features.history.snapshot import SnapshotStore
 from project_index.features.seen.store import SeenStore
@@ -103,8 +104,15 @@ def make_env(
     make_source_config: Callable[..., SourceConfig],
     make_served_source: Callable[..., ServedSource],
     make_registry: Callable[..., SourceRegistry],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> Callable[..., WriteEnv]:
     """git リポジトリとそのワークツリー x を持つ配信元と、書き込みの部品を作る関数を返す。"""
+
+    def keep_source(source: ServedSource, _root: Path) -> ServedSource:
+        # 配信元はメモリ上の設定で作るため、ワークツリーの設定の読み直しは受け取った配信元のまま返す
+        return source
+
+    monkeypatch.setattr(access_service, "load_source_at", keep_source)
 
     def _make(
         files: dict[str, str] | None = None,
