@@ -174,3 +174,52 @@ def test_error_when_schema_invalid(
     assert all(error["reason"] for error in response.json()["errors"])
     assert env.settings_path.read_bytes() == snapshot
     assert env.client.get("/sources/sample/docs").status_code == 200
+
+
+def test_normal_when_unsent_keys_kept(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """行に含めなかったキーを、ファイルの同じ配信元の行の今の値で残す（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    extra = make_source("extra", outside_read=False, scope_write=[make_source("other").folder])
+    env = make_server(sample, extra)
+    before = load_terminal_config(env.settings_path).sources[1]
+    # 実行
+    response = env.client.put(
+        "/settings/sources",
+        json={"sources": [_row(sample, enabled=False), _row(extra)]},
+        headers=ORIGIN,
+    )
+    # 検証
+    rows = load_yaml(env.settings_path.read_text(encoding="utf-8"))["sources"]
+    assert response.status_code == 200
+    assert {row["id"]: row["status"] for row in response.json()["sources"]} == {
+        "sample": "disabled",
+        "extra": "serving",
+    }
+    assert rows[0]["enabled"] is False
+    assert rows[1]["outside_read"] is False
+    assert rows[1]["scope"]["write"] == before.scope.write
+
+
+def test_normal_when_sent_keys_override(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """行に含めたキーは、ファイルの同じ配信元の行の値より送信した値で記載する（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    extra = make_source("extra", outside_read=False)
+    env = make_server(sample, extra)
+    # 実行
+    response = env.client.put(
+        "/settings/sources",
+        json={"sources": [_row(sample), _row(extra, outside_read=True)]},
+        headers=ORIGIN,
+    )
+    listed = env.client.get("/settings/sources")
+    # 検証
+    rows = load_yaml(env.settings_path.read_text(encoding="utf-8"))["sources"]
+    assert response.status_code == 200
+    assert "outside_read" not in rows[1]
+    assert {row["id"]: row["outsideRead"] for row in listed.json()["sources"]}["extra"] is True
