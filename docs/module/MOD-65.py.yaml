@@ -43,12 +43,12 @@ functions:
     process: |-
       1. 全てのルートは、先頭で `await handlers.registry.wait_loaded()` を呼び、配信元の初回の読み込みが終わるまで待つ（起動.待ち受けまでの順番）
       2. GET `/settings/sources` は、排他を取らずに `handlers.terminal.file` を 1 回だけ読んで本文と内容のバージョンを求め（端末の設定の内容の読み込み）、同じ本文を端末の設定の読み込みに `text` で渡して行にする。`handlers.terminal.file` を `settings_path` にし、`sources[]` の各行に、`config`（行に `id` があれば `id` も）が同じ配信元の状態の `id`・`status`・`errors`・`config_version` を重ねた（行の `config`・`enabled`・`scope`・`outside_read` はそのまま返す）（1 つの状態は 1 行にだけ重ねる。当たる状態が無い行は `status` を `pending_reload`・`id` を行の `id` にする） `SettingsSourcesView` を、内容のバージョンを `version` にして返す（配信元の一覧.状態の一覧）
-      3. PUT `/settings/sources` は、同じオリジンの確認を依存に持ち（同じオリジンの確認）、本文を `SettingsSourcesRequest` で受けて『配信元の保存』を `expected_version`・`reload=handlers.reload_sources`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼び、`SettingsSourcesResponse` を返す（配信元の保存）
+      3. PUT `/settings/sources` は、同じオリジンの確認を依存に持ち（同じオリジンの確認）、本文を `SettingsSourcesRequest` で受けて『配信元の保存』を `expected_version`・`reload=handlers.reload_sources`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼び、`SettingsSourcesWriteResponse` を返す（配信元の保存）
          - `TerminalConfigInvalidError` は例外の変換で 422、`SettingsVersionMismatchError` は 409 の problem+json になる
       4. POST `/settings/sources` は、同じオリジンの確認を依存に持ち、本文を `SettingsSourceAddRequest` で受けて『配信元の 1 行の追加』を `expected_version`・`reload=handlers.reload_changed`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼ぶ。`added` は 201、`exists` は 409 で `SettingsSourceAddResponse` を返す
-      5. PATCH `/settings/sources/{source_id}` は、同じオリジンの確認を依存に持ち、本文を `SettingsSourcePatchRequest` で受けて『配信元の 1 行の変更』を `reload=handlers.reload_changed`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼び、200 で `SettingsSourcesResponse` を返す
+      5. PATCH `/settings/sources/{source_id}` は、同じオリジンの確認を依存に持ち、本文を `SettingsSourcePatchRequest` で受けて『配信元の 1 行の変更』を `reload=handlers.reload_changed`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼び、200 で `SettingsSourcesWriteResponse` を返す
          - `SourceRowNotFoundError` は例外の変換で 404 の problem+json になる
-      6. DELETE `/settings/sources/{source_id}` は、同じオリジンの確認を依存に持ち、クエリ `expectedVersion`（必須）を受けて『配信元の 1 行の削除』を `reload=handlers.reload_changed`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼び、200 で `SettingsSourcesResponse` を返す
+      6. DELETE `/settings/sources/{source_id}` は、同じオリジンの確認を依存に持ち、クエリ `expectedVersion`（必須）を受けて『配信元の 1 行の削除』を `reload=handlers.reload_changed`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼び、200 で `SettingsSourcesWriteResponse` を返す
       7. ルーターは `APIRouter(tags=["settings"])` にする。各ルートの `name`（`operation_id` は渡さず、アプリの組み立てが operationId を `settings-{name}` にする）は、GET が `get_settings_sources`、PUT が `put_settings_sources`、POST が `add_settings_source`、PATCH が `patch_settings_source`、DELETE が `delete_settings_source`
     unit_tests:
       - name: test_build_settings_router_when_get

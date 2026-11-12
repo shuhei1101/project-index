@@ -164,18 +164,13 @@ data_models:
     usecase: 端末の設定
     role: DTO
     summary: 再読み込みした後の配信元ごとの状態
-    description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。`from_statuses(statuses, version=...)` で配信元の状態の並びと内容のバージョンから作る。'
+    description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。`from_statuses(statuses)` で配信元の状態の並びから作る。読み取り API の配信元の一覧（`GET /sources`）もこの型を返すため、内容のバージョンを持たない'
     properties:
       - name: sources
         title: 配信元
         type: list[SourceStatusItem]
         access: 公開
         description: '`id`・`status`（`serving` / `not_served` / `disabled`）・`errors[]`（`{path, reason}`。`not_served` のときだけ）・`config_version`（`{config, server}`。設定のバージョンが古いときだけ）'
-      - name: version
-        title: 内容のバージョン
-        type: str
-        access: 公開
-        description: 書き換えた後の端末の設定の内容のバージョン
   - name: SettingsSourceRow
     title: 配信元の行と状態
     container: project_index/features/settings/types.py
@@ -387,6 +382,20 @@ data_models:
         type: list[SourceStatus]
         access: 公開
         description: 読み直した後の配信元の状態
+      - name: version
+        title: 内容のバージョン
+        type: str
+        access: 公開
+        description: 書き換えた後の端末の設定の内容のバージョン
+  - name: SettingsSourcesWriteResponse
+    title: 書き換えの応答
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定
+    role: DTO
+    summary: PUT `/settings/sources` と PATCH・DELETE `/settings/sources/{id}` の応答
+    description: '`SettingsSourcesResponse` を継承し、内容のバージョンを足す。`from_result(result)` で書き換えの結果（`SourceWriteResult`）から作る'
+    inherits: SettingsSourcesResponse
+    properties:
       - name: version
         title: 内容のバージョン
         type: str
