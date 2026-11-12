@@ -71,7 +71,7 @@ classes:
         process: |-
           1. 書き出し先があれば更新日時を今にして返す
           2. commit ごとの排他を取り、取った後にもう一度書き出し先を確かめる
-          3. `{commit}.tmp` を空にして作り、`git archive --format=tar {commit}` の出力を `tarfile`（`filter="data"`）で展開する（gitの実行）
+          3. `{commit}.tmp` を空にして作り、`git archive --format=tar {commit}` を `timeout=GIT_ARCHIVE_TIMEOUT_SEC` で呼び、出力を `tarfile`（`filter="data"`）で展開する（gitの実行）
           4. `{commit}.tmp` を `{commit}` に名前を変える
              - `[info]` リビジョンを書き出した（リポジトリ・commit・ファイル数）
           5. リポジトリの書き出しが `keep` を超えたら、更新日時が古いものから `shutil.rmtree` する（今書き出したものは残す）
@@ -93,7 +93,7 @@ classes:
             summary: 2 回目は git を呼ばない
             condition: 同じ commit で 2 回
             mock: gitの実行（呼ばれた回数を数える包み）
-            expected: '`git archive` は 1 回だけ'
+            expected: '`git archive` は 1 回だけで、指定した `timeout` が `GIT_ARCHIVE_TIMEOUT_SEC`'
           - name: test_snapshot_store_checkout_when_concurrent
             case: 正常
             summary: 同時の書き出しは 1 回
