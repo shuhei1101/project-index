@@ -90,7 +90,7 @@ functions:
       - name: test_build_read_router_when_queries
         case: 正常
         summary: 追加したクエリを service に渡す
-        condition: '`/sources/sample/config?schemas=true`・`/sources/sample/docs?values=true`・`/sources/sample/docs/terms.yaml?id=term-2`'
+        condition: '`/sources/sample/config?schemas=true`・`/sources/sample/docs?values=true`・`/sources/sample/docs/terms.yaml?id=term-2`・`/sources/sample/search?q=beta`'
         mock: 配線済みの関数（一時フォルダの配信元）
         expected: '`schemas` が辞書、`documents[].value` が値、`metadata.id` が `term-2` で、`diff.ignore_keys`・`documents[].version`・`items[].filePath` のキーを持つ'
       - name: test_build_read_router_when_not_found
