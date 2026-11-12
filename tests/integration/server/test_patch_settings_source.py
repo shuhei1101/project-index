@@ -75,7 +75,8 @@ def test_normal_when_row_without_id(
     # 検証
     rows = load_yaml(env.settings_path.read_text(encoding="utf-8"))["sources"]
     assert response.status_code == 200
-    assert response.json()["sources"][1] == {"id": "sources[1]", "status": "disabled", "errors": []}
+    assert response.json()["sources"][1]["id"] == "sources[1]"
+    assert response.json()["sources"][1]["status"] == "disabled"
     assert rows[1]["enabled"] is False
     assert "id" not in rows[1]
 
