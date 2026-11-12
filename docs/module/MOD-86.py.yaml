@@ -98,7 +98,7 @@ constants:
     summary: git を 1 回呼んで待つ秒数の上限（`timeout` を指定しない呼び出し）
     value: '8'
     notes:
-      導き方: 規約『資源の値の決め方』の下流を待つタイムアウト。project-index のクローン（WSL の `/mnt/c` の下）で各 30 回測った最長は `git archive HEAD` が 5.2 秒、`git log --name-status -n 500` が 4.4 秒。最長を p99.9 の代わりに置き、その 50% の余裕を足して切り上げた。実装後に p99.9 を測り直す
+      導き方: 規約『資源の値の決め方』の下流を待つタイムアウト。project-index のクローン（WSL の `/mnt/c` の下）で各 30 回測った最長は `git archive HEAD` が 5.2 秒、`git log --name-status -n 500` が 4.4 秒。最長を p99.9 の代わりに置き、その 50% の余裕を足して切り上げた。実装後に p99.9 を測り直す。端末の負荷が高い間（load average 14〜16・8 コア）に、配信元の文書を読み込む経路の git を各 30 回測った最長（中央値）は、`git log --format=%x00%cI --name-only --no-renames {commit}` が 1.7 秒（0.6 秒）、`git ls-tree -r -z --full-tree {commit}` が 1.2 秒（0.4 秒）、`git rev-parse --verify --quiet {ref}^{commit}` が 0.2 秒（0.1 秒）。最長に 50% の余裕を追加しても 8 秒に収まる
   - name: GIT_ENV
     title: git の環境変数
     container: project_index/integrations/git.py
@@ -118,7 +118,7 @@ constants:
     summary: リビジョンの書き出し・取り出しの `git archive` を待つ秒数の上限
     value: '20'
     notes:
-      導き方: 規約『資源の値の決め方』の下流を待つタイムアウト。端末の負荷が高い間（load average 15〜21・8 コア）に project-index のクローン（WSL の `/mnt/c` の下）で `git archive --format=tar {develop の commit}` を 30 回測った最長は 12.3 秒（中央値 7.5 秒）。最長を p99.9 の代わりにし、その 50% の余裕を追加して切り上げた。外側の待ち（Claude Code の MCP のツールの呼び出しの時間切れ 1 分）に収まる
+      導き方: 規約『資源の値の決め方』の下流を待つタイムアウト。端末の負荷が高い間（load average 15〜21・8 コア）に project-index のクローン（WSL の `/mnt/c` の下）で `git archive --format=tar {develop の commit}` を 30 回測った最長は 12.3 秒（中央値 7.5 秒）。最長を p99.9 の代わりにし、その 50% の余裕を追加して切り上げた。外側の待ちは Claude Code の MCP のツールの呼び出しの時間切れ 1 分。内側の待ちが最も重なる `list_changes` の区間指定（`from`・`to` のどちらも書き出していない commit）では、`git archive` 2 回（20 秒 × 2）と `resolve_ref`・`file_dates`・`ls-tree` の各 `GIT_TIMEOUT_SEC` の上限の合計が 1 分を超えうる。超えた呼び出しは Claude Code の側で失敗になり、書き出し済みの commit は再実行で書き出さない
 functions:
   - name: run_git
     title: gitの実行
