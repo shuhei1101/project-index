@@ -10,6 +10,12 @@ from project_index.features.sources.types import ServedSource
 
 AccessLevel = Literal["read", "write"]
 
+# 文書の MCP のツールの入力のスキーマで、`cwd` の説明に入れる文
+CWD_DESCRIPTION = (
+    "作業場所。PreToolUse のフックがセッションの作業場所で上書きするため、指定しても使わない。"
+    "ワークツリーを指すときは worktree を指定する"
+)
+
 
 @dataclass(frozen=True)
 class SourceAccess:

@@ -290,7 +290,8 @@ def resolve_write_target(
         wt = find_worktree(item, path) if path is not None else None
     # Git の配信元はワークツリーにだけ書く
     if wt is None and item.is_git:
-        clone = item.repo_root or item.root
+        # 設定をワークツリーから読む配信元でも、ワークツリーの親のクローン本体を返す
+        clone = item.main_root or item.repo_root or item.root
         raise TargetIsCloneError(
             message=f"{clone} はクローン本体です。worktree でワークツリーを指してください",
             clone=str(clone),
