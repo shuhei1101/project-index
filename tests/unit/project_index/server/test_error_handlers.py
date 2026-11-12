@@ -5,10 +5,9 @@ from typing import ClassVar
 
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
-from pydantic import BaseModel
-
 from project_index.server.error_handlers import register_error_handlers
 from project_index.shared.errors import ProjectIndexError, ValidationFailedError, Violation
+from pydantic import BaseModel
 
 
 class HiddenBody(BaseModel):

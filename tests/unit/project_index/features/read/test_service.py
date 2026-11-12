@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import pytest
-
-from project_index.features.access.types import Target
 from project_index.features.read.paths import read_target
 from project_index.features.read.service import (
     get_decision,
@@ -16,6 +14,11 @@ from project_index.features.read.service import (
 )
 from project_index.features.sources.types import DocumentTable, ScriptEntry
 from project_index.shared.errors import DecisionNotFoundError, DocumentNotFoundError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from project_index.features.access.types import Target
 
 NOTES_TABLES = [
     DocumentTable(id="rules", paths=["docs/*.yaml"], schema_path="schemas/rule.schema.yaml"),
@@ -158,7 +161,7 @@ def test_get_document_when_not_found(make_view_env: Callable[..., SimpleNamespac
     # 準備
     env = make_view_env()
     # 実行・検証
-    with pytest.raises(DocumentNotFoundError, match="no/such.yaml"):
+    with pytest.raises(DocumentNotFoundError, match=r"no/such\.yaml"):
         get_document(
             _target(env), "no/such.yaml", store=env.handlers.store, converter=env.handlers.converter
         )

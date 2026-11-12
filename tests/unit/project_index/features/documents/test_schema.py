@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING
 
 import pytest
-
 from project_index.features.documents import schema as schema_module
 from project_index.features.documents.schema import resolve_schema_refs, startup_schema
 from project_index.features.sources.schema_ref import SchemaRef
 from project_index.features.sources.types import DocumentTable, ServedSource, SourceConfig
 from project_index.shared.yaml_io import load_yaml
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 FILES_SCHEMA_TEMPLATE = Path(__file__).parents[5] / "templates" / "files.schema.yaml"
 

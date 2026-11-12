@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from project_index.features.access.types import SourceAccess
 from project_index.features.describe.source_checks import SourceChecks
 from project_index.features.describe.warnings import collect_warnings
-from project_index.features.settings.types import SourceEntry, TerminalConfig
 from project_index.main import Handlers, build_handlers
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from project_index.features.settings.types import SourceEntry, TerminalConfig
 
 MISSING_FILES_CONFIG = (
     "name: a\n"

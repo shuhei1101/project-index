@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
-
 from project_index.features.history.query import (
     changed_files,
     co_changed_files,
@@ -16,8 +15,12 @@ from project_index.features.history.query import (
     resolve_ref,
 )
 from project_index.features.history.types import CommitStep, FileChange, FileDates
-from project_index.features.sources.types import ServedSource, SourceConfig
 from project_index.shared.errors import RefNotFoundError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from project_index.features.sources.types import ServedSource, SourceConfig
 
 OCT_01 = "2026-10-01T12:00:00+09:00"
 OCT_03 = "2026-10-03T12:00:00+09:00"

@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import io
 import json
-from collections.abc import Callable
-from types import ModuleType
+from typing import TYPE_CHECKING
 
-import pytest
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from types import ModuleType
+
+    import pytest
 
 
 def test_main(

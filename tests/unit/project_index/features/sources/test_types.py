@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import pytest
-
 from project_index.features.sources.types import DocumentTable, ServedSource, SourceConfig
 from project_index.shared.errors import UnknownKindError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def test_served_source_table(

@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
-from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
-from starlette.types import Message, Receive, Scope, Send
-
 from project_index.server import app as app_module
 from project_index.server.app import build_app, route_operation_id
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from starlette.types import Message, Receive, Scope, Send
 
 LOCAL_BASE_URL = "http://127.0.0.1:8786"
 MCP_HEADERS = {
@@ -33,7 +34,6 @@ INITIALIZE = {
 
 def _endpoint() -> None:
     """ルートの例に使う何もしない関数。"""
-
 
 
 async def _noop_receive() -> Message:

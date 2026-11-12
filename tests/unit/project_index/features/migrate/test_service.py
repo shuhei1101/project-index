@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
 from project_index.features.migrate.service import apply_migration, plan_migration, resolve_target
 from project_index.features.migrate.types import (
     ConfigNewerError,
@@ -17,6 +15,9 @@ from project_index.features.migrate.types import (
     MigrationTarget,
 )
 from project_index.shared.yaml_io import load_roundtrip, load_yaml
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 SETTINGS_V1 = 'version: "1"\nclone: /x\nlog_dir: /logs\n'
 NOW = datetime(2026, 10, 29, 12, 0, 0, tzinfo=UTC)
@@ -206,7 +207,9 @@ def test_apply_migration_when_source_needs_setup(
         tmp_path,
         {"project-index.yaml": legacy, "schemas/rule.schema.yaml": "title: rule\ntype: object\n"},
     )
-    target = MigrationTarget(kind="project-index", file=tmp_path / "project-index.yaml", current="2")
+    target = MigrationTarget(
+        kind="project-index", file=tmp_path / "project-index.yaml", current="2"
+    )
     data, steps = plan_migration(target)
     # 実行・検証
     with pytest.raises(MigrationFailedError) as exc_info:

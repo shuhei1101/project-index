@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import os
 import sys
-from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
-
 from project_index.integrations.scripts import (
     ScriptFailedError,
     ScriptNotFoundError,
@@ -14,6 +13,9 @@ from project_index.integrations.scripts import (
     check_runnable,
     run_script,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def test_run_script(tmp_path: Path) -> None:

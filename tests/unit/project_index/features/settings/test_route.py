@@ -2,22 +2,24 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from collections.abc import Callable
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 from project_index.features.settings import route as route_module
 from project_index.features.settings.query import load_terminal_config
 from project_index.features.settings.route import build_settings_router
 from project_index.features.settings.types import SourceAddResult, SourceEntry, TerminalConfig
 from project_index.features.sources.registry import SourceRegistry
-from project_index.features.sources.types import SourceStatus
 from project_index.shared.errors import Violation
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    import pytest
+    from project_index.features.sources.types import SourceStatus
 
 SETTINGS = (
     'version: "1"\n'
@@ -143,9 +145,7 @@ def test_build_settings_router_when_put(
     client = TestClient(app)
     body = {"sources": [{"id": "a", "config": ["/tmp/a/project-index.yaml"]}]}
     # 実行
-    response = client.put(
-        "/settings/sources", json=body, headers={"Sec-Fetch-Site": "same-origin"}
-    )
+    response = client.put("/settings/sources", json=body, headers={"Sec-Fetch-Site": "same-origin"})
     # 検証
     assert response.status_code == 200
     assert response.json()["sources"][0]["status"] == "serving"

@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from datetime import UTC, date, datetime
+from typing import TYPE_CHECKING
 
 import pytest
-
-from project_index.features.documents.types import Document
 from project_index.features.search.filters import (
     check_filter,
     compile_regex,
@@ -13,6 +11,11 @@ from project_index.features.search.filters import (
     parse_compare_value,
 )
 from project_index.features.search.types import Condition, Group, LineRange, OrderKey, SearchRequest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from project_index.features.documents.types import Document
 
 TODAY = date(2026, 10, 28)
 FIELDS = {

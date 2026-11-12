@@ -6,8 +6,6 @@ from datetime import UTC, datetime
 
 import pytest
 from mcp.types import TextContent
-from pydantic import ValidationError
-
 from project_index.features.access.types import SourceAccess
 from project_index.features.changes.types import (
     WORKTREE_LABEL,
@@ -25,6 +23,7 @@ from project_index.features.search.types import (
 )
 from project_index.server.mcp.result import to_tool_result, tool_error
 from project_index.shared.errors import SourceNotReadableError
+from pydantic import ValidationError
 
 
 @dataclass

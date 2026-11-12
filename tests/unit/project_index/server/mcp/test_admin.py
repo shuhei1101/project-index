@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-import pytest
 from mcp.types import CallToolResult, TextContent
-
 from project_index.features.admin.types import CheckProjectRequest, CheckProjectResult
 from project_index.features.lifecycle.control import RestartControl
 from project_index.server.mcp import admin as admin_module
 from project_index.server.mcp.admin import build_admin_mcp
 from project_index.server.mcp.result import tool_prompt_id
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import pytest
 
 TOOL_NAMES = {
     "status",

@@ -5,13 +5,15 @@ import json
 import socket
 import time
 import urllib.error
-from collections.abc import Callable, Iterator
 from contextlib import closing, contextmanager
 from pathlib import Path
-from types import ModuleType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+    from types import ModuleType
 
 
 def _free_port() -> int:
@@ -159,7 +161,8 @@ def test_main_when_forget_failed(
     hook = load_hook("session_start")
 
     def failing_forget(port: int, payload: dict[str, str]) -> None:
-        raise TimeoutError("timed out")
+        msg = "timed out"
+        raise TimeoutError(msg)
 
     monkeypatch.setattr(hook, "is_listening", lambda port: True)
     monkeypatch.setattr(hook, "request_forget", failing_forget)

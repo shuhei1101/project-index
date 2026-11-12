@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
 from project_index.features.migrate.steps import apply_step, load_steps
 from project_index.features.migrate.types import MigrationFailedError, MigrationStep
 from project_index.shared.yaml_io import dump_roundtrip, load_roundtrip
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def _rename_step(version: str = "2") -> dict[str, Any]:

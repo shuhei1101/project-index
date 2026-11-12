@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from project_index.features.documents.types import Document
 from project_index.features.read.search import search_words
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from project_index.features.documents.types import Document
 
 
 def test_search_words(make_document: Callable[..., Document]) -> None:

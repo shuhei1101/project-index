@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
 from project_index.features.validation import markdown as markdown_module
 from project_index.features.validation.markdown import (
     UncheckedKey,
@@ -14,6 +12,9 @@ from project_index.features.validation.markdown import (
 )
 from project_index.integrations.mdmark import MdmarkFinding, MdmarkUnavailableError
 from project_index.shared.errors import Violation
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 MARKDOWN = {"type": "string", "contentMediaType": "text/markdown"}
 

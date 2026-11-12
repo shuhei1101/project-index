@@ -6,7 +6,6 @@ from types import SimpleNamespace
 from typing import Any
 
 from fastapi import FastAPI
-
 from project_index.server.lifespan import build_lifespan
 
 

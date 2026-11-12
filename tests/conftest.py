@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import os
 import subprocess
-from collections.abc import Callable
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
 
 GIT_ENV = {
     "GIT_AUTHOR_NAME": "tester",

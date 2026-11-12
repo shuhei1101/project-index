@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
 from project_index.features.prompt_doc.runtime import (
     DEFAULT_PROMPTS_DIR,
     load_prompts,
@@ -13,6 +11,9 @@ from project_index.features.prompt_doc.runtime import (
 )
 from project_index.features.prompt_doc.types import PromptInvalidError
 from project_index.server.mcp.result import DOCS_INSTRUCTIONS_PROMPT_ID, mcp_prompt_ids
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # 本文に置かない言い回し
 FORBIDDEN_WORDS = ("MUST", "必ず", "禁止")

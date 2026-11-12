@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from project_index.features.access.types import Target
-from project_index.features.documents.types import Document
-from project_index.features.sources.registry import SourceRegistry
-from project_index.features.sources.types import ServedSource, SourceConfig
 from project_index.features.read.paths import find_page, page_path, read_target
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from project_index.features.documents.types import Document
+    from project_index.features.sources.registry import SourceRegistry
+    from project_index.features.sources.types import ServedSource, SourceConfig
 
 
 def test_page_path(make_document: Callable[..., Document]) -> None:

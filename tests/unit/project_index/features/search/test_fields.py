@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from project_index.features.documents.types import Document
 from project_index.features.search.fields import field_values, heading_lines
 from project_index.features.search.types import Heading
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from project_index.features.documents.types import Document
 
 
 def test_field_values(make_document: Callable[..., Document]) -> None:

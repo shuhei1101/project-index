@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
-
 from project_index.integrations.mdmark import (
     MdmarkFinding,
     MdmarkUnavailableError,
     check_markdown,
     parse_check_output,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
 
 
 @pytest.fixture

@@ -3,21 +3,23 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import threading
-from collections.abc import Callable
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import pytest
 from mcp.types import CallToolResult, TextContent
-
 from project_index.features.search.types import SearchRequest, SearchResult
-from project_index.features.settings.types import SourceEntry, TerminalConfig
 from project_index.features.sources.registry import SourceRegistry
 from project_index.main import build_handlers
 from project_index.server.mcp import docs as docs_module
 from project_index.server.mcp.docs import build_docs_mcp
 from project_index.server.mcp.result import DOCS_INSTRUCTIONS_PROMPT_ID, tool_prompt_id
 from project_index.shared.errors import UnknownKindError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    import pytest
+    from project_index.features.settings.types import SourceEntry, TerminalConfig
 
 TOOL_NAMES = {
     "search_docs",

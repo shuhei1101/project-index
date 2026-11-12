@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import subprocess
-from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
-
 from project_index.features.lifecycle.control import RestartControl
 from project_index.features.lifecycle.types import COMMAND_TIMEOUT_SEC
 from project_index.features.lifecycle.update import _run, update_clone
 from project_index.shared.errors import RestartInProgressError, UpdateFailedError
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 type Response = tuple[int, str, str] | BaseException
 

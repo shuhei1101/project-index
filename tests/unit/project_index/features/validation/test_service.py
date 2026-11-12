@@ -1,22 +1,29 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
-from project_index.features.access.types import Target
 from project_index.features.documents.store import DocumentStore
-from project_index.features.documents.types import Document
 from project_index.features.history.snapshot import SnapshotStore
-from project_index.features.sources.types import DocumentTable, ScriptEntry, ServedSource, SourceConfig
+from project_index.features.sources.types import (
+    DocumentTable,
+    ScriptEntry,
+    ServedSource,
+    SourceConfig,
+)
 from project_index.features.validation import service as service_module
 from project_index.features.validation.markdown import MarkdownCheck
 from project_index.features.validation.service import DocumentChecker
 from project_index.shared.yaml_io import load_yaml
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from project_index.features.access.types import Target
+    from project_index.features.documents.types import Document
 
 SCHEMA = {"type": "object", "required": ["name"]}
 

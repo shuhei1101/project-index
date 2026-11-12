@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from project_index.features.validation.scripts import parse_validator_output
 
 

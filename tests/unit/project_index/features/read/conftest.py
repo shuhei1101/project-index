@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
 from project_index.features.convert.service import ConvertService
 from project_index.features.documents.store import DocumentStore
 from project_index.features.history.snapshot import SnapshotStore
 from project_index.features.sources.types import DocumentTable, ScriptEntry, ServedSource
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
 
 
 @pytest.fixture

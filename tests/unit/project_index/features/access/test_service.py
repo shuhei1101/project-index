@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
 from project_index.features.access import service as service_module
 from project_index.features.access.service import (
     access_of,
@@ -21,7 +19,6 @@ from project_index.features.access.service import (
 )
 from project_index.features.access.types import SourceAccess
 from project_index.features.history.types import ResolvedRef
-from project_index.features.sources.types import ServedSource, SourceConfig
 from project_index.shared.errors import (
     InvalidArgumentError,
     RefNotFoundError,
@@ -30,6 +27,11 @@ from project_index.shared.errors import (
     TargetIsCloneError,
     WorktreeNotMatchedError,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from project_index.features.sources.types import ServedSource, SourceConfig
 
 WORKTREE_GLOBS = ["/r/.claude/worktrees/*"]
 

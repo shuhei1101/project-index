@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import subprocess
-from collections.abc import Callable
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
 from project_index.integrations import git as git_module
 from project_index.integrations.git import GitError, is_ignored, repo_root, run_git
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
 
 
 def test_run_git(git_repo: Callable[..., Path]) -> None:

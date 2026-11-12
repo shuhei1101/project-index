@@ -4,7 +4,6 @@ from typing import Any
 
 import jinja2
 import pytest
-
 from project_index.features.prompt_doc.render import (
     TracedStr,
     build_environment,

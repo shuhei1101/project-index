@@ -2,15 +2,18 @@ from __future__ import annotations
 
 import contextlib
 import sqlite3
-from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
-
-from project_index.features.documents.types import Document
 from project_index.features.seen.store import SeenStore
 from project_index.features.seen.types import SessionKey
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from project_index.features.documents.types import Document
 
 
 @pytest.fixture

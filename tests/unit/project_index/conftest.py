@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
 from project_index.features.access.types import Target
 from project_index.features.documents.types import Document
 from project_index.features.settings.query import load_terminal_config
@@ -22,6 +20,9 @@ from project_index.features.sources.types import (
 from project_index.main import Handlers, build_handlers
 from project_index.shared.errors import UnknownSourceError
 from project_index.shared.yaml_io import dump_roundtrip, load_roundtrip
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 SAMPLE_SCHEMA = (
     "title: rule\n"
@@ -377,7 +378,9 @@ def migrations_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     root = tmp_path / "migrations"
     root.mkdir()
     monkeypatch.setattr("project_index.features.migrate.types.MIGRATIONS_DIR", str(root))
-    monkeypatch.setattr("project_index.features.migrate.steps.MIGRATIONS_DIR", str(root), raising=False)
+    monkeypatch.setattr(
+        "project_index.features.migrate.steps.MIGRATIONS_DIR", str(root), raising=False
+    )
     return root
 
 

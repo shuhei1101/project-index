@@ -4,7 +4,6 @@ import re
 from typing import Any
 
 import pytest
-
 from project_index.features.prompt_doc.markdown import (
     convert_prompt,
     example_body,

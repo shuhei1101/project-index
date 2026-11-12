@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
 from project_index.features.documents.store import DocumentStore
 from project_index.features.history.snapshot import SnapshotStore
 from project_index.features.search.service import search_docs
@@ -28,7 +25,6 @@ from project_index.features.search.types import (
 )
 from project_index.features.seen.store import SeenStore
 from project_index.features.seen.types import SEEN_MARK
-from project_index.features.sources.registry import SourceRegistry
 from project_index.features.sources.types import (
     DocumentTable,
     ScriptEntry,
@@ -38,7 +34,14 @@ from project_index.features.sources.types import (
 from project_index.features.validation.service import DocumentChecker
 from project_index.shared.errors import InvalidArgumentError
 from project_index.shared.yaml_io import load_yaml
+
 from tests.unit.project_index.conftest import records_files_schema
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from project_index.features.sources.registry import SourceRegistry
 
 TODAY = date(2026, 10, 28)
 

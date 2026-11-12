@@ -3,14 +3,16 @@ from __future__ import annotations
 import importlib.util
 import json
 import threading
-from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from types import ModuleType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+    from types import ModuleType
 
 HOOKS_DIR = Path(__file__).parents[5] / "plugins" / "project-index" / "hooks"
 

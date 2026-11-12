@@ -2,17 +2,20 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
-
-from project_index.features.settings.types import SourceEntry, TerminalConfig
 from project_index.features.sources import registry as registry_module
 from project_index.features.sources.registry import SourceRegistry
-from project_index.features.sources.schema_ref import SchemaRefLookup
 from project_index.features.sources.types import ServedSource, SourceStatus
 from project_index.shared.errors import SourceNotServedError, UnknownSourceError, Violation
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from project_index.features.settings.types import SourceEntry, TerminalConfig
+    from project_index.features.sources.schema_ref import SchemaRefLookup
 
 type LoadResult = tuple[ServedSource | None, SourceStatus]
 
@@ -103,7 +106,9 @@ def test_source_registry_reload_when_reading(
         return source, make_status("a", index)
 
     monkeypatch.setattr(registry_module, "load_source", blocking_load)
-    terminal = make_terminal_config(sources=[make_entry("/tmp/a/project-index.yaml", source_id="a")])
+    terminal = make_terminal_config(
+        sources=[make_entry("/tmp/a/project-index.yaml", source_id="a")]
+    )
     registry = SourceRegistry()
     registry.reload(terminal)
     worker = threading.Thread(target=registry.reload, args=(terminal,))
@@ -238,7 +243,9 @@ def test_source_registry_reload_when_loading(
         return make_served_source(id="a"), make_status("a", index)
 
     monkeypatch.setattr(registry_module, "load_source", blocking_load)
-    terminal = make_terminal_config(sources=[make_entry("/tmp/a/project-index.yaml", source_id="a")])
+    terminal = make_terminal_config(
+        sources=[make_entry("/tmp/a/project-index.yaml", source_id="a")]
+    )
     registry = SourceRegistry(loading=True)
     observed: dict[str, object] = {}
 
@@ -278,10 +285,13 @@ def test_source_registry_reload_when_failed(
 
     # 準備
     def failing_load(entry: SourceEntry, *, index: int, lookup: object = None) -> LoadResult:
-        raise RuntimeError("読めない")
+        msg = "読めない"
+        raise RuntimeError(msg)
 
     monkeypatch.setattr(registry_module, "load_source", failing_load)
-    terminal = make_terminal_config(sources=[make_entry("/tmp/a/project-index.yaml", source_id="a")])
+    terminal = make_terminal_config(
+        sources=[make_entry("/tmp/a/project-index.yaml", source_id="a")]
+    )
     registry = SourceRegistry(loading=True)
     errors: list[BaseException] = []
 
@@ -335,7 +345,8 @@ class _Loader:
             self.entered[name].set()
             self.release[name].wait(timeout=5)
         if name in self._failing:
-            raise RuntimeError(f"{name} を読めない")
+            msg = f"{name} を読めない"
+            raise RuntimeError(msg)
         source_id = entry.id or self._names.get(name, name)
         return (
             self._make_served_source(id=source_id, root=Path("/tmp") / name),
@@ -415,7 +426,8 @@ def test_source_registry_load_when_lookup_failed(
     # 準備
 
     def failing_lookup(terminal: TerminalConfig) -> SchemaRefLookup:
-        raise RuntimeError("引き当てを作れない")
+        msg = "引き当てを作れない"
+        raise RuntimeError(msg)
 
     monkeypatch.setattr(registry_module, "terminal_lookup", failing_lookup)
     terminal = make_terminal_config(sources=_entries(make_entry, "a"))
@@ -625,8 +637,12 @@ def test_source_registry_wait_for_when_cwd(
     monkeypatch.setattr(registry_module, "load_source", loader)
     terminal = make_terminal_config(
         sources=[
-            make_entry("/tmp/a/project-index.yaml", source_id="a", scope=SourceScope(read=["/w/a/**"])),
-            make_entry("/tmp/b/project-index.yaml", source_id="b", scope=SourceScope(read=["/w/b/**"])),
+            make_entry(
+                "/tmp/a/project-index.yaml", source_id="a", scope=SourceScope(read=["/w/a/**"])
+            ),
+            make_entry(
+                "/tmp/b/project-index.yaml", source_id="b", scope=SourceScope(read=["/w/b/**"])
+            ),
         ]
     )
     registry = SourceRegistry(loading=True)

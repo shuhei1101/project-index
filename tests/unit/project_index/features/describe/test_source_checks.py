@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any
-
-import pytest
+from typing import TYPE_CHECKING, Any
 
 from project_index.features.describe import source_checks as source_checks_module
 from project_index.features.describe.source_checks import SourceChecks
 from project_index.features.documents.types import SyncReport
-from project_index.features.settings.types import SourceEntry, TerminalConfig
-from project_index.features.sources.types import ServedSource
 from project_index.main import Handlers, build_handlers
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import pytest
+    from project_index.features.settings.types import SourceEntry, TerminalConfig
+    from project_index.features.sources.types import ServedSource
 
 
 def _sample(

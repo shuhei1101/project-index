@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 from project_index.features.session_start.route import build_session_start_router
-from project_index.features.settings.types import SourceEntry, TerminalConfig
 from project_index.main import Handlers, build_handlers
 from project_index.server.error_handlers import register_error_handlers
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from project_index.features.settings.types import SourceEntry, TerminalConfig
 
 
 def _loaded_handlers(terminal: TerminalConfig) -> Handlers:
@@ -65,4 +68,3 @@ def test_build_session_start_router_when_invalid(
     assert response.status_code == 422
     assert response.headers["content-type"].startswith("application/problem+json")
     assert any("reason" in item["path"] for item in body["errors"])
-

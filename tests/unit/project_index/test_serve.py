@@ -7,24 +7,17 @@ import os
 import shutil
 import socket
 import sys
-import threading
-from collections.abc import Callable, Iterator
 from contextlib import closing, contextmanager
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import uvicorn
-
-from project_index import main as main_module
 from project_index.features.access.types import Target
 from project_index.features.convert.service import ConvertService
 from project_index.features.describe.source_checks import SourceChecks
 from project_index.features.documents.store import DocumentStore
 from project_index.features.history.snapshot import SnapshotStore
-from project_index.features.settings.types import SourceEntry, TerminalConfig
 from project_index.features.sources.registry import SourceRegistry
-from project_index.features.sources.types import SourceStatus
 from project_index.features.validation.service import DocumentChecker
 from project_index.main import (
     PortInUseError,
@@ -35,6 +28,16 @@ from project_index.main import (
     run_serve,
 )
 from project_index.shared.yaml_io import load_yaml
+
+from project_index import main as main_module
+
+if TYPE_CHECKING:
+    import threading
+    from collections.abc import Callable, Iterator
+    from pathlib import Path
+
+    from project_index.features.settings.types import SourceEntry, TerminalConfig
+    from project_index.features.sources.types import SourceStatus
 
 
 def _free_port() -> int:
@@ -354,7 +357,9 @@ def test_build_handlers_when_out_of_sync(
             "docs/rule/doc-2.yaml": "id: doc-2\n",
         },
     )
-    terminal = make_terminal_config(sources=[make_entry(str(tmp_path / "ws" / "project-index.yaml"))])
+    terminal = make_terminal_config(
+        sources=[make_entry(str(tmp_path / "ws" / "project-index.yaml"))]
+    )
     # 実行
     handlers = build_handlers(terminal)
     with caplog.at_level(logging.WARNING):
@@ -756,7 +761,9 @@ def test_start_loading(
     """裏で配信元を読み ID を出す（正常系）。"""
     # 準備
     write_files(tmp_path / "ws", sample_files)
-    terminal = make_terminal_config(sources=[make_entry(str(tmp_path / "ws" / "project-index.yaml"))])
+    terminal = make_terminal_config(
+        sources=[make_entry(str(tmp_path / "ws" / "project-index.yaml"))]
+    )
     handlers = build_handlers(terminal)
     # 実行
     thread = main_module.start_loading(handlers)
@@ -779,11 +786,14 @@ def test_start_loading_when_failed(
     """読み込みの例外をログに書いて待ちを解く（異常系）。"""
     # 準備
     write_files(tmp_path / "ws", sample_files)
-    terminal = make_terminal_config(sources=[make_entry(str(tmp_path / "ws" / "project-index.yaml"))])
+    terminal = make_terminal_config(
+        sources=[make_entry(str(tmp_path / "ws" / "project-index.yaml"))]
+    )
     handlers = build_handlers(terminal)
 
     def failing_refresh(store: DocumentStore, source: Any) -> Any:
-        raise RuntimeError("検査に失敗した")
+        msg = "検査に失敗した"
+        raise RuntimeError(msg)
 
     handlers.checks.refresh = failing_refresh  # type: ignore[method-assign]
     # 実行

@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from project_index.features.documents.store import DocumentStore
 from project_index.features.history.snapshot import SnapshotStore
-from project_index.features.sources.registry import SourceRegistry
 from project_index.features.sources.types import DocumentTable, ServedSource, SourceConfig
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from project_index.features.sources.registry import SourceRegistry
 
 TERM_DOCS = {
     "terms/scope.yaml": (

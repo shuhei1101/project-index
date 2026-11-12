@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from project_index.features.documents.types import Document
 from project_index.features.sources.types import DocumentTable, ServedSource, SourceConfig
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from project_index.features.documents.types import Document
 
 
 def _alias_document(

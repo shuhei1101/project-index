@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from project_index.features.documents.types import Document
 from project_index.features.related.graph import walk_related
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from project_index.features.documents.types import Document
 
 
 def _chain(make_document: Callable[..., Document]) -> dict[str, Document]:

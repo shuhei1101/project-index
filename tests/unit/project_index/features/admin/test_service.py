@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
 from project_index.features.admin.service import (
     _load_candidate,
     _source_states,
@@ -16,18 +14,25 @@ from project_index.features.admin.service import (
     version_state,
 )
 from project_index.features.admin.types import CheckProjectRequest, TryConvertRequest
-from project_index.features.settings.types import SourceEntry, TerminalConfig, TerminalConfigInvalidError
+from project_index.features.settings.types import (
+    SourceEntry,
+    TerminalConfig,
+    TerminalConfigInvalidError,
+)
 from project_index.features.sources.registry import SourceRegistry
 from project_index.main import Handlers, build_handlers
 from project_index.shared.errors import (
-    ConverterNotDefinedError,
     ConfigNotFoundError,
     ConfigParseError,
+    ConverterNotDefinedError,
     ConvertScriptError,
     DocumentNotFoundError,
     ValidationFailedError,
 )
 from project_index.shared.yaml_io import load_yaml
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 BROKEN_CONFIG = "name: {name}\ndocuments:\n  - id: rules\n    schema: schemas/rule.schema.yaml\n"
 NOTES_CONFIG = (
@@ -525,7 +530,9 @@ def test_load_candidate_when_legacy_config(make_source_dir: Callable[..., Path])
     assert candidate.source is not None
     assert candidate.source.id == "alpha"
     # project-index.yaml を置くと、そちらを読む
-    config.write_text(legacy.read_text(encoding="utf-8").replace("alpha", "beta", 1), encoding="utf-8")
+    config.write_text(
+        legacy.read_text(encoding="utf-8").replace("alpha", "beta", 1), encoding="utf-8"
+    )
     assert _load_candidate(str(legacy.parent), config=None).source.id == "beta"
 
 
@@ -851,7 +858,8 @@ def test_source_states_when_not_checked(
 
     def failing_check_sync(store: Any, source: Any) -> Any:
         calls.append(source.id)
-        raise AssertionError("check_sync を呼んだ")
+        msg = "check_sync を呼んだ"
+        raise AssertionError(msg)
 
     monkeypatch.setattr(service_module, "check_sync", failing_check_sync, raising=False)
     # 実行
@@ -879,7 +887,8 @@ def test_source_states_without_refresh(
 
     def failing_get(source_id: str) -> Any:
         calls.append(source_id)
-        raise AssertionError("registry.get を呼んだ")
+        msg = "registry.get を呼んだ"
+        raise AssertionError(msg)
 
     monkeypatch.setattr(handlers.registry, "get", failing_get)
     # 実行

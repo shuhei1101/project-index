@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-import pytest
+from project_index.features.convert.decisions import find_decisions
 
-from project_index.features.convert.decisions import decision_page_id, find_decisions
-from project_index.features.sources.types import ServedSource, SourceConfig
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from project_index.features.sources.types import ServedSource, SourceConfig
 
 
 def test_find_decisions(
@@ -72,4 +74,3 @@ def test_find_decisions_when_no_folders(
     result = find_decisions(source)
     # 検証
     assert result == {}
-

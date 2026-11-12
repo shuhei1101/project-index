@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
-
 from project_index.features.settings.query import (
     config_path,
     listen_port,
@@ -14,6 +13,9 @@ from project_index.features.settings.query import (
     xdg_base_dir,
 )
 from project_index.features.settings.types import TerminalConfig, TerminalConfigInvalidError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def test_config_path() -> None:
@@ -181,7 +183,11 @@ def test_load_terminal_config_when_schema_invalid(tmp_path: Path) -> None:
 
 def _valid_settings() -> dict[str, object]:
     """必須のキーだけを持つ端末の設定の値を返す。"""
-    return {"version": "1", "clone": "/tmp/clone", "sources": [{"config": "/tmp/a/project-index.yaml"}]}
+    return {
+        "version": "1",
+        "clone": "/tmp/clone",
+        "sources": [{"config": "/tmp/a/project-index.yaml"}],
+    }
 
 
 def test_validate_terminal_config() -> None:

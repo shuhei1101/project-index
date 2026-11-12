@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
 from project_index.features.history import snapshot as snapshot_module
 from project_index.features.history.snapshot import SnapshotStore
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
 
 
 @pytest.fixture

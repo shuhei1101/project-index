@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
 from project_index.features.describe.service import describe
 from project_index.features.describe.source_checks import SourceChecks
 from project_index.features.describe.types import (
@@ -18,10 +16,14 @@ from project_index.features.describe.types import (
 from project_index.features.documents.store import DocumentStore
 from project_index.features.history.snapshot import SnapshotStore
 from project_index.features.settings.types import SourceEntry, TerminalConfig
-from project_index.features.sources.registry import SourceRegistry
 from project_index.features.sources.types import DocumentTable, ServedSource, SourceConfig
 from project_index.main import build_handlers
 from project_index.shared.errors import UnknownKindError, ValidationFailedError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from project_index.features.sources.registry import SourceRegistry
 
 SCHEMA_TEXT = "description: 規約の文書\ntype: object\n"
 # 偽の配信元では警告を求めないので、端末の設定はどの値でもよい

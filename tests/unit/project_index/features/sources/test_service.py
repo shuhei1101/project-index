@@ -2,13 +2,10 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
-from project_index.features.settings.types import SourceEntry
 from project_index.features.sources import service as service_module
 from project_index.features.sources.service import (
     assemble_source,
@@ -20,6 +17,11 @@ from project_index.features.sources.service import (
 )
 from project_index.features.sources.types import ScriptEntry, ServedSource, SourceConfig
 from project_index.shared.errors import ValidationFailedError, Violation
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from project_index.features.settings.types import SourceEntry
 
 RULE_SCHEMA = "title: rule\ntype: object\n"
 
@@ -400,7 +402,10 @@ def test_load_source_when_version_old(
     monkeypatch.setattr(service_module, "SOURCE_CONFIG_VERSION", "2")
     write_files(
         tmp_path,
-        {**sample_files, "project-index.yaml": 'version: "1"\n' + sample_files["project-index.yaml"]},
+        {
+            **sample_files,
+            "project-index.yaml": 'version: "1"\n' + sample_files["project-index.yaml"],
+        },
     )
     entry = make_entry(str(tmp_path / "project-index.yaml"), source_id="sample")
     # 実行
@@ -495,7 +500,9 @@ def test_load_source_at(
     """ワークツリーの設定（正常系）。"""
     # 準備
     extra = "  - id: notes\n    paths: [docs/note/*.yaml]\n    schema: schemas/rule.schema.yaml\n"
-    (worktree / "project-index.yaml").write_text(sample_files["project-index.yaml"] + extra, encoding="utf-8")
+    (worktree / "project-index.yaml").write_text(
+        sample_files["project-index.yaml"] + extra, encoding="utf-8"
+    )
     # 実行
     result = load_source_at(cloned_source, worktree)
     # 検証
@@ -560,7 +567,9 @@ def test_assemble_source(
     """`root_override` のフォルダを配信元のフォルダにする（正常系）。"""
     # 準備
     root = tmp_path / "root"
-    write_files(root, {key: value for key, value in sample_files.items() if key != "project-index.yaml"})
+    write_files(
+        root, {key: value for key, value in sample_files.items() if key != "project-index.yaml"}
+    )
     config_dir = tmp_path / "cfg"
     write_files(config_dir, {"project-index.yaml": sample_files["project-index.yaml"]})
     # 実行
@@ -745,7 +754,8 @@ def test_load_source_when_worktree_config(
     # 準備
     files = {
         **sample_files,
-        "project-index.yaml": sample_files["project-index.yaml"] + "worktrees: [.claude/worktrees/*]\n",
+        "project-index.yaml": sample_files["project-index.yaml"]
+        + "worktrees: [.claude/worktrees/*]\n",
     }
     root = git_repo(files, branch="main")
     worktree = root / ".claude/worktrees/develop"
@@ -822,7 +832,10 @@ def test_read_default_ref_config_when_ref_missing(
     from project_index.features.sources.service import read_default_ref_config
 
     # 準備
-    files = {**sample_files, "project-index.yaml": sample_files["project-index.yaml"] + "default_ref: none\n"}
+    files = {
+        **sample_files,
+        "project-index.yaml": sample_files["project-index.yaml"] + "default_ref: none\n",
+    }
     root = git_repo(files)
     # 実行・検証
     with pytest.raises(ValidationFailedError, match="none を解けません") as exc_info:

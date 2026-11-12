@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from datetime import datetime
-from pathlib import Path
-from typing import Any
-
-import pytest
+from typing import TYPE_CHECKING, Any
 
 from project_index.features.documents import loader as loader_module
 from project_index.features.documents.loader import (
@@ -16,6 +12,12 @@ from project_index.features.documents.loader import (
 from project_index.features.history.types import FileDates
 from project_index.features.sources.types import DocumentTable
 from project_index.shared.hashing import content_hash, value_hash
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    import pytest
 
 
 def test_collect_files(tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]) -> None:

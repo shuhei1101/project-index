@@ -1,22 +1,28 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable
-from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
-from project_index.features.access.types import Target
 from project_index.features.convert import service as service_module
 from project_index.features.convert.service import ConvertService
-from project_index.features.documents.store import DocumentStore
 from project_index.features.documents.types import Document, LoadResult
-from project_index.features.history.snapshot import SnapshotStore
-from project_index.features.sources.types import DocumentTable, ScriptEntry, ServedSource, SourceConfig
+from project_index.features.sources.types import (
+    DocumentTable,
+    ScriptEntry,
+    ServedSource,
+    SourceConfig,
+)
 from project_index.integrations.scripts import ScriptResult
 from project_index.shared.errors import ConverterNotDefinedError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from project_index.features.access.types import Target
+
 
 def _service(tmp_path: Path, schema: dict[str, Any], timeout_sec: float = 10) -> ConvertService:
     """決めたスキーマを返す文書のストアの偽物で、変換を作る。"""
@@ -234,4 +240,3 @@ LINK_SCHEMA = {
         "flow": {"type": "string", "x-heading": "処理の流れ"},
     }
 }
-

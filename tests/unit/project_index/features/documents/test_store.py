@@ -1,19 +1,15 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
-from project_index.features.access.types import Target
 from project_index.features.documents import indexable as indexable_module
 from project_index.features.documents import loader as loader_module
 from project_index.features.documents import store as store_module
 from project_index.features.documents.store import DocumentStore
-from project_index.features.documents.types import Document
 from project_index.features.history import query as query_module
 from project_index.features.history import snapshot as snapshot_module
 from project_index.features.history.snapshot import SnapshotStore
@@ -21,6 +17,12 @@ from project_index.features.sources.types import DocumentTable, ServedSource, So
 from project_index.integrations import git as git_module
 from project_index.shared.errors import DocumentNotFoundError, UnknownKindError
 from project_index.shared.yaml_io import load_yaml
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from project_index.features.access.types import Target
+    from project_index.features.documents.types import Document
 
 OCT_01 = "2026-10-01T12:00:00+09:00"
 

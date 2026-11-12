@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
-from project_index.features.documents.types import Document
 from project_index.features.related.suggest import suggest_related
 from project_index.features.related.types import Suggestion
 from project_index.features.seen.types import Activity
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from project_index.features.documents.types import Document
 
 
 def test_suggest_related(make_document: Callable[..., Document]) -> None:

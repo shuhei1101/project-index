@@ -1,18 +1,20 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
-from project_index.features.settings.types import SourceEntry, TerminalConfig
 from project_index.features.sources.schema_ref import (
     SchemaRef,
     SchemaRefError,
     read_schema_ref,
     terminal_lookup,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from project_index.features.settings.types import SourceEntry, TerminalConfig
 
 NOTE_SCHEMA_V1 = (
     "title: note\ntype: object\nproperties:\n  body:\n    $ref: common.schema.yaml#/$defs/text\n"

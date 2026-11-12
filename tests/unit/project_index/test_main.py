@@ -4,10 +4,10 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from project_index.main import run_migrate, run_serve
 
 from project_index import main as main_module
 from project_index.__main__ import build_parser, main
-from project_index.main import run_migrate, run_serve
 
 PYPROJECT_PATH = Path(__file__).parents[3] / "pyproject.toml"
 

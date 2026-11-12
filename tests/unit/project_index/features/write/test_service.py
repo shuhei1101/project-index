@@ -1,21 +1,15 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
-from project_index.features.access.types import Target
 from project_index.features.documents.store import DocumentStore
-from project_index.features.documents.types import Document
 from project_index.features.history.snapshot import SnapshotStore
 from project_index.features.seen.store import SeenStore
 from project_index.features.seen.types import LastRead, SessionKey
-from project_index.features.sources.registry import SourceRegistry
 from project_index.features.sources.types import (
     DocumentTable,
     ScriptEntry,
@@ -44,6 +38,14 @@ from project_index.shared.errors import (
 )
 from project_index.shared.hashing import content_hash, value_hash
 from project_index.shared.yaml_io import load_yaml
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from project_index.features.access.types import Target
+    from project_index.features.documents.types import Document
+    from project_index.features.sources.registry import SourceRegistry
 
 DOC_1 = "id: doc-1\nname: 文書 1\n"
 DOC_2 = "id: doc-2\nname: 文書 2\n"

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
 from project_index.features.documents import fields as fields_module
 from project_index.features.documents.fields import (
     delete_field,
@@ -13,9 +11,13 @@ from project_index.features.documents.fields import (
     resolve_metadata,
     set_field,
 )
-from project_index.features.documents.types import Document
 from project_index.features.sources.types import DocumentTable
 from project_index.shared.errors import InvalidArgumentError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from project_index.features.documents.types import Document
 
 
 def test_parse_field_path() -> None:

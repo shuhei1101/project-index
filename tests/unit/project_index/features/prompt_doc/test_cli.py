@@ -3,10 +3,12 @@ from __future__ import annotations
 import argparse
 import io
 import sys
-
-import pytest
+from typing import TYPE_CHECKING
 
 from project_index.features.prompt_doc.cli import run_prompt_doc
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def test_run_prompt_doc(

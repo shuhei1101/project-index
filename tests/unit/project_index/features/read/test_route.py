@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 from project_index.features.read.route import build_read_router
 from project_index.server.error_handlers import register_error_handlers
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from types import SimpleNamespace
 
 
 def _client(handlers: Any) -> TestClient:
@@ -50,7 +51,9 @@ def test_build_read_router(make_view_env: Callable[..., SimpleNamespace]) -> Non
     assert {path: r.status_code for path, r in responses.items()} == dict.fromkeys(responses, 200)
     assert responses["/sources/sample/docs/docs/a.yaml"].json()["value"] == {"id": "a", "name": "A"}
     assert "updatedAt" in responses["/sources/sample/docs/docs/a.yaml"].json()
-    assert responses["/sources/sample/decisions"].json()["decisions"] == [{"id": "D-1", "folders": 1}]
+    assert responses["/sources/sample/decisions"].json()["decisions"] == [
+        {"id": "D-1", "folders": 1}
+    ]
 
 
 @pytest.mark.parametrize(

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
-
 from project_index.shared.files import replace_file
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_replace_file(tmp_path: Path) -> None:
@@ -39,7 +41,8 @@ def test_replace_file_when_replace_fails(tmp_path: Path, monkeypatch: pytest.Mon
     target.write_text("old\n", encoding="utf-8")
 
     def failing_replace(src: str, dst: str) -> None:
-        raise OSError("replace failed")
+        msg = "replace failed"
+        raise OSError(msg)
 
     monkeypatch.setattr(os, "replace", failing_replace)
     # 実行・検証

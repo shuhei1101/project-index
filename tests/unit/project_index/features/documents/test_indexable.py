@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from project_index.features.documents.indexable import indexable_files, is_excluded_file, walk_files
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
 
 
 def test_walk_files(tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]) -> None:

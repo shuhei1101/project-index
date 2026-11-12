@@ -1,19 +1,21 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from project_index.features.documents.store import DocumentStore
-from project_index.features.documents.types import Document
 from project_index.features.history.snapshot import SnapshotStore
-from project_index.features.settings.types import SourceEntry
-from project_index.features.sources.service import load_source
-from project_index.features.sources.types import DocumentTable, ServedSource, SourceConfig
 from project_index.features.read import nav as nav_module
-from project_index.features.read.nav import build_nav, mark_nav_changes
-from project_index.features.read.types import NavItem, NavTab
+from project_index.features.read.types import NavItem
+from project_index.features.sources.service import load_source
+from project_index.features.sources.types import DocumentTable
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from project_index.features.documents.types import Document
+    from project_index.features.settings.types import SourceEntry
 
 
 def _tables() -> list[DocumentTable]:
@@ -170,8 +172,8 @@ def _tagged_documents(make_document: Callable[..., Document]) -> list[Document]:
 
 def test_nav_auto_counts(make_document: Callable[..., Document]) -> None:
     """入れ子の auto を数える（正常系）。"""
-    from project_index.features.search.fields import known_fields
     from project_index.features.read.nav import nav_auto_counts
+    from project_index.features.search.fields import known_fields
 
     # 準備
     nav = {
@@ -198,8 +200,8 @@ def test_nav_auto_counts(make_document: Callable[..., Document]) -> None:
 
 def test_check_nav_filters() -> None:
     """知らない項目と無い行（異常系）。"""
-    from project_index.features.search.fields import known_fields
     from project_index.features.read.nav import check_nav_filters
+    from project_index.features.search.fields import known_fields
 
     # 準備
     nav = {

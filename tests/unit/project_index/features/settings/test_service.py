@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
-
 from project_index.features.settings.service import add_source, save_sources
-from project_index.features.settings.types import SourceEntry, TerminalConfig, TerminalConfigInvalidError
-from project_index.features.sources.types import SourceStatus
+from project_index.features.settings.types import (
+    SourceEntry,
+    TerminalConfig,
+    TerminalConfigInvalidError,
+)
 from project_index.shared.yaml_io import load_yaml
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from project_index.features.sources.types import SourceStatus
 
 SETTINGS_TEXT = (
     'version: "1"\n'

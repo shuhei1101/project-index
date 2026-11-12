@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from project_index.features.documents.types import Document
 from project_index.features.seen.store import SeenStore
 from project_index.features.seen.types import SessionKey
 from project_index.features.session_start.service import start_session
 from project_index.features.session_start.types import SessionStartRequest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from project_index.features.documents.types import Document
 
 
 def _seen(tmp_path: Path) -> SeenStore:
