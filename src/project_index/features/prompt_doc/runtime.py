@@ -100,6 +100,31 @@ def _schema_reason(violation: Violation) -> str:
     return violation.rule
 
 
+def _read_prompt(
+    file: Path, *, directory: Path, schema: object, registry: Registry[Any]
+) -> tuple[PromptDoc | None, list[tuple[str, str]]]:
+    """YAML として読み、スキーマ・id・モデルで検査したプロンプトか、(パス, 理由) の並びを返す。"""
+    # YAML として読む
+    try:
+        value = load_yaml(file.read_text(encoding="utf-8"), file=str(file))
+    except (OSError, YamlLoadError) as error:
+        return None, [(WHOLE_FILE_PATH, str(error))]
+    # スキーマで検査する
+    violations = schema_violations(schema, value, registry=registry)
+    if violations:
+        return None, [(item.path, _schema_reason(item)) for item in violations]
+    # id がフォルダからのパスと同じか
+    expected_id = file.relative_to(directory).with_suffix("").as_posix()
+    if not is_dict(value) or value.get("id") != expected_id:
+        return None, [("id", f"ファイルのパス {expected_id} と違います")]
+    try:
+        return PromptDoc.model_validate(value), []
+    except ValidationError as error:
+        return None, [
+            (format_path(item["loc"]) or WHOLE_FILE_PATH, item["msg"]) for item in error.errors()
+        ]
+
+
 def _check_file(
     file: Path,
     *,
@@ -113,26 +138,9 @@ def _check_file(
     def problem(path: str, reason: str) -> PromptProblem:
         return PromptProblem(file=file, path=path, reason=reason)
 
-    # YAML として読む
-    try:
-        value = load_yaml(file.read_text(encoding="utf-8"), file=str(file))
-    except (OSError, YamlLoadError) as error:
-        return None, [problem(WHOLE_FILE_PATH, str(error))]
-    # スキーマで検査する
-    violations = schema_violations(schema, value, registry=registry)
-    if violations:
-        return None, [problem(item.path, _schema_reason(item)) for item in violations]
-    # id がフォルダからのパスと同じか
-    expected_id = file.relative_to(directory).with_suffix("").as_posix()
-    if not is_dict(value) or value.get("id") != expected_id:
-        return None, [problem("id", f"ファイルのパス {expected_id} と違います")]
-    try:
-        doc = PromptDoc.model_validate(value)
-    except ValidationError as error:
-        return None, [
-            problem(format_path(item["loc"]) or WHOLE_FILE_PATH, item["msg"])
-            for item in error.errors()
-        ]
+    doc, found = _read_prompt(file, directory=directory, schema=schema, registry=registry)
+    if doc is None:
+        return None, [problem(path, reason) for path, reason in found]
     # 部品をテンプレートにする
     compiled, syntax_errors = compile_parts(doc, env=env)
     if syntax_errors:

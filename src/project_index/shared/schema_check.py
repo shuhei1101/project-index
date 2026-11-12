@@ -32,6 +32,12 @@ def _as_list(value: object) -> list[str]:
     return [str(item) for item in value] if is_list(value) else []
 
 
+def _properties(schema: object) -> set[object]:
+    """スキーマの `properties` のキーの集合（無ければ空）。"""
+    properties = schema.get("properties") if is_dict(schema) else None
+    return set(properties) if is_dict(properties) else set()
+
+
 def _from_error(error: ValidationError) -> list[Violation]:
     """jsonschema の誤り 1 つを違反の並びにする（必須のキーと知らないキーは 1 キーずつ）。"""
     base = list(error.absolute_path)
@@ -43,9 +49,7 @@ def _from_error(error: ValidationError) -> list[Violation]:
             if key not in instance
         ]
     if error.validator == "additionalProperties" and is_dict(instance):
-        schema: object = error.schema
-        properties = schema.get("properties") if is_dict(schema) else None
-        known: set[object] = set(properties) if is_dict(properties) else set()
+        known = _properties(error.schema)
         return [
             Violation(path=format_path([*base, str(key)]), rule="知らないキー")
             for key in instance

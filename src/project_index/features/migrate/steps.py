@@ -103,20 +103,21 @@ def _parents(data: CommentedMap, parts: list[str]) -> list[_Parent]:
     """キーのパスの末尾の手前までをたどり、末尾のキーを持つ親の辞書を集める。"""
     parents = [_Parent(data)]
     for part in parts:
-        next_parents: list[_Parent] = []
-        for parent in parents:
-            # `{キー}[]` は配列の要素ごとにたどる
-            key = part.removesuffix(ARRAY_SUFFIX)
-            child = parent.node.get(key)
-            if part.endswith(ARRAY_SUFFIX):
-                if is_list(child):
-                    next_parents.extend(
-                        _Parent(item) for item in child if isinstance(item, CommentedMap)
-                    )
-            elif isinstance(child, CommentedMap):
-                next_parents.append(_Parent(child, parent.node, key))
-        parents = next_parents
+        parents = [child for parent in parents for child in _children(parent, part)]
     return parents
+
+
+def _children(parent: _Parent, part: str) -> list[_Parent]:
+    """親の辞書の 1 つのキーの先の辞書を返す（`{キー}[]` は配列の要素の辞書ごと）。"""
+    key = part.removesuffix(ARRAY_SUFFIX)
+    child = parent.node.get(key)
+    if part.endswith(ARRAY_SUFFIX):
+        return (
+            [_Parent(item) for item in child if isinstance(item, CommentedMap)]
+            if is_list(child)
+            else []
+        )
+    return [_Parent(child, parent.node, key)] if isinstance(child, CommentedMap) else []
 
 
 def _rename(parent: CommentedMap, step: MigrationStep, key: str) -> None:

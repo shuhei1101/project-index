@@ -18,6 +18,23 @@ SCORE_DIGITS = 2
 type Signal = Literal["co_change", "edited", "viewed"]
 
 
+def _co_change_scores(
+    documents: Sequence[Document], co_changed: Mapping[str, int]
+) -> list[tuple[str, float]]:
+    """一緒に変わったファイルの文書ごとに、最も多い回数を 1 にした重みつきの点数を返す。"""
+    if not co_changed:
+        return []
+    most = max(co_changed.values())
+    by_file: dict[str, list[str]] = {}
+    for document in documents:
+        by_file.setdefault(document.body_path or document.path, []).append(document.id)
+    return [
+        (doc_id, SIGNAL_WEIGHTS["co_change"] * count / most)
+        for path, count in co_changed.items()
+        for doc_id in by_file.get(path, [])
+    ]
+
+
 def suggest_related(
     start: Sequence[Document],
     documents: Sequence[Document],
@@ -35,14 +52,8 @@ def suggest_related(
         if signal not in signals.setdefault(doc_id, []):
             signals[doc_id].append(signal)
 
-    if co_changed:
-        most = max(co_changed.values())
-        by_file: dict[str, list[str]] = {}
-        for document in documents:
-            by_file.setdefault(document.body_path or document.path, []).append(document.id)
-        for path, count in co_changed.items():
-            for doc_id in by_file.get(path, []):
-                add(doc_id, "co_change", SIGNAL_WEIGHTS["co_change"] * count / most)
+    for doc_id, value in _co_change_scores(documents, co_changed):
+        add(doc_id, "co_change", value)
     for item in activity:
         add(item.doc_id, "edited" if item.kind == "edited" else "viewed", SIGNAL_WEIGHTS[item.kind])
     known = {document.id for document in documents}
