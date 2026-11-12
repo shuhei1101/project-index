@@ -10,6 +10,7 @@ from jsonschema import Draft202012Validator
 from jsonschema import validators as jsonschema_validators
 from jsonschema.exceptions import ValidationError
 from jsonschema.validators import validator_for
+from referencing.exceptions import Unresolvable
 
 from project_index.integrations.mdmark import MdmarkUnavailableError, check_markdown
 from project_index.shared.errors import Violation
@@ -87,10 +88,15 @@ def markdown_values(data: Mapping[str, Any], schema: Mapping[str, Any]) -> dict[
     marker_class = _EXTEND(base, validators={MEDIA_TYPE_KEYWORD: _mark_markdown})
     validator = marker_class(dict(schema))
     # 目印は文字列の値にだけ出すので、instance は str
-    return {
-        format_path(error.absolute_path): str(error.instance)
-        for error in _marked(validator.iter_errors(dict(data)))
-    }
+    try:
+        return {
+            format_path(error.absolute_path): str(error.instance)
+            for error in _marked(validator.iter_errors(dict(data)))
+        }
+    except Unresolvable as error:
+        # 解決できない `$ref` はスキーマの検査が違反にするので、Markdown のキーは無いものとする
+        logger.warning("Markdown のキーを取り出せなかった（%s）", error.ref)
+        return {}
 
 
 def changed_markdown(

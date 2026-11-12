@@ -106,12 +106,21 @@ class _Resolver:
         ref = value.get("$ref")
         if isinstance(ref, str):
             return self._resolve_ref(value, ref, current, document, stack)
-        # 最上位の `$defs` は参照先として使うので、そのまま残す
         return {
-            key: item
+            key: self._resolve_defs(item, current, document)
             if key == "$defs" and not stack
             else self.resolve(item, current, document, stack)
             for key, item in value.items()
+        }
+
+    def _resolve_defs(self, defs: object, current: PurePath, document: object) -> object:
+        """最上位の `$defs` を参照先として残したまま、各定義の中の `$ref` を解く。"""
+        if not is_dict(defs):
+            return defs
+        # 定義を自分自身への参照をたどる途中として解き、自分へ戻る `#/$defs/{名前}` だけを残す
+        return {
+            name: self.resolve(item, current, document, (f"{current}#/$defs/{name}",))
+            for name, item in defs.items()
         }
 
     def _resolve_ref(

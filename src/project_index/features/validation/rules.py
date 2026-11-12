@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from jsonschema import FormatChecker
 from jsonschema.validators import Draft202012Validator, validator_for
+from referencing.exceptions import Unresolvable
 
 from project_index.shared.errors import Violation
 from project_index.shared.narrowing import is_dict, is_list
@@ -43,20 +44,32 @@ def _schema_fix(error: ValidationError) -> str:
     return ""
 
 
-def check_schema(data: Mapping[str, Any], schema: Mapping[str, Any]) -> list[Violation]:
+def check_schema(
+    data: Mapping[str, Any], schema: Mapping[str, Any], *, schema_file: str
+) -> list[Violation]:
     """文書の内容を種類の JSON Schema で検査する。"""
     if not schema:
         return []
     validator_class = validator_for(dict(schema), default=Draft202012Validator)
     validator = validator_class(dict(schema), format_checker=FormatChecker())
-    violations = [
-        Violation(
-            path=format_path(error.absolute_path) or ROOT_PATH,
-            rule=error.message,
-            fix=_schema_fix(error),
-        )
-        for error in validator.iter_errors(dict(data))
-    ]
+    try:
+        violations = [
+            Violation(
+                path=format_path(error.absolute_path) or ROOT_PATH,
+                rule=error.message,
+                fix=_schema_fix(error),
+            )
+            for error in validator.iter_errors(dict(data))
+        ]
+    except Unresolvable as error:
+        # 検査の途中で解決できない `$ref` に到達した: 参照とスキーマのファイルを違反 1 件にする
+        return [
+            Violation(
+                path=ROOT_PATH,
+                rule=f"スキーマの参照 {error.ref} を解決できません（{schema_file}）",
+                fix="参照先のファイルと定義があるかを確認してください",
+            )
+        ]
     return sorted(violations, key=lambda violation: violation.path)
 
 
