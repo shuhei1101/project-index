@@ -1,6 +1,6 @@
 id: MOD-40
 title: 索引のサーバー / プロンプトの文書の変換 / cli.py
-lead: '`project-index prompt-doc` の処理。標準入力を変換して標準出力に出し、失敗を終了コードにする。'
+lead: '`project-index prompt-doc` の処理を受け持ち、プロンプトの文書の変換の cli.py を修正するときに参照する。'
 test_files:
   - tests/unit/project_index/features/prompt_doc/test_cli.py
 constants:
@@ -58,3 +58,5 @@ functions:
         exception: なし（終了コード 1）
     refs:
       - MOD-41#functions[convert_prompt]
+notes:
+  決まり: 標準入力を変換して標準出力に出し、失敗を終了コードにする。

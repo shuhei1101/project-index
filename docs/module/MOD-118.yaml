@@ -1,8 +1,7 @@
 id: MOD-118
 title: 索引のサーバー / 端末の設定
 lead: |-
-  端末の設定 `settings.yaml` をスキーマで検証して読み、端末の設定の API に送られた `sources[]` を、他のキーとコメントを保って書き換える。
-  端末の設定の取得・保存の入口も持つ。
+  端末の設定の分類の構成図・ファイルの並び・決まりを定め、端末の設定のファイルを追加・移動するときに参照する。
 directory: |-
   ```text
   src/project_index/features/settings/
@@ -54,3 +53,7 @@ diagrams:
         click 端末の設定の読み込み href "./MOD-64.py.yaml#端末の設定の読み込み"
         click 配信元の読み直し href "./MOD-89.py.yaml#配信元の読み直し"
         click 端末の設定 href "./MOD-67.py.yaml#端末の設定"
+notes:
+  受け持つこと: |-
+    端末の設定 `settings.yaml` をスキーマで検証して読み、端末の設定の API に送られた `sources[]` を、他のキーとコメントを保って書き換える。
+    端末の設定の取得・保存の入口も持つ。

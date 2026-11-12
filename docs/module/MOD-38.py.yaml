@@ -1,6 +1,6 @@
 id: MOD-38
 title: 索引のサーバー / 設定の移し替え / steps.py
-lead: パッケージに入れた移し替えの手順を読み、メモリの上の YAML に 1 つずつ当てる。ファイルには書かない。
+lead: パッケージに入れた移し替えの手順を、メモリの上の YAML に 1 つずつ適用する処理を受け持ち、設定の移し替えの steps.py を修正するときに参照する。
 test_files:
   - tests/unit/project_index/features/migrate/test_steps.py
 directory: |-
@@ -168,3 +168,5 @@ functions:
         exception: 改名先がある
     callers:
       - MOD-37#functions[apply_migration]
+notes:
+  決まり: ファイルには書かない。

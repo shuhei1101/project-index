@@ -1,8 +1,7 @@
 id: MOD-110
 title: 索引のサーバー / 変更
 lead: |-
-  `list_changes` の処理。区間（commit・日時・ブランチ・タグ）か、この会話で前回読んだ時点から今までに変わった文書・変わったキー・差分の行を返す。
-  変わったキーと差分の行は、書き込みの差分と文書の取得の `diff` も使う。
+  変更の分類の構成図・ファイルの並び・決まりを定め、変更のファイルを追加・移動するときに参照する。
 directory: |-
   ```text
   src/project_index/features/changes/
@@ -87,3 +86,8 @@ diagrams:
         click 語の出現数 href "./MOD-12.py.yaml#語の出現数"
         click 正規表現の組み立て href "./MOD-53.py.yaml#正規表現の組み立て"
         click 変更の結果 href "./MOD-15.py.yaml#変更の結果"
+notes:
+  受け持つこと: |-
+    `list_changes` の処理。
+    区間（commit・日時・ブランチ・タグ）か、この会話で前回読んだ時点から今までに変わった文書・変わったキー・差分の行を返す。
+    変わったキーと差分の行は、書き込みの差分と文書の取得の `diff` も使う。

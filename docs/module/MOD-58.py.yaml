@@ -1,6 +1,6 @@
 id: MOD-58
 title: 索引のサーバー / 検索 / types.py
-lead: '`search_docs`・用語の一覧の要求と結果の型。'
+lead: '`search_docs`・用語の一覧の要求と結果の型を受け持ち、検索の types.py を修正するときに参照する。'
 diagrams:
   - name: 全体
     diagram: |-
@@ -68,7 +68,7 @@ data_models:
     usecase: 検索
     role: DTO
     summary: 条件を AND・OR でまとめるか、否定する
-    description: '`pydantic.BaseModel`（`extra="forbid"`）。`and`・`or`・`not` のどれか 1 つだけを持つ（Python の属性は `all_of`・`any_of`・`not_`、別名が `and`・`or`・`not`）。#16 の画面の `nav` のタグの式も同じスキーマで書く。'
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。`and`・`or`・`not` のどれか 1 つだけを持つ（Python の属性は `all_of`・`any_of`・`not_`、別名が `and`・`or`・`not`）。[shuhei1101/dev-docs#16 画面のナビゲーションにタグの式で絞った文書の一覧を置く](https://github.com/shuhei1101/dev-docs/issues/16) の画面の `nav` のタグの式も同じスキーマで書く。'
     properties:
       - name: all_of
         title: AND

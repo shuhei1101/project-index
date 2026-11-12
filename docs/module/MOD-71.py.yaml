@@ -1,6 +1,6 @@
 id: MOD-71
 title: 索引のサーバー / 配信元 / types.py
-lead: 配信元の設定・文書の行・スクリプト・配信中の配信元・状態の型。
+lead: 配信元の設定・文書の行・スクリプト・配信中の配信元・状態の型を受け持ち、配信元の types.py を修正するときに参照する。
 test_files:
   - tests/unit/project_index/features/sources/test_types.py
 diagrams:
@@ -46,7 +46,7 @@ data_models:
     usecase: 共通
     role: DTO
     summary: 配信元の設定の `documents[]` の 1 行（同じ形式・スキーマ・検査で扱う文書のまとまり）
-    description: '`pydantic.BaseModel`（`frozen=True`）。既定値は Issue #3 の資料 A-25 の `documents[]` のキー一覧。行の ID は MCP の `kind` になる。'
+    description: '`pydantic.BaseModel`（`frozen=True`）。既定値は [shuhei1101/dev-docs#3 汎用の開発ドキュメントサーバーを作る](https://github.com/shuhei1101/dev-docs/issues/3) の資料 A-25 の `documents[]` のキー一覧。行の ID は MCP の `kind` になる。'
     properties:
       - name: id
         title: 文書の行の ID
@@ -235,7 +235,7 @@ data_models:
     usecase: 共通
     role: DTO
     summary: マージして検証を通した配信元の設定
-    description: '`pydantic.BaseModel`（`frozen=True`）。キーの意味と既定値は Issue #3 の資料 A-25 のキー一覧。ドットを含むキー（`ids.format`・`related.types`・`diff.ignore_keys`・`github.repository`・`github.issue_labels`）は入れ子のモデルで持つ。'
+    description: '`pydantic.BaseModel`（`frozen=True`）。キーの意味と既定値は [shuhei1101/dev-docs#3 汎用の開発ドキュメントサーバーを作る](https://github.com/shuhei1101/dev-docs/issues/3) の資料 A-25 のキー一覧。ドットを含むキー（`ids.format`・`related.types`・`diff.ignore_keys`・`github.repository`・`github.issue_labels`）は入れ子のモデルで持つ。'
     properties:
       - name: version
         title: 設定のバージョン

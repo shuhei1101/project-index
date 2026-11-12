@@ -1,8 +1,7 @@
 id: MOD-4
 title: プラグイン / ツール実行前のフック / pre_tool_use.py
 lead: |-
-  PreToolUse のフック。文書の MCP のツールの入力に `cwd`・`session_id`・`agent_id` を上書きで入れ、`updatedInput` で返す。
-  Python 3.14 の標準ライブラリだけで書き、常に終了コード 0 で戻る。
+  PreToolUse のフックを受け持ち、ツール実行前のフックの pre_tool_use.py を修正するときに参照する。
 test_files:
   - tests/unit/plugins/project_index/hooks/test_pre_tool_use.py
 directory: |-
@@ -88,3 +87,7 @@ functions:
         expected: 戻り値に `agent_id` が無い
 refs:
   - IF-20#
+notes:
+  決まり: |-
+    文書の MCP のツールの入力に `cwd`・`session_id`・`agent_id` を上書きで入れ、`updatedInput` で返す。
+    Python 3.14 の標準ライブラリだけで書き、常に終了コード 0 で戻る。

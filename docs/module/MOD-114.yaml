@@ -1,8 +1,7 @@
 id: MOD-114
 title: 索引のサーバー / 書き込み
 lead: |-
-  `write_docs`・`delete_docs` の処理。操作を全て当てた後の文書を検査に通し、通ったときだけ作業ツリー（Git 管理外の配信元はそのフォルダ）のファイルを書き換える。
-  書き込み・削除は配信元ごとに 1 つずつ行い、commit はしない。
+  書き込みの分類の構成図・ファイルの並び・決まりを定め、書き込みのファイルを追加・移動するときに参照する。
 directory: |-
   ```text
   src/project_index/features/write/
@@ -102,3 +101,8 @@ diagrams:
         click スクリプトの実行 href "./MOD-88.py.yaml#スクリプトの実行"
         click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
         click 文書の削除 href "./MOD-84.py.yaml#文書の削除"
+notes:
+  受け持つこと: |-
+    `write_docs`・`delete_docs` の処理。
+    操作を全て当てた後の文書を検査に通し、通ったときだけ作業ツリー（Git 管理外の配信元はそのフォルダ）のファイルを書き換える。
+    書き込み・削除は配信元ごとに 1 つずつ行い、commit はしない。

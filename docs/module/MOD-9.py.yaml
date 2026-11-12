@@ -1,6 +1,6 @@
 id: MOD-9
 title: 索引のサーバー / 管理 / render.py
-lead: '管理の MCP の `format: markdown` の応答の文を組み立てる。値は service.py の結果をそのまま使い、計算しない。'
+lead: '管理の MCP の `format: markdown` の応答の文を組み立てる処理を受け持ち、管理の render.py を修正するときに参照する。'
 test_files:
   - tests/unit/project_index/features/admin/test_render.py
 functions:
@@ -242,3 +242,5 @@ functions:
         condition: '`counts` が 2 件（うち 1 件が 0）、`warnings` が 1 件'
         mock: なし
         expected: '表に 2 行、`警告: 1 件` の下に 1 行、末尾に `nav` のコードブロック'
+notes:
+  決まり: 値は service.py の結果をそのまま使い、計算しない。

@@ -1,6 +1,6 @@
 id: MOD-29
 title: 索引のサーバー / 文書のストア / store.py
-lead: 文書のキャッシュ・ID の引き当て・種類のスキーマ・文書の場所と、メタデータのずれの確かめ。
+lead: 文書のキャッシュ・ID の引き当て・種類のスキーマ・文書の場所と、メタデータのずれの確かめを受け持ち、文書のストアの store.py を修正するときに参照する。
 test_files:
   - tests/unit/project_index/features/documents/test_store.py
 diagrams:
@@ -533,7 +533,7 @@ functions:
     usecase: 起動
     role: サービス
     summary: 配信元のクローン本体の文書を読み、`metadata` の列の欠け・管理用の YAML のずれ・当たらない関連・エイリアスのキーの違反を求める
-    description: 起動時と読み直しのときに呼ぶ。#4 の `check_project` も呼ばれるたびにこの関数で求め直す。
+    description: 起動時と読み直しのときに呼ぶ。[shuhei1101/dev-docs#4 管理用のプラグインを作る](https://github.com/shuhei1101/dev-docs/issues/4) の `check_project` も呼ばれるたびにこの関数で求め直す。
     kind: 関数
     scope: public
     thread_safe: true

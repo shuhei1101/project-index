@@ -1,8 +1,7 @@
 id: MOD-111
 title: 索引のサーバー / 履歴
 lead: |-
-  git を子プロセスで呼び、リビジョン（ブランチ・タグ・commit・日時）の解決・一覧・変わったファイル・ファイルの日時を返す。
-  過去のリビジョンは `git archive` で `state_dir` に書き出し、作業ツリーと同じ読み方で読めるようにする。
+  履歴の分類の構成図・ファイルの並び・決まりを定め、履歴のファイルを追加・移動するときに参照する。
 directory: |-
   ```text
   src/project_index/
@@ -86,3 +85,7 @@ diagrams:
         click 解いたリビジョン href "./MOD-33.py.yaml#解いたリビジョン"
         click 区間の commit と親 href "./MOD-33.py.yaml#区間の commit と親"
         click gitの失敗 href "./MOD-86.py.yaml#gitの失敗"
+notes:
+  受け持つこと: |-
+    git を子プロセスで呼び、リビジョン（ブランチ・タグ・commit・日時）の解決・一覧・変わったファイル・ファイルの日時を返す。
+    過去のリビジョンは `git archive` で `state_dir` に書き出し、作業ツリーと同じ読み方で読めるようにする。

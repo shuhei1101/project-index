@@ -1,6 +1,6 @@
 id: MOD-37
 title: 索引のサーバー / 設定の移し替え / service.py
-lead: '`project-index migrate` の対象を決め、当てる手順を求め、バックアップを取ってから 1 回だけ書き込む。動いているサーバーには反映しない。'
+lead: '`project-index migrate` の対象と適用する手順を決め、バックアップを取ってから 1 回だけ書き込む処理を受け持ち、設定の移し替えの service.py を修正するときに参照する。'
 test_files:
   - tests/unit/project_index/features/migrate/test_service.py
 functions:
@@ -229,3 +229,5 @@ functions:
       - MOD-89#functions[run_migrate]
     callees:
       - MOD-38#functions[apply_step]
+notes:
+  決まり: 動いているサーバーには反映しない。

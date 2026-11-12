@@ -1,8 +1,7 @@
 id: MOD-5
 title: プラグイン / セッション開始のフック / session_start.py
 lead: |-
-  SessionStart のフック。ポートにつながらなければ `project-index serve` を切り離して起動し、つながれば文脈を入れず、`/clear`・圧縮のときだけ `POST /_admin/session-start` で返し済みの記録の削除を依頼する。
-  Python 3.14 の標準ライブラリだけで書き、どの失敗でも終了コード 0 で戻る。
+  SessionStart のフックを受け持ち、セッション開始のフックの session_start.py を修正するときに参照する。
 test_files:
   - tests/unit/plugins/project_index/hooks/test_session_start.py
 directory: |-
@@ -335,3 +334,7 @@ functions:
         exception: TimeoutError
 refs:
   - IF-19#
+notes:
+  決まり: |-
+    ポートにつながらなければ `project-index serve` を切り離して起動し、つながれば文脈を入れず、`/clear`・圧縮のときだけ `POST /_admin/session-start` で返し済みの記録の削除を依頼する。
+    Python 3.14 の標準ライブラリだけで書き、どの失敗でも終了コード 0 で戻る。

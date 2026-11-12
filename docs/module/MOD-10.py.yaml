@@ -1,6 +1,6 @@
 id: MOD-10
 title: 索引のサーバー / 管理 / service.py
-lead: 管理の MCP の `status`・`reload`・`check_project`・`try_convert` の中身。配信中の部品（`Handlers`）を読むだけで、`reload_config` 以外は配信元の状態を変えない。
+lead: 管理の MCP の `status`・`reload`・`check_project`・`try_convert` の中身を受け持ち、管理の service.py を修正するときに参照する。
 test_files:
   - tests/unit/project_index/features/admin/test_service.py
 functions:
@@ -599,3 +599,5 @@ constants:
     usecase: 配信元の検査
     summary: '`CONFIG_FILE` が無いときに探す、今の各リポジトリのファイル名。各リポジトリが改名し終えたら除く'
     value: '"dev-docs.yaml"'
+notes:
+  決まり: 配信中の部品（`Handlers`）を読むだけで、`reload_config` 以外は配信元の状態を変えない。

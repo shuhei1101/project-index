@@ -1,8 +1,7 @@
 id: MOD-106
 title: 索引のサーバー / 会話の記録
 lead: |-
-  会話キー（`session_id`・`agent_id`）ごとに、返した文書の ID とバージョン・本文を返した時点の内容・閲覧と編集を `state_dir` の SQLite に記録する。
-  1 セッション 1 回の省略・`list_changes` の前回読んだ時点・`trace_related` の関連の候補が読む。
+  会話の記録の分類の構成図・ファイルの並び・決まりを定め、会話の記録のファイルを追加・移動するときに参照する。
 directory: |-
   ```text
   src/project_index/features/seen/
@@ -45,3 +44,7 @@ diagrams:
         click 会話キー href "./MOD-60.py.yaml#会話キー"
         click 前回読んだ内容 href "./MOD-60.py.yaml#前回読んだ内容"
         click 閲覧と編集 href "./MOD-60.py.yaml#閲覧と編集"
+notes:
+  受け持つこと: |-
+    会話キー（`session_id`・`agent_id`）ごとに、返した文書の ID とバージョン・本文を返した時点の内容・閲覧と編集を `state_dir` の SQLite に記録する。
+    1 セッション 1 回の省略・`list_changes` の前回読んだ時点・`trace_related` の関連の候補が読む。

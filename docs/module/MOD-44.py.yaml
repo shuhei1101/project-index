@@ -1,6 +1,6 @@
 id: MOD-44
 title: 索引のサーバー / プロンプトの文書の変換 / types.py
-lead: '`project-index prompt-doc` が読むプロンプトの YAML のモデルと、描画の結果・例外の型。モデルは変換に使うキーだけを持ち、他のキーは読み捨てる。サーバーが起動のときに読むプロンプトの違反の型も持つ。'
+lead: '`project-index prompt-doc` が読むプロンプトの YAML のモデルと、描画の結果・例外の型を受け持ち、プロンプトの文書の変換の types.py を修正するときに参照する。'
 data_models:
   - name: PromptVar
     title: 変数の定義
@@ -281,3 +281,7 @@ classes:
     description: '`problems: list[PromptProblem]` を持つ。`project-index serve` は違反ごとに `{file}: {path}: {reason}` を標準エラーに出し、終了コード 4 で終える。'
     inherits: Exception
     kind: クラス
+notes:
+  決まり: |-
+    モデルは変換に使うキーだけを持ち、他のキーは読み捨てる。
+    サーバーが起動のときに読むプロンプトの違反の型も持つ。

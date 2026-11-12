@@ -1,6 +1,6 @@
 id: MOD-67
 title: 索引のサーバー / 端末の設定 / types.py
-lead: 端末の設定と、端末の設定の API の `sources[]` の要求と結果の型。
+lead: 端末の設定と、端末の設定の API の `sources[]` の要求と結果の型を受け持ち、端末の設定の types.py を修正するときに参照する。
 diagrams:
   - name: 全体
     diagram: |-
@@ -80,7 +80,7 @@ data_models:
     usecase: 端末の設定
     role: DTO
     summary: 検証を通して既定値を埋めた端末の設定
-    description: '`pydantic.BaseModel`（`frozen=True`）。キーの意味と既定値は Issue #3 の資料 A-25 のキー一覧。'
+    description: '`pydantic.BaseModel`（`frozen=True`）。キーの意味と既定値は [shuhei1101/dev-docs#3 汎用の開発ドキュメントサーバーを作る](https://github.com/shuhei1101/dev-docs/issues/3) の資料 A-25 のキー一覧。'
     properties:
       - name: file
         title: 設定のファイル
