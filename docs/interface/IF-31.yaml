@@ -183,6 +183,32 @@ flows:
       - '`settings.yaml` の sample の行の `enabled` が `false`'
       - '`settings.yaml` の extra の行に `outside_read: false` と元の `scope.write` が残る'
     test: test_normal_when_unsent_keys_kept
+  - name: 正常系（送信したキーを優先する）
+    summary: 行に含めたキーは、ファイルの同じ配信元の行の値より送信した値で記載する
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample と extra の 2 行'
+        notes: 'extra の行に `outside_read: false`'
+      - name: 入力
+        description: 'extra の行に `outside_read: true` を含めた 2 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as PUT /settings/sources
+        participant CF as 端末の設定
+
+        C->>E: sources: sample, extra（outside_read: true）
+        E->>CF: 送信した値で settings.yaml を書き換える
+        E->>E: 配信元を読み直す
+        E-->>C: 200
+      ```
+    expected:
+      - '`settings.yaml` の extra の行に `outside_read` が無い'
+      - '`GET /settings/sources` が返す extra の行の `outsideRead` が `true`'
+    test: test_normal_when_sent_keys_override
 lead: 'dev-docs の画面のサーバーが設定画面での配信元の追加・編集・削除の後の `sources[]` を丸ごと送信する。スキーマに通ったときだけ `settings.yaml` を書き換え、配信元を読み直す。'
 identifier: put_settings_sources
 permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ'
