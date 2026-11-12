@@ -1,9 +1,11 @@
+# pyright: reportUnknownArgumentType=warning, reportUnknownLambdaType=warning
 from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from project_index.features.describe.service import describe
 from project_index.features.describe.source_checks import SourceChecks
 from project_index.features.describe.types import (

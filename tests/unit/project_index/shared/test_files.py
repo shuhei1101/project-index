@@ -4,6 +4,7 @@ import os
 from typing import TYPE_CHECKING
 
 import pytest
+
 from project_index.shared.files import replace_file
 
 if TYPE_CHECKING:

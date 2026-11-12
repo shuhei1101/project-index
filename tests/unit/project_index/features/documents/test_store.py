@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from project_index.features.documents import indexable as indexable_module
 from project_index.features.documents import loader as loader_module
 from project_index.features.documents import store as store_module

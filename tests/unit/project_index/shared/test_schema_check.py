@@ -1,9 +1,11 @@
+# pyright: reportUnknownArgumentType=warning, reportUnknownMemberType=warning, reportUnknownVariableType=warning
 from __future__ import annotations
 
 from jsonschema import Draft202012Validator
+from referencing import Registry, Resource
+
 from project_index.shared.errors import Violation
 from project_index.shared.schema_check import _as_list, _from_error, format_path, schema_violations
-from referencing import Registry, Resource
 
 
 def test_format_path() -> None:

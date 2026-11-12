@@ -4,6 +4,7 @@ from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING
 
 import pytest
+
 from project_index.features.search.filters import (
     check_filter,
     compile_regex,

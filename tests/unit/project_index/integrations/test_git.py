@@ -4,6 +4,7 @@ import subprocess
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from project_index.integrations import git as git_module
 from project_index.integrations.git import GitError, is_ignored, repo_root, run_git
 

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
 from mcp.types import CallToolResult, TextContent
+
 from project_index.features.admin.types import CheckProjectRequest, CheckProjectResult
 from project_index.features.lifecycle.control import RestartControl
 from project_index.server.mcp import admin as admin_module

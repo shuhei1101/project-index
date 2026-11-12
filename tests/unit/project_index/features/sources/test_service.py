@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from project_index.features.sources import service as service_module
 from project_index.features.sources.service import (
     assemble_source,

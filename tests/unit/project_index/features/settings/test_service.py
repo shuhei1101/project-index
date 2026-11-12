@@ -4,6 +4,7 @@ import threading
 from typing import TYPE_CHECKING
 
 import pytest
+
 from project_index.features.settings.service import add_source, save_sources
 from project_index.features.settings.types import (
     SourceEntry,

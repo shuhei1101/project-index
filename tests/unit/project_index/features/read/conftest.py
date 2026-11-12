@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from project_index.features.convert.service import ConvertService
 from project_index.features.documents.store import DocumentStore
 from project_index.features.history.snapshot import SnapshotStore

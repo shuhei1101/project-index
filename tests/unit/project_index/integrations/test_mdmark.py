@@ -4,6 +4,7 @@ import sys
 from typing import TYPE_CHECKING
 
 import pytest
+
 from project_index.integrations.mdmark import (
     MdmarkFinding,
     MdmarkUnavailableError,

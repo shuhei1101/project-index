@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+
 from project_index.features.sources.types import DocumentTable
 from project_index.features.write import apply as apply_module
 from project_index.features.write.apply import apply_operation

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from project_index.features.admin.service import (
     _load_candidate,
     _source_states,
@@ -533,7 +534,9 @@ def test_load_candidate_when_legacy_config(make_source_dir: Callable[..., Path])
     config.write_text(
         legacy.read_text(encoding="utf-8").replace("alpha", "beta", 1), encoding="utf-8"
     )
-    assert _load_candidate(str(legacy.parent), config=None).source.id == "beta"
+    renamed = _load_candidate(str(legacy.parent), config=None)
+    assert renamed.source is not None
+    assert renamed.source.id == "beta"
 
 
 def test_load_candidate_when_not_found(tmp_path: Path) -> None:

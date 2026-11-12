@@ -1,3 +1,4 @@
+# pyright: reportUnknownLambdaType=warning
 from __future__ import annotations
 
 import json
@@ -5,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from project_index.features.access.types import Target
 from project_index.features.documents.types import Document
 from project_index.features.settings.query import load_terminal_config

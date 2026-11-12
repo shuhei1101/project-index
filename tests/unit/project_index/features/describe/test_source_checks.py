@@ -1,3 +1,4 @@
+# pyright: reportUnknownArgumentType=warning, reportUnknownLambdaType=warning
 from __future__ import annotations
 
 import threading
@@ -13,6 +14,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     import pytest
+
     from project_index.features.settings.types import SourceEntry, TerminalConfig
     from project_index.features.sources.types import ServedSource
 

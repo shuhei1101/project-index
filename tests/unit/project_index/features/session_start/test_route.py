@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
 from project_index.features.session_start.route import build_session_start_router
 from project_index.main import Handlers, build_handlers
 from project_index.server.error_handlers import register_error_handlers

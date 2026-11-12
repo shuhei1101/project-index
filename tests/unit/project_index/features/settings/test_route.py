@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
 from project_index.features.settings import route as route_module
 from project_index.features.settings.query import load_terminal_config
 from project_index.features.settings.route import build_settings_router
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     import pytest
+
     from project_index.features.sources.types import SourceStatus
 
 SETTINGS = (

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+
 from project_index.features.sources.types import DocumentTable
 from project_index.features.write.placement import new_document_path
 from project_index.shared.errors import InvalidArgumentError

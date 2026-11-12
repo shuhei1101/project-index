@@ -1,3 +1,4 @@
+# pyright: reportUnknownArgumentType=warning, reportUnknownLambdaType=warning
 from __future__ import annotations
 
 import time
@@ -5,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from project_index.features.history import snapshot as snapshot_module
 from project_index.features.history.snapshot import SnapshotStore
 

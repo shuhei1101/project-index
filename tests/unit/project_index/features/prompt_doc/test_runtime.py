@@ -4,6 +4,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from project_index.features.prompt_doc.runtime import (
     DEFAULT_PROMPTS_DIR,
     load_prompts,

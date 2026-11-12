@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
+
 from project_index.features.lifecycle.control import RestartControl
 from project_index.shared.errors import RestartInProgressError
 

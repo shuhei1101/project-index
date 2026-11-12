@@ -1,8 +1,10 @@
+# pyright: reportUnknownArgumentType=warning, reportUnknownVariableType=warning
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from project_index.features.migrate.steps import apply_step, load_steps
 from project_index.features.migrate.types import MigrationFailedError, MigrationStep
 from project_index.shared.yaml_io import dump_roundtrip, load_roundtrip

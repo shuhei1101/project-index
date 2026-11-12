@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+
 from project_index.integrations.scripts import (
     ScriptFailedError,
     ScriptNotFoundError,

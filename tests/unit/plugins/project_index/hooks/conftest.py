@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Generator
     from types import ModuleType
 
 HOOKS_DIR = Path(__file__).parents[5] / "plugins" / "project-index" / "hooks"
@@ -47,7 +47,7 @@ def context_server() -> Callable[..., AbstractContextManager[ReceivedBodies]]:
     @contextmanager
     def _serve(
         response: dict[str, Any] | None = None, *, hold_sec: float = 0.0
-    ) -> Iterator[ReceivedBodies]:
+    ) -> Generator[ReceivedBodies]:
         released = threading.Event()
         received: list[ReceivedBodies] = []
 

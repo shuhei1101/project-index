@@ -1,23 +1,24 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from project_index.features.documents.store import DocumentStore
 from project_index.features.history.snapshot import SnapshotStore
 from project_index.features.related.service import trace_related
 from project_index.features.related.types import RelatedRequest, RelatedResult
 from project_index.features.seen.store import SeenStore
 from project_index.features.seen.types import SEEN_MARK
+from project_index.features.sources.registry import SourceRegistry
 from project_index.features.sources.types import DocumentTable, ServedSource, SourceConfig
 from project_index.shared.errors import DocumentNotFoundError, InvalidArgumentError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from pathlib import Path
 
-    from project_index.features.sources.registry import SourceRegistry
 
 CHAIN = {
     "docs/doc-1.yaml": "id: doc-1\nname: 文書 1\nrelated:\n  - to: doc-2\n    type: references\n",

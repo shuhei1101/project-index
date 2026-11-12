@@ -1,3 +1,4 @@
+# pyright: reportUnknownLambdaType=warning
 from __future__ import annotations
 
 import sys
@@ -5,6 +6,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from project_index.features.convert import service as service_module
 from project_index.features.convert.service import ConvertService
 from project_index.features.documents.types import Document, LoadResult

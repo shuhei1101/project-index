@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from project_index.features.changes.service import list_changes
 from project_index.features.changes.types import (
     LAST_READ_LABEL,
@@ -16,15 +18,14 @@ from project_index.features.history.snapshot import SnapshotStore
 from project_index.features.search.types import Condition
 from project_index.features.seen.store import SeenStore
 from project_index.features.seen.types import SessionKey
+from project_index.features.sources.registry import SourceRegistry
 from project_index.features.sources.types import DocumentTable, ServedSource, SourceConfig
 from project_index.shared.errors import InvalidArgumentError, LastReadNotFoundError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from pathlib import Path
 
     from project_index.features.access.types import Target
-    from project_index.features.sources.registry import SourceRegistry
 
 DOC_1 = "id: doc-1\nname: 文書 1\n"
 DOC_2 = "id: doc-2\nname: 文書 2\n"

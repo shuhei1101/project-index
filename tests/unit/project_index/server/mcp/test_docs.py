@@ -1,3 +1,4 @@
+# pyright: reportUnknownArgumentType=warning, reportUnknownVariableType=warning
 from __future__ import annotations
 
 import asyncio
@@ -6,6 +7,7 @@ import threading
 from typing import TYPE_CHECKING, Any
 
 from mcp.types import CallToolResult, TextContent
+
 from project_index.features.search.types import SearchRequest, SearchResult
 from project_index.features.sources.registry import SourceRegistry
 from project_index.main import build_handlers
@@ -19,6 +21,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     import pytest
+
     from project_index.features.settings.types import SourceEntry, TerminalConfig
 
 TOOL_NAMES = {

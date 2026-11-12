@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+
 from project_index.features.history.query import (
     changed_files,
     co_changed_files,

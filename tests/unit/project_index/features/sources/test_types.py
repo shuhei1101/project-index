@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+
 from project_index.features.sources.types import DocumentTable, ServedSource, SourceConfig
 from project_index.shared.errors import UnknownKindError
 

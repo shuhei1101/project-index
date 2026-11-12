@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+
 from project_index.features.settings.query import (
     config_path,
     listen_port,

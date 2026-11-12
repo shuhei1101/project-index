@@ -3,17 +3,21 @@ from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
+
 from project_index.server.lifespan import build_lifespan
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 def _fake_mcp(name: str, events: list[str]) -> SimpleNamespace:
     """`session_manager.run()` が入った・出たを記録する MCP の偽物を作る。"""
 
     @asynccontextmanager
-    async def run() -> Any:
+    async def run() -> AsyncGenerator[None]:
         events.append(f"{name}.enter")
         yield
         events.append(f"{name}.exit")

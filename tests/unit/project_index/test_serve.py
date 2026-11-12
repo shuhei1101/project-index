@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 import uvicorn
+
+from project_index import main as main_module
 from project_index.features.access.types import Target
 from project_index.features.convert.service import ConvertService
 from project_index.features.describe.source_checks import SourceChecks
@@ -29,11 +31,9 @@ from project_index.main import (
 )
 from project_index.shared.yaml_io import load_yaml
 
-from project_index import main as main_module
-
 if TYPE_CHECKING:
     import threading
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Generator
     from pathlib import Path
 
     from project_index.features.settings.types import SourceEntry, TerminalConfig
@@ -48,7 +48,7 @@ def _free_port() -> int:
 
 
 @contextmanager
-def _listening() -> Iterator[int]:
+def _listening() -> Generator[int]:
     """テストが `listen` しているポートの番号を渡す。"""
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
         sock.bind(("127.0.0.1", 0))

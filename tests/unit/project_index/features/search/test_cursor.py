@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+
 from project_index.features.search.cursor import decode_cursor, encode_cursor
 from project_index.shared.errors import InvalidArgumentError
 

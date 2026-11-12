@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import pytest
+from ruamel.yaml.comments import CommentedMap
+
 from project_index.shared.yaml_io import (
     YamlLoadError,
     dump_roundtrip,
     load_roundtrip,
     load_yaml,
 )
-from ruamel.yaml.comments import CommentedMap
 
 
 def test_load_yaml() -> None:

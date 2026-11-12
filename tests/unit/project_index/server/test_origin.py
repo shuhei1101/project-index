@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import pytest
+from starlette.requests import Request
+
 from project_index.server.origin import require_same_origin
 from project_index.shared.errors import CrossOriginError
-from starlette.requests import Request
 
 
 def _request(headers: dict[str, str]) -> Request:

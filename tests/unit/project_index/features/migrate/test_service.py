@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from project_index.features.migrate.service import apply_migration, plan_migration, resolve_target
 from project_index.features.migrate.types import (
     ConfigNewerError,

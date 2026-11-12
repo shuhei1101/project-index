@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import pytest
+
 from project_index.features.seen.store import SeenStore
 from project_index.features.seen.types import SessionKey
 

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
+
 from project_index.features.lifecycle.control import RestartControl
 from project_index.features.lifecycle.types import COMMAND_TIMEOUT_SEC
 from project_index.features.lifecycle.update import _run, update_clone

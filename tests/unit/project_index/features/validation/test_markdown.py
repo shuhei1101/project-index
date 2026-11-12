@@ -1,8 +1,10 @@
+# pyright: reportUnknownArgumentType=warning, reportUnknownLambdaType=warning
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
 from project_index.features.validation import markdown as markdown_module
 from project_index.features.validation.markdown import (
     UncheckedKey,

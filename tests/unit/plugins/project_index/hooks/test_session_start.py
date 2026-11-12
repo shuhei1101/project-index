@@ -1,3 +1,4 @@
+# pyright: reportUnknownArgumentType=warning, reportUnknownLambdaType=warning
 from __future__ import annotations
 
 import io
@@ -12,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Generator
     from types import ModuleType
 
 
@@ -24,7 +25,7 @@ def _free_port() -> int:
 
 
 @contextmanager
-def _listening() -> Iterator[int]:
+def _listening() -> Generator[int]:
     """テストが `listen` しているポートの番号を渡す。"""
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
         sock.bind(("127.0.0.1", 0))

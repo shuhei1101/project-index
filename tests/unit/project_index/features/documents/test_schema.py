@@ -5,6 +5,7 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 import pytest
+
 from project_index.features.documents import schema as schema_module
 from project_index.features.documents.schema import resolve_schema_refs, startup_schema
 from project_index.features.sources.schema_ref import SchemaRef
