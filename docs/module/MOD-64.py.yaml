@@ -2,412 +2,452 @@ id: MOD-64
 title: 索引のサーバー / 端末の設定 / query.py
 lead: 端末の設定の場所・読み込みと検証・待ち受けのポート。
 test_files:
-- tests/unit/project_index/features/settings/test_query.py
+  - tests/unit/project_index/features/settings/test_query.py
 diagrams:
-- name: 全体
-  diagram: |-
-    classDiagram
-      direction TD
-      配信元の保存 ..> 端末の設定の検証 : 書く前
-      端末の設定の読み込み ..> 端末の設定の検証 : 読んだ後
-      端末の設定の読み込み ..> 端末の設定 : 返す
-      class 配信元の保存 {
-        <<function>>
-      }
-      class 端末の設定の読み込み {
-        <<function>>
-      }
-      class 端末の設定の検証 {
-        <<function>>
-      }
-      class 端末の設定 {
-        +配信元: list
-        +状態の置き場所: Path
-      }
-      click 配信元の保存 href "./MOD-66.py.yaml#配信元の保存"
-      click 端末の設定 href "./MOD-67.py.yaml#端末の設定"
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        配信元の保存 ..> 端末の設定の検証 : 書く前
+        端末の設定の読み込み ..> 端末の設定の検証 : 読んだ後
+        端末の設定の読み込み ..> 端末の設定 : 返す
+        class 配信元の保存 {
+          <<function>>
+        }
+        class 端末の設定の読み込み {
+          <<function>>
+        }
+        class 端末の設定の検証 {
+          <<function>>
+        }
+        class 端末の設定 {
+          +配信元: list
+          +状態の置き場所: Path
+        }
+        click 配信元の保存 href "./MOD-66.py.yaml#配信元の保存"
+        click 端末の設定 href "./MOD-67.py.yaml#端末の設定"
 constants:
-- name: DEFAULT_CONFIG_HOME
-  title: 設定の置き場の既定の親
-  container: project_index/features/settings/query.py
-  usecase: 端末の設定
-  summary: '`XDG_CONFIG_HOME` が無いときの設定の置き場の親'
-  value: '"~/.config"'
-- name: CONFIG_FILE
-  title: 端末の設定の相対パス
-  container: project_index/features/settings/query.py
-  usecase: 端末の設定
-  summary: 設定の置き場の親から端末の設定までの相対パス
-  value: '"project-index/settings.yaml"'
-- name: DEFAULT_STATE_HOME
-  title: 状態の置き場の既定の親
-  container: project_index/features/settings/query.py
-  usecase: 端末の設定
-  summary: '`XDG_STATE_HOME` が無いときの状態の置き場の親'
-  value: '"~/.local/state"'
-- name: STATE_SUBDIR
-  title: 状態の置き場のフォルダ名
-  container: project_index/features/settings/query.py
-  usecase: 端末の設定
-  summary: 状態の置き場の親の下のフォルダ名
-  value: '"project-index"'
-- name: XDG_CONFIG_HOME_ENV
-  title: 設定の置き場の親の環境変数
-  container: project_index/features/settings/query.py
-  usecase: 端末の設定
-  summary: XDG Base Directory Specification の設定の置き場の親の環境変数の名前
-  value: '"XDG_CONFIG_HOME"'
-- name: XDG_STATE_HOME_ENV
-  title: 状態の置き場の親の環境変数
-  container: project_index/features/settings/query.py
-  usecase: 端末の設定
-  summary: XDG Base Directory Specification の状態の置き場の親の環境変数の名前
-  value: '"XDG_STATE_HOME"'
-- name: STATE_DIR_ENV
-  title: 状態の置き場の環境変数
-  container: project_index/features/settings/query.py
-  usecase: 端末の設定
-  summary: 状態の置き場を上書きする環境変数の名前
-  value: '"PROJECT_INDEX_STATE_DIR"'
-- name: CONFIG_ENV
-  title: 端末の設定の環境変数
-  container: project_index/features/settings/query.py
-  usecase: 端末の設定
-  summary: 端末の設定のパスを渡す環境変数の名前
-  value: '"PROJECT_INDEX_CONFIG"'
-- name: PORT_ENV
-  title: ポートの環境変数
-  container: project_index/features/settings/query.py
-  usecase: 端末の設定
-  summary: 待ち受けのポートを上書きする環境変数の名前
-  value: '"PROJECT_INDEX_PORT"'
-- name: SETTINGS_SCHEMA
-  title: 端末の設定のスキーマ
-  container: project_index/features/settings/query.py
-  usecase: 端末の設定
-  summary: 配布に同梱する端末の設定のスキーマのパス（`importlib.resources` で引く）
-  value: '"schemas/settings.schema.yaml"'
-- name: SETTINGS_VERSION
-  title: 端末の設定の読めるバージョン
-  container: project_index/features/settings/query.py
-  usecase: 端末の設定
-  summary: このサーバーが読める端末の設定の `version`
-  value: '"1"'
+  - name: DEFAULT_CONFIG_HOME
+    title: 設定の置き場の既定の親
+    container: project_index/features/settings/query.py
+    usecase: 端末の設定
+    summary: '`XDG_CONFIG_HOME` が無いときの設定の置き場の親'
+    value: '"~/.config"'
+  - name: CONFIG_FILE
+    title: 端末の設定の相対パス
+    container: project_index/features/settings/query.py
+    usecase: 端末の設定
+    summary: 設定の置き場の親から端末の設定までの相対パス
+    value: '"project-index/settings.yaml"'
+  - name: DEFAULT_STATE_HOME
+    title: 状態の置き場の既定の親
+    container: project_index/features/settings/query.py
+    usecase: 端末の設定
+    summary: '`XDG_STATE_HOME` が無いときの状態の置き場の親'
+    value: '"~/.local/state"'
+  - name: STATE_SUBDIR
+    title: 状態の置き場のフォルダ名
+    container: project_index/features/settings/query.py
+    usecase: 端末の設定
+    summary: 状態の置き場の親の下のフォルダ名
+    value: '"project-index"'
+  - name: XDG_CONFIG_HOME_ENV
+    title: 設定の置き場の親の環境変数
+    container: project_index/features/settings/query.py
+    usecase: 端末の設定
+    summary: XDG Base Directory Specification の設定の置き場の親の環境変数の名前
+    value: '"XDG_CONFIG_HOME"'
+  - name: XDG_STATE_HOME_ENV
+    title: 状態の置き場の親の環境変数
+    container: project_index/features/settings/query.py
+    usecase: 端末の設定
+    summary: XDG Base Directory Specification の状態の置き場の親の環境変数の名前
+    value: '"XDG_STATE_HOME"'
+  - name: STATE_DIR_ENV
+    title: 状態の置き場の環境変数
+    container: project_index/features/settings/query.py
+    usecase: 端末の設定
+    summary: 状態の置き場を上書きする環境変数の名前
+    value: '"PROJECT_INDEX_STATE_DIR"'
+  - name: CONFIG_ENV
+    title: 端末の設定の環境変数
+    container: project_index/features/settings/query.py
+    usecase: 端末の設定
+    summary: 端末の設定のパスを渡す環境変数の名前
+    value: '"PROJECT_INDEX_CONFIG"'
+  - name: PORT_ENV
+    title: ポートの環境変数
+    container: project_index/features/settings/query.py
+    usecase: 端末の設定
+    summary: 待ち受けのポートを上書きする環境変数の名前
+    value: '"PROJECT_INDEX_PORT"'
+  - name: SETTINGS_SCHEMA
+    title: 端末の設定のスキーマ
+    container: project_index/features/settings/query.py
+    usecase: 端末の設定
+    summary: 配布に同梱する端末の設定のスキーマのパス（`importlib.resources` で引く）
+    value: '"schemas/settings.schema.yaml"'
+  - name: SETTINGS_VERSION
+    title: 端末の設定の読めるバージョン
+    container: project_index/features/settings/query.py
+    usecase: 端末の設定
+    summary: このサーバーが読める端末の設定の `version`
+    value: '"1"'
 functions:
-- name: xdg_base_dir
-  title: XDG の置き場の親
-  kind: 関数
-  container: project_index/features/settings/query.py
-  usecase: 端末の設定
-  role: 読み取り
-  summary: XDG の環境変数の値を、空の文字列か相対パスなら既定に替えて返す
-  scope: public
-  args:
-  - name: env
-    title: 環境変数
-    type: Mapping[str, str]
-    required: true
-    passing: positional
-    description: '`os.environ`'
-  - name: name
-    title: 環境変数の名前
-    type: str
-    required: true
-    passing: positional
-    description: '`XDG_CONFIG_HOME_ENV` か `XDG_STATE_HOME_ENV`'
-  - name: default
-    title: 既定
-    type: str
-    required: true
-    passing: positional
-    description: '`DEFAULT_CONFIG_HOME` か `DEFAULT_STATE_HOME`'
-  returns:
-    type: Path
-    description: 正規化した絶対パス
-  process: |-
-    1. `name` の値が空でなく絶対パスならその値、そうでなければ `default` を『パスの正規化』にかけて返す（パスの正規化）
-  unit_tests:
-  - name: test_xdg_base_dir
-    case: 正常
-    summary: 絶対パスの値
-    condition: '`{"XDG_STATE_HOME": "/tmp/s"}`'
-    mock: なし
-    expected: '`Path("/tmp/s")`'
-  - name: test_xdg_base_dir_when_unset_or_relative
-    case: 正常
-    summary: 未設定・空の文字列・相対パスは既定
-    condition: '`{}`・`{"XDG_STATE_HOME": ""}`・`{"XDG_STATE_HOME": "rel"}`（`HOME` を `/home/u` に monkeypatch）'
-    mock: なし
-    expected: どれも `Path("/home/u/.local/state")`
-- name: config_path
-  title: 端末の設定のパス
-  kind: 関数
-  container: project_index/features/settings/query.py
-  usecase: 起動
-  role: 読み取り
-  summary: 環境変数から端末の設定のパスを決める
-  scope: public
-  args:
-  - name: env
-    title: 環境変数
-    type: Mapping[str, str]
-    required: true
-    passing: positional
-    description: '`os.environ`'
-  returns:
-    type: Path
-    description: '`CONFIG_ENV` の値、無ければ `{XDG の設定の置き場の親}/CONFIG_FILE` を正規化した絶対パス'
-  process: |-
-    1. `CONFIG_ENV` が空でなければ、その値を『パスの正規化』にかけて返す（パスの正規化）
-    2. 無ければ、`XDG_CONFIG_HOME_ENV` と `DEFAULT_CONFIG_HOME` の XDG の置き場の親の下の `CONFIG_FILE` を返す（XDG の置き場の親）
-  unit_tests:
-  - name: test_config_path
-    case: 正常
-    summary: 環境変数の値
-    condition: '`{"PROJECT_INDEX_CONFIG": "/tmp/x/settings.yaml"}`'
-    mock: なし
-    expected: '`Path("/tmp/x/settings.yaml")`'
-  - name: test_config_path_when_unset
-    case: 正常
-    summary: 環境変数が無い
-    condition: '`{"HOME": "/home/u"}`（`HOME` を monkeypatch）'
-    mock: なし
-    expected: '`Path("/home/u/.config/project-index/settings.yaml")`'
-  - name: test_config_path_when_xdg_config_home_set
-    case: 正常
-    summary: XDG_CONFIG_HOME の下
-    condition: '`{"XDG_CONFIG_HOME": "/tmp/c"}`'
-    mock: なし
-    expected: '`Path("/tmp/c/project-index/settings.yaml")`'
-- name: state_dir_path
-  title: 状態の置き場
-  kind: 関数
-  container: project_index/features/settings/query.py
-  usecase: 端末の設定
-  role: 読み取り
-  summary: 環境変数と端末の設定の `state_dir` から状態の置き場を決める
-  scope: public
-  args:
-  - name: value
-    title: 端末の設定の state_dir
-    type: str | None
-    required: true
-    passing: positional
-    description: 端末の設定の `state_dir`。無ければ `None`
-  - name: env
-    title: 環境変数
-    type: Mapping[str, str]
-    required: true
-    passing: positional
-    description: '`os.environ`'
-  returns:
-    type: Path
-    description: 正規化した絶対パス
-  process: |-
-    1. `STATE_DIR_ENV` が空でなければ、その値を『パスの正規化』にかけて返す（パスの正規化）
-    2. `value` があれば、その値を『パスの正規化』にかけて返す
-    3. 無ければ、`XDG_STATE_HOME_ENV` と `DEFAULT_STATE_HOME` の XDG の置き場の親の下の `STATE_SUBDIR` を返す（XDG の置き場の親）
-  unit_tests:
-  - name: test_state_dir_path
-    case: 正常
-    summary: 環境変数が端末の設定より優先
-    condition: '`value` が `/tmp/a`、`{"PROJECT_INDEX_STATE_DIR": "/tmp/b", "XDG_STATE_HOME": "/tmp/c"}`'
-    mock: なし
-    expected: '`Path("/tmp/b")`'
-  - name: test_state_dir_path_when_config_value
-    case: 正常
-    summary: 端末の設定の値
-    condition: '`value` が `/tmp/a`、`{"XDG_STATE_HOME": "/tmp/c"}`'
-    mock: なし
-    expected: '`Path("/tmp/a")`'
-  - name: test_state_dir_path_when_xdg_state_home_set
-    case: 正常
-    summary: XDG_STATE_HOME の下
-    condition: '`value` が `None`、`{"XDG_STATE_HOME": "/tmp/c"}`'
-    mock: なし
-    expected: '`Path("/tmp/c/project-index")`'
-  - name: test_state_dir_path_when_unset
-    case: 正常
-    summary: どれも無い
-    condition: '`value` が `None`、`{}`（`HOME` を `/home/u` に monkeypatch）'
-    mock: なし
-    expected: '`Path("/home/u/.local/state/project-index")`'
-- name: load_terminal_config
-  title: 端末の設定の読み込み
-  kind: 関数
-  container: project_index/features/settings/query.py
-  usecase: 起動
-  role: 読み込み
-  summary: '`settings.yaml` を読み、スキーマの違反を全て集めてから端末の設定にする'
-  scope: public
-  thread_safe: true
-  args:
-  - name: path
-    title: 設定のファイル
-    type: Path
-    required: true
-    passing: positional
-    description: 端末の設定のパス
-  - name: env
-    title: 環境変数
-    type: Mapping[str, str] | None
-    required: false
-    default: None
-    passing: keyword
-    description: 状態の置き場を決める環境変数。`None` なら `os.environ`
-  returns:
-    type: TerminalConfig
-    description: 既定値を埋めた端末の設定
-  process: |-
-    1. ファイルを UTF-8 で読む
-       - 無い場合、`TerminalConfigInvalidError` を送る
-    2. YAML として読む（YAMLの読み込み）
-       - 読めない場合、行と列を `Violation` にして `TerminalConfigInvalidError` を送る
-    3. 端末の設定の値を検証する（端末の設定の検証）
-       - 違反が 1 つでもある場合、全ての違反を載せた `TerminalConfigInvalidError` を送る
-    4. `TerminalConfig` を作る。`state_dir` は端末の設定の `state_dir` と `env` から決め（状態の置き場）、`log_dir` は『パスの正規化』にかけ、無ければ `{state_dir}/logs` にする
-  exceptions:
-  - name: TerminalConfigInvalidError
-    condition: ファイルが無い
-    message: '`{path}: 端末の設定が見つかりません`'
-  - name: TerminalConfigInvalidError
-    condition: YAML として読めない
-    message: '`{path}:{line}:{column}: {reason}`'
-  - name: TerminalConfigInvalidError
-    condition: スキーマに違反する
-    message: '違反ごとに `{path}: {キーのパス}: {理由}`'
-  unit_tests:
-  - name: test_load_terminal_config
-    case: 正常
-    summary: 既定値を埋める
-    condition: '`version`・`clone` と `sources` 1 行（`config` は文字列）だけの設定'
-    mock: なし（一時フォルダ）
-    expected: '`port` が 8786、`bind` が `127.0.0.1`、`sources[0].config` が配列、`log_dir` が `{state_dir}/logs`'
-  - name: test_load_terminal_config_when_state_dir_env_set
-    case: 正常
-    summary: 状態の置き場を環境変数で決める
-    condition: '`state_dir: /tmp/a` を持つ設定、`env` が `{"PROJECT_INDEX_STATE_DIR": "/tmp/b"}`'
-    mock: なし（一時フォルダ）
-    expected: '`state_dir` が `/tmp/b`、`log_dir` が `/tmp/b/logs`'
-  - name: test_load_terminal_config_when_missing
-    case: 異常
-    summary: ファイルが無い
-    condition: 無いパス
-    mock: なし
-    expected: '`TerminalConfigInvalidError` の本文にそのパス'
-    exception: ファイルが無い
-  - name: test_load_terminal_config_when_yaml_broken
-    case: 異常
-    summary: YAML として読めない
-    condition: '`sources: [`'
-    mock: なし
-    expected: '`TerminalConfigInvalidError` の違反に行と列'
-    exception: YAML として読めない
-  - name: test_load_terminal_config_when_schema_invalid
-    case: 異常
-    summary: 違反を全て集める
-    condition: '`sources[0]` に `config` が無く、`port` が文字列'
-    mock: なし
-    expected: '`TerminalConfigInvalidError` の違反に `sources[0].config` と `port` の 2 つ'
-    exception: スキーマに違反する
-- name: validate_terminal_config
-  title: 端末の設定の検証
-  kind: 関数
-  container: project_index/features/settings/query.py
-  usecase: 端末の設定
-  role: 検証
-  summary: 端末の設定の値をスキーマと行の間の決まりで確かめ、違反を全て返す
-  scope: public
-  thread_safe: true
-  args:
-  - name: value
-    title: 設定の値
-    type: Any
-    required: true
-    passing: positional
-    description: YAML として読んだ素の値
-  returns:
-    type: list[Violation]
-    description: 違反の並び。無ければ空
-  process: |-
-    1. `SETTINGS_SCHEMA` を読み、スキーマの違反を全て集める（スキーマの違反）
-    2. `sources[].id` が行の間で重なる場合、後の行の `sources[{n}].id` に重複の違反を加える（`id` を省いた行はここでは比べず、配信元の読み込みで比べる）
-    3. `scope.read`・`scope.write` に空の文字列がある場合、その要素のパスに違反を加える
-    4. `version` が `SETTINGS_VERSION` より新しい場合、`version` に「このサーバーより新しい設定」の違反を加える
-  unit_tests:
-  - name: test_validate_terminal_config
-    case: 正常
-    summary: 違反が無い
-    condition: 必須のキーを持つ設定
-    mock: なし
-    expected: 空
-  - name: test_validate_terminal_config_when_duplicate_id
-    case: 正常
-    summary: 行の ID が重なる
-    condition: '`sources` の 2 行がどちらも `id: a`'
-    mock: なし
-    expected: '`sources[1].id` の違反 1 つで、`rule` が `a は既に使用されています`'
-  - name: test_validate_terminal_config_when_empty_glob
-    case: 正常
-    summary: 空の glob
-    condition: '`scope.read: [""]`'
-    mock: なし
-    expected: '`sources[0].scope.read[0]` の違反で、`rule` が `空の文字列は記載できません`'
-  - name: test_validate_terminal_config_when_newer_version
-    case: 正常
-    summary: 新しいバージョンの設定
-    condition: '`version: "2"`'
-    mock: なし
-    expected: '`version` の違反'
-- name: listen_port
-  title: 待ち受けのポート
-  kind: 関数
-  container: project_index/features/settings/query.py
-  usecase: 起動
-  role: 読み取り
-  summary: '`PROJECT_INDEX_PORT` を優先して待ち受けのポートを決める'
-  scope: public
-  args:
-  - name: config
-    title: 端末の設定
-    type: TerminalConfig
-    required: true
-    passing: positional
-    description: 読んだ端末の設定
-  - name: env
-    title: 環境変数
-    type: Mapping[str, str]
-    required: true
-    passing: positional
-    description: '`os.environ`'
-  returns:
-    type: int
-    description: 待ち受けるポート
-  process: |-
-    1. `PORT_ENV` が空でなければ整数にして返す
-       - 1〜65535 の整数でない場合、`TerminalConfigInvalidError` を送る
-    2. 無ければ端末の設定の `port` を返す
-  exceptions:
-  - name: TerminalConfigInvalidError
-    condition: '`PROJECT_INDEX_PORT` が 1〜65535 の整数でない'
-    message: '`PROJECT_INDEX_PORT: 1〜65535 の整数にしてください（{value}）`'
-  unit_tests:
-  - name: test_listen_port
-    case: 正常
-    summary: 環境変数が優先
-    condition: '`port: 9000`、`PROJECT_INDEX_PORT=9100`'
-    mock: なし
-    expected: '9100'
-  - name: test_listen_port_when_unset
-    case: 正常
-    summary: 設定の値
-    condition: '`port: 9000`、環境変数なし'
-    mock: なし
-    expected: '9000'
-  - name: test_listen_port_when_invalid
-    case: 異常
-    summary: 整数でない
-    condition: '`PROJECT_INDEX_PORT=abc`'
-    mock: なし
-    expected: '`TerminalConfigInvalidError`'
-    exception: '`PROJECT_INDEX_PORT` が整数でない'
+  - name: xdg_base_dir
+    title: XDG の置き場の親
+    kind: 関数
+    container: project_index/features/settings/query.py
+    usecase: 端末の設定
+    role: 読み取り
+    summary: XDG の環境変数の値を、空の文字列か相対パスなら既定に替えて返す
+    scope: public
+    args:
+      - name: env
+        title: 環境変数
+        type: Mapping[str, str]
+        required: true
+        passing: positional
+        description: '`os.environ`'
+      - name: name
+        title: 環境変数の名前
+        type: str
+        required: true
+        passing: positional
+        description: '`XDG_CONFIG_HOME_ENV` か `XDG_STATE_HOME_ENV`'
+      - name: default
+        title: 既定
+        type: str
+        required: true
+        passing: positional
+        description: '`DEFAULT_CONFIG_HOME` か `DEFAULT_STATE_HOME`'
+    returns:
+      type: Path
+      description: 正規化した絶対パス
+    process: |-
+      1. `name` の値が空でなく絶対パスならその値、そうでなければ `default` を『パスの正規化』にかけて返す（パスの正規化）
+    unit_tests:
+      - name: test_xdg_base_dir
+        case: 正常
+        summary: 絶対パスの値
+        condition: '`{"XDG_STATE_HOME": "/tmp/s"}`'
+        mock: なし
+        expected: '`Path("/tmp/s")`'
+      - name: test_xdg_base_dir_when_unset_or_relative
+        case: 正常
+        summary: 未設定・空の文字列・相対パスは既定
+        condition: '`{}`・`{"XDG_STATE_HOME": ""}`・`{"XDG_STATE_HOME": "rel"}`（`HOME` を `/home/u` に monkeypatch）'
+        mock: なし
+        expected: どれも `Path("/home/u/.local/state")`
+  - name: config_path
+    title: 端末の設定のパス
+    kind: 関数
+    container: project_index/features/settings/query.py
+    usecase: 起動
+    role: 読み取り
+    summary: 環境変数から端末の設定のパスを決める
+    scope: public
+    args:
+      - name: env
+        title: 環境変数
+        type: Mapping[str, str]
+        required: true
+        passing: positional
+        description: '`os.environ`'
+    returns:
+      type: Path
+      description: '`CONFIG_ENV` の値、無ければ `{XDG の設定の置き場の親}/CONFIG_FILE` を正規化した絶対パス'
+    process: |-
+      1. `CONFIG_ENV` が空でなければ、その値を『パスの正規化』にかけて返す（パスの正規化）
+      2. 無ければ、`XDG_CONFIG_HOME_ENV` と `DEFAULT_CONFIG_HOME` の XDG の置き場の親の下の `CONFIG_FILE` を返す（XDG の置き場の親）
+    unit_tests:
+      - name: test_config_path
+        case: 正常
+        summary: 環境変数の値
+        condition: '`{"PROJECT_INDEX_CONFIG": "/tmp/x/settings.yaml"}`'
+        mock: なし
+        expected: '`Path("/tmp/x/settings.yaml")`'
+      - name: test_config_path_when_unset
+        case: 正常
+        summary: 環境変数が無い
+        condition: '`{"HOME": "/home/u"}`（`HOME` を monkeypatch）'
+        mock: なし
+        expected: '`Path("/home/u/.config/project-index/settings.yaml")`'
+      - name: test_config_path_when_xdg_config_home_set
+        case: 正常
+        summary: XDG_CONFIG_HOME の下
+        condition: '`{"XDG_CONFIG_HOME": "/tmp/c"}`'
+        mock: なし
+        expected: '`Path("/tmp/c/project-index/settings.yaml")`'
+  - name: state_dir_path
+    title: 状態の置き場
+    kind: 関数
+    container: project_index/features/settings/query.py
+    usecase: 端末の設定
+    role: 読み取り
+    summary: 環境変数と端末の設定の `state_dir` から状態の置き場を決める
+    scope: public
+    args:
+      - name: value
+        title: 端末の設定の state_dir
+        type: str | None
+        required: true
+        passing: positional
+        description: 端末の設定の `state_dir`。無ければ `None`
+      - name: env
+        title: 環境変数
+        type: Mapping[str, str]
+        required: true
+        passing: positional
+        description: '`os.environ`'
+    returns:
+      type: Path
+      description: 正規化した絶対パス
+    process: |-
+      1. `STATE_DIR_ENV` が空でなければ、その値を『パスの正規化』にかけて返す（パスの正規化）
+      2. `value` があれば、その値を『パスの正規化』にかけて返す
+      3. 無ければ、`XDG_STATE_HOME_ENV` と `DEFAULT_STATE_HOME` の XDG の置き場の親の下の `STATE_SUBDIR` を返す（XDG の置き場の親）
+    unit_tests:
+      - name: test_state_dir_path
+        case: 正常
+        summary: 環境変数が端末の設定より優先
+        condition: '`value` が `/tmp/a`、`{"PROJECT_INDEX_STATE_DIR": "/tmp/b", "XDG_STATE_HOME": "/tmp/c"}`'
+        mock: なし
+        expected: '`Path("/tmp/b")`'
+      - name: test_state_dir_path_when_config_value
+        case: 正常
+        summary: 端末の設定の値
+        condition: '`value` が `/tmp/a`、`{"XDG_STATE_HOME": "/tmp/c"}`'
+        mock: なし
+        expected: '`Path("/tmp/a")`'
+      - name: test_state_dir_path_when_xdg_state_home_set
+        case: 正常
+        summary: XDG_STATE_HOME の下
+        condition: '`value` が `None`、`{"XDG_STATE_HOME": "/tmp/c"}`'
+        mock: なし
+        expected: '`Path("/tmp/c/project-index")`'
+      - name: test_state_dir_path_when_unset
+        case: 正常
+        summary: どれも無い
+        condition: '`value` が `None`、`{}`（`HOME` を `/home/u` に monkeypatch）'
+        mock: なし
+        expected: '`Path("/home/u/.local/state/project-index")`'
+  - name: load_terminal_config
+    title: 端末の設定の読み込み
+    kind: 関数
+    container: project_index/features/settings/query.py
+    usecase: 起動
+    role: 読み込み
+    summary: '`settings.yaml` を読み、スキーマの違反を全て集めてから端末の設定にする'
+    scope: public
+    thread_safe: true
+    args:
+      - name: path
+        title: 設定のファイル
+        type: Path
+        required: true
+        passing: positional
+        description: 端末の設定のパス
+      - name: env
+        title: 環境変数
+        type: Mapping[str, str] | None
+        required: false
+        default: None
+        passing: keyword
+        description: 状態の置き場を決める環境変数。`None` なら `os.environ`
+    returns:
+      type: TerminalConfig
+      description: 既定値を埋めた端末の設定
+    process: |-
+      1. ファイルを UTF-8 で読む
+         - 無い場合、`TerminalConfigInvalidError` を送る
+      2. YAML として読む（YAMLの読み込み）
+         - 読めない場合、行と列を `Violation` にして `TerminalConfigInvalidError` を送る
+      3. 端末の設定の値を検証する（端末の設定の検証）
+         - 違反が 1 つでもある場合、全ての違反を載せた `TerminalConfigInvalidError` を送る
+      4. `TerminalConfig` を作る。`state_dir` は端末の設定の `state_dir` と `env` から決め（状態の置き場）、`log_dir` は『パスの正規化』にかけ、無ければ `{state_dir}/logs` にする
+    exceptions:
+      - name: TerminalConfigInvalidError
+        condition: ファイルが無い
+        message: '`{path}: 端末の設定が見つかりません`'
+      - name: TerminalConfigInvalidError
+        condition: YAML として読めない
+        message: '`{path}:{line}:{column}: {reason}`'
+      - name: TerminalConfigInvalidError
+        condition: スキーマに違反する
+        message: '違反ごとに `{path}: {キーのパス}: {理由}`'
+    unit_tests:
+      - name: test_load_terminal_config
+        case: 正常
+        summary: 既定値を埋める
+        condition: '`version`・`clone` と `sources` 1 行（`config` は文字列）だけの設定'
+        mock: なし（一時フォルダ）
+        expected: '`port` が 8786、`bind` が `127.0.0.1`、`sources[0].config` が配列、`log_dir` が `{state_dir}/logs`'
+      - name: test_load_terminal_config_when_state_dir_env_set
+        case: 正常
+        summary: 状態の置き場を環境変数で決める
+        condition: '`state_dir: /tmp/a` を持つ設定、`env` が `{"PROJECT_INDEX_STATE_DIR": "/tmp/b"}`'
+        mock: なし（一時フォルダ）
+        expected: '`state_dir` が `/tmp/b`、`log_dir` が `/tmp/b/logs`'
+      - name: test_load_terminal_config_when_missing
+        case: 異常
+        summary: ファイルが無い
+        condition: 無いパス
+        mock: なし
+        expected: '`TerminalConfigInvalidError` の本文にそのパス'
+        exception: ファイルが無い
+      - name: test_load_terminal_config_when_yaml_broken
+        case: 異常
+        summary: YAML として読めない
+        condition: '`sources: [`'
+        mock: なし
+        expected: '`TerminalConfigInvalidError` の違反に行と列'
+        exception: YAML として読めない
+      - name: test_load_terminal_config_when_schema_invalid
+        case: 異常
+        summary: 違反を全て集める
+        condition: '`sources[0]` に `config` が無く、`port` が文字列'
+        mock: なし
+        expected: '`TerminalConfigInvalidError` の違反に `sources[0].config` と `port` の 2 つ'
+        exception: スキーマに違反する
+  - name: validate_terminal_config
+    title: 端末の設定の検証
+    kind: 関数
+    container: project_index/features/settings/query.py
+    usecase: 端末の設定
+    role: 検証
+    summary: 端末の設定の値をスキーマと行の間の決まりで確かめ、違反を全て返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: value
+        title: 設定の値
+        type: Any
+        required: true
+        passing: positional
+        description: YAML として読んだ素の値
+    returns:
+      type: list[Violation]
+      description: 違反の並び。無ければ空
+    process: |-
+      1. `SETTINGS_SCHEMA` を読み、スキーマの違反を全て集める（スキーマの違反）
+      2. `sources[].id` が行の間で重なる場合、後の行の `sources[{n}].id` に重複の違反を加える（`id` を省いた行はここでは比べず、配信元の読み込みで比べる）
+      3. `scope.read`・`scope.write` に空の文字列がある場合、その要素のパスに違反を加える
+      4. `version` が `SETTINGS_VERSION` より新しい場合、`version` に「このサーバーより新しい設定」の違反を加える
+    unit_tests:
+      - name: test_validate_terminal_config
+        case: 正常
+        summary: 違反が無い
+        condition: 必須のキーを持つ設定
+        mock: なし
+        expected: 空
+      - name: test_validate_terminal_config_when_duplicate_id
+        case: 正常
+        summary: 行の ID が重なる
+        condition: '`sources` の 2 行がどちらも `id: a`'
+        mock: なし
+        expected: '`sources[1].id` の違反 1 つで、`rule` が `a は既に使用されています`'
+      - name: test_validate_terminal_config_when_empty_glob
+        case: 正常
+        summary: 空の glob
+        condition: '`scope.read: [""]`'
+        mock: なし
+        expected: '`sources[0].scope.read[0]` の違反で、`rule` が `空の文字列は記載できません`'
+      - name: test_validate_terminal_config_when_newer_version
+        case: 正常
+        summary: 新しいバージョンの設定
+        condition: '`version: "2"`'
+        mock: なし
+        expected: '`version` の違反'
+  - name: listen_port
+    title: 待ち受けのポート
+    kind: 関数
+    container: project_index/features/settings/query.py
+    usecase: 起動
+    role: 読み取り
+    summary: '`PROJECT_INDEX_PORT` を優先して待ち受けのポートを決める'
+    scope: public
+    args:
+      - name: config
+        title: 端末の設定
+        type: TerminalConfig
+        required: true
+        passing: positional
+        description: 読んだ端末の設定
+      - name: env
+        title: 環境変数
+        type: Mapping[str, str]
+        required: true
+        passing: positional
+        description: '`os.environ`'
+    returns:
+      type: int
+      description: 待ち受けるポート
+    process: |-
+      1. `PORT_ENV` が空でなければ整数にして返す
+         - 1〜65535 の整数でない場合、`TerminalConfigInvalidError` を送る
+      2. 無ければ端末の設定の `port` を返す
+    exceptions:
+      - name: TerminalConfigInvalidError
+        condition: '`PROJECT_INDEX_PORT` が 1〜65535 の整数でない'
+        message: '`PROJECT_INDEX_PORT: 1〜65535 の整数にしてください（{value}）`'
+    unit_tests:
+      - name: test_listen_port
+        case: 正常
+        summary: 環境変数が優先
+        condition: '`port: 9000`、`PROJECT_INDEX_PORT=9100`'
+        mock: なし
+        expected: '9100'
+      - name: test_listen_port_when_unset
+        case: 正常
+        summary: 設定の値
+        condition: '`port: 9000`、環境変数なし'
+        mock: なし
+        expected: '9000'
+      - name: test_listen_port_when_invalid
+        case: 異常
+        summary: 整数でない
+        condition: '`PROJECT_INDEX_PORT=abc`'
+        mock: なし
+        expected: '`TerminalConfigInvalidError`'
+        exception: '`PROJECT_INDEX_PORT` が整数でない'
+  - name: read_settings_file
+    title: 端末の設定の内容の読み込み
+    kind: 関数
+    container: project_index/features/settings/query.py
+    usecase: 端末の設定
+    role: 読み込み
+    summary: '`settings.yaml` を 1 回だけ読み、本文と内容のバージョンを返す'
+    scope: public
+    args:
+      - name: path
+        title: 設定のファイル
+        type: Path
+        required: true
+        passing: positional
+        description: 端末の設定のパス
+    returns:
+      type: tuple[str, str]
+      description: UTF-8 で読んだ本文と、端末の設定の内容のバージョン
+    process: |-
+      1. `path` をバイト列で 1 回だけ読む
+      2. バイト列の内容のハッシュを内容のバージョンにする（内容のハッシュ）
+      3. バイト列を UTF-8 で本文にし、本文と内容のバージョンを返す
+    exceptions:
+      - name: FileNotFoundError
+        condition: '`path` が無い'
+        message: 標準のメッセージ
+    unit_tests:
+      - name: test_read_settings_file
+        case: 正常
+        summary: 本文と内容のバージョンを返す
+        condition: 一時フォルダの `settings.yaml`
+        mock: なし（一時フォルダ）
+        expected: 本文がファイルの中身で、内容のバージョンがファイルのバイト列の内容のハッシュ。末尾にコメントを 1 行足すと内容のバージョンが変わる
+      - name: test_read_settings_file_when_missing
+        case: 異常
+        summary: ファイルが無い
+        condition: 無いパス
+        mock: なし（一時フォルダ）
+        expected: '`FileNotFoundError`'
+        exception: '`path` が無い'
