@@ -1,0 +1,16 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: changed
+    detail: ワークツリーの配信元の設定に種類を追加し、その種類の文書をワークツリーへ作成するシナリオを追加する
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: run_only
+    detail: ワークツリーへの書き込みで参照する配信元の設定が変わるため、既存の書き込みを回帰確認する
+    depends_on: []
+scope_out:
+  - item: Issue の事象の 3 点目（`worktree` の代わりに `cwd` に作業ブランチのワークツリーを指定すると `TargetIsCloneError` になる）
+    reason: Issue の期待は `worktree` を指定した場合だけを挙げている。`cwd` の場合は `find_worktree` がワークツリーを決められていない別の原因で、今回の修正と独立に成り立つかを設計のレビューで確定する
+    plan: to_file
+docs: []
