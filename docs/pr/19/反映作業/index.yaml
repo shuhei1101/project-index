@@ -1,14 +1,14 @@
 端末の設定の配信元のパスの修正:
-  説明: 端末の設定 `~/.config/dev-docs/settings.yaml` の配信元 `project-index` の `config` を、`/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/develop/dev-docs.yaml` から同じフォルダの `project-index.yaml` へ書き換える。develop の worktree が改名を取り込んだ後に実行する
-  タグ: [端末の設定]
+  説明: 端末の設定 `~/.config/dev-docs/settings.yaml` の配信元 `project-index` の `config` を、`/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/develop/dev-docs.yaml` から同じフォルダの `project-index.yaml` へ書き換え、dev-docs の管理の MCP の `reload` で読み直させる。develop のブランチと worktree が改名を取り込んだ後に実行する
+  タグ: [設定, 再読み込み]
   実行者: planner
   時期: マージの後
   回数: 1 回限り
   可逆: true
-  疎通確認: 端末の設定の配信元のパスの修正/疎通確認.sh
-  実行: 端末の設定の配信元のパスの修正/実行.sh
-  確認: 端末の設定の配信元のパスの修正/確認.sh
-  切り戻し: 端末の設定の配信元のパスの修正/切り戻し.sh
+  疎通確認: 端末の設定の配信元のパスの修正/疎通確認.py
+  実行: 端末の設定の配信元のパスの修正/実行.py
+  確認: 端末の設定の配信元のパスの修正/確認.py
+  切り戻し: 端末の設定の配信元のパスの修正/切り戻し.py
   失敗時: 既定の対処を 1 回、2 回連続で失敗したら依頼元へ返す
-  確認方法: 端末の設定の配信元 `project-index` の `config` が `/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/develop/project-index.yaml` を指し、そのファイルがある
+  確認方法: dev-docs の `describe` の一覧に `project-index` が write の権限で載り、`search_docs` で `project-index` の ARCH-1 が引ける
   状態: "-"
