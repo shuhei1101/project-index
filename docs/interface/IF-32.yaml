@@ -109,6 +109,7 @@ side_effects: '`settings.yaml` の `sources` の末尾に 1 行追加し、追�
 callers:
   - SC-12#scenarios[正常シナリオ（1 行を追加する）]
   - SC-12#scenarios[正常シナリオ（同じ id の行がある）]
+  - SC-12#scenarios[異常シナリオ（取得した後にほかの書き換えが入った）]
 exclusivity: 内容のバージョンの照合と端末の設定の書き込みは、端末の設定の保存と同じ排他で 1 つずつ
 request:
   - name: source
@@ -159,7 +160,7 @@ status_codes:
   - code: '409'
     condition: '`expectedVersion` が今の端末の設定の内容のバージョンと違う'
     notes: 同じ id の行がある 409 と違い、problem+json で拡張メンバー `current` に今の内容のバージョンを入れる
-error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）
+error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`・`current`）
 constraints:
   - item: オリジンの確認
     constraint: 端末の設定の保存と同じ

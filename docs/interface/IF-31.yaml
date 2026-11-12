@@ -365,7 +365,7 @@ status_codes:
   - code: '409'
     condition: '`expectedVersion` が今の端末の設定の内容のバージョンと違う'
     notes: problem+json の拡張メンバー `current` に今の内容のバージョンを入れる
-error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）。検証の違反は `errors[]` に `{path, reason}` で並べる（`path` は `sources[1].id` の形）
+error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`・`current`）。検証の違反は `errors[]` に `{path, reason}` で並べる（`path` は `sources[1].id` の形）
 constraints:
   - item: オリジンの確認
     constraint: '`Origin` と `Sec-Fetch-Site` をどちらも持たない要求（dev-docs の画面のサーバーなど、サーバーの側からの呼び出し）と、`Origin` が project-index のオリジンと同じ要求だけを受ける'

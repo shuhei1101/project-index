@@ -87,7 +87,7 @@ status_codes:
     condition: '`expectedVersion` が今の端末の設定の内容のバージョンと違う'
     notes: 拡張メンバー `current` に今の内容のバージョンを入れる
   - code: '422'
-    condition: '`expectedVersion` が無い、`source` に `id` か知らないキーがある、変更後の端末の設定がスキーマに通らない'
+    condition: '`expectedVersion` が無い、`source` に `id` か知らないキーがある、`id` を省いた行の `config` を配信元の ID が変わる設定へ変える、変更後の端末の設定がスキーマに通らない'
     notes: '`errors[]` に違反したキーのパスと理由を全て並べる'
 error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`・`current`）
 constraints:
@@ -110,6 +110,9 @@ constraints:
     constraint: '`expectedVersion` とレスポンスのキーは camelCase。`source` の中のキーは端末の設定のキーのまま'
   - item: operationId
     constraint: '`{tag}-{関数名}` の `settings-patch_settings_source`'
+  - item: 配信元の ID が変わる変更
+    constraint: '`id` を省いた行の `config` を、配信元の設定の `name` がパスの `id` と違う設定へ変える要求は 422 で断る'
+    notes: 差し替えるときは、端末の設定の配信元の 1 行の削除と追加を呼ぶ。読み直しの範囲を 1 つの配信元に保ち、ID の重なりを起こさない
 flows:
   - name: 正常系
     summary: 指した行の送信したキーだけを変更し、その配信元だけを読み直す
@@ -218,14 +221,14 @@ flows:
       - '`settings.yaml` が変わらない'
     test: test_error_when_row_not_found
   - name: 異常系（スキーマに通らない・422）
-    summary: 内容のバージョンが無い変更と、変更後がスキーマに通らない変更を断る
+    summary: 内容のバージョンが無い変更と、配信元の ID が変わる変更と、変更後がスキーマに通らない変更を断る
     setup:
       - name: Mock
         description: なし
       - name: 端末の設定
-        description: '`sources` に sample と extra の 2 行'
+        description: '`sources` に sample と extra と、`id` を省いた notes の 3 行'
       - name: 入力
-        description: '`expectedVersion` が無い要求と、`scope.read` に空の文字列を含む要求と、`source` に `id` を含む要求'
+        description: '`expectedVersion` が無い要求と、`scope.read` に空の文字列を含む要求と、`source` に `id` を含む要求と、`id` を省いた notes の行の `config` を `name` が `memo` の設定へ変える要求'
     flow: |-
       ```mermaid
       sequenceDiagram
@@ -236,7 +239,7 @@ flows:
         E-->>C: 422 problem+json（違反したキーと理由）
       ```
     expected:
-      - 3 つとも 422 で、`errors` に違反したキーのパスと理由がある
+      - 4 つとも 422 で、`errors` に違反したキーのパスと理由がある
       - '`settings.yaml` が変わらない'
     test: test_error_when_schema_invalid
   - name: 異常系（別のオリジン・403）
