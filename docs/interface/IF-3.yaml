@@ -1,0 +1,404 @@
+id: IF-3
+title: "関連のたどり"
+entry:
+  kind: mcp_tool
+  value: '`trace_related`'
+flows:
+- name: 正常系
+  summary: 起点の文書の `related` をたどって関連する文書を返す
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+  - name: サンプルの配信元
+    description: 文書 1・2・3 を持つ sample。文書 1 の `related` が文書 2、文書 2 の `related` が文書 3 を指す
+    notes: id `sample`
+  - name: 入力
+    description: '`from_ids: [文書 1]`、`direction: out`'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as trace_related
+      participant ST as 配信元の文書
+
+      C->>T: from_ids: 文書 1, direction: out
+      T-->>ST: 文書 1 から related を深さ 2 までたどる
+      T-->>C: 文書 2（深さ 1）と文書 3（深さ 2）
+    ```
+  expected:
+  - 文書 2 を深さ 1、文書 3 を深さ 2 で返す
+  - 各行にたどった `related` の元と関係の種類がある
+  - '`depth: 1` では文書 2 だけを返す'
+  - '`format: json` の各項目に `path`（文書の絶対パス）と `scope: summary` がある'
+  test: test_normal
+- name: 正常系（逆向きにたどる）
+  summary: '`direction: in` で起点を指す文書を返し、循環をたどらない'
+  setup:
+  - name: Mock
+    description: なし
+  - name: 循環する関連
+    description: 正常系の sample に、文書 3 の `related` が文書 1 を指す行を加える
+  - name: 入力
+    description: '`from_ids: [文書 3]`、`direction: in`、`depth: 4`'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as trace_related
+
+      C->>T: from_ids: 文書 3, direction: in, depth: 4
+      T->>T: 文書 3 を指す文書をたどり、一度たどった文書は飛ばす
+      T-->>C: 文書 2 と文書 1
+    ```
+  expected:
+  - 文書 2 を深さ 1、文書 1 を深さ 2 で返し、同じ文書を 2 回返さない
+  - '`depth: 5` では 4 に丸め、`notes` で知らせる'
+  test: test_normal_when_direction_in
+- name: 正常系（コードのパスから）
+  summary: コードのパスを本文に持つ文書を起点にたどる
+  setup:
+  - name: Mock
+    description: なし
+  - name: コードの文書
+    description: 'sample に `records: files`・`body_file: path` の行を加え、`src/a.py` の文書の `related` が文書 1 を指す'
+  - name: 入力
+    description: '`code_paths: [src/a.py]`'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as trace_related
+
+      C->>T: code_paths: src/a.py
+      T->>T: src/a.py を本文に持つ文書を起点にする
+      T-->>C: 文書 1 と、その先の文書 2
+    ```
+  expected:
+  - 文書 1 を深さ 1、文書 2 を深さ 2 で返す
+  test: test_normal_when_code_paths
+- name: 正常系（関連の候補）
+  summary: '`suggest: true` で同じ commit の変更と会話での閲覧から候補を返す'
+  setup:
+  - name: Mock
+    description: なし（`state_dir` は一時フォルダ）
+  - name: 同じ commit の変更
+    description: 文書 1 と文書 4（`related` で繋がらない）を同じ commit で変える
+  - name: 閲覧の記録
+    description: '`session_id: s1` で文書 1 と文書 5 を `view: full` で読む'
+  - name: 入力
+    description: '`from_ids: [文書 1]`、`suggest: true`、`session_id: s1`'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as trace_related
+      participant G as Git の履歴
+      participant SD as state_dir
+
+      C->>T: from_ids: 文書 1, suggest: true
+      T-->>G: 文書 1 と同じ commit で変わった文書を数える
+      T-->>SD: 同じ会話で編集・閲覧した文書を読む
+      T-->>C: たどった文書と、上位 3 件の候補
+    ```
+  expected:
+  - '`suggestions` に文書 4（`co_change`）と文書 5（`viewed`）がある'
+  - '`related` ですでに繋がる文書 2 は候補に入らない'
+  - 文書 1 の `related` は変わらない
+  test: test_normal_when_suggest
+- name: 正常系（返し済みの相手）
+  summary: 同じ会話で 2 回目は相手の名前・概要文を省く
+  setup:
+  - name: Mock
+    description: なし（`state_dir` は一時フォルダ）
+  - name: 入力
+    description: '`session_id: s1` で正常系と同じ呼び出しを 2 回、3 回目は `repeat_seen: true`'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as trace_related
+      participant SD as state_dir
+
+      C->>T: from_ids: 文書 1, session_id: s1
+      T->>SD: 返した相手を記録する
+      T-->>C: 文書 2 と文書 3 の名前と概要文
+      C->>T: 同じ引数
+      T-->>C: ID と（この会話で返却済み）
+    ```
+  expected:
+  - 2 回目の文書 2・3 の `name`・`description` が `（この会話で返却済み）` になり、json の項目に `path`・`scope` が無い
+  - 3 回目は名前と概要文を返す
+  test: test_normal_when_seen
+- name: 異常系（無い起点・DocumentNotFoundError）
+  summary: 無い文書・文書の無いコードのパスを起点にすると断る
+  setup:
+  - name: Mock
+    description: なし
+  - name: 入力
+    description: '1 回目は `from_ids: [doc-9]`、2 回目は `code_paths: [src/none.py]`'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as trace_related
+
+      C->>T: from_ids: doc-9
+      T-->>C: isError（見つからない ID と近い候補）
+    ```
+  expected:
+  - '1 回目が `isError: true` で、`doc-9` と近い ID の候補を返す'
+  - '2 回目が `isError: true` で、`src/none.py` を本文に持つ文書が無いことを返す'
+  test: test_error_when_document_not_found
+- name: 異常系（起点の指定の誤り・InvalidArgumentError）
+  summary: '`from_ids` と `code_paths` の両方かどちらも無い呼び出しを断る'
+  setup:
+  - name: Mock
+    description: なし
+  - name: 入力
+    description: 1 回目は両方、2 回目はどちらも渡さない
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as trace_related
+
+      C->>T: from_ids と code_paths
+      T-->>C: isError（どちらか 1 つを渡すこと）
+    ```
+  expected:
+  - 'どちらの呼び出しも `isError: true` で、`from_ids` か `code_paths` のどちらか 1 つを渡すことを返す'
+  test: test_error_when_invalid_argument
+- name: 異常系（読めない配信元・SourceNotReadableError）
+  summary: '`scope` に当たらない配信元を起点にしない'
+  setup:
+  - name: Mock
+    description: なし
+  - name: 読めない配信元
+    description: '`scope.read` が other のフォルダだけの配信元'
+    notes: id `other`
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as trace_related
+
+      C->>T: source: other, from_ids: other の文書
+      T-->>C: isError（読めない配信元と、使える配信元の一覧）
+    ```
+  expected:
+  - '`isError: true` で、other を読めないことと使える配信元の一覧を返す'
+  test: test_error_when_source_not_readable
+- name: 正常系（作業範囲の外を参考にたどる）
+  summary: '`outside_scope: true` で、`scope` に当たらない配信元の関連を作業範囲の外（参考）としてたどる'
+  setup:
+  - name: Mock
+    description: なし
+  - name: 配信元
+    description: sample と、文書 1 の `related` が文書 2 を指す other（`scope.read` は other のフォルダだけ。端末の設定の `outside_read` は書かない）
+  - name: 入力
+    description: '`source: other`, `from_ids: [文書 1]`, `outside_scope: true`。`cwd` は sample のクローン本体'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as trace_related
+      participant L as 要求のログ
+
+      C->>T: source: other, from_ids, outside_scope: true
+      T->>T: scope に cwd が当たらず、outside_read が真
+      T->>L: cwd と other を残す
+      T-->>C: 作業範囲の外（参考）、文書 2
+    ```
+  expected:
+  - 先頭の行に「作業範囲の外（参考）」があり、文書 2 を返す
+  - 要求のログに sample のクローン本体のパスと `other` が残る
+  - '`outside_read: false` の other では `SourceNotReadableError` を返す'
+  test: test_normal_when_outside_scope
+lead: 起点の文書かコードのパスから `related` をたどって関連する文書を返す。`suggest` で、まだ `related` に無い関連の候補も返す。
+identifier: trace_related
+permissions: 対象の配信元の `scope.read` か `scope.write` に `cwd` が当たること。たどった先が読めない配信元の文書なら、その文書は ID だけを返す
+idempotent: true
+side_effects: 会話キーごとに、名前・概要文を返した関連の相手を `state_dir` に記録する
+callers:
+- SC-6#scenarios[正常シナリオ]
+- SC-6#scenarios[正常シナリオ（設計書を実装するコードを引く）]
+exclusivity: '読み取りだけで排他しない（`readOnlyHint: true`）'
+request:
+- name: source
+  type: str
+  required: false
+  default: なし（作業中の配信元）
+  location: argument
+  description: 起点の配信元の ID
+- name: ref
+  type: str
+  required: false
+  default: なし（配信元の `default_ref`。作業中の配信元は作業ツリー）
+  location: argument
+  description: 読むリビジョン
+- name: worktree
+  type: str
+  required: false
+  default: なし（`cwd` がワークツリーの中ならそのワークツリー）
+  location: argument
+  description: 読むワークツリーのパス
+- name: from_ids
+  type: list[str]
+  required: false
+  default: なし（`code_paths` からたどる）
+  location: argument
+  description: 起点の文書の ID
+  constraints: '`from_ids` か `code_paths` のどちらか 1 つを渡す'
+- name: code_paths
+  type: list[str]
+  required: false
+  default: なし（`from_ids` からたどる）
+  location: argument
+  description: 起点のコードのパス（配信元の直下から）
+  notes: '`records`・`body_file` の行で、そのパスを本文に持つ文書を起点にする'
+- name: depth
+  type: int
+  required: false
+  default: '`2`'
+  location: argument
+  description: たどる深さ
+  constraints: 1〜4。超えたら 4 に丸めて `notes` で知らせる
+- name: direction
+  type: Literal['out', 'in', 'both']
+  required: false
+  default: '`both`'
+  location: argument
+  description: '`out` は起点の `related` が指す先、`in` は起点を `related` で指す文書'
+  notes: 設計書を起点に `in` で呼ぶと、`via.type` が `implements` の文書がその設計書を実装するコードになる。コードを起点にすると `tests` の文書がそのテストになる
+- name: suggest
+  type: bool
+  required: false
+  default: '`false`'
+  location: argument
+  description: '`true` で、関連の候補（同じ commit での変更・同じ会話での編集と閲覧）を上位 3 件返す'
+- name: repeat_seen
+  type: bool
+  required: false
+  default: '`false`'
+  location: argument
+  description: この会話で返し済みの相手の名前・概要文も返す
+- name: format
+  type: Literal['markdown', 'json']
+  required: false
+  default: '`markdown`'
+  location: argument
+  description: 返却する形式
+- name: cwd
+  type: str
+  required: false
+  default: なし（どの `scope` にも当たらない）
+  location: argument
+  description: 作業場所
+  notes: フックが入れる
+- name: session_id
+  type: str
+  required: false
+  default: なし
+  location: argument
+  description: 会話キー
+  notes: フックが入れる
+- name: agent_id
+  type: str
+  required: false
+  default: なし（メインの会話）
+  location: argument
+  description: 会話キー（サブエージェント）
+  notes: フックが入れる
+- name: outside_scope
+  type: bool
+  required: false
+  default: '`false`'
+  location: argument
+  description: '`true` のとき、`cwd` が `scope` に当たらない起点の配信元も、端末の設定の `sources[].outside_read` が真なら作業範囲の外（参考）としてたどる'
+  notes: '`format: markdown` は先頭の行に「作業範囲の外（参考）」を出し、`format: json` は `outside_scope: true` を返す。外から読んだ呼び出しは作業場所と配信元の ID を要求のログに残す'
+  status: planned
+request_example: |-
+  ```json
+  {"from_ids": ["doc-1"], "depth": 2, "direction": "out", "suggest": true}
+  ```
+response:
+- name: items[].id
+  type: str
+  description: たどった文書の ID
+- name: items[].source
+  type: str
+  description: 文書の配信元の ID
+  notes: 起点と違う配信元のときだけ
+- name: items[].depth
+  type: int
+  description: 起点からの深さ
+- name: items[].via
+  type: "{from: str, type: str, direction: Literal['out', 'in']}"
+  description: たどった `related` の元・関係の種類・向き
+- name: items[].name
+  type: str
+  description: 文書の名前
+  notes: 返し済みなら `（この会話で返却済み）`。読めない配信元の文書は返さない
+- name: items[].description
+  type: str
+  description: 概要文
+  notes: '`name` と同じ'
+- name: suggestions[].id
+  type: str
+  description: 関連の候補の文書の ID
+  notes: '`suggest: true` のときだけ'
+- name: suggestions[].signals
+  type: list[Literal['co_change', 'edited', 'viewed']]
+  description: 候補にした信号
+- name: suggestions[].score
+  type: float
+  description: 信号から求めた順位の値
+- name: notes
+  type: list[str]
+  description: 丸めた・読めなかった文書の知らせ
+- name: items[].path
+  type: str
+  description: たどった文書の場所。`search_docs` の `items[].path` と同じ決め方の絶対パス
+  notes: '`ref` を渡した呼び出し、返し済みの相手、読めない配信元の文書では持たない'
+- name: items[].scope
+  type: Literal['summary']
+  description: 返した範囲。名前と概要文だけを返すため常に `summary`
+  notes: '`items[].path` と同じ条件で持たない'
+response_example: |-
+  ```markdown
+  doc-1 から 2 件
+
+  | id | 深さ | たどった関連 | name | description |
+  | --- | --- | --- | --- | --- |
+  | doc-2 | 1 | doc-1 → references | 文書 2 | 2 件目 |
+  ```
+response_notes: 候補は `related` には書き込まない。採用するときは `write_docs` で `related` に追加する。
+exceptions:
+- name: なし（正常終了）
+  condition: たどれた（関連が 0 件のときも正常終了）
+- name: DocumentNotFoundError
+  condition: '`from_ids` の文書が無い、または `code_paths` を本文に持つ文書が無い'
+  notes: 見つからなかった ID・パスと近い候補を添える
+- name: InvalidArgumentError
+  condition: '`from_ids` と `code_paths` を両方渡した、またはどちらも渡さない'
+- name: SourceNotReadableError
+  condition: '`cwd` が起点の配信元の `scope.read`・`scope.write` に当たらない（`outside_scope: true` のときは、加えて `outside_read` が偽）'
+  notes: '`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に読めることを添える'
+constraints:
+- item: 深さ
+  constraint: 最大 4
+- item: 候補の数
+  constraint: 上位 3 件
+- item: 循環
+  constraint: 一度たどった文書はたどらない
+- item: 注釈
+  constraint: '`readOnlyHint: true`'
+- item: タイムアウト
+  constraint: 制限なし
+- item: 配信元・ワークツリーの解決
+  constraint: '`search_docs` と同じ（配信していない配信元・当たらないワークツリーのエラーも同じ）'
+  notes: 共通の処理で解決するため、結合テストは [文書の検索](id:IF-2) が持つ
+refs:
+- SC-6#scenarios[正常シナリオ]
+- SC-6#scenarios[正常シナリオ（同じ本文を 2 回取る）]
+test_file: tests/integration/server/test_trace_related.py

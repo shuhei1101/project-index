@@ -1,0 +1,135 @@
+id: IF-32
+title: 端末の設定の配信元の 1 行の追加
+entry:
+  kind: endpoint
+  value: POST `/settings/sources`
+flows:
+- name: 正常系
+  summary: 同じ id の行が無ければ末尾に追加し、配信元を読み直す
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに端末の設定を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+  - name: 端末の設定
+    description: '`sources` に sample の 1 行'
+  - name: 入力
+    description: extra の行（`id`・`config`・`scope.read`）
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /settings/sources
+      participant F as settings.yaml
+
+      C->>E: extra の行
+      E->>E: オリジンを確かめ、追加後の端末の設定をスキーマで検証する
+      E->>F: sources の末尾に追加し、配信元を読み直す
+      E-->>C: 201 added
+    ```
+  expected:
+  - 201 で、`result` が `added`、`sources` に読み直した後の状態がある
+  - '`settings.yaml` の `sources` が sample・extra の順で、sample の行と他のキー・コメントは変わらない'
+  test: test_normal
+- name: 異常系（同じ id の行がある・409）
+  summary: 同じ id の行があれば追加せず、内容が同じかを返す
+  setup:
+  - name: Mock
+    description: なし
+  - name: 端末の設定
+    description: '`sources` に sample と extra の 2 行'
+  - name: 入力
+    description: extra と同じ内容の行と、extra と id が同じで `config` が違う行
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /settings/sources
+
+      C->>E: extra と同じ内容の行
+      E-->>C: 409 same: true
+      C->>E: extra と config が違う行
+      E-->>C: 409 same: false
+    ```
+  expected:
+  - 1 回目は 409 で `same` が `true`、2 回目は 409 で `same` が `false`
+  - '`settings.yaml` が変わらない'
+  test: test_error_when_same_id_exists
+- name: 異常系（スキーマに通らない・422）
+  summary: 追加後の端末の設定がスキーマに通らない行を断る
+  setup:
+  - name: Mock
+    description: なし
+  - name: 入力
+    description: '`id` が `Sample Docs` の行'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /settings/sources
+
+      C->>E: id が Sample Docs の行
+      E-->>C: 422 errors
+    ```
+  expected:
+  - 422 で、`errors[]` に `sources[1].id` のパスと理由がある
+  - '`settings.yaml` が変わらない'
+  test: test_error_when_schema_invalid
+lead: 端末の設定へ配信元の行を 1 行追加する。同じ id の行があれば追加せずに、内容が同じかを返す。
+identifier: add_settings_source
+permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ'
+idempotent: false
+side_effects: '`settings.yaml` の `sources` の末尾に 1 行追加し、配信元を読み直す'
+callers:
+- SC-12#scenarios[正常シナリオ（1 行を追加する）]
+- SC-12#scenarios[正常シナリオ（同じ id の行がある）]
+exclusivity: 端末の設定の書き込みは、端末の設定の保存と同じ排他で 1 つずつ
+request:
+- name: source
+  type: SourceRow
+  required: true
+  location: body
+  description: 追加する配信元の行（端末の設定の保存の `sources[]` の要素と同じキー）
+request_example: |-
+  ```json
+  {"source": {"id": "extra", "config": "/path/to/extra/project-index.yaml", "scope": {"read": ["/path/to/extra/**"]}}}
+  ```
+response:
+- name: result
+  type: Literal['added', 'exists']
+  description: 追加したか、同じ id の行があったか
+- name: same
+  type: bool | None
+  description: 同じ id の行の内容が同じか（`exists` のときだけ）
+- name: sources[].id
+  type: str
+  description: 配信元の ID（`added` のとき、読み直した後の状態）
+- name: sources[].status
+  type: Literal['serving', 'not_served', 'disabled']
+  description: 読み直した後の状態
+response_example: |-
+  ```json
+  {"result": "added", "same": null, "sources": [{"id": "sample", "status": "serving"}, {"id": "extra", "status": "serving"}]}
+  ```
+status_codes:
+- code: '201'
+  condition: 追加した
+- code: '403'
+  condition: project-index と別のオリジンの `Origin` を持つ要求か、`Origin` が無く `Sec-Fetch-Site` が `cross-site`・`same-site` の要求
+- code: '409'
+  condition: 同じ id の行がある（`result` が `exists`、`same` に内容が同じか）
+- code: '422'
+  condition: 追加後の端末の設定がスキーマに通らない
+  notes: '`errors[]` に違反したキーのパスと理由を全て並べる'
+error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）
+constraints:
+- item: オリジンの確認
+  constraint: 端末の設定の保存と同じ
+- item: 内容が同じかの比べ方
+  constraint: 行のキーと値を比べる。既定の値と同じ値を書いたキーと、書かないキーは同じとみなす
+- item: 書き込みの範囲
+  constraint: '`settings.yaml` の `sources` だけを書き換え、他のキーとコメントを保つ。一時ファイルに書いてから置き換える'
+- item: 認可
+  constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
+  decided_by: NFR-1#requirements[通信]
+- item: JSON のキー
+  constraint: レスポンスのキーは camelCase。行のキーは端末の設定のキーのまま
+test_file: tests/integration/server/test_add_settings_source.py

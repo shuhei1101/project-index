@@ -18,5 +18,6 @@ project-index のドキュメント全体の目次
 | [test-procedure](./test-procedure/) | テスト種別ごとの実行方法 |
 | [guide](./guide/) | project-index の使い方（はじめに・使い方・リファレンス） |
 | [scenario](./scenario/) | 単一 / 複合ユースケースの業務フロー設計（E2E テストの元） |
+| [interface](./interface/) | 操作ごとの入出力・制約・正常系と異常系のフロー（結合テストの元） |
 
 <!-- /table -->

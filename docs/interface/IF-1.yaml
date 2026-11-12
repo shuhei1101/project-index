@@ -1,0 +1,518 @@
+id: IF-1
+title: "配信元の説明"
+entry:
+  kind: mcp_tool
+  value: '`describe`'
+flows:
+- name: 正常系
+  summary: 引数なしで、今の作業場所から使える配信元の一覧を返す
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+  - name: 配信元
+    description: sample（`scope.read`・`scope.write` は sample のフォルダ）、notes（`scope.read` は sample のフォルダ）、other（`scope.read` は other のフォルダだけ）
+  - name: 入力
+    description: 引数なし。`cwd` は sample のクローン本体
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as describe
+
+      C->>T: 引数なし, cwd
+      T->>T: 各配信元の scope に cwd を照らす
+      T-->>C: 作業場所と、使える配信元の表
+    ```
+  expected:
+  - 先頭に作業場所と、sample のクローン本体であることがある
+  - sample を `write（作業中）`、notes を `read` として返す
+  - other を返さない
+  test: test_normal
+- name: 正常系（使える配信元の警告）
+  summary: 引数なしで、使える配信元の一覧に続けて、使える配信元の同期のずれ・古い設定と、配信していない配信元の警告を返す
+  setup:
+  - name: Mock
+    description: なし
+  - name: 配信元
+    description: 正常系と同じ sample・notes・other に、`project-index.yaml` の `version` が古い old（`scope.read` は sample のフォルダ）と、検証で外れる broken を加える。sample は管理用の YAML に無いファイルを 1 件持つ
+  - name: 入力
+    description: 引数なし。`cwd` は sample のクローン本体
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as describe
+
+      C->>T: 引数なし, cwd
+      T->>T: 使える配信元の同期のずれ・設定のバージョン・nav の警告を求める
+      T->>T: 検証で外した配信元を集める
+      T-->>C: 作業場所と使える配信元の表、注意の一覧
+    ```
+  expected:
+  - 使える配信元の表の後に「注意」の見出しと、sample の管理用の YAML に無いファイル 1 件・old の設定が古いこと（`project-index migrate` の案内）・broken を配信していないこと（理由のキーのパス）の行がある
+  - '`format: json` の `warnings` が同じ 3 件の文を持つ'
+  - 警告の行は `check_project` で確かめられることを示す
+  test: test_normal_when_warned
+- name: 正常系（使える配信元が無い）
+  summary: どの配信元の `scope` にも当たらない作業場所では、空の一覧に `/project-index:setup` の案内と、使える配信元によらない警告を添える
+  setup:
+  - name: Mock
+    description: なし
+  - name: 配信元
+    description: 正常系と同じ sample・notes・other に、検証で外れる broken（`scope.read` は一時フォルダ）を加える
+  - name: 入力
+    description: 引数なし。`cwd` はどの配信元の `scope` にも当たらない一時フォルダ
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as describe
+
+      C->>T: 引数なし, cwd
+      T->>T: 各配信元の scope に cwd を照らす（当たらない）
+      T->>T: 検証で外した配信元を集める
+      T-->>C: 作業場所、setup の案内、注意の一覧
+    ```
+  expected:
+  - 配信元の表の代わりに、使える配信元が無いことと `/project-index:setup` で配信元にできることの行がある
+  - 「注意」の見出しの下に、broken を配信していないこと（理由のキーのパス）の行がある
+  - '`format: json` が `sources` のキーを持たず、`warnings` が broken の 1 件'
+  test: test_normal_when_no_source_available
+- name: 正常系（書き込みの後の警告）
+  summary: '`write_docs` を当てた後に裏で流し直した検査の結果で、引数なしの警告が変わる'
+  setup:
+  - name: Mock
+    description: なし
+  - name: 配信元
+    description: sample と、Git 管理外で管理用の YAML に無いファイル `src/extra0.py` を 1 件持つ memo（`scope.read`・`scope.write` は sample のフォルダ）
+  - name: 入力
+    description: '`write_docs` で memo の `src` の行に `extra0.py` を作り、引数なしの `describe` を呼ぶ。`cwd` は sample のクローン本体'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant W as write_docs
+      participant T as describe
+
+      C->>T: 引数なし
+      T-->>C: memo の管理用の YAML に無いファイル 1 件の警告
+      C->>W: create（src・extra0.py）
+      W-->>C: applied: true
+      W->>W: 書ける配信元を裏で検査し直す
+      C->>T: 引数なし（検査を終えた後）
+      T-->>C: memo の警告が無い
+    ```
+  expected:
+  - 書き込みの前の引数なしの一覧に、memo の管理用の YAML に無いファイル 1 件の警告がある
+  - 裏の検査を終えた後の引数なしの一覧に、memo の警告が無い
+  test: test_normal_when_rechecked_after_write
+- name: 正常系（配信元の説明書）
+  summary: '`source` で配信元の説明書と種類の一覧を返す'
+  setup:
+  - name: Mock
+    description: なし
+  - name: 説明書
+    description: sample の設定に `instructions` と種類 1 つを持たせる
+  - name: 入力
+    description: '`source: sample`'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as describe
+      participant CF as 配信元の設定
+
+      C->>T: source: sample
+      T-->>CF: マージした設定を読む
+      T-->>C: 説明書と種類の表
+    ```
+  expected:
+  - '`instructions` の本文がそのままある'
+  - 種類の表に sample の種類の `id` と説明がある
+  test: test_normal_when_source
+- name: 正常系（種類のスキーマ）
+  summary: '`source` と `kind` で種類のスキーマを YAML のまま返す'
+  setup:
+  - name: Mock
+    description: なし
+  - name: 列名の対応
+    description: 'sample の種類の行が `metadata: {name: title, description: meta.summary}` を持つ'
+  - name: 入力
+    description: '`source: sample`, `kind` は sample の種類'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as describe
+      participant ST as 配信元のファイル
+
+      C->>T: source: sample, kind
+      T-->>ST: 種類のスキーマを読む
+      T-->>C: 共通のキーと列名の対応と、スキーマの YAML
+    ```
+  expected:
+  - 種類のスキーマのファイルと同じ YAML を返す
+  - スキーマの前に、`name` → `title`・`description` → `meta.summary` の対応の表がある
+  - '`format: json` ではスキーマを JSON のオブジェクトで、`metadata` を `{name: title, description: meta.summary}` で structuredContent と text に入れる'
+  - '`metadata` を持たない種類では対応の表を出さず、`format: json` の `metadata` が無いか空になる'
+  test: test_normal_when_kind
+- name: 正常系（ほかの配信元のスキーマ）
+  summary: '`documents[].schema` でほかの配信元を指す種類は、参照したリビジョンのスキーマを `$ref` を解いて返す'
+  setup:
+  - name: Mock
+    description: なし
+  - name: スキーマの配信元
+    description: '`schemas/note.schema.yaml` と、そこから `$ref` で指す `schemas/common.schema.yaml` を持つ Git のリポジトリ'
+    notes: id `schemas`。タグ `v1` の後の commit で `common.schema.yaml` の定義に項目 `extra` を追加し、作業ツリーはその commit
+  - name: 入力
+    description: '`source: sample`, `kind: note`（sample の行は `schema: {source: schemas, path: schemas/note.schema.yaml, ref: v1}`）'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as describe
+      participant G as schemas のリポジトリ
+
+      C->>T: source: sample, kind: note
+      T-->>G: v1 の note.schema.yaml と common.schema.yaml
+      T-->>C: v1 のスキーマ
+    ```
+  expected:
+  - 返すスキーマに、`common.schema.yaml` の定義が v1 の内容で入り、`extra` が無い
+  - '`worktree` を渡しても、参照したリビジョンのスキーマを返す'
+  test: test_normal_when_kind_from_other_source
+- name: 異常系（読めない配信元・SourceNotReadableError）
+  summary: '`scope` に当たらない配信元の説明を断る'
+  setup:
+  - name: Mock
+    description: なし
+  - name: 入力
+    description: '`source: other`、`cwd` は sample のクローン本体'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as describe
+
+      C->>T: source: other
+      T-->>C: isError（読めない配信元と、使える配信元の一覧）
+    ```
+  expected:
+  - '`isError: true` で、other を読めないことと、引数なしと同じ配信元の一覧を返す'
+  - other の説明書を返さない
+  test: test_error_when_source_not_readable
+- name: 異常系（配信していない配信元・SourceNotServedError）
+  summary: 起動時の検証で外した配信元の説明を断る
+  setup:
+  - name: Mock
+    description: なし
+  - name: 検証に失敗する配信元
+    description: '`documents[0].paths` が無い配信元。`scope.read` は sample のフォルダ'
+    notes: id `broken`
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as describe
+
+      C->>T: source: broken
+      T-->>C: isError（配信していない配信元、違反したキーのパスと理由）
+    ```
+  expected:
+  - '`isError: true` で、broken を配信していないことと `documents[0].paths` の違反を返す'
+  - 引数なしの一覧に broken が出ない
+  test: test_error_when_source_not_served
+- name: 異常系（知らない種類・UnknownKindError）
+  summary: 配信元に無い `kind` を断る
+  setup:
+  - name: Mock
+    description: なし
+  - name: 入力
+    description: '`source: sample`, `kind: no-such-kind`'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as describe
+
+      C->>T: source: sample, kind: no-such-kind
+      T-->>C: isError（知らない種類と、種類の一覧）
+    ```
+  expected:
+  - '`isError: true` で、`no-such-kind` と sample の種類の一覧を返す'
+  test: test_error_when_unknown_kind
+- name: 正常系（作業範囲の外を参考に読む）
+  summary: '`outside_scope: true` で、`scope` に当たらない配信元の説明書を作業範囲の外（参考）として返す'
+  setup:
+  - name: Mock
+    description: なし
+  - name: 配信元
+    description: 正常系と同じ sample・other。端末の設定の other の行は `outside_read` を書かない（既定 `true`）
+  - name: 入力
+    description: '`source: other`, `outside_scope: true`。`cwd` は sample のクローン本体'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as describe
+      participant L as 要求のログ
+
+      C->>T: source: other, outside_scope: true
+      T->>T: scope に cwd が当たらず、outside_read が真
+      T->>L: cwd と other を残す
+      T-->>C: 作業範囲の外（参考）、説明書と種類の表
+    ```
+  expected:
+  - 先頭の行に「作業範囲の外（参考）」があり、other の説明書と種類の表が続く
+  - '`format: json` の `outside_scope` が `true`'
+  - 要求のログに sample のクローン本体のパスと `other` が残る
+  - '`source: sample`（`scope` に当たる）に `outside_scope: true` を渡しても、`outside_scope` は `false` で要求のログに残さない'
+  - 引数なしの一覧に other を載せない
+  test: test_normal_when_outside_scope
+- name: 異常系（作業範囲の外の参照を断る・SourceNotReadableError）
+  summary: '`outside_read: false` の配信元は `outside_scope: true` でも断る'
+  setup:
+  - name: Mock
+    description: なし
+  - name: 配信元
+    description: '正常系と同じ sample・other。端末の設定の other の行に `outside_read: false`'
+  - name: 入力
+    description: '`source: other`, `outside_scope: true`。`cwd` は sample のクローン本体'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as describe
+
+      C->>T: source: other, outside_scope: true
+      T->>T: scope に cwd が当たらず、outside_read が偽
+      T-->>C: isError（読めない配信元）
+    ```
+  expected:
+  - '`isError: true` で、other を読めないことを返す'
+  - '`fix` が `outside_scope: true` を案内しない'
+  - 要求のログに作業範囲の外の記録を残さない
+  - '`outside_read` が真の other に `outside_scope` を渡さずに呼ぶと、`fix` が `outside_scope: true` を案内する'
+  test: test_error_when_outside_read_disabled
+- name: 正常系（作業範囲の外で読める配信元の一覧）
+  summary: '`source` を省いた `outside_scope: true` で、使える配信元の一覧に加えて、作業範囲の外で読める配信元の一覧を返す'
+  setup:
+  - name: Mock
+    description: なし
+  - name: 配信元
+    description: '正常系と同じ sample・notes・other（`outside_read` を書かない）に、`scope.read` が closed のフォルダだけで端末の設定の行に `outside_read: false` を持つ closed を加える'
+  - name: 入力
+    description: '`outside_scope: true`（`source` なし）。`cwd` は sample のクローン本体'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as describe
+
+      C->>T: outside_scope: true
+      T->>T: 各配信元の scope に cwd を照らす
+      T->>T: scope に当たらず outside_read が真の配信元を集める
+      T-->>C: 作業場所と使える配信元の表、作業範囲の外（参考）で読める配信元の表
+    ```
+  expected:
+  - 作業場所と使える配信元の表は、引数なしの正常系と同じ（sample・notes）
+  - 続けて「作業範囲の外（参考）」の見出しと、other の ID と `description` の行を持つ表がある
+  - 作業範囲の外の表に、`scope` に当たる sample・notes と、`outside_read` が偽の closed が無い
+  - '`format: json` の `outside_sources` が other の 1 件だけで、`sources` は引数なしと同じ'
+  - 要求のログに作業範囲の外の記録を残さない（文書を読まない）
+  - '`outside_scope` を省いた引数なしの一覧には、作業範囲の外の表が無い'
+  test: test_normal_when_outside_list
+- name: 正常系（ブランチとワークツリー）
+  summary: '`source` で、説明書と種類の一覧に加えてブランチ・タグとワークツリーの一覧を返す'
+  setup:
+  - name: Mock
+    description: なし
+  - name: ブランチとタグ
+    description: sample に `develop` ブランチと `v0.1.0` タグを作る
+  - name: ワークツリー
+    description: sample の `.claude/worktrees/x`（`feat/x` を checkout）と、`worktrees` に当たらない `../outside`（`feat/y` を checkout）
+    notes: 配信元の設定の `worktrees` は既定（`[./.claude/worktrees/*]`）
+  - name: 入力
+    description: '`source: sample`。`cwd` は sample のクローン本体'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant T as describe
+      participant G as sample のリポジトリ
+
+      C->>T: source: sample
+      T->>G: ブランチ・タグとワークツリーの一覧を引く
+      T-->>C: 説明書と種類の表、ブランチ・タグ、ワークツリーの表
+    ```
+  expected:
+  - '`refs.branches` に `develop`・`feat/x` がある'
+  - '`refs.tags` に `v0.1.0` がある'
+  - '`worktrees` に `.claude/worktrees/x` の絶対パスと `branch: feat/x` があり、`../outside` は無い'
+  - Git 管理外の配信元では `refs`・`worktrees` を返さない
+  test: test_normal_when_refs_and_worktrees
+lead: '引数の数で、使える配信元の一覧・配信元の説明書と種類の一覧・種類のスキーマを返す。`source` を省いた `outside_scope: true` では、作業範囲の外で読める配信元の一覧も返す。'
+identifier: describe
+permissions: 引数なしは不要。`source` を渡すときはその配信元の `scope.read` か `scope.write` に `cwd` が当たること
+idempotent: true
+side_effects: なし
+callers:
+- SC-6#scenarios[正常シナリオ]
+- SC-7#scenarios[正常シナリオ]
+- SC-6#scenarios[正常シナリオ（ブランチとワークツリーを引く）]
+- SC-6#scenarios[正常シナリオ（作業範囲の外を参考に読む）]
+- SC-6#scenarios[異常シナリオ（作業範囲の外の参照を断る配信元を指す）]
+- SC-6#scenarios[正常シナリオ（instructions の調査の案内を受け取る）]
+exclusivity: '読み取りだけで排他しない（`readOnlyHint: true`）'
+request:
+- name: source
+  type: str
+  required: false
+  default: なし（使える配信元の一覧を返す）
+  location: argument
+  description: 配信元の ID
+- name: kind
+  type: str
+  required: false
+  default: なし（説明書と種類の一覧を返す）
+  location: argument
+  description: 種類（`documents[].id`）
+  constraints: '`source` を渡したときだけ'
+- name: worktree
+  type: str
+  required: false
+  default: なし（`cwd` がワークツリーの中ならそのワークツリー）
+  location: argument
+  description: 設定とスキーマを読むワークツリーのパス
+- name: format
+  type: Literal['markdown', 'json']
+  required: false
+  default: '`markdown`'
+  location: argument
+  description: 返却する形式
+- name: cwd
+  type: str
+  required: false
+  default: なし（使える配信元が無い）
+  location: argument
+  description: 作業場所
+  notes: フックが入れる
+- name: outside_scope
+  type: bool
+  required: false
+  default: '`false`'
+  location: argument
+  description: '`true` のとき、`cwd` が `scope` に該当しない配信元も、端末の設定の `sources[].outside_read` が真なら作業範囲の外（参考）として参照する'
+  constraints: '`source` を渡したときはその配信元を作業範囲の外として読む。`source` を省いたときは、使える配信元の一覧に作業範囲の外で読める配信元の一覧を加える'
+  notes: '`outside_scope` を省いた引数なしの一覧には作業範囲の外の配信元を載せない'
+  status: planned
+request_example: |-
+  ```json
+  {"source": "sample", "kind": "sample"}
+  ```
+response:
+- name: workplace
+  type: str
+  description: 作業場所と、それがどの配信元のクローン本体かワークツリーか
+  notes: 引数なしのとき
+- name: sources[].id
+  type: str
+  description: 配信元の ID
+  notes: 引数なしのとき
+- name: sources[].access
+  type: Literal['read', 'write']
+  description: 今の作業場所からの権限
+- name: sources[].current
+  type: bool
+  description: 作業中の配信元か
+- name: sources[].description
+  type: str
+  description: 配信元の設定の `description`
+- name: outside_sources[].id
+  type: str
+  description: '`scope` に `cwd` が当たらず、端末の設定の `sources[].outside_read` が真の配信元の ID'
+  notes: '`source` を省いて `outside_scope: true` のとき。`format: markdown` は「作業範囲の外（参考）」の見出しの下の表で出し、0 件は表の代わりに `なし` と出す。`format: json` は 0 件のときキーを持たない'
+- name: outside_sources[].description
+  type: str
+  description: 配信元の設定の `description`
+- name: warnings[]
+  type: str
+  description: 使える配信元の同期のずれ（metadata の列の欠け・管理用の YAML に無いファイル・ファイルが無い行・どの文書にも該当しない関連）とエイリアスのキーの違反、配信元・端末の設定のバージョンが古いこと、どの文書にも当たらない `nav` の条件、検証で外した配信元
+  notes: '引数なしのとき。同期のずれ・エイリアス・`nav`・配信元の設定のバージョンは使える配信元だけを対象にし、端末の設定のバージョンと検証で外した配信元は使える配信元が 0 件のときも載せる。`format: markdown` は使える配信元の表の後の「注意」の見出しの下に 1 行ずつ出し、0 件は見出しごと出さない。`format: json` は 0 件のときキーを持たない'
+- name: instructions
+  type: str
+  description: 配信元の設定の `instructions` をそのまま
+  notes: '`source` だけのとき'
+- name: kinds[].id
+  type: str
+  description: 種類の ID
+  notes: '`source` だけのとき'
+- name: kinds[].description
+  type: str
+  description: 種類の説明
+- name: schema
+  type: str
+  description: 種類のスキーマ（YAML のまま）
+  notes: '`source`・`kind` のとき。`documents[].schema` でほかの配信元を指す種類は、参照したリビジョンのスキーマの `$ref` を解いた YAML'
+- name: metadata
+  type: dict[str, str]
+  description: 種類の共通のキーと列名の対応（種類の行の `metadata`）。書いていないキーは同じ名前の列を読む
+  notes: '`source`・`kind` のとき。`format: markdown` ではスキーマの前に「共通のキー | 列名」の表で出し、対応が空なら表を出さない'
+- name: outside_scope
+  type: bool
+  description: 作業範囲の外から読んだか
+  notes: '`format: markdown` は先頭の行に「作業範囲の外（参考）」を出す'
+- name: refs.branches[]
+  type: str
+  description: 配信元のリポジトリのブランチ名
+  notes: '`source` だけのとき。Git の配信元だけ。読み取り API のリビジョンの一覧と同じ関数で求める'
+- name: refs.tags[]
+  type: str
+  description: 配信元のリポジトリのタグ名
+  notes: '`refs.branches[]` と同じ条件'
+- name: worktrees[].path
+  type: str
+  description: 配信元の設定の `worktrees` に当たるワークツリーの絶対パス
+  notes: '`source` だけのとき。Git の配信元だけ。`worktrees` の相対パスはメインのリポジトリの直下（`git rev-parse --git-common-dir` の親）から数える'
+- name: worktrees[].branch
+  type: str | None
+  description: ワークツリーが checkout しているブランチ
+  notes: detached HEAD のときは `null`
+response_example: |-
+  ```markdown
+  作業場所: /path/to/sample（sample のクローン本体）
+
+  | source | 権限 | description |
+  | --- | --- | --- |
+  | sample | write（作業中） | サンプルの文書 |
+  | notes | read | 読み取りだけのメモ |
+  ```
+response_notes: '説明書には配信元に固有のことだけが書かれている。タグの一覧・文書の件数は `search_docs` の `group_by`・`view: count` で取る。'
+exceptions:
+- name: なし（正常終了）
+  condition: 返せた（引数なしで使える配信元が 0 件のときも、空の一覧と `/project-index:setup` の案内を返して正常終了）
+- name: SourceNotReadableError
+  condition: '`cwd` が配信元の `scope.read`・`scope.write` に当たらない（`outside_scope: true` のときは、加えて `outside_read` が偽）'
+  notes: '今の作業場所から使える配信元の一覧を添える。`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に読めることを添える'
+- name: SourceNotServedError
+  condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
+- name: UnknownKindError
+  condition: '`kind` が配信元の種類に無い'
+  notes: その配信元の種類の一覧を添える
+constraints:
+- item: 注釈
+  constraint: '`readOnlyHint: true`'
+- item: 一覧の中身
+  constraint: 引数なし（`outside_scope` を省く）の結果は、作業場所から使える配信元と、その警告だけを持つ
+- item: タイムアウト
+  constraint: 制限なし
+- item: 警告の求め方
+  constraint: 同期のずれ・エイリアスのキーの違反・`nav` の警告は、配信元の読み込み・読み直し・`default_ref` の組み立て直しの後と、`write_docs`・`delete_docs` の後に裏で流す検査の結果を読み、`describe` は配信元のファイルをたどらない。返す配信元の読み込みが終わってから答える（起動の配信元の読み込みの単位）ため、読み込み中の案内は持たない
+  notes: 配信元のフォルダをたどる検査は /mnt/c の配信元で 1 件 3〜12 秒かかる（2026-11-04 の実測）。直接編集したファイルのずれは、次の検査まで警告に出ない
+- item: 作業範囲の外の記録
+  constraint: '`outside_scope: true` で作業範囲の外の配信元を読んだ呼び出しは、作業場所（`cwd`）と配信元の ID を要求のログに残す'
+- item: ほかの配信元のスキーマの参照
+  constraint: '`documents[].schema` でほかの配信元を指す行は、配信元の検査の制約「ほかの配信元のスキーマの参照」のとおりに読む'
+refs:
+- SC-6#scenarios[正常シナリオ]
+test_file: tests/integration/server/test_describe.py

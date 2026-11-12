@@ -1,0 +1,110 @@
+id: IF-26
+title: 検討事項の ID の一覧
+entry:
+  kind: endpoint
+  value: GET `/sources/{source}/decisions`
+flows:
+- name: 正常系
+  summary: '`decisions.folders` にある検討事項の ID と、ID ごとに当たるフォルダの数を返す'
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+  - name: サンプルの配信元
+    description: '`decisions.folders` に 2 つのフォルダを持つ sample。1 つ目に `.mindstella/docs/D-1.md`・`D-2.md`、2 つ目に `D-2.md` を置く'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as GET /sources/{source}/decisions
+
+      C->>E: GET /sources/sample/decisions
+      E-->>C: 200 ID とフォルダの数
+    ```
+  expected:
+  - 200 で、`decisions` が `D-1`（`folders` が 1）・`D-2`（`folders` が 2）の ID の順
+  test: test_normal
+- name: 正常系（decisions.folders を持たない）
+  summary: '`decisions.folders` を持たない配信元は空の一覧を返す'
+  setup:
+  - name: Mock
+    description: なし
+  - name: 配信元
+    description: '`decisions` を書かない `project-index.yaml` の配信元'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as GET /sources/{source}/decisions
+
+      C->>E: GET /sources/plain/decisions
+      E-->>C: 200 空の一覧
+    ```
+  expected:
+  - 200 で、`decisions` が空
+  test: test_normal_when_no_decision_folder
+- name: 異常系（無い配信元・404）
+  summary: 無い配信元・配信していない配信元を断る
+  setup:
+  - name: Mock
+    description: なし
+  - name: 入力
+    description: '`/sources/unknown/decisions`'
+  flow: |-
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as GET /sources/{source}/decisions
+
+      C->>E: GET /sources/unknown/decisions
+      E-->>C: 404 problem+json
+    ```
+  expected:
+  - 404 で、`missing` が `source`
+  test: test_error_when_source_not_found
+lead: '`decisions.folders` にある検討事項の ID と、ID ごとに当たるフォルダの数を返す。'
+identifier: list_decisions
+permissions: なし（`127.0.0.1` でだけ待ち受ける）
+idempotent: true
+side_effects: なし
+callers:
+- SC-11#scenarios[正常シナリオ]
+- SC-11#scenarios[異常シナリオ（検討事項の文書が 1 つに決まらない）]
+exclusivity: 読み取りだけで排他しない
+request:
+- name: source
+  type: str
+  required: true
+  location: path
+  description: 配信元の ID
+request_example: |-
+  ```text
+  GET /sources/sample/decisions
+  ```
+response:
+- name: decisions[].id
+  type: str
+  description: 検討事項の ID（`.mindstella/docs/{ID}.md` の `{ID}`）
+- name: decisions[].folders
+  type: int
+  description: その ID の文書があるフォルダの数
+response_example: |-
+  ```json
+  {"decisions": [{"id": "D-1", "folders": 1}, {"id": "D-2", "folders": 2}]}
+  ```
+status_codes:
+- code: '200'
+  condition: 返した（`decisions.folders` を持たない配信元は空の一覧）
+- code: '404'
+  condition: 配信元が無い・配信していない
+error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）
+constraints:
+- item: ID の形式
+  constraint: '`^[A-Z]+-[0-9]+$` に当たるファイル名だけを数える'
+- item: リビジョン
+  constraint: 検討事項の文書は Git の管理外のため、リビジョンによらず今のファイルを数える
+- item: 認可
+  constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
+  decided_by: NFR-1#requirements[通信]
+- item: JSON のキー
+  constraint: レスポンスのキーは camelCase
+test_file: tests/integration/server/test_list_decisions.py
