@@ -84,7 +84,7 @@ def test_error_when_version_missing(
     # 実行
     response = env.client.delete("/settings/sources/extra")
     # 検証
-    assert response.status_code == 422
+    assert response.status_code == 400
     assert env.settings_path.read_text(encoding="utf-8") == before
 
 

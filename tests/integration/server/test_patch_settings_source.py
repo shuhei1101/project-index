@@ -61,7 +61,9 @@ def test_normal_when_row_without_id(
 ) -> None:
     """id を省いた行を配信元の設定の name で指す（正常系）。"""
     # 準備
-    notes = make_source("notes", sample_files(**{"project-index.yaml": sample_config(name="notes")}))
+    notes = make_source(
+        "notes", sample_files(**{"project-index.yaml": sample_config(name="notes")})
+    )
     env = make_server(make_source("sample"))
     _append_unnamed_row(env, notes)
     version = _version(env)
@@ -73,9 +75,7 @@ def test_normal_when_row_without_id(
     # 検証
     rows = load_yaml(env.settings_path.read_text(encoding="utf-8"))["sources"]
     assert response.status_code == 200
-    assert ("notes", "disabled") in [
-        (row["id"], row["status"]) for row in response.json()["sources"]
-    ]
+    assert response.json()["sources"][1] == {"id": "sources[1]", "status": "disabled", "errors": []}
     assert rows[1]["enabled"] is False
     assert "id" not in rows[1]
 
@@ -123,36 +123,29 @@ def test_error_when_row_not_found(
 def test_error_when_schema_invalid(
     make_source: Callable[..., Any], make_server: Callable[..., Any]
 ) -> None:
-    """内容のバージョンが無い変更と、配信元の ID が変わる変更と、変更後がスキーマに通らない変更を断る（異常系）。"""
+    """配信元の ID が変わる変更と、変更後がスキーマに通らない変更を断る（異常系）。"""
     # 準備
-    notes = make_source("notes", sample_files(**{"project-index.yaml": sample_config(name="notes")}))
+    notes = make_source(
+        "notes", sample_files(**{"project-index.yaml": sample_config(name="notes")})
+    )
     memo = make_source("memo", sample_files(**{"project-index.yaml": sample_config(name="memo")}))
     env = make_server(make_source("sample"), make_source("extra"))
     _append_unnamed_row(env, notes)
     version = _version(env)
     before = env.settings_path.read_text(encoding="utf-8")
     # 実行
-    missing = env.client.patch("/settings/sources/extra", json={"source": {"enabled": False}})
     empty_glob = env.client.patch(
         "/settings/sources/extra",
         json={"expectedVersion": version, "source": {"scope": {"read": [""]}}},
-    )
-    with_id = env.client.patch(
-        "/settings/sources/extra",
-        json={"expectedVersion": version, "source": {"id": "other"}},
     )
     id_change = env.client.patch(
         "/settings/sources/notes",
         json={"expectedVersion": version, "source": {"config": [str(memo.config[0])]}},
     )
     # 検証
-    assert missing.status_code == 422
     assert empty_glob.status_code == 422
-    assert with_id.status_code == 422
     assert id_change.status_code == 422
-    assert missing.json()["errors"]
     assert empty_glob.json()["errors"]
-    assert with_id.json()["errors"]
     assert id_change.json()["errors"][0]["path"] == "source.config"
     assert env.settings_path.read_text(encoding="utf-8") == before
 
@@ -173,3 +166,25 @@ def test_error_when_cross_origin(
     # 検証
     assert response.status_code == 403
     assert env.settings_path.read_bytes() == before
+
+
+def test_error_when_argument_invalid(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """内容のバージョンが無い変更と、source に id を含む変更を断る（異常系）。"""
+    # 準備
+    env = make_server(make_source("sample"), make_source("extra"))
+    version = _version(env)
+    before = env.settings_path.read_text(encoding="utf-8")
+    # 実行
+    missing = env.client.patch("/settings/sources/extra", json={"source": {"enabled": False}})
+    with_id = env.client.patch(
+        "/settings/sources/extra",
+        json={"expectedVersion": version, "source": {"id": "other"}},
+    )
+    # 検証
+    assert missing.status_code == 400
+    assert with_id.status_code == 400
+    assert missing.json()["errors"]
+    assert with_id.json()["errors"]
+    assert env.settings_path.read_text(encoding="utf-8") == before
