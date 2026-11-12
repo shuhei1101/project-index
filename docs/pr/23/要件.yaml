@@ -123,7 +123,7 @@ docs:
 scope_out:
   - item: 文書へのタグ・エイリアス・用語の付与（A-5 の「一緒に行う改善」）
     reason: '判断が分かれている。`dev-docs.yaml` の `documents[].metadata` が `tags` を持たず、設計書のスキーマ（`schemas/`）も `tags` を持たないため、付与には設定とスキーマの変更が要る。`dev-docs.yaml` は #16 で `project-index.yaml` へ改名中で、同じファイルを変える。今の判断は、この PR の後続として切り出す（レビューで確定する）'
-    plan: to_file
+    plan: '#30'
   - item: 管理用の YAML のコード・テストの行への設計書への `related`（`implements`・`tests`）の付与
     reason: 配信元の `documents[]` にコード・テストの行が無く、管理用の YAML の行を新しく作る配信元の設定の変更になる。文書の書き換えとは目的が違う
     plan: '#24'
@@ -141,4 +141,4 @@ scope_out:
     plan: none
   - item: モジュール構成のクラス図（`diagrams[].diagram`）の `click ... href "./MOD-59.py.yaml#..."` のパスの参照（77 文書・406 件）の ID の参照への置き換え
     reason: Mermaid の `click` の href は URL で、`id:` の参照を解く描画があるかが未確認。参照元の ai-monitor のモジュール構成もパスの href で書いている。今の判断は、描画の対応を確かめてから後続として切り出す（レビューで確定する）
-    plan: to_file
+    plan: '#31'
