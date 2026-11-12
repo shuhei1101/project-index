@@ -6,7 +6,7 @@ scenarios:
       - name: Mock
         description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが読み取り API を HTTP で呼ぶ）
       - name: サンプルの配信元
-        description: 文書の種類を 1 つ（`$ref` を持つスキーマと YAML 2 件）と、`nav`・`decisions.folders`・`github`・`diff` を持つ `project-index.yaml` を持つ git リポジトリ。`default_ref` は `main`
+        description: 文書の種類を 3 つ（同じファイルの `$defs` の循環しない定義を `$ref` で指すスキーマを持つ種類の YAML 2 件、`files.yaml` を `records`・`body_file` で指す種類、`terms.yaml` を `body_file` の無い `records` で指す種類）と、`nav`・`decisions.folders`・`github`・`diff` を持つ `project-index.yaml` を持つ git リポジトリ。`default_ref` は `main`
         notes: id `sample`。文書 1 を変えた commit が `main` の最新で、その親の commit では文書 1 の `title` が違う。`decisions.folders` の 1 つのフォルダに検討事項の文書 `D-1` を置く。管理用の YAML `files.yaml` の行の文書として Markdown `guide.md` を置く。本文のファイルを持たない行の文書 `term-1`・`term-2` を 1 つの管理用の YAML `terms.yaml` に配置する
       - name: project-index
         description: sample を端末の設定に並べて起動した project-index
@@ -30,6 +30,8 @@ scenarios:
         PI-->>DD: 文書の値・種類のスキーマ・メタデータ
         DD->>PI: 文書 1 を親の commit を指して取得する
         PI-->>DD: 親の commit の文書の値
+        DD->>PI: sample の文書の一覧を、値とバージョンを求めて親の commit を指して取得する
+        PI-->>DD: 親の commit の文書ごとの値・バージョン
         DD->>PI: sample のリビジョンの一覧を取得する
         PI-->>DD: ブランチ・タグ・最近の commit
         DD->>PI: sample の文書を単語で検索する
@@ -50,8 +52,8 @@ scenarios:
     expected:
       - 配信元の一覧が sample を配信中として返却する
       - 配信元の設定が、`project-index.yaml` の `nav`・`documents[]`・`decisions.folders`・`github` を返却する
-      - 配信元の設定が、`project-index.yaml` の `diff` と、種類のスキーマの `$ref` を解いたスキーマを返却する
-      - 文書の一覧が、`main` の文書 2 件の ID・パス・種類・メタデータを返却する
+      - 配信元の設定が、`project-index.yaml` の `diff` と、参照先の定義が展開され `$ref` が残らない種類のスキーマを返却する
+      - 文書の一覧が、`main` の文書 5 件（YAML 2 件と行の文書 3 件）の ID・パス・種類・メタデータを返却する
       - 値とバージョンを求めた文書の一覧が、各文書の値と、文書 1 の取得の値と同じ値を返却し、文書 1 のバージョンは親の commit を指した文書の一覧のバージョンと違う
       - 文書 1 の取得が、`main` の文書 1 の値・種類のスキーマ・メタデータ（ID・種類・名前・概要）を返却する
       - 親の commit を指した文書 1 の取得が、親の commit の `title` の値を返却する
