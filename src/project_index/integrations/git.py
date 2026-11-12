@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 GIT_TIMEOUT_SEC = 8
 GIT_ENV = {"GIT_TERMINAL_PROMPT": "0", "LC_ALL": "C", "GIT_OPTIONAL_LOCKS": "0"}
+GIT_ARCHIVE_TIMEOUT_SEC = 20
 STDERR_TAIL_LINES = 5
 
 
@@ -38,8 +39,12 @@ def _tail(text: str) -> str:
     return "\n".join(text.strip().splitlines()[-STDERR_TAIL_LINES:])
 
 
-def run_git(args: Sequence[str], *, cwd: Path, binary: bool = False) -> str | bytes:
+def run_git(
+    args: Sequence[str], *, cwd: Path, binary: bool = False, timeout: float | None = None
+) -> str | bytes:
     """git を子プロセスで 1 回呼び、標準出力を返す。"""
+    # 待ち時間の上限は、指定が無ければ git の呼び出しに共通の上限にする
+    limit = GIT_TIMEOUT_SEC if timeout is None else timeout
     command = ["git", *args]
     try:
         completed = subprocess.run(  # noqa: S603
@@ -48,7 +53,7 @@ def run_git(args: Sequence[str], *, cwd: Path, binary: bool = False) -> str | by
             env={**os.environ, **GIT_ENV},
             stdin=subprocess.DEVNULL,
             capture_output=True,
-            timeout=GIT_TIMEOUT_SEC,
+            timeout=limit,
             check=False,
         )
     except subprocess.TimeoutExpired as error:
@@ -57,12 +62,12 @@ def run_git(args: Sequence[str], *, cwd: Path, binary: bool = False) -> str | by
             "git が待ち時間の上限を超えた（引数: %s・cwd: %s・%s 秒）",
             list(args),
             cwd,
-            GIT_TIMEOUT_SEC,
+            limit,
         )
         raise GitError(
             list(args),
             -1,
-            f"{GIT_TIMEOUT_SEC} 秒を超えたため止めました",
+            f"{limit} 秒を超えたため止めました",
             timed_out=True,
         ) from error
     if completed.returncode != 0:
