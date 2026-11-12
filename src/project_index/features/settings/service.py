@@ -11,6 +11,7 @@ from project_index.features.settings.query import load_terminal_config, validate
 from project_index.features.settings.types import (
     SourceAddResult,
     SourceEntry,
+    SourceScope,
     TerminalConfig,
     TerminalConfigInvalidError,
 )
@@ -48,6 +49,39 @@ def _to_yaml_row(entry: SourceEntry) -> dict[str, Any]:
     return row
 
 
+def _current_entries(document: object) -> dict[str, SourceEntry]:
+    """ファイルの `sources` の行を、配信元の ID ごとに引ける形にする（ID が求まらない行は除く）。"""
+    rows = cast("Mapping[str, list[object] | None]", document).get("sources") or []
+    current: dict[str, SourceEntry] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        entry = SourceEntry.model_validate(json.loads(json.dumps(row)))
+        source_id = entry_source_id(entry)
+        if source_id is not None:
+            current.setdefault(source_id, entry)
+    return current
+
+
+def _fill_unsent(entry: SourceEntry, current: Mapping[str, SourceEntry]) -> SourceEntry:
+    """行に含めなかったキーを、ファイルの同じ配信元の行の値で埋める。"""
+    source_id = entry_source_id(entry)
+    found = current.get(source_id) if source_id is not None else None
+    if found is None:
+        return entry
+    sent = entry.model_fields_set
+    updates: dict[str, Any] = {
+        key: getattr(found, key) for key in ("enabled", "outside_read") if key not in sent
+    }
+    # scope は read・write を別々に、送られたかで決める
+    scope_sent = entry.scope.model_fields_set if "scope" in sent else set[str]()
+    updates["scope"] = SourceScope(
+        read=entry.scope.read if "read" in scope_sent else found.scope.read,
+        write=entry.scope.write if "write" in scope_sent else found.scope.write,
+    )
+    return entry.model_copy(update=updates)
+
+
 def _validate_or_raise(document: object, path: Path) -> None:
     """書き換えた端末の設定を検証し、違反があれば `TerminalConfigInvalidError` を送る。"""
     plain = json.loads(json.dumps(document, default=str))
@@ -71,7 +105,10 @@ def save_sources(
     with lock:
         # sources だけを送られた行に置き換える（他のキーとコメントは保つ）
         document = load_roundtrip(path.read_text(encoding="utf-8"), file=str(path))
-        document["sources"] = [_to_yaml_row(entry) for entry in sources]
+        # 送られなかったキーは、ファイルの同じ配信元の行の今の値で埋める
+        current = _current_entries(document)
+        filled = [_fill_unsent(entry, current) for entry in sources]
+        document["sources"] = [_to_yaml_row(entry) for entry in filled]
         # 置き換えた後を検証し、違反があれば書かない
         _validate_or_raise(document, path)
         replace_file(path, dump_roundtrip(document))
