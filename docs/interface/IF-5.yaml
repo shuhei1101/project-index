@@ -137,8 +137,8 @@ request:
     required: false
     default: なし（使える配信元が無い）
     location: argument
-    description: 作業場所
-    notes: フックが入れる
+    description: セッションの作業場所
+    notes: PreToolUse のフックがセッションの作業場所で上書きし、エージェントが指定した値は使わない。ツールの入力のスキーマの `description` にも同じことと、ワークツリーは `worktree` で指すことを載せる
 request_example: |-
   ```json
   {"source": "sample"}

@@ -357,6 +357,34 @@ flows:
       - '`isError: true` で、クローン本体には書かないことと、`worktree` でワークツリーを指すことを返す'
       - sample のクローン本体のファイルは変わらない
     test: test_error_when_target_is_clone
+  - name: 異常系（設定をワークツリーから読む配信元のクローン本体・TargetIsCloneError）
+    summary: 配信元の設定をワークツリーから読んでいても、返すクローン本体のパスはワークツリーの親のクローン本体
+    setup:
+      - name: Mock
+        description: なし
+      - name: サンプルの配信元
+        description: sample の設定をワークツリー y（`.claude/worktrees/y`）の `project-index.yaml` から読む配信元
+        notes: '`worktrees` は既定の `./.claude/worktrees/*`'
+      - name: 入力
+        description: '`cwd` は sample のクローン本体で、`worktree` を渡さない `update`'
+    flow: |-
+      <!-- map: {"title": "異常系（設定をワークツリーから読む配信元のクローン本体・TargetIsCloneError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: operations: update 文書 1
+        T->>T: 書く先がクローン本体になる
+        T-->>C: isError（クローン本体のパス、worktree でワークツリーを指すこと）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、返すクローン本体のパスが sample のクローン本体で、ワークツリー y ではない'
+      - sample のクローン本体とワークツリー y のファイルは変わらない
+    test: test_error_when_target_is_clone_and_config_in_worktree
   - name: 異常系（読んだ後に変わった・VersionMismatchError）
     summary: 読んだときのバージョンでは、直接編集した内容を上書きしない
     setup:
@@ -680,6 +708,7 @@ flows:
       <!-- /map -->
     expected:
       - '`write_docs` の `description` が「範囲のファイルを作成・削除・改名したら、管理用の YAML の行を修正する」を含む'
+      - 文書の MCP の全てのツールの入力のスキーマで、`cwd` の `description` が、フックが上書きして指定した値は使わないことと、ワークツリーは `worktree` で指すことを含む
     test: test_normal_when_tool_description
 lead: 文書の作成・部分更新・置き換えを検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 identifier: write_docs
@@ -798,8 +827,8 @@ request:
     required: false
     default: なし（どの `scope.write` にも当たらない）
     location: argument
-    description: 作業場所
-    notes: フックが入れる
+    description: セッションの作業場所
+    notes: PreToolUse のフックがセッションの作業場所で上書きし、エージェントが指定した値は使わない。ツールの入力のスキーマの `description` にも同じことと、ワークツリーは `worktree` で指すことを載せる
   - name: session_id
     type: str
     required: false
@@ -873,7 +902,7 @@ exceptions:
     notes: 今の作業場所から使える配信元の一覧を添える
   - name: TargetIsCloneError
     condition: Git の配信元で、書く先がクローン本体になる
-    notes: '`worktree` でワークツリーを指すことを添える'
+    notes: クローン本体のパス（配信元の設定をワークツリーから読んでいても、ワークツリーの親のクローン本体）と、`worktree` でワークツリーを指すことを添える
   - name: VersionMismatchError
     condition: '`expected_version` が今のバージョンと違う'
     notes: 今のバージョンと差分、読み直して呼び直すことを添える
