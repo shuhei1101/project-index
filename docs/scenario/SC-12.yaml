@@ -258,9 +258,11 @@ scenarios:
         description: なし（実環境で実行）
       - name: 端末の設定
         description: '`PROJECT_INDEX_CONFIG` が指す一時フォルダの `settings.yaml`'
-        notes: '`sources` に sample と、`outside_read: false` を記載した extra の 2 行'
+        notes: '`sources` に sample と、`outside_read: false` と `scope.read` に extra のフォルダだけを記載した extra の 2 行'
       - name: project-index
         description: 端末の設定で起動した project-index
+      - name: 範囲の外の作業場所
+        description: extra の `scope.read` に該当しない一時フォルダ
     flow: |-
       ```mermaid
       sequenceDiagram
@@ -292,7 +294,7 @@ stakeholders:
 trigger: dev-docs の画面のサーバーが、利用者の設定画面の操作（開く・保存する）を受けて端末の設定の API を呼ぶ
 preconditions:
   - project-index が待ち受け、端末の設定に配信元が並んでいる
-success_guarantee: 保存した sources だけが `settings.yaml` に書き込まれ（保存で送信しなかった行のキーはファイルの今の値で残る）、読み直した後の配信元の状態が応答と文書の MCP・読み取り API に反映される。
+success_guarantee: 保存した sources だけが `settings.yaml` に書き込まれ（送信した行に含めなかったキーは、ファイルの同じ配信元の行の今の値で残る）、読み直した後の配信元の状態が応答と文書の MCP・読み取り API に反映される。
 minimal_guarantee: スキーマに合格しない保存と、別のオリジンからの保存は `settings.yaml` を書き換えない。配信元のフォルダのファイルは変えない。他の配信元の配信は止まらない。
 frequency: 配信元を追加・停止・削除するとき
 priority: 中
