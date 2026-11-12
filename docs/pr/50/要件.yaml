@@ -1,0 +1,31 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: none
+    detail: エージェントがワークツリーを指して文書を書き込む流れは変わらない。ワークツリーを指す手段の説明だけを揃える
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: none
+    detail: エージェントが文書を調べる流れは変わらない
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: 共通の引数の表の `cwd`・`worktree` の行を、インターフェース定義設計で決めた `cwd` の扱いに揃える
+    status: todo
+  - page: docs/guide/コアコンセプト-配信元と権限.md
+    new: false
+    change: '`## ワークツリーへの読み替え` の `cwd` と `worktree` の説明を、インターフェース定義設計で決めた `cwd` の扱いに揃える（変わらなければ変更しない）'
+    status: todo
+  - page: docs/guide/コアコンセプト-プラグイン.md
+    new: false
+    change: '`## 作業場所の受け渡し` の上書きの説明を、インターフェース定義設計で決めた `cwd` の扱いに揃える（案 A では変更しない）'
+    status: todo
+scope_out:
+  - item: write_docs 以外の文書の MCP のツール（search_docs・describe など）の cwd の説明
+    reason: 全てのツールが同じフックで cwd を上書きされるため、要望に含めるか判断が分かれる。ツールの cwd の説明は共通の入力の型で持つ見込みで、設計で同じ型の箇所として含めるかを決める
+    plan: to_file
+  - item: 管理の MCP（project-index-admin）のツール
+    reason: IF-20 の制約で管理の MCP にはフックを当てず、cwd を持たない
+    plan: none
