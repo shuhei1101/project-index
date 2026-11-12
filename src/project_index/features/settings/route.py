@@ -1,22 +1,29 @@
-"""端末の設定の取得・保存・1 行の追加のルート。"""
+"""端末の設定の取得・保存と、1 行ずつの追加・変更・削除のルート。"""
 
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Response
 
-from project_index.features.settings.query import load_terminal_config
-from project_index.features.settings.service import add_source, save_sources
+from project_index.features.settings.query import load_terminal_config, read_settings_file
+from project_index.features.settings.service import (
+    add_source,
+    delete_source,
+    patch_source,
+    save_sources,
+)
 from project_index.features.settings.types import (
     SettingsSourceAddRequest,
     SettingsSourceAddResponse,
+    SettingsSourcePatchRequest,
     SettingsSourceRow,
     SettingsSourcesRequest,
     SettingsSourcesResponse,
     SettingsSourcesView,
+    SettingsSourcesWriteResponse,
     SourceEntry,
 )
 from project_index.features.sources.types import SourceStatus
@@ -25,7 +32,13 @@ from project_index.server.origin import require_same_origin
 if TYPE_CHECKING:
     from project_index.main import Handlers
 
-__all__ = ["add_source", "build_settings_router", "save_sources"]
+__all__ = [
+    "add_source",
+    "build_settings_router",
+    "delete_source",
+    "patch_source",
+    "save_sources",
+]
 
 
 def _match_status(
@@ -43,12 +56,16 @@ def _match_status(
 
 def _settings_view(handlers: Handlers) -> SettingsSourcesView:
     """端末の設定を読み直し、`sources[]` の各行に同じ `config` の配信元の状態を重ねる。"""
-    terminal = load_terminal_config(handlers.terminal.file)
+    # 排他を取らずに 1 回だけ読み、内容のバージョンと行を同じ本文から求める
+    text, version = read_settings_file(handlers.terminal.file)
+    terminal = load_terminal_config(handlers.terminal.file, text=text)
     statuses = handlers.registry.statuses()
     items = {
         status.index: item
         for status, item in zip(
-            statuses, SettingsSourcesResponse.from_statuses(statuses).sources, strict=True
+            statuses,
+            SettingsSourcesResponse.from_statuses(statuses).sources,
+            strict=True,
         )
     }
     rows: list[SettingsSourceRow] = []
@@ -82,11 +99,11 @@ def _settings_view(handlers: Handlers) -> SettingsSourcesView:
                 outside_read=entry.outside_read,
             )
         )
-    return SettingsSourcesView(settings_path=str(terminal.file), sources=rows)
+    return SettingsSourcesView(settings_path=str(terminal.file), sources=rows, version=version)
 
 
 def build_settings_router(handlers: Handlers) -> APIRouter:
-    """端末の設定の取得・保存・1 行の追加のルートを持つルーターを作る。"""
+    """端末の設定の取得・保存・1 行の追加・変更・削除のルートを持つルーターを作る。"""
     router = APIRouter(tags=["settings"])
 
     @router.get("/settings/sources", name="get_settings_sources")
@@ -99,16 +116,17 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
         name="put_settings_sources",
         dependencies=[Depends(require_same_origin)],
     )
-    async def put_sources(body: SettingsSourcesRequest) -> SettingsSourcesResponse:
+    async def put_sources(body: SettingsSourcesRequest) -> SettingsSourcesWriteResponse:
         await handlers.registry.wait_loaded()
-        statuses = await asyncio.to_thread(
+        result = await asyncio.to_thread(
             save_sources,
             body.sources,
+            expected_version=body.expected_version,
             path=handlers.terminal.file,
             reload=handlers.reload_sources,
             lock=handlers.settings_lock,
         )
-        return SettingsSourcesResponse.from_statuses(statuses)
+        return SettingsSourcesWriteResponse.from_result(result)
 
     @router.post(
         "/settings/sources",
@@ -123,8 +141,9 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
         result = await asyncio.to_thread(
             add_source,
             body.source,
+            expected_version=body.expected_version,
             path=handlers.terminal.file,
-            reload=handlers.reload_sources,
+            reload=handlers.reload_changed,
             lock=handlers.settings_lock,
         )
         # 同じ id の行があった: 追加せずに 409 で内容が同じかを返す
@@ -134,6 +153,46 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
             result=result.result,
             same=result.same,
             sources=SettingsSourcesResponse.from_statuses(result.statuses).sources,
+            version=result.version,
         )
+
+    @router.patch(
+        "/settings/sources/{source_id}",
+        name="patch_settings_source",
+        dependencies=[Depends(require_same_origin)],
+    )
+    async def patch_one(
+        source_id: str, body: SettingsSourcePatchRequest
+    ) -> SettingsSourcesWriteResponse:
+        await handlers.registry.wait_loaded()
+        result = await asyncio.to_thread(
+            patch_source,
+            source_id,
+            body.source,
+            expected_version=body.expected_version,
+            path=handlers.terminal.file,
+            reload=handlers.reload_changed,
+            lock=handlers.settings_lock,
+        )
+        return SettingsSourcesWriteResponse.from_result(result)
+
+    @router.delete(
+        "/settings/sources/{source_id}",
+        name="delete_settings_source",
+        dependencies=[Depends(require_same_origin)],
+    )
+    async def delete_one(
+        source_id: str, expected_version: Annotated[str, Query(alias="expectedVersion")]
+    ) -> SettingsSourcesWriteResponse:
+        await handlers.registry.wait_loaded()
+        result = await asyncio.to_thread(
+            delete_source,
+            source_id,
+            expected_version=expected_version,
+            path=handlers.terminal.file,
+            reload=handlers.reload_changed,
+            lock=handlers.settings_lock,
+        )
+        return SettingsSourcesWriteResponse.from_result(result)
 
     return router

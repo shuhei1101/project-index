@@ -40,6 +40,23 @@ class SourceEntry(BaseModel):
         return [value] if isinstance(value, str) else value
 
 
+class SourcePatch(BaseModel):
+    """1 行の変更で重ねるキー（送ったキーだけが `model_fields_set` に入る）。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    config: list[str] | None = None
+    enabled: bool | None = None
+    scope: SourceScope | None = None
+    outside_read: bool | None = None
+
+    @field_validator("config", mode="before")
+    @classmethod
+    def _as_list(cls, value: Any) -> Any:  # noqa: ANN401
+        """文字列 1 つで書かれたときも配列にする。"""
+        return [value] if isinstance(value, str) else value
+
+
 class TerminalConfig(BaseModel):
     """検証を通して既定値を埋めた端末の設定。"""
 
@@ -63,6 +80,8 @@ class SettingsSourcesRequest(ApiModel):
     model_config = ConfigDict(extra="forbid")
 
     sources: list[SourceEntry]
+    # 取得したときの端末の設定の内容のバージョン（`None` は照合しない）
+    expected_version: str | None = None
 
 
 class SettingsSourceAddRequest(ApiModel):
@@ -71,6 +90,18 @@ class SettingsSourceAddRequest(ApiModel):
     model_config = ConfigDict(extra="forbid")
 
     source: SourceEntry
+    # 取得したときの端末の設定の内容のバージョン（`None` は照合しない）
+    expected_version: str | None = None
+
+
+class SettingsSourcePatchRequest(ApiModel):
+    """PATCH `/settings/sources/{id}` の本文。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # 取得したときの端末の設定の内容のバージョン（必須）
+    expected_version: str
+    source: SourcePatch
 
 
 @dataclass(frozen=True)
@@ -82,6 +113,18 @@ class SourceAddResult:
     same: bool | None = None
     # 読み直した後の配信元の状態（`added` のときだけ）
     statuses: list[SourceStatus] = field(default_factory=list[SourceStatus])
+    # `added` は追加した後、`exists` は今の端末の設定の内容のバージョン
+    version: str = ""
+
+
+@dataclass(frozen=True)
+class SourceWriteResult:
+    """丸ごとの保存・1 行の変更・1 行の削除の戻り値。"""
+
+    # 読み直した後の配信元の状態
+    statuses: list[SourceStatus]
+    # 書き換えた後の端末の設定の内容のバージョン
+    version: str
 
 
 class SourceViolation(ApiModel):
@@ -133,12 +176,28 @@ class SettingsSourcesResponse(ApiModel):
         return cls(sources=items)
 
 
+class SettingsSourcesWriteResponse(SettingsSourcesResponse):
+    """PUT `/settings/sources` と PATCH・DELETE `/settings/sources/{id}` の応答。"""
+
+    # 書き換えた後の端末の設定の内容のバージョン
+    version: str
+
+    @classmethod
+    def from_result(cls, result: SourceWriteResult) -> SettingsSourcesWriteResponse:
+        """書き換えの結果から作る。"""
+        return cls(
+            sources=SettingsSourcesResponse.from_statuses(result.statuses).sources,
+            version=result.version,
+        )
+
+
 class SettingsSourceAddResponse(ApiModel):
     """POST `/settings/sources` の応答。"""
 
     result: Literal["added", "exists"]
     same: bool | None = None
     sources: list[SettingsSourceStatus] = Field(default_factory=list[SettingsSourceStatus])
+    version: str
 
 
 class SettingsSourceRow(ApiModel):
@@ -159,6 +218,8 @@ class SettingsSourcesView(ApiModel):
 
     settings_path: str
     sources: list[SettingsSourceRow]
+    # 行と同じ本文から求めた端末の設定の内容のバージョン
+    version: str
 
 
 @dataclass(kw_only=True)
@@ -168,3 +229,19 @@ class TerminalConfigInvalidError(ProjectIndexError):
     status: ClassVar[int] = 422
     file: Path = Path()
     violations: list[Violation] = field(default_factory=list[Violation])
+
+
+@dataclass(kw_only=True)
+class SettingsVersionMismatchError(ProjectIndexError):
+    """要求の内容のバージョンが、今の端末の設定の内容のバージョンと違うこと。"""
+
+    status: ClassVar[int] = 409
+    current: str = ""
+
+
+@dataclass(kw_only=True)
+class SourceRowNotFoundError(ProjectIndexError):
+    """1 行の変更・削除で指した ID の行が端末の設定に無いこと。"""
+
+    status: ClassVar[int] = 404
+    source_id: str = ""

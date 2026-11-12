@@ -1,4 +1,4 @@
-"""端末の設定の API からの端末の設定の保存と 1 行の追加。"""
+"""端末の設定の API からの端末の設定の保存と、1 行ずつの追加・変更・削除。"""
 
 from __future__ import annotations
 
@@ -9,15 +9,24 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import ValidationError
 
-from project_index.features.settings.query import load_terminal_config, validate_terminal_config
+from project_index.features.settings.query import (
+    load_terminal_config,
+    read_settings_file,
+    validate_terminal_config,
+)
 from project_index.features.settings.types import (
+    SettingsVersionMismatchError,
     SourceAddResult,
     SourceEntry,
+    SourcePatch,
+    SourceRowNotFoundError,
     SourceScope,
+    SourceWriteResult,
     TerminalConfig,
     TerminalConfigInvalidError,
 )
 from project_index.features.sources.service import entry_source_id
+from project_index.shared.errors import Violation
 from project_index.shared.files import replace_file
 from project_index.shared.yaml_io import dump_roundtrip, load_roundtrip
 
@@ -100,38 +109,102 @@ def _validate_or_raise(document: object, path: Path) -> None:
         )
 
 
+def _check_version(current: str, expected: str | None) -> None:
+    """要求の内容のバージョンを今の内容のバージョンと照合し、違えば断る（`None` は照合しない）。"""
+    if expected is not None and expected != current:
+        raise SettingsVersionMismatchError(
+            message=f"端末の設定が取得した後に書き換えられています（今の内容のバージョン: {current}）",
+            next_steps=["端末の設定の配信元を取得し直してから、もう一度書き換えてください"],
+            current=current,
+        )
+
+
+def _find_row(rows: Sequence[object], source_id: str) -> tuple[int, SourceEntry]:
+    """配信元の ID が `source_id` の最初の行の位置と行を返す（読めない行は探す対象から除く）。"""
+    for index, row in enumerate(rows):
+        if not isinstance(row, Mapping):
+            continue
+        try:
+            entry = SourceEntry.model_validate(json.loads(json.dumps(row)))
+        except ValidationError:
+            continue
+        if entry_source_id(entry) == source_id:
+            return index, entry
+    raise SourceRowNotFoundError(
+        message=f"端末の設定に {source_id} の行がありません",
+        next_steps=["端末の設定の配信元を取得し、行の ID を確かめてください"],
+        source_id=source_id,
+    )
+
+
+def _apply_patch(entry: SourceEntry, patch: SourcePatch) -> SourceEntry:
+    """行に、変更で送ったキーだけを重ねる。"""
+    sent = patch.model_fields_set
+    updates: dict[str, Any] = {
+        key: getattr(patch, key) for key in ("config", "enabled", "outside_read") if key in sent
+    }
+    # scope は read・write を別々に、送られたかで決める
+    if "scope" in sent and patch.scope is not None:
+        scope_sent = patch.scope.model_fields_set
+        updates["scope"] = SourceScope(
+            read=patch.scope.read if "read" in scope_sent else entry.scope.read,
+            write=patch.scope.write if "write" in scope_sent else entry.scope.write,
+        )
+    return entry.model_copy(update=updates)
+
+
+def _write_and_reload(
+    document: object,
+    path: Path,
+    reload: Callable[[TerminalConfig], list[SourceStatus]],
+) -> SourceWriteResult:
+    """書き換えた端末の設定を書き、読み直して配信元の状態と書いた後の内容のバージョンを返す。"""
+    replace_file(path, dump_roundtrip(document))
+    text, version = read_settings_file(path)
+    statuses = reload(load_terminal_config(path, text=text))
+    return SourceWriteResult(statuses=statuses, version=version)
+
+
 def save_sources(
     sources: Sequence[SourceEntry],
     *,
+    expected_version: str | None = None,
     path: Path,
     reload: Callable[[TerminalConfig], list[SourceStatus]],
     lock: threading.Lock,
-) -> list[SourceStatus]:
+) -> SourceWriteResult:
     """`settings.yaml` の `sources` だけを書き換え、検証に通ったら書いて配信元を読み直す。"""
     with lock:
+        # 取得した後に書き換えられていないかを照合する
+        text, current = read_settings_file(path)
+        _check_version(current, expected_version)
         # sources だけを送られた行に置き換える（他のキーとコメントは保つ）
-        document = load_roundtrip(path.read_text(encoding="utf-8"), file=str(path))
+        document = load_roundtrip(text, file=str(path))
         # 送られなかったキーは、ファイルの同じ配信元の行の今の値で埋める
         current = _current_entries(document)
         filled = [_fill_unsent(entry, current) for entry in sources]
         document["sources"] = [_to_yaml_row(entry) for entry in filled]
         # 置き換えた後を検証し、違反があれば書かない
         _validate_or_raise(document, path)
-        replace_file(path, dump_roundtrip(document))
+        result = _write_and_reload(document, path, reload)
         logger.info("端末の設定の sources を保存した（%s・%s 行）", path, len(sources))
-        return reload(load_terminal_config(path))
+        return result
 
 
 def add_source(
     source: SourceEntry,
     *,
+    expected_version: str | None = None,
     path: Path,
     reload: Callable[[TerminalConfig], list[SourceStatus]],
     lock: threading.Lock,
 ) -> SourceAddResult:
     """同じ id の行が無ければ `sources` の末尾に 1 行追加して読み直し、あれば内容が同じかを返す。"""
     with lock:
-        document = load_roundtrip(path.read_text(encoding="utf-8"), file=str(path))
+        # 取得した後に書き換えられていないかを、同じ id の行の確認より前に照合する
+        text, current_version = read_settings_file(path)
+        _check_version(current_version, expected_version)
+        document = load_roundtrip(text, file=str(path))
         current_rows = cast("Mapping[str, list[object] | None]", document).get("sources")
         rows: list[object] = list(current_rows or [])
         row = _to_yaml_row(source)
@@ -143,10 +216,79 @@ def add_source(
                     continue
                 current = SourceEntry.model_validate(json.loads(json.dumps(existing)))
                 if entry_source_id(current) == source_id:
-                    return SourceAddResult(result="exists", same=_to_yaml_row(current) == row)
+                    return SourceAddResult(
+                        result="exists", same=_to_yaml_row(current) == row, version=current_version
+                    )
         document["sources"] = [*rows, row]
         # 加えた後を検証し、違反があれば書かない
         _validate_or_raise(document, path)
-        replace_file(path, dump_roundtrip(document))
+        written = _write_and_reload(document, path, reload)
         logger.info("端末の設定の sources に 1 行追加した（%s・%s）", path, source.id)
-        return SourceAddResult(result="added", statuses=reload(load_terminal_config(path)))
+        return SourceAddResult(result="added", statuses=written.statuses, version=written.version)
+
+
+def patch_source(
+    source_id: str,
+    patch: SourcePatch,
+    *,
+    expected_version: str,
+    path: Path,
+    reload: Callable[[TerminalConfig], list[SourceStatus]],
+    lock: threading.Lock,
+) -> SourceWriteResult:
+    """指した 1 行に送ったキーだけを重ねて `settings.yaml` を書き換え、変わった行の配信元を読み直す。"""
+    with lock:
+        # 取得した後に書き換えられていないかを、行の検索より前に照合する
+        text, current = read_settings_file(path)
+        _check_version(current, expected_version)
+        document = load_roundtrip(text, file=str(path))
+        rows: list[object] = list(cast("Mapping[str, list[object] | None]", document).get("sources") or [])
+        index, entry = _find_row(rows, source_id)
+        patched = _apply_patch(entry, patch)
+        # id を省いた行の配信元の ID が変わる: 読み直す配信元が 1 つに決まらないため断る
+        if entry.id is None:
+            new_id = entry_source_id(patched)
+            if new_id != source_id:
+                raise TerminalConfigInvalidError(
+                    file=path,
+                    message=f"source.config: 配信元の ID が {source_id} から {new_id} に変わります",
+                    violations=[
+                        Violation(
+                            path="source.config",
+                            rule=f"配信元の ID が {source_id} から {new_id} に変わります",
+                            fix="1 行の削除と追加で差し替えてください",
+                        )
+                    ],
+                )
+        rows[index] = _to_yaml_row(patched)
+        document["sources"] = rows
+        # 置き換えた後を検証し、違反があれば書かない
+        _validate_or_raise(document, path)
+        result = _write_and_reload(document, path, reload)
+        logger.info("端末の設定の sources の 1 行を変更した（%s・%s）", path, source_id)
+        return result
+
+
+def delete_source(
+    source_id: str,
+    *,
+    expected_version: str,
+    path: Path,
+    reload: Callable[[TerminalConfig], list[SourceStatus]],
+    lock: threading.Lock,
+) -> SourceWriteResult:
+    """指した 1 行だけを `settings.yaml` の `sources` から削除し、その配信元を配信から除外する。"""
+    with lock:
+        # 取得した後に書き換えられていないかを、行の検索より前に照合する
+        text, current = read_settings_file(path)
+        _check_version(current, expected_version)
+        document = load_roundtrip(text, file=str(path))
+        rows: list[object] = list(cast("Mapping[str, list[object] | None]", document).get("sources") or [])
+        index, _ = _find_row(rows, source_id)
+        del rows[index]
+        document["sources"] = rows
+        # 削除した後を検証し、違反があれば書かない
+        _validate_or_raise(document, path)
+        result = _write_and_reload(document, path, reload)
+        logger.info("端末の設定の sources から 1 行削除した（%s・%s）", path, source_id)
+        return result
