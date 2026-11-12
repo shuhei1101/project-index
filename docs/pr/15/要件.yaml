@@ -144,6 +144,9 @@ scope_out:
   - item: 端末の設定の最上位の知らないキーを警告として返して読み込みを続ける
     reason: 移した後のコードに対して行う変更。この作業 PR は今の dev-docs の振る舞いのまま移す
     plan: '#11'
+  - item: 呼ぶ側のリポジトリ（AI Monitor・knowledge・rule-inject・alias-inject）の、文書の MCP・管理の MCP のツールの完全名の書き換え
+    reason: 別のリポジトリの変更。確認ログのとおりリポジトリごとに起票し、shuhei1101/dev-docs#163 のマージと同じ時期に入れる。完全名はこの作業 PR のプラグインが決めるため、この作業 PR がマージされなければ成り立たない
+    plan: to_file
 use_cases:
   - kind: composite
     scenario: docs/scenario/SC-1.yaml
