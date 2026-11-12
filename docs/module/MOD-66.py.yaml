@@ -69,7 +69,7 @@ functions:
       1. `lock` を取る
       2. 端末の設定を往復編集の形で読み（往復編集の読み込み）、送られた行ごとに、ファイルの `sources` から配信元の ID（配信元の『行の配信元の ID』。`id`、無ければ設定の `name`）が同じ行を探す
          - 見つかった場合、送られた行に含めなかったキー（`SourceEntry` の `model_fields_set` に無い `enabled`・`outside_read` と、`scope` を含めなかった行か `SourceScope` の `model_fields_set` に無い `scope.read`・`scope.write`）を、見つかった行の値で埋める
-         - ID が求まらない行と、同じ ID の行が無い行は埋めない（既定値のまま）
+         - ID が求まらない行と、同じ ID の行が無い行は埋めない（既定値のまま）。ファイルの行のうち `SourceEntry` として読めない行（スキーマに通らない行）は探す対象から除く
       3. `sources` だけを埋めた後の行に置き換える。`config` は要素の数によらず配列で書く。既定値と同じキー（`enabled: true`・`outside_read: true`・空の `scope.read` など）は書かない
       4. 置き換えた値を検証する（端末の設定の検証）
          - 違反がある場合、ファイルを書かずに `TerminalConfigInvalidError` を送る
@@ -118,6 +118,12 @@ functions:
         condition: 'ファイルの sample の行に `outside_read: false`。送る行は id が extra で `config` が同じ'
         mock: 配信元の読み直し（偽物）
         expected: ファイルの extra の行に `outside_read` が無い
+      - name: test_save_sources_when_current_row_invalid
+        case: 正常
+        summary: ファイルに読めない行があっても送った行で保存する
+        condition: 'ファイルの extra の行に知らないキー `outside-read: false`。送る extra の行は `id`・`config` だけ'
+        mock: 配信元の読み直し（偽物）
+        expected: 例外を送らず、ファイルの extra の行が `id`・`config` だけになる。`reload` が 1 回呼ばれる
       - name: test_save_sources_when_invalid
         case: 異常
         summary: 検証に通らない
