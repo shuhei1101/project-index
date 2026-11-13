@@ -278,6 +278,11 @@ data_models:
         type: str | None
         access: 公開
         description: 管理用の YAML の行の文書だけ
+      - name: common_keys
+        title: 共通のキー
+        type: dict[str, Any] | None
+        access: 公開
+        description: 文書のストアが読み込んだ文書の `metadata`（`resolve_metadata` の結果）をそのまま入れる。中のキーは `METADATA_KEYS` の名前のまま。文書の一覧は求めたときだけ入れ、それ以外は `None`。文書の取得は常に入れる
   - name: DocumentListEntry
     title: 文書の一覧の値つきの要素
     container: project_index/features/read/types.py
@@ -349,7 +354,7 @@ data_models:
         title: メタデータ
         type: DocumentListItem
         access: 公開
-        description: '`id`・`kind`・`name`・`description`・`tags`・`visibility`'
+        description: '`id`・`kind`・`name`・`description`・`tags`・`visibility`・`common_keys`'
       - name: body
         title: 本文
         type: str | None
