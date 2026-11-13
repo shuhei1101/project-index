@@ -74,8 +74,8 @@ def _tag_names(tags: object) -> list[str]:
     return [str(tag) for tag in cast("list[object]", tags)]
 
 
-def _metadata(document: Document) -> DocumentListItem:
-    """文書の ID・パス・種類・共通のメタデータを一覧の 1 件にする。"""
+def _metadata(document: Document, *, common_keys: bool) -> DocumentListItem:
+    """文書の ID・パス・種類・共通のメタデータと、求めたときだけ共通のキーを一覧の 1 件にする。"""
     metadata = document.metadata
     return DocumentListItem(
         id=document.id,
@@ -86,6 +86,7 @@ def _metadata(document: Document) -> DocumentListItem:
         tags=_tag_names(metadata.get("tags")),
         visibility=metadata.get("visibility"),
         body_path=document.body_path,
+        common_keys=dict(metadata) if common_keys else None,
     )
 
 
@@ -97,17 +98,17 @@ def _ref_name(target: Target) -> str:
     return target.ref or source.config.default_ref
 
 
-def _entry(document: Document, *, values: bool) -> DocumentListEntry:
+def _entry(document: Document, *, values: bool, common_keys: bool) -> DocumentListEntry:
     """文書のメタデータに、バージョンと、求めたときだけ値を加える。"""
     return DocumentListEntry(
-        **_metadata(document).model_dump(),
+        **_metadata(document, common_keys=common_keys).model_dump(),
         version=document.version,
         value=document.data if values else None,
     )
 
 
 def list_documents(
-    target: Target, *, store: DocumentStore, values: bool = False
+    target: Target, *, store: DocumentStore, values: bool = False, common_keys: bool = False
 ) -> DocumentListResponse:
     """読み取りの場所の文書の ID・パス・種類・メタデータ・バージョンを、`documents[]` の行の順に返す。"""
     loaded = store.load(target)
@@ -116,7 +117,8 @@ def list_documents(
         loaded.documents, key=lambda found: (order.get(found.kind, len(order)), found.path)
     )
     return DocumentListResponse(
-        ref=_ref_name(target), documents=[_entry(found, values=values) for found in documents]
+        ref=_ref_name(target),
+        documents=[_entry(found, values=values, common_keys=common_keys) for found in documents],
     )
 
 
@@ -196,7 +198,7 @@ def get_document(
         path=document.path,
         value=document.data,
         schema=store.row_schema(target, document.kind),
-        metadata=_metadata(document),
+        metadata=_metadata(document, common_keys=True),
         body=document.body if is_row else None,
         body_path=document.body_path,
         markdown=markdown,

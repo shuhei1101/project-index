@@ -61,28 +61,28 @@ properties:
           properties:
             read:
               type: array
-              title: 読める作業場所
+              title: 参照できる作業場所
               items:
                 type: string
             write:
               type: array
-              title: 読み書きできる作業場所
+              title: 参照と書き込みができる作業場所
               items:
                 type: string
         outside_read:
           type: boolean
-          title: 作業範囲の外から読めるか
+          title: 作業範囲の外から参照できるか
   state_dir:
     type: string
-    title: 状態の置き場所
+    title: 状態の配置先
     minLength: 1
   log_dir:
     type: string
-    title: ログの置き場所
+    title: ログの配置先
     minLength: 1
   seen_retention_days:
     type: integer
-    title: 返し済みの記録の保持日数
+    title: 返却済みの記録の保持日数
     minimum: 1
   script_timeout_sec:
     type: integer

@@ -163,7 +163,7 @@ functions:
       description: バックアップのパス
     process: |-
       1. 手順に破壊的なものがあり `allow_destructive` が `False` の場合、`DestructiveStepBlockedError` を送出する
-      2. ファイルを読み直して `data` と同じ内容かを比べ、ハッシュを控える（`content_hash`）
+      2. ファイルを読み直して `data` と同じ内容かを比べ、ハッシュを記録する（`content_hash`）
          - 違う場合、`MigrationFailedError` を送出する
       3. 手順を順に当てる（手順の適用）
       4. `version` を `target.current` にする

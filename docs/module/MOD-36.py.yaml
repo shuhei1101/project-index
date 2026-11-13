@@ -36,7 +36,7 @@ functions:
          - 取れない場合、または `control.requested` が `True` の場合、`RestartInProgressError` を送出する
       2. 手順 3〜9 を `try` に入れ、`finally` で `update_lock` を放す（返す経路・`UpdateFailedError` の経路を含む）
       3. `previous_version` を 起動時に読んだ値（動いているバージョン。更新で配布のメタデータが入れ替わっても変わらない） で得る
-      4. `git rev-parse HEAD` を実行して前の HEAD を控え、`git pull --ff-only` を実行する（コマンドの実行）
+      4. `git rev-parse HEAD` を実行して前の HEAD を記録し、`git pull --ff-only` を実行する（コマンドの実行）
          - `[INFO]` クローンを更新する（clone）
       5. もう一度 `git rev-parse HEAD` を実行する
          - 前の HEAD と同じ場合、`updated`・`migration_needed`・`restarting` を `False`、`version` を `previous_version` にして返す

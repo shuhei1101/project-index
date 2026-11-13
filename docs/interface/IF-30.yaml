@@ -30,6 +30,7 @@ flows:
       - 200 で、`sources` に sample が `serving` で並ぶ
       - '`settingsPath` に端末の設定のパス、sample の行に `config`・`scope` がある'
       - 配信元が 0 件の端末の設定でも 200 で、`sources` が空
+      - '`version` に端末の設定の内容のバージョンがあり、ファイルを書き換えずにもう一度取得すると同じ値を返却する'
     test: test_normal
   - name: 正常系（配信していない配信元がある）
     summary: 配信していない・無効・設定が古い配信元を状態と理由つきで返す
@@ -74,12 +75,16 @@ flows:
         description: sample と notes の 2 行で起動した後、ファイルを fresh・notes・sample の順に書き換え、読み直さない
         notes: fresh は `id` を省いた新しい行
     flow: |-
+      <!-- map: {"title": "正常系（読み直していない行がある）"} -->
+
       sequenceDiagram
         participant C as クライアント
         participant E as GET /settings/sources
 
         C->>E: GET /settings/sources
         E-->>C: 200（ファイルの行の順と状態）
+
+      <!-- /map -->
     expected:
       - 200 で、`sources` がファイルの順（fresh・notes・sample）に並ぶ
       - fresh が `pending_reload` で、`id` が `null`
@@ -154,7 +159,7 @@ response:
     description: 配信するか
   - name: sources[].scope
     type: '{read: list[str], write: list[str] | None}'
-    description: 読める・書ける作業場所の glob
+    description: 参照できる・参照と書き込みができる作業場所の glob
     notes: '`write` を省いた行は `null`（既定値の配信元のフォルダだけから書ける）'
   - name: sources[].status
     type: Literal['serving', 'not_served', 'disabled', 'pending_reload']
@@ -169,8 +174,12 @@ response:
     notes: 設定のバージョンが古いときだけ
   - name: sources[].outsideRead
     type: bool
-    description: '`scope` に当たらない作業場所からも `outside_scope: true` で作業範囲の外（参考）として読めるか（端末の設定の `outside_read`）'
+    description: '`scope` に当たらない作業場所からも `outside_scope: true` で作業範囲の外（参考）として参照できるか（端末の設定の `outside_read`）'
     notes: 書いていない行は `true`
+  - name: version
+    type: str
+    description: 端末の設定の内容のバージョン（`settings.yaml` のファイル全体の内容のハッシュ）。書き換えの `expectedVersion` に指定する
+    notes: '`version` キーの設定のバージョンとは別。利用者がファイルを手で書き換えたときも変わる'
   - name: warnings[].path
     type: str
     description: 端末の設定の最上位の知らないキーのパス

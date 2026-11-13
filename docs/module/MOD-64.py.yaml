@@ -22,7 +22,7 @@ diagrams:
         }
         class 端末の設定 {
           +配信元: list
-          +状態の置き場所: Path
+          +状態の配置先: Path
         }
         click 配信元の保存 href "./MOD-66.py.yaml#配信元の保存"
         click 端末の設定 href "./MOD-67.py.yaml#端末の設定"
@@ -261,12 +261,19 @@ functions:
         default: None
         passing: keyword
         description: 状態の置き場を決める環境変数。`None` なら `os.environ`
+      - name: text
+        title: 本文
+        type: str | None
+        required: false
+        default: None
+        passing: keyword
+        description: 既に参照した `settings.yaml` の本文（端末の設定の内容の読み込みが返した本文）。`None` ならファイルを読む
     returns:
       type: TerminalConfig
       description: 既定値を埋めた端末の設定
     process: |-
-      1. ファイルを UTF-8 で読む
-         - 無い場合、`TerminalConfigInvalidError` を送る
+      1. `text` が渡された場合はそれを本文にし、無ければファイルを UTF-8 で読む
+         - ファイルが無い場合、`TerminalConfigInvalidError` を送る
       2. YAML として読む（YAMLの読み込み）
          - 読めない場合、行と列を `Violation` にして `TerminalConfigInvalidError` を送る
       3. 端末の設定の値を検証する（端末の設定の検証）
@@ -317,6 +324,12 @@ functions:
         mock: なし
         expected: '`TerminalConfigInvalidError` の違反に `sources[0].config` と `port` の 2 つ'
         exception: スキーマに違反する
+      - name: test_load_terminal_config_when_text_given
+        case: 正常
+        summary: 渡した本文から端末の設定を作る
+        condition: ファイルとは違う `sources` を持つ本文を `text` に渡す
+        mock: なし（一時フォルダ）
+        expected: '`sources` が渡した本文の行で、`file` は `path`'
       - name: test_load_terminal_config_when_unknown_top_level_key
         case: 正常
         summary: 最上位の知らないキーを読み飛ばす
@@ -529,3 +542,43 @@ functions:
         condition: '最上位に `prot: 9000` を持ち `port` を書かない設定を端末の設定の読み込みで読み、環境変数なし'
         mock: なし（一時フォルダ）
         expected: '8786'
+  - name: read_settings_file
+    title: 端末の設定の内容の読み込み
+    kind: 関数
+    container: project_index/features/settings/query.py
+    usecase: 端末の設定
+    role: 読み込み
+    summary: '`settings.yaml` を 1 回だけ読み、本文と内容のバージョンを返す'
+    scope: public
+    args:
+      - name: path
+        title: 設定のファイル
+        type: Path
+        required: true
+        passing: positional
+        description: 端末の設定のパス
+    returns:
+      type: tuple[str, str]
+      description: UTF-8 で読んだ本文と、端末の設定の内容のバージョン
+    process: |-
+      1. `path` をバイト列で 1 回だけ読む
+      2. バイト列の内容のハッシュを内容のバージョンにする（内容のハッシュ）
+      3. バイト列を UTF-8 で本文にし、本文と内容のバージョンを返す
+    exceptions:
+      - name: FileNotFoundError
+        condition: '`path` が無い'
+        message: 標準のメッセージ
+    unit_tests:
+      - name: test_read_settings_file
+        case: 正常
+        summary: 本文と内容のバージョンを返す
+        condition: 一時フォルダの `settings.yaml`
+        mock: なし（一時フォルダ）
+        expected: 本文がファイルの中身で、内容のバージョンがファイルのバイト列の内容のハッシュ。末尾にコメントを 1 行足すと内容のバージョンが変わる
+      - name: test_read_settings_file_when_missing
+        case: 異常
+        summary: ファイルが無い
+        condition: 無いパス
+        mock: なし（一時フォルダ）
+        expected: '`FileNotFoundError`'
+        exception: '`path` が無い'

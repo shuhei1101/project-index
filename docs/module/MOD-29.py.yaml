@@ -149,10 +149,10 @@ classes:
              - `target.ref` が `None` の場合、`target.base`
              - `target.ref` がある場合、読む場所の commit（下の「読む場所の commit」）を `snapshots.checkout` で書き出し、その下に `source.root` の `repo_root` からの相対パスをつなぐ
           2. 文書の行を決める。`kinds` があれば `source.table` で引き（無い種類は `UnknownKindError`）、無ければ `enabled` の全ての行
-          3. Git の配信元の場合、履歴の『ファイルの日時』を `_dates` から作業ツリー・commit・配信元の `root` の `repo_root` からの相対パスで引く。無ければ、作業ツリー（ワークツリーか `repo_root`）と commit（`ref` があれば読む場所の commit、無ければ作業ツリーの `HEAD` を解いた SHA）で呼び、配信元の直下からのパスに直して控える
+          3. Git の配信元の場合、履歴の『ファイルの日時』を `_dates` から作業ツリー・commit・配信元の `root` の `repo_root` からの相対パスで引く。無ければ、作業ツリー（ワークツリーか `repo_root`）と commit（`ref` があれば読む場所の commit、無ければ作業ツリーの `HEAD` を解いた SHA）で呼び、配信元の直下からのパスに直してキャッシュする
           4. 読むフォルダのファイルを、`files` が無ければ `walk_files` で 1 回だけたどって得る。行ごとにそのパスを渡して『ファイルの収集』でファイルを集める
-             - `target.ref` が `None` の場合、ファイルごとに `stat` を取る。`_files` の更新日時と大きさが同じで、理由に `missing_body_file` が無く、本文のファイルの (パス, 更新日時, 大きさ) も同じなら控えた結果を使い、それ以外は『ファイルの読み込み』で読んで `_files` を置き換える
-             - `target.ref` がある場合、読む場所の commit のファイルの blob の SHA を `_trees` から引く（無ければ `git ls-tree -r --full-tree {commit}` を 1 回だけ起動して控える）。`_revision_files` の blob の SHA が同じで、理由に `missing_body_file` が無く、本文のファイルの (パス, blob の SHA) と、ファイルと本文のファイルの日時（手順 3）も同じなら控えた結果を使い、それ以外は『ファイルの読み込み』で読んで `_revision_files` を置き換える。blob の SHA が無いファイルは読まない
+             - `target.ref` が `None` の場合、ファイルごとに `stat` を取る。`_files` の更新日時と大きさが同じで、理由に `missing_body_file` が無く、本文のファイルの (パス, 更新日時, 大きさ) も同じならキャッシュした結果を使い、それ以外は『ファイルの読み込み』で読んで `_files` を置き換える
+             - `target.ref` がある場合、読む場所の commit のファイルの blob の SHA を `_trees` から引く（無ければ `git ls-tree -r --full-tree {commit}` を 1 回だけ起動してキャッシュする）。`_revision_files` の blob の SHA が同じで、理由に `missing_body_file` が無く、本文のファイルの (パス, blob の SHA) と、ファイルと本文のファイルの日時（手順 3）も同じならキャッシュした結果を使い、それ以外は『ファイルの読み込み』で読んで `_revision_files` を置き換える。blob の SHA が無いファイルは読まない
           5. 収集で当たらなかった `_files` のキーのうち、読むフォルダの下にあるものを削除する（削除されたファイル）。
              `target.ref` がある場合は、読んだ行ごとに、`_revision_files` のキーのうち `repo_root`・配信元の ID・行の ID が同じで、今回の commit のファイルに当たらないもの、または行の定義のハッシュが違うものを削除する（`_revision_files` を今の commit と行の定義のファイルの数に抑える）
           6. 行の順に文書を並べ、先に現れた ID を残して、後に現れた同じ ID の文書を `duplicate_id` にする（`detail` に ID と先の文書のファイル）
@@ -328,11 +328,11 @@ classes:
           1. `source.table(kind)` で行を引く
           2. `target.ref` と `target.worktree` がどちらも `None` の場合と、行の `schema_path` が `SchemaRef` の場合、起動時のスキーマを返す（読む場所によらず参照したリビジョンのスキーマ）
           3. `target.ref` がある場合、`repo_root`・読む場所の commit（`load` と同じ）・スキーマのファイル（設定ファイルのフォルダからの相対パスを `source.config_path` で `root` からにしたもの）の `repo_root` からの相対パスで `_revision_schemas` を引き、当たればそのまま返す（リビジョンの書き出しとファイルの `stat` をしない）。
-             当たらなければ、`load` と同じ読むフォルダの `source.config_path(schema_path)` を『YAMLの読み込み』で読み、`$ref` を解いた結果を `_revision_schemas` に控える
-             - ファイルが無い・読めない場合、手順 2 のスキーマを使い、控えない
+             当たらなければ、`load` と同じ読むフォルダの `source.config_path(schema_path)` を『YAMLの読み込み』で読み、`$ref` を解いた結果を `_revision_schemas` にキャッシュする
+             - ファイルが無い・読めない場合、手順 2 のスキーマを使い、キャッシュしない
           4. ワークツリーの場合、読むフォルダの `source.config_path(schema_path)` を `_schemas` から引き、更新日時か大きさが違えば『YAMLの読み込み』で読み直す
              - ファイルが無い・読めない場合、手順 2 のスキーマを使う
-          5. `$ref` を解いたスキーマを返す（スキーマの参照の解決。基準は手順 2〜4 で使った `schema_path`）。ワークツリーで解いた結果は `_schemas` に控える
+          5. `$ref` を解いたスキーマを返す（スキーマの参照の解決。基準は手順 2〜4 で使った `schema_path`）。ワークツリーで解いた結果は `_schemas` にキャッシュする
         exceptions:
           - name: UnknownKindError
             condition: '`kind` が有効な文書の行に無い'
@@ -354,7 +354,7 @@ classes:
             exception: '-'
           - name: test_document_store_schema_when_revision
             case: 正常
-            summary: リビジョンのスキーマは commit で控える
+            summary: リビジョンのスキーマは commit でキャッシュする
             condition: Git の配信元で `schemas/rule.schema.yaml` を commit した後、作業ツリーで `required` を書き換え、`commit` に最初の commit を持つ読む場所で 2 回呼ぶ
             mock: '`snapshots.checkout`（本物を包んで呼ばれた回数を記録する）'
             expected: 2 回とも commit した `required` のスキーマを返し、`snapshots.checkout` が 1 回だけ呼ばれる
@@ -470,7 +470,7 @@ classes:
           type: None
           description: '-'
         process: |-
-          1. `_files`・`_schemas`・`_revision_schemas`・`_dates` を空にする（起動の『配信元の読み直し』と『配信元の控えの破棄』が呼ぶ）
+          1. `_files`・`_schemas`・`_revision_schemas`・`_dates` を空にする（起動の『配信元の読み直し』と『配信元のキャッシュの破棄』が呼ぶ）
           2. `_revision_files`・`_trees` は、commit の blob と文書の行の定義で中身が決まり古くならないので残す
       - name: location
         title: 文書の場所
@@ -527,10 +527,10 @@ constants:
     summary: 無い ID ごとに添える近い ID の数の上限
     value: '5'
   - name: TREE_KEEP
-    title: 控える commit の blob の数
+    title: キャッシュする commit の blob の数
     container: project_index/features/documents/store.py
     usecase: 共通
-    summary: '`_trees` に控える (`repo_root`, commit) の上限。リビジョンの書き出しの `SNAPSHOT_KEEP` と同じ値にする'
+    summary: '`_trees` にキャッシュする (`repo_root`, commit) の上限。リビジョンの書き出しの `SNAPSHOT_KEEP` と同じ値にする'
     value: '20'
   - name: CANDIDATE_CUTOFF
     title: 近さの下限

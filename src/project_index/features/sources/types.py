@@ -59,7 +59,7 @@ class ScriptEntry:
     id: str
     run: list[str]
     on: list[Literal["read", "write"]] = field(default_factory=lambda: ["write"])
-    # `converters[]` だけが使う。False の行の変換は控えを読まず書かない
+    # `converters[]` だけが使う。False の行の変換は変換の結果のキャッシュを参照も保存もしない
     cache: bool = True
 
 
@@ -91,6 +91,8 @@ class SourceConfig:
     decision_folders: list[str] = field(default_factory=list[str])
     description: str = ""
     instructions: str = ""
+    # 使う場面（どういうときにこの配信元で検索するか）の行
+    when: list[str] = field(default_factory=list[str])
 
 
 @dataclass(frozen=True)

@@ -1,0 +1,46 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: changed
+    detail: エージェントが配信元の一覧・作業範囲の外の一覧と、接続で受け取る案内から、配信元ごとの使う場面を知って引く配信元を選ぶ。案内の一覧は上限の字数に収め、配信元の読み直しの後の新しい接続に反映する
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: run_only
+    detail: 配信元を追加するときの設定の読み込みが、使う場面の項目を省いた既存の設定でも変わらない
+    depends_on: []
+docs:
+  - page: docs/guide/設定.md
+    new: false
+    change: 配信元の設定のキーの表に `when` を足す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-13T01:36:13.760276+00:00'
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: instructions の中身に配信元と `when` の 1 行目の一覧と字数の上限を、`describe` の出力の表に `when` を足す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-13T01:36:13.760276+00:00'
+scope_out:
+  - item: SessionStart での配信元の `when` の案内
+    reason: shuhei1101/dev-docs#92 で SessionStart の配信元の案内を廃止したため、D-152 の決定のうち SessionStart の部分は行わない
+    plan: none
+  - item: 読み取り API の配信元の設定の取得（IF-23）・配信元の一覧（IF-22）の応答への `when` の追加
+    reason: 要望はエージェントへの案内（`describe`・instructions）で、画面のサーバーの読み取り API は含まない。IF-23 は設定のうち `nav`・`documents`・`decisions.folders`・`github`・`diff.ignore_keys`・`schemas` だけを返却し、`description` も返却しないため、`when` も加えない
+    plan: none
+  - item: knowledge の配信元の設定への `when` の記載
+    reason: 起点 Issue の本文のとおり、`when` を含むスキーマのリリース後に各リポジトリの別の Issue で行う
+    plan: shuhei1101/knowledge#315
+  - item: mdmark の配信元の設定への `when` の記載
+    reason: 起点 Issue の本文のとおり、`when` を含むスキーマのリリース後に各リポジトリの別の Issue で行う
+    plan: shuhei1101/mdmark#519
+  - item: claude-balancer の配信元の設定への `when` の記載
+    reason: 起点 Issue の本文のとおり、`when` を含むスキーマのリリース後に各リポジトリの別の Issue で行う
+    plan: shuhei1101/claude-balancer#285
+  - item: ai-monitor の配信元の設定への `when` の記載
+    reason: 起点 Issue の本文のとおり、`when` を含むスキーマのリリース後に各リポジトリの別の Issue で行う
+    plan: shuhei1101/ai-monitor#3417
+  - item: alias-inject の配信元の設定への `when`・`description` の記載
+    reason: 起点 Issue の本文のとおり、`when` を含むスキーマのリリース後に各リポジトリの別の Issue で行う
+    plan: shuhei1101/alias-inject#92

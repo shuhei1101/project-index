@@ -46,6 +46,19 @@ TERMS_FILES = {
     "schemas/terms.schema.yaml": "type: object\n",
     "terms.yaml": "terms:\n  - id: term-1\n    name: alpha\n  - id: term-2\n    name: beta\n",
 }
+LINKS_TABLES = [
+    DocumentTable(
+        id="design",
+        paths=["design/*.yaml"],
+        schema_path="schemas/design.schema.yaml",
+        metadata={"related": "links"},
+        alias_type="term",
+    ),
+]
+LINKS_FILES = {
+    "schemas/design.schema.yaml": "type: object\n",
+    "design/D-1.yaml": "id: D-1\nname: タスクの保存\nlinks:\n  - to: D-2\n",
+}
 SCHEMA_TABLES = [
     DocumentTable(id="design", paths=["design/*.yaml"], schema_path="schemas/design.schema.yaml"),
     DocumentTable(
@@ -186,6 +199,8 @@ def test_list_documents(make_view_env: Callable[..., SimpleNamespace]) -> None:
     assert [item.version for item in response.documents] == versions
     assert response.documents[0].value is None
     assert response.documents[1].value is None
+    assert response.documents[0].common_keys is None
+    assert response.documents[1].common_keys is None
 
 
 def test_list_documents_when_values(make_view_env: Callable[..., SimpleNamespace]) -> None:
@@ -197,6 +212,23 @@ def test_list_documents_when_values(make_view_env: Callable[..., SimpleNamespace
     # 検証
     assert response.documents[0].value == {"id": "a", "name": "A"}
     assert response.documents[1].value == {"path": "guide.md"}
+
+
+def test_list_documents_when_common_keys(make_view_env: Callable[..., SimpleNamespace]) -> None:
+    """共通のキーを求めたときだけ文書の metadata を入れる（正常系）。"""
+    # 準備
+    env = make_view_env(LINKS_FILES, tables=LINKS_TABLES)
+    target = _target(env)
+    metadata = env.handlers.store.load(target).documents[0].metadata
+    # 実行
+    response = list_documents(target, store=env.handlers.store, common_keys=True)
+    # 検証
+    item = response.documents[0]
+    assert item.common_keys == metadata
+    assert item.common_keys is not None
+    assert item.common_keys["related"] == [{"to": "D-2"}]
+    assert item.common_keys["alias_type"] == "term"
+    assert item.value is None
 
 
 def test_get_document(
@@ -218,6 +250,8 @@ def test_get_document(
     # 検証
     assert response.value == {"id": "a", "name": "A"}
     assert response.model_dump(by_alias=True)["schema"] == {"type": "object"}
+    assert response.metadata is not None
+    assert response.metadata.common_keys == {"id": "a", "name": "A"}
     assert response.markdown is None
     assert calls == []
 

@@ -85,7 +85,7 @@ def test_build_read_router_when_queries(make_view_env: Callable[..., SimpleNames
     client = _client(env.handlers)
     # 実行
     config = client.get("/sources/sample/config?schemas=true").json()
-    documents = client.get("/sources/sample/docs?values=true").json()
+    documents = client.get("/sources/sample/docs?values=true&common_keys=true").json()
     document = client.get("/sources/sample/docs/terms.yaml?id=term-2").json()
     search = client.get("/sources/sample/search?q=beta").json()
     # 検証
@@ -93,6 +93,7 @@ def test_build_read_router_when_queries(make_view_env: Callable[..., SimpleNames
     assert config["diff"] == {"ignore_keys": ["updated"]}
     assert documents["documents"][0]["value"] == {"id": "a", "name": "A"}
     assert "version" in documents["documents"][0]
+    assert documents["documents"][0]["commonKeys"] == {"id": "a", "name": "A"}
     assert document["metadata"]["id"] == "term-2"
     assert search["items"][0]["id"] == "term-2"
     assert search["items"][0]["filePath"] == "terms.yaml"

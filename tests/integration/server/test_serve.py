@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import shutil
 import socket
 import threading
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -103,6 +105,12 @@ NONE_NAV = (
 INSTRUCTIONS_MAX_CHARS = 4096
 # instructions が持つ見出し（使用する場面・grep と Read が向く場面・ツールの順序・タグの付け方）
 INSTRUCTIONS_HEADERS = ("使用する場面:", "grep・Read が向く場面:", "使用方法:", "タグ:")
+# 使う場面の一覧の上限を超える配信元の数と、1 行目の字数
+SOURCE_GUIDE_COUNT = 30
+SOURCE_GUIDE_WHEN_CHARS = 200
+# 裏の確認の後の反映を待つ上限の秒数と、問い合わせ直す間隔
+REFRESH_WAIT_SEC = 60
+REFRESH_POLL_SEC = 0.5
 # 文に置かない言い回し
 FORBIDDEN_WORDS = ("MUST", "必ず", "禁止")
 # 読み込み中の要求が答えないことを確かめる間と、読み終えた後に答えを待つ上限
@@ -668,6 +676,162 @@ def test_normal_when_mcp_text_from_prompts(
     assert [text for text in texts if any(word in text for word in FORBIDDEN_WORDS)] == []
     assert _argument_keys(tools) == _model_keys(DOCS_TOOL_MODELS)
     assert _argument_keys(admin_tools) == _model_keys(ADMIN_TOOL_MODELS)
+
+
+def _when_line(*lines: str) -> str:
+    """配信元の設定の `when` の行を作る。"""
+    return "when:\n" + "".join(f"  - {line}\n" for line in lines)
+
+
+def _instructions(port: int) -> str:
+    """新しい接続の `initialize` で instructions を受け取る。"""
+    response = _mcp(port, "/mcp/", INITIALIZE)
+    text: str = response.json()["result"]["instructions"]
+    return text
+
+
+def _wait_loaded(call_tool: Callable[..., dict[str, Any]], port: int, cwd: str) -> None:
+    """全ての行の読み込みを待つ（作業範囲の外の一覧は全ての行を待つ）。"""
+    with httpx.Client(timeout=LOADING_REQUEST_SEC) as client:
+        call_tool(client, port, "/mcp/", "describe", cwd=cwd, outside_scope=True)
+
+
+def test_normal_when_source_guide_listed(
+    make_source: Callable[..., Any],
+    write_settings: Callable[..., Path],
+    free_port: Callable[[], int],
+    start_serve: Callable[..., Any],
+    wait_until_serving: Callable[..., None],
+    call_tool: Callable[..., dict[str, Any]],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """instructions に配信元と使う場面の一覧を加える（正常系）。"""
+    # 準備
+    other = make_source(
+        "other",
+        sample_file_set(
+            **{
+                "project-index.yaml": sample_config_text(
+                    _when_line("別の配信元を引くとき"), name="other"
+                )
+            }
+        ),
+    )
+    sample = make_source(
+        "sample",
+        sample_file_set(
+            **{
+                "project-index.yaml": sample_config_text(
+                    _when_line("規約を確かめるとき", "設計書を書く前")
+                )
+            }
+        ),
+    )
+    old = make_source(
+        "old", sample_file_set(**{"project-index.yaml": sample_config_text(name="old")})
+    )
+    port = free_port()
+    process = start_serve(write_settings(other, sample, old), port)
+    wait_until_serving(process, port)
+    _wait_loaded(call_tool, port, str(sample.folder))
+    # 実行
+    instructions = _instructions(port)
+    # 検証
+    assert "`other`: 別の配信元を引くとき" in instructions
+    assert "`sample`: 規約を確かめるとき" in instructions
+    assert instructions.index("`other`") < instructions.index("`sample`")
+    assert "設計書を書く前" not in instructions
+    assert "`old`" not in instructions
+    assert len(instructions) <= INSTRUCTIONS_MAX_CHARS
+
+
+def test_normal_when_source_guide_exceeds_limit(
+    make_source: Callable[..., Any],
+    write_settings: Callable[..., Path],
+    free_port: Callable[[], int],
+    start_serve: Callable[..., Any],
+    wait_until_serving: Callable[..., None],
+    call_tool: Callable[..., dict[str, Any]],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """一覧を加えると 4,096 字を超えるときは、端末の設定の順に収まる配信元まで載せる（正常系）。"""
+    # 準備
+    ids = [f"src{index:02d}" for index in range(1, SOURCE_GUIDE_COUNT + 1)]
+    specs = [
+        make_source(
+            source_id,
+            sample_file_set(
+                **{
+                    "project-index.yaml": sample_config_text(
+                        _when_line("あ" * SOURCE_GUIDE_WHEN_CHARS), name=source_id
+                    )
+                }
+            ),
+            git=False,
+        )
+        for source_id in ids
+    ]
+    port = free_port()
+    process = start_serve(write_settings(*specs), port)
+    wait_until_serving(process, port)
+    _wait_loaded(call_tool, port, str(specs[0].folder))
+    # 実行
+    instructions = _instructions(port)
+    # 検証
+    listed = re.findall(r"`(src\d{2})`", instructions)
+    assert len(instructions) <= INSTRUCTIONS_MAX_CHARS
+    assert 0 < len(listed) < SOURCE_GUIDE_COUNT
+    assert listed == ids[: len(listed)]
+    assert f"{SOURCE_GUIDE_COUNT - len(listed)} 件" in instructions
+    assert "describe(outside_scope: true)" in instructions
+    assert "作業場所から使用できる配信元と作業範囲の外で参照できる配信元" in instructions
+
+
+def test_normal_when_source_guide_changed_before_connect(
+    make_source: Callable[..., Any],
+    write_settings: Callable[..., Path],
+    free_port: Callable[[], int],
+    start_serve: Callable[..., Any],
+    wait_until_serving: Callable[..., None],
+    call_tool: Callable[..., dict[str, Any]],
+    commit_all: Callable[..., str],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """default_ref に when の書き換えを commit した後の新しい接続が、書き換えた when を返す（正常系）。
+
+    `initialize` が待たずに応答することは、単体テスト `test_docs_instructions` が確かめる。
+    """
+    # 準備
+    sample = make_source(
+        "sample",
+        sample_file_set(**{"project-index.yaml": sample_config_text(_when_line("前の使う場面"))}),
+    )
+    port = free_port()
+    process = start_serve(write_settings(sample), port)
+    wait_until_serving(process, port)
+    cwd = str(sample.folder)
+    _wait_loaded(call_tool, port, cwd)
+    before = _instructions(port)
+    commit_all(
+        sample.folder, {"project-index.yaml": sample_config_text(_when_line("後の使う場面"))}
+    )
+    # 実行
+    first = _instructions(port)
+    deadline = time.monotonic() + REFRESH_WAIT_SEC
+    after = first
+    while "`sample`: 後の使う場面" not in after and time.monotonic() < deadline:
+        time.sleep(REFRESH_POLL_SEC)
+        after = _instructions(port)
+    with httpx.Client(timeout=LOADING_REQUEST_SEC) as client:
+        listed = _tool_data(call_tool(client, port, "/mcp/", "describe", cwd=cwd, format="json"))
+    # 検証
+    assert "`sample`: 前の使う場面" in before
+    assert "`sample`: 後の使う場面" in after
+    assert [item["when"] for item in listed["sources"]] == [["後の使う場面"]]
+    assert process.poll() is None
 
 
 def test_error_when_prompt_invalid(

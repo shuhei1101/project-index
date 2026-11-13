@@ -54,11 +54,11 @@ def attach_schema_hints(
 ) -> list[WriteViolation]:
     """文書の検査の違反のうちスキーマの違反に、違反した項目のスキーマの説明を添える。"""
     hints: dict[tuple[str, str], dict[str, Any]] = {}
-    # スキーマの検査と同じ検査器で違反を引き直し、`path`・`rule` の組で説明を控える
+    # スキーマの検査と同じ検査器で違反を引き直し、`path`・`rule` の組で説明を記録する
     if schema:
         validator_class = validator_for(dict(schema), default=Draft202012Validator)
         validator = validator_class(dict(schema), format_checker=FormatChecker())
-        # 解決できない `$ref` の違反は説明を持たないので、それまでに控えた説明だけで続ける
+        # 解決できない `$ref` の違反は説明を持たないので、それまでに記録した説明だけで続ける
         with suppress(Unresolvable):
             for error in validator.iter_errors(dict(data)):
                 hint = _hint(_definition(error))

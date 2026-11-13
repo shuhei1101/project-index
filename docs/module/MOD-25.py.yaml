@@ -47,7 +47,7 @@ constants:
     container: project_index/features/documents/fields.py
     usecase: 共通
     summary: '`documents[].metadata` で列名を対応づける共通のキー（エイリアスのキーを含む）'
-    value: ("id", "name", "description", "tags", "main_tags", "related", "status", "alias_type", "aliases", "command", "cwd", "url", "avoid", "skill", "tool", "path", "port", "replacement")
+    value: ("id", "name", "description", "tags", "main_tags", "related", "status", "alias_type", "aliases", "command", "cwd", "url", "avoid", "skill", "tool", "path", "port", "replacement", "visibility")
 functions:
   - name: parse_field_path
     title: 項目のパスの分解
@@ -331,9 +331,9 @@ functions:
       - name: test_resolve_metadata
         case: 正常
         summary: 列名の対応と同じ名前の列
-        condition: '`metadata` が `{name: title}`、行の `alias_type` が `term`、内容が `{"id": "a", "title": "A", "tags": ["x"]}`'
+        condition: '`metadata` が `{name: title}`、行の `alias_type` が `term`、内容が `{"id": "a", "title": "A", "tags": ["x"], "visibility": "internal"}`'
         mock: なし
-        expected: '`{"id": "a", "name": "A", "tags": ["x"], "alias_type": "term"}`'
+        expected: '`{"id": "a", "name": "A", "tags": ["x"], "alias_type": "term", "visibility": "internal"}`'
         exception: '-'
       - name: test_resolve_metadata_when_nested_field
         case: 正常

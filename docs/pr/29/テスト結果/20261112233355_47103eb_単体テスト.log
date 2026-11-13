@@ -1,0 +1,39 @@
+$ uv run pytest tests/unit/ -q -p no:cacheprovider
+
+==================================== ERRORS ====================================
+__ ERROR collecting tests/unit/project_index/features/settings/test_query.py ___
+ImportError while importing test module '/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/feat-settings-source-row-api/tests/unit/project_index/features/settings/test_query.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/settings/test_query.py:8: in <module>
+    from project_index.features.settings.query import (
+E   ImportError: cannot import name 'read_settings_file' from 'project_index.features.settings.query' (/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/feat-settings-source-row-api/src/project_index/features/settings/query.py)
+__ ERROR collecting tests/unit/project_index/features/settings/test_route.py ___
+ImportError while importing test module '/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/feat-settings-source-row-api/tests/unit/project_index/features/settings/test_route.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/settings/test_route.py:14: in <module>
+    from project_index.features.settings.types import (
+E   ImportError: cannot import name 'SourcePatch' from 'project_index.features.settings.types' (/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/feat-settings-source-row-api/src/project_index/features/settings/types.py)
+_ ERROR collecting tests/unit/project_index/features/settings/test_service.py __
+ImportError while importing test module '/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/feat-settings-source-row-api/tests/unit/project_index/features/settings/test_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/settings/test_service.py:8: in <module>
+    from project_index.features.settings.query import read_settings_file
+E   ImportError: cannot import name 'read_settings_file' from 'project_index.features.settings.query' (/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/feat-settings-source-row-api/src/project_index/features/settings/query.py)
+___________ ERROR collecting tests/unit/project_index/test_serve.py ____________
+ImportError while importing test module '/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/feat-settings-source-row-api/tests/unit/project_index/test_serve.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/test_serve.py:24: in <module>
+    from project_index.main import (
+E   ImportError: cannot import name 'reload_changed_sources' from 'project_index.main' (/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/feat-settings-source-row-api/src/project_index/main.py)
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/settings/test_query.py
+ERROR tests/unit/project_index/features/settings/test_route.py
+ERROR tests/unit/project_index/features/settings/test_service.py
+ERROR tests/unit/project_index/test_serve.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 4 errors during collection !!!!!!!!!!!!!!!!!!!!
+4 errors in 68.96s (0:01:08)
+EXIT 2

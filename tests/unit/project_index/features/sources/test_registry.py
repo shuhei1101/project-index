@@ -228,6 +228,99 @@ def test_source_registry_get_when_default_ref_moved_with_on_rebuilt(
     assert rebuilt == [first]
 
 
+def test_source_registry_refresh_later(
+    git_repo: Callable[..., Path],
+    commit_all: Callable[..., str],
+    sample_files: dict[str, str],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """裏で組み立て直し、待たずに戻る（正常系）。"""
+    # 準備
+    files = {
+        **sample_files,
+        "project-index.yaml": "when:\n  - 前の使う場面\n" + sample_files["project-index.yaml"],
+    }
+    root = git_repo(files)
+    terminal = make_terminal_config(
+        sources=[make_entry(str(root / "project-index.yaml"), source_id="a")]
+    )
+    registry = SourceRegistry()
+    registry.reload(terminal)
+    commit_all(
+        root,
+        {"project-index.yaml": "when:\n  - 後の使う場面\n" + sample_files["project-index.yaml"]},
+    )
+    # 実行
+    threads = registry.refresh_later(["a"])
+    for thread in threads:
+        thread.join(timeout=60)
+    # 検証
+    assert len(threads) == 1
+    assert [source.config.when for source in registry.served()] == [["後の使う場面"]]
+
+
+def test_source_registry_refresh_later_when_running(
+    git_repo: Callable[..., Path],
+    sample_files: dict[str, str],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """確認中の配信元は重ねて確認しない（正常系）。"""
+    # 準備
+    root = git_repo(sample_files)
+    terminal = make_terminal_config(
+        sources=[make_entry(str(root / "project-index.yaml"), source_id="a")]
+    )
+    registry = SourceRegistry()
+    registry.reload(terminal)
+    started = threading.Event()
+    release = threading.Event()
+    calls: list[str] = []
+    original = registry_module.resolve_ref
+
+    def blocking_resolve_ref(repo_root: Path, ref: str, **kwargs: object) -> object:
+        calls.append(ref)
+        started.set()
+        release.wait(timeout=60)
+        return original(repo_root, ref, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(registry_module, "resolve_ref", blocking_resolve_ref)
+    # 実行
+    first = registry.refresh_later(["a"])
+    started.wait(timeout=60)
+    second = registry.refresh_later(["a", "a"])
+    release.set()
+    for thread in first:
+        thread.join(timeout=60)
+    third = registry.refresh_later(["a"])
+    for thread in third:
+        thread.join(timeout=60)
+    # 検証
+    assert len(first) == 1
+    assert second == []
+    assert len(third) == 1
+    assert len(calls) == 2
+
+
+def test_source_registry_refresh_later_when_not_git(
+    make_source_dir: Callable[..., Path],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """Git でない配信元と配信していない ID は確認しない（正常系）。"""
+    # 準備
+    config = make_source_dir("notes")
+    terminal = make_terminal_config(sources=[make_entry(str(config), source_id="notes")])
+    registry = SourceRegistry()
+    registry.reload(terminal)
+    # 実行
+    threads = registry.refresh_later(["notes", "z"])
+    # 検証
+    assert threads == []
+
+
 def test_source_registry_reload_when_loading(
     monkeypatch: pytest.MonkeyPatch,
     make_terminal_config: Callable[..., TerminalConfig],
@@ -594,6 +687,71 @@ def test_source_registry_load_when_duplicate_loaded_later(
     assert registry.get("a").root == Path("/tmp/x")
 
 
+def test_source_registry_load_when_duplicate_loaded_later_with_on_rebuilt(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """後の行が先に読み込まれて ID が重なると、入れ替えた後の処理を呼ぶ（正常系）。"""
+    # 準備
+    from project_index.features.settings.types import SourceScope
+
+    loader = _Loader(make_served_source, make_status, blocked=("z",), names={"x": "a", "y": "a"})
+    monkeypatch.setattr(registry_module, "load_source", loader)
+    terminal = make_terminal_config(
+        sources=[
+            make_entry("/tmp/z/project-index.yaml", source_id="z"),
+            make_entry("/tmp/x/project-index.yaml", scope=SourceScope(read=["/w/x/**"])),
+            make_entry("/tmp/y/project-index.yaml", scope=SourceScope(read=["/w/y/**"])),
+        ]
+    )
+    waiting = threading.Event()
+    rebuilt: list[ServedSource] = []
+    registry = SourceRegistry(on_rebuilt=rebuilt.append, loading=True, on_waiting=waiting.set)
+
+    async def scenario() -> None:
+        worker = threading.Thread(target=registry.load, args=(terminal,))
+        worker.start()
+        await asyncio.to_thread(loader.entered["z"].wait, 5)
+        waiter = asyncio.ensure_future(registry.wait_for(cwd="/w/y/q"))
+        await asyncio.to_thread(waiting.wait, 5)
+        loader.release["z"].set()
+        await asyncio.wait_for(waiter, timeout=5)
+        await asyncio.to_thread(worker.join, 5)
+
+    # 実行
+    asyncio.run(scenario())
+    # 検証
+    assert loader.order == ["z", "y", "x"]
+    assert [(source.id, source.root) for source in rebuilt] == [("a", Path("/tmp/x"))]
+
+
+def test_source_registry_load_when_duplicate_loaded_earlier_with_on_rebuilt(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """先の行が先に読み込まれて ID が重なると、入れ替えた後の処理を呼ばない（正常系）。"""
+    # 準備
+    loader = _Loader(make_served_source, make_status, names={"x": "a", "y": "a"})
+    monkeypatch.setattr(registry_module, "load_source", loader)
+    terminal = make_terminal_config(sources=_entries(make_entry, "x", "y", with_id=False))
+    rebuilt: list[ServedSource] = []
+    registry = SourceRegistry(on_rebuilt=rebuilt.append, loading=True)
+    # 実行
+    registry.load(terminal)
+    # 検証
+    assert loader.order == ["x", "y"]
+    assert rebuilt == []
+    statuses = registry.statuses()
+    assert [status.status for status in statuses] == ["serving", "not_served"]
+    assert [error.path for error in statuses[1].errors] == ["sources[1].id"]
+
+
 def test_source_registry_wait_for(
     monkeypatch: pytest.MonkeyPatch,
     make_terminal_config: Callable[..., TerminalConfig],
@@ -775,3 +933,104 @@ def test_source_registry_get_when_row_loading(
     assert returned_before is False
     assert [source.id for source in results] == ["b"]
     assert loader.order == ["a", "b"]
+
+
+def test_source_registry_reload_changed(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """変わった行だけを読み込む（正常系）。"""
+    # 準備
+    loader = _Loader(make_served_source, make_status)
+    monkeypatch.setattr(registry_module, "load_source", loader)
+    registry = SourceRegistry()
+    registry.reload(make_terminal_config(sources=_entries(make_entry, "a", "b")))
+    before = registry.get("a")
+    changed = [
+        make_entry("/tmp/a/project-index.yaml", source_id="a"),
+        make_entry("/tmp/b/project-index.yaml", source_id="b", outside_read=False),
+    ]
+    loader.order.clear()
+    # 実行
+    statuses = registry.reload_changed(make_terminal_config(sources=changed))
+    # 検証
+    assert loader.order == ["b"]
+    assert registry.get("a") is before
+    assert [(status.id, status.index) for status in statuses] == [("a", 0), ("b", 1)]
+
+
+def test_source_registry_reload_changed_when_added(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """追加した行だけを読み込む（正常系）。"""
+    # 準備
+    loader = _Loader(make_served_source, make_status)
+    monkeypatch.setattr(registry_module, "load_source", loader)
+    registry = SourceRegistry()
+    registry.reload(make_terminal_config(sources=_entries(make_entry, "a")))
+    loader.order.clear()
+    # 実行
+    registry.reload_changed(make_terminal_config(sources=_entries(make_entry, "a", "c")))
+    # 検証
+    assert loader.order == ["c"]
+    assert sorted(source.id for source in registry.served()) == ["a", "c"]
+
+
+def test_source_registry_reload_changed_when_deleted(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """削除した行の配信元を除き、後ろの行の位置を詰める（正常系）。"""
+    # 準備
+    loader = _Loader(make_served_source, make_status)
+    monkeypatch.setattr(registry_module, "load_source", loader)
+    registry = SourceRegistry()
+    registry.reload(make_terminal_config(sources=_entries(make_entry, "a", "b", "c")))
+    loader.order.clear()
+    # 実行
+    statuses = registry.reload_changed(make_terminal_config(sources=_entries(make_entry, "a", "c")))
+    # 検証
+    assert loader.order == []
+    with pytest.raises(UnknownSourceError):
+        registry.get("b")
+    assert [(status.id, status.index) for status in statuses] == [("a", 0), ("c", 1)]
+
+
+def test_source_registry_reload_changed_when_not_served(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """配信していなかった行は値が同じでも読み直す（正常系）。"""
+    # 準備
+    order: list[str] = []
+    results: dict[str, LoadResult] = {
+        "a": (make_served_source(id="a"), make_status("a", 0)),
+        "broken": (None, make_status("broken", 1, "not_served")),
+    }
+
+    def fake_load(entry: SourceEntry, *, index: int, lookup: SchemaRefLookup) -> LoadResult:
+        order.append(str(entry.id))
+        return results[str(entry.id)]
+
+    monkeypatch.setattr(registry_module, "load_source", fake_load)
+    registry = SourceRegistry()
+    terminal = make_terminal_config(sources=_entries(make_entry, "a", "broken"))
+    registry.reload(terminal)
+    order.clear()
+    # 実行
+    registry.reload_changed(terminal)
+    # 検証
+    assert order == ["broken"]

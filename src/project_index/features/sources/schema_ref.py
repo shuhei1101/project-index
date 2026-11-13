@@ -102,7 +102,7 @@ def read_schema_ref(ref: SchemaRef, *, lookup: SchemaRefLookup) -> RefSchema:
     if not is_dict(raw):
         msg = f"{ref.path} を読み込めません"
         raise SchemaRefError(msg)
-    # 同じ commit のファイルを読み、読めなかったパスを控える
+    # 同じ commit のファイルを読み、読めなかったパスを記録する
     missing: list[str] = []
 
     def read(path: str) -> str | None:

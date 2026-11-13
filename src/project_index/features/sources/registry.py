@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import dataclasses
 import logging
 import threading
 from typing import TYPE_CHECKING
@@ -59,6 +60,9 @@ class SourceRegistry:
         self._rows_done: list[threading.Event] = []
         self._requested: list[int] = []
         self._on_waiting = on_waiting
+        # 裏のスレッドで default_ref の commit を確認している配信元の ID
+        self._refreshing: set[str] = set()
+        self._refreshing_lock = threading.Lock()
 
     @property
     def loading(self) -> bool:
@@ -230,6 +234,7 @@ class SourceRegistry:
             sources = dict(current)
             entries = dict(self._entries)
             statuses = [item for item in current_statuses if item.index != index]
+            replaced: ServedSource | None = None
             if served is not None and served.id in entries:
                 other_entry, other = entries[served.id]
                 if other < index:
@@ -238,14 +243,8 @@ class SourceRegistry:
                     served = None
                 else:
                     # 後の位置の行が先に読み込まれていたので、その行を外す
-                    statuses = [
-                        _duplicate_status(served.id, other, other_entry)
-                        if item.index == other
-                        else item
-                        for item in statuses
-                    ]
-                    del sources[served.id]
-                    del entries[served.id]
+                    statuses = _drop_row(served.id, other, other_entry, sources, entries, statuses)
+                    replaced = served
             if served is not None:
                 sources[served.id] = served
                 entries[served.id] = (entry, index)
@@ -253,6 +252,9 @@ class SourceRegistry:
             statuses.sort(key=lambda item: item.index)
             self._entries = entries
             self._snapshot = (sources, statuses)
+            # 除外した行の文書をキャッシュに残さないよう、入れ替えた配信元でキャッシュを破棄させる
+            if replaced is not None and self._on_rebuilt is not None:
+                self._on_rebuilt(replaced)
 
     def reload(self, terminal: TerminalConfig) -> list[SourceStatus]:
         """端末の設定の全行を読み直し、一覧を差し替える。"""
@@ -291,6 +293,82 @@ class SourceRegistry:
                 sum(1 for status in statuses if status.status == "not_served"),
             )
             return statuses
+
+    def reload_changed(self, terminal: TerminalConfig) -> list[SourceStatus]:
+        """前に読んだ行と同じ行は今の配信元を使い回し、変わった行だけを読み込んで一覧を差し替える。"""
+        try:
+            return self._reload_changed(terminal)
+        finally:
+            self._release_waiters()
+
+    def _previous_rows(self) -> list[tuple[SourceEntry, ServedSource | None, SourceStatus]]:
+        """前に読んだ行ごとに、行と配信中の配信元（無ければ None）と状態を並べる。"""
+        sources, statuses = self._snapshot
+        by_index = {status.index: status for status in statuses}
+        rows: list[tuple[SourceEntry, ServedSource | None, SourceStatus]] = []
+        for index, entry in enumerate(self._rows):
+            status = by_index.get(index)
+            if status is None:
+                continue
+            owner = self._entries.get(status.id)
+            served = sources.get(status.id) if owner is not None and owner[1] == index else None
+            rows.append((entry, served, status))
+        return rows
+
+    def _reload_changed(self, terminal: TerminalConfig) -> list[SourceStatus]:
+        """変わった行だけを読み、一覧を差し替える（例外のときは差し替えない）。"""
+        with self._reload_lock:
+            previous = self._previous_rows()
+            used: set[int] = set()
+            sources: dict[str, ServedSource] = {}
+            statuses: list[SourceStatus] = []
+            entries: dict[str, tuple[SourceEntry, int]] = {}
+            loaded: list[int] = []
+            lookup = terminal_lookup(terminal)
+            for index, entry in enumerate(terminal.sources):
+                reused = self._reuse(previous, used, entry)
+                # 前に読んだ同じ値の行があり、配信中か無効: 配信元と状態を使い回して位置だけ替える
+                if reused is not None:
+                    served, old = reused
+                    status = dataclasses.replace(old, index=index)
+                else:
+                    # 変わった行か、配信していなかった行: 読み込む
+                    served, status = load_source(entry, index=index, lookup=lookup)
+                    loaded.append(index)
+                # 配信する配信元の ID が先の行と重なるときは、後の行を外す
+                if served is not None and served.id in sources:
+                    status = _duplicate_status(served.id, index, entry)
+                    served = None
+                if served is not None:
+                    sources[served.id] = served
+                    entries[served.id] = (entry, index)
+                statuses.append(status)
+            self._entries = entries
+            self._lookup = lookup
+            self._snapshot = (sources, statuses)
+            with self._waiters_lock:
+                self._rows = list(terminal.sources)
+                self._rows_done = [threading.Event() for _ in self._rows]
+            logger.info(
+                "変わった行の配信元を読み直した（読んだ行: %s・配信中: %s）", loaded, list(sources)
+            )
+            return statuses
+
+    @staticmethod
+    def _reuse(
+        previous: list[tuple[SourceEntry, ServedSource | None, SourceStatus]],
+        used: set[int],
+        entry: SourceEntry,
+    ) -> tuple[ServedSource | None, SourceStatus] | None:
+        """前に読んだ行のうち、値が同じで使っていない行の配信元と状態を返す（`not_served` は使い回さない）。"""
+        for position, (old_entry, served, status) in enumerate(previous):
+            if position in used or old_entry != entry:
+                continue
+            if status.status == "not_served":
+                return None
+            used.add(position)
+            return served, status
+        return None
 
     def get(self, source_id: str) -> ServedSource:
         """配信中の配信元を ID で引く。読み込んでいない行の ID は、その行の読み込みを待つ。"""
@@ -370,6 +448,41 @@ class SourceRegistry:
             return self.get(source.id)
         return served
 
+    def refresh_later(self, source_ids: Sequence[str]) -> list[threading.Thread]:
+        """配信元ごとの `default_ref` の確認と組み立て直しを裏のスレッドで実行し、待たずに戻る。"""
+        sources = self._snapshot[0]
+        starting: list[str] = []
+        with self._refreshing_lock:
+            for source_id in dict.fromkeys(source_ids):
+                source = sources.get(source_id)
+                # 確認中・配信していない・Git でない配信元は、新しく確認しない
+                if source_id in self._refreshing or source is None or source.config_commit is None:
+                    continue
+                self._refreshing.add(source_id)
+                starting.append(source_id)
+        threads = [
+            threading.Thread(
+                target=self._refresh_in_background,
+                args=(source_id,),
+                name=f"project-index-source-refresh-{source_id}",
+                daemon=True,
+            )
+            for source_id in starting
+        ]
+        for thread in threads:
+            thread.start()
+        return threads
+
+    def _refresh_in_background(self, source_id: str) -> None:
+        """裏のスレッドで配信元を引き直し（`default_ref` が進んでいれば組み立て直す）、確認中から除く。"""
+        try:
+            self.get(source_id)
+        except ProjectIndexError as error:
+            logger.warning("裏の確認に失敗した（%s・%s）", source_id, error)
+        finally:
+            with self._refreshing_lock:
+                self._refreshing.discard(source_id)
+
     def served(self) -> list[ServedSource]:
         """配信中の配信元を `sources[]` の順に返す。"""
         sources, statuses = self._snapshot
@@ -382,6 +495,23 @@ class SourceRegistry:
     def statuses(self) -> list[SourceStatus]:
         """`sources[]` の順の状態を返す。"""
         return self._snapshot[1]
+
+
+def _drop_row(
+    source_id: str,
+    index: int,
+    entry: SourceEntry,
+    sources: dict[str, ServedSource],
+    entries: dict[str, tuple[SourceEntry, int]],
+    statuses: list[SourceStatus],
+) -> list[SourceStatus]:
+    """配信中の行を ID の重複で除外し、その行の状態を重複の違反に差し替えた状態の並びを返却する。"""
+    del sources[source_id]
+    del entries[source_id]
+    return [
+        _duplicate_status(source_id, index, entry) if item.index == index else item
+        for item in statuses
+    ]
 
 
 def _duplicate_status(source_id: str, index: int, entry: SourceEntry) -> SourceStatus:

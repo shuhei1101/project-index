@@ -19,18 +19,38 @@ WARNINGS_LINE = "注意:"
 MEMO_WARNING = "memo: 管理用の YAML に無いファイルが 1 件"
 # 書き込みの後の裏の検査を待つ上限の秒数
 RECHECK_WAIT_SEC = 10
+SAMPLE_WHEN = ("規約を確かめるとき", "設計書を書く前")
+OTHER_WHEN = ("別のリポジトリの設計を確かめるとき", "別のリポジトリの API を呼ぶとき")
+# 裏の確認の後の反映を待つ上限の秒数と、問い合わせ直す間隔
+REFRESH_WAIT_SEC = 60
+REFRESH_POLL_SEC = 0.5
 
 
-def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]) -> None:
+def _when_line(*lines: str) -> str:
+    """配信元の設定の `when` の行を作る。"""
+    return "when:\n" + "".join(f"  - {line}\n" for line in lines)
+
+
+def test_normal(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
     """引数なしで、今の作業場所から使える配信元の一覧を返す（正常系）。"""
     # 準備
-    sample = make_source("sample")
+    config = sample_config_text(_when_line(*SAMPLE_WHEN))
+    sample = make_source("sample", sample_file_set(**{"project-index.yaml": config}))
     notes = make_source("notes", git=False, scope_read=[sample.folder])
     other = make_source("other")
     env = make_server(sample, notes, other)
     # 実行
     result = env.call("describe", cwd=str(sample.folder))
+    as_json = env.call("describe", cwd=str(sample.folder), format="json")
     # 検証
+    assert f"| {'<br>'.join(SAMPLE_WHEN)} |" in result.text
+    assert "| notes | read |  |  |" in result.text
+    assert [item.get("when") for item in as_json.data["sources"]] == [list(SAMPLE_WHEN), None]
     assert not result.is_error
     assert result.text.startswith(f"作業場所: {sample.folder}")
     assert "sample のクローン本体" in result.text.splitlines()[0]
@@ -162,14 +182,28 @@ def test_normal_when_source(
 ) -> None:
     """source で配信元の説明書と種類の一覧を返す（正常系）。"""
     # 準備
-    config = sample_config_text("instructions: |-\n  " + INSTRUCTIONS + "\n")
+    config = sample_config_text(
+        "instructions: |-\n  " + INSTRUCTIONS + "\n" + _when_line(*SAMPLE_WHEN)
+    )
     sample = make_source("sample", sample_file_set(**{"project-index.yaml": config}))
-    env = make_server(sample)
+    plain = make_source("plain", scope_read=[sample.folder])
+    env = make_server(sample, plain)
     # 実行
     result = env.call("describe", cwd=str(sample.folder), source="sample")
+    as_json = env.call("describe", cwd=str(sample.folder), source="sample", format="json")
+    plain_result = env.call("describe", cwd=str(sample.folder), source="plain")
+    plain_json = env.call("describe", cwd=str(sample.folder), source="plain", format="json")
     # 検証
+    lines = result.text.splitlines()
     assert INSTRUCTIONS in result.text
     assert "| sample |" in result.text
+    assert lines.index("使う場面:") < lines.index(INSTRUCTIONS)
+    assert [f"- {line}" for line in SAMPLE_WHEN] == [
+        line for line in lines if line in {f"- {when}" for when in SAMPLE_WHEN}
+    ]
+    assert as_json.data["when"] == list(SAMPLE_WHEN)
+    assert "使う場面:" not in plain_result.text
+    assert "when" not in plain_json.data
 
 
 def test_normal_when_kind(
@@ -356,7 +390,9 @@ def test_normal_when_outside_list(
 ) -> None:
     """source を省いた outside_scope: true で、作業範囲の外で読める配信元の一覧を添える（正常系）。"""
     # 準備
-    config = sample_config_text(name="other", description=OTHER_DESCRIPTION)
+    config = sample_config_text(
+        _when_line(*OTHER_WHEN), name="other", description=OTHER_DESCRIPTION
+    )
     sample = make_source("sample")
     notes = make_source("notes", git=False, scope_read=[sample.folder])
     other = make_source("other", sample_file_set(**{"project-index.yaml": config}))
@@ -375,14 +411,60 @@ def test_normal_when_outside_list(
     head, outside = result.text.split(OUTSIDE_LINE)
     assert "| sample | write（作業中） |" in head
     assert "| notes | read |" in head
-    assert f"| other | {OTHER_DESCRIPTION} |" in outside
+    assert f"| other | {OTHER_DESCRIPTION} | {'<br>'.join(OTHER_WHEN)} |" in outside
     assert "| sample |" not in outside
     assert "| notes |" not in outside
     assert "| closed |" not in outside
-    assert as_json.data["outside_sources"] == [{"id": "other", "description": OTHER_DESCRIPTION}]
+    assert as_json.data["outside_sources"] == [
+        {"id": "other", "description": OTHER_DESCRIPTION, "when": list(OTHER_WHEN)}
+    ]
     assert as_json.data["sources"] == plain_json.data["sources"]
     assert logged == []
     assert OUTSIDE_LINE not in listed.text
+
+
+def _sample_when(env: Any, cwd: str, **arguments: Any) -> list[str] | None:
+    """引数なしの一覧（`outside_scope` は引数のまま）の sample の `when` を返す。"""
+    data = env.call("describe", cwd=cwd, format="json", **arguments).data
+    rows = [*data["sources"], *data.get("outside_sources", [])]
+    return next(row.get("when") for row in rows if row.get("id", row.get("source_id")) == "sample")
+
+
+def test_normal_when_source_when_changed(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    commit_all: Callable[..., str],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """default_ref に when の書き換えを commit した後の一覧が、裏の確認の後に書き換えた when を返す（正常系）。
+
+    待たずに応答することと確認の重複の抑止は、単体テスト `test_describe_when_refresh_requested`・
+    `test_source_registry_refresh_later_when_running` が確かめる。
+    """
+    # 準備
+    config = sample_config_text(_when_line("前の使う場面"))
+    sample = make_source("sample", sample_file_set(**{"project-index.yaml": config}))
+    other = make_source("other")
+    env = make_server(sample, other)
+    cwd = str(sample.folder)
+    other_cwd = str(other.folder)
+    before = _sample_when(env, cwd)
+    commit_all(
+        sample.folder, {"project-index.yaml": sample_config_text(_when_line("後の使う場面"))}
+    )
+    # 実行
+    first = _sample_when(env, cwd)
+    deadline = time.monotonic() + REFRESH_WAIT_SEC
+    after = first
+    while after != ["後の使う場面"] and time.monotonic() < deadline:
+        time.sleep(REFRESH_POLL_SEC)
+        after = _sample_when(env, cwd)
+    outside = _sample_when(env, other_cwd, outside_scope=True)
+    # 検証
+    assert before == ["前の使う場面"]
+    assert after == ["後の使う場面"]
+    assert outside == ["後の使う場面"]
 
 
 def test_normal_when_refs_and_worktrees(

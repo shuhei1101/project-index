@@ -4,7 +4,53 @@ from pathlib import Path
 
 from project_index.features.access.types import SourceAccess, Workplace
 from project_index.features.describe.render import render_describe_markdown
-from project_index.features.describe.types import KindSchemaResult, OutsideSource, SourceListResult
+from project_index.features.describe.types import (
+    KindSchemaResult,
+    OutsideSource,
+    SourceGuideResult,
+    SourceListResult,
+)
+
+
+def test_render_describe_markdown_when_source_when() -> None:
+    """使う場面の列と見出し（正常系）。"""
+    # 準備
+    listed = SourceListResult(
+        workplace=Workplace(cwd=Path("/w/sample"), source_id="sample", worktree=None),
+        sources=[
+            SourceAccess(
+                source_id="sample",
+                access="write",
+                current=True,
+                description="サンプル",
+                when=["規約を確かめるとき", "設計書を書く前"],
+            ),
+            SourceAccess(source_id="notes", access="read", current=False, description="メモ"),
+        ],
+        outside_sources=[OutsideSource(id="other", description="別", when=["別を引くとき"])],
+    )
+    guide = SourceGuideResult(
+        source_id="sample",
+        instructions="着手前に規約を引く",
+        kinds=[],
+        when=["規約を確かめるとき", "設計書を書く前"],
+    )
+    plain = SourceGuideResult(source_id="sample", instructions="着手前に規約を引く", kinds=[])
+    # 実行
+    listed_markdown = render_describe_markdown(listed)
+    guide_lines = render_describe_markdown(guide).splitlines()
+    plain_markdown = render_describe_markdown(plain)
+    # 検証
+    assert "| source | 権限 | description | when |" in listed_markdown
+    assert "| sample | write（作業中） | サンプル | 規約を確かめるとき<br>設計書を書く前 |" in (
+        listed_markdown
+    )
+    assert "| notes | read | メモ |  |" in listed_markdown
+    assert "| other | 別 | 別を引くとき |" in listed_markdown
+    assert guide_lines.index("使う場面:") < guide_lines.index("着手前に規約を引く")
+    assert "- 規約を確かめるとき" in guide_lines
+    assert "- 設計書を書く前" in guide_lines
+    assert "使う場面:" not in plain_markdown
 
 
 def test_render_describe_markdown() -> None:
@@ -38,7 +84,7 @@ def test_render_describe_markdown_when_warnings() -> None:
     quiet_markdown = render_describe_markdown(quiet)
     # 検証
     lines = markdown.splitlines()
-    assert lines.index("注意:") > lines.index("| sample | write（作業中） | サンプル |")
+    assert lines.index("注意:") > lines.index("| sample | write（作業中） | サンプル |  |")
     assert "- 警告です" in lines
     assert "注意:" not in quiet_markdown
 

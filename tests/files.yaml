@@ -63,6 +63,15 @@ files:
   related:
   - to: IF-7
     type: tests
+- path: integration/server/test_delete_settings_source.py
+  name: 端末の設定の配信元の 1 行の削除の結合テスト
+  description: '`delete_settings_source` の結合テストを受け持ち、端末の設定の配信元の 1 行の削除の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-34
+    type: tests
 - path: integration/server/test_describe.py
   name: 配信元の説明の結合テスト
   description: '`describe` の結合テストを受け持ち、配信元の説明の振る舞いのテストを修正するときに参照する。'
@@ -188,6 +197,15 @@ files:
   - tool:pytest
   related:
   - to: IF-16
+    type: tests
+- path: integration/server/test_patch_settings_source.py
+  name: 端末の設定の配信元の 1 行の変更の結合テスト
+  description: '`patch_settings_source` の結合テストを受け持ち、端末の設定の配信元の 1 行の変更の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-33
     type: tests
 - path: integration/server/test_prompt_doc.py
   name: プロンプトの文書の変換の結合テスト
@@ -409,7 +427,7 @@ files:
   - to: src/project_index/features/convert/decisions.py
     type: tests
 - path: unit/project_index/features/convert/test_service.py
-  name: '`converters[]` の実行と結果の控えの単体テスト'
+  name: '`converters[]` の実行と結果のキャッシュの単体テスト'
   description: 変換の service.py の単体テストを受け持ち、変換の service.py のテストを修正するときに参照する。
   tags:
   - topic:変換

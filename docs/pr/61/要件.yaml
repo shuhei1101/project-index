@@ -1,0 +1,11 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: run_only
+    detail: 起動時の配信元の行ごとの読み込みで ID が重なった行を入れ替える処理を変えるため、起動の流れを壊していないかを確かめる
+    depends_on: []
+scope_out:
+  - item: 文書のストアの控えを配信元の ID ごとに捨てる（今の discard_source_caches は全ての控えを捨てる）
+    reason: 設定の誤りのときだけ通る経路で、既存の on_rebuilt と同じ全件の破棄で事象は直る。ID ごとの破棄はストアの持ち方の変更になり要望に含まれない
+    plan: none
+docs: []

@@ -10,12 +10,12 @@ diagrams:
         direction TD
         画面の構成の書き込み ..> nav の条件の数え
         画面の構成の書き込み ..> nav の条件の確かめ
-        配信元の検査の控え ..> nav の警告
+        配信元の検査のキャッシュ ..> nav の警告
         nav の警告 ..> nav の条件の数え
         class 画面の構成の書き込み {
           <<function>>
         }
-        class 配信元の検査の控え {
+        class 配信元の検査のキャッシュ {
           <<class>>
         }
         class nav の条件の数え {
@@ -28,7 +28,7 @@ diagrams:
           <<function>>
         }
         click 画面の構成の書き込み href "./MOD-10.py.yaml#画面の構成の書き込み"
-        click 配信元の検査の控え href "./MOD-21.py.yaml#配信元の検査の控え"
+        click 配信元の検査のキャッシュ href "./MOD-21.py.yaml#配信元の検査のキャッシュ"
 functions:
   - name: nav_auto_counts
     title: nav の条件の数え

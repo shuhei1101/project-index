@@ -30,7 +30,7 @@ flows:
     expected:
       - '`kind` が `note`、`converter` が変換スクリプトのパス'
       - '`markdown` がスクリプトの出力と同じ'
-      - 配信元のフォルダと変換の控えのフォルダが変わらない
+      - 配信元のフォルダと変換のキャッシュのフォルダが変わらない
     test: test_normal
   - name: 異常系（ファイルが範囲に無い・DocumentNotFoundError）
     summary: どの文書の種類にも当たらないファイルを指すと断る
@@ -167,7 +167,7 @@ lead: 配信元の 1 つのファイルを配信と同じ変換で Markdown に�
 identifier: try_convert
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true
-side_effects: なし（変換スクリプトを実行するが、ファイルと変換の控えは書かない）
+side_effects: なし（変換スクリプトを実行するが、ファイルと変換のキャッシュに保存しない）
 callers:
   - SC-10#scenarios[正常シナリオ]
 exclusivity: '読み取りだけで排他しない（`readOnlyHint: true`）'

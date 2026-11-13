@@ -66,13 +66,21 @@ def _source_list(
     # outside_scope を渡したときだけ、作業範囲の外で読める配信元を添える
     outside_sources = (
         [
-            OutsideSource(id=source.id, description=source.config.description)
+            OutsideSource(
+                id=source.id,
+                description=source.config.description,
+                when=list(source.config.when),
+            )
             for source in outside_readable_sources(request.cwd, registry=registry)
         ]
         if request.outside_scope
         else None
     )
     available = available_sources(request.cwd, registry=registry)
+    # 一覧に出した配信元の default_ref の進みは、待たずに裏で取り込む
+    registry.refresh_later(
+        [item.source_id for item in available] + [item.id for item in outside_sources or []]
+    )
     return SourceListResult(
         workplace=describe_workplace(request.cwd, registry=registry),
         sources=available,
@@ -104,6 +112,7 @@ def _source_guide(store: DocumentStore, target: Target) -> SourceGuideResult:
     return SourceGuideResult(
         source_id=source.id,
         instructions=source.config.instructions,
+        when=list(source.config.when),
         kinds=kinds,
         outside_scope=target.outside_scope,
         refs=refs,

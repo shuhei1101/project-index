@@ -397,6 +397,7 @@ def build_source_config(value: dict[str, Any]) -> SourceConfig:
         name=value["name"],
         description=value.get("description", ""),
         instructions=value.get("instructions", ""),
+        when=list(value.get("when", [])),
         documents=[_build_table(row) for row in value.get("documents", [])],
         validators=[_build_script(row) for row in value.get("validators", [])],
         converters=[_build_script(row) for row in value.get("converters", [])],

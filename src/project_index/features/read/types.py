@@ -111,6 +111,8 @@ class DocumentListItem(ApiModel):
     tags: list[str] = Field(default_factory=list[str])
     visibility: str | None = None
     body_path: str | None = None
+    # 中のキーは `METADATA_KEYS` の名前のまま返すため辞書で持つ
+    common_keys: dict[str, Any] | None = None
 
 
 class DocumentListEntry(DocumentListItem):

@@ -163,7 +163,7 @@ class _Session:
         return found
 
     def commit(self, path: str, text: str | None, table: DocumentTable) -> None:
-        """新しい内容を控え、今の文書をそれに差し替える。"""
+        """新しい内容を記録し、今の文書をそれに差し替える。"""
         self.pending[path] = text
         self.docs = {
             doc_id: document
@@ -174,7 +174,7 @@ class _Session:
             self.docs.update({d.id: d for d in self.build(path, text, table)})
 
     def write_pending(self) -> list[Path]:
-        """控えた内容をファイルへ書き、消す予定のファイルを消して、触ったパスを返す。"""
+        """記録した内容をファイルへ書き、消す予定のファイルを消して、触ったパスを返す。"""
         touched: list[Path] = []
         for path, text in self.pending.items():
             absolute = self.target.base / path
@@ -341,7 +341,7 @@ def _check_and_commit(
     new: bool,
     previous: Mapping[str, Any] | None,
 ) -> tuple[Document, list[UncheckedKey]]:
-    """新しい内容を文書にして検査し、通れば控える（点検できなかった Markdown のキーも返す）。"""
+    """新しい内容を文書にして検査し、通れば記録する（点検できなかった Markdown のキーも返す）。"""
     documents = session.build(path, text, table)
     if not documents:
         raise ValidationFailedError(
@@ -544,7 +544,7 @@ def _apply_one(
     created_ids: set[str],
     now: datetime,
 ) -> tuple[WriteResultItem, DocumentTable]:
-    """操作 1 件を当てて検査し、通れば控える。"""
+    """操作 1 件を当てて検査し、通れば記録する。"""
     if operation.op == "create":
         return _apply_create_one(session, checker, operation, index, created_ids, now)
     return _apply_existing_one(session, checker, operation, index, last_reads, now)
@@ -558,7 +558,7 @@ def _apply_create_one(
     created_ids: set[str],
     now: datetime,
 ) -> tuple[WriteResultItem, DocumentTable]:
-    """`create` 1 件を当てて検査し、通れば控える。"""
+    """`create` 1 件を当てて検査し、通れば記録する。"""
     if operation.kind is None:
         msg = "create に kind がありません"
         raise RuntimeError(msg)
@@ -606,7 +606,7 @@ def _apply_existing_one(
     last_reads: Mapping[str, LastRead],
     now: datetime,
 ) -> tuple[WriteResultItem, DocumentTable]:
-    """`update`・`replace` 1 件を当てて検査し、通れば控える。"""
+    """`update`・`replace` 1 件を当てて検査し、通れば記録する。"""
     if operation.id is None:
         msg = "操作に id がありません"
         raise RuntimeError(msg)
@@ -730,7 +730,7 @@ def _delete_target(
 def _apply_unlinks(
     session: _Session, checker: DocumentChecker, unlink_plan: Mapping[str, set[str]]
 ) -> None:
-    """参照元の `related` から消す文書を指す行を除き、検査に通れば控える。"""
+    """参照元の `related` から消す文書を指す行を除き、検査に通れば記録する。"""
     target = session.target
     for referrer_id, removed in unlink_plan.items():
         referrer = session.docs[referrer_id]

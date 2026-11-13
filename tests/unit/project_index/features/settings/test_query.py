@@ -12,6 +12,7 @@ from project_index.features.settings.query import (
     listen_port,
     load_terminal_config,
     log_unknown_keys,
+    read_settings_file,
     state_dir_path,
     unknown_key_warnings,
     unknown_top_level_keys,
@@ -272,6 +273,45 @@ def test_listen_port_when_invalid(make_terminal_config: Callable[..., TerminalCo
     with pytest.raises(TerminalConfigInvalidError) as exc_info:
         listen_port(config, {"PROJECT_INDEX_PORT": "abc"})
     assert "PROJECT_INDEX_PORT" in exc_info.value.message
+
+
+def test_load_terminal_config_when_text_given(tmp_path: Path) -> None:
+    """渡した本文から端末の設定を作る（正常系）。"""
+    # 準備
+    path = tmp_path / "settings.yaml"
+    path.write_text(
+        'version: "1"\nclone: /tmp/clone\nsources:\n  - config: /tmp/a/project-index.yaml\n',
+        encoding="utf-8",
+    )
+    text = 'version: "1"\nclone: /tmp/clone\nsources:\n  - config: /tmp/b/project-index.yaml\n'
+    # 実行
+    result = load_terminal_config(path, text=text)
+    # 検証
+    assert result.sources[0].config == ["/tmp/b/project-index.yaml"]
+    assert result.file == path
+
+
+def test_read_settings_file(tmp_path: Path) -> None:
+    """本文と内容のバージョンを返す（正常系）。"""
+    # 準備
+    path = tmp_path / "settings.yaml"
+    path.write_text('version: "1"\nclone: /tmp/clone\n', encoding="utf-8")
+    # 実行
+    first = read_settings_file(path)
+    path.write_text('version: "1"\nclone: /tmp/clone\n# memo\n', encoding="utf-8")
+    second = read_settings_file(path)
+    # 検証
+    assert first == ('version: "1"\nclone: /tmp/clone\n', "fd1feb")
+    assert second == ('version: "1"\nclone: /tmp/clone\n# memo\n', "c0892c")
+
+
+def test_read_settings_file_when_missing(tmp_path: Path) -> None:
+    """ファイルが無い（異常系）。"""
+    # 準備
+    path = tmp_path / "missing.yaml"
+    # 実行・検証
+    with pytest.raises(FileNotFoundError, match=r"missing\.yaml"):
+        read_settings_file(path)
 
 
 def test_load_terminal_config_when_unknown_top_level_key(tmp_path: Path) -> None:

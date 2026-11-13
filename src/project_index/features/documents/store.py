@@ -267,7 +267,7 @@ class DocumentStore:
         def read(
             path: str, key: _RevisionKey, blob: str
         ) -> tuple[list[Document], list[LoadProblem]]:
-            """控えが新しければ控えを、古ければファイルを読み直して控える。"""
+            """キャッシュが新しければキャッシュを、古ければファイルを読み直してキャッシュする。"""
             with self._lock:
                 cached = self._revision_files.get(key)
             if cached is not None and _revision_fresh(
@@ -304,7 +304,7 @@ class DocumentStore:
     def _discard_revisions(
         self, owner: tuple[Path, str], table_id: str, seen: set[str], table_hash: str
     ) -> None:
-        """配信元の行の控えのうち、読んだファイルに無いものと行の定義が変わったものを捨てる。"""
+        """配信元の行のキャッシュのうち、読んだファイルに無いものと行の定義が変わったものを捨てる。"""
         with self._lock:
             for key in [
                 key
@@ -318,7 +318,7 @@ class DocumentStore:
     def _discard_files(
         self, root: Path, kind_ids: set[str], seen_keys: set[tuple[Path, str]]
     ) -> None:
-        """作業ツリーから消えたファイルの控えを捨てる。"""
+        """作業ツリーから消えたファイルのキャッシュを捨てる。"""
         with self._lock:
             for key in [
                 key
@@ -415,7 +415,7 @@ class DocumentStore:
     def _revision_schema(
         self, target: Target, schema_path: str, startup: dict[str, Any], base: Path
     ) -> dict[str, Any]:
-        """リビジョンの種類のスキーマを、commit とスキーマのファイルの相対パスで控えて返す。"""
+        """リビジョンの種類のスキーマを、commit とスキーマのファイルの相対パスでキャッシュして返す。"""
         source = target.source
         repo_root = source.repo_root or source.root
         commit = self._commit_of(target)
@@ -473,7 +473,7 @@ class DocumentStore:
 def _revision_fresh(
     cached: _CachedRevisionFile, blob: str, bodies: _BodyBlobs, stamps: _DateStamps
 ) -> bool:
-    """リビジョンのファイルの控えが、blob・本文の blob・日時とも変わらず、本文のファイルの欠けも無いか。"""
+    """リビジョンのファイルのキャッシュが、blob・本文の blob・日時とも変わらず、本文のファイルの欠けも無いか。"""
     return (
         cached[0] == blob
         and not any(issue.reason == "missing_body_file" for issue in cached[4])

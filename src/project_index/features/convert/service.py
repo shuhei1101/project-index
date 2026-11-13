@@ -1,4 +1,4 @@
-"""`converters[]` の実行と結果の控え。"""
+"""`converters[]` の実行と結果のキャッシュ。"""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ class ConvertService:
     def _cache_path(
         self, target: Target, document: Document, converter: str, run: list[str]
     ) -> Path:
-        """`converters[]` の結果の控えのファイルを返す。"""
+        """`converters[]` の結果のキャッシュのファイルを返す。"""
         # project-index が持つ変換（`project-index prompt-doc`）の出力は project-index の更新で変わるため、バージョンも含める
         parts = (
             target.source.id,
@@ -57,7 +57,7 @@ class ConvertService:
         return self.cache_dir / f"{name}.md"
 
     def _prune(self) -> None:
-        """控えが `CONVERT_CACHE_KEEP` を超えたら、更新日時が古いものから消す。"""
+        """キャッシュが `CONVERT_CACHE_KEEP` を超えたら、更新日時が古いものから消す。"""
         files = [item for item in self.cache_dir.glob("*.md") if item.is_file()]
         excess = len(files) - CONVERT_CACHE_KEEP
         if excess <= 0:
@@ -68,7 +68,7 @@ class ConvertService:
     def _run_converter(
         self, target: Target, document: Document, converter: str
     ) -> str | ConvertFailure:
-        """`converters[]` のスクリプトで Markdown にする（`cache` の行は控えがあればそれを使う）。"""
+        """`converters[]` のスクリプトで Markdown にする（`cache` の行はキャッシュがあればそれを使う）。"""
         entry = target.source.script("converters", converter)
         cache = self._cache_path(target, document, converter, entry.run) if entry.cache else None
         if cache is not None and cache.is_file():
@@ -97,7 +97,7 @@ class ConvertService:
             return ConvertFailure(
                 reason="not_runnable", kind=document.kind, script=script, detail=error.reason
             )
-        # `cache: false` の行の変換は控えを書かない
+        # `cache: false` の行の変換はキャッシュに保存しない
         if cache is not None:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             replace_file(cache, result.stdout)
@@ -119,7 +119,7 @@ class ConvertService:
         return Converted(markdown=produced)
 
     def clear(self) -> None:
-        """`cache_dir` の控えを全て消す。"""
+        """`cache_dir` のキャッシュを全て消す。"""
         if not self.cache_dir.is_dir():
             return
         for item in self.cache_dir.iterdir():
