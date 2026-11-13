@@ -231,6 +231,7 @@ class SourceRegistry:
             sources = dict(current)
             entries = dict(self._entries)
             statuses = [item for item in current_statuses if item.index != index]
+            replaced = False
             if served is not None and served.id in entries:
                 other_entry, other = entries[served.id]
                 if other < index:
@@ -247,6 +248,7 @@ class SourceRegistry:
                     ]
                     del sources[served.id]
                     del entries[served.id]
+                    replaced = True
             if served is not None:
                 sources[served.id] = served
                 entries[served.id] = (entry, index)
@@ -254,6 +256,9 @@ class SourceRegistry:
             statuses.sort(key=lambda item: item.index)
             self._entries = entries
             self._snapshot = (sources, statuses)
+            # 除外した行の文書をキャッシュに残さないよう、入れ替えた配信元でキャッシュを破棄させる
+            if replaced and served is not None and self._on_rebuilt is not None:
+                self._on_rebuilt(served)
 
     def reload(self, terminal: TerminalConfig) -> list[SourceStatus]:
         """端末の設定の全行を読み直し、一覧を差し替える。"""
