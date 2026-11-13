@@ -57,7 +57,8 @@ functions:
          - 参照先が `base` と別のファイルの場合、その `$ref` を、参照先の定義を最上位の `$defs` へ加えた名前を指す `#/$defs/{名前}` に書き換える（`$ref` 以外のキーはそのまま残す）
            - 名前は `{base のフォルダからの参照先のファイルの相対パス}#{参照先の JSON Pointer}`（例: `common.schema.yaml#/$defs/tree`）。種類のスキーマの最上位の `$defs` の名前と重なる場合は、重ならなくなるまで末尾に `-{2 からの連番}` を付ける
            - `$ref` には、名前を JSON Pointer の 1 つの区切りとしてエスケープ（`~` → `~0`・`/` → `~1`）し、URL エンコードして入れる
-           - 加える定義は、参照先の定義を、たどっている途中の `$ref` をその参照先だけにした状態から解いたもの。同じ参照先は 1 回だけ加え、2 回目からは同じ名前を指す
+           - 加える定義は、参照先の定義を、たどっている途中の `$ref` をその参照先だけにした状態から解いたもの。同じ参照先は 1 回だけ加え、2 回目からは同じ名前を指す（名前は定義を解く前に登録する）
+           - `[warning]` は、手順 3 と同じく加える定義を解く途中の循環では出さない
       5. 参照先が無い・読めない場合、その `$ref` は解かずに残す
          - `[warning]` スキーマの参照を解けなかった（ファイル・`$ref`・理由）
     unit_tests:
@@ -84,7 +85,7 @@ functions:
         summary: 別のファイルの中で循環する参照
         condition: '`properties.tree` が `共通.schema.yaml#/$defs/tree`、`共通.schema.yaml` の `$defs.tree.properties.children.items` が `#/$defs/tree`。種類のスキーマの最上位の `$defs` は `tree` を持たない'
         mock: なし（`tmp_path`）
-        expected: '最上位の `$defs` に `共通.schema.yaml#/$defs/tree` の名前で `tree` の中身が加わり、`properties.tree.properties.children.items` と加えた定義の `properties.children.items` が、その名前を指す `$ref` になる。返したスキーマで jsonschema が入れ子の `children` を持つ値を検査でき、違反が無い'
+        expected: '最上位の `$defs` に `共通.schema.yaml#/$defs/tree` の名前で `tree` の中身が加わり、`properties.tree.properties.children.items` と加えた定義の `properties.children.items` が、その名前を指す `$ref` になる。返したスキーマで jsonschema が入れ子の `children` を持つ値を検査でき、違反が無い。`[warning]` が 1 件'
       - name: test_resolve_schema_refs_when_cycle_in_other_file_with_same_name
         case: 正常
         summary: 別のファイルの中で循環する参照と同じ名前の定義
