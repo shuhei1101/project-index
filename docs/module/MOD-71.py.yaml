@@ -224,11 +224,11 @@ data_models:
         default: '["write"]'
         description: '`validators[]` だけが使う'
       - name: cache
-        title: 変換の結果の控え
+        title: 変換の結果のキャッシュ
         type: bool
         access: 公開
         default: 'True'
-        description: '`converters[]` だけが使う。`False` の行の変換は控えを読まず書かない'
+        description: '`converters[]` だけが使う。`False` の行の変換は変換の結果のキャッシュを参照も保存もしない'
   - name: SourceConfig
     title: 配信元の設定
     container: project_index/features/sources/types.py
@@ -418,17 +418,17 @@ data_models:
         description: '`default_ref` から設定を読んだときの commit。Git でない配信元は `None`'
         default: None
       - name: scope_read
-        title: 読める作業場所
+        title: 参照できる作業場所
         type: list[str]
         access: 公開
         description: '`sources[].scope.read`'
       - name: scope_write
-        title: 読み書きできる作業場所
+        title: 参照と書き込みができる作業場所
         type: list[str]
         access: 公開
         description: '`sources[].scope.write`。無ければ `[str(config_root)]`'
       - name: outside_read
-        title: 作業範囲の外から読めるか
+        title: 作業範囲の外から参照できるか
         type: bool
         access: 公開
         description: '`sources[].outside_read`'

@@ -267,8 +267,8 @@ constraints:
   - item: 変換の制限時間
     constraint: '`converters[]` のスクリプトを制限時間で止める'
     decided_by: NFR-1#requirements[スクリプトの制限時間]
-  - item: 変換の結果の控え
-    constraint: '`converters[]` の行の `cache` が `true`（既定）なら、控えがあればスクリプトを動かさずに返し、無ければ動かして控えを書く。`false` なら控えを読まず書かず、要求のたびにスクリプトを動かす'
+  - item: 変換の結果のキャッシュ
+    constraint: '`converters[]` の行の `cache` が `true`（既定）なら、変換の結果のキャッシュがあればスクリプトを動かさずにキャッシュを返却し、無ければ動かしてキャッシュに保存する。`false` なら変換の結果のキャッシュを参照も保存もせず、要求のたびにスクリプトを動かす'
     notes: '控えのキーは本文の外のファイルを含まない。本文の外のファイルを読む変換は `cache: false` にする'
   - item: 読み直し
     constraint: ファイルの更新日時か大きさが変わった文書は、次の要求で読み直す

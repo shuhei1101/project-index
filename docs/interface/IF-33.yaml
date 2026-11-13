@@ -41,20 +41,20 @@ request:
     required: false
     default: なし（今の値を残す）
     location: body
-    description: この配信元を読める作業場所の glob
+    description: この配信元を参照できる作業場所の glob
     constraints: 空の文字列を含めない
   - name: source.scope.write
     type: list[str] | None
     required: false
     default: なし（今の値を残す）
     location: body
-    description: この配信元を読み書きできる作業場所の glob。`null` で既定（配信元のフォルダだけ）に戻す
+    description: この配信元を参照と書き込みができる作業場所の glob。`null` で既定（配信元のフォルダだけ）に戻す
   - name: source.outside_read
     type: bool
     required: false
     default: なし（今の値を残す）
     location: body
-    description: '`scope` に当たらない作業場所からも `outside_scope: true` で作業範囲の外（参考）として読めるか'
+    description: '`scope` に当たらない作業場所からも `outside_scope: true` で作業範囲の外（参考）として参照できるか'
 request_example: |-
   ```json
   {"expectedVersion": "a1b2c3", "source": {"outside_read": false}}

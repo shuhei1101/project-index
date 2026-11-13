@@ -159,7 +159,7 @@ response:
     description: 配信するか
   - name: sources[].scope
     type: '{read: list[str], write: list[str] | None}'
-    description: 読める・書ける作業場所の glob
+    description: 参照できる・参照と書き込みができる作業場所の glob
     notes: '`write` を省いた行は `null`（既定値の配信元のフォルダだけから書ける）'
   - name: sources[].status
     type: Literal['serving', 'not_served', 'disabled', 'pending_reload']
@@ -174,7 +174,7 @@ response:
     notes: 設定のバージョンが古いときだけ
   - name: sources[].outsideRead
     type: bool
-    description: '`scope` に当たらない作業場所からも `outside_scope: true` で作業範囲の外（参考）として読めるか（端末の設定の `outside_read`）'
+    description: '`scope` に当たらない作業場所からも `outside_scope: true` で作業範囲の外（参考）として参照できるか（端末の設定の `outside_read`）'
     notes: 書いていない行は `true`
   - name: version
     type: str
