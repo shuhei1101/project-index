@@ -318,7 +318,7 @@ class _Item:
 
 
 def _put_body(build: _Build, hit: _Hit, item: _Item) -> None:
-    """本文を返す（切り出し・抜粋・返し済みの印・文字数の切り詰め）。"""
+    """本文を返す（切り出し・抜粋・返却済みの印・文字数の切り詰め）。"""
     request = build.request
     document = hit.document
     body = document.body
@@ -419,7 +419,7 @@ def _seen_ids(
     targets: list[Target],
     window: list[_Hit],
 ) -> dict[str, set[str]]:
-    """この会話で同じバージョンの本文を返し済みの文書の ID を、配信元ごとに引く。"""
+    """この会話で同じバージョンの本文を返却済みの文書の ID を、配信元ごとに引く。"""
     returns_body = request.view == "full" or BODY in request.fields
     cuts_body = request.sections is not None or request.lines is not None
     if not returns_body or request.repeat_seen or request.snippets is not None or cuts_body:
@@ -531,7 +531,7 @@ def search_docs(
             f"max_chars {max_chars} で打ち切りました。cursor を指定して続きを取得するか、"
             "fields を絞るか view: ids で再取得してください"
         )
-    # sections・lines の呼び出しは返し済みに記録しない
+    # sections・lines の呼び出しは返却済みに記録しない
     if not build.cuts_body:
         _mark_returned(seen, key, targets, page.returned_bodies)
     return dataclasses.replace(
@@ -546,7 +546,7 @@ def search_docs(
 def _mark_returned(
     seen: SeenStore, key: SessionKey | None, targets: list[Target], returned: list[_Hit]
 ) -> None:
-    """本文を返した文書を、配信元ごとに返し済みとして記録する。"""
+    """本文を返した文書を、配信元ごとに返却済みとして記録する。"""
     for target in targets:
         documents = [hit.document for hit in returned if hit.target.source.id == target.source.id]
         seen.mark_returned(key, target.source.id, "body", documents)

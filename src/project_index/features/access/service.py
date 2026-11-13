@@ -301,6 +301,6 @@ def resolve_write_target(
         )
     # ワークツリーへ書くか
     if wt is not None:
-        # 書く: 種類・置き場所をそのワークツリーの設定で参照するため、配信元を読み直す
+        # 書く: 種類・配置先をそのワークツリーの設定で参照するため、配信元を読み直す
         item = load_source_at(item, wt)
     return Target(item, _base_of(item, wt), None, wt, "write")

@@ -111,7 +111,7 @@ def _commit_reader(root: Path, repo: Path, commit: str) -> ReadText:
 def _file_violation(
     read_text: ReadText, key_path: str, relative: str, what: str
 ) -> Violation | None:
-    """設定が指すファイルが配信元の下にあり、YAML として読めるかを確かめる。"""
+    """設定が指すファイルが配信元の下にあり、YAML として解析できるかを確かめる。"""
     if _outside_root(relative):
         return Violation(path=key_path, rule=f"配信元の外を指しています: {relative}")
     text = read_text(relative)
@@ -355,7 +355,7 @@ def _script_folders(
 
 
 def compare_config_version(version: str) -> Literal["same", "older", "newer"]:
-    """配信元の設定のバージョンをサーバーの読めるバージョンと比べる。"""
+    """配信元の設定のバージョンをサーバーの参照できるバージョンと比べる。"""
     mine, current = int(version), int(SOURCE_CONFIG_VERSION)
     if mine == current:
         return "same"
@@ -682,7 +682,7 @@ def load_source(
     if comparison == "older":
         config_version = (config.version, SOURCE_CONFIG_VERSION)
         logger.warning(
-            "配信元の設定のバージョンが古い（%s・設定 %s・サーバーが読める %s）",
+            "配信元の設定のバージョンが古い（%s・設定 %s・サーバーが参照できる %s）",
             source_id,
             config.version,
             SOURCE_CONFIG_VERSION,

@@ -700,7 +700,7 @@ def wait_until_serving() -> Callable[..., None]:
 
 @pytest.fixture
 def migrations_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """移し替えの手順の置き場所を一時のフォルダに差し替え、そのフォルダを返す。"""
+    """移し替えの手順の配置先を一時のフォルダに差し替え、そのフォルダを返す。"""
     root = tmp_path / "migrations"
     root.mkdir()
     monkeypatch.setattr("project_index.features.migrate.types.MIGRATIONS_DIR", str(root))
@@ -724,7 +724,7 @@ def write_steps(migrations_root: Path) -> Callable[..., None]:
 
 @pytest.fixture
 def versions_2(monkeypatch: pytest.MonkeyPatch) -> None:
-    """project-index が読める端末の設定と配信元の設定のバージョンを `2` に差し替える。"""
+    """project-index が参照できる端末の設定と配信元の設定のバージョンを `2` に差し替える。"""
     for name in ("SETTINGS_VERSION", "SOURCE_CONFIG_VERSION"):
         for module in (
             "project_index.features.settings.query",

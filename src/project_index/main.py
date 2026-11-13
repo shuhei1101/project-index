@@ -63,7 +63,7 @@ class PortInUseError(OSError):
 
 @dataclass(frozen=True)
 class Handlers:
-    """入口（読み取り API・MCP）が使う部品を 1 回だけ作って束ねたもの。"""
+    """入口（読み取り API・MCP）が使う部品を 1 回だけ作ってまとめたもの。"""
 
     terminal: TerminalConfig
     registry: SourceRegistry
@@ -344,7 +344,7 @@ def check_sources(
 ) -> None:
     """渡した配信元ごとに検査して結果を持たせ、ずれと警告をログに書く。"""
     for source in sources:
-        # 検査の結果をキャッシュに持たせ、`describe` の警告が読めるようにする
+        # 検査の結果をキャッシュに持たせ、`describe` の警告が参照できるようにする
         check = checks.refresh(store, source)
         report = check.report
         for label, values in (

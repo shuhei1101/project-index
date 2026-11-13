@@ -207,7 +207,7 @@ class SearchItem:
     source: str | None
     values: dict[str, Any]
     snippets: list[Snippet] = field(default_factory=list[Snippet])
-    # 文書の場所と返した範囲。`ref` を渡した呼び出し・返し済み・本文を扱わない view では `None`
+    # 文書の場所と返した範囲。`ref` を渡した呼び出し・返却済み・本文を扱わない view では `None`
     path: str | None = None
     scope: Literal["full", "section", "summary"] | None = None
     # `sections`・`lines` で切り出した本文の行の範囲（渡さない呼び出しでは `None`、範囲が無ければ空）

@@ -223,7 +223,7 @@ def test_describe_when_outside_list(
     make_source_config: Callable[..., SourceConfig],
     make_registry: Callable[..., SourceRegistry],
 ) -> None:
-    """作業範囲の外で読める配信元の一覧（正常系）。"""
+    """作業範囲の外で参照できる配信元の一覧（正常系）。"""
     # 準備
     notes = make_served_source(
         id="notes", root=Path("/w/notes"), scope_read=[str(folder_source.root)], scope_write=[]
@@ -254,7 +254,7 @@ def test_describe_when_outside_list_empty(
     make_served_source: Callable[..., ServedSource],
     make_registry: Callable[..., SourceRegistry],
 ) -> None:
-    """作業範囲の外で読める配信元が無い（正常系）。"""
+    """作業範囲の外で参照できる配信元が無い（正常系）。"""
     # 準備
     notes = make_served_source(
         id="notes", root=Path("/w/notes"), scope_read=[str(folder_source.root)], scope_write=[]

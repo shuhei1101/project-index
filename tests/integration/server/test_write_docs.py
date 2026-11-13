@@ -755,7 +755,7 @@ def test_error_when_placement_excluded(
     sample_file_set: Callable[..., dict[str, str]],
     sample_config_text: Callable[..., str],
 ) -> None:
-    """create で決めた置き場所のファイル名が exclude に当たるとき、何も書かずに断る（異常系）。"""
+    """create で決めた配置先のファイル名が exclude に当たるとき、何も書かずに断る（異常系）。"""
     # 準備
     rule_row = (
         "  - id: rule\n"

@@ -28,7 +28,7 @@ def test_new_document_path() -> None:
 
 
 def test_new_document_path_when_excluded() -> None:
-    """置き場所が除外の名前に当たる（異常系）。"""
+    """配置先が除外の名前に当たる（異常系）。"""
     # 準備
     table = DocumentTable(
         id="sample",
