@@ -23,12 +23,24 @@ docs:
     updated_by: planner
     updated_at: '2026-11-13T01:36:13.760276+00:00'
 scope_out:
-  - item: 各リポジトリ（knowledge・mdmark・claude-balancer・ai-monitor・alias-inject）の配信元の設定への `when` の記載
-    reason: 起点 Issue の本文のとおり、`when` を含むスキーマのリリース後に各リポジトリの別の Issue で行う
-    plan: to_file
   - item: SessionStart での配信元の `when` の案内
     reason: shuhei1101/dev-docs#92 で SessionStart の配信元の案内を廃止したため、D-152 の決定のうち SessionStart の部分は行わない
     plan: none
   - item: 読み取り API の配信元の設定の取得（IF-23）・配信元の一覧（IF-22）の応答への `when` の追加
     reason: 要望はエージェントへの案内（`describe`・instructions）で、画面のサーバーの読み取り API は含まない。IF-23 は設定のうち `nav`・`documents`・`decisions.folders`・`github`・`diff.ignore_keys`・`schemas` だけを返却し、`description` も返却しないため、`when` も加えない
     plan: none
+  - item: knowledge の配信元の設定への `when` の記載
+    reason: 起点 Issue の本文のとおり、`when` を含むスキーマのリリース後に各リポジトリの別の Issue で行う
+    plan: shuhei1101/knowledge#315
+  - item: mdmark の配信元の設定への `when` の記載
+    reason: 起点 Issue の本文のとおり、`when` を含むスキーマのリリース後に各リポジトリの別の Issue で行う
+    plan: shuhei1101/mdmark#519
+  - item: claude-balancer の配信元の設定への `when` の記載
+    reason: 起点 Issue の本文のとおり、`when` を含むスキーマのリリース後に各リポジトリの別の Issue で行う
+    plan: shuhei1101/claude-balancer#285
+  - item: ai-monitor の配信元の設定への `when` の記載
+    reason: 起点 Issue の本文のとおり、`when` を含むスキーマのリリース後に各リポジトリの別の Issue で行う
+    plan: shuhei1101/ai-monitor#3417
+  - item: alias-inject の配信元の設定への `when`・`description` の記載
+    reason: 起点 Issue の本文のとおり、`when` を含むスキーマのリリース後に各リポジトリの別の Issue で行う
+    plan: shuhei1101/alias-inject#92
