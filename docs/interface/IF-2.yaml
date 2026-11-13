@@ -708,6 +708,60 @@ flows:
       - '`view: count, group_by: tags` が `MCP` 2・`設計` 2 を返す（`mcp`・`MCP` は 1 つにまとめ、表記は同数なので値の昇順で先の `MCP`）'
       - '`fields: [tags, main_tags]` が文書 1 で `tags: [mcp, 設計]`・`main_tags: [mcp]` を返す'
     test: test_normal_when_tags_are_objects
+  - name: 正常系（$defs の中の相対パスの参照）
+    summary: 種類のスキーマの `$defs` の中にある相対パスの `$ref` を解決して検査し、文書を返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 参照を持つスキーマ
+        description: 'sample の種類のスキーマが `$defs.entry` を持ち、`$defs.entry` は `summary` を `common.schema.yaml#/$defs/summary`（同じフォルダの別のファイル）で、`children.items` を `#/$defs/entry`（循環する参照）で指す。最上位の `properties.entries.items` は `#/$defs/entry`'
+        notes: 文書 1 は `entries` に入れ子の `children` を持ち、スキーマに合う
+    flow: |-
+      <!-- map: {"title": "正常系（$defs の中の相対パスの参照）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+
+        C->>T: filter: id eq 文書 1
+        T->>T: $defs の中の common.schema.yaml の参照を解決し、文書 1 を検査する
+        T-->>C: 文書 1
+      ```
+
+      <!-- /map -->
+    expected:
+      - 結果に文書 1 がある
+      - '`notes` に文書 1 の違反が無い'
+      - '`isError` ではない'
+    test: test_normal_when_relative_ref_in_defs
+  - name: 正常系（スキーマの参照を解決できない）
+    summary: 種類のスキーマの `$ref` の参照先が無い文書も返し、解決できなかった参照を `notes` で知らせる
+    setup:
+      - name: Mock
+        description: なし
+      - name: 参照先の無いスキーマ
+        description: 'sample の種類のスキーマの `$defs.entry.properties.summary` が、無いファイル `missing.schema.yaml#/$defs/summary` を指す。最上位の `properties.entries.items` は `#/$defs/entry`'
+        notes: 文書 1 は `entries` に `summary` を持つ要素を持つ（検査が `$defs.entry` の参照へ当たる）
+    flow: |-
+      <!-- map: {"title": "正常系（スキーマの参照を解決できない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+
+        C->>T: filter: id eq 文書 1
+        T->>T: 文書 1 を検査し、missing.schema.yaml の参照を解決できない
+        T-->>C: 文書 1 と、解決できなかった参照の知らせ
+      ```
+
+      <!-- /map -->
+    expected:
+      - 結果に文書 1 がある
+      - '`notes` に、文書 1 の ID と、解決できなかった `$ref`（`missing.schema.yaml#/$defs/summary`）と、スキーマのファイルのパスがある'
+      - '`isError` ではない'
+    test: test_normal_when_schema_ref_unresolvable
 lead: '条件に該当する文書の取得・一覧・件数・集計を返却する `search_docs` の入出力を定め、`search_docs` を修正するときに参照する。'
 identifier: search_docs
 permissions: 対象の配信元の `scope.read` か `scope.write` に `cwd` が当たること
@@ -1127,6 +1181,10 @@ constraints:
   - item: ID の既定
     constraint: メタデータの `id` が空なら、配信元の直下からのファイルのパス（拡張子付き）にする。`records` の要素は `body_file` が指すファイルのパス、`body_file` が無ければ `{管理用の YAML のパス}#{位置}`
     notes: 同じ名前で拡張子の違うファイルも別の文書になる
+  - item: スキーマの参照の解決
+    constraint: '種類のスキーマの `$ref` は、最上位の `$defs` の中の相対パスの `$ref` を含めて、スキーマのファイルのフォルダを基準に解決してから検査に当てる。循環する参照は `#/$defs/...` のまま検査に当てる'
+  - item: 解決できないスキーマの参照
+    constraint: '読み取りの検査で種類のスキーマの `$ref` を解決できない文書は、結果に含め、`notes` に文書の ID・解決できなかった `$ref`・スキーマのファイルのパスを入れる'
 refs:
   - SC-6#scenarios[正常シナリオ]
   - SC-9#scenarios[正常シナリオ]

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import ast
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
 from jsonschema import FormatChecker
 from jsonschema.validators import Draft202012Validator, validator_for
+from referencing.exceptions import Unresolvable
 
 from project_index.features.validation.rules import REQUIRED_MESSAGE, ROOT_PATH
 from project_index.features.write.types import WriteViolation
@@ -56,11 +58,13 @@ def attach_schema_hints(
     if schema:
         validator_class = validator_for(dict(schema), default=Draft202012Validator)
         validator = validator_class(dict(schema), format_checker=FormatChecker())
-        for error in validator.iter_errors(dict(data)):
-            hint = _hint(_definition(error))
-            if hint is not None:
-                path = format_path(error.absolute_path) or ROOT_PATH
-                hints.setdefault((path, error.message), hint)
+        # 解決できない `$ref` の違反は説明を持たないので、それまでに控えた説明だけで続ける
+        with suppress(Unresolvable):
+            for error in validator.iter_errors(dict(data)):
+                hint = _hint(_definition(error))
+                if hint is not None:
+                    path = format_path(error.absolute_path) or ROOT_PATH
+                    hints.setdefault((path, error.message), hint)
     return [
         WriteViolation(
             path=violation.path,

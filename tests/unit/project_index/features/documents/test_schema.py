@@ -67,6 +67,34 @@ def test_resolve_schema_refs_when_cycle(tmp_path: Path, caplog: pytest.LogCaptur
     assert len([r for r in caplog.records if r.levelno == logging.WARNING]) == 1
 
 
+def test_resolve_schema_refs_when_relative_ref_in_defs(
+    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """`$defs` の中の相対パスの参照と循環する参照（正常系）。"""
+    # 準備
+    write_files(tmp_path, {"schemas/共通.schema.yaml": "$defs:\n  summary:\n    type: string\n"})
+    schema = {
+        "$defs": {
+            "entry": {
+                "type": "object",
+                "properties": {
+                    "summary": {"$ref": "共通.schema.yaml#/$defs/summary"},
+                    "children": {"type": "array", "items": {"$ref": "#/$defs/entry"}},
+                },
+            }
+        },
+        "properties": {"entries": {"type": "array", "items": {"$ref": "#/$defs/entry"}}},
+    }
+    # 実行
+    result = resolve_schema_refs(schema, tmp_path / "schemas" / "layout.schema.yaml")
+    # 検証
+    entry = result["$defs"]["entry"]["properties"]
+    assert entry["summary"] == {"type": "string"}
+    assert entry["children"]["items"] == {"$ref": "#/$defs/entry"}
+    assert result["properties"]["entries"]["items"]["properties"]["summary"] == {"type": "string"}
+    assert "共通.schema.yaml" not in repr(result)
+
+
 def test_resolve_schema_refs_when_missing(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     """参照先が無い（正常系）。"""
     # 準備
