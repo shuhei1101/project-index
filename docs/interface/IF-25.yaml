@@ -29,7 +29,7 @@ flows:
     expected:
       - 200 で、`value` が YAML を読み込んだ値、`schema` が種類 `design` のスキーマ（`$ref` を解いた形）
       - '`metadata` が `id`・`kind`・`name`・`description`・`tags`・`visibility` を持つ'
-      - '`metadata.fields` が、文書の一覧（`fields=true`）の同じ文書の `fields` と同じ値'
+      - '`metadata.commonKeys` が、文書の一覧（`common_keys=true`）の同じ文書の `commonKeys` と同じ値'
       - '`markdown`・`conversionError`・`body`・`bodyPath` が `null`'
       - '`updatedAt` が文書を最後に変えた commit の日時'
     test: test_normal
@@ -223,8 +223,8 @@ response:
     notes: '`records` の行の文書は要素 1 つのスキーマに、ファイル全体のスキーマの最上位の `$defs` を加えたもの'
   - name: metadata
     type: DocumentMetadata
-    description: '`id`・`kind`・`name`・`description`・`tags`・`visibility` と、共通のキーの値 `fields`（文書の一覧の `documents[].fields` と同じ値）'
-    notes: '`fields` は常に入れる'
+    description: '`id`・`kind`・`name`・`description`・`tags`・`visibility` と、共通のキーの値 `commonKeys`（文書の一覧の `documents[].commonKeys` と同じ値）'
+    notes: '`commonKeys` は常に入れる'
   - name: body
     type: str | None
     description: 本文の文字列（管理用の YAML の行の文書だけ）
@@ -244,9 +244,9 @@ response:
 response_example: |-
   ```json
   {"source": "sample", "ref": "main", "path": "design/D-1.yaml",
-   "value": {"id": "D-1", "title": "タスクの保存"},
+   "value": {"id": "D-1", "title": "タスクの保存", "links": [{"to": "D-2"}]},
    "schema": {"type": "object", "required": ["id", "title"]},
-   "metadata": {"id": "D-1", "kind": "design", "name": "タスクの保存", "description": null, "tags": [], "visibility": "internal", "fields": {"id": "D-1", "name": "タスクの保存"}},
+   "metadata": {"id": "D-1", "kind": "design", "name": "タスクの保存", "description": null, "tags": [], "visibility": "internal", "commonKeys": {"id": "D-1", "name": "タスクの保存", "related": [{"to": "D-2"}], "alias_type": "term"}},
    "body": null, "bodyPath": null, "markdown": null, "conversionError": null,
    "updatedAt": "2026-11-12T10:30:00+09:00"}
   ```
@@ -275,5 +275,5 @@ constraints:
     constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
     decided_by: NFR-1#requirements[通信]
   - item: JSON のキー
-    constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名と、`value`・`schema`・`metadata.fields` の中身は変えない
+    constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名と、`value`・`schema`・`metadata.commonKeys` の中身は変えない
 test_file: tests/integration/server/test_get_document.py
