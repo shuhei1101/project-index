@@ -27,6 +27,7 @@ flows:
     expected:
       - 200 で、`ref` が `main`、`documents` に 3 件が並ぶ
       - 各要素が `id`・`path`・`kind`・`name`・`description`・`tags`・`visibility` を持ち、行の文書は `bodyPath` を持つ
+      - '`visibility` は文書の `visibility` の値で、文書が持たなければ `null`'
       - 各要素が `version` を持つ
     test: test_normal
   - name: 正常系（値を求める）
@@ -187,7 +188,7 @@ response:
     description: タグ
   - name: documents[].visibility
     type: str | None
-    description: 公開範囲
+    description: 公開範囲（共通のキー `visibility`）
   - name: documents[].bodyPath
     type: str | None
     description: 本文のファイルのパス（管理用の YAML の行の文書だけ）
@@ -206,8 +207,8 @@ response:
 response_example: |-
   ```json
   {"ref": "main", "documents": [
-    {"id": "D-1", "path": "design/D-1.yaml", "kind": "design", "name": "タスクの保存", "description": "タスクの保存と取得", "tags": ["topic:task"], "visibility": "internal", "bodyPath": null, "version": "3f2a9c", "value": {"id": "D-1", "title": "タスクの保存", "links": [{"to": "D-2"}]}, "commonKeys": {"id": "D-1", "name": "タスクの保存", "related": [{"to": "D-2"}], "alias_type": "term"}},
-    {"id": "guide.md", "path": "files.yaml", "kind": "files_guide", "name": "使い方", "description": null, "tags": [], "visibility": "public", "bodyPath": "guide.md", "version": "8b41d0", "value": {"path": "guide.md", "name": "使い方"}, "commonKeys": {"name": "使い方", "path": "guide.md"}}
+    {"id": "D-1", "path": "design/D-1.yaml", "kind": "design", "name": "タスクの保存", "description": "タスクの保存と取得", "tags": ["topic:task"], "visibility": "internal", "bodyPath": null, "version": "3f2a9c", "value": {"id": "D-1", "title": "タスクの保存", "links": [{"to": "D-2"}], "visibility": "internal"}, "commonKeys": {"id": "D-1", "name": "タスクの保存", "related": [{"to": "D-2"}], "alias_type": "term", "visibility": "internal"}},
+    {"id": "guide.md", "path": "files.yaml", "kind": "files_guide", "name": "使い方", "description": null, "tags": [], "visibility": "public", "bodyPath": "guide.md", "version": "8b41d0", "value": {"path": "guide.md", "name": "使い方", "visibility": "public"}, "commonKeys": {"name": "使い方", "path": "guide.md", "visibility": "public"}}
   ]}
   ```
 status_codes:
