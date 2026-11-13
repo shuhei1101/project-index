@@ -225,6 +225,12 @@ functions:
         mock: なし
         expected: '`MigrationFailedError` のメッセージに `documents[0].type` の違反と `/project-index:setup`。対象は元の内容のまま'
         exception: 新しいスキーマの違反
+      - name: test_apply_migration_when_unknown_top_level_key
+        case: 正常
+        summary: 最上位の知らないキーを残して移し替える
+        condition: '`version: "1"` で改名前のキーと、最上位に `mindstella: {threads: 3}` を持つ端末の設定'
+        mock: 手順の置き場所をテスト用のフォルダに monkeypatch
+        expected: '移し替えに成功し、書き換えた端末の設定の `mindstella` が `{threads: 3}` のまま'
     callers:
       - MOD-89#functions[run_migrate]
     callees:

@@ -177,7 +177,7 @@ scenarios:
         description: なし（実環境で実行）
       - name: 端末の設定
         description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
-        notes: '`sources[0]` に必須のキー `config` が無く、`port` が整数でない'
+        notes: '`sources[0]` に必須のキー `config` が無く、`port` が整数でない。`sources[0]` に知らないキー `enable`（`enabled` の打ち間違い）を持つ'
     flow: |-
       <!-- map: {"title": "異常シナリオ（端末の設定がスキーマに違反する）"} -->
 
@@ -195,7 +195,10 @@ scenarios:
     expected:
       - プロセスが 0 以外の終了コードで終わり、ポートを待ち受けない
       - '標準エラーに `{ファイル}: sources[0].config: 必須のキーが無い` の形で違反が全て並ぶ'
+      - 標準エラーの違反に、知らないキーのパス `sources[0].enable` が含まれる
     test: test_error_when_terminal_config_invalid
+    decisions:
+      - D-308
   - name: 異常シナリオ（ポートが使用中）
     setup:
       - name: Mock
@@ -597,6 +600,66 @@ scenarios:
       - 警告があっても配信を始める
       - 違反した文書は `search_docs` の `term`・`list_match_words` に載らない
     test: test_normal_when_alias_and_nav_warned
+  - name: 正常シナリオ（paths の基準のフォルダを指定する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: ノードの配信元
+        description: 'git リポジトリ repo の `content/node-docs/brain/project-index.yaml`。`paths_base: ../../..`（repo の直下）を持ち、`documents[0].paths` が `[docs/knowhow/*.yaml, content/node-docs/shared/*.yaml]`'
+        notes: id `brain`。スキーマは `content/node-docs/brain/` の下に配置し、設定ファイルのフォルダからの相対パスで指す
+      - name: repo の文書
+        description: '`docs/knowhow/a.yaml`・`content/node-docs/shared/b.yaml` と、`paths` に該当しない `docs/design/c.yaml`'
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に brain の 1 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
+        participant CF as 配信元の設定
+
+        U->>DD: project-index serve
+        DD->>CF: content/node-docs/brain/project-index.yaml を参照する
+        DD->>DD: paths_base を設定ファイルのフォルダから解き、repo の直下を paths の基準のフォルダにする
+        DD->>DD: documents の paths を基準のフォルダから解き、スキーマは設定ファイルのフォルダから解く
+        DD-->>U: brain を配信する
+      ```
+    expected:
+      - '`search_docs(source: brain)` が `docs/knowhow/a.yaml` と `content/node-docs/shared/b.yaml` の文書を返却し、`docs/design/c.yaml` の文書は返却しない'
+      - 返却した文書のパスが、基準のフォルダ（repo の直下）からの相対パスになる
+    test: test_normal_when_paths_base_set
+    decisions:
+      - D-189
+  - name: 正常シナリオ（端末の設定の最上位に知らないキーがある）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample の 1 行。最上位に project-index が知らないキー `mindstella`（入れ子の値を持つ）と `prot`（`port` の打ち間違い）を持つ'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        actor A as エージェント
+        participant DD as project-index
+
+        U->>DD: project-index serve
+        DD->>DD: 端末の設定をスキーマで検証し、最上位の知らないキーのパスを集める
+        DD->>DD: 知らないキーのパスを警告のログに残す
+        DD-->>U: sample を配信する
+        A->>DD: describe()
+        DD-->>A: 使用できる配信元と、知らないキーの警告
+      ```
+    expected:
+      - 読み取り API の sample の文書の取得が 200 を返却する
+      - 警告のログに、端末の設定のファイルと知らないキーのパス `mindstella`・`prot` が残る
+      - 引数なしの `describe()` の警告に、知らないキーのパス `mindstella`・`prot` が載る
+      - '`prot` の値は使用せず、`port` の既定で待ち受ける'
+    test: test_normal_when_terminal_config_has_unknown_top_level_key
+    decisions:
+      - D-308
 lead: 利用者が `project-index serve` で端末の設定の配信元を配信し始めるシナリオを定め、起動の流れを変えるときに参照する。
 issue: 14
 primary_actor: 利用者

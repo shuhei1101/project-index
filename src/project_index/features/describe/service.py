@@ -120,7 +120,7 @@ def _kind_schema(store: DocumentStore, target: Target, kind: str) -> KindSchemaR
     if not isinstance(table.schema_path, str):
         schema_text = _dump_yaml(schema)
     else:
-        schema_file = store.read_root(target) / table.schema_path
+        schema_file = store.read_root(target) / target.source.config_path(table.schema_path)
         if schema_file.is_file():
             schema_text = schema_file.read_text(encoding="utf-8")
     return KindSchemaResult(

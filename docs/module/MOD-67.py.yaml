@@ -139,6 +139,12 @@ data_models:
         access: 公開
         default: 非機能要件の `script_timeout` の決定値
         description: 検査・変換・生成のスクリプト 1 回の上限（秒）
+      - name: unknown_keys
+        title: 最上位の知らないキー
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: スキーマの `properties` に無い最上位のキー（ファイルの順）。値は持たない
   - name: SettingsSourcesRequest
     title: 配信元の保存の要求
     container: project_index/features/settings/types.py
@@ -152,19 +158,42 @@ data_models:
         type: list[SourceEntry]
         access: 公開
         description: 保存する `sources[]` の全行
+  - name: SettingsWarning
+    title: 端末の設定の警告
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定
+    role: DTO
+    summary: 端末の設定の API の応答の `warnings[]` の 1 件
+    description: 共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。
+    properties:
+      - name: path
+        title: キーのパス
+        type: str
+        access: 公開
+        description: 端末の設定の最上位の知らないキー
+      - name: reason
+        title: 理由
+        type: str
+        access: 公開
+        description: '`UNKNOWN_KEY_REASON`'
   - name: SettingsSourcesResponse
     title: 配信元の保存の応答
     container: project_index/features/settings/types.py
     usecase: 端末の設定
     role: DTO
     summary: 再読み込みした後の配信元ごとの状態
-    description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。`from_statuses(statuses)` で配信元の状態の並びから作る。'
+    description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。`from_statuses(statuses, warnings=[])` で配信元の状態の並びと警告から作る。'
     properties:
       - name: sources
         title: 配信元
         type: list[SourceStatusItem]
         access: 公開
         description: '`id`・`status`（`serving` / `not_served` / `disabled`）・`errors[]`（`{path, reason}`。`not_served` のときだけ）・`config_version`（`{config, server}`。設定のバージョンが古いときだけ）'
+      - name: warnings
+        title: 警告
+        type: list[SettingsWarning]
+        access: 公開
+        description: 端末の設定の最上位の知らないキーの警告。無ければ空
   - name: SettingsSourceRow
     title: 配信元の行と状態
     container: project_index/features/settings/types.py
@@ -233,6 +262,11 @@ data_models:
         type: list[SettingsSourceRow]
         access: 公開
         description: '`sources[]` の行の順'
+      - name: warnings
+        title: 警告
+        type: list[SettingsWarning]
+        access: 公開
+        description: 端末の設定の最上位の知らないキーの警告。無ければ空
   - name: SettingsSourceAddRequest
     title: 1 行の追加の要求
     container: project_index/features/settings/types.py
@@ -292,6 +326,11 @@ data_models:
         type: list[SourceStatusItem]
         access: 公開
         description: '`added` のとき、読み直した後の状態'
+      - name: warnings
+        title: 警告
+        type: list[SettingsWarning]
+        access: 公開
+        description: 端末の設定の最上位の知らないキーの警告。無ければ空
 classes:
   - name: TerminalConfigInvalidError
     title: 端末の設定の違反

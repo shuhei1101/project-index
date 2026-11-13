@@ -57,7 +57,7 @@ class DocumentChecker:
         try:
             result = run_script(
                 entry.run,
-                cwd=target.base,
+                cwd=target.config_base,
                 stdin=document.body,
                 timeout_sec=self.timeout_sec,
                 at=script_at(target),

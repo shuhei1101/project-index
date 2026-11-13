@@ -138,6 +138,7 @@ flows:
         description: なし
       - name: 端末の設定
         description: '`sources[0]` に必須のキー `config` が無く、`port` が文字列'
+        notes: '`sources[0]` に知らないキー `enable`（`enabled` の打ち間違い）を持つ'
     flow: |-
       <!-- map: {"title": "異常系（端末の設定が違反する・TerminalConfigInvalidError）"} -->
 
@@ -155,8 +156,11 @@ flows:
     expected:
       - 終了コードが 2 で、ポートを待ち受けない
       - '標準エラーに `{ファイル}: sources[0].config` と `{ファイル}: port` の違反が両方並ぶ'
+      - '標準エラーの違反に、`sources[0]` の知らないキー `{ファイル}: sources[0].enable` が含まれる'
       - '`PROJECT_INDEX_CONFIG` が無いファイルを指すときも、そのパスを出して終了コード 2 で終わる'
     test: test_error_when_terminal_config_invalid
+    decisions:
+      - D-308
   - name: 異常系（ポートが使用中・PortInUseError）
     summary: ポートで待ち受けられないと終わる
     setup:
@@ -685,6 +689,68 @@ flows:
       - '`/sources/sample/docs` が応答し、`/sources/schemas/docs` が 404'
       - '`describe(source: sample, kind: note)` が v1 のスキーマを返す'
     test: test_normal_when_schema_from_other_source
+  - name: 正常系（paths の基準のフォルダを指定する）
+    summary: '`paths_base` を持つ配信元を、`paths[]` を基準のフォルダから解いて配信し、スキーマは設定ファイルのフォルダから解く'
+    setup:
+      - name: Mock
+        description: なし（`project-index serve` を子プロセスで起動する）
+      - name: ノードの配信元
+        description: 'git リポジトリ repo の `content/node-docs/brain/project-index.yaml`。`paths_base: ../../..`（repo の直下）を持ち、`documents[0].paths` が `[docs/knowhow/*.yaml, content/node-docs/shared/*.yaml]`、`documents[0].schema` が設定ファイルのフォルダの `note.schema.yaml`'
+        notes: id `brain`。`default_ref` の `develop` に全てのファイルを commit する
+      - name: repo の文書
+        description: '`docs/knowhow/a.yaml`・`content/node-docs/shared/b.yaml` と、`paths` に該当しない `docs/design/c.yaml`'
+      - name: 端末の設定
+        description: '`sources` に brain の 1 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as project-index serve
+        participant G as repo
+
+        C->>T: project-index serve
+        T-->>G: develop の content/node-docs/brain/project-index.yaml を読む
+        T->>T: paths_base を設定ファイルのフォルダから解き、repo の直下を基準のフォルダにする
+        T-->>G: develop の基準のフォルダから paths の文書を、設定ファイルのフォルダからスキーマを読む
+        T-->>C: brain を配信する
+        C->>T: search_docs（source: brain）
+        T-->>C: 文書
+      ```
+    expected:
+      - '`search_docs(source: brain)` が `docs/knowhow/a.yaml`・`content/node-docs/shared/b.yaml` の文書を返却し、`docs/design/c.yaml` を返却しない'
+      - 返した文書のパスが repo の直下からの相対パス（`docs/knowhow/a.yaml`）
+      - '`describe(source: brain, kind: note)` が設定ファイルのフォルダの `note.schema.yaml` を返却する'
+    test: test_normal_when_paths_base_set
+    decisions:
+      - D-189
+  - name: 正常系（端末の設定の最上位に知らないキーがある）
+    summary: 端末の設定の最上位の知らないキーを違反にせず、キーのパスを警告のログと引数なしの `describe` の警告に残して配信を始める
+    setup:
+      - name: Mock
+        description: なし（`project-index serve` を子プロセスで起動し、空きポートを `PROJECT_INDEX_PORT` に入れる）
+      - name: 端末の設定
+        description: '`sources` に sample の 1 行。最上位に知らないキー `mindstella`（入れ子の値を持つ）と `prot`（`port` の打ち間違い）を持つ'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as project-index serve
+        participant CF as 端末の設定
+
+        C->>T: project-index serve
+        T-->>CF: 端末の設定を読み、スキーマで検証する
+        T->>T: 最上位の知らないキーのパスを集め、警告のログに書く
+        T-->>C: sample を配信する
+        C->>T: describe()
+        T-->>C: 使える配信元と、知らないキーの警告
+      ```
+    expected:
+      - '`/sources/sample/docs` が 200 を返却する'
+      - 警告のログに、端末の設定のファイルと知らないキーのパス `mindstella`・`prot` がある
+      - 引数なしの `describe()` の `warnings` に、知らないキーのパス `mindstella`・`prot` を持つ 1 件がある
+    test: test_normal_when_terminal_config_has_unknown_top_level_key
+    decisions:
+      - D-308
 lead: 端末の設定を読み、検証に合格した配信元を 1 プロセス・1 ポートで配信する `project-index serve` の入出力を定め、起動を修正するときに参照する。
 identifier: serve
 permissions: なし
@@ -698,6 +764,8 @@ callers:
   - SC-4#scenarios[正常シナリオ（XDG の環境変数で置き場を決める）]
   - SC-4#scenarios[正常シナリオ（エイリアスのキーと nav の条件を検証する）]
   - SC-6#scenarios[正常シナリオ（MCP を使う場面の案内を受け取る）]
+  - SC-4#scenarios[正常シナリオ（paths の基準のフォルダを指定する）]
+  - SC-4#scenarios[正常シナリオ（端末の設定の最上位に知らないキーがある）]
 exclusivity: 同じポートで待ち受けるプロセスは 1 つだけ（後からの起動はポート使用中で終わる）
 request:
   - name: PROJECT_INDEX_CONFIG
@@ -749,7 +817,7 @@ response:
     description: '検証に失敗した配信元ごとに `{id}: {キーのパス}: {理由}`。その配信元の設定の `version` が古いときは、`project-index migrate --source` で移し替えられることも出す'
   - name: 警告のログ
     type: str
-    description: 設定のバージョンが古い配信元の ID・設定のバージョン・サーバーが読めるバージョン。配信元と documents の行ごとに、`metadata` に書いた列が無い文書の件数・管理用の YAML に無いファイル・ファイルが無い行（`missing_body_file`）・どの文書にも当たらない `related[].to`（`source` を持たない行）が 0 件でなければ、その件数とパス。`alias_type` を持つ行の文書のエイリアスのキーの違反（文書のパスと内容）と、どの文書にも当たらない `nav` の `auto` の条件（タブと条件）
+    description: 設定のバージョンが古い配信元の ID・設定のバージョン・サーバーが読めるバージョン。配信元と documents の行ごとに、`metadata` に書いた列が無い文書の件数・管理用の YAML に無いファイル・ファイルが無い行（`missing_body_file`）・どの文書にも当たらない `related[].to`（`source` を持たない行）が 0 件でなければ、その件数とパス。`alias_type` を持つ行の文書のエイリアスのキーの違反（文書のパスと内容）と、どの文書にも当たらない `nav` の `auto` の条件（タブと条件）。端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパス）
   - name: 終了コード
     type: int
     description: 起動できないとき 0 以外
@@ -758,7 +826,7 @@ exceptions:
   - name: なし（正常終了）
     condition: 待ち受けを始めた（検証に失敗した配信元があっても、その配信元を外して待ち受ける）
   - name: TerminalConfigInvalidError
-    condition: 端末の設定が無い・スキーマに違反する
+    condition: 端末の設定が無い・スキーマに違反する（最上位の知らないキーは違反にしない）
     notes: '標準エラーに `{ファイル}: {キーのパス}: {理由}` を全て出し、終了コード 2 で終わる'
   - name: PortInUseError
     condition: ポートで待ち受けられない
@@ -789,6 +857,11 @@ constraints:
   - item: 設定・スキーマ・スクリプトの読み元
     constraint: Git の配信元は、ディスクの `project-index.yaml` から `default_ref` だけを読み（ディスクに無いか読めないときは既定の `develop`）、`project-index.yaml`・`documents[].schema` のスキーマ・`validators`・`converters` のスクリプトを `default_ref` から読む（`generators` は書き込み先のワークツリーのスクリプトで動く）。要求ごとに `default_ref` の commit を確かめ、変わっていれば配信元を組み立て直す。Git でない配信元はディスクの設定を読む。先頭の設定が `default_ref` に無く、`git check-ignore` で無視されていれば、先頭の設定はディスクから読み、スキーマとスクリプトは `default_ref` から読む。無視されていなければ `config[0]` の `{default_ref} に {パス} がありません` で配信しない
     notes: '`worktree` の引数で作業ツリー・ワークツリーを指して読むときは、そのフォルダの設定とスクリプトを使う。そのフォルダに無く、無視されている設定のファイルは、クローン本体のディスクのファイルを使う'
+  - item: paths の基準のフォルダ
+    constraint: '配信元の設定の `paths_base` を設定ファイル（`config` の先頭）のフォルダから解き、`documents[].paths` をそのフォルダから解く。返却する文書のパスと `exclude[]`・管理用の YAML の同期のパスも基準のフォルダからの相対パスにする。`paths_base` を省くと設定ファイルのフォルダ。`documents[].schema`・`validators`・`converters`・`generators` などのほかの相対パス、`scope.write` の既定、作業中の配信元の判定は設定ファイルのフォルダで解く。Git の配信元は `default_ref` の commit からも基準のフォルダからの相対パスで参照する'
+    notes: '`paths_base` の検証は配信元の検査の制約「paths の基準のフォルダの検証」と同じ。`worktree` で参照するときは、ワークツリーの中の同じ相対位置を基準のフォルダにする'
+  - item: 端末の設定の知らないキー
+    constraint: 端末の設定の最上位の、スキーマの `properties` に無いキーは違反にせず、値を使わずに無視する。キーのパスを読み込みの結果に持ち、警告のログ・引数なしの `describe` の `warnings`・端末の設定の API の応答の `warnings` で返却する。`sources[]` の行と `scope` の知らないキーは今どおり違反にする
   - item: 端末の設定と状態の置き場
     constraint: 端末の設定は `PROJECT_INDEX_CONFIG`、無ければ `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`。状態の置き場は `PROJECT_INDEX_STATE_DIR` → 端末の設定の `state_dir` → `${XDG_STATE_HOME:-~/.local/state}/project-index` の順。ログの置き場は端末の設定の `log_dir`、無ければ決めた状態の置き場の `logs`。`XDG_CONFIG_HOME`・`XDG_STATE_HOME` が空の文字列か相対パスなら未設定として扱う
     notes: 環境変数が端末の設定より先に有効になる並びは `PROJECT_INDEX_CONFIG`・`PROJECT_INDEX_PORT` と同じ。相対パスの扱いは XDG Base Directory Specification に従う。セッション開始のフックも同じ規則で端末の設定のパスを決める

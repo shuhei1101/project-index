@@ -906,3 +906,36 @@ def test_source_states_without_refresh(
     assert [(state.id, state.status) for state in states] == [("alpha", "serving")]
     assert states[0].config_version == served.config.version
     assert calls == []
+
+
+def test_check_project_when_paths_base_invalid(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_terminal_config: Callable[..., TerminalConfig],
+) -> None:
+    """paths_base と paths の範囲の違反（正常系）。"""
+    # 準備
+    write_files(
+        tmp_path / "brain",
+        {
+            "project-index.yaml": (
+                "name: brain\n"
+                "paths_base: sub\n"
+                "documents:\n"
+                "  - id: notes\n"
+                "    paths: [docs/a/*.yaml, docs/b/*.yaml, ../outside/*.yaml]\n"
+                "    schema: note.schema.yaml\n"
+            ),
+            "note.schema.yaml": "title: note\ntype: object\n",
+            "sub/.keep": "",
+        },
+    )
+    handlers = _handlers(make_terminal_config)
+    # 実行
+    result = check_project(CheckProjectRequest(path=str(tmp_path / "brain")), handlers=handlers)
+    # 検証
+    assert sorted(violation.path for violation in result.violations) == [
+        "documents[0].paths[2]",
+        "paths_base",
+    ]
+    assert result.sync is None
