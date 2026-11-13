@@ -961,7 +961,7 @@ def test_normal_when_paths_base_set(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
 ) -> None:
-    """paths_base を持つ配信元を、paths を基準のフォルダから解いて配信し、スキーマは設定ファイルのフォルダから解く（正常系）。"""
+    """paths_base を持つ配信元を、paths を基準のフォルダから解いて配信し、スキーマは describe と読み取り API の配信元の設定とも設定ファイルのフォルダから解く（正常系）。"""
     # 準備
     files = {
         "content/node-docs/brain/project-index.yaml": BRAIN_CONFIG,
@@ -979,6 +979,7 @@ def test_normal_when_paths_base_set(
     found = env.call("search_docs", cwd=cwd, source="brain", format="json")
     listed = env.client.get("/sources/brain/docs")
     schema = env.call("describe", cwd=cwd, source="brain", kind="note", format="json")
+    config = env.client.get("/sources/brain/config", params={"schemas": "true"})
     # 検証
     assert sorted(item["id"] for item in found.data["items"]) == ["a", "b"]
     assert sorted(row["path"] for row in listed.json()["documents"]) == [
@@ -986,6 +987,7 @@ def test_normal_when_paths_base_set(
         "docs/knowhow/a.yaml",
     ]
     assert schema.data["schema"]["title"] == "note"
+    assert config.json()["schemas"]["note"]["title"] == "note"
 
 
 def test_normal_when_terminal_config_has_unknown_top_level_key(
