@@ -445,7 +445,12 @@ class DocumentStore:
         if records is None:
             return schema
         # records の行: 要素 1 つのスキーマ。取り出せなければ何も当てない
-        return records_item_schema(schema, records) or {}
+        item = records_item_schema(schema, records)
+        if item is None:
+            return {}
+        # 要素の中に残った `#/$defs/...` の参照先を辿れるよう、最上位の `$defs` を残す
+        defs = schema.get("$defs")
+        return {**item, "$defs": defs} if defs is not None else item
 
     def invalidate(self, paths: Iterable[Path]) -> None:
         """書き込んだファイルのキャッシュを捨てる。"""

@@ -39,6 +39,7 @@ def make_view_env(
         nav: dict[str, Any] | None = None,
         extra_sources: list[ServedSource] | None = None,
         decision_folders: list[str] | None = None,
+        diff_ignore_keys: list[str] | None = None,
         **source_overrides: Any,
     ) -> SimpleNamespace:
         if root is None:
@@ -56,6 +57,7 @@ def make_view_env(
             converters=converters or [],
             nav=nav,
             decision_folders=decision_folders or [],
+            **({} if diff_ignore_keys is None else {"diff_ignore_keys": diff_ignore_keys}),
         )
         source = make_served_source(id="sample", root=root, config=config, **source_overrides)
         store = DocumentStore(SnapshotStore(tmp_path / "snapshots"))

@@ -84,21 +84,28 @@ async def _run[T](
         return problem_of(error, fields)
 
 
-def _source_config(handlers: Handlers, source: str) -> SourceConfigResponse:
+def _source_config(handlers: Handlers, source: str, schemas: bool) -> SourceConfigResponse:
     """配信元の設定を返す。"""
-    return get_source_config(handlers.registry.get(source))
+    target, _ = read_target(source, None, registry=handlers.registry)
+    return get_source_config(target, store=handlers.store, schemas=schemas)
 
 
-def _documents(handlers: Handlers, source: str, ref: str | None) -> DocumentListResponse:
+def _documents(
+    handlers: Handlers, source: str, ref: str | None, values: bool
+) -> DocumentListResponse:
     """リビジョンの文書の一覧を返す。"""
     target, _ = read_target(source, ref, registry=handlers.registry)
-    return list_documents(target, store=handlers.store)
+    return list_documents(target, store=handlers.store, values=values)
 
 
-def _document(handlers: Handlers, source: str, path: str, ref: str | None) -> DocumentValueResponse:
+def _document(
+    handlers: Handlers, source: str, path: str, ref: str | None, doc_id: str | None
+) -> DocumentValueResponse:
     """リビジョンの文書 1 件を返す。"""
     target, _ = read_target(source, ref, registry=handlers.registry)
-    return get_document(target, path, store=handlers.store, converter=handlers.converter)
+    return get_document(
+        target, path, doc_id=doc_id, store=handlers.store, converter=handlers.converter
+    )
 
 
 def _decisions(handlers: Handlers, source: str) -> DecisionListResponse:
@@ -142,14 +149,16 @@ def build_read_router(handlers: Handlers) -> APIRouter:
     @router.get(
         "/sources/{source}/config", name="get_source_config", response_model=SourceConfigResponse
     )
-    async def config(source: str) -> SourceConfigResponse | Response:
-        return await _run(handlers, source, "", partial(_source_config, handlers, source))
+    async def config(source: str, schemas: bool = False) -> SourceConfigResponse | Response:
+        return await _run(handlers, source, "", partial(_source_config, handlers, source, schemas))
 
     @router.get(
         "/sources/{source}/docs", name="list_documents", response_model=DocumentListResponse
     )
-    async def documents(source: str, ref: str | None = None) -> DocumentListResponse | Response:
-        return await _run(handlers, source, "", partial(_documents, handlers, source, ref))
+    async def documents(
+        source: str, ref: str | None = None, values: bool = False
+    ) -> DocumentListResponse | Response:
+        return await _run(handlers, source, "", partial(_documents, handlers, source, ref, values))
 
     @router.get(
         "/sources/{source}/docs/{path:path}",
@@ -157,9 +166,14 @@ def build_read_router(handlers: Handlers) -> APIRouter:
         response_model=DocumentValueResponse,
     )
     async def document(
-        source: str, path: str, ref: str | None = None
+        source: str,
+        path: str,
+        ref: str | None = None,
+        doc_id: Annotated[str | None, Query(alias="id")] = None,
     ) -> DocumentValueResponse | Response:
-        return await _run(handlers, source, path, partial(_document, handlers, source, path, ref))
+        return await _run(
+            handlers, source, path, partial(_document, handlers, source, path, ref, doc_id)
+        )
 
     @router.get(
         "/sources/{source}/decisions", name="list_decisions", response_model=DecisionListResponse

@@ -130,6 +130,8 @@ functions:
       2. 『スキーマの検査』と同じ検査器のクラス（`validator_for`、既定は Draft 2020-12）を、`contentMediaType` の処理を「値が `MARKDOWN_MEDIA_TYPE` で、当たった値が `str` なら目印の `ValidationError` を 1 つ出す」に差し替えて作る（`jsonschema.validators.extend`）
          - `$ref`・`properties`・`items`・`allOf` をたどるのは jsonschema に任せる
       3. 検査器の `iter_errors(data)` を最後まで回し、`validator` が `contentMediaType` の誤りの `absolute_path` を項目のパスへの変換で項目のパスにし、`instance` を値にして返す。`anyOf`・`oneOf` などにまとめられた誤りは `context` の中を再帰してたどる（ほかの誤りは捨てる）
+      4. たどる途中で `referencing.exceptions.Unresolvable` が送出された場合、空の辞書を返す（解決できない参照は『スキーマの検査』が違反にする）
+         - `[warning]` Markdown のキーを取り出せなかった（`Unresolvable.ref`）
     unit_tests:
       - name: test_markdown_values
         case: 正常
@@ -143,6 +145,12 @@ functions:
         condition: '`properties.body` が `{anyOf: [{type: string, contentMediaType: text/markdown}, {type: "null"}]}`、値 `{body: a}`'
         mock: なし
         expected: '`{"body": "a"}`'
+      - name: test_markdown_values_when_unresolvable
+        case: 正常
+        summary: 解決できない参照
+        condition: '`properties.body` が `{"$ref": "missing.schema.yaml#/$defs/md"}`、値 `{body: a}`'
+        mock: なし
+        expected: '`{}` で、`[warning]` が 1 件'
       - name: test_markdown_values_when_not_string
         case: 正常
         summary: 文字列でない値と無い値

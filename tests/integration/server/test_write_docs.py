@@ -99,6 +99,29 @@ HINT_SCHEMA = (
 )
 
 
+# `$defs.entry` が別のファイルの `summary` を相対パスで指し、`children` で自分自身を指すスキーマ
+DEFS_REF_SCHEMA = (
+    "type: object\n"
+    "properties:\n"
+    "  entries:\n"
+    "    type: array\n"
+    "    items: {$ref: '#/$defs/entry'}\n"
+    "$defs:\n"
+    "  entry:\n"
+    "    type: object\n"
+    "    properties:\n"
+    "      summary: {$ref: 'common.schema.yaml#/$defs/summary'}\n"
+    "      children:\n"
+    "        type: array\n"
+    "        items: {$ref: '#/$defs/entry'}\n"
+)
+# `$defs.entry` の `summary` が無いファイルを指すスキーマ
+MISSING_REF_SCHEMA = DEFS_REF_SCHEMA.replace("common.schema.yaml", "missing.schema.yaml")
+COMMON_SCHEMA = "$defs:\n  summary:\n    type: string\n"
+MISSING_REF = "missing.schema.yaml#/$defs/summary"
+ENTRIES = [{"summary": "a", "children": [{"summary": "b"}]}]
+
+
 def _setup(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
@@ -1034,3 +1057,85 @@ def test_error_when_mdmark_warning(
     assert not embed.is_error
     assert embed.data["results"][0]["status"] == "updated"
     assert load_yaml(first.read_text(encoding="utf-8"))["body"] == "<!-- embed: x -->\n"
+
+
+def test_normal_when_relative_ref_in_defs(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_doc_text: Callable[..., str],
+) -> None:
+    """$defs の中の相対パスの参照を解決して検査し、部分更新を書き込む（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "schemas/sample.schema.yaml": DEFS_REF_SCHEMA,
+            "schemas/common.schema.yaml": COMMON_SCHEMA,
+            "docs/doc-1.yaml": sample_doc_text(
+                "doc-1", "文書 1", description="1 件目", entries=ENTRIES
+            ),
+        }
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    target = worktree / "docs" / "doc-1.yaml"
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(source.folder),
+        worktree=str(worktree),
+        operations=[
+            _update(
+                "doc-1",
+                _version(target),
+                text_edits=[{"field": "description", "old": "1 件目", "new": "一件目"}],
+            )
+        ],
+    )
+    # 検証
+    assert not result.is_error
+    assert result.data["applied"] is True
+    assert result.data["results"][0]["status"] == "updated"
+    assert load_yaml(target.read_text(encoding="utf-8"))["description"] == "一件目"
+
+
+def test_error_when_schema_ref_unresolvable(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_doc_text: Callable[..., str],
+) -> None:
+    """スキーマの参照を解決できないときは、解決できなかった参照を違反として返し、何も書かない（異常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "schemas/sample.schema.yaml": MISSING_REF_SCHEMA,
+            "docs/doc-1.yaml": sample_doc_text(
+                "doc-1", "文書 1", description="1 件目", entries=ENTRIES
+            ),
+        }
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    target = worktree / "docs" / "doc-1.yaml"
+    before = target.read_text(encoding="utf-8")
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(source.folder),
+        worktree=str(worktree),
+        operations=[
+            _update(
+                "doc-1",
+                _version(target),
+                text_edits=[{"field": "description", "old": "1 件目", "new": "一件目"}],
+            )
+        ],
+    )
+    # 検証
+    assert result.is_error
+    assert "ValidationFailedError" in result.text
+    assert "operations[0]" in result.text
+    assert MISSING_REF in result.text
+    assert "schemas/sample.schema.yaml" in result.text
+    assert target.read_text(encoding="utf-8") == before

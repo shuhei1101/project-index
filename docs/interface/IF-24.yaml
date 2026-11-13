@@ -27,7 +27,32 @@ flows:
     expected:
       - 200 で、`ref` が `main`、`documents` に 3 件が並ぶ
       - 各要素が `id`・`path`・`kind`・`name`・`description`・`tags`・`visibility` を持ち、行の文書は `bodyPath` を持つ
+      - 各要素が `version` を持つ
     test: test_normal
+  - name: 正常系（値を求める）
+    summary: '`values` を指したときだけ、各文書の値を返す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: サンプルの配信元
+        description: 正常系と同じ sample
+    flow: |-
+      <!-- map: {"title": "正常系（値を求める）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs
+
+        C->>E: GET /sources/sample/docs?values=true
+        E-->>C: 200 値つきの文書の一覧
+      ```
+
+      <!-- /map -->
+    expected:
+      - 200 で、各要素の `value` が文書の取得の `value` と同じ（YAML の文書は YAML を読み込んだ値、行の文書は行の値）
+      - '`values` を省いた正常系の各要素の `value` は `null`'
+    test: test_normal_when_values_requested
   - name: 正常系（リビジョンを指す）
     summary: '`ref` の文書の一覧を返す'
     setup:
@@ -50,6 +75,7 @@ flows:
       <!-- /map -->
     expected:
       - 200 で、`documents` に追加した文書が無い
+      - 親の commit と `main` の両方にある文書の `version` は、内容が同じなら同じ値になる
     test: test_normal_when_ref_given
   - name: 異常系（無い配信元・リビジョン・404）
     summary: 無い配信元・配信していない配信元・解決できないリビジョンを断る
@@ -96,9 +122,15 @@ request:
     default: 配信元の `default_ref`
     location: query
     description: リビジョン（ブランチ・コミット・タグ）
+  - name: values
+    type: bool
+    required: false
+    default: '`false`'
+    location: query
+    description: '`true` のとき、各要素の `value` に文書の値を入れる'
 request_example: |-
   ```text
-  GET /sources/sample/docs?ref=main
+  GET /sources/sample/docs?ref=main&values=true
   ```
 response:
   - name: ref
@@ -128,11 +160,19 @@ response:
   - name: documents[].bodyPath
     type: str | None
     description: 本文のファイルのパス（管理用の YAML の行の文書だけ）
+  - name: documents[].version
+    type: str
+    description: 文書のバージョン。YAML の文書はファイルの内容のハッシュ、行の文書は行の値のハッシュで、内容が変わると変わる
+    notes: 文書の書き込み（`write_docs`）の `expected_version` と同じ値
+  - name: documents[].value
+    type: dict | None
+    description: 文書の値（YAML を読み込んだもの、行の文書は行の値）
+    notes: '`values` が `true` のときだけ入れ、それ以外は `null`'
 response_example: |-
   ```json
   {"ref": "main", "documents": [
-    {"id": "D-1", "path": "design/D-1.yaml", "kind": "design", "name": "タスクの保存", "description": "タスクの保存と取得", "tags": ["topic:task"], "visibility": "internal", "bodyPath": null},
-    {"id": "guide.md", "path": "files.yaml", "kind": "files_guide", "name": "使い方", "description": null, "tags": [], "visibility": "public", "bodyPath": "guide.md"}
+    {"id": "D-1", "path": "design/D-1.yaml", "kind": "design", "name": "タスクの保存", "description": "タスクの保存と取得", "tags": ["topic:task"], "visibility": "internal", "bodyPath": null, "version": "3f2a9c", "value": {"id": "D-1", "title": "タスクの保存"}},
+    {"id": "guide.md", "path": "files.yaml", "kind": "files_guide", "name": "使い方", "description": null, "tags": [], "visibility": "public", "bodyPath": "guide.md", "version": "8b41d0", "value": {"path": "guide.md", "name": "使い方"}}
   ]}
   ```
 status_codes:
@@ -145,9 +185,11 @@ error_format: RFC 9457 の `application/problem+json`。拡張メンバーは ca
 constraints:
   - item: 並び
     constraint: '`documents[]` の行の順、行の中はパスの順'
+  - item: 値の読み込み
+    constraint: '`value`・`version` は文書のストアが読み込み済みの文書から返し、文書ごとにファイルを読み直さない'
   - item: 認可
     constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
     decided_by: NFR-1#requirements[通信]
   - item: JSON のキー
-    constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名は変えない
+    constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名と、`value` の中身は変えない
 test_file: tests/integration/server/test_list_documents.py

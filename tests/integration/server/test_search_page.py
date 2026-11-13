@@ -26,6 +26,10 @@ def test_normal(
     found = env.client.get("/sources/sample/search", params={"q": "ページング"})
     body = found.json()
     opened = env.client.get(f"/sources/sample/docs/{body['items'][0]['path']}")
+    by_id = env.client.get(
+        f"/sources/sample/docs/{body['items'][0]['filePath']}",
+        params={"id": body["items"][0]["id"]},
+    )
     # 検証
     assert found.status_code == 200
     assert body["totalCount"] == 1
@@ -33,6 +37,10 @@ def test_normal(
     assert any("ページング" in snippet for snippet in body["items"][0]["snippets"])
     assert opened.status_code == 200
     assert opened.json()["path"] == "docs/doc-2.yaml"
+    assert body["items"][0]["id"] == "doc-2"
+    assert body["items"][0]["filePath"] == "docs/doc-2.yaml"
+    assert by_id.status_code == 200
+    assert by_id.json()["metadata"]["id"] == "doc-2"
 
 
 def test_error_when_query_invalid(

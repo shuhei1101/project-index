@@ -1,0 +1,577 @@
+$ uv run pytest tests/unit/
+........................................................................ [  8%]
+........................................................................ [ 17%]
+........................................................................ [ 25%]
+...............F........................................................ [ 34%]
+........................................................................ [ 43%]
+........................................................................ [ 51%]
+........................................................................ [ 60%]
+........................................................................ [ 68%]
+.................................F.........FFFF......................... [ 77%]
+..............FFF....................................................... [ 86%]
+........................................................................ [ 94%]
+.............................................                            [100%]
+=================================== FAILURES ===================================
+______________ test_resolve_schema_refs_when_relative_ref_in_defs ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-shuhei2441/pytest-7853/test_resolve_schema_refs_when_1')
+write_files = <function write_files.<locals>._write at 0x73ed254c0eb0>
+
+    def test_resolve_schema_refs_when_relative_ref_in_defs(
+        tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+    ) -> None:
+        """`$defs` の中の相対パスの参照と循環する参照（正常系）。"""
+        # 準備
+        write_files(tmp_path, {"schemas/共通.schema.yaml": "$defs:\n  summary:\n    type: string\n"})
+        schema = {
+            "$defs": {
+                "entry": {
+                    "type": "object",
+                    "properties": {
+                        "summary": {"$ref": "共通.schema.yaml#/$defs/summary"},
+                        "children": {"type": "array", "items": {"$ref": "#/$defs/entry"}},
+                    },
+                }
+            },
+            "properties": {"entries": {"type": "array", "items": {"$ref": "#/$defs/entry"}}},
+        }
+        # 実行
+        result = resolve_schema_refs(schema, tmp_path / "schemas" / "layout.schema.yaml")
+        # 検証
+        entry = result["$defs"]["entry"]["properties"]
+>       assert entry["summary"] == {"type": "string"}
+E       AssertionError: assert {'$ref': '共通....defs/summary'} == {'type': 'string'}
+E         
+E         Left contains 1 more item:
+E         {'$ref': '共通.schema.yaml#/$defs/summary'}
+E         Right contains 1 more item:
+E         {'type': 'string'}
+E         Use -v to get more diff
+
+tests/unit/project_index/features/documents/test_schema.py:92: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  project_index.features.documents.schema:schema.py:130 スキーマの循環する参照を解かずに残した（/tmp/pytest-of-shuhei2441/pytest-7853/test_resolve_schema_refs_when_1/schemas/layout.schema.yaml・#/$defs/entry）
+____________________ test_markdown_values_when_unresolvable ____________________
+
+self = <Registry (21 resources, 1 uncrawled)>, uri = 'missing.schema.yaml'
+
+    def get_or_retrieve(self, uri: URI) -> Retrieved[D, Resource[D]]:
+        """
+        Get a resource from the registry, crawling or retrieving if necessary.
+    
+        May involve crawling to find the given URI if it is not already known,
+        so the returned object is a `Retrieved` object which contains both the
+        resource value as well as the registry which ultimately contained it.
+        """
+        resource = self._resources.get(uri)
+        if resource is not None:
+            return Retrieved(registry=self, value=resource)
+    
+        registry = self.crawl()
+        resource = registry._resources.get(uri)
+        if resource is not None:
+            return Retrieved(registry=registry, value=resource)
+    
+        try:
+>           resource = registry._retrieve(uri)
+                       ^^^^^^^^^^^^^^^^^^^^^^^
+
+.venv/lib/python3.14/site-packages/referencing/_core.py:428: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.venv/lib/python3.14/site-packages/jsonschema/validators.py:111: in _warn_for_remote_retrieve
+    request = Request(uri, headers=headers)  # noqa: S310
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/shuhei2441/.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/urllib/request.py:290: in __init__
+    self.full_url = url
+    ^^^^^^^^^^^^^
+/home/shuhei2441/.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/urllib/request.py:316: in full_url
+    self._parse()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <urllib.request.Request object at 0x73ed1ea24410>
+
+    def _parse(self):
+        self.type, rest = _splittype(self._full_url)
+        if self.type is None:
+>           raise ValueError("unknown url type: %r" % self.full_url)
+E           ValueError: unknown url type: 'missing.schema.yaml'
+
+/home/shuhei2441/.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/urllib/request.py:345: ValueError
+
+The above exception was the direct cause of the following exception:
+
+self = Resolver(_base_uri='', _registry=<Registry (21 resources, 1 uncrawled)>)
+ref = 'missing.schema.yaml#/$defs/md'
+
+    def lookup(self, ref: URI) -> Resolved[D]:
+        """
+        Resolve the given reference to the resource it points to.
+    
+        Raises:
+    
+            `exceptions.Unresolvable`
+    
+                or a subclass thereof (see below) if the reference isn't
+                resolvable
+    
+            `exceptions.NoSuchAnchor`
+    
+                if the reference is to a URI where a resource exists but
+                contains a plain name fragment which does not exist within
+                the resource
+    
+            `exceptions.PointerToNowhere`
+    
+                if the reference is to a URI where a resource exists but
+                contains a JSON pointer to a location within the resource
+                that does not exist
+    
+        """
+        if ref.startswith("#"):
+            uri, fragment = self._base_uri, ref[1:]
+        else:
+            uri, fragment = urldefrag(urljoin(self._base_uri, ref))
+        try:
+>           retrieved = self._registry.get_or_retrieve(uri)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.venv/lib/python3.14/site-packages/referencing/_core.py:682: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Registry (21 resources, 1 uncrawled)>, uri = 'missing.schema.yaml'
+
+    def get_or_retrieve(self, uri: URI) -> Retrieved[D, Resource[D]]:
+        """
+        Get a resource from the registry, crawling or retrieving if necessary.
+    
+        May involve crawling to find the given URI if it is not already known,
+        so the returned object is a `Retrieved` object which contains both the
+        resource value as well as the registry which ultimately contained it.
+        """
+        resource = self._resources.get(uri)
+        if resource is not None:
+            return Retrieved(registry=self, value=resource)
+    
+        registry = self.crawl()
+        resource = registry._resources.get(uri)
+        if resource is not None:
+            return Retrieved(registry=registry, value=resource)
+    
+        try:
+            resource = registry._retrieve(uri)
+        except (
+            exceptions.CannotDetermineSpecification,
+            exceptions.NoSuchResource,
+        ):
+            raise
+        except Exception as error:
+>           raise exceptions.Unretrievable(ref=uri) from error
+E           referencing.exceptions.Unretrievable: 'missing.schema.yaml'
+
+.venv/lib/python3.14/site-packages/referencing/_core.py:435: Unretrievable
+
+The above exception was the direct cause of the following exception:
+
+self = Validator(schema={'$ref': 'missing.sche...aml#/$defs/md'}, format_checker=None)
+ref = 'missing.schema.yaml#/$defs/md', instance = 'a'
+
+    def _validate_reference(self, ref, instance):
+        if self._ref_resolver is None:
+            try:
+>               resolved = self._resolver.lookup(ref)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.venv/lib/python3.14/site-packages/jsonschema/validators.py:462: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = Resolver(_base_uri='', _registry=<Registry (21 resources, 1 uncrawled)>)
+ref = 'missing.schema.yaml#/$defs/md'
+
+    def lookup(self, ref: URI) -> Resolved[D]:
+        """
+        Resolve the given reference to the resource it points to.
+    
+        Raises:
+    
+            `exceptions.Unresolvable`
+    
+                or a subclass thereof (see below) if the reference isn't
+                resolvable
+    
+            `exceptions.NoSuchAnchor`
+    
+                if the reference is to a URI where a resource exists but
+                contains a plain name fragment which does not exist within
+                the resource
+    
+            `exceptions.PointerToNowhere`
+    
+                if the reference is to a URI where a resource exists but
+                contains a JSON pointer to a location within the resource
+                that does not exist
+    
+        """
+        if ref.startswith("#"):
+            uri, fragment = self._base_uri, ref[1:]
+        else:
+            uri, fragment = urldefrag(urljoin(self._base_uri, ref))
+        try:
+            retrieved = self._registry.get_or_retrieve(uri)
+        except exceptions.NoSuchResource:
+            raise exceptions.Unresolvable(ref=ref) from None
+        except exceptions.Unretrievable as error:
+>           raise exceptions.Unresolvable(ref=ref) from error
+E           referencing.exceptions.Unresolvable: missing.schema.yaml#/$defs/md
+
+.venv/lib/python3.14/site-packages/referencing/_core.py:686: Unresolvable
+
+The above exception was the direct cause of the following exception:
+
+caplog = <_pytest.logging.LogCaptureFixture object at 0x73ed1ed81f50>
+
+    def test_markdown_values_when_unresolvable(caplog: pytest.LogCaptureFixture) -> None:
+        """解決できない参照（正常系）。"""
+        # 準備
+        schema = {"type": "object", "properties": {"body": {"$ref": "missing.schema.yaml#/$defs/md"}}}
+        # 実行
+        with caplog.at_level(logging.WARNING):
+>           result = markdown_values({"body": "a"}, schema)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/validation/test_markdown.py:57: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/project_index/features/validation/markdown.py:92: in markdown_values
+    for error in _marked(validator.iter_errors(dict(data)))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/project_index/features/validation/markdown.py:74: in _marked
+    for error in errors:
+                 ^^^^^^
+.venv/lib/python3.14/site-packages/jsonschema/validators.py:383: in iter_errors
+    for error in errors:
+                 ^^^^^^
+.venv/lib/python3.14/site-packages/jsonschema/_keywords.py:296: in properties
+    yield from validator.descend(
+.venv/lib/python3.14/site-packages/jsonschema/validators.py:431: in descend
+    for error in errors:
+                 ^^^^^^
+.venv/lib/python3.14/site-packages/jsonschema/_keywords.py:275: in ref
+    yield from validator._validate_reference(ref=ref, instance=instance)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = Validator(schema={'$ref': 'missing.sche...aml#/$defs/md'}, format_checker=None)
+ref = 'missing.schema.yaml#/$defs/md', instance = 'a'
+
+    def _validate_reference(self, ref, instance):
+        if self._ref_resolver is None:
+            try:
+                resolved = self._resolver.lookup(ref)
+            except referencing.exceptions.Unresolvable as err:
+>               raise exceptions._WrappedReferencingError(err) from err
+E               jsonschema.exceptions._WrappedReferencingError: Unresolvable: missing.schema.yaml#/$defs/md
+
+.venv/lib/python3.14/site-packages/jsonschema/validators.py:464: _WrappedReferencingError
+______________________________ test_check_schema _______________________________
+
+    def test_check_schema() -> None:
+        """合格（正常系）。"""
+        # 準備
+        schema = {"type": "object", "required": ["id"]}
+        # 実行
+>       result = check_schema({"id": "a"}, schema, schema_file="schemas/note.schema.yaml")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: check_schema() got an unexpected keyword argument 'schema_file'
+
+tests/unit/project_index/features/validation/test_rules.py:17: TypeError
+______________________ test_check_schema_when_violations _______________________
+
+    def test_check_schema_when_violations() -> None:
+        """違反のパスと直し方（正常系）。"""
+        # 準備
+        schema = {
+            "type": "object",
+            "required": ["id"],
+            "properties": {"items": {"type": "array", "items": {"type": "integer"}}},
+        }
+        # 実行
+>       result = check_schema({"items": [1, "x"]}, schema, schema_file="schemas/note.schema.yaml")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: check_schema() got an unexpected keyword argument 'schema_file'
+
+tests/unit/project_index/features/validation/test_rules.py:31: TypeError
+_____________________ test_check_schema_when_unresolvable ______________________
+
+    def test_check_schema_when_unresolvable() -> None:
+        """解決できない参照（正常系）。"""
+        # 準備
+        schema = {"properties": {"a": {"$ref": "missing.schema.yaml#/$defs/x"}}}
+        # 実行
+>       result = check_schema({"a": 1}, schema, schema_file="schemas/note.schema.yaml")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: check_schema() got an unexpected keyword argument 'schema_file'
+
+tests/unit/project_index/features/validation/test_rules.py:43: TypeError
+_________________________ test_check_schema_when_empty _________________________
+
+    def test_check_schema_when_empty() -> None:
+        """スキーマが無い（正常系）。"""
+        # 実行
+>       result = check_schema({"anything": 1}, {}, schema_file="schemas/note.schema.yaml")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: check_schema() got an unexpected keyword argument 'schema_file'
+
+tests/unit/project_index/features/validation/test_rules.py:53: TypeError
+___________________________ test_attach_schema_hints ___________________________
+
+    def test_attach_schema_hints() -> None:
+        """違反した項目の説明だけを添える（正常系）。"""
+        # 準備
+        data = {"count": "3"}
+>       violations = check_schema(data, SCHEMA, schema_file="schemas/note.schema.yaml")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: check_schema() got an unexpected keyword argument 'schema_file'
+
+tests/unit/project_index/features/write/test_hints.py:31: TypeError
+_____________________ test_attach_schema_hints_when_rules ______________________
+
+    def test_attach_schema_hints_when_rules() -> None:
+        """`x-rules`・`x-bad-examples` も添える（正常系）。"""
+        # 準備
+        data = {"name": "a", "status": 1}
+>       violations = check_schema(data, SCHEMA, schema_file="schemas/note.schema.yaml")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: check_schema() got an unexpected keyword argument 'schema_file'
+
+tests/unit/project_index/features/write/test_hints.py:45: TypeError
+__________________ test_attach_schema_hints_when_unresolvable __________________
+
+self = <Registry (21 resources, 1 uncrawled)>, uri = 'missing.schema.yaml'
+
+    def get_or_retrieve(self, uri: URI) -> Retrieved[D, Resource[D]]:
+        """
+        Get a resource from the registry, crawling or retrieving if necessary.
+    
+        May involve crawling to find the given URI if it is not already known,
+        so the returned object is a `Retrieved` object which contains both the
+        resource value as well as the registry which ultimately contained it.
+        """
+        resource = self._resources.get(uri)
+        if resource is not None:
+            return Retrieved(registry=self, value=resource)
+    
+        registry = self.crawl()
+        resource = registry._resources.get(uri)
+        if resource is not None:
+            return Retrieved(registry=registry, value=resource)
+    
+        try:
+>           resource = registry._retrieve(uri)
+                       ^^^^^^^^^^^^^^^^^^^^^^^
+
+.venv/lib/python3.14/site-packages/referencing/_core.py:428: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.venv/lib/python3.14/site-packages/jsonschema/validators.py:111: in _warn_for_remote_retrieve
+    request = Request(uri, headers=headers)  # noqa: S310
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/shuhei2441/.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/urllib/request.py:290: in __init__
+    self.full_url = url
+    ^^^^^^^^^^^^^
+/home/shuhei2441/.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/urllib/request.py:316: in full_url
+    self._parse()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <urllib.request.Request object at 0x73ed253f36f0>
+
+    def _parse(self):
+        self.type, rest = _splittype(self._full_url)
+        if self.type is None:
+>           raise ValueError("unknown url type: %r" % self.full_url)
+E           ValueError: unknown url type: 'missing.schema.yaml'
+
+/home/shuhei2441/.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/urllib/request.py:345: ValueError
+
+The above exception was the direct cause of the following exception:
+
+self = Resolver(_base_uri='', _registry=<Registry (21 resources, 1 uncrawled)>)
+ref = 'missing.schema.yaml#/$defs/x'
+
+    def lookup(self, ref: URI) -> Resolved[D]:
+        """
+        Resolve the given reference to the resource it points to.
+    
+        Raises:
+    
+            `exceptions.Unresolvable`
+    
+                or a subclass thereof (see below) if the reference isn't
+                resolvable
+    
+            `exceptions.NoSuchAnchor`
+    
+                if the reference is to a URI where a resource exists but
+                contains a plain name fragment which does not exist within
+                the resource
+    
+            `exceptions.PointerToNowhere`
+    
+                if the reference is to a URI where a resource exists but
+                contains a JSON pointer to a location within the resource
+                that does not exist
+    
+        """
+        if ref.startswith("#"):
+            uri, fragment = self._base_uri, ref[1:]
+        else:
+            uri, fragment = urldefrag(urljoin(self._base_uri, ref))
+        try:
+>           retrieved = self._registry.get_or_retrieve(uri)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.venv/lib/python3.14/site-packages/referencing/_core.py:682: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Registry (21 resources, 1 uncrawled)>, uri = 'missing.schema.yaml'
+
+    def get_or_retrieve(self, uri: URI) -> Retrieved[D, Resource[D]]:
+        """
+        Get a resource from the registry, crawling or retrieving if necessary.
+    
+        May involve crawling to find the given URI if it is not already known,
+        so the returned object is a `Retrieved` object which contains both the
+        resource value as well as the registry which ultimately contained it.
+        """
+        resource = self._resources.get(uri)
+        if resource is not None:
+            return Retrieved(registry=self, value=resource)
+    
+        registry = self.crawl()
+        resource = registry._resources.get(uri)
+        if resource is not None:
+            return Retrieved(registry=registry, value=resource)
+    
+        try:
+            resource = registry._retrieve(uri)
+        except (
+            exceptions.CannotDetermineSpecification,
+            exceptions.NoSuchResource,
+        ):
+            raise
+        except Exception as error:
+>           raise exceptions.Unretrievable(ref=uri) from error
+E           referencing.exceptions.Unretrievable: 'missing.schema.yaml'
+
+.venv/lib/python3.14/site-packages/referencing/_core.py:435: Unretrievable
+
+The above exception was the direct cause of the following exception:
+
+self = Draft202012Validator(schema={'$ref': 'missing.schema.yaml#/$defs/x'}, format_checker=<FormatChecker checkers=['date', 'email', 'idn-email', 'idn-hostname', 'ipv4', 'ipv6', 'regex', 'time', 'uuid']>)
+ref = 'missing.schema.yaml#/$defs/x', instance = 1
+
+    def _validate_reference(self, ref, instance):
+        if self._ref_resolver is None:
+            try:
+>               resolved = self._resolver.lookup(ref)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.venv/lib/python3.14/site-packages/jsonschema/validators.py:462: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = Resolver(_base_uri='', _registry=<Registry (21 resources, 1 uncrawled)>)
+ref = 'missing.schema.yaml#/$defs/x'
+
+    def lookup(self, ref: URI) -> Resolved[D]:
+        """
+        Resolve the given reference to the resource it points to.
+    
+        Raises:
+    
+            `exceptions.Unresolvable`
+    
+                or a subclass thereof (see below) if the reference isn't
+                resolvable
+    
+            `exceptions.NoSuchAnchor`
+    
+                if the reference is to a URI where a resource exists but
+                contains a plain name fragment which does not exist within
+                the resource
+    
+            `exceptions.PointerToNowhere`
+    
+                if the reference is to a URI where a resource exists but
+                contains a JSON pointer to a location within the resource
+                that does not exist
+    
+        """
+        if ref.startswith("#"):
+            uri, fragment = self._base_uri, ref[1:]
+        else:
+            uri, fragment = urldefrag(urljoin(self._base_uri, ref))
+        try:
+            retrieved = self._registry.get_or_retrieve(uri)
+        except exceptions.NoSuchResource:
+            raise exceptions.Unresolvable(ref=ref) from None
+        except exceptions.Unretrievable as error:
+>           raise exceptions.Unresolvable(ref=ref) from error
+E           referencing.exceptions.Unresolvable: missing.schema.yaml#/$defs/x
+
+.venv/lib/python3.14/site-packages/referencing/_core.py:686: Unresolvable
+
+The above exception was the direct cause of the following exception:
+
+    def test_attach_schema_hints_when_unresolvable() -> None:
+        """解決できない参照（正常系）。"""
+        # 準備
+        schema = {"properties": {"a": {"$ref": "missing.schema.yaml#/$defs/x"}}}
+        data = {"a": 1}
+        violations = [
+            Violation(
+                path="$",
+                rule="スキーマの参照 missing.schema.yaml#/$defs/x を解決できません（schemas/note.schema.yaml）",
+            )
+        ]
+        # 実行
+>       result = attach_schema_hints(violations, schema=schema, data=data)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/write/test_hints.py:66: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/project_index/features/write/hints.py:59: in attach_schema_hints
+    for error in validator.iter_errors(dict(data)):
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/jsonschema/validators.py:383: in iter_errors
+    for error in errors:
+                 ^^^^^^
+.venv/lib/python3.14/site-packages/jsonschema/_keywords.py:296: in properties
+    yield from validator.descend(
+.venv/lib/python3.14/site-packages/jsonschema/validators.py:431: in descend
+    for error in errors:
+                 ^^^^^^
+.venv/lib/python3.14/site-packages/jsonschema/_keywords.py:275: in ref
+    yield from validator._validate_reference(ref=ref, instance=instance)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = Draft202012Validator(schema={'$ref': 'missing.schema.yaml#/$defs/x'}, format_checker=<FormatChecker checkers=['date', 'email', 'idn-email', 'idn-hostname', 'ipv4', 'ipv6', 'regex', 'time', 'uuid']>)
+ref = 'missing.schema.yaml#/$defs/x', instance = 1
+
+    def _validate_reference(self, ref, instance):
+        if self._ref_resolver is None:
+            try:
+                resolved = self._resolver.lookup(ref)
+            except referencing.exceptions.Unresolvable as err:
+>               raise exceptions._WrappedReferencingError(err) from err
+E               jsonschema.exceptions._WrappedReferencingError: Unresolvable: missing.schema.yaml#/$defs/x
+
+.venv/lib/python3.14/site-packages/jsonschema/validators.py:464: _WrappedReferencingError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/documents/test_schema.py::test_resolve_schema_refs_when_relative_ref_in_defs
+FAILED tests/unit/project_index/features/validation/test_markdown.py::test_markdown_values_when_unresolvable
+FAILED tests/unit/project_index/features/validation/test_rules.py::test_check_schema
+FAILED tests/unit/project_index/features/validation/test_rules.py::test_check_schema_when_violations
+FAILED tests/unit/project_index/features/validation/test_rules.py::test_check_schema_when_unresolvable
+FAILED tests/unit/project_index/features/validation/test_rules.py::test_check_schema_when_empty
+FAILED tests/unit/project_index/features/write/test_hints.py::test_attach_schema_hints
+FAILED tests/unit/project_index/features/write/test_hints.py::test_attach_schema_hints_when_rules
+FAILED tests/unit/project_index/features/write/test_hints.py::test_attach_schema_hints_when_unresolvable
+9 failed, 828 passed in 148.94s (0:02:28)

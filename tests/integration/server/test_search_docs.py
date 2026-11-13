@@ -52,6 +52,28 @@ TAG_MCP = {"field": "tags", "op": "eq", "values": ["mcp"]}
 MAIN_TAG_MCP = {"field": "main_tags", "op": "eq", "values": ["mcp"]}
 NOTES_A = {"field": "id", "op": "eq", "values": ["notes/a.md"]}
 
+# `$defs.entry` が別のファイルの `summary` を相対パスで指し、`children` で自分自身を指すスキーマ
+DEFS_REF_SCHEMA = (
+    "type: object\n"
+    "properties:\n"
+    "  entries:\n"
+    "    type: array\n"
+    "    items: {$ref: '#/$defs/entry'}\n"
+    "$defs:\n"
+    "  entry:\n"
+    "    type: object\n"
+    "    properties:\n"
+    "      summary: {$ref: 'common.schema.yaml#/$defs/summary'}\n"
+    "      children:\n"
+    "        type: array\n"
+    "        items: {$ref: '#/$defs/entry'}\n"
+)
+# `$defs.entry` の `summary` が無いファイルを指すスキーマ
+MISSING_REF_SCHEMA = DEFS_REF_SCHEMA.replace("common.schema.yaml", "missing.schema.yaml")
+COMMON_SCHEMA = "$defs:\n  summary:\n    type: string\n"
+MISSING_REF = "missing.schema.yaml#/$defs/summary"
+ENTRIES = [{"summary": "a", "children": [{"summary": "b"}]}]
+
 
 def _notes_files(
     sample_file_set: Callable[..., dict[str, str]],
@@ -956,3 +978,55 @@ def test_normal_when_tags_are_objects(
     values = picked.data["items"][0]["values"]
     assert values["tags"] == ["mcp", "設計"]
     assert values["main_tags"] == ["mcp"]
+
+
+def test_normal_when_relative_ref_in_defs(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_doc_text: Callable[..., str],
+) -> None:
+    """$defs の中の相対パスの参照を解決して検査し、文書を返す（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "schemas/sample.schema.yaml": DEFS_REF_SCHEMA,
+            "schemas/common.schema.yaml": COMMON_SCHEMA,
+            "docs/doc-1.yaml": sample_doc_text("doc-1", "文書 1", entries=ENTRIES),
+        }
+    )
+    source = make_source("sample", files)
+    env = make_server(source)
+    # 実行
+    result = env.call("search_docs", cwd=str(source.folder), filter=DOC_1, format="json")
+    # 検証
+    assert not result.is_error
+    assert [item["id"] for item in result.data["items"]] == ["doc-1"]
+    assert [note for note in result.data.get("notes", []) if note.startswith("doc-1:")] == []
+
+
+def test_normal_when_schema_ref_unresolvable(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_doc_text: Callable[..., str],
+) -> None:
+    """スキーマの参照先が無い文書も返し、解決できなかった参照を notes で知らせる（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "schemas/sample.schema.yaml": MISSING_REF_SCHEMA,
+            "docs/doc-1.yaml": sample_doc_text("doc-1", "文書 1", entries=ENTRIES),
+        }
+    )
+    source = make_source("sample", files)
+    env = make_server(source)
+    # 実行
+    result = env.call("search_docs", cwd=str(source.folder), filter=DOC_1, format="json")
+    # 検証
+    notes = " ".join(result.data["notes"])
+    assert not result.is_error
+    assert [item["id"] for item in result.data["items"]] == ["doc-1"]
+    assert "doc-1:" in notes
+    assert MISSING_REF in notes
+    assert "schemas/sample.schema.yaml" in notes

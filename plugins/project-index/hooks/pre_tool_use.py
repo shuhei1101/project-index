@@ -13,6 +13,8 @@ from typing import Any, cast
 
 # フックの入力から `tool_input` へ上書きで入れるキー
 INJECTED_KEYS = ("cwd", "session_id", "agent_id")
+# `permissionDecisionReason` に入れる固定の文
+PERMISSION_DECISION_REASON = "文書の MCP の入力に作業場所とセッションを入れた"
 
 
 def build_updated_input(event: dict[str, Any]) -> dict[str, Any]:
@@ -46,6 +48,8 @@ def main() -> int:
     output = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
+            "permissionDecision": "allow",
+            "permissionDecisionReason": PERMISSION_DECISION_REASON,
             "updatedInput": build_updated_input(event),
         }
     }

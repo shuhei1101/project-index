@@ -713,6 +713,31 @@ def test_document_store_row_schema_when_records(
     assert result["required"] == ["path"]
 
 
+def test_document_store_row_schema_when_records_defs(
+    document_store: DocumentStore,
+    tmp_path: Path,
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+) -> None:
+    """records の行は最上位の $defs を残す（正常系）。"""
+    # 準備（files の要素が、自分を指す循環する定義 node を参照する）
+    node = {"type": "object", "properties": {"children": {"items": {"$ref": "#/$defs/node"}}}}
+    notes_schema = {
+        "type": "object",
+        "properties": {"files": {"type": "array", "items": {"$ref": "#/$defs/node"}}},
+        "$defs": {"node": node},
+    }
+    source = _row_schema_source(
+        tmp_path / "ws", notes_schema, make_source_config, make_served_source
+    )
+    # 実行
+    result = document_store.row_schema(make_target(source), "notes")
+    # 検証
+    assert result["$defs"] == {"node": node}
+    assert result["properties"]["children"]["items"] == {"$ref": "#/$defs/node"}
+
+
 def test_document_store_row_schema_when_items_missing(
     document_store: DocumentStore,
     tmp_path: Path,

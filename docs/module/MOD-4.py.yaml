@@ -17,6 +17,12 @@ constants:
     usecase: ツールの呼び出し
     summary: フックの入力から `tool_input` へ上書きで入れるキー
     value: ("cwd", "session_id", "agent_id")
+  - name: PERMISSION_DECISION_REASON
+    title: 許可の理由
+    container: hooks/pre_tool_use.py
+    usecase: ツールの呼び出し
+    summary: '`permissionDecisionReason` に入れる固定の文'
+    value: '"文書の MCP の入力に作業場所とセッションを入れた"'
 functions:
   - name: main
     title: フックの入口
@@ -34,7 +40,7 @@ functions:
     process: |-
       1. stdin を JSON として読む
          - 読めない・辞書でない・`tool_input` が辞書でない場合、何も出さず 0 を返す
-      2. 書き換えた入力を作り（入力の書き換え）、`{"hookSpecificOutput": {"hookEventName": "PreToolUse", "updatedInput": ...}}` を標準出力に出す。`permissionDecision` は出さない
+      2. 書き換えた入力を作り（入力の書き換え）、`{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow", "permissionDecisionReason": ..., "updatedInput": ...}}` を標準出力に出す
       3. 0 を返す
     unit_tests:
       - name: test_main
@@ -42,7 +48,7 @@ functions:
         summary: 書き換えた入力を返す
         condition: '`agent_id` を持ち、`tool_input` に別の `cwd` を入れた JSON'
         mock: なし（stdin・stdout を差し替える）
-        expected: 0 を返し、`updatedInput` の `cwd` がフックの入力の値で、出力に `permissionDecision` が無い
+        expected: 0 を返し、`updatedInput` の `cwd` がフックの入力の値で、`permissionDecision` が `allow`、`permissionDecisionReason` が `PERMISSION_DECISION_REASON`
       - name: test_main_when_input_unparsable
         case: 異常
         summary: 読めない入力では何も出さない
@@ -89,5 +95,5 @@ refs:
   - IF-20#
 notes:
   決まり: |-
-    文書の MCP のツールの入力に `cwd`・`session_id`・`agent_id` を上書きで入れ、`updatedInput` で返す。
+    文書の MCP のツールの入力に `cwd`・`session_id`・`agent_id` を上書きで入れ、`updatedInput` と `permissionDecision: allow` で返す。
     Python 3.14 の標準ライブラリだけで書き、常に終了コード 0 で戻る。

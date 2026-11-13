@@ -54,12 +54,19 @@ functions:
         required: true
         passing: positional
         description: 文書のストアの『種類のスキーマ』。空の辞書は検査しない
+      - name: schema_file
+        title: スキーマのファイル
+        type: str
+        required: true
+        passing: keyword
+        description: 違反に書くスキーマのファイル（配信元の直下からのパス、ほかの配信元の参照は `{配信元}:{パス}@{リビジョン}`）
     returns:
       type: list[Violation]
       description: 違反。項目のパスの昇順
     process: |-
       1. `schema` が空なら空の並びを返す
       2. `jsonschema.validators.validator_for` でスキーマの `$schema` に合う検査器を選び（無ければ Draft 2020-12）、`format_checker` を付けて `iter_errors` で全ての誤りを取る
+         - 検査の途中で `referencing.exceptions.Unresolvable` が送出された場合、`path` が `$`、`rule` が `スキーマの参照 {Unresolvable.ref} を解決できません（{schema_file}）`、`fix` が `参照先のファイルと定義があるかを確認してください` の違反 1 件だけを返す
       3. 誤りごとに、`absolute_path` を `a.b[0]` の形の項目のパス（項目のパスへの変換。最上位は `$`）に、`message` を決まりにした `Violation` を作る。`fix` には `validator` が `required`・`enum`・`type` のとき、足りないキー・許す値・期待する型を書く
       4. 項目のパスの昇順に並べて返す
     unit_tests:
@@ -76,6 +83,13 @@ functions:
         condition: '`required: [id]` と `properties.items.items.type: integer` に `{"items": [1, "x"]}`'
         mock: なし
         expected: 2 件で、`$` の `fix` に `id`、`items[1]` の `fix` に `integer`
+        exception: '-'
+      - name: test_check_schema_when_unresolvable
+        case: 正常
+        summary: 解決できない参照
+        condition: '`properties.a` が `{"$ref": "missing.schema.yaml#/$defs/x"}` のスキーマに `{"a": 1}`、`schema_file="schemas/note.schema.yaml"`'
+        mock: なし
+        expected: '1 件で、`path` が `$`、`rule` に `missing.schema.yaml#/$defs/x` と `schemas/note.schema.yaml` が入る'
         exception: '-'
       - name: test_check_schema_when_empty
         case: 正常

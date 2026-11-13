@@ -50,6 +50,8 @@ class SearchItem(ApiModel):
     """語での検索の結果の文書。"""
 
     path: str
+    id: str
+    file_path: str
     name: str
     snippets: list[str]
 
@@ -93,6 +95,9 @@ class SourceConfigResponse(ApiModel):
     documents: list[dict[str, Any]]
     decisions: dict[str, list[str]]
     github: GitHubTarget | None
+    # 中のキー `ignore_keys` は配信元の設定から写したまま camelCase にしないため辞書で持つ
+    diff: dict[str, list[str]]
+    schemas: dict[str, dict[str, Any]] | None = None
 
 
 class DocumentListItem(ApiModel):
@@ -108,11 +113,18 @@ class DocumentListItem(ApiModel):
     body_path: str | None = None
 
 
+class DocumentListEntry(DocumentListItem):
+    """文書の一覧の 1 件。文書の取得のメタデータに無いバージョンと値を持つ。"""
+
+    version: str
+    value: dict[str, Any] | None = None
+
+
 class DocumentListResponse(ApiModel):
     """GET `/sources/{source}/docs` の応答。"""
 
     ref: str
-    documents: list[DocumentListItem]
+    documents: list[DocumentListEntry]
 
 
 class DocumentValueResponse(ApiModel):

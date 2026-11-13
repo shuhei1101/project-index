@@ -35,8 +35,8 @@ def test_main(
     assert code == 0
     assert specific["hookEventName"] == "PreToolUse"
     assert specific["updatedInput"]["cwd"] == "/repo"
-    assert "permissionDecision" not in specific
-    assert "permissionDecision" not in output
+    assert specific["permissionDecision"] == "allow"
+    assert specific["permissionDecisionReason"] == hook.PERMISSION_DECISION_REASON
 
 
 def test_main_when_input_unparsable(
