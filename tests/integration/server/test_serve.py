@@ -800,7 +800,10 @@ def test_normal_when_source_guide_changed_before_connect(
     sample_file_set: Callable[..., dict[str, str]],
     sample_config_text: Callable[..., str],
 ) -> None:
-    """default_ref に when の書き換えを commit した後の新しい接続が、書き換えた when を返す（正常系）。"""
+    """default_ref に when の書き換えを commit した後の新しい接続が、書き換えた when を返す（正常系）。
+
+    `initialize` が待たずに応答することは、単体テスト `test_docs_instructions` が確かめる。
+    """
     # 準備
     sample = make_source(
         "sample",
@@ -816,9 +819,7 @@ def test_normal_when_source_guide_changed_before_connect(
         sample.folder, {"project-index.yaml": sample_config_text(_when_line("後の使う場面"))}
     )
     # 実行
-    started = time.monotonic()
     first = _instructions(port)
-    first_elapsed = time.monotonic() - started
     deadline = time.monotonic() + REFRESH_WAIT_SEC
     after = first
     while "`sample`: 後の使う場面" not in after and time.monotonic() < deadline:
@@ -828,7 +829,6 @@ def test_normal_when_source_guide_changed_before_connect(
         listed = _tool_data(call_tool(client, port, "/mcp/", "describe", cwd=cwd, format="json"))
     # 検証
     assert "`sample`: 前の使う場面" in before
-    assert first_elapsed < REFRESH_WAIT_SEC
     assert "`sample`: 後の使う場面" in after
     assert [item["when"] for item in listed["sources"]] == [["後の使う場面"]]
     assert process.poll() is None

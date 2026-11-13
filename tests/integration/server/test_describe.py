@@ -24,7 +24,6 @@ OTHER_WHEN = ("別のリポジトリの設計を確かめるとき", "別のリ�
 # 裏の確認の後の反映を待つ上限の秒数と、問い合わせ直す間隔
 REFRESH_WAIT_SEC = 60
 REFRESH_POLL_SEC = 0.5
-REBUILT_LOG = "default_ref が進んだので配信元を組み立て直した"
 
 
 def _when_line(*lines: str) -> str:
@@ -437,9 +436,12 @@ def test_normal_when_source_when_changed(
     commit_all: Callable[..., str],
     sample_file_set: Callable[..., dict[str, str]],
     sample_config_text: Callable[..., str],
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """default_ref に when の書き換えを commit した後の一覧が、裏の確認の後に書き換えた when を返す（正常系）。"""
+    """default_ref に when の書き換えを commit した後の一覧が、裏の確認の後に書き換えた when を返す（正常系）。
+
+    待たずに応答することと確認の重複の抑止は、単体テスト `test_describe_when_refresh_requested`・
+    `test_source_registry_refresh_later_when_running` が確かめる。
+    """
     # 準備
     config = sample_config_text(_when_line("前の使う場面"))
     sample = make_source("sample", sample_file_set(**{"project-index.yaml": config}))
@@ -451,25 +453,18 @@ def test_normal_when_source_when_changed(
     commit_all(
         sample.folder, {"project-index.yaml": sample_config_text(_when_line("後の使う場面"))}
     )
-    caplog.set_level(logging.INFO)
     # 実行
-    started = time.monotonic()
     first = _sample_when(env, cwd)
-    first_elapsed = time.monotonic() - started
-    _sample_when(env, cwd)
     deadline = time.monotonic() + REFRESH_WAIT_SEC
     after = first
     while after != ["後の使う場面"] and time.monotonic() < deadline:
         time.sleep(REFRESH_POLL_SEC)
         after = _sample_when(env, cwd)
     outside = _sample_when(env, other_cwd, outside_scope=True)
-    rebuilt = [record for record in caplog.records if REBUILT_LOG in record.getMessage()]
     # 検証
     assert before == ["前の使う場面"]
-    assert first_elapsed < REFRESH_WAIT_SEC
     assert after == ["後の使う場面"]
     assert outside == ["後の使う場面"]
-    assert len(rebuilt) == 1
 
 
 def test_normal_when_refs_and_worktrees(
