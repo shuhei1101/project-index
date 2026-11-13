@@ -97,7 +97,7 @@ class DocumentChecker:
     def _validate(
         self, target: Target, document: Document, validator_id: str, *, on: Literal["read", "write"]
     ) -> list[Violation]:
-        """`validators[]` の 1 行を通す（読み取りの結果は文書のバージョンごとに控える）。"""
+        """`validators[]` の 1 行を通す（読み取りの結果は文書のバージョンごとにキャッシュする）。"""
         key = (target.source.id, document.kind, validator_id, document.version)
         if on == "read":
             with self._lock:
@@ -107,7 +107,7 @@ class DocumentChecker:
             if cached is not None:
                 return cached
         found, ran = self._run_validator(target, document, validator_id)
-        # 動かせなかった結果は控えない
+        # 動かせなかった結果はキャッシュしない
         if on == "read" and ran:
             with self._lock:
                 self._read_cache[key] = found
@@ -134,6 +134,6 @@ class DocumentChecker:
         )
 
     def clear(self) -> None:
-        """読み取りの結果の控えを捨てる。"""
+        """読み取りの結果のキャッシュを捨てる。"""
         with self._lock:
             self._read_cache.clear()

@@ -106,7 +106,7 @@ def test_document_checker_check_when_on_read(
     make_document: Callable[..., Document],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """通す時点と控え（正常系）。"""
+    """通す時点とキャッシュ（正常系）。"""
     # 準備
     calls: list[list[str]] = []
     real = service_module.run_script

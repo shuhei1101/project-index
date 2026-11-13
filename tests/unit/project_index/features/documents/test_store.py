@@ -595,7 +595,7 @@ def test_document_store_schema_when_revision(
     document_store: DocumentStore,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """リビジョンのスキーマは commit で控える（正常系）。"""
+    """リビジョンのスキーマは commit でキャッシュする（正常系）。"""
     # 準備
     root = git_repo(
         {"rules/a.yaml": "id: a\n", "schemas/rule.schema.yaml": "type: object\nrequired: [id]\n"}

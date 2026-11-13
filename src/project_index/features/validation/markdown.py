@@ -115,7 +115,7 @@ def check_markdown_values(
     timeout_sec: float,
     stopped: str | None = None,
 ) -> MarkdownCheck:
-    """値ごとに mdmark の点検を通し、書き方の警告を違反に、点検できなかった値を控える。"""
+    """値ごとに mdmark の点検を通し、書き方の警告を違反に、点検できなかった値を記録する。"""
     violations: list[Violation] = []
     unchecked: list[UncheckedKey] = []
     for path, text in values.items():

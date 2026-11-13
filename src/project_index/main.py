@@ -298,7 +298,7 @@ def reload_sources(
     converter: ConvertService,
     checks: SourceChecks,
 ) -> list[SourceStatus]:
-    """配信元の一覧を読み直し、配信元の内容を控えた部品の控えを捨てる。"""
+    """配信元の一覧を読み直し、配信元の内容をキャッシュした部品のキャッシュを捨てる。"""
     statuses = registry.reload(terminal)
     discard_source_caches(
         registry.served(), store=store, checker=checker, converter=converter, checks=checks
@@ -315,10 +315,10 @@ def reload_changed_sources(
     converter: ConvertService,
     checks: SourceChecks,
 ) -> list[SourceStatus]:
-    """配信元の一覧の変わった行だけを読み直し、新しく読んだ配信元だけで控えを作り直す。"""
+    """配信元の一覧の変わった行だけを読み直し、新しく読んだ配信元だけでキャッシュを作り直す。"""
     before = {id(source) for source in registry.served()}
     statuses = registry.reload_changed(terminal)
-    # 使い回した配信元は検査の控えが今のままなので、新しく読んだ配信元だけを検査する
+    # 使い回した配信元は検査のキャッシュが今のままなので、新しく読んだ配信元だけを検査する
     fresh = [source for source in registry.served() if id(source) not in before]
     discard_source_caches(fresh, store=store, checker=checker, converter=converter, checks=checks)
     return statuses
@@ -332,7 +332,7 @@ def discard_source_caches(
     converter: ConvertService,
     checks: SourceChecks,
 ) -> None:
-    """配信元の内容を控えた部品の控えを捨て、渡した配信元ごとのずれと警告をログに書く。"""
+    """配信元の内容をキャッシュした部品のキャッシュを捨て、渡した配信元ごとのずれと警告をログに書く。"""
     store.clear()
     checker.clear()
     converter.clear()
@@ -344,7 +344,7 @@ def check_sources(
 ) -> None:
     """渡した配信元ごとに検査して結果を持たせ、ずれと警告をログに書く。"""
     for source in sources:
-        # 検査の結果を控えに持たせ、`describe` の警告が読めるようにする
+        # 検査の結果をキャッシュに持たせ、`describe` の警告が読めるようにする
         check = checks.refresh(store, source)
         report = check.report
         for label, values in (

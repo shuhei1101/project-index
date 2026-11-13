@@ -199,7 +199,7 @@ class DocsMCPServer(MCPServer):
 
 def _docs_instructions(handlers: Handlers) -> str:
     """プロンプトの文と配信元と使う場面の一覧を上限の字数に収めて描き、並べた配信元の裏の確認を依頼する。"""
-    # initialize の中で Git を呼ばないよう、待たずに今の控えを読む
+    # initialize の中で Git を呼ばないよう、待たずに今のキャッシュを読む
     guided = [source for source in handlers.registry.served() if source.config.when]
     entries = [{"id": source.id, "when": source.config.when[0]} for source in guided]
     omitted = 0
