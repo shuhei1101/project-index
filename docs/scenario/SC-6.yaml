@@ -741,13 +741,13 @@ scenarios:
         M->>M: 端末の設定の配信元の順に、4,096 字に収まる配信元まで一覧に加える
         M-->>A: instructions（収まった配信元の一覧と、除外した件数と describe(outside_scope: true) の案内）
         A->>M: describe(outside_scope: true)
-        M-->>A: 全ての配信元と使う場面
+        M-->>A: 作業場所から使える配信元と作業範囲の外で参照できる配信元の使う場面
       ```
 
       <!-- /map -->
     expected:
       - instructions が 4,096 字以内に収まる
-      - 'instructions の一覧が `src01` から端末の設定の順に並び、一覧に含めなかった配信元の件数と、`describe(outside_scope: true)` で全ての配信元の使う場面を引けることを案内する'
+      - 'instructions の一覧が `src01` から端末の設定の順に並び、一覧に含めなかった配信元の件数と、`describe(outside_scope: true)` で、作業場所から使える配信元と作業範囲の外で参照できる配信元の使う場面を引けることを案内する'
       - instructions の一覧の配信元の数と案内の件数の合計が 30 になる
     test: test_normal_when_source_guide_exceeds_limit
   - name: 正常シナリオ（使う場面を書き換えた後に接続する）

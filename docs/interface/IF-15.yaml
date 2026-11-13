@@ -549,7 +549,7 @@ flows:
       - instructions が 4,096 字以内
       - 一覧が `src01` から端末の設定の順に並び、途中の配信元を飛ばさない
       - 一覧の配信元の数と、案内の載せなかった件数の合計が 30
-      - '案内が `describe(outside_scope: true)` で全ての配信元の使う場面を引けることを示す'
+      - '案内が `describe(outside_scope: true)` で、作業場所から使える配信元と作業範囲の外で参照できる配信元の使う場面を引けることを示す'
     test: test_normal_when_source_guide_exceeds_limit
   - name: 正常系（使う場面を書き換えた後に接続する）
     summary: '`default_ref` に `when` の書き換えを commit した後の新しい接続の instructions が、`reload` をしなくても書き換えた `when` の 1 行目を返す'
