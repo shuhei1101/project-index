@@ -406,7 +406,7 @@ functions:
          - どちらも無く、`cwd` が配信元のワークツリーの中の場合、そのワークツリーを `ref` なしで読む
          - どちらも無く、作業中の配信元か Git の管理外の配信元の場合、`root` を `ref` なしで読む
          - それ以外は `root` を `default_ref` で読む
-      5. `ref` で読む場所は、`ref` を履歴の『リビジョンの解決』（`date_base` は配信元の `default_ref`）で 1 回だけ解き、解いた commit を `Target.commit` に持たせる。ブランチ名の `ref` も要求ごとに解き直し、要求をまたいで commit を控えない
+      5. `ref` で読む場所は、`ref` を履歴の『リビジョンの解決』（`date_base` は配信元の `default_ref`）で 1 回だけ解き、解いた commit を `Target.commit` に持たせる。ブランチ名の `ref` も要求ごとに解き直し、要求をまたいで commit をキャッシュしない
       6. `Target` の並びを返す
     exceptions:
       - name: SourceNotReadableError

@@ -28,7 +28,7 @@ functions:
         passing: keyword
         description: 配信中の配信元と配信の状態
       - name: checks
-        title: 配信元の検査の控え
+        title: 配信元の検査のキャッシュ
         type: SourceChecks
         required: true
         passing: keyword
@@ -43,7 +43,7 @@ functions:
       type: list[str]
       description: 警告の文
     process: |-
-      1. 使える配信元ごとに最後の検査の結果を読み（配信元の検査の控え.結果の取得。`None` の配信元は同期のずれ・エイリアス・nav を飛ばす）、件数が 0 でない並びごとに `{id}: {並びの名前}が {件数} 件あります（check_project で確認できます）` を加える
+      1. 使える配信元ごとに最後の検査の結果を読み（配信元の検査のキャッシュ.結果の取得。`None` の配信元は同期のずれ・エイリアス・nav を飛ばす）、件数が 0 でない並びごとに `{id}: {並びの名前}が {件数} 件あります（check_project で確認できます）` を加える
       2. 使える配信元の設定のバージョンが `old` なら `{id}: 設定のバージョンが古い（{設定}・読み込める {現在}）。project-index migrate で移し替えます` を加える（バージョンの新旧）
       3. 端末の設定のバージョンが `old` なら同じ形の文を加える（使える配信元が 0 件でも加える）。端末の設定の `unknown_keys` が空でなければ `端末の設定: {ファイル} に project-index が知らないキーがあります（{キーを , でつないだもの}）。値は使用しません` を加える（使える配信元が 0 件でも加える）
       4. 使える配信元ごとに、`alias_violations` が 0 件でなければ `{id}: エイリアスのキーの違反が {件数} 件あります（check_project で確認できます）` を加え、nav の警告（読み取り API）ごとに `{id}: {path}: {rule}` を加える
@@ -53,7 +53,7 @@ functions:
         case: 正常
         summary: 同期のずれ・古い設定・配信していない配信元を並べる
         condition: 使える配信元 a（ファイルが無い行 2 件・当たらない関連 1 件・古い設定）、`not_served` の b
-        mock: なし（検査の結果は配信元の検査の控えに流してから渡す）
+        mock: なし（検査の結果は配信元の検査のキャッシュに流してから渡す）
         expected: 警告が 4 件（a のファイルが無い行・a の当たらない関連・a の古い設定・b の配信していない）
       - name: test_collect_warnings_when_unavailable_source
         case: 正常
@@ -70,7 +70,7 @@ functions:
       - name: test_collect_warnings_when_unchecked
         case: 正常
         summary: まだ検査していない配信元は、同期のずれを載せない
-        condition: 使える配信元 a（管理用の YAML に無いファイル 1 件）を、配信元の検査の控えに流さずに渡す
+        condition: 使える配信元 a（管理用の YAML に無いファイル 1 件）を、配信元の検査のキャッシュに流さずに渡す
         mock: なし
         expected: 警告が空
       - name: test_collect_warnings_when_no_source_available

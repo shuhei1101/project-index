@@ -45,7 +45,7 @@ functions:
         summary: 配信中・検証で外した・無効の配信元を並べる
         condition: 配信元 3 つ（`serving` で索引に無いファイル 1 件・`not_served`・`disabled`）、`env` は空
         mock: なし（一時ディレクトリの配信元）
-        expected: '`address` が `http://127.0.0.1:{port}/`、`sources` が 3 件で `serving` だけ `sync.unindexed_files` が 1（配信元の検査の控えに検査の結果を入れてから呼ぶ）'
+        expected: '`address` が `http://127.0.0.1:{port}/`、`sources` が 3 件で `serving` だけ `sync.unindexed_files` が 1（配信元の検査のキャッシュに検査の結果を入れてから呼ぶ）'
       - name: test_get_status_when_port_env
         case: 正常
         summary: '`PROJECT_INDEX_PORT` のポートをアドレスに使う'
@@ -73,7 +73,7 @@ functions:
     scope: public
     is_async: false
     thread_safe: true
-    side_effects: 配信元の一覧を入れ替え、文書・検査・変換の控えを捨てる（`handlers.reload_sources`）
+    side_effects: 配信元の一覧を入れ替え、文書・検査・変換のキャッシュを捨てる（`handlers.reload_sources`）
     args:
       - name: handlers
         title: 部品
@@ -86,7 +86,7 @@ functions:
       description: 読み直しの結果
     process: |-
       1. `handlers.settings_lock` を取る（端末の設定の保存と同じロック）
-      2. 読み直す前の `serving` の ID を控える（`handlers.registry.statuses()`）
+      2. 読み直す前の `serving` の ID を記録する（`handlers.registry.statuses()`）
       3. `handlers.terminal.file` を読む（端末の設定の読み込み）
       4. 配信元を読み直す（`handlers.reload_sources`）
       5. 読み直した後の `serving` の ID と比べ、`added`・`removed`・`not_served` を作る
@@ -312,7 +312,7 @@ functions:
     usecase: 試しの変換
     role: サービス
     summary: 指した配信元のファイルを、その種類の `converters[]` のスクリプトで Markdown にする
-    description: 配信中の変換の控えを汚さないよう、一時フォルダを控えの場所にした使い捨ての `ConvertService` で変換する。
+    description: 配信中の変換のキャッシュを汚さないよう、一時フォルダをキャッシュのフォルダにした使い捨ての `ConvertService` で変換する。
     scope: public
     is_async: false
     thread_safe: true
@@ -343,7 +343,7 @@ functions:
       4. その種類の文書を読み、`path` か `body_path` が `file` の文書だけを残す（`DocumentStore.load`）
          - 残らない場合、`DocumentNotFoundError` を送出する
       5. 文書の行が `converter` を持たなければ `ConverterNotDefinedError` を送出する
-      6. 一時フォルダを控えの場所にした `ConvertService` で文書ごとに変換する（`ConvertService.convert`）
+      6. 一時フォルダをキャッシュのフォルダにした `ConvertService` で文書ごとに変換する（`ConvertService.convert`）
          - 変換が `failure` を返した場合、`ConvertScriptError` を送出する
       7. 文書が複数なら Markdown を `\n\n---\n\n` でつなぐ
       8. `converter` を変換の行の `run` の最後の要素にする
@@ -376,7 +376,7 @@ functions:
         summary: 配信元の変換スクリプトで変換する
         condition: '`converter` が `python scripts/convert.py` の行に当たる YAML のファイル'
         mock: なし（一時ディレクトリのスクリプト）
-        expected: '`converter` が `scripts/convert.py`、`markdown` がスクリプトの標準出力。`handlers.converter` の控えの場所にファイルが無い'
+        expected: '`converter` が `scripts/convert.py`、`markdown` がスクリプトの標準出力。`handlers.converter` のキャッシュのフォルダにファイルが無い'
       - name: test_try_convert_when_outside
         case: 異常
         summary: 配信元の外を指す
@@ -510,7 +510,7 @@ functions:
         type: Handlers
         required: true
         passing: positional
-        description: 登録簿と配信元の検査の控えを使う
+        description: 登録簿と配信元の検査のキャッシュを使う
     returns:
       type: list[SourceState]
       description: '`sources[]` の順の配信元の状態'
@@ -529,7 +529,7 @@ functions:
       - name: test_source_states_when_not_checked
         case: 正常
         summary: 検査が済んでいない配信元は同期の件数を持たず、ファイルをたどらない
-        condition: '`serving` の 1 行で、配信元の検査の控えに結果が無い。`check_sync` を呼ぶと失敗する偽物に差し替える'
+        condition: '`serving` の 1 行で、配信元の検査のキャッシュに結果が無い。`check_sync` を呼ぶと失敗する偽物に差し替える'
         mock: '`check_sync`（呼ばれたら `AssertionError` を送る偽物）'
         expected: '`serving` の行の `sync` が `None` で、`check_sync` が呼ばれない'
       - name: test_source_states_without_refresh

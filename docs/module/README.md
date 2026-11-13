@@ -24,7 +24,7 @@
 | [索引のサーバー / 変更 / service.py](./MOD-14.py.yaml) | `list_changes` の区間か前回読んだ時点からの変わった文書と差分。 |
 | [索引のサーバー / 変更 / types.py](./MOD-15.py.yaml) | `list_changes` の要求と結果の型。 |
 | [索引のサーバー / 変換 / decisions.py](./MOD-16.py.yaml) | 配信元の `decisions.folders` から検討事項の文書を探す。 |
-| [索引のサーバー / 変換 / service.py](./MOD-17.py.yaml) | `converters[]` の実行と結果の控え。 |
+| [索引のサーバー / 変換 / service.py](./MOD-17.py.yaml) | `converters[]` の実行と結果のキャッシュ。 |
 | [索引のサーバー / 変換 / types.py](./MOD-18.py.yaml) | 変換の結果と変換の失敗のデータモデル。 |
 | [索引のサーバー / 説明 / render.py](./MOD-19.py.yaml) | `describe` の結果の Markdown。 |
 | [索引のサーバー / 説明 / service.py](./MOD-20.py.yaml) | `describe` の使える配信元・説明書と種類・種類のスキーマ。 |
@@ -116,7 +116,7 @@
 | [索引のサーバー / 会話の記録](./MOD-106.yaml) | 会話キー（`session_id`・`agent_id`）ごとに、返した文書の ID とバージョン・本文を返した時点の内容・閲覧と編集を `state_dir` の SQLite に記録する。 |
 | [索引のサーバー / 入口](./MOD-107.yaml) | `project-index` コマンドの入口。引数を読み、バージョン・ヘルプを出すか、サブコマンドの処理へ渡す。 |
 | [索引のサーバー / 共通](./MOD-108.yaml) | どの分類からも使う例外の階層・YAML の読み書き・内容のハッシュ・パスの照合と、端末の設定の API への書き込みの要求のオリジンの確認。 |
-| [索引のサーバー / 変換](./MOD-109.yaml) | `converters[]` を指す種類の文書を、配信元のスクリプトで Markdown にし、結果を控える。 |
+| [索引のサーバー / 変換](./MOD-109.yaml) | `converters[]` を指す種類の文書を、配信元のスクリプトで Markdown にし、結果をキャッシュする。 |
 | [索引のサーバー / 変更](./MOD-110.yaml) | `list_changes` の処理。区間（commit・日時・ブランチ・タグ）か、この会話で前回読んだ時点から今までに変わった文書・変わったキー・差分の行を返す。 |
 | [索引のサーバー / 履歴](./MOD-111.yaml) | git を子プロセスで呼び、リビジョン（ブランチ・タグ・commit・日時）の解決・一覧・変わったファイル・ファイルの日時を返す。 |
 | [索引のサーバー / 文書のMCP](./MOD-112.yaml) | 文書の MCP（`/mcp`）と管理の MCP（`/_admin/mcp`）の組み立て。 |

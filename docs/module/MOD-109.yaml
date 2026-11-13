@@ -8,7 +8,7 @@ directory: |-
   ├─ __init__.py   # 公開する型と関数の再エクスポート
   ├─ types.py      # Converted / ConvertFailure
   ├─ decisions.py  # find_decisions / DECISION_ID / DECISION_DOCS_DIR（検討事項の文書を探す）
-  └─ service.py    # ConvertService（converters[] の実行・結果の控え）
+  └─ service.py    # ConvertService（converters[] の実行・結果のキャッシュ）
   ```
 diagrams:
   - name: 全体
@@ -20,7 +20,7 @@ diagrams:
         変換の結果 o-- 変換の失敗
         class 変換 {
           +変換する(読み書きの場所, 文書) 変換の結果
-          +控えを捨てる() None
+          +キャッシュを捨てる() None
         }
         class スクリプトの実行 {
           <<function>>
@@ -36,6 +36,6 @@ diagrams:
         click 変換の結果 href "./MOD-18.py.yaml#変換の結果"
 notes:
   受け持つこと: |-
-    変換の結果を控える。
+    変換の結果をキャッシュする。
     スキーマ駆動の Markdown への変換は dev-docs の画面のサーバーが持つ。
     検討事項の文書を探す処理もここに置く。
