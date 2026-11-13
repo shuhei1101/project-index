@@ -7,10 +7,10 @@ scenarios:
         description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
       - name: サンプルの配信元
         description: 文書の種類を 1 つ（スキーマと YAML 2 件。片方の `related` がもう片方を指す）と `project-index.yaml` を持つ git リポジトリ
-        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ。`project-index.yaml` の `when` に 2 行
       - name: 読み取りだけの配信元
         description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
-        notes: id `notes`。`scope.read` は sample のフォルダ
+        notes: id `notes`。`scope.read` は sample のフォルダ。`project-index.yaml` に `when` を記載しない
       - name: project-index
         description: 上の 2 つを配信している project-index
         notes: '`cwd` は sample のクローン本体'
@@ -24,9 +24,9 @@ scenarios:
         participant ST as 配信元の文書
 
         A->>M: describe()
-        M-->>A: 使える配信元の一覧（sample は読み書き、notes は読み取りだけ）
+        M-->>A: 使える配信元の一覧（sample は読み書き、notes は読み取りだけ。配信元ごとの使う場面）
         A->>M: describe(source: sample)
-        M-->>A: 説明書と種類の一覧
+        M-->>A: 使う場面・説明書と種類の一覧
         A->>M: search_docs(filter: kind が sample の種類, view: summary)
         M->>M: source を省いたので作業中の配信元 sample を指し、scope.read を確かめる
         M->>ST: 文書を読む
@@ -40,7 +40,8 @@ scenarios:
       <!-- /map -->
     expected:
       - '`describe()` が sample を読み書き、notes を読み取りだけとして返す'
-      - '`describe(source: sample)` が説明書と種類の一覧を返す'
+      - '`describe()` が sample の `when` の 2 行を返却し、`when` を記載しない notes の使う場面を空で返却する'
+      - '`describe(source: sample)` が `when` の 2 行と説明書と種類の一覧を返却する'
       - '`source` を省いた `search_docs` が sample の 2 件を、総件数 2 と各行の `version` つきで返す'
       - '`view: full` の `search_docs` が文書 1 の YAML を返す'
       - '`view: full` の `search_docs` の文書 1 が `<document path="{sample のクローン本体}/{文書 1 のパス}" scope="full">` で包まれる'
@@ -476,7 +477,7 @@ scenarios:
         description: なし（実環境で実行。`cwd` はテストが引数に入れる）
       - name: 別の配信元
         description: 文書の種類を 1 つと文書 2 件（片方の `related` がもう片方を指す）を持つ Git の配信元
-        notes: id `other`。`scope.read` は other のフォルダだけ。端末の設定の `outside_read` は書かない（既定 `true`）
+        notes: id `other`。`scope.read` は other のフォルダだけ。端末の設定の `outside_read` は書かない（既定 `true`）。`project-index.yaml` の `when` に 2 行
       - name: project-index
         description: sample と other を配信している project-index
         notes: '`cwd` は sample のクローン本体'
@@ -491,7 +492,7 @@ scenarios:
         participant L as 要求のログ
 
         A->>M: describe(outside_scope: true)
-        M-->>A: 作業範囲の外で読める配信元の一覧（other。作業範囲の外（参考））
+        M-->>A: 作業範囲の外で読める配信元の一覧（other と使う場面。作業範囲の外（参考））
         A->>M: describe(source: other, outside_scope: true)
         M->>M: other の scope.read に cwd が当たらず、outside_read が真
         M-->>A: 説明書と種類の一覧（作業範囲の外（参考））
@@ -508,6 +509,7 @@ scenarios:
       <!-- /map -->
     expected:
       - '`source` を省いた `describe(outside_scope: true)` が、作業範囲の外で読める配信元として other を「作業範囲の外（参考）」の表示付きで返し、`scope` に当たる sample を外の一覧に含めない'
+      - '`source` を省いた `describe(outside_scope: true)` の外の一覧の other の行が、`when` の 2 行を返却する'
       - '`outside_scope: true` の `describe`・`search_docs`・`trace_related`・`list_changes` が other の結果を返す'
       - 返した文書・一覧の行に「作業範囲の外（参考）」の表示が付く
       - 要求のログに、外から読んだ呼び出しの作業場所（`cwd`）と配信元 `other` が残る
@@ -660,13 +662,13 @@ scenarios:
         description: なし（実環境で実行）
       - name: project-index
         description: sample と other を配信している project-index
-        notes: '`cwd` は sample のクローン本体。sample のワークツリーに、管理用の YAML の `files` に無いファイルを 1 件置く'
+        notes: '`cwd` は sample のクローン本体。sample のワークツリーに、管理用の YAML の `files` に無いファイルを 1 件置く。sample の `project-index.yaml` の `when` に 2 行'
       - name: 別の配信元
         description: 作業範囲の外の配信元
-        notes: id `other`。`scope.read` は other のフォルダだけ
+        notes: id `other`。`scope.read` は other のフォルダだけ。`project-index.yaml` の `when` に 1 行
       - name: 設定が古い配信元
         description: '`project-index.yaml` の `version` がサーバーの読めるバージョンより古い配信元'
-        notes: id `old`。`scope.read` は sample のクローン本体を含む
+        notes: id `old`。`scope.read` は sample のクローン本体を含む。`project-index.yaml` に `when` を記載しない
     flow: |-
       <!-- map: {"title": "正常シナリオ（instructions の調査の案内を受け取る）"} -->
 
@@ -676,7 +678,7 @@ scenarios:
         participant M as 文書の MCP（/mcp）
 
         A->>M: initialize
-        M-->>A: instructions（使える配信元の引き方・設計書から調べる案内・作業場所の外を参照する案内・タグの付け方）
+        M-->>A: instructions（使える配信元の引き方・設計書から調べる案内・作業場所の外を参照する案内・タグの付け方・配信元と使う場面の一覧）
         A->>M: describe()
         M-->>A: 使える配信元と警告
       ```
@@ -686,7 +688,8 @@ scenarios:
       - 文書の MCP の instructions のタグの行が、単語まで分けてタグにすること・`action:`・`topic:`・`tool:` の命名・配信元のタグの規約に従うこと・付ける前に `group_by="tags"` で使われているタグを見ることを案内する
       - instructions が、使える配信元は引数なしの `describe()` で引けることを示し、SessionStart を参照しない
       - instructions が、コードや不具合の調査も設計書から参照し、設計書が指すコードを参照することを案内する
-      - 'instructions が、作業場所の外のリポジトリも `source` と `outside_scope: true` で参照でき、外で読める配信元の ID は `describe(outside_scope: true)` で引けることを案内し、配信元の ID を固有の値で持たない'
+      - 'instructions が、作業場所の外のリポジトリも `source` と `outside_scope: true` で参照でき、外で読める配信元の ID は `describe(outside_scope: true)` で引けることを案内し、プロンプトの文面に配信元の ID を固有の値で持たない'
+      - 'instructions の配信元と使う場面の一覧が、sample と other の ID と `when` の 1 行目を返却し、`when` を記載しない old を含まない'
       - 引数なしの `describe()` が、sample の索引の同期の件数 1 と、old の設定が古いことの警告を返す
     test: test_normal_when_research_guide_received
   - name: 正常シナリオ（MCP を使う場面の案内を受け取る）
@@ -717,6 +720,66 @@ scenarios:
       - 文書の MCP の各ツールの description が、何をする・いつ使う・いつ使わない・何を返さないを持つ
       - instructions・description に `MUST`・`必ず`・`禁止` の語が無い
     test: test_normal_when_usage_guide_received
+  - name: 正常シナリオ（配信元と使う場面の一覧が instructions の上限を超える）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 使う場面の長い配信元
+        description: '`project-index.yaml` の `when` の 1 行目が 200 字の配信元を 30 件'
+        notes: 'id `src01`〜`src30`。端末の設定の `sources[]` にこの順で記載する'
+      - name: project-index
+        description: 上の 30 件を配信している project-index
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（配信元と使う場面の一覧が instructions の上限を超える）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: initialize
+        M->>M: 端末の設定の配信元の順に、4,096 字に収まる配信元まで一覧に加える
+        M-->>A: instructions（収まった配信元の一覧と、除外した件数と describe(outside_scope: true) の案内）
+        A->>M: describe(outside_scope: true)
+        M-->>A: 全ての配信元と使う場面
+      ```
+
+      <!-- /map -->
+    expected:
+      - instructions が 4,096 字以内に収まる
+      - 'instructions の一覧が `src01` から端末の設定の順に並び、一覧に含めなかった配信元の件数と、`describe(outside_scope: true)` で全ての配信元の使う場面を引けることを案内する'
+      - instructions の一覧の配信元の数と案内の件数の合計が 30 になる
+    test: test_normal_when_source_guide_exceeds_limit
+  - name: 正常シナリオ（配信元を読み直した後に接続する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: project-index
+        description: sample を配信している project-index
+        notes: sample の `project-index.yaml` の `when` に 1 行
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（配信元を読み直した後に接続する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        actor U as 利用者
+        participant M as 文書の MCP（/mcp）
+        participant AD as 管理の MCP（/_admin/mcp）
+
+        A->>M: initialize
+        M-->>A: instructions（sample と使う場面の 1 行目）
+        U->>U: sample の when の 1 行目を書き換えて commit する
+        U->>AD: reload
+        A->>M: initialize（新しい接続）
+        M-->>A: instructions（sample と書き換えた使う場面の 1 行目）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`reload` の後の新しい接続の instructions が、書き換えた `when` の 1 行目を返却する'
+      - '`reload` の後も、サーバーを再起動せずに新しい接続の instructions が変わる'
+    test: test_normal_when_reloaded_before_connect
 lead: エージェントが文書の MCP で、作業場所から使用できる配信元の文書を探して参照するシナリオを定め、調査の流れを変えるときに参照する。
 issue: 14
 primary_actor: エージェント（Claude Code）
