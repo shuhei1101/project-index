@@ -59,6 +59,7 @@ def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]
     assert load_yaml(text)["sources"][1]["config"] == [str(extra.config[0])]
     assert docs.status_code == 200
     assert "extra" in described.text
+    assert response.json()["version"] == env.client.get("/settings/sources").json()["version"]
 
 
 def test_normal_when_source_disabled(
@@ -229,6 +230,52 @@ def test_normal_when_sent_keys_override(
     assert response.status_code == 200
     assert "outside_read" not in rows[1]
     assert {row["id"]: row["outsideRead"] for row in listed.json()["sources"]}["extra"] is True
+
+
+def test_normal_when_version_matched(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """取得した内容のバージョンを添えた保存を受ける（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    extra = make_source("extra")
+    env = make_server(sample, extra)
+    version = env.client.get("/settings/sources").json()["version"]
+    # 実行
+    response = env.client.put(
+        "/settings/sources",
+        json={"expectedVersion": version, "sources": [_row(sample)]},
+        headers=ORIGIN,
+    )
+    # 検証
+    assert response.status_code == 200
+    assert response.json()["version"] != version
+    assert [entry.id for entry in load_terminal_config(env.settings_path).sources] == ["sample"]
+
+
+def test_error_when_version_outdated(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """取得した後に書き換えられた端末の設定への保存を断る（異常系）。"""
+    # 準備
+    sample = make_source("sample")
+    extra = make_source("extra")
+    env = make_server(sample)
+    version = env.client.get("/settings/sources").json()["version"]
+    added = env.client.post(
+        "/settings/sources", json={"source": _row(extra)}, headers=ORIGIN
+    ).json()["version"]
+    # 実行
+    response = env.client.put(
+        "/settings/sources",
+        json={"expectedVersion": version, "sources": [_row(sample)]},
+        headers=ORIGIN,
+    )
+    # 検証
+    assert response.status_code == 409
+    assert response.json()["current"] == added
+    assert "id: extra" in env.settings_path.read_text(encoding="utf-8")
+    assert env.client.get("/sources/extra/docs").status_code == 200
 
 
 UNKNOWN_KEY_EXTRA = "# MindStella の設定\nmindstella:\n  threads: 3  # 同時に動かす数\n"

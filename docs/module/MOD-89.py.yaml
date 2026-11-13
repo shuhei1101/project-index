@@ -166,6 +166,11 @@ data_models:
         type: PromptSet
         access: 公開
         description: 起動のときに読んだプロンプトの YAML（文書の MCP・管理の MCP が描画する。書き換えは再起動で効かせる）
+      - name: reload_changed
+        title: 変わった配信元の読み直し
+        type: Callable[[TerminalConfig], list[SourceStatus]]
+        access: 公開
+        description: 『変わった配信元の読み直し』をこの `Handlers` の部品で束ねたもの。配信元の 1 行の追加・変更・削除が呼ぶ
 classes:
   - name: PortInUseError
     title: ポートが使用中
@@ -358,7 +363,8 @@ functions:
       2. `state_dir` を作る
       3. 配信元の一覧・リビジョンの書き出し（`{state_dir}/snapshots`）・文書のストア・変換（`{state_dir}/converted`、制限時間は `script_timeout_sec`）・会話の記録（`{state_dir}/seen.sqlite3`、保持日数は `seen_retention_days`）・文書の検査（制限時間は `script_timeout_sec`）・配信元ごとの排他・再起動の制御を作る。配信元の一覧は `loading=True` で作り、組み立て直した配信元を 1 つ受け取って『配信元の控えの破棄』をこれらの部品で呼ぶ関数を `on_rebuilt` に渡す
       4. 『配信元の読み直し』をこれらの部品で束ねた関数を作る（呼ぶのは配信元の読み込みの開始と配信元の保存）。関数は、読み直した後に起動時の端末の設定の `sources` と `unknown_keys` を新しい端末の設定の値に差し替え、新しい端末の設定の知らないキーを警告のログに書く（知らないキーのログ）
-      5. プロンプトの一式・これらの部品・手順 4 の関数を持つ `Handlers` を返す
+      5. 『変わった配信元の読み直し』をこれらの部品で束ねた関数を作る（呼ぶのは配信元の 1 行の追加・変更・削除）。読み直した後の差し替えと警告のログは手順 4 と同じ
+      6. プロンプトの一式・これらの部品・手順 4・5 の関数を持つ `Handlers` を返す
     exceptions:
       - name: PromptInvalidError
         condition: プロンプトの YAML が無い・読めない・スキーマに違反する・描画できない
@@ -394,6 +400,12 @@ functions:
         case: 正常
         summary: 読み直しで知らないキーを差し替える
         condition: 知らないキーの無い端末の設定で配線し、`mindstella` を持つ端末の設定で `reload_sources` を呼ぶ
+        mock: なし（一時フォルダ）
+        expected: '`handlers.terminal.unknown_keys` が `["mindstella"]` で、警告のログに `mindstella`'
+      - name: test_build_handlers_when_unknown_key_reloaded_changed
+        case: 正常
+        summary: 変わった配信元の読み直しでも知らないキーを差し替える
+        condition: '`old` を持つ端末の設定で配線し、`mindstella` を持つ端末の設定で `reload_changed` を呼ぶ'
         mock: なし（一時フォルダ）
         expected: '`handlers.terminal.unknown_keys` が `["mindstella"]` で、警告のログに `mindstella`'
   - name: reload_sources
@@ -729,5 +741,66 @@ functions:
         condition: '`build_handlers` した `Handlers` の `checks.refresh` を、`RuntimeError` を送るものに差し替える'
         mock: '`checks.refresh`（例外を送る偽物）'
         expected: スレッドを join した後、`caplog` に `error` の行が 1 件あり、`registry.loading` が `False`
+  - name: reload_changed_sources
+    title: 変わった配信元の読み直し
+    kind: 関数
+    container: project_index/main.py
+    usecase: 端末の設定の配信元の 1 行の追加・変更・削除
+    role: 合成の起点
+    summary: 配信元の一覧の変わった行だけを読み直し、配信元の内容を控えた部品の控えを捨てる
+    scope: public
+    thread_safe: true
+    side_effects: 配信元の一覧を入れ替え、文書のストア・文書の検査・変換の控えを捨てる。読み直した配信元のメタデータのずれを警告のログに書く
+    args:
+      - name: terminal
+        title: 端末の設定
+        type: TerminalConfig
+        required: true
+        passing: positional
+        description: 書き換えた後に読んだ端末の設定
+      - name: registry
+        title: 配信元の一覧
+        type: SourceRegistry
+        required: true
+        passing: injected
+        description: 読み直す配信元の一覧
+      - name: store
+        title: 文書のストア
+        type: DocumentStore
+        required: true
+        passing: injected
+        description: 控えを捨てる
+      - name: checker
+        title: 文書の検査
+        type: DocumentChecker
+        required: true
+        passing: injected
+        description: 控えを捨てる
+      - name: converter
+        title: 変換
+        type: ConvertService
+        required: true
+        passing: injected
+        description: 控えを捨てる
+      - name: checks
+        title: 配信元の検査の控え
+        type: SourceChecks
+        required: true
+        passing: injected
+        description: 配信元の控えの破棄へ渡す
+    returns:
+      type: list[SourceStatus]
+      description: 読み直した後の配信元ごとの状態
+    process: |-
+      1. 読み直す前の配信中の配信元を控え、配信元の一覧の変わった行を読み直す（配信元の一覧.変わった行を読み直す）
+      2. 読み直した後の配信中の配信元のうち、手順 1 の前と同じオブジェクトでない配信元（新しく読んだ配信元）だけで『配信元の控えの破棄』を呼ぶ
+      3. 手順 1 の状態を返す
+    unit_tests:
+      - name: test_reload_changed_sources
+        case: 正常
+        summary: 変わった行を読み直してから、新しく読んだ配信元だけで控えを捨てる
+        condition: 配信中の a はそのまま、b を新しく読む端末の設定
+        mock: 配信元の一覧・文書のストア・文書の検査・変換・配信元の検査の控え（呼ばれた順と引数を記録する偽物）
+        expected: '`registry.reload_changed` が 1 回呼ばれた後に `store.clear`・`checker.clear`・`converter.clear` が 1 回ずつ呼ばれ、配信元の検査は b だけ。`reload_changed` の状態を返す'
 refs:
   - IF-15#

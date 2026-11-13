@@ -158,6 +158,12 @@ data_models:
         type: list[SourceEntry]
         access: 公開
         description: 保存する `sources[]` の全行
+      - name: expected_version
+        title: 取得したときの内容のバージョン
+        type: str | None
+        access: 公開
+        default: None
+        description: JSON のキーは `expectedVersion`。`None` は照合しない
   - name: SettingsWarning
     title: 端末の設定の警告
     container: project_index/features/settings/types.py
@@ -182,7 +188,7 @@ data_models:
     usecase: 端末の設定
     role: DTO
     summary: 再読み込みした後の配信元ごとの状態
-    description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。`from_statuses(statuses, warnings=[])` で配信元の状態の並びと警告から作る。'
+    description: '共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。`from_statuses(statuses, warnings=[])` で配信元の状態の並びと警告から作る。読み取り API の配信元の一覧（`GET /sources`）もこの型を返すため、内容のバージョンを持たない'
     properties:
       - name: sources
         title: 配信元
@@ -262,6 +268,11 @@ data_models:
         type: list[SettingsSourceRow]
         access: 公開
         description: '`sources[]` の行の順'
+      - name: version
+        title: 内容のバージョン
+        type: str
+        access: 公開
+        description: 行と同じ本文から求めた端末の設定の内容のバージョン
       - name: warnings
         title: 警告
         type: list[SettingsWarning]
@@ -280,6 +291,12 @@ data_models:
         type: SettingsSourceRow
         access: 公開
         description: 追加する行
+      - name: expected_version
+        title: 取得したときの内容のバージョン
+        type: str | None
+        access: 公開
+        default: None
+        description: JSON のキーは `expectedVersion`。`None` は照合しない
   - name: SourceAddResult
     title: 1 行の追加の結果
     container: project_index/features/settings/types.py
@@ -303,6 +320,11 @@ data_models:
         type: list[SourceStatus]
         access: 公開
         description: '`added` のとき、読み直した後の状態'
+      - name: version
+        title: 内容のバージョン
+        type: str
+        access: 公開
+        description: '`added` のときは追加した後、`exists` のときは今の端末の設定の内容のバージョン'
   - name: SettingsSourceAddResponse
     title: 1 行の追加の応答
     container: project_index/features/settings/types.py
@@ -331,6 +353,93 @@ data_models:
         type: list[SettingsWarning]
         access: 公開
         description: 端末の設定の最上位の知らないキーの警告。無ければ空
+      - name: version
+        title: 内容のバージョン
+        type: str
+        access: 公開
+        description: '`SourceAddResult` の `version`'
+  - name: SourcePatch
+    title: 配信元の行の変更
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定の配信元の 1 行の変更
+    role: DTO
+    summary: 1 行の変更で重ねるキー
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。`id` を持たない（送ると 422）。送ったキーだけが `model_fields_set` に入り、送らなかったキーはファイルの今の値を残す。`config` は文字列 1 つでも配列にする（`field_validator`）'
+    properties:
+      - name: config
+        title: 配信元の設定のパス
+        type: list[str] | None
+        access: 公開
+        default: None
+        description: 送ったときだけ行の `config` を置き換える
+      - name: enabled
+        title: 配信するか
+        type: bool | None
+        access: 公開
+        default: None
+        description: 送ったときだけ置き換える
+      - name: scope
+        title: 権限の範囲
+        type: SourceScope | None
+        access: 公開
+        default: None
+        description: '`read`・`write` を `SourceScope` の `model_fields_set` で別々に置き換える。`write: null` は既定に戻す'
+      - name: outside_read
+        title: 作業範囲の外から読めるか
+        type: bool | None
+        access: 公開
+        default: None
+        description: 送ったときだけ置き換える
+  - name: SettingsSourcePatchRequest
+    title: 1 行の変更の要求
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定の配信元の 1 行の変更
+    role: DTO
+    summary: PATCH `/settings/sources/{id}` の本文
+    description: 共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。`model_config` は `extra="forbid"`
+    properties:
+      - name: expected_version
+        title: 取得したときの内容のバージョン
+        type: str
+        access: 公開
+        description: JSON のキーは `expectedVersion`。必須
+      - name: source
+        title: 変更
+        type: SourcePatch
+        access: 公開
+        description: 行に重ねるキー
+  - name: SourceWriteResult
+    title: 書き換えの結果
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定
+    role: DTO
+    summary: 丸ごとの保存・1 行の変更・1 行の削除の戻り値
+    description: '`dataclass(frozen=True)`'
+    properties:
+      - name: statuses
+        title: 配信元の状態
+        type: list[SourceStatus]
+        access: 公開
+        description: 読み直した後の配信元の状態
+      - name: version
+        title: 内容のバージョン
+        type: str
+        access: 公開
+        description: 書き換えた後の端末の設定の内容のバージョン
+  - name: SettingsSourcesWriteResponse
+    title: 書き換えの応答
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定
+    role: DTO
+    summary: PUT `/settings/sources` と PATCH・DELETE `/settings/sources/{id}` の応答
+    description: '`SettingsSourcesResponse` を継承し、内容のバージョンを足す。`from_result(result, warnings=[])` で書き換えの結果（`SourceWriteResult`）と警告から作る'
+    inherits: SettingsSourcesResponse
+    properties:
+      - name: version
+        title: 内容のバージョン
+        type: str
+        access: 公開
+        description: 書き換えた後の端末の設定の内容のバージョン
 classes:
   - name: TerminalConfigInvalidError
     title: 端末の設定の違反
@@ -353,3 +462,33 @@ classes:
         access: 公開
         default: '[]'
         description: 違反の並び。ファイルが無いときは空
+  - name: SettingsVersionMismatchError
+    title: 端末の設定の内容のバージョンの不一致
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定
+    role: 例外
+    summary: 要求の内容のバージョンが今の端末の設定の内容のバージョンと違うこと
+    description: '`ProjectIndexError` の子で HTTP 409。problem+json の拡張メンバー `current` に今の内容のバージョンを入れる'
+    kind: クラス
+    inherits: ProjectIndexError
+    properties:
+      - name: current
+        title: 今の内容のバージョン
+        type: str
+        access: 公開
+        description: 今の端末の設定の内容のバージョン
+  - name: SourceRowNotFoundError
+    title: 指した配信元の行が無い
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定
+    role: 例外
+    summary: 1 行の変更・削除で指した ID の行が端末の設定に無いこと
+    description: '`ProjectIndexError` の子で HTTP 404'
+    kind: クラス
+    inherits: ProjectIndexError
+    properties:
+      - name: source_id
+        title: 指した ID
+        type: str
+        access: 公開
+        description: パスの `id`

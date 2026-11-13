@@ -1,0 +1,356 @@
+title: 端末の設定の配信元の 1 行の変更
+entry:
+  kind: endpoint
+  value: PATCH `/settings/sources/{id}`
+lead: 端末の設定の配信元の行を 1 行だけ送信したキーで変更する端末の設定の API の入出力を定め、配信元の 1 行の変更を修正するときに参照する。
+identifier: patch_settings_source
+permissions: '`Origin` を持たない要求（サーバーの側や端末のほかのプロセスからの呼び出し）か、project-index と同じオリジンからの要求だけ'
+idempotent: true
+side_effects: '`settings.yaml` の `sources` の指した 1 行だけを書き換え、その行の配信元だけを読み直す（ほかの配信元は読み直さず、配信を続ける）。配信元のフォルダのファイルは変えない'
+callers:
+  - SC-12#scenarios[正常シナリオ（1 行を変更する）]
+  - SC-12#scenarios[異常シナリオ（指した行が無い）]
+  - SC-12#scenarios[正常シナリオ（端末の設定の最上位に知らないキーがある）]
+exclusivity: 端末の設定の保存と同じ排他ロックの中で、内容のバージョンの照合・行の検索・検証・書き込み・読み直しを行う
+request:
+  - name: id
+    type: str
+    required: true
+    location: path
+    description: 変更する行の配信元の ID
+    notes: '`id` を省いた行は、配信元の設定の `name` で照合する'
+  - name: expectedVersion
+    type: str
+    required: true
+    location: body
+    description: 取得したときの端末の設定の内容のバージョン
+  - name: source.config
+    type: str | list[str]
+    required: false
+    default: なし（今の値を残す）
+    location: body
+    description: 配信元の設定の YAML の絶対パス
+  - name: source.enabled
+    type: bool
+    required: false
+    default: なし（今の値を残す）
+    location: body
+    description: 配信するか
+  - name: source.scope.read
+    type: list[str]
+    required: false
+    default: なし（今の値を残す）
+    location: body
+    description: この配信元を読める作業場所の glob
+    constraints: 空の文字列を含めない
+  - name: source.scope.write
+    type: list[str] | None
+    required: false
+    default: なし（今の値を残す）
+    location: body
+    description: この配信元を読み書きできる作業場所の glob。`null` で既定（配信元のフォルダだけ）に戻す
+  - name: source.outside_read
+    type: bool
+    required: false
+    default: なし（今の値を残す）
+    location: body
+    description: '`scope` に当たらない作業場所からも `outside_scope: true` で作業範囲の外（参考）として読めるか'
+request_example: |-
+  ```json
+  {"expectedVersion": "a1b2c3", "source": {"outside_read": false}}
+  ```
+response:
+  - name: version
+    type: str
+    description: 書き換えた後の端末の設定の内容のバージョン
+  - name: sources[].id
+    type: str
+    description: 配信元の ID
+  - name: sources[].status
+    type: Literal['serving', 'not_served', 'disabled']
+    description: 読み直した後の状態。変更した行の配信元もここに並ぶ
+  - name: sources[].errors
+    type: 'list[{path: str, reason: str}]'
+    description: 検証で除外した理由
+    notes: '`not_served` のときだけ'
+  - name: warnings[].path
+    type: str
+    description: 端末の設定の最上位の知らないキーのパス
+    notes: 知らないキーが無いときは `warnings` が空の配列
+  - name: warnings[].reason
+    type: str
+    description: project-index が知らないキーで、値を使わずにファイルに残すこと
+response_example: |-
+  ```json
+  {"version": "d4e5f6", "sources": [{"id": "sample", "status": "serving"}, {"id": "extra", "status": "serving"}], "warnings": []}
+  ```
+status_codes:
+  - code: '200'
+    condition: 変更してその行の配信元を読み直した（読み直しで除外した配信元があっても 200）
+  - code: '403'
+    condition: project-index と別のオリジンの `Origin` を持つ要求か、`Origin` が無く `Sec-Fetch-Site` が `cross-site`・`same-site` の要求
+  - code: '404'
+    condition: 指した ID の行が無い
+  - code: '409'
+    condition: '`expectedVersion` が今の端末の設定の内容のバージョンと違う'
+    notes: 拡張メンバー `current` に今の内容のバージョンを入れる
+  - code: '422'
+    condition: '`id` を省いた行の `config` を配信元の ID が変わる設定へ変える、変更後の端末の設定がスキーマに通らない'
+    notes: '`errors[]` に違反したキーのパスと理由を全て並べる'
+  - code: '400'
+    condition: '`expectedVersion` が無い、`source` に `id` か知らないキーがある'
+    notes: 要求の型の検証の失敗。起動の『例外の変換の登録』が `InvalidArgumentError` の problem+json にし、`errors[]` にキーのパスと理由を並べる
+error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`・`current`）
+constraints:
+  - item: オリジンの確認
+    constraint: 端末の設定の保存と同じ
+  - item: 行の指し方
+    constraint: 行の `id`、`id` を省いた行は配信元の設定の `name` がパスの `id` と同じ行を指す。端末の設定の配信元の 1 行の追加の同じ id の判定と同じ求め方
+  - item: 送信しなかったキー
+    constraint: 送信したキーだけを行に重ね、送信しなかったキーはファイルの今の値を残す。行の `id` は変えられない
+  - item: 内容のバージョンの照合
+    constraint: 排他ロックを取った後に `settings.yaml` の内容のバージョンと照合し、行の検索より前に断る
+  - item: 書き込みの範囲
+    constraint: '`settings.yaml` の指した 1 行だけを書き換え、ほかの行・他のキー・コメントを保つ。一時ファイルに書いてから置き換える'
+  - item: 読み直しの範囲
+    constraint: 変更した行の配信元だけを読み直し、ほかの配信元は読み直さない
+  - item: 認可
+    constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
+    decided_by: NFR-1#requirements[通信]
+  - item: JSON のキー
+    constraint: '`expectedVersion` とレスポンスのキーは camelCase。`source` の中のキーは端末の設定のキーのまま'
+  - item: operationId
+    constraint: '`{tag}-{関数名}` の `settings-patch_settings_source`'
+  - item: 配信元の ID が変わる変更
+    constraint: '`id` を省いた行の `config` を、配信元の設定の `name` がパスの `id` と違う設定へ変える要求は 422 で断る'
+    notes: 差し替えるときは、端末の設定の配信元の 1 行の削除と追加を呼ぶ。読み直しの範囲を 1 つの配信元に保ち、ID の重なりを起こさない
+flows:
+  - name: 正常系
+    summary: 指した行の送信したキーだけを変更し、その配信元だけを読み直す
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに端末の設定と配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+      - name: 端末の設定
+        description: '`sources` に sample と extra の 2 行。別のキーとコメントを持つ'
+        notes: extra の行に `scope.read` と `scope.write`
+      - name: 入力
+        description: '`GET /settings/sources` で取得した `version` と、`outside_read: false` だけの `source`'
+        notes: パスの `id` は `extra`
+    flow: |-
+      <!-- map: {"title": "正常系"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as PATCH /settings/sources/extra
+        participant CF as 端末の設定
+
+        C->>E: expectedVersion, source: outside_read false
+        E-->>CF: 内容のバージョンを照合し、extra の行を探す
+        E->>CF: extra の行だけを書き換える
+        E->>E: extra の配信元だけを読み直す
+        E-->>C: 200（version・配信元ごとの状態）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 200 で、`version` が `expectedVersion` と違う値で、`sources` に extra が `serving` で並ぶ
+      - '`settings.yaml` の extra の行に `outside_read: false` が入り、`scope.read`・`scope.write` は変わらない'
+      - sample の行・他のキー・コメントは変わらない
+      - 変更の前後で sample の配信元を読み直さず、`/sources/sample/docs` が 200 を返却し続ける
+      - '`GET /settings/sources` が返却する extra の行の `outsideRead` が `false`'
+    test: test_normal
+  - name: 正常系（id を省いた行を指す）
+    summary: '`id` を省いた行を配信元の設定の `name` で指す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample と、`id` を省いた notes の 2 行'
+        notes: notes の配信元の設定の `name` は `notes`
+      - name: 入力
+        description: '取得した `version` と、`enabled: false` だけの `source`'
+        notes: パスの `id` は `notes`
+    flow: |-
+      <!-- map: {"title": "正常系（id を省いた行を指す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as PATCH /settings/sources/notes
+        participant CF as 端末の設定
+
+        C->>E: expectedVersion, source: enabled false
+        E->>CF: name が notes の行を書き換える
+        E-->>C: 200（notes は disabled）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 200 で、notes の行が `disabled`（無効の行は配信元の設定を読まないため、状態の `id` は `sources[1]`）
+      - '`settings.yaml` の notes の行に `enabled: false` が入り、`id` は書き足されない'
+    test: test_normal_when_row_without_id
+  - name: 正常系（端末の設定の最上位に知らないキーがある）
+    summary: 最上位の知らないキーを違反にせずに 1 行を変更し、ファイルの値とコメントを残して警告で返却する
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample と extra の 2 行。最上位に知らないキー `mindstella`（入れ子の値とコメントを持つ）を持つ'
+      - name: 入力
+        description: '取得した `version` と、`outside_read: false` だけの `source`'
+        notes: パスの `id` は `extra`
+    flow: |-
+      <!-- map: {"title": "正常系（端末の設定の最上位に知らないキーがある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as PATCH /settings/sources/extra
+        participant CF as 端末の設定
+
+        C->>E: expectedVersion
+        E->>CF: extra の行だけを書き換える（mindstella は違反にしない）
+        E-->>C: 200 と警告
+      ```
+
+      <!-- /map -->
+    expected:
+      - 200 で、`warnings` に `path` が `mindstella` の 1 件がある
+      - '`settings.yaml` の `mindstella` の値とコメントが変更の前と変わらない'
+    test: test_normal_when_unknown_top_level_key_kept
+  - name: 異常系（内容のバージョンが古い・409）
+    summary: 取得した後に書き換えられた端末の設定への変更を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample と extra の 2 行'
+      - name: ほかの書き換え
+        description: 取得の後に `settings.yaml` の末尾へコメントを 1 行追記する
+      - name: 入力
+        description: '取得した `version` と、`outside_read: false` だけの `source`'
+    flow: |-
+      <!-- map: {"title": "異常系（内容のバージョンが古い・409）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as PATCH /settings/sources/extra
+        participant CF as 端末の設定
+
+        C->>E: 古い expectedVersion
+        E-->>CF: 今の内容のバージョンを求めて照合する
+        E-->>C: 409 problem+json（current）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 409 で、`current` がコメントを追記した後の内容のバージョン
+      - '`settings.yaml` が追記した内容のまま'
+    test: test_error_when_version_outdated
+  - name: 異常系（指した行が無い・404）
+    summary: 指した ID の行が無い変更を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample の 1 行'
+      - name: 入力
+        description: '取得した `version` と `enabled: false`'
+        notes: パスの `id` は `extra`
+    flow: |-
+      <!-- map: {"title": "異常系（指した行が無い・404）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as PATCH /settings/sources/extra
+
+        C->>E: expectedVersion, source: enabled false
+        E-->>C: 404 problem+json
+      ```
+
+      <!-- /map -->
+    expected:
+      - 404 で、extra の行が無いことを返却する
+      - '`settings.yaml` が変わらない'
+    test: test_error_when_row_not_found
+  - name: 異常系（スキーマに通らない・422）
+    summary: 配信元の ID が変わる変更と、変更後がスキーマに通らない変更を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample と extra と、`id` を省いた notes の 3 行'
+      - name: 入力
+        description: '`scope.read` に空の文字列を含む要求と、`id` を省いた notes の行の `config` を `name` が `memo` の設定へ変える要求'
+    flow: |-
+      <!-- map: {"title": "異常系（スキーマに通らない・422）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as PATCH /settings/sources/extra
+
+        C->>E: 違反を含む要求
+        E-->>C: 422 problem+json（違反したキーと理由）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 2 つとも 422 で、`errors` に違反したキーのパスと理由がある
+      - '`settings.yaml` が変わらない'
+    test: test_error_when_schema_invalid
+  - name: 異常系（別のオリジン・403）
+    summary: ブラウザからの別のオリジンの変更を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`Origin: http://127.0.0.1:9999` で、取得した `version` と `enabled: false`'
+    flow: |-
+      <!-- map: {"title": "異常系（別のオリジン・403）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as PATCH /settings/sources/extra
+
+        C->>E: Origin: 別のオリジン
+        E-->>C: 403
+      ```
+
+      <!-- /map -->
+    expected:
+      - 403 を返却する
+      - '`settings.yaml` が変わらない'
+    test: test_error_when_cross_origin
+  - name: 異常系（引数の誤り・400）
+    summary: 内容のバージョンが無い変更と、`source` に `id` を含む変更を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample と extra の 2 行'
+      - name: 入力
+        description: '`expectedVersion` が無い要求と、`source` に `id` を含む要求'
+    flow: |-
+      <!-- map: {"title": "異常系（引数の誤り・400）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as PATCH /settings/sources/extra
+
+        C->>E: 型に合わない要求
+        E-->>C: 400 problem+json（違反したキーと理由）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 2 つとも 400 で、`errors` に違反したキーのパスと理由がある
+      - '`settings.yaml` が変わらない'
+    test: test_error_when_argument_invalid
+test_file: tests/integration/server/test_patch_settings_source.py
+id: IF-33

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import dataclasses
 import logging
 import threading
 from typing import TYPE_CHECKING
@@ -291,6 +292,82 @@ class SourceRegistry:
                 sum(1 for status in statuses if status.status == "not_served"),
             )
             return statuses
+
+    def reload_changed(self, terminal: TerminalConfig) -> list[SourceStatus]:
+        """前に読んだ行と同じ行は今の配信元を使い回し、変わった行だけを読み込んで一覧を差し替える。"""
+        try:
+            return self._reload_changed(terminal)
+        finally:
+            self._release_waiters()
+
+    def _previous_rows(self) -> list[tuple[SourceEntry, ServedSource | None, SourceStatus]]:
+        """前に読んだ行ごとに、行と配信中の配信元（無ければ None）と状態を並べる。"""
+        sources, statuses = self._snapshot
+        by_index = {status.index: status for status in statuses}
+        rows: list[tuple[SourceEntry, ServedSource | None, SourceStatus]] = []
+        for index, entry in enumerate(self._rows):
+            status = by_index.get(index)
+            if status is None:
+                continue
+            owner = self._entries.get(status.id)
+            served = sources.get(status.id) if owner is not None and owner[1] == index else None
+            rows.append((entry, served, status))
+        return rows
+
+    def _reload_changed(self, terminal: TerminalConfig) -> list[SourceStatus]:
+        """変わった行だけを読み、一覧を差し替える（例外のときは差し替えない）。"""
+        with self._reload_lock:
+            previous = self._previous_rows()
+            used: set[int] = set()
+            sources: dict[str, ServedSource] = {}
+            statuses: list[SourceStatus] = []
+            entries: dict[str, tuple[SourceEntry, int]] = {}
+            loaded: list[int] = []
+            lookup = terminal_lookup(terminal)
+            for index, entry in enumerate(terminal.sources):
+                reused = self._reuse(previous, used, entry)
+                # 前に読んだ同じ値の行があり、配信中か無効: 配信元と状態を使い回して位置だけ替える
+                if reused is not None:
+                    served, old = reused
+                    status = dataclasses.replace(old, index=index)
+                else:
+                    # 変わった行か、配信していなかった行: 読み込む
+                    served, status = load_source(entry, index=index, lookup=lookup)
+                    loaded.append(index)
+                # 配信する配信元の ID が先の行と重なるときは、後の行を外す
+                if served is not None and served.id in sources:
+                    status = _duplicate_status(served.id, index, entry)
+                    served = None
+                if served is not None:
+                    sources[served.id] = served
+                    entries[served.id] = (entry, index)
+                statuses.append(status)
+            self._entries = entries
+            self._lookup = lookup
+            self._snapshot = (sources, statuses)
+            with self._waiters_lock:
+                self._rows = list(terminal.sources)
+                self._rows_done = [threading.Event() for _ in self._rows]
+            logger.info(
+                "変わった行の配信元を読み直した（読んだ行: %s・配信中: %s）", loaded, list(sources)
+            )
+            return statuses
+
+    @staticmethod
+    def _reuse(
+        previous: list[tuple[SourceEntry, ServedSource | None, SourceStatus]],
+        used: set[int],
+        entry: SourceEntry,
+    ) -> tuple[ServedSource | None, SourceStatus] | None:
+        """前に読んだ行のうち、値が同じで使っていない行の配信元と状態を返す（`not_served` は使い回さない）。"""
+        for position, (old_entry, served, status) in enumerate(previous):
+            if position in used or old_entry != entry:
+                continue
+            if status.status == "not_served":
+                return None
+            used.add(position)
+            return served, status
+        return None
 
     def get(self, source_id: str) -> ServedSource:
         """配信中の配信元を ID で引く。読み込んでいない行の ID は、その行の読み込みを待つ。"""
