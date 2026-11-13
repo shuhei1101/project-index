@@ -116,6 +116,35 @@ flows:
       - extra のフォルダのファイルは変わらない
       - '`/sources/extra/docs` が 404、`/sources/sample/docs` が 200 を返却し、sample の配信元は読み直さない'
     test: test_normal
+  - name: 正常系（端末の設定の最上位に知らないキーがある）
+    summary: 最上位の知らないキーを違反にせずに 1 行を削除し、ファイルの値とコメントを残して警告で返却する
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample と extra の 2 行。最上位に知らないキー `mindstella`（入れ子の値とコメントを持つ）を持つ'
+      - name: 入力
+        description: '取得した `version`'
+        notes: パスの `id` は `extra`
+    flow: |-
+      <!-- map: {"title": "正常系（端末の設定の最上位に知らないキーがある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as DELETE /settings/sources/extra
+        participant CF as 端末の設定
+
+        C->>E: expectedVersion
+        E->>CF: extra の行だけを削除する（mindstella は違反にしない）
+        E-->>C: 200 と警告
+      ```
+
+      <!-- /map -->
+    expected:
+      - 200 で、`warnings` に `path` が `mindstella` の 1 件がある
+      - '`settings.yaml` の `mindstella` の値とコメントが削除の前と変わらない'
+    test: test_normal_when_unknown_top_level_key_kept
   - name: 異常系（内容のバージョンが古い・409）
     summary: 取得した後に書き換えられた端末の設定からの削除を断る
     setup:

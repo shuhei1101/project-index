@@ -190,6 +190,35 @@ flows:
       - 200 で、notes の行が `disabled`（無効の行は配信元の設定を読まないため、状態の `id` は `sources[1]`）
       - '`settings.yaml` の notes の行に `enabled: false` が入り、`id` は書き足されない'
     test: test_normal_when_row_without_id
+  - name: 正常系（端末の設定の最上位に知らないキーがある）
+    summary: 最上位の知らないキーを違反にせずに 1 行を変更し、ファイルの値とコメントを残して警告で返却する
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample と extra の 2 行。最上位に知らないキー `mindstella`（入れ子の値とコメントを持つ）を持つ'
+      - name: 入力
+        description: '取得した `version` と、`outside_read: false` だけの `source`'
+        notes: パスの `id` は `extra`
+    flow: |-
+      <!-- map: {"title": "正常系（端末の設定の最上位に知らないキーがある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as PATCH /settings/sources/extra
+        participant CF as 端末の設定
+
+        C->>E: expectedVersion
+        E->>CF: extra の行だけを書き換える（mindstella は違反にしない）
+        E-->>C: 200 と警告
+      ```
+
+      <!-- /map -->
+    expected:
+      - 200 で、`warnings` に `path` が `mindstella` の 1 件がある
+      - '`settings.yaml` の `mindstella` の値とコメントが変更の前と変わらない'
+    test: test_normal_when_unknown_top_level_key_kept
   - name: 異常系（内容のバージョンが古い・409）
     summary: 取得した後に書き換えられた端末の設定への変更を断る
     setup:
