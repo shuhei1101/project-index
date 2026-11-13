@@ -1,0 +1,301 @@
+$ uv run pytest tests/unit/ -q -p no:cacheprovider --continue-on-collection-errors
+........................................................................ [  7%]
+........................................................................ [ 15%]
+F.F......FF............................................................. [ 23%]
+........................................................................ [ 31%]
+........................................................................ [ 39%]
+........................................................................ [ 47%]
+........................................................................ [ 55%]
+........................................................................ [ 63%]
+..............FFF....................................................... [ 71%]
+........................................................................ [ 79%]
+........................................................................ [ 86%]
+........................................................................ [ 94%]
+...............................................                          [100%]
+==================================== ERRORS ====================================
+______ ERROR collecting tests/unit/project_index/server/mcp/test_docs.py _______
+ImportError while importing test module '/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/chore-describe-source-when/tests/unit/project_index/server/mcp/test_docs.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/server/mcp/test_docs.py:15: in <module>
+    from project_index.server.mcp.docs import INSTRUCTIONS_MAX_CHARS, DocsMCPServer, build_docs_mcp
+E   ImportError: cannot import name 'INSTRUCTIONS_MAX_CHARS' from 'project_index.server.mcp.docs' (/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/chore-describe-source-when/src/project_index/server/mcp/docs.py)
+=================================== FAILURES ===================================
+________________ test_render_describe_markdown_when_source_when ________________
+
+    def test_render_describe_markdown_when_source_when() -> None:
+        """使う場面の列と見出し（正常系）。"""
+        # 準備
+        listed = SourceListResult(
+            workplace=Workplace(cwd=Path("/w/sample"), source_id="sample", worktree=None),
+            sources=[
+>               SourceAccess(
+                    source_id="sample",
+                    access="write",
+                    current=True,
+                    description="サンプル",
+                    when=["規約を確かめるとき", "設計書を書く前"],
+                ),
+                SourceAccess(source_id="notes", access="read", current=False, description="メモ"),
+            ],
+            outside_sources=[OutsideSource(id="other", description="別", when=["別を引くとき"])],
+        )
+E       TypeError: SourceAccess.__init__() got an unexpected keyword argument 'when'
+
+tests/unit/project_index/features/describe/test_render.py:21: TypeError
+_________________ test_render_describe_markdown_when_warnings __________________
+
+    def test_render_describe_markdown_when_warnings() -> None:
+        """注意の一覧（正常系）。"""
+        # 準備
+        workplace = Workplace(cwd=Path("/w/sample"), source_id="sample", worktree=None)
+        sources = [
+            SourceAccess(source_id="sample", access="write", current=True, description="サンプル")
+        ]
+        warned = SourceListResult(workplace=workplace, sources=sources, warnings=["警告です"])
+        quiet = SourceListResult(workplace=workplace, sources=sources)
+        # 実行
+        markdown = render_describe_markdown(warned)
+        quiet_markdown = render_describe_markdown(quiet)
+        # 検証
+        lines = markdown.splitlines()
+>       assert lines.index("注意:") > lines.index("| sample | write（作業中） | サンプル |  |")
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       ValueError: list.index(x): x not in list
+
+tests/unit/project_index/features/describe/test_render.py:87: ValueError
+____________________ test_describe_when_source_when_listed _____________________
+
+store = <project_index.features.documents.store.DocumentStore object at 0x797f79793380>
+folder_source = ServedSource(id='sample', root=PosixPath('/tmp/pytest-of-shuhei2441/pytest-7948/test_describe_when_source_when0/sample...on': '規約の文書', 'type': 'object'}}, main_root=None, config_commit=None, outside_read=True, config_dir=PurePosixPath('.'))
+make_served_source = <function make_served_source.<locals>._make at 0x797f794fd9b0>
+make_registry = <function make_registry.<locals>._make at 0x797f794fd380>
+
+    def test_describe_when_source_when_listed(
+        store: DocumentStore,
+        folder_source: ServedSource,
+        make_served_source: Callable[..., ServedSource],
+        make_registry: Callable[..., SourceRegistry],
+    ) -> None:
+        """一覧と説明書に使う場面を入れる（正常系）。"""
+        # 準備
+        sample = dataclasses.replace(
+            folder_source,
+>           config=dataclasses.replace(
+                folder_source.config, when=["規約を確かめるとき", "設計書を書く前"]
+            ),
+        )
+
+tests/unit/project_index/features/describe/test_service.py:134: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/shuhei2441/.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/dataclasses.py:1770: in replace
+    return _replace(obj, **changes)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = SourceConfig(name='sample', version='3', enabled=True, default_ref='develop', paths_base=None, visibility=None, worktr...dated'], github_repository=None, github_issue_labels=[], decision_folders=[], description='', instructions='着手前に規約を引く')
+changes = {'when': ['規約を確かめるとき', '設計書を書く前'], 'name': 'sample', 'version': '3', 'enabled': True, ...}
+
+    def _replace(self, /, **changes):
+        # We're going to mutate 'changes', but that's okay because it's a
+        # new dict, even if called with 'replace(self, **my_changes)'.
+    
+        # It's an error to have init=False fields in 'changes'.
+        # If a field is not in 'changes', read its value from the provided 'self'.
+    
+        for f in getattr(self, _FIELDS).values():
+            # Only consider normal fields or InitVars.
+            if f._field_type is _FIELD_CLASSVAR:
+                continue
+    
+            if not f.init:
+                # Error if this field is specified in changes.
+                if f.name in changes:
+                    raise TypeError(f'field {f.name} is declared with '
+                                    f'init=False, it cannot be specified with '
+                                    f'replace()')
+                continue
+    
+            if f.name not in changes:
+                if f._field_type is _FIELD_INITVAR and f.default is MISSING:
+                    raise TypeError(f"InitVar {f.name!r} "
+                                    f'must be specified with replace()')
+                changes[f.name] = getattr(self, f.name)
+    
+        # Create the new object, which calls __init__() and
+        # __post_init__() (if defined), using all of the init fields we've
+        # added and/or left in 'changes'.  If there are values supplied in
+        # changes that aren't fields, this will correctly raise a
+        # TypeError.
+>       return self.__class__(**changes)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: SourceConfig.__init__() got an unexpected keyword argument 'when'
+
+/home/shuhei2441/.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/dataclasses.py:1804: TypeError
+_____________________ test_describe_when_refresh_requested _____________________
+
+store = <project_index.features.documents.store.DocumentStore object at 0x797f798ac8c0>
+folder_source = ServedSource(id='sample', root=PosixPath('/tmp/pytest-of-shuhei2441/pytest-7948/test_describe_when_refresh_req0/sample...on': '規約の文書', 'type': 'object'}}, main_root=None, config_commit=None, outside_read=True, config_dir=PurePosixPath('.'))
+make_served_source = <function make_served_source.<locals>._make at 0x797f794fc720>
+make_source_config = <function make_source_config.<locals>._make at 0x797f794fc930>
+make_registry = <function make_registry.<locals>._make at 0x797f794fc460>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x797f783e62e0>
+
+    def test_describe_when_refresh_requested(
+        store: DocumentStore,
+        folder_source: ServedSource,
+        make_served_source: Callable[..., ServedSource],
+        make_source_config: Callable[..., SourceConfig],
+        make_registry: Callable[..., SourceRegistry],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """引数なしの一覧は裏の確認を依頼して待たずに返す（正常系）。"""
+        # 準備
+        notes = make_served_source(
+            id="notes", root=Path("/w/notes"), scope_read=[str(folder_source.root)], scope_write=[]
+        )
+        other = make_served_source(
+            id="other",
+            root=Path("/w/other"),
+            scope_read=["/zzz"],
+            scope_write=[],
+            outside_read=True,
+>           config=make_source_config(when=["別の配信元を引くとき"]),
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        )
+
+tests/unit/project_index/features/describe/test_service.py:174: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+overrides = {'when': ['別の配信元を引くとき']}
+
+    def _make(**overrides: Any) -> SourceConfig:
+        values: dict[str, Any] = {
+            "name": "sample",
+            "documents": [
+                DocumentTable(
+                    id="rules",
+                    paths=["docs/rule/*.yaml"],
+                    schema_path="schemas/rule.schema.yaml",
+                )
+            ],
+        }
+        values.update(overrides)
+>       return SourceConfig(**values)
+               ^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: SourceConfig.__init__() got an unexpected keyword argument 'when'
+
+tests/unit/project_index/conftest.py:106: TypeError
+______________________ test_source_registry_refresh_later ______________________
+
+git_repo = <function git_repo.<locals>._create at 0x797f782f7690>
+commit_all = <function commit_all.<locals>._commit at 0x797f782f71c0>
+sample_files = {'project-index.yaml': 'name: sample\ndocuments:\n  - id: rules\n    paths: [docs/rule/*.yaml]\n    schema: schemas/ru...d: [id, name]\n', 'docs/rule/doc-1.yaml': 'id: doc-1\nname: 文書 1\n', 'docs/rule/doc-2.yaml': 'id: doc-2\nname: 文書 2\n'}
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x797f782f54e0>
+make_entry = <function make_entry.<locals>._make at 0x797f782f7b60>
+
+    def test_source_registry_refresh_later(
+        git_repo: Callable[..., Path],
+        commit_all: Callable[..., str],
+        sample_files: dict[str, str],
+        make_terminal_config: Callable[..., TerminalConfig],
+        make_entry: Callable[..., SourceEntry],
+    ) -> None:
+        """裏で組み立て直し、待たずに戻る（正常系）。"""
+        # 準備
+        files = {
+            **sample_files,
+            "project-index.yaml": "when:\n  - 前の使う場面\n" + sample_files["project-index.yaml"],
+        }
+        root = git_repo(files)
+        terminal = make_terminal_config(
+            sources=[make_entry(str(root / "project-index.yaml"), source_id="a")]
+        )
+        registry = SourceRegistry()
+        registry.reload(terminal)
+        commit_all(
+            root,
+            {"project-index.yaml": "when:\n  - 後の使う場面\n" + sample_files["project-index.yaml"]},
+        )
+        # 実行
+>       threads = registry.refresh_later(["a"])
+                  ^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'SourceRegistry' object has no attribute 'refresh_later'
+
+tests/unit/project_index/features/sources/test_registry.py:255: AttributeError
+------------------------------ Captured log call -------------------------------
+ERROR    project_index.features.sources.service:service.py:599 a: when: 知らないキー
+_______________ test_source_registry_refresh_later_when_running ________________
+
+git_repo = <function git_repo.<locals>._create at 0x797f7980f950>
+sample_files = {'project-index.yaml': 'name: sample\ndocuments:\n  - id: rules\n    paths: [docs/rule/*.yaml]\n    schema: schemas/ru...d: [id, name]\n', 'docs/rule/doc-1.yaml': 'id: doc-1\nname: 文書 1\n', 'docs/rule/doc-2.yaml': 'id: doc-2\nname: 文書 2\n'}
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x797f7980ddd0>
+make_entry = <function make_entry.<locals>._make at 0x797f7980d430>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x797f79f933f0>
+
+    def test_source_registry_refresh_later_when_running(
+        git_repo: Callable[..., Path],
+        sample_files: dict[str, str],
+        make_terminal_config: Callable[..., TerminalConfig],
+        make_entry: Callable[..., SourceEntry],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """確認中の配信元は重ねて確認しない（正常系）。"""
+        # 準備
+        root = git_repo(sample_files)
+        terminal = make_terminal_config(
+            sources=[make_entry(str(root / "project-index.yaml"), source_id="a")]
+        )
+        registry = SourceRegistry()
+        registry.reload(terminal)
+        started = threading.Event()
+        release = threading.Event()
+        calls: list[str] = []
+        original = registry_module.resolve_ref
+    
+        def blocking_resolve_ref(repo_root: Path, ref: str, **kwargs: object) -> object:
+            calls.append(ref)
+            started.set()
+            release.wait(timeout=60)
+            return original(repo_root, ref, **kwargs)  # type: ignore[arg-type]
+    
+        monkeypatch.setattr(registry_module, "resolve_ref", blocking_resolve_ref)
+        # 実行
+>       first = registry.refresh_later(["a"])
+                ^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'SourceRegistry' object has no attribute 'refresh_later'
+
+tests/unit/project_index/features/sources/test_registry.py:291: AttributeError
+_______________ test_source_registry_refresh_later_when_not_git ________________
+
+make_source_dir = <function make_source_dir.<locals>._make at 0x797f7980e6c0>
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x797f7980e400>
+make_entry = <function make_entry.<locals>._make at 0x797f7980e560>
+
+    def test_source_registry_refresh_later_when_not_git(
+        make_source_dir: Callable[..., Path],
+        make_terminal_config: Callable[..., TerminalConfig],
+        make_entry: Callable[..., SourceEntry],
+    ) -> None:
+        """Git でない配信元と配信していない ID は確認しない（正常系）。"""
+        # 準備
+        config = make_source_dir("notes")
+        terminal = make_terminal_config(sources=[make_entry(str(config), source_id="notes")])
+        registry = SourceRegistry()
+        registry.reload(terminal)
+        # 実行
+>       threads = registry.refresh_later(["notes", "z"])
+                  ^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'SourceRegistry' object has no attribute 'refresh_later'
+
+tests/unit/project_index/features/sources/test_registry.py:319: AttributeError
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/server/mcp/test_docs.py
+FAILED tests/unit/project_index/features/describe/test_render.py::test_render_describe_markdown_when_source_when
+FAILED tests/unit/project_index/features/describe/test_render.py::test_render_describe_markdown_when_warnings
+FAILED tests/unit/project_index/features/describe/test_service.py::test_describe_when_source_when_listed
+FAILED tests/unit/project_index/features/describe/test_service.py::test_describe_when_refresh_requested
+FAILED tests/unit/project_index/features/sources/test_registry.py::test_source_registry_refresh_later
+FAILED tests/unit/project_index/features/sources/test_registry.py::test_source_registry_refresh_later_when_running
+FAILED tests/unit/project_index/features/sources/test_registry.py::test_source_registry_refresh_later_when_not_git
+7 failed, 904 passed, 1 error in 69.76s (0:01:09)
