@@ -1,0 +1,2510 @@
+$ (rc=0; uv run ruff check . || rc=1; uv run ruff format --check . || rc=1; uv run pyright || rc=1; uv run complexipy src tests || rc=1; exit $rc)
+All checks passed!
+363 files already formatted
+0 errors, 0 warnings, 0 informations
+──────────────────────────────── 🐙 complexipy ─────────────────────────────────
+src/project_index/__main__.py
+    build_parser 0  ✅  PASSED  
+    main 0  ✅  PASSED  
+
+src/project_index/features/access/service.py
+    _not_readable 0  ✅  PASSED  
+    _normalize 1  ✅  PASSED  
+    _revision_target 1  ✅  PASSED  
+    describe_workplace 1  ✅  PASSED  
+    _base_of 3  ✅  PASSED  
+    available_sources 3  ✅  PASSED  
+    find_worktree 3  ✅  PASSED  
+    outside_readable_sources 3  ✅  PASSED  
+    access_of 4  ✅  PASSED  
+    current_source 9  ✅  PASSED  
+    resolve_read_targets 10  ✅  PASSED  
+    _target_of 11  ✅  PASSED  
+    _readable_sources 15  ✅  PASSED  
+    resolve_write_target 15  ✅  PASSED  
+
+src/project_index/features/access/types.py
+    Target::config_base 0  ✅  PASSED  
+    script_at 2  ✅  PASSED  
+
+src/project_index/features/admin/render.py
+    _violation_line 1  ✅  PASSED  
+    render_reload 2  ✅  PASSED  
+    render_status 3  ✅  PASSED  
+    _source_row 4  ✅  PASSED  
+    _sync_lines 4  ✅  PASSED  
+    render_write_nav 4  ✅  PASSED  
+    _violation_lines 5  ✅  PASSED  
+    render_check 10  ✅  PASSED  
+
+src/project_index/features/admin/service.py
+    _command 0  ✅  PASSED  
+    _nav_invalid_argument 0  ✅  PASSED  
+    get_status 0  ✅  PASSED  
+    _config_file 2  ✅  PASSED  
+    _nav_documents 2  ✅  PASSED  
+    _serving_ids 2  ✅  PASSED  
+    reload_config 2  ✅  PASSED  
+    version_state 2  ✅  PASSED  
+    _body_file_table 3  ✅  PASSED  
+    _convert_once 4  ✅  PASSED  
+    _find_tab 4  ✅  PASSED  
+    _nested_group 4  ✅  PASSED  
+    _find_group 6  ✅  PASSED  
+    _records_schema_violations 6  ✅  PASSED  
+    _apply_tab_operation 7  ✅  PASSED  
+    _source_states 7  ✅  PASSED  
+    _registered_id 9  ✅  PASSED  
+    check_project 9  ✅  PASSED  
+    _apply_nav_operation 10  ✅  PASSED  
+    _load_candidate 10  ✅  PASSED  
+    try_convert 11  ✅  PASSED  
+    write_nav 11  ✅  PASSED  
+    _overlaid_nav 12  ✅  PASSED  
+
+src/project_index/features/admin/types.py
+    SyncCounts::of 0  ✅  PASSED  
+
+src/project_index/features/changes/compare.py
+    _walk_dicts 3  ✅  PASSED  
+    changed_keys 3  ✅  PASSED  
+    count_occurrences 4  ✅  PASSED  
+    _walk 5  ✅  PASSED  
+    diff_lines 8  ✅  PASSED  
+    _walk_lists 9  ✅  PASSED  
+    _match_key 10  ✅  PASSED  
+
+src/project_index/features/changes/render.py
+    _diff_block 2  ✅  PASSED  
+    _point 2  ✅  PASSED  
+    render_changes_markdown 7  ✅  PASSED  
+    _table 9  ✅  PASSED  
+
+src/project_index/features/changes/service.py
+    _commit_point 0  ✅  PASSED  
+    _invalid 0  ✅  PASSED  
+    _content 1  ✅  PASSED  
+    _relative 1  ✅  PASSED  
+    _element_data 2  ✅  PASSED  
+    _index_files 2  ✅  PASSED  
+    _read_documents 2  ✅  PASSED  
+    _bounded 3  ✅  PASSED  
+    _check_git 3  ✅  PASSED  
+    _page 4  ✅  PASSED  
+    _range_sides 4  ✅  PASSED  
+    _word_changes_in_range 4  ✅  PASSED  
+    _check_request 5  ✅  PASSED  
+    _recorded_document 5  ✅  PASSED  
+    _change_kind 6  ✅  PASSED  
+    _file_reader 6  ✅  PASSED  
+    _range_documents 6  ✅  PASSED  
+    _result 6  ✅  PASSED  
+    _change_item 7  ✅  PASSED  
+    _with_index_files 8  ✅  PASSED  
+    _word_change 10  ✅  PASSED  
+    _change_items 13  ✅  PASSED  
+    _last_read_sides 13  ✅  PASSED  
+    _documents_between 14  ✅  PASSED  
+    list_changes 14  ✅  PASSED  
+
+src/project_index/features/convert/decisions.py
+    find_decisions 12  ✅  PASSED  
+
+src/project_index/features/convert/service.py
+    ConvertService::__init__ 0  ✅  PASSED  
+    ConvertService::_cache_path 0  ✅  PASSED  
+    ConvertService::convert 2  ✅  PASSED  
+    ConvertService::_prune 4  ✅  PASSED  
+    ConvertService::clear 4  ✅  PASSED  
+    ConvertService::_run_converter 7  ✅  PASSED  
+
+src/project_index/features/describe/render.py
+    _cell 0  ✅  PASSED  
+    _outside_rows 1  ✅  PASSED  
+    _place 2  ✅  PASSED  
+    _kind_schema 3  ✅  PASSED  
+    render_describe_markdown 3  ✅  PASSED  
+    _source_guide 5  ✅  PASSED  
+    _source_list 11  ✅  PASSED  
+
+src/project_index/features/describe/service.py
+    _dump_yaml 0  ✅  PASSED  
+    _kind_schema 4  ✅  PASSED  
+    _source_list 4  ✅  PASSED  
+    describe 4  ✅  PASSED  
+    _source_guide 7  ✅  PASSED  
+
+src/project_index/features/describe/source_checks.py
+    SourceChecks::__init__ 0  ✅  PASSED  
+    SourceChecks::get 1  ✅  PASSED  
+    SourceChecks::refresh 2  ✅  PASSED  
+    SourceChecks::_work 5  ✅  PASSED  
+    SourceChecks::refresh_later 6  ✅  PASSED  
+
+src/project_index/features/describe/warnings.py
+    _old_version 0  ✅  PASSED  
+    _config_warnings 2  ✅  PASSED  
+    _sync_warnings 2  ✅  PASSED  
+    _terminal_warnings 2  ✅  PASSED  
+    collect_warnings 8  ✅  PASSED  
+
+src/project_index/features/documents/aliases.py
+    _alias_keys 0  ✅  PASSED  
+    _normalize 0  ✅  PASSED  
+    alias_schema 0  ✅  PASSED  
+    alias_schema_version 0  ✅  PASSED  
+    _empty 1  ✅  PASSED  
+    _read 1  ✅  PASSED  
+    _is_related_item 2  ✅  PASSED  
+    term_ids 2  ✅  PASSED  
+    match_words 3  ✅  PASSED  
+    _as_list 5  ✅  PASSED  
+    collect_aliases 7  ✅  PASSED  
+    _type_rule 15  ✅  PASSED  
+    check_alias_document 15  ✅  PASSED  
+
+src/project_index/features/documents/fields.py
+    _invalid 0  ✅  PASSED  
+    get_field 0  ✅  PASSED  
+    is_markdown_body 1  ✅  PASSED  
+    _plain 2  ✅  PASSED  
+    missing_ref_fields 2  ✅  PASSED  
+    set_field 3  ✅  PASSED  
+    _plain_tokens 4  ✅  PASSED  
+    resolve_metadata 4  ✅  PASSED  
+    _join 7  ✅  PASSED  
+    _select 7  ✅  PASSED  
+    delete_field 7  ✅  PASSED  
+    _child 9  ✅  PASSED  
+    _put 9  ✅  PASSED  
+    parse_field_path 10  ✅  PASSED  
+    unresolved_related 11  ✅  PASSED  
+    _walk 12  ✅  PASSED  
+    _select_elements 14  ✅  PASSED  
+
+src/project_index/features/documents/indexable.py
+    _is_docstring 1  ✅  PASSED  
+    _join 1  ✅  PASSED  
+    indexable_files 2  ✅  PASSED  
+    _is_all_assignment 5  ✅  PASSED  
+    is_excluded_file 7  ✅  PASSED  
+    walk_files 7  ✅  PASSED  
+    _is_reexport_only 9  ✅  PASSED  
+
+src/project_index/features/documents/loader.py
+    load_file 1  ✅  PASSED  
+    _timestamps 3  ✅  PASSED  
+    collect_files 3  ✅  PASSED  
+    documents_from_text 4  ✅  PASSED  
+    _as_datetime 5  ✅  PASSED  
+    _build 6  ✅  PASSED  
+    _body_file 10  ✅  PASSED  
+    _record_documents 10  ✅  PASSED  
+    unindexed_files 10  ✅  PASSED  
+
+src/project_index/features/documents/schema.py
+    _Resolver::__init__ 0  ✅  PASSED  
+    _Resolver::_load 1  ✅  PASSED  
+    resolve_schema_refs 1  ✅  PASSED  
+    startup_schema 1  ✅  PASSED  
+    _Resolver::_resolve_defs 2  ✅  PASSED  
+    _target 2  ✅  PASSED  
+    _disk_schema 3  ✅  PASSED  
+    records_item_schema 3  ✅  PASSED  
+    _read_schema 7  ✅  PASSED  
+    _Resolver::_resolve_ref 8  ✅  PASSED  
+    _Resolver::resolve 9  ✅  PASSED  
+    _pointer 11  ✅  PASSED  
+
+src/project_index/features/documents/store.py
+    DocumentStore::__init__ 0  ✅  PASSED  
+    DocumentStore::clear 0  ✅  PASSED  
+    _table_hash 0  ✅  PASSED  
+    not_found_error 0  ✅  PASSED  
+    DocumentStore::_revision_root 1  ✅  PASSED  
+    DocumentStore::location 1  ✅  PASSED  
+    DocumentStore::read_root 1  ✅  PASSED  
+    _date_stamps 1  ✅  PASSED  
+    _revision_fresh 1  ✅  PASSED  
+    DocumentStore::_commit_of 3  ✅  PASSED  
+    DocumentStore::row_schema 3  ✅  PASSED  
+    _unique 3  ✅  PASSED  
+    DocumentStore::_discard_files 4  ✅  PASSED  
+    DocumentStore::_revision_schema 4  ✅  PASSED  
+    DocumentStore::_discard_revisions 5  ✅  PASSED  
+    DocumentStore::_tables 5  ✅  PASSED  
+    DocumentStore::get 5  ✅  PASSED  
+    _body_stamps 5  ✅  PASSED  
+    DocumentStore::_blobs 6  ✅  PASSED  
+    DocumentStore::invalidate 6  ✅  PASSED  
+    DocumentStore::_load_table 7  ✅  PASSED  
+    _unindexed 7  ✅  PASSED  
+    DocumentStore::load 9  ✅  PASSED  
+    DocumentStore::schema 9  ✅  PASSED  
+    check_sync 11  ✅  PASSED  
+    DocumentStore::_load_revision_table 14  ✅  PASSED  
+    DocumentStore::_file_dates 15  ✅  PASSED  
+
+src/project_index/features/history/query.py
+    _not_found 0  ✅  PASSED  
+    _text 1  ✅  PASSED  
+    export_paths_at 1  ✅  PASSED  
+    read_file_at 2  ✅  PASSED  
+    co_changed_files 7  ✅  PASSED  
+    file_dates 9  ✅  PASSED  
+    list_commits 10  ✅  PASSED  
+    list_refs 12  ✅  PASSED  
+    list_worktrees 12  ✅  PASSED  
+    changed_files 14  ✅  PASSED  
+    resolve_ref 14  ✅  PASSED  
+
+src/project_index/features/history/snapshot.py
+    SnapshotStore::__init__ 0  ✅  PASSED  
+    SnapshotStore::_lock_for 0  ✅  PASSED  
+    SnapshotStore::checkout 6  ✅  PASSED  
+    SnapshotStore::_prune 7  ✅  PASSED  
+
+src/project_index/features/lifecycle/control.py
+    RestartControl::__init__ 0  ✅  PASSED  
+    RestartControl::attach 0  ✅  PASSED  
+    RestartControl::requested 0  ✅  PASSED  
+    RestartControl::request 2  ✅  PASSED  
+
+src/project_index/features/lifecycle/update.py
+    update_clone 2  ✅  PASSED  
+    _run 3  ✅  PASSED  
+    _update 3  ✅  PASSED  
+
+src/project_index/features/migrate/service.py
+    _violations 1  ✅  PASSED  
+    resolve_target 1  ✅  PASSED  
+    plan_migration 5  ✅  PASSED  
+    apply_migration 14  ✅  PASSED  
+
+src/project_index/features/migrate/steps.py
+    _optional_str 1  ✅  PASSED  
+    _rename 2  ✅  PASSED  
+    _matches 3  ✅  PASSED  
+    _unwrap 3  ✅  PASSED  
+    _read_version 4  ✅  PASSED  
+    _lift 5  ✅  PASSED  
+    _parents 5  ✅  PASSED  
+    apply_step 5  ✅  PASSED  
+    load_steps 5  ✅  PASSED  
+    _step_of 7  ✅  PASSED  
+    _children 8  ✅  PASSED  
+    _apply_key 15  ✅  PASSED  
+
+src/project_index/features/migrate/types.py
+    MigrationStep::destructive 1  ✅  PASSED  
+
+src/project_index/features/prompt_doc/cli.py
+    _read_stdin 1  ✅  PASSED  
+    run_prompt_doc 1  ✅  PASSED  
+
+src/project_index/features/prompt_doc/markdown.py
+    _cell 0  ✅  PASSED  
+    _html_block 1  ✅  PASSED  
+    _syntax_caution 1  ✅  PASSED  
+    _var_hint 1  ✅  PASSED  
+    lang_tabs 2  ✅  PASSED  
+    _header 3  ✅  PASSED  
+    _lookup 3  ✅  PASSED  
+    _marked_html 3  ✅  PASSED  
+    _part_badges 3  ✅  PASSED  
+    convert_prompt 4  ✅  PASSED  
+    _resolve_var 5  ✅  PASSED  
+    prompt_to_markdown 5  ✅  PASSED  
+    template_html 5  ✅  PASSED  
+    languages 6  ✅  PASSED  
+    _loc_path 7  ✅  PASSED  
+    example_body 8  ✅  PASSED  
+    var_table 8  ✅  PASSED  
+    _template_section 13  ✅  PASSED  
+
+src/project_index/features/prompt_doc/render.py
+    TracedFloat::__new__ 0  ✅  PASSED  
+    TracedInt::__new__ 0  ✅  PASSED  
+    TracedStr::__new__ 0  ✅  PASSED  
+    _failed 0  ✅  PASSED  
+    _message 0  ✅  PASSED  
+    build_environment 0  ✅  PASSED  
+    _finalize 1  ✅  PASSED  
+    _syntax_problem 1  ✅  PASSED  
+    _strip_braces 2  ✅  PASSED  
+    _flow_scalar 4  ✅  PASSED  
+    _traced_scalar 4  ✅  PASSED  
+    flow_yaml 4  ✅  PASSED  
+    _matches 7  ✅  PASSED  
+    build_values 7  ✅  PASSED  
+    flatten_vars 7  ✅  PASSED  
+    _messages 9  ✅  PASSED  
+    compile_parts 14  ✅  PASSED  
+    render_example 14  ✅  PASSED  
+    _trace 15  ✅  PASSED  
+
+src/project_index/features/prompt_doc/runtime.py
+    _schema_registry 0  ✅  PASSED  
+    _schema_reason 1  ✅  PASSED  
+    prompts_dir 1  ✅  PASSED  
+    PromptSet::render 8  ✅  PASSED  
+    load_prompts 9  ✅  PASSED  
+    _read_prompt 10  ✅  PASSED  
+    _check_file 12  ✅  PASSED  
+
+src/project_index/features/prompt_doc/types.py
+    PromptProblem::line 0  ✅  PASSED  
+    PromptInvalidError::__init__ 1  ✅  PASSED  
+
+src/project_index/features/read/nav.py
+    _filter_of 1  ✅  PASSED  
+    nav_auto_counts 1  ✅  PASSED  
+    zero_count_warnings 2  ✅  PASSED  
+    _autos 5  ✅  PASSED  
+    _walk_autos 5  ✅  PASSED  
+    nav_warnings 6  ✅  PASSED  
+    _select 7  ✅  PASSED  
+    check_nav_filters 10  ✅  PASSED  
+
+src/project_index/features/read/paths.py
+    page_path 1  ✅  PASSED  
+    read_target 3  ✅  PASSED  
+    find_page 10  ✅  PASSED  
+
+src/project_index/features/read/route.py
+    _decision 0  ✅  PASSED  
+    _decisions 0  ✅  PASSED  
+    _document 0  ✅  PASSED  
+    _documents 0  ✅  PASSED  
+    _refs 0  ✅  PASSED  
+    _source_config 0  ✅  PASSED  
+    build_read_router 0  ✅  PASSED  
+    _search 2  ✅  PASSED  
+    _run 3  ✅  PASSED  
+    _not_found_fields 4  ✅  PASSED  
+
+src/project_index/features/read/search.py
+    search_words 3  ✅  PASSED  
+
+src/project_index/features/read/service.py
+    _entry 0  ✅  PASSED  
+    _file_time 0  ✅  PASSED  
+    _metadata 0  ✅  PASSED  
+    _row_dict 0  ✅  PASSED  
+    get_source_config 1  ✅  PASSED  
+    list_decisions 1  ✅  PASSED  
+    list_documents 1  ✅  PASSED  
+    _ref_name 2  ✅  PASSED  
+    _tag_names 2  ✅  PASSED  
+    _kind_of 3  ✅  PASSED  
+    _unreadable 3  ✅  PASSED  
+    get_decision 3  ✅  PASSED  
+    get_document 7  ✅  PASSED  
+    _decision_files 10  ✅  PASSED  
+
+src/project_index/features/related/graph.py
+    _Walk::_note 1  ✅  PASSED  
+    _Walk::into 3  ✅  PASSED  
+    _Walk::_target 4  ✅  PASSED  
+    _Walk::out 4  ✅  PASSED  
+    _reverse 6  ✅  PASSED  
+    related_links 7  ✅  PASSED  
+    walk_related 9  ✅  PASSED  
+
+src/project_index/features/related/render.py
+    _cell 0  ✅  PASSED  
+    render_related_markdown 13  ✅  PASSED  
+
+src/project_index/features/related/service.py
+    _Others::__init__ 0  ✅  PASSED  
+    _invalid 0  ✅  PASSED  
+    _depth 3  ✅  PASSED  
+    trace_related 3  ✅  PASSED  
+    _Others::resolve 5  ✅  PASSED  
+    _seen_ids 6  ✅  PASSED  
+    _start_by_paths 7  ✅  PASSED  
+    _items 8  ✅  PASSED  
+    _start 9  ✅  PASSED  
+    _co_changed 12  ✅  PASSED  
+
+src/project_index/features/related/suggest.py
+    _co_change_scores 4  ✅  PASSED  
+    suggest_related 11  ✅  PASSED  
+
+src/project_index/features/search/body_parts.py
+    _line_range 2  ✅  PASSED  
+    join_ranges 2  ✅  PASSED  
+    _section_ranges 6  ✅  PASSED  
+    select_ranges 7  ✅  PASSED  
+
+src/project_index/features/search/cursor.py
+    _invalid 0  ✅  PASSED  
+    encode_cursor 0  ✅  PASSED  
+    decode_cursor 4  ✅  PASSED  
+
+src/project_index/features/search/fields.py
+    _headings 1  ✅  PASSED  
+    _path 1  ✅  PASSED  
+    _sections 1  ✅  PASSED  
+    known_fields 1  ✅  PASSED  
+    field_values 2  ✅  PASSED  
+    _raw_values 3  ✅  PASSED  
+    _base_fields 5  ✅  PASSED  
+    as_datetime 5  ✅  PASSED  
+    heading_lines 5  ✅  PASSED  
+    _schema_type 8  ✅  PASSED  
+    _walk 11  ✅  PASSED  
+    _leaves 12  ✅  PASSED  
+
+src/project_index/features/search/filters.py
+    _midnight 0  ✅  PASSED  
+    _same 0  ✅  PASSED  
+    normalize 0  ✅  PASSED  
+    _nfkc_unless 1  ✅  PASSED  
+    _unknown_field 1  ✅  PASSED  
+    compile_regex 1  ✅  PASSED  
+    match_words 2  ✅  PASSED  
+    _match_condition 4  ✅  PASSED  
+    _test_compare 4  ✅  PASSED  
+    _text 4  ✅  PASSED  
+    _check_body_range 5  ✅  PASSED  
+    parse_compare_value 9  ✅  PASSED  
+    _comparable 10  ✅  PASSED  
+    _walk 10  ✅  PASSED  
+    _test 11  ✅  PASSED  
+    check_filter 14  ✅  PASSED  
+    _check_condition 15  ✅  PASSED  
+    match_filter 15  ✅  PASSED  
+
+src/project_index/features/search/render.py
+    _title 0  ✅  PASSED  
+    _range_line 2  ✅  PASSED  
+    _cell 4  ✅  PASSED  
+    _snippet_lines 5  ✅  PASSED  
+    _table 6  ✅  PASSED  
+    _full 8  ✅  PASSED  
+    render_search_markdown 15  ✅  PASSED  
+
+src/project_index/features/search/service.py
+    _invalid 0  ✅  PASSED  
+    _item_size 0  ✅  PASSED  
+    _cut 2  ✅  PASSED  
+    _bounded 3  ✅  PASSED  
+    _field_value 3  ✅  PASSED  
+    _id_ordered 3  ✅  PASSED  
+    _put_body 3  ✅  PASSED  
+    _mark_returned 4  ✅  PASSED  
+    _per_source 4  ✅  PASSED  
+    _sort_value 4  ✅  PASSED  
+    _cut_body 5  ✅  PASSED  
+    _hits 6  ✅  PASSED  
+    _scope 6  ✅  PASSED  
+    _groups 7  ✅  PASSED  
+    _page 7  ✅  PASSED  
+    _search_item 7  ✅  PASSED  
+    _field_names 8  ✅  PASSED  
+    _order 8  ✅  PASSED  
+    _seen_ids 8  ✅  PASSED  
+    _body_conditions 9  ✅  PASSED  
+    search_docs 11  ✅  PASSED  
+    _load_targets 15  ✅  PASSED  
+
+src/project_index/features/search/snippets.py
+    _same 0  ✅  PASSED  
+    count_matches 0  ✅  PASSED  
+    split_lines 2  ✅  PASSED  
+    snippet_lines 3  ✅  PASSED  
+    _hit_lines 4  ✅  PASSED  
+    _regex_hits 6  ✅  PASSED  
+    _text_hits 6  ✅  PASSED  
+    _spans 8  ✅  PASSED  
+    find_snippets 8  ✅  PASSED  
+
+src/project_index/features/search/terms.py
+    list_match_words 0  ✅  PASSED  
+    render_match_words_markdown 2  ✅  PASSED  
+
+src/project_index/features/seen/store.py
+    SeenStore::__del__ 0  ✅  PASSED  
+    SeenStore::__init__ 0  ✅  PASSED  
+    SeenStore::close 0  ✅  PASSED  
+    _now 0  ✅  PASSED  
+    SeenStore::activity 2  ✅  PASSED  
+    SeenStore::last_read 2  ✅  PASSED  
+    SeenStore::forget 3  ✅  PASSED  
+    SeenStore::record_activity 3  ✅  PASSED  
+    SeenStore::returned 4  ✅  PASSED  
+    SeenStore::purge_expired 5  ✅  PASSED  
+    SeenStore::mark_returned 7  ✅  PASSED  
+
+src/project_index/features/seen/types.py
+    SessionKey::of 2  ✅  PASSED  
+
+src/project_index/features/session_start/route.py
+    build_session_start_router 5  ✅  PASSED  
+
+src/project_index/features/session_start/service.py
+    start_session 2  ✅  PASSED  
+
+src/project_index/features/settings/query.py
+    _settings_schema 0  ✅  PASSED  
+    _rows 1  ✅  PASSED  
+    config_path 1  ✅  PASSED  
+    log_unknown_keys 1  ✅  PASSED  
+    unknown_key_warnings 1  ✅  PASSED  
+    state_dir_path 2  ✅  PASSED  
+    unknown_top_level_keys 2  ✅  PASSED  
+    xdg_base_dir 2  ✅  PASSED  
+    listen_port 3  ✅  PASSED  
+    validate_terminal_config 4  ✅  PASSED  
+    _duplicate_ids 7  ✅  PASSED  
+    load_terminal_config 13  ✅  PASSED  
+    _empty_globs 14  ✅  PASSED  
+
+src/project_index/features/settings/route.py
+    build_settings_router 2  ✅  PASSED  
+    _settings_view 4  ✅  PASSED  
+    _match_status 7  ✅  PASSED  
+
+src/project_index/features/settings/service.py
+    _validate_or_raise 1  ✅  PASSED  
+    save_sources 2  ✅  PASSED  
+    _fill_unsent 5  ✅  PASSED  
+    _to_yaml_row 6  ✅  PASSED  
+    _current_entries 8  ✅  PASSED  
+    add_source 10  ✅  PASSED  
+
+src/project_index/features/settings/types.py
+    SourceEntry::_as_list 1  ✅  PASSED  
+    SettingsSourcesResponse::from_statuses 3  ✅  PASSED  
+
+src/project_index/features/sources/merge.py
+    merge_configs 1  ✅  PASSED  
+    _merge_dict 8  ✅  PASSED  
+    _merge_table 11  ✅  PASSED  
+
+src/project_index/features/sources/registry.py
+    SourceRegistry::loading 0  ✅  PASSED  
+    SourceRegistry::reload 0  ✅  PASSED  
+    SourceRegistry::statuses 0  ✅  PASSED  
+    SourceRegistry::wait_loaded 0  ✅  PASSED  
+    _duplicate_status 0  ✅  PASSED  
+    SourceRegistry::__init__ 1  ✅  PASSED  
+    SourceRegistry::_load_row 1  ✅  PASSED  
+    SourceRegistry::_release_waiters 1  ✅  PASSED  
+    _finish 1  ✅  PASSED  
+    SourceRegistry::_current_commit 2  ✅  PASSED  
+    SourceRegistry::_next_row 3  ✅  PASSED  
+    SourceRegistry::_request 3  ✅  PASSED  
+    SourceRegistry::served 3  ✅  PASSED  
+    SourceRegistry::load 4  ✅  PASSED  
+    SourceRegistry::_id_rows 5  ✅  PASSED  
+    SourceRegistry::_wait_row 6  ✅  PASSED  
+    SourceRegistry::_target_rows 7  ✅  PASSED  
+    SourceRegistry::_finish_waiters 9  ✅  PASSED  
+    SourceRegistry::_reload 9  ✅  PASSED  
+    SourceRegistry::get 12  ✅  PASSED  
+    SourceRegistry::_refresh 13  ✅  PASSED  
+    SourceRegistry::wait_for 14  ✅  PASSED  
+    SourceRegistry::_publish 15  ✅  PASSED  
+
+src/project_index/features/sources/schema_ref.py
+    SchemaRefError::__init__ 0  ✅  PASSED  
+    _config_name 3  ✅  PASSED  
+    terminal_lookup 4  ✅  PASSED  
+    read_schema_ref 9  ✅  PASSED  
+
+src/project_index/features/sources/service.py
+    _build_script 0  ✅  PASSED  
+    _build_table 0  ✅  PASSED  
+    _outside_root 0  ✅  PASSED  
+    _source_schema 0  ✅  PASSED  
+    assemble_source 0  ✅  PASSED  
+    source_schema_json 0  ✅  PASSED  
+    validate_source_config 0  ✅  PASSED  
+    _as_schema 1  ✅  PASSED  
+    _check_schema 1  ✅  PASSED  
+    _check_schema_file 1  ✅  PASSED  
+    _commit_reader 1  ✅  PASSED  
+    _log_violations 1  ✅  PASSED  
+    _paths_base_violations 1  ✅  PASSED  
+    _settings_lookup 1  ✅  PASSED  
+    _check_scripts_at 2  ✅  PASSED  
+    _disk_reader 2  ✅  PASSED  
+    compare_config_version 2  ✅  PASSED  
+    _declared_version 3  ✅  PASSED  
+    _duplicate_ids 3  ✅  PASSED  
+    _file_violation 3  ✅  PASSED  
+    _worktree_globs 3  ✅  PASSED  
+    _row_schemas 4  ✅  PASSED  
+    _schema_violation 4  ✅  PASSED  
+    entry_source_id 4  ✅  PASSED  
+    _ref_reader 5  ✅  PASSED  
+    _resolve_paths_base 6  ✅  PASSED  
+    check_scripts 6  ✅  PASSED  
+    _script_folders 7  ✅  PASSED  
+    read_default_ref_config 8  ✅  PASSED  
+    _validate 9  ✅  PASSED  
+    build_source_config 9  ✅  PASSED  
+    _read_configs 10  ✅  PASSED  
+    load_source_at 10  ✅  PASSED  
+    _document_row_violations 12  ✅  PASSED  
+    _assemble 14  ✅  PASSED  
+    load_source 14  ✅  PASSED  
+
+src/project_index/features/sources/types.py
+    ServedSource::config_path 0  ✅  PASSED  
+    ServedSource::config_root 0  ✅  PASSED  
+    DocumentTable::excludes 1  ✅  PASSED  
+    DocumentTable::is_writable 1  ✅  PASSED  
+    DocumentTable::matches 2  ✅  PASSED  
+    ServedSource::script 3  ✅  PASSED  
+    ServedSource::table 5  ✅  PASSED  
+
+src/project_index/features/validation/markdown.py
+    _Validator::iter_errors 0  ✅  PASSED  
+    _mark_markdown 2  ✅  PASSED  
+    changed_markdown 3  ✅  PASSED  
+    markdown_values 3  ✅  PASSED  
+    _marked 5  ✅  PASSED  
+    check_markdown_values 11  ✅  PASSED  
+
+src/project_index/features/validation/rules.py
+    _listed 1  ✅  PASSED  
+    check_id_format 2  ✅  PASSED  
+    check_schema 3  ✅  PASSED  
+    _format_pattern 6  ✅  PASSED  
+    _schema_fix 9  ✅  PASSED  
+    check_related 12  ✅  PASSED  
+
+src/project_index/features/validation/scripts.py
+    parse_validator_output 8  ✅  PASSED  
+
+src/project_index/features/validation/service.py
+    DocumentChecker::__init__ 0  ✅  PASSED  
+    DocumentChecker::clear 0  ✅  PASSED  
+    DocumentChecker::_run_validator 1  ✅  PASSED  
+    DocumentChecker::check_markdown 1  ✅  PASSED  
+    _schema_file 1  ✅  PASSED  
+    DocumentChecker::check 4  ✅  PASSED  
+    DocumentChecker::_validate 9  ✅  PASSED  
+
+src/project_index/features/write/apply.py
+    _violation 0  ✅  PASSED  
+    _is_names 1  ✅  PASSED  
+    _raise_if 1  ✅  PASSED  
+    _rebuild 2  ✅  PASSED  
+    _to_column 2  ✅  PASSED  
+    _without 2  ✅  PASSED  
+    _set 3  ✅  PASSED  
+    _array_keys 4  ✅  PASSED  
+    _check_overlap 4  ✅  PASSED  
+    _data_to_columns 4  ✅  PASSED  
+    _known 4  ✅  PASSED  
+    _mark 4  ✅  PASSED  
+    _merge 6  ✅  PASSED  
+    _original 6  ✅  PASSED  
+    _add_to 7  ✅  PASSED  
+    _name_violations 7  ✅  PASSED  
+    _remove_from 8  ✅  PASSED  
+    _array_update 9  ✅  PASSED  
+    _text_edits 9  ✅  PASSED  
+    expand_array_keys 10  ✅  PASSED  
+    to_columns 10  ✅  PASSED  
+    apply_operation 11  ✅  PASSED  
+    _apply_all_key 14  ✅  PASSED  
+    _apply_selected_key 14  ✅  PASSED  
+
+src/project_index/features/write/hints.py
+    _hint 4  ✅  PASSED  
+    _definition 5  ✅  PASSED  
+    attach_schema_hints 8  ✅  PASSED  
+
+src/project_index/features/write/ids.py
+    generate_id 2  ✅  PASSED  
+
+src/project_index/features/write/locks.py
+    SourceLocks::__init__ 0  ✅  PASSED  
+    SourceLocks::_hold 0  ✅  PASSED  
+    SourceLocks::hold 0  ✅  PASSED  
+
+src/project_index/features/write/placement.py
+    _excluded 0  ✅  PASSED  
+    _undecided 0  ✅  PASSED  
+    new_document_path 13  ✅  PASSED  
+
+src/project_index/features/write/service.py
+    _Session::build 0  ✅  PASSED  
+    _Session::source_id 0  ✅  PASSED  
+    _invalid 0  ✅  PASSED  
+    _related_column 0  ✅  PASSED  
+    _unique 0  ✅  PASSED  
+    _Session::__post_init__ 1  ✅  PASSED  
+    _Session::exists 1  ✅  PASSED  
+    _Session::text 1  ✅  PASSED  
+    _apply_one 1  ✅  PASSED  
+    _records 1  ✅  PASSED  
+    _writable 1  ✅  PASSED  
+    _apply_existing 2  ✅  PASSED  
+    _points_to 2  ✅  PASSED  
+    _apply_create_one 3  ✅  PASSED  
+    _apply_unlinks 3  ✅  PASSED  
+    _check_and_commit 3  ✅  PASSED  
+    _finish 3  ✅  PASSED  
+    _prefixed 3  ✅  PASSED  
+    _unlink 3  ✅  PASSED  
+    _Session::write_pending 4  ✅  PASSED  
+    _apply_existing_one 4  ✅  PASSED  
+    _content_for 4  ✅  PASSED  
+    _check_operations 5  ✅  PASSED  
+    _stamp 5  ✅  PASSED  
+    _Session::commit 6  ✅  PASSED  
+    _new_id 6  ✅  PASSED  
+    _referrers 6  ✅  PASSED  
+    check_version 6  ✅  PASSED  
+    _atomic_error 7  ✅  PASSED  
+    _delete_target 7  ✅  PASSED  
+    _remove_documents 8  ✅  PASSED  
+    _run_generators 9  ✅  PASSED  
+    _apply_create 11  ✅  PASSED  
+    _new_document 12  ✅  PASSED  
+    delete_docs 13  ✅  PASSED  
+    write_docs 13  ✅  PASSED  
+
+src/project_index/integrations/git.py
+    GitError::__init__ 0  ✅  PASSED  
+    _tail 0  ✅  PASSED  
+    is_ignored 1  ✅  PASSED  
+    main_repo_root 2  ✅  PASSED  
+    repo_root 2  ✅  PASSED  
+    run_git 4  ✅  PASSED  
+
+src/project_index/integrations/mdmark.py
+    MdmarkUnavailableError::__init__ 0  ✅  PASSED  
+    parse_check_output 7  ✅  PASSED  
+    check_markdown 8  ✅  PASSED  
+
+src/project_index/integrations/scripts.py
+    ScriptError::__init__ 0  ✅  PASSED  
+    run_script 0  ✅  PASSED  
+    _run 2  ✅  PASSED  
+    _stop 4  ✅  PASSED  
+    _run_at 8  ✅  PASSED  
+    check_runnable 11  ✅  PASSED  
+
+src/project_index/main.py
+    PortInUseError::__init__ 0  ✅  PASSED  
+    _report_port 0  ✅  PASSED  
+    discard_source_caches 0  ✅  PASSED  
+    reload_sources 0  ✅  PASSED  
+    _close_logging 1  ✅  PASSED  
+    _setup_logging 1  ✅  PASSED  
+    build_handlers 2  ✅  PASSED  
+    run_files 2  ✅  PASSED  
+    check_port 3  ✅  PASSED  
+    _report_invalid 4  ✅  PASSED  
+    start_loading 4  ✅  PASSED  
+    run_serve 7  ✅  PASSED  
+    run_migrate 9  ✅  PASSED  
+    check_sources 10  ✅  PASSED  
+
+src/project_index/server/app.py
+    SlashlessMcpPathMiddleware::__init__ 0  ✅  PASSED  
+    build_app 1  ✅  PASSED  
+    route_operation_id 1  ✅  PASSED  
+    SlashlessMcpPathMiddleware::__call__ 2  ✅  PASSED  
+
+src/project_index/server/error_handlers.py
+    _problem 0  ✅  PASSED  
+    problem_of 8  ✅  PASSED  
+    _camelize 11  ✅  PASSED  
+    register_error_handlers 13  ✅  PASSED  
+
+src/project_index/server/lifespan.py
+    build_lifespan 2  ✅  PASSED  
+
+src/project_index/server/mcp/admin.py
+    build_admin_mcp 0  ✅  PASSED  
+    _signature 1  ✅  PASSED  
+    _register 6  ✅  PASSED  
+
+src/project_index/server/mcp/docs.py
+    build_docs_mcp 0  ✅  PASSED  
+    _recheck_after 4  ✅  PASSED  
+    _register 6  ✅  PASSED  
+    _wait_target 8  ✅  PASSED  
+    _signature 9  ✅  PASSED  
+
+src/project_index/server/mcp/result.py
+    _changes 0  ✅  PASSED  
+    _contains 0  ✅  PASSED  
+    _related 0  ✅  PASSED  
+    _snippet_line 0  ✅  PASSED  
+    _yaml 0  ✅  PASSED  
+    mcp_prompt_ids 0  ✅  PASSED  
+    tool_prompt_id 0  ✅  PASSED  
+    _deleted 1  ✅  PASSED  
+    _fields 2  ✅  PASSED  
+    to_tool_result 2  ✅  PASSED  
+    _plain_dict 4  ✅  PASSED  
+    _search_item 4  ✅  PASSED  
+    tool_error 8  ✅  PASSED  
+    _plain 13  ✅  PASSED  
+
+src/project_index/server/origin.py
+    require_same_origin 5  ✅  PASSED  
+
+src/project_index/shared/errors.py
+    ProjectIndexError::__str__ 0  ✅  PASSED  
+    ProjectIndexError::name 0  ✅  PASSED  
+    ProjectIndexError::details 4  ✅  PASSED  
+    _plain 10  ✅  PASSED  
+
+src/project_index/shared/files.py
+    replace_file 3  ✅  PASSED  
+
+src/project_index/shared/hashing.py
+    value_hash 0  ✅  PASSED  
+    content_hash 1  ✅  PASSED  
+
+src/project_index/shared/narrowing.py
+    is_dict 0  ✅  PASSED  
+    is_list 0  ✅  PASSED  
+
+src/project_index/shared/paths.py
+    normalize_path 0  ✅  PASSED  
+    match_glob 11  ✅  PASSED  
+
+src/project_index/shared/schema_check.py
+    _iter_errors 0  ✅  PASSED  
+    _properties 2  ✅  PASSED  
+    schema_violations 2  ✅  PASSED  
+    _as_list 3  ✅  PASSED  
+    format_path 7  ✅  PASSED  
+    _from_error 13  ✅  PASSED  
+
+src/project_index/shared/yaml_io.py
+    YamlLoadError::__init__ 0  ✅  PASSED  
+    dump_roundtrip 0  ✅  PASSED  
+    _represent_str 1  ✅  PASSED  
+    load_yaml 1  ✅  PASSED  
+    _error_from 2  ✅  PASSED  
+    YamlLoadError::__str__ 3  ✅  PASSED  
+    load_roundtrip 3  ✅  PASSED  
+
+tests/conftest.py
+    git_repo 0  ✅  PASSED  
+    run_git 0  ✅  PASSED  
+    _date_env 1  ✅  PASSED  
+    commit_all 2  ✅  PASSED  
+    write_files 2  ✅  PASSED  
+
+tests/integration/plugin/conftest.py
+    HookRun::output 0  ✅  PASSED  
+    free_port 0  ✅  PASSED  
+    run_hook 2  ✅  PASSED  
+    context_server 4  ✅  PASSED  
+
+tests/integration/plugin/test_pre_tool_use.py
+    test_normal 0  ✅  PASSED  
+    test_normal_when_input_unparsable 0  ✅  PASSED  
+
+tests/integration/plugin/test_session_start.py
+    _clone_with_recorder 0  ✅  PASSED  
+    _hooks_with_forget_timeout 0  ✅  PASSED  
+    test_normal_when_cleared 0  ✅  PASSED  
+    test_normal_when_forget_failed 0  ✅  PASSED  
+    test_normal_when_server_down 0  ✅  PASSED  
+    test_normal_when_server_listening 0  ✅  PASSED  
+    test_normal_when_terminal_config_missing 0  ✅  PASSED  
+    test_normal_when_xdg_config_home_set 1  ✅  PASSED  
+    _wait_for 2  ✅  PASSED  
+
+tests/integration/server/conftest.py
+    DevDocsClone::head 0  ✅  PASSED  
+    LoadingServerEnv::finish 0  ✅  PASSED  
+    ServerEnv::_call 0  ✅  PASSED  
+    ServerEnv::call 0  ✅  PASSED  
+    ServerEnv::call_admin 0  ✅  PASSED  
+    ServerEnv::rewrite_settings 0  ✅  PASSED  
+    ToolResult::data 0  ✅  PASSED  
+    add_worktree 0  ✅  PASSED  
+    alias_file_set 0  ✅  PASSED  
+    call_tool 0  ✅  PASSED  
+    free_port 0  ✅  PASSED  
+    make_server 0  ✅  PASSED  
+    migrations_root 0  ✅  PASSED  
+    ref_config_text 0  ✅  PASSED  
+    sample_config_text 0  ✅  PASSED  
+    sample_doc_text 0  ✅  PASSED  
+    sample_file_set 0  ✅  PASSED  
+    sample_files 0  ✅  PASSED  
+    sample_sync_file_set 0  ✅  PASSED  
+    write_settings 0  ✅  PASSED  
+    write_steps 0  ✅  PASSED  
+    DevDocsClone::push_upstream 1  ✅  PASSED  
+    ServerEnv::tool_names 1  ✅  PASSED  
+    alias_files 1  ✅  PASSED  
+    ref_config 1  ✅  PASSED  
+    sample_doc 1  ✅  PASSED  
+    sample_sync_files 1  ✅  PASSED  
+    DevDocsClone::bump_version 2  ✅  PASSED  
+    make_schemas_source 2  ✅  PASSED  
+    sample_config 2  ✅  PASSED  
+    started_count 2  ✅  PASSED  
+    serve_in_thread 3  ✅  PASSED  
+    start_serve_from_clone 3  ✅  PASSED  
+    versions_2 3  ✅  PASSED  
+    project_index_clone 4  ✅  PASSED  
+    make_source 5  ✅  PASSED  
+    wait_until_serving 8  ✅  PASSED  
+    make_loading_server 11  ✅  PASSED  
+    wait_for_restart 13  ✅  PASSED  
+    start_serve 14  ✅  PASSED  
+    _settings_text 15  ✅  PASSED  
+
+tests/integration/server/test_add_settings_source.py
+    load_yaml 0  ✅  PASSED  
+    test_error_when_same_id_exists 0  ✅  PASSED  
+    test_error_when_schema_invalid 1  ✅  PASSED  
+    test_normal_when_unknown_top_level_key_kept 1  ✅  PASSED  
+    _row 2  ✅  PASSED  
+    test_normal 2  ✅  PASSED  
+
+tests/integration/server/test_check_project.py
+    _node_config 0  ✅  PASSED  
+    test_error_when_config_not_found 0  ✅  PASSED  
+    test_error_when_config_unparsable 0  ✅  PASSED  
+    test_normal_when_schema_from_other_source 0  ✅  PASSED  
+    test_normal 1  ✅  PASSED  
+    test_normal_when_config_has_violations 1  ✅  PASSED  
+    test_normal_when_config_legacy 1  ✅  PASSED  
+    test_normal_when_files_excluded 1  ✅  PASSED  
+    test_normal_when_legacy_config_name 1  ✅  PASSED  
+    test_normal_when_records_schema_mismatch 1  ✅  PASSED  
+    test_normal_when_related_unresolved 1  ✅  PASSED  
+    test_normal_when_schema_ref_not_found 1  ✅  PASSED  
+    test_normal_when_alias_and_nav_checked 2  ✅  PASSED  
+    _listing 3  ✅  PASSED  
+    test_normal_when_paths_base_or_paths_out_of_range 3  ✅  PASSED  
+
+tests/integration/server/test_delete_docs.py
+    _referenced_files 0  ✅  PASSED  
+    _setup 0  ✅  PASSED  
+    _version 0  ✅  PASSED  
+    load_yaml 0  ✅  PASSED  
+    test_error_when_delete_not_allowed 0  ✅  PASSED  
+    test_error_when_document_not_found 0  ✅  PASSED  
+    test_error_when_referenced 0  ✅  PASSED  
+    test_error_when_source_not_writable 0  ✅  PASSED  
+    test_error_when_target_is_clone 0  ✅  PASSED  
+    test_error_when_version_mismatch 0  ✅  PASSED  
+    test_normal 0  ✅  PASSED  
+    test_normal_when_dry_run 0  ✅  PASSED  
+    test_normal_when_unlink 0  ✅  PASSED  
+    test_normal_when_unlink_quotes_preserved 0  ✅  PASSED  
+
+tests/integration/server/test_describe.py
+    test_error_when_outside_read_disabled 0  ✅  PASSED  
+    test_error_when_source_not_readable 0  ✅  PASSED  
+    test_error_when_source_not_served 0  ✅  PASSED  
+    test_error_when_unknown_kind 0  ✅  PASSED  
+    test_normal 0  ✅  PASSED  
+    test_normal_when_kind 0  ✅  PASSED  
+    test_normal_when_kind_from_other_source 0  ✅  PASSED  
+    test_normal_when_outside_list 0  ✅  PASSED  
+    test_normal_when_source 0  ✅  PASSED  
+    test_normal_when_refs_and_worktrees 1  ✅  PASSED  
+    _outside_logs 2  ✅  PASSED  
+    test_normal_when_no_source_available 2  ✅  PASSED  
+    test_normal_when_outside_scope 2  ✅  PASSED  
+    test_normal_when_rechecked_after_write 2  ✅  PASSED  
+    test_normal_when_warned 11  ✅  PASSED  
+
+tests/integration/server/test_files.py
+    range_folder 0  ✅  PASSED  
+    test_error_when_root_not_found 0  ✅  PASSED  
+    test_normal 0  ✅  PASSED  
+    test_normal_when_exclude_given 0  ✅  PASSED  
+    _listing 2  ✅  PASSED  
+
+tests/integration/server/test_get_decision.py
+    _decision_files 0  ✅  PASSED  
+    test_error_when_id_invalid 0  ✅  PASSED  
+    test_error_when_not_unique 0  ✅  PASSED  
+    test_normal 0  ✅  PASSED  
+
+tests/integration/server/test_get_document.py
+    terms_files 0  ✅  PASSED  
+    test_error_when_not_found 0  ✅  PASSED  
+    test_normal 0  ✅  PASSED  
+    test_normal_when_body_path_given 0  ✅  PASSED  
+    test_normal_when_converter_kind 0  ✅  PASSED  
+    test_normal_when_id_given 0  ✅  PASSED  
+    test_normal_when_ref_given 0  ✅  PASSED  
+
+tests/integration/server/test_get_settings_sources.py
+    test_normal 1  ✅  PASSED  
+    test_normal_when_outside_read_false 1  ✅  PASSED  
+    test_normal_when_pending_reload 1  ✅  PASSED  
+    test_normal_when_unknown_top_level_key 2  ✅  PASSED  
+    test_normal_when_source_not_served 3  ✅  PASSED  
+
+tests/integration/server/test_get_source_config.py
+    test_error_when_source_not_found 0  ✅  PASSED  
+    test_normal_when_schemas_requested 0  ✅  PASSED  
+    test_normal 1  ✅  PASSED  
+
+tests/integration/server/test_get_status.py
+    test_normal_when_checking 0  ✅  PASSED  
+    test_normal_when_loading 1  ✅  PASSED  
+    test_normal 2  ✅  PASSED  
+
+tests/integration/server/test_list_changes.py
+    _changed_source 0  ✅  PASSED  
+    _word_history 0  ✅  PASSED  
+    test_error_when_invalid_argument 0  ✅  PASSED  
+    test_error_when_last_read_not_found 0  ✅  PASSED  
+    test_error_when_ref_not_found 0  ✅  PASSED  
+    test_error_when_source_not_readable 0  ✅  PASSED  
+    test_normal 1  ✅  PASSED  
+    test_normal_when_range_by_date_and_branch 1  ✅  PASSED  
+    test_normal_when_since_last_read 2  ✅  PASSED  
+    test_normal_when_outside_scope 5  ✅  PASSED  
+    test_normal_when_contains 6  ✅  PASSED  
+
+tests/integration/server/test_list_decisions.py
+    test_error_when_source_not_found 0  ✅  PASSED  
+    test_normal 0  ✅  PASSED  
+    test_normal_when_no_decision_folder 0  ✅  PASSED  
+
+tests/integration/server/test_list_documents.py
+    main_files 0  ✅  PASSED  
+    test_error_when_not_found 0  ✅  PASSED  
+    test_normal_when_values_requested 0  ✅  PASSED  
+    test_normal 1  ✅  PASSED  
+    test_normal_when_ref_given 2  ✅  PASSED  
+
+tests/integration/server/test_list_match_words.py
+    test_error_when_source_not_readable 0  ✅  PASSED  
+    test_error_when_source_not_served 0  ✅  PASSED  
+    test_normal_when_no_alias_type 0  ✅  PASSED  
+    test_normal 2  ✅  PASSED  
+
+tests/integration/server/test_list_refs.py
+    test_error_when_source_not_found 0  ✅  PASSED  
+    test_normal_when_non_git_source 0  ✅  PASSED  
+    test_normal 3  ✅  PASSED  
+
+tests/integration/server/test_list_sources.py
+    test_normal_when_no_source 0  ✅  PASSED  
+    test_normal 2  ✅  PASSED  
+
+tests/integration/server/test_migrate.py
+    _backups 0  ✅  PASSED  
+    load_yaml 0  ✅  PASSED  
+    settings_file 0  ✅  PASSED  
+    test_error_when_config_invalid 0  ✅  PASSED  
+    test_error_when_config_newer 0  ✅  PASSED  
+    test_error_when_destructive_step_blocked 0  ✅  PASSED  
+    test_error_when_source_config_unmigratable 0  ✅  PASSED  
+    test_error_when_step_fails 0  ✅  PASSED  
+    test_normal 0  ✅  PASSED  
+    test_normal_when_record_only 0  ✅  PASSED  
+    test_normal_when_source_config 0  ✅  PASSED  
+    test_normal_when_terminal_config_has_unknown_top_level_key 0  ✅  PASSED  
+
+tests/integration/server/test_prompt_doc.py
+    _char_count 0  ✅  PASSED  
+    _run 0  ✅  PASSED  
+    _section 0  ✅  PASSED  
+    _tab 0  ✅  PASSED  
+    _tab_names 0  ✅  PASSED  
+    _until_next 0  ✅  PASSED  
+    test_error_when_required_key_missing 0  ✅  PASSED  
+    test_error_when_yaml_unreadable 0  ✅  PASSED  
+    test_normal 0  ✅  PASSED  
+    test_normal_when_example_invalid 0  ✅  PASSED  
+    test_normal_when_hook_text_too_long 0  ✅  PASSED  
+    test_normal_when_part_syntax_invalid 0  ✅  PASSED  
+    test_normal_when_single_language 0  ✅  PASSED  
+    _pre_text_length 1  ✅  PASSED  
+    _outside_fences 6  ✅  PASSED  
+
+tests/integration/server/test_put_settings_sources.py
+    load_yaml 0  ✅  PASSED  
+    test_error_when_cross_origin 0  ✅  PASSED  
+    test_normal_when_sent_keys_override 0  ✅  PASSED  
+    test_normal_when_source_disabled 1  ✅  PASSED  
+    test_normal_when_unsent_keys_kept 1  ✅  PASSED  
+    _row 2  ✅  PASSED  
+    test_normal 2  ✅  PASSED  
+    test_normal_when_added_source_invalid 2  ✅  PASSED  
+    test_normal_when_source_deleted 2  ✅  PASSED  
+    test_normal_when_unknown_top_level_key_kept 2  ✅  PASSED  
+    test_error_when_schema_invalid 3  ✅  PASSED  
+
+tests/integration/server/test_reload.py
+    test_error_when_terminal_config_invalid 0  ✅  PASSED  
+    test_normal 1  ✅  PASSED  
+    test_normal_when_source_becomes_invalid 2  ✅  PASSED  
+    test_normal_when_terminal_config_has_unknown_top_level_key 5  ✅  PASSED  
+
+tests/integration/server/test_restart.py
+    test_normal 1  ✅  PASSED  
+    _status_after_loading 4  ✅  PASSED  
+    test_error_when_restart_in_progress 4  ✅  PASSED  
+
+tests/integration/server/test_search_docs.py
+    _other_files 0  ✅  PASSED  
+    test_error_when_invalid_argument 0  ✅  PASSED  
+    test_error_when_outside_read_disabled 0  ✅  PASSED  
+    test_error_when_ref_not_found 0  ✅  PASSED  
+    test_error_when_source_not_served 0  ✅  PASSED  
+    test_error_when_worktree_not_matched 0  ✅  PASSED  
+    test_normal_when_count_grouped 0  ✅  PASSED  
+    test_normal_when_seen 0  ✅  PASSED  
+    test_normal_when_worktree 0  ✅  PASSED  
+    _term_ids 1  ✅  PASSED  
+    test_error_when_source_not_readable 1  ✅  PASSED  
+    test_normal_when_file_unreadable 1  ✅  PASSED  
+    test_normal_when_files_index 1  ✅  PASSED  
+    test_normal_when_part_of_body 1  ✅  PASSED  
+    test_normal_when_schema_ref_unresolvable 1  ✅  PASSED  
+    test_normal_when_snippets 1  ✅  PASSED  
+    test_normal_when_source_all 1  ✅  PASSED  
+    test_normal_when_term 1  ✅  PASSED  
+    _outside_logs 2  ✅  PASSED  
+    test_normal_when_excluded_name 2  ✅  PASSED  
+    test_normal_when_metadata_mapped 2  ✅  PASSED  
+    test_normal_when_tags_are_objects 2  ✅  PASSED  
+    test_normal_when_relative_ref_in_defs 3  ✅  PASSED  
+    test_normal 4  ✅  PASSED  
+    test_normal_when_outside_scope 4  ✅  PASSED  
+    test_normal_when_ordered_by_matches 5  ✅  PASSED  
+    _notes_files 6  ✅  PASSED  
+    test_normal_when_full 7  ✅  PASSED  
+    test_normal_when_ordered_and_limited 7  ✅  PASSED  
+
+tests/integration/server/test_search_page.py
+    _source 0  ✅  PASSED  
+    test_error_when_not_found 0  ✅  PASSED  
+    test_error_when_query_invalid 0  ✅  PASSED  
+    test_normal 2  ✅  PASSED  
+
+tests/integration/server/test_serve.py
+    _kind_row 0  ✅  PASSED  
+    _mcp 0  ✅  PASSED  
+    load_yaml 0  ✅  PASSED  
+    test_normal_when_mcp_path_without_slash 0  ✅  PASSED  
+    test_normal_when_other_source_loading 0  ✅  PASSED  
+    test_normal_when_schema_from_other_source 0  ✅  PASSED  
+    test_normal_when_source_config_legacy 0  ✅  PASSED  
+    test_normal_when_source_invalid 0  ✅  PASSED  
+    test_normal_when_xdg_dirs_set 0  ✅  PASSED  
+    _argument_keys 1  ✅  PASSED  
+    _descriptions 1  ✅  PASSED  
+    _rendered 1  ✅  PASSED  
+    _tool_data 1  ✅  PASSED  
+    test_error_when_port_in_use 1  ✅  PASSED  
+    test_error_when_prompt_invalid 1  ✅  PASSED  
+    test_normal_when_requested_source_loaded_first 1  ✅  PASSED  
+    test_normal_when_requested_while_loading 1  ✅  PASSED  
+    test_error_when_terminal_config_invalid 2  ✅  PASSED  
+    test_normal_when_configs_merged 2  ✅  PASSED  
+    test_normal_when_first_config_not_committed 2  ✅  PASSED  
+    test_normal_when_paths_base_set 2  ✅  PASSED  
+    test_error_when_source_load_failed 3  ✅  PASSED  
+    test_normal 3  ✅  PASSED  
+    test_normal_when_alias_and_nav_warned 3  ✅  PASSED  
+    test_normal_when_ignored_config_first 3  ✅  PASSED  
+    test_normal_when_terminal_config_has_unknown_top_level_key 3  ✅  PASSED  
+    _model_keys 4  ✅  PASSED  
+    test_normal_when_config_read_from_default_ref 4  ✅  PASSED  
+    test_normal_when_config_version_old 4  ✅  PASSED  
+    test_normal_when_mcp_text_from_prompts 6  ✅  PASSED  
+    _listening_addresses 7  ✅  PASSED  
+    test_normal_when_metadata_out_of_sync 13  ✅  PASSED  
+
+tests/integration/server/test_session_start.py
+    _post 0  ✅  PASSED  
+    test_normal_when_cleared 0  ✅  PASSED  
+    test_normal_when_loading 0  ✅  PASSED  
+    test_normal_when_not_forget_reason 0  ✅  PASSED  
+    test_error_when_input_invalid 1  ✅  PASSED  
+
+tests/integration/server/test_trace_related.py
+    _chain_files 0  ✅  PASSED  
+    _link 0  ✅  PASSED  
+    load_yaml 0  ✅  PASSED  
+    test_error_when_document_not_found 0  ✅  PASSED  
+    test_error_when_source_not_readable 0  ✅  PASSED  
+    test_error_when_invalid_argument 1  ✅  PASSED  
+    test_normal_when_code_paths 1  ✅  PASSED  
+    test_normal_when_direction_in 2  ✅  PASSED  
+    test_normal_when_suggest 2  ✅  PASSED  
+    test_normal 3  ✅  PASSED  
+    test_normal_when_outside_scope 5  ✅  PASSED  
+    test_normal_when_seen 6  ✅  PASSED  
+
+tests/integration/server/test_try_convert.py
+    _note_files 0  ✅  PASSED  
+    test_error_when_config_not_found 0  ✅  PASSED  
+    test_error_when_config_parse_error 0  ✅  PASSED  
+    test_error_when_convert_script_fails 0  ✅  PASSED  
+    test_error_when_converter_not_defined 0  ✅  PASSED  
+    test_error_when_document_not_found 0  ✅  PASSED  
+    test_error_when_invalid_config 0  ✅  PASSED  
+    test_normal 1  ✅  PASSED  
+    _listing 2  ✅  PASSED  
+
+tests/integration/server/test_update.py
+    _slow_update 0  ✅  PASSED  
+    test_error_when_pull_fails 0  ✅  PASSED  
+    test_error_when_restart_in_progress 0  ✅  PASSED  
+    test_normal 0  ✅  PASSED  
+    test_normal_when_migration_needed 0  ✅  PASSED  
+    test_normal_when_up_to_date 0  ✅  PASSED  
+    _read_result 1  ✅  PASSED  
+
+tests/integration/server/test_write_docs.py
+    _markdown_setup 0  ✅  PASSED  
+    _put_mdmark 0  ✅  PASSED  
+    _setup 0  ✅  PASSED  
+    _update 0  ✅  PASSED  
+    _version 0  ✅  PASSED  
+    _version_of 0  ✅  PASSED  
+    _write_tags 0  ✅  PASSED  
+    load_yaml 0  ✅  PASSED  
+    test_error_when_document_not_found 0  ✅  PASSED  
+    test_error_when_invalid_argument 0  ✅  PASSED  
+    test_error_when_mdmark_warning 0  ✅  PASSED  
+    test_error_when_placement_excluded 0  ✅  PASSED  
+    test_error_when_schema_ref_unresolvable 0  ✅  PASSED  
+    test_error_when_source_not_served 0  ✅  PASSED  
+    test_error_when_source_not_writable 0  ✅  PASSED  
+    test_error_when_target_is_clone 0  ✅  PASSED  
+    test_error_when_target_is_clone_and_config_in_worktree 0  ✅  PASSED  
+    test_error_when_validation_failed 0  ✅  PASSED  
+    test_error_when_version_mismatch 0  ✅  PASSED  
+    test_error_when_worktree_not_matched 0  ✅  PASSED  
+    test_normal 0  ✅  PASSED  
+    test_normal_when_create 0  ✅  PASSED  
+    test_normal_when_dry_run 0  ✅  PASSED  
+    test_normal_when_kind_added_in_worktree 0  ✅  PASSED  
+    test_normal_when_mdmark_unavailable 0  ✅  PASSED  
+    test_normal_when_metadata_mapped 0  ✅  PASSED  
+    test_normal_when_non_git_source 0  ✅  PASSED  
+    test_normal_when_quotes_preserved 0  ✅  PASSED  
+    test_normal_when_relative_ref_in_defs 0  ✅  PASSED  
+    test_normal_when_tags_are_objects 0  ✅  PASSED  
+    test_normal_when_not_atomic 1  ✅  PASSED  
+    test_normal_when_operations_combined 1  ✅  PASSED  
+    _hide_mdmark 2  ✅  PASSED  
+    test_error_when_unknown_kind 2  ✅  PASSED  
+    test_normal_when_tool_description 2  ✅  PASSED  
+
+tests/integration/server/test_write_nav.py
+    _setup 0  ✅  PASSED  
+    _tagged_files 0  ✅  PASSED  
+    load_yaml 0  ✅  PASSED  
+    test_error_when_config_missing 0  ✅  PASSED  
+    test_error_when_config_unparsable 0  ✅  PASSED  
+    test_error_when_item_not_group 0  ✅  PASSED  
+    test_error_when_nav_invalid 0  ✅  PASSED  
+    test_error_when_tab_missing 0  ✅  PASSED  
+    _counts 1  ✅  PASSED  
+    test_normal 1  ✅  PASSED  
+    test_normal_when_filter_matches_nothing 1  ✅  PASSED  
+    test_normal_when_group_by_folder 1  ✅  PASSED  
+
+tests/unit/plugins/project_index/hooks/conftest.py
+    ReceivedBodies::__init__ 0  ✅  PASSED  
+    load_hook 0  ✅  PASSED  
+    context_server 4  ✅  PASSED  
+
+tests/unit/plugins/project_index/hooks/test_pre_tool_use.py
+    test_build_updated_input 0  ✅  PASSED  
+    test_build_updated_input_when_no_agent 0  ✅  PASSED  
+    test_main 0  ✅  PASSED  
+    test_main_when_input_unparsable 0  ✅  PASSED  
+
+tests/unit/plugins/project_index/hooks/test_session_start.py
+    _free_port 0  ✅  PASSED  
+    _listening 0  ✅  PASSED  
+    _port_closed 0  ✅  PASSED  
+    _port_open 0  ✅  PASSED  
+    _stdin 0  ✅  PASSED  
+    test_config_path 0  ✅  PASSED  
+    test_config_path_when_unset_or_relative 0  ✅  PASSED  
+    test_config_path_when_xdg_config_home_set 0  ✅  PASSED  
+    test_is_listening 0  ✅  PASSED  
+    test_is_listening_when_closed 0  ✅  PASSED  
+    test_main_when_cleared 0  ✅  PASSED  
+    test_main_when_config_missing 0  ✅  PASSED  
+    test_main_when_down 0  ✅  PASSED  
+    test_main_when_forget_failed 0  ✅  PASSED  
+    test_main_when_forget_refused 0  ✅  PASSED  
+    test_main_when_input_unparsable 0  ✅  PASSED  
+    test_main_when_listening 0  ✅  PASSED  
+    test_read_clone 0  ✅  PASSED  
+    test_read_clone_when_missing 0  ✅  PASSED  
+    test_request_forget 0  ✅  PASSED  
+    test_request_forget_when_timeout 0  ✅  PASSED  
+    test_start_server_when_no_venv 0  ✅  PASSED  
+    test_start_server 2  ✅  PASSED  
+
+tests/unit/project_index/conftest.py
+    FakeRegistry::__init__ 0  ✅  PASSED  
+    FakeRegistry::served 0  ✅  PASSED  
+    _no_reload 0  ✅  PASSED  
+    bundled_prompts 0  ✅  PASSED  
+    make_document 0  ✅  PASSED  
+    make_mcp_handlers 0  ✅  PASSED  
+    make_real_handlers 0  ✅  PASSED  
+    make_registry 0  ✅  PASSED  
+    make_script 0  ✅  PASSED  
+    make_served_source 0  ✅  PASSED  
+    make_source_config 0  ✅  PASSED  
+    make_status 0  ✅  PASSED  
+    make_target 0  ✅  PASSED  
+    make_terminal_config 0  ✅  PASSED  
+    migrations_root 0  ✅  PASSED  
+    records_files_schema 0  ✅  PASSED  
+    sample_files 0  ✅  PASSED  
+    write_settings 0  ✅  PASSED  
+    write_steps 0  ✅  PASSED  
+    FakeRegistry::statuses 1  ✅  PASSED  
+    settings_version_2 1  ✅  PASSED  
+    make_alias_source_dir 2  ✅  PASSED  
+    make_entry 2  ✅  PASSED  
+    make_handlers 2  ✅  PASSED  
+    FakeRegistry::get 3  ✅  PASSED  
+    make_records_nav_source_dir 6  ✅  PASSED  
+    make_source_dir 7  ✅  PASSED  
+
+tests/unit/project_index/features/access/test_service.py
+    sample 0  ✅  PASSED  
+    test_access_of_when_none 0  ✅  PASSED  
+    test_access_of_when_read 0  ✅  PASSED  
+    test_access_of_when_worktree 0  ✅  PASSED  
+    test_access_of_when_write 0  ✅  PASSED  
+    test_available_sources 0  ✅  PASSED  
+    test_available_sources_when_no_cwd 0  ✅  PASSED  
+    test_current_source 0  ✅  PASSED  
+    test_current_source_when_none 0  ✅  PASSED  
+    test_current_source_when_paths_base_set 0  ✅  PASSED  
+    test_current_source_when_worktree 0  ✅  PASSED  
+    test_describe_workplace 0  ✅  PASSED  
+    test_find_worktree 0  ✅  PASSED  
+    test_find_worktree_when_clone 0  ✅  PASSED  
+    test_find_worktree_when_outside_repo 0  ✅  PASSED  
+    test_resolve_read_targets 0  ✅  PASSED  
+    test_resolve_read_targets_when_other_source 0  ✅  PASSED  
+    test_resolve_read_targets_when_ref_not_found 0  ✅  PASSED  
+    test_resolve_read_targets_when_worktree_cwd 0  ✅  PASSED  
+    test_resolve_read_targets_when_worktree_not_matched 0  ✅  PASSED  
+    test_resolve_write_target 0  ✅  PASSED  
+    test_resolve_write_target_when_clone 0  ✅  PASSED  
+    test_resolve_write_target_when_clone_and_config_in_worktree 0  ✅  PASSED  
+    test_resolve_write_target_when_folder 0  ✅  PASSED  
+    test_resolve_write_target_when_folder_not_reloaded 0  ✅  PASSED  
+    test_resolve_write_target_when_worktree_config 0  ✅  PASSED  
+    test_resolve_write_target_when_worktree_config_invalid 0  ✅  PASSED  
+    test_outside_readable_sources 1  ✅  PASSED  
+    test_outside_readable_sources_when_no_cwd 1  ✅  PASSED  
+    test_resolve_read_targets_when_all 1  ✅  PASSED  
+    test_resolve_read_targets_when_not_readable 1  ✅  PASSED  
+    test_resolve_read_targets_when_outside_scope_all 1  ✅  PASSED  
+    test_resolve_read_targets_when_ref_on_folder 1  ✅  PASSED  
+    test_resolve_write_target_when_read_only 1  ✅  PASSED  
+    test_resolve_read_targets_when_not_readable_guides_outside 2  ✅  PASSED  
+    test_resolve_read_targets_when_outside_read_disabled 2  ✅  PASSED  
+    test_resolve_read_targets_when_outside_scope_in_scope 2  ✅  PASSED  
+    test_resolve_read_targets_when_outside_scope 6  ✅  PASSED  
+
+tests/unit/project_index/features/access/test_types.py
+    test_target_config_base 0  ✅  PASSED  
+
+tests/unit/project_index/features/admin/test_render.py
+    _not_served 0  ✅  PASSED  
+    _serving 0  ✅  PASSED  
+    test_render_check 0  ✅  PASSED  
+    test_render_check_when_items_truncated 0  ✅  PASSED  
+    test_render_reload 0  ✅  PASSED  
+    test_render_reload_when_no_change 0  ✅  PASSED  
+    test_render_status 0  ✅  PASSED  
+    test_render_status_when_loading 0  ✅  PASSED  
+    test_render_status_when_no_sources 0  ✅  PASSED  
+    test_source_row 0  ✅  PASSED  
+    test_source_row_when_checking 0  ✅  PASSED  
+    test_source_row_when_not_served 0  ✅  PASSED  
+    test_render_check_when_violations 2  ✅  PASSED  
+    test_render_write_nav 2  ✅  PASSED  
+
+tests/unit/project_index/features/admin/test_service.py
+    _handlers 0  ✅  PASSED  
+    load_yaml 0  ✅  PASSED  
+    nav_source 0  ✅  PASSED  
+    test_check_project 0  ✅  PASSED  
+    test_check_project_when_items_over_limit 0  ✅  PASSED  
+    test_check_project_when_missing_paths 0  ✅  PASSED  
+    test_check_project_when_records_schema 0  ✅  PASSED  
+    test_check_project_when_violations 0  ✅  PASSED  
+    test_get_status_when_loading 0  ✅  PASSED  
+    test_get_status_when_port_env 0  ✅  PASSED  
+    test_load_candidate 0  ✅  PASSED  
+    test_load_candidate_when_config_text 0  ✅  PASSED  
+    test_load_candidate_when_legacy_config 0  ✅  PASSED  
+    test_load_candidate_when_not_found 0  ✅  PASSED  
+    test_load_candidate_when_parse_error 0  ✅  PASSED  
+    test_reload_config_when_invalid 0  ✅  PASSED  
+    test_try_convert_when_converter_not_defined 0  ✅  PASSED  
+    test_try_convert_when_invalid_config 0  ✅  PASSED  
+    test_try_convert_when_not_matched 0  ✅  PASSED  
+    test_try_convert_when_outside 0  ✅  PASSED  
+    test_try_convert_when_script 0  ✅  PASSED  
+    test_try_convert_when_script_failed 0  ✅  PASSED  
+    test_version_state 0  ✅  PASSED  
+    test_version_state_when_not_integer 0  ✅  PASSED  
+    test_write_nav_when_missing_tab 0  ✅  PASSED  
+    test_write_nav_when_overlaid_nav 0  ✅  PASSED  
+    test_check_project_when_alias_and_nav 1  ✅  PASSED  
+    test_check_project_when_paths_base_invalid 1  ✅  PASSED  
+    test_check_project_when_records_schema_mismatch 1  ✅  PASSED  
+    test_check_project_when_script_missing 1  ✅  PASSED  
+    test_get_status 1  ✅  PASSED  
+    test_source_states 1  ✅  PASSED  
+    test_source_states_when_not_checked 1  ✅  PASSED  
+    test_source_states_without_refresh 1  ✅  PASSED  
+    test_write_nav_when_invalid_filter 1  ✅  PASSED  
+    test_write_nav_when_records_filter 1  ✅  PASSED  
+    test_write_nav_when_zero_count 1  ✅  PASSED  
+    test_write_nav 2  ✅  PASSED  
+    test_reload_config 4  ✅  PASSED  
+
+tests/unit/project_index/features/changes/test_compare.py
+    test_changed_keys 0  ✅  PASSED  
+    test_count_occurrences 0  ✅  PASSED  
+    test_count_occurrences_when_case_sensitive 0  ✅  PASSED  
+    test_count_occurrences_when_regex 0  ✅  PASSED  
+    test_diff_lines 0  ✅  PASSED  
+
+tests/unit/project_index/features/changes/test_render.py
+    test_render_changes_markdown 0  ✅  PASSED  
+    test_render_changes_markdown_when_contains 0  ✅  PASSED  
+    test_render_changes_markdown_when_outside_scope 0  ✅  PASSED  
+    test_render_changes_markdown_when_location 2  ✅  PASSED  
+
+tests/unit/project_index/features/changes/test_service.py
+    ChangesEnv::list 0  ✅  PASSED  
+    body_file_env 0  ✅  PASSED  
+    env 0  ✅  PASSED  
+    excluded_env 0  ✅  PASSED  
+    test_list_changes_when_contains_worktree 0  ✅  PASSED  
+    test_list_changes_when_invalid_regex 0  ✅  PASSED  
+    test_list_changes_when_no_last_read 0  ✅  PASSED  
+    test_list_changes_when_to_without_from 0  ✅  PASSED  
+    word_history 0  ✅  PASSED  
+    test_list_changes 1  ✅  PASSED  
+    test_list_changes_when_added_and_deleted 1  ✅  PASSED  
+    test_list_changes_when_contains_last_read 1  ✅  PASSED  
+    test_list_changes_when_excluded 1  ✅  PASSED  
+    test_list_changes_when_last_read 1  ✅  PASSED  
+    test_list_changes_when_last_read_body_file 1  ✅  PASSED  
+    test_list_changes_when_contains_merge 2  ✅  PASSED  
+    test_list_changes_when_contains_regex 2  ✅  PASSED  
+    test_list_changes_when_contains 3  ✅  PASSED  
+    test_list_changes_when_contains_body_file 3  ✅  PASSED  
+
+tests/unit/project_index/features/convert/test_decisions.py
+    test_find_decisions 0  ✅  PASSED  
+    test_find_decisions_when_absolute_and_worktree 0  ✅  PASSED  
+    test_find_decisions_when_no_folders 0  ✅  PASSED  
+
+tests/unit/project_index/features/convert/test_service.py
+    _service 0  ✅  PASSED  
+    make_converted_target 0  ✅  PASSED  
+    test_convert_service_convert_when_cache_disabled 0  ✅  PASSED  
+    test_convert_service_convert_when_converter 0  ✅  PASSED  
+    test_convert_service_convert_when_converter_not_defined 0  ✅  PASSED  
+    test_convert_service_convert_when_default_ref 0  ✅  PASSED  
+    test_convert_service_convert_when_project_index_updated 0  ✅  PASSED  
+    test_convert_service_convert_when_timeout 0  ✅  PASSED  
+
+tests/unit/project_index/features/describe/test_render.py
+    test_render_describe_markdown 0  ✅  PASSED  
+    test_render_describe_markdown_when_metadata 0  ✅  PASSED  
+    test_render_describe_markdown_when_no_source 0  ✅  PASSED  
+    test_render_describe_markdown_when_outside_scope 0  ✅  PASSED  
+    test_render_describe_markdown_when_outside_sources 0  ✅  PASSED  
+    test_render_describe_markdown_when_outside_sources_empty 0  ✅  PASSED  
+    test_render_describe_markdown_when_warnings 0  ✅  PASSED  
+
+tests/unit/project_index/features/describe/test_service.py
+    _describe 0  ✅  PASSED  
+    _no_warnings 0  ✅  PASSED  
+    folder_source 0  ✅  PASSED  
+    store 0  ✅  PASSED  
+    test_describe_when_kind 0  ✅  PASSED  
+    test_describe_when_outside_list_empty 0  ✅  PASSED  
+    test_describe_when_refs_and_worktrees 0  ✅  PASSED  
+    test_describe_when_unknown_kind 0  ✅  PASSED  
+    test_describe_when_warned 0  ✅  PASSED  
+    test_describe_when_worktree 0  ✅  PASSED  
+    worktree_source 0  ✅  PASSED  
+    no_warnings 1  ✅  PASSED  
+    test_describe 1  ✅  PASSED  
+    test_describe_when_outside_list 1  ✅  PASSED  
+    test_describe_when_source 1  ✅  PASSED  
+    test_describe_when_worktree_config_invalid 1  ✅  PASSED  
+
+tests/unit/project_index/features/describe/test_source_checks.py
+    _no_nav_warnings 0  ✅  PASSED  
+    _report 0  ✅  PASSED  
+    _sample 0  ✅  PASSED  
+    test_source_checks_get_when_unchecked 0  ✅  PASSED  
+    test_source_checks_refresh 0  ✅  PASSED  
+    test_source_checks_refresh_when_older_finished_later 0  ✅  PASSED  
+    test_source_checks_refresh_later 1  ✅  PASSED  
+    test_source_checks_refresh_later_when_running 1  ✅  PASSED  
+    _gated_check_sync 2  ✅  PASSED  
+
+tests/unit/project_index/features/describe/test_warnings.py
+    _access 0  ✅  PASSED  
+    _loaded_handlers 0  ✅  PASSED  
+    test_collect_warnings 0  ✅  PASSED  
+    test_collect_warnings_when_alias_and_nav 0  ✅  PASSED  
+    test_collect_warnings_when_no_source_available 0  ✅  PASSED  
+    test_collect_warnings_when_unavailable_source 0  ✅  PASSED  
+    test_collect_warnings_when_unchecked 0  ✅  PASSED  
+    test_collect_warnings_when_unknown_top_level_key 0  ✅  PASSED  
+
+tests/unit/project_index/features/documents/test_aliases.py
+    _alias_document 0  ✅  PASSED  
+    _alias_tables 0  ✅  PASSED  
+    _scope_entry 0  ✅  PASSED  
+    test_alias_schema 0  ✅  PASSED  
+    test_alias_schema_version 0  ✅  PASSED  
+    test_check_alias_document 0  ✅  PASSED  
+    test_check_alias_document_when_aliases_string 0  ✅  PASSED  
+    test_collect_aliases_when_no_alias_rows 0  ✅  PASSED  
+    test_term_ids 0  ✅  PASSED  
+    test_check_alias_document_when_aliases_number 1  ✅  PASSED  
+    test_match_words 1  ✅  PASSED  
+    test_collect_aliases 2  ✅  PASSED  
+    test_check_alias_document_when_required_missing 3  ✅  PASSED  
+
+tests/unit/project_index/features/documents/test_fields.py
+    test_delete_field 0  ✅  PASSED  
+    test_delete_field_when_missing 0  ✅  PASSED  
+    test_get_field 0  ✅  PASSED  
+    test_get_field_when_missing 0  ✅  PASSED  
+    test_get_field_when_selector 0  ✅  PASSED  
+    test_is_markdown_body 0  ✅  PASSED  
+    test_missing_ref_fields 0  ✅  PASSED  
+    test_parse_field_path 0  ✅  PASSED  
+    test_parse_field_path_when_invalid 0  ✅  PASSED  
+    test_parse_field_path_when_selector 0  ✅  PASSED  
+    test_resolve_metadata 0  ✅  PASSED  
+    test_resolve_metadata_when_nested_field 0  ✅  PASSED  
+    test_resolve_metadata_when_object_array 0  ✅  PASSED  
+    test_set_field 0  ✅  PASSED  
+    test_set_field_when_append 0  ✅  PASSED  
+    test_set_field_when_out_of_range 0  ✅  PASSED  
+    test_set_field_when_selector 0  ✅  PASSED  
+    test_set_field_when_type_mismatch 0  ✅  PASSED  
+    test_unresolved_related 0  ✅  PASSED  
+    test_unresolved_related_when_not_list 0  ✅  PASSED  
+
+tests/unit/project_index/features/documents/test_indexable.py
+    test_indexable_files 0  ✅  PASSED  
+    test_indexable_files_when_exclude_given 0  ✅  PASSED  
+    test_is_excluded_file_when_binary 0  ✅  PASSED  
+    test_is_excluded_file_when_generated_suffix 0  ✅  PASSED  
+    test_is_excluded_file_when_init_has_logic 0  ✅  PASSED  
+    test_is_excluded_file_when_lock 0  ✅  PASSED  
+    test_is_excluded_file_when_reexport_init 0  ✅  PASSED  
+    test_is_excluded_file_when_source 0  ✅  PASSED  
+    test_is_excluded_file_when_vendor 0  ✅  PASSED  
+    test_walk_files 0  ✅  PASSED  
+    test_walk_files_when_start_given 0  ✅  PASSED  
+    test_walk_files_when_symlink_folder 0  ✅  PASSED  
+
+tests/unit/project_index/features/documents/test_loader.py
+    test_collect_files 0  ✅  PASSED  
+    test_collect_files_when_excluded 0  ✅  PASSED  
+    test_collect_files_when_files_given 0  ✅  PASSED  
+    test_collect_files_when_overlapping_patterns 0  ✅  PASSED  
+    test_collect_files_when_worktrees 0  ✅  PASSED  
+    test_load_file_when_dates 0  ✅  PASSED  
+    test_load_file_when_unreadable 0  ✅  PASSED  
+    test_load_file_when_yaml 0  ✅  PASSED  
+    test_unindexed_files 0  ✅  PASSED  
+    test_unindexed_files_when_excluded 0  ✅  PASSED  
+    test_unindexed_files_when_files_given 0  ✅  PASSED  
+    test_unindexed_files_when_matching_exclusion 0  ✅  PASSED  
+    test_load_file_when_missing_body_file 1  ✅  PASSED  
+    test_documents_from_text_when_read_body 2  ✅  PASSED  
+    test_load_file_when_same_stem 2  ✅  PASSED  
+    test_load_file_when_default_name 3  ✅  PASSED  
+    test_load_file_when_records 4  ✅  PASSED  
+
+tests/unit/project_index/features/documents/test_schema.py
+    load_yaml 0  ✅  PASSED  
+    test_records_item_schema 0  ✅  PASSED  
+    test_records_item_schema_when_missing 0  ✅  PASSED  
+    test_resolve_schema_refs 0  ✅  PASSED  
+    test_resolve_schema_refs_when_read 0  ✅  PASSED  
+    test_resolve_schema_refs_when_relative_ref_in_defs 0  ✅  PASSED  
+    test_startup_schema 0  ✅  PASSED  
+    test_resolve_schema_refs_when_cycle 2  ✅  PASSED  
+    test_resolve_schema_refs_when_missing 2  ✅  PASSED  
+
+tests/unit/project_index/features/documents/test_store.py
+    _git_source 0  ✅  PASSED  
+    _recording_load_file 0  ✅  PASSED  
+    _row_schema_source 0  ✅  PASSED  
+    _sync_source 0  ✅  PASSED  
+    _two_commits 0  ✅  PASSED  
+    document_store 0  ✅  PASSED  
+    load_yaml 0  ✅  PASSED  
+    test_check_sync 0  ✅  PASSED  
+    test_check_sync_when_clean 0  ✅  PASSED  
+    test_check_sync_when_related_unresolved 0  ✅  PASSED  
+    test_check_sync_when_walked_once 0  ✅  PASSED  
+    test_document_store_get_when_missing 0  ✅  PASSED  
+    test_document_store_invalidate 0  ✅  PASSED  
+    test_document_store_load_when_cached 0  ✅  PASSED  
+    test_document_store_load_when_commit 0  ✅  PASSED  
+    test_document_store_load_when_dates_shared_repo 0  ✅  PASSED  
+    test_document_store_load_when_ref 0  ✅  PASSED  
+    test_document_store_load_when_revision_reused_after_clear 0  ✅  PASSED  
+    test_document_store_load_when_revision_table_changed 0  ✅  PASSED  
+    test_document_store_load_when_unknown_kind 0  ✅  PASSED  
+    test_document_store_location 0  ✅  PASSED  
+    test_document_store_location_when_ref 0  ✅  PASSED  
+    test_document_store_location_when_worktree 0  ✅  PASSED  
+    test_document_store_row_schema 0  ✅  PASSED  
+    test_document_store_row_schema_when_items_missing 0  ✅  PASSED  
+    test_document_store_row_schema_when_records 0  ✅  PASSED  
+    test_document_store_row_schema_when_records_defs 0  ✅  PASSED  
+    test_document_store_schema_when_ref 0  ✅  PASSED  
+    test_document_store_schema_when_revision_shared_repo 0  ✅  PASSED  
+    test_document_store_schema_when_worktree 0  ✅  PASSED  
+    test_store_schema_when_paths_base_set 0  ✅  PASSED  
+    workspace 0  ✅  PASSED  
+    git_calls 1  ✅  PASSED  
+    test_check_sync_when_alias_violation 1  ✅  PASSED  
+    test_document_store_get 1  ✅  PASSED  
+    test_document_store_load 1  ✅  PASSED  
+    test_document_store_load_when_many_tables 1  ✅  PASSED  
+    test_document_store_load_when_revision_reused 1  ✅  PASSED  
+    test_document_store_schema_when_revision 1  ✅  PASSED  
+    walk_calls 1  ✅  PASSED  
+    test_document_store_load_when_deleted 2  ✅  PASSED  
+    test_document_store_load_when_duplicate_id 2  ✅  PASSED  
+    test_document_store_row_schema_when_many_documents 3  ✅  PASSED  
+
+tests/unit/project_index/features/history/test_query.py
+    test_changed_files 0  ✅  PASSED  
+    test_changed_files_when_pathspec 0  ✅  PASSED  
+    test_changed_files_when_work_tree 0  ✅  PASSED  
+    test_co_changed_files 0  ✅  PASSED  
+    test_export_paths_at 0  ✅  PASSED  
+    test_file_dates 0  ✅  PASSED  
+    test_list_commits 0  ✅  PASSED  
+    test_list_refs_when_not_git 0  ✅  PASSED  
+    test_read_file_at 0  ✅  PASSED  
+    test_read_file_at_when_missing 0  ✅  PASSED  
+    test_resolve_ref 0  ✅  PASSED  
+    test_resolve_ref_when_before_first 0  ✅  PASSED  
+    test_resolve_ref_when_date 0  ✅  PASSED  
+    test_resolve_ref_when_not_found 0  ✅  PASSED  
+    test_list_commits_when_merge 1  ✅  PASSED  
+    test_list_refs 1  ✅  PASSED  
+    test_list_worktrees 1  ✅  PASSED  
+    archive_timeouts 2  ✅  PASSED  
+
+tests/unit/project_index/features/history/test_snapshot.py
+    archive_calls 0  ✅  PASSED  
+    test_snapshot_store_checkout 0  ✅  PASSED  
+    test_snapshot_store_checkout_when_over_keep 0  ✅  PASSED  
+    archive_timeouts 2  ✅  PASSED  
+    test_snapshot_store_checkout_when_cached 2  ✅  PASSED  
+    test_snapshot_store_checkout_when_concurrent 2  ✅  PASSED  
+
+tests/unit/project_index/features/lifecycle/test_control.py
+    _stub_server 0  ✅  PASSED  
+    test_attach 0  ✅  PASSED  
+    test_request 0  ✅  PASSED  
+    test_request_when_in_progress 0  ✅  PASSED  
+
+tests/unit/project_index/features/lifecycle/test_update.py
+    FakeRun::__init__ 0  ✅  PASSED  
+    _install 0  ✅  PASSED  
+    _ok 0  ✅  PASSED  
+    clone 0  ✅  PASSED  
+    control 0  ✅  PASSED  
+    test_run 0  ✅  PASSED  
+    test_run_when_failed 0  ✅  PASSED  
+    test_run_when_not_found 0  ✅  PASSED  
+    test_run_when_timeout 0  ✅  PASSED  
+    test_update_clone_when_failed_then_again 0  ✅  PASSED  
+    test_update_clone_when_in_progress 0  ✅  PASSED  
+    test_update_clone_when_migration_needed 0  ✅  PASSED  
+    test_update_clone_when_up_to_date 0  ✅  PASSED  
+    test_update_clone_when_up_to_date_then_again 0  ✅  PASSED  
+    FakeRun::__call__ 1  ✅  PASSED  
+    test_update_clone 1  ✅  PASSED  
+
+tests/unit/project_index/features/migrate/test_service.py
+    _step 0  ✅  PASSED  
+    _target 0  ✅  PASSED  
+    settings_file 0  ✅  PASSED  
+    test_apply_migration 0  ✅  PASSED  
+    test_apply_migration_when_changed 0  ✅  PASSED  
+    test_apply_migration_when_destructive 0  ✅  PASSED  
+    test_apply_migration_when_invalid_result 0  ✅  PASSED  
+    test_apply_migration_when_record 0  ✅  PASSED  
+    test_apply_migration_when_source_needs_setup 0  ✅  PASSED  
+    test_apply_migration_when_unknown_top_level_key 0  ✅  PASSED  
+    test_plan_migration_when_current 0  ✅  PASSED  
+    test_plan_migration_when_newer 0  ✅  PASSED  
+    test_plan_migration_when_no_version 0  ✅  PASSED  
+    test_resolve_target 0  ✅  PASSED  
+    test_resolve_target_when_source 0  ✅  PASSED  
+    test_plan_migration 1  ✅  PASSED  
+
+tests/unit/project_index/features/migrate/test_steps.py
+    _rename_step 0  ✅  PASSED  
+    _step 0  ✅  PASSED  
+    test_apply_step_when_add 0  ✅  PASSED  
+    test_apply_step_when_delete 0  ✅  PASSED  
+    test_apply_step_when_delete_value 0  ✅  PASSED  
+    test_apply_step_when_lift_conflict 0  ✅  PASSED  
+    test_apply_step_when_rename_conflict 0  ✅  PASSED  
+    test_apply_step_when_unwrap 0  ✅  PASSED  
+    test_load_steps_when_invalid_op 0  ✅  PASSED  
+    test_load_steps_when_none 0  ✅  PASSED  
+    test_apply_step_when_lift 1  ✅  PASSED  
+    test_apply_step_when_rename 2  ✅  PASSED  
+    test_load_steps 3  ✅  PASSED  
+
+tests/unit/project_index/features/prompt_doc/conftest.py
+    reflection_without_parts_yaml 0  ✅  PASSED  
+    reflection_yaml 0  ✅  PASSED  
+    session_context_yaml 0  ✅  PASSED  
+
+tests/unit/project_index/features/prompt_doc/test_cli.py
+    test_run_prompt_doc 0  ✅  PASSED  
+    test_run_prompt_doc_when_invalid 0  ✅  PASSED  
+
+tests/unit/project_index/features/prompt_doc/test_markdown.py
+    _doc 0  ✅  PASSED  
+    _section 0  ✅  PASSED  
+    load_yaml 0  ✅  PASSED  
+    test_convert_prompt 0  ✅  PASSED  
+    test_convert_prompt_when_required_key_missing 0  ✅  PASSED  
+    test_convert_prompt_when_texts_invalid 0  ✅  PASSED  
+    test_convert_prompt_when_yaml_unreadable 0  ✅  PASSED  
+    test_example_body 0  ✅  PASSED  
+    test_example_body_when_hook_at_limit 0  ✅  PASSED  
+    test_example_body_when_hook_over_limit 0  ✅  PASSED  
+    test_example_body_when_problems 0  ✅  PASSED  
+    test_lang_tabs 0  ✅  PASSED  
+    test_lang_tabs_when_single_language 0  ✅  PASSED  
+    test_languages 0  ✅  PASSED  
+    test_prompt_to_markdown 0  ✅  PASSED  
+    test_prompt_to_markdown_when_part_syntax_invalid 0  ✅  PASSED  
+    test_template_html 0  ✅  PASSED  
+    test_template_html_when_html_in_text 0  ✅  PASSED  
+    test_template_html_when_loop_variable 0  ✅  PASSED  
+    test_var_table 0  ✅  PASSED  
+
+tests/unit/project_index/features/prompt_doc/test_render.py
+    _doc 0  ✅  PASSED  
+    test_build_environment 0  ✅  PASSED  
+    test_build_environment_when_traced 0  ✅  PASSED  
+    test_build_values 0  ✅  PASSED  
+    test_build_values_when_type_mismatch 0  ✅  PASSED  
+    test_compile_parts 0  ✅  PASSED  
+    test_compile_parts_when_condition_braced 0  ✅  PASSED  
+    test_compile_parts_when_syntax_error 0  ✅  PASSED  
+    test_render_example_when_condition_false 0  ✅  PASSED  
+    test_render_example_when_hook 0  ✅  PASSED  
+    test_render_example_when_lang_missing 0  ✅  PASSED  
+    test_render_example_when_runtime_error 0  ✅  PASSED  
+    test_render_example_when_syntax_error 0  ✅  PASSED  
+    test_render_example_when_undefined 0  ✅  PASSED  
+    test_flatten_vars 1  ✅  PASSED  
+    test_render_example 1  ✅  PASSED  
+
+tests/unit/project_index/features/prompt_doc/test_runtime.py
+    _prompt 0  ✅  PASSED  
+    test_load_prompts 0  ✅  PASSED  
+    test_load_prompts_when_id_mismatch 0  ✅  PASSED  
+    test_load_prompts_when_schema_violation 0  ✅  PASSED  
+    test_load_prompts_when_undefined_variable 0  ✅  PASSED  
+    test_prompt_set_render 0  ✅  PASSED  
+    test_prompt_set_render_when_lang_missing 0  ✅  PASSED  
+    test_prompts_dir 0  ✅  PASSED  
+    test_prompts_dir_when_env 0  ✅  PASSED  
+    _write 1  ✅  PASSED  
+    test_load_prompts_when_many_violations 1  ✅  PASSED  
+    test_load_prompts_when_required_missing 1  ✅  PASSED  
+    test_load_prompts_when_syntax_error 1  ✅  PASSED  
+    test_load_prompts_when_bundled 7  ✅  PASSED  
+
+tests/unit/project_index/features/read/conftest.py
+    make_view_env 3  ✅  PASSED  
+
+tests/unit/project_index/features/read/test_nav.py
+    _tagged_documents 0  ✅  PASSED  
+    test_nav_warnings_when_no_nav 0  ✅  PASSED  
+    test_nav_warnings_when_records_filter 0  ✅  PASSED  
+    test_check_nav_filters 1  ✅  PASSED  
+    test_nav_auto_counts 1  ✅  PASSED  
+    test_nav_warnings 1  ✅  PASSED  
+
+tests/unit/project_index/features/read/test_paths.py
+    test_find_page 0  ✅  PASSED  
+    test_find_page_when_body_path 0  ✅  PASSED  
+    test_find_page_when_doc_id 0  ✅  PASSED  
+    test_find_page_when_doc_id_missing 0  ✅  PASSED  
+    test_find_page_when_missing 0  ✅  PASSED  
+    test_page_path 0  ✅  PASSED  
+    test_read_target 0  ✅  PASSED  
+    test_read_target_when_not_git 0  ✅  PASSED  
+
+tests/unit/project_index/features/read/test_route.py
+    _client 0  ✅  PASSED  
+    test_build_read_router_when_not_found 0  ✅  PASSED  
+    test_build_read_router_when_queries 0  ✅  PASSED  
+    test_build_read_router 2  ✅  PASSED  
+
+tests/unit/project_index/features/read/test_search.py
+    test_search_words_when_record 0  ✅  PASSED  
+    test_search_words 2  ✅  PASSED  
+
+tests/unit/project_index/features/read/test_service.py
+    _target 0  ✅  PASSED  
+    test_get_decision 0  ✅  PASSED  
+    test_get_decision_when_ambiguous 0  ✅  PASSED  
+    test_get_decision_when_invalid_id 0  ✅  PASSED  
+    test_get_document 0  ✅  PASSED  
+    test_get_document_when_body_path 0  ✅  PASSED  
+    test_get_document_when_converter 0  ✅  PASSED  
+    test_get_document_when_doc_id 0  ✅  PASSED  
+    test_get_document_when_doc_id_not_found 0  ✅  PASSED  
+    test_get_document_when_not_found 0  ✅  PASSED  
+    test_get_document_when_yaml_broken 0  ✅  PASSED  
+    test_get_source_config_when_diff 0  ✅  PASSED  
+    test_get_source_config_when_no_decisions 0  ✅  PASSED  
+    test_get_source_config_when_schemas 0  ✅  PASSED  
+    test_list_documents_when_values 0  ✅  PASSED  
+    test_get_source_config 1  ✅  PASSED  
+    test_list_decisions 1  ✅  PASSED  
+    test_list_documents 3  ✅  PASSED  
+
+tests/unit/project_index/features/related/test_graph.py
+    _chain 0  ✅  PASSED  
+    test_walk_related_when_cycle 1  ✅  PASSED  
+    test_walk_related_when_other_source 1  ✅  PASSED  
+    test_walk_related 2  ✅  PASSED  
+
+tests/unit/project_index/features/related/test_service.py
+    RelatedEnv::trace 0  ✅  PASSED  
+    test_render_related_markdown_when_outside_scope 0  ✅  PASSED  
+    test_trace_related_when_both_given 0  ✅  PASSED  
+    test_trace_related_when_missing 0  ✅  PASSED  
+    test_trace_related_when_seen 0  ✅  PASSED  
+    make_env 1  ✅  PASSED  
+    test_trace_related_when_code_paths 1  ✅  PASSED  
+    test_trace_related_when_depth_over 1  ✅  PASSED  
+    test_trace_related 2  ✅  PASSED  
+
+tests/unit/project_index/features/related/test_suggest.py
+    test_suggest_related 1  ✅  PASSED  
+
+tests/unit/project_index/features/search/test_body_parts.py
+    test_join_ranges 0  ✅  PASSED  
+    test_select_ranges_when_lines 0  ✅  PASSED  
+    test_select_ranges_when_no_heading 0  ✅  PASSED  
+    test_select_ranges_when_sections 0  ✅  PASSED  
+
+tests/unit/project_index/features/search/test_cursor.py
+    test_decode_cursor 0  ✅  PASSED  
+    test_decode_cursor_when_other_request 0  ✅  PASSED  
+
+tests/unit/project_index/features/search/test_fields.py
+    test_field_values 0  ✅  PASSED  
+    test_heading_lines 0  ✅  PASSED  
+
+tests/unit/project_index/features/search/test_filters.py
+    test_compile_regex 0  ✅  PASSED  
+    test_match_filter 0  ✅  PASSED  
+    test_match_filter_when_case_sensitive 0  ✅  PASSED  
+    test_match_filter_when_glob 0  ✅  PASSED  
+    test_match_filter_when_match_all 0  ✅  PASSED  
+    test_match_filter_when_not 0  ✅  PASSED  
+    test_match_filter_when_regex_lines 0  ✅  PASSED  
+    test_parse_compare_value 0  ✅  PASSED  
+    test_parse_compare_value_when_invalid 0  ✅  PASSED  
+    test_check_filter_when_group_keys 1  ✅  PASSED  
+    test_check_filter_when_matches 1  ✅  PASSED  
+    test_check_filter_when_not_child 1  ✅  PASSED  
+    test_check_filter_when_body_range 2  ✅  PASSED  
+
+tests/unit/project_index/features/search/test_render.py
+    test_render_search_markdown_when_full 0  ✅  PASSED  
+    test_render_search_markdown_when_ranges 0  ✅  PASSED  
+    test_render_search_markdown_when_snippets 0  ✅  PASSED  
+    test_render_search_markdown 1  ✅  PASSED  
+    test_render_search_markdown_when_outside_scope 2  ✅  PASSED  
+
+tests/unit/project_index/features/search/test_service.py
+    SearchEnv::search 0  ✅  PASSED  
+    _notes_table 0  ✅  PASSED  
+    _terms_table 0  ✅  PASSED  
+    _yaml_table 0  ✅  PASSED  
+    make_env 0  ✅  PASSED  
+    test_search_docs_when_count_grouped 0  ✅  PASSED  
+    test_search_docs_when_full_and_seen 0  ✅  PASSED  
+    test_search_docs_when_grouped_normalized 0  ✅  PASSED  
+    test_search_docs_when_grouped_tie 0  ✅  PASSED  
+    test_search_docs_when_part_of_body 0  ✅  PASSED  
+    test_search_docs_when_snippets_regex 0  ✅  PASSED  
+    test_search_docs_when_unknown_field 0  ✅  PASSED  
+    test_search_docs 1  ✅  PASSED  
+    test_search_docs_when_id_values 1  ✅  PASSED  
+    test_search_docs_when_id_values_and_order_by 1  ✅  PASSED  
+    test_search_docs_when_matches_under_not 1  ✅  PASSED  
+    test_search_docs_when_order_by_dates 1  ✅  PASSED  
+    test_search_docs_when_read_validator 1  ✅  PASSED  
+    test_search_docs_when_sources_all 1  ✅  PASSED  
+    test_search_when_records_fields 1  ✅  PASSED  
+    test_search_docs_when_ordered_by_matches 2  ✅  PASSED  
+    test_search_docs_when_unreadable_file 2  ✅  PASSED  
+    test_search_docs_when_limited 3  ✅  PASSED  
+    test_search_docs_when_term 4  ✅  PASSED  
+    test_search_docs_when_part_of_body_with_snippets 5  ✅  PASSED  
+    test_search_docs_when_location 6  ✅  PASSED  
+
+tests/unit/project_index/features/search/test_snippets.py
+    test_count_matches 0  ✅  PASSED  
+    test_count_matches_when_no_conditions 0  ✅  PASSED  
+    test_find_snippets 0  ✅  PASSED  
+    test_find_snippets_when_anchor 0  ✅  PASSED  
+    test_find_snippets_when_overlap 0  ✅  PASSED  
+    test_find_snippets_when_ranges 0  ✅  PASSED  
+    test_find_snippets_when_trailing_newline 0  ✅  PASSED  
+    test_snippet_lines 0  ✅  PASSED  
+
+tests/unit/project_index/features/search/test_terms.py
+    _sample 0  ✅  PASSED  
+    test_list_match_words_when_no_alias_rows 0  ✅  PASSED  
+    test_render_match_words_markdown 0  ✅  PASSED  
+    test_list_match_words 1  ✅  PASSED  
+
+tests/unit/project_index/features/seen/test_store.py
+    _insert_session 0  ✅  PASSED  
+    seen_store 0  ✅  PASSED  
+    test_seen_store_purge_expired 0  ✅  PASSED  
+    test_seen_store_returned 0  ✅  PASSED  
+    test_seen_store_returned_when_other_key 0  ✅  PASSED  
+    test_seen_store_activity 1  ✅  PASSED  
+    test_seen_store_forget 1  ✅  PASSED  
+    test_seen_store_mark_returned 1  ✅  PASSED  
+
+tests/unit/project_index/features/seen/test_types.py
+    test_session_key_of 0  ✅  PASSED  
+
+tests/unit/project_index/features/session_start/test_route.py
+    _client 0  ✅  PASSED  
+    _loaded_handlers 0  ✅  PASSED  
+    test_build_session_start_router 0  ✅  PASSED  
+    test_build_session_start_router_when_invalid 1  ✅  PASSED  
+
+tests/unit/project_index/features/session_start/test_service.py
+    _seen 0  ✅  PASSED  
+    test_start_session_when_cleared 0  ✅  PASSED  
+    test_start_session_when_compacted 0  ✅  PASSED  
+    test_start_session_when_resumed 0  ✅  PASSED  
+
+tests/unit/project_index/features/settings/test_query.py
+    _valid_settings 0  ✅  PASSED  
+    test_config_path 0  ✅  PASSED  
+    test_config_path_when_unset 0  ✅  PASSED  
+    test_config_path_when_xdg_config_home_set 0  ✅  PASSED  
+    test_listen_port 0  ✅  PASSED  
+    test_listen_port_when_invalid 0  ✅  PASSED  
+    test_listen_port_when_unknown_key_like_port 0  ✅  PASSED  
+    test_listen_port_when_unset 0  ✅  PASSED  
+    test_load_terminal_config 0  ✅  PASSED  
+    test_load_terminal_config_when_missing 0  ✅  PASSED  
+    test_load_terminal_config_when_state_dir_env_set 0  ✅  PASSED  
+    test_load_terminal_config_when_unknown_top_level_key 0  ✅  PASSED  
+    test_load_terminal_config_when_yaml_broken 0  ✅  PASSED  
+    test_state_dir_path 0  ✅  PASSED  
+    test_state_dir_path_when_config_value 0  ✅  PASSED  
+    test_state_dir_path_when_unset 0  ✅  PASSED  
+    test_state_dir_path_when_xdg_state_home_set 0  ✅  PASSED  
+    test_unknown_top_level_keys 0  ✅  PASSED  
+    test_unknown_top_level_keys_when_none 0  ✅  PASSED  
+    test_validate_terminal_config 0  ✅  PASSED  
+    test_validate_terminal_config_when_unknown_top_level_key 0  ✅  PASSED  
+    test_xdg_base_dir 0  ✅  PASSED  
+    test_xdg_base_dir_when_unset_or_relative 0  ✅  PASSED  
+    test_load_terminal_config_when_schema_invalid 1  ✅  PASSED  
+    test_load_terminal_config_when_unknown_row_key 1  ✅  PASSED  
+    test_unknown_key_warnings 1  ✅  PASSED  
+    test_validate_terminal_config_when_newer_version 1  ✅  PASSED  
+    test_log_unknown_keys 2  ✅  PASSED  
+    test_validate_terminal_config_when_duplicate_id 2  ✅  PASSED  
+    test_validate_terminal_config_when_empty_glob 2  ✅  PASSED  
+
+tests/unit/project_index/features/settings/test_route.py
+    FakeRegistry::__init__ 0  ✅  PASSED  
+    FakeRegistry::statuses 0  ✅  PASSED  
+    test_build_settings_router_when_post 0  ✅  PASSED  
+    test_build_settings_router_when_put 0  ✅  PASSED  
+    test_build_settings_router_when_unknown_top_level_key 0  ✅  PASSED  
+    test_build_settings_router_when_get 1  ✅  PASSED  
+    test_build_settings_router_when_loading 1  ✅  PASSED  
+    test_build_settings_router_when_pending_reload 1  ✅  PASSED  
+
+tests/unit/project_index/features/settings/test_service.py
+    _unnamed_settings 0  ✅  PASSED  
+    fake_reload 0  ✅  PASSED  
+    load_yaml 0  ✅  PASSED  
+    settings_path 0  ✅  PASSED  
+    test_add_source_when_id_matches_name 0  ✅  PASSED  
+    test_add_source_when_invalid 0  ✅  PASSED  
+    test_add_source_when_same_id 0  ✅  PASSED  
+    test_add_source_when_same_name 0  ✅  PASSED  
+    test_add_source_when_unknown_top_level_key 0  ✅  PASSED  
+    test_save_sources_when_current_row_invalid 0  ✅  PASSED  
+    test_save_sources_when_defaults 0  ✅  PASSED  
+    test_save_sources_when_invalid 0  ✅  PASSED  
+    test_save_sources_when_no_same_row 0  ✅  PASSED  
+    test_save_sources_when_outside_read_false 0  ✅  PASSED  
+    test_save_sources_when_sent_keys_override 0  ✅  PASSED  
+    test_save_sources_when_unknown_top_level_key 0  ✅  PASSED  
+    test_save_sources_when_unsent_keys 0  ✅  PASSED  
+    test_add_source 1  ✅  PASSED  
+    test_save_sources 1  ✅  PASSED  
+
+tests/unit/project_index/features/sources/test_merge.py
+    test_merge_configs 0  ✅  PASSED  
+    test_merge_configs_when_nested_object 0  ✅  PASSED  
+    test_merge_configs_when_single 0  ✅  PASSED  
+    test_merge_configs_when_value_array 0  ✅  PASSED  
+
+tests/unit/project_index/features/sources/test_registry.py
+    test_source_registry_get 0  ✅  PASSED  
+    test_source_registry_get_when_default_ref_moved_with_on_rebuilt 0  ✅  PASSED  
+    test_source_registry_get_when_not_served 0  ✅  PASSED  
+    test_source_registry_get_when_unknown 0  ✅  PASSED  
+    test_source_registry_load_when_requested 0  ✅  PASSED  
+    test_source_registry_load_when_row_loading 0  ✅  PASSED  
+    test_source_registry_load_when_schema_ref 0  ✅  PASSED  
+    test_source_registry_wait_for 0  ✅  PASSED  
+    test_source_registry_wait_for_when_cwd 0  ✅  PASSED  
+    test_source_registry_wait_for_when_id_less_row 0  ✅  PASSED  
+    _entries 1  ✅  PASSED  
+    test_source_registry_get_when_default_ref_moved 1  ✅  PASSED  
+    test_source_registry_get_when_row_loading 1  ✅  PASSED  
+    test_source_registry_load 1  ✅  PASSED  
+    test_source_registry_load_when_row_failed 1  ✅  PASSED  
+    test_source_registry_reload 1  ✅  PASSED  
+    test_source_registry_load_when_duplicate_loaded_later 2  ✅  PASSED  
+    test_source_registry_reload_when_duplicate_name 2  ✅  PASSED  
+    test_source_registry_reload_when_reading 2  ✅  PASSED  
+    test_source_registry_wait_for_when_cancelled 2  ✅  PASSED  
+    _Loader::__call__ 3  ✅  PASSED  
+    _Loader::__init__ 3  ✅  PASSED  
+    test_source_registry_load_when_lookup_failed 3  ✅  PASSED  
+    test_source_registry_reload_when_failed 3  ✅  PASSED  
+    test_source_registry_reload_when_loading 4  ✅  PASSED  
+
+tests/unit/project_index/features/sources/test_schema_ref.py
+    _lookup 0  ✅  PASSED  
+    schemas_repo 0  ✅  PASSED  
+    test_read_schema_ref 0  ✅  PASSED  
+    test_read_schema_ref_when_not_found 0  ✅  PASSED  
+    test_terminal_lookup 0  ✅  PASSED  
+
+tests/unit/project_index/features/sources/test_service.py
+    _config_value 0  ✅  PASSED  
+    brain_files 0  ✅  PASSED  
+    cloned_source 0  ✅  PASSED  
+    develop_ahead 0  ✅  PASSED  
+    source_root 0  ✅  PASSED  
+    test_assemble_source_when_script_missing 0  ✅  PASSED  
+    test_check_scripts 0  ✅  PASSED  
+    test_compare_config_version 0  ✅  PASSED  
+    test_entry_source_id 0  ✅  PASSED  
+    test_load_source 0  ✅  PASSED  
+    test_load_source_at_when_paths_base_set 0  ✅  PASSED  
+    test_load_source_when_converter_cache 0  ✅  PASSED  
+    test_load_source_when_disabled 0  ✅  PASSED  
+    test_load_source_when_merged 0  ✅  PASSED  
+    test_load_source_when_not_git 0  ✅  PASSED  
+    test_load_source_when_paths_base_set 0  ✅  PASSED  
+    test_load_source_when_worktree_config 0  ✅  PASSED  
+    test_read_default_ref_config 0  ✅  PASSED  
+    test_read_default_ref_config_when_not_git 0  ✅  PASSED  
+    test_resolve_paths_base 0  ✅  PASSED  
+    test_resolve_paths_base_when_not_git 0  ✅  PASSED  
+    test_resolve_paths_base_when_unset 0  ✅  PASSED  
+    test_source_schema_json 0  ✅  PASSED  
+    test_source_schema_json_when_metadata 0  ✅  PASSED  
+    test_validate_source_config 0  ✅  PASSED  
+    test_validate_source_config_when_nav_filter 0  ✅  PASSED  
+    test_validate_source_config_when_required_missing 0  ✅  PASSED  
+    worktree 0  ✅  PASSED  
+    test_check_scripts_when_missing 1  ✅  PASSED  
+    test_load_source_at 1  ✅  PASSED  
+    test_load_source_at_when_config_missing 1  ✅  PASSED  
+    test_load_source_at_when_invalid 1  ✅  PASSED  
+    test_load_source_when_config_broken 1  ✅  PASSED  
+    test_load_source_when_config_missing 1  ✅  PASSED  
+    test_load_source_when_default_ref 1  ✅  PASSED  
+    test_load_source_when_invalid 1  ✅  PASSED  
+    test_load_source_when_legacy 1  ✅  PASSED  
+    test_load_source_when_paths_base_invalid 1  ✅  PASSED  
+    test_load_source_when_script_missing 1  ✅  PASSED  
+    test_read_default_ref_config_when_ref_missing 1  ✅  PASSED  
+    test_resolve_paths_base_when_below 1  ✅  PASSED  
+    test_resolve_paths_base_when_missing 1  ✅  PASSED  
+    test_resolve_paths_base_when_outside_repo 1  ✅  PASSED  
+    test_validate_source_config_when_body_file_without_records 1  ✅  PASSED  
+    test_validate_source_config_when_cache_outside_converters 1  ✅  PASSED  
+    test_validate_source_config_when_dangling_reference 1  ✅  PASSED  
+    test_validate_source_config_when_duplicate_id 1  ✅  PASSED  
+    test_validate_source_config_when_exclude_has_slash 1  ✅  PASSED  
+    test_validate_source_config_when_legacy_keys 1  ✅  PASSED  
+    test_validate_source_config_when_outside_root 1  ✅  PASSED  
+    test_validate_source_config_when_paths_base_and_paths_invalid 1  ✅  PASSED  
+    test_validate_source_config_when_paths_outside_base 1  ✅  PASSED  
+    test_validate_source_config_when_schema_broken 1  ✅  PASSED  
+    test_validate_source_config_when_schema_missing 1  ✅  PASSED  
+    test_validate_source_config_when_tag_master 1  ✅  PASSED  
+    test_validate_source_config_when_unknown_key 1  ✅  PASSED  
+    test_assemble_source 2  ✅  PASSED  
+    test_load_source_at_when_ignored_config 2  ✅  PASSED  
+    test_load_source_when_version_old 2  ✅  PASSED  
+    test_read_default_ref_config_when_ignored 2  ✅  PASSED  
+    test_read_default_ref_config_when_not_committed 3  ✅  PASSED  
+
+tests/unit/project_index/features/sources/test_types.py
+    test_document_table_excludes 0  ✅  PASSED  
+    test_document_table_matches 0  ✅  PASSED  
+    test_document_table_matches_when_excluded 0  ✅  PASSED  
+    test_document_table_matches_when_outside_paths 0  ✅  PASSED  
+    test_served_source_config_path 0  ✅  PASSED  
+    test_served_source_config_root 0  ✅  PASSED  
+    test_served_source_table 0  ✅  PASSED  
+    test_served_source_table_when_unknown 0  ✅  PASSED  
+
+tests/unit/project_index/features/validation/test_markdown.py
+    test_changed_markdown 0  ✅  PASSED  
+    test_changed_markdown_when_create 0  ✅  PASSED  
+    test_check_markdown_values 0  ✅  PASSED  
+    test_check_markdown_values_when_missing 0  ✅  PASSED  
+    test_check_markdown_values_when_stopped 0  ✅  PASSED  
+    test_markdown_values 0  ✅  PASSED  
+    test_markdown_values_when_any_of 0  ✅  PASSED  
+    test_markdown_values_when_not_string 0  ✅  PASSED  
+    test_check_markdown_values_when_continuable 2  ✅  PASSED  
+    test_markdown_values_when_unresolvable 2  ✅  PASSED  
+
+tests/unit/project_index/features/validation/test_rules.py
+    test_check_id_format 0  ✅  PASSED  
+    test_check_id_format_when_mismatch 0  ✅  PASSED  
+    test_check_id_format_when_none 0  ✅  PASSED  
+    test_check_related 0  ✅  PASSED  
+    test_check_schema 0  ✅  PASSED  
+    test_check_schema_when_empty 0  ✅  PASSED  
+    test_check_related_when_malformed 1  ✅  PASSED  
+    test_check_schema_when_unresolvable 1  ✅  PASSED  
+    test_check_schema_when_violations 1  ✅  PASSED  
+
+tests/unit/project_index/features/validation/test_scripts.py
+    test_parse_validator_output_when_empty 0  ✅  PASSED  
+    test_parse_validator_output_when_invalid 0  ✅  PASSED  
+    test_parse_validator_output 1  ✅  PASSED  
+
+tests/unit/project_index/features/validation/test_service.py
+    _checker 0  ✅  PASSED  
+    _script 0  ✅  PASSED  
+    load_yaml 0  ✅  PASSED  
+    make_checked_target 0  ✅  PASSED  
+    test_document_checker_check_markdown 0  ✅  PASSED  
+    test_document_checker_check_markdown_when_unchanged 0  ✅  PASSED  
+    test_document_checker_check_when_on_read 0  ✅  PASSED  
+    test_document_checker_check_when_records 0  ✅  PASSED  
+    test_document_checker_check_when_script_fails 0  ✅  PASSED  
+    test_document_checker_check 1  ✅  PASSED  
+    test_document_checker_check_when_new 1  ✅  PASSED  
+
+tests/unit/project_index/features/write/test_apply.py
+    _decisions_table 0  ✅  PASSED  
+    _tags_table 0  ✅  PASSED  
+    test_apply_operation 0  ✅  PASSED  
+    test_apply_operation_when_replace 0  ✅  PASSED  
+    test_apply_operation_when_text_edit_ambiguous 0  ✅  PASSED  
+    test_expand_array_keys 0  ✅  PASSED  
+    test_expand_array_keys_when_create 0  ✅  PASSED  
+    test_expand_array_keys_when_main 0  ✅  PASSED  
+    test_expand_array_keys_when_plain 0  ✅  PASSED  
+    test_expand_array_keys_when_string 0  ✅  PASSED  
+    test_expand_array_keys_when_unknown_name 0  ✅  PASSED  
+    test_to_columns 0  ✅  PASSED  
+    test_to_columns_when_both 0  ✅  PASSED  
+    test_to_columns_when_column_name 0  ✅  PASSED  
+    test_to_columns_when_data 0  ✅  PASSED  
+    test_expand_array_keys_when_objects 1  ✅  PASSED  
+
+tests/unit/project_index/features/write/test_hints.py
+    test_attach_schema_hints 1  ✅  PASSED  
+    test_attach_schema_hints_when_not_schema 1  ✅  PASSED  
+    test_attach_schema_hints_when_rules 1  ✅  PASSED  
+    test_attach_schema_hints_when_unresolvable 1  ✅  PASSED  
+
+tests/unit/project_index/features/write/test_ids.py
+    test_generate_id 0  ✅  PASSED  
+    test_generate_id_when_no_ascii 0  ✅  PASSED  
+
+tests/unit/project_index/features/write/test_locks.py
+    test_source_locks_hold 0  ✅  PASSED  
+
+tests/unit/project_index/features/write/test_placement.py
+    test_new_document_path 0  ✅  PASSED  
+    test_new_document_path_when_excluded 0  ✅  PASSED  
+    test_new_document_path_when_records_excluded 0  ✅  PASSED  
+
+tests/unit/project_index/features/write/test_service.py
+    WriteEnv::delete 0  ✅  PASSED  
+    WriteEnv::write 0  ✅  PASSED  
+    _with_related 0  ✅  PASSED  
+    load_yaml 0  ✅  PASSED  
+    test_check_version_when_fields 0  ✅  PASSED  
+    test_check_version_when_mismatch 0  ✅  PASSED  
+    test_delete_docs 0  ✅  PASSED  
+    test_delete_docs_when_not_allowed 0  ✅  PASSED  
+    test_delete_docs_when_records 0  ✅  PASSED  
+    test_delete_docs_when_referenced 0  ✅  PASSED  
+    test_delete_docs_when_unlink 0  ✅  PASSED  
+    test_write_docs 0  ✅  PASSED  
+    test_write_docs_when_create 0  ✅  PASSED  
+    test_write_docs_when_dry_run 0  ✅  PASSED  
+    test_write_docs_when_invalid 0  ✅  PASSED  
+    test_write_docs_when_not_git 0  ✅  PASSED  
+    test_write_docs_when_tags_are_objects 0  ✅  PASSED  
+    test_write_docs_when_version_mismatch 0  ✅  PASSED  
+    test_write_docs_when_mdmark_unavailable 1  ✅  PASSED  
+    test_write_docs_when_metadata_mapped 1  ✅  PASSED  
+    test_write_docs_when_partial 1  ✅  PASSED  
+    test_write_docs_when_too_many 1  ✅  PASSED  
+    make_env 2  ✅  PASSED  
+    test_write_docs_when_mdmark_warning 3  ✅  PASSED  
+
+tests/unit/project_index/integrations/test_git.py
+    test_is_ignored 0  ✅  PASSED  
+    test_is_ignored_when_not_ignored 0  ✅  PASSED  
+    test_main_repo_root 0  ✅  PASSED  
+    test_main_repo_root_when_not_git 0  ✅  PASSED  
+    test_repo_root 0  ✅  PASSED  
+    test_repo_root_when_not_git 0  ✅  PASSED  
+    test_run_git 0  ✅  PASSED  
+    test_run_git_when_failed 0  ✅  PASSED  
+    test_run_git_when_timeout_given 0  ✅  PASSED  
+    test_run_git_when_timeout 1  ✅  PASSED  
+
+tests/unit/project_index/integrations/test_mdmark.py
+    fake_mdmark 0  ✅  PASSED  
+    test_check_markdown 0  ✅  PASSED  
+    test_check_markdown_when_findings 0  ✅  PASSED  
+    test_check_markdown_when_missing 0  ✅  PASSED  
+    test_check_markdown_when_no_summary 0  ✅  PASSED  
+    test_check_markdown_when_timeout 0  ✅  PASSED  
+    test_parse_check_output 0  ✅  PASSED  
+    test_parse_check_output_when_no_summary 0  ✅  PASSED  
+
+tests/unit/project_index/integrations/test_scripts.py
+    test_check_runnable 0  ✅  PASSED  
+    test_check_runnable_when_command_missing 0  ✅  PASSED  
+    test_check_runnable_when_empty 0  ✅  PASSED  
+    test_check_runnable_when_script_missing 0  ✅  PASSED  
+    test_check_runnable_when_server_env 0  ✅  PASSED  
+    test_run_script 0  ✅  PASSED  
+    test_run_script_when_at 0  ✅  PASSED  
+    test_run_script_when_cwd 0  ✅  PASSED  
+    test_run_script_when_failed 0  ✅  PASSED  
+    test_run_script_when_timeout 0  ✅  PASSED  
+
+tests/unit/project_index/server/mcp/test_admin.py
+    test_build_admin_mcp_when_call 0  ✅  PASSED  
+    test_build_admin_mcp_when_restart_in_progress 0  ✅  PASSED  
+    test_build_admin_mcp_when_descriptions 2  ✅  PASSED  
+    test_build_admin_mcp 3  ✅  PASSED  
+
+tests/unit/project_index/server/mcp/test_docs.py
+    test_build_docs_mcp_when_call 0  ✅  PASSED  
+    test_build_docs_mcp_when_error 0  ✅  PASSED  
+    test_build_docs_mcp_when_instructions 0  ✅  PASSED  
+    test_build_docs_mcp 1  ✅  PASSED  
+    test_wait_target 1  ✅  PASSED  
+    test_build_docs_mcp_when_descriptions 8  ✅  PASSED  
+    test_build_docs_mcp_when_loading 10  ✅  PASSED  
+
+tests/unit/project_index/server/mcp/test_result.py
+    _text 0  ✅  PASSED  
+    test_mcp_prompt_ids 0  ✅  PASSED  
+    test_to_tool_result 0  ✅  PASSED  
+    test_to_tool_result_when_contains_changes 0  ✅  PASSED  
+    test_to_tool_result_when_empty_ranges 0  ✅  PASSED  
+    test_to_tool_result_when_json 0  ✅  PASSED  
+    test_to_tool_result_when_location 0  ✅  PASSED  
+    test_to_tool_result_when_snippet_empty_line 0  ✅  PASSED  
+    test_tool_error 0  ✅  PASSED  
+    test_tool_error_when_validation 0  ✅  PASSED  
+    test_tool_prompt_id 0  ✅  PASSED  
+
+tests/unit/project_index/server/test_app.py
+    _endpoint 0  ✅  PASSED  
+    _noop_receive 0  ✅  PASSED  
+    _noop_send 0  ✅  PASSED  
+    _pass_through 0  ✅  PASSED  
+    test_build_app_when_mcp_without_slash 0  ✅  PASSED  
+    test_route_operation_id 0  ✅  PASSED  
+    test_route_operation_id_when_no_tag 0  ✅  PASSED  
+    test_slashless_mcp_path_middleware 0  ✅  PASSED  
+    test_slashless_mcp_path_middleware_when_other_path 0  ✅  PASSED  
+    test_build_app 1  ✅  PASSED  
+
+tests/unit/project_index/server/test_error_handlers.py
+    test_register_error_handlers 0  ✅  PASSED  
+    test_register_error_handlers_when_details_snake 0  ✅  PASSED  
+    test_register_error_handlers_when_http_error 0  ✅  PASSED  
+    test_register_error_handlers_when_http_error_headers 0  ✅  PASSED  
+    test_register_error_handlers_when_request_invalid 0  ✅  PASSED  
+
+tests/unit/project_index/server/test_lifespan.py
+    _fake_mcp 0  ✅  PASSED  
+    test_build_lifespan 0  ✅  PASSED  
+
+tests/unit/project_index/server/test_origin.py
+    test_require_same_origin 0  ✅  PASSED  
+    test_require_same_origin_when_cross_origin 0  ✅  PASSED  
+    test_require_same_origin_when_cross_site 0  ✅  PASSED  
+    test_require_same_origin_when_fetch_site 0  ✅  PASSED  
+    test_require_same_origin_when_server_side 0  ✅  PASSED  
+    _request 1  ✅  PASSED  
+
+tests/unit/project_index/shared/test_errors.py
+    test_project_index_error_details 0  ✅  PASSED  
+    test_project_index_error_details_when_no_extra 0  ✅  PASSED  
+
+tests/unit/project_index/shared/test_files.py
+    test_replace_file 0  ✅  PASSED  
+    test_replace_file_when_new_folder 0  ✅  PASSED  
+    test_replace_file_when_replace_fails 0  ✅  PASSED  
+
+tests/unit/project_index/shared/test_hashing.py
+    test_content_hash 0  ✅  PASSED  
+    test_value_hash 0  ✅  PASSED  
+
+tests/unit/project_index/shared/test_narrowing.py
+    test_is_dict 0  ✅  PASSED  
+    test_is_list 0  ✅  PASSED  
+
+tests/unit/project_index/shared/test_paths.py
+    test_match_glob 0  ✅  PASSED  
+    test_match_glob_when_recursive 0  ✅  PASSED  
+    test_match_glob_when_relative 0  ✅  PASSED  
+    test_match_glob_when_relative_without_base 0  ✅  PASSED  
+    test_normalize_path 0  ✅  PASSED  
+
+tests/unit/project_index/shared/test_schema_check.py
+    test_as_list 0  ✅  PASSED  
+    test_as_list_when_not_list 0  ✅  PASSED  
+    test_format_path 0  ✅  PASSED  
+    test_format_path_when_empty 0  ✅  PASSED  
+    test_format_path_when_index_first 0  ✅  PASSED  
+    test_from_error_when_additional_properties 0  ✅  PASSED  
+    test_from_error_when_enum 0  ✅  PASSED  
+    test_from_error_when_other 0  ✅  PASSED  
+    test_from_error_when_required 0  ✅  PASSED  
+    test_from_error_when_type 0  ✅  PASSED  
+    test_schema_violations 0  ✅  PASSED  
+    test_schema_violations_when_registry 0  ✅  PASSED  
+    test_schema_violations_when_many 1  ✅  PASSED  
+
+tests/unit/project_index/shared/test_yaml_io.py
+    test_dump_roundtrip 0  ✅  PASSED  
+    test_load_roundtrip 0  ✅  PASSED  
+    test_load_roundtrip_when_not_mapping 0  ✅  PASSED  
+    test_load_roundtrip_when_quotes 0  ✅  PASSED  
+    test_load_yaml 0  ✅  PASSED  
+    test_load_yaml_when_duplicate_key 0  ✅  PASSED  
+    test_load_yaml_when_syntax_error 0  ✅  PASSED  
+
+tests/unit/project_index/test_main.py
+    test_build_parser 0  ✅  PASSED  
+    test_build_parser_when_files 0  ✅  PASSED  
+    test_build_parser_when_migrate 0  ✅  PASSED  
+    test_build_parser_when_plan_and_record 0  ✅  PASSED  
+    test_build_parser_when_prompt_doc 0  ✅  PASSED  
+    test_build_parser_when_serve 0  ✅  PASSED  
+    test_main_when_help 0  ✅  PASSED  
+    test_main_when_no_command 0  ✅  PASSED  
+    test_main_when_version 0  ✅  PASSED  
+
+tests/unit/project_index/test_serve.py
+    _Recorder::clear 0  ✅  PASSED  
+    _Recorder::reload 0  ✅  PASSED  
+    _Recorder::served 0  ✅  PASSED  
+    _files_args 0  ✅  PASSED  
+    _free_port 0  ✅  PASSED  
+    _listening 0  ✅  PASSED  
+    _migrate_args 0  ✅  PASSED  
+    _write_settings_file 0  ✅  PASSED  
+    load_yaml 0  ✅  PASSED  
+    serve_settings 0  ✅  PASSED  
+    test_build_handlers 0  ✅  PASSED  
+    test_build_handlers_when_prompt_invalid 0  ✅  PASSED  
+    test_check_port 0  ✅  PASSED  
+    test_check_port_when_in_use 0  ✅  PASSED  
+    test_check_port_when_time_wait 0  ✅  PASSED  
+    test_check_sources 0  ✅  PASSED  
+    test_reload_sources 0  ✅  PASSED  
+    test_run_files 0  ✅  PASSED  
+    test_run_files_when_root_not_found 0  ✅  PASSED  
+    test_run_migrate 0  ✅  PASSED  
+    test_run_migrate_when_config_invalid 0  ✅  PASSED  
+    test_run_migrate_when_current 0  ✅  PASSED  
+    test_run_migrate_when_destructive 0  ✅  PASSED  
+    test_run_migrate_when_newer 0  ✅  PASSED  
+    test_run_migrate_when_plan 0  ✅  PASSED  
+    test_run_migrate_when_record 0  ✅  PASSED  
+    test_run_serve 0  ✅  PASSED  
+    test_run_serve_when_config_invalid 0  ✅  PASSED  
+    test_run_serve_when_port_in_use 0  ✅  PASSED  
+    test_run_serve_when_prompt_invalid 0  ✅  PASSED  
+    test_run_serve_when_restart 0  ✅  PASSED  
+    test_start_loading 0  ✅  PASSED  
+    _Recorder::__init__ 1  ✅  PASSED  
+    test_build_handlers_when_default_ref_moved 1  ✅  PASSED  
+    test_build_handlers_when_unknown_key_reloaded 1  ✅  PASSED  
+    _warnings 2  ✅  PASSED  
+    test_build_handlers_when_out_of_sync 2  ✅  PASSED  
+    test_start_loading_when_failed 2  ✅  PASSED  
+    test_reload_sources_when_alias_and_nav 8  ✅  PASSED  
+    test_reload_sources_when_out_of_sync 13  ✅  PASSED  
+
+All functions are within the allowed complexity.
+────────────────────────── 🎉 Analysis completed! 🎉 ───────────────────────────
+rc=0
