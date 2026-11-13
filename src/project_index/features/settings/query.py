@@ -14,6 +14,7 @@ from project_index.features.settings.types import (
     TerminalConfigInvalidError,
 )
 from project_index.shared.errors import Violation
+from project_index.shared.hashing import content_hash
 from project_index.shared.narrowing import is_dict, is_list
 from project_index.shared.paths import normalize_path
 from project_index.shared.schema_check import schema_violations
@@ -131,6 +132,12 @@ def _empty_globs(sources: list[object]) -> list[Violation]:
     return violations
 
 
+def read_settings_file(path: Path) -> tuple[str, str]:
+    """`settings.yaml` を 1 回だけ読み、本文と内容のバージョンを返す。"""
+    raw = path.read_bytes()
+    return raw.decode("utf-8"), content_hash(raw)
+
+
 def unknown_top_level_keys(value: Iterable[object]) -> list[str]:
     """端末の設定の値の最上位の、スキーマの `properties` に無いキーをファイルの順に返す。"""
     known = set(_settings_schema()["properties"])
@@ -152,12 +159,19 @@ def log_unknown_keys(config: TerminalConfig) -> None:
         )
 
 
-def load_terminal_config(path: Path, *, env: Mapping[str, str] | None = None) -> TerminalConfig:
+def load_terminal_config(
+    path: Path, *, env: Mapping[str, str] | None = None, text: str | None = None
+) -> TerminalConfig:
     """`settings.yaml` を読み、スキーマの違反を全て集めてから端末の設定にする。"""
-    if not path.is_file():
-        raise TerminalConfigInvalidError(file=path, message=f"{path}: 端末の設定が見つかりません")
+    # 本文を渡されたときはファイルを読まない（内容のバージョンと同じ本文から作る）
+    if text is None:
+        if not path.is_file():
+            raise TerminalConfigInvalidError(
+                file=path, message=f"{path}: 端末の設定が見つかりません"
+            )
+        text = path.read_text(encoding="utf-8")
     try:
-        value = load_yaml(path.read_text(encoding="utf-8"), file=str(path))
+        value = load_yaml(text, file=str(path))
     except YamlLoadError as error:
         location = f"{error.line}:{error.column}: " if error.line else ""
         raise TerminalConfigInvalidError(
