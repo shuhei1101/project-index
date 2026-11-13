@@ -57,7 +57,7 @@ classes:
         type: Callable[[ServedSource], None] | None
         access: 内部 (_)
         default: None
-        description: 初期化の引数 `on_rebuilt` で受け取り、`get` が配信元を組み立て直して差し替えた後に、新しい配信元を渡して呼ぶ。`None` なら呼ばない
+        description: 初期化の引数 `on_rebuilt` で受け取り、`get` が配信元を組み立て直して差し替えた後と、`load` が ID の重なる後の位置の行を除外して先の位置の行の配信元に入れ替えた後に、新しい配信元を渡して呼ぶ。`None` なら呼ばない
       - name: _ready
         title: 読み込みの済み
         type: threading.Event
@@ -181,7 +181,7 @@ classes:
              - 行を配信元の読み込み（`lookup` に手順 1 の引き当て）で読む。例外の場合、`[error]` 配信元の行の読み込みに失敗した（行の位置・例外のスタックトレース）を書き、状態を `not_served`・ID を行の `id`（無ければ `sources[{n}]`）・違反を `Violation(path="sources[{n}]", rule="読み込みに失敗しました（{例外の型}: {本文}）", fix="エラーログを確かめ、reload で読み直してください")` にする
           3. 読み込んだ行ごとに `_reload_lock` を取り、今の組に行を加えた新しい組を作って `_snapshot` と `_entries` を入れ替える。状態は行の位置の順に並べる
              - 配信する配信元の ID が、先の位置の行の配信中の ID と重なる場合、その行を `sources[{n}].id` の重複の違反を持つ `not_served` にする
-             - 後の位置の行が先に読み込まれて同じ ID で配信中の場合、その後の行を同じ違反の `not_served` に替え、この行を配信する
+             - 後の位置の行が先に読み込まれて同じ ID で配信中の場合、その後の行を同じ違反の `not_served` に替え、この行を配信する。組を入れ替えた後、`_reload_lock` を持ったまま `_on_rebuilt` をこの行の配信元で呼ぶ
           4. 行の `_rows_done` を立て、`_waiters_lock` を持って、待っている行が全て済んだ待ち手を `_waiters` から取り出し、`loop.call_soon_threadsafe` で Future を済ませる（済んだ Future と閉じたループは飛ばす）
           5. 全ての行を読み込もうとし終えたら `[info]` 配信元を読み直した（配信中の ID の並び・外した数）を書き、`_ready` を立てて残りの待ち手を全て済ませる
              - 手順 1〜4 で、行の読み込み以外の例外が起きた場合も、全ての `_rows_done` と `_ready` を立てて待ち手を全て済ませてから送り直す
@@ -230,6 +230,18 @@ classes:
             condition: 3 行の設定の 2・3 行目が `id` を省き `name` がどちらも `a`。1 行目の読み込みを止めている間に、3 行目の scope に当たる作業場所で `wait_for` を呼び、3 行目を 2 行目より先に読み込ませる
             mock: 配信元の読み込み（偽物）
             expected: 読み込みの順が 1・3・2 行目で、全ての行を読み込んだ後に、2 行目が `serving`、3 行目が `not_served` で違反が `sources[2].id`。`get("a")` が 2 行目の配信元を返す
+          - name: test_source_registry_load_when_duplicate_loaded_later_with_on_rebuilt
+            case: 正常
+            summary: 後の行が先に読み込まれて ID が重なると、入れ替えた後の処理を呼ぶ
+            condition: '`on_rebuilt` に呼ばれた配信元を記録する関数を指定した `SourceRegistry(loading=True)`。設定と読み込みの順は `test_source_registry_load_when_duplicate_loaded_later` と同じ'
+            mock: 配信元の読み込み（偽物）
+            expected: '`on_rebuilt` が 2 行目の配信元で 1 回だけ呼ばれる（1・3 行目の読み込みでは呼ばれない）'
+          - name: test_source_registry_load_when_duplicate_loaded_earlier_with_on_rebuilt
+            case: 正常
+            summary: 先の行が先に読み込まれて ID が重なると、入れ替えた後の処理を呼ばない
+            condition: '`on_rebuilt` に呼ばれた配信元を記録する関数を指定した `SourceRegistry(loading=True)`。2 行の設定がどちらも `id` を省き `name` が `a` で、位置の順に読み込む'
+            mock: 配信元の読み込み（偽物）
+            expected: '`on_rebuilt` が呼ばれず、2 行目が `not_served` で違反が `sources[1].id`'
       - name: wait_for
         title: 指す行の待ち
         kind: メソッド
