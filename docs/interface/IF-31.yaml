@@ -366,14 +366,14 @@ request:
     required: false
     default: 'ファイルの同じ配信元の行の今の値（同じ配信元の行が無ければ `[]`）'
     location: body
-    description: この配信元を読める作業場所の glob
+    description: この配信元を参照できる作業場所の glob
     constraints: 空の文字列を含めない
   - name: sources[].scope.write
     type: list[str]
     required: false
     default: ファイルの同じ配信元の行の今の値（同じ配信元の行が無ければ配信元のフォルダだけ）
     location: body
-    description: この配信元を読み書きできる作業場所の glob
+    description: この配信元を参照と書き込みができる作業場所の glob
   - name: Origin
     type: str
     required: false
@@ -385,7 +385,7 @@ request:
     required: false
     default: 'ファイルの同じ配信元の行の今の値（同じ配信元の行が無ければ `true`）'
     location: body
-    description: '`scope` に当たらない作業場所からも `outside_scope: true` で作業範囲の外（参考）として読めるか'
+    description: '`scope` に当たらない作業場所からも `outside_scope: true` で作業範囲の外（参考）として参照できるか'
     notes: '`false` の配信元は `scope` の外から一切読めない'
   - name: expectedVersion
     type: str

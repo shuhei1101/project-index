@@ -194,7 +194,7 @@ flows:
       - '2 回目は `isError: true` で、`local/project-index.yaml` のパスを返す'
       - どちらの `project-index.yaml` も書き換わらない
     test: test_error_when_item_not_group
-  - name: 正常系（フォルダで束ねる auto を書く）
+  - name: 正常系（フォルダでグループ化する auto を書く）
     summary: "`group_by: '@folder'` の `auto` を検証に通して書き、文書の数を返す"
     setup:
       - name: Mock
@@ -204,7 +204,7 @@ flows:
         description: "`add`（タブ `folders`、`auto` が `{document: sample, group_by: '@folder'}`）"
         notes: sample の文書は 3 件
     flow: |-
-      <!-- map: {"title": "正常系（フォルダで束ねる auto を書く）"} -->
+      <!-- map: {"title": "正常系（フォルダでグループ化する auto を書く）"} -->
 
       ```mermaid
       sequenceDiagram
@@ -330,7 +330,7 @@ constraints:
   - item: 重ねた設定
     constraint: 端末の設定の `sources[].config` で `path` の `project-index.yaml` より後に重ねた設定の YAML が `nav` を持つ配信元は、書いても配信に出ないため `InvalidArgumentError` で断る
   - item: auto の group_by
-    constraint: "`auto` の `group_by` は、項目のパスかフォルダで束ねる指定 `'@folder'` を受ける。`'@folder'` は項目のパスとして検査しない。`counts` は `group_by` によらず条件に当たる文書の数"
+    constraint: "`auto` の `group_by` は、項目のパスかフォルダでグループ化する指定 `'@folder'` を受ける。`'@folder'` は項目のパスとして検査しない。`counts` は `group_by` によらず条件に当たる文書の数"
   - item: 設定の探し方
     constraint: 書き込む先がフォルダのときは `project-index.yaml` を探し、無ければ `dev-docs.yaml` を探す（今の各リポジトリが `project-index.yaml` へ改名するまでの移行の間）
 test_file: tests/integration/server/test_write_nav.py
