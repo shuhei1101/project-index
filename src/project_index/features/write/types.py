@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from project_index.features.access.types import CWD_DESCRIPTION
 from project_index.features.validation.markdown import UncheckedKey
 from project_index.shared.errors import Violation
 
@@ -59,7 +60,7 @@ class WriteRequest(BaseModel):
     worktree: str | None = None
     atomic: bool = True
     dry_run: bool = False
-    cwd: str | None = None
+    cwd: str | None = Field(default=None, description=CWD_DESCRIPTION)
     session_id: str | None = None
     agent_id: str | None = None
 
@@ -105,7 +106,7 @@ class DeleteRequest(BaseModel):
     on_referenced: Literal["fail", "unlink"] = "fail"
     atomic: bool = True
     dry_run: bool = False
-    cwd: str | None = None
+    cwd: str | None = Field(default=None, description=CWD_DESCRIPTION)
 
 
 @dataclass(frozen=True)
