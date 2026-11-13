@@ -1,0 +1,21 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: run_only
+    detail: 参照先の別のファイルの中で循環する定義を持つスキーマの種類の文書を、その定義どおりに検査して調べられるようになる。流れは変わらないが、検索・取得のスキーマの扱いを変えるため E2E の対象にする
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: run_only
+    detail: 参照先の別のファイルの中で循環する定義を持つスキーマの種類の文書を、その定義どおりに検査して書き込めるようになる。流れは変わらないが、書き込みの検査を変えるため E2E の対象にする
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: run_only
+    detail: 画面のサーバーが受け取る解いたスキーマの最上位の $defs に、別のファイルの中で循環する定義が追加される。流れは変わらないが、応答のスキーマを変えるため E2E の対象にする
+    depends_on: []
+docs: []
+scope_out:
+  - item: 既存の配信元のスキーマで、別のファイルの中の循環に当たっていた種類の文書の検査のやり直し
+    reason: 参照の解決は文書を読むたびに行うため、修正が入ればそのまま効き、別の作業が要らない
+    plan: none
