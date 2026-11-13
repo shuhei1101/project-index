@@ -39,8 +39,8 @@
 | `GET /settings/sources` | 端末の設定の `sources[]` の行と、配信元ごとの状態を返す | - |
 | `PUT /settings/sources` | `sources[]` を丸ごと保存して配信元を読み直し、状態を返す | 403（別のオリジン）・422（スキーマに通らない） |
 | `POST /settings/sources` | 配信元の行を 1 行追加して読み直す（201）。同じ id の行があれば追加せず、内容が同じかを返す（409） | 403・409・422 |
-| `PATCH /settings/sources/{id}` | 配信元の行を 1 行だけ、送信したキーで変更し、その配信元だけを読み直す | 403・404（行が無い）・409（内容のバージョンが古い）・422 |
-| `DELETE /settings/sources/{id}` | 配信元の行を 1 行だけ削除し、その配信元を配信から除外する | 403・404・409・422 |
+| `PATCH /settings/sources/{id}` | 配信元の行を 1 行だけ、送信したキーで変更し、その配信元だけを読み直す | 400（引数の誤り）・403・404（行が無い）・409（内容のバージョンが古い）・422 |
+| `DELETE /settings/sources/{id}` | 配信元の行を 1 行だけ削除し、その配信元を配信から除外する | 400・403・404・409 |
 
 <!-- /table -->
 
@@ -50,5 +50,5 @@
 `GET` の行は、端末の設定の `outside_read` を `outsideRead` で返します。
 `GET` と書き換えの応答は、端末の設定の内容のバージョンを `version` で返します。
 書き換えの要求の `expectedVersion`（`DELETE` はクエリ）が今の内容のバージョンと違うと、書き換えずに 409 で断り、今の内容のバージョンを `current` で返します。
-`PATCH`・`DELETE` は `expectedVersion` が必須で、`PUT`・`POST` は送信したときだけ照合します。
+`PATCH`・`DELETE` は `expectedVersion` が必須で、無いときは 400 で断ります。`PUT`・`POST` は送信したときだけ照合します。
 5 つとも、端末の設定の最上位の project-index が知らないキーを誤りにせず、応答の `warnings[]`（`path`・`reason`）で返します。知らないキーが無いときは空の配列です。
