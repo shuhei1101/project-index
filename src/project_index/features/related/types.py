@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from project_index.features.access.types import CWD_DESCRIPTION
+
 DEPTH_DEFAULT = 2
 DEPTH_MAX = 4
 SUGGEST_COUNT = 3
@@ -27,7 +29,7 @@ class RelatedRequest(BaseModel):
     suggest: bool = False
     repeat_seen: bool = False
     format: Literal["markdown", "json"] = "markdown"
-    cwd: str | None = None
+    cwd: str | None = Field(default=None, description=CWD_DESCRIPTION)
     outside_scope: bool = Field(
         default=False,
         description=(

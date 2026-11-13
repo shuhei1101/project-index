@@ -556,7 +556,7 @@ functions:
       3. 書くワークツリーを決める
          - `worktree` を渡された場合、当たらなければ `WorktreeNotMatchedError` を送る
          - 渡されず、`cwd` がワークツリーの中ならそのワークツリー
-      4. ワークツリーが無く、配信元が Git の配信元の場合、`clone` に `repo_root` を入れた `TargetIsCloneError` を送る
+      4. ワークツリーが無く、配信元が Git の配信元の場合、`clone` にクローン本体（`main_root`、無ければ `repo_root`）を入れた `TargetIsCloneError` を送る
       5. ワークツリーへ書く場合、配信元をワークツリーの設定で読み直す（作業場所の配信元の読み込み）。検証に通らなければ `ValidationFailedError` を送る
       6. Git の管理外は登録済みの配信元と `root`、ワークツリーは読み直した配信元とその `base` を `Target` にして返す
     exceptions:
@@ -598,6 +598,13 @@ functions:
         condition: '`cwd` が sample のクローン本体で `worktree` なし'
         mock: 配信元の一覧（偽物）
         expected: '`TargetIsCloneError` の `clone` が `repo_root`'
+        exception: 書く先がクローン本体
+      - name: test_resolve_write_target_when_clone_and_config_in_worktree
+        case: 異常
+        summary: 設定をワークツリーから読む配信元でも、クローン本体のパスを返す
+        condition: sample の `repo_root` がワークツリー y、`main_root` がクローン本体で、`cwd` がクローン本体で `worktree` なし
+        mock: 配信元の一覧（偽物）
+        expected: '`TargetIsCloneError` の `clone` が `main_root` で、ワークツリー y ではない'
         exception: 書く先がクローン本体
       - name: test_resolve_write_target_when_worktree_config
         case: 正常

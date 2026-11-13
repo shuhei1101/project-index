@@ -8,6 +8,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from project_index.features.access.types import CWD_DESCRIPTION
 from project_index.features.search.types import LIMIT_DEFAULT, MAX_CHARS_DEFAULT, Condition, Group
 
 LAST_READ_LABEL = "前回読んだ時点"
@@ -41,7 +42,7 @@ class ChangesRequest(BaseModel):
     cursor: str | None = None
     max_chars: int = MAX_CHARS_DEFAULT
     format: Literal["markdown", "json"] = "markdown"
-    cwd: str | None = None
+    cwd: str | None = Field(default=None, description=CWD_DESCRIPTION)
     outside_scope: bool = Field(
         default=False,
         description=(

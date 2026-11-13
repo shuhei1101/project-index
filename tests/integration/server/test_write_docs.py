@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -117,6 +118,21 @@ DEFS_REF_SCHEMA = (
 )
 # `$defs.entry` の `summary` が無いファイルを指すスキーマ
 MISSING_REF_SCHEMA = DEFS_REF_SCHEMA.replace("common.schema.yaml", "missing.schema.yaml")
+# `cwd` の説明を持つ文書の MCP のツール
+TOOLS_WITH_CWD = (
+    "describe",
+    "search_docs",
+    "list_match_words",
+    "trace_related",
+    "list_changes",
+    "write_docs",
+    "delete_docs",
+)
+# ツールの入力のスキーマの `cwd` の説明
+CWD_DESCRIPTION_TEXT = (
+    "作業場所。PreToolUse のフックがセッションの作業場所で上書きするため、指定しても使わない。"
+    "ワークツリーを指すときは worktree を指定する"
+)
 COMMON_SCHEMA = "$defs:\n  summary:\n    type: string\n"
 MISSING_REF = "missing.schema.yaml#/$defs/summary"
 ENTRIES = [{"summary": "a", "children": [{"summary": "b"}]}]
@@ -481,6 +497,42 @@ def test_error_when_target_is_clone(
     assert target.read_text(encoding="utf-8") == before
 
 
+def test_error_when_target_is_clone_and_config_in_worktree(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+) -> None:
+    """配信元の設定をワークツリーから読んでいても、返すクローン本体のパスはワークツリーの親のクローン本体（異常系）。"""
+    # 準備
+    source = make_source("sample")
+    worktree_y = add_worktree(source.folder, "y")
+    env = make_server(
+        replace(
+            source,
+            config=[worktree_y / "project-index.yaml"],
+            scope_write=[source.folder],
+        )
+    )
+    clone_target = source.folder / "docs" / "doc-1.yaml"
+    worktree_target = worktree_y / "docs" / "doc-1.yaml"
+    clone_before = clone_target.read_text(encoding="utf-8")
+    worktree_before = worktree_target.read_text(encoding="utf-8")
+    # 実行
+    result = env.call(
+        "write_docs",
+        source="sample",
+        cwd=str(source.folder),
+        operations=[_update("doc-1", _version(clone_target), set={"name": "新しい名前"})],
+    )
+    # 検証
+    assert result.is_error
+    assert "TargetIsCloneError" in result.text
+    assert f"{source.folder} はクローン本体です" in result.text
+    assert str(worktree_y) not in result.text
+    assert clone_target.read_text(encoding="utf-8") == clone_before
+    assert worktree_target.read_text(encoding="utf-8") == worktree_before
+
+
 def test_error_when_version_mismatch(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
@@ -769,7 +821,7 @@ def test_normal_when_metadata_mapped(
 def test_normal_when_tool_description(
     make_source: Callable[..., Any], make_server: Callable[..., Any]
 ) -> None:
-    """ツールの説明に、範囲のファイルの増減・改名で管理用の YAML の行を修正することを含める（正常系）。"""
+    """ツールの説明に、範囲のファイルの作成・削除・改名で管理用の YAML の行を修正することと、`cwd` は指定しても使わず `worktree` でワークツリーを指すことを含める（正常系）。"""
     # 準備
     env = make_server(make_source("sample"))
     # 実行
@@ -787,6 +839,11 @@ def test_normal_when_tool_description(
         "範囲のファイルを作成・削除・改名したら、管理用の YAML の行を修正する"
         in tools["write_docs"]["description"]
     )
+    cwd_descriptions = {
+        name: tools[name]["inputSchema"]["properties"]["cwd"]["description"]
+        for name in TOOLS_WITH_CWD
+    }
+    assert cwd_descriptions == dict.fromkeys(TOOLS_WITH_CWD, CWD_DESCRIPTION_TEXT)
 
 
 def _write_tags(env: Any, source: Any, worktree: Path, step: dict[str, Any]) -> tuple[Any, Any]:

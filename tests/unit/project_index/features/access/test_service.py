@@ -456,6 +456,28 @@ def test_resolve_write_target_when_clone(
     assert exc_info.value.clone == "/r"
 
 
+def test_resolve_write_target_when_clone_and_config_in_worktree(
+    make_served_source: Callable[..., ServedSource], make_registry: Callable[..., Any]
+) -> None:
+    """設定をワークツリーから読む配信元でも、クローン本体のパスを返す（異常系）。"""
+    # 準備
+    source = make_served_source(
+        id="sample",
+        root=Path("/r/.claude/worktrees/y"),
+        config_files=[Path("/r/.claude/worktrees/y/project-index.yaml")],
+        is_git=True,
+        repo_root=Path("/r/.claude/worktrees/y"),
+        main_root=Path("/r"),
+        scope_write=["/r"],
+        worktree_globs=WORKTREE_GLOBS,
+    )
+    registry = make_registry(source)
+    # 実行・検証
+    with pytest.raises(TargetIsCloneError, match="クローン本体です") as exc_info:
+        resolve_write_target(registry=registry, source="sample", cwd="/r")
+    assert exc_info.value.clone == "/r"
+
+
 def test_resolve_read_targets_when_outside_scope(
     sample: ServedSource,
     make_served_source: Callable[..., ServedSource],

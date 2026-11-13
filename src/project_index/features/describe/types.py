@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from project_index.features.access.types import SourceAccess, Workplace
+from project_index.features.access.types import CWD_DESCRIPTION, SourceAccess, Workplace
 from project_index.features.history.types import WorktreeInfo
 
 
@@ -20,7 +20,7 @@ class DescribeRequest(BaseModel):
     kind: str | None = None
     worktree: str | None = None
     format: Literal["markdown", "json"] = "markdown"
-    cwd: str | None = None
+    cwd: str | None = Field(default=None, description=CWD_DESCRIPTION)
     outside_scope: bool = Field(
         default=False,
         description=(
