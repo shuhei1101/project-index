@@ -1,0 +1,1 @@
+# サーバーのスキーマの title・description の文言を AI slop の単語の対応表に合わせて修正する
