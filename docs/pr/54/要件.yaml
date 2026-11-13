@@ -1,0 +1,23 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: changed
+    detail: 画面のサーバーが文書の一覧と文書の取得で、配信元の設定の行で解決した全ての共通のキーを受け取り、エイリアスの集めと nav の絞り込みに使用する
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-1.yaml
+    impact: run_only
+    detail: 読み取り API で文書を読む流れの記述は変わらないが、文書の一覧・文書の取得の応答が変わるため回帰を確かめる
+    depends_on: []
+docs:
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: エンドポイントの表の `docs`・`docs/{path}` の行に、解決した共通のキーの返却（と追加するクエリ）を書き足す
+    status: todo
+scope_out:
+  - item: dev-docs の画面のサーバーの、共通のキーを組み立てる処理の削除
+    reason: 別のリポジトリの変更で、Issue の本文が別の Issue で行うと決めている。この作業 PR の出力を前提にする後続のため
+    plan: to_file
+  - item: 文書の一覧・文書の取得の `visibility` が、`METADATA_KEYS` に無いため常に `null` になる点
+    reason: 要望は `METADATA_KEYS` のキーの返却で、`visibility` を共通のキーへ加えるかは要望の外と判断した。この作業 PR がマージされなくても同じ内容で成り立つかを含め、レビューで確定する
+    plan: to_file
