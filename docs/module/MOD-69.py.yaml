@@ -405,3 +405,55 @@ classes:
           type: None
           description: 読み込みが終わったら戻る
         process: 1. 指す行の待ち（`every=True`）を await する
+      - name: reload_changed
+        title: 変わった行を読み直す
+        kind: メソッド
+        summary: 端末の設定の行のうち、前に読んだ行と同じ行は今の配信元をそのまま使い、変わった行だけを読み込んで一覧を差し替える
+        description: 1 行の追加・変更・削除の後に呼ぶ。削除した行の配信元は新しい組に入らず、配信から除外される
+        scope: public
+        thread_safe: true
+        side_effects: 一覧を入れ替える
+        args:
+          - name: terminal
+            title: 端末の設定
+            type: TerminalConfig
+            required: true
+            passing: positional
+            description: 書き換えた後に読んだ端末の設定
+        returns:
+          type: list[SourceStatus]
+          description: '`sources[]` の順の状態'
+        process: |-
+          1. `_reload_lock` を取り、端末の設定から参照先の配信元の引き当てを作る（端末の設定からの引き当て）
+          2. `sources[]` の行ごとに、今の `_rows` に同じ値の行（`SourceEntry` どうしが等しい）があるかを、使っていない前の行から順に探す
+             - あり、前の行の状態が `serving` か `disabled` の場合、前の行の配信元と状態をそのまま使い、状態の位置だけを新しい行の位置に替える
+             - 無いか、前の行の状態が `not_served` の場合、行を読む（配信元の読み込み。引き当てを渡す）
+          3. 配信する配信元の ID が先の行と重なる場合、後の行を `sources[{n}].id` の重複の違反を持つ `not_served` にする（読み直すと同じ）
+          4. 新しい組を作り、`_snapshot`・`_entries`・`_lookup` を入れ替え、`_rows` を `sources[]` に替え、`_rows_done` を行の数だけ立てて作る
+             - `[info]` 変わった行の配信元を読み直した（読んだ行の位置の並び・配信中の ID の並び）
+          5. 状態を返す。手順 2〜3 で例外が起きた場合、`_snapshot` は入れ替えずに送り直す
+        unit_tests:
+          - name: test_source_registry_reload_changed
+            case: 正常
+            summary: 変わった行だけを読み込む
+            condition: '`reload` で a・b を読んだ後、b の `outside_read` を `False` にした端末の設定で `reload_changed`'
+            mock: 配信元の読み込み（読んだ行を記録する偽物）
+            expected: '`reload_changed` で読まれたのは b だけで、`get("a")` が前と同じ配信元を返し、状態が 2 つ'
+          - name: test_source_registry_reload_changed_when_added
+            case: 正常
+            summary: 追加した行だけを読み込む
+            condition: a を読んだ後、末尾に c を加えた端末の設定で `reload_changed`
+            mock: 配信元の読み込み（読んだ行を記録する偽物）
+            expected: 読まれたのは c だけで、`served()` が a・c の 2 つ
+          - name: test_source_registry_reload_changed_when_deleted
+            case: 正常
+            summary: 削除した行の配信元を除き、後ろの行の位置を詰める
+            condition: a・b・c を読んだ後、b を除いた端末の設定で `reload_changed`
+            mock: 配信元の読み込み（読んだ行を記録する偽物）
+            expected: どの行も読まれず、`get("b")` が `UnknownSourceError` を送り、c の状態の位置が 1
+          - name: test_source_registry_reload_changed_when_not_served
+            case: 正常
+            summary: 配信していなかった行は値が同じでも読み直す
+            condition: a・broken を読んだ後（broken は `not_served`）、同じ端末の設定で `reload_changed`
+            mock: 配信元の読み込み（読んだ行を記録する偽物）
+            expected: 読まれたのは broken だけ

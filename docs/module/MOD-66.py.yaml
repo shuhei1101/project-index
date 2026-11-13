@@ -1,6 +1,6 @@
 id: MOD-66
 title: 索引のサーバー / 端末の設定 / service.py
-lead: '`sources[]` の保存を受け持ち、端末の設定の service.py を修正するときに参照する。'
+lead: '`sources[]` の保存と、1 行ずつの追加・変更・削除を受け持ち、端末の設定の service.py を修正するときに参照する。'
 test_files:
   - tests/unit/project_index/features/settings/test_service.py
 diagrams:
@@ -62,25 +62,37 @@ functions:
         required: true
         passing: injected
         description: 端末の設定の読み書きと読み直しの排他
+      - name: expected_version
+        title: 取得したときの内容のバージョン
+        type: str | None
+        required: false
+        default: None
+        passing: keyword
+        description: '`None` は照合しない'
     returns:
-      type: list[SourceStatus]
-      description: 読み直した後の配信元ごとの状態（配信元の『配信元の状態』）
+      type: SourceWriteResult
+      description: 読み直した後の配信元ごとの状態と、書き換えた後の端末の設定の内容のバージョン
     process: |-
       1. `lock` を取る
-      2. 端末の設定を往復編集の形で読み（往復編集の読み込み）、送られた行ごとに、ファイルの `sources` から配信元の ID（配信元の『行の配信元の ID』。`id`、無ければ設定の `name`）が同じ行を探す
+      2. 端末の設定の本文と内容のバージョンを読み（端末の設定の内容の読み込み）、内容のバージョンを照合する（内容のバージョンの照合）
+      3. 本文を往復編集の形で読み（往復編集の読み込み）、送られた行ごとに、ファイルの `sources` から配信元の ID（配信元の『行の配信元の ID』。`id`、無ければ設定の `name`）が同じ行を探す
          - 見つかった場合、送られた行に含めなかったキー（`SourceEntry` の `model_fields_set` に無い `enabled`・`outside_read` と、`scope` を含めなかった行か `SourceScope` の `model_fields_set` に無い `scope.read`・`scope.write`）を、見つかった行の値で埋める
          - ID が求まらない行と、同じ ID の行が無い行は埋めない（既定値のまま）。ファイルの行のうち `SourceEntry` として読めない行（スキーマに通らない行）は探す対象から除く
-      3. `sources` だけを埋めた後の行に置き換える。`config` は要素の数によらず配列で書く。既定値と同じキー（`enabled: true`・`outside_read: true`・空の `scope.read` など）は書かない
-      4. 置き換えた値を検証する（端末の設定の検証）
+      4. `sources` だけを埋めた後の行に置き換える。`config` は要素の数によらず配列で書く。既定値と同じキー（`enabled: true`・`outside_read: true`・空の `scope.read` など）は書かない
+      5. 置き換えた値を検証する（端末の設定の検証）
          - 違反がある場合、ファイルを書かずに `TerminalConfigInvalidError` を送る
-      5. 一時ファイルに書いてから置き換える（往復編集の書き出し・ファイルの置き換え）
+      6. 一時ファイルに書いてから置き換える（往復編集の書き出し・ファイルの置き換え）
          - `[info]` 端末の設定の sources を保存した（パス・行数）
-      6. 端末の設定を読み直し（端末の設定の読み込み）、`reload` で配信元を読み直して状態を返す（起動の『配信元の読み直し』）
+      7. 書いた後の端末の設定の内容のバージョンを求め（端末の設定の内容の読み込み）、端末の設定を読み直して（端末の設定の読み込み）、`reload` で配信元を読み直し、状態と内容のバージョンを返す（起動の『配信元の読み直し』）
     exceptions:
       - name: TerminalConfigInvalidError
         condition: 置き換えた後の端末の設定がスキーマに通らない
         message: '違反ごとに `{キーのパス}: {理由}`'
         notes: 入口が 422 にする
+      - name: SettingsVersionMismatchError
+        condition: '`expected_version` が今の端末の設定の内容のバージョンと違う'
+        message: '`端末の設定が取得した後に書き換えられています（今の内容のバージョン: {current}）`'
+        notes: 入口が 409 にする
     unit_tests:
       - name: test_save_sources
         case: 正常
@@ -131,6 +143,19 @@ functions:
         mock: 配信元の読み直し（偽物）
         expected: '`TerminalConfigInvalidError` で、ファイルは元のまま、`reload` は呼ばれない'
         exception: 置き換えた後がスキーマに通らない
+      - name: test_save_sources_when_version_matched
+        case: 正常
+        summary: 内容のバージョンが一致すれば保存する
+        condition: '`expected_version` に今の内容のバージョン'
+        mock: 配信元の読み直し（偽物）
+        expected: ファイルが書き換わり、戻り値の `version` が書いた後のファイルの内容のバージョン
+      - name: test_save_sources_when_version_outdated
+        case: 異常
+        summary: 内容のバージョンが古い
+        condition: '`expected_version` に、末尾へコメントを足す前の内容のバージョン'
+        mock: 配信元の読み直し（呼ばれた数を数える）
+        expected: '`SettingsVersionMismatchError` で `current` が今の内容のバージョン。ファイルは変わらず、`reload` は呼ばれない'
+        exception: 内容のバージョンが今と違う
       - name: test_save_sources_when_unknown_top_level_key
         case: 正常
         summary: 最上位の知らないキーを残して保存する
@@ -161,34 +186,46 @@ functions:
         passing: injected
         description: 端末の設定のパス
       - name: reload
-        title: 配信元の読み直し
+        title: 変わった配信元の読み直し
         type: Callable[[TerminalConfig], list[SourceStatus]]
         required: true
         passing: injected
-        description: 起動の『配線済みの関数』の `reload_sources`
+        description: 起動の『配線済みの関数』の `reload_changed`
       - name: lock
         title: 端末の設定の排他
         type: threading.Lock
         required: true
         passing: injected
         description: 端末の設定の読み書きと読み直しの排他（配信元の保存と同じ）
+      - name: expected_version
+        title: 取得したときの内容のバージョン
+        type: str | None
+        required: false
+        default: None
+        passing: keyword
+        description: '`None` は照合しない'
     returns:
       type: SourceAddResult
-      description: '`added` と読み直した後の状態か、`exists` と内容が同じか'
+      description: '`added` と読み直した後の状態か、`exists` と内容が同じか。どちらも端末の設定の内容のバージョンを持つ'
     process: |-
       1. `lock` を取る
-      2. 端末の設定を往復編集の形で読み（往復編集の読み込み）、`sources` に、配信元の ID（配信元の『行の配信元の ID』。`id`、無ければ設定の `name`）が `source` と同じ行があるかを探す。`source` の ID が求まらないときは探さない
-         - ある場合、既定値と同じ値を書いたキーと書かないキーを同じとみなして行を比べ、`exists` と内容が同じか（`same`）を返す（ファイルは書かない）
-      3. `sources` の末尾に行を加える。書き方は配信元の保存と同じ（`config` は配列、既定値と同じキーは書かない）
-      4. 加えた値を検証する（端末の設定の検証）
+      2. 端末の設定の本文と内容のバージョンを読み（端末の設定の内容の読み込み）、内容のバージョンを照合する（内容のバージョンの照合）
+      3. 本文を往復編集の形で読み（往復編集の読み込み）、`sources` に、配信元の ID（配信元の『行の配信元の ID』。`id`、無ければ設定の `name`）が `source` と同じ行があるかを探す。`source` の ID が求まらないときは探さない
+         - ある場合、既定値と同じ値を書いたキーと書かないキーを同じとみなして行を比べ、`exists` と内容が同じか（`same`）と今の内容のバージョンを返す（ファイルは書かない）
+      4. `sources` の末尾に行を加える。書き方は配信元の保存と同じ（`config` は配列、既定値と同じキーは書かない）
+      5. 加えた値を検証する（端末の設定の検証）
          - 違反がある場合、ファイルを書かずに `TerminalConfigInvalidError` を送る
-      5. 一時ファイルに書いてから置き換え、端末の設定を読み直して `reload` で配信元を読み直し、`added` と状態を返す
+      6. 一時ファイルに書いてから置き換え、書いた後の内容のバージョンを求め、端末の設定を読み直して `reload` で変わった行の配信元だけを読み直し、`added` と状態と内容のバージョンを返す（起動の『変わった配信元の読み直し』）
          - `[info]` 端末の設定の sources に 1 行追加した（パス・id）
     exceptions:
       - name: TerminalConfigInvalidError
         condition: 加えた後の端末の設定がスキーマに通らない
         message: '違反ごとに `{キーのパス}: {理由}`'
         notes: 入口が 422 にする
+      - name: SettingsVersionMismatchError
+        condition: '`expected_version` が今の端末の設定の内容のバージョンと違う'
+        message: '`端末の設定が取得した後に書き換えられています（今の内容のバージョン: {current}）`'
+        notes: 入口が 409 にする。同じ id の行の確認より前に送る
     unit_tests:
       - name: test_add_source
         case: 正常
@@ -227,3 +264,223 @@ functions:
         condition: 最上位に `mindstella`（入れ子の値とコメント）を持つ `settings.yaml` に、extra の 1 行を追加する
         mock: なし（一時フォルダ。`reload` は状態を返す偽物）
         expected: '`added` で、`settings.yaml` の `mindstella` の値とコメントが追加の前と同じ'
+      - name: test_add_source_when_version_outdated
+        case: 異常
+        summary: 内容のバージョンが古い
+        condition: '`expected_version` に、末尾へコメントを足す前の内容のバージョン'
+        mock: '`reload`（呼ばれた数を数える）'
+        expected: '`SettingsVersionMismatchError` で、ファイルは変わらず、`reload` は呼ばれない'
+        exception: 内容のバージョンが今と違う
+  - name: patch_source
+    title: 配信元の 1 行の変更
+    kind: 関数
+    container: project_index/features/settings/service.py
+    usecase: 端末の設定の配信元の 1 行の変更
+    role: サービス
+    summary: 指した 1 行に送ったキーだけを重ねて `settings.yaml` を書き換え、変わった行の配信元だけを読み直す
+    scope: public
+    thread_safe: true
+    side_effects: 端末の設定のファイルを書き換え、配信元の一覧の変わった行を入れ替える
+    args:
+      - name: source_id
+        title: 指した ID
+        type: str
+        required: true
+        passing: positional
+        description: パスの `id`
+      - name: patch
+        title: 変更
+        type: SourcePatch
+        required: true
+        passing: positional
+        description: 行に重ねるキー
+      - name: expected_version
+        title: 取得したときの内容のバージョン
+        type: str
+        required: true
+        passing: keyword
+        description: 今の内容のバージョンと照合する
+      - name: path
+        title: 設定のファイル
+        type: Path
+        required: true
+        passing: injected
+        description: 端末の設定のパス
+      - name: reload
+        title: 変わった配信元の読み直し
+        type: Callable[[TerminalConfig], list[SourceStatus]]
+        required: true
+        passing: injected
+        description: 起動の『配線済みの関数』の `reload_changed`
+      - name: lock
+        title: 端末の設定の排他
+        type: threading.Lock
+        required: true
+        passing: injected
+        description: 配信元の保存と同じ排他
+    returns:
+      type: SourceWriteResult
+      description: 読み直した後の配信元ごとの状態と、書き換えた後の内容のバージョン
+    process: |-
+      1. `lock` を取る
+      2. 端末の設定の本文と内容のバージョンを読み（端末の設定の内容の読み込み）、内容のバージョンを照合する（内容のバージョンの照合）
+      3. 本文を往復編集の形で読み（往復編集の読み込み）、`sources` から配信元の ID（配信元の『行の配信元の ID』）が `source_id` の最初の行を探す。`SourceEntry` として読めない行は探す対象から除く
+         - 無い場合、`SourceRowNotFoundError` を送る
+      4. 見つけた行に、`patch` の `model_fields_set` にあるキーだけを重ねる。`scope` は `read`・`write` を `SourceScope` の `model_fields_set` で別々に重ねる
+      5. 見つけた行が `id` を省いていて、重ねた後の行の配信元の ID が `source_id` と違う場合、ファイルを書かずに `TerminalConfigInvalidError`（違反のパス `source.config`）を送る
+      6. 見つけた行の位置だけを、重ねた後の行に置き換える。書き方は配信元の保存と同じ
+      7. 置き換えた値を検証する（端末の設定の検証）
+         - 違反がある場合、ファイルを書かずに `TerminalConfigInvalidError` を送る
+      8. 一時ファイルに書いてから置き換え、書いた後の内容のバージョンを求め、端末の設定を読み直して `reload` で変わった行の配信元だけを読み直し、状態と内容のバージョンを返す（起動の『変わった配信元の読み直し』）
+         - `[info]` 端末の設定の sources の 1 行を変更した（パス・id）
+    exceptions:
+      - name: SettingsVersionMismatchError
+        condition: '`expected_version` が今の端末の設定の内容のバージョンと違う'
+        message: '`端末の設定が取得した後に書き換えられています（今の内容のバージョン: {current}）`'
+        notes: 入口が 409 にする
+      - name: SourceRowNotFoundError
+        condition: 配信元の ID が `source_id` の行が無い
+        message: '`端末の設定に {source_id} の行がありません`'
+        notes: 入口が 404 にする
+      - name: TerminalConfigInvalidError
+        condition: '`id` を省いた行の配信元の ID が変わる'
+        message: '`source.config: 配信元の ID が {source_id} から {新しい ID} に変わります`'
+        notes: 入口が 422 にする。直し方に、1 行の削除と追加で差し替えることを入れる
+      - name: TerminalConfigInvalidError
+        condition: 置き換えた後の端末の設定がスキーマに通らない
+        message: '違反ごとに `{キーのパス}: {理由}`'
+        notes: 入口が 422 にする
+    unit_tests:
+      - name: test_patch_source
+        case: 正常
+        summary: 送ったキーだけを重ねる
+        condition: 'ファイルの extra の行に `scope.read`・`scope.write`。`outside_read: false` だけの変更'
+        mock: '`reload`（受け取った端末の設定を記録する偽物）'
+        expected: 'ファイルの extra の行に `outside_read: false` が入り、`scope` は元のまま。sample の行・他のキー・コメントは変わらない。`reload` が 1 回呼ばれ、戻り値の `version` が書いた後の内容のバージョン'
+      - name: test_patch_source_when_scope_write_null
+        case: 正常
+        summary: scope.write に null を送ると既定に戻す
+        condition: 'ファイルの extra の行に `scope.read`・`scope.write`。`scope` に `write: null` だけを送る変更'
+        mock: '`reload`（偽物）'
+        expected: ファイルの extra の行の `scope.write` が無くなり、`scope.read` は元のまま
+      - name: test_patch_source_when_row_without_id
+        case: 正常
+        summary: id を省いた行を設定の name で指す
+        condition: '`name: notes` の設定を `id` を省いて指す行に、`enabled: false` の変更'
+        mock: '`reload`（偽物）'
+        expected: 'ファイルの notes の行に `enabled: false` が入り、`id` は書き足されない'
+      - name: test_patch_source_when_version_outdated
+        case: 異常
+        summary: 内容のバージョンが古い
+        condition: '`expected_version` に、末尾へコメントを足す前の内容のバージョン'
+        mock: '`reload`（呼ばれた数を数える）'
+        expected: '`SettingsVersionMismatchError` で、ファイルは変わらず、`reload` は呼ばれない'
+        exception: 内容のバージョンが今と違う
+      - name: test_patch_source_when_not_found
+        case: 異常
+        summary: 指した行が無い
+        condition: '`sources` に sample だけの設定に、`extra` の変更'
+        mock: '`reload`（呼ばれた数を数える）'
+        expected: '`SourceRowNotFoundError` で `source_id` が `extra`。ファイルは変わらず、`reload` は呼ばれない'
+        exception: 配信元の ID が `source_id` の行が無い
+      - name: test_patch_source_when_id_changes
+        case: 異常
+        summary: id を省いた行の配信元の ID が変わる
+        condition: '`id` を省いた notes の行の `config` を、`name` が `memo` の設定へ変える変更'
+        mock: '`reload`（呼ばれた数を数える）'
+        expected: '`TerminalConfigInvalidError` で違反のパスが `source.config`。ファイルは変わらず、`reload` は呼ばれない'
+        exception: '`id` を省いた行の配信元の ID が変わる'
+      - name: test_patch_source_when_invalid
+        case: 異常
+        summary: 重ねた後にスキーマに通らない
+        condition: '`scope.read` に空の文字列を含む変更'
+        mock: '`reload`（呼ばれた数を数える）'
+        expected: '`TerminalConfigInvalidError` で、ファイルは変わらず、`reload` は呼ばれない'
+        exception: 置き換えた後がスキーマに通らない
+  - name: delete_source
+    title: 配信元の 1 行の削除
+    kind: 関数
+    container: project_index/features/settings/service.py
+    usecase: 端末の設定の配信元の 1 行の削除
+    role: サービス
+    summary: 指した 1 行だけを `settings.yaml` の `sources` から削除し、その配信元を配信から除外する
+    scope: public
+    thread_safe: true
+    side_effects: 端末の設定のファイルを書き換え、配信元の一覧から削除した行の配信元を除く
+    args:
+      - name: source_id
+        title: 指した ID
+        type: str
+        required: true
+        passing: positional
+        description: パスの `id`
+      - name: expected_version
+        title: 取得したときの内容のバージョン
+        type: str
+        required: true
+        passing: keyword
+        description: 今の内容のバージョンと照合する
+      - name: path
+        title: 設定のファイル
+        type: Path
+        required: true
+        passing: injected
+        description: 端末の設定のパス
+      - name: reload
+        title: 変わった配信元の読み直し
+        type: Callable[[TerminalConfig], list[SourceStatus]]
+        required: true
+        passing: injected
+        description: 起動の『配線済みの関数』の `reload_changed`
+      - name: lock
+        title: 端末の設定の排他
+        type: threading.Lock
+        required: true
+        passing: injected
+        description: 配信元の保存と同じ排他
+    returns:
+      type: SourceWriteResult
+      description: 削除した後の配信元ごとの状態と、書き換えた後の内容のバージョン
+    process: |-
+      1. `lock` を取る
+      2. 端末の設定の本文と内容のバージョンを読み（端末の設定の内容の読み込み）、内容のバージョンを照合する（内容のバージョンの照合）
+      3. 本文を往復編集の形で読み、`sources` から配信元の ID が `source_id` の最初の行を探す（配信元の 1 行の変更と同じ探し方）
+         - 無い場合、`SourceRowNotFoundError` を送る
+      4. 見つけた行だけを `sources` から削除し、削除した後の値を検証する（端末の設定の検証）
+         - 違反がある場合、ファイルを書かずに `TerminalConfigInvalidError` を送る
+      5. 一時ファイルに書いてから置き換え、書いた後の内容のバージョンを求め、端末の設定を読み直して `reload` で配信元の一覧から削除した行の配信元を除き、状態と内容のバージョンを返す（起動の『変わった配信元の読み直し』）
+         - `[info]` 端末の設定の sources から 1 行削除した（パス・id）
+    exceptions:
+      - name: SettingsVersionMismatchError
+        condition: '`expected_version` が今の端末の設定の内容のバージョンと違う'
+        message: '`端末の設定が取得した後に書き換えられています（今の内容のバージョン: {current}）`'
+        notes: 入口が 409 にする
+      - name: SourceRowNotFoundError
+        condition: 配信元の ID が `source_id` の行が無い
+        message: '`端末の設定に {source_id} の行がありません`'
+        notes: 入口が 404 にする
+      - name: TerminalConfigInvalidError
+        condition: 削除した後の端末の設定がスキーマに通らない
+        message: '違反ごとに `{キーのパス}: {理由}`'
+        notes: 入口が 422 にする
+    unit_tests:
+      - name: test_delete_source
+        case: 正常
+        summary: 指した行だけを削除する
+        condition: '`sources` に sample と extra の 2 行の設定から `extra` を削除'
+        mock: '`reload`（受け取った端末の設定を記録する偽物）'
+        expected: ファイルの `sources` が sample だけで、他のキー・コメントは変わらない。`reload` が sample だけの端末の設定で 1 回呼ばれ、戻り値の `version` が書いた後の内容のバージョン
+      - name: test_delete_source_when_version_outdated
+        case: 異常
+        summary: 内容のバージョンが古い
+        condition: '`expected_version` に、末尾へコメントを足す前の内容のバージョン'
+        mock: '`reload`（呼ばれた数を数える）'
+        expected: '`SettingsVersionMismatchError` で、ファイルは変わらず、`reload` は呼ばれない'
+        exception: 内容のバージョンが今と違う
+      - name: test_delete_source_when_not_found
+        case: 異常
+        summary: 指した行が無い
+        condition: '`sources` に sample だけの設定から `extra` を削除'
+        mock: '`reload`（呼ばれた数を数える）'
+        expected: '`SourceRowNotFoundError` で、ファイルは変わらず、`reload` は呼ばれない'
+        exception: 配信元の ID が `source_id` の行が無い

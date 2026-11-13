@@ -24,7 +24,7 @@ flows:
 
         C->>E: extra の行
         E->>E: オリジンを確かめ、追加後の端末の設定をスキーマで検証する
-        E->>F: sources の末尾に追加し、配信元を読み直す
+        E->>F: sources の末尾に追加し、extra の配信元だけを読み込む
         E-->>C: 201 added
       ```
 
@@ -32,6 +32,8 @@ flows:
     expected:
       - 201 で、`result` が `added`、`sources` に読み直した後の状態がある
       - '`settings.yaml` の `sources` が sample・extra の順で、sample の行と他のキー・コメントは変わらない'
+      - '`version` が追加した後の `settings.yaml` の内容のバージョン'
+      - 追加の前後で sample の配信元を読み直さず、`/sources/sample/docs` が 200 を返却し続ける
     test: test_normal
   - name: 正常系（端末の設定の最上位に知らないキーがある）
     summary: 最上位の知らないキーを違反にせずに 1 行を追加し、ファイルの値とコメントを残して警告で返却する
@@ -113,22 +115,59 @@ flows:
       - 422 で、`errors[]` に `sources[1].id` のパスと理由がある
       - '`settings.yaml` が変わらない'
     test: test_error_when_schema_invalid
+  - name: 異常系（内容のバージョンが古い・409）
+    summary: 取得した後に書き換えられた端末の設定への追加を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample の 1 行'
+      - name: ほかの書き換え
+        description: 取得の後に `settings.yaml` の末尾へコメントを 1 行追記する
+      - name: 入力
+        description: 取得した `version` を `expectedVersion` にした extra の行
+    flow: |-
+      <!-- map: {"title": "異常系（内容のバージョンが古い・409）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as POST /settings/sources
+        participant F as settings.yaml
+
+        C->>E: 古い expectedVersion, extra の行
+        E-->>F: 今の内容のバージョンを求めて照合する
+        E-->>C: 409 problem+json（current）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 409 で、`current` がコメントを追記した後の内容のバージョン
+      - '`settings.yaml` が追記した内容のままで、extra の行が無い'
+    test: test_error_when_version_outdated
 lead: 端末の設定へ配信元の行を 1 行追加する端末の設定の API の入出力を定め、配信元の 1 行の追加を修正するときに参照する。
 identifier: add_settings_source
 permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ'
 idempotent: false
-side_effects: '`settings.yaml` の `sources` の末尾に 1 行追加し、配信元を読み直す'
+side_effects: '`settings.yaml` の `sources` の末尾に 1 行追加し、追加した行の配信元だけを読み込む（ほかの配信元は読み直さず、配信を続ける）'
 callers:
   - SC-12#scenarios[正常シナリオ（1 行を追加する）]
   - SC-12#scenarios[正常シナリオ（同じ id の行がある）]
   - SC-12#scenarios[正常シナリオ（端末の設定の最上位に知らないキーがある）]
-exclusivity: 端末の設定の書き込みは、端末の設定の保存と同じ排他で 1 つずつ
+  - SC-12#scenarios[異常シナリオ（取得した後にほかの書き換えが入った）]
+exclusivity: 内容のバージョンの照合と端末の設定の書き込みは、端末の設定の保存と同じ排他で 1 つずつ
 request:
   - name: source
     type: SourceRow
     required: true
     location: body
     description: 追加する配信元の行（端末の設定の保存の `sources[]` の要素と同じキー）
+  - name: expectedVersion
+    type: str
+    required: false
+    default: なし（照合せずに追加する）
+    location: body
+    description: 取得したときの端末の設定の内容のバージョン。今の内容のバージョンと違えば追加しない
 request_example: |-
   ```json
   {"source": {"id": "extra", "config": "/path/to/extra/project-index.yaml", "scope": {"read": ["/path/to/extra/**"]}}}
@@ -146,6 +185,9 @@ response:
   - name: sources[].status
     type: Literal['serving', 'not_served', 'disabled']
     description: 読み直した後の状態
+  - name: version
+    type: str
+    description: 追加した後の端末の設定の内容のバージョン。`exists` のときは今の内容のバージョン
   - name: warnings[].path
     type: str
     description: 端末の設定の最上位の知らないキーのパス
@@ -167,7 +209,10 @@ status_codes:
   - code: '422'
     condition: 追加後の端末の設定がスキーマに通らない（最上位の知らないキーは違反にしない）
     notes: '`errors[]` に違反したキーのパスと理由を全て並べる'
-error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）
+  - code: '409'
+    condition: '`expectedVersion` が今の端末の設定の内容のバージョンと違う'
+    notes: 同じ id の行がある 409 と違い、problem+json で拡張メンバー `current` に今の内容のバージョンを入れる
+error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`・`current`）
 constraints:
   - item: オリジンの確認
     constraint: 端末の設定の保存と同じ
@@ -182,4 +227,8 @@ constraints:
     decided_by: NFR-1#requirements[通信]
   - item: JSON のキー
     constraint: レスポンスのキーは camelCase。行のキーは端末の設定のキーのまま
+  - item: 内容のバージョンの照合
+    constraint: '`expectedVersion` を送信したときだけ、排他ロックを取った後に `settings.yaml` の内容のバージョンと照合し、同じ id の行の確認より前に断る'
+  - item: 読み直しの範囲
+    constraint: 追加した行の配信元だけを読み込み、ほかの配信元は読み直さない
 test_file: tests/integration/server/test_add_settings_source.py
