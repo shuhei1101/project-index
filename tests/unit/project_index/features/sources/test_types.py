@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 import pytest
@@ -110,3 +111,43 @@ def test_document_table_matches_when_outside_paths() -> None:
     result = table.matches("src/a.md")
     # 検証
     assert result is False
+
+
+@pytest.mark.parametrize(
+    ("config_dir", "expected"),
+    [
+        pytest.param("content/node-docs/brain", Path("/r/content/node-docs/brain"), id="below"),
+        pytest.param(".", Path("/r"), id="same"),
+    ],
+)
+def test_served_source_config_root(
+    make_served_source: Callable[..., ServedSource], config_dir: str, expected: Path
+) -> None:
+    """基準のフォルダの下の設定ファイルのフォルダ（正常系）。"""
+    # 準備
+    source = make_served_source(root=Path("/r"), config_dir=PurePosixPath(config_dir))
+    # 実行
+    result = source.config_root
+    # 検証
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    ("config_dir", "expected"),
+    [
+        pytest.param(
+            "content/node-docs/brain", "content/node-docs/brain/note.schema.yaml", id="below"
+        ),
+        pytest.param(".", "note.schema.yaml", id="same"),
+    ],
+)
+def test_served_source_config_path(
+    make_served_source: Callable[..., ServedSource], config_dir: str, expected: str
+) -> None:
+    """設定ファイルのフォルダの下のスキーマ（正常系）。"""
+    # 準備
+    source = make_served_source(root=Path("/r"), config_dir=PurePosixPath(config_dir))
+    # 実行
+    result = source.config_path("note.schema.yaml")
+    # 検証
+    assert result == expected

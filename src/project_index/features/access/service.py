@@ -60,7 +60,7 @@ def access_of(source: ServedSource, cwd: Path | None) -> AccessLevel | None:
     if cwd is None:
         return None
     # ワークツリーの中は、配信元のフォルダにいるものとして照らす
-    path = source.root if find_worktree(source, cwd) is not None else cwd
+    path = source.config_root if find_worktree(source, cwd) is not None else cwd
     if match_glob(path, source.scope_write):
         return "write"
     if match_glob(path, source.scope_read):
@@ -78,7 +78,8 @@ def current_source(
     best_depth = -1
     for source in sources:
         worktree = find_worktree(source, cwd)
-        candidate = worktree if worktree is not None else source.root
+        # 作業中の配信元は、ワークツリーの中ならワークツリー、それ以外は設定ファイルのフォルダで判定する
+        candidate = worktree if worktree is not None else source.config_root
         if candidate != cwd and candidate not in cwd.parents:
             continue
         # 同じ深さは先の配信元を残す
@@ -290,7 +291,8 @@ def resolve_write_target(
         wt = find_worktree(item, path) if path is not None else None
     # Git の配信元はワークツリーにだけ書く
     if wt is None and item.is_git:
-        clone = item.repo_root or item.root
+        # 設定をワークツリーから読む配信元でも、ワークツリーの親のクローン本体を返す
+        clone = item.main_root or item.repo_root or item.root
         raise TargetIsCloneError(
             message=f"{clone} はクローン本体です。worktree でワークツリーを指してください",
             clone=str(clone),

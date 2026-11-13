@@ -333,3 +333,67 @@ def test_normal_when_schema_ref_not_found(
         ("documents[2].schema", "v1 に schemas/none.schema.yaml がありません"),
     ]
     assert env.handlers.registry.statuses() == before
+
+
+def _node_config(name: str, paths_base: str, paths: str) -> str:
+    """ノードのフォルダに置く、paths_base を持つ配信元の設定の YAML を作る。"""
+    return (
+        f"name: {name}\n"
+        f"paths_base: {paths_base}\n"
+        "documents:\n"
+        "  - id: note\n"
+        f"    paths: {paths}\n"
+        "    schema: note.schema.yaml\n"
+    )
+
+
+def test_normal_when_paths_base_or_paths_out_of_range(
+    git_repo: Callable[..., Path],
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+) -> None:
+    """paths_base が設定ファイルのフォルダより上でない・リポジトリの直下より上を指す違反と、paths が基準のフォルダの外を指す違反を返す（正常系）。"""
+    # 準備
+    schema = "title: note\ntype: object\n"
+    in_range = "[docs/knowhow/*.yaml, content/node-docs/shared/*.yaml]"
+    repo = git_repo(
+        {
+            "content/node-docs/brain/project-index.yaml": _node_config(
+                "brain",
+                "sub",
+                "[docs/knowhow/*.yaml, content/node-docs/shared/*.yaml, ../outside/*.yaml]",
+            ),
+            "content/node-docs/brain/note.schema.yaml": schema,
+            "content/node-docs/brain/sub/.keep": "",
+            "content/node-docs/edge/project-index.yaml": _node_config(
+                "edge", "../../../..", in_range
+            ),
+            "content/node-docs/edge/note.schema.yaml": schema,
+            "content/node-docs/ok/project-index.yaml": _node_config("ok", "../../..", in_range),
+            "content/node-docs/ok/note.schema.yaml": schema,
+        },
+        name="nodes",
+    )
+    env = make_server(make_source("sample"))
+    before = env.handlers.registry.statuses()
+    nodes = repo / "content" / "node-docs"
+    # 実行
+    brain = env.call_admin(
+        "check_project", path=str(nodes / "brain" / "project-index.yaml"), format="json"
+    )
+    edge = env.call_admin(
+        "check_project", path=str(nodes / "edge" / "project-index.yaml"), format="json"
+    )
+    ok = env.call_admin(
+        "check_project", path=str(nodes / "ok" / "project-index.yaml"), format="json"
+    )
+    # 検証
+    assert sorted((v["path"], v["rule"]) for v in brain.data["violations"]) == [
+        ("documents[0].paths[2]", "配信元の外を指しています: ../outside/*.yaml"),
+        ("paths_base", "設定ファイルのフォルダかそれより上のフォルダを指してください: sub"),
+    ]
+    assert [(v["path"], v["rule"]) for v in edge.data["violations"]] == [
+        ("paths_base", "リポジトリの外を指しています: ../../../..")
+    ]
+    assert "violations" not in ok.data or ok.data["violations"] == []
+    assert env.handlers.registry.statuses() == before

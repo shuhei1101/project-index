@@ -22,6 +22,14 @@ diagrams:
         }
         click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
         click 書く場所の解決 href "./MOD-7.py.yaml#書く場所の解決"
+constants:
+  - name: CWD_DESCRIPTION
+    title: 作業場所の引数の説明
+    container: project_index/features/access/types.py
+    usecase: 共通
+    summary: 文書の MCP のツールの入力のスキーマで、`cwd` の `description` に入れる文
+    value: '"作業場所。PreToolUse のフックがセッションの作業場所で上書きするため、指定しても使わない。ワークツリーを指すときは worktree を指定する"'
+    reason: フックが上書きする `cwd` をエージェントが指定してワークツリーを指そうとしないよう、全てのツールで同じ文を出す
 data_models:
   - name: SourceAccess
     title: 使える配信元
@@ -93,7 +101,7 @@ data_models:
         title: 配信元の直下
         type: Path
         access: 公開
-        description: 文書の相対パスを解くフォルダ。ワークツリーでは、クローンの `repo_root` から `root` への相対パスをワークツリーにつないだフォルダ
+        description: 文書の相対パスを解くフォルダ（配信元の `root`）。ワークツリーでは、クローンの `repo_root` から `root` への相対パスをワークツリーにつないだフォルダ
       - name: ref
         title: リビジョン
         type: str | None
@@ -121,6 +129,23 @@ data_models:
         access: 公開
         default: None
         description: '`ref` を履歴の『リビジョンの解決』で解いた commit の SHA。`ref` が `None` の場所は `None`。`ref` を持ち `commit` が `None` の場所は、文書のストアが読むときに 1 回解く'
+    methods:
+      - name: config_base
+        title: 設定ファイルのフォルダ
+        kind: メソッド
+        summary: 読む場所の中の設定ファイルのフォルダを返す（`@property`）
+        scope: public
+        returns:
+          type: Path
+          description: '`base / source.config_dir`'
+        process: 1. `base` に `source.config_dir` をつないで返す（ワークツリーでも同じ相対位置になる）
+        unit_tests:
+          - name: test_target_config_base
+            case: 正常
+            summary: ワークツリーの中の設定ファイルのフォルダ
+            condition: '`base` が `/wt`、`source.config_dir` が `content/node-docs/brain`'
+            mock: なし
+            expected: '`Path("/wt/content/node-docs/brain")`'
 enums:
   - name: AccessLevel
     title: 権限
@@ -135,3 +160,5 @@ enums:
       - value: write
         title: 読み書き
         description: '`scope.write` に当たる（読むこともできる）'
+test_files:
+  - tests/unit/project_index/features/access/test_types.py

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -456,6 +456,28 @@ def test_resolve_write_target_when_clone(
     assert exc_info.value.clone == "/r"
 
 
+def test_resolve_write_target_when_clone_and_config_in_worktree(
+    make_served_source: Callable[..., ServedSource], make_registry: Callable[..., Any]
+) -> None:
+    """設定をワークツリーから読む配信元でも、クローン本体のパスを返す（異常系）。"""
+    # 準備
+    source = make_served_source(
+        id="sample",
+        root=Path("/r/.claude/worktrees/y"),
+        config_files=[Path("/r/.claude/worktrees/y/project-index.yaml")],
+        is_git=True,
+        repo_root=Path("/r/.claude/worktrees/y"),
+        main_root=Path("/r"),
+        scope_write=["/r"],
+        worktree_globs=WORKTREE_GLOBS,
+    )
+    registry = make_registry(source)
+    # 実行・検証
+    with pytest.raises(TargetIsCloneError, match="クローン本体です") as exc_info:
+        resolve_write_target(registry=registry, source="sample", cwd="/r")
+    assert exc_info.value.clone == "/r"
+
+
 def test_resolve_read_targets_when_outside_scope(
     sample: ServedSource,
     make_served_source: Callable[..., ServedSource],
@@ -546,6 +568,21 @@ def test_resolve_read_targets_when_not_readable_guides_outside(
     with pytest.raises(SourceNotReadableError, match="other はこの作業場所") as exc_info:
         resolve_read_targets(registry=registry, source="other", cwd="/r")
     assert len([step for step in exc_info.value.next_steps if "outside_scope: true" in step]) == 1
+
+
+def test_current_source_when_paths_base_set(
+    make_served_source: Callable[..., ServedSource],
+) -> None:
+    """基準のフォルダが上でも設定ファイルのフォルダで判定する（正常系）。"""
+    # 準備
+    brain = make_served_source(
+        id="brain", root=Path("/r"), config_dir=PurePosixPath("content/node-docs/brain")
+    )
+    repo = make_served_source(id="repo", root=Path("/r"))
+    # 実行
+    result = current_source([brain, repo], Path("/r"))
+    # 検証
+    assert result == (repo, None)
 
 
 def test_resolve_write_target_when_worktree_config(

@@ -451,8 +451,8 @@ request:
     required: false
     default: なし（使える配信元が無い）
     location: argument
-    description: 作業場所
-    notes: フックが入れる
+    description: セッションの作業場所
+    notes: PreToolUse のフックがセッションの作業場所で上書きし、エージェントが指定した値は使わない。ツールの入力のスキーマの `description` にも同じことと、ワークツリーは `worktree` で指すことを載せる
   - name: outside_scope
     type: bool
     required: false
@@ -493,8 +493,8 @@ response:
     description: 配信元の設定の `description`
   - name: warnings[]
     type: str
-    description: 使える配信元の同期のずれ（metadata の列の欠け・管理用の YAML に無いファイル・ファイルが無い行・どの文書にも該当しない関連）とエイリアスのキーの違反、配信元・端末の設定のバージョンが古いこと、どの文書にも当たらない `nav` の条件、検証で外した配信元
-    notes: '引数なしのとき。同期のずれ・エイリアス・`nav`・配信元の設定のバージョンは使える配信元だけを対象にし、端末の設定のバージョンと検証で外した配信元は使える配信元が 0 件のときも載せる。`format: markdown` は使える配信元の表の後の「注意」の見出しの下に 1 行ずつ出し、0 件は見出しごと出さない。`format: json` は 0 件のときキーを持たない'
+    description: 使える配信元の同期のずれ（metadata の列の欠け・管理用の YAML に無いファイル・ファイルが無い行・どの文書にも該当しない関連）とエイリアスのキーの違反、配信元・端末の設定のバージョンが古いこと、どの文書にも当たらない `nav` の条件、検証で外した配信元、端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパスを 1 件にまとめる）
+    notes: '引数なしのとき。同期のずれ・エイリアス・`nav`・配信元の設定のバージョンは使える配信元だけを対象にし、端末の設定のバージョン・端末の設定の知らないキーと検証で外した配信元は使える配信元が 0 件のときも載せる。`format: markdown` は使える配信元の表の後の「注意」の見出しの下に 1 行ずつ出し、0 件は見出しごと出さない。`format: json` は 0 件のときキーを持たない'
   - name: instructions
     type: str
     description: 配信元の設定の `instructions` をそのまま

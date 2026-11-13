@@ -329,6 +329,42 @@ flows:
       - '`violations` に `documents[0].schema`（配信元 `nothing` が端末の設定に無い）・`documents[1].schema`（schemas に `v9` が無い）・`documents[2].schema`（`v1` に `schemas/none.schema.yaml` が無い）が理由と一緒にある'
       - 結果は配信中の配信元の状態に反映しない
     test: test_normal_when_schema_ref_not_found
+  - name: 正常系（paths_base と paths が範囲の外を指す）
+    summary: '`paths_base` が設定ファイルのフォルダより上でない・リポジトリの直下より上を指す違反と、`paths[]` が基準のフォルダの外を指す違反を返却する'
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+      - name: ノードの配信元
+        description: 'git リポジトリ repo の `content/node-docs/brain/project-index.yaml`。`paths_base: sub`（設定ファイルのフォルダの下）で、`documents[0].paths` が `[docs/knowhow/*.yaml, content/node-docs/shared/*.yaml, ../outside/*.yaml]`'
+        notes: '`paths[2]` が基準のフォルダの外'
+      - name: リポジトリの外を指す配信元
+        description: '同じ repo の `content/node-docs/edge/project-index.yaml`。`paths_base: ../../../..`（repo の直下より上）'
+      - name: 範囲の中の配信元
+        description: '同じ repo の `content/node-docs/ok/project-index.yaml`。`paths_base: ../../..`（repo の直下）で、`paths[]` は基準のフォルダの中だけ'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as check_project
+        participant F as 配信元のフォルダ
+
+        C->>T: path（brain の設定ファイル）
+        T-->>F: project-index.yaml を読む
+        T->>T: paths_base と paths を基準のフォルダで検証する
+        T-->>C: violations（paths_base・documents[0].paths[2]）
+        C->>T: path（edge の設定ファイル）
+        T-->>C: violations（paths_base）
+        C->>T: path（ok の設定ファイル）
+        T-->>C: violations が空
+      ```
+    expected:
+      - 'brain の `violations` に、`paths_base`（設定ファイルのフォルダかそれより上のフォルダを指す必要がある）と `documents[0].paths[2]`（基準のフォルダの外を指している）が理由と一緒にある'
+      - 'edge の `violations` に、`paths_base`（リポジトリの外を指している）が理由と一緒にある'
+      - ok の `violations` が空
+      - 結果は配信中の配信元の状態に反映しない
+    test: test_normal_when_paths_base_or_paths_out_of_range
+    decisions:
+      - D-189
 lead: 配信元の設定・管理用の YAML・スクリプトを検証する管理の MCP の `check_project` の入出力を定め、`check_project` を修正するときに参照する。
 identifier: check_project
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
@@ -339,6 +375,7 @@ callers:
   - SC-10#scenarios[正常シナリオ]
   - SC-5#scenarios[正常シナリオ（除外の条件と関連の候補）]
   - SC-10#scenarios[正常シナリオ（エイリアスのキーと nav の条件を点検する）]
+  - SC-10#scenarios[異常シナリオ（paths_base と paths が範囲の外を指す）]
 exclusivity: '読み取りだけで排他しない（`readOnlyHint: true`）'
 request:
   - name: path
@@ -461,6 +498,9 @@ constraints:
     notes: 参照先の作業ツリー・`default_ref` の今の内容は読まない。`ref` は配信元を組み立てるとき（起動・`reload`・`default_ref` の commit が変わったとき）に commit へ解き直す
   - item: 参照先のスキーマの違反
     constraint: 参照先の配信元が端末の設定に無い・Git のリポジトリでない、`ref` を commit に解けない、そのリビジョンに `path` のファイルが無い・YAML として読めない・オブジェクトでない、`$ref` の参照先がそのリビジョンに無いときは、`documents[{番号}].schema` の違反にする
+  - item: paths の基準のフォルダの検証
+    constraint: '`paths_base` は設定ファイルのフォルダからの相対パスで、設定ファイルのフォルダかその上のフォルダを指す。無いフォルダ・設定ファイルのフォルダの下や横を指すときと、設定ファイルのフォルダが Git のリポジトリの中でリポジトリの直下より上を指すときは `paths_base` の違反にする。`documents[].paths` が `..` で基準のフォルダの外を指すときは `documents[{番号}].paths[{番号}]` の違反にする'
+    notes: 起動・`reload` の検証も同じ関数を使う。`paths_base` を省いた配信元の基準のフォルダは設定ファイルのフォルダ
   - item: 設定の探し方
     constraint: '`path` がフォルダのときは `project-index.yaml` を探し、無ければ `dev-docs.yaml` を探す（今の各リポジトリが `project-index.yaml` へ改名するまでの移行の間）'
     notes: 端末の設定の `config` は名前によらず書いたファイルを読む

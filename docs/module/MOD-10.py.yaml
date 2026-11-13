@@ -142,7 +142,7 @@ functions:
       description: 検査の結果
     process: |-
       1. 配信元を読む（検査する配信元の読み込み）
-      2. 端末の設定の `sources[]` のうち、`config` の先頭のファイルのフォルダが `root` と同じ行の ID を `registered_id` にする
+      2. 端末の設定の `sources[]` のうち、`config` の先頭のファイルのフォルダが設定ファイルのフォルダ（`config_root`）と同じ行の ID を `registered_id` にする
       3. `config_version` があれば新旧を求める（バージョンの新旧）
       4. 取り得た値に応じて分ける
          - `violations` がある場合、`missing_paths`・`script_errors` を空、`sync` を `None` にして返す
@@ -201,6 +201,12 @@ functions:
         condition: '`documents[0]` が `records: files` で、`schema` が `templates/files.schema.yaml` のコピー'
         mock: なし
         expected: '`violations` が空'
+      - name: test_check_project_when_paths_base_invalid
+        case: 正常
+        summary: paths_base と paths の範囲の違反
+        condition: '`paths_base: sub`（設定ファイルのフォルダの下。`sub` はある）と、`documents[0].paths: [docs/a/*.yaml, docs/b/*.yaml, ../outside/*.yaml]` を持つ設定'
+        mock: 配線済みの関数（偽物）
+        expected: '`violations` に `paths_base` と `documents[0].paths[2]` がそれぞれ理由と一緒にあり、`sync` が `None`'
     callers:
       - MOD-93#functions[build_admin_mcp]
     callees:

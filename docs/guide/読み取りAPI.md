@@ -46,3 +46,4 @@
 保存は `settings.yaml` の `sources` だけを書き換え、他のキーとコメントを残します。
 `PUT` で行に含めなかったキー（`enabled`・`scope.read`・`scope.write`・`outside_read`）は、ファイルの同じ配信元の行（`id`、無ければ配信元の設定の `name` で照合します）の今の値で残ります。
 `GET` の行は、端末の設定の `outside_read` を `outsideRead` で返します。
+3 つとも、端末の設定の最上位の project-index が知らないキーを誤りにせず、応答の `warnings[]`（`path`・`reason`）で返します。知らないキーが無いときは空の配列です。

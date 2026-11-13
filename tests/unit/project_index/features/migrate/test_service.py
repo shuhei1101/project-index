@@ -218,3 +218,22 @@ def test_apply_migration_when_source_needs_setup(
     assert "documents[0].type" in str(exc_info.value)
     assert "/project-index:setup" in str(exc_info.value)
     assert target.file.read_text(encoding="utf-8") == legacy
+
+
+@pytest.mark.usefixtures("settings_version_2")
+def test_apply_migration_when_unknown_top_level_key(tmp_path: Path) -> None:
+    """最上位の知らないキーを残して移し替える（正常系）。"""
+    # 準備
+    path = tmp_path / "settings.yaml"
+    path.write_text(SETTINGS_V1 + "mindstella:\n  threads: 3\n", encoding="utf-8")
+    data = load_roundtrip(path.read_text(encoding="utf-8"))
+    steps = [_step("rename", "log_dir", to="state_dir")]
+    # 実行
+    apply_migration(_target(path), data, steps, allow_destructive=False, now=NOW)
+    # 検証
+    assert load_yaml(path.read_text(encoding="utf-8")) == {
+        "version": "2",
+        "clone": "/x",
+        "state_dir": "/logs",
+        "mindstella": {"threads": 3},
+    }

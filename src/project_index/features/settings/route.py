@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, Response
 
-from project_index.features.settings.query import load_terminal_config
+from project_index.features.settings.query import load_terminal_config, unknown_key_warnings
 from project_index.features.settings.service import add_source, save_sources
 from project_index.features.settings.types import (
     SettingsSourceAddRequest,
@@ -82,7 +82,9 @@ def _settings_view(handlers: Handlers) -> SettingsSourcesView:
                 outside_read=entry.outside_read,
             )
         )
-    return SettingsSourcesView(settings_path=str(terminal.file), sources=rows)
+    return SettingsSourcesView(
+        settings_path=str(terminal.file), sources=rows, warnings=unknown_key_warnings(terminal)
+    )
 
 
 def build_settings_router(handlers: Handlers) -> APIRouter:
@@ -108,7 +110,10 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
             reload=handlers.reload_sources,
             lock=handlers.settings_lock,
         )
-        return SettingsSourcesResponse.from_statuses(statuses)
+        # 保存の後の読み直しで差し替わった端末の設定の知らないキーを警告にする
+        return SettingsSourcesResponse.from_statuses(
+            statuses, unknown_key_warnings(handlers.terminal)
+        )
 
     @router.post(
         "/settings/sources",
@@ -134,6 +139,7 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
             result=result.result,
             same=result.same,
             sources=SettingsSourcesResponse.from_statuses(result.statuses).sources,
+            warnings=unknown_key_warnings(handlers.terminal),
         )
 
     return router

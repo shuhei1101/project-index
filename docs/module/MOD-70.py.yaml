@@ -94,14 +94,15 @@ functions:
       type: list[Violation]
       description: 違反の並び。無ければ空
     process: |-
-      1. `SOURCE_SCHEMA` でスキーマの違反を全て集める（スキーマの違反）。スキーマの違反があれば、ここで返す
+      1. `SOURCE_SCHEMA` でスキーマの違反を全て集める（スキーマの違反）。スキーマは最上位に `paths_base`（文字列）を持つ。スキーマの違反があれば、ここで返す
       2. テーブル（`TABLE_KEYS`）ごとに `id` の重なりを確かめ、後の行の `{テーブル}[{n}].id` に違反を加える
       3. 行の参照を確かめる。`documents[].validators[]`・`documents[].converter`・`documents[].after_write[]` が、それぞれ `validators[]`・`converters[]`・`generators[]` に無い ID を指す場合、その要素のパスに `存在しない ID` の違反を加える
       4. `body_file` を `records` なしで書いた行は `documents[{n}].body_file` に違反を加える
-      5. `documents[].schema` のファイルが `root` の下に無いか YAML として読めない場合、そのキーに違反を加える（YAMLの読み込み）。スキーマは Draft 2020-12 の `check_schema` も通す
+      5. `documents[].schema` のファイルが設定ファイルのフォルダの下に無いか YAML として読めない場合、そのキーに違反を加える（YAMLの読み込み）。スキーマは Draft 2020-12 の `check_schema` も通す
          - `schema` がオブジェクトの行は、参照先のスキーマの読み取りで読み、`SchemaRefError` は `documents[{n}].schema` の違反（理由は例外の `rule`）にする。読めたスキーマは `check_schema` を通す
-      6. パス（`documents[].paths[]`・`schema`）が `..` で `root` の外を指す場合、その要素に違反を加える
-      7. 違反を返す
+      6. パス（`documents[].paths[]`・`schema`）が `..` で外（`paths[]` は基準のフォルダ、`schema` は設定ファイルのフォルダ）を指す場合、その要素に違反を加える
+      7. `paths_base` を『paths の基準のフォルダの解決』（`config_root` は `root`、`repo_root` は `root` の履歴の『リポジトリの直下』）にかけ、違反を加える
+      8. 違反を返す
     unit_tests:
       - name: test_validate_source_config
         case: 正常
@@ -187,6 +188,18 @@ functions:
         condition: '`validators: [{id: v, run: [python3, scripts/v.py], cache: false}]`'
         mock: なし
         expected: '`validators[0].cache` の違反が 1 件'
+      - name: test_validate_source_config_when_paths_outside_base
+        case: 正常
+        summary: paths が基準のフォルダの外
+        condition: '`paths_base: ../..`、`documents[0].paths: [docs/*.yaml, ../outside/*.yaml]`'
+        mock: なし
+        expected: '`documents[0].paths[1]` の違反 1 つで、`rule` が `配信元の外を指しています: ../outside/*.yaml`'
+      - name: test_validate_source_config_when_paths_base_and_paths_invalid
+        case: 正常
+        summary: paths_base と paths の違反を並べる
+        condition: '`root` の下に `sub` がある配信元で、`paths_base: sub`・`documents[0].paths: [docs/*.yaml, ../outside/*.yaml]`'
+        mock: なし（一時フォルダ）
+        expected: '`documents[0].paths[1]` と `paths_base` の 2 つの違反'
   - name: check_scripts
     title: スクリプトの確かめ
     kind: 関数
@@ -291,18 +304,18 @@ functions:
       1. `entry.enabled` が `False` の場合、`disabled` を返す（設定は読まない。ID は `entry.id`、無ければ `sources[{index}]`）
       2. `entry.config` の各ファイルを順に読む（YAMLの読み込み）。先頭のファイルは、Git の配信元なら『default_ref の設定の読み込み』の内容を読み、commit を設定の commit にする（`ValidationFailedError` は違反を持つ `not_served` を返す）。2 つ目以降のファイルはディスクから読む
          - 無い・読めない・辞書でない場合、`config[{n}]` のパスの違反を持つ `not_served` を返す
-      3. 読んだ値をマージする（設定のマージ）。`root` は先頭のファイルのフォルダにする
+      3. 読んだ値をマージする（設定のマージ）。設定ファイルのフォルダは先頭のファイルのフォルダにする
       4. マージした値を検証する（配信元の設定の検証）
          - 違反がある場合、その違反を持つ `not_served` を返す。設定の `version` を設定のバージョンの比較にかけて `older` なら、エラーログに `project-index migrate --source {先頭の設定のファイル}` で移し替えられることを足す
       5. `SourceConfig` にする。設定の `enabled` が `False` の場合、`disabled` を返す
-      6. スクリプトを確かめる（スクリプトの確かめ。設定の commit がある場合は、そのリビジョンにスクリプトのファイルがあるか）
+      6. スクリプトを設定ファイルのフォルダで確かめる（スクリプトの確かめ。設定の commit がある場合は、そのリビジョンにスクリプトのファイルがあるか）
          - 違反がある場合、その違反を持つ `not_served` を返す
       7. 設定のバージョンを比べる（設定のバージョンの比較）
          - `newer` の場合、`version` に「このサーバーより新しい設定」の違反を持つ `not_served` を返す
          - `older` の場合、状態の `config_version` に `(設定, SOURCE_CONFIG_VERSION)` を入れる
          - `[warning]` 配信元の設定のバージョンが古い（ID・設定のバージョン・サーバーが読めるバージョン）
-      8. `root` が Git の作業ツリーかとその直下を引く（履歴の『リポジトリの直下』）
-      9. 種類ごとのスキーマを読み（設定の commit がある場合はそのリビジョンのファイル。`schema_path` が `SchemaRef` の行は参照先のスキーマの読み取りの結果）、`worktrees` をメインのリポジトリの直下（Git でなければ `root`）からの絶対パスにして、`ServedSource` を作る。ID は `entry.id`、無ければ `config.name`。`outside_read` は `entry.outside_read`
+      8. 設定ファイルのフォルダが Git の作業ツリーかとその直下を引く（履歴の『リポジトリの直下』）。『paths の基準のフォルダの解決』で `root` を決める（範囲の違反は手順 4 の検証で返している）
+      9. 種類ごとのスキーマを設定ファイルのフォルダから読み（設定の commit がある場合はそのリビジョンのファイル。`schema_path` が `SchemaRef` の行は参照先のスキーマの読み取りの結果）、`worktrees` をメインのリポジトリの直下（Git でなければ設定ファイルのフォルダ）からの絶対パスにして、`ServedSource` を作る。`config_dir` は `root` から設定ファイルのフォルダへの相対パス、`scope_write` が無ければ `[str(設定ファイルのフォルダ)]`。ID は `entry.id`、無ければ `config.name`。`outside_read` は `entry.outside_read`
       10. `ServedSource` と `serving` を返す
 
       違反で返すときは `[error]` 配信元を配信しない（違反ごとに `{id}: {パス}: {理由}`）を書く。
@@ -385,6 +398,18 @@ functions:
         condition: '`converters` に `cache: false` の行 `c1` と `cache` を書かない行 `c2`'
         mock: なし（一時フォルダ）
         expected: '`serving` で、`script("converters", "c1").cache` が `False`、`c2` が `True`'
+      - name: test_load_source_when_paths_base_set
+        case: 正常
+        summary: paths の基準のフォルダを指定する
+        condition: 'Git の一時リポジトリ repo の `content/node-docs/brain/project-index.yaml` が `paths_base: ../../..`・`documents[0].schema: note.schema.yaml`（同じフォルダ）'
+        mock: なし（一時フォルダで `git init`）
+        expected: '`serving` で、`root` が repo の直下、`config_dir` が `content/node-docs/brain`、`schemas` に `note.schema.yaml` の内容、`scope_write` が `[str(repo/content/node-docs/brain)]`'
+      - name: test_load_source_when_paths_base_invalid
+        case: 正常
+        summary: paths の基準のフォルダが範囲の外
+        condition: '`paths_base` が `sub`（設定ファイルのフォルダの下。`sub` はある）の行と、`../../../..`（リポジトリの直下より上）の行'
+        mock: なし（一時フォルダで `git init`）
+        expected: どちらも `None` と `not_served`。違反のパスが `paths_base` で、理由はそれぞれ設定ファイルのフォルダかその上を指す必要があること・リポジトリの外を指していること
   - name: read_default_ref_config
     title: default_ref の設定の読み込み
     kind: 関数
@@ -480,7 +505,7 @@ functions:
     process: |-
       1. `source.config_files` を `source.repo_root`（無ければ `source.root`）からの相対パスにし、`root` の下の同じパスにする
          - `root` の下の同じパスにファイルが無く、元のファイルが無視されている場合（無視されているファイル）、元のファイル（クローン本体のディスク）を使う
-      2. 配信元の読み込みの手順 2〜6・8〜9 を、ディスクの設定・スキーマ・スクリプトで（`default_ref` を読まずに）、配信元の読み込みと同じ内部の関数で行う（設定のバージョンは比べない）
+      2. `source.config_root` の `repo_root`（無ければ `source.root`）からの相対パスを `root` の下につないだフォルダを設定ファイルのフォルダにし、配信元の読み込みの手順 2〜6・8〜9 を、ディスクの設定・スキーマ・スクリプトで（`default_ref` を読まずに）、配信元の読み込みと同じ内部の関数で行う（設定のバージョンは比べない）
          - 違反がある場合、その違反を持つ `ValidationFailedError` を送る
       3. 作った配信元を返す
     exceptions:
@@ -515,6 +540,12 @@ functions:
         mock: なし
         expected: '`ValidationFailedError` で違反が `documents[0].paths`'
         exception: 検証に通らない
+      - name: test_load_source_at_when_paths_base_set
+        case: 正常
+        summary: ワークツリーでも基準のフォルダを解く
+        condition: '`paths_base: ../../..` の配信元を、`git worktree add` したワークツリーで読み直す'
+        mock: なし（一時フォルダで `git init` と `git worktree add`）
+        expected: '`root` がワークツリーの直下、`config_dir` が元の配信元と同じ'
   - name: assemble_source
     title: 配信元の組み立て
     kind: 関数
@@ -577,7 +608,10 @@ functions:
       1. 設定のファイルを順に読む。無い・読めない・辞書でないファイルは違反にする
       2. マージして検証する（`merge_configs`・`validate_source_config`）
       3. 設定を作り、スクリプトを確かめる（`check_scripts`）
-      4. スキーマ・ワークツリーの glob を解いて配信中の配信元を作る
+      4. paths の基準のフォルダを解く（『paths の基準のフォルダの解決』。範囲の違反は手順 2 の検証で返している）
+      5. スキーマ・ワークツリーの glob を解いて配信中の配信元を作る
+
+      `root_override` は設定ファイルのフォルダを置き換える（作業ツリー・ワークツリーの同じ場所で読み直すとき）。
     unit_tests:
       - name: test_assemble_source
         case: 正常
@@ -599,6 +633,81 @@ functions:
       - MOD-68#functions[merge_configs]
       - '#functions[validate_source_config]'
       - '#functions[check_scripts]'
+  - name: _resolve_paths_base
+    title: paths の基準のフォルダの解決
+    kind: 関数
+    container: project_index/features/sources/service.py
+    usecase: 起動
+    role: 検証
+    summary: '`paths_base` を設定ファイルのフォルダから解き、範囲を確かめて基準のフォルダを返す'
+    scope: internal
+    args:
+      - name: value
+        title: paths の基準のフォルダ
+        type: str | None
+        required: true
+        passing: positional
+        description: 設定の `paths_base`
+      - name: config_root
+        title: 設定ファイルのフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: 先頭の設定の YAML のフォルダ
+      - name: repo_root
+        title: リポジトリの直下
+        type: Path | None
+        required: true
+        passing: positional
+        description: 設定ファイルのフォルダが Git の作業ツリーの中ならその直下、それ以外は `None`
+    returns:
+      type: tuple[Path, list[Violation]]
+      description: 基準のフォルダと違反の並び（違反があるときの基準のフォルダは `config_root`）
+    process: |-
+      1. `value` が `None` の場合、`config_root` と空の違反を返す
+      2. `config_root / value` を『パスの正規化』にかける
+      3. 範囲を確かめる
+         - フォルダが無い場合、`paths_base` に `フォルダがありません: {value}` の違反を加える
+         - `config_root` が解いたフォルダ自身かその下でない場合（設定ファイルのフォルダの下や横を指す）、`paths_base` に `設定ファイルのフォルダかそれより上のフォルダを指してください: {value}` の違反を加える
+         - `repo_root` があり、解いたフォルダが `repo_root` 自身かその下でない場合、`paths_base` に `リポジトリの外を指しています: {value}` の違反を加える
+      4. 違反があれば `config_root` と違反を、無ければ解いたフォルダと空の違反を返す
+    unit_tests:
+      - name: test_resolve_paths_base
+        case: 正常
+        summary: 上のフォルダを基準にする
+        condition: '`value` が `../..`、`config_root` が `repo/a/b`、`repo_root` が `repo`'
+        mock: なし（一時フォルダ）
+        expected: '`repo` と空の違反'
+      - name: test_resolve_paths_base_when_unset
+        case: 正常
+        summary: 省いた設定
+        condition: '`value` が `None`'
+        mock: なし
+        expected: '`config_root` と空の違反'
+      - name: test_resolve_paths_base_when_below
+        case: 正常
+        summary: 設定ファイルのフォルダの下
+        condition: '`value` が `sub`（`repo/a/b/sub` はある）'
+        mock: なし（一時フォルダ）
+        expected: '`paths_base` の違反 1 つで、`rule` が `設定ファイルのフォルダかそれより上のフォルダを指してください: sub`'
+      - name: test_resolve_paths_base_when_outside_repo
+        case: 正常
+        summary: リポジトリの直下より上
+        condition: '`value` が `../../..`、`repo_root` が `repo`'
+        mock: なし（一時フォルダ）
+        expected: '`paths_base` の違反 1 つで、`rule` が `リポジトリの外を指しています: ../../..`'
+      - name: test_resolve_paths_base_when_not_git
+        case: 正常
+        summary: Git の管理外はリポジトリの範囲を確かめない
+        condition: '`value` が `../..`、`repo_root` が `None`'
+        mock: なし（一時フォルダ）
+        expected: '`config_root` の 2 つ上のフォルダと空の違反'
+      - name: test_resolve_paths_base_when_missing
+        case: 正常
+        summary: 無いフォルダ
+        condition: '`value` が `../none`'
+        mock: なし（一時フォルダ）
+        expected: '`paths_base` の違反に `フォルダがありません: ../none`'
   - name: source_schema_json
     title: 配布のスキーマの生成
     kind: 関数
@@ -615,6 +724,8 @@ functions:
     process: |-
       1. `SOURCE_SCHEMA` を読む（YAMLの読み込み）
       2. `json.dumps(値, ensure_ascii=False, indent=2)` に改行を 1 つ続けた文字列を返す
+
+      `SOURCE_SCHEMA` にキーを加えたときは、配布する `schemas/project-index.schema.json` をこの関数の出力で作り直す（`test_source_schema_json` が一致を確かめる）
     unit_tests:
       - name: test_source_schema_json
         case: 正常

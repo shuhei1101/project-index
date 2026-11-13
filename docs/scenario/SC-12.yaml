@@ -288,6 +288,42 @@ scenarios:
     test: test_error_when_cross_origin
     notes:
       画面のサーバーからの呼び出し: dev-docs の画面のサーバーはサーバーの側から呼ぶため `Origin` を持たない。断る条件はインターフェース定義設計で決める
+  - name: 正常シナリオ（端末の設定の最上位に知らないキーがある）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 追加する配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ git リポジトリ。端末の設定にはまだ無い
+        notes: id `extra`
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す一時フォルダの `settings.yaml`'
+        notes: '`sources` に sample の 1 行。最上位に project-index が知らないキー `mindstella`（入れ子の値とコメントを持つ）を持つ'
+      - name: project-index
+        description: 端末の設定で起動した project-index
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant DD as dev-docs の画面のサーバー
+        participant PI as project-index（端末の設定の API）
+        participant CF as 端末の設定
+
+        DD->>PI: 端末の設定の配信元を取得する
+        PI-->>DD: sample の行と状態と、知らないキーの警告
+        DD->>PI: sample の 1 行の sources を保存する
+        PI->>CF: sources だけを書き換え、配信元を読み直す
+        PI-->>DD: 保存した sources と状態と、知らないキーの警告
+        DD->>PI: extra の行を 1 行追加する
+        PI->>CF: sources の末尾に extra の行を追加し、配信元を読み直す
+        PI-->>DD: 追加したことと、知らないキーの警告
+      ```
+    expected:
+      - 取得の応答が sample の行と、知らないキーのパス `mindstella` の警告を返却する
+      - 保存が 200 で、応答が sample を配信中とする状態と、`mindstella` の警告を返却する
+      - 1 行の追加の応答が、行を追加したことと `mindstella` の警告を返却する
+      - 保存と 1 行の追加の後も、`settings.yaml` の `mindstella` の値とコメントが取得の前と変わらない
+    test: test_normal_when_unknown_top_level_key_kept
+    decisions:
+      - D-308
   - name: 正常シナリオ（送信しなかったキーを残す）
     setup:
       - name: Mock
