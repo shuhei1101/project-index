@@ -88,17 +88,18 @@ classes:
     container: project_index/server/mcp/docs.py
     usecase: 共通
     role: 入口
-    summary: '`initialize` のたびに instructions を描き直す `MCPServer`'
+    summary: '`initialize`・`server/discover` のたびに instructions を描き直す `MCPServer`'
     description: |-
-      `MCPServer` を継承する。mcp 2.3.0 は接続ごとに instructions を作るフックを持たず、`initialize` の応答は lowlevel の `Server.create_initialization_options()` が属性 `instructions` を読んで作る。
-      そのため初期化で lowlevel の `Server`（`self._lowlevel_server`）のインスタンスの `create_initialization_options` を、描画してから属性を差し替えて元のメソッドを呼ぶ関数に `setattr` で置き換える。
+      `MCPServer` を継承する。mcp 2.3.0 は接続ごとに instructions を作るフックを持たず、instructions を返す経路が 2 つある。
+      `initialize` の応答は lowlevel の `Server.create_initialization_options()` が属性 `instructions` を読んで作り、2026-07-28 版（`MODERN_PROTOCOL_VERSIONS`）の `server/discover` の応答は既定の処理 `Server._handle_discover` が同じ属性を直接読んで作る。
+      そのため初期化で、lowlevel の `Server`（`self._lowlevel_server`）のインスタンスの `create_initialization_options` を `setattr` で置き換え、`server/discover` を公開の `add_request_handler` で置き換えて、どちらも描画してから属性を差し替えて元の処理を呼ぶ。
       `initialize` は読み取りのループの中で同期に実行されるため、描画の関数は Git を呼ばない（文書の MCP の instructions の描画）。
     kind: クラス
     methods:
       - name: __init__
         title: 初期化
         kind: メソッド
-        summary: 名前と instructions の描画を受け取り、`initialize` のたびに描画する
+        summary: 名前と instructions の描画を受け取り、`initialize`・`server/discover` のたびに描画する
         scope: public
         args:
           - name: name
@@ -119,6 +120,7 @@ classes:
         process: |-
           1. `super().__init__(name, instructions=instructions())` で作る
           2. lowlevel の `Server` の今の `create_initialization_options` を控え、`*args`・`**kwargs` を受けて、`instructions()` を lowlevel の `Server` の属性 `instructions` に入れてから控えたメソッドを呼んで返す関数を、`setattr` でインスタンスの `create_initialization_options` に入れる
+          3. lowlevel の `Server` の今の `_handle_discover` を控え、`ctx`・`params` を受けて、`instructions()` を属性 `instructions` に入れてから控えた処理を await して返す async の関数を、`add_request_handler("server/discover", types.RequestParams, 関数)` で登録する
         unit_tests:
           - name: test_docs_mcp_server_when_initialize
             case: 正常
@@ -126,6 +128,13 @@ classes:
             condition: 呼ぶたびに `"v1"`・`"v2"`・`"v3"` を順に返す描画の関数で作り、`initialize` を 2 回（別の接続）呼ぶ
             mock: instructions の描画（偽物）
             expected: 描画の関数は作るときに 1 回、`initialize` ごとに 1 回呼ばれ、1 回目の `initialize` の `instructions` が `"v2"`、2 回目が `"v3"`。ツールの一覧は変わらない
+            exception: '-'
+          - name: test_docs_mcp_server_when_discover
+            case: 正常
+            summary: '`server/discover` のたびに描き直す'
+            condition: 呼ぶたびに `"v1"`・`"v2"`・`"v3"` を順に返す描画の関数で作り、2026-07-28 版で `server/discover` を 2 回呼ぶ
+            mock: instructions の描画（偽物）
+            expected: 1 回目の `server/discover` の `instructions` が `"v2"`、2 回目が `"v3"`。`supported_versions`・`capabilities` は既定の処理と同じ
             exception: '-'
 functions:
   - name: build_docs_mcp
