@@ -101,7 +101,7 @@ $defs:
     type: array
     title: タグ
     description: |-
-      文書を検索で絞り込むタグ。`name` にタグの名前（`action:`・`topic:`・`tool:` で始める）、最も分量の多い主題 1 つに `main: true` を記載する。
+      文書を検索で絞り込むタグ。`name` にタグの名前（`{facet}:{値}` の形で記載する）、最も分量の多い主題 1 つに `main: true` を記載する。
       付け方は knowledge の規約『文書のタグと description の記載』に従う。
     minItems: 1
     uniqueItems: true
@@ -113,7 +113,7 @@ $defs:
         name:
           type: string
           title: タグの名前
-          pattern: "^(action|topic|tool):\\S+$"
+          pattern: "^[a-z]+:\\S+$"
         main:
           type: boolean
           title: 主題
