@@ -1,0 +1,83 @@
+tasks:
+  - process: 初期構築
+    status: skipped
+    reason: 既存リポジトリのため対象外
+    updated_by: planner
+    updated_at: '2026-11-12T23:32:11.156503+00:00'
+  - process: リバースエンジニアリング
+    status: skipped
+    reason: 設計書が揃っているため対象外
+    updated_by: planner
+    updated_at: '2026-11-12T23:32:11.156503+00:00'
+  - process: 方針決め
+    status: skipped
+    reason: 方針決めの依頼ではないため対象外
+    updated_by: planner
+    updated_at: '2026-11-12T23:32:11.156503+00:00'
+  - process: PoC 検証
+    status: skipped
+    reason: フックの入力の書き換えと書き込み先の解決は実装済みの仕組みで、未検証の機構に依存しないため対象外
+    updated_by: planner
+    updated_at: '2026-11-12T23:32:11.156503+00:00'
+  - process: 複合ユースケース設計
+    status: skipped
+    reason: 利用者の操作の流れは変わらないため対象外
+    updated_by: planner
+    updated_at: '2026-11-12T23:32:11.156503+00:00'
+  - process: デザインスタイル選定
+    status: skipped
+    reason: 画面に関わらないため対象外
+    updated_by: planner
+    updated_at: '2026-11-12T23:32:11.156503+00:00'
+  - process: 画面一覧・画面遷移
+    status: skipped
+    reason: 画面に関わらないため対象外
+    updated_by: planner
+    updated_at: '2026-11-12T23:32:11.156503+00:00'
+  - process: 単一ユースケース設計
+    status: skipped
+    reason: SC-7 は worktree でワークツリーを指す流れで、シナリオの記述は変わらないため対象外
+    updated_by: planner
+    updated_at: '2026-11-12T23:32:11.156503+00:00'
+  - process: モック作成
+    status: skipped
+    reason: 画面に関わらないため対象外
+    updated_by: planner
+    updated_at: '2026-11-12T23:32:11.156503+00:00'
+  - process: インターフェース定義設計
+    status: done
+    note: IF-1〜IF-7 の cwd の説明を揃え、IF-6 にツールの入力のスキーマの cwd の説明と、設定をワークツリーから読む配信元の TargetIsCloneError のクローン本体のパスを定める
+    updated_by: planner
+    updated_at: '2026-11-12T23:38:50.605571+00:00'
+  - process: 部品設計
+    status: skipped
+    reason: 画面の部品に関わらないため対象外
+    updated_by: planner
+    updated_at: '2026-11-12T23:32:11.156503+00:00'
+  - process: 画面設計
+    status: skipped
+    reason: 画面に関わらないため対象外
+    updated_by: planner
+    updated_at: '2026-11-12T23:32:11.156503+00:00'
+  - process: モジュール構成設計
+    status: done
+    note: MOD-8 に CWD_DESCRIPTION を追加し、MOD-15・22・49・58・85 の各ツールの入力の cwd がその説明を持つと定める。MOD-7 の resolve_write_target が返すクローン本体のパスを main_root にし、単体テストを追加する
+    updated_by: planner
+    updated_at: '2026-11-12T23:47:41.803846+00:00'
+  - process: ドキュメント修正
+    status: done
+    note: 更新ドキュメントの docs/guide/文書のMCP.md はインターフェース定義設計で修正済み
+    updated_by: planner
+    updated_at: '2026-11-12T23:50:53.401633+00:00'
+  - process: 単体テスト作成
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T23:54:16.734093+00:00'
+  - process: 実装
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-13T00:04:58.836536+00:00'
+  - process: 結合テスト作成
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-13T00:14:59.057772+00:00'

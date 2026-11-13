@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from project_index.features.access.types import CWD_DESCRIPTION
 from project_index.features.documents.types import MatchWord
 
 LIMIT_DEFAULT = 20
@@ -134,7 +135,7 @@ class SearchRequest(BaseModel):
     snippets: Snippets | None = None
     repeat_seen: bool = False
     format: Literal["markdown", "json"] = "markdown"
-    cwd: str | None = None
+    cwd: str | None = Field(default=None, description=CWD_DESCRIPTION)
     outside_scope: bool = Field(
         default=False,
         description=(
@@ -249,7 +250,7 @@ class MatchWordsRequest(BaseModel):
     source: str
     worktree: str | None = None
     format: Literal["markdown", "json"] = "markdown"
-    cwd: str | None = None
+    cwd: str | None = Field(default=None, description=CWD_DESCRIPTION)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

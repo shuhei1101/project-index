@@ -1,0 +1,25 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: none
+    detail: エージェントがワークツリーを指して文書を書き込む流れは変わらない。ワークツリーを指す手段の説明だけを揃える
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: none
+    detail: エージェントが文書を調べる流れは変わらない
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: 共通の引数の表の `cwd` の行に、フックが上書きして指定した値は使わないことと `worktree` でワークツリーを指すことを、エラーの表の TargetIsCloneError の行にクローン本体のパスを書く
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-12T23:38:10.288053+00:00'
+scope_out:
+  - item: 管理の MCP（project-index-admin）のツール
+    reason: IF-20 の制約で管理の MCP にはフックを当てず、cwd を持たない
+    plan: none
+  - item: PreToolUse のフックがエージェントの入れた cwd を残す変更
+    reason: IF-20 の制約「上書き」は作業場所を偽って scope の外を書き換えさせないために置いており、ワークツリーを指す手段は worktree がある
+    plan: none
