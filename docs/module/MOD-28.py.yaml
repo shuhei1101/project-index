@@ -54,6 +54,7 @@ functions:
       3. 最上位の `$defs` は参照先として残し、各定義 `{名前}` の中の `$ref` を、たどっている途中の `$ref` に `{base}#/$defs/{名前}` を入れた状態から解く（自分自身へ戻る `#/$defs/{名前}` は解かずに残り、ほかのファイルを指す相対パスの `$ref` は解ける）
       4. たどっている途中の `$ref` に戻る（循環する）場合、その `$ref` は解かずに残す
          - `[warning]` スキーマの循環する参照を解かずに残した（ファイル・`$ref`）。手順 3 で `$defs` の定義を解く途中の循環では出さない
+         - 参照先が `base` で、`$ref` がファイルのパスを持つ（別のファイルから `base` へ戻る）場合、その `$ref` を `#{参照先の JSON Pointer}` に書き換える（`$ref` 以外のキーはそのまま残す）
          - 参照先が `base` と別のファイルの場合、その `$ref` を、参照先の定義を最上位の `$defs` へ加えた名前を指す `#/$defs/{名前}` に書き換える（`$ref` 以外のキーはそのまま残す）
            - 名前は `{base のフォルダからの参照先のファイルの相対パス}#{参照先の JSON Pointer}`（例: `common.schema.yaml#/$defs/tree`）。種類のスキーマの最上位の `$defs` の名前と重なる場合は、重ならなくなるまで末尾に `-{2 からの連番}` を付ける
            - `$ref` には、名前を JSON Pointer の 1 つの区切りとしてエスケープ（`~` → `~0`・`/` → `~1`）し、URL エンコードして入れる
@@ -92,6 +93,12 @@ functions:
         condition: '`test_resolve_schema_refs_when_cycle_in_other_file` の条件に加え、種類のスキーマの最上位の `$defs` が `tree`（`type: string`）と `共通.schema.yaml#/$defs/tree`（`type: integer`）を持つ'
         mock: なし（`tmp_path`）
         expected: '種類のスキーマの `$defs.tree` と `$defs.共通.schema.yaml#/$defs/tree` はそのまま残り、`共通.schema.yaml` の `tree` は `共通.schema.yaml#/$defs/tree-2` の名前で加わる。返したスキーマで jsonschema が入れ子の `children` を持つ値を検査でき、違反が無い'
+      - name: test_resolve_schema_refs_when_cycle_back_to_base
+        case: 正常
+        summary: 別のファイルから種類のスキーマへ戻る循環する参照
+        condition: '`base` が `rule.schema.yaml`、`$defs.node.properties.child` が `共通.schema.yaml#/$defs/wrap`、`共通.schema.yaml` の `$defs.wrap.properties.inner` が `rule.schema.yaml#/$defs/node`'
+        mock: なし（`tmp_path`）
+        expected: '`$defs.node.properties.child.properties.inner` が `#/$defs/node` を指す `$ref` になり、返したスキーマのどこにも `rule.schema.yaml` を指す `$ref` が無い'
       - name: test_resolve_schema_refs_when_missing
         case: 正常
         summary: 参照先が無い
