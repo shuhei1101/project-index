@@ -239,6 +239,35 @@ scenarios:
       - ワークツリー x のパスを渡した `try_convert` の本文の先頭に `worktree-x` の文字が付き、`develop` の文字は付かない
       - 読み取り API の文書の取得（ワークツリーを指さない）は `develop` の文字が付いた本文を返す
     test: test_normal_when_scripts_run_from_worktree
+  - name: 正常シナリオ（ワークツリーの設定に追加した種類の文書を作る）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: ワークツリー
+        description: sample の `.claude/worktrees/x`。`project-index.yaml` に、`develop` に無い種類 `term`（スキーマと置き場所の行）を追加して commit していない
+        notes: 配信元の設定の `worktrees` は既定（`[./.claude/worktrees/*]`）
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（ワークツリーの設定に追加した種類の文書を作る）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant DM as 文書の MCP
+        participant WT as ワークツリー x
+
+        A->>DM: describe(source: sample, worktree: x)
+        DM-->>A: ワークツリーの設定の種類の一覧（term あり）
+        A->>DM: write_docs(source: sample, worktree: x, create・kind: term)
+        DM->>WT: ワークツリーの設定の term の置き場所へ文書を作成する
+        DM-->>A: 作成した文書
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`worktree` に x を指定した `describe` の種類の一覧に `term` がある'
+      - '`worktree` に x を指定した `write_docs` の `create`（`kind: term`）が、ワークツリー x の `term` の置き場所に文書を作成する'
+      - クローン本体の作業ツリーには文書が作成されない
+    test: test_normal_when_kind_added_in_worktree
   - name: 正常シナリオ（参照するスキーマのリビジョンを上げる）
     setup:
       - name: Mock
@@ -275,6 +304,61 @@ scenarios:
       - '`reload` の後の `describe` は `owner` を必須にした v2 のスキーマを返す'
       - '`reload` の後、`owner` を持たない文書の `write_docs` が `owner` の違反で書かれない'
     test: test_normal_when_schema_ref_raised
+  - name: 異常シナリオ（paths_base と paths が範囲の外を指す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: ノードの配信元
+        description: 配信中の配信元 brain（起動するの『正常シナリオ（paths の基準のフォルダを指定する）』と同じ）
+        notes: '`project-index.yaml` の `paths_base` を `sub`（設定ファイルのフォルダの下）にし、`documents[0].paths` に `../outside/*.yaml`（基準のフォルダの外）を加えておく'
+      - name: リポジトリの外を指す配信元
+        description: 同じ repo の `content/node-docs/edge/project-index.yaml`
+        notes: '`paths_base: ../../../..`（repo の直下より上）'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor A as 利用者・エージェント
+        participant AD as 管理の MCP
+
+        A->>AD: check_project（brain の設定ファイルのパス）
+        AD-->>A: 違反（キーのパスと理由）
+        A->>AD: check_project（edge の設定ファイルのパス）
+        AD-->>A: 違反（キーのパスと理由）
+      ```
+    expected:
+      - brain の `check_project` が、`paths_base` と設定ファイルのフォルダかそれより上のフォルダを指す必要がある理由、`documents[0].paths[2]` と基準のフォルダの外を指している理由を並べて返却する
+      - edge の `check_project` が、`paths_base` とリポジトリの外を指している理由を返却する
+      - '`reload` を呼ぶまで brain は変える前の設定で配信される'
+    test: test_error_when_paths_base_or_paths_out_of_range
+    decisions:
+      - D-189
+  - name: 正常シナリオ（端末の設定の最上位に知らないキーがある状態で読み直す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample の 1 行。配信中に、最上位へ project-index が知らないキー `mindstella` を追加し、sample の `project-index.yaml` の `description` を書き換えておく'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor A as 利用者・エージェント
+        participant AD as 管理の MCP
+        participant DM as 文書の MCP
+
+        A->>AD: reload
+        AD->>AD: 端末の設定を検証し、最上位の知らないキーのパスを警告のログに残す
+        AD-->>A: 読み直した配信元
+        A->>DM: describe
+        DM-->>A: 新しい description と、知らないキーの警告
+      ```
+    expected:
+      - '`reload` がエラーにならず、sample を読み直した配信元として返却する'
+      - '`reload` の後の `describe` が書き換えた `description` を返却し、引数なしの `describe()` の警告に `mindstella` が載る'
+      - 警告のログに、端末の設定のファイルと知らないキーのパス `mindstella` が残る
+    test: test_normal_when_reloaded_with_unknown_top_level_key
+    decisions:
+      - D-308
 lead: 利用者かエージェントが配信元の設定・スキーマ・スクリプトを変え、管理の MCP で確認してから `reload` で配信に入れるシナリオを定め、設定の変更の流れを変えるときに参照する。
 issue: 14
 primary_actor: 利用者・エージェント（Claude Code）

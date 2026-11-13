@@ -8,7 +8,11 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, Query, Response
 
-from project_index.features.settings.query import load_terminal_config, read_settings_file
+from project_index.features.settings.query import (
+    load_terminal_config,
+    read_settings_file,
+    unknown_key_warnings,
+)
 from project_index.features.settings.service import (
     add_source,
     delete_source,
@@ -99,7 +103,12 @@ def _settings_view(handlers: Handlers) -> SettingsSourcesView:
                 outside_read=entry.outside_read,
             )
         )
-    return SettingsSourcesView(settings_path=str(terminal.file), sources=rows, version=version)
+    return SettingsSourcesView(
+        settings_path=str(terminal.file),
+        sources=rows,
+        version=version,
+        warnings=unknown_key_warnings(terminal),
+    )
 
 
 def build_settings_router(handlers: Handlers) -> APIRouter:
@@ -126,7 +135,10 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
             reload=handlers.reload_sources,
             lock=handlers.settings_lock,
         )
-        return SettingsSourcesWriteResponse.from_result(result)
+        # 書き換えの後の読み直しで差し替わった端末の設定の知らないキーを警告にする
+        return SettingsSourcesWriteResponse.from_result(
+            result, unknown_key_warnings(handlers.terminal)
+        )
 
     @router.post(
         "/settings/sources",
@@ -154,6 +166,7 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
             same=result.same,
             sources=SettingsSourcesResponse.from_statuses(result.statuses).sources,
             version=result.version,
+            warnings=unknown_key_warnings(handlers.terminal),
         )
 
     @router.patch(
@@ -174,7 +187,10 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
             reload=handlers.reload_changed,
             lock=handlers.settings_lock,
         )
-        return SettingsSourcesWriteResponse.from_result(result)
+        # 書き換えの後の読み直しで差し替わった端末の設定の知らないキーを警告にする
+        return SettingsSourcesWriteResponse.from_result(
+            result, unknown_key_warnings(handlers.terminal)
+        )
 
     @router.delete(
         "/settings/sources/{source_id}",
@@ -193,6 +209,9 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
             reload=handlers.reload_changed,
             lock=handlers.settings_lock,
         )
-        return SettingsSourcesWriteResponse.from_result(result)
+        # 書き換えの後の読み直しで差し替わった端末の設定の知らないキーを警告にする
+        return SettingsSourcesWriteResponse.from_result(
+            result, unknown_key_warnings(handlers.terminal)
+        )
 
     return router

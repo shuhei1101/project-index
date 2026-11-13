@@ -121,12 +121,12 @@ classes:
           type: list[Violation]
           description: 違反。検査の順に並ぶ
         process: |-
-          1. 文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）を `store.row_schema(target, kind)` で引いて『スキーマの検査』を通す（`records` の行は要素に 1 行のスキーマを、それ以外はファイルの内容に種類のスキーマを当てる）
+          1. 文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）を `store.row_schema(target, kind)` で引いて『スキーマの検査』を通す（`records` の行は要素に 1 行のスキーマを、それ以外はファイルの内容に種類のスキーマを当てる）。`schema_file` には行の `schema_path` を渡す（`SchemaRef` は `{source}:{path}@{ref}`）
           2. `new` なら『IDの形の検査』を通す
           3. 『関連の種類の検査』をメタデータに通す
           4. 行の `validators` の ID ごとに `source.script("validators", id)` を引き、`on` が行の `on` にあるものだけを通す
              - `on` が `read` の場合、`_read_cache` に控えがあればそれを使う
-             - スクリプトの実行の『スクリプトの実行』を `cwd=target.base`・`stdin`（`body`）・`timeout_sec`・`at` で呼び（`at` は `target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`））、『検査の出力の解釈』で違反にする
+             - スクリプトの実行の『スクリプトの実行』を `cwd=target.config_base`（設定ファイルのフォルダ）・`stdin`（`body`）・`timeout_sec`・`at` で呼び（`at` は `target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`））、『検査の出力の解釈』で違反にする
              - `ScriptError` の場合、`path` が `$`、`rule` が `{id}: 検査を実行できませんでした（{メッセージ}）` の違反にする（控えない）
           5. 違反を返す
         unit_tests:

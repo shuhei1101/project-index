@@ -71,6 +71,8 @@ class SourceConfig:
     version: str = SOURCE_CONFIG_VERSION
     enabled: bool = True
     default_ref: str = "develop"
+    # `documents[].paths` の基準のフォルダ（設定ファイルのフォルダからの相対パス）。`None` は設定ファイルのフォルダ
+    paths_base: str | None = None
     visibility: dict[str, Any] | None = None
     worktrees: list[str] = field(default_factory=lambda: ["./.claude/worktrees/*"])
     documents: list[DocumentTable] = field(default_factory=list[DocumentTable])
@@ -96,6 +98,7 @@ class ServedSource:
     """検証を通した 1 つの配信元と、読み書きに要る解いた値。"""
 
     id: str
+    # `documents[].paths` と返却する文書のパスの基準のフォルダ
     root: Path
     config_files: list[Path]
     config: SourceConfig
@@ -108,6 +111,17 @@ class ServedSource:
     main_root: Path | None = None
     config_commit: str | None = None
     outside_read: bool = True
+    # `root` から先頭の設定の YAML のフォルダへの相対パス。`paths_base` を省いた配信元は `.`
+    config_dir: PurePosixPath = field(default_factory=PurePosixPath)
+
+    @property
+    def config_root(self) -> Path:
+        """先頭の設定の YAML のフォルダを返す。"""
+        return self.root / self.config_dir
+
+    def config_path(self, relative: str) -> str:
+        """設定ファイルのフォルダからの相対パスを、`root` からの相対パスにする。"""
+        return (self.config_dir / relative).as_posix()
 
     def table(self, kind: str) -> DocumentTable:
         """種類から有効な文書の行を引く。"""

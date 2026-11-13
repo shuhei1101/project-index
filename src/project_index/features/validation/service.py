@@ -26,10 +26,18 @@ if TYPE_CHECKING:
 
     from project_index.features.documents.store import DocumentStore
     from project_index.features.documents.types import Document
+    from project_index.features.sources.schema_ref import SchemaRef
 
 VALIDATOR_ON_READ_CACHE = 4096
 
 __all__ = ["VALIDATOR_ON_READ_CACHE", "DocumentChecker", "run_script"]
+
+
+def _schema_file(schema_path: str | SchemaRef) -> str:
+    """違反に書くスキーマのファイル（ほかの配信元の参照は `{配信元}:{パス}@{リビジョン}`）。"""
+    if isinstance(schema_path, str):
+        return schema_path
+    return f"{schema_path.source}:{schema_path.path}@{schema_path.ref}"
 
 
 class DocumentChecker:
@@ -49,7 +57,7 @@ class DocumentChecker:
         try:
             result = run_script(
                 entry.run,
-                cwd=target.base,
+                cwd=target.config_base,
                 stdin=document.body,
                 timeout_sec=self.timeout_sec,
                 at=script_at(target),
@@ -72,7 +80,10 @@ class DocumentChecker:
         source = target.source
         table = source.table(document.kind)
         violations: list[Violation] = []
-        violations.extend(check_schema(document.data, self.store.row_schema(target, document.kind)))
+        schema = self.store.row_schema(target, document.kind)
+        violations.extend(
+            check_schema(document.data, schema, schema_file=_schema_file(table.schema_path))
+        )
         if new:
             violations.extend(
                 check_id_format(document.id, source.config.ids_format, kind=document.kind)

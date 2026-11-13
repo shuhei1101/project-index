@@ -195,3 +195,25 @@ def test_error_when_argument_invalid(
     assert missing.json()["errors"]
     assert with_id.json()["errors"]
     assert env.settings_path.read_text(encoding="utf-8") == before
+
+
+UNKNOWN_KEY_EXTRA = "# MindStella の設定\nmindstella:\n  threads: 3  # 同時に動かす数\n"
+
+
+def test_normal_when_unknown_top_level_key_kept(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """最上位の知らないキーを違反にせずに 1 行を変更し、ファイルの値とコメントを残して警告で返す（正常系）。"""
+    # 準備
+    env = make_server(make_source("sample"), make_source("extra"), settings_extra=UNKNOWN_KEY_EXTRA)
+    version = _version(env)
+    # 実行
+    response = env.client.patch(
+        "/settings/sources/extra",
+        json={"expectedVersion": version, "source": {"outside_read": False}},
+    )
+    # 検証
+    body = response.json()
+    assert response.status_code == 200
+    assert [warning["path"] for warning in body["warnings"]] == ["mindstella"]
+    assert UNKNOWN_KEY_EXTRA in env.settings_path.read_text(encoding="utf-8")

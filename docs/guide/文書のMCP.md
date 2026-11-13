@@ -192,6 +192,7 @@ Condition = {"field": str, "op": enum, "values": [str, ...], "match": "any" | "a
 <!-- /table -->
 
 YAML として読めないファイルがあっても、そのファイルを除いて返し、`notes` で知らせます。
+種類のスキーマの `$ref` を解決できない文書は結果に含め、解決できなかった `$ref` とスキーマのファイルのパスを `notes` で知らせます。
 
 ### 使われているタグを引く
 
@@ -327,9 +328,9 @@ Git 管理外の配信元では、種類の `documents[].writable` が削除を�
 | `source` | その配信元の説明書（`instructions`）と種類（`kinds[]`）の一覧。Git の配信元は、ブランチ・タグ（`refs.branches[]`・`refs.tags[]`）と、`worktrees` に当たるワークツリー（`worktrees[]` の `path`・`branch`）の一覧も返す |
 | `source`・`kind` | その種類の共通のキーと列名の対応（`metadata`）と、スキーマ（YAML のまま） |
 
-`warnings[]` は、使える配信元の同期のずれ（metadata の列の欠け・管理用の YAML に無いファイル・ファイルが無い行・どの文書にも当たらない関連）・エイリアスのキーの違反・どの文書にも当たらない `nav` の条件、配信元と端末の設定のバージョンが古いこと、検証で外した配信元です。
+`warnings[]` は、使える配信元の同期のずれ（metadata の列の欠け・管理用の YAML に無いファイル・ファイルが無い行・どの文書にも当たらない関連）・エイリアスのキーの違反・どの文書にも当たらない `nav` の条件、配信元と端末の設定のバージョンが古いこと、検証で外した配信元、端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパスを 1 件にまとめる）です。
 `markdown` では配信元の表の後に「注意」の見出しの下に 1 行ずつ出し、0 件のときは見出しごと出しません。
-使える配信元が無い作業場所では、表の代わりに `/project-index:setup` で配信元にできることを返し、端末の設定のバージョンと検証で外した配信元の警告は載せます。
+使える配信元が無い作業場所では、表の代わりに `/project-index:setup` で配信元にできることを返し、端末の設定のバージョン・端末の設定の最上位の知らないキーと検証で外した配信元の警告は載せます。
 詳しい内容は管理の MCP の `check_project` で確認します。
 
 `metadata` は、種類の行の `metadata` をそのまま返します。
@@ -443,7 +444,7 @@ Git 管理外の配信元では、種類の `documents[].writable` が削除を�
 | UnknownKindError | `kind` が配信元の種類に無い | その配信元の種類の一覧 |
 | DocumentNotFoundError | 指した ID の文書が無い | 見つからなかった ID と、近い ID の候補 |
 | VersionMismatchError | `expected_version` が今のバージョンと違う | 今のバージョンと差分、読み直して呼び直すこと |
-| ValidationFailedError | 変更を当てた後の文書がスキーマか `validators[]` に通らない（`atomic: true`） | 違反ごとの添字・パス・決まり・直し方。スキーマの違反には、違反した項目のスキーマの `title`・`description`・`x-rules`・`examples`・`x-bad-examples` のうちスキーマが持つもの |
+| ValidationFailedError | 変更を当てた後の文書がスキーマか `validators[]` に通らない、または種類のスキーマの `$ref` を解決できない（`atomic: true`） | 違反ごとの添字・パス・決まり・直し方。スキーマの違反には、違反した項目のスキーマの `title`・`description`・`x-rules`・`examples`・`x-bad-examples` のうちスキーマが持つもの |
 | DocumentReferencedError | `on_referenced: fail` で、消す文書が他の文書の `related` から参照されている | 参照元の ID と `on_referenced: unlink` |
 | DeleteNotAllowedError | Git 管理外の配信元で、種類の `documents[].writable` が削除を許していない | 種類の ID と `documents[].writable` のパス |
 | LastReadNotFoundError | `list_changes` の `from` を省いたが、この会話で本文を読んだ記録が無い | `from` を渡すこと |

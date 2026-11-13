@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -45,6 +46,18 @@ def test_markdown_values() -> None:
     result = markdown_values(data, schema)
     # 検証
     assert result == {"body": "a", "items[0].note": "b"}
+
+
+def test_markdown_values_when_unresolvable(caplog: pytest.LogCaptureFixture) -> None:
+    """解決できない参照（正常系）。"""
+    # 準備
+    schema = {"type": "object", "properties": {"body": {"$ref": "missing.schema.yaml#/$defs/md"}}}
+    # 実行
+    with caplog.at_level(logging.WARNING):
+        result = markdown_values({"body": "a"}, schema)
+    # 検証
+    assert result == {}
+    assert len([r for r in caplog.records if r.levelno == logging.WARNING]) == 1
 
 
 def test_markdown_values_when_any_of() -> None:

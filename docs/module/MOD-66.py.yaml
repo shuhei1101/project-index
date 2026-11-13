@@ -156,6 +156,12 @@ functions:
         mock: 配信元の読み直し（呼ばれた数を数える）
         expected: '`SettingsVersionMismatchError` で `current` が今の内容のバージョン。ファイルは変わらず、`reload` は呼ばれない'
         exception: 内容のバージョンが今と違う
+      - name: test_save_sources_when_unknown_top_level_key
+        case: 正常
+        summary: 最上位の知らないキーを残して保存する
+        condition: 最上位に `mindstella`（入れ子の値とコメント）を持つ `settings.yaml` に、sample の 1 行を保存する
+        mock: なし（一時フォルダ。`reload` は状態を返す偽物）
+        expected: 違反にならず、保存した `settings.yaml` の `mindstella` の値とコメントが保存の前と同じ
   - name: add_source
     title: 配信元の 1 行の追加
     kind: 関数
@@ -252,6 +258,12 @@ functions:
         condition: '`name: sample` の設定を `id` を省略して指す行を持つ設定に、同じ設定を指す `id: sample` の行'
         mock: '`reload`（呼ばれた数を数える）'
         expected: '`exists`・`same` が `False`。ファイルは変わらず、`reload` は呼ばれない'
+      - name: test_add_source_when_unknown_top_level_key
+        case: 正常
+        summary: 最上位の知らないキーを残して 1 行を追加する
+        condition: 最上位に `mindstella`（入れ子の値とコメント）を持つ `settings.yaml` に、extra の 1 行を追加する
+        mock: なし（一時フォルダ。`reload` は状態を返す偽物）
+        expected: '`added` で、`settings.yaml` の `mindstella` の値とコメントが追加の前と同じ'
       - name: test_add_source_when_version_outdated
         case: 異常
         summary: 内容のバージョンが古い

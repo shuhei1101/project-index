@@ -14,6 +14,7 @@ from project_index.features.read.types import (
     ConversionError,
     DecisionItem,
     DecisionResponse,
+    DocumentListEntry,
     DocumentListItem,
     DocumentListResponse,
     DocumentValueResponse,
@@ -40,9 +41,11 @@ def _row_dict(row: DocumentTable) -> dict[str, Any]:
     return data
 
 
-def get_source_config(source: ServedSource) -> SourceConfigResponse:
-    """配信元の設定のうち、`nav`・`documents[]`・`decisions.folders`・`github` を返す。"""
-    config = source.config
+def get_source_config(
+    target: Target, *, store: DocumentStore, schemas: bool = False
+) -> SourceConfigResponse:
+    """配信元の設定のうち画面が使うキーと、求めたときだけ行ごとの種類のスキーマを返す。"""
+    config = target.source.config
     github = (
         GitHubTarget(
             repository=config.github_repository, issue_labels=list(config.github_issue_labels)
@@ -55,6 +58,12 @@ def get_source_config(source: ServedSource) -> SourceConfigResponse:
         documents=[_row_dict(row) for row in config.documents],
         decisions={"folders": list(config.decision_folders)},
         github=github,
+        diff={"ignore_keys": list(config.diff_ignore_keys)},
+        schemas=(
+            {row.id: store.row_schema(target, row.id) for row in config.documents if row.enabled}
+            if schemas
+            else None
+        ),
     )
 
 
@@ -88,15 +97,26 @@ def _ref_name(target: Target) -> str:
     return target.ref or source.config.default_ref
 
 
-def list_documents(target: Target, *, store: DocumentStore) -> DocumentListResponse:
-    """読み取りの場所の文書の ID・パス・種類・メタデータを、`documents[]` の行の順に返す。"""
+def _entry(document: Document, *, values: bool) -> DocumentListEntry:
+    """文書のメタデータに、バージョンと、求めたときだけ値を加える。"""
+    return DocumentListEntry(
+        **_metadata(document).model_dump(),
+        version=document.version,
+        value=document.data if values else None,
+    )
+
+
+def list_documents(
+    target: Target, *, store: DocumentStore, values: bool = False
+) -> DocumentListResponse:
+    """読み取りの場所の文書の ID・パス・種類・メタデータ・バージョンを、`documents[]` の行の順に返す。"""
     loaded = store.load(target)
     order = {row.id: index for index, row in enumerate(target.source.config.documents)}
     documents = sorted(
         loaded.documents, key=lambda found: (order.get(found.kind, len(order)), found.path)
     )
     return DocumentListResponse(
-        ref=_ref_name(target), documents=[_metadata(found) for found in documents]
+        ref=_ref_name(target), documents=[_entry(found, values=values) for found in documents]
     )
 
 
@@ -127,12 +147,17 @@ def _file_time(file: Path) -> datetime:
 
 
 def get_document(
-    target: Target, path: str, *, store: DocumentStore, converter: ConvertService
+    target: Target,
+    path: str,
+    *,
+    doc_id: str | None = None,
+    store: DocumentStore,
+    converter: ConvertService,
 ) -> DocumentValueResponse:
     """パスの文書の値・種類のスキーマ・メタデータを返し、`converters[]` を指す種類だけ変換する。"""
     source = target.source
     loaded = store.load(target)
-    document = find_page(loaded.documents, path)
+    document = find_page(loaded.documents, path, doc_id=doc_id)
     # 文書が無い: YAML を読めなかったファイルなら読めなかった位置を返し、それも無ければ 404
     if document is None:
         broken = _unreadable(loaded.problems, path)

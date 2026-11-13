@@ -185,3 +185,20 @@ def test_collect_warnings_when_no_source_available(
     assert len(result) == 2
     assert result[0].startswith("端末の設定: 設定のバージョンが古い")
     assert result[1].startswith("b: 配信していません")
+
+
+def test_collect_warnings_when_unknown_top_level_key(
+    make_terminal_config: Callable[..., TerminalConfig],
+) -> None:
+    """端末の設定の知らないキーを 1 件にまとめて載せる（正常系）。"""
+    # 準備
+    terminal = make_terminal_config(unknown_keys=["mindstella", "prot"])
+    handlers = _loaded_handlers(terminal)
+    # 実行
+    result = collect_warnings(
+        [], registry=handlers.registry, checks=handlers.checks, terminal=handlers.terminal
+    )
+    # 検証
+    assert len(result) == 1
+    assert str(terminal.file) in result[0]
+    assert "mindstella, prot" in result[0]

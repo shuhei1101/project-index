@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -713,6 +713,31 @@ def test_document_store_row_schema_when_records(
     assert result["required"] == ["path"]
 
 
+def test_document_store_row_schema_when_records_defs(
+    document_store: DocumentStore,
+    tmp_path: Path,
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+) -> None:
+    """records の行は最上位の $defs を残す（正常系）。"""
+    # 準備（files の要素が、自分を指す循環する定義 node を参照する）
+    node = {"type": "object", "properties": {"children": {"items": {"$ref": "#/$defs/node"}}}}
+    notes_schema = {
+        "type": "object",
+        "properties": {"files": {"type": "array", "items": {"$ref": "#/$defs/node"}}},
+        "$defs": {"node": node},
+    }
+    source = _row_schema_source(
+        tmp_path / "ws", notes_schema, make_source_config, make_served_source
+    )
+    # 実行
+    result = document_store.row_schema(make_target(source), "notes")
+    # 検証
+    assert result["$defs"] == {"node": node}
+    assert result["properties"]["children"]["items"] == {"$ref": "#/$defs/node"}
+
+
 def test_document_store_row_schema_when_items_missing(
     document_store: DocumentStore,
     tmp_path: Path,
@@ -1014,3 +1039,39 @@ def test_check_sync_when_walked_once(
     assert len(report.missing_body_files) == 1
     assert report.missing_body_files[0].startswith("src/files.yaml: ")
     assert "c.py" in report.missing_body_files[0]
+
+
+def test_store_schema_when_paths_base_set(
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+    tmp_path: Path,
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    document_store: DocumentStore,
+) -> None:
+    """基準のフォルダが上でもスキーマは設定ファイルのフォルダから読む（正常系）。"""
+    # 準備
+    repo = git_repo(
+        {"content/node-docs/brain/note.schema.yaml": "type: object\nrequired: [brain]\n"}
+    )
+    head = run_git(repo, "rev-parse", "HEAD").strip()
+    worktree = tmp_path / "wt"
+    run_git(repo, "worktree", "add", "-b", "feat/x", str(worktree))
+    documents = [DocumentTable(id="notes", paths=["docs/*.yaml"], schema_path="note.schema.yaml")]
+    source = make_served_source(
+        root=repo,
+        config_dir=PurePosixPath("content/node-docs/brain"),
+        config=make_source_config(documents=documents),
+        is_git=True,
+        repo_root=repo,
+        schemas={"notes": {"type": "object"}},
+    )
+    in_worktree = make_target(source, base=worktree, worktree=worktree)
+    at_ref = make_target(source, ref="develop", commit=head)
+    # 実行
+    from_worktree = document_store.schema(in_worktree, "notes")
+    from_ref = document_store.schema(at_ref, "notes")
+    # 検証
+    assert from_worktree["required"] == ["brain"]
+    assert from_ref["required"] == ["brain"]

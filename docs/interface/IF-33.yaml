@@ -10,6 +10,7 @@ side_effects: '`settings.yaml` の `sources` の指した 1 行だけを書き�
 callers:
   - SC-12#scenarios[正常シナリオ（1 行を変更する）]
   - SC-12#scenarios[異常シナリオ（指した行が無い）]
+  - SC-12#scenarios[正常シナリオ（端末の設定の最上位に知らないキーがある）]
 exclusivity: 端末の設定の保存と同じ排他ロックの中で、内容のバージョンの照合・行の検索・検証・書き込み・読み直しを行う
 request:
   - name: id
@@ -72,9 +73,16 @@ response:
     type: 'list[{path: str, reason: str}]'
     description: 検証で除外した理由
     notes: '`not_served` のときだけ'
+  - name: warnings[].path
+    type: str
+    description: 端末の設定の最上位の知らないキーのパス
+    notes: 知らないキーが無いときは `warnings` が空の配列
+  - name: warnings[].reason
+    type: str
+    description: project-index が知らないキーで、値を使わずにファイルに残すこと
 response_example: |-
   ```json
-  {"version": "d4e5f6", "sources": [{"id": "sample", "status": "serving"}, {"id": "extra", "status": "serving"}]}
+  {"version": "d4e5f6", "sources": [{"id": "sample", "status": "serving"}, {"id": "extra", "status": "serving"}], "warnings": []}
   ```
 status_codes:
   - code: '200'

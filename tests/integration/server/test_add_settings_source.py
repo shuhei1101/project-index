@@ -121,3 +121,24 @@ def test_error_when_version_outdated(
     assert response.status_code == 409
     assert response.json()["current"] == edited
     assert env.settings_path.read_text(encoding="utf-8") == before
+
+
+UNKNOWN_KEY_EXTRA = "# MindStella の設定\nmindstella:\n  threads: 3  # 同時に動かす数\n"
+
+
+def test_normal_when_unknown_top_level_key_kept(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """最上位の知らないキーを違反にせずに 1 行を追加し、ファイルの値とコメントを残して警告で返す（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    extra = make_source("extra")
+    env = make_server(sample, settings_extra=UNKNOWN_KEY_EXTRA)
+    # 実行
+    response = env.client.post("/settings/sources", json={"source": _row(extra)})
+    # 検証
+    body = response.json()
+    assert response.status_code == 201
+    assert body["result"] == "added"
+    assert [warning["path"] for warning in body["warnings"]] == ["mindstella"]
+    assert UNKNOWN_KEY_EXTRA in env.settings_path.read_text(encoding="utf-8")

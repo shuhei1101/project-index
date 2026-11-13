@@ -386,10 +386,12 @@ class DocumentStore:
         ):
             return startup_schema(source, table)
         startup = source.schemas.get(kind, {})
-        base = source.root / table.schema_path
+        # スキーマは設定ファイルのフォルダからの相対パスなので、root からの相対パスにして読む
+        schema_path = source.config_path(table.schema_path)
+        base = source.root / schema_path
         if target.ref is not None:
-            return self._revision_schema(target, table.schema_path, startup, base)
-        path = self.read_root(target) / table.schema_path
+            return self._revision_schema(target, schema_path, startup, base)
+        path = self.read_root(target) / schema_path
         try:
             stat = path.stat()
         except OSError:
@@ -443,7 +445,12 @@ class DocumentStore:
         if records is None:
             return schema
         # records の行: 要素 1 つのスキーマ。取り出せなければ何も当てない
-        return records_item_schema(schema, records) or {}
+        item = records_item_schema(schema, records)
+        if item is None:
+            return {}
+        # 要素の中に残った `#/$defs/...` の参照先を辿れるよう、最上位の `$defs` を残す
+        defs = schema.get("$defs")
+        return {**item, "$defs": defs} if defs is not None else item
 
     def invalidate(self, paths: Iterable[Path]) -> None:
         """書き込んだファイルのキャッシュを捨てる。"""

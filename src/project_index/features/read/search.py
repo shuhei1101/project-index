@@ -30,6 +30,8 @@ def search_words(documents: Sequence[Document], q: str, limit: int) -> SearchRes
     items = [
         SearchItem(
             path=page_path(document),
+            id=document.id,
+            file_path=document.path,
             name=str(document.metadata["name"]),
             snippets=snippet_lines(
                 document.body, words, context_lines=CONTEXT_LINES, max_count=SNIPPETS_PER_DOC

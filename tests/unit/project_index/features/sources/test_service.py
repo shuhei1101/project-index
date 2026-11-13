@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -905,3 +905,209 @@ def test_read_default_ref_config_when_not_committed(
     ) as exc_info:
         read_default_ref_config(root / "project-index.yaml")
     assert [item.path for item in exc_info.value.violations] == ["config[0]"]
+
+
+BRAIN_CONFIG = (
+    "name: brain\n"
+    "paths_base: ../../..\n"
+    "documents:\n"
+    "  - id: knowhow\n"
+    "    paths: [docs/knowhow/*.yaml, content/node-docs/shared/*.yaml]\n"
+    "    schema: note.schema.yaml\n"
+)
+NOTE_SCHEMA = "title: note\ntype: object\n"
+
+
+@pytest.fixture
+def brain_files() -> dict[str, str]:
+    """ノードのフォルダに設定ファイルを置き、上のフォルダの文書を配信するリポジトリのファイルを返す。"""
+    return {
+        "content/node-docs/brain/project-index.yaml": BRAIN_CONFIG,
+        "content/node-docs/brain/note.schema.yaml": NOTE_SCHEMA,
+        "content/node-docs/brain/sub/.keep": "",
+        "docs/knowhow/a.yaml": "id: a\n",
+        "content/node-docs/shared/b.yaml": "id: b\n",
+    }
+
+
+def test_validate_source_config_when_paths_outside_base(source_root: Path) -> None:
+    """paths が基準のフォルダの外（正常系）。"""
+    # 準備
+    row = {
+        "id": "rules",
+        "paths": ["docs/*.yaml", "../outside/*.yaml"],
+        "schema": "schemas/rule.schema.yaml",
+    }
+    value = _config_value(paths_base="../..", documents=[row])
+    # 実行
+    result = validate_source_config(value, root=source_root)
+    # 検証
+    assert [(v.path, v.rule) for v in result] == [
+        ("documents[0].paths[1]", "配信元の外を指しています: ../outside/*.yaml")
+    ]
+
+
+def test_validate_source_config_when_paths_base_and_paths_invalid(source_root: Path) -> None:
+    """paths_base と paths の違反を並べる（正常系）。"""
+    # 準備
+    (source_root / "sub").mkdir()
+    row = {
+        "id": "rules",
+        "paths": ["docs/*.yaml", "../outside/*.yaml"],
+        "schema": "schemas/rule.schema.yaml",
+    }
+    value = _config_value(paths_base="sub", documents=[row])
+    # 実行
+    result = validate_source_config(value, root=source_root)
+    # 検証
+    assert sorted(v.path for v in result) == ["documents[0].paths[1]", "paths_base"]
+
+
+def test_load_source_when_paths_base_set(
+    git_repo: Callable[..., Path],
+    brain_files: dict[str, str],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """paths の基準のフォルダを指定する（正常系）。"""
+    # 準備
+    repo = git_repo(brain_files)
+    entry = make_entry(str(repo / "content/node-docs/brain/project-index.yaml"))
+    # 実行
+    served, status = load_source(entry, index=0)
+    # 検証
+    assert status.status == "serving"
+    assert served is not None
+    assert served.root == repo
+    assert served.config_dir == PurePosixPath("content/node-docs/brain")
+    assert served.schemas["knowhow"] == {"title": "note", "type": "object"}
+    assert served.scope_write == [str(repo / "content/node-docs/brain")]
+
+
+@pytest.mark.parametrize(
+    ("paths_base", "rule"),
+    [
+        pytest.param(
+            "sub", "設定ファイルのフォルダかそれより上のフォルダを指してください: sub", id="below"
+        ),
+        pytest.param("../../../..", "リポジトリの外を指しています: ../../../..", id="outside_repo"),
+    ],
+)
+def test_load_source_when_paths_base_invalid(
+    git_repo: Callable[..., Path],
+    brain_files: dict[str, str],
+    make_entry: Callable[..., SourceEntry],
+    paths_base: str,
+    rule: str,
+) -> None:
+    """paths の基準のフォルダが範囲の外（正常系）。"""
+    # 準備
+    files = dict(brain_files)
+    files["content/node-docs/brain/project-index.yaml"] = BRAIN_CONFIG.replace(
+        "paths_base: ../../..", f"paths_base: {paths_base}"
+    )
+    repo = git_repo(files)
+    entry = make_entry(str(repo / "content/node-docs/brain/project-index.yaml"))
+    # 実行
+    served, status = load_source(entry, index=0)
+    # 検証
+    assert served is None
+    assert status.status == "not_served"
+    assert [(v.path, v.rule) for v in status.errors] == [("paths_base", rule)]
+
+
+def test_load_source_at_when_paths_base_set(
+    git_repo: Callable[..., Path],
+    brain_files: dict[str, str],
+    make_entry: Callable[..., SourceEntry],
+    run_git: Callable[..., str],
+    tmp_path: Path,
+) -> None:
+    """ワークツリーでも基準のフォルダを解く（正常系）。"""
+    # 準備
+    repo = git_repo(brain_files)
+    served, _ = load_source(
+        make_entry(str(repo / "content/node-docs/brain/project-index.yaml")), index=0
+    )
+    assert served is not None
+    worktree = tmp_path / "wt"
+    run_git(repo, "worktree", "add", "-b", "feat/x", str(worktree))
+    # 実行
+    result = load_source_at(served, worktree)
+    # 検証
+    assert result.root == worktree
+    assert result.config_dir == PurePosixPath("content/node-docs/brain")
+
+
+def test_resolve_paths_base(tmp_path: Path) -> None:
+    """上のフォルダを基準にする（正常系）。"""
+    # 準備
+    repo = tmp_path / "repo"
+    config_root = repo / "a" / "b"
+    config_root.mkdir(parents=True)
+    # 実行
+    result = service_module._resolve_paths_base("../..", config_root, repo)
+    # 検証
+    assert result == (repo, [])
+
+
+def test_resolve_paths_base_when_unset(tmp_path: Path) -> None:
+    """省いた設定（正常系）。"""
+    # 準備
+    config_root = tmp_path / "a"
+    config_root.mkdir()
+    # 実行
+    result = service_module._resolve_paths_base(None, config_root, None)
+    # 検証
+    assert result == (config_root, [])
+
+
+def test_resolve_paths_base_when_below(tmp_path: Path) -> None:
+    """設定ファイルのフォルダの下（正常系）。"""
+    # 準備
+    repo = tmp_path / "repo"
+    config_root = repo / "a" / "b"
+    (config_root / "sub").mkdir(parents=True)
+    # 実行
+    base, violations = service_module._resolve_paths_base("sub", config_root, repo)
+    # 検証
+    assert base == config_root
+    assert [(v.path, v.rule) for v in violations] == [
+        ("paths_base", "設定ファイルのフォルダかそれより上のフォルダを指してください: sub")
+    ]
+
+
+def test_resolve_paths_base_when_outside_repo(tmp_path: Path) -> None:
+    """リポジトリの直下より上（正常系）。"""
+    # 準備
+    repo = tmp_path / "repo"
+    config_root = repo / "a" / "b"
+    config_root.mkdir(parents=True)
+    # 実行
+    base, violations = service_module._resolve_paths_base("../../..", config_root, repo)
+    # 検証
+    assert base == config_root
+    assert [(v.path, v.rule) for v in violations] == [
+        ("paths_base", "リポジトリの外を指しています: ../../..")
+    ]
+
+
+def test_resolve_paths_base_when_not_git(tmp_path: Path) -> None:
+    """Git の管理外はリポジトリの範囲を確かめない（正常系）。"""
+    # 準備
+    config_root = tmp_path / "x" / "a" / "b"
+    config_root.mkdir(parents=True)
+    # 実行
+    result = service_module._resolve_paths_base("../..", config_root, None)
+    # 検証
+    assert result == (tmp_path / "x", [])
+
+
+def test_resolve_paths_base_when_missing(tmp_path: Path) -> None:
+    """無いフォルダ（正常系）。"""
+    # 準備
+    config_root = tmp_path / "a" / "b"
+    config_root.mkdir(parents=True)
+    # 実行
+    _, violations = service_module._resolve_paths_base("../none", config_root, None)
+    # 検証
+    assert "フォルダがありません: ../none" in [v.rule for v in violations]

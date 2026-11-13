@@ -327,10 +327,10 @@ classes:
         process: |-
           1. `source.table(kind)` で行を引く
           2. `target.ref` と `target.worktree` がどちらも `None` の場合と、行の `schema_path` が `SchemaRef` の場合、起動時のスキーマを返す（読む場所によらず参照したリビジョンのスキーマ）
-          3. `target.ref` がある場合、`repo_root`・読む場所の commit（`load` と同じ）・スキーマのファイルの `repo_root` からの相対パスで `_revision_schemas` を引き、当たればそのまま返す（リビジョンの書き出しとファイルの `stat` をしない）。
-             当たらなければ、`load` と同じ読むフォルダの `schema_path` を『YAMLの読み込み』で読み、`$ref` を解いた結果を `_revision_schemas` に控える
+          3. `target.ref` がある場合、`repo_root`・読む場所の commit（`load` と同じ）・スキーマのファイル（設定ファイルのフォルダからの相対パスを `source.config_path` で `root` からにしたもの）の `repo_root` からの相対パスで `_revision_schemas` を引き、当たればそのまま返す（リビジョンの書き出しとファイルの `stat` をしない）。
+             当たらなければ、`load` と同じ読むフォルダの `source.config_path(schema_path)` を『YAMLの読み込み』で読み、`$ref` を解いた結果を `_revision_schemas` に控える
              - ファイルが無い・読めない場合、手順 2 のスキーマを使い、控えない
-          4. ワークツリーの場合、読むフォルダの `schema_path` を `_schemas` から引き、更新日時か大きさが違えば『YAMLの読み込み』で読み直す
+          4. ワークツリーの場合、読むフォルダの `source.config_path(schema_path)` を `_schemas` から引き、更新日時か大きさが違えば『YAMLの読み込み』で読み直す
              - ファイルが無い・読めない場合、手順 2 のスキーマを使う
           5. `$ref` を解いたスキーマを返す（スキーマの参照の解決。基準は手順 2〜4 で使った `schema_path`）。ワークツリーで解いた結果は `_schemas` に控える
         exceptions:
@@ -364,6 +364,12 @@ classes:
             condition: 1 つのリポジトリの `docs/` と `dev/` を `root` にした配信元 2 つが、どちらも種類 `rule` を持ち、`schemas/rule.schema.yaml` の `required` が違う。同じ commit を持つ読む場所で、順に `schema` を呼ぶ
             mock: なし（`tmp_path` に `git init`）
             expected: それぞれの配信元の `required` のスキーマを返す
+          - name: test_store_schema_when_paths_base_set
+            case: 正常
+            summary: 基準のフォルダが上でもスキーマは設定ファイルのフォルダから読む
+            condition: '`root` が repo の直下、`config_dir` が `content/node-docs/brain` の配信元を、ワークツリーと `ref` の 2 つの読む場所で引く'
+            mock: なし（一時フォルダで `git init`）
+            expected: どちらも `content/node-docs/brain/note.schema.yaml` の内容のスキーマを返す
       - name: row_schema
         title: 文書に当てるスキーマ
         summary: 文書 1 件の内容に当てるスキーマを返す。`records` を持つ行は 1 行のスキーマ
@@ -390,7 +396,7 @@ classes:
         process: |-
           1. `schema(target, kind)` で種類のスキーマを得る
           2. 行の `records` が `None` の場合、そのまま返す
-          3. `records` がある場合、records の行の 1 行のスキーマ（`records_item_schema`）を返す。`None` なら空の辞書を返す
+          3. `records` がある場合、records の行の 1 行のスキーマ（`records_item_schema`）に、種類のスキーマの最上位の `$defs`（あれば）を加えて返す。`None` なら空の辞書を返す
         exceptions:
           - name: UnknownKindError
             condition: '`kind` が有効な文書の行に無い'
@@ -408,6 +414,12 @@ classes:
             condition: '行 `notes`（`records: files`）の `schema` が `templates/files.schema.yaml` のコピー'
             mock: なし（`tmp_path`）
             expected: '`required` が `[path]` の `files` の `items`'
+          - name: test_document_store_row_schema_when_records_defs
+            case: 正常
+            summary: records の行は最上位の $defs を残す
+            condition: '行 `notes`（`records: files`）の `schema` が、`$defs` に自分を指す循環する定義 `node` を持ち、`files` の `items` が `$ref` で `node` を指す'
+            mock: なし（`tmp_path`）
+            expected: 返したスキーマが最上位の `$defs.node` を持ち、残った `#/$defs/node` の参照先がその中にある
           - name: test_document_store_row_schema_when_items_missing
             case: 正常
             summary: 1 行のスキーマを取り出せない

@@ -23,3 +23,17 @@ def test_search_words(make_document: Callable[..., Document]) -> None:
     assert result.total_count == 1
     assert result.items[0].path == "docs/both"
     assert any("foo" in line or "bar" in line for line in result.items[0].snippets)
+
+
+def test_search_words_when_record(make_document: Callable[..., Document]) -> None:
+    """行の文書の ID とファイルのパスを返す（正常系）。"""
+    # 準備
+    first = make_document(id="term-1", path="terms.yaml", record_index=0, body="name: alpha\n")
+    second = make_document(id="term-2", path="terms.yaml", record_index=1, body="name: beta\n")
+    # 実行
+    result = search_words([first, second], "beta", 20)
+    # 検証
+    assert result.total_count == 1
+    assert result.items[0].id == "term-2"
+    assert result.items[0].file_path == "terms.yaml"
+    assert result.items[0].path == "terms/term-2"

@@ -907,3 +907,37 @@ def test_reload_changed_sources(
     assert sorted(calls[1:]) == ["checker.clear", "converter.clear", "store.clear"]
     assert checked == [["b"]]
     assert result == statuses
+
+
+def test_build_handlers_when_unknown_key_reloaded(
+    make_terminal_config: Callable[..., TerminalConfig],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """読み直しで知らないキーを差し替える（正常系）。"""
+    # 準備
+    terminal = make_terminal_config()
+    handlers = build_handlers(terminal)
+    new_terminal = make_terminal_config(unknown_keys=["mindstella"])
+    caplog.set_level(logging.WARNING)
+    # 実行
+    handlers.reload_sources(new_terminal)
+    # 検証
+    assert handlers.terminal.unknown_keys == ["mindstella"]
+    assert any("mindstella" in record.getMessage() for record in caplog.records)
+
+
+def test_build_handlers_when_unknown_key_reloaded_changed(
+    make_terminal_config: Callable[..., TerminalConfig],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """変わった配信元の読み直しでも知らないキーを差し替える（正常系）。"""
+    # 準備
+    terminal = make_terminal_config(unknown_keys=["old"])
+    handlers = build_handlers(terminal)
+    new_terminal = make_terminal_config(unknown_keys=["mindstella"])
+    caplog.set_level(logging.WARNING)
+    # 実行
+    handlers.reload_changed(new_terminal)
+    # 検証
+    assert handlers.terminal.unknown_keys == ["mindstella"]
+    assert any("mindstella" in record.getMessage() for record in caplog.records)

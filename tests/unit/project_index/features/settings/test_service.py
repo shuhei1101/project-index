@@ -721,3 +721,51 @@ def test_delete_source_when_not_found(
         )
     assert settings_path.read_text(encoding="utf-8") == SETTINGS_TEXT
     assert calls == []
+
+
+UNKNOWN_KEY_TEXT = (
+    'version: "1"\n'
+    "clone: /tmp/clone\n"
+    "# MindStella の設定\n"
+    "mindstella:\n"
+    "  threads: 3  # 同時に動かす数\n"
+    "sources:\n"
+    "  - config: /tmp/a/project-index.yaml\n"
+)
+
+
+def test_save_sources_when_unknown_top_level_key(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """最上位の知らないキーを残して保存する（正常系）。"""
+    # 準備
+    path = tmp_path / "settings.yaml"
+    path.write_text(UNKNOWN_KEY_TEXT, encoding="utf-8")
+    reload, _ = fake_reload
+    sources = [make_entry("/tmp/a/project-index.yaml", source_id="sample")]
+    # 実行
+    save_sources(sources, path=path, reload=reload, lock=threading.Lock())
+    # 検証
+    text = path.read_text(encoding="utf-8")
+    assert "# MindStella の設定\nmindstella:\n  threads: 3  # 同時に動かす数\n" in text
+
+
+def test_add_source_when_unknown_top_level_key(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """最上位の知らないキーを残して 1 行を追加する（正常系）。"""
+    # 準備
+    path = tmp_path / "settings.yaml"
+    path.write_text(UNKNOWN_KEY_TEXT, encoding="utf-8")
+    reload, _ = fake_reload
+    entry = make_entry("/tmp/b/project-index.yaml", source_id="extra")
+    # 実行
+    result = add_source(entry, path=path, reload=reload, lock=threading.Lock())
+    # 検証
+    text = path.read_text(encoding="utf-8")
+    assert result.result == "added"
+    assert "# MindStella の設定\nmindstella:\n  threads: 3  # 同時に動かす数\n" in text

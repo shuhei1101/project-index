@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from importlib import resources
 from typing import TYPE_CHECKING, Any, cast
 
 from project_index.features.settings.types import (
+    SettingsWarning,
     SourceEntry,
     TerminalConfig,
     TerminalConfigInvalidError,
@@ -19,7 +21,7 @@ from project_index.shared.schema_check import schema_violations
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Iterable, Mapping
     from pathlib import Path
 
 DEFAULT_CONFIG_HOME = "~/.config"
@@ -33,8 +35,11 @@ PORT_ENV = "PROJECT_INDEX_PORT"
 STATE_DIR_ENV = "PROJECT_INDEX_STATE_DIR"
 SETTINGS_SCHEMA = "schemas/settings.schema.yaml"
 SETTINGS_VERSION = "1"
+UNKNOWN_KEY_REASON = "project-index が知らないキーです。値は使用せず、ファイルに残します"
 PORT_MIN = 1
 PORT_MAX = 65535
+
+logger = logging.getLogger(__name__)
 
 
 def xdg_base_dir(env: Mapping[str, str], name: str, default: str) -> Path:
@@ -133,6 +138,27 @@ def read_settings_file(path: Path) -> tuple[str, str]:
     return raw.decode("utf-8"), content_hash(raw)
 
 
+def unknown_top_level_keys(value: Iterable[object]) -> list[str]:
+    """端末の設定の値の最上位の、スキーマの `properties` に無いキーをファイルの順に返す。"""
+    known = set(_settings_schema()["properties"])
+    return [str(key) for key in value if key not in known]
+
+
+def unknown_key_warnings(config: TerminalConfig) -> list[SettingsWarning]:
+    """端末の設定の知らないキーを、端末の設定の API の警告の並びにする。"""
+    return [SettingsWarning(path=key, reason=UNKNOWN_KEY_REASON) for key in config.unknown_keys]
+
+
+def log_unknown_keys(config: TerminalConfig) -> None:
+    """端末の設定の知らないキーを警告のログに書く。"""
+    if config.unknown_keys:
+        logger.warning(
+            "端末の設定に project-index が知らないキーがある（%s・%s）",
+            config.file,
+            ", ".join(config.unknown_keys),
+        )
+
+
 def load_terminal_config(
     path: Path, *, env: Mapping[str, str] | None = None, text: str | None = None
 ) -> TerminalConfig:
@@ -176,6 +202,7 @@ def load_terminal_config(
     return TerminalConfig.model_validate(
         {
             "file": path,
+            "unknown_keys": unknown_top_level_keys(data),
             "version": data["version"],
             "clone": normalize_path(str(data["clone"])),
             "state_dir": state_dir,

@@ -11,6 +11,7 @@ callers:
   - SC-12#scenarios[正常シナリオ（1 行を削除する）]
   - SC-12#scenarios[異常シナリオ（利用者が端末の設定を手で書き換えた）]
   - SC-12#scenarios[異常シナリオ（指した行が無い）]
+  - SC-12#scenarios[正常シナリオ（端末の設定の最上位に知らないキーがある）]
 exclusivity: 端末の設定の保存と同じ排他ロックの中で、内容のバージョンの照合・行の検索・書き込み・配信からの除外を行う
 request:
   - name: id
@@ -38,9 +39,16 @@ response:
   - name: sources[].status
     type: Literal['serving', 'not_served', 'disabled']
     description: 削除した後の状態。削除した配信元は並ばない
+  - name: warnings[].path
+    type: str
+    description: 端末の設定の最上位の知らないキーのパス
+    notes: 知らないキーが無いときは `warnings` が空の配列
+  - name: warnings[].reason
+    type: str
+    description: project-index が知らないキーで、値を使わずにファイルに残すこと
 response_example: |-
   ```json
-  {"version": "d4e5f6", "sources": [{"id": "sample", "status": "serving"}]}
+  {"version": "d4e5f6", "sources": [{"id": "sample", "status": "serving"}], "warnings": []}
   ```
 status_codes:
   - code: '200'
