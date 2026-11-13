@@ -17,8 +17,8 @@
 | --- | --- | --- |
 | `GET /sources` | 配信元ごとの ID・状態（`serving`・`not_served`・`disabled`）・配信していない理由 | - |
 | `GET /sources/{source}/config?schemas=` | 配信元の設定のうち `nav`・`documents[]`（スクリプトのコマンドを除く）・`decisions.folders`・`github`・`diff`。`schemas=true` で `documents[]` の行ごとの `$ref` を解いた種類のスキーマも返す | 404（無い・配信していない配信元） |
-| `GET /sources/{source}/docs?ref=&values=` | 指したリビジョン（省くと `default_ref`）の文書の ID・パス・種類・メタデータ・バージョン。`values=true` で文書の値も返す | 404（配信元・リビジョン） |
-| `GET /sources/{source}/docs/{path}?ref=&id=` | 文書の値・種類のスキーマ・メタデータ。管理用の YAML の行の文書は本文の文字列と本文のファイルのパスも返す。`converters[]` を指す種類は、スクリプトが出した Markdown か変換の失敗 | 404（配信元・リビジョン・文書） |
+| `GET /sources/{source}/docs?ref=&values=&common_keys=` | 指したリビジョン（省くと `default_ref`）の文書の ID・パス・種類・メタデータ・バージョン。`values=true` で文書の値も返す。`common_keys=true` で、配信元の設定の行の `metadata`・`alias_type` で解決した共通のキーも返す | 404（配信元・リビジョン） |
+| `GET /sources/{source}/docs/{path}?ref=&id=` | 文書の値・種類のスキーマ・メタデータ（解決した共通のキーを含む）。管理用の YAML の行の文書は本文の文字列と本文のファイルのパスも返す。`converters[]` を指す種類は、スクリプトが出した Markdown か変換の失敗 | 404（配信元・リビジョン・文書） |
 | `GET /sources/{source}/decisions` | `decisions.folders` にある検討事項の ID と、ID ごとに当たるフォルダの数 | 404（配信元） |
 | `GET /sources/{source}/decisions/{id}` | ちょうど 1 つのフォルダにある検討事項の文書の本文 | 404（当たるフォルダが 0 個か 2 個以上。`reason` に `not_found`・`ambiguous`） |
 | `GET /sources/{source}/search?q=&ref=&limit=` | 語を含む文書の ID・文書のファイルのパスと一致した箇所 | 400（語が空・長すぎる）・404 |

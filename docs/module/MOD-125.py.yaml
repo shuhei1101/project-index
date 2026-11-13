@@ -139,12 +139,19 @@ functions:
         default: 'False'
         passing: keyword
         description: '`True` のとき、各要素の `value` に文書の値を入れる'
+      - name: common_keys
+        title: 共通のキーを求めるか
+        type: bool
+        required: false
+        default: 'False'
+        passing: keyword
+        description: '`True` のとき、各要素の `common_keys` に文書の `metadata` を入れる'
     returns:
       type: DocumentListResponse
       description: 文書の一覧の応答
     process: |-
       1. `store.load(target)` で文書を読み込む
-      2. 文書ごとに `id`・`path`・`kind`・メタデータ（`name`・`description`・`tags`・`visibility`）・`body_path`・`version` と、`values` が `True` のときだけ `value`（文書の `data`）を `DocumentListEntry` にする
+      2. 文書ごとに `id`・`path`・`kind`・メタデータ（`name`・`description`・`tags`・`visibility`）・`body_path`・`version` と、`values` が `True` のときだけ `value`（文書の `data`）、`common_keys` が `True` のときだけ `common_keys`（文書の `metadata`）を `DocumentListEntry` にする
       3. `documents[]` の行の順、行の中はパスの順に並べ、`ref` に解決したリビジョンの名前を入れて返す
     unit_tests:
       - name: test_list_documents
@@ -152,13 +159,19 @@ functions:
         summary: 行の順に並べる
         condition: 種類 `design` の YAML 2 件と、`files.yaml` の行の文書 1 件
         mock: なし（一時フォルダの配信元）
-        expected: 3 件が行の順に並び、行の文書だけが `body_path` を持ち、各要素が文書の `version` を持ち、`value` が `None`
+        expected: 3 件が行の順に並び、行の文書だけが `body_path` を持ち、各要素が文書の `version` を持ち、`value` と `common_keys` が `None`
       - name: test_list_documents_when_values
         case: 正常
         summary: 値を求めたときだけ値を入れる
         condition: 同じ配信元で `values` が `True`
         mock: なし（一時フォルダの配信元）
         expected: YAML の文書の `value` が YAML の値、行の文書の `value` が行の値
+      - name: test_list_documents_when_common_keys
+        case: 正常
+        summary: 共通のキーを求めたときだけ文書の metadata を入れる
+        condition: 種類 `design` の行が `metadata`（`related` を列名 `links` から取る）と `alias_type` を持つ配信元で、`common_keys` が `True`
+        mock: なし（一時フォルダの配信元）
+        expected: YAML の文書の `common_keys` が文書の `metadata` と同じで、`related` に `links` の値、`alias_type` に行の値を持ち、`value` が `None`
   - name: get_document
     title: 文書の取得
     kind: 関数
@@ -205,7 +218,7 @@ functions:
     process: |-
       1. `store.load(target)` の文書から、`path` の文書を引く（文書のページの特定。文書のファイル、無ければ本文のファイルが `path` と同じ最初の文書。`doc_id` を指したときは、そのうち文書の ID が `doc_id` と同じ文書）
          - 無い場合、`DocumentNotFoundError` を送出する
-      2. 文書の値・種類のスキーマ（`store.row_schema(target, kind)` の `$ref` を解いた形）・メタデータ・本文と本文のファイルのパス（管理用の YAML の行の文書だけ）を集める
+      2. 文書の値・種類のスキーマ（`store.row_schema(target, kind)` の `$ref` を解いた形）・メタデータ（`common_keys` に文書の `metadata` を入れる）・本文と本文のファイルのパス（管理用の YAML の行の文書だけ）を集める
          - YAML として読み込めない文書は、`value` を `None` にし、ファイルのパスと行と列を `conversion_error` に入れる
       3. 文書の種類の行が `converter` を持つ場合だけ、`converter.convert(target, document)` の `markdown` か `failure` を入れる
       4. `updated_at` に、Git の配信元はそのリビジョンでファイルを最後に変えた commit の日時、Git 管理外の配信元はファイルの更新日時を入れる
@@ -220,7 +233,7 @@ functions:
         summary: 値とスキーマを返し、変換しない
         condition: '`converters[]` を指さない種類の YAML の文書'
         mock: なし（一時フォルダの配信元）
-        expected: '`value` が YAML の値、`schema` が種類のスキーマ、`markdown` が `None` で、`ConvertService.convert` を呼ばない'
+        expected: '`value` が YAML の値、`schema` が種類のスキーマ、`metadata.common_keys` が文書の `metadata`、`markdown` が `None` で、`ConvertService.convert` を呼ばない'
       - name: test_get_document_when_body_path
         case: 正常
         summary: 本文のファイルのパスで引く

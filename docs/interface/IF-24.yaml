@@ -53,6 +53,31 @@ flows:
       - 200 で、各要素の `value` が文書の取得の `value` と同じ（YAML の文書は YAML を読み込んだ値、行の文書は行の値）
       - '`values` を省いた正常系の各要素の `value` は `null`'
     test: test_normal_when_values_requested
+  - name: 正常系（共通のキーを求める）
+    summary: '`common_keys` を指したときだけ、各文書の共通のキーを返す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: サンプルの配信元
+        description: 正常系と同じ sample。種類 `design` の `documents[]` の行は、`metadata` に `name` を列名 `title` から、`related` を列名 `links` から取る対応と、`alias_type` を持つ
+    flow: |-
+      <!-- map: {"title": "正常系（共通のキーを求める）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs
+
+        C->>E: GET /sources/sample/docs?common_keys=true
+        E-->>C: 200 共通のキーつきの文書の一覧
+      ```
+
+      <!-- /map -->
+    expected:
+      - 200 で、種類 `design` の各要素の `commonKeys` が、文書の `title` の値を `name` に、`links` の値を `related` に入れ、行の `alias_type` を `alias_type` に入れた共通のキーを持つ
+      - 各要素の `commonKeys` の中のキーは `METADATA_KEYS` の名前のまま（camelCase にしない）で、文書に値の無いキーを持たない
+      - '`common_keys` を省いた正常系の各要素の `commonKeys` は `null`'
+    test: test_normal_when_common_keys_requested
   - name: 正常系（リビジョンを指す）
     summary: '`ref` の文書の一覧を返す'
     setup:
@@ -128,9 +153,15 @@ request:
     default: '`false`'
     location: query
     description: '`true` のとき、各要素の `value` に文書の値を入れる'
+  - name: common_keys
+    type: bool
+    required: false
+    default: '`false`'
+    location: query
+    description: '`true` のとき、各要素の `commonKeys` に文書の共通のキーを入れる'
 request_example: |-
   ```text
-  GET /sources/sample/docs?ref=main&values=true
+  GET /sources/sample/docs?ref=main&values=true&common_keys=true
   ```
 response:
   - name: ref
@@ -168,11 +199,15 @@ response:
     type: dict | None
     description: 文書の値（YAML を読み込んだもの、行の文書は行の値）
     notes: '`values` が `true` のときだけ入れ、それ以外は `null`'
+  - name: documents[].commonKeys
+    type: dict | None
+    description: 共通のキーの値。配信元の設定の行の `metadata` の列名の対応で文書から取った値と、行の `alias_type`。`name` は無いときの既定を入れた値
+    notes: '`common_keys` が `true` のときだけ入れ、それ以外は `null`。値の無いキーは持たない'
 response_example: |-
   ```json
   {"ref": "main", "documents": [
-    {"id": "D-1", "path": "design/D-1.yaml", "kind": "design", "name": "タスクの保存", "description": "タスクの保存と取得", "tags": ["topic:task"], "visibility": "internal", "bodyPath": null, "version": "3f2a9c", "value": {"id": "D-1", "title": "タスクの保存"}},
-    {"id": "guide.md", "path": "files.yaml", "kind": "files_guide", "name": "使い方", "description": null, "tags": [], "visibility": "public", "bodyPath": "guide.md", "version": "8b41d0", "value": {"path": "guide.md", "name": "使い方"}}
+    {"id": "D-1", "path": "design/D-1.yaml", "kind": "design", "name": "タスクの保存", "description": "タスクの保存と取得", "tags": ["topic:task"], "visibility": "internal", "bodyPath": null, "version": "3f2a9c", "value": {"id": "D-1", "title": "タスクの保存", "links": [{"to": "D-2"}]}, "commonKeys": {"id": "D-1", "name": "タスクの保存", "related": [{"to": "D-2"}], "alias_type": "term"}},
+    {"id": "guide.md", "path": "files.yaml", "kind": "files_guide", "name": "使い方", "description": null, "tags": [], "visibility": "public", "bodyPath": "guide.md", "version": "8b41d0", "value": {"path": "guide.md", "name": "使い方"}, "commonKeys": {"name": "使い方", "path": "guide.md"}}
   ]}
   ```
 status_codes:
@@ -186,10 +221,10 @@ constraints:
   - item: 並び
     constraint: '`documents[]` の行の順、行の中はパスの順'
   - item: 値の読み込み
-    constraint: '`value`・`version` は文書のストアが読み込み済みの文書から返し、文書ごとにファイルを読み直さない'
+    constraint: '`value`・`version`・`commonKeys` は文書のストアが読み込み済みの文書から返し、文書ごとにファイルを読み直さない'
   - item: 認可
     constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
     decided_by: NFR-1#requirements[通信]
   - item: JSON のキー
-    constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名と、`value` の中身は変えない
+    constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名と、`value`・`commonKeys` の中身は変えない
 test_file: tests/integration/server/test_list_documents.py
