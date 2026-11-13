@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -24,6 +23,7 @@ from project_index.main import build_handlers
 from project_index.shared.errors import UnknownKindError, ValidationFailedError
 
 if TYPE_CHECKING:
+    import threading
     from collections.abc import Callable, Sequence
 
     from project_index.features.sources.registry import SourceRegistry
