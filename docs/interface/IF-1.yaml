@@ -11,6 +11,7 @@ flows:
         description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
       - name: 配信元
         description: sample（`scope.read`・`scope.write` は sample のフォルダ）、notes（`scope.read` は sample のフォルダ）、other（`scope.read` は other のフォルダだけ）
+        notes: sample の設定の `when` に 2 行。notes の設定に `when` を記載しない
       - name: 入力
         description: 引数なし。`cwd` は sample のクローン本体
     flow: |-
@@ -31,6 +32,8 @@ flows:
       - 先頭に作業場所と、sample のクローン本体であることがある
       - sample を `write（作業中）`、notes を `read` として返す
       - other を返さない
+      - 表の `when` 列の sample の行が `when` の 2 行を `<br>` でつないだ値で、notes の行が空
+      - '`format: json` の `sources[].when` が sample は 2 行の配列で、notes の行は `when` のキーを持たない（空の値のキーを落とす）'
     test: test_normal
   - name: 正常系（使える配信元の警告）
     summary: 引数なしで、使える配信元の一覧に続けて、使える配信元の同期のずれ・古い設定と、配信していない配信元の警告を返す
@@ -128,7 +131,7 @@ flows:
       - name: Mock
         description: なし
       - name: 説明書
-        description: sample の設定に `instructions` と種類 1 つを持たせる
+        description: sample の設定に `instructions`・`when` の 2 行と種類 1 つを持たせる
       - name: 入力
         description: '`source: sample`'
     flow: |-
@@ -142,12 +145,15 @@ flows:
 
         C->>T: source: sample
         T-->>CF: マージした設定を読む
-        T-->>C: 説明書と種類の表
+        T-->>C: 使う場面・説明書と種類の表
       ```
 
       <!-- /map -->
     expected:
+      - 説明書の前に「使う場面」の見出しと、`when` の 2 行の箇条書きがある
       - '`instructions` の本文がそのままある'
+      - '`format: json` の `when` が 2 行の配列'
+      - '`when` を記載しない配信元では「使う場面」の見出しを出さず、`format: json` が `when` のキーを持たない'
       - 種類の表に sample の種類の `id` と説明がある
     test: test_normal_when_source
   - name: 正常系（種類のスキーマ）
@@ -349,6 +355,7 @@ flows:
         description: なし
       - name: 配信元
         description: '正常系と同じ sample・notes・other（`outside_read` を書かない）に、`scope.read` が closed のフォルダだけで端末の設定の行に `outside_read: false` を持つ closed を加える'
+        notes: other の設定の `when` に 2 行
       - name: 入力
         description: '`outside_scope: true`（`source` なし）。`cwd` は sample のクローン本体'
     flow: |-
@@ -368,12 +375,53 @@ flows:
       <!-- /map -->
     expected:
       - 作業場所と使える配信元の表は、引数なしの正常系と同じ（sample・notes）
-      - 続けて「作業範囲の外（参考）」の見出しと、other の ID と `description` の行を持つ表がある
+      - 続けて「作業範囲の外（参考）」の見出しと、other の ID と `description` と `when` の行を持つ表がある
+      - 作業範囲の外の表の `when` 列が、other の `when` の 2 行を `<br>` でつないだ値
+      - '`format: json` の `outside_sources[].when` が other の `when` の 2 行の配列'
       - 作業範囲の外の表に、`scope` に当たる sample・notes と、`outside_read` が偽の closed が無い
       - '`format: json` の `outside_sources` が other の 1 件だけで、`sources` は引数なしと同じ'
       - 要求のログに作業範囲の外の記録を残さない（文書を読まない）
       - '`outside_scope` を省いた引数なしの一覧には、作業範囲の外の表が無い'
     test: test_normal_when_outside_list
+  - name: 正常系（使う場面を書き換えた後の一覧）
+    summary: '`default_ref` に `when` の書き換えを commit した後の引数なしの一覧が、裏の確認の後に、`reload` をしなくても書き換えた `when` を返す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 配信元
+        description: Git のリポジトリの sample。`default_ref` は `develop`
+        notes: '`develop` の設定の `when` に 1 行'
+      - name: 入力
+        description: 引数なし。`cwd` は sample のクローン本体
+      - name: 裏の確認の待ち方
+        description: commit の後、引数なしの `describe` を 0.5 秒おきに上限 60 秒まで呼び、sample の `when` が書き換えた値になるまで待つ
+        notes: 決め打ちの時間では待たない。上限を超えたら失敗にする
+    flow: |-
+      <!-- map: {"title": "正常系（使う場面を書き換えた後の一覧）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as describe
+        participant G as sample のリポジトリ
+
+        C->>T: 引数なし
+        T-->>C: sample と when の 1 行
+        C->>G: develop の when の 1 行目を書き換えて commit する
+        C->>T: 引数なし
+        T-->>C: その時点の sample と when
+        T->>G: 裏で一覧に出した配信元の default_ref の commit を確認し、変わっていれば組み立て直す
+        C->>T: 引数なし（書き換えた when が出るまで繰り返す）
+        T-->>C: sample と書き換えた when
+      ```
+
+      <!-- /map -->
+    expected:
+      - 裏の確認の後の引数なしの一覧の sample の `when` が、書き換えた値になる
+      - commit の直後の呼び出しは、裏の確認と組み立て直しを待たずに応答する
+      - 裏の確認が走っている間に続けて呼んでも、sample の確認は重ねて走らない
+      - '`outside_scope: true` の作業範囲の外の一覧も、同じく組み立て直した配信元の `when` を返す'
+    test: test_normal_when_source_when_changed
   - name: 正常系（ブランチとワークツリー）
     summary: '`source` で、説明書と種類の一覧に加えてブランチ・タグとワークツリーの一覧を返す'
     setup:
@@ -419,6 +467,7 @@ callers:
   - SC-6#scenarios[正常シナリオ（作業範囲の外を参考に読む）]
   - SC-6#scenarios[異常シナリオ（作業範囲の外の参照を断る配信元を指す）]
   - SC-6#scenarios[正常シナリオ（instructions の調査の案内を受け取る）]
+  - SC-6#scenarios[正常シナリオ（使う場面を書き換えた後に接続する）]
 exclusivity: '読み取りだけで排他しない（`readOnlyHint: true`）'
 request:
   - name: source
@@ -484,6 +533,10 @@ response:
   - name: sources[].description
     type: str
     description: 配信元の設定の `description`
+  - name: sources[].when
+    type: list[str]
+    description: '配信元の設定の `when`（使う場面）の全ての行。記載しない配信元は空の配列（`format: json` はキーを落とす）'
+    notes: '`format: markdown` は表の `when` 列に、行を `<br>` でつないで出す'
   - name: outside_sources[].id
     type: str
     description: '`scope` に `cwd` が当たらず、端末の設定の `sources[].outside_read` が真の配信元の ID'
@@ -491,10 +544,18 @@ response:
   - name: outside_sources[].description
     type: str
     description: 配信元の設定の `description`
+  - name: outside_sources[].when
+    type: list[str]
+    description: 配信元の設定の `when` の全ての行
+    notes: '`sources[].when` と同じ出し方'
   - name: warnings[]
     type: str
     description: 使える配信元の同期のずれ（metadata の列の欠け・管理用の YAML に無いファイル・ファイルが無い行・どの文書にも該当しない関連）とエイリアスのキーの違反、配信元・端末の設定のバージョンが古いこと、どの文書にも当たらない `nav` の条件、検証で外した配信元、端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパスを 1 件にまとめる）
     notes: '引数なしのとき。同期のずれ・エイリアス・`nav`・配信元の設定のバージョンは使える配信元だけを対象にし、端末の設定のバージョン・端末の設定の知らないキーと検証で外した配信元は使える配信元が 0 件のときも載せる。`format: markdown` は使える配信元の表の後の「注意」の見出しの下に 1 行ずつ出し、0 件は見出しごと出さない。`format: json` は 0 件のときキーを持たない'
+  - name: when
+    type: list[str]
+    description: 配信元の設定の `when` の全ての行
+    notes: '`source` だけのとき。`format: markdown` は説明書の前に「使う場面」の見出しと箇条書きで出し、空の配列なら見出しごと出さない'
   - name: instructions
     type: str
     description: 配信元の設定の `instructions` をそのまま
@@ -538,10 +599,10 @@ response_example: |-
   ```markdown
   作業場所: /path/to/sample（sample のクローン本体）
 
-  | source | 権限 | description |
-  | --- | --- | --- |
-  | sample | write（作業中） | サンプルの文書 |
-  | notes | read | 読み取りだけのメモ |
+  | source | 権限 | description | when |
+  | --- | --- | --- | --- |
+  | sample | write（作業中） | サンプルの文書 | サンプルの設計書を確認するとき<br>サンプルの文書を書き換えるとき |
+  | notes | read | 読み取りだけのメモ |  |
   ```
 response_notes: '説明書には配信元に固有のことだけが書かれている。タグの一覧・文書の件数は `search_docs` の `group_by`・`view: count` で取る。'
 exceptions:
@@ -562,6 +623,9 @@ constraints:
     constraint: 引数なし（`outside_scope` を省く）の結果は、作業場所から使える配信元と、その警告だけを持つ
   - item: タイムアウト
     constraint: 制限なし
+  - item: 一覧の配信元の組み立て直し
+    constraint: '`source` を省いた一覧（使える配信元・作業範囲の外の配信元）は、その時点の配信元の `description`・`when` で即座に返し、一覧に出した配信元ごとの `default_ref` の commit の確認と、変わっていたときの組み立て直しを裏のスレッドで実行する。配信元ごとに走っている確認があれば、その配信元の確認を新しく実行しない'
+    notes: '一覧の中で確認・組み立て直しをすると、/mnt/c で確認が 1 件 0.4〜1.0 秒、組み立て直しが 1 件 15〜27 秒かかる（2026-11-13 の実測）。Git でない配信元は確認しない。組み立て直しの条件は起動の制約「設定・スキーマ・スクリプトの読み元」と同じで、組み立て直した配信元は配信元の一覧の控えに差し替わり、次の呼び出しと `initialize` から使われる'
   - item: 警告の求め方
     constraint: 同期のずれ・エイリアスのキーの違反・`nav` の警告は、配信元の読み込み・読み直し・`default_ref` の組み立て直しの後と、`write_docs`・`delete_docs` の後に裏で流す検査の結果を読み、`describe` は配信元のファイルをたどらない。返す配信元の読み込みが終わってから答える（起動の配信元の読み込みの単位）ため、読み込み中の案内は持たない
     notes: 配信元のフォルダをたどる検査は /mnt/c の配信元で 1 件 3〜12 秒かかる（2026-11-04 の実測）。直接編集したファイルのずれは、次の検査まで警告に出ない

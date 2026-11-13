@@ -112,6 +112,12 @@ data_models:
         type: str
         access: 公開
         description: 配信元の設定の `description`
+      - name: when
+        title: 使う場面
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: 配信元の設定の `when`
   - name: SourceGuideResult
     title: 配信元の説明書
     container: project_index/features/describe/types.py
@@ -130,6 +136,12 @@ data_models:
         type: str
         access: 公開
         description: 配信元の設定の `instructions` をそのまま
+      - name: when
+        title: 使う場面
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: '配信元の設定の `when`。`format: json` は空のリストを落とすので、0 件のときは `when` のキーを持たない'
       - name: kinds
         title: 種類
         type: list[KindSummary]

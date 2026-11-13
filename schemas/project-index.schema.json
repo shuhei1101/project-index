@@ -68,6 +68,15 @@
       "type": "string",
       "title": "説明書"
     },
+    "when": {
+      "type": "array",
+      "title": "使う場面",
+      "description": "どういうときにこの配信元で検索するかを 1 行ずつ記載する。`describe` の一覧と説明書に全ての行を、文書の MCP の instructions に 1 行目を表示する。",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "ids": {
       "type": "object",
       "title": "ID の付け方",

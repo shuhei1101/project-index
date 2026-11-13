@@ -228,6 +228,99 @@ def test_source_registry_get_when_default_ref_moved_with_on_rebuilt(
     assert rebuilt == [first]
 
 
+def test_source_registry_refresh_later(
+    git_repo: Callable[..., Path],
+    commit_all: Callable[..., str],
+    sample_files: dict[str, str],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """裏で組み立て直し、待たずに戻る（正常系）。"""
+    # 準備
+    files = {
+        **sample_files,
+        "project-index.yaml": "when:\n  - 前の使う場面\n" + sample_files["project-index.yaml"],
+    }
+    root = git_repo(files)
+    terminal = make_terminal_config(
+        sources=[make_entry(str(root / "project-index.yaml"), source_id="a")]
+    )
+    registry = SourceRegistry()
+    registry.reload(terminal)
+    commit_all(
+        root,
+        {"project-index.yaml": "when:\n  - 後の使う場面\n" + sample_files["project-index.yaml"]},
+    )
+    # 実行
+    threads = registry.refresh_later(["a"])
+    for thread in threads:
+        thread.join(timeout=60)
+    # 検証
+    assert len(threads) == 1
+    assert [source.config.when for source in registry.served()] == [["後の使う場面"]]
+
+
+def test_source_registry_refresh_later_when_running(
+    git_repo: Callable[..., Path],
+    sample_files: dict[str, str],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """確認中の配信元は重ねて確認しない（正常系）。"""
+    # 準備
+    root = git_repo(sample_files)
+    terminal = make_terminal_config(
+        sources=[make_entry(str(root / "project-index.yaml"), source_id="a")]
+    )
+    registry = SourceRegistry()
+    registry.reload(terminal)
+    started = threading.Event()
+    release = threading.Event()
+    calls: list[str] = []
+    original = registry_module.resolve_ref
+
+    def blocking_resolve_ref(repo_root: Path, ref: str, **kwargs: object) -> object:
+        calls.append(ref)
+        started.set()
+        release.wait(timeout=60)
+        return original(repo_root, ref, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(registry_module, "resolve_ref", blocking_resolve_ref)
+    # 実行
+    first = registry.refresh_later(["a"])
+    started.wait(timeout=60)
+    second = registry.refresh_later(["a", "a"])
+    release.set()
+    for thread in first:
+        thread.join(timeout=60)
+    third = registry.refresh_later(["a"])
+    for thread in third:
+        thread.join(timeout=60)
+    # 検証
+    assert len(first) == 1
+    assert second == []
+    assert len(third) == 1
+    assert len(calls) == 2
+
+
+def test_source_registry_refresh_later_when_not_git(
+    make_source_dir: Callable[..., Path],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """Git でない配信元と配信していない ID は確認しない（正常系）。"""
+    # 準備
+    config = make_source_dir("notes")
+    terminal = make_terminal_config(sources=[make_entry(str(config), source_id="notes")])
+    registry = SourceRegistry()
+    registry.reload(terminal)
+    # 実行
+    threads = registry.refresh_later(["notes", "z"])
+    # 検証
+    assert threads == []
+
+
 def test_source_registry_reload_when_loading(
     monkeypatch: pytest.MonkeyPatch,
     make_terminal_config: Callable[..., TerminalConfig],

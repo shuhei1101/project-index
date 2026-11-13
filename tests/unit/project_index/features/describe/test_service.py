@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -22,7 +23,8 @@ from project_index.main import build_handlers
 from project_index.shared.errors import UnknownKindError, ValidationFailedError
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    import threading
+    from collections.abc import Callable, Sequence
 
     from project_index.features.sources.registry import SourceRegistry
 
@@ -117,6 +119,76 @@ def test_describe(
     ]
     assert result.outside_sources is None
     assert result.warnings == []
+
+
+def test_describe_when_source_when_listed(
+    store: DocumentStore,
+    folder_source: ServedSource,
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., SourceRegistry],
+) -> None:
+    """一覧と説明書に使う場面を入れる（正常系）。"""
+    # 準備
+    sample = dataclasses.replace(
+        folder_source,
+        config=dataclasses.replace(
+            folder_source.config, when=["規約を確かめるとき", "設計書を書く前"]
+        ),
+    )
+    notes = make_served_source(
+        id="notes", root=Path("/w/notes"), scope_read=[str(sample.root)], scope_write=[]
+    )
+    registry = make_registry(sample, notes)
+    # 実行
+    listed = _describe(registry, store, sample.root)
+    guide = _describe(registry, store, sample.root, source="sample")
+    # 検証
+    assert isinstance(listed, SourceListResult)
+    assert [(item.source_id, item.when) for item in listed.sources] == [
+        ("sample", ["規約を確かめるとき", "設計書を書く前"]),
+        ("notes", []),
+    ]
+    assert isinstance(guide, SourceGuideResult)
+    assert guide.when == ["規約を確かめるとき", "設計書を書く前"]
+
+
+def test_describe_when_refresh_requested(
+    store: DocumentStore,
+    folder_source: ServedSource,
+    make_served_source: Callable[..., ServedSource],
+    make_source_config: Callable[..., SourceConfig],
+    make_registry: Callable[..., SourceRegistry],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """引数なしの一覧は裏の確認を依頼して待たずに返す（正常系）。"""
+    # 準備
+    notes = make_served_source(
+        id="notes", root=Path("/w/notes"), scope_read=[str(folder_source.root)], scope_write=[]
+    )
+    other = make_served_source(
+        id="other",
+        root=Path("/w/other"),
+        scope_read=["/zzz"],
+        scope_write=[],
+        outside_read=True,
+        config=make_source_config(when=["別の配信元を引くとき"]),
+    )
+    registry = make_registry(folder_source, notes, other)
+    requested: list[list[str]] = []
+
+    def fake_refresh_later(source_ids: Sequence[str]) -> list[threading.Thread]:
+        requested.append(list(source_ids))
+        return []
+
+    monkeypatch.setattr(registry, "refresh_later", fake_refresh_later)
+    # 実行
+    result = _describe(registry, store, folder_source.root, outside_scope=True)
+    # 検証
+    assert requested == [["sample", "notes", "other"]]
+    assert isinstance(result, SourceListResult)
+    assert result.outside_sources == [
+        OutsideSource(id="other", description="", when=["別の配信元を引くとき"])
+    ]
 
 
 def test_describe_when_warned(

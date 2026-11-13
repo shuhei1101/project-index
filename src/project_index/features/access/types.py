@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
@@ -25,6 +25,7 @@ class SourceAccess:
     access: AccessLevel
     current: bool
     description: str
+    when: list[str] = field(default_factory=list[str])
 
 
 @dataclass(frozen=True)

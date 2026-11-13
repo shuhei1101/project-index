@@ -91,6 +91,8 @@ class SourceConfig:
     decision_folders: list[str] = field(default_factory=list[str])
     description: str = ""
     instructions: str = ""
+    # 使う場面（どういうときにこの配信元で検索するか）の行
+    when: list[str] = field(default_factory=list[str])
 
 
 @dataclass(frozen=True)

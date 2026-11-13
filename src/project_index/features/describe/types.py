@@ -45,6 +45,7 @@ class OutsideSource:
 
     id: str
     description: str
+    when: list[str] = field(default_factory=list[str])
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,7 @@ class SourceGuideResult:
     instructions: str
     kinds: list[KindSummary]
     outside_scope: bool = False
+    when: list[str] = field(default_factory=list[str])
     refs: dict[str, list[str]] | None = None
     worktrees: list[WorktreeInfo] | None = None
 

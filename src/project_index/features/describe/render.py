@@ -15,11 +15,17 @@ NO_SOURCE_LINE = (
     "使用できる配信元はありません。配信元にするときは /project-index:setup を実行します。"
 )
 WARNINGS_LINE = "注意:"
+WHEN_LINE = "使う場面:"
 
 
 def _cell(text: str) -> str:
     """表のセルの文字列にする。"""
     return text.replace("|", "\\|").replace("\n", "<br>")
+
+
+def _when_cell(when: list[str]) -> str:
+    """使う場面の行を `<br>` でつないだ表のセルにする。"""
+    return "<br>".join(_cell(line) for line in when)
 
 
 def _place(result: SourceListResult) -> str:
@@ -35,10 +41,13 @@ def _source_list(result: SourceListResult) -> list[str]:
     """使える配信元の一覧（と作業範囲の外の一覧・警告）の行を作る。"""
     lines = [_place(result), ""]
     if result.sources:
-        lines.extend(["| source | 権限 | description |", "| --- | --- | --- |"])
+        lines.extend(["| source | 権限 | description | when |", "| --- | --- | --- | --- |"])
         for item in result.sources:
             access = f"{item.access}（作業中）" if item.current else item.access
-            lines.append(f"| {_cell(item.source_id)} | {access} | {_cell(item.description)} |")
+            lines.append(
+                f"| {_cell(item.source_id)} | {access} | {_cell(item.description)}"
+                f" | {_when_cell(item.when)} |"
+            )
     else:
         lines.append(NO_SOURCE_LINE)
     # 作業範囲の外の一覧を求められたときだけ、表か「なし」を続ける
@@ -55,15 +64,21 @@ def _outside_rows(outside: list[OutsideSource]) -> list[str]:
     if not outside:
         return [OUTSIDE_NONE_LINE]
     return [
-        "| source | description |",
-        "| --- | --- |",
-        *(f"| {_cell(item.id)} | {_cell(item.description)} |" for item in outside),
+        "| source | description | when |",
+        "| --- | --- | --- |",
+        *(
+            f"| {_cell(item.id)} | {_cell(item.description)} | {_when_cell(item.when)} |"
+            for item in outside
+        ),
     ]
 
 
 def _source_guide(result: SourceGuideResult, head: list[str]) -> list[str]:
     """配信元の説明書と種類の一覧・ブランチとタグ・ワークツリーの行を作る。"""
-    lines = [*head, result.instructions, "", "| kind | description |", "| --- | --- |"]
+    lines = list(head)
+    if result.when:
+        lines.extend([WHEN_LINE, *(f"- {line}" for line in result.when), ""])
+    lines.extend([result.instructions, "", "| kind | description |", "| --- | --- |"])
     lines.extend(f"| {_cell(kind.id)} | {_cell(kind.description)} |" for kind in result.kinds)
     if result.refs is not None:
         lines.extend(

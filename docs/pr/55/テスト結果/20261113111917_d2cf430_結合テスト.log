@@ -1,0 +1,6 @@
+$ uv run pytest tests/integration/server/test_describe.py tests/integration/server/test_serve.py -q -p no:cacheprovider
+.........................................                                [100%]
+41 passed in 163.93s (0:02:43)
+exit=0
+
+# 1 回目の実行（同じ commit）は test_normal_when_xdg_dirs_set が空きポートの取り合い（終了コード 3）で fail。単独で 3 回流して全て pass したため、流し直した上の結果を全 pass のログとする

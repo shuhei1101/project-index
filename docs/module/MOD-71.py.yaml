@@ -355,6 +355,12 @@ data_models:
         access: 公開
         default: '""'
         description: '`describe(source)` で返す使い方'
+      - name: when
+        title: 使う場面
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: 配信元の設定の `when`（どういうときにこの配信元で探すか）の行。`build_source_config` が `value.get("when", [])` を並びにして入れる。`describe` の一覧・説明書と、文書の MCP の instructions の配信元と使う場面の一覧（1 行目）に出す
   - name: ServedSource
     title: 配信中の配信元
     container: project_index/features/sources/types.py
