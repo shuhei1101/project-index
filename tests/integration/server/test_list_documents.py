@@ -72,6 +72,7 @@ def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]
         "bodyPath": None,
         "version": first["version"],
         "value": None,
+        "commonKeys": None,
     }
     assert isinstance(first["version"], str)
     assert first["version"]
@@ -95,6 +96,38 @@ def test_normal_when_values_requested(
     assert documents[0]["value"]["title"] == "最初"
     assert documents[2]["value"] == row.json()["value"]
     assert documents[2]["value"] == {"path": "guide.md", "name": "手引き"}
+
+
+def test_normal_when_common_keys_requested(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """`common_keys` を指したときだけ、各文書の共通のキーを返す（正常系）。"""
+    # 準備（種類 design の行に、name を title から・related を links から取る対応と alias_type を持たせる）
+    files = main_files()
+    files["project-index.yaml"] = CONFIG.replace(
+        "    schema: schemas/design.schema.yaml\n",
+        "    schema: schemas/design.schema.yaml\n"
+        "    metadata:\n"
+        "      name: title\n"
+        "      related: links\n"
+        "    alias_type: term\n",
+    )
+    files["design/D-1.yaml"] += "links:\n  - to: D-2\n"
+    env = make_server(make_source("sample", files, branch="main"))
+    # 実行
+    response = env.client.get("/sources/sample/docs", params={"common_keys": "true"})
+    omitted = env.client.get("/sources/sample/docs")
+    # 検証
+    documents = response.json()["documents"]
+    assert response.status_code == 200
+    common_keys = documents[0]["commonKeys"]
+    assert common_keys["name"] == "最初"
+    assert common_keys["related"] == [{"to": "D-2"}]
+    assert common_keys["alias_type"] == "term"
+    # 中のキーは METADATA_KEYS の名前のまま（camelCase にしない）で、値の無いキーを持たない
+    assert "aliasType" not in common_keys
+    assert None not in common_keys.values()
+    assert all(row["commonKeys"] is None for row in omitted.json()["documents"])
 
 
 def test_normal_when_ref_given(
