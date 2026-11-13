@@ -1,0 +1,1 @@
+# 配信元の設定に「使う場面」（when）を持たせ、describe と MCP の instructions で案内する
