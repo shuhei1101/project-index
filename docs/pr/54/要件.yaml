@@ -19,5 +19,5 @@ scope_out:
     reason: 別のリポジトリの変更で、Issue の本文が別の Issue で行うと決めている。この作業 PR の出力を前提にする後続のため
     plan: to_file
   - item: 文書の一覧・文書の取得の `visibility` が、`METADATA_KEYS` に無いため常に `null` になる点
-    reason: 要望は `METADATA_KEYS` のキーの返却で、`visibility` を共通のキーへ加えるかは要望の外と判断した。この作業 PR がマージされなくても同じ内容で成り立つかを含め、レビューで確定する
-    plan: to_file
+    reason: 要望は `METADATA_KEYS` のキーの返却で、`visibility` の扱いは要望の外。develop でも常に `null` で、この作業 PR がマージされなくても同じ内容で成り立つ
+    plan: '#57'
