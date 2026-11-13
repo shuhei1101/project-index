@@ -750,7 +750,7 @@ scenarios:
       - 'instructions の一覧が `src01` から端末の設定の順に並び、一覧に含めなかった配信元の件数と、`describe(outside_scope: true)` で全ての配信元の使う場面を引けることを案内する'
       - instructions の一覧の配信元の数と案内の件数の合計が 30 になる
     test: test_normal_when_source_guide_exceeds_limit
-  - name: 正常シナリオ（配信元を読み直した後に接続する）
+  - name: 正常シナリオ（使う場面を書き換えた後に接続する）
     setup:
       - name: Mock
         description: なし（実環境で実行）
@@ -758,28 +758,28 @@ scenarios:
         description: sample を配信している project-index
         notes: sample の `project-index.yaml` の `when` に 1 行
     flow: |-
-      <!-- map: {"title": "正常シナリオ（配信元を読み直した後に接続する）"} -->
+      <!-- map: {"title": "正常シナリオ（使う場面を書き換えた後に接続する）"} -->
 
       ```mermaid
       sequenceDiagram
         actor A as エージェント
         actor U as 利用者
         participant M as 文書の MCP（/mcp）
-        participant AD as 管理の MCP（/_admin/mcp）
 
         A->>M: initialize
         M-->>A: instructions（sample と使う場面の 1 行目）
-        U->>U: sample の when の 1 行目を書き換えて commit する
-        U->>AD: reload
+        U->>U: sample の when の 1 行目を書き換えて default_ref に commit する
         A->>M: initialize（新しい接続）
+        M->>M: default_ref の commit が変わったので配信元を組み立て直す
         M-->>A: instructions（sample と書き換えた使う場面の 1 行目）
+        A->>M: describe()
+        M-->>A: 使える配信元の一覧（sample と書き換えた使う場面）
       ```
 
       <!-- /map -->
     expected:
-      - '`reload` の後の新しい接続の instructions が、書き換えた `when` の 1 行目を返却する'
-      - '`reload` の後も、サーバーを再起動せずに新しい接続の instructions が変わる'
-    test: test_normal_when_reloaded_before_connect
+      - '`reload` をしなくても、commit の後の新しい接続の instructions と `describe()` が、書き換えた `when` の 1 行目を返却する'
+    test: test_normal_when_source_guide_changed_before_connect
 lead: エージェントが文書の MCP で、作業場所から使用できる配信元の文書を探して参照するシナリオを定め、調査の流れを変えるときに参照する。
 issue: 14
 primary_actor: エージェント（Claude Code）
