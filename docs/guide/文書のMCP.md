@@ -23,7 +23,10 @@
 
 読み取りのツールには `readOnlyHint: true` が付き、並列に呼ばれます。
 引数の検証は strict tool use を使わず、サーバーが配信元のスキーマで検証し、直し方を添えてエラーを返します。
-`initialize` の `instructions` は、`search_docs`・`trace_related`・`list_changes`・`write_docs` を使う場面と、grep・Read が向く場面（コードの識別子・文字列の出現箇所、配信の範囲の外のファイル）、`describe(source)` で種類と書き方を確かめてから探す・書く順序、タグの付け方（[使われているタグを引く](#使われているタグを引く)）を持ち、4,096 字以内です。
+`initialize` の `instructions` は、`search_docs`・`trace_related`・`list_changes`・`write_docs` を使う場面と、grep・Read が向く場面（コードの識別子・文字列の出現箇所、配信の範囲の外のファイル）、`describe(source)` で種類と書き方を確かめてから探す・書く順序、タグの付け方（[使われているタグを引く](#使われているタグを引く)）と、配信元と使う場面の一覧を持ち、4,096 字以内です。
+配信元と使う場面の一覧は、配信中で `when` を持つ配信元を端末の設定の `sources[]` の順に並べ、ID と `when` の 1 行目を出します。
+4,096 字を超える分の配信元は載せず、載せなかった件数と、`describe(outside_scope: true)` で使う場面を引けることを添えます。
+一覧は接続（`initialize`・`server/discover`）のたびに描き直します。`default_ref` に `when` の書き換えを commit すると、裏の確認が終わった後の接続から反映されます（`reload` は要りません）。
 `instructions` とツールごとの description は、起動のときに `content/prompts/mcp/` のプロンプトの YAML から読みます（置き場所は環境変数 `PROJECT_INDEX_PROMPTS_DIR` で変えられます）。
 YAML を書き換えたときは、再起動で反映します。
 
@@ -323,10 +326,13 @@ Git 管理外の配信元では、種類の `documents[].writable` が削除を�
 
 | 引数 | 返すもの |
 | --- | --- |
-| なし | 今の作業場所から使える配信元の一覧（`id`・権限 `read` / `write`・作業中か・`description`）と、作業場所、使える配信元の警告（`warnings[]`） |
-| `outside_scope: true`（`source` なし） | 引数なしと同じ一覧に加えて、作業範囲の外（参考）で読める配信元（`scope` に当たらず `sources[].outside_read` が真）の一覧（`outside_sources[]` の `id`・`description`） |
-| `source` | その配信元の説明書（`instructions`）と種類（`kinds[]`）の一覧。Git の配信元は、ブランチ・タグ（`refs.branches[]`・`refs.tags[]`）と、`worktrees` に当たるワークツリー（`worktrees[]` の `path`・`branch`）の一覧も返す |
+| なし | 今の作業場所から使える配信元の一覧（`id`・権限 `read` / `write`・作業中か・`description`・`when`）と、作業場所、使える配信元の警告（`warnings[]`） |
+| `outside_scope: true`（`source` なし） | 引数なしと同じ一覧に加えて、作業範囲の外（参考）で読める配信元（`scope` に当たらず `sources[].outside_read` が真）の一覧（`outside_sources[]` の `id`・`description`・`when`） |
+| `source` | その配信元の使う場面（`when`）・説明書（`instructions`）と種類（`kinds[]`）の一覧。Git の配信元は、ブランチ・タグ（`refs.branches[]`・`refs.tags[]`）と、`worktrees` に当たるワークツリー（`worktrees[]` の `path`・`branch`）の一覧も返す |
 | `source`・`kind` | その種類の共通のキーと列名の対応（`metadata`）と、スキーマ（YAML のまま） |
+
+`when` は、`markdown` では一覧の表の `when` 列（行を `<br>` でつなぐ）と、説明書の前の「使う場面:」の箇条書きで出し、`json` では記載の無い配信元のキーを持ちません。
+引数なしの一覧はその時点の配信元で答え、一覧に出した配信元の `default_ref` の commit の確認と組み立て直しを裏で行います。
 
 `warnings[]` は、使える配信元の同期のずれ（metadata の列の欠け・管理用の YAML に無いファイル・ファイルが無い行・どの文書にも当たらない関連）・エイリアスのキーの違反・どの文書にも当たらない `nav` の条件、配信元と端末の設定のバージョンが古いこと、検証で外した配信元、端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパスを 1 件にまとめる）です。
 `markdown` では配信元の表の後に「注意」の見出しの下に 1 行ずつ出し、0 件のときは見出しごと出しません。
