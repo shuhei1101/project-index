@@ -92,6 +92,34 @@ flows:
       - '`tags` が無くなり、`tags.yaml` は残る'
       - 端末の設定が変わらない
     test: test_normal_when_source_config
+  - name: 正常系（端末の設定の最上位に知らないキーがある）
+    summary: 最上位の知らないキーを持つ古い端末の設定にも手順を当て、知らないキーの値を残す
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 移し替えの手順
+        description: 正常系と同じ手順
+      - name: 端末の設定
+        description: '`version: "1"` で改名前のキーと、最上位に知らないキー `mindstella`（入れ子の値を持つ）を持つ'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index migrate
+        participant F as 端末の設定
+
+        C->>M: フラグなし
+        M->>F: バックアップを取る
+        M->>M: 手順を当て、新しいスキーマで検証する（mindstella は違反にしない）
+        M->>F: 書き換える
+        M-->>C: 当てた手順とバックアップのパス（終了コード 0）
+      ```
+    expected:
+      - 終了コード 0 で、端末の設定の `version` が `"2"` で、キーが改名される
+      - '`mindstella` の値が適用前と変わらない'
+    test: test_normal_when_terminal_config_has_unknown_top_level_key
+    decisions:
+      - D-308
   - name: 異常系（設定が読めない・ConfigInvalid）
     summary: '`version` の無い設定は移し替えずに終了コード 2 で止める'
     setup:
@@ -273,7 +301,7 @@ exceptions:
   - name: ConfigInvalid
     condition: 対象の設定が無い・YAML として読めない・`version` が無い（終了コード 2）
   - name: MigrationFailed
-    condition: 手順の途中で失敗した、または当てた結果が新しいバージョンのスキーマに違反した（終了コード 4）
+    condition: 手順の途中で失敗した、または当てた結果が新しいバージョンのスキーマに違反した（終了コード 4。端末の設定の最上位の知らないキーは違反にしない）
     notes: 全ての手順を当てて新しいスキーマで検証してから書き込むため、ファイルには触らない。失敗した手順と理由を stderr に出す
   - name: DestructiveStepBlocked
     condition: 当てる手順に破壊的なものがあり、`--allow-destructive` が無い（終了コード 5）
@@ -290,6 +318,8 @@ constraints:
     constraint: 適用の前に必ず取る。成功しても消さない
   - item: 反映
     constraint: 動いているサーバーには反映しない。利用者が続けて `restart`（配信元の設定だけなら `reload`）を呼ぶ
+  - item: 端末の設定の知らないキー
+    constraint: 端末の設定の最上位の知らないキーは、手順を当てた結果の検証で違反にせず、値を書き換えずにファイルに残す
   - item: タイムアウト
     constraint: 制限なし
   - item: 配信元の設定の 1 → 2 の手順

@@ -114,7 +114,7 @@ functions:
       description: '`$ref` を解いた行のスキーマ'
     process: |-
       1. `table.schema_path` が `SchemaRef` なら、`source.schemas[table.id]`（起動時に解いたもの）を返す
-      2. それ以外は、`source.schemas[table.id]` を基準 `source.root / table.schema_path` でスキーマの参照の解決にかけて返す
+      2. それ以外は、`source.schemas[table.id]` を基準 `source.config_root / table.schema_path`（設定ファイルのフォルダ）でスキーマの参照の解決にかけて返す
     unit_tests:
       - name: test_startup_schema
         case: 正常

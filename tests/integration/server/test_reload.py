@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    import pytest
 
 
 def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]) -> None:
@@ -69,3 +72,34 @@ def test_error_when_terminal_config_invalid(
     assert result.is_error
     assert "sources[0].config" in result.text
     assert not searched.is_error
+
+
+def test_normal_when_terminal_config_has_unknown_top_level_key(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """端末の設定の最上位に知らないキーがあっても読み直し、キーのパスを警告のログと引数なしの describe の警告に残す（正常系）。"""
+    # 準備
+    sample = make_source("sample", sample_file_set(), git=False)
+    env = make_server(sample)
+    env.settings_extra = "mindstella:\n  threads: 3"
+    env.rewrite_settings(sample)
+    (sample.folder / "project-index.yaml").write_text(
+        sample_config_text(description="書き換えた説明"), encoding="utf-8"
+    )
+    caplog.set_level(logging.WARNING)
+    # 実行
+    result = env.call_admin("reload", format="json")
+    # 検証
+    described = env.call("describe", cwd=str(sample.folder), format="json")
+    assert not result.is_error
+    assert "not_served" not in result.data
+    assert [item["description"] for item in described.data["sources"]] == ["書き換えた説明"]
+    assert len([w for w in described.data["warnings"] if "mindstella" in w]) == 1
+    assert any(
+        "mindstella" in record.getMessage() and str(env.settings_path) in record.getMessage()
+        for record in caplog.records
+    )

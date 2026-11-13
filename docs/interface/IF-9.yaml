@@ -57,6 +57,34 @@ flows:
       - '`not_served` に sample と `documents[0].paths` の違反がある'
       - '`search_docs(source: sample)` が `SourceNotServedError` を返す'
     test: test_normal_when_source_becomes_invalid
+  - name: 正常系（端末の設定の最上位に知らないキーがある）
+    summary: 端末の設定の最上位に知らないキーがあっても読み直し、キーのパスを警告のログと引数なしの `describe` の警告に残す
+    setup:
+      - name: Mock
+        description: なし（project-index のアプリをテストのクライアントで呼ぶ）
+      - name: 端末の設定
+        description: sample の 1 行で起動した後、最上位に知らないキー `mindstella` を追加し、sample の `project-index.yaml` の `description` を書き換える
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as reload
+        participant CF as 端末の設定・配信元の設定
+
+        C->>T: 引数なし
+        T-->>CF: 端末の設定と配信元の設定を読む
+        T->>T: 最上位の知らないキーのパスを集め、警告のログに書く
+        T->>T: 配信元の一覧を差し替える
+        T-->>C: added・removed・not_served
+      ```
+    expected:
+      - '`isError` を返却せず、`not_served` が空'
+      - '読み直した後の `describe(source: sample)` が書き換えた `description` を返却する'
+      - 引数なしの `describe()` の `warnings` に、知らないキーのパス `mindstella` を持つ 1 件がある
+      - 警告のログに、端末の設定のファイルと知らないキーのパス `mindstella` がある
+    test: test_normal_when_terminal_config_has_unknown_top_level_key
+    decisions:
+      - D-308
   - name: 異常系（端末の設定が壊れている・TerminalConfigInvalidError）
     summary: 端末の設定がスキーマに違反すると、配信元の一覧を変えずに断る
     setup:
@@ -90,6 +118,7 @@ callers:
   - SC-5#scenarios[正常シナリオ]
   - SC-10#scenarios[正常シナリオ]
   - SC-5#scenarios[正常シナリオ（.gitignore した設定を指して追加する）]
+  - SC-10#scenarios[正常シナリオ（端末の設定の最上位に知らないキーがある状態で読み直す）]
 exclusivity: 端末の設定の保存と同じロック（`settings_lock`）で一度に 1 つだけ読み直す
 request:
   - name: format
@@ -123,13 +152,16 @@ exceptions:
   - name: なし（正常終了）
     condition: 読み直せた（検証に失敗した配信元があっても、外して正常終了）
   - name: TerminalConfigInvalidError
-    condition: 端末の設定が無い・スキーマに違反する
+    condition: 端末の設定が無い・スキーマに違反する（最上位の知らないキーは違反にしない）
     notes: '`isError: true` で違反を全て返す。配信元の一覧は読み直す前のまま'
 constraints:
   - item: セッション
     constraint: 読み直しの前後で `/mcp`・`/_admin/mcp` の接続を切らない
   - item: 読み直す対象
     constraint: 端末の設定の `sources` と各配信元の設定。`bind`・`port`・`state_dir` など反映が `restart` のキーは読み直さない
+  - item: 端末の設定の知らないキー
+    constraint: 起動の制約「端末の設定の知らないキー」と同じ。読み直した端末の設定の知らないキーで、引数なしの `describe` の警告を置き換える
+    notes: '`reload` の応答には記載しない'
   - item: タイムアウト
     constraint: 制限なし（スクリプトの確かめは配信元ごとに `script_timeout_sec` で打ち切る）
 test_file: tests/integration/server/test_reload.py

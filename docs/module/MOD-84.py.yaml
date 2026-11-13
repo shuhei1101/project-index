@@ -222,7 +222,7 @@ functions:
       7. 成功した行の `version` は組み立てた文書のバージョン、`diff` は今の本文との差分の行（変更.差分の行）にする
       8. `dry_run` なら `applied=False` で返す
       9. 変わったファイルをファイルの置き換えで書き、文書のストア.キャッシュを捨てる
-      10. 書いた種類の `after_write` の生成を、ID の重なりを除いて順にスクリプトの実行（`cwd=target.base`・引数に書いたファイルのパス・`timeout_sec`・`at`）で動かす。`at` は、`target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`）。`ScriptError` は `[warning]` 書き込み後の生成に失敗した（配信元・生成の ID・理由）を書き、結果は変えない
+      10. 書いた種類の `after_write` の生成を、ID の重なりを除いて順にスクリプトの実行（`cwd=target.config_base`（設定ファイルのフォルダ）・引数に書いたファイルのパス・`timeout_sec`・`at`）で動かす。`at` は、`target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`）。`ScriptError` は `[warning]` 書き込み後の生成に失敗した（配信元・生成の ID・理由）を書き、結果は変えない
       11. 会話の記録に書いた文書を `edited` で残す
       12. `applied=True` で返す
     exceptions:

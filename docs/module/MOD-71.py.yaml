@@ -74,7 +74,7 @@ data_models:
         title: スキーマ
         type: str | SchemaRef
         access: 公開
-        description: '`schema` の値（pydantic の属性と重なるので `alias="schema"`）。全ての行で必須。文字列は配信元の直下からの相対パス、`SchemaRef` はほかの配信元のリビジョンのスキーマ'
+        description: '`schema` の値（pydantic の属性と重なるので `alias="schema"`）。全ての行で必須。文字列は設定ファイルのフォルダからの相対パス、`SchemaRef` はほかの配信元のリビジョンのスキーマ'
       - name: validators
         title: 検査
         type: list[str]
@@ -272,6 +272,12 @@ data_models:
         access: 公開
         default: '["./.claude/worktrees/*"]'
         description: ワークツリーの glob
+      - name: paths_base
+        title: paths の基準のフォルダ
+        type: str | None
+        access: 公開
+        default: None
+        description: 設定ファイルのフォルダからの相対パスで書いた、`documents[].paths` の基準のフォルダ。`None` は設定ファイルのフォルダ
       - name: documents
         title: 文書
         type: list[DocumentTable]
@@ -363,10 +369,16 @@ data_models:
         access: 公開
         description: '`sources[].id`、無ければ設定の `name`'
       - name: root
-        title: 配信元の直下
+        title: 文書の基準のフォルダ
         type: Path
         access: 公開
-        description: 先頭の設定の YAML のフォルダ（クローン本体か Git の管理外のフォルダ）
+        description: '`documents[].paths` と返却する文書のパスの基準のフォルダ。`paths_base` を設定ファイルのフォルダから解いたフォルダで、無ければ設定ファイルのフォルダ（クローン本体か Git の管理外のフォルダ）'
+      - name: config_dir
+        title: 設定ファイルのフォルダの相対パス
+        type: PurePosixPath
+        access: 公開
+        default: PurePosixPath('.')
+        description: '`root` から先頭の設定の YAML のフォルダへの相対パス。`paths_base` を省いた配信元は `.`'
       - name: config_files
         title: 設定のファイル
         type: list[Path]
@@ -408,7 +420,7 @@ data_models:
         title: 読み書きできる作業場所
         type: list[str]
         access: 公開
-        description: '`sources[].scope.write`。無ければ `[str(root)]`'
+        description: '`sources[].scope.write`。無ければ `[str(config_root)]`'
       - name: outside_read
         title: 作業範囲の外から読めるか
         type: bool
@@ -424,7 +436,7 @@ data_models:
         title: 種類のスキーマ
         type: dict[str, dict[str, Any]]
         access: 公開
-        description: '`documents[].id` → 読んだスキーマ（配信元の直下のファイルを起動時に読む。作業中のワークツリーを読むときは文書のストアが読み直す）。`schema_path` が `SchemaRef` の行は、参照先のスキーマの読み取りで `$ref` まで解いたスキーマ'
+        description: '`documents[].id` → 読んだスキーマ（設定ファイルのフォルダからの相対パスのファイルを起動時に読む。作業中のワークツリーを読むときは文書のストアが読み直す）。`schema_path` が `SchemaRef` の行は、参照先のスキーマの読み取りで `$ref` まで解いたスキーマ'
     methods:
       - name: table
         title: 文書の行を引く
@@ -484,6 +496,45 @@ data_models:
           type: ScriptEntry
           description: その行（参照は検証で確かめてあるので必ずある）
         process: 1. `config` の `table` の表から `id` が `script_id` の行を返す
+      - name: config_root
+        title: 設定ファイルのフォルダ
+        kind: メソッド
+        summary: 先頭の設定の YAML のフォルダを返す（`@property`）
+        scope: public
+        returns:
+          type: Path
+          description: '`root / config_dir`'
+        process: 1. `root` に `config_dir` をつないで返す
+        unit_tests:
+          - name: test_served_source_config_root
+            case: 正常
+            summary: 基準のフォルダの下の設定ファイルのフォルダ
+            condition: '`root` が `/r`、`config_dir` が `content/node-docs/brain`'
+            mock: なし
+            expected: '`Path("/r/content/node-docs/brain")`。`config_dir` が `.` なら `Path("/r")`'
+      - name: config_path
+        title: 設定ファイルのフォルダからの相対パス
+        kind: メソッド
+        summary: 設定ファイルのフォルダからの相対パスを、`root` からの相対パスにする
+        scope: public
+        args:
+          - name: relative
+            title: 相対パス
+            type: str
+            required: true
+            passing: positional
+            description: '`documents[].schema` など、設定ファイルのフォルダからの相対パス'
+        returns:
+          type: str
+          description: '`root` からの相対パス（POSIX の区切り）'
+        process: 1. `config_dir` と `relative` をつないだ POSIX のパスを返す（`config_dir` が `.` なら `relative` のまま）
+        unit_tests:
+          - name: test_served_source_config_path
+            case: 正常
+            summary: 設定ファイルのフォルダの下のスキーマ
+            condition: '`config_dir` が `content/node-docs/brain`、`config_path("note.schema.yaml")`'
+            mock: なし
+            expected: '`"content/node-docs/brain/note.schema.yaml"`。`config_dir` が `.` なら `"note.schema.yaml"`'
   - name: SourceStatus
     title: 配信元の状態
     container: project_index/features/sources/types.py

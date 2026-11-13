@@ -847,3 +847,20 @@ def test_check_sources(
     assert check is not None
     assert len(check.report.unindexed_files) == 1
     assert cleared == []
+
+
+def test_build_handlers_when_unknown_key_reloaded(
+    make_terminal_config: Callable[..., TerminalConfig],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """読み直しで知らないキーを差し替える（正常系）。"""
+    # 準備
+    terminal = make_terminal_config()
+    handlers = build_handlers(terminal)
+    new_terminal = make_terminal_config(unknown_keys=["mindstella"])
+    caplog.set_level(logging.WARNING)
+    # 実行
+    handlers.reload_sources(new_terminal)
+    # 検証
+    assert handlers.terminal.unknown_keys == ["mindstella"]
+    assert any("mindstella" in record.getMessage() for record in caplog.records)

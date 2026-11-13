@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from project_index.features.settings import route as route_module
-from project_index.features.settings.query import load_terminal_config
+from project_index.features.settings.query import UNKNOWN_KEY_REASON, load_terminal_config
 from project_index.features.settings.route import build_settings_router
 from project_index.features.settings.types import SourceAddResult, SourceEntry, TerminalConfig
 from project_index.features.sources.registry import SourceRegistry
@@ -223,3 +223,43 @@ def test_build_settings_router_when_loading(
     assert [(row["id"], row["status"]) for row in response.json()["sources"]] == [
         ("sample", "serving")
     ]
+
+
+def test_build_settings_router_when_unknown_top_level_key(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_handlers: Callable[..., Any],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_status: Callable[..., SourceStatus],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """知らないキーの警告を返す（正常系）。"""
+    # 準備
+    write_files(tmp_path, {"settings.yaml": "mindstella:\n  threads: 3\n" + SETTINGS})
+    statuses = [make_status("a", 0, config=("/tmp/a/project-index.yaml",))]
+
+    def fake_save_sources(sources: list[SourceEntry], **kwargs: Any) -> list[SourceStatus]:
+        return statuses
+
+    def fake_add_source(source: SourceEntry, **kwargs: Any) -> SourceAddResult:
+        return SourceAddResult(result="added", same=None, statuses=statuses)
+
+    monkeypatch.setattr(route_module, "save_sources", fake_save_sources)
+    monkeypatch.setattr(route_module, "add_source", fake_add_source)
+    terminal = make_terminal_config(file=tmp_path / "settings.yaml", unknown_keys=["mindstella"])
+    handlers = make_handlers(
+        terminal=terminal, settings_lock=threading.Lock(), registry=FakeRegistry(statuses)
+    )
+    app = FastAPI()
+    app.include_router(build_settings_router(handlers))
+    client = TestClient(app)
+    row = {"id": "a", "config": ["/tmp/a/project-index.yaml"]}
+    # 実行
+    got = client.get("/settings/sources")
+    put = client.put("/settings/sources", json={"sources": [row]})
+    post = client.post("/settings/sources", json={"source": row})
+    # 検証
+    expected = [{"path": "mindstella", "reason": UNKNOWN_KEY_REASON}]
+    assert got.json()["warnings"] == expected
+    assert put.json()["warnings"] == expected
+    assert post.json()["warnings"] == expected

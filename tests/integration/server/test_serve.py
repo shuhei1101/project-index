@@ -501,7 +501,7 @@ def test_error_when_terminal_config_invalid(
     # 準備
     settings = tmp_path / "settings.yaml"
     settings.write_text(
-        'version: "1"\nclone: /tmp/clone\nport: "not-a-number"\nsources:\n  - id: a\n',
+        'version: "1"\nclone: /tmp/clone\nport: "not-a-number"\nsources:\n  - id: a\n    enable: false\n',
         encoding="utf-8",
     )
     port = free_port()
@@ -517,6 +517,7 @@ def test_error_when_terminal_config_invalid(
     assert invalid_code == 2
     assert f"{settings}: sources[0].config" in invalid_error
     assert f"{settings}: port" in invalid_error
+    assert f"{settings}: sources[0].enable" in invalid_error
     assert missing_code == 2
     assert str(missing_file) in missing_error
     assert _listening_addresses(port) == set()
@@ -944,3 +945,79 @@ def test_normal_when_xdg_dirs_set(
     assert (home / ".local" / "state" / "project-index" / "logs" / "project-index.log").is_file()
     assert not (Path.cwd() / "rel").exists()
     assert not state_home.exists()
+
+
+BRAIN_CONFIG = (
+    "name: brain\n"
+    "paths_base: ../../..\n"
+    "documents:\n"
+    "  - id: note\n"
+    "    paths: [docs/knowhow/*.yaml, content/node-docs/shared/*.yaml]\n"
+    "    schema: note.schema.yaml\n"
+)
+
+
+def test_normal_when_paths_base_set(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+) -> None:
+    """paths_base を持つ配信元を、paths を基準のフォルダから解いて配信し、スキーマは describe と読み取り API の配信元の設定とも設定ファイルのフォルダから解く（正常系）。"""
+    # 準備
+    files = {
+        "content/node-docs/brain/project-index.yaml": BRAIN_CONFIG,
+        "content/node-docs/brain/note.schema.yaml": "title: note\ntype: object\n",
+        "docs/knowhow/a.yaml": "id: a\nname: ノウハウ A\n",
+        "content/node-docs/shared/b.yaml": "id: b\nname: 共有 B\n",
+        "docs/design/c.yaml": "id: c\nname: 設計 C\n",
+    }
+    brain = make_source(
+        "brain", files, config_names=("content/node-docs/brain/project-index.yaml",)
+    )
+    env = make_server(brain)
+    cwd = str(brain.folder / "content" / "node-docs" / "brain")
+    # 実行
+    found = env.call("search_docs", cwd=cwd, source="brain", format="json")
+    listed = env.client.get("/sources/brain/docs")
+    schema = env.call("describe", cwd=cwd, source="brain", kind="note", format="json")
+    config = env.client.get("/sources/brain/config", params={"schemas": "true"})
+    # 検証
+    assert sorted(item["id"] for item in found.data["items"]) == ["a", "b"]
+    assert sorted(row["path"] for row in listed.json()["documents"]) == [
+        "content/node-docs/shared/b.yaml",
+        "docs/knowhow/a.yaml",
+    ]
+    assert schema.data["schema"]["title"] == "note"
+    assert config.json()["schemas"]["note"]["title"] == "note"
+
+
+def test_normal_when_terminal_config_has_unknown_top_level_key(
+    make_source: Callable[..., Any],
+    write_settings: Callable[..., Path],
+    free_port: Callable[[], int],
+    start_serve: Callable[..., Any],
+    wait_until_serving: Callable[..., None],
+    call_tool: Callable[..., dict[str, Any]],
+) -> None:
+    """端末の設定の最上位の知らないキーを違反にせず、警告のログと引数なしの describe の警告に残して配信を始める（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    settings = write_settings(sample, extra="mindstella:\n  threads: 3\nprot: 9000")
+    port = free_port()
+    process = start_serve(settings, port)
+    wait_until_serving(process, port)
+    # 実行
+    with httpx.Client(timeout=15) as client:
+        docs = client.get(f"http://127.0.0.1:{port}/sources/sample/docs")
+        described = _tool_data(
+            call_tool(client, port, "/mcp/", "describe", cwd=str(sample.folder), format="json")
+        )
+    process.terminate()
+    process.wait(timeout=15)
+    logs = process.stderr.read() if process.stderr else ""
+    # 検証
+    assert docs.status_code == 200
+    assert str(settings) in logs
+    assert "mindstella, prot" in logs
+    unknown = [w for w in described["warnings"] if "mindstella" in w]
+    assert len(unknown) == 1
+    assert "prot" in unknown[0]
