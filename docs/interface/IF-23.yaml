@@ -123,7 +123,7 @@ response:
   - name: schemas
     type: dict[str, dict] | None
     description: '`documents[].id` ごとの種類のスキーマ（`$ref` を解いた形で、文書の取得の `schema` と同じ。`records` の行は要素 1 つのスキーマに、ファイル全体のスキーマの最上位の `$defs` を加えたもの）'
-    notes: '`schemas` が `true` のときだけ入れ、それ以外は `null`。解けない・循環する `$ref` はそのまま残し、最上位の `$defs` を残す'
+    notes: '`schemas` が `true` のときだけ入れ、それ以外は `null`。解けない `$ref` と、種類のスキーマの中で循環する `$ref` はそのまま残し、最上位の `$defs` を残す。参照先の別のファイルの中で循環する定義は最上位の `$defs` に加え、`$ref` をその定義へ向ける'
 response_example: |-
   ```json
   {"nav": [{"title": "設計書", "items": [{"auto": {"document": "design"}}]}],

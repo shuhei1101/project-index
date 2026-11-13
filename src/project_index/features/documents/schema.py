@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
+import os.path
 import posixpath
 from collections.abc import Callable, Mapping
 from pathlib import Path, PurePath, PurePosixPath
 from typing import TYPE_CHECKING, Any, cast
-from urllib.parse import unquote, urldefrag
+from urllib.parse import quote, unquote, urldefrag
 
 from project_index.shared.narrowing import is_dict, is_list
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
@@ -82,14 +83,70 @@ def _target(current: PurePath, location: str, *, posix: bool) -> PurePath:
     return PurePosixPath(posixpath.normpath(joined.as_posix())) if posix else joined
 
 
+def _relative_name(base: PurePath, target: PurePath, fragment: str, *, posix: bool) -> str:
+    """参照先の定義を、`base` のフォルダからの相対パスと JSON Pointer の名前にする。"""
+    if posix:
+        relative = posixpath.relpath(target.as_posix(), base.parent.as_posix())
+    else:
+        relative = PurePath(os.path.relpath(target, base.parent)).as_posix()
+    return f"{relative}#{fragment}"
+
+
+def _defs_ref(name: str) -> str:
+    """最上位の `$defs` の名前を指す `$ref` を作る（JSON Pointer の区切りとしてエスケープし、URL エンコードする）。"""
+    return "#/$defs/" + quote(name.replace("~", "~0").replace("/", "~1"), safe="")
+
+
 class _Resolver:
     """スキーマの `$ref` を参照先の中身で置き換える（参照先のファイルは 1 回だけ読む）。"""
 
-    def __init__(self, read: ReadText | None) -> None:
+    def __init__(self, read: ReadText | None, base: PurePath, names: set[str]) -> None:
         self._read = read
+        self._base = base
         self._files: dict[str, object] = {}
-        # 最上位の `$defs` の定義を解いている途中か（途中の循環は警告しない）
+        # 最上位の `$defs` の定義・加える定義を解いている途中か（途中の循環は警告しない）
         self._in_defs = False
+        # 最上位の `$defs` で使っている名前（種類のスキーマの定義と加えた定義）
+        self._names = set(names)
+        # 別のファイルの中で循環する参照先（`{ファイル}#{JSON Pointer}`）ごとの加えた名前
+        self._hoisted: dict[str, str] = {}
+        # 最上位の `$defs` へ加える定義
+        self.hoisted_defs: dict[str, object] = {}
+
+    def _is_base(self, path: PurePath) -> bool:
+        """参照先のファイルが種類のスキーマのファイルか。"""
+        return os.path.normpath(path) == os.path.normpath(self._base)
+
+    def _unique_name(self, name: str) -> str:
+        """最上位の `$defs` の名前と重ならなくなるまで末尾に連番を付ける。"""
+        candidate = name
+        number = 2
+        while candidate in self._names:
+            candidate = f"{name}-{number}"
+            number += 1
+        self._names.add(candidate)
+        return candidate
+
+    def _hoist(
+        self, identity: str, target_path: PurePath, fragment: str, target_doc: object
+    ) -> str:
+        """別のファイルの中で循環する参照先の定義を最上位の `$defs` へ加え、その名前を返す。"""
+        if identity in self._hoisted:
+            return self._hoisted[identity]
+        name = self._unique_name(
+            _relative_name(self._base, target_path, fragment, posix=self._read is not None)
+        )
+        # 定義を解く途中で同じ参照先に戻ったときに同じ名前を指すよう、解く前に登録する
+        self._hoisted[identity] = name
+        in_defs = self._in_defs
+        self._in_defs = True
+        try:
+            self.hoisted_defs[name] = self.resolve(
+                _pointer(target_doc, fragment), target_path, target_doc, (identity,)
+            )
+        finally:
+            self._in_defs = in_defs
+        return name
 
     def _load(self, path: PurePath) -> object:
         """参照先のファイルを読む（`read` が無ければディスクから）。"""
@@ -145,7 +202,14 @@ class _Resolver:
             # 循環する参照は解かずに残す（`$defs` の定義の中の循環は、定義の外からたどった側で警告する）
             if not self._in_defs:
                 logger.warning("スキーマの循環する参照を解かずに残した（%s・%s）", current, ref)
-            return dict(value)
+            # 種類のスキーマの中の循環: 最上位の `$defs` を指したまま残す
+            if self._is_base(target_path):
+                # 別のファイルから種類のスキーマへ戻る参照は、ファイルのパスを除いて種類のスキーマを指す
+                return {**value, "$ref": f"#{fragment}"} if location else dict(value)
+            # 別のファイルの中の循環: 参照先の定義を最上位の `$defs` へ加えた名前を指す
+            target_doc = document if not location else self._load(target_path)
+            name = self._hoist(identity, target_path, fragment, target_doc)
+            return {**value, "$ref": _defs_ref(name)}
         try:
             target_doc = document if not location else self._load(target_path)
             target = _pointer(target_doc, fragment)
@@ -167,10 +231,20 @@ def resolve_schema_refs(
     schema: Mapping[str, Any], base: Path | PurePosixPath, *, read: ReadText | None = None
 ) -> dict[str, Any]:
     """種類のスキーマの `$ref` を参照先の中身で置き換えたスキーマを返す。"""
-    result = _Resolver(read).resolve(schema, base, schema, ())
+    defs: object = schema.get("$defs")
+    names = {name for name in defs if isinstance(name, str)} if is_dict(defs) else set[str]()
+    resolver = _Resolver(read, base, names)
+    result = resolver.resolve(schema, base, schema, ())
     # 最上位の `$ref` が辞書でない値を指したときは、解かずに返す
     if not is_dict(result):
         return dict(schema)
+    # 別のファイルの中で循環する定義があれば、最上位の `$defs` へ加える
+    if resolver.hoisted_defs:
+        resolved_defs = result.get("$defs")
+        result = {
+            **result,
+            "$defs": {**(resolved_defs if is_dict(resolved_defs) else {}), **resolver.hoisted_defs},
+        }
     return cast("dict[str, Any]", result)
 
 

@@ -5,6 +5,8 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from jsonschema import Draft202012Validator
+from jsonschema.validators import validator_for
 
 from project_index.features.documents import schema as schema_module
 from project_index.features.documents.schema import resolve_schema_refs, startup_schema
@@ -93,6 +95,105 @@ def test_resolve_schema_refs_when_relative_ref_in_defs(
     assert entry["children"]["items"] == {"$ref": "#/$defs/entry"}
     assert result["properties"]["entries"]["items"]["properties"]["summary"] == {"type": "string"}
     assert "共通.schema.yaml" not in repr(result)
+
+
+TREE_SCHEMA = (
+    "$defs:\n"
+    "  tree:\n"
+    "    type: object\n"
+    "    properties:\n"
+    "      name:\n"
+    "        type: string\n"
+    "      children:\n"
+    "        type: array\n"
+    "        items:\n"
+    "          $ref: '#/$defs/tree'\n"
+)
+
+
+def test_resolve_schema_refs_when_cycle_in_other_file(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """別のファイルの中で循環する参照（正常系）。"""
+    # 準備
+    write_files(tmp_path, {"schemas/共通.schema.yaml": TREE_SCHEMA})
+    schema = {"properties": {"tree": {"$ref": "共通.schema.yaml#/$defs/tree"}}}
+    value = {"tree": {"name": "a", "children": [{"name": "b", "children": [{"name": "c"}]}]}}
+    # 実行
+    with caplog.at_level(logging.WARNING):
+        result = resolve_schema_refs(schema, tmp_path / "schemas" / "rule.schema.yaml")
+    # 検証
+    # `共通.schema.yaml#/$defs/tree` を JSON Pointer の区切りとしてエスケープし、URL エンコードした名前を指す
+    hoisted_ref = {"$ref": "#/$defs/%E5%85%B1%E9%80%9A.schema.yaml%23~1%24defs~1tree"}
+    hoisted = result["$defs"]["共通.schema.yaml#/$defs/tree"]
+    assert hoisted["properties"]["children"]["items"] == hoisted_ref
+    assert result["properties"]["tree"]["properties"]["children"]["items"] == hoisted_ref
+    assert (
+        list(validator_for(result, default=Draft202012Validator)(result).iter_errors(value)) == []
+    )
+    assert len([r for r in caplog.records if r.levelno == logging.WARNING]) == 1
+
+
+def test_resolve_schema_refs_when_cycle_in_other_file_with_same_name(
+    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """別のファイルの中で循環する参照と同じ名前の定義（正常系）。"""
+    # 準備
+    write_files(tmp_path, {"schemas/共通.schema.yaml": TREE_SCHEMA})
+    schema = {
+        "$defs": {"tree": {"type": "string"}, "共通.schema.yaml#/$defs/tree": {"type": "integer"}},
+        "properties": {"tree": {"$ref": "共通.schema.yaml#/$defs/tree"}},
+    }
+    value = {"tree": {"name": "a", "children": [{"name": "b", "children": [{"name": "c"}]}]}}
+    # 実行
+    result = resolve_schema_refs(schema, tmp_path / "schemas" / "rule.schema.yaml")
+    # 検証
+    hoisted_ref = {"$ref": "#/$defs/%E5%85%B1%E9%80%9A.schema.yaml%23~1%24defs~1tree-2"}
+    assert result["$defs"]["tree"] == {"type": "string"}
+    assert result["$defs"]["共通.schema.yaml#/$defs/tree"] == {"type": "integer"}
+    hoisted = result["$defs"]["共通.schema.yaml#/$defs/tree-2"]
+    assert hoisted["properties"]["children"]["items"] == hoisted_ref
+    assert result["properties"]["tree"]["properties"]["children"]["items"] == hoisted_ref
+    assert (
+        list(validator_for(result, default=Draft202012Validator)(result).iter_errors(value)) == []
+    )
+
+
+def test_resolve_schema_refs_when_cycle_back_to_base(
+    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """別のファイルから種類のスキーマへ戻る循環する参照（正常系）。"""
+    # 準備
+    write_files(
+        tmp_path,
+        {
+            "schemas/共通.schema.yaml": (
+                "$defs:\n"
+                "  wrap:\n"
+                "    type: object\n"
+                "    properties:\n"
+                "      inner:\n"
+                "        $ref: 'rule.schema.yaml#/$defs/node'\n"
+            )
+        },
+    )
+    schema = {
+        "$defs": {
+            "node": {
+                "type": "object",
+                "properties": {"child": {"$ref": "共通.schema.yaml#/$defs/wrap"}},
+            }
+        },
+        "properties": {"root": {"$ref": "#/$defs/node"}},
+    }
+    # 実行
+    result = resolve_schema_refs(schema, tmp_path / "schemas" / "rule.schema.yaml")
+    # 検証
+    child = result["$defs"]["node"]["properties"]["child"]
+    assert child["properties"]["inner"] == {"$ref": "#/$defs/node"}
+    assert "rule.schema.yaml" not in repr(result)
 
 
 def test_resolve_schema_refs_when_missing(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
