@@ -32,13 +32,13 @@ docs:
 scope_out:
   - item: dev-docs の設定の画面で、取得したバージョンを保存の要求に含めて送信し、409 を受けたときに取得し直す
     reason: 設定の画面は dev-docs に残り、project-index は画面を持たない。この作業 PR のバージョンの設計を前提にするため、マージ提案の前に shuhei1101/dev-docs へ起票する（本文に、バージョンを送信しない保存の扱いと、この変更が入った後に着手する順番を記載する）
-    plan: to_file
+    plan: shuhei1101/dev-docs#190
   - item: dev-docs の設定の画面で、配信元の行の outside_read を表示・変更する
     reason: '設定の画面は dev-docs に残る。取得の応答の outsideRead は #14・#9 で入っているが、画面の作業はバージョンの送信と同じフォームを変えるため、上の行とまとめて起票するかをレビューで決める'
-    plan: to_file
+    plan: shuhei1101/dev-docs#190
   - item: 端末のほかのプロセスの呼び出しを、端末だけで読めるトークンで受ける
     reason: '#14 で移した require_same_origin は Origin も Sec-Fetch-Site も無い要求をサーバーの側からの呼び出しとして受け、NFR-1 の通信（127.0.0.1 でだけ待ち受け、認証を持たない）で認可を持たない。端末のほかのプロセスは既に PUT で丸ごと書き換えられるため、1 行の API にだけトークンを付けても守れる範囲が増えない（インターフェース定義設計のレビューで確定）'
     plan: none
   - item: 丸ごとの保存と 1 行の追加で、内容のバージョン（expectedVersion）を必須に切り替える
     reason: dev-docs の設定の画面がバージョンを送信するようになるまでは、必須にすると画面からの保存が断られる。この作業 PR の照合を前提にし、dev-docs の画面の作業の後に着手する
-    plan: to_file
+    plan: '#60'
