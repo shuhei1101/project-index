@@ -161,6 +161,41 @@ def test_resolve_schema_refs_when_cycle_in_other_file_with_same_name(
     )
 
 
+def test_resolve_schema_refs_when_cycle_back_to_base(
+    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """別のファイルから種類のスキーマへ戻る循環する参照（正常系）。"""
+    # 準備
+    write_files(
+        tmp_path,
+        {
+            "schemas/共通.schema.yaml": (
+                "$defs:\n"
+                "  wrap:\n"
+                "    type: object\n"
+                "    properties:\n"
+                "      inner:\n"
+                "        $ref: 'rule.schema.yaml#/$defs/node'\n"
+            )
+        },
+    )
+    schema = {
+        "$defs": {
+            "node": {
+                "type": "object",
+                "properties": {"child": {"$ref": "共通.schema.yaml#/$defs/wrap"}},
+            }
+        },
+        "properties": {"root": {"$ref": "#/$defs/node"}},
+    }
+    # 実行
+    result = resolve_schema_refs(schema, tmp_path / "schemas" / "rule.schema.yaml")
+    # 検証
+    child = result["$defs"]["node"]["properties"]["child"]
+    assert child["properties"]["inner"] == {"$ref": "#/$defs/node"}
+    assert "rule.schema.yaml" not in repr(result)
+
+
 def test_resolve_schema_refs_when_missing(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     """参照先が無い（正常系）。"""
     # 準備
