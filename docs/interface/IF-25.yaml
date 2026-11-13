@@ -29,6 +29,7 @@ flows:
     expected:
       - 200 で、`value` が YAML を読み込んだ値、`schema` が種類 `design` のスキーマ（`$ref` を解いた形）
       - '`metadata` が `id`・`kind`・`name`・`description`・`tags`・`visibility` を持つ'
+      - '`visibility` は文書の `visibility` の値で、文書が持たなければ `null`'
       - '`metadata.commonKeys` が、文書の一覧（`common_keys=true`）の同じ文書の `commonKeys` と同じ値'
       - '`markdown`・`conversionError`・`body`・`bodyPath` が `null`'
       - '`updatedAt` が文書を最後に変えた commit の日時'
@@ -244,9 +245,9 @@ response:
 response_example: |-
   ```json
   {"source": "sample", "ref": "main", "path": "design/D-1.yaml",
-   "value": {"id": "D-1", "title": "タスクの保存", "links": [{"to": "D-2"}]},
+   "value": {"id": "D-1", "title": "タスクの保存", "links": [{"to": "D-2"}], "visibility": "internal"},
    "schema": {"type": "object", "required": ["id", "title"]},
-   "metadata": {"id": "D-1", "kind": "design", "name": "タスクの保存", "description": null, "tags": [], "visibility": "internal", "commonKeys": {"id": "D-1", "name": "タスクの保存", "related": [{"to": "D-2"}], "alias_type": "term"}},
+   "metadata": {"id": "D-1", "kind": "design", "name": "タスクの保存", "description": null, "tags": [], "visibility": "internal", "commonKeys": {"id": "D-1", "name": "タスクの保存", "related": [{"to": "D-2"}], "alias_type": "term", "visibility": "internal"}},
    "body": null, "bodyPath": null, "markdown": null, "conversionError": null,
    "updatedAt": "2026-11-12T10:30:00+09:00"}
   ```

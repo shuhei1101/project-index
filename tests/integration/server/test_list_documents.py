@@ -32,13 +32,13 @@ CONFIG = (
 
 
 def main_files() -> dict[str, str]:
-    """種類 `design` の YAML 2 件と、管理用の YAML の行の文書 1 件を持つ配信元のファイル一式を返す。"""
+    """種類 `design` の YAML 2 件（1 件目だけが `visibility` を持つ）と、管理用の YAML の行の文書 1 件を持つ配信元のファイル一式を返す。"""
     return {
         "project-index.yaml": CONFIG,
         "schemas/design.schema.yaml": DESIGN_SCHEMA,
         "schemas/common.schema.yaml": COMMON_SCHEMA,
         "schemas/files.schema.yaml": FILES_SCHEMA_TEMPLATE.read_text(encoding="utf-8"),
-        "design/D-1.yaml": "id: D-1\nname: 設計 1\ndescription: 1 件目\ntags: [a]\ntitle: 最初\n",
+        "design/D-1.yaml": "id: D-1\nname: 設計 1\ndescription: 1 件目\ntags: [a]\ntitle: 最初\nvisibility: internal\n",
         "design/D-2.yaml": "id: D-2\nname: 設計 2\ntitle: 2 件目\n",
         "notes/files.yaml": "files:\n  - path: guide.md\n    name: 手引き\n",
         "notes/guide.md": "# 手引き\n\n本文\n",
@@ -68,7 +68,7 @@ def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]
         "name": "設計 1",
         "description": "1 件目",
         "tags": ["a"],
-        "visibility": None,
+        "visibility": "internal",
         "bodyPath": None,
         "version": first["version"],
         "value": None,
@@ -77,6 +77,8 @@ def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]
     assert isinstance(first["version"], str)
     assert first["version"]
     assert body["documents"][2]["bodyPath"] == "notes/guide.md"
+    # visibility を持たない文書は null
+    assert body["documents"][1]["visibility"] is None
 
 
 def test_normal_when_values_requested(
@@ -124,6 +126,7 @@ def test_normal_when_common_keys_requested(
     assert common_keys["name"] == "最初"
     assert common_keys["related"] == [{"to": "D-2"}]
     assert common_keys["alias_type"] == "term"
+    assert common_keys["visibility"] == "internal"
     # 中のキーは METADATA_KEYS の名前のまま（camelCase にしない）で、値の無いキーを持たない
     assert "aliasType" not in common_keys
     assert None not in common_keys.values()

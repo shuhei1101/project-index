@@ -169,11 +169,17 @@ def test_resolve_metadata() -> None:
         metadata={"name": "title"},
         alias_type="term",
     )
-    data = {"id": "a", "title": "A", "tags": ["x"]}
+    data = {"id": "a", "title": "A", "tags": ["x"], "visibility": "internal"}
     # 実行
     result = resolve_metadata(data, table)
     # 検証
-    assert result == {"id": "a", "name": "A", "tags": ["x"], "alias_type": "term"}
+    assert result == {
+        "id": "a",
+        "name": "A",
+        "tags": ["x"],
+        "alias_type": "term",
+        "visibility": "internal",
+    }
 
 
 def test_resolve_metadata_when_nested_field() -> None:
