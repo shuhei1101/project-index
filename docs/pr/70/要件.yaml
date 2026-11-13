@@ -1,0 +1,75 @@
+use_cases: []
+docs:
+  - page: docs/guide/用語集.md
+    new: false
+    change: 用語を用語集の種類の文書へ移し、用語集の文書の一覧を描く目次にする。「置き場所」「読める」の文言を修正
+    status: todo
+  - page: docs/guide/コアコンセプト-文書のメタデータ.md
+    new: false
+    change: '設計書の文書が tags・aliases を持つことと、用語集の種類（alias_type: term）を追記。「置き場所」「読み直し」の文言を修正'
+    status: todo
+  - page: docs/guide/files.yml
+    new: false
+    change: 公開ドキュメントの Markdown の行にタグを付与
+    status: todo
+  - page: docs/guide/コアコンセプト-プラグイン.md
+    new: false
+    change: 「返し済み」を「返却済み」に修正
+    status: todo
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: 「返し済み」「読める」「置き場所」と反映の値の「読み直し」の文言を修正
+    status: todo
+  - page: docs/guide/CLI.md
+    new: false
+    change: 「読める」の文言を修正
+    status: todo
+  - page: docs/guide/コアコンセプト-配信元と権限.md
+    new: false
+    change: 「作業範囲の外で読める」の文言を修正
+    status: todo
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: 「読める」と反映の値の「読み直し」の文言を修正
+    status: todo
+  - page: docs/guide/設定.md
+    new: false
+    change: 表の反映の列の「読み直し」（全行）・「読めるバージョン」・「束ねる」の文言を修正
+    status: todo
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: 「読める」「置き場所」「束ねる」と反映の値の「読み直し」の文言を修正
+    status: todo
+  - page: docs/guide/README.md
+    new: false
+    change: 「置き場所」の文言を修正
+    status: todo
+  - page: docs/guide/documentsの行の判定.md
+    new: false
+    change: 「置き場所」の文言を修正
+    status: todo
+  - page: docs/guide/はじめに.md
+    new: false
+    change: 「置き場所」の文言を修正
+    status: todo
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: 反映の値の「読み直し」に触れる箇所があれば修正
+    status: todo
+  - page: project-index.yaml
+    new: false
+    change: '設計書の種類の行の metadata に tags・main_tags と alias_type: doc を追加し、用語集の種類の行を追加'
+    status: todo
+scope_out:
+  - item: PR ドキュメント（docs/pr/・dev/pr/）に残る「返し済み」「読める」「読み直し」「置き場所」「束ねる」とパスの click のリンク
+    reason: マージ済みの作業 PR の計画と記録で、当時の文言のまま残す
+    plan: none
+  - item: 反映の値以外の「読み直し」「読み直す」（設定を読み直す など。docs/interface・docs/module・docs/scenario・src・tests の約 50 ファイル）
+    reason: '#65 は「読み直し」を設定.md の反映の列と反映の値に触れるページに限っている。対応表の「読む」に当たるため同じ PR で含めるかは判断が分かれる。今の判断は、この作業 PR がマージされなくても成り立つ横展開の残りとして起票する。レビューで確定する'
+    plan: to_file
+  - item: 修正する文に残る、対象の単語以外の対応表の NG の単語（読む・置く・返す など）
+    reason: '#65・#66 の対象は単語ごとに決まっており、要望に含まれない'
+    plan: none
+  - item: ai-monitor のモジュール構成のクラス図の click の href のパス
+    reason: '#31 の本文が参照元として挙げている別のリポジトリで、このリポジトリの作業 PR では変えられない'
+    plan: none
