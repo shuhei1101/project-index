@@ -35,6 +35,7 @@ METADATA_KEYS = (
     "path",
     "port",
     "replacement",
+    "visibility",
 )
 
 PART_PATTERN = re.compile(r"^([^.\[\]]+)((?:\[(?:\d+|[A-Za-z][A-Za-z0-9_]*)?\])*)$")
