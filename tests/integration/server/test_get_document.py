@@ -62,6 +62,8 @@ def test_normal(
     assert body["metadata"]["kind"] == "design"
     assert body["metadata"]["name"] == "設計 1"
     assert body["metadata"]["tags"] == ["a"]
+    assert body["metadata"]["visibility"] == "internal"
+    assert body["metadata"]["commonKeys"]["visibility"] == "internal"
     assert body["metadata"]["commonKeys"] == listed.json()["documents"][0]["commonKeys"]
     assert body["markdown"] is None
     assert body["conversionError"] is None
