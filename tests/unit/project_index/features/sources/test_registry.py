@@ -594,6 +594,71 @@ def test_source_registry_load_when_duplicate_loaded_later(
     assert registry.get("a").root == Path("/tmp/x")
 
 
+def test_source_registry_load_when_duplicate_loaded_later_with_on_rebuilt(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """後の行が先に読み込まれて ID が重なると、入れ替えた後の処理を呼ぶ（正常系）。"""
+    # 準備
+    from project_index.features.settings.types import SourceScope
+
+    loader = _Loader(make_served_source, make_status, blocked=("z",), names={"x": "a", "y": "a"})
+    monkeypatch.setattr(registry_module, "load_source", loader)
+    terminal = make_terminal_config(
+        sources=[
+            make_entry("/tmp/z/project-index.yaml", source_id="z"),
+            make_entry("/tmp/x/project-index.yaml", scope=SourceScope(read=["/w/x/**"])),
+            make_entry("/tmp/y/project-index.yaml", scope=SourceScope(read=["/w/y/**"])),
+        ]
+    )
+    waiting = threading.Event()
+    rebuilt: list[ServedSource] = []
+    registry = SourceRegistry(on_rebuilt=rebuilt.append, loading=True, on_waiting=waiting.set)
+
+    async def scenario() -> None:
+        worker = threading.Thread(target=registry.load, args=(terminal,))
+        worker.start()
+        await asyncio.to_thread(loader.entered["z"].wait, 5)
+        waiter = asyncio.ensure_future(registry.wait_for(cwd="/w/y/q"))
+        await asyncio.to_thread(waiting.wait, 5)
+        loader.release["z"].set()
+        await asyncio.wait_for(waiter, timeout=5)
+        await asyncio.to_thread(worker.join, 5)
+
+    # 実行
+    asyncio.run(scenario())
+    # 検証
+    assert loader.order == ["z", "y", "x"]
+    assert [(source.id, source.root) for source in rebuilt] == [("a", Path("/tmp/x"))]
+
+
+def test_source_registry_load_when_duplicate_loaded_earlier_with_on_rebuilt(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """先の行が先に読み込まれて ID が重なると、入れ替えた後の処理を呼ばない（正常系）。"""
+    # 準備
+    loader = _Loader(make_served_source, make_status, names={"x": "a", "y": "a"})
+    monkeypatch.setattr(registry_module, "load_source", loader)
+    terminal = make_terminal_config(sources=_entries(make_entry, "x", "y", with_id=False))
+    rebuilt: list[ServedSource] = []
+    registry = SourceRegistry(on_rebuilt=rebuilt.append, loading=True)
+    # 実行
+    registry.load(terminal)
+    # 検証
+    assert loader.order == ["x", "y"]
+    assert rebuilt == []
+    statuses = registry.statuses()
+    assert [status.status for status in statuses] == ["serving", "not_served"]
+    assert [error.path for error in statuses[1].errors] == ["sources[1].id"]
+
+
 def test_source_registry_wait_for(
     monkeypatch: pytest.MonkeyPatch,
     make_terminal_config: Callable[..., TerminalConfig],
