@@ -26,5 +26,5 @@ scope_out:
     reason: shuhei1101/dev-docs#92 で SessionStart の配信元の案内を廃止したため、D-152 の決定のうち SessionStart の部分は行わない
     plan: none
   - item: 読み取り API の配信元の設定の取得（IF-23）・配信元の一覧（IF-22）の応答への `when` の追加
-    reason: 要望はエージェントへの案内（`describe`・instructions）で、画面のサーバーの読み取り API は含まない。IF-23 が設定をそのまま返す場合は追加の作業なしで載るため、インターフェース定義設計で確かめて確定する
+    reason: 要望はエージェントへの案内（`describe`・instructions）で、画面のサーバーの読み取り API は含まない。IF-23 は設定のうち `nav`・`documents`・`decisions.folders`・`github`・`diff.ignore_keys`・`schemas` だけを返却し、`description` も返却しないため、`when` も加えない
     plan: none
