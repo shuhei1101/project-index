@@ -251,6 +251,13 @@ flows:
       - '`outside_read: false` の other では `SourceNotReadableError` を返す'
     test: test_normal_when_outside_scope
 lead: '`related` をたどって関連する文書と関連の候補を返却する `trace_related` の入出力を定め、`trace_related` を修正するときに参照する。'
+tags:
+  - name: topic:関連
+    main: true
+  - name: action:追跡
+  - name: tool:mcp
+aliases:
+  - 'trace_related'
 identifier: trace_related
 permissions: 対象の配信元の `scope.read` か `scope.write` に `cwd` が当たること。たどった先が読めない配信元の文書なら、その文書は ID だけを返す
 idempotent: true

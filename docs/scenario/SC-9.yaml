@@ -102,6 +102,11 @@ scenarios:
       - 壊れた内容を `default_ref` へ commit した後は、読み取り API で取得した文書 1 のエラーに、読めなかったファイルのパスと理由が入る
     test: test_error_when_yaml_broken
 lead: 利用者が YAML を直接編集した後、次の取得が読み直した内容を返却するシナリオを定め、直接編集の後の振る舞いを変えるときに参照する。
+tags:
+  - name: topic:文書
+    main: true
+  - name: action:編集
+  - name: topic:キャッシュ
 issue: 14
 primary_actor: 利用者
 stakeholders:

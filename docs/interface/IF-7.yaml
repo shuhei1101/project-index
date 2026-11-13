@@ -269,6 +269,13 @@ flows:
       - '文書 1 の YAML の、`related` の文書 2 の行以外の行が書き込み前の文字列と一致し、`description: ''2020-12''` と `name: "A: b"` が残る'
     test: test_normal_when_unlink_quotes_preserved
 lead: 文書を物理削除し、`related` からの参照を拒否するか除外する `delete_docs` の入出力を定め、`delete_docs` を修正するときに参照する。
+tags:
+  - name: topic:文書
+    main: true
+  - name: action:削除
+  - name: tool:mcp
+aliases:
+  - 'delete_docs'
 identifier: delete_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーだけ。Git 管理外の配信元は種類の `documents[].writable` が削除を許すこと
 idempotent: false

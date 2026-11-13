@@ -184,6 +184,14 @@ flows:
       - プロセスを起動していない
     test: test_normal_when_forget_failed
 lead: サーバーの起動と返却済みの記録の削除の依頼をする SessionStart のフックの入出力を定め、セッション開始のフックを修正するときに参照する。
+tags:
+  - name: topic:フック
+    main: true
+  - name: topic:セッション
+  - name: action:起動
+  - name: tool:claude-code
+aliases:
+  - 'SessionStart のフック'
 identifier: hooks/session_start.py
 permissions: 利用者の権限で動く
 idempotent: true

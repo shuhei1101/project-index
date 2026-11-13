@@ -799,6 +799,14 @@ flows:
       - ワークツリー x の文書 1 は書き換わらない
     test: test_error_when_schema_ref_unresolvable
 lead: 文書の作成・部分更新・置き換えを検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
+tags:
+  - name: topic:文書
+    main: true
+  - name: action:書き込み
+  - name: action:検証
+  - name: tool:mcp
+aliases:
+  - 'write_docs'
 identifier: write_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーにだけ書く
 idempotent: false

@@ -259,6 +259,14 @@ flows:
       - '`outside_read: false` の other では `SourceNotReadableError` を返す'
     test: test_normal_when_outside_scope
 lead: 区間か前回参照した時点から変わった文書・キー・差分の行を返却する `list_changes` の入出力を定め、`list_changes` を修正するときに参照する。
+tags:
+  - name: topic:差分
+    main: true
+  - name: action:比較
+  - name: tool:mcp
+  - name: tool:git
+aliases:
+  - 'list_changes'
 identifier: list_changes
 permissions: 対象の配信元の `scope.read` か `scope.write` に `cwd` が当たること
 idempotent: true

@@ -146,6 +146,12 @@ flows:
       - '`settings.yaml` が追記した内容のままで、extra の行が無い'
     test: test_error_when_version_outdated
 lead: 端末の設定へ配信元の行を 1 行追加する端末の設定の API の入出力を定め、配信元の 1 行の追加を修正するときに参照する。
+tags:
+  - name: topic:設定
+    main: true
+  - name: topic:配信元
+  - name: topic:api
+  - name: action:追加
 identifier: add_settings_source
 permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ'
 idempotent: false

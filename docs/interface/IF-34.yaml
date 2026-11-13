@@ -3,6 +3,12 @@ entry:
   kind: endpoint
   value: DELETE `/settings/sources/{id}`
 lead: 端末の設定の配信元の行を 1 行だけ削除して配信から除外する端末の設定の API の入出力を定め、配信元の 1 行の削除を修正するときに参照する。
+tags:
+  - name: topic:設定
+    main: true
+  - name: topic:配信元
+  - name: topic:api
+  - name: action:削除
 identifier: delete_settings_source
 permissions: '`Origin` を持たない要求（サーバーの側や端末のほかのプロセスからの呼び出し）か、project-index と同じオリジンからの要求だけ'
 idempotent: false

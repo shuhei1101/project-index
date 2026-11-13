@@ -10,6 +10,7 @@ github:
 documents:
   - id: architecture
     title: アーキテクチャ図
+    alias_type: doc
     paths: ["docs/architecture/*.yaml"]
     exclude: [index.yaml]
     schema: schemas/architecture.schema.yaml
@@ -17,8 +18,11 @@ documents:
       name: title
       description: lead
       visibility: visibility
+      tags: tags[].name
+      main_tags: tags[main].name
   - id: nonfunctional
     title: 非機能要件
+    alias_type: doc
     paths: ["docs/nonfunctional/*.yaml"]
     exclude: [index.yaml]
     schema: schemas/nonfunctional.schema.yaml
@@ -26,8 +30,11 @@ documents:
       name: title
       description: lead
       visibility: visibility
+      tags: tags[].name
+      main_tags: tags[main].name
   - id: scenario
     title: シナリオ
+    alias_type: doc
     paths: ["docs/scenario/*.yaml"]
     exclude: [index.yaml]
     schema: schemas/scenario.schema.yaml
@@ -35,8 +42,11 @@ documents:
       name: title
       description: lead
       visibility: visibility
+      tags: tags[].name
+      main_tags: tags[main].name
   - id: interface
     title: インターフェース定義
+    alias_type: doc
     paths: ["docs/interface/*.yaml"]
     exclude: [index.yaml]
     schema: schemas/interface.schema.yaml
@@ -44,8 +54,11 @@ documents:
       name: title
       description: lead
       visibility: visibility
+      tags: tags[].name
+      main_tags: tags[main].name
   - id: module
     title: モジュール構成
+    alias_type: doc
     paths: ["docs/module/*.yaml"]
     exclude: [index.yaml]
     schema: schemas/module.schema.yaml
@@ -53,8 +66,11 @@ documents:
       name: title
       description: lead
       visibility: visibility
+      tags: tags[].name
+      main_tags: tags[main].name
   - id: config
     title: 設定
+    alias_type: doc
     paths: ["docs/config/*.yaml"]
     exclude: [index.yaml]
     schema: schemas/config.schema.yaml
@@ -62,8 +78,11 @@ documents:
       name: title
       description: lead
       visibility: visibility
+      tags: tags[].name
+      main_tags: tags[main].name
   - id: api
     title: 外部API
+    alias_type: doc
     paths: ["docs/external-api/*.yaml"]
     exclude: [index.yaml]
     schema: schemas/external-api.schema.yaml
@@ -71,8 +90,11 @@ documents:
       name: title
       description: lead
       visibility: visibility
+      tags: tags[].name
+      main_tags: tags[main].name
   - id: library
     title: 外部ライブラリ
+    alias_type: doc
     paths: ["docs/library/*.yaml"]
     exclude: [index.yaml]
     schema: schemas/library.schema.yaml
@@ -80,8 +102,11 @@ documents:
       name: title
       description: lead
       visibility: visibility
+      tags: tags[].name
+      main_tags: tags[main].name
   - id: test_procedure
     title: テスト実行方法
+    alias_type: doc
     paths: ["docs/test-procedure/*.yaml"]
     exclude: [index.yaml]
     schema: schemas/test-procedure.schema.yaml
@@ -89,8 +114,11 @@ documents:
       name: title
       description: lead
       visibility: visibility
+      tags: tags[].name
+      main_tags: tags[main].name
   - id: dev_command
     title: 開発コマンド
+    alias_type: doc
     paths: ["docs/dev-command/*.yaml"]
     exclude: [index.yaml]
     schema: schemas/dev-command.schema.yaml
@@ -98,6 +126,15 @@ documents:
       name: title
       description: lead
       visibility: visibility
+      tags: tags[].name
+      main_tags: tags[main].name
+  - id: glossary
+    title: 用語集
+    paths: ["docs/glossary/*.yaml"]
+    exclude: [index.yaml]
+    schema: schemas/glossary.schema.yaml
+    records: terms
+    alias_type: term
   - id: index
     title: 目次
     paths:

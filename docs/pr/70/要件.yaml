@@ -2,16 +2,22 @@ use_cases: []
 docs:
   - page: docs/guide/用語集.md
     new: false
-    change: 用語を用語集の種類の文書へ移し、用語集の文書の一覧を描く目次にする。「置き場所」「読める」の文言を修正
-    status: todo
+    change: 用語を docs/glossary/GLO-1.yaml へ移し、用語集の文書へのリンクを持つ目次にする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-13T09:11:03.705942+00:00'
   - page: docs/guide/コアコンセプト-文書のメタデータ.md
     new: false
-    change: '設計書の文書が tags・aliases を持つことと、用語集の種類（alias_type: term）を追記。「置き場所」「読み直し」の文言を修正'
-    status: todo
+    change: 「置き場所」の文言を修正。tags・main_tags の列名の対応とエイリアスのキーは既に記載があり、この配信元の設計書の持ち方は project-index.yaml とスキーマが持つため追記しない
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-13T09:11:03.705942+00:00'
   - page: docs/guide/files.yml
     new: false
     change: 公開ドキュメントの Markdown の行にタグを付与
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-13T09:11:03.705942+00:00'
   - page: docs/guide/コアコンセプト-プラグイン.md
     new: false
     change: 「返し済み」を「返却済み」に修正
@@ -75,7 +81,15 @@ docs:
   - page: project-index.yaml
     new: false
     change: '設計書の種類の行の metadata に tags・main_tags と alias_type: doc を追加し、用語集の種類の行を追加'
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-13T09:11:03.705942+00:00'
+  - page: docs/glossary/GLO-1.yaml
+    new: true
+    change: 'docs/guide/用語集.md の 33 の用語を terms の配列で持つ用語集（alias_type: term）を作る'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-13T09:11:05.726033+00:00'
 scope_out:
   - item: PR ドキュメント（docs/pr/・dev/pr/）に残る「返し済み」「読める」「読み直し」「置き場所」「束ねる」とパスの click のリンク
     reason: マージ済みの作業 PR の計画と記録で、当時の文言のまま残す

@@ -102,6 +102,14 @@ flows:
       - 同じ `session_id` の返却済みの記録が残っている
     test: test_error_when_input_invalid
 lead: '`/clear`・圧縮の後にセッションの返却済みの記録を削除する `POST /_admin/session-start` の入出力を定め、セッションの開始の処理を修正するときに参照する。'
+tags:
+  - name: topic:セッション
+    main: true
+  - name: topic:会話
+  - name: action:削除
+  - name: topic:api
+aliases:
+  - 'POST /_admin/session-start'
 identifier: post_session_start
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true

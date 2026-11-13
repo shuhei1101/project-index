@@ -63,6 +63,11 @@ flows:
       - 起動し直すのは 1 回だけ（ログの起動の行が 1 つ増える）
     test: test_error_when_restart_in_progress
 lead: 応答の後に同じプロセス ID で `project-index serve` を起動し直す管理の MCP の `restart` の入出力を定め、`restart` を修正するときに参照する。
+tags:
+  - name: topic:サーバー
+    main: true
+  - name: action:再起動
+  - name: tool:mcp
 identifier: restart
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: false
