@@ -73,6 +73,25 @@ MISSING_REF_SCHEMA = DEFS_REF_SCHEMA.replace("common.schema.yaml", "missing.sche
 COMMON_SCHEMA = "$defs:\n  summary:\n    type: string\n"
 MISSING_REF = "missing.schema.yaml#/$defs/summary"
 ENTRIES = [{"summary": "a", "children": [{"summary": "b"}]}]
+# 最上位の `tree` が別のファイルの中で循環する定義を指し、中身の違う同じ名前の `$defs.tree` も持つスキーマ
+TREE_REF_SCHEMA = (
+    "type: object\n"
+    "properties:\n"
+    "  tree: {$ref: 'common.schema.yaml#/$defs/tree'}\n"
+    "$defs:\n"
+    "  tree: {type: string}\n"
+)
+TREE_COMMON_SCHEMA = (
+    "$defs:\n"
+    "  tree:\n"
+    "    type: object\n"
+    "    properties:\n"
+    "      name: {type: string}\n"
+    "      children:\n"
+    "        type: array\n"
+    "        items: {$ref: '#/$defs/tree'}\n"
+)
+TREE = {"name": "a", "children": [{"name": "b", "children": [{"name": "c"}]}]}
 
 
 def _notes_files(
@@ -993,6 +1012,31 @@ def test_normal_when_relative_ref_in_defs(
             "schemas/sample.schema.yaml": DEFS_REF_SCHEMA,
             "schemas/common.schema.yaml": COMMON_SCHEMA,
             "docs/doc-1.yaml": sample_doc_text("doc-1", "文書 1", entries=ENTRIES),
+        }
+    )
+    source = make_source("sample", files)
+    env = make_server(source)
+    # 実行
+    result = env.call("search_docs", cwd=str(source.folder), filter=DOC_1, format="json")
+    # 検証
+    assert not result.is_error
+    assert [item["id"] for item in result.data["items"]] == ["doc-1"]
+    assert [note for note in result.data.get("notes", []) if note.startswith("doc-1:")] == []
+
+
+def test_normal_when_cyclic_ref_in_other_file(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_doc_text: Callable[..., str],
+) -> None:
+    """別のファイルの中で循環する参照をそのファイルの定義を指したまま検査し、文書を返す（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "schemas/sample.schema.yaml": TREE_REF_SCHEMA,
+            "schemas/common.schema.yaml": TREE_COMMON_SCHEMA,
+            "docs/doc-1.yaml": sample_doc_text("doc-1", "文書 1", tree=TREE),
         }
     )
     source = make_source("sample", files)
