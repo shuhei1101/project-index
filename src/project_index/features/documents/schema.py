@@ -204,7 +204,8 @@ class _Resolver:
                 logger.warning("スキーマの循環する参照を解かずに残した（%s・%s）", current, ref)
             # 種類のスキーマの中の循環: 最上位の `$defs` を指したまま残す
             if self._is_base(target_path):
-                return dict(value)
+                # 別のファイルから種類のスキーマへ戻る参照は、ファイルのパスを除いて種類のスキーマを指す
+                return {**value, "$ref": f"#{fragment}"} if location else dict(value)
             # 別のファイルの中の循環: 参照先の定義を最上位の `$defs` へ加えた名前を指す
             target_doc = document if not location else self._load(target_path)
             name = self._hoist(identity, target_path, fragment, target_doc)
