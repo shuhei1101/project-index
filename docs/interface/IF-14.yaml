@@ -194,7 +194,7 @@ flows:
       - '2 回目は `isError: true` で、`local/project-index.yaml` のパスを返す'
       - どちらの `project-index.yaml` も書き換わらない
     test: test_error_when_item_not_group
-  - name: 正常系（フォルダでグループ化する auto を書く）
+  - name: 正常系（フォルダでグループ化する auto を書き込む）
     summary: "`group_by: '@folder'` の `auto` を検証に通して書き、文書の数を返す"
     setup:
       - name: Mock
@@ -204,7 +204,7 @@ flows:
         description: "`add`（タブ `folders`、`auto` が `{document: sample, group_by: '@folder'}`）"
         notes: sample の文書は 3 件
     flow: |-
-      <!-- map: {"title": "正常系（フォルダでグループ化する auto を書く）"} -->
+      <!-- map: {"title": "正常系（フォルダでグループ化する auto を書き込む）"} -->
 
       ```mermaid
       sequenceDiagram
