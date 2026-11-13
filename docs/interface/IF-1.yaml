@@ -33,7 +33,7 @@ flows:
       - sample を `write（作業中）`、notes を `read` として返す
       - other を返さない
       - 表の `when` 列の sample の行が `when` の 2 行を `<br>` でつないだ値で、notes の行が空
-      - '`format: json` の `sources[].when` が sample は 2 行の配列、notes は空の配列'
+      - '`format: json` の `sources[].when` が sample は 2 行の配列で、notes の行は `when` のキーを持たない（空の値のキーを落とす）'
     test: test_normal
   - name: 正常系（使える配信元の警告）
     summary: 引数なしで、使える配信元の一覧に続けて、使える配信元の同期のずれ・古い設定と、配信していない配信元の警告を返す
@@ -153,7 +153,7 @@ flows:
       - 説明書の前に「使う場面」の見出しと、`when` の 2 行の箇条書きがある
       - '`instructions` の本文がそのままある'
       - '`format: json` の `when` が 2 行の配列'
-      - '`when` を記載しない配信元では「使う場面」の見出しを出さず、`format: json` の `when` が空の配列'
+      - '`when` を記載しない配信元では「使う場面」の見出しを出さず、`format: json` が `when` のキーを持たない'
       - 種類の表に sample の種類の `id` と説明がある
     test: test_normal_when_source
   - name: 正常系（種類のスキーマ）
@@ -535,7 +535,7 @@ response:
     description: 配信元の設定の `description`
   - name: sources[].when
     type: list[str]
-    description: 配信元の設定の `when`（使う場面）の全ての行。記載しない配信元は空の配列
+    description: '配信元の設定の `when`（使う場面）の全ての行。記載しない配信元は空の配列（`format: json` はキーを落とす）'
     notes: '`format: markdown` は表の `when` 列に、行を `<br>` でつないで出す'
   - name: outside_sources[].id
     type: str

@@ -92,9 +92,9 @@ functions:
       description: 引数の数で決まる結果
     process: |-
       1. `kind` があって `source` が無い場合、`InvalidArgumentError`（`kind` には `source` が要ります）を送る
-      2. `source` が無い場合、作業場所の説明と使える配信元を返す（使える配信元が 0 件でも返す）。`outside_scope` が `True` なら、作業範囲の外で読める配信元（作業範囲の外で読める配信元）を `OutsideSource` にして `outside_sources` に入れる（0 件は空のリスト）。`False` なら `outside_sources` は `None`。警告（警告の収集）を `warnings` に入れる。文書を読まないので要求のログには残さない
+      2. `source` が無い場合、作業場所の説明と使える配信元を返す（使える配信元が 0 件でも返す）。`outside_scope` が `True` なら、作業範囲の外で読める配信元（作業範囲の外で読める配信元）を `OutsideSource`（`id`・`description`・`when`）にして `outside_sources` に入れる（0 件は空のリスト）。`False` なら `outside_sources` は `None`。警告（警告の収集）を `warnings` に入れる。返す前に、使える配信元と作業範囲の外の配信元の ID を並べて、配信元の一覧.裏での確認の実行（`refresh_later`）を呼ぶ（待たない）。文書を読まないので要求のログには残さない
       3. `source` がある場合、読む場所を解く（読む場所の解決。`source`・`worktree`・`cwd`・`outside_scope`。結果の `outside_scope` は場所の `outside_scope`）。作業中の配信元の作業ツリーかワークツリーを読むときは、その場所の設定を読み直した配信元を使う（作業場所の配信元の読み込み）
-      4. `kind` が無い場合、`instructions` と、有効な文書の行ごとの種類の概要（スキーマは文書のストア.種類のスキーマ）を返す。Git の配信元は、リビジョンの一覧（`commits=0`）のブランチとタグの名前を `refs`、ワークツリーの一覧を `worktrees` に入れる
+      4. `kind` が無い場合、`instructions`・`when` と、有効な文書の行ごとの種類の概要（スキーマは文書のストア.種類のスキーマ）を返す。Git の配信元は、リビジョンの一覧（`commits=0`）のブランチとタグの名前を `refs`、ワークツリーの一覧を `worktrees` に入れる
       5. `kind` がある場合、文書の行を引き（無ければ `UnknownKindError`）、`target.config_base`（設定ファイルのフォルダ）の `schema` のファイルの内容と読んだスキーマ、行の `metadata` を返す。`schema_path` が `SchemaRef` の行は、ファイルの内容の代わりに起動時のスキーマを YAML にしたものを返す
     exceptions:
       - name: InvalidArgumentError
@@ -113,6 +113,18 @@ functions:
         condition: '`kind` が配信元の種類に無い'
         message: '`{source}: 種類 {kind} はありません`'
     unit_tests:
+      - name: test_describe_when_source_when_listed
+        case: 正常
+        summary: 一覧と説明書に使う場面を入れる
+        condition: '`cwd` が sample のクローン本体で、sample の設定の `when` に 2 行、notes は `when` を記載しない。引数なしと `source: sample` で呼ぶ'
+        mock: なし（一時フォルダの配信元）
+        expected: '引数なしの `sources` の sample の `when` が 2 行、notes の `when` が空。`source: sample` の `when` が 2 行'
+      - name: test_describe_when_refresh_requested
+        case: 正常
+        summary: 引数なしの一覧は裏の確認を依頼して待たずに返す
+        condition: '`outside_scope: true`、`cwd` が sample のクローン本体で、other が作業範囲の外'
+        mock: 配信元の一覧の `refresh_later`（受け取った ID を記録する偽物）
+        expected: '`refresh_later` に sample・notes・other の ID が 1 回で渡り、結果は呼ぶ前の配信元の `when` を返す'
       - name: test_describe
         case: 正常
         summary: 使える配信元の一覧

@@ -16,6 +16,19 @@ diagrams:
         文書の MCP の組み立て ..> 変更の一覧
         文書の MCP の組み立て ..> 関連のたどり
         文書の MCP の組み立て ..> 配信元の説明
+        文書の MCP の組み立て ..> 接続ごとに instructions を描く文書の MCP
+        文書の MCP の組み立て ..> 文書の MCP の instructions の描画
+        文書の MCP の instructions の描画 ..> 配信元の一覧 : 配信中・裏での確認の実行
+        class 接続ごとに instructions を描く文書の MCP {
+          +初期化(名前・instructions の描画)
+        }
+        class 文書の MCP の instructions の描画 {
+          <<function>>
+        }
+        class 配信元の一覧 {
+          <<class>>
+        }
+        click 配信元の一覧 href "./MOD-69.py.yaml#配信元の一覧"
         文書の MCP の組み立て ..> ツールのプロンプトの ID
         class ツールのプロンプトの ID {
           <<function>>
@@ -63,6 +76,57 @@ constants:
     usecase: 共通
     summary: '`initialize` で返すサーバーの名前'
     value: '"project-index"'
+  - name: INSTRUCTIONS_MAX_CHARS
+    title: instructions の上限の字数
+    container: project_index/server/mcp/docs.py
+    usecase: 共通
+    summary: 文書の MCP の instructions 全体の字数の上限（インターフェース定義『起動』の制約「MCP の文の出どころ」）
+    value: '4096'
+classes:
+  - name: DocsMCPServer
+    title: 接続ごとに instructions を描く文書の MCP
+    container: project_index/server/mcp/docs.py
+    usecase: 共通
+    role: 入口
+    summary: '`initialize` のたびに instructions を描き直す `MCPServer`'
+    description: |-
+      `MCPServer` を継承する。mcp 2.3.0 は接続ごとに instructions を作るフックを持たず、`initialize` の応答は lowlevel の `Server.create_initialization_options()` が属性 `instructions` を読んで作る。
+      そのため初期化で lowlevel の `Server`（`self._lowlevel_server`）のインスタンスの `create_initialization_options` を、描画してから属性を差し替えて元のメソッドを呼ぶ関数に `setattr` で置き換える。
+      `initialize` は読み取りのループの中で同期に実行されるため、描画の関数は Git を呼ばない（文書の MCP の instructions の描画）。
+    kind: クラス
+    methods:
+      - name: __init__
+        title: 初期化
+        kind: メソッド
+        summary: 名前と instructions の描画を受け取り、`initialize` のたびに描画する
+        scope: public
+        args:
+          - name: name
+            title: 名前
+            type: str
+            required: true
+            passing: positional
+            description: '`initialize` で返すサーバーの名前'
+          - name: instructions
+            title: instructions の描画
+            type: Callable[[], str]
+            required: true
+            passing: keyword
+            description: 呼ぶたびに今の instructions を返す関数
+        returns:
+          type: None
+          description: '-'
+        process: |-
+          1. `super().__init__(name, instructions=instructions())` で作る
+          2. lowlevel の `Server` の今の `create_initialization_options` を控え、`*args`・`**kwargs` を受けて、`instructions()` を lowlevel の `Server` の属性 `instructions` に入れてから控えたメソッドを呼んで返す関数を、`setattr` でインスタンスの `create_initialization_options` に入れる
+        unit_tests:
+          - name: test_docs_mcp_server_when_initialize
+            case: 正常
+            summary: '`initialize` のたびに描き直す'
+            condition: 呼ぶたびに `"v1"`・`"v2"`・`"v3"` を順に返す描画の関数で作り、`initialize` を 2 回（別の接続）呼ぶ
+            mock: instructions の描画（偽物）
+            expected: 描画の関数は作るときに 1 回、`initialize` ごとに 1 回呼ばれ、1 回目の `initialize` の `instructions` が `"v2"`、2 回目が `"v3"`。ツールの一覧は変わらない
+            exception: '-'
 functions:
   - name: build_docs_mcp
     title: 文書の MCP の組み立て
@@ -83,7 +147,7 @@ functions:
       type: mcp.server.mcpserver.MCPServer
       description: 文書の MCP（`stateless_http`・`json_response` はアプリの組み立てが `streamable_http_app()` の引数で渡す）
     process: |-
-      1. `MCPServer(DOCS_MCP_NAME, instructions=handlers.prompts.render(DOCS_INSTRUCTIONS_PROMPT_ID))` を作る
+      1. `DocsMCPServer(DOCS_MCP_NAME, instructions=functools.partial(_docs_instructions, handlers))` を作る（接続ごとに instructions を描く文書の MCP）
       2. `DOCS_TOOL_NAMES` のツールを、`description` を `handlers.prompts.render(tool_prompt_id("docs", 名前))` にして `TOOL_ANNOTATIONS` の注釈で登録する。引数はインターフェース定義の `request` をキーワード引数で受ける（`list_changes` の `from` は `from_: Annotated[str | None, Field(validation_alias="from")]` で受け、ツールの入力のスキーマでは `from` を出す。`alias` は関数の呼び出しで `TypeError` になるため使わない）
          - 要求のモデルのフィールドが `description` を持つ場合、その説明を入力のスキーマの項目の説明に出す（`Annotated[型, Field(description=...)]`）
          - 今のツールの説明（`search_docs`・`write_docs`・`list_changes` の引数の説明の文と `trace_related` の説明を含む）は、削らずに各ツールの YAML へ移す
@@ -126,13 +190,60 @@ functions:
         summary: instructions をプロンプトの YAML から描画する
         condition: '`initialize` を呼ぶ'
         mock: 配線済みの関数（偽物。`prompts` は同梱した YAML を読んだ一式）
-        expected: '`instructions` が `prompts.render(DOCS_INSTRUCTIONS_PROMPT_ID)` と同じで、`grep`・`action:`・`topic:`・`tool:` を含む'
+        expected: '配信元が無いとき、`instructions` が `prompts.render(DOCS_INSTRUCTIONS_PROMPT_ID, {"sources": [], "omitted": 0})` と同じで、`grep`・`action:`・`topic:`・`tool:` を含む'
       - name: test_build_docs_mcp_when_loading
         case: 正常
         summary: ツールの呼び出しは指す配信元の読み込みを待ち、スレッドを持たない
         condition: '`SourceRegistry(loading=True)` のまま `search_docs(source="sample")` を 13 本並べて呼び、`tools/list` を呼ぶ。その後 `reload` する'
         mock: なし（一時フォルダの配信元）
         expected: '`reload` の前に `tools/list` が答え、`search_docs` はまだ答えない（既定の executor のスレッドを使っていない）。`reload` の後に 13 本とも結果を返す'
+  - name: _docs_instructions
+    title: 文書の MCP の instructions の描画
+    kind: 関数
+    container: project_index/server/mcp/docs.py
+    usecase: 共通
+    role: 変換
+    summary: プロンプトの文と、配信中の配信元と使う場面の一覧を 4,096 字に収めて描き、並べた配信元の裏での確認を依頼する
+    scope: internal
+    thread_safe: true
+    args:
+      - name: handlers
+        title: 配線済みの関数
+        type: Handlers
+        required: true
+        passing: positional
+        description: '`registry`・`prompts` を使う'
+    returns:
+      type: str
+      description: instructions
+    process: |-
+      1. `handlers.registry.served()`（待たずに今の控えを読む）から、設定の `when` が空でない配信元を `sources[]` の順に並べ、`{"id": ID, "when": when の 1 行目}` の並びにする
+      2. `handlers.prompts.render(DOCS_INSTRUCTIONS_PROMPT_ID, {"sources": 並び, "omitted": 0})` を描く
+      3. 描いた文が `INSTRUCTIONS_MAX_CHARS` を超える間、並びの末尾を 1 つ除いて `omitted` を 1 増やして描き直す（並びが空になっても `omitted` が 1 以上なら案内だけを描く）
+      4. 1 で並べた全ての配信元の ID で、配信元の一覧.裏での確認の実行（`refresh_later`）を呼ぶ（待たない）
+      5. 描いた文を返す
+    unit_tests:
+      - name: test_docs_instructions
+        case: 正常
+        summary: 使う場面を持つ配信元を端末の設定の順に並べる
+        condition: '配信中の配信元が other（`when` 1 行）・sample（`when` 2 行）・old（`when` なし）の順'
+        mock: 配線済みの関数（偽物。`prompts` は同梱した YAML を読んだ一式。`registry.refresh_later` は受け取った ID を記録する偽物）
+        expected: other・sample の順に ID と `when` の 1 行目があり、sample の 2 行目と old が無い。`refresh_later` に other・sample の ID が渡る
+        exception: '-'
+      - name: test_docs_instructions_when_exceeds_limit
+        case: 正常
+        summary: 上限を超える配信元を末尾から除く
+        condition: '`when` の 1 行目が 200 字の配信元 30 件（`src01`〜`src30`）'
+        mock: 配線済みの関数（偽物。`prompts` は同梱した YAML を読んだ一式）
+        expected: 字数が 4,096 以下で、一覧が `src01` から途中を飛ばさず並び、並んだ件数と案内の件数の合計が 30
+        exception: '-'
+      - name: test_docs_instructions_when_no_source_guide
+        case: 正常
+        summary: 使う場面を持つ配信元が無い
+        condition: 配信中の配信元が `when` を持たない old だけ
+        mock: 配線済みの関数（偽物）
+        expected: '`prompts.render(DOCS_INSTRUCTIONS_PROMPT_ID, {"sources": [], "omitted": 0})` と同じ文'
+        exception: '-'
   - name: _wait_target
     title: 指す配信元の決定
     kind: 関数
@@ -171,4 +282,5 @@ refs:
   - IF-3#
   - IF-1#
 notes:
+  instructions のプロンプトの変数: '`content/prompts/mcp/docs/instructions.yaml` は `vars` に `sources`（`id`・`when` を持つ辞書の並び）と `omitted`（載せなかった件数）を持ち、条件 `sources or omitted` の部品で、配信元と使う場面の一覧（`` `{id}`: {when} `` の行）と、`omitted` が 1 以上のときの載せなかった件数と `describe(outside_scope: true)` の案内（作業場所から使える配信元と作業範囲の外で参照できる配信元の使う場面を引ける）を描く。コードは文を持たない'
   trace_related のツールの説明: '`content/prompts/mcp/docs/tools/trace-related.yaml` は「起点の文書やコードのパスから、related をたどって関連する文書を返す。設計書を起点に direction: in で呼ぶと、via.type が implements の文書がその設計書を実装するコード、コードを起点にすると tests の文書がそのテストになる。」を持つ（インターフェース定義『関連のたどり』の `direction` の補足）'

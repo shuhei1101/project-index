@@ -14,6 +14,7 @@ diagrams:
           +行ごとに読み込む(端末の設定) None
           +指す行の待ち(ID・作業場所・全て) None
           +引く(配信元の ID) 配信中の配信元
+          +裏での確認の実行(配信元の ID の並び) list
           +配信中() list
           +状態の一覧() list
         }
@@ -92,6 +93,12 @@ classes:
         access: 内部 (_)
         default: '[]'
         description: '`wait_for`・`wait_loaded` が待っているイベントループと Future と、待っている行の位置。`_waiters_lock`（`threading.Lock`）を持って足し引きする'
+      - name: _refreshing
+        title: 裏で確認中の配信元
+        type: set[str]
+        access: 内部 (_)
+        default: set()
+        description: '`refresh_later` が裏のスレッドで `default_ref` の commit を確認している配信元の ID。`_refreshing_lock`（`threading.Lock`）を持って足し引きする'
     methods:
       - name: reload
         title: 読み直す
@@ -361,6 +368,49 @@ classes:
             condition: '`SourceRegistry(loading=True)`。行 a・b で、`load` が a の読み込みで止まっている間に、別のスレッドから `get("b")`'
             mock: 配信元の読み込み（a だけ止められる偽物）
             expected: '`get("b")` が a を進めるまで戻らず、進めた後に b の配信元を返す。読んだ行の順が a・b'
+            exception: '-'
+      - name: refresh_later
+        title: 裏での確認の実行
+        kind: メソッド
+        summary: 配信元ごとの `default_ref` の commit の確認と組み立て直しを、裏のスレッドで実行して待たずに戻る
+        scope: public
+        thread_safe: true
+        args:
+          - name: source_ids
+            title: 配信元の ID の並び
+            type: Sequence[str]
+            required: true
+            passing: positional
+            description: 確認する配信元の ID（引数なしの `describe` の一覧に出した配信元・instructions の一覧に並べた配信元）
+        returns:
+          type: list[threading.Thread]
+          description: 始めたスレッド（テストが `join` で終わりを待つ）
+        description: 引数なしの `describe` と文書の MCP の `initialize` が、応答を止めずに `default_ref` の進みを取り込むために呼ぶ（インターフェース定義『配信元の説明』の制約「一覧の配信元の組み立て直し」・『起動』の制約「instructions の配信元と使う場面の一覧」）
+        process: |-
+          1. `_refreshing_lock` を持って、`source_ids` のうち `_refreshing` に無く、`_snapshot` に配信中で Git の配信元（設定の commit を持つ）の ID だけを `_refreshing` に足す（並びの中の同じ ID は 1 つにする）
+          2. 足した ID ごとに `threading.Thread`（`daemon=True`、名前は `project-index-source-refresh-{ID}`）を始める。スレッドは `get(ID)` を呼び（`default_ref` が進んでいれば組み立て直して差し替える）、`ProjectIndexError` は `[warning]` 裏の確認に失敗した（ID・例外）を書いて捨て、最後に `_refreshing_lock` を持って `_refreshing` から ID を除く
+          3. 始めたスレッドを返す
+        unit_tests:
+          - name: test_source_registry_refresh_later
+            case: 正常
+            summary: 裏で組み立て直し、待たずに戻る
+            condition: '`a` を読んだ後に `default_ref` の設定の `when` を書き換える commit を積み、`refresh_later(["a"])` を呼んで返ったスレッドを `join` する'
+            mock: なし（一時フォルダで `git init`）
+            expected: '`join` の前に戻り、`join` の後の `served()` の `a` の `when` が書き換えた値'
+            exception: '-'
+          - name: test_source_registry_refresh_later_when_running
+            case: 正常
+            summary: 確認中の配信元は重ねて確認しない
+            condition: '`get` の commit の確認を止められる偽物で `refresh_later(["a"])` を呼び、止まっている間にもう一度 `refresh_later(["a", "a"])` を呼ぶ'
+            mock: '`default_ref` の commit の確認（止められる偽物）'
+            expected: 2 回目が空の並びを返し、確認が 1 回だけ走る。止めを解いて `join` した後の `refresh_later(["a"])` はスレッドを 1 つ返す
+            exception: '-'
+          - name: test_source_registry_refresh_later_when_not_git
+            case: 正常
+            summary: Git でない配信元と配信していない ID は確認しない
+            condition: '`refresh_later(["notes", "z"])`（notes は Git 管理外、z は端末の設定に無い）'
+            mock: なし
+            expected: 空の並びを返す
             exception: '-'
       - name: served
         title: 配信中

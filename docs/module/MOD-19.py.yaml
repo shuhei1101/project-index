@@ -25,10 +25,16 @@ functions:
       description: Markdown
     process: |-
       1. 配信元の説明書と種類のスキーマは、`outside_scope` が `True` なら先頭に `作業範囲の外（参考）` の行を置く
-      2. 使える配信元の一覧は、`作業場所: {cwd}（{配信元} のクローン本体 / ワークツリー）` の行と `| source | 権限 | description |` の表（作業中の配信元は権限に `（作業中）`）。`outside_sources` が `None` でなければ、空行・`作業範囲の外（参考）` の行・`| source | description |` の表を続ける（0 件は表の代わりに `なし` の行）。使える配信元が 0 件のときは、表の代わりに `使用できる配信元はありません。配信元にするときは /project-index:setup を実行します。` の行を置く。`warnings` が空でなければ、空行・`注意:` の行・警告ごとに `- {警告}` の行を続ける
-      3. 配信元の説明書は、`instructions` をそのまま置き、`| kind | description |` の表を続ける。`refs` があれば `ブランチ: {,で繋いだ名前}`・`タグ: {同じ}` の行、`worktrees` があれば `| ワークツリー | ブランチ |` の表を続ける
+      2. 使える配信元の一覧は、`作業場所: {cwd}（{配信元} のクローン本体 / ワークツリー）` の行と `| source | 権限 | description | when |` の表（作業中の配信元は権限に `（作業中）`。`when` 列は行を `<br>` でつなぎ、無ければ空）。`outside_sources` が `None` でなければ、空行・`作業範囲の外（参考）` の行・`| source | description | when |` の表を続ける（0 件は表の代わりに `なし` の行）。使える配信元が 0 件のときは、表の代わりに `使用できる配信元はありません。配信元にするときは /project-index:setup を実行します。` の行を置く。`warnings` が空でなければ、空行・`注意:` の行・警告ごとに `- {警告}` の行を続ける
+      3. 配信元の説明書は、`when` が空でなければ `使う場面:` の行と行ごとの `- {行}` を置いて空行を挟み、`instructions` をそのまま置き、`| kind | description |` の表を続ける。`refs` があれば `ブランチ: {,で繋いだ名前}`・`タグ: {同じ}` の行、`worktrees` があれば `| ワークツリー | ブランチ |` の表を続ける
       4. 種類のスキーマは、`metadata` が空でなければ `| 共通のキー | 列名 |` の表を置き、```yaml でスキーマの YAML を囲む
     unit_tests:
+      - name: test_render_describe_markdown_when_source_when
+        case: 正常
+        summary: 使う場面の列と見出し
+        condition: '一覧の sample の `when` が 2 行、notes が空。作業範囲の外の other の `when` が 1 行。説明書の `when` が 2 行と空のもの'
+        mock: なし
+        expected: '`| sample | write（作業中） | ... | {1 行目}<br>{2 行目} |`・notes の `when` 列が空・other の行に `when` がある。説明書は `使う場面:` と `- {行}` が `instructions` の前にあり、`when` が空の説明書には `使う場面:` が無い'
       - name: test_render_describe_markdown
         case: 正常
         summary: 一覧の表

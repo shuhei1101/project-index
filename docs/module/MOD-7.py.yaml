@@ -249,7 +249,7 @@ functions:
       description: '`sources[]` の順。使える配信元が無ければ空'
     process: |-
       1. `cwd` を正規化する（パスの正規化）
-      2. 配信中の配信元ごとに権限を決め（権限の判定）、`None` でないものを `SourceAccess` にする。`current` は作業中の配信元か（作業中の配信元）
+      2. 配信中の配信元ごとに権限を決め（権限の判定）、`None` でないものを `SourceAccess` にする。`current` は作業中の配信元か（作業中の配信元）。`description`・`when` は配信元の設定の値
     unit_tests:
       - name: test_available_sources
         case: 正常
