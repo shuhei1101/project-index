@@ -91,11 +91,11 @@ def _source_config(handlers: Handlers, source: str, schemas: bool) -> SourceConf
 
 
 def _documents(
-    handlers: Handlers, source: str, ref: str | None, values: bool
+    handlers: Handlers, source: str, ref: str | None, values: bool, common_keys: bool
 ) -> DocumentListResponse:
     """リビジョンの文書の一覧を返す。"""
     target, _ = read_target(source, ref, registry=handlers.registry)
-    return list_documents(target, store=handlers.store, values=values)
+    return list_documents(target, store=handlers.store, values=values, common_keys=common_keys)
 
 
 def _document(
@@ -156,9 +156,11 @@ def build_read_router(handlers: Handlers) -> APIRouter:
         "/sources/{source}/docs", name="list_documents", response_model=DocumentListResponse
     )
     async def documents(
-        source: str, ref: str | None = None, values: bool = False
+        source: str, ref: str | None = None, values: bool = False, common_keys: bool = False
     ) -> DocumentListResponse | Response:
-        return await _run(handlers, source, "", partial(_documents, handlers, source, ref, values))
+        return await _run(
+            handlers, source, "", partial(_documents, handlers, source, ref, values, common_keys)
+        )
 
     @router.get(
         "/sources/{source}/docs/{path:path}",
