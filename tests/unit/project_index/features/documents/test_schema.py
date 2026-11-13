@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 from jsonschema import Draft202012Validator
+from jsonschema.validators import validator_for
 
 from project_index.features.documents import schema as schema_module
 from project_index.features.documents.schema import resolve_schema_refs, startup_schema
@@ -129,7 +130,9 @@ def test_resolve_schema_refs_when_cycle_in_other_file(
     hoisted = result["$defs"]["共通.schema.yaml#/$defs/tree"]
     assert hoisted["properties"]["children"]["items"] == hoisted_ref
     assert result["properties"]["tree"]["properties"]["children"]["items"] == hoisted_ref
-    assert list(Draft202012Validator(result).iter_errors(value)) == []
+    assert (
+        list(validator_for(result, default=Draft202012Validator)(result).iter_errors(value)) == []
+    )
     assert len([r for r in caplog.records if r.levelno == logging.WARNING]) == 1
 
 
@@ -153,7 +156,9 @@ def test_resolve_schema_refs_when_cycle_in_other_file_with_same_name(
     hoisted = result["$defs"]["共通.schema.yaml#/$defs/tree-2"]
     assert hoisted["properties"]["children"]["items"] == hoisted_ref
     assert result["properties"]["tree"]["properties"]["children"]["items"] == hoisted_ref
-    assert list(Draft202012Validator(result).iter_errors(value)) == []
+    assert (
+        list(validator_for(result, default=Draft202012Validator)(result).iter_errors(value)) == []
+    )
 
 
 def test_resolve_schema_refs_when_missing(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
