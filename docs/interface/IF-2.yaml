@@ -735,6 +735,33 @@ flows:
       - '`notes` に文書 1 の違反が無い'
       - '`isError` ではない'
     test: test_normal_when_relative_ref_in_defs
+  - name: 正常系（別のファイルの中で循環する参照）
+    summary: 参照先の別のファイルの中で循環する `$ref` を、そのファイルの定義を指したまま検査し、文書を返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 参照を持つスキーマ
+        description: 'sample の種類のスキーマの最上位の `properties.tree` が `common.schema.yaml#/$defs/tree`（同じフォルダの別のファイル）を指し、`common.schema.yaml` の `$defs.tree` は `children.items` を `#/$defs/tree`（そのファイルの中で循環する参照）で指す。sample の種類のスキーマも、中身の違う `$defs.tree`（文字列）を持つ'
+        notes: 文書 1 は `tree` に入れ子の `children` を持ち、`common.schema.yaml` の `$defs.tree` に合う（sample の `$defs.tree` には合わない）
+    flow: |-
+      <!-- map: {"title": "正常系（別のファイルの中で循環する参照）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+
+        C->>T: filter: id eq 文書 1
+        T->>T: common.schema.yaml の中で循環する参照を common.schema.yaml の定義へ向けて解決し、文書 1 を検査する
+        T-->>C: 文書 1
+      ```
+
+      <!-- /map -->
+    expected:
+      - 結果に文書 1 がある
+      - '`notes` に文書 1 の違反が無い'
+      - '`isError` ではない'
+    test: test_normal_when_cyclic_ref_in_other_file
   - name: 正常系（スキーマの参照を解決できない）
     summary: 種類のスキーマの `$ref` の参照先が無い文書も返し、解決できなかった参照を `notes` で知らせる
     setup:
@@ -1182,7 +1209,7 @@ constraints:
     constraint: メタデータの `id` が空なら、配信元の直下からのファイルのパス（拡張子付き）にする。`records` の要素は `body_file` が指すファイルのパス、`body_file` が無ければ `{管理用の YAML のパス}#{位置}`
     notes: 同じ名前で拡張子の違うファイルも別の文書になる
   - item: スキーマの参照の解決
-    constraint: '種類のスキーマの `$ref` は、最上位の `$defs` の中の相対パスの `$ref` を含めて、スキーマのファイルのフォルダを基準に解決してから検査に当てる。循環する参照は `#/$defs/...` のまま検査に当てる'
+    constraint: '種類のスキーマの `$ref` は、最上位の `$defs` の中の相対パスの `$ref` を含めて、スキーマのファイルのフォルダを基準に解決してから検査に当てる。種類のスキーマの中で循環する参照は `#/$defs/...` のまま、参照先の別のファイルの中で循環する参照はそのファイルの定義を指したまま検査に当てる'
   - item: 解決できないスキーマの参照
     constraint: '読み取りの検査で種類のスキーマの `$ref` を解決できない文書は、結果に含め、`notes` に文書の ID・解決できなかった `$ref`・スキーマのファイルのパスを入れる'
 refs:

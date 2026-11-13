@@ -740,6 +740,36 @@ flows:
       - '`applied: true` で、文書 1 の `status` が `updated`'
       - ワークツリー x の文書 1 に `text_edits` の変更が入る
     test: test_normal_when_relative_ref_in_defs
+  - name: 正常系（別のファイルの中で循環する参照）
+    summary: 参照先の別のファイルの中で循環する `$ref` を、そのファイルの定義を指したまま検査し、部分更新を書き込む
+    setup:
+      - name: Mock
+        description: なし
+      - name: 参照を持つスキーマ
+        description: 'sample の種類のスキーマの最上位の `properties.tree` が `common.schema.yaml#/$defs/tree`（同じフォルダの別のファイル）を指し、`common.schema.yaml` の `$defs.tree` は `children.items` を `#/$defs/tree`（そのファイルの中で循環する参照）で指す。sample の種類のスキーマも、中身の違う `$defs.tree`（文字列）を持つ'
+        notes: 文書 1 は `tree` に入れ子の `children` を持ち、`common.schema.yaml` の `$defs.tree` に合う（sample の `$defs.tree` には合わない）
+      - name: 入力
+        description: '`worktree` にワークツリー x のパス、文書 1 の `update`（`expected_version` と `text_edits` 1 件）'
+    flow: |-
+      <!-- map: {"title": "正常系（別のファイルの中で循環する参照）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: operations: update 文書 1・text_edits
+        T->>T: common.schema.yaml の中で循環する参照を common.schema.yaml の定義へ向けて解決し、変更を当てた文書を検査する
+        T->>WT: 一時ファイルに書いてから置き換える
+        T-->>C: applied: true、新しい version と差分
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`applied: true` で、文書 1 の `status` が `updated`'
+      - ワークツリー x の文書 1 に `text_edits` の変更が入る
+    test: test_normal_when_cyclic_ref_in_other_file
   - name: 異常系（スキーマの参照を解決できない・ValidationFailedError）
     summary: 種類のスキーマの `$ref` を解決できないときは、解決できなかった参照を違反として返し、何も書かない
     setup:
@@ -1019,7 +1049,7 @@ constraints:
   - item: 当てるスキーマ
     constraint: '`documents[].schema` でほかの配信元を指す種類は、参照したリビジョンのスキーマで検査する（読み方は配信元の検査の制約「ほかの配信元のスキーマの参照」）'
   - item: スキーマの参照の解決
-    constraint: '種類のスキーマの `$ref` は、最上位の `$defs` の中の相対パスの `$ref` を含めて、スキーマのファイルのフォルダを基準に解決してから検査に当てる。循環する参照は `#/$defs/...` のまま検査に当てる'
+    constraint: '種類のスキーマの `$ref` は、最上位の `$defs` の中の相対パスの `$ref` を含めて、スキーマのファイルのフォルダを基準に解決してから検査に当てる。種類のスキーマの中で循環する参照は `#/$defs/...` のまま、参照先の別のファイルの中で循環する参照はそのファイルの定義を指したまま検査に当てる'
   - item: 解決できないスキーマの参照
     constraint: '種類のスキーマの `$ref` を解決できない文書への操作は、解決できなかった `$ref` とスキーマのファイルのパスを決まりにした違反として、`atomic: true` は `ValidationFailedError`、`atomic: false` は `results[].status` の `failed` で返す'
 refs:
