@@ -231,7 +231,7 @@ class SourceRegistry:
             sources = dict(current)
             entries = dict(self._entries)
             statuses = [item for item in current_statuses if item.index != index]
-            replaced = False
+            replaced: ServedSource | None = None
             if served is not None and served.id in entries:
                 other_entry, other = entries[served.id]
                 if other < index:
@@ -240,15 +240,8 @@ class SourceRegistry:
                     served = None
                 else:
                     # 後の位置の行が先に読み込まれていたので、その行を外す
-                    statuses = [
-                        _duplicate_status(served.id, other, other_entry)
-                        if item.index == other
-                        else item
-                        for item in statuses
-                    ]
-                    del sources[served.id]
-                    del entries[served.id]
-                    replaced = True
+                    statuses = _drop_row(served.id, other, other_entry, sources, entries, statuses)
+                    replaced = served
             if served is not None:
                 sources[served.id] = served
                 entries[served.id] = (entry, index)
@@ -257,8 +250,8 @@ class SourceRegistry:
             self._entries = entries
             self._snapshot = (sources, statuses)
             # 除外した行の文書をキャッシュに残さないよう、入れ替えた配信元でキャッシュを破棄させる
-            if replaced and served is not None and self._on_rebuilt is not None:
-                self._on_rebuilt(served)
+            if replaced is not None and self._on_rebuilt is not None:
+                self._on_rebuilt(replaced)
 
     def reload(self, terminal: TerminalConfig) -> list[SourceStatus]:
         """端末の設定の全行を読み直し、一覧を差し替える。"""
@@ -464,6 +457,23 @@ class SourceRegistry:
     def statuses(self) -> list[SourceStatus]:
         """`sources[]` の順の状態を返す。"""
         return self._snapshot[1]
+
+
+def _drop_row(
+    source_id: str,
+    index: int,
+    entry: SourceEntry,
+    sources: dict[str, ServedSource],
+    entries: dict[str, tuple[SourceEntry, int]],
+    statuses: list[SourceStatus],
+) -> list[SourceStatus]:
+    """配信中の行を ID の重複で除外し、その行の状態を重複の違反に差し替えた状態の並びを返却する。"""
+    del sources[source_id]
+    del entries[source_id]
+    return [
+        _duplicate_status(source_id, index, entry) if item.index == index else item
+        for item in statuses
+    ]
 
 
 def _duplicate_status(source_id: str, index: int, entry: SourceEntry) -> SourceStatus:
