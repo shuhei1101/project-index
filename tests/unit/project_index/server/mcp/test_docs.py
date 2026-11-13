@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import re
 import threading
 from typing import TYPE_CHECKING, Any
 
@@ -11,12 +12,12 @@ from project_index.features.search.types import SearchRequest, SearchResult
 from project_index.features.sources.registry import SourceRegistry
 from project_index.main import build_handlers
 from project_index.server.mcp import docs as docs_module
-from project_index.server.mcp.docs import build_docs_mcp
+from project_index.server.mcp.docs import INSTRUCTIONS_MAX_CHARS, DocsMCPServer, build_docs_mcp
 from project_index.server.mcp.result import DOCS_INSTRUCTIONS_PROMPT_ID, tool_prompt_id
 from project_index.shared.errors import UnknownKindError
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
     from pathlib import Path
 
     import pytest
@@ -61,14 +62,16 @@ def test_build_docs_mcp_when_instructions(
     mcp = build_docs_mcp(make_mcp_handlers())
 
     async def _initialize() -> str | None:
-        async with Client(mcp) as client:
+        async with Client(mcp, mode="legacy") as client:
             return client.instructions
 
     # 実行
     result = asyncio.run(_initialize())
     # 検証
     assert result is not None
-    assert result == bundled_prompts.render(DOCS_INSTRUCTIONS_PROMPT_ID)
+    assert result == bundled_prompts.render(
+        DOCS_INSTRUCTIONS_PROMPT_ID, {"sources": [], "omitted": 0}
+    )
     assert "grep" in result
     assert "action:" in result
     assert "topic:" in result
@@ -193,6 +196,159 @@ def test_build_docs_mcp_when_loading(
     assert observed["executor_threads"] == []
     assert len(results) == 13
     assert all(isinstance(result, CallToolResult) and not result.is_error for result in results)
+
+
+def _counter(*values: str) -> Callable[[], str]:
+    """呼ぶたびに `values` を順に返す描画の関数を返す。"""
+    pending = list(values)
+
+    def _next() -> str:
+        return pending.pop(0)
+
+    return _next
+
+
+def test_docs_mcp_server_when_initialize() -> None:
+    """`initialize` のたびに描き直す（正常系）。"""
+    from mcp import Client
+
+    # 準備
+    mcp = DocsMCPServer("project-index", instructions=_counter("v1", "v2", "v3"))
+
+    async def _initialize() -> tuple[str | None, list[str]]:
+        async with Client(mcp, mode="legacy") as client:
+            tools = [tool.name for tool in (await client.list_tools()).tools]
+            return client.instructions, tools
+
+    # 実行
+    first, first_tools = asyncio.run(_initialize())
+    second, second_tools = asyncio.run(_initialize())
+    # 検証
+    assert first == "v2"
+    assert second == "v3"
+    assert first_tools == second_tools
+
+
+def test_docs_mcp_server_when_discover() -> None:
+    """`server/discover` のたびに描き直す（正常系）。"""
+    from mcp import Client
+
+    # 準備
+    mcp = DocsMCPServer("project-index", instructions=_counter("v1", "v2", "v3"))
+
+    async def _discover() -> tuple[str | None, str]:
+        async with Client(mcp) as client:
+            return client.instructions, client.protocol_version
+
+    # 実行
+    first, first_version = asyncio.run(_discover())
+    second, _ = asyncio.run(_discover())
+    # 検証
+    assert first_version == "2026-07-28"
+    assert first == "v2"
+    assert second == "v3"
+
+
+def _guided_registry(
+    make_registry: Callable[..., Any],
+    make_served_source: Callable[..., Any],
+    make_source_config: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+    guides: list[tuple[str, list[str]]],
+) -> tuple[Any, list[list[str]]]:
+    """`(ID, when)` の配信元を並べた配信元の一覧の偽物と、裏の確認を依頼された ID の記録を返す。"""
+    sources = [
+        make_served_source(id=source_id, config=make_source_config(when=when))
+        for source_id, when in guides
+    ]
+    registry = make_registry(*sources)
+    requested: list[list[str]] = []
+
+    def fake_refresh_later(source_ids: Sequence[str]) -> list[threading.Thread]:
+        requested.append(list(source_ids))
+        return []
+
+    monkeypatch.setattr(registry, "refresh_later", fake_refresh_later)
+    return registry, requested
+
+
+def test_docs_instructions(
+    make_mcp_handlers: Callable[..., Any],
+    make_registry: Callable[..., Any],
+    make_served_source: Callable[..., Any],
+    make_source_config: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """使う場面を持つ配信元を端末の設定の順に並べる（正常系）。"""
+    # 準備
+    registry, requested = _guided_registry(
+        make_registry,
+        make_served_source,
+        make_source_config,
+        monkeypatch,
+        [
+            ("other", ["別の配信元を引くとき"]),
+            ("sample", ["規約を確かめるとき", "設計書を書く前"]),
+            ("old", []),
+        ],
+    )
+    handlers = make_mcp_handlers(registry=registry)
+    # 実行
+    text = docs_module._docs_instructions(handlers)  # pyright: ignore[reportPrivateUsage]
+    # 検証
+    assert "`other`: 別の配信元を引くとき" in text
+    assert "`sample`: 規約を確かめるとき" in text
+    assert text.index("`other`") < text.index("`sample`")
+    assert "設計書を書く前" not in text
+    assert "`old`" not in text
+    assert requested == [["other", "sample"]]
+
+
+def test_docs_instructions_when_exceeds_limit(
+    make_mcp_handlers: Callable[..., Any],
+    make_registry: Callable[..., Any],
+    make_served_source: Callable[..., Any],
+    make_source_config: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """上限を超える配信元を末尾から除く（正常系）。"""
+    # 準備
+    guides = [(f"src{index:02d}", ["あ" * 200]) for index in range(1, 31)]
+    registry, _ = _guided_registry(
+        make_registry, make_served_source, make_source_config, monkeypatch, guides
+    )
+    handlers = make_mcp_handlers(registry=registry)
+    # 実行
+    text = docs_module._docs_instructions(handlers)  # pyright: ignore[reportPrivateUsage]
+    # 検証
+    listed = re.findall(r"`(src\d{2})`", text)
+    assert len(text) <= INSTRUCTIONS_MAX_CHARS
+    assert 0 < len(listed) < 30
+    assert listed == [f"src{index:02d}" for index in range(1, len(listed) + 1)]
+    assert f"{30 - len(listed)} 件" in text
+    assert "describe(outside_scope: true)" in text
+
+
+def test_docs_instructions_when_no_source_guide(
+    make_mcp_handlers: Callable[..., Any],
+    make_registry: Callable[..., Any],
+    make_served_source: Callable[..., Any],
+    make_source_config: Callable[..., Any],
+    bundled_prompts: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """使う場面を持つ配信元が無い（正常系）。"""
+    # 準備
+    registry, _ = _guided_registry(
+        make_registry, make_served_source, make_source_config, monkeypatch, [("old", [])]
+    )
+    handlers = make_mcp_handlers(registry=registry)
+    # 実行
+    text = docs_module._docs_instructions(handlers)  # pyright: ignore[reportPrivateUsage]
+    # 検証
+    assert text == bundled_prompts.render(
+        DOCS_INSTRUCTIONS_PROMPT_ID, {"sources": [], "omitted": 0}
+    )
 
 
 def test_wait_target() -> None:
