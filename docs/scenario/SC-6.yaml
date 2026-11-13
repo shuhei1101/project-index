@@ -757,6 +757,9 @@ scenarios:
       - name: project-index
         description: sample を配信している project-index
         notes: sample の `project-index.yaml` の `when` に 1 行
+      - name: 裏の確認の待ち方
+        description: commit の後、引数なしの `describe()` を 0.5 秒おきに上限 60 秒まで呼び、sample の `when` が書き換えた値になるまで待つ
+        notes: 決め打ちの時間では待たない。上限を超えたら失敗にする
     flow: |-
       <!-- map: {"title": "正常シナリオ（使う場面を書き換えた後に接続する）"} -->
 
@@ -769,16 +772,19 @@ scenarios:
         A->>M: initialize
         M-->>A: instructions（sample と使う場面の 1 行目）
         U->>U: sample の when の 1 行目を書き換えて default_ref に commit する
-        A->>M: initialize（新しい接続）
-        M->>M: default_ref の commit が変わったので配信元を組み立て直す
-        M-->>A: instructions（sample と書き換えた使う場面の 1 行目）
         A->>M: describe()
+        M-->>A: 使える配信元の一覧（その時点の使う場面）
+        M->>M: 裏で default_ref の commit を確認し、変わったので配信元を組み立て直す
+        A->>M: describe()（書き換えた使う場面が出るまで繰り返す）
         M-->>A: 使える配信元の一覧（sample と書き換えた使う場面）
+        A->>M: initialize（新しい接続）
+        M-->>A: instructions（sample と書き換えた使う場面の 1 行目）
       ```
 
       <!-- /map -->
     expected:
-      - '`reload` をしなくても、commit の後の新しい接続の instructions と `describe()` が、書き換えた `when` の 1 行目を返却する'
+      - '`reload` をしなくても、裏の確認が終わった後の `describe()` と新しい接続の instructions が、書き換えた `when` の 1 行目を返却する'
+      - commit の直後の `describe()` は、裏の確認を待たずに応答する
     test: test_normal_when_source_guide_changed_before_connect
 lead: エージェントが文書の MCP で、作業場所から使用できる配信元の文書を探して参照するシナリオを定め、調査の流れを変えるときに参照する。
 issue: 14

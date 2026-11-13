@@ -511,9 +511,9 @@ flows:
 
         U->>T: project-index serve
         U->>T: POST /mcp（initialize）
-        T->>T: 配信中の配信元の default_ref の commit を確かめ、変わっていれば組み立て直す
-        T->>T: when を持つ配信元の ID と when の 1 行目をプロンプトの YAML の一覧の部品で描画する
+        T->>T: 配信元の一覧の今の控えから、when を持つ配信元の ID と when の 1 行目をプロンプトの YAML の一覧の部品で描画する
         T-->>U: instructions（プロンプトの文と、配信元と使う場面の一覧）
+        T->>T: 裏で並べた配信元の default_ref の commit を確認し、変わっていれば組み立て直す
       ```
 
       <!-- /map -->
@@ -559,6 +559,9 @@ flows:
       - name: 配信元
         description: Git のリポジトリの sample。`default_ref` は `develop`
         notes: '`develop` の設定の `when` に 1 行'
+      - name: 裏の確認の待ち方
+        description: commit の後の新しい接続の `initialize` を 0.5 秒おきに上限 60 秒まで繰り返し、instructions の sample の行が書き換えた値になるまで待つ
+        notes: 決め打ちの時間では待たない。上限を超えたら失敗にする
     flow: |-
       <!-- map: {"title": "正常系（使う場面を書き換えた後に接続する）"} -->
 
@@ -572,13 +575,16 @@ flows:
         T-->>U: instructions（sample と when の 1 行目）
         U->>G: develop の when の 1 行目を書き換えて commit する
         U->>T: POST /mcp（新しい接続の initialize）
-        T->>G: default_ref の commit が変わったので sample を組み立て直す
+        T-->>U: instructions（その時点の控えの sample と when の 1 行目）
+        T->>G: 裏で default_ref の commit が変わったことを確認し、sample を組み立て直す
+        U->>T: POST /mcp（新しい接続の initialize。書き換えた when が出るまで繰り返す）
         T-->>U: instructions（sample と書き換えた when の 1 行目）
       ```
 
       <!-- /map -->
     expected:
-      - 新しい接続の instructions の sample の行が、書き換えた `when` の 1 行目になる
+      - 裏の確認の後の新しい接続の instructions の sample の行が、書き換えた `when` の 1 行目になる
+      - '`initialize` は裏の確認と組み立て直しを待たずに応答する'
       - 同じ時点の引数なしの `describe()` の sample の `when` と一致する
       - サーバーのプロセスが同じまま（再起動しない）
     test: test_normal_when_source_guide_changed_before_connect
@@ -963,8 +969,8 @@ constraints:
     constraint: '文書の MCP の instructions（`kind: instructions`）と、文書の MCP・管理の MCP のツールごとの description（`kind: tool`）を、起動のときにプロンプトの YAML から読んで描画する。コードは文を持たない。instructions は 4,096 字以内'
     notes: ツールの名前・引数・返り値は変えない。YAML を書き換えたときは再起動で効かせる。instructions の配信元と使う場面の一覧は、下の「instructions の配信元と使う場面の一覧」のとおり接続ごとに描画する
   - item: instructions の配信元と使う場面の一覧
-    constraint: '文書の MCP の `initialize` のたびに、読み込み済みで配信中の配信元のうち `when` を持つ配信元を端末の設定の `sources[]` の順に並べ、ID と `when` の 1 行目をプロンプトの YAML（`mcp/docs/instructions`）の一覧の部品で描画して、instructions の末尾に加える。描画の前に、並べる配信元ごとに `default_ref` の commit を確かめ、変わっていれば組み立て直す。instructions 全体が 4,096 字を超えるときは、端末の設定の順に収まる配信元まで載せ、載せなかった件数と `describe(outside_scope: true)` の案内を添える。`when` を持つ配信元が無いときは一覧の部品を描画しない'
-    notes: 'instructions は接続の時点で作業場所（`cwd`）を受け取らないため、`scope`・`outside_read` で絞らない。`initialize` は配信元の読み込みを待たない（待ち受けまでの順番）ため、読み込み中に届いた `initialize` の一覧は読み込み済みの配信元だけになる。一覧と案内の文はプロンプトの YAML が持ち、コードは値（ID・`when` の 1 行目・載せなかった件数）だけを渡す'
+    constraint: '文書の MCP の `initialize` のたびに、配信元の一覧の今の控え（`registry.served()`）から、`when` を持つ配信元を端末の設定の `sources[]` の順に並べ、ID と `when` の 1 行目をプロンプトの YAML（`mcp/docs/instructions`）の一覧の部品で描画して、instructions の末尾に加える。描画は lowlevel の `Server` の `create_initialization_options` を上書きして行い、`initialize` の中で Git を呼ばない。応答の後に、並べた配信元ごとの `default_ref` の commit の確認と、変わっていたときの組み立て直しを裏のスレッドで実行する（引数なしの `describe` と同じ。配信元ごとに走っている確認があれば新しく実行しない）。組み立て直した配信元は控えに差し替わり、次の `initialize` が控えを読み直して描画する。instructions 全体が 4,096 字を超えるときは、端末の設定の順に収まる配信元まで載せ、載せなかった件数と `describe(outside_scope: true)` の案内を添える。`when` を持つ配信元が無いときは一覧の部品を描画しない'
+    notes: 'instructions は接続の時点で作業場所（`cwd`）を受け取らないため、`scope`・`outside_read` で絞らない。`initialize` は配信元の読み込みを待たない（待ち受けまでの順番）ため、読み込み中に届いた `initialize` の一覧は読み込み済みの配信元だけになる。一覧と案内の文はプロンプトの YAML が持ち、コードは値（ID・`when` の 1 行目・載せなかった件数）だけを渡す。mcp 2.3.0 の `initialize` は読み取りのループの中で同期に実行され、`create_initialization_options()` で `Server.instructions` を読む。`initialize` の中で確認・組み立て直しをすると、/mnt/c で確認が 1 件 0.4〜1.0 秒、組み立て直しが 1 件 15〜27 秒、同じプロセスのほかの要求ごと止まる（2026-11-13 の実測）'
   - item: 待ち受けまでの順番
     constraint: 端末の設定・ポート・プロンプトの YAML を確かめたら待ち受けを始め、配信元の読み込み（`registry.reload`）とその後の検査（管理用の YAML の同期・エイリアスのキー・`nav` の警告）を待ち受けの裏で流す。配信元を使う要求は、その配信元の読み込みが終わるまで待ってから答える（配信元の読み込みの単位）。検査は待たない
     decided_by: NFR-1#requirements[起動から接続を受け付けるまでの時間]
