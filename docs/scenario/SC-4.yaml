@@ -79,7 +79,7 @@ scenarios:
       - name: Mock
         description: なし（実環境で実行）
       - name: 古い配信元
-        description: '`version` がサーバーが読めるバージョンより古い `project-index.yaml` を持つ配信元'
+        description: '`version` がサーバーが参照できるバージョンより古い `project-index.yaml` を持つ配信元'
         notes: id `old`。マージした設定は今のスキーマを満たす
       - name: 端末の設定
         description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
@@ -93,7 +93,7 @@ scenarios:
         participant DD as project-index
 
         U->>DD: project-index serve
-        DD->>DD: old の設定の version をサーバーが読めるバージョンと比べる
+        DD->>DD: old の設定の version をサーバーが参照できるバージョンと比べる
         DD->>DD: 古い設定の配信元として状態に持つ
         DD-->>U: old を配信する
       ```
@@ -101,7 +101,7 @@ scenarios:
       <!-- /map -->
     expected:
       - 読み取り API の old の文書の取得が 200 を返す
-      - 警告のログに old の id・設定のバージョン・サーバーが読めるバージョンが残る
+      - 警告のログに old の id・設定のバージョン・サーバーが参照できるバージョンが残る
     test: test_normal_when_config_version_old
     notes:
       知らせる経路: '古い設定の配信元は、管理の MCP の `check_project` と、『エージェントが調べる』の正常シナリオ（instructions の調査の案内を受け取る）の引数なしの `describe()` の警告でも知らせる。'
@@ -667,12 +667,12 @@ stakeholders:
   - name: 利用者
     interest: 1 つのコマンドで全ての配信元が配信され、配信できなかった配信元とその理由が分かる
   - name: エージェント（Claude Code）
-    interest: 起動の後、`/mcp` の 1 つにつなげば使える配信元の文書を読める
+    interest: 起動の後、`/mcp` の 1 つにつなげば使える配信元の文書を参照できる
 trigger: '利用者が `project-index serve` を実行するか、ポートにつながらないときに SessionStart のフックが切り離して起動する'
 preconditions:
   - '`PROJECT_INDEX_CONFIG`（既定 `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`）に端末の設定がある'
   - '`PROJECT_INDEX_PORT`（既定 8786）のポートが空いている'
-success_guarantee: 検証に通った配信元が読み取り API と `/mcp` の文書の MCP で読める。`/mcp` のツールは配信元の数によらず 7 つ。
+success_guarantee: 検証に通った配信元が読み取り API と `/mcp` の文書の MCP で参照できる。`/mcp` のツールは配信元の数によらず 7 つ。
 minimal_guarantee: 検証に失敗した配信元があっても、他の配信元と `/_admin/mcp` は配信する。失敗した配信元の id・違反したキーのパス・理由がエラーログに残る。
 frequency: 端末の起動ごと・project-index の更新ごと
 priority: 高

@@ -75,18 +75,18 @@ diagrams:
           +ID: str
           +コマンド: list
         }
-        click 配信元の一覧 href "./MOD-69.py.yaml#配信元の一覧"
-        click 配信元の読み込み href "./MOD-70.py.yaml#配信元の読み込み"
-        click 設定のマージ href "./MOD-68.py.yaml#設定のマージ"
-        click 配信元の設定の検証 href "./MOD-70.py.yaml#配信元の設定の検証"
-        click スクリプトの確かめ href "./MOD-70.py.yaml#スクリプトの確かめ"
-        click 設定のバージョンの比較 href "./MOD-70.py.yaml#設定のバージョンの比較"
-        click 実行できるかの確かめ href "./MOD-88.py.yaml#実行できるかの確かめ"
-        click 配信中の配信元 href "./MOD-71.py.yaml#配信中の配信元"
-        click 配信元の状態 href "./MOD-71.py.yaml#配信元の状態"
-        click 配信元の設定 href "./MOD-71.py.yaml#配信元の設定"
-        click 文書の行 href "./MOD-71.py.yaml#文書の行"
-        click スクリプトの行 href "./MOD-71.py.yaml#スクリプトの行"
+        click 配信元の一覧 href "id:MOD-69#classes[SourceRegistry]"
+        click 配信元の読み込み href "id:MOD-70#functions[load_source]"
+        click 設定のマージ href "id:MOD-68#functions[merge_configs]"
+        click 配信元の設定の検証 href "id:MOD-70#functions[validate_source_config]"
+        click スクリプトの確かめ href "id:MOD-70#functions[check_scripts]"
+        click 設定のバージョンの比較 href "id:MOD-70#functions[compare_config_version]"
+        click 実行できるかの確かめ href "id:MOD-88#functions[check_runnable]"
+        click 配信中の配信元 href "id:MOD-71#data_models[ServedSource]"
+        click 配信元の状態 href "id:MOD-71#data_models[SourceStatus]"
+        click 配信元の設定 href "id:MOD-71#data_models[SourceConfig]"
+        click 文書の行 href "id:MOD-71#data_models[DocumentTable]"
+        click スクリプトの行 href "id:MOD-71#data_models[ScriptEntry]"
 notes:
   受け持つこと: |-
     読み直しは新しい一覧を作ってから差し替え、その間の要求には古い一覧で応える。

@@ -125,7 +125,7 @@ flows:
       - '`next_cursor` で呼ぶと続きの文書から返る'
     test: test_normal_when_ordered_and_limited
   - name: 正常系（複数の配信元）
-    summary: '`source: *` で読める全配信元を横断する'
+    summary: '`source: *` で参照できる全配信元を横断する'
     setup:
       - name: Mock
         description: なし
@@ -186,7 +186,7 @@ flows:
       - '`cwd` がクローン本体で `worktree` を省くと、クローン本体の文書 1 を返す'
       - 'ワークツリーの文書 1 の `view: full` は、`path` がワークツリー x の中の絶対パスになる'
     test: test_normal_when_worktree
-  - name: 正常系（返し済みの本文）
+  - name: 正常系（返却済みの本文）
     summary: 同じ会話で同じバージョンの本文を 2 回目は省く
     setup:
       - name: Mock
@@ -194,7 +194,7 @@ flows:
       - name: 入力
         description: '`session_id: s1` で文書 1 を `view: full` で 2 回呼び、3 回目は `repeat_seen: true`'
     flow: |-
-      <!-- map: {"title": "正常系（返し済みの本文）"} -->
+      <!-- map: {"title": "正常系（返却済みの本文）"} -->
 
       ```mermaid
       sequenceDiagram
@@ -478,7 +478,7 @@ flows:
       - '`@matches` を渡さない呼び出しは `values` に `@matches` を持たない'
     test: test_normal_when_ordered_by_matches
   - name: 正常系（本文の一部）
-    summary: '`sections`・`lines` で本文の一部を返し、返し済みに記録しない'
+    summary: '`sections`・`lines` で本文の一部を返し、返却済みに記録しない'
     setup:
       - name: Mock
         description: なし（`state_dir` は一時フォルダ）
@@ -512,7 +512,7 @@ flows:
       - '1 回目の `values.body` が 6〜8 行目だけで、`scope` が `section`、`ranges` が `[{start_line: 6, end_line: 8}]`、`total_lines` が 10'
       - '2 回目の `values.body` が 3〜4 行目だけで、`ranges` が `[{start_line: 3, end_line: 4}]`'
       - '3 回目は全文を `scope: full` で返し、`（この会話で返却済み）` にならない'
-      - 3 回目の後に 1 回目と同じ引数で呼ぶと、返し済みでも 6〜8 行目を返す
+      - 3 回目の後に 1 回目と同じ引数で呼ぶと、返却済みでも 6〜8 行目を返す
       - '`sections: [決まったこと]` と `snippets: {context_lines: 0}`、`filter` に `body` の `contains` `検索` を渡すと、抜粋が `7:` の行（本文の行番号）になる'
       - '`sections: [無い見出し]` は本文を空で返し、`ranges` が空で、`notes` に当たる見出しが無いことがある'
       - '`format: markdown` では `<document>` の前の行に `notes/a.md: 6-8 行目 / 全 10 行` がある'
@@ -805,7 +805,7 @@ request:
     default: なし（作業中の配信元）
     location: argument
     description: 配信元の ID（端末の設定の `sources[].id`）
-    notes: 配列か `*`（読める全配信元）も受ける
+    notes: 配列か `*`（参照できる全配信元）も受ける
   - name: ref
     type: str
     required: false
@@ -933,7 +933,7 @@ request:
     required: false
     default: '`false`'
     location: argument
-    description: この会話で返し済みの本文も返す
+    description: この会話で返却済みの本文も返す
   - name: format
     type: Literal['markdown', 'json']
     required: false
@@ -950,7 +950,7 @@ request:
   - name: session_id
     type: str
     required: false
-    default: なし（返し済みの記録をしない）
+    default: なし（返却済みの記録をしない）
     location: argument
     description: 会話キー
     notes: フックが入れる
@@ -1096,11 +1096,11 @@ response:
   - name: items[].values.body
     type: str
     description: 本文。YAML の文書は YAML、Markdown の文書は Markdown
-    notes: 返し済みなら `（この会話で返却済み）`
+    notes: 返却済みなら `（この会話で返却済み）`
   - name: items[].path
     type: str
     description: 文書の場所。配信元（ワークツリーを指したときはワークツリー）の直下と文書のパスを結んだ絶対パス。`body_file` のある `records` の要素は指したファイル
-    notes: '`values` の外に置く（メタデータのキー `path` と別）。`view: ids`・`count`、`ref` を渡した呼び出し、返し済みの文書では持たない'
+    notes: '`values` の外に置く（メタデータのキー `path` と別）。`view: ids`・`count`、`ref` を渡した呼び出し、返却済みの文書では持たない'
   - name: items[].scope
     type: Literal['full', 'section', 'summary']
     description: 返した範囲。`full` は本文を切らずに返した、`section` は本文の一部を返した、`summary` は本文を返さなかった
@@ -1155,7 +1155,7 @@ exceptions:
     condition: 検索できた（読めなかったファイルがあっても `notes` で知らせて正常終了）
   - name: SourceNotReadableError
     condition: '`cwd` が配信元の `scope.read`・`scope.write` に当たらない（`outside_scope: true` のときは、加えて `outside_read` が偽）、または `cwd` が無い'
-    notes: '今の作業場所から使える配信元の一覧を添える。`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に読めることを添える'
+    notes: '今の作業場所から使える配信元の一覧を添える。`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に参照できることを添える'
   - name: SourceNotServedError
     condition: '端末の設定にあるが、起動時の検証で外したか `enabled: false` の配信元を指した'
     notes: 違反したキーのパスと理由を添える
@@ -1194,8 +1194,8 @@ constraints:
   - item: 本文の切り出しの順序
     constraint: '`sections`・`lines` で切り出し → 切り出した範囲の中で `snippets` の抜粋を探す → `max_chars_per_field` で切る、の順に当てる。抜粋の行番号は本文の行番号のまま'
     notes: 抜粋の行番号を続けて `lines` に渡せる
-  - item: 返し済みの記録
-    constraint: '`sections`・`lines` を渡した呼び出しは、返した文書を記録せず、返し済みでも切り出した本文を返す。ほかの呼び出しは `scope` によらず本文を返した文書を記録し、返し済みの本文を省く'
+  - item: 返却済みの記録
+    constraint: '`sections`・`lines` を渡した呼び出しは、返した文書を記録せず、返却済みでも切り出した本文を返す。ほかの呼び出しは `scope` によらず本文を返した文書を記録し、返却済みの本文を省く'
     notes: 既存の呼び出し（`max_chars_per_field` で切った本文・`body_file` の無い `records` の要素を含む）の記録は変えない
   - item: 作業範囲の外の記録
     constraint: '`outside_scope: true` で作業範囲の外の配信元を読んだ呼び出しは、作業場所（`cwd`）と配信元の ID を要求のログに残す'

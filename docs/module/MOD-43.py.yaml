@@ -80,13 +80,13 @@ data_models:
             expected: '`a` の本文だけ'
 constants:
   - name: PROMPTS_DIR_ENV
-    title: プロンプトの置き場所の環境変数
+    title: プロンプトの配置先の環境変数
     container: project_index/features/prompt_doc/runtime.py
     usecase: プロンプトの読み込み
     summary: 読むフォルダを `DEFAULT_PROMPTS_DIR` から差し替える環境変数。結合テストが違反する YAML の一時フォルダへ向ける
     value: '"PROJECT_INDEX_PROMPTS_DIR"'
   - name: DEFAULT_PROMPTS_DIR
-    title: プロンプトの既定の置き場所
+    title: プロンプトの既定の配置先
     container: project_index/features/prompt_doc/runtime.py
     usecase: プロンプトの読み込み
     summary: クローンの直下の `content/prompts`
@@ -117,7 +117,7 @@ constants:
     value: ("必須のキーが無い", "知らないキー")
 functions:
   - name: prompts_dir
-    title: プロンプトの置き場所
+    title: プロンプトの配置先
     kind: 関数
     container: project_index/features/prompt_doc/runtime.py
     usecase: プロンプトの読み込み
@@ -140,7 +140,7 @@ functions:
     unit_tests:
       - name: test_prompts_dir
         case: 正常
-        summary: 既定の置き場所
+        summary: 既定の配置先
         condition: '`env` が空'
         mock: なし
         expected: '`DEFAULT_PROMPTS_DIR`'
@@ -163,7 +163,7 @@ functions:
     side_effects: ファイルを読む
     args:
       - name: directory
-        title: 置き場所
+        title: 配置先
         type: Path
         required: true
         passing: positional

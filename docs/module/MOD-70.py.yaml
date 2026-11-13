@@ -48,11 +48,11 @@ diagrams:
           +状態: str
           +違反: list
         }
-        click 配信元の一覧 href "./MOD-69.py.yaml#配信元の一覧"
-        click 設定のマージ href "./MOD-68.py.yaml#設定のマージ"
-        click 実行できるかの確かめ href "./MOD-88.py.yaml#実行できるかの確かめ"
-        click 配信中の配信元 href "./MOD-71.py.yaml#配信中の配信元"
-        click 配信元の状態 href "./MOD-71.py.yaml#配信元の状態"
+        click 配信元の一覧 href "id:MOD-69#classes[SourceRegistry]"
+        click 設定のマージ href "id:MOD-68#functions[merge_configs]"
+        click 実行できるかの確かめ href "id:MOD-88#functions[check_runnable]"
+        click 配信中の配信元 href "id:MOD-71#data_models[ServedSource]"
+        click 配信元の状態 href "id:MOD-71#data_models[SourceStatus]"
 constants:
   - name: SOURCE_SCHEMA
     title: 配信元の設定のスキーマ
@@ -248,7 +248,7 @@ functions:
     container: project_index/features/sources/service.py
     usecase: 起動
     role: 検証
-    summary: 配信元の設定のバージョンをサーバーの読めるバージョンと比べる
+    summary: 配信元の設定のバージョンをサーバーの参照できるバージョンと比べる
     scope: public
     args:
       - name: version
@@ -313,7 +313,7 @@ functions:
       7. 設定のバージョンを比べる（設定のバージョンの比較）
          - `newer` の場合、`version` に「このサーバーより新しい設定」の違反を持つ `not_served` を返す
          - `older` の場合、状態の `config_version` に `(設定, SOURCE_CONFIG_VERSION)` を入れる
-         - `[warning]` 配信元の設定のバージョンが古い（ID・設定のバージョン・サーバーが読めるバージョン）
+         - `[warning]` 配信元の設定のバージョンが古い（ID・設定のバージョン・サーバーが参照できるバージョン）
       8. 設定ファイルのフォルダが Git の作業ツリーかとその直下を引く（履歴の『リポジトリの直下』）。『paths の基準のフォルダの解決』で `root` を決める（範囲の違反は手順 4 の検証で返している）
       9. 種類ごとのスキーマを設定ファイルのフォルダから読み（設定の commit がある場合はそのリビジョンのファイル。`schema_path` が `SchemaRef` の行は参照先のスキーマの読み取りの結果）、`worktrees` をメインのリポジトリの直下（Git でなければ設定ファイルのフォルダ）からの絶対パスにして、`ServedSource` を作る。`config_dir` は `root` から設定ファイルのフォルダへの相対パス、`scope_write` が無ければ `[str(設定ファイルのフォルダ)]`。ID は `entry.id`、無ければ `config.name`。`outside_read` は `entry.outside_read`
       10. `ServedSource` と `serving` を返す

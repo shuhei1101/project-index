@@ -88,7 +88,7 @@ functions:
         case: 正常
         summary: 当てる手順を返す
         condition: '`version: "1"` の対象、`current` が `2`、`2` の手順が 1 つ'
-        mock: 手順の置き場所
+        mock: 手順の配置先
         expected: 手順が 1 つ
       - name: test_plan_migration_when_current
         case: 正常
@@ -229,7 +229,7 @@ functions:
         case: 正常
         summary: 最上位の知らないキーを残して移し替える
         condition: '`version: "1"` で改名前のキーと、最上位に `mindstella: {threads: 3}` を持つ端末の設定'
-        mock: 手順の置き場所をテスト用のフォルダに monkeypatch
+        mock: 手順の配置先をテスト用のフォルダに monkeypatch
         expected: '移し替えに成功し、書き換えた端末の設定の `mindstella` が `{threads: 3}` のまま'
     callers:
       - MOD-89#functions[run_migrate]

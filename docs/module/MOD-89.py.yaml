@@ -19,7 +19,7 @@ diagrams:
         部品の配線 ..> 配信元の一覧 : 読み込み中で作る
         部品の配線 ..> 再起動の制御 : 作る
         部品の配線 ..> 配線済みの関数 : 作る
-        部品の配線 ..> 配信元の読み直し : 束ねる
+        部品の配線 ..> 配信元の読み直し : まとめる
         配信元の読み直し ..> 配信元の一覧 : 読み直す
         配信元の読み直し ..> 配信元のキャッシュの破棄
         配信元のキャッシュの破棄 ..> 配信元の検査
@@ -64,10 +64,10 @@ diagrams:
           +配信元の一覧: SourceRegistry
           +再起動の制御: RestartControl
         }
-        click 端末の設定の読み込み href "./MOD-64.py.yaml#端末の設定の読み込み"
-        click アプリの組み立て href "./MOD-90.py.yaml#アプリの組み立て"
-        click 配信元の一覧 href "./MOD-69.py.yaml#配信元の一覧"
-        click 再起動の制御 href "./MOD-34.py.yaml#再起動の制御"
+        click 端末の設定の読み込み href "id:MOD-64#functions[load_terminal_config]"
+        click アプリの組み立て href "id:MOD-90#functions[build_app]"
+        click 配信元の一覧 href "id:MOD-69#classes[SourceRegistry]"
+        click 再起動の制御 href "id:MOD-34#classes[RestartControl]"
   - name: 設定の移し替え
     diagram: |-
       classDiagram
@@ -87,16 +87,16 @@ diagrams:
         class 移し替えの適用 {
           <<function>>
         }
-        click 対象の決定 href "./MOD-37.py.yaml#対象の決定"
-        click 当てる手順の一覧 href "./MOD-37.py.yaml#当てる手順の一覧"
-        click 移し替えの適用 href "./MOD-37.py.yaml#移し替えの適用"
+        click 対象の決定 href "id:MOD-37#functions[resolve_target]"
+        click 当てる手順の一覧 href "id:MOD-37#functions[plan_migration]"
+        click 移し替えの適用 href "id:MOD-37#functions[apply_migration]"
 data_models:
   - name: Handlers
     title: 配線済みの関数
     container: project_index/main.py
     usecase: 共通
     role: 合成の起点
-    summary: 入口（読み取り API・MCP）が使う部品を 1 回だけ作って束ねたもの
+    summary: 入口（読み取り API・MCP）が使う部品を 1 回だけ作ってまとめたもの
     description: |-
       `dataclass(frozen=True)`。入口はこの属性から部品を引き、部品を自分で作らない。
       サービスは同期の関数で、入口は `asyncio.to_thread` で呼ぶ。テストは属性を偽物に差し替えた `Handlers` を作る。
@@ -130,7 +130,7 @@ data_models:
         title: 会話の記録
         type: SeenStore
         access: 公開
-        description: 会話ごとの返し済み・前回読んだ内容（会話の記録）
+        description: 会話ごとの返却済み・前回読んだ内容（会話の記録）
       - name: locks
         title: 配信元ごとの排他
         type: SourceLocks
@@ -150,7 +150,7 @@ data_models:
         title: 配信元の読み直し
         type: Callable[[TerminalConfig], list[SourceStatus]]
         access: 公開
-        description: '『配信元の読み直し』をこの `Handlers` の部品で束ねたもの。配信元の保存が呼ぶ'
+        description: '『配信元の読み直し』をこの `Handlers` の部品でまとめたもの。配信元の保存が呼ぶ'
       - name: restart
         title: 再起動の制御
         type: RestartControl
@@ -170,7 +170,7 @@ data_models:
         title: 変わった配信元の読み直し
         type: Callable[[TerminalConfig], list[SourceStatus]]
         access: 公開
-        description: 『変わった配信元の読み直し』をこの `Handlers` の部品で束ねたもの。配信元の 1 行の追加・変更・削除が呼ぶ
+        description: 『変わった配信元の読み直し』をこの `Handlers` の部品でまとめたもの。配信元の 1 行の追加・変更・削除が呼ぶ
 classes:
   - name: PortInUseError
     title: ポートが使用中
@@ -362,8 +362,8 @@ functions:
       1. プロンプトの一式を読む（`load_prompts(prompts_dir(os.environ), required=mcp_prompt_ids())`）。`PromptInvalidError` はそのまま送る
       2. `state_dir` を作る
       3. 配信元の一覧・リビジョンの書き出し（`{state_dir}/snapshots`）・文書のストア・変換（`{state_dir}/converted`、制限時間は `script_timeout_sec`）・会話の記録（`{state_dir}/seen.sqlite3`、保持日数は `seen_retention_days`）・文書の検査（制限時間は `script_timeout_sec`）・配信元ごとの排他・再起動の制御を作る。配信元の一覧は `loading=True` で作り、組み立て直した配信元か ID の重なりで入れ替えた配信元を 1 つ受け取って『配信元のキャッシュの破棄』をこれらの部品で呼ぶ関数を `on_rebuilt` に渡す
-      4. 『配信元の読み直し』をこれらの部品で束ねた関数を作る（呼ぶのは配信元の読み込みの開始と配信元の保存）。関数は、読み直した後に起動時の端末の設定の `sources` と `unknown_keys` を新しい端末の設定の値に差し替え、新しい端末の設定の知らないキーを警告のログに書く（知らないキーのログ）
-      5. 『変わった配信元の読み直し』をこれらの部品で束ねた関数を作る（呼ぶのは配信元の 1 行の追加・変更・削除）。読み直した後の差し替えと警告のログは手順 4 と同じ
+      4. 『配信元の読み直し』をこれらの部品でまとめた関数を作る（呼ぶのは配信元の読み込みの開始と配信元の保存）。関数は、読み直した後に起動時の端末の設定の `sources` と `unknown_keys` を新しい端末の設定の値に差し替え、新しい端末の設定の知らないキーを警告のログに書く（知らないキーのログ）
+      5. 『変わった配信元の読み直し』をこれらの部品でまとめた関数を作る（呼ぶのは配信元の 1 行の追加・変更・削除）。読み直した後の差し替えと警告のログは手順 4 と同じ
       6. プロンプトの一式・これらの部品・手順 4・5 の関数を持つ `Handlers` を返す
     exceptions:
       - name: PromptInvalidError
@@ -608,20 +608,20 @@ functions:
         condition: 破壊的な手順があり `--allow-destructive` が無い（`DestructiveStepBlockedError`）
         message: 破壊的な手順と `--allow-destructive` の案内
       - name: なし（終了コード 6）
-        condition: 対象の `version` が project-index の読めるバージョンより新しい（`ConfigNewerError`）
+        condition: 対象の `version` が project-index の参照できるバージョンより新しい（`ConfigNewerError`）
         message: '`{ファイル}: 設定のバージョン {対象} が project-index で読み込める {現在} より新しい。project-index を更新してください`'
     unit_tests:
       - name: test_run_migrate_when_plan
         case: 正常
         summary: 当てる手順を表示するだけで書き換えない
         condition: '`version: "1"` の端末の設定。`2` の手順に `rename` と `delete`。`--plan`'
-        mock: 手順の置き場所（一時フォルダ）・`SETTINGS_VERSION`（`2`）
+        mock: 手順の配置先（一時フォルダ）・`SETTINGS_VERSION`（`2`）
         expected: '0 を返し、標準出力が `2: ` で始まる 2 行で `delete` の行だけ末尾が `[destructive]`。対象は変わらない'
       - name: test_run_migrate
         case: 正常
         summary: 手順を当ててバックアップを取る
         condition: '`version: "1"` の端末の設定。`2` の手順に `rename` だけ'
-        mock: 手順の置き場所・`SETTINGS_VERSION`（`2`）
+        mock: 手順の配置先・`SETTINGS_VERSION`（`2`）
         expected: '0 を返し、対象が改名後で `version: "2"`。標準出力にバックアップのパス'
       - name: test_run_migrate_when_current
         case: 正常
@@ -633,13 +633,13 @@ functions:
         case: 正常
         summary: '`--record` は version だけを書き換える'
         condition: '`version: "1"`、`--record`'
-        mock: 手順の置き場所・`SETTINGS_VERSION`（`2`）
+        mock: 手順の配置先・`SETTINGS_VERSION`（`2`）
         expected: 0 を返し、`version` だけが `2` に変わる
       - name: test_run_migrate_when_destructive
         case: 異常
         summary: 破壊的な手順で止める
         condition: '`2` の手順に `delete`。`--allow-destructive` なし'
-        mock: 手順の置き場所・`SETTINGS_VERSION`（`2`）
+        mock: 手順の配置先・`SETTINGS_VERSION`（`2`）
         expected: 5 を返し、標準エラーに `--allow-destructive`。対象は変わらない
         exception: なし（終了コード 5）
       - name: test_run_migrate_when_newer

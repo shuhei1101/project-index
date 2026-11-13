@@ -42,7 +42,7 @@ flows:
         description: '`documents[0]` に必須のキー `paths` が無い配信元'
         notes: id `broken`
       - name: 設定のバージョンが古い配信元
-        description: '`version` がサーバーが読めるバージョンより古い配信元'
+        description: '`version` がサーバーが参照できるバージョンより古い配信元'
         notes: id `legacy`
       - name: 無効の配信元
         description: '端末の設定で `enabled: false` の配信元'
@@ -63,7 +63,7 @@ flows:
     expected:
       - sample と legacy が `serving`
       - broken が `not_served` で、`errors` に `documents[0].paths` と必須のキーが無いことがある
-      - legacy の `configVersion` に設定のバージョンとサーバーが読めるバージョンがある
+      - legacy の `configVersion` に設定のバージョンとサーバーが参照できるバージョンがある
       - archive が `disabled`
     test: test_normal_when_source_not_served
   - name: 正常系（読み直していない行がある）

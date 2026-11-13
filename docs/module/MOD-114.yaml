@@ -9,7 +9,7 @@ directory: |-
   ├─ types.py       # Operation / TextEdit / WriteRequest / WriteResult / DeleteTarget / DeleteRequest / DeleteResult
   ├─ apply.py       # apply_operation（項目の操作を当てる）/ to_columns（共通のキーを列名へ読み替える）/ expand_array_keys（オブジェクトの配列の列へ書き戻す）
   ├─ ids.py         # generate_id（ids.format から ID を作る）
-  ├─ placement.py   # new_document_path（新しい文書の置き場所）
+  ├─ placement.py   # new_document_path（新しい文書の配置先）
   ├─ locks.py       # SourceLocks（配信元ごとの排他）
   └─ service.py     # write_docs / delete_docs / check_version
   ```
@@ -26,7 +26,7 @@ diagrams:
         文書の書き込み ..> 列名への読み替え
         文書の書き込み ..> 操作を当てる
         文書の書き込み ..> IDを作る
-        文書の書き込み ..> 新しい文書の置き場所
+        文書の書き込み ..> 新しい文書の配置先
         文書の書き込み ..> 文字列からの文書の組み立て
         文書の書き込み ..> 文書の検査
         文書の書き込み ..> ファイルの置き換え
@@ -67,7 +67,7 @@ diagrams:
         class IDを作る {
           <<function>>
         }
-        class 新しい文書の置き場所 {
+        class 新しい文書の配置先 {
           <<function>>
         }
         class 文字列からの文書の組み立て {
@@ -85,22 +85,22 @@ diagrams:
         class 会話の記録 {
           <<class>>
         }
-        click 文書の書き込み href "./MOD-84.py.yaml#文書の書き込み"
-        click 書く場所の解決 href "./MOD-7.py.yaml#書く場所の解決"
-        click 配信元ごとの排他 href "./MOD-82.py.yaml#配信元ごとの排他"
-        click 文書を集める href "./MOD-29.py.yaml#文書を集める"
-        click バージョンの確かめ href "./MOD-84.py.yaml#バージョンの確かめ"
-        click オブジェクトの配列への書き戻し href "./MOD-80.py.yaml#オブジェクトの配列への書き戻し"
-        click 列名への読み替え href "./MOD-80.py.yaml#列名への読み替え"
-        click 操作を当てる href "./MOD-80.py.yaml#操作を当てる"
-        click IDを作る href "./MOD-81.py.yaml#IDを作る"
-        click 新しい文書の置き場所 href "./MOD-83.py.yaml#新しい文書の置き場所"
-        click 文字列からの文書の組み立て href "./MOD-27.py.yaml#文字列からの文書の組み立て"
-        click 文書の検査 href "./MOD-75.py.yaml#文書の検査"
-        click ファイルの置き換え href "./MOD-99.py.yaml#ファイルの置き換え"
-        click スクリプトの実行 href "./MOD-88.py.yaml#スクリプトの実行"
-        click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
-        click 文書の削除 href "./MOD-84.py.yaml#文書の削除"
+        click 文書の書き込み href "id:MOD-84#functions[write_docs]"
+        click 書く場所の解決 href "id:MOD-7#functions[resolve_write_target]"
+        click 配信元ごとの排他 href "id:MOD-82#classes[SourceLocks]"
+        click 文書を集める href "id:MOD-29#classes[DocumentStore].methods[load]"
+        click バージョンの確かめ href "id:MOD-84#functions[check_version]"
+        click オブジェクトの配列への書き戻し href "id:MOD-80#functions[expand_array_keys]"
+        click 列名への読み替え href "id:MOD-80#functions[to_columns]"
+        click 操作を当てる href "id:MOD-80#functions[apply_operation]"
+        click IDを作る href "id:MOD-81#functions[generate_id]"
+        click 新しい文書の配置先 href "id:MOD-83#functions[new_document_path]"
+        click 文字列からの文書の組み立て href "id:MOD-27#functions[documents_from_text]"
+        click 文書の検査 href "id:MOD-75#classes[DocumentChecker]"
+        click ファイルの置き換え href "id:MOD-99#functions[replace_file]"
+        click スクリプトの実行 href "id:MOD-88#functions[run_script]"
+        click 会話の記録 href "id:MOD-59#classes[SeenStore]"
+        click 文書の削除 href "id:MOD-84#functions[delete_docs]"
 notes:
   受け持つこと: |-
     Git 管理外の配信元はそのフォルダのファイルを書き換える。

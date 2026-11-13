@@ -14,7 +14,7 @@ diagrams:
         文書の検索 ..> 条件の照合
         文書の検索 ..> 続きの位置
         文書の検索 ..> 文書の検査 : on read
-        文書の検索 ..> 会話の記録 : 返し済み
+        文書の検索 ..> 会話の記録 : 返却済み
         文書の検索 ..> 検索の結果 : 返す
         文書の検索 ..> 抜粋の検索
         文書の検索 ..> 当たった行の数 : @matches
@@ -60,18 +60,18 @@ diagrams:
           +総件数: int
           +文書: list
         }
-        click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
-        click 文書を集める href "./MOD-29.py.yaml#文書のストア"
-        click 条件の確かめ href "./MOD-53.py.yaml#条件の確かめ"
-        click 条件の照合 href "./MOD-53.py.yaml#条件の照合"
-        click 抜粋の検索 href "./MOD-56.py.yaml#抜粋の検索"
-        click 当たった行の数 href "./MOD-56.py.yaml#当たった行の数"
-        click 本文の範囲の選択 href "./MOD-50.py.yaml#本文の範囲の選択"
-        click 範囲の本文 href "./MOD-50.py.yaml#範囲の本文"
-        click 続きの位置 href "./MOD-51.py.yaml#続きの位置を作る"
-        click 文書の検査 href "./MOD-75.py.yaml#文書の検査"
-        click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
-        click 検索の結果 href "./MOD-58.py.yaml#検索の結果"
+        click 読む場所の解決 href "id:MOD-7#functions[resolve_read_targets]"
+        click 文書を集める href "id:MOD-29#classes[DocumentStore]"
+        click 条件の確かめ href "id:MOD-53#functions[check_filter]"
+        click 条件の照合 href "id:MOD-53#functions[match_filter]"
+        click 抜粋の検索 href "id:MOD-56#functions[find_snippets]"
+        click 当たった行の数 href "id:MOD-56#functions[count_matches]"
+        click 本文の範囲の選択 href "id:MOD-50#functions[select_ranges]"
+        click 範囲の本文 href "id:MOD-50#functions[join_ranges]"
+        click 続きの位置 href "id:MOD-51#functions[encode_cursor]"
+        click 文書の検査 href "id:MOD-75#classes[DocumentChecker]"
+        click 会話の記録 href "id:MOD-59#classes[SeenStore]"
+        click 検索の結果 href "id:MOD-58#data_models[SearchResult]"
 functions:
   - name: search_docs
     title: 文書の検索
@@ -113,7 +113,7 @@ functions:
         type: SeenStore
         required: true
         passing: injected
-        description: 返し済みの省略と記録
+        description: 返却済みの省略と記録
       - name: today
         title: 今日
         type: date | None
@@ -141,7 +141,7 @@ functions:
       11. 始まりの位置を `skip` と、`cursor` があれば続きの位置を読む（指紋は要求のハッシュ）の和にし、`limit` 件を取り出す
       12. 文書ごとに返す項目を作る
           - `ids` は `id`、`summary` は `id` と `SUMMARY_FIELDS`、`full` はさらに `body` と全てのメタデータ。`fields` を足し `exclude_fields` を除く。`@matches` は 7 で数えた数
-          - 本文を返す場合、`repeat_seen` が `False` で `sections`・`lines` が無いなら、会話の記録.返し済みに当たる文書の `body` を `SEEN_MARK` にする
+          - 本文を返す場合、`repeat_seen` が `False` で `sections`・`lines` が無いなら、会話の記録.返却済みに当たる文書の `body` を `SEEN_MARK` にする
           - `sections`・`lines` がある場合、本文を行の分割で分け、本文の範囲の選択で範囲を決める（Markdownの本文かが `False` の文書には `sections` を渡さず空の範囲にする）。`ranges` に範囲、`total_lines` に行数を入れ、本文を範囲の本文にする。`sections` で範囲が空の文書は、`False` の文書なら `{id}: YAML の文書は sections で切り出せません。lines を使用してください`、`True` の文書なら `{id}: sections に該当する見出しがありません（{sections}）` を `notes` に足す
           - `snippets` がある場合、本文の条件で抜粋の検索をし（`before`・`after` は `None` なら `context_lines`、`max_count` は `max_per_doc`、`ranges` は切り出した範囲）、`body` を返さない
           - 文字列の値が項目の文字数を超えたら切る（切り出した本文は切り出した後に切る）
@@ -176,7 +176,7 @@ functions:
         expected: '`total_count` が 2、`items` の `values` が `SUMMARY_FIELDS`、`id` の昇順'
       - name: test_search_docs_when_full_and_seen
         case: 正常
-        summary: 本文と返し済み
+        summary: 本文と返却済み
         condition: '`view: full`・`session_id` ありで 2 回、3 回目は `repeat_seen: true`'
         mock: なし
         expected: 1 回目と 3 回目は本文で `scope` が `full`、2 回目は `SEEN_MARK` で `path`・`scope` が `None`
@@ -263,10 +263,10 @@ functions:
         expected: '`items` が `b`・`c` で、`values["@matches"]` がどちらも 0'
       - name: test_search_docs_when_part_of_body
         case: 正常
-        summary: 本文の一部と返し済み
+        summary: 本文の一部と返却済み
         condition: '10 行の `notes/a.md`（6 行目 `## 決まったこと`、9 行目 `## 残り`）を `session_id: s1`・`view: full` で、`sections: [決まったこと]`、`lines: {offset: 3, limit: 2}`、どちらも無し、もう一度 `sections: [決まったこと]` の順に呼ぶ'
         mock: なし
-        expected: '1 回目は `body` が 6〜8 行目で `scope` が `section`、`ranges` が `[BodyRange(6, 8)]`、`total_lines` が 10。2 回目は `ranges` が `[BodyRange(3, 4)]`。3 回目は全文を `scope: full` で返し `SEEN_MARK` にならず、`ranges`・`total_lines` が `None`。4 回目は返し済みでも 6〜8 行目を返す'
+        expected: '1 回目は `body` が 6〜8 行目で `scope` が `section`、`ranges` が `[BodyRange(6, 8)]`、`total_lines` が 10。2 回目は `ranges` が `[BodyRange(3, 4)]`。3 回目は全文を `scope: full` で返し `SEEN_MARK` にならず、`ranges`・`total_lines` が `None`。4 回目は返却済みでも 6〜8 行目を返す'
       - name: test_search_docs_when_part_of_body_with_snippets
         case: 正常
         summary: 切り出した範囲の抜粋と当たる見出しの無い文書

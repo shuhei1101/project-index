@@ -34,7 +34,7 @@ flows:
       - 終了コード 0、プロセスを起動していない
     test: test_normal_when_server_listening
   - name: 正常系（/clear の後）
-    summary: '`source` が `clear`・`compact` のとき、`POST /_admin/session-start` で返し済みの記録の削除を依頼し、文脈を入れずに戻る'
+    summary: '`source` が `clear`・`compact` のとき、`POST /_admin/session-start` で返却済みの記録の削除を依頼し、文脈を入れずに戻る'
     setup:
       - name: Mock
         description: '`POST /_admin/session-start` を真似る HTTP サーバーを一時のポートで立て、`forgotten: true` を返す'
@@ -187,7 +187,7 @@ lead: サーバーの起動と返却済みの記録の削除の依頼をする S
 identifier: hooks/session_start.py
 permissions: 利用者の権限で動く
 idempotent: true
-side_effects: サーバーが待ち受けていなければ `project-index serve` のプロセスを 1 つ起動する。`clear`・`compact` ではサーバーがそのセッションの返し済みの記録を削除する
+side_effects: サーバーが待ち受けていなければ `project-index serve` のプロセスを 1 つ起動する。`clear`・`compact` ではサーバーがそのセッションの返却済みの記録を削除する
 callers:
   - SC-4#scenarios[正常シナリオ（SessionStart で起動する）]
   - SC-4#scenarios[正常シナリオ（待ち受けているサーバーがあるときは文脈を注入しない）]

@@ -27,7 +27,7 @@ diagrams:
         文書の検索 ..> 条件の照合
         文書の検索 ..> 続きの位置
         文書の検索 ..> 文書の検査 : on read
-        文書の検索 ..> 会話の記録 : 返し済み
+        文書の検索 ..> 会話の記録 : 返却済み
         文書の検索 ..> 検索の結果 : 返す
         条件の確かめ ..> 使える項目
         条件の照合 ..> 項目の値
@@ -110,27 +110,27 @@ diagrams:
         class 検索の結果の Markdown {
           <<function>>
         }
-        click 文書の検索 href "./MOD-55.py.yaml#文書の検索"
-        click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
-        click 文書を集める href "./MOD-29.py.yaml#文書を集める"
-        click 条件の確かめ href "./MOD-53.py.yaml#条件の確かめ"
-        click 条件の照合 href "./MOD-53.py.yaml#条件の照合"
-        click 文書の検査 href "./MOD-75.py.yaml#文書の検査"
-        click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
-        click 検索の結果 href "./MOD-58.py.yaml#検索の結果"
-        click 使える項目 href "./MOD-52.py.yaml#使える項目"
-        click 項目の値 href "./MOD-52.py.yaml#項目の値"
-        click 比べる値の解釈 href "./MOD-53.py.yaml#比べる値の解釈"
-        click 正規表現の組み立て href "./MOD-53.py.yaml#正規表現の組み立て"
-        click 抜粋の検索 href "./MOD-56.py.yaml#抜粋の検索"
-        click 当たった行の数 href "./MOD-56.py.yaml#当たった行の数"
-        click 本文の範囲の選択 href "./MOD-50.py.yaml#本文の範囲の選択"
-        click 範囲の本文 href "./MOD-50.py.yaml#範囲の本文"
-        click 見出しの行 href "./MOD-52.py.yaml#見出しの行"
-        click 行の分割 href "./MOD-56.py.yaml#行の分割"
-        click 一致した箇所の抜き出し href "./MOD-56.py.yaml#一致した箇所の抜き出し"
-        click 検索の結果の Markdown href "./MOD-54.py.yaml#検索の結果の Markdown"
-        click 続きの位置 href "./MOD-51.py.yaml#続きの位置を作る"
+        click 文書の検索 href "id:MOD-55#functions[search_docs]"
+        click 読む場所の解決 href "id:MOD-7#functions[resolve_read_targets]"
+        click 文書を集める href "id:MOD-29#classes[DocumentStore].methods[load]"
+        click 条件の確かめ href "id:MOD-53#functions[check_filter]"
+        click 条件の照合 href "id:MOD-53#functions[match_filter]"
+        click 文書の検査 href "id:MOD-75#classes[DocumentChecker]"
+        click 会話の記録 href "id:MOD-59#classes[SeenStore]"
+        click 検索の結果 href "id:MOD-58#data_models[SearchResult]"
+        click 使える項目 href "id:MOD-52#functions[known_fields]"
+        click 項目の値 href "id:MOD-52#functions[field_values]"
+        click 比べる値の解釈 href "id:MOD-53#functions[parse_compare_value]"
+        click 正規表現の組み立て href "id:MOD-53#functions[compile_regex]"
+        click 抜粋の検索 href "id:MOD-56#functions[find_snippets]"
+        click 当たった行の数 href "id:MOD-56#functions[count_matches]"
+        click 本文の範囲の選択 href "id:MOD-50#functions[select_ranges]"
+        click 範囲の本文 href "id:MOD-50#functions[join_ranges]"
+        click 見出しの行 href "id:MOD-52#functions[heading_lines]"
+        click 行の分割 href "id:MOD-56#functions[split_lines]"
+        click 一致した箇所の抜き出し href "id:MOD-56#functions[snippet_lines]"
+        click 検索の結果の Markdown href "id:MOD-54#functions[render_search_markdown]"
+        click 続きの位置 href "id:MOD-51#functions[encode_cursor]"
 notes:
   受け持つこと: |-
     指定した項目だけを返す。

@@ -367,7 +367,7 @@ scenarios:
         description: なし（実環境で実行。`cwd` はテストが引数に入れる）
         notes: '-'
       - name: 文書
-        description: 'sample の `decisions/` に、名前を `title` 列、概要文を `meta.summary` 列に持つ YAML の文書 `d1.yaml`（`title: 設定の置き場所`）を置く'
+        description: 'sample の `decisions/` に、名前を `title` 列、概要文を `meta.summary` 列に持つ YAML の文書 `d1.yaml`（`title: 設定の配置先`）を置く'
         notes: '`name`・`description` の列は持たない'
       - name: 文書の行
         description: 'sample の `project-index.yaml` の行 `decisions`（`paths: [decisions/*.yaml]`・`metadata: {name: title, description: meta.summary}`）'
@@ -386,7 +386,7 @@ scenarios:
 
         A->>M: describe(source: sample, kind: decisions)
         M-->>A: スキーマと、共通のキーと列名の対応（name は title、description は meta.summary）
-        A->>M: search_docs(filter: name が 設定の置き場所, view: summary)
+        A->>M: search_docs(filter: name が 設定の配置先, view: summary)
         M->>ST: decisions/d1.yaml を読む
         M->>M: metadata の対応の列から name・description を取る
         M-->>A: d1 の行（name と概要文）
@@ -395,7 +395,7 @@ scenarios:
       <!-- /map -->
     expected:
       - '`describe(source: sample, kind: decisions)` が、`metadata` に書いた対応（`name` は `title`、`description` は `meta.summary`）と、書かない共通のキーは同じ名前の列であることを返す'
-      - '`name` が `設定の置き場所` の `search_docs` が d1 を返し、概要文が `meta.summary` の値になる'
+      - '`name` が `設定の配置先` の `search_docs` が d1 を返し、概要文が `meta.summary` の値になる'
     test: test_normal_when_metadata_mapped
   - name: 正常シナリオ（設計書を実装するコードを引く）
     setup:
@@ -492,7 +492,7 @@ scenarios:
         participant L as 要求のログ
 
         A->>M: describe(outside_scope: true)
-        M-->>A: 作業範囲の外で読める配信元の一覧（other と使う場面。作業範囲の外（参考））
+        M-->>A: 作業範囲の外で参照できる配信元の一覧（other と使う場面。作業範囲の外（参考））
         A->>M: describe(source: other, outside_scope: true)
         M->>M: other の scope.read に cwd が当たらず、outside_read が真
         M-->>A: 説明書と種類の一覧（作業範囲の外（参考））
@@ -508,7 +508,7 @@ scenarios:
 
       <!-- /map -->
     expected:
-      - '`source` を省いた `describe(outside_scope: true)` が、作業範囲の外で読める配信元として other を「作業範囲の外（参考）」の表示付きで返し、`scope` に当たる sample を外の一覧に含めない'
+      - '`source` を省いた `describe(outside_scope: true)` が、作業範囲の外で参照できる配信元として other を「作業範囲の外（参考）」の表示付きで返し、`scope` に当たる sample を外の一覧に含めない'
       - '`source` を省いた `describe(outside_scope: true)` の外の一覧の other の行が、`when` の 2 行を返却する'
       - '`outside_scope: true` の `describe`・`search_docs`・`trace_related`・`list_changes` が other の結果を返す'
       - 返した文書・一覧の行に「作業範囲の外（参考）」の表示が付く
@@ -540,7 +540,7 @@ scenarios:
         M-->>A: エラー（読めない配信元）
         A->>M: describe(outside_scope: true)
         M->>M: outside_read が偽の other をエラーにせず、作業範囲の外の一覧から除外する
-        M-->>A: 作業範囲の外で読める配信元の一覧（other を含まない）
+        M-->>A: 作業範囲の外で参照できる配信元の一覧（other を含まない）
       ```
 
       <!-- /map -->
@@ -667,7 +667,7 @@ scenarios:
         description: 作業範囲の外の配信元
         notes: id `other`。`scope.read` は other のフォルダだけ。`project-index.yaml` の `when` に 1 行
       - name: 設定が古い配信元
-        description: '`project-index.yaml` の `version` がサーバーの読めるバージョンより古い配信元'
+        description: '`project-index.yaml` の `version` がサーバーの参照できるバージョンより古い配信元'
         notes: id `old`。`scope.read` は sample のクローン本体を含む。`project-index.yaml` に `when` を記載しない
     flow: |-
       <!-- map: {"title": "正常シナリオ（instructions の調査の案内を受け取る）"} -->
@@ -688,7 +688,7 @@ scenarios:
       - 文書の MCP の instructions のタグの行が、単語まで分けてタグにすること・`action:`・`topic:`・`tool:` の命名・配信元のタグの規約に従うこと・付ける前に `group_by="tags"` で使われているタグを見ることを案内する
       - instructions が、使える配信元は引数なしの `describe()` で引けることを示し、SessionStart を参照しない
       - instructions が、コードや不具合の調査も設計書から参照し、設計書が指すコードを参照することを案内する
-      - 'instructions が、作業場所の外のリポジトリも `source` と `outside_scope: true` で参照でき、外で読める配信元の ID は `describe(outside_scope: true)` で引けることを案内し、プロンプトの文面に配信元の ID を固有の値で持たない'
+      - 'instructions が、作業場所の外のリポジトリも `source` と `outside_scope: true` で参照でき、外で参照できる配信元の ID は `describe(outside_scope: true)` で引けることを案内し、プロンプトの文面に配信元の ID を固有の値で持たない'
       - 'instructions の配信元と使う場面の一覧が、sample と other の ID と `when` の 1 行目を返却し、`when` を記載しない old を含まない'
       - 引数なしの `describe()` が、sample の索引の同期の件数 1 と、old の設定が古いことの警告を返す
     test: test_normal_when_research_guide_received
@@ -791,7 +791,7 @@ issue: 14
 primary_actor: エージェント（Claude Code）
 stakeholders:
   - name: エージェント（Claude Code）
-    interest: 何も分からないところから、使える配信元・種類・文書を少ない文字数で順に絞って読める
+    interest: 何も分からないところから、使える配信元・種類・文書を少ない文字数で順に絞って参照できる
   - name: 利用者
     interest: '`scope.read` に当たらない作業場所から、その配信元の文書が読まれない'
 trigger: エージェントが作業に要る文書を探す

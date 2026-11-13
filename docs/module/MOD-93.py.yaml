@@ -15,7 +15,7 @@ diagrams:
         class 管理の MCP の組み立て {
           <<function>>
         }
-        click ツールのプロンプトの ID href "./MOD-95.py.yaml#ツールのプロンプトの ID"
+        click ツールのプロンプトの ID href "id:MOD-95#functions[tool_prompt_id]"
   - name: 管理の MCP
     diagram: |-
       classDiagram
@@ -67,17 +67,17 @@ diagrams:
         class 検査の文 {
           <<function>>
         }
-        click ツールの結果 href "./MOD-95.py.yaml#ツールの結果"
-        click ツールのエラーの変換 href "./MOD-95.py.yaml#ツールのエラーの変換"
-        click 状態の取得 href "./MOD-10.py.yaml#状態の取得"
-        click 設定の読み直し href "./MOD-10.py.yaml#設定の読み直し"
-        click 配信元の検査 href "./MOD-10.py.yaml#配信元の検査"
-        click 試しの変換 href "./MOD-10.py.yaml#試しの変換"
-        click 再起動の制御 href "./MOD-34.py.yaml#再起動の制御"
-        click クローンの更新 href "./MOD-36.py.yaml#クローンの更新"
-        click 状態の文 href "./MOD-9.py.yaml#状態の文"
-        click 読み直しの文 href "./MOD-9.py.yaml#読み直しの文"
-        click 検査の文 href "./MOD-9.py.yaml#検査の文"
+        click ツールの結果 href "id:MOD-95#functions[to_tool_result]"
+        click ツールのエラーの変換 href "id:MOD-95#functions[tool_error]"
+        click 状態の取得 href "id:MOD-10#functions[get_status]"
+        click 設定の読み直し href "id:MOD-10#functions[reload_config]"
+        click 配信元の検査 href "id:MOD-10#functions[check_project]"
+        click 試しの変換 href "id:MOD-10#functions[try_convert]"
+        click 再起動の制御 href "id:MOD-34#classes[RestartControl]"
+        click クローンの更新 href "id:MOD-36#functions[update_clone]"
+        click 状態の文 href "id:MOD-9#functions[render_status]"
+        click 読み直しの文 href "id:MOD-9#functions[render_reload]"
+        click 検査の文 href "id:MOD-9#functions[render_check]"
 constants:
   - name: ADMIN_MCP_NAME
     title: 管理の MCP の名前

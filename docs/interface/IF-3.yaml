@@ -121,7 +121,7 @@ flows:
       - '`related` ですでに繋がる文書 2 は候補に入らない'
       - 文書 1 の `related` は変わらない
     test: test_normal_when_suggest
-  - name: 正常系（返し済みの相手）
+  - name: 正常系（返却済みの相手）
     summary: 同じ会話で 2 回目は相手の名前・概要文を省く
     setup:
       - name: Mock
@@ -129,7 +129,7 @@ flows:
       - name: 入力
         description: '`session_id: s1` で正常系と同じ呼び出しを 2 回、3 回目は `repeat_seen: true`'
     flow: |-
-      <!-- map: {"title": "正常系（返し済みの相手）"} -->
+      <!-- map: {"title": "正常系（返却済みの相手）"} -->
 
       ```mermaid
       sequenceDiagram
@@ -317,7 +317,7 @@ request:
     required: false
     default: '`false`'
     location: argument
-    description: この会話で返し済みの相手の名前・概要文も返す
+    description: この会話で返却済みの相手の名前・概要文も返す
   - name: format
     type: Literal['markdown', 'json']
     required: false
@@ -374,7 +374,7 @@ response:
   - name: items[].name
     type: str
     description: 文書の名前
-    notes: 返し済みなら `（この会話で返却済み）`。読めない配信元の文書は返さない
+    notes: 返却済みなら `（この会話で返却済み）`。読めない配信元の文書は返さない
   - name: items[].description
     type: str
     description: 概要文
@@ -395,7 +395,7 @@ response:
   - name: items[].path
     type: str
     description: たどった文書の場所。`search_docs` の `items[].path` と同じ決め方の絶対パス
-    notes: '`ref` を渡した呼び出し、返し済みの相手、読めない配信元の文書では持たない'
+    notes: '`ref` を渡した呼び出し、返却済みの相手、読めない配信元の文書では持たない'
   - name: items[].scope
     type: Literal['summary']
     description: 返した範囲。名前と概要文だけを返すため常に `summary`
@@ -419,7 +419,7 @@ exceptions:
     condition: '`from_ids` と `code_paths` を両方渡した、またはどちらも渡さない'
   - name: SourceNotReadableError
     condition: '`cwd` が起点の配信元の `scope.read`・`scope.write` に当たらない（`outside_scope: true` のときは、加えて `outside_read` が偽）'
-    notes: '`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に読めることを添える'
+    notes: '`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に参照できることを添える'
 constraints:
   - item: 深さ
     constraint: 最大 4

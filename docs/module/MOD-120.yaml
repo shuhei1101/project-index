@@ -24,7 +24,7 @@ diagrams:
         部品の配線 ..> 配信元の一覧 : 読み直す
         部品の配線 ..> 再起動の制御 : 作る
         部品の配線 ..> 配線済みの関数 : 作る
-        部品の配線 ..> 配信元の読み直し : 束ねる
+        部品の配線 ..> 配信元の読み直し : まとめる
         配信元の読み直し ..> 配信元の一覧 : 読み直す
         配信元の読み直し ..> 配信元のキャッシュの破棄
         配信元の一覧 ..> 配信元のキャッシュの破棄 : 組み立て直した後に呼ぶ
@@ -97,25 +97,25 @@ diagrams:
         class アプリの寿命 {
           <<function>>
         }
-        click 待ち受けの開始 href "./MOD-89.py.yaml#待ち受けの開始"
-        click 端末の設定の読み込み href "./MOD-64.py.yaml#端末の設定の読み込み"
-        click ポートの確かめ href "./MOD-89.py.yaml#ポートの確かめ"
-        click 部品の配線 href "./MOD-89.py.yaml#部品の配線"
-        click アプリの組み立て href "./MOD-90.py.yaml#アプリの組み立て"
-        click 再起動の制御 href "./MOD-34.py.yaml#再起動の制御"
-        click 配信元の一覧 href "./MOD-69.py.yaml#配信元の一覧"
-        click 配線済みの関数 href "./MOD-89.py.yaml#配線済みの関数"
-        click 配信元の読み直し href "./MOD-89.py.yaml#配信元の読み直し"
-        click 配信元のキャッシュの破棄 href "./MOD-89.py.yaml#配信元のキャッシュの破棄"
-        click 文書の MCP の組み立て href "./MOD-94.py.yaml#文書の MCP の組み立て"
-        click 管理の MCP の組み立て href "./MOD-93.py.yaml#管理の MCP の組み立て"
-        click 端末の設定の入口 href "./MOD-65.py.yaml#端末の設定の入口"
-        click 読み取り API の入口 href "./MOD-126.py.yaml#読み取り API の入口"
-        click セッションの開始のルーター href "./MOD-61.py.yaml#セッションの開始のルーター"
-        click 例外の変換の登録 href "./MOD-91.py.yaml#例外の変換の登録"
-        click 操作の識別子 href "./MOD-90.py.yaml#操作の識別子"
-        click アプリの寿命 href "./MOD-92.py.yaml#アプリの寿命"
-        click MCPのパスの補い href "./MOD-90.py.yaml#MCPのパスの補い"
+        click 待ち受けの開始 href "id:MOD-89#functions[run_serve]"
+        click 端末の設定の読み込み href "id:MOD-64#functions[load_terminal_config]"
+        click ポートの確かめ href "id:MOD-89#functions[check_port]"
+        click 部品の配線 href "id:MOD-89#functions[build_handlers]"
+        click アプリの組み立て href "id:MOD-90#functions[build_app]"
+        click 再起動の制御 href "id:MOD-34#classes[RestartControl]"
+        click 配信元の一覧 href "id:MOD-69#classes[SourceRegistry]"
+        click 配線済みの関数 href "id:MOD-89#data_models[Handlers]"
+        click 配信元の読み直し href "id:MOD-89#functions[reload_sources]"
+        click 配信元のキャッシュの破棄 href "id:MOD-89#functions[discard_source_caches]"
+        click 文書の MCP の組み立て href "id:MOD-94#functions[build_docs_mcp]"
+        click 管理の MCP の組み立て href "id:MOD-93#functions[build_admin_mcp]"
+        click 端末の設定の入口 href "id:MOD-65#functions[build_settings_router]"
+        click 読み取り API の入口 href "id:MOD-126#functions[build_read_router]"
+        click セッションの開始のルーター href "id:MOD-61#functions[build_session_start_router]"
+        click 例外の変換の登録 href "id:MOD-91#functions[register_error_handlers]"
+        click 操作の識別子 href "id:MOD-90#functions[route_operation_id]"
+        click アプリの寿命 href "id:MOD-92#functions[build_lifespan]"
+        click MCPのパスの補い href "id:MOD-90#classes[SlashlessMcpPathMiddleware]"
   - name: 設定の移し替え
     diagram: |-
       classDiagram
@@ -135,10 +135,10 @@ diagrams:
         class 移し替えの適用 {
           <<function>>
         }
-        click 設定の移し替えの実行 href "./MOD-89.py.yaml#設定の移し替えの実行"
-        click 対象の決定 href "./MOD-37.py.yaml#対象の決定"
-        click 当てる手順の一覧 href "./MOD-37.py.yaml#当てる手順の一覧"
-        click 移し替えの適用 href "./MOD-37.py.yaml#移し替えの適用"
+        click 設定の移し替えの実行 href "id:MOD-89#functions[run_migrate]"
+        click 対象の決定 href "id:MOD-37#functions[resolve_target]"
+        click 当てる手順の一覧 href "id:MOD-37#functions[plan_migration]"
+        click 移し替えの適用 href "id:MOD-37#functions[apply_migration]"
 notes:
   受け持つこと: |-
     待ち受けるのは、読み取り API・文書の MCP・管理の MCP・セッションの開始。

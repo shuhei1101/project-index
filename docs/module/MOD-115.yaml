@@ -42,13 +42,13 @@ diagrams:
         class 違反 {
           <<dataclass>>
         }
-        click 文書の検査 href "./MOD-75.py.yaml#文書の検査"
-        click スキーマの検査 href "./MOD-73.py.yaml#スキーマの検査"
-        click IDの形の検査 href "./MOD-73.py.yaml#IDの形の検査"
-        click 関連の種類の検査 href "./MOD-73.py.yaml#関連の種類の検査"
-        click スクリプトの実行 href "./MOD-88.py.yaml#スクリプトの実行"
-        click 検査の出力の解釈 href "./MOD-74.py.yaml#検査の出力の解釈"
-        click 違反 href "./MOD-98.py.yaml#違反"
+        click 文書の検査 href "id:MOD-75#classes[DocumentChecker]"
+        click スキーマの検査 href "id:MOD-73#functions[check_schema]"
+        click IDの形の検査 href "id:MOD-73#functions[check_id_format]"
+        click 関連の種類の検査 href "id:MOD-73#functions[check_related]"
+        click スクリプトの実行 href "id:MOD-88#functions[run_script]"
+        click 検査の出力の解釈 href "id:MOD-74#functions[parse_validator_output]"
+        click 違反 href "id:MOD-98#data_models[Violation]"
 notes:
   受け持つこと: |-
     書き込みは違反があれば書かず、読み取りは違反を警告として添える。

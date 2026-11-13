@@ -27,7 +27,7 @@
 配信元と使う場面の一覧は、配信中で `when` を持つ配信元を端末の設定の `sources[]` の順に並べ、ID と `when` の 1 行目を出します。
 4,096 字を超える分の配信元は載せず、載せなかった件数と、`describe(outside_scope: true)` で使う場面を引けることを添えます。
 一覧は接続（`initialize`・`server/discover`）のたびに描き直します。`default_ref` に `when` の書き換えを commit すると、裏の確認が終わった後の接続から反映されます（`reload` は要りません）。
-`instructions` とツールごとの description は、起動のときに `content/prompts/mcp/` のプロンプトの YAML から読みます（置き場所は環境変数 `PROJECT_INDEX_PROMPTS_DIR` で変えられます）。
+`instructions` とツールごとの description は、起動のときに `content/prompts/mcp/` のプロンプトの YAML から読みます（配置先は環境変数 `PROJECT_INDEX_PROMPTS_DIR` で変えられます）。
 YAML を書き換えたときは、再起動で反映します。
 
 ### 共通の引数
@@ -36,13 +36,13 @@ YAML を書き換えたときは、再起動で反映します。
 
 | 引数 | 型 | 説明 | 補足 |
 | --- | --- | --- | --- |
-| `source` | str（`search_docs`・`list_changes` は list[str] も可） | 配信元の ID（端末の設定の `sources[].id`） | 省略すると作業中の配信元。`scope` に当たらない配信元はエラー（`outside_scope` を除く）。`search_docs`・`list_changes` は配列か `*`（読める全配信元）も受ける |
+| `source` | str（`search_docs`・`list_changes` は list[str] も可） | 配信元の ID（端末の設定の `sources[].id`） | 省略すると作業中の配信元。`scope` に当たらない配信元はエラー（`outside_scope` を除く）。`search_docs`・`list_changes` は配列か `*`（参照できる全配信元）も受ける |
 | `ref` | str | 読むリビジョン（ブランチ・コミット・タグ） | 省略すると配信元の `default_ref`。作業中の配信元は作業ツリー。Git 管理外の配信元と、複数の配信元を指したときは渡せない |
 | `worktree` | str | 読み書きするワークツリーのパス | 配信元の `worktrees` に当たるパスだけ。省略して `cwd` がワークツリーの中なら、そのワークツリー |
 | `format` | `markdown` / `json` | 返す形式 | 既定 `markdown` |
 | `cwd` | str | 作業場所 | プラグインのフックがセッションの作業場所で上書きする。エージェントが指定した値は使わない。ワークツリーを指すときは `worktree` を指定する |
 | `session_id`・`agent_id` | str | 会話キー | 同じ。メインの会話は `agent_id` が空 |
-| `outside_scope` | bool | `true` のとき、`cwd` が `scope` に当たらない配信元も、端末の設定の `sources[].outside_read` が真なら作業範囲の外（参考）として読む | 既定 `false`。`describe`・`search_docs`・`trace_related`・`list_changes` だけが持ち、作業範囲の外を読むのは `source` に ID を 1 つ渡したときだけ（配列・`*` は `scope` に当たる配信元だけを対象にする）。`describe` は `source` を省くと、作業範囲の外で読める配信元の一覧を加える。下の「作業範囲の外」 |
+| `outside_scope` | bool | `true` のとき、`cwd` が `scope` に当たらない配信元も、端末の設定の `sources[].outside_read` が真なら作業範囲の外（参考）として読む | 既定 `false`。`describe`・`search_docs`・`trace_related`・`list_changes` だけが持ち、作業範囲の外を読むのは `source` に ID を 1 つ渡したときだけ（配列・`*` は `scope` に当たる配信元だけを対象にする）。`describe` は `source` を省くと、作業範囲の外で参照できる配信元の一覧を加える。下の「作業範囲の外」 |
 
 <!-- /table -->
 
@@ -57,7 +57,7 @@ YAML を書き換えたときは、再起動で反映します。
 `json` は `outside_scope: true` を返します。
 外から読んだ呼び出しは、作業場所（`cwd`）と配信元の ID を要求のログに残します。
 引数なしの `describe()` の一覧には、作業範囲の外の配信元を載せません。
-作業範囲の外で読める配信元の ID は、`source` を省いた `describe(outside_scope: true)` で引けます。
+作業範囲の外で参照できる配信元の ID は、`source` を省いた `describe(outside_scope: true)` で引けます。
 
 ### 返す形式
 
@@ -96,17 +96,17 @@ rule-inject は、この `path` と `scope` で文書を既読にします。
 
 - `ref` を渡して読んだ文書
 - `list_changes` で `to` を渡したときの文書、`change` が `deleted` の文書
-- 返し済みにした文書
+- 返却済みにした文書
 - `view: ids`・`view: count` の結果と、読めない配信元の文書
 
 ### 1 セッション 1 回
 
 サーバーは会話キー（`session_id`・`agent_id`）ごとに、返した文書の id とハッシュを記録します。
-同じバージョンの本文と、`trace_related` の関連の相手の名前・概要文は、2 回目から `（この会話で返し済み）` だけを返します。
+同じバージョンの本文と、`trace_related` の関連の相手の名前・概要文は、2 回目から `（この会話で返却済み）` だけを返します。
 `repeat_seen: true` で取り直せます。
 一覧の各行の概要文は、選ぶために使うので省きません。
 
-`search_docs` の `sections`・`lines` を渡した呼び出しは、返した文書を記録せず、返し済みの文書でも切り出した本文を返します。
+`search_docs` の `sections`・`lines` を渡した呼び出しは、返した文書を記録せず、返却済みの文書でも切り出した本文を返します。
 `list_changes` の前回読んだ時点も、この呼び出しでは進みません。
 
 ### 作成日時・更新日時
@@ -146,7 +146,7 @@ ID で絞れば取得、`view: summary` で一覧、`view: count` で件数、`g
 | `snippets` | {`context_lines`, `before`, `after`, `max_per_doc`} | なし | 本文の代わりに、条件に当たった行と前後の行だけを行番号つきで返す。下の「抜粋」 |
 | `sections` | list[str] | なし（本文の全文） | Markdown の本文から返すセクションの見出し。`view: full` のときだけで、`lines` と同時に渡せない。下の「本文の一部」 |
 | `lines` | {`offset`, `limit`} | なし（本文の全文） | 本文から返す行の範囲。`view: full` のときだけで、`sections` と同時に渡せない。文書の種類を問わない。下の「本文の一部」 |
-| `repeat_seen` | bool | `false` | この会話で返し済みの本文も返す |
+| `repeat_seen` | bool | `false` | この会話で返却済みの本文も返す |
 | `term` | str | なし（用語で絞らない） | 用語。`alias_type` を持つ documents の行の文書のうち、`name` か `aliases` の値がこの語に一致する文書に当たる。条件の比較と同じ正規化（NFKC と `casefold`）をして完全一致で比べ、部分一致はしない。`filter` と同時に渡すと両方に当たる文書を返す。`alias_type` を持つ行が無い配信元では 0 件で、`notes` で知らせる |
 
 <!-- /table -->
@@ -230,7 +230,7 @@ YAML として読めないファイルがあっても、そのファイルを除
 ### 本文の一部
 
 `sections`・`lines` は、`view: full` の本文の一部だけを返します。
-どちらも返した文書の `scope` は `section` で、返し済みの記録をしません。
+どちらも返した文書の `scope` は `section` で、返却済みの記録をしません。
 
 | 引数 | 説明 |
 | --- | --- |
@@ -267,7 +267,7 @@ YAML として読めないファイルがあっても、そのファイルを除
 | Operation のキー | 使える `op` | 説明 |
 | --- | --- | --- |
 | `op` | すべて | `create`（新しい文書）・`update`（部分更新）・`replace`（全項目の置き換え）。upsert は無い |
-| `kind` | `create`（必須） | 種類（`documents[].id`）。スキーマと置き場所を決める |
+| `kind` | `create`（必須） | 種類（`documents[].id`）。スキーマと配置先を決める |
 | `id` | `update`・`replace`（必須）、`create`（省略可） | 対象の文書の ID。`create` で省くと `ids.format` から作る |
 | `expected_version` | `update`・`replace`（必須） | 読んだときのバージョン。`update` では項目のパスごとのハッシュも受ける |
 | `data` | `create`・`replace`（必須） | 文書の全項目 |
@@ -327,7 +327,7 @@ Git 管理外の配信元では、種類の `documents[].writable` が削除を�
 | 引数 | 返すもの |
 | --- | --- |
 | なし | 今の作業場所から使える配信元の一覧（`id`・権限 `read` / `write`・作業中か・`description`・`when`）と、作業場所、使える配信元の警告（`warnings[]`） |
-| `outside_scope: true`（`source` なし） | 引数なしと同じ一覧に加えて、作業範囲の外（参考）で読める配信元（`scope` に当たらず `sources[].outside_read` が真）の一覧（`outside_sources[]` の `id`・`description`・`when`） |
+| `outside_scope: true`（`source` なし） | 引数なしと同じ一覧に加えて、作業範囲の外（参考）で参照できる配信元（`scope` に当たらず `sources[].outside_read` が真）の一覧（`outside_sources[]` の `id`・`description`・`when`） |
 | `source` | その配信元の使う場面（`when`）・説明書（`instructions`）と種類（`kinds[]`）の一覧。Git の配信元は、ブランチ・タグ（`refs.branches[]`・`refs.tags[]`）と、`worktrees` に当たるワークツリー（`worktrees[]` の `path`・`branch`）の一覧も返す |
 | `source`・`kind` | その種類の共通のキーと列名の対応（`metadata`）と、スキーマ（YAML のまま） |
 
@@ -420,7 +420,7 @@ Git 管理外の配信元では、種類の `documents[].writable` が削除を�
 | `depth` | int | 2 | たどる深さ。1〜4 で、超えたら 4 に丸めて `notes` で知らせる |
 | `direction` | `out` / `in` / `both` | `both` | `out` は起点の `related` が指す先、`in` は起点を `related` で指す文書 |
 | `suggest` | bool | `false` | `true` で、関連の候補（同じ commit での変更・同じ会話での編集と閲覧）を上位 3 件返す |
-| `repeat_seen` | bool | `false` | この会話で返し済みの相手の名前・概要文も返す |
+| `repeat_seen` | bool | `false` | この会話で返却済みの相手の名前・概要文も返す |
 
 <!-- /table -->
 
@@ -440,12 +440,12 @@ Git 管理外の配信元では、種類の `documents[].writable` が削除を�
 
 | エラー | 発生条件 | 本文に記載すること |
 | --- | --- | --- |
-| SourceNotReadableError | `cwd` が配信元の `scope.read`・`scope.write` に当たらない（`outside_scope: true` のときは、加えて `outside_read` が偽）、または `cwd` が無い | 今の作業場所から使える配信元の一覧。`outside_read` が真で `outside_scope` を渡していないときは、`outside_scope: true` で作業範囲の外を参考に読めること |
+| SourceNotReadableError | `cwd` が配信元の `scope.read`・`scope.write` に当たらない（`outside_scope: true` のときは、加えて `outside_read` が偽）、または `cwd` が無い | 今の作業場所から使える配信元の一覧。`outside_read` が真で `outside_scope` を渡していないときは、`outside_scope: true` で作業範囲の外を参考に参照できること |
 | SourceNotWritableError | `cwd` が配信元の `scope.write` に当たらない | 今の作業場所から使える配信元の一覧 |
 | SourceNotServedError | 起動時の検証で外したか `enabled: false` の配信元を指した | 違反したキーのパスと理由 |
 | WorktreeNotMatchedError | `worktree` が配信元の `worktrees` に当たらない | 渡したパスと `worktrees` の値 |
 | TargetIsCloneError | Git の配信元で、書く先がクローン本体になる | クローン本体のパス（配信元の設定をワークツリーから読んでいても、ワークツリーの親のクローン本体）と、`worktree` でワークツリーを指すこと |
-| InvalidArgumentError | `filter`・`order_by`・`group_by`・Operation の中の知らない項目・型の合わない値、50 件を超える操作、必須のキーの欠け、`text_edits` の `old` が 1 か所に一致しない、`ref` を渡せない配信元に `ref`・`from`・`to` を渡した、`create` の置き場所のファイル名が `documents[].exclude[]` に当たる、共通のキーとその列名を同じ操作に両方渡した、束が `and`・`or`・`not` のキーを 2 つ以上持つ、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない、`main_tags` の `set`・`add_to` に `tags` に無い名前を渡した | 項目のパス・期待する型・実際の値と、`describe(source, kind)` でスキーマを見ること |
+| InvalidArgumentError | `filter`・`order_by`・`group_by`・Operation の中の知らない項目・型の合わない値、50 件を超える操作、必須のキーの欠け、`text_edits` の `old` が 1 か所に一致しない、`ref` を渡せない配信元に `ref`・`from`・`to` を渡した、`create` の配置先のファイル名が `documents[].exclude[]` に当たる、共通のキーとその列名を同じ操作に両方渡した、束が `and`・`or`・`not` のキーを 2 つ以上持つ、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない、`main_tags` の `set`・`add_to` に `tags` に無い名前を渡した | 項目のパス・期待する型・実際の値と、`describe(source, kind)` でスキーマを見ること |
 | RefNotFoundError | `ref`・`from`・`to` を commit に解決できない | 解決できなかった値 |
 | UnknownKindError | `kind` が配信元の種類に無い | その配信元の種類の一覧 |
 | DocumentNotFoundError | 指した ID の文書が無い | 見つからなかった ID と、近い ID の候補 |

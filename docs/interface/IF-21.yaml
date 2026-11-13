@@ -5,11 +5,11 @@ entry:
   value: POST /_admin/session-start
 flows:
   - name: 正常系（/clear の後）
-    summary: '`reason: clear` で呼ぶと、そのセッションの返し済みの記録を削除する'
+    summary: '`reason: clear` で呼ぶと、そのセッションの返却済みの記録を削除する'
     setup:
       - name: Mock
         description: なし（project-index のアプリをテストのクライアントで呼ぶ）
-      - name: 返し済みの記録
+      - name: 返却済みの記録
         description: 同じ `session_id` で `search_docs` を呼び、文書を 1 件返した状態
     flow: |-
       <!-- map: {"title": "正常系（/clear の後）"} -->
@@ -18,7 +18,7 @@ flows:
       sequenceDiagram
         participant C as クライアント
         participant T as POST /_admin/session-start
-        participant M as 返し済みの記録
+        participant M as 返却済みの記録
 
         C->>T: session_id・reason: clear
         T->>M: session_id の記録を削除する
@@ -35,7 +35,7 @@ flows:
     setup:
       - name: Mock
         description: なし
-      - name: 返し済みの記録
+      - name: 返却済みの記録
         description: 同じ `session_id` で `search_docs` を呼び、文書を 1 件返した状態
     flow: |-
       <!-- map: {"title": "正常系（記録を削除しない理由）"} -->
@@ -99,16 +99,16 @@ flows:
       <!-- /map -->
     expected:
       - 422 で `reason` の違反を返す
-      - 同じ `session_id` の返し済みの記録が残っている
+      - 同じ `session_id` の返却済みの記録が残っている
     test: test_error_when_input_invalid
 lead: '`/clear`・圧縮の後にセッションの返却済みの記録を削除する `POST /_admin/session-start` の入出力を定め、セッションの開始の処理を修正するときに参照する。'
 identifier: post_session_start
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true
-side_effects: '`reason` が `clear`・`compact` のとき、`session_id`（と `agent_id`）の返し済みの記録を削除する'
+side_effects: '`reason` が `clear`・`compact` のとき、`session_id`（と `agent_id`）の返却済みの記録を削除する'
 callers:
   - IF-19#flows[正常系（/clear の後）]
-exclusivity: 返し済みの記録の削除は記録の書き込みと同じロックで行う
+exclusivity: 返却済みの記録の削除は記録の書き込みと同じロックで行う
 request:
   - name: session_id
     type: str

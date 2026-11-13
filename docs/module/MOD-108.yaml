@@ -41,10 +41,10 @@ diagrams:
         class 往復編集の読み込み {
           <<function>>
         }
-        click 索引のサーバーのエラー href "./MOD-98.py.yaml#索引のサーバーのエラー"
-        click YAMLの読み込み href "./MOD-104.py.yaml#YAMLの読み込み"
-        click YAMLを読めない href "./MOD-104.py.yaml#YAMLを読めない"
-        click 往復編集の読み込み href "./MOD-104.py.yaml#往復編集の読み込み"
+        click 索引のサーバーのエラー href "id:MOD-98#classes[ProjectIndexError]"
+        click YAMLの読み込み href "id:MOD-104#functions[load_yaml]"
+        click YAMLを読めない href "id:MOD-104#classes[YamlLoadError]"
+        click 往復編集の読み込み href "id:MOD-104#functions[load_roundtrip]"
 notes:
-  例外の置き場所: どの分類の関数も、呼び出し側へ返す失敗は `shared/errors.py` の子クラスで送る。スクリプトの実行の失敗（スクリプトの実行の分類）と YAML を読めないことは、それぞれの分類の例外で送り、呼び出し側が `Violation` か本文の誤りに変える。
+  例外の配置先: どの分類の関数も、呼び出し側へ返す失敗は `shared/errors.py` の子クラスで送る。スクリプトの実行の失敗（スクリプトの実行の分類）と YAML を読めないことは、それぞれの分類の例外で送り、呼び出し側が `Violation` か本文の誤りに変える。
   受け持つこと: 端末の設定の API への書き込みの要求のオリジンの確認も受け持つ。

@@ -59,7 +59,7 @@ data_models:
         default: 'False'
         description: '`True` で関連の候補を返す'
       - name: repeat_seen
-        title: 返し済みも返す
+        title: 返却済みも返す
         type: bool
         access: 公開
         default: 'False'
@@ -159,17 +159,17 @@ data_models:
         title: 名前
         type: str
         access: 公開
-        description: 返し済みなら `SEEN_MARK`
+        description: 返却済みなら `SEEN_MARK`
       - name: description
         title: 概要文
         type: str
         access: 公開
-        description: 返し済みなら `SEEN_MARK`
+        description: 返却済みなら `SEEN_MARK`
       - name: path
         title: 文書の場所
         type: str | None
         access: 公開
-        description: たどった文書の場所（文書のストア.文書の場所）。`ref` を渡した呼び出し、返し済みの相手、読めない配信元の文書では `None`
+        description: たどった文書の場所（文書のストア.文書の場所）。`ref` を渡した呼び出し、返却済みの相手、読めない配信元の文書では `None`
       - name: scope
         title: 返した範囲
         type: Literal['summary'] | None

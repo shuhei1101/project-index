@@ -286,7 +286,7 @@ functions:
     kind: 関数
     scope: public
     is_async: false
-    side_effects: サーバーがその会話の返し済みの記録を削除する
+    side_effects: サーバーがその会話の返却済みの記録を削除する
     args:
       - name: port
         title: ポート
@@ -336,5 +336,5 @@ refs:
   - IF-19#
 notes:
   決まり: |-
-    ポートにつながらなければ `project-index serve` を切り離して起動し、つながれば文脈を入れず、`/clear`・圧縮のときだけ `POST /_admin/session-start` で返し済みの記録の削除を依頼する。
+    ポートにつながらなければ `project-index serve` を切り離して起動し、つながれば文脈を入れず、`/clear`・圧縮のときだけ `POST /_admin/session-start` で返却済みの記録の削除を依頼する。
     Python 3.14 の標準ライブラリだけで書き、どの失敗でも終了コード 0 で戻る。
