@@ -1,6 +1,6 @@
 id: MOD-17
 title: 索引のサーバー / 変換 / service.py
-lead: '`converters[]` の実行と結果の控えを受け持ち、変換の service.py を修正するときに参照する。'
+lead: '`converters[]` の実行と結果のキャッシュを受け持ち、変換の service.py を修正するときに参照する。'
 test_files:
   - tests/unit/project_index/features/convert/test_service.py
 diagrams:
@@ -12,7 +12,7 @@ diagrams:
         変換 ..> 変換の結果 : 返す
         class 変換 {
           +変換する(読み書きの場所, 文書) 変換の結果
-          +控えを捨てる() None
+          +キャッシュを捨てる() None
         }
         class スクリプトの実行 {
           <<function>>
@@ -33,7 +33,7 @@ classes:
     kind: クラス
     properties:
       - name: cache_dir
-        title: 控えの場所
+        title: キャッシュのフォルダ
         type: Path
         access: 公開
         description: '`{state_dir}/converted`'
@@ -74,7 +74,7 @@ classes:
         process: |-
           1. 文書の行を引く（`target.source.table(document.kind)`）
              - 行が `converter` を持たない場合、`ConverterNotDefinedError` を送出する
-          2. 行（`target.source.script("converters", converter)`）の `cache` が `True` で `cache_dir` の控えがあればそれを使う。無ければスクリプトの実行（`cwd=target.config_base`（設定ファイルのフォルダ）・`stdin` に文書の YAML・制限時間 `timeout_sec`・`at`。`at` は `target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`））の標準出力を使い、`cache` が `True` なら一時ファイルから置き換えて控える。控えが `CONVERT_CACHE_KEEP` を超えたら古いものを消す。`cache` が `False` なら控えを書かない
+          2. 行（`target.source.script("converters", converter)`）の `cache` が `True` で `cache_dir` のキャッシュがあればそれを使う。無ければスクリプトの実行（`cwd=target.config_base`（設定ファイルのフォルダ）・`stdin` に文書の YAML・制限時間 `timeout_sec`・`at`。`at` は `target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`））の標準出力を使い、`cache` が `True` なら一時ファイルから置き換えてキャッシュする。キャッシュが `CONVERT_CACHE_KEEP` を超えたら古いものを消す。`cache` が `False` ならキャッシュに保存しない
              - `ScriptTimeoutError`・`ScriptFailedError`・実行できない `ScriptError` の場合、`reason` が `timeout`・`exit`・`not_runnable` の `ConvertFailure` を返す
           3. スクリプトの標準出力を `markdown` にした `Converted` を返す
 
@@ -89,13 +89,13 @@ classes:
             exception: 種類が converters[] を指さない
           - name: test_convert_service_convert_when_converter
             case: 正常
-            summary: スクリプトで変換し、2 回目は控えを使う
+            summary: スクリプトで変換し、2 回目はキャッシュを使う
             condition: '`converters[]` を指す行の同じ文書を 2 回'
             mock: '`run_script`（`# 変換した` を返し、呼ばれた数を数える）'
             expected: 2 回とも `# 変換した` で、スクリプトは 1 回だけ呼ばれる
           - name: test_convert_service_convert_when_cache_disabled
             case: 正常
-            summary: 'cache: false の変換は毎回スクリプトを動かし、控えを書かない'
+            summary: 'cache: false の変換は毎回スクリプトを動かし、キャッシュに保存しない'
             condition: '`cache: false` の `converters[]` を指す行の同じ文書を 2 回'
             mock: '`run_script`（`# 変換した` を返し、呼ばれた数を数える）'
             expected: 2 回とも `# 変換した` で、スクリプトは 2 回呼ばれ、`cache_dir` にファイルが無い
@@ -125,8 +125,8 @@ classes:
             message: '`{種類}: converters[] を指していない種類です`'
             notes: '`ProjectIndexError` の子'
       - name: clear
-        title: 控えを捨てる
-        summary: '`cache_dir` の控えを全て消す'
+        title: キャッシュを捨てる
+        summary: '`cache_dir` のキャッシュを全て消す'
         kind: メソッド
         scope: public
         thread_safe: true

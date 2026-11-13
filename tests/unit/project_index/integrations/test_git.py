@@ -50,7 +50,7 @@ def test_run_git_when_timeout(
     real_popen = subprocess.Popen
 
     def recording_popen(*args: Any, **kwargs: Any) -> subprocess.Popen[Any]:
-        """起こした子プロセスを控えて返す。"""
+        """起こした子プロセスを記録して返す。"""
         process = real_popen(*args, **kwargs)
         started.append(process)
         return process

@@ -22,7 +22,7 @@ data_models:
         description: '`nav_warnings` の結果'
 classes:
   - name: SourceChecks
-    title: 配信元の検査の控え
+    title: 配信元の検査のキャッシュ
     container: project_index/features/describe/source_checks.py
     usecase: 説明
     role: 状態
@@ -53,9 +53,9 @@ classes:
           type: SourceCheck
           description: 検査の結果
         process: |-
-          1. ロックを取り、配信元の ID の始めた順の番号を 1 つ進めて控える
+          1. ロックを取り、配信元の ID の始めた順の番号を 1 つ進めて記録する
           2. 同期のずれ（`check_sync`）と `nav` の警告（`nav_warnings`）を求める（ロックの外）
-          3. ロックを取り、控えた番号が持っている結果の番号より新しいときだけ結果を置き換え、求めた結果を返す
+          3. ロックを取り、記録した番号が持っている結果の番号より新しいときだけ結果を置き換え、求めた結果を返す
         unit_tests:
           - name: test_source_checks_refresh
             case: 正常

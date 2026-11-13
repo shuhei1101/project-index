@@ -439,7 +439,7 @@ def test_reload_sources(
     make_terminal_config: Callable[..., TerminalConfig],
     make_status: Callable[..., SourceStatus],
 ) -> None:
-    """読み直してから控えを捨てる（正常系）。"""
+    """読み直してからキャッシュを捨てる（正常系）。"""
     # 準備
     calls: list[str] = []
     statuses = [make_status("sample", 0)]
@@ -817,7 +817,7 @@ def test_check_sources(
     make_terminal_config: Callable[..., TerminalConfig],
     make_entry: Callable[..., SourceEntry],
 ) -> None:
-    """控えを捨てずに検査の結果を持たせる（正常系）。"""
+    """キャッシュを捨てずに検査の結果を持たせる（正常系）。"""
     # 準備
     from project_index.main import check_sources
 
@@ -880,7 +880,7 @@ def test_reload_changed_sources(
     make_served_source: Callable[..., ServedSource],
     make_status: Callable[..., SourceStatus],
 ) -> None:
-    """変わった行を読み直してから、新しく読んだ配信元だけで控えを捨てる（正常系）。"""
+    """変わった行を読み直してから、新しく読んだ配信元だけでキャッシュを捨てる（正常系）。"""
     # 準備
     calls: list[str] = []
     a = make_served_source(id="a")

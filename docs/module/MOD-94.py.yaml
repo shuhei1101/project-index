@@ -119,8 +119,8 @@ classes:
           description: '-'
         process: |-
           1. `super().__init__(name, instructions=instructions())` で作る
-          2. lowlevel の `Server` の今の `create_initialization_options` を控え、`*args`・`**kwargs` を受けて、`instructions()` を lowlevel の `Server` の属性 `instructions` に入れてから控えたメソッドを呼んで返す関数を、`setattr` でインスタンスの `create_initialization_options` に入れる
-          3. lowlevel の `Server` の今の `_handle_discover` を控え、`ctx`・`params` を受けて、`instructions()` を属性 `instructions` に入れてから控えた処理を await して返す async の関数を、`add_request_handler("server/discover", types.RequestParams, 関数)` で登録する
+          2. lowlevel の `Server` の今の `create_initialization_options` を記録し、`*args`・`**kwargs` を受けて、`instructions()` を lowlevel の `Server` の属性 `instructions` に入れてから記録したメソッドを呼んで返す関数を、`setattr` でインスタンスの `create_initialization_options` に入れる
+          3. lowlevel の `Server` の今の `_handle_discover` を記録し、`ctx`・`params` を受けて、`instructions()` を属性 `instructions` に入れてから記録した処理を await して返す async の関数を、`add_request_handler("server/discover", types.RequestParams, 関数)` で登録する
         unit_tests:
           - name: test_docs_mcp_server_when_initialize
             case: 正常
@@ -165,7 +165,7 @@ functions:
          - 引数で要求のモデル（`SearchRequest` など）を作る
          - 要求が指す配信元を決め（指す配信元の決定）、`await handlers.registry.wait_for(...)` でその行の読み込みだけを待つ（初期化とツールの一覧は待たない）
          - サービスを `asyncio.to_thread` で呼ぶ（引数は `handlers` の属性）
-         - `write_docs`・`delete_docs` の結果の `applied` が `True` の場合、`cwd` から書ける配信元を裏で検査し直す（配信元の検査の控え.裏での検査の流し直し）
+         - `write_docs`・`delete_docs` の結果の `applied` が `True` の場合、`cwd` から書ける配信元を裏で検査し直す（配信元の検査のキャッシュ.裏での検査の流し直し）
          - 結果をツールの結果にする（`write_docs`・`delete_docs` の `render` は `None`。`search_docs` は `functools.partial(render_search_markdown, source_label=result.source_label)`、`list_changes` は `functools.partial(render_changes_markdown, source_label=request.source or "作業中の配信元")`、`list_match_words` は用語の一覧の文を渡す）
          - `ProjectIndexError` と `pydantic.ValidationError` はツールのエラーの変換の `CallToolResult(is_error=True)` をそのまま返す。それ以外の例外は `[error]` ツールの処理に失敗した（ツール名・例外）を書いて MCP の既定に任せる
       4. 作った MCP を返す
@@ -226,7 +226,7 @@ functions:
       type: str
       description: instructions
     process: |-
-      1. `handlers.registry.served()`（待たずに今の控えを読む）から、設定の `when` が空でない配信元を `sources[]` の順に並べ、`{"id": ID, "when": when の 1 行目}` の並びにする
+      1. `handlers.registry.served()`（待たずに今のキャッシュを読む）から、設定の `when` が空でない配信元を `sources[]` の順に並べ、`{"id": ID, "when": when の 1 行目}` の並びにする
       2. `handlers.prompts.render(DOCS_INSTRUCTIONS_PROMPT_ID, {"sources": 並び, "omitted": 0})` を描く
       3. 描いた文が `INSTRUCTIONS_MAX_CHARS` を超える間、並びの末尾を 1 つ除いて `omitted` を 1 増やして描き直す（並びが空になっても `omitted` が 1 以上なら案内だけを描く）
       4. 1 で並べた全ての配信元の ID で、配信元の一覧.裏での確認の実行（`refresh_later`）を呼ぶ（待たない）

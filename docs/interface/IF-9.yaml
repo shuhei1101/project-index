@@ -113,7 +113,7 @@ lead: 端末の設定と配信元の設定を読み直す管理の MCP の `relo
 identifier: reload
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true
-side_effects: 配信元の一覧を差し替え、文書・検査・変換の控えを捨てる
+side_effects: 配信元の一覧を差し替え、文書・検査・変換のキャッシュを捨てる
 callers:
   - SC-5#scenarios[正常シナリオ]
   - SC-10#scenarios[正常シナリオ]

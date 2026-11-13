@@ -21,9 +21,9 @@ diagrams:
         部品の配線 ..> 配線済みの関数 : 作る
         部品の配線 ..> 配信元の読み直し : 束ねる
         配信元の読み直し ..> 配信元の一覧 : 読み直す
-        配信元の読み直し ..> 配信元の控えの破棄
-        配信元の控えの破棄 ..> 配信元の検査
-        配信元の一覧 ..> 配信元の控えの破棄 : 組み立て直した・入れ替えた後に呼ぶ
+        配信元の読み直し ..> 配信元のキャッシュの破棄
+        配信元のキャッシュの破棄 ..> 配信元の検査
+        配信元の一覧 ..> 配信元のキャッシュの破棄 : 組み立て直した・入れ替えた後に呼ぶ
         class 待ち受けの開始 {
           <<function>>
         }
@@ -45,7 +45,7 @@ diagrams:
         class 配信元の読み直し {
           <<function>>
         }
-        class 配信元の控えの破棄 {
+        class 配信元のキャッシュの破棄 {
           <<function>>
         }
         class 配信元の検査 {
@@ -157,7 +157,7 @@ data_models:
         access: 公開
         description: 再起動と更新の要求を 1 つずつにし、`run_serve` が止まった後に同じプロセスを置き換えるかを持つ（再起動と更新）
       - name: checks
-        title: 配信元の検査の控え
+        title: 配信元の検査のキャッシュ
         type: SourceChecks
         access: 公開
         description: 配信元ごとの最後の検査の結果（`describe` の警告が読む）
@@ -361,7 +361,7 @@ functions:
     process: |-
       1. プロンプトの一式を読む（`load_prompts(prompts_dir(os.environ), required=mcp_prompt_ids())`）。`PromptInvalidError` はそのまま送る
       2. `state_dir` を作る
-      3. 配信元の一覧・リビジョンの書き出し（`{state_dir}/snapshots`）・文書のストア・変換（`{state_dir}/converted`、制限時間は `script_timeout_sec`）・会話の記録（`{state_dir}/seen.sqlite3`、保持日数は `seen_retention_days`）・文書の検査（制限時間は `script_timeout_sec`）・配信元ごとの排他・再起動の制御を作る。配信元の一覧は `loading=True` で作り、組み立て直した配信元か ID の重なりで入れ替えた配信元を 1 つ受け取って『配信元の控えの破棄』をこれらの部品で呼ぶ関数を `on_rebuilt` に渡す
+      3. 配信元の一覧・リビジョンの書き出し（`{state_dir}/snapshots`）・文書のストア・変換（`{state_dir}/converted`、制限時間は `script_timeout_sec`）・会話の記録（`{state_dir}/seen.sqlite3`、保持日数は `seen_retention_days`）・文書の検査（制限時間は `script_timeout_sec`）・配信元ごとの排他・再起動の制御を作る。配信元の一覧は `loading=True` で作り、組み立て直した配信元か ID の重なりで入れ替えた配信元を 1 つ受け取って『配信元のキャッシュの破棄』をこれらの部品で呼ぶ関数を `on_rebuilt` に渡す
       4. 『配信元の読み直し』をこれらの部品で束ねた関数を作る（呼ぶのは配信元の読み込みの開始と配信元の保存）。関数は、読み直した後に起動時の端末の設定の `sources` と `unknown_keys` を新しい端末の設定の値に差し替え、新しい端末の設定の知らないキーを警告のログに書く（知らないキーのログ）
       5. 『変わった配信元の読み直し』をこれらの部品で束ねた関数を作る（呼ぶのは配信元の 1 行の追加・変更・削除）。読み直した後の差し替えと警告のログは手順 4 と同じ
       6. プロンプトの一式・これらの部品・手順 4・5 の関数を持つ `Handlers` を返す
@@ -414,10 +414,10 @@ functions:
     container: project_index/main.py
     usecase: 端末の設定の保存
     role: 合成の起点
-    summary: 配信元の一覧を読み直し、配信元の内容を控えた部品の控えを捨てる
+    summary: 配信元の一覧を読み直し、配信元の内容をキャッシュした部品のキャッシュを捨てる
     scope: public
     thread_safe: true
-    side_effects: 配信元の一覧を入れ替え、文書のストア・文書の検査・変換の控えを捨てる。メタデータのずれを警告のログに書く
+    side_effects: 配信元の一覧を入れ替え、文書のストア・文書の検査・変換のキャッシュを捨てる。メタデータのずれを警告のログに書く
     args:
       - name: terminal
         title: 端末の設定
@@ -436,36 +436,36 @@ functions:
         type: DocumentStore
         required: true
         passing: injected
-        description: 控えを捨てる
+        description: キャッシュを捨てる
       - name: checker
         title: 文書の検査
         type: DocumentChecker
         required: true
         passing: injected
-        description: 控えを捨てる
+        description: キャッシュを捨てる
       - name: converter
         title: 変換
         type: ConvertService
         required: true
         passing: injected
-        description: 控えを捨てる
+        description: キャッシュを捨てる
       - name: checks
-        title: 配信元の検査の控え
+        title: 配信元の検査のキャッシュ
         type: SourceChecks
         required: true
         passing: injected
-        description: 配信元の控えの破棄へ渡す
+        description: 配信元のキャッシュの破棄へ渡す
     returns:
       type: list[SourceStatus]
       description: 読み直した後の配信元ごとの状態
     process: |-
       1. 配信元の一覧を読み直す（配信元の一覧.読み直す）
-      2. 配信中の配信元で『配信元の控えの破棄』を呼ぶ
+      2. 配信中の配信元で『配信元のキャッシュの破棄』を呼ぶ
       3. 手順 1 の状態を返す
     unit_tests:
       - name: test_reload_sources
         case: 正常
-        summary: 読み直してから控えを捨てる
+        summary: 読み直してからキャッシュを捨てる
         condition: 配信元 1 つの端末の設定
         mock: 配信元の一覧・文書のストア・文書の検査・変換（呼ばれた順を記録する偽物）
         expected: '`registry.reload` が端末の設定で 1 回呼ばれた後に `store.clear`・`checker.clear`・`converter.clear` が 1 回ずつ呼ばれ、`reload` の状態を返す'
@@ -484,15 +484,15 @@ functions:
         expected: 警告のログに違反した文書のパスと `aliases` が文字列か文字列の並びでないことと、タブ `none` の条件が出て、`sample` が `serving`
         exception: '-'
   - name: discard_source_caches
-    title: 配信元の控えの破棄
+    title: 配信元のキャッシュの破棄
     kind: 関数
     container: project_index/main.py
     usecase: 共通
     role: 合成の起点
-    summary: 配信元の内容を控えた部品の控えを捨て、渡した配信元ごとにメタデータのずれ・エイリアス・nav の警告をログに書く
+    summary: 配信元の内容をキャッシュした部品のキャッシュを捨て、渡した配信元ごとにメタデータのずれ・エイリアス・nav の警告をログに書く
     scope: public
     thread_safe: true
-    side_effects: 文書のストア・文書の検査・変換の控えを捨てる。メタデータのずれを警告のログに書く
+    side_effects: 文書のストア・文書の検査・変換のキャッシュを捨てる。メタデータのずれを警告のログに書く
     args:
       - name: sources
         title: 配信元
@@ -505,21 +505,21 @@ functions:
         type: DocumentStore
         required: true
         passing: injected
-        description: 控えを捨てる
+        description: キャッシュを捨てる
       - name: checker
         title: 文書の検査
         type: DocumentChecker
         required: true
         passing: injected
-        description: 控えを捨てる
+        description: キャッシュを捨てる
       - name: converter
         title: 変換
         type: ConvertService
         required: true
         passing: injected
-        description: 控えを捨てる
+        description: キャッシュを捨てる
       - name: checks
-        title: 配信元の検査の控え
+        title: 配信元の検査のキャッシュ
         type: SourceChecks
         required: true
         passing: injected
@@ -528,7 +528,7 @@ functions:
       type: None
       description: なし
     process: |-
-      1. 文書のストア・文書の検査・変換の控えを捨てる（文書のストア.全て捨てる・文書の検査.控えを捨てる・変換.控えを捨てる）
+      1. 文書のストア・文書の検査・変換のキャッシュを捨てる（文書のストア.全て捨てる・文書の検査.キャッシュを捨てる・変換.キャッシュを捨てる）
       2. 渡した配信元で『配信元の検査』を呼ぶ
   - name: check_sources
     title: 配信元の検査
@@ -539,7 +539,7 @@ functions:
     summary: 渡した配信元ごとに検査して結果を持たせ、メタデータのずれ・エイリアス・nav の警告をログに書く
     scope: public
     thread_safe: true
-    side_effects: 配信元の検査の控えを書き換える。メタデータのずれを警告のログに書く
+    side_effects: 配信元の検査のキャッシュを書き換える。メタデータのずれを警告のログに書く
     args:
       - name: sources
         title: 配信元
@@ -554,7 +554,7 @@ functions:
         passing: injected
         description: 検査が文書を読む
       - name: checks
-        title: 配信元の検査の控え
+        title: 配信元の検査のキャッシュ
         type: SourceChecks
         required: true
         passing: injected
@@ -563,11 +563,11 @@ functions:
       type: None
       description: なし
     process: |-
-      1. 渡した配信元ごとに検査し（配信元の検査の控え.検査の流し直し）、3 つの並びのうち 0 件でないものを、配信元の ID・ずれの種類・件数・並びの値で警告のログに書く。`alias_violations` は文書のパス・キー・理由で、nav の警告（読み取り API）はキーのパスと理由で警告のログに書く
+      1. 渡した配信元ごとに検査し（配信元の検査のキャッシュ.検査の流し直し）、3 つの並びのうち 0 件でないものを、配信元の ID・ずれの種類・件数・並びの値で警告のログに書く。`alias_violations` は文書のパス・キー・理由で、nav の警告（読み取り API）はキーのパスと理由で警告のログに書く
     unit_tests:
       - name: test_check_sources
         case: 正常
-        summary: 控えを捨てずに検査の結果を持たせる
+        summary: キャッシュを捨てずに検査の結果を持たせる
         condition: 配信元 `sample`（管理用の YAML に無いファイル 1 件）を読み込んだ文書のストア
         mock: 文書のストア（`clear` の呼び出しを記録する偽物で包む）
         expected: '`checks.get("sample")` の `report.unindexed_files` が 1 件で、`store.clear` が呼ばれない'
@@ -725,7 +725,7 @@ functions:
     process: |-
       1. 次を実行するデーモンのスレッドを起こして返す
          - `handlers.registry.load(handlers.terminal)` を呼ぶ（行ごとに読み込み、読み込み終えた行から待ちを解く）
-         - 配信中の配信元で『配信元の検査』を呼ぶ（全ての行を読み込んだ後に行ごとに検査し、警告をログに書く。控えは捨てない）
+         - 配信中の配信元で『配信元の検査』を呼ぶ（全ての行を読み込んだ後に行ごとに検査し、警告をログに書く。キャッシュは捨てない）
          - 配信中の配信元の ID を標準出力に 1 行ずつ出す
          - 例外の場合、`[error]` 配信元の読み込みに失敗した（例外のスタックトレース）を書いてスレッドを終える（配信元の一覧は待ちを解いている）
     unit_tests:
@@ -747,10 +747,10 @@ functions:
     container: project_index/main.py
     usecase: 端末の設定の配信元の 1 行の追加・変更・削除
     role: 合成の起点
-    summary: 配信元の一覧の変わった行だけを読み直し、配信元の内容を控えた部品の控えを捨てる
+    summary: 配信元の一覧の変わった行だけを読み直し、配信元の内容をキャッシュした部品のキャッシュを捨てる
     scope: public
     thread_safe: true
-    side_effects: 配信元の一覧を入れ替え、文書のストア・文書の検査・変換の控えを捨てる。読み直した配信元のメタデータのずれを警告のログに書く
+    side_effects: 配信元の一覧を入れ替え、文書のストア・文書の検査・変換のキャッシュを捨てる。読み直した配信元のメタデータのずれを警告のログに書く
     args:
       - name: terminal
         title: 端末の設定
@@ -769,38 +769,38 @@ functions:
         type: DocumentStore
         required: true
         passing: injected
-        description: 控えを捨てる
+        description: キャッシュを捨てる
       - name: checker
         title: 文書の検査
         type: DocumentChecker
         required: true
         passing: injected
-        description: 控えを捨てる
+        description: キャッシュを捨てる
       - name: converter
         title: 変換
         type: ConvertService
         required: true
         passing: injected
-        description: 控えを捨てる
+        description: キャッシュを捨てる
       - name: checks
-        title: 配信元の検査の控え
+        title: 配信元の検査のキャッシュ
         type: SourceChecks
         required: true
         passing: injected
-        description: 配信元の控えの破棄へ渡す
+        description: 配信元のキャッシュの破棄へ渡す
     returns:
       type: list[SourceStatus]
       description: 読み直した後の配信元ごとの状態
     process: |-
-      1. 読み直す前の配信中の配信元を控え、配信元の一覧の変わった行を読み直す（配信元の一覧.変わった行を読み直す）
-      2. 読み直した後の配信中の配信元のうち、手順 1 の前と同じオブジェクトでない配信元（新しく読んだ配信元）だけで『配信元の控えの破棄』を呼ぶ
+      1. 読み直す前の配信中の配信元を記録し、配信元の一覧の変わった行を読み直す（配信元の一覧.変わった行を読み直す）
+      2. 読み直した後の配信中の配信元のうち、手順 1 の前と同じオブジェクトでない配信元（新しく読んだ配信元）だけで『配信元のキャッシュの破棄』を呼ぶ
       3. 手順 1 の状態を返す
     unit_tests:
       - name: test_reload_changed_sources
         case: 正常
-        summary: 変わった行を読み直してから、新しく読んだ配信元だけで控えを捨てる
+        summary: 変わった行を読み直してから、新しく読んだ配信元だけでキャッシュを捨てる
         condition: 配信中の a はそのまま、b を新しく読む端末の設定
-        mock: 配信元の一覧・文書のストア・文書の検査・変換・配信元の検査の控え（呼ばれた順と引数を記録する偽物）
+        mock: 配信元の一覧・文書のストア・文書の検査・変換・配信元の検査のキャッシュ（呼ばれた順と引数を記録する偽物）
         expected: '`registry.reload_changed` が 1 回呼ばれた後に `store.clear`・`checker.clear`・`converter.clear` が 1 回ずつ呼ばれ、配信元の検査は b だけ。`reload_changed` の状態を返す'
 refs:
   - IF-15#

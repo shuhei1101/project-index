@@ -378,7 +378,7 @@ def _body_file_table(handlers: Handlers, target: Target, relative: str) -> Docum
 
 
 def _convert_once(handlers: Handlers, target: Target, documents: list[Document]) -> list[Converted]:
-    """配信中の変換の控えを汚さないよう、使い捨てのフォルダを控えの場所にして変換する。"""
+    """配信中の変換のキャッシュを汚さないよう、使い捨てのフォルダをキャッシュのフォルダにして変換する。"""
     with tempfile.TemporaryDirectory() as directory:
         converter = ConvertService(
             Path(directory), handlers.store, handlers.terminal.script_timeout_sec

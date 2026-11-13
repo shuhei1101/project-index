@@ -96,7 +96,7 @@ def test_convert_service_convert_when_converter(
     make_document: Callable[..., Document],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """スクリプトで変換し、2 回目は控えを使う（正常系）。"""
+    """スクリプトで変換し、2 回目はキャッシュを使う（正常系）。"""
     # 準備
     calls: list[list[str]] = []
 
@@ -125,7 +125,7 @@ def test_convert_service_convert_when_cache_disabled(
     make_document: Callable[..., Document],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """cache: false の変換は毎回スクリプトを動かし、控えを書かない（正常系）。"""
+    """cache: false の変換は毎回スクリプトを動かし、キャッシュに保存しない（正常系）。"""
     # 準備
     calls: list[list[str]] = []
 

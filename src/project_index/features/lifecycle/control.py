@@ -27,7 +27,7 @@ class RestartControl:
         self.update_lock = threading.Lock()
 
     def attach(self, server: uvicorn.Server) -> None:
-        """停止を伝える uvicorn のサーバーを控える。"""
+        """停止を伝える uvicorn のサーバーを記録する。"""
         self._server = server
 
     def request(self) -> RestartResult:

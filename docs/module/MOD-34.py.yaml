@@ -38,7 +38,7 @@ classes:
       - name: attach
         title: サーバーの取り付け
         kind: メソッド
-        summary: 停止を伝える uvicorn のサーバーを控える
+        summary: 停止を伝える uvicorn のサーバーを記録する
         scope: public
         is_async: false
         thread_safe: false
@@ -52,7 +52,7 @@ classes:
         returns:
           type: None
           description: なし
-        process: 1. `_server` に控える
+        process: 1. `_server` に記録する
         unit_tests:
           - name: test_attach
             case: 正常

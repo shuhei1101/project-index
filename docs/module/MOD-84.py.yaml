@@ -317,7 +317,7 @@ functions:
         case: 正常
         summary: mdmark を使えない
         condition: '`body` の `set` を 2 件。1 件目の点検が `stopped` に R を入れて点検できなかったキーを返す'
-        mock: '`DocumentChecker.check_markdown`（受けた `stopped` を控える）・作業場所の配信元の読み込み（受け取った配信元を返す偽物）'
+        mock: '`DocumentChecker.check_markdown`（受けた `stopped` を記録する）・作業場所の配信元の読み込み（受け取った配信元を返す偽物）'
         expected: '`applied` が `True`、両方の行の `unchecked` が `body`（理由 R）、2 件目の呼び出しの `stopped` が R'
         exception: '-'
       - name: test_write_docs_when_tags_are_objects

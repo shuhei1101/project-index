@@ -113,13 +113,13 @@ classes:
             case: 正常
             summary: スラッシュ無しの MCP のパスにスラッシュを補う
             condition: '`paths=("/mcp", "/_admin/mcp")` で、`type: http` の `path` が `/mcp` と `/_admin/mcp` の scope を渡す'
-            mock: 次のアプリ（受け取った scope を控える偽物）
+            mock: 次のアプリ（受け取った scope を記録する偽物）
             expected: '次のアプリが受け取った `path` が `/mcp/`・`/_admin/mcp/`、`raw_path` が `b"/mcp/"`・`b"/_admin/mcp/"`。渡した元の scope の `path` は変わらない'
           - name: test_slashless_mcp_path_middleware_when_other_path
             case: 正常
             summary: 他のパスと HTTP でない要求はそのまま渡す
             condition: '`path` が `/mcp/`・`/mcpx`・`/sample/mcp` の HTTP の scope と、`type: lifespan` の scope を渡す'
-            mock: 次のアプリ（受け取った scope を控える偽物）
+            mock: 次のアプリ（受け取った scope を記録する偽物）
             expected: 次のアプリが受け取った scope が渡した scope そのもの
 constants:
   - name: DOCS_MCP_PATH

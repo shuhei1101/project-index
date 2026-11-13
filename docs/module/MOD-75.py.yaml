@@ -59,8 +59,8 @@ classes:
     role: サービス
     summary: 1 件の文書に全ての検査を通し、違反をまとめて返す
     description: |-
-      読み取りの `validators[]` の結果は (配信元, 種類, 検査の ID, 文書のバージョン) で控え、同じ内容でスクリプトを動かし直さない。
-      書き込みの検査は控えず、毎回動かす。
+      読み取りの `validators[]` の結果は (配信元, 種類, 検査の ID, 文書のバージョン) でキャッシュし、同じ内容でスクリプトを動かし直さない。
+      書き込みの検査はキャッシュせず、毎回動かす。
     kind: クラス
     properties:
       - name: store
@@ -125,9 +125,9 @@ classes:
           2. `new` なら『IDの形の検査』を通す
           3. 『関連の種類の検査』をメタデータに通す
           4. 行の `validators` の ID ごとに `source.script("validators", id)` を引き、`on` が行の `on` にあるものだけを通す
-             - `on` が `read` の場合、`_read_cache` に控えがあればそれを使う
+             - `on` が `read` の場合、`_read_cache` にキャッシュがあればそれを使う
              - スクリプトの実行の『スクリプトの実行』を `cwd=target.config_base`（設定ファイルのフォルダ）・`stdin`（`body`）・`timeout_sec`・`at` で呼び（`at` は `target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`））、『検査の出力の解釈』で違反にする
-             - `ScriptError` の場合、`path` が `$`、`rule` が `{id}: 検査を実行できませんでした（{メッセージ}）` の違反にする（控えない）
+             - `ScriptError` の場合、`path` が `$`、`rule` が `{id}: 検査を実行できませんでした（{メッセージ}）` の違反にする（キャッシュしない）
           5. 違反を返す
         unit_tests:
           - name: test_document_checker_check
@@ -139,7 +139,7 @@ classes:
             exception: '-'
           - name: test_document_checker_check_when_on_read
             case: 正常
-            summary: 通す時点と控え
+            summary: 通す時点とキャッシュ
             condition: '`on: [read]` の検査と `on: [write]` の検査を持つ行で、同じ文書を `on="read"` で 2 回'
             mock: '`run_script`（呼ばれた数を数える）'
             expected: '`read` の検査だけが 1 回呼ばれる'
@@ -210,7 +210,7 @@ classes:
             case: 正常
             summary: 変えた値だけを点検に渡す
             condition: '`body` が `contentMediaType: text/markdown` の種類で、前 `{body: a}`、後 `{body: b}` の文書'
-            mock: '`check_markdown_values`（受けた値を控える）'
+            mock: '`check_markdown_values`（受けた値を記録する）'
             expected: '`{"body": "b"}` と `cwd=target.base` で呼ばれる'
           - name: test_document_checker_check_markdown_when_unchanged
             case: 正常
@@ -219,8 +219,8 @@ classes:
             mock: '`check_markdown_values`'
             expected: 空の `MarkdownCheck` で、`check_markdown_values` は呼ばれない
       - name: clear
-        title: 控えを捨てる
-        summary: 読み取りの結果の控えを捨てる
+        title: キャッシュを捨てる
+        summary: 読み取りの結果のキャッシュを捨てる
         kind: メソッド
         scope: public
         thread_safe: true
@@ -234,5 +234,5 @@ constants:
     title: 読み取りの検査の結果の数
     container: project_index/features/validation/service.py
     usecase: 共通
-    summary: 読み取りの `validators[]` の結果を控える件数の上限。超えたら使ったのが古いものから捨てる
+    summary: 読み取りの `validators[]` の結果をキャッシュする件数の上限。超えたら使ったのが古いものから捨てる
     value: '4096'
