@@ -10,7 +10,7 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from mcp.server.mcpserver import MCPServer
-from mcp.types import CallToolResult
+from mcp.types import CallToolResult, DiscoverResult, RequestParams
 from pydantic import BaseModel, Field, ValidationError
 
 from project_index.features.access.service import available_sources
@@ -45,14 +45,22 @@ from project_index.shared.errors import ProjectIndexError
 from project_index.shared.narrowing import is_list
 
 if TYPE_CHECKING:
+    from mcp.server.context import ServerRequestContext
+    from mcp.server.lowlevel.server import NotificationOptions
+    from mcp.server.models import InitializationOptions
+
     from project_index.main import Handlers
 
 logger = logging.getLogger(__name__)
 
 DOCS_MCP_NAME = "project-index"
+# 文書の MCP の instructions 全体の字数の上限
+INSTRUCTIONS_MAX_CHARS = 4096
 
 __all__ = [
     "DOCS_MCP_NAME",
+    "INSTRUCTIONS_MAX_CHARS",
+    "DocsMCPServer",
     "build_docs_mcp",
     "delete_docs",
     "describe",
@@ -161,11 +169,57 @@ def _recheck_after[R: (WriteResult, DeleteResult)](
     return result
 
 
+class DocsMCPServer(MCPServer):
+    """`initialize`・`server/discover` のたびに instructions を描き直す文書の MCP。"""
+
+    def __init__(self, name: str, *, instructions: Callable[[], str]) -> None:
+        super().__init__(name, instructions=instructions())
+        server = self._lowlevel_server
+        create = server.create_initialization_options
+        discover = server._handle_discover  # pyright: ignore[reportPrivateUsage]
+
+        # mcp は接続ごとに instructions を作るフックを持たず、どちらの経路も属性を読む
+        def create_with_instructions(
+            notification_options: NotificationOptions | None = None,
+            experimental_capabilities: dict[str, dict[str, Any]] | None = None,
+            extensions: dict[str, dict[str, Any]] | None = None,
+        ) -> InitializationOptions:
+            server.instructions = instructions()
+            return create(notification_options, experimental_capabilities, extensions)
+
+        async def discover_with_instructions(
+            ctx: ServerRequestContext[Any], params: RequestParams
+        ) -> DiscoverResult:
+            server.instructions = instructions()
+            return await discover(ctx, params)
+
+        setattr(server, "create_initialization_options", create_with_instructions)  # noqa: B010
+        server.add_request_handler("server/discover", RequestParams, discover_with_instructions)
+
+
+def _docs_instructions(handlers: Handlers) -> str:
+    """プロンプトの文と配信元と使う場面の一覧を上限の字数に収めて描き、並べた配信元の裏の確認を依頼する。"""
+    # initialize の中で Git を呼ばないよう、待たずに今の控えを読む
+    guided = [source for source in handlers.registry.served() if source.config.when]
+    entries = [{"id": source.id, "when": source.config.when[0]} for source in guided]
+    omitted = 0
+    text = handlers.prompts.render(
+        DOCS_INSTRUCTIONS_PROMPT_ID, {"sources": entries, "omitted": omitted}
+    )
+    # 上限を超える間は、端末の設定の順の末尾から除く
+    while len(text) > INSTRUCTIONS_MAX_CHARS and entries:
+        entries.pop()
+        omitted += 1
+        text = handlers.prompts.render(
+            DOCS_INSTRUCTIONS_PROMPT_ID, {"sources": entries, "omitted": omitted}
+        )
+    handlers.registry.refresh_later([source.id for source in guided])
+    return text
+
+
 def build_docs_mcp(handlers: Handlers) -> MCPServer:
     """7 つのツールを持つ文書の MCP を作る。"""
-    mcp = MCPServer(
-        DOCS_MCP_NAME, instructions=handlers.prompts.render(DOCS_INSTRUCTIONS_PROMPT_ID)
-    )
+    mcp = DocsMCPServer(DOCS_MCP_NAME, instructions=functools.partial(_docs_instructions, handlers))
     timeout = handlers.terminal.script_timeout_sec
     register = functools.partial(
         _register,

@@ -104,6 +104,7 @@ def available_sources(cwd: str | None, *, registry: SourceRegistry) -> list[Sour
                 access=access,
                 current=current is not None and current[0].id == source.id,
                 description=source.config.description,
+                when=list(source.config.when),
             )
         )
     return result

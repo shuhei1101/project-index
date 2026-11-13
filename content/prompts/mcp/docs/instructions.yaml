@@ -1,9 +1,43 @@
 # yaml-language-server: $schema=../../../../templates/prompt.schema.yaml
 id: mcp/docs/instructions
 name: 文書の MCP の instructions
-description: 文書の MCP を使用する場面と grep・Read が向く場面、調べ方、ツールの順序、タグの付け方を伝える
+description: 文書の MCP を使用する場面と grep・Read が向く場面、調べ方、ツールの順序、タグの付け方と、配信元ごとの使う場面を伝える
 kind: instructions
 lang: ja
+vars:
+  sources:
+    type: array
+    description: 配信中で `when` を持つ配信元（端末の設定の順。上限の字数に収まる分だけ）
+    source: 配信元の設定の when
+    default: []
+    example:
+      - id: knowledge
+        when: コードを書く・レビューする前に、言語やフレームワークの規約を確認するとき
+    items:
+      type: object
+      description: 配信元 1 件
+      properties:
+        id:
+          type: string
+          description: 配信元の ID
+        when:
+          type: string
+          description: 配信元の設定の when の 1 行目
+  omitted:
+    type: integer
+    description: 上限の字数を超えるため一覧に載せなかった配信元の件数
+    default: 0
+    example: 0
+examples:
+  - id: no-source
+    name: 使う場面を持つ配信元が無い
+    values:
+      sources: []
+      omitted: 0
+  - id: omitted
+    name: 載せなかった配信元がある
+    values:
+      omitted: 3
 parts:
   - id: overview
     texts:
@@ -59,3 +93,16 @@ parts:
           - 複合語は単語まで分けてタグにする（`エラー処理` は `topic:エラー` と `action:処理`）
           - 動作は `action:`、題材は `topic:`、道具は `tool:` で始める
           - 配信元にタグの規約があれば、`describe(source)` の説明書に従う
+  - id: sources
+    when: sources or omitted
+    texts:
+      - lang: ja
+        text: |
+
+          配信元と使う場面（全ての行は `describe(source)` で確認できます）:
+          {% for source in sources %}
+          - `{{ source.id }}`: {{ source.when }}
+          {% endfor %}
+          {% if omitted %}
+          - ほか {{ omitted }} 件の配信元は、上限の字数を超えるため載せていません。作業場所から使用できる配信元と作業範囲の外で参照できる配信元の使う場面は、`describe(outside_scope: true)` で確認できます
+          {% endif %}

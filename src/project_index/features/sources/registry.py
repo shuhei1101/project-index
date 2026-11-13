@@ -60,6 +60,9 @@ class SourceRegistry:
         self._rows_done: list[threading.Event] = []
         self._requested: list[int] = []
         self._on_waiting = on_waiting
+        # 裏のスレッドで default_ref の commit を確認している配信元の ID
+        self._refreshing: set[str] = set()
+        self._refreshing_lock = threading.Lock()
 
     @property
     def loading(self) -> bool:
@@ -446,6 +449,41 @@ class SourceRegistry:
         if served is None:
             return self.get(source.id)
         return served
+
+    def refresh_later(self, source_ids: Sequence[str]) -> list[threading.Thread]:
+        """配信元ごとの `default_ref` の確認と組み立て直しを裏のスレッドで実行し、待たずに戻る。"""
+        sources = self._snapshot[0]
+        starting: list[str] = []
+        with self._refreshing_lock:
+            for source_id in dict.fromkeys(source_ids):
+                source = sources.get(source_id)
+                # 確認中・配信していない・Git でない配信元は、新しく確認しない
+                if source_id in self._refreshing or source is None or source.config_commit is None:
+                    continue
+                self._refreshing.add(source_id)
+                starting.append(source_id)
+        threads = [
+            threading.Thread(
+                target=self._refresh_in_background,
+                args=(source_id,),
+                name=f"project-index-source-refresh-{source_id}",
+                daemon=True,
+            )
+            for source_id in starting
+        ]
+        for thread in threads:
+            thread.start()
+        return threads
+
+    def _refresh_in_background(self, source_id: str) -> None:
+        """裏のスレッドで配信元を引き直し（`default_ref` が進んでいれば組み立て直す）、確認中から除く。"""
+        try:
+            self.get(source_id)
+        except ProjectIndexError as error:
+            logger.warning("裏の確認に失敗した（%s・%s）", source_id, error)
+        finally:
+            with self._refreshing_lock:
+                self._refreshing.discard(source_id)
 
     def served(self) -> list[ServedSource]:
         """配信中の配信元を `sources[]` の順に返す。"""
