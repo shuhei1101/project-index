@@ -1,0 +1,394 @@
+id: LAY-73-1
+visibility: internal
+title: project-index
+repository: shuhei1101/project-index
+lead: |-
+  索引のサーバーのコードは `src/project_index/`、プラグインは `plugins/project-index/`、テストは `tests/` に分ける。
+  文書の原本は `docs/` の種類のフォルダ、MCP のプロンプトは `content/prompts/`、スキーマは `schemas/`、配信元と端末へ書き出す雛形は `templates/` に配置する。
+tags:
+  - name: topic:フォルダ
+    main: true
+  - name: topic:構成
+  - name: topic:リポジトリ
+  - name: topic:gitignore
+content_types:
+  - name: design_doc
+    group: role
+    summary: project-index の AI Monitor の設計書（YAML）
+  - name: guide_doc
+    group: role
+    summary: 公開ドキュメントの Markdown
+  - name: pr_doc
+    group: role
+    summary: 作業 PR ごとの計画書・テスト結果・反映作業
+  - name: index
+    group: role
+    summary: フォルダの目次の原本と、そこから生成した README.md
+  - name: file_list
+    group: role
+    summary: YAML でないファイルの名前・概要文・タグ・関連の一覧（files.yaml）
+  - name: design_schema
+    group: role
+    summary: 設計書・目次・管理用の YAML を検査する JSON Schema
+  - name: config_schema
+    group: role
+    summary: 配信元の設定・端末の設定・プロンプトを検査する JSON Schema
+  - name: template
+    group: role
+    summary: setup・global-setup のスキルが配信元と端末へ書き出す雛形
+  - name: prompt
+    group: role
+    summary: MCP の instructions とツールの description のプロンプトファイル
+  - name: source
+    group: role
+    summary: Python のコード
+  - name: test
+    group: role
+    summary: 単体・結合のテスト
+  - name: type_stub
+    group: role
+    summary: 型情報を持たない依存の型スタブ
+  - name: tool_config
+    group: role
+    summary: 依存・lint・型検査・テスト・配信の道具の設定
+  - name: plugin_manifest
+    group: role
+    summary: プラグインとマーケットプレイスの定義
+  - name: hook
+    group: role
+    summary: Claude Code のフックの登録と本体
+  - name: skill
+    group: role
+    summary: スキルの本体
+  - name: server
+    group: feature
+    summary: 索引のサーバー
+  - name: plugin
+    group: feature
+    summary: プラグイン project-index
+  - name: pages
+    group: feature
+    summary: 公開ドキュメントの GitHub Pages への配信
+entries:
+  - type: folder
+    name: .claude-plugin
+    contents: project-index のマーケットプレイスの定義
+    children:
+      - type: file
+        name: marketplace.json
+        contents: プラグイン project-index（`plugins/project-index/`）を掲載するマーケットプレイスの定義
+        content_types: [plugin_manifest, plugin]
+  - type: folder
+    name: content
+    contents: コードではない原本
+    children:
+      - type: folder
+        name: prompts
+        contents: プロンプトファイル。ID は `content/prompts/` からのパス
+        id_root: true
+        convention: prompt-file
+        children:
+          - type: folder
+            name: mcp
+            contents: MCP のプロンプト
+            children:
+              - type: folder
+                name: docs
+                contents: 文書の MCP の instructions（`instructions.yaml`）と、ツールの description の `tools/`
+                content_types: [prompt, server]
+                naming: [instructions.yaml, 'tools/{tool}.yaml']
+              - type: folder
+                name: admin
+                contents: 管理の MCP のツールの description の `tools/`
+                content_types: [prompt, server]
+                naming: ['tools/{tool}.yaml']
+  - type: folder
+    name: dev
+    contents: 作業 PR の PR ドキュメント
+    children:
+      - type: folder
+        name: pr
+        contents: 作業 PR ごとの PR ドキュメント
+        content_types: [pr_doc]
+        naming: ['{pr}/']
+  - type: folder
+    name: docs
+    contents: 文書の原本。設計書の種類のフォルダ、公開ドキュメントの `guide/`、作業 PR の計画の `pr/` に分ける
+    children:
+      - type: file
+        name: index.yaml
+        contents: '`docs/` の目次の原本'
+        content_types: [index]
+      - type: file
+        name: README.md
+        contents: '`index.yaml` から生成した `docs/` の目次'
+        content_types: [index]
+        generated_from:
+          path: docs/index.yaml
+          command: CMD-1#categories[ビルド・生成]
+      - type: file
+        name: _config.yml
+        contents: GitHub Pages の Jekyll の設定（Pages に出さないフォルダ・タブ）
+        content_types: [tool_config, pages]
+      - type: folder
+        name: _theme
+        contents: Pages のテーマのデータ
+        children:
+          - type: folder
+            name: _data
+            contents: Pages のナビゲーション（`nav.project.yml`）
+            content_types: [pages]
+            generated_from:
+              path: docs/guide/files.yml
+              command: CMD-1#categories[ビルド・生成]
+      - type: folder
+        name: architecture
+        contents: アーキテクチャ図。設計書のフォルダは、目次の `index.yaml` と、そこから生成した `README.md` を持つ
+        content_types: [design_doc]
+        naming: ['ARCH-{n}.yaml', index.yaml, README.md]
+      - type: folder
+        name: config
+        contents: 設定
+        content_types: [design_doc]
+        naming: ['CFG-{n}.yaml', index.yaml, README.md]
+      - type: folder
+        name: dev-command
+        contents: 開発コマンド
+        content_types: [design_doc]
+        naming: ['CMD-{n}.yaml', index.yaml, README.md]
+      - type: folder
+        name: external-api
+        contents: 外部API
+        content_types: [design_doc]
+        naming: ['API-{n}.yaml', index.yaml, README.md]
+      - type: folder
+        name: interface
+        contents: インターフェース定義
+        content_types: [design_doc]
+        naming: ['IF-{n}.yaml', index.yaml, README.md]
+      - type: folder
+        name: layout
+        contents: フォルダ構成
+        content_types: [design_doc]
+        naming: ['LAY-{n}.yaml', index.yaml, README.md]
+      - type: folder
+        name: library
+        contents: 外部ライブラリ
+        content_types: [design_doc]
+        naming: ['LIB-{n}.yaml', index.yaml, README.md]
+      - type: folder
+        name: module
+        contents: モジュール構成。Python のファイルごとの設計書は ID の後ろに拡張子を付ける
+        content_types: [design_doc]
+        naming: ['MOD-{n}.yaml', 'MOD-{n}.py.yaml', index.yaml, README.md]
+      - type: folder
+        name: nonfunctional
+        contents: 非機能要件
+        content_types: [design_doc]
+        naming: ['NFR-{n}.yaml', index.yaml, README.md]
+      - type: folder
+        name: scenario
+        contents: シナリオ
+        content_types: [design_doc]
+        naming: ['SC-{n}.yaml', index.yaml, README.md]
+      - type: folder
+        name: test-procedure
+        contents: テスト実行方法
+        content_types: [design_doc]
+        naming: ['TP-{n}.yaml', index.yaml, README.md]
+      - type: folder
+        name: guide
+        contents: 公開ドキュメントの Markdown と、その管理用の YAML（`files.yml`）・目次（`index.yaml`・`README.md`）
+        content_types: [guide_doc, pages]
+        naming: ['{page}.md', files.yml, index.yaml, README.md]
+      - type: folder
+        name: pr
+        contents: 作業 PR ごとの PR ドキュメント
+        content_types: [pr_doc]
+        naming: ['{pr}/']
+  - type: folder
+    name: plugins
+    contents: 配布するプラグイン
+    children:
+      - type: folder
+        name: project-index
+        contents: プラグイン project-index（MCP の接続・フック・スキル）
+        children:
+          - type: folder
+            name: .claude-plugin
+            contents: プラグインの定義（`plugin.json`）
+            content_types: [plugin_manifest, plugin]
+          - type: file
+            name: .mcp.json
+            contents: 文書の MCP と管理の MCP の接続先
+            content_types: [plugin_manifest, plugin]
+          - type: file
+            name: files.yaml
+            contents: '`hooks/` の Python のファイルの管理用の YAML'
+            content_types: [file_list, plugin]
+          - type: folder
+            name: hooks
+            contents: フックの登録（`hooks.json`）と、SessionStart・PreToolUse のフックの本体
+            content_types: [hook, plugin]
+            naming: [hooks.json, '{event}.py']
+          - type: folder
+            name: skills
+            contents: global-setup・setup のスキル
+            content_types: [skill, plugin]
+            naming: ['{skill}/SKILL.md']
+  - type: folder
+    name: schemas
+    contents: 設計書の種類ごと・目次・管理用の YAML のスキーマ（`project-index.yaml` の `documents[].schema` が指す）と、配信元の設定のスキーマ
+    content_types: [design_schema]
+    naming: ['{kind}.schema.yaml', project-index.schema.json]
+    children:
+      - type: file
+        name: project-index.schema.json
+        contents: 配信元の設定 `project-index.yaml` のスキーマ。配信元の 1 行目の `$schema` が GitHub の raw の URL で指す
+        content_types: [config_schema, server]
+        generated_from:
+          path: src/project_index/features/sources/
+          command: CMD-1#categories[ビルド・生成]
+  - type: folder
+    name: src
+    contents: コード（src レイアウトのため、パッケージ 1 つと管理用の YAML だけを配置する）
+    children:
+      - type: file
+        name: files.yaml
+        contents: '`project_index/` の Python のファイルの管理用の YAML'
+        content_types: [file_list, server]
+      - type: folder
+        name: project_index
+        contents: 索引のサーバーのコード
+        content_types: [source, server]
+        convention: python-architecture-layout
+        children:
+          - type: folder
+            name: schemas
+            contents: サーバーが読み込む、配信元の設定・端末の設定・エイリアスのスキーマ
+            content_types: [config_schema, server]
+          - type: folder
+            name: migrations
+            contents: 配信元の設定のバージョンごとの移し替えの手順（`project-index migrate`）
+            content_types: [server]
+            naming: ['project-index/{version}/steps.yaml']
+  - type: folder
+    name: templates
+    contents: setup・global-setup のスキルが配信元と端末へ書き出す雛形と、プロンプトファイルのスキーマ
+    children:
+      - type: file
+        name: project-index.yaml
+        contents: 配信元に配置する `project-index.yaml` の雛形
+        content_types: [template, plugin]
+      - type: file
+        name: settings.yaml
+        contents: 端末の設定の雛形
+        content_types: [template, plugin]
+      - type: file
+        name: common.schema.yaml
+        contents: 配信元へ書き出す、設計書の共通の型のスキーマ
+        content_types: [design_schema, plugin]
+      - type: file
+        name: files.schema.yaml
+        contents: 配信元へ書き出す、管理用の YAML のスキーマ
+        content_types: [design_schema, plugin]
+      - type: file
+        name: prompt.schema.yaml
+        contents: プロンプトファイルのスキーマ。配信元とこのリポジトリの `content/prompts/` が指す
+        content_types: [config_schema]
+  - type: folder
+    name: tests
+    contents: テストと、その管理用の YAML（`files.yaml`）・共通の fixture（`conftest.py`）
+    content_types: [test]
+    convention: python-testing-layers
+    children:
+      - type: folder
+        name: unit
+        contents: 単体テスト
+        children:
+          - type: folder
+            name: project_index
+            contents: '`src/project_index/` の単体テスト。`src/project_index/` と同じ構成'
+            content_types: [test, server]
+          - type: folder
+            name: plugins
+            contents: '`plugins/project-index/hooks/` の単体テスト'
+            content_types: [test, plugin]
+      - type: folder
+        name: integration
+        contents: 結合テスト
+        children:
+          - type: folder
+            name: server
+            contents: 索引のサーバーの結合テスト
+            content_types: [test, server]
+          - type: folder
+            name: plugin
+            contents: プラグインのフックの結合テスト
+            content_types: [test, plugin]
+  - type: folder
+    name: typings
+    contents: 型情報を持たない依存（ruamel.yaml）の型スタブ
+    content_types: [type_stub]
+    naming: ['{package}/']
+  - type: file
+    name: project-index.yaml
+    contents: project-index の配信元の設定（文書の種類ごとのパス・スキーマ）
+    content_types: [tool_config]
+  - type: file
+    name: pyproject.toml
+    contents: パッケージの定義と、依存・ruff・pyright・pytest の設定
+    content_types: [tool_config]
+  - type: file
+    name: uv.lock
+    contents: 依存のロック
+    content_types: [tool_config]
+  - type: file
+    name: .python-version
+    contents: uv が使用する Python のバージョン
+    content_types: [tool_config]
+  - type: file
+    name: version.ini
+    contents: project-index のバージョン
+  - type: file
+    name: ai-monitor-version.ini
+    contents: '`schemas/` に取り込んだ AI Monitor の配布物のバージョン'
+  - type: file
+    name: rules.yaml
+    contents: rule-inject の索引（触るファイルのパスと規約の対応）
+  - type: file
+    name: CLAUDE.md
+    contents: project-index で作業するエージェントへの案内
+  - type: file
+    name: README.md
+    contents: project-index の説明と導入方法
+  - type: file
+    name: .gitignore
+    contents: Git で管理しないもののパターン
+gitignore:
+  - pattern: .venv/
+    reason: uv が作る仮想環境（ロックから再インストールできる）
+  - pattern: __pycache__/
+    reason: Python のバイトコードのキャッシュ
+  - pattern: '*.pyc'
+    reason: Python のバイトコードのキャッシュ
+  - pattern: .pytest_cache/
+    reason: pytest のキャッシュ
+  - pattern: .ruff_cache/
+    reason: ruff のキャッシュ
+  - pattern: .mypy_cache/
+    reason: mypy のキャッシュ
+  - pattern: dev/generated/
+    reason: AI Monitor が YAML の設計書から生成する Markdown（生成物）
+  - pattern: dist/
+    reason: ビルドの成果物（生成物）
+  - pattern: .env
+    reason: 秘匿値
+refs:
+  - ARCH-1#repository
+  - CMD-1#
+  - TP-1#
+notes:
+  Git で管理する生成物: |-
+    `docs/` の `README.md` と `docs/_theme/_data/nav.project.yml` は GitHub と Pages で目次として表示するため、生成物でも Git で管理する。
+    `schemas/project-index.schema.json` は配信元の 1 行目の `$schema` が raw の URL で指すため、生成物でも Git で管理する。
