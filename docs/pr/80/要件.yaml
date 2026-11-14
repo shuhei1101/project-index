@@ -1,0 +1,13 @@
+scope_out:
+  - item: 反映作業『各プロジェクトのスキーマの参照への移行』（shuhei1101/ai-monitor#3430）
+    reason: 'task-planner の受付判断で #76 へ移した（schemas/phase.schema.yaml・schemas/files.schema.yaml の削除と、管理用の YAML の行の knowledge の参照への切り替えを含む）'
+    plan: '#76'
+  - item: サイトのレイアウトの取り込み（docs/_theme/ の import-site）
+    reason: docs/_theme/ に控え ai-monitor-theme.yaml が無く、AI Monitor のテーマを取り込んでいない
+    plan: none
+  - item: 配信設定 docs/_config.yml へのキーの追加
+    reason: 配布元の docs/_config.yml で v0.3.0..v0.4.0 に変わったのは配布元の exclude だけで、増えたキーが無い
+    plan: none
+  - item: 配布元のルール索引で増えた行の rules.yaml への追加
+    reason: 配布元の rules.yaml の行は AI Monitor 固有のフェーズ索引・フェーズ・組織図のファイル（docs/phase-index/・docs/phase/・agent_context.global.yaml・config/constants.yaml）に紐づき、このリポジトリに当たるファイルが無い
+    plan: none
