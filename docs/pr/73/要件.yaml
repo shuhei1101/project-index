@@ -1,0 +1,59 @@
+docs:
+  - page: docs/layout/LAY-73-1.yaml
+    new: true
+    change: knowledge のテンプレート『フォルダ構成』の書式で、リポジトリの直下からの全てのフォルダとファイル・Git で管理しないもの・中身の種類を記載するフォルダ構成の設計書を新設
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-14T07:21:35.146913+00:00'
+  - page: docs/layout/index.yaml
+    new: true
+    change: フォルダ構成の目次を新設し、LAY-73-1.yaml の行を置く
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-14T07:21:35.146913+00:00'
+  - page: docs/index.yaml
+    new: false
+    change: 目次に layout/（リポジトリのフォルダとファイルの構成）の行を追加
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-14T07:21:35.146913+00:00'
+  - page: project-index.yaml
+    new: false
+    change: 'documents に種類 layout（paths: docs/layout/*.yaml、スキーマは knowledge の schemas/design/layout.schema.yaml）を追加'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-14T07:21:35.146913+00:00'
+  - page: docs/layout/README.md
+    new: true
+    change: docs/layout/index.yaml から生成するフォルダ構成の目次
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-14T07:21:35.146913+00:00'
+  - page: docs/README.md
+    new: false
+    change: 目次に layout/ の行を追加（docs/index.yaml と合わせる）
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-14T07:21:35.146913+00:00'
+  - page: docs/_config.yml
+    new: false
+    change: Pages に出さないフォルダに layout/（visibility が internal の文書だけを持つ）を追加
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-14T07:21:35.146913+00:00'
+  - page: docs/dev-command/CMD-1.yaml
+    new: false
+    change: 「ビルド・生成」に、目次の README.md・Pages のナビゲーションの再作成のコマンドと、schemas/project-index.schema.json の再作成（MOD-70 の参照）を記載する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-14T07:35:50.292461+00:00'
+scope_out:
+  - item: '同じ種類が散る: [pr_doc] が dev/pr/（作業 PR #13 の 1 件）と docs/pr/ の 2 か所にある。dev/pr/13/ を docs/pr/13/ へ移し、dev/ を削除する'
+    reason: フォルダの配置を変える対処で、要望は洗い出して別の Issue で対処を決めるところまで
+    plan: '#74'
+  - item: '同じ種類が散る: [design_schema] の common.schema.yaml・files.schema.yaml が schemas/ と templates/ の 2 か所にあり、中身が食い違う。配信元へ書き出す雛形をどちらの原本から作るか（生成にするか・片方へ寄せるか）を決める'
+    reason: フォルダの配置・形式を変える対処で、要望は洗い出して別の Issue で対処を決めるところまで
+    plan: '#75'
+  - item: '種類が混ざる: schemas/ に AI Monitor の配布物から取り込んだ設計書のスキーマ（[design_schema]、ai-monitor-version.ini）と、配信元へ配る設定のスキーマ project-index.schema.json（[config_schema, server]）が混ざる。[config_schema] も schemas/・src/project_index/schemas/・templates/prompt.schema.yaml に散る。shuhei1101/ai-monitor#3188 で設計書の検査は knowledge のスキーマを参照するようになったため、設計書のスキーマは knowledge の参照へ切り替え、配るスキーマの置き場所を決める'
+    reason: 配信元の設定とフォルダの配置を変える対処で、要望は洗い出して別の Issue で対処を決めるところまで
+    plan: '#76'
