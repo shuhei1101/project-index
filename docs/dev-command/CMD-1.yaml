@@ -66,7 +66,21 @@ categories:
     refs:
       - TP-1#layers[lint]
   - name: ビルド・生成
-    commands: 未確定
+    prerequisites:
+      - AI Monitor のクローンがある（`uv` で AI Monitor の依存を入れてある）
+    commands: |-
+      1. `docs/` のフォルダの目次の原本（`index.yaml`）か `docs/guide/files.yml` を変えたら、目次の `README.md` と Pages のナビゲーション（`docs/_theme/_data/nav.project.yml`）を AI Monitor の公開ドキュメントの書き出しで再作成し、原本と一緒に commit する
+
+      ```bash
+      cd {AI Monitor のクローン} && PYTHONPATH=src uv run python -m ai_monitor.design_docs publish --root {project-index の作業ツリー}
+      ```
+
+      2. 配信元の設定のスキーマの原本（`src/project_index/schemas/project-index.schema.yaml`）を変えたら、配布する `schemas/project-index.schema.json` を再作成し、原本と一緒に commit する（コマンドは `refs` の『配布のスキーマの生成』）
+    refs:
+      - MOD-70#functions[source_schema_json]
+    verification:
+      state: 未確認
+      detail: 1 は、AI Monitor が配信元の設定を `dev-docs.yaml` の名前でだけ読み込み、`project-index.yaml` のこのリポジトリでは `No such file or directory` で止まるため確認していない（shuhei1101/ai-monitor#3441 で修正する）。2 の『配布のスキーマの生成』のコマンドは作業 PR の worktree で実行し、終了コード 0 で、出力が commit 済みの `schemas/project-index.schema.json` と一致した（2026-11-14）
   - name: 取り込み前の検査
     refs:
       - TP-1#layers[単体テスト（バック）]

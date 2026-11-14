@@ -84,24 +84,10 @@ entries:
     children:
       - type: folder
         name: prompts
-        contents: プロンプトファイル。ID は `content/prompts/` からのパス
+        contents: MCP の instructions とツールの description のプロンプトファイル（文書の MCP は `mcp/docs/`、管理の MCP は `mcp/admin/`）。ID は `content/prompts/` からのパス
+        content_types: [prompt, server]
         id_root: true
         convention: prompt-file
-        children:
-          - type: folder
-            name: mcp
-            contents: MCP のプロンプト
-            children:
-              - type: folder
-                name: docs
-                contents: 文書の MCP の instructions（`instructions.yaml`）と、ツールの description の `tools/`
-                content_types: [prompt, server]
-                naming: [instructions.yaml, 'tools/{tool}.yaml']
-              - type: folder
-                name: admin
-                contents: 管理の MCP のツールの description の `tools/`
-                content_types: [prompt, server]
-                naming: ['tools/{tool}.yaml']
   - type: folder
     name: dev
     contents: 作業 PR の PR ドキュメント
@@ -247,7 +233,7 @@ entries:
         contents: 配信元の設定 `project-index.yaml` のスキーマ。配信元の 1 行目の `$schema` が GitHub の raw の URL で指す
         content_types: [config_schema, server]
         generated_from:
-          path: src/project_index/features/sources/
+          path: src/project_index/schemas/project-index.schema.yaml
           command: CMD-1#categories[ビルド・生成]
   - type: folder
     name: src
@@ -259,19 +245,9 @@ entries:
         content_types: [file_list, server]
       - type: folder
         name: project_index
-        contents: 索引のサーバーのコード
+        contents: 索引のサーバーのコード。規約が定めない置き場所は、サーバーが読み込む配信元の設定・端末の設定・エイリアスのスキーマの `schemas/` と、配信元の設定のバージョンごとの移し替えの手順（`project-index migrate`）の `migrations/`
         content_types: [source, server]
         convention: python-architecture-layout
-        children:
-          - type: folder
-            name: schemas
-            contents: サーバーが読み込む、配信元の設定・端末の設定・エイリアスのスキーマ
-            content_types: [config_schema, server]
-          - type: folder
-            name: migrations
-            contents: 配信元の設定のバージョンごとの移し替えの手順（`project-index migrate`）
-            content_types: [server]
-            naming: ['project-index/{version}/steps.yaml']
   - type: folder
     name: templates
     contents: setup・global-setup のスキルが配信元と端末へ書き出す雛形と、プロンプトファイルのスキーマ
@@ -298,34 +274,9 @@ entries:
         content_types: [config_schema]
   - type: folder
     name: tests
-    contents: テストと、その管理用の YAML（`files.yaml`）・共通の fixture（`conftest.py`）
+    contents: 索引のサーバーとプラグインのフックの単体テスト（`unit/`）・結合テスト（`integration/`）と、その管理用の YAML（`files.yaml`）・共通の fixture（`conftest.py`）
     content_types: [test]
     convention: python-testing-layers
-    children:
-      - type: folder
-        name: unit
-        contents: 単体テスト
-        children:
-          - type: folder
-            name: project_index
-            contents: '`src/project_index/` の単体テスト。`src/project_index/` と同じ構成'
-            content_types: [test, server]
-          - type: folder
-            name: plugins
-            contents: '`plugins/project-index/hooks/` の単体テスト'
-            content_types: [test, plugin]
-      - type: folder
-        name: integration
-        contents: 結合テスト
-        children:
-          - type: folder
-            name: server
-            contents: 索引のサーバーの結合テスト
-            content_types: [test, server]
-          - type: folder
-            name: plugin
-            contents: プラグインのフックの結合テスト
-            content_types: [test, plugin]
   - type: folder
     name: typings
     contents: 型情報を持たない依存（ruamel.yaml）の型スタブ
@@ -378,7 +329,7 @@ gitignore:
     reason: ruff のキャッシュ
   - pattern: .mypy_cache/
     reason: mypy のキャッシュ
-  - pattern: dev/generated/
+  - pattern: docs/generated/
     reason: AI Monitor が YAML の設計書から生成する Markdown（生成物）
   - pattern: dist/
     reason: ビルドの成果物（生成物）
