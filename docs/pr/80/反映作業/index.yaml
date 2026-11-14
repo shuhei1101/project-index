@@ -29,22 +29,6 @@
   失敗時: 実行者が原因を確かめて依頼元へ返す
   確認方法: 配布先のリポジトリに、内容が AI Monitor の過去の版と同じ移した文書のファイルが無く、索引（rules.yaml・docs/rules.yaml）に、移した文書のパスを指すのにファイルが無いエントリが無い
   状態: 未
-配布先の dev-docs への移行:
-  説明: '配布先のリポジトリの直下に `dev-docs.yaml`（設計書の種類を documents に定義したもの）を置き、`/dev-docs:setup {配布先のパス}` で dev-docs の配信元として登録し、`settings.yaml` の `agents[].mcp_tools` から旧い設計書のツールを外して dev-docs のツールを割り当てる（手順書の設計書のツールが dev-docs のツールに変わるため）。`dev-docs.yaml` の作成と登録はファイルごとの判断を伴うため実行者が `/dev-docs:setup` で行い、実行スクリプトは書き換えずに整ったかを確かめる（書き換えないため切り戻しは持たない）（配布元: https://github.com/shuhei1101/ai-monitor/tree/v0.4.0/docs/pr/3119/%E5%8F%8D%E6%98%A0%E4%BD%9C%E6%A5%AD/%E9%85%8D%E5%B8%83%E5%85%88%E3%81%AE%20dev-docs%20%E3%81%B8%E3%81%AE%E7%A7%BB%E8%A1%8C）'
-  タグ:
-  - 配布先
-  - 設定ファイル
-  実行者: planner
-  時期: マージの前
-  回数: 1 回限り
-  可逆: true
-  疎通確認: 配布先の dev-docs への移行/疎通確認.sh
-  実行: 配布先の dev-docs への移行/実行.py
-  確認: 配布先の dev-docs への移行/確認.sh
-  切り戻し: null
-  失敗時: 実行者が原因を確かめて依頼元へ返す
-  確認方法: 配布先のリポジトリで作業中のセッションから dev-docs の `describe()` を呼ぶと、配布先の配信元が権限 `write` で一覧に出る
-  状態: 未
 配布先のエージェント統合への追従:
   説明: '配布先の `agent_context.yaml` の `docs[]` で、implementer・designer に割り当てた資料を planner へ、operator に割り当てた資料を tester へ割り当て直し、`.claude/agent-settings/` から 3 つのエージェントの設定を削除する（配布元: https://github.com/shuhei1101/ai-monitor/tree/v0.4.0/docs/pr/3137/%E5%8F%8D%E6%98%A0%E4%BD%9C%E6%A5%AD/%E9%85%8D%E5%B8%83%E5%85%88%E3%81%AE%E3%82%A8%E3%83%BC%E3%82%B8%E3%82%A7%E3%83%B3%E3%83%88%E7%B5%B1%E5%90%88%E3%81%B8%E3%81%AE%E8%BF%BD%E5%BE%93）'
   タグ:

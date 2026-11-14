@@ -11,3 +11,6 @@ scope_out:
   - item: 配布元のルール索引で増えた行の rules.yaml への追加
     reason: 配布元の rules.yaml の行は AI Monitor 固有のフェーズ索引・フェーズ・組織図のファイル（docs/phase-index/・docs/phase/・agent_context.global.yaml・config/constants.yaml）に紐づき、このリポジトリに当たるファイルが無い
     plan: none
+  - item: 反映作業『配布先の dev-docs への移行』（shuhei1101/ai-monitor#3119）の実行
+    reason: dev-docs.yaml を project-index.yaml へ改名した後の配信元 project-index が describe() の一覧に権限 write で出ていて、作業の効果が既に観測できる。配布元のスクリプトは改名前の dev-docs.yaml と ~/.config/dev-docs/settings.yaml を探すため、このリポジトリでは必ず failed になる
+    plan: none
