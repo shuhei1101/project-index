@@ -12,7 +12,7 @@
 | [プラグイン / 配布](./MOD-2.yaml) | Claude Code のプラグイン project-index と、それを掲載するマーケットプレースのファイルの並び。 |
 | [索引のサーバー / 入口 / __main__.py](./MOD-3.py.yaml) | `project-index` コマンドの引数の組み立てと main。 |
 | [プラグイン / ツール実行前のフック / pre_tool_use.py](./MOD-4.py.yaml) | PreToolUse のフック。文書の MCP のツールの入力に `cwd`・`session_id`・`agent_id` を上書きで入れ、`updatedInput` で返す。 |
-| [プラグイン / セッション開始のフック / session_start.py](./MOD-5.py.yaml) | SessionStart のフック。ポートにつながらなければ `project-index serve` を切り離して起動し、つながれば文脈を入れず、`/clear`・圧縮のときだけ `POST /_admin/session-start` で返し済みの記録の削除を依頼する。 |
+| [プラグイン / セッション開始のフック / session_start.py](./MOD-5.py.yaml) | SessionStart のフック。ポートにつながらなければ `project-index serve` を切り離して起動し、つながれば文脈を入れず、`/clear`・圧縮のときだけ `POST /_admin/session-start` で返却済みの記録の削除を依頼する。 |
 | [索引のサーバー / 入口 / __init__.py](./MOD-6.py.yaml) | インストール済みのパッケージからバージョンを引くときの配布名。 |
 | [索引のサーバー / 権限と作業場所 / service.py](./MOD-7.py.yaml) | 作業場所からの権限と、MCP の引数からの読み書きする場所の解決。 |
 | [索引のサーバー / 権限と作業場所 / types.py](./MOD-8.py.yaml) | 配信元の権限・作業場所・読み書きする場所・権限のレベルの型。 |
@@ -66,11 +66,11 @@
 | [索引のサーバー / 検索 / snippets.py](./MOD-56.py.yaml) | 行の分割・抜粋の検索・当たった行の数・一致した箇所の抜き出し。 |
 | [索引のサーバー / 検索 / terms.py](./MOD-57.py.yaml) | 用語の一覧と、その Markdown。 |
 | [索引のサーバー / 検索 / types.py](./MOD-58.py.yaml) | `search_docs`・用語の一覧の要求と結果の型。 |
-| [索引のサーバー / 会話の記録 / store.py](./MOD-59.py.yaml) | 会話キーごとの返し済み・前回読んだ内容・閲覧と編集の SQLite への記録と読み出し。 |
+| [索引のサーバー / 会話の記録 / store.py](./MOD-59.py.yaml) | 会話キーごとの返却済み・前回読んだ内容・閲覧と編集の SQLite への記録と読み出し。 |
 | [索引のサーバー / 会話の記録 / types.py](./MOD-60.py.yaml) | 会話の記録の会話キー・前回読んだ内容・閲覧と編集の記録の型。 |
 | [索引のサーバー / セッションの開始 / route.py](./MOD-61.py.yaml) | `POST /_admin/session-start` のルート。 |
-| [索引のサーバー / セッションの開始 / service.py](./MOD-62.py.yaml) | `/clear`・圧縮の後に、その会話の返し済みの記録を削除する。 |
-| [索引のサーバー / セッションの開始 / types.py](./MOD-63.py.yaml) | `POST /_admin/session-start` の本文と応答の型と、返し済みの記録を削除する理由。 |
+| [索引のサーバー / セッションの開始 / service.py](./MOD-62.py.yaml) | `/clear`・圧縮の後に、その会話の返却済みの記録を削除する。 |
+| [索引のサーバー / セッションの開始 / types.py](./MOD-63.py.yaml) | `POST /_admin/session-start` の本文と応答の型と、返却済みの記録を削除する理由。 |
 | [索引のサーバー / 端末の設定 / query.py](./MOD-64.py.yaml) | 端末の設定の場所・読み込みと検証・待ち受けのポート。 |
 | [索引のサーバー / 端末の設定 / route.py](./MOD-65.py.yaml) | 端末の設定のルーター（`GET`・`PUT`・`POST /settings/sources`）。 |
 | [索引のサーバー / 端末の設定 / service.py](./MOD-66.py.yaml) | `sources[]` の保存。 |
@@ -90,7 +90,7 @@
 | [索引のサーバー / 書き込み / apply.py](./MOD-80.py.yaml) | 項目の操作の適用と、共通のキーの列名への読み替え。 |
 | [索引のサーバー / 書き込み / ids.py](./MOD-81.py.yaml) | `ids.format` からの ID の生成。 |
 | [索引のサーバー / 書き込み / locks.py](./MOD-82.py.yaml) | 配信元ごとの書き込みの排他。 |
-| [索引のサーバー / 書き込み / placement.py](./MOD-83.py.yaml) | 新しい文書の置き場所。 |
+| [索引のサーバー / 書き込み / placement.py](./MOD-83.py.yaml) | 新しい文書の配置先。 |
 | [索引のサーバー / 書き込み / service.py](./MOD-84.py.yaml) | `write_docs`・`delete_docs` の操作の適用・検査・書き換えと、バージョンの確かめ。 |
 | [索引のサーバー / 書き込み / types.py](./MOD-85.py.yaml) | `write_docs`・`delete_docs` の要求と結果の型。 |
 | [索引のサーバー / 履歴 / git.py](./MOD-86.py.yaml) | git の実行と、リポジトリの直下の解決。 |

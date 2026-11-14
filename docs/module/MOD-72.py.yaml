@@ -1,6 +1,11 @@
 id: MOD-72
 title: 索引のサーバー / 検査 / markdown.py
 lead: スキーマで Markdown と宣言したキーのうち操作で変えた値を mdmark で点検し、描画時の記載方法の警告を違反にする処理を受け持ち、検査の markdown.py を修正するときに参照する。
+tags:
+  - name: action:検査
+    main: true
+  - name: topic:スキーマ
+  - name: tool:jsonschema
 test_files:
   - tests/unit/project_index/features/validation/test_markdown.py
 diagrams:
@@ -35,8 +40,8 @@ diagrams:
         class 違反 {
           <<dataclass>>
         }
-        click Markdownの点検 href "./MOD-87.py.yaml#Markdownの点検"
-        click 違反 href "./MOD-98.py.yaml#違反"
+        click Markdownの点検 href "id:MOD-87#functions[check_markdown]"
+        click 違反 href "id:MOD-98#data_models[Violation]"
 data_models:
   - name: UncheckedKey
     title: 点検できなかったキー

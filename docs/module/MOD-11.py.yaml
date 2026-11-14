@@ -1,6 +1,11 @@
 id: MOD-11
 title: 索引のサーバー / 管理の操作 / types.py
 lead: 管理の MCP の `status`・`reload`・`check_project`・`try_convert` の要求と結果の型を受け持ち、管理の操作の types.py を修正するときに参照する。
+tags:
+  - name: tool:mcp
+    main: true
+  - name: action:管理
+  - name: topic:型ヒント
 data_models:
   - name: SyncCounts
     title: 索引の同期の件数
@@ -434,12 +439,12 @@ enums:
     title: 設定のバージョンの新旧
     container: project_index/features/admin/types.py
     usecase: 共通
-    summary: 設定の `version` と project-index が読めるバージョンの比較
+    summary: 設定の `version` と project-index が参照できるバージョンの比較
     description: '`Literal` の型エイリアス。'
     values:
       - value: current
         title: 同じ
-        description: project-index が読めるバージョンと同じ
+        description: project-index が参照できるバージョンと同じ
       - value: old
         title: 古い
         description: 移し替えで上げられる

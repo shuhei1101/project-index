@@ -1,6 +1,12 @@
 id: MOD-71
 title: 索引のサーバー / 配信元 / types.py
 lead: 配信元の設定・文書の行・スクリプト・配信中の配信元・状態の型を受け持ち、配信元の types.py を修正するときに参照する。
+tags:
+  - name: topic:配信元
+    main: true
+  - name: action:読み込み
+  - name: action:配信
+  - name: topic:型ヒント
 test_files:
   - tests/unit/project_index/features/sources/test_types.py
 diagrams:
@@ -38,7 +44,7 @@ diagrams:
           +ID: str
           +コマンド: list
         }
-        click 配信元の読み込み href "./MOD-70.py.yaml#配信元の読み込み"
+        click 配信元の読み込み href "id:MOD-70#functions[load_source]"
 data_models:
   - name: DocumentTable
     title: 文書の行
@@ -165,7 +171,7 @@ data_models:
         kind: メソッド
         scope: public
         summary: ファイルがこの行の文書になるか（`paths` に当たり、除外の名前に当たらない）を返す
-        description: '`paths` で行を判定する箇所（ファイルの収集・変更の一覧・文書のページ）は全てこのメソッドで判定する。新しい文書の置き場所は `excludes` で判定する。'
+        description: '`paths` で行を判定する箇所（ファイルの収集・変更の一覧・文書のページ）は全てこのメソッドで判定する。新しい文書の配置先は `excludes` で判定する。'
         args:
           - name: path
             title: ファイルのパス
@@ -575,7 +581,7 @@ data_models:
         type: tuple[str, str] | None
         access: 公開
         default: None
-        description: 設定のバージョンがサーバーの読めるバージョンより古いとき、`(設定, サーバー)`
+        description: 設定のバージョンがサーバーの参照できるバージョンより古いとき、`(設定, サーバー)`
       - name: config
         title: 配信元の設定のパス
         type: tuple[str, ...]
@@ -601,8 +607,8 @@ enums:
         description: '端末の設定か配信元の設定で `enabled: false`'
 constants:
   - name: SOURCE_CONFIG_VERSION
-    title: 配信元の設定の読めるバージョン
+    title: 配信元の設定の参照できるバージョン
     container: project_index/features/sources/types.py
     usecase: 共通
-    summary: このサーバーが読める配信元の設定の `version`（整数の文字列。大きいほど新しい）
+    summary: このサーバーが参照できる配信元の設定の `version`（整数の文字列。大きいほど新しい）
     value: '"3"'

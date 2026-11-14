@@ -1,6 +1,11 @@
 id: MOD-64
 title: 索引のサーバー / 端末の設定 / query.py
 lead: 端末の設定の場所・読み込みと検証・待ち受けのポートを受け持ち、端末の設定の query.py を修正するときに参照する。
+tags:
+  - name: topic:設定
+    main: true
+  - name: topic:端末
+  - name: action:取得
 test_files:
   - tests/unit/project_index/features/settings/test_query.py
 diagrams:
@@ -24,8 +29,8 @@ diagrams:
           +配信元: list
           +状態の配置先: Path
         }
-        click 配信元の保存 href "./MOD-66.py.yaml#配信元の保存"
-        click 端末の設定 href "./MOD-67.py.yaml#端末の設定"
+        click 配信元の保存 href "id:MOD-66#functions[save_sources]"
+        click 端末の設定 href "id:MOD-67#data_models[TerminalConfig]"
 constants:
   - name: DEFAULT_CONFIG_HOME
     title: 設定の置き場の既定の親
@@ -88,10 +93,10 @@ constants:
     summary: 配布に同梱する端末の設定のスキーマのパス（`importlib.resources` で引く）
     value: '"schemas/settings.schema.yaml"'
   - name: SETTINGS_VERSION
-    title: 端末の設定の読めるバージョン
+    title: 端末の設定の参照できるバージョン
     container: project_index/features/settings/query.py
     usecase: 端末の設定
-    summary: このサーバーが読める端末の設定の `version`
+    summary: このサーバーが参照できる端末の設定の `version`
     value: '"1"'
   - name: UNKNOWN_KEY_REASON
     title: 知らないキーの警告の理由

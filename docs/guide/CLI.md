@@ -39,8 +39,8 @@ PROJECT_INDEX_CONFIG=/tmp/x/settings.yaml PROJECT_INDEX_PORT=8786 project-index 
 
 ## project-index migrate
 
-端末の設定か配信元の `project-index.yaml` の `version` を、project-index が読めるバージョンと比べ、移し替えの手順を古い順に当てます。
-対象の `version` より新しく、project-index が読めるバージョン以下の手順を全て当て、新しいスキーマで検証してから 1 回だけ書き込みます。
+端末の設定か配信元の `project-index.yaml` の `version` を、project-index が参照できるバージョンと比べ、移し替えの手順を古い順に当てます。
+対象の `version` より新しく、project-index が参照できるバージョン以下の手順を全て当て、新しいスキーマで検証してから 1 回だけ書き込みます。
 動いているサーバーには反映しません。
 端末の設定を移し替えたら `restart`、配信元の設定を移し替えたら `reload` を呼びます。
 
@@ -74,7 +74,7 @@ project-index migrate --source ~/repo/sample/project-index.yaml --allow-destruct
 | 2 | 対象の設定が無い・YAML として読めない・`version` が無い | 何も書き換えず、バックアップも作らない |
 | 4 | 手順の途中で失敗した、または当てた結果が新しいスキーマに違反した | ファイルに触らず、失敗した手順と理由を標準エラーに出す |
 | 5 | 当てる手順に破壊的なものがあり、`--allow-destructive` が無い | ファイルに触らず、破壊的な手順を標準エラーに出す |
-| 6 | 対象の `version` が project-index が読めるバージョンより新しい | project-index の更新を案内する |
+| 6 | 対象の `version` が project-index が参照できるバージョンより新しい | project-index の更新を案内する |
 
 <!-- /table -->
 

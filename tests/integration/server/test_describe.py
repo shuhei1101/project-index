@@ -388,7 +388,7 @@ def test_normal_when_outside_list(
     sample_config_text: Callable[..., str],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """source を省いた outside_scope: true で、作業範囲の外で読める配信元の一覧を添える（正常系）。"""
+    """source を省いた outside_scope: true で、作業範囲の外で参照できる配信元の一覧を添える（正常系）。"""
     # 準備
     config = sample_config_text(
         _when_line(*OTHER_WHEN), name="other", description=OTHER_DESCRIPTION

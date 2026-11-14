@@ -1,6 +1,13 @@
 id: MOD-126
 title: 索引のサーバー / 読み取り API / route.py
 lead: 読み取り API のルーター（`/sources` の下）を受け持ち、読み取り API の route.py を修正するときに参照する。
+tags:
+  - name: topic:api
+    main: true
+  - name: topic:エンドポイント
+  - name: action:読み取り
+  - name: tool:fastapi
+  - name: topic:ルート
 test_files:
   - tests/unit/project_index/features/read/test_route.py
 diagrams:
@@ -43,13 +50,13 @@ diagrams:
         class リビジョンの一覧 {
           <<function>>
         }
-        click 読み取りの場所 href "./MOD-77.py.yaml#読み取りの場所"
-        click 配信元の設定の取得 href "./MOD-125.py.yaml#配信元の設定の取得"
-        click 文書の一覧 href "./MOD-125.py.yaml#文書の一覧"
-        click 文書の取得 href "./MOD-125.py.yaml#文書の取得"
-        click 検討事項の ID の一覧 href "./MOD-125.py.yaml#検討事項の ID の一覧"
-        click 検討事項の文書の取得 href "./MOD-125.py.yaml#検討事項の文書の取得"
-        click 語での検索 href "./MOD-78.py.yaml#語での検索"
+        click 読み取りの場所 href "id:MOD-77#functions[read_target]"
+        click 配信元の設定の取得 href "id:MOD-125#functions[get_source_config]"
+        click 文書の一覧 href "id:MOD-125#functions[list_documents]"
+        click 文書の取得 href "id:MOD-125#functions[get_document]"
+        click 検討事項の ID の一覧 href "id:MOD-125#functions[list_decisions]"
+        click 検討事項の文書の取得 href "id:MOD-125#functions[get_decision]"
+        click 語での検索 href "id:MOD-78#functions[search_words]"
 functions:
   - name: build_read_router
     title: 読み取り API の入口

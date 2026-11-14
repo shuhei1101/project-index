@@ -1,6 +1,12 @@
 id: MOD-60
 title: 索引のサーバー / 会話の記録 / types.py
 lead: 会話の記録の会話キー・前回読んだ内容・閲覧と編集の記録の型を受け持ち、会話の記録の types.py を修正するときに参照する。
+tags:
+  - name: topic:会話
+    main: true
+  - name: action:記録
+  - name: topic:履歴
+  - name: topic:型ヒント
 test_files:
   - tests/unit/project_index/features/seen/test_types.py
 diagrams:
@@ -12,7 +18,7 @@ diagrams:
         会話の記録 ..> 前回読んだ内容 : 返す
         会話の記録 ..> 閲覧と編集 : 返す
         class 会話の記録 {
-          +返し済み(会話キー, 配信元, 種類, バージョン) set
+          +返却済み(会話キー, 配信元, 種類, バージョン) set
           +返したことを記録する(会話キー, 配信元, 種類, 文書) None
           +前回読んだ内容(会話キー, 配信元, ID) dict
           +閲覧と編集を記録する(会話キー, 配信元, ID, 種類) None
@@ -34,7 +40,7 @@ diagrams:
           +種類: str
           +日時: datetime
         }
-        click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
+        click 会話の記録 href "id:MOD-59#classes[SeenStore]"
 data_models:
   - name: SessionKey
     title: 会話キー
@@ -171,8 +177,8 @@ enums:
         description: '`write_docs` で書いた'
 constants:
   - name: SEEN_MARK
-    title: 返し済みの文言
+    title: 返却済みの文言
     container: project_index/features/seen/types.py
     usecase: 共通
-    summary: 返し済みの本文・名前・概要文の代わりに返す文言
+    summary: 返却済みの本文・名前・概要文の代わりに返す文言
     value: '"（この会話で返却済み）"'

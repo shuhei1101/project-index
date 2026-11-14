@@ -37,7 +37,7 @@ def _prompt(prompt_id: str, **overrides: Any) -> dict[str, Any]:
 
 
 def _write(directory: Path, relative: str, value: dict[str, Any] | str) -> Path:
-    """プロンプトの YAML を書く（JSON は YAML として読める）。"""
+    """プロンプトの YAML を書く（JSON は YAML として解析できる）。"""
     path = directory / relative
     path.parent.mkdir(parents=True, exist_ok=True)
     text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
@@ -92,7 +92,7 @@ def test_prompt_set_render_when_lang_missing(tmp_path: Path) -> None:
 
 
 def test_prompts_dir() -> None:
-    """既定の置き場所（正常系）。"""
+    """既定の配置先（正常系）。"""
     # 準備
     env: dict[str, str] = {}
     # 実行

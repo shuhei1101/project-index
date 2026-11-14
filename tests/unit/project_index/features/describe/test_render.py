@@ -107,7 +107,7 @@ def test_render_describe_markdown_when_no_source() -> None:
 
 
 def test_render_describe_markdown_when_outside_sources() -> None:
-    """作業範囲の外で読める配信元の表（正常系）。"""
+    """作業範囲の外で参照できる配信元の表（正常系）。"""
     # 準備
     workplace = Workplace(cwd=Path("/w/sample"), source_id="sample", worktree=None)
     sources = [
@@ -130,7 +130,7 @@ def test_render_describe_markdown_when_outside_sources() -> None:
 
 
 def test_render_describe_markdown_when_outside_sources_empty() -> None:
-    """作業範囲の外で読める配信元が 0 件（正常系）。"""
+    """作業範囲の外で参照できる配信元が 0 件（正常系）。"""
     # 準備
     result = SourceListResult(
         workplace=Workplace(cwd=Path("/w/sample"), source_id="sample", worktree=None),

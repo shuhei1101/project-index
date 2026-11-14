@@ -1,6 +1,11 @@
 id: MOD-7
 title: 索引のサーバー / 権限と作業場所 / service.py
 lead: 作業場所からの権限と、MCP の引数からの読み書きする場所の解決を受け持ち、権限と作業場所の service.py を修正するときに参照する。
+tags:
+  - name: topic:権限
+    main: true
+  - name: topic:スコープ
+  - name: topic:worktree
 test_files:
   - tests/unit/project_index/features/access/test_service.py
 diagrams:
@@ -17,7 +22,7 @@ diagrams:
         書く場所の解決 ..> ワークツリーの解決
         書く場所の解決 ..> 作業場所の配信元の読み込み
         使える配信元 ..> 権限の判定
-        作業範囲の外で読める配信元 ..> 権限の判定
+        作業範囲の外で参照できる配信元 ..> 権限の判定
         作業場所の説明 ..> 作業中の配信元
         権限の判定 ..> ワークツリーの解決
         権限の判定 ..> globの照合
@@ -32,7 +37,7 @@ diagrams:
         class 使える配信元 {
           <<function>>
         }
-        class 作業範囲の外で読める配信元 {
+        class 作業範囲の外で参照できる配信元 {
           <<function>>
         }
         class 作業場所の説明 {
@@ -62,10 +67,10 @@ diagrams:
           +リビジョン: str
           +解いた commit: str
         }
-        click globの照合 href "./MOD-101.py.yaml#globの照合"
-        click リビジョンの解決 href "./MOD-31.py.yaml#リビジョンの解決"
-        click 作業場所の配信元の読み込み href "./MOD-70.py.yaml#作業場所の配信元の読み込み"
-        click 読み書きの場所 href "./MOD-8.py.yaml#読み書きの場所"
+        click globの照合 href "id:MOD-101#functions[match_glob]"
+        click リビジョンの解決 href "id:MOD-31#functions[resolve_ref]"
+        click 作業場所の配信元の読み込み href "id:MOD-70#functions[load_source_at]"
+        click 読み書きの場所 href "id:MOD-8#data_models[Target]"
 functions:
   - name: find_worktree
     title: ワークツリーの解決
@@ -264,7 +269,7 @@ functions:
         mock: 配信元の一覧（偽物）
         expected: 空
   - name: outside_readable_sources
-    title: 作業範囲の外で読める配信元
+    title: 作業範囲の外で参照できる配信元
     kind: 関数
     container: project_index/features/access/service.py
     usecase: 配信元を調べる
@@ -398,7 +403,7 @@ functions:
          - `*` の場合、権限のある配信中の配信元を全てにする（権限の無い配信元は黙って外す）
          - ID か配列の場合、それぞれを引き（配信元の一覧.引く。`UnknownSourceError`・`SourceNotServedError` はそのまま伝える）、権限が無ければ `SourceNotReadableError` を送る
          - ID 1 つで権限が無く、`outside_scope` が `True` で配信元の `outside_read` が真の場合、断らずに `access` を `read`、`outside_scope` を `True` にした場所にし、`[info]` 作業範囲の外を読んだ（`cwd`・配信元の ID）を要求のログに書く
-         - `SourceNotReadableError` の `fix` は、ID 1 つの配信元の `outside_read` が真で `outside_scope` を渡していないときだけ、`outside_scope: true` で作業範囲の外（参考）として読めることを案内する
+         - `SourceNotReadableError` の `fix` は、ID 1 つの配信元の `outside_read` が真で `outside_scope` を渡していないときだけ、`outside_scope: true` で作業範囲の外（参考）として参照できることを案内する
       3. 配信元が 2 つ以上で `ref` か `worktree` を渡された場合、`InvalidArgumentError` を送る
       4. 配信元ごとに場所を決める
          - `worktree` を渡された場合、そのパスがワークツリーに当たらなければ `WorktreeNotMatchedError` を送る。当たればそのワークツリーを `ref` なしで読む
@@ -443,7 +448,7 @@ functions:
         expected: '`base` が `/r/.claude/worktrees/x/docs-src`、`worktree` が `/r/.claude/worktrees/x`'
       - name: test_resolve_read_targets_when_all
         case: 正常
-        summary: '`*` は読める配信元だけ'
+        summary: '`*` は参照できる配信元だけ'
         condition: '`source: "*"`、配信元 3 つのうち 2 つに権限'
         mock: 配信元の一覧（偽物）
         expected: 2 つの `Target`
@@ -505,7 +510,7 @@ functions:
         exception: '`scope` に当たらない'
       - name: test_resolve_read_targets_when_not_readable_guides_outside
         case: 異常
-        summary: 外から読めることを案内する
+        summary: 外から参照できることを案内する
         condition: '`source: other`、`outside_scope` なし、other の `outside_read` が `True`'
         mock: 配信元の一覧（偽物）
         expected: '`SourceNotReadableError` の `fix` に `outside_scope: true`'

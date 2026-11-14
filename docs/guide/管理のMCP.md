@@ -32,7 +32,7 @@
 
 | 値 | 意味 |
 | --- | --- |
-| `current` | 設定の `version` が project-index が読めるバージョンと同じ |
+| `current` | 設定の `version` が project-index が参照できるバージョンと同じ |
 | `old` | 古い。`project-index migrate` で移し替える |
 | `newer` | 新しい。project-index を更新する |
 
@@ -186,7 +186,7 @@ http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
 | `path` | str | 検査した配信元のフォルダ |
 | `registered_id` | str / null | 端末の設定の `sources` に同じフォルダの行があれば、その ID |
 | `config_version` | str / null | `project-index.yaml` の `version` |
-| `version_state` | `current` / `old` / `newer` / null | project-index が読めるバージョンとの比較 |
+| `version_state` | `current` / `old` / `newer` / null | project-index が参照できるバージョンとの比較 |
 | `violations[].path` | str | 違反したキーのパス（`documents[0].paths`） |
 | `violations[].rule` | str | 違反の理由 |
 | `violations[].doc` | str / null | 違反した文書のパス。`alias_type` を持つ行の文書のエイリアスのキーを、取り込んだエイリアスのスキーマで検証した違反に入る。`project-index.yaml` のキーの違反は `null` |

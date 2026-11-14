@@ -2,6 +2,10 @@ id: MOD-118
 title: 索引のサーバー / 端末の設定
 lead: |-
   端末の設定 `settings.yaml` の検証と読み込み、`sources[]` の書き換えを受け持つ端末の設定の分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
+tags:
+  - name: topic:設定
+    main: true
+  - name: topic:端末
 directory: |-
   ```text
   src/project_index/features/settings/
@@ -31,8 +35,8 @@ diagrams:
         class 変わった配信元の読み直し {
           <<function>>
         }
-        click 配信元の1行の変更 href "./MOD-66.py.yaml#配信元の 1 行の変更"
-        click 変わった配信元の読み直し href "./MOD-89.py.yaml#変わった配信元の読み直し"
+        click 配信元の1行の変更 href "id:MOD-66#functions[patch_source]"
+        click 変わった配信元の読み直し href "id:MOD-89#functions[reload_changed_sources]"
         端末の設定の読み込み ..> 端末の設定 : 返す
         class 端末の設定の入口 {
           <<function>>
@@ -56,13 +60,13 @@ diagrams:
           +配信元: list
           +状態の配置先: Path
         }
-        click 端末の設定の入口 href "./MOD-65.py.yaml#端末の設定の入口"
-        click 配信元の保存 href "./MOD-66.py.yaml#配信元の保存"
-        click 同じオリジンの確認 href "./MOD-96.py.yaml#同じオリジンの確認"
-        click 端末の設定の検証 href "./MOD-64.py.yaml#端末の設定の検証"
-        click 端末の設定の読み込み href "./MOD-64.py.yaml#端末の設定の読み込み"
-        click 配信元の読み直し href "./MOD-89.py.yaml#配信元の読み直し"
-        click 端末の設定 href "./MOD-67.py.yaml#端末の設定"
+        click 端末の設定の入口 href "id:MOD-65#functions[build_settings_router]"
+        click 配信元の保存 href "id:MOD-66#functions[save_sources]"
+        click 同じオリジンの確認 href "id:MOD-96#functions[require_same_origin]"
+        click 端末の設定の検証 href "id:MOD-64#functions[validate_terminal_config]"
+        click 端末の設定の読み込み href "id:MOD-64#functions[load_terminal_config]"
+        click 配信元の読み直し href "id:MOD-89#functions[reload_sources]"
+        click 端末の設定 href "id:MOD-67#data_models[TerminalConfig]"
 notes:
   受け持つこと: |-
     `sources[]` の書き換えでは、他のキーとコメントを保つ。

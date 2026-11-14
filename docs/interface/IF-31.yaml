@@ -332,6 +332,12 @@ flows:
       - '`settings.yaml` に extra の行が残り、`/sources/extra/docs` が 200 を返却する'
     test: test_error_when_version_outdated
 lead: '`sources[]` を丸ごと受けて端末の設定を書き換え、配信元を読み直す端末の設定の API の入出力を定め、端末の設定の保存を修正するときに参照する。'
+tags:
+  - name: topic:設定
+    main: true
+  - name: topic:端末
+  - name: topic:api
+  - name: action:保存
 identifier: put_settings_sources
 permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ'
 idempotent: true

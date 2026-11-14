@@ -78,7 +78,7 @@ flows:
       - name: Mock
         description: なし
       - name: 古い配信元
-        description: '`version` がサーバーが読めるバージョンより古く、今のスキーマは満たす配信元'
+        description: '`version` がサーバーが参照できるバージョンより古く、今のスキーマは満たす配信元'
         notes: id `old`
     flow: |-
       <!-- map: {"title": "正常系（設定のバージョンが古い）"} -->
@@ -89,14 +89,14 @@ flows:
         participant T as project-index serve
 
         U->>T: project-index serve
-        T->>T: old の設定の version をサーバーが読めるバージョンと比べる
+        T->>T: old の設定の version をサーバーが参照できるバージョンと比べる
         T-->>U: old を配信し、警告のログを残す
       ```
 
       <!-- /map -->
     expected:
       - '`/sources/old/docs` が 200 を返す'
-      - 警告のログに old の id・設定のバージョン・サーバーが読めるバージョンがある
+      - 警告のログに old の id・設定のバージョン・サーバーが参照できるバージョンがある
     test: test_normal_when_config_version_old
   - name: 正常系（配信元の検証に失敗する）
     summary: 設定がスキーマに違反する配信元と、スクリプトを実行できない配信元を外して配信する
@@ -594,7 +594,7 @@ flows:
       - name: Mock
         description: なし（`project-index serve` を子プロセスで起動する）
       - name: 違反する YAML
-        description: プロンプトの YAML の置き場所をテストの一時フォルダへ向け、`search_docs` のツールの YAML から必須のキー `kind` を削除する
+        description: プロンプトの YAML の配置先をテストの一時フォルダへ向け、`search_docs` のツールの YAML から必須のキー `kind` を削除する
         notes: '`PROJECT_INDEX_PROMPTS_DIR` に一時フォルダを入れる'
     flow: |-
       <!-- map: {"title": "異常系（プロンプトの YAML が違反する・PromptInvalidError）"} -->
@@ -847,6 +847,13 @@ flows:
     decisions:
       - D-308
 lead: 端末の設定を読み、検証に合格した配信元を 1 プロセス・1 ポートで配信する `project-index serve` の入出力を定め、起動を修正するときに参照する。
+tags:
+  - name: topic:サーバー
+    main: true
+  - name: action:起動
+  - name: topic:cli
+aliases:
+  - 'project-index serve'
 identifier: serve
 permissions: なし
 idempotent: false
@@ -915,7 +922,7 @@ response:
     description: '検証に失敗した配信元ごとに `{id}: {キーのパス}: {理由}`。その配信元の設定の `version` が古いときは、`project-index migrate --source` で移し替えられることも出す'
   - name: 警告のログ
     type: str
-    description: 設定のバージョンが古い配信元の ID・設定のバージョン・サーバーが読めるバージョン。配信元と documents の行ごとに、`metadata` に書いた列が無い文書の件数・管理用の YAML に無いファイル・ファイルが無い行（`missing_body_file`）・どの文書にも当たらない `related[].to`（`source` を持たない行）が 0 件でなければ、その件数とパス。`alias_type` を持つ行の文書のエイリアスのキーの違反（文書のパスと内容）と、どの文書にも当たらない `nav` の `auto` の条件（タブと条件）。端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパス）
+    description: 設定のバージョンが古い配信元の ID・設定のバージョン・サーバーが参照できるバージョン。配信元と documents の行ごとに、`metadata` に書いた列が無い文書の件数・管理用の YAML に無いファイル・ファイルが無い行（`missing_body_file`）・どの文書にも当たらない `related[].to`（`source` を持たない行）が 0 件でなければ、その件数とパス。`alias_type` を持つ行の文書のエイリアスのキーの違反（文書のパスと内容）と、どの文書にも当たらない `nav` の `auto` の条件（タブと条件）。端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパス）
   - name: 終了コード
     type: int
     description: 起動できないとき 0 以外

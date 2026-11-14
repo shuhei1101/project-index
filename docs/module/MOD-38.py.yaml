@@ -1,6 +1,11 @@
 id: MOD-38
 title: 索引のサーバー / 設定の移し替え / steps.py
 lead: パッケージに入れた移し替えの手順を、メモリの上の YAML に 1 つずつ適用する処理を受け持ち、設定の移し替えの steps.py を修正するときに参照する。
+tags:
+  - name: topic:設定
+    main: true
+  - name: topic:バージョン
+  - name: action:移行
 test_files:
   - tests/unit/project_index/features/migrate/test_steps.py
 directory: |-
@@ -18,7 +23,7 @@ functions:
     container: project_index/features/migrate/steps.py
     usecase: 設定の移し替え
     role: 読み込み
-    summary: 対象のバージョンより新しく読めるバージョン以下の手順を古い順に読む
+    summary: 対象のバージョンより新しく参照できるバージョン以下の手順を古い順に読む
     scope: public
     is_async: false
     thread_safe: true
@@ -36,11 +41,11 @@ functions:
         passing: keyword
         description: 対象の `version`
       - name: current
-        title: 読めるバージョン
+        title: 参照できるバージョン
         type: str
         required: true
         passing: keyword
-        description: project-index が読めるバージョン
+        description: project-index が参照できるバージョン
     returns:
       type: list[MigrationStep]
       description: 当てる順の手順。当てるものが無ければ空
@@ -58,19 +63,19 @@ functions:
         case: 正常
         summary: 範囲のバージョンの手順を古い順に読む
         condition: 手順のフォルダ `2`・`3`・`10`、`mine` が `2`、`current` が `10`
-        mock: 手順の置き場所（一時ディレクトリを `monkeypatch` で差し替える）
+        mock: 手順の配置先（一時ディレクトリを `monkeypatch` で差し替える）
         expected: '`3` の手順の後に `10` の手順'
       - name: test_load_steps_when_none
         case: 正常
         summary: 当てる手順が無い
         condition: '`mine` と `current` が同じ'
-        mock: 手順の置き場所
+        mock: 手順の配置先
         expected: 空
       - name: test_load_steps_when_invalid_op
         case: 異常
         summary: 知らない操作
         condition: '`op: copy` の行'
-        mock: 手順の置き場所
+        mock: 手順の配置先
         expected: '`MigrationFailedError`'
         exception: 操作が選択肢の外
     callers:

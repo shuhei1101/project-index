@@ -331,7 +331,7 @@ def test_normal_when_ordered_and_limited(
 def test_normal_when_source_all(
     make_source: Callable[..., Any], make_server: Callable[..., Any]
 ) -> None:
-    """source: * で読める全配信元を横断する（正常系）。"""
+    """source: * で参照できる全配信元を横断する（正常系）。"""
     # 準備
     sample = make_source("sample")
     notes = make_source("notes", git=False, scope_read=[sample.folder])
@@ -737,7 +737,7 @@ def test_normal_when_part_of_body(
     sample_file_set: Callable[..., dict[str, str]],
     sample_config_text: Callable[..., str],
 ) -> None:
-    """sections・lines で本文の一部を返し、返し済みに記録しない（正常系）。"""
+    """sections・lines で本文の一部を返し、返却済みに記録しない（正常系）。"""
     # 準備
     lines = [
         "# a",

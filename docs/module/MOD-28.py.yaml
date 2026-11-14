@@ -1,6 +1,11 @@
 id: MOD-28
 title: 索引のサーバー / 文書のストア / schema.py
 lead: 種類のスキーマの `$ref` の解決と、`records` の行のスキーマを受け持ち、文書のストアの schema.py を修正するときに参照する。
+tags:
+  - name: topic:文書
+    main: true
+  - name: topic:キャッシュ
+  - name: action:読み込み
 test_files:
   - tests/unit/project_index/features/documents/test_schema.py
 diagrams:
@@ -15,7 +20,7 @@ diagrams:
         class スキーマの参照の解決 {
           <<function>>
         }
-        click 文書のストア href "./MOD-29.py.yaml#文書のストア"
+        click 文書のストア href "id:MOD-29#classes[DocumentStore]"
 functions:
   - name: resolve_schema_refs
     title: スキーマの参照の解決

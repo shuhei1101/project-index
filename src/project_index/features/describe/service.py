@@ -51,7 +51,7 @@ def _source_list(
     terminal: TerminalConfig,
     checks: SourceChecks,
 ) -> SourceListResult:
-    """使える配信元の一覧と警告（`outside_scope` なら作業範囲の外で読める配信元も）を返す。"""
+    """使える配信元の一覧と警告（`outside_scope` なら作業範囲の外で参照できる配信元も）を返す。"""
     if request.kind is not None:
         raise InvalidArgumentError(
             message="kind には source が要ります",
@@ -63,7 +63,7 @@ def _source_list(
                 )
             ],
         )
-    # outside_scope を渡したときだけ、作業範囲の外で読める配信元を添える
+    # outside_scope を渡したときだけ、作業範囲の外で参照できる配信元を添える
     outside_sources = (
         [
             OutsideSource(

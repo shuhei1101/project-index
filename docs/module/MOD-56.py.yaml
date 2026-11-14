@@ -1,6 +1,12 @@
 id: MOD-56
 title: 索引のサーバー / 検索 / snippets.py
 lead: 行の分割・抜粋の検索・当たった行の数・一致した箇所の抜き出しを受け持ち、検索の snippets.py を修正するときに参照する。
+tags:
+  - name: topic:クエリ
+    main: true
+  - name: action:検索
+  - name: action:絞り込み
+  - name: topic:本文
 test_files:
   - tests/unit/project_index/features/search/test_snippets.py
 diagrams:
@@ -37,9 +43,9 @@ diagrams:
         class 一致した箇所の抜き出し {
           <<function>>
         }
-        click 文書の検索 href "./MOD-55.py.yaml#文書の検索"
-        click 正規表現の組み立て href "./MOD-53.py.yaml#正規表現の組み立て"
-        click 本文の範囲の選択 href "./MOD-50.py.yaml#本文の範囲の選択"
+        click 文書の検索 href "id:MOD-55#functions[search_docs]"
+        click 正規表現の組み立て href "id:MOD-53#functions[compile_regex]"
+        click 本文の範囲の選択 href "id:MOD-50#functions[select_ranges]"
 functions:
   - name: snippet_lines
     title: 一致した箇所の抜き出し

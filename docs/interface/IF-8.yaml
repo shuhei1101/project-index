@@ -94,6 +94,12 @@ flows:
       - '`status` を 2 回呼んでも、`check_sync` を呼んだ回数は起動の後の検査の 1 回のまま'
     test: test_normal_when_checking
 lead: 待ち受けのアドレス・バージョン・端末の設定・配信元ごとの状態を返却する管理の MCP の `status` の入出力を定め、`status` を修正するときに参照する。
+tags:
+  - name: topic:サーバー
+    main: true
+  - name: topic:状態
+  - name: action:取得
+  - name: tool:mcp
 identifier: status
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true
@@ -127,7 +133,7 @@ response:
     description: 読んだ端末の設定のパス
   - name: terminal.version_state
     type: Literal['current', 'old', 'newer']
-    description: 端末の設定の `version` と project-index が読めるバージョンの比較
+    description: 端末の設定の `version` と project-index が参照できるバージョンの比較
   - name: sources[].id
     type: str
     description: 配信元の ID

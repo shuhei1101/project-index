@@ -348,8 +348,8 @@ flows:
       - 要求のログに作業範囲の外の記録を残さない
       - '`outside_read` が真の other に `outside_scope` を渡さずに呼ぶと、`fix` が `outside_scope: true` を案内する'
     test: test_error_when_outside_read_disabled
-  - name: 正常系（作業範囲の外で読める配信元の一覧）
-    summary: '`source` を省いた `outside_scope: true` で、使える配信元の一覧に加えて、作業範囲の外で読める配信元の一覧を返す'
+  - name: 正常系（作業範囲の外で参照できる配信元の一覧）
+    summary: '`source` を省いた `outside_scope: true` で、使える配信元の一覧に加えて、作業範囲の外で参照できる配信元の一覧を返す'
     setup:
       - name: Mock
         description: なし
@@ -359,7 +359,7 @@ flows:
       - name: 入力
         description: '`outside_scope: true`（`source` なし）。`cwd` は sample のクローン本体'
     flow: |-
-      <!-- map: {"title": "正常系（作業範囲の外で読める配信元の一覧）"} -->
+      <!-- map: {"title": "正常系（作業範囲の外で参照できる配信元の一覧）"} -->
 
       ```mermaid
       sequenceDiagram
@@ -369,7 +369,7 @@ flows:
         C->>T: outside_scope: true
         T->>T: 各配信元の scope に cwd を照らす
         T->>T: scope に当たらず outside_read が真の配信元を集める
-        T-->>C: 作業場所と使える配信元の表、作業範囲の外（参考）で読める配信元の表
+        T-->>C: 作業場所と使える配信元の表、作業範囲の外（参考）で参照できる配信元の表
       ```
 
       <!-- /map -->
@@ -456,6 +456,12 @@ flows:
       - Git 管理外の配信元では `refs`・`worktrees` を返さない
     test: test_normal_when_refs_and_worktrees
 lead: '引数の数で配信元の一覧・説明書と種類・種類のスキーマを返却する `describe` の入出力を定め、`describe` を修正するときに参照する。'
+tags:
+  - name: topic:配信元
+    main: true
+  - name: action:案内
+  - name: topic:スキーマ
+  - name: tool:mcp
 identifier: describe
 permissions: 引数なしは不要。`source` を渡すときはその配信元の `scope.read` か `scope.write` に `cwd` が当たること
 idempotent: true
@@ -508,7 +514,7 @@ request:
     default: '`false`'
     location: argument
     description: '`true` のとき、`cwd` が `scope` に該当しない配信元も、端末の設定の `sources[].outside_read` が真なら作業範囲の外（参考）として参照する'
-    constraints: '`source` を渡したときはその配信元を作業範囲の外として読む。`source` を省いたときは、使える配信元の一覧に作業範囲の外で読める配信元の一覧を加える'
+    constraints: '`source` を渡したときはその配信元を作業範囲の外として読む。`source` を省いたときは、使える配信元の一覧に作業範囲の外で参照できる配信元の一覧を加える'
     notes: '`outside_scope` を省いた引数なしの一覧には作業範囲の外の配信元を載せない'
     status: planned
 request_example: |-
@@ -610,7 +616,7 @@ exceptions:
     condition: 返せた（引数なしで使える配信元が 0 件のときも、空の一覧と `/project-index:setup` の案内を返して正常終了）
   - name: SourceNotReadableError
     condition: '`cwd` が配信元の `scope.read`・`scope.write` に当たらない（`outside_scope: true` のときは、加えて `outside_read` が偽）'
-    notes: '今の作業場所から使える配信元の一覧を添える。`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に読めることを添える'
+    notes: '今の作業場所から使える配信元の一覧を添える。`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に参照できることを添える'
   - name: SourceNotServedError
     condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
   - name: UnknownKindError

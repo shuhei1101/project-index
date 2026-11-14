@@ -259,6 +259,14 @@ flows:
       - '`outside_read: false` の other では `SourceNotReadableError` を返す'
     test: test_normal_when_outside_scope
 lead: 区間か前回参照した時点から変わった文書・キー・差分の行を返却する `list_changes` の入出力を定め、`list_changes` を修正するときに参照する。
+tags:
+  - name: topic:差分
+    main: true
+  - name: action:比較
+  - name: tool:mcp
+  - name: tool:git
+aliases:
+  - 'list_changes'
 identifier: list_changes
 permissions: 対象の配信元の `scope.read` か `scope.write` に `cwd` が当たること
 idempotent: true
@@ -273,7 +281,7 @@ request:
     default: なし（作業中の配信元）
     location: argument
     description: 配信元の ID
-    notes: 配列か `*`（読める全配信元）も受ける
+    notes: 配列か `*`（参照できる全配信元）も受ける
   - name: worktree
     type: str
     required: false
@@ -466,7 +474,7 @@ exceptions:
     condition: 'Git 管理外の配信元に `from`・`to` を渡した、`from` 無しで `to` を渡した、`filter` に知らない項目を渡した、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない'
   - name: SourceNotReadableError
     condition: '`cwd` が配信元の `scope.read`・`scope.write` に当たらない（`outside_scope: true` のときは、加えて `outside_read` が偽）'
-    notes: '`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に読めることを添える'
+    notes: '`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に参照できることを添える'
 constraints:
   - item: 件数
     constraint: '`limit` は最大 100'

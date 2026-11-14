@@ -24,7 +24,7 @@ def make_view_env(
     make_registry: Callable[..., Any],
     make_handlers: Callable[..., Any],
 ) -> Callable[..., SimpleNamespace]:
-    """文書を置いた配信元 sample と、実物の部品を束ねた配線済みの関数を作る関数を返す。
+    """文書を置いた配信元 sample と、実物の部品をまとめた配線済みの関数を作る関数を返す。
 
     返す値は handlers（配線済みの関数）・source（配信元）・root（配信元のフォルダ）を持つ。
     """

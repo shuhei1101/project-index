@@ -60,7 +60,7 @@ scenarios:
         A->>M: write_docs(operations: create・kind・data)
         M->>M: id が ids.format に合い、重複しないことを確かめる
         M->>M: スキーマと validators に通す
-        M->>WT: kind の documents の置き場所に YAML を書く
+        M->>WT: kind の documents の配置先に YAML を書く
         M->>WT: generators のスクリプトを流す
         M-->>A: 作った文書の id と version
       ```
@@ -332,7 +332,7 @@ scenarios:
       - '`isError: true` で、参照元の文書 1 の `id` と `on_referenced: unlink` で消せることを返す'
       - 文書 2 のファイルも文書 1 も変わらない
     test: test_error_when_delete_referenced
-  - name: 異常シナリオ（置き場所が除外の名前に当たる）
+  - name: 異常シナリオ（配置先が除外の名前に当たる）
     setup:
       - name: Mock
         description: なし（実環境で実行）
@@ -344,7 +344,7 @@ scenarios:
         description: sample を配信している project-index
         notes: '`worktree` にワークツリー x のパスを渡す'
     flow: |-
-      <!-- map: {"title": "異常シナリオ（置き場所が除外の名前に当たる）"} -->
+      <!-- map: {"title": "異常シナリオ（配置先が除外の名前に当たる）"} -->
 
       ```mermaid
       sequenceDiagram
@@ -353,13 +353,13 @@ scenarios:
         participant WT as ワークツリー x
 
         A->>M: write_docs(operations: create・kind rule・id index)
-        M->>M: 置き場所 docs/rule/index.yaml のファイル名が rule の exclude に当たる
-        M-->>A: エラー（添字 0・置き場所が exclude に当たること・直し方）
+        M->>M: 配置先 docs/rule/index.yaml のファイル名が rule の exclude に当たる
+        M-->>A: エラー（添字 0・配置先が exclude に当たること・直し方）
       ```
 
       <!-- /map -->
     expected:
-      - '`isError: true` で、添字 0 の `kind` の違反として、置き場所 `docs/rule/index.yaml` が行 `rule` の `exclude` に当たることと直し方を返す'
+      - '`isError: true` で、添字 0 の `kind` の違反として、配置先 `docs/rule/index.yaml` が行 `rule` の `exclude` に当たることと直し方を返す'
       - ワークツリー x の `docs/rule/index.yaml` は変わらない（無ければ作られない）
     test: test_error_when_placement_excluded
   - name: 正常シナリオ（共通のキー名で書く）
@@ -480,6 +480,12 @@ scenarios:
       - '`write_docs` の結果の差分に、`set` で変えた項目の行だけが出る'
     test: test_normal_when_quotes_preserved
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
+tags:
+  - name: topic:文書
+    main: true
+  - name: action:書き込み
+  - name: topic:エージェント
+  - name: tool:mcp
 issue: 14
 primary_actor: エージェント（Claude Code）
 stakeholders:

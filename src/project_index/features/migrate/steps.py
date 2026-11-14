@@ -28,7 +28,7 @@ WILDCARD = "*"
 def load_steps(
     kind: Literal["settings", "project-index"], *, mine: str, current: str
 ) -> list[MigrationStep]:
-    """対象のバージョンより新しく読めるバージョン以下の手順を、古い順に読む。"""
+    """対象のバージョンより新しく参照できるバージョン以下の手順を、古い順に読む。"""
     root = resources.files("project_index") / MIGRATIONS_DIR / kind
     if not root.is_dir():
         return []

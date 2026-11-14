@@ -59,7 +59,7 @@ flows:
         C->>T: operations: create・kind・data
         T->>T: ids.format から id を作り、重複しないことを確かめる
         T->>T: スキーマと validators に通す
-        T->>WT: kind の documents の置き場所に YAML を書く
+        T->>WT: kind の documents の配置先に YAML を書く
         T->>WT: generators のスクリプトを流す
         T-->>C: 作った文書の id と version
       ```
@@ -76,7 +76,7 @@ flows:
       - name: Mock
         description: なし
       - name: サンプルの配信元
-        description: 正常系の sample。ワークツリー x の `project-index.yaml` にだけ、種類 `term`（スキーマと置き場所の行）を追加して commit していない
+        description: 正常系の sample。ワークツリー x の `project-index.yaml` にだけ、種類 `term`（スキーマと配置先の行）を追加して commit していない
         notes: クローン本体の `project-index.yaml` に `term` は無い
       - name: 入力
         description: '`worktree` にワークツリー x のパス、`create`・`kind: term`・`data`'
@@ -92,7 +92,7 @@ flows:
         C->>T: worktree: x, operations: create・kind: term・data
         T->>WT: ワークツリーの project-index.yaml で配信元の設定を読み直す
         T->>T: term のスキーマと validators に通す
-        T->>WT: term の documents の置き場所に YAML を作成する
+        T->>WT: term の documents の配置先に YAML を作成する
         T-->>C: 作成した文書の id と version
       ```
 
@@ -538,8 +538,8 @@ flows:
       - '`isError: true` で、渡したパスと sample の `worktrees` の値を返す'
       - 一時フォルダにファイルを書かない
     test: test_error_when_worktree_not_matched
-  - name: 異常系（置き場所が除外の名前に当たる・InvalidArgumentError）
-    summary: '`create` で決めた置き場所のファイル名が行の `exclude[]` に当たるとき、何も書かずに断る'
+  - name: 異常系（配置先が除外の名前に当たる・InvalidArgumentError）
+    summary: '`create` で決めた配置先のファイル名が行の `exclude[]` に当たるとき、何も書かずに断る'
     setup:
       - name: Mock
         description: なし
@@ -547,9 +547,9 @@ flows:
         description: 'sample の行 `rule`（`paths: [docs/rule/*.yaml]`・`exclude: [index.yaml]`）'
       - name: 入力
         description: '`operations` は `create`・`kind: rule`・`id: index` の 1 件。`worktree` にワークツリー x'
-        notes: 置き場所は `docs/rule/index.yaml` になる
+        notes: 配置先は `docs/rule/index.yaml` になる
     flow: |-
-      <!-- map: {"title": "異常系（置き場所が除外の名前に当たる・InvalidArgumentError）"} -->
+      <!-- map: {"title": "異常系（配置先が除外の名前に当たる・InvalidArgumentError）"} -->
 
       ```mermaid
       sequenceDiagram
@@ -557,17 +557,17 @@ flows:
         participant T as write_docs
 
         C->>T: operations: create・kind rule・id index
-        T->>T: 置き場所 docs/rule/index.yaml のファイル名が exclude に当たる
-        T-->>C: isError（operations[0].kind・置き場所が exclude に当たる）
+        T->>T: 配置先 docs/rule/index.yaml のファイル名が exclude に当たる
+        T-->>C: isError（operations[0].kind・配置先が exclude に当たる）
       ```
 
       <!-- /map -->
     expected:
-      - '`isError: true` で、違反の `path` が `operations[0].kind`、決まりに置き場所 `docs/rule/index.yaml` が行 `rule` の `exclude` に当たること、`fix` に `id` を変えるか `exclude` から外すことを返す'
+      - '`isError: true` で、違反の `path` が `operations[0].kind`、決まりに配置先 `docs/rule/index.yaml` が行 `rule` の `exclude` に当たること、`fix` に `id` を変えるか `exclude` から外すことを返す'
       - ワークツリー x に `docs/rule/index.yaml` が作られない
     test: test_error_when_placement_excluded
     refs:
-      - SC-7#scenarios[異常シナリオ（置き場所が除外の名前に当たる）]
+      - SC-7#scenarios[異常シナリオ（配置先が除外の名前に当たる）]
   - name: 正常系（共通のキー名で書く）
     summary: 共通のキー名で渡した値を、行の `metadata` の対応で元の列に書く
     setup:
@@ -799,6 +799,14 @@ flows:
       - ワークツリー x の文書 1 は書き換わらない
     test: test_error_when_schema_ref_unresolvable
 lead: 文書の作成・部分更新・置き換えを検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
+tags:
+  - name: topic:文書
+    main: true
+  - name: action:書き込み
+  - name: action:検証
+  - name: tool:mcp
+aliases:
+  - 'write_docs'
 identifier: write_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーにだけ書く
 idempotent: false
@@ -823,7 +831,7 @@ request:
     location: argument
     description: 書き込むワークツリーのパス
     constraints: 配信元の設定の `worktrees` に当たるパスだけ
-    notes: 種類・置き場所は、そのワークツリーの `project-index.yaml` で読み直した配信元の設定で参照する
+    notes: 種類・配置先は、そのワークツリーの `project-index.yaml` で読み直した配信元の設定で参照する
   - name: operations
     type: list[Operation]
     required: true
@@ -841,7 +849,7 @@ request:
     required: false
     default: なし（`create` では必須）
     location: argument
-    description: 種類（`documents[].id`）。スキーマと置き場所を決める
+    description: 種類（`documents[].id`）。スキーマと配置先を決める
   - name: operations[].id
     type: str
     required: false
@@ -1001,7 +1009,7 @@ exceptions:
     condition: '`update`・`replace` の `id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
   - name: InvalidArgumentError
-    condition: 操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の置き場所のファイル名が行の `exclude[]` に当たる・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ
+    condition: 操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先のファイル名が行の `exclude[]` に当たる・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ
   - name: SourceNotServedError
     condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
   - name: WorktreeNotMatchedError

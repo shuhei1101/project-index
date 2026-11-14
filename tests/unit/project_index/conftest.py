@@ -340,7 +340,7 @@ def make_source_dir(
 
 @pytest.fixture
 def write_settings(tmp_path: Path) -> Callable[..., Path]:
-    """端末の設定をファイルに書き、そのパスを返す関数を返す（JSON は YAML として読める）。"""
+    """端末の設定をファイルに書き、そのパスを返す関数を返す（JSON は YAML として解析できる）。"""
 
     def _write(sources: list[dict[str, Any]], **top: Any) -> Path:
         values: dict[str, Any] = {
@@ -372,7 +372,7 @@ def make_real_handlers() -> Callable[[Path], Handlers]:
 
 @pytest.fixture
 def migrations_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """移し替えの手順の置き場所を一時のフォルダに差し替え、そのフォルダを返す。
+    """移し替えの手順の配置先を一時のフォルダに差し替え、そのフォルダを返す。
 
     絶対パスを手順のフォルダの名前に差し替えると、パッケージのフォルダにつないでも絶対パスが残る。
     """
@@ -399,7 +399,7 @@ def write_steps(migrations_root: Path) -> Callable[..., None]:
 
 @pytest.fixture
 def settings_version_2(monkeypatch: pytest.MonkeyPatch) -> None:
-    """project-index が読める端末の設定のバージョンを `2` に差し替える。"""
+    """project-index が参照できる端末の設定のバージョンを `2` に差し替える。"""
     monkeypatch.setattr("project_index.features.settings.query.SETTINGS_VERSION", "2")
     for target in (
         "project_index.features.migrate.service.SETTINGS_VERSION",

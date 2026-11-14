@@ -1,4 +1,4 @@
-"""新しい文書の置き場所。"""
+"""新しい文書の配置先。"""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ RECURSIVE = "**/"
 
 
 def _undecided(table: DocumentTable) -> InvalidArgumentError:
-    """置き場所を決められないエラーを作る（添字は書き込みが付ける）。"""
+    """配置先を決められないエラーを作る（添字は書き込みが付ける）。"""
     return InvalidArgumentError(
         message=f"{table.id} の新しい文書の配置先を決められません",
         violations=[
@@ -29,7 +29,7 @@ def _undecided(table: DocumentTable) -> InvalidArgumentError:
 
 
 def _excluded(table: DocumentTable, path: str) -> InvalidArgumentError:
-    """置き場所が除外の名前に当たるエラーを作る（添字は書き込みが付ける）。"""
+    """配置先が除外の名前に当たるエラーを作る（添字は書き込みが付ける）。"""
     rule = f"配置先 {path} が {table.id} の exclude に該当します"
     return InvalidArgumentError(
         message=rule,
@@ -64,7 +64,7 @@ def new_document_path(table: DocumentTable, doc_id: str) -> tuple[str, bool]:
         raise _undecided(table)
     folder = "/".join(part for part in folder.split("/") if not GLOB_CHARS.search(part))
     path = f"{folder}/{filename}" if folder else filename
-    # 置き場所のファイル名が除外の名前に当たると、書いても文書にならない
+    # 配置先のファイル名が除外の名前に当たると、書いても文書にならない
     if table.excludes(path):
         raise _excluded(table, path)
     return path, False

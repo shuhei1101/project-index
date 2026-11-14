@@ -1,6 +1,10 @@
 id: MOD-94
 title: 索引のサーバー / 文書のMCP / docs.py
 lead: 文書の MCP の組み立て（ツールの登録）を受け持ち、文書の MCP の docs.py を修正するときに参照する。
+tags:
+  - name: tool:mcp
+    main: true
+  - name: topic:ツール
 test_files:
   - tests/unit/project_index/server/mcp/test_docs.py
 diagrams:
@@ -28,7 +32,7 @@ diagrams:
         class 配信元の一覧 {
           <<class>>
         }
-        click 配信元の一覧 href "./MOD-69.py.yaml#配信元の一覧"
+        click 配信元の一覧 href "id:MOD-69#classes[SourceRegistry]"
         文書の MCP の組み立て ..> ツールのプロンプトの ID
         class ツールのプロンプトの ID {
           <<function>>
@@ -60,15 +64,15 @@ diagrams:
         class 配信元の説明 {
           <<function>>
         }
-        click ツールのプロンプトの ID href "./MOD-95.py.yaml#ツールのプロンプトの ID"
-        click ツールの結果 href "./MOD-95.py.yaml#ツールの結果"
-        click ツールのエラーの変換 href "./MOD-95.py.yaml#ツールのエラーの変換"
-        click 文書の検索 href "./MOD-55.py.yaml#文書の検索"
-        click 文書の書き込み href "./MOD-84.py.yaml#文書の書き込み"
-        click 文書の削除 href "./MOD-84.py.yaml#文書の削除"
-        click 変更の一覧 href "./MOD-14.py.yaml#変更の一覧"
-        click 関連のたどり href "./MOD-47.py.yaml#関連のたどり"
-        click 配信元の説明 href "./MOD-20.py.yaml#配信元の説明"
+        click ツールのプロンプトの ID href "id:MOD-95#functions[tool_prompt_id]"
+        click ツールの結果 href "id:MOD-95#functions[to_tool_result]"
+        click ツールのエラーの変換 href "id:MOD-95#functions[tool_error]"
+        click 文書の検索 href "id:MOD-55#functions[search_docs]"
+        click 文書の書き込み href "id:MOD-84#functions[write_docs]"
+        click 文書の削除 href "id:MOD-84#functions[delete_docs]"
+        click 変更の一覧 href "id:MOD-14#functions[list_changes]"
+        click 関連のたどり href "id:MOD-47#functions[trace_related]"
+        click 配信元の説明 href "id:MOD-20#functions[describe]"
 constants:
   - name: DOCS_MCP_NAME
     title: 文書の MCP の名前

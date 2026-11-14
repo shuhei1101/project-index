@@ -366,6 +366,13 @@ flows:
     decisions:
       - D-189
 lead: 配信元の設定・管理用の YAML・スクリプトを検証する管理の MCP の `check_project` の入出力を定め、`check_project` を修正するときに参照する。
+tags:
+  - name: action:検査
+    main: true
+  - name: topic:配信元
+  - name: tool:mcp
+aliases:
+  - 'check_project'
 identifier: check_project
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true
@@ -412,7 +419,7 @@ response:
     description: '`project-index.yaml` の `version`'
   - name: version_state
     type: Literal['current', 'old', 'newer'] | None
-    description: project-index が読めるバージョンとの比較
+    description: project-index が参照できるバージョンとの比較
   - name: violations[].path
     type: str
     description: 違反したキーのパス（`documents[0].paths`）

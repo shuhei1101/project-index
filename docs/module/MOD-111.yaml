@@ -2,6 +2,11 @@ id: MOD-111
 title: 索引のサーバー / 履歴
 lead: |-
   git でリビジョンの解決・一覧・変わったファイルと日時の取得・過去のリビジョンの書き出しを受け持つ履歴の分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
+tags:
+  - name: topic:履歴
+    main: true
+  - name: topic:リビジョン
+  - name: tool:git
 directory: |-
   ```text
   src/project_index/
@@ -72,19 +77,19 @@ diagrams:
         class gitの失敗 {
           +終了コード: int
         }
-        click リビジョンの解決 href "./MOD-31.py.yaml#リビジョンの解決"
-        click gitの実行 href "./MOD-86.py.yaml#gitの実行"
-        click リビジョンの一覧 href "./MOD-31.py.yaml#リビジョンの一覧"
-        click 変わったファイル href "./MOD-31.py.yaml#変わったファイル"
-        click 区間の commit href "./MOD-31.py.yaml#区間の commit"
-        click ファイルの日時 href "./MOD-31.py.yaml#ファイルの日時"
-        click 一緒に変わったファイル href "./MOD-31.py.yaml#一緒に変わったファイル"
-        click リビジョンのファイル href "./MOD-31.py.yaml#リビジョンのファイル"
-        click リポジトリの直下 href "./MOD-86.py.yaml#リポジトリの直下"
-        click リビジョンの書き出し href "./MOD-32.py.yaml#リビジョンの書き出し"
-        click 解いたリビジョン href "./MOD-33.py.yaml#解いたリビジョン"
-        click 区間の commit と親 href "./MOD-33.py.yaml#区間の commit と親"
-        click gitの失敗 href "./MOD-86.py.yaml#gitの失敗"
+        click リビジョンの解決 href "id:MOD-31#functions[resolve_ref]"
+        click gitの実行 href "id:MOD-86#functions[run_git]"
+        click リビジョンの一覧 href "id:MOD-31#functions[list_refs]"
+        click 変わったファイル href "id:MOD-31#functions[changed_files]"
+        click 区間の commit href "id:MOD-31#functions[list_commits]"
+        click ファイルの日時 href "id:MOD-31#functions[file_dates]"
+        click 一緒に変わったファイル href "id:MOD-31#functions[co_changed_files]"
+        click リビジョンのファイル href "id:MOD-31#functions[read_file_at]"
+        click リポジトリの直下 href "id:MOD-86#functions[repo_root]"
+        click リビジョンの書き出し href "id:MOD-32#classes[SnapshotStore]"
+        click 解いたリビジョン href "id:MOD-33#data_models[ResolvedRef]"
+        click 区間の commit と親 href "id:MOD-33#data_models[CommitStep]"
+        click gitの失敗 href "id:MOD-86#classes[GitError]"
 notes:
   受け持つこと: |-
-    過去のリビジョンは `git archive` で `state_dir` に書き出し、作業ツリーと同じ読み方で読めるようにする。
+    過去のリビジョンは `git archive` で `state_dir` に書き出し、作業ツリーと同じ読み方で参照できるようにする。

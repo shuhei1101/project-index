@@ -81,6 +81,12 @@ flows:
       - 配信していない配信元は `missing` が `not_served` で、`errors[]` に外した理由がある
     test: test_error_when_source_not_found
 lead: 配信元の設定のうち画面が使用するキーを返却する読み取り API の入出力を定め、配信元の設定の取得を修正するときに参照する。
+tags:
+  - name: topic:設定
+    main: true
+  - name: topic:配信元
+  - name: topic:api
+  - name: action:読み取り
 identifier: get_source_config
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true
