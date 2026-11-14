@@ -41,12 +41,15 @@ docs:
     status: done
     updated_by: planner
     updated_at: '2026-11-14T07:21:35.146913+00:00'
+  - page: docs/dev-command/CMD-1.yaml
+    new: false
+    change: 「ビルド・生成」に、目次の README.md・Pages のナビゲーションの再作成のコマンドと、schemas/project-index.schema.json の再作成（MOD-70 の参照）を記載する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-14T07:35:50.292461+00:00'
 scope_out:
   - item: '同じ種類が散る: [pr_doc] が dev/pr/（作業 PR #13 の 1 件）と docs/pr/ の 2 か所にある。dev/pr/13/ を docs/pr/13/ へ移し、dev/ を削除する'
     reason: フォルダの配置を変える対処で、要望は洗い出して別の Issue で対処を決めるところまで
-    plan: to_file
-  - item: '管理しないもの: .gitignore の dev/generated/ が指す生成先は無く、AI Monitor が設計書の Markdown を書き出す docs/generated/（docs/_config.yml も generated/ を除外している）が Git の管理から外れていない。dev/generated/ を docs/generated/ に置き換える'
-    reason: 要望は洗い出して別の Issue で対処を決めるところまで。設計書の gitignore は今の .gitignore のまま記載した
     plan: to_file
   - item: '同じ種類が散る: [design_schema] の common.schema.yaml・files.schema.yaml が schemas/ と templates/ の 2 か所にあり、中身が食い違う。配信元へ書き出す雛形をどちらの原本から作るか（生成にするか・片方へ寄せるか）を決める'
     reason: フォルダの配置・形式を変える対処で、要望は洗い出して別の Issue で対処を決めるところまで
