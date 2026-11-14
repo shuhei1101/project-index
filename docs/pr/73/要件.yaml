@@ -1,0 +1,21 @@
+docs:
+  - page: docs/layout/LAY-73-1.yaml
+    new: true
+    change: knowledge のテンプレート『フォルダ構成』の書式で、リポジトリの直下からの全てのフォルダとファイル・Git で管理しないもの・中身の種類を記載するフォルダ構成の設計書を新設
+    status: todo
+  - page: docs/layout/index.yaml
+    new: true
+    change: フォルダ構成の目次を新設し、LAY-73-1.yaml の行を置く
+    status: todo
+  - page: docs/index.yaml
+    new: false
+    change: 目次に layout/（リポジトリのフォルダとファイルの構成）の行を追加
+    status: todo
+  - page: project-index.yaml
+    new: false
+    change: 'documents に種類 layout（paths: docs/layout/*.yaml、スキーマは knowledge の schemas/design/layout.schema.yaml）を追加'
+    status: todo
+scope_out:
+  - item: レビューの観点で見つかったフォルダ構成の問題の対処（フォルダの移動・統合・.gitignore の修正）
+    reason: Issue の要望は、問題を洗い出して別の Issue で対処を決めるところまで。この作業 PR ではフォルダの配置・形式を変えない
+    plan: to_file
