@@ -50,10 +50,10 @@ docs:
 scope_out:
   - item: '同じ種類が散る: [pr_doc] が dev/pr/（作業 PR #13 の 1 件）と docs/pr/ の 2 か所にある。dev/pr/13/ を docs/pr/13/ へ移し、dev/ を削除する'
     reason: フォルダの配置を変える対処で、要望は洗い出して別の Issue で対処を決めるところまで
-    plan: to_file
+    plan: '#74'
   - item: '同じ種類が散る: [design_schema] の common.schema.yaml・files.schema.yaml が schemas/ と templates/ の 2 か所にあり、中身が食い違う。配信元へ書き出す雛形をどちらの原本から作るか（生成にするか・片方へ寄せるか）を決める'
     reason: フォルダの配置・形式を変える対処で、要望は洗い出して別の Issue で対処を決めるところまで
-    plan: to_file
+    plan: '#75'
   - item: '種類が混ざる: schemas/ に AI Monitor の配布物から取り込んだ設計書のスキーマ（[design_schema]、ai-monitor-version.ini）と、配信元へ配る設定のスキーマ project-index.schema.json（[config_schema, server]）が混ざる。[config_schema] も schemas/・src/project_index/schemas/・templates/prompt.schema.yaml に散る。shuhei1101/ai-monitor#3188 で設計書の検査は knowledge のスキーマを参照するようになったため、設計書のスキーマは knowledge の参照へ切り替え、配るスキーマの置き場所を決める'
     reason: 配信元の設定とフォルダの配置を変える対処で、要望は洗い出して別の Issue で対処を決めるところまで
-    plan: to_file
+    plan: '#76'
