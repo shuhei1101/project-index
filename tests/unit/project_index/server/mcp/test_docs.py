@@ -494,7 +494,25 @@ def _fake_store(*, loaded: bool, release: threading.Event | None = None) -> Any:
         if release is not None:
             release.wait(timeout=10)
 
-    return SimpleNamespace(has_worktree=lambda target: loaded, load=load, calls=calls)
+    return SimpleNamespace(has_worktree=_answer(loaded), load=load, calls=calls)
+
+
+def _answer(value: bool) -> Callable[[object], bool]:
+    """いつも `value` を返す、読み込み済みかの判定の偽物。"""
+
+    def _fixed(target: object) -> bool:
+        return value
+
+    return _fixed
+
+
+def _returning(value: object) -> Callable[..., object]:
+    """キーワード引数を受けていつも `value` を返す、場所の解決の偽物。"""
+
+    def _fixed(**kwargs: object) -> object:
+        return value
+
+    return _fixed
 
 
 def test_ensure_worktree(
@@ -507,9 +525,7 @@ def test_ensure_worktree(
     """初めての読み込みを待つ（正常系）。"""
     # 準備
     target = _worktree_target(tmp_path, make_served_source, make_target)
-    monkeypatch.setattr(
-        docs_module, "resolve_read_targets", lambda **kwargs: [target], raising=False
-    )
+    monkeypatch.setattr(docs_module, "resolve_read_targets", _returning([target]), raising=False)
     store = _fake_store(loaded=False)
     handlers = make_mcp_handlers(store=store)
     loads: dict[Path, Any] = {}
@@ -535,9 +551,7 @@ def test_ensure_worktree_when_loaded(
     """読み込み済みのワークツリーは待たない（正常系）。"""
     # 準備
     target = _worktree_target(tmp_path, make_served_source, make_target)
-    monkeypatch.setattr(
-        docs_module, "resolve_read_targets", lambda **kwargs: [target], raising=False
-    )
+    monkeypatch.setattr(docs_module, "resolve_read_targets", _returning([target]), raising=False)
     store = _fake_store(loaded=True)
     handlers = make_mcp_handlers(store=store)
     # 実行
@@ -557,9 +571,7 @@ def test_ensure_worktree_when_slow(
     """上限までに終わらない読み込み（異常系）。"""
     # 準備
     target = _worktree_target(tmp_path, make_served_source, make_target)
-    monkeypatch.setattr(
-        docs_module, "resolve_read_targets", lambda **kwargs: [target], raising=False
-    )
+    monkeypatch.setattr(docs_module, "resolve_read_targets", _returning([target]), raising=False)
     release = threading.Event()
     store = _fake_store(loaded=False, release=release)
     handlers = make_mcp_handlers(
@@ -574,7 +586,7 @@ def test_ensure_worktree_when_slow(
         second = await asyncio.gather(ensure(request, handlers, loads), return_exceptions=True)
         release.set()
         await asyncio.gather(*loads.values(), return_exceptions=True)
-        store.has_worktree = lambda target: True
+        store.has_worktree = _answer(True)
         third = await asyncio.gather(ensure(request, handlers, loads), return_exceptions=True)
         return [first[0], second[0], third[0]]
 
@@ -598,7 +610,7 @@ def test_ensure_worktree_when_write(
     """書き込みでも初めての読み込みを上限まで待つ（異常系）。"""
     # 準備
     target = _worktree_target(tmp_path, make_served_source, make_target)
-    monkeypatch.setattr(docs_module, "resolve_write_target", lambda **kwargs: target, raising=False)
+    monkeypatch.setattr(docs_module, "resolve_write_target", _returning(target), raising=False)
     release = threading.Event()
     store = _fake_store(loaded=False, release=release)
     handlers = make_mcp_handlers(
