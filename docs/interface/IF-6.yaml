@@ -798,6 +798,96 @@ flows:
       - '`isError: true` で、添字 0 の違反の決まりに、解決できなかった `$ref`（`missing.schema.yaml#/$defs/summary`）とスキーマのファイルのパスが入る'
       - ワークツリー x の文書 1 は書き換わらない
     test: test_error_when_schema_ref_unresolvable
+  - name: 異常系（書き込みの期限を過ぎた・WriteDeadlineExceededError）
+    summary: 作業ツリーのファイルを置き換える前に書き込みの期限を過ぎていたら、何も書き込まずに時間切れを返却する
+    setup:
+      - name: Mock
+        description: なし。端末の設定の `write_deadline_sec` を 2 にする
+      - name: 遅い検査のスクリプト
+        description: sample の種類の `validators[]` に、4 秒待ってから違反なしで終了するスクリプトを配置する
+        notes: '`script_timeout_sec` は既定（30）'
+      - name: 入力
+        description: 正常系と同じ、ワークツリー x の文書 1 の `update` 1 件
+    flow: |-
+      <!-- map: {"title": "異常系（書き込みの期限を過ぎた・WriteDeadlineExceededError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: worktree: x, operations: update 文書 1
+        T->>T: 変更を適用した文書を validators で検査する（4 秒）
+        T->>T: 置き換える前に、要求を受けてから write_deadline_sec を過ぎたことを確認する
+        T-->>C: isError（書き込みの期限・経過した秒数・書き換えていないこと）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、`WriteDeadlineExceededError`、書き込みの期限（2 秒）を超えたことと、ファイルを書き換えていないことを返却する'
+      - 応答は、要求を送信してから 6 秒の内に返却される
+      - 応答の後に検査のスクリプトが終了しても、ワークツリー x の文書 1 は書き換わらない
+      - 続けての `search_docs` が、書き込み前の `version` を返却する
+    test: test_error_when_write_deadline_exceeded
+  - name: 異常系（呼び出しが取り消された）
+    summary: MCP の取り消しの通知を受けたら、作業ツリーのファイルを置き換える前に止め、ログに残す
+    setup:
+      - name: Mock
+        description: なし。端末の設定の `write_deadline_sec` は既定
+      - name: 遅い検査のスクリプト
+        description: 異常系（書き込みの期限を過ぎた・WriteDeadlineExceededError）と同じ、4 秒待つスクリプト
+      - name: 入力
+        description: 正常系と同じ `update` 1 件を送信し、1 秒後に同じ接続で `notifications/cancelled`（`requestId` は `write_docs` の要求の ID）を送信する
+    flow: |-
+      <!-- map: {"title": "異常系（呼び出しが取り消された）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: worktree: x, operations: update 文書 1
+        T->>T: 変更を適用した文書を validators で検査する
+        C-->>T: notifications/cancelled
+        T->>T: 置き換える前に取り消しを確認して止める
+      ```
+
+      <!-- /map -->
+    expected:
+      - 検査のスクリプトが終了した後も、ワークツリー x の文書 1 は書き換わらない
+      - 続けての `search_docs` が、書き込み前の `version` を返却する
+      - サーバーのログに、`取り消されたため書き込まなかった（write_docs・sample・{ワークツリー x のパス}）` の行が残る
+    test: test_error_when_call_cancelled
+  - name: 異常系（検査のスクリプトが制限時間を超えた・ValidationFailedError）
+    summary: '`validators[]` のスクリプトが `script_timeout_sec` を超えたら止め、止めたスクリプトの ID を違反として返却する'
+    setup:
+      - name: Mock
+        description: なし。端末の設定の `script_timeout_sec` を 1 にする
+      - name: 止まらない検査のスクリプト
+        description: sample の種類の `validators[]` に、5 秒待ってから終了するスクリプトを ID `slow` で配置する
+      - name: 入力
+        description: 正常系と同じ `update` 1 件
+    flow: |-
+      <!-- map: {"title": "異常系（検査のスクリプトが制限時間を超えた・ValidationFailedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: operations: update 文書 1
+        T->>T: validators の slow を 1 秒で止める
+        T-->>C: isError（添字 0・slow を制限時間で止めたこと）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、`ValidationFailedError` と、添字 0 の違反の決まり `slow: 検査を実行できませんでした（制限時間（1 秒）を超えたため、スクリプトを止めました。）` を返却する'
+      - 応答が `Error executing tool` で始まらない
+      - ワークツリー x の文書 1 は書き換わらない
+    test: test_error_when_validator_timed_out
 lead: 文書の作成・部分更新・置き換えを検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 identifier: write_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーにだけ書く
@@ -808,6 +898,9 @@ callers:
   - SC-7#scenarios[正常シナリオ（変更していない項目の引用符を保つ）]
   - SC-7#scenarios[異常シナリオ（Markdown の値に mdmark の警告がある）]
   - SC-7#scenarios[正常シナリオ（mdmark の CLI が無い）]
+  - SC-7#scenarios[異常シナリオ（書き込みが期限を過ぎる）]
+  - SC-7#scenarios[異常シナリオ（呼び出しが取り消される）]
+  - SC-7#scenarios[異常シナリオ（検査のスクリプトが制限時間を超える）]
 exclusivity: 配信元ごとの排他ロックの中で、読み込み・バージョンの確認・検査・書き込みを行う。後から来た呼び出しはロックを待つ
 request:
   - name: source
@@ -1006,6 +1099,12 @@ exceptions:
     condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
   - name: WorktreeNotMatchedError
     condition: '`worktree` が配信元の `worktrees` に当たらない'
+  - name: WriteDeadlineExceededError
+    condition: 作業ツリーのファイルを置き換える前に、要求を受けてから端末の設定の `write_deadline_sec` を過ぎていた
+    notes: 書き込みの期限・経過した秒数・ファイルを書き換えていないことと、検査のスクリプトの所要時間を確認してから再実行することを添える
+  - name: UnexpectedError
+    condition: '`ProjectIndexError` でない例外（`GitError` など）で処理を終了できなかった'
+    notes: 例外の型と内容を返却する。サーバーのログには例外のトレースバックを残す。文書の MCP の全てのツールで共通の変換のため、結合テストは [文書の検索](id:IF-2) が持つ
 constraints:
   - item: 件数
     constraint: 1 回の `operations` は最大 50 件
@@ -1032,8 +1131,6 @@ constraints:
     constraint: project-index は commit しない
   - item: 注釈
     constraint: '`readOnlyHint: false`・`destructiveHint: false`'
-  - item: タイムアウト
-    constraint: 制限なし（mdmark の点検は 1 回の起動ごとに `script_timeout_sec`）
   - item: ツールの説明
     constraint: 「範囲のファイルを作成・削除・改名したら、管理用の YAML の行を修正する」を含める
     notes: D-163。索引へ反映するフックを置かないため
@@ -1052,6 +1149,17 @@ constraints:
     constraint: '種類のスキーマの `$ref` は、最上位の `$defs` の中の相対パスの `$ref` を含めて、スキーマのファイルのフォルダを基準に解決してから検査に当てる。種類のスキーマの中で循環する参照は `#/$defs/...` のまま、参照先の別のファイルの中で循環する参照はそのファイルの定義を指したまま検査に当てる'
   - item: 解決できないスキーマの参照
     constraint: '種類のスキーマの `$ref` を解決できない文書への操作は、解決できなかった `$ref` とスキーマのファイルのパスを決まりにした違反として、`atomic: true` は `ValidationFailedError`、`atomic: false` は `results[].status` の `failed` で返す'
+  - item: 書き込みの期限
+    constraint: 作業ツリーのファイルを置き換える前に、要求を受けてからの経過が端末の設定の `write_deadline_sec`（既定は [非機能要件](id:NFR-1) の書き込みの期限）を過ぎていたら、何も書き込まずに `WriteDeadlineExceededError` を返却する。置き換えを始めた後は、期限を過ぎても全てのファイルを書き込み終える
+    notes: 期限を過ぎた後に検査のスクリプトが終了しても書き込まない
+  - item: 取り消し
+    constraint: MCP の取り消しの通知（`notifications/cancelled`）を受けた要求は、作業ツリーのファイルを置き換える前に止め、何も書き込まない。置き換えを始めた後は全てのファイルを書き込み終える。止めたときはサーバーのログに `取り消されたため書き込まなかった（{ツール}・{配信元}・{書き込む先のパス}）` を出す
+    notes: 'Claude Code 2.1.325 は時間切れのときに取り消しの通知を送信しない（作業 PR #82 の計画書『調査の結果』）。時間切れとの一致は書き込みの期限で守る'
+  - item: 書き込み後の生成の制限時間
+    constraint: '`generators[]` のスクリプトの制限時間は、`script_timeout_sec` と、[非機能要件](id:NFR-1) の文書の MCP の応答の上限までの残りの時間の短い方にする。残りの時間が無ければ生成を実行せず、実行しなかった生成をサーバーのログに残す'
+    notes: 生成の失敗と同じく、書き込みの結果は変えない
+  - item: 想定外の例外
+    constraint: '`ProjectIndexError` でない例外は、`UnexpectedError` として例外の型と内容を `isError: true` の応答にする。`Error executing tool` だけの応答にしない'
 refs:
   - SC-7#scenarios[正常シナリオ]
   - SC-9#scenarios[異常シナリオ（読んだ後に変わった文書へ書き込む）]
