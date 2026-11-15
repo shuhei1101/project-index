@@ -23,7 +23,8 @@ from project_index.features.search.types import (
     Snippet,
     SnippetLine,
 )
-from project_index.server.mcp.result import to_tool_result, tool_error
+from project_index.integrations.git import GitError
+from project_index.server.mcp.result import to_tool_result, tool_error, tool_unexpected_error
 from project_index.shared.errors import SourceNotReadableError
 
 
@@ -218,3 +219,17 @@ def test_mcp_prompt_ids() -> None:
     assert len(result) == 15
     assert result[0] == "mcp/docs/instructions"
     assert "mcp/admin/tools/check-project" in result
+
+
+def test_tool_unexpected_error() -> None:
+    """GitError（正常系）。"""
+    # 準備
+    error = GitError(["archive", "abc"], -1, "20 秒を超えたため止めました", timed_out=True)
+    # 実行
+    result = tool_unexpected_error(error)
+    # 検証
+    assert result.is_error is True
+    assert (
+        _text(result.content[0])
+        == "UnexpectedError: GitError: git archive abc: 20 秒を超えたため止めました"
+    )

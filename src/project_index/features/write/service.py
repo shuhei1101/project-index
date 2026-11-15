@@ -34,6 +34,7 @@ from project_index.features.write.types import (
     WriteResultItem,
 )
 from project_index.integrations.scripts import ScriptError, run_script
+from project_index.shared.deadline import Deadline
 from project_index.shared.errors import (
     DeleteNotAllowedError,
     DocumentReferencedError,
@@ -42,6 +43,7 @@ from project_index.shared.errors import (
     ValidationFailedError,
     VersionMismatchError,
     Violation,
+    WriteDeadlineExceededError,
 )
 from project_index.shared.files import replace_file
 from project_index.shared.hashing import value_hash
@@ -57,6 +59,7 @@ if TYPE_CHECKING:
     from project_index.features.validation.markdown import UncheckedKey
     from project_index.features.validation.service import DocumentChecker
     from project_index.features.write.locks import SourceLocks
+    from project_index.shared.deadline import CallLimits
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +137,8 @@ class _Session:
     tables: dict[str, DocumentTable] = field(default_factory=dict[str, DocumentTable])
     # mdmark の CLI が無い・制限時間を超えたときの理由。後の操作の点検を飛ばす
     markdown_stopped: str | None = None
+    # 書き込みの期限（文書の MCP から呼ばれたときだけ）。検査と点検の制限時間を切る
+    deadline: Deadline | None = None
 
     def __post_init__(self) -> None:
         self.docs = {document.id: document for document in self.store.load(self.target).documents}
@@ -349,12 +354,18 @@ def _check_and_commit(
             violations=[Violation(path="$", rule="文書として読み込めません")],
         )
     document = _new_document(documents, index, doc_id)
-    violations = checker.check(session.target, document, on="write", new=new)
+    violations = checker.check(
+        session.target, document, on="write", new=new, deadline=session.deadline
+    )
     unchecked: list[UncheckedKey] = []
     # 検査に通った文書だけ、変えた Markdown の値を mdmark の点検に通す
     if not violations:
         markdown = checker.check_markdown(
-            session.target, document, previous=previous, stopped=session.markdown_stopped
+            session.target,
+            document,
+            previous=previous,
+            stopped=session.markdown_stopped,
+            deadline=session.deadline,
         )
         session.markdown_stopped = markdown.stopped
         violations = markdown.violations
@@ -378,22 +389,35 @@ def _unique(tables: list[DocumentTable]) -> list[DocumentTable]:
 
 
 def _run_generators(
-    target: Target, tables: list[DocumentTable], paths: list[Path], timeout_sec: float
+    target: Target,
+    tables: list[DocumentTable],
+    paths: list[Path],
+    timeout_sec: float,
+    respond_by: Deadline | None = None,
 ) -> None:
-    """`after_write` の生成を、ID の重なりを除いて順に動かす。"""
+    """`after_write` の生成を、ID の重なりを除いて順に動かす（応答の上限までの時間で切る）。"""
     done: set[str] = set()
     for table in tables:
         for generator_id in table.after_write:
             if generator_id in done:
                 continue
             done.add(generator_id)
+            limit = timeout_sec if respond_by is None else respond_by.cap(timeout_sec)
+            # 応答の上限まで時間が無い: 生成を動かさない（書き込みの結果は変えない）
+            if limit <= 0:
+                logger.warning(
+                    "応答の上限までの時間が無いため書き込み後の生成を実行しなかった（%s・%s）",
+                    target.source.id,
+                    generator_id,
+                )
+                continue
             try:
                 entry = target.source.script("generators", generator_id)
                 run_script(
                     entry.run,
                     cwd=target.config_base,
                     args=[str(path) for path in paths],
-                    timeout_sec=timeout_sec,
+                    timeout_sec=limit,
                 )
             except (ScriptError, KeyError) as error:
                 logger.warning(
@@ -402,6 +426,12 @@ def _run_generators(
                     generator_id,
                     error,
                 )
+
+
+def _check_before_write(limits: CallLimits | None) -> None:
+    """ファイルを置き換える前に書き込みの期限を確かめる（過ぎていれば何も書かずに超過を送る）。"""
+    if limits is not None:
+        limits.write_deadline.check()
 
 
 def _atomic_error(failures: list[tuple[int, ProjectIndexError]]) -> ProjectIndexError:
@@ -440,6 +470,7 @@ def write_docs(
     locks: SourceLocks,
     timeout_sec: float,
     now: datetime | None = None,
+    limits: CallLimits | None = None,
 ) -> WriteResult:
     """`write_docs` の要求を処理して書き込みの結果を返す。"""
     now = now or datetime.now(UTC)
@@ -450,39 +481,73 @@ def write_docs(
     source = target.source
     key = SessionKey.of(request.session_id, request.agent_id)
     with locks.hold(source.id):
-        session = _Session(store, target)
-        last_reads = seen.last_read(key, source.id)
-        results: list[WriteResultItem] = []
-        failures: list[tuple[int, ProjectIndexError]] = []
-        written_ids: list[str] = []
-        written_tables: list[DocumentTable] = []
-        created_ids: set[str] = set()
-        for index, operation in enumerate(request.operations):
-            try:
-                item = _apply_one(session, checker, operation, index, last_reads, created_ids, now)
-            except ProjectIndexError as error:
-                failures.append((index, error))
-                results.append(
-                    WriteResultItem(
-                        index=index,
-                        id=operation.id,
-                        status="failed",
-                        errors=_prefixed(index, error),
-                    )
-                )
-                continue
-            results.append(item[0])
-            written_ids.append(item[0].id or "")
-            written_tables.append(item[1])
-        if failures and request.atomic:
-            raise _atomic_error(failures)
+        session = _Session(
+            store, target, deadline=None if limits is None else limits.write_deadline
+        )
+        applied = _apply_operations(
+            session, checker, request.operations, seen.last_read(key, source.id), now
+        )
+        results = applied.results
+        if applied.failures and request.atomic:
+            raise _atomic_error(applied.failures)
         succeeded = [item for item in results if item.status != "failed"]
         if request.dry_run or not succeeded:
             return WriteResult(applied=False, results=results)
+        _check_before_write(limits)
         touched = session.write_pending()
-        _run_generators(target, _unique(written_tables), touched, timeout_sec)
-        seen.record_activity(key, source.id, [i for i in written_ids if i], "edited")
+        _run_generators(
+            target,
+            _unique(applied.tables),
+            touched,
+            timeout_sec,
+            None if limits is None else limits.respond_by,
+        )
+        seen.record_activity(key, source.id, [i for i in applied.ids if i], "edited")
         return WriteResult(applied=True, results=results)
+
+
+@dataclass
+class _Applied:
+    """操作を順に当てた結果（行・失敗・書いた文書の ID と種類の行）。"""
+
+    results: list[WriteResultItem] = field(default_factory=list[WriteResultItem])
+    failures: list[tuple[int, ProjectIndexError]] = field(
+        default_factory=list[tuple[int, ProjectIndexError]]
+    )
+    ids: list[str] = field(default_factory=list[str])
+    tables: list[DocumentTable] = field(default_factory=list[DocumentTable])
+
+
+def _apply_operations(
+    session: _Session,
+    checker: DocumentChecker,
+    operations: list[Operation],
+    last_reads: Mapping[str, LastRead],
+    now: datetime,
+) -> _Applied:
+    """操作を順に当てる。失敗した操作は `failed` の行にして次へ進む。"""
+    applied = _Applied()
+    created_ids: set[str] = set()
+    for index, operation in enumerate(operations):
+        try:
+            item, table = _apply_one(
+                session, checker, operation, index, last_reads, created_ids, now
+            )
+        except WriteDeadlineExceededError:
+            # 期限の超過は操作の失敗にせず、`atomic` によらず全体を止める
+            raise
+        except ProjectIndexError as error:
+            applied.failures.append((index, error))
+            applied.results.append(
+                WriteResultItem(
+                    index=index, id=operation.id, status="failed", errors=_prefixed(index, error)
+                )
+            )
+            continue
+        applied.results.append(item)
+        applied.ids.append(item.id or "")
+        applied.tables.append(table)
+    return applied
 
 
 def _writable(table: DocumentTable, path: str) -> DocumentTable:
@@ -739,7 +804,7 @@ def _apply_unlinks(
         changed = _new_document(
             session.build(path, text, table), referrer.record_index, referrer.id
         )
-        violations = checker.check(target, changed, on="write")
+        violations = checker.check(target, changed, on="write", deadline=session.deadline)
         if violations:
             raise ValidationFailedError(
                 message=f"検査に通らない操作があります: {len(violations)} 件",
@@ -756,6 +821,7 @@ def delete_docs(
     checker: DocumentChecker,
     locks: SourceLocks,
     timeout_sec: float,
+    limits: CallLimits | None = None,
 ) -> DeleteResult:
     """`delete_docs` の要求を処理して削除の結果を返す。"""
     if not 1 <= len(request.targets) <= OPERATIONS_MAX:
@@ -773,7 +839,9 @@ def delete_docs(
     )
     source = target.source
     with locks.hold(source.id):
-        session = _Session(store, target)
+        session = _Session(
+            store, target, deadline=None if limits is None else limits.write_deadline
+        )
         leaving = {item.id for item in request.targets}
         results: list[WriteResultItem] = []
         failures: list[tuple[int, ProjectIndexError]] = []
@@ -801,6 +869,7 @@ def delete_docs(
         unlinked = [(referrer_id, session.docs[referrer_id].version) for referrer_id in unlink_plan]
         if request.dry_run or not accepted:
             return DeleteResult(applied=False, results=results, unlinked=unlinked)
+        _check_before_write(limits)
         _remove_documents(session, accepted)
         touched = session.write_pending()
         _run_generators(
@@ -808,5 +877,6 @@ def delete_docs(
             _unique([source.table(d.kind) for d in accepted]),
             touched,
             timeout_sec,
+            None if limits is None else limits.respond_by,
         )
         return DeleteResult(applied=True, results=results, unlinked=unlinked)

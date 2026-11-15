@@ -381,6 +381,15 @@ exceptions:
   - name: DocumentNotFoundError
     condition: '`targets[].id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
+  - name: WriteDeadlineExceededError
+    condition: 作業ツリーのファイルを削除・置き換える前に、要求を受けてから端末の設定の `write_deadline_sec` を過ぎていた
+    notes: '`write_docs` と同じ'
+  - name: UnexpectedError
+    condition: '`ProjectIndexError` でない例外で処理を終了できなかった'
+    notes: '`write_docs` と同じ'
+  - name: WorktreeLoadingError
+    condition: 消す先のワークツリーの初めての読み込みが、端末の設定の `worktree_load_wait_sec` までに終了しなかった
+    notes: '`write_docs` と同じ'
 constraints:
   - item: 件数
     constraint: 1 回の `targets` は最大 50 件
@@ -391,8 +400,9 @@ constraints:
   - item: 配信元・ワークツリーの解決
     constraint: '`write_docs` と同じ（配信していない配信元・当たらないワークツリーのエラーも同じ）'
     notes: 共通の処理で解決するため、結合テストは [文書の書き込み](id:IF-6) が持つ
-  - item: タイムアウト
-    constraint: 制限なし
+  - item: 書き込みの期限・生成の制限時間
+    constraint: '`write_docs` と同じ。作業ツリーのファイルを削除・置き換える前に期限を確認し、始めた後は全てのファイルを処理し終える'
+    notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
 refs:
   - SC-7#scenarios[正常シナリオ（参照も外して消す）]
   - SC-7#scenarios[異常シナリオ（参照されている文書を消す）]

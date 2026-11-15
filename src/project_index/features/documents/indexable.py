@@ -44,6 +44,28 @@ def walk_files(root: Path, *, start: str = ".") -> Iterator[str]:
             yield _join(relative_folder, name)
 
 
+def walk_tree(root: Path) -> tuple[list[str], dict[str, int]]:
+    """中をたどるファイルの一覧と、たどったフォルダごとの更新日時（`st_mtime_ns`）を返す。"""
+    files: list[str] = []
+    folders: dict[str, int] = {}
+    for folder, dirnames, filenames in os.walk(root, followlinks=False):
+        relative_folder = Path(folder).relative_to(root).as_posix()
+        # フォルダの中のファイルの追加・削除・改名で、フォルダの更新日時が変わる
+        try:
+            folders[relative_folder] = os.stat(folder).st_mtime_ns
+        except OSError:
+            # たどる途中で無くなったフォルダは記録しない
+            continue
+        # たどらない名前・パスのフォルダは中に入らない（中をたどるファイルの列挙と同じ）
+        dirnames[:] = [
+            name
+            for name in dirnames
+            if name not in SKIP_DIRS and _join(relative_folder, name) not in SKIP_PATHS
+        ]
+        files.extend(_join(relative_folder, name) for name in filenames)
+    return files, folders
+
+
 def _join(relative_folder: str, name: str) -> str:
     """`root` からのフォルダのパスと名前をつなぐ（`root` 直下は名前だけ）。"""
     return name if relative_folder == "." else f"{relative_folder}/{name}"

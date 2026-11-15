@@ -117,6 +117,13 @@ classes:
             default: 'False'
             passing: keyword
             description: '`True` のときだけ `ids.format` を確かめる'
+          - name: deadline
+            title: 書き込みの期限
+            type: Deadline | None
+            required: false
+            default: None
+            passing: keyword
+            description: 書き込み・削除の検査で渡す。`None` は期限を持たない（読み取りの検査）
         returns:
           type: list[Violation]
           description: 違反。検査の順に並ぶ
@@ -126,8 +133,10 @@ classes:
           3. 『関連の種類の検査』をメタデータに通す
           4. 行の `validators` の ID ごとに `source.script("validators", id)` を引き、`on` が行の `on` にあるものだけを通す
              - `on` が `read` の場合、`_read_cache` にキャッシュがあればそれを使う
-             - スクリプトの実行の『スクリプトの実行』を `cwd=target.config_base`（設定ファイルのフォルダ）・`stdin`（`body`）・`timeout_sec`・`at` で呼び（`at` は `target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`））、『検査の出力の解釈』で違反にする
+             - `deadline` がある場合、動かす前に『期限』.期限の確認を呼ぶ（過ぎていれば `WriteDeadlineExceededError` が伝わる）
+             - スクリプトの実行の『スクリプトの実行』を `cwd=target.config_base`（設定ファイルのフォルダ）・`stdin`（`body`）・制限時間（`deadline` があれば『期限』.制限時間の切り詰めに `timeout_sec` を渡した値、無ければ `timeout_sec`）・`at` で呼び（`at` は `target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`））、『検査の出力の解釈』で違反にする
              - `ScriptError` の場合、`path` が `$`、`rule` が `{id}: 検査を実行できませんでした（{メッセージ}）` の違反にする（キャッシュしない）
+             - `deadline` がある場合、動かした後（`ScriptError` のときも）に『期限』.期限の確認を呼ぶ。残りの時間でスクリプトを止めたときは、違反ではなく `WriteDeadlineExceededError` が伝わる
           5. 違反を返す
         unit_tests:
           - name: test_document_checker_check
@@ -165,6 +174,30 @@ classes:
             mock: なし
             expected: 空の並び（`'files' is a required property` を返さない）
             exception: '-'
+          - name: test_document_checker_check_when_deadline_capped
+            case: 異常
+            summary: 期限までの残りの時間でスクリプトを止める
+            condition: '`timeout_sec=30`、残りの時間が 2 秒の `deadline`。スクリプトの実行が時計を 3 秒進めて `ScriptTimeoutError` を送る'
+            mock: スクリプトの実行（受けた制限時間を記録する偽物）・時計（偽物）
+            expected: '`WriteDeadlineExceededError`。スクリプトの実行に渡った制限時間が 2'
+            exception: '`deadline` があり、検査のスクリプトを動かす前か動かした後に期限を過ぎている'
+          - name: test_document_checker_check_when_deadline_passed
+            case: 異常
+            summary: 期限を過ぎた後はスクリプトを動かさない
+            condition: 残りの時間が 0 の `deadline`
+            mock: スクリプトの実行（呼ばれた回数を記録する偽物）・時計（偽物）
+            expected: '`WriteDeadlineExceededError`。スクリプトの実行が呼ばれない'
+            exception: '`deadline` があり、検査のスクリプトを動かす前か動かした後に期限を過ぎている'
+          - name: test_document_checker_check_when_script_timed_out
+            case: 正常
+            summary: '`script_timeout_sec` で止めたスクリプトは違反'
+            condition: '`timeout_sec=1`、残りの時間が 30 秒の `deadline`。スクリプトの実行が時計を 1 秒進めて `ScriptTimeoutError("制限時間（1 秒）を超えたため、スクリプトを止めました。")` を送る'
+            mock: スクリプトの実行（送る偽物）・時計（偽物）
+            expected: '違反 1 件、`rule` が `{id}: 検査を実行できませんでした（制限時間（1 秒）を超えたため、スクリプトを止めました。）`'
+        exceptions:
+          - name: WriteDeadlineExceededError
+            condition: '`deadline` があり、検査のスクリプトを動かす前か動かした後に期限を過ぎている'
+            message: 『期限』.期限の確認のまま
       - name: check_markdown
         title: Markdownの値を点検する
         summary: 書き込む文書の変えた Markdown の値を mdmark の点検に通す
@@ -198,13 +231,20 @@ classes:
             default: None
             passing: keyword
             description: 同じ書き込みの前の文書の点検で止めた理由
+          - name: deadline
+            title: 書き込みの期限
+            type: Deadline | None
+            required: false
+            default: None
+            passing: keyword
+            description: 書き込みの期限。`None` は期限を持たない
         returns:
           type: MarkdownCheck
           description: 違反・点検できなかったキー・止めた理由
         process: |-
           1. 文書に当てるスキーマを `store.row_schema(target, kind)` で引く
           2. 変えたMarkdownの値（`document.data`・`previous`・スキーマ）を引く。空なら空の `MarkdownCheck`（`stopped` は引数のまま）を返す
-          3. Markdownの値の点検（`cwd=target.base`・`timeout_sec`・`stopped`）を返す
+          3. Markdownの値の点検（`cwd=target.base`・`timeout_sec`・`stopped`・`deadline`）を返す
         unit_tests:
           - name: test_document_checker_check_markdown
             case: 正常

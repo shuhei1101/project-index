@@ -72,6 +72,10 @@ class TerminalConfig(BaseModel):
     sources: list[SourceEntry] = Field(default_factory=list[SourceEntry])
     seen_retention_days: int = 7
     script_timeout_sec: int = 30
+    # 書き込み・削除で、要求を受けてからファイルを書き換え始めてよい上限（秒）
+    write_deadline_sec: int = 32
+    # 初めて指されたワークツリーの読み込みを待つ上限（秒）
+    worktree_load_wait_sec: int = 22
     # スキーマの properties に無い最上位のキー（ファイルの順）。値は持たない
     unknown_keys: list[str] = Field(default_factory=list[str])
 

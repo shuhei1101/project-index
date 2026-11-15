@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -1253,3 +1254,94 @@ def test_error_when_schema_ref_unresolvable(
     assert MISSING_REF in result.text
     assert "schemas/sample.schema.yaml" in result.text
     assert target.read_text(encoding="utf-8") == before
+
+
+def _slow_validator_files(
+    sample_file_set: Callable[..., dict[str, str]], wait_sec: int
+) -> dict[str, str]:
+    """`wait_sec` 秒待ってから違反なしで終わる検査のスクリプト `slow` を持つ配信元のファイル一式。"""
+    config = (
+        "name: sample\n"
+        "default_ref: develop\n"
+        "documents:\n"
+        "  - id: sample\n"
+        "    paths: [docs/*.yaml]\n"
+        "    schema: schemas/sample.schema.yaml\n"
+        "    validators: [slow]\n"
+        "validators:\n"
+        "  - id: slow\n"
+        "    run: [python3, scripts/slow.py]\n"
+    )
+    script = f"import sys, time\nsys.stdin.read()\ntime.sleep({wait_sec})\nprint('[]')\n"
+    return sample_file_set(**{"project-index.yaml": config, "scripts/slow.py": script})
+
+
+def test_error_when_write_deadline_exceeded(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """検査が書き込みの期限までに終了しなければ、検査のスクリプトを止めて、何も書き込まずに時間切れを返却する（異常系）。"""
+    # 準備
+    source = make_source("sample", _slow_validator_files(sample_file_set, 4))
+    worktree = add_worktree(source.folder, "x")
+    env = make_server(source, settings_extra="write_deadline_sec: 2\n")
+    target = worktree / "docs" / "doc-1.yaml"
+    before_text = target.read_text(encoding="utf-8")
+    before = _version(target)
+    # 実行
+    started = time.monotonic()
+    result = env.call(
+        "write_docs",
+        cwd=str(source.folder),
+        worktree=str(worktree),
+        operations=[_update("doc-1", before, set={"name": "新しい名前"})],
+    )
+    elapsed = time.monotonic() - started
+    time.sleep(4)
+    searched = env.call(
+        "search_docs",
+        cwd=str(source.folder),
+        worktree=str(worktree),
+        filter={"field": "id", "op": "eq", "values": ["doc-1"]},
+        format="json",
+    )
+    # 検証
+    assert result.is_error is True
+    assert result.text.startswith("WriteDeadlineExceededError: 書き込みの期限（2 秒）を超えたため")
+    assert "ファイルを書き換えずに止めました" in result.text
+    assert elapsed < 3
+    assert target.read_text(encoding="utf-8") == before_text
+    assert searched.data["items"][0]["values"]["version"] == before
+
+
+def test_error_when_validator_timed_out(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """`validators[]` のスクリプトが `script_timeout_sec` を超えたら止め、止めたスクリプトの ID を違反として返却する（異常系）。"""
+    # 準備
+    source = make_source("sample", _slow_validator_files(sample_file_set, 5))
+    worktree = add_worktree(source.folder, "x")
+    env = make_server(source, settings_extra="script_timeout_sec: 1\n")
+    target = worktree / "docs" / "doc-1.yaml"
+    before_text = target.read_text(encoding="utf-8")
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(source.folder),
+        worktree=str(worktree),
+        operations=[_update("doc-1", _version(target), set={"name": "新しい名前"})],
+    )
+    # 検証
+    assert result.is_error is True
+    assert result.text.startswith("ValidationFailedError:")
+    assert not result.text.startswith("Error executing tool")
+    assert (
+        "slow: 検査を実行できませんでした（制限時間（1 秒）を超えたため、スクリプトを止めました。）"
+        in result.text
+    )
+    assert target.read_text(encoding="utf-8") == before_text

@@ -13,7 +13,8 @@ from project_index.features.validation.markdown import (
     markdown_values,
 )
 from project_index.integrations.mdmark import MdmarkFinding, MdmarkUnavailableError
-from project_index.shared.errors import Violation
+from project_index.shared.deadline import Deadline
+from project_index.shared.errors import Violation, WriteDeadlineExceededError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -199,3 +200,34 @@ def test_check_markdown_values_when_stopped(
     # 検証
     assert result.unchecked == [UncheckedKey(path="a", reason="R")]
     assert calls == []
+
+
+class _Clock:
+    """テストが進める時計。"""
+
+    def __init__(self, now: float) -> None:
+        self.now = now
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def test_check_markdown_values_when_deadline_capped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """期限までの残りの時間で mdmark を止める（異常系）。"""
+    # 準備
+    clock = _Clock(0)
+    received: list[float] = []
+
+    def _fake(text: str, **kwargs: Any) -> list[MdmarkFinding]:
+        received.append(kwargs["timeout_sec"])
+        clock.now = 3
+        raise MdmarkUnavailableError(reason="制限時間を超えました", continuable=False)
+
+    monkeypatch.setattr(markdown_module, "check_markdown", _fake)
+    deadline = Deadline(limit_sec=2, started=0, clock=clock)
+    # 実行・検証
+    with pytest.raises(WriteDeadlineExceededError, match="書き込みの期限"):
+        check_markdown_values({"a": "x"}, cwd=tmp_path, timeout_sec=30, deadline=deadline)
+    assert received == [2]

@@ -298,6 +298,11 @@ YAML として読めないファイルがあっても、そのファイルを除
 全ての操作を当ててから 1 回だけ検証し、通ったときだけ一時ファイルに書いてから置き換えます。
 読み込み・検査・書き込みは配信元ごとの排他ロックの中で行い、書いた後に `generators[]` を流します。
 
+要求を受けてから端末の設定の `write_deadline_sec` を過ぎても検査が終わらないときは、検査のスクリプトを止め、ファイルを 1 つも書き換えずに `WriteDeadlineExceededError` を返します。
+検査のスクリプトと mdmark の点検の制限時間は、`script_timeout_sec` と、この期限までの残りの時間の短い方です。
+`script_timeout_sec` で止めた検査のスクリプトは、`{検査の ID}: 検査を実行できませんでした（制限時間（{秒} 秒）を超えたため、スクリプトを止めました。）` の違反になります。
+ファイルの書き換えを始めた後は、期限を過ぎても全てのファイルを書き終えます。
+
 種類のスキーマで `contentMediaType: text/markdown` を持つキーは Markdown のキーで、操作で値を変えたキー（`create` は値を持つ全てのキー）を mdmark の点検（`mdmark check --text -`）に通します。
 点検のずれのうち描画時の書き方の警告（`diagram_invalid`・`syntax_warning`）は、項目のパス・`mdmark の {種類}（{行} 行目）`・mdmark の内容の違反になり、スキーマの違反と同じく書き込みを止めます。
 ほかの種類（知らない印の `unknown_mark`・図の配置のずれ・見つからないファイル）では書き込みを止めません。
@@ -454,6 +459,9 @@ Git 管理外の配信元では、種類の `documents[].writable` が削除を�
 | DocumentReferencedError | `on_referenced: fail` で、消す文書が他の文書の `related` から参照されている | 参照元の ID と `on_referenced: unlink` |
 | DeleteNotAllowedError | Git 管理外の配信元で、種類の `documents[].writable` が削除を許していない | 種類の ID と `documents[].writable` のパス |
 | LastReadNotFoundError | `list_changes` の `from` を省いたが、この会話で本文を読んだ記録が無い | `from` を渡すこと |
+| WriteDeadlineExceededError | `write_docs`・`delete_docs` で、ファイルを書き換える前に端末の設定の `write_deadline_sec` を過ぎた | 書き込みの期限・経過した秒数・ファイルを書き換えていないことと、検査のスクリプトの所要時間を確かめてから再実行すること |
+| WorktreeLoadingError | `search_docs`・`write_docs`・`delete_docs` が指すワークツリーの初めての読み込みが、端末の設定の `worktree_load_wait_sec` までに終わらない。読み込みは止めずに続ける | ワークツリーのパスと、時間を空けて同じ呼び出しを再実行すること |
+| UnexpectedError | どのツールでも、上のエラーでない例外（`GitError` など）で処理を終えられない | `UnexpectedError: {例外の型}: {内容}` |
 
 <!-- /table -->
 

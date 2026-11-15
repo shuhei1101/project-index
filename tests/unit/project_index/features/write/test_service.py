@@ -22,6 +22,7 @@ from project_index.features.sources.types import (
 )
 from project_index.features.validation.markdown import MarkdownCheck, UncheckedKey
 from project_index.features.validation.service import DocumentChecker
+from project_index.features.write import service as write_service
 from project_index.features.write.locks import SourceLocks
 from project_index.features.write.service import check_version, delete_docs, write_docs
 from project_index.features.write.types import (
@@ -32,6 +33,7 @@ from project_index.features.write.types import (
     WriteRequest,
     WriteResult,
 )
+from project_index.shared.deadline import CallLimits, Deadline
 from project_index.shared.errors import (
     DeleteNotAllowedError,
     DocumentReferencedError,
@@ -39,6 +41,7 @@ from project_index.shared.errors import (
     ValidationFailedError,
     VersionMismatchError,
     Violation,
+    WriteDeadlineExceededError,
 )
 from project_index.shared.hashing import content_hash, value_hash
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
@@ -73,7 +76,11 @@ class WriteEnv:
     clone: Path
     worktree: Path
 
-    def write(self, now: datetime | None = None, **request: Any) -> WriteResult:
+    def write(
+        self, now: datetime | None = None, limits: CallLimits | None = None, **request: Any
+    ) -> WriteResult:
+        # 期限を渡すテストだけ `limits` を渡す
+        extra: dict[str, Any] = {} if limits is None else {"limits": limits}
         return write_docs(
             WriteRequest(cwd=str(self.worktree), **request),
             registry=self.registry,
@@ -83,9 +90,12 @@ class WriteEnv:
             locks=self.locks,
             timeout_sec=10,
             now=now,
+            **extra,
         )
 
-    def delete(self, **request: Any) -> DeleteResult:
+    def delete(self, limits: CallLimits | None = None, **request: Any) -> DeleteResult:
+        # 期限を渡すテストだけ `limits` を渡す
+        extra: dict[str, Any] = {} if limits is None else {"limits": limits}
         return delete_docs(
             DeleteRequest(cwd=str(self.worktree), **request),
             registry=self.registry,
@@ -93,6 +103,7 @@ class WriteEnv:
             checker=self.checker,
             locks=self.locks,
             timeout_sec=10,
+            **extra,
         )
 
 
@@ -625,3 +636,95 @@ def test_write_docs_when_tags_are_objects(make_env: Callable[..., WriteEnv]) -> 
         {"name": "b"},
         {"name": "c", "main": True},
     ]
+
+
+def _limits(write_remaining: float, respond_remaining: float = 48) -> CallLimits:
+    """残りの時間を決めた呼び出しの期限を作る（時計は 0 のまま進まない）。"""
+    return CallLimits(
+        write_deadline=Deadline(limit_sec=write_remaining, started=0, clock=lambda: 0),
+        respond_by=Deadline(limit_sec=respond_remaining, started=0, clock=lambda: 0),
+    )
+
+
+def test_write_docs_when_deadline_passed(make_env: Callable[..., WriteEnv]) -> None:
+    """置き換える前に期限を過ぎている（異常系）。"""
+    # 準備
+    env = make_env()
+    operation = Operation(
+        op="update", id="doc-1", expected_version=content_hash(DOC_1), set={"name": "新しい名前"}
+    )
+    # 実行・検証
+    with pytest.raises(WriteDeadlineExceededError, match="書き込みの期限"):
+        env.write(operations=[operation], session_id="s1", limits=_limits(0))
+    assert (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
+    assert env.seen.activity(SessionKey.of("s1", None), "sample") == []
+
+
+def test_write_docs_when_deadline_passed_not_atomic(
+    make_env: Callable[..., WriteEnv], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`atomic: false` でも期限の超過は全体を止める（異常系）。"""
+    # 準備
+    env = make_env()
+
+    def _passed(target: Target, document: Document, **kwargs: Any) -> list[Violation]:
+        raise WriteDeadlineExceededError(
+            message="書き込みの期限（32 秒）を超えたため、ファイルを書き換えずに止めました（経過 33.0 秒）",
+            deadline_sec=32,
+            elapsed_sec=33.0,
+        )
+
+    monkeypatch.setattr(env.checker, "check", _passed)
+    operations = [
+        Operation(
+            op="update", id="doc-1", expected_version=content_hash(DOC_1), set={"name": "一"}
+        ),
+        Operation(
+            op="update", id="doc-2", expected_version=content_hash(DOC_2), set={"name": "二"}
+        ),
+    ]
+    # 実行・検証
+    with pytest.raises(WriteDeadlineExceededError, match="書き込みの期限"):
+        env.write(operations=operations, atomic=False, limits=_limits(30))
+    assert (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
+    assert (env.worktree / "docs/rule/doc-2.yaml").read_text(encoding="utf-8") == DOC_2
+
+
+def test_write_docs_when_no_time_for_generators(
+    make_env: Callable[..., WriteEnv], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """応答の上限まで時間が無ければ生成を動かさない（正常系）。"""
+    # 準備
+    calls: list[Any] = []
+
+    def counting(run: Any, **kwargs: Any) -> Any:
+        calls.append(run)
+        raise AssertionError
+
+    monkeypatch.setattr(write_service, "run_script", counting)
+    generators = [ScriptEntry(id="index", run=[sys.executable, "-c", "pass"])]
+    table = DocumentTable(
+        id="rules",
+        paths=["docs/rule/*.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        after_write=["index"],
+    )
+    env = make_env(tables=[table], generators=generators, ids_format="{kind}-{slug}")
+    operation = Operation(op="create", kind="rules", data={"name": "Doc Three"})
+    # 実行
+    result = env.write(operations=[operation], limits=_limits(30, 0))
+    # 検証
+    assert result.applied is True
+    assert (env.worktree / "docs/rule/rules-doc-three.yaml").exists()
+    assert calls == []
+
+
+def test_delete_docs_when_deadline_passed(make_env: Callable[..., WriteEnv]) -> None:
+    """消す前に期限を過ぎている（異常系）。"""
+    # 準備
+    env = make_env()
+    targets = [DeleteTarget(id="doc-2", expected_version=content_hash(DOC_2))]
+    # 実行・検証
+    with pytest.raises(WriteDeadlineExceededError, match="書き込みの期限"):
+        env.delete(targets=targets, limits=_limits(0))
+    assert (env.worktree / "docs/rule/doc-2.yaml").exists()

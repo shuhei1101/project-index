@@ -241,15 +241,24 @@ functions:
         default: None
         passing: keyword
         description: 同じ書き込みの前の文書の `MarkdownCheck.stopped`
+      - name: deadline
+        title: 書き込みの期限
+        type: Deadline | None
+        required: false
+        default: None
+        passing: keyword
+        description: '`None` は期限を持たない'
     returns:
       type: MarkdownCheck
       description: 違反・点検できなかったキー・止めた理由
     process: |-
       1. `values` を順に回す
          - `stopped` がある場合、mdmark を呼ばずに（パス, `stopped`）を点検できなかったキーにする
-         - Markdownの点検（`cwd`・`timeout_sec`）を呼び、種類が `BLOCKING_KINDS` のずれを、`path` がそのパス、`rule` が `mdmark の {種類}（{行} 行目）`、`fix` が内容の違反にする。ほかの種類のずれは捨てる
+         - `deadline` がある場合、呼ぶ前に『期限』.期限の確認を呼ぶ
+         - Markdownの点検（`cwd`・制限時間。`deadline` があれば『期限』.制限時間の切り詰めに `timeout_sec` を渡した値、無ければ `timeout_sec`）を呼び、種類が `BLOCKING_KINDS` のずれを、`path` がそのパス、`rule` が `mdmark の {種類}（{行} 行目）`、`fix` が内容の違反にする。ほかの種類のずれは捨てる
          - `MdmarkUnavailableError` の場合、（パス, `reason`）を点検できなかったキーにする。`continuable` が `False` なら `stopped` を `reason` にする
            - `[info]` mdmark で点検できなかった（パス・理由）
+         - `deadline` がある場合、呼んだ後（`MdmarkUnavailableError` のときも）に『期限』.期限の確認を呼ぶ。残りの時間で mdmark を止めたときは、点検できなかったキーではなく `WriteDeadlineExceededError` が伝わる
       2. 違反・点検できなかったキー・`stopped` を返す
     unit_tests:
       - name: test_check_markdown_values
@@ -276,3 +285,14 @@ functions:
         condition: '`stopped` に R、`{a: x}`'
         mock: '`check_markdown`'
         expected: '`unchecked` が `a`（理由 R）、`check_markdown` は呼ばれない'
+      - name: test_check_markdown_values_when_deadline_capped
+        case: 異常
+        summary: 期限までの残りの時間で mdmark を止める
+        condition: '`timeout_sec=30`、残りの時間が 2 秒の `deadline`。mdmark の点検が時計を 3 秒進めて制限時間を超えた `MdmarkUnavailableError` を送る'
+        mock: mdmark の点検（受けた制限時間を記録する偽物）・時計（偽物）
+        expected: '`WriteDeadlineExceededError`。mdmark の点検に渡った制限時間が 2'
+        exception: '`deadline` があり、mdmark を動かす前か動かした後に期限を過ぎている'
+    exceptions:
+      - name: WriteDeadlineExceededError
+        condition: '`deadline` があり、mdmark を動かす前か動かした後に期限を過ぎている'
+        message: 『期限』.期限の確認のまま

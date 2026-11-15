@@ -12,13 +12,19 @@ from jsonschema.exceptions import ValidationError
 from jsonschema.validators import validator_for
 from referencing.exceptions import Unresolvable
 
-from project_index.integrations.mdmark import MdmarkUnavailableError, check_markdown
+from project_index.integrations.mdmark import (
+    MdmarkFinding,
+    MdmarkUnavailableError,
+    check_markdown,
+)
 from project_index.shared.errors import Violation
 from project_index.shared.schema_check import format_path
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator, Mapping
     from pathlib import Path
+
+    from project_index.shared.deadline import Deadline
 
 logger = logging.getLogger(__name__)
 
@@ -108,12 +114,31 @@ def changed_markdown(
     return {path: current[path] for path in sorted(current) if before.get(path) != current[path]}
 
 
+def _check_within(
+    text: str, *, cwd: Path, timeout_sec: float, deadline: Deadline | None
+) -> list[MdmarkFinding]:
+    """mdmark の点検を、書き込みの期限があれば残りの時間で切って呼ぶ（期限を過ぎたら超過を送る）。"""
+    if deadline is None:
+        return check_markdown(text, cwd=cwd, timeout_sec=timeout_sec)
+    # 過ぎていれば呼ばない
+    deadline.check()
+    try:
+        findings = check_markdown(text, cwd=cwd, timeout_sec=deadline.cap(timeout_sec))
+    except MdmarkUnavailableError:
+        # 期限で止めた点検は、点検できなかったキーではなく期限の超過にする
+        deadline.check()
+        raise
+    deadline.check()
+    return findings
+
+
 def check_markdown_values(
     values: Mapping[str, str],
     *,
     cwd: Path,
     timeout_sec: float,
     stopped: str | None = None,
+    deadline: Deadline | None = None,
 ) -> MarkdownCheck:
     """値ごとに mdmark の点検を通し、書き方の警告を違反に、点検できなかった値を記録する。"""
     violations: list[Violation] = []
@@ -124,7 +149,7 @@ def check_markdown_values(
             unchecked.append(UncheckedKey(path=path, reason=stopped))
             continue
         try:
-            findings = check_markdown(text, cwd=cwd, timeout_sec=timeout_sec)
+            findings = _check_within(text, cwd=cwd, timeout_sec=timeout_sec, deadline=deadline)
         except MdmarkUnavailableError as error:
             logger.info("mdmark で点検できなかった（%s・%s）", path, error.reason)
             unchecked.append(UncheckedKey(path=path, reason=error.reason))

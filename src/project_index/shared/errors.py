@@ -258,3 +258,20 @@ class UpdateFailedError(ProjectIndexError):
     status: ClassVar[int] = 500
     command: list[str] = field(default_factory=list[str])
     stderr: str = ""
+
+
+@dataclass(kw_only=True)
+class WriteDeadlineExceededError(ProjectIndexError):
+    """書き込みの期限の超過（ファイルを書き換えずに止めた）。"""
+
+    status: ClassVar[int] = 504
+    deadline_sec: float = 0
+    elapsed_sec: float = 0
+
+
+@dataclass(kw_only=True)
+class WorktreeLoadingError(ProjectIndexError):
+    """ワークツリーの読み込み中（読み込みは続けている）。"""
+
+    status: ClassVar[int] = 503
+    worktree: str = ""
