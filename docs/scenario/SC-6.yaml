@@ -786,6 +786,98 @@ scenarios:
       - '`reload` をしなくても、裏の確認が終わった後の `describe()` と新しい接続の instructions が、書き換えた `when` の 1 行目を返却する'
       - commit の直後の `describe()` は、裏の確認を待たずに応答する
     test: test_normal_when_source_guide_changed_before_connect
+  - name: 正常シナリオ（作った直後のワークツリーを指す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+      - name: ファイルの多い配信元
+        description: sample に、管理用の YAML に記載していないファイルを範囲の glob に該当する場所へ多数配置して commit したもの
+        notes: ファイルの数は、修正前の実装で読み取りの上限を超える数
+      - name: 作った直後のワークツリー
+        description: project-index が起動した後に `git worktree add` で作った sample の `.claude/worktrees/y`
+        notes: 文書 1 の `name` をクローン本体と変えてある
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` はワークツリー y'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（作った直後のワークツリーを指す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー y
+
+        A->>M: search_docs(worktree: y, view: ids)
+        M->>WT: 設定と文書を読み込む
+        M-->>A: ワークツリーの文書の ID
+        A->>M: search_docs(worktree: y, filter: id が文書 1, view: full)
+        M-->>A: ワークツリーの文書 1
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`view: ids`・`summary`・`full` のどの `search_docs` も、非機能要件のワークツリーを指定した読み取りの上限の内に返却される'
+      - 2 回目以降の呼び出しは、ワークツリー y のファイルが変わっていなければ、クローン本体を指す呼び出しと同じ程度の時間で返却される
+      - 文書 1 はワークツリー y の `name` を返却する
+    test: test_normal_when_new_worktree_given
+  - name: 異常シナリオ（ワークツリーの読み込みが上限までに終了しない）
+    setup:
+      - name: Mock
+        description: project-index を起動する環境の `PATH` の先頭に、待ってから本物の `git` を実行する `git` のスクリプトを配置し、端末の設定でワークツリーを指定した読み取りの上限を短くする
+        notes: 待つ時間は読み取りの上限より長く、git の待ち時間の上限より短い
+      - name: 作った直後のワークツリー
+        description: 正常シナリオ（作った直後のワークツリーを指す）と同じワークツリー y
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` はワークツリー y'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（ワークツリーの読み込みが上限までに終了しない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: search_docs(worktree: y)
+        M->>M: ワークツリーの読み込みが上限までに終了しない
+        M-->>A: エラー（読み込み中。時間を空けて同じ呼び出しを送信すること）
+        A->>M: 時間を空けて同じ search_docs
+        M-->>A: ワークツリーの文書
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目は読み取りの上限から数秒の内に、`isError: true` で読み込み中であることと、時間を空けて同じ呼び出しを送信する次の手を返却する'
+      - 読み込み中の応答は、クローン本体の文書をワークツリーの文書として返却しない
+      - 読み込みが終了した後の同じ呼び出しは、ワークツリー y の文書を返却する
+    test: test_error_when_worktree_loading_slow
+  - name: 異常シナリオ（git の実行が失敗する）
+    setup:
+      - name: Mock
+        description: project-index を起動する環境の `PATH` の先頭に、`archive` の呼び出しだけ git の待ち時間の上限より長く待つ `git` のスクリプトを配置する
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`ref` に sample の過去の commit を指定する'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（git の実行が失敗する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: search_docs(ref: 過去の commit)
+        M->>M: リビジョンの書き出しの git が待ち時間の上限で止まる
+        M-->>A: エラー（止まった git のコマンドと理由）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、止まった git のコマンドと、待ち時間の上限を超えたことを返却する'
+      - '`Error executing tool` だけの応答にならない'
+      - '`describe` も同じエラーを返却する'
+    test: test_error_when_git_failed
 lead: エージェントが文書の MCP で、作業場所から使用できる配信元の文書を探して参照するシナリオを定め、調査の流れを変えるときに参照する。
 issue: 14
 primary_actor: エージェント（Claude Code）
@@ -799,7 +891,7 @@ preconditions:
   - project-index が起動し、配信元を配信している
   - 呼び出しの引数に、フックが作業場所 `cwd` と会話キー `session_id`・`agent_id` を入れている
 success_guarantee: '`scope.read` に当たる配信元の文書だけが返る。同じ会話で同じバージョンの本文は 2 回返らない。'
-minimal_guarantee: '読めない配信元・配信していない配信元・誤った条件を指した呼び出しは、`isError: true` で原因と次の手を返し、他の配信元の文書を返さない。'
+minimal_guarantee: '読めない配信元・配信していない配信元・誤った条件を指した呼び出し、ワークツリーの読み込みが上限までに終了しない呼び出し、内部の処理が失敗した呼び出しは、`isError: true` で原因と次の手を返し、他の配信元の文書を返さない。'
 frequency: 作業のたび
 priority: 高
 refs:
