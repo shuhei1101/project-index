@@ -1147,8 +1147,8 @@ def test_document_store_load_when_worktree_cached(
     assert len(walks) == 1
     assert len(collects) == 1
     assert caplog.text.count("ワークツリーを読み込んだ") == 1
-    assert [document.name for document in first.documents] == ["A", "B"]
-    assert [document.name for document in second.documents] == ["A", "B"]
+    assert [document.data["name"] for document in first.documents] == ["A", "B"]
+    assert [document.data["name"] for document in second.documents] == ["A", "B"]
 
 
 def test_document_store_load_when_worktree_file_added(
