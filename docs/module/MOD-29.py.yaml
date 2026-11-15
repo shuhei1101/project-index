@@ -127,6 +127,11 @@ classes:
         type: dict[tuple[str, str], dict[str, Any]]
         access: 内部 (_)
         description: (配信元の ID, 行の ID) → `$ref` を解いた起動時のスキーマ
+      - name: _generation
+        title: clear の回数
+        type: int
+        access: 内部 (_)
+        description: '`clear` のたびに 1 つ増やす。`clear` の前に解き始めた起動時のスキーマを `_startup_schemas` に書き戻さないために使う'
     methods:
       - name: load
         title: 文書を集める
@@ -170,6 +175,7 @@ classes:
                - `_worktrees` に無い場合、『フォルダごとの列挙』でたどり、ファイルの一覧と、フォルダごとの更新日時を記録する。手順 7 の前に `[info]` ワークツリーを読み込んだ（配信元・ワークツリーのパス・秒数）を書く
                - `_worktrees` にある場合、記録したフォルダごとに `stat` を取る。更新日時が変わった・無くなったフォルダがあればたどり直して置き換え、無ければ記録したファイルの一覧を使う（たどり直しではログを書かない）
                - 『ファイルの収集』の結果を、行の定義のハッシュごとに `_worktrees` に持ち、ファイルの一覧が変わらなければ集め直さない
+               - 読み込みを終えたら `_worktrees` の末尾に入れ（使った順）、`WORKTREE_KEEP` 件を超えたら先頭から捨てる（そのワークツリーの `_worktree_locks` も除く）。捨てたワークツリーは、次に指されたときに初めての読み込みとして読み直す
              - `target.ref` が `None` の場合、ファイルごとに `stat` を取る。`_files` の更新日時と大きさが同じで、理由に `missing_body_file` が無く、本文のファイルの (パス, 更新日時, 大きさ) も同じならキャッシュした結果を使い、それ以外は『ファイルの読み込み』で読んで `_files` を置き換える
              - `target.ref` がある場合、読む場所の commit のファイルの blob の SHA を `_trees` から引く（無ければ `git ls-tree -r --full-tree {commit}` を 1 回だけ起動してキャッシュする）。`_revision_files` の blob の SHA が同じで、理由に `missing_body_file` が無く、本文のファイルの (パス, blob の SHA) と、ファイルと本文のファイルの日時（手順 3）も同じならキャッシュした結果を使い、それ以外は『ファイルの読み込み』で読んで `_revision_files` を置き換える。blob の SHA が無いファイルは読まない
           5. 収集で当たらなかった `_files` のキーのうち、読むフォルダの下にあるものを削除する（削除されたファイル）。
@@ -283,6 +289,12 @@ classes:
             condition: ワークツリー x を指す読む場所で 2 つのスレッドから同時に呼ぶ
             mock: フォルダごとの列挙（本物を包んで、呼ばれた回数を記録し、合図まで止まる）
             expected: フォルダごとの列挙が 1 回だけ呼ばれ、両方のスレッドが同じ文書を返す
+          - name: test_document_store_load_when_worktrees_over_keep
+            case: 正常
+            summary: 上限を超えたワークツリーの記録を古く使ったものから捨てる
+            condition: '`WORKTREE_KEEP` を 1 にして、ワークツリー x、y の順に `load` する'
+            mock: なし（`tmp_path`）
+            expected: '`has_worktree` が x は `False`、y は `True`'
       - name: get
         title: ID で引く
         summary: ID の並びの順に文書を返す
@@ -363,7 +375,7 @@ classes:
           description: JSON Schema
         process: |-
           1. `source.table(kind)` で行を引く
-          2. `target.ref` と `target.worktree` がどちらも `None` の場合と、行の `schema_path` が `SchemaRef` の場合、起動時のスキーマを返す（読む場所によらず参照したリビジョンのスキーマ）。`$ref` を解いた起動時のスキーマは `_startup_schemas` に (配信元の ID, 行の ID) でキャッシュし、呼ぶたびに解き直さない
+          2. `target.ref` と `target.worktree` がどちらも `None` の場合と、行の `schema_path` が `SchemaRef` の場合、起動時のスキーマを返す（読む場所によらず参照したリビジョンのスキーマ）。`$ref` を解いた起動時のスキーマは `_startup_schemas` に (配信元の ID, 行の ID) でキャッシュし、呼ぶたびに解き直さない。解き始めたときの `_generation` と解き終えたときの `_generation` が違う（その間に `clear` された）場合は、結果を返すがキャッシュしない
           3. `target.ref` がある場合、`repo_root`・読む場所の commit（`load` と同じ）・スキーマのファイル（設定ファイルのフォルダからの相対パスを `source.config_path` で `root` からにしたもの）の `repo_root` からの相対パスで `_revision_schemas` を引き、当たればそのまま返す（リビジョンの書き出しとファイルの `stat` をしない）。
              当たらなければ、`load` と同じ読むフォルダの `source.config_path(schema_path)` を『YAMLの読み込み』で読み、`$ref` を解いた結果を `_revision_schemas` にキャッシュする
              - ファイルが無い・読めない場合、手順 2 のスキーマを使い、キャッシュしない
@@ -413,6 +425,12 @@ classes:
             condition: クローン本体を指す読む場所で、`$ref` を持つ種類のスキーマを 2 回引く
             mock: スキーマの参照の解決（本物を包んで呼ばれた回数を記録する）
             expected: スキーマの参照の解決が 1 回だけ呼ばれ、`clear` の後にもう一度呼ばれる
+          - name: test_document_store_schema_when_cleared_during_resolve
+            case: 正常
+            summary: 解いている間に clear されたスキーマは記録しない
+            condition: クローン本体を指す読む場所で、起動時のスキーマを解く途中で `clear` を呼ぶようにして、スキーマを 2 回引く
+            mock: 起動時のスキーマの解決（本物を包んで、呼ばれた回数を記録し、解いた後に `clear` を呼ぶ）
+            expected: 起動時のスキーマの解決が 2 回呼ばれる（1 回目の結果を記録していない）
       - name: row_schema
         title: 文書に当てるスキーマ
         summary: 文書 1 件の内容に当てるスキーマを返す。`records` を持つ行は 1 行のスキーマ
@@ -513,7 +531,7 @@ classes:
           type: None
           description: '-'
         process: |-
-          1. `_files`・`_schemas`・`_revision_schemas`・`_dates`・`_startup_schemas`・`_worktrees` を空にする（起動の『配信元の読み直し』と『配信元のキャッシュの破棄』が呼ぶ）
+          1. `_files`・`_schemas`・`_revision_schemas`・`_dates`・`_startup_schemas`・`_worktrees` を空にし、`_generation` を 1 つ増やす（起動の『配信元の読み直し』と『配信元のキャッシュの破棄』が呼ぶ）
           2. `_revision_files`・`_trees` は、commit の blob と文書の行の定義で中身が決まり古くならないので残す
       - name: location
         title: 文書の場所
@@ -605,6 +623,12 @@ constants:
     usecase: 共通
     summary: 近い ID とみなす `difflib.get_close_matches` の `cutoff`
     value: '0.6'
+  - name: WORKTREE_KEEP
+    title: 保持するワークツリーの数
+    container: project_index/features/documents/store.py
+    usecase: 読み取り
+    summary: ワークツリーのたどった結果を保持する数。超えたら古く使ったものから捨てる（`TREE_KEEP` と同じ数）
+    value: '20'
 functions:
   - name: check_sync
     title: メタデータのずれの確かめ
