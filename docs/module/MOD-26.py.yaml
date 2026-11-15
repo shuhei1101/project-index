@@ -228,3 +228,33 @@ functions:
         mock: なし（`tmp_path`）
         expected: '`["src/a.py"]`'
         exception: '-'
+  - name: walk_tree
+    title: フォルダごとの列挙
+    kind: 関数
+    container: project_index/features/documents/indexable.py
+    usecase: 読み取り
+    role: 列挙
+    summary: 中をたどるファイルの一覧と、たどったフォルダごとの更新日時を返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: root
+        title: 読むフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: たどるフォルダ
+    returns:
+      type: tuple[list[str], dict[str, int]]
+      description: (`root` からのファイルのパスの一覧, `root` からのフォルダのパス（`root` は `.`）→ `st_mtime_ns`)
+    process: |-
+      1. 中をたどるファイルの列挙と同じに `os.walk` でたどり、同じフォルダを飛ばす
+      2. たどったフォルダごとに `os.stat` の `st_mtime_ns` を記録する（たどる途中で無くなったフォルダは記録しない）
+      3. ファイルの一覧とフォルダの更新日時を返す
+    unit_tests:
+      - name: test_walk_tree
+        case: 正常
+        summary: ファイルとフォルダの更新日時
+        condition: '`a.yaml`・`rules/b.yaml`・空のフォルダ `empty/`・`node_modules/x.js` を置く'
+        mock: なし（`tmp_path`）
+        expected: ファイルは `a.yaml`・`rules/b.yaml`、フォルダは `.`・`rules`・`empty` で、それぞれの `st_mtime_ns` を持ち、`node_modules` は無い

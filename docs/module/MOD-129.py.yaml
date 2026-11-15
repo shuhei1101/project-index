@@ -1,0 +1,148 @@
+id: MOD-129
+title: 索引のサーバー / 共通 / deadline.py
+lead: 1 回のツールの呼び出しの期限と取り消しの合図を受け持ち、共通の deadline.py を修正するときに参照する。
+diagrams:
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        呼び出しの期限 --> 期限 : 書き込みの期限・応答の上限
+        期限 ..> 書き込みの期限の超過 : 送る
+        class 呼び出しの期限 {
+          <<dataclass>>
+        }
+        class 期限 {
+          <<dataclass>>
+          +残りの時間()
+          +制限時間の切り詰め()
+          +期限の確認()
+        }
+        class 書き込みの期限の超過 {
+          <<exception>>
+        }
+        click 書き込みの期限の超過 href "./MOD-98.py.yaml#索引のサーバーのエラー"
+data_models:
+  - name: Deadline
+    title: 期限
+    container: project_index/shared/deadline.py
+    usecase: 共通
+    role: 値オブジェクト
+    summary: 要求を受けた時刻から決めた秒数の後の時刻と、そこまでの残りの時間
+    description: '`@dataclass(frozen=True, slots=True, kw_only=True)`。時刻は `clock`（既定 `time.monotonic`）の秒で持ち、壁時計の時刻は使わない。'
+    properties:
+      - name: limit_sec
+        title: 秒数
+        type: float
+        access: 公開
+        description: 要求を受けてから期限までの秒数
+        example: '32'
+      - name: started
+        title: 要求を受けた時刻
+        type: float
+        access: 公開
+        description: '`clock` の秒'
+      - name: clock
+        title: 時計
+        type: Callable[[], float]
+        access: 公開
+        default: time.monotonic
+        description: 今の時刻を返す関数。テストで差し替える
+    methods:
+      - name: remaining
+        title: 残りの時間
+        kind: メソッド
+        summary: 期限までの残りの秒数を返す（過ぎていれば 0）
+        scope: public
+        thread_safe: true
+        returns:
+          type: float
+          description: '`max(0, started + limit_sec - clock())`'
+        process: 1. `started + limit_sec - clock()` と 0 の大きい方を返す
+        unit_tests:
+          - name: test_deadline_remaining
+            case: 正常
+            summary: 期限の前
+            condition: '`started=10`・`limit_sec=32`、`clock` が 20 を返す'
+            mock: 時計（偽物）
+            expected: '22'
+          - name: test_deadline_remaining_when_passed
+            case: 正常
+            summary: 期限の後
+            condition: 同じ期限で `clock` が 50 を返す
+            mock: 時計（偽物）
+            expected: '0'
+      - name: cap
+        title: 制限時間の切り詰め
+        kind: メソッド
+        summary: スクリプトの制限時間を、期限までの残りの時間との短い方にする
+        scope: public
+        thread_safe: true
+        args:
+          - name: timeout_sec
+            title: 制限時間
+            type: float
+            required: true
+            passing: positional
+            description: 端末の設定の `script_timeout_sec` など
+        returns:
+          type: float
+          description: '`min(timeout_sec, remaining())`。残りが無ければ 0'
+        process: 1. `timeout_sec` と残りの時間の短い方を返す
+        unit_tests:
+          - name: test_deadline_cap
+            case: 正常
+            summary: 残りの時間で切る
+            condition: 残りの時間が 22 の期限で `cap(30)` と `cap(5)`
+            mock: 時計（偽物）
+            expected: 22 と 5
+      - name: check
+        title: 期限の確認
+        kind: メソッド
+        summary: 期限を過ぎていれば書き込みの期限の超過を送る
+        scope: public
+        thread_safe: true
+        returns:
+          type: None
+          description: '-'
+        process: 1. 残りの時間が 0 の場合、`WriteDeadlineExceededError`（`deadline_sec=limit_sec`・`elapsed_sec=clock() - started` を小数点 1 桁に丸めた値）を送る
+        exceptions:
+          - name: WriteDeadlineExceededError
+            condition: 残りの時間が 0
+            message: '`書き込みの期限（{limit_sec} 秒）を超えたため、ファイルを書き換えずに止めました（経過 {elapsed_sec} 秒）`'
+        unit_tests:
+          - name: test_deadline_check
+            case: 正常
+            summary: 期限の前は送らない
+            condition: '`started=10`・`limit_sec=32`、`clock` が 20 を返す'
+            mock: 時計（偽物）
+            expected: 何も送らない
+          - name: test_deadline_check_when_passed
+            case: 異常
+            summary: 期限の後
+            condition: 同じ期限で `clock` が 43 を返す
+            mock: 時計（偽物）
+            expected: '`WriteDeadlineExceededError` の `deadline_sec` が 32、`elapsed_sec` が 33'
+            exception: 残りの時間が 0
+  - name: CallLimits
+    title: 呼び出しの期限
+    container: project_index/shared/deadline.py
+    usecase: 共通
+    role: DTO
+    summary: 1 回のツールの呼び出しの書き込みの期限・応答の上限・取り消しの合図
+    description: '`@dataclass(frozen=True, slots=True, kw_only=True)`。文書の MCP が要求ごとに作り、スレッドで動く書き込み・削除へ渡す。'
+    properties:
+      - name: write_deadline
+        title: 書き込みの期限
+        type: Deadline
+        access: 公開
+        description: '`limit_sec` が端末の設定の `write_deadline_sec`'
+      - name: respond_by
+        title: 応答の上限
+        type: Deadline
+        access: 公開
+        description: '`limit_sec` が文書の MCP の応答の上限（`TOOL_RESPONSE_LIMIT_SEC`）'
+      - name: cancelled
+        title: 取り消しの合図
+        type: threading.Event
+        access: 公開
+        description: MCP の取り消しの通知を受けたら文書の MCP が `set` する

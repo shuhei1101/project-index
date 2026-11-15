@@ -97,8 +97,11 @@ classes:
       | `DecisionNotFoundError` | 検討事項の文書が 1 つに決まらない | `reason: Literal['not_found', 'ambiguous']`・`folders: list[str]` | 404 |
       | `RestartInProgressError` | 再起動か更新の途中 | - | 409 |
       | `UpdateFailedError` | 更新のコマンドの失敗 | `command: list[str]`・`stderr: str` | 500 |
+      | `WriteDeadlineExceededError` | 書き込みの期限の超過 | `deadline_sec: float`・`elapsed_sec: float` | 504 |
+      | `WorktreeLoadingError` | ワークツリーの読み込み中 | `worktree: str` | 503 |
 
       `SourceAccess` は権限と作業場所の『使える配信元』。
+      `WriteDeadlineExceededError` の `next_steps` は「検査のスクリプトの所要時間を確認してから再実行してください」、`WorktreeLoadingError` の `message` は `{worktree} を読み込み中です`、`next_steps` は「時間を空けて同じ呼び出しを再実行してください」。
     properties:
       - name: name
         title: エラーの名前
