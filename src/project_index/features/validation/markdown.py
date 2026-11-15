@@ -20,6 +20,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator, Mapping
     from pathlib import Path
 
+    from project_index.shared.deadline import Deadline
+
 logger = logging.getLogger(__name__)
 
 MARKDOWN_MEDIA_TYPE = "text/markdown"
@@ -114,6 +116,7 @@ def check_markdown_values(
     cwd: Path,
     timeout_sec: float,
     stopped: str | None = None,
+    deadline: Deadline | None = None,
 ) -> MarkdownCheck:
     """値ごとに mdmark の点検を通し、書き方の警告を違反に、点検できなかった値を記録する。"""
     violations: list[Violation] = []
@@ -123,15 +126,24 @@ def check_markdown_values(
         if stopped is not None:
             unchecked.append(UncheckedKey(path=path, reason=stopped))
             continue
+        # 書き込みの期限がある: 過ぎていれば呼ばず、制限時間を残りの時間で切る
+        if deadline is not None:
+            deadline.check()
+        limit = timeout_sec if deadline is None else deadline.cap(timeout_sec)
         try:
-            findings = check_markdown(text, cwd=cwd, timeout_sec=timeout_sec)
+            findings = check_markdown(text, cwd=cwd, timeout_sec=limit)
         except MdmarkUnavailableError as error:
+            # 期限で止めた点検は、点検できなかったキーではなく期限の超過にする
+            if deadline is not None:
+                deadline.check()
             logger.info("mdmark で点検できなかった（%s・%s）", path, error.reason)
             unchecked.append(UncheckedKey(path=path, reason=error.reason))
             # CLI が無い・制限時間を超えた: 残りの値も呼ばない
             if not error.continuable:
                 stopped = error.reason
             continue
+        if deadline is not None:
+            deadline.check()
         # 描画時の書き方の警告だけを違反にし、ほかの種類は書き込みを止めない
         violations.extend(
             Violation(

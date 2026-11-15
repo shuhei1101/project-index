@@ -6,6 +6,8 @@ import asyncio
 import functools
 import inspect
 import logging
+import threading
+import time
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
@@ -13,7 +15,11 @@ from mcp.server.mcpserver import MCPServer
 from mcp.types import CallToolResult, DiscoverResult, RequestParams
 from pydantic import BaseModel, Field, ValidationError
 
-from project_index.features.access.service import available_sources
+from project_index.features.access.service import (
+    available_sources,
+    resolve_read_targets,
+    resolve_write_target,
+)
 from project_index.features.changes.render import render_changes_markdown
 from project_index.features.changes.service import list_changes
 from project_index.features.changes.types import ChangesRequest
@@ -40,15 +46,20 @@ from project_index.server.mcp.result import (
     to_tool_result,
     tool_error,
     tool_prompt_id,
+    tool_unexpected_error,
 )
-from project_index.shared.errors import ProjectIndexError
+from project_index.shared.deadline import CallLimits, Deadline
+from project_index.shared.errors import ProjectIndexError, WorktreeLoadingError
 from project_index.shared.narrowing import is_list
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from mcp.server.context import ServerRequestContext
     from mcp.server.lowlevel.server import NotificationOptions
     from mcp.server.models import InitializationOptions
 
+    from project_index.features.access.types import Target
     from project_index.main import Handlers
 
 logger = logging.getLogger(__name__)
@@ -56,10 +67,13 @@ logger = logging.getLogger(__name__)
 DOCS_MCP_NAME = "project-index"
 # 文書の MCP の instructions 全体の字数の上限
 INSTRUCTIONS_MAX_CHARS = 4096
+# 要求を受けてから応答を返すまでの上限（秒）。Claude Code の HTTP の要求の待ち時間 60 秒の 8 割
+TOOL_RESPONSE_LIMIT_SEC = 48
 
 __all__ = [
     "DOCS_MCP_NAME",
     "INSTRUCTIONS_MAX_CHARS",
+    "TOOL_RESPONSE_LIMIT_SEC",
     "DocsMCPServer",
     "build_docs_mcp",
     "delete_docs",
@@ -104,18 +118,30 @@ def _register(
     name: str,
     description: str,
     model: type[BaseModel],
-    call: Callable[[Any], Any],
+    call: Callable[[Any, CallLimits], Any],
     render: Callable[[Any, Any], str] | None,
     *,
     wait_sources: Callable[[BaseModel], Awaitable[None]],
+    write_deadline_sec: float,
+    prepare: Callable[[BaseModel], Awaitable[None]] | None = None,
 ) -> None:
     """要求のモデルを引数に持つツールを 1 つ登録する（呼ぶ前に要求が指す配信元の読み込みを待つ）。"""
 
     async def tool(**arguments: object) -> CallToolResult:
+        # 期限は要求を受けた時刻から数える
+        started = time.monotonic()
+        limits = CallLimits(
+            write_deadline=Deadline(limit_sec=write_deadline_sec, started=started),
+            respond_by=Deadline(limit_sec=TOOL_RESPONSE_LIMIT_SEC, started=started),
+            cancelled=threading.Event(),
+        )
         try:
             request = model(**arguments)
             await wait_sources(request)
-            result = await asyncio.to_thread(call, request)
+            # ワークツリーの初めての読み込みを上限まで待つ（search_docs・write_docs・delete_docs）
+            if prepare is not None:
+                await prepare(request)
+            result = await asyncio.to_thread(call, request, limits)
             fmt: Literal["markdown", "json"] = getattr(request, "format", "json")
             # 描画を持つツール: 要求を添えて Markdown にする
             renderer: Callable[[Any], str] | None = None
@@ -128,11 +154,15 @@ def _register(
                 renderer = render_with_request
 
             return to_tool_result(result, fmt, renderer)
+        except asyncio.CancelledError:
+            # 取り消しの通知を受けた: スレッドの書き込みは、ファイルを置き換える前に合図を見て止まる
+            limits.cancelled.set()
+            raise
         except (ProjectIndexError, ValidationError) as error:
             return tool_error(error)
-        except Exception:
+        except Exception as error:
             logger.exception("ツールの処理に失敗した（%s）", name)
-            raise
+            return tool_unexpected_error(error)
 
     tool.__signature__ = _signature(model)  # type: ignore[attr-defined]
     tool.__doc__ = description
@@ -153,6 +183,78 @@ def _wait_target(request: BaseModel) -> dict[str, Any]:
         return {"every": True}
     cwd = getattr(request, "worktree", None) or getattr(request, "cwd", None)
     return {"cwd": cwd} if cwd else {}
+
+
+def _worktree_target(
+    request: SearchRequest | WriteRequest | DeleteRequest, handlers: Handlers
+) -> Target | None:
+    """要求が指すワークツリーの場所を解く（ワークツリーでなければ `None`）。"""
+    if isinstance(request, SearchRequest):
+        targets = resolve_read_targets(
+            registry=handlers.registry,
+            source=request.source,
+            worktree=request.worktree,
+            cwd=request.cwd,
+            outside_scope=request.outside_scope,
+        )
+        # 複数の配信元を横断する要求は、ワークツリーを指さない
+        if len(targets) != 1:
+            return None
+        target = targets[0]
+    else:
+        target = resolve_write_target(
+            registry=handlers.registry,
+            source=request.source,
+            worktree=request.worktree,
+            cwd=request.cwd,
+        )
+    return target if target.worktree is not None else None
+
+
+async def _ensure_worktree(
+    request: SearchRequest | WriteRequest | DeleteRequest,
+    handlers: Handlers,
+    loads: dict[Path, asyncio.Future[object]],
+) -> None:
+    """要求が指すワークツリーの初めての読み込みを上限まで待ち、終わらなければ読み込み中のエラーを送る。"""
+    if isinstance(request, SearchRequest) and request.ref is not None:
+        return
+    try:
+        target = await asyncio.to_thread(_worktree_target, request, handlers)
+    except ProjectIndexError:
+        # 解けない要求は、サービスが同じ解決で同じエラーを返す
+        return
+    if target is None or handlers.store.has_worktree(target):
+        return
+    root = target.base
+    task = loads.get(root)
+    # 同じワークツリーの読み込みは 1 つだけ動かし、後の要求は同じ読み込みを待つ
+    if task is None or task.done():
+        task = asyncio.ensure_future(asyncio.to_thread(handlers.store.load, target))
+        loads[root] = task
+
+        def forget(done: asyncio.Future[object], root: Path = root) -> None:
+            if loads.get(root) is done:
+                del loads[root]
+
+        task.add_done_callback(forget)
+    wait_sec = handlers.terminal.worktree_load_wait_sec
+    try:
+        async with asyncio.timeout(wait_sec):
+            await asyncio.shield(task)
+    except TimeoutError:
+        # 読み込みは止めずに続け、次の要求で同じ読み込みの終わりを待つ
+        logger.info(
+            "ワークツリーを読み込み中のため待たずに返した（%s・%s・%s 秒）",
+            target.source.id,
+            root,
+            wait_sec,
+        )
+        raise WorktreeLoadingError(
+            message=f"{root} を読み込み中です",
+            worktree=str(root),
+            next_steps=["時間を空けて同じ呼び出しを再実行してください"],
+        ) from None
 
 
 def _recheck_after[R: (WriteResult, DeleteResult)](
@@ -224,14 +326,21 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
     register = functools.partial(
         _register,
         wait_sources=lambda request: handlers.registry.wait_for(**_wait_target(request)),
+        write_deadline_sec=handlers.terminal.write_deadline_sec,
     )
+    # ワークツリーのパスごとの読み込み中のタスク（イベントループの中だけで触る）
+    loads: dict[Path, asyncio.Future[object]] = {}
+
+    async def ensure_worktree(request: BaseModel) -> None:
+        if isinstance(request, SearchRequest | WriteRequest | DeleteRequest):
+            await _ensure_worktree(request, handlers, loads)
 
     register(
         mcp,
         "search_docs",
         handlers.prompts.render(tool_prompt_id("docs", "search_docs")),
         SearchRequest,
-        lambda request: search_docs(
+        lambda request, limits: search_docs(
             request,
             registry=handlers.registry,
             store=handlers.store,
@@ -239,13 +348,14 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
             seen=handlers.seen,
         ),
         lambda result, request: render_search_markdown(result, source_label=result.source_label),
+        prepare=ensure_worktree,
     )
     register(
         mcp,
         "describe",
         handlers.prompts.render(tool_prompt_id("docs", "describe")),
         DescribeRequest,
-        lambda request: describe(
+        lambda request, limits: describe(
             request,
             registry=handlers.registry,
             store=handlers.store,
@@ -259,7 +369,7 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
         "list_changes",
         handlers.prompts.render(tool_prompt_id("docs", "list_changes")),
         ChangesRequest,
-        lambda request: list_changes(
+        lambda request, limits: list_changes(
             request, registry=handlers.registry, store=handlers.store, seen=handlers.seen
         ),
         lambda result, request: render_changes_markdown(
@@ -271,7 +381,7 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
         "trace_related",
         handlers.prompts.render(tool_prompt_id("docs", "trace_related")),
         RelatedRequest,
-        lambda request: trace_related(
+        lambda request, limits: trace_related(
             request, registry=handlers.registry, store=handlers.store, seen=handlers.seen
         ),
         lambda result, request: render_related_markdown(result),
@@ -281,7 +391,7 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
         "write_docs",
         handlers.prompts.render(tool_prompt_id("docs", "write_docs")),
         WriteRequest,
-        lambda request: _recheck_after(
+        lambda request, limits: _recheck_after(
             write_docs(
                 request,
                 registry=handlers.registry,
@@ -290,18 +400,20 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
                 seen=handlers.seen,
                 locks=handlers.locks,
                 timeout_sec=timeout,
+                limits=limits,
             ),
             request.cwd,
             handlers,
         ),
         None,
+        prepare=ensure_worktree,
     )
     register(
         mcp,
         "delete_docs",
         handlers.prompts.render(tool_prompt_id("docs", "delete_docs")),
         DeleteRequest,
-        lambda request: _recheck_after(
+        lambda request, limits: _recheck_after(
             delete_docs(
                 request,
                 registry=handlers.registry,
@@ -309,18 +421,22 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
                 checker=handlers.checker,
                 locks=handlers.locks,
                 timeout_sec=timeout,
+                limits=limits,
             ),
             request.cwd,
             handlers,
         ),
         None,
+        prepare=ensure_worktree,
     )
     register(
         mcp,
         "list_match_words",
         handlers.prompts.render(tool_prompt_id("docs", "list_match_words")),
         MatchWordsRequest,
-        lambda request: list_match_words(request, registry=handlers.registry, store=handlers.store),
+        lambda request, limits: list_match_words(
+            request, registry=handlers.registry, store=handlers.store
+        ),
         lambda result, request: render_match_words_markdown(result),
     )
     return mcp

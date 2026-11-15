@@ -214,3 +214,9 @@ def tool_error(error: ProjectIndexError | ValidationError) -> CallToolResult:
             lines.append(_yaml(details))
         lines.extend(f"- {step}" for step in error.next_steps)
     return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))], is_error=True)
+
+
+def tool_unexpected_error(error: Exception) -> CallToolResult:
+    """`ProjectIndexError` でない例外を、例外の型と内容を持つ `isError: true` の結果にする。"""
+    text = f"UnexpectedError: {type(error).__name__}: {error}"
+    return CallToolResult(content=[TextContent(type="text", text=text)], is_error=True)
