@@ -282,7 +282,9 @@ def test_document_checker_check_when_deadline_capped(
     def stopping(run: Any, **kwargs: Any) -> Any:
         received.append(kwargs["timeout_sec"])
         clock.now = 3
-        raise ScriptTimeoutError(list(run), "制限時間（2 秒）を超えたため、スクリプトを止めました。")
+        raise ScriptTimeoutError(
+            list(run), "制限時間（2 秒）を超えたため、スクリプトを止めました。"
+        )
 
     monkeypatch.setattr(service_module, "run_script", stopping)
     target = make_checked_target(
@@ -331,7 +333,9 @@ def test_document_checker_check_when_script_timed_out(
 
     def stopping(run: Any, **kwargs: Any) -> Any:
         clock.now = 1
-        raise ScriptTimeoutError(list(run), "制限時間（1 秒）を超えたため、スクリプトを止めました。")
+        raise ScriptTimeoutError(
+            list(run), "制限時間（1 秒）を超えたため、スクリプトを止めました。"
+        )
 
     monkeypatch.setattr(service_module, "run_script", stopping)
     target = make_checked_target(
@@ -343,4 +347,7 @@ def test_document_checker_check_when_script_timed_out(
     result = checker.check(target, make_document(), on="write", deadline=deadline)
     # 検証
     assert len(result) == 1
-    assert result[0].rule == "v: 検査を実行できませんでした（制限時間（1 秒）を超えたため、スクリプトを止めました。）"
+    assert (
+        result[0].rule
+        == "v: 検査を実行できませんでした（制限時間（1 秒）を超えたため、スクリプトを止めました。）"
+    )

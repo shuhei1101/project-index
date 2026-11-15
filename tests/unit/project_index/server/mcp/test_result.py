@@ -229,4 +229,7 @@ def test_tool_unexpected_error() -> None:
     result = tool_unexpected_error(error)
     # 検証
     assert result.is_error is True
-    assert _text(result.content[0]) == "UnexpectedError: GitError: git archive abc: 20 秒を超えたため止めました"
+    assert (
+        _text(result.content[0])
+        == "UnexpectedError: GitError: git archive abc: 20 秒を超えたため止めました"
+    )

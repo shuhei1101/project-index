@@ -5,7 +5,6 @@ import dataclasses
 import logging
 import re
 import threading
-from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
@@ -28,6 +27,7 @@ from project_index.shared.errors import UnknownKindError, WorktreeLoadingError
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
+    from pathlib import Path
 
     import pytest
 
@@ -507,7 +507,9 @@ def test_ensure_worktree(
     """初めての読み込みを待つ（正常系）。"""
     # 準備
     target = _worktree_target(tmp_path, make_served_source, make_target)
-    monkeypatch.setattr(docs_module, "resolve_read_targets", lambda **kwargs: [target], raising=False)
+    monkeypatch.setattr(
+        docs_module, "resolve_read_targets", lambda **kwargs: [target], raising=False
+    )
     store = _fake_store(loaded=False)
     handlers = make_mcp_handlers(store=store)
     loads: dict[Path, Any] = {}
@@ -533,7 +535,9 @@ def test_ensure_worktree_when_loaded(
     """読み込み済みのワークツリーは待たない（正常系）。"""
     # 準備
     target = _worktree_target(tmp_path, make_served_source, make_target)
-    monkeypatch.setattr(docs_module, "resolve_read_targets", lambda **kwargs: [target], raising=False)
+    monkeypatch.setattr(
+        docs_module, "resolve_read_targets", lambda **kwargs: [target], raising=False
+    )
     store = _fake_store(loaded=True)
     handlers = make_mcp_handlers(store=store)
     # 実行
@@ -553,7 +557,9 @@ def test_ensure_worktree_when_slow(
     """上限までに終わらない読み込み（異常系）。"""
     # 準備
     target = _worktree_target(tmp_path, make_served_source, make_target)
-    monkeypatch.setattr(docs_module, "resolve_read_targets", lambda **kwargs: [target], raising=False)
+    monkeypatch.setattr(
+        docs_module, "resolve_read_targets", lambda **kwargs: [target], raising=False
+    )
     release = threading.Event()
     store = _fake_store(loaded=False, release=release)
     handlers = make_mcp_handlers(
