@@ -1,0 +1,64 @@
+$ uv run pytest tests/unit/
+# commit: 158a1a5（テストコードの末尾。実装の前の Red）
+
+==================================== ERRORS ====================================
+_ ERROR collecting tests/unit/project_index/features/documents/test_indexable.py _
+ImportError while importing test module '/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/fix-docs-mcp-timeout-write-and-worktree-read/tests/unit/project_index/features/documents/test_indexable.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/documents/test_indexable.py:5: in <module>
+    from project_index.features.documents.indexable import (
+E   ImportError: cannot import name 'walk_tree' from 'project_index.features.documents.indexable' (/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/fix-docs-mcp-timeout-write-and-worktree-read/src/project_index/features/documents/indexable.py)
+_ ERROR collecting tests/unit/project_index/features/validation/test_markdown.py _
+ImportError while importing test module '/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/fix-docs-mcp-timeout-write-and-worktree-read/tests/unit/project_index/features/validation/test_markdown.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/validation/test_markdown.py:16: in <module>
+    from project_index.shared.deadline import Deadline
+E   ModuleNotFoundError: No module named 'project_index.shared.deadline'
+_ ERROR collecting tests/unit/project_index/features/validation/test_service.py _
+ImportError while importing test module '/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/fix-docs-mcp-timeout-write-and-worktree-read/tests/unit/project_index/features/validation/test_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/validation/test_service.py:22: in <module>
+    from project_index.shared.deadline import Deadline
+E   ModuleNotFoundError: No module named 'project_index.shared.deadline'
+___ ERROR collecting tests/unit/project_index/features/write/test_service.py ___
+ImportError while importing test module '/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/fix-docs-mcp-timeout-write-and-worktree-read/tests/unit/project_index/features/write/test_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_service.py:38: in <module>
+    from project_index.shared.deadline import CallLimits, Deadline
+E   ModuleNotFoundError: No module named 'project_index.shared.deadline'
+______ ERROR collecting tests/unit/project_index/server/mcp/test_docs.py _______
+ImportError while importing test module '/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/fix-docs-mcp-timeout-write-and-worktree-read/tests/unit/project_index/server/mcp/test_docs.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/server/mcp/test_docs.py:20: in <module>
+    from project_index.server.mcp.docs import (
+E   ImportError: cannot import name 'TOOL_RESPONSE_LIMIT_SEC' from 'project_index.server.mcp.docs' (/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/fix-docs-mcp-timeout-write-and-worktree-read/src/project_index/server/mcp/docs.py)
+_____ ERROR collecting tests/unit/project_index/server/mcp/test_result.py ______
+ImportError while importing test module '/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/fix-docs-mcp-timeout-write-and-worktree-read/tests/unit/project_index/server/mcp/test_result.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/server/mcp/test_result.py:27: in <module>
+    from project_index.server.mcp.result import to_tool_result, tool_error, tool_unexpected_error
+E   ImportError: cannot import name 'tool_unexpected_error' from 'project_index.server.mcp.result' (/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/fix-docs-mcp-timeout-write-and-worktree-read/src/project_index/server/mcp/result.py)
+______ ERROR collecting tests/unit/project_index/shared/test_deadline.py _______
+ImportError while importing test module '/mnt/c/Users/shuhe/repo/project-index/.claude/worktrees/fix-docs-mcp-timeout-write-and-worktree-read/tests/unit/project_index/shared/test_deadline.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/shared/test_deadline.py:7: in <module>
+    from project_index.shared.deadline import Deadline
+E   ModuleNotFoundError: No module named 'project_index.shared.deadline'
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/documents/test_indexable.py
+ERROR tests/unit/project_index/features/validation/test_markdown.py
+ERROR tests/unit/project_index/features/validation/test_service.py
+ERROR tests/unit/project_index/features/write/test_service.py
+ERROR tests/unit/project_index/server/mcp/test_docs.py
+ERROR tests/unit/project_index/server/mcp/test_result.py
+ERROR tests/unit/project_index/shared/test_deadline.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 7 errors during collection !!!!!!!!!!!!!!!!!!!!
+7 errors in 99.58s (0:01:39)
+exit=2
