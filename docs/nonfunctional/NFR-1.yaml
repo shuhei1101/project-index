@@ -158,20 +158,20 @@ requirements:
     external_constraint: 文書の MCP の応答の上限 48 秒
     source_kind: 実行基盤の制限
     source: NFR-1#requirements[文書の MCP の応答の上限]
-    value: '40'
+    value: '32'
     unit: 秒
     measurement: '`write_deadline_sec` より長く待つ検査のスクリプトを持つ種類へ `write_docs` を送信し、応答までの時間と、ファイルが書き換わっていないことを測る'
     breakdown:
       - part: 外側の待ち
         value: '48'
         notes: 文書の MCP の応答の上限
-      - part: 置き換え・書き込み後の生成・応答の余裕
-        value: '8'
-        notes: 実測が無いため仮の値にする。生成は応答の上限までの残りの時間を制限時間にするため、余裕が足りなくても応答は上限を超えない
+      - part: 余裕（置き換え・書き込み後の生成・応答の組み立て）
+        value: '16'
+        notes: 実測が無いため、内側の待ち（書き込みの期限）の 50%。置き換えから応答までの所要時間を測り、p99.9 で差し替える。生成は応答の上限までの残りの時間を制限時間にするため、余裕が足りなくても応答は上限を超えない
       - part: アプリの決定値
-        value: '40'
-        notes: 48 − 8
-    rationale: 置き換えを始めた後は最後まで書き込むため、置き換えを始めてよい期限は、応答の上限から置き換えと応答の組み立ての時間を差し引いた値にする。端末の設定の `write_deadline_sec` で変えられる
+        value: '32'
+        notes: 32 × 1.5 = 48
+    rationale: 置き換えを始めた後は最後まで書き込むため、検査と置き換えの開始を期限までに収め、応答の上限を外側の待ちとする入れ子の待ち（規約『資源の値の決め方』）で導く。端末の設定の `write_deadline_sec` で変えられる
     overflow: 期限を過ぎたら、ファイルを 1 つも書き換えずに `WriteDeadlineExceededError` を返却する
     status: planned
   - id: NFR-12
@@ -181,7 +181,7 @@ requirements:
     external_constraint: 文書の MCP の応答の上限 48 秒
     source_kind: 実行基盤の制限
     source: NFR-1#requirements[文書の MCP の応答の上限]
-    value: '30'
+    value: '22'
     unit: 秒
     measurement: 読み込みを遅らせたワークツリーを指す `search_docs` を送信し、応答までの時間を測る
     breakdown:
@@ -191,13 +191,13 @@ requirements:
       - part: 読み込んだ後の検索
         value: '10'
         notes: 作業範囲の外の配信元の検索の所要時間の決定値。読み込んだ後の検索は文書の数によらず数秒
-      - part: 余裕
-        value: '8'
-        notes: 応答の組み立てと端末の負荷。実測が無いため仮の値にする
+      - part: 余裕（応答の組み立てと端末の負荷）
+        value: '16'
+        notes: 実測が無いため、内側の待ち（読み込みの待ち + 検索）の 50%。応答の組み立ての所要時間を測り、p99.9 で差し替える
       - part: アプリの決定値
-        value: '30'
-        notes: 48 − 10 − 8
-    rationale: 読み込みを待った後に検索して応答を組み立てるため、応答の上限から検索と余裕を差し引く。端末の設定の `worktree_load_wait_sec` で変えられる
+        value: '22'
+        notes: (22 + 10) × 1.5 = 48
+    rationale: 読み込みを待った後に検索して応答を組み立てるため、読み込みの待ちと検索を内側の待ち、応答の上限を外側の待ちとする入れ子の待ち（規約『資源の値の決め方』）で導く。端末の設定の `worktree_load_wait_sec` で変えられる
     overflow: 上限までに読み込みが終了しなければ `WorktreeLoadingError` を返却し、読み込みは続ける。次の呼び出しは同じ読み込みの終了を待つ
     status: planned
 id: NFR-1

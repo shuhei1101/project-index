@@ -799,7 +799,7 @@ flows:
       - ワークツリー x の文書 1 は書き換わらない
     test: test_error_when_schema_ref_unresolvable
   - name: 異常系（書き込みの期限を過ぎた・WriteDeadlineExceededError）
-    summary: 作業ツリーのファイルを置き換える前に書き込みの期限を過ぎていたら、何も書き込まずに時間切れを返却する
+    summary: 検査が書き込みの期限までに終了しなければ、検査のスクリプトを止めて、何も書き込まずに時間切れを返却する
     setup:
       - name: Mock
         description: なし。端末の設定の `write_deadline_sec` を 2 にする
@@ -818,16 +818,16 @@ flows:
         participant WT as ワークツリー x
 
         C->>T: worktree: x, operations: update 文書 1
-        T->>T: 変更を適用した文書を validators で検査する（4 秒）
-        T->>T: 置き換える前に、要求を受けてから write_deadline_sec を過ぎたことを確認する
+        T->>T: 変更を適用した文書を validators で検査する（制限時間は期限までの残りの時間）
+        T->>T: 期限でスクリプトを止める
         T-->>C: isError（書き込みの期限・経過した秒数・書き換えていないこと）
       ```
 
       <!-- /map -->
     expected:
       - '`isError: true` で、`WriteDeadlineExceededError`、書き込みの期限（2 秒）を超えたことと、ファイルを書き換えていないことを返却する'
-      - 応答は、要求を送信してから 6 秒の内に返却される
-      - 応答の後に検査のスクリプトが終了しても、ワークツリー x の文書 1 は書き換わらない
+      - 応答は、要求を送信してから 3 秒の内に返却される（検査のスクリプトの 4 秒を待たない）
+      - 応答から 4 秒待った後も、ワークツリー x の文書 1 は書き換わらない
       - 続けての `search_docs` が、書き込み前の `version` を返却する
     test: test_error_when_write_deadline_exceeded
   - name: 異常系（呼び出しが取り消された）
@@ -1150,8 +1150,8 @@ constraints:
   - item: 解決できないスキーマの参照
     constraint: '種類のスキーマの `$ref` を解決できない文書への操作は、解決できなかった `$ref` とスキーマのファイルのパスを決まりにした違反として、`atomic: true` は `ValidationFailedError`、`atomic: false` は `results[].status` の `failed` で返す'
   - item: 書き込みの期限
-    constraint: 作業ツリーのファイルを置き換える前に、要求を受けてからの経過が端末の設定の `write_deadline_sec`（既定は [非機能要件](id:NFR-1) の書き込みの期限）を過ぎていたら、何も書き込まずに `WriteDeadlineExceededError` を返却する。置き換えを始めた後は、期限を過ぎても全てのファイルを書き込み終える
-    notes: 期限を過ぎた後に検査のスクリプトが終了しても書き込まない
+    constraint: 書き込みの期限は、要求を受けた時刻に端末の設定の `write_deadline_sec`（既定は [非機能要件](id:NFR-1) の書き込みの期限）を足した時刻。`validators[]` のスクリプトと mdmark の点検の制限時間は、`script_timeout_sec` と期限までの残りの時間の短い方にする。残りの時間が無いとき、残りの時間でスクリプトを止めたとき、作業ツリーのファイルを置き換える前に期限を過ぎていたときは、何も書き込まずに `WriteDeadlineExceededError` を返却する。置き換えを始めた後は、期限を過ぎても全てのファイルを書き込み終える
+    notes: '`script_timeout_sec` で止めたスクリプトは、違反（`ValidationFailedError`）にする'
   - item: 取り消し
     constraint: MCP の取り消しの通知（`notifications/cancelled`）を受けた要求は、作業ツリーのファイルを置き換える前に止め、何も書き込まない。置き換えを始めた後は全てのファイルを書き込み終える。止めたときはサーバーのログに `取り消されたため書き込まなかった（{ツール}・{配信元}・{書き込む先のパス}）` を出す
     notes: 'Claude Code 2.1.325 は時間切れのときに取り消しの通知を送信しない（作業 PR #82 の計画書『調査の結果』）。時間切れとの一致は書き込みの期限で守る'
