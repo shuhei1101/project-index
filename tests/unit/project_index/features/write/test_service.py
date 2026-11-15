@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import logging
 import sys
-import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -640,17 +638,11 @@ def test_write_docs_when_tags_are_objects(make_env: Callable[..., WriteEnv]) -> 
     ]
 
 
-def _limits(
-    write_remaining: float, respond_remaining: float = 48, *, cancelled: bool = False
-) -> CallLimits:
+def _limits(write_remaining: float, respond_remaining: float = 48) -> CallLimits:
     """残りの時間を決めた呼び出しの期限を作る（時計は 0 のまま進まない）。"""
-    event = threading.Event()
-    if cancelled:
-        event.set()
     return CallLimits(
         write_deadline=Deadline(limit_sec=write_remaining, started=0, clock=lambda: 0),
         respond_by=Deadline(limit_sec=respond_remaining, started=0, clock=lambda: 0),
-        cancelled=event,
     )
 
 
@@ -698,24 +690,6 @@ def test_write_docs_when_deadline_passed_not_atomic(
     assert (env.worktree / "docs/rule/doc-2.yaml").read_text(encoding="utf-8") == DOC_2
 
 
-def test_write_docs_when_cancelled(
-    make_env: Callable[..., WriteEnv], caplog: pytest.LogCaptureFixture
-) -> None:
-    """取り消された要求は書かない（正常系）。"""
-    # 準備
-    env = make_env()
-    operation = Operation(
-        op="update", id="doc-1", expected_version=content_hash(DOC_1), set={"name": "新しい名前"}
-    )
-    caplog.set_level(logging.INFO, logger=write_service.__name__)
-    # 実行
-    result = env.write(operations=[operation], limits=_limits(30, cancelled=True))
-    # 検証
-    assert result.applied is False
-    assert (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
-    assert f"取り消されたため書き込まなかった（write_docs・sample・{env.worktree}）" in caplog.text
-
-
 def test_write_docs_when_no_time_for_generators(
     make_env: Callable[..., WriteEnv], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -753,16 +727,4 @@ def test_delete_docs_when_deadline_passed(make_env: Callable[..., WriteEnv]) -> 
     # 実行・検証
     with pytest.raises(WriteDeadlineExceededError, match="書き込みの期限"):
         env.delete(targets=targets, limits=_limits(0))
-    assert (env.worktree / "docs/rule/doc-2.yaml").exists()
-
-
-def test_delete_docs_when_cancelled(make_env: Callable[..., WriteEnv]) -> None:
-    """取り消された要求は消さない（正常系）。"""
-    # 準備
-    env = make_env()
-    targets = [DeleteTarget(id="doc-2", expected_version=content_hash(DOC_2))]
-    # 実行
-    result = env.delete(targets=targets, limits=_limits(30, cancelled=True))
-    # 検証
-    assert result.applied is False
     assert (env.worktree / "docs/rule/doc-2.yaml").exists()

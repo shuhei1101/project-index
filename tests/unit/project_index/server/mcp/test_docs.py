@@ -435,43 +435,6 @@ def test_build_docs_mcp_when_limits(
     # 検証
     assert received[0].write_deadline.limit_sec == 32
     assert received[0].respond_by.limit_sec == TOOL_RESPONSE_LIMIT_SEC
-    assert received[0].cancelled.is_set() is False
-
-
-def test_build_docs_mcp_when_cancelled(
-    make_mcp_handlers: Callable[..., Any], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """取り消しの合図を立てる（正常系）。"""
-    from mcp import Client
-
-    # 準備
-    received: list[CallLimits] = []
-    started = threading.Event()
-    release = threading.Event()
-
-    def blocking_write_docs(request: WriteRequest, **kwargs: Any) -> WriteResult:
-        received.append(kwargs["limits"])
-        started.set()
-        release.wait(timeout=10)
-        return WriteResult(applied=False, results=[])
-
-    monkeypatch.setattr(docs_module, "write_docs", blocking_write_docs)
-    mcp = build_docs_mcp(make_mcp_handlers())
-    arguments: dict[str, Any] = {"operations": [{"op": "create", "kind": "x", "data": {}}]}
-
-    async def scenario() -> bool:
-        async with Client(mcp) as client:
-            call = asyncio.ensure_future(client.call_tool("write_docs", arguments))
-            await asyncio.to_thread(started.wait, 10)
-            call.cancel()
-            cancelled = await asyncio.to_thread(received[0].cancelled.wait, 10)
-            release.set()
-            return cancelled
-
-    # 実行
-    result = asyncio.run(scenario())
-    # 検証
-    assert result is True
 
 
 def _worktree_target(
