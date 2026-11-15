@@ -1105,6 +1105,9 @@ exceptions:
   - name: UnexpectedError
     condition: '`ProjectIndexError` でない例外（`GitError` など）で処理を終了できなかった'
     notes: 例外の型と内容を返却する。サーバーのログには例外のトレースバックを残す。文書の MCP の全てのツールで共通の変換のため、結合テストは [文書の検索](id:IF-2) が持つ
+  - name: WorktreeLoadingError
+    condition: 書き込むワークツリーの初めての読み込みが、端末の設定の `worktree_load_wait_sec` までに終了しなかった
+    notes: 何も書き込まない。ワークツリーのパスと、時間を空けて同じ呼び出しを送信することを添える
 constraints:
   - item: 件数
     constraint: 1 回の `operations` は最大 50 件
@@ -1160,6 +1163,9 @@ constraints:
     notes: 生成の失敗と同じく、書き込みの結果は変えない
   - item: 想定外の例外
     constraint: '`ProjectIndexError` でない例外は、`UnexpectedError` として例外の型と内容を `isError: true` の応答にする。`Error executing tool` だけの応答にしない'
+  - item: ワークツリーの読み込みの待ち
+    constraint: '[文書の検索](id:IF-2) の制約「ワークツリーの読み込みの待ち」と同じ。終了しなければ何も書き込まずに `WorktreeLoadingError` を返却する'
+    notes: 共通の処理のため、結合テストは文書の検索が持つ
 refs:
   - SC-7#scenarios[正常シナリオ]
   - SC-9#scenarios[異常シナリオ（読んだ後に変わった文書へ書き込む）]

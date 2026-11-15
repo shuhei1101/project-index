@@ -387,6 +387,9 @@ exceptions:
   - name: UnexpectedError
     condition: '`ProjectIndexError` でない例外で処理を終了できなかった'
     notes: '`write_docs` と同じ'
+  - name: WorktreeLoadingError
+    condition: 消す先のワークツリーの初めての読み込みが、端末の設定の `worktree_load_wait_sec` までに終了しなかった
+    notes: '`write_docs` と同じ'
 constraints:
   - item: 件数
     constraint: 1 回の `targets` は最大 50 件

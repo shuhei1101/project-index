@@ -171,7 +171,7 @@ functions:
          - 要求を受けた時刻を `time.monotonic()` で記録し、呼び出しの期限（`write_deadline` は `limit_sec` が `handlers.terminal.write_deadline_sec`、`respond_by` は `TOOL_RESPONSE_LIMIT_SEC`、`cancelled` は新しい `threading.Event`）を作る
          - 引数で要求のモデル（`SearchRequest` など）を作る
          - 要求が指す配信元を決め（指す配信元の決定）、`await handlers.registry.wait_for(...)` でその行の読み込みだけを待つ（初期化とツールの一覧は待たない）
-         - `search_docs` の場合、ワークツリーの読み込みの待ちを await する
+         - `search_docs`・`write_docs`・`delete_docs` の場合、ワークツリーの読み込みの待ちを await する
          - サービスを `asyncio.to_thread` で呼ぶ（引数は `handlers` の属性。`write_docs`・`delete_docs` は `limits` に呼び出しの期限）
          - `asyncio.CancelledError` の場合（MCP の取り消しの通知で SDK がタスクを取り消した）、`limits.cancelled` を `set` してから送り直す。スレッドのサービスは止めない（ファイルを置き換える前に合図を見て止まる）
          - `write_docs`・`delete_docs` の結果の `applied` が `True` の場合、`cwd` から書ける配信元を裏で検査し直す（配信元の検査のキャッシュ.裏での検査の流し直し）
@@ -316,16 +316,16 @@ functions:
     container: project_index/server/mcp/docs.py
     usecase: 読み取り
     role: 待ち
-    summary: '`search_docs` が指すワークツリーの初めての読み込みを上限まで待ち、終わらなければ読み込み中のエラーを送る'
+    summary: '`search_docs`・`write_docs`・`delete_docs` が指すワークツリーの初めての読み込みを上限まで待ち、終わらなければ読み込み中のエラーを送る'
     scope: internal
     is_async: true
     args:
       - name: request
-        title: 検索の要求
-        type: SearchRequest
+        title: 要求
+        type: SearchRequest | WriteRequest | DeleteRequest
         required: true
         passing: positional
-        description: '`source`・`worktree`・`cwd`・`ref` を使う'
+        description: '`source`・`worktree`・`cwd`・`ref`（`SearchRequest` だけ）を使う'
       - name: handlers
         title: 配線済みの関数
         type: Handlers
@@ -343,7 +343,7 @@ functions:
       description: '-'
     process: |-
       1. `request.ref` がある場合、何もしない
-      2. `asyncio.to_thread` で権限と作業場所の『読む場所の解決』を `source`・`worktree`・`cwd`・`outside_scope` で呼ぶ。読む場所が 1 つでない、または `worktree` が `None` なら何もしない（エラーはそのまま伝わる）
+      2. `asyncio.to_thread` で場所を解く。`SearchRequest` は権限と作業場所の『読む場所の解決』を `source`・`worktree`・`cwd`・`outside_scope` で、`WriteRequest`・`DeleteRequest` は『書く場所の解決』を `source`・`worktree`・`cwd` で呼ぶ。場所が 1 つでない、または `worktree` が `None` なら何もしない（エラーはそのまま伝わる）
       3. 文書のストア.ワークツリーを読み込んだかが `True` なら何もしない
       4. `loads` にそのワークツリーの終わっていないタスクが無ければ、`asyncio.to_thread(handlers.store.load, 読む場所)` のタスクを作って入れ、終わったら `loads` から除くコールバックを付ける
       5. `async with asyncio.timeout(handlers.terminal.worktree_load_wait_sec)` の中でタスクを `asyncio.shield` で包んで await する
@@ -373,6 +373,13 @@ functions:
         condition: '`worktree_load_wait_sec=1`、`load` が外から合図するまで終わらない。同じワークツリーの要求を 2 つ続けて送り、合図した後に 3 つ目を送る'
         mock: 文書のストア（`load` を合図まで止める偽物）
         expected: 1 つ目と 2 つ目が `WorktreeLoadingError`、`load` は 1 回だけ呼ばれる。3 つ目は何も送らない
+        exception: 初めての読み込みが `worktree_load_wait_sec` までに終わらない
+      - name: test_ensure_worktree_when_write
+        case: 異常
+        summary: 書き込みでも初めての読み込みを上限まで待つ
+        condition: '`worktree_load_wait_sec=1`、`load` が外から合図するまで終わらない。ワークツリー x を指す `WriteRequest`'
+        mock: 文書のストア（`load` を合図まで止める偽物）
+        expected: '`WorktreeLoadingError`、`load` に渡った場所が書く場所の解決の結果'
         exception: 初めての読み込みが `worktree_load_wait_sec` までに終わらない
 refs:
   - IF-2#
