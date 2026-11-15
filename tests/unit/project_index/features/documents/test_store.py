@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import os
+import threading
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
@@ -9,6 +11,7 @@ import pytest
 
 from project_index.features.documents import indexable as indexable_module
 from project_index.features.documents import loader as loader_module
+from project_index.features.documents import schema as schema_module
 from project_index.features.documents import store as store_module
 from project_index.features.documents.store import DocumentStore
 from project_index.features.history import query as query_module
@@ -1075,3 +1078,152 @@ def test_store_schema_when_paths_base_set(
     # 検証
     assert from_worktree["required"] == ["brain"]
     assert from_ref["required"] == ["brain"]
+
+
+@pytest.fixture
+def worktree_target(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+) -> Target:
+    """行 `rules`（YAML 2 件）をワークツリー x に持つ配信元の、ワークツリー x の読む場所を返す。"""
+    clone = tmp_path / "clone"
+    worktree = clone / ".claude" / "worktrees" / "x"
+    write_files(clone, {"rules/a.yaml": "id: a\nname: 本体\n"})
+    write_files(worktree, {"rules/a.yaml": "id: a\nname: A\n", "rules/b.yaml": "id: b\nname: B\n"})
+    source = make_served_source(
+        id="sample", root=clone, config=make_source_config(documents=[RULES_TABLE])
+    )
+    return make_target(source, base=worktree, worktree=worktree)
+
+
+def _count_calls(monkeypatch: pytest.MonkeyPatch, module: Any, name: str) -> list[Any]:
+    """モジュールの関数を本物を包んで差し替え、呼ばれた引数の並びを返す。"""
+    calls: list[Any] = []
+    original = getattr(module, name)
+
+    def _wrapped(*args: Any, **kwargs: Any) -> Any:
+        calls.append(args)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(module, name, _wrapped)
+    return calls
+
+
+def test_document_store_has_worktree(
+    document_store: DocumentStore, worktree_target: Target
+) -> None:
+    """読み込んだ後だけ True（正常系）。"""
+    # 準備
+    before = document_store.has_worktree(worktree_target)
+    # 実行
+    document_store.load(worktree_target)
+    after = document_store.has_worktree(worktree_target)
+    document_store.clear()
+    cleared = document_store.has_worktree(worktree_target)
+    # 検証
+    assert before is False
+    assert after is True
+    assert cleared is False
+
+
+def test_document_store_load_when_worktree_cached(
+    document_store: DocumentStore,
+    worktree_target: Target,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """ワークツリーは 2 回目からたどり直さない（正常系）。"""
+    # 準備
+    walks = _count_calls(monkeypatch, store_module, "walk_tree")
+    collects = _count_calls(monkeypatch, store_module, "collect_files")
+    caplog.set_level(logging.INFO, logger=store_module.__name__)
+    # 実行
+    first = document_store.load(worktree_target)
+    second = document_store.load(worktree_target)
+    # 検証
+    assert len(walks) == 1
+    assert len(collects) == 1
+    assert caplog.text.count("ワークツリーを読み込んだ") == 1
+    assert [document.name for document in first.documents] == ["A", "B"]
+    assert [document.name for document in second.documents] == ["A", "B"]
+
+
+def test_document_store_load_when_worktree_file_added(
+    document_store: DocumentStore,
+    worktree_target: Target,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """ファイルを足したフォルダをたどり直す（正常系）。"""
+    # 準備
+    caplog.set_level(logging.INFO, logger=store_module.__name__)
+    document_store.load(worktree_target)
+    rules = worktree_target.base / "rules"
+    (rules / "c.yaml").write_text("id: c\nname: C\n", encoding="utf-8")
+    stat = rules.stat()
+    os.utime(rules, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))
+    # 実行
+    result = document_store.load(worktree_target)
+    # 検証
+    assert [document.id for document in result.documents] == ["a", "b", "c"]
+    assert caplog.text.count("ワークツリーを読み込んだ") == 1
+
+
+def test_document_store_load_when_worktree_concurrent(
+    document_store: DocumentStore,
+    worktree_target: Target,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """同じワークツリーの並行の呼び出しは 1 回だけたどる（正常系）。"""
+    # 準備
+    calls: list[Path] = []
+    entered = threading.Event()
+    release = threading.Event()
+    original = store_module.walk_tree
+
+    def _blocking(root: Path) -> Any:
+        calls.append(root)
+        entered.set()
+        release.wait(timeout=10)
+        return original(root)
+
+    monkeypatch.setattr(store_module, "walk_tree", _blocking)
+    results: list[list[str]] = []
+
+    def _load() -> None:
+        loaded = document_store.load(worktree_target)
+        results.append([document.id for document in loaded.documents])
+
+    first = threading.Thread(target=_load)
+    second = threading.Thread(target=_load)
+    # 実行
+    first.start()
+    entered.wait(timeout=10)
+    second.start()
+    release.set()
+    first.join(timeout=10)
+    second.join(timeout=10)
+    # 検証
+    assert len(calls) == 1
+    assert results == [["a", "b"], ["a", "b"]]
+
+
+def test_document_store_schema_when_startup_cached(
+    document_store: DocumentStore,
+    workspace: Target,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """起動時のスキーマを解き直さない（正常系）。"""
+    # 準備
+    calls = _count_calls(monkeypatch, schema_module, "resolve_schema_refs")
+    # 実行
+    document_store.schema(workspace, "rules")
+    document_store.schema(workspace, "rules")
+    once = len(calls)
+    document_store.clear()
+    document_store.schema(workspace, "rules")
+    # 検証
+    assert once == 1
+    assert len(calls) == 2

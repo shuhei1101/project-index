@@ -2,27 +2,39 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import logging
 import re
 import threading
+from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 from mcp.types import CallToolResult, TextContent
 
 from project_index.features.search.types import SearchRequest, SearchResult
 from project_index.features.sources.registry import SourceRegistry
+from project_index.features.write.types import WriteRequest, WriteResult
+from project_index.integrations.git import GitError
 from project_index.main import build_handlers
 from project_index.server.mcp import docs as docs_module
-from project_index.server.mcp.docs import INSTRUCTIONS_MAX_CHARS, DocsMCPServer, build_docs_mcp
+from project_index.server.mcp.docs import (
+    INSTRUCTIONS_MAX_CHARS,
+    TOOL_RESPONSE_LIMIT_SEC,
+    DocsMCPServer,
+    build_docs_mcp,
+)
 from project_index.server.mcp.result import DOCS_INSTRUCTIONS_PROMPT_ID, tool_prompt_id
-from project_index.shared.errors import UnknownKindError
+from project_index.shared.errors import UnknownKindError, WorktreeLoadingError
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
-    from pathlib import Path
 
     import pytest
 
+    from project_index.features.access.types import Target
     from project_index.features.settings.types import SourceEntry, TerminalConfig
+    from project_index.features.sources.types import ServedSource
+    from project_index.shared.deadline import CallLimits
 
 TOOL_NAMES = {
     "search_docs",
@@ -374,3 +386,243 @@ def test_wait_target() -> None:
         {"cwd": "/w/a"},
         {},
     ]
+
+
+def test_build_docs_mcp_when_unexpected_error(
+    make_mcp_handlers: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """想定外の例外を isError にする（正常系）。"""
+
+    # 準備
+    def failing_search_docs(*args: Any, **kwargs: Any) -> Any:
+        raise GitError(["archive", "abc"], -1, "20 秒を超えたため止めました", timed_out=True)
+
+    monkeypatch.setattr(docs_module, "search_docs", failing_search_docs)
+    caplog.set_level(logging.ERROR, logger=docs_module.__name__)
+    mcp = build_docs_mcp(make_mcp_handlers())
+    # 実行
+    result = asyncio.run(mcp.call_tool("search_docs", {"source": "sample"}))
+    # 検証
+    assert isinstance(result, CallToolResult)
+    assert result.is_error is True
+    assert isinstance(result.content[0], TextContent)
+    assert result.content[0].text.startswith("UnexpectedError: GitError:")
+    assert "ツールの処理に失敗した（search_docs）" in caplog.text
+    assert "Traceback" in caplog.text
+
+
+def test_build_docs_mcp_when_limits(
+    make_mcp_handlers: Callable[..., Any],
+    make_terminal_config: Callable[..., TerminalConfig],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """書き込みに呼び出しの期限を渡す（正常系）。"""
+    # 準備
+    received: list[CallLimits] = []
+
+    def recording_write_docs(request: WriteRequest, **kwargs: Any) -> WriteResult:
+        received.append(kwargs["limits"])
+        return WriteResult(applied=False, results=[])
+
+    monkeypatch.setattr(docs_module, "write_docs", recording_write_docs)
+    handlers = make_mcp_handlers(terminal=make_terminal_config(write_deadline_sec=32))
+    mcp = build_docs_mcp(handlers)
+    arguments: dict[str, Any] = {"operations": [{"op": "create", "kind": "x", "data": {}}]}
+    # 実行
+    asyncio.run(mcp.call_tool("write_docs", arguments))
+    # 検証
+    assert received[0].write_deadline.limit_sec == 32
+    assert received[0].respond_by.limit_sec == TOOL_RESPONSE_LIMIT_SEC
+    assert received[0].cancelled.is_set() is False
+
+
+def test_build_docs_mcp_when_cancelled(
+    make_mcp_handlers: Callable[..., Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """取り消しの合図を立てる（正常系）。"""
+    from mcp import Client
+
+    # 準備
+    received: list[CallLimits] = []
+    started = threading.Event()
+    release = threading.Event()
+
+    def blocking_write_docs(request: WriteRequest, **kwargs: Any) -> WriteResult:
+        received.append(kwargs["limits"])
+        started.set()
+        release.wait(timeout=10)
+        return WriteResult(applied=False, results=[])
+
+    monkeypatch.setattr(docs_module, "write_docs", blocking_write_docs)
+    mcp = build_docs_mcp(make_mcp_handlers())
+    arguments: dict[str, Any] = {"operations": [{"op": "create", "kind": "x", "data": {}}]}
+
+    async def scenario() -> bool:
+        async with Client(mcp) as client:
+            call = asyncio.ensure_future(client.call_tool("write_docs", arguments))
+            await asyncio.to_thread(started.wait, 10)
+            call.cancel()
+            cancelled = await asyncio.to_thread(received[0].cancelled.wait, 10)
+            release.set()
+            return cancelled
+
+    # 実行
+    result = asyncio.run(scenario())
+    # 検証
+    assert result is True
+
+
+def _worktree_target(
+    tmp_path: Path,
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+) -> Target:
+    """ワークツリー x を指す読み書きの場所を作る。"""
+    worktree = tmp_path / "clone" / ".claude" / "worktrees" / "x"
+    source = make_served_source(id="sample", root=tmp_path / "clone")
+    return make_target(source, base=worktree, worktree=worktree)
+
+
+def _fake_store(*, loaded: bool, release: threading.Event | None = None) -> Any:
+    """読み込み済みかを決めた文書のストアの偽物（`load` の呼び出しを記録し、`release` まで止まる）。"""
+    calls: list[Any] = []
+
+    def load(target: Any) -> None:
+        calls.append(target)
+        if release is not None:
+            release.wait(timeout=10)
+
+    return SimpleNamespace(has_worktree=lambda target: loaded, load=load, calls=calls)
+
+
+def test_ensure_worktree(
+    tmp_path: Path,
+    make_mcp_handlers: Callable[..., Any],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """初めての読み込みを待つ（正常系）。"""
+    # 準備
+    target = _worktree_target(tmp_path, make_served_source, make_target)
+    monkeypatch.setattr(docs_module, "resolve_read_targets", lambda **kwargs: [target], raising=False)
+    store = _fake_store(loaded=False)
+    handlers = make_mcp_handlers(store=store)
+    loads: dict[Path, Any] = {}
+
+    async def scenario() -> None:
+        await docs_module._ensure_worktree(SearchRequest(source="sample"), handlers, loads)  # pyright: ignore[reportPrivateUsage]
+        await asyncio.sleep(0)
+
+    # 実行
+    asyncio.run(scenario())
+    # 検証
+    assert store.calls == [target]
+    assert loads == {}
+
+
+def test_ensure_worktree_when_loaded(
+    tmp_path: Path,
+    make_mcp_handlers: Callable[..., Any],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """読み込み済みのワークツリーは待たない（正常系）。"""
+    # 準備
+    target = _worktree_target(tmp_path, make_served_source, make_target)
+    monkeypatch.setattr(docs_module, "resolve_read_targets", lambda **kwargs: [target], raising=False)
+    store = _fake_store(loaded=True)
+    handlers = make_mcp_handlers(store=store)
+    # 実行
+    asyncio.run(docs_module._ensure_worktree(SearchRequest(source="sample"), handlers, {}))  # pyright: ignore[reportPrivateUsage]
+    # 検証
+    assert store.calls == []
+
+
+def test_ensure_worktree_when_slow(
+    tmp_path: Path,
+    make_mcp_handlers: Callable[..., Any],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """上限までに終わらない読み込み（異常系）。"""
+    # 準備
+    target = _worktree_target(tmp_path, make_served_source, make_target)
+    monkeypatch.setattr(docs_module, "resolve_read_targets", lambda **kwargs: [target], raising=False)
+    release = threading.Event()
+    store = _fake_store(loaded=False, release=release)
+    handlers = make_mcp_handlers(
+        store=store, terminal=make_terminal_config(worktree_load_wait_sec=1)
+    )
+    loads: dict[Path, Any] = {}
+    request = SearchRequest(source="sample")
+    ensure = docs_module._ensure_worktree  # pyright: ignore[reportPrivateUsage]
+
+    async def scenario() -> list[BaseException | None]:
+        first = await asyncio.gather(ensure(request, handlers, loads), return_exceptions=True)
+        second = await asyncio.gather(ensure(request, handlers, loads), return_exceptions=True)
+        release.set()
+        await asyncio.gather(*loads.values(), return_exceptions=True)
+        store.has_worktree = lambda target: True
+        third = await asyncio.gather(ensure(request, handlers, loads), return_exceptions=True)
+        return [first[0], second[0], third[0]]
+
+    # 実行
+    results = asyncio.run(scenario())
+    # 検証
+    assert isinstance(results[0], WorktreeLoadingError)
+    assert isinstance(results[1], WorktreeLoadingError)
+    assert results[2] is None
+    assert store.calls == [target]
+
+
+def test_ensure_worktree_when_write(
+    tmp_path: Path,
+    make_mcp_handlers: Callable[..., Any],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """書き込みでも初めての読み込みを上限まで待つ（異常系）。"""
+    # 準備
+    target = _worktree_target(tmp_path, make_served_source, make_target)
+    monkeypatch.setattr(docs_module, "resolve_write_target", lambda **kwargs: target, raising=False)
+    release = threading.Event()
+    store = _fake_store(loaded=False, release=release)
+    handlers = make_mcp_handlers(
+        store=store, terminal=make_terminal_config(worktree_load_wait_sec=1)
+    )
+    loads: dict[Path, Any] = {}
+    request = WriteRequest(operations=[])
+    ensure = docs_module._ensure_worktree  # pyright: ignore[reportPrivateUsage]
+
+    async def scenario() -> BaseException | None:
+        result = await asyncio.gather(ensure(request, handlers, loads), return_exceptions=True)
+        release.set()
+        await asyncio.gather(*loads.values(), return_exceptions=True)
+        return result[0]
+
+    # 実行
+    result = asyncio.run(scenario())
+    # 検証
+    assert isinstance(result, WorktreeLoadingError)
+    assert store.calls == [target]
+
+
+def test_ensure_worktree_when_unresolved(
+    make_mcp_handlers: Callable[..., Any],
+) -> None:
+    """場所を解けない要求は待たずにサービスへ渡す（正常系）。"""
+    # 準備
+    store = _fake_store(loaded=False)
+    handlers = make_mcp_handlers(store=store)
+    # 実行
+    asyncio.run(docs_module._ensure_worktree(SearchRequest(source="sample"), handlers, {}))  # pyright: ignore[reportPrivateUsage]
+    # 検証
+    assert store.calls == []

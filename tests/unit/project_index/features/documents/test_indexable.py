@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from project_index.features.documents.indexable import indexable_files, is_excluded_file, walk_files
+from project_index.features.documents.indexable import (
+    indexable_files,
+    is_excluded_file,
+    walk_files,
+    walk_tree,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -182,3 +187,20 @@ def test_indexable_files_when_exclude_given(
     result = indexable_files(tmp_path, ["src/**"], exclude=["b.py"])
     # 検証
     assert result == ["src/a.py"]
+
+
+def test_walk_tree(tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]) -> None:
+    """ファイルとフォルダの更新日時（正常系）。"""
+    # 準備
+    write_files(tmp_path, {"a.yaml": "a\n", "rules/b.yaml": "b\n", "node_modules/x.js": "x\n"})
+    (tmp_path / "empty").mkdir()
+    expected_folders = {
+        ".": tmp_path.stat().st_mtime_ns,
+        "rules": (tmp_path / "rules").stat().st_mtime_ns,
+        "empty": (tmp_path / "empty").stat().st_mtime_ns,
+    }
+    # 実行
+    files, folders = walk_tree(tmp_path)
+    # 検証
+    assert sorted(files) == ["a.yaml", "rules/b.yaml"]
+    assert folders == expected_folders
