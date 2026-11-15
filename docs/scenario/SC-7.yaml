@@ -511,37 +511,6 @@ scenarios:
       - 検査のスクリプトが終了した後も、ワークツリー x の文書 1 は書き換わらない
       - 続けての `search_docs` が書き込み前の `version` を返却する
     test: test_error_when_write_deadline_exceeded
-  - name: 異常シナリオ（呼び出しが取り消される）
-    setup:
-      - name: Mock
-        description: なし（実環境で実行）
-      - name: 遅い検査のスクリプト
-        description: 異常シナリオ（書き込みが期限を過ぎる）と同じスクリプト
-        notes: 端末の設定の書き込みの期限は既定
-      - name: project-index
-        description: sample を配信している project-index
-        notes: テストが `write_docs` を送信し、検査のスクリプトの実行中に、同じ接続で MCP の取り消しの通知（`notifications/cancelled`、`requestId` は `write_docs` の要求の ID）を送信する
-    flow: |-
-      <!-- map: {"title": "異常シナリオ（呼び出しが取り消される）"} -->
-
-      ```mermaid
-      sequenceDiagram
-        actor A as エージェント
-        participant M as 文書の MCP（/mcp）
-        participant WT as ワークツリー x
-
-        A->>M: write_docs(worktree: x, operations: update 文書 1)
-        M->>M: 変更を適用した文書を validators で検査する
-        A-->>M: 呼び出しを取り消す（時間切れ）
-        M->>M: 置き換える前に取り消しを確認して止める
-      ```
-
-      <!-- /map -->
-    expected:
-      - 検査のスクリプトが終了した後も、ワークツリー x の文書 1 は書き換わらない
-      - 続けての `search_docs` が書き込み前の `version` を返却する
-      - サーバーのログに、取り消されたため書き込まなかったことが残る
-    test: test_error_when_call_cancelled
   - name: 異常シナリオ（検査のスクリプトが制限時間を超える）
     setup:
       - name: Mock
@@ -584,7 +553,7 @@ preconditions:
   - 呼び出しの引数に、フックが作業場所 `cwd` と会話キーを入れている
   - エージェントが直す文書を `search_docs` で読み、`version` を持っている
 success_guarantee: 変更を当てた後の文書が配信元のスキーマと `validators[]` に通り、作業ツリー（Git 管理外の配信元はそのフォルダ）のファイルだけが書き換わる。新しいバージョンが返る。変えた Markdown の値は、mdmark の CLI を使えるときは点検に通っており、使えないとき（CLI が無い・制限時間を超えた）は点検できなかった理由が返る。
-minimal_guarantee: '検査に通らない書き込み、mdmark の警告がある Markdown の値の書き込み、`scope.write` に当たらない作業場所からの書き込み、クローン本体への書き込み、書き込みの期限を過ぎた・取り消された書き込みは、ファイルを 1 つも書き換えない（`atomic: true` のときは他の操作も書かない）。書き込まなかったときは、取り消された場合を除き `isError: true` で理由を返却する。'
+minimal_guarantee: '検査に通らない書き込み、mdmark の警告がある Markdown の値の書き込み、`scope.write` に当たらない作業場所からの書き込み、クローン本体への書き込み、書き込みの期限を過ぎた書き込みは、ファイルを 1 つも書き換えない（`atomic: true` のときは他の操作も書かない）。書き込まなかったときは `isError: true` で理由を返却する。'
 frequency: 作業のたび
 priority: 高
 refs:

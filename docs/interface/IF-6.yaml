@@ -830,36 +830,6 @@ flows:
       - 応答から 4 秒待った後も、ワークツリー x の文書 1 は書き換わらない
       - 続けての `search_docs` が、書き込み前の `version` を返却する
     test: test_error_when_write_deadline_exceeded
-  - name: 異常系（呼び出しが取り消された）
-    summary: MCP の取り消しの通知を受けたら、作業ツリーのファイルを置き換える前に止め、ログに残す
-    setup:
-      - name: Mock
-        description: なし。端末の設定の `write_deadline_sec` は既定
-      - name: 遅い検査のスクリプト
-        description: 異常系（書き込みの期限を過ぎた・WriteDeadlineExceededError）と同じ、4 秒待つスクリプト
-      - name: 入力
-        description: 正常系と同じ `update` 1 件を送信し、1 秒後に同じ接続で `notifications/cancelled`（`requestId` は `write_docs` の要求の ID）を送信する
-    flow: |-
-      <!-- map: {"title": "異常系（呼び出しが取り消された）"} -->
-
-      ```mermaid
-      sequenceDiagram
-        participant C as クライアント
-        participant T as write_docs
-        participant WT as ワークツリー x
-
-        C->>T: worktree: x, operations: update 文書 1
-        T->>T: 変更を適用した文書を validators で検査する
-        C-->>T: notifications/cancelled
-        T->>T: 置き換える前に取り消しを確認して止める
-      ```
-
-      <!-- /map -->
-    expected:
-      - 検査のスクリプトが終了した後も、ワークツリー x の文書 1 は書き換わらない
-      - 続けての `search_docs` が、書き込み前の `version` を返却する
-      - サーバーのログに、`取り消されたため書き込まなかった（write_docs・sample・{ワークツリー x のパス}）` の行が残る
-    test: test_error_when_call_cancelled
   - name: 異常系（検査のスクリプトが制限時間を超えた・ValidationFailedError）
     summary: '`validators[]` のスクリプトが `script_timeout_sec` を超えたら止め、止めたスクリプトの ID を違反として返却する'
     setup:
@@ -899,7 +869,6 @@ callers:
   - SC-7#scenarios[異常シナリオ（Markdown の値に mdmark の警告がある）]
   - SC-7#scenarios[正常シナリオ（mdmark の CLI が無い）]
   - SC-7#scenarios[異常シナリオ（書き込みが期限を過ぎる）]
-  - SC-7#scenarios[異常シナリオ（呼び出しが取り消される）]
   - SC-7#scenarios[異常シナリオ（検査のスクリプトが制限時間を超える）]
 exclusivity: 配信元ごとの排他ロックの中で、読み込み・バージョンの確認・検査・書き込みを行う。後から来た呼び出しはロックを待つ
 request:
@@ -1157,7 +1126,7 @@ constraints:
     notes: '`script_timeout_sec` で止めたスクリプトは、違反（`ValidationFailedError`）にする'
   - item: 取り消し
     constraint: MCP の取り消しの通知（`notifications/cancelled`）を受けた要求は、作業ツリーのファイルを置き換える前に止め、何も書き込まない。置き換えを始めた後は全てのファイルを書き込み終える。止めたときはサーバーのログに `取り消されたため書き込まなかった（{ツール}・{配信元}・{書き込む先のパス}）` を出す
-    notes: 'Claude Code 2.1.325 は時間切れのときに取り消しの通知を送信しない（作業 PR #82 の計画書『調査の結果』）。時間切れとの一致は書き込みの期限で守る'
+    notes: '`/mcp` は `stateless_http` で要求ごとに接続を作るため、別の要求で送信した取り消しの通知も、クライアントの接続の切断も、ツールの処理に届かない。Claude Code 2.1.325 も時間切れのときに取り消しの通知を送信しない（どちらも作業 PR #82 の計画書『調査の結果』）。そのため結合テストの流れは持たず、SDK の接続で取り消すときの振る舞いは文書の MCP の単体テストが確かめる。時間切れとの一致は書き込みの期限で守る'
   - item: 書き込み後の生成の制限時間
     constraint: '`generators[]` のスクリプトの制限時間は、`script_timeout_sec` と、[非機能要件](id:NFR-1) の文書の MCP の応答の上限までの残りの時間の短い方にする。残りの時間が無ければ生成を実行せず、実行しなかった生成をサーバーのログに残す'
     notes: 生成の失敗と同じく、書き込みの結果は変えない

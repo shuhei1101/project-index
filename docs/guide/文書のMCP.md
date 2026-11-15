@@ -301,7 +301,6 @@ YAML として読めないファイルがあっても、そのファイルを除
 要求を受けてから端末の設定の `write_deadline_sec` を過ぎても検査が終わらないときは、検査のスクリプトを止め、ファイルを 1 つも書き換えずに `WriteDeadlineExceededError` を返します。
 検査のスクリプトと mdmark の点検の制限時間は、`script_timeout_sec` と、この期限までの残りの時間の短い方です。
 `script_timeout_sec` で止めた検査のスクリプトは、`{検査の ID}: 検査を実行できませんでした（制限時間（{秒} 秒）を超えたため、スクリプトを止めました。）` の違反になります。
-MCP の取り消しの通知（`notifications/cancelled`）を受けた呼び出しも、ファイルを書き換えずに止めます。
 ファイルの書き換えを始めた後は、期限を過ぎても全てのファイルを書き終えます。
 
 種類のスキーマで `contentMediaType: text/markdown` を持つキーは Markdown のキーで、操作で値を変えたキー（`create` は値を持つ全てのキー）を mdmark の点検（`mdmark check --text -`）に通します。
