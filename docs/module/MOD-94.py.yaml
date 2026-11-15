@@ -168,12 +168,11 @@ functions:
          - 今のツールの説明（`search_docs`・`write_docs`・`list_changes` の引数の説明の文と `trace_related` の説明を含む）は、削らずに各ツールの YAML へ移す
          - 引数の型の誤り・`Literal` に無い値は、SDK が関数を呼ぶ前に `isError` の結果にする。入力のスキーマに無いキーは SDK が捨てる
       3. 各ツールは次の順で処理する
-         - 要求を受けた時刻を `time.monotonic()` で記録し、呼び出しの期限（`write_deadline` は `limit_sec` が `handlers.terminal.write_deadline_sec`、`respond_by` は `TOOL_RESPONSE_LIMIT_SEC`、`cancelled` は新しい `threading.Event`）を作る
+         - 要求を受けた時刻を `time.monotonic()` で記録し、呼び出しの期限（`write_deadline` は `limit_sec` が `handlers.terminal.write_deadline_sec`、`respond_by` は `TOOL_RESPONSE_LIMIT_SEC`）を作る
          - 引数で要求のモデル（`SearchRequest` など）を作る
          - 要求が指す配信元を決め（指す配信元の決定）、`await handlers.registry.wait_for(...)` でその行の読み込みだけを待つ（初期化とツールの一覧は待たない）
          - `search_docs`・`write_docs`・`delete_docs` の場合、ワークツリーの読み込みの待ちを await する
          - サービスを `asyncio.to_thread` で呼ぶ（引数は `handlers` の属性。`write_docs`・`delete_docs` は `limits` に呼び出しの期限）
-         - `asyncio.CancelledError` の場合（MCP の取り消しの通知で SDK がタスクを取り消した）、`limits.cancelled` を `set` してから送り直す。スレッドのサービスは止めない（ファイルを置き換える前に合図を見て止まる）
          - `write_docs`・`delete_docs` の結果の `applied` が `True` の場合、`cwd` から書ける配信元を裏で検査し直す（配信元の検査のキャッシュ.裏での検査の流し直し）
          - 結果をツールの結果にする（`write_docs`・`delete_docs` の `render` は `None`。`search_docs` は `functools.partial(render_search_markdown, source_label=result.source_label)`、`list_changes` は `functools.partial(render_changes_markdown, source_label=request.source or "作業中の配信元")`、`list_match_words` は用語の一覧の文を渡す）
          - `ProjectIndexError` と `pydantic.ValidationError` はツールのエラーの変換の `CallToolResult(is_error=True)` をそのまま返す。それ以外の例外（`asyncio.CancelledError` を除く）は `[error]` ツールの処理に失敗した（ツール名・例外のトレースバック）を書き、想定外の例外の変換の結果を返す
@@ -226,13 +225,7 @@ functions:
         summary: 書き込みに呼び出しの期限を渡す
         condition: '`write_deadline_sec=32` の端末の設定で `write_docs` を呼ぶ'
         mock: '`write_docs`（受けた `limits` を記録する偽物）'
-        expected: '`limits.write_deadline.limit_sec` が 32、`limits.respond_by.limit_sec` が `TOOL_RESPONSE_LIMIT_SEC`、`limits.cancelled` が立っていない'
-      - name: test_build_docs_mcp_when_cancelled
-        case: 正常
-        summary: 取り消しの合図を立てる
-        condition: 'メモリの上のクライアント（`mcp.Client`）で `write_docs` を呼び、実行中に呼び出しのタスクを取り消す（クライアントの SDK が `notifications/cancelled` を送る）'
-        mock: '`write_docs`（合図まで止まり、受けた `limits` を記録する偽物）'
-        expected: 記録した `limits.cancelled` が立つ
+        expected: '`limits.write_deadline.limit_sec` が 32、`limits.respond_by.limit_sec` が `TOOL_RESPONSE_LIMIT_SEC`'
   - name: _docs_instructions
     title: 文書の MCP の instructions の描画
     kind: 関数

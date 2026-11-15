@@ -208,7 +208,7 @@ functions:
         required: false
         default: None
         passing: keyword
-        description: 文書の MCP が要求ごとに作る期限と取り消しの合図。`None` は期限も取り消しも持たない
+        description: 文書の MCP が要求ごとに作る期限。`None` は期限を持たない
     returns:
       type: WriteResult
       description: 書き込みの結果
@@ -229,11 +229,8 @@ functions:
       6. `atomic` が `True` で `failed` があれば、最初の失敗の例外（`ValidationFailedError` は全ての違反を、`InvalidArgumentError` はその操作の違反を添字つきで）を送り、何も書かない
       7. 成功した行の `version` は組み立てた文書のバージョン、`diff` は今の本文との差分の行（変更.差分の行）にする
       8. `dry_run` なら `applied=False` で返す
-      9. `limits` がある場合、ファイルを置き換える前に確かめる
-         - `limits.cancelled` が立っていれば、何も書かずに `applied=False` で返す
-           - `[info]` 取り消されたため書き込まなかった（`write_docs`・配信元・`target.base`）
-         - `limits.write_deadline` の『期限』.期限の確認を呼ぶ（過ぎていれば `WriteDeadlineExceededError` が伝わり、何も書かない）
-      10. 変わったファイルをファイルの置き換えで書き、文書のストア.キャッシュを捨てる。書き始めた後は、期限を過ぎても取り消されても全てのファイルを書き終える
+      9. `limits` がある場合、ファイルを置き換える前に `limits.write_deadline` の『期限』.期限の確認を呼ぶ（過ぎていれば `WriteDeadlineExceededError` が伝わり、何も書かない）
+      10. 変わったファイルをファイルの置き換えで書き、文書のストア.キャッシュを捨てる。書き始めた後は、期限を過ぎても全てのファイルを書き終える
       11. 書いた種類の `after_write` の生成を、ID の重なりを除いて順にスクリプトの実行（`cwd=target.config_base`（設定ファイルのフォルダ）・引数に書いたファイルのパス・制限時間・`at`）で動かす。制限時間は、`limits` があれば `limits.respond_by` の『期限』.制限時間の切り詰めに `timeout_sec` を渡した値、無ければ `timeout_sec`。制限時間が 0 の生成は動かさず `[warning]` 応答の上限までの時間が無いため書き込み後の生成を実行しなかった（配信元・生成の ID）を書き、結果は変えない。`at` は、`target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`）。`ScriptError` は `[warning]` 書き込み後の生成に失敗した（配信元・生成の ID・理由）を書き、結果は変えない
       12. 会話の記録に書いた文書を `edited` で残す
       13. `applied=True` で返す
@@ -356,12 +353,6 @@ functions:
         mock: '`DocumentChecker.check`（1 件目で送る偽物）・作業場所の配信元の読み込み（受け取った配信元を返す偽物）'
         expected: '`WriteDeadlineExceededError`、`failed` の行を返さず、どのファイルも変わらない'
         exception: 検査の前後か、ファイルを置き換える前に `limits.write_deadline` を過ぎている
-      - name: test_write_docs_when_cancelled
-        case: 正常
-        summary: 取り消された要求は書かない
-        condition: '`cancelled` を `set` した `limits` で `set`'
-        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
-        expected: '`applied` が `False`、ワークツリー x のファイルは変わらず、ログに `取り消されたため書き込まなかった（write_docs・sample・{ワークツリー x のパス}）`'
       - name: test_write_docs_when_no_time_for_generators
         case: 正常
         summary: 応答の上限まで時間が無ければ生成を動かさない
@@ -436,7 +427,7 @@ functions:
       4. `atomic` が `True` で `failed` があれば、最初の失敗の例外を送る
       5. 参照を外した文書を文書の検査に通す（違反は `ValidationFailedError`。`deadline` は `limits` があれば `limits.write_deadline`）
       6. `dry_run` なら `applied=False` で、`unlinked` に参照を外す文書と外した後のバージョンを入れて返す
-      7. `limits` がある場合、文書の書き込みの手順 9 と同じに取り消しと期限を確かめる（ログのツール名は `delete_docs`）
+      7. `limits` がある場合、文書の書き込みの手順 9 と同じに期限を確かめる
       8. ファイル 1 つの文書はファイルを消し、`records` の文書は配列から要素を除いてファイルを置き換える（`body_file` の指すファイルは消さない）。参照を外した文書を書き、文書のストア.キャッシュを捨てる
       9. 消した種類の `after_write` の生成を、文書の書き込みと同じに動かす（引数は消したファイルのパス。制限時間も同じ）
       10. `applied=True` で、`unlinked` に参照を外した文書と新しいバージョンを入れて返す
@@ -496,12 +487,6 @@ functions:
         mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）・時計（偽物）
         expected: '`WriteDeadlineExceededError`、文書 2 のファイルが残る'
         exception: 検査の前後か、ファイルを消す・置き換える前に `limits.write_deadline` を過ぎている
-      - name: test_delete_docs_when_cancelled
-        case: 正常
-        summary: 取り消された要求は消さない
-        condition: '`cancelled` を `set` した `limits` で文書 2 を消す'
-        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
-        expected: '`applied` が `False`、文書 2 のファイルが残る'
 refs:
   - IF-6#
   - IF-7#
