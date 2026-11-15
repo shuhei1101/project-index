@@ -493,34 +493,12 @@ def write_docs(
         session = _Session(
             store, target, deadline=None if limits is None else limits.write_deadline
         )
-        last_reads = seen.last_read(key, source.id)
-        results: list[WriteResultItem] = []
-        failures: list[tuple[int, ProjectIndexError]] = []
-        written_ids: list[str] = []
-        written_tables: list[DocumentTable] = []
-        created_ids: set[str] = set()
-        for index, operation in enumerate(request.operations):
-            try:
-                item = _apply_one(session, checker, operation, index, last_reads, created_ids, now)
-            except WriteDeadlineExceededError:
-                # 期限の超過は操作の失敗にせず、`atomic` によらず全体を止める
-                raise
-            except ProjectIndexError as error:
-                failures.append((index, error))
-                results.append(
-                    WriteResultItem(
-                        index=index,
-                        id=operation.id,
-                        status="failed",
-                        errors=_prefixed(index, error),
-                    )
-                )
-                continue
-            results.append(item[0])
-            written_ids.append(item[0].id or "")
-            written_tables.append(item[1])
-        if failures and request.atomic:
-            raise _atomic_error(failures)
+        applied = _apply_operations(
+            session, checker, request.operations, seen.last_read(key, source.id), now
+        )
+        results = applied.results
+        if applied.failures and request.atomic:
+            raise _atomic_error(applied.failures)
         succeeded = [item for item in results if item.status != "failed"]
         if request.dry_run or not succeeded:
             return WriteResult(applied=False, results=results)
@@ -529,13 +507,57 @@ def write_docs(
         touched = session.write_pending()
         _run_generators(
             target,
-            _unique(written_tables),
+            _unique(applied.tables),
             touched,
             timeout_sec,
             None if limits is None else limits.respond_by,
         )
-        seen.record_activity(key, source.id, [i for i in written_ids if i], "edited")
+        seen.record_activity(key, source.id, [i for i in applied.ids if i], "edited")
         return WriteResult(applied=True, results=results)
+
+
+@dataclass
+class _Applied:
+    """操作を順に当てた結果（行・失敗・書いた文書の ID と種類の行）。"""
+
+    results: list[WriteResultItem] = field(default_factory=list[WriteResultItem])
+    failures: list[tuple[int, ProjectIndexError]] = field(
+        default_factory=list[tuple[int, ProjectIndexError]]
+    )
+    ids: list[str] = field(default_factory=list[str])
+    tables: list[DocumentTable] = field(default_factory=list[DocumentTable])
+
+
+def _apply_operations(
+    session: _Session,
+    checker: DocumentChecker,
+    operations: list[Operation],
+    last_reads: Mapping[str, LastRead],
+    now: datetime,
+) -> _Applied:
+    """操作を順に当てる。失敗した操作は `failed` の行にして次へ進む。"""
+    applied = _Applied()
+    created_ids: set[str] = set()
+    for index, operation in enumerate(operations):
+        try:
+            item, table = _apply_one(
+                session, checker, operation, index, last_reads, created_ids, now
+            )
+        except WriteDeadlineExceededError:
+            # 期限の超過は操作の失敗にせず、`atomic` によらず全体を止める
+            raise
+        except ProjectIndexError as error:
+            applied.failures.append((index, error))
+            applied.results.append(
+                WriteResultItem(
+                    index=index, id=operation.id, status="failed", errors=_prefixed(index, error)
+                )
+            )
+            continue
+        applied.results.append(item)
+        applied.ids.append(item.id or "")
+        applied.tables.append(table)
+    return applied
 
 
 def _writable(table: DocumentTable, path: str) -> DocumentTable:

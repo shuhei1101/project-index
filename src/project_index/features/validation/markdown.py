@@ -12,7 +12,11 @@ from jsonschema.exceptions import ValidationError
 from jsonschema.validators import validator_for
 from referencing.exceptions import Unresolvable
 
-from project_index.integrations.mdmark import MdmarkUnavailableError, check_markdown
+from project_index.integrations.mdmark import (
+    MdmarkFinding,
+    MdmarkUnavailableError,
+    check_markdown,
+)
 from project_index.shared.errors import Violation
 from project_index.shared.schema_check import format_path
 
@@ -110,6 +114,24 @@ def changed_markdown(
     return {path: current[path] for path in sorted(current) if before.get(path) != current[path]}
 
 
+def _check_within(
+    text: str, *, cwd: Path, timeout_sec: float, deadline: Deadline | None
+) -> list[MdmarkFinding]:
+    """mdmark の点検を、書き込みの期限があれば残りの時間で切って呼ぶ（期限を過ぎたら超過を送る）。"""
+    if deadline is None:
+        return check_markdown(text, cwd=cwd, timeout_sec=timeout_sec)
+    # 過ぎていれば呼ばない
+    deadline.check()
+    try:
+        findings = check_markdown(text, cwd=cwd, timeout_sec=deadline.cap(timeout_sec))
+    except MdmarkUnavailableError:
+        # 期限で止めた点検は、点検できなかったキーではなく期限の超過にする
+        deadline.check()
+        raise
+    deadline.check()
+    return findings
+
+
 def check_markdown_values(
     values: Mapping[str, str],
     *,
@@ -126,24 +148,15 @@ def check_markdown_values(
         if stopped is not None:
             unchecked.append(UncheckedKey(path=path, reason=stopped))
             continue
-        # 書き込みの期限がある: 過ぎていれば呼ばず、制限時間を残りの時間で切る
-        if deadline is not None:
-            deadline.check()
-        limit = timeout_sec if deadline is None else deadline.cap(timeout_sec)
         try:
-            findings = check_markdown(text, cwd=cwd, timeout_sec=limit)
+            findings = _check_within(text, cwd=cwd, timeout_sec=timeout_sec, deadline=deadline)
         except MdmarkUnavailableError as error:
-            # 期限で止めた点検は、点検できなかったキーではなく期限の超過にする
-            if deadline is not None:
-                deadline.check()
             logger.info("mdmark で点検できなかった（%s・%s）", path, error.reason)
             unchecked.append(UncheckedKey(path=path, reason=error.reason))
             # CLI が無い・制限時間を超えた: 残りの値も呼ばない
             if not error.continuable:
                 stopped = error.reason
             continue
-        if deadline is not None:
-            deadline.check()
         # 描画時の書き方の警告だけを違反にし、ほかの種類は書き込みを止めない
         violations.extend(
             Violation(
