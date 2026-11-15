@@ -1227,3 +1227,48 @@ def test_document_store_schema_when_startup_cached(
     # 検証
     assert once == 1
     assert len(calls) == 2
+
+
+def test_document_store_load_when_worktrees_over_keep(
+    document_store: DocumentStore,
+    worktree_target: Target,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_target: Callable[..., Target],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """上限を超えたワークツリーの記録を古く使ったものから捨てる（正常系）。"""
+    # 準備
+    monkeypatch.setattr(store_module, "WORKTREE_KEEP", 1)
+    other = worktree_target.base.parent / "y"
+    write_files(other, {"rules/a.yaml": "id: a\nname: Y\n"})
+    other_target = make_target(worktree_target.source, base=other, worktree=other)
+    # 実行
+    document_store.load(worktree_target)
+    document_store.load(other_target)
+    # 検証
+    assert document_store.has_worktree(worktree_target) is False
+    assert document_store.has_worktree(other_target) is True
+
+
+def test_document_store_schema_when_cleared_during_resolve(
+    document_store: DocumentStore,
+    workspace: Target,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """解いている間に clear されたスキーマは記録しない（正常系）。"""
+    # 準備
+    calls: list[Any] = []
+    original = store_module.startup_schema
+
+    def clearing(source: ServedSource, table: DocumentTable) -> dict[str, Any]:
+        calls.append(table.id)
+        resolved = original(source, table)
+        document_store.clear()
+        return resolved
+
+    monkeypatch.setattr(store_module, "startup_schema", clearing)
+    # 実行
+    document_store.schema(workspace, "rules")
+    document_store.schema(workspace, "rules")
+    # 検証
+    assert calls == ["rules", "rules"]
