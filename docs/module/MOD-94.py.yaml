@@ -230,7 +230,7 @@ functions:
       - name: test_build_docs_mcp_when_cancelled
         case: 正常
         summary: 取り消しの合図を立てる
-        condition: '`write_docs` の実行中に、同じ接続で `notifications/cancelled` を送る'
+        condition: 'メモリの上のクライアント（`mcp.Client`）で `write_docs` を呼び、実行中に呼び出しのタスクを取り消す（クライアントの SDK が `notifications/cancelled` を送る）'
         mock: '`write_docs`（合図まで止まり、受けた `limits` を記録する偽物）'
         expected: 記録した `limits.cancelled` が立つ
   - name: _docs_instructions
@@ -343,7 +343,7 @@ functions:
       description: '-'
     process: |-
       1. `request.ref` がある場合、何もしない
-      2. `asyncio.to_thread` で場所を解く。`SearchRequest` は権限と作業場所の『読む場所の解決』を `source`・`worktree`・`cwd`・`outside_scope` で、`WriteRequest`・`DeleteRequest` は『書く場所の解決』を `source`・`worktree`・`cwd` で呼ぶ。場所が 1 つでない、または `worktree` が `None` なら何もしない（エラーはそのまま伝わる）
+      2. `asyncio.to_thread` で場所を解く。`SearchRequest` は権限と作業場所の『読む場所の解決』を `source`・`worktree`・`cwd`・`outside_scope` で、`WriteRequest`・`DeleteRequest` は『書く場所の解決』を `source`・`worktree`・`cwd` で呼ぶ。場所を解けない（`ProjectIndexError`）、場所が 1 つでない、または `worktree` が `None` なら何もしない（解けないときは、サービスが同じ解決で同じエラーを返す）
       3. 文書のストア.ワークツリーを読み込んだかが `True` なら何もしない
       4. `loads` にそのワークツリーの終わっていないタスクが無ければ、`asyncio.to_thread(handlers.store.load, 読む場所)` のタスクを作って入れ、終わったら `loads` から除くコールバックを付ける
       5. `async with asyncio.timeout(handlers.terminal.worktree_load_wait_sec)` の中でタスクを `asyncio.shield` で包んで await する
@@ -381,6 +381,12 @@ functions:
         mock: 文書のストア（`load` を合図まで止める偽物）
         expected: '`WorktreeLoadingError`、`load` に渡った場所が書く場所の解決の結果'
         exception: 初めての読み込みが `worktree_load_wait_sec` までに終わらない
+      - name: test_ensure_worktree_when_unresolved
+        case: 正常
+        summary: 場所を解けない要求は待たずにサービスへ渡す
+        condition: '配信元の無い配信元の一覧で、`source: sample` の `SearchRequest`'
+        mock: 文書のストア（呼ばれた回数を記録する偽物）
+        expected: 何も送らず、`has_worktree`・`load` が呼ばれない
 refs:
   - IF-2#
   - IF-6#
