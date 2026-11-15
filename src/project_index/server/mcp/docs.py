@@ -6,7 +6,6 @@ import asyncio
 import functools
 import inspect
 import logging
-import threading
 import time
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Annotated, Any, Literal
@@ -133,7 +132,6 @@ def _register(
         limits = CallLimits(
             write_deadline=Deadline(limit_sec=write_deadline_sec, started=started),
             respond_by=Deadline(limit_sec=TOOL_RESPONSE_LIMIT_SEC, started=started),
-            cancelled=threading.Event(),
         )
         try:
             request = model(**arguments)
@@ -154,10 +152,6 @@ def _register(
                 renderer = render_with_request
 
             return to_tool_result(result, fmt, renderer)
-        except asyncio.CancelledError:
-            # 取り消しの通知を受けた: スレッドの書き込みは、ファイルを置き換える前に合図を見て止まる
-            limits.cancelled.set()
-            raise
         except (ProjectIndexError, ValidationError) as error:
             return tool_error(error)
         except Exception as error:

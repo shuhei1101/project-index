@@ -428,19 +428,10 @@ def _run_generators(
                 )
 
 
-def _stopped_before_write(limits: CallLimits | None, tool: str, target: Target) -> bool:
-    """ファイルを置き換える前に、取り消しと書き込みの期限を確かめる（取り消されていれば `True`）。"""
-    if limits is None:
-        return False
-    # 取り消しの通知を受けた: 呼び出し元はもう応答を待っていないので、書かずに終える
-    if limits.cancelled.is_set():
-        logger.info(
-            "取り消されたため書き込まなかった（%s・%s・%s）", tool, target.source.id, target.base
-        )
-        return True
-    # 期限を過ぎていれば、何も書かずに期限の超過を送る
-    limits.write_deadline.check()
-    return False
+def _check_before_write(limits: CallLimits | None) -> None:
+    """ファイルを置き換える前に書き込みの期限を確かめる（過ぎていれば何も書かずに超過を送る）。"""
+    if limits is not None:
+        limits.write_deadline.check()
 
 
 def _atomic_error(failures: list[tuple[int, ProjectIndexError]]) -> ProjectIndexError:
@@ -502,8 +493,7 @@ def write_docs(
         succeeded = [item for item in results if item.status != "failed"]
         if request.dry_run or not succeeded:
             return WriteResult(applied=False, results=results)
-        if _stopped_before_write(limits, "write_docs", target):
-            return WriteResult(applied=False, results=results)
+        _check_before_write(limits)
         touched = session.write_pending()
         _run_generators(
             target,
@@ -879,8 +869,7 @@ def delete_docs(
         unlinked = [(referrer_id, session.docs[referrer_id].version) for referrer_id in unlink_plan]
         if request.dry_run or not accepted:
             return DeleteResult(applied=False, results=results, unlinked=unlinked)
-        if _stopped_before_write(limits, "delete_docs", target):
-            return DeleteResult(applied=False, results=results, unlinked=unlinked)
+        _check_before_write(limits)
         _remove_documents(session, accepted)
         touched = session.write_pending()
         _run_generators(

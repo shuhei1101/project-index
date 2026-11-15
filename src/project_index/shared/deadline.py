@@ -1,11 +1,10 @@
-"""1 回のツールの呼び出しの期限と取り消しの合図。"""
+"""1 回のツールの呼び出しの期限。"""
 
 from __future__ import annotations
 
-import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from project_index.shared.errors import WriteDeadlineExceededError
 
@@ -45,9 +44,7 @@ class Deadline:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class CallLimits:
-    """1 回のツールの呼び出しの書き込みの期限・応答の上限・取り消しの合図。"""
+    """1 回のツールの呼び出しの書き込みの期限と応答の上限。"""
 
     write_deadline: Deadline
     respond_by: Deadline
-    # MCP の取り消しの通知を受けたら文書の MCP が立てる
-    cancelled: threading.Event = field(default_factory=threading.Event)
