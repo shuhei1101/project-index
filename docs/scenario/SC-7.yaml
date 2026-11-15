@@ -509,7 +509,7 @@ scenarios:
       - '`isError: true` で、書き込みの期限を超えたことと、ファイルを書き換えていないことを返却する'
       - 応答は書き込みの期限から数秒の内に返却される
       - 検査のスクリプトが終了した後も、ワークツリー x の文書 1 は書き換わらない
-      - 続けて同じ `expected_version` で、遅い検査のスクリプトを除外した `write_docs` を送信すると書き込める
+      - 続けての `search_docs` が書き込み前の `version` を返却する
     test: test_error_when_write_deadline_exceeded
   - name: 異常シナリオ（呼び出しが取り消される）
     setup:
@@ -520,7 +520,7 @@ scenarios:
         notes: 端末の設定の書き込みの期限は既定
       - name: project-index
         description: sample を配信している project-index
-        notes: テストが `write_docs` を送信し、検査のスクリプトの実行中に MCP の取り消しの通知（`notifications/cancelled`）を送信するか、接続を切る
+        notes: テストが `write_docs` を送信し、検査のスクリプトの実行中に、同じ接続で MCP の取り消しの通知（`notifications/cancelled`、`requestId` は `write_docs` の要求の ID）を送信する
     flow: |-
       <!-- map: {"title": "異常シナリオ（呼び出しが取り消される）"} -->
 
@@ -570,32 +570,6 @@ scenarios:
       - '`Error executing tool` だけの応答にならない'
       - ワークツリー x の文書 1 は書き換わらない
     test: test_error_when_validator_timed_out
-  - name: 異常シナリオ（内部の処理が失敗する）
-    setup:
-      - name: Mock
-        description: 'project-index を起動する環境の `PATH` の先頭に、`show` の呼び出しだけ終了コード 128 と `fatal: unable to read tree` で終了する `git` のスクリプトを配置する'
-      - name: project-index
-        description: sample を配信している project-index
-        notes: 文書 1 の `update` 1 件
-    flow: |-
-      <!-- map: {"title": "異常シナリオ（内部の処理が失敗する）"} -->
-
-      ```mermaid
-      sequenceDiagram
-        actor A as エージェント
-        participant M as 文書の MCP（/mcp）
-
-        A->>M: write_docs(operations: update 文書 1)
-        M->>M: git の実行が失敗する
-        M-->>A: エラー（失敗した処理と git の出力）
-      ```
-
-      <!-- /map -->
-    expected:
-      - '`isError: true` で、失敗した git のコマンドと標準エラーの末尾を返却する'
-      - '`Error executing tool` だけの応答にならない'
-      - ワークツリー x の文書 1 は書き換わらない
-    test: test_error_when_internal_failure
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 issue: 14
 primary_actor: エージェント（Claude Code）

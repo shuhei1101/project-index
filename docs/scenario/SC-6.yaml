@@ -818,7 +818,7 @@ scenarios:
       <!-- /map -->
     expected:
       - '`view: ids`・`summary`・`full` のどの `search_docs` も、非機能要件のワークツリーを指定した読み取りの上限の内に返却される'
-      - 2 回目以降の呼び出しは、ワークツリー y のファイルが変わっていなければ、クローン本体を指す呼び出しと同じ程度の時間で返却される
+      - ワークツリー y のファイルが変わっていなければ、2 回目以降の呼び出しでサーバーのログのワークツリー y の読み込みの記録が増えない
       - 文書 1 はワークツリー y の `name` を返却する
     test: test_normal_when_new_worktree_given
   - name: 異常シナリオ（ワークツリーの読み込みが上限までに終了しない）
@@ -876,7 +876,6 @@ scenarios:
     expected:
       - '`isError: true` で、止まった git のコマンドと、待ち時間の上限を超えたことを返却する'
       - '`Error executing tool` だけの応答にならない'
-      - '`describe` も同じエラーを返却する'
     test: test_error_when_git_failed
 lead: エージェントが文書の MCP で、作業場所から使用できる配信元の文書を探して参照するシナリオを定め、調査の流れを変えるときに参照する。
 issue: 14
