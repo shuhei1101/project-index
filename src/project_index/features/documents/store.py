@@ -41,11 +41,14 @@ logger = logging.getLogger(__name__)
 CANDIDATE_COUNT = 5
 CANDIDATE_CUTOFF = 0.6
 TREE_KEEP = 20
+# 保持するワークツリーのたどった結果の数（超えたら古く使ったものから捨てる）
+WORKTREE_KEEP = 20
 
 __all__ = [
     "CANDIDATE_COUNT",
     "CANDIDATE_CUTOFF",
     "TREE_KEEP",
+    "WORKTREE_KEEP",
     "DocumentStore",
     "check_sync",
     "collect_files",
@@ -136,6 +139,8 @@ class DocumentStore:
         self._worktrees: dict[Path, _WorktreeWalk] = {}
         self._worktree_locks: dict[Path, threading.Lock] = {}
         self._startup_schemas: dict[tuple[str, str], dict[str, Any]] = {}
+        # `clear` のたびに増やし、`clear` の前に解き始めたスキーマを書き戻さない
+        self._generation = 0
         self._lock = threading.Lock()
 
     def read_root(self, target: Target) -> Path:
@@ -387,7 +392,10 @@ class DocumentStore:
         """ワークツリーの文書を、たどった結果を使い回して集める（ワークツリーごとの排他の中で呼ぶ）。"""
         started = time.monotonic()
         with self._lock:
-            walk = self._worktrees.get(root)
+            walk = self._worktrees.pop(root, None)
+            # 使った順の末尾へ移す（上限を超えたら先頭から捨てる）
+            if walk is not None:
+                self._worktrees[root] = walk
         cold = walk is None
         # 初めて読む・フォルダの中のファイルが増減した: たどり直す
         if walk is None or not _folders_fresh(root, walk.folders):
@@ -402,7 +410,13 @@ class DocumentStore:
         result = self._load_walked(target, root, tables, None, walk.files, collected)
         # 読み込みを終えてから記録し、読み込み中のワークツリーを読み込み済みとみなさない
         with self._lock:
+            self._worktrees.pop(root, None)
             self._worktrees[root] = walk
+            # 上限を超えたら、古く使ったワークツリーの記録から捨てる
+            while len(self._worktrees) > WORKTREE_KEEP:
+                dropped = next(iter(self._worktrees))
+                del self._worktrees[dropped]
+                self._worktree_locks.pop(dropped, None)
         if cold:
             logger.info(
                 "ワークツリーを読み込んだ（%s・%s・%.1f 秒）",
@@ -504,11 +518,14 @@ class DocumentStore:
         key = (source.id, table.id)
         with self._lock:
             cached = self._startup_schemas.get(key)
+            generation = self._generation
         if cached is not None:
             return cached
         resolved = startup_schema(source, table)
         with self._lock:
-            self._startup_schemas[key] = resolved
+            # 解いている間に `clear` された: 古い配信元のスキーマかもしれないので記録しない
+            if generation == self._generation:
+                self._startup_schemas[key] = resolved
         return resolved
 
     def _revision_schema(
@@ -574,6 +591,7 @@ class DocumentStore:
             self._dates.clear()
             self._startup_schemas.clear()
             self._worktrees.clear()
+            self._generation += 1
 
 
 def _revision_fresh(
