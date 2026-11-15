@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
+import shutil
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -1074,3 +1077,175 @@ def test_normal_when_schema_ref_unresolvable(
     assert "doc-1:" in notes
     assert MISSING_REF in notes
     assert "schemas/sample.schema.yaml" in notes
+
+
+LOADED_LOG = "ワークツリーを読み込んだ"
+# ワークツリーの読み込みを待つ間に、同じ呼び出しを送り直す回数と間隔
+LOADING_RETRIES = 30
+LOADING_RETRY_SEC = 1
+
+
+def _put_git(folder: Path, body: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`body` を実行してから本物の git を実行する `git` のスクリプトを、PATH の先頭に置く。"""
+    real = shutil.which("git")
+    assert real is not None
+    folder.mkdir(parents=True)
+    script = folder / "git"
+    script.write_text(f'#!/bin/sh\n{body}\nexec "{real}" "$@"\n', encoding="utf-8")
+    script.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{folder}{os.pathsep}{os.environ['PATH']}")
+
+
+def _loaded_logs(caplog: pytest.LogCaptureFixture, worktree: Path) -> list[str]:
+    """ワークツリーを読み込んだログの行のうち、`worktree` のものを返す。"""
+    return [
+        record.getMessage()
+        for record in caplog.records
+        if LOADED_LOG in record.getMessage() and str(worktree) in record.getMessage()
+    ]
+
+
+def _call_until_loaded(env: Any, **arguments: Any) -> Any:
+    """読み込み中のエラーでなくなるまで、同じ `search_docs` を間を空けて送り直す。"""
+    result = env.call("search_docs", **arguments)
+    for _ in range(LOADING_RETRIES):
+        if "WorktreeLoadingError" not in result.text:
+            return result
+        time.sleep(LOADING_RETRY_SEC)
+        result = env.call("search_docs", **arguments)
+    return result
+
+
+def test_normal_when_new_worktree(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_doc_text: Callable[..., str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """サーバーの起動後に作ったワークツリーを 1 回だけ読み込み、2 回目以降の呼び出しは読み込んだ内容で返却する（正常系）。"""
+    # 準備
+    extra = {
+        f"docs/extra-{index}.yaml": sample_doc_text(f"extra-{index}", "追加")
+        for index in range(500)
+    }
+    source = make_source("sample", sample_file_set(**extra))
+    env = make_server(source)
+    worktree = add_worktree(source.folder, "y")
+    (worktree / "docs" / "doc-1.yaml").write_text(
+        sample_doc_text("doc-1", "ワークツリーの名前"), encoding="utf-8"
+    )
+    caplog.set_level(logging.INFO)
+    common = {"cwd": str(source.folder), "worktree": str(worktree)}
+    wait_sec = env.handlers.terminal.worktree_load_wait_sec
+    # 実行
+    timings: list[float] = []
+    started = time.monotonic()
+    ids = env.call("search_docs", view="ids", **common)
+    timings.append(time.monotonic() - started)
+    started = time.monotonic()
+    summary = env.call("search_docs", view="summary", **common)
+    timings.append(time.monotonic() - started)
+    started = time.monotonic()
+    full = env.call("search_docs", view="full", filter=DOC_1, **common)
+    timings.append(time.monotonic() - started)
+    logs_after_three = _loaded_logs(caplog, worktree)
+    (worktree / "docs" / "doc-2.yaml").write_text(
+        sample_doc_text("doc-2", "書き換えた名前"), encoding="utf-8"
+    )
+    changed = env.call(
+        "search_docs",
+        view="full",
+        filter={"field": "id", "op": "eq", "values": ["doc-2"]},
+        **common,
+    )
+    # 検証
+    assert [ids.is_error, summary.is_error, full.is_error] == [False, False, False]
+    assert max(timings) < wait_sec
+    assert len(logs_after_three) == 1
+    assert "name: ワークツリーの名前" in full.text
+    assert "name: 書き換えた名前" in changed.text
+
+
+def test_error_when_worktree_loading(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_doc_text: Callable[..., str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """ワークツリーの読み込みが待ちの上限までに終了しなければ、読み込みを続けたまま読み込み中である旨を返却する（異常系）。"""
+    # 準備
+    source = make_source("sample")
+    env = make_server(source, settings_extra="worktree_load_wait_sec: 1\n")
+    worktree = add_worktree(source.folder, "y")
+    (worktree / "docs" / "doc-1.yaml").write_text(
+        sample_doc_text("doc-1", "ワークツリーの名前"), encoding="utf-8"
+    )
+    _put_git(tmp_path / "bin", f'case "$PWD" in "{worktree}"*) sleep 3;; esac', monkeypatch)
+    caplog.set_level(logging.INFO)
+    arguments = {
+        "cwd": str(source.folder),
+        "worktree": str(worktree),
+        "view": "summary",
+        "filter": DOC_1,
+    }
+    # 実行
+    started = time.monotonic()
+    first = env.call("search_docs", **arguments)
+    elapsed = time.monotonic() - started
+    finished = time.monotonic()
+    loaded = _call_until_loaded(env, **arguments)
+    waited = time.monotonic() - finished
+    # 検証
+    assert first.is_error is True
+    assert first.text.startswith(f"WorktreeLoadingError: {worktree} を読み込み中です")
+    assert "時間を空けて同じ呼び出しを再実行してください" in first.text
+    assert "文書 1" not in first.text
+    assert elapsed < 3
+    assert loaded.is_error is False
+    assert "ワークツリーの名前" in loaded.text
+    assert waited < 30
+    assert len(_loaded_logs(caplog, worktree)) == 1
+
+
+def test_error_when_unexpected(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """`ProjectIndexError` でない例外を、例外の型と内容を持つ `isError` の応答にする（異常系）。"""
+    # 準備
+    source = make_source("sample")
+    previous = run_git(source.folder, "rev-parse", "HEAD").strip()
+    (source.folder / "docs" / "doc-3.yaml").write_text(
+        "id: doc-3\nname: 文書 3\n", encoding="utf-8"
+    )
+    run_git(source.folder, "add", "-A")
+    run_git(source.folder, "commit", "-m", "文書 3")
+    env = make_server(source)
+    _put_git(
+        tmp_path / "bin",
+        'for arg in "$@"; do [ "$arg" = archive ] && exec sleep 25; done',
+        monkeypatch,
+    )
+    caplog.set_level(logging.ERROR)
+    # 実行
+    result = env.call("search_docs", cwd=str(source.folder), ref=previous, view="summary")
+    without_ref = env.call("search_docs", cwd=str(source.folder), view="summary")
+    # 検証
+    assert result.is_error is True
+    assert result.text.startswith("UnexpectedError: GitError:")
+    assert "git archive" in result.text
+    assert "20 秒を超えたため止めました" in result.text
+    assert not result.text.startswith("Error executing tool")
+    assert "ツールの処理に失敗した（search_docs）" in caplog.text
+    assert "Traceback" in caplog.text
+    assert without_ref.is_error is False
+    assert "doc-3" in without_ref.text
