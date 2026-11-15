@@ -37,8 +37,8 @@ packages = ["src/project_index"]
 [tool.ruff]
 line-length = 100
 target-version = "py314"
-# 反映作業のスクリプトは配布元のコピーのため修正しない
-extend-exclude = ["docs/pr"]
+# 配布元からコピーした反映作業のスクリプトは修正しない
+extend-exclude = ["docs/pr/80/反映作業"]
 
 [tool.ruff.lint]
 # PLC2701・PLW1514 は preview の規則のため、preview のうち select に書いた規則だけを有効にする
@@ -92,7 +92,7 @@ indent-style = "space"
 [tool.pyright]
 typeCheckingMode = "strict"
 pythonVersion = "3.14"
-exclude = ["**/node_modules", "**/__pycache__", "**/.*", "docs/pr"]
+exclude = ["**/node_modules", "**/__pycache__", "**/.*", "docs/pr/80/反映作業"]
 
 # 設計書が単体テストを置く _ 付きの関数・属性を、テストから呼ぶ
 [[tool.pyright.executionEnvironments]]
