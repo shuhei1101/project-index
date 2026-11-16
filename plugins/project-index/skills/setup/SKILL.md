@@ -38,7 +38,7 @@ argument-hint: "[path]"
 4. YAML でない範囲を管理用の YAML の行にする。
    - `{clone}/.venv/bin/python -m project_index files --root {path} --paths {範囲の glob}` で、範囲のうち管理用の YAML に記載するファイルを求める（`--paths` は繰り返せる。生成物・ロック・バイナリ・ベンダーのコード・再エクスポートや空の `__init__` と、`.git`・`node_modules`・`.claude/worktrees` の下は含まれない）。管理用の YAML（`files.yaml`、ローカル運用は `files.local.yaml`）の行と突き合わせる。`*.local.*` の名前のファイルは含まれない
      - 範囲の glob は、`{config}` が無いときは手順 3 で回答した範囲にする
-     - Git が無視するファイルを除外すると回答した場合、`git -C {path} ls-files --others --ignored --exclude-standard --directory` の結果を 1 つずつ `--exclude` で指定する
+     - Git が無視するファイルを除外すると回答した場合、`git -C {path} ls-files --others --ignored --exclude-standard` でファイルの一覧を取り、`project-index files` の結果からその一覧のパスを除く（`--exclude` はファイル名だけに当たるため使わない）
      - `{config}` があるときは、`records: files` の行ごとに 1 回ずつ呼び、範囲の glob を `{管理用の YAML のフォルダ}/**` にする（行の `paths` の値は指定しない）。その行の `exclude` を 1 つずつ `--exclude` で指定する。行をまとめて 1 回で呼ばない
    - 結果は次の候補にする
 
