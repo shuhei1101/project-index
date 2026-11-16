@@ -537,6 +537,44 @@ scenarios:
       - 変更と削除の応答がどちらも 404 で、extra の行が無いことを返却する
       - '`settings.yaml` が変わらない'
     test: test_error_when_row_not_found
+  - name: 正常シナリオ（読み書きの方法を持つ行を保存する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: ローカル運用の配信元
+        description: 起動するの『正常シナリオ（disk を指定した配信元を Git を参照せずに配信する）』と同じ company
+        notes: '端末の設定の company の行は `storage.type: disk`'
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す一時フォルダの `settings.yaml`'
+        notes: '`sources` に sample（`storage` を持たない、git リポジトリ）と company の 2 行'
+      - name: project-index
+        description: 端末の設定で起動した project-index
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（読み書きの方法を持つ行を保存する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant DD as dev-docs の画面のサーバー
+        participant PI as project-index（端末の設定の API）
+        participant CF as 端末の設定
+
+        DD->>PI: 端末の設定の配信元を取得する
+        PI-->>DD: sample と company の行（company は storage.type: disk）
+        DD->>PI: sample の enabled を false にし、どちらの行にも storage を含めない sources を保存する
+        PI->>CF: 送信しなかった storage をファイルの今の値で残して書き換え、配信元を読み直す
+        PI-->>DD: 読み直した後の配信元の状態
+        DD->>PI: 取得したバージョンを添えて、sample の行の storage.type を disk に変更する
+        PI->>CF: sample の行だけを書き換え、sample の配信元だけを読み直す
+        PI-->>DD: sample の配信元の状態と、書き換えた後のバージョン
+      ```
+
+      <!-- /map -->
+    expected:
+      - '取得が company の行を `storage.type: disk` つきで返却し、sample の行は `storage` を返却しない'
+      - '`storage` を含めない保存の後も、`settings.yaml` の company の行に `storage.type: disk` が残り、company は disk の配信元として配信される'
+      - '1 行の変更の後、`settings.yaml` の sample の行に `storage.type: disk` が入り、再起動せずに読み取り API の sample のリビジョンの一覧が `git: false` を返却する'
+      - '`storage.type` に `git`・`disk` 以外の値を送信した保存は、スキーマに通らないとして書き換えを断る'
+    test: test_normal_when_storage_kept_and_changed
 lead: dev-docs の画面のサーバーと端末のほかのプロセスが端末の設定の API で配信元を丸ごとか 1 行ずつ変更し、再起動せずに配信へ反映するシナリオを定め、端末の設定の配信元の変更の流れを変えるときに参照する。
 issue: 14
 visibility: internal

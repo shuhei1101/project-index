@@ -219,6 +219,39 @@ scenarios:
       - D-2 の取得が、文書が 1 つに決まらないことを、文書のある 2 つのフォルダつきでエラーとして返却する
       - D-3 の取得が、文書が無いことを 404 で返却する
     test: test_error_when_decision_not_unique
+  - name: 正常シナリオ（disk の配信元を読む）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが読み取り API を HTTP で呼ぶ）
+      - name: ローカル運用の配信元
+        description: 起動するの『正常シナリオ（disk を指定した配信元を Git を参照せずに配信する）』と同じ company。`files.local.yaml` の行の文書 1 を持つ
+        notes: company のリポジトリには `develop`・`master` ブランチがある
+      - name: project-index
+        description: company を端末の設定に並べて起動した project-index
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（disk の配信元を読む）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant DD as dev-docs の画面のサーバー
+        participant PI as project-index（読み取り API）
+        participant F as company のクローン本体
+
+        DD->>PI: company のリビジョンの一覧を取得する
+        PI-->>DD: git: false
+        DD->>PI: company の文書 1 を master を指して取得する
+        PI->>F: リビジョンの指定を無視して登録したフォルダの文書 1 を参照する
+        PI-->>DD: 文書 1 の値（ref は空）
+        DD->>PI: company の文書の一覧を取得する
+        PI-->>DD: 登録したフォルダの文書の一覧（ref は空）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 'リビジョンの一覧が `git: false` を返却し、ブランチと commit を返却しない'
+      - '`master` を指した文書 1 の取得が、エラーにせず、company のクローン本体の文書 1 の値を返却し、応答の `ref` が空'
+      - 文書の一覧が、`files.local.yaml` の行の文書を含む登録したフォルダの文書を返却し、応答の `ref` が空
+    test: test_normal_when_disk_storage_source
 lead: dev-docs の画面のサーバーが読み取り API で配信元と文書を取得するシナリオを定め、画面のサーバーからの読み取りの流れを変えるときに参照する。
 issue: 14
 visibility: internal
