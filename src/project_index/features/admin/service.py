@@ -96,7 +96,7 @@ def version_state(mine: str, current: str) -> VersionState:
     return "old" if left < right else "newer"
 
 
-def _source_states(handlers: Handlers) -> list[SourceState]:
+def _source_states(handlers: Handlers, *, with_sync: bool = True) -> list[SourceState]:
     """登録簿の状態を配信元の状態の行にする。"""
     states: list[SourceState] = []
     # 配信元ごとの `default_ref` の commit を確かめず、いま配信中の組を読む
@@ -106,8 +106,9 @@ def _source_states(handlers: Handlers) -> list[SourceState]:
         if status.status == "serving" and status.id in served:
             source = served[status.id]
             config_version = source.config.version
-            # 裏で実行した検査の最後の結果を読み、配信元のファイルはたどらない
-            check = handlers.checks.get(status.id)
+            # 裏で実行した検査の最後の結果を読み、配信元のファイルはたどらない。
+            # 同期の件数を含めない指定（読み直しの応答）のときは結果を参照しない
+            check = handlers.checks.get(status.id) if with_sync else None
             states.append(
                 SourceState(
                     id=status.id,
@@ -170,7 +171,8 @@ def reload_config(handlers: Handlers) -> ReloadResult:
                 for status in statuses
                 if status.status == "not_served"
             ],
-            sources=_source_states(handlers),
+            # 裏の検査が済んでいても、読み直しの応答には同期の件数を含めない
+            sources=_source_states(handlers, with_sync=False),
         )
     logger.info(
         "設定を読み直した（追加 %s・削除 %s・配信していない %s）",
