@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
+import threading
 from typing import TYPE_CHECKING, Any
+
+from project_index.features.describe import source_checks as source_checks_module
+from project_index.features.documents.store import check_sync
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     import pytest
+
+# 止めた検査の合図を待つ上限
+CHECK_WAIT_SEC = 30
 
 
 def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]) -> None:
@@ -103,3 +111,46 @@ def test_normal_when_terminal_config_has_unknown_top_level_key(
         "mindstella" in record.getMessage() and str(env.settings_path) in record.getMessage()
         for record in caplog.records
     )
+
+
+def test_normal_when_reloaded_before_checks_finish(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_sync_file_set: Callable[..., dict[str, str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """前の検査を待たずに応答し、前の検査の結果で後の結果を上書きしない（正常系）。"""
+    # 準備
+    entered = threading.Event()
+    release = threading.Event()
+    calls: list[str] = []
+
+    def stale_check(store: Any, source: Any) -> Any:
+        calls.append(source.id)
+        report = check_sync(store, source)
+        # 起動の後の 1 回と 2 回目の読み直しの検査は本物の結果、1 回目の読み直しの検査は合図まで止めて 5 件の結果
+        if len(calls) != 2:
+            return report
+        entered.set()
+        release.wait(timeout=CHECK_WAIT_SEC)
+        return dataclasses.replace(report, unindexed_files=[f"stale-{i}.py" for i in range(5)])
+
+    monkeypatch.setattr(source_checks_module, "check_sync", stale_check)
+    env = make_server(make_source("sample", sample_sync_file_set(1), git=False))
+    env.wait_background()
+    # 実行
+    first = env.call_admin("reload", format="json")
+    reached = entered.wait(timeout=CHECK_WAIT_SEC)
+    second = env.call_admin("reload", format="json")
+    answered_while_blocked = not release.is_set()
+    release.set()
+    env.wait_background()
+    status = env.call_admin("status", format="json")
+    # 検証
+    [source] = status.data["sources"]
+    assert not first.is_error
+    assert reached
+    assert not second.is_error
+    assert answered_while_blocked
+    assert source["sync"]["unindexed_files"] == 1
+    assert len(calls) == 3

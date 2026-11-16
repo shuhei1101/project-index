@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from project_index.integrations.git import GIT_ARCHIVE_TIMEOUT_SEC
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -157,3 +159,30 @@ def test_error_when_source_not_found(
     assert not_served.status_code == 404
     assert not_served.json()["missing"] == "not_served"
     assert not_served.json()["errors"]
+
+
+def test_error_when_revision_export_times_out(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+    time_out_archive: Callable[..., list[str]],
+) -> None:
+    """`schemas` を指して default_ref の commit の書き出しが上限を超えたとき、止めた処理と理由を返す（異常系）。"""
+    # 準備
+    sample = make_source("sample")
+    commit = run_git(sample.folder, "rev-parse", "develop").strip()
+    time_out_archive()
+    env = make_server(sample)
+    env.wait_background()
+    # 実行
+    response = env.client.get("/sources/sample/config", params={"schemas": "true"})
+    # 検証
+    body = response.json()
+    assert response.status_code == 504
+    assert body["title"] == "RevisionExportTimeoutError"
+    assert body["operation"] == "revision_export"
+    assert body["commit"] == commit
+    assert body["limitSec"] == GIT_ARCHIVE_TIMEOUT_SEC
+    assert "リビジョンの書き出し" in body["detail"]
+    assert f"{GIT_ARCHIVE_TIMEOUT_SEC:g} 秒" in body["detail"]
+    assert list((env.state_dir / "snapshots").glob("*/*.tmp")) == []
