@@ -74,6 +74,12 @@ data_models:
         access: 公開
         default: 'True'
         description: '`False` で、`scope` に当たらない作業場所から `outside_scope: true` で読むのを断る'
+      - name: storage
+        title: 読み書きの方法
+        type: SourceStorage | None
+        access: 公開
+        default: None
+        description: '`None` は、配信元のフォルダが Git の作業ツリーの中なら `git`、外なら `disk` として扱う'
   - name: TerminalConfig
     title: 端末の設定
     container: project_index/features/settings/types.py
@@ -262,6 +268,12 @@ data_models:
         type: bool
         access: 公開
         description: 行の `outside_read`
+      - name: storage
+        title: 読み書きの方法
+        type: SourceStorage | None
+        access: 公開
+        default: None
+        description: 行の `storage`。書いていない行は `None`（JSON ではキーを出さない）
   - name: SettingsSourcesView
     title: 端末の設定の取得の応答
     container: project_index/features/settings/types.py
@@ -402,6 +414,12 @@ data_models:
         access: 公開
         default: None
         description: 送ったときだけ置き換える
+      - name: storage
+        title: 読み書きの方法
+        type: SourceStorage | None
+        access: 公開
+        default: None
+        description: 送ったときだけ置き換える
   - name: SettingsSourcePatchRequest
     title: 1 行の変更の要求
     container: project_index/features/settings/types.py
@@ -452,6 +470,19 @@ data_models:
         type: str
         access: 公開
         description: 書き換えた後の端末の設定の内容のバージョン
+  - name: SourceStorage
+    title: 配信元の読み書きの方法
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定
+    role: DTO
+    summary: 端末の設定の `sources[].storage`
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。端末の設定のスキーマ（`schemas/settings.schema.yaml`）の `sources[].storage` も同じ形にする'
+    properties:
+      - name: type
+        title: 種類
+        type: StorageType
+        access: 公開
+        description: '`git`・`disk`'
 classes:
   - name: TerminalConfigInvalidError
     title: 端末の設定の違反
@@ -504,3 +535,17 @@ classes:
         type: str
         access: 公開
         description: パスの `id`
+enums:
+  - name: StorageType
+    title: 読み書きの方法の種類
+    container: project_index/features/settings/types.py
+    usecase: 共通
+    role: 型エイリアス
+    summary: 配信元の読み書きの方法（`Literal`）
+    values:
+      - value: git
+        title: Git
+        description: '`default_ref` のリビジョンから参照し、ワークツリーへ書き込む'
+      - value: disk
+        title: ディスク
+        description: Git を参照せず、登録したフォルダのファイルを参照し、書き込む

@@ -76,7 +76,7 @@ functions:
       1. `lock` を取る
       2. 端末の設定の本文と内容のバージョンを読み（端末の設定の内容の読み込み）、内容のバージョンを照合する（内容のバージョンの照合）
       3. 本文を往復編集の形で読み（往復編集の読み込み）、送られた行ごとに、ファイルの `sources` から配信元の ID（配信元の『行の配信元の ID』。`id`、無ければ設定の `name`）が同じ行を探す
-         - 見つかった場合、送られた行に含めなかったキー（`SourceEntry` の `model_fields_set` に無い `enabled`・`outside_read` と、`scope` を含めなかった行か `SourceScope` の `model_fields_set` に無い `scope.read`・`scope.write`）を、見つかった行の値で埋める
+         - 見つかった場合、送られた行に含めなかったキー（`SourceEntry` の `model_fields_set` に無い `enabled`・`outside_read`・`storage` と、`scope` を含めなかった行か `SourceScope` の `model_fields_set` に無い `scope.read`・`scope.write`）を、見つかった行の値で埋める
          - ID が求まらない行と、同じ ID の行が無い行は埋めない（既定値のまま）。ファイルの行のうち `SourceEntry` として読めない行（スキーマに通らない行）は探す対象から除く
       4. `sources` だけを埋めた後の行に置き換える。`config` は要素の数によらず配列で書く。既定値と同じキー（`enabled: true`・`outside_read: true`・空の `scope.read` など）は書かない
       5. 置き換えた値を検証する（端末の設定の検証）
@@ -162,6 +162,12 @@ functions:
         condition: 最上位に `mindstella`（入れ子の値とコメント）を持つ `settings.yaml` に、sample の 1 行を保存する
         mock: なし（一時フォルダ。`reload` は状態を返す偽物）
         expected: 違反にならず、保存した `settings.yaml` の `mindstella` の値とコメントが保存の前と同じ
+      - name: test_save_sources_when_unsent_storage
+        case: 正常
+        summary: 送らなかった storage を残す
+        condition: 'ファイルの company の行が `storage: {type: disk}`、送る行は `storage` を持たない'
+        mock: '`reload` を stub'
+        expected: '書いた company の行に `storage: {type: disk}` が残る'
   - name: add_source
     title: 配信元の 1 行の追加
     kind: 関数

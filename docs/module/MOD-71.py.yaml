@@ -437,12 +437,18 @@ data_models:
         title: ワークツリーの glob
         type: list[str]
         access: 公開
-        description: 設定の `worktrees` を `main_root`（Git でなければ `root`）からの絶対パスにしたもの
+        description: 設定の `worktrees` を `main_root`（Git でなければ `root`）からの絶対パスにしたもの。`storage` が `disk` の配信元は空
       - name: schemas
         title: 種類のスキーマ
         type: dict[str, dict[str, Any]]
         access: 公開
         description: '`documents[].id` → 読んだスキーマ（設定ファイルのフォルダからの相対パスのファイルを起動時に読む。作業中のワークツリーを読むときは文書のストアが読み直す）。`schema_path` が `SchemaRef` の行は、参照先のスキーマの読み取りで `$ref` まで解いたスキーマ'
+      - name: storage
+        title: 読み書きの方法
+        type: StorageType | None
+        access: 公開
+        default: None
+        description: 端末の設定の行の `storage.type`。`None` は行で省いた（`is_git` で決める）。`disk` のとき `is_git` は `False`、`repo_root`・`main_root` は `None`、`worktree_globs` は空
     methods:
       - name: table
         title: 文書の行を引く
