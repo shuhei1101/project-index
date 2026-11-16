@@ -1,0 +1,551 @@
+$ TMPDIR=$(mktemp -d -p "$HOME") uv run pytest tests/unit/
+# /tmp/pytest-of-shuhei2441 が別のユーザーの持ち物のため、TMPDIR だけを私用のフォルダに向けて実行した
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/fix-server-first-query-and-reload-response
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 966 items
+
+tests/unit/plugins/project_index/hooks/test_pre_tool_use.py ....         [  0%]
+tests/unit/plugins/project_index/hooks/test_session_start.py ........... [  1%]
+.........                                                                [  2%]
+tests/unit/project_index/features/access/test_service.py ............... [  4%]
+......................                                                   [  6%]
+tests/unit/project_index/features/access/test_types.py .                 [  6%]
+tests/unit/project_index/features/admin/test_render.py ............F     [  7%]
+tests/unit/project_index/features/admin/test_service.py ................ [  9%]
+......................F                                                  [ 11%]
+tests/unit/project_index/features/changes/test_compare.py .....          [ 12%]
+tests/unit/project_index/features/changes/test_render.py ....            [ 12%]
+tests/unit/project_index/features/changes/test_service.py .............. [ 14%]
+                                                                         [ 14%]
+tests/unit/project_index/features/convert/test_decisions.py ...          [ 14%]
+tests/unit/project_index/features/convert/test_service.py ......         [ 15%]
+tests/unit/project_index/features/describe/test_render.py ........       [ 15%]
+tests/unit/project_index/features/describe/test_service.py ............  [ 17%]
+tests/unit/project_index/features/describe/test_source_checks.py .....FF [ 17%]
+                                                                         [ 17%]
+tests/unit/project_index/features/describe/test_warnings.py ......       [ 18%]
+tests/unit/project_index/features/documents/test_aliases.py ..........   [ 19%]
+tests/unit/project_index/features/documents/test_fields.py ............. [ 20%]
+.............                                                            [ 22%]
+tests/unit/project_index/features/documents/test_indexable.py .......... [ 23%]
+...                                                                      [ 23%]
+tests/unit/project_index/features/documents/test_loader.py ............. [ 24%]
+....                                                                     [ 25%]
+tests/unit/project_index/features/documents/test_schema.py ............. [ 26%]
+                                                                         [ 26%]
+tests/unit/project_index/features/documents/test_store.py .............. [ 28%]
+..........................                                               [ 30%]
+tests/unit/project_index/features/history/test_query.py ................ [ 32%]
+.                                                                        [ 32%]
+tests/unit/project_index/features/history/test_snapshot.py ....FFF       [ 33%]
+tests/unit/project_index/features/lifecycle/test_control.py ...          [ 33%]
+tests/unit/project_index/features/lifecycle/test_update.py ..........    [ 34%]
+tests/unit/project_index/features/migrate/test_service.py .............  [ 36%]
+tests/unit/project_index/features/migrate/test_steps.py ...........      [ 37%]
+tests/unit/project_index/features/prompt_doc/test_cli.py ..              [ 37%]
+tests/unit/project_index/features/prompt_doc/test_markdown.py .......... [ 38%]
+.......                                                                  [ 39%]
+tests/unit/project_index/features/prompt_doc/test_render.py ............ [ 40%]
+...                                                                      [ 40%]
+tests/unit/project_index/features/prompt_doc/test_runtime.py ........... [ 41%]
+.                                                                        [ 41%]
+tests/unit/project_index/features/read/test_nav.py .....                 [ 42%]
+tests/unit/project_index/features/read/test_paths.py ........            [ 43%]
+tests/unit/project_index/features/read/test_route.py .....               [ 43%]
+tests/unit/project_index/features/read/test_search.py ..                 [ 43%]
+tests/unit/project_index/features/read/test_service.py ................. [ 45%]
+..                                                                       [ 45%]
+tests/unit/project_index/features/related/test_graph.py ...              [ 46%]
+tests/unit/project_index/features/related/test_service.py .......        [ 46%]
+tests/unit/project_index/features/related/test_suggest.py .              [ 47%]
+tests/unit/project_index/features/search/test_body_parts.py ....         [ 47%]
+tests/unit/project_index/features/search/test_cursor.py ..               [ 47%]
+tests/unit/project_index/features/search/test_fields.py ..               [ 47%]
+tests/unit/project_index/features/search/test_filters.py .............   [ 49%]
+tests/unit/project_index/features/search/test_render.py .....            [ 49%]
+tests/unit/project_index/features/search/test_service.py ............... [ 51%]
+......                                                                   [ 51%]
+tests/unit/project_index/features/search/test_snippets.py ........       [ 52%]
+tests/unit/project_index/features/search/test_terms.py ...               [ 53%]
+tests/unit/project_index/features/seen/test_store.py ......              [ 53%]
+tests/unit/project_index/features/seen/test_types.py .                   [ 53%]
+tests/unit/project_index/features/session_start/test_route.py ..         [ 54%]
+tests/unit/project_index/features/session_start/test_service.py ...      [ 54%]
+tests/unit/project_index/features/settings/test_query.py ............... [ 55%]
+...................                                                      [ 57%]
+tests/unit/project_index/features/settings/test_route.py ..........      [ 58%]
+tests/unit/project_index/features/settings/test_service.py ............. [ 60%]
+...............                                                          [ 61%]
+tests/unit/project_index/features/sources/test_merge.py ....             [ 62%]
+tests/unit/project_index/features/sources/test_registry.py ............. [ 63%]
+..................                                                       [ 65%]
+tests/unit/project_index/features/sources/test_schema_ref.py .......     [ 66%]
+tests/unit/project_index/features/sources/test_service.py .............. [ 67%]
+............................................                             [ 72%]
+tests/unit/project_index/features/sources/test_types.py ..........       [ 73%]
+tests/unit/project_index/features/validation/test_markdown.py .......... [ 74%]
+..                                                                       [ 74%]
+tests/unit/project_index/features/validation/test_rules.py .........     [ 75%]
+tests/unit/project_index/features/validation/test_scripts.py ....        [ 75%]
+tests/unit/project_index/features/validation/test_service.py ..........  [ 76%]
+tests/unit/project_index/features/write/test_apply.py .................. [ 78%]
+.....                                                                    [ 79%]
+tests/unit/project_index/features/write/test_hints.py ....               [ 79%]
+tests/unit/project_index/features/write/test_ids.py ..                   [ 79%]
+tests/unit/project_index/features/write/test_locks.py .                  [ 79%]
+tests/unit/project_index/features/write/test_placement.py ...            [ 80%]
+tests/unit/project_index/features/write/test_service.py ................ [ 81%]
+.......                                                                  [ 82%]
+tests/unit/project_index/integrations/test_git.py ..........             [ 83%]
+tests/unit/project_index/integrations/test_mdmark.py .......             [ 84%]
+tests/unit/project_index/integrations/test_scripts.py ..........         [ 85%]
+tests/unit/project_index/server/mcp/test_admin.py ....                   [ 85%]
+tests/unit/project_index/server/mcp/test_docs.py ...................     [ 87%]
+tests/unit/project_index/server/mcp/test_result.py ...........           [ 88%]
+tests/unit/project_index/server/test_app.py .........                    [ 89%]
+tests/unit/project_index/server/test_error_handlers.py .....             [ 90%]
+tests/unit/project_index/server/test_lifespan.py .                       [ 90%]
+tests/unit/project_index/server/test_origin.py .....                     [ 90%]
+tests/unit/project_index/shared/test_deadline.py .....                   [ 91%]
+tests/unit/project_index/shared/test_errors.py ..                        [ 91%]
+tests/unit/project_index/shared/test_files.py ...                        [ 92%]
+tests/unit/project_index/shared/test_hashing.py ..                       [ 92%]
+tests/unit/project_index/shared/test_narrowing.py ..........             [ 93%]
+tests/unit/project_index/shared/test_paths.py .....                      [ 93%]
+tests/unit/project_index/shared/test_schema_check.py .............       [ 95%]
+tests/unit/project_index/shared/test_yaml_io.py .......                  [ 95%]
+tests/unit/project_index/test_main.py .........                          [ 96%]
+tests/unit/project_index/test_serve.py ............FF.........FFFFFF..   [100%]
+
+=================================== FAILURES ===================================
+________________ test_render_status_when_checking_and_exporting ________________
+
+    def test_render_status_when_checking_and_exporting() -> None:
+        """検査と書き出しの最中を出す（正常系）。"""
+        # 準備
+>       status = ServerStatus(
+            address="http://127.0.0.1:8786/",
+            version="0.2.0",
+            pid=4242,
+            terminal=TerminalState(
+                file="/home/u/.config/project-index/settings.yaml", version_state="current"
+            ),
+            sources=[_serving("sample", (0, 0, 0))],
+            checking=True,
+            exporting=True,
+        )
+E       TypeError: ServerStatus.__init__() got an unexpected keyword argument 'checking'
+
+tests/unit/project_index/features/admin/test_render.py:321: TypeError
+_________________ test_get_status_when_checking_and_exporting __________________
+
+make_handlers = <function make_handlers.<locals>._make at 0x7a431f631fe0>
+
+    def test_get_status_when_checking_and_exporting(
+        make_handlers: Callable[..., Any],
+    ) -> None:
+        """裏の検査と書き出しの最中を返す（正常系）。"""
+        # 準備
+        from types import SimpleNamespace
+    
+        handlers = make_handlers(
+            registry=SourceRegistry(),
+            checks=SimpleNamespace(checking=True),
+            snapshots=SimpleNamespace(exporting=True),
+        )
+        # 実行
+        status = get_status(handlers, env={})
+        # 検証
+>       assert status.checking is True
+               ^^^^^^^^^^^^^^^
+E       AttributeError: 'ServerStatus' object has no attribute 'checking'
+
+tests/unit/project_index/features/admin/test_service.py:959: AttributeError
+_________________________ test_source_checks_checking __________________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a432046a970>
+make_served_source = <function make_served_source.<locals>._make at 0x7a431faebc10>
+
+    def test_source_checks_checking(
+        monkeypatch: pytest.MonkeyPatch,
+        make_served_source: Callable[..., ServedSource],
+    ) -> None:
+        """裏の検査の間だけ True（正常系）。"""
+        # 準備
+        gate = threading.Event()
+        _, first_started = _gated_check_sync(monkeypatch, gate)
+        source = make_served_source(id="sample", root=Path("/w/sample"))
+        checks = SourceChecks()
+        # 実行
+        threads = checks.refresh_later(None, [source])  # type: ignore[arg-type]
+        first_started.wait(10)
+>       checking_before = checks.checking
+                          ^^^^^^^^^^^^^^^
+E       AttributeError: 'SourceChecks' object has no attribute 'checking'
+
+tests/unit/project_index/features/describe/test_source_checks.py:182: AttributeError
+__________________________ test_source_checks_forget ___________________________
+
+make_source_dir = <function make_source_dir.<locals>._make at 0x7a431fa71dd0>
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x7a431fa71010>
+make_entry = <function make_entry.<locals>._make at 0x7a431fa71220>
+
+    def test_source_checks_forget(
+        make_source_dir: Callable[..., Path],
+        make_terminal_config: Callable[..., TerminalConfig],
+        make_entry: Callable[..., SourceEntry],
+    ) -> None:
+        """結果を捨てる（正常系）。"""
+        # 準備
+        handlers, source = _sample(make_source_dir, make_terminal_config, make_entry)
+        checks = SourceChecks()
+        checks.refresh(handlers.store, source)
+        # 実行
+>       checks.forget(["sample"])
+        ^^^^^^^^^^^^^
+E       AttributeError: 'SourceChecks' object has no attribute 'forget'
+
+tests/unit/project_index/features/describe/test_source_checks.py:202: AttributeError
+------------------------------ Captured log call -------------------------------
+WARNING  project_index.main:main.py:357 sample: 管理用の YAML に無いファイル 1 件: src: src/u0.py
+_________________ test_snapshot_store_checkout_when_timed_out __________________
+
+tmp_path = PosixPath('/home/shuhei2441/tmp.FgdeNjO8E3/pytest-of-shuhei2441/pytest-0/test_snapshot_store_checkout_w3')
+git_repo = <function git_repo.<locals>._create at 0x7a431fc92140>
+run_git = <function run_git.<locals>._run at 0x7a431fcc3060>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a431e10cec0>
+
+    def test_snapshot_store_checkout_when_timed_out(
+        tmp_path: Path,
+        git_repo: Callable[..., Path],
+        run_git: Callable[..., str],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """待ち時間の上限を超えたら止めた処理と理由を送る（異常系）。"""
+        from project_index.integrations.git import GIT_ARCHIVE_TIMEOUT_SEC
+>       from project_index.shared.errors import RevisionExportTimeoutError
+E       ImportError: cannot import name 'RevisionExportTimeoutError' from 'project_index.shared.errors' (/home/shuhei2441/repo/project-index/.claude/worktrees/fix-server-first-query-and-reload-response/src/project_index/shared/errors.py)
+
+tests/unit/project_index/features/history/test_snapshot.py:161: ImportError
+______________________ test_snapshot_store_checkout_later ______________________
+
+tmp_path = PosixPath('/home/shuhei2441/tmp.FgdeNjO8E3/pytest-of-shuhei2441/pytest-0/test_snapshot_store_checkout_l0')
+git_repo = <function git_repo.<locals>._create at 0x7a431fc91640>
+run_git = <function run_git.<locals>._run at 0x7a431fc91850>
+
+    def test_snapshot_store_checkout_later(
+        tmp_path: Path,
+        git_repo: Callable[..., Path],
+        run_git: Callable[..., str],
+    ) -> None:
+        """先のスレッドの後に裏で書き出す（正常系）。"""
+        # 準備
+        root = git_repo({"a.yaml": "a: 1\n"})
+        commit = run_git(root, "rev-parse", "HEAD").strip()
+        store = SnapshotStore(tmp_path / "snapshots")
+        gate = threading.Event()
+        before = threading.Thread(target=gate.wait, args=(10,), daemon=True)
+        before.start()
+        # 実行
+>       thread = store.checkout_later([(root, commit)], after=[before])
+                 ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'SnapshotStore' object has no attribute 'checkout_later'
+
+tests/unit/project_index/features/history/test_snapshot.py:192: AttributeError
+______________ test_snapshot_store_checkout_later_when_timed_out _______________
+
+tmp_path = PosixPath('/home/shuhei2441/tmp.FgdeNjO8E3/pytest-of-shuhei2441/pytest-0/test_snapshot_store_checkout_l1')
+git_repo = <function git_repo.<locals>._create at 0x7a431fc90ca0>
+commit_all = <function commit_all.<locals>._commit at 0x7a431fc90a90>
+run_git = <function run_git.<locals>._run at 0x7a431fc90eb0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a431e10e190>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x7a431e141250>
+
+    def test_snapshot_store_checkout_later_when_timed_out(
+        tmp_path: Path,
+        git_repo: Callable[..., Path],
+        commit_all: Callable[..., str],
+        run_git: Callable[..., str],
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """上限で止まった書き出しを飛ばして次へ進む（正常系）。"""
+        # 準備
+        root = git_repo({"a.yaml": "a: 1\n"})
+        first = run_git(root, "rev-parse", "HEAD").strip()
+        second = commit_all(root, {"a.yaml": "a: 2\n"})
+        _timing_out_archive(monkeypatch, {first})
+        store = SnapshotStore(tmp_path / "snapshots")
+        # 実行
+        with caplog.at_level(logging.WARNING, logger=snapshot_module.__name__):
+>           thread = store.checkout_later([(root, first), (root, second)])
+                     ^^^^^^^^^^^^^^^^^^^^
+E           AttributeError: 'SnapshotStore' object has no attribute 'checkout_later'
+
+tests/unit/project_index/features/history/test_snapshot.py:221: AttributeError
+_____________________________ test_reload_sources ______________________________
+
+tmp_path = PosixPath('/home/shuhei2441/tmp.FgdeNjO8E3/pytest-of-shuhei2441/pytest-0/test_reload_sources0')
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x7a431f3d12d0>
+make_status = <function make_status.<locals>._make at 0x7a431f3d3270>
+
+    def test_reload_sources(
+        tmp_path: Path,
+        make_terminal_config: Callable[..., TerminalConfig],
+        make_status: Callable[..., SourceStatus],
+    ) -> None:
+        """読み直してからキャッシュを捨てる（正常系）。"""
+        # 準備
+        calls: list[str] = []
+        statuses = [make_status("sample", 0)]
+        registry = _Recorder("registry", calls, statuses)
+        # 実行
+>       result = reload_sources(
+            make_terminal_config(),
+            registry=registry,  # type: ignore[arg-type]
+            store=_Recorder("store", calls),  # type: ignore[arg-type]
+            checker=_Recorder("checker", calls),  # type: ignore[arg-type]
+            converter=_Recorder("converter", calls),  # type: ignore[arg-type]
+            checks=SourceChecks(),
+            snapshots=SnapshotStore(tmp_path / "snapshots"),
+        )
+E       TypeError: reload_sources() got an unexpected keyword argument 'snapshots'
+
+tests/unit/project_index/test_serve.py:458: TypeError
+_____________________ test_reload_sources_when_out_of_sync _____________________
+
+tmp_path = PosixPath('/home/shuhei2441/tmp.FgdeNjO8E3/pytest-of-shuhei2441/pytest-0/test_reload_sources_when_out_o0')
+write_files = <function write_files.<locals>._write at 0x7a431f231900>
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x7a431f2316f0>
+make_entry = <function make_entry.<locals>._make at 0x7a431f2305c0>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x7a431f208710>
+
+    def test_reload_sources_when_out_of_sync(
+        tmp_path: Path,
+        write_files: Callable[[Path, dict[str, str]], None],
+        make_terminal_config: Callable[..., TerminalConfig],
+        make_entry: Callable[..., SourceEntry],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """メタデータのずれを警告のログに書く（正常系）。"""
+        # 準備
+>       from project_index.main import log_source_check
+E       ImportError: cannot import name 'log_source_check' from 'project_index.main' (/home/shuhei2441/repo/project-index/.claude/worktrees/fix-server-first-query-and-reload-response/src/project_index/main.py)
+
+tests/unit/project_index/test_serve.py:482: ImportError
+____________________ test_reload_sources_when_alias_and_nav ____________________
+
+tmp_path = PosixPath('/home/shuhei2441/tmp.FgdeNjO8E3/pytest-of-shuhei2441/pytest-0/test_reload_sources_when_alias0')
+make_alias_source_dir = <function make_alias_source_dir.<locals>._make at 0x7a431f2337f0>
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x7a431f233a00>
+make_entry = <function make_entry.<locals>._make at 0x7a431f233c10>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x7a431f233ee0>
+
+    def test_reload_sources_when_alias_and_nav(
+        tmp_path: Path,
+        make_alias_source_dir: Callable[..., Path],
+        make_terminal_config: Callable[..., TerminalConfig],
+        make_entry: Callable[..., SourceEntry],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """エイリアスのキーと nav の条件の警告（正常系）。"""
+        # 準備
+>       from project_index.main import log_source_check
+E       ImportError: cannot import name 'log_source_check' from 'project_index.main' (/home/shuhei2441/repo/project-index/.claude/worktrees/fix-server-first-query-and-reload-response/src/project_index/main.py)
+
+tests/unit/project_index/test_serve.py:747: ImportError
+______________________________ test_start_loading ______________________________
+
+tmp_path = PosixPath('/home/shuhei2441/tmp.FgdeNjO8E3/pytest-of-shuhei2441/pytest-0/test_start_loading0')
+write_files = <function write_files.<locals>._write at 0x7a431f2c03b0>
+sample_files = {'project-index.yaml': 'name: sample\ndocuments:\n  - id: rules\n    paths: [docs/rule/*.yaml]\n    schema: schemas/ru...d: [id, name]\n', 'docs/rule/doc-1.yaml': 'id: doc-1\nname: 文書 1\n', 'docs/rule/doc-2.yaml': 'id: doc-2\nname: 文書 2\n'}
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x7a431f2c05c0>
+make_entry = <function make_entry.<locals>._make at 0x7a431f2c07d0>
+capsys = <_pytest.capture.CaptureFixture object at 0x7a431f3e62d0>
+
+    def test_start_loading(
+        tmp_path: Path,
+        write_files: Callable[[Path, dict[str, str]], None],
+        sample_files: dict[str, str],
+        make_terminal_config: Callable[..., TerminalConfig],
+        make_entry: Callable[..., SourceEntry],
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """裏で配信元を読み ID を出す（正常系）。"""
+        # 準備
+        write_files(tmp_path / "ws", sample_files)
+        terminal = make_terminal_config(
+            sources=[make_entry(str(tmp_path / "ws" / "project-index.yaml"))]
+        )
+        handlers = build_handlers(terminal)
+        # 実行
+        thread = main_module.start_loading(handlers)
+        thread.join(timeout=30)
+>       _wait_until(lambda: not handlers.checks.checking and not handlers.snapshots.exporting)
+
+tests/unit/project_index/test_serve.py:799: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/project_index/test_serve.py:421: in _wait_until
+    while not predicate():
+              ^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+>   _wait_until(lambda: not handlers.checks.checking and not handlers.snapshots.exporting)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'SourceChecks' object has no attribute 'checking'
+
+tests/unit/project_index/test_serve.py:799: AttributeError
+----------------------------- Captured stdout call -----------------------------
+sample
+------------------------------ Captured log call -------------------------------
+INFO     project_index.features.sources.registry:registry.py:184 配信元を読み直した（配信中: ['sample']・外した数: 0）
+________________________ test_start_loading_when_failed ________________________
+
+tmp_path = PosixPath('/home/shuhei2441/tmp.FgdeNjO8E3/pytest-of-shuhei2441/pytest-0/test_start_loading_when_failed0')
+write_files = <function write_files.<locals>._write at 0x7a431f2c2ae0>
+sample_files = {'project-index.yaml': 'name: sample\ndocuments:\n  - id: rules\n    paths: [docs/rule/*.yaml]\n    schema: schemas/ru...d: [id, name]\n', 'docs/rule/doc-1.yaml': 'id: doc-1\nname: 文書 1\n', 'docs/rule/doc-2.yaml': 'id: doc-2\nname: 文書 2\n'}
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x7a431f2c2b90>
+make_entry = <function make_entry.<locals>._make at 0x7a431f2c2e50>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x7a431f2c3120>
+
+    def test_start_loading_when_failed(
+        tmp_path: Path,
+        write_files: Callable[[Path, dict[str, str]], None],
+        sample_files: dict[str, str],
+        make_terminal_config: Callable[..., TerminalConfig],
+        make_entry: Callable[..., SourceEntry],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """読み込みの例外をログに書いて待ちを解く（異常系）。"""
+        # 準備
+        write_files(tmp_path / "ws", sample_files)
+        terminal = make_terminal_config(
+            sources=[make_entry(str(tmp_path / "ws" / "project-index.yaml"))]
+        )
+        handlers = build_handlers(terminal)
+    
+        def failing_refresh(store: DocumentStore, source: Any) -> Any:
+            msg = "検査に失敗した"
+            raise RuntimeError(msg)
+    
+        handlers.checks.refresh = failing_refresh  # type: ignore[method-assign]
+        # 実行
+        with caplog.at_level(logging.ERROR):
+            thread = main_module.start_loading(handlers)
+            thread.join(timeout=30)
+>           _wait_until(lambda: not handlers.checks.checking)
+
+tests/unit/project_index/test_serve.py:832: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/project_index/test_serve.py:421: in _wait_until
+    while not predicate():
+              ^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+>   _wait_until(lambda: not handlers.checks.checking)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'SourceChecks' object has no attribute 'checking'
+
+tests/unit/project_index/test_serve.py:832: AttributeError
+------------------------------ Captured log call -------------------------------
+ERROR    project_index.main:main.py:192 配信元の読み込みに失敗した
+Traceback (most recent call last):
+  File "/home/shuhei2441/repo/project-index/.claude/worktrees/fix-server-first-query-and-reload-response/src/project_index/main.py", line 188, in work
+    check_sources(handlers.registry.served(), store=handlers.store, checks=handlers.checks)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/shuhei2441/repo/project-index/.claude/worktrees/fix-server-first-query-and-reload-response/src/project_index/main.py", line 348, in check_sources
+    check = checks.refresh(store, source)
+  File "/home/shuhei2441/repo/project-index/.claude/worktrees/fix-server-first-query-and-reload-response/tests/unit/project_index/test_serve.py", line 825, in failing_refresh
+    raise RuntimeError(msg)
+RuntimeError: 検査に失敗した
+____________________________ test_log_source_check _____________________________
+
+make_served_source = <function make_served_source.<locals>._make at 0x7a431f291170>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x7a431f20e670>
+
+    def test_log_source_check(
+        make_served_source: Callable[..., ServedSource],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """ずれのある並びだけを警告のログに書く（正常系）。"""
+        # 準備
+        from project_index.features.describe.source_checks import SourceCheck
+        from project_index.features.documents.types import SyncReport
+>       from project_index.main import log_source_check
+E       ImportError: cannot import name 'log_source_check' from 'project_index.main' (/home/shuhei2441/repo/project-index/.claude/worktrees/fix-server-first-query-and-reload-response/src/project_index/main.py)
+
+tests/unit/project_index/test_serve.py:846: ImportError
+_________________________ test_check_and_export_later __________________________
+
+tmp_path = PosixPath('/home/shuhei2441/tmp.FgdeNjO8E3/pytest-of-shuhei2441/pytest-0/test_check_and_export_later0')
+git_repo = <function git_repo.<locals>._create at 0x7a431f292400>
+write_files = <function write_files.<locals>._write at 0x7a431f2921f0>
+sample_files = {'project-index.yaml': 'name: sample\ndocuments:\n  - id: rules\n    paths: [docs/rule/*.yaml]\n    schema: schemas/ru...d: [id, name]\n', 'docs/rule/doc-1.yaml': 'id: doc-1\nname: 文書 1\n', 'docs/rule/doc-2.yaml': 'id: doc-2\nname: 文書 2\n'}
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x7a431f2926c0>
+make_entry = <function make_entry.<locals>._make at 0x7a431f2928d0>
+
+    def test_check_and_export_later(
+        tmp_path: Path,
+        git_repo: Callable[..., Path],
+        write_files: Callable[[Path, dict[str, str]], None],
+        sample_files: dict[str, str],
+        make_terminal_config: Callable[..., TerminalConfig],
+        make_entry: Callable[..., SourceEntry],
+    ) -> None:
+        """検査の後に Git の配信元だけを書き出す（正常系）。"""
+        # 準備
+>       from project_index.main import check_and_export_later
+E       ImportError: cannot import name 'check_and_export_later' from 'project_index.main' (/home/shuhei2441/repo/project-index/.claude/worktrees/fix-server-first-query-and-reload-response/src/project_index/main.py)
+
+tests/unit/project_index/test_serve.py:881: ImportError
+_________________________ test_reload_changed_sources __________________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a431f221cc0>
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x7a431f292e50>
+make_served_source = <function make_served_source.<locals>._make at 0x7a431f2931c0>
+make_status = <function make_status.<locals>._make at 0x7a431f2933d0>
+
+    def test_reload_changed_sources(
+        monkeypatch: pytest.MonkeyPatch,
+        make_terminal_config: Callable[..., TerminalConfig],
+        make_served_source: Callable[..., ServedSource],
+        make_status: Callable[..., SourceStatus],
+    ) -> None:
+        """変わった行を読み直してから、新しく読んだ配信元だけでキャッシュを捨てる（正常系）。"""
+        # 準備
+        calls: list[str] = []
+        a = make_served_source(id="a")
+        b = make_served_source(id="b")
+        statuses = [make_status("a", 0), make_status("b", 1)]
+        registry = _ChangedRegistry(calls, [a], [a, b], statuses)
+        checked: list[list[str]] = []
+    
+        def fake_check_and_export_later(
+            sources: list[ServedSource], *, store: object, checks: object, snapshots: object
+        ) -> None:
+            checked.append([source.id for source in sources])
+    
+>       monkeypatch.setattr(main_module, "check_and_export_later", fake_check_and_export_later)
+E       AttributeError: <module 'project_index.main' from '/home/shuhei2441/repo/project-index/.claude/worktrees/fix-server-first-query-and-reload-response/src/project_index/main.py'> has no attribute 'check_and_export_later'
+
+tests/unit/project_index/test_serve.py:963: AttributeError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/admin/test_render.py::test_render_status_when_checking_and_exporting
+FAILED tests/unit/project_index/features/admin/test_service.py::test_get_status_when_checking_and_exporting
+FAILED tests/unit/project_index/features/describe/test_source_checks.py::test_source_checks_checking
+FAILED tests/unit/project_index/features/describe/test_source_checks.py::test_source_checks_forget
+FAILED tests/unit/project_index/features/history/test_snapshot.py::test_snapshot_store_checkout_when_timed_out
+FAILED tests/unit/project_index/features/history/test_snapshot.py::test_snapshot_store_checkout_later
+FAILED tests/unit/project_index/features/history/test_snapshot.py::test_snapshot_store_checkout_later_when_timed_out
+FAILED tests/unit/project_index/test_serve.py::test_reload_sources - TypeErro...
+FAILED tests/unit/project_index/test_serve.py::test_reload_sources_when_out_of_sync
+FAILED tests/unit/project_index/test_serve.py::test_reload_sources_when_alias_and_nav
+FAILED tests/unit/project_index/test_serve.py::test_start_loading - Attribute...
+FAILED tests/unit/project_index/test_serve.py::test_start_loading_when_failed
+FAILED tests/unit/project_index/test_serve.py::test_log_source_check - Import...
+FAILED tests/unit/project_index/test_serve.py::test_check_and_export_later - ...
+FAILED tests/unit/project_index/test_serve.py::test_reload_changed_sources - ...
+======================= 15 failed, 951 passed in 31.48s ========================
