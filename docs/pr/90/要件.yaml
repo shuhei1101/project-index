@@ -43,6 +43,12 @@ use_cases:
     impact: run_only
     detail: 入れる・参照・書き込み・設定の変更・更新の流れは変わらないが、配信元の読む場所と書き込みの先の解決を変えるため回帰を確かめる
     depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-12.yaml
+    impact: changed
+    detail: 端末の設定の配信元の行の読み書きの方法を取得・保存・1 行ずつ変更でき、送信しなかったときは今の値を残す
+    depends_on:
+      - docs/scenario/SC-4.yaml
 docs:
   - page: docs/guide/設定.md
     new: false
