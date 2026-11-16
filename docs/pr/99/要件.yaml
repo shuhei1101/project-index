@@ -1,0 +1,41 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: changed
+    detail: エージェントが関連をたどるときに、文書の最上位の関連と入れ子の項目の中の関連の両方の相手が出るようになる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: run_only
+    detail: どの深さの列もまとめる対応の共通のキーへの書き込みは断られる。書き込みの流れの記述は変わらないが、共通のキーの列名への読み替えが変わるため回帰を確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: run_only
+    detail: 起動時の metadata の列の欠けと該当しない関連の数え方は変わらないが、列名の解釈が変わるため回帰を確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: run_only
+    detail: 画面のサーバーが受け取る共通のキーの流れは変わらないが、列名の解釈が変わるため回帰を確かめる
+    depends_on: []
+docs:
+  - page: docs/guide/設定.md
+    new: false
+    change: '`documents[].metadata` の行に、どの深さの同じ名前の列もまとめる `**.{列名}` の記載と例（`related: "**.refs[]"`）、書き込みでは断ることを加える'
+    status: todo
+  - page: docs/guide/コアコンセプト-文書のメタデータ.md
+    new: false
+    change: 列名の記載の説明に `**.{列名}` の記載と例を加える
+    status: todo
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: '`write_docs` の共通のキーの読み替えの説明に、`**` を含む列名に対応づけたキーへの操作を断ることを加える'
+    status: todo
+scope_out:
+  - item: AI Monitor の `dev-docs.yaml` の設計書の種別の行の `related` の対応の書き換えと、`trace_related` での確認
+    reason: 別のリポジトリの変更で、Issue の本文が AI Monitor 側で受け持つと決めている。この作業 PR の記載を前提にする後続のため
+    plan: shuhei1101/ai-monitor#3042
+  - item: '`**` を先頭以外の位置に置く記載（`a.**.b` など）と、`**` を 2 つ以上持つ記載'
+    reason: 要望はどの深さの同じ名前の列をまとめることで、先頭の `**.` だけで足りる
+    plan: none
