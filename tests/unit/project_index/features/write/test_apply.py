@@ -152,6 +152,31 @@ def test_apply_body_when_text_edit_ambiguous() -> None:
     assert exc_info.value.violations[0].path == "operations[1].text_edits[0].old"
 
 
+@pytest.mark.parametrize(
+    ("operation", "expected_path"),
+    [
+        pytest.param(
+            Operation(op="update", id="n1", expected_version="v1", set={"@body": None}),
+            "operations[0].set.@body",
+            id="update_null",
+        ),
+        pytest.param(
+            Operation(op="create", kind="notes", data={"id": "n2", "path": "n2.md", "@body": 123}),
+            "operations[0].data.@body",
+            id="create_number",
+        ),
+    ],
+)
+def test_apply_body_when_not_string(operation: Operation, expected_path: str) -> None:
+    """文字列でない @body（異常系）。"""
+    # 準備
+    index = 0
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError) as exc_info:
+        apply_body("a", operation, index=index)
+    assert [v.path for v in exc_info.value.violations] == [expected_path]
+
+
 def test_to_columns() -> None:
     """update の項目のパスを読み替える（正常系）。"""
     # 準備
