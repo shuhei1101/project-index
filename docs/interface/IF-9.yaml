@@ -33,7 +33,7 @@ flows:
       - '読み直した後の `search_docs(source: notes)` が文書を返す'
       - 読み直す前に張った `/mcp` のセッションで、続けて `describe` を呼べる
       - 応答の `sources[]` の sample・notes の `sync` が `null`
-      - '応答の後の `status` が、裏の検査が済むまで `checking: true` を、済んだ後は `checking: false` と `sync` の件数を返す'
+      - '裏の検査が済んだ後の `status` が `checking: false` と sample・notes の `sync` の件数を返す（検査の最中の `checking: true` は IF-8 の `正常系（読み直した配信元を検査している）` で確かめる）'
     test: test_normal
   - name: 正常系（検証に失敗する配信元がある）
     summary: 配信元の設定を壊して読み直すと、その配信元を外して返す
