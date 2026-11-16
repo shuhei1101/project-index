@@ -1411,9 +1411,16 @@ def test_normal_when_body_file(
             }
         ],
     )
+    created_text = (worktree / "notes" / "n2.md").read_text(encoding="utf-8")
     tried = env.call("write_docs", **common, operations=[edit], dry_run=True)
     tried_text = (worktree / "notes" / "n1.md").read_text(encoding="utf-8")
     edited = env.call("write_docs", **common, operations=[edit])
+    searched = env.call(
+        "search_docs",
+        **common,
+        filter={"field": "id", "op": "eq", "values": ["n1"]},
+        format="json",
+    )
     stale = env.call("write_docs", **common, operations=[edit])
     replaced = env.call(
         "write_docs",
@@ -1426,12 +1433,14 @@ def test_normal_when_body_file(
     index = load_yaml((worktree / "notes" / "index.yaml").read_text(encoding="utf-8"))
     assert not created.is_error
     assert index["items"] == [{"id": "n1", "path": "n1.md"}, {"id": "n2", "path": "n2.md"}]
+    assert created_text == "本文\n"
     assert tried.data["applied"] is False
     assert "@@ notes/n1.md" in tried.data["results"][0]["diff"]
     assert "新しい行" in tried.data["results"][0]["diff"]
     assert tried_text == NOTE_1
     assert not edited.is_error
     assert edited.data["results"][0]["version"] != n1_version
+    assert searched.data["items"][0]["values"]["version"] == edited.data["results"][0]["version"]
     assert (worktree / "notes" / "n1.md").read_text(encoding="utf-8") == "# n1\n新しい行\n"
     assert stale.is_error
     assert "VersionMismatchError" in stale.text
