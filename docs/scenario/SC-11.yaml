@@ -219,6 +219,73 @@ scenarios:
       - D-2 の取得が、文書が 1 つに決まらないことを、文書のある 2 つのフォルダつきでエラーとして返却する
       - D-3 の取得が、文書が無いことを 404 で返却する
     test: test_error_when_decision_not_unique
+  - name: 正常シナリオ（配信元を読み込んだ直後に開く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが読み取り API を HTTP で呼ぶ）
+      - name: サンプルの配信元
+        description: 正常シナリオと同じ配信元
+        notes: id `sample`。`default_ref` は `main`
+      - name: project-index
+        description: 状態のフォルダ（`state_dir`）を空にし、sample を端末の設定に並べて起動した project-index
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant DD as dev-docs の画面のサーバー
+        participant PI as project-index（読み取り API）
+        participant SRC as sample
+
+        PI->>SRC: 配信元の読み込みと検査の後に、裏で default_ref の commit を書き出す
+        DD->>PI: 配信元の一覧と状態を取得する
+        PI-->>DD: sample が配信中
+        DD->>PI: sample の配信元の設定を、解いたスキーマを求めて取得する
+        PI-->>DD: 書き出したリビジョンから読んだ設定とスキーマ
+        DD->>PI: sample の文書の一覧を、値とバージョンと共通のキーを求めて取得する（リビジョンを省く）
+        PI-->>DD: 書き出したリビジョンから読んだ文書の一覧
+        SRC->>SRC: 利用者が main に commit を追加する
+        DD->>PI: sample の文書の一覧を取得する（リビジョンを省く）
+        PI-->>DD: 配信中の組の文書の一覧
+        PI->>SRC: 裏で配信元を組み立て直し、main の新しい commit を書き出す
+        DD->>PI: sample の文書の一覧を取得する（リビジョンを省く）
+        PI-->>DD: 新しい commit の文書の一覧
+      ```
+    expected:
+      - リビジョンの書き出しは、配信元の読み込みと検査の後に、最初の取得を待たずに行い、ログの `リビジョンを書き出した` が `main` の commit で 1 行出る
+      - 最初の配信元の設定の取得と文書の一覧の取得が 200 を返却し、その間にリビジョンの書き出しのログが増えない
+      - 書き出しの最中に届いた取得は、同じ commit を書き出し直さずに、書き出しの終了を待って返却する（`main` の commit の `リビジョンを書き出した` は 1 行のまま）
+      - '`main` が進んだ後の組み立て直しで、新しい commit の `リビジョンを書き出した` が 1 行出て、その後の文書の一覧の取得の間にリビジョンの書き出しのログが増えない'
+      - 新しい commit の後の文書の一覧が、追加した commit の文書の値を返却する
+    test: test_normal_when_opened_after_loading
+  - name: 異常シナリオ（リビジョンの書き出しが上限を超える）
+    setup:
+      - name: Mock
+        description: PATH の先頭に包みの git を置く。`archive` のときだけ、`git archive` の待ち時間の上限より長く待ってから本物の git を呼ぶ
+        notes: ほかの git の呼び出しは本物の git をそのまま呼ぶ
+      - name: サンプルの配信元
+        description: 正常シナリオと同じ配信元
+        notes: id `sample`。文書 1 を変えた commit が `main` の最新
+      - name: project-index
+        description: 状態のフォルダ（`state_dir`）を空にし、sample を端末の設定に並べて起動した project-index
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant DD as dev-docs の画面のサーバー
+        participant PI as project-index（読み取り API）
+        participant SRC as sample
+
+        DD->>PI: sample の文書 1 を親の commit を指して取得する
+        PI->>SRC: 親の commit を書き出す
+        PI->>PI: 書き出しが上限を超えたので止める
+        PI-->>DD: 書き出しを止めたエラー（処理・commit・上限の秒数）
+        DD->>PI: 配信元の一覧と状態を取得する
+        PI-->>DD: sample が配信中
+      ```
+    expected:
+      - 文書 1 の取得が、止めた処理がリビジョンの書き出しであることと、親の commit・上限の秒数を持つエラーを返却する。理由を持たない 500 を返却しない
+      - 書き出しの途中のフォルダが状態のフォルダに残らない
+      - 警告のログに、上限を超えた git の引数と上限の秒数が残る
+      - エラーの後も、配信元の一覧は sample を配信中として返却する
+    test: test_error_when_revision_export_times_out
 lead: dev-docs の画面のサーバーが読み取り API で配信元と文書を取得するシナリオを定め、画面のサーバーからの読み取りの流れを変えるときに参照する。
 issue: 14
 visibility: internal

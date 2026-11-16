@@ -660,6 +660,38 @@ scenarios:
     test: test_normal_when_terminal_config_has_unknown_top_level_key
     decisions:
       - D-308
+  - name: 正常シナリオ（default_ref のリビジョンを先に書き出す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`project-index serve` を子プロセスで起動する）
+      - name: サンプルの配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ git リポジトリ
+        notes: id `sample`。`default_ref` は `main`
+      - name: 読み取りだけの配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
+        notes: id `notes`
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample と notes の 2 行。`state_dir` は空のフォルダ'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
+        participant SRC as sample
+
+        U->>DD: project-index serve
+        DD->>DD: 127.0.0.1:8786 で待ち受ける
+        DD->>DD: 裏で配信元を読み込み、検査する
+        DD->>SRC: 裏で sample の default_ref の commit を書き出す
+        DD-->>U: 待ち受けたアドレスと配信している配信元を標準出力に出す
+      ```
+    expected:
+      - 待ち受けと配信元の読み込みは、リビジョンの書き出しの終了を待たない（書き出しの最中も、管理の MCP の `status` が配信元の読み込みが済んだことを返却する）
+      - ログの `リビジョンを書き出した` が sample の `main` の commit で 1 行出る
+      - Git 管理外の notes は書き出さない
+      - 状態のフォルダの下に sample の `main` の commit の書き出しがあり、その後の読み取り API の sample の文書の取得が書き出し直さずに 200 を返却する
+    test: test_normal_when_default_ref_exported_in_background
 lead: 利用者が `project-index serve` で端末の設定の配信元を配信し始めるシナリオを定め、起動の流れを変えるときに参照する。
 issue: 14
 primary_actor: 利用者
