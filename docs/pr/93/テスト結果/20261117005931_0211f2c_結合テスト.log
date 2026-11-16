@@ -1,0 +1,12 @@
+$ uv run pytest tests/integration/server/test_prompt_doc.py 2>&1 | tail -8
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/chore-docs-mdmark-json-marker
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 7 items
+
+tests/integration/server/test_prompt_doc.py .......                      [100%]
+
+============================== 7 passed in 0.52s ===============================
+
+$ uv run project-index prompt-doc < content/prompts/mcp/docs/instructions.yaml | mdmark check --text -   # mdmark v0.11.0
+ずれ 0 件（JSON のマーカー 2 か所、legacy_mark 0 件）
