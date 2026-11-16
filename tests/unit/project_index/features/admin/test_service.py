@@ -959,9 +959,7 @@ def test_check_project_when_disk_storage(
         },
     )
     handlers = _handlers(make_terminal_config)
-    request = CheckProjectRequest(
-        path=str(root / "project-index.local.yaml"), storage_type="disk"
-    )
+    request = CheckProjectRequest(path=str(root / "project-index.local.yaml"), storage_type="disk")
     # 実行
     result = check_project(request, handlers=handlers)
     # 検証
