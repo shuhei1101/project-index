@@ -939,3 +939,23 @@ def test_check_project_when_paths_base_invalid(
         "paths_base",
     ]
     assert result.sync is None
+
+
+def test_get_status_when_checking_and_exporting(
+    make_handlers: Callable[..., Any],
+) -> None:
+    """裏の検査と書き出しの最中を返す（正常系）。"""
+    # 準備
+    from types import SimpleNamespace
+
+    handlers = make_handlers(
+        registry=SourceRegistry(),
+        checks=SimpleNamespace(checking=True),
+        snapshots=SimpleNamespace(exporting=True),
+    )
+    # 実行
+    status = get_status(handlers, env={})
+    # 検証
+    assert status.checking is True
+    assert status.exporting is True
+    assert status.loading is False

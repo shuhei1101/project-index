@@ -313,3 +313,29 @@ def test_render_write_nav() -> None:
         "- nav.tabs[1].items[0].auto.filter: none: 条件 {} に該当する文書がありません"
     )
     assert result.rstrip().endswith(f"```yaml\n{nav}```")
+
+
+def test_render_status_when_checking_and_exporting() -> None:
+    """検査と書き出しの最中を出す（正常系）。"""
+    # 準備
+    status = ServerStatus(
+        address="http://127.0.0.1:8786/",
+        version="0.2.0",
+        pid=4242,
+        terminal=TerminalState(
+            file="/home/u/.config/project-index/settings.yaml", version_state="current"
+        ),
+        sources=[_serving("sample", (0, 0, 0))],
+        checking=True,
+        exporting=True,
+    )
+    # 実行
+    result = render_status(status)
+    # 検証
+    lines = result.splitlines()
+    assert lines[2] == "検査: 検査中（索引の同期の件数は検査が済んだ後に出ます）"
+    assert (
+        lines[3]
+        == "リビジョンの書き出し: 書き出し中（書き出し中のリビジョンを読む要求は待たされます）"
+    )
+    assert any(line.startswith("| sample |") for line in lines[4:])

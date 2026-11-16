@@ -7,6 +7,7 @@ import os
 import shutil
 import socket
 import sys
+import time
 from contextlib import closing, contextmanager
 from typing import TYPE_CHECKING, Any
 
@@ -414,6 +415,14 @@ def test_build_handlers_when_default_ref_moved(
     assert [document.metadata["name"] for document in documents] == ["タイトル"]
 
 
+def _wait_until(predicate: Callable[[], bool], timeout: float = 30) -> None:
+    """`predicate` が真になるまで待つ（`timeout` 秒を超えたら AssertionError）。"""
+    deadline = time.monotonic() + timeout
+    while not predicate():
+        assert time.monotonic() < deadline, "待ち時間の上限を超えた"
+        time.sleep(0.05)
+
+
 class _Recorder:
     """呼ばれた順を共有の記録へ残す部品の偽物。"""
 
@@ -436,6 +445,7 @@ class _Recorder:
 
 
 def test_reload_sources(
+    tmp_path: Path,
     make_terminal_config: Callable[..., TerminalConfig],
     make_status: Callable[..., SourceStatus],
 ) -> None:
@@ -452,6 +462,7 @@ def test_reload_sources(
         checker=_Recorder("checker", calls),  # type: ignore[arg-type]
         converter=_Recorder("converter", calls),  # type: ignore[arg-type]
         checks=SourceChecks(),
+        snapshots=SnapshotStore(tmp_path / "snapshots"),
     )
     # 検証
     assert calls[0] == "registry.reload"
@@ -468,6 +479,8 @@ def test_reload_sources_when_out_of_sync(
 ) -> None:
     """メタデータのずれを警告のログに書く（正常系）。"""
     # 準備
+    from project_index.main import log_source_check
+
     write_files(
         tmp_path / "sample",
         {
@@ -499,6 +512,7 @@ def test_reload_sources_when_out_of_sync(
     )
     snapshots = SnapshotStore(tmp_path / "snapshots")
     store = DocumentStore(snapshots)
+    checks = SourceChecks(on_checked=log_source_check)
     # 実行
     with caplog.at_level(logging.WARNING):
         statuses = reload_sources(
@@ -507,8 +521,10 @@ def test_reload_sources_when_out_of_sync(
             store=store,
             checker=DocumentChecker(store, timeout_sec=10),
             converter=ConvertService(tmp_path / "converted", store, 10),
-            checks=SourceChecks(),
+            checks=checks,
+            snapshots=snapshots,
         )
+        _wait_until(lambda: not checks.checking)
     # 検証
     warnings = _warnings(caplog)
     sample = [message for message in warnings if "sample" in message]
@@ -728,9 +744,13 @@ def test_reload_sources_when_alias_and_nav(
 ) -> None:
     """エイリアスのキーと nav の条件の警告（正常系）。"""
     # 準備
+    from project_index.main import log_source_check
+
     config = make_alias_source_dir(broken=True, none_nav=True)
     terminal = make_terminal_config(sources=[make_entry(str(config))])
-    store = DocumentStore(SnapshotStore(tmp_path / "snapshots"))
+    snapshots = SnapshotStore(tmp_path / "snapshots")
+    store = DocumentStore(snapshots)
+    checks = SourceChecks(on_checked=log_source_check)
     # 実行
     with caplog.at_level(logging.WARNING):
         statuses = reload_sources(
@@ -739,8 +759,10 @@ def test_reload_sources_when_alias_and_nav(
             store=store,
             checker=DocumentChecker(store, timeout_sec=10),
             converter=ConvertService(tmp_path / "converted", store, 10),
-            checks=SourceChecks(),
+            checks=checks,
+            snapshots=snapshots,
         )
+        _wait_until(lambda: not checks.checking)
     # 検証
     warnings = [message for message in _warnings(caplog) if "sample" in message]
     alias = [
@@ -774,6 +796,7 @@ def test_start_loading(
     # 実行
     thread = main_module.start_loading(handlers)
     thread.join(timeout=30)
+    _wait_until(lambda: not handlers.checks.checking and not handlers.snapshots.exporting)
     # 検証
     assert handlers.registry.loading is False
     assert len(handlers.registry.served()) == 1
@@ -806,48 +829,91 @@ def test_start_loading_when_failed(
     with caplog.at_level(logging.ERROR):
         thread = main_module.start_loading(handlers)
         thread.join(timeout=30)
+        _wait_until(lambda: not handlers.checks.checking)
     # 検証
     assert len([record for record in caplog.records if record.levelno == logging.ERROR]) == 1
     assert handlers.registry.loading is False
 
 
-def test_check_sources(
+def test_log_source_check(
+    make_served_source: Callable[..., ServedSource],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """ずれのある並びだけを警告のログに書く（正常系）。"""
+    # 準備
+    from project_index.features.describe.source_checks import SourceCheck
+    from project_index.features.documents.types import SyncReport
+    from project_index.main import log_source_check
+
+    source = make_served_source(id="sample")
+    check = SourceCheck(
+        report=SyncReport(
+            source_id="sample",
+            missing_refs=[],
+            unindexed_files=["src: src/d.py"],
+            missing_body_files=[],
+            unresolved_related=[],
+            alias_violations=[],
+        ),
+        nav=[],
+    )
+    # 実行
+    with caplog.at_level(logging.WARNING):
+        log_source_check(source, check)
+    # 検証
+    warnings = _warnings(caplog)
+    assert len(warnings) == 1
+    assert "sample" in warnings[0]
+    assert "1" in warnings[0]
+    assert "src: src/d.py" in warnings[0]
+
+
+def test_check_and_export_later(
     tmp_path: Path,
+    git_repo: Callable[..., Path],
     write_files: Callable[[Path, dict[str, str]], None],
+    sample_files: dict[str, str],
     make_terminal_config: Callable[..., TerminalConfig],
     make_entry: Callable[..., SourceEntry],
 ) -> None:
-    """キャッシュを捨てずに検査の結果を持たせる（正常系）。"""
+    """検査の後に Git の配信元だけを書き出す（正常系）。"""
     # 準備
-    from project_index.main import check_sources
+    from project_index.main import check_and_export_later
 
-    write_files(
-        tmp_path / "sample",
+    repo = git_repo(
         {
-            "project-index.yaml": SYNC_RULES_CONFIG.format(name="sample") + SYNC_SRC_CONFIG,
-            "schemas/rule.schema.yaml": SYNC_SCHEMA,
-            "docs/rule/doc-1.yaml": "id: doc-1\ntitle: 文書 1\n",
-            "src/files.yaml": "files:\n  - path: a.py\n",
-            "src/a.py": "a = 1\n",
-            "src/d.py": "d = 4\n",
+            **sample_files,
+            "project-index.yaml": sample_files["project-index.yaml"].replace("sample", "a"),
+        }
+    )
+    write_files(
+        tmp_path / "b",
+        {
+            **sample_files,
+            "project-index.yaml": sample_files["project-index.yaml"].replace("sample", "b"),
         },
     )
     terminal = make_terminal_config(
-        sources=[make_entry(str(tmp_path / "sample" / "project-index.yaml"))]
+        sources=[
+            make_entry(str(repo / "project-index.yaml"), source_id="a"),
+            make_entry(str(tmp_path / "b" / "project-index.yaml"), source_id="b"),
+        ]
     )
     registry = SourceRegistry()
     registry.reload(terminal)
-    store = DocumentStore(SnapshotStore(tmp_path / "snapshots"))
-    cleared: list[bool] = []
-    store.clear = lambda: cleared.append(True)  # type: ignore[method-assign]
+    snapshots = SnapshotStore(tmp_path / "snapshots")
+    store = DocumentStore(snapshots)
     checks = SourceChecks()
+    commit = registry.get("a").config_commit
     # 実行
-    check_sources(registry.served(), store=store, checks=checks)
+    thread = check_and_export_later(
+        registry.served(), store=store, checks=checks, snapshots=snapshots
+    )
+    thread.join(timeout=30)
     # 検証
-    check = checks.get("sample")
-    assert check is not None
-    assert len(check.report.unindexed_files) == 1
-    assert cleared == []
+    assert checks.get("a") is not None
+    assert checks.get("b") is not None
+    assert [path.name for path in (tmp_path / "snapshots").glob("*/*")] == [commit]
 
 
 class _ChangedRegistry:
@@ -889,10 +955,12 @@ def test_reload_changed_sources(
     registry = _ChangedRegistry(calls, [a], [a, b], statuses)
     checked: list[list[str]] = []
 
-    def fake_check_sources(sources: list[ServedSource], *, store: object, checks: object) -> None:
+    def fake_check_and_export_later(
+        sources: list[ServedSource], *, store: object, checks: object, snapshots: object
+    ) -> None:
         checked.append([source.id for source in sources])
 
-    monkeypatch.setattr(main_module, "check_sources", fake_check_sources)
+    monkeypatch.setattr(main_module, "check_and_export_later", fake_check_and_export_later)
     # 実行
     result = reload_changed_sources(
         make_terminal_config(),
@@ -901,6 +969,7 @@ def test_reload_changed_sources(
         checker=_Recorder("checker", calls),  # type: ignore[arg-type]
         converter=_Recorder("converter", calls),  # type: ignore[arg-type]
         checks=SourceChecks(),
+        snapshots=_Recorder("snapshots", calls),  # type: ignore[arg-type]
     )
     # 検証
     assert calls[0] == "registry.reload_changed"

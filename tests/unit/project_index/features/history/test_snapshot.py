@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any
@@ -131,3 +133,95 @@ def test_snapshot_store_checkout_when_over_keep(
     assert not first_dir.exists()
     assert second_dir.exists()
     assert third_dir.exists()
+
+
+def _timing_out_archive(monkeypatch: pytest.MonkeyPatch, commits: set[str]) -> None:
+    """`commits` の `git archive` だけ、待ち時間の上限を超えたときと同じ失敗を送る包みに差し替える。"""
+    from project_index.integrations.git import GitError
+
+    real = snapshot_module.run_git
+
+    def timing_out(args: Any, **kwargs: Any) -> Any:
+        values = list(args)
+        if values[:1] == ["archive"] and values[-1] in commits:
+            raise GitError(values, -1, "20 秒を超えたため止めました", timed_out=True)
+        return real(args, **kwargs)
+
+    monkeypatch.setattr(snapshot_module, "run_git", timing_out)
+
+
+def test_snapshot_store_checkout_when_timed_out(
+    tmp_path: Path,
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """待ち時間の上限を超えたら止めた処理と理由を送る（異常系）。"""
+    from project_index.integrations.git import GIT_ARCHIVE_TIMEOUT_SEC
+    from project_index.shared.errors import RevisionExportTimeoutError
+
+    # 準備
+    root = git_repo({"a.yaml": "a: 1\n"})
+    commit = run_git(root, "rev-parse", "HEAD").strip()
+    _timing_out_archive(monkeypatch, {commit})
+    store = SnapshotStore(tmp_path / "snapshots")
+    # 実行・検証
+    with pytest.raises(RevisionExportTimeoutError, match=commit) as caught:
+        store.checkout(root, commit)
+    assert caught.value.operation == "revision_export"
+    assert caught.value.commit == commit
+    assert caught.value.limit_sec == GIT_ARCHIVE_TIMEOUT_SEC
+    assert not list((tmp_path / "snapshots").glob(f"*/{commit}"))
+    assert not list((tmp_path / "snapshots").glob(f"*/{commit}.tmp"))
+
+
+def test_snapshot_store_checkout_later(
+    tmp_path: Path,
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+) -> None:
+    """先のスレッドの後に裏で書き出す（正常系）。"""
+    # 準備
+    root = git_repo({"a.yaml": "a: 1\n"})
+    commit = run_git(root, "rev-parse", "HEAD").strip()
+    store = SnapshotStore(tmp_path / "snapshots")
+    gate = threading.Event()
+    before = threading.Thread(target=gate.wait, args=(10,), daemon=True)
+    before.start()
+    # 実行
+    thread = store.checkout_later([(root, commit)], after=[before])
+    exporting_before = store.exporting
+    exported_before = list((tmp_path / "snapshots").glob(f"*/{commit}"))
+    gate.set()
+    thread.join(timeout=30)
+    # 検証
+    assert exporting_before is True
+    assert exported_before == []
+    assert len(list((tmp_path / "snapshots").glob(f"*/{commit}"))) == 1
+    assert store.exporting is False
+
+
+def test_snapshot_store_checkout_later_when_timed_out(
+    tmp_path: Path,
+    git_repo: Callable[..., Path],
+    commit_all: Callable[..., str],
+    run_git: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """上限で止まった書き出しを飛ばして次へ進む（正常系）。"""
+    # 準備
+    root = git_repo({"a.yaml": "a: 1\n"})
+    first = run_git(root, "rev-parse", "HEAD").strip()
+    second = commit_all(root, {"a.yaml": "a: 2\n"})
+    _timing_out_archive(monkeypatch, {first})
+    store = SnapshotStore(tmp_path / "snapshots")
+    # 実行
+    with caplog.at_level(logging.WARNING, logger=snapshot_module.__name__):
+        thread = store.checkout_later([(root, first), (root, second)])
+        thread.join(timeout=30)
+    # 検証
+    assert list((tmp_path / "snapshots").glob(f"*/{first}")) == []
+    assert len(list((tmp_path / "snapshots").glob(f"*/{second}"))) == 1
+    assert len([record for record in caplog.records if record.levelno == logging.WARNING]) == 1
+    assert store.exporting is False

@@ -164,3 +164,41 @@ def test_source_checks_refresh_later_when_running(
 def _no_nav_warnings(store: object, source: object) -> list[object]:
     """nav の警告を出さない偽物。"""
     return []
+
+
+def test_source_checks_checking(
+    monkeypatch: pytest.MonkeyPatch,
+    make_served_source: Callable[..., ServedSource],
+) -> None:
+    """裏の検査の間だけ True（正常系）。"""
+    # 準備
+    gate = threading.Event()
+    _, first_started = _gated_check_sync(monkeypatch, gate)
+    source = make_served_source(id="sample", root=Path("/w/sample"))
+    checks = SourceChecks()
+    # 実行
+    threads = checks.refresh_later(None, [source])  # type: ignore[arg-type]
+    first_started.wait(10)
+    checking_before = checks.checking
+    gate.set()
+    for thread in threads:
+        thread.join(timeout=10)
+    # 検証
+    assert checking_before is True
+    assert checks.checking is False
+
+
+def test_source_checks_forget(
+    make_source_dir: Callable[..., Path],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """結果を捨てる（正常系）。"""
+    # 準備
+    handlers, source = _sample(make_source_dir, make_terminal_config, make_entry)
+    checks = SourceChecks()
+    checks.refresh(handlers.store, source)
+    # 実行
+    checks.forget(["sample"])
+    # 検証
+    assert checks.get("sample") is None
