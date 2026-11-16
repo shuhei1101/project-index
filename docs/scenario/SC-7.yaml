@@ -539,6 +539,106 @@ scenarios:
       - '`Error executing tool` だけの応答にならない'
       - ワークツリー x の文書 1 は書き換わらない
     test: test_error_when_validator_timed_out
+  - name: 正常シナリオ（本文のファイルを持つ文書を書く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 本文のファイルを持つ行
+        description: 'sample の `project-index.yaml` の行 `notes`（`paths: [notes/index.yaml]`・`records: items`・`body_file: path`）。要素 1 件が `notes/n1.md` を指す'
+        notes: '`notes/n1.md` は 3 行の Markdown'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` にワークツリー x のパスを渡す'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（本文のファイルを持つ文書を書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: write_docs(operations: create・kind notes・要素のキー・本文・本文のファイルのパス notes/n2.md)
+        M->>M: 本文のファイルのパスが scope.write に当たることを確かめ、要素と本文を検査に通す
+        M->>WT: notes/index.yaml に要素を追加し、notes/n2.md を作る
+        M-->>A: 作った文書の id と version
+        A->>M: write_docs(operations: update n1・本文の text_edits, dry_run: true)
+        M-->>A: notes/n1.md の差分を含む結果（書き込まない）
+        A->>M: write_docs(operations: update n1・expected_version・本文の text_edits)
+        M->>WT: notes/n1.md の一部だけを置き換える
+        M-->>A: 新しい version と差分
+        A->>M: write_docs(operations: update n2・set 本文)
+        M->>WT: notes/n2.md を置き換える
+        M-->>A: 新しい version と差分
+      ```
+
+      <!-- /map -->
+    expected:
+      - create の後、ワークツリー x の `notes/index.yaml` に `notes/n2.md` を指す要素が加わり、`notes/n2.md` の内容が渡した本文になる
+      - '`dry_run: true` の結果の差分に `notes/n1.md` の変わる行が出て、`applied` が `false` で、`notes/n1.md` は変わらない'
+      - '`text_edits` の後、`notes/n1.md` は `old` の箇所だけが `new` になり、`notes/index.yaml` は変わらない'
+      - '`set` の後、`notes/n2.md` の内容が `set` の本文になる'
+      - 本文のファイルだけを書き換えた後も、文書の `version` が書き込み前と違う。書き込み前の `version` を `expected_version` にした update は、バージョンの不一致で断られる
+      - 次の `search_docs` が n1・n2 の本文として書いた内容を返す
+    test: test_normal_when_body_file
+  - name: 正常シナリオ（本文のファイルを持つ文書を消す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 本文のファイルを持つ行
+        description: 正常シナリオ（本文のファイルを持つ文書を書く）と同じ行 `notes`。要素 2 件が `notes/n1.md`・`notes/n2.md` を指す
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` にワークツリー x のパスを渡す'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（本文のファイルを持つ文書を消す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: delete_docs(targets: n2)
+        M->>M: n2 を参照している文書が無いことを確かめる
+        M->>WT: notes/index.yaml から n2 の要素を除き、notes/n2.md を消す
+        M-->>A: 消した文書
+      ```
+
+      <!-- /map -->
+    expected:
+      - ワークツリー x の `notes/index.yaml` が n1 の要素だけになり、`notes/n2.md` が無い
+      - '`notes/n1.md` は変わらない'
+      - 消した後の `check_project` の管理用の YAML に無いファイルに `notes/n2.md` が出ない
+    test: test_normal_when_delete_body_file
+  - name: 異常シナリオ（本文のファイルを書き込めない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 本文のファイルを持つ行
+        description: 正常シナリオ（本文のファイルを持つ文書を書く）と同じ行 `notes`
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`operations` は create 1 件。本文のファイルのパスに、配信元の外を指す `../outside/n3.md` を渡す'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（本文のファイルを書き込めない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: write_docs(operations: create・kind notes・本文・本文のファイルのパス ../outside/n3.md)
+        M->>M: 本文のファイルのパスが配信元の外を指す
+        M-->>A: エラー（添字 0・本文のファイルのパス・書き込めない理由）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、添字 0 の違反として、本文のファイルのパスが配信元の外を指すことを返す'
+      - ワークツリー x の `notes/index.yaml` に要素が加わらず、`../outside/n3.md` も作られない
+      - 本文のファイルのパスが `scope.write` の外を指すときも、同じく何も書き込まずに断る
+    test: test_error_when_body_file_not_writable
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 issue: 14
 primary_actor: エージェント（Claude Code）
@@ -553,7 +653,7 @@ preconditions:
   - 呼び出しの引数に、フックが作業場所 `cwd` と会話キーを入れている
   - エージェントが直す文書を `search_docs` で読み、`version` を持っている
 success_guarantee: 変更を当てた後の文書が配信元のスキーマと `validators[]` に通り、作業ツリー（Git 管理外の配信元はそのフォルダ）のファイルだけが書き換わる。新しいバージョンが返る。変えた Markdown の値は、mdmark の CLI を使えるときは点検に通っており、使えないとき（CLI が無い・制限時間を超えた）は点検できなかった理由が返る。
-minimal_guarantee: '検査に通らない書き込み、mdmark の警告がある Markdown の値の書き込み、`scope.write` に当たらない作業場所からの書き込み、クローン本体への書き込み、書き込みの期限を過ぎた書き込みは、ファイルを 1 つも書き換えない（`atomic: true` のときは他の操作も書かない）。書き込まなかったときは `isError: true` で理由を返却する。'
+minimal_guarantee: '検査に通らない書き込み、mdmark の警告がある Markdown の値の書き込み、`scope.write` に当たらない作業場所からの書き込み、クローン本体への書き込み、本文のファイルのパスが配信元・`scope.write` の外を指す書き込み、書き込みの期限を過ぎた書き込みは、ファイルを 1 つも書き換えない（`atomic: true` のときは他の操作も書かない）。書き込まなかったときは `isError: true` で理由を返却する。'
 frequency: 作業のたび
 priority: 高
 refs:
