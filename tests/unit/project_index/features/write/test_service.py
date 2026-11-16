@@ -543,8 +543,8 @@ def test_write_docs_when_body_file(make_env: Callable[..., WriteEnv]) -> None:
     assert created.results[0].status == "created"
     assert "path: n2.md" in index
     assert "@body" not in index
-    assert "@@ notes/n1.md" in tried.results[0].diff
-    assert "新しい行" in tried.results[0].diff
+    assert "@@ notes/n1.md" in (tried.results[0].diff or "")
+    assert "新しい行" in (tried.results[0].diff or "")
     assert edited.results[0].status == "updated"
     assert edited.results[0].version == value_hash(
         [{"id": "n1", "path": "n1.md"}, "# n1\n新しい行\n"]
