@@ -308,13 +308,14 @@ functions:
       type: str | None
       description: 新しい本文。本文を変えない操作は `None`
     process: |-
-      1. `create`・`replace` は `data` の `@body`（無ければ `None`）を返す
-      2. `update` は、`set` に `@body` があればその値、無ければ `current_body` を本文にし、`field` が `@body` の `text_edits` を順に当てる。一致の判定と違反は、項目の操作の適用の `text_edits` と同じ（`path` は `operations[{index}].text_edits[{n}].old`）
-      3. `update` で `set` の `@body` も `@body` の `text_edits` も無ければ `None` を返す
-      4. 違反があれば `InvalidArgumentError` で送る
+      1. `create`・`replace` の `data`、`update` の `set` の `@body` が文字列でなければ、`path` が `operations[{index}].data.@body`（`update` は `set.@body`）の違反で `InvalidArgumentError` を送る
+      2. `create`・`replace` は `data` の `@body`（無ければ `None`）を返す
+      3. `update` は、`set` に `@body` があればその値、無ければ `current_body` を本文にし、`field` が `@body` の `text_edits` を順に当てる。一致の判定と違反は、項目の操作の適用の `text_edits` と同じ（`path` は `operations[{index}].text_edits[{n}].old`）
+      4. `update` で `set` の `@body` も `@body` の `text_edits` も無ければ `None` を返す
+      5. 違反があれば `InvalidArgumentError` で送る
     exceptions:
       - name: InvalidArgumentError
-        condition: '`replace_all` が `False` の `@body` の `text_edits` の `old` が 1 か所に一致しない'
+        condition: '`@body` が文字列でないか、`replace_all` が `False` の `@body` の `text_edits` の `old` が 1 か所に一致しない'
         message: '`引数が正しくありません: {違反の数} 件`'
     unit_tests:
       - name: test_apply_body
@@ -330,3 +331,10 @@ functions:
         mock: なし
         expected: '`InvalidArgumentError` の違反の `path` が `operations[1].text_edits[0].old`'
         exception: '`replace_all` が `False` の `@body` の `text_edits` の `old` が 1 か所に一致しない'
+      - name: test_apply_body_when_not_string
+        case: 異常
+        summary: 文字列でない @body
+        condition: '`index=0` で、`update` の `set: {@body: null}` と `create` の `data: {id: n2, path: n2.md, @body: 123}`'
+        mock: なし
+        expected: どちらも `InvalidArgumentError` で、違反の `path` が `operations[0].set.@body`・`operations[0].data.@body`
+        exception: '`@body` が文字列でない'
