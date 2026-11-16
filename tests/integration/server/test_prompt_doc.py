@@ -345,7 +345,7 @@ def test_normal(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[s
     )
     # 例の組のセクション
     assert out.index("\n### 既定の例\n") < out.index("\n### ログが無い\n")
-    assert "\n### ログが無い\n\n<!-- section: closed -->\n" in out
+    assert '\n### ログが無い\n\n<!-- section: {"open": false} -->\n' in out
     assert "**system**" in _tab(default_example, "en")
     assert "**user**" in _tab(default_example, "en")
     assert "注入する本文（en）: " in _tab(default_example, "en")
@@ -353,7 +353,7 @@ def test_normal(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[s
     assert "使用しなかった部品: logs" in _tab(no_logs_example, "en")
     assert '<mark data-hint="character.display_name: 表示名">ひな</mark>' in default_example
     # 言語のタブ
-    assert "<!-- tabs: group=lang -->" in out
+    assert '<!-- tabs: {"group": "lang"} -->' in out
     assert set(_tab_names(out)) == {"en", "ja"}
     assert _tab_names(default_example) == ["en", "ja"]
     # 注意書きが無い
