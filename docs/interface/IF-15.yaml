@@ -846,6 +846,63 @@ flows:
     test: test_normal_when_terminal_config_has_unknown_top_level_key
     decisions:
       - D-308
+  - name: 正常系（default_ref のリビジョンを先に書き出す）
+    summary: 読み込みと検査の後に、Git の配信元の default_ref の commit を裏で書き出す
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+      - name: 配信元
+        description: git リポジトリの sample（`default_ref` は `main`）と Git 管理外の notes
+        notes: 状態のフォルダは空
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant S as project-index serve
+        participant G as git
+
+        S->>S: 配信元を読み込み、検査する
+        S->>G: 裏で sample の main の commit を書き出す
+        C->>S: 管理の MCP の status（exporting が false になるまで繰り返す）
+        C->>S: 読み取り API で sample の文書の一覧を取得する
+        S-->>C: 200 文書の一覧
+      ```
+    expected:
+      - 状態のフォルダの下に sample の `main` の commit の書き出しがあり、notes の書き出しは無い
+      - ログの `リビジョンを書き出した` が `main` の commit で 1 行で、文書の一覧の取得の後も増えない
+    test: test_normal_when_default_ref_exported_in_background
+    refs:
+      - SC-4#scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
+  - name: 正常系（裏のリビジョンの書き出しが上限を超える）
+    summary: 裏の書き出しが上限で止まっても配信を続け、次の要求が書き出し直す
+    setup:
+      - name: Mock
+        description: git の実行を、`archive` の 1 回目だけ待ち時間の上限を超えたときと同じ失敗（`GitError` の `timed_out`）を返すものに差し替える
+      - name: 配信元
+        description: git リポジトリの sample（`default_ref` は `main`）
+        notes: 状態のフォルダは空
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant S as project-index serve
+        participant G as git
+
+        S->>G: 裏で sample の main の commit を書き出す
+        S->>S: 上限を超えたので止め、警告のログに残す
+        C->>S: 管理の MCP の status
+        S-->>C: sample が serving・exporting: false
+        C->>S: 読み取り API で sample の文書の一覧を取得する
+        S->>G: 要求の中で main の commit を書き出し直す
+        S-->>C: 200 文書の一覧
+      ```
+    expected:
+      - 警告のログに、止めた git の引数（`main` の commit）と上限の秒数が 1 行ある
+      - '`status` が sample を `serving`、`exporting: false` で返す'
+      - 文書の一覧の取得が 200 を返し、ログの `リビジョンを書き出した` が 1 行出る
+    test: test_normal_when_background_export_times_out
+    refs:
+      - SC-4#scenarios[異常シナリオ（裏のリビジョンの書き出しが上限を超える）]
 lead: 端末の設定を読み、検証に合格した配信元を 1 プロセス・1 ポートで配信する `project-index serve` の入出力を定め、起動を修正するときに参照する。
 identifier: serve
 permissions: なし
@@ -864,6 +921,8 @@ callers:
   - SC-6#scenarios[正常シナリオ（使う場面を書き換えた後に接続する）]
   - SC-4#scenarios[正常シナリオ（paths の基準のフォルダを指定する）]
   - SC-4#scenarios[正常シナリオ（端末の設定の最上位に知らないキーがある）]
+  - SC-4#scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
+  - SC-4#scenarios[異常シナリオ（裏のリビジョンの書き出しが上限を超える）]
 exclusivity: 同じポートで待ち受けるプロセスは 1 つだけ（後からの起動はポート使用中で終わる）
 request:
   - name: PROJECT_INDEX_CONFIG
@@ -982,6 +1041,9 @@ constraints:
     constraint: '`documents[].schema` でほかの配信元を指す行は、配信元の検査の制約「ほかの配信元のスキーマの参照」のとおりに読む'
   - item: 参照先が見つからない配信元
     constraint: 参照先のスキーマを読めない行を持つ配信元は、`documents[{番号}].schema` の違反として配信から外し、エラーログに残す（違反の条件は配信元の検査と同じ）
+  - item: リビジョンの先の書き出し
+    constraint: 全ての行の読み込みと検査の後に、Git の配信元ごとに `default_ref` の commit を裏のスレッドで書き出す。`reload`・端末の設定の保存の後と、`default_ref` が進んで配信元を組み立て直した後も同じく書き出す。待ち受け・配信元の読み込み・要求は書き出しを待たない。同じ commit を読む要求は、書き出しの最中ならその終了を待ち、書き出し直さない
+    notes: 書き出しが `git archive` の待ち時間の上限を超えたときは警告のログに残して止め、配信元は配信し続ける。その commit を読む次の要求が書き出し直す。書き出しの最中かは管理の MCP の `status` の `exporting` で返す
 refs:
   - SC-4#scenarios[正常シナリオ]
 test_file: tests/integration/server/test_serve.py

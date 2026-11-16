@@ -336,7 +336,7 @@ identifier: put_settings_sources
 permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ'
 idempotent: true
 side_effects: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml` の `sources` を書き換え、配信元を読み直す。配信元のフォルダのファイルは変えない'
-exclusivity: 端末の設定の排他ロックの中で、内容のバージョンの照合・検証・書き込み・読み直しを行う。読み直しの間の要求は、読み直す前の配信元で応える
+exclusivity: 端末の設定の排他ロックの中で、内容のバージョンの照合・検証・書き込み・読み直しを行う。読み直しの間の要求は、読み直す前の配信元で応える。読み直した配信元の裏の検査はロックの外で実行する
 request:
   - name: sources
     type: list[Source]
@@ -467,4 +467,9 @@ constraints:
   - item: 内容のバージョンの照合
     constraint: '`expectedVersion` を送信したときだけ、排他ロックを取った後に `settings.yaml` の内容のバージョンと照合し、スキーマの検証より前に断る'
     notes: dev-docs の設定の画面が送信するようになった後に必須へ切り替える
+  - item: 検査とリビジョンの書き出し
+    constraint: 応答は配信元の一覧を差し替えた時点で返し、読み直した配信元の検査と `default_ref` の commit の書き出しは裏で実行して待たない。応答の配信元ごとの状態は検査の前の値（`sync` は `null`）
+    notes: 管理の MCP の `reload` と同じ。検査が済んだかは管理の MCP の `status` の `checking` で確かめる
 test_file: tests/integration/server/test_put_settings_sources.py
+callers:
+  - SC-12#scenarios[正常シナリオ]
