@@ -26,6 +26,8 @@ def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]
     env.rewrite_settings(sample, notes)
     # 実行
     result = env.call_admin("reload", format="json")
+    env.wait_background()
+    status = env.call_admin("status", format="json")
     # 検証
     found = env.call(
         "search_docs", cwd=str(notes.folder), source="notes", view="ids", format="json"
@@ -34,6 +36,16 @@ def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]
     assert result.data["added"] == ["notes"]
     assert "removed" not in result.data
     assert "not_served" not in result.data
+    # 空の値は MCP の結果から落ちる
+    assert [(item["id"], item.get("sync")) for item in result.data["sources"]] == [
+        ("sample", None),
+        ("notes", None),
+    ]
+    assert status.data["checking"] is False
+    assert {item["id"]: item["sync"]["unindexed_files"] for item in status.data["sources"]} == {
+        "sample": 0,
+        "notes": 0,
+    }
     assert {item["id"] for item in found.data["items"]} == {"doc-1", "doc-2"}
     assert not described.is_error
 
