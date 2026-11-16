@@ -14,12 +14,18 @@ from project_index.features.access.service import resolve_write_target
 from project_index.features.access.types import Target
 from project_index.features.changes.compare import diff_lines
 from project_index.features.documents.fields import get_field, resolve_metadata, set_field
-from project_index.features.documents.loader import documents_from_text
+from project_index.features.documents.loader import documents_from_text, resolve_body_path
 from project_index.features.documents.store import DocumentStore, not_found_error
 from project_index.features.documents.types import Document
 from project_index.features.seen.types import LastRead, SessionKey
 from project_index.features.sources.types import DocumentTable
-from project_index.features.write.apply import apply_operation, expand_array_keys, to_columns
+from project_index.features.write.apply import (
+    BODY_KEY,
+    apply_body,
+    apply_operation,
+    expand_array_keys,
+    to_columns,
+)
 from project_index.features.write.hints import attach_schema_hints
 from project_index.features.write.ids import generate_id
 from project_index.features.write.placement import new_document_path
@@ -134,6 +140,8 @@ class _Session:
     target: Target
     docs: dict[str, Document] = field(default_factory=dict[str, Document])
     pending: dict[str, str | None] = field(default_factory=dict[str, str | None])
+    # 本文のファイルの新しい内容（`None` は消す）。管理用の YAML より先に書く
+    bodies: dict[str, str | None] = field(default_factory=dict[str, str | None])
     tables: dict[str, DocumentTable] = field(default_factory=dict[str, DocumentTable])
     # mdmark の CLI が無い・制限時間を超えたときの理由。後の操作の点検を飛ばす
     markdown_stopped: str | None = None
@@ -160,10 +168,36 @@ class _Session:
             return self.pending[path] is not None
         return (self.target.base / path).is_file()
 
-    def build(self, path: str, text: str, table: DocumentTable) -> list[Document]:
-        """内容から文書を組み立てる（書かずに確かめる）。"""
+    def read_body(self, path: str, bodies: Mapping[str, str | None] | None = None) -> str | None:
+        """本文のファイルの内容（書く予定の内容があればそれ。無いファイルは `None`）。"""
+        for overlay in (bodies or {}, self.bodies):
+            if path in overlay:
+                return overlay[path]
+        absolute = self.target.base / path
+        try:
+            return absolute.read_text(encoding="utf-8") if absolute.is_file() else None
+        except OSError, UnicodeDecodeError:
+            return None
+
+    def body_exists(self, path: str) -> bool:
+        """本文のファイルがあるか（書く予定のものを含む）。"""
+        return self.read_body(path) is not None
+
+    def build(
+        self,
+        path: str,
+        text: str,
+        table: DocumentTable,
+        bodies: Mapping[str, str | None] | None = None,
+    ) -> list[Document]:
+        """内容から文書を組み立てる（書かずに確かめる）。本文は書く予定の内容で読む。"""
         found, _ = documents_from_text(
-            text, self.target.base, path, table, source_id=self.source_id
+            text,
+            self.target.base,
+            path,
+            table,
+            source_id=self.source_id,
+            read_body=lambda body_path: self.read_body(body_path, bodies),
         )
         return found
 
@@ -181,7 +215,8 @@ class _Session:
     def write_pending(self) -> list[Path]:
         """記録した内容をファイルへ書き、消す予定のファイルを消して、触ったパスを返す。"""
         touched: list[Path] = []
-        for path, text in self.pending.items():
+        # 本文のファイルを先に書き、管理用の YAML が指すファイルを先にそろえる
+        for path, text in [*self.bodies.items(), *self.pending.items()]:
             absolute = self.target.base / path
             if text is None:
                 absolute.unlink(missing_ok=True)
@@ -345,9 +380,10 @@ def _check_and_commit(
     doc_id: str | None,
     new: bool,
     previous: Mapping[str, Any] | None,
+    bodies: Mapping[str, str] | None = None,
 ) -> tuple[Document, list[UncheckedKey]]:
     """新しい内容を文書にして検査し、通れば記録する（点検できなかった Markdown のキーも返す）。"""
-    documents = session.build(path, text, table)
+    documents = session.build(path, text, table, bodies)
     if not documents:
         raise ValidationFailedError(
             message="検査に通らない操作があります: 1 件",
@@ -379,8 +415,129 @@ def _check_and_commit(
         raise ValidationFailedError(
             message=f"検査に通らない操作があります: {len(hinted)} 件", violations=hinted
         )
+    session.bodies.update(bodies or {})
     session.commit(path, text, table)
     return document, unchecked
+
+
+def _body_paths(operation: Operation) -> list[str]:
+    """操作が `@body` を指す箇所の、違反の項目のパスを返す。"""
+    paths = [
+        f"{item}.{BODY_KEY}"
+        for item, given in (("data", operation.data or {}), ("set", operation.set))
+        if BODY_KEY in given
+    ]
+    paths += [
+        f"text_edits[{n}].field"
+        for n, edit in enumerate(operation.text_edits)
+        if edit.field == BODY_KEY
+    ]
+    return paths
+
+
+def _check_body(operation: Operation, table: DocumentTable, existing: Document | None) -> None:
+    """`@body` を受け付ける操作かと、`body_file` の列の値を変えないかを確かめる。"""
+    violations: list[Violation] = []
+    if BODY_KEY in operation.unset:
+        violations.append(
+            Violation(path="unset", rule=f"{BODY_KEY} は消せません", fix="unset から除いてください")
+        )
+    violations.extend(
+        Violation(
+            path=f"{item}.{BODY_KEY}",
+            rule=f"{BODY_KEY} は配列の項目ではありません",
+            fix=f"本文は set.{BODY_KEY} か text_edits で書いてください",
+        )
+        for item, given in (("add_to", operation.add_to), ("remove_from", operation.remove_from))
+        if BODY_KEY in given
+    )
+    column = table.body_file
+    if column is None:
+        violations.extend(
+            Violation(
+                path=path,
+                rule=f"{table.id} は本文のファイル（body_file）を持たないため {BODY_KEY} を受けません",
+                fix=f"{BODY_KEY} を除いてください",
+            )
+            for path in _body_paths(operation)
+        )
+    elif operation.op == "create" and BODY_KEY not in (operation.data or {}):
+        violations.append(
+            Violation(
+                path=f"data.{BODY_KEY}",
+                rule=f"{table.id} の文書の作成には本文（{BODY_KEY}）が要ります",
+                fix=f"data に {BODY_KEY} を加えてください",
+            )
+        )
+    elif existing is not None:
+        item, given = (
+            ("set", operation.set) if operation.op == "update" else ("data", operation.data or {})
+        )
+        current = get_field(existing.data, column)
+        if column in given and given[column] != current:
+            violations.append(
+                Violation(
+                    path=f"{item}.{column}",
+                    rule=f"{column}（本文のファイルのパス）は変えられません",
+                    fix=f"{column} を除くか、今の値（{current}）にしてください",
+                )
+            )
+    if violations:
+        raise _invalid(violations)
+
+
+def _create_body(
+    session: _Session,
+    operation: Operation,
+    table: DocumentTable,
+    path: str,
+    index: int,
+) -> dict[str, str]:
+    """`create` の本文のファイルのパスを解き、(パス → 本文) を返す（作れなければ違反）。"""
+    column = table.body_file
+    if column is None:
+        return {}
+    value = get_field(operation.data or {}, column)
+    body_path = resolve_body_path(path, value)
+    if body_path is None or session.body_exists(body_path):
+        rule = (
+            f"本文のファイルのパス（{value}）が配信元の外を指します"
+            if body_path is None
+            else f"本文のファイル {body_path} は既にあります"
+        )
+        raise ValidationFailedError(
+            message="検査に通らない操作があります: 1 件",
+            violations=[
+                Violation(
+                    path=column,
+                    rule=rule,
+                    fix=f"{column} に、管理用の YAML のフォルダからの相対で、配信元の中の新しいファイルのパスを指定してください",
+                )
+            ],
+        )
+    return {body_path: apply_body(None, operation, index=index) or ""}
+
+
+def _diff(before: Document | None, after: Document, body: Mapping[str, str]) -> str:
+    """差分の行。本文のファイルを持つ文書は、要素の差分の後に本文のファイルの差分を並べる。"""
+    if after.body_path is None:
+        return diff_lines("" if before is None else before.body, after.body)
+    element = diff_lines(
+        "" if before is None else _element_text(before.data), _element_text(after.data)
+    )
+    if after.body_path not in body:
+        return element
+    lines = [element] if element else []
+    lines += [
+        f"@@ {after.body_path}",
+        diff_lines("" if before is None else before.body, after.body),
+    ]
+    return "\n".join(lines)
+
+
+def _element_text(data: Mapping[str, Any]) -> str:
+    """`records` の要素を YAML に書き出した文字列。"""
+    return dump_roundtrip(data if isinstance(data, CommentedMap) else CommentedMap(data))
 
 
 def _unique(tables: list[DocumentTable]) -> list[DocumentTable]:
@@ -630,10 +787,12 @@ def _apply_create_one(
     table = _writable(session.target.source.table(operation.kind), "kind")
     operation = expand_array_keys(operation, table, None, index=index)
     operation = to_columns(operation, table, index=index)
+    _check_body(operation, table, None)
     doc_id = _new_id(
         session, operation, table, resolve_metadata(operation.data or {}, table), created_ids
     )
     path, text, appended = _apply_create(session, operation, table, doc_id, now)
+    body = _create_body(session, operation, table, path, index)
     # 配列へ追加した文書は、配列の末尾の要素
     index_in_file = (
         len(_records(load_roundtrip(text), table.records or "")) - 1 if appended else None
@@ -648,6 +807,7 @@ def _apply_create_one(
         doc_id=doc_id,
         new=True,
         previous=None,
+        bodies=body,
     )
     created_ids.add(document.id)
     return (
@@ -656,7 +816,7 @@ def _apply_create_one(
             id=document.id,
             status="created",
             version=document.version,
-            diff=diff_lines("", document.body),
+            diff=_diff(None, document, body),
             unchecked=unchecked,
         ),
         table,
@@ -686,6 +846,13 @@ def _apply_existing_one(
         msg = "操作に expected_version がありません"
         raise RuntimeError(msg)
     check_version(existing, operation.expected_version, last_read=last_reads.get(existing.id))
+    _check_body(operation, table, existing)
+    new_body = (
+        apply_body(existing.body, operation, index=index)
+        if existing.body_path is not None
+        else None
+    )
+    body = {} if existing.body_path is None or new_body is None else {existing.body_path: new_body}
     path, text = _apply_existing(session, operation, existing, table, now)
     new_document, unchecked = _check_and_commit(
         session,
@@ -697,6 +864,7 @@ def _apply_existing_one(
         doc_id=None,
         new=False,
         previous=existing.data,
+        bodies=body,
     )
     return (
         WriteResultItem(
@@ -704,7 +872,7 @@ def _apply_existing_one(
             id=new_document.id,
             status="updated" if operation.op == "update" else "replaced",
             version=new_document.version,
-            diff=diff_lines(existing.body, new_document.body),
+            diff=_diff(existing, new_document, body),
             unchecked=unchecked,
         ),
         table,
@@ -763,6 +931,24 @@ def _remove_documents(session: _Session, documents: list[Document]) -> None:
         file_map = load_roundtrip(session.text(document.path), file=document.path)
         del _records(file_map, table.records)[document.record_index or 0]
         session.commit(document.path, dump_roundtrip(file_map), table)
+    _remove_bodies(session, [document for document in records if document.body_path is not None])
+
+
+def _remove_bodies(session: _Session, documents: list[Document]) -> None:
+    """消した要素の本文のファイルを、同じ管理用の YAML の残る要素が指していなければ消す。"""
+    source = session.target.source
+    for document in documents:
+        table = source.table(document.kind)
+        if table.records is None or table.body_file is None or document.body_path is None:
+            continue
+        file_map = load_roundtrip(session.text(document.path), file=document.path)
+        remaining = {
+            resolve_body_path(document.path, get_field(row, table.body_file))
+            for row in _records(file_map, table.records)
+            if is_dict(row)
+        }
+        if document.body_path not in remaining and session.body_exists(document.body_path):
+            session.bodies[document.body_path] = None
 
 
 def _delete_target(

@@ -54,6 +54,16 @@ def _timestamps(data: Mapping[str, Any], key: str, file_dates: FileDates | None)
     return _as_datetime(data.get(key))
 
 
+def resolve_body_path(path: str, value: object) -> str | None:
+    """`body_file` の列の値を管理用の YAML のフォルダから解き、配信元の直下からのパスを返す。"""
+    if not isinstance(value, str) or not value:
+        return None
+    relative = posixpath.normpath(posixpath.join(posixpath.dirname(path), value))
+    if relative == ".." or relative.startswith(("../", "/")):
+        return None
+    return relative
+
+
 def _body_file(
     root: Path,
     path: str,
@@ -61,10 +71,8 @@ def _body_file(
     read_body: Callable[[str], str | None] | None = None,
 ) -> tuple[str, str] | None:
     """`body_file` が指すファイルの `root` からのパスと内容を返す（無い・外を指すなら `None`）。"""
-    if not isinstance(value, str) or not value:
-        return None
-    relative = posixpath.normpath(posixpath.join(posixpath.dirname(path), value))
-    if relative == ".." or relative.startswith(("../", "/")):
+    relative = resolve_body_path(path, value)
+    if relative is None:
         return None
     if read_body is not None:
         # 内容は呼び出し元の読み方（commit のファイルなど）で読む
@@ -214,7 +222,8 @@ def _record_documents(
                 body=body,
                 body_path=body_path,
                 index=index,
-                version=value_hash(record),
+                # 本文のファイルを持つ要素は、本文だけが変わってもバージョンが変わる
+                version=value_hash(record if body_path is None else [record, body]),
                 fallback_id=fallback_id,
                 **common,
             )
