@@ -544,8 +544,8 @@ scenarios:
       - name: Mock
         description: なし（実環境で実行）
       - name: 本文のファイルを持つ行
-        description: 'sample の `project-index.yaml` の行 `notes`（`paths: [notes/index.yaml]`・`records: items`・`body_file: path`）。要素 1 件が `notes/n1.md` を指す'
-        notes: '`notes/n1.md` は 3 行の Markdown'
+        description: 'sample の `project-index.yaml` の行 `notes`（`paths: [notes/index.yaml]`・`records: items`・`body_file: path`）。要素 1 件の `path` が `n1.md` で、`notes/n1.md` を指す'
+        notes: '`body_file` のパスは管理用の YAML（`notes/index.yaml`）のフォルダからの相対。`notes/n1.md` は 3 行の Markdown'
       - name: project-index
         description: sample を配信している project-index
         notes: '`worktree` にワークツリー x のパスを渡す'
@@ -558,8 +558,8 @@ scenarios:
         participant M as 文書の MCP（/mcp）
         participant WT as ワークツリー x
 
-        A->>M: write_docs(operations: create・kind notes・要素のキー・本文・本文のファイルのパス notes/n2.md)
-        M->>M: 本文のファイルのパスが scope.write に当たることを確かめ、要素と本文を検査に通す
+        A->>M: write_docs(operations: create・kind notes・要素のキー・本文・本文のファイルのパス n2.md)
+        M->>M: 本文のファイルのパスを notes/index.yaml のフォルダから解き、配信元の中を指すことを確かめ、要素と本文を検査に通す
         M->>WT: notes/index.yaml に要素を追加し、notes/n2.md を作る
         M-->>A: 作った文書の id と version
         A->>M: write_docs(operations: update n1・本文の text_edits, dry_run: true)
@@ -574,7 +574,7 @@ scenarios:
 
       <!-- /map -->
     expected:
-      - create の後、ワークツリー x の `notes/index.yaml` に `notes/n2.md` を指す要素が加わり、`notes/n2.md` の内容が渡した本文になる
+      - create の後、ワークツリー x の `notes/index.yaml` に `path` が `n2.md` の要素が加わり、`notes/n2.md` の内容が渡した本文になる
       - '`dry_run: true` の結果の差分に `notes/n1.md` の変わる行が出て、`applied` が `false` で、`notes/n1.md` は変わらない'
       - '`text_edits` の後、`notes/n1.md` は `old` の箇所だけが `new` になり、`notes/index.yaml` は変わらない'
       - '`set` の後、`notes/n2.md` の内容が `set` の本文になる'
@@ -619,7 +619,7 @@ scenarios:
         description: 正常シナリオ（本文のファイルを持つ文書を書く）と同じ行 `notes`
       - name: project-index
         description: sample を配信している project-index
-        notes: '`operations` は create 1 件。本文のファイルのパスに、配信元の外を指す `../outside/n3.md` を渡す'
+        notes: '`operations` は create 1 件。本文のファイルのパスに `../../outside/n3.md` を渡す（`notes/index.yaml` のフォルダから解くと、配信元のフォルダの外の `outside/n3.md` を指す）'
     flow: |-
       <!-- map: {"title": "異常シナリオ（本文のファイルを書き込めない）"} -->
 
@@ -628,7 +628,7 @@ scenarios:
         actor A as エージェント
         participant M as 文書の MCP（/mcp）
 
-        A->>M: write_docs(operations: create・kind notes・本文・本文のファイルのパス ../outside/n3.md)
+        A->>M: write_docs(operations: create・kind notes・本文・本文のファイルのパス ../../outside/n3.md)
         M->>M: 本文のファイルのパスが配信元の外を指す
         M-->>A: エラー（添字 0・本文のファイルのパス・書き込めない理由）
       ```
@@ -636,8 +636,7 @@ scenarios:
       <!-- /map -->
     expected:
       - '`isError: true` で、添字 0 の違反として、本文のファイルのパスが配信元の外を指すことを返す'
-      - ワークツリー x の `notes/index.yaml` に要素が加わらず、`../outside/n3.md` も作られない
-      - 本文のファイルのパスが `scope.write` の外を指すときも、同じく何も書き込まずに断る
+      - ワークツリー x の `notes/index.yaml` に要素が加わらず、配信元のフォルダの外の `outside/n3.md` も作られない
     test: test_error_when_body_file_not_writable
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 issue: 14
@@ -653,7 +652,7 @@ preconditions:
   - 呼び出しの引数に、フックが作業場所 `cwd` と会話キーを入れている
   - エージェントが直す文書を `search_docs` で読み、`version` を持っている
 success_guarantee: 変更を当てた後の文書が配信元のスキーマと `validators[]` に通り、作業ツリー（Git 管理外の配信元はそのフォルダ）のファイルだけが書き換わる。新しいバージョンが返る。変えた Markdown の値は、mdmark の CLI を使えるときは点検に通っており、使えないとき（CLI が無い・制限時間を超えた）は点検できなかった理由が返る。
-minimal_guarantee: '検査に通らない書き込み、mdmark の警告がある Markdown の値の書き込み、`scope.write` に当たらない作業場所からの書き込み、クローン本体への書き込み、本文のファイルのパスが配信元・`scope.write` の外を指す書き込み、書き込みの期限を過ぎた書き込みは、ファイルを 1 つも書き換えない（`atomic: true` のときは他の操作も書かない）。書き込まなかったときは `isError: true` で理由を返却する。'
+minimal_guarantee: '検査に通らない書き込み、mdmark の警告がある Markdown の値の書き込み、`scope.write` に当たらない作業場所からの書き込み、クローン本体への書き込み、本文のファイルのパスが配信元の外を指す書き込み、書き込みの期限を過ぎた書き込みは、ファイルを 1 つも書き換えない（`atomic: true` のときは他の操作も書かない）。書き込まなかったときは `isError: true` で理由を返却する。'
 frequency: 作業のたび
 priority: 高
 refs:
