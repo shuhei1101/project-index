@@ -394,6 +394,24 @@ def make_local_source(
     return _make
 
 
+def _source_lines(spec: SourceSpec) -> list[str]:
+    """端末の設定の `sources[]` の 1 行の YAML の行を組み立てる。"""
+    lines = [f"  - id: {spec.id}", "    config:"]
+    lines.extend(f"      - {path}" for path in spec.config)
+    if not spec.enabled:
+        lines.append("    enabled: false")
+    if spec.outside_read is not None:
+        lines.append(f"    outside_read: {str(spec.outside_read).lower()}")
+    if spec.storage is not None:
+        lines.extend(["    storage:", f"      type: {spec.storage}"])
+    lines.extend(["    scope:", "      read:"])
+    lines.extend(f"        - {path}" for path in spec.scope_read)
+    if spec.scope_write is not None:
+        lines.append("      write:")
+        lines.extend(f"        - {path}" for path in spec.scope_write)
+    return lines
+
+
 def _settings_text(root: Path, state_dir: Path, specs: list[SourceSpec], extra: str) -> str:
     """端末の設定の YAML を組み立てる。"""
     lines = [
@@ -404,22 +422,7 @@ def _settings_text(root: Path, state_dir: Path, specs: list[SourceSpec], extra: 
         "sources:" if specs else "sources: []",
     ]
     for spec in specs:
-        lines.append(f"  - id: {spec.id}")
-        lines.append("    config:")
-        lines.extend(f"      - {path}" for path in spec.config)
-        if not spec.enabled:
-            lines.append("    enabled: false")
-        if spec.outside_read is not None:
-            lines.append(f"    outside_read: {str(spec.outside_read).lower()}")
-        if spec.storage is not None:
-            lines.append("    storage:")
-            lines.append(f"      type: {spec.storage}")
-        lines.append("    scope:")
-        lines.append("      read:")
-        lines.extend(f"        - {path}" for path in spec.scope_read)
-        if spec.scope_write is not None:
-            lines.append("      write:")
-            lines.extend(f"        - {path}" for path in spec.scope_write)
+        lines.extend(_source_lines(spec))
     return "\n".join(line for line in lines if line != "") + "\n"
 
 
