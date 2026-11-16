@@ -8,7 +8,7 @@
 `127.0.0.1` だけで待ち受け、作業場所（`cwd`）での絞り込みは持たず、全ての配信元を扱います。
 文書の MCP のツールに入る `cwd`・`session_id`・`agent_id` は、管理の MCP のツールには入りません。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | ツール | 種類 | 役割 |
 | --- | --- | --- |
@@ -55,7 +55,7 @@
 | --- | --- | --- | --- |
 | `format` | `markdown` / `json` | `markdown` | 返す形式 |
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 返すフィールド | 型 | 説明 |
 | --- | --- | --- |
@@ -187,7 +187,7 @@ http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
 | `config` | str | - | `path` の `project-index.yaml` を読む | ファイルに記載する前の `project-index.yaml` の中身（YAML の文字列）。記載する前の設定を確かめるときに渡す |
 | `format` | `markdown` / `json` | - | `markdown` | 返す形式 |
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 返すフィールド | 型 | 説明 |
 | --- | --- | --- |
@@ -258,7 +258,7 @@ http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
 `nav` 以外のキーとコメントはそのまま残し、commit はしません。
 配信中の配信元には、`default_ref` へ commit された後の要求から入ります。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 引数 | 型 | 必須 | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

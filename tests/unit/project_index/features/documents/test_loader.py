@@ -3,11 +3,14 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+import pytest
+
 from project_index.features.documents import loader as loader_module
 from project_index.features.documents.loader import (
     collect_files,
     documents_from_text,
     load_file,
+    resolve_body_path,
 )
 from project_index.features.history.types import FileDates
 from project_index.features.sources.types import DocumentTable
@@ -16,8 +19,6 @@ from project_index.shared.hashing import content_hash, value_hash
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
-
-    import pytest
 
 
 def test_collect_files(tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]) -> None:
@@ -174,7 +175,7 @@ def test_load_file_when_records(
     assert [doc.body for doc in documents] == ["a = 1\n", "b = 2\n"]
     assert [doc.body_path for doc in documents] == ["src/a.py", "src/b.py"]
     assert [doc.record_index for doc in documents] == [0, 1]
-    assert documents[0].version == value_hash({"path": "a.py", "tags": ["x"]})
+    assert documents[0].version == value_hash([{"path": "a.py", "tags": ["x"]}, "a = 1\n"])
 
 
 def test_documents_from_text_when_read_body(
@@ -208,6 +209,56 @@ def test_documents_from_text_when_read_body(
     assert [(doc.body, doc.body_path) for doc in read] == [("過去の本文", "a.md")]
     assert missing == []
     assert [problem.reason for problem in missing_problems] == ["missing_body_file"]
+
+
+def test_documents_from_text_when_body_file_version(tmp_path: Path) -> None:
+    """本文のファイルだけが変わってもバージョンが変わる（正常系）。"""
+    # 準備
+    text = "items:\n  - path: a.md\n"
+    table = DocumentTable(
+        id="src",
+        paths=["index.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        records="items",
+        body_file="path",
+    )
+    plain = DocumentTable(
+        id="list",
+        paths=["index.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        records="items",
+    )
+    # 実行
+    first, _ = documents_from_text(
+        text, tmp_path, "index.yaml", table, source_id="sample", read_body={"a.md": "本文 1"}.get
+    )
+    second, _ = documents_from_text(
+        text, tmp_path, "index.yaml", table, source_id="sample", read_body={"a.md": "本文 2"}.get
+    )
+    records, _ = documents_from_text(text, tmp_path, "index.yaml", plain, source_id="sample")
+    # 検証
+    assert first[0].version != second[0].version
+    assert records[0].version == value_hash({"path": "a.md"})
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        pytest.param("n1.md", "notes/n1.md", id="same_folder"),
+        pytest.param("../../outside/n3.md", None, id="outside_source"),
+        pytest.param("../a.md", "a.md", id="parent_folder"),
+        pytest.param("", None, id="empty"),
+        pytest.param(1, None, id="not_string"),
+    ],
+)
+def test_resolve_body_path(value: object, expected: str | None) -> None:
+    """管理用の YAML のフォルダから解く（正常系）。"""
+    # 準備
+    path = "notes/index.yaml"
+    # 実行
+    result = resolve_body_path(path, value)
+    # 検証
+    assert result == expected
 
 
 def test_load_file_when_dates(

@@ -93,7 +93,7 @@ def prompt_to_markdown(doc: PromptDoc) -> str:
     for index, (name, values) in enumerate(groups):
         lines += [f"### {name}", ""]
         if index > 0:
-            lines += ["<!-- section: closed -->", ""]
+            lines += ['<!-- section: {"open": false} -->', ""]
 
         def example_tab(lang: str, values: Mapping[str, Any] = values) -> list[str]:
             """例の組の 1 言語の描画の結果。"""
@@ -290,7 +290,7 @@ def lang_tabs(languages: Sequence[str], body_of: Callable[[str], list[str]]) -> 
     """言語ごとの中身を言語のタブに並べる（言語が 1 つなら中身だけ）。"""
     if len(languages) == 1:
         return body_of(languages[0])
-    lines = [f"<!-- tabs: group={LANG_TAB_GROUP} -->", ""]
+    lines = [f'<!-- tabs: {{"group": "{LANG_TAB_GROUP}"}} -->', ""]
     for lang in languages:
         lines += [f"#### {lang}", "", *body_of(lang), ""]
     lines.append("<!-- /tabs -->")

@@ -86,8 +86,8 @@ class SettingsSourcesRequest(ApiModel):
     model_config = ConfigDict(extra="forbid")
 
     sources: list[SourceEntry]
-    # 取得したときの端末の設定の内容のバージョン（`None` は照合しない）
-    expected_version: str | None = None
+    # 取得したときの端末の設定の内容のバージョン
+    expected_version: str
 
 
 class SettingsSourceAddRequest(ApiModel):
@@ -96,8 +96,8 @@ class SettingsSourceAddRequest(ApiModel):
     model_config = ConfigDict(extra="forbid")
 
     source: SourceEntry
-    # 取得したときの端末の設定の内容のバージョン（`None` は照合しない）
-    expected_version: str | None = None
+    # 取得したときの端末の設定の内容のバージョン
+    expected_version: str
 
 
 class SettingsSourcePatchRequest(ApiModel):

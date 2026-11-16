@@ -858,11 +858,107 @@ flows:
       - 応答が `Error executing tool` で始まらない
       - ワークツリー x の文書 1 は書き換わらない
     test: test_error_when_validator_timed_out
+  - name: 正常系（本文のファイルを持つ文書を書く）
+    summary: '`records`・`body_file` の行で、要素と本文のファイルを作成・一部の置き換え・全体の置き換えをする'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 本文のファイルを持つ行
+        description: '行 `notes`（`paths: [notes/index.yaml]`・`records: items`・`body_file: path`）。要素 n1 の `path` が `n1.md`'
+        notes: '`notes/n1.md` は `# n1` と `古い行` の 2 行'
+      - name: 入力
+        description: '1 回目は `create`（`kind: notes`・`data: {id: n2, path: n2.md, @body: 本文}`）。2 回目は n1 の `update`（`text_edits: [{field: @body, old: 古い行, new: 新しい行}]`・`dry_run: true`）。3 回目は同じ `update` を `dry_run` なし。4 回目は n2 の `update`（`set: {@body: 置き換えた本文}`）'
+    flow: |-
+      <!-- map: {"title": "正常系（本文のファイルを持つ文書を書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー
+
+        C->>T: create n2（path: n2.md・@body）
+        T->>WT: notes/n2.md を作り、notes/index.yaml に要素を追加する
+        T-->>C: created・version
+        C->>T: update n1（text_edits @body・dry_run）
+        T-->>C: updated・notes/n1.md の差分（書かない）
+        C->>T: update n1（expected_version・text_edits @body）
+        T->>WT: notes/n1.md を置き換える
+        T-->>C: updated・新しい version
+        C->>T: update n2（set @body）
+        T->>WT: notes/n2.md を置き換える
+        T-->>C: updated・新しい version
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目の後、`notes/index.yaml` に `{id: n2, path: n2.md}` の要素があり `@body` のキーを持たず、`notes/n2.md` の内容が渡した本文'
+      - 2 回目の `diff` に `@@ notes/n1.md` の行と `- 古い行`・`+ 新しい行` があり、`applied` が `false` で `notes/n1.md` は変わらない
+      - 3 回目の後、`notes/n1.md` の 2 行目が `新しい行` になり、`notes/index.yaml` は変わらない。`version` が書き込み前と違い、`search_docs` の n1 の `version` と同じ
+      - 3 回目の前の `version` を `expected_version` にした n1 の `update` は `VersionMismatchError`
+      - 4 回目の後、`notes/n2.md` の内容が `set` の `@body`
+    test: test_normal_when_body_file
+  - name: 異常系（本文のファイルが配信元の外を指す・ValidationFailedError）
+    summary: 配信元の外へ解かれる本文のファイルのパスの `create` を断り、何も書かない
+    setup:
+      - name: Mock
+        description: なし
+      - name: 本文のファイルを持つ行
+        description: 正常系（本文のファイルを持つ文書を書く）と同じ行 `notes`
+      - name: 入力
+        description: '`create`（`kind: notes`・`data: {id: n3, path: ../../outside/n3.md, @body: 本文}`）と、通る `create` の 2 件。`atomic` は既定'
+    flow: |-
+      <!-- map: {"title": "異常系（本文のファイルが配信元の外を指す・ValidationFailedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: create n3（path: ../../outside/n3.md）と create 1 件
+        T->>T: 本文のファイルのパスを解き、配信元の外を指す
+        T-->>C: isError（添字 0・path の違反）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、添字 0 の違反の `path` が `body_file` の列 `path`、決まりが本文のファイルのパスが配信元の外を指すこと'
+      - '`notes/index.yaml` が変わらず、配信元のフォルダの外の `outside/n3.md` も、もう 1 件の `create` のファイルも作られない'
+      - '`create` で既にある `n1.md` を指すときも、同じく `path` の違反で断る'
+    test: test_error_when_body_file_outside_source
+  - name: 異常系（本文のファイルを持たない文書に本文を渡す・InvalidArgumentError）
+    summary: '`@body` を受けられない操作と、`body_file` の列の値を変える操作を断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`body_file` を持たない行の文書 1 への `set: {@body: x}`、行 `notes` への `@body` の無い `create`、n1 の `set: {path: other.md}` を 1 件ずつ呼ぶ'
+    flow: |-
+      <!-- map: {"title": "異常系（本文のファイルを持たない文書に本文を渡す・InvalidArgumentError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: 文書 1 の update（set @body）
+        T-->>C: isError（body_file を持たない行）
+        C->>T: notes の create（@body なし）
+        T-->>C: isError（@body が無い）
+        C->>T: n1 の update（set path）
+        T-->>C: isError（body_file の列は変えられない）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 3 回とも `InvalidArgumentError` で、違反の `path` がそれぞれ `operations[0].set.@body`・`operations[0].data.@body`・`operations[0].set.path`
+      - どのファイルも変わらない
+    test: test_error_when_body_not_accepted
 lead: 文書の作成・部分更新・置き換えを検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 identifier: write_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーにだけ書く
 idempotent: false
-side_effects: 作業ツリー（Git 管理外の配信元はそのフォルダ）の文書の YAML を作る・書き換える。`generators[]` のスクリプトを流して生成物を書き出す。Git 管理外の配信元ではメタデータの `created`・`updated` を付ける。
+side_effects: 作業ツリー（Git 管理外の配信元はそのフォルダ）の文書の YAML と、`records`・`body_file` の行の文書の本文のファイルを作る・書き換える。`generators[]` のスクリプトを流して生成物を書き出す。Git 管理外の配信元ではメタデータの `created`・`updated` を付ける。
 callers:
   - SC-7#scenarios[正常シナリオ]
   - SC-7#scenarios[正常シナリオ（変更していない項目の引用符を保つ）]
@@ -870,6 +966,8 @@ callers:
   - SC-7#scenarios[正常シナリオ（mdmark の CLI が無い）]
   - SC-7#scenarios[異常シナリオ（書き込みが期限を過ぎる）]
   - SC-7#scenarios[異常シナリオ（検査のスクリプトが制限時間を超える）]
+  - SC-7#scenarios[正常シナリオ（本文のファイルを持つ文書を書く）]
+  - SC-7#scenarios[異常シナリオ（本文のファイルを書き込めない）]
 exclusivity: 配信元ごとの排他ロックの中で、読み込み・バージョンの確認・検査・書き込みを行う。後から来た呼び出しはロックを待つ
 request:
   - name: source
@@ -993,6 +1091,26 @@ request:
     location: argument
     description: 会話キー（サブエージェント）
     notes: フックが入れる
+  - name: operations[].data.@body
+    type: str
+    required: false
+    default: なし（`records`・`body_file` の行の `create` では必須）
+    location: argument
+    description: 本文のファイルの内容
+    notes: '`records`・`body_file` の行の文書だけ。本文のファイルのパスは `data` の `body_file` の列に、管理用の YAML のフォルダからの相対で渡す'
+  - name: operations[].set.@body
+    type: str
+    required: false
+    default: なし（本文のファイルを変えない）
+    location: argument
+    description: 本文のファイルの内容の全体。本文のファイルを置き換える
+    notes: '`records`・`body_file` の行の文書の `update` だけ'
+  - name: operations[].text_edits[].field
+    type: str
+    required: true
+    location: argument
+    description: 置き換える文字列の項目のパス。`@body` は本文のファイルの一部を置き換える
+    notes: '`@body` は `records`・`body_file` の行の文書だけ'
 request_example: |-
   ```json
   {
@@ -1024,7 +1142,7 @@ response:
   - name: results[].diff
     type: str
     description: git と同じ `+`・`-` の差分の行
-    notes: '`updated`・`replaced` と `dry_run` のとき'
+    notes: '`updated`・`replaced` と `dry_run` のとき。本文のファイルを書き換える文書は、要素の差分の行に続けて `@@ {本文のファイルの配信元の直下からのパス}` の行と本文のファイルの差分の行を並べる'
   - name: results[].errors
     type: 'list[{path: str, rule: str, fix: str, schema?: {title?: str, description?: str, x-rules?: list, examples?: list, x-bad-examples?: list}}]'
     description: 違反ごとの項目のパス・決まり・直し方と、違反した項目のスキーマの説明
@@ -1045,7 +1163,7 @@ exceptions:
   - name: なし（正常終了）
     condition: '全ての操作を書いた（`atomic: false` で一部が失敗したときも、失敗分を `failed` として返して正常終了）'
   - name: ValidationFailedError
-    condition: '変更を当てた後の文書がスキーマか `validators[]` に通らないか、種類のスキーマの `$ref` を解決できないか、変えた Markdown のキーの値に mdmark の描画時の書き方の警告がある（`atomic: true`）'
+    condition: '変更を当てた後の文書がスキーマか `validators[]` に通らないか、種類のスキーマの `$ref` を解決できないか、変えた Markdown のキーの値に mdmark の描画時の書き方の警告があるか、本文のファイルのパスが配信元の外・`create` で既にあるファイルを指す（`atomic: true`）'
     notes: '違反ごとの添字・パス・決まり・直し方を添える。スキーマの違反には、違反した項目のスキーマの説明（`schema`）も添える'
   - name: SourceNotWritableError
     condition: '`cwd` が配信元の `scope.write` に当たらない'
@@ -1063,7 +1181,7 @@ exceptions:
     condition: '`update`・`replace` の `id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
   - name: InvalidArgumentError
-    condition: 操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の置き場所のファイル名が行の `exclude[]` に当たる・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ
+    condition: 操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の置き場所のファイル名が行の `exclude[]` に当たる・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した
   - name: SourceNotServedError
     condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
   - name: WorktreeNotMatchedError
@@ -1132,6 +1250,16 @@ constraints:
   - item: ワークツリーの読み込みの待ち
     constraint: '[文書の検索](id:IF-2) の制約「ワークツリーの読み込みの待ち」と同じ。終了しなければ何も書き込まずに `WorktreeLoadingError` を返却する'
     notes: 共通の処理のため、結合テストは文書の検索が持つ
+  - item: 本文のファイル
+    constraint: '`records`・`body_file` の行の文書の本文は `@body` で受ける。`create` は `body_file` の列の値（管理用の YAML のフォルダからの相対）に本文のファイルを作成し、`set` の `@body` は全体を、`text_edits` の `field: @body` は一部を置き換える。`replace` は `data` に `@body` があれば置き換え、無ければ本文のファイルを変えない。`body_file` の列の値を変える `update`・`replace` は受けない'
+    notes: '`@body` は種類の列名と重ならない。`body_file` の列の名前が `body` の配信元でも、`body` は列を指す'
+  - item: 本文のファイルの検査
+    constraint: 本文のファイルの内容は、スキーマ・`validators[]`・mdmark の点検に通さない。パスを読み込みと同じく管理用の YAML のフォルダから解き、配信元の外を指すときと、`create` で既にあるファイルを指すときは `body_file` の列の違反にする
+  - item: 本文のファイルの書き込み
+    constraint: 要素の YAML と本文のファイルは、全ての検査に通ってからそれぞれ一時ファイルに書いて置き換える。書き込みの期限は置き換える前に確認し、始めた後は両方を書き終える
+  - item: 本文のファイルを持つ文書のバージョン
+    constraint: 要素の値と本文のファイルの内容の両方から求める（読み取りの `version` も同じ値）。本文のファイルだけを書き換えてもバージョンが変わる
+    notes: 今は要素の値だけから求めているため、`records`・`body_file` の行の文書の `version` はこの変更で 1 度だけ変わる
 refs:
   - SC-7#scenarios[正常シナリオ]
   - SC-9#scenarios[異常シナリオ（読んだ後に変わった文書へ書き込む）]

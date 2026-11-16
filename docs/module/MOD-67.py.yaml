@@ -172,10 +172,9 @@ data_models:
         description: 保存する `sources[]` の全行
       - name: expected_version
         title: 取得したときの内容のバージョン
-        type: str | None
+        type: str
         access: 公開
-        default: None
-        description: JSON のキーは `expectedVersion`。`None` は照合しない
+        description: JSON のキーは `expectedVersion`。必須
   - name: SettingsWarning
     title: 端末の設定の警告
     container: project_index/features/settings/types.py
@@ -305,10 +304,9 @@ data_models:
         description: 追加する行
       - name: expected_version
         title: 取得したときの内容のバージョン
-        type: str | None
+        type: str
         access: 公開
-        default: None
-        description: JSON のキーは `expectedVersion`。`None` は照合しない
+        description: JSON のキーは `expectedVersion`。必須
   - name: SourceAddResult
     title: 1 行の追加の結果
     container: project_index/features/settings/types.py

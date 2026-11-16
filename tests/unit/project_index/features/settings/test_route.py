@@ -19,6 +19,7 @@ from project_index.features.settings.types import (
     TerminalConfig,
 )
 from project_index.features.sources.registry import SourceRegistry
+from project_index.server.error_handlers import register_error_handlers
 from project_index.shared.errors import Violation
 
 if TYPE_CHECKING:
@@ -143,9 +144,11 @@ def test_build_settings_router_when_put(
     """保存して状態を返す（正常系）。"""
     # 準備
     saved: list[list[SourceEntry]] = []
+    versions: list[str] = []
 
     def fake_save_sources(sources: list[SourceEntry], **kwargs: Any) -> SourceWriteResult:
         saved.append(list(sources))
+        versions.append(kwargs["expected_version"])
         return SourceWriteResult(statuses=[make_status("a", 0)], version="d4e5f6")
 
     monkeypatch.setattr(route_module, "save_sources", fake_save_sources)
@@ -153,13 +156,17 @@ def test_build_settings_router_when_put(
     app = FastAPI()
     app.include_router(build_settings_router(handlers))
     client = TestClient(app)
-    body = {"sources": [{"id": "a", "config": ["/tmp/a/project-index.yaml"]}]}
+    body = {
+        "expectedVersion": "a1b2c3",
+        "sources": [{"id": "a", "config": ["/tmp/a/project-index.yaml"]}],
+    }
     # 実行
     response = client.put("/settings/sources", json=body, headers={"Sec-Fetch-Site": "same-origin"})
     # 検証
     assert response.status_code == 200
     assert response.json()["sources"][0]["status"] == "serving"
     assert saved[0][0].id == "a"
+    assert versions == ["a1b2c3"]
 
 
 def test_build_settings_router_when_post(
@@ -184,7 +191,10 @@ def test_build_settings_router_when_post(
     app = FastAPI()
     app.include_router(build_settings_router(handlers))
     client = TestClient(app)
-    body = {"source": {"id": "a", "config": ["/tmp/a/project-index.yaml"]}}
+    body = {
+        "expectedVersion": "a1b2c3",
+        "source": {"id": "a", "config": ["/tmp/a/project-index.yaml"]},
+    }
     # 実行
     first = client.post("/settings/sources", json=body)
     second = client.post("/settings/sources", json=body)
@@ -339,6 +349,41 @@ def test_build_settings_router_when_delete_without_version(
     assert received == []
 
 
+def test_build_settings_router_when_write_without_version(
+    make_handlers: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """保存・1 行の追加に expectedVersion が無い（異常系）。"""
+    # 準備
+    calls: list[str] = []
+
+    def fake_save_sources(sources: list[SourceEntry], **kwargs: Any) -> SourceWriteResult:
+        calls.append("save_sources")
+        return SourceWriteResult(statuses=[], version="d4e5f6")
+
+    def fake_add_source(source: SourceEntry, **kwargs: Any) -> SourceAddResult:
+        calls.append("add_source")
+        return SourceAddResult(result="added", same=None, statuses=[], version="d4e5f6")
+
+    monkeypatch.setattr(route_module, "save_sources", fake_save_sources)
+    monkeypatch.setattr(route_module, "add_source", fake_add_source)
+    handlers = make_handlers(settings_lock=threading.Lock(), registry=SourceRegistry())
+    app = FastAPI()
+    register_error_handlers(app)
+    app.include_router(build_settings_router(handlers))
+    client = TestClient(app)
+    row = {"id": "a", "config": ["/tmp/a/project-index.yaml"]}
+    # 実行
+    put = client.put("/settings/sources", json={"sources": [row]})
+    post = client.post("/settings/sources", json={"source": row})
+    # 検証
+    assert put.status_code == 400
+    assert [error["path"] for error in put.json()["errors"]] == ["expectedVersion"]
+    assert post.status_code == 400
+    assert [error["path"] for error in post.json()["errors"]] == ["expectedVersion"]
+    assert calls == []
+
+
 def test_build_settings_router_when_unknown_top_level_key(
     tmp_path: Path,
     write_files: Callable[[Path, dict[str, str]], None],
@@ -378,8 +423,8 @@ def test_build_settings_router_when_unknown_top_level_key(
     row = {"id": "a", "config": ["/tmp/a/project-index.yaml"]}
     # 実行
     got = client.get("/settings/sources")
-    put = client.put("/settings/sources", json={"sources": [row]})
-    post = client.post("/settings/sources", json={"source": row})
+    put = client.put("/settings/sources", json={"expectedVersion": "a1b2c3", "sources": [row]})
+    post = client.post("/settings/sources", json={"expectedVersion": "a1b2c3", "source": row})
     patch = client.patch(
         "/settings/sources/a", json={"expectedVersion": "a1b2c3", "source": {"enabled": False}}
     )

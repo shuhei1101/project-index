@@ -7,7 +7,7 @@
 接続先は `http://127.0.0.1:${PROJECT_INDEX_PORT:-8786}/mcp` の 1 つで、トランスポートは HTTP（Streamable HTTP）です。
 ツールは全配信元で共通で、配信元は引数 `source` で指します。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | ツール | 種類 | 役割 |
 | --- | --- | --- |
@@ -32,7 +32,7 @@ YAML を書き換えたときは、再起動で反映します。
 
 ### 共通の引数
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 引数 | 型 | 説明 | 補足 |
 | --- | --- | --- | --- |
@@ -81,7 +81,7 @@ rule-inject は、この `path` と `scope` で文書を既読にします。
 `body_file` のある `records` の要素は、`body_file` が指すファイルのパスになります。
 メタデータのキー `path`（`values` の中。管理用の YAML では `files[].path` の値）とは別の項目です。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | `scope` | 返したもの | 該当する呼び出し |
 | --- | --- | --- |
@@ -128,7 +128,7 @@ rule-inject は、この `path` と `scope` で文書を既読にします。
 条件に当たる文書を、指定した項目・量・順で返します。
 ID で絞れば取得、`view: summary` で一覧、`view: count` で件数、`group_by` で集計になります。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 引数 | 型 | 既定 | 説明 |
 | --- | --- | --- | --- |
@@ -158,7 +158,7 @@ Group     = {"and": [Group | Condition, ...]} | {"or": [Group | Condition, ...]}
 Condition = {"field": str, "op": enum, "values": [str, ...], "match": "any" | "all", "case_sensitive": bool}
 ```
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 項目 | 説明 |
 | --- | --- |
@@ -174,7 +174,7 @@ Condition = {"field": str, "op": enum, "values": [str, ...], "match": "any" | "a
 
 ### レスポンス
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | フィールド | 説明 |
 | --- | --- |
@@ -262,7 +262,7 @@ YAML として読めないファイルがあっても、そのファイルを除
 | `atomic` | bool | `true` | `true` は 1 件でも失敗したら何も書かない。`false` は成功分を書き、失敗分を添字付きで返す |
 | `dry_run` | bool | `false` | 本番と同じ検証・バージョンの確認・差分を返し、書き込まない |
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | Operation のキー | 使える `op` | 説明 |
 | --- | --- | --- |
@@ -283,6 +283,21 @@ YAML として読めないファイルがあっても、そのファイルを除
 列名をそのまま渡したキーと、`metadata` に書いていないキーは読み替えません。
 共通のキーとその列名を同じ操作に両方渡すと、`InvalidArgumentError` です。
 種類ごとの対応は `describe(source, kind)` で引けます。
+
+`records`・`body_file` の行の文書は、本文のファイルを `@body` で書きます。
+`@body` は種類の列名と重ならないキーで、`body_file` の列の名前が `body` の配信元でも `body` は列を指します。
+
+| 操作 | 本文のファイル |
+| --- | --- |
+| `create` | `data` の `body_file` の列（管理用の YAML のフォルダからの相対）に、`data.@body` の内容で作成する。`@body` は必須 |
+| `update` の `set` | `@body` の内容で全体を置き換える |
+| `update` の `text_edits` | `field: @body` で一部を置き換える |
+| `replace` | `data` に `@body` があれば置き換え、無ければ変えない |
+
+本文のファイルのパスが配信元の外を指すとき・`create` で既にあるファイルを指すときは、`body_file` の列の違反で、要素も本文のファイルも書き込みません。
+`body_file` の列の値を変える操作と、`body_file` を持たない行の文書への `@body` は `InvalidArgumentError` です。
+本文のファイルはスキーマ・`validators[]`・mdmark の点検に通しません。
+これらの文書の `version` は要素と本文のファイルの両方から求め、`diff` は要素の差分の行に続けて `@@ {本文のファイルのパス}` の行と本文のファイルの差分の行を並べます。
 
 行の `metadata` が `tags: tags[].name` のとき、`tags` への操作はオブジェクトの配列へ書き戻し、元の要素の `main` などのキーを保ちます。
 
@@ -324,6 +339,7 @@ Git の配信元で消した文書は Git で戻せます。
 
 レスポンスは `applied` と `results[]`（`status` は `deleted`・`failed`）、`on_referenced: unlink` のときの `unlinked[]`（参照を外した文書の `id`・`version`）です。
 Git 管理外の配信元では、種類の `documents[].writable` が削除を許していることが要ります。
+`records`・`body_file` の行の文書は、本文のファイルも削除します。同じ管理用の YAML のほかの要素が同じ本文のファイルを指すときは残します。
 
 ## describe
 
@@ -373,7 +389,7 @@ Git 管理外の配信元では、種類の `documents[].writable` が削除を�
 
 区間か、この会話で前回読んだ時点から今までに変わった文書・変わったキー・差分の行を返します。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 引数 | 型 | 既定 | 説明 |
 | --- | --- | --- | --- |
@@ -416,7 +432,7 @@ Git 管理外の配信元では、種類の `documents[].writable` が削除を�
 
 起点の文書かコードのパスから `related` をたどって、関連する文書を返します。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 引数 | 型 | 既定 | 説明 |
 | --- | --- | --- | --- |
@@ -441,7 +457,7 @@ Git 管理外の配信元では、種類の `documents[].writable` が削除を�
 
 エラーは `isError: true` のツール結果で返し、本文に原因と次の手を記載します。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | エラー | 発生条件 | 本文に記載すること |
 | --- | --- | --- |

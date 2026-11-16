@@ -268,9 +268,9 @@ functions:
          - 本文はファイルの内容。バージョンはファイルの内容の『内容のハッシュ』
       3. `table.records` がある場合、『項目の取得』で配列を取り、要素ごとに文書を作る（配列が無ければ 0 件）
          - 要素が辞書でない場合、その要素は `not_mapping` にして飛ばす
-         - `table.body_file` があれば、要素のその列のパスを YAML のファイルのフォルダから解き、`read_body`（`None` なら `root` のファイル）で読んで本文と `body_path` にする。無いファイル（`read_body` が `None` を返す）・`root` の外を指す場合、その要素は `missing_body_file` にして飛ばす
+         - `table.body_file` があれば、要素のその列の値を本文のファイルのパスの解決で解き、`read_body`（`None` なら `root` のファイル）で読んで本文と `body_path` にする。無いファイル（`read_body` が `None` を返す）・`root` の外を指す場合、その要素は `missing_body_file` にして飛ばす
          - `body_file` が無ければ、要素を YAML に書き出した文字列を本文にする
-         - バージョンは要素の『値のハッシュ』
+         - バージョンは、`body_file` があれば要素と本文の組（`[要素, 本文]`）の『値のハッシュ』、無ければ要素の『値のハッシュ』
       4. 文書ごとに『メタデータの解決』を当てる
       5. ID はメタデータの `id`。無ければ、`body_path` か `path` を拡張子付きのまま（`records` で `body_file` が無ければ末尾に `#{位置}`）にする
          - メタデータの `name` が空なら、`body_path`（無ければ `path`）のファイル名から拡張子を除いた名前を入れる。`records` で `body_file` が無ければ ID を入れる
@@ -283,6 +283,12 @@ functions:
         condition: '`records`・`body_file` の行の索引の YAML（要素の `body_file` が `a.md`）に、`a.md` を受けると `過去の本文` を返す `read_body` を渡す（`root` の `a.md` は `今の本文`）。もう 1 つは `a.md` に `None` を返す `read_body`'
         mock: なし（`tmp_path`）
         expected: 1 つ目は文書の `body` が `過去の本文`、`body_path` が `a.md`。2 つ目は文書が 0 件で、`missing_body_file` の `LoadProblem` が 1 件
+      - name: test_documents_from_text_when_body_file_version
+        case: 正常
+        summary: 本文のファイルだけが変わってもバージョンが変わる
+        condition: '`records`・`body_file` の行の索引の YAML（要素の `body_file` が `a.md`）に、`a.md` を `本文 1` と返す `read_body` と `本文 2` と返す `read_body` をそれぞれ渡す'
+        mock: なし（`tmp_path`）
+        expected: 2 つの文書の `version` が違う。`body_file` を持たない `records` の行の文書の `version` は要素の『値のハッシュ』のまま
   - name: unindexed_files
     title: 索引に無いファイル
     container: project_index/features/documents/loader.py
@@ -358,3 +364,39 @@ functions:
         condition: '`src/files.yaml`・`src/a.py`・`src/d.py`・`docs/x.md` を置き、`files` にその 4 件、`body_paths` が `[src/a.py]`'
         mock: '`walk_files`（呼ばれないことを確かめる）'
         expected: '`["src/d.py"]` で、`walk_files` を呼ばない'
+  - name: resolve_body_path
+    title: 本文のファイルのパスの解決
+    kind: 関数
+    container: project_index/features/documents/loader.py
+    usecase: 文書の読み込み・書き込み
+    role: 変換
+    summary: '`body_file` の列の値を管理用の YAML のフォルダから解き、配信元の直下からのパスを返す'
+    scope: public
+    thread_safe: true
+    args:
+      - name: path
+        title: 管理用の YAML のパス
+        type: str
+        required: true
+        passing: positional
+        description: 配信元の直下からのパス
+      - name: value
+        title: 列の値
+        type: object
+        required: true
+        passing: positional
+        description: 要素の `body_file` の列の値
+    returns:
+      type: str | None
+      description: 配信元の直下からのパス。値が空でない文字列でないときと、配信元の外を指すときは `None`
+    process: |-
+      1. `value` が空でない文字列でなければ `None` を返す
+      2. `path` のフォルダと `value` をつないで正規化する
+      3. `..` か `../`・`/` で始まる場合は `None`、それ以外は正規化したパスを返す
+    unit_tests:
+      - name: test_resolve_body_path
+        case: 正常
+        summary: 管理用の YAML のフォルダから解く
+        condition: '`path` が `notes/index.yaml` で、`value` が `n1.md`・`../../outside/n3.md`・`../a.md`・空の文字列・`1`'
+        mock: なし
+        expected: '`notes/n1.md`・`None`・`a.md`・`None`・`None`'

@@ -1,0 +1,17 @@
+$ TMPDIR=$(mktemp -d) uv run pytest tests/integration/server/test_put_settings_sources.py tests/integration/server/test_add_settings_source.py tests/integration/server/test_write_docs.py tests/integration/server/test_delete_docs.py
+（並列数 1。pytest の一時フォルダ /tmp/pytest-of-{利用者} が別の利用者の所有のため、TMPDIR を自分の一時フォルダに向けた）
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/chore-write-body-file-and-settings-version
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 61 items
+
+tests/integration/server/test_put_settings_sources.py ............       [ 19%]
+tests/integration/server/test_add_settings_source.py ......              [ 29%]
+tests/integration/server/test_write_docs.py ............................ [ 75%]
+....                                                                     [ 81%]
+tests/integration/server/test_delete_docs.py ...........                 [100%]
+
+============================= 61 passed in 28.32s ==============================
+exit=0
