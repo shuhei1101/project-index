@@ -81,7 +81,7 @@ flows:
       - 配信していない配信元は `missing` が `not_served` で、`errors[]` に外した理由がある
     test: test_error_when_source_not_found
   - name: 異常系（リビジョンの書き出しが上限を超える・504）
-    summary: default_ref の commit の書き出しが上限を超えたとき、止めた処理と理由を返す
+    summary: '`schemas` を指して default_ref の commit の書き出しが上限を超えたとき、止めた処理と理由を返す'
     setup:
       - name: Mock
         description: git の実行を、`archive` のときだけ待ち時間の上限を超えたときと同じ失敗（`GitError` の `timed_out`）を返すものに差し替える
@@ -93,7 +93,7 @@ flows:
         participant C as クライアント
         participant E as GET /sources/{source}/config
 
-        C->>E: GET /sources/sample/config
+        C->>E: GET /sources/sample/config?schemas=true
         E->>E: default_ref の commit の書き出しが上限を超えて止まる
         E-->>C: 504 problem+json
       ```
@@ -165,7 +165,7 @@ status_codes:
     condition: 配信元が無い・配信していない
     notes: '`missing`（`source`・`not_served`）と値、配信していない配信元は `errors[]` に外した理由'
   - code: '504'
-    condition: リビジョンの書き出し（`git archive`）が待ち時間の上限を超えて止まった
+    condition: '`schemas` を指したときに、リビジョンの書き出し（`git archive`）が待ち時間の上限を超えて止まった'
     notes: '`title` が `RevisionExportTimeoutError`。`operation`（`revision_export`）・`commit`・`limitSec`'
 error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）
 constraints:
