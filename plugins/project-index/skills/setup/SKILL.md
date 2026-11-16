@@ -17,9 +17,13 @@ argument-hint: "[path]"
    - 端末の設定の `clone` の値を以降 `{clone}` と呼ぶ
    - `{clone}/.venv/bin/python -m project_index --version` の番号に `v` を付けた値を以降 `{tag}` と呼ぶ（`project-index 0.2.0` なら `v0.2.0`）
 
-2. 配信元の設定を決める。
-   - `{path}/project-index.yaml` がある場合、`check_project` を呼ぶ。`version_state` が `old` なら、`{clone}/.venv/bin/python -m project_index migrate --source {path}/project-index.yaml --plan` で手順を示し、了承されたら `{clone}/.venv/bin/python -m project_index migrate --source ...` で適用する。`newer` なら、管理の MCP の `update` で project-index を更新するよう案内して止まる。違反があれば、キーのパスと理由を示す。違反が `type`・`defaults`・`metadata` の値（`migrate` で移せない設定）なら手順 3 以降で移し、それ以外の違反では止まる。端末の設定は書き換えない
-   - `{path}/project-index.yaml` が無い場合、手順 3 以降で `{clone}/templates/project-index.yaml` から作る（YAML でない範囲の配信元）
+2. 運用と配信元の設定を決める。
+   - 端末の設定の `sources[]` に、`config` の先頭のファイルが `{path}` にある行があれば、その行の `storage.type` が `disk` ならローカル運用、それ以外はコミットする運用にする。行が無ければ、運用（コミットする・ローカル運用）を聞く。既定はコミットする
+   - ローカル運用は、project-index のために追加するファイルを全て `*.local.*` の名前にし、Git に無視させる運用。コミットできないリポジトリで選ぶ
+   - 配信元の設定のファイルを以降 `{config}` と呼ぶ。コミットする運用は `{path}/project-index.yaml`、ローカル運用は `{path}/project-index.local.yaml`。ローカル運用では、管理用の YAML を `files.local.yaml`、スキーマを `schemas/{名前}.schema.local.yaml`、スクリプトを `*.local.*` の名前にする
+   - 以降の `check_project` は、`path` に `{config}` を渡し、ローカル運用では `storage_type: disk` も渡す
+   - `{config}` がある場合、`check_project` を呼ぶ。`version_state` が `old` なら、`{clone}/.venv/bin/python -m project_index migrate --source {config} --plan` で手順を示し、了承されたら `{clone}/.venv/bin/python -m project_index migrate --source {config}` で適用する。`newer` なら、管理の MCP の `update` で project-index を更新するよう案内して止まる。違反があれば、キーのパスと理由を示す。違反が `type`・`defaults`・`metadata` の値（`migrate` で移せない設定）なら手順 3 以降で移し、それ以外の違反では止まる。端末の設定は書き換えない
+   - `{config}` が無い場合、手順 3 以降で `{clone}/templates/project-index.yaml` から作る（YAML でない範囲の配信元）
 
 3. 権限と範囲を聞く。端末の設定の `sources[]` に同じ配信元の行が既にあるときは、今の値を示して変えるかだけを聞く。
 
@@ -27,22 +31,24 @@ argument-hint: "[path]"
    | --- | --- |
    | 書き込める作業場所（`scope.write`）。パスか glob | `{path}` |
    | 参照できる作業場所（`scope.read`） | `{path}/**` |
-   | 検索できるようにするファイル（`documents[].paths`）。`project-index.yaml` が無いときだけ聞く | `**/*.md`。`.git`・`node_modules`・`.claude/worktrees` の下は除く |
-   | 実装のパスを持つ設計書の種類とキー。`project-index.yaml` が無いときだけ聞く（ある配信元は手順 4 で聞く） | 無し |
+   | 検索できるようにするファイル（`documents[].paths`）。`{config}` が無いときだけ聞く | `**/*.md`。`.git`・`node_modules`・`.claude/worktrees` の下は除く |
+   | Git が無視するファイル（生成物・`.env` など）を除外するか。`{config}` が無いときだけ聞く。ファイルの列挙は `.gitignore` を参照しない | 除外する |
+   | 実装のパスを持つ設計書の種類とキー。`{config}` が無いときだけ聞く（ある配信元は手順 4 で聞く） | 無し |
 
 4. YAML でない範囲を管理用の YAML の行にする。
-   - `{clone}/.venv/bin/python -m project_index files --root {path} --paths {範囲の glob}` で、範囲のうち管理用の YAML に記載するファイルを求める（`--paths` は繰り返せる。生成物・ロック・バイナリ・ベンダーのコード・再エクスポートや空の `__init__` と、`.git`・`node_modules`・`.claude/worktrees` の下は含まれない）。管理用の YAML（`files.yaml`）の行と突き合わせる
-     - 範囲の glob は、`project-index.yaml` が無いときは手順 3 で回答した範囲にする
-     - `project-index.yaml` があるときは、`records: files` の行ごとに 1 回ずつ呼び、範囲の glob を `{管理用の YAML のフォルダ}/**` にする（行の `paths` の値は指定しない）。その行の `exclude` を 1 つずつ `--exclude` で指定する。行をまとめて 1 回で呼ばない
+   - `{clone}/.venv/bin/python -m project_index files --root {path} --paths {範囲の glob}` で、範囲のうち管理用の YAML に記載するファイルを求める（`--paths` は繰り返せる。生成物・ロック・バイナリ・ベンダーのコード・再エクスポートや空の `__init__` と、`.git`・`node_modules`・`.claude/worktrees` の下は含まれない）。管理用の YAML（`files.yaml`、ローカル運用は `files.local.yaml`）の行と突き合わせる。`*.local.*` の名前のファイルは含まれない
+     - 範囲の glob は、`{config}` が無いときは手順 3 で回答した範囲にする
+     - Git が無視するファイルを除外すると回答した場合、`git -C {path} ls-files --others --ignored --exclude-standard --directory` の結果を 1 つずつ `--exclude` で指定する
+     - `{config}` があるときは、`records: files` の行ごとに 1 回ずつ呼び、範囲の glob を `{管理用の YAML のフォルダ}/**` にする（行の `paths` の値は指定しない）。その行の `exclude` を 1 つずつ `--exclude` で指定する。行をまとめて 1 回で呼ばない
    - 結果は次の候補にする
 
      | 突き合わせの結果 | 候補 |
      | --- | --- |
      | 管理用の YAML に無いファイル | 仮のメタデータと関連の候補を付けて行を追加 |
      | ファイルが無い行 | 行を削除 |
-     | 名前が変わったファイル | 行のパスを新しくし、メタデータは残す。Git の配信元は `git diff --name-status -M` のリネームの検出、Git 管理外は内容のハッシュの一致で見つける |
+     | 名前が変わったファイル | 行のパスを新しくし、メタデータは残す。Git のリポジトリの中の配信元（ローカル運用を含む）は `git diff --name-status -M` のリネームの検出、Git 管理外は内容のハッシュの一致で見つける |
 
-   - `project-index.yaml` があるときは、次の候補も加える
+   - `{config}` があるときは、次の候補も加える
 
      | 状況 | 候補 |
      | --- | --- |
@@ -61,20 +67,21 @@ argument-hint: "[path]"
      | `tests` | テストのファイル。ファイル名から `test_` の接頭辞（`_test`・`.test` の接尾辞）を除いた名前のコードを指す（`to` は文書の ID で、指すコードの配信元の直下からの拡張子付きのパス）。同じ名前のコードが範囲に無ければ付けない |
      | `implements` | 回答した種類の文書を `search_docs`（`filter` は `kind`、`format: json`）で引き、そのキーの値とパスが一致するコード。その設計書を指す。種類とキーが無しなら付けない |
 
-   - 配信元の直下と、配信元の中のプラグインのルート（`.claude-plugin/plugin.json` を持つフォルダ）で `content/prompts/` を探す。見つけたフォルダのうち、`content/prompts/**/*.yaml`（プラグインのルートは `{ルート}/content/prompts/**/*.yaml`）を `paths` に持つ行が `project-index.yaml` に無いものごとに、次の候補を加える
+   - 配信元の直下と、配信元の中のプラグインのルート（`.claude-plugin/plugin.json` を持つフォルダ）で `content/prompts/` を探す。見つけたフォルダのうち、`content/prompts/**/*.yaml`（プラグインのルートは `{ルート}/content/prompts/**/*.yaml`）を `paths` に持つ行が `{config}` に無いものごとに、次の候補を加える
      - `{clone}/templates/project-index.yaml` の `prompts` の行の `paths` をそのフォルダにした `documents` の行。プラグインのルートの行は `id` を `prompts-{ルートのフォルダ名}` にする
      - `converters[]` に `prompt-doc` の行が無ければ、雛形の `prompt-doc` の行
      - `nav` の、プロンプトの行を `auto` で並べ `group_by: kind` でまとめる `プロンプト` のタブ。`nav` が無ければ、今の `documents` の行ごとの `auto` のタブ（`title` は行の `title`）を先に並べる
    - 追加・削除・改名と、仮のメタデータ・関連・プロンプトの行の候補を表で示し、記載してよいかを聞く。断られたら何も書き換えずに止まる
 
 5. 確認が済んだものを記載する。
-   - `project-index.yaml` が無い場合、`{clone}/templates/project-index.yaml` から `project-index.yaml` を作り、1 行目のスキーマの行のタグを `{tag}` に、`name`・`description`・`files` の行の `paths` を決めた値にする。雛形の `prompts` の行と `converters[]` は削除する。`{clone}/templates/files.schema.yaml` を `{path}/schemas/files.schema.yaml` にコピーする
-   - プロンプトの行の候補が了承された場合、`project-index.yaml` に `documents`・`converters[]`・`nav` の行を記載し、`{clone}/templates/prompt.schema.yaml` を `{path}/schemas/prompt.schema.yaml` にコピーする
-   - 管理用の YAML の行は、`write_docs` で記載する（配信元が登録済みのとき）。登録前の配信元は、`templates/files.schema.yaml` に沿って `files.yaml` を直接書く
-   - `check_project`（`path` は配信元のフォルダ）を呼び、違反が無いことを確認する。違反があれば示して止まり、端末の設定は書き換えない
+   - `{config}` が無い場合、`{clone}/templates/project-index.yaml` から `{config}` を作り、1 行目のスキーマの行のタグを `{tag}` に、`name`・`description`・`files` の行の `paths` を決めた値にする。雛形の `prompts` の行と `converters[]` は削除する。`{clone}/templates/files.schema.yaml` を `{path}/schemas/files.schema.yaml`（ローカル運用は `files.schema.local.yaml`）にコピーする。ローカル運用では、`files` の行の `paths`・`schema` を `files.local.yaml`・`schemas/files.schema.local.yaml` にする
+   - プロンプトの行の候補が了承された場合、`{config}` に `documents`・`converters[]`・`nav` の行を記載し、`{clone}/templates/prompt.schema.yaml` を `{path}/schemas/prompt.schema.yaml`（ローカル運用は `prompt.schema.local.yaml`）にコピーする
+   - 管理用の YAML の行は、`write_docs` で記載する（配信元が登録済みのとき）。登録前の配信元は、`templates/files.schema.yaml` に沿って `files.yaml`（ローカル運用は `files.local.yaml`）を直接書く
+   - ローカル運用では、`git -C {path} rev-parse --git-path info/exclude` の指すファイルに `*.local.*` の行が無ければ追加する。`.gitignore` は書き換えない
+   - `check_project` を呼び、違反が無いことを確認する。違反があれば示して止まり、端末の設定は書き換えない
 
 6. 端末の設定の `sources[]` に行を記載し、配信を始める。
-   - 端末の設定の `sources[]` に、`config`（`{path}/project-index.yaml` の絶対パス）・`scope.write`・`scope.read` の行を記載する。同じ配信元の行があれば、その行を修正する
+   - 端末の設定の `sources[]` に、`config`（`{config}` の絶対パス）・`scope.write`・`scope.read` の行を記載する。ローカル運用では `storage: {type: disk}` も記載する。同じ配信元の行があれば、その行を修正する
    - 管理の MCP の `reload` を呼ぶ。`/mcp` のセッションは切れない
    - 追加した配信元と `check_project` の結果（索引の同期の件数を含む）を示す
 
