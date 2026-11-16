@@ -207,6 +207,26 @@ def resolve_read_targets(
     return targets
 
 
+def _reject_disk_arguments(item: ServedSource, **arguments: str | None) -> None:
+    """disk の配信元に、リビジョン・ワークツリーを指す引数が渡されたら断る。"""
+    if item.storage != "disk":
+        return
+    given = [name for name, value in arguments.items() if value is not None]
+    if not given:
+        return
+    raise InvalidArgumentError(
+        message=f"{item.id} は disk の配信元のため {'・'.join(given)} を指定できません",
+        violations=[
+            Violation(
+                path=name,
+                rule=f"{item.id} は disk の配信元のため {name} を指定できません",
+                fix=f"{name} を省いてください（disk の配信元は登録したフォルダを読み書きします）",
+            )
+            for name in given
+        ],
+    )
+
+
 def _target_of(
     item: ServedSource,
     access: AccessLevel,
@@ -217,6 +237,7 @@ def _target_of(
     current: tuple[ServedSource, Path | None] | None,
 ) -> Target:
     """1 つの配信元の読む場所を決める。"""
+    _reject_disk_arguments(item, ref=ref, worktree=worktree)
     if worktree is not None:
         wt = find_worktree(item, normalize_path(worktree))
         if wt is None:
@@ -280,6 +301,7 @@ def resolve_write_target(
             available=available_sources(cwd, registry=registry),
             next_steps=[DESCRIBE_HINT],
         )
+    _reject_disk_arguments(item, worktree=worktree)
     if worktree is not None:
         wt = find_worktree(item, normalize_path(worktree))
         if wt is None:

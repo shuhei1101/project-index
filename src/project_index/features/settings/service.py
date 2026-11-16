@@ -52,6 +52,8 @@ def _to_yaml_row(entry: SourceEntry) -> dict[str, Any]:
         row["enabled"] = False
     if not entry.outside_read:
         row["outside_read"] = False
+    if entry.storage is not None:
+        row["storage"] = {"type": entry.storage.type}
     scope: dict[str, Any] = {}
     if entry.scope.read:
         scope["read"] = list(entry.scope.read)
@@ -88,7 +90,9 @@ def _fill_unsent(entry: SourceEntry, current: Mapping[str, SourceEntry]) -> Sour
         return entry
     sent = entry.model_fields_set
     updates: dict[str, Any] = {
-        key: getattr(found, key) for key in ("enabled", "outside_read") if key not in sent
+        key: getattr(found, key)
+        for key in ("enabled", "outside_read", "storage")
+        if key not in sent
     }
     # scope は read・write を別々に、送られたかで決める
     scope_sent = entry.scope.model_fields_set if "scope" in sent else set[str]()
@@ -143,7 +147,9 @@ def _apply_patch(entry: SourceEntry, patch: SourcePatch) -> SourceEntry:
     """行に、変更で送ったキーだけを重ねる。"""
     sent = patch.model_fields_set
     updates: dict[str, Any] = {
-        key: getattr(patch, key) for key in ("config", "enabled", "outside_read") if key in sent
+        key: getattr(patch, key)
+        for key in ("config", "enabled", "outside_read", "storage")
+        if key in sent
     }
     # scope は read・write を別々に、送られたかで決める
     if "scope" in sent and patch.scope is not None:

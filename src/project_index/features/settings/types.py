@@ -8,7 +8,7 @@ from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from project_index.features.sources.types import SourceStatus
+from project_index.features.sources.types import SourceStatus, StorageType
 from project_index.shared.api_model import ApiModel
 from project_index.shared.errors import ProjectIndexError, Violation
 
@@ -22,6 +22,14 @@ class SourceScope(BaseModel):
     write: list[str] | None = None
 
 
+class SourceStorage(BaseModel):
+    """`sources[].storage`。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: StorageType
+
+
 class SourceEntry(BaseModel):
     """端末の設定の `sources[]` の 1 行。"""
 
@@ -32,6 +40,8 @@ class SourceEntry(BaseModel):
     enabled: bool = True
     scope: SourceScope = SourceScope()
     outside_read: bool = True
+    # 省くと、配信元のフォルダが Git の作業ツリーの中なら git、外なら disk として扱う
+    storage: SourceStorage | None = None
 
     @field_validator("config", mode="before")
     @classmethod
@@ -49,6 +59,7 @@ class SourcePatch(BaseModel):
     enabled: bool | None = None
     scope: SourceScope | None = None
     outside_read: bool | None = None
+    storage: SourceStorage | None = None
 
     @field_validator("config", mode="before")
     @classmethod
@@ -232,6 +243,8 @@ class SettingsSourceRow(ApiModel):
     errors: list[SourceViolation] = Field(default_factory=list[SourceViolation])
     config_version: SourceConfigVersion | None = None
     outside_read: bool
+    # 書いていない行は JSON にキーを出さない
+    storage: SourceStorage | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class SettingsSourcesView(ApiModel):

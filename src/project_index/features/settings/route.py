@@ -86,6 +86,7 @@ def _settings_view(handlers: Handlers) -> SettingsSourcesView:
                     scope=entry.scope,
                     status="pending_reload",
                     outside_read=entry.outside_read,
+                    storage=entry.storage,
                 )
             )
             continue
@@ -101,6 +102,7 @@ def _settings_view(handlers: Handlers) -> SettingsSourcesView:
                 errors=item.errors,
                 config_version=item.config_version,
                 outside_read=entry.outside_read,
+                storage=entry.storage,
             )
         )
     return SettingsSourcesView(
