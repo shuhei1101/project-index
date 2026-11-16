@@ -769,3 +769,31 @@ def test_add_source_when_unknown_top_level_key(
     text = path.read_text(encoding="utf-8")
     assert result.result == "added"
     assert "# MindStella の設定\nmindstella:\n  threads: 3  # 同時に動かす数\n" in text
+
+
+def test_save_sources_when_unsent_storage(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """送らなかった storage を残す（正常系）。"""
+    # 準備
+    reload, _ = fake_reload
+    path = tmp_path / "settings.yaml"
+    path.write_text(
+        'version: "1"\n'
+        "clone: /tmp/clone\n"
+        "sources:\n"
+        "  - id: company\n"
+        "    config: /tmp/company/project-index.local.yaml\n"
+        "    storage:\n"
+        "      type: disk\n",
+        encoding="utf-8",
+    )
+    sent = SourceEntry.model_validate(
+        {"id": "company", "config": "/tmp/company/project-index.local.yaml"}
+    )
+    # 実行
+    save_sources([sent], path=path, reload=reload, lock=threading.Lock())
+    # 検証
+    row = load_yaml(path.read_text(encoding="utf-8"))["sources"][0]
+    assert row["storage"] == {"type": "disk"}

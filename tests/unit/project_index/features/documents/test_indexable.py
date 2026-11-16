@@ -100,6 +100,32 @@ def test_is_excluded_file_when_generated_suffix(
     assert minified is True
 
 
+def test_is_excluded_file_when_local_name(
+    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """`*.local.*` の名前のファイル（正常系）。"""
+    # 準備
+    write_files(
+        tmp_path,
+        {
+            "files.local.yaml": "files: []\n",
+            "src/settings.local.json": "{}\n",
+            "local.py": "a = 1\n",
+            "docs/locale.md": "# locale\n",
+        },
+    )
+    # 実行
+    files_local = is_excluded_file(tmp_path, "files.local.yaml")
+    settings_local = is_excluded_file(tmp_path, "src/settings.local.json")
+    local_py = is_excluded_file(tmp_path, "local.py")
+    locale_md = is_excluded_file(tmp_path, "docs/locale.md")
+    # 検証
+    assert files_local is True
+    assert settings_local is True
+    assert local_py is False
+    assert locale_md is False
+
+
 def test_is_excluded_file_when_binary(tmp_path: Path) -> None:
     """NUL バイトを持つファイル（正常系）。"""
     # 準備

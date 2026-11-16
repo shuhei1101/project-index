@@ -939,3 +939,34 @@ def test_check_project_when_paths_base_invalid(
         "paths_base",
     ]
     assert result.sync is None
+
+
+def test_check_project_when_disk_storage(
+    git_repo: Callable[..., Path],
+    write_files: Callable[[Path, dict[str, str]], None],
+    sample_files: dict[str, str],
+    make_terminal_config: Callable[..., TerminalConfig],
+) -> None:
+    """disk を指定して commit していない設定を検査する（正常系）。"""
+    # 準備
+    root = git_repo({"README.md": "readme\n"})
+    write_files(
+        root,
+        {
+            "project-index.local.yaml": sample_files["project-index.yaml"],
+            "schemas/rule.schema.yaml": sample_files["schemas/rule.schema.yaml"],
+            "docs/rule/doc-1.yaml": sample_files["docs/rule/doc-1.yaml"],
+        },
+    )
+    handlers = _handlers(make_terminal_config)
+    request = CheckProjectRequest(
+        path=str(root / "project-index.local.yaml"), storage_type="disk"
+    )
+    # 実行
+    result = check_project(request, handlers=handlers)
+    # 検証
+    assert result.violations == []
+    assert result.sync is not None
+    assert result.sync.missing_refs == 0
+    assert result.sync.unindexed_files == 0
+    assert result.sync.missing_body_files == 0
