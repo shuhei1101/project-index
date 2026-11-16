@@ -877,6 +877,81 @@ scenarios:
       - '`isError: true` で、止まった git のコマンドと、待ち時間の上限を超えたことを返却する'
       - '`Error executing tool` だけの応答にならない'
     test: test_error_when_git_failed
+  - name: 正常シナリオ（disk の配信元をどの作業場所からも同じ内容で参照する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+      - name: ローカル運用の配信元
+        description: 起動するの『正常シナリオ（disk を指定した配信元を Git を参照せずに配信する）』と同じ company。`files.local.yaml` の行の文書 1 を持つ
+        notes: '`scope.read` は company のフォルダと sample のフォルダ。ワークツリー `.claude/worktrees/x` は project-index のファイルを持たない'
+      - name: 別のリポジトリ
+        description: 配信元 sample のクローン本体
+        notes: company の外部の作業場所
+      - name: project-index
+        description: company と sample を配信している project-index
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（disk の配信元をどの作業場所からも同じ内容で参照する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant F as company のクローン本体
+
+        A->>M: search_docs(cwd: company のクローン本体, source: company, filter: id が文書 1)
+        M->>F: 登録したフォルダの文書を参照する
+        M-->>A: 文書 1
+        A->>M: search_docs(cwd: ワークツリー x, source: company, filter: id が文書 1)
+        M->>M: worktrees に当たってもワークツリーに読み替えない
+        M->>F: 登録したフォルダの文書を参照する
+        M-->>A: 文書 1
+        A->>M: search_docs(cwd: sample のクローン本体, source: company, filter: id が文書 1)
+        M->>F: 登録したフォルダの文書を参照する
+        M-->>A: 文書 1
+        A->>M: describe(source: company)
+        M-->>A: 説明書と種類の一覧（ブランチ・タグ・ワークツリーが無い）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 3 つの作業場所の `search_docs` が、どれも company のクローン本体の文書 1 を同じ `version` で返却する
+      - '`view: full` の `path` が、どの作業場所からも company のクローン本体の中の絶対パスになる'
+      - '`describe(source: company)` がブランチ・タグ・ワークツリーを返却しない'
+      - '`trace_related` が一緒に変わったファイルを返却しない'
+      - 文書 1 のファイルの日時は、文書の `created`・`updated` の値になる（無ければ空）
+    test: test_normal_when_disk_storage_read_from_any_workplace
+  - name: 異常シナリオ（disk の配信元にリビジョンを指定する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: ローカル運用の配信元
+        description: 正常シナリオ（disk の配信元をどの作業場所からも同じ内容で参照する）と同じ company
+        notes: company のリポジトリには `develop` ブランチがある
+      - name: project-index
+        description: company を配信している project-index
+        notes: '`cwd` は company のクローン本体'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（disk の配信元にリビジョンを指定する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: search_docs(source: company, ref: develop)
+        M-->>A: エラー（disk の配信元は ref を指定できない）
+        A->>M: list_changes(source: company, from: develop)
+        M-->>A: エラー（disk の配信元は区間を指定できない）
+        A->>M: list_changes(source: company)
+        M-->>A: 前回参照した時点からの変更
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`ref` を指定した `search_docs`・`trace_related` が `isError: true` で、company は `ref` を指定できない理由を返却する'
+      - '`from`・`to` を指定した `list_changes` が `isError: true` で、company は区間を指定できない理由を返却する'
+      - 区間を省いた `list_changes` は、前回参照した時点から変わった文書を返却する
+    test: test_error_when_ref_given_to_disk_source
 lead: エージェントが文書の MCP で、作業場所から使用できる配信元の文書を探して参照するシナリオを定め、調査の流れを変えるときに参照する。
 issue: 14
 primary_actor: エージェント（Claude Code）
