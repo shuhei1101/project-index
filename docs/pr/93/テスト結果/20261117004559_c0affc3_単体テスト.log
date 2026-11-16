@@ -1,0 +1,16 @@
+$ uv run pytest tests/unit/ 2>&1 | tail -15
+        result = "\n".join(lang_tabs(["en", "ja"], lambda lang: [f"body-{lang}"]))
+        # 検証
+        assert (
+>           result.index('<!-- tabs: {"group": "lang"} -->')
+            < result.index("#### en")
+            < result.index("#### ja")
+            < result.index("<!-- /tabs -->")
+        )
+E       ValueError: substring not found
+
+tests/unit/project_index/features/prompt_doc/test_markdown.py:274: ValueError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/prompt_doc/test_markdown.py::test_prompt_to_markdown
+FAILED tests/unit/project_index/features/prompt_doc/test_markdown.py::test_lang_tabs
+=================== 2 failed, 956 passed in 75.31s (0:01:15) ===================
