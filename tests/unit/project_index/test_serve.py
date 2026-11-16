@@ -371,6 +371,7 @@ def test_build_handlers_when_out_of_sync(
     handlers = build_handlers(terminal)
     with caplog.at_level(logging.WARNING):
         handlers.reload_sources(terminal)
+        _wait_until(lambda: not handlers.checks.checking)
     # 検証
     warnings = [message for message in _warnings(caplog) if "sample" in message]
     assert len(warnings) == 1

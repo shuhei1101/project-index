@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -99,7 +101,16 @@ def _handlers(
     terminal = make_terminal_config(sources=list(entries), **overrides)
     handlers = build_handlers(terminal)
     handlers.reload_sources(terminal)
+    _wait_checked(handlers)
     return handlers
+
+
+def _wait_checked(handlers: Handlers) -> None:
+    """裏の検査とリビジョンの書き出しが済むまで待つ（30 秒を超えたら AssertionError）。"""
+    deadline = time.monotonic() + 30
+    while handlers.checks.checking or handlers.snapshots.exporting:
+        assert time.monotonic() < deadline, "待ち時間の上限を超えた"
+        time.sleep(0.05)
 
 
 def test_get_status(
@@ -147,7 +158,12 @@ def test_get_status_when_loading(
     terminal = make_terminal_config(
         sources=[make_entry(str(make_source_dir("alpha")), source_id="alpha")]
     )
-    handlers = make_handlers(terminal=terminal, registry=SourceRegistry(loading=True))
+    handlers = make_handlers(
+        terminal=terminal,
+        registry=SourceRegistry(loading=True),
+        checks=SimpleNamespace(checking=False),
+        snapshots=SimpleNamespace(exporting=False),
+    )
     # 実行
     status = get_status(handlers, env={})
     # 検証
@@ -946,8 +962,6 @@ def test_get_status_when_checking_and_exporting(
 ) -> None:
     """裏の検査と書き出しの最中を返す（正常系）。"""
     # 準備
-    from types import SimpleNamespace
-
     handlers = make_handlers(
         registry=SourceRegistry(),
         checks=SimpleNamespace(checking=True),
