@@ -441,7 +441,7 @@ exceptions:
     condition: '`from_ids` の文書が無い、または `code_paths` を本文に持つ文書が無い'
     notes: 見つからなかった ID・パスと近い候補を添える
   - name: InvalidArgumentError
-    condition: '`from_ids` と `code_paths` を両方渡した、またはどちらも渡さない'
+    condition: '`from_ids` と `code_paths` を両方渡した、またはどちらも渡さない、`storage.type: disk` の配信元に `ref`・`worktree` を渡した'
   - name: SourceNotReadableError
     condition: '`cwd` が起点の配信元の `scope.read`・`scope.write` に当たらない（`outside_scope: true` のときは、加えて `outside_read` が偽）'
     notes: '`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に読めることを添える'

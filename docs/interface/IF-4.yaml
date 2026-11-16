@@ -518,7 +518,7 @@ exceptions:
     condition: '`from` を省いたが、この会話で本文を読んだ記録が無い'
     notes: '`from` を渡すことを添える'
   - name: InvalidArgumentError
-    condition: 'Git 管理外の配信元に `from`・`to` を渡した、`from` 無しで `to` を渡した、`filter` に知らない項目を渡した、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない'
+    condition: 'Git 管理外の配信元に `from`・`to` を渡した、`storage.type: disk` の配信元に `from`・`to`・`worktree` を渡した、`from` 無しで `to` を渡した、`filter` に知らない項目を渡した、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない'
   - name: SourceNotReadableError
     condition: '`cwd` が配信元の `scope.read`・`scope.write` に当たらない（`outside_scope: true` のときは、加えて `outside_read` が偽）'
     notes: '`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に読めることを添える'

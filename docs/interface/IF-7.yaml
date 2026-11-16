@@ -403,7 +403,7 @@ exceptions:
     condition: Git の配信元で、消す先がクローン本体になる
     notes: クローン本体のパス（配信元の設定をワークツリーから読んでいても、ワークツリーの親のクローン本体）と、`worktree` でワークツリーを指すことを添える
   - name: DeleteNotAllowedError
-    condition: Git 管理外の配信元で、種類の `documents[].writable` が削除を許していない
+    condition: 'Git 管理外の配信元か `storage.type: disk` の配信元で、種類の `documents[].writable` が削除を許していない'
   - name: DocumentNotFoundError
     condition: '`targets[].id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
@@ -416,6 +416,8 @@ exceptions:
   - name: WorktreeLoadingError
     condition: 消す先のワークツリーの初めての読み込みが、端末の設定の `worktree_load_wait_sec` までに終了しなかった
     notes: '`write_docs` と同じ'
+  - name: InvalidArgumentError
+    condition: '`storage.type: disk` の配信元に `worktree` を渡した'
 constraints:
   - item: 件数
     constraint: 1 回の `targets` は最大 50 件
@@ -430,7 +432,7 @@ constraints:
     constraint: '`write_docs` と同じ。作業ツリーのファイルを削除・置き換える前に期限を確認し、始めた後は全てのファイルを処理し終える'
     notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
   - item: disk の配信元
-    constraint: '端末の設定の行が `storage.type: disk` の配信元は、登録したフォルダから消し、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく、`documents[].writable` が削除を許さない種類は `DeleteNotAllowedError`'
+    constraint: '端末の設定の行が `storage.type: disk` の配信元は、登録したフォルダから消し、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく、`documents[].writable` が削除を許さない種類は `DeleteNotAllowedError`。`worktree` を指定すると `InvalidArgumentError`'
 refs:
   - SC-7#scenarios[正常シナリオ（参照も外して消す）]
   - SC-7#scenarios[異常シナリオ（参照されている文書を消す）]

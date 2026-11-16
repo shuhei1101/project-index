@@ -1318,7 +1318,7 @@ exceptions:
   - name: WorktreeNotMatchedError
     condition: '`worktree` が配信元の `worktrees` に当たらない'
   - name: InvalidArgumentError
-    condition: '知らない項目・型の合わない値を条件・並べ替え・`group_by` に渡した、束に `and`・`or`・`not` のキーを 2 つ以上持たせた、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満'
+    condition: '知らない項目・型の合わない値を条件・並べ替え・`group_by` に渡した、束に `and`・`or`・`not` のキーを 2 つ以上持たせた、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満、`storage.type: disk` の配信元に `ref`・`worktree` を渡した'
     notes: 項目のパス・期待する型・実際の値と、`describe(source, kind)` でスキーマを見ることを添える
   - name: RefNotFoundError
     condition: '`ref` を commit に解決できない'
