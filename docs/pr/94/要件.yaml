@@ -29,11 +29,9 @@ docs:
   - page: docs/guide/管理のMCP.md
     new: false
     change: '`## reload` に応答の時点と、読み直しが済んだかを `status` で確かめる方法を書き、`## status` に読み直し・検査の最中を表す値を足す'
-    status: todo
-  - page: docs/nonfunctional/NFR-1.yaml
-    new: false
-    change: 配信元ごとの最初の問い合わせの所要時間と、読み直しの応答までの時間の決定値を足す（値を決める場合）
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-16T17:03:52.952024+00:00'
 scope_out:
   - item: 起動から `GET /sources` に 2 秒以内に応答するまでの時間（#85 の計測で 506.7 秒）
     reason: '#85 の終わりの条件は配信元ごとの最初の問い合わせで、起動の後の全ての配信元の読み込みにかかる時間は含まないと判断した。ただし、先に書き出しを済ませると起動の後の読み込みが延びうるため、スコープに含めるかはレビューで確定する'

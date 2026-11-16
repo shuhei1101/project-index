@@ -71,6 +71,8 @@
 | `sources[].version_state` | `current` / `old` / `newer` / null | 配信元の設定の `version` の比較 |
 | `sources[].sync` | obj / null | 索引の同期の件数。`serving` のとき。配信元の検査が済んでいなければ `null` |
 | `loading` | bool | 配信元を読み込んでいる間は `true`。その間の `sources[]` は空 |
+| `checking` | bool | 起動の後・`reload`・端末の設定の保存の後に裏で実行する配信元の検査が済んでいない間は `true` |
+| `exporting` | bool | 配信元ごとの `default_ref` の commit を裏で書き出している間は `true` |
 
 <!-- /table -->
 
@@ -97,6 +99,12 @@ http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
 
 `bind`・`port`・`state_dir` など、反映が「再起動」のキーは読み直しません。
 読み直しは、端末の設定の保存と同じロックで一度に 1 つだけ行います。
+
+`reload` は、配信元の一覧を差し替えた時点で応答します。
+読み直した配信元の検査と、`default_ref` の commit の書き出しは、応答の後に裏で実行します。
+このため、応答の `sources[]` の `sync` は `null` です。
+読み直しが済んだかは、`status` の `checking` が `false` になったことで確認します。
+検査の最中にもう一度 `reload` を呼んでも前の検査を待たずに応答し、索引の同期の件数は後に読み直した設定の検査の結果になります。
 
 | 引数 | 型 | 既定 | 説明 |
 | --- | --- | --- | --- |
