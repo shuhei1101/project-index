@@ -224,6 +224,33 @@ def test_reload_config_when_invalid(
     assert handlers.registry.statuses() == before
 
 
+def test_reload_config_when_checked_before_response(
+    make_source_dir: Callable[..., Path],
+    write_settings: Callable[..., Path],
+    make_real_handlers: Callable[[Path], Handlers],
+) -> None:
+    """応答を組み立てる前に裏の検査が済んでも、読み直した配信元の `sync` を持たない（正常系）。"""
+    # 準備
+    from dataclasses import replace
+
+    row = {"id": "a", "config": str(make_source_dir("a"))}
+    handlers = make_real_handlers(write_settings([row]))
+    _wait_checked(handlers)
+    reload_sources = handlers.reload_sources
+
+    def reload_and_wait(terminal: TerminalConfig) -> Any:
+        statuses = reload_sources(terminal)
+        _wait_checked(handlers)
+        return statuses
+
+    handlers = replace(handlers, reload_sources=reload_and_wait)
+    # 実行
+    result = reload_config(handlers)
+    # 検証
+    assert handlers.checks.get("a") is not None
+    assert [(item.id, item.sync) for item in result.sources] == [("a", None)]
+
+
 def test_check_project(
     make_source_dir: Callable[..., Path],
     make_terminal_config: Callable[..., TerminalConfig],
@@ -922,6 +949,24 @@ def test_source_states_without_refresh(
     assert [(state.id, state.status) for state in states] == [("alpha", "serving")]
     assert states[0].config_version == served.config.version
     assert calls == []
+
+
+def test_source_states_without_sync(
+    make_source_dir: Callable[..., Path],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """同期の件数を含めない指定では、検査の結果があっても `sync` を持たない（正常系）。"""
+    # 準備
+    alpha = make_source_dir("alpha", unindexed=1)
+    handlers = _handlers(make_terminal_config, make_entry(str(alpha), source_id="alpha"))
+    assert handlers.checks.get("alpha") is not None
+    # 実行
+    states = _source_states(handlers, with_sync=False)
+    # 検証
+    assert [(state.id, state.status, state.sync) for state in states] == [
+        ("alpha", "serving", None)
+    ]
 
 
 def test_check_project_when_paths_base_invalid(
