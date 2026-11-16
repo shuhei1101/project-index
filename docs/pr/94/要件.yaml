@@ -32,6 +32,12 @@ docs:
     status: done
     updated_by: planner
     updated_at: '2026-11-16T17:03:52.952024+00:00'
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: 読み取り API の設定・文書の一覧・文書の取得・検索の主なエラーに 504（`RevisionExportTimeoutError`）を足し、端末の設定の API の読み直しの応答の時点を管理の MCP の `reload` への参照で記載する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-16T17:08:08.971649+00:00'
 scope_out:
   - item: 起動から `GET /sources` に 2 秒以内に応答するまでの時間（#85 の計測で 506.7 秒）
     reason: '#85 の終わりの条件は配信元ごとの最初の問い合わせで、起動の後の全ての配信元の読み込みにかかる時間は含まないと判断した。ただし、先に書き出しを済ませると起動の後の読み込みが延びうるため、スコープに含めるかはレビューで確定する'
