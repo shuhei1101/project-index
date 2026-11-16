@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from project_index.shared.hashing import content_hash
+from project_index.shared.hashing import content_hash, value_hash
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
@@ -337,3 +337,76 @@ def test_normal_when_unlink_quotes_preserved(
     assert referrer.read_text(encoding="utf-8").startswith(
         "id: doc-1\nname: \"A: b\"\ndescription: '2020-12'\n"
     )
+
+
+NOTES_ROW = (
+    "  - id: notes\n"
+    "    paths: [notes/index.yaml]\n"
+    "    schema: schemas/notes.schema.yaml\n"
+    "    records: items\n"
+    "    body_file: path\n"
+)
+NOTES_SCHEMA = (
+    "type: object\n"
+    "properties:\n"
+    "  items:\n"
+    "    type: array\n"
+    "    items:\n"
+    "      type: object\n"
+    "      properties:\n"
+    "        id: {type: string}\n"
+    "        path: {type: string}\n"
+)
+NOTES = (
+    "items:\n"
+    "  - id: n1\n    path: n1.md\n"
+    "  - id: n2\n    path: n2.md\n"
+    "  - id: n3\n    path: n1.md\n"
+)
+
+
+def test_normal_when_body_file(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """`records`・`body_file` の行の文書を、要素と本文のファイルごと削除する（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "project-index.yaml": sample_config_text(NOTES_ROW),
+            "schemas/notes.schema.yaml": NOTES_SCHEMA,
+            "notes/index.yaml": NOTES,
+            "notes/n1.md": "# n1\n",
+            "notes/n2.md": "# n2\n",
+        }
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    common = {"cwd": str(source.folder), "worktree": str(worktree)}
+    # 実行
+    first = env.call(
+        "delete_docs",
+        **common,
+        targets=[
+            {"id": "n2", "expected_version": value_hash([{"id": "n2", "path": "n2.md"}, "# n2\n"])}
+        ],
+    )
+    second = env.call(
+        "delete_docs",
+        **common,
+        targets=[
+            {"id": "n3", "expected_version": value_hash([{"id": "n3", "path": "n1.md"}, "# n1\n"])}
+        ],
+    )
+    checked = env.call_admin("check_project", path=str(worktree), format="json")
+    # 検証
+    assert not first.is_error
+    assert not second.is_error
+    assert load_yaml((worktree / "notes" / "index.yaml").read_text(encoding="utf-8")) == {
+        "items": [{"id": "n1", "path": "n1.md"}]
+    }
+    assert not (worktree / "notes" / "n2.md").exists()
+    assert (worktree / "notes" / "n1.md").read_text(encoding="utf-8") == "# n1\n"
+    assert "notes/n2.md" not in checked.text

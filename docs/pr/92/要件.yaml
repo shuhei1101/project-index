@@ -1,0 +1,41 @@
+use_cases:
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: none
+    detail: 文書を読み書きするまでの流れは変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: 本文を別のファイルに持つ文書で、エージェントが本文のファイルを含めて作成・置き換え・一部の書き換え・削除する流れと、本文のファイルを書き込めないときに何も書き込まずに断る流れを加える
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-9.yaml
+    impact: run_only
+    detail: 読んだ後に変わった文書への書き込みの照合は変わらないが、本文のファイルを含めた照合に変わるため回帰を確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-12.yaml
+    impact: changed
+    detail: 画面のサーバーが配信元を丸ごと保存するときと 1 行を追加するときに、取得した内容のバージョンを必ず添え、添えなければ断られる
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: '`write_docs` の `records`・`body_file` の行の文書で本文のファイルを書き込む入力と結果、`delete_docs` の本文のファイルの扱いを記載する'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-16T15:44:20.266230+00:00'
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: '`PUT`・`POST /settings/sources` も `expectedVersion` が必須で、無いときは 400 で断ると記載する'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-16T15:44:20.266230+00:00'
+scope_out:
+  - item: 使う側（MindStella）のスキルの手順を project-index の本文のファイルの書き込みへ移す変更
+    reason: 別のリポジトリの作業で、使う側の作業 PR（shuhei1101/mindstella#540）が持つ
+    plan: none
+  - item: dev-docs の設定の画面が保存・1 行の追加に `expectedVersion` を添える変更
+    reason: 別のリポジトリの作業で、shuhei1101/dev-docs#190 で済んでいる（closed）
+    plan: none

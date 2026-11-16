@@ -56,14 +56,15 @@ functions:
       type: dict[str, Any]
       description: 新しい内容（`current` は書き換えない）
     process: |-
-      1. `create`・`replace` は `data` の深いコピーを返す
-      2. `update` は `current` の深いコピーに順に当てる
+      1. `data`・`set` の `@body` のキーと、`field` が `@body` の `text_edits` は当てずに除く（本文の適用が当てる）
+      2. `create`・`replace` は `data` の深いコピーを返す
+      3. `update` は `current` の深いコピーに順に当てる
          - `set` の値は、オブジェクトなら今の値へ再帰でマージし、配列とスカラーは置き換える（項目の書き込み）
          - `unset` は項目の削除。無い項目は飛ばす
          - `add_to` は配列の末尾へ足す（無ければ作る。配列でなければ違反）
          - `remove_from` は等しい要素を全て除く
          - `text_edits` は文字列の項目の `old` を `new` にする。`replace_all` が `False` で一致が 1 か所でない場合は違反
-      3. 違反は `Violation`（`path` は `set.a.b`・`text_edits[0].old` など。`fix` に一致した数と、`replace_all` か前後の文字を含めること）を集めて `InvalidArgumentError` で送る
+      4. 違反は `Violation`（`path` は `set.a.b`・`text_edits[0].old` など。`fix` に一致した数と、`replace_all` か前後の文字を含めること）を集めて `InvalidArgumentError` で送る
     exceptions:
       - name: InvalidArgumentError
         condition: 配列でない項目への追加・削除、文字列でない項目への置き換え、`old` の一致が 1 か所でない
@@ -88,6 +89,12 @@ functions:
         condition: '`{a: 1, b: 2}` に `replace` の `data: {a: 3}`'
         mock: なし
         expected: '`{a: 3}`'
+      - name: test_apply_operation_when_body
+        case: 正常
+        summary: '@body を要素に当てない'
+        condition: '`create` の `data: {id: n2, path: n2.md, @body: 本文}` と、`update` の `set: {@body: x}`・`text_edits: [{field: @body, old: a, new: b}]`'
+        mock: なし
+        expected: '`create` の結果が `{id: n2, path: n2.md}` で、`update` の結果が `current` と同じ'
   - name: to_columns
     title: 列名への読み替え
     kind: 関数
@@ -269,3 +276,65 @@ functions:
         mock: なし
         expected: どちらも `InvalidArgumentError` で、違反の `path` が `operations[0].set.tags`・`operations[0].set.main_tags`。`a` の 1 文字のタグを書かない
         exception: 集めたキーに名前（文字列）の配列でない値を渡した、選んだ要素のキーに配列に無い名前を渡した、または `text_edits` で指した
+  - name: apply_body
+    title: 本文の適用
+    kind: 関数
+    container: project_index/features/write/apply.py
+    usecase: 書き込み
+    role: 変換
+    summary: 操作の `@body` を本文に当てて、新しい本文を返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: current_body
+        title: 今の本文
+        type: str | None
+        required: true
+        passing: positional
+        description: '`update`・`replace` は今の文書の本文。`create` は `None`'
+      - name: operation
+        title: 操作
+        type: Operation
+        required: true
+        passing: positional
+        description: 当てる操作
+      - name: index
+        title: 操作の添字
+        type: int
+        required: true
+        passing: keyword
+        description: 違反の `path` に付ける `operations` の位置
+    returns:
+      type: str | None
+      description: 新しい本文。本文を変えない操作は `None`
+    process: |-
+      1. `create`・`replace` の `data`、`update` の `set` の `@body` が文字列でなければ、`path` が `operations[{index}].data.@body`（`update` は `set.@body`）の違反で `InvalidArgumentError` を送る
+      2. `create`・`replace` は `data` の `@body`（無ければ `None`）を返す
+      3. `update` は、`set` に `@body` があればその値、無ければ `current_body` を本文にし、`field` が `@body` の `text_edits` を順に当てる。一致の判定と違反は、項目の操作の適用の `text_edits` と同じ（`path` は `operations[{index}].text_edits[{n}].old`）
+      4. `update` で `set` の `@body` も `@body` の `text_edits` も無ければ `None` を返す
+      5. 違反があれば `InvalidArgumentError` で送る
+    exceptions:
+      - name: InvalidArgumentError
+        condition: '`@body` が文字列でないか、`replace_all` が `False` の `@body` の `text_edits` の `old` が 1 か所に一致しない'
+        message: '`引数が正しくありません: {違反の数} 件`'
+    unit_tests:
+      - name: test_apply_body
+        case: 正常
+        summary: create・set・text_edits の本文
+        condition: '`create` の `data.@body` が `本文`、`update` の `set: {@body: x}`、`current_body` が `a\nb` で `text_edits: [{field: @body, old: b, new: c}]`、`set: {name: y}` だけの `update`'
+        mock: なし
+        expected: '`本文`・`x`・`a\nc`・`None`'
+      - name: test_apply_body_when_text_edit_ambiguous
+        case: 異常
+        summary: 本文の old が 2 か所に一致する
+        condition: '`current_body` が `a a`、`index=1` で `text_edits: [{field: @body, old: a, new: b}]`'
+        mock: なし
+        expected: '`InvalidArgumentError` の違反の `path` が `operations[1].text_edits[0].old`'
+        exception: '`replace_all` が `False` の `@body` の `text_edits` の `old` が 1 か所に一致しない'
+      - name: test_apply_body_when_not_string
+        case: 異常
+        summary: 文字列でない @body
+        condition: '`index=0` で、`update` の `set: {@body: null}` と `create` の `data: {id: n2, path: n2.md, @body: 123}`'
+        mock: なし
+        expected: どちらも `InvalidArgumentError` で、違反の `path` が `operations[0].set.@body`・`operations[0].data.@body`
+        exception: '`@body` が文字列でない'

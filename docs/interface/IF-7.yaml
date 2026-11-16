@@ -268,14 +268,48 @@ flows:
     expected:
       - '文書 1 の YAML の、`related` の文書 2 の行以外の行が書き込み前の文字列と一致し、`description: ''2020-12''` と `name: "A: b"` が残る'
     test: test_normal_when_unlink_quotes_preserved
+  - name: 正常系（本文のファイルを持つ文書を消す）
+    summary: '`records`・`body_file` の行の文書を、要素と本文のファイルごと削除する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 本文のファイルを持つ行
+        description: '行 `notes`（`paths: [notes/index.yaml]`・`records: items`・`body_file: path`）。要素 n1・n2・n3 の `path` が `n1.md`・`n2.md`・`n1.md`'
+        notes: n3 は n1 と同じ本文のファイルを指す
+      - name: 入力
+        description: 1 回目は n2、2 回目は n3 を削除する
+    flow: |-
+      <!-- map: {"title": "正常系（本文のファイルを持つ文書を消す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
+        participant WT as ワークツリー
+
+        C->>T: targets: n2
+        T->>WT: notes/index.yaml から n2 を除き、notes/n2.md を削除する
+        T-->>C: deleted
+        C->>T: targets: n3
+        T->>WT: notes/index.yaml から n3 を除き、n1 が指す notes/n1.md は残す
+        T-->>C: deleted
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目の後、`notes/index.yaml` に n2 が無く、`notes/n2.md` が無い
+      - 2 回目の後、`notes/index.yaml` が n1 だけになり、`notes/n1.md` は変わらない
+      - 削除した後の `check_project` の `unindexed_files` に `notes/n2.md` が出ない
+    test: test_normal_when_body_file
 lead: 文書を物理削除し、`related` からの参照を拒否するか除外する `delete_docs` の入出力を定め、`delete_docs` を修正するときに参照する。
 identifier: delete_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーだけ。Git 管理外の配信元は種類の `documents[].writable` が削除を許すこと
 idempotent: false
-side_effects: '作業ツリー（Git 管理外の配信元はそのフォルダ）の文書のファイルを削除する。`on_referenced: unlink` のときは参照元の文書の `related` も書き換える。`generators[]` を流す。'
+side_effects: '作業ツリー（Git 管理外の配信元はそのフォルダ）の文書のファイルと、`records`・`body_file` の行の文書の本文のファイルを削除する。`on_referenced: unlink` のときは参照元の文書の `related` も書き換える。`generators[]` を流す。'
 callers:
   - SC-7#scenarios[正常シナリオ（参照も外して消す）]
   - SC-7#scenarios[正常シナリオ（変更していない項目の引用符を保つ）]
+  - SC-7#scenarios[正常シナリオ（本文のファイルを持つ文書を消す）]
 exclusivity: '`write_docs` と同じ配信元ごとの排他ロックの中で行う'
 request:
   - name: source
@@ -403,6 +437,8 @@ constraints:
   - item: 書き込みの期限・生成の制限時間
     constraint: '`write_docs` と同じ。作業ツリーのファイルを削除・置き換える前に期限を確認し、始めた後は全てのファイルを処理し終える'
     notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
+  - item: 本文のファイル
+    constraint: '`records`・`body_file` の行の文書は、管理用の YAML から要素を除き、本文のファイルも削除する。同じ管理用の YAML のほかの要素が同じ本文のファイルを指すときは、本文のファイルを削除しない'
 refs:
   - SC-7#scenarios[正常シナリオ（参照も外して消す）]
   - SC-7#scenarios[異常シナリオ（参照されている文書を消す）]

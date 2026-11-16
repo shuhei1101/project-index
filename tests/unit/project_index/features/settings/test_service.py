@@ -78,7 +78,13 @@ def test_save_sources(
         make_entry("/tmp/b/project-index.yaml", source_id="b"),
     ]
     # 実行
-    result = save_sources(sources, path=settings_path, reload=reload, lock=threading.Lock())
+    result = save_sources(
+        sources,
+        expected_version=read_settings_file(settings_path)[1],
+        path=settings_path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
     # 検証
     text = settings_path.read_text(encoding="utf-8")
     assert text.count("config:") == 2
@@ -98,7 +104,13 @@ def test_save_sources_when_defaults(
     reload, _ = fake_reload
     sources = [make_entry("/tmp/a/project-index.yaml", source_id="a", enabled=True)]
     # 実行
-    save_sources(sources, path=settings_path, reload=reload, lock=threading.Lock())
+    save_sources(
+        sources,
+        expected_version=read_settings_file(settings_path)[1],
+        path=settings_path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
     # 検証
     text = settings_path.read_text(encoding="utf-8")
     row = load_yaml(text)["sources"][0]
@@ -117,7 +129,13 @@ def test_save_sources_when_outside_read_false(
     reload, _ = fake_reload
     sources = [make_entry("/tmp/a/project-index.yaml", source_id="a", outside_read=False)]
     # 実行
-    save_sources(sources, path=settings_path, reload=reload, lock=threading.Lock())
+    save_sources(
+        sources,
+        expected_version=read_settings_file(settings_path)[1],
+        path=settings_path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
     # 検証
     text = settings_path.read_text(encoding="utf-8")
     assert "outside_read: false" in text
@@ -152,7 +170,13 @@ def test_save_sources_when_unsent_keys(
         }
     )
     # 実行
-    save_sources([sent], path=path, reload=reload, lock=threading.Lock())
+    save_sources(
+        [sent],
+        expected_version=read_settings_file(path)[1],
+        path=path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
     # 検証
     row = load_yaml(path.read_text(encoding="utf-8"))["sources"][0]
     assert row["enabled"] is False
@@ -181,7 +205,13 @@ def test_save_sources_when_sent_keys_override(
         {"id": "extra", "config": "/tmp/extra/project-index.yaml", "outside_read": True}
     )
     # 実行
-    save_sources([sent], path=path, reload=reload, lock=threading.Lock())
+    save_sources(
+        [sent],
+        expected_version=read_settings_file(path)[1],
+        path=path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
     # 検証
     row = load_yaml(path.read_text(encoding="utf-8"))["sources"][0]
     assert "outside_read" not in row
@@ -206,7 +236,13 @@ def test_save_sources_when_no_same_row(
     )
     sent = SourceEntry.model_validate({"id": "extra", "config": "/tmp/extra/project-index.yaml"})
     # 実行
-    save_sources([sent], path=path, reload=reload, lock=threading.Lock())
+    save_sources(
+        [sent],
+        expected_version=read_settings_file(path)[1],
+        path=path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
     # 検証
     row = load_yaml(path.read_text(encoding="utf-8"))["sources"][0]
     assert row["id"] == "extra"
@@ -232,7 +268,13 @@ def test_save_sources_when_current_row_invalid(
     )
     sent = SourceEntry.model_validate({"id": "extra", "config": "/tmp/extra/project-index.yaml"})
     # 実行
-    save_sources([sent], path=path, reload=reload, lock=threading.Lock())
+    save_sources(
+        [sent],
+        expected_version=read_settings_file(path)[1],
+        path=path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
     # 検証
     row = load_yaml(path.read_text(encoding="utf-8"))["sources"][0]
     assert row == {"id": "extra", "config": ["/tmp/extra/project-index.yaml"]}
@@ -253,7 +295,13 @@ def test_save_sources_when_invalid(
     ]
     # 実行・検証
     with pytest.raises(TerminalConfigInvalidError):
-        save_sources(sources, path=settings_path, reload=reload, lock=threading.Lock())
+        save_sources(
+            sources,
+            expected_version=read_settings_file(settings_path)[1],
+            path=settings_path,
+            reload=reload,
+            lock=threading.Lock(),
+        )
     assert settings_path.read_text(encoding="utf-8") == SETTINGS_TEXT
     assert calls == []
 
@@ -268,7 +316,13 @@ def test_add_source(
     reload, calls = fake_reload
     entry = make_entry("/tmp/b/project-index.yaml", source_id="b")
     # 実行
-    result = add_source(entry, path=settings_path, reload=reload, lock=threading.Lock())
+    result = add_source(
+        entry,
+        expected_version=read_settings_file(settings_path)[1],
+        path=settings_path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
     # 検証
     text = settings_path.read_text(encoding="utf-8")
     data = load_yaml(text)
@@ -299,12 +353,14 @@ def test_add_source_when_same_id(
     # 実行
     same = add_source(
         make_entry("/tmp/b/project-index.yaml", source_id="b"),
+        expected_version=read_settings_file(path)[1],
         path=path,
         reload=reload,
         lock=threading.Lock(),
     )
     other = add_source(
         make_entry("/tmp/c/project-index.yaml", source_id="b"),
+        expected_version=read_settings_file(path)[1],
         path=path,
         reload=reload,
         lock=threading.Lock(),
@@ -340,7 +396,13 @@ def test_add_source_when_same_name(
     before = path.read_text(encoding="utf-8")
     reload, calls = fake_reload
     # 実行
-    result = add_source(make_entry(str(config)), path=path, reload=reload, lock=threading.Lock())
+    result = add_source(
+        make_entry(str(config)),
+        expected_version=read_settings_file(path)[1],
+        path=path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
     # 検証
     assert (result.result, result.same) == ("exists", True)
     assert path.read_text(encoding="utf-8") == before
@@ -360,6 +422,7 @@ def test_add_source_when_id_matches_name(
     # 実行
     result = add_source(
         make_entry(str(config), source_id="sample"),
+        expected_version=read_settings_file(path)[1],
         path=path,
         reload=reload,
         lock=threading.Lock(),
@@ -382,7 +445,13 @@ def test_add_source_when_invalid(
     entry = make_entry("/tmp/b/project-index.yaml", source_id="Sample Docs")
     # 実行・検証
     with pytest.raises(TerminalConfigInvalidError):
-        add_source(entry, path=settings_path, reload=reload, lock=threading.Lock())
+        add_source(
+            entry,
+            expected_version=read_settings_file(settings_path)[1],
+            path=settings_path,
+            reload=reload,
+            lock=threading.Lock(),
+        )
     assert settings_path.read_text(encoding="utf-8") == before
     assert calls == []
 
@@ -746,7 +815,13 @@ def test_save_sources_when_unknown_top_level_key(
     reload, _ = fake_reload
     sources = [make_entry("/tmp/a/project-index.yaml", source_id="sample")]
     # 実行
-    save_sources(sources, path=path, reload=reload, lock=threading.Lock())
+    save_sources(
+        sources,
+        expected_version=read_settings_file(path)[1],
+        path=path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
     # 検証
     text = path.read_text(encoding="utf-8")
     assert "# MindStella の設定\nmindstella:\n  threads: 3  # 同時に動かす数\n" in text
@@ -764,7 +839,13 @@ def test_add_source_when_unknown_top_level_key(
     reload, _ = fake_reload
     entry = make_entry("/tmp/b/project-index.yaml", source_id="extra")
     # 実行
-    result = add_source(entry, path=path, reload=reload, lock=threading.Lock())
+    result = add_source(
+        entry,
+        expected_version=read_settings_file(path)[1],
+        path=path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
     # 検証
     text = path.read_text(encoding="utf-8")
     assert result.result == "added"

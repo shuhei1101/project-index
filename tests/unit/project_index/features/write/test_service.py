@@ -30,6 +30,7 @@ from project_index.features.write.types import (
     DeleteResult,
     DeleteTarget,
     Operation,
+    TextEdit,
     WriteRequest,
     WriteResult,
 )
@@ -479,6 +480,160 @@ def test_write_docs_when_mdmark_unavailable(
     assert previous == [{"id": "doc-1", "name": "文書 1"}, {"id": "doc-2", "name": "文書 2"}]
 
 
+NOTES = "items:\n  - id: n1\n    path: n1.md\n"
+NOTE_1 = "# n1\n古い行\n"
+
+
+def _notes_table() -> DocumentTable:
+    """本文のファイルを持つ `records`・`body_file` の行を返す。"""
+    return DocumentTable(
+        id="notes",
+        paths=["notes/index.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        records="items",
+        body_file="path",
+    )
+
+
+def _notes_files() -> dict[str, str]:
+    """本文のファイルを持つ行と、`body_file` を持たない行の文書を持つ配信元のファイルを返す。"""
+    return {
+        "notes/index.yaml": NOTES,
+        "notes/n1.md": NOTE_1,
+        "docs/rule/doc-1.yaml": DOC_1,
+        "schemas/rule.schema.yaml": SCHEMA,
+    }
+
+
+def _rules_table() -> DocumentTable:
+    """`body_file` を持たない行を返す。"""
+    return DocumentTable(
+        id="rules", paths=["docs/rule/*.yaml"], schema_path="schemas/rule.schema.yaml"
+    )
+
+
+def test_write_docs_when_body_file(make_env: Callable[..., WriteEnv]) -> None:
+    """本文のファイルの作成・一部の置き換え・全体の置き換え（正常系）。"""
+    # 準備
+    env = make_env(_notes_files(), tables=[_notes_table(), _rules_table()])
+    n1_version = value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1])
+    create = Operation(
+        op="create", kind="notes", data={"id": "n2", "path": "n2.md", "@body": "本文\n"}
+    )
+    edit = Operation(
+        op="update",
+        id="n1",
+        expected_version=n1_version,
+        text_edits=[TextEdit(field="@body", old="古い行", new="新しい行")],
+    )
+    # 実行
+    created = env.write(operations=[create])
+    tried = env.write(operations=[edit], dry_run=True)
+    edited = env.write(operations=[edit])
+    n2_version = created.results[0].version
+    replaced = env.write(
+        operations=[
+            Operation(
+                op="update", id="n2", expected_version=n2_version, set={"@body": "置き換えた本文\n"}
+            )
+        ]
+    )
+    # 検証
+    index = (env.worktree / "notes/index.yaml").read_text(encoding="utf-8")
+    assert created.results[0].status == "created"
+    assert "path: n2.md" in index
+    assert "@body" not in index
+    assert "@@ notes/n1.md" in (tried.results[0].diff or "")
+    assert "新しい行" in (tried.results[0].diff or "")
+    assert edited.results[0].status == "updated"
+    assert edited.results[0].version == value_hash(
+        [{"id": "n1", "path": "n1.md"}, "# n1\n新しい行\n"]
+    )
+    assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == "# n1\n新しい行\n"
+    assert replaced.results[0].status == "updated"
+    assert (env.worktree / "notes/n2.md").read_text(encoding="utf-8") == "置き換えた本文\n"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        pytest.param("../../outside/n3.md", id="outside_source"),
+        pytest.param("n1.md", id="existing_file"),
+    ],
+)
+def test_write_docs_when_body_file_rejected(make_env: Callable[..., WriteEnv], path: str) -> None:
+    """配信元の外・既にあるファイルを指す本文のファイル（異常系）。"""
+    # 準備
+    env = make_env(_notes_files(), tables=[_notes_table(), _rules_table()])
+    operations = [
+        Operation(op="create", kind="notes", data={"id": "n3", "path": path, "@body": "本文\n"}),
+        Operation(op="create", kind="notes", data={"id": "n4", "path": "n4.md", "@body": "本文\n"}),
+    ]
+    # 実行・検証
+    with pytest.raises(ValidationFailedError) as exc_info:
+        env.write(operations=operations)
+    assert [(v.index, v.path) for v in exc_info.value.violations] == [(0, "operations[0].path")]
+    assert (env.worktree / "notes/index.yaml").read_text(encoding="utf-8") == NOTES
+    assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == NOTE_1
+    assert not (env.worktree / "notes/n4.md").exists()
+    assert not (env.clone.parent / "outside").exists()
+
+
+@pytest.mark.parametrize(
+    ("operation", "expected_path"),
+    [
+        pytest.param(
+            Operation(
+                op="update",
+                id="doc-1",
+                expected_version=content_hash(DOC_1),
+                set={"@body": "x"},
+            ),
+            "operations[0].set.@body",
+            id="no_body_file",
+        ),
+        pytest.param(
+            Operation(op="create", kind="notes", data={"id": "n2", "path": "n2.md"}),
+            "operations[0].data.@body",
+            id="create_without_body",
+        ),
+        pytest.param(
+            Operation(
+                op="update",
+                id="n1",
+                expected_version=value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1]),
+                set={"path": "other.md"},
+            ),
+            "operations[0].set.path",
+            id="body_file_column_changed",
+        ),
+        pytest.param(
+            Operation(
+                op="update",
+                id="n1",
+                expected_version=value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1]),
+                unset=["@body"],
+            ),
+            "operations[0].unset",
+            id="unset_body",
+        ),
+    ],
+)
+def test_write_docs_when_body_not_accepted(
+    make_env: Callable[..., WriteEnv], operation: Operation, expected_path: str
+) -> None:
+    """@body を受け付けない操作（異常系）。"""
+    # 準備
+    env = make_env(_notes_files(), tables=[_notes_table(), _rules_table()])
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError) as exc_info:
+        env.write(operations=[operation])
+    assert [v.path for v in exc_info.value.violations] == [expected_path]
+    assert (env.worktree / "notes/index.yaml").read_text(encoding="utf-8") == NOTES
+    assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == NOTE_1
+    assert (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
+
+
 def _with_related() -> dict[str, str]:
     """文書 1 の `related` が文書 2 を指す配信元のファイルを返す。"""
     return {
@@ -533,14 +688,41 @@ def test_delete_docs_when_records(
         body_file="path",
     )
     env = make_env(files, tables=[table])
-    targets = [DeleteTarget(id="b", expected_version=value_hash({"id": "b", "path": "b.txt"}))]
+    targets = [
+        DeleteTarget(id="b", expected_version=value_hash([{"id": "b", "path": "b.txt"}, "b\n"]))
+    ]
     # 実行
     env.delete(targets=targets)
     # 検証
     text = (env.worktree / "data/list.yaml").read_text(encoding="utf-8")
     assert "id: a" in text
     assert "id: b" not in text
-    assert (env.worktree / "data/b.txt").exists()
+    assert not (env.worktree / "data/b.txt").exists()
+    assert (env.worktree / "data/a.txt").read_text(encoding="utf-8") == "a\n"
+
+
+def test_delete_docs_when_body_file_shared(
+    make_env: Callable[..., WriteEnv],
+) -> None:
+    """ほかの要素も指す本文のファイルを残す（正常系）。"""
+    # 準備
+    files = {
+        "notes/index.yaml": "items:\n  - id: n1\n    path: n1.md\n  - id: n3\n    path: n1.md\n",
+        "notes/n1.md": "# n1\n",
+    }
+    env = make_env(files, tables=[_notes_table()])
+    targets = [
+        DeleteTarget(
+            id="n3", expected_version=value_hash([{"id": "n3", "path": "n1.md"}, "# n1\n"])
+        )
+    ]
+    # 実行
+    env.delete(targets=targets)
+    # 検証
+    text = (env.worktree / "notes/index.yaml").read_text(encoding="utf-8")
+    assert "id: n1" in text
+    assert "id: n3" not in text
+    assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == "# n1\n"
 
 
 def test_delete_docs_when_referenced(make_env: Callable[..., WriteEnv]) -> None:
