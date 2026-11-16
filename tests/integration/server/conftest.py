@@ -113,6 +113,8 @@ class SourceSpec:
     scope_write: list[Path] | None = None
     enabled: bool = True
     outside_read: bool | None = None
+    # 端末の設定の行の `storage.type`。None は行に書かない
+    storage: str | None = None
 
 
 @dataclass
@@ -327,6 +329,7 @@ def make_source(
         date: str | None = None,
         outside_read: bool | None = None,
         branch: str = "develop",
+        storage: str | None = None,
     ) -> SourceSpec:
         content = files if files is not None else sample_files()
         if git:
@@ -342,6 +345,50 @@ def make_source(
             scope_write=scope_write,
             enabled=enabled,
             outside_read=outside_read,
+            storage=storage,
+        )
+
+    return _make
+
+
+# ローカル運用の配信元の設定（`default_ref` を持たず、追加するファイルを全て `*.local.*` の名前にする）
+LOCAL_CONFIG = (
+    "name: company\n"
+    "documents:\n"
+    "  - id: src\n"
+    "    paths: [files.local.yaml]\n"
+    "    schema: schemas/files.schema.local.yaml\n"
+    "    records: files\n"
+    "    body_file: path\n"
+    "    validators: [check]\n"
+    "validators:\n"
+    "  - id: check\n"
+    "    run: [python3, scripts/check.local.py]\n"
+)
+LOCAL_FILES = {
+    "project-index.local.yaml": LOCAL_CONFIG,
+    "schemas/files.schema.local.yaml": FILES_SCHEMA_TEMPLATE.read_text(encoding="utf-8"),
+    "files.local.yaml": "files:\n  - path: src/app.py\n    name: アプリの入口\n",
+    "scripts/check.local.py": "import sys\nsys.stdin.read()\nprint('[]')\n",
+}
+
+
+@pytest.fixture
+def make_local_source(
+    git_repo: Callable[..., Path],
+    write_files: Callable[[Path, dict[str, str]], None],
+) -> Callable[..., SourceSpec]:
+    """`src/app.py` を commit したリポジトリに `*.local.*` のファイルを commit せずに置き、disk の配信元の行を返す関数を返す。"""
+
+    def _make(source_id: str = "company", *, storage: str | None = "disk") -> SourceSpec:
+        folder = git_repo({"src/app.py": "print('app')\n"}, name=source_id)
+        write_files(folder, LOCAL_FILES)
+        return SourceSpec(
+            id=source_id,
+            folder=folder,
+            config=[folder / "project-index.local.yaml"],
+            scope_read=[folder],
+            storage=storage,
         )
 
     return _make
@@ -364,6 +411,9 @@ def _settings_text(root: Path, state_dir: Path, specs: list[SourceSpec], extra: 
             lines.append("    enabled: false")
         if spec.outside_read is not None:
             lines.append(f"    outside_read: {str(spec.outside_read).lower()}")
+        if spec.storage is not None:
+            lines.append("    storage:")
+            lines.append(f"      type: {spec.storage}")
         lines.append("    scope:")
         lines.append("      read:")
         lines.extend(f"        - {path}" for path in spec.scope_read)

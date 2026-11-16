@@ -8,6 +8,8 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from tests.integration.server.conftest import SourceSpec
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -1249,3 +1251,71 @@ def test_error_when_unexpected(
     assert "Traceback" in caplog.text
     assert without_ref.is_error is False
     assert "doc-3" in without_ref.text
+
+
+def test_normal_when_disk_storage(
+    git_repo: Callable[..., Path],
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_doc_text: Callable[..., str],
+) -> None:
+    """disk の配信元はワークツリーに読み替えず、登録したフォルダの文書と文書の日時を返す（正常系）。"""
+    # 準備（project-index のファイルは commit せず、ワークツリーは持たない）
+    folder = git_repo({"README.md": "# company\n"}, name="company")
+    stamped = sample_doc_text(
+        "doc-1", "文書 1", created="2026-11-01T00:00:00+00:00", updated="2026-11-02T00:00:00+00:00"
+    )
+    write_files(folder, sample_file_set(**{"docs/doc-1.yaml": stamped}))
+    worktree = add_worktree(folder, "x")
+    company = SourceSpec(
+        id="company",
+        folder=folder,
+        config=[folder / "project-index.yaml"],
+        # disk の配信元はワークツリーを配信元のフォルダとみなさないため、配下も参照できるようにする
+        scope_read=[folder / "**"],
+        storage="disk",
+    )
+    env = make_server(company)
+    # 実行
+    result = env.call(
+        "search_docs",
+        cwd=str(worktree),
+        source="company",
+        view="full",
+        fields=["id", "created", "updated"],
+        format="json",
+    )
+    # 検証
+    rows = {item["id"]: item for item in result.data["items"]}
+    assert not result.is_error
+    assert {item["path"] for item in result.data["items"]} == {
+        f"{folder}/docs/doc-1.yaml",
+        f"{folder}/docs/doc-2.yaml",
+    }
+    assert str(rows["doc-1"]["values"]["created"]).startswith("2026-11-01")
+    assert str(rows["doc-1"]["values"]["updated"]).startswith("2026-11-02")
+    assert not rows["doc-2"]["values"].get("created")
+    assert not rows["doc-2"]["values"].get("updated")
+
+
+def test_error_when_ref_given_to_disk_source(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+) -> None:
+    """disk の配信元への ref・worktree の指定を断る（異常系）。"""
+    # 準備
+    company = make_source("company", storage="disk")
+    worktree = add_worktree(company.folder, "x")
+    env = make_server(company)
+    cwd = str(company.folder)
+    # 実行
+    by_ref = env.call("search_docs", cwd=cwd, source="company", ref="develop")
+    by_worktree = env.call("search_docs", cwd=cwd, source="company", worktree=str(worktree))
+    # 検証
+    assert by_ref.is_error
+    assert "company は disk の配信元のため ref を指定できません" in by_ref.text
+    assert by_worktree.is_error
+    assert "company は disk の配信元のため worktree を指定できません" in by_worktree.text

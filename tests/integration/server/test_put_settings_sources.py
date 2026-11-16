@@ -353,3 +353,28 @@ def test_error_when_version_missing(
     assert [error["path"] for error in response.json()["errors"]] == ["expectedVersion"]
     assert env.settings_path.read_bytes() == before
     assert env.client.get("/sources/extra/docs").status_code == 404
+
+
+def test_normal_when_unsent_storage_kept(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """行に含めなかった storage を、ファイルの同じ配信元の行の今の値で残す（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    company = make_source("company", storage="disk")
+    env = make_server(sample, company)
+    # 実行
+    response = env.client.put(
+        "/settings/sources",
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "sources": [_row(sample, enabled=False), _row(company)],
+        },
+        headers=ORIGIN,
+    )
+    # 検証
+    rows = load_yaml(env.settings_path.read_text(encoding="utf-8"))["sources"]
+    assert response.status_code == 200
+    assert {row["id"]: row["status"] for row in response.json()["sources"]}["company"] == "serving"
+    assert rows[1]["storage"] == {"type": "disk"}
+    assert env.client.get("/sources/company/refs").json()["git"] is False
