@@ -367,9 +367,10 @@ scenarios:
   - name: 正常シナリオ（読み直しの検査が済む前に読み直す）
     setup:
       - name: Mock
-        description: なし（実環境で実行）
+        description: 配信元の検査（`check_sync`）を差し替える。1 回目の読み直しの検査は、テストが合図を出すまで止めてから管理用の YAML に無いファイル 5 件の結果を返却し、2 回目以降は本物の検査の結果を返却する
+        notes: project-index のアプリをテストのクライアントで呼ぶ。合図は `threading.Event`
       - name: サンプルの配信元
-        description: 配信中の配信元 sample（Git 管理外のフォルダ）
+        description: 配信中の配信元 sample（Git 管理外のフォルダ。管理用の YAML に無いファイル 1 件）
         notes: '`project-index.yaml` の `description` を書き換えておく'
     flow: |-
       ```mermaid
@@ -380,18 +381,22 @@ scenarios:
 
         A->>AD: reload
         AD-->>A: 一覧を差し替えた時点の配信元（検査の前の状態）
+        AD->>AD: 裏で 1 回目に読み直した配信元を検査し始め、合図まで止まる
         A->>A: sample の project-index.yaml の description をもう一度書き換える
         A->>AD: reload
-        AD-->>A: 前の読み直しの検査を待たずに、一覧を差し替えた時点の配信元
+        AD-->>A: 1 回目の検査を待たずに、一覧を差し替えた時点の配信元
         AD->>AD: 裏で 2 回目に読み直した配信元を検査する
+        A->>AD: 1 回目の検査に合図を出す
+        AD->>AD: 1 回目の検査は最後まで実行し、結果は 2 回目より前に始めた検査のものとして捨てる
         A->>AD: status（読み直しが済むまで繰り返す）
         AD-->>A: 読み直しが済んだことと索引の同期の件数
         A->>DM: describe
         DM-->>A: 2 回目に書き換えた description
       ```
     expected:
-      - 2 回目の `reload` が、1 回目の読み直しの検査の終了を待たずに応答する
-      - 読み直しが済んだ後の `status` の sample の索引の同期の件数が、2 回目に読み直した設定での検査の結果になる
+      - 2 回目の `reload` が、1 回目の検査が合図で止まっている間に応答する
+      - 合図の前の `status` が読み直しの最中であることを返却する
+      - 読み直しが済んだ後の `status` の sample の管理用の YAML に無いファイルの件数が 1 で、1 回目の検査の結果（5 件）で上書きされない
       - '`describe` が 2 回目に書き換えた `description` を返却する'
       - '`reload` の前後で `/mcp` のセッションが切れない'
     test: test_normal_when_reloaded_before_checks_finish
