@@ -143,7 +143,11 @@ def apply_body(current_body: str | None, operation: Operation, *, index: int) ->
     if BODY_KEY not in operation.set and not edits:
         return None
     given = operation.set.get(BODY_KEY, current_body)
-    body = given if isinstance(given, str) else ""
+    return _edit_body(given if isinstance(given, str) else "", edits, index=index)
+
+
+def _edit_body(body: str, edits: list[tuple[int, TextEdit]], *, index: int) -> str:
+    """本文に `text_edits` を順に当てる（一致の判定は項目の `text_edits` と同じ）。"""
     violations: list[Violation] = []
     for n, edit in edits:
         count = body.count(edit.old) if edit.old else 0

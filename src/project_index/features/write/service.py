@@ -6,7 +6,7 @@ import dataclasses
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from ruamel.yaml.comments import CommentedMap
 
@@ -437,6 +437,26 @@ def _body_paths(operation: Operation) -> list[str]:
 
 def _check_body(operation: Operation, table: DocumentTable, existing: Document | None) -> None:
     """`@body` を受け付ける操作かと、`body_file` の列の値を変えないかを確かめる。"""
+    violations = _misplaced_body(operation)
+    if table.body_file is None:
+        violations.extend(
+            Violation(
+                path=path,
+                rule=f"{table.id} は本文のファイル（body_file）を持たないため {BODY_KEY} を受けません",
+                fix=f"{BODY_KEY} を除いてください",
+            )
+            for path in _body_paths(operation)
+        )
+    elif operation.op == "create":
+        violations.extend(_missing_body(operation, table))
+    elif existing is not None:
+        violations.extend(_moved_body(operation, table.body_file, existing))
+    if violations:
+        raise _invalid(violations)
+
+
+def _misplaced_body(operation: Operation) -> list[Violation]:
+    """`unset`・`add_to`・`remove_from` に渡した `@body` の違反。"""
     violations: list[Violation] = []
     if BODY_KEY in operation.unset:
         violations.append(
@@ -451,39 +471,37 @@ def _check_body(operation: Operation, table: DocumentTable, existing: Document |
         for item, given in (("add_to", operation.add_to), ("remove_from", operation.remove_from))
         if BODY_KEY in given
     )
-    column = table.body_file
-    if column is None:
-        violations.extend(
-            Violation(
-                path=path,
-                rule=f"{table.id} は本文のファイル（body_file）を持たないため {BODY_KEY} を受けません",
-                fix=f"{BODY_KEY} を除いてください",
-            )
-            for path in _body_paths(operation)
+    return violations
+
+
+def _missing_body(operation: Operation, table: DocumentTable) -> list[Violation]:
+    """`body_file` の行の `create` に本文が無いときの違反。"""
+    if BODY_KEY in (operation.data or {}):
+        return []
+    return [
+        Violation(
+            path=f"data.{BODY_KEY}",
+            rule=f"{table.id} の文書の作成には本文（{BODY_KEY}）が要ります",
+            fix=f"data に {BODY_KEY} を加えてください",
         )
-    elif operation.op == "create" and BODY_KEY not in (operation.data or {}):
-        violations.append(
-            Violation(
-                path=f"data.{BODY_KEY}",
-                rule=f"{table.id} の文書の作成には本文（{BODY_KEY}）が要ります",
-                fix=f"data に {BODY_KEY} を加えてください",
-            )
+    ]
+
+
+def _moved_body(operation: Operation, column: str, existing: Document) -> list[Violation]:
+    """`update`・`replace` で `body_file` の列の値を変えるときの違反。"""
+    item, given = (
+        ("set", operation.set) if operation.op == "update" else ("data", operation.data or {})
+    )
+    current = get_field(existing.data, column)
+    if column not in given or given[column] == current:
+        return []
+    return [
+        Violation(
+            path=f"{item}.{column}",
+            rule=f"{column}（本文のファイルのパス）は変えられません",
+            fix=f"{column} を除くか、今の値（{current}）にしてください",
         )
-    elif existing is not None:
-        item, given = (
-            ("set", operation.set) if operation.op == "update" else ("data", operation.data or {})
-        )
-        current = get_field(existing.data, column)
-        if column in given and given[column] != current:
-            violations.append(
-                Violation(
-                    path=f"{item}.{column}",
-                    rule=f"{column}（本文のファイルのパス）は変えられません",
-                    fix=f"{column} を除くか、今の値（{current}）にしてください",
-                )
-            )
-    if violations:
-        raise _invalid(violations)
+    ]
 
 
 def _create_body(
@@ -943,7 +961,9 @@ def _remove_bodies(session: _Session, documents: list[Document]) -> None:
             continue
         file_map = load_roundtrip(session.text(document.path), file=document.path)
         remaining = {
-            resolve_body_path(document.path, get_field(row, table.body_file))
+            resolve_body_path(
+                document.path, get_field(cast("Mapping[str, Any]", row), table.body_file)
+            )
             for row in _records(file_map, table.records)
             if is_dict(row)
         }
