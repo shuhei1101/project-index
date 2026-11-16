@@ -180,7 +180,7 @@ flows:
         description: Git のリポジトリのクローン本体に `project-index.local.yaml` を置き、commit しない
         notes: id `company`
       - name: 入力
-        description: '`source` は company の行（`config: project-index.local.yaml`・`storage.type: disk`）'
+        description: '`GET /settings/sources` で取得した `version` を `expectedVersion` にし、`source` は company の行（`config: project-index.local.yaml`・`storage.type: disk`）'
     flow: |-
       <!-- map: {"title": "正常系（読み書きの方法を持つ行を追加する）"} -->
 
@@ -190,7 +190,7 @@ flows:
         participant E as POST /settings/sources
         participant CF as 端末の設定
 
-        C->>E: source: company（storage.type: disk）
+        C->>E: expectedVersion, source: company（storage.type: disk）
         E->>CF: company の行を追加する
         E->>E: company を読み込む
         E-->>C: 201（company は serving）

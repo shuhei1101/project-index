@@ -604,7 +604,7 @@ scenarios:
 
         DD->>PI: 端末の設定の配信元を取得する
         PI-->>DD: sample と company の行（company は storage.type: disk）
-        DD->>PI: sample の enabled を false にし、どちらの行にも storage を含めない sources を保存する
+        DD->>PI: 取得したバージョンを添えて、sample の enabled を false にし、どちらの行にも storage を含めない sources を保存する
         PI->>CF: 送信しなかった storage をファイルの今の値で残して書き換え、配信元を読み直す
         PI-->>DD: 読み直した後の配信元の状態
         DD->>PI: 取得したバージョンを添えて、sample の行の storage.type を disk に変更する

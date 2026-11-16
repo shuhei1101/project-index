@@ -366,7 +366,7 @@ flows:
       - name: 端末の設定
         description: '`sources` に sample と company（`storage.type: disk`）の 2 行'
       - name: 入力
-        description: 'sample の行を `enabled: false` にした 2 行。どちらの行にも `storage` を含めない'
+        description: '`GET /settings/sources` で取得した `version` を `expectedVersion` にし、sample の行を `enabled: false` にした 2 行。どちらの行にも `storage` を含めない'
     flow: |-
       <!-- map: {"title": "正常系（送信しなかった読み書きの方法を残す）"} -->
 
@@ -376,7 +376,7 @@ flows:
         participant E as PUT /settings/sources
         participant CF as 端末の設定
 
-        C->>E: sources: sample（enabled: false）, company
+        C->>E: expectedVersion, sources: sample（enabled: false）, company
         E->>CF: 同じ配信元の行の今の値で storage を埋めて settings.yaml を書き換える
         E->>E: 配信元を読み直す
         E-->>C: 200（company は serving）

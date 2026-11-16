@@ -883,7 +883,7 @@ scenarios:
         description: なし（実環境で実行。`cwd` はテストが引数に入れる）
       - name: ローカル運用の配信元
         description: 起動するの『正常シナリオ（disk を指定した配信元を Git を参照せずに配信する）』と同じ company。YAML の文書 1 と文書 2 を持ち、文書 2 の `related` が文書 1 を指す
-        notes: '文書 1 は `created: 2026-11-01T00:00:00+09:00`・`updated: 2026-11-02T00:00:00+09:00` を持ち、文書 2 は `created`・`updated` を持たない。文書 1 と文書 2 を同じ commit で commit する。`scope.read` は company のフォルダと sample のフォルダ。ワークツリー `.claude/worktrees/x` は project-index のファイルを持たない'
+        notes: '文書 1 は `created: 2026-11-01T00:00:00+09:00`・`updated: 2026-11-02T00:00:00+09:00` を持ち、文書 2 は `created`・`updated` を持たない。文書 1 と文書 2 を同じ commit で commit する。`scope.read` は `{company のクローン本体}/**` と sample のフォルダ（ワークツリーを配信元のフォルダとみなさないため）。ワークツリー `.claude/worktrees/x` は project-index のファイルを持たない'
       - name: 別のリポジトリ
         description: 配信元 sample のクローン本体
         notes: company の外部の作業場所
