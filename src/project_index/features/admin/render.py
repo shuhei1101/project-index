@@ -21,6 +21,10 @@ LOADING_LINE = (
     "配信元: 読み込み中（読み込みが終わっていない配信元を指す文書の MCP の呼び出しは待たされます）"
 )
 CHECKING_CELL = "検査中"
+CHECKING_LINE = "検査: 検査中（索引の同期の件数は検査が済んだ後に出ます）"
+EXPORTING_LINE = (
+    "リビジョンの書き出し: 書き出し中（書き出し中のリビジョンを読む要求は待たされます）"
+)
 SYNC_LABELS = {
     "missing_refs": "metadata の列の欠け",
     "unindexed_files": "管理用の YAML に無いファイル",
@@ -55,6 +59,11 @@ def render_status(status: ServerStatus) -> str:
         f"{status.address} project-index {status.version}（pid {status.pid}）",
         f"端末の設定: {status.terminal.file}（{status.terminal.version_state}）",
     ]
+    # 裏の検査と書き出しの最中は、表の前にその旨を出す
+    if status.checking:
+        lines.append(CHECKING_LINE)
+    if status.exporting:
+        lines.append(EXPORTING_LINE)
     if status.loading:
         lines.append(LOADING_LINE)
     elif status.sources:

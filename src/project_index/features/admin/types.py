@@ -83,6 +83,10 @@ class ServerStatus:
     sources: list[SourceState]
     # 配信元の初回の読み込みが終わっていないとき True（その間は sources が空）
     loading: bool = False
+    # 配信元の裏の検査（起動の後・reload・端末の設定の保存の後）が済んでいないとき True
+    checking: bool = False
+    # 裏のリビジョンの書き出しが済んでいないとき True
+    exporting: bool = False
 
 
 @dataclass(frozen=True)

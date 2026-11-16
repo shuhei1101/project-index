@@ -275,3 +275,13 @@ class WorktreeLoadingError(ProjectIndexError):
 
     status: ClassVar[int] = 503
     worktree: str = ""
+
+
+@dataclass(kw_only=True)
+class RevisionExportTimeoutError(ProjectIndexError):
+    """リビジョンの書き出しの待ち時間の超過（書き出しを止めた）。"""
+
+    status: ClassVar[int] = 504
+    operation: str = "revision_export"
+    commit: str = ""
+    limit_sec: float = 0

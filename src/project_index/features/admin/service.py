@@ -147,6 +147,8 @@ def get_status(handlers: Handlers, *, env: Mapping[str, str]) -> ServerStatus:
         ),
         sources=[] if loading else _source_states(handlers),
         loading=loading,
+        checking=handlers.checks.checking,
+        exporting=handlers.snapshots.exporting,
     )
 
 

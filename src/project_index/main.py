@@ -36,7 +36,9 @@ if TYPE_CHECKING:
     import argparse
 
     from project_index.features.convert.service import ConvertService
+    from project_index.features.describe.source_checks import SourceCheck
     from project_index.features.documents.store import DocumentStore
+    from project_index.features.history.snapshot import SnapshotStore
     from project_index.features.validation.service import DocumentChecker
 
 EXIT_CONFIG_INVALID = 2
@@ -180,12 +182,18 @@ def run_serve(args: argparse.Namespace) -> int:
 
 
 def start_loading(handlers: Handlers) -> threading.Thread:
-    """配信元の行ごとの読み込みと、全ての行の後の検査を裏のスレッドで始める。"""
+    """配信元の行ごとの読み込みと、全ての行の後の検査とリビジョンの書き出しを裏のスレッドで始める。"""
 
     def work() -> None:
         try:
             handlers.registry.load(handlers.terminal)
-            check_sources(handlers.registry.served(), store=handlers.store, checks=handlers.checks)
+            # 検査と書き出しは裏で流し、待たない
+            check_and_export_later(
+                handlers.registry.served(),
+                store=handlers.store,
+                checks=handlers.checks,
+                snapshots=handlers.snapshots,
+            )
             for source in handlers.registry.served():
                 print(source.id, flush=True)
         except Exception:
@@ -228,11 +236,16 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
     converter = ConvertService(state_dir / "converted", store, terminal.script_timeout_sec)
     seen = SeenStore(state_dir / "seen.sqlite3", terminal.seen_retention_days)
     checker = DocumentChecker(store, terminal.script_timeout_sec)
-    checks = SourceChecks()
+    checks = SourceChecks(on_checked=log_source_check)
 
     def on_rebuilt(source: ServedSource) -> None:
         discard_source_caches(
-            [source], store=store, checker=checker, converter=converter, checks=checks
+            [source],
+            store=store,
+            checker=checker,
+            converter=converter,
+            checks=checks,
+            snapshots=snapshots,
         )
 
     registry = SourceRegistry(on_rebuilt=on_rebuilt, loading=True)
@@ -245,6 +258,7 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
             checker=checker,
             converter=converter,
             checks=checks,
+            snapshots=snapshots,
         )
         # 端末の設定の API が起動時の一覧ではなく保存した一覧を返すよう、起動時の端末の設定の一覧を差し替える
         terminal.sources[:] = new_terminal.sources
@@ -263,6 +277,7 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
             checker=checker,
             converter=converter,
             checks=checks,
+            snapshots=snapshots,
         )
         # 端末の設定の API が起動時の一覧ではなく書き換えた一覧を返すよう、起動時の端末の設定の一覧を差し替える
         terminal.sources[:] = new_terminal.sources
@@ -297,11 +312,18 @@ def reload_sources(
     checker: DocumentChecker,
     converter: ConvertService,
     checks: SourceChecks,
+    snapshots: SnapshotStore,
 ) -> list[SourceStatus]:
     """配信元の一覧を読み直し、配信元の内容をキャッシュした部品のキャッシュを捨てる。"""
     statuses = registry.reload(terminal)
+    # 裏の検査と書き出しは待たない
     discard_source_caches(
-        registry.served(), store=store, checker=checker, converter=converter, checks=checks
+        registry.served(),
+        store=store,
+        checker=checker,
+        converter=converter,
+        checks=checks,
+        snapshots=snapshots,
     )
     return statuses
 
@@ -314,13 +336,21 @@ def reload_changed_sources(
     checker: DocumentChecker,
     converter: ConvertService,
     checks: SourceChecks,
+    snapshots: SnapshotStore,
 ) -> list[SourceStatus]:
     """配信元の一覧の変わった行だけを読み直し、新しく読んだ配信元だけでキャッシュを作り直す。"""
     before = {id(source) for source in registry.served()}
     statuses = registry.reload_changed(terminal)
     # 使い回した配信元は検査のキャッシュが今のままなので、新しく読んだ配信元だけを検査する
     fresh = [source for source in registry.served() if id(source) not in before]
-    discard_source_caches(fresh, store=store, checker=checker, converter=converter, checks=checks)
+    discard_source_caches(
+        fresh,
+        store=store,
+        checker=checker,
+        converter=converter,
+        checks=checks,
+        snapshots=snapshots,
+    )
     return statuses
 
 
@@ -331,42 +361,58 @@ def discard_source_caches(
     checker: DocumentChecker,
     converter: ConvertService,
     checks: SourceChecks,
-) -> None:
-    """配信元の内容をキャッシュした部品のキャッシュを捨て、渡した配信元ごとのずれと警告をログに書く。"""
+    snapshots: SnapshotStore,
+) -> threading.Thread:
+    """配信元の内容をキャッシュした部品のキャッシュと検査の結果を捨て、裏で検査と書き出しを始める。"""
     store.clear()
     checker.clear()
     converter.clear()
-    check_sources(sources, store=store, checks=checks)
+    # 応答の索引の同期の件数を検査の前の状態（null）にする
+    checks.forget(source.id for source in sources)
+    return check_and_export_later(sources, store=store, checks=checks, snapshots=snapshots)
 
 
-def check_sources(
-    sources: list[ServedSource], *, store: DocumentStore, checks: SourceChecks
-) -> None:
-    """渡した配信元ごとに検査して結果を持たせ、ずれと警告をログに書く。"""
-    for source in sources:
-        # 検査の結果をキャッシュに持たせ、`describe` の警告が読めるようにする
-        check = checks.refresh(store, source)
-        report = check.report
-        for label, values in (
-            ("metadata の列の欠け", report.missing_refs),
-            ("管理用の YAML に無いファイル", report.unindexed_files),
-            ("ファイルが無い行", report.missing_body_files),
-            ("どの文書にも該当しない関連", report.unresolved_related),
-        ):
-            if values:
-                logger.warning(
-                    "%s: %s %d 件: %s", report.source_id, label, len(values), "、".join(values)
-                )
-        for violation in report.alias_violations:
+def check_and_export_later(
+    sources: list[ServedSource],
+    *,
+    store: DocumentStore,
+    checks: SourceChecks,
+    snapshots: SnapshotStore,
+) -> threading.Thread:
+    """渡した配信元を裏で検査し、検査の後に Git の配信元の default_ref の commit を裏で書き出す。"""
+    threads = checks.refresh_later(store, sources)
+    # Git の配信元だけが default_ref の commit を持つ
+    targets = [
+        (source.repo_root, source.config_commit)
+        for source in sources
+        if source.repo_root is not None and source.config_commit is not None
+    ]
+    return snapshots.checkout_later(targets, after=threads)
+
+
+def log_source_check(source: ServedSource, check: SourceCheck) -> None:
+    """1 つの配信元の検査の結果のうち、ずれと警告をログに書く。"""
+    report = check.report
+    for label, values in (
+        ("metadata の列の欠け", report.missing_refs),
+        ("管理用の YAML に無いファイル", report.unindexed_files),
+        ("ファイルが無い行", report.missing_body_files),
+        ("どの文書にも該当しない関連", report.unresolved_related),
+    ):
+        if values:
             logger.warning(
-                "%s: エイリアスのキーの違反: %s: %s: %s",
-                report.source_id,
-                violation.doc,
-                violation.path,
-                violation.rule,
+                "%s: %s %d 件: %s", report.source_id, label, len(values), "、".join(values)
             )
-        for warning in check.nav:
-            logger.warning("%s: nav: %s: %s", source.id, warning.path, warning.rule)
+    for violation in report.alias_violations:
+        logger.warning(
+            "%s: エイリアスのキーの違反: %s: %s: %s",
+            report.source_id,
+            violation.doc,
+            violation.path,
+            violation.rule,
+        )
+    for warning in check.nav:
+        logger.warning("%s: nav: %s: %s", source.id, warning.path, warning.rule)
 
 
 def run_files(args: argparse.Namespace) -> int:
