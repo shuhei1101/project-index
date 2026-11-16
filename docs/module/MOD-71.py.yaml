@@ -605,6 +605,19 @@ enums:
       - value: disabled
         title: 無効
         description: '端末の設定か配信元の設定で `enabled: false`'
+  - name: StorageType
+    title: 読み書きの方法の種類
+    container: project_index/features/sources/types.py
+    usecase: 共通
+    role: 型エイリアス
+    summary: 配信元の読み書きの方法（`Literal`）。端末の設定の `sources[].storage.type` と `check_project` の引数も使用する
+    values:
+      - value: git
+        title: Git
+        description: '`default_ref` のリビジョンから参照し、ワークツリーへ書き込む'
+      - value: disk
+        title: ディスク
+        description: Git を参照せず、登録したフォルダのファイルを参照し、書き込む
 constants:
   - name: SOURCE_CONFIG_VERSION
     title: 配信元の設定の読めるバージョン

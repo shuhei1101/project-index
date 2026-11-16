@@ -535,17 +535,3 @@ classes:
         type: str
         access: 公開
         description: パスの `id`
-enums:
-  - name: StorageType
-    title: 読み書きの方法の種類
-    container: project_index/features/settings/types.py
-    usecase: 共通
-    role: 型エイリアス
-    summary: 配信元の読み書きの方法（`Literal`）
-    values:
-      - value: git
-        title: Git
-        description: '`default_ref` のリビジョンから参照し、ワークツリーへ書き込む'
-      - value: disk
-        title: ディスク
-        description: Git を参照せず、登録したフォルダのファイルを参照し、書き込む
