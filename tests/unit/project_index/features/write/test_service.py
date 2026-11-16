@@ -572,7 +572,7 @@ def test_write_docs_when_body_file_rejected(make_env: Callable[..., WriteEnv], p
     # 実行・検証
     with pytest.raises(ValidationFailedError) as exc_info:
         env.write(operations=operations)
-    assert [(v.index, v.path) for v in exc_info.value.violations] == [(0, "path")]
+    assert [(v.index, v.path) for v in exc_info.value.violations] == [(0, "operations[0].path")]
     assert (env.worktree / "notes/index.yaml").read_text(encoding="utf-8") == NOTES
     assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == NOTE_1
     assert not (env.worktree / "notes/n4.md").exists()
