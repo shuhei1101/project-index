@@ -221,16 +221,18 @@ functions:
          - `create` の場合、種類の行を引き（無ければ `UnknownKindError`）、`writable` でなければ `documents[].writable` の違反にする。ID が無ければ IDを作る（`ids.format` も無ければ `id` が必須の違反）。ID が既にあれば違反。置き場所は新しい文書の置き場所。Git 管理外の配信元では `created`・`updated` に `now` を入れる
          - `update`・`replace` の場合、文書が無ければ近い ID を添えた `DocumentNotFoundError`。バージョンの確かめ（前回読んだ内容は会話の記録）。Git 管理外の配信元では `updated` に `now` を入れ、`replace` は `created` を引き継ぐ
          - 操作を、`create` は `kind` の行、`update`・`replace` は文書の種類の行で、オブジェクトの配列への書き戻し（`update` は今の内容を渡す）にかけてから列名への読み替えにかける。`create` の ID は行の `metadata.id` の列（無ければ `id`）に入れる
+         - `@body` を受け付けるかを確かめる。種類の行が `body_file` を持たない文書への `@body`、`unset`・`add_to`・`remove_from` の `@body`、`body_file` の行の `create` で `data` に `@body` が無いこと、`update`・`replace` で `body_file` の列の値が今の値と違うことは、添字つきの違反で `InvalidArgumentError` にする
+         - `body_file` の行の文書は、本文の適用（`current_body` は `update`・`replace` が今の文書の本文、`create` が `None`）で新しい本文を求める。本文のファイルのパスは文書のストアの本文のファイルのパスの解決で解き、`create` で `None`（配信元の外）か作業ツリーに既にあるファイルなら、`path` が `body_file` の列名の違反を `failed` の行に入れる。新しい本文は、本文のファイルのパス → 本文で持ち、後の操作が同じ本文のファイルに当たるときは当てた後の本文に重ねる
          - 操作を当てる。`records` の文書は配列の要素を、それ以外はファイルの内容を置き換える
-         - 変更を当てた後のファイルの内容を往復編集の書き出しで文字列にし、文字列からの文書の組み立てで文書にして、文書の検査.検査する（`on="write"`、`create` は `new=True`、`deadline` は `limits` があれば `limits.write_deadline`）。違反はスキーマの説明の添付にかけ（スキーマは文書のストア.文書に当てるスキーマ）、添字を付けて `failed` の行に入れる。添字を付けるときは `schema` を保つ
+         - 変更を当てた後のファイルの内容を往復編集の書き出しで文字列にし、文字列からの文書の組み立て（`read_body` は、新しい本文を持つ本文のファイルならその本文、無ければ作業ツリーのファイルを返す）で文書にして、文書の検査.検査する（`on="write"`、`create` は `new=True`、`deadline` は `limits` があれば `limits.write_deadline`）。違反はスキーマの説明の添付にかけ（スキーマは文書のストア.文書に当てるスキーマ）、添字を付けて `failed` の行に入れる。添字を付けるときは `schema` を保つ
          - 検査するで違反が無ければ、文書の検査.Markdownの値を点検する（`deadline` は検査すると同じ。`previous` は `update`・`replace` が操作の前の文書の `data`、`create` が `None`。`stopped` は同じ呼び出しの前の点検が返した `stopped`）。違反は添字を付けて `failed` の行に入れ、点検できなかったキーは成功した行の `unchecked` に入れる。返った `stopped` を次の操作へ引き継ぐ
          - 後の操作が同じファイルに当たるときは、当てた後の内容に重ねる
          - `WriteDeadlineExceededError` は `failed` の行にせず、`atomic` によらずそのまま送る（何も書かない）
       6. `atomic` が `True` で `failed` があれば、最初の失敗の例外（`ValidationFailedError` は全ての違反を、`InvalidArgumentError` はその操作の違反を添字つきで）を送り、何も書かない
-      7. 成功した行の `version` は組み立てた文書のバージョン、`diff` は今の本文との差分の行（変更.差分の行）にする
+      7. 成功した行の `version` は組み立てた文書のバージョン、`diff` は今の本文との差分の行（変更.差分の行）にする。`body_file` の行の文書は、要素を YAML に書き出した文字列どうしの差分の行に続けて、本文が変わったときは `@@ {本文のファイルのパス}` の行と本文の差分の行を並べる
       8. `dry_run` なら `applied=False` で返す
       9. `limits` がある場合、ファイルを置き換える前に `limits.write_deadline` の『期限』.期限の確認を呼ぶ（過ぎていれば `WriteDeadlineExceededError` が伝わり、何も書かない）
-      10. 変わったファイルをファイルの置き換えで書き、文書のストア.キャッシュを捨てる。書き始めた後は、期限を過ぎても全てのファイルを書き終える
+      10. 新しい本文を持つ本文のファイル、変わったファイルの順にファイルの置き換えで書き、文書のストア.キャッシュを捨てる。書き始めた後は、期限を過ぎても全てのファイルを書き終える
       11. 書いた種類の `after_write` の生成を、ID の重なりを除いて順にスクリプトの実行（`cwd=target.config_base`（設定ファイルのフォルダ）・引数に書いたファイルのパス・制限時間・`at`）で動かす。制限時間は、`limits` があれば `limits.respond_by` の『期限』.制限時間の切り詰めに `timeout_sec` を渡した値、無ければ `timeout_sec`。制限時間が 0 の生成は動かさず `[warning]` 応答の上限までの時間が無いため書き込み後の生成を実行しなかった（配信元・生成の ID）を書き、結果は変えない。`at` は、`target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`）。`ScriptError` は `[warning]` 書き込み後の生成に失敗した（配信元・生成の ID・理由）を書き、結果は変えない
       12. 会話の記録に書いた文書を `edited` で残す
       13. `applied=True` で返す
@@ -359,6 +361,24 @@ functions:
         condition: '`after_write: [index]` の行に `create`。`write_deadline` の残りの時間が 30 秒、`respond_by` の残りの時間が 0 の `limits`'
         mock: スクリプトの実行（呼ばれた回数を記録する偽物）・時計（偽物）・作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: '`applied` が `True`、置き場所にファイルができ、`index` の生成は呼ばれず、ログに生成を実行しなかったこと'
+      - name: test_write_docs_when_body_file
+        case: 正常
+        summary: 本文のファイルの作成・一部の置き換え・全体の置き換え
+        condition: '`records: items`・`body_file: path` の行（`notes/index.yaml`、要素 n1 の `path` が `n1.md`）で、n2 の `create`（`path: n2.md`・`@body`）、n1 の `text_edits: [{field: @body, ...}]` を `dry_run` あり・なし、n2 の `set: {@body: ...}` を順に呼ぶ'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）。配信元とワークツリーは一時フォルダ
+        expected: '`notes/n2.md` が作られ、要素に `@body` が無い。`dry_run` の `diff` に `@@ notes/n1.md` の行があり、ファイルは変わらない。`dry_run` なしで `notes/n1.md` の一部だけが変わり、`version` が変わる。`set` で `notes/n2.md` が置き換わる'
+      - name: test_write_docs_when_body_file_rejected
+        case: 異常
+        summary: 配信元の外・既にあるファイルを指す本文のファイル
+        condition: '同じ行で、`path: ../../outside/n3.md` の `create` と通る `create` の 2 件。別に `path: n1.md`（既にある）の `create`'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        expected: どちらも `ValidationFailedError` で、添字 0 の違反の `path` が `path`。`notes/index.yaml` も本文のファイルも変わらない
+      - name: test_write_docs_when_body_not_accepted
+        case: 異常
+        summary: '@body を受け付けない操作'
+        condition: '`body_file` を持たない行の文書への `set: {@body: x}`、`body_file` の行への `@body` の無い `create`、n1 の `set: {path: other.md}`、n1 の `unset: [@body]` を 1 件ずつ'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        expected: 全て `InvalidArgumentError` で、違反の `path` が `operations[0].set.@body`・`operations[0].data.@body`・`operations[0].set.path`・`operations[0].unset`。どのファイルも変わらない
   - name: delete_docs
     title: 文書の削除
     kind: 関数
@@ -428,7 +448,7 @@ functions:
       5. 参照を外した文書を文書の検査に通す（違反は `ValidationFailedError`。`deadline` は `limits` があれば `limits.write_deadline`）
       6. `dry_run` なら `applied=False` で、`unlinked` に参照を外す文書と外した後のバージョンを入れて返す
       7. `limits` がある場合、文書の書き込みの手順 9 と同じに期限を確かめる
-      8. ファイル 1 つの文書はファイルを消し、`records` の文書は配列から要素を除いてファイルを置き換える（`body_file` の指すファイルは消さない）。参照を外した文書を書き、文書のストア.キャッシュを捨てる
+      8. ファイル 1 つの文書はファイルを消し、`records` の文書は配列から要素を除いてファイルを置き換える。`body_file` の行の文書は本文のファイルも消す。要素を除いた後の同じ管理用の YAML の要素が同じ本文のファイルを指すときと、本文のファイルが無いときは消さない。参照を外した文書を書き、文書のストア.キャッシュを捨てる
       9. 消した種類の `after_write` の生成を、文書の書き込みと同じに動かす（引数は消したファイルのパス。制限時間も同じ）
       10. `applied=True` で、`unlinked` に参照を外した文書と新しいバージョンを入れて返す
     exceptions:
@@ -465,7 +485,7 @@ functions:
         summary: 配列の要素を消す
         condition: '`records` の行の 2 件目を消す'
         mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
-        expected: ファイルの配列が 1 件になり、`body_file` の指すファイルは残る
+        expected: ファイルの配列が 1 件になり、消した要素の `body_file` の指すファイルも無い
       - name: test_delete_docs_when_referenced
         case: 異常
         summary: 参照されている
@@ -487,6 +507,12 @@ functions:
         mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）・時計（偽物）
         expected: '`WriteDeadlineExceededError`、文書 2 のファイルが残る'
         exception: 検査の前後か、ファイルを消す・置き換える前に `limits.write_deadline` を過ぎている
+      - name: test_delete_docs_when_body_file_shared
+        case: 正常
+        summary: ほかの要素も指す本文のファイルを残す
+        condition: '`records`・`body_file` の行で、要素 n1・n3 が同じ `n1.md` を指す。n3 を消す'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        expected: 配列が n1 だけになり、`n1.md` は変わらない
 refs:
   - IF-6#
   - IF-7#
