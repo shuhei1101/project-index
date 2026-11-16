@@ -1,0 +1,92 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: changed
+    detail: 初回に運用（コミットする・ローカル運用）を聞き、ローカル運用なら *.local.* の名前で設定・管理用の YAML・スキーマを作り、Git が無視する設定に追加し、端末の設定の行を disk にする流れを加える。2 回目以降は端末の設定の行で運用を判定する
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: changed
+    detail: 端末の設定の配信元の行に読み書きの方法（git・disk）を指定でき、disk の配信元を Git のリポジトリの中でも登録したフォルダのファイルで検証・配信する。Git の作業ツリーの外のフォルダに git を指定した行を違反にする
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: changed
+    detail: disk の配信元は、どの作業場所（ワークツリー・リポジトリの外を含む）からも登録したフォルダの文書を返却し、リビジョンの指定と区間の変更の一覧を受け付けない
+    depends_on:
+      - docs/scenario/SC-4.yaml
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: disk の配信元は、書き込みの範囲に該当すれば登録したフォルダ（クローン本体）へ書き込み、作成・更新の日時を文書に追加する
+    depends_on:
+      - docs/scenario/SC-4.yaml
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: changed
+    detail: disk の配信元の設定・スキーマ・スクリプトの変更は、commit ではなく reload の後に配信に入る
+    depends_on:
+      - docs/scenario/SC-4.yaml
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: changed
+    detail: 画面のサーバーが disk の配信元を読むとき、リビジョンの指定を無視して登録したフォルダの文書を返却し、Git 管理外の配信元と同じくリビジョンの一覧を持たない
+    depends_on:
+      - docs/scenario/SC-4.yaml
+  - kind: single
+    scenario: docs/scenario/SC-9.yaml
+    impact: run_only
+    detail: YAML を直接編集した後の読み直しは変わらないが、disk の配信元の読む場所を変えるため回帰を確かめる
+    depends_on: []
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: run_only
+    detail: 入れる・参照・書き込み・設定の変更・更新の流れは変わらないが、配信元の読む場所と書き込みの先の解決を変えるため回帰を確かめる
+    depends_on: []
+docs:
+  - page: docs/guide/設定.md
+    new: false
+    change: 端末の設定のキー `sources[].storage`・`sources[].storage.type` と、Git の作業ツリーの外に git を指定した行の違反を記載する
+    status: todo
+  - page: docs/guide/コアコンセプト-配信元と権限.md
+    new: false
+    change: 配信元の読み書きの方法（git・disk）と、disk の参照・書き込みの先（ワークツリーに読み替えない、クローン本体へ書き込む）を記載する
+    status: todo
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: 'ローカル運用（*.local.* のファイル・info/exclude・storage.type: disk）の手順と、git clean -x で files.local.yaml が削除されると戻せないことを記載する'
+    status: todo
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: disk の配信元で ref の引数と list_changes の区間を指定できないこと、describe がブランチ・タグ・ワークツリーを返却しないこと、trace_related が一緒に変わったファイルを返却しないこと、write_docs が created・updated を追加することを記載する
+    status: todo
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: check_project の storage.type の引数と、設定のファイルの絶対パスの指定を記載する
+    status: todo
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: disk の配信元で ref のクエリを無視し、応答の ref が空になることと、端末の設定の API の sources[] の行の storage を記載する
+    status: todo
+  - page: docs/guide/用語集.md
+    new: false
+    change: 「読み書きの方法（storage）」「ローカル運用」を追加する
+    status: todo
+  - page: docs/config/CFG-1.yaml
+    new: false
+    change: project-index.local.yaml をローカル運用の配信元の設定にも使うことと、files.local.yaml・*.local.* のスキーマを記載する
+    status: todo
+  - page: plugins/project-index/skills/setup/SKILL.md
+    new: false
+    change: '初回に運用を聞き、ローカル運用のファイルの作成・info/exclude への追加・端末の設定の storage.type: disk・check_project への storage.type と設定のファイルの指定を加える。*.local.* を候補から除外し、Git が無視する生成物・.env の除外を確認する'
+    status: todo
+scope_out:
+  - item: dev-docs の設定の画面で storage が保存で消えないようにし、編集のダイアログで表示・修正できるようにすること、disk の配信元の文書の画面の表示の確認
+    reason: 'dev-docs のリポジトリの変更。この PR は端末の設定の API の行に storage を加え、disk の配信元の GET /refs が git: false を返却するところまでを持つ'
+    plan: shuhei1101/dev-docs#235
+  - item: rule-inject の rules.yaml・alias-inject の設定を、コミットできないリポジトリで使用する方法
+    reason: 起点 Issue の対象外。要るときに別の Issue にする
+    plan: none
+  - item: ローカル運用からコミットする運用への切り替えの手順のスキル
+    reason: 起点 Issue の対象外。ファイル名を変えて storage の行を削除すれば切り替わる
+    plan: none
