@@ -51,5 +51,5 @@
 `storage` は記載した行だけが `storage.type`（`git`・`disk`）で返し、`git`・`disk` 以外の値を送った書き換えは 422 で断ります。
 `GET` と書き換えの応答は、端末の設定の内容のバージョンを `version` で返します。
 書き換えの要求の `expectedVersion`（`DELETE` はクエリ）が今の内容のバージョンと違うと、書き換えずに 409 で断り、今の内容のバージョンを `current` で返します。
-`PATCH`・`DELETE` は `expectedVersion` が必須で、無いときは 400 で断ります。`PUT`・`POST` は送信したときだけ照合します。
+4 つとも `expectedVersion` が必須で、無いときは 400 で断ります。
 5 つとも、端末の設定の最上位の project-index が知らないキーを誤りにせず、応答の `warnings[]`（`path`・`reason`）で返します。知らないキーが無いときは空の配列です。

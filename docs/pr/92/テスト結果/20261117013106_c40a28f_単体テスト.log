@@ -1,0 +1,645 @@
+# 単体テスト（Red）: テストコードの末尾の commit c40a28f
+
+$ uv run pytest tests/unit/
+（pytest の一時フォルダ /tmp/pytest-of-{利用者} が別の利用者の所有のため、環境変数 TMPDIR を自分の一時フォルダに向けて実行した。収集で止まらないよう --continue-on-collection-errors を付けた）
+$ TMPDIR=$(mktemp -d) uv run pytest tests/unit/ -q -p no:cacheprovider --continue-on-collection-errors
+........................................................................ [  7%]
+........................................................................ [ 15%]
+........................................................................ [ 23%]
+........................................................................ [ 31%]
+........................................................................ [ 38%]
+........................................................................ [ 46%]
+........................................................................ [ 54%]
+........................................F............................... [ 62%]
+........................................................................ [ 69%]
+........................................................................ [ 77%]
+......................FFFFFFF..FF....................................... [ 85%]
+........................................................................ [ 93%]
+...............................................................          [100%]
+==================================== ERRORS ====================================
+_ ERROR collecting tests/unit/project_index/features/documents/test_loader.py __
+ImportError while importing test module '/home/shuhei2441/repo/project-index/.claude/worktrees/chore-write-body-file-and-settings-version/tests/unit/project_index/features/documents/test_loader.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/documents/test_loader.py:9: in <module>
+    from project_index.features.documents.loader import (
+E   ImportError: cannot import name 'resolve_body_path' from 'project_index.features.documents.loader' (/home/shuhei2441/repo/project-index/.claude/worktrees/chore-write-body-file-and-settings-version/src/project_index/features/documents/loader.py)
+____ ERROR collecting tests/unit/project_index/features/write/test_apply.py ____
+ImportError while importing test module '/home/shuhei2441/repo/project-index/.claude/worktrees/chore-write-body-file-and-settings-version/tests/unit/project_index/features/write/test_apply.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_apply.py:9: in <module>
+    from project_index.features.write.apply import apply_body, apply_operation
+E   ImportError: cannot import name 'apply_body' from 'project_index.features.write.apply' (/home/shuhei2441/repo/project-index/.claude/worktrees/chore-write-body-file-and-settings-version/src/project_index/features/write/apply.py)
+=================================== FAILURES ===================================
+____________ test_build_settings_router_when_write_without_version _____________
+
+make_handlers = <function make_handlers.<locals>._make at 0x779af85cec40>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x779af94c8750>
+
+    def test_build_settings_router_when_write_without_version(
+        make_handlers: Callable[..., Any],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """保存・1 行の追加に expectedVersion が無い（異常系）。"""
+        # 準備
+        calls: list[str] = []
+    
+        def fake_save_sources(sources: list[SourceEntry], **kwargs: Any) -> SourceWriteResult:
+            calls.append("save_sources")
+            return SourceWriteResult(statuses=[], version="d4e5f6")
+    
+        def fake_add_source(source: SourceEntry, **kwargs: Any) -> SourceAddResult:
+            calls.append("add_source")
+            return SourceAddResult(result="added", same=None, statuses=[], version="d4e5f6")
+    
+        monkeypatch.setattr(route_module, "save_sources", fake_save_sources)
+        monkeypatch.setattr(route_module, "add_source", fake_add_source)
+        handlers = make_handlers(settings_lock=threading.Lock(), registry=SourceRegistry())
+        app = FastAPI()
+        register_error_handlers(app)
+        app.include_router(build_settings_router(handlers))
+        client = TestClient(app)
+        row = {"id": "a", "config": ["/tmp/a/project-index.yaml"]}
+        # 実行
+        put = client.put("/settings/sources", json={"sources": [row]})
+        post = client.post("/settings/sources", json={"source": row})
+        # 検証
+>       assert put.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <Response [200 OK]>.status_code
+
+tests/unit/project_index/features/settings/test_route.py:380: AssertionError
+________________________ test_write_docs_when_body_file ________________________
+
+make_env = <function make_env.<locals>._make at 0x779af840ac40>
+
+    def test_write_docs_when_body_file(make_env: Callable[..., WriteEnv]) -> None:
+        """本文のファイルの作成・一部の置き換え・全体の置き換え（正常系）。"""
+        # 準備
+        env = make_env(_notes_files(), tables=[_notes_table(), _rules_table()])
+        n1_version = value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1])
+        create = Operation(
+            op="create", kind="notes", data={"id": "n2", "path": "n2.md", "@body": "本文\n"}
+        )
+        edit = Operation(
+            op="update",
+            id="n1",
+            expected_version=n1_version,
+            text_edits=[TextEdit(field="@body", old="古い行", new="新しい行")],
+        )
+        # 実行
+        created = env.write(operations=[create])
+>       tried = env.write(operations=[edit], dry_run=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/write/test_service.py:531: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/project_index/features/write/test_service.py:85: in write
+    return write_docs(
+src/project_index/features/write/service.py:492: in write_docs
+    raise _atomic_error(applied.failures)
+src/project_index/features/write/service.py:533: in _apply_operations
+    item, table = _apply_one(
+src/project_index/features/write/service.py:615: in _apply_one
+    return _apply_existing_one(session, checker, operation, index, last_reads, now)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/project_index/features/write/service.py:688: in _apply_existing_one
+    check_version(existing, operation.expected_version, last_read=last_reads.get(existing.id))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+document = Document(id='n1', kind='notes', source_id='sample', path='notes/index.yaml', record_index=0, data={'id': 'n1', 'path':...00))), updated=datetime.datetime(2026, 11, 17, 1, 30, 33, tzinfo=datetime.timezone(datetime.timedelta(seconds=32400))))
+expected = 'eba65c', last_read = None
+
+    def check_version(
+        document: Document, expected: str | Mapping[str, str], *, last_read: LastRead | None
+    ) -> None:
+        """`expected_version` が今の文書と同じかを確かめる。"""
+        if isinstance(expected, str):
+            same = document.version == expected
+        else:
+            same = all(
+                value_hash(get_field(document.data, path)) == digest
+                for path, digest in expected.items()
+            )
+        if same:
+            return
+        diff = diff_lines(last_read.content, document.body) if last_read is not None else ""
+>       raise VersionMismatchError(
+            message=f"{document.id} は参照した後に変わっています（今のバージョン {document.version}）",
+            doc_id=document.id,
+            current=document.version,
+            diff=diff,
+            next_steps=["search_docs で再取得してから、新しいバージョンで再実行してください"],
+        )
+E       project_index.shared.errors.VersionMismatchError: n1 は参照した後に変わっています（今のバージョン 541c51）
+
+src/project_index/features/write/service.py:81: VersionMismatchError
+___________ test_write_docs_when_body_file_rejected[outside_source] ____________
+
+make_env = <function make_env.<locals>._make at 0x779af8445a60>
+path = '../../outside/n3.md'
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            pytest.param("../../outside/n3.md", id="outside_source"),
+            pytest.param("n1.md", id="existing_file"),
+        ],
+    )
+    def test_write_docs_when_body_file_rejected(make_env: Callable[..., WriteEnv], path: str) -> None:
+        """配信元の外・既にあるファイルを指す本文のファイル（異常系）。"""
+        # 準備
+        env = make_env(_notes_files(), tables=[_notes_table(), _rules_table()])
+        operations = [
+            Operation(op="create", kind="notes", data={"id": "n3", "path": path, "@body": "本文\n"}),
+            Operation(op="create", kind="notes", data={"id": "n4", "path": "n4.md", "@body": "本文\n"}),
+        ]
+        # 実行・検証
+>       with pytest.raises(ValidationFailedError) as exc_info:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValidationFailedError
+
+tests/unit/project_index/features/write/test_service.py:573: Failed
+____________ test_write_docs_when_body_file_rejected[existing_file] ____________
+
+make_env = <function make_env.<locals>._make at 0x779af8447060>, path = 'n1.md'
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            pytest.param("../../outside/n3.md", id="outside_source"),
+            pytest.param("n1.md", id="existing_file"),
+        ],
+    )
+    def test_write_docs_when_body_file_rejected(make_env: Callable[..., WriteEnv], path: str) -> None:
+        """配信元の外・既にあるファイルを指す本文のファイル（異常系）。"""
+        # 準備
+        env = make_env(_notes_files(), tables=[_notes_table(), _rules_table()])
+        operations = [
+            Operation(op="create", kind="notes", data={"id": "n3", "path": path, "@body": "本文\n"}),
+            Operation(op="create", kind="notes", data={"id": "n4", "path": "n4.md", "@body": "本文\n"}),
+        ]
+        # 実行・検証
+>       with pytest.raises(ValidationFailedError) as exc_info:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValidationFailedError
+
+tests/unit/project_index/features/write/test_service.py:573: Failed
+_____________ test_write_docs_when_body_not_accepted[no_body_file] _____________
+
+make_env = <function make_env.<locals>._make at 0x779af92207d0>
+operation = Operation(op='update', kind=None, id='doc-1', expected_version='20761b', data=None, set={'@body': 'x'}, unset=[], add_to={}, remove_from={}, text_edits=[])
+expected_path = 'operations[0].set.@body'
+
+    @pytest.mark.parametrize(
+        ("operation", "expected_path"),
+        [
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="doc-1",
+                    expected_version=content_hash(DOC_1),
+                    set={"@body": "x"},
+                ),
+                "operations[0].set.@body",
+                id="no_body_file",
+            ),
+            pytest.param(
+                Operation(op="create", kind="notes", data={"id": "n2", "path": "n2.md"}),
+                "operations[0].data.@body",
+                id="create_without_body",
+            ),
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="n1",
+                    expected_version=value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1]),
+                    set={"path": "other.md"},
+                ),
+                "operations[0].set.path",
+                id="body_file_column_changed",
+            ),
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="n1",
+                    expected_version=value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1]),
+                    unset=["@body"],
+                ),
+                "operations[0].unset",
+                id="unset_body",
+            ),
+        ],
+    )
+    def test_write_docs_when_body_not_accepted(
+        make_env: Callable[..., WriteEnv], operation: Operation, expected_path: str
+    ) -> None:
+        """@body を受け付けない操作（異常系）。"""
+        # 準備
+        env = make_env(_notes_files(), tables=[_notes_table(), _rules_table()])
+        # 実行・検証
+>       with pytest.raises(InvalidArgumentError) as exc_info:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE InvalidArgumentError
+
+tests/unit/project_index/features/write/test_service.py:629: Failed
+_________ test_write_docs_when_body_not_accepted[create_without_body] __________
+
+make_env = <function make_env.<locals>._make at 0x779af92e0a90>
+operation = Operation(op='create', kind='notes', id=None, expected_version=None, data={'id': 'n2', 'path': 'n2.md'}, set={}, unset=[], add_to={}, remove_from={}, text_edits=[])
+expected_path = 'operations[0].data.@body'
+
+    @pytest.mark.parametrize(
+        ("operation", "expected_path"),
+        [
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="doc-1",
+                    expected_version=content_hash(DOC_1),
+                    set={"@body": "x"},
+                ),
+                "operations[0].set.@body",
+                id="no_body_file",
+            ),
+            pytest.param(
+                Operation(op="create", kind="notes", data={"id": "n2", "path": "n2.md"}),
+                "operations[0].data.@body",
+                id="create_without_body",
+            ),
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="n1",
+                    expected_version=value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1]),
+                    set={"path": "other.md"},
+                ),
+                "operations[0].set.path",
+                id="body_file_column_changed",
+            ),
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="n1",
+                    expected_version=value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1]),
+                    unset=["@body"],
+                ),
+                "operations[0].unset",
+                id="unset_body",
+            ),
+        ],
+    )
+    def test_write_docs_when_body_not_accepted(
+        make_env: Callable[..., WriteEnv], operation: Operation, expected_path: str
+    ) -> None:
+        """@body を受け付けない操作（異常系）。"""
+        # 準備
+        env = make_env(_notes_files(), tables=[_notes_table(), _rules_table()])
+        # 実行・検証
+>       with pytest.raises(InvalidArgumentError) as exc_info:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE InvalidArgumentError
+
+tests/unit/project_index/features/write/test_service.py:629: Failed
+_______ test_write_docs_when_body_not_accepted[body_file_column_changed] _______
+
+make_env = <function make_env.<locals>._make at 0x779af92e21f0>
+operation = Operation(op='update', kind=None, id='n1', expected_version='eba65c', data=None, set={'path': 'other.md'}, unset=[], add_to={}, remove_from={}, text_edits=[])
+expected_path = 'operations[0].set.path'
+
+    @pytest.mark.parametrize(
+        ("operation", "expected_path"),
+        [
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="doc-1",
+                    expected_version=content_hash(DOC_1),
+                    set={"@body": "x"},
+                ),
+                "operations[0].set.@body",
+                id="no_body_file",
+            ),
+            pytest.param(
+                Operation(op="create", kind="notes", data={"id": "n2", "path": "n2.md"}),
+                "operations[0].data.@body",
+                id="create_without_body",
+            ),
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="n1",
+                    expected_version=value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1]),
+                    set={"path": "other.md"},
+                ),
+                "operations[0].set.path",
+                id="body_file_column_changed",
+            ),
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="n1",
+                    expected_version=value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1]),
+                    unset=["@body"],
+                ),
+                "operations[0].unset",
+                id="unset_body",
+            ),
+        ],
+    )
+    def test_write_docs_when_body_not_accepted(
+        make_env: Callable[..., WriteEnv], operation: Operation, expected_path: str
+    ) -> None:
+        """@body を受け付けない操作（異常系）。"""
+        # 準備
+        env = make_env(_notes_files(), tables=[_notes_table(), _rules_table()])
+        # 実行・検証
+        with pytest.raises(InvalidArgumentError) as exc_info:
+>           env.write(operations=[operation])
+
+tests/unit/project_index/features/write/test_service.py:630: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/project_index/features/write/test_service.py:85: in write
+    return write_docs(
+src/project_index/features/write/service.py:492: in write_docs
+    raise _atomic_error(applied.failures)
+src/project_index/features/write/service.py:533: in _apply_operations
+    item, table = _apply_one(
+src/project_index/features/write/service.py:615: in _apply_one
+    return _apply_existing_one(session, checker, operation, index, last_reads, now)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/project_index/features/write/service.py:688: in _apply_existing_one
+    check_version(existing, operation.expected_version, last_read=last_reads.get(existing.id))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+document = Document(id='n1', kind='notes', source_id='sample', path='notes/index.yaml', record_index=0, data={'id': 'n1', 'path':...00))), updated=datetime.datetime(2026, 11, 17, 1, 30, 35, tzinfo=datetime.timezone(datetime.timedelta(seconds=32400))))
+expected = 'eba65c', last_read = None
+
+    def check_version(
+        document: Document, expected: str | Mapping[str, str], *, last_read: LastRead | None
+    ) -> None:
+        """`expected_version` が今の文書と同じかを確かめる。"""
+        if isinstance(expected, str):
+            same = document.version == expected
+        else:
+            same = all(
+                value_hash(get_field(document.data, path)) == digest
+                for path, digest in expected.items()
+            )
+        if same:
+            return
+        diff = diff_lines(last_read.content, document.body) if last_read is not None else ""
+>       raise VersionMismatchError(
+            message=f"{document.id} は参照した後に変わっています（今のバージョン {document.version}）",
+            doc_id=document.id,
+            current=document.version,
+            diff=diff,
+            next_steps=["search_docs で再取得してから、新しいバージョンで再実行してください"],
+        )
+E       project_index.shared.errors.VersionMismatchError: n1 は参照した後に変わっています（今のバージョン 541c51）
+
+src/project_index/features/write/service.py:81: VersionMismatchError
+______________ test_write_docs_when_body_not_accepted[unset_body] ______________
+
+make_env = <function make_env.<locals>._make at 0x779af92e3b60>
+operation = Operation(op='update', kind=None, id='n1', expected_version='eba65c', data=None, set={}, unset=['@body'], add_to={}, remove_from={}, text_edits=[])
+expected_path = 'operations[0].unset'
+
+    @pytest.mark.parametrize(
+        ("operation", "expected_path"),
+        [
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="doc-1",
+                    expected_version=content_hash(DOC_1),
+                    set={"@body": "x"},
+                ),
+                "operations[0].set.@body",
+                id="no_body_file",
+            ),
+            pytest.param(
+                Operation(op="create", kind="notes", data={"id": "n2", "path": "n2.md"}),
+                "operations[0].data.@body",
+                id="create_without_body",
+            ),
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="n1",
+                    expected_version=value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1]),
+                    set={"path": "other.md"},
+                ),
+                "operations[0].set.path",
+                id="body_file_column_changed",
+            ),
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="n1",
+                    expected_version=value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1]),
+                    unset=["@body"],
+                ),
+                "operations[0].unset",
+                id="unset_body",
+            ),
+        ],
+    )
+    def test_write_docs_when_body_not_accepted(
+        make_env: Callable[..., WriteEnv], operation: Operation, expected_path: str
+    ) -> None:
+        """@body を受け付けない操作（異常系）。"""
+        # 準備
+        env = make_env(_notes_files(), tables=[_notes_table(), _rules_table()])
+        # 実行・検証
+        with pytest.raises(InvalidArgumentError) as exc_info:
+>           env.write(operations=[operation])
+
+tests/unit/project_index/features/write/test_service.py:630: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/project_index/features/write/test_service.py:85: in write
+    return write_docs(
+src/project_index/features/write/service.py:492: in write_docs
+    raise _atomic_error(applied.failures)
+src/project_index/features/write/service.py:533: in _apply_operations
+    item, table = _apply_one(
+src/project_index/features/write/service.py:615: in _apply_one
+    return _apply_existing_one(session, checker, operation, index, last_reads, now)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/project_index/features/write/service.py:688: in _apply_existing_one
+    check_version(existing, operation.expected_version, last_read=last_reads.get(existing.id))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+document = Document(id='n1', kind='notes', source_id='sample', path='notes/index.yaml', record_index=0, data={'id': 'n1', 'path':...00))), updated=datetime.datetime(2026, 11, 17, 1, 30, 35, tzinfo=datetime.timezone(datetime.timedelta(seconds=32400))))
+expected = 'eba65c', last_read = None
+
+    def check_version(
+        document: Document, expected: str | Mapping[str, str], *, last_read: LastRead | None
+    ) -> None:
+        """`expected_version` が今の文書と同じかを確かめる。"""
+        if isinstance(expected, str):
+            same = document.version == expected
+        else:
+            same = all(
+                value_hash(get_field(document.data, path)) == digest
+                for path, digest in expected.items()
+            )
+        if same:
+            return
+        diff = diff_lines(last_read.content, document.body) if last_read is not None else ""
+>       raise VersionMismatchError(
+            message=f"{document.id} は参照した後に変わっています（今のバージョン {document.version}）",
+            doc_id=document.id,
+            current=document.version,
+            diff=diff,
+            next_steps=["search_docs で再取得してから、新しいバージョンで再実行してください"],
+        )
+E       project_index.shared.errors.VersionMismatchError: n1 は参照した後に変わっています（今のバージョン 541c51）
+
+src/project_index/features/write/service.py:81: VersionMismatchError
+________________________ test_delete_docs_when_records _________________________
+
+make_env = <function make_env.<locals>._make at 0x779af8364e00>
+
+    def test_delete_docs_when_records(
+        make_env: Callable[..., WriteEnv],
+    ) -> None:
+        """配列の要素を消す（正常系）。"""
+        # 準備
+        files = {
+            "data/list.yaml": "items:\n  - id: a\n    path: a.txt\n  - id: b\n    path: b.txt\n",
+            "data/a.txt": "a\n",
+            "data/b.txt": "b\n",
+        }
+        table = DocumentTable(
+            id="items",
+            paths=["data/list.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            records="items",
+            body_file="path",
+        )
+        env = make_env(files, tables=[table])
+        targets = [
+            DeleteTarget(id="b", expected_version=value_hash([{"id": "b", "path": "b.txt"}, "b\n"]))
+        ]
+        # 実行
+>       env.delete(targets=targets)
+
+tests/unit/project_index/features/write/test_service.py:695: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/project_index/features/write/test_service.py:100: in delete
+    return delete_docs(
+src/project_index/features/write/service.py:866: in delete_docs
+    raise failures[0][1]
+src/project_index/features/write/service.py:852: in delete_docs
+    document, referrers = _delete_target(session, item, leaving, request.on_referenced)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/project_index/features/write/service.py:782: in _delete_target
+    check_version(document, item.expected_version, last_read=None)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+document = Document(id='b', kind='items', source_id='sample', path='data/list.yaml', record_index=1, data={'id': 'b', 'path': 'b....00))), updated=datetime.datetime(2026, 11, 17, 1, 30, 36, tzinfo=datetime.timezone(datetime.timedelta(seconds=32400))))
+expected = 'd286c0', last_read = None
+
+    def check_version(
+        document: Document, expected: str | Mapping[str, str], *, last_read: LastRead | None
+    ) -> None:
+        """`expected_version` が今の文書と同じかを確かめる。"""
+        if isinstance(expected, str):
+            same = document.version == expected
+        else:
+            same = all(
+                value_hash(get_field(document.data, path)) == digest
+                for path, digest in expected.items()
+            )
+        if same:
+            return
+        diff = diff_lines(last_read.content, document.body) if last_read is not None else ""
+>       raise VersionMismatchError(
+            message=f"{document.id} は参照した後に変わっています（今のバージョン {document.version}）",
+            doc_id=document.id,
+            current=document.version,
+            diff=diff,
+            next_steps=["search_docs で再取得してから、新しいバージョンで再実行してください"],
+        )
+E       project_index.shared.errors.VersionMismatchError: b は参照した後に変わっています（今のバージョン 16ddf5）
+
+src/project_index/features/write/service.py:81: VersionMismatchError
+____________________ test_delete_docs_when_body_file_shared ____________________
+
+make_env = <function make_env.<locals>._make at 0x779af8366e50>
+
+    def test_delete_docs_when_body_file_shared(
+        make_env: Callable[..., WriteEnv],
+    ) -> None:
+        """ほかの要素も指す本文のファイルを残す（正常系）。"""
+        # 準備
+        files = {
+            "notes/index.yaml": "items:\n  - id: n1\n    path: n1.md\n  - id: n3\n    path: n1.md\n",
+            "notes/n1.md": "# n1\n",
+        }
+        env = make_env(files, tables=[_notes_table()])
+        targets = [
+            DeleteTarget(
+                id="n3", expected_version=value_hash([{"id": "n3", "path": "n1.md"}, "# n1\n"])
+            )
+        ]
+        # 実行
+>       env.delete(targets=targets)
+
+tests/unit/project_index/features/write/test_service.py:720: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/project_index/features/write/test_service.py:100: in delete
+    return delete_docs(
+src/project_index/features/write/service.py:866: in delete_docs
+    raise failures[0][1]
+src/project_index/features/write/service.py:852: in delete_docs
+    document, referrers = _delete_target(session, item, leaving, request.on_referenced)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/project_index/features/write/service.py:782: in _delete_target
+    check_version(document, item.expected_version, last_read=None)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+document = Document(id='n3', kind='notes', source_id='sample', path='notes/index.yaml', record_index=1, data={'id': 'n3', 'path':...00))), updated=datetime.datetime(2026, 11, 17, 1, 30, 36, tzinfo=datetime.timezone(datetime.timedelta(seconds=32400))))
+expected = '8ee44b', last_read = None
+
+    def check_version(
+        document: Document, expected: str | Mapping[str, str], *, last_read: LastRead | None
+    ) -> None:
+        """`expected_version` が今の文書と同じかを確かめる。"""
+        if isinstance(expected, str):
+            same = document.version == expected
+        else:
+            same = all(
+                value_hash(get_field(document.data, path)) == digest
+                for path, digest in expected.items()
+            )
+        if same:
+            return
+        diff = diff_lines(last_read.content, document.body) if last_read is not None else ""
+>       raise VersionMismatchError(
+            message=f"{document.id} は参照した後に変わっています（今のバージョン {document.version}）",
+            doc_id=document.id,
+            current=document.version,
+            diff=diff,
+            next_steps=["search_docs で再取得してから、新しいバージョンで再実行してください"],
+        )
+E       project_index.shared.errors.VersionMismatchError: n3 は参照した後に変わっています（今のバージョン cd2f6d）
+
+src/project_index/features/write/service.py:81: VersionMismatchError
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/documents/test_loader.py
+ERROR tests/unit/project_index/features/write/test_apply.py
+FAILED tests/unit/project_index/features/settings/test_route.py::test_build_settings_router_when_write_without_version
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_body_file
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_body_file_rejected[outside_source]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_body_file_rejected[existing_file]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_body_not_accepted[no_body_file]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_body_not_accepted[create_without_body]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_body_not_accepted[body_file_column_changed]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_body_not_accepted[unset_body]
+FAILED tests/unit/project_index/features/write/test_service.py::test_delete_docs_when_records
+FAILED tests/unit/project_index/features/write/test_service.py::test_delete_docs_when_body_file_shared
+10 failed, 917 passed, 2 errors in 58.88s
+exit=1

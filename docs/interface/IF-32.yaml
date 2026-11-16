@@ -22,7 +22,7 @@ flows:
         participant E as POST /settings/sources
         participant F as settings.yaml
 
-        C->>E: extra の行
+        C->>E: expectedVersion, extra の行
         E->>E: オリジンを確かめ、追加後の端末の設定をスキーマで検証する
         E->>F: sources の末尾に追加し、extra の配信元だけを読み込む
         E-->>C: 201 added
@@ -51,7 +51,7 @@ flows:
         participant E as POST /settings/sources
         participant F as settings.yaml
 
-        C->>E: extra の行
+        C->>E: expectedVersion, extra の行
         E->>E: 追加後の端末の設定をスキーマで検証する（mindstella は違反にしない）
         E->>F: sources の末尾に追加し、配信元を読み直す
         E-->>C: 201 added と警告
@@ -80,9 +80,9 @@ flows:
         participant C as クライアント
         participant E as POST /settings/sources
 
-        C->>E: extra と同じ内容の行
+        C->>E: expectedVersion, extra と同じ内容の行
         E-->>C: 409 same: true
-        C->>E: extra と config が違う行
+        C->>E: expectedVersion, extra と config が違う行
         E-->>C: 409 same: false
       ```
 
@@ -106,7 +106,7 @@ flows:
         participant C as クライアント
         participant E as POST /settings/sources
 
-        C->>E: id が Sample Docs の行
+        C->>E: expectedVersion, id が Sample Docs の行
         E-->>C: 422 errors
       ```
 
@@ -145,6 +145,32 @@ flows:
       - 409 で、`current` がコメントを追記した後の内容のバージョン
       - '`settings.yaml` が追記した内容のままで、extra の行が無い'
     test: test_error_when_version_outdated
+  - name: 異常系（内容のバージョンが無い・400）
+    summary: 内容のバージョンを添えない追加を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample の 1 行'
+      - name: 入力
+        description: '`expectedVersion` を持たない extra の行'
+    flow: |-
+      <!-- map: {"title": "異常系（内容のバージョンが無い・400）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as POST /settings/sources
+
+        C->>E: extra の行（expectedVersion なし）
+        E-->>C: 400 problem+json（errors に expectedVersion）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 400 で、`errors[]` に `expectedVersion` のパスと理由がある
+      - '`settings.yaml` が変わらず、extra の行が無い'
+    test: test_error_when_version_missing
   - name: 正常系（読み書きの方法を持つ行を追加する）
     summary: '`storage.type: disk` を持つ行を追加し、disk の配信元として読み込む'
     setup:
@@ -185,6 +211,7 @@ callers:
   - SC-12#scenarios[正常シナリオ（同じ id の行がある）]
   - SC-12#scenarios[正常シナリオ（端末の設定の最上位に知らないキーがある）]
   - SC-12#scenarios[異常シナリオ（取得した後にほかの書き換えが入った）]
+  - SC-12#scenarios[異常シナリオ（バージョンを添えずに書き換える）]
 exclusivity: 内容のバージョンの照合と端末の設定の書き込みは、端末の設定の保存と同じ排他で 1 つずつ
 request:
   - name: source
@@ -194,13 +221,12 @@ request:
     description: 追加する配信元の行（端末の設定の保存の `sources[]` の要素と同じキー）
   - name: expectedVersion
     type: str
-    required: false
-    default: なし（照合せずに追加する）
+    required: true
     location: body
     description: 取得したときの端末の設定の内容のバージョン。今の内容のバージョンと違えば追加しない
 request_example: |-
   ```json
-  {"source": {"id": "extra", "config": "/path/to/extra/project-index.yaml", "scope": {"read": ["/path/to/extra/**"]}}}
+  {"expectedVersion": "a1b2c3", "source": {"id": "extra", "config": "/path/to/extra/project-index.yaml", "scope": {"read": ["/path/to/extra/**"]}}}
   ```
 response:
   - name: result
@@ -242,6 +268,9 @@ status_codes:
   - code: '409'
     condition: '`expectedVersion` が今の端末の設定の内容のバージョンと違う'
     notes: 同じ id の行がある 409 と違い、problem+json で拡張メンバー `current` に今の内容のバージョンを入れる
+  - code: '400'
+    condition: '`expectedVersion` が無い'
+    notes: 要求の型の検証の失敗。起動の『例外の変換の登録』が `InvalidArgumentError` の problem+json にし、`errors[]` にキーのパスと理由を並べる
 error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`・`current`）
 constraints:
   - item: オリジンの確認
@@ -258,7 +287,7 @@ constraints:
   - item: JSON のキー
     constraint: レスポンスのキーは camelCase。行のキーは端末の設定のキーのまま
   - item: 内容のバージョンの照合
-    constraint: '`expectedVersion` を送信したときだけ、排他ロックを取った後に `settings.yaml` の内容のバージョンと照合し、同じ id の行の確認より前に断る'
+    constraint: '排他ロックを取った後に `settings.yaml` の内容のバージョンと照合し、同じ id の行の確認より前に断る。フローの `expectedVersion` は、直前に `GET /settings/sources` で取得した `version`'
   - item: 読み直しの範囲
     constraint: 追加した行の配信元だけを読み込み、ほかの配信元は読み直さない
 test_file: tests/integration/server/test_add_settings_source.py

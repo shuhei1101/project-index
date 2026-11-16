@@ -64,11 +64,10 @@ functions:
         description: 端末の設定の読み書きと読み直しの排他
       - name: expected_version
         title: 取得したときの内容のバージョン
-        type: str | None
-        required: false
-        default: None
+        type: str
+        required: true
         passing: keyword
-        description: '`None` は照合しない'
+        description: '今の内容のバージョンと照合する'
     returns:
       type: SourceWriteResult
       description: 読み直した後の配信元ごとの状態と、書き換えた後の端末の設定の内容のバージョン
@@ -205,11 +204,10 @@ functions:
         description: 端末の設定の読み書きと読み直しの排他（配信元の保存と同じ）
       - name: expected_version
         title: 取得したときの内容のバージョン
-        type: str | None
-        required: false
-        default: None
+        type: str
+        required: true
         passing: keyword
-        description: '`None` は照合しない'
+        description: '今の内容のバージョンと照合する'
     returns:
       type: SourceAddResult
       description: '`added` と読み直した後の状態か、`exists` と内容が同じか。どちらも端末の設定の内容のバージョンを持つ'

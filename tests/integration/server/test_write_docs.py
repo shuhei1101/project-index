@@ -7,7 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from project_index.shared.hashing import content_hash
+from project_index.shared.hashing import content_hash, value_hash
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
@@ -1345,3 +1345,193 @@ def test_error_when_validator_timed_out(
         in result.text
     )
     assert target.read_text(encoding="utf-8") == before_text
+
+
+NOTES_ROW = (
+    "  - id: notes\n"
+    "    paths: [notes/index.yaml]\n"
+    "    schema: schemas/notes.schema.yaml\n"
+    "    records: items\n"
+    "    body_file: path\n"
+)
+NOTES_SCHEMA = (
+    "type: object\n"
+    "properties:\n"
+    "  items:\n"
+    "    type: array\n"
+    "    items:\n"
+    "      type: object\n"
+    "      properties:\n"
+    "        id: {type: string}\n"
+    "        path: {type: string}\n"
+)
+NOTES = "items:\n  - id: n1\n    path: n1.md\n"
+NOTE_1 = "# n1\n古い行\n"
+
+
+def _notes_files(
+    sample_file_set: Callable[..., dict[str, str]], sample_config_text: Callable[..., str]
+) -> dict[str, str]:
+    """本文のファイルを持つ行 `notes` と、sample の文書を持つ配信元のファイル一式を返す。"""
+    return sample_file_set(
+        **{
+            "project-index.yaml": sample_config_text(NOTES_ROW),
+            "schemas/notes.schema.yaml": NOTES_SCHEMA,
+            "notes/index.yaml": NOTES,
+            "notes/n1.md": NOTE_1,
+        }
+    )
+
+
+def test_normal_when_body_file(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """`records`・`body_file` の行で、要素と本文のファイルを作成・一部の置き換え・全体の置き換えをする（正常系）。"""
+    # 準備
+    files = _notes_files(sample_file_set, sample_config_text)
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    n1_version = value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1])
+    edit = _update(
+        "n1", n1_version, text_edits=[{"field": "@body", "old": "古い行", "new": "新しい行"}]
+    )
+    common = {"cwd": str(source.folder), "worktree": str(worktree)}
+    # 実行
+    created = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            {
+                "op": "create",
+                "kind": "notes",
+                "data": {"id": "n2", "path": "n2.md", "@body": "本文\n"},
+            }
+        ],
+    )
+    created_text = (worktree / "notes" / "n2.md").read_text(encoding="utf-8")
+    tried = env.call("write_docs", **common, operations=[edit], dry_run=True)
+    tried_text = (worktree / "notes" / "n1.md").read_text(encoding="utf-8")
+    edited = env.call("write_docs", **common, operations=[edit])
+    searched = env.call(
+        "search_docs",
+        **common,
+        filter={"field": "id", "op": "eq", "values": ["n1"]},
+        format="json",
+    )
+    stale = env.call("write_docs", **common, operations=[edit])
+    replaced = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            _update("n2", created.data["results"][0]["version"], set={"@body": "置き換えた本文\n"})
+        ],
+    )
+    # 検証
+    index = load_yaml((worktree / "notes" / "index.yaml").read_text(encoding="utf-8"))
+    assert not created.is_error
+    assert index["items"] == [{"id": "n1", "path": "n1.md"}, {"id": "n2", "path": "n2.md"}]
+    assert created_text == "本文\n"
+    assert tried.data["applied"] is False
+    assert "@@ notes/n1.md" in tried.data["results"][0]["diff"]
+    assert "新しい行" in tried.data["results"][0]["diff"]
+    assert tried_text == NOTE_1
+    assert not edited.is_error
+    assert edited.data["results"][0]["version"] != n1_version
+    assert searched.data["items"][0]["values"]["version"] == edited.data["results"][0]["version"]
+    assert (worktree / "notes" / "n1.md").read_text(encoding="utf-8") == "# n1\n新しい行\n"
+    assert stale.is_error
+    assert "VersionMismatchError" in stale.text
+    assert not replaced.is_error
+    assert (worktree / "notes" / "n2.md").read_text(encoding="utf-8") == "置き換えた本文\n"
+
+
+def test_error_when_body_file_outside_source(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """配信元の外へ解かれる本文のファイルのパスの `create` を断り、何も書かない（異常系）。"""
+    # 準備
+    files = _notes_files(sample_file_set, sample_config_text)
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    common = {"cwd": str(source.folder), "worktree": str(worktree)}
+    n4 = {"op": "create", "kind": "notes", "data": {"id": "n4", "path": "n4.md", "@body": "本文\n"}}
+    # 実行
+    outside = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            {
+                "op": "create",
+                "kind": "notes",
+                "data": {"id": "n3", "path": "../../outside/n3.md", "@body": "本文\n"},
+            },
+            n4,
+        ],
+    )
+    existing = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            {
+                "op": "create",
+                "kind": "notes",
+                "data": {"id": "n3", "path": "n1.md", "@body": "本文\n"},
+            }
+        ],
+    )
+    # 検証
+    assert outside.is_error
+    assert "ValidationFailedError" in outside.text
+    assert "operations[0].path" in outside.text
+    assert existing.is_error
+    assert "operations[0].path" in existing.text
+    assert (worktree / "notes" / "index.yaml").read_text(encoding="utf-8") == NOTES
+    assert (worktree / "notes" / "n1.md").read_text(encoding="utf-8") == NOTE_1
+    assert not (worktree / "notes" / "n4.md").exists()
+    assert not (worktree.parent / "outside").exists()
+
+
+def test_error_when_body_not_accepted(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """`@body` を受けられない操作と、`body_file` の列の値を変える操作を断る（異常系）。"""
+    # 準備
+    files = _notes_files(sample_file_set, sample_config_text)
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    common = {"cwd": str(source.folder), "worktree": str(worktree)}
+    doc_1 = worktree / "docs" / "doc-1.yaml"
+    doc_1_before = doc_1.read_text(encoding="utf-8")
+    n1_version = value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1])
+    # 実行
+    no_body_file = env.call(
+        "write_docs", **common, operations=[_update("doc-1", _version(doc_1), set={"@body": "x"})]
+    )
+    without_body = env.call(
+        "write_docs",
+        **common,
+        operations=[{"op": "create", "kind": "notes", "data": {"id": "n2", "path": "n2.md"}}],
+    )
+    moved = env.call(
+        "write_docs", **common, operations=[_update("n1", n1_version, set={"path": "other.md"})]
+    )
+    # 検証
+    assert no_body_file.is_error
+    assert "InvalidArgumentError" in no_body_file.text
+    assert "operations[0].set.@body" in no_body_file.text
+    assert without_body.is_error
+    assert "operations[0].data.@body" in without_body.text
+    assert moved.is_error
+    assert "operations[0].set.path" in moved.text
+    assert doc_1.read_text(encoding="utf-8") == doc_1_before
+    assert (worktree / "notes" / "index.yaml").read_text(encoding="utf-8") == NOTES
+    assert (worktree / "notes" / "n1.md").read_text(encoding="utf-8") == NOTE_1

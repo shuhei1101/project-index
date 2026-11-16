@@ -284,6 +284,21 @@ YAML として読めないファイルがあっても、そのファイルを除
 共通のキーとその列名を同じ操作に両方渡すと、`InvalidArgumentError` です。
 種類ごとの対応は `describe(source, kind)` で引けます。
 
+`records`・`body_file` の行の文書は、本文のファイルを `@body` で書きます。
+`@body` は種類の列名と重ならないキーで、`body_file` の列の名前が `body` の配信元でも `body` は列を指します。
+
+| 操作 | 本文のファイル |
+| --- | --- |
+| `create` | `data` の `body_file` の列（管理用の YAML のフォルダからの相対）に、`data.@body` の内容で作成する。`@body` は必須 |
+| `update` の `set` | `@body` の内容で全体を置き換える |
+| `update` の `text_edits` | `field: @body` で一部を置き換える |
+| `replace` | `data` に `@body` があれば置き換え、無ければ変えない |
+
+本文のファイルのパスが配信元の外を指すとき・`create` で既にあるファイルを指すときは、`body_file` の列の違反で、要素も本文のファイルも書き込みません。
+`body_file` の列の値を変える操作と、`body_file` を持たない行の文書への `@body` は `InvalidArgumentError` です。
+本文のファイルはスキーマ・`validators[]`・mdmark の点検に通しません。
+これらの文書の `version` は要素と本文のファイルの両方から求め、`diff` は要素の差分の行に続けて `@@ {本文のファイルのパス}` の行と本文のファイルの差分の行を並べます。
+
 行の `metadata` が `tags: tags[].name` のとき、`tags` への操作はオブジェクトの配列へ書き戻し、元の要素の `main` などのキーを保ちます。
 
 | 操作 | `tags` | `main_tags`（`tags[main].name`） |
@@ -324,6 +339,7 @@ Git の配信元で消した文書は Git で戻せます。
 
 レスポンスは `applied` と `results[]`（`status` は `deleted`・`failed`）、`on_referenced: unlink` のときの `unlinked[]`（参照を外した文書の `id`・`version`）です。
 Git 管理外の配信元と `storage.type: disk` の配信元では、種類の `documents[].writable` が削除を許していることが要ります。
+`records`・`body_file` の行の文書は、本文のファイルも削除します。同じ管理用の YAML のほかの要素が同じ本文のファイルを指すときは残します。
 
 ## describe
 
