@@ -94,7 +94,7 @@ def test_prompt_to_markdown(reflection_yaml: str) -> None:
     assert "badge:kind: llm" in result
     assert "badge:lang: en" in result
     assert result.index("\n### 既定の例\n") < result.index("\n### ログが無い\n")
-    assert re.search(r"\n### ログが無い\n+<!-- section: closed -->\n", result)
+    assert re.search(r'\n### ログが無い\n+<!-- section: \{"open": false\} -->\n', result)
     assert (
         result.index("\n### role\n")
         < result.index("\n### now\n")
@@ -271,7 +271,7 @@ def test_lang_tabs() -> None:
     result = "\n".join(lang_tabs(["en", "ja"], lambda lang: [f"body-{lang}"]))
     # 検証
     assert (
-        result.index("<!-- tabs: group=lang -->")
+        result.index('<!-- tabs: {"group": "lang"} -->')
         < result.index("#### en")
         < result.index("#### ja")
         < result.index("<!-- /tabs -->")
