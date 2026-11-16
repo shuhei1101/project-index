@@ -138,6 +138,30 @@ flows:
       - 200 で、extra の行の `outsideRead` が `false`
       - '`outside_read` を記載していない sample の行の `outsideRead` が `true`'
     test: test_normal_when_outside_read_false
+  - name: 正常系（読み書きの方法を持つ行がある）
+    summary: '`storage` を持つ行だけに `storage.type` を返す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample（`storage` 無し）と company（`storage.type: disk`）の 2 行'
+    flow: |-
+      <!-- map: {"title": "正常系（読み書きの方法を持つ行がある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /settings/sources
+
+        C->>E: GET /settings/sources
+        E-->>C: 200 sample と company の行
+      ```
+
+      <!-- /map -->
+    expected:
+      - company の行の `storage.type` が `disk`
+      - sample の行は `storage` を持たない
+    test: test_normal_when_storage_given
 lead: '端末の設定の配信元と配信元ごとの状態を返却する端末の設定の API の入出力を定め、端末の設定の取得を修正するときに参照する。'
 identifier: get_settings_sources
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
@@ -187,6 +211,10 @@ response:
   - name: warnings[].reason
     type: str
     description: project-index が知らないキーで、値を使わずにファイルに残すこと
+  - name: sources[].storage.type
+    type: Literal['git', 'disk'] | None
+    description: 端末の設定の行の読み書きの方法
+    notes: 書いていない行は `storage` を返さない
 status_codes:
   - code: '200'
     condition: 返した（配信元が 0 件でも 200）

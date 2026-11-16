@@ -885,6 +885,63 @@ flows:
       - サーバーのログに `ツールの処理に失敗した（search_docs）` と例外のトレースバックが残る
       - 続けての `ref` を省いた `search_docs` は文書を返却する
     test: test_error_when_unexpected
+  - name: 正常系（disk の配信元をワークツリーの作業場所から引く）
+    summary: disk の配信元はワークツリーに読み替えず、登録したフォルダの文書と文書の日時を返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: ローカル運用の配信元
+        description: 'Git のリポジトリの中の `storage.type: disk` の配信元。文書 1（`created`・`updated` を持つ）と文書 2（持たない）'
+        notes: id `company`。`scope.read` は `{company のクローン本体}/**`（ワークツリーを配信元のフォルダとみなさないため）。`.claude/worktrees/x` のワークツリーは project-index のファイルを持たない
+      - name: 入力
+        description: '`cwd` をワークツリー x にした `source: company`・`view: full`・`fields: [id, created, updated]`'
+    flow: |-
+      <!-- map: {"title": "正常系（disk の配信元をワークツリーの作業場所から引く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+        participant F as company のクローン本体
+
+        C->>T: cwd: ワークツリー x, source: company
+        T->>T: worktrees に当たってもワークツリーに読み替えない
+        T-->>F: 登録したフォルダの文書を読む
+        T-->>C: 文書 1・文書 2
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`items[].path` が company のクローン本体の中の絶対パス'
+      - 文書 1 の `created`・`updated` が文書の値で、文書 2 は空
+    test: test_normal_when_disk_storage
+  - name: 異常系（disk の配信元に ref を指定する・InvalidArgumentError）
+    summary: disk の配信元への `ref`・`worktree` の指定を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: ローカル運用の配信元
+        description: 正常系（disk の配信元をワークツリーの作業場所から引く）と同じ company
+        notes: '`develop` ブランチがある'
+      - name: 入力
+        description: '`source: company`・`ref: develop`'
+    flow: |-
+      <!-- map: {"title": "異常系（disk の配信元に ref を指定する・InvalidArgumentError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+
+        C->>T: source: company, ref: develop
+        T-->>C: isError（company は ref を指定できない）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、company が disk の配信元のため `ref` を指定できない理由を返す'
+      - '`worktree` を指定しても同じ理由の `isError: true` を返す'
+    test: test_error_when_ref_given_to_disk_source
 lead: '条件に該当する文書の取得・一覧・件数・集計を返却する `search_docs` の入出力を定め、`search_docs` を修正するときに参照する。'
 identifier: search_docs
 permissions: 対象の配信元の `scope.read` か `scope.write` に `cwd` が当たること
@@ -1261,7 +1318,7 @@ exceptions:
   - name: WorktreeNotMatchedError
     condition: '`worktree` が配信元の `worktrees` に当たらない'
   - name: InvalidArgumentError
-    condition: '知らない項目・型の合わない値を条件・並べ替え・`group_by` に渡した、束に `and`・`or`・`not` のキーを 2 つ以上持たせた、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満'
+    condition: '知らない項目・型の合わない値を条件・並べ替え・`group_by` に渡した、束に `and`・`or`・`not` のキーを 2 つ以上持たせた、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満、`storage.type: disk` の配信元に `ref`・`worktree` を渡した'
     notes: 項目のパス・期待する型・実際の値と、`describe(source, kind)` でスキーマを見ることを添える
   - name: RefNotFoundError
     condition: '`ref` を commit に解決できない'
@@ -1324,6 +1381,8 @@ constraints:
   - item: 想定外の例外
     constraint: '`ProjectIndexError` でない例外は、`UnexpectedError: {例外の型}: {内容}` を本文にした `isError: true` の応答にする。`Error executing tool` だけの応答にしない'
     notes: 文書の MCP の全てのツールに共通する
+  - item: disk の配信元
+    constraint: '端末の設定の行が `storage.type: disk` の配信元は、作業場所が `worktrees[]` に当たっても登録したフォルダの文書を返す。`ref`・`worktree` を指定すると `InvalidArgumentError`。ファイルの日時は文書の `created`・`updated` の値（無ければ空）'
 refs:
   - SC-6#scenarios[正常シナリオ]
   - SC-9#scenarios[正常シナリオ]

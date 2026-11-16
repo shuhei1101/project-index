@@ -401,6 +401,7 @@ functions:
          - `SourceNotReadableError` の `fix` は、ID 1 つの配信元の `outside_read` が真で `outside_scope` を渡していないときだけ、`outside_scope: true` で作業範囲の外（参考）として読めることを案内する
       3. 配信元が 2 つ以上で `ref` か `worktree` を渡された場合、`InvalidArgumentError` を送る
       4. 配信元ごとに場所を決める
+         - 配信元の `storage` が `disk` で `ref` か `worktree` を渡された場合、`InvalidArgumentError` を送る（`disk` の配信元は `worktree_globs` が空のため、`cwd` がワークツリーの中でも `root` を `ref` なしで読む）
          - `worktree` を渡された場合、そのパスがワークツリーに当たらなければ `WorktreeNotMatchedError` を送る。当たればそのワークツリーを `ref` なしで読む
          - `ref` を渡された場合、Git の管理外の配信元なら `InvalidArgumentError` を送る。そうでなければ `root` をその `ref` で読む
          - どちらも無く、`cwd` が配信元のワークツリーの中の場合、そのワークツリーを `ref` なしで読む
@@ -417,7 +418,7 @@ functions:
         condition: '`worktree` が配信元の `worktrees` に当たらない'
         message: '`{worktree} は {id} のワークツリーに該当しません`'
       - name: InvalidArgumentError
-        condition: 複数の配信元に `ref`・`worktree` を渡した、または Git の管理外の配信元に `ref` を渡した
+        condition: 複数の配信元に `ref`・`worktree` を渡した、または Git の管理外の配信元に `ref` を渡した、`storage` が `disk` の配信元に `ref`・`worktree` を渡した
         message: '`ref は 1 つの Git の配信元を指すときだけ指定できます`'
       - name: RefNotFoundError
         condition: '`ref`（渡されなければ `default_ref`）を commit に解けない'
@@ -510,6 +511,19 @@ functions:
         mock: 配信元の一覧（偽物）
         expected: '`SourceNotReadableError` の `fix` に `outside_scope: true`'
         exception: '`scope` に当たらない'
+      - name: test_resolve_read_targets_when_disk_storage_worktree_cwd
+        case: 正常
+        summary: disk の配信元はワークツリーに読み替えない
+        condition: '`storage: disk`・`worktree_globs` が空の配信元で、`cwd` が `{root}/.claude/worktrees/x`'
+        mock: なし
+        expected: '`Target` の `base` が `root`、`worktree`・`commit` が `None`'
+      - name: test_resolve_read_targets_when_disk_storage_ref
+        case: 異常
+        summary: disk の配信元に ref・worktree を渡す
+        condition: '`storage: disk` の配信元に `ref="develop"`、別に `worktree` を渡す'
+        mock: なし
+        expected: どちらも `InvalidArgumentError`
+        exception: disk の配信元に ref・worktree を渡した
   - name: resolve_write_target
     title: 書く場所の解決
     kind: 関数
@@ -554,6 +568,7 @@ functions:
       1. `cwd` を正規化し、配信元を決める。`None` なら作業中の配信元、無ければ使える配信元を添えた `SourceNotWritableError` を送る
       2. 権限が `write` でなければ、使える配信元を添えた `SourceNotWritableError` を送る
       3. 書くワークツリーを決める
+         - 配信元の `storage` が `disk` で `worktree` を渡された場合、`InvalidArgumentError` を送る（`disk` は `is_git` が偽のため、手順 4 を通らず `root` へ書く）
          - `worktree` を渡された場合、当たらなければ `WorktreeNotMatchedError` を送る
          - 渡されず、`cwd` がワークツリーの中ならそのワークツリー
       4. ワークツリーが無く、配信元が Git の配信元の場合、`clone` にクローン本体（`main_root`、無ければ `repo_root`）を入れた `TargetIsCloneError` を送る
@@ -572,6 +587,9 @@ functions:
       - name: ValidationFailedError
         condition: ワークツリーの配信元の設定が検証に通らない
         message: 作業場所の配信元の読み込みの `ValidationFailedError` をそのまま送る
+      - name: InvalidArgumentError
+        condition: '`storage` が `disk` の配信元に `worktree` を渡した'
+        message: '`{id} は disk の配信元のため worktree を指定できません`'
     unit_tests:
       - name: test_resolve_write_target
         case: 正常
@@ -625,6 +643,19 @@ functions:
         mock: 配信元の一覧（偽物）・作業場所の配信元の読み込み（`ValidationFailedError` を送る偽物）
         expected: '`ValidationFailedError` がそのまま送られる'
         exception: ワークツリーの設定が検証に通らない
+      - name: test_resolve_write_target_when_disk_storage
+        case: 正常
+        summary: disk の配信元はクローン本体へ書く
+        condition: 'Git のリポジトリの中の `storage: disk` の配信元で、`cwd` が `root`'
+        mock: なし
+        expected: '`TargetIsCloneError` を送らず、`Target` の `base` が `root`'
+      - name: test_resolve_write_target_when_disk_storage_worktree
+        case: 異常
+        summary: disk の配信元に worktree を渡す
+        condition: '`storage: disk` の配信元に `worktree` を渡す'
+        mock: なし
+        expected: '`InvalidArgumentError`'
+        exception: disk の配信元に worktree を渡した
 refs:
   - IF-2#
   - IF-6#

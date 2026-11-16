@@ -400,6 +400,37 @@ scenarios:
       - '`describe` が 2 回目に書き換えた `description` を返却する'
       - '`reload` の前後で `/mcp` のセッションが切れない'
     test: test_normal_when_reloaded_before_checks_finish
+  - name: 正常シナリオ（disk の配信元の設定を reload で反映する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: ローカル運用の配信元
+        description: 起動するの『正常シナリオ（disk を指定した配信元を Git を参照せずに配信する）』と同じ配信中の company
+        notes: '`project-index.local.yaml` の `description` を書き換え、commit しない'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（disk の配信元の設定を reload で反映する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 利用者・エージェント
+        participant AD as 管理の MCP
+        participant DM as 文書の MCP
+
+        A->>DM: describe(source: company)
+        DM-->>A: 書き換える前の description
+        A->>AD: check_project（company の project-index.local.yaml の絶対パス, storage.type: disk）
+        AD-->>A: 違反 0 件
+        A->>AD: reload
+        A->>DM: describe(source: company)
+        DM-->>A: 新しい description
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`reload` の前の `describe` が書き換える前の `description` を返却する'
+      - '`storage.type: disk` と設定のファイルの絶対パスを指定した `check_project` が、`default_ref` に設定が無い違反を出さずに違反 0 件を返却する'
+      - '`reload` の後の `describe` が書き換えた `description` を返却する'
+    test: test_normal_when_disk_storage_reloaded
 lead: 利用者かエージェントが配信元の設定・スキーマ・スクリプトを変え、管理の MCP で確認してから `reload` で配信に入れるシナリオを定め、設定の変更の流れを変えるときに参照する。
 issue: 14
 primary_actor: 利用者・エージェント（Claude Code）

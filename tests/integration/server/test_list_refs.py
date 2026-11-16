@@ -63,3 +63,24 @@ def test_error_when_source_not_found(
     assert response.status_code == 404
     assert response.headers["content-type"].startswith("application/problem+json")
     assert "unknown" in body["detail"]
+
+
+def test_normal_when_disk_storage(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """Git のリポジトリの中の disk の配信元も git: false を返す（正常系）。"""
+    # 準備
+    company = make_source("company", storage="disk")
+    run_git(company.folder, "branch", "master")
+    env = make_server(company)
+    # 実行
+    response = env.client.get("/sources/company/refs")
+    # 検証
+    body = response.json()
+    assert response.status_code == 200
+    assert body["git"] is False
+    assert body["branches"] == []
+    assert body["tags"] == []
+    assert body["commits"] == []

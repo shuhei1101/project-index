@@ -401,3 +401,38 @@ def test_normal_when_outside_scope(
     assert any(cwd in message and "other" in message for message in logs)
     assert refused.is_error
     assert "SourceNotReadableError" in refused.text
+
+
+def test_normal_when_disk_storage(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """disk の配信元は、前回読んだ時点から直接編集した文書を返す（正常系）。"""
+    # 準備
+    company = make_source("company", storage="disk")
+    env = make_server(company)
+    arguments = {"cwd": str(company.folder), "source": "company", "session_id": "s1"}
+    env.call("search_docs", view="full", **arguments)
+    (company.folder / "docs" / "doc-2.yaml").write_text(
+        "id: doc-2\nname: 文書 2 の新しい名前\n", encoding="utf-8"
+    )
+    # 実行
+    result = env.call("list_changes", format="json", **arguments)
+    # 検証
+    assert not result.is_error
+    assert [item["id"] for item in result.data["items"]] == ["doc-2"]
+
+
+def test_error_when_range_given_to_disk_source(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """disk の配信元への区間の指定を断る（異常系）。"""
+    # 準備
+    company = make_source("company", storage="disk")
+    env = make_server(company)
+    # 実行
+    result = env.call(
+        "list_changes", cwd=str(company.folder), source="company", **{"from": "develop"}
+    )
+    # 検証
+    assert result.is_error
+    assert "company は disk の配信元のため区間を指定できません" in result.text

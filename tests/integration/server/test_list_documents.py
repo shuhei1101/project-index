@@ -212,3 +212,24 @@ def test_error_when_revision_export_times_out(
     assert f"{GIT_ARCHIVE_TIMEOUT_SEC:g} 秒" in body["detail"]
     assert list((env.state_dir / "snapshots").glob("*/*.tmp")) == []
     assert latest.status_code == 200
+
+
+def test_normal_when_disk_storage(
+    make_local_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """disk の配信元は ref を無視して登録したフォルダの文書を返す（正常系）。"""
+    # 準備
+    company = make_local_source()
+    run_git(company.folder, "branch", "master")
+    env = make_server(company)
+    # 実行
+    response = env.client.get("/sources/company/docs", params={"ref": "master"})
+    # 検証
+    body = response.json()
+    assert response.status_code == 200
+    assert body["ref"] == ""
+    assert [(row["path"], row["bodyPath"]) for row in body["documents"]] == [
+        ("files.local.yaml", "src/app.py")
+    ]

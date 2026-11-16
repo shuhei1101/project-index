@@ -397,3 +397,41 @@ def test_normal_when_paths_base_or_paths_out_of_range(
     ]
     assert "violations" not in ok.data or ok.data["violations"] == []
     assert env.handlers.registry.statuses() == before
+
+
+def test_normal_when_disk_storage(
+    make_local_source: Callable[..., Any],
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+) -> None:
+    """storage_type: disk と設定のファイルの絶対パスで、commit していない配信元を検査する（正常系）。"""
+    # 準備（company は端末の設定に行が無い）
+    company = make_local_source()
+    env = make_server(make_source("sample"))
+    config = str(company.config[0])
+    # 実行
+    result = env.call_admin("check_project", path=config, storage_type="disk", format="json")
+    # 検証
+    assert not result.is_error
+    assert "violations" not in result.data
+    assert result.data["sync"]["unindexed_files"] == 0
+    assert "items" not in result.data["sync"]
+
+
+def test_normal_when_local_files_excluded(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_sync_file_set: Callable[..., dict[str, str]],
+    write_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    """コミットする運用の配信元でも *.local.* の名前のファイルを索引に無いファイルに数えない（正常系）。"""
+    # 準備
+    sample = make_source("sample", sample_sync_file_set(0))
+    write_files(sample.folder, {"src/settings.local.json": "{}\n"})
+    env = make_server(sample)
+    # 実行
+    result = env.call_admin("check_project", path=str(sample.folder), format="json")
+    # 検証
+    assert not result.is_error
+    assert result.data["sync"]["unindexed_files"] == 0
+    assert "items" not in result.data["sync"]

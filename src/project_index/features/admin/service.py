@@ -77,7 +77,7 @@ from project_index.shared.yaml_io import YamlLoadError, dump_roundtrip, load_rou
 if TYPE_CHECKING:
     from project_index.features.convert.types import Converted
     from project_index.features.documents.types import Document
-    from project_index.features.sources.types import DocumentTable
+    from project_index.features.sources.types import DocumentTable, StorageType
     from project_index.main import Handlers
 
 logger = logging.getLogger(__name__)
@@ -199,7 +199,11 @@ def _config_file(root: Path) -> Path:
 
 
 def _load_candidate(
-    path: str, *, config: str | None, lookup: SchemaRefLookup | None = None
+    path: str,
+    *,
+    config: str | None,
+    lookup: SchemaRefLookup | None = None,
+    storage: StorageType | None = None,
 ) -> CandidateSource:
     """パスか書く前の設定の文字列から、端末の設定によらず配信元を組み立てる。"""
     target = normalize_path(path)
@@ -235,6 +239,7 @@ def _load_candidate(
             scope_write=None,
             root_override=root,
             lookup=lookup,
+            storage=storage,
         )
     if loaded is None:
         return CandidateSource(
@@ -279,7 +284,10 @@ def _registered_id(handlers: Handlers, root: Path) -> str | None:
 def check_project(request: CheckProjectRequest, *, handlers: Handlers) -> CheckProjectResult:
     """端末の設定に無い配信元も含め、設定・スクリプト・索引の同期を検査する。"""
     candidate = _load_candidate(
-        request.path, config=request.config, lookup=terminal_lookup(handlers.terminal)
+        request.path,
+        config=request.config,
+        lookup=terminal_lookup(handlers.terminal),
+        storage=request.storage_type,
     )
     registered_id = _registered_id(handlers, candidate.root)
     state = (

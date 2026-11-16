@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import os
+from fnmatch import fnmatch
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
@@ -24,6 +25,8 @@ LOCK_FILES = frozenset(
 VENDOR_DIRS = frozenset({"vendor", "third_party", "generated", "__generated__", "dist"})
 # ファイル名がこの末尾のファイルを生成物とみなす
 GENERATED_SUFFIXES = ("_pb2.py", "_pb2_grpc.py", ".min.js", ".min.css", ".map")
+# その端末だけで使用する（Git に無視させる）ファイルの名前
+LOCAL_FILE_PATTERN = "*.local.*"
 # 先頭のこのバイト数に NUL バイトがあればバイナリとみなす
 BINARY_SNIFF_BYTES = 8192
 
@@ -82,6 +85,9 @@ def is_excluded_file(root: Path, path: str) -> bool:
         return True
     # 生成物のファイル名か
     if target.name.endswith(GENERATED_SUFFIXES):
+        return True
+    # その端末だけで使用するファイルの名前か
+    if fnmatch(target.name, LOCAL_FILE_PATTERN):
         return True
     try:
         with (root / path).open("rb") as file:

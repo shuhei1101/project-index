@@ -1535,3 +1535,50 @@ def test_error_when_body_not_accepted(
     assert doc_1.read_text(encoding="utf-8") == doc_1_before
     assert (worktree / "notes" / "index.yaml").read_text(encoding="utf-8") == NOTES
     assert (worktree / "notes" / "n1.md").read_text(encoding="utf-8") == NOTE_1
+
+
+def test_normal_when_disk_storage(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """disk の配信元はクローン本体へ書き、created・updated を付ける（正常系）。"""
+    # 準備
+    config = sample_config_text('ids:\n  format: "{kind}-{slug}"\n', name="company")
+    company = make_source(
+        "company", sample_file_set(**{"project-index.yaml": config}), storage="disk"
+    )
+    env = make_server(company)
+    cwd = str(company.folder)
+    # 実行
+    created = env.call(
+        "write_docs",
+        cwd=cwd,
+        source="company",
+        operations=[{"op": "create", "kind": "sample", "data": {"name": "メモ 1"}}],
+    )
+    target = company.folder / "docs" / f"{created.data['results'][0]['id']}.yaml"
+    first = load_yaml(target.read_text(encoding="utf-8"))
+    updated = env.call(
+        "write_docs",
+        cwd=cwd,
+        source="company",
+        operations=[
+            _update(
+                created.data["results"][0]["id"],
+                created.data["results"][0]["version"],
+                set={"description": "追記"},
+            )
+        ],
+    )
+    second = load_yaml(target.read_text(encoding="utf-8"))
+    # 検証
+    assert not created.is_error
+    assert "TargetIsCloneError" not in created.text
+    assert created.data["results"][0]["status"] == "created"
+    assert first["created"]
+    assert first["updated"]
+    assert updated.data["results"][0]["status"] == "updated"
+    assert second["created"] == first["created"]
+    assert str(second["updated"]) > str(first["updated"])

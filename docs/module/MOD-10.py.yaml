@@ -154,7 +154,7 @@ functions:
       type: CheckProjectResult
       description: 検査の結果
     process: |-
-      1. 配信元を読む（検査する配信元の読み込み）
+      1. 配信元を読む（検査する配信元の読み込み。`storage` は `request.storage_type`）
       2. 端末の設定の `sources[]` のうち、`config` の先頭のファイルのフォルダが設定ファイルのフォルダ（`config_root`）と同じ行の ID を `registered_id` にする
       3. `config_version` があれば新旧を求める（バージョンの新旧）
       4. 取り得た値に応じて分ける
@@ -220,6 +220,12 @@ functions:
         condition: '`paths_base: sub`（設定ファイルのフォルダの下。`sub` はある）と、`documents[0].paths: [docs/a/*.yaml, docs/b/*.yaml, ../outside/*.yaml]` を持つ設定'
         mock: 配線済みの関数（偽物）
         expected: '`violations` に `paths_base` と `documents[0].paths[2]` がそれぞれ理由と一緒にあり、`sync` が `None`'
+      - name: test_check_project_when_disk_storage
+        case: 正常
+        summary: disk を指定して commit していない設定を検査する
+        condition: Git のリポジトリの中に commit していない `project-index.local.yaml` を置き、`path` にその絶対パス、`storage_type="disk"`
+        mock: なし（一時ディレクトリの git リポジトリ）
+        expected: '`violations` が空で、`sync` の件数が 0'
     callers:
       - MOD-93#functions[build_admin_mcp]
     callees:
@@ -446,6 +452,12 @@ functions:
         required: true
         passing: keyword
         description: '`None` はファイルを読む'
+      - name: storage
+        title: 読み書きの方法
+        type: StorageType | None
+        default: None
+        passing: keyword
+        description: '`assemble_source` へ渡す。`disk` は Git を参照せずに組み立てる'
     returns:
       type: CandidateSource
       description: 検査する配信元
@@ -458,7 +470,7 @@ functions:
       3. 文字列を YAML として読み、辞書なら `version` を文字列にして `config_version` にする（`load_yaml`）
          - 読めない場合、`ConfigParseError` を送出する
       4. `config` がある場合、一時フォルダに `project-index.yaml` を書き、そのファイルを読む対象にする
-      5. 配信元を組み立てる（`assemble_source`、`root_override` は `root`、`scope_read` は空、`scope_write` は `None`、`lookup` はサーバーの端末の設定から作った引き当て（端末の設定からの引き当て））
+      5. 配信元を組み立てる（`assemble_source`、`root_override` は `root`、`scope_read` は空、`scope_write` は `None`、`lookup` はサーバーの端末の設定から作った引き当て（端末の設定からの引き当て）、`storage` は引数の `storage`）
       6. 戻り値を分ける
          - 設定が `None` の場合、違反を `violations` に入れる
          - 設定があり配信元が `None` の場合、違反を `script_violations` に入れる

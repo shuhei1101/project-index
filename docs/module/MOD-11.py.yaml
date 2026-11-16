@@ -199,7 +199,7 @@ data_models:
       - name: path
         title: 配信元の場所
         type: str
-        description: 配信元のフォルダか `project-index.yaml` の絶対パス
+        description: 配信元のフォルダか、配信元の設定のファイル（`project-index.yaml`・`project-index.local.yaml` など）の絶対パス
       - name: config
         title: 書く前の設定
         type: str | None
@@ -210,6 +210,11 @@ data_models:
         type: Literal['markdown', 'json']
         default: "'markdown'"
         description: '`markdown` は `render_check` の文、`json` は結果の辞書'
+      - name: storage_type
+        title: 読み書きの方法
+        type: StorageType | None
+        default: None
+        description: '`disk` は Git を参照せずに組み立てる。`None` は配信元のフォルダが Git の作業ツリーの中かで決める'
   - name: CheckProjectResult
     title: 配信元の検査の結果
     container: project_index/features/admin/types.py

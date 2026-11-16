@@ -954,6 +954,37 @@ flows:
       - 3 回とも `InvalidArgumentError` で、違反の `path` がそれぞれ `operations[0].set.@body`・`operations[0].data.@body`・`operations[0].set.path`
       - どのファイルも変わらない
     test: test_error_when_body_not_accepted
+  - name: 正常系（disk の配信元のクローン本体に書く）
+    summary: disk の配信元はクローン本体へ書き、`created`・`updated` を付ける
+    setup:
+      - name: Mock
+        description: なし
+      - name: ローカル運用の配信元
+        description: 'Git のリポジトリの中の `storage.type: disk` の配信元。YAML の文書の種類を 1 つ持つ'
+        notes: id `company`。`scope.write` は company のクローン本体
+      - name: 入力
+        description: '`cwd` は company のクローン本体で、`worktree` を渡さない `create`。続けて同じ文書の `update`'
+    flow: |-
+      <!-- map: {"title": "正常系（disk の配信元のクローン本体に書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant F as company のクローン本体
+
+        C->>T: source: company, operations: create
+        T->>T: disk のためクローン本体を書く先にし、created・updated を付ける
+        T->>F: YAML を書く
+        T-->>C: id と version
+      ```
+
+      <!-- /map -->
+    expected:
+      - company のクローン本体に新しい YAML ができ、`created`・`updated` に書いた日時が入る
+      - '`TargetIsCloneError` にならない'
+      - 続けての `update` で `updated` だけが新しい日時になり、`created` は変わらない
+    test: test_normal_when_disk_storage
 lead: 文書の作成・部分更新・置き換えを検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 identifier: write_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーにだけ書く
@@ -1181,7 +1212,7 @@ exceptions:
     condition: '`update`・`replace` の `id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
   - name: InvalidArgumentError
-    condition: 操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の置き場所のファイル名が行の `exclude[]` に当たる・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した
+    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の置き場所のファイル名が行の `exclude[]` に当たる・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した'
   - name: SourceNotServedError
     condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
   - name: WorktreeNotMatchedError
@@ -1260,6 +1291,8 @@ constraints:
   - item: 本文のファイルを持つ文書のバージョン
     constraint: 要素の値と本文のファイルの内容の両方から求める（読み取りの `version` も同じ値）。本文のファイルだけを書き換えてもバージョンが変わる
     notes: 今は要素の値だけから求めているため、`records`・`body_file` の行の文書の `version` はこの変更で 1 度だけ変わる
+  - item: disk の配信元
+    constraint: '端末の設定の行が `storage.type: disk` の配信元は、作業場所が `scope.write` に当たれば登録したフォルダへ書き、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく `created`・`updated` を付ける。`worktree` を指定すると `InvalidArgumentError`'
 refs:
   - SC-7#scenarios[正常シナリオ]
   - SC-9#scenarios[異常シナリオ（読んだ後に変わった文書へ書き込む）]

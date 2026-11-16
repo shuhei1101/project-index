@@ -1,0 +1,34 @@
+$ TMPDIR=/home/shuhei2441/.cache/pi90-tmp uv run pytest tests/integration/server/test_describe.py::test_normal_when_disk_storage tests/integration/server/test_search_docs.py::test_normal_when_disk_storage tests/integration/server/test_search_docs.py::test_error_when_ref_given_to_disk_source tests/integration/server/test_trace_related.py::test_normal_when_disk_storage tests/integration/server/test_list_changes.py::test_normal_when_disk_storage tests/integration/server/test_list_changes.py::test_error_when_range_given_to_disk_source tests/integration/server/test_write_docs.py::test_normal_when_disk_storage tests/integration/server/test_delete_docs.py::test_error_when_disk_storage_delete_not_allowed tests/integration/server/test_check_project.py::test_normal_when_disk_storage tests/integration/server/test_check_project.py::test_normal_when_local_files_excluded tests/integration/server/test_serve.py::test_normal_when_disk_storage tests/integration/server/test_serve.py::test_normal_when_git_storage_outside_work_tree tests/integration/server/test_list_documents.py::test_normal_when_disk_storage tests/integration/server/test_get_document.py::test_normal_when_disk_storage tests/integration/server/test_list_refs.py::test_normal_when_disk_storage tests/integration/server/test_get_settings_sources.py::test_normal_when_storage_given tests/integration/server/test_put_settings_sources.py::test_normal_when_unsent_storage_kept tests/integration/server/test_add_settings_source.py::test_normal_when_storage_given tests/integration/server/test_patch_settings_source.py::test_normal_when_storage_changed tests/integration/server/test_list_changes.py::test_error_when_invalid_argument
+# TMPDIR: 既定の一時フォルダの持ち主が実行ユーザーと違い pytest の tmp_path が作れないため、実行ユーザーの持つフォルダを指定した
+# 範囲: 計画書の ### 結合テストの実行範囲 の表。並列数 1（TL-2 は parallelism を持たない）
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0 -- /home/shuhei2441/repo/project-index/.claude/worktrees/feat-sources-disk-storage-local-operation/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/feat-sources-disk-storage-local-operation
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 20 items
+
+tests/integration/server/test_describe.py::test_normal_when_disk_storage PASSED [  5%]
+tests/integration/server/test_search_docs.py::test_normal_when_disk_storage PASSED [ 10%]
+tests/integration/server/test_search_docs.py::test_error_when_ref_given_to_disk_source PASSED [ 15%]
+tests/integration/server/test_trace_related.py::test_normal_when_disk_storage PASSED [ 20%]
+tests/integration/server/test_list_changes.py::test_normal_when_disk_storage PASSED [ 25%]
+tests/integration/server/test_list_changes.py::test_error_when_range_given_to_disk_source PASSED [ 30%]
+tests/integration/server/test_write_docs.py::test_normal_when_disk_storage PASSED [ 35%]
+tests/integration/server/test_delete_docs.py::test_error_when_disk_storage_delete_not_allowed PASSED [ 40%]
+tests/integration/server/test_check_project.py::test_normal_when_disk_storage PASSED [ 45%]
+tests/integration/server/test_check_project.py::test_normal_when_local_files_excluded PASSED [ 50%]
+tests/integration/server/test_serve.py::test_normal_when_disk_storage PASSED [ 55%]
+tests/integration/server/test_serve.py::test_normal_when_git_storage_outside_work_tree PASSED [ 60%]
+tests/integration/server/test_list_documents.py::test_normal_when_disk_storage PASSED [ 65%]
+tests/integration/server/test_get_document.py::test_normal_when_disk_storage PASSED [ 70%]
+tests/integration/server/test_list_refs.py::test_normal_when_disk_storage PASSED [ 75%]
+tests/integration/server/test_get_settings_sources.py::test_normal_when_storage_given PASSED [ 80%]
+tests/integration/server/test_put_settings_sources.py::test_normal_when_unsent_storage_kept PASSED [ 85%]
+tests/integration/server/test_add_settings_source.py::test_normal_when_storage_given PASSED [ 90%]
+tests/integration/server/test_patch_settings_source.py::test_normal_when_storage_changed PASSED [ 95%]
+tests/integration/server/test_list_changes.py::test_error_when_invalid_argument PASSED [100%]
+
+============================== 20 passed in 6.00s ==============================
+exit=0

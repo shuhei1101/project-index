@@ -187,3 +187,30 @@ def test_error_when_version_missing(
     assert response.status_code == 400
     assert [error["path"] for error in response.json()["errors"]] == ["expectedVersion"]
     assert env.settings_path.read_bytes() == before
+
+
+def test_normal_when_storage_given(
+    make_source: Callable[..., Any],
+    make_local_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+) -> None:
+    """storage.type: disk を持つ行を追加し、disk の配信元として読み込む（正常系）。"""
+    # 準備
+    company = make_local_source()
+    env = make_server(make_source("sample"))
+    # 実行
+    response = env.client.post(
+        "/settings/sources",
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "source": _row(company, storage={"type": "disk"}),
+        },
+        headers=ORIGIN,
+    )
+    # 検証
+    rows = load_yaml(env.settings_path.read_text(encoding="utf-8"))["sources"]
+    assert response.status_code == 201
+    assert ("company", "serving") in [
+        (row["id"], row["status"]) for row in response.json()["sources"]
+    ]
+    assert rows[1]["storage"] == {"type": "disk"}

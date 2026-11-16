@@ -258,6 +258,62 @@ flows:
       - 要求のログに sample のクローン本体のパスと `other` が残る
       - '`outside_read: false` の other では `SourceNotReadableError` を返す'
     test: test_normal_when_outside_scope
+  - name: 正常系（disk の配信元の前回読んだ時点から）
+    summary: disk の配信元は、前回読んだ時点から直接編集した文書を返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: ローカル運用の配信元
+        description: '`storage.type: disk` の配信元。文書 1 と文書 2'
+        notes: id `company`
+      - name: 参照の後の書き換え
+        description: '`search_docs` で文書 1 と文書 2 を読んだ後に、文書 2 の YAML を直接編集する'
+        notes: commit しない。どの呼び出しも同じ `session_id`
+    flow: |-
+      <!-- map: {"title": "正常系（disk の配信元の前回読んだ時点から）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant S as search_docs
+        participant T as list_changes
+
+        C->>S: source: company
+        S-->>C: 文書 1・文書 2（読んだ時点を記録する）
+        C->>T: source: company（文書 2 を編集した後）
+        T-->>C: 文書 2
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`list_changes` の `items` が文書 2 だけで、文書 1 を含まない'
+    test: test_normal_when_disk_storage
+  - name: 異常系（disk の配信元に区間を指定する・InvalidArgumentError）
+    summary: disk の配信元への区間の指定を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: ローカル運用の配信元
+        description: '`storage.type: disk` の配信元'
+        notes: id `company`。`develop` ブランチがある
+      - name: 入力
+        description: '`source: company`・`from: develop`'
+    flow: |-
+      <!-- map: {"title": "異常系（disk の配信元に区間を指定する・InvalidArgumentError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as list_changes
+
+        C->>T: source: company, from: develop
+        T-->>C: isError（company は区間を指定できない）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、company が disk の配信元のため区間を指定できない理由を返す'
+    test: test_error_when_range_given_to_disk_source
 lead: 区間か前回参照した時点から変わった文書・キー・差分の行を返却する `list_changes` の入出力を定め、`list_changes` を修正するときに参照する。
 identifier: list_changes
 permissions: 対象の配信元の `scope.read` か `scope.write` に `cwd` が当たること
@@ -463,7 +519,7 @@ exceptions:
     condition: '`from` を省いたが、この会話で本文を読んだ記録が無い'
     notes: '`from` を渡すことを添える'
   - name: InvalidArgumentError
-    condition: 'Git 管理外の配信元に `from`・`to` を渡した、`from` 無しで `to` を渡した、`filter` に知らない項目を渡した、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない'
+    condition: 'Git 管理外の配信元に `from`・`to` を渡した、`storage.type: disk` の配信元に `from`・`to`・`worktree` を渡した、`from` 無しで `to` を渡した、`filter` に知らない項目を渡した、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない'
   - name: SourceNotReadableError
     condition: '`cwd` が配信元の `scope.read`・`scope.write` に当たらない（`outside_scope: true` のときは、加えて `outside_read` が偽）'
     notes: '`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に読めることを添える'
@@ -484,6 +540,8 @@ constraints:
   - item: 語の当て方
     constraint: '区間の中の commit（`git log {from}..{to}` が並べる commit のうち、親が 2 つ以上のマージ commit を除く）ごとに、その commit と親の文書の内容で語の出現数（正規表現なら当たった数）を比べ、数が変わった commit を返す。`to` を省いた呼び出しは `{from}..HEAD` の commit に加え、HEAD と今の作業ツリーを最後の区間として比べる。文書の内容は `search_docs` の `view: full` が返す本文で、`records` の文書も 1 件ずつ比べる'
     notes: '`git log -S`（正規表現は `--pickaxe-regex`）と同じ当て方で、マージ commit も見ない。語を含む行を書き換えただけで出現数が同じ commit、マージの競合の解消で入った語は返さない'
+  - item: disk の配信元
+    constraint: '端末の設定の行が `storage.type: disk` の配信元は、前回読んだ時点からの変更だけを返す。`from`・`to`・`worktree` を指定すると `InvalidArgumentError`'
 refs:
   - SC-8#scenarios[正常シナリオ]
   - SC-8#scenarios[正常シナリオ（前回読んだ時点から）]
