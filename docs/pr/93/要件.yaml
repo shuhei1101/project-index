@@ -1,0 +1,79 @@
+docs:
+  - page: docs/README.md
+    new: false
+    change: '`table` のマーカーを JSON の記載へ移す（`mdmark upgrade`）'
+    status: todo
+  - page: docs/interface/README.md
+    new: false
+    change: '`table` のマーカーを JSON の記載へ移す（`mdmark upgrade`）'
+    status: todo
+  - page: docs/library/README.md
+    new: false
+    change: '`table` のマーカーを JSON の記載へ移す（`mdmark upgrade`）'
+    status: todo
+  - page: docs/module/README.md
+    new: false
+    change: '`table` のマーカーを JSON の記載へ移す（`mdmark upgrade`）'
+    status: todo
+  - page: docs/scenario/README.md
+    new: false
+    change: '`table` のマーカーを JSON の記載へ移す（`mdmark upgrade`）'
+    status: todo
+  - page: docs/guide/README.md
+    new: false
+    change: '`table` のマーカーを JSON の記載へ移す（`mdmark upgrade`）'
+    status: todo
+  - page: docs/guide/CLI.md
+    new: false
+    change: '`table` のマーカーを JSON の記載へ移す（`mdmark upgrade`）'
+    status: todo
+  - page: docs/guide/project-indexを更新する.md
+    new: false
+    change: '`table` のマーカーを JSON の記載へ移す（`mdmark upgrade`）'
+    status: todo
+  - page: docs/guide/リファレンス.md
+    new: false
+    change: '`table` のマーカーを JSON の記載へ移す（`mdmark upgrade`）'
+    status: todo
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: '`table` のマーカーを JSON の記載へ移す（`mdmark upgrade`）'
+    status: todo
+  - page: docs/guide/用語集.md
+    new: false
+    change: '`table` のマーカーを JSON の記載へ移す（`mdmark upgrade`）'
+    status: todo
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: '`table` のマーカーを JSON の記載へ移す（`mdmark upgrade`）'
+    status: todo
+  - page: docs/guide/設定.md
+    new: false
+    change: '`table` のマーカーを JSON の記載へ移す（`mdmark upgrade`）'
+    status: todo
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: '`table` のマーカーを JSON の記載へ移す（`mdmark upgrade`）'
+    status: todo
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: '`table` のマーカーを JSON の記載へ移す（`mdmark upgrade`）'
+    status: todo
+  - page: docs/interface/IF-18.yaml
+    new: false
+    change: 生成する `section`・`tabs` のマーカーの記載を JSON の記載へ直す（インターフェース定義設計）
+    status: todo
+  - page: docs/module/MOD-41.py.yaml
+    new: false
+    change: 生成する `section`・`tabs` のマーカーの記載と期待値を JSON の記載へ直す（モジュール構成設計）
+    status: todo
+scope_out:
+  - item: '`tests/integration/server/test_write_docs.py` と IF-6 の `<!-- embed: x -->`'
+    reason: mdmark が `unknown_mark` を返す入力として置いた値で、移行の対象ではない。mdmark#479 の後に返る警告が変わるかは実装の段で確かめる
+    plan: none
+  - item: '`docs/pr/` の過去の PR ドキュメントのマーカー'
+    reason: マージ済みの作業の記録で、Jekyll のビルドからも除外していて描かない
+    plan: none
+  - item: mdmark の参照を develop の最新にする切り替え
+    reason: 目的が別（参照するバージョンの決め方）
+    plan: '#88'
