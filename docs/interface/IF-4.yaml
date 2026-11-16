@@ -267,7 +267,7 @@ flows:
         description: '`storage.type: disk` の配信元。文書 1 と文書 2'
         notes: id `company`
       - name: 参照の後の書き換え
-        description: 1 回目の呼び出しの後に、文書 2 の YAML を直接編集する
+        description: '`search_docs` で文書 1 と文書 2 を読んだ後に、文書 2 の YAML を直接編集する'
         notes: commit しない。どの呼び出しも同じ `session_id`
     flow: |-
       <!-- map: {"title": "正常系（disk の配信元の前回読んだ時点から）"} -->
@@ -275,17 +275,18 @@ flows:
       ```mermaid
       sequenceDiagram
         participant C as クライアント
+        participant S as search_docs
         participant T as list_changes
 
-        C->>T: source: company
-        T-->>C: 初めて読んだ時点を記録する
+        C->>S: source: company
+        S-->>C: 文書 1・文書 2（読んだ時点を記録する）
         C->>T: source: company（文書 2 を編集した後）
         T-->>C: 文書 2
       ```
 
       <!-- /map -->
     expected:
-      - 2 回目の `items` が文書 2 だけで、文書 1 を含まない
+      - '`list_changes` の `items` が文書 2 だけで、文書 1 を含まない'
     test: test_normal_when_disk_storage
   - name: 異常系（disk の配信元に区間を指定する・InvalidArgumentError）
     summary: disk の配信元への区間の指定を断る

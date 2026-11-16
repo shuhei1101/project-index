@@ -892,7 +892,7 @@ flows:
         description: なし
       - name: ローカル運用の配信元
         description: 'Git のリポジトリの中の `storage.type: disk` の配信元。文書 1（`created`・`updated` を持つ）と文書 2（持たない）'
-        notes: id `company`。`.claude/worktrees/x` のワークツリーは project-index のファイルを持たない
+        notes: id `company`。`scope.read` は `{company のクローン本体}/**`（ワークツリーを配信元のフォルダとみなさないため）。`.claude/worktrees/x` のワークツリーは project-index のファイルを持たない
       - name: 入力
         description: '`cwd` をワークツリー x にした `source: company`・`view: full`・`fields: [id, created, updated]`'
     flow: |-

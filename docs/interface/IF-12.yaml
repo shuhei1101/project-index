@@ -392,7 +392,6 @@ flows:
     expected:
       - '`violations` が空で、`default_ref` に設定が無い違反を返さない'
       - '`sync` の件数がどれも 0（`*.local.*` の名前のファイルを `unindexed_files` に数えない）'
-      - '`storage_type` を省くと、`config[0]` の `default_ref` に設定が無い違反を返す'
     test: test_normal_when_disk_storage
   - name: 正常系（*.local.* の名前のファイルを数えない）
     summary: コミットする運用の配信元でも `*.local.*` の名前のファイルを索引に無いファイルに数えない
