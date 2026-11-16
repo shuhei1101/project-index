@@ -533,7 +533,11 @@ def _create_body(
                 )
             ],
         )
-    return {body_path: apply_body(None, operation, index=index) or ""}
+    body = apply_body(None, operation, index=index)
+    if body is None:
+        msg = "create に本文がありません"
+        raise RuntimeError(msg)
+    return {body_path: body}
 
 
 def _diff(before: Document | None, after: Document, body: Mapping[str, str]) -> str:

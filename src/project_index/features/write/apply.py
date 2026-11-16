@@ -136,14 +136,28 @@ def _text_edits(content: dict[str, Any], edits: list[TextEdit]) -> list[Violatio
 
 def apply_body(current_body: str | None, operation: Operation, *, index: int) -> str | None:
     """操作の `@body` を本文に当てて、新しい本文を返す（本文を変えない操作は `None`）。"""
-    if operation.op in ("create", "replace"):
-        body = (operation.data or {}).get(BODY_KEY)
-        return body if isinstance(body, str) else None
+    item, given = (
+        ("data", operation.data or {})
+        if operation.op in ("create", "replace")
+        else ("set", operation.set)
+    )
+    if BODY_KEY in given and not isinstance(given[BODY_KEY], str):
+        raise InvalidArgumentError(
+            message="操作を適用できません",
+            violations=[
+                _violation(
+                    f"operations[{index}].{item}.{BODY_KEY}",
+                    f"{BODY_KEY} は文字列で指定します",
+                    "本文の全体を文字列で指定してください",
+                )
+            ],
+        )
+    if item == "data":
+        return given.get(BODY_KEY)
     edits = [(n, edit) for n, edit in enumerate(operation.text_edits) if edit.field == BODY_KEY]
-    if BODY_KEY not in operation.set and not edits:
+    if BODY_KEY not in given and not edits:
         return None
-    given = operation.set.get(BODY_KEY, current_body)
-    return _edit_body(given if isinstance(given, str) else "", edits, index=index)
+    return _edit_body(given.get(BODY_KEY, current_body or ""), edits, index=index)
 
 
 def _edit_body(body: str, edits: list[tuple[int, TextEdit]], *, index: int) -> str:
