@@ -247,14 +247,14 @@ scenarios:
         participant DD as dev-docs の画面のサーバー
         participant PI as project-index（端末の設定の API）
 
-        DD->>PI: id を Sample Docs、scope.read に空の行を含めた sources を保存する
+        DD->>PI: id を Sample Docs、scope.read に空の行を含め、storage.type を local にした sources を保存する
         PI->>PI: スキーマで検証する
         PI-->>DD: 422（違反したキーのパスと理由）
       ```
 
       <!-- /map -->
     expected:
-      - 応答が 422 で、id と scope.read の違反をキーのパスと理由つきで返却する
+      - 応答が 422 で、id・scope.read・storage.type（`git`・`disk` 以外の値）の違反をキーのパスと理由つきで返却する
       - '`settings.yaml` が変わらず、読み取り API の sample の文書の取得は応答する'
     test: test_error_when_schema_invalid
   - name: 異常シナリオ（別のオリジンから書き込む）
@@ -573,7 +573,6 @@ scenarios:
       - '取得が company の行を `storage.type: disk` つきで返却し、sample の行は `storage` を返却しない'
       - '`storage` を含めない保存の後も、`settings.yaml` の company の行に `storage.type: disk` が残り、company は disk の配信元として配信される'
       - '1 行の変更の後、`settings.yaml` の sample の行に `storage.type: disk` が入り、再起動せずに読み取り API の sample のリビジョンの一覧が `git: false` を返却する'
-      - '`storage.type` に `git`・`disk` 以外の値を送信した保存は、スキーマに通らないとして書き換えを断る'
     test: test_normal_when_storage_kept_and_changed
 lead: dev-docs の画面のサーバーと端末のほかのプロセスが端末の設定の API で配信元を丸ごとか 1 行ずつ変更し、再起動せずに配信へ反映するシナリオを定め、端末の設定の配信元の変更の流れを変えるときに参照する。
 issue: 14

@@ -563,6 +563,10 @@ scenarios:
         M->>M: スキーマと validators に通し、created・updated を付ける
         M->>F: YAML を書く
         M-->>A: id と version
+        A->>M: write_docs(source: company, operations: update 作った文書・set)
+        M->>M: updated だけを書き換える
+        M->>F: YAML を書く
+        M-->>A: 新しい version
         A->>M: delete_docs(source: company, targets: writable: false の種類の文書)
         M-->>A: エラー（削除できない種類）
       ```

@@ -882,8 +882,8 @@ scenarios:
       - name: Mock
         description: なし（実環境で実行。`cwd` はテストが引数に入れる）
       - name: ローカル運用の配信元
-        description: 起動するの『正常シナリオ（disk を指定した配信元を Git を参照せずに配信する）』と同じ company。`files.local.yaml` の行の文書 1 を持つ
-        notes: '`scope.read` は company のフォルダと sample のフォルダ。ワークツリー `.claude/worktrees/x` は project-index のファイルを持たない'
+        description: 起動するの『正常シナリオ（disk を指定した配信元を Git を参照せずに配信する）』と同じ company。YAML の文書 1 と文書 2 を持ち、文書 2 の `related` が文書 1 を指す
+        notes: '文書 1 は `created: 2026-11-01T00:00:00+09:00`・`updated: 2026-11-02T00:00:00+09:00` を持ち、文書 2 は `created`・`updated` を持たない。文書 1 と文書 2 を同じ commit で commit する。`scope.read` は company のフォルダと sample のフォルダ。ワークツリー `.claude/worktrees/x` は project-index のファイルを持たない'
       - name: 別のリポジトリ
         description: 配信元 sample のクローン本体
         notes: company の外部の作業場所
@@ -902,12 +902,16 @@ scenarios:
         M->>F: 登録したフォルダの文書を参照する
         M-->>A: 文書 1
         A->>M: search_docs(cwd: ワークツリー x, source: company, filter: id が文書 1)
-        M->>M: worktrees に当たってもワークツリーに読み替えない
+        M->>M: worktrees に該当してもワークツリーに読み替えない
         M->>F: 登録したフォルダの文書を参照する
         M-->>A: 文書 1
         A->>M: search_docs(cwd: sample のクローン本体, source: company, filter: id が文書 1)
         M->>F: 登録したフォルダの文書を参照する
         M-->>A: 文書 1
+        A->>M: search_docs(source: company, fields: [id, created, updated], order_by: updated)
+        M-->>A: 文書 1 と文書 2 の作成・更新の日時
+        A->>M: trace_related(source: company, from_ids: [文書 1])
+        M-->>A: related で文書 1 を指す文書 2（一緒に変わったファイルは無い）
         A->>M: describe(source: company)
         M-->>A: 説明書と種類の一覧（ブランチ・タグ・ワークツリーが無い）
       ```
@@ -916,20 +920,23 @@ scenarios:
     expected:
       - 3 つの作業場所の `search_docs` が、どれも company のクローン本体の文書 1 を同じ `version` で返却する
       - '`view: full` の `path` が、どの作業場所からも company のクローン本体の中の絶対パスになる'
+      - 作成・更新の日時の `search_docs` が、文書 1 には文書の `created`・`updated` の値を、文書 2 には空の値を返却し、commit の日時を返却しない
+      - '`trace_related` が文書 2 を `related` の関連として返却し、同じ commit で変わった文書 2 を一緒に変わったファイルとして返却しない'
       - '`describe(source: company)` がブランチ・タグ・ワークツリーを返却しない'
-      - '`trace_related` が一緒に変わったファイルを返却しない'
-      - 文書 1 のファイルの日時は、文書の `created`・`updated` の値になる（無ければ空）
     test: test_normal_when_disk_storage_read_from_any_workplace
   - name: 異常シナリオ（disk の配信元にリビジョンを指定する）
     setup:
       - name: Mock
-        description: なし（実環境で実行）
+        description: なし（実環境で実行。`session_id` はテストが引数に入れる）
       - name: ローカル運用の配信元
         description: 正常シナリオ（disk の配信元をどの作業場所からも同じ内容で参照する）と同じ company
         notes: company のリポジトリには `develop` ブランチがある
+      - name: 参照の後の書き換え
+        description: 1 回目の区間を省いた `list_changes` の後に、テストが company のクローン本体の文書 2 の YAML を直接編集する
+        notes: 文書 1 は変えない。commit しない
       - name: project-index
         description: company を配信している project-index
-        notes: '`cwd` は company のクローン本体'
+        notes: '`cwd` は company のクローン本体。どの呼び出しも同じ `session_id`'
     flow: |-
       <!-- map: {"title": "異常シナリオ（disk の配信元にリビジョンを指定する）"} -->
 
@@ -937,20 +944,26 @@ scenarios:
       sequenceDiagram
         actor A as エージェント
         participant M as 文書の MCP（/mcp）
+        participant F as company のクローン本体
 
         A->>M: search_docs(source: company, ref: develop)
+        M-->>A: エラー（disk の配信元は ref を指定できない）
+        A->>M: trace_related(source: company, from_ids: [文書 1], ref: develop)
         M-->>A: エラー（disk の配信元は ref を指定できない）
         A->>M: list_changes(source: company, from: develop)
         M-->>A: エラー（disk の配信元は区間を指定できない）
         A->>M: list_changes(source: company)
-        M-->>A: 前回参照した時点からの変更
+        M-->>A: 初めて参照した時点として記録する
+        A->>F: 文書 2 の YAML を直接編集する
+        A->>M: list_changes(source: company)
+        M-->>A: 前回参照した時点から変わった文書 2
       ```
 
       <!-- /map -->
     expected:
       - '`ref` を指定した `search_docs`・`trace_related` が `isError: true` で、company は `ref` を指定できない理由を返却する'
-      - '`from`・`to` を指定した `list_changes` が `isError: true` で、company は区間を指定できない理由を返却する'
-      - 区間を省いた `list_changes` は、前回参照した時点から変わった文書を返却する
+      - '`from` を指定した `list_changes` が `isError: true` で、company は区間を指定できない理由を返却する'
+      - 文書 2 を編集した後の区間を省いた `list_changes` が、文書 2 だけを返却し、文書 1 を返却しない
     test: test_error_when_ref_given_to_disk_source
 lead: エージェントが文書の MCP で、作業場所から使用できる配信元の文書を探して参照するシナリオを定め、調査の流れを変えるときに参照する。
 issue: 14

@@ -296,7 +296,7 @@ scenarios:
         description: '`project-index.yaml` が設計書の行 `design`（YAML の文書。`design/repo.yaml` が id `design/repo` と `implementation: src/tasks/repo.py` を持つ）と、管理用の YAML を読む行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`）を持ち、端末の設定に登録済みの git リポジトリ。`src/files.yaml` は `files: []`'
         notes: '`project-index.yaml` は `related.types[]` を書かない'
       - name: 範囲のファイル
-        description: '`src/` に `tasks/repo.py`・`tasks/test_repo.py`・空の `tasks/__init__.py`・`uv.lock`・`logo.png` を置き commit する。その commit でワークツリーを作る'
+        description: '`src/` に `tasks/repo.py`・`tasks/test_repo.py`・空の `tasks/__init__.py`・`uv.lock`・`logo.png` を置き commit する。`tasks/settings.local.json` を commit せずに置く（`.gitignore` に当たらない）。その commit でワークツリーを作る'
         notes: 実装のパスを持つ設計書の質問に、種類 `design`・キー `implementation` を答える
     flow: |-
       <!-- map: {"title": "正常シナリオ（除外の条件と関連の候補）"} -->
@@ -329,11 +329,11 @@ scenarios:
 
       <!-- /map -->
     expected:
-      - 管理用の YAML に `tasks/repo.py` と `tasks/test_repo.py` の 2 行だけが並び、`tasks/__init__.py`・`uv.lock`・`logo.png` の行は無い
+      - 管理用の YAML に `tasks/repo.py` と `tasks/test_repo.py` の 2 行だけが並び、`tasks/__init__.py`・`uv.lock`・`logo.png`・`tasks/settings.local.json` の行は無い
       - '`tasks/repo.py` の行が `related: [{to: design/repo, type: implements}]` を持つ'
       - '`tasks/test_repo.py` の行が `related: [{to: src/tasks/repo.py, type: tests}]` を持つ（`to` は関連先のファイルの配信元の直下からのパスで、拡張子を含む）'
       - 確認の表に `implements`・`tests` の候補が出る
-      - '`check_project` が違反と索引の同期の件数を 0 で返す（除外した 3 件を索引に無いファイルとして数えず、付けた関連の `to` はどれも文書に当たる）'
+      - '`check_project` が違反と索引の同期の件数を 0 で返す（除外した 3 件と `*.local.*` の名前の `tasks/settings.local.json` を索引に無いファイルとして数えず、付けた関連の `to` はどれも文書に当たる）'
       - '`reload` の後、`design/repo` を起点にした `direction: in` の `trace_related` が `src/tasks/repo.py` を返す'
     test: test_normal_when_excluded_and_related_candidates
   - name: 正常シナリオ（content/prompts/ を見つける）
@@ -650,8 +650,8 @@ scenarios:
       - name: project-index
         description: '端末の設定（`sources: []`）で待ち受けている project-index'
       - name: 配信元にするリポジトリ
-        description: Markdown を 2 件と `.env`・`settings.local.json` を持ち、project-index のファイルを持たない Git のリポジトリ `company`。クローン本体は `develop` を checkout する
-        notes: 引数に渡すパス。`.env` は `.gitignore` で無視されている
+        description: commit 済みの Markdown 2 件と、commit していない `.env`・`settings.local.json` を持ち、project-index のファイルを持たない Git のリポジトリ `company`。クローン本体は `develop` を checkout する
+        notes: 引数に渡すパス。`.env` は `.gitignore` で無視され、`settings.local.json` は `.gitignore` に当たらず未追跡
     flow: |-
       <!-- map: {"title": "正常シナリオ（ローカル運用で追加する）"} -->
 
