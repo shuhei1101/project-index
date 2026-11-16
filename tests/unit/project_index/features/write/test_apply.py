@@ -6,7 +6,7 @@ import pytest
 
 from project_index.features.sources.types import DocumentTable
 from project_index.features.write import apply as apply_module
-from project_index.features.write.apply import apply_operation
+from project_index.features.write.apply import apply_body, apply_operation
 from project_index.features.write.types import Operation, TextEdit
 from project_index.shared.errors import InvalidArgumentError
 
@@ -68,6 +68,88 @@ def test_apply_operation_when_replace() -> None:
     result = apply_operation({"a": 1, "b": 2}, operation)
     # 検証
     assert result == {"a": 3}
+
+
+def test_apply_operation_when_body() -> None:
+    """@body を要素に当てない（正常系）。"""
+    # 準備
+    create = Operation(
+        op="create", kind="notes", data={"id": "n2", "path": "n2.md", "@body": "本文"}
+    )
+    update = Operation(
+        op="update",
+        id="n1",
+        expected_version="v1",
+        set={"@body": "x"},
+        text_edits=[TextEdit(field="@body", old="a", new="b")],
+    )
+    # 実行
+    created = apply_operation(None, create)
+    updated = apply_operation({"id": "n1", "path": "n1.md"}, update)
+    # 検証
+    assert created == {"id": "n2", "path": "n2.md"}
+    assert updated == {"id": "n1", "path": "n1.md"}
+
+
+@pytest.mark.parametrize(
+    ("current_body", "operation", "expected"),
+    [
+        pytest.param(
+            None,
+            Operation(
+                op="create", kind="notes", data={"id": "n2", "path": "n2.md", "@body": "本文"}
+            ),
+            "本文",
+            id="create",
+        ),
+        pytest.param(
+            "a\nb",
+            Operation(op="update", id="n1", expected_version="v1", set={"@body": "x"}),
+            "x",
+            id="set",
+        ),
+        pytest.param(
+            "a\nb",
+            Operation(
+                op="update",
+                id="n1",
+                expected_version="v1",
+                text_edits=[TextEdit(field="@body", old="b", new="c")],
+            ),
+            "a\nc",
+            id="text_edits",
+        ),
+        pytest.param(
+            "a\nb",
+            Operation(op="update", id="n1", expected_version="v1", set={"name": "y"}),
+            None,
+            id="no_body",
+        ),
+    ],
+)
+def test_apply_body(current_body: str | None, operation: Operation, expected: str | None) -> None:
+    """create・set・text_edits の本文（正常系）。"""
+    # 準備
+    index = 0
+    # 実行
+    result = apply_body(current_body, operation, index=index)
+    # 検証
+    assert result == expected
+
+
+def test_apply_body_when_text_edit_ambiguous() -> None:
+    """本文の old が 2 か所に一致する（異常系）。"""
+    # 準備
+    operation = Operation(
+        op="update",
+        id="n1",
+        expected_version="v1",
+        text_edits=[TextEdit(field="@body", old="a", new="b")],
+    )
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError) as exc_info:
+        apply_body("a a", operation, index=1)
+    assert exc_info.value.violations[0].path == "operations[1].text_edits[0].old"
 
 
 def test_to_columns() -> None:
