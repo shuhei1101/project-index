@@ -145,6 +145,36 @@ flows:
       - 409 で、`current` がコメントを追記した後の内容のバージョン
       - '`settings.yaml` が追記した内容のままで、extra の行が無い'
     test: test_error_when_version_outdated
+  - name: 正常系（読み書きの方法を持つ行を追加する）
+    summary: '`storage.type: disk` を持つ行を追加し、disk の配信元として読み込む'
+    setup:
+      - name: Mock
+        description: なし
+      - name: ローカル運用のフォルダ
+        description: Git のリポジトリのクローン本体に `project-index.local.yaml` を置き、commit しない
+        notes: id `company`
+      - name: 入力
+        description: '`source` は company の行（`config: project-index.local.yaml`・`storage.type: disk`）'
+    flow: |-
+      <!-- map: {"title": "正常系（読み書きの方法を持つ行を追加する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as POST /settings/sources
+        participant CF as 端末の設定
+
+        C->>E: source: company（storage.type: disk）
+        E->>CF: company の行を追加する
+        E->>E: company を読み込む
+        E-->>C: 201（company は serving）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 201 で、company が `serving`
+      - '`settings.yaml` の company の行に `storage.type: disk` がある'
+    test: test_normal_when_storage_given
 lead: 端末の設定へ配信元の行を 1 行追加する端末の設定の API の入出力を定め、配信元の 1 行の追加を修正するときに参照する。
 identifier: add_settings_source
 permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ'

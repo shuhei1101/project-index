@@ -858,6 +858,37 @@ flows:
       - 応答が `Error executing tool` で始まらない
       - ワークツリー x の文書 1 は書き換わらない
     test: test_error_when_validator_timed_out
+  - name: 正常系（disk の配信元のクローン本体に書く）
+    summary: disk の配信元はクローン本体へ書き、`created`・`updated` を付ける
+    setup:
+      - name: Mock
+        description: なし
+      - name: ローカル運用の配信元
+        description: 'Git のリポジトリの中の `storage.type: disk` の配信元。YAML の文書の種類を 1 つ持つ'
+        notes: id `company`。`scope.write` は company のクローン本体
+      - name: 入力
+        description: '`cwd` は company のクローン本体で、`worktree` を渡さない `create`。続けて同じ文書の `update`'
+    flow: |-
+      <!-- map: {"title": "正常系（disk の配信元のクローン本体に書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant F as company のクローン本体
+
+        C->>T: source: company, operations: create
+        T->>T: disk のためクローン本体を書く先にし、created・updated を付ける
+        T->>F: YAML を書く
+        T-->>C: id と version
+      ```
+
+      <!-- /map -->
+    expected:
+      - company のクローン本体に新しい YAML ができ、`created`・`updated` に書いた日時が入る
+      - '`TargetIsCloneError` にならない'
+      - 続けての `update` で `updated` だけが新しい日時になり、`created` は変わらない
+    test: test_normal_when_disk_storage
 lead: 文書の作成・部分更新・置き換えを検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 identifier: write_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーにだけ書く
@@ -1132,6 +1163,8 @@ constraints:
   - item: ワークツリーの読み込みの待ち
     constraint: '[文書の検索](id:IF-2) の制約「ワークツリーの読み込みの待ち」と同じ。終了しなければ何も書き込まずに `WorktreeLoadingError` を返却する'
     notes: 共通の処理のため、結合テストは文書の検索が持つ
+  - item: disk の配信元
+    constraint: '端末の設定の行が `storage.type: disk` の配信元は、作業場所が `scope.write` に当たれば登録したフォルダへ書き、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく `created`・`updated` を付ける。`worktree` を指定すると `InvalidArgumentError`'
 refs:
   - SC-7#scenarios[正常シナリオ]
   - SC-9#scenarios[異常シナリオ（読んだ後に変わった文書へ書き込む）]

@@ -365,6 +365,59 @@ flows:
     test: test_normal_when_paths_base_or_paths_out_of_range
     decisions:
       - D-189
+  - name: 正常系（disk を指定して検査する）
+    summary: '`storage_type: disk` と設定のファイルの絶対パスで、commit していない配信元を検査する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: ローカル運用のフォルダ
+        description: Git のリポジトリのクローン本体に `project-index.local.yaml`・`files.local.yaml`・`schemas/files.schema.local.yaml` を置き、どのブランチにも commit しない
+        notes: 端末の設定にはまだ行が無い
+      - name: 入力
+        description: '`path` は `project-index.local.yaml` の絶対パス、`storage_type: disk`'
+    flow: |-
+      <!-- map: {"title": "正常系（disk を指定して検査する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as check_project
+
+        C->>T: path: project-index.local.yaml, storage_type: disk
+        T->>T: Git を参照せずにディスクの設定・スキーマ・文書で検査する
+        T-->>C: 違反 0 件・索引の同期の件数 0
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`violations` が空で、`default_ref` に設定が無い違反を返さない'
+      - '`sync` の件数がどれも 0（`*.local.*` の名前のファイルを `unindexed_files` に数えない）'
+      - '`storage_type` を省くと、`config[0]` の `default_ref` に設定が無い違反を返す'
+    test: test_normal_when_disk_storage
+  - name: 正常系（*.local.* の名前のファイルを数えない）
+    summary: コミットする運用の配信元でも `*.local.*` の名前のファイルを索引に無いファイルに数えない
+    setup:
+      - name: Mock
+        description: なし
+      - name: 配信元
+        description: '`src/files.yaml` を読む行を持ち、`src/` に管理用の YAML に行のある `a.py` と、行の無い `settings.local.json` を置く git リポジトリ'
+        notes: '`settings.local.json` は commit しない'
+    flow: |-
+      <!-- map: {"title": "正常系（*.local.* の名前のファイルを数えない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as check_project
+
+        C->>T: path: 配信元のフォルダ
+        T-->>C: 索引の同期の件数 0
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`sync.unindexed_files` が 0 で、`sync.items` に `src/settings.local.json` が無い'
+    test: test_normal_when_local_files_excluded
 lead: 配信元の設定・管理用の YAML・スクリプトを検証する管理の MCP の `check_project` の入出力を定め、`check_project` を修正するときに参照する。
 identifier: check_project
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
@@ -382,7 +435,7 @@ request:
     type: str
     required: true
     location: argument
-    description: 配信元のフォルダか、その `project-index.yaml` の絶対パス
+    description: 配信元のフォルダか、配信元の設定のファイル（`project-index.yaml`・`project-index.local.yaml` など）の絶対パス
   - name: config
     type: str
     required: false
@@ -396,6 +449,13 @@ request:
     default: '`markdown`'
     location: argument
     description: 返却する形式
+  - name: storage_type
+    type: Literal['git', 'disk']
+    required: false
+    default: なし（`path` が Git の作業ツリーの中なら `git`、外なら `disk`）
+    location: argument
+    description: 配信元の読み書きの方法（端末の設定の `sources[].storage.type` と同じ値）
+    notes: '`disk` は Git を参照せず、設定・スキーマ・スクリプト・文書をディスクから読む'
 request_example: |-
   ```json
   {"path": "/home/u/repo/sample"}
@@ -486,7 +546,7 @@ constraints:
   - item: タイムアウト
     constraint: スクリプトの確かめは `script_timeout_sec` で打ち切り、`script_errors` に入れる
   - item: 除外の条件
-    constraint: 生成物・ロック・バイナリ・ベンダーのコード・再エクスポートや空の `__init__` だけのファイルを `unindexed_files` に数えない。起動時の警告・状態の取得・`project-index files` も同じ判定を使う
+    constraint: 生成物・ロック・バイナリ・ベンダーのコード・再エクスポートや空の `__init__` だけのファイル・`*.local.*` の名前のファイルを `unindexed_files` に数えない。起動時の警告・状態の取得・`project-index files` も同じ判定を使う
     notes: 見分け方はモジュール構成『文書のストア / indexable.py』の `is_excluded_file`。配信元固有の除外は `documents[].exclude[]`
   - item: nav の auto の group_by
     constraint: "`group_by` の `'@folder'` は項目のパスとして検査せず、違反・警告にしない"

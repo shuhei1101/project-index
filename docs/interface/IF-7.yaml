@@ -268,6 +268,32 @@ flows:
     expected:
       - '文書 1 の YAML の、`related` の文書 2 の行以外の行が書き込み前の文字列と一致し、`description: ''2020-12''` と `name: "A: b"` が残る'
     test: test_normal_when_unlink_quotes_preserved
+  - name: 異常系（disk の配信元で削除を許していない種類・DeleteNotAllowedError）
+    summary: disk の配信元で `writable` が削除を許さない種類の文書を消さない
+    setup:
+      - name: Mock
+        description: なし
+      - name: ローカル運用の配信元
+        description: 'Git のリポジトリの中の `storage.type: disk` の配信元で、種類の `documents[].writable` が `false`'
+        notes: id `company`。`cwd` は company のクローン本体で、`scope.write` に当たる
+    flow: |-
+      <!-- map: {"title": "異常系（disk の配信元で削除を許していない種類・DeleteNotAllowedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
+
+        C->>T: source: company, targets: company の文書
+        T->>T: 種類の writable が削除を許していない
+        T-->>C: isError（削除を許していない種類と documents[].writable のパス）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、種類の id と `documents[].writable` が削除を許していないことを返す（`TargetIsCloneError` ではない）'
+      - company のクローン本体のファイルが残る
+    test: test_error_when_disk_storage_delete_not_allowed
 lead: 文書を物理削除し、`related` からの参照を拒否するか除外する `delete_docs` の入出力を定め、`delete_docs` を修正するときに参照する。
 identifier: delete_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーだけ。Git 管理外の配信元は種類の `documents[].writable` が削除を許すこと
@@ -403,6 +429,8 @@ constraints:
   - item: 書き込みの期限・生成の制限時間
     constraint: '`write_docs` と同じ。作業ツリーのファイルを削除・置き換える前に期限を確認し、始めた後は全てのファイルを処理し終える'
     notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
+  - item: disk の配信元
+    constraint: '端末の設定の行が `storage.type: disk` の配信元は、登録したフォルダから消し、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく、`documents[].writable` が削除を許さない種類は `DeleteNotAllowedError`'
 refs:
   - SC-7#scenarios[正常シナリオ（参照も外して消す）]
   - SC-7#scenarios[異常シナリオ（参照されている文書を消す）]
