@@ -223,3 +223,24 @@ def test_error_when_not_found(
     assert (no_ref.status_code, no_ref.json()["missing"]) == (404, "ref")
     assert (no_doc.status_code, no_doc.json()["missing"]) == (404, "doc")
     assert (no_id.status_code, no_id.json()["missing"]) == (404, "doc")
+
+
+def test_normal_when_disk_storage(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+    write_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    """disk の配信元は ref を無視して登録したフォルダの文書を返す（正常系）。"""
+    # 準備（master には D-3 が無く、登録したフォルダにだけ D-3 を置く）
+    company = make_source("company", main_files(), branch="main", storage="disk")
+    run_git(company.folder, "branch", "master")
+    write_files(company.folder, {"design/D-3.yaml": "id: D-3\nname: 設計 3\ntitle: 手元\n"})
+    env = make_server(company)
+    # 実行
+    response = env.client.get("/sources/company/docs/design/D-3.yaml", params={"ref": "master"})
+    # 検証
+    body = response.json()
+    assert response.status_code == 200
+    assert body["ref"] == ""
+    assert body["value"]["title"] == "手元"

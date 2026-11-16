@@ -163,6 +163,31 @@ flows:
       - 無い文書は 404 で `missing` が `doc`
       - '`path` の文書に `id` が一致する文書が無いときは 404 で `missing` が `doc`'
     test: test_error_when_not_found
+  - name: 正常系（disk の配信元でリビジョンを指す）
+    summary: disk の配信元は `ref` を無視して登録したフォルダの文書を返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: ローカル運用の配信元
+        description: 'Git のリポジトリの中の `storage.type: disk` の配信元。文書 1 を持つ'
+        notes: id `company`。`master` ブランチがあり、`master` には文書 1 が無い
+    flow: |-
+      <!-- map: {"title": "正常系（disk の配信元でリビジョンを指す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs/{path}
+
+        C->>E: GET /sources/company/docs/{文書 1 のパス}?ref=master
+        E-->>C: 200 登録したフォルダの文書 1（ref は空）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 200 で、登録したフォルダの文書 1 の `value` を返す
+      - '`ref` が空の文字列'
+    test: test_normal_when_disk_storage
 lead: 指定のリビジョンの文書の値・種類のスキーマ・メタデータ・変換の結果を返却する読み取り API の入出力を定め、文書の取得を修正するときに参照する。
 identifier: get_document
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
@@ -277,4 +302,6 @@ constraints:
     decided_by: NFR-1#requirements[通信]
   - item: JSON のキー
     constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名と、`value`・`schema`・`metadata.commonKeys` の中身は変えない
+  - item: disk の配信元
+    constraint: '端末の設定の行が `storage.type: disk` の配信元は、`ref` を無視して登録したフォルダの文書を返し、応答の `ref` を空にする'
 test_file: tests/integration/server/test_get_document.py

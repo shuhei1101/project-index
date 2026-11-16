@@ -638,6 +638,45 @@ scenarios:
       - '`isError: true` で、添字 0 の違反として、本文のファイルのパスが配信元の外を指すことを返す'
       - ワークツリー x の `notes/index.yaml` に要素が加わらず、配信元のフォルダの外の `outside/n3.md` も作られない
     test: test_error_when_body_file_not_writable
+  - name: 正常シナリオ（disk の配信元のクローン本体に書く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+      - name: ローカル運用の配信元
+        description: '起動するの『正常シナリオ（disk を指定した配信元を Git を参照せずに配信する）』と同じ company に、YAML の文書の種類を 1 つ（`*.local.*` の名前のスキーマ）と、`writable: false` の種類を 1 つ足したもの'
+        notes: '`scope.write` は company のクローン本体'
+      - name: project-index
+        description: company を配信している project-index
+        notes: '`cwd` は company のクローン本体。`worktree` を渡さない'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（disk の配信元のクローン本体に書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant F as company のクローン本体
+
+        A->>M: write_docs(source: company, operations: create)
+        M->>M: company の scope.write に cwd が該当し、disk のためクローン本体を書く先にする
+        M->>M: スキーマと validators に通し、created・updated を付ける
+        M->>F: YAML を書く
+        M-->>A: id と version
+        A->>M: write_docs(source: company, operations: update 作った文書・set)
+        M->>M: updated だけを書き換える
+        M->>F: YAML を書く
+        M-->>A: 新しい version
+        A->>M: delete_docs(source: company, targets: writable: false の種類の文書)
+        M-->>A: エラー（削除できない種類）
+      ```
+
+      <!-- /map -->
+    expected:
+      - company のクローン本体に新しい YAML ができ、メタデータの `created`・`updated` に書いた日時が入る
+      - 続けて update したとき、`updated` だけが新しい日時になり、`created` は変わらない
+      - クローン本体への書き込みを断るエラー（`worktree` でワークツリーを指す案内）を返却しない
+      - '`writable: false` の種類の文書の `delete_docs` が `isError: true` で、その種類は削除できない理由を返却し、ファイルは残る'
+    test: test_normal_when_disk_storage_clone_written
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 issue: 14
 primary_actor: エージェント（Claude Code）

@@ -302,7 +302,7 @@ functions:
       description: 配信するときは配信中の配信元と `serving` の状態、配信しないときは `None` と `not_served` か `disabled` の状態
     process: |-
       1. `entry.enabled` が `False` の場合、`disabled` を返す（設定は読まない。ID は `entry.id`、無ければ `sources[{index}]`）
-      2. `entry.config` の各ファイルを順に読む（YAMLの読み込み）。先頭のファイルは、Git の配信元なら『default_ref の設定の読み込み』の内容を読み、commit を設定の commit にする（`ValidationFailedError` は違反を持つ `not_served` を返す）。2 つ目以降のファイルはディスクから読む
+      2. `entry.config` の各ファイルを順に読む（YAMLの読み込み）。先頭のファイルは、`entry.storage` が `disk` でない Git の配信元なら『default_ref の設定の読み込み』の内容を読み、commit を設定の commit にする（`ValidationFailedError` は違反を持つ `not_served` を返す）。2 つ目以降のファイルはディスクから読む
          - 無い・読めない・辞書でない場合、`config[{n}]` のパスの違反を持つ `not_served` を返す
       3. 読んだ値をマージする（設定のマージ）。設定ファイルのフォルダは先頭のファイルのフォルダにする
       4. マージした値を検証する（配信元の設定の検証）
@@ -314,8 +314,8 @@ functions:
          - `newer` の場合、`version` に「このサーバーより新しい設定」の違反を持つ `not_served` を返す
          - `older` の場合、状態の `config_version` に `(設定, SOURCE_CONFIG_VERSION)` を入れる
          - `[warning]` 配信元の設定のバージョンが古い（ID・設定のバージョン・サーバーが読めるバージョン）
-      8. 設定ファイルのフォルダが Git の作業ツリーかとその直下を引く（履歴の『リポジトリの直下』）。『paths の基準のフォルダの解決』で `root` を決める（範囲の違反は手順 4 の検証で返している）
-      9. 種類ごとのスキーマを設定ファイルのフォルダから読み（設定の commit がある場合はそのリビジョンのファイル。`schema_path` が `SchemaRef` の行は参照先のスキーマの読み取りの結果）、`worktrees` をメインのリポジトリの直下（Git でなければ設定ファイルのフォルダ）からの絶対パスにして、`ServedSource` を作る。`config_dir` は `root` から設定ファイルのフォルダへの相対パス、`scope_write` が無ければ `[str(設定ファイルのフォルダ)]`。ID は `entry.id`、無ければ `config.name`。`outside_read` は `entry.outside_read`
+      8. `entry.storage` が `disk` の場合、Git の作業ツリーとして扱わず、直下とメインのリポジトリを引かない。それ以外は設定ファイルのフォルダが Git の作業ツリーかとその直下を引く（履歴の『リポジトリの直下』）。`entry.storage` が `git` で Git の作業ツリーの外の場合、`sources[{index}].storage.type` に「フォルダが Git の作業ツリーの中にありません」の違反を持つ `not_served` を返す。『paths の基準のフォルダの解決』で `root` を決める（範囲の違反は手順 4 の検証で返している）
+      9. 種類ごとのスキーマを設定ファイルのフォルダから読み（設定の commit がある場合はそのリビジョンのファイル。`schema_path` が `SchemaRef` の行は参照先のスキーマの読み取りの結果）、`worktrees` をメインのリポジトリの直下（Git でなければ設定ファイルのフォルダ）からの絶対パスにして、`ServedSource` を作る。`config_dir` は `root` から設定ファイルのフォルダへの相対パス、`scope_write` が無ければ `[str(設定ファイルのフォルダ)]`。ID は `entry.id`、無ければ `config.name`。`outside_read` は `entry.outside_read`、`storage` は `entry.storage` の `type`（省いた行は `None`）。`storage` が `disk` の場合、`worktree_globs` は空にする
       10. `ServedSource` と `serving` を返す
 
       違反で返すときは `[error]` 配信元を配信しない（違反ごとに `{id}: {パス}: {理由}`）を書く。
@@ -410,6 +410,18 @@ functions:
         condition: '`paths_base` が `sub`（設定ファイルのフォルダの下。`sub` はある）の行と、`../../../..`（リポジトリの直下より上）の行'
         mock: なし（一時フォルダで `git init`）
         expected: どちらも `None` と `not_served`。違反のパスが `paths_base` で、理由はそれぞれ設定ファイルのフォルダかその上を指す必要があること・リポジトリの外を指していること
+      - name: test_load_source_when_disk_storage
+        case: 正常
+        summary: disk の行は default_ref を読まずに配信する
+        condition: Git のリポジトリの中に commit していない `project-index.local.yaml`（`default_ref` を持たない）を置き、行の `storage.type` が `disk`
+        mock: なし（一時ディレクトリの git リポジトリ）
+        expected: 状態が `serving` で、`ServedSource` の `storage` が `disk`、`config_commit` が `None`
+      - name: test_load_source_when_git_storage_outside_work_tree
+        case: 正常
+        summary: Git の作業ツリーの外に git を指定した行を配信しない
+        condition: Git 管理外のフォルダの設定で、`index=1` の行の `storage.type` が `git`
+        mock: なし（一時ディレクトリ）
+        expected: '`not_served` で、違反のパスが `sources[1].storage.type`'
   - name: read_default_ref_config
     title: default_ref の設定の読み込み
     kind: 関数
@@ -601,6 +613,12 @@ functions:
         default: None
         passing: keyword
         description: 配信元の設定の検証へ渡す（`None` は端末の設定のファイルから作る）
+      - name: storage
+        title: 読み書きの方法
+        type: StorageType | None
+        default: None
+        passing: keyword
+        description: '`disk` は Git を参照せず、`repo_root`・`main_root` を `None`、`worktree_globs` を空にする。`git` で Git の作業ツリーの外なら `storage.type` の違反にする'
     returns:
       type: tuple[ServedSource | None, SourceConfig | None, list[Violation]]
       description: 配信中の配信元・設定・違反。読めないか検証に失敗したら `(None, None, 違反)`、スクリプトの確かめに失敗したら `(None, 設定, 違反)`
@@ -625,6 +643,18 @@ functions:
         condition: '`converters[0].run` が無いファイルを指す'
         mock: なし
         expected: '`(None, 設定, 違反 1 件)`'
+      - name: test_assemble_source_when_disk_storage
+        case: 正常
+        summary: disk は Git の作業ツリーの中でも Git を参照しない
+        condition: Git のリポジトリの中に commit していない設定とスキーマを置き、`storage="disk"`
+        mock: なし（一時ディレクトリの git リポジトリ）
+        expected: 違反が空で、`is_git` が `False`、`repo_root`・`main_root` が `None`、`worktree_globs` が空、`storage` が `disk`
+      - name: test_assemble_source_when_git_storage_outside_work_tree
+        case: 正常
+        summary: Git の作業ツリーの外に git を指定する
+        condition: Git 管理外のフォルダの設定、`storage="git"`
+        mock: なし（一時ディレクトリ）
+        expected: '`(None, None, 違反 1 件)` で、違反のパスが `storage.type`'
     callers:
       - '#functions[load_source]'
       - '#functions[load_source_at]'

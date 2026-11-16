@@ -72,6 +72,15 @@ properties:
         outside_read:
           type: boolean
           title: 作業範囲の外から参照できるか
+        storage:
+          type: object
+          title: 読み書きの方法
+          additionalProperties: false
+          required: [type]
+          properties:
+            type:
+              enum: [git, disk]
+              title: 種類
   state_dir:
     type: string
     title: 状態の配置先

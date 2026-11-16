@@ -217,3 +217,25 @@ def test_normal_when_unknown_top_level_key_kept(
     assert response.status_code == 200
     assert [warning["path"] for warning in body["warnings"]] == ["mindstella"]
     assert UNKNOWN_KEY_EXTRA in env.settings_path.read_text(encoding="utf-8")
+
+
+def test_normal_when_storage_changed(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """1 行の storage.type を disk に変え、その配信元を disk の配信元として読み直す（正常系）。"""
+    # 準備
+    env = make_server(make_source("sample"))
+    before = load_yaml(env.settings_path.read_text(encoding="utf-8"))["sources"][0]
+    version = _version(env)
+    # 実行
+    response = env.client.patch(
+        "/settings/sources/sample",
+        json={"expectedVersion": version, "source": {"storage": {"type": "disk"}}},
+    )
+    # 検証
+    row = load_yaml(env.settings_path.read_text(encoding="utf-8"))["sources"][0]
+    assert response.status_code == 200
+    assert response.json()["version"] != version
+    assert row["storage"] == {"type": "disk"}
+    assert {key: value for key, value in row.items() if key != "storage"} == before
+    assert env.client.get("/sources/sample/refs").json()["git"] is False

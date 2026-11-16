@@ -301,6 +301,32 @@ flows:
       - 2 回目の後、`notes/index.yaml` が n1 だけになり、`notes/n1.md` は変わらない
       - 削除した後の `check_project` の `unindexed_files` に `notes/n2.md` が出ない
     test: test_normal_when_body_file
+  - name: 異常系（disk の配信元で削除を許していない種類・DeleteNotAllowedError）
+    summary: disk の配信元で `writable` が削除を許さない種類の文書を消さない
+    setup:
+      - name: Mock
+        description: なし
+      - name: ローカル運用の配信元
+        description: 'Git のリポジトリの中の `storage.type: disk` の配信元で、種類の `documents[].writable` が `false`'
+        notes: id `company`。`cwd` は company のクローン本体で、`scope.write` に当たる
+    flow: |-
+      <!-- map: {"title": "異常系（disk の配信元で削除を許していない種類・DeleteNotAllowedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
+
+        C->>T: source: company, targets: company の文書
+        T->>T: 種類の writable が削除を許していない
+        T-->>C: isError（削除を許していない種類と documents[].writable のパス）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、種類の id と `documents[].writable` が削除を許していないことを返す（`TargetIsCloneError` ではない）'
+      - company のクローン本体のファイルが残る
+    test: test_error_when_disk_storage_delete_not_allowed
 lead: 文書を物理削除し、`related` からの参照を拒否するか除外する `delete_docs` の入出力を定め、`delete_docs` を修正するときに参照する。
 identifier: delete_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーだけ。Git 管理外の配信元は種類の `documents[].writable` が削除を許すこと
@@ -411,7 +437,7 @@ exceptions:
     condition: Git の配信元で、消す先がクローン本体になる
     notes: クローン本体のパス（配信元の設定をワークツリーから読んでいても、ワークツリーの親のクローン本体）と、`worktree` でワークツリーを指すことを添える
   - name: DeleteNotAllowedError
-    condition: Git 管理外の配信元で、種類の `documents[].writable` が削除を許していない
+    condition: 'Git 管理外の配信元か `storage.type: disk` の配信元で、種類の `documents[].writable` が削除を許していない'
   - name: DocumentNotFoundError
     condition: '`targets[].id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
@@ -424,6 +450,8 @@ exceptions:
   - name: WorktreeLoadingError
     condition: 消す先のワークツリーの初めての読み込みが、端末の設定の `worktree_load_wait_sec` までに終了しなかった
     notes: '`write_docs` と同じ'
+  - name: InvalidArgumentError
+    condition: '`storage.type: disk` の配信元に `worktree` を渡した'
 constraints:
   - item: 件数
     constraint: 1 回の `targets` は最大 50 件
@@ -439,6 +467,8 @@ constraints:
     notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
   - item: 本文のファイル
     constraint: '`records`・`body_file` の行の文書は、管理用の YAML から要素を除き、本文のファイルも削除する。同じ管理用の YAML のほかの要素が同じ本文のファイルを指すときは、本文のファイルを削除しない'
+  - item: disk の配信元
+    constraint: '端末の設定の行が `storage.type: disk` の配信元は、登録したフォルダから消し、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく、`documents[].writable` が削除を許さない種類は `DeleteNotAllowedError`。`worktree` を指定すると `InvalidArgumentError`'
 refs:
   - SC-7#scenarios[正常シナリオ（参照も外して消す）]
   - SC-7#scenarios[異常シナリオ（参照されている文書を消す）]

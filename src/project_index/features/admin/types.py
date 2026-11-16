@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from project_index.features.read.types import NavAutoCount
-from project_index.features.sources.types import ServedSource, SourceStatusKind
+from project_index.features.sources.types import ServedSource, SourceStatusKind, StorageType
 from project_index.shared.errors import Violation
 
 if TYPE_CHECKING:
@@ -116,12 +116,18 @@ class CheckProjectRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    path: str = Field(description="配信元のフォルダか `project-index.yaml` の絶対パス")
+    path: str = Field(
+        description="配信元のフォルダか、配信元の設定のファイル（`project-index.yaml`・`project-index.local.yaml` など）の絶対パス"
+    )
     config: str | None = Field(
         default=None,
         description="ファイルに記載する前の `project-index.yaml` の中身（YAML の文字列）。省くとファイルを読み込む",
     )
     format: Literal["markdown", "json"] = Field(default="markdown", description="返却する形式")
+    storage_type: StorageType | None = Field(
+        default=None,
+        description="配信元の読み書きの方法。`disk` は Git を参照せずに検査する。省くと、配信元のフォルダが Git の作業ツリーの中なら `git`、外なら `disk`",
+    )
 
 
 @dataclass(frozen=True)

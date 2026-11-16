@@ -296,7 +296,7 @@ scenarios:
         description: '`project-index.yaml` が設計書の行 `design`（YAML の文書。`design/repo.yaml` が id `design/repo` と `implementation: src/tasks/repo.py` を持つ）と、管理用の YAML を読む行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`）を持ち、端末の設定に登録済みの git リポジトリ。`src/files.yaml` は `files: []`'
         notes: '`project-index.yaml` は `related.types[]` を書かない'
       - name: 範囲のファイル
-        description: '`src/` に `tasks/repo.py`・`tasks/test_repo.py`・空の `tasks/__init__.py`・`uv.lock`・`logo.png` を置き commit する。その commit でワークツリーを作る'
+        description: '`src/` に `tasks/repo.py`・`tasks/test_repo.py`・空の `tasks/__init__.py`・`uv.lock`・`logo.png` を置き commit する。`tasks/settings.local.json` を commit せずに置く（`.gitignore` に当たらない）。その commit でワークツリーを作る'
         notes: 実装のパスを持つ設計書の質問に、種類 `design`・キー `implementation` を答える
     flow: |-
       <!-- map: {"title": "正常シナリオ（除外の条件と関連の候補）"} -->
@@ -329,11 +329,11 @@ scenarios:
 
       <!-- /map -->
     expected:
-      - 管理用の YAML に `tasks/repo.py` と `tasks/test_repo.py` の 2 行だけが並び、`tasks/__init__.py`・`uv.lock`・`logo.png` の行は無い
+      - 管理用の YAML に `tasks/repo.py` と `tasks/test_repo.py` の 2 行だけが並び、`tasks/__init__.py`・`uv.lock`・`logo.png`・`tasks/settings.local.json` の行は無い
       - '`tasks/repo.py` の行が `related: [{to: design/repo, type: implements}]` を持つ'
       - '`tasks/test_repo.py` の行が `related: [{to: src/tasks/repo.py, type: tests}]` を持つ（`to` は関連先のファイルの配信元の直下からのパスで、拡張子を含む）'
       - 確認の表に `implements`・`tests` の候補が出る
-      - '`check_project` が違反と索引の同期の件数を 0 で返す（除外した 3 件を索引に無いファイルとして数えず、付けた関連の `to` はどれも文書に当たる）'
+      - '`check_project` が違反と索引の同期の件数を 0 で返す（除外した 3 件と `*.local.*` の名前の `tasks/settings.local.json` を索引に無いファイルとして数えず、付けた関連の `to` はどれも文書に当たる）'
       - '`reload` の後、`design/repo` を起点にした `direction: in` の `trace_related` が `src/tasks/repo.py` を返す'
     test: test_normal_when_excluded_and_related_candidates
   - name: 正常シナリオ（content/prompts/ を見つける）
@@ -643,6 +643,85 @@ scenarios:
       - 端末の設定は変わらず、schemas の配信は続く
       - スキルの応答に `documents[0].schema` と、リビジョン `v9` が見つからない理由が出る
     test: test_error_when_schema_ref_not_found
+  - name: 正常シナリオ（ローカル運用で追加する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion の運用の質問には「ローカル運用」、ほかは既定の選択肢で答える）
+      - name: project-index
+        description: '端末の設定（`sources: []`）で待ち受けている project-index'
+      - name: 配信元にするリポジトリ
+        description: commit 済みの Markdown 2 件と、commit していない `.env`・`settings.local.json` を持ち、project-index のファイルを持たない Git のリポジトリ `company`。クローン本体は `develop` を checkout する
+        notes: 引数に渡すパス。`.env` は `.gitignore` で無視され、`settings.local.json` は `.gitignore` に当たらず未追跡
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（ローカル運用で追加する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant G as company
+        participant AD as 管理の MCP
+        participant CF as 端末の設定
+
+        U->>SK: /project-index:setup {company のパス}
+        SK->>CF: config が company にある行を探す（無い）
+        SK->>U: 運用（コミットする・ローカル運用）を聞く
+        U-->>SK: ローカル運用
+        SK->>U: 検索できるようにするファイルと、Git が無視するファイル（.env）を除外するかを聞く
+        U-->>SK: 既定の値（除外する）
+        SK->>G: project-index.local.yaml・files.local.yaml・schemas/files.schema.local.yaml を作る
+        SK->>G: git rev-parse --git-path info/exclude のファイルに *.local.* を追加する
+        SK->>AD: check_project（project-index.local.yaml の絶対パス, storage.type: disk）
+        AD-->>SK: 違反 0 件
+        SK-->>U: 書き込む行を表で示して確かめる
+        U-->>SK: 了承
+        SK->>CF: sources に storage.type: disk の company の行を書く
+        SK->>AD: reload
+        SK-->>U: 追加した配信元と check_project の結果を出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - company の直下に `project-index.local.yaml`・`files.local.yaml`・`schemas/files.schema.local.yaml` があり、`project-index.yaml`・`files.yaml` は無い
+      - '`info/exclude` に `*.local.*` の行が 1 行だけあり、`.gitignore` は変わらない'
+      - company の `git status --porcelain` が空（作ったファイルを Git が無視する）
+      - 端末の設定の company の行の `config` が `project-index.local.yaml`、`storage.type` が `disk` になっている
+      - '`files.local.yaml` は Markdown 2 件の行を持ち、`*.local.*` の名前のファイル（`settings.local.json` を含む）と `.env` の行を持たない'
+      - company のフォルダで呼んだ `describe` が `company`（読み書き）を返却し、`check_project` が違反と索引の同期の件数を 0 で返却する
+    test: test_normal_when_local_operation
+  - name: 正常シナリオ（ローカル運用の 2 回目以降）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 登録済みのローカル運用の配信元
+        description: 正常シナリオ（ローカル運用で追加する）で登録した company に Markdown を 1 件足し、1 件を中身を変えずに改名して commit する
+        notes: '端末の設定の company の行は `storage.type: disk`'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（ローカル運用の 2 回目以降）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant CF as 端末の設定
+        participant DM as 文書の MCP
+
+        U->>SK: /project-index:setup {company のパス}
+        SK->>CF: config が company にある行を探し、storage.type が disk
+        SK->>SK: 運用を聞かずに project-index.local.yaml と files.local.yaml を対象にする
+        SK->>SK: Git のリネームの検出で改名を突き合わせる
+        SK-->>U: 追加・改名の行を表で示して確かめる
+        U-->>SK: 了承
+        SK->>DM: write_docs（files.local.yaml の行を追加・修正する）
+        SK-->>U: 修正した行を出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - 運用の質問を出さない
+      - '`files.local.yaml` に足した Markdown の行が入り、改名したファイルの行はパスだけが新しくなり、メタデータは元の値を保つ'
+      - '`project-index.yaml`・`files.yaml` を作らず、`info/exclude` の `*.local.*` の行は 1 行のまま'
+    test: test_normal_when_local_operation_rerun
 lead: 利用者が `/project-index:setup` でフォルダを配信元として登録し、管理用の YAML を範囲のファイルに合わせるシナリオを定め、配信元の追加の流れを変えるときに参照する。
 issue: 14
 primary_actor: 利用者

@@ -1185,3 +1185,44 @@ def test_normal_when_terminal_config_has_unknown_top_level_key(
     unknown = [w for w in described["warnings"] if "mindstella" in w]
     assert len(unknown) == 1
     assert "prot" in unknown[0]
+
+
+def test_normal_when_disk_storage(
+    make_local_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Git のリポジトリの中の disk の配信元を、登録したフォルダの設定・スキーマ・スクリプトで配信する（正常系）。"""
+    # 準備
+    company = make_local_source()
+    caplog.set_level(logging.ERROR)
+    # 実行
+    env = make_server(company)
+    docs = env.client.get("/sources/company/docs")
+    refs = env.client.get("/sources/company/refs")
+    # 検証
+    assert docs.status_code == 200
+    assert [row["bodyPath"] for row in docs.json()["documents"]] == ["src/app.py"]
+    assert refs.json()["git"] is False
+    assert "config[0]: develop に project-index.local.yaml がありません" not in caplog.text
+
+
+def test_normal_when_git_storage_outside_work_tree(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Git の作業ツリーの外部のフォルダに storage.type: git を指定した配信元を外して配信する（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    notes = make_source("notes", git=False, storage="git")
+    caplog.set_level(logging.ERROR)
+    # 実行
+    env = make_server(sample, notes)
+    # 検証
+    assert env.client.get("/sources/notes/docs").status_code == 404
+    assert env.client.get("/sources/sample/docs").status_code == 200
+    assert env.call("describe", cwd=str(sample.folder)).is_error is False
+    assert (
+        "notes: sources[1].storage.type: フォルダが Git の作業ツリーの中にありません" in caplog.text
+    )

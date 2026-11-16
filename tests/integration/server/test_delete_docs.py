@@ -410,3 +410,35 @@ def test_normal_when_body_file(
     assert not (worktree / "notes" / "n2.md").exists()
     assert (worktree / "notes" / "n1.md").read_text(encoding="utf-8") == "# n1\n"
     assert "notes/n2.md" not in checked.text
+
+
+def test_error_when_disk_storage_delete_not_allowed(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """disk の配信元で writable が削除を許さない種類の文書を消さない（異常系）。"""
+    # 準備
+    config = sample_config_text(name="company").replace(
+        "  - id: sample\n    paths: [docs/*.yaml]\n    schema: schemas/sample.schema.yaml\n",
+        WRITABLE_FALSE_ROW,
+    )
+    company = make_source(
+        "company", sample_file_set(**{"project-index.yaml": config}), storage="disk"
+    )
+    env = make_server(company)
+    target = company.folder / "docs" / "doc-2.yaml"
+    # 実行
+    result = env.call(
+        "delete_docs",
+        cwd=str(company.folder),
+        source="company",
+        targets=[{"id": "doc-2", "expected_version": _version(target)}],
+    )
+    # 検証
+    assert result.is_error
+    assert "DeleteNotAllowedError" in result.text
+    assert "TargetIsCloneError" not in result.text
+    assert "writable" in result.text
+    assert target.is_file()

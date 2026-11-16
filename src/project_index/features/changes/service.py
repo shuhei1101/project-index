@@ -330,11 +330,17 @@ def _check_git(targets: list[Target]) -> None:
     """区間を指す呼び出しで、Git の管理外の配信元を違反にする。"""
     for target in targets:
         if not target.source.is_git:
+            # disk の配信元は Git のリポジトリの中でも区間を指せない
+            reason = (
+                "disk の配信元のため区間を指定できません"
+                if target.source.storage == "disk"
+                else "Git の管理外なので区間を指せません"
+            )
             raise _invalid(
                 [
                     Violation(
                         path="from",
-                        rule=f"{target.source.id} は Git の管理外なので区間を指せません",
+                        rule=f"{target.source.id} は {reason}",
                         fix="from を省くと、この会話で前回読んだ時点からの変更を返却します",
                     )
                 ]

@@ -1111,3 +1111,95 @@ def test_resolve_paths_base_when_missing(tmp_path: Path) -> None:
     _, violations = service_module._resolve_paths_base("../none", config_root, None)
     # 検証
     assert "フォルダがありません: ../none" in [v.rule for v in violations]
+
+
+@pytest.fixture
+def local_repo(
+    git_repo: Callable[..., Path],
+    write_files: Callable[[Path, dict[str, str]], None],
+    sample_files: dict[str, str],
+) -> Path:
+    """配信元のファイルを commit せずに置いた git リポジトリを返す。"""
+    root = git_repo({"README.md": "readme\n"})
+    write_files(
+        root,
+        {
+            "project-index.local.yaml": sample_files["project-index.yaml"],
+            "schemas/rule.schema.yaml": sample_files["schemas/rule.schema.yaml"],
+            "docs/rule/doc-1.yaml": sample_files["docs/rule/doc-1.yaml"],
+        },
+    )
+    return root
+
+
+def test_assemble_source_when_disk_storage(local_repo: Path) -> None:
+    """disk は Git の作業ツリーの中でも Git を参照しない（正常系）。"""
+    # 準備
+    config_file = local_repo / "project-index.local.yaml"
+    # 実行
+    served, _, violations = assemble_source(
+        [config_file], source_id=None, scope_read=[], scope_write=None, storage="disk"
+    )
+    # 検証
+    assert violations == []
+    assert served is not None
+    assert served.is_git is False
+    assert served.repo_root is None
+    assert served.main_root is None
+    assert served.worktree_globs == []
+    assert served.storage == "disk"
+
+
+def test_assemble_source_when_git_storage_outside_work_tree(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    sample_files: dict[str, str],
+) -> None:
+    """Git の作業ツリーの外に git を指定する（正常系）。"""
+    # 準備
+    write_files(tmp_path / "plain", sample_files)
+    # 実行
+    served, config, violations = assemble_source(
+        [tmp_path / "plain" / "project-index.yaml"],
+        source_id=None,
+        scope_read=[],
+        scope_write=None,
+        storage="git",
+    )
+    # 検証
+    assert served is None
+    assert config is None
+    assert [violation.path for violation in violations] == ["storage.type"]
+
+
+def test_load_source_when_disk_storage(
+    local_repo: Path, make_entry: Callable[..., SourceEntry]
+) -> None:
+    """disk の行は default_ref を読まずに配信する（正常系）。"""
+    # 準備
+    entry = make_entry(str(local_repo / "project-index.local.yaml"), storage={"type": "disk"})
+    # 実行
+    served, status = load_source(entry, index=0)
+    # 検証
+    assert status.status == "serving"
+    assert served is not None
+    assert served.storage == "disk"
+    assert served.config_commit is None
+
+
+def test_load_source_when_git_storage_outside_work_tree(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    sample_files: dict[str, str],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """Git の作業ツリーの外に git を指定した行を配信しない（正常系）。"""
+    # 準備
+    write_files(tmp_path / "plain", sample_files)
+    entry = make_entry(str(tmp_path / "plain" / "project-index.yaml"), storage={"type": "git"})
+    # 実行
+    served, status = load_source(entry, index=1)
+    # 検証
+    assert served is None
+    assert status.status == "not_served"
+    assert [violation.path for violation in status.errors] == ["sources[1].storage.type"]

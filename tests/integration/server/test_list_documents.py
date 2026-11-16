@@ -180,3 +180,24 @@ def test_error_when_not_found(
     assert no_ref.status_code == 404
     assert no_ref.json()["missing"] == "ref"
     assert "no-such-branch" in no_ref.json()["detail"]
+
+
+def test_normal_when_disk_storage(
+    make_local_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """disk の配信元は ref を無視して登録したフォルダの文書を返す（正常系）。"""
+    # 準備
+    company = make_local_source()
+    run_git(company.folder, "branch", "master")
+    env = make_server(company)
+    # 実行
+    response = env.client.get("/sources/company/docs", params={"ref": "master"})
+    # 検証
+    body = response.json()
+    assert response.status_code == 200
+    assert body["ref"] == ""
+    assert [(row["path"], row["bodyPath"]) for row in body["documents"]] == [
+        ("files.local.yaml", "src/app.py")
+    ]

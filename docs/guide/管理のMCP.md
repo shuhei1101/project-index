@@ -175,7 +175,8 @@ http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
 
 | 引数 | 型 | 必須 | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
-| `path` | str | ✅ | - | 配信元のフォルダか、その `project-index.yaml` の絶対パス |
+| `path` | str | ✅ | - | 配信元のフォルダか、配信元の設定のファイル（`project-index.yaml`・`project-index.local.yaml` など）の絶対パス |
+| `storage_type` | `git` / `disk` | - | `path` が Git の作業ツリーの中なら `git`、外なら `disk` | 配信元の読み書きの方法。`disk` は Git を参照せず、ディスクの設定・スキーマ・スクリプト・文書で検査する。ローカル運用の配信元を端末の設定に記載する前に確かめるときに渡す |
 | `config` | str | - | `path` の `project-index.yaml` を読む | ファイルに記載する前の `project-index.yaml` の中身（YAML の文字列）。記載する前の設定を確かめるときに渡す |
 | `format` | `markdown` / `json` | - | `markdown` | 返す形式 |
 
@@ -193,7 +194,7 @@ http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
 | `missing_paths[]` | list[str] | `documents[].paths` などが指して無いフォルダ・ファイル |
 | `script_errors[].script` | str | 確かめに失敗したスクリプトのパス |
 | `script_errors[].reason` | str | 終了コードと標準エラーの要約 |
-| `sync` | obj | 索引の同期の件数。`metadata` の列の欠け・索引に無いファイル・ファイルが無い行・どの文書にも当たらない関連 |
+| `sync` | obj | 索引の同期の件数。`metadata` の列の欠け・索引に無いファイル・ファイルが無い行・どの文書にも当たらない関連。`*.local.*` の名前のファイルは索引に無いファイルに数えない |
 | `sync.items[]` | list | 件数の内訳（種類とパス）。先頭 50 件まで。件数は全件を数える |
 | `warnings[].path` | str | 警告したキーのパス（`nav.tabs[2].items[0].auto.filter`） |
 | `warnings[].rule` | str | 警告の理由。`nav` の `auto` の条件がどの文書にも当たらないときは、タブの名前と条件 |
