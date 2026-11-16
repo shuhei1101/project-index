@@ -44,7 +44,7 @@ PROJECT_INDEX_CONFIG=/tmp/x/settings.yaml PROJECT_INDEX_PORT=8786 project-index 
 動いているサーバーには反映しません。
 端末の設定を移し替えたら `restart`、配信元の設定を移し替えたら `reload` を呼びます。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | オプション | 既定 | 説明 |
 | --- | --- | --- |
@@ -66,7 +66,7 @@ project-index migrate --source ~/repo/sample/project-index.yaml --allow-destruct
 
 端末の設定は動いているサーバーと同じファイルなので、書き換えの前後でファイルの中身を比べ、変わっていたら書かずに失敗とします。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 終了コード | 意味 | 動き |
 | --- | --- | --- |
@@ -86,7 +86,7 @@ project-index migrate --source ~/repo/sample/project-index.yaml --allow-destruct
 `settings` は端末の設定、`project-index` は配信元の設定を、そのバージョンへ上げる手順です。
 `steps.yaml` は `steps:` の下に、次のキーを持つ行を並べます。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | キー | 説明 |
 | --- | --- |
