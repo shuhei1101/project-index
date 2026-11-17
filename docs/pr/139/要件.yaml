@@ -2,7 +2,9 @@ docs:
   - page: docs/test-procedure/TP-1.yaml
     new: false
     change: TL-1・TL-2 の run_runner で、gh workflow run が返却した run を API で参照できるまで 1 秒おきに最大 10 回待ってから gh run watch を呼ぶ
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T09:19:05.700956+00:00'
 scope_out:
   - item: ほかのリポジトリ（ai-monitor の TP-3038-1・alias-inject の TP-1・knowledge の TP-72-1・gui-support の TP-93-1・voice-paste の TP-1・observability の TP-49-1）の run_runner も gh workflow run の直後に gh run watch を呼ぶ
     reason: 起点 Issue の対象は project-index の TP-1 だけで、ほかのリポジトリの修正はこの作業 PR のマージによらず成り立つ。それぞれのリポジトリへ起票するかはレビューで確定する
