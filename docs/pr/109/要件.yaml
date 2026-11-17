@@ -2,7 +2,12 @@ use_cases:
   - kind: single
     scenario: docs/scenario/SC-2.yaml
     impact: changed
-    detail: global-setup が案内する mdmark の CLI の入れ方を、既定で develop の最新にし、バージョンを固定する書き方を添える（期待値 L47 の入れ方も合わせる）
+    detail: global-setup が案内する mdmark の CLI の入れ方を、端末の設定 `mdmark_ref`（既定 `develop`）の参照にする。バージョンを固定したときのシナリオを追加する
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-3.yaml
+    impact: changed
+    detail: '`update` が、mdmark の CLI を端末の設定の参照で入れ直す。入れ直せなかったときも更新を続けるシナリオを追加する'
     depends_on: []
 docs:
   - page: docs/library/LIB-7.yaml
@@ -16,6 +21,10 @@ docs:
   - page: plugins/project-index/skills/global-setup/SKILL.md
     new: false
     change: L46 の mdmark の CLI の入れ方の案内を、既定で develop の最新にし、固定するときの書き方を添える
+    status: todo
+  - page: docs/guide/設定.md
+    new: false
+    change: 端末の設定の表に `mdmark_ref`（str・既定 `develop`・タグか commit の SHA で固定）の行を追加する
     status: todo
 scope_out:
   - item: LIB-7 の `verification` の画面（jsDelivr の `dist/index.js`）の確認の記述の見直し
