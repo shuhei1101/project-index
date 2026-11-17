@@ -1,0 +1,24 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: changed
+    detail: 起動の後の全ての配信元の読み込みを短くし、配信元の一覧と状態の取得が起動の後すぐに応答する
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: changed
+    detail: 画面のサーバーが起動の直後に配信元の一覧を取得しても、全ての配信元の読み込みを待たずに応答を受け取る
+    depends_on:
+      - docs/scenario/SC-4.yaml
+docs:
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: '`GET /sources` の行に、起動の後の読み込み中の応答（読み込み中の配信元の扱い）を設計の結果に合わせて書き足す'
+    status: todo
+scope_out:
+  - item: 配信元ごとの最初の問い合わせの時間（#85）
+    reason: '#94 で対応済み。この作業 PR は起動の後の全ての配信元の読み込みと `GET /sources` の応答だけを扱う'
+    plan: none
+  - item: dev-docs の画面のサーバーが `GET /sources` の新しい状態の値を表示する対応
+    reason: '`GET /sources` が読み込み中の配信元を新しい状態で返す設計になったときだけ要る dev-docs のリポジトリの対応。応答の形を変えるかはインターフェース定義設計で決める'
+    plan: to_file
