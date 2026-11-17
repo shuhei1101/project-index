@@ -6,21 +6,6 @@ tags:
   - name: tool:mcp
     main: true
   - name: topic:ツール
-directory: |-
-  ```text
-  src/project_index/server/mcp/
-  ├─ __init__.py   # build_docs_mcp / build_admin_mcp の再エクスポート
-  ├─ docs.py       # build_docs_mcp（7 つのツールの登録）
-  ├─ admin.py      # build_admin_mcp（7 つのツールの登録）
-  └─ result.py     # to_tool_result / tool_error / TOOL_ANNOTATIONS / 2 つの MCP のツール名とプロンプトの ID
-
-  content/prompts/mcp/
-  ├─ docs/
-  │  ├─ instructions.yaml   # 文書の MCP の instructions（kind: instructions）
-  │  └─ tools/{ツール名}.yaml # 文書の MCP のツールの description（kind: tool。ツール名の _ を - にした名前）
-  └─ admin/
-     └─ tools/{ツール名}.yaml # 管理の MCP のツールの description（kind: tool）
-  ```
 diagrams:
   - name: 全体
     diagram: |-

@@ -7,21 +7,6 @@ tags:
     main: true
   - name: topic:キャッシュ
   - name: action:読み込み
-directory: |
-  ```text
-  src/project_index/features/documents/
-  ├─ __init__.py   # 公開する型と関数の再エクスポート
-  ├─ types.py      # Document / LoadProblem / LoadResult / SyncReport / AliasEntry / MatchWord / AliasCollection
-  ├─ fields.py     # ArraySelector / parse_field_path / get_field / set_field / delete_field / resolve_metadata / missing_ref_fields / is_markdown_body
-  ├─ loader.py     # collect_files / load_file / unindexed_files（ファイルから文書を作る）
-  ├─ indexable.py  # walk_files / is_excluded_file / indexable_files（たどるフォルダと載せるファイルの判定）
-  ├─ schema.py     # resolve_schema_refs（種類のスキーマの $ref を解く）/ records_item_schema（records の行の 1 行のスキーマ）
-  ├─ aliases.py    # alias_schema / alias_schema_version / check_alias_document / collect_aliases / match_words / term_ids（エイリアスのキーの検証と用語）
-  └─ store.py      # DocumentStore（キャッシュ・ID の引き当て・種類のスキーマ・文書の場所）/ check_sync（メタデータのずれ）
-  src/project_index/schemas/
-  ├─ aliases.schema.yaml   # alias-inject の `schemas/aliases.schema.yaml`（エイリアスの元の行）の複製
-  └─ aliases.source.yaml   # 取り込み元のリポジトリ・タグ・パス
-  ```
 diagrams:
   - name: 全体
     diagram: |-

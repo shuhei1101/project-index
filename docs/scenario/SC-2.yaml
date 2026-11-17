@@ -184,7 +184,6 @@ tags:
     main: true
   - name: action:導入
   - name: topic:プラグイン
-issue: 14
 primary_actor: 利用者
 stakeholders:
   - name: 利用者
@@ -200,5 +199,8 @@ minimal_guarantee: 端末の設定が project-index より新しいときと、�
 frequency: 端末ごとに 1 回。入れ直し・端末の移行・project-index の更新のとき
 priority: 高
 refs:
-  - SC-1#scenarios[正常シナリオ]
+  - to: SC-1
+    item: scenarios[正常シナリオ]
+    type: part_of
+    when: このシナリオの前後の流れを、複合ユースケースの中で確認するときに参照する。
 test_file: tests/e2e/単一ユースケース/test_project-indexを入れる.py

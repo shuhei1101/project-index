@@ -7,17 +7,6 @@ tags:
     main: true
   - name: action:読み込み
   - name: action:配信
-directory: |-
-  ```text
-  src/project_index/features/sources/
-  ├─ __init__.py   # 公開する型と関数の再エクスポート
-  ├─ types.py      # SourceConfig / DocumentTable / ScriptEntry / ServedSource / SourceStatus
-  ├─ merge.py      # merge_configs（設定の YAML のマージ）
-  ├─ service.py    # load_source / load_source_at / validate_source_config / check_scripts / compare_config_version / source_schema_json
-  └─ registry.py   # SourceRegistry（配信元の一覧と読み直し）
-  schemas/
-  └─ project-index.schema.yaml   # 配信元の設定のスキーマ（JSON Schema 2020-12）
-  ```
 diagrams:
   - name: 全体
     diagram: |-

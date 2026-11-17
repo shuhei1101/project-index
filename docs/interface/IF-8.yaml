@@ -123,7 +123,10 @@ flows:
       - '合図の後の `status` が `checking: false` で、`sync` に件数がある'
     test: test_normal_when_reload_checking
     refs:
-      - SC-10#scenarios[正常シナリオ]
+      - to: SC-10
+        item: scenarios[正常シナリオ]
+        type: references
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『設定・スクリプトを変える』の対応する流れと期待値を確認する。
   - name: 正常系（裏でリビジョンを書き出している）
     summary: 裏のリビジョンの書き出しが済むまで、書き出しの最中であることを返す
     setup:
@@ -150,8 +153,14 @@ flows:
       - '合図の後の `status` が `exporting: false` を返す'
     test: test_normal_when_exporting
     refs:
-      - SC-4#scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
-      - SC-11#scenarios[正常シナリオ（配信元を読み込んだ直後に開く）]
+      - to: SC-4
+        item: scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
+        type: references
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『起動する』の対応する流れと期待値を確認する。
+      - to: SC-11
+        item: scenarios[正常シナリオ（配信元を読み込んだ直後に開く）]
+        type: references
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『画面のサーバーが文書を読む』の対応する流れと期待値を確認する。
 lead: 待ち受けのアドレス・バージョン・端末の設定・配信元ごとの状態を返却する管理の MCP の `status` の入出力を定め、`status` を修正するときに参照する。
 tags:
   - name: topic:サーバー

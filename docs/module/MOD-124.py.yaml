@@ -158,6 +158,9 @@ functions:
         expected: どれも `SchemaRefError` で、手順ごとの理由
         exception: 参照先が見つからない
 refs:
-  - IF-12#constraints[ほかの配信元のスキーマの参照]
+  - to: IF-12
+    item: constraints[ほかの配信元のスキーマの参照]
+    type: requires
+    when: インターフェース定義『配信元の検査』の入出力を変えるときに、この設計書の関数と型を合わせる。
 test_files:
   - tests/unit/project_index/features/sources/test_schema_ref.py

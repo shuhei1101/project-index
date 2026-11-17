@@ -551,7 +551,16 @@ constraints:
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、前回読んだ時点からの変更だけを返す。`from`・`to`・`worktree` を指定すると `InvalidArgumentError`'
 refs:
-  - SC-8#scenarios[正常シナリオ]
-  - SC-8#scenarios[正常シナリオ（前回読んだ時点から）]
-  - SC-8#scenarios[正常シナリオ（語が入った・消えた変更を引く）]
+  - to: SC-8
+    item: scenarios[正常シナリオ]
+    type: references
+    when: このインターフェースの入出力やフローを変えるときに、シナリオ『変更をレビューする』の対応する流れと期待値を確認する。
+  - to: SC-8
+    item: scenarios[正常シナリオ（前回読んだ時点から）]
+    type: references
+    when: このインターフェースの入出力やフローを変えるときに、シナリオ『変更をレビューする』の対応する流れと期待値を確認する。
+  - to: SC-8
+    item: scenarios[正常シナリオ（語が入った・消えた変更を引く）]
+    type: references
+    when: このインターフェースの入出力やフローを変えるときに、シナリオ『変更をレビューする』の対応する流れと期待値を確認する。
 test_file: tests/integration/server/test_list_changes.py

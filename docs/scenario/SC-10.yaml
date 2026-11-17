@@ -437,7 +437,6 @@ tags:
     main: true
   - name: topic:スクリプト
   - name: action:変更
-issue: 14
 primary_actor: 利用者・エージェント（Claude Code）
 stakeholders:
   - name: 利用者
@@ -452,5 +451,8 @@ minimal_guarantee: '`check_project` と `try_convert` は配信元のフォル�
 frequency: 設定・スクリプトを変えるたび
 priority: 中
 refs:
-  - SC-1#scenarios[正常シナリオ]
+  - to: SC-1
+    item: scenarios[正常シナリオ]
+    type: part_of
+    when: このシナリオの前後の流れを、複合ユースケースの中で確認するときに参照する。
 test_file: tests/e2e/単一ユースケース/test_設定・スクリプトを変える.py

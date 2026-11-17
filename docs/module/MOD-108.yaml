@@ -4,22 +4,6 @@ lead: どの分類からも使用する例外の階層・YAML の読み書き・
 tags:
   - name: topic:ユーティリティ
     main: true
-directory: |-
-  ```text
-  src/project_index/
-  ├─ shared/
-  │  ├─ errors.py    # ProjectIndexError と MCP・読み取り API が返すエラーの階層
-  │  ├─ api_model.py # ApiModel（読み取り API の DTO の基底。キーは camelCase）
-  │  ├─ yaml_io.py   # YAML の読み込み・往復編集の読み書き・YamlLoadError
-  │  ├─ hashing.py   # 内容のハッシュ（文書のバージョン）
-  │  ├─ narrowing.py # YAML・JSON から読んだ値の辞書・配列への絞り込み
-  │  ├─ paths.py     # 作業場所の glob の照合・パスの正規化
-  │  ├─ files.py     # 一時ファイルからのファイルの置き換え
-  │  ├─ schema_check.py # JSON Schema の違反を項目のパスつきの Violation にする
-  │  └─ version.py   # 動いているプロセスが起動した時点の project-index のバージョン
-  └─ server/
-     └─ origin.py    # 端末の設定の API への別のオリジンの書き込みの確認
-  ```
 diagrams:
   - name: 全体
     diagram: |-

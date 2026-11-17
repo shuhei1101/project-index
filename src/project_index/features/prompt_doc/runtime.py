@@ -32,7 +32,7 @@ PROMPTS_DIR_ENV = "PROJECT_INDEX_PROMPTS_DIR"
 # クローンの直下の `content/prompts`
 DEFAULT_PROMPTS_DIR = Path(__file__).resolve().parents[4] / "content" / "prompts"
 # プロンプトの YAML を検査するスキーマ（knowledge の `schemas/prompt.schema.yaml` のコピー）
-PROMPT_SCHEMA_PATH = Path(__file__).resolve().parents[4] / "templates" / "prompt.schema.yaml"
+PROMPT_SCHEMA_PATH = Path(__file__).resolve().parents[4] / "schemas" / "prompt.schema.yaml"
 # プロンプトのスキーマが `$ref` で指す共通の型（knowledge の `schemas/common.schema.yaml` のコピー）
 COMMON_SCHEMA_PATH = PROMPT_SCHEMA_PATH.with_name("common.schema.yaml")
 # ファイル全体の違反のキーのパス

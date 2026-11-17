@@ -684,7 +684,6 @@ tags:
   - name: action:書き込み
   - name: topic:エージェント
   - name: tool:mcp
-issue: 14
 primary_actor: エージェント（Claude Code）
 stakeholders:
   - name: エージェント（Claude Code）
@@ -701,7 +700,10 @@ minimal_guarantee: '検査に通らない書き込み、mdmark の警告があ�
 frequency: 作業のたび
 priority: 高
 refs:
-  - SC-1#scenarios[正常シナリオ]
+  - to: SC-1
+    item: scenarios[正常シナリオ]
+    type: part_of
+    when: このシナリオの前後の流れを、複合ユースケースの中で確認するときに参照する。
 notes:
   バージョンの不一致: 読んだ後に文書が変わっていたときの書き込みは、[YAMLを直接編集した](id:SC-9) の異常シナリオが持つ。
 test_file: tests/e2e/単一ユースケース/test_エージェントが書き込む.py

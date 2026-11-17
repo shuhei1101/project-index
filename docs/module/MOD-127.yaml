@@ -8,17 +8,6 @@ tags:
   - name: topic:エンドポイント
   - name: action:読み取り
   - name: tool:fastapi
-directory: |-
-  ```text
-  src/project_index/features/read/
-  ├─ __init__.py   # 公開する型と関数の再エクスポート
-  ├─ types.py      # NavTab / NavItem / NavAutoCount / ConversionError / GitHubTarget / SearchItem / SearchResult / SourceConfigResponse / DocumentListItem / DocumentListResponse / DocumentValueResponse / DecisionItem / DecisionResponse
-  ├─ paths.py      # page_path / find_page / read_target
-  ├─ nav.py        # nav_auto_counts / check_nav_filters / nav_warnings
-  ├─ search.py     # search_words
-  ├─ service.py    # get_source_config / list_documents / get_document / list_decisions / get_decision
-  └─ route.py      # build_read_router（/sources の下）
-  ```
 diagrams:
   - name: 全体
     diagram: |-

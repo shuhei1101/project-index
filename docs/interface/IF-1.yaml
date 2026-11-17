@@ -669,5 +669,8 @@ constraints:
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、`refs`・`worktrees` を返さない。`worktree` を指定すると `InvalidArgumentError`'
 refs:
-  - SC-6#scenarios[正常シナリオ]
+  - to: SC-6
+    item: scenarios[正常シナリオ]
+    type: references
+    when: このインターフェースの入出力やフローを変えるときに、シナリオ『エージェントが調べる』の対応する流れと期待値を確認する。
 test_file: tests/integration/server/test_describe.py
