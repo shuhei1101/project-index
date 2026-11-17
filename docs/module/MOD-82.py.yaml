@@ -1,6 +1,12 @@
 id: MOD-82
 title: 索引のサーバー / 書き込み / locks.py
 lead: 配信元ごとの書き込みの排他を受け持ち、書き込みの locks.py を修正するときに参照する。
+tags:
+  - name: topic:文書
+    main: true
+  - name: action:書き込み
+  - name: action:検証
+  - name: tool:ruamel.yaml
 test_files:
   - tests/unit/project_index/features/write/test_locks.py
 diagrams:
@@ -19,8 +25,8 @@ diagrams:
         class 配信元ごとの排他 {
           +握る(配信元の ID) ContextManager
         }
-        click 文書の書き込み href "./MOD-84.py.yaml#文書の書き込み"
-        click 文書の削除 href "./MOD-84.py.yaml#文書の削除"
+        click 文書の書き込み href "id:MOD-84#functions[write_docs]"
+        click 文書の削除 href "id:MOD-84#functions[delete_docs]"
 classes:
   - name: SourceLocks
     title: 配信元ごとの排他

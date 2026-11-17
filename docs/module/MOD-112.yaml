@@ -2,6 +2,10 @@ id: MOD-112
 title: 索引のサーバー / 文書のMCP
 lead: |-
   文書の MCP（`/mcp`）と管理の MCP（`/_admin/mcp`）を組み立てる文書の MCP の分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
+tags:
+  - name: tool:mcp
+    main: true
+  - name: topic:ツール
 directory: |-
   ```text
   src/project_index/server/mcp/
@@ -69,18 +73,18 @@ diagrams:
         class 索引のサーバーのエラー {
           <<class>>
         }
-        click 文書の MCP の組み立て href "./MOD-94.py.yaml#文書の MCP の組み立て"
-        click ツールの結果 href "./MOD-95.py.yaml#ツールの結果"
-        click ツールのエラーの変換 href "./MOD-95.py.yaml#ツールのエラーの変換"
-        click 文書の検索 href "./MOD-55.py.yaml#文書の検索"
-        click 文書の書き込み href "./MOD-84.py.yaml#文書の書き込み"
-        click 文書の削除 href "./MOD-84.py.yaml#文書の削除"
-        click 変更の一覧 href "./MOD-14.py.yaml#変更の一覧"
-        click 関連のたどり href "./MOD-47.py.yaml#関連のたどり"
-        click 配信元の説明 href "./MOD-20.py.yaml#配信元の説明"
-        click 索引のサーバーのエラー href "./MOD-98.py.yaml#索引のサーバーのエラー"
-        click ツールのプロンプトの ID href "./MOD-95.py.yaml#ツールのプロンプトの ID"
-        click 管理の MCP の組み立て href "./MOD-93.py.yaml#管理の MCP の組み立て"
+        click 文書の MCP の組み立て href "id:MOD-94#functions[build_docs_mcp]"
+        click ツールの結果 href "id:MOD-95#functions[to_tool_result]"
+        click ツールのエラーの変換 href "id:MOD-95#functions[tool_error]"
+        click 文書の検索 href "id:MOD-55#functions[search_docs]"
+        click 文書の書き込み href "id:MOD-84#functions[write_docs]"
+        click 文書の削除 href "id:MOD-84#functions[delete_docs]"
+        click 変更の一覧 href "id:MOD-14#functions[list_changes]"
+        click 関連のたどり href "id:MOD-47#functions[trace_related]"
+        click 配信元の説明 href "id:MOD-20#functions[describe]"
+        click 索引のサーバーのエラー href "id:MOD-98#classes[ProjectIndexError]"
+        click ツールのプロンプトの ID href "id:MOD-95#functions[tool_prompt_id]"
+        click 管理の MCP の組み立て href "id:MOD-93#functions[build_admin_mcp]"
   - name: 管理の MCP
     diagram: |-
       classDiagram
@@ -132,18 +136,18 @@ diagrams:
         class 検査の文 {
           <<function>>
         }
-        click 管理の MCP の組み立て href "./MOD-93.py.yaml#管理の MCP の組み立て"
-        click ツールの結果 href "./MOD-95.py.yaml#ツールの結果"
-        click ツールのエラーの変換 href "./MOD-95.py.yaml#ツールのエラーの変換"
-        click 状態の取得 href "./MOD-10.py.yaml#状態の取得"
-        click 設定の読み直し href "./MOD-10.py.yaml#設定の読み直し"
-        click 配信元の検査 href "./MOD-10.py.yaml#配信元の検査"
-        click 試しの変換 href "./MOD-10.py.yaml#試しの変換"
-        click 再起動の制御 href "./MOD-34.py.yaml#再起動の制御"
-        click クローンの更新 href "./MOD-36.py.yaml#クローンの更新"
-        click 状態の文 href "./MOD-9.py.yaml#状態の文"
-        click 読み直しの文 href "./MOD-9.py.yaml#読み直しの文"
-        click 検査の文 href "./MOD-9.py.yaml#検査の文"
+        click 管理の MCP の組み立て href "id:MOD-93#functions[build_admin_mcp]"
+        click ツールの結果 href "id:MOD-95#functions[to_tool_result]"
+        click ツールのエラーの変換 href "id:MOD-95#functions[tool_error]"
+        click 状態の取得 href "id:MOD-10#functions[get_status]"
+        click 設定の読み直し href "id:MOD-10#functions[reload_config]"
+        click 配信元の検査 href "id:MOD-10#functions[check_project]"
+        click 試しの変換 href "id:MOD-10#functions[try_convert]"
+        click 再起動の制御 href "id:MOD-34#classes[RestartControl]"
+        click クローンの更新 href "id:MOD-36#functions[update_clone]"
+        click 状態の文 href "id:MOD-9#functions[render_status]"
+        click 読み直しの文 href "id:MOD-9#functions[render_reload]"
+        click 検査の文 href "id:MOD-9#functions[render_check]"
 notes:
   受け持つこと: |-
     各ツールの引数を要求のモデルで受け、サービスを呼んで `format` の形式で返し、`ProjectIndexError` を `isError` の結果にする。

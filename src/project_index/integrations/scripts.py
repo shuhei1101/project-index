@@ -14,7 +14,7 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Sequence
+    from collections.abc import Generator, Mapping, Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -133,10 +133,34 @@ def run_script(
     args: Sequence[str] = (),
     timeout_sec: float,
     at: tuple[Path, str] | None = None,
+    env: Mapping[str, str | None] | None = None,
 ) -> ScriptResult:
     """コマンドを配信元の直下で動かし、制限時間を超えたら止める。"""
     with _run_at(run, cwd, at) as resolved:
-        return _run(resolved, list(run), cwd=cwd, stdin=stdin, args=args, timeout_sec=timeout_sec)
+        return _run(
+            resolved,
+            list(run),
+            cwd=cwd,
+            stdin=stdin,
+            args=args,
+            timeout_sec=timeout_sec,
+            env=_child_env(env),
+        )
+
+
+def _child_env(env: Mapping[str, str | None] | None) -> dict[str, str] | None:
+    """サーバーの環境変数に `env` を重ねた子プロセスの環境を返す（値が `None` のキーは除く）。"""
+    # 重ねる値が無い: サーバーの環境をそのまま引き継ぐ
+    if env is None:
+        return None
+    merged = dict(os.environ)
+    for key, value in env.items():
+        # 値が None のキーは子プロセスに渡さない
+        if value is None:
+            merged.pop(key, None)
+        else:
+            merged[key] = value
+    return merged
 
 
 def _run(
@@ -147,6 +171,7 @@ def _run(
     stdin: str,
     args: Sequence[str],
     timeout_sec: float,
+    env: dict[str, str] | None,
 ) -> ScriptResult:
     """置き換えたコマンドを動かす。"""
     command = check_runnable(resolved, cwd=cwd)
@@ -154,6 +179,7 @@ def _run(
     process = subprocess.Popen(  # noqa: S603
         full,
         cwd=cwd,
+        env=env,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

@@ -1,6 +1,12 @@
 id: MOD-8
 title: 索引のサーバー / 権限と作業場所 / types.py
 lead: 配信元の権限・作業場所・読み書きする場所・権限のレベルの型を受け持ち、権限と作業場所の types.py を修正するときに参照する。
+tags:
+  - name: topic:権限
+    main: true
+  - name: topic:スコープ
+  - name: topic:worktree
+  - name: topic:型ヒント
 diagrams:
   - name: 全体
     diagram: |-
@@ -20,8 +26,8 @@ diagrams:
           +リビジョン: str
           +解いた commit: str
         }
-        click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
-        click 書く場所の解決 href "./MOD-7.py.yaml#書く場所の解決"
+        click 読む場所の解決 href "id:MOD-7#functions[resolve_read_targets]"
+        click 書く場所の解決 href "id:MOD-7#functions[resolve_write_target]"
 constants:
   - name: CWD_DESCRIPTION
     title: 作業場所の引数の説明

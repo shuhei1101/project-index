@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
@@ -177,6 +178,47 @@ def test_convert_service_convert_when_project_index_updated(
     service.convert(target, document)
     # 検証
     assert len(calls) == 2
+
+
+@pytest.mark.parametrize(
+    ("commit", "expected"),
+    [
+        pytest.param(
+            "0123456789abcdef0123456789abcdef01234567",
+            {"PROJECT_INDEX_COMMIT": "0123456789abcdef0123456789abcdef01234567"},
+            id="commit",
+        ),
+        pytest.param(None, {"PROJECT_INDEX_COMMIT": None}, id="no_commit"),
+    ],
+)
+def test_convert_service_convert_when_commit(
+    tmp_path: Path,
+    make_converted_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+    monkeypatch: pytest.MonkeyPatch,
+    commit: str | None,
+    expected: dict[str, str | None],
+) -> None:
+    """参照している commit を環境変数で指定する（正常系）。"""
+    # 準備
+    envs: list[object] = []
+
+    def fake_run_script(run: Any, **kwargs: Any) -> ScriptResult:
+        envs.append(kwargs.get("env"))
+        return ScriptResult(stdout="# 変換した\n", stderr="")
+
+    monkeypatch.setattr(service_module, "run_script", fake_run_script)
+    target = replace(
+        make_converted_target(
+            converter="c",
+            converters=[ScriptEntry(id="c", run=["python3", "scripts/c.py"], cache=False)],
+        ),
+        commit=commit,
+    )
+    # 実行
+    _service(tmp_path, {}).convert(target, make_document())
+    # 検証
+    assert envs == [expected]
 
 
 def test_convert_service_convert_when_timeout(

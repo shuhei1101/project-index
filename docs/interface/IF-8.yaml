@@ -153,6 +153,12 @@ flows:
       - SC-4#scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
       - SC-11#scenarios[正常シナリオ（配信元を読み込んだ直後に開く）]
 lead: 待ち受けのアドレス・バージョン・端末の設定・配信元ごとの状態を返却する管理の MCP の `status` の入出力を定め、`status` を修正するときに参照する。
+tags:
+  - name: topic:サーバー
+    main: true
+  - name: topic:状態
+  - name: action:取得
+  - name: tool:mcp
 identifier: status
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true
@@ -190,7 +196,7 @@ response:
     description: 読んだ端末の設定のパス
   - name: terminal.version_state
     type: Literal['current', 'old', 'newer']
-    description: 端末の設定の `version` と project-index が読めるバージョンの比較
+    description: 端末の設定の `version` と project-index が参照できるバージョンの比較
   - name: sources[].id
     type: str
     description: 配信元の ID

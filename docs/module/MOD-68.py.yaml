@@ -1,6 +1,12 @@
 id: MOD-68
 title: 索引のサーバー / 配信元 / merge.py
 lead: 設定の YAML のマージを受け持ち、配信元の merge.py を修正するときに参照する。
+tags:
+  - name: topic:配信元
+    main: true
+  - name: action:読み込み
+  - name: action:配信
+  - name: action:統合
 test_files:
   - tests/unit/project_index/features/sources/test_merge.py
 diagrams:
@@ -15,7 +21,7 @@ diagrams:
         class 設定のマージ {
           <<function>>
         }
-        click 配信元の読み込み href "./MOD-70.py.yaml#配信元の読み込み"
+        click 配信元の読み込み href "id:MOD-70#functions[load_source]"
 constants:
   - name: TABLE_KEYS
     title: テーブルのキー

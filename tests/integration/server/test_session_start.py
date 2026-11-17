@@ -20,7 +20,7 @@ def _post(env: Any, body: dict[str, Any]) -> Any:
 def test_normal_when_cleared(
     make_source: Callable[..., Any], make_server: Callable[..., Any]
 ) -> None:
-    """/clear の後は、そのセッションの返し済みの記録を削除する（正常系）。"""
+    """/clear の後は、そのセッションの返却済みの記録を削除する（正常系）。"""
     # 準備
     sample = make_source("sample")
     env = make_server(sample)

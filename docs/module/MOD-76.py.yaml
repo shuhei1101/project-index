@@ -1,6 +1,12 @@
 id: MOD-76
 title: 索引のサーバー / 読み取り API / nav.py
 lead: '`nav` の `auto` に該当する文書の数・`filter` の検証・警告（管理の MCP と配信元の説明が使う）を受け持ち、読み取り API の nav.py を修正するときに参照する。'
+tags:
+  - name: topic:api
+    main: true
+  - name: topic:エンドポイント
+  - name: action:読み取り
+  - name: tool:fastapi
 test_files:
   - tests/unit/project_index/features/read/test_nav.py
 diagrams:
@@ -27,8 +33,8 @@ diagrams:
         class nav の警告 {
           <<function>>
         }
-        click 画面の構成の書き込み href "./MOD-10.py.yaml#画面の構成の書き込み"
-        click 配信元の検査のキャッシュ href "./MOD-21.py.yaml#配信元の検査のキャッシュ"
+        click 画面の構成の書き込み href "id:MOD-10#functions[write_nav]"
+        click 配信元の検査のキャッシュ href "id:MOD-21#classes[SourceChecks]"
 functions:
   - name: nav_auto_counts
     title: nav の条件の数え

@@ -24,7 +24,7 @@ def seen_store(tmp_path: Path) -> SeenStore:
 
 
 def test_seen_store_returned(seen_store: SeenStore, make_document: Callable[..., Document]) -> None:
-    """同じバージョンだけ返し済み（正常系）。"""
+    """同じバージョンだけ返却済み（正常系）。"""
     # 準備
     key = SessionKey("s1")
     documents = [

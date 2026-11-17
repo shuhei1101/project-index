@@ -10,6 +10,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
+    import pytest
+
 PROMPT_CONFIG = (
     "name: sample\n"
     "default_ref: main\n"
@@ -197,6 +199,54 @@ def test_normal_when_converter_kind(
     assert failed.json()["markdown"] is None
     assert again.json()["markdown"] == "# 変換したプロンプト\n"
     assert calls.read_text(encoding="utf-8").count("called") == called
+
+
+COMMIT_CONFIG = (
+    "name: sample\n"
+    "default_ref: main\n"
+    "documents:\n"
+    "  - id: prompt\n"
+    "    paths: [prompts/*.yaml]\n"
+    "    schema: schemas/prompt.schema.yaml\n"
+    "    converter: commit_md\n"
+    "converters:\n"
+    "  - id: commit_md\n"
+    "    run: [python3, scripts/print_commit.py]\n"
+    "    cache: false\n"
+)
+# 環境変数 PROJECT_INDEX_COMMIT の値（無ければ none）を出す
+PRINT_COMMIT = "import os\nprint(os.environ.get('PROJECT_INDEX_COMMIT', 'none'))\n"
+
+
+def test_normal_when_converter_given_commit(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    commit_all: Callable[..., str],
+    run_git: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Git の配信元の converters[] のスクリプトは、環境変数 PROJECT_INDEX_COMMIT で応答の ref を解いた commit を受け取る（正常系）。"""
+    # 準備（main に 2 つの commit を追加し、サーバーの環境に outer を入れる）
+    files = {
+        "project-index.yaml": COMMIT_CONFIG,
+        "schemas/prompt.schema.yaml": PROMPT_SCHEMA,
+        "scripts/print_commit.py": PRINT_COMMIT,
+        "prompts/a.yaml": "id: a\nname: 最初\n",
+    }
+    source = make_source("sample", files, branch="main")
+    parent = run_git(source.folder, "rev-parse", "HEAD").strip()
+    commit_all(source.folder, {"prompts/a.yaml": "id: a\nname: 変えた\n"}, "docs: 改題")
+    head = run_git(source.folder, "rev-parse", "HEAD").strip()
+    monkeypatch.setenv("PROJECT_INDEX_COMMIT", "outer")
+    env = make_server(source)
+    # 実行
+    at_parent = env.client.get("/sources/sample/docs/prompts/a.yaml", params={"ref": parent})
+    at_default = env.client.get("/sources/sample/docs/prompts/a.yaml")
+    # 検証
+    assert at_parent.status_code == 200
+    assert at_parent.json()["markdown"] == f"{parent}\n"
+    assert at_default.status_code == 200
+    assert at_default.json()["markdown"] == f"{head}\n"
 
 
 def test_error_when_not_found(
