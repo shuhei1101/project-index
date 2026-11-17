@@ -773,7 +773,9 @@ def test_run_outline(
     assert [json.loads(line)["path"] for line in lines] == ["docs/a.md", "docs/b.md"]
 
 
-def test_run_outline_when_root_not_found(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_run_outline_when_root_not_found(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """フォルダが無い（異常系）。"""
     # 準備
     missing = tmp_path / "missing"
@@ -793,14 +795,21 @@ def test_run_changed(
     # 準備
     from project_index.features.checkpoint.types import BaseKind, ChangedBase, ChangedResult
 
-    result = ChangedResult(base=ChangedBase(kind=BaseKind.CHECKPOINT_COMMIT, value="abc"), files=("a.md",))
-    monkeypatch.setattr("project_index.features.checkpoint.changed.find_changed", lambda root, files_yaml: result)
+    result = ChangedResult(
+        base=ChangedBase(kind=BaseKind.CHECKPOINT_COMMIT, value="abc"), files=("a.md",)
+    )
+    monkeypatch.setattr(
+        "project_index.features.checkpoint.changed.find_changed", lambda root, files_yaml: result
+    )
     # 実行
     code = main_module.run_changed(_changed_args(root=str(tmp_path)))
     # 検証
     captured = capsys.readouterr()
     assert code == 0
-    assert json.loads(captured.out) == {"base": {"kind": "checkpoint_commit", "value": "abc"}, "files": ["a.md"]}
+    assert json.loads(captured.out) == {
+        "base": {"kind": "checkpoint_commit", "value": "abc"},
+        "files": ["a.md"],
+    }
     assert captured.err == ""
 
 
@@ -812,9 +821,13 @@ def test_run_changed_when_commit_missing(
     from project_index.features.checkpoint.types import BaseKind, ChangedBase, ChangedResult
 
     result = ChangedResult(
-        base=ChangedBase(kind=BaseKind.FILES_YAML_COMMIT, value="def"), files=(), missing_commit="dead"
+        base=ChangedBase(kind=BaseKind.FILES_YAML_COMMIT, value="def"),
+        files=(),
+        missing_commit="dead",
     )
-    monkeypatch.setattr("project_index.features.checkpoint.changed.find_changed", lambda root, files_yaml: result)
+    monkeypatch.setattr(
+        "project_index.features.checkpoint.changed.find_changed", lambda root, files_yaml: result
+    )
     # 実行
     code = main_module.run_changed(_changed_args(root=str(tmp_path)))
     # 検証
@@ -824,7 +837,9 @@ def test_run_changed_when_commit_missing(
     assert "files_yaml_commit" in err
 
 
-def test_run_changed_when_files_yaml_not_found(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_run_changed_when_files_yaml_not_found(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """管理用の YAML が無い（異常系）。"""
     # 実行
     code = main_module.run_changed(_changed_args(root=str(tmp_path), files_yaml="missing.yaml"))
@@ -839,9 +854,11 @@ def test_run_changed_when_checkpoint_invalid(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """壊れた checkpoint（異常系）。"""
+
     # 準備
     def _raise(root: Path, files_yaml: str) -> None:
-        raise ValueError("checked_at: ISO 8601 の日時")
+        msg = "checked_at: ISO 8601 の日時"
+        raise ValueError(msg)
 
     monkeypatch.setattr("project_index.features.checkpoint.changed.find_changed", _raise)
     # 実行
@@ -875,10 +892,14 @@ def test_run_checkpoint(
     assert calls[0]["now"].tzinfo is not None
 
 
-def test_run_checkpoint_when_files_yaml_not_found(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_run_checkpoint_when_files_yaml_not_found(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """管理用の YAML が無い（異常系）。"""
     # 実行
-    code = main_module.run_checkpoint(_checkpoint_args(root=str(tmp_path), files_yaml="missing.yaml"))
+    code = main_module.run_checkpoint(
+        _checkpoint_args(root=str(tmp_path), files_yaml="missing.yaml")
+    )
     # 検証
     assert code == 2
     assert "missing.yaml" in capsys.readouterr().err

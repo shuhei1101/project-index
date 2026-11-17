@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
-
 from project_index.features.checkpoint.changed import find_changed, read_checkpoint
 from project_index.features.checkpoint.types import BaseKind, FilesYamlNotFoundError
 
@@ -53,7 +52,9 @@ def test_find_changed(
 ) -> None:
     """記録した commit の後の commit と未 commit の変更（正常系）。"""
     # 準備
-    repo = git_repo({"a.md": "a\n", "b.md": "b\n", "c.md": "c\n", "d.md": "d\n", "files.yaml": ROWS_ABCD})
+    repo = git_repo(
+        {"a.md": "a\n", "b.md": "b\n", "c.md": "c\n", "d.md": "d\n", "files.yaml": ROWS_ABCD}
+    )
     head = run_git(repo, "rev-parse", "HEAD").strip()
     commit_all(repo, {"files.yaml": ROWS_ABCD + f"checkpoint:\n  commit: {head}\n"})
     commit_all(repo, {"a.md": "a2\n"})
@@ -99,10 +100,13 @@ def test_find_changed_when_renamed_and_deleted(
     """改名と削除（正常系）。"""
     # 準備
     body = "".join(f"line {i}\n" for i in range(20))
-    repo = git_repo({"e.md": body, "g.md": "g\n", "files.yaml": "files:\n  - path: e.md\n  - path: g.md\n"})
+    repo = git_repo(
+        {"e.md": body, "g.md": "g\n", "files.yaml": "files:\n  - path: e.md\n  - path: g.md\n"}
+    )
     head = run_git(repo, "rev-parse", "HEAD").strip()
     commit_all(
-        repo, {"files.yaml": f"files:\n  - path: e.md\n  - path: g.md\ncheckpoint:\n  commit: {head}\n"}
+        repo,
+        {"files.yaml": f"files:\n  - path: e.md\n  - path: g.md\ncheckpoint:\n  commit: {head}\n"},
     )
     run_git(repo, "mv", "e.md", "f.md")
     commit_all(repo, {"f.md": body + "added\n"}, delete=("g.md",))
@@ -118,7 +122,9 @@ def test_find_changed_when_commit_missing(
     """記録した commit が無い（正常系）。"""
     # 準備
     missing = "0123456789abcdef0123456789abcdef01234567"
-    repo = git_repo({"a.md": "a\n", "files.yaml": f"files:\n  - path: a.md\ncheckpoint:\n  commit: {missing}\n"})
+    repo = git_repo(
+        {"a.md": "a\n", "files.yaml": f"files:\n  - path: a.md\ncheckpoint:\n  commit: {missing}\n"}
+    )
     commit_all(repo, {"a.md": "a2\n"})
     # 実行
     result = find_changed(repo, "files.yaml")
@@ -153,7 +159,9 @@ def test_find_changed_when_untracked_files_yaml(
     repo = git_repo({"a.md": "a\n", "b.md": "b\n", "c.md": "c\n"}, date="2026-01-01T00:00:00+00:00")
     exclude = repo / run_git(repo, "rev-parse", "--git-path", "info/exclude").strip()
     exclude.write_text("*.local.*\n", encoding="utf-8")
-    write_files(repo, {"files.local.yaml": "files:\n  - path: a.md\n  - path: b.md\n  - path: c.md\n"})
+    write_files(
+        repo, {"files.local.yaml": "files:\n  - path: a.md\n  - path: b.md\n  - path: c.md\n"}
+    )
     boundary = datetime(2026, 1, 10, tzinfo=UTC).timestamp()
     os.utime(repo / "files.local.yaml", (boundary, boundary))
     commit_all(repo, {"a.md": "a2\n"}, date="2026-01-05T00:00:00+00:00")
@@ -205,9 +213,13 @@ def test_find_changed_when_root_is_subfolder(
 ) -> None:
     """リポジトリの下のフォルダを配信元にする（正常系）。"""
     # 準備
-    repo = git_repo({"docs/a.md": "a\n", "other.md": "o\n", "docs/files.yaml": "files:\n  - path: a.md\n"})
+    repo = git_repo(
+        {"docs/a.md": "a\n", "other.md": "o\n", "docs/files.yaml": "files:\n  - path: a.md\n"}
+    )
     head = run_git(repo, "rev-parse", "HEAD").strip()
-    commit_all(repo, {"docs/files.yaml": f"files:\n  - path: a.md\ncheckpoint:\n  commit: {head}\n"})
+    commit_all(
+        repo, {"docs/files.yaml": f"files:\n  - path: a.md\ncheckpoint:\n  commit: {head}\n"}
+    )
     commit_all(repo, {"docs/a.md": "a2\n", "other.md": "o2\n"})
     # 実行
     result = find_changed(repo / "docs", "files.yaml")

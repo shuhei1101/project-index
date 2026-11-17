@@ -42,12 +42,12 @@ def _markdown_outline(
     )
 
 
-def test_outline_files(
-    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
-) -> None:
+def test_outline_files(tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]) -> None:
     """載せるファイルだけを昇順で返す（正常系）。"""
     # 準備
-    write_files(tmp_path, {"docs/b.md": GUIDE_MD, "docs/a.md": GUIDE_MD, "uv.lock": "version = 1\n"})
+    write_files(
+        tmp_path, {"docs/b.md": GUIDE_MD, "docs/a.md": GUIDE_MD, "uv.lock": "version = 1\n"}
+    )
     # 実行
     result = outline_files(tmp_path, ["**"])
     # 検証
@@ -163,7 +163,9 @@ def test_judge_next_stage_when_code_with_description() -> None:
     """説明だけを持つコード（正常系）。"""
     # 準備
     outline = CodeOutline(
-        existing_description=ExistingDescription(source="docstring", title="設定。", description=None),
+        existing_description=ExistingDescription(
+            source="docstring", title="設定。", description=None
+        ),
         functions=(),
         classes=(),
         imports=(),

@@ -5,10 +5,9 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
-from ruamel.yaml import YAML
-
 from project_index.features.checkpoint.record import record_checkpoint
 from project_index.features.checkpoint.types import FilesYamlNotFoundError
+from ruamel.yaml import YAML
 
 if TYPE_CHECKING:
     from collections.abc import Callable
