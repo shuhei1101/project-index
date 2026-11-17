@@ -565,4 +565,124 @@ functions:
         mock: なし
         expected: どちらも `[]`
         exception: '-'
+  - name: resolve_ref_path
+    title: 参照の型の項目のパスの解決
+    kind: 関数
+    container: project_index/features/documents/fields.py
+    usecase: 書き込み
+    role: 読み取り
+    summary: 参照の型の項目のパス（`#` の後）を、文書と種類のスキーマでキーと位置の並びに解く
+    scope: public
+    thread_safe: true
+    args:
+      - name: data
+        title: 内容
+        type: Mapping[str, Any]
+        required: true
+        passing: positional
+        description: 文書の内容
+      - name: schema
+        title: スキーマ
+        type: Mapping[str, Any]
+        required: true
+        passing: positional
+        description: 文書 1 件の内容に当てるスキーマ（文書のストアの `row_schema`。最上位に `$defs` を持ち得る）
+      - name: path
+        title: 項目のパス
+        type: str
+        required: true
+        passing: positional
+        description: '`#` の後（`functions[save#2].process`・`notes[main.py の補足]`）'
+    returns:
+      type: list[str | int]
+      description: 辞書のキーと配列の位置の並び
+    process: |-
+      1. `[` から `]` までを 1 つの区切りとし、`[]` の外の `.` で名前を区切る。`[` を閉じない・空の名前は `InvalidArgumentError`
+      2. 内容とスキーマを先頭から一緒にたどる。スキーマの `$ref`（`#/$defs/...`）は最上位の `$defs` で解き、辞書のキーは `properties.{キー}`（無ければ `additionalProperties`）、配列の要素は `items` へ進む
+      3. 名前と、辞書に対する `[{キー}]` はそのキーを並びに加える。値が辞書でない・キーが無い場合は `InvalidArgumentError`
+      4. 配列に対する `[{値}]` は、スキーマの `x-key` のキーがその値の最初の要素の位置を加える。その値の要素が無く、値の末尾が `#{整数}` なら、`#` の前の値の要素のその順番（ 1 始まり）の位置を加える。`x-key` が無い・該当する要素が無い・順番が要素の数を超える場合は `InvalidArgumentError`
+      5. 並びを返す
+    exceptions:
+      - name: InvalidArgumentError
+        condition: 書式が誤っている
+        message: 項目のパス {path} の記載方法が誤っています（例 `#functions[save].process`・`#functions[save#2].process`・`#notes[main.py の補足]`）
+      - name: InvalidArgumentError
+        condition: '`x-key` を持たない配列'
+        message: '{path}: {配列のパス} は x-key を持たない配列です'
+      - name: InvalidArgumentError
+        condition: 該当する要素が無い
+        message: '{path}: {配列のパス} に {x-key} が {値} の要素がありません'
+      - name: InvalidArgumentError
+        condition: 順番が要素の数を超える
+        message: '{path}: {x-key} が {値} の要素は {数} 個です'
+      - name: InvalidArgumentError
+        condition: キーが無い・辞書でない
+        message: '{path}: {辞書のパス} にキー {キー} がありません'
+    unit_tests:
+      - name: test_resolve_ref_path
+        case: 正常
+        summary: x-key の値と順番で要素を指す
+        condition: '`functions`（`$ref` で `x-key: name` の配列）が `load`・`save`・`save` の内容を `functions[save].process` と `functions[save#2].process`'
+        mock: なし
+        expected: '`["functions", 1, "process"]` と `["functions", 2, "process"]`'
+        exception: '-'
+      - name: test_resolve_ref_path_when_dict_key
+        case: 正常
+        summary: '`.` を含む辞書のキー'
+        condition: '`{"notes": {"main.py の補足": "x"}}` を `notes[main.py の補足]`'
+        mock: なし
+        expected: '`["notes", "main.py の補足"]`'
+        exception: '-'
+      - name: test_resolve_ref_path_when_unresolved
+        case: 異常
+        summary: 要素・キーを指せない
+        condition: 同じ内容と `x-key` を持たない配列 `steps` で、`steps[a].body`・`functions[missing].process`・`functions[save#3].process`・`notes[missing]`
+        mock: なし
+        expected: どれも `InvalidArgumentError` で、理由が順に x-key の無い配列・要素が無い・要素は 2 個・キーが無い
+        exception: '`x-key` を持たない配列・該当する要素が無い・順番が要素の数を超える・キーが無い'
+  - name: set_field_at
+    title: 並びで指した項目の書き込み
+    kind: 関数
+    container: project_index/features/documents/fields.py
+    usecase: 書き込み
+    role: 書き込み
+    summary: キーと位置の並びで指した場所へ値を書く
+    scope: public
+    thread_safe: false
+    side_effects: '`data` を書き換える'
+    args:
+      - name: data
+        title: 内容
+        type: MutableMapping[str, Any]
+        required: true
+        passing: positional
+        description: 書き換える内容
+      - name: tokens
+        title: キーと位置の並び
+        type: Sequence[str | int]
+        required: true
+        passing: positional
+        description: 参照の型の項目のパスの解決の結果（`.` を含むキーも 1 つのキー）
+      - name: value
+        title: 値
+        type: object
+        required: true
+        passing: positional
+        description: 書く値
+    returns:
+      type: None
+      description: '-'
+    process: 1. 『項目の書き込み』の手順 2〜5 を、項目のパスを分けた並びの代わりに `tokens` で行う（『項目の書き込み』も分けた並びでこの関数を呼ぶ）
+    exceptions:
+      - name: InvalidArgumentError
+        condition: 途中の値の型が合わない・位置が配列の長さを超える
+        message: 『項目の書き込み』と同じ
+    unit_tests:
+      - name: test_set_field_at
+        case: 正常
+        summary: '`.` を含むキーへ書く'
+        condition: '`{"notes": {"main.py の補足": "x"}}` へ `["notes", "main.py の補足"]` = `y`'
+        mock: なし
+        expected: '`{"notes": {"main.py の補足": "y"}}`'
+        exception: '-'
 visibility: internal

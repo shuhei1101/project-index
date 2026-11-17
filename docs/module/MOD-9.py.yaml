@@ -195,7 +195,7 @@ functions:
     process: |-
       1. 状態を書く。`not_served` は `errors` を `、` でつないで括弧で添える
       2. 設定のバージョンは `{config_version}（{version_state}）`、無ければ `-`
-      3. 索引の同期は 3 つの件数の合計。`serving` で `sync` が無ければ `検査中`、それ以外で `sync` が無ければ `-`
+      3. 索引の同期は `SyncCounts` の全ての件数（`duplicate_files` を含む）の合計。`serving` で `sync` が無ければ `検査中`、それ以外で `sync` が無ければ `-`
     unit_tests:
       - name: test_source_row
         case: 正常

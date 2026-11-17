@@ -186,7 +186,7 @@ classes:
              - `target.ref` がある場合、読む場所の commit のファイルの blob の SHA を `_trees` から引く（無ければ `git ls-tree -r --full-tree {commit}` を 1 回だけ起動してキャッシュする）。`_revision_files` の blob の SHA が同じで、理由に `missing_body_file` が無く、本文のファイルの (パス, blob の SHA) と、ファイルと本文のファイルの日時（手順 3）も同じならキャッシュした結果を使い、それ以外は『ファイルの読み込み』で読んで `_revision_files` を置き換える。blob の SHA が無いファイルは読まない
           5. 収集で当たらなかった `_files` のキーのうち、読むフォルダの下にあるものを削除する（削除されたファイル）。
              `target.ref` がある場合は、読んだ行ごとに、`_revision_files` のキーのうち `repo_root`・配信元の ID・行の ID が同じで、今回の commit のファイルに当たらないもの、または行の定義のハッシュが違うものを削除する（`_revision_files` を今の commit と行の定義のファイルの数に抑える）
-          6. 行の順に文書を並べ、先に現れた ID を残して、後に現れた同じ ID の文書を `duplicate_id` にする（`detail` に ID と先の文書のファイル）
+          6. 行の順に文書を並べ、先に現れた ID を残して、後に現れた同じ ID の文書を `duplicate_id` にする（`detail` に ID と先の文書のファイル）。除外した文書は `duplicates` に行の順で入れる
           7. `LoadResult` を返す
 
           読む場所の commit は、`target.commit` があればそのまま使い、無ければ `target.ref` を履歴の『リビジョンの解決』（`date_base` は配信元の `default_ref`）で解く。
@@ -225,7 +225,7 @@ classes:
             summary: 重なった ID
             condition: '`rules/a.yaml` と `rules/b.yaml` がどちらも `id: x`'
             mock: なし（`tmp_path`）
-            expected: 文書は `rules/a.yaml` の 1 件で、`problems` に `rules/b.yaml` の `duplicate_id`
+            expected: 文書は `rules/a.yaml` の 1 件で、`problems` に `rules/b.yaml` の `duplicate_id`、`duplicates` に `rules/b.yaml` の文書
             exception: '-'
           - name: test_document_store_load_when_ref
             case: 正常
@@ -641,7 +641,7 @@ functions:
     container: project_index/features/documents/store.py
     usecase: 起動
     role: サービス
-    summary: 配信元のクローン本体の文書を読み、`metadata` の列の欠け・管理用の YAML のずれ・当たらない関連・エイリアスのキーの違反を求める
+    summary: 配信元のクローン本体の文書を読み、`metadata` の列の欠け・管理用の YAML のずれ・当たらない関連・行どうしの同じファイルの重なり・エイリアスのキーの違反を求める
     description: 起動時と再読み込みのときに呼ぶ。[shuhei1101/dev-docs#4 管理用のプラグインを作る](https://github.com/shuhei1101/dev-docs/issues/4) の `check_project` も呼ばれるたびにこの関数で求め直す。
     kind: 関数
     scope: public
@@ -668,8 +668,9 @@ functions:
       3. `records` と `body_file` を持つ行ごとに、行に当たる管理用の YAML（手順 1 のパスを渡したファイルの収集）ごとに、その YAML から作った文書の `body_path` と行と手順 1 のパスと、その行でない有効な行（`others`）を渡して索引に無いファイルを求め、`{行の id}: {パス}` で `unindexed_files` に加える
       4. 手順 1 の `problems` のうち `reason` が `missing_body_file` のものを `{path}: {detail}` で `missing_body_files` に加える
       5. 手順 1 の文書の ID の集合を 1 回だけ作り、文書ごとに当たらない関連を求めて `{行の id}: {文書の id}: {to}` で `unresolved_related` に加える
-      6. 手順 1 の文書でエイリアスの集めをし、`violations` を `alias_violations` にする
-      7. `SyncReport` を返す
+      6. 手順 1 の `documents` と `duplicates` の文書ごとに、行が文書にするファイル（`records` を持たない行は `path`、`records`・`body_file` の行は `body_path`。`body_file` の無い `records` の行は数えない）を求め、ファイルごとに行の ID を `documents[]` の順で重なりなく集める。2 つ以上の行の ID を持つファイルを、パスの昇順に `{ファイル}: {行の id}・{行の id}` で `duplicate_files` に加える
+      7. 手順 1 の文書でエイリアスの集めをし、`violations` を `alias_violations` にする
+      8. `SyncReport` を返す
     unit_tests:
       - name: test_check_sync
         case: 正常
@@ -711,5 +712,12 @@ functions:
         condition: '行 `files`（`paths: [files.yaml]`・`records: files`・`body_file: path`）の直下の `files.yaml` が `src/a.py` を持ち、行 `prompts`（`paths: [content/prompts/**/*.yaml]`）を持つ配信元に、`src/a.py`・`content/prompts/p.yaml` を置く'
         mock: なし（一時フォルダの配信元）
         expected: '`unindexed_files` が空'
+        exception: '-'
+      - name: test_check_sync_when_rows_share_file
+        case: 正常
+        summary: 2 つの行が同じファイルを文書にする
+        condition: '行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`）の `src/files.yaml` が `a.yaml`・`b.py` を持ち、行 `yaml`（`paths: [src/*.yaml]`）と `enabled: false` の行 `off`（`paths: [src/b.py]`）を持つ配信元に、`src/a.yaml`（`id: src/a.yaml`）・`src/b.py` を置く'
+        mock: なし（一時フォルダの配信元）
+        expected: '`duplicate_files` が `["src/a.yaml: src・yaml"]` で、`src/b.py`・`src/files.yaml` を含まない（`src/a.yaml` の 2 つの文書は ID が重なる）'
         exception: '-'
 visibility: internal
