@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from project_index.features.documents.fields import get_field
 from project_index.shared.narrowing import is_dict, is_list
@@ -20,7 +20,7 @@ def _replace_slot(
     new: str,
 ) -> int:
     """入れ物の 1 つの値を置換するか、配下をたどって、置換の件数を返す。"""
-    value = container[key]  # type: ignore[index]
+    value = cast("object", container[key])  # type: ignore[index]
     if isinstance(value, str):
         found = value.count(old)
         if found:

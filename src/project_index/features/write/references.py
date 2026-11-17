@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import posixpath
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from project_index.features.write.types import ReferenceChange
 from project_index.shared.narrowing import is_dict, is_list
@@ -120,7 +120,7 @@ def _rewrite_slot(
     changes: list[ReferenceChange],
 ) -> None:
     """入れ物の 1 つの値を書き換えるか、配下をたどる。"""
-    value = container[key]  # type: ignore[index]
+    value = cast("object", container[key])  # type: ignore[index]
     if isinstance(value, str):
         after, pieces = rewrite(value)
         if pieces:
@@ -130,7 +130,7 @@ def _rewrite_slot(
     _visit(value, path, rewrite, changes)
 
 
-def rewrite_references(  # noqa: PLR0913
+def rewrite_references(
     content: CommentedMap,
     *,
     related_column: str,
@@ -145,8 +145,12 @@ def rewrite_references(  # noqa: PLR0913
     rows = content.get(related_column)
     if is_list(rows) and old_id != new_id:
         for position, row in enumerate(rows):
-            if is_dict(row) and row.get("to") == old_id and "source" not in row:
-                row["to"] = _same_kind(row["to"], new_id)
+            if not is_dict(row):
+                continue
+            mapping: MutableMapping[object, object] = row
+            to = mapping.get("to")
+            if isinstance(to, str) and to == old_id and "source" not in mapping:
+                mapping["to"] = _same_kind(to, new_id)
                 changes.append(
                     ReferenceChange(
                         path=f"{related_column}[{position}].to", before=old_id, after=new_id

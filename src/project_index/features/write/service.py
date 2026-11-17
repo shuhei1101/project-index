@@ -1003,14 +1003,16 @@ def _plan_body_move(
     new_path = posixpath.normpath(operation.new_path)
     relative = posixpath.relpath(new_path, posixpath.dirname(existing.path) or ".")
     if resolve_body_path(existing.path, relative) != new_path:
+        rule = f"new_path（{operation.new_path}）が配信元の外を指します"
         raise _rename_invalid(
-            f"new_path（{operation.new_path}）が配信元の外を指します",
+            rule,
             "配信元の直下からのパスを指定してください",
         )
     if new_path == existing.body_path:
         return None
     if session.body_exists(new_path):
-        raise _rename_invalid(f"new_path（{new_path}）は既にあります", "別のパスを指定してください")
+        rule = f"new_path（{new_path}）は既にあります"
+        raise _rename_invalid(rule, "別のパスを指定してください")
     return existing.body_path, new_path
 
 
@@ -1029,12 +1031,14 @@ def _plan_file_move(
     if new_path == existing.path:
         return None
     if not table.matches(new_path):
+        rule = f"new_path（{new_path}）が {table.id} の paths に該当しないか exclude に該当します"
         raise _rename_invalid(
-            f"new_path（{new_path}）が {table.id} の paths に該当しないか exclude に該当します",
+            rule,
             f"{table.id} の documents[].paths に該当するパスを指定してください",
         )
     if session.exists(new_path):
-        raise _rename_invalid(f"new_path（{new_path}）は既にあります", "別のパスを指定してください")
+        rule = f"new_path（{new_path}）は既にあります"
+        raise _rename_invalid(rule, "別のパスを指定してください")
     return existing.path, new_path
 
 
@@ -1048,6 +1052,24 @@ def _id_exists(new_id: str) -> ValidationFailedError:
     )
 
 
+def _renamed_id(
+    session: _Session,
+    operation: Operation,
+    existing: Document,
+    *,
+    has_id: bool,
+    moved: tuple[str, str] | None,
+) -> str:
+    """改名後の ID（ID の列の値を持つ文書は `new_id`、ID がパスの文書は改名後のパス）。"""
+    if has_id:
+        new_id = operation.new_id or existing.id
+    else:
+        new_id = existing.id if moved is None else moved[1]
+    if new_id != existing.id and new_id in session.docs:
+        raise _id_exists(new_id)
+    return new_id
+
+
 def _plan_rename(
     session: _Session, operation: Operation, table: DocumentTable, existing: Document
 ) -> _RenamePlan:
@@ -1055,8 +1077,9 @@ def _plan_rename(
     id_column = table.metadata.get("id", "id")
     has_id = get_field(existing.data, id_column) is not None
     if operation.new_id is not None and not has_id:
+        rule = f"{existing.id} は ID がパスの文書のため new_id を受けません"
         raise _rename_invalid(
-            f"{existing.id} は ID がパスの文書のため new_id を受けません",
+            rule,
             "new_path で改名してください",
             path="new_id",
         )
@@ -1064,8 +1087,9 @@ def _plan_rename(
     if operation.new_id not in (None, existing.id) and operation.new_id in session.docs:
         raise _id_exists(operation.new_id)
     if table.records is not None and table.body_file is None and operation.new_path is not None:
+        rule = f"{table.id} は本文のファイル（body_file）を持たないため new_path を受けません"
         raise _rename_invalid(
-            f"{table.id} は本文のファイル（body_file）を持たないため new_path を受けません",
+            rule,
             "new_path を除いてください",
         )
     if table.records is not None:
@@ -1074,12 +1098,7 @@ def _plan_rename(
     else:
         moved = _plan_file_move(session, operation, table, existing)
         file_path = existing.path if moved is None else moved[1]
-    if has_id:
-        new_id = operation.new_id or existing.id
-    else:
-        new_id = existing.id if moved is None else moved[1]
-    if new_id != existing.id and new_id in session.docs:
-        raise _id_exists(new_id)
+    new_id = _renamed_id(session, operation, existing, has_id=has_id, moved=moved)
     return _RenamePlan(old_id=existing.id, new_id=new_id, file_path=file_path, moved=moved)
 
 
