@@ -1,0 +1,20 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: run_only
+    detail: 書き込んだ YAML の文書が、変えた行だけの差分で残るようになる。書き込みの流れは変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: none
+    detail: 配信元の説明と検索の結合テストの期待と準備だけを直し、調べる流れは変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: none
+    detail: 試しの変換の結合テストの期待だけを直し、設定を変える流れは変わらない
+    depends_on: []
+scope_out:
+  - item: 配列の `- ` の位置以外の字下げ（辞書の字下げの幅）を元のファイルに合わせること
+    reason: '#118 の事象は配列の `- ` の位置の差で起きている。辞書の字下げの幅まで合わせるかは、モジュール構成設計のレビューで確定する'
+    plan: to_file
