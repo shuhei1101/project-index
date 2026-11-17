@@ -264,7 +264,7 @@ functions:
       - MOD-34#classes[RestartControl].methods[requested]
     test_setup:
       - name: background_threads_joined
-        description: 各テストの後に、テストが起動した `project-index-` で始まる名前のスレッドを全て join する（読み込みのスレッドが起動する子プロセスが、後のテストのソケットの fd を exec まで持ち続けないようにする）
+        description: 各テストの後に、`project-index-` で始まる名前の生きているスレッドが無くなるまで、一覧を取り直して join する。join はスレッドごとに 30 秒で打ち切り、30 秒を過ぎても残ったスレッドがあれば、その名前を出してテストを fail させる（読み込みのスレッドと、読み込みのスレッドが起動する検査・書き出しのスレッドの子プロセスが、後のテストのソケットの fd を exec まで持ち続けないようにする）
         notes: test_serve.py の autouse の fixture `_join_background_threads`
     unit_tests:
       - name: test_run_serve
@@ -333,7 +333,7 @@ functions:
         message: '`{bind}:{port} は使用中です`'
     test_setup:
       - name: background_threads_joined
-        description: 各テストの後に、テストが起動した `project-index-` で始まる名前のスレッドを全て join する（読み込みのスレッドが起動する子プロセスが、後のテストのソケットの fd を exec まで持ち続けないようにする）
+        description: 各テストの後に、`project-index-` で始まる名前の生きているスレッドが無くなるまで、一覧を取り直して join する。join はスレッドごとに 30 秒で打ち切り、30 秒を過ぎても残ったスレッドがあれば、その名前を出してテストを fail させる（読み込みのスレッドと、読み込みのスレッドが起動する検査・書き出しのスレッドの子プロセスが、後のテストのソケットの fd を exec まで持ち続けないようにする）
         notes: test_serve.py の autouse の fixture `_join_background_threads`
     unit_tests:
       - name: test_check_port
