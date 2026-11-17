@@ -43,7 +43,7 @@ flows:
       - name: 配信元
         description: 正常系と同じ sample・notes・other に、`project-index.yaml` の `version` が古い old（`scope.read` は sample のフォルダ）と、検証で外れる broken を加える。sample は管理用の YAML に無いファイルを 1 件持つ
       - name: 入力
-        description: 引数なし。`cwd` は sample のクローン本体
+        description: '引数なし。`cwd` は sample のクローン本体。起動の後の裏の検査を終えてから（管理の MCP の `status` が `checking: false` を返してから）呼ぶ'
     flow: |-
       <!-- map: {"title": "正常系（使える配信元の警告）"} -->
 
@@ -99,9 +99,9 @@ flows:
       - name: Mock
         description: なし
       - name: 配信元
-        description: sample と、Git 管理外で管理用の YAML に無いファイル `src/extra0.py` を 1 件持つ memo（`scope.read`・`scope.write` は sample のフォルダ）
+        description: sample と、Git 管理外で、文書 doc-1 の `related` が無い文書 doc-9 を指す memo（`scope.read`・`scope.write` は sample のフォルダ）
       - name: 入力
-        description: '`write_docs` で memo の `src` の行に `extra0.py` を作り、引数なしの `describe` を呼ぶ。`cwd` は sample のクローン本体'
+        description: '起動の後の裏の検査を終えてから（管理の MCP の `status` が `checking: false` を返してから）引数なしの `describe` を呼び、`write_docs` で memo の doc-1 の `related` を除き（`update`・`unset: [related]`）、引数なしの `describe` を呼ぶ。`cwd` は sample のクローン本体'
     flow: |-
       <!-- map: {"title": "正常系（書き込みの後の警告）"} -->
 
@@ -112,8 +112,8 @@ flows:
         participant T as describe
 
         C->>T: 引数なし
-        T-->>C: memo の管理用の YAML に無いファイル 1 件の警告
-        C->>W: create（src・extra0.py）
+        T-->>C: memo のどの文書にも該当しない関連 1 件の警告
+        C->>W: update（doc-1・unset related）
         W-->>C: applied: true
         W->>W: 書ける配信元を裏で検査し直す
         C->>T: 引数なし（検査を終えた後）
@@ -122,7 +122,7 @@ flows:
 
       <!-- /map -->
     expected:
-      - 書き込みの前の引数なしの一覧に、memo の管理用の YAML に無いファイル 1 件の警告がある
+      - 書き込みの前の引数なしの一覧に、memo のどの文書にも該当しない関連 1 件の警告がある
       - 裏の検査を終えた後の引数なしの一覧に、memo の警告が無い
     test: test_normal_when_rechecked_after_write
   - name: 正常系（配信元の説明書）

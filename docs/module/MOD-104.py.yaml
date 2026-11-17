@@ -65,7 +65,7 @@ constants:
     title: YAMLの字下げ
     container: project_index/shared/yaml_io.py
     usecase: 共通
-    summary: 往復編集で書き出す YAML の字下げ
+    summary: 往復編集で書き出す YAML の既定の字下げ。元の文字列から配列の字下げを決められないときに使用する
     entries:
       - key: mapping
         value: '2'
@@ -201,12 +201,20 @@ functions:
         required: true
         passing: positional
         description: 書き出す値
+      - name: original
+        title: 元の文字列
+        type: str | None
+        required: false
+        default: None
+        passing: keyword
+        description: 書き換える前のファイルの文字列。配列の字下げをこの文字列に合わせる。`None` は `YAML_INDENT` で書く
     returns:
       type: str
       description: YAML の文字列（末尾は改行 1 つ）
     process: |-
-      1. 幅を `YAML_WIDTH`、字下げを `YAML_INDENT` にした往復編集の YAML で書き出す
-      2. 引用符の種類を持つ文字列（往復編集の読み込みで引用符つきで読んだ値）は元の引用符で書く。改行を含む引用符なしの文字列の値は、ブロックのリテラル（`|-`）にして書く
+      1. 字下げを決める。`original` が無い場合は `YAML_INDENT` にする。ある場合は、`original` の中で値を持たないキーの行（`{キー}:` で終わる行）の次の空行・コメントでない行が `- ` で始まる最初の箇所を探し、`- ` の列とキーの列の差を `offset`、`offset` に 2 を加えた値を `sequence` にする（`mapping` は `YAML_INDENT` の値）。見つからない場合は `YAML_INDENT` にする
+      2. 幅を `YAML_WIDTH`、字下げを手順 1 の値にした往復編集の YAML で書き出す
+      3. 引用符の種類を持つ文字列（往復編集の読み込みで引用符つきで読んだ値）は元の引用符で書く。改行を含む引用符なしの文字列の値は、ブロックのリテラル（`|-`）にして書く
     unit_tests:
       - name: test_dump_roundtrip
         case: 正常
@@ -214,3 +222,21 @@ functions:
         condition: '`{"a": "x\ny"}`'
         mock: なし
         expected: '`a: |-\n  x\n  y\n`'
+      - name: test_dump_roundtrip_when_original_unindented
+        case: 正常
+        summary: 字下げ無しの配列を保つ
+        condition: '`items:\n- key: k1\n  label: a\n` を読み、`items` に `{key: k2, label: b}` を加えて、読んだ文字列を `original` に渡す'
+        mock: なし
+        expected: '`items:\n- key: k1\n  label: a\n- key: k2\n  label: b\n`'
+      - name: test_dump_roundtrip_when_original_indented
+        case: 正常
+        summary: 2 文字の字下げの配列を保つ
+        condition: '`items:\n  - key: k1\n    label: a\n` を読み、`items` に `{key: k2, label: b}` を加えて、読んだ文字列を `original` に渡す'
+        mock: なし
+        expected: '`items:\n  - key: k1\n    label: a\n  - key: k2\n    label: b\n`'
+      - name: test_dump_roundtrip_when_original_without_sequence
+        case: 正常
+        summary: 配列の無い元の文字列は既定の字下げ
+        condition: '`a: 1\n` を読み、`items` に `[{key: k1, label: a}]` を入れて、読んだ文字列を `original` に渡す'
+        mock: なし
+        expected: '`a: 1\nitems:\n  - key: k1\n    label: a\n`（`YAML_INDENT` と同じ）'

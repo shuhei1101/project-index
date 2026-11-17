@@ -298,8 +298,9 @@ def _finish(
     content: Mapping[str, Any],
     container: CommentedMap | None,
     document: Document | None,
+    original: str,
 ) -> str:
-    """操作を当てた内容を、ファイルの内容の文字列にする。"""
+    """操作を当てた内容を、元のファイルの配列の字下げのまま、ファイルの内容の文字列にする。"""
     if (
         table.records is not None
         and document is not None
@@ -307,9 +308,10 @@ def _finish(
         and container is not None
     ):
         _records(container, table.records)[document.record_index] = content
-        return dump_roundtrip(container)
+        return dump_roundtrip(container, original=original)
     return dump_roundtrip(
-        CommentedMap(content) if not isinstance(content, CommentedMap) else content
+        CommentedMap(content) if not isinstance(content, CommentedMap) else content,
+        original=original,
     )
 
 
@@ -328,7 +330,7 @@ def _apply_existing(
         new_content = CommentedMap(new_content)
     if not session.target.source.is_git:
         _stamp(new_content, operation.op, now, current)
-    return document.path, _finish(table, new_content, container, document)
+    return document.path, _finish(table, new_content, container, document, text)
 
 
 def _apply_create(
@@ -353,7 +355,8 @@ def _apply_create(
         if get_field(file_map, table.records) is None:
             set_field(file_map, table.records, [])
         _records(file_map, table.records).append(data)
-        return path, dump_roundtrip(file_map), True
+        # 既にある管理用の YAML へ追加するときは、元のファイルの配列の字下げに合わせる
+        return path, dump_roundtrip(file_map, original=text or None), True
     if session.exists(path):
         raise _invalid(
             [Violation(path="id", rule=f"{path} は既にあります", fix="別の ID にしてください")]
@@ -939,7 +942,7 @@ def _unlink(session: _Session, referrer: Document, removed: set[str]) -> tuple[s
     # `**.` の列名では、最上位と入れ子の全ての配列から除く
     for rows in arrays:
         rows[:] = [row for row in rows if not _points_to(row, removed)]
-    return referrer.path, _finish(table, current, container, referrer)
+    return referrer.path, _finish(table, current, container, referrer, text)
 
 
 def _remove_documents(session: _Session, documents: list[Document]) -> None:
@@ -957,9 +960,10 @@ def _remove_documents(session: _Session, documents: list[Document]) -> None:
         if table.records is None:
             msg = "文書の行に records がありません"
             raise RuntimeError(msg)
-        file_map = load_roundtrip(session.text(document.path), file=document.path)
+        text = session.text(document.path)
+        file_map = load_roundtrip(text, file=document.path)
         del _records(file_map, table.records)[document.record_index or 0]
-        session.commit(document.path, dump_roundtrip(file_map), table)
+        session.commit(document.path, dump_roundtrip(file_map, original=text), table)
     _remove_bodies(session, [document for document in records if document.body_path is not None])
 
 

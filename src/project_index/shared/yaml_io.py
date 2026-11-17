@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from io import StringIO
 from typing import TYPE_CHECKING
 
@@ -14,6 +15,11 @@ if TYPE_CHECKING:
 
 YAML_WIDTH = 4096
 YAML_INDENT = {"mapping": 2, "sequence": 4, "offset": 2}
+
+# 値を持たないキーの行（`{キー}:` で終わる行。配列の要素の中のキーは `- ` の後ろの列）
+_VALUELESS_KEY = re.compile(r"^(?P<indent> *)(?P<dash>(?:- )*)[^\s#-][^#]*?:\s*$")
+# 配列の要素の行
+_SEQUENCE_ITEM = re.compile(r"^(?P<indent> *)- ")
 
 
 class YamlLoadError(ValueError):
@@ -79,16 +85,48 @@ def load_roundtrip(text: str, *, file: str | None = None) -> CommentedMap:
     return value
 
 
-def dump_roundtrip(doc: CommentedMap) -> str:
+def dump_roundtrip(doc: CommentedMap, *, original: str | None = None) -> str:
     """往復編集の値を、コメント・順序・字下げを保って文字列にする。"""
     yaml = YAML(typ="rt", pure=True)
     yaml.width = YAML_WIDTH
-    yaml.indent(**YAML_INDENT)
+    # 元の文字列があれば配列の字下げを合わせ、無ければ既定の字下げで書き出す
+    indent = YAML_INDENT if original is None else _indent_of(original)
+    yaml.indent(**indent)
     yaml.preserve_quotes = True
     yaml.representer.add_representer(str, _represent_str)
     stream = StringIO()
     yaml.dump(doc, stream)
     return stream.getvalue()
+
+
+def _indent_of(original: str) -> dict[str, int]:
+    """元の文字列の最初の配列の `- ` の位置から、書き出しの字下げを決める。"""
+    lines = original.splitlines()
+    for index, line in enumerate(lines):
+        key = _VALUELESS_KEY.match(line)
+        if key is None:
+            continue
+        key_column = len(key.group("indent")) + len(key.group("dash"))
+        following = next(
+            (
+                rest
+                for rest in lines[index + 1 :]
+                if rest.strip() and not rest.lstrip().startswith("#")
+            ),
+            None,
+        )
+        # 値を持たないキーの後ろに行が無ければ、配列は見つからない
+        if following is None:
+            break
+        item = _SEQUENCE_ITEM.match(following)
+        # 次の行が `- ` で始まらない（入れ子の辞書）か、キーより左にあるときは次のキーを確認する
+        if item is None or len(item.group("indent")) < key_column:
+            continue
+        # 次の行が `- ` で始まる: その列とキーの列の差を配列の字下げにする
+        offset = len(item.group("indent")) - key_column
+        return {"mapping": YAML_INDENT["mapping"], "sequence": offset + 2, "offset": offset}
+    # 配列が見つからないときは既定の字下げ
+    return YAML_INDENT
 
 
 def _represent_str(representer: Representer, data: str) -> object:

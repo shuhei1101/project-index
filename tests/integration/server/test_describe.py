@@ -4,6 +4,8 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any
 
+from project_index.shared.hashing import content_hash
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -16,7 +18,7 @@ OUTSIDE_LOG = "作業範囲の外を読んだ"
 OUTSIDE_HINT = "outside_scope: true"
 OTHER_DESCRIPTION = "別のリポジトリの設計書"
 WARNINGS_LINE = "注意:"
-MEMO_WARNING = "memo: 管理用の YAML に無いファイルが 1 件"
+MEMO_WARNING = "memo: どの文書にも該当しない関連が 1 件"
 # 書き込みの後の裏の検査を待つ上限の秒数
 RECHECK_WAIT_SEC = 10
 SAMPLE_WHEN = ("規約を確かめるとき", "設計書を書く前")
@@ -80,6 +82,7 @@ def test_normal_when_warned(
         "broken", {"project-index.yaml": BROKEN_CONFIG}, scope_read=[sample.folder]
     )
     env = make_server(sample, notes, other, old, broken)
+    _wait_checked(env)
     # 実行
     result = env.call("describe", cwd=str(sample.folder))
     as_json = env.call("describe", cwd=str(sample.folder), format="json")
@@ -138,20 +141,23 @@ def test_normal_when_no_source_available(
 def test_normal_when_rechecked_after_write(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
-    sample_sync_file_set: Callable[..., dict[str, str]],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_doc_text: Callable[..., str],
 ) -> None:
     """`write_docs` を当てた後に裏で流し直した検査の結果で、引数なしの警告が変わる（正常系）。"""
     # 準備
     sample = make_source("sample")
+    doc_1 = sample_doc_text("doc-1", "文書 1", related=[{"to": "doc-9", "type": "references"}])
     memo = make_source(
         "memo",
-        sample_sync_file_set(1),
+        sample_file_set(**{"docs/doc-1.yaml": doc_1}),
         git=False,
         scope_read=[sample.folder],
         scope_write=[sample.folder],
     )
     env = make_server(sample, memo)
     cwd = str(sample.folder)
+    _wait_checked(env)
     before = env.call("describe", cwd=cwd)
     # 実行
     written = env.call(
@@ -159,7 +165,12 @@ def test_normal_when_rechecked_after_write(
         cwd=cwd,
         source="memo",
         operations=[
-            {"op": "create", "kind": "src", "id": "src/extra0.py", "data": {"path": "extra0.py"}}
+            {
+                "op": "update",
+                "id": "doc-1",
+                "expected_version": content_hash(doc_1),
+                "unset": ["related"],
+            }
         ],
     )
     # 裏の検査が終わるまで、警告が消えるのを待つ
@@ -548,3 +559,13 @@ def test_normal_when_disk_storage(
     assert "worktrees" not in result.data
     assert in_worktree.is_error
     assert "company は disk の配信元のため worktree を指定できません" in in_worktree.text
+
+
+def _wait_checked(env: Any) -> None:
+    """管理の MCP の `status` が `checking: false` を返すまで待つ（上限を超えたら AssertionError）。"""
+    deadline = time.monotonic() + RECHECK_WAIT_SEC
+    while env.call_admin("status", format="json").data["checking"]:
+        if time.monotonic() > deadline:
+            message = "起動の後の裏の検査が上限の時間までに済まなかった"
+            raise AssertionError(message)
+        time.sleep(0.1)

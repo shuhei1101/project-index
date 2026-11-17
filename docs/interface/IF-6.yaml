@@ -1025,6 +1025,39 @@ flows:
       - どの違反も、直し方に列名（`refs`・`functions[0].refs` など）で渡すことを示す
       - 4 回目の `diff` が n1 の最上位の `refs` だけを書き換え、`functions[0].refs` は変わらない
     test: test_error_when_recursive_metadata_key_written
+  - name: 正常系（変更していない行の字下げを保つ）
+    summary: 書き換えた文書の、変更していない行の字下げを元のまま書き出す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 字下げの異なる文書
+        description: ワークツリー x の sample の種類の文書 1 が `items:` の直下に `- ` を字下げ無しで、文書 2 が `items:` の直下に `- ` を 2 文字の字下げで、それぞれ `{key, label}` の 2 つのキーを持つ要素を 2 つ並べる（要素ごとに `- key:` と `label:` の 2 行）
+      - name: 入力
+        description: '文書 1 と文書 2 の `update`（`add_to: {items: [{key: k3, label: 名称 3}]}`）を 1 件ずつ呼ぶ'
+    flow: |-
+      <!-- map: {"title": "正常系（変更していない行の字下げを保つ）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: update 文書 1・add_to items
+        T->>T: 元の字下げを参照し、変更を適用して検査に合格させる
+        T->>WT: 文書 1 を元の字下げで書き換える
+        T-->>C: status updated・diff
+        C->>T: update 文書 2・add_to items
+        T->>WT: 文書 2 を元の字下げで書き換える
+        T-->>C: status updated・diff
+      ```
+
+      <!-- /map -->
+    expected:
+      - 書き換えた文書 1 の YAML は、元の 2 要素の全ての行が書き込み前の文字列と一致し、追加した要素の `- ` を字下げ無しで配置し、続きの行（`label:`）が元の要素の続きの行と同じ列に並ぶ
+      - 書き換えた文書 2 の YAML は、元の 2 要素の全ての行が書き込み前の文字列と一致し、追加した要素の `- ` を 2 文字の字下げで配置し、続きの行（`label:`）が元の要素の続きの行と同じ列に並ぶ
+      - 2 件とも `results[0].diff` が追加した要素の 2 行の `+` だけを持つ
+    test: test_normal_when_indent_preserved
 lead: 文書の作成・部分更新・置き換えを検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
