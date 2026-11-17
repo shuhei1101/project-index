@@ -616,3 +616,43 @@ def test_document_checker_check_when_stamps_shared(
     checker.check(target, make_document(id="doc-2", version="aaaaaa"), on="read", stamps=stamps)
     # 検証
     assert len(folder_calls) == 1
+
+
+def test_document_checker_check_when_script_outside_repository(
+    tmp_path: Path,
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+    run_git: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Git のリポジトリの外のスクリプトを指す `run` でもキーを作れる（正常系）。"""
+    # 準備
+    calls = _count_runs(monkeypatch)
+    root = tmp_path / "ws"
+    root.mkdir()
+    (root / "README.md").write_text("ws\n", encoding="utf-8")
+    run_git(root, "init", "-b", "develop")
+    run_git(root, "add", ".")
+    run_git(root, "commit", "-m", "init")
+    shared = tmp_path / "shared" / "check.py"
+    shared.parent.mkdir()
+    shared.write_text("a\n", encoding="utf-8")
+    source = _read_source(
+        root,
+        make_source_config,
+        make_served_source,
+        ["python3", "../shared/check.py"],
+        is_git=True,
+        repo_root=root,
+    )
+    target = make_target(source, worktree=root)
+    checker = _checker({})
+    document = make_document()
+    # 実行
+    checker.check(target, document, on="read")
+    shared.write_text("aa\n", encoding="utf-8")
+    checker.check(target, document, on="read")
+    # 検証
+    assert len(calls) == 2
