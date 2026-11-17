@@ -283,15 +283,14 @@ def resolve_ref_path(
     tokens: list[str | int] = []
     current: object = data
     node = _schema_node(schema, schema)
-    for bracket, name in _split_ref_path(path):
+    for key, bracketed in _split_ref_path(path):
         # 配列に対する `[...]` は、スキーマの `x-key` の値で要素を選ぶ
-        if bracket is not None and is_list(current):
-            position = _element_position(current, node, bracket, path, tokens)
+        if bracketed and is_list(current):
+            position = _element_position(current, node, key, path, tokens)
             tokens.append(position)
             current = current[position]
             node = _schema_node(schema, node.get("items"))
             continue
-        key = name if bracket is None else bracket
         if not is_dict(current) or key not in current:
             raise _invalid(path, f"{path}: {_join(tokens) or '最上位'} にキー {key} がありません")
         tokens.append(key)
@@ -300,18 +299,18 @@ def resolve_ref_path(
     return tokens
 
 
-def _split_ref_path(path: str) -> list[tuple[str | None, str | None]]:
+def _split_ref_path(path: str) -> list[tuple[str, bool]]:
     """参照の型の項目のパスを、`[...]` の値か `.` で区切った名前の並びに分ける。
 
     `[...]` の中の対応の取れた `[` `]` は値の一部にする。
-    要素は `(値, None)`（`[...]`）か `(None, 名前)`。
+    要素は `(値, True)`（`[...]`）か `(名前, False)`。
     """
     invalid = _invalid(path, f"項目のパス {path} の記載方法が誤っています（{REF_PATH_EXAMPLE}）")
     # 先頭は名前
     head = REF_NAME_PATTERN.match(path)
     if head is None:
         raise invalid
-    parts: list[tuple[str | None, str | None]] = [(None, head.group())]
+    parts: list[tuple[str, bool]] = [(head.group(), False)]
     position = head.end()
     while position < len(path):
         # `[...]`: 対応する `]` までを値にする
@@ -319,7 +318,7 @@ def _split_ref_path(path: str) -> list[tuple[str | None, str | None]]:
             end = _closing_bracket(path, position)
             if end is None:
                 raise invalid
-            parts.append((path[position + 1 : end], None))
+            parts.append((path[position + 1 : end], True))
             position = end + 1
             continue
         # `.名前`: `.` の後に空でない名前が要る
@@ -327,7 +326,7 @@ def _split_ref_path(path: str) -> list[tuple[str | None, str | None]]:
         if name is None:
             # 対応する `[` の無い `]`・`]` の直後の名前・空の名前
             raise invalid
-        parts.append((None, name.group()))
+        parts.append((name.group(), False))
         position = name.end()
     return parts
 
