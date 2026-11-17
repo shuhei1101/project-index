@@ -246,7 +246,7 @@ def _target_of(
                 given=worktree,
                 patterns=item.worktree_globs,
             )
-        return Target(item, _base_of(item, wt), None, wt, access, outside_scope=outside)
+        return _worktree_target(item, wt, access, outside)
     if ref is not None:
         if not item.is_git:
             raise InvalidArgumentError(
@@ -262,10 +262,17 @@ def _target_of(
         return _revision_target(item, ref, access, outside)
     wt = find_worktree(item, path) if path is not None else None
     if wt is not None:
-        return Target(item, _base_of(item, wt), None, wt, access, outside_scope=outside)
+        return _worktree_target(item, wt, access, outside)
     if (current is not None and current[0].id == item.id) or not item.is_git:
         return Target(item, item.root, None, None, access, outside_scope=outside)
     return _revision_target(item, item.config.default_ref, access, outside)
+
+
+def _worktree_target(item: ServedSource, wt: Path, access: AccessLevel, outside: bool) -> Target:
+    """ワークツリーを読む場所を、そのワークツリーの設定で作り直した配信元で作る。"""
+    # 種類と文書の行をワークツリーの設定で参照するため、配信元を再読み込みする（検証に通らなければ伝える）
+    reloaded = load_source_at(item, wt)
+    return Target(reloaded, _base_of(reloaded, wt), None, wt, access, outside_scope=outside)
 
 
 def _revision_target(item: ServedSource, ref: str, access: AccessLevel, outside: bool) -> Target:

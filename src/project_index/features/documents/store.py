@@ -6,6 +6,7 @@ import difflib
 import hashlib
 import logging
 import os
+import posixpath
 import threading
 import time
 from dataclasses import dataclass
@@ -31,7 +32,7 @@ from project_index.shared.narrowing import is_dict
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Collection, Iterable, Sequence
 
     from project_index.features.history.snapshot import SnapshotStore
     from project_index.features.sources.types import DocumentTable, ServedSource
@@ -633,6 +634,13 @@ def _unindexed(
     unindexed: list[str] = []
     # その行でない有効な行の文書になるファイルは、索引に無いファイルに数えない
     others = [other for other in source.config.documents if other.enabled and other.id != table.id]
+    # 有効な管理用の YAML の行（この行を含む）に当たる管理用の YAML のフォルダ
+    index_dirs = {
+        posixpath.dirname(path) or "."
+        for row in source.config.documents
+        if row.enabled and row.records is not None and row.body_file is not None
+        for path in collect_files(source.root, row, files=files)
+    }
     for index_path in collect_files(source.root, table, files=files):
         body_paths = {
             document.body_path
@@ -642,10 +650,25 @@ def _unindexed(
         unindexed.extend(
             f"{table.id}: {path}"
             for path in unindexed_files(
-                source.root, index_path, body_paths, table, files=files, others=others
+                source.root,
+                index_path,
+                body_paths,
+                table,
+                files=files,
+                others=others,
+                nested_dirs=_nested_dirs(posixpath.dirname(index_path) or ".", index_dirs),
             )
         )
     return unindexed
+
+
+def _nested_dirs(start: str, index_dirs: Collection[str]) -> list[str]:
+    """`start` より深いフォルダにある管理用の YAML のフォルダを返す。"""
+    # 配信元の直下の管理用の YAML: 直下でない全てのフォルダが深い
+    if start == ".":
+        return [folder for folder in index_dirs if folder != "."]
+    # それ以外: `start` の配下のフォルダだけが深い
+    return [folder for folder in index_dirs if folder.startswith(f"{start}/")]
 
 
 def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:

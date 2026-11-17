@@ -44,9 +44,17 @@ class DocumentTable:
         return True if self.writable is None else self.writable
 
     def excludes(self, path: str) -> bool:
-        """ファイル名（パスの末尾の要素）が `exclude` のどれかに当たるか。"""
-        name = PurePosixPath(PurePosixPath(path).name)
-        return any(name.full_match(pattern) for pattern in self.exclude)
+        """`exclude` のどれかに当たるか（`/` を含む値はパス全体、含まない値はファイル名に当てる）。"""
+        target = PurePosixPath(path)
+        name = PurePosixPath(target.name)
+        return any(
+            # `/` を含む値: 配信元の直下からのパスで当てる（`docs/pr/**` など）
+            target.full_match(pattern)
+            if "/" in pattern
+            # `/` を含まない値: ファイル名（パスの末尾の要素）で当てる
+            else name.full_match(pattern)
+            for pattern in self.exclude
+        )
 
     def matches(self, path: str) -> bool:
         """ファイルがこの行の文書になるか（`paths` に当たり、`exclude` に当たらない）。"""
