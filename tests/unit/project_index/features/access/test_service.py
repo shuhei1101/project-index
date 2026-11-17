@@ -321,7 +321,9 @@ def test_resolve_read_targets_when_ref_not_found(
 
 
 def test_resolve_read_targets_when_worktree_cwd(
-    make_served_source: Callable[..., ServedSource], make_registry: Callable[..., Any]
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """ワークツリーの中から読む（正常系）。"""
     # 準備
@@ -334,6 +336,12 @@ def test_resolve_read_targets_when_worktree_cwd(
         worktree_globs=WORKTREE_GLOBS,
     )
     registry = make_registry(source)
+
+    def keep_source(item: ServedSource, _root: Path) -> ServedSource:
+        # 配信元はメモリ上の設定で作るため、ワークツリーの設定の再読み込みは受け取った配信元のまま返す
+        return item
+
+    monkeypatch.setattr(service_module, "load_source_at", keep_source)
     # 実行
     result = resolve_read_targets(registry=registry, cwd="/r/.claude/worktrees/x")
     # 検証
