@@ -17,6 +17,7 @@ from project_index.features.documents.store import DocumentStore
 from project_index.features.history import query as query_module
 from project_index.features.history import snapshot as snapshot_module
 from project_index.features.history.snapshot import SnapshotStore
+from project_index.features.sources.schema_ref import SchemaRef
 from project_index.features.sources.types import DocumentTable, ServedSource, SourceConfig
 from project_index.integrations import git as git_module
 from project_index.shared.background import BackgroundGate
@@ -173,6 +174,60 @@ def test_document_store_load_when_cached(
     # 検証
     assert calls == ["rules/a.yaml"]
     assert result.documents[0].data["name"] == "A2 changed"
+
+
+def test_document_store_load_when_table_changed(
+    document_store: DocumentStore,
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """行の定義が変わると再読み込みする（正常系）。"""
+    # 準備
+    root = tmp_path / "ws"
+    write_files(
+        root,
+        {
+            "rules/a.yaml": "id: a\nname: A\nrefs:\n  - to: b\n    type: references\n",
+            "rules/b.yaml": "id: b\nname: B\n",
+        },
+    )
+    before = DocumentTable(
+        id="rules", paths=["rules/*.yaml"], schema_path="schemas/rule.schema.yaml"
+    )
+    after = DocumentTable(
+        id="rules",
+        paths=["rules/*.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        metadata={"related": "refs"},
+    )
+    before_target = make_target(
+        make_served_source(root=root, config=make_source_config(documents=[before]))
+    )
+    after_target = make_target(
+        make_served_source(root=root, config=make_source_config(documents=[after]))
+    )
+    calls: list[str] = []
+    real = store_module.load_file
+
+    def recording(root: Path, path: str, *args: Any, **kwargs: Any) -> Any:
+        calls.append(path)
+        return real(root, path, *args, **kwargs)
+
+    monkeypatch.setattr(store_module, "load_file", recording)
+    document_store.load(before_target)
+    calls.clear()
+    # 実行
+    result = document_store.load(after_target)
+    # 検証
+    assert "rules/a.yaml" in calls
+    assert result.documents[0].id == "a"
+    assert result.documents[0].metadata["related"] == [{"to": "b", "type": "references"}]
+    a_keys = [key for key in document_store._files if key[0] == root / "rules" / "a.yaml"]
+    assert len(a_keys) == 1
 
 
 def test_document_store_load_when_deleted(document_store: DocumentStore, workspace: Target) -> None:
@@ -553,6 +608,51 @@ def test_document_store_schema_when_worktree(
     # 検証
     assert from_worktree["required"] == ["id"]
     assert from_clone == startup
+
+
+def test_document_store_schema_when_schema_ref_differs(
+    document_store: DocumentStore,
+    tmp_path: Path,
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+) -> None:
+    """同じ配信元の ID でも行の定義が違う起動時のスキーマを取り違えない（正常系）。"""
+    # 準備
+    clone = tmp_path / "clone"
+    worktree = tmp_path / "wt"
+    v1 = DocumentTable(
+        id="rule",
+        paths=["rules/*.yaml"],
+        schema_path=SchemaRef(source="schemas", path="rule.schema.yaml", ref="v1"),
+    )
+    v2 = DocumentTable(
+        id="rule",
+        paths=["rules/*.yaml"],
+        schema_path=SchemaRef(source="schemas", path="rule.schema.yaml", ref="v2"),
+    )
+    served = make_served_source(
+        id="sample",
+        root=clone,
+        config=make_source_config(documents=[v1]),
+        schemas={"rule": {"type": "object", "required": ["a"]}},
+    )
+    reloaded = make_served_source(
+        id="sample",
+        root=worktree,
+        config=make_source_config(documents=[v2]),
+        schemas={"rule": {"type": "object", "required": ["b"]}},
+    )
+    in_clone = make_target(served)
+    in_worktree = make_target(reloaded, base=worktree, worktree=worktree)
+    # 実行
+    first = document_store.schema(in_clone, "rule")
+    second = document_store.schema(in_worktree, "rule")
+    third = document_store.schema(in_clone, "rule")
+    # 検証
+    assert first["required"] == ["a"]
+    assert second["required"] == ["b"]
+    assert third["required"] == ["a"]
 
 
 def test_document_store_schema_when_ref(

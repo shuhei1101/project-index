@@ -75,6 +75,8 @@ def not_found_error(source_id: str, missing: list[str], known: list[str]) -> Doc
 
 type _BodyStamps = tuple[tuple[str, int, int], ...]
 type _CachedFile = tuple[int, int, list[Document], list[LoadProblem], _BodyStamps]
+# (ファイルの絶対パス, 文書の行の ID, 文書の行の定義のハッシュ)
+type _FileKey = tuple[Path, str, str]
 type _BodyBlobs = tuple[tuple[str, str], ...]
 type _DateStamps = tuple[tuple[str, FileDates | None], ...]
 type _RevisionKey = tuple[Path, str, str, str, str]
@@ -134,7 +136,7 @@ class DocumentStore:
         self.snapshots = snapshots
         # 裏の検査が読むとき、要求の応答中はファイル 1 件ごとに休ませる関所
         self.gate = gate if gate is not None else BackgroundGate()
-        self._files: dict[tuple[Path, str], _CachedFile] = {}
+        self._files: dict[_FileKey, _CachedFile] = {}
         self._schemas: dict[Path, tuple[int, int, dict[str, Any]]] = {}
         self._revision_schemas: dict[tuple[Path, str, str], dict[str, Any]] = {}
         self._revision_files: dict[_RevisionKey, _CachedRevisionFile] = {}
@@ -142,7 +144,8 @@ class DocumentStore:
         self._dates: dict[tuple[Path, str, str], dict[str, FileDates]] = {}
         self._worktrees: dict[Path, _WorktreeWalk] = {}
         self._worktree_locks: dict[Path, threading.Lock] = {}
-        self._startup_schemas: dict[tuple[str, str], dict[str, Any]] = {}
+        # (配信元の ID, 文書の行の ID, 文書の行の定義のハッシュ) → `$ref` を解いた起動時のスキーマ
+        self._startup_schemas: dict[tuple[str, str, str], dict[str, Any]] = {}
         # `clear` のたびに増やし、`clear` の前に解き始めたスキーマを書き戻さない
         self._generation = 0
         self._lock = threading.Lock()
@@ -223,17 +226,19 @@ class DocumentStore:
         dates: dict[str, FileDates],
         files: Sequence[str],
         collected: Sequence[str] | None = None,
-    ) -> tuple[list[Document], list[LoadProblem], set[tuple[Path, str]]]:
+    ) -> tuple[list[Document], list[LoadProblem], set[_FileKey]]:
         """1 つの文書の行のファイルを集め、変わったファイルだけ再読み込みする。"""
         documents: list[Document] = []
         problems: list[LoadProblem] = []
-        seen: set[tuple[Path, str]] = set()
+        seen: set[_FileKey] = set()
+        # 行の定義が変わったら別のキーにして、前の定義で読んだ結果を使わない（行ごとに 1 回だけ求める）
+        table_hash = _table_hash(table)
         # 集め済みのパスがあればそれを使い、無ければ行の範囲で集める
         paths = collect_files(root, table, files=files) if collected is None else collected
         # ファイル 1 件ごとの照合と読み込みを、裏の処理の 1 件にする（要求のスレッドでは何もしない）
         for path in self.gate.each(paths):
             absolute = root / path
-            key = (absolute, table.id)
+            key = (absolute, table.id, table_hash)
             seen.add(key)
             try:
                 stat = absolute.stat()
@@ -356,9 +361,7 @@ class DocumentStore:
             ]:
                 del self._revision_files[key]
 
-    def _discard_files(
-        self, root: Path, kind_ids: set[str], seen_keys: set[tuple[Path, str]]
-    ) -> None:
+    def _discard_files(self, root: Path, kind_ids: set[str], seen_keys: set[_FileKey]) -> None:
         """作業ツリーから消えたファイルのキャッシュを捨てる。"""
         with self._lock:
             for key in [
@@ -447,7 +450,7 @@ class DocumentStore:
         documents: list[Document] = []
         problems: list[LoadProblem] = []
         kind_ids = {table.id for table in tables}
-        seen_keys: set[tuple[Path, str]] = set()
+        seen_keys: set[_FileKey] = set()
         for table in tables:
             if revision is None:
                 found, issues, seen = self._load_table(
@@ -521,8 +524,9 @@ class DocumentStore:
         return resolved
 
     def _startup_schema(self, source: ServedSource, table: DocumentTable) -> dict[str, Any]:
-        """起動時のスキーマの `$ref` を解いた結果を、配信元と行ごとに 1 回だけ作って返す。"""
-        key = (source.id, table.id)
+        """起動時のスキーマの `$ref` を解いた結果を、配信元と行の定義ごとに 1 回だけ作って返す。"""
+        # ワークツリーの設定で作り直した配信元は、行の定義（`schema` の `ref` など）が違えば別のキーになる
+        key = (source.id, table.id, _table_hash(table))
         with self._lock:
             cached = self._startup_schemas.get(key)
             generation = self._generation

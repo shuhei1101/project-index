@@ -308,6 +308,37 @@ flows:
       - 1 回目が n2 と n3 を深さ 1 で返却し、どちらの行もたどった関係の種類が `references`
       - 2 回目が n1 を深さ 1 で返却する
     test: test_normal_when_nested_related
+  - name: 正常系（ワークツリーの設定でメタデータの対応を変えた）
+    summary: ワークツリーを読み込んだ後に行の `metadata` に `related` の対応を追加すると、次の呼び出しからその列の関連をたどる
+    setup:
+      - name: Mock
+        description: なし
+      - name: ワークツリー
+        description: sample の `.claude/worktrees/x`。文書 1 は列 `refs` に文書 2 を持ち、行の `metadata` は `related` を対応付けていない
+      - name: 入力
+        description: '`worktree` に x のパス、`from_ids: [文書 2]`、`direction: in`。1 回呼んだ後、ワークツリー x の `project-index.yaml` の行の `metadata` に `related: refs` を追加し（commit しない）、同じ入力でもう 1 回呼ぶ'
+    flow: |-
+      <!-- map: {"title": "正常系（ワークツリーの設定でメタデータの対応を変えた）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as trace_related
+        participant WT as ワークツリー x
+
+        C->>T: worktree: x, from_ids: 文書 2, direction: in
+        T-->>C: 関連する文書なし
+        Note over WT: 行の metadata に related: refs を追加する
+        C->>T: worktree: x, from_ids: 文書 2, direction: in
+        T-->>WT: 変わった設定の行で、行の定義が変わった文書を再読み込みする
+        T-->>C: 文書 1（深さ 1）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目は関連する文書が無く、2 回目は文書 1 を深さ 1 で返却する
+      - '`reload` も再起動も呼ばない'
+    test: test_normal_when_worktree_metadata_changed
 lead: '`related` をたどって関連する文書と関連の候補を返却する `trace_related` の入出力を定め、`trace_related` を修正するときに参照する。'
 tags:
   - name: topic:関連

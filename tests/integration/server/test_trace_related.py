@@ -7,6 +7,7 @@ from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
     import pytest
 
@@ -387,3 +388,42 @@ def test_normal_when_nested_related(
     assert [(item["id"], item["depth"]) for item in out.data["items"]] == [("n2", 1), ("n3", 1)]
     assert [item["via"]["type"] for item in out.data["items"]] == ["references", "references"]
     assert [(item["id"], item["depth"]) for item in incoming.data["items"]] == [("n1", 1)]
+
+
+def test_normal_when_worktree_metadata_changed(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_config_text: Callable[..., str],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_doc_text: Callable[..., str],
+) -> None:
+    """ワークツリーの設定で related の対応を追加すると、次の呼び出しからその列の関連をたどる（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{"docs/doc-1.yaml": sample_doc_text("doc-1", "文書 1", refs=_link("doc-2"))}
+    )
+    source = make_source("sample", files)
+    worktree = add_worktree(source.folder, "x")
+    env = make_server(source)
+    arguments = {
+        "cwd": str(source.folder),
+        "worktree": str(worktree),
+        "from_ids": ["doc-2"],
+        "direction": "in",
+        "format": "json",
+    }
+    before = env.call("trace_related", **arguments)
+    # ワークツリーの設定だけ、行の metadata に related: refs を追加し、commit しない
+    (worktree / "project-index.yaml").write_text(
+        sample_config_text().replace(
+            "    schema: schemas/sample.schema.yaml\n",
+            "    schema: schemas/sample.schema.yaml\n    metadata:\n      related: refs\n",
+        ),
+        encoding="utf-8",
+    )
+    # 実行
+    after = env.call("trace_related", **arguments)
+    # 検証
+    assert not before.data.get("items")
+    assert [(item["id"], item["depth"]) for item in after.data["items"]] == [("doc-1", 1)]

@@ -1,0 +1,16 @@
+# ランナーで回せなかった理由: test.yml の paths はファイルのパスだけを受け、表の範囲（関数）を指定できない（run 44116414260 の出力を下に記載）
+$ gh workflow run test.yml --ref bug/write/ref-path-bracket-in-key -f layer=integration -f paths="tests/integration/server/test_write_docs.py::test_normal_when_text_edits_ref_path ..."
+paths の値が層のフォルダの外か、空白以外の区切りを含む: tests/integration/server/test_write_docs.py::test_normal_when_text_edits_ref_path
+
+# 手元の個別実行（run_one）。/tmp/pytest-of-shuhei2441 が root の所有で pytest の一時フォルダを作れないため、TMPDIR だけを差し替えた
+$ TMPDIR=/tmp/claude-1000/pi169 uv run pytest tests/integration/server/test_write_docs.py::test_normal_when_text_edits_ref_path tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved tests/integration/server/test_write_docs.py::test_normal_when_add_to_ref_path
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/bug-write-ref-path-bracket-in-key
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 7 items
+
+tests/integration/server/test_write_docs.py .......                      [100%]
+
+============================== 7 passed in 1.68s ===============================

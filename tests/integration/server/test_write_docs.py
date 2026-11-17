@@ -192,11 +192,14 @@ REF_PATH_DOC = (
     "    process: 2 書き出す\n"
     "  - name: save\n"
     "    process: 3 書き出す\n"
+    "  - name: items[].name\n"
+    "    process: 5 書き出す\n"
     "steps:\n"
     "  - name: a\n"
     "    body: x\n"
     "notes:\n"
     "  main.py の補足: 4 書き出す\n"
+    "  a[b]: 6 書き出す\n"
 )
 
 
@@ -312,6 +315,122 @@ def test_normal_when_kind_added_in_worktree(
     assert item["version"]
     assert (worktree / "terms" / "t1.yaml").is_file()
     assert not (source.folder / "terms").exists()
+
+
+# 関連の要素の `refs` を文字列の並びで持つスキーマ（タグ v1）と、オブジェクトの並びで持つスキーマ（タグ v2）
+REF_SCHEMA_V1 = (
+    "type: object\n"
+    "required: [id]\n"
+    "properties:\n"
+    "  id: {type: string}\n"
+    "  name: {type: string}\n"
+    "  refs:\n"
+    "    type: array\n"
+    "    items: {type: string}\n"
+)
+REF_SCHEMA_V2 = (
+    "type: object\n"
+    "required: [id]\n"
+    "properties:\n"
+    "  id: {type: string}\n"
+    "  name: {type: string}\n"
+    "  refs:\n"
+    "    type: array\n"
+    "    items:\n"
+    "      type: object\n"
+    "      required: [to, type]\n"
+    "      properties:\n"
+    "        to: {type: string}\n"
+    "        type: {type: string}\n"
+)
+
+
+def _ref_config(ref: str) -> str:
+    """種類 note のスキーマに、配信元 schemas の `ref` のリビジョンを指す配信元の設定の YAML を作る。"""
+    return (
+        "name: sample\n"
+        "default_ref: develop\n"
+        "documents:\n"
+        "  - id: note\n"
+        "    paths: [notes/*.yaml]\n"
+        "    schema:\n"
+        "      source: schemas\n"
+        "      path: schemas/note.schema.yaml\n"
+        f"      ref: {ref}\n"
+    )
+
+
+def test_normal_when_schema_ref_changed_in_worktree(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    run_git: Callable[..., str],
+    commit_all: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ワークツリーの設定でスキーマの参照を変えた種類を検査する（正常系）。"""
+    # 準備
+    schemas = make_source(
+        "schemas",
+        {
+            "project-index.yaml": (
+                "name: schemas\ndocuments:\n  - id: note\n    paths: [notes/*.yaml]\n"
+                "    schema: schemas/note.schema.yaml\n"
+            ),
+            "schemas/note.schema.yaml": REF_SCHEMA_V1,
+        },
+    )
+    run_git(schemas.folder, "tag", "v1")
+    commit_all(schemas.folder, {"schemas/note.schema.yaml": REF_SCHEMA_V2})
+    run_git(schemas.folder, "tag", "v2")
+    source = make_source(
+        "sample",
+        {
+            "project-index.yaml": _ref_config("v1"),
+            "notes/a.yaml": "id: a\nname: A\n",
+            "notes/b.yaml": "id: b\nname: B\n",
+        },
+    )
+    changed = add_worktree(source.folder, "x")
+    unchanged = add_worktree(source.folder, "y")
+    # ワークツリー x の設定だけ v2 を指し、commit しない
+    (changed / "project-index.yaml").write_text(_ref_config("v2"), encoding="utf-8")
+    env = make_server(source, schemas)
+    # ワークツリーの設定を読み直すときに、参照先の配信元 schemas をこの端末の設定から引かせる
+    monkeypatch.setenv("PROJECT_INDEX_CONFIG", str(env.settings_path))
+    # クローン本体を指す呼び出しで、起動時の v1 のスキーマを解かせておく
+    env.call("search_docs", cwd=str(source.folder), format="json")
+    objects = [{"to": "b", "type": "references"}]
+    # 実行
+    as_objects = env.call(
+        "write_docs",
+        cwd=str(source.folder),
+        worktree=str(changed),
+        operations=[_update("a", _version(changed / "notes" / "a.yaml"), set={"refs": objects})],
+    )
+    as_strings = env.call(
+        "write_docs",
+        cwd=str(source.folder),
+        worktree=str(changed),
+        operations=[_update("a", _version(changed / "notes" / "a.yaml"), set={"refs": ["b"]})],
+    )
+    in_unchanged = env.call(
+        "write_docs",
+        cwd=str(source.folder),
+        worktree=str(unchanged),
+        operations=[_update("a", _version(unchanged / "notes" / "a.yaml"), set={"refs": ["b"]})],
+    )
+    # 検証
+    assert not as_objects.is_error
+    assert as_objects.data["applied"] is True
+    assert as_objects.data["results"][0]["status"] == "updated"
+    assert load_yaml((changed / "notes" / "a.yaml").read_text(encoding="utf-8"))["refs"] == objects
+    assert as_strings.is_error
+    assert "ValidationFailedError" in as_strings.text
+    assert "is not of type 'object'" in as_strings.text
+    assert not in_unchanged.is_error
+    assert in_unchanged.data["applied"] is True
+    assert load_yaml((unchanged / "notes" / "a.yaml").read_text(encoding="utf-8"))["refs"] == ["b"]
 
 
 def test_normal_when_operations_combined(
@@ -693,25 +812,50 @@ def test_normal_when_text_edits_ref_path(
         **arguments,
     )
     after_fourth = load_yaml(path.read_text(encoding="utf-8"))
+    fifth = env.call(
+        "write_docs",
+        operations=[
+            _update("doc-1", _version(path), text_edits=[_edit("#functions[items[].name].process")])
+        ],
+        **arguments,
+    )
+    after_fifth = load_yaml(path.read_text(encoding="utf-8"))
+    sixth = env.call(
+        "write_docs",
+        operations=[_update("doc-1", _version(path), text_edits=[_edit("#notes[a[b]]")])],
+        **arguments,
+    )
+    after_sixth = load_yaml(path.read_text(encoding="utf-8"))
     # 検証
     assert [item["status"] for item in first.data["results"]] == ["updated"]
     assert [item["process"] for item in after_first["functions"]] == [
         "1 書き出す",
         "2 保存する",
         "3 書き出す",
+        "5 書き出す",
     ]
     assert [item["status"] for item in second.data["results"]] == ["updated"]
     assert [item["process"] for item in after_second["functions"]] == [
         "1 書き出す",
         "2 保存する",
         "3 保存する",
+        "5 書き出す",
     ]
     assert third.is_error
     assert "text_edits[0].field" in third.text
     assert "文字列ではない項目は置き換えられません" in third.text
     assert after_third == before_third
     assert [item["status"] for item in fourth.data["results"]] == ["updated"]
-    assert after_fourth["notes"] == {"main.py の補足": "4 保存する"}
+    assert after_fourth["notes"] == {"main.py の補足": "4 保存する", "a[b]": "6 書き出す"}
+    assert [item["status"] for item in fifth.data["results"]] == ["updated"]
+    assert [item["process"] for item in after_fifth["functions"]] == [
+        "1 書き出す",
+        "2 保存する",
+        "3 保存する",
+        "5 保存する",
+    ]
+    assert [item["status"] for item in sixth.data["results"]] == ["updated"]
+    assert after_sixth["notes"] == {"main.py の補足": "4 保存する", "a[b]": "6 保存する"}
 
 
 @pytest.mark.parametrize(
@@ -723,6 +867,9 @@ def test_normal_when_text_edits_ref_path(
         ),
         pytest.param("#functions[save#3].process", "name が save の要素は 2 個です", id="order"),
         pytest.param("#notes[missing]", "キー missing がありません", id="no_key"),
+        pytest.param(
+            "#functions[save[1].process", "記載方法が誤っています", id="unbalanced_brackets"
+        ),
     ],
 )
 def test_error_when_text_edits_ref_path_unresolved(
@@ -733,7 +880,7 @@ def test_error_when_text_edits_ref_path_unresolved(
     field: str,
     message: str,
 ) -> None:
-    """x-key の無い配列・該当する要素の無い値・無い順番・無いキーを指す参照の型の項目のパスを断る（異常系）。"""
+    """x-key の無い配列・該当する要素の無い値・無い順番・無いキーを指すパスと、`[...]` の中の `[` `]` の対応が取れない参照の型の項目のパスを断る（異常系）。"""
     # 準備
     files = sample_file_set(
         **{"schemas/sample.schema.yaml": REF_PATH_SCHEMA, "docs/doc-1.yaml": REF_PATH_DOC}

@@ -34,7 +34,9 @@ layers:
       ```bash
       uv run pytest tests/integration/
       ```
-    description: pytest で実行する。一時フォルダに git の配信元を作り、アプリを HTTP のテストのクライアントで呼ぶ。起動・再起動・更新のテストは `project-index serve` を子プロセスで空きポートに起動する
+    description: |-
+      pytest で実行する。一時フォルダに git の配信元を作り、アプリを HTTP のテストのクライアントで呼ぶ。起動・再起動・更新のテストは `project-index serve` を子プロセスで空きポートに起動する。
+      `{結合テストのパス}` には、結合テストのファイル・フォルダか pytest のノード ID（`{ファイル}::{関数}`）を空白で区切って指定する
     prerequisites:
       - git と python3 が `PATH` にある
       - 更新のテストは、依存を uv のキャッシュから入れる（`UV_OFFLINE=1`。先に `uv sync` でキャッシュを作っておく）
