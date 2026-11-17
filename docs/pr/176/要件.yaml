@@ -17,16 +17,22 @@ use_cases:
 docs:
   - page: docs/interface/IF-6.yaml
     new: false
-    change: worktree の設定で行の schema.ref を変えた後の書き込みを、変えた後のスキーマで検査する正常系と制約を追加
-    status: todo
+    change: worktree の設定で行の schema.ref を変えた後の書き込みを、変えた後のスキーマで検査する正常系を追加
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T16:05:21.800581+00:00'
   - page: docs/interface/IF-2.yaml
     new: false
-    change: worktree の設定で行の metadata を変えた後の読み取りが、変えた後の対応で共通のメタデータを返却する正常系と制約を追加
-    status: todo
+    change: worktree の設定で行の metadata を変えた後の読み取りが、変えた後の対応で共通のメタデータを返却する正常系を追加
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T16:05:21.800581+00:00'
   - page: docs/interface/IF-3.yaml
     new: false
     change: worktree の設定で行の metadata を変えた後の関連のたどりの正常系を追加
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T16:05:21.800581+00:00'
   - page: docs/module/MOD-29.py.yaml
     new: false
     change: schema の SchemaRef の分岐・_startup_schema のキャッシュのキー・_load_table の文書のキャッシュの照合に、worktree の行の定義を反映
@@ -38,3 +44,6 @@ scope_out:
   - item: '#171 の store.py の読み込みの変更との重なり'
     reason: '#171 は未マージで、同じ _load_table を変える予定。先にマージされた側に合わせて作業PRの最新化で取り込む'
     plan: none
+  - item: '検査の読み取りの結果のキャッシュ（validation/service.py の _read_cache。キー: 配信元の ID・種類・validator の ID・文書のバージョン）が、worktree の設定で validators の行やスクリプトを変えても前の結果を返却しうる'
+    reason: 判断が分かれる。起点 Issue はスキーマの参照とメタデータの対応を扱い、validators の変更は報告されていない。今回の修正がマージされなくても同じ内容で成り立つため、結果を確かめたうえで別の Issue にするのを推奨する。レビューで確定する
+    plan: to_file
