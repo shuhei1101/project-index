@@ -99,15 +99,26 @@ class SourceChecks:
                 else:
                     self._running.add(source.id)
                     starting.append(source)
-        threads = [
-            threading.Thread(
-                target=self._work,
-                args=(store, source),
-                name=f"project-index-source-checks-{source.id}",
-                daemon=True,
-            )
-            for source in starting
-        ]
+        if poc_timing.flag("POC_FIX"):
+            # PoC の修正: 1 つのスレッドで配信元を順に検査し、応答中の要求があれば次の配信元の前で待つ
+            def sequential() -> None:
+                for source in starting:
+                    poc_timing.wait_idle("check_wait_idle", source=source.id)
+                    self._work(store, source)
+
+            threads = [
+                threading.Thread(target=sequential, name="project-index-source-checks", daemon=True)
+            ]
+        else:
+            threads = [
+                threading.Thread(
+                    target=self._work,
+                    args=(store, source),
+                    name=f"project-index-source-checks-{source.id}",
+                    daemon=True,
+                )
+                for source in starting
+            ]
         for thread in threads:
             thread.start()
         return threads

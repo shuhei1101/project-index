@@ -56,3 +56,30 @@ def span(event: str, **fields: Any) -> Iterator[dict[str, Any]]:
             **fields,
             **extra,
         )
+
+
+# 読み取り API の応答中の要求の数。裏の処理は 0 になるまで次へ進まない
+_ACTIVE = 0
+_IDLE = threading.Condition()
+
+
+@contextlib.contextmanager
+def request_active() -> Iterator[None]:
+    """読み取り API の要求の処理中であることを数える。"""
+    global _ACTIVE
+    with _IDLE:
+        _ACTIVE += 1
+    try:
+        yield
+    finally:
+        with _IDLE:
+            _ACTIVE -= 1
+            _IDLE.notify_all()
+
+
+def wait_idle(event: str, **fields: Any) -> None:
+    """応答中の要求が無くなるまで待つ（PoC の修正を入れたときだけ）。"""
+    if not flag("POC_FIX"):
+        return
+    with span(event, **fields), _IDLE:
+        _IDLE.wait_for(lambda: _ACTIVE == 0)

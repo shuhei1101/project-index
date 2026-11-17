@@ -68,6 +68,7 @@ class SnapshotStore:
                         thread.join()
                 poc_timing.emit("export_begin", count=len(targets))
                 for repo_root, commit in targets:
+                    poc_timing.wait_idle("export_wait_idle", commit=commit)
                     try:
                         self.checkout(repo_root, commit)
                     except (RevisionExportTimeoutError, GitError) as error:

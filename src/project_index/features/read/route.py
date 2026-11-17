@@ -87,7 +87,8 @@ async def _run[T](
             "api_work", source=source, name=getattr(work, "func", work).__name__, value=value
         ) as extra:
             extra["queue"] = time.perf_counter() - queued
-            return work()
+            with poc_timing.request_active():
+                return work()
 
     try:
         return await asyncio.to_thread(timed)
