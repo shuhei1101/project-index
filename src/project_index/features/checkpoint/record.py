@@ -35,7 +35,8 @@ def record_checkpoint(
     for path in reviewed:
         if not (root / path).is_file():
             raise ReviewedFileNotFoundError(root / path)
-    doc = load_roundtrip(yaml_path.read_text(encoding="utf-8"), file=str(yaml_path))
+    original = yaml_path.read_text(encoding="utf-8")
+    doc = load_roundtrip(original, file=str(yaml_path))
     value = CommentedMap()
     if repo_root(root) is not None:
         # Git の配信元: HEAD の commit と、見直した未 commit のファイルの中身のハッシュ
@@ -53,5 +54,6 @@ def record_checkpoint(
         value["checked_at"] = now.isoformat()
         checkpoint = Checkpoint(commit=None, checked_at=now)
     doc[CHECKPOINT_KEY] = value
-    replace_file(yaml_path, dump_roundtrip(doc))
+    # 読んだ管理用の YAML の配列の字下げで書く
+    replace_file(yaml_path, dump_roundtrip(doc, original=original))
     return checkpoint
