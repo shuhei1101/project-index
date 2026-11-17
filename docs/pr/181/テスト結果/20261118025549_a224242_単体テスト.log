@@ -1,0 +1,176 @@
+$ TMPDIR=/tmp/pi181 uv run pytest tests/unit/project_index/features/validation/test_service.py
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/bug-validation-read-cache-key
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 17 items
+
+tests/unit/project_index/features/validation/test_service.py ........... [ 64%]
+...FFF                                                                   [100%]
+
+=================================== FAILURES ===================================
+____________ test_document_checker_check_when_script_folder_ignored ____________
+
+tmp_path = PosixPath('/tmp/pi181/pytest-of-shuhei2441/pytest-7/test_document_checker_check_wh11')
+make_source_config = <function make_source_config.<locals>._make at 0x74e4adba4ca0>
+make_served_source = <function make_served_source.<locals>._make at 0x74e4adba4880>
+make_target = <function make_target.<locals>._make at 0x74e4adba4d50>
+make_document = <function make_document.<locals>._make at 0x74e4adba5220>
+run_git = <function run_git.<locals>._run at 0x74e4adba54e0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74e4adb6fd90>
+
+    def test_document_checker_check_when_script_folder_ignored(
+        tmp_path: Path,
+        make_source_config: Callable[..., SourceConfig],
+        make_served_source: Callable[..., ServedSource],
+        make_target: Callable[..., Target],
+        make_document: Callable[..., Document],
+        run_git: Callable[..., str],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Git が無視するファイルの書き換えでは動かし直さない（正常系）。"""
+        # 準備
+        calls = _count_runs(monkeypatch)
+        root = tmp_path / "ws"
+        (root / "scripts" / "node_modules").mkdir(parents=True)
+        (root / ".gitignore").write_text("scripts/node_modules/\n", encoding="utf-8")
+        (root / "scripts" / "check.py").write_text("a\n", encoding="utf-8")
+        ignored = root / "scripts" / "node_modules" / "a.js"
+        ignored.write_text("x\n", encoding="utf-8")
+        run_git(root, "init", "-b", "develop")
+        run_git(root, "add", ".")
+        run_git(root, "commit", "-m", "init")
+        source = _read_source(
+            root,
+            make_source_config,
+            make_served_source,
+            ["python3", "scripts/check.py"],
+            is_git=True,
+            repo_root=root,
+        )
+        target = make_target(source, worktree=root)
+        checker = _checker({})
+        document = make_document()
+        # 実行
+        checker.check(target, document, on="read")
+        ignored.write_text("xxx\n", encoding="utf-8")
+        checker.check(target, document, on="read")
+        (root / "scripts" / "new.py").write_text("b\n", encoding="utf-8")
+        checker.check(target, document, on="read")
+        # 検証
+>       assert len(calls) == 2
+E       AssertionError: assert 3 == 2
+E        +  where 3 = len([['python3', 'scripts/check.py'], ['python3', 'scripts/check.py'], ['python3', 'scripts/check.py']])
+
+tests/unit/project_index/features/validation/test_service.py:555: AssertionError
+________ test_document_checker_check_when_script_folder_has_broken_link ________
+
+tmp_path = PosixPath('/tmp/pi181/pytest-of-shuhei2441/pytest-7/test_document_checker_check_wh12')
+make_source_config = <function make_source_config.<locals>._make at 0x74e4adba5640>
+make_served_source = <function make_served_source.<locals>._make at 0x74e4adbcb1c0>
+make_target = <function make_target.<locals>._make at 0x74e4adbcb3d0>
+make_document = <function make_document.<locals>._make at 0x74e4adbcb5e0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74e4ada04460>
+
+    def test_document_checker_check_when_script_folder_has_broken_link(
+        tmp_path: Path,
+        make_source_config: Callable[..., SourceConfig],
+        make_served_source: Callable[..., ServedSource],
+        make_target: Callable[..., Target],
+        make_document: Callable[..., Document],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """状態を取れないファイルがあってもキーを作れる（正常系）。"""
+        # 準備
+        calls = _count_runs(monkeypatch)
+        root = tmp_path / "ws"
+        (root / "scripts").mkdir(parents=True)
+        (root / "scripts" / "check.py").write_text("a\n", encoding="utf-8")
+        (root / "scripts" / "broken.py").symlink_to(root / "scripts" / "missing.py")
+        source = _read_source(
+            root, make_source_config, make_served_source, ["python3", "scripts/check.py"]
+        )
+        target = make_target(source, worktree=root)
+        checker = _checker({})
+        document = make_document()
+        # 実行
+>       checker.check(target, document, on="read")
+
+tests/unit/project_index/features/validation/test_service.py:580: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/project_index/features/validation/service.py:120: in check
+    self._validate(target, document, validator_id, on=on, deadline=deadline)
+src/project_index/features/validation/service.py:136: in _validate
+    self._read_key(target, document, target.source.script("validators", validator_id))
+src/project_index/features/validation/service.py:163: in _read_key
+    script_state = at[1] if at is not None else _script_stamp(target.config_base, entry.run)
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/project_index/features/validation/service.py:212: in _script_stamp
+    stamps.extend(_folder_stamps(base, folder))
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/project_index/features/validation/service.py:237: in _folder_stamps
+    stat = path.stat()
+           ^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/tmp/pi181/pytest-of-shuhei2441/pytest-7/test_document_checker_check_wh12/ws/scripts/broken.py')
+follow_symlinks = True
+
+    def stat(self, *, follow_symlinks=True):
+        """
+        Return the result of the stat() system call on this path, like
+        os.stat() does.
+        """
+>       return os.stat(self, follow_symlinks=follow_symlinks)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: '/tmp/pi181/pytest-of-shuhei2441/pytest-7/test_document_checker_check_wh12/ws/scripts/broken.py'
+
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/pathlib/__init__.py:654: FileNotFoundError
+________________ test_document_checker_check_when_stamps_shared ________________
+
+tmp_path = PosixPath('/tmp/pi181/pytest-of-shuhei2441/pytest-7/test_document_checker_check_wh13')
+make_source_config = <function make_source_config.<locals>._make at 0x74e4adba5850>
+make_served_source = <function make_served_source.<locals>._make at 0x74e4adba4b40>
+make_target = <function make_target.<locals>._make at 0x74e4adba4f60>
+make_document = <function make_document.<locals>._make at 0x74e4adba4930>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74e4adbb3f50>
+
+    def test_document_checker_check_when_stamps_shared(
+        tmp_path: Path,
+        make_source_config: Callable[..., SourceConfig],
+        make_served_source: Callable[..., ServedSource],
+        make_target: Callable[..., Target],
+        make_document: Callable[..., Document],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """1 回の要求の中でスクリプトの状態を使い回す（正常系）。"""
+        # 準備
+        _count_runs(monkeypatch)
+        folder_calls: list[Path] = []
+        real = service_module._folder_stamps  # pyright: ignore[reportPrivateUsage]
+    
+        def counting(base: Path, folder: Path, **kwargs: Any) -> Any:
+            folder_calls.append(folder)
+            return real(base, folder, **kwargs)
+    
+        monkeypatch.setattr(service_module, "_folder_stamps", counting)
+        root = tmp_path / "ws"
+        (root / "scripts").mkdir(parents=True)
+        (root / "scripts" / "check.py").write_text("a\n", encoding="utf-8")
+        source = _read_source(
+            root, make_source_config, make_served_source, ["python3", "scripts/check.py"]
+        )
+        target = make_target(source, worktree=root)
+        checker = _checker({})
+        stamps: dict[Any, str] = {}
+        # 実行
+>       checker.check(target, make_document(id="doc-1"), on="read", stamps=stamps)
+E       TypeError: DocumentChecker.check() got an unexpected keyword argument 'stamps'
+
+tests/unit/project_index/features/validation/test_service.py:615: TypeError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/validation/test_service.py::test_document_checker_check_when_script_folder_ignored
+FAILED tests/unit/project_index/features/validation/test_service.py::test_document_checker_check_when_script_folder_has_broken_link
+FAILED tests/unit/project_index/features/validation/test_service.py::test_document_checker_check_when_stamps_shared
+========================= 3 failed, 14 passed in 0.25s =========================
