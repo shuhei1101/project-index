@@ -64,7 +64,10 @@ tasks:
     updated_by: planner
     updated_at: '2026-11-17T05:29:09.395863+00:00'
   - process: ドキュメント修正
-    status: todo
+    status: done
+    note: 更新ドキュメントは設計の段（インターフェース定義設計）で全て反映し、レビューに合格した
+    updated_by: planner
+    updated_at: '2026-11-17T06:00:34.241481+00:00'
   - process: 単体テスト作成
     status: skipped
     reason: src/ のコードを変更しない
@@ -73,4 +76,7 @@ tasks:
   - process: 実装
     status: todo
   - process: 結合テスト作成
-    status: todo
+    status: skipped
+    reason: IF-116-1 は対応テストファイルを持たない（workflow を起動して確認するテストは E2E テストの層で回すが、この層の実行コマンドが未確定。reviewer の合格報告で認められた）。src/・tests/ も変更しない
+    updated_by: planner
+    updated_at: '2026-11-17T06:00:34.241481+00:00'
