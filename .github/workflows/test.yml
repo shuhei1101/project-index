@@ -1,8 +1,6 @@
 name: test
 
 on:
-  push:
-    branches: [chore/ci/run-tests-on-github-actions]
   workflow_dispatch:
     inputs:
       layer:
@@ -21,13 +19,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: test-${{ github.ref }}-${{ (inputs.layer || 'integration') }}
+  group: test-${{ github.ref }}-${{ inputs.layer }}
   cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ fromJSON('{"unit":5,"integration":29}')[inputs.layer || 'integration'] }}
+    timeout-minutes: ${{ fromJSON('{"unit":5,"integration":29}')[inputs.layer] }}
     steps:
       - name: ブランチを取得する
         uses: actions/checkout@v7
@@ -40,8 +38,8 @@ jobs:
 
       - name: 層の全件を回す
         env:
-          LAYER: ${{ (inputs.layer || 'integration') }}
-          PATHS: ${{ inputs.paths || 'tests/integration/plugin/ tests/integration/server/test_add_settings_source.py tests/integration/server/test_changed.py tests/integration/server/test_check_project.py tests/integration/server/test_checkpoint.py tests/integration/server/test_delete_docs.py tests/integration/server/test_delete_settings_source.py tests/integration/server/test_files.py tests/integration/server/test_get_decision.py tests/integration/server/test_get_document.py tests/integration/server/test_get_settings_sources.py tests/integration/server/test_get_source_config.py tests/integration/server/test_get_status.py tests/integration/server/test_list_changes.py tests/integration/server/test_list_decisions.py tests/integration/server/test_list_documents.py tests/integration/server/test_list_match_words.py tests/integration/server/test_list_refs.py tests/integration/server/test_list_sources.py tests/integration/server/test_migrate.py tests/integration/server/test_outline.py tests/integration/server/test_patch_settings_source.py tests/integration/server/test_prompt_doc.py tests/integration/server/test_put_settings_sources.py tests/integration/server/test_reload.py tests/integration/server/test_restart.py tests/integration/server/test_search_page.py tests/integration/server/test_serve.py tests/integration/server/test_session_start.py tests/integration/server/test_trace_related.py tests/integration/server/test_update.py tests/integration/server/test_write_docs.py tests/integration/server/test_write_nav.py' }}
+          LAYER: ${{ inputs.layer }}
+          PATHS: ${{ inputs.paths }}
         run: |
           case "$LAYER" in
             unit) limit=20 ;;
