@@ -30,3 +30,6 @@ scope_out:
   - item: 文書の多い配信元（ai-monitor）の文書の一覧の読み込みの時間（1 回目約 12 秒・2 回目 6〜9 秒）
     reason: 裏の検査との競合と別の待ちで、競合を除いても残る。確認ログの要件の見直し（推奨案 A）で別の Issue にした
     plan: '#161'
+  - item: write の単体テスト 2 ファイル（test_references.py・test_replace.py）の import の並びの lint の違反（ruff の I001）
+    reason: ruff の I001 の違反で、#157 で develop に入った。今回の要望に含まれない
+    plan: '#166'
