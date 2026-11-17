@@ -1009,6 +1009,48 @@ def test_check_sync_when_rows_share_file(
     assert report.duplicate_files == ["src/a.yaml: src・yaml", "src/c.py: src・py"]
 
 
+def test_check_sync_when_ids_overlap(
+    document_store: DocumentStore,
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+) -> None:
+    """文書の ID が重なる（正常系）。"""
+    # 準備
+    root = tmp_path / "ws"
+    write_files(
+        root,
+        {
+            "docs/a.yaml": "id: a\n",
+            "docs/b.yaml": "id: a\n",
+            "notes/c.yaml": "id: a\n",
+            "src/files.yaml": "files:\n  - path: a.yaml\n",
+            "src/a.yaml": "id: src/a.yaml\n",
+        },
+    )
+    documents = [
+        DocumentTable(id="rules", paths=["docs/*.yaml"], schema_path="schemas/rule.schema.yaml"),
+        DocumentTable(id="notes", paths=["notes/*.yaml"], schema_path="schemas/rule.schema.yaml"),
+        DocumentTable(
+            id="src",
+            paths=["src/files.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            records="files",
+            body_file="path",
+        ),
+        DocumentTable(id="yaml", paths=["src/a.yaml"], schema_path="schemas/rule.schema.yaml"),
+    ]
+    source = make_served_source(root=root, config=make_source_config(documents=documents))
+    # 実行
+    report = store_module.check_sync(document_store, source)
+    # 検証
+    assert report.duplicate_ids == [
+        "a: rules（docs/a.yaml）・rules（docs/b.yaml）",
+        "a: rules（docs/a.yaml）・notes（notes/c.yaml）",
+    ]
+
+
 def test_check_sync_when_nested_index(
     document_store: DocumentStore,
     tmp_path: Path,
