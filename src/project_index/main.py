@@ -32,6 +32,7 @@ from project_index.features.settings.types import TerminalConfig, TerminalConfig
 from project_index.features.sources.registry import SourceRegistry
 from project_index.features.sources.types import ServedSource, SourceStatus
 from project_index.server.mcp.result import mcp_prompt_ids
+from project_index.shared.background import BackgroundGate
 
 if TYPE_CHECKING:
     import argparse
@@ -84,6 +85,8 @@ class Handlers:
     checks: SourceChecks
     # 配信元の 1 行の追加・変更・削除の後に、変わった行の配信元だけを再読み込みする
     reload_changed: Callable[[TerminalConfig], list[SourceStatus]]
+    # 読み取り API・文書の MCP の要求の応答中を数え、裏の検査と書き出しを休ませる関所
+    gate: BackgroundGate
 
 
 def _setup_logging(log_dir: Path) -> list[logging.Handler]:
@@ -233,12 +236,14 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
     prompts = load_prompts(prompts_dir(os.environ), required=mcp_prompt_ids())
     state_dir = terminal.state_dir
     state_dir.mkdir(parents=True, exist_ok=True)
-    snapshots = SnapshotStore(state_dir / "snapshots")
-    store = DocumentStore(snapshots)
+    # 裏の処理の関所は 1 つだけ作り、書き出し・文書のストア・検査で共有する
+    gate = BackgroundGate()
+    snapshots = SnapshotStore(state_dir / "snapshots", gate=gate)
+    store = DocumentStore(snapshots, gate=gate)
     converter = ConvertService(state_dir / "converted", store, terminal.script_timeout_sec)
     seen = SeenStore(state_dir / "seen.sqlite3", terminal.seen_retention_days)
     checker = DocumentChecker(store, terminal.script_timeout_sec)
-    checks = SourceChecks(on_checked=log_source_check)
+    checks = SourceChecks(on_checked=log_source_check, gate=gate)
 
     def on_rebuilt(source: ServedSource) -> None:
         discard_source_caches(
@@ -303,6 +308,7 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
         prompts=prompts,
         checks=checks,
         reload_changed=reload_changed,
+        gate=gate,
     )
 
 
@@ -381,15 +387,15 @@ def check_and_export_later(
     checks: SourceChecks,
     snapshots: SnapshotStore,
 ) -> threading.Thread:
-    """渡した配信元を裏で検査し、検査の後に Git の配信元の default_ref の commit を裏で書き出す。"""
-    threads = checks.refresh_later(store, sources)
+    """渡した配信元を裏で検査し、検査の終了を待たずに Git の配信元の default_ref の commit を裏で書き出す。"""
+    checks.refresh_later(store, sources)
     # Git の配信元だけが default_ref の commit を持つ
     targets = [
         (source.repo_root, source.config_commit)
         for source in sources
         if source.repo_root is not None and source.config_commit is not None
     ]
-    return snapshots.checkout_later(targets, after=threads)
+    return snapshots.checkout_later(targets)
 
 
 def log_source_check(source: ServedSource, check: SourceCheck) -> None:

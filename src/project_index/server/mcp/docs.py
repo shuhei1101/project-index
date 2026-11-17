@@ -60,6 +60,7 @@ if TYPE_CHECKING:
 
     from project_index.features.access.types import Target
     from project_index.main import Handlers
+    from project_index.shared.background import BackgroundGate
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,7 @@ def _register(
     *,
     wait_sources: Callable[[BaseModel], Awaitable[None]],
     write_deadline_sec: float,
+    gate: BackgroundGate,
     prepare: Callable[[BaseModel], Awaitable[None]] | None = None,
 ) -> None:
     """要求のモデルを引数に持つツールを 1 つ登録する（呼ぶ前に要求が指す配信元の読み込みを待つ）。"""
@@ -139,7 +141,9 @@ def _register(
             # ワークツリーの初めての読み込みを上限まで待つ（search_docs・write_docs・delete_docs）
             if prepare is not None:
                 await prepare(request)
-            result = await asyncio.to_thread(call, request, limits)
+            # サービスの処理の間は要求の応答中として数え、裏の検査と書き出しを休ませる
+            with gate.foreground():
+                result = await asyncio.to_thread(call, request, limits)
             fmt: Literal["markdown", "json"] = getattr(request, "format", "json")
             # 描画を持つツール: 要求を添えて Markdown にする
             renderer: Callable[[Any], str] | None = None
@@ -340,6 +344,7 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
         _register,
         wait_sources=lambda request: handlers.registry.wait_for(**_wait_target(request)),
         write_deadline_sec=handlers.terminal.write_deadline_sec,
+        gate=handlers.gate,
     )
     # ワークツリーのパスごとの読み込み中のタスク（イベントループの中だけで触る）
     loads: dict[Path, asyncio.Future[object]] = {}
