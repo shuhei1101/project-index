@@ -641,7 +641,7 @@ functions:
     container: project_index/features/documents/store.py
     usecase: 起動
     role: サービス
-    summary: 配信元のクローン本体の文書を読み、`metadata` の列の欠け・管理用の YAML のずれ・当たらない関連・行どうしの同じファイルの重なり・エイリアスのキーの違反を求める
+    summary: 配信元のクローン本体の文書を読み、`metadata` の列の欠け・管理用の YAML のずれ・当たらない関連・行どうしの同じファイルの重なり・文書の ID の重なり・エイリアスのキーの違反を求める
     description: 起動時と再読み込みのときに呼ぶ。[shuhei1101/dev-docs#4 管理用のプラグインを作る](https://github.com/shuhei1101/dev-docs/issues/4) の `check_project` も呼ばれるたびにこの関数で求め直す。
     kind: 関数
     scope: public
@@ -669,8 +669,9 @@ functions:
       4. 手順 1 の `problems` のうち `reason` が `missing_body_file` のものを `{path}: {detail}` で `missing_body_files` に加える
       5. 手順 1 の文書の ID の集合を 1 回だけ作り、文書ごとに当たらない関連を求めて `{行の id}: {文書の id}: {to}` で `unresolved_related` に加える
       6. 有効な行ごとに、行が文書にするファイルを求め、ファイルごとに行の ID を `documents[]` の順で重なりなく集める。`records` を持たない行は、手順 1 のパスを渡したファイルの収集（`collect_files(source.root, table, files=files)`）で集めたファイル（YAML として読めず文書にならないファイルも含む）。`records`・`body_file` の行は、手順 1 の `documents` と `duplicates` のその行の文書の `body_path`。`body_file` の無い `records` の行は数えない。2 つ以上の行の ID を持つファイルを、パスの昇順に `{ファイル}: {行の id}・{行の id}` で `duplicate_files` に加える
-      7. 手順 1 の文書でエイリアスの集めをし、`violations` を `alias_violations` にする
-      8. `SyncReport` を返す
+      7. 手順 1 の `duplicates` を `path` の昇順（同じパスは `duplicates` の順）に並べ、除外した文書ごとに手順 1 の `documents` から同じ ID の先の文書を参照する。文書のファイルは `body_path` があれば `body_path`、無ければ `path` とする。2 つの文書の `kind` が違い、ファイルが同じで、そのファイルを手順 6 で `duplicate_files` に数えたときは飛ばし、それ以外は `{文書の id}: {先の文書の kind}（{先の文書のファイル}）・{除外した文書の kind}（{除外した文書のファイル}）` で `duplicate_ids` に加える
+      8. 手順 1 の文書でエイリアスの集めをし、`violations` を `alias_violations` にする
+      9. `SyncReport` を返す
     unit_tests:
       - name: test_check_sync
         case: 正常
@@ -733,5 +734,12 @@ functions:
         condition: '行 `notes`（`paths: [notes/**/files.yaml]`・`records: files`・`body_file: path`）に当たる `notes/files.yaml`（`x.md` を持つ）と `notes/a/files.yaml`（`y.md` を持つ）があり、`notes/x.md`・`notes/a/y.md`・`notes/a/z.md` を置く'
         mock: なし（一時フォルダの配信元）
         expected: '`unindexed_files` が `["notes: notes/a/z.md"]` の 1 件だけ（`notes/files.yaml` の側で `notes/a/` の下を数えない）'
+        exception: '-'
+      - name: test_check_sync_when_ids_overlap
+        case: 正常
+        summary: 文書の ID が重なる
+        condition: '行 `rules`（`paths: [docs/*.yaml]`）・行 `notes`（`paths: [notes/*.yaml]`）・行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`。`src/files.yaml` が `a.yaml` を持つ）・行 `yaml`（`paths: [src/a.yaml]`）をこの順に持つ配信元に、`docs/a.yaml`・`docs/b.yaml`・`notes/c.yaml`（どれも `id: a`）と `src/a.yaml`（`id: src/a.yaml`）を置く'
+        mock: なし（一時フォルダの配信元）
+        expected: '`duplicate_ids` が `["a: rules（docs/a.yaml）・rules（docs/b.yaml）", "a: rules（docs/a.yaml）・notes（notes/c.yaml）"]` で、同じファイルの重なりに数えた `src/a.yaml` を含まない'
         exception: '-'
 visibility: internal
