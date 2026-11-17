@@ -274,7 +274,7 @@ YAML として読めないファイルがあっても、そのファイルを除
 | `set` | `update` | 項目に値を入れる。オブジェクトは再帰的にマージし、配列と値は置き換える |
 | `unset` | `update` | 消す項目のパスの配列 |
 | `add_to` | `update` | 配列の項目の末尾へ要素を追加する |
-| `remove_from` | `update` | 配列の項目から一致する要素を削除する |
+| `remove_from` | `update` | 配列の項目から一致する要素を削除する。`x-key` を持つ配列は `x-key` の値でも要素を指し、削除する要素が無い値は `InvalidArgumentError` |
 | `text_edits` | `update` | `[{field, old, new, replace_all}]`。`replace_all` が `false` のとき `old` が 1 か所だけ一致すること |
 | `new_id` | `rename` | 改名後の ID。`new_id`・`new_path` の少なくとも 1 つを指定する |
 | `new_path` | `rename` | 改名後のファイルの配信元の直下からのパス。`records`・`body_file` の行の文書は本文のファイルのパス |
