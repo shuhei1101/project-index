@@ -34,6 +34,13 @@ constants:
     summary: 管理用の YAML に載せない `*.local.*` のファイル名の glob
     value: "'*.local.*'"
     description: ローカル運用の設定・管理用の YAML・スキーマと、Git が追跡しない `settings.local.json` などを除く。`fnmatch` でファイル名だけに当てる
+  - name: SKIP_FILES
+    title: たどらないファイル
+    container: project_index/features/documents/indexable.py
+    usecase: 共通
+    summary: ファイルをたどるときに返さないファイル名
+    value: frozenset({".git"})
+    description: ワークツリーとサブモジュールの `.git` は本体を指す 1 行のファイルで、フォルダの `.git` と同じく文書にしない
 functions:
   - name: walk_files
     title: 中をたどるファイルの列挙
@@ -64,7 +71,7 @@ functions:
     process: |-
       1. `root / start` を `os.walk`（`followlinks=False`）でたどる。シンボリックリンクのフォルダには `os.walk` が入らないので、フォルダごとに `os.path.islink` を呼ばない
       2. 各フォルダで、`SKIP_DIRS` の名前のフォルダ・`root` からのパスが `SKIP_PATHS` にあるフォルダをたどる先から外す
-      3. ファイルごとに `root` からのパスを作って返す
+      3. 名前が `SKIP_FILES` にあるファイル（ワークツリーの `.git`）を除き、ファイルごとに `root` からのパスを作って返す
     unit_tests:
       - name: test_walk_files
         case: 正常
@@ -86,6 +93,13 @@ functions:
         condition: '`a/x.md` と、`a` を指すシンボリックリンク `l` を置く'
         mock: なし（`tmp_path`）
         expected: '`["a/x.md"]`'
+        exception: '-'
+      - name: test_walk_files_when_git_file
+        case: 正常
+        summary: 名前が `.git` のファイルを返さない
+        condition: '`a.md`・1 行のファイル `.git`・`sub/.git`・`sub/b.md` を置く'
+        mock: なし（`tmp_path`）
+        expected: 昇順にして `["a.md", "sub/b.md"]`
         exception: '-'
   - name: is_excluded_file
     title: 除外の条件の判定
@@ -246,7 +260,7 @@ functions:
       type: tuple[list[str], dict[str, int]]
       description: (`root` からのファイルのパスの一覧, `root` からのフォルダのパス（`root` は `.`）→ `st_mtime_ns`)
     process: |-
-      1. 中をたどるファイルの列挙と同じに `os.walk` でたどり、同じフォルダを飛ばす
+      1. 中をたどるファイルの列挙と同じに `os.walk` でたどり、同じフォルダを飛ばし、同じ名前のファイルを除く
       2. たどったフォルダごとに `os.stat` の `st_mtime_ns` を記録する（たどる途中で無くなったフォルダは記録しない）
       3. ファイルの一覧とフォルダの更新日時を返す
     unit_tests:
@@ -256,4 +270,10 @@ functions:
         condition: '`a.yaml`・`rules/b.yaml`・空のフォルダ `empty/`・`node_modules/x.js` を置く'
         mock: なし（`tmp_path`）
         expected: ファイルは `a.yaml`・`rules/b.yaml`、フォルダは `.`・`rules`・`empty` で、それぞれの `st_mtime_ns` を持ち、`node_modules` は無い
+      - name: test_walk_tree_when_git_file
+        case: 正常
+        summary: 名前が `.git` のファイルを返さない
+        condition: '`a.yaml` と 1 行のファイル `.git` を置く'
+        mock: なし（`tmp_path`）
+        expected: ファイルが `a.yaml` だけ
 visibility: internal
