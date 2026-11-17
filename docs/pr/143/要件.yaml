@@ -29,8 +29,8 @@ docs:
     updated_at: '2026-11-17T10:20:38.421042+00:00'
 scope_out:
   - item: 文書の ID の重なり（duplicate_id）を check_sync の報告に入れる
-    reason: '#136 の要望は同じファイルの重なりの検出で、ID の重なりの報告は含まない。含めるかをインターフェース定義設計のレビューで確定する'
-    plan: to_file
+    reason: '#136 の要望は同じファイルの重なりの検出で、ID の重なりの報告は含まない。報告先は別の判断になるため、インターフェース定義設計のレビューで切り出すと決めた'
+    plan: '#144'
   - item: set・unset・add_to・remove_from の項目のパスでの x-key の値の指定
     reason: '#138 の完了の条件は text_edits。set・unset・add_to・remove_from は項目の値を丸ごと渡すため、位置の `[n]` で足りる'
     plan: none
