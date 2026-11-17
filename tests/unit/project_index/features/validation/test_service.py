@@ -511,3 +511,108 @@ def test_document_checker_check_when_config_commit_changed(
     checker.check(make_target(after), document, on="read")
     # 検証
     assert len(calls) == 2
+
+
+def test_document_checker_check_when_script_folder_ignored(
+    tmp_path: Path,
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+    run_git: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Git が無視するファイルの書き換えでは動かし直さない（正常系）。"""
+    # 準備
+    calls = _count_runs(monkeypatch)
+    root = tmp_path / "ws"
+    (root / "scripts" / "node_modules").mkdir(parents=True)
+    (root / ".gitignore").write_text("scripts/node_modules/\n", encoding="utf-8")
+    (root / "scripts" / "check.py").write_text("a\n", encoding="utf-8")
+    ignored = root / "scripts" / "node_modules" / "a.js"
+    ignored.write_text("x\n", encoding="utf-8")
+    run_git(root, "init", "-b", "develop")
+    run_git(root, "add", ".")
+    run_git(root, "commit", "-m", "init")
+    source = _read_source(
+        root,
+        make_source_config,
+        make_served_source,
+        ["python3", "scripts/check.py"],
+        is_git=True,
+        repo_root=root,
+    )
+    target = make_target(source, worktree=root)
+    checker = _checker({})
+    document = make_document()
+    # 実行
+    checker.check(target, document, on="read")
+    ignored.write_text("xxx\n", encoding="utf-8")
+    checker.check(target, document, on="read")
+    (root / "scripts" / "new.py").write_text("b\n", encoding="utf-8")
+    checker.check(target, document, on="read")
+    # 検証
+    assert len(calls) == 2
+
+
+def test_document_checker_check_when_script_folder_has_broken_link(
+    tmp_path: Path,
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """状態を取れないファイルがあってもキーを作れる（正常系）。"""
+    # 準備
+    calls = _count_runs(monkeypatch)
+    root = tmp_path / "ws"
+    (root / "scripts").mkdir(parents=True)
+    (root / "scripts" / "check.py").write_text("a\n", encoding="utf-8")
+    (root / "scripts" / "broken.py").symlink_to(root / "scripts" / "missing.py")
+    source = _read_source(
+        root, make_source_config, make_served_source, ["python3", "scripts/check.py"]
+    )
+    target = make_target(source, worktree=root)
+    checker = _checker({})
+    document = make_document()
+    # 実行
+    checker.check(target, document, on="read")
+    checker.check(target, document, on="read")
+    # 検証
+    assert len(calls) == 1
+
+
+def test_document_checker_check_when_stamps_shared(
+    tmp_path: Path,
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """1 回の要求の中でスクリプトの状態を使い回す（正常系）。"""
+    # 準備
+    _count_runs(monkeypatch)
+    folder_calls: list[Path] = []
+    real = service_module._folder_stamps  # pyright: ignore[reportPrivateUsage]
+
+    def counting(base: Path, folder: Path, **kwargs: Any) -> Any:
+        folder_calls.append(folder)
+        return real(base, folder, **kwargs)
+
+    monkeypatch.setattr(service_module, "_folder_stamps", counting)
+    root = tmp_path / "ws"
+    (root / "scripts").mkdir(parents=True)
+    (root / "scripts" / "check.py").write_text("a\n", encoding="utf-8")
+    source = _read_source(
+        root, make_source_config, make_served_source, ["python3", "scripts/check.py"]
+    )
+    target = make_target(source, worktree=root)
+    checker = _checker({})
+    stamps: dict[Any, str] = {}
+    # 実行
+    checker.check(target, make_document(id="doc-1"), on="read", stamps=stamps)
+    checker.check(target, make_document(id="doc-2", version="aaaaaa"), on="read", stamps=stamps)
+    # 検証
+    assert len(folder_calls) == 1
