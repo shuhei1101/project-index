@@ -7,6 +7,7 @@ import os
 import shutil
 import socket
 import sys
+import threading
 import time
 from contextlib import closing, contextmanager
 from typing import TYPE_CHECKING, Any
@@ -34,7 +35,6 @@ from project_index.main import (
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
-    import threading
     from collections.abc import Callable, Generator
     from pathlib import Path
 
@@ -45,6 +45,23 @@ if TYPE_CHECKING:
 def load_yaml(text: str) -> Any:
     """形の分かっている YAML の文字列を読む。"""
     return load_yaml_value(text)
+
+
+@pytest.fixture(autouse=True)
+def _join_background_threads() -> Generator[None]:
+    """各テストの後に、`project-index-` で始まる名前の生きているスレッドが無くなるまで join する。
+
+    裏のスレッドが起動する子プロセスが、fork から exec までの間に後のテストのソケットの fd を持ち続けないようにする。
+    """
+    yield
+    while alive := [
+        thread for thread in threading.enumerate() if thread.name.startswith("project-index-")
+    ]:
+        for thread in alive:
+            thread.join(timeout=30)
+        stuck = [thread.name for thread in alive if thread.is_alive()]
+        if stuck:
+            pytest.fail(f"30 秒を過ぎても終わらないスレッドがあります: {stuck}")
 
 
 def _free_port() -> int:
