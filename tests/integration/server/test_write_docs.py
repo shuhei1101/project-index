@@ -996,6 +996,93 @@ def test_normal_when_add_to_ref_path(
     assert after_unset_errors == before_unset_errors
 
 
+FLOWS_SCHEMA = (
+    "type: object\n"
+    "title: サンプル\n"
+    "properties:\n"
+    "  id: {type: string}\n"
+    "  name: {type: string}\n"
+    "  flows:\n"
+    "    type: array\n"
+    "    x-key: name\n"
+    "    items:\n"
+    "      type: object\n"
+    "      properties:\n"
+    "        name: {type: string}\n"
+    "        summary: {type: string}\n"
+    "  notes:\n"
+    "    type: array\n"
+    "    items: {type: string}\n"
+)
+FLOWS_DOC = (
+    "id: doc-1\n"
+    "name: 文書 1\n"
+    "flows:\n"
+    "  - name: 正常系\n"
+    "    summary: s1\n"
+    "  - name: 異常系\n"
+    "    summary: s2\n"
+    "  - name: 準正常系\n"
+    "    summary: s3\n"
+    "notes: [a]\n"
+)
+
+
+def test_normal_when_remove_from_x_key(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """remove_from で x-key を持つ配列の要素を x-key の値と要素のオブジェクトで指して削除し、削除する要素が無い値を断る。同じ操作の add_to は remove_from の後に当てる（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{"schemas/sample.schema.yaml": FLOWS_SCHEMA, "docs/doc-1.yaml": FLOWS_DOC}
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    path = worktree / "docs" / "doc-1.yaml"
+    arguments = {"cwd": str(source.folder), "worktree": str(worktree)}
+
+    def _call(**operation: Any) -> Any:
+        return env.call(
+            "write_docs", operations=[_update("doc-1", _version(path), **operation)], **arguments
+        )
+
+    # 実行
+    version_before = _version(path)
+    first = _call(remove_from={"flows": ["異常系"]})
+    after_first = load_yaml(path.read_text(encoding="utf-8"))
+    second = _call(remove_from={"flows": [{"name": "準正常系", "summary": "s3"}]})
+    after_second = load_yaml(path.read_text(encoding="utf-8"))
+    before_error = path.read_text(encoding="utf-8")
+    third = _call(remove_from={"flows": ["正常系", "無い名前"]})
+    after_error = path.read_text(encoding="utf-8")
+    fourth = _call(remove_from={"notes": ["z"]})
+    after_fourth = load_yaml(path.read_text(encoding="utf-8"))
+    fifth = _call(
+        remove_from={"flows": ["正常系", {"name": "正常系", "summary": "s1"}]},
+        add_to={"flows": [{"name": "正常系", "summary": "s9"}]},
+    )
+    after_fifth = load_yaml(path.read_text(encoding="utf-8"))
+    # 検証
+    assert [item["status"] for item in first.data["results"]] == ["updated"]
+    assert first.data["results"][0]["version"] != version_before
+    assert after_first["flows"] == [
+        {"name": "正常系", "summary": "s1"},
+        {"name": "準正常系", "summary": "s3"},
+    ]
+    assert [item["status"] for item in second.data["results"]] == ["updated"]
+    assert after_second["flows"] == [{"name": "正常系", "summary": "s1"}]
+    assert third.is_error
+    assert "operations[0].remove_from.flows" in third.text
+    assert "無い名前" in third.text
+    assert after_error == before_error
+    assert [item["status"] for item in fourth.data["results"]] == ["updated"]
+    assert after_fourth["notes"] == ["a"]
+    assert [item["status"] for item in fifth.data["results"]] == ["updated"]
+    assert after_fifth["flows"] == [{"name": "正常系", "summary": "s9"}]
+
+
 def test_error_when_unknown_kind(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
