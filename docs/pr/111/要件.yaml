@@ -1,0 +1,21 @@
+use_cases: []
+docs:
+  - page: project-index.yaml
+    new: false
+    change: nav.tabs[] を規約『開発ドキュメントのナビゲーション』の順（はじめに・使い方・設計書・規約・コード・リファレンス・用語集のうち配信元にあるもの）で追加し、設計書の種類をタブ「設計書」のサイドバーのグループにまとめ、目次（documents の index の行）をタブとサイドバーに並べない
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T04:06:13.134133+00:00'
+scope_out:
+  - item: project-index 以外の配信元の nav の定義
+    reason: 要望はこの配信元（project-index）の設定に限る。他の配信元は shuhei1101/knowledge#441 が扱う
+    plan: none
+  - item: documents[] の検索の対象（paths・exclude）とメタデータの見直し
+    reason: 画面の並びではなく検索の対象の範囲の変更で、目的が異なる。#104 が扱う
+    plan: '#104'
+  - item: dev-docs の画面の目次の重なりの不具合
+    reason: dev-docs の画面の実装の不具合で、この配信元の設定では直せない。shuhei1101/dev-docs#226 が扱う
+    plan: none
+  - item: dev-docs の nav の auto.group_by で共通のメタデータ（main_tags など）を指定してグループに分ける機能
+    reason: dev-docs の実装の変更で、この配信元の設定では扱えない。この PR はモジュール構成を名前の前方一致の filter で分類ごとのグループに分けて回避した
+    plan: shuhei1101/dev-docs#251
