@@ -43,10 +43,13 @@ scenarios:
   - name: 正常シナリオ（端末の設定が古くなる）
     setup:
       - name: Mock
-        description: なし（実環境で実行）
+        description: '`npm`（`PATH` の先頭に、受けた引数を記録して終了コード 0 で終わるスクリプトを置く）'
       - name: project-index のクローン
         description: 正常シナリオと同じ
         notes: 新しいバージョンが端末の設定のキーを 1 つ改名する移し替えの手順を持つ
+      - name: mdmark の CLI
+        description: '`PATH` に `mdmark` がある'
+        notes: 端末の設定に `mdmark_ref` が無い（既定の `develop`）
     flow: |-
       <!-- map: {"title": "正常シナリオ（端末の設定が古くなる）"} -->
 
@@ -56,9 +59,11 @@ scenarios:
         participant AD as 管理の MCP
         participant MG as project-index migrate
         participant CF as 端末の設定
+        participant NP as npm
 
         U->>AD: update
-        AD-->>U: 新しいバージョンと、移し替えが要ること（再起動しない）
+        AD->>NP: mdmark の CLI を入れ直す（npm install -g github:shuhei1101/mdmark#develop）
+        AD-->>U: 新しいバージョン・mdmark の CLI を入れ直したことと、移し替えが要ること（再起動しない）
         U->>MG: project-index migrate --plan
         MG-->>U: 当てる手順の一覧
         U->>MG: project-index migrate
@@ -74,6 +79,7 @@ scenarios:
       - '`migrate` の後、端末の設定の `version` が新しいバージョンになり、改名したキーが新しい名前で元の値を持つ'
       - 当てる前の端末の設定のバックアップがある
       - '`restart` の後、`status` が新しいバージョンを返し、`sample` と `notes` を配信している'
+      - 移し替えが要るときも、`npm` が `install -g github:shuhei1101/mdmark#develop` の引数で 1 回呼ばれる
     test: test_normal_when_terminal_config_old
   - name: 異常シナリオ（移し替えの手順が失敗する）
     setup:
@@ -106,7 +112,7 @@ scenarios:
   - name: 異常シナリオ（クローンを更新できない）
     setup:
       - name: Mock
-        description: なし（実環境で実行）
+        description: なし（実環境で実行。`PATH` に mdmark の CLI を置かない）
       - name: project-index のクローン
         description: 上流の新しい commit と同じファイルを手元で書き換え、commit していないクローン
     flow: |-
@@ -202,7 +208,9 @@ scenarios:
         description: 正常シナリオと同じ
       - name: mdmark の CLI
         description: '`PATH` に `mdmark` がある'
-        notes: 端末の設定の `mdmark_ref` が `v0.13.0`
+      - name: 端末の設定
+        description: 正常シナリオと同じ `sources`
+        notes: '`mdmark_ref: v0.13.0`'
     flow: |-
       <!-- map: {"title": "正常シナリオ（mdmark の CLI を入れ直せない）"} -->
 
@@ -226,6 +234,40 @@ scenarios:
       - '`npm` が `install -g github:shuhei1101/mdmark#v0.13.0` の引数で呼ばれる'
       - 再起動の後の `status` が新しいバージョンを返す
     test: test_normal_when_mdmark_reinstall_fails
+  - name: 正常シナリオ（project-index に新しい commit が無い）
+    setup:
+      - name: Mock
+        description: '`npm`（`PATH` の先頭に、受けた引数を記録して終了コード 0 で終わるスクリプトを置く）'
+      - name: project-index のクローン
+        description: テスト用の bare リポジトリを上流にしたクローン
+        notes: 上流がクローンと同じ commit
+      - name: 端末の設定
+        description: 正常シナリオと同じ `sources`
+        notes: '`mdmark_ref` が無い（既定の `develop`）'
+      - name: mdmark の CLI
+        description: '`PATH` に `mdmark` がある'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（project-index に新しい commit が無い）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant AD as 管理の MCP
+        participant DD as project-index
+        participant NP as npm
+
+        U->>AD: update
+        AD->>DD: クローンで git pull（新しい commit が無い）
+        AD->>NP: mdmark の CLI を入れ直す（npm install -g github:shuhei1101/mdmark#develop）
+        AD-->>U: project-index を更新しなかったことと、mdmark の CLI を入れ直したこと（再起動しない）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`update` が project-index を更新しなかったことと、mdmark の CLI を `develop` で入れ直したことを返す'
+      - '`npm` が `install -g github:shuhei1101/mdmark#develop` の引数で 1 回呼ばれる'
+      - project-index は再起動せず、`status` が前と同じバージョンを返す
+    test: test_normal_when_up_to_date
 lead: 利用者が管理の MCP の `update` で project-index を更新し、古くなった設定を `project-index migrate` で移し替えるシナリオを定め、更新の流れを変えるときに参照する。
 tags:
   - name: topic:セットアップ

@@ -188,6 +188,9 @@ scenarios:
       - name: 端末の設定
         description: '`version` が project-index と同じで、`clone` を持ち、`mdmark_ref` にタグを書いた `settings.yaml`'
         notes: '`mdmark_ref: v0.13.0`'
+      - name: project-index のクローン
+        description: 正常シナリオと同じ
+        notes: 端末の設定の `clone` がこのパスを指す。ポート 8786 が空き
     flow: |-
       <!-- map: {"title": "正常シナリオ（mdmark のバージョンを固定している）"} -->
 
@@ -201,6 +204,7 @@ scenarios:
         U->>SK: /project-index:global-setup
         SK->>CF: 端末の設定を読み、mdmark_ref の v0.13.0 を得る
         SK->>SK: PATH に mdmark の CLI が無いことを確かめる
+        SK->>DD: project-index serve を切り離して起動する
         SK->>DD: /mcp につながり、ツールの一覧を取る
         SK-->>U: つながった結果と、v0.13.0 を指した mdmark の CLI の入れ方を出す
       ```
