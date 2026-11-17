@@ -11,6 +11,7 @@ import pytest
 from project_index.features.access import service as access_service
 from project_index.features.documents.store import DocumentStore
 from project_index.features.history.snapshot import SnapshotStore
+from project_index.features.search.types import Condition
 from project_index.features.seen.store import SeenStore
 from project_index.features.seen.types import LastRead, SessionKey
 from project_index.features.sources.registry import SourceRegistry
@@ -1098,7 +1099,7 @@ def test_write_docs_when_rename(make_env: Callable[..., WriteEnv]) -> None:
     ],
 )
 def test_write_docs_when_rename_invalid(
-    make_env: Callable[..., WriteEnv], changes: dict[str, str], error: type[Exception]
+    make_env: Callable[..., WriteEnv], changes: dict[str, Any], error: type[Exception]
 ) -> None:
     """改名の引数の誤り（異常系）。"""
     # 準備
@@ -1127,7 +1128,7 @@ def test_write_docs_when_replace_text(make_env: Callable[..., WriteEnv]) -> None
     env = make_env(_with_words())
     operation = Operation(
         op="replace_text",
-        filter={"field": "tags", "op": "eq", "values": ["topic:a"]},
+        filter=Condition(field="tags", op="eq", values=["topic:a"]),
         old="旧語",
         new="新語",
     )
@@ -1152,7 +1153,7 @@ def test_write_docs_when_replace_text_invalid(make_env: Callable[..., WriteEnv])
     env = make_env({**_with_words(), "schemas/rule.schema.yaml": one_line})
     operation = Operation(
         op="replace_text",
-        filter={"field": "tags", "op": "eq", "values": ["topic:a"]},
+        filter=Condition(field="tags", op="eq", values=["topic:a"]),
         old="旧語",
         new="新\n語",
     )
