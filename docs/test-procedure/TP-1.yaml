@@ -23,6 +23,11 @@ layers:
         uv run pytest {単体テストファイルパス}
         ```
     parallel: true
+    location: runner
+    run_runner: |-
+      ```bash
+      run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=unit | grep -o 'https://[^ ]*/actions/runs/[0-9]*') && run_id=${run_url##*/} && (rc=0; gh run watch "$run_id" --exit-status > /dev/null || rc=1; if gh run download "$run_id" -n test-log -D "/tmp/test-log-$run_id"; then cat "/tmp/test-log-$run_id/test.log"; else gh run view "$run_id" --log-failed; fi; exit $rc)
+      ```
   - id: TL-2
     name: 結合テスト（バック）
     run_all: |-
@@ -37,9 +42,14 @@ layers:
       label: ファイル
       command: |-
         ```bash
-        uv run pytest {結合テストファイルパス}
+        uv run pytest {結合テストのパス}
         ```
     parallel: false
+    location: runner
+    run_runner: |-
+      ```bash
+      run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=integration -f paths="{結合テストのパス}" | grep -o 'https://[^ ]*/actions/runs/[0-9]*') && run_id=${run_url##*/} && (rc=0; gh run watch "$run_id" --exit-status > /dev/null || rc=1; if gh run download "$run_id" -n test-log -D "/tmp/test-log-$run_id"; then cat "/tmp/test-log-$run_id/test.log"; else gh run view "$run_id" --log-failed; fi; exit $rc)
+      ```
   - id: TL-3
     name: E2E テスト
     run_all: 未確定
@@ -58,6 +68,7 @@ layers:
     description: ruff で linter・formatter の check を、pyright（strict）で型検査を、complexipy で cognitive complexity を検査する。型検査と cognitive complexity はプロジェクト全体に回す。
     prerequisites:
       - 検査の設定は `pyproject.toml` が持つ
+    location: local
 id: TP-1
 visibility: internal
 prerequisites:

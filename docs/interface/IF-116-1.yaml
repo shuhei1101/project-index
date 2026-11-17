@@ -1,0 +1,249 @@
+id: IF-116-1
+visibility: internal
+title: テストの全件実行
+entry:
+  kind: trigger
+  value: '`.github/workflows/test.yml`（手動の起動 `workflow_dispatch`。起動を絞る条件は無い）'
+lead: テスト実行方法の層のテストを GitHub Actions のランナーで回す workflow `.github/workflows/test.yml` の入力・制約・正常系と異常系のフローを定め、workflow を修正するときに参照する。
+idempotent: true
+read_only: true
+permissions: '`contents: read`'
+side_effects: 成果物 `test-log`（層の全件か、指定された結合テストを回した pytest の出力）を上げる。リポジトリへは書き込まない
+exclusivity: '同じブランチ・同じ層の実行は、古い方を止める（`concurrency` の `group: test-${{ github.ref }}-${{ inputs.layer }}`・`cancel-in-progress: true`）'
+request:
+  - name: layer
+    type: choice
+    required: true
+    location: argument
+    description: 全件を回す層で、`unit` / `integration` のどれか。テスト実行方法の実行場所が `runner` の層（単体テスト（バック）・結合テスト（バック））
+    notes: '`on.workflow_dispatch.inputs.layer` の `options`'
+  - name: paths
+    type: string
+    required: false
+    location: argument
+    default: なし（層のフォルダの全件を回す）
+    description: 回す結合テストのファイルかフォルダを空白で区切って並べたもの。`layer` が `integration` のときだけ使用する
+    notes: テスト実行方法の `run_runner` の `{結合テストのパス}` に、判定フローチャート『結合テストの実行範囲』で決めた範囲を指定する。各値はリポジトリの直下からの `tests/integration/` の下のパスに限る
+constraints:
+  - item: ランナー
+    constraint: '`ubuntu-latest`'
+  - item: 層とテストのフォルダ
+    constraint: '`unit` は `tests/unit/`、`integration` は `tests/integration/`'
+  - item: 回す範囲
+    constraint: '`paths` を指定したときは `paths` の結合テストだけを回し、省いたときは層のフォルダの全件を回す。`layer` が `integration` でないときに `paths` を指定したとき、`paths` の値が `tests/integration/` の下に無いとき、`..` か空白以外の区切りを含むときは、テストを回さずに失敗で終える'
+    notes: 作業 PR では判定フローチャート『結合テストの実行範囲』で決めた範囲だけを回す
+  - item: 並列
+    constraint: 並列にせず、1 回の pytest で回す
+    notes: 'テスト実行方法の結合テスト（バック）の層は `parallel: false`'
+  - item: 無出力の時間
+    constraint: step「層の全件を回す」で、`test.log` の大きさが変わらない時間が上限を超えたら pytest を止めて失敗で終える。上限は `unit` は 20 秒、`integration` は 203 秒
+    notes: 手元で測った出力の間隔の最長（`unit` 2.0 秒・`integration` 20.3 秒）の 10 倍
+  - item: タイムアウト
+    constraint: ジョブの `timeout-minutes` を、`unit` は 5 分、`integration` は 29 分にする
+    notes: 無出力の時間の外側の止め役。手元の全件実行の実測（`unit` 29 秒・`integration` 169 秒）の 10 倍を分に切り上げた値で、GitHub Actions の 1 ジョブの上限（360 分）より短い
+overall_flow: |-
+  <!-- map -->
+
+  ```mermaid
+  flowchart TD
+    s([workflow_dispatch で起動]) --> a
+    subgraph test
+      a[ブランチを取得する] -- 成功 --> b1[uv を入れる]
+      b1 -- 成功 --> b2[Python の依存を入れる]
+      b2 -- 成功 --> c[層の全件を回す]
+      a & b1 & b2 & c -->|"失敗（if: always()）"| d[ログを成果物に上げる]
+      c -->|"成功（if: always()）"| d
+    end
+    d -->|"全ての step が成功"| ok([成功])
+    d -->|"失敗した step がある"| ng([失敗])
+  ```
+
+  <!-- /map -->
+flows:
+  - name: 正常系
+    summary: 単体テストの層の全件が pass して成功で終わる
+    setup:
+      - name: Mock
+        description: なし（本物の GitHub Actions で回す）
+      - name: ブランチ
+        description: '`tests/unit/` の中身を pass するテスト 1 件だけに差し替えたブランチ'
+        notes: '`layer: unit`'
+    flow: |-
+      <!-- map -->
+
+      ```mermaid
+      flowchart TD
+        s([layer: unit で起動]) --> a[ブランチを取得する] --> b1[uv を入れる] --> b2[Python の依存を入れる] --> c[層の全件を回す]
+        c -- 全件 pass --> d[ログを成果物に上げる] --> e([成功])
+      ```
+
+      <!-- /map -->
+    expected:
+      - 実行の結論が `success`
+      - 成果物 `test-log` があり、pytest の集計の行を持つ
+  - name: 正常系（結合テストの層）
+    summary: 結合テストの層の全件が pass して成功で終わる
+    setup:
+      - name: Mock
+        description: なし（本物の GitHub Actions で回す）
+      - name: ブランチ
+        description: '`tests/integration/` の中身を pass するテスト 1 件だけに差し替えたブランチ'
+        notes: '`layer: integration`'
+    flow: |-
+      <!-- map -->
+
+      ```mermaid
+      flowchart TD
+        s([layer: integration で起動]) --> a[ブランチを取得する] --> b1[uv を入れる] --> b2[Python の依存を入れる] --> c[層の全件を回す]
+        c -- 全件 pass --> d[ログを成果物に上げる] --> e([成功])
+      ```
+
+      <!-- /map -->
+    expected:
+      - 実行の結論が `success`
+      - 成果物 `test-log` があり、pytest の集計の行を持つ
+  - name: 正常系（結合テストのパスを指定）
+    summary: 指定した結合テストだけを回し、成功で終わる
+    setup:
+      - name: Mock
+        description: なし（本物の GitHub Actions で回す）
+      - name: ブランチ
+        description: '`tests/integration/` に、pass するテストのフォルダ 2 つ（`a/`・`b/`）を配置したブランチ'
+        notes: '`layer: integration`・`paths: tests/integration/a/`'
+    flow: |-
+      <!-- map -->
+
+      ```mermaid
+      flowchart TD
+        s([layer: integration・paths で起動]) --> a[ブランチを取得する] --> b1[uv を入れる] --> b2[Python の依存を入れる] --> c[層の全件を回す]
+        c -- pass --> d[ログを成果物に上げる] --> e([成功])
+      ```
+
+      <!-- /map -->
+    expected:
+      - 実行の結論が `success`
+      - 成果物 `test-log` に `tests/integration/a/` のテストを回した出力がある
+      - '`tests/integration/b/` のテストが回されていない'
+  - name: 異常系（テストの fail・failure）
+    summary: 層の全件に fail があり、ログを上げて失敗で終わる
+    setup:
+      - name: Mock
+        description: なし（本物の GitHub Actions で回す）
+      - name: ブランチ
+        description: '`tests/unit/` の中身を必ず fail するテスト 1 件だけに差し替えたブランチ'
+        notes: '`layer: unit`'
+    flow: |-
+      <!-- map -->
+
+      ```mermaid
+      flowchart TD
+        s([layer: unit で起動]) --> a[ブランチを取得する] --> b1[uv を入れる] --> b2[Python の依存を入れる] --> c[層の全件を回す]
+        c -->|"失敗（if: always()）"| d[ログを成果物に上げる] --> e([失敗])
+      ```
+
+      <!-- /map -->
+    expected:
+      - 実行の結論が `failure`
+      - 成果物 `test-log` があり、fail したテストと pytest の集計の行を持つ
+  - name: 異常系（無出力の時間の超過・failure）
+    summary: 出力が上限の時間を超えて変わらず、pytest を止めてログを上げ、失敗で終わる
+    setup:
+      - name: Mock
+        description: なし（本物の GitHub Actions で回す）
+      - name: ブランチ
+        description: '`tests/unit/` の中身を、何も出力せずに 60 秒待つテスト 1 件だけに差し替えたブランチ'
+        notes: '`layer: unit`（上限 20 秒）'
+    flow: |-
+      <!-- map -->
+
+      ```mermaid
+      flowchart TD
+        s([layer: unit で起動]) --> a[ブランチを取得する] --> b1[uv を入れる] --> b2[Python の依存を入れる] --> c[層の全件を回す]
+        c -->|"失敗（if: always()）"| d[ログを成果物に上げる] --> e([失敗])
+      ```
+
+      <!-- /map -->
+    expected:
+      - 実行の結論が `failure`
+      - 成果物 `test-log` に、出力が上限の時間変わらなかったため pytest を止めた旨がある
+  - name: 異常系（道具の導入に失敗・failure）
+    summary: 依存の導入に失敗し、層の全件を回さずにログを上げて失敗で終わる
+    setup:
+      - name: Mock
+        description: なし（本物の GitHub Actions で回す）
+      - name: ブランチ
+        description: '`uv.lock` を壊して `uv sync` が失敗するブランチ'
+        notes: '`layer: unit`'
+    flow: |-
+      <!-- map -->
+
+      ```mermaid
+      flowchart TD
+        s([layer: unit で起動]) --> a[ブランチを取得する] --> b1[uv を入れる] --> b2[Python の依存を入れる]
+        b2 -->|"失敗（if: always()）"| d[ログを成果物に上げる] --> e([失敗])
+      ```
+
+      <!-- /map -->
+    expected:
+      - 実行の結論が `failure`
+      - step「層の全件を回す」の結論が `skipped`
+  - name: 異常系（結合テストのパスが層のフォルダの外・failure）
+    summary: '`paths` に `tests/integration/` の外のパスを指定し、テストを回さずに失敗で終わる'
+    setup:
+      - name: Mock
+        description: なし（本物の GitHub Actions で回す）
+      - name: ブランチ
+        description: '`tests/integration/` の中身を pass するテスト 1 件だけに差し替えたブランチ'
+        notes: '`layer: integration`・`paths: tests/unit/`。同じ結論になる例として、`layer: unit`・`paths: tests/integration/`（結合テストでない層に `paths` を指定）と、`layer: integration`・`paths: tests/integration/../unit/`（`tests/integration/` で始まり `..` で外へ出る）も起動する'
+    flow: |-
+      <!-- map -->
+
+      ```mermaid
+      flowchart TD
+        s([layer: integration・paths: tests/unit/ で起動]) --> a[ブランチを取得する] --> b1[uv を入れる] --> b2[Python の依存を入れる] --> c[層の全件を回す]
+        c -->|"失敗（if: always()）"| d[ログを成果物に上げる] --> e([失敗])
+      ```
+
+      <!-- /map -->
+    expected:
+      - 実行の結論が `failure`
+      - 成果物 `test-log` に、`paths` を弾いた理由（層のフォルダの外・結合テストでない層への指定・`..` を含む）があり、pytest の集計の行が無い
+notes:
+  step ごとの中身: |-
+    | step | 中身 |
+    | --- | --- |
+    | ブランチを取得する | `actions/checkout` で起動したブランチを取得する |
+    | uv を入れる | `astral-sh/setup-uv` で uv を入れる |
+    | Python の依存を入れる | `uv sync` で、`.python-version` の Python と依存を入れる。結合テストの更新のテストが `UV_OFFLINE=1` で使用する uv のキャッシュもここで作られる |
+    | 層の全件を回す | `PYTHONUNBUFFERED=1 uv run pytest {paths か層のフォルダ} -v` を裏で起動して出力を `test.log` に記録し、`test.log` の大きさを 10 秒ごとに確認し、無出力の時間の上限を超えたら pytest を止め、止めた旨を `test.log` に記録して失敗で終える。止めなかったときは pytest の終了コードを step の成否にする |
+    | ログを成果物に上げる | `if: always()` で `actions/upload-artifact` により `test.log` を成果物 `test-log` に上げる |
+  タイムアウトの決め方: |-
+    判定フローチャート『タイムアウトの決め方』では、自分の処理の完了を待つだけで進み具合の出力（pytest の `-v` のテスト 1 件ごとの行）があるため、無出力の時間で止まったことを検知する（制約の「無出力の時間」）。
+    ジョブの `timeout-minutes` は、無出力の時間の外側の止め役として、実測の 10 倍で決める。
+
+    | 実測 | 値 |
+    | --- | --- |
+    | `unit` の全件 | 29 秒・出力の間隔の最長 2.0 秒（1079 件） |
+    | `integration` の全件 | 169 秒・出力の間隔の最長 20.3 秒（322 件） |
+
+    手元の WSL で `uv run pytest tests/{層}/ -v` を回して測った。
+  対応テストファイルを持たない理由: |-
+    workflow を起動して結論と成果物を確認するテストは、テスト実行方法の E2E テストの層で回す。
+    E2E テストの層の実行コマンドが未確定のため、対応テストファイルを持たない。
+    フローは、develop へ入った後に初めてランナーで回す作業 PR で、手で起動して確認する。
+impl_files:
+  - .github/workflows/test.yml
+refs:
+  - to: TP-1
+    type: references
+    when: 層の追加・実行場所の変更で、`layer` の選択肢と層のフォルダを確認するとき。
+tags:
+  - name: topic:testing
+    main: true
+  - name: topic:単体テスト
+  - name: topic:結合テスト
+  - name: topic:ci
+  - name: tool:pytest
+  - name: tool:uv
+  - name: tool:github
+  - name: action:実行

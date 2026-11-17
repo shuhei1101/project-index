@@ -309,6 +309,21 @@ entries:
   - type: file
     name: .gitignore
     contents: Git で管理しないもののパターン
+  - type: folder
+    name: .github
+    contents: GitHub Actions の workflow
+    children:
+      - type: folder
+        name: workflows
+        contents: テスト実行方法の層のテストをランナーで回す workflow
+        content_types:
+          - tool_config
+        children:
+          - type: file
+            name: test.yml
+            contents: 層のテストの全件か、指定した結合テストを `workflow_dispatch` で回す workflow
+            content_types:
+              - tool_config
 gitignore:
   - pattern: .venv/
     reason: uv が作る仮想環境（ロックから再インストールできる）

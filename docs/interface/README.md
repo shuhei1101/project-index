@@ -47,5 +47,6 @@
 | [確認の時点の記録](./IF-106-3.yaml) | 確認の時点の記録（project-index checkpoint（CLI）） |
 | [本文が指すファイルの一覧](./IF-113-1.yaml) | 本文が指すファイルの一覧（project-index links（CLI）） |
 | [メタデータの偏りの一覧](./IF-113-2.yaml) | メタデータの偏りの一覧（project-index skew（CLI）） |
+| [テストの全件実行](./IF-116-1.yaml) | テストの全件実行（`.github/workflows/test.yml`（workflow_dispatch）） |
 
 <!-- /table -->
