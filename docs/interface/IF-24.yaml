@@ -179,6 +179,44 @@ flows:
       - 200 で、`documents` に `files.local.yaml` の行の文書がある
       - '`ref` が空の文字列'
     test: test_normal_when_disk_storage
+  - name: 正常系（裏の検査の最中に応答する）
+    summary: 応答の最中は、裏の検査が休みを挟んで進む
+    setup:
+      - name: Mock
+        description: sample の文書の一覧の処理を、テストが合図を出すまで止まるものに差し替える（応答の最中の状態を保つ）。裏の検査が文書のファイルを読み込んだ時刻を記録する包みを配置する
+        notes: 合図は、裏の検査が始まってから決めた秒数の後に出す
+      - name: 大きな配信元
+        description: 種類 `design` の YAML を多数持ち、裏の検査に合図までの秒数より長くかかる large
+      - name: サンプルの配信元
+        description: 正常系と同じ sample
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs
+        participant B as 裏の検査
+
+        B->>B: large を検査し始める
+        C->>E: GET /sources/sample/docs（合図まで応答の最中になる）
+        B->>B: ファイル 1 件ごとに休みを挟んで進む
+        C->>E: 合図を出す
+        E-->>C: 200 文書の一覧
+        B->>B: 休みを挟まずに検査を済ませる
+      ```
+    expected:
+      - 応答の最中に裏の検査が 1 秒あたりに読み込んだファイルの数が、合図の後の 2 割以下
+      - 応答の最中も、裏の検査が読み込んだファイルの数が 1 件以上増える（止まらない）
+      - 合図の後に 200 で sample の文書の一覧を返却し、裏の検査が済むと large の `sync` が休まずに済ませたときと同じ件数になる
+    test: test_normal_when_background_check_running
+    refs:
+      - to: SC-11
+        item: scenarios[正常シナリオ（裏の検査の最中に開く）]
+        type: references
+        when: このインターフェースのフローを変えるときに、シナリオ『画面のサーバーが文書を読む』の対応する流れと期待値を確認する。
+      - to: IF-15
+        item: constraints[裏の処理の譲り方]
+        type: requires
+        when: 休みの長さや確認の単位を変えるときに、起動の制約と合うかを確認する。
 lead: 指定のリビジョンの文書の一覧を返却する読み取り API の入出力を定め、文書の一覧を修正するときに参照する。
 tags:
   - name: topic:文書
