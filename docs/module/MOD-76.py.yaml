@@ -18,6 +18,8 @@ diagrams:
         画面の構成の書き込み ..> nav の条件の確かめ
         配信元の検査のキャッシュ ..> nav の警告
         nav の警告 ..> nav の条件の数え
+        nav の警告 ..> 行の metadata の項目
+        画面の構成の書き込み ..> 行の metadata の項目
         class 画面の構成の書き込み {
           <<function>>
         }
@@ -33,8 +35,12 @@ diagrams:
         class nav の警告 {
           <<function>>
         }
+        class 行の metadata の項目 {
+          <<function>>
+        }
         click 画面の構成の書き込み href "id:MOD-10#functions[write_nav]"
         click 配信元の検査のキャッシュ href "id:MOD-21#classes[SourceChecks]"
+        click 行の metadata の項目 href "id:MOD-52#functions[with_metadata_fields]"
 functions:
   - name: nav_auto_counts
     title: nav の条件の数え
@@ -70,12 +76,19 @@ functions:
         required: true
         passing: keyword
         description: 日付の相対の値の基準
+      - name: columns
+        title: 行ごとの共通のキーの列
+        type: Mapping[str, Mapping[str, str]]
+        required: false
+        passing: keyword
+        default: '{}'
+        description: 行の ID → その行の `metadata`（共通のキー → 列名）
     returns:
       type: list[NavAutoCount]
       description: '`nav` を上からたどった順の `auto` ごとの数'
     process: |-
       1. `nav.tabs[]` の `items[]` を、`group` の `items[]` の入れ子までたどって `auto` を集める（キーのパスは `nav.tabs[{i}].items[{j}]...auto`）
-      2. `auto` ごとに、タブとサイドバーの組み立てと同じ選び方（`document` と `filter`）で当たる文書を数える
+      2. `auto` ごとに、タブとサイドバーの組み立てと同じ選び方（`document` と `filter`）で当たる文書を数える。条件の照合には文書の種類（行の ID）の `columns` を指定する
       3. `NavAutoCount` にして返す
     unit_tests:
       - name: test_nav_auto_counts
@@ -84,6 +97,12 @@ functions:
         condition: 'タブ `mcp` の `auto: {filter: tags が mcp}` と、タブ `設計` の group の下の `auto: {document: rules}`、タブ `none` の `auto: {filter: tags が none}`'
         mock: なし
         expected: 3 件で、`path` が `nav.tabs[0].items[0].auto`・`nav.tabs[1].items[0].items[0].auto`・`nav.tabs[2].items[0].auto`、`none` の `count` が 0
+      - name: test_nav_auto_counts_when_metadata_column
+        case: 正常
+        summary: 行の metadata で対応付けた列で数える
+        condition: '種類 `guide` の文書 `data.section: 使い方` と `data.section: はじめに`、`auto: {document: guide, filter: {field: category, op: eq, values: [使い方]}}`、`columns: {guide: {category: section}}`'
+        mock: なし
+        expected: '`count` が 1'
   - name: check_nav_filters
     title: nav の条件の確かめ
     kind: 関数
@@ -162,9 +181,9 @@ functions:
       description: 警告。`nav` が無い配信元は空
     process: |-
       1. `source.config.nav` が無ければ空を返す
-      2. `Target(source, source.root, None, None, "read")` で文書を集め（文書のストア.文書を集める）、有効な文書の行ごとの文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）から使える項目（検索）を作る
+      2. `Target(source, source.root, None, None, "read")` で文書を集め（文書のストア.文書を集める）、有効な文書の行ごとの文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）から使える項目（検索）を作り、行の metadata の項目（検索）で有効な行の `metadata` のキーを加える
       3. nav の条件の確かめの違反を加える
-      4. nav の条件の数えで `count` が 0 の `auto` ごとに、`path` を `{auto のパス}.filter`（`filter` が無ければ `auto` のパス）、`rule` を `{タブの名前}: 条件 {filter を JSON にした文字列} に該当する文書がありません` にした警告を加える
+      4. nav の条件の数え（`columns` は有効な行の ID → その行の `metadata`）で `count` が 0 の `auto` ごとに、`path` を `{auto のパス}.filter`（`filter` が無ければ `auto` のパス）、`rule` を `{タブの名前}: 条件 {filter を JSON にした文字列} に該当する文書がありません` にした警告を加える
       5. 警告を返す
     unit_tests:
       - name: test_nav_warnings
@@ -187,6 +206,13 @@ functions:
         condition: '`nav` の無い配信元'
         mock: なし（一時フォルダの配信元）
         expected: 空
+        exception: '-'
+      - name: test_nav_warnings_when_metadata_filter
+        case: 正常
+        summary: 行の metadata で対応付けたキーの条件を警告しない
+        condition: '行 `notes`（`records: files`、`schema` が `templates/files.schema.yaml` のコピーの `files.items.properties` に `section: {type: string}` を追加したもの、`metadata: {area: section}`）に要素 `{path: a.md, section: 使い方}`、`nav` に `auto: {document: notes, filter: {field: area, op: eq, values: [使い方]}}` のタブ'
+        mock: なし（一時フォルダの配信元）
+        expected: 空（知らない項目の違反も、該当する文書が無い警告も出ない）
         exception: '-'
 notes:
   決まり: タブとサイドバーの組み立ては dev-docs の画面のサーバーが持つ。
