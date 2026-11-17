@@ -1,0 +1,104 @@
+$ run_runner（layer=integration、paths="tests/integration/server/test_write_docs.py tests/integration/server/test_delete_docs.py"、commit 447c682。develop の取り込みの後）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 62 items
+
+tests/integration/server/test_write_docs.py::test_normal PASSED          [  1%]
+tests/integration/server/test_write_docs.py::test_normal_when_create PASSED [  3%]
+tests/integration/server/test_write_docs.py::test_normal_when_kind_added_in_worktree PASSED [  4%]
+tests/integration/server/test_write_docs.py::test_normal_when_operations_combined PASSED [  6%]
+tests/integration/server/test_write_docs.py::test_normal_when_dry_run PASSED [  8%]
+tests/integration/server/test_write_docs.py::test_normal_when_not_atomic PASSED [  9%]
+tests/integration/server/test_write_docs.py::test_normal_when_non_git_source PASSED [ 11%]
+tests/integration/server/test_write_docs.py::test_error_when_validation_failed PASSED [ 12%]
+tests/integration/server/test_write_docs.py::test_error_when_source_not_writable PASSED [ 14%]
+tests/integration/server/test_write_docs.py::test_error_when_target_is_clone PASSED [ 16%]
+tests/integration/server/test_write_docs.py::test_error_when_target_is_clone_and_config_in_worktree PASSED [ 17%]
+tests/integration/server/test_write_docs.py::test_error_when_version_mismatch PASSED [ 19%]
+tests/integration/server/test_write_docs.py::test_normal_when_text_edits_ref_path PASSED [ 20%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[no_x_key] PASSED [ 22%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[missing] PASSED [ 24%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[order] PASSED [ 25%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[no_key] PASSED [ 27%]
+tests/integration/server/test_write_docs.py::test_normal_when_add_to_ref_path PASSED [ 29%]
+tests/integration/server/test_write_docs.py::test_error_when_unknown_kind PASSED [ 30%]
+tests/integration/server/test_write_docs.py::test_error_when_document_not_found PASSED [ 32%]
+tests/integration/server/test_write_docs.py::test_error_when_invalid_argument PASSED [ 33%]
+tests/integration/server/test_write_docs.py::test_error_when_source_not_served PASSED [ 35%]
+tests/integration/server/test_write_docs.py::test_error_when_worktree_not_matched PASSED [ 37%]
+tests/integration/server/test_write_docs.py::test_error_when_placement_excluded PASSED [ 38%]
+tests/integration/server/test_write_docs.py::test_normal_when_metadata_mapped PASSED [ 40%]
+tests/integration/server/test_write_docs.py::test_normal_when_tool_description PASSED [ 41%]
+tests/integration/server/test_write_docs.py::test_normal_when_tags_are_objects PASSED [ 43%]
+tests/integration/server/test_write_docs.py::test_normal_when_quotes_preserved PASSED [ 45%]
+tests/integration/server/test_write_docs.py::test_normal_when_indent_preserved PASSED [ 46%]
+tests/integration/server/test_write_docs.py::test_normal_when_mdmark_unavailable PASSED [ 48%]
+tests/integration/server/test_write_docs.py::test_error_when_mdmark_warning PASSED [ 50%]
+tests/integration/server/test_write_docs.py::test_normal_when_relative_ref_in_defs PASSED [ 51%]
+tests/integration/server/test_write_docs.py::test_normal_when_cyclic_ref_in_other_file PASSED [ 53%]
+tests/integration/server/test_write_docs.py::test_error_when_schema_ref_unresolvable PASSED [ 54%]
+tests/integration/server/test_write_docs.py::test_error_when_write_deadline_exceeded PASSED [ 56%]
+tests/integration/server/test_write_docs.py::test_error_when_validator_timed_out PASSED [ 58%]
+tests/integration/server/test_write_docs.py::test_normal_when_body_file PASSED [ 59%]
+tests/integration/server/test_write_docs.py::test_error_when_body_file_outside_source PASSED [ 61%]
+tests/integration/server/test_write_docs.py::test_error_when_body_not_accepted PASSED [ 62%]
+tests/integration/server/test_write_docs.py::test_normal_when_disk_storage PASSED [ 64%]
+tests/integration/server/test_write_docs.py::test_error_when_recursive_metadata_key_written PASSED [ 66%]
+tests/integration/server/test_write_docs.py::test_normal_when_rename PASSED [ 67%]
+tests/integration/server/test_write_docs.py::test_normal_when_rename_path_only PASSED [ 69%]
+tests/integration/server/test_write_docs.py::test_normal_when_rename_body_file PASSED [ 70%]
+tests/integration/server/test_write_docs.py::test_error_when_rename_id_exists PASSED [ 72%]
+tests/integration/server/test_write_docs.py::test_error_when_rename_path_invalid[outside_paths] PASSED [ 74%]
+tests/integration/server/test_write_docs.py::test_error_when_rename_path_invalid[exists] PASSED [ 75%]
+tests/integration/server/test_write_docs.py::test_normal_when_replace_text PASSED [ 77%]
+tests/integration/server/test_write_docs.py::test_error_when_replace_text_validation_failed PASSED [ 79%]
+tests/integration/server/test_delete_docs.py::test_normal PASSED         [ 80%]
+tests/integration/server/test_delete_docs.py::test_normal_when_unlink PASSED [ 82%]
+tests/integration/server/test_delete_docs.py::test_normal_when_dry_run PASSED [ 83%]
+tests/integration/server/test_delete_docs.py::test_error_when_referenced PASSED [ 85%]
+tests/integration/server/test_delete_docs.py::test_error_when_version_mismatch PASSED [ 87%]
+tests/integration/server/test_delete_docs.py::test_error_when_source_not_writable PASSED [ 88%]
+tests/integration/server/test_delete_docs.py::test_error_when_target_is_clone PASSED [ 90%]
+tests/integration/server/test_delete_docs.py::test_error_when_delete_not_allowed PASSED [ 91%]
+tests/integration/server/test_delete_docs.py::test_error_when_document_not_found PASSED [ 93%]
+tests/integration/server/test_delete_docs.py::test_normal_when_unlink_quotes_preserved PASSED [ 95%]
+tests/integration/server/test_delete_docs.py::test_normal_when_body_file PASSED [ 96%]
+tests/integration/server/test_delete_docs.py::test_error_when_disk_storage_delete_not_allowed PASSED [ 98%]
+tests/integration/server/test_delete_docs.py::test_normal_when_unlink_nested_related PASSED [100%]
+
+============================= 62 passed in 26.98s ==============================
+exit=0 run=https://github.com/shuhei1101/project-index/actions/runs/44096392531
+
+# 同じ 2 ファイルの手元の個別実行。skip の件数はランナー・手元ともに 0 件
+$ uv run pytest tests/integration/server/test_write_docs.py tests/integration/server/test_delete_docs.py -rs
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/feat-write-rename-and-replace-words
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 62 items
+
+tests/integration/server/test_write_docs.py ............................ [ 45%]
+.....................                                                    [ 79%]
+tests/integration/server/test_delete_docs.py .............               [100%]
+
+============================= 62 passed in 21.93s ==============================
+exit=0
+
+# ランナーの workflow が paths に :: を受け付けないため手元の個別実行
+$ uv run pytest tests/integration/server/test_serve.py::test_normal_when_mcp_text_from_prompts -rs
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/feat-write-rename-and-replace-words
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 1 item
+
+tests/integration/server/test_serve.py .                                 [100%]
+
+============================== 1 passed in 0.94s ===============================
+exit=0

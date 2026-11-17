@@ -11,6 +11,7 @@ import pytest
 from project_index.features.access import service as access_service
 from project_index.features.documents.store import DocumentStore
 from project_index.features.history.snapshot import SnapshotStore
+from project_index.features.search.types import Condition
 from project_index.features.seen.store import SeenStore
 from project_index.features.seen.types import LastRead, SessionKey
 from project_index.features.sources.registry import SourceRegistry
@@ -1061,3 +1062,106 @@ def test_delete_docs_when_deadline_passed(make_env: Callable[..., WriteEnv]) -> 
     with pytest.raises(WriteDeadlineExceededError, match="書き込みの期限"):
         env.delete(targets=targets, limits=_limits(0))
     assert (env.worktree / "docs/rule/doc-2.yaml").exists()
+
+
+def test_write_docs_when_rename(make_env: Callable[..., WriteEnv]) -> None:
+    """改名と参照元の追随（正常系）。"""
+    # 準備
+    env = make_env(_with_related())
+    operation = Operation(
+        op="rename", id="doc-2", expected_version=content_hash(DOC_2), new_id="doc-9"
+    )
+    # 実行
+    result = env.write(operations=[operation])
+    # 検証
+    renamed = result.results[0]
+    referrer = result.results[1]
+    assert renamed.status == "renamed"
+    assert renamed.id == "doc-9"
+    assert renamed.path == "docs/rule/doc-9.yaml"
+    assert renamed.renamed_from == "doc-2"
+    assert referrer.index == 0
+    assert referrer.id == "doc-1"
+    assert referrer.status == "updated"
+    assert len(referrer.references) == 1
+    assert not (env.worktree / "docs/rule/doc-2.yaml").exists()
+    assert (env.worktree / "docs/rule/doc-9.yaml").read_text(encoding="utf-8") == (
+        "id: doc-9\nname: 文書 2\n"
+    )
+    assert "to: doc-9" in (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("changes", "error"),
+    [
+        pytest.param({}, InvalidArgumentError, id="no_new_id_and_path"),
+        pytest.param({"new_id": "doc-1"}, ValidationFailedError, id="id_exists"),
+    ],
+)
+def test_write_docs_when_rename_invalid(
+    make_env: Callable[..., WriteEnv], changes: dict[str, Any], error: type[Exception]
+) -> None:
+    """改名の引数の誤り（異常系）。"""
+    # 準備
+    env = make_env()
+    operation = Operation(op="rename", id="doc-2", expected_version=content_hash(DOC_2), **changes)
+    # 実行・検証
+    with pytest.raises(error):
+        env.write(operations=[operation])
+    assert (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
+    assert (env.worktree / "docs/rule/doc-2.yaml").read_text(encoding="utf-8") == DOC_2
+
+
+def _with_words() -> dict[str, str]:
+    """タグ `topic:a` の文書 2 件と持たない文書 1 件が `旧語` を持つ配信元のファイルを返す。"""
+    return {
+        "docs/rule/doc-1.yaml": "id: doc-1\nname: 文書 1\ntags: [topic:a]\nbody: 旧語と旧語\n",
+        "docs/rule/doc-2.yaml": "id: doc-2\nname: 旧語\ntags: [topic:a]\n",
+        "docs/rule/doc-3.yaml": "id: doc-3\nname: 旧語\n",
+        "schemas/rule.schema.yaml": SCHEMA,
+    }
+
+
+def test_write_docs_when_replace_text(make_env: Callable[..., WriteEnv]) -> None:
+    """一括置換（正常系）。"""
+    # 準備
+    env = make_env(_with_words())
+    operation = Operation(
+        op="replace_text",
+        filter=Condition(field="tags", op="eq", values=["topic:a"]),
+        old="旧語",
+        new="新語",
+    )
+    # 実行
+    result = env.write(operations=[operation])
+    # 検証
+    assert [(item.index, item.id, item.status, item.count) for item in result.results] == [
+        (0, "doc-1", "updated", 2),
+        (0, "doc-2", "updated", 1),
+    ]
+    assert "body: 新語と新語" in (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8")
+    assert (env.worktree / "docs/rule/doc-3.yaml").read_text(encoding="utf-8") == (
+        "id: doc-3\nname: 旧語\n"
+    )
+
+
+def test_write_docs_when_replace_text_invalid(make_env: Callable[..., WriteEnv]) -> None:
+    """置換した文書が検査に合格しない（異常系）。"""
+    # 準備
+    # 2 件目の文書だけが置換した `name` に改行を持ち、スキーマに合格しない
+    one_line = SCHEMA + "properties:\n  name:\n    type: string\n    pattern: '^[^\\n]+$'\n"
+    env = make_env({**_with_words(), "schemas/rule.schema.yaml": one_line})
+    operation = Operation(
+        op="replace_text",
+        filter=Condition(field="tags", op="eq", values=["topic:a"]),
+        old="旧語",
+        new="新\n語",
+    )
+    # 実行
+    result = env.write(operations=[operation], atomic=False)
+    # 検証
+    assert len(result.results) == 1
+    assert result.results[0].status == "failed"
+    assert "doc-2" in str(result.results[0].errors)
+    assert "旧語" in (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8")
+    assert "旧語" in (env.worktree / "docs/rule/doc-2.yaml").read_text(encoding="utf-8")

@@ -1,0 +1,91 @@
+id: MOD-131
+title: 索引のサーバー / 書き込み / replace.py
+lead: '`replace_text` の文書の配下の文字列の値の置換を受け持ち、書き込みの replace.py を修正するときに参照する。'
+test_files:
+  - tests/unit/project_index/features/write/test_replace.py
+diagrams:
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        文書の書き込み ..> 文字列の値の置換
+        class 文書の書き込み {
+          <<function>>
+        }
+        class 文字列の値の置換 {
+          <<function>>
+        }
+        click 文書の書き込み href "id:MOD-84#functions[write_docs]"
+functions:
+  - name: replace_in_values
+    title: 文字列の値の置換
+    kind: 関数
+    container: project_index/features/write/replace.py
+    usecase: 書き込み
+    role: 変換
+    summary: 文書 1 件の内容の文字列の値の `old` をその場で `new` にし、置換の件数を返す
+    scope: public
+    thread_safe: false
+    args:
+      - name: content
+        title: 文書の内容
+        type: CommentedMap
+        required: true
+        passing: positional
+        description: 往復編集で読んだ文書の内容（`records` の文書は要素）。その場で書き換える
+      - name: old
+        title: 置換する前
+        type: str
+        required: true
+        passing: keyword
+        description: 空でない文字列
+      - name: new
+        title: 置換した後
+        type: str
+        required: true
+        passing: keyword
+        description: 置換した後の文字列
+      - name: fields
+        title: 置換する項目
+        type: Sequence[str] | None
+        required: true
+        passing: keyword
+        description: 列名へ読み替えた項目のパス。`None` は全ての項目
+      - name: skip
+        title: 置換しない列
+        type: Collection[str]
+        required: true
+        passing: keyword
+        description: 種類の行の ID の列と `body_file` の列（最上位のキー）
+    returns:
+      type: int
+      description: 置換した箇所の数（文字列の中の `old` の出現ごとに 1）
+    process: |-
+      1. `fields` があればその項目の値だけを、無ければ最上位の `skip` のキーを除いた全ての値を起点にする。`fields` の項目が無ければ飛ばす
+      2. 辞書の値と配列の要素をたどり、文字列の値の `old` を全て `new` にして、出現の数を足す。辞書のキーと文字列でない値は変えない
+      3. 引用符の種類は元のスカラーの型で保ち、改行を含むようになった引用符なしの値は書き出しがブロックのリテラルにする
+    unit_tests:
+      - name: test_replace_in_values
+        case: 正常
+        summary: 配下の文字列を置換し、キーは変えない
+        condition: '`description: 旧語`、`items: [{text: 旧語と旧語}]`、`notes: {旧語: 旧語}`、`count: 3`、`old: 旧語`・`new: 新語`・`fields: None`'
+        mock: なし
+        expected: 値は全て `新語` になり、`notes` のキー `旧語` と `count` は変わらず、返り値が 4
+      - name: test_replace_in_values_when_fields
+        case: 正常
+        summary: 項目を絞る
+        condition: '同じ内容に `fields: [items]`'
+        mock: なし
+        expected: '`items` の配下だけが置換され、返り値が 2'
+      - name: test_replace_in_values_when_skipped
+        case: 正常
+        summary: ID の列と body_file の列は置換しない
+        condition: '`skip` に `id`・`path`、`id: 旧語-1`・`path: 旧語.md`・`name: 旧語`'
+        mock: なし
+        expected: '`name` だけが置換され、返り値が 1'
+visibility: internal
+tags:
+  - name: topic:文書
+    main: true
+  - name: action:書き込み
+  - name: action:置換
