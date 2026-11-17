@@ -3309,3 +3309,11 @@ tests/unit/project_index/test_serve.py
 
 All functions are within the allowed complexity.
 ────────────────────────── 🎉 Analysis completed! 🎉 ───────────────────────────
+
+# base ブランチ（develop の 0bbe47b の worktree）で同じ ruff check を回した出力
+$ uv run ruff check .
+unsorted-imports: [*] Import block is un-sorted or un-formatted
+ --> tests/unit/project_index/features/write/test_references.py:1:1
+unsorted-imports: [*] Import block is un-sorted or un-formatted
+ --> tests/unit/project_index/features/write/test_replace.py:1:1
+Found 2 errors.
