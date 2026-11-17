@@ -69,9 +69,14 @@ tasks:
     updated_by: planner
     updated_at: '2026-11-17T07:43:42.053358+00:00'
   - process: 単体テスト作成
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T10:28:42.916989+00:00'
   - process: 実装
-    status: todo
+    status: skipped
+    reason: 原因はテストの準備で、check_port を含む src は変更しない（単体テスト作成で fixture を足した）
+    updated_by: planner
+    updated_at: '2026-11-17T10:28:42.916989+00:00'
   - process: 結合テスト作成
     status: skipped
     reason: 変更は単体テストと check_port に閉じ、結合テストは変わらない
