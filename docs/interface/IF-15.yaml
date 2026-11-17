@@ -1089,7 +1089,7 @@ exceptions:
     condition: ポートで待ち受けられない
     notes: 標準エラーにポートの番号と `PROJECT_INDEX_PORT` で変えられることを出し、終了コード 3 で終わる
   - name: PromptInvalidError
-    condition: プロンプトの YAML（文書の MCP の instructions・文書の MCP と管理の MCP のツールの description）が無い・読めない・`templates/prompt.schema.yaml` に違反する・Jinja2 として解釈できない
+    condition: プロンプトの YAML（文書の MCP の instructions・文書の MCP と管理の MCP のツールの description）が無い・読めない・`schemas/prompt.schema.yaml` に違反する・Jinja2 として解釈できない
     notes: '標準エラーに `{ファイル}: {キーのパス}: {理由}` を全て出し、待ち受けずに終了コード 4 で終わる。代わりの文は持たない'
   - name: SourceNotServedError
     condition: ある行の読み込みが例外で止まった後に、その行の配信元を指す要求が届いた
