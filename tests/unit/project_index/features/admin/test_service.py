@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -22,6 +23,7 @@ from project_index.features.settings.types import (
     TerminalConfig,
     TerminalConfigInvalidError,
 )
+from project_index.features.sources import registry as registry_module
 from project_index.features.sources.registry import SourceRegistry
 from project_index.main import Handlers, build_handlers
 from project_index.shared.errors import (
@@ -36,6 +38,8 @@ from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from project_index.features.sources.types import ServedSource, SourceStatus
 
 
 def load_yaml(text: str) -> Any:
@@ -147,28 +151,59 @@ def test_get_status(
     assert status.sources[2].sync is None
 
 
+def _no_check(source_id: str) -> None:
+    """検査の結果を持たない偽物。"""
+    del source_id
+
+
 def test_get_status_when_loading(
-    make_source_dir: Callable[..., Path],
+    monkeypatch: pytest.MonkeyPatch,
     make_terminal_config: Callable[..., TerminalConfig],
     make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
     make_handlers: Callable[..., Any],
 ) -> None:
-    """読み込み中は配信元を待たずに返す（正常系）。"""
+    """読み込み中は配信元を待たずに、読み込み済みの行と loading の行を返す（正常系）。"""
     # 準備
+    entered = threading.Event()
+    release = threading.Event()
+
+    def load_source(entry: SourceEntry, *, index: int, lookup: object) -> tuple[Any, Any]:
+        del lookup
+        if entry.id == "beta":
+            entered.set()
+            release.wait(timeout=5)
+        return make_served_source(id=entry.id), make_status(entry.id, index)
+
+    monkeypatch.setattr(registry_module, "load_source", load_source)
     terminal = make_terminal_config(
-        sources=[make_entry(str(make_source_dir("alpha")), source_id="alpha")]
+        sources=[
+            make_entry("/tmp/alpha/project-index.yaml", source_id="alpha"),
+            make_entry("/tmp/beta/project-index.yaml", source_id="beta"),
+        ]
     )
+    registry = SourceRegistry(loading=True)
+    worker = threading.Thread(target=registry.load, args=(terminal,))
+    worker.start()
+    entered.wait(timeout=5)
+    registry._rows_done[0].wait(timeout=5)
     handlers = make_handlers(
         terminal=terminal,
-        registry=SourceRegistry(loading=True),
-        checks=SimpleNamespace(checking=False),
+        registry=registry,
+        checks=SimpleNamespace(checking=False, get=_no_check),
         snapshots=SimpleNamespace(exporting=False),
     )
     # 実行
     status = get_status(handlers, env={})
+    release.set()
+    worker.join(timeout=5)
     # 検証
     assert status.loading is True
-    assert status.sources == []
+    assert [(source.id, source.status) for source in status.sources] == [
+        ("alpha", "serving"),
+        ("beta", "loading"),
+    ]
 
 
 def test_get_status_when_port_env(

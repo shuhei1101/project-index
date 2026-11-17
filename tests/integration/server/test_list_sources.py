@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import dataclasses
 from typing import TYPE_CHECKING, Any
+
+from tests.integration.server.conftest import sample_config
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -41,3 +44,37 @@ def test_normal_when_no_source(make_server: Callable[..., Any]) -> None:
     # 検証
     assert response.status_code == 200
     assert response.json()["sources"] == []
+
+
+def test_normal_when_include_loading(
+    make_source: Callable[..., Any],
+    make_loading_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """include_loading=true のとき、読み込みが終わっていない配信元を loading で返す（正常系）。"""
+    # 準備
+    slow = make_source("slow")
+    sample = make_source("sample")
+    third = dataclasses.replace(
+        make_source(
+            "third", sample_file_set(**{"project-index.yaml": sample_config(name="third")})
+        ),
+        with_id=False,
+    )
+    loading = make_loading_server(slow, sample, third, blocked=("slow", "third"))
+    env = loading.env
+    # 実行
+    before = env.client.get("/sources?include_loading=true")
+    loading.finish()
+    after = env.client.get("/sources")
+    # 検証
+    assert before.status_code == 200
+    rows = [(row["id"], row["status"]) for row in before.json()["sources"]]
+    assert rows[0] == ("slow", "loading")
+    assert rows[2] == ("sources[2]", "loading")
+    assert after.status_code == 200
+    assert [(row["id"], row["status"]) for row in after.json()["sources"]] == [
+        ("slow", "serving"),
+        ("sample", "serving"),
+        ("third", "serving"),
+    ]
