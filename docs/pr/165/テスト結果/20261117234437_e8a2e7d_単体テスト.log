@@ -1,0 +1,154 @@
+$ TMPDIR=/tmp/pi165 uv run pytest tests/unit/project_index/features/write/test_references.py tests/unit/project_index/features/write/test_replace.py tests/unit/project_index/features/write/test_service.py
+（Red の確認。/tmp/pytest-of-* が別のユーザーの持ち物で pytest の一時フォルダを作れないため、TMPDIR を指定した）
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/feat-write-rename-replace-body-file
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 46 items / 2 errors
+
+==================================== ERRORS ====================================
+_ ERROR collecting tests/unit/project_index/features/write/test_references.py __
+ImportError while importing test module '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-write-rename-replace-body-file/tests/unit/project_index/features/write/test_references.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_references.py:5: in <module>
+    from project_index.features.write.references import (
+E   ImportError: cannot import name 'rewrite_body_references' from 'project_index.features.write.references' (/home/shuhei2441/repo/project-index/.claude/worktrees/feat-write-rename-replace-body-file/src/project_index/features/write/references.py)
+___ ERROR collecting tests/unit/project_index/features/write/test_replace.py ___
+ImportError while importing test module '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-write-rename-replace-body-file/tests/unit/project_index/features/write/test_replace.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_replace.py:5: in <module>
+    from project_index.features.write.replace import replace_in_body, replace_in_values
+E   ImportError: cannot import name 'replace_in_body' from 'project_index.features.write.replace' (/home/shuhei2441/repo/project-index/.claude/worktrees/feat-write-rename-replace-body-file/src/project_index/features/write/replace.py)
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/write/test_references.py
+ERROR tests/unit/project_index/features/write/test_replace.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!!
+============================== 2 errors in 0.07s ===============================
+$ TMPDIR=/tmp/pi165 uv run pytest tests/unit/project_index/features/write/test_service.py
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/feat-write-rename-replace-body-file
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 46 items
+
+tests/unit/project_index/features/write/test_service.py ................ [ 34%]
+..........................FF.F                                           [100%]
+
+=================================== FAILURES ===================================
+_________________ test_write_docs_when_rename_body_references __________________
+
+make_env = <function make_env.<locals>._make at 0x79bf4907d220>
+
+    def test_write_docs_when_rename_body_references(make_env: Callable[..., WriteEnv]) -> None:
+        """改名で本文のファイルの中のリンクも追随する（正常系）。"""
+        # 準備
+        files = {
+            "notes/index.yaml": "items:\n  - id: n1\n    path: n1.md\n  - id: n2\n    path: n2.py\n",
+            "notes/n1.md": "[文書 2](id:doc-2)\n[文書 2](../docs/rule/doc-2.yaml)\n",
+            "notes/n2.py": "# id:doc-2\n",
+            "docs/rule/doc-1.yaml": DOC_1,
+            "docs/rule/doc-2.yaml": DOC_2,
+            "schemas/rule.schema.yaml": SCHEMA,
+        }
+        env = make_env(files, tables=[_notes_table(), _rules_table()])
+        operation = Operation(
+            op="rename", id="doc-2", expected_version=content_hash(DOC_2), new_id="doc-9"
+        )
+        # 実行
+        result = env.write(operations=[operation])
+        # 検証
+        n1 = [item for item in result.results if item.id == "n1"]
+        assert [item.id for item in result.results if item.id == "n2"] == []
+>       assert n1[0].status == "updated"
+               ^^^^^
+E       IndexError: list index out of range
+
+tests/unit/project_index/features/write/test_service.py:1191: IndexError
+_________________ test_write_docs_when_replace_text_body[all] __________________
+
+make_env = <function make_env.<locals>._make at 0x79bf4907dd20>, fields = None
+expected = [(0, 'n1', 'updated', 2)], body = '# 新語\n新語と別の語\n'
+
+    @pytest.mark.parametrize(
+        ("fields", "expected", "body"),
+        [
+            pytest.param(None, [(0, "n1", "updated", 2)], "# 新語\n新語と別の語\n", id="all"),
+            pytest.param(["name"], [], "# 旧語\n旧語と別の語\n", id="name_only"),
+            pytest.param(["@body"], [(0, "n1", "updated", 2)], "# 新語\n新語と別の語\n", id="body_only"),
+        ],
+    )
+    def test_write_docs_when_replace_text_body(
+        make_env: Callable[..., WriteEnv],
+        fields: list[str] | None,
+        expected: list[tuple[int, str, str, int]],
+        body: str,
+    ) -> None:
+        """一括置換で本文のファイルも置換する（正常系）。"""
+        # 準備
+        env = make_env(_body_words(), tables=[_notes_table(), _rules_table()])
+        operation = Operation(
+            op="replace_text",
+            filter=Condition(field="tags", op="eq", values=["topic:a"]),
+            old="旧語",
+            new="新語",
+            fields=fields,
+        )
+        # 実行
+        result = env.write(operations=[operation])
+        # 検証
+>       assert [(item.index, item.id, item.status, item.count) for item in result.results] == expected
+E       AssertionError: assert [] == [(0, 'n1', 'updated', 2)]
+E         
+E         Right contains one more item: (0, 'n1', 'updated', 2)
+E         Use -v to get more diff
+
+tests/unit/project_index/features/write/test_service.py:1251: AssertionError
+______________ test_write_docs_when_replace_text_body[body_only] _______________
+
+make_env = <function make_env.<locals>._make at 0x79bf4907d900>
+fields = ['@body'], expected = [(0, 'n1', 'updated', 2)]
+body = '# 新語\n新語と別の語\n'
+
+    @pytest.mark.parametrize(
+        ("fields", "expected", "body"),
+        [
+            pytest.param(None, [(0, "n1", "updated", 2)], "# 新語\n新語と別の語\n", id="all"),
+            pytest.param(["name"], [], "# 旧語\n旧語と別の語\n", id="name_only"),
+            pytest.param(["@body"], [(0, "n1", "updated", 2)], "# 新語\n新語と別の語\n", id="body_only"),
+        ],
+    )
+    def test_write_docs_when_replace_text_body(
+        make_env: Callable[..., WriteEnv],
+        fields: list[str] | None,
+        expected: list[tuple[int, str, str, int]],
+        body: str,
+    ) -> None:
+        """一括置換で本文のファイルも置換する（正常系）。"""
+        # 準備
+        env = make_env(_body_words(), tables=[_notes_table(), _rules_table()])
+        operation = Operation(
+            op="replace_text",
+            filter=Condition(field="tags", op="eq", values=["topic:a"]),
+            old="旧語",
+            new="新語",
+            fields=fields,
+        )
+        # 実行
+        result = env.write(operations=[operation])
+        # 検証
+>       assert [(item.index, item.id, item.status, item.count) for item in result.results] == expected
+E       AssertionError: assert [] == [(0, 'n1', 'updated', 2)]
+E         
+E         Right contains one more item: (0, 'n1', 'updated', 2)
+E         Use -v to get more diff
+
+tests/unit/project_index/features/write/test_service.py:1251: AssertionError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_rename_body_references
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_replace_text_body[all]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_replace_text_body[body_only]
+========================= 3 failed, 43 passed in 2.57s =========================
