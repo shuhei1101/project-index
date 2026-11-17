@@ -416,15 +416,16 @@ def _apply_all_key(
         elements = _rebuild(elements, item, data[key])
     if key in operation.set:
         elements = _rebuild(elements, item, operation.set[key])
+    # 同じ名前を削除してから追加する
+    if key in operation.remove_from:
+        removed = operation.remove_from[key]
+        elements = [element for element in elements if element.get(item) not in removed]
     if key in operation.add_to:
         present = {element.get(item) for element in elements}
         for name in operation.add_to[key]:
             if name not in present:
                 elements.append({item: name})
                 present.add(name)
-    if key in operation.remove_from:
-        removed = operation.remove_from[key]
-        elements = [element for element in elements if element.get(item) not in removed]
     return elements, key in operation.unset
 
 
@@ -486,15 +487,16 @@ def _apply_selected_key(
             chosen, missing = _known(values[key], by_name, where, problem)
             violations.extend(missing)
             _mark(elements, flag, item, set(chosen))
+    # 同じ名前の真偽値のキーを削除してから立てる
+    if key in operation.remove_from:
+        for name in operation.remove_from[key]:
+            if name in by_name:
+                by_name[name].pop(flag, None)
     if key in operation.add_to:
         chosen, missing = _known(operation.add_to[key], by_name, "add_to", problem)
         violations.extend(missing)
         for name in chosen:
             by_name[name][flag] = True
-    if key in operation.remove_from:
-        for name in operation.remove_from[key]:
-            if name in by_name:
-                by_name[name].pop(flag, None)
     if key in operation.unset:
         _mark(elements, flag, item, set())
     return violations
