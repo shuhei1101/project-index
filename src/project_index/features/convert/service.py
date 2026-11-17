@@ -13,6 +13,7 @@ from project_index.integrations.scripts import (
     ScriptFailedError,
     ScriptTimeoutError,
     run_script,
+    script_stamp,
 )
 from project_index.shared.errors import ConverterNotDefinedError
 from project_index.shared.files import replace_file
@@ -46,6 +47,14 @@ class ConvertService:
         self, target: Target, document: Document, converter: str, run: list[str]
     ) -> Path:
         """`converters[]` の結果のキャッシュのファイルを返す。"""
+        at = script_at(target)
+        # クローン本体で config_commit があればスクリプトはその commit から取り出して動かすため commit で、
+        # それ以外（ワークツリー・disk・Git の管理外の配信元）は作業ツリーのスクリプトの状態で区別する
+        script_state = (
+            at[1]
+            if at is not None
+            else script_stamp(target.config_base, run, use_git=target.source.is_git)
+        )
         # project-index が持つ変換（`project-index prompt-doc`）の出力は project-index の更新で変わるため、バージョンも含める
         parts = (
             target.source.id,
@@ -54,6 +63,7 @@ class ConvertService:
             document.version,
             value_hash(run),
             RUNNING_VERSION,
+            script_state,
         )
         name = hashlib.sha256("\0".join(parts).encode("utf-8")).hexdigest()[:32]
         return self.cache_dir / f"{name}.md"
