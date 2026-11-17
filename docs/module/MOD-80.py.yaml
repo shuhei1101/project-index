@@ -275,15 +275,22 @@ functions:
         summary: 配列でなく文字列 1 つ
         condition: '同じ `metadata` と今の内容で `index=0`。`set: {tags: a}`・`set: {main_tags: a}` を別々に当てる'
         mock: なし
-        expected: どちらも `InvalidArgumentError` で、違反の `path` が `operations[0].set.tags`・`operations[0].set.main_tags`。`a` の 1 文字のタグを書かない
+        expected: 'どちらも `InvalidArgumentError` で、違反の `path` が `operations[0].set.tags`・`operations[0].set.main_tags`。`a` の 1 文字のタグを書かない'
         exception: 集めたキーに名前（文字列）の配列でない値を渡した、選んだ要素のキーに配列に無い名前を渡した、または `text_edits` で指した
       - name: test_expand_array_keys_when_any_depth
         case: 異常
         summary: どの深さの列もまとめるキーへの操作
-        condition: '`metadata` が `{related: "**.refs[]"}` で `index=0`。`set: {related: []}`・`unset: [related]`・`create` の `data: {related: []}`・`text_edits: [{field: related, old: a, new: b}]` を別々に当てる。もう 1 つは `set: {refs: []}`'
+        condition: '`metadata` が `{related: "**.refs[]"}` で `index=0`。`set: {related: []}`・`unset: [related]`・`create` の `data: {related: []}`・`text_edits: [{field: related, old: a, new: b}]` を別々に当てる'
         mock: なし
-        expected: '4 つは `InvalidArgumentError` で、違反の `path` が `operations[0].set.related`・`operations[0].unset`・`operations[0].data.related`・`operations[0].text_edits[0].field`、`rule` に `**.refs[]`。`set: {refs: []}` は渡した操作のまま'
+        expected: '`InvalidArgumentError` で、違反の `path` が `operations[0].set.related`・`operations[0].unset`・`operations[0].data.related`・`operations[0].text_edits[0].field`、`rule` に `**.refs[]`'
         exception: 列名が `**.` で始まる共通のキーへの操作を渡した、集めたキーに名前（文字列）の配列でない値を渡した、選んだ要素のキーに配列に無い名前を渡した、または `text_edits` で指した
+      - name: test_expand_array_keys_when_any_depth_column_name
+        case: 正常
+        summary: どの深さの列もまとめるキーの列名をそのまま渡す
+        condition: '`metadata` が `{related: "**.refs[]"}` で `set: {refs: []}`'
+        mock: なし
+        expected: 渡した操作のまま
+        exception: '-'
   - name: apply_body
     title: 本文の適用
     kind: 関数
