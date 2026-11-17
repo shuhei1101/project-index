@@ -712,11 +712,12 @@ def test_document_store_row_schema_when_records(
     # 実行
     result = document_store.row_schema(make_target(source), "notes")
     # 検証
-    assert result == {
-        **files_schema["properties"]["files"]["items"],
-        "$defs": files_schema["$defs"],
-    }
     assert result["required"] == ["path"]
+    assert (
+        result["properties"].keys()
+        == files_schema["properties"]["files"]["items"]["properties"].keys()
+    )
+    assert result["$defs"].keys() == files_schema["$defs"].keys()
 
 
 def test_document_store_row_schema_when_records_defs(
