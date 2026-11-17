@@ -15,6 +15,17 @@ NONE_NAV = (
     "        - auto: {filter: {field: tags, op: eq, values: [none]}}\n"
 )
 ALIAS_SCHEMA_VERSION = "v0.3.0"
+# 直下の管理用の YAML を読む行 `files` と、その配下の `content/prompts/` を読む行 `prompts`
+PROMPT_ROWS = (
+    "  - id: files\n"
+    "    paths: [files.yaml]\n"
+    "    schema: schemas/files.schema.yaml\n"
+    "    records: files\n"
+    "    body_file: path\n"
+    "  - id: prompts\n"
+    "    paths: [content/prompts/**/*.yaml]\n"
+    "    schema: schemas/prompt.schema.yaml\n"
+)
 
 
 def _listing(folder: Path) -> dict[str, str]:
@@ -79,6 +90,43 @@ def test_normal_when_files_excluded(
         "src: src/b.py",
         "src: src/uv.lock",
     ]
+
+
+def test_normal_when_file_belongs_to_other_row(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_sync_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """管理用の YAML のフォルダの配下でも、ほかの行の文書になるファイルを数えない（正常系）。"""
+    # 準備
+    files = sample_sync_file_set(0)
+    files.update(
+        {
+            "project-index.yaml": sample_config_text(PROMPT_ROWS, version="3"),
+            "schemas/prompt.schema.yaml": "title: プロンプト\ntype: object\n",
+            # 配信元の直下の管理用の YAML は、ほかの行の文書でない設定・スキーマ・コードを記載する
+            "files.yaml": (
+                "files:\n"
+                "  - path: project-index.yaml\n"
+                "  - path: schemas/files.schema.yaml\n"
+                "  - path: schemas/prompt.schema.yaml\n"
+                "  - path: schemas/sample.schema.yaml\n"
+                "  - path: src/a.py\n"
+            ),
+            "content/prompts/p.yaml": "id: p\nname: プロンプト\n",
+        }
+    )
+    del files["src/files.yaml"]
+    sample = make_source("sample", files, git=False)
+    env = make_server(sample)
+    # 実行
+    result = env.call_admin("check_project", path=str(sample.folder), format="json")
+    # 検証
+    assert not result.is_error
+    assert "violations" not in result.data
+    assert result.data["sync"]["unindexed_files"] == 0
+    assert "items" not in result.data["sync"]
 
 
 def test_normal_when_related_unresolved(

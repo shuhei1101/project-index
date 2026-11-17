@@ -425,7 +425,9 @@ def run_files(args: argparse.Namespace) -> int:
     if not root.is_dir():
         print(f"{root}: フォルダがありません", file=sys.stderr)
         return EXIT_ROOT_NOT_FOUND
-    for path in indexable_files(root, args.paths, exclude=args.exclude):
+    for path in indexable_files(
+        root, args.paths, exclude=args.exclude, exclude_paths=args.exclude_path
+    ):
         print(path)
     return 0
 
