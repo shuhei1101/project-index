@@ -16,5 +16,8 @@ use_cases:
     depends_on: []
 scope_out:
   - item: 配列の `- ` の位置以外の字下げ（辞書の字下げの幅）を元のファイルに合わせること
-    reason: '#118 の事象は配列の `- ` の位置の差で起きている。辞書の字下げの幅まで合わせるかは、モジュール構成設計のレビューで確定する'
+    reason: 配信元の YAML の辞書の字下げは 2 で、`YAML_INDENT` の `mapping` と同じ。幅の違うファイルは見つかっていない
+    plan: none
+  - item: '`migrate`・`settings`・`admin`（`write_nav`）・`checkpoint` の往復編集の書き出しで、元のファイルの配列の字下げを保つこと'
+    reason: '#118 は `write_docs` の事象。今回は `dump_roundtrip` に `original` を受ける口だけを入れ、`write_docs`・`delete_docs` で渡す。他の呼び出し元は今回の引数を前提にする'
     plan: to_file
