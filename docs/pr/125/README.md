@@ -1,0 +1,1 @@
+# 管理用の YAML に shared/deadline.py と test_deadline.py の行を追加する
