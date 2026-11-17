@@ -20,6 +20,11 @@ properties:
           title: ファイルのパス
           description: 管理用の YAML のフォルダからの相対パス。1 行 1 ファイルで記載し、glob は入れない。
           minLength: 1
+        id:
+          type: string
+          title: 文書の ID
+          description: 'ファイルの文書の変わらない ID。配信の設定の行に `alias_type` を付けて、この管理用の YAML の行をエイリアスとして照合させるときに入れる。'
+          minLength: 1
         name:
           type: string
           title: 名前
@@ -28,6 +33,15 @@ properties:
           type: string
           title: 概要文
           description: '1 文で「何を受け持つか」と「どんなときに参照するか」を入れる（例 `タスクの保存と取得を受け持つ。保存先や検索の条件を変えるときに参照する`）。関数の一覧・実装の手順は入れない。'
+        aliases:
+          type: array
+          title: 別名
+          description: 本文や会話でこのファイルの文書を呼ぶ別の名前。
+          items:
+            type: string
+            minLength: 1
+        inject_when:
+          $ref: '#/$defs/inject_when'
         tags:
           type: array
           title: タグ
@@ -47,7 +61,6 @@ properties:
               to:
                 type: string
                 title: 関連先の文書の ID
-                description: '関連先が `id` を持たないファイルなら、拡張子付きのパス（`src/a.py`）を入れる。'
               type:
                 type: string
                 title: 関係の種類
@@ -59,6 +72,15 @@ properties:
           type: string
           title: 状態
           description: '`deprecated` など、検索で除外したい状態だけを入れる。'
+        category:
+          type: string
+          title: 分類
+          description: '公開ドキュメントを開発ドキュメントのタブ・公開サイトの上タブに分ける分類。配信の設定の `nav` の `auto.filter` の `field: category` で絞る。'
+          minLength: 1
+          examples:
+            - はじめに
+            - 使い方
+            - リファレンス
   checkpoint:
     type: object
     title: 確認の時点
@@ -89,3 +111,169 @@ properties:
         format: date-time
         title: 確認した日時
         description: Git 管理外の配信元で、確認を済ませた日時（UTC のタイムゾーン付き ISO 8601）。
+$defs:
+  inject_condition:
+    title: 照合条件の条件
+    description: 照合した本文を 1 つの比べ方で比べる条件。規約『フィルター・照合条件の構造』の条件。
+    type: object
+    additionalProperties: false
+    required:
+      - field
+      - op
+      - values
+    properties:
+      field:
+        title: 項目
+        description: 比べる項目。照合した本文を指す `text` だけを記載する。
+        const: text
+      op:
+        title: 比べ方
+        description: '`contains`（含む）か `not_contains`（含まない）。'
+        enum:
+          - contains
+          - not_contains
+      values:
+        title: 値
+        description: 比べる値。
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      match:
+        title: 値の合わせ方
+        description: '`values` のどれか（`any`。既定）か全て（`all`）を本文が含めば該当する。'
+        enum:
+          - any
+          - all
+      case_sensitive:
+        title: 大文字小文字の区別
+        description: '`true` のとき正規化せずに比べる。既定は `false`。'
+        type: boolean
+  inject_when:
+    title: 照合条件
+    description: alias-inject が文書の name・aliases を照合した本文に、この条件に該当するときだけ文書を案内する。条件 1 つか、`and`・`or`・`not` のどれか 1 つを持つ束で、束の入れ子は 3 レイヤーまで。
+    oneOf:
+      - $ref: '#/$defs/inject_condition'
+      - type: object
+        additionalProperties: false
+        required:
+          - and
+        properties:
+          and:
+            type: array
+            minItems: 1
+            items:
+              $ref: '#/$defs/inject_when_2'
+      - type: object
+        additionalProperties: false
+        required:
+          - or
+        properties:
+          or:
+            type: array
+            minItems: 1
+            items:
+              $ref: '#/$defs/inject_when_2'
+      - type: object
+        additionalProperties: false
+        required:
+          - not
+        properties:
+          not:
+            $ref: '#/$defs/inject_when_2'
+    examples:
+      - field: text
+        op: contains
+        values:
+          - React
+          - tsx
+      - and:
+          - field: text
+            op: contains
+            values:
+              - React
+              - tsx
+          - field: text
+            op: not_contains
+            values:
+              - Python
+      - or:
+          - and:
+              - not:
+                  field: text
+                  op: contains
+                  values:
+                    - Python
+              - field: text
+                op: contains
+                values:
+                  - React
+          - field: text
+            op: contains
+            values:
+              - tsx
+  inject_when_2:
+    title: 照合条件（2 レイヤー目）
+    description: 照合条件の束の要素。条件 1 つか、束の要素が 3 レイヤー目の束。
+    oneOf:
+      - $ref: '#/$defs/inject_condition'
+      - type: object
+        additionalProperties: false
+        required:
+          - and
+        properties:
+          and:
+            type: array
+            minItems: 1
+            items:
+              $ref: '#/$defs/inject_when_3'
+      - type: object
+        additionalProperties: false
+        required:
+          - or
+        properties:
+          or:
+            type: array
+            minItems: 1
+            items:
+              $ref: '#/$defs/inject_when_3'
+      - type: object
+        additionalProperties: false
+        required:
+          - not
+        properties:
+          not:
+            $ref: '#/$defs/inject_when_3'
+  inject_when_3:
+    title: 照合条件（3 レイヤー目）
+    description: 照合条件の束の要素。条件 1 つか、要素が条件だけの束。
+    oneOf:
+      - $ref: '#/$defs/inject_condition'
+      - type: object
+        additionalProperties: false
+        required:
+          - and
+        properties:
+          and:
+            type: array
+            minItems: 1
+            items:
+              $ref: '#/$defs/inject_condition'
+      - type: object
+        additionalProperties: false
+        required:
+          - or
+        properties:
+          or:
+            type: array
+            minItems: 1
+            items:
+              $ref: '#/$defs/inject_condition'
+      - type: object
+        additionalProperties: false
+        required:
+          - not
+        properties:
+          not:
+            $ref: '#/$defs/inject_condition'
