@@ -188,3 +188,62 @@ documents:
     schema: schemas/files.schema.yaml
     records: files
     body_file: path
+nav:
+  tabs:
+    - title: はじめに
+      items:
+        - auto:
+            document: files_guide
+            filter: {field: category, op: eq, values: [はじめに]}
+    - title: 使い方
+      items:
+        - auto:
+            document: files_guide
+            filter: {field: category, op: eq, values: [使い方]}
+    - title: 設計書
+      items:
+        - group: 全体
+          items:
+            - page: architecture
+            - page: nonfunctional
+            - page: layout
+            - page: config
+        - group: シナリオ
+          items:
+            - auto: {document: scenario}
+        - group: インターフェース定義
+          items:
+            - auto: {document: interface}
+        - group: モジュール構成
+          items:
+            - auto: {document: module}
+        - group: 外部ライブラリ
+          items:
+            - auto: {document: library}
+        - group: 開発
+          items:
+            - page: test_procedure
+            - page: dev_command
+    - title: コード
+      items:
+        - group: 索引のサーバー
+          items:
+            - auto: {document: src, group_by: tags}
+        - group: プラグイン
+          items:
+            - auto: {document: plugin}
+        - group: テスト
+          items:
+            - auto: {document: tests, group_by: tags}
+    - title: リファレンス
+      items:
+        - auto:
+            document: files_guide
+            filter:
+              and:
+                - {field: category, op: eq, values: [リファレンス]}
+                - not: {field: name, op: eq, values: [用語集]}
+    - title: 用語集
+      items:
+        - page: files_guide/docs/guide/用語集.md
+        - auto: {document: glossary}
