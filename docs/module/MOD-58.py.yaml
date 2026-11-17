@@ -1,6 +1,12 @@
 id: MOD-58
 title: 索引のサーバー / 検索 / types.py
 lead: '`search_docs`・用語の一覧の要求と結果の型を受け持ち、検索の types.py を修正するときに参照する。'
+tags:
+  - name: topic:クエリ
+    main: true
+  - name: action:検索
+  - name: action:絞り込み
+  - name: topic:型ヒント
 diagrams:
   - name: 全体
     diagram: |-
@@ -22,8 +28,8 @@ diagrams:
         class 検索の結果の Markdown {
           <<function>>
         }
-        click 文書の検索 href "./MOD-55.py.yaml#文書の検索"
-        click 検索の結果の Markdown href "./MOD-54.py.yaml#検索の結果の Markdown"
+        click 文書の検索 href "id:MOD-55#functions[search_docs]"
+        click 検索の結果の Markdown href "id:MOD-54#functions[render_search_markdown]"
 data_models:
   - name: Condition
     title: 条件
@@ -244,7 +250,7 @@ data_models:
         default: None
         description: 一致した行の前後だけを返す
       - name: repeat_seen
-        title: 返し済みも返す
+        title: 返却済みも返す
         type: bool
         access: 公開
         default: 'False'
@@ -313,7 +319,7 @@ data_models:
         title: 項目
         type: dict[str, Any]
         access: 公開
-        description: 返す項目 → 値（長い文字列は末尾を切って `…（残り {n} 文字）` を付けたもの）。`body` は返し済みなら `SEEN_MARK`
+        description: 返す項目 → 値（長い文字列は末尾を切って `…（残り {n} 文字）` を付けたもの）。`body` は返却済みなら `SEEN_MARK`
       - name: snippets
         title: 一致した箇所
         type: list[Snippet]
@@ -325,7 +331,7 @@ data_models:
         type: str | None
         access: 公開
         default: None
-        description: '文書の場所（文書のストア.文書の場所）。`view: ids`・`count`、`ref` を渡した呼び出し、返し済みの文書では `None`'
+        description: '文書の場所（文書のストア.文書の場所）。`view: ids`・`count`、`ref` を渡した呼び出し、返却済みの文書では `None`'
       - name: scope
         title: 返した範囲
         type: Literal['full', 'section', 'summary'] | None

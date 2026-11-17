@@ -1,6 +1,11 @@
 id: MOD-52
 title: 索引のサーバー / 検索 / fields.py
 lead: 項目の値・計算項目・使える項目・見出しの行を受け持ち、検索の fields.py を修正するときに参照する。
+tags:
+  - name: topic:クエリ
+    main: true
+  - name: action:検索
+  - name: action:絞り込み
 test_files:
   - tests/unit/project_index/features/search/test_fields.py
 diagrams:
@@ -29,9 +34,9 @@ diagrams:
         class 本文の範囲の選択 {
           <<function>>
         }
-        click 条件の確かめ href "./MOD-53.py.yaml#条件の確かめ"
-        click 条件の照合 href "./MOD-53.py.yaml#条件の照合"
-        click 本文の範囲の選択 href "./MOD-50.py.yaml#本文の範囲の選択"
+        click 条件の確かめ href "id:MOD-53#functions[check_filter]"
+        click 条件の照合 href "id:MOD-53#functions[match_filter]"
+        click 本文の範囲の選択 href "id:MOD-50#functions[select_ranges]"
 constants:
   - name: COMPUTED_FIELDS
     title: 計算項目

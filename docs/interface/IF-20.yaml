@@ -53,6 +53,13 @@ flows:
       - stdout が空で終了コード 0
     test: test_normal_when_input_unparsable
 lead: 文書の MCP の呼び出しに `cwd`・`session_id`・`agent_id` を入れる PreToolUse のフックの入出力を定め、ツール実行前のフックを修正するときに参照する。
+tags:
+  - name: topic:フック
+    main: true
+  - name: action:注入
+  - name: tool:claude-code
+aliases:
+  - 'PreToolUse のフック'
 identifier: hooks/pre_tool_use.py
 permissions: 利用者の権限で動く
 idempotent: true

@@ -1,6 +1,12 @@
 id: MOD-80
 title: 索引のサーバー / 書き込み / apply.py
 lead: 項目の操作の適用と、共通のキーの列名への読み替えを受け持ち、書き込みの apply.py を修正するときに参照する。
+tags:
+  - name: topic:文書
+    main: true
+  - name: action:書き込み
+  - name: action:検証
+  - name: tool:ruamel.yaml
 test_files:
   - tests/unit/project_index/features/write/test_apply.py
 diagrams:
@@ -27,8 +33,8 @@ diagrams:
         class 操作を当てる {
           <<function>>
         }
-        click 文書の書き込み href "./MOD-84.py.yaml#文書の書き込み"
-        click 文書の削除 href "./MOD-84.py.yaml#文書の削除"
+        click 文書の書き込み href "id:MOD-84#functions[write_docs]"
+        click 文書の削除 href "id:MOD-84#functions[delete_docs]"
 functions:
   - name: apply_operation
     title: 操作を当てる

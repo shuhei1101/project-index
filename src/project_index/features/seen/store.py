@@ -43,7 +43,7 @@ def _now() -> str:
 
 
 class SeenStore:
-    """会話キーごとの返し済み・前回読んだ内容・閲覧と編集を SQLite に読み書きする。"""
+    """会話キーごとの返却済み・前回読んだ内容・閲覧と編集を SQLite に読み書きする。"""
 
     def __init__(self, path: Path, retention_days: int) -> None:
         self.path = path
@@ -72,7 +72,7 @@ class SeenStore:
         kind: ReturnKind,
         versions: Mapping[str, str],
     ) -> set[str]:
-        """同じバージョンをこの会話で返し済みの文書の ID を返す。"""
+        """同じバージョンをこの会話で返却済みの文書の ID を返す。"""
         if key is None or not versions:
             return set()
         with self._lock:

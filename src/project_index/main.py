@@ -65,7 +65,7 @@ class PortInUseError(OSError):
 
 @dataclass(frozen=True)
 class Handlers:
-    """入口（読み取り API・MCP）が使う部品を 1 回だけ作って束ねたもの。"""
+    """入口（読み取り API・MCP）が使う部品を 1 回だけ作ってまとめたもの。"""
 
     terminal: TerminalConfig
     registry: SourceRegistry

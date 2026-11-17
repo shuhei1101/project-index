@@ -1,4 +1,4 @@
-"""`POST /_admin/session-start` の本文と応答の型と、返し済みの記録を削除する理由。"""
+"""`POST /_admin/session-start` の本文と応答の型と、返却済みの記録を削除する理由。"""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# 返し済みの記録を削除する `reason`
+# 返却済みの記録を削除する `reason`
 FORGET_REASONS = frozenset({"clear", "compact"})
 
 

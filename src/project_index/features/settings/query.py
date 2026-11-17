@@ -83,7 +83,7 @@ def validate_terminal_config(value: object) -> list[Violation]:
     if is_list(sources):
         violations.extend(_duplicate_ids(sources))
         violations.extend(_empty_globs(sources))
-    # 読めるバージョンより新しい設定
+    # 参照できるバージョンより新しい設定
     version = value.get("version")
     if isinstance(version, str) and version.isdigit() and int(version) > int(SETTINGS_VERSION):
         violations.append(Violation(path="version", rule="このサーバーより新しい設定です"))

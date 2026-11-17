@@ -1,4 +1,4 @@
-"""SessionStart のフック。落ちている project-index を起動し、`/clear`・圧縮のときは返し済みの記録の削除を依頼する。
+"""SessionStart のフック。落ちている project-index を起動し、`/clear`・圧縮のときは返却済みの記録の削除を依頼する。
 
 Usage:
 # Claude Code が stdin に SessionStart の入力の JSON を渡して実行する
@@ -28,7 +28,7 @@ CONFIG_FILE = "project-index/settings.yaml"
 CONNECT_TIMEOUT_SEC = 0.5
 # `POST /_admin/session-start` を打ち切る秒数（実装の後に応答の時間を測って決め直す）
 FORGET_TIMEOUT_SEC = 3
-# 返し済みの記録の削除を依頼する `source`
+# 返却済みの記録の削除を依頼する `source`
 FORGET_REASONS = frozenset({"clear", "compact"})
 # 起動したときに文脈に入れる文
 RECONNECT_GUIDE = (

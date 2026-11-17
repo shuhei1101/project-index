@@ -20,7 +20,7 @@ def _seen(tmp_path: Path) -> SeenStore:
 
 
 def test_start_session_when_cleared(tmp_path: Path, make_document: Callable[..., Document]) -> None:
-    """/clear の後は返し済みの記録を削除する（正常系）。"""
+    """/clear の後は返却済みの記録を削除する（正常系）。"""
     # 準備
     seen = _seen(tmp_path)
     key = SessionKey("s1", "")

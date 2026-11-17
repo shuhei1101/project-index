@@ -1,6 +1,12 @@
 id: MOD-31
 title: 索引のサーバー / 履歴 / query.py
 lead: git によるリビジョンの解決・一覧・変わったファイル・ファイルの日時・ワークツリーの一覧を受け持ち、履歴の query.py を修正するときに参照する。
+tags:
+  - name: topic:履歴
+    main: true
+  - name: topic:リビジョン
+  - name: tool:git
+  - name: action:取得
 test_files:
   - tests/unit/project_index/features/history/test_query.py
 diagrams:
@@ -50,9 +56,9 @@ diagrams:
           +commit: str
           +親: str
         }
-        click gitの実行 href "./MOD-86.py.yaml#gitの実行"
-        click 解いたリビジョン href "./MOD-33.py.yaml#解いたリビジョン"
-        click 区間の commit と親 href "./MOD-33.py.yaml#区間の commit と親"
+        click gitの実行 href "id:MOD-86#functions[run_git]"
+        click 解いたリビジョン href "id:MOD-33#data_models[ResolvedRef]"
+        click 区間の commit と親 href "id:MOD-33#data_models[CommitStep]"
 constants:
   - name: SHORT_SHA_LENGTH
     title: 短縮した commit の桁数
@@ -106,7 +112,7 @@ functions:
       type: ResolvedRef
       description: 解いたリビジョン
     process: |-
-      1. `ref` が ISO 8601 の日付か日時（`datetime.fromisoformat` で読める。タイムゾーンが無ければ端末のタイムゾーン、日付だけならその日の終わり）の場合、`rev-list -1 --before={日時} {date_base}` でその時点の最後の commit にする
+      1. `ref` が ISO 8601 の日付か日時（`datetime.fromisoformat` で解析できる。タイムゾーンが無ければ端末のタイムゾーン、日付だけならその日の終わり）の場合、`rev-list -1 --before={日時} {date_base}` でその時点の最後の commit にする
          - 空の場合（それより前に commit が無い）、`RefNotFoundError` を送る
       2. それ以外は `rev-parse --verify --quiet {ref}^{commit}` で解く
          - `GitError` の場合、`RefNotFoundError` を送る

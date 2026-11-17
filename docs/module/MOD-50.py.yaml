@@ -1,6 +1,11 @@
 id: MOD-50
 title: 索引のサーバー / 検索 / body_parts.py
 lead: 本文の切り出しを受け持ち、検索の body_parts.py を修正するときに参照する。
+tags:
+  - name: topic:クエリ
+    main: true
+  - name: action:検索
+  - name: action:絞り込み
 test_files:
   - tests/unit/project_index/features/search/test_body_parts.py
 diagrams:
@@ -27,9 +32,9 @@ diagrams:
         class 範囲の本文 {
           <<function>>
         }
-        click 文書の検索 href "./MOD-55.py.yaml#文書の検索"
-        click 行の分割 href "./MOD-56.py.yaml#行の分割"
-        click 見出しの行 href "./MOD-52.py.yaml#見出しの行"
+        click 文書の検索 href "id:MOD-55#functions[search_docs]"
+        click 行の分割 href "id:MOD-56#functions[split_lines]"
+        click 見出しの行 href "id:MOD-52#functions[heading_lines]"
 functions:
   - name: select_ranges
     title: 本文の範囲の選択

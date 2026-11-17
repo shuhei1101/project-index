@@ -1,6 +1,12 @@
 id: MOD-39
 title: 索引のサーバー / 設定の移し替え / types.py
 lead: '`project-index migrate` の手順・対象・例外の型と終了コードを受け持ち、設定の移し替えの types.py を修正するときに参照する。'
+tags:
+  - name: topic:設定
+    main: true
+  - name: topic:バージョン
+  - name: action:移行
+  - name: topic:型ヒント
 data_models:
   - name: MigrationStep
     title: 移し替えの手順
@@ -73,7 +79,7 @@ data_models:
         type: Path
         description: 書き換える YAML
       - name: current
-        title: 読めるバージョン
+        title: 参照できるバージョン
         type: str
         description: '`SETTINGS_VERSION` か `SOURCE_CONFIG_VERSION`'
 classes:
@@ -138,7 +144,7 @@ classes:
     container: project_index/features/migrate/types.py
     usecase: 設定の移し替え
     role: 例外
-    summary: 対象の `version` が読めるバージョンより新しい
+    summary: 対象の `version` が参照できるバージョンより新しい
     inherits: MigrationError
     properties:
       - name: exit_code
@@ -149,7 +155,7 @@ classes:
         description: '6'
 constants:
   - name: MIGRATIONS_DIR
-    title: 手順の置き場所
+    title: 手順の配置先
     container: project_index/features/migrate/types.py
     usecase: 設定の移し替え
     summary: パッケージの中の手順のフォルダ。`{MIGRATIONS_DIR}/{kind}/{バージョン}/steps.yaml` を `importlib.resources` で読む

@@ -1,6 +1,11 @@
 id: MOD-62
 title: 索引のサーバー / セッションの開始 / service.py
-lead: '`/clear`・圧縮の後に、その会話の返し済みの記録を削除する処理を受け持ち、セッションの開始の service.py を修正するときに参照する。'
+lead: '`/clear`・圧縮の後に、その会話の返却済みの記録を削除する処理を受け持ち、セッションの開始の service.py を修正するときに参照する。'
+tags:
+  - name: topic:セッション
+    main: true
+  - name: topic:会話
+  - name: action:削除
 test_files:
   - tests/unit/project_index/features/session_start/test_service.py
 functions:
@@ -10,11 +15,11 @@ functions:
     container: project_index/features/session_start/service.py
     usecase: セッションの開始
     role: サービス
-    summary: '`reason` が `FORGET_REASONS` なら、その会話キーの返し済みの記録を削除する'
+    summary: '`reason` が `FORGET_REASONS` なら、その会話キーの返却済みの記録を削除する'
     scope: public
     is_async: false
     thread_safe: true
-    side_effects: '`reason` が `FORGET_REASONS` なら、その会話キーの返し済みの記録を削除する'
+    side_effects: '`reason` が `FORGET_REASONS` なら、その会話キーの返却済みの記録を削除する'
     args:
       - name: request
         title: 要求
@@ -34,11 +39,11 @@ functions:
     process: |-
       1. `reason` が `FORGET_REASONS` に無い場合、`forgotten` を `False` にして返す（以降の手順は実行しない）
       2. `SessionKey.of(session_id, agent_id)` の記録を削除し、`forgotten` を `True` にして返す（`SeenStore.forget`）
-         - `[INFO]` 返し済みの記録を削除した（セッション ID・件数）
+         - `[INFO]` 返却済みの記録を削除した（セッション ID・件数）
     unit_tests:
       - name: test_start_session_when_cleared
         case: 正常
-        summary: '`/clear` の後は返し済みの記録を削除する'
+        summary: '`/clear` の後は返却済みの記録を削除する'
         condition: '`reason` が `clear`、`session_id` の記録がある'
         mock: なし（一時ディレクトリの `SeenStore`）
         expected: '`forgotten` が `True`、その会話キーの記録が 0 件'

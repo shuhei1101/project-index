@@ -1,6 +1,12 @@
 id: MOD-19
 title: 索引のサーバー / 説明 / render.py
 lead: '`describe` の結果の Markdown を受け持ち、説明の render.py を修正するときに参照する。'
+tags:
+  - name: topic:配信元
+    main: true
+  - name: topic:警告
+  - name: action:案内
+  - name: action:描画
 test_files:
   - tests/unit/project_index/features/describe/test_render.py
 functions:
@@ -43,13 +49,13 @@ functions:
         expected: '`| sample | write（作業中） | ... |` と `| notes | read | ... |` の行'
       - name: test_render_describe_markdown_when_outside_sources
         case: 正常
-        summary: 作業範囲の外で読める配信元の表
+        summary: 作業範囲の外で参照できる配信元の表
         condition: sample（write・作業中）と、`outside_sources` に other
         mock: なし
         expected: 使える配信元の表の後ろに `作業範囲の外（参考）` の行と `| other | ... |` の行があり、`outside_sources` が `None` の一覧には `作業範囲の外（参考）` の行が無い
       - name: test_render_describe_markdown_when_outside_sources_empty
         case: 正常
-        summary: 作業範囲の外で読める配信元が 0 件
+        summary: 作業範囲の外で参照できる配信元が 0 件
         condition: '`outside_sources` が空のリスト'
         mock: なし
         expected: '`作業範囲の外（参考）` の行の次が `なし` の行で、`| source | description |` の表が無い'
