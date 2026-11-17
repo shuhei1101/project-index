@@ -1,0 +1,37 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: changed
+    detail: 検索の範囲の既定を全てのファイルにし、関連の候補を種類とキーの回答なしで出し、既存の行にも出す。仮のメタデータの偏りの見直しと、alias-inject の設定との突き合わせを加える
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-3.yaml
+    impact: changed
+    detail: 設定のファイルを移し替えたときに、alias-inject が読む設定のファイルの一覧とのずれを示す（#108 で案 A に決まったとき）
+    depends_on:
+      - docs/scenario/SC-5.yaml
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: none
+    detail: 配信元の追加と更新の流れの連鎖は変わらない
+    depends_on: []
+docs:
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: setup の範囲の既定・Git が無視するファイルの既定・関連の候補の出し方を修正し、メタデータの偏りの見直しと alias-inject の設定との突き合わせを追加する
+    status: todo
+  - page: docs/guide/CLI.md
+    new: false
+    change: files の除外の条件の変更と、関連の候補の取り出し・メタデータの偏りの洗い出しのサブコマンドを追加する
+    status: todo
+  - page: docs/guide/project-indexを更新する.md
+    new: false
+    change: migrate で設定のファイルを移し替えたときに示す alias-inject の設定とのずれを追加する（#108 で案 A に決まったとき）
+    status: todo
+scope_out:
+  - item: 既存の配信元の検索の対象とメタデータの見直し
+    reason: この作業 PR は setup の手順と手段を変えるもので、既存の配信元へ当てる作業は別の Issue が持つ
+    plan: '#104'
+  - item: alias-inject の側で project-index の端末の設定の sources[] を読み、repositories を別に持たない変更
+    reason: alias-inject のリポジトリの変更で、#108 の推奨の案 A では要らない。案の決着は単一ユースケース設計のレビューで確定する
+    plan: none
