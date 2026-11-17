@@ -637,7 +637,7 @@ def make_loading_server(
         loaded: list[str] = []
         waiting = threading.Event()
 
-        def load(entry: Any, *, index: int, lookup: Any = None) -> Any:
+        def load(entry: Any, *, index: int, lookup: Any = None, unit: Any = None) -> Any:
             # `id` を持たない行は、配信元のフォルダの名前で見分ける
             name = entry.id or Path(entry.config[0]).parent.name
             order.append(name)
@@ -648,7 +648,7 @@ def make_loading_server(
             if name in failing:
                 msg = f"{name} を読み込めない"
                 raise RuntimeError(msg)
-            result = original(entry, index=index, lookup=lookup)
+            result = original(entry, index=index, lookup=lookup, unit=unit)
             loaded.append(name)
             return result
 
