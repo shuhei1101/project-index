@@ -1,0 +1,11 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: run_only
+    detail: エージェントが x-key を持つ配列の要素を x-key の値で指して削除できるようになり、削除できない値は書き込まずに断られる。シナリオの流れと条件は変わらない
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: remove_from の説明に、x-key を持つ配列から x-key の値で要素を削除することと、削除できない値の扱いを追記する
+    status: todo
