@@ -172,6 +172,12 @@ functions:
         condition: '`sync.unindexed_files` が 51、`sync.items` が 50 件'
         mock: なし
         expected: '`（先頭 50 件）` を含む'
+      - name: test_render_check_when_duplicate_ids
+        case: 正常
+        summary: ID が重なる文書の件数と内訳を並べる
+        condition: '登録済み・違反なし・`duplicate_ids` が 1 件（`a: rules（docs/a.yaml）・rules（docs/b.yaml）`）'
+        mock: なし
+        expected: '「索引の同期: ID が重なる文書 1 件」と内訳の行を並べる'
   - name: _source_row
     title: 配信元の行
     kind: 関数
