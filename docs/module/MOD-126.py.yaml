@@ -78,7 +78,7 @@ functions:
       description: 8 つのルートを持つルーター
     process: |-
       1. 配信元を指すルートは、先頭で要求が指す配信元の行の読み込みを待つ（起動.配信元の読み込みの単位）
-      2. GET `/sources` は、配信元の一覧の状態を `id`・`status`・`errors` で返す
+      2. GET `/sources` は、クエリ `include_loading`（`bool`、既定 `false`）が `false` なら全ての行の読み込みを待ち（`wait_loaded`）、配信元の一覧の状態（`statuses`）を返す。`true` なら待たずに、読み込み中の行を含めた状態（`statuses_with_loading`）を返す。どちらも `id`・`status`・`errors` で返す
       3. GET `/sources/{source}/config` は、読み取りの場所（`read_target`、`ref` なし）で配信元の設定の取得を呼ぶ（クエリ `schemas` を `bool`、既定 `false` で渡す）
       4. GET `/sources/{source}/docs` は、読み取りの場所（`ref` はクエリ）で文書の一覧を呼ぶ（クエリ `values`・`common_keys` を `bool`、既定 `false` で渡す）
       5. GET `/sources/{source}/docs/{path:path}` は、読み取りの場所で文書の取得を `asyncio.to_thread` で呼ぶ（クエリ `id` を `doc_id` に渡す）
@@ -106,6 +106,12 @@ functions:
         condition: '`/sources/unknown/docs`・`/sources/sample/docs?ref=no-such`・`/sources/sample/docs/no/such.yaml`'
         mock: 配線済みの関数（一時フォルダの配信元）
         expected: どれも 404 の problem+json で、`missing` が `source`・`ref`・`doc`
+      - name: test_build_read_router_when_include_loading
+        case: 正常
+        summary: include_loading で読み込みを待たずに返す
+        condition: '配信元の読み込みの偽物が `threading.Event` で止まっている間に、別のスレッドで `load` を流している配線済みの関数で `/sources?include_loading=true` を GET'
+        mock: 配信元の読み込み（止められる偽物）
+        expected: '待たずに 200 で、`sources` にその行が `status: loading` で並ぶ'
 refs:
   - IF-22#
   - IF-23#

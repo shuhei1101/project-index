@@ -1,0 +1,25 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: run_only
+    detail: 起動の流れは変わらないが、配信元の読み込みの待ち方の変更が起動の後の配信を壊しうる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: changed
+    detail: 画面のサーバーが起動の直後に配信元の一覧を取得しても、全ての配信元の読み込みを待たずに、読み込み中の配信元を読み込み中として受け取る
+    depends_on: []
+docs:
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: '`GET /sources` の行に `include_loading` と `loading` の状態を書き足す'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T02:20:30.495251+00:00'
+scope_out:
+  - item: 配信元ごとの最初の問い合わせの時間（#85）
+    reason: '#94 で対応済み。この作業 PR は起動の後の全ての配信元の読み込みと `GET /sources` の応答だけを扱う'
+    plan: none
+  - item: dev-docs の画面のサーバーが `GET /sources` に `include_loading=true` を付け、`loading` の配信元を表示する対応
+    reason: dev-docs のリポジトリの対応。dev-docs は状態の値を `Literal` で受けるため、project-index は `include_loading` を渡さない要求に `loading` を返さず互換を保つ。この作業 PR の契約（IF-22）を前提にする後続
+    plan: shuhei1101/dev-docs#250

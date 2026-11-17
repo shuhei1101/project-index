@@ -205,5 +205,35 @@ requirements:
     rationale: 読み込みを待った後に検索して応答を組み立てるため、読み込みの待ちと検索を内側の待ち、応答の上限を外側の待ちとする入れ子の待ち（規約『資源の値の決め方』）で導く。端末の設定の `worktree_load_wait_sec` で変えられる
     overflow: 上限までに読み込みが終了しなければ `WorktreeLoadingError` を返却し、読み込みは続ける。次の呼び出しは同じ読み込みの終了を待つ
     status: planned
+  - id: NFR-13
+    name: 同時に読み込む行の数
+    english_name: load_workers
+    category: 性能
+    external_constraint: WSL の `/mnt/c`（9P）の行ごとの読み込みの待ちと、Python の GIL（行の読み込みの CPU の部分は同時に 1 つしか進まない）
+    source_kind: 実行基盤の制限
+    value: '10'
+    unit: 行
+    overflow: 行の数が上回る分は、読み終えたスレッドが続けて読む
+    measurement: '#85 と同じ `/mnt/c` の配信元 14 件を、配信元の読み込み（`load_source`）を `ThreadPoolExecutor` で実行し、全ての行の読み込みの時間を測る'
+    rationale: スループット × レイテンシ（規約『資源の値の決め方』）で導く。スループットの上限は GIL で進む CPU の部分で決まり、それより多く並べても CPU の待ちが増えるだけになる。同じ 14 件の計測で、スレッド 1 は 58.9 秒・4 は 20.8 秒・8 は 16.9 秒・10 は 14.5 秒・14 は 13.8 秒で、10 で頭打ちに近づく。ext4 の配信元 15 件は CPU の時間が実時間の大半（17.7 秒のうち 14.4 秒）で、スレッドを増やしても短くも長くもならない（1 は 14.6〜16.5 秒、8 は 15.8 秒）
+    status: planned
+    breakdown:
+      - part: 行ごとの読み込みの時間（レイテンシ）
+        value: '4.05'
+        notes: スレッド 1 で 14 件を読み込んだ実時間 56.7 秒 ÷ 14。CPU の時間と同じ回の計測で、rationale のスレッド 1 の 58.9 秒はスレッドの数を変えた別の回
+      - part: 行ごとの CPU の時間
+        value: '0.44'
+        notes: スレッド 1 の CPU の時間（`time.process_time`）6.1 秒 ÷ 14。GIL のため、この部分は並列にしても足し合わせになる
+      - part: スループットの上限
+        value: '2.3'
+        notes: 1 ÷ 0.44（行 / 秒）
+      - part: アプリの決定値
+        value: '10'
+        notes: 2.3 × 4.05 = 9.3 を切り上げる
+    verification:
+      device: WSL2 の Ubuntu（Windows 11）
+      version: Linux 6.6.87.2-microsoft-standard-WSL2
+      date: '2026-11-17'
+      result: 合格
 id: NFR-1
 visibility: internal

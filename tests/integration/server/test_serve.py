@@ -24,6 +24,7 @@ from project_index.features.history import snapshot as snapshot_module
 from project_index.features.prompt_doc.runtime import DEFAULT_PROMPTS_DIR, PromptSet, load_prompts
 from project_index.features.related.types import RelatedRequest
 from project_index.features.search.types import MatchWordsRequest, SearchRequest
+from project_index.features.sources import registry as registry_module
 from project_index.features.write.types import DeleteRequest, WriteRequest
 from project_index.integrations.git import GIT_ARCHIVE_TIMEOUT_SEC
 from project_index.server.app import build_app
@@ -936,10 +937,14 @@ def test_normal_when_other_source_loading(
 
 
 def test_normal_when_requested_source_loaded_first(
-    make_source: Callable[..., Any], make_loading_server: Callable[..., Any]
+    make_source: Callable[..., Any],
+    make_loading_server: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """待っている要求が指す配信元を、端末の設定の順より先に読み込む（正常系）。"""
     # 準備
+    # 同時に読み込む行の数を 1 にし、a の行で並列の枠を埋める
+    monkeypatch.setattr(registry_module, "LOAD_WORKERS", 1)
     a, b, c = (make_source(source_id) for source_id in ("a", "b", "c"))
     loading = make_loading_server(a, b, c, blocked=("a",), held=("b",))
     env = loading.env
@@ -963,6 +968,31 @@ def test_normal_when_requested_source_loaded_first(
     assert not results["c"].is_error
     assert results["c"].text.startswith("c: ")
     assert results["loaded"] == ["a", "c"]
+
+
+def test_normal_when_slow_source_not_blocking(
+    make_source: Callable[..., Any], make_loading_server: Callable[..., Any]
+) -> None:
+    """読み込みの遅い行が止まっていても、後ろの行を並列に読み込んで配信する（正常系）。"""
+    # 準備
+    slow = make_source("slow")
+    sample = make_source("sample")
+    loading = make_loading_server(slow, sample, blocked=("slow",))
+    env = loading.env
+    # 実行
+    found = env.call("search_docs", cwd=str(sample.folder), source="sample", view="ids")
+    before = env.call_admin("status", format="json")
+    loading.finish()
+    after = env.call_admin("status", format="json")
+    # 検証
+    assert not found.is_error
+    assert "doc-1" in found.text
+    assert before.data["loading"] is True
+    assert after.data["loading"] is False
+    assert [(item["id"], item["status"]) for item in after.data["sources"]] == [
+        ("slow", "serving"),
+        ("sample", "serving"),
+    ]
 
 
 def test_error_when_source_load_failed(

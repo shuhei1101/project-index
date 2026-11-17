@@ -1,0 +1,315 @@
+$ TMPDIR=/tmp/pi97/tmp uv run pytest tests/unit/
+（/tmp/pytest-of-shuhei2441 が別のユーザーの持ち物で pytest の一時フォルダを作れないため、TMPDIR だけを変えて実行した）
+
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/fix-server-startup-sources-response
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 1028 items
+
+tests/unit/plugins/project_index/hooks/test_pre_tool_use.py ....         [  0%]
+tests/unit/plugins/project_index/hooks/test_session_start.py ........... [  1%]
+.........                                                                [  2%]
+tests/unit/project_index/features/access/test_service.py ............... [  3%]
+...........................                                              [  6%]
+tests/unit/project_index/features/access/test_types.py .                 [  6%]
+tests/unit/project_index/features/admin/test_render.py .............     [  7%]
+tests/unit/project_index/features/admin/test_service.py .F.............. [  9%]
+..........................                                               [ 11%]
+tests/unit/project_index/features/changes/test_compare.py .....          [ 12%]
+tests/unit/project_index/features/changes/test_render.py ....            [ 12%]
+tests/unit/project_index/features/changes/test_service.py .............. [ 14%]
+                                                                         [ 14%]
+tests/unit/project_index/features/convert/test_decisions.py ...          [ 14%]
+tests/unit/project_index/features/convert/test_service.py ........       [ 15%]
+tests/unit/project_index/features/describe/test_render.py ........       [ 15%]
+tests/unit/project_index/features/describe/test_service.py ............  [ 17%]
+tests/unit/project_index/features/describe/test_source_checks.py ....... [ 17%]
+                                                                         [ 17%]
+tests/unit/project_index/features/describe/test_warnings.py ......       [ 18%]
+tests/unit/project_index/features/documents/test_aliases.py ..........   [ 19%]
+tests/unit/project_index/features/documents/test_fields.py ............. [ 20%]
+..........................                                               [ 23%]
+tests/unit/project_index/features/documents/test_indexable.py .......... [ 24%]
+....                                                                     [ 24%]
+tests/unit/project_index/features/documents/test_loader.py ............. [ 25%]
+..........                                                               [ 26%]
+tests/unit/project_index/features/documents/test_schema.py ............. [ 28%]
+                                                                         [ 28%]
+tests/unit/project_index/features/documents/test_store.py .............. [ 29%]
+..........................                                               [ 31%]
+tests/unit/project_index/features/history/test_query.py ................ [ 33%]
+.                                                                        [ 33%]
+tests/unit/project_index/features/history/test_snapshot.py .......       [ 34%]
+tests/unit/project_index/features/lifecycle/test_control.py ...          [ 34%]
+tests/unit/project_index/features/lifecycle/test_update.py ..........    [ 35%]
+tests/unit/project_index/features/migrate/test_service.py .............  [ 36%]
+tests/unit/project_index/features/migrate/test_steps.py ...........      [ 37%]
+tests/unit/project_index/features/prompt_doc/test_cli.py ..              [ 38%]
+tests/unit/project_index/features/prompt_doc/test_markdown.py .......... [ 39%]
+.......                                                                  [ 39%]
+tests/unit/project_index/features/prompt_doc/test_render.py ............ [ 40%]
+...                                                                      [ 41%]
+tests/unit/project_index/features/prompt_doc/test_runtime.py ........... [ 42%]
+.                                                                        [ 42%]
+tests/unit/project_index/features/read/test_nav.py .....                 [ 42%]
+tests/unit/project_index/features/read/test_paths.py ........            [ 43%]
+tests/unit/project_index/features/read/test_route.py .....F              [ 44%]
+tests/unit/project_index/features/read/test_search.py ..                 [ 44%]
+tests/unit/project_index/features/read/test_service.py ................. [ 46%]
+..                                                                       [ 46%]
+tests/unit/project_index/features/related/test_graph.py ...              [ 46%]
+tests/unit/project_index/features/related/test_service.py .......        [ 47%]
+tests/unit/project_index/features/related/test_suggest.py .              [ 47%]
+tests/unit/project_index/features/search/test_body_parts.py ....         [ 47%]
+tests/unit/project_index/features/search/test_cursor.py ..               [ 47%]
+tests/unit/project_index/features/search/test_fields.py ..               [ 48%]
+tests/unit/project_index/features/search/test_filters.py .............   [ 49%]
+tests/unit/project_index/features/search/test_render.py .....            [ 49%]
+tests/unit/project_index/features/search/test_service.py ............... [ 51%]
+......                                                                   [ 51%]
+tests/unit/project_index/features/search/test_snippets.py ........       [ 52%]
+tests/unit/project_index/features/search/test_terms.py ...               [ 52%]
+tests/unit/project_index/features/seen/test_store.py ......              [ 53%]
+tests/unit/project_index/features/seen/test_types.py .                   [ 53%]
+tests/unit/project_index/features/session_start/test_route.py ..         [ 53%]
+tests/unit/project_index/features/session_start/test_service.py ...      [ 54%]
+tests/unit/project_index/features/settings/test_query.py ............... [ 55%]
+...................                                                      [ 57%]
+tests/unit/project_index/features/settings/test_route.py ...........     [ 58%]
+tests/unit/project_index/features/settings/test_service.py ............. [ 59%]
+................                                                         [ 61%]
+tests/unit/project_index/features/sources/test_merge.py ....             [ 61%]
+tests/unit/project_index/features/sources/test_registry.py ............. [ 62%]
+....FF..............                                                     [ 64%]
+tests/unit/project_index/features/sources/test_schema_ref.py .......     [ 65%]
+tests/unit/project_index/features/sources/test_service.py .............. [ 66%]
+................................................                         [ 71%]
+tests/unit/project_index/features/sources/test_types.py ..........       [ 72%]
+tests/unit/project_index/features/validation/test_markdown.py .......... [ 73%]
+..                                                                       [ 73%]
+tests/unit/project_index/features/validation/test_rules.py .........     [ 74%]
+tests/unit/project_index/features/validation/test_scripts.py ....        [ 75%]
+tests/unit/project_index/features/validation/test_service.py ..........  [ 75%]
+tests/unit/project_index/features/write/test_apply.py .................. [ 77%]
+..................                                                       [ 79%]
+tests/unit/project_index/features/write/test_hints.py ....               [ 79%]
+tests/unit/project_index/features/write/test_ids.py ..                   [ 80%]
+tests/unit/project_index/features/write/test_locks.py .                  [ 80%]
+tests/unit/project_index/features/write/test_placement.py ...            [ 80%]
+tests/unit/project_index/features/write/test_service.py ................ [ 82%]
+................                                                         [ 83%]
+tests/unit/project_index/integrations/test_git.py ..........             [ 84%]
+tests/unit/project_index/integrations/test_mdmark.py .......             [ 85%]
+tests/unit/project_index/integrations/test_scripts.py ...........        [ 86%]
+tests/unit/project_index/server/mcp/test_admin.py ....                   [ 86%]
+tests/unit/project_index/server/mcp/test_docs.py ...................     [ 88%]
+tests/unit/project_index/server/mcp/test_result.py ...........           [ 89%]
+tests/unit/project_index/server/test_app.py .........                    [ 90%]
+tests/unit/project_index/server/test_error_handlers.py .....             [ 90%]
+tests/unit/project_index/server/test_lifespan.py .                       [ 91%]
+tests/unit/project_index/server/test_origin.py .....                     [ 91%]
+tests/unit/project_index/shared/test_deadline.py .....                   [ 92%]
+tests/unit/project_index/shared/test_errors.py ..                        [ 92%]
+tests/unit/project_index/shared/test_files.py ...                        [ 92%]
+tests/unit/project_index/shared/test_hashing.py ..                       [ 92%]
+tests/unit/project_index/shared/test_narrowing.py ..........             [ 93%]
+tests/unit/project_index/shared/test_paths.py .....                      [ 94%]
+tests/unit/project_index/shared/test_schema_check.py .............       [ 95%]
+tests/unit/project_index/shared/test_yaml_io.py .......                  [ 96%]
+tests/unit/project_index/test_main.py .........                          [ 96%]
+tests/unit/project_index/test_serve.py ...............................   [100%]
+
+=================================== FAILURES ===================================
+_________________________ test_get_status_when_loading _________________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7149b8b12ad0>
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x7149b7f10a90>
+make_entry = <function make_entry.<locals>._make at 0x7149b7f12090>
+make_served_source = <function make_served_source.<locals>._make at 0x7149b8272560>
+make_status = <function make_status.<locals>._make at 0x7149b8273530>
+make_handlers = <function make_handlers.<locals>._make at 0x7149b8272cf0>
+
+    def test_get_status_when_loading(
+        monkeypatch: pytest.MonkeyPatch,
+        make_terminal_config: Callable[..., TerminalConfig],
+        make_entry: Callable[..., SourceEntry],
+        make_served_source: Callable[..., ServedSource],
+        make_status: Callable[..., SourceStatus],
+        make_handlers: Callable[..., Any],
+    ) -> None:
+        """読み込み中は配信元を待たずに、読み込み済みの行と loading の行を返す（正常系）。"""
+        # 準備
+        entered = threading.Event()
+        release = threading.Event()
+    
+        def load_source(entry: SourceEntry, *, index: int, lookup: object) -> tuple[Any, Any]:
+            del lookup
+            if entry.id == "beta":
+                entered.set()
+                release.wait(timeout=5)
+            return make_served_source(id=entry.id), make_status(entry.id, index)
+    
+        monkeypatch.setattr(registry_module, "load_source", load_source)
+        terminal = make_terminal_config(
+            sources=[
+                make_entry("/tmp/alpha/project-index.yaml", source_id="alpha"),
+                make_entry("/tmp/beta/project-index.yaml", source_id="beta"),
+            ]
+        )
+        registry = SourceRegistry(loading=True)
+        worker = threading.Thread(target=registry.load, args=(terminal,))
+        worker.start()
+        entered.wait(timeout=5)
+        registry._rows_done[0].wait(timeout=5)
+        handlers = make_handlers(
+            terminal=terminal,
+            registry=registry,
+            checks=SimpleNamespace(checking=False, get=lambda _source_id: None),
+            snapshots=SimpleNamespace(exporting=False),
+        )
+        # 実行
+        status = get_status(handlers, env={})
+        release.set()
+        worker.join(timeout=5)
+        # 検証
+        assert status.loading is True
+>       assert [(source.id, source.status) for source in status.sources] == [
+            ("alpha", "serving"),
+            ("beta", "loading"),
+        ]
+E       AssertionError: assert [] == [('alpha', 's...', 'loading')]
+E         
+E         Right contains 2 more items, first extra item: ('alpha', 'serving')
+E         Use -v to get more diff
+
+tests/unit/project_index/features/admin/test_service.py:198: AssertionError
+_________________ test_build_read_router_when_include_loading __________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7149b80c4910>
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x7149b596b3d0>
+make_entry = <function make_entry.<locals>._make at 0x7149b8906b90>
+make_served_source = <function make_served_source.<locals>._make at 0x7149b8906c40>
+make_status = <function make_status.<locals>._make at 0x7149b8907480>
+make_handlers = <function make_handlers.<locals>._make at 0x7149b8906da0>
+
+    def test_build_read_router_when_include_loading(
+        monkeypatch: pytest.MonkeyPatch,
+        make_terminal_config: Callable[..., TerminalConfig],
+        make_entry: Callable[..., SourceEntry],
+        make_served_source: Callable[..., ServedSource],
+        make_status: Callable[..., SourceStatus],
+        make_handlers: Callable[..., Any],
+    ) -> None:
+        """include_loading で読み込みを待たずに返す（正常系）。"""
+        # 準備
+        entered = threading.Event()
+        release = threading.Event()
+    
+        def load_source(entry: SourceEntry, *, index: int, lookup: object) -> tuple[Any, Any]:
+            del lookup
+            entered.set()
+            release.wait(timeout=5)
+            return make_served_source(id=entry.id), make_status(entry.id, index)
+    
+        monkeypatch.setattr(registry_module, "load_source", load_source)
+        terminal = make_terminal_config(
+            sources=[make_entry("/tmp/slow/project-index.yaml", source_id="slow")]
+        )
+        registry = SourceRegistry(loading=True)
+        worker = threading.Thread(target=registry.load, args=(terminal,))
+        worker.start()
+        entered.wait(timeout=5)
+        client = _client(make_handlers(terminal=terminal, registry=registry))
+        # 実行
+        response = client.get("/sources?include_loading=true")
+        release.set()
+        worker.join(timeout=5)
+        # 検証
+        assert response.status_code == 200
+>       assert response.json()["sources"] == [
+            {"id": "slow", "status": "loading", "errors": [], "configVersion": None}
+        ]
+E       AssertionError: assert [{'id': 'slow...rsion': None}] == [{'id': 'slow...rsion': None}]
+E         
+E         At index 0 diff: {'id': 'slow', 'status': 'serving', 'errors': [], 'configVersion': None} != {'id': 'slow', 'status': 'loading', 'errors': [], 'configVersion': None}
+E         Use -v to get more diff
+
+tests/unit/project_index/features/read/test_route.py:169: AssertionError
+___________________ test_source_registry_load_when_slow_row ____________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7149b7e2bee0>
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x7149b556f480>
+make_entry = <function make_entry.<locals>._make at 0x7149b556e770>
+make_served_source = <function make_served_source.<locals>._make at 0x7149b556d590>
+make_status = <function make_status.<locals>._make at 0x7149b556c040>
+
+    def test_source_registry_load_when_slow_row(
+        monkeypatch: pytest.MonkeyPatch,
+        make_terminal_config: Callable[..., TerminalConfig],
+        make_entry: Callable[..., SourceEntry],
+        make_served_source: Callable[..., ServedSource],
+        make_status: Callable[..., SourceStatus],
+    ) -> None:
+        """読み込みの遅い行がほかの行の読み込みを止めない（正常系）。"""
+        # 準備
+        loader = _Loader(make_served_source, make_status, blocked=("slow",))
+        monkeypatch.setattr(registry_module, "load_source", loader)
+        terminal = make_terminal_config(sources=_entries(make_entry, "slow", "a"))
+        registry = SourceRegistry(loading=True)
+        worker = threading.Thread(target=registry.load, args=(terminal,))
+        worker.start()
+        loader.entered["slow"].wait(timeout=5)
+        # 実行
+        a_done = registry._rows_done[1].wait(timeout=5)
+        result = registry.get("a")
+        loading = registry.loading
+        loader.release["slow"].set()
+        worker.join(timeout=5)
+        # 検証
+>       assert a_done is True
+E       assert False is True
+
+tests/unit/project_index/features/sources/test_registry.py:604: AssertionError
+__________________ test_source_registry_statuses_with_loading __________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7149b85fc4b0>
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x7149b556fc10>
+make_entry = <function make_entry.<locals>._make at 0x7149b556c3b0>
+make_served_source = <function make_served_source.<locals>._make at 0x7149b556c5c0>
+make_status = <function make_status.<locals>._make at 0x7149b556c930>
+
+    def test_source_registry_statuses_with_loading(
+        monkeypatch: pytest.MonkeyPatch,
+        make_terminal_config: Callable[..., TerminalConfig],
+        make_entry: Callable[..., SourceEntry],
+        make_served_source: Callable[..., ServedSource],
+        make_status: Callable[..., SourceStatus],
+    ) -> None:
+        """読み込み中の行を loading で並べる（正常系）。"""
+        # 準備
+        loader = _Loader(make_served_source, make_status, blocked=("b",))
+        monkeypatch.setattr(registry_module, "load_source", loader)
+        entries = [
+            make_entry("/tmp/a/project-index.yaml", source_id="a"),
+            make_entry("/tmp/b/project-index.yaml", source_id=None),
+        ]
+        terminal = make_terminal_config(sources=entries)
+        registry = SourceRegistry(loading=True)
+        worker = threading.Thread(target=registry.load, args=(terminal,))
+        worker.start()
+        loader.entered["b"].wait(timeout=5)
+        registry._rows_done[0].wait(timeout=5)
+        # 実行
+>       result = registry.statuses_with_loading()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'SourceRegistry' object has no attribute 'statuses_with_loading'
+
+tests/unit/project_index/features/sources/test_registry.py:632: AttributeError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/admin/test_service.py::test_get_status_when_loading
+FAILED tests/unit/project_index/features/read/test_route.py::test_build_read_router_when_include_loading
+FAILED tests/unit/project_index/features/sources/test_registry.py::test_source_registry_load_when_slow_row
+FAILED tests/unit/project_index/features/sources/test_registry.py::test_source_registry_statuses_with_loading
+======================= 4 failed, 1024 passed in 35.12s ========================

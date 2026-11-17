@@ -1,0 +1,16 @@
+$ TMPDIR=/tmp/pi97/tmp uv run pytest tests/integration/server/test_serve.py::test_normal_when_requested_while_loading tests/integration/server/test_serve.py::test_normal_when_other_source_loading tests/integration/server/test_serve.py::test_normal_when_requested_source_loaded_first tests/integration/server/test_serve.py::test_error_when_source_load_failed tests/integration/server/test_serve.py::test_normal_when_slow_source_not_blocking tests/integration/server/test_list_sources.py tests/integration/server/test_get_settings_sources.py tests/integration/server/test_get_status.py::test_normal_when_loading
+（/tmp/pytest-of-shuhei2441 が別のユーザーの持ち物のため、TMPDIR だけを変えて実行した）
+
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/fix-server-startup-sources-response
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 15 items
+
+tests/integration/server/test_serve.py .....                             [ 33%]
+tests/integration/server/test_list_sources.py ...                        [ 53%]
+tests/integration/server/test_get_settings_sources.py ......             [ 93%]
+tests/integration/server/test_get_status.py .                            [100%]
+
+============================== 15 passed in 5.55s ==============================

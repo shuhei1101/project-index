@@ -7,6 +7,7 @@ import contextlib
 import dataclasses
 import logging
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 from project_index.features.history.query import resolve_ref
@@ -28,7 +29,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["SourceRegistry", "load_source"]
+__all__ = ["LOAD_WORKERS", "SourceRegistry", "load_source"]
+
+# 起動の後の `load` が同時に読み込む行の数の上限（非機能要件の同時に読み込む行の数）
+LOAD_WORKERS = 10
 
 
 type _Waiter = tuple[asyncio.AbstractEventLoop, asyncio.Future[None], frozenset[int] | None]
@@ -58,6 +62,7 @@ class SourceRegistry:
         self._waiters_lock = threading.Lock()
         self._rows: list[SourceEntry] = []
         self._rows_done: list[threading.Event] = []
+        self._rows_started: list[bool] = []
         self._requested: list[int] = []
         self._on_waiting = on_waiting
         # 裏のスレッドで default_ref の commit を確認している配信元の ID
@@ -169,17 +174,20 @@ class SourceRegistry:
         with self._waiters_lock:
             self._rows = list(terminal.sources)
             self._rows_done = [threading.Event() for _ in self._rows]
+            self._rows_started = [False for _ in self._rows]
         try:
             # ほかの配信元のスキーマの参照先は端末の設定から引き、行の読み込みを待たない
             lookup = terminal_lookup(terminal)
             with self._reload_lock:
                 self._lookup = lookup
-            while (index := self._next_row()) is not None:
-                entry = self._rows[index]
-                served, status = self._load_row(entry, index, lookup)
-                self._publish(entry, index, served, status)
-                self._rows_done[index].set()
-                self._finish_waiters(every=False)
+            workers = min(LOAD_WORKERS, len(self._rows))
+            if workers:
+                with ThreadPoolExecutor(
+                    max_workers=workers, thread_name_prefix="project-index-loading"
+                ) as executor:
+                    futures = [executor.submit(self._load_rows, lookup) for _ in range(workers)]
+                    for future in futures:
+                        future.result()
             sources, statuses = self._snapshot
             logger.info(
                 "配信元を読み直した（配信中: %s・外した数: %s）",
@@ -189,12 +197,22 @@ class SourceRegistry:
         finally:
             self._release_waiters()
 
+    def _load_rows(self, lookup: SchemaRefLookup) -> None:
+        """読み始めていない行が無くなるまで、次の行を選んで読み込む（読み込みのスレッドの 1 つ）。"""
+        while (index := self._next_row()) is not None:
+            entry = self._rows[index]
+            served, status = self._load_row(entry, index, lookup)
+            self._publish(entry, index, served, status)
+            self._rows_done[index].set()
+            self._finish_waiters(every=False)
+
     def _next_row(self) -> int | None:
-        """次に読み込む行。待っている要求が指す行を先にし、無ければ位置の順。"""
+        """次に読み込む行を選び、読み始めた印を付ける。待っている要求が指す行を先にし、無ければ位置の順。"""
         with self._waiters_lock:
             candidates: list[int] = [*self._requested, *range(len(self._rows))]
             for index in candidates:
-                if not self._rows_done[index].is_set():
+                if not self._rows_started[index]:
+                    self._rows_started[index] = True
                     return index
         return None
 
@@ -287,6 +305,7 @@ class SourceRegistry:
             with self._waiters_lock:
                 self._rows = list(terminal.sources)
                 self._rows_done = [threading.Event() for _ in self._rows]
+                self._rows_started = [True for _ in self._rows]
             logger.info(
                 "配信元を読み直した（配信中: %s・外した数: %s）",
                 list(sources),
@@ -349,6 +368,7 @@ class SourceRegistry:
             with self._waiters_lock:
                 self._rows = list(terminal.sources)
                 self._rows_done = [threading.Event() for _ in self._rows]
+                self._rows_started = [True for _ in self._rows]
             logger.info(
                 "変わった行の配信元を読み直した（読んだ行: %s・配信中: %s）", loaded, list(sources)
             )
@@ -495,6 +515,22 @@ class SourceRegistry:
     def statuses(self) -> list[SourceStatus]:
         """`sources[]` の順の状態を返す。"""
         return self._snapshot[1]
+
+    def statuses_with_loading(self) -> list[SourceStatus]:
+        """読み込みの済んだ行の状態と、読み込みが終わっていない行の `loading` を `sources[]` の順に返す。"""
+        with self._waiters_lock:
+            rows = list(self._rows)
+        by_index = {status.index: status for status in self._snapshot[1]}
+        return [
+            by_index.get(index)
+            or SourceStatus(
+                id=entry.id or f"sources[{index}]",
+                index=index,
+                status="loading",
+                config=tuple(entry.config),
+            )
+            for index, entry in enumerate(rows)
+        ]
 
 
 def _drop_row(
