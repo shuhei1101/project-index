@@ -885,7 +885,7 @@ flows:
         type: references
         when: このインターフェースの入出力やフローを変えるときに、シナリオ『起動する』の対応する流れと期待値を確認する。
   - name: 正常系（裏のリビジョンの書き出しが上限を超える）
-    summary: 裏の書き出しが上限で止まっても配信を続け、次の要求が書き出し直す
+    summary: 裏の書き出しが上限で止まっても配信を続け、文書の一覧は書き出さずに返し、次の文書の取得が書き出し直す
     setup:
       - name: Mock
         description: git の実行を、`archive` の 1 回目だけ待ち時間の上限を超えたときと同じ失敗（`GitError` の `timed_out`）を返すものに差し替える
@@ -904,13 +904,17 @@ flows:
         C->>S: 管理の MCP の status
         S-->>C: sample が serving・exporting: false
         C->>S: 読み取り API で sample の文書の一覧を取得する
-        S->>G: 要求の中で main の commit を書き出し直す
+        S->>G: 書き出さずに main の commit のファイルを読み込む
         S-->>C: 200 文書の一覧
+        C->>S: 読み取り API で sample の文書を取得する
+        S->>G: 要求の中で main の commit を書き出し直す
+        S-->>C: 200 文書
       ```
     expected:
       - 警告のログに、止めた git の引数（`main` の commit）と上限の秒数が 1 行ある
       - '`status` が sample を `serving`、`exporting: false` で返す'
-      - 文書の一覧の取得が 200 を返し、ログの `リビジョンを書き出した` が 1 行出る
+      - 文書の一覧の取得が 200 を返し、ログの `リビジョンを書き出した` を出さない
+      - その後の文書の取得が 200 を返し、ログの `リビジョンを書き出した` が 1 行出る
     test: test_normal_when_background_export_times_out
     refs:
       - to: SC-4
