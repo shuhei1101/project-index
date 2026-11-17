@@ -22,16 +22,16 @@ request:
     required: false
     location: argument
     default: なし（層のフォルダの全件を回す）
-    description: 回す結合テストのファイルかフォルダを空白で区切って並べたもの。`layer` が `integration` のときだけ使用する
-    notes: テスト実行方法の `run_runner` の `{結合テストのパス}` に、判定フローチャート『結合テストの実行範囲』で決めた範囲を指定する。各値はリポジトリの直下からの `tests/integration/` の下のパスに限る
+    description: 回す結合テストのファイル・フォルダか、ファイルに `::{関数}` を続けた pytest のノード ID を空白で区切って並べたもの。`layer` が `integration` のときだけ使用する
+    notes: テスト実行方法の `run_runner` の `{結合テストのパス}` に、判定フローチャート『結合テストの実行範囲』で決めた範囲を指定する。各値はリポジトリの直下からの `tests/integration/` の下のパスか、`tests/integration/` の下の `.py` のファイルに `::{関数}` を 1 つ続けたノード ID（末尾に parametrize の `[{id}]` を 1 つ続けられる）に限る
 constraints:
   - item: ランナー
     constraint: '`ubuntu-latest`'
   - item: 層とテストのフォルダ
     constraint: '`unit` は `tests/unit/`、`integration` は `tests/integration/`'
   - item: 回す範囲
-    constraint: '`paths` を指定したときは `paths` の結合テストだけを回し、省いたときは層のフォルダの全件を回す。`layer` が `integration` でないときに `paths` を指定したとき、`paths` の値が `tests/integration/` の下に無いとき、`..` か空白以外の区切りを含むときは、テストを回さずに失敗で終える'
-    notes: 作業 PR では判定フローチャート『結合テストの実行範囲』で決めた範囲だけを回す
+    constraint: '`paths` を指定したときは `paths` の結合テストだけを回し、省いたときは層のフォルダの全件を回す。`layer` が `integration` でないときに `paths` を指定したとき、`paths` の値が `tests/integration/` の下に無いとき、`..`・`,`・`;` を含むとき、`{.py のファイル}::{関数}` の書式に合わない `:` を含むときは、テストを回さずに失敗で終える。ノード ID の `[{id}]` の中も同じ検査を適用し、`..`・`,`・`;` を含む id は指定できない。`paths` の値はパス名の展開をせずに pytest の引数にする'
+    notes: 作業 PR では判定フローチャート『結合テストの実行範囲』で決めた範囲だけを回す。`..`・`,`・`;` を含む id の関数は、関数名までを指定して id の全件を回す
   - item: 並列
     constraint: 並列にせず、1 回の pytest で回す
     notes: 'テスト実行方法の結合テスト（バック）の層は `parallel: false`'
@@ -124,6 +124,28 @@ flows:
       - 実行の結論が `success`
       - 成果物 `test-log` に `tests/integration/a/` のテストを回した出力がある
       - '`tests/integration/b/` のテストが回されていない'
+  - name: 正常系（結合テストのノード ID を指定）
+    summary: ノード ID で指定した関数のテストだけを回し、成功で終わる
+    setup:
+      - name: Mock
+        description: なし（本物の GitHub Actions で回す）
+      - name: ブランチ
+        description: '`tests/integration/test_a.py` に、pass するテスト関数 `test_x` と、`[1]`・`[2]` の id で parametrize した `test_y` を配置したブランチ'
+        notes: '`layer: integration`・`paths: tests/integration/test_a.py::test_x tests/integration/test_a.py::test_y[1]`'
+    flow: |-
+      <!-- map -->
+
+      ```mermaid
+      flowchart TD
+        s([layer: integration・paths にノード ID で起動]) --> a[ブランチを取得する] --> b1[uv を入れる] --> b2[Python の依存を入れる] --> c[層の全件を回す]
+        c -- pass --> d[ログを成果物に上げる] --> e([成功])
+      ```
+
+      <!-- /map -->
+    expected:
+      - 実行の結論が `success`
+      - 成果物 `test-log` に `test_x` と `test_y[1]` を回した出力がある
+      - '`test_y[2]` が回されていない'
   - name: 異常系（テストの fail・failure）
     summary: 層の全件に fail があり、ログを上げて失敗で終わる
     setup:
@@ -194,7 +216,7 @@ flows:
         description: なし（本物の GitHub Actions で回す）
       - name: ブランチ
         description: '`tests/integration/` の中身を pass するテスト 1 件だけに差し替えたブランチ'
-        notes: '`layer: integration`・`paths: tests/unit/`。同じ結論になる例として、`layer: unit`・`paths: tests/integration/`（結合テストでない層に `paths` を指定）と、`layer: integration`・`paths: tests/integration/../unit/`（`tests/integration/` で始まり `..` で外へ出る）も起動する'
+        notes: '`layer: integration`・`paths: tests/unit/`。同じ結論になる例として、`layer: unit`・`paths: tests/integration/`（結合テストでない層に `paths` を指定）と、`layer: integration`・`paths: tests/integration/../unit/`（`tests/integration/` で始まり `..` で外へ出る）と、`layer: integration`・`paths: tests/integration/test_a.py:test_a`（ノード ID の書式に合わない `:`）も起動する'
     flow: |-
       <!-- map -->
 
@@ -207,7 +229,7 @@ flows:
       <!-- /map -->
     expected:
       - 実行の結論が `failure`
-      - 成果物 `test-log` に、`paths` を弾いた理由（層のフォルダの外・結合テストでない層への指定・`..` を含む）があり、pytest の集計の行が無い
+      - 成果物 `test-log` に、`paths` を弾いた理由（層のフォルダの外・結合テストでない層への指定・`..` を含む・ノード ID の書式に合わない `:` を含む）があり、pytest の集計の行が無い
 notes:
   step ごとの中身: |-
     | step | 中身 |
@@ -215,7 +237,7 @@ notes:
     | ブランチを取得する | `actions/checkout` で起動したブランチを取得する |
     | uv を入れる | `astral-sh/setup-uv` で uv を入れる |
     | Python の依存を入れる | `uv sync` で、`.python-version` の Python と依存を入れる。結合テストの更新のテストが `UV_OFFLINE=1` で使用する uv のキャッシュもここで作られる |
-    | 層の全件を回す | `PYTHONUNBUFFERED=1 uv run pytest {paths か層のフォルダ} -v` を裏で起動して出力を `test.log` に記録し、`test.log` の大きさを 10 秒ごとに確認し、無出力の時間の上限を超えたら pytest を止め、止めた旨を `test.log` に記録して失敗で終える。止めなかったときは pytest の終了コードを step の成否にする |
+    | 層の全件を回す | パス名の展開を止めて `PYTHONUNBUFFERED=1 uv run pytest {paths か層のフォルダ} -v` を裏で起動して出力を `test.log` に記録し、`test.log` の大きさを 10 秒ごとに確認し、無出力の時間の上限を超えたら pytest を止め、止めた旨を `test.log` に記録して失敗で終える。止めなかったときは pytest の終了コードを step の成否にする |
     | ログを成果物に上げる | `if: always()` で `actions/upload-artifact` により `test.log` を成果物 `test-log` に上げる |
   タイムアウトの決め方: |-
     判定フローチャート『タイムアウトの決め方』では、自分の処理の完了を待つだけで進み具合の出力（pytest の `-v` のテスト 1 件ごとの行）があるため、無出力の時間で止まったことを検知する（制約の「無出力の時間」）。
