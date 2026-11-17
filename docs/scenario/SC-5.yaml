@@ -39,6 +39,7 @@ scenarios:
       - sample のフォルダで呼んだ `describe` が `sample`（読み書き）を返す
       - '`reload` の前後で `/mcp` のセッションが切れず、ツールは 7 つのまま'
       - スキルの応答に、書き込んだ行の表と `check_project` の結果がある
+      - 配信元の `schemas/files.schema.yaml` が、knowledge の `schemas/knowledge-files.schema.yaml` のファイルの行のキー（`id`・`aliases`・`inject_when`・`category`）と `checkpoint` を持ち、配信元のフォルダの外部のファイルを `$ref` で指さない
     test: test_normal
   - name: 正常シナリオ（YAML でない範囲を加える）
     setup:
@@ -1129,6 +1130,92 @@ scenarios:
       - '`check_project` が違反を 0 件で返す'
       - '`reload` の後の `search_docs` がプロンプトを YAML の `name` で返す'
     test: test_normal_when_prompt_folder_found_in_local_operation
+  - name: 正常シナリオ（初回の範囲が content/prompts/ を含む）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
+      - name: project-index
+        description: 正常シナリオと同じ
+      - name: プロンプトを持つ配信元
+        description: '直下の `content/prompts/` に A-42 の例 2 のプロンプト（`kind: llm`）と `src/app.py` を持ち、`project-index.yaml` も管理用の YAML も無い git リポジトリ'
+        notes: 範囲の質問に既定の `**/*` を答える
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（初回の範囲が content/prompts/ を含む）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant CL as project-index の CLI
+        participant FS as 配信元のフォルダ
+        participant AD as 管理の MCP
+        participant CF as 端末の設定
+
+        U->>SK: /project-index:setup {配信元のパス}
+        SK->>U: scope・範囲を聞く
+        U-->>SK: 既定の値（範囲は **/*）
+        SK->>FS: 直下とプラグインのルートの content/prompts/ を探す
+        FS-->>SK: content/prompts/
+        SK->>CL: project-index files --root {配信元のパス} --paths **/* --exclude-path content/prompts/**/*.yaml
+        CL-->>SK: 管理用の YAML に記載するファイル（content/prompts/ の YAML を含まない）
+        SK-->>U: 管理用の YAML の追加の候補（src/app.py）とプロンプトの行の候補を表で示して確かめる
+        U-->>SK: 了承
+        SK->>FS: project-index.yaml・管理用の YAML を作り、プロンプトのスキーマと、その $ref が指す共通の型を schemas/ に配置して、プロンプトの行を記載する
+        SK->>AD: check_project（配信元のパス）
+        AD-->>SK: 違反 0 件・索引の同期の件数 0
+        SK->>CF: sources に行を書く
+        SK->>AD: reload
+        SK-->>U: 追加した配信元と結果を出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - 確認の表の管理用の YAML の追加の候補が `src/app.py` だけで、`content/prompts/` の YAML は出ない
+      - 管理用の YAML に `src/app.py` の行だけが並び、`content/prompts/` の YAML の行は無い
+      - '`project-index.yaml` の documents に、`paths` が `content/prompts/**/*.yaml` の行がある'
+      - '`check_project` が違反と索引の同期の件数を 0 で返す'
+      - '`reload` の後の `search_docs` が、プロンプトを 1 件だけ（プロンプトの行の文書として、YAML の `name` で）返す'
+    test: test_normal_when_first_run_range_includes_prompts
+  - name: 正常シナリオ（管理用の YAML にプロンプトの YAML の行がある）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: プロンプトを管理用の YAML の行に持つ配信元
+        description: '直下の `content/prompts/` に A-42 の例 2 のプロンプト（`kind: llm`）を置き、`project-index.yaml` が直下の管理用の YAML を読む行（`paths: [files.yaml]`・`records: files`・`body_file: path`）だけを持ち、管理用の YAML がそのプロンプトの YAML の行を持つ、端末の設定に登録済みの git リポジトリ'
+        notes: プロンプトの documents の行は無い。その commit でワークツリーを作る（クローン本体には `write_docs` で書き込めない）
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（管理用の YAML にプロンプトの YAML の行がある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant FS as 配信元のフォルダ
+        participant DM as 文書の MCP
+        participant AD as 管理の MCP
+
+        U->>SK: 配信元のワークツリーで /project-index:setup
+        SK->>FS: 直下とプラグインのルートの content/prompts/ を探す
+        FS-->>SK: content/prompts/
+        SK->>SK: 管理用の YAML の行のうち、プロンプトの行の paths に当たるファイルの行を削除の候補にする
+        SK-->>U: プロンプトの行の候補と、管理用の YAML の行の削除の候補を表で示して確かめる
+        U-->>SK: 了承
+        SK->>FS: プロンプトのスキーマと、その $ref が指す共通の型を schemas/ に配置し、project-index.yaml にプロンプトの行を記載する
+        SK->>DM: write_docs（管理用の YAML のプロンプトの YAML の行を削除する）
+        SK->>AD: check_project
+        AD-->>SK: 違反 0 件・索引の同期の件数 0
+        SK->>AD: reload
+        SK-->>U: 書いた行と結果を出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - 確認の表に、プロンプトの行の候補と、管理用の YAML の `content/prompts/` の YAML の行の削除の候補が出る
+      - 管理用の YAML に `content/prompts/` の YAML の行が無い
+      - '`check_project` が違反と索引の同期の件数を 0 で返す'
+      - '`reload` の後の `search_docs` が、プロンプトを 1 件だけ（プロンプトの行の文書として）返す'
+      - '`project-index.yaml` の documents に、`paths` が `content/prompts/**/*.yaml` の行があり、配信元の `schemas/` に `prompt.schema.yaml` と、その `$ref` が指す `common.schema.yaml` がある'
+    test: test_normal_when_files_yaml_has_prompt_rows
 lead: 利用者が `/project-index:setup` でフォルダを配信元として登録し、管理用の YAML を範囲のファイルに合わせるシナリオを定め、配信元の追加の流れを変えるときに参照する。
 tags:
   - name: topic:配信元
@@ -1155,3 +1242,4 @@ refs:
     type: part_of
     when: このシナリオの前後の流れを、複合ユースケースの中で確認するときに参照する。
 test_file: tests/e2e/単一ユースケース/test_配信元を追加する.py
+visibility: internal

@@ -59,7 +59,7 @@ def _match_status(
 
 
 def _settings_view(handlers: Handlers) -> SettingsSourcesView:
-    """端末の設定を読み直し、`sources[]` の各行に同じ `config` の配信元の状態を重ねる。"""
+    """端末の設定を再読み込みし、`sources[]` の各行に同じ `config` の配信元の状態を重ねる。"""
     # 排他を取らずに 1 回だけ読み、内容のバージョンと行を同じ本文から求める
     text, version = read_settings_file(handlers.terminal.file)
     terminal = load_terminal_config(handlers.terminal.file, text=text)
@@ -76,7 +76,7 @@ def _settings_view(handlers: Handlers) -> SettingsSourcesView:
     used: set[int] = set()
     for entry in terminal.sources:
         status = _match_status(entry, statuses, used)
-        # 当たる状態が無い行は、読み直していない行
+        # 当たる状態が無い行は、再読み込みしていない行
         if status is None:
             rows.append(
                 SettingsSourceRow(
@@ -98,7 +98,7 @@ def _settings_view(handlers: Handlers) -> SettingsSourcesView:
                 config=list(entry.config),
                 enabled=entry.enabled,
                 scope=entry.scope,
-                # 読み込みの済んでいない行は、読み直していない行と同じく `pending_reload` にする
+                # 読み込みの済んでいない行は、再読み込みしていない行と同じく `pending_reload` にする
                 status="pending_reload" if item.status == "loading" else item.status,
                 errors=item.errors,
                 config_version=item.config_version,
@@ -138,7 +138,7 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
             reload=handlers.reload_sources,
             lock=handlers.settings_lock,
         )
-        # 書き換えの後の読み直しで差し替わった端末の設定の知らないキーを警告にする
+        # 書き換えの後の再読み込みで差し替わった端末の設定の知らないキーを警告にする
         return SettingsSourcesWriteResponse.from_result(
             result, unknown_key_warnings(handlers.terminal)
         )
@@ -190,7 +190,7 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
             reload=handlers.reload_changed,
             lock=handlers.settings_lock,
         )
-        # 書き換えの後の読み直しで差し替わった端末の設定の知らないキーを警告にする
+        # 書き換えの後の再読み込みで差し替わった端末の設定の知らないキーを警告にする
         return SettingsSourcesWriteResponse.from_result(
             result, unknown_key_warnings(handlers.terminal)
         )
@@ -212,7 +212,7 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
             reload=handlers.reload_changed,
             lock=handlers.settings_lock,
         )
-        # 書き換えの後の読み直しで差し替わった端末の設定の知らないキーを警告にする
+        # 書き換えの後の再読み込みで差し替わった端末の設定の知らないキーを警告にする
         return SettingsSourcesWriteResponse.from_result(
             result, unknown_key_warnings(handlers.terminal)
         )

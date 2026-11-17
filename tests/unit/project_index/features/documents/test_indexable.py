@@ -193,6 +193,25 @@ def test_indexable_files_when_exclude_given(
     assert result == ["src/a.py"]
 
 
+def test_indexable_files_when_exclude_paths_given(
+    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """除外のパスに当たるファイルも除く（正常系）。"""
+    # 準備
+    write_files(
+        tmp_path,
+        {
+            "src/a.py": "a = 1\n",
+            "content/prompts/p.yaml": "id: p\n",
+            "content/readme.md": "# content\n",
+        },
+    )
+    # 実行
+    result = indexable_files(tmp_path, ["**"], exclude_paths=["content/prompts/**/*.yaml"])
+    # 検証
+    assert result == ["content/readme.md", "src/a.py"]
+
+
 def test_walk_tree(tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]) -> None:
     """ファイルとフォルダの更新日時（正常系）。"""
     # 準備

@@ -121,7 +121,7 @@ def make_env(
     """git リポジトリとそのワークツリー x を持つ配信元と、書き込みの部品を作る関数を返す。"""
 
     def keep_source(source: ServedSource, _root: Path) -> ServedSource:
-        # 配信元はメモリ上の設定で作るため、ワークツリーの設定の読み直しは受け取った配信元のまま返す
+        # 配信元はメモリ上の設定で作るため、ワークツリーの設定の再読み込みは受け取った配信元のまま返す
         return source
 
     monkeypatch.setattr(access_service, "load_source_at", keep_source)
@@ -174,6 +174,73 @@ def make_env(
         )
 
     return _make
+
+
+UNINDENTED_DOC = (
+    "id: doc-1\nname: 文書 1\nitems:\n- key: k1\n  label: 名称 1\n- key: k2\n  label: 名称 2\n"
+)
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        Operation(
+            op="update",
+            id="doc-1",
+            expected_version=content_hash(UNINDENTED_DOC),
+            add_to={"items": [{"key": "k3", "label": "名称 3"}]},
+        ),
+        Operation(
+            op="replace",
+            id="doc-1",
+            expected_version=content_hash(UNINDENTED_DOC),
+            data={
+                "id": "doc-1",
+                "name": "文書 1",
+                "items": [
+                    {"key": "k1", "label": "名称 1"},
+                    {"key": "k2", "label": "名称 2"},
+                    {"key": "k3", "label": "名称 3"},
+                ],
+            },
+        ),
+    ],
+    ids=["add_to", "replace"],
+)
+def test_write_docs_when_indent_preserved(
+    make_env: Callable[..., WriteEnv], operation: Operation
+) -> None:
+    """元のファイルの配列の字下げを保つ（正常系）。"""
+    # 準備
+    env = make_env(
+        {
+            "docs/rule/doc-1.yaml": UNINDENTED_DOC,
+            "docs/rule/doc-2.yaml": DOC_2,
+            "schemas/rule.schema.yaml": SCHEMA,
+        }
+    )
+    # 実行
+    result = env.write(operations=[operation])
+    # 検証
+    text = (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8")
+    assert text == UNINDENTED_DOC + "- key: k3\n  label: 名称 3\n"
+    assert result.results[0].diff == "+ - key: k3\n+   label: 名称 3"
+
+
+def test_write_docs_when_records_indent_preserved(make_env: Callable[..., WriteEnv]) -> None:
+    """`records` への追加で管理用の YAML の配列の字下げを保つ（正常系）。"""
+    # 準備
+    notes = "items:\n- id: n1\n  path: n1.md\n"
+    files = {**_notes_files(), "notes/index.yaml": notes}
+    env = make_env(files, tables=[_notes_table(), _rules_table()])
+    operation = Operation(
+        op="create", kind="notes", data={"id": "n2", "path": "n2.md", "@body": "# n2\n"}
+    )
+    # 実行
+    env.write(operations=[operation])
+    # 検証
+    text = (env.worktree / "notes/index.yaml").read_text(encoding="utf-8")
+    assert text == notes + "- id: n2\n  path: n2.md\n"
 
 
 def test_check_version_when_fields(make_document: Callable[..., Document]) -> None:
@@ -670,6 +737,30 @@ def test_delete_docs_when_unlink(make_env: Callable[..., WriteEnv]) -> None:
     assert result.unlinked == [("doc-1", content_hash(text))]
 
 
+def test_delete_docs_when_unlink_indent_preserved(make_env: Callable[..., WriteEnv]) -> None:
+    """参照を外した文書の配列の字下げを保つ（正常系）。"""
+    # 準備
+    doc_1 = "id: doc-1\nname: 文書 1\n"
+    doc_2 = (
+        "id: doc-2\nname: 文書 2\nrelated:\n- to: doc-1\n  type: references\n"
+        "- to: doc-3\n  type: references\n"
+    )
+    env = make_env(
+        {
+            "docs/rule/doc-1.yaml": doc_1,
+            "docs/rule/doc-2.yaml": doc_2,
+            "docs/rule/doc-3.yaml": "id: doc-3\nname: 文書 3\n",
+            "schemas/rule.schema.yaml": SCHEMA,
+        }
+    )
+    targets = [DeleteTarget(id="doc-1", expected_version=content_hash(doc_1))]
+    # 実行
+    env.delete(targets=targets, on_referenced="unlink")
+    # 検証
+    text = (env.worktree / "docs/rule/doc-2.yaml").read_text(encoding="utf-8")
+    assert text == "id: doc-2\nname: 文書 2\nrelated:\n- to: doc-3\n  type: references\n"
+
+
 def test_delete_docs_when_unlink_nested(make_env: Callable[..., WriteEnv]) -> None:
     """入れ子の参照も外す（正常系）。"""
     # 準備
@@ -702,6 +793,32 @@ def test_delete_docs_when_unlink_nested(make_env: Callable[..., WriteEnv]) -> No
     assert data["refs"] == [{"to": "n3", "type": "references"}]
     assert data["functions"][0]["refs"] == []
     assert result.unlinked == [("n1", content_hash(text))]
+
+
+def test_delete_docs_when_records_indent_preserved(make_env: Callable[..., WriteEnv]) -> None:
+    """`records` の要素の削除で管理用の YAML の配列の字下げを保つ（正常系）。"""
+    # 準備
+    files = {
+        "data/list.yaml": "items:\n- id: a\n  path: a.txt\n- id: b\n  path: b.txt\n",
+        "data/a.txt": "a\n",
+        "data/b.txt": "b\n",
+    }
+    table = DocumentTable(
+        id="items",
+        paths=["data/list.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        records="items",
+        body_file="path",
+    )
+    env = make_env(files, tables=[table])
+    targets = [
+        DeleteTarget(id="b", expected_version=value_hash([{"id": "b", "path": "b.txt"}, "b\n"]))
+    ]
+    # 実行
+    env.delete(targets=targets)
+    # 検証
+    text = (env.worktree / "data/list.yaml").read_text(encoding="utf-8")
+    assert text == "items:\n- id: a\n  path: a.txt\n"
 
 
 def test_delete_docs_when_records(

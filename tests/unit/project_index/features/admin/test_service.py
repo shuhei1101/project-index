@@ -264,7 +264,7 @@ def test_reload_config_when_checked_before_response(
     write_settings: Callable[..., Path],
     make_real_handlers: Callable[[Path], Handlers],
 ) -> None:
-    """応答を組み立てる前に裏の検査が済んでも、読み直した配信元の `sync` を持たない（正常系）。"""
+    """応答を組み立てる前に裏の検査が済んでも、再読み込みした配信元の `sync` を持たない（正常系）。"""
     # 準備
     from dataclasses import replace
 
@@ -1082,3 +1082,61 @@ def test_check_project_when_disk_storage(
     assert result.sync.missing_refs == 0
     assert result.sync.unindexed_files == 0
     assert result.sync.missing_body_files == 0
+
+
+INDENTLESS_NAV_CONFIG = (
+    "name: navs\n"
+    "documents:\n"
+    "- id: rules\n"
+    "  paths:\n"
+    "  - docs/rule/*.yaml\n"
+    "  schema: schemas/rule.schema.yaml\n"
+    "nav:\n"
+    "  tabs:\n"
+    "  - title: 設計\n"
+    "    items:\n"
+    "    - page: rules/doc-1\n"
+)
+ADDED_MCP_TAB = (
+    "  - title: mcp\n"
+    "    items:\n"
+    "    - auto:\n"
+    "        filter:\n"
+    "          field: tags\n"
+    "          op: eq\n"
+    "          values:\n"
+    "          - mcp\n"
+)
+
+
+def test_write_nav_when_indent_preserved(
+    nav_source: Path, make_terminal_config: Callable[..., TerminalConfig]
+) -> None:
+    """設定のファイルの配列の字下げを保つ（正常系）。"""
+    from project_index.features.admin.service import write_nav
+    from project_index.features.admin.types import NavOperation, WriteNavRequest
+
+    # 準備
+    (nav_source / "project-index.yaml").write_text(INDENTLESS_NAV_CONFIG, encoding="utf-8")
+    handlers = _handlers(make_terminal_config)
+    request = WriteNavRequest(
+        path=str(nav_source),
+        operations=[
+            NavOperation(
+                op="add",
+                tab="mcp",
+                value={
+                    "title": "mcp",
+                    "items": [
+                        {"auto": {"filter": {"field": "tags", "op": "eq", "values": ["mcp"]}}}
+                    ],
+                },
+            )
+        ],
+    )
+    # 実行
+    write_nav(request, handlers=handlers)
+    # 検証
+    assert (nav_source / "project-index.yaml").read_text(encoding="utf-8") == (
+        INDENTLESS_NAV_CONFIG + ADDED_MCP_TAB
+    )

@@ -237,3 +237,37 @@ def test_apply_migration_when_unknown_top_level_key(tmp_path: Path) -> None:
         "state_dir": "/logs",
         "mindstella": {"threads": 3},
     }
+
+
+@pytest.mark.usefixtures("settings_version_2")
+def test_apply_migration_when_indent_preserved(tmp_path: Path) -> None:
+    """元のファイルの配列の字下げを保つ（正常系）。"""
+    # 準備
+    path = tmp_path / "settings.yaml"
+    path.write_text(
+        'version: "1"\n'
+        "clone: /x\n"
+        "sources:\n"
+        "- id: a\n"
+        "  config:\n"
+        "  - /a/project-index.yaml\n"
+        "- id: b\n"
+        "  config:\n"
+        "  - /b/project-index.yaml\n",
+        encoding="utf-8",
+    )
+    data = load_roundtrip(path.read_text(encoding="utf-8"))
+    # 実行
+    apply_migration(_target(path), data, [], allow_destructive=False, now=NOW)
+    # 検証
+    assert path.read_text(encoding="utf-8") == (
+        'version: "2"\n'
+        "clone: /x\n"
+        "sources:\n"
+        "- id: a\n"
+        "  config:\n"
+        "  - /a/project-index.yaml\n"
+        "- id: b\n"
+        "  config:\n"
+        "  - /b/project-index.yaml\n"
+    )

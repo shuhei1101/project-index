@@ -60,6 +60,31 @@ def test_normal_when_exclude_given(range_folder: Path, capsys: pytest.CaptureFix
     assert capsys.readouterr().out == "src/a.py\nsrc/uv.lock\n"
 
 
+def test_normal_when_exclude_path_given(
+    range_folder: Path,
+    capsys: pytest.CaptureFixture[str],
+    write_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    """`--exclude-path` の glob に当たるパスのファイルも外す（正常系）。"""
+    # 準備
+    write_files(range_folder, {"content/prompts/p.yaml": "id: p\n"})
+    # 実行
+    code = main(
+        [
+            "files",
+            "--root",
+            str(range_folder),
+            "--paths",
+            "**",
+            "--exclude-path",
+            "content/prompts/**/*.yaml",
+        ]
+    )
+    # 検証
+    assert code == 0
+    assert capsys.readouterr().out == "src/a.py\nsrc/b.py\nsrc/uv.lock\n"
+
+
 def test_error_when_root_not_found(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """`--root` が無いと終了コード 2 で終える（異常系）。"""
     # 準備

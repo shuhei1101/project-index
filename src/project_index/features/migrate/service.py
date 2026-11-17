@@ -112,7 +112,8 @@ def apply_migration(
         apply_step(data, step)
     previous_version = str(data["version"])
     data["version"] = DoubleQuotedScalarString(target.current)
-    text = dump_roundtrip(data)
+    # 再読み込みした元の文字列の配列の字下げで書く
+    text = dump_roundtrip(data, original=original)
     violations = _violations(target, load_yaml(text))
     # 当てた結果が新しいスキーマに違反するときは書かない
     if violations:

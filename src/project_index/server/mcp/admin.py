@@ -149,7 +149,7 @@ def build_admin_mcp(handlers: Handlers) -> MCPServer:
         lambda request: update_clone(
             handlers.terminal.clone,
             control=handlers.restart,
-            # 呼ばれた時点の端末の設定を読み直す（違反なら更新せずに伝える）
+            # 呼ばれた時点の端末の設定を再読み込みする（違反なら更新せずに伝える）
             mdmark_ref=load_terminal_config(handlers.terminal.file).mdmark_ref,
         ),
         wait_loaded=lambda: handlers.registry.wait_loaded(),

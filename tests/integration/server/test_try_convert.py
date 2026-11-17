@@ -147,7 +147,7 @@ def test_error_when_invalid_config(tmp_path: Path, make_server: Callable[..., An
     # 検証
     assert result.is_error
     assert result.text.startswith("ValidationFailedError")
-    assert "1" in result.text
+    assert "違反が 3 件あります" in result.text
     assert "check_project" in result.text
     assert _listing(folder) == before
 

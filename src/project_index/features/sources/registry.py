@@ -1,4 +1,4 @@
-"""配信元の一覧と読み直し。"""
+"""配信元の一覧と再読み込み。"""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ type _Waiter = tuple[asyncio.AbstractEventLoop, asyncio.Future[None], frozenset[
 
 
 class SourceRegistry:
-    """配信中の配信元と状態を持ち、読み直しで一覧ごと差し替える。"""
+    """配信中の配信元と状態を持ち、再読み込みで一覧ごと差し替える。"""
 
     def __init__(
         self,
@@ -51,7 +51,7 @@ class SourceRegistry:
         self._snapshot: tuple[dict[str, ServedSource], list[SourceStatus]] = ({}, [])
         self._reload_lock = threading.Lock()
         self._entries: dict[str, tuple[SourceEntry, int]] = {}
-        # 最後に読み直した端末の設定から作った、参照先の配信元の引き当て
+        # 最後に再読み込みした端末の設定から作った、参照先の配信元の引き当て
         self._lookup: SchemaRefLookup | None = None
         self._on_rebuilt = on_rebuilt
         self._ready = threading.Event()
@@ -190,7 +190,7 @@ class SourceRegistry:
                         future.result()
             sources, statuses = self._snapshot
             logger.info(
-                "配信元を読み直した（配信中: %s・外した数: %s）",
+                "配信元を再読み込みした（配信中: %s・外した数: %s）",
                 list(sources),
                 sum(1 for status in statuses if status.status == "not_served"),
             )
@@ -234,7 +234,7 @@ class SourceRegistry:
                     Violation(
                         path=f"sources[{index}]",
                         rule=f"読み込みに失敗しました（{type(error).__name__}: {error}）",
-                        fix="エラーログを確かめ、reload で読み直してください",
+                        fix="エラーログを確かめ、reload で再読み込みしてください",
                     )
                 ],
             )
@@ -275,7 +275,7 @@ class SourceRegistry:
                 self._on_rebuilt(replaced)
 
     def reload(self, terminal: TerminalConfig) -> list[SourceStatus]:
-        """端末の設定の全行を読み直し、一覧を差し替える。"""
+        """端末の設定の全行を再読み込みし、一覧を差し替える。"""
         try:
             return self._reload(terminal)
         finally:
@@ -287,7 +287,7 @@ class SourceRegistry:
             sources: dict[str, ServedSource] = {}
             statuses: list[SourceStatus] = []
             entries: dict[str, tuple[SourceEntry, int]] = {}
-            # ほかの配信元のスキーマの参照先は、読み直す端末の設定から引く
+            # ほかの配信元のスキーマの参照先は、再読み込みする端末の設定から引く
             lookup = terminal_lookup(terminal)
             for index, entry in enumerate(terminal.sources):
                 served, status = load_source(entry, index=index, lookup=lookup)
@@ -307,7 +307,7 @@ class SourceRegistry:
                 self._rows_done = [threading.Event() for _ in self._rows]
                 self._rows_started = [True for _ in self._rows]
             logger.info(
-                "配信元を読み直した（配信中: %s・外した数: %s）",
+                "配信元を再読み込みした（配信中: %s・外した数: %s）",
                 list(sources),
                 sum(1 for status in statuses if status.status == "not_served"),
             )
@@ -370,7 +370,9 @@ class SourceRegistry:
                 self._rows_done = [threading.Event() for _ in self._rows]
                 self._rows_started = [True for _ in self._rows]
             logger.info(
-                "変わった行の配信元を読み直した（読んだ行: %s・配信中: %s）", loaded, list(sources)
+                "変わった行の配信元を再読み込みした（読んだ行: %s・配信中: %s）",
+                loaded,
+                list(sources),
             )
             return statuses
 

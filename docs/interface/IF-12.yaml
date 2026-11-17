@@ -417,6 +417,37 @@ flows:
     expected:
       - '`sync.unindexed_files` が 0 で、`sync.items` に `src/settings.local.json` が無い'
     test: test_normal_when_local_files_excluded
+  - name: 正常系（ほかの行の文書になるファイルを数えない）
+    summary: 管理用の YAML のフォルダの配下でも、ほかの documents の行の `paths` に当たるファイルを索引に無いファイルとして数えない
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+      - name: 配信元
+        description: '検証に通る sample。行 `sample`（`paths: [docs/*.yaml]`）、行 `files`（`paths: [files.yaml]`・`records: files`・`body_file: path`）、行 `prompts`（`paths: [content/prompts/**/*.yaml]`）を持ち、直下の `files.yaml` がほかの行の文書でない `project-index.yaml`・`schemas/*.yaml`・`src/a.py` の行を持つ'
+        notes: '`docs/*.yaml` も行 `sample` の文書なので、索引に無いファイルに数えない'
+      - name: 範囲のファイル
+        description: '`src/a.py` と、プロンプトのスキーマに通る `content/prompts/p.yaml` を置く'
+        notes: '`content/prompts/p.yaml` は行 `files` の管理用の YAML のフォルダの配下で、行 `prompts` の `paths` に当たる'
+    flow: |-
+      <!-- map: {"title": "正常系（ほかの行の文書になるファイルを数えない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as check_project
+        participant F as 配信元のフォルダ
+
+        C->>T: path
+        T-->>F: 管理用の YAML とそのフォルダの配下のファイルを読む
+        T->>T: 除外の条件と、ほかの行の paths に当たるファイルを外す
+        T-->>C: 同期の件数と内訳
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`sync.unindexed_files` が 0 で、`sync.items` に `content/prompts/p.yaml` が無い'
+      - '`violations` が空'
+    test: test_normal_when_file_belongs_to_other_row
 lead: 配信元の設定・管理用の YAML・スクリプトを検証する管理の MCP の `check_project` の入出力を定め、`check_project` を修正するときに参照する。
 tags:
   - name: action:検査
@@ -570,4 +601,8 @@ constraints:
   - item: 設定の探し方
     constraint: '`path` がフォルダのときは `project-index.yaml` を探し、無ければ `dev-docs.yaml` を探す（今の各リポジトリが `project-index.yaml` へ改名するまでの移行の間）'
     notes: 端末の設定の `config` は名前によらず書いたファイルを読む
+  - item: ほかの行の文書になるファイル
+    constraint: '`records`・`body_file` の行の管理用の YAML のフォルダの配下でも、ほかの documents の行の `paths` に当たり、その行の `exclude` に当たらないファイルを `unindexed_files` に数えない。起動時の警告・状態の取得も同じ判定を使う'
+    notes: そのファイルはほかの行の文書として配信するため、管理用の YAML に記載しない
 test_file: tests/integration/server/test_check_project.py
+visibility: internal

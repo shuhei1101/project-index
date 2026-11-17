@@ -130,7 +130,7 @@ class SourceAddResult:
     result: Literal["added", "exists"]
     # 同じ id の行の内容が同じか（`exists` のときだけ）
     same: bool | None = None
-    # 読み直した後の配信元の状態（`added` のときだけ）
+    # 再読み込みした後の配信元の状態（`added` のときだけ）
     statuses: list[SourceStatus] = field(default_factory=list[SourceStatus])
     # `added` は追加した後、`exists` は今の端末の設定の内容のバージョン
     version: str = ""
@@ -140,7 +140,7 @@ class SourceAddResult:
 class SourceWriteResult:
     """丸ごとの保存・1 行の変更・1 行の削除の戻り値。"""
 
-    # 読み直した後の配信元の状態
+    # 再読み込みした後の配信元の状態
     statuses: list[SourceStatus]
     # 書き換えた後の端末の設定の内容のバージョン
     version: str

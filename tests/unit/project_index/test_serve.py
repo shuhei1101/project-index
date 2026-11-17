@@ -450,7 +450,7 @@ def test_reload_sources(
     make_terminal_config: Callable[..., TerminalConfig],
     make_status: Callable[..., SourceStatus],
 ) -> None:
-    """読み直してからキャッシュを捨てる（正常系）。"""
+    """再読み込みしてからキャッシュを捨てる（正常系）。"""
     # 準備
     calls: list[str] = []
     statuses = [make_status("sample", 0)]
@@ -703,7 +703,7 @@ def test_run_migrate_when_config_invalid(
 
 def _files_args(**overrides: Any) -> argparse.Namespace:
     """`files` の解析結果を作る。"""
-    values: dict[str, Any] = {"root": "", "paths": ["src/**"], "exclude": []}
+    values: dict[str, Any] = {"root": "", "paths": ["src/**"], "exclude": [], "exclude_path": []}
     values.update(overrides)
     return argparse.Namespace(**values)
 
@@ -719,6 +719,28 @@ def test_run_files(
     (tmp_path / "src/logo.png").write_bytes(b"\x00PNG\r\n")
     # 実行
     code = main_module.run_files(_files_args(root=str(tmp_path), paths=["src/**"], exclude=[]))
+    # 検証
+    assert code == 0
+    assert capsys.readouterr().out == "src/a.py\n"
+
+
+def test_run_files_when_exclude_path_given(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    write_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    """除外のパスを渡す（正常系）。"""
+    # 準備
+    write_files(tmp_path, {"src/a.py": "a = 1\n", "content/prompts/p.yaml": "id: p\n"})
+    # 実行
+    code = main_module.run_files(
+        _files_args(
+            root=str(tmp_path),
+            paths=["**"],
+            exclude=[],
+            exclude_path=["content/prompts/**/*.yaml"],
+        )
+    )
     # 検証
     assert code == 0
     assert capsys.readouterr().out == "src/a.py\n"
@@ -1132,7 +1154,7 @@ def test_reload_changed_sources(
     make_served_source: Callable[..., ServedSource],
     make_status: Callable[..., SourceStatus],
 ) -> None:
-    """変わった行を読み直してから、新しく読んだ配信元だけでキャッシュを捨てる（正常系）。"""
+    """変わった行を再読み込みしてから、新しく読んだ配信元だけでキャッシュを捨てる（正常系）。"""
     # 準備
     calls: list[str] = []
     a = make_served_source(id="a")
@@ -1168,7 +1190,7 @@ def test_build_handlers_when_unknown_key_reloaded(
     make_terminal_config: Callable[..., TerminalConfig],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """読み直しで知らないキーを差し替える（正常系）。"""
+    """再読み込みで知らないキーを差し替える（正常系）。"""
     # 準備
     terminal = make_terminal_config()
     handlers = build_handlers(terminal)
@@ -1185,7 +1207,7 @@ def test_build_handlers_when_unknown_key_reloaded_changed(
     make_terminal_config: Callable[..., TerminalConfig],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """変わった配信元の読み直しでも知らないキーを差し替える（正常系）。"""
+    """変わった配信元の再読み込みでも知らないキーを差し替える（正常系）。"""
     # 準備
     terminal = make_terminal_config(unknown_keys=["old"])
     handlers = build_handlers(terminal)

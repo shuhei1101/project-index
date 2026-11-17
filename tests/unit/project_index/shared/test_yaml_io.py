@@ -80,3 +80,39 @@ def test_dump_roundtrip() -> None:
     result = dump_roundtrip(doc)
     # 検証
     assert result == "a: |-\n  x\n  y\n"
+
+
+def test_dump_roundtrip_when_original_unindented() -> None:
+    """字下げ無しの配列を保つ（正常系）。"""
+    # 準備
+    original = "items:\n- key: k1\n  label: a\n"
+    doc = load_roundtrip(original)
+    doc["items"].append(CommentedMap({"key": "k2", "label": "b"}))
+    # 実行
+    result = dump_roundtrip(doc, original=original)
+    # 検証
+    assert result == "items:\n- key: k1\n  label: a\n- key: k2\n  label: b\n"
+
+
+def test_dump_roundtrip_when_original_indented() -> None:
+    """2 文字の字下げの配列を保つ（正常系）。"""
+    # 準備
+    original = "items:\n  - key: k1\n    label: a\n"
+    doc = load_roundtrip(original)
+    doc["items"].append(CommentedMap({"key": "k2", "label": "b"}))
+    # 実行
+    result = dump_roundtrip(doc, original=original)
+    # 検証
+    assert result == "items:\n  - key: k1\n    label: a\n  - key: k2\n    label: b\n"
+
+
+def test_dump_roundtrip_when_original_without_sequence() -> None:
+    """配列の無い元の文字列は既定の字下げ（正常系）。"""
+    # 準備
+    original = "a: 1\n"
+    doc = load_roundtrip(original)
+    doc["items"] = [CommentedMap({"key": "k1", "label": "a"})]
+    # 実行
+    result = dump_roundtrip(doc, original=original)
+    # 検証
+    assert result == "a: 1\nitems:\n  - key: k1\n    label: a\n"

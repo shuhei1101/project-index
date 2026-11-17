@@ -113,7 +113,7 @@ def _source_states(
             source = served[status.id]
             config_version = source.config.version
             # 裏で実行した検査の最後の結果を読み、配信元のファイルはたどらない。
-            # 同期の件数を含めない指定（読み直しの応答）のときは結果を参照しない
+            # 同期の件数を含めない指定（再読み込みの応答）のときは結果を参照しない
             check = handlers.checks.get(status.id) if with_sync else None
             states.append(
                 SourceState(
@@ -160,8 +160,8 @@ def get_status(handlers: Handlers, *, env: Mapping[str, str]) -> ServerStatus:
 
 
 def reload_config(handlers: Handlers) -> ReloadResult:
-    """端末の設定と配信元の設定を読み直し、前後の差を返す。"""
-    # 端末の設定の保存と同じロックの中で、一度に 1 つだけ読み直す
+    """端末の設定と配信元の設定を再読み込みし、前後の差を返す。"""
+    # 端末の設定の保存と同じロックの中で、一度に 1 つだけ再読み込みする
     with handlers.settings_lock:
         before = _serving_ids(handlers)
         terminal = load_terminal_config(handlers.terminal.file)
@@ -177,11 +177,11 @@ def reload_config(handlers: Handlers) -> ReloadResult:
                 for status in statuses
                 if status.status == "not_served"
             ],
-            # 裏の検査が済んでいても、読み直しの応答には同期の件数を含めない
+            # 裏の検査が済んでいても、再読み込みの応答には同期の件数を含めない
             sources=_source_states(handlers, with_sync=False),
         )
     logger.info(
-        "設定を読み直した（追加 %s・削除 %s・配信していない %s）",
+        "設定を再読み込みした（追加 %s・削除 %s・配信していない %s）",
         len(result.added),
         len(result.removed),
         len(result.not_served),
@@ -596,7 +596,8 @@ def write_nav(request: WriteNavRequest, *, handlers: Handlers) -> WriteNavResult
             next_steps=["/project-index:setup で配信元を追加してください"],
         )
     try:
-        doc = load_roundtrip(config_file.read_text(encoding="utf-8"), file=str(config_file))
+        original = config_file.read_text(encoding="utf-8")
+        doc = load_roundtrip(original, file=str(config_file))
     except YamlLoadError as error:
         raise ConfigParseError(
             message=f"配信元の設定を読み込めません: {config_file}（{error}）",
@@ -625,7 +626,8 @@ def write_nav(request: WriteNavRequest, *, handlers: Handlers) -> WriteNavResult
     for index, operation in enumerate(request.operations):
         _apply_nav_operation(nav, operation, index)
     doc["nav"] = nav
-    text = dump_roundtrip(doc)
+    # 読んだ設定のファイルの配列の字下げで書く
+    text = dump_roundtrip(doc, original=original)
     # 書いた後の設定を使い捨てのフォルダに置き、配信元を組み立てて確かめる
     with tempfile.TemporaryDirectory() as directory:
         file = Path(directory) / CONFIG_FILE

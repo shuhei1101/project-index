@@ -1116,7 +1116,7 @@ constraints:
     constraint: 制限なし
   - item: 管理用の YAML の同期で比べる範囲
     constraint: 管理用の YAML のフォルダの配下（下のフォルダを含む）のファイルから、管理用の YAML 自身と `SKIP_DIRS` を除いたもの
-    notes: 件数は配信元を受け取って求める関数で求め、配信元の状態には持たない。読み直しのときも同じ関数で求め直す
+    notes: 件数は配信元を受け取って求める関数で求め、配信元の状態には持たない。再読み込みのときも同じ関数で求め直す
   - item: 設定・スキーマ・スクリプトの読み元
     constraint: 'Git の配信元は、ディスクの `project-index.yaml` から `default_ref` だけを読み（ディスクに無いか読めないときは既定の `develop`）、`project-index.yaml`・`documents[].schema` のスキーマ・`validators`・`converters` のスクリプトを `default_ref` から読む（`generators` は書き込み先のワークツリーのスクリプトで動く）。要求ごとに `default_ref` の commit を確かめ、変わっていれば配信元を組み立て直す。Git でない配信元と、端末の設定の行が `storage.type: disk` の配信元は、ディスクの設定・スキーマ・スクリプトを読み、`default_ref`・リポジトリの直下・メインのリポジトリを求めない。先頭の設定が `default_ref` に無く、`git check-ignore` で無視されていれば、先頭の設定はディスクから読み、スキーマとスクリプトは `default_ref` から読む。無視されていなければ `config[0]` の `{default_ref} に {パス} がありません` で配信しない'
     notes: '`worktree` の引数で作業ツリー・ワークツリーを指して読むときは、そのフォルダの設定とスクリプトを使う。そのフォルダに無く、無視されている設定のファイルは、クローン本体のディスクのファイルを使う'
@@ -1134,7 +1134,7 @@ constraints:
     constraint: '文書の MCP の instructions（`kind: instructions`）と、文書の MCP・管理の MCP のツールごとの description（`kind: tool`）を、起動のときにプロンプトの YAML から読んで描画する。コードは文を持たない。instructions は 4,096 字以内'
     notes: ツールの名前・引数・返り値は変えない。YAML を書き換えたときは再起動で効かせる。instructions の配信元と使う場面の一覧は、下の「instructions の配信元と使う場面の一覧」のとおり接続ごとに描画する
   - item: instructions の配信元と使う場面の一覧
-    constraint: '文書の MCP の `initialize`・`server/discover`（2026-07-28 版）のたびに、配信元の一覧の今のキャッシュ（`registry.served()`）から、`when` を持つ配信元を端末の設定の `sources[]` の順に並べ、ID と `when` の 1 行目をプロンプトの YAML（`mcp/docs/instructions`）の一覧の部品で描画して、instructions の末尾に加える。描画は lowlevel の `Server` の `create_initialization_options` の上書きと、`add_request_handler` での `server/discover` の置き換えで行い、どちらの中でも Git を呼ばない。応答の後に、並べた配信元ごとの `default_ref` の commit の確認と、変わっていたときの組み立て直しを裏のスレッドで実行する（引数なしの `describe` と同じ。配信元ごとに走っている確認があれば新しく実行しない）。組み立て直した配信元はキャッシュに差し替わり、次の `initialize` がキャッシュを読み直して描画する。instructions 全体が 4,096 字を超えるときは、端末の設定の順に収まる配信元まで載せ、載せなかった件数と `describe(outside_scope: true)` の案内を添える。`when` を持つ配信元が無いときは一覧の部品を描画しない'
+    constraint: '文書の MCP の `initialize`・`server/discover`（2026-07-28 版）のたびに、配信元の一覧の今のキャッシュ（`registry.served()`）から、`when` を持つ配信元を端末の設定の `sources[]` の順に並べ、ID と `when` の 1 行目をプロンプトの YAML（`mcp/docs/instructions`）の一覧の部品で描画して、instructions の末尾に加える。描画は lowlevel の `Server` の `create_initialization_options` の上書きと、`add_request_handler` での `server/discover` の置き換えで行い、どちらの中でも Git を呼ばない。応答の後に、並べた配信元ごとの `default_ref` の commit の確認と、変わっていたときの組み立て直しを裏のスレッドで実行する（引数なしの `describe` と同じ。配信元ごとに走っている確認があれば新しく実行しない）。組み立て直した配信元はキャッシュに差し替わり、次の `initialize` がキャッシュを再読み込みして描画する。instructions 全体が 4,096 字を超えるときは、端末の設定の順に収まる配信元まで載せ、載せなかった件数と `describe(outside_scope: true)` の案内を添える。`when` を持つ配信元が無いときは一覧の部品を描画しない'
     notes: 'instructions は接続の時点で作業場所（`cwd`）を受け取らないため、`scope`・`outside_read` で絞らない。`initialize` は配信元の読み込みを待たない（待ち受けまでの順番）ため、読み込み中に届いた `initialize` の一覧は読み込み済みの配信元だけになる。一覧と案内の文はプロンプトの YAML が持ち、コードは値（ID・`when` の 1 行目・載せなかった件数）だけを渡す。mcp 2.3.0 の `initialize` は読み取りのループの中で同期に実行され、`create_initialization_options()` で `Server.instructions` を読む。`initialize` の中で確認・組み立て直しをすると、/mnt/c で確認が 1 件 0.4〜1.0 秒、組み立て直しが 1 件 15〜27 秒、同じプロセスのほかの要求ごと止まる（2026-11-13 の実測）'
   - item: 待ち受けまでの順番
     constraint: 端末の設定・ポート・プロンプトの YAML を確かめたら待ち受けを始め、配信元の読み込み（`registry.reload`）とその後の検査（管理用の YAML の同期・エイリアスのキー・`nav` の警告）を待ち受けの裏で流す。配信元を使う要求は、その配信元の読み込みが終わるまで待ってから答える（配信元の読み込みの単位）。検査は待たない
@@ -1159,3 +1159,4 @@ refs:
     type: references
     when: このインターフェースの入出力やフローを変えるときに、シナリオ『起動する』の対応する流れと期待値を確認する。
 test_file: tests/integration/server/test_serve.py
+visibility: internal

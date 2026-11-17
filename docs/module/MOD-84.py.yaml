@@ -129,7 +129,7 @@ functions:
       description: 同じなら何も返さない
     process: |-
       1. 文字列なら `document.version` と比べる。辞書なら項目ごとに今の値の値のハッシュと比べる
-      2. 違う場合、今のバージョンと、`last_read` があればその内容と今の本文の差分の行（変更.差分の行）を添えた `VersionMismatchError` を送る（`next_steps` に読み直して呼び直すこと）
+      2. 違う場合、今のバージョンと、`last_read` があればその内容と今の本文の差分の行（変更.差分の行）を添えた `VersionMismatchError` を送る（`next_steps` に `search_docs` で再取得して呼び直すこと）
     exceptions:
       - name: VersionMismatchError
         condition: バージョンが違う
@@ -230,7 +230,7 @@ functions:
          - `@body` を受け付けるかを確かめる。種類の行が `body_file` を持たない文書への `@body`、`unset`・`add_to`・`remove_from` の `@body`、`body_file` の行の `create` で `data` に `@body` が無いこと、`update`・`replace` で `body_file` の列の値が今の値と違うことは、添字つきの違反で `InvalidArgumentError` にする
          - `body_file` の行の文書は、本文の適用（`current_body` は `update`・`replace` が今の文書の本文、`create` が `None`）で新しい本文を求める。本文のファイルのパスは文書のストアの本文のファイルのパスの解決で解き、`create` で `None`（配信元の外）か、作業ツリーに既にあるファイル・同じ呼び出しの前の `create` が作る本文のファイルなら、`path` が `body_file` の列名の違反を `failed` の行に入れる（手順 6 では `ValidationFailedError` として送る）。新しい本文は、本文のファイルのパス → 本文で持ち、後の操作が同じ本文のファイルに当たるときは当てた後の本文に重ねる
          - 操作を当てる。`records` の文書は配列の要素を、それ以外はファイルの内容を置き換える
-         - 変更を当てた後のファイルの内容を往復編集の書き出しで文字列にし、文字列からの文書の組み立て（`read_body` は、新しい本文を持つ本文のファイルならその本文、無ければ作業ツリーのファイルを返す）で文書にして、文書の検査.検査する（`on="write"`、`create` は `new=True`、`deadline` は `limits` があれば `limits.write_deadline`）。違反はスキーマの説明の添付にかけ（スキーマは文書のストア.文書に当てるスキーマ）、添字を付けて `failed` の行に入れる。添字を付けるときは `schema` を保つ
+         - 変更を当てた後のファイルの内容を往復編集の書き出し（`original` は、既にあるファイルに当てるときはそのファイルの作業ツリーの文字列、新しいファイルを作る `create` は `None`）で文字列にし、文字列からの文書の組み立て（`read_body` は、新しい本文を持つ本文のファイルならその本文、無ければ作業ツリーのファイルを返す）で文書にして、文書の検査.検査する（`on="write"`、`create` は `new=True`、`deadline` は `limits` があれば `limits.write_deadline`）。違反はスキーマの説明の添付にかけ（スキーマは文書のストア.文書に当てるスキーマ）、添字を付けて `failed` の行に入れる。添字を付けるときは `schema` を保つ
          - 検査するで違反が無ければ、文書の検査.Markdownの値を点検する（`deadline` は検査すると同じ。`previous` は `update`・`replace` が操作の前の文書の `data`、`create` が `None`。`stopped` は同じ呼び出しの前の点検が返した `stopped`）。違反は添字を付けて `failed` の行に入れ、点検できなかったキーは成功した行の `unchecked` に入れる。返った `stopped` を次の操作へ引き継ぐ
          - 後の操作が同じファイルに当たるときは、当てた後の内容に重ねる
          - `WriteDeadlineExceededError` は `failed` の行にせず、`atomic` によらずそのまま送る（何も書かない）
@@ -385,6 +385,18 @@ functions:
         condition: '`body_file` を持たない行の文書への `set: {@body: x}`、`body_file` の行への `@body` の無い `create`、n1 の `set: {path: other.md}`、n1 の `unset: [@body]` を 1 件ずつ'
         mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: 全て `InvalidArgumentError` で、違反の `path` が `operations[0].set.@body`・`operations[0].data.@body`・`operations[0].set.path`・`operations[0].unset`。どのファイルも変わらない
+      - name: test_write_docs_when_indent_preserved
+        case: 正常
+        summary: 元のファイルの配列の字下げを保つ
+        condition: '文書 1 の `items:` の直下に `- ` を字下げ無しで `{key, label}` の要素を 2 つ並べ、`add_to: {items: [{key: k3, label: 名称 3}]}` と、`replace`（同じ `items` に 1 要素を加えた `data`）を 1 件ずつ'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        expected: 2 件とも、書き換えたファイルの `- ` が字下げ無しのままで、`diff` が加えた要素の 2 行の `+` だけ
+      - name: test_write_docs_when_records_indent_preserved
+        case: 正常
+        summary: '`records` への追加で管理用の YAML の配列の字下げを保つ'
+        condition: '`records: items`・`body_file: path` の行の管理用の YAML が `items:` の直下に `- ` を字下げ無しで並べる。`create`（`data: {id: n2, path: n2.md, @body: 本文}`）'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        expected: '管理用の YAML は元の行の後ろに、字下げ無しの `- id: n2` と `path: n2.md` の 2 行だけが加わる'
   - name: delete_docs
     title: 文書の削除
     kind: 関数
@@ -454,7 +466,7 @@ functions:
       5. 参照を外した文書を文書の検査に通す（違反は `ValidationFailedError`。`deadline` は `limits` があれば `limits.write_deadline`）
       6. `dry_run` なら `applied=False` で、`unlinked` に参照を外す文書と外した後のバージョンを入れて返す
       7. `limits` がある場合、文書の書き込みの手順 9 と同じに期限を確かめる
-      8. ファイル 1 つの文書はファイルを消し、`records` の文書は配列から要素を除いてファイルを置き換える。`body_file` の行の文書は本文のファイルも消す。要素を除いた後の同じ管理用の YAML の要素が同じ本文のファイルを指すときと、本文のファイルが無いときは消さない。参照を外した文書を書き、文書のストア.キャッシュを捨てる
+      8. ファイル 1 つの文書はファイルを消し、`records` の文書は配列から要素を除いて、往復編集の書き出し（`original` はそのファイルの作業ツリーの文字列）でファイルを置き換える。`body_file` の行の文書は本文のファイルも消す。要素を除いた後の同じ管理用の YAML の要素が同じ本文のファイルを指すときと、本文のファイルが無いときは消さない。参照を外した文書を、往復編集の書き出し（`original` は参照元のファイルの作業ツリーの文字列）で書き、文書のストア.キャッシュを捨てる
       9. 消した種類の `after_write` の生成を、文書の書き込みと同じに動かす（引数は消したファイルのパス。制限時間も同じ）
       10. `applied=True` で、`unlinked` に参照を外した文書と新しいバージョンを入れて返す
     exceptions:
@@ -526,6 +538,18 @@ functions:
         mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: n1 の最上位の `refs` が n3 だけになり、`functions[0].refs` が空になる。`unlinked` に n1
         exception: '-'
+      - name: test_delete_docs_when_unlink_indent_preserved
+        case: 正常
+        summary: 参照を外した文書の配列の字下げを保つ
+        condition: '文書 2 が `related:` の直下に `- ` を字下げ無しで `{to, type}` の要素を 2 つ並べ、その 1 つが文書 1 を指す。文書 1 を `on_referenced: unlink` で消す'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        expected: 文書 2 のファイルは、文書 1 を指す要素の 2 行だけが消え、残る行は書き込み前の文字列と一致する（`- ` が字下げ無しのまま）
+      - name: test_delete_docs_when_records_indent_preserved
+        case: 正常
+        summary: '`records` の要素の削除で管理用の YAML の配列の字下げを保つ'
+        condition: '`records: items`・`body_file: path` の行の管理用の YAML が `items:` の直下に `- ` を字下げ無しで 2 要素を並べる。2 件目を消す'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        expected: 管理用の YAML は 2 件目の要素の 2 行だけが消え、1 件目は字下げ無しのまま残る
 refs:
   - to: IF-6
     type: requires
@@ -533,3 +557,4 @@ refs:
   - to: IF-7
     type: requires
     when: インターフェース定義『文書の削除』の入出力を変えるときに、この設計書の関数と型を合わせる。
+visibility: internal

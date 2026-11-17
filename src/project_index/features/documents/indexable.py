@@ -83,10 +83,22 @@ def is_excluded_file(root: Path, path: str) -> bool:
     return b"\x00" in head
 
 
-def indexable_files(root: Path, paths: Sequence[str], *, exclude: Sequence[str] = ()) -> list[str]:
-    """範囲の glob に当たるファイルのうち、除外の名前と除外の条件に当たらないものを返す。"""
+def indexable_files(
+    root: Path,
+    paths: Sequence[str],
+    *,
+    exclude: Sequence[str] = (),
+    exclude_paths: Sequence[str] = (),
+) -> list[str]:
+    """範囲の glob に当たるファイルのうち、除外の名前・除外のパス・除外の条件に当たらないものを返す。"""
     # loader が walk_files を使うため、循環を避けて呼ぶ時点で取り込む
     from project_index.features.documents.loader import collect_files
 
     table = DocumentTable(id="files", paths=list(paths), schema_path="", exclude=list(exclude))
-    return [path for path in collect_files(root, table) if not is_excluded_file(root, path)]
+    return [
+        path
+        for path in collect_files(root, table)
+        # 除外のパスは文書の行の paths と同じく、パス全体で当てる
+        if not any(PurePosixPath(path).full_match(pattern) for pattern in exclude_paths)
+        and not is_excluded_file(root, path)
+    ]

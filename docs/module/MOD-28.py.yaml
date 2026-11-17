@@ -185,10 +185,11 @@ functions:
         summary: 要素のスキーマを取り出す
         condition: '`templates/files.schema.yaml` を読んだスキーマと `files`'
         mock: なし
-        expected: '`required` が `[path]` の `items`'
+        expected: '`required` が `[path]` で、`properties` に `id`・`aliases`・`inject_when`・`category` を持つ `items`'
       - name: test_records_item_schema_when_missing
         case: 正常
         summary: 要素のスキーマが無い
         condition: '`properties.files` が `{type: array}` だけのスキーマ、`properties` が無いスキーマ、`files` 以外の `records`'
         mock: なし
         expected: どれも `None`
+visibility: internal

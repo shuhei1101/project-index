@@ -55,7 +55,7 @@ def settings_path(tmp_path: Path) -> Path:
 def fake_reload(
     make_status: Callable[..., SourceStatus],
 ) -> tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]]:
-    """`serving` を 2 つ返し、呼ばれた端末の設定を記録する配信元の読み直しの偽物。"""
+    """`serving` を 2 つ返し、呼ばれた端末の設定を記録する配信元の再読み込みの偽物。"""
     calls: list[TerminalConfig] = []
 
     def _reload(terminal: TerminalConfig) -> list[SourceStatus]:
@@ -311,7 +311,7 @@ def test_add_source(
     fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
     make_entry: Callable[..., SourceEntry],
 ) -> None:
-    """末尾に追加して読み直す（正常系）。"""
+    """末尾に追加して再読み込みする（正常系）。"""
     # 準備
     reload, calls = fake_reload
     entry = make_entry("/tmp/b/project-index.yaml", source_id="b")
@@ -884,3 +884,62 @@ def test_save_sources_when_unsent_storage(
     # 検証
     row = load_yaml(path.read_text(encoding="utf-8"))["sources"][0]
     assert row["storage"] == {"type": "disk"}
+
+
+INDENTLESS_TEXT = (
+    'version: "1"\n'
+    "clone: /tmp/clone\n"
+    "sources:\n"
+    "- id: sample\n"
+    "  config:\n"
+    "  - /tmp/a/project-index.yaml\n"
+)
+
+
+def test_save_sources_when_indent_preserved(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """端末の設定の配列の字下げを保つ（正常系）。"""
+    # 準備
+    path = tmp_path / "settings.yaml"
+    path.write_text(INDENTLESS_TEXT, encoding="utf-8")
+    reload, _ = fake_reload
+    sources = [make_entry("/tmp/a/project-index.yaml", source_id="sample")]
+    # 実行
+    save_sources(
+        sources,
+        expected_version=read_settings_file(path)[1],
+        path=path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
+    # 検証
+    assert path.read_text(encoding="utf-8") == INDENTLESS_TEXT
+
+
+def test_add_source_when_indent_preserved(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """端末の設定の配列の字下げを保って 1 行を追加する（正常系）。"""
+    # 準備
+    path = tmp_path / "settings.yaml"
+    path.write_text(INDENTLESS_TEXT, encoding="utf-8")
+    reload, _ = fake_reload
+    entry = make_entry("/tmp/b/project-index.yaml", source_id="extra")
+    # 実行
+    result = add_source(
+        entry,
+        expected_version=read_settings_file(path)[1],
+        path=path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
+    # 検証
+    assert result.result == "added"
+    assert path.read_text(encoding="utf-8") == (
+        INDENTLESS_TEXT + "- id: extra\n  config:\n  - /tmp/b/project-index.yaml\n"
+    )

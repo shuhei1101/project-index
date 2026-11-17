@@ -51,7 +51,7 @@ class LoadedPrompt:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class PromptSet:
-    """起動のときに読んだプロンプトを ID で引いて描画する（読み直さない）。"""
+    """起動のときに読んだプロンプトを ID で引いて描画する（再読み込みしない）。"""
 
     prompts: dict[str, LoadedPrompt]
     env: jinja2.Environment

@@ -14,7 +14,7 @@ diagrams:
         direction TD
         端末の設定の入口 ..> 配信元の保存 : PUT
         配信元の保存 ..> 端末の設定の検証 : 書く前
-        配信元の保存 ..> 配信元の読み直し : 書いた後
+        配信元の保存 ..> 配信元の再読み込み : 書いた後
         class 端末の設定の入口 {
           <<function>>
         }
@@ -24,12 +24,12 @@ diagrams:
         class 端末の設定の検証 {
           <<function>>
         }
-        class 配信元の読み直し {
+        class 配信元の再読み込み {
           <<function>>
         }
         click 端末の設定の入口 href "id:MOD-65#functions[build_settings_router]"
         click 端末の設定の検証 href "id:MOD-64#functions[validate_terminal_config]"
-        click 配信元の読み直し href "id:MOD-89#functions[reload_sources]"
+        click 配信元の再読み込み href "id:MOD-89#functions[reload_sources]"
 functions:
   - name: save_sources
     title: 配信元の保存
@@ -37,7 +37,7 @@ functions:
     container: project_index/features/settings/service.py
     usecase: 端末の設定の保存
     role: サービス
-    summary: '`settings.yaml` の `sources` だけを書き換え、検証に通ったら書いて配信元を読み直す'
+    summary: '`settings.yaml` の `sources` だけを書き換え、検証に通ったら書いて配信元を再読み込みする'
     scope: public
     thread_safe: true
     side_effects: 端末の設定のファイルを書き換え、配信元の一覧を入れ替える
@@ -55,7 +55,7 @@ functions:
         passing: injected
         description: 端末の設定のパス
       - name: reload
-        title: 配信元の読み直し
+        title: 配信元の再読み込み
         type: Callable[[TerminalConfig], list[SourceStatus]]
         required: true
         passing: injected
@@ -65,7 +65,7 @@ functions:
         type: threading.Lock
         required: true
         passing: injected
-        description: 端末の設定の読み書きと読み直しの排他
+        description: 端末の設定の読み書きと再読み込みの排他
       - name: expected_version
         title: 取得したときの内容のバージョン
         type: str
@@ -74,7 +74,7 @@ functions:
         description: '今の内容のバージョンと照合する'
     returns:
       type: SourceWriteResult
-      description: 読み直した後の配信元ごとの状態と、書き換えた後の端末の設定の内容のバージョン
+      description: 再読み込みした後の配信元ごとの状態と、書き換えた後の端末の設定の内容のバージョン
     process: |-
       1. `lock` を取る
       2. 端末の設定の本文と内容のバージョンを読み（端末の設定の内容の読み込み）、内容のバージョンを照合する（内容のバージョンの照合）
@@ -84,9 +84,9 @@ functions:
       4. `sources` だけを埋めた後の行に置き換える。`config` は要素の数によらず配列で書く。既定値と同じキー（`enabled: true`・`outside_read: true`・空の `scope.read` など）は書かない
       5. 置き換えた値を検証する（端末の設定の検証）
          - 違反がある場合、ファイルを書かずに `TerminalConfigInvalidError` を送る
-      6. 一時ファイルに書いてから置き換える（往復編集の書き出し・ファイルの置き換え）
+      6. 一時ファイルに書いてから置き換える（往復編集の書き出し・ファイルの置き換え。往復編集の書き出しの `original` は手順 2 で読んだ本文）
          - `[info]` 端末の設定の sources を保存した（パス・行数）
-      7. 書いた後の端末の設定の内容のバージョンを求め（端末の設定の内容の読み込み）、端末の設定を読み直して（端末の設定の読み込み）、`reload` で配信元を読み直し、状態と内容のバージョンを返す（起動の『配信元の読み直し』）
+      7. 書いた後の端末の設定の内容のバージョンを求め（端末の設定の内容の読み込み）、端末の設定を再読み込みして（端末の設定の読み込み）、`reload` で配信元を再読み込みし、状態と内容のバージョンを返す（起動の『配信元の再読み込み』）
     exceptions:
       - name: TerminalConfigInvalidError
         condition: 置き換えた後の端末の設定がスキーマに通らない
@@ -101,62 +101,62 @@ functions:
         case: 正常
         summary: sources だけを書き換えコメントを保つ
         condition: '`port` にコメントを持つ設定に、行を 1 つ足した `sources`'
-        mock: 配信元の読み直し（`serving` を 2 つ返す偽物）
+        mock: 配信元の再読み込み（`serving` を 2 つ返す偽物）
         expected: ファイルの `sources` が 2 行で、`port` の行とコメントはそのまま。`reload` が書いた後の設定で 1 回呼ばれる
       - name: test_save_sources_when_defaults
         case: 正常
         summary: 既定値のキーを書かない
         condition: '`enabled: true`・`scope.read: []`・`config` が要素 1 つの行'
-        mock: 配信元の読み直し（偽物）
+        mock: 配信元の再読み込み（偽物）
         expected: ファイルの行に `enabled` と `scope` が無く、`config` が要素 1 つの配列
       - name: test_save_sources_when_outside_read_false
         case: 正常
         summary: 既定値と違う outside_read を書く
         condition: '`outside_read: false` の行'
-        mock: 配信元の読み直し（偽物）
+        mock: 配信元の再読み込み（偽物）
         expected: 'ファイルの行に `outside_read: false` がある'
       - name: test_save_sources_when_unsent_keys
         case: 正常
         summary: 行に含めなかったキーをファイルの同じ配信元の行の値で埋める
         condition: 'ファイルの extra の行に `enabled: false`・`outside_read: false`・`scope.read`・`scope.write`。送る extra の行は `id`・`config` と `scope.read` だけ'
-        mock: 配信元の読み直し（偽物）
+        mock: 配信元の再読み込み（偽物）
         expected: 'ファイルの extra の行に `enabled: false`・`outside_read: false`・元の `scope.write` が残り、`scope.read` は送った値'
       - name: test_save_sources_when_sent_keys_override
         case: 正常
         summary: 行に含めたキーは送った値で書く
         condition: 'ファイルの extra の行に `outside_read: false`。送る extra の行に `outside_read: true`'
-        mock: 配信元の読み直し（偽物）
+        mock: 配信元の再読み込み（偽物）
         expected: ファイルの extra の行に `outside_read` が無い
       - name: test_save_sources_when_no_same_row
         case: 正常
         summary: ファイルに同じ配信元の行が無い行は埋めない
         condition: 'ファイルの sample の行に `outside_read: false`。送る行は id が extra で `config` が同じ'
-        mock: 配信元の読み直し（偽物）
+        mock: 配信元の再読み込み（偽物）
         expected: ファイルの extra の行に `outside_read` が無い
       - name: test_save_sources_when_current_row_invalid
         case: 正常
         summary: ファイルに読めない行があっても送った行で保存する
         condition: 'ファイルの extra の行に知らないキー `outside-read: false`。送る extra の行は `id`・`config` だけ'
-        mock: 配信元の読み直し（偽物）
+        mock: 配信元の再読み込み（偽物）
         expected: 例外を送らず、ファイルの extra の行が `id`・`config` だけになる。`reload` が 1 回呼ばれる
       - name: test_save_sources_when_invalid
         case: 異常
         summary: 検証に通らない
         condition: '2 行とも `id: a`'
-        mock: 配信元の読み直し（偽物）
+        mock: 配信元の再読み込み（偽物）
         expected: '`TerminalConfigInvalidError` で、ファイルは元のまま、`reload` は呼ばれない'
         exception: 置き換えた後がスキーマに通らない
       - name: test_save_sources_when_version_matched
         case: 正常
         summary: 内容のバージョンが一致すれば保存する
         condition: '`expected_version` に今の内容のバージョン'
-        mock: 配信元の読み直し（偽物）
+        mock: 配信元の再読み込み（偽物）
         expected: ファイルが書き換わり、戻り値の `version` が書いた後のファイルの内容のバージョン
       - name: test_save_sources_when_version_outdated
         case: 異常
         summary: 内容のバージョンが古い
         condition: '`expected_version` に、末尾へコメントを足す前の内容のバージョン'
-        mock: 配信元の読み直し（呼ばれた数を数える）
+        mock: 配信元の再読み込み（呼ばれた数を数える）
         expected: '`SettingsVersionMismatchError` で `current` が今の内容のバージョン。ファイルは変わらず、`reload` は呼ばれない'
         exception: 内容のバージョンが今と違う
       - name: test_save_sources_when_unknown_top_level_key
@@ -171,13 +171,19 @@ functions:
         condition: 'ファイルの company の行が `storage: {type: disk}`、送る行は `storage` を持たない'
         mock: '`reload` を stub'
         expected: '書いた company の行に `storage: {type: disk}` が残る'
+      - name: test_save_sources_when_indent_preserved
+        case: 正常
+        summary: 端末の設定の配列の字下げを保つ
+        condition: '`sources:` の直下に `- ` を字下げ無しで sample の 1 行を並べる `settings.yaml` に、同じ sample の 1 行を保存する'
+        mock: 配信元の再読み込み（偽物）
+        expected: 保存した `settings.yaml` が保存の前の文字列と一致する
   - name: add_source
     title: 配信元の 1 行の追加
     kind: 関数
     container: project_index/features/settings/service.py
     usecase: 端末の設定の配信元の 1 行の追加
     role: サービス
-    summary: 同じ id の行が無ければ `settings.yaml` の `sources` の末尾に 1 行追加して配信元を読み直し、あれば内容が同じかを返す
+    summary: 同じ id の行が無ければ `settings.yaml` の `sources` の末尾に 1 行追加して配信元を再読み込みし、あれば内容が同じかを返す
     scope: public
     thread_safe: true
     side_effects: 端末の設定のファイルを書き換え、配信元の一覧を入れ替える（追加したときだけ）
@@ -195,7 +201,7 @@ functions:
         passing: injected
         description: 端末の設定のパス
       - name: reload
-        title: 変わった配信元の読み直し
+        title: 変わった配信元の再読み込み
         type: Callable[[TerminalConfig], list[SourceStatus]]
         required: true
         passing: injected
@@ -205,7 +211,7 @@ functions:
         type: threading.Lock
         required: true
         passing: injected
-        description: 端末の設定の読み書きと読み直しの排他（配信元の保存と同じ）
+        description: 端末の設定の読み書きと再読み込みの排他（配信元の保存と同じ）
       - name: expected_version
         title: 取得したときの内容のバージョン
         type: str
@@ -214,7 +220,7 @@ functions:
         description: '今の内容のバージョンと照合する'
     returns:
       type: SourceAddResult
-      description: '`added` と読み直した後の状態か、`exists` と内容が同じか。どちらも端末の設定の内容のバージョンを持つ'
+      description: '`added` と再読み込みした後の状態か、`exists` と内容が同じか。どちらも端末の設定の内容のバージョンを持つ'
     process: |-
       1. `lock` を取る
       2. 端末の設定の本文と内容のバージョンを読み（端末の設定の内容の読み込み）、内容のバージョンを照合する（内容のバージョンの照合）
@@ -223,7 +229,7 @@ functions:
       4. `sources` の末尾に行を加える。書き方は配信元の保存と同じ（`config` は配列、既定値と同じキーは書かない）
       5. 加えた値を検証する（端末の設定の検証）
          - 違反がある場合、ファイルを書かずに `TerminalConfigInvalidError` を送る
-      6. 一時ファイルに書いてから置き換え、書いた後の内容のバージョンを求め、端末の設定を読み直して `reload` で変わった行の配信元だけを読み直し、`added` と状態と内容のバージョンを返す（起動の『変わった配信元の読み直し』）
+      6. 一時ファイルに書いてから置き換え（往復編集の書き出しの `original` は手順 2 で読んだ本文）、書いた後の内容のバージョンを求め、端末の設定を再読み込みして `reload` で変わった行の配信元だけを再読み込みし、`added` と状態と内容のバージョンを返す（起動の『変わった配信元の再読み込み』）
          - `[info]` 端末の設定の sources に 1 行追加した（パス・id）
     exceptions:
       - name: TerminalConfigInvalidError
@@ -237,7 +243,7 @@ functions:
     unit_tests:
       - name: test_add_source
         case: 正常
-        summary: 末尾に追加して読み直す
+        summary: 末尾に追加して再読み込みする
         condition: '`sources` に sample の 1 行の設定に extra を追加'
         mock: '`reload`（状態を返す偽物）'
         expected: '`added` で、ファイルの `sources` が sample・extra の順、コメントと他のキーが変わらず、`reload` が 1 回呼ばれる'
@@ -272,6 +278,12 @@ functions:
         condition: 最上位に `mindstella`（入れ子の値とコメント）を持つ `settings.yaml` に、extra の 1 行を追加する
         mock: なし（一時フォルダ。`reload` は状態を返す偽物）
         expected: '`added` で、`settings.yaml` の `mindstella` の値とコメントが追加の前と同じ'
+      - name: test_add_source_when_indent_preserved
+        case: 正常
+        summary: 端末の設定の配列の字下げを保って 1 行を追加する
+        condition: '`sources:` の直下に `- ` を字下げ無しで sample の 1 行を並べる `settings.yaml` に、extra の 1 行を追加する'
+        mock: '`reload`（状態を返す偽物）'
+        expected: '`settings.yaml` は元の行が全て追加の前の文字列と一致し、末尾に字下げ無しの `- ` で始まる extra の行だけが加わる'
       - name: test_add_source_when_version_outdated
         case: 異常
         summary: 内容のバージョンが古い
@@ -285,7 +297,7 @@ functions:
     container: project_index/features/settings/service.py
     usecase: 端末の設定の配信元の 1 行の変更
     role: サービス
-    summary: 指した 1 行に送ったキーだけを重ねて `settings.yaml` を書き換え、変わった行の配信元だけを読み直す
+    summary: 指した 1 行に送ったキーだけを重ねて `settings.yaml` を書き換え、変わった行の配信元だけを再読み込みする
     scope: public
     thread_safe: true
     side_effects: 端末の設定のファイルを書き換え、配信元の一覧の変わった行を入れ替える
@@ -315,7 +327,7 @@ functions:
         passing: injected
         description: 端末の設定のパス
       - name: reload
-        title: 変わった配信元の読み直し
+        title: 変わった配信元の再読み込み
         type: Callable[[TerminalConfig], list[SourceStatus]]
         required: true
         passing: injected
@@ -328,7 +340,7 @@ functions:
         description: 配信元の保存と同じ排他
     returns:
       type: SourceWriteResult
-      description: 読み直した後の配信元ごとの状態と、書き換えた後の内容のバージョン
+      description: 再読み込みした後の配信元ごとの状態と、書き換えた後の内容のバージョン
     process: |-
       1. `lock` を取る
       2. 端末の設定の本文と内容のバージョンを読み（端末の設定の内容の読み込み）、内容のバージョンを照合する（内容のバージョンの照合）
@@ -339,7 +351,7 @@ functions:
       6. 見つけた行の位置だけを、重ねた後の行に置き換える。書き方は配信元の保存と同じ
       7. 置き換えた値を検証する（端末の設定の検証）
          - 違反がある場合、ファイルを書かずに `TerminalConfigInvalidError` を送る
-      8. 一時ファイルに書いてから置き換え、書いた後の内容のバージョンを求め、端末の設定を読み直して `reload` で変わった行の配信元だけを読み直し、状態と内容のバージョンを返す（起動の『変わった配信元の読み直し』）
+      8. 一時ファイルに書いてから置き換え（往復編集の書き出しの `original` は手順 2 で読んだ本文）、書いた後の内容のバージョンを求め、端末の設定を再読み込みして `reload` で変わった行の配信元だけを再読み込みし、状態と内容のバージョンを返す（起動の『変わった配信元の再読み込み』）
          - `[info]` 端末の設定の sources の 1 行を変更した（パス・id）
     exceptions:
       - name: SettingsVersionMismatchError
@@ -435,7 +447,7 @@ functions:
         passing: injected
         description: 端末の設定のパス
       - name: reload
-        title: 変わった配信元の読み直し
+        title: 変わった配信元の再読み込み
         type: Callable[[TerminalConfig], list[SourceStatus]]
         required: true
         passing: injected
@@ -456,7 +468,7 @@ functions:
          - 無い場合、`SourceRowNotFoundError` を送る
       4. 見つけた行だけを `sources` から削除し、削除した後の値を検証する（端末の設定の検証）
          - 違反がある場合、ファイルを書かずに `TerminalConfigInvalidError` を送る
-      5. 一時ファイルに書いてから置き換え、書いた後の内容のバージョンを求め、端末の設定を読み直して `reload` で配信元の一覧から削除した行の配信元を除き、状態と内容のバージョンを返す（起動の『変わった配信元の読み直し』）
+      5. 一時ファイルに書いてから置き換え（往復編集の書き出しの `original` は手順 2 で読んだ本文）、書いた後の内容のバージョンを求め、端末の設定を再読み込みして `reload` で配信元の一覧から削除した行の配信元を除き、状態と内容のバージョンを返す（起動の『変わった配信元の再読み込み』）
          - `[info]` 端末の設定の sources から 1 行削除した（パス・id）
     exceptions:
       - name: SettingsVersionMismatchError
@@ -492,3 +504,4 @@ functions:
         mock: '`reload`（呼ばれた数を数える）'
         expected: '`SourceRowNotFoundError` で、ファイルは変わらず、`reload` は呼ばれない'
         exception: 配信元の ID が `source_id` の行が無い
+visibility: internal

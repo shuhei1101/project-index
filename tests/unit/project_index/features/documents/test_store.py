@@ -154,7 +154,7 @@ def test_document_store_load_when_cached(
     write_files: Callable[[Path, dict[str, str]], None],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """変わったファイルだけ読み直す（正常系）。"""
+    """変わったファイルだけ再読み込みする（正常系）。"""
     # 準備
     calls: list[str] = []
     real = store_module.load_file
@@ -306,7 +306,7 @@ def test_document_store_load_when_revision_reused(
     document_store: DocumentStore,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """新しい commit でも変わったファイルだけ読み直す（正常系）。"""
+    """新しい commit でも変わったファイルだけ再読み込みする（正常系）。"""
     # 準備
     root, first, second = _two_commits(git_repo, write_files, run_git)
     source = _git_source(root, root, make_source_config, make_served_source)
@@ -333,7 +333,7 @@ def test_document_store_load_when_revision_reused_after_clear(
     document_store: DocumentStore,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """配信元の組み立て直しの後も変わったファイルだけ読み直す（正常系）。"""
+    """配信元の組み立て直しの後も変わったファイルだけ再読み込みする（正常系）。"""
     # 準備
     root, first, second = _two_commits(git_repo, write_files, run_git)
     source = _git_source(root, root, make_source_config, make_served_source)
@@ -356,7 +356,7 @@ def test_document_store_load_when_revision_table_changed(
     document_store: DocumentStore,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """文書の行の定義が変われば読み直す（正常系）。"""
+    """文書の行の定義が変われば再読み込みする（正常系）。"""
     # 準備
     root = git_repo({"rules/a.yaml": "id: a\ntitle: T\n"})
     head = run_git(root, "rev-parse", "HEAD").strip()
@@ -712,8 +712,12 @@ def test_document_store_row_schema_when_records(
     # 実行
     result = document_store.row_schema(make_target(source), "notes")
     # 検証
-    assert result == files_schema["properties"]["files"]["items"]
     assert result["required"] == ["path"]
+    assert (
+        result["properties"].keys()
+        == files_schema["properties"]["files"]["items"]["properties"].keys()
+    )
+    assert result["$defs"].keys() == files_schema["$defs"].keys()
 
 
 def test_document_store_row_schema_when_records_defs(
@@ -912,6 +916,45 @@ def test_check_sync(
     assert len(report.missing_body_files) == 1
     assert report.missing_body_files[0].startswith("src/files.yaml: ")
     assert "c.py" in report.missing_body_files[0]
+
+
+def test_check_sync_when_file_belongs_to_other_row(
+    document_store: DocumentStore,
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+) -> None:
+    """ほかの行の文書になるファイルを索引に無いファイルに数えない（正常系）。"""
+    # 準備
+    root = tmp_path / "ws"
+    write_files(
+        root,
+        {
+            "files.yaml": "files:\n  - path: src/a.py\n",
+            "src/a.py": "a = 1\n",
+            "content/prompts/p.yaml": "id: p\n",
+        },
+    )
+    documents = [
+        DocumentTable(
+            id="files",
+            paths=["files.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            records="files",
+            body_file="path",
+        ),
+        DocumentTable(
+            id="prompts",
+            paths=["content/prompts/**/*.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+        ),
+    ]
+    source = make_served_source(root=root, config=make_source_config(documents=documents))
+    # 実行
+    report = store_module.check_sync(document_store, source)
+    # 検証
+    assert report.unindexed_files == []
 
 
 def test_check_sync_when_clean(

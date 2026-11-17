@@ -1,0 +1,92 @@
+docs:
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: reload の役割と節の「読み直し」「読み直さない」「読み直した」「読み直す」を「再読み込み」に修正
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:09:48.196697+00:00'
+  - page: docs/guide/設定.md
+    new: false
+    change: 「読み直し」を「再読み込み」に修正
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:09:48.196697+00:00'
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: 「読み直し」「読み直す」を「再読み込み」に修正
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:09:48.196697+00:00'
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: 「読み直し」「読み直す」を「再読み込み」に修正
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:09:48.196697+00:00'
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: 「読み直し」「読み直す」を「再読み込み」に修正
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:09:48.196697+00:00'
+  - page: docs/guide/コアコンセプト-文書のメタデータ.md
+    new: false
+    change: 「読み直し」「読み直す」を「再読み込み」に修正
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:09:48.196697+00:00'
+  - page: docs/guide/files.yml
+    new: false
+    change: 検索の対象に入っていなかった docs/guide/ の README.md・はじめに.md・使い方.md・リファレンス.md の行を追加し、確認の時点を記録。公開ドキュメントの行は既存と同じく name・description を見出しと冒頭から引く書式のままにした
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:40:43.196152+00:00'
+  - page: docs/interface/README.md
+    new: false
+    change: 「読み直し」「読み直す」を「再読み込み」に修正
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:09:48.196697+00:00'
+  - page: docs/module/README.md
+    new: false
+    change: 「読み直し」「読み直す」を「再読み込み」に修正
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:09:48.196697+00:00'
+  - page: docs/scenario/README.md
+    new: false
+    change: 「読み直し」「読み直す」を「再読み込み」に修正
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:09:48.196697+00:00'
+  - page: docs/interface/index.yaml
+    new: false
+    change: 「読み直し」「読み直す」を「再読み込み」に修正し、README.md を生成し直す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:09:48.196697+00:00'
+  - page: docs/module/index.yaml
+    new: false
+    change: 「読み直し」「読み直す」を「再読み込み」に修正し、README.md を生成し直す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:09:48.196697+00:00'
+  - page: docs/scenario/index.yaml
+    new: false
+    change: 「読み直し」「読み直す」を「再読み込み」に修正し、README.md を生成し直す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:09:48.196697+00:00'
+scope_out:
+  - item: setup が content/prompts/ の YAML を管理用の YAML の行とプロンプトの行の 2 つの文書として記載する不具合
+    reason: 'setup の手順の修正で、作業 PR #131 が持つ。この作業 PR は project-index 自身の project-index.yaml で同じファイルを 1 つの行だけに載せる'
+    plan: '#124'
+  - item: 端末の設定に登録済みで設定ファイルが無い mindstella-nandemo-kaiwa の 2 つの配信元
+    reason: リポジトリの外の端末の設定の行で、配信元の検索の対象とメタデータの見直しに含まれない
+    plan: none
+  - item: 直下の 10 件（README.md・pyproject.toml など）と docs/README.md・docs/_config.yml を検索の対象に入れること
+    reason: 管理用の YAML の範囲が配置したフォルダの配下の全てのファイルで、exclude はファイル名だけに該当するため、今の project-index では記載できない。判定の変更を別の Issue で入れる（確認ログの推奨案 A）
+    plan: '#133'
+  - item: 動いているサーバーが、作業ブランチの worktree で project-index.yaml に加えた行（docs_folder・repo・prompts）の種類を describe では返すのに、search_docs ではその種類の文書を 0 件で返す（commit の後も同じ）
+    reason: この作業 PR の変更の対象外の振る舞い。同じコードの check_sync を作業ブランチで呼ぶと文書は数えられるため、サーバーの worktree のキャッシュか、動いているサーバーの版によるものかは未調査
+    plan: '#134'

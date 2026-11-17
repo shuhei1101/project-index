@@ -1234,7 +1234,7 @@ def test_error_when_unexpected(
     env = make_server(source)
     _put_git(
         tmp_path / "bin",
-        'for arg in "$@"; do [ "$arg" = archive ] && exec sleep 25; done',
+        'for arg in "$@"; do [ "$arg" = archive ] && { echo "fatal: archive failed" >&2; exit 128; }; done',
         monkeypatch,
     )
     caplog.set_level(logging.ERROR)
@@ -1245,7 +1245,7 @@ def test_error_when_unexpected(
     assert result.is_error is True
     assert result.text.startswith("UnexpectedError: GitError:")
     assert "git archive" in result.text
-    assert "20 秒を超えたため止めました" in result.text
+    assert "fatal: archive failed" in result.text
     assert not result.text.startswith("Error executing tool")
     assert "ツールの処理に失敗した（search_docs）" in caplog.text
     assert "Traceback" in caplog.text

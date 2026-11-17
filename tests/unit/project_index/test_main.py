@@ -62,6 +62,27 @@ def test_build_parser_when_files() -> None:
     assert args.handler is main_module.run_files
 
 
+def test_build_parser_when_files_exclude_path() -> None:
+    """files の除外のパスを引く（正常系）。"""
+    # 準備
+    parser = build_parser()
+    # 実行
+    args = parser.parse_args(
+        [
+            "files",
+            "--root",
+            "/tmp/a",
+            "--paths",
+            "**",
+            "--exclude-path",
+            "content/prompts/**/*.yaml",
+        ]
+    )
+    # 検証
+    assert args.exclude_path == ["content/prompts/**/*.yaml"]
+    assert args.exclude == []
+
+
 def test_build_parser_when_outline() -> None:
     """outline の引数と処理を引く（正常系）。"""
     # 準備

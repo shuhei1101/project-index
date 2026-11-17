@@ -982,6 +982,49 @@ def test_normal_when_quotes_preserved(
     assert result.data["results"][0]["diff"] == "- weight: 1\n+ weight: 2"
 
 
+UNINDENTED_ITEMS_DOC = (
+    "id: doc-1\nname: 文書 1\nitems:\n- key: k1\n  label: 名称 1\n- key: k2\n  label: 名称 2\n"
+)
+INDENTED_ITEMS_DOC = (
+    "id: doc-2\nname: 文書 2\nitems:\n  - key: k1\n    label: 名称 1\n"
+    "  - key: k2\n    label: 名称 2\n"
+)
+
+
+def test_normal_when_indent_preserved(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """書き換えた文書の、変更していない行の字下げを元のまま書き出す（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{"docs/doc-1.yaml": UNINDENTED_ITEMS_DOC, "docs/doc-2.yaml": INDENTED_ITEMS_DOC}
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    added = {"items": [{"key": "k3", "label": "名称 3"}]}
+    results: dict[str, Any] = {}
+    # 実行
+    for doc_id in ("doc-1", "doc-2"):
+        target = worktree / "docs" / f"{doc_id}.yaml"
+        results[doc_id] = env.call(
+            "write_docs",
+            cwd=str(source.folder),
+            worktree=str(worktree),
+            operations=[_update(doc_id, _version(target), add_to=added)],
+        )
+    # 検証
+    assert (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8") == (
+        UNINDENTED_ITEMS_DOC + "- key: k3\n  label: 名称 3\n"
+    )
+    assert (worktree / "docs" / "doc-2.yaml").read_text(encoding="utf-8") == (
+        INDENTED_ITEMS_DOC + "  - key: k3\n    label: 名称 3\n"
+    )
+    assert results["doc-1"].data["results"][0]["diff"] == "+ - key: k3\n+   label: 名称 3"
+    assert results["doc-2"].data["results"][0]["diff"] == "+   - key: k3\n+     label: 名称 3"
+
+
 MARKDOWN_SCHEMA = (
     "type: object\n"
     "properties:\n"

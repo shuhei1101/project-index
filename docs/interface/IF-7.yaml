@@ -391,7 +391,7 @@ request:
     location: argument
     description: 消すワークツリーのパス
     constraints: 配信元の設定の `worktrees` に当たるパスだけ
-    notes: 種類・配置先は、そのワークツリーの `project-index.yaml` で読み直した配信元の設定で参照する
+    notes: 種類・配置先は、そのワークツリーの `project-index.yaml` で再読み込みした配信元の設定で参照する
   - name: targets
     type: 'list[{id: str, expected_version: str}]'
     required: true
@@ -519,3 +519,4 @@ refs:
     type: references
     when: このインターフェースの入出力やフローを変えるときに、シナリオ『エージェントが書き込む』の対応する流れと期待値を確認する。
 test_file: tests/integration/server/test_delete_docs.py
+visibility: internal

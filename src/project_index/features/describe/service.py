@@ -160,7 +160,7 @@ def describe(
         cwd=request.cwd,
         outside_scope=request.outside_scope,
     )[0]
-    # 作業ツリーかワークツリーを読むときは、その場所の設定を読み直した配信元を使う
+    # 作業ツリーかワークツリーを読むときは、その場所の設定を再読み込みした配信元を使う
     if target.worktree is not None and target.ref is None:
         target = dataclasses.replace(target, source=load_source_at(target.source, target.worktree))
     if request.kind is None:

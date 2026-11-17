@@ -220,7 +220,7 @@ class DocumentStore:
         files: Sequence[str],
         collected: Sequence[str] | None = None,
     ) -> tuple[list[Document], list[LoadProblem], set[tuple[Path, str]]]:
-        """1 つの文書の行のファイルを集め、変わったファイルだけ読み直す。"""
+        """1 つの文書の行のファイルを集め、変わったファイルだけ再読み込みする。"""
         documents: list[Document] = []
         problems: list[LoadProblem] = []
         seen: set[tuple[Path, str]] = set()
@@ -302,7 +302,7 @@ class DocumentStore:
         def read(
             path: str, key: _RevisionKey, blob: str
         ) -> tuple[list[Document], list[LoadProblem]]:
-            """キャッシュが新しければキャッシュを、古ければファイルを読み直してキャッシュする。"""
+            """キャッシュが新しければキャッシュを、古ければファイルを再読み込みしてキャッシュする。"""
             with self._lock:
                 cached = self._revision_files.get(key)
             if cached is not None and _revision_fresh(
@@ -631,6 +631,8 @@ def _unindexed(
 ) -> list[str]:
     """`records`・`body_file` の行の索引ごとに、索引に無い本文のファイルを集める。"""
     unindexed: list[str] = []
+    # その行でない有効な行の文書になるファイルは、索引に無いファイルに数えない
+    others = [other for other in source.config.documents if other.enabled and other.id != table.id]
     for index_path in collect_files(source.root, table, files=files):
         body_paths = {
             document.body_path
@@ -639,7 +641,9 @@ def _unindexed(
         }
         unindexed.extend(
             f"{table.id}: {path}"
-            for path in unindexed_files(source.root, index_path, body_paths, table, files=files)
+            for path in unindexed_files(
+                source.root, index_path, body_paths, table, files=files, others=others
+            )
         )
     return unindexed
 

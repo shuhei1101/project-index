@@ -146,7 +146,7 @@ classes:
         returns:
           type: None
           description: '-'
-        process: 1. `cache_dir` の下のファイルを削除する（起動の『配信元の読み直し』が呼ぶ）
+        process: 1. `cache_dir` の下のファイルを削除する（起動の『配信元の再読み込み』が呼ぶ）
 constants:
   - name: CONVERT_CACHE_KEEP
     title: 変換の結果を残す数
@@ -164,3 +164,4 @@ refs:
   - to: IF-25
     type: requires
     when: インターフェース定義『文書の取得』の入出力を変えるときに、この設計書の関数と型を合わせる。
+visibility: internal

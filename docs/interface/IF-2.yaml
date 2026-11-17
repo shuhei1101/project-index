@@ -865,7 +865,7 @@ flows:
     summary: '`ProjectIndexError` でない例外を、例外の型と内容を持つ `isError` の応答にする'
     setup:
       - name: Mock
-        description: project-index を起動する環境の `PATH` の先頭に、`archive` の呼び出しだけ git の書き出しの待ち時間の上限（20 秒）より長く待つ `git` のスクリプトを配置する
+        description: 'project-index を起動する環境の `PATH` の先頭に、`archive` の呼び出しだけ標準エラーに `fatal: archive failed` を出して 128 で終わる `git` のスクリプトを配置する'
       - name: 入力
         description: '`ref` に sample の 1 つ前の commit、`view: summary`'
     flow: |-
@@ -877,13 +877,13 @@ flows:
         participant T as search_docs
 
         C->>T: ref: 1 つ前の commit
-        T->>T: リビジョンの書き出しの git archive が待ち時間の上限で止まる（GitError）
+        T->>T: リビジョンの書き出しの git archive が 0 以外で終わる（GitError）
         T-->>C: isError（UnexpectedError・例外の型と内容）
       ```
 
       <!-- /map -->
     expected:
-      - '`isError: true` で、本文が `UnexpectedError: GitError:` で始まり、止まった git のコマンド（`git archive`）と `20 秒を超えたため止めました` を含む'
+      - '`isError: true` で、本文が `UnexpectedError: GitError:` で始まり、失敗した git のコマンド（`git archive`）と標準エラーの `fatal: archive failed` を含む'
       - 応答が `Error executing tool` で始まらない
       - サーバーのログに `ツールの処理に失敗した（search_docs）` と例外のトレースバックが残る
       - 続けての `ref` を省いた `search_docs` は文書を返却する
@@ -1348,8 +1348,8 @@ constraints:
     constraint: '`readOnlyHint: true`'
   - item: 引数の検証
     constraint: strict tool use は使わず、サーバーが検証して直し方を返す
-  - item: 読み直し
-    constraint: ファイルの更新日時か大きさが変わった文書は、次の呼び出しで読み直す
+  - item: 再読み込み
+    constraint: ファイルの更新日時か大きさが変わった文書は、次の呼び出しで再読み込みする
   - item: 範囲の決め方
     constraint: '本文を切らずに返したら `full`。`max_chars_per_field` で切った本文・`snippets`・`sections`・`lines` で切り出した本文・`body_file` の無い `records` の要素（本文が管理用の YAML の 1 要素）は `section`。本文を返さない呼び出し（`view: summary`、`exclude_fields` で `body` を除いた `view: full`）は `summary`'
     notes: rule-inject は `full` だけを既読にする（D-125）
@@ -1412,3 +1412,4 @@ refs:
     type: references
     when: このインターフェースの入出力やフローを変えるときに、シナリオ『エージェントが調べる』の対応する流れと期待値を確認する。
 test_file: tests/integration/server/test_search_docs.py
+visibility: internal

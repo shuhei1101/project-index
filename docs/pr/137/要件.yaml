@@ -1,0 +1,32 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-3.yaml
+    impact: run_only
+    detail: 古くなった設定を移し替えたとき、移し替えた設定のファイルで変えていない行の字下げが元のまま残る。流れは変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-12.yaml
+    impact: run_only
+    detail: 端末の設定の配信元を変えたとき、端末の設定のファイルで変えていない行の字下げが元のまま残る。流れは変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: run_only
+    detail: 画面の構成を書き換えたとき、配信元の設定のファイルで変えていない行の字下げが元のまま残る。流れは変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: run_only
+    detail: 確認を済ませた時点を記録したとき、管理用の YAML で変えていない行の字下げが元のまま残る。流れは変わらない
+    depends_on: []
+scope_out:
+  - item: ファイルへ書き戻さない dump_roundtrip の呼び出し（write_nav の応答の nav・records の要素を本文にする documents/loader.py・write_docs の差分の表示）
+    reason: 元のファイルを書き換えないため、変えていない行の字下げが変わる事象が起きない
+    plan: none
+  - item: 新しいファイルを作る write_docs の create の書き出し
+    reason: 元の文字列が無く、#121 のとおり YAML_INDENT で書く
+    plan: none
+  - item: write_docs の text_edits で配列の要素の中の文字列の項目を部分更新できない
+    reason: この作業 PR の字下げの修正と独立した不具合。モジュール構成設計では YAML を直接編集して進めた
+    plan: '#138'
+docs: []
