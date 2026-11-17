@@ -1430,6 +1430,8 @@ flows:
         notes: 'クローン本体の `project-index.yaml` は `ref: v1` のまま。呼ぶ前に、クローン本体を指す `search_docs` を 1 回呼び、起動時のスキーマを解かせておく'
       - name: 入力
         description: '`worktree` にワークツリー x のパス、文書 1 の `update`（`set: {refs: [{to: 文書 2, type: references}]}`）'
+      - name: 設定を変えていないワークツリー
+        description: 'sample の `.claude/worktrees/y`。`project-index.yaml` はクローン本体と同じ `ref: v1` のまま'
     flow: |-
       <!-- map: {"title": "正常系（ワークツリーの設定でスキーマの参照を変えた種類を検査する）"} -->
 
@@ -1438,12 +1440,17 @@ flows:
         participant C as クライアント
         participant T as write_docs
         participant WT as ワークツリー x
+        participant WY as ワークツリー y
 
         C->>T: worktree: x, operations: update 文書 1
         T->>WT: ワークツリーの project-index.yaml で配信元の設定を再読み込みする
         T->>T: ワークツリーの設定が指す v2 のスキーマと validators に通す
         T->>WT: 一時ファイルに書いてから置き換える
         T-->>C: applied: true、書き込んだ後の version
+        C->>T: worktree: y, operations: update 文書 1（refs が文字列の並び）
+        T->>T: ワークツリー y の設定が指す v1 のスキーマと validators に通す
+        T->>WY: 一時ファイルに書いてから置き換える
+        T-->>C: applied: true
       ```
 
       <!-- /map -->
@@ -1451,7 +1458,7 @@ flows:
       - '`applied: true` で、文書 1 の `status` が `updated`'
       - ワークツリー x の文書 1 の `refs` が `set` の値になる
       - '同じ `set` を `refs: [文書 2]`（文字列の並び）にした呼び出しは、`applied: false` で、違反の `schema` が v2 のスキーマの場所を指す'
-      - 続けてクローン本体の文書を検査すると、v1 のスキーマで検査する
+      - '続けてワークツリー y の文書 1 へ `refs: [文書 2]`（文字列の並び）の `update` を呼ぶと、v1 のスキーマで検査して `applied: true` になる'
     test: test_normal_when_schema_ref_changed_in_worktree
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
