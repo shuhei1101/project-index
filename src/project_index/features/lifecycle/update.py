@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import logging
+import shutil
 import subprocess
 import tomllib
 from typing import TYPE_CHECKING
 
-from project_index.features.lifecycle.types import COMMAND_TIMEOUT_SEC, UpdateResult
+from project_index.features.lifecycle.types import (
+    COMMAND_TIMEOUT_SEC,
+    MDMARK_PACKAGE,
+    MdmarkReinstallResult,
+    UpdateResult,
+)
 from project_index.shared.errors import RestartInProgressError, UpdateFailedError
 from project_index.shared.version import RUNNING_VERSION
 
@@ -52,7 +58,35 @@ def _run(argv: list[str], *, cwd: Path) -> str:
     return result.stdout
 
 
-def update_clone(clone: Path, *, control: RestartControl) -> UpdateResult:
+def _reinstall_mdmark(mdmark_ref: str) -> MdmarkReinstallResult | None:
+    """`PATH` に mdmark の CLI があれば `npm install -g` で入れ直し、結果を返す。"""
+    if shutil.which("mdmark") is None:
+        return None
+    argv = ["npm", "install", "-g", f"{MDMARK_PACKAGE}#{mdmark_ref}"]
+    command = " ".join(argv)
+    logger.info("mdmark の CLI を入れ直す（%s）", mdmark_ref)
+    error: str | None = None
+    try:
+        result = subprocess.run(  # noqa: S603
+            argv, capture_output=True, text=True, timeout=COMMAND_TIMEOUT_SEC
+        )
+    except FileNotFoundError:
+        error = f"{command}: コマンドが見つかりません"
+    except subprocess.TimeoutExpired:
+        error = f"{command}: {COMMAND_TIMEOUT_SEC} 秒で打ち切りました"
+    except OSError as os_error:
+        error = f"{command}: {os_error}"
+    else:
+        if result.returncode != 0:
+            error = (
+                f"{command}: 終了コード {result.returncode}\n{result.stderr[-STDERR_TAIL_CHARS:]}"
+            )
+    if error is not None:
+        logger.warning("mdmark の CLI を入れ直せなかった（%s）", error)
+    return MdmarkReinstallResult(ref=mdmark_ref, reinstalled=error is None, error=error)
+
+
+def update_clone(clone: Path, *, control: RestartControl, mdmark_ref: str) -> UpdateResult:
     """クローンを更新し、移し替えが要らなければ再起動を要求する。"""
     # 他の更新が進んでいるか、再起動を要求済みなら断る
     if not control.update_lock.acquire(blocking=False):
@@ -60,19 +94,19 @@ def update_clone(clone: Path, *, control: RestartControl) -> UpdateResult:
     try:
         if control.requested:
             raise RestartInProgressError(message="再起動か更新の途中です")
-        return _update(clone, control)
+        return _update(clone, control, mdmark_ref)
     finally:
         control.update_lock.release()
 
 
-def _update(clone: Path, control: RestartControl) -> UpdateResult:
+def _update(clone: Path, control: RestartControl, mdmark_ref: str) -> UpdateResult:
     """更新の本体（`update_lock` を取った中で呼ぶ）。"""
     previous_version = RUNNING_VERSION
     before = _run(["git", "rev-parse", "HEAD"], cwd=clone).strip()
     logger.info("クローンを更新する（%s）", clone)
     _run(["git", "pull", "--ff-only"], cwd=clone)
     after = _run(["git", "rev-parse", "HEAD"], cwd=clone).strip()
-    # 新しい commit が無ければ何もしない
+    # 新しい commit が無ければ mdmark の CLI だけを入れ直す
     if before == after:
         return UpdateResult(
             previous_version=previous_version,
@@ -80,6 +114,7 @@ def _update(clone: Path, control: RestartControl) -> UpdateResult:
             updated=False,
             migration_needed=False,
             restarting=False,
+            mdmark=_reinstall_mdmark(mdmark_ref),
         )
     _run(["uv", "sync"], cwd=clone)
     with (clone / "pyproject.toml").open("rb") as file:
@@ -88,6 +123,7 @@ def _update(clone: Path, control: RestartControl) -> UpdateResult:
     python = clone / ".venv" / "bin" / "python"
     plan = _run([str(python), "-m", "project_index", "migrate", "--plan"], cwd=clone)
     migration_needed = bool(plan.strip())
+    mdmark = _reinstall_mdmark(mdmark_ref)
     if migration_needed:
         # 移し替えが要るときは、利用者が移し替えてから再起動する
         logger.warning("移し替えが要るため再起動しない（%s）", version)
@@ -99,4 +135,5 @@ def _update(clone: Path, control: RestartControl) -> UpdateResult:
         updated=True,
         migration_needed=migration_needed,
         restarting=not migration_needed,
+        mdmark=mdmark,
     )

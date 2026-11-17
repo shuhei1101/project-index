@@ -8,7 +8,7 @@ import pytest
 
 from project_index.features.lifecycle.control import RestartControl
 from project_index.features.lifecycle.types import COMMAND_TIMEOUT_SEC
-from project_index.features.lifecycle.update import _run, update_clone
+from project_index.features.lifecycle.update import _reinstall_mdmark, _run, update_clone
 from project_index.shared.errors import RestartInProgressError, UpdateFailedError
 
 if TYPE_CHECKING:
@@ -63,15 +63,25 @@ def _install(monkeypatch: pytest.MonkeyPatch, fake: FakeRun) -> None:
     monkeypatch.setattr("project_index.features.lifecycle.update.subprocess.run", fake)
 
 
+def _install_mdmark(monkeypatch: pytest.MonkeyPatch, path: str | None) -> None:
+    """`PATH` の mdmark の CLI を探す `shutil.which` を、`path` を返す偽物に差し替える。"""
+
+    def which(name: str) -> str | None:
+        return path
+
+    monkeypatch.setattr("project_index.features.lifecycle.update.shutil.which", which)
+
+
 def test_update_clone(
     monkeypatch: pytest.MonkeyPatch, clone: Path, control: RestartControl
 ) -> None:
     """取り込んで移し替えが要らなければ再起動を要求する（正常系）。"""
     # 準備
-    fake = FakeRun(_ok("aaa\n"), _ok(), _ok("bbb\n"), _ok(), _ok(""))
+    fake = FakeRun(_ok("aaa\n"), _ok(), _ok("bbb\n"), _ok(), _ok(""), _ok())
     _install(monkeypatch, fake)
+    _install_mdmark(monkeypatch, "/usr/local/bin/mdmark")
     # 実行
-    result = update_clone(clone, control=control)
+    result = update_clone(clone, control=control, mdmark_ref="develop")
     # 検証
     assert result.version == "0.3.0"
     assert result.updated is True
@@ -86,23 +96,30 @@ def test_update_clone(
     ]
     assert fake.calls[4][0] == str(clone / ".venv" / "bin" / "python")
     assert fake.calls[4][1:] == ["-m", "project_index", "migrate", "--plan"]
-    assert {call["cwd"] for call in fake.kwargs} == {clone}
+    assert fake.calls[5] == ["npm", "install", "-g", "github:shuhei1101/mdmark#develop"]
+    assert {call["cwd"] for call in fake.kwargs[:5]} == {clone}
+    assert result.mdmark is not None
+    assert result.mdmark.reinstalled is True
 
 
 def test_update_clone_when_up_to_date(
     monkeypatch: pytest.MonkeyPatch, clone: Path, control: RestartControl
 ) -> None:
-    """新しい commit が無ければ何もしない（正常系）。"""
+    """新しい commit が無ければ mdmark の CLI だけを入れ直す（正常系）。"""
     # 準備
-    fake = FakeRun(_ok("aaa\n"), _ok(), _ok("aaa\n"))
+    fake = FakeRun(_ok("aaa\n"), _ok(), _ok("aaa\n"), _ok())
     _install(monkeypatch, fake)
+    _install_mdmark(monkeypatch, "/usr/local/bin/mdmark")
     # 実行
-    result = update_clone(clone, control=control)
+    result = update_clone(clone, control=control, mdmark_ref="develop")
     # 検証
     assert result.updated is False
     assert result.restarting is False
     assert result.version == result.previous_version
     assert ["uv", "sync"] not in fake.calls
+    assert fake.calls.count(["npm", "install", "-g", "github:shuhei1101/mdmark#develop"]) == 1
+    assert result.mdmark is not None
+    assert result.mdmark.reinstalled is True
     assert control.requested is False
 
 
@@ -111,14 +128,16 @@ def test_update_clone_when_migration_needed(
 ) -> None:
     """移し替えが要れば再起動しない（正常系）。"""
     # 準備
-    fake = FakeRun(_ok("aaa\n"), _ok(), _ok("bbb\n"), _ok(), _ok("2: rename a to b\n"))
+    fake = FakeRun(_ok("aaa\n"), _ok(), _ok("bbb\n"), _ok(), _ok("2: rename a to b\n"), _ok())
     _install(monkeypatch, fake)
+    _install_mdmark(monkeypatch, "/usr/local/bin/mdmark")
     # 実行
-    result = update_clone(clone, control=control)
+    result = update_clone(clone, control=control, mdmark_ref="develop")
     # 検証
     assert result.migration_needed is True
     assert result.restarting is False
     assert control.requested is False
+    assert fake.calls.count(["npm", "install", "-g", "github:shuhei1101/mdmark#develop"]) == 1
 
 
 def test_update_clone_when_in_progress(
@@ -131,7 +150,7 @@ def test_update_clone_when_in_progress(
     control.request()
     # 実行・検証
     with pytest.raises(RestartInProgressError):
-        update_clone(clone, control=control)
+        update_clone(clone, control=control, mdmark_ref="develop")
     assert fake.calls == []
 
 
@@ -142,9 +161,10 @@ def test_update_clone_when_up_to_date_then_again(
     # 準備
     fake = FakeRun(_ok("aaa\n"), _ok(), _ok("aaa\n"), _ok("aaa\n"), _ok(), _ok("aaa\n"))
     _install(monkeypatch, fake)
-    update_clone(clone, control=control)
+    _install_mdmark(monkeypatch, None)
+    update_clone(clone, control=control, mdmark_ref="develop")
     # 実行
-    result = update_clone(clone, control=control)
+    result = update_clone(clone, control=control, mdmark_ref="develop")
     # 検証
     assert result.updated is False
 
@@ -162,12 +182,27 @@ def test_update_clone_when_failed_then_again(
         _ok("aaa\n"),
     )
     _install(monkeypatch, fake)
+    _install_mdmark(monkeypatch, None)
     with pytest.raises(UpdateFailedError):
-        update_clone(clone, control=control)
+        update_clone(clone, control=control, mdmark_ref="develop")
     # 実行
-    result = update_clone(clone, control=control)
+    result = update_clone(clone, control=control, mdmark_ref="develop")
     # 検証
     assert result.updated is False
+
+
+def test_update_clone_when_pull_fails(
+    monkeypatch: pytest.MonkeyPatch, clone: Path, control: RestartControl
+) -> None:
+    """取り込みに失敗したら mdmark を入れ直さない（異常系）。"""
+    # 準備
+    fake = FakeRun(_ok("aaa\n"), (1, "", "Not possible to fast-forward"))
+    _install(monkeypatch, fake)
+    _install_mdmark(monkeypatch, "/usr/local/bin/mdmark")
+    # 実行・検証
+    with pytest.raises(UpdateFailedError, match="git pull --ff-only"):
+        update_clone(clone, control=control, mdmark_ref="develop")
+    assert fake.calls == [["git", "rev-parse", "HEAD"], ["git", "pull", "--ff-only"]]
 
 
 def test_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -212,3 +247,94 @@ def test_run_when_not_found(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     # 実行・検証
     with pytest.raises(UpdateFailedError):
         _run(["uv", "sync"], cwd=tmp_path)
+
+
+def test_reinstall_mdmark(monkeypatch: pytest.MonkeyPatch) -> None:
+    """参照を付けて入れ直す（正常系）。"""
+    # 準備
+    fake = FakeRun(_ok())
+    _install(monkeypatch, fake)
+    _install_mdmark(monkeypatch, "/usr/local/bin/mdmark")
+    # 実行
+    result = _reinstall_mdmark("v0.13.0")
+    # 検証
+    assert result is not None
+    assert result.ref == "v0.13.0"
+    assert result.reinstalled is True
+    assert result.error is None
+    assert fake.calls == [["npm", "install", "-g", "github:shuhei1101/mdmark#v0.13.0"]]
+    assert fake.kwargs[0]["timeout"] == COMMAND_TIMEOUT_SEC
+
+
+def test_reinstall_mdmark_when_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mdmark の CLI が無ければ入れ直さない（正常系）。"""
+    # 準備
+    fake = FakeRun()
+    _install(monkeypatch, fake)
+    _install_mdmark(monkeypatch, None)
+    # 実行
+    result = _reinstall_mdmark("develop")
+    # 検証
+    assert result is None
+    assert fake.calls == []
+
+
+def test_reinstall_mdmark_when_failed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """npm が失敗しても例外にせず理由を返す（正常系）。"""
+    # 準備
+    fake = FakeRun((1, "", "npm error code ENOTFOUND"))
+    _install(monkeypatch, fake)
+    _install_mdmark(monkeypatch, "/usr/local/bin/mdmark")
+    # 実行
+    result = _reinstall_mdmark("develop")
+    # 検証
+    assert result is not None
+    assert result.reinstalled is False
+    assert result.error is not None
+    assert "npm install -g github:shuhei1101/mdmark#develop: 終了コード 1" in result.error
+    assert "npm error code ENOTFOUND" in result.error
+
+
+def test_reinstall_mdmark_when_npm_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    """npm が無い（正常系）。"""
+    # 準備
+    fake = FakeRun(FileNotFoundError("npm"))
+    _install(monkeypatch, fake)
+    _install_mdmark(monkeypatch, "/usr/local/bin/mdmark")
+    # 実行
+    result = _reinstall_mdmark("develop")
+    # 検証
+    assert result is not None
+    assert result.reinstalled is False
+    assert (
+        result.error == "npm install -g github:shuhei1101/mdmark#develop: コマンドが見つかりません"
+    )
+
+
+def test_reinstall_mdmark_when_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """打ち切る（正常系）。"""
+    # 準備
+    fake = FakeRun(subprocess.TimeoutExpired(["npm"], COMMAND_TIMEOUT_SEC))
+    _install(monkeypatch, fake)
+    _install_mdmark(monkeypatch, "/usr/local/bin/mdmark")
+    # 実行
+    result = _reinstall_mdmark("develop")
+    # 検証
+    assert result is not None
+    assert result.reinstalled is False
+    assert result.error is not None
+    assert "300 秒で打ち切りました" in result.error
+
+
+def test_reinstall_mdmark_when_os_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """npm を実行できない（正常系）。"""
+    # 準備
+    fake = FakeRun(PermissionError("Permission denied"))
+    _install(monkeypatch, fake)
+    _install_mdmark(monkeypatch, "/usr/local/bin/mdmark")
+    # 実行
+    result = _reinstall_mdmark("develop")
+    # 検証
+    assert result is not None
+    assert result.reinstalled is False
+    assert result.error == "npm install -g github:shuhei1101/mdmark#develop: Permission denied"

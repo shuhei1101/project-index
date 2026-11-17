@@ -168,6 +168,13 @@ data_models:
         access: 公開
         default: 非機能要件の `worktree_load_wait` の決定値
         description: '`search_docs` がワークツリーの読み込みを待つ上限（秒）。1 以上'
+      - name: mdmark_ref
+        title: mdmark の参照
+        type: str
+        access: 公開
+        default: '"develop"'
+        description: '`update` が mdmark の CLI を入れ直す参照（ブランチ・`v{MAJOR}.{MINOR}.{PATCH}` のタグ・commit の SHA）。スキーマで `^[A-Za-z0-9][A-Za-z0-9._/-]*$` に当たることを検証する'
+        example: v0.13.0
   - name: SettingsSourcesRequest
     title: 配信元の保存の要求
     container: project_index/features/settings/types.py

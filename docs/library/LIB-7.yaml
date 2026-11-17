@@ -2,11 +2,11 @@ id: LIB-7
 title: "mdmark"
 kind: "CLI"
 version:
-  current: master
+  current: develop
   latest: v0.10.0
   checked_on: '2026-11-09'
-  source: https://cdn.jsdelivr.net/gh/shuhei1101/mdmark@master/
-  pinning: '固定しない。リリースのたびに `dist/` が入る master ブランチを読み、中身が変わるため integrity を付けない。jsDelivr は `@master` を CDN で 12 時間、ブラウザで 7 日キャッシュする（`cache-control: public, max-age=604800, s-maxage=43200`）。リリースをすぐ届けるときは purge.jsdelivr.net で CDN のキャッシュを削除する'
+  source: https://github.com/shuhei1101/mdmark/tree/develop
+  pinning: '既定は develop の最新。端末の設定の `mdmark_ref`（既定 `develop`）を `npm install -g github:shuhei1101/mdmark#{mdmark_ref}` の参照に使い、`v{MAJOR}.{MINOR}.{PATCH}` のタグか commit の SHA を記載するとそのバージョンに固定する。`npm install -g` は入れた時点の配布物で止まるため、管理の MCP の `update` が同じ参照で入れ直す'
 catalogs:
   - name: コマンド
     version: develop（mdmark#328 のマージ後）
