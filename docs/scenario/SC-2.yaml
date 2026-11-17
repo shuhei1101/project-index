@@ -44,7 +44,7 @@ scenarios:
       - Claude Code の設定の場所の `settings.json` の env の `PROJECT_INDEX_CONFIG` が、その `settings.yaml` の絶対パスを指す。env のほかのキーは変わらない
       - '`127.0.0.1:8786` を待ち受ける project-index のプロセスが 1 つだけあり、`/mcp` のツールが 7 つ返る'
       - スキルの最後の応答に、作った端末の設定のパスと `/project-index:setup` の案内がある
-      - スキルの最後の応答に、mdmark の CLI の入れ方（`npm install -g github:shuhei1101/mdmark`）の案内がある
+      - スキルの最後の応答に、mdmark の CLI の入れ方（端末の設定に `mdmark_ref` が無いので既定の `develop` を指した `npm install -g github:shuhei1101/mdmark#develop`）の案内がある
       - テストを流した端末の `~/.claude` と `~/.config/project-index` は変わらない
     test: test_normal
   - name: 正常シナリオ（端末の設定に足りないキーがある）
@@ -178,6 +178,42 @@ scenarios:
       - '`settings.yaml` と、Claude Code の設定の場所の `settings.json` は変わらない'
       - スキルの応答に、設定のバージョン・project-index のバージョンと、管理の MCP の `update` で project-index を更新する案内がある
     test: test_error_when_terminal_config_newer
+  - name: 正常シナリオ（mdmark のバージョンを固定している）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かす）
+        notes: '`claude -p` を動かす環境の `PATH` に mdmark の CLI を置かない'
+      - name: Claude Code の設定の場所
+        description: '`CLAUDE_CONFIG_DIR` が指すテスト用の一時フォルダ。env の `PROJECT_INDEX_CONFIG` がテスト用の一時フォルダの端末の設定を指す'
+      - name: 端末の設定
+        description: '`version` が project-index と同じで、`clone` を持ち、`mdmark_ref` にタグを書いた `settings.yaml`'
+        notes: '`mdmark_ref: v0.13.0`'
+      - name: project-index のクローン
+        description: 正常シナリオと同じ
+        notes: 端末の設定の `clone` がこのパスを指す。ポート 8786 が空き
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（mdmark のバージョンを固定している）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as global-setup のスキル
+        participant CF as 端末の設定
+        participant DD as project-index
+
+        U->>SK: /project-index:global-setup
+        SK->>CF: 端末の設定を読み、mdmark_ref の v0.13.0 を得る
+        SK->>SK: PATH に mdmark の CLI が無いことを確かめる
+        SK->>DD: project-index serve を切り離して起動する
+        SK->>DD: /mcp につながり、ツールの一覧を取る
+        SK-->>U: つながった結果と、v0.13.0 を指した mdmark の CLI の入れ方を出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - スキルの最後の応答に、mdmark の CLI の入れ方として `npm install -g github:shuhei1101/mdmark#v0.13.0` の案内がある
+      - '`settings.yaml` は変わらない'
+    test: test_normal_when_mdmark_ref_pinned
 lead: 利用者が `/project-index:global-setup` で端末に project-index を用意して `/mcp` に接続するまでのシナリオを定め、導入の流れを変えるときに参照する。
 tags:
   - name: topic:セットアップ

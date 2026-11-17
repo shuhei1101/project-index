@@ -1,0 +1,12 @@
+$ uv run pytest tests/integration/server/test_update.py
+# 作業ブランチのテスト実行方法の TL-2 は手元で回す層（ランナーで回す workflow は develop の #116 で入り、作業ブランチに無い）。TMPDIR=/tmp/pi109-tmp（/tmp/pytest-of-shuhei2441 が root の所有で pytest の一時フォルダを作れないため）
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/chore-mdmark-reference-develop
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 8 items
+
+tests/integration/server/test_update.py ........                         [100%]
+
+============================== 8 passed in 41.71s ==============================

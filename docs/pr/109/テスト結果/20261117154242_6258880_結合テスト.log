@@ -1,0 +1,23 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=integration -f paths="tests/integration/server/test_update.py" | grep -o 'https://[^ ]*/actions/runs/[0-9]*') && run_id=${run_url##*/} && (rc=0; gh run watch "$run_id" --exit-status > /dev/null || rc=1; if gh run download "$run_id" -n test-log -D "/tmp/test-log-$run_id"; then cat "/tmp/test-log-$run_id/test.log"; else gh run view "$run_id" --log-failed; fi; exit $rc)
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 8 items
+
+tests/integration/server/test_update.py::test_normal PASSED              [ 12%]
+tests/integration/server/test_update.py::test_normal_when_up_to_date PASSED [ 25%]
+tests/integration/server/test_update.py::test_normal_when_migration_needed PASSED [ 37%]
+tests/integration/server/test_update.py::test_error_when_pull_fails PASSED [ 50%]
+tests/integration/server/test_update.py::test_error_when_restart_in_progress PASSED [ 62%]
+tests/integration/server/test_update.py::test_normal_when_mdmark_absent PASSED [ 75%]
+tests/integration/server/test_update.py::test_normal_when_mdmark_reinstall_fails PASSED [ 87%]
+tests/integration/server/test_update.py::test_error_when_terminal_config_invalid PASSED [100%]
+
+============================== 8 passed in 45.84s ==============================
+rc=0
+https://github.com/shuhei1101/project-index/actions/runs/44033062892
+
+# skip の件数: ランナー 0 件・手元（テスト結果/20261117153410_3bcc47a_結合テスト.log）0 件

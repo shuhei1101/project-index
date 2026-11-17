@@ -41,7 +41,7 @@
 | 依存 | クローンで `uv sync` を実行する |
 | 端末の設定 | 雛形から作る。`version` に project-index のバージョン、`clone` に引数のパス、`sources: []` を持つ |
 | Claude Code の env | 端末の設定が既定の場所と違うときだけ、`settings.json` の env に `PROJECT_INDEX_CONFIG` を記載する。env のほかのキーは変えない |
-| mdmark の CLI | `PATH` にあるかを確かめる。無いときは、入れると `write_docs` が Markdown の値を点検することと入れ方（`npm install -g github:shuhei1101/mdmark`。Node 24 以降）を案内する。無くても `write_docs` は点検せずに書き込む |
+| mdmark の CLI | `PATH` にあるかを確かめる。無いときは、入れると `write_docs` が Markdown の値を点検することと入れ方（`npm install -g github:shuhei1101/mdmark#{mdmark_ref}`。`{mdmark_ref}` は端末の設定の `mdmark_ref` で、既定は develop の最新を指す `develop`。Node 24 以降）を案内する。無くても `write_docs` は点検せずに書き込む |
 | 起動 | `project-index serve` を切り離して起動する |
 | 接続の確認 | `/mcp` につながり、文書の MCP のツールが 7 つ返ることを確かめる |
 
