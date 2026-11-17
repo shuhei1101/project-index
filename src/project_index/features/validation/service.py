@@ -203,6 +203,18 @@ class DocumentChecker:
 
 def _script_stamp(base: Path, run: list[str]) -> str:
     """`run` が指すファイルのフォルダの配下（`__pycache__` を除く）の `stat` のハッシュを返す。"""
+    folders = _script_folders(base, run)
+    # 作業ツリーにスクリプトのファイルが無い（コマンドだけの `run`）
+    if not folders:
+        return ""
+    stamps: list[tuple[str, int, int]] = []
+    for folder in sorted(folders):
+        stamps.extend(_folder_stamps(base, folder))
+    return value_hash(stamps)
+
+
+def _script_folders(base: Path, run: list[str]) -> set[Path]:
+    """`run` の要素のうち `base` から解いてファイルがあるものの、フォルダを返す。"""
     folders: set[Path] = set()
     for item in run:
         # オプションと絶対パス（インタープリターなど）は作業ツリーのスクリプトではない
@@ -211,17 +223,19 @@ def _script_stamp(base: Path, run: list[str]) -> str:
         path = base / item
         if path.is_file():
             folders.add(path.parent)
-    if not folders:
-        return ""
+    return folders
+
+
+def _folder_stamps(base: Path, folder: Path) -> list[tuple[str, int, int]]:
+    """フォルダの配下のファイルの (`base` からの相対パス, 更新時刻, 大きさ) をパスの順に返す。"""
     stamps: list[tuple[str, int, int]] = []
-    for folder in sorted(folders):
-        for current, dirs, files in os.walk(folder):
-            # 実行で書かれるキャッシュのフォルダはたどらない
-            dirs[:] = sorted(name for name in dirs if name != _SCRIPT_CACHE_DIR)
-            for name in sorted(files):
-                path = Path(current) / name
-                stat = path.stat()
-                stamps.append(
-                    (Path(os.path.relpath(path, base)).as_posix(), stat.st_mtime_ns, stat.st_size)
-                )
-    return value_hash(stamps)
+    for current, dirs, files in os.walk(folder):
+        # 実行で書かれるキャッシュのフォルダはたどらない
+        dirs[:] = sorted(name for name in dirs if name != _SCRIPT_CACHE_DIR)
+        for name in sorted(files):
+            path = Path(current) / name
+            stat = path.stat()
+            stamps.append(
+                (Path(os.path.relpath(path, base)).as_posix(), stat.st_mtime_ns, stat.st_size)
+            )
+    return stamps
