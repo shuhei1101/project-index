@@ -138,7 +138,7 @@ def test_normal_when_only_draft(
 ) -> None:
     """`--only-draft` を渡すと、行の案を含む組だけを出す（正常系）。"""
     # 準備
-    draft = {"path": "c.md", "description": PARTICLE_DE, "tags": []}
+    draft: dict[str, object] = {"path": "c.md", "description": PARTICLE_DE, "tags": []}
     write_files(
         tmp_path,
         {
