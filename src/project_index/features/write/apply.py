@@ -78,20 +78,27 @@ def apply_operation(
             violations.extend(
                 _violation(f"set.{path}", violation.rule) for violation in error.violations
             )
-    for path in operation.unset:
-        try:
-            delete_field(content, path, schema=schema)
-        except InvalidArgumentError as error:
-            # 要素の選び方を含む・`#` で始まるパスを解けない: 理由を `unset.{要素}` の違反にする
-            violations.extend(
-                _violation(f"unset.{path}", violation.rule) for violation in error.violations
-            )
+    violations.extend(_unset(content, operation.unset, schema))
     violations.extend(_add_to(content, operation.add_to, schema))
     violations.extend(_remove_from(content, operation.remove_from, schema))
     violations.extend(_text_edits(content, operation.text_edits, schema))
     if violations:
         raise InvalidArgumentError(message="操作を適用できません", violations=violations)
     return content
+
+
+def _unset(
+    content: dict[str, Any], unset: Iterable[str], schema: Mapping[str, Any] | None
+) -> list[Violation]:
+    """項目を削除する（無い項目は飛ばす）。"""
+    violations: list[Violation] = []
+    for path in unset:
+        try:
+            delete_field(content, path, schema=schema)
+        except InvalidArgumentError as error:
+            # 要素の選び方を含む・`#` で始まるパスを解けない: 理由を `unset.{要素}` の違反にする
+            violations.extend(_violation(f"unset.{path}", item.rule) for item in error.violations)
+    return violations
 
 
 def _add_to(
