@@ -1,0 +1,112 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/shuhei1101/knowledge/design-schemas/v9.2.0/schemas/knowledge-files.schema.yaml
+files:
+- path: .gitignore
+  name: Git の追跡から除外するファイルの一覧
+  description: 仮想環境・キャッシュ・生成した Markdown・ビルドの成果物を Git の追跡から除外する設定を受け持ち、追跡しないファイルを追加・修正するときに参照する。
+  tags:
+  - topic:gitignore
+  - tool:git
+  related:
+  - to: LAY-73-1
+    type: see_also
+- path: .python-version
+  name: 開発で使用する Python のバージョン
+  description: uv が仮想環境を作るときに使用する Python のバージョンを受け持ち、開発の Python のバージョンを変えるときに参照する。
+  tags:
+  - topic:バージョン
+  - tool:uv
+  related:
+  - to: CMD-1
+    type: see_also
+- path: CLAUDE.md
+  name: Claude Code へのリポジトリの案内
+  description: Claude Code のセッションに参照させるリポジトリの概要とドキュメントの場所を受け持ち、エージェントへの案内を修正するときに参照する。
+  tags:
+  - topic:エージェント
+  - tool:claude-code
+  related:
+  - to: LAY-73-1
+    type: see_also
+- path: README.md
+  name: リポジトリの README
+  description: GitHub で最初に表示するリポジトリの概要と使い方への起点を受け持ち、リポジトリの紹介を修正するときに参照する。
+  tags:
+  - topic:入口
+  - topic:リポジトリ
+  related:
+  - to: ARCH-1
+    type: see_also
+- path: mdmark.config.yaml
+  name: mdmark の設定
+  description: 文書の書き込みで mdmark が Markdown を点検・描画するときの図の部品の種類と見た目を受け持ち、mdmark の設定を修正するときに参照する。
+  tags:
+  - topic:設定
+  - tool:mdmark
+  related:
+  - to: LIB-7
+    type: see_also
+- path: project-index.yaml
+  name: project-index 自身の配信元の設定
+  description: project-index 自身の配信元の文書の行・検査・変換・画面の構成を受け持ち、自身の配信元で配信する文書の範囲や種類を修正するときに参照する。
+  tags:
+  - topic:配信元
+  - topic:設定
+  related:
+  - to: LAY-73-1
+    type: see_also
+- path: pyproject.toml
+  name: Python のパッケージの定義
+  description: パッケージの名前・依存・CLI のエントリポイント・ruff と pyright と pytest の設定を受け持ち、依存やツールの設定を追加・修正するときに参照する。
+  tags:
+  - topic:パッケージ
+  - topic:エントリポイント
+  - tool:uv
+  related:
+  - to: CMD-1
+    type: see_also
+  - to: TP-1
+    type: see_also
+- path: rules.yaml
+  name: rule-inject の索引
+  description: rule-inject がこのリポジトリのファイルを触る前に案内するルールの索引を受け持ち、リポジトリ固有のルールの割り当てを修正するときに参照する。
+  tags:
+  - topic:索引
+  - topic:設定
+  related:
+  - to: LAY-73-1
+    type: see_also
+- path: uv.lock
+  name: 依存の固定
+  description: uv が解決した依存のバージョンとハッシュを受け持ち、依存を追加・更新したときに差分を確認するときに参照する。
+  tags:
+  - topic:パッケージ
+  - tool:uv
+  related:
+  - to: CMD-1
+    type: see_also
+- path: version.ini
+  name: リリースのバージョン
+  description: リリースで打つ project-index のバージョンを受け持ち、リリースでバージョンを上げるときに参照する。
+  tags:
+  - topic:バージョン
+  - topic:リリース
+  related:
+  - to: docs/guide/変更履歴.md
+    type: see_also
+- path: docs/README.md
+  name: ドキュメント全体の目次
+  description: docs/index.yaml から生成したドキュメントの種類のフォルダの一覧を受け持ち、GitHub でドキュメント全体の目次を開くときに参照する。
+  tags:
+  - topic:目次
+  related:
+  - to: docs/index.yaml
+    type: see_also
+- path: docs/_config.yml
+  name: GitHub Pages の Jekyll の設定
+  description: GitHub Pages で公開ドキュメントを組むときのタイトルと、ビルドから除外する内部の文書のフォルダを受け持ち、公開する範囲を修正するときに参照する。
+  tags:
+  - topic:設定
+  - tool:github
+  related:
+  - to: docs/_theme/_data/nav.project.yml
+    type: see_also

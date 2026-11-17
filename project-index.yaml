@@ -271,6 +271,16 @@ documents:
       ref: design-schemas/v9.2.0
     records: files
     body_file: path
+  - id: root
+    title: リポジトリの直下と docs/ の直下のファイル
+    paths: [files.yaml]
+    exclude: ["docs/pr/**", ".pytest_cache/**", ".ruff_cache/**", ".mypy_cache/**", "dist/**", "docs/generated/**", ".env"]
+    schema:
+      source: knowledge
+      path: schemas/knowledge-files.schema.yaml
+      ref: design-schemas/v9.2.0
+    records: files
+    body_file: path
   - id: prompts
     title: プロンプト
     paths: [content/prompts/**/*.yaml]
