@@ -115,7 +115,7 @@ functions:
          - `status`: 状態の取得（`env` は `os.environ`）。`render` は状態の文
          - `reload`: 設定の読み直し。`render` は読み直しの文
          - `restart`: 再起動の制御の再起動の要求（`handlers.restart.request()`）。`render` は `None`
-         - `update`: クローンの更新（クローンは端末の設定の `clone`、`control` は `handlers.restart`、`mdmark_ref` は呼ばれた時点で端末の設定のファイル `handlers.terminal.file` を読み直した値（端末の設定の読み込み））。`render` は `None`
+         - `update`: クローンの更新（クローンは端末の設定の `clone`、`control` は `handlers.restart`、`mdmark_ref` は呼ばれた時点で端末の設定のファイル `handlers.terminal.file` を読み直した値（端末の設定の読み込み））。読み直しが `TerminalConfigInvalidError` を送出したらクローンの更新を呼ばずに伝える。`render` は `None`
          - `check_project`: 配信元の検査。`render` は検査の文
          - `try_convert`: 試しの変換。`render` は `None`
          - `write_nav`: 画面の構成の書き込み。`render` は画面の構成の書き込みの文

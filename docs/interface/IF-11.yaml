@@ -214,6 +214,35 @@ flows:
       - '`mdmark` が `ref: v0.13.0`・`reinstalled: false` で、`error` に `npm install -g github:shuhei1101/mdmark#v0.13.0` と標準エラーの `npm error code ENOTFOUND` が入る'
       - 起動し直した後の `status` の `version` が新しいバージョン
     test: test_normal_when_mdmark_reinstall_fails
+  - name: 異常系（端末の設定が読めない・TerminalConfigInvalidError）
+    summary: 端末の設定がスキーマに違反すると、クローンに触らずに違反を返す
+    setup:
+      - name: Mock
+        description: 正常系と同じ `npm` と `mdmark` のスクリプト
+      - name: 上流
+        description: 正常系と同じ
+      - name: 端末の設定
+        description: 起動した後に `mdmark_ref` をパターンに当たらない値へ書き換えた端末の設定
+        notes: '`mdmark_ref: -x`'
+    flow: |-
+      <!-- map: {"title": "異常系（端末の設定が読めない・TerminalConfigInvalidError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as update
+
+        C->>T: 引数なし
+        T->>T: 端末の設定を読み直す（違反）
+        T-->>C: isError（mdmark_ref の違反）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で `mdmark_ref` の違反を返す'
+      - クローンの HEAD が変わらず、`npm` が呼ばれない
+      - プロセスが起動し直さない
+    test: test_error_when_terminal_config_invalid
 lead: クローンを `git pull --ff-only` と `uv sync` で更新して再起動する管理の MCP の `update` の入出力を定め、`update` を修正するときに参照する。
 tags:
   - name: topic:サーバー
@@ -284,6 +313,9 @@ exceptions:
   - name: RestartInProgressError
     condition: 再起動か更新がまだ終わっていない
     notes: '`isError: true`'
+  - name: TerminalConfigInvalidError
+    condition: '`update` を呼んだ時点で端末の設定のファイルが無い・YAML として読めない・スキーマに違反する（`mdmark_ref` のパターン違反を含む）'
+    notes: '`isError: true` で違反を返す。`git pull` の前に止め、クローンに触らず再起動もしない'
 constraints:
   - item: クローンの場所
     constraint: 端末の設定の `clone`
