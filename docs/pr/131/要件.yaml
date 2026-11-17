@@ -12,15 +12,27 @@ docs:
   - page: docs/guide/配信元を配信する.md
     new: false
     change: setup が content/prompts/ の行を候補に出す説明に、プロンプトの YAML を管理用の YAML に記載しないことを書き足す
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:14:57.213032+00:00'
   - page: docs/guide/コアコンセプト-文書のメタデータ.md
     new: false
-    change: 「載せるファイルの判定」「ずれの検出」の索引に無いファイルの数え方を、選んだ直し方に合わせる（設計で直し方が決まってから確定）
-    status: todo
+    change: 「ずれの検出」の索引に無いファイルに、ほかの documents の行の paths に当たるファイルを数えないことを書き足す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:14:57.213032+00:00'
   - page: docs/guide/設定.md
     new: false
-    change: 索引に無いファイルの説明（と、直し方によっては documents[].exclude[] の説明）を選んだ直し方に合わせる（設計で直し方が決まってから確定）
-    status: todo
+    change: 索引に無いファイルの説明に、ほかの documents の行の paths[] に当たるファイルを数えないことを書き足す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:14:57.213032+00:00'
+  - page: docs/guide/CLI.md
+    new: false
+    change: project-index files のオプションの表に --exclude-path を足す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T08:14:57.213032+00:00'
 scope_out:
   - item: content/prompts/ 以外で、2 つの documents の行（管理用の YAML の行と YAML の文書の行）の paths が同じファイルに当たる配置の検出
     reason: 要望はプロンプトの行を記載するときの重なりに限る。一般の重なりの検出に広げるかは、設計で直し方を決めるときに判断する
