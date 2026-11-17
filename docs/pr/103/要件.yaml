@@ -12,12 +12,14 @@ use_cases:
 docs:
   - page: docs/guide/読み取りAPI.md
     new: false
-    change: '`GET /sources` の行に、起動の後の読み込み中の応答（読み込み中の配信元の扱い）を設計の結果に合わせて書き足す'
-    status: todo
+    change: '`GET /sources` の行に `include_loading` と `loading` の状態を書き足す'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T02:20:30.495251+00:00'
 scope_out:
   - item: 配信元ごとの最初の問い合わせの時間（#85）
     reason: '#94 で対応済み。この作業 PR は起動の後の全ての配信元の読み込みと `GET /sources` の応答だけを扱う'
     plan: none
-  - item: dev-docs の画面のサーバーが `GET /sources` の新しい状態の値を表示する対応
-    reason: '`GET /sources` が読み込み中の配信元を新しい状態で返す設計になったときだけ要る dev-docs のリポジトリの対応。応答の形を変えるかはインターフェース定義設計で決める'
+  - item: dev-docs の画面のサーバーが `GET /sources` に `include_loading=true` を付け、`loading` の配信元を表示する対応
+    reason: dev-docs のリポジトリの対応。dev-docs は状態の値を `Literal` で受けるため、project-index は `include_loading` を渡さない要求に `loading` を返さず互換を保つ。この作業 PR の契約（IF-22）を前提にする後続
     plan: to_file
