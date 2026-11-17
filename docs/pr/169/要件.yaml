@@ -14,10 +14,13 @@ docs:
 scope_out:
   - item: knowledge の共通の型 ref の pattern（schemas/design/common.schema.yaml）と、テンプレートに写した同じ pattern を、決めた書き方に追随させる
     reason: 別のリポジトリの変更。IF-6 の制約「参照の型の項目のパス」は設計書の参照の型（{ID}#{項目のパス}）と同じ書き方で、今の pattern（\[[^\]]*\]）は対応の取れた [ ] を含む値を断る。この PR の書き方がレビューで確定してから中身が決まる
-    plan: to_file
+    plan: shuhei1101/knowledge#490
   - item: dev-docs の変換の項目のパスの解釈（src/dev_docs/features/convert/markdown.py の ITEM_STEP）を、決めた書き方に追随させる
     reason: 別のリポジトリの変更。文書の参照（id:{ID}#{項目のパス}）も同じ書き方で、今の ITEM_STEP は [...] の中の ] で値を切る。この PR の書き方がレビューで確定してから中身が決まる
-    plan: to_file
+    plan: shuhei1101/dev-docs#281
   - item: ai-monitor のフェーズのスキーマ（schemas/phase.schema.yaml）の $defs.ref の pattern を、決めた書き方に追随させる
     reason: 別のリポジトリの変更。knowledge の共通の型 ref と同じ pattern（\[[^\]]*\]）を持つ。この PR の書き方がレビューで確定してから中身が決まる
-    plan: to_file
+    plan: shuhei1101/ai-monitor#3611
+  - item: .github/workflows/test.yml の paths で pytest のノード ID（{ファイル}::{関数}）を指定できない
+    reason: 判定フローチャート『結合テストの実行範囲』の R7 で関数の単位に決まった範囲を TP-1 の TL-2 の run_runner で回せない（reviewer の対象外の逸脱の報告）。今回の要望に含まれない
+    plan: '#172'
