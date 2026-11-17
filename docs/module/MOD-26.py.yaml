@@ -276,4 +276,35 @@ functions:
         condition: '`a.yaml` と 1 行のファイル `.git` を置く'
         mock: なし（`tmp_path`）
         expected: ファイルが `a.yaml` だけ
+  - name: is_walked
+    title: たどるパスの判定
+    container: project_index/features/documents/indexable.py
+    usecase: 共通
+    role: 判定
+    summary: '`root` からのパスが、中をたどるファイルの列挙の返すパスに当たるかを、フォルダをたどらずに判定する'
+    description: commit のファイルの一覧（`git ls-tree`）から、書き出しを `walk_files` でたどったときと同じパスを選ぶ。
+    kind: 関数
+    scope: public
+    thread_safe: true
+    args:
+      - name: path
+        title: パス
+        type: str
+        required: true
+        passing: positional
+        description: '`root` からのファイルのパス（`/` 区切り）'
+    returns:
+      type: bool
+      description: たどるファイルなら `True`
+    process: |-
+      1. パスを `/` で分け、ファイル名が `SKIP_FILES` にあるか、フォルダの名前のどれかが `SKIP_DIRS` にあれば `False` を返す
+      2. パスが `SKIP_PATHS` のどれかの配下（`{パス}/` で始まる）なら `False` を返す
+      3. それ以外は `True` を返す
+    unit_tests:
+      - name: test_is_walked
+        case: 正常
+        summary: 中をたどるファイルの列挙と同じパスを選ぶ
+        condition: test_walk_files と同じファイルと `sub/.git`・`a/node_modules/n.js` を置き、置いた全てのファイルのパスを判定する
+        mock: なし（`tmp_path`）
+        expected: '`True` になるパスの集合が、同じフォルダの `walk_files` の結果の集合と同じ'
 visibility: internal

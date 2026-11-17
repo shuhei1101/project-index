@@ -17,5 +17,6 @@
 | [mdmark](./LIB-7.yaml) | Markdown を検査・描画するライブラリと CLI。project-index は、文書の書き込みで Markdown の値を `mdmark check --text` で点検するためだけに使う。 |
 | [jinja2](./LIB-8.yaml) | Python のテンプレートエンジン。`{{ 変数 }}`・`{% if %}`・`{% for %}` の構文で文字列を組み立てる。 |
 | [alias-inject](./LIB-9.yaml) | Claude Code のプロンプトに、YAML の文書から集めた用語・文書の別名・コマンドなどのエイリアスを差し込むプラグイン。エイリアスの元の行のスキーマ（`schemas/aliases.schema.yaml`）を正本として持つ。 |
+| [ruamel.yaml.clib](./LIB-171-1.yaml) | ruamel.yaml の読み込みの字句の解析と構文の解析を C（libyaml）で行う拡張。`YAML(pure=False)` のときに ruamel.yaml が使用する。 |
 
 <!-- /table -->

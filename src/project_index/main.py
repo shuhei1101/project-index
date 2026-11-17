@@ -33,6 +33,7 @@ from project_index.features.sources.registry import SourceRegistry
 from project_index.features.sources.types import ServedSource, SourceStatus
 from project_index.server.mcp.result import mcp_prompt_ids
 from project_index.shared.background import BackgroundGate
+from project_index.shared.yaml_io import c_loader_available
 
 if TYPE_CHECKING:
     import argparse
@@ -236,7 +237,12 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
     prompts = load_prompts(prompts_dir(os.environ), required=mcp_prompt_ids())
     state_dir = terminal.state_dir
     state_dir.mkdir(parents=True, exist_ok=True)
-    # 裏の処理の関所は 1 つだけ作り、書き出し・文書のストア・検査で共有する
+    # C の解析を使用できない: Python 実装で読み続ける（読み込みが遅くなる）
+    if not c_loader_available():
+        logger.warning(
+            "YAML の C の解析を使用できないため Python 実装で読む（ruamel.yaml.clib を入れ直す）"
+        )
+    # 裏の処理の関所は 1 つだけ作り、書き出し・文書のストア・検査・配信元の一覧で共有する
     gate = BackgroundGate()
     snapshots = SnapshotStore(state_dir / "snapshots", gate=gate)
     store = DocumentStore(snapshots, gate=gate)
@@ -255,7 +261,7 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
             snapshots=snapshots,
         )
 
-    registry = SourceRegistry(on_rebuilt=on_rebuilt, loading=True)
+    registry = SourceRegistry(on_rebuilt=on_rebuilt, loading=True, gate=gate)
 
     def reload(new_terminal: TerminalConfig) -> list[SourceStatus]:
         statuses = reload_sources(

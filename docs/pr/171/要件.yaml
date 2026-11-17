@@ -1,0 +1,31 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: changed
+    detail: 起動の直後に最初に開いた配信元と、文書の多い配信元の文書の一覧が、読み込みの完了と過去のリビジョンの書き出しを長く待たずに表示される
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: changed
+    detail: 起動の後の配信元の読み込みと、既定のリビジョンの書き出しの進め方が、開いた配信元の文書の一覧を待たせない順に変わる
+    depends_on: []
+docs:
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: 起動・再読み込みの後の検査と default_ref の書き出しの進め方（`exporting` の説明と 106〜109 行）を、設計で決めた読み込み方に合わせる
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T18:22:06.698768+00:00'
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: 文書の一覧の 504（リビジョンの書き出しが待ち時間の上限を超えた）の条件を、default_ref の読み込み方に合わせる
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T18:22:06.698768+00:00'
+scope_out:
+  - item: dev-docs の画面のサーバーの描画の時間
+    reason: dev-docs の画面のサーバーの処理で、project-index の変更ではない。判定は読み取り API の応答時間で行う
+    plan: none
+  - item: 文書の取得・語での検索・文書の MCP の search_docs の応答時間
+    reason: 要望は文書の一覧に限る。読み込み方の変更が及ぶ範囲は設計の工程で確認する
+    plan: none

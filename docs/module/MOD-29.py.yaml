@@ -112,7 +112,7 @@ classes:
         title: commit のファイルの blob のキャッシュ
         type: dict[tuple[Path, str], dict[str, str]]
         access: 内部 (_)
-        description: (`repo_root`, 解いた commit) → `repo_root` からの相対パス → blob の SHA。`TREE_KEEP` 件を超えたら古く入れたものから捨てる。commit の中身は変わらないので、`clear` では空にしない
+        description: (`repo_root`, 解いた commit) → `repo_root` からの相対パス → blob の SHA。通常のファイル（`100644`・`100755`）と、リンク先が同じ commit の通常のファイルのシンボリックリンク（`120000`。値はリンク先の blob の SHA）だけを持ち、サブモジュールとリンク先の無いシンボリックリンクは持たない。`TREE_KEEP` 件を超えたら古く入れたものから捨てる。commit の中身は変わらないので、`clear` では空にしない
       - name: _lock
         title: 排他
         type: threading.Lock
@@ -144,6 +144,16 @@ classes:
         access: 公開
         default: BackgroundGate()
         description: 裏の検査が読むとき、要求の応答中はファイル 1 件ごとに休ませる（起動のときに `Handlers.gate` を渡す）
+      - name: _blob_readers
+        title: blob の読み取り
+        type: dict[Path, BlobReader]
+        access: 内部 (_)
+        description: '`repo_root` → 履歴の blob の読み取り。`from_blobs` の `load` が初めてそのリポジトリを読むときに作り、捨てない（子プロセスはリポジトリごとに 1 本）'
+      - name: _collected
+        title: commit の収集の結果
+        type: dict[tuple[Path, str, str, str], list[str]]
+        access: 内部 (_)
+        description: (`repo_root`, 配信元の ID, 解いた commit, 文書の行の定義のハッシュ) → 『ファイルの収集』の結果。commit の中身と行の定義で決まり古くならないので `clear` では空にしない。`_trees` から捨てた (`repo_root`, commit) の要素も一緒に捨て、`TREE_KEEP` 件の commit の分に抑える
     methods:
       - name: load
         title: 文書を集める
@@ -173,13 +183,21 @@ classes:
             default: None
             passing: keyword
             description: 読むフォルダを `walk_files` でたどったパス。呼び出し元が既にたどったときに渡す。`None` は `load` が 1 回だけたどる
+          - name: from_blobs
+            title: 書き出さずに読む
+            type: bool
+            required: false
+            default: 'False'
+            passing: keyword
+            description: '`True` は、`ref` のある読む場所を状態のフォルダへ書き出さずに commit の blob から読む（文書の一覧が渡す）。`files` を渡したときと `ref` が無いときは使わない'
         returns:
           type: LoadResult
           description: 集めた文書と読めなかったファイル
         process: |-
           1. 読むフォルダを決める
              - `target.ref` が `None` の場合、`target.base`
-             - `target.ref` がある場合、読む場所の commit（下の「読む場所の commit」）を `snapshots.checkout` で書き出し、その下に `source.root` の `repo_root` からの相対パスをつなぐ
+             - `target.ref` があり、`from_blobs` が偽か `files` がある場合、読む場所の commit（下の「読む場所の commit」）を `snapshots.checkout` で書き出し、その下に `source.root` の `repo_root` からの相対パスをつなぐ
+             - `target.ref` があり、`from_blobs` が真で `files` が `None` の場合、書き出さずに `source.root` にする。手順 4 のファイルは、読む場所の commit のファイルの blob（`_trees`）のうち `source.root` の下にあり『たどるパスの判定』に当たるパスを、`source.root` からのパスにして得る（`walk_files` でたどらない）
           2. 文書の行を決める。`kinds` があれば `source.table` で引き（無い種類は `UnknownKindError`）、無ければ `enabled` の全ての行
           3. Git の配信元の場合、履歴の『ファイルの日時』を `_dates` から作業ツリー・commit・配信元の `root` の `repo_root` からの相対パスで引く。無ければ、作業ツリー（ワークツリーか `repo_root`）と commit（`ref` があれば読む場所の commit、無ければ作業ツリーの `HEAD` を解いた SHA）で呼び、配信元の直下からのパスに直してキャッシュする
           4. 読むフォルダのファイルを、`files` が無ければ `walk_files` で 1 回だけたどって得る。行ごとにそのパスを渡して『ファイルの収集』でファイルを集める。集めたファイル 1 件ごとの照合と読み込み（下の 2 つ）は、裏の処理の関所の裏の処理の 1 件（`gate.unit`。裏の処理のスレッドでなければ何もしない）の中で行う
@@ -190,6 +208,8 @@ classes:
                - 読み込みを終えたら `_worktrees` の末尾に入れ（使った順）、`WORKTREE_KEEP` 件を超えたら先頭から捨てる（そのワークツリーの `_worktree_locks` も除く）。捨てたワークツリーは、次に指されたときに初めての読み込みとして再読み込みする
              - `target.ref` が `None` の場合、ファイルごとに `stat` を取る。`_files` を (絶対パス, 行の ID, 行の定義のハッシュ) で引き、更新日時と大きさが同じで、理由に `missing_body_file` が無く、本文のファイルの (パス, 更新日時, 大きさ) も同じならキャッシュした結果を使い、それ以外は『ファイルの読み込み』で読んで `_files` を置き換える
              - `target.ref` がある場合、読む場所の commit のファイルの blob の SHA を `_trees` から引く（無ければ `git ls-tree -r --full-tree {commit}` を 1 回だけ起動してキャッシュする）。`_revision_files` の blob の SHA が同じで、理由に `missing_body_file` が無く、本文のファイルの (パス, blob の SHA) と、ファイルと本文のファイルの日時（手順 3）も同じならキャッシュした結果を使い、それ以外は『ファイルの読み込み』で読んで `_revision_files` を置き換える。blob の SHA が無いファイルは読まない
+                         - `from_blobs` が真で書き出さない場合、『ファイルの読み込み』の代わりに、ファイルの blob の内容を `_blob_readers` の `repo_root` の blob の読み取り（無ければ作る）の『blobの文字列』で読み、『文字列からの文書の組み立て』（`root` は `source.root`）で文書にする。本文のファイルは、同じ commit の `_trees` の blob を同じ読み取りで読む関数（`read_body`）で読む。UTF-8 で読めないファイルは、『ファイルの読み込み』と同じく `unreadable` の理由にする
+                         - 行ごとの『ファイルの収集』の結果を `_collected` に (`repo_root`, 配信元の ID, 読む場所の commit, 行の定義のハッシュ) で持ち、当たれば集め直さない（書き出しを読むときも同じ）
           5. 収集で当たらなかった `_files` のキーのうち、読んだ行の ID を持ち読むフォルダの下にあるものを削除する（削除されたファイルと、行の定義が変わる前のキー）。
              `target.ref` がある場合は、読んだ行ごとに、`_revision_files` のキーのうち `repo_root`・配信元の ID・行の ID が同じで、今回の commit のファイルに当たらないもの、または行の定義のハッシュが違うものを削除する（`_revision_files` を今の commit と行の定義のファイルの数に抑える）
           6. 行の順に文書を並べ、先に現れた ID を残して、後に現れた同じ ID の文書を `duplicate_id` にする（`detail` に ID と先の文書のファイル）。除外した文書は `duplicates` に行の順で入れる
@@ -320,6 +340,30 @@ classes:
             mock: '`load_file`（本物を包んで呼ばれたパスを記録する）'
             expected: 2 回目に `load_file` が `rules/a.yaml` で呼ばれ、`a` の `metadata["related"]` が `b` を指す。`_files` に `rules/a.yaml` のキーが 1 つだけ残る
             exception: '-'
+          - name: test_document_store_load_when_from_blobs
+            case: 正常
+            summary: 書き出さずに commit の blob から読む
+            condition: test_document_store_load_when_ref と同じ配信元で、`rules/a.yaml` と `body_file` の行の `src/files.yaml`・`src/a.py` を commit し、最初の commit を持つ読む場所で `from_blobs=True` と `False` の別のストアで読む
+            mock: リビジョンの書き出し（本物を包んで呼ばれた回数を記録する）
+            expected: 2 つの結果の文書（値・本文・日時・バージョン）が同じで、`from_blobs=True` のストアでは書き出しが呼ばれない
+          - name: test_document_store_load_when_from_blobs_symlink
+            case: 正常
+            summary: シンボリックリンクは書き出しと同じくリンク先の内容で読む
+            condition: '`rules/a.yaml` と、それを指すシンボリックリンク `rules/b.yaml`（`id` を持たない文書）、無いファイルを指す `rules/c.yaml` を commit し、`from_blobs=True` と `False` で読む'
+            mock: なし（`tmp_path` に `git init`）
+            expected: どちらも `rules/b.yaml` の文書が `rules/a.yaml` と同じ値で、`rules/c.yaml` の文書が無い
+          - name: test_document_store_load_when_from_blobs_not_utf8
+            case: 正常
+            summary: UTF-8 で読めないファイル
+            condition: Shift_JIS の `rules/x.yaml` を commit し、`from_blobs=True` で読む
+            mock: なし
+            expected: '`problems` に `rules/x.yaml` の `unreadable`'
+          - name: test_document_store_load_when_collected_reused
+            case: 正常
+            summary: 同じ commit の 2 回目は集め直さない
+            condition: Git の配信元で、同じ commit を持つ読む場所を `from_blobs=True` で 2 回読み、`rules/c.yaml` を足した 2 つ目の commit を持つ読む場所で 3 回目を読む
+            mock: 『ファイルの収集』（本物を包んで呼ばれた回数を記録する）
+            expected: 2 回目は収集が呼ばれず、2 回とも同じ文書。3 回目は収集が呼ばれ、`rules/c.yaml` の文書を返す
       - name: get
         title: ID で引く
         summary: ID の並びの順に文書を返す

@@ -21,6 +21,7 @@ diagrams:
         リビジョンのファイル ..> gitの実行
         リポジトリの直下 ..> gitの実行
         リビジョンの書き出し ..> gitの実行 : git archive
+        blobの読み取り ..> gitの実行 : git cat-file --batch
         リビジョンの解決 ..> 解いたリビジョン : 返す
         区間の commit ..> 区間の commit と親 : 返す
         gitの実行 ..> gitの失敗 : 送る
@@ -54,6 +55,9 @@ diagrams:
         class リビジョンの書き出し {
           +書き出す(リポジトリ, commit) Path
         }
+        class blobの読み取り {
+          +blobの内容(blob) bytes
+        }
         class 解いたリビジョン {
           +渡した値: str
           +commit: str
@@ -76,10 +80,11 @@ diagrams:
         click リビジョンのファイル href "id:MOD-31#functions[read_file_at]"
         click リポジトリの直下 href "id:MOD-86#functions[repo_root]"
         click リビジョンの書き出し href "id:MOD-32#classes[SnapshotStore]"
+        click blobの読み取り href "id:MOD-171-1#classes[BlobReader]"
         click 解いたリビジョン href "id:MOD-33#data_models[ResolvedRef]"
         click 区間の commit と親 href "id:MOD-33#data_models[CommitStep]"
         click gitの失敗 href "id:MOD-86#classes[GitError]"
 notes:
   受け持つこと: |-
-    過去のリビジョンは `git archive` で `state_dir` に書き出し、作業ツリーと同じ読み方で参照できるようにする。
+    過去のリビジョンは `git archive` で `state_dir` に書き出し、作業ツリーと同じ読み方で参照できるようにする。文書の一覧は書き出さずに、commit の blob を `git cat-file --batch` で読む。
 visibility: internal

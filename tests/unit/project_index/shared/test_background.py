@@ -187,3 +187,59 @@ def test_background_gate_each_when_foreground_active() -> None:
     # 検証
     assert items == ["a", "b", "c"]
     assert slept == [pytest.approx(9.0), pytest.approx(9.0), pytest.approx(9.0)]
+
+
+def test_background_gate_yield_unit_when_idle() -> None:
+    """応答中でなければ 2 本の 1 件が重なって進む（正常系）。"""
+    # 準備
+    gate, _, slept = _gate()
+    both_inside = threading.Barrier(2, timeout=5)
+    finished: list[str] = []
+
+    def work(name: str) -> None:
+        with gate.background(), gate.yield_unit():
+            both_inside.wait()
+            finished.append(name)
+
+    threads = [threading.Thread(target=work, args=(name,)) for name in ("x", "y")]
+    # 実行
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+    # 検証
+    assert sorted(finished) == ["x", "y"]
+    assert slept == []
+
+
+def test_background_gate_yield_unit_when_foreground_active() -> None:
+    """応答中は 1 件ずつにして休む（正常系）。"""
+    # 準備
+    gate, clock, slept = _gate()
+    running = 0
+    seen: list[int] = []
+    lock = threading.Lock()
+
+    def work() -> None:
+        nonlocal running
+        with gate.background():
+            for _ in range(3):
+                with gate.yield_unit():
+                    with lock:
+                        running += 1
+                        seen.append(running)
+                        clock.advance(1.0)
+                    threading.Event().wait(0.001)
+                    with lock:
+                        running -= 1
+
+    threads = [threading.Thread(target=work) for _ in range(2)]
+    # 実行
+    with gate.foreground():
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+    # 検証
+    assert max(seen) == 1
+    assert slept == [pytest.approx(9.0)] * 6

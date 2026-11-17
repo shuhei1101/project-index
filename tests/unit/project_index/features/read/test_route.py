@@ -169,7 +169,9 @@ def test_build_read_router_when_include_loading(
     entered = threading.Event()
     release = threading.Event()
 
-    def load_source(entry: SourceEntry, *, index: int, lookup: object) -> tuple[Any, Any]:
+    def load_source(
+        entry: SourceEntry, *, index: int, lookup: object, unit: object = None
+    ) -> tuple[Any, Any]:
         del lookup
         entered.set()
         release.wait(timeout=5)

@@ -111,7 +111,8 @@ def list_documents(
     target: Target, *, store: DocumentStore, values: bool = False, common_keys: bool = False
 ) -> DocumentListResponse:
     """読み取りの場所の文書の ID・パス・種類・メタデータ・バージョンを、`documents[]` の行の順に返す。"""
-    loaded = store.load(target)
+    # 文書の一覧はリビジョンを書き出さずに commit の blob から読む
+    loaded = store.load(target, from_blobs=True)
     order = {row.id: index for index, row in enumerate(target.source.config.documents)}
     documents = sorted(
         loaded.documents, key=lambda found: (order.get(found.kind, len(order)), found.path)

@@ -137,7 +137,9 @@ def _register(
         )
         try:
             request = model(**arguments)
-            await wait_sources(request)
+            # 読み込みを待つ間も要求の応答中として数え、要求が待っていない行の読み込みを休ませる
+            with gate.foreground():
+                await wait_sources(request)
             # ワークツリーの初めての読み込みを上限まで待つ（search_docs・write_docs・delete_docs）
             if prepare is not None:
                 await prepare(request)

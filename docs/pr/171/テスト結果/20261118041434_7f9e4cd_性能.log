@@ -1,0 +1,146 @@
+# 文書の一覧の応答時間（NFR-14）と全ての行の読み込みの時間（NFR-13）
+
+前: develop の worktree（e397f28）・後: 作業ブランチ（実装は 69609ee から変わらない）。端末の設定の複製（/tmp/poc171/pi-settings.yaml）・空の状態フォルダで起動し、裏の検査と書き出しを止めた（下の launch.py が check_and_export_later を何もしない関数に差し替える）。
+api は起動から 5 秒後から 14 件の配信元の GET /sources/{source}/docs?values=true&common_keys=true を 2 回ずつ、load は要求を送らずに registry.load の開始から終了まで。前・後を api・load の順に交互に 3 回ずつ回した。
+
+$ for i in 1 2 3; do run.sh {前} before-api-$i api; run.sh {後} after-api-$i api; run.sh {前} before-load-$i load; run.sh {後} after-load-$i load; done
+$ python3 analyze.py
+| 配信元 | 回 | 前（中央値・秒） | 後（中央値・秒） | 比 | 前の 3 回 | 後の 3 回 |
+| --- | --- | --- | --- | --- | --- | --- |
+| dev-docs | 1 | 20.34 | 0.96 | 0.05 | 24.85 / 18.38 / 20.34 | 1.21 / 0.96 / 0.87 |
+| dev-docs | 2 | 0.30 | 0.03 | 0.10 | 0.36 / 0.29 / 0.30 | 0.03 / 0.03 / 0.02 |
+| claude-balancer | 1 | 4.69 | 2.17 | 0.46 | 4.69 / 5.14 / 4.33 | 2.17 / 2.26 / 1.92 |
+| claude-balancer | 2 | 0.25 | 0.04 | 0.16 | 0.25 / 0.25 / 0.23 | 0.04 / 0.04 / 0.06 |
+| aituber | 1 | 1.56 | 0.40 | 0.26 | 1.60 / 1.56 / 1.51 | 0.42 / 0.40 / 0.39 |
+| aituber | 2 | 0.09 | 0.02 | 0.29 | 0.10 / 0.09 / 0.08 | 0.03 / 0.02 / 0.02 |
+| knowledge | 1 | 2.31 | 1.01 | 0.44 | 2.66 / 2.27 / 2.31 | 1.01 / 1.37 / 1.01 |
+| knowledge | 2 | 0.28 | 0.03 | 0.11 | 0.34 / 0.26 / 0.28 | 0.03 / 0.03 / 0.03 |
+| mdmark | 1 | 6.46 | 2.69 | 0.42 | 6.91 / 6.25 / 6.46 | 2.38 / 2.69 / 3.43 |
+| mdmark | 2 | 0.65 | 0.11 | 0.17 | 0.74 / 0.65 / 0.65 | 0.11 / 0.11 / 0.16 |
+| ai-monitor | 1 | 14.27 | 5.03 | 0.35 | 13.88 / 14.27 / 15.21 | 5.03 / 4.99 / 6.22 |
+| ai-monitor | 2 | 1.31 | 0.20 | 0.15 | 1.17 / 1.32 / 1.31 | 0.14 / 0.22 / 0.20 |
+| voice-input | 1 | 2.24 | 0.70 | 0.31 | 2.34 / 2.17 / 2.24 | 0.69 / 1.08 / 0.70 |
+| voice-input | 2 | 0.24 | 0.05 | 0.21 | 0.25 / 0.21 / 0.24 | 0.05 / 0.04 / 0.07 |
+| gui-support | 1 | 0.77 | 0.29 | 0.38 | 0.77 / 0.70 / 0.83 | 0.27 / 0.31 / 0.29 |
+| gui-support | 2 | 0.08 | 0.02 | 0.26 | 0.08 / 0.08 / 0.10 | 0.02 / 0.04 / 0.02 |
+| mindstella | 1 | 4.70 | 1.38 | 0.29 | 4.69 / 4.70 / 4.81 | 1.26 / 1.54 / 1.38 |
+| mindstella | 2 | 0.32 | 0.06 | 0.19 | 0.31 / 0.32 / 0.35 | 0.06 / 0.07 / 0.05 |
+| observability | 1 | 0.83 | 0.39 | 0.47 | 0.80 / 0.83 / 0.87 | 0.37 / 0.39 / 0.40 |
+| observability | 2 | 0.11 | 0.02 | 0.22 | 0.10 / 0.11 / 0.11 | 0.02 / 0.02 / 0.02 |
+| project-index | 1 | 2.57 | 0.69 | 0.27 | 2.67 / 2.48 / 2.57 | 0.69 / 0.73 / 0.68 |
+| project-index | 2 | 0.22 | 0.04 | 0.16 | 0.24 / 0.22 / 0.21 | 0.04 / 0.03 / 0.04 |
+| alias-inject | 1 | 0.58 | 0.18 | 0.31 | 0.75 / 0.54 / 0.58 | 0.18 / 0.18 / 0.24 |
+| alias-inject | 2 | 0.06 | 0.02 | 0.34 | 0.07 / 0.05 / 0.06 | 0.03 / 0.02 / 0.02 |
+| rule-inject | 1 | 1.27 | 0.43 | 0.34 | 1.22 / 1.27 / 1.31 | 0.45 / 0.40 / 0.43 |
+| rule-inject | 2 | 0.11 | 0.03 | 0.23 | 0.11 / 0.11 / 0.13 | 0.03 / 0.02 / 0.03 |
+| shuhdev-gateway | 1 | 0.41 | 0.13 | 0.33 | 0.38 / 0.42 / 0.41 | 0.12 / 0.14 / 0.13 |
+| shuhdev-gateway | 2 | 0.09 | 0.04 | 0.44 | 0.09 / 0.11 / 0.07 | 0.04 / 0.04 / 0.04 |
+
+全ての行の読み込み: 前 20.91 秒（19.17 / 36.16 / 20.91）・後 5.76 秒（5.49 / 5.87 / 5.76）
+応答の不一致: []
+1 load avg ['8.54', '13.09', '13.21'] ['8.42', '12.07', '12.85']
+2 load avg ['6.88', '11.05', '12.45'] ['7.69', '10.46', '12.14']
+3 load avg ['20.07', '13.08', '12.89'] ['14.93', '13.01', '12.88']
+
+## launch.py
+"""計測用: 裏の検査と書き出しを止め、全ての行の読み込みの開始と終了の時刻を記録して serve を起動する。"""
+
+import json
+import os
+import sys
+import threading
+import time
+
+from project_index import __main__ as entry
+from project_index import main as main_module
+from project_index.features.sources.registry import SourceRegistry
+
+OUT = os.environ["MEASURE_LOAD_OUT"]
+
+
+def no_checks(*args, **kwargs):
+    thread = threading.Thread(target=lambda: None, daemon=True)
+    thread.start()
+    return thread
+
+
+main_module.check_and_export_later = no_checks
+original = SourceRegistry.load
+
+
+def timed(self, terminal):
+    started = time.time()
+    original(self, terminal)
+    with open(OUT, "w", encoding="utf-8") as file:
+        json.dump({"start": started, "end": time.time()}, file)
+
+
+SourceRegistry.load = timed
+sys.argv = ["project-index", "serve"]
+sys.exit(entry.main())
+
+## run.sh
+#!/bin/bash
+# 使い方: run.sh {クローン} {名前} {api|load}
+set -u
+CLONE=$1; NAME=$2; MODE=$3
+R=/tmp/pr171-measure/runs/$NAME; rm -rf "$R"; mkdir -p "$R/state" "$R/body"
+SOURCES="dev-docs claude-balancer aituber knowledge mdmark ai-monitor voice-input gui-support mindstella observability project-index alias-inject rule-inject shuhdev-gateway"
+cat /proc/loadavg > "$R/loadavg-before"
+T0=$(date +%s.%N); echo "$T0" > "$R/t0"
+MEASURE_LOAD_OUT="$R/load.json" PROJECT_INDEX_CONFIG=/tmp/poc171/pi-settings.yaml PROJECT_INDEX_PORT=18787 PROJECT_INDEX_STATE_DIR="$R/state" \
+  "$CLONE/.venv/bin/python" /tmp/pr171-measure/launch.py > "$R/pi.log" 2>&1 &
+PI=$!
+until ss -ltn | grep -q "127.0.0.1:18787 "; do sleep 0.1; done
+if [ "$MODE" = api ]; then
+  sleep "$(python3 -c "import time;print(max(0,$T0+5-time.time()))")"
+  for s in $SOURCES; do
+    for n in 1 2; do
+      curl -s -o "$R/body/$s-$n.json" -w "$s $n %{http_code} %{time_total}\n" \
+        "http://127.0.0.1:18787/sources/$s/docs?values=true&common_keys=true" >> "$R/api.txt"
+    done
+  done
+else
+  until [ -f "$R/load.json" ]; do sleep 0.2; done
+fi
+cat /proc/loadavg > "$R/loadavg-after"
+kill $PI; wait $PI 2>/dev/null
+echo done "$R"
+
+## analyze.py
+import json, statistics, pathlib
+R = pathlib.Path("/tmp/pr171-measure/runs")
+def api(name):
+    rows = {}
+    for line in (R / name / "api.txt").read_text().splitlines():
+        s, n, code, t = line.split()
+        rows[(s, int(n))] = (code, float(t))
+    return rows
+def load(name):
+    d = json.loads((R / name / "load.json").read_text())
+    return d["end"] - d["start"]
+runs = [1, 2, 3]
+sources = [k[0] for k in api("before-api-1") if k[1] == 1]
+print("| 配信元 | 回 | 前（中央値・秒） | 後（中央値・秒） | 比 | 前の 3 回 | 後の 3 回 |")
+print("| --- | --- | --- | --- | --- | --- | --- |")
+for s in sources:
+    for n in (1, 2):
+        b = [api(f"before-api-{i}")[(s, n)][1] for i in runs]
+        a = [api(f"after-api-{i}")[(s, n)][1] for i in runs]
+        codes = {api(f"after-api-{i}")[(s, n)][0] for i in runs} | {api(f"before-api-{i}")[(s, n)][0] for i in runs}
+        mb, ma = statistics.median(b), statistics.median(a)
+        print(f"| {s} | {n} | {mb:.2f} | {ma:.2f} | {ma/mb:.2f} | {' / '.join(f'{x:.2f}' for x in b)} | {' / '.join(f'{x:.2f}' for x in a)} |" + ("" if codes == {"200"} else f" codes={codes}"))
+lb = [load(f"before-load-{i}") for i in runs]; la = [load(f"after-load-{i}") for i in runs]
+print()
+print(f"全ての行の読み込み: 前 {statistics.median(lb):.2f} 秒（{' / '.join(f'{x:.2f}' for x in lb)}）・後 {statistics.median(la):.2f} 秒（{' / '.join(f'{x:.2f}' for x in la)}）")
+# 応答の一致（同じ回の前後で、値が同じか）
+diff = []
+for i in runs:
+    for s in sources:
+        b = json.loads((R / f"before-api-{i}" / "body" / f"{s}-1.json").read_text())
+        a = json.loads((R / f"after-api-{i}" / "body" / f"{s}-1.json").read_text())
+        if b != a:
+            diff.append((i, s))
+print("応答の不一致:", diff)
+for i in runs:
+    print(i, "load avg", (R / f"before-api-{i}" / "loadavg-before").read_text().split()[:3], (R / f"after-api-{i}" / "loadavg-before").read_text().split()[:3])

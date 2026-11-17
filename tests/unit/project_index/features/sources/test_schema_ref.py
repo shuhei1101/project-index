@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from project_index.features.sources import schema_ref as schema_ref_module
 from project_index.features.sources.schema_ref import (
     SchemaRef,
     SchemaRefError,
@@ -171,3 +172,37 @@ def test_read_schema_ref_when_not_found(
     # 実行・検証
     with pytest.raises(SchemaRefError, match=rule):
         read_schema_ref(SchemaRef(**values), lookup=lookup)
+
+
+def test_read_schema_ref_when_cached(
+    schemas_repo: Path,
+    commit_all: Callable[..., str],
+    run_git: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """同じ commit の 2 回目は読み直さない（正常系）。"""
+    # 準備
+    calls: list[str] = []
+    real = schema_ref_module.read_file_at
+
+    def recording(repo: Path, commit: str, path: str) -> Any:
+        calls.append(path)
+        return real(repo, commit, path)
+
+    monkeypatch.setattr(schema_ref_module, "read_file_at", recording)
+    lookup = _lookup({"schemas": schemas_repo / "project-index.yaml"})
+    tag_ref = SchemaRef(source="schemas", path="schemas/note.schema.yaml", ref="v1")
+    branch_ref = SchemaRef(source="schemas", path="schemas/note.schema.yaml", ref="develop")
+    first_tag = read_schema_ref(tag_ref, lookup=lookup)
+    calls.clear()
+    # 実行
+    second_tag = read_schema_ref(tag_ref, lookup=lookup)
+    tag_calls = list(calls)
+    read_schema_ref(branch_ref, lookup=lookup)
+    moved = commit_all(schemas_repo, {"schemas/note.schema.yaml": "title: moved\ntype: object\n"})
+    after_move = read_schema_ref(branch_ref, lookup=lookup)
+    # 検証
+    assert tag_calls == []
+    assert second_tag == first_tag
+    assert after_move.commit == moved
+    assert after_move.schema == {"title": "moved", "type": "object"}

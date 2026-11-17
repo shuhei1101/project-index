@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import difflib
+import functools
 import hashlib
 import logging
 import os
@@ -16,14 +17,20 @@ from typing import TYPE_CHECKING, Any, cast
 from project_index.features.access.types import Target
 from project_index.features.documents.aliases import collect_aliases
 from project_index.features.documents.fields import missing_ref_fields, unresolved_related
-from project_index.features.documents.indexable import walk_files, walk_tree
-from project_index.features.documents.loader import collect_files, load_file, unindexed_files
+from project_index.features.documents.indexable import is_walked, walk_files, walk_tree
+from project_index.features.documents.loader import (
+    collect_files,
+    documents_from_text,
+    load_file,
+    unindexed_files,
+)
 from project_index.features.documents.schema import (
     records_item_schema,
     resolve_schema_refs,
     startup_schema,
 )
 from project_index.features.documents.types import Document, LoadProblem, LoadResult, SyncReport
+from project_index.features.history.blob import BlobReader
 from project_index.features.history.query import file_dates, resolve_ref
 from project_index.features.history.types import FileDates
 from project_index.integrations.git import GitError, ignored_paths, run_git
@@ -33,7 +40,7 @@ from project_index.shared.narrowing import is_dict
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
 
 if TYPE_CHECKING:
-    from collections.abc import Collection, Iterable, Sequence
+    from collections.abc import Callable, Collection, Iterable, Sequence
 
     from project_index.features.history.snapshot import SnapshotStore
     from project_index.features.sources.types import DocumentTable, ServedSource
@@ -141,6 +148,10 @@ class DocumentStore:
         self._revision_schemas: dict[tuple[Path, str, str], dict[str, Any]] = {}
         self._revision_files: dict[_RevisionKey, _CachedRevisionFile] = {}
         self._trees: dict[tuple[Path, str], dict[str, str]] = {}
+        # (`repo_root`, 配信元の ID, 解いた commit, 行の定義のハッシュ) → ファイルの収集の結果
+        self._collected: dict[tuple[Path, str, str, str], list[str]] = {}
+        # `repo_root` → 書き出さずに commit の blob を読む `git cat-file --batch`
+        self._blob_readers: dict[Path, BlobReader] = {}
         self._dates: dict[tuple[Path, str, str], dict[str, FileDates]] = {}
         self._worktrees: dict[Path, _WorktreeWalk] = {}
         self._worktree_locks: dict[Path, threading.Lock] = {}
@@ -275,16 +286,72 @@ class DocumentStore:
         )
         text = output if isinstance(output, str) else output.decode("utf-8")
         blobs: dict[str, str] = {}
+        links: dict[str, str] = {}
         for entry in text.split("\0"):
             if not entry:
                 continue
             meta, path = entry.split("\t", 1)
-            blobs[path] = meta.split(" ")[2]
+            mode, kind, sha = meta.split(" ")
+            # サブモジュール（commit）は持たない
+            if kind != "blob":
+                continue
+            # シンボリックリンクは、リンク先を解いてから持つ
+            if mode == _SYMLINK_MODE:
+                links[path] = sha
+                continue
+            blobs[path] = sha
+        blobs.update(self._link_blobs(repo_root, links, blobs))
         with self._lock:
             self._trees[key] = blobs
             while len(self._trees) > TREE_KEEP:
-                del self._trees[next(iter(self._trees))]
+                dropped = next(iter(self._trees))
+                del self._trees[dropped]
+                # 捨てた commit の収集の結果も捨てる
+                for collected in [k for k in self._collected if (k[0], k[2]) == dropped]:
+                    del self._collected[collected]
         return blobs
+
+    def _link_blobs(
+        self, repo_root: Path, links: dict[str, str], blobs: dict[str, str]
+    ) -> dict[str, str]:
+        """リンク先が同じ commit の通常のファイルのシンボリックリンクを、リンク先の blob で返す。"""
+        if not links:
+            return {}
+        reader = self._blob_reader(repo_root)
+        resolved: dict[str, str] = {}
+        for path, sha in links.items():
+            target = reader.read_text(sha)
+            if target is None:
+                continue
+            linked = posixpath.normpath(posixpath.join(posixpath.dirname(path), target))
+            # リポジトリの外を指すリンクと、リンク先の無いリンクは持たない（書き出しでも読めない）
+            if linked in blobs:
+                resolved[path] = blobs[linked]
+        return resolved
+
+    def _blob_reader(self, repo_root: Path) -> BlobReader:
+        """リポジトリの blob の読み取りを返す（無ければ作る）。"""
+        with self._lock:
+            reader = self._blob_readers.get(repo_root)
+            if reader is None:
+                reader = self._blob_readers[repo_root] = BlobReader(repo_root)
+            return reader
+
+    def _commit_files(self, target: Target, commit: str) -> list[str]:
+        """commit のファイルのうち、配信元の直下の下にあり、たどるパスに当たるものを配信元の直下からのパスで返す。"""
+        source = target.source
+        repo_root = source.repo_root or source.root
+        prefix = source.root.relative_to(repo_root).as_posix()
+        blobs = self._blobs(repo_root, commit)
+        # 配信元の直下がリポジトリの直下: 全てのパスがそのまま配信元の直下からのパス
+        if prefix == ".":
+            return [path for path in blobs if is_walked(path)]
+        head = f"{prefix}/"
+        return [
+            path.removeprefix(head)
+            for path in blobs
+            if path.startswith(head) and is_walked(path.removeprefix(head))
+        ]
 
     def _load_revision_table(
         self,
@@ -294,8 +361,12 @@ class DocumentStore:
         dates: dict[str, FileDates],
         files: Sequence[str],
         commit: str,
+        reader: BlobReader | None = None,
     ) -> tuple[list[Document], list[LoadProblem]]:
-        """リビジョンの 1 つの文書の行のファイルを集め、blob・日時・行の定義が変わったファイルだけ読む。"""
+        """リビジョンの 1 つの文書の行のファイルを集め、blob・日時・行の定義が変わったファイルだけ読む。
+
+        `reader` があれば、書き出しを読まずに commit の blob の内容から読む。
+        """
         source = target.source
         repo_root = source.repo_root or source.root
         prefix = source.root.relative_to(repo_root).as_posix()
@@ -309,43 +380,82 @@ class DocumentStore:
             paths = sorted({d.body_path for d in found if d.body_path is not None})
             return tuple((path, blobs.get(from_repo(path), "")) for path in paths)
 
-        def read(
-            path: str, key: _RevisionKey, blob: str
-        ) -> tuple[list[Document], list[LoadProblem]]:
-            """キャッシュが新しければキャッシュを、古ければファイルを再読み込みしてキャッシュする。"""
-            with self._lock:
-                cached = self._revision_files.get(key)
-            if cached is not None and _revision_fresh(
-                cached, blob, body_blobs(cached[3]), _date_stamps(path, cached[3], dates)
-            ):
-                return cached[3], cached[4]
-            found, issues = load_file(root, path, table, source_id=source.id, dates=dates)
-            with self._lock:
-                self._revision_files[key] = (
-                    blob,
-                    body_blobs(found),
-                    _date_stamps(path, found, dates),
-                    found,
-                    issues,
-                )
-            return found, issues
+        def load(path: str, blob: str) -> tuple[list[Document], list[LoadProblem]]:
+            """書き出しを読む / 書き出さずに commit の blob の内容から読む。"""
+            if reader is None:
+                return load_file(root, path, table, source_id=source.id, dates=dates)
+            return _documents_from_blob(
+                reader,
+                blob,
+                _body_reader(reader, blobs, from_repo),
+                root,
+                path,
+                table,
+                source_id=source.id,
+                dates=dates,
+            )
 
         documents: list[Document] = []
         problems: list[LoadProblem] = []
         seen: set[str] = set()
+        collected = self._collected_files(
+            (repo_root, source.id, commit, table_hash), root, table, files
+        )
         # ファイル 1 件ごとの照合と読み込みを、裏の処理の 1 件にする（要求のスレッドでは何もしない）
-        for path in self.gate.each(collect_files(root, table, files=files)):
+        for path in self.gate.each(collected):
             relative = from_repo(path)
             blob = blobs.get(relative)
             if blob is None:
                 continue
             seen.add(relative)
-            found, issues = read(path, (repo_root, source.id, relative, table.id, table_hash), blob)
+            found, issues = self._read_revision(
+                (repo_root, source.id, relative, table.id, table_hash),
+                blob,
+                body_blobs,
+                functools.partial(_date_stamps, path, dates=dates),
+                functools.partial(load, path, blob),
+            )
             documents.extend(found)
             problems.extend(issues)
         # 今の commit に無いファイルと、行の定義が変わった結果を捨てる
         self._discard_revisions((repo_root, source.id), table.id, seen, table_hash)
         return documents, problems
+
+    def _read_revision(
+        self,
+        key: _RevisionKey,
+        blob: str,
+        body_blobs: Callable[[Sequence[Document]], _BodyBlobs],
+        stamps: Callable[[Sequence[Document]], _DateStamps],
+        load: Callable[[], tuple[list[Document], list[LoadProblem]]],
+    ) -> tuple[list[Document], list[LoadProblem]]:
+        """キャッシュが新しければキャッシュを、古ければファイルを再読み込みしてキャッシュする。"""
+        with self._lock:
+            cached = self._revision_files.get(key)
+        if cached is not None and _revision_fresh(
+            cached, blob, body_blobs(cached[3]), stamps(cached[3])
+        ):
+            return cached[3], cached[4]
+        found, issues = load()
+        with self._lock:
+            self._revision_files[key] = (blob, body_blobs(found), stamps(found), found, issues)
+        return found, issues
+
+    def _collected_files(
+        self,
+        key: tuple[Path, str, str, str],
+        root: Path,
+        table: DocumentTable,
+        files: Sequence[str],
+    ) -> list[str]:
+        """同じ commit と行の定義のファイルの収集の結果を使い回す（無ければ集めて記録する）。"""
+        with self._lock:
+            collected = self._collected.get(key)
+        if collected is None:
+            collected = list(collect_files(root, table, files=files))
+            with self._lock:
+                self._collected[key] = collected
+        return collected
 
     def _discard_revisions(
         self, owner: tuple[Path, str], table_id: str, seen: set[str], table_hash: str
@@ -377,15 +487,25 @@ class DocumentStore:
         *,
         kinds: Sequence[str] | None = None,
         files: Sequence[str] | None = None,
+        from_blobs: bool = False,
     ) -> LoadResult:
         """読む場所の文書を、文書の行ごとに集めて返す。
 
         `files` は呼び出し元が読むフォルダを `walk_files` でたどったパス。
         無ければここで 1 回だけたどり、行ごとにたどり直さない。
+        `from_blobs` は、`ref` のある読む場所を書き出さずに commit の blob から読む（`files` を渡したときは使わない）。
         """
         revision = None if target.ref is None else self._commit_of(target)
-        root = target.base if revision is None else self._revision_root(target, revision)
         tables = self._tables(target, kinds)
+        # 書き出さずに読む: commit のファイルの一覧から、たどるパスを選んで blob を読む
+        if revision is not None and from_blobs and files is None:
+            source = target.source
+            reader = self._blob_reader(source.repo_root or source.root)
+            commit_files = self._commit_files(target, revision)
+            return self._load_walked(
+                target, source.root, tables, revision, commit_files, reader=reader
+            )
+        root = target.base if revision is None else self._revision_root(target, revision)
         # ワークツリーを読む: ワークツリーごとの排他の中で、たどった結果を使い回す
         if revision is None and target.worktree is not None and files is None:
             with self._worktree_lock(root):
@@ -443,8 +563,10 @@ class DocumentStore:
         revision: str | None,
         files: Sequence[str] | None,
         collected: dict[str, list[str]] | None = None,
+        *,
+        reader: BlobReader | None = None,
     ) -> LoadResult:
-        """読むフォルダのファイルから、文書の行ごとに文書を集める。"""
+        """読むフォルダのファイルから、文書の行ごとに文書を集める（`reader` があれば commit の blob から読む）。"""
         dates = self._file_dates(target, revision)
         walked = list(walk_files(root)) if files is None else files
         documents: list[Document] = []
@@ -464,7 +586,7 @@ class DocumentStore:
                 seen_keys |= seen
             else:
                 found, issues = self._load_revision_table(
-                    target, root, table, dates, walked, revision
+                    target, root, table, dates, walked, revision, reader
                 )
             documents.extend(found)
             problems.extend(issues)
@@ -792,4 +914,41 @@ def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
         alias_violations=alias_violations,
         duplicate_files=[f"{path}: {'・'.join(ids)}" for path, ids in shared.items()],
         duplicate_ids=duplicate_ids,
+    )
+
+
+# `git ls-tree` のシンボリックリンクのモード
+_SYMLINK_MODE = "120000"
+
+
+def _body_reader(
+    reader: BlobReader, blobs: dict[str, str], from_repo: Callable[[str], str]
+) -> Callable[[str], str | None]:
+    """本文のファイルを同じ commit の blob から読む関数を返す（無い・UTF-8 で読めないなら `None`）。"""
+
+    def read(path: str) -> str | None:
+        blob = blobs.get(from_repo(path))
+        return None if blob is None else reader.read_text(blob)
+
+    return read
+
+
+def _documents_from_blob(
+    reader: BlobReader,
+    blob: str,
+    read_body: Callable[[str], str | None],
+    root: Path,
+    path: str,
+    table: DocumentTable,
+    *,
+    source_id: str,
+    dates: dict[str, FileDates],
+) -> tuple[list[Document], list[LoadProblem]]:
+    """commit のファイルの blob の内容を、文書の行に従って 1 件以上の文書にする。"""
+    text = reader.read_text(blob)
+    # UTF-8 で読めない: ファイルの読み込みと同じく読めないファイルにする
+    if text is None:
+        return [], [LoadProblem(path=path, reason="unreadable", detail="UTF-8 で読めません")]
+    return documents_from_text(
+        text, root, path, table, source_id=source_id, dates=dates, read_body=read_body
     )

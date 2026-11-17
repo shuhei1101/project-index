@@ -1,0 +1,156 @@
+id: MOD-171-1
+title: 索引のサーバー / 履歴 / blob.py
+lead: commit のファイルの blob の内容を、書き出さずに 1 本の `git cat-file --batch` から読む処理を受け持ち、履歴の blob.py を修正するときに参照する。
+test_files:
+  - tests/unit/project_index/features/history/test_blob.py
+diagrams:
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        文書のストア ..> blobの読み取り : 文書の一覧
+        class blobの読み取り {
+          +blobの内容(blob) bytes
+          +blobの文字列(blob) str
+          +止める()
+        }
+        click 文書のストア href "id:MOD-29#classes[DocumentStore]"
+classes:
+  - name: BlobReader
+    title: blobの読み取り
+    container: project_index/features/history/blob.py
+    usecase: 読み取り
+    role: アダプター
+    summary: 1 つのリポジトリの `git cat-file --batch` を 1 本だけ動かし続け、blob の SHA を渡して内容を返す
+    description: 文書のストアがリポジトリごとに 1 つ作り、使い回す。子プロセスへの書き込みと読み取りの 1 往復を排他（`_lock`）の中で行う。子プロセスが終わっていたら、次の読み取りで起動し直す。索引のサーバーのプロセスが終わるときは、標準入力が閉じて子プロセスも終わる。
+    kind: クラス
+    properties:
+      - name: repo_root
+        title: リポジトリの直下
+        type: Path
+        access: 公開
+        description: '`git cat-file` を起動するフォルダ'
+      - name: _process
+        title: 子プロセス
+        type: subprocess.Popen[bytes] | None
+        access: 内部 (_)
+        default: None
+        description: 動いている `git cat-file --batch`。初めての読み取りで起動する
+      - name: _lock
+        title: 排他
+        type: threading.Lock
+        access: 内部 (_)
+        description: 1 往復の書き込みと読み取りを 1 つのスレッドだけが行う
+    methods:
+      - name: read_bytes
+        title: blobの内容
+        kind: メソッド
+        summary: blob の内容をバイト列で返す
+        scope: public
+        thread_safe: true
+        side_effects: 子プロセスが無い・終わっていれば起動する
+        args:
+          - name: blob
+            title: blob
+            type: str
+            required: true
+            passing: positional
+            description: blob の SHA（`git ls-tree` の値）
+        returns:
+          type: bytes | None
+          description: blob の内容。リポジトリに無い SHA は `None`
+        process: |-
+          1. `_lock` を取る
+          2. 子プロセスが無いか終わっていれば、`git cat-file --batch` を `repo_root` で起動する（標準入力と標準出力をパイプにし、標準エラーは捨てる）
+          3. `{blob}\n` を書いて送り、1 行の見出し（`{SHA} {種類} {大きさ}`）を読む
+             - 見出しが `{blob} missing` の場合、`None` を返す
+          4. 大きさの分のバイト列と、続く改行 1 つを読む
+          5. 手順 3・4 で子プロセスが終わった（`BrokenPipeError`・見出しが空）場合、子プロセスを止めて手順 2 から 1 回だけやり直す。やり直しも失敗したら `GitError` を送る
+          6. バイト列を返す
+        exceptions:
+          - name: GitError
+            condition: 起動し直した子プロセスも見出しを返さずに終わる
+            message: '`git cat-file --batch が終了しました`'
+        unit_tests:
+          - name: test_blob_reader_read_bytes
+            case: 正常
+            summary: blob の内容を返す
+            condition: '`a.yaml`・`b.md` を commit した一時リポジトリの 2 つの blob を順に'
+            mock: なし（一時フォルダで `git init`）
+            expected: それぞれのファイルの内容のバイト列
+          - name: test_blob_reader_read_bytes_when_missing
+            case: 正常
+            summary: 無い SHA
+            condition: リポジトリに無い 40 桁の SHA
+            mock: なし
+            expected: '`None` を返し、続けて読んだ存在する blob の内容を返す'
+          - name: test_blob_reader_read_bytes_when_process_exited
+            case: 正常
+            summary: 終わった子プロセスを起動し直す
+            condition: 1 回読んだ後に子プロセスを `kill` して終わるのを待ってから、もう 1 回読む
+            mock: なし
+            expected: 2 回目も内容を返す
+          - name: test_blob_reader_read_bytes_when_concurrent
+            case: 正常
+            summary: 並行の読み取りで内容を取り違えない
+            condition: 内容の違う blob 20 個を 4 スレッドから 5 回ずつ読む
+            mock: なし
+            expected: 全ての読み取りが、渡した blob の内容を返す
+      - name: read_text
+        title: blobの文字列
+        kind: メソッド
+        summary: blob の内容を UTF-8 の文字列で返す
+        scope: public
+        thread_safe: true
+        args:
+          - name: blob
+            title: blob
+            type: str
+            required: true
+            passing: positional
+            description: blob の SHA
+        returns:
+          type: str | None
+          description: 文字列。無い SHA と UTF-8 で読めない内容は `None`
+        process: |-
+          1. blobの内容で読む
+          2. `None` なら `None` を返す
+          3. UTF-8 で読めなければ `None` を返し、読めれば文字列を返す
+        unit_tests:
+          - name: test_blob_reader_read_text_when_not_utf8
+            case: 正常
+            summary: UTF-8 で読めない内容
+            condition: Shift_JIS のファイルを commit した blob
+            mock: なし
+            expected: '`None`'
+      - name: close
+        title: 止める
+        kind: メソッド
+        summary: 子プロセスを止める
+        scope: public
+        thread_safe: true
+        side_effects: 子プロセスの標準入力を閉じて終わりを待つ
+        returns:
+          type: None
+          description: なし
+        process: |-
+          1. `_lock` を取り、子プロセスがあれば標準入力を閉じて `wait` する（`BLOB_READER_STOP_SEC` を超えたら `kill`）
+          2. 子プロセスを `None` にする
+constants:
+  - name: BLOB_READER_STOP_SEC
+    title: 子プロセスの終わりを待つ時間
+    container: project_index/features/history/blob.py
+    usecase: 読み取り
+    summary: 標準入力を閉じた `git cat-file --batch` の終わりを待つ秒数。標準入力を閉じると次の行を読まずに終わるため、すぐ終わる
+    value: '5'
+refs:
+  - to: IF-24
+    item: constraints[リビジョンの読み込み]
+    type: requires
+    when: commit のファイルの読み方を変えるときに、文書の一覧の制約と合うかを確認する。
+visibility: internal
+tags:
+  - name: topic:履歴
+    main: true
+  - name: topic:リビジョン
+  - name: tool:git

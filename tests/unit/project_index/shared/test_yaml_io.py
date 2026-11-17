@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 import pytest
 from ruamel.yaml.comments import CommentedMap
+from ruamel.yaml.parser import Parser
 
+from project_index.shared import yaml_io as yaml_io_module
 from project_index.shared.yaml_io import (
     YamlLoadError,
+    c_loader_available,
     dump_roundtrip,
     load_roundtrip,
     load_yaml,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def test_load_yaml() -> None:
@@ -116,3 +124,40 @@ def test_dump_roundtrip_when_original_without_sequence() -> None:
     result = dump_roundtrip(doc, original=original)
     # 検証
     assert result == "a: 1\nitems:\n  - key: k1\n    label: a\n"
+
+
+def test_load_yaml_when_unreadable_by_c() -> None:
+    """C の解析で読めない YAML を Python 実装で読み直す（正常系）。"""
+    # 準備
+    text = "tags: [scope:a, topic:b]\n"
+    # 実行
+    result = load_yaml(text)
+    # 検証
+    assert result == {"tags": ["scope:a", "topic:b"]}
+
+
+@pytest.mark.skipif(not c_loader_available(), reason="C の解析を使用できない環境")
+def test_load_yaml_when_c(monkeypatch: pytest.MonkeyPatch) -> None:
+    """C の解析で読む（正常系）。"""
+    # 準備
+    calls: list[str] = []
+    real: Callable[..., None] = vars(Parser)["__init__"]
+
+    def counting(self: Parser, *args: Any, **kwargs: Any) -> None:
+        calls.append("parser")
+        real(self, *args, **kwargs)
+
+    monkeypatch.setattr(Parser, "__init__", counting)
+    # 実行
+    result = load_yaml("a: [1, 2]\n")
+    # 検証
+    assert result == {"a": [1, 2]}
+    assert calls == []
+
+
+def test_c_loader_available() -> None:
+    """依存を入れた環境では使用できる（正常系）。"""
+    # 実行
+    result = yaml_io_module.c_loader_available()
+    # 検証
+    assert result is True

@@ -91,6 +91,16 @@ class BackgroundGate:
                 elapsed = self.clock() - started
                 self.sleep(elapsed * (1 - BACKGROUND_SHARE) / BACKGROUND_SHARE)
 
+    @contextlib.contextmanager
+    def yield_unit(self) -> Generator[None]:
+        """応答中だけ、裏の処理の 1 件を他の裏の処理と重ならずに実行して休む。応答中でなければ排他を取らずに実行する。"""
+        # 応答中でない裏の処理のスレッド: 他の裏の処理と重なって進める
+        if self.in_background and not self.active:
+            yield
+            return
+        with self.unit():
+            yield
+
     def each[T](self, items: Iterable[T]) -> Iterator[T]:
         """要素 1 つごとに、取り出しと呼び出し側の 1 回分の処理を裏の処理の 1 件にする。"""
         iterator = iter(items)

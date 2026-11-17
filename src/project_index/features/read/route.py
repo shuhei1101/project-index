@@ -73,7 +73,9 @@ async def _run[T](
     handlers: Handlers, source: str, value: str, work: Callable[[], T]
 ) -> T | Response:
     """配信元の読み込みを待って処理を別のスレッドで呼び、見つからなかったものを 404 にする。"""
-    await handlers.registry.wait_for(ids=[source])
+    # 読み込みを待つ間も要求の応答中として数え、要求が待っていない行の読み込みを休ませる
+    with handlers.gate.foreground():
+        await handlers.registry.wait_for(ids=[source])
     try:
         # サービスの処理の間は要求の応答中として数え、裏の検査と書き出しを休ませる
         with handlers.gate.foreground():

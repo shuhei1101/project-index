@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from project_index.features.documents.indexable import (
     indexable_files,
     is_excluded_file,
+    is_walked,
     walk_files,
     walk_tree,
 )
@@ -271,3 +272,24 @@ def test_walk_tree_when_git_file(
     files, _ = walk_tree(tmp_path)
     # 検証
     assert files == ["a.yaml"]
+
+
+def test_is_walked(tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]) -> None:
+    """中をたどるファイルの列挙と同じパスを選ぶ（正常系）。"""
+    # 準備
+    paths = [
+        "a/x.md",
+        ".git/c",
+        "node_modules/m.js",
+        ".claude/worktrees/wt/y.md",
+        ".claude/z.md",
+        "sub/.git",
+        "a/node_modules/n.js",
+    ]
+    write_files(tmp_path, dict.fromkeys(paths, "x\n"))
+    walked = set(walk_files(tmp_path))
+    # 実行
+    result = {path for path in paths if is_walked(path)}
+    # 検証
+    assert result == walked
+    assert result == {"a/x.md", ".claude/z.md"}

@@ -169,7 +169,9 @@ def test_get_status_when_loading(
     entered = threading.Event()
     release = threading.Event()
 
-    def load_source(entry: SourceEntry, *, index: int, lookup: object) -> tuple[Any, Any]:
+    def load_source(
+        entry: SourceEntry, *, index: int, lookup: object, unit: object = None
+    ) -> tuple[Any, Any]:
         del lookup
         if entry.id == "beta":
             entered.set()

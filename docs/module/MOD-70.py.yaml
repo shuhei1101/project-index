@@ -65,6 +65,12 @@ constants:
     usecase: 共通
     summary: 配布に同梱する配信元の設定のスキーマのパス（`importlib.resources` で引く）
     value: '"schemas/project-index.schema.yaml"'
+  - name: _checked
+    title: スキーマの検査の結果
+    container: project_index/features/sources/service.py
+    usecase: 起動
+    summary: スキーマの『値のハッシュ』→ Draft 2020-12 の `check_schema` の違反の理由（違反が無ければ `None`）のモジュールの辞書。結果はスキーマの内容だけで決まるので捨てない。読み書きはモジュールの `threading.Lock` の中で行い、`check_schema` はロックの外で呼ぶ
+    value: '{}'
 functions:
   - name: validate_source_config
     title: 配信元の設定の検証
@@ -105,6 +111,7 @@ functions:
       4. `body_file` を `records` なしで書いた行は `documents[{n}].body_file` に違反を加える
       5. `documents[].schema` のファイルが設定ファイルのフォルダの下に無いか YAML として読めない場合、そのキーに違反を加える（YAMLの読み込み）。スキーマは Draft 2020-12 の `check_schema` も通す
          - `schema` がオブジェクトの行は、参照先のスキーマの読み取りで読み、`SchemaRefError` は `documents[{n}].schema` の違反（理由は例外の `rule`）にする。読めたスキーマは `check_schema` を通す
+               - `check_schema` の結果（違反の理由か、違反なし）は、スキーマの『値のハッシュ』ごとに `_checked` に持ち、当たれば `check_schema` を呼ばない（行と組み立て直しをまたいで使い回す）
       6. パス（`documents[].paths[]`・`schema`）が `..` で外（`paths[]` は基準のフォルダ、`schema` は設定ファイルのフォルダ）を指す場合、その要素に違反を加える
       7. `paths_base` を『paths の基準のフォルダの解決』（`config_root` は `root`、`repo_root` は `root` の履歴の『リポジトリの直下』）にかけ、違反を加える
       8. 違反を返す
@@ -205,6 +212,12 @@ functions:
         condition: '`root` の下に `sub` がある配信元で、`paths_base: sub`・`documents[0].paths: [docs/*.yaml, ../outside/*.yaml]`'
         mock: なし（一時フォルダ）
         expected: '`documents[0].paths[1]` と `paths_base` の 2 つの違反'
+      - name: test_validate_source_config_when_schema_checked_once
+        case: 正常
+        summary: 同じ内容のスキーマの検査を使い回す
+        condition: '内容の同じスキーマを別のファイルで指す文書の行 2 つと、正しくないスキーマ（`type: 1`）を指す行 2 つを持つ設定を、検証した後にもう 1 回検証する'
+        mock: '`Draft202012Validator.check_schema`（本物を包んで呼ばれた回数を記録する）'
+        expected: '`check_schema` が合わせて 2 回だけ呼ばれ、2 回の検証とも正しくないスキーマの 2 行に同じ理由の違反がある'
   - name: check_scripts
     title: スクリプトの確かめ
     kind: 関数
@@ -302,6 +315,13 @@ functions:
         default: None
         passing: keyword
         description: 再読み込みする端末の設定から作った引き当て（配信元の設定の検証へ渡す。`None` は端末の設定のファイルから作る）
+      - name: unit
+        title: 行の読み込みの 1 件
+        type: Callable[[], AbstractContextManager[None]] | None
+        required: false
+        default: None
+        passing: keyword
+        description: 文書の行 1 つ分のスキーマの確かめと読み込みを包む文脈を返す関数。配信元の一覧が、要求が待っていない行を裏の処理の関所で休ませるために渡す。`None` は何もしない文脈
     returns:
       type: tuple[ServedSource | None, SourceStatus]
       description: 配信するときは配信中の配信元と `serving` の状態、配信しないときは `None` と `not_served` か `disabled` の状態
@@ -310,7 +330,7 @@ functions:
       2. `entry.config` の各ファイルを順に読む（YAMLの読み込み）。先頭のファイルは、`entry.storage` が `disk` でない Git の配信元なら『default_ref の設定の読み込み』の内容を読み、commit を設定の commit にする（`ValidationFailedError` は違反を持つ `not_served` を返す）。2 つ目以降のファイルはディスクから読む
          - 無い・読めない・辞書でない場合、`config[{n}]` のパスの違反を持つ `not_served` を返す
       3. 読んだ値をマージする（設定のマージ）。設定ファイルのフォルダは先頭のファイルのフォルダにする
-      4. マージした値を検証する（配信元の設定の検証）
+      4. マージした値を検証する（配信元の設定の検証）。`documents[].schema` の確かめ（検証の手順 5）は、文書の行 1 つごとに `unit` の 1 件の中で行う
          - 違反がある場合、その違反を持つ `not_served` を返す。設定の `version` を設定のバージョンの比較にかけて `older` なら、エラーログに `project-index migrate --source {先頭の設定のファイル}` で移し替えられることを足す
       5. `SourceConfig` にする。設定の `enabled` が `False` の場合、`disabled` を返す
       6. スクリプトを設定ファイルのフォルダで確かめる（スクリプトの確かめ。設定の commit がある場合は、そのリビジョンにスクリプトのファイルがあるか）
@@ -320,7 +340,7 @@ functions:
          - `older` の場合、状態の `config_version` に `(設定, SOURCE_CONFIG_VERSION)` を入れる
          - `[warning]` 配信元の設定のバージョンが古い（ID・設定のバージョン・サーバーが参照できるバージョン）
       8. `entry.storage` が `disk` の場合、Git の作業ツリーとして扱わず、直下とメインのリポジトリを引かない。それ以外は設定ファイルのフォルダが Git の作業ツリーかとその直下を引く（履歴の『リポジトリの直下』）。`entry.storage` が `git` で Git の作業ツリーの外の場合、`sources[{index}].storage.type` に「フォルダが Git の作業ツリーの中にありません」の違反を持つ `not_served` を返す。『paths の基準のフォルダの解決』で `root` を決める（範囲の違反は手順 4 の検証で返している）
-      9. 種類ごとのスキーマを設定ファイルのフォルダから読み（設定の commit がある場合はそのリビジョンのファイル。`schema_path` が `SchemaRef` の行は参照先のスキーマの読み取りの結果）、`worktrees` をメインのリポジトリの直下（Git でなければ設定ファイルのフォルダ）からの絶対パスにして、`ServedSource` を作る。`config_dir` は `root` から設定ファイルのフォルダへの相対パス、`scope_write` が無ければ `[str(設定ファイルのフォルダ)]`。ID は `entry.id`、無ければ `config.name`。`outside_read` は `entry.outside_read`、`storage` は `entry.storage` の `type`（省いた行は `None`）。`storage` が `disk` の場合、`worktree_globs` は空にする
+      9. 種類ごとのスキーマを設定ファイルのフォルダから、文書の行 1 つごとに `unit` の 1 件の中で読み（設定の commit がある場合はそのリビジョンのファイル。`schema_path` が `SchemaRef` の行は参照先のスキーマの読み取りの結果）、`worktrees` をメインのリポジトリの直下（Git でなければ設定ファイルのフォルダ）からの絶対パスにして、`ServedSource` を作る。`config_dir` は `root` から設定ファイルのフォルダへの相対パス、`scope_write` が無ければ `[str(設定ファイルのフォルダ)]`。ID は `entry.id`、無ければ `config.name`。`outside_read` は `entry.outside_read`、`storage` は `entry.storage` の `type`（省いた行は `None`）。`storage` が `disk` の場合、`worktree_globs` は空にする
       10. `ServedSource` と `serving` を返す
 
       違反で返すときは `[error]` 配信元を配信しない（違反ごとに `{id}: {パス}: {理由}`）を書く。
@@ -427,6 +447,12 @@ functions:
         condition: Git 管理外のフォルダの設定で、`index=1` の行の `storage.type` が `git`
         mock: なし（一時ディレクトリ）
         expected: '`not_served` で、違反のパスが `sources[1].storage.type`'
+      - name: test_load_source_when_unit
+        case: 正常
+        summary: 文書の行ごとのスキーマの確かめと読み込みを 1 件ずつ包む
+        condition: 文書の行 3 つの配信元を、入った回数を数える文脈を返す `unit` で読む
+        mock: なし（`tmp_path`）
+        expected: '`serving` で、文脈に入った回数が 6（確かめ 3 回と読み込み 3 回）。種類のスキーマが `unit` を渡さないときと同じ'
   - name: read_default_ref_config
     title: default_ref の設定の読み込み
     kind: 関数
