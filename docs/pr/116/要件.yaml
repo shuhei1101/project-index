@@ -1,21 +1,29 @@
 use_cases: []
 docs:
-  - page: docs/interface/IF-72-1.yaml
-    new: true
-    change: ランナーで回す層のテストを workflow_dispatch で実行し、ログを成果物に上げる workflow `.github/workflows/test.yml` のインターフェース定義を新設する
-    status: todo
   - page: docs/interface/index.yaml
     new: false
     change: 新設する workflow のインターフェース定義の行を追加する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T05:45:28.445942+00:00'
   - page: docs/test-procedure/TP-1.yaml
     new: false
-    change: 単体テスト（バック）・結合テスト（バック）・lint の層に、判定フローチャート『テストの実行場所』で決めた location を記載し、runner の層に run_runner を追加する。run_all・run_one は手元で回すコマンドのまま残す
-    status: todo
+    change: 単体テスト（バック）・結合テスト（バック）・lint の層に、判定フローチャート『テストの実行場所』で決めた location を記載し、runner の層に run_runner を追加する。run_all・run_one は手元で回すコマンドのまま残し、結合テストの run_one のプレースホルダを `{結合テストのパス}` にする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T05:46:44.760709+00:00'
   - page: docs/layout/LAY-73-1.yaml
     new: false
     change: フォルダ構成に `.github/workflows/test.yml` のエントリを追加する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T05:46:44.760709+00:00'
+  - page: docs/interface/IF-116-1.yaml
+    new: true
+    change: ランナーで回す層のテストを workflow_dispatch で実行し、ログを成果物に上げる workflow `.github/workflows/test.yml` のインターフェース定義を新設する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T05:45:32.638205+00:00'
 scope_out:
   - item: スキーマのコピー（`schemas/test-procedure.schema.yaml`・`schemas/interface.schema.yaml`）の更新
     reason: '#114 で設計書のスキーマを knowledge の design-schemas/v9.2.0 の参照に切り替え、コピーが無くなった。v9.2.0 のテスト実行方法のスキーマは location・run_runner を持つ'
