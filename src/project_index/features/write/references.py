@@ -6,6 +6,7 @@ import posixpath
 import re
 from typing import TYPE_CHECKING, cast
 
+from project_index.features.write.apply import BODY_KEY
 from project_index.features.write.types import ReferenceChange
 from project_index.shared.narrowing import is_dict, is_list
 
@@ -67,24 +68,35 @@ class _Rewriter:
         self.id_link = re.compile(rf"id:{re.escape(old_id)}(?=[#)\"'\s]|$)")
 
     def __call__(self, value: str) -> tuple[str, list[_Piece]]:
+        """値の全体と値の中のリンクを書き換える（文書の項目の文字列の値）。"""
         pieces: list[_Piece] = []
         result = value
-        if self.old_id != self.new_id:
-            if result.startswith(f"{self.old_id}#"):
-                after = f"{self.new_id}#{result[len(self.old_id) + 1 :]}"
-                pieces.append((result, after))
-                result = after
-            found = len(self.id_link.findall(result))
-            result = self.id_link.sub(f"id:{self.new_id}", result)
-            pieces += [(f"id:{self.old_id}", f"id:{self.new_id}")] * found
+        if self.old_id != self.new_id and result.startswith(f"{self.old_id}#"):
+            after = f"{self.new_id}#{result[len(self.old_id) + 1 :]}"
+            pieces.append((result, after))
+            result = after
+        if self.moved is not None and _resolves_to(result, self.base_dir, self.moved[0]):
+            result, pieces = self._ids(result, pieces)
+            after = _moved_value(result, self.base_dir, self.moved)
+            return after, [*pieces, (result, after)]
+        return self.links(result, pieces)
+
+    def links(self, value: str, pieces: list[_Piece] | None = None) -> tuple[str, list[_Piece]]:
+        """値の中の `id:{旧 ID}` と Markdown のリンクの先だけを書き換える（本文のファイル）。"""
+        result, found = self._ids(value, list(pieces or []))
         if self.moved is not None:
-            if _resolves_to(result, self.base_dir, self.moved[0]):
-                after = _moved_value(result, self.base_dir, self.moved)
-                return after, [*pieces, (result, after)]
             links: list[_Piece] = []
             result = LINK_TARGET.sub(lambda match: self._link(match, links), result)
-            pieces += links
-        return result, pieces
+            found += links
+        return result, found
+
+    def _ids(self, value: str, pieces: list[_Piece]) -> tuple[str, list[_Piece]]:
+        """`id:{旧 ID}` を `id:{新 ID}` にする。"""
+        if self.old_id == self.new_id:
+            return value, pieces
+        count = len(self.id_link.findall(value))
+        result = self.id_link.sub(f"id:{self.new_id}", value)
+        return result, [*pieces, *[(f"id:{self.old_id}", f"id:{self.new_id}")] * count]
 
     def _link(self, match: re.Match[str], links: list[_Piece]) -> str:
         target = match.group(1)
@@ -162,3 +174,17 @@ def rewrite_references(
             continue
         _rewrite_slot(content, key, str(key), rewrite, changes)
     return changes
+
+
+def rewrite_body_references(
+    body: str,
+    *,
+    old_id: str,
+    new_id: str,
+    moved: tuple[str, str] | None,
+    base_dir: str,
+) -> tuple[str, list[ReferenceChange]]:
+    """本文のファイル 1 つの、旧 ID・旧パスを指すリンクを書き換えた本文と、書き換えた箇所を返す。"""
+    rewrite = _Rewriter(old_id=old_id, new_id=new_id, moved=moved, base_dir=base_dir)
+    after, pieces = rewrite.links(body)
+    return after, [ReferenceChange(path=BODY_KEY, before=b, after=a) for b, a in pieces]

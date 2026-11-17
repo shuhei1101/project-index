@@ -38,14 +38,19 @@ from project_index.features.write.apply import (
 from project_index.features.write.hints import attach_schema_hints
 from project_index.features.write.ids import generate_id
 from project_index.features.write.placement import new_document_path
-from project_index.features.write.references import renamed_path, rewrite_references
-from project_index.features.write.replace import replace_in_values
+from project_index.features.write.references import (
+    renamed_path,
+    rewrite_body_references,
+    rewrite_references,
+)
+from project_index.features.write.replace import replace_in_body, replace_in_values
 from project_index.features.write.types import (
     OPERATIONS_MAX,
     DeleteRequest,
     DeleteResult,
     DeleteTarget,
     Operation,
+    ReferenceChange,
     WriteRequest,
     WriteResult,
     WriteResultItem,
@@ -977,6 +982,15 @@ def _skip_columns(table: DocumentTable) -> list[str]:
     return columns
 
 
+def _markdown_body(document: Document, seen: set[str]) -> str | None:
+    """書き換える本文のファイルのパス（拡張子が `.md` で、同じ操作でまだ扱っていないもの）。"""
+    path = document.body_path
+    if path is None or not path.endswith(".md") or path in seen:
+        return None
+    seen.add(path)
+    return path
+
+
 def _rename_invalid(rule: str, fix: str, path: str = "new_path") -> InvalidArgumentError:
     """改名の引数の誤り。"""
     return _invalid([Violation(path=path, rule=rule, fix=fix)])
@@ -1133,6 +1147,24 @@ def _renamed_content(
     return _finish(table, current, container, existing, text)
 
 
+def _rewritten_body(
+    session: _Session, document: Document, plan: _RenamePlan, seen: set[str]
+) -> tuple[dict[str, str], list[ReferenceChange]] | None:
+    """参照元の本文のファイルの旧 ID・旧パスを指すリンクを書き換え、新しい本文と箇所を返す。"""
+    path = _markdown_body(document, seen)
+    current = None if path is None else session.read_body(path)
+    if path is None or current is None:
+        return None
+    body, changes = rewrite_body_references(
+        current,
+        old_id=plan.old_id,
+        new_id=plan.new_id,
+        moved=plan.moved,
+        base_dir=posixpath.dirname(path),
+    )
+    return ({path: body}, changes) if changes else None
+
+
 def _rewrite_referrers(
     session: _Session,
     checker: DocumentChecker,
@@ -1142,6 +1174,7 @@ def _rewrite_referrers(
 ) -> list[tuple[WriteResultItem, DocumentTable]]:
     """同じ配信元のほかの文書の、改名前の ID・パスを指す箇所を書き換える。"""
     done: list[tuple[WriteResultItem, DocumentTable]] = []
+    seen: set[str] = set()
     for doc_id in list(session.docs):
         document = session.docs.get(doc_id)
         if document is None or doc_id == plan.new_id:
@@ -1158,6 +1191,10 @@ def _rewrite_referrers(
             base_dir=posixpath.dirname(document.path),
             skip=_skip_columns(table),
         )
+        body = _rewritten_body(session, document, plan, seen)
+        if body is not None:
+            changes = [*changes, *body[1]]
+        bodies = {} if body is None else body[0]
         if not changes:
             continue
         table = _writable(table, "id")
@@ -1174,6 +1211,7 @@ def _rewrite_referrers(
             doc_id=None,
             new=False,
             previous=document.data,
+            bodies=bodies,
         )
         done.append(
             (
@@ -1182,7 +1220,7 @@ def _rewrite_referrers(
                     id=new_document.id,
                     status="updated",
                     version=new_document.version,
-                    diff=_diff(document, new_document, {}),
+                    diff=_diff(document, new_document, bodies),
                     unchecked=unchecked,
                     references=changes,
                 ),
@@ -1274,6 +1312,50 @@ def _matched(session: _Session, checker: DocumentChecker, operation: Operation) 
     ]
 
 
+def _replaced_body(
+    session: _Session, document: Document, old: str, new: str, seen: set[str]
+) -> tuple[dict[str, str], int]:
+    """本文のファイルの `old` を `new` にした本文と件数を返す（置換が無ければ空と 0）。"""
+    path = _markdown_body(document, seen)
+    current = None if path is None else session.read_body(path)
+    if path is None or current is None:
+        return {}, 0
+    body, found = replace_in_body(current, old=old, new=new)
+    return ({path: body} if found else {}), found
+
+
+def _commit_replaced(
+    session: _Session,
+    checker: DocumentChecker,
+    table: DocumentTable,
+    document: Document,
+    text: str,
+    bodies: Mapping[str, str],
+) -> tuple[Document, list[UncheckedKey]]:
+    """置換した文書を検査して記録する。違反には項目のパスの前に文書の ID を付ける。"""
+    try:
+        return _check_and_commit(
+            session,
+            checker,
+            table,
+            document.path,
+            text,
+            index=document.record_index,
+            doc_id=None,
+            new=False,
+            previous=document.data,
+            bodies=bodies,
+        )
+    except ValidationFailedError as error:
+        raise ValidationFailedError(
+            message=error.message,
+            violations=[
+                dataclasses.replace(violation, path=f"{document.id}#{violation.path}")
+                for violation in error.violations
+            ],
+        ) from error
+
+
 def _apply_replace_text_one(
     session: _Session,
     checker: DocumentChecker,
@@ -1286,6 +1368,10 @@ def _apply_replace_text_one(
         msg = "replace_text に old か new がありません"
         raise RuntimeError(msg)
     done: list[tuple[WriteResultItem, DocumentTable]] = []
+    fields = operation.fields
+    value_fields = None if fields is None else [path for path in fields if path != BODY_KEY]
+    with_body = fields is None or BODY_KEY in fields
+    seen: set[str] = set()
     for doc_id in _matched(session, checker, operation):
         document = session.docs[doc_id]
         table = session.target.source.table(document.kind)
@@ -1295,35 +1381,23 @@ def _apply_replace_text_one(
             current,
             old=operation.old,
             new=operation.new,
-            fields=_columns(operation.fields, table),
+            fields=_columns(value_fields, table),
             skip=_skip_columns(table),
         )
+        bodies, found = (
+            _replaced_body(session, document, operation.old, operation.new, seen)
+            if with_body
+            else ({}, 0)
+        )
+        count += found
         if count == 0:
             continue
         if not session.target.source.is_git:
             _stamp(current, "update", now, None)
         new_text = _finish(table, current, container, document, text)
-        try:
-            new_document, unchecked = _check_and_commit(
-                session,
-                checker,
-                table,
-                document.path,
-                new_text,
-                index=document.record_index,
-                doc_id=None,
-                new=False,
-                previous=document.data,
-            )
-        except ValidationFailedError as error:
-            # どの文書の違反かを、項目のパスの前に文書の ID を付けて示す
-            raise ValidationFailedError(
-                message=error.message,
-                violations=[
-                    dataclasses.replace(violation, path=f"{doc_id}#{violation.path}")
-                    for violation in error.violations
-                ],
-            ) from error
+        new_document, unchecked = _commit_replaced(
+            session, checker, table, document, new_text, bodies
+        )
         done.append(
             (
                 WriteResultItem(
@@ -1331,7 +1405,7 @@ def _apply_replace_text_one(
                     id=new_document.id,
                     status="updated",
                     version=new_document.version,
-                    diff=_diff(document, new_document, {}),
+                    diff=_diff(document, new_document, bodies),
                     unchecked=unchecked,
                     count=count,
                 ),

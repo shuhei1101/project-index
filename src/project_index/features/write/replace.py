@@ -62,3 +62,8 @@ def replace_in_values(
         if is_dict(parent) and last in parent and last not in (skip if not parent_path else ()):
             count += _replace_slot(parent, last, old, new)
     return count
+
+
+def replace_in_body(body: str, *, old: str, new: str) -> tuple[str, int]:
+    """本文のファイル 1 つの `old` を `new` にした本文と、置換の件数を返す。"""
+    return body.replace(old, new), body.count(old)
