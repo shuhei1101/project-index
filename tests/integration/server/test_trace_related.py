@@ -350,57 +350,21 @@ def test_normal_when_disk_storage(
     assert "company は disk の配信元のため ref を指定できません" in by_ref.text
 
 
-NESTED_ROW = (
-    "  - id: nested\n"
-    "    paths: [nested/*.yaml]\n"
-    "    schema: nested.schema.yaml\n"
-    "    metadata:\n"
-    '      related: "**.refs[]"\n'
+# 最上位の refs と functions[0].refs を持つ n1
+NESTED_N1 = (
+    "id: n1\nname: n1\nrefs:\n  - {to: n2, type: references}\n"
+    "functions:\n  - name: f\n    refs:\n      - {to: n3, type: references}\n"
 )
-NESTED_SCHEMA = (
-    "type: object\n"
-    "required: [id, name]\n"
-    "properties:\n"
-    "  id: {type: string}\n"
-    "  name: {type: string}\n"
-    "  refs: {type: array}\n"
-    "  functions:\n"
-    "    type: array\n"
-    "    items:\n"
-    "      type: object\n"
-    "      properties:\n"
-    "        name: {type: string}\n"
-    "        refs: {type: array}\n"
-)
-
-
-def _nested_files(
-    sample_file_set: Callable[..., dict[str, str]], sample_config_text: Callable[..., str]
-) -> dict[str, str]:
-    """`related: "**.refs[]"` の行と、最上位と入れ子の refs を持つ n1・refs を持たない n2・n3 の配信元のファイル一式を返す。"""
-    return sample_file_set(
-        **{
-            "project-index.yaml": sample_config_text(NESTED_ROW),
-            "nested.schema.yaml": NESTED_SCHEMA,
-            "nested/n1.yaml": (
-                "id: n1\nname: n1\nrefs:\n  - {to: n2, type: references}\n"
-                "functions:\n  - name: f\n    refs:\n      - {to: n3, type: references}\n"
-            ),
-            "nested/n2.yaml": "id: n2\nname: n2\n",
-            "nested/n3.yaml": "id: n3\nname: n3\n",
-        }
-    )
 
 
 def test_normal_when_nested_related(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
-    sample_file_set: Callable[..., dict[str, str]],
-    sample_config_text: Callable[..., str],
+    nested_file_set: Callable[..., dict[str, str]],
 ) -> None:
     """**.refs[] の対応で最上位と入れ子の refs をまとめた related を、両方向にたどる（正常系）。"""
     # 準備
-    source = make_source("sample", _nested_files(sample_file_set, sample_config_text))
+    source = make_source("sample", nested_file_set(NESTED_N1))
     env = make_server(source)
     # 実行
     out = env.call(

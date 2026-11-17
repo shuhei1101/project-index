@@ -1584,58 +1584,22 @@ def test_normal_when_disk_storage(
     assert str(second["updated"]) > str(first["updated"])
 
 
-NESTED_ROW = (
-    "  - id: nested\n"
-    "    paths: [nested/*.yaml]\n"
-    "    schema: nested.schema.yaml\n"
-    "    metadata:\n"
-    '      related: "**.refs[]"\n'
+# 最上位の refs と functions[0].refs を持つ n1
+NESTED_N1 = (
+    "id: n1\nname: n1\nrefs:\n  - {to: n2, type: references}\n"
+    "functions:\n  - name: f\n    refs:\n      - {to: n3, type: references}\n"
 )
-NESTED_SCHEMA = (
-    "type: object\n"
-    "required: [id, name]\n"
-    "properties:\n"
-    "  id: {type: string}\n"
-    "  name: {type: string}\n"
-    "  refs: {type: array}\n"
-    "  functions:\n"
-    "    type: array\n"
-    "    items:\n"
-    "      type: object\n"
-    "      properties:\n"
-    "        name: {type: string}\n"
-    "        refs: {type: array}\n"
-)
-
-
-def _nested_files(
-    sample_file_set: Callable[..., dict[str, str]], sample_config_text: Callable[..., str]
-) -> dict[str, str]:
-    """`related: "**.refs[]"` の行と、最上位と入れ子の refs を持つ n1・refs を持たない n2・n3 の配信元のファイル一式を返す。"""
-    return sample_file_set(
-        **{
-            "project-index.yaml": sample_config_text(NESTED_ROW),
-            "nested.schema.yaml": NESTED_SCHEMA,
-            "nested/n1.yaml": (
-                "id: n1\nname: n1\nrefs:\n  - {to: n2, type: references}\n"
-                "functions:\n  - name: f\n    refs:\n      - {to: n3, type: references}\n"
-            ),
-            "nested/n2.yaml": "id: n2\nname: n2\n",
-            "nested/n3.yaml": "id: n3\nname: n3\n",
-        }
-    )
 
 
 def test_error_when_recursive_metadata_key_written(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
     add_worktree: Callable[..., Path],
-    sample_file_set: Callable[..., dict[str, str]],
-    sample_config_text: Callable[..., str],
+    nested_file_set: Callable[..., dict[str, str]],
 ) -> None:
     """**.{列名} の対応を持つ共通のキーは、書き込む場所を 1 つに決められないため断る（異常系）。"""
     # 準備
-    files = _nested_files(sample_file_set, sample_config_text)
+    files = nested_file_set(NESTED_N1)
     source, env, worktree = _setup(make_source, make_server, add_worktree, files)
     target = worktree / "nested" / "n1.yaml"
     before = target.read_text(encoding="utf-8")
@@ -1657,6 +1621,7 @@ def test_error_when_recursive_metadata_key_written(
         ],
         **arguments,
     )
+    unchanged = target.read_text(encoding="utf-8")
     fourth = env.call(
         "write_docs", operations=[_update("n1", _version(target), set={"refs": link})], **arguments
     )
@@ -1669,6 +1634,7 @@ def test_error_when_recursive_metadata_key_written(
     assert third.is_error
     assert "operations[0].data.related" in third.text
     assert not (worktree / "nested" / "n4.yaml").exists()
+    assert unchanged == before
     assert all("functions[0].refs" in result.text for result in (first, second, third))
     assert not fourth.is_error
     after = load_yaml(target.read_text(encoding="utf-8"))
