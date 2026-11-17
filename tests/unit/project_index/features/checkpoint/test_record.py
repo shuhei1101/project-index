@@ -75,7 +75,7 @@ def test_record_checkpoint_when_reviewed_missing(git_repo: Callable[..., Path]) 
     # 準備
     repo = git_repo({"files.yaml": FILES_YAML})
     # 実行・検証
-    with pytest.raises(ReviewedFileNotFoundError, match="missing.md"):
+    with pytest.raises(ReviewedFileNotFoundError, match=r"missing\.md"):
         record_checkpoint(
             repo, "files.yaml", reviewed=["missing.md"], now=datetime(2026, 11, 17, tzinfo=UTC)
         )
