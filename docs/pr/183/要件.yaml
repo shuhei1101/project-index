@@ -1,0 +1,18 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: none
+    detail: エージェントが書き込む流れと条件は変わらない。x-key を持つ配列へ追加するときの扱いと、要素を置き換える手順が設計書とガイドから読めるようになる
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: add_to の説明に、x-key を持つ配列で既にある x-key の値の要素も重なりを確認せずに末尾へ追加することと、要素を置き換えるときは remove_from（x-key の値で指す）と add_to を 1 つの update に渡すか set で配列ごと置き換えることを記載する
+    status: todo
+scope_out:
+  - item: add_to で x-key を持つ配列に既にある x-key の値の要素を渡したときに違反にする（重複を書き込まない）
+    reason: 同じ x-key の値の要素が複数ある状態は IF-6 の参照の型の項目のパス（[{値}#{順番}]）とガイドが受け付けており、違反にすると公開済みの write_docs で今は書き込める操作を断る破壊的変更になる。#180 の扱いの判断（task-reviewer の合格）で案 B（記載で済ませる）に決まった
+    plan: none
+  - item: add_to で既にある x-key の値の要素を渡すと末尾へ追加する振る舞いの単体テスト・結合テストの追加
+    reason: コードの振る舞いを変えず記載だけを足す PR で、置き換えの手順は IF-6 の既存の流れ「正常系（x-key の値で配列の要素を削除する）」の 5 回目が検証している。単独の add_to の重複を検証する流れを足すかはインターフェース定義設計のレビューで確定する
+    plan: none
