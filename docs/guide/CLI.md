@@ -196,7 +196,7 @@ project-index changed --root ~/repo/sample --files-yaml files.yaml
 | `checkpoint_commit` | 管理用の YAML の `checkpoint.commit` がリポジトリにある | その commit から作業ツリーまでの差分に出るファイル（commit していない変更を含む） |
 | `checkpoint_time` | `checkpoint.checked_at` がある（Git 管理外の配信元） | その日時より後に変更されたファイル |
 | `files_yaml_commit` | 記録が無いか記録した commit が無く、管理用の YAML が Git で追跡されている | 管理用の YAML を最後に変更した commit から作業ツリーまでの差分に出るファイル |
-| `files_yaml_mtime` | 記録が無く、管理用の YAML が Git で追跡されていない（ローカル運用・Git 管理外） | Git の配信元は管理用の YAML の変更日時より後の commit の差分と commit していない変更、Git 管理外は変更日時より後に変更されたファイル |
+| `files_yaml_mtime` | 記録が無いか記録した commit が無く、管理用の YAML が Git で追跡されていない（ローカル運用・Git 管理外） | Git の配信元は管理用の YAML の変更日時より後の commit の差分と commit していない変更、Git 管理外は変更日時より後に変更されたファイル |
 
 - 改名したファイルは改名先のパスで出し、削除したファイルは出しません
 - `checkpoint.reviewed` のファイルのうち、中身が記録したハッシュと同じものは出しません
@@ -204,7 +204,7 @@ project-index changed --root ~/repo/sample --files-yaml files.yaml
 
 | 終了コード | 意味 |
 | --- | --- |
-| 2 | `--root` か `--files-yaml` が無い。標準エラーに渡したパスを出す |
+| 2 | `--root` か `--files-yaml` が無い（標準エラーに渡したパスを出す）か、`checkpoint` の形が違う（標準エラーにキーと期待する型を出す） |
 
 ## project-index checkpoint
 

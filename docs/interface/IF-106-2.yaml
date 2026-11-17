@@ -47,7 +47,7 @@ response:
     notes: 管理用の YAML に行が無いファイルは含めない（追加の候補は `project-index files` との突き合わせで出す）
   - name: 終了コード
     type: int
-    description: 0 正常（変わったファイルが 0 件のときも 0）・2 `--root` か `--files-yaml` が無い
+    description: 0 正常（変わったファイルが 0 件のときも 0）・2 `--root` か `--files-yaml` が無いか、`checkpoint` の形が違う
 response_example: |-
   ```json
   {"base": {"kind": "checkpoint_commit", "value": "a1b2c3d"}, "files": ["docs/guide.md", "src/tasks.py"]}
@@ -64,6 +64,9 @@ exceptions:
   - name: なし（記録した commit が無い）
     condition: '`checkpoint.commit` がリポジトリに無い（終了コード 0）'
     notes: 記録が無いときと同じ起点で一覧を出し、stderr に切り替えた旨を出す
+  - name: InvalidCheckpoint
+    condition: 管理用の YAML の `checkpoint` がマッピングでない・値の型が違う・`checked_at` が日時として読めない（終了コード 2）
+    notes: キーと期待する型を stderr に出す
 constraints:
   - item: 起点の選び方
     constraint: 管理用の YAML の `checkpoint` に `commit` があればその commit、`checked_at` があればその日時。無ければ、管理用の YAML が Git で追跡されていればそれを最後に変更した commit、追跡されていなければ管理用の YAML の変更日時。記録した commit がリポジトリに無いとき（squash merge・rebase で消えたとき）は、記録が無いときと同じ起点に切り替え、stderr に切り替えた旨と記録した commit を出す
@@ -261,6 +264,30 @@ flows:
     expected:
       - '`files` が `f.md` の 1 件で、`e.md`・`g.md` を含まない'
     test: test_normal_when_renamed_and_deleted
+  - name: 異常系（記録の形が違う・InvalidCheckpoint）
+    summary: 壊れた `checkpoint` では終了コード 2 で終え、キーと期待する型を出す
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元のフォルダ
+        description: '`checkpoint: {checked_at: x}` を持つ `files.yaml` を置いた一時フォルダ'
+    flow: |-
+      <!-- map: {"title": "異常系（記録の形が違う・InvalidCheckpoint）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index changed
+
+        C->>M: --root {フォルダ} --files-yaml files.yaml
+        M-->>C: stderr にキーと期待する型（終了コード 2）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 2
+      - 標準出力が空で、stderr に `checked_at` がある
+    test: test_error_when_checkpoint_invalid
 test_file: tests/integration/server/test_changed.py
 aliases:
   - project-index changed

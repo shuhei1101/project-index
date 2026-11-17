@@ -936,6 +936,7 @@ functions:
       1. `root` を `Path` にし、フォルダでなければ「`{root}: フォルダがありません`」を標準エラーに出して 2 を返す
       2. 中身が変わったファイルの一覧（`find_changed`）を作る
          - `FilesYamlNotFoundError` の場合、「`{パス}: 管理用の YAML がありません`」を標準エラーに出して 2 を返す
+         - `ValueError`（確認の時点の読み取りが送る `checkpoint` の形の違い）の場合、「`{管理用の YAML}: checkpoint の {メッセージ}`」を標準エラーに出して 2 を返す
       3. `missing_commit` があれば、「記録した commit `{commit}` が無いため、起点を `{base.kind}` に切り替えました」を標準エラーに出す
       4. `{"base": {"kind", "value"}, "files": [...]}` を `json.dumps(ensure_ascii=False)` で標準出力に出して 0 を返す
     exceptions:
@@ -945,6 +946,9 @@ functions:
       - name: なし（終了コード 2・管理用の YAML）
         condition: '`--files-yaml` が無い（`FilesYamlNotFound`）'
         message: '`{パス}: 管理用の YAML がありません`'
+      - name: なし（終了コード 2・checkpoint）
+        condition: '`checkpoint` の形が違う（`InvalidCheckpoint`）'
+        message: '`{管理用の YAML}: checkpoint の {メッセージ}`'
     unit_tests:
       - name: test_run_changed
         case: 正常
@@ -967,6 +971,13 @@ functions:
         mock: なし（`tmp_path`・`capsys`）
         expected: 2 を返し、標準出力が空で、標準エラーに渡したパス
         exception: なし（終了コード 2・管理用の YAML）
+      - name: test_run_changed_when_checkpoint_invalid
+        case: 異常
+        summary: 壊れた checkpoint
+        condition: '`find_changed` が `ValueError("checked_at: ISO 8601 の日時")` を送る'
+        mock: '`find_changed`（monkeypatch）'
+        expected: 2 を返し、標準出力が空で、標準エラーに `checked_at`
+        exception: なし（終了コード 2・checkpoint）
     refs:
       - MOD-106-8#functions[find_changed]
   - name: run_checkpoint
