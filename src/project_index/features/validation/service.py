@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import os
 import threading
 from collections import OrderedDict
@@ -21,7 +22,7 @@ from project_index.features.validation.rules import (
     check_schema,
 )
 from project_index.features.validation.scripts import parse_validator_output
-from project_index.integrations.git import run_git
+from project_index.integrations.git import GitError, run_git
 from project_index.integrations.scripts import ScriptError, run_script
 from project_index.shared.errors import Violation
 from project_index.shared.hashing import value_hash
@@ -34,6 +35,8 @@ if TYPE_CHECKING:
     from project_index.features.sources.schema_ref import SchemaRef
     from project_index.features.sources.types import ScriptEntry
     from project_index.shared.deadline import Deadline
+
+logger = logging.getLogger(__name__)
 
 VALIDATOR_ON_READ_CACHE = 4096
 
@@ -261,7 +264,15 @@ def _script_folders(base: Path, run: list[str]) -> set[Path]:
 def _folder_files(folder: Path, *, use_git: bool) -> list[Path]:
     """フォルダの配下のファイルを、`__pycache__` の配下を除いてパスの順に返す。"""
     # Git の配信元は `git archive` が取り出す範囲、管理外はサブフォルダまで全て
-    files = _git_files(folder) if use_git else _walked_files(folder)
+    if use_git:
+        try:
+            files = _git_files(folder)
+        except GitError as error:
+            # リポジトリの外のフォルダ・git の待ち時間の超過: たどって状態を作り、検索を止めない
+            logger.warning("スクリプトのフォルダを git で列挙できない（%s）: %s", folder, error)
+            files = _walked_files(folder)
+    else:
+        files = _walked_files(folder)
     return sorted(
         {path for path in files if _SCRIPT_CACHE_DIR not in path.relative_to(folder).parts}
     )
