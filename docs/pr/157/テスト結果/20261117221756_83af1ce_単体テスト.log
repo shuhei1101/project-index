@@ -1,0 +1,49 @@
+$ run_runner（layer=unit、commit 83af1ce）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 1173 items / 2 errors
+
+==================================== ERRORS ====================================
+_ ERROR collecting tests/unit/project_index/features/write/test_references.py __
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/write/test_references.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_references.py:3: in <module>
+    from project_index.features.write.references import renamed_path, rewrite_references
+E   ModuleNotFoundError: No module named 'project_index.features.write.references'
+___ ERROR collecting tests/unit/project_index/features/write/test_replace.py ___
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/write/test_replace.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_replace.py:3: in <module>
+    from project_index.features.write.replace import replace_in_values
+E   ModuleNotFoundError: No module named 'project_index.features.write.replace'
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/write/test_references.py
+ERROR tests/unit/project_index/features/write/test_replace.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!!
+============================== 2 errors in 2.70s ===============================
+exit=1 run=https://github.com/shuhei1101/project-index/actions/runs/44091216170
+
+# ランナーは test_references.py・test_replace.py の収集の誤り（実装のモジュールが無い）で止まるため、test_service.py を手元の個別実行でも回した
+$ uv run pytest tests/unit/project_index/features/write/test_service.py
+E       pydantic_core._pydantic_core.ValidationError: 2 validation errors for Operation
+E         Input should be 'create', 'update' or 'replace' [type=literal_error, input_value='rename', input_type=str]
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for Operation
+E         Input should be 'create', 'update' or 'replace' [type=literal_error, input_value='rename', input_type=str]
+E       pydantic_core._pydantic_core.ValidationError: 2 validation errors for Operation
+E         Input should be 'create', 'update' or 'replace' [type=literal_error, input_value='rename', input_type=str]
+E       pydantic_core._pydantic_core.ValidationError: 4 validation errors for Operation
+E         Input should be 'create', 'update' or 'replace' [type=literal_error, input_value='replace_text', input_type=str]
+E       pydantic_core._pydantic_core.ValidationError: 4 validation errors for Operation
+E         Input should be 'create', 'update' or 'replace' [type=literal_error, input_value='replace_text', input_type=str]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_rename
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_rename_invalid[no_new_id_and_path]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_rename_invalid[id_exists]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_replace_text
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_replace_text_invalid
+========================= 5 failed, 37 passed in 2.45s =========================
