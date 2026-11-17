@@ -1554,7 +1554,12 @@ def test_check_sync_when_not_git_ignored(
         },
     )
     calls: list[Path] = []
-    monkeypatch.setattr(store_module, "ignored_paths", lambda path: calls.append(path) or [])
+
+    def _ignored_paths(path: Path) -> list[str]:
+        calls.append(path)
+        return []
+
+    monkeypatch.setattr(store_module, "ignored_paths", _ignored_paths)
     source = make_served_source(root=root, config=make_source_config(documents=[_root_table()]))
     # 実行
     report = store_module.check_sync(document_store, source)
