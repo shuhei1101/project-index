@@ -192,31 +192,330 @@ nav:
   tabs:
     - title: はじめに
       items:
-        - auto:
-            document: files_guide
-            filter: {field: category, op: eq, values: [はじめに]}
+        - group: コアコンセプト
+          items:
+            - page: files_guide/docs/guide/コアコンセプト-配信元と権限.md
+            - page: files_guide/docs/guide/コアコンセプト-文書のメタデータ.md
+            - page: files_guide/docs/guide/コアコンセプト-プラグイン.md
+        - group: リリース
+          items:
+            - page: files_guide/docs/guide/変更履歴.md
     - title: 使い方
       items:
-        - auto:
-            document: files_guide
-            filter: {field: category, op: eq, values: [使い方]}
+        - group: 導入と更新
+          items:
+            - page: files_guide/docs/guide/project-indexを入れる.md
+            - page: files_guide/docs/guide/配信元を配信する.md
+            - page: files_guide/docs/guide/project-indexを更新する.md
+        - group: 判定
+          items:
+            - page: files_guide/docs/guide/新しく作るか修正するかの判定.md
+            - page: files_guide/docs/guide/documentsの行の判定.md
     - title: 設計書
       items:
         - group: 全体
           items:
             - page: architecture
             - page: nonfunctional
-            - page: layout
+            - {page: layout, title: フォルダ構成}
             - page: config
         - group: シナリオ
           items:
+            - page: scenario/SC-1
+            - page: scenario/SC-2
+            - page: scenario/SC-4
+            - page: scenario/SC-5
+            - page: scenario/SC-6
+            - page: scenario/SC-7
+            - page: scenario/SC-8
+            - page: scenario/SC-9
+            - page: scenario/SC-10
+            - page: scenario/SC-12
+            - page: scenario/SC-11
+            - page: scenario/SC-3
             - auto: {document: scenario}
-        - group: インターフェース定義
+        - group: インターフェース定義 / 文書の MCP
           items:
+            - page: interface/IF-1
+            - page: interface/IF-2
+            - page: interface/IF-3
+            - page: interface/IF-4
+            - page: interface/IF-5
+            - page: interface/IF-6
+            - page: interface/IF-7
+        - group: インターフェース定義 / 管理の MCP
+          items:
+            - page: interface/IF-8
+            - page: interface/IF-9
+            - page: interface/IF-10
+            - page: interface/IF-11
+            - page: interface/IF-12
+            - page: interface/IF-13
+            - page: interface/IF-14
+        - group: インターフェース定義 / 読み取り API
+          items:
+            - page: interface/IF-22
+            - page: interface/IF-23
+            - page: interface/IF-24
+            - page: interface/IF-25
+            - page: interface/IF-26
+            - page: interface/IF-27
+            - page: interface/IF-28
+            - page: interface/IF-29
+        - group: インターフェース定義 / 端末の設定の API
+          items:
+            - page: interface/IF-30
+            - page: interface/IF-31
+            - page: interface/IF-32
+            - page: interface/IF-33
+            - page: interface/IF-34
+        - group: インターフェース定義 / CLI
+          items:
+            - page: interface/IF-15
+            - page: interface/IF-16
+            - page: interface/IF-17
+            - page: interface/IF-18
+            - page: interface/IF-106-1
+            - page: interface/IF-106-2
+            - page: interface/IF-106-3
+        - group: インターフェース定義 / フック
+          items:
+            - page: interface/IF-19
+            - page: interface/IF-20
+            - page: interface/IF-21
             - auto: {document: interface}
-        - group: モジュール構成
+        - group: モジュール構成 / パッケージ
           items:
-            - auto: {document: module}
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / パッケージ']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / パッケージ / ']}
+        - group: モジュール構成 / 入口
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 入口']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 入口 / ']}
+        - group: モジュール構成 / 起動
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 起動']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 起動 / ']}
+        - group: モジュール構成 / 端末の設定
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 端末の設定']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 端末の設定 / ']}
+        - group: モジュール構成 / 配信元
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 配信元']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 配信元 / ']}
+        - group: モジュール構成 / 権限と作業場所
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 権限と作業場所']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 権限と作業場所 / ']}
+        - group: モジュール構成 / 文書のストア
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 文書のストア']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 文書のストア / ']}
+        - group: モジュール構成 / 検索
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 検索']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 検索 / ']}
+        - group: モジュール構成 / 関連
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 関連']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 関連 / ']}
+        - group: モジュール構成 / 変更
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 変更']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 変更 / ']}
+        - group: モジュール構成 / 説明
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 説明']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 説明 / ']}
+        - group: モジュール構成 / 書き込み
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 書き込み']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 書き込み / ']}
+        - group: モジュール構成 / 検査
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 検査']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 検査 / ']}
+        - group: モジュール構成 / 変換
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 変換']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 変換 / ']}
+        - group: モジュール構成 / スクリプトの実行
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / スクリプトの実行']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / スクリプトの実行 / ']}
+        - group: モジュール構成 / プロンプトの文書の変換
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / プロンプトの文書の変換']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / プロンプトの文書の変換 / ']}
+        - group: モジュール構成 / 履歴
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 履歴']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 履歴 / ']}
+        - group: モジュール構成 / 会話の記録
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 会話の記録']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 会話の記録 / ']}
+        - group: モジュール構成 / セッションの開始
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / セッションの開始']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / セッションの開始 / ']}
+        - group: モジュール構成 / 文書のMCP
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 文書のMCP']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 文書のMCP / ']}
+        - group: モジュール構成 / 管理
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 管理']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 管理 / ']}
+        - group: モジュール構成 / 管理の操作
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 管理の操作']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 管理の操作 / ']}
+        - group: モジュール構成 / 再起動と更新
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 再起動と更新']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 再起動と更新 / ']}
+        - group: モジュール構成 / 設定の移し替え
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 設定の移し替え']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 設定の移し替え / ']}
+        - group: モジュール構成 / 読み取り API
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 読み取り API']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 読み取り API / ']}
+        - group: モジュール構成 / アウトライン
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / アウトライン']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / アウトライン / ']}
+        - group: モジュール構成 / 確認の時点
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 確認の時点']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 確認の時点 / ']}
+        - group: モジュール構成 / 共通
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['索引のサーバー / 共通']}
+                    - {field: name, op: prefix, values: ['索引のサーバー / 共通 / ']}
+        - group: モジュール構成 / プラグイン
+          items:
+            - auto:
+                document: module
+                filter:
+                  or:
+                    - {field: name, op: eq, values: ['プラグイン']}
+                    - {field: name, op: prefix, values: ['プラグイン / ']}
         - group: 外部ライブラリ
           items:
             - auto: {document: library}
@@ -237,13 +536,18 @@ nav:
             - auto: {document: tests, group_by: tags}
     - title: リファレンス
       items:
-        - auto:
-            document: files_guide
-            filter:
-              and:
-                - {field: category, op: eq, values: [リファレンス]}
-                - not: {field: name, op: eq, values: [用語集]}
+        - group: MCP と API
+          items:
+            - page: files_guide/docs/guide/文書のMCP.md
+            - page: files_guide/docs/guide/管理のMCP.md
+            - page: files_guide/docs/guide/読み取りAPI.md
+        - group: CLI と設定
+          items:
+            - page: files_guide/docs/guide/CLI.md
+            - page: files_guide/docs/guide/設定.md
     - title: 用語集
       items:
-        - page: files_guide/docs/guide/用語集.md
-        - auto: {document: glossary}
+        - group: 用語集
+          items:
+            - page: files_guide/docs/guide/用語集.md
+            - auto: {document: glossary}
