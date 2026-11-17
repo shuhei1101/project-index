@@ -129,6 +129,54 @@ def test_normal_when_file_belongs_to_other_row(
     assert "items" not in result.data["sync"]
 
 
+def test_normal_when_nested_index_and_exclude_path(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_sync_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """直下の管理用の YAML で、深い管理用の YAML の範囲と exclude のパスを数えない（正常系）。"""
+    # 準備
+    files = sample_sync_file_set(0)
+    root_row = (
+        "  - id: root\n"
+        "    paths: [files.yaml]\n"
+        "    schema: schemas/files.schema.yaml\n"
+        "    records: files\n"
+        "    body_file: path\n"
+        "    exclude: ['docs/pr/**']\n"
+    )
+    src_row = (
+        "  - id: src\n"
+        "    paths: [src/files.yaml]\n"
+        "    schema: schemas/files.schema.yaml\n"
+        "    records: files\n"
+        "    body_file: path\n"
+    )
+    files.update(
+        {
+            "project-index.yaml": sample_config_text(root_row + src_row, version="3"),
+            "files.yaml": (
+                "files:\n"
+                "  - path: project-index.yaml\n"
+                "  - path: schemas/files.schema.yaml\n"
+                "  - path: schemas/sample.schema.yaml\n"
+            ),
+            "src/b.py": "b = 2\n",
+            "docs/pr/1/README.md": "# PR 1\n",
+        }
+    )
+    sample = make_source("sample", files, git=False)
+    env = make_server(sample)
+    # 実行
+    result = env.call_admin("check_project", path=str(sample.folder), format="json")
+    # 検証
+    assert not result.is_error
+    assert "violations" not in result.data
+    assert result.data["sync"]["unindexed_files"] == 1
+    assert [item["path"] for item in result.data["sync"]["items"]] == ["src: src/b.py"]
+
+
 def test_normal_when_related_unresolved(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
