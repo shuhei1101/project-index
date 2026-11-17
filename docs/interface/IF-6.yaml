@@ -1420,8 +1420,6 @@ flows:
   - name: 正常系（ワークツリーの設定でスキーマの参照を変えた種類を検査する）
     summary: ワークツリーの `project-index.yaml` で行の `schema.ref` をほかの配信元の別のリビジョンへ変えた種類の文書を、変えた後のリビジョンのスキーマで検査して書き込む
     setup:
-      - name: Mock
-        description: なし
       - name: スキーマの配信元
         description: 種類 `rule` のスキーマを持つ git リポジトリ。タグ `v1` では `properties.refs.items` が文字列、タグ `v2` ではオブジェクト（`to`・`type`）
         notes: id `schemas`
@@ -1432,6 +1430,8 @@ flows:
         description: '`worktree` にワークツリー x のパス、文書 1 の `update`（`set: {refs: [{to: 文書 2, type: references}]}`）'
       - name: 設定を変えていないワークツリー
         description: 'sample の `.claude/worktrees/y`。`project-index.yaml` はクローン本体と同じ `ref: v1` のまま'
+      - name: Mock
+        description: なし（ワークツリーの設定を再読み込みするときに参照先の配信元 schemas を引き当てるため、環境変数 `PROJECT_INDEX_CONFIG` にテストの端末の設定を指定する）
     flow: |-
       <!-- map: {"title": "正常系（ワークツリーの設定でスキーマの参照を変えた種類を検査する）"} -->
 
@@ -1457,8 +1457,8 @@ flows:
     expected:
       - '`applied: true` で、文書 1 の `status` が `updated`'
       - ワークツリー x の文書 1 の `refs` が `set` の値になる
-      - '同じ `set` を `refs: [文書 2]`（文字列の並び）にした呼び出しは、`applied: false` で、違反の `schema` が v2 のスキーマの場所を指す'
       - '続けてワークツリー y の文書 1 へ `refs: [文書 2]`（文字列の並び）の `update` を呼ぶと、v1 のスキーマで検査して `applied: true` になる'
+      - '同じ `set` を `refs: [文書 2]`（文字列の並び）にした呼び出しは、`isError: true` の `ValidationFailedError` で、違反の `rule` が v2 のスキーマの型（要素が `object`）を求める'
     test: test_normal_when_schema_ref_changed_in_worktree
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
