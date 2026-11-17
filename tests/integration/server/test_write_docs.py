@@ -789,7 +789,7 @@ def test_normal_when_add_to_ref_path(
     add_worktree: Callable[..., Path],
     sample_file_set: Callable[..., dict[str, str]],
 ) -> None:
-    """add_to・remove_from のキーの参照の型の項目のパスで、x-key の値で指した要素の中の配列へ追加・削除する（正常系）。"""
+    """add_to・remove_from のキーの参照の型の項目のパスで、x-key の値で指した要素の中の配列へ追加・削除し、unset の要素の参照の型の項目のパスで項目を削除する（正常系）。"""
     # 準備
     files = sample_file_set(
         **{"schemas/sample.schema.yaml": MODELS_SCHEMA, "docs/doc-1.yaml": MODELS_DOC}
@@ -813,6 +813,12 @@ def test_normal_when_add_to_ref_path(
     fourth = _call(add_to={"#models[Zzz].properties": ["d"]})
     fifth = _call(add_to={"#models[Row].name": ["d"]})
     after_errors = path.read_text(encoding="utf-8")
+    sixth = _call(unset=["#models[Col].properties"])
+    after_sixth = load_yaml(path.read_text(encoding="utf-8"))
+    before_unset_errors = path.read_text(encoding="utf-8")
+    seventh = _call(unset=["models[Row].properties"])
+    eighth = _call(unset=["#models[Zzz].properties"])
+    after_unset_errors = path.read_text(encoding="utf-8")
     # 検証
     assert [item["status"] for item in first.data["results"]] == ["updated"]
     assert after_first["models"] == [
@@ -831,6 +837,16 @@ def test_normal_when_add_to_ref_path(
     assert fifth.is_error
     assert "operations[0].add_to.#models[Row].name" in fifth.text
     assert after_errors == before_errors
+    assert [item["status"] for item in sixth.data["results"]] == ["updated"]
+    assert after_sixth["models"] == [
+        {"name": "Row", "properties": ["c"]},
+        {"name": "Col"},
+    ]
+    assert seventh.is_error
+    assert "operations[0].unset.models[Row].properties" in seventh.text
+    assert eighth.is_error
+    assert "operations[0].unset.#models[Zzz].properties" in eighth.text
+    assert after_unset_errors == before_unset_errors
 
 
 def test_error_when_unknown_kind(

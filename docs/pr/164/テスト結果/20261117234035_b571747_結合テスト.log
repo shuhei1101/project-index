@@ -1,0 +1,60 @@
+$ gh workflow run test.yml --ref fix/project-index/write-docs-unset-ref-path -f layer=integration -f paths="tests/integration/server/test_write_docs.py"（TP-1 の結合テストの run_runner）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 49 items
+
+tests/integration/server/test_write_docs.py::test_normal PASSED          [  2%]
+tests/integration/server/test_write_docs.py::test_normal_when_create PASSED [  4%]
+tests/integration/server/test_write_docs.py::test_normal_when_kind_added_in_worktree PASSED [  6%]
+tests/integration/server/test_write_docs.py::test_normal_when_operations_combined PASSED [  8%]
+tests/integration/server/test_write_docs.py::test_normal_when_dry_run PASSED [ 10%]
+tests/integration/server/test_write_docs.py::test_normal_when_not_atomic PASSED [ 12%]
+tests/integration/server/test_write_docs.py::test_normal_when_non_git_source PASSED [ 14%]
+tests/integration/server/test_write_docs.py::test_error_when_validation_failed PASSED [ 16%]
+tests/integration/server/test_write_docs.py::test_error_when_source_not_writable PASSED [ 18%]
+tests/integration/server/test_write_docs.py::test_error_when_target_is_clone PASSED [ 20%]
+tests/integration/server/test_write_docs.py::test_error_when_target_is_clone_and_config_in_worktree PASSED [ 22%]
+tests/integration/server/test_write_docs.py::test_error_when_version_mismatch PASSED [ 24%]
+tests/integration/server/test_write_docs.py::test_normal_when_text_edits_ref_path PASSED [ 26%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[no_x_key] PASSED [ 28%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[missing] PASSED [ 30%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[order] PASSED [ 32%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[no_key] PASSED [ 34%]
+tests/integration/server/test_write_docs.py::test_normal_when_add_to_ref_path PASSED [ 36%]
+tests/integration/server/test_write_docs.py::test_error_when_unknown_kind PASSED [ 38%]
+tests/integration/server/test_write_docs.py::test_error_when_document_not_found PASSED [ 40%]
+tests/integration/server/test_write_docs.py::test_error_when_invalid_argument PASSED [ 42%]
+tests/integration/server/test_write_docs.py::test_error_when_source_not_served PASSED [ 44%]
+tests/integration/server/test_write_docs.py::test_error_when_worktree_not_matched PASSED [ 46%]
+tests/integration/server/test_write_docs.py::test_error_when_placement_excluded PASSED [ 48%]
+tests/integration/server/test_write_docs.py::test_normal_when_metadata_mapped PASSED [ 51%]
+tests/integration/server/test_write_docs.py::test_normal_when_tool_description PASSED [ 53%]
+tests/integration/server/test_write_docs.py::test_normal_when_tags_are_objects PASSED [ 55%]
+tests/integration/server/test_write_docs.py::test_normal_when_quotes_preserved PASSED [ 57%]
+tests/integration/server/test_write_docs.py::test_normal_when_indent_preserved PASSED [ 59%]
+tests/integration/server/test_write_docs.py::test_normal_when_mdmark_unavailable PASSED [ 61%]
+tests/integration/server/test_write_docs.py::test_error_when_mdmark_warning PASSED [ 63%]
+tests/integration/server/test_write_docs.py::test_normal_when_relative_ref_in_defs PASSED [ 65%]
+tests/integration/server/test_write_docs.py::test_normal_when_cyclic_ref_in_other_file PASSED [ 67%]
+tests/integration/server/test_write_docs.py::test_error_when_schema_ref_unresolvable PASSED [ 69%]
+tests/integration/server/test_write_docs.py::test_error_when_write_deadline_exceeded PASSED [ 71%]
+tests/integration/server/test_write_docs.py::test_error_when_validator_timed_out PASSED [ 73%]
+tests/integration/server/test_write_docs.py::test_normal_when_body_file PASSED [ 75%]
+tests/integration/server/test_write_docs.py::test_error_when_body_file_outside_source PASSED [ 77%]
+tests/integration/server/test_write_docs.py::test_error_when_body_not_accepted PASSED [ 79%]
+tests/integration/server/test_write_docs.py::test_normal_when_disk_storage PASSED [ 81%]
+tests/integration/server/test_write_docs.py::test_error_when_recursive_metadata_key_written PASSED [ 83%]
+tests/integration/server/test_write_docs.py::test_normal_when_rename PASSED [ 85%]
+tests/integration/server/test_write_docs.py::test_normal_when_rename_path_only PASSED [ 87%]
+tests/integration/server/test_write_docs.py::test_normal_when_rename_body_file PASSED [ 89%]
+tests/integration/server/test_write_docs.py::test_error_when_rename_id_exists PASSED [ 91%]
+tests/integration/server/test_write_docs.py::test_error_when_rename_path_invalid[outside_paths] PASSED [ 93%]
+tests/integration/server/test_write_docs.py::test_error_when_rename_path_invalid[exists] PASSED [ 95%]
+tests/integration/server/test_write_docs.py::test_normal_when_replace_text PASSED [ 97%]
+tests/integration/server/test_write_docs.py::test_error_when_replace_text_validation_failed PASSED [100%]
+
+============================= 49 passed in 17.71s ==============================

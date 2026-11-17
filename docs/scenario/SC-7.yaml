@@ -703,14 +703,20 @@ scenarios:
         A->>M: write_docs(update 文書 1, remove_from: #models[Row].properties から a)
         M->>WT: Row の properties を [c] で書く
         M-->>A: applied: true と新しい version
+        A->>M: write_docs(update 文書 1, unset: #models[Col].properties)
+        M->>M: 種類のスキーマの x-key で models の Col の要素の properties へ解決する
+        M->>WT: Col の properties を削除して書く
+        M-->>A: applied: true と新しい version
       ```
 
       <!-- /map -->
     expected:
       - '`add_to` の後、ワークツリー x の文書 1 の Row の `properties` が `[a, c]` で、Col の `properties` は `[b]` のまま'
       - '`remove_from` の後、Row の `properties` が `[c]`'
-      - '`#` で始まらず要素の選び方を含むパス（`models[Row].properties`）の `add_to`・`remove_from` は、`isError: true` で `add_to.models[Row].properties`（`remove_from.` も同じ）の違反を返し、ファイルは変わらない'
-      - 無い要素（`#models[Zzz].properties`）・`x-key` の無い配列・配列でない項目を指す `#` で始まるパスも、違反を返して書き込まない
+      - '`unset` の後、Col の要素に `properties` が無く、Row の `properties` は `[c]` のまま'
+      - '`#` で始まらず要素の選び方を含むパス（`models[Row].properties`）の `add_to`・`remove_from`・`unset` は、`isError: true` で `add_to.models[Row].properties`（`remove_from.`・`unset.` も同じ）の違反を返し、ファイルは変わらない'
+      - '`add_to`・`remove_from` の、無い要素（`#models[Zzz].properties`）・`x-key` の無い配列・配列でない項目を指す `#` で始まるパスも、違反を返して書き込まない'
+      - '`unset` の無い要素（`#models[Zzz].properties`）・`x-key` の無い配列を指す `#` で始まるパスも、`unset.{パス}` の違反を返して書き込まない'
     test: test_normal_when_add_to_keyed_element
   - name: 正常シナリオ（文書を改名して参照元を追随させる）
     setup:
