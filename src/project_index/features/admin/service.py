@@ -45,10 +45,10 @@ from project_index.features.documents.store import check_sync
 from project_index.features.read.nav import (
     check_nav_filters,
     nav_auto_counts,
+    nav_fields,
     nav_warnings,
     zero_count_warnings,
 )
-from project_index.features.search.fields import known_fields
 from project_index.features.settings.query import (
     SETTINGS_VERSION,
     listen_port,
@@ -576,14 +576,14 @@ def _overlaid_nav(handlers: Handlers, config_file: Path) -> Path | None:
     return None
 
 
-def _nav_documents(handlers: Handlers, source: ServedSource) -> tuple[list[Any], dict[str, str]]:
-    """配信元の文書と、行ごとの文書に当てるスキーマから使える項目を返す。"""
+def _nav_documents(
+    handlers: Handlers, source: ServedSource
+) -> tuple[list[Any], dict[str, str], dict[str, dict[str, str]]]:
+    """配信元の文書と、nav の条件の使える項目と、行の ID → `metadata` を返す。"""
     target = Target(source, source.root, None, None, "read")
     documents = handlers.store.load(target).documents
-    fields = known_fields(
-        handlers.store.row_schema(target, row.id) for row in source.config.documents if row.enabled
-    )
-    return documents, fields
+    fields, columns = nav_fields(handlers.store, target, source)
+    return documents, fields, columns
 
 
 def write_nav(request: WriteNavRequest, *, handlers: Handlers) -> WriteNavResult:
@@ -647,8 +647,9 @@ def write_nav(request: WriteNavRequest, *, handlers: Handlers) -> WriteNavResult
     ]
     documents: list[Any] = []
     fields: dict[str, str] = {}
+    columns: dict[str, dict[str, str]] = {}
     if source is not None:
-        documents, fields = _nav_documents(handlers, source)
+        documents, fields, columns = _nav_documents(handlers, source)
         nav_violations.extend(
             check_nav_filters(
                 nav,
@@ -663,7 +664,11 @@ def write_nav(request: WriteNavRequest, *, handlers: Handlers) -> WriteNavResult
         )
     replace_file(config_file, text)
     counts = nav_auto_counts(
-        nav, documents, fields=fields, today=datetime.now(UTC).astimezone().date()
+        nav,
+        documents,
+        fields=fields,
+        today=datetime.now(UTC).astimezone().date(),
+        columns=columns,
     )
     return WriteNavResult(
         path=str(config_file),

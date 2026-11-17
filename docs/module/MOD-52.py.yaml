@@ -16,6 +16,7 @@ diagrams:
         条件の確かめ ..> 使える項目
         条件の照合 ..> 項目の値
         本文の範囲の選択 ..> 見出しの行
+        nav の警告 ..> 行の metadata の項目
         class 条件の確かめ {
           <<function>>
         }
@@ -34,9 +35,16 @@ diagrams:
         class 本文の範囲の選択 {
           <<function>>
         }
+        class nav の警告 {
+          <<function>>
+        }
+        class 行の metadata の項目 {
+          <<function>>
+        }
         click 条件の確かめ href "id:MOD-53#functions[check_filter]"
         click 条件の照合 href "id:MOD-53#functions[match_filter]"
         click 本文の範囲の選択 href "id:MOD-50#functions[select_ranges]"
+        click nav の警告 href "id:MOD-76#functions[nav_warnings]"
 constants:
   - name: COMPUTED_FIELDS
     title: 計算項目
@@ -73,6 +81,13 @@ functions:
         required: true
         passing: positional
         description: 項目
+      - name: columns
+        title: 共通のキーの列
+        type: Mapping[str, str]
+        required: false
+        passing: keyword
+        default: '{}'
+        description: 文書の行の `metadata`（共通のキー → 列名）
     returns:
       type: list[Any]
       description: 値の並び。配列の項目は要素、値が無ければ空
@@ -85,6 +100,7 @@ functions:
          - `*` の場合、`data` の全ての文字列の葉と本文
          - `@chars` は本文の文字数、`@path` は `document.path`（`records` の行は `{path}#{record_index}`）、`@sections` は Markdownの本文かが `True` の文書なら本文の見出しの文字列、それ以外は `data` の最上位のキーの並び
          - `@matches` は条件で決まり文書だけでは決まらないので、値を持たない（文書の検索が当たった行の数で数える）
+         - `columns` のキーで `METADATA_KEYS` に無い場合、`data` から対応付けた列（`columns[項目]`）を項目の取得で取得する
          - それ以外は `data` を項目の取得で引く
       2. 値が配列なら要素を、`None` なら空、それ以外は 1 要素の並びを返す
     unit_tests:
@@ -94,6 +110,12 @@ functions:
         condition: '`tags: [a, b]`・`data.owner.name: x`・本文 `# 見出し`'
         mock: なし
         expected: '`tags` が `[a, b]`、`owner.name` が `[x]`、`@chars` が本文の文字数、`missing` が `[]`'
+      - name: test_field_values_when_columns
+        case: 正常
+        summary: 行の metadata で対応付けた列の値
+        condition: '`data.section: 使い方`、`columns: {category: section, name: title}`、`document.metadata.name: a`、項目 `category` と `name`'
+        mock: なし
+        expected: '`category` が `[使い方]`、`name` が `[a]`（`METADATA_KEYS` のキーは `document.metadata` のまま）'
   - name: known_fields
     title: 使える項目
     kind: 関数
@@ -173,4 +195,48 @@ functions:
          - `date` の場合、その日の 0 時を端末のタイムゾーンの日時にして返す
          - `str` の場合、`datetime.fromisoformat` で読んで返す。読めなければ `None` を返す
          - それ以外の場合、`None` を返す
+  - name: with_metadata_fields
+    title: 行の metadata の項目
+    kind: 関数
+    container: project_index/features/search/fields.py
+    usecase: 画面の構成の書き込み
+    role: 読み取り
+    summary: 使える項目に、文書の行の `metadata` で対応付けたキーを、対応付けた列の型で加える
+    description: '`nav` の条件の確かめと数え（nav の警告・画面の構成の書き込み）だけが呼ぶ。`search_docs`・`list_changes` の使える項目は変えない。'
+    scope: public
+    thread_safe: true
+    args:
+      - name: fields
+        title: 使える項目
+        type: Mapping[str, str]
+        required: true
+        passing: positional
+        description: 使える項目の結果
+      - name: rows
+        title: 文書の行と行の使える項目
+        type: Iterable[tuple[DocumentTable, Mapping[str, str]]]
+        required: true
+        passing: positional
+        description: 有効な `documents[]` の行と、その行の文書に当てるスキーマだけで作った使える項目の組
+    returns:
+      type: dict[str, str]
+      description: 項目のパス → 型。`fields` の複製にキーを加えたもの
+    process: |-
+      1. `fields` を複製する
+      2. 行の並びの順に `metadata` のキーと列名をたどり、複製に無いキーを加える（`METADATA_KEYS`・スキーマの項目と、先の行で加えたキーは変えない）
+         - 型は、その行の使える項目の列名（そのままの文字列）の型。無ければ `string`
+      3. 加えた結果を返却する
+    unit_tests:
+      - name: test_with_metadata_fields
+        case: 正常
+        summary: 対応付けた列の型で加える
+        condition: '行の使える項目が `section: string`・`labels: array`、行の `metadata` が `{category: section, kinds: labels, area: meta.area, all: "**.section", name: title}`'
+        mock: なし
+        expected: '`category` が `string`、`kinds` が `array`、`area` と `all` が `string`（そのままの列名が行の使える項目に無い）、`name` は `fields` のまま。引数の `fields` は変わらない'
+      - name: test_with_metadata_fields_when_rows_differ
+        case: 正常
+        summary: 行ごとに型が食い違うキーと他の行のスキーマ
+        condition: '行 A（使える項目に `section` が無い）の `metadata` が `{order: section}`、行 B（`section: number`・`labels: array`）の `metadata` が `{order: labels}`。`fields` は両方の行を合わせた使える項目'
+        mock: なし
+        expected: '`order` が `string`（先の行 A の型。行 B の `section: number` は使用しない）'
 visibility: internal

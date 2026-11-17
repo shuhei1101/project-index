@@ -200,12 +200,19 @@ functions:
         required: true
         passing: keyword
         description: 日付の相対の値の基準
+      - name: columns
+        title: 共通のキーの列
+        type: Mapping[str, str]
+        required: false
+        passing: keyword
+        default: '{}'
+        description: 文書の行の `metadata`（共通のキー → 列名）。項目の値に指定する
     returns:
       type: bool
       description: 当たるか
     process: |-
       1. `Group` は `all_of` なら全て、`any_of` ならどれかが当たるとき、`not_` なら中が当たらないとき `True`
-      2. `Condition` は項目の値を引き、`values` の各値と比べる（`match` が `any` ならどれか、`all` なら全て）
+      2. `Condition` は項目の値（`columns` を指定する）を引き、`values` の各値と比べる（`match` が `any` ならどれか、`all` なら全て）
          - `exists`・`not_exists` は値の並びが空でないか
          - `eq`・`ne`・`prefix`・`suffix`・`contains`・`not_contains` は、値の並びのどれかとの文字列の比較（`case_sensitive` が `False` なら両方を NFKC と `casefold`）。`ne`・`not_contains` は値の並びのどれとも当たらないとき `True`
          - `regex` は正規表現の組み立ての `search`。`case_sensitive` が `False` なら文書の値を NFKC にして比べる（パターンには正規化をかけない）
@@ -248,6 +255,12 @@ functions:
         condition: '`{field: "@path", op: glob, values: ["notes/*.md"]}` と `{field: "@path", op: glob, values: ["NOTES/**"]}`'
         mock: なし
         expected: 1 つ目は `notes/a.md` が `True`、`notes/archive/c.md` が `False`。2 つ目（`case_sensitive` を省く）はどちらも `True`
+      - name: test_match_filter_when_columns
+        case: 正常
+        summary: 行の metadata で対応付けた列で照合する
+        condition: '`{field: category, op: eq, values: [使い方]}`、`data.section: 使い方` の文書、`columns: {category: section}` を指定する場合と指定しない場合'
+        mock: なし
+        expected: 指定する場合が `True`、指定しない場合が `False`
   - name: match_words
     title: 語の照合
     kind: 関数
