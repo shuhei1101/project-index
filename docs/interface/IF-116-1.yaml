@@ -194,7 +194,7 @@ flows:
         description: なし（本物の GitHub Actions で回す）
       - name: ブランチ
         description: '`tests/integration/` の中身を pass するテスト 1 件だけに差し替えたブランチ'
-        notes: '`layer: integration`・`paths: tests/unit/`'
+        notes: '`layer: integration`・`paths: tests/unit/`。同じ結論になる例として、`layer: unit`・`paths: tests/integration/`（結合テストでない層に `paths` を指定）と、`layer: integration`・`paths: tests/integration/../unit/`（`tests/integration/` で始まり `..` で外へ出る）も起動する'
     flow: |-
       <!-- map -->
 
@@ -207,7 +207,7 @@ flows:
       <!-- /map -->
     expected:
       - 実行の結論が `failure`
-      - 成果物 `test-log` に、`paths` が層のフォルダの外である旨があり、pytest の集計の行が無い
+      - 成果物 `test-log` に、`paths` を弾いた理由（層のフォルダの外・結合テストでない層への指定・`..` を含む）があり、pytest の集計の行が無い
 notes:
   step ごとの中身: |-
     | step | 中身 |
