@@ -715,7 +715,7 @@ scenarios:
       - '`remove_from` の後、Row の `properties` が `[c]`'
       - '`unset` の後、Col の要素に `properties` が無く、Row の `properties` は `[c]` のまま'
       - '`#` で始まらず要素の選び方を含むパス（`models[Row].properties`）の `add_to`・`remove_from`・`unset` は、`isError: true` で `add_to.models[Row].properties`（`remove_from.`・`unset.` も同じ）の違反を返し、ファイルは変わらない'
-      - 無い要素（`#models[Zzz].properties`）・`x-key` の無い配列・配列でない項目を指す `#` で始まるパスも、違反を返して書き込まない
+      - '`add_to`・`remove_from` の、無い要素（`#models[Zzz].properties`）・`x-key` の無い配列・配列でない項目を指す `#` で始まるパスも、違反を返して書き込まない'
       - '`unset` の無い要素（`#models[Zzz].properties`）・`x-key` の無い配列を指す `#` で始まるパスも、`unset.{パス}` の違反を返して書き込まない'
     test: test_normal_when_add_to_keyed_element
   - name: 正常シナリオ（文書を改名して参照元を追随させる）
