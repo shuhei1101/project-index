@@ -677,6 +677,130 @@ scenarios:
       - クローン本体への書き込みを断るエラー（`worktree` でワークツリーを指す案内）を返却しない
       - '`writable: false` の種類の文書の `delete_docs` が `isError: true` で、その種類は削除できない理由を返却し、ファイルは残る'
     test: test_normal_when_disk_storage_clone_written
+  - name: 正常シナリオ（文書を改名して参照元を追随させる）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 参照されている文書
+        description: ワークツリー x の文書 2（`docs/doc-2.yaml`）。文書 1 が、`related` の `to`・参照の型の項目の値（`doc-2#items[a]`）・Markdown の値のリンク（`[文書 2](id:doc-2)`）で文書 2 を指す
+        notes: 文書 3 は文書 2 を指さない
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` にワークツリー x のパスを指定する'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（文書を改名して参照元を追随させる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: write_docs(operations: 改名・文書 2・改名後の ID doc-9, dry_run: true)
+        M->>M: 同じ配信元の文書から、文書 2 の ID とパスを指す箇所を探す
+        M-->>A: 改名後のパスと、書き換わる参照元の文書と箇所の一覧（書き込まない）
+        A->>M: write_docs(operations: 改名・文書 2・expected_version・改名後の ID doc-9)
+        M->>M: 文書 2 と参照元の文書 1 を書き換えた後の文書を検査する
+        M->>WT: docs/doc-9.yaml を作成して docs/doc-2.yaml を削除し、文書 1 を書き換える
+        M-->>A: 改名した文書と参照元の文書の id と書き込んだ後の version
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`dry_run: true` の結果が、改名後のパス `docs/doc-9.yaml` と、参照元の文書 1 の 3 か所（`related`・参照の型の項目・Markdown の値のリンク）を返却し、`applied` が `false` で、ワークツリー x のファイルは変わらない'
+      - 改名の後、ワークツリー x に `docs/doc-9.yaml` があり、`docs/doc-2.yaml` が無く、`docs/doc-9.yaml` の `id` が `doc-9` で、ほかの項目は改名の前と同じ
+      - 文書 1 の `related` の `to`・参照の型の項目の値・Markdown の値のリンクが `doc-9` を指し、文書 1 のほかの項目は変わらない
+      - 文書 3 は変わらない
+      - '次の `search_docs` が `doc-9` を返却し、`doc-2` を返却しない。`trace_related` で `doc-9` から `direction: in` でたどると文書 1 を返却する'
+    test: test_normal_when_rename
+  - name: 異常シナリオ（改名先の ID が既にある）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: project-index
+        description: 正常シナリオと同じ sample を配信している project-index
+        notes: 文書 2 の改名後の ID に、既にある文書 1 の ID を指定する
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（改名先の ID が既にある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: write_docs(operations: 改名・文書 2・改名後の ID 文書 1 の ID)
+        M->>M: 改名後の ID が配信元の文書と重なる
+        M-->>A: エラー（添字 0・重なる ID）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、添字 0 の違反として、改名後の ID が既にある文書と重なることを返却する'
+      - ワークツリー x の文書 1・文書 2 は変わらず、ファイルも作成されない
+    test: test_error_when_rename_id_exists
+  - name: 正常シナリオ（複数の文書の単語を一括で置換する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 単語を持つ文書
+        description: ワークツリー x の文書 1・文書 2 が、最上位の文字列の項目と、配列の要素の中の文字列と、辞書の値の文字列に単語 `旧語` を持つ。文書 3 も `旧語` を持つ
+        notes: 文書 1・文書 2 はタグ `topic:a` を持ち、文書 3 は持たない
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` にワークツリー x のパスを指定する。絞り込みの条件はタグ `topic:a`'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（複数の文書の単語を一括で置換する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: write_docs(operations: 一括置換・条件 topic:a・旧語 → 新語, dry_run: true)
+        M->>M: 条件に該当する文書の文字列の値を、配列と辞書の配下までたどって置換する
+        M-->>A: 文書ごとの置換の件数と差分（書き込まない）
+        A->>M: write_docs(operations: 一括置換・条件 topic:a・旧語 → 新語)
+        M->>M: 置換した文書を検査する
+        M->>WT: 文書 1・文書 2 を書き換える
+        M-->>A: 文書ごとの置換の件数と書き込んだ後の version
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`dry_run: true` の結果が、文書 1・文書 2 の置換の件数を返却し、`applied` が `false` で、ワークツリー x のファイルは変わらない'
+      - 置換した後、文書 1・文書 2 の最上位の項目・配列の要素の中・辞書の値の `旧語` が全て `新語` になり、ほかの文字列とキーの名前は変わらない
+      - 条件に該当しない文書 3 は変わらない
+      - 変更していない項目のコメント・順序・引用符の種類が書き込みの前と同じ
+    test: test_normal_when_replace_words
+  - name: 異常シナリオ（一括置換の後の文書が検査に合格しない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 単語を持つ文書
+        description: 正常シナリオ（複数の文書の単語を一括で置換する）と同じ文書 1・文書 2
+        notes: 文書 2 は、スキーマが 1 行と定める項目に `旧語` を持つ
+      - name: project-index
+        description: sample を配信している project-index
+        notes: 置換後の単語に改行を含む値を指定する。`atomic` は既定（`true`）
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（一括置換の後の文書が検査に合格しない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: write_docs(operations: 一括置換・条件 topic:a)
+        M->>M: 置換した文書を検査し、文書 2 が合格しない
+        M-->>A: エラー（文書 2 の id・違反したパス・決まり・修正方法）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、文書 2 の `id` と違反したパス・決まり・修正方法を返却する'
+      - 文書 1 も文書 2 も書き換わらない
+    test: test_error_when_replace_words_validation_failed
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 tags:
   - name: topic:文書
@@ -690,13 +814,13 @@ stakeholders:
     interest: 変える項目だけを渡して、スキーマと検査に通る文書だけを書ける。通らないときは直し方が分かる
   - name: 利用者
     interest: 書き込みが作業中のワークツリーと `scope.write` に当たる配信元にだけ入り、クローン本体は変わらない。project-index は commit しない
-trigger: エージェントが文書を作る・直す・消す
+trigger: エージェントが文書を作成・修正・改名・削除するか、複数の文書の単語を置換する
 preconditions:
   - project-index が起動し、配信元を配信している
   - 呼び出しの引数に、フックが作業場所 `cwd` と会話キーを入れている
   - エージェントが直す文書を `search_docs` で読み、`version` を持っている
 success_guarantee: 変更を当てた後の文書が配信元のスキーマと `validators[]` に通り、作業ツリー（Git 管理外の配信元はそのフォルダ）のファイルだけが書き換わる。新しいバージョンが返る。変えた Markdown の値は、mdmark の CLI を使えるときは点検に通っており、使えないとき（CLI が無い・制限時間を超えた）は点検できなかった理由が返る。
-minimal_guarantee: '検査に通らない書き込み、mdmark の警告がある Markdown の値の書き込み、`scope.write` に当たらない作業場所からの書き込み、クローン本体への書き込み、本文のファイルのパスが配信元の外を指す書き込み、書き込みの期限を過ぎた書き込みは、ファイルを 1 つも書き換えない（`atomic: true` のときは他の操作も書かない）。書き込まなかったときは `isError: true` で理由を返却する。'
+minimal_guarantee: '検査に通らない書き込み、改名後の ID が既にある文書と重なる改名、mdmark の警告がある Markdown の値の書き込み、`scope.write` に当たらない作業場所からの書き込み、クローン本体への書き込み、本文のファイルのパスが配信元の外を指す書き込み、書き込みの期限を過ぎた書き込みは、ファイルを 1 つも書き換えない（`atomic: true` のときは他の操作も書かない）。書き込まなかったときは `isError: true` で理由を返却する。'
 frequency: 作業のたび
 priority: 高
 refs:
