@@ -213,9 +213,9 @@ classes:
           - name: test_document_checker_check_when_script_file_changed
             case: 正常
             summary: ワークツリーのスクリプトを書き換えると動かし直す
-            condition: ワークツリーを指す読み書きの場所で同じ文書を `on="read"` で 2 回呼び、続けて `run` が指すスクリプトのファイルを書き換えて 1 回、さらに同じフォルダのほかのファイルを書き換えて 1 回
+            condition: ワークツリーを指す読み書きの場所で同じ文書を `on="read"` で 2 回呼び、続けて `run` が指すスクリプトのファイルを書き換えて 1 回、さらに同じフォルダのサブフォルダのファイルを書き換えて 1 回、最後に `__pycache__` にファイルを置いて 1 回。書き換えはどれも大きさを変える
             mock: '`run_script`（呼ばれた数を数える）'
-            expected: '`run_script` が 3 回呼ばれる（2 回目だけキャッシュを使う）'
+            expected: '`run_script` が 3 回呼ばれる（2 回目と `__pycache__` の後の 5 回目はキャッシュを使う）'
           - name: test_document_checker_check_when_worktree_and_main_clone
             case: 正常
             summary: ワークツリーとクローン本体のキャッシュを分ける
@@ -309,7 +309,7 @@ classes:
         kind: メソッド
         scope: internal
         thread_safe: true
-        side_effects: ワークツリー・Git の管理外では、スクリプトのフォルダのファイルの `stat` を取る
+        side_effects: ワークツリー・Git の管理外では、スクリプトのフォルダの配下のファイルの `stat` を取る
         args:
           - name: target
             title: 読み書きの場所
@@ -336,11 +336,12 @@ classes:
           1. 検査の行の定義のハッシュを、行の全ての項目（`id`・`run`・`on`・`cache`）から『値のハッシュ』で作る
           2. スクリプトの状態を作る
              - `script_at(target)` が commit を返す場合（クローン本体で `config_commit` がある）、その commit の SHA にする（スクリプトはその commit から取り出して動かす）
-             - それ以外（ワークツリー・`config_commit` の無い配信元）の場合、`run` の要素のうち `-` で始まらない相対パスで、`target.config_base` から解いてファイルがあるものごとに、そのファイルのフォルダの直下のファイルの (`config_base` からの相対パス, `st_mtime_ns`, `st_size`) をパスの順に並べ、『値のハッシュ』で作る。該当するファイルが無ければ空の文字列
+             - それ以外（ワークツリー・`config_commit` の無い配信元）の場合、`run` の要素のうち `-` で始まらない相対パスで、`target.config_base` から解いてファイルがあるものごとに、そのファイルのフォルダの配下（サブフォルダを含む。`__pycache__` のフォルダは除く）のファイルの (`config_base` からの相対パス, `st_mtime_ns`, `st_size`) をパスの順に並べ、『値のハッシュ』で作る。該当するファイルが無ければ空の文字列
           3. 参照する場所を、`target.worktree` があればその絶対パス、無ければ空の文字列にする
           4. (配信元の ID, 種類, 検査の ID, 文書のバージョン, 行の定義のハッシュ, スクリプトの状態, 参照する場所) を返す
         notes:
           フォルダの直下のファイルを見る理由: スクリプトの実行（`run_script` の `at`）は `run` の要素のファイルのフォルダごと取り出して動かすため、同じフォルダから import するファイルの書き換えでも結果が変わる。
+          フォルダの配下のファイルを見る理由: スクリプトの実行（`run_script` の `at`）は `run` の要素のファイルのフォルダをサブフォルダごと取り出して動かすため、その配下から import するファイルの書き換えでも結果が変わる。`__pycache__` はスクリプトの実行で書かれるため除き、実行のたびにキーが変わらないようにする。
 constants:
   - name: VALIDATOR_ON_READ_CACHE
     title: 読み取りの検査の結果の数
