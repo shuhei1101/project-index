@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 from project_index.features.documents.fields import METADATA_KEYS, get_field, is_markdown_body
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Mapping, Sequence
 
     from project_index.features.documents.types import Document
+    from project_index.features.sources.types import DocumentTable
 
 COMPUTED_FIELDS = ("@chars", "@path", "@sections", "@matches")
 DATE_FIELDS = ("created", "updated")
@@ -24,6 +26,8 @@ NUMBER_METADATA = ("port",)
 HEADING = re.compile(r"^\s{0,3}(?P<level>#{1,6})\s+(?P<text>.+?)\s*#*\s*$")
 FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
 SCHEMA_TYPES = {"string", "number", "boolean", "array", "object"}
+# 行の metadata の対応付けを指定しないときの空の対応
+NO_COLUMNS: Mapping[str, str] = MappingProxyType({})
 
 
 def _leaves(value: object) -> list[str]:
@@ -83,22 +87,26 @@ _COMPUTED: dict[str, Callable[[Document], object]] = {
 }
 
 
-def _raw_values(document: Document, field: str) -> object:
+def _raw_values(document: Document, field: str, columns: Mapping[str, str]) -> object:
     """項目の値を、配列のまま引く。"""
     computed = _COMPUTED.get(field)
     if computed is not None:
         return computed(document)
     if field in METADATA_KEYS:
         return document.metadata.get(field)
+    # 行の metadata で対応付けたキー: 対応付けた列から取得する（無ければ同じ名前の項目）
+    path = columns.get(field, field)
     try:
-        return get_field(document.data, field)
+        return get_field(document.data, path)
     except InvalidArgumentError:
         return None
 
 
-def field_values(document: Document, field: str) -> list[Any]:
+def field_values(
+    document: Document, field: str, *, columns: Mapping[str, str] = NO_COLUMNS
+) -> list[Any]:
     """文書から項目の値を引き、比べられる値の並びにする。"""
-    value = _raw_values(document, field)
+    value = _raw_values(document, field, columns)
     if value is None:
         return []
     return list(value) if is_list(value) else [value]
@@ -156,6 +164,22 @@ def known_fields(schemas: Iterable[Mapping[str, Any]]) -> dict[str, str]:
     for schema in schemas:
         _walk(dict(schema), "", fields)
     return fields
+
+
+def with_metadata_fields(
+    fields: Mapping[str, str],
+    rows: Iterable[tuple[DocumentTable, Mapping[str, str]]],
+) -> dict[str, str]:
+    """使える項目に、文書の行の `metadata` で対応付けたキーを、対応付けた列の型で加える。"""
+    result = dict(fields)
+    for row, row_fields in rows:
+        for key, column in row.metadata.items():
+            # 既に使える項目（共通のキー・スキーマの項目・先の行で加えたキー）はそのまま
+            if key in result:
+                continue
+            # 型は、その行の使える項目の列名そのままの型（無ければ string）
+            result[key] = row_fields.get(column, "string")
+    return result
 
 
 def as_datetime(value: object) -> datetime | None:

@@ -509,6 +509,7 @@ def make_records_nav_source_dir(
     """1 行に項目を追加した `records: files` の行 `notes` の配信元のフォルダを作り、`project-index.yaml` のパスを返す関数を返す。
 
     `values` はファイル名（拡張子 `.md`）→ 項目 `field` の値、`nav_filter` はあれば行 `notes` をその条件で絞るタブ `notes` を持つ `nav` を置く。
+    `metadata` はあれば行 `notes` の `metadata`（共通のキー → 列名）にする。
     """
 
     def _make(
@@ -517,12 +518,16 @@ def make_records_nav_source_dir(
         values: dict[str, Any],
         *,
         nav_filter: dict[str, Any] | None = None,
+        metadata: dict[str, str] | None = None,
     ) -> Path:
         root = tmp_path / "sample"
         rows = "".join(
             f"  - path: {stem}.md\n    {field}: {value}\n" for stem, value in values.items()
         )
         config = RECORDS_NAV_CONFIG
+        # metadata の指定あり: 行 notes の末尾に metadata のキーを足す
+        if metadata is not None:
+            config += f"    metadata: {json.dumps(metadata)}\n"
         if nav_filter is not None:
             auto = json.dumps({"document": "notes", "filter": nav_filter})
             config += f"nav:\n  tabs:\n    - title: notes\n      items:\n        - auto: {auto}\n"

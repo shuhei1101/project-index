@@ -262,9 +262,9 @@ functions:
          - `add` は、`item` が無ければタブの並びの末尾に `value` のタブ、あれば指した group の `items` の末尾に `value` の項目を加える。同じ名前のタブ・group があれば `InvalidArgumentError`
          - `update` は指したタブか group に `value` のキーだけを重ね、`remove` は指したタブか group を除く
          - 指したタブ・group が無い、`item` が `group` でない項目に当たる、`add`・`update` で `value` が無い場合、今のタブ・group の名前を添えた `InvalidArgumentError` を送る（`path` は `operations[{n}]`）
-      4. 書いた後の `nav` を検証する。`nav` を置き換えた設定で `SOURCE_SCHEMA` の `nav` の下の違反と、`root` の配信元を組み立てて（`assemble_source`。`lookup` はサーバーの端末の設定から作った引き当て）集めた文書と、有効な文書の行ごとの文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）から作った使える項目での nav の条件の確かめの違反があれば、`NavInvalidError` を送り、ファイルを書き換えない
+      4. 書いた後の `nav` を検証する。`nav` を置き換えた設定で `SOURCE_SCHEMA` の `nav` の下の違反と、`root` の配信元を組み立てて（`assemble_source`。`lookup` はサーバーの端末の設定から作った引き当て）集めた文書と、nav の条件の項目（読み取り API）で作った使える項目での nav の条件の確かめの違反があれば、`NavInvalidError` を送り、ファイルを書き換えない
       5. 往復編集の `nav` のキーだけを置き換えて書く（`dump_roundtrip`・`replace_file`。`dump_roundtrip` の `original` は手順 1 で読んだ設定のファイルの文字列）
-      6. nav の条件の数えを 4 の文書で求め、`count` が 0 の `auto` を nav の警告と同じ文の `warnings` にする
+      6. nav の条件の数えを 4 の文書と、nav の条件の項目の項目・行の ID → `metadata`（`columns`）で求め、`count` が 0 の `auto` を nav の警告と同じ文の `warnings` にする
       7. `WriteNavResult` を返す（`nav` は書いた `nav` を YAML にした文字列）
     exceptions:
       - name: ConfigNotFoundError
@@ -328,6 +328,13 @@ functions:
         condition: '`documents:` の直下と `nav.tabs:` の直下に `- ` を字下げ無しで並べる `project-index.yaml` に、`add`（タブ `mcp`、`value: {title: mcp, items: [{auto: {filter: tags が mcp}}]}`）'
         mock: なし（一時ディレクトリ）
         expected: '`project-index.yaml` は `nav` の外の行が書き込みの前の文字列と一致し、加えたタブの `- ` が元のタブと同じく字下げ無しで並ぶ'
+        exception: '-'
+      - name: test_write_nav_when_metadata_filter
+        case: 正常
+        summary: 行の metadata で対応付けたキーの条件
+        condition: '行 `notes`（`records: files`、`metadata: {area: section}`、要素 `{path: a.md, section: 使い方}`）を持つ配信元に、`add` で `auto: {document: notes, filter: {field: area, op: eq, values: [使い方]}}` のタブ'
+        mock: なし（一時ディレクトリ）
+        expected: '`NavInvalidError` を送らずに書き、`counts` の `count` が 1、`warnings` が空'
         exception: '-'
   - name: try_convert
     title: 試しの変換

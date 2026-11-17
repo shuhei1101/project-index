@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import UTC, date, datetime
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
@@ -12,7 +13,7 @@ from pydantic import ValidationError
 from project_index.features.access.types import Target
 from project_index.features.read.paths import page_path
 from project_index.features.read.types import NavAutoCount
-from project_index.features.search.fields import known_fields
+from project_index.features.search.fields import NO_COLUMNS, known_fields, with_metadata_fields
 from project_index.features.search.filters import check_filter, match_filter
 from project_index.features.search.types import Condition, Group, SearchRequest
 from project_index.shared.errors import Violation
@@ -25,6 +26,8 @@ if TYPE_CHECKING:
     from project_index.features.sources.types import ServedSource
 
 logger = logging.getLogger(__name__)
+# 行の metadata の対応付けを指定しないときの空の対応（行の ID → 共通のキー → 列名）
+NO_ROW_COLUMNS: Mapping[str, Mapping[str, str]] = MappingProxyType({})
 
 
 def _filter_of(spec: Mapping[str, Any]) -> Condition | Group | None:
@@ -39,6 +42,7 @@ def _select(
     *,
     fields: Mapping[str, str],
     today: date,
+    columns: Mapping[str, Mapping[str, str]],
 ) -> list[Document]:
     """`auto` の `document` と `filter` に当たる文書を、文書のページのパスの昇順で返す。"""
     kind = spec.get("document")
@@ -49,7 +53,14 @@ def _select(
         return []
     if node is None:
         return found
-    return [d for d in found if match_filter(node, d, fields=fields, today=today)]
+    # 文書の種類（行の ID）の metadata の対応付けで照合する
+    return [
+        d
+        for d in found
+        if match_filter(
+            node, d, fields=fields, today=today, columns=columns.get(d.kind, NO_COLUMNS)
+        )
+    ]
 
 
 def _walk_autos(
@@ -77,6 +88,7 @@ def nav_auto_counts(
     *,
     fields: Mapping[str, str],
     today: date,
+    columns: Mapping[str, Mapping[str, str]] = NO_ROW_COLUMNS,
 ) -> list[NavAutoCount]:
     """`nav` の全ての `auto` について、条件に当たる文書を数える。"""
     return [
@@ -84,7 +96,7 @@ def nav_auto_counts(
             path=path,
             tab=tab,
             filter=spec.get("filter"),
-            count=len(_select(documents, spec, fields=fields, today=today)),
+            count=len(_select(documents, spec, fields=fields, today=today, columns=columns)),
         )
         for path, tab, spec in _autos(nav)
     ]
@@ -129,15 +141,27 @@ def nav_warnings(
     today = today or datetime.now(UTC).astimezone().date()
     target = Target(source, source.root, None, None, "read")
     documents = store.load(target).documents
-    fields = known_fields(
-        store.row_schema(target, row.id) for row in source.config.documents if row.enabled
-    )
+    fields, columns = nav_fields(store, target, source)
     table_ids = [row.id for row in source.config.documents if row.enabled]
-    counts = nav_auto_counts(nav, documents, fields=fields, today=today)
+    counts = nav_auto_counts(nav, documents, fields=fields, today=today, columns=columns)
     return [
         *check_nav_filters(nav, table_ids=table_ids, fields=fields),
         *zero_count_warnings(counts),
     ]
+
+
+def nav_fields(
+    store: DocumentStore, target: Target, source: ServedSource
+) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+    """`nav` の条件の使える項目と、行の ID → その行の `metadata` を返す。"""
+    rows = [row for row in source.config.documents if row.enabled]
+    schemas = {row.id: store.row_schema(target, row.id) for row in rows}
+    fields = with_metadata_fields(
+        known_fields(schemas.values()),
+        # 型は行ごとに、その行のスキーマだけで作った使える項目から引く
+        ((row, known_fields([schemas[row.id]])) for row in rows),
+    )
+    return fields, {row.id: dict(row.metadata) for row in rows}
 
 
 def zero_count_warnings(counts: Sequence[NavAutoCount]) -> list[Violation]:
