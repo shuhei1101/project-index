@@ -810,7 +810,7 @@ scenarios:
         notes: 文書 1 の `related` が n1 を指す
       - name: project-index
         description: sample を配信している project-index
-        notes: '`worktree` にワークツリー x のパスを指定する。n1 の改名後の ID に n9、本文のファイルのパスに `n9.md` を指定する'
+        notes: '`worktree` にワークツリー x のパスを指定する。n1 の改名後の ID に n9、本文のファイルのパスに `notes/n9.md` を指定する'
     flow: |-
       <!-- map: {"title": "正常シナリオ（本文のファイルを持つ文書を改名する）"} -->
 
@@ -820,7 +820,7 @@ scenarios:
         participant M as 文書の MCP（/mcp）
         participant WT as ワークツリー x
 
-        A->>M: write_docs(operations: 改名・n1・expected_version・改名後の ID n9・本文のファイルのパス n9.md)
+        A->>M: write_docs(operations: 改名・n1・expected_version・改名後の ID n9・本文のファイルのパス notes/n9.md)
         M->>M: n1 を指す参照元を探し、書き換えた後の文書を検査する
         M->>WT: notes/index.yaml の要素の path を書き換え、notes/n1.md を notes/n9.md へ移し、文書 1 を書き換える
         M-->>A: 改名した文書と参照元の文書の id と書き込んだ後の version

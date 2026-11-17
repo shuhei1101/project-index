@@ -1206,7 +1206,7 @@ flows:
       - name: Mock
         description: なし
       - name: 本文のファイルを持つ行
-        description: '行 `files`（`paths: [notes/files.yaml]`・`records: files`・`body_file: path`、`metadata` に ID の列を持たない）。要素 1 件の `path` が `n1.md`'
+        description: '行 `files`（`paths: [notes/files.yaml]`・`records: files`・`body_file: path`、要素は ID の列の値を持たない）。要素 1 件の `path` が `n1.md`'
         notes: 文書の ID は本文のファイルのパス `notes/n1.md`。文書 1 の `related` が `notes/n1.md` を指す
       - name: 入力
         description: '1 回目は `rename`・`id: notes/n1.md`・`new_path: notes/sub/n9.md`。2 回目は別の文書に `new_id` だけを指定する'
@@ -1524,7 +1524,7 @@ request:
     default: なし（ID を変えない）
     location: argument
     description: 改名後の ID
-    constraints: '`ids.format` に合い、配信元の中で重複しない。種類の行の `metadata` が ID の列を持たない文書（ID がパスの文書）では受けない'
+    constraints: '`ids.format` に合い、配信元の中で重複しない。ID の列（種類の行の `metadata.id`。省くと `id`）の値を持たない文書（ID がパスの文書）では受けない'
     notes: '`rename` だけ。`new_id`・`new_path` の少なくとも 1 つを指定する'
   - name: operations[].new_path
     type: str
