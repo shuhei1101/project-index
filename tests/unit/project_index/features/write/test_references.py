@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from project_index.features.write.references import renamed_path, rewrite_references
+
 from project_index.features.write.types import ReferenceChange
 from project_index.shared.yaml_io import load_roundtrip
 
