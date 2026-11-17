@@ -856,6 +856,7 @@ CLONE_FILES = (
     "src",
     "content",
     "templates",
+    "schemas",
     "pyproject.toml",
     "uv.lock",
     ".python-version",
