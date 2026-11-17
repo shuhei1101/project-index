@@ -8,11 +8,16 @@ docs:
   - page: docs/guide/文書のMCP.md
     new: false
     change: 参照の型の項目のパスで、x-key の値に [ ] を含む要素を指す書き方を追記する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T15:20:03.860514+00:00'
 scope_out:
   - item: knowledge の共通の型 ref の pattern（schemas/design/common.schema.yaml）と、テンプレートに写した同じ pattern を、決めた書き方に追随させる
-    reason: 別のリポジトリの変更。この PR で決める書き方が決まらないと中身が決まらない。書き方が設計書の参照の型（{ID}#{項目のパス}）にも現れるかはインターフェース定義設計で決め、現れなければ none にする
+    reason: 別のリポジトリの変更。IF-6 の制約「参照の型の項目のパス」は設計書の参照の型（{ID}#{項目のパス}）と同じ書き方で、今の pattern（\[[^\]]*\]）は対応の取れた [ ] を含む値を断る。この PR の書き方がレビューで確定してから中身が決まる
     plan: to_file
   - item: dev-docs の変換の項目のパスの解釈（src/dev_docs/features/convert/markdown.py の ITEM_STEP）を、決めた書き方に追随させる
-    reason: 別のリポジトリの変更。この PR で決める書き方が決まらないと中身が決まらない。書き方が文書の参照（id:{ID}#{項目のパス}）にも現れるかはインターフェース定義設計で決め、現れなければ none にする
+    reason: 別のリポジトリの変更。文書の参照（id:{ID}#{項目のパス}）も同じ書き方で、今の ITEM_STEP は [...] の中の ] で値を切る。この PR の書き方がレビューで確定してから中身が決まる
+    plan: to_file
+  - item: ai-monitor のフェーズのスキーマ（schemas/phase.schema.yaml）の $defs.ref の pattern を、決めた書き方に追随させる
+    reason: 別のリポジトリの変更。knowledge の共通の型 ref と同じ pattern（\[[^\]]*\]）を持つ。この PR の書き方がレビューで確定してから中身が決まる
     plan: to_file

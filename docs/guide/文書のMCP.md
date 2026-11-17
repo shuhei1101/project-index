@@ -291,6 +291,7 @@ YAML として読めないファイルがあっても、そのファイルを除
 
 `text_edits[].field`・`add_to`・`remove_from` のキーと `unset` の要素は、`#` で始まる参照の型の項目のパス（`#functions[apply_migration].process`）も受け付けます。
 配列の要素を種類のスキーマの `x-key` の値で指し、同じ値の 2 つ目以降は `[{値}#{順番}]`、辞書のキーは `[{キー}]`（`.` や空白を含んでも 1 階層）で指します。
+`[...]` の中の対応の取れた `[` `]` は値の一部として扱い（`#request[operations[].fields].description`）、対応の取れないパスは `InvalidArgumentError` です。
 `#` で始まるパスは共通のキーへ読み替えません。
 `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指すと `InvalidArgumentError` です。
 `add_to`・`remove_from` の `#` で始まるキーは配列を作らず、配列でない項目を指すと `InvalidArgumentError` です。
