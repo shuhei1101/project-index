@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from project_index.integrations.git import GIT_ARCHIVE_TIMEOUT_SEC
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -80,3 +82,32 @@ def test_error_when_not_found(
     assert "unknown" in unknown.json()["detail"]
     assert no_ref.status_code == 404
     assert "no-such-branch" in no_ref.json()["detail"]
+
+
+def test_error_when_revision_export_times_out(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    commit_all: Callable[..., str],
+    run_git: Callable[..., str],
+    time_out_archive: Callable[..., list[str]],
+) -> None:
+    """親の commit の書き出しが上限を超えたとき、止めた処理と理由を返す（異常系）。"""
+    # 準備
+    source = _source(make_source, sample_file_set)
+    parent = run_git(source.folder, "rev-parse", "HEAD").strip()
+    commit_all(source.folder, {"docs/doc-3.yaml": "id: doc-3\nname: 文書 3\n"}, "docs: 追加")
+    time_out_archive(commits={parent})
+    env = make_server(source)
+    env.wait_background()
+    # 実行
+    response = env.client.get("/sources/sample/search", params={"q": "ページング", "ref": parent})
+    # 検証
+    body = response.json()
+    assert response.status_code == 504
+    assert body["title"] == "RevisionExportTimeoutError"
+    assert body["operation"] == "revision_export"
+    assert body["commit"] == parent
+    assert body["limitSec"] == GIT_ARCHIVE_TIMEOUT_SEC
+    assert "リビジョンの書き出し" in body["detail"]
+    assert f"{GIT_ARCHIVE_TIMEOUT_SEC:g} 秒" in body["detail"]

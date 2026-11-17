@@ -18,9 +18,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from project_index import main as main_module
+from project_index.features.history import snapshot as snapshot_module
 from project_index.features.settings.query import load_terminal_config
 from project_index.features.sources import registry as registry_module
 from project_index.features.sources.registry import SourceRegistry
+from project_index.integrations.git import GitError
 from project_index.main import Handlers, build_handlers, start_loading
 from project_index.server.app import build_app
 
@@ -30,6 +32,8 @@ if TYPE_CHECKING:
 LOCAL_BASE_URL = "http://127.0.0.1:8786"
 # 読み込みを止めた配信元の合図を待つ上限と、読み込みのスレッドの終わりを待つ上限
 LOADING_WAIT_SEC = 60
+# 裏の検査とリビジョンの書き出しが済むのを待つ上限
+BACKGROUND_WAIT_SEC = 30
 MCP_HEADERS = {
     "Accept": "application/json, text/event-stream",
     "Content-Type": "application/json",
@@ -135,6 +139,15 @@ class ServerEnv:
             _settings_text(self.root, self.state_dir, list(specs), self.settings_extra),
             encoding="utf-8",
         )
+
+    def wait_background(self) -> None:
+        """裏の検査とリビジョンの書き出しが済むまで待つ（上限を超えたら AssertionError）。"""
+        deadline = time.monotonic() + BACKGROUND_WAIT_SEC
+        while self.handlers.checks.checking or self.handlers.snapshots.exporting:
+            if time.monotonic() > deadline:
+                message = "裏の検査とリビジョンの書き出しが上限の時間までに済まなかった"
+                raise AssertionError(message)
+            time.sleep(0.05)
 
     def call(self, name: str, **arguments: Any) -> ToolResult:
         """`/mcp` のツールを HTTP で呼ぶ。"""
@@ -952,3 +965,34 @@ def wait_for_restart(started_count: Callable[[Path], int]) -> Callable[..., None
         raise AssertionError(message)
 
     return _wait
+
+
+@pytest.fixture
+def time_out_archive(monkeypatch: pytest.MonkeyPatch) -> Callable[..., list[str]]:
+    """リビジョンの書き出しの `git archive` を、待ち時間の上限を超えたときと同じ失敗にする関数を返す。
+
+    `commits` を渡すとその commit だけ、`times` を渡すと最初のその回数だけ失敗させる。
+    返す並びには、失敗させた commit を順に入れる。
+    """
+
+    def _patch(*, commits: set[str] | None = None, times: int | None = None) -> list[str]:
+        failed: list[str] = []
+        original = snapshot_module.run_git
+
+        def run(
+            args: list[str], *, cwd: Path, binary: bool = False, timeout: float | None = None
+        ) -> str | bytes:
+            # 書き出しの対象の commit で、失敗させる回数が残っているときだけ時間切れにする
+            if (
+                args[0] == "archive"
+                and (commits is None or args[-1] in commits)
+                and (times is None or len(failed) < times)
+            ):
+                failed.append(args[-1])
+                raise GitError(list(args), -9, "", timed_out=True)
+            return original(args, cwd=cwd, binary=binary, timeout=timeout)
+
+        monkeypatch.setattr(snapshot_module, "run_git", run)
+        return failed
+
+    return _patch

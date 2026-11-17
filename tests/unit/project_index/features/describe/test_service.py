@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -19,7 +20,7 @@ from project_index.features.documents.store import DocumentStore
 from project_index.features.history.snapshot import SnapshotStore
 from project_index.features.settings.types import SourceEntry, TerminalConfig
 from project_index.features.sources.types import DocumentTable, ServedSource, SourceConfig
-from project_index.main import build_handlers
+from project_index.main import Handlers, build_handlers
 from project_index.shared.errors import UnknownKindError, ValidationFailedError
 
 if TYPE_CHECKING:
@@ -202,6 +203,7 @@ def test_describe_when_warned(
     terminal = make_terminal_config(sources=[make_entry(str(config), source_id="sample")])
     handlers = build_handlers(terminal)
     handlers.reload_sources(terminal)
+    _wait_checked(handlers)
     # 実行
     result = describe(
         DescribeRequest(cwd=str(config.parent)),
@@ -395,3 +397,11 @@ def test_describe_when_refs_and_worktrees(
 def _no_warnings(*args: Any, **kwargs: Any) -> list[str]:
     """警告を集めない偽物。"""
     return []
+
+
+def _wait_checked(handlers: Handlers) -> None:
+    """裏の検査とリビジョンの書き出しが済むまで待つ（30 秒を超えたら AssertionError）。"""
+    deadline = time.monotonic() + 30
+    while handlers.checks.checking or handlers.snapshots.exporting:
+        assert time.monotonic() < deadline, "待ち時間の上限を超えた"
+        time.sleep(0.05)

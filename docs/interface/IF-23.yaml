@@ -80,6 +80,30 @@ flows:
       - 404 で、`missing` が `source`、`detail` に配信元 `unknown` がある
       - 配信していない配信元は `missing` が `not_served` で、`errors[]` に外した理由がある
     test: test_error_when_source_not_found
+  - name: 異常系（リビジョンの書き出しが上限を超える・504）
+    summary: '`schemas` を指して default_ref の commit の書き出しが上限を超えたとき、止めた処理と理由を返す'
+    setup:
+      - name: Mock
+        description: git の実行を、`archive` のときだけ待ち時間の上限を超えたときと同じ失敗（`GitError` の `timed_out`）を返すものに差し替える
+      - name: サンプルの配信元
+        description: git リポジトリの sample。状態のフォルダに書き出しが無い
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/config
+
+        C->>E: GET /sources/sample/config?schemas=true
+        E->>E: default_ref の commit の書き出しが上限を超えて止まる
+        E-->>C: 504 problem+json
+      ```
+    expected:
+      - 504 で、`title` が `RevisionExportTimeoutError`、`operation` が `revision_export`、`commit` が default_ref の commit、`limitSec` が `git archive` の待ち時間の上限
+      - '`detail` に、止めた処理がリビジョンの書き出しであることと上限の秒数がある'
+      - 状態のフォルダに書き出しの途中のフォルダが残らない
+    test: test_error_when_revision_export_times_out
+    refs:
+      - SC-11#scenarios[異常シナリオ（リビジョンの書き出しが上限を超える）]
 lead: 配信元の設定のうち画面が使用するキーを返却する読み取り API の入出力を定め、配信元の設定の取得を修正するときに参照する。
 identifier: get_source_config
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
@@ -87,6 +111,7 @@ idempotent: true
 side_effects: なし
 callers:
   - SC-11#scenarios[正常シナリオ]
+  - SC-11#scenarios[正常シナリオ（配信元を読み込んだ直後に開く）]
 exclusivity: 読み取りだけで排他しない
 request:
   - name: source
@@ -139,6 +164,9 @@ status_codes:
   - code: '404'
     condition: 配信元が無い・配信していない
     notes: '`missing`（`source`・`not_served`）と値、配信していない配信元は `errors[]` に外した理由'
+  - code: '504'
+    condition: '`schemas` を指したときに、リビジョンの書き出し（`git archive`）が待ち時間の上限を超えて止まった'
+    notes: '`title` が `RevisionExportTimeoutError`。`operation`（`revision_export`）・`commit`・`limitSec`'
 error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）
 constraints:
   - item: 返すキー

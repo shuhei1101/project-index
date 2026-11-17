@@ -25,6 +25,7 @@ scenarios:
         PI->>PI: スキーマで検証する
         PI->>CF: settings.yaml を書き換え、配信元を読み直す
         PI-->>DD: 保存した sources と、読み直した後の配信元の状態
+        PI->>PI: 裏で読み直した配信元を検査する
       ```
 
       <!-- /map -->
@@ -34,6 +35,7 @@ scenarios:
       - '`settings.yaml` の `sources` から extra の行が消え、sample の行の値は変わらない（設定ファイルが 1 つの `config` は文字列で記載される）'
       - extra のフォルダのファイルは変わらない
       - project-index を再起動せずに、読み取り API の extra の文書の取得が 404 を返却し、sample の文書の取得は応答する
+      - 保存の応答は、読み直した配信元の検査の終了を待たずに返却される（管理の MCP の `reload` と同じ）
     test: test_normal
   - name: 正常シナリオ（配信元を追加する）
     setup:
