@@ -1,0 +1,151 @@
+$ uv run pytest tests/unit/project_index/features/documents/test_fields.py
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/bug-write-ref-path-bracket-in-key
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 64 items
+
+tests/unit/project_index/features/documents/test_fields.py ............. [ 20%]
+.................................FFF...............                      [100%]
+
+=================================== FAILURES ===================================
+_____________ test_resolve_ref_path_when_nested_brackets[element] ______________
+
+path = 'request[operations[].fields].description'
+expected = ['request', 0, 'description']
+
+    @pytest.mark.parametrize(
+        ("path", "expected"),
+        [
+            pytest.param(
+                "request[operations[].fields].description",
+                ["request", 0, "description"],
+                id="element",
+            ),
+            pytest.param(
+                "request[operations[].fields#2].description",
+                ["request", 1, "description"],
+                id="order",
+            ),
+            pytest.param("notes[a[b]]", ["notes", "a[b]"], id="dict_key"),
+        ],
+    )
+    def test_resolve_ref_path_when_nested_brackets(path: str, expected: list[str | int]) -> None:
+        """対応の取れた `[` `]` を含む値で要素とキーを指す（正常系）。"""
+        # 準備
+        data = _nested_data()
+        # 実行
+>       result = resolve_ref_path(data, _NESTED_SCHEMA, path)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/documents/test_fields.py:560: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+data = {'request': [{'name': 'operations[].fields', 'description': 'x'}, {'name': 'operations[].fields', 'description': 'x'}], 'notes': {'a[b]': 'x'}}
+schema = {'type': 'object', 'properties': {'request': {'type': 'array', 'x-key': 'name', 'items': {'type': 'object', 'propertie...ring'}, 'description': {'type': 'string'}}}}, 'notes': {'type': 'object', 'additionalProperties': {'type': 'string'}}}}
+path = 'request[operations[].fields].description'
+
+    def resolve_ref_path(
+        data: Mapping[str, Any], schema: Mapping[str, Any], path: str
+    ) -> list[str | int]:
+        """参照の型の項目のパス（`#` の後）を、文書と種類のスキーマでキーと位置の並びに解く。"""
+        if REF_PATH_PATTERN.fullmatch(path) is None:
+>           raise _invalid(path, f"項目のパス {path} の記載方法が誤っています（{REF_PATH_EXAMPLE}）")
+E           project_index.shared.errors.InvalidArgumentError: 項目のパス request[operations[].fields].description の記載方法が誤っています（例 `#functions[save].process`・`#functions[save#2].process`・`#notes[main.py の補足]`）
+
+src/project_index/features/documents/fields.py:285: InvalidArgumentError
+______________ test_resolve_ref_path_when_nested_brackets[order] _______________
+
+path = 'request[operations[].fields#2].description'
+expected = ['request', 1, 'description']
+
+    @pytest.mark.parametrize(
+        ("path", "expected"),
+        [
+            pytest.param(
+                "request[operations[].fields].description",
+                ["request", 0, "description"],
+                id="element",
+            ),
+            pytest.param(
+                "request[operations[].fields#2].description",
+                ["request", 1, "description"],
+                id="order",
+            ),
+            pytest.param("notes[a[b]]", ["notes", "a[b]"], id="dict_key"),
+        ],
+    )
+    def test_resolve_ref_path_when_nested_brackets(path: str, expected: list[str | int]) -> None:
+        """対応の取れた `[` `]` を含む値で要素とキーを指す（正常系）。"""
+        # 準備
+        data = _nested_data()
+        # 実行
+>       result = resolve_ref_path(data, _NESTED_SCHEMA, path)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/documents/test_fields.py:560: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+data = {'request': [{'name': 'operations[].fields', 'description': 'x'}, {'name': 'operations[].fields', 'description': 'x'}], 'notes': {'a[b]': 'x'}}
+schema = {'type': 'object', 'properties': {'request': {'type': 'array', 'x-key': 'name', 'items': {'type': 'object', 'propertie...ring'}, 'description': {'type': 'string'}}}}, 'notes': {'type': 'object', 'additionalProperties': {'type': 'string'}}}}
+path = 'request[operations[].fields#2].description'
+
+    def resolve_ref_path(
+        data: Mapping[str, Any], schema: Mapping[str, Any], path: str
+    ) -> list[str | int]:
+        """参照の型の項目のパス（`#` の後）を、文書と種類のスキーマでキーと位置の並びに解く。"""
+        if REF_PATH_PATTERN.fullmatch(path) is None:
+>           raise _invalid(path, f"項目のパス {path} の記載方法が誤っています（{REF_PATH_EXAMPLE}）")
+E           project_index.shared.errors.InvalidArgumentError: 項目のパス request[operations[].fields#2].description の記載方法が誤っています（例 `#functions[save].process`・`#functions[save#2].process`・`#notes[main.py の補足]`）
+
+src/project_index/features/documents/fields.py:285: InvalidArgumentError
+_____________ test_resolve_ref_path_when_nested_brackets[dict_key] _____________
+
+path = 'notes[a[b]]', expected = ['notes', 'a[b]']
+
+    @pytest.mark.parametrize(
+        ("path", "expected"),
+        [
+            pytest.param(
+                "request[operations[].fields].description",
+                ["request", 0, "description"],
+                id="element",
+            ),
+            pytest.param(
+                "request[operations[].fields#2].description",
+                ["request", 1, "description"],
+                id="order",
+            ),
+            pytest.param("notes[a[b]]", ["notes", "a[b]"], id="dict_key"),
+        ],
+    )
+    def test_resolve_ref_path_when_nested_brackets(path: str, expected: list[str | int]) -> None:
+        """対応の取れた `[` `]` を含む値で要素とキーを指す（正常系）。"""
+        # 準備
+        data = _nested_data()
+        # 実行
+>       result = resolve_ref_path(data, _NESTED_SCHEMA, path)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/documents/test_fields.py:560: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+data = {'request': [{'name': 'operations[].fields', 'description': 'x'}, {'name': 'operations[].fields', 'description': 'x'}], 'notes': {'a[b]': 'x'}}
+schema = {'type': 'object', 'properties': {'request': {'type': 'array', 'x-key': 'name', 'items': {'type': 'object', 'propertie...ring'}, 'description': {'type': 'string'}}}}, 'notes': {'type': 'object', 'additionalProperties': {'type': 'string'}}}}
+path = 'notes[a[b]]'
+
+    def resolve_ref_path(
+        data: Mapping[str, Any], schema: Mapping[str, Any], path: str
+    ) -> list[str | int]:
+        """参照の型の項目のパス（`#` の後）を、文書と種類のスキーマでキーと位置の並びに解く。"""
+        if REF_PATH_PATTERN.fullmatch(path) is None:
+>           raise _invalid(path, f"項目のパス {path} の記載方法が誤っています（{REF_PATH_EXAMPLE}）")
+E           project_index.shared.errors.InvalidArgumentError: 項目のパス notes[a[b]] の記載方法が誤っています（例 `#functions[save].process`・`#functions[save#2].process`・`#notes[main.py の補足]`）
+
+src/project_index/features/documents/fields.py:285: InvalidArgumentError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_resolve_ref_path_when_nested_brackets[element]
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_resolve_ref_path_when_nested_brackets[order]
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_resolve_ref_path_when_nested_brackets[dict_key]
+========================= 3 failed, 61 passed in 0.07s =========================
