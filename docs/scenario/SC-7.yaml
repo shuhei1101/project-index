@@ -752,6 +752,7 @@ scenarios:
       - '次の `search_docs` が `doc-9` を返却し、`doc-2` を返却しない。`trace_related` で `doc-9` から `direction: in` でたどると文書 1 を返却する'
       - '`dry_run: true` の結果の書き換わる箇所に、n1 の本文のファイル `notes/n1.md` の 2 か所（`id:` のリンク・相対パスのリンク）が入る'
       - 改名の後、`notes/n1.md` の `id:` のリンクが `id:doc-9#items[a]`、相対パスのリンクが `../docs/doc-9.yaml` を指し、リンクの外の `doc-2` とほかの行は変わらない。`notes/index.yaml` の n1 の要素は変わらない
+      - 応答の参照元の文書に、本文のファイルだけが変わった n1 と、書き込んだ後の n1 の version（書き込み前と違う）が入る
     test: test_normal_when_rename
   - name: 異常シナリオ（改名先の ID が既にある）
     setup:
@@ -789,8 +790,8 @@ scenarios:
         description: sample を配信している project-index
         notes: '`worktree` にワークツリー x のパスを指定する。絞り込みの条件はタグ `topic:a`'
       - name: 単語を持つ本文のファイル
-        description: 行 `notes` の要素 n1 の本文のファイル `notes/n1.md` が `旧語` を持つ
-        notes: n1 はタグ `topic:a` を持つ
+        description: 行 `notes` の要素 n1 の本文のファイル `notes/n1.md` が `旧語` を 2 か所持ち、要素 n2 の本文のファイル `notes/n2.md` も `旧語` を持つ
+        notes: n1 はタグ `topic:a` を持ち、n1 の要素の YAML は `旧語` を持たない。n2 は `topic:a` を持たない
     flow: |-
       <!-- map: {"title": "正常シナリオ（複数の文書の単語を一括で置換する）"} -->
 
@@ -813,10 +814,10 @@ scenarios:
     expected:
       - '`dry_run: true` の結果が、文書 1・文書 2 の置換の件数を返却し、`applied` が `false` で、ワークツリー x のファイルは変わらない'
       - 置換した後、文書 1・文書 2 の最上位の項目・配列の要素の中・辞書の値の `旧語` が全て `新語` になり、ほかの文字列とキーの名前は変わらない
-      - 条件に該当しない文書 3 は変わらない
       - 変更していない項目のコメント・順序・引用符の種類が書き込みの前と同じ
-      - '`dry_run: true` の文書ごとの置換の件数に、n1 の本文のファイルの件数が入る'
       - 置換した後、`notes/n1.md` の `旧語` が全て `新語` になり、ほかの文字列は変わらない
+      - 条件に該当しない文書 3 と `notes/n2.md` は変わらない
+      - '`dry_run: true` の文書ごとの置換の件数で、n1 の件数が 2（本文のファイルの 2 か所）になり、n2 の行は無い'
     test: test_normal_when_replace_words
   - name: 異常シナリオ（一括置換の後の文書が検査に合格しない）
     setup:
