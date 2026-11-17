@@ -21,6 +21,7 @@ diagrams:
         文書の検査 ..> 違反 : 返す
         文書の検査 ..> 変えたMarkdownの値
         文書の検査 ..> Markdownの値の点検
+        文書の検査 ..> 値のハッシュ : 読み取りのキー
         class 文書の検査 {
           <<class>>
         }
@@ -48,6 +49,9 @@ diagrams:
         class Markdownの値の点検 {
           <<function>>
         }
+        class 値のハッシュ {
+          <<function>>
+        }
         click スキーマの検査 href "id:MOD-73#functions[check_schema]"
         click IDの形の検査 href "id:MOD-73#functions[check_id_format]"
         click 関連の種類の検査 href "id:MOD-73#functions[check_related]"
@@ -56,6 +60,7 @@ diagrams:
         click 違反 href "id:MOD-98#data_models[Violation]"
         click 変えたMarkdownの値 href "id:MOD-72#functions[changed_markdown]"
         click Markdownの値の点検 href "id:MOD-72#functions[check_markdown_values]"
+        click 値のハッシュ href "id:MOD-100#functions[value_hash]"
 classes:
   - name: DocumentChecker
     title: 文書の検査
@@ -64,7 +69,7 @@ classes:
     role: サービス
     summary: 1 件の文書に全ての検査を通し、違反をまとめて返す
     description: |-
-      読み取りの `validators[]` の結果は (配信元, 種類, 検査の ID, 文書のバージョン) でキャッシュし、同じ内容でスクリプトを動かし直さない。
+      読み取りの `validators[]` の結果は (配信元, 種類, 検査の ID, 文書のバージョン, 検査の行の定義, スクリプトの状態, 参照する場所) でキャッシュし、同じ内容でスクリプトを動かし直さない。
       書き込みの検査はキャッシュせず、毎回動かす。
     kind: クラス
     properties:
@@ -80,9 +85,9 @@ classes:
         description: 端末の設定の `script_timeout_sec`
       - name: _read_cache
         title: 読み取りの結果
-        type: OrderedDict[tuple[str, str, str, str], list[Violation]]
+        type: OrderedDict[tuple[str, str, str, str, str, str, str], list[Violation]]
         access: 内部 (_)
-        description: 上限は `VALIDATOR_ON_READ_CACHE`
+        description: キーは `_read_key` で作る。上限は `VALIDATOR_ON_READ_CACHE`
       - name: _lock
         title: 排他
         type: threading.Lock
@@ -137,7 +142,7 @@ classes:
           2. `new` なら『IDの形の検査』を通す
           3. 『関連の種類の検査』をメタデータに通す
           4. 行の `validators` の ID ごとに `source.script("validators", id)` を引き、`on` が行の `on` にあるものだけを通す
-             - `on` が `read` の場合、`_read_cache` にキャッシュがあればそれを使う
+             - `on` が `read` の場合、`_read_key` で作ったキーで `_read_cache` にキャッシュがあればそれを使う
              - `deadline` がある場合、動かす前に『期限』.期限の確認を呼ぶ（過ぎていれば `WriteDeadlineExceededError` が伝わる）
              - スクリプトの実行の『スクリプトの実行』を `cwd=target.config_base`（設定ファイルのフォルダ）・`stdin`（`body`）・制限時間（`deadline` があれば『期限』.制限時間の切り詰めに `timeout_sec` を渡した値、無ければ `timeout_sec`）・`at` で呼び（`at` は `target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`））、『検査の出力の解釈』で違反にする
              - `ScriptError` の場合、`path` が `$`、`rule` が `{id}: 検査を実行できませんでした（{メッセージ}）` の違反にする（キャッシュしない）
@@ -199,6 +204,30 @@ classes:
             condition: '`timeout_sec=1`、残りの時間が 30 秒の `deadline`。スクリプトの実行が時計を 1 秒進めて `ScriptTimeoutError("制限時間（1 秒）を超えたため、スクリプトを止めました。")` を送る'
             mock: スクリプトの実行（送る偽物）・時計（偽物）
             expected: '違反 1 件、`rule` が `{id}: 検査を実行できませんでした（制限時間（1 秒）を超えたため、スクリプトを止めました。）`'
+          - name: test_document_checker_check_when_validator_entry_changed
+            case: 正常
+            summary: 検査の行を変えると動かし直す
+            condition: 同じ文書を `on="read"` で、`check` の `run` だけが違う 2 つの配信元の設定の読み書きの場所で 1 回ずつ、続けて 1 つ目の場所でもう 1 回
+            mock: '`run_script`（呼ばれた数を数える）'
+            expected: '`run_script` が 2 回呼ばれる（3 回目は 1 回目のキャッシュを使う）'
+          - name: test_document_checker_check_when_script_file_changed
+            case: 正常
+            summary: ワークツリーのスクリプトを書き換えると動かし直す
+            condition: ワークツリーを指す読み書きの場所で同じ文書を `on="read"` で 2 回呼び、続けて `run` が指すスクリプトのファイルを書き換えて 1 回、さらに同じフォルダのほかのファイルを書き換えて 1 回
+            mock: '`run_script`（呼ばれた数を数える）'
+            expected: '`run_script` が 3 回呼ばれる（2 回目だけキャッシュを使う）'
+          - name: test_document_checker_check_when_worktree_and_main_clone
+            case: 正常
+            summary: ワークツリーとクローン本体のキャッシュを分ける
+            condition: 行・スクリプト・文書が同じで、`worktree` があるものと無いもの（`config_commit` あり）の 2 つの読み書きの場所で `on="read"` を 1 回ずつ
+            mock: '`run_script`（呼ばれた数を数える）'
+            expected: '`run_script` が 2 回呼ばれる'
+          - name: test_document_checker_check_when_config_commit_changed
+            case: 正常
+            summary: クローン本体のスクリプトを取り出す commit が進むと動かし直す
+            condition: クローン本体を指す読み書きの場所で `config_commit` を `a` にして `on="read"` を 2 回、`b` に変えて 1 回
+            mock: '`run_script`（呼ばれた数を数える）'
+            expected: '`run_script` が 2 回呼ばれる'
         exceptions:
           - name: WriteDeadlineExceededError
             condition: '`deadline` があり、検査のスクリプトを動かす前か動かした後に期限を過ぎている'
@@ -274,6 +303,44 @@ classes:
           type: None
           description: '-'
         process: 1. `_read_cache` を空にする（起動の『配信元の再読み込み』が呼ぶ）
+      - name: _read_key
+        title: 読み取りのキーを作る
+        summary: 読み取りの `validators[]` の結果をキャッシュするキーを作る
+        kind: メソッド
+        scope: internal
+        thread_safe: true
+        side_effects: ワークツリー・Git の管理外では、スクリプトのフォルダのファイルの `stat` を取る
+        args:
+          - name: target
+            title: 読み書きの場所
+            type: Target
+            required: true
+            passing: positional
+            description: スクリプトを動かす場所
+          - name: document
+            title: 文書
+            type: Document
+            required: true
+            passing: positional
+            description: 検査する文書
+          - name: entry
+            title: 検査の行
+            type: ScriptEntry
+            required: true
+            passing: positional
+            description: '`source.script("validators", id)` で引いた行'
+        returns:
+          type: tuple[str, str, str, str, str, str, str]
+          description: (配信元の ID, 種類, 検査の ID, 文書のバージョン, 検査の行の定義のハッシュ, スクリプトの状態, 参照する場所)
+        process: |-
+          1. 検査の行の定義のハッシュを、行の全ての項目（`id`・`run`・`on`・`cache`）から『値のハッシュ』で作る
+          2. スクリプトの状態を作る
+             - `script_at(target)` が commit を返す場合（クローン本体で `config_commit` がある）、その commit の SHA にする（スクリプトはその commit から取り出して動かす）
+             - それ以外（ワークツリー・`config_commit` の無い配信元）の場合、`run` の要素のうち `-` で始まらない相対パスで、`target.config_base` から解いてファイルがあるものごとに、そのファイルのフォルダの直下のファイルの (`config_base` からの相対パス, `st_mtime_ns`, `st_size`) をパスの順に並べ、『値のハッシュ』で作る。該当するファイルが無ければ空の文字列
+          3. 参照する場所を、`target.worktree` があればその絶対パス、無ければ空の文字列にする
+          4. (配信元の ID, 種類, 検査の ID, 文書のバージョン, 行の定義のハッシュ, スクリプトの状態, 参照する場所) を返す
+        notes:
+          フォルダの直下のファイルを見る理由: スクリプトの実行（`run_script` の `at`）は `run` の要素のファイルのフォルダごと取り出して動かすため、同じフォルダから import するファイルの書き換えでも結果が変わる。
 constants:
   - name: VALIDATOR_ON_READ_CACHE
     title: 読み取りの検査の結果の数
