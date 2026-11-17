@@ -58,7 +58,7 @@ scenarios:
         A->>M: write_docs(operations: update 文書 1・読んだときの expected_version)
         M->>WT: 今の文書 1 を読む
         M->>M: 今のバージョンと expected_version が違う
-        M-->>A: エラー（今のバージョンと差分、再読み込みして呼び直すこと）
+        M-->>A: エラー（今のバージョンと差分、search_docs で再取得して呼び直すこと）
         A->>M: search_docs(filter: id が文書 1, view: full)
         M-->>A: 直接編集した内容と今の version
         A->>M: write_docs(operations: update 文書 1・今の expected_version)
@@ -67,9 +67,9 @@ scenarios:
 
       <!-- /map -->
     expected:
-      - '1 回目の `write_docs` が `isError: true` で、今のバージョン・読んだときとの差分・再読み込みして呼び直すことを返す'
+      - '1 回目の `write_docs` が `isError: true` で、今のバージョン・読んだときとの差分・`search_docs` で再取得して呼び直すことを返す'
       - 1 回目の後、文書 1 の YAML は直接編集した内容のまま
-      - 再読み込みした `version` での `write_docs` は書き込め、直接編集した内容のうち `set` しなかった項目が残る
+      - 再取得した `version` での `write_docs` は書き込め、直接編集した内容のうち `set` しなかった項目が残る
       - '`delete_docs` も読んだときの `expected_version` では同じエラーを返し、消さない'
     test: test_error_when_version_mismatch
   - name: 異常シナリオ（YAML を壊した）

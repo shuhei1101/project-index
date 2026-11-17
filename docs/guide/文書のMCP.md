@@ -473,7 +473,7 @@ Git 管理外の配信元と `storage.type: disk` の配信元では、種類の
 | RefNotFoundError | `ref`・`from`・`to` を commit に解決できない | 解決できなかった値 |
 | UnknownKindError | `kind` が配信元の種類に無い | その配信元の種類の一覧 |
 | DocumentNotFoundError | 指した ID の文書が無い | 見つからなかった ID と、近い ID の候補 |
-| VersionMismatchError | `expected_version` が今のバージョンと違う | 今のバージョンと差分、再読み込みして呼び直すこと |
+| VersionMismatchError | `expected_version` が今のバージョンと違う | 今のバージョンと差分、`search_docs` で再取得して呼び直すこと |
 | ValidationFailedError | 変更を当てた後の文書がスキーマか `validators[]` に通らない、または種類のスキーマの `$ref` を解決できない（`atomic: true`） | 違反ごとの添字・パス・決まり・直し方。スキーマの違反には、違反した項目のスキーマの `title`・`description`・`x-rules`・`examples`・`x-bad-examples` のうちスキーマが持つもの |
 | DocumentReferencedError | `on_referenced: fail` で、消す文書が他の文書の `related` から参照されている | 参照元の ID と `on_referenced: unlink` |
 | DeleteNotAllowedError | Git 管理外の配信元か `storage.type: disk` の配信元で、種類の `documents[].writable` が削除を許していない | 種類の ID と `documents[].writable` のパス |
