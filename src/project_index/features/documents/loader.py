@@ -256,11 +256,13 @@ def unindexed_files(
     files: Sequence[str] | None = None,
     others: Sequence[DocumentTable] = (),
     nested_dirs: Collection[str] = (),
+    ignored: Collection[str] = (),
 ) -> list[str]:
     """管理用の YAML のフォルダの配下で、どの行も指していないファイルを `root` からのパスで返す。
 
     行の `exclude` に当たるファイルと、除外の条件に当たるファイルと、`others` のどれかの行の文書になるファイルと、
-    `nested_dirs`（より深いフォルダの管理用の YAML のフォルダ）の配下のファイルは数えない。
+    `nested_dirs`（より深いフォルダの管理用の YAML のフォルダ）の配下のファイルと、
+    `ignored`（Git が無視するパス。`/` で終わる値はフォルダ）に当たるファイルは数えない。
     `files` は呼び出し元が `walk_files(root)` でたどったパスで、渡されたらフォルダをたどらない。
     """
     start = posixpath.dirname(index_path) or "."
@@ -276,6 +278,9 @@ def unindexed_files(
         candidates = [path for path in files if path.startswith(prefix)]
     excluded = {index_path, *body_paths}
     nested_prefixes = tuple(f"{folder}/" for folder in nested_dirs)
+    # Git が無視するパス: `/` で終わる値はフォルダの配下、それ以外は同じパスに当てる
+    ignored_prefixes = tuple(path for path in ignored if path.endswith("/"))
+    ignored_files = {path for path in ignored if not path.endswith("/")}
     return sorted(
         path
         for path in candidates
@@ -286,4 +291,7 @@ def unindexed_files(
         and not any(other.matches(path) for other in others)
         # より深いフォルダの管理用の YAML の範囲は、その管理用の YAML の側で数える
         and not path.startswith(nested_prefixes)
+        # Git の配信元で Git が無視するファイルは、配信できないため記載しない
+        and path not in ignored_files
+        and not path.startswith(ignored_prefixes)
     )
