@@ -46,3 +46,6 @@ scope_out:
   - item: alias-inject の側で project-index の端末の設定の sources[] を読み、repositories を別に持たない変更
     reason: alias-inject のリポジトリの変更で、setup での突き合わせ（#108 の案 A）で終わりの条件を満たすため要らない
     plan: none
+  - item: src/files.yaml・tests/files.yaml に shared/deadline.py・test_deadline.py の行が無い
+    reason: '公開ドキュメント『配信元を配信する』の「範囲のファイルを作ったときは管理用の YAML の行を修正する」から外れている #82 のファイルで、今回の要望に含まれない'
+    plan: '#119'
