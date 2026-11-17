@@ -262,9 +262,9 @@ functions:
          - `add` は、`item` が無ければタブの並びの末尾に `value` のタブ、あれば指した group の `items` の末尾に `value` の項目を加える。同じ名前のタブ・group があれば `InvalidArgumentError`
          - `update` は指したタブか group に `value` のキーだけを重ね、`remove` は指したタブか group を除く
          - 指したタブ・group が無い、`item` が `group` でない項目に当たる、`add`・`update` で `value` が無い場合、今のタブ・group の名前を添えた `InvalidArgumentError` を送る（`path` は `operations[{n}]`）
-      4. 書いた後の `nav` を検証する。`nav` を置き換えた設定で `SOURCE_SCHEMA` の `nav` の下の違反と、`root` の配信元を組み立てて（`assemble_source`。`lookup` はサーバーの端末の設定から作った引き当て）集めた文書と、有効な文書の行ごとの文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）から作った使える項目に行の metadata の項目（有効な行と、その行のスキーマだけで作った使える項目の組を指定する）で有効な行の `metadata` のキーを加えた項目での nav の条件の確かめの違反があれば、`NavInvalidError` を送り、ファイルを書き換えない
+      4. 書いた後の `nav` を検証する。`nav` を置き換えた設定で `SOURCE_SCHEMA` の `nav` の下の違反と、`root` の配信元を組み立てて（`assemble_source`。`lookup` はサーバーの端末の設定から作った引き当て）集めた文書と、nav の条件の項目（読み取り API）で作った使える項目での nav の条件の確かめの違反があれば、`NavInvalidError` を送り、ファイルを書き換えない
       5. 往復編集の `nav` のキーだけを置き換えて書く（`dump_roundtrip`・`replace_file`。`dump_roundtrip` の `original` は手順 1 で読んだ設定のファイルの文字列）
-      6. nav の条件の数えを 4 の文書と項目（`columns` は有効な行の ID → その行の `metadata`）で求め、`count` が 0 の `auto` を nav の警告と同じ文の `warnings` にする
+      6. nav の条件の数えを 4 の文書と、nav の条件の項目の項目・行の ID → `metadata`（`columns`）で求め、`count` が 0 の `auto` を nav の警告と同じ文の `warnings` にする
       7. `WriteNavResult` を返す（`nav` は書いた `nav` を YAML にした文字列）
     exceptions:
       - name: ConfigNotFoundError

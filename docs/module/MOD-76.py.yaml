@@ -18,8 +18,9 @@ diagrams:
         画面の構成の書き込み ..> nav の条件の確かめ
         配信元の検査のキャッシュ ..> nav の警告
         nav の警告 ..> nav の条件の数え
-        nav の警告 ..> 行の metadata の項目
-        画面の構成の書き込み ..> 行の metadata の項目
+        nav の警告 ..> nav の条件の項目
+        画面の構成の書き込み ..> nav の条件の項目
+        nav の条件の項目 ..> 行の metadata の項目
         class 画面の構成の書き込み {
           <<function>>
         }
@@ -33,6 +34,9 @@ diagrams:
           <<function>>
         }
         class nav の警告 {
+          <<function>>
+        }
+        class nav の条件の項目 {
           <<function>>
         }
         class 行の metadata の項目 {
@@ -181,7 +185,7 @@ functions:
       description: 警告。`nav` が無い配信元は空
     process: |-
       1. `source.config.nav` が無ければ空を返す
-      2. `Target(source, source.root, None, None, "read")` で文書を集め（文書のストア.文書を集める）、有効な文書の行ごとの文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）から使える項目（検索）を作り、行の metadata の項目（検索。有効な行と、その行のスキーマだけで作った使える項目の組を指定する）で有効な行の `metadata` のキーを加える
+      2. `Target(source, source.root, None, None, "read")` で文書を集め（文書のストア.文書を集める）、有効な文書の行ごとの文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）から使える項目と行の ID → `metadata` を nav の条件の項目で作る
       3. nav の条件の確かめの違反を加える
       4. nav の条件の数え（`columns` は有効な行の ID → その行の `metadata`）で `count` が 0 の `auto` ごとに、`path` を `{auto のパス}.filter`（`filter` が無ければ `auto` のパス）、`rule` を `{タブの名前}: 条件 {filter を JSON にした文字列} に該当する文書がありません` にした警告を加える
       5. 警告を返す
@@ -214,6 +218,42 @@ functions:
         mock: なし（一時フォルダの配信元）
         expected: 空（知らない項目の違反も、該当する文書が無い警告も出ない）
         exception: '-'
+  - name: nav_fields
+    title: nav の条件の項目
+    kind: 関数
+    container: project_index/features/read/nav.py
+    usecase: 画面の構成の書き込み
+    role: 読み取り
+    summary: '`nav` の条件の使える項目（行の `metadata` のキーを加えたもの）と、行の ID → その行の `metadata` を作る'
+    description: nav の警告と画面の構成の書き込みが同じ条件を受け付けるように、両方がこの関数で項目を作る。
+    scope: public
+    thread_safe: true
+    args:
+      - name: store
+        title: 文書のストア
+        type: DocumentStore
+        required: true
+        passing: injected
+        description: 文書に当てるスキーマを読む
+      - name: target
+        title: 読む先
+        type: Target
+        required: true
+        passing: positional
+        description: 文書を集めたのと同じ読む先
+      - name: source
+        title: 配信中の配信元
+        type: ServedSource
+        required: true
+        passing: positional
+        description: 項目を作る配信元
+    returns:
+      type: tuple[dict[str, str], dict[str, dict[str, str]]]
+      description: 使える項目と、有効な行の ID → その行の `metadata`
+    process: |-
+      1. 有効な文書の行ごとに、文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）を読む
+      2. 全ての行のスキーマから使える項目（検索）を作り、行の metadata の項目（検索。行と、その行のスキーマだけで作った使える項目の組を指定する）で行の `metadata` のキーを加える
+      3. 使える項目と、行の ID → その行の `metadata` を返却する
 notes:
   決まり: タブとサイドバーの組み立ては dev-docs の画面のサーバーが持つ。
 visibility: internal
