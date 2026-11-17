@@ -129,7 +129,9 @@ def test_find_skew() -> None:
             description="タスクの保存と取得を受け持ち、保存先や検索の条件を変えるときを参照する",
             tags=("topic:doc",),
         ),
-        MetadataRow(path="c.md", description="画面の部品の並びを定める", tags=("topic:doc", "topic:x")),
+        MetadataRow(
+            path="c.md", description="画面の部品の並びを定める", tags=("topic:doc", "topic:x")
+        ),
         MetadataRow(path="d.md", description="設定の読み込みを受け持つ", tags=("topic:doc",)),
         MetadataRow(path="e.md", description="ログの出し方を定める", tags=("topic:doc",)),
         MetadataRow(path="f.md", description="起動の手順を並べる", tags=("topic:doc",)),

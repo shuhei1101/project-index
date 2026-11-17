@@ -1282,9 +1282,7 @@ def test_run_skew(
     assert output["dominant_tags"] == []
 
 
-def test_run_skew_when_input_not_found(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_run_skew_when_input_not_found(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """管理用の YAML が無い（異常系）。"""
     # 準備
     missing = "missing/files.yaml"
