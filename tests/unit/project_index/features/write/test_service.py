@@ -1091,28 +1091,19 @@ def test_write_docs_when_rename(make_env: Callable[..., WriteEnv]) -> None:
 
 
 @pytest.mark.parametrize(
-    ("operation", "error"),
+    ("changes", "error"),
     [
-        pytest.param(
-            Operation(op="rename", id="doc-2", expected_version=content_hash(DOC_2)),
-            InvalidArgumentError,
-            id="no_new_id_and_path",
-        ),
-        pytest.param(
-            Operation(
-                op="rename", id="doc-2", expected_version=content_hash(DOC_2), new_id="doc-1"
-            ),
-            ValidationFailedError,
-            id="id_exists",
-        ),
+        pytest.param({}, InvalidArgumentError, id="no_new_id_and_path"),
+        pytest.param({"new_id": "doc-1"}, ValidationFailedError, id="id_exists"),
     ],
 )
 def test_write_docs_when_rename_invalid(
-    make_env: Callable[..., WriteEnv], operation: Operation, error: type[Exception]
+    make_env: Callable[..., WriteEnv], changes: dict[str, str], error: type[Exception]
 ) -> None:
     """改名の引数の誤り（異常系）。"""
     # 準備
     env = make_env()
+    operation = Operation(op="rename", id="doc-2", expected_version=content_hash(DOC_2), **changes)
     # 実行・検証
     with pytest.raises(error):
         env.write(operations=[operation])
