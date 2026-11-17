@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -18,7 +19,7 @@ from project_index.features.sources.types import (
 from project_index.features.validation import service as service_module
 from project_index.features.validation.markdown import MarkdownCheck
 from project_index.features.validation.service import DocumentChecker
-from project_index.integrations.scripts import ScriptTimeoutError
+from project_index.integrations.scripts import ScriptResult, ScriptTimeoutError
 from project_index.shared.deadline import Deadline
 from project_index.shared.errors import WriteDeadlineExceededError
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
@@ -351,3 +352,162 @@ def test_document_checker_check_when_script_timed_out(
         result[0].rule
         == "v: 検査を実行できませんでした（制限時間（1 秒）を超えたため、スクリプトを止めました。）"
     )
+
+
+def _count_runs(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+    """スクリプトの実行を、呼ばれた `run` を記録して違反なしを返す偽物にする。"""
+    calls: list[list[str]] = []
+
+    def counting(run: Any, **kwargs: Any) -> ScriptResult:
+        calls.append(list(run))
+        return ScriptResult(stdout="[]", stderr="")
+
+    monkeypatch.setattr(service_module, "run_script", counting)
+    return calls
+
+
+def _read_source(
+    root: Path,
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    run: list[str],
+    **overrides: Any,
+) -> ServedSource:
+    """`on: [read]` の検査 `check` を行 `rules` に持つ配信中の配信元を作る。"""
+    table = DocumentTable(
+        id="rules",
+        paths=["rules/*.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        validators=["check"],
+    )
+    config = make_source_config(
+        documents=[table], validators=[ScriptEntry(id="check", run=run, on=["read"])]
+    )
+    return make_served_source(root=root, config=config, **overrides)
+
+
+def test_document_checker_check_when_validator_entry_changed(
+    tmp_path: Path,
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """検査の行を変えると動かし直す（正常系）。"""
+    # 準備
+    calls = _count_runs(monkeypatch)
+    root = tmp_path / "ws"
+    root.mkdir()
+    first = make_target(
+        _read_source(root, make_source_config, make_served_source, ["python3", "a.py"])
+    )
+    second = make_target(
+        _read_source(root, make_source_config, make_served_source, ["python3", "b.py"])
+    )
+    checker = _checker({})
+    document = make_document()
+    # 実行
+    checker.check(first, document, on="read")
+    checker.check(second, document, on="read")
+    checker.check(first, document, on="read")
+    # 検証
+    assert calls == [["python3", "a.py"], ["python3", "b.py"]]
+
+
+def test_document_checker_check_when_script_file_changed(
+    tmp_path: Path,
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ワークツリーのスクリプトを書き換えると動かし直す（正常系）。"""
+    # 準備
+    calls = _count_runs(monkeypatch)
+    root = tmp_path / "ws"
+    script = root / "scripts" / "check.py"
+    helper = root / "scripts" / "lib" / "util.py"
+    helper.parent.mkdir(parents=True)
+    script.write_text("a\n", encoding="utf-8")
+    helper.write_text("x\n", encoding="utf-8")
+    source = _read_source(
+        root, make_source_config, make_served_source, ["python3", "scripts/check.py"]
+    )
+    target = make_target(source, worktree=root)
+    checker = _checker({})
+    document = make_document()
+    # 実行
+    checker.check(target, document, on="read")
+    checker.check(target, document, on="read")
+    # 書き換えは大きさを変え、更新時刻の粒度によらず状態が変わるようにする
+    script.write_text("aa\n", encoding="utf-8")
+    checker.check(target, document, on="read")
+    helper.write_text("xx\n", encoding="utf-8")
+    checker.check(target, document, on="read")
+    cache = root / "scripts" / "__pycache__" / "check.cpython.pyc"
+    cache.parent.mkdir()
+    cache.write_bytes(b"pyc")
+    checker.check(target, document, on="read")
+    # 検証
+    assert len(calls) == 3
+
+
+def test_document_checker_check_when_worktree_and_main_clone(
+    tmp_path: Path,
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ワークツリーとクローン本体のキャッシュを分ける（正常系）。"""
+    # 準備
+    calls = _count_runs(monkeypatch)
+    root = tmp_path / "ws"
+    (root / "scripts").mkdir(parents=True)
+    (root / "scripts" / "check.py").write_text("a\n", encoding="utf-8")
+    source = _read_source(
+        root,
+        make_source_config,
+        make_served_source,
+        ["python3", "scripts/check.py"],
+        main_root=root,
+        config_commit="a",
+    )
+    checker = _checker({})
+    document = make_document()
+    # 実行
+    checker.check(make_target(source, worktree=root), document, on="read")
+    checker.check(make_target(source), document, on="read")
+    # 検証
+    assert len(calls) == 2
+
+
+def test_document_checker_check_when_config_commit_changed(
+    tmp_path: Path,
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """クローン本体のスクリプトを取り出す commit が進むと動かし直す（正常系）。"""
+    # 準備
+    calls = _count_runs(monkeypatch)
+    root = tmp_path / "ws"
+    root.mkdir()
+    run = ["python3", "scripts/check.py"]
+    before = _read_source(
+        root, make_source_config, make_served_source, run, main_root=root, config_commit="a"
+    )
+    after = dataclasses.replace(before, config_commit="b")
+    checker = _checker({})
+    document = make_document()
+    # 実行
+    checker.check(make_target(before), document, on="read")
+    checker.check(make_target(before), document, on="read")
+    checker.check(make_target(after), document, on="read")
+    # 検証
+    assert len(calls) == 2
