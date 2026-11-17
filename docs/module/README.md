@@ -40,6 +40,7 @@
 | [索引のサーバー / 文書のストア / types.py](./MOD-30.py.yaml) | 文書・読み込みの誤りと結果・同期のずれ・エイリアスの型。 |
 | [索引のサーバー / 履歴 / query.py](./MOD-31.py.yaml) | git によるリビジョンの解決・一覧・変わったファイル・ファイルの日時・ワークツリーの一覧。 |
 | [索引のサーバー / 履歴 / snapshot.py](./MOD-32.py.yaml) | リビジョンの書き出し。 |
+| [索引のサーバー / 履歴 / blob.py](./MOD-171-1.py.yaml) | commit の blob の内容を書き出さずに読む `git cat-file --batch` の読み取り。 |
 | [索引のサーバー / 履歴 / types.py](./MOD-33.py.yaml) | リビジョン・変わったファイル・ファイルの日時・commit・ワークツリーの型。 |
 | [索引のサーバー / 再起動と更新 / control.py](./MOD-34.py.yaml) | 再起動の要求を受けて uvicorn を止め、止まった後に `run_serve` が同じプロセスを置き換えるかを持つ。 |
 | [索引のサーバー / 再起動と更新 / types.py](./MOD-35.py.yaml) | 管理の MCP の `restart`・`update` の結果の型と定数。 |
@@ -106,6 +107,7 @@
 | [索引のサーバー / 共通 / origin.py](./MOD-96.py.yaml) | 端末の設定の API への、ブラウザからの別のオリジンの書き込みの確認。 |
 | [索引のサーバー / 共通 / api_model.py](./MOD-97.py.yaml) | 読み取り API の DTO の基底（キーは camelCase）。 |
 | [索引のサーバー / 共通 / deadline.py](./MOD-129.py.yaml) | 1 回のツールの呼び出しの書き込みの期限・応答の上限と、取り消しの合図。 |
+| [索引のサーバー / 共通 / background.py](./MOD-147-1.py.yaml) | 要求の応答中に裏の検査と書き出しが使用する時間を抑える関所。 |
 | [索引のサーバー / 共通 / errors.py](./MOD-98.py.yaml) | `ProjectIndexError` と、MCP・読み取り API が返すエラーの階層。 |
 | [索引のサーバー / 共通 / files.py](./MOD-99.py.yaml) | 一時ファイルからのファイルの置き換え。 |
 | [索引のサーバー / 共通 / hashing.py](./MOD-100.py.yaml) | 内容のハッシュ（文書のバージョン）。 |

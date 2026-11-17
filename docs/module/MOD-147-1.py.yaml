@@ -11,6 +11,7 @@ diagrams:
         配信元の検査 ..> 裏の処理の関所 : 裏の処理のスレッド
         文書のストア ..> 裏の処理の関所 : ファイル 1 件
         リビジョンの書き出し ..> 裏の処理の関所 : commit 1 件
+        配信元の一覧 ..> 裏の処理の関所 : 文書の行 1 つ
         class 裏の処理の関所 {
           +要求の応答中()
           +裏の処理のスレッド()
@@ -21,6 +22,7 @@ diagrams:
         click 配信元の検査 href "id:MOD-21#classes[SourceChecks]"
         click 文書のストア href "id:MOD-29"
         click リビジョンの書き出し href "id:MOD-32#classes[SnapshotStore]"
+        click 配信元の一覧 href "id:MOD-69#classes[SourceRegistry]"
 classes:
   - name: BackgroundGate
     title: 裏の処理の関所
@@ -28,7 +30,7 @@ classes:
     usecase: 共通
     role: 状態
     summary: 要求の応答中は、裏の処理を 1 件ずつ順に進め、1 件の後に休ませて使用する時間を `BACKGROUND_SHARE` に抑える
-    description: 起動のときに 1 つだけ作り、`Handlers.gate` と、リビジョンの書き出し・文書のストア・配信元の検査に渡す。応答中の要求の数は `_guard` で読み書きする。裏の処理のスレッドかはスレッドごとの値（`threading.local`）で持ち、裏の処理のスレッドでなければ 1 件は何もしない（要求のスレッドが同じ読み込みを通っても休まない）。
+    description: 起動のときに 1 つだけ作り、`Handlers.gate` と、リビジョンの書き出し・文書のストア・配信元の検査・配信元の一覧に渡す。読み取り API と文書の MCP は、配信元の行の読み込みを待つ間も `foreground` の中にいる。応答中の要求の数は `_guard` で読み書きする。裏の処理のスレッドかはスレッドごとの値（`threading.local`）で持ち、裏の処理のスレッドでなければ 1 件は何もしない（要求のスレッドが同じ読み込みを通っても休まない）。
     properties:
       - name: clock
         title: 時計

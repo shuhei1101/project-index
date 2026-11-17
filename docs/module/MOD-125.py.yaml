@@ -156,7 +156,7 @@ functions:
       type: DocumentListResponse
       description: 文書の一覧の応答
     process: |-
-      1. `store.load(target)` で文書を読み込む
+      1. `store.load(target, from_blobs=True)` で、リビジョンを書き出さずに文書を読み込む
       2. 文書ごとに `id`・`path`・`kind`・メタデータ（`name`・`description`・`tags`・`visibility`）・`body_path`・`version` と、`values` が `True` のときだけ `value`（文書の `data`）、`common_keys` が `True` のときだけ `common_keys`（文書の `metadata`）を `DocumentListEntry` にする
       3. `documents[]` の行の順、行の中はパスの順に並べ、`ref` に解決したリビジョンの名前を入れて返す
     unit_tests:

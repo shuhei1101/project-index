@@ -101,8 +101,9 @@ functions:
       type: object
       description: 読んだ値。空の文字列は `None`
     process: |-
-      1. ruamel.yaml の安全なローダー（`typ="safe"`、Python 実装）で読む
-      2. 読めない場合、誤りの位置（`problem_mark`）から行と列を 1 始まりで取り、`YamlLoadError` を送る。キーの重複は重なったキーの名前を理由に添える
+      1. ruamel.yaml の安全なローダーの C の解析（`typ="safe"`・`pure=False`。ruamel.yaml.clib）で読む
+         - `YAMLError` の場合、誤りを捨て、Python 実装（`pure=True`）で読み直す。C の解析を使用できないときは、ruamel.yaml が手順 1 を Python 実装で読む
+      2. Python 実装でも読めない場合、誤りの位置（`problem_mark`）から行と列を 1 始まりで取り、`YamlLoadError` を送る。キーの重複は重なったキーの名前を理由に添える
     exceptions:
       - name: YamlLoadError
         condition: YAML として読めない（構文の誤り・キーの重複）
@@ -128,6 +129,18 @@ functions:
         mock: なし
         expected: '`YamlLoadError` の `reason` に `a` が載る'
         exception: YAML として読めない
+      - name: test_load_yaml_when_unreadable_by_c
+        case: 正常
+        summary: C の解析で読めない YAML を Python 実装で読み直す
+        condition: 'flow の中に `:` を含む plain scalar の `tags: [scope:a, topic:b]`'
+        mock: なし
+        expected: '`{"tags": ["scope:a", "topic:b"]}`'
+      - name: test_load_yaml_when_c
+        case: 正常
+        summary: C の解析で読む
+        condition: '`a: [1, 2]` を読む'
+        mock: ruamel.yaml の Python 実装の構文の解析（呼ばれた回数を数える包み）
+        expected: '`{"a": [1, 2]}` で、Python 実装の解析が呼ばれない（C の解析を使用できない環境では飛ばす）'
   - name: load_roundtrip
     title: 往復編集の読み込み
     kind: 関数
@@ -240,4 +253,25 @@ functions:
         condition: '`a: 1\n` を読み、`items` に `[{key: k1, label: a}]` を入れて、読んだ文字列を `original` に渡す'
         mock: なし
         expected: '`a: 1\nitems:\n  - key: k1\n    label: a\n`（`YAML_INDENT` と同じ）'
+  - name: c_loader_available
+    title: Cの解析の有無
+    container: project_index/shared/yaml_io.py
+    usecase: 起動
+    role: 判定
+    summary: ruamel.yaml.clib の C の解析を使用できるかを返す
+    description: 起動のときに、使用できなければ警告を 1 行残すために呼ぶ。
+    kind: 関数
+    scope: public
+    thread_safe: true
+    returns:
+      type: bool
+      description: '`ruamel.yaml.cyaml` の C の解析（`CParser`）を import できれば `True`'
+    process: 1. `ruamel.yaml.cyaml` の `CParser` を import し、`ImportError` なら `False`、それ以外は `True` を返す
+    unit_tests:
+      - name: test_c_loader_available
+        case: 正常
+        summary: 依存を入れた環境では使用できる
+        condition: '`uv sync` した環境'
+        mock: なし
+        expected: '`True`'
 visibility: internal

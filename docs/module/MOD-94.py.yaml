@@ -174,7 +174,7 @@ functions:
       3. 各ツールは次の順で処理する
          - 要求を受けた時刻を `time.monotonic()` で記録し、呼び出しの期限（`write_deadline` は `limit_sec` が `handlers.terminal.write_deadline_sec`、`respond_by` は `TOOL_RESPONSE_LIMIT_SEC`）を作る
          - 引数で要求のモデル（`SearchRequest` など）を作る
-         - 要求が指す配信元を決め（指す配信元の決定）、`await handlers.registry.wait_for(...)` でその行の読み込みだけを待つ（初期化とツールの一覧は待たない）
+         - 要求が指す配信元を決め（指す配信元の決定）、`await handlers.registry.wait_for(...)` でその行の読み込みだけを待つ（初期化とツールの一覧は待たない）。待つ間も裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中にいて、要求が待っていない行の読み込みを休ませる
          - `search_docs`・`write_docs`・`delete_docs` の場合、ワークツリーの読み込みの待ちを await する
          - サービスを、裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中で `asyncio.to_thread` で呼ぶ（引数は `handlers` の属性。`write_docs`・`delete_docs` は `limits` に呼び出しの期限）
          - `write_docs`・`delete_docs` の結果の `applied` が `True` の場合、`cwd` から書ける配信元を裏で検査し直す（配信元の検査のキャッシュ.裏での検査の流し直し）

@@ -136,9 +136,10 @@ functions:
       1. `lookup(ref.source)` で設定のファイルを引く。`None` なら `SchemaRefError`（`配信元 {source} が端末の設定にありません`）
       2. 設定のファイルのフォルダのリポジトリの直下を引く（リポジトリの直下）。Git でなければ `SchemaRefError`（`配信元 {source} は Git のリポジトリではありません`）
       3. `ref.ref` を commit に解く（`resolve_ref`）。解けなければ `SchemaRefError`（`配信元 {source} に {ref} がありません`）
+         - `_resolved` を (`ref.source`, リポジトリの直下, 解いた commit, `ref.path`) で引き、当たればその `RefSchema` を返す（手順 4・5 をしない）
       4. その commit の `ref.path` を読む（`read_file_at`）。無い・YAML として読めない・辞書でないなら `SchemaRefError`（`{ref} に {path} がありません` か `{path} を読み込めません`）
       5. `resolve_schema_refs` に、基準を `ref.path`、読み取りを同じ commit のファイルを読む関数にして渡し、`$ref` を解く。解けない `$ref` があれば `SchemaRefError`（`{ref} に {$ref の参照先} がありません`）
-      6. `RefSchema` を返す
+      6. `RefSchema` を手順 3 の組で `_resolved` に入れて返す（`SchemaRefError` は入れない）
     exceptions:
       - name: SchemaRefError
         condition: 配信元・Git のリポジトリ・リビジョン・パス・`$ref` の参照先のどれかが無い
@@ -157,6 +158,12 @@ functions:
         mock: なし（`tmp_path`）
         expected: どれも `SchemaRefError` で、手順ごとの理由
         exception: 参照先が見つからない
+      - name: test_read_schema_ref_when_cached
+        case: 正常
+        summary: 同じ commit の 2 回目は読み直さない
+        condition: test_read_schema_ref と同じリポジトリで `v1` を 2 回読み、ブランチ `main` を指す参照を読んだ後、`main` に `note.schema.yaml` を書き換えた commit を積んでもう 1 回読む
+        mock: 履歴の『リビジョンのファイル』（本物を包んで呼ばれた回数を記録する）
+        expected: '`v1` の 2 回目はリビジョンのファイルが呼ばれず同じスキーマ。`main` の 2 回目は積んだ commit と書き換えたスキーマを返す'
 refs:
   - to: IF-12
     item: constraints[ほかの配信元のスキーマの参照]
@@ -165,3 +172,10 @@ refs:
 test_files:
   - tests/unit/project_index/features/sources/test_schema_ref.py
 visibility: internal
+constants:
+  - name: _resolved
+    title: 読んだ参照先のスキーマ
+    container: project_index/features/sources/schema_ref.py
+    usecase: 起動
+    summary: (参照先の配信元の ID, リポジトリの直下, 解いた commit, パス) → 読んだ `RefSchema` のモジュールの辞書。行の読み込みと組み立て直しをまたいで使い回す。commit の中身は変わらないので捨てない。読み書きはモジュールの `threading.Lock` の中で行い、ファイルの読み取りはロックの外で行う
+    value: '{}'
