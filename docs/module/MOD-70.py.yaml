@@ -525,7 +525,7 @@ functions:
          - `root` の下の同じパスにファイルが無く、元のファイルが無視されている場合（無視されているファイル）、元のファイル（クローン本体のディスク）を使う
       3. `source.config_root` の `repo_root`（無ければ `source.root`）からの相対パスを `root` の下につないだフォルダを設定ファイルのフォルダにし、配信元の読み込みの手順 2〜6・8〜9 を、ディスクの設定・スキーマ・スクリプトで（`default_ref` を読まずに）、配信元の読み込みと同じ内部の関数で行う（設定のバージョンは比べない）
          - 違反がある場合、その違反を持つ `ValidationFailedError` を送る
-      4. 作った配信元を、配信元の ID と `root` をキーに、元の配信元・手順 2 の設定のファイルと作った配信元が読んだスキーマのファイルの `mtime_ns`・`size` と一緒にキャッシュへ入れ、返す
+      4. 作った配信元を、配信元の ID と `root` をキーに、元の配信元・手順 2 の設定のファイルと作った配信元が読んだスキーマのファイルの `mtime_ns`・`size` と一緒にキャッシュへ入れ、返す。手順 2 でクローン本体のファイルへ切り替えた設定は、`root` の側のパスにファイルが無いことも記録し、手順 1 はそのパスにファイルが現れたらキャッシュを使わない
     exceptions:
       - name: ValidationFailedError
         condition: '`root` の設定が無い・読めない・検証に通らない・スクリプトが無い'
@@ -574,9 +574,9 @@ functions:
       - name: test_load_source_at_when_config_changed
         case: 正常
         summary: 設定が変われば作り直す
-        condition: 1 回目の後にワークツリーの `project-index.yaml` に行を足し、もう一度呼ぶ。別の呼び出しでは、元の配信元を再読み込みした別のオブジェクトにして呼ぶ
+        condition: 1 回目の後にワークツリーの `project-index.yaml` に行を足し、もう一度呼ぶ。別の呼び出しでは、元の配信元を再読み込みした別のオブジェクトにして呼ぶ。もう 1 つの呼び出しでは、無視した先頭の設定（`project-index.local.yaml`）がワークツリーに無い状態で 1 回呼び、ワークツリーの同じパスに行を足した設定を置いてもう一度呼ぶ
         mock: なし（一時フォルダで `git init` と `git worktree add`）
-        expected: どちらも作り直した配信元を返し、足した行が `config.documents` にある
+        expected: どの呼び出しも作り直した配信元を返し、足した行が `config.documents` にある（無視した設定の呼び出しでは、`config_files` の先頭がワークツリーのファイルになる）
         exception: '-'
   - name: assemble_source
     title: 配信元の組み立て

@@ -636,7 +636,7 @@ constraints:
     constraint: '`records`・`body_file` の行の管理用の YAML のフォルダの配下でも、ほかの documents の行の `paths` に当たり、その行の `exclude` に当たらないファイルを `unindexed_files` に数えない。起動時の警告・状態の取得も同じ判定を使う'
     notes: そのファイルはほかの行の文書として配信するため、管理用の YAML に記載しない
   - item: より深い管理用の YAML の範囲
-    constraint: '`records`・`body_file` の行の管理用の YAML ごとに、ほかの有効な `records`・`body_file` の行の管理用の YAML のうち、より深いフォルダにあるもののフォルダの配下を `unindexed_files` に数えない。起動時の警告・状態の取得も同じ判定を使う'
+    constraint: '`records`・`body_file` の行の管理用の YAML ごとに、有効な `records`・`body_file` の行（同じ行を含む）のほかの管理用の YAML のうち、より深いフォルダにあるもののフォルダの配下を `unindexed_files` に数えない。起動時の警告・状態の取得も同じ判定を使う'
     notes: そのファイルは深い管理用の YAML の側で数える。同じフォルダの管理用の YAML どうしは除かない
   - item: exclude のパス
     constraint: '`documents[].exclude[]` の `/` を含む値は、`paths` の基準のフォルダからのパスの glob として当てる。`/` を含まない値はファイル名に当てる。どちらも行の文書の集め方と `unindexed_files` の判定に使う'
