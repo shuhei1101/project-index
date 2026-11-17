@@ -53,6 +53,8 @@ class SyncReport:
     alias_violations: list[Violation] = field(default_factory=list[Violation])
     # 2 つ以上の有効な行が文書にするファイル（`{ファイル}: {行の id}・{行の id}`）
     duplicate_files: list[str] = field(default_factory=list[str])
+    # ID が先の文書と重なり除外した文書（`{文書の id}: {先の行の id}（{ファイル}）・{除外した行の id}（{ファイル}）`）
+    duplicate_ids: list[str] = field(default_factory=list[str])
 
 
 @dataclass(frozen=True)

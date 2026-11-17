@@ -9,6 +9,7 @@ from project_index.features.documents.fields import (
     delete_field,
     get_field,
     parse_field_path,
+    resolve_array,
     resolve_metadata,
     resolve_ref_path,
     set_field,
@@ -516,3 +517,94 @@ def test_set_field_at() -> None:
     set_field_at(data, ["notes", "main.py の補足"], "y")
     # 検証
     assert data == {"notes": {"main.py の補足": "y"}}
+
+
+_MODELS_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "models": {
+            "type": "array",
+            "x-key": "name",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "properties": {"type": "array", "items": {"type": "string"}},
+                },
+            },
+        },
+    },
+}
+
+
+def _models_data() -> dict[str, Any]:
+    """`x-key` の配列 `models` を持つ内容を返す。"""
+    return {
+        "models": [
+            {"name": "Row", "properties": ["a"]},
+            {"name": "Col", "properties": ["b"]},
+        ]
+    }
+
+
+def test_resolve_array() -> None:
+    """参照の型の項目のパスで要素の中の配列を返す（正常系）。"""
+    # 準備
+    data = _models_data()
+    # 実行
+    result = resolve_array(data, _MODELS_SCHEMA, "#models[Row].properties", create=True)
+    # 検証
+    assert result is data["models"][0]["properties"]
+
+
+def test_resolve_array_when_plain_missing() -> None:
+    """要素の選び方を含まないパスの項目が無い（正常系）。"""
+    # 準備
+    created: dict[str, Any] = {}
+    untouched: dict[str, Any] = {}
+    # 実行
+    result_created = resolve_array(created, {}, "tags", create=True)
+    result_untouched = resolve_array(untouched, {}, "tags", create=False)
+    # 検証
+    assert result_created == []
+    assert created == {"tags": []}
+    assert result_created is created["tags"]
+    assert result_untouched is None
+    assert untouched == {}
+
+
+def test_resolve_array_when_index() -> None:
+    """位置で指すパス（正常系）。"""
+    # 準備
+    data: dict[str, Any] = {"functions": [{"refs": ["x"]}]}
+    # 実行
+    result = resolve_array(data, {}, "functions[0].refs", create=True)
+    # 検証
+    assert result is data["functions"][0]["refs"]
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        pytest.param("models[Row].properties", id="key_selector"),
+        pytest.param("models[].properties", id="all_selector"),
+        pytest.param("**.properties", id="any_depth"),
+    ],
+)
+def test_resolve_array_when_selector(path: str) -> None:
+    """`#` で始まらず要素の選び方を含むパス（異常系）。"""
+    # 準備
+    data = _models_data()
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError):
+        resolve_array(data, _MODELS_SCHEMA, path, create=True)
+    assert data == _models_data()
+
+
+def test_resolve_array_when_unresolved() -> None:
+    """参照の型の項目のパスを解けない（異常系）。"""
+    # 準備
+    data = _models_data()
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError):
+        resolve_array(data, _MODELS_SCHEMA, "#models[Zzz].properties", create=True)

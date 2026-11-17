@@ -1,0 +1,77 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: add_to・remove_from で x-key の値で配列の要素を指して書き込め、1 つの配列に解決できない項目のパスは違反で止まる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: changed
+    detail: worktree の .git のファイルと、Git が無視するファイルを、管理用の YAML に無いファイルに数えない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: run_only
+    detail: 起動時の警告の管理用の YAML に無いファイルの件数が、同じ判定で変わる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: run_only
+    detail: 再読み込み後の状態の管理用の YAML に無いファイルの件数が、同じ判定で変わる
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: 'add_to・remove_from が # で始まる参照の型の項目のパス（x-key の値で配列の要素を指す）を受け付けることと、文書の中の 1 つの配列に解決できない項目のパスが違反になることを記載する'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T13:02:51.526589+00:00'
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: unindexed_files の数えないファイルに、名前が .git のファイルと Git が無視するファイルを加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T13:02:51.526589+00:00'
+  - page: docs/guide/コアコンセプト-文書のメタデータ.md
+    new: false
+    change: 「.gitignore は読みません」に、管理用の YAML に無いファイルの判定だけは Git が無視するファイルを数えないことを書き分け、たどらないものに名前が .git のファイルを加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T13:02:51.526589+00:00'
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: 範囲から除くものに、名前が .git のファイル（worktree の .git）を加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T13:02:51.526589+00:00'
+  - page: plugins/project-index/skills/setup/SKILL.md
+    new: false
+    change: project-index files の結果に含まれないものに、名前が .git のファイルを加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T13:02:51.526589+00:00'
+  - page: project-index.yaml
+    new: false
+    change: root の行の exclude から、#155 で写したキャッシュ・生成物の行（.pytest_cache/**・.ruff_cache/**・.mypy_cache/**・dist/**・docs/generated/**・.env）を削除し、docs/pr/** だけを残す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T13:17:32.241351+00:00'
+  - page: docs/guide/CLI.md
+    new: false
+    change: project-index files が辿らないものに、名前が .git のファイルを加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T13:07:21.040749+00:00'
+  - page: docs/guide/設定.md
+    new: false
+    change: 起動時・再読み込みの警告の索引に無いファイルの数えないものに、名前が .git のファイルと Git の配信元で Git が無視するファイルを加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T13:07:21.040749+00:00'
+scope_out:
+  - item: update の unset で x-key の値で配列の要素を指すことと、要素の選び方を含むパスの InvalidArgumentError を unset.{パス} の違反へ変換すること（#151 の task-reviewer の任意の指摘）
+    reason: '今の判断は含めない。#151 の完了の条件は add_to・remove_from で、unset は書き込まずに applied: true を返す不具合ではなく、例外で止まるため。含めるかは設計のレビューで確定する'
+    plan: '#162'
+  - item: shuhei1101/gui-support の直下の管理用の YAML の行の exclude から .git を外す（gui-support#184 の回避）
+    reason: 別のリポジトリの設定で、この作業 PR の修正が配信された後に外せる
+    plan: shuhei1101/gui-support#185

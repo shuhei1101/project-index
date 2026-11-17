@@ -1,0 +1,65 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=unit ...)  # TP-1 の単体テストの run_runner
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 1123 items / 2 errors
+
+==================================== ERRORS ====================================
+_ ERROR collecting tests/unit/project_index/features/documents/test_fields.py __
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/documents/test_fields.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/documents/test_fields.py:8: in <module>
+    from project_index.features.documents.fields import (
+E   ImportError: cannot import name 'resolve_array' from 'project_index.features.documents.fields' (/home/runner/work/project-index/project-index/src/project_index/features/documents/fields.py)
+______ ERROR collecting tests/unit/project_index/integrations/test_git.py ______
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/integrations/test_git.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/integrations/test_git.py:9: in <module>
+    from project_index.integrations.git import GitError, ignored_paths, is_ignored, repo_root, run_git
+E   ImportError: cannot import name 'ignored_paths' from 'project_index.integrations.git' (/home/runner/work/project-index/project-index/src/project_index/integrations/git.py)
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/documents/test_fields.py
+ERROR tests/unit/project_index/integrations/test_git.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!!
+============================== 2 errors in 3.23s ===============================
+
+# 収集で止まった 2 ファイル以外の追加したテストの fail の内容（手元の個別実行）
+$ uv run pytest tests/unit/project_index/features/documents/test_indexable.py tests/unit/project_index/features/documents/test_loader.py tests/unit/project_index/features/documents/test_store.py tests/unit/project_index/features/write/test_apply.py
+E       AssertionError: assert ['.git', 'a.m...', 'sub/b.md'] == ['a.md', 'sub/b.md']
+E         
+E         At index 0 diff: '.git' != 'a.md'
+E         Left contains 2 more items, first extra item: 'sub/.git'
+E         Use -v to get more diff
+E       AssertionError: assert ['.git', 'a.yaml'] == ['a.yaml']
+E         
+E         At index 0 diff: '.git' != 'a.yaml'
+E         Left contains one more item: 'a.yaml'
+E         Use -v to get more diff
+E       TypeError: unindexed_files() got an unexpected keyword argument 'ignored'
+E       AssertionError: assert ['root: .pyte... docs/new.md'] == ['root: docs/new.md']
+E         
+E         At index 0 diff: 'root: .pytest_cache/x' != 'root: docs/new.md'
+E         Left contains 2 more items, first extra item: 'root: dist/app.js'
+E         Use -v to get more diff
+E       AttributeError: <module 'project_index.features.documents.store' from '/home/shuhei2441/repo/project-index/.claude/worktrees/fix-project-index-write-docs-array-path-and-unindexed-git/src/project_index/features/documents/store.py'> has no attribute 'ignored_paths'
+E           project_index.shared.errors.InvalidArgumentError: #models[Row].properties: `**`・`[]`・`[{キー}]` を含む項目のパスには書き込めません
+E       Failed: DID NOT RAISE InvalidArgumentError
+E       AssertionError: assert ['#models[Zzz].properties'] == ['add_to.#mod...ls[Row].name']
+E         
+E         At index 0 diff: '#models[Zzz].properties' != 'add_to.#models[Zzz].properties'
+E         Right contains one more item: 'remove_from.#models[Row].name'
+E         Use -v to get more diff
+FAILED tests/unit/project_index/features/documents/test_indexable.py::test_walk_files_when_git_file
+FAILED tests/unit/project_index/features/documents/test_indexable.py::test_walk_tree_when_git_file
+FAILED tests/unit/project_index/features/documents/test_loader.py::test_unindexed_files_when_ignored_given
+FAILED tests/unit/project_index/features/documents/test_store.py::test_check_sync_when_git_ignored
+FAILED tests/unit/project_index/features/documents/test_store.py::test_check_sync_when_not_git_ignored
+FAILED tests/unit/project_index/features/write/test_apply.py::test_apply_operation_when_add_to_ref_path
+FAILED tests/unit/project_index/features/write/test_apply.py::test_apply_operation_when_add_to_selector_path
+FAILED tests/unit/project_index/features/write/test_apply.py::test_apply_operation_when_add_to_ref_path_unresolved
+8 failed, 123 passed in 0.63s

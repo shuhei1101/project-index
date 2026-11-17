@@ -1,0 +1,28 @@
+docs:
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: check_project・status の索引の同期の件数の表に、文書の ID の重なりを追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T11:51:20.156868+00:00'
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: 引数なしの describe の warnings[] の同期のずれに、文書の ID の重なりを追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T11:51:20.156868+00:00'
+scope_out:
+  - item: duplicate_id 以外の読めないファイル（not_mapping・unreadable などの LoadProblem）を索引の同期に入れる
+    reason: 要望は文書の ID の重なりの報告で、他の種類の読み込みの誤りは含まない
+    plan: none
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: run_only
+    detail: 配信元の設定を変えて管理の MCP で確かめたとき、ID が重なり配信されない文書が索引の同期に出る。流れは変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: run_only
+    detail: 起動したとき、ID が重なり配信されない文書が警告のログに出る。流れは変わらない
+    depends_on: []

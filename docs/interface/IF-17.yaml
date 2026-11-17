@@ -196,10 +196,10 @@ exceptions:
     notes: 渡したパスを stderr に出す
 constraints:
   - item: 除外の条件
-    constraint: バイナリ（先頭 8192 バイトに NUL バイトがある）・空のファイル（0 バイト）・`*.local.*` の名前のファイルを出さない。生成物・ロック・ベンダーのコードは出す。`check_project` の `unindexed_files` と同じ判定を使う
+    constraint: バイナリ（先頭 8192 バイトに NUL バイトがある）・空のファイル（0 バイト）・`*.local.*` の名前のファイルを出さない。生成物・ロック・ベンダーのコードと、Git が無視するファイルは出す。`check_project` の `unindexed_files` と同じ判定を使う
     notes: 見分け方はモジュール構成『文書のストア / indexable.py』の `is_excluded_file`
   - item: 辿らないフォルダ
-    constraint: '`.git`・`node_modules`・`__pycache__`・`.venv`・`.claude/worktrees` とシンボリックリンク。文書の収集・`unindexed_files` と同じ'
+    constraint: '`.git`・`node_modules`・`__pycache__`・`.venv`・`.claude/worktrees` とシンボリックリンク。名前が `.git` のファイル（ワークツリーの `.git`）もどの深さでも出さない。文書の収集・`unindexed_files` と同じ'
     notes: '`.claude/worktrees` は配信元の設定の `worktrees` の既定と同じ場所で、setup の範囲の既定でも除く'
   - item: exclude のパス
     constraint: '`--exclude` の `/` を含む値は `--root` からのパスの glob、含まない値はファイル名の glob として当てる。`documents[].exclude[]` と同じ判定を使う'

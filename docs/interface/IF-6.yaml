@@ -1136,6 +1136,48 @@ flows:
       - いずれもファイルを書き換えない
       - 4 回目は `text_edits[0].field` の違反で、`notes` にキー `missing` が無いことを返却する
     test: test_error_when_text_edits_ref_path_unresolved
+  - name: 正常系（参照の型の項目のパスで配列へ追加・削除する）
+    summary: '`add_to`・`remove_from` のキーに `#` で始まる参照の型の項目のパスを渡し、`x-key` の値で指した配列の要素の中の配列へ追加・削除する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 種類のスキーマ
+        description: 'sample の種類のスキーマが `models`（`x-key: name` の配列。要素は `name` と文字列の配列 `properties` を持つ）を定める'
+      - name: 文書 1
+        description: '`models` が `{name: Row, properties: [a]}`・`{name: Col, properties: [b]}`'
+      - name: 入力
+        description: '1 回目は `add_to: {"#models[Row].properties": [c]}`。2 回目は `remove_from: {"#models[Row].properties": [a]}`。3 回目は `add_to: {"models[Row].properties": [d]}`。4 回目は `add_to: {"#models[Zzz].properties": [d]}`。5 回目は `add_to: {"#models[Row].name": [d]}`'
+        notes: 3 回目は `#` で始まらず要素の選び方を含むキー。4 回目は無い要素、5 回目は配列でない項目
+    flow: |-
+      <!-- map: {"title": "正常系（参照の型の項目のパスで配列へ追加・削除する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: update 文書 1（add_to #models[Row].properties）
+        T->>T: 種類のスキーマの x-key で models[0].properties に解決して追加する
+        T->>WT: YAML を書き換える
+        T-->>C: updated
+        C->>T: update 文書 1（remove_from #models[Row].properties）
+        T->>T: models[0].properties に解決して削除する
+        T-->>C: updated
+        C->>T: update 文書 1（add_to models[Row].properties）
+        T-->>C: isError（add_to.models[Row].properties）
+        C->>T: update 文書 1（add_to #models[Zzz].properties）
+        T-->>C: isError（add_to.#models[Zzz].properties）
+        C->>T: update 文書 1（add_to #models[Row].name）
+        T-->>C: isError（配列ではない項目）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目の後、Row の `properties` が `[a, c]` で Col の `properties` は `[b]` のまま
+      - 2 回目の後、Row の `properties` が `[c]`
+      - '3・4・5 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].add_to.{キー}` で、文書 1 を書き換えない（`applied: true` を返さない）'
+    test: test_normal_when_add_to_ref_path
   - name: 正常系（文書を改名して参照元を追随させる）
     summary: '`rename` で ID とファイル名を変え、同じ配信元の参照元を書き換える。`dry_run` では書き換わる箇所だけを返却する'
     setup:
@@ -1731,8 +1773,11 @@ constraints:
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、作業場所が `scope.write` に当たれば登録したフォルダへ書き、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく `created`・`updated` を付ける。`worktree` を指定すると `InvalidArgumentError`'
   - item: 参照の型の項目のパス
-    constraint: '`text_edits[].field` が `#` で始まるとき、`#` の後を種類のスキーマ（`$ref` を解決した後）と文書でたどり、位置で指す項目のパスに解決してから既存の取得・書き込みで置き換える。配列の項目の `[{値}]` はスキーマの `x-key` のキーがその値の最初の要素、`[{値}#{順番}]` は同じ値の要素のその順番の要素（同じ値の要素が無く、末尾が `#{整数}` のときだけ）、辞書の項目の `[{キー}]` はそのキー（`.` や空白を含んでも 1 階層）を指す。`[]` の外の `.` で区切った名前は辞書のキー。共通のキーの列名への読み替えはしない。`text_edits[].field` だけが受け付け、`set`・`unset`・`add_to`・`remove_from` と `metadata` の列名・`search_docs`・`list_changes` の項目のパスの読み方は変えない'
+    constraint: '`text_edits[].field` が `#` で始まるとき、`#` の後を種類のスキーマ（`$ref` を解決した後）と文書でたどり、位置で指す項目のパスに解決してから既存の取得・書き込みで置き換える。配列の項目の `[{値}]` はスキーマの `x-key` のキーがその値の最初の要素、`[{値}#{順番}]` は同じ値の要素のその順番の要素（同じ値の要素が無く、末尾が `#{整数}` のときだけ）、辞書の項目の `[{キー}]` はそのキー（`.` や空白を含んでも 1 階層）を指す。`[]` の外の `.` で区切った名前は辞書のキー。共通のキーの列名への読み替えはしない。`text_edits[].field` と `add_to`・`remove_from` のキーだけが受け付け、`set`・`unset` と `metadata` の列名・`search_docs`・`list_changes` の項目のパスの読み方は変えない'
     notes: 書き方は設計書の参照の型（`{ID}#{項目のパス}`）の `#` から後と同じ。`#` で始まらない既存の `[{キー}]`（キーが真の要素）とは `#` の有無で分ける
+  - item: add_to・remove_from の項目のパス
+    constraint: '`add_to`・`remove_from` のキーが `#` で始まるとき、「参照の型の項目のパス」と同じ読み方で文書の中の 1 つの配列へ解決し、その配列へ追加・削除する。解決できないパス（無い要素・`x-key` の無い配列・無いキー）と、解決した値が配列でないパスは `add_to.{パス}`・`remove_from.{パス}` の違反にする。`#` で始まらないキーに要素の選び方（`[...]`・`**.`）を含めると、書き込まずに同じ違反にする'
+    notes: '`#` で始まらない要素の選び方を含まないキーは今までどおりで、項目が無ければ `add_to` は空の配列を作り、`remove_from` は何もしない。`#` で始まるキーは配列を作らない。共通のキーの列名への読み替えは `#` で始まるキーにはしない'
   - item: 改名後のパス
     constraint: '`new_path` を省いた `rename` は、ファイル名の最初の `.` より前が旧 ID と一致する 1 ファイル 1 文書だけ、同じフォルダでその部分を `new_id` にしたパスへ移す（`IF-6.yaml` → `IF-9.yaml`、`MOD-1.py.yaml` → `MOD-2.py.yaml`）。一致しない文書と `records` の要素の文書はパスを変えない'
     notes: '`new_id` を省いた `rename` は ID を変えない。ID がパスの文書は、`new_path` で ID も変わる'

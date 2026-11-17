@@ -1009,6 +1009,48 @@ def test_check_sync_when_rows_share_file(
     assert report.duplicate_files == ["src/a.yaml: src・yaml", "src/c.py: src・py"]
 
 
+def test_check_sync_when_ids_overlap(
+    document_store: DocumentStore,
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+) -> None:
+    """文書の ID が重なる（正常系）。"""
+    # 準備
+    root = tmp_path / "ws"
+    write_files(
+        root,
+        {
+            "docs/a.yaml": "id: a\n",
+            "docs/b.yaml": "id: a\n",
+            "notes/c.yaml": "id: a\n",
+            "src/files.yaml": "files:\n  - path: a.yaml\n",
+            "src/a.yaml": "id: src/a.yaml\n",
+        },
+    )
+    documents = [
+        DocumentTable(id="rules", paths=["docs/*.yaml"], schema_path="schemas/rule.schema.yaml"),
+        DocumentTable(id="notes", paths=["notes/*.yaml"], schema_path="schemas/rule.schema.yaml"),
+        DocumentTable(
+            id="src",
+            paths=["src/files.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            records="files",
+            body_file="path",
+        ),
+        DocumentTable(id="yaml", paths=["src/a.yaml"], schema_path="schemas/rule.schema.yaml"),
+    ]
+    source = make_served_source(root=root, config=make_source_config(documents=documents))
+    # 実行
+    report = store_module.check_sync(document_store, source)
+    # 検証
+    assert report.duplicate_ids == [
+        "a: rules（docs/a.yaml）・rules（docs/b.yaml）",
+        "a: rules（docs/a.yaml）・notes（notes/c.yaml）",
+    ]
+
+
 def test_check_sync_when_nested_index(
     document_store: DocumentStore,
     tmp_path: Path,
@@ -1446,3 +1488,85 @@ def test_document_store_schema_when_cleared_during_resolve(
     document_store.schema(workspace, "rules")
     # 検証
     assert calls == ["rules", "rules"]
+
+
+def _root_table() -> DocumentTable:
+    """直下の管理用の YAML を読む行を返す。"""
+    return DocumentTable(
+        id="root",
+        paths=["files.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        records="files",
+        body_file="path",
+    )
+
+
+_IGNORED_FILES = {"dist/app.js": "app\n", ".pytest_cache/x": "x\n", "docs/new.md": "# new\n"}
+
+
+def test_check_sync_when_git_ignored(
+    document_store: DocumentStore,
+    git_repo: Callable[..., Path],
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+) -> None:
+    """Git の配信元で Git が無視するファイルを数えない（正常系）。"""
+    # 準備
+    root = git_repo(
+        {
+            ".gitignore": "dist/\n.pytest_cache/\n",
+            "files.yaml": "files:\n  - path: README.md\n  - path: .gitignore\n",
+            "README.md": "# readme\n",
+        }
+    )
+    write_files(root, _IGNORED_FILES)
+    source = make_served_source(
+        root=root,
+        is_git=True,
+        repo_root=root,
+        config=make_source_config(documents=[_root_table()]),
+    )
+    # 実行
+    report = store_module.check_sync(document_store, source)
+    # 検証
+    assert report.unindexed_files == ["root: docs/new.md"]
+
+
+def test_check_sync_when_not_git_ignored(
+    document_store: DocumentStore,
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Git でない配信元では Git が無視するファイルも数える（正常系）。"""
+    # 準備
+    root = tmp_path / "ws"
+    write_files(
+        root,
+        {
+            ".gitignore": "dist/\n.pytest_cache/\n",
+            "files.yaml": "files:\n  - path: README.md\n  - path: .gitignore\n",
+            "README.md": "# readme\n",
+            **_IGNORED_FILES,
+        },
+    )
+    calls: list[Path] = []
+
+    def _ignored_paths(path: Path) -> list[str]:
+        calls.append(path)
+        return []
+
+    monkeypatch.setattr(store_module, "ignored_paths", _ignored_paths)
+    source = make_served_source(root=root, config=make_source_config(documents=[_root_table()]))
+    # 実行
+    report = store_module.check_sync(document_store, source)
+    # 検証
+    assert report.unindexed_files == [
+        "root: .pytest_cache/x",
+        "root: dist/app.js",
+        "root: docs/new.md",
+    ]
+    assert calls == []

@@ -349,12 +349,19 @@ functions:
         default: ()
         passing: keyword
         description: '`index_path` のフォルダより深い、ほかの管理用の YAML のフォルダ（`root` からのパス）。その配下のパスを数えない'
+      - name: ignored
+        title: Git が無視するパス
+        type: Collection[str]
+        required: false
+        default: ()
+        passing: keyword
+        description: '`root` からのパス。`/` で終わる値はフォルダ。Git の配信元の呼び出し元が Git が無視するパスの一覧で求めて渡す'
     returns:
       type: list[str]
       description: '`root` からのパスの昇順'
     process: |-
       1. `files` があればそのうち `index_path` のフォルダの配下のパス（フォルダが `root` なら全て）、無ければ中をたどるファイルの列挙（`walk_files`）で `index_path` のフォルダの配下のファイルを `root` からのパスで得る
-      2. `index_path` 自身と `body_paths` にあるパスと、文書の行.除外の名前に当たるかが `True` のパスと、除外の条件に当たるか（`is_excluded_file`）が `True` のパスと、`others` のどれかの行の文書になるか（文書の行.`matches`）が `True` のパスと、`nested_dirs` のどれかのフォルダの配下のパスを除き、昇順で返す
+      2. `index_path` 自身と `body_paths` にあるパスと、文書の行.除外の名前に当たるかが `True` のパスと、除外の条件に当たるか（`is_excluded_file`）が `True` のパスと、`others` のどれかの行の文書になるか（文書の行.`matches`）が `True` のパスと、`nested_dirs` のどれかのフォルダの配下のパスと、`ignored` に当たるパス（`/` で終わる値はそのフォルダの配下、それ以外は同じパス）を除き、昇順で返す
     unit_tests:
       - name: test_unindexed_files
         case: 正常
@@ -403,6 +410,13 @@ functions:
         condition: '`files.yaml`・`README.md`・`docs/pr/1/README.md`・`docs/a.md` を置き、`index_path` が `files.yaml`、`body_paths` が `[README.md]`、行の `exclude` が `[docs/pr/**]`'
         mock: なし（`tmp_path`）
         expected: '`["docs/a.md"]`'
+        exception: '-'
+      - name: test_unindexed_files_when_ignored_given
+        case: 正常
+        summary: Git が無視するパスを数えない
+        condition: '`files.yaml`・`a.py`・`d.py`・`dist/app.js`・`.pytest_cache/x`・`dist2/b.js` を置き、`index_path` が `files.yaml`、`body_paths` が `[a.py]`、`ignored` が `[".pytest_cache/", "dist/"]`'
+        mock: なし（`tmp_path`）
+        expected: '`["d.py", "dist2/b.js"]`（名前が `dist` で始まる別のフォルダは数える）'
         exception: '-'
   - name: resolve_body_path
     title: 本文のファイルのパスの解決

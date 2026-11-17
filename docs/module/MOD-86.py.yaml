@@ -324,4 +324,49 @@ functions:
         mock: なし（一時フォルダで `git init`）
         expected: '`False`'
         exception: '-'
+  - name: ignored_paths
+    title: 無視されているパスの一覧
+    kind: 関数
+    container: project_index/integrations/git.py
+    usecase: 起動
+    role: 読み取り
+    summary: フォルダの配下で Git が無視するファイルとフォルダを、フォルダからのパスで返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: root
+        title: フォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: Git の作業ツリーの中のフォルダ（配信元の直下）
+    returns:
+      type: list[str] | None
+      description: '`root` からのパスの昇順。無視のパターンに当たるフォルダは中のファイルを並べず `/` で終わる 1 行になる。追跡していないフォルダの中が全て無視されているときは、フォルダの行と中のファイルの行が両方並ぶ（`root` 自身がそのフォルダなら `./`）。無視しないファイルを含むフォルダはフォルダの行にならない。取れなければ `None`'
+    process: |-
+      1. `root` で `ls-files -z --others --ignored --exclude-standard --directory` を呼ぶ（gitの実行）。`--directory` で無視されたフォルダを 1 行にまとめ、返る行の数をフォルダの単位に抑える
+      2. 標準出力を NUL で分け、空の値を除いて昇順で返す
+         - `GitError`・`FileNotFoundError`・`NotADirectoryError` の場合、`None` を返す
+    unit_tests:
+      - name: test_ignored_paths
+        case: 正常
+        summary: 無視されたファイルとフォルダ
+        condition: '`.gitignore` に `dist/` と `*.log` を書いた一時リポジトリに、`dist/app.js`・`dist/sub/b.js`・`a.log`・`b.md` を置く'
+        mock: なし（一時フォルダで `git init`）
+        expected: '`["a.log", "dist/"]`'
+        exception: '-'
+      - name: test_ignored_paths_when_subfolder
+        case: 正常
+        summary: サブフォルダからのパス
+        condition: 同じリポジトリの `docs/` に、commit した `docs/keep.md` と `docs/x.log` を置き、`root` を `docs`
+        mock: なし（一時フォルダで `git init`）
+        expected: '`["x.log"]`'
+        exception: '-'
+      - name: test_ignored_paths_when_not_repo
+        case: 正常
+        summary: Git の作業ツリーでない
+        condition: '`git init` していない一時フォルダ'
+        mock: なし
+        expected: '`None`'
+        exception: '-'
 visibility: internal

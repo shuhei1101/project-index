@@ -39,7 +39,7 @@ argument-hint: "[path]"
    - 実装のパスを持つ設計書の種類とキーの既定は、YAML の文書の行の種類ごとに `search_docs`（`filter` は `kind`、`format: json`）で文書を引き、値が範囲のファイルのパスに一致するキーを持つ種類とそのキーにする
 
 4. YAML でない範囲を管理用の YAML の行にする。
-   - `{clone}/.venv/bin/python -m project_index files --root {path} --paths {範囲の glob}` で、範囲のうち管理用の YAML に記載するファイルを求める（`--paths` は繰り返せる。バイナリ・空のファイル・`*.local.*` の名前のファイルと、`.git`・`node_modules`・`.claude/worktrees` の下は含まれない）。管理用の YAML（`files.yaml`、ローカル運用は `files.local.yaml`）の行と突き合わせる
+   - `{clone}/.venv/bin/python -m project_index files --root {path} --paths {範囲の glob}` で、範囲のうち管理用の YAML に記載するファイルを求める（`--paths` は繰り返せる。バイナリ・空のファイル・`*.local.*` の名前のファイルと、名前が `.git` のファイルと、`.git`・`node_modules`・`.claude/worktrees` の下は含まれない）。管理用の YAML（`files.yaml`、ローカル運用は `files.local.yaml`）の行と突き合わせる
      - 範囲の glob は、`{config}` が無いときは手順 3 で回答した範囲にする
      - Git が無視するファイルを除外する場合（コミットする運用の Git の配信元か、除外すると回答した場合）、`git -C {path} ls-files --others --ignored --exclude-standard` でファイルの一覧を取り、`project-index files` の結果からその一覧のパスを除く（`--exclude` はファイル名だけに当たるため使わない）
      - 除外しないと回答した場合は、`--exclude .env --exclude '.env.*'` を渡す

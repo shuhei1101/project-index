@@ -254,6 +254,9 @@ response:
   - name: sources[].sync.duplicate_files
     type: int
     description: 2 つ以上の有効な documents の行が文書にするファイルの件数（`check_project` と同じ）
+  - name: sources[].sync.duplicate_ids
+    type: int
+    description: ID が先の文書と重なり、配信から除外した文書の件数（`check_project` と同じ）
 response_example: |-
   ```markdown
   http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）

@@ -755,6 +755,84 @@ def test_error_when_text_edits_ref_path_unresolved(
     assert path.read_text(encoding="utf-8") == before
 
 
+MODELS_SCHEMA = (
+    "type: object\n"
+    "title: サンプル\n"
+    "properties:\n"
+    "  id: {type: string}\n"
+    "  name: {type: string}\n"
+    "  models:\n"
+    "    type: array\n"
+    "    x-key: name\n"
+    "    items:\n"
+    "      type: object\n"
+    "      properties:\n"
+    "        name: {type: string}\n"
+    "        properties:\n"
+    "          type: array\n"
+    "          items: {type: string}\n"
+)
+MODELS_DOC = (
+    "id: doc-1\n"
+    "name: 文書 1\n"
+    "models:\n"
+    "  - name: Row\n"
+    "    properties: [a]\n"
+    "  - name: Col\n"
+    "    properties: [b]\n"
+)
+
+
+def test_normal_when_add_to_ref_path(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """add_to・remove_from のキーの参照の型の項目のパスで、x-key の値で指した要素の中の配列へ追加・削除する（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{"schemas/sample.schema.yaml": MODELS_SCHEMA, "docs/doc-1.yaml": MODELS_DOC}
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    path = worktree / "docs" / "doc-1.yaml"
+    arguments = {"cwd": str(source.folder), "worktree": str(worktree)}
+
+    def _call(**operation: Any) -> Any:
+        return env.call(
+            "write_docs", operations=[_update("doc-1", _version(path), **operation)], **arguments
+        )
+
+    # 実行
+    first = _call(add_to={"#models[Row].properties": ["c"]})
+    after_first = load_yaml(path.read_text(encoding="utf-8"))
+    second = _call(remove_from={"#models[Row].properties": ["a"]})
+    after_second = load_yaml(path.read_text(encoding="utf-8"))
+    before_errors = path.read_text(encoding="utf-8")
+    third = _call(add_to={"models[Row].properties": ["d"]})
+    fourth = _call(add_to={"#models[Zzz].properties": ["d"]})
+    fifth = _call(add_to={"#models[Row].name": ["d"]})
+    after_errors = path.read_text(encoding="utf-8")
+    # 検証
+    assert [item["status"] for item in first.data["results"]] == ["updated"]
+    assert after_first["models"] == [
+        {"name": "Row", "properties": ["a", "c"]},
+        {"name": "Col", "properties": ["b"]},
+    ]
+    assert [item["status"] for item in second.data["results"]] == ["updated"]
+    assert after_second["models"] == [
+        {"name": "Row", "properties": ["c"]},
+        {"name": "Col", "properties": ["b"]},
+    ]
+    assert third.is_error
+    assert "operations[0].add_to.models[Row].properties" in third.text
+    assert fourth.is_error
+    assert "operations[0].add_to.#models[Zzz].properties" in fourth.text
+    assert fifth.is_error
+    assert "operations[0].add_to.#models[Row].name" in fifth.text
+    assert after_errors == before_errors
+
+
 def test_error_when_unknown_kind(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
