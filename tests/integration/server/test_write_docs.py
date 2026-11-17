@@ -789,7 +789,7 @@ def test_normal_when_add_to_ref_path(
     add_worktree: Callable[..., Path],
     sample_file_set: Callable[..., dict[str, str]],
 ) -> None:
-    """add_to・remove_from のキーの参照の型の項目のパスで、x-key の値で指した要素の中の配列へ追加・削除する（正常系）。"""
+    """add_to・remove_from のキーの参照の型の項目のパスで、x-key の値で指した要素の中の配列へ追加・削除し、unset の要素の参照の型の項目のパスで項目を削除する（正常系）。"""
     # 準備
     files = sample_file_set(
         **{"schemas/sample.schema.yaml": MODELS_SCHEMA, "docs/doc-1.yaml": MODELS_DOC}
@@ -813,6 +813,12 @@ def test_normal_when_add_to_ref_path(
     fourth = _call(add_to={"#models[Zzz].properties": ["d"]})
     fifth = _call(add_to={"#models[Row].name": ["d"]})
     after_errors = path.read_text(encoding="utf-8")
+    sixth = _call(unset=["#models[Col].properties"])
+    after_sixth = load_yaml(path.read_text(encoding="utf-8"))
+    before_unset_errors = path.read_text(encoding="utf-8")
+    seventh = _call(unset=["models[Row].properties"])
+    eighth = _call(unset=["#models[Zzz].properties"])
+    after_unset_errors = path.read_text(encoding="utf-8")
     # 検証
     assert [item["status"] for item in first.data["results"]] == ["updated"]
     assert after_first["models"] == [
@@ -831,6 +837,16 @@ def test_normal_when_add_to_ref_path(
     assert fifth.is_error
     assert "operations[0].add_to.#models[Row].name" in fifth.text
     assert after_errors == before_errors
+    assert [item["status"] for item in sixth.data["results"]] == ["updated"]
+    assert after_sixth["models"] == [
+        {"name": "Row", "properties": ["c"]},
+        {"name": "Col"},
+    ]
+    assert seventh.is_error
+    assert "operations[0].unset.models[Row].properties" in seventh.text
+    assert eighth.is_error
+    assert "operations[0].unset.#models[Zzz].properties" in eighth.text
+    assert after_unset_errors == before_unset_errors
 
 
 def test_error_when_unknown_kind(
@@ -1958,6 +1974,14 @@ PATH_ID_ROW = (
 PATH_ID_FILES = "files:\n  - path: n1.md\n    name: メモ 1\n  - path: n2.md\n    name: メモ 2\n"
 
 
+# 文書 2 を `id:` のリンクと相対パスのリンクで指す本文のファイル（`notes/n1.md`）
+REFERRER_BODY = (
+    "[文書 2](id:doc-2#items[a])\n"
+    "[文書 2](../docs/doc-2.yaml)\n"
+    "[文書 20](id:doc-20) と、リンクでない文の doc-2\n"
+)
+
+
 def _rename(doc_id: str, version: str, **operation: Any) -> dict[str, Any]:
     """`rename` の操作を作る。"""
     return {"op": "rename", "id": doc_id, "expected_version": version, **operation}
@@ -1969,6 +1993,7 @@ def test_normal_when_rename(
     add_worktree: Callable[..., Path],
     sample_file_set: Callable[..., dict[str, str]],
     sample_doc_text: Callable[..., str],
+    sample_config_text: Callable[..., str],
 ) -> None:
     """`rename` で ID とファイル名を変え、同じ配信元の参照元を書き換える（正常系）。"""
     # 準備
@@ -1976,15 +2001,21 @@ def test_normal_when_rename(
         **{
             "docs/doc-1.yaml": REFERRER_DOC,
             "docs/doc-3.yaml": sample_doc_text("doc-3", "文書 3"),
+            "project-index.yaml": sample_config_text(NOTES_ROW),
+            "schemas/notes.schema.yaml": NOTES_SCHEMA,
+            "notes/index.yaml": NOTES,
+            "notes/n1.md": REFERRER_BODY,
         }
     )
     source, env, worktree = _setup(make_source, make_server, add_worktree, files)
     common = {"cwd": str(source.folder), "worktree": str(worktree)}
     operation = _rename("doc-2", _version(worktree / "docs" / "doc-2.yaml"), new_id="doc-9")
     doc_3 = (worktree / "docs" / "doc-3.yaml").read_text(encoding="utf-8")
+    n1_version = value_hash([{"id": "n1", "path": "n1.md"}, REFERRER_BODY])
     # 実行
     tried = env.call("write_docs", **common, operations=[operation], dry_run=True)
     tried_exists = (worktree / "docs" / "doc-2.yaml").exists()
+    tried_body = (worktree / "notes" / "n1.md").read_text(encoding="utf-8")
     renamed = env.call("write_docs", **common, operations=[operation])
     searched = env.call(
         "search_docs",
@@ -1993,7 +2024,11 @@ def test_normal_when_rename(
         format="json",
     )
     # 検証
-    first, referrer = tried.data["results"]
+    results = {item["id"]: item for item in tried.data["results"]}
+    first = results["doc-9"]
+    referrer = results["doc-1"]
+    note = results["n1"]
+    written_note = next(item for item in renamed.data["results"] if item["id"] == "n1")
     text = (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8")
     assert tried.data["applied"] is False
     assert tried_exists
@@ -2026,6 +2061,22 @@ def test_normal_when_rename(
     )
     assert (worktree / "docs" / "doc-3.yaml").read_text(encoding="utf-8") == doc_3
     assert [item["id"] for item in searched.data["items"]] == ["doc-9"]
+    assert len(tried.data["results"]) == 3
+    assert note["index"] == 0
+    assert note["status"] == "updated"
+    assert note["references"] == [
+        {"path": "@body", "before": "id:doc-2", "after": "id:doc-9"},
+        {"path": "@body", "before": "../docs/doc-2.yaml", "after": "../docs/doc-9.yaml"},
+    ]
+    assert "@@ notes/n1.md" in note["diff"]
+    assert tried_body == REFERRER_BODY
+    assert (worktree / "notes" / "n1.md").read_text(encoding="utf-8") == (
+        "[文書 2](id:doc-9#items[a])\n"
+        "[文書 2](../docs/doc-9.yaml)\n"
+        "[文書 20](id:doc-20) と、リンクでない文の doc-2\n"
+    )
+    assert (worktree / "notes" / "index.yaml").read_text(encoding="utf-8") == NOTES
+    assert written_note["version"] != n1_version
 
 
 def test_normal_when_rename_path_only(
@@ -2221,15 +2272,29 @@ def _word_files(sample_file_set: Callable[..., dict[str, str]]) -> dict[str, str
     )
 
 
+# タグ `a` を持つ n1 と持たない n2 が、本文のファイルに `旧語` を持つ（要素の YAML は持たない）
+WORD_NOTES = "items:\n  - id: n1\n    path: n1.md\n    tags: [a]\n  - id: n2\n    path: n2.md\n"
+WORD_NOTE_1 = "# 旧語\n旧語と別の語\n"
+WORD_NOTE_2 = "# 旧語\n"
+
+
 def test_normal_when_replace_text(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
     add_worktree: Callable[..., Path],
     sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
 ) -> None:
     """`replace_text` で `filter` に該当する文書の配下の文字列を置換し、文書ごとの件数を返す（正常系）。"""
     # 準備
-    files = _word_files(sample_file_set)
+    files = {
+        **_word_files(sample_file_set),
+        "project-index.yaml": sample_config_text(NOTES_ROW),
+        "schemas/notes.schema.yaml": NOTES_SCHEMA,
+        "notes/index.yaml": WORD_NOTES,
+        "notes/n1.md": WORD_NOTE_1,
+        "notes/n2.md": WORD_NOTE_2,
+    }
     source, env, worktree = _setup(make_source, make_server, add_worktree, files)
     common = {"cwd": str(source.folder), "worktree": str(worktree)}
     # 実行
@@ -2238,19 +2303,33 @@ def test_normal_when_replace_text(
     replaced = env.call("write_docs", **common, operations=[_replace_text(new="新語")])
     replaced_1 = (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8")
     replaced_2 = (worktree / "docs" / "doc-2.yaml").read_text(encoding="utf-8")
+    replaced_note_1 = (worktree / "notes" / "n1.md").read_text(encoding="utf-8")
+    replaced_note_2 = (worktree / "notes" / "n2.md").read_text(encoding="utf-8")
+    replaced_notes = (worktree / "notes" / "index.yaml").read_text(encoding="utf-8")
     # 置換の前の内容に戻してから、`fields` で項目を絞る
     (worktree / "docs" / "doc-1.yaml").write_text(WORD_DOC_1, encoding="utf-8")
     (worktree / "docs" / "doc-2.yaml").write_text(WORD_DOC_2, encoding="utf-8")
+    (worktree / "notes" / "n1.md").write_text(WORD_NOTE_1, encoding="utf-8")
     narrowed = env.call(
         "write_docs", **common, operations=[_replace_text(new="新語", fields=["items"])]
+    )
+    narrowed_1 = (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8")
+    narrowed_2 = (worktree / "docs" / "doc-2.yaml").read_text(encoding="utf-8")
+    narrowed_note_1 = (worktree / "notes" / "n1.md").read_text(encoding="utf-8")
+    # 置換の前の内容に戻してから、`fields` で本文のファイルだけを置換する
+    (worktree / "docs" / "doc-1.yaml").write_text(WORD_DOC_1, encoding="utf-8")
+    body_only = env.call(
+        "write_docs", **common, operations=[_replace_text(new="新語", fields=["@body"])]
     )
     # 検証
     assert tried.data["applied"] is False
     assert [(i["index"], i["id"], i["status"], i["count"]) for i in tried.data["results"]] == [
         (0, "doc-1", "updated", 4),
         (0, "doc-2", "updated", 1),
+        (0, "n1", "updated", 2),
     ]
     assert all(item["diff"] for item in tried.data["results"])
+    assert "@@ notes/n1.md" in tried.data["results"][2]["diff"]
     assert tried_text == WORD_DOC_1
     assert not replaced.is_error
     assert replaced_1 == (
@@ -2261,10 +2340,15 @@ def test_normal_when_replace_text(
     assert replaced_2 == "id: doc-2\nname: 新語\ntags: [a]\n"
     assert (worktree / "docs" / "doc-3.yaml").read_text(encoding="utf-8") == WORD_DOC_3
     assert [(item["id"], item["count"]) for item in narrowed.data["results"]] == [("doc-1", 2)]
-    assert (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8") == (
-        WORD_DOC_1.replace("旧語と旧語", "新語と新語")
-    )
-    assert (worktree / "docs" / "doc-2.yaml").read_text(encoding="utf-8") == WORD_DOC_2
+    assert narrowed_1 == WORD_DOC_1.replace("旧語と旧語", "新語と新語")
+    assert narrowed_2 == WORD_DOC_2
+    assert replaced_note_1 == "# 新語\n新語と別の語\n"
+    assert replaced_note_2 == WORD_NOTE_2
+    assert replaced_notes == WORD_NOTES
+    assert narrowed_note_1 == WORD_NOTE_1
+    assert [(item["id"], item["count"]) for item in body_only.data["results"]] == [("n1", 2)]
+    assert (worktree / "notes" / "n1.md").read_text(encoding="utf-8") == "# 新語\n新語と別の語\n"
+    assert (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8") == WORD_DOC_1
 
 
 def test_error_when_replace_text_validation_failed(

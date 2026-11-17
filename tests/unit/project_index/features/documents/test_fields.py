@@ -608,3 +608,36 @@ def test_resolve_array_when_unresolved() -> None:
     # 実行・検証
     with pytest.raises(InvalidArgumentError):
         resolve_array(data, _MODELS_SCHEMA, "#models[Zzz].properties", create=True)
+
+
+def test_delete_field_when_ref_path() -> None:
+    """参照の型の項目のパスで要素の中の項目を削除する（正常系）。"""
+    # 準備
+    data = _models_data()
+    # 実行
+    result = delete_field(data, "#models[Col].properties", schema=_MODELS_SCHEMA)
+    # 検証
+    assert result is True
+    assert data == {
+        "models": [
+            {"name": "Row", "properties": ["a"]},
+            {"name": "Col"},
+        ]
+    }
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        pytest.param("#models[Zzz].properties", id="missing_element"),
+        pytest.param("#models[Row].missing", id="missing_key"),
+    ],
+)
+def test_delete_field_when_ref_path_unresolved(path: str) -> None:
+    """参照の型の項目のパスを解けない（異常系）。"""
+    # 準備
+    data = _models_data()
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError):
+        delete_field(data, path, schema=_MODELS_SCHEMA)
+    assert data == _models_data()

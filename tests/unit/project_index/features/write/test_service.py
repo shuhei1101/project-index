@@ -31,6 +31,7 @@ from project_index.features.write.types import (
     DeleteResult,
     DeleteTarget,
     Operation,
+    ReferenceChange,
     TextEdit,
     WriteRequest,
     WriteResult,
@@ -1165,3 +1166,90 @@ def test_write_docs_when_replace_text_invalid(make_env: Callable[..., WriteEnv])
     assert "doc-2" in str(result.results[0].errors)
     assert "旧語" in (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8")
     assert "旧語" in (env.worktree / "docs/rule/doc-2.yaml").read_text(encoding="utf-8")
+
+
+def test_write_docs_when_rename_body_references(make_env: Callable[..., WriteEnv]) -> None:
+    """改名で本文のファイルの中のリンクも追随する（正常系）。"""
+    # 準備
+    files = {
+        "notes/index.yaml": "items:\n  - id: n1\n    path: n1.md\n  - id: n2\n    path: n2.py\n",
+        "notes/n1.md": "[文書 2](id:doc-2)\n[文書 2](../docs/rule/doc-2.yaml)\n",
+        "notes/n2.py": "# id:doc-2\n",
+        "docs/rule/doc-1.yaml": DOC_1,
+        "docs/rule/doc-2.yaml": DOC_2,
+        "schemas/rule.schema.yaml": SCHEMA,
+    }
+    env = make_env(files, tables=[_notes_table(), _rules_table()])
+    operation = Operation(
+        op="rename", id="doc-2", expected_version=content_hash(DOC_2), new_id="doc-9"
+    )
+    # 実行
+    result = env.write(operations=[operation])
+    # 検証
+    n1 = [item for item in result.results if item.id == "n1"]
+    assert [item.id for item in result.results if item.id == "n2"] == []
+    assert n1[0].status == "updated"
+    assert n1[0].references == [
+        ReferenceChange(path="@body", before="id:doc-2", after="id:doc-9"),
+        ReferenceChange(
+            path="@body", before="../docs/rule/doc-2.yaml", after="../docs/rule/doc-9.yaml"
+        ),
+    ]
+    assert "@@ notes/n1.md" in (n1[0].diff or "")
+    assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == (
+        "[文書 2](id:doc-9)\n[文書 2](../docs/rule/doc-9.yaml)\n"
+    )
+    assert (env.worktree / "notes/n2.py").read_text(encoding="utf-8") == "# id:doc-2\n"
+    assert (env.worktree / "notes/index.yaml").read_text(encoding="utf-8") == files[
+        "notes/index.yaml"
+    ]
+
+
+def _body_words() -> dict[str, str]:
+    """タグ `topic:a` の要素の本文のファイルが `旧語` を持つ配信元のファイルを返す。"""
+    return {
+        "notes/index.yaml": (
+            "items:\n"
+            "  - id: n1\n    name: n1\n    path: n1.md\n    tags: [topic:a]\n"
+            "  - id: n3\n    name: n3\n    path: n3.py\n    tags: [topic:a]\n"
+            "  - id: n4\n    name: n4\n    path: n1.md\n    tags: [topic:a]\n"
+        ),
+        "notes/n1.md": "# 旧語\n旧語と別の語\n",
+        "notes/n3.py": "# 旧語\n",
+        "docs/rule/doc-1.yaml": DOC_1,
+        "schemas/rule.schema.yaml": SCHEMA,
+    }
+
+
+@pytest.mark.parametrize(
+    ("fields", "expected", "body"),
+    [
+        pytest.param(None, [(0, "n1", "updated", 2)], "# 新語\n新語と別の語\n", id="all"),
+        pytest.param(["name"], [], "# 旧語\n旧語と別の語\n", id="name_only"),
+        pytest.param(
+            ["@body"], [(0, "n1", "updated", 2)], "# 新語\n新語と別の語\n", id="body_only"
+        ),
+    ],
+)
+def test_write_docs_when_replace_text_body(
+    make_env: Callable[..., WriteEnv],
+    fields: list[str] | None,
+    expected: list[tuple[int, str, str, int]],
+    body: str,
+) -> None:
+    """一括置換で本文のファイルも置換する（正常系）。"""
+    # 準備
+    env = make_env(_body_words(), tables=[_notes_table(), _rules_table()])
+    operation = Operation(
+        op="replace_text",
+        filter=Condition(field="tags", op="eq", values=["topic:a"]),
+        old="旧語",
+        new="新語",
+        fields=fields,
+    )
+    # 実行
+    result = env.write(operations=[operation])
+    # 検証
+    assert [(item.index, item.id, item.status, item.count) for item in result.results] == expected
+    assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == body
+    assert (env.worktree / "notes/n3.py").read_text(encoding="utf-8") == "# 旧語\n"

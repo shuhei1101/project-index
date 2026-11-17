@@ -703,14 +703,20 @@ scenarios:
         A->>M: write_docs(update 文書 1, remove_from: #models[Row].properties から a)
         M->>WT: Row の properties を [c] で書く
         M-->>A: applied: true と新しい version
+        A->>M: write_docs(update 文書 1, unset: #models[Col].properties)
+        M->>M: 種類のスキーマの x-key で models の Col の要素の properties へ解決する
+        M->>WT: Col の properties を削除して書く
+        M-->>A: applied: true と新しい version
       ```
 
       <!-- /map -->
     expected:
       - '`add_to` の後、ワークツリー x の文書 1 の Row の `properties` が `[a, c]` で、Col の `properties` は `[b]` のまま'
       - '`remove_from` の後、Row の `properties` が `[c]`'
-      - '`#` で始まらず要素の選び方を含むパス（`models[Row].properties`）の `add_to`・`remove_from` は、`isError: true` で `add_to.models[Row].properties`（`remove_from.` も同じ）の違反を返し、ファイルは変わらない'
-      - 無い要素（`#models[Zzz].properties`）・`x-key` の無い配列・配列でない項目を指す `#` で始まるパスも、違反を返して書き込まない
+      - '`unset` の後、Col の要素に `properties` が無く、Row の `properties` は `[c]` のまま'
+      - '`#` で始まらず要素の選び方を含むパス（`models[Row].properties`）の `add_to`・`remove_from`・`unset` は、`isError: true` で `add_to.models[Row].properties`（`remove_from.`・`unset.` も同じ）の違反を返し、ファイルは変わらない'
+      - '`add_to`・`remove_from` の、無い要素（`#models[Zzz].properties`）・`x-key` の無い配列・配列でない項目を指す `#` で始まるパスも、違反を返して書き込まない'
+      - '`unset` の無い要素（`#models[Zzz].properties`）・`x-key` の無い配列を指す `#` で始まるパスも、`unset.{パス}` の違反を返して書き込まない'
     test: test_normal_when_add_to_keyed_element
   - name: 正常シナリオ（文書を改名して参照元を追随させる）
     setup:
@@ -722,6 +728,9 @@ scenarios:
       - name: project-index
         description: sample を配信している project-index
         notes: '`worktree` にワークツリー x のパスを指定する'
+      - name: 本文のファイルを持つ参照元
+        description: '行 `notes`（`notes/index.yaml`・`records: items`・`body_file: path`）の要素 n1 の本文のファイル `notes/n1.md` が、`id:` のリンク（`[文書 2](id:doc-2#items[a])`）と相対パスのリンク（`[文書 2](../docs/doc-2.yaml)`）で文書 2 を指す'
+        notes: '`notes/n1.md` はリンクの外の文にも `doc-2` を持つ'
     flow: |-
       <!-- map: {"title": "正常シナリオ（文書を改名して参照元を追随させる）"} -->
 
@@ -732,11 +741,11 @@ scenarios:
         participant WT as ワークツリー x
 
         A->>M: write_docs(operations: 改名・文書 2・改名後の ID doc-9, dry_run: true)
-        M->>M: 同じ配信元の文書から、文書 2 の ID とパスを指す箇所を探す
+        M->>M: 同じ配信元の文書と本文のファイルから、文書 2 の ID とパスを指す箇所を探す
         M-->>A: 改名後のパスと、書き換わる参照元の文書と箇所の一覧（書き込まない）
         A->>M: write_docs(operations: 改名・文書 2・expected_version・改名後の ID doc-9)
         M->>M: 文書 2 と参照元の文書 1 を書き換えた後の文書を検査する
-        M->>WT: docs/doc-9.yaml を作成して docs/doc-2.yaml を削除し、文書 1 を書き換える
+        M->>WT: docs/doc-9.yaml を作成して docs/doc-2.yaml を削除し、文書 1 と notes/n1.md を書き換える
         M-->>A: 改名した文書と参照元の文書の id と書き込んだ後の version
       ```
 
@@ -747,6 +756,9 @@ scenarios:
       - 文書 1 の `related` の `to`・参照の型の項目の値・Markdown の値のリンク・クラス図の `click` の `href` が `doc-9` を指し、文書 1 のほかの項目は変わらない
       - 文書 3 は変わらない
       - '次の `search_docs` が `doc-9` を返却し、`doc-2` を返却しない。`trace_related` で `doc-9` から `direction: in` でたどると文書 1 を返却する'
+      - '`dry_run: true` の結果の書き換わる箇所に、n1 の本文のファイル `notes/n1.md` の 2 か所（`id:` のリンク・相対パスのリンク）が入る'
+      - 改名の後、`notes/n1.md` の `id:` のリンクが `id:doc-9#items[a]`、相対パスのリンクが `../docs/doc-9.yaml` を指し、リンクの外の `doc-2` とほかの行は変わらない。`notes/index.yaml` の n1 の要素は変わらない
+      - 応答の参照元の文書に、本文のファイルだけが変わった n1 と、書き込んだ後の n1 の version（書き込み前と違う）が入る
     test: test_normal_when_rename
   - name: 異常シナリオ（改名先の ID が既にある）
     setup:
@@ -783,6 +795,9 @@ scenarios:
       - name: project-index
         description: sample を配信している project-index
         notes: '`worktree` にワークツリー x のパスを指定する。絞り込みの条件はタグ `topic:a`'
+      - name: 単語を持つ本文のファイル
+        description: 行 `notes` の要素 n1 の本文のファイル `notes/n1.md` が `旧語` を 2 か所持ち、要素 n2 の本文のファイル `notes/n2.md` も `旧語` を持つ
+        notes: n1 はタグ `topic:a` を持ち、n1 の要素の YAML は `旧語` を持たない。n2 は `topic:a` を持たない
     flow: |-
       <!-- map: {"title": "正常シナリオ（複数の文書の単語を一括で置換する）"} -->
 
@@ -793,11 +808,11 @@ scenarios:
         participant WT as ワークツリー x
 
         A->>M: write_docs(operations: 一括置換・条件 topic:a・旧語 → 新語, dry_run: true)
-        M->>M: 条件に該当する文書の文字列の値を、配列と辞書の配下までたどって置換する
+        M->>M: 条件に該当する文書の文字列の値を、配列と辞書の配下までたどって置換し、本文のファイルの単語も置換する
         M-->>A: 文書ごとの置換の件数と差分（書き込まない）
         A->>M: write_docs(operations: 一括置換・条件 topic:a・旧語 → 新語)
         M->>M: 置換した文書を検査する
-        M->>WT: 文書 1・文書 2 を書き換える
+        M->>WT: 文書 1・文書 2 と notes/n1.md を書き換える
         M-->>A: 文書ごとの置換の件数と書き込んだ後の version
       ```
 
@@ -805,8 +820,10 @@ scenarios:
     expected:
       - '`dry_run: true` の結果が、文書 1・文書 2 の置換の件数を返却し、`applied` が `false` で、ワークツリー x のファイルは変わらない'
       - 置換した後、文書 1・文書 2 の最上位の項目・配列の要素の中・辞書の値の `旧語` が全て `新語` になり、ほかの文字列とキーの名前は変わらない
-      - 条件に該当しない文書 3 は変わらない
       - 変更していない項目のコメント・順序・引用符の種類が書き込みの前と同じ
+      - 置換した後、`notes/n1.md` の `旧語` が全て `新語` になり、ほかの文字列は変わらない
+      - 条件に該当しない文書 3 と `notes/n2.md` は変わらない
+      - '`dry_run: true` の文書ごとの置換の件数で、n1 の件数が 2（本文のファイルの 2 か所）になり、n2 の行は無い'
     test: test_normal_when_replace_words
   - name: 異常シナリオ（一括置換の後の文書が検査に合格しない）
     setup:

@@ -1,0 +1,28 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: 文書を改名したとき、本文のファイルを持つ文書の本文の中の旧 ID・旧パスのリンクも追随し、一括置換で本文の中の単語も置き換わる期待値を追加
+    depends_on: []
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: none
+    detail: 書き込みの単一ユースケースの中で操作の対象が広がるだけで、連鎖は変わらない
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: '`write_docs` の改名・一括置換の節の「本文のファイルの中は書き換えない・置換しない」を、本文のファイルの中の参照の追随と単語の置換、`fields` の `@body` の説明に置き換える'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T14:40:22.988589+00:00'
+scope_out:
+  - item: ほかの配信元から改名した文書を指す本文のファイルの中の参照の追随
+    reason: 要望は同じ配信元の本文のファイルが対象。ほかの配信元は書き込みの `scope.write` とワークツリーが別になる（#157 と同じ扱い）
+    plan: none
+  - item: Markdown でない本文のファイル（コード・スキーマ）と配信の範囲の外のファイルの中の旧 ID・旧パスの追随と単語の置換
+    reason: 要望と Issue の対象は Markdown の本文のファイルで、参照の書き換えの規則も Markdown のリンクが前提。本文のファイルは検査に通さないため、コードを置換すると壊れたコードが検査なしで書き込まれる
+    plan: none
+  - item: '`write_docs` の参照の型の項目のパスで、`x-key` の値に `[]` を含む要素（`request[operations[].fields]` など）を指せない不具合'
+    reason: 要望に含まれない。#165 では該当の 4 か所を YAML の直接編集で修正した
+    plan: '#167'

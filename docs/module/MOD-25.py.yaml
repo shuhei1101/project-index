@@ -310,14 +310,22 @@ functions:
         type: str
         required: true
         passing: positional
-        description: ドット記法と `[n]`
+        description: ドット記法と `[n]`。`#` で始まる参照の型の項目のパスも受ける
+      - name: schema
+        title: スキーマ
+        type: Mapping[str, Any] | None
+        required: false
+        default: None
+        passing: keyword
+        description: 文書 1 件の内容に当てるスキーマ。`#` で始まるパスの `x-key` の解決に使用する
     returns:
       type: bool
       description: 削除したら `True`、指した値が無ければ `False`
     process: |-
-      1. 『項目のパスの分解』で分ける。`AnyDepth`・`ArraySelector` を含む場合、`InvalidArgumentError` を送る
-      2. 最後の手前までたどり、たどれない場合は `False` を返す
-      3. 最後がキーなら辞書から、位置なら配列から削除して `True` を返す
+      1. `path` が `#` で始まる場合、`#` の後を『参照の型の項目のパスの解決』で `data` と `schema`（`None` なら空のスキーマ）からキーと位置の並びに解き、3 へ進む（解けなければ『参照の型の項目のパスの解決』の `InvalidArgumentError` をそのまま送る）
+      2. それ以外は『項目のパスの分解』で分ける。`AnyDepth`・`ArraySelector` を含む場合、`InvalidArgumentError` を送る
+      3. 最後の手前までたどり、たどれない場合は `False` を返す
+      4. 最後がキーなら辞書から、位置なら配列から削除して `True` を返す
     exceptions:
       - name: InvalidArgumentError
         condition: パスの書式が誤っている
@@ -325,6 +333,9 @@ functions:
       - name: InvalidArgumentError
         condition: パスが `**`・`[]`・`[{キー}]` を含む
         message: '{path}: `**`・`[]`・`[{キー}]` を含む項目のパスは削除できません'
+      - name: InvalidArgumentError
+        condition: '`#` で始まるパスを解けない（`x-key` の無い配列・要素が無い・順番が無い・キーが無い）'
+        message: 『参照の型の項目のパスの解決』のまま
     unit_tests:
       - name: test_delete_field
         case: 正常
@@ -347,6 +358,20 @@ functions:
         mock: なし
         expected: '`InvalidArgumentError` で内容は変わらない'
         exception: パスが `**`・`[]`・`[{キー}]` を含む
+      - name: test_delete_field_when_ref_path
+        case: 正常
+        summary: 参照の型の項目のパスで要素の中の項目を削除する
+        condition: '`models`（`x-key: name`）が `{name: Row, properties: [a]}`・`{name: Col, properties: [b]}` の内容とスキーマに `#models[Col].properties`'
+        mock: なし
+        expected: '`True` で、Col の要素が `{name: Col}`、Row の要素は変わらない'
+        exception: '-'
+      - name: test_delete_field_when_ref_path_unresolved
+        case: 異常
+        summary: 参照の型の項目のパスを解けない
+        condition: 同じ内容とスキーマに `#models[Zzz].properties` と `#models[Row].missing`
+        mock: なし
+        expected: どちらも `InvalidArgumentError` で、内容は変わらない
+        exception: '`#` で始まるパスを解けない'
   - name: resolve_metadata
     title: メタデータの解決
     kind: 関数

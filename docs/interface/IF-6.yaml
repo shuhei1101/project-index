@@ -1137,7 +1137,7 @@ flows:
       - 4 回目は `text_edits[0].field` の違反で、`notes` にキー `missing` が無いことを返却する
     test: test_error_when_text_edits_ref_path_unresolved
   - name: 正常系（参照の型の項目のパスで配列へ追加・削除する）
-    summary: '`add_to`・`remove_from` のキーに `#` で始まる参照の型の項目のパスを渡し、`x-key` の値で指した配列の要素の中の配列へ追加・削除する'
+    summary: '`add_to`・`remove_from` のキーに `#` で始まる参照の型の項目のパスを渡し、`x-key` の値で指した配列の要素の中の配列へ追加・削除する。`unset` の要素の `#` で始まるパスで、指した項目を削除する'
     setup:
       - name: Mock
         description: なし
@@ -1146,8 +1146,8 @@ flows:
       - name: 文書 1
         description: '`models` が `{name: Row, properties: [a]}`・`{name: Col, properties: [b]}`'
       - name: 入力
-        description: '1 回目は `add_to: {"#models[Row].properties": [c]}`。2 回目は `remove_from: {"#models[Row].properties": [a]}`。3 回目は `add_to: {"models[Row].properties": [d]}`。4 回目は `add_to: {"#models[Zzz].properties": [d]}`。5 回目は `add_to: {"#models[Row].name": [d]}`'
-        notes: 3 回目は `#` で始まらず要素の選び方を含むキー。4 回目は無い要素、5 回目は配列でない項目
+        description: '1 回目は `add_to: {"#models[Row].properties": [c]}`。2 回目は `remove_from: {"#models[Row].properties": [a]}`。3 回目は `add_to: {"models[Row].properties": [d]}`。4 回目は `add_to: {"#models[Zzz].properties": [d]}`。5 回目は `add_to: {"#models[Row].name": [d]}`。6 回目は `unset: ["#models[Col].properties"]`。7 回目は `unset: ["models[Row].properties"]`。8 回目は `unset: ["#models[Zzz].properties"]`'
+        notes: 3 回目は `#` で始まらず要素の選び方を含むキー。4 回目は無い要素、5 回目は配列でない項目。7 回目は `#` で始まらず要素の選び方を含む要素、8 回目は無い要素
     flow: |-
       <!-- map: {"title": "正常系（参照の型の項目のパスで配列へ追加・削除する）"} -->
 
@@ -1170,6 +1170,14 @@ flows:
         T-->>C: isError（add_to.#models[Zzz].properties）
         C->>T: update 文書 1（add_to #models[Row].name）
         T-->>C: isError（配列ではない項目）
+        C->>T: update 文書 1（unset #models[Col].properties）
+        T->>T: 種類のスキーマの x-key で models[1].properties に解決して削除する
+        T->>WT: YAML を書き換える
+        T-->>C: updated
+        C->>T: update 文書 1（unset models[Row].properties）
+        T-->>C: isError（unset.models[Row].properties）
+        C->>T: update 文書 1（unset #models[Zzz].properties）
+        T-->>C: isError（unset.#models[Zzz].properties）
       ```
 
       <!-- /map -->
@@ -1177,6 +1185,8 @@ flows:
       - 1 回目の後、Row の `properties` が `[a, c]` で Col の `properties` は `[b]` のまま
       - 2 回目の後、Row の `properties` が `[c]`
       - '3・4・5 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].add_to.{キー}` で、文書 1 を書き換えない（`applied: true` を返さない）'
+      - 6 回目の後、Col の要素に `properties` が無く、Row の `properties` は `[c]` のまま
+      - '7・8 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].unset.{要素}` で、文書 1 を書き換えない（`applied: true` を返さない）'
     test: test_normal_when_add_to_ref_path
   - name: 正常系（文書を改名して参照元を追随させる）
     summary: '`rename` で ID とファイル名を変え、同じ配信元の参照元を書き換える。`dry_run` では書き換わる箇所だけを返却する'
@@ -1188,6 +1198,9 @@ flows:
         notes: 文書 1 は `doc-20` を指す `[文書 20](id:doc-20)` も持つ。文書 3 は文書 2 を指さない
       - name: 入力
         description: '1 回目は `rename`・`id: doc-2`・`new_id: doc-9`・`dry_run: true`。2 回目は同じ操作を `dry_run` なしで指定する'
+      - name: 本文のファイルを持つ参照元
+        description: '行 `notes`（`paths: [notes/index.yaml]`・`records: items`・`body_file: path`）の要素 n1 の本文のファイル `notes/n1.md` が `[文書 2](id:doc-2#items[a])`・`[文書 2](../docs/doc-2.yaml)`・`[文書 20](id:doc-20)` と、リンクでない文の `doc-2` を持つ'
+        notes: n1 の要素の YAML は文書 2 を指さない
     flow: |-
       <!-- map: {"title": "正常系（文書を改名して参照元を追随させる）"} -->
 
@@ -1198,10 +1211,10 @@ flows:
         participant WT as ワークツリー x
 
         C->>T: rename doc-2 → doc-9, dry_run: true
-        T->>T: 同じ配信元の文書から doc-2 を指す箇所を探し、書き換えた後の文書を検査する
+        T->>T: 同じ配信元の文書と本文のファイルから doc-2 を指す箇所を探し、書き換えた後の文書を検査する
         T-->>C: applied: false、renamed と参照元の updated（references）
         C->>T: rename doc-2 → doc-9
-        T->>WT: docs/doc-9.yaml を作成して docs/doc-2.yaml を削除し、文書 1 を書き換える
+        T->>WT: docs/doc-9.yaml を作成して docs/doc-2.yaml を削除し、文書 1 と notes/n1.md を書き換える
         T-->>C: applied: true、renamed と参照元の updated
       ```
 
@@ -1211,6 +1224,8 @@ flows:
       - 2 回目の後、`docs/doc-9.yaml` があり `id` が `doc-9` でほかの項目は改名の前と同じで、`docs/doc-2.yaml` が無い
       - 文書 1 の `related` の `to`・`doc-9#items[a]`・`[文書 2](id:doc-9)`・`click N href "id:doc-9#items[a]"` になり、`[文書 20](id:doc-20)` とほかの項目は変わらず、変更していない行の引用符の種類も保つ
       - 文書 3 は変わらず、次の `search_docs` が `doc-9` を返却し `doc-2` を返却しない
+      - 2 回目の後、`notes/n1.md` の 2 つのリンクが `id:doc-9#items[a]`・`../docs/doc-9.yaml` を指し、`[文書 20](id:doc-20)`・リンクでない文の `doc-2`・ほかの行と `notes/index.yaml` は変わらず、n1 の行の `version` が書き込みの前と違う
+      - '1 回目の `results` に、n1 の `id`・`index: 0`・`status: updated` の行があり、`references` が `{path: @body, before: id:doc-2, after: id:doc-9}` と `{path: @body, before: ../docs/doc-2.yaml, after: ../docs/doc-9.yaml}` の 2 か所で、`diff` に `@@ notes/n1.md` の行がある'
     test: test_normal_when_rename
   - name: 正常系（ID を変えずにファイル名だけを改名する）
     summary: '`new_path` だけの `rename` でファイルを移し、パスで指す参照元を書き換える'
@@ -1335,8 +1350,11 @@ flows:
       - name: 単語を持つ文書
         description: 文書 1 は `description` に `旧語` を 1 つ、配列 `items[].text` に 2 つ、辞書 `notes` の値に 1 つ持ち、キー名 `旧語` の辞書のキーを持つ。文書 2 は `name` に 1 つ持つ。文書 3 も `旧語` を持つ
         notes: 文書 1・文書 2 はタグ `topic:a` を持ち、文書 3 は持たない
+      - name: 単語を持つ本文のファイル
+        description: 行 `notes` の要素 n1 の本文のファイル `notes/n1.md` が `旧語` を 2 つ持ち、要素 n2 の `notes/n2.md` が `旧語` を 1 つ持つ
+        notes: n1 はタグ `topic:a` を持ち、n1 の要素の YAML は `旧語` を持たない。n2 は `topic:a` を持たない
       - name: 入力
-        description: '1 回目は `replace_text`・`filter: {field: tags, op: eq, values: [topic:a]}`・`old: 旧語`・`new: 新語`・`dry_run: true`。2 回目は `dry_run` なし。3 回目は 1 回目の前の状態に `fields: [items]` を指定する'
+        description: '1 回目は `replace_text`・`filter: {field: tags, op: eq, values: [topic:a]}`・`old: 旧語`・`new: 新語`・`dry_run: true`。2 回目は `dry_run` なし。3 回目は 1 回目の前の状態に `fields: [items]` を、4 回目は 1 回目の前の状態に `fields: [@body]` を指定する'
     flow: |-
       <!-- map: {"title": "正常系（複数の文書の単語を一括で置換する）"} -->
 
@@ -1347,18 +1365,19 @@ flows:
         participant WT as ワークツリー x
 
         C->>T: replace_text topic:a、旧語 → 新語、dry_run: true
-        T->>T: filter に該当する文書の文字列の値をたどって置換し、検査する
+        T->>T: filter に該当する文書の文字列の値と本文のファイルを置換し、検査する
         T-->>C: applied: false、文書ごとの count と diff
         C->>T: replace_text topic:a、旧語 → 新語
-        T->>WT: 文書 1・文書 2 を書き換える
+        T->>WT: 文書 1・文書 2 と notes/n1.md を書き換える
         T-->>C: applied: true、文書ごとの count と version
       ```
 
       <!-- /map -->
     expected:
-      - '1 回目は `applied: false` で、`results` が `index: 0` の 2 行（文書 1 は `count: 4`、文書 2 は `count: 1`、どちらも `status: updated` と `diff`）で、ファイルは変わらない'
-      - 2 回目の後、文書 1・文書 2 の値の `旧語` が全て `新語` になり、辞書のキー `旧語` と文書 3 は変わらず、変更していない行のコメントと引用符の種類も保つ
-      - '3 回目は文書 1 の `items[].text` だけが置換され `count: 2` で、文書 2 の行は返却しない'
+      - '1 回目は `applied: false` で、`results` が `index: 0` の 3 行（文書 1 は `count: 4`、文書 2 は `count: 1`、n1 は `count: 2` で `diff` に `@@ notes/n1.md` の行を持つ。どれも `status: updated` と `diff`）で、n2 の行は無く、ファイルは変わらない'
+      - 2 回目の後、文書 1・文書 2 の値と `notes/n1.md` の `旧語` が全て `新語` になり、辞書のキー `旧語`・文書 3・`notes/n2.md`・`notes/index.yaml` は変わらず、変更していない行のコメントと引用符の種類も保つ
+      - '3 回目は文書 1 の `items[].text` だけが置換され `count: 2` で、文書 2 と n1 の行は返却しない'
+      - '4 回目は `notes/n1.md` だけが置換され、n1 の行だけを `count: 2` で返却し、文書 1・文書 2 は変わらない'
     test: test_normal_when_replace_text
   - name: 異常系（一括置換の後の文書が検査に合格しない・ValidationFailedError）
     summary: 置換した文書が 1 件でも検査に合格しなければ、どの文書も書き換えない
@@ -1484,7 +1503,7 @@ request:
     default: なし
     location: argument
     description: 消す項目のパス
-    notes: '`update` だけ'
+    notes: '`update` だけ。`#` で始まる参照の型の項目のパスも受ける（制約「unset の項目のパス」）'
   - name: operations[].add_to
     type: dict[str, list]
     required: false
@@ -1603,8 +1622,8 @@ request:
     required: false
     default: なし（制約の「一括置換の対象」の全ての項目）
     location: argument
-    description: 置換する項目のパス。項目の配下の文字列も置換する
-    notes: '`replace_text` だけ。共通のキーは列名へ読み替える'
+    description: 置換する項目のパス。項目の配下の文字列も置換する。`@body` は本文のファイルを指す
+    notes: '`replace_text` だけ。`@body` は `records`・`body_file` の行の文書のうち本文のファイルの拡張子が `.md` の文書だけに適用し、ほかの文書では無視する。共通のキーは列名へ読み替える'
 request_example: |-
   ```json
   {
@@ -1655,11 +1674,11 @@ response:
     notes: '`renamed` のときだけ'
   - name: results[].references
     type: 'list[{path: str, before: str, after: str}]'
-    description: 改名で書き換えた参照元の箇所（項目のパスと、書き換える前後の値）
+    description: 改名で書き換えた参照元の箇所（項目のパスと、書き換える前後の値）。本文のファイルの箇所は `path` が `@body`
     notes: '`rename` の参照元の文書の行だけ。`rename` の参照元は、改名した文書の行と同じ `index` で `status` が `updated` の行になる'
   - name: results[].count
     type: int
-    description: 文書ごとの置換の件数
+    description: 文書ごとの置換の件数（本文のファイルの件数を含む）
     notes: '`replace_text` だけ。置換した文書ごとに同じ `index` で 1 行ずつ返却し、置換が 0 件の文書の行は返却しない'
 response_example: |-
   ```json
@@ -1691,7 +1710,7 @@ exceptions:
     condition: '`update`・`replace` の `id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
   - name: InvalidArgumentError
-    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先が行の `exclude[]` に当たる（`/` を含む値はパス、含まない値はファイル名で当てる）・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`rename` に `new_id`・`new_path` がどちらも無い・ID がパスの文書に `new_id` を渡した・`body_file` を持たない `records` の行の文書に `new_path` を渡した・`new_path` が種類の行の `paths` に当たらないか `exclude[]` に当たるか既にあるファイルを指す・`replace_text` に `filter`・`old`・`new` のどれかが無いか `old` が空・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す'
+    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先が行の `exclude[]` に当たる（`/` を含む値はパス、含まない値はファイル名で当てる）・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`rename` に `new_id`・`new_path` がどちらも無い・ID がパスの文書に `new_id` を渡した・`body_file` を持たない `records` の行の文書に `new_path` を渡した・`new_path` が種類の行の `paths` に当たらないか `exclude[]` に当たるか既にあるファイルを指す・`replace_text` に `filter`・`old`・`new` のどれかが無いか `old` が空・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す・`unset` の要素の参照の型の項目のパスを解決できないか、`#` で始まらない要素に要素の選び方（`[...]`・`**.`）を含む'
   - name: SourceNotServedError
     condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
   - name: WorktreeNotMatchedError
@@ -1773,7 +1792,7 @@ constraints:
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、作業場所が `scope.write` に当たれば登録したフォルダへ書き、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく `created`・`updated` を付ける。`worktree` を指定すると `InvalidArgumentError`'
   - item: 参照の型の項目のパス
-    constraint: '`text_edits[].field` が `#` で始まるとき、`#` の後を種類のスキーマ（`$ref` を解決した後）と文書でたどり、位置で指す項目のパスに解決してから既存の取得・書き込みで置き換える。配列の項目の `[{値}]` はスキーマの `x-key` のキーがその値の最初の要素、`[{値}#{順番}]` は同じ値の要素のその順番の要素（同じ値の要素が無く、末尾が `#{整数}` のときだけ）、辞書の項目の `[{キー}]` はそのキー（`.` や空白を含んでも 1 階層）を指す。`[]` の外の `.` で区切った名前は辞書のキー。共通のキーの列名への読み替えはしない。`text_edits[].field` と `add_to`・`remove_from` のキーだけが受け付け、`set`・`unset` と `metadata` の列名・`search_docs`・`list_changes` の項目のパスの読み方は変えない'
+    constraint: '`text_edits[].field` が `#` で始まるとき、`#` の後を種類のスキーマ（`$ref` を解決した後）と文書でたどり、位置で指す項目のパスに解決してから既存の取得・書き込みで置き換える。配列の項目の `[{値}]` はスキーマの `x-key` のキーがその値の最初の要素、`[{値}#{順番}]` は同じ値の要素のその順番の要素（同じ値の要素が無く、末尾が `#{整数}` のときだけ）、辞書の項目の `[{キー}]` はそのキー（`.` や空白を含んでも 1 階層）を指す。`[]` の外の `.` で区切った名前は辞書のキー。共通のキーの列名への読み替えはしない。`text_edits[].field`・`add_to`・`remove_from` のキーと `unset` の要素だけが受け付け、`set` と `metadata` の列名・`search_docs`・`list_changes` の項目のパスの読み方は変えない'
     notes: 書き方は設計書の参照の型（`{ID}#{項目のパス}`）の `#` から後と同じ。`#` で始まらない既存の `[{キー}]`（キーが真の要素）とは `#` の有無で分ける
   - item: add_to・remove_from の項目のパス
     constraint: '`add_to`・`remove_from` のキーが `#` で始まるとき、「参照の型の項目のパス」と同じ読み方で文書の中の 1 つの配列へ解決し、その配列へ追加・削除する。解決できないパス（無い要素・`x-key` の無い配列・無いキー）と、解決した値が配列でないパスは `add_to.{パス}`・`remove_from.{パス}` の違反にする。`#` で始まらないキーに要素の選び方（`[...]`・`**.`）を含めると、書き込まずに同じ違反にする'
@@ -1785,14 +1804,17 @@ constraints:
     constraint: 1 ファイル 1 文書は、改名後のパスに YAML を作成して改名前のファイルを削除する。`records`・`body_file` の行の文書は、管理用の YAML の要素の `body_file` の列を管理用の YAML のフォルダからの相対で書き換え、本文のファイルを移す。移すファイルの内容は変えない
     notes: どちらも、全ての検査に合格してから一時ファイルを経由して置き換える。project-index は `git mv` しない
   - item: 改名の参照元
-    constraint: "同じ配信元の全ての文書から、次の箇所を書き換える。(1) 種類の行の `metadata.related` の列の、`source` を持たず `to` が旧 ID の行の `to`。(2) 文字列の値の全体が `{旧 ID}#{項目のパス}` の値の ID の部分。(3) 文字列の値の中の `id:{旧 ID}` のうち、直後が `#`・`)`・`\"`・`'`・空白・文字列の末尾のものの ID の部分（Markdown のリンク・mermaid の `click` の `href`）。(4) パスが変わるとき、文字列の値の全体と Markdown のリンクの先のうち、その文書のファイルのフォルダから解くと改名前のパスになる値を、同じフォルダから改名後のパスを指す相対の値（`index.yaml` の `page: IF-6.yaml` など）"
-    notes: 本文のファイルの中と、ほかの配信元からの参照は書き換えない。書き換えた参照元の文書も検査と mdmark の点検に合格させる
+    constraint: "同じ配信元の全ての文書から、次の箇所を書き換える。(1) 種類の行の `metadata.related` の列の、`source` を持たず `to` が旧 ID の行の `to`。(2) 文字列の値の全体が `{旧 ID}#{項目のパス}` の値の ID の部分。(3) 文字列の値の中の `id:{旧 ID}` のうち、直後が `#`・`)`・`\"`・`'`・空白・文字列の末尾のものの ID の部分（Markdown のリンク・mermaid の `click` の `href`）。(4) パスが変わるとき、文字列の値の全体と Markdown のリンクの先のうち、その文書のファイルのフォルダから解くと改名前のパスになる値を、同じフォルダから改名後のパスを指す相対の値（`index.yaml` の `page: IF-6.yaml` など）。(5) `records`・`body_file` の行の文書の、拡張子が `.md` の本文のファイルの、(3) の `id:{旧 ID}` と、本文のファイルのフォルダから解くと改名前のパスになる Markdown のリンクの先。本文のファイルの箇所は `references[].path` を `@body` にする"
+    notes: 拡張子が `.md` でない本文のファイル（コード・スキーマ・画像など）は読まず、書き換えない。本文のファイルの中のリンクでない文と、改名した文書自身の本文のファイルと、ほかの配信元からの参照は書き換えない。同じ本文のファイルを複数の要素が指すときは、管理用の YAML で先に並ぶ要素の文書の行で 1 回だけ書き換える。本文のファイルは検査と mdmark の点検に通さない（制約の「本文のファイルの検査」）。書き換えた参照元の文書も検査と mdmark の点検に合格させる
   - item: 一括置換の対象
-    constraint: '`filter` に該当する文書の、文字列の値（配列の要素・辞書の値の配下を含む）の `old` を全て `new` にする。辞書のキー・文字列でない値・種類の行の ID の列と `body_file` の列・本文のファイルは置換しない'
-    notes: '`old` を含まない文書は書き換えず、検査しない。置換した文書が 1 件も無いときは `results` に行を返却せず正常終了する'
+    constraint: '`filter` に該当する文書の、文字列の値（配列の要素・辞書の値の配下を含む）の `old` を全て `new` にする。`records`・`body_file` の行の文書のうち本文のファイルの拡張子が `.md` の文書は、本文のファイルの `old` も全て `new` にし、件数をその文書の `count` に含める。`fields` を指定したときは、`@body` を含むときだけ本文のファイルを置換する。辞書のキー・文字列でない値・種類の行の ID の列と `body_file` の列・拡張子が `.md` でない本文のファイルは置換しない'
+    notes: '`old` を含まない文書は書き換えず、検査しない。同じ本文のファイルを複数の要素が指すときは、管理用の YAML で先に並ぶ要素の文書で 1 回だけ置換して数える。置換した文書が 1 件も無いときは `results` に行を返却せず正常終了する'
   - item: 一括置換の失敗
     constraint: 置換した文書が 1 件でも検査に合格しなければ、その `replace_text` の操作全体を失敗にする。違反には合格しなかった文書の `id` を添える
     notes: '`atomic: false` でも、同じ操作の合格した文書だけを書き込むことはしない'
+  - item: unset の項目のパス
+    constraint: '`unset` の要素が `#` で始まるとき、「参照の型の項目のパス」と同じ読み方で文書の中の 1 つの項目へ解決し、その項目を削除する。解決できないパス（無い要素・`x-key` の無い配列・無い順番・無いキー）は `unset.{パス}` の違反にする。`#` で始まらない要素に要素の選び方（`[...]`・`**.`）を含めると、書き込まずに同じ違反にする'
+    notes: '`#` で始まらず要素の選び方を含まない要素は今までどおりで、項目が無ければ何もしない。解決した項目は配列でなくても削除する。共通のキーの列名への読み替えは `#` で始まる要素にはしない'
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]
