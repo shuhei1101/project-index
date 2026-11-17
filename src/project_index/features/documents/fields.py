@@ -268,6 +268,24 @@ def resolve_array(
     return _walk(data, tokens)[1]
 
 
+def array_x_key(data: Mapping[str, Any], schema: Mapping[str, Any], path: str) -> str | None:
+    """`add_to`・`remove_from` のキーの項目のパスが指す配列のスキーマの `x-key` を返す。"""
+    # キーの項目のパスをキーと位置の並びに解く（`#` で始まるパスは x-key の値で要素の位置を解く）
+    if path.startswith(REF_PATH_PREFIX):
+        tokens = resolve_ref_path(data, schema, path[len(REF_PATH_PREFIX) :])
+    else:
+        tokens = _plain_tokens(
+            path, "は配列として指せません。`#` で始めて x-key の値で要素を指してください"
+        )
+    # スキーマを最上位から並びの順にたどる（位置は配列の items、キーは辞書の項目へ進む）
+    node = _schema_node(schema, schema)
+    for token in tokens:
+        child = node.get("items") if isinstance(token, int) else _property_schema(node, token)
+        node = _schema_node(schema, child)
+    key = node.get("x-key")
+    return key if isinstance(key, str) else None
+
+
 REF_PATH_EXAMPLE = (
     "例 `#functions[save].process`・`#functions[save#2].process`・`#notes[main.py の補足]`"
 )

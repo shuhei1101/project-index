@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, cast
 from project_index.features.documents.fields import (
     ANY_DEPTH_PREFIX,
     REF_PATH_PREFIX,
+    array_x_key,
     delete_field,
     get_field,
     resolve_array,
@@ -79,8 +80,10 @@ def apply_operation(
                 _violation(f"set.{path}", violation.rule) for violation in error.violations
             )
     violations.extend(_unset(content, operation.unset, schema))
+    # 同じ配列の要素を削除してから追加する（違反は add_to・remove_from の順に並べる）
+    removed = _remove_from(content, operation.remove_from, schema)
     violations.extend(_add_to(content, operation.add_to, schema))
-    violations.extend(_remove_from(content, operation.remove_from, schema))
+    violations.extend(removed)
     violations.extend(_text_edits(content, operation.text_edits, schema))
     if violations:
         raise InvalidArgumentError(message="操作を適用できません", violations=violations)
@@ -129,6 +132,7 @@ def _remove_from(
     for path, values in remove_from.items():
         try:
             existing = resolve_array(content, schema or {}, path, create=False)
+            key = array_x_key(content, schema or {}, path)
         except InvalidArgumentError as error:
             violations.extend(
                 _violation(f"remove_from.{path}", item.rule) for item in error.violations
@@ -141,8 +145,33 @@ def _remove_from(
                 _violation(f"remove_from.{path}", "配列ではない項目からは削除できません")
             )
             continue
-        existing[:] = [item for item in existing if item not in values]
+        # x-key を持たない配列: 渡した値と等しい要素を除く（該当しない値は何もしない）
+        if key is None:
+            existing[:] = [item for item in existing if item not in values]
+            continue
+        # x-key を持つ配列: 除く前の配列で、値ごとに削除する要素が有るかを確かめる
+        missing = [
+            value for value in values if not any(_matches(item, value, key) for item in existing)
+        ]
+        if missing:
+            violations.extend(
+                _violation(f"remove_from.{path}", f"{path} に {value!r} の要素がありません")
+                for value in missing
+            )
+            continue
+        existing[:] = [
+            item for item in existing if not any(_matches(item, value, key) for value in values)
+        ]
     return violations
+
+
+def _matches(item: object, value: object, key: str) -> bool:
+    """`x-key` を持つ配列の要素が、`remove_from` の値の削除する要素かを返す。"""
+    # オブジェクトの値: 要素そのものと等しいか
+    if is_dict(value):
+        return item == value
+    # オブジェクトでない値: 要素の x-key のキーの値と等しいか
+    return is_dict(item) and key in item and item[key] == value
 
 
 def _text_edits(
