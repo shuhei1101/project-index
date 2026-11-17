@@ -440,8 +440,8 @@ functions:
       - name: test_write_docs_when_replace_text_invalid
         case: 異常
         summary: 置換した文書が検査に合格しない
-        condition: '同じ文書で、検査が 2 件目の文書だけに違反を返す。`atomic: false`'
-        mock: 検査を差し替える
+        condition: '同じ文書で、種類のスキーマが `name` に改行を許可しない。`new` に改行を含む値、`atomic: false`'
+        mock: 一時フォルダの配信元
         expected: '`replace_text` の行が `failed` で違反に 2 件目の文書の `id` が入り、どの文書も変わらない'
   - name: delete_docs
     title: 文書の削除
