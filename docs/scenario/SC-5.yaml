@@ -39,6 +39,7 @@ scenarios:
       - sample のフォルダで呼んだ `describe` が `sample`（読み書き）を返す
       - '`reload` の前後で `/mcp` のセッションが切れず、ツールは 7 つのまま'
       - スキルの応答に、書き込んだ行の表と `check_project` の結果がある
+      - 配信元の `schemas/files.schema.yaml` が、knowledge の `schemas/knowledge-files.schema.yaml` のファイルの行のキー（`id`・`aliases`・`inject_when`・`category`）と `checkpoint` を持ち、配信元のフォルダの外部のファイルを `$ref` で指さない
     test: test_normal
   - name: 正常シナリオ（YAML でない範囲を加える）
     setup:
