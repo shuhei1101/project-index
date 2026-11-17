@@ -423,8 +423,8 @@ flows:
       - name: Mock
         description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
       - name: 配信元
-        description: '検証に通る sample。行 `files`（`paths: [files.yaml]`・`records: files`・`body_file: path`）の直下の `files.yaml` が `src/a.py` の行だけを持ち、行 `prompts`（`paths: [content/prompts/**/*.yaml]`・プロンプトのスキーマ）を持つ'
-        notes: '-'
+        description: '検証に通る sample。行 `sample`（`paths: [docs/*.yaml]`）、行 `files`（`paths: [files.yaml]`・`records: files`・`body_file: path`）、行 `prompts`（`paths: [content/prompts/**/*.yaml]`）を持ち、直下の `files.yaml` がほかの行の文書でない `project-index.yaml`・`schemas/*.yaml`・`src/a.py` の行を持つ'
+        notes: '`docs/*.yaml` も行 `sample` の文書なので、索引に無いファイルに数えない'
       - name: 範囲のファイル
         description: '`src/a.py` と、プロンプトのスキーマに通る `content/prompts/p.yaml` を置く'
         notes: '`content/prompts/p.yaml` は行 `files` の管理用の YAML のフォルダの配下で、行 `prompts` の `paths` に当たる'
