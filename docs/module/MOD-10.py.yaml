@@ -69,8 +69,6 @@ functions:
         condition: '`checks.checking` と `snapshots.exporting` が `True` の `Handlers`'
         mock: 配信元の検査のキャッシュ・リビジョンの書き出し（最中を返す偽物）
         expected: '`checking` と `exporting` が `True`、`loading` が `False`'
-    callers:
-      - MOD-93#functions[build_admin_mcp]
     callees:
       - '#functions[_source_states]'
       - '#functions[version_state]'
@@ -127,8 +125,6 @@ functions:
         condition: 起動時は `a` が `serving`。`handlers.reload_sources` を、本物を呼んだ後に `a` の検査の終了を待つ関数に差し替える
         mock: '`handlers.reload_sources`（本物を呼び、検査の終了を待つ）'
         expected: '`sources[]` の `a` の行の `sync` が `None`'
-    callers:
-      - MOD-93#functions[build_admin_mcp]
     callees:
       - '#functions[_source_states]'
   - name: check_project
@@ -230,8 +226,6 @@ functions:
         condition: Git のリポジトリの中に commit していない `project-index.local.yaml` を置き、`path` にその絶対パス、`storage_type="disk"`
         mock: なし（一時ディレクトリの git リポジトリ）
         expected: '`violations` が空で、`sync` の件数が 0'
-    callers:
-      - MOD-93#functions[build_admin_mcp]
     callees:
       - '#functions[_load_candidate]'
       - '#functions[version_state]'
@@ -428,8 +422,6 @@ functions:
         mock: なし
         expected: '`ValidationFailedError`'
         exception: 配信元の設定の違反
-    callers:
-      - MOD-93#functions[build_admin_mcp]
     callees:
       - '#functions[_load_candidate]'
   - name: _load_candidate
@@ -518,9 +510,6 @@ functions:
         condition: '`dev-docs.yaml` だけを置いたフォルダ'
         mock: なし（一時フォルダ）
         expected: '`dev-docs.yaml` を読んだ配信元を返す。同じフォルダに `project-index.yaml` を置くと `project-index.yaml` を読む'
-    callers:
-      - '#functions[check_project]'
-      - '#functions[try_convert]'
     callees:
       - MOD-70#functions[assemble_source]
   - name: _source_states
@@ -580,9 +569,6 @@ functions:
         condition: '`serving` の 1 行で、配信元の検査のキャッシュに結果がある。`with_sync=False`'
         mock: なし
         expected: '`serving` の行の `sync` が `None`'
-    callers:
-      - '#functions[get_status]'
-      - '#functions[reload_config]'
     callees:
       - '#functions[version_state]'
   - name: version_state
@@ -630,10 +616,6 @@ functions:
         mock: なし
         expected: '`ValueError`'
         exception: 整数にできない
-    callers:
-      - '#functions[get_status]'
-      - '#functions[check_project]'
-      - '#functions[_source_states]'
 constants:
   - name: CONFIG_FILE
     title: 配信元の設定のファイル名

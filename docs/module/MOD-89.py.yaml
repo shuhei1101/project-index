@@ -715,7 +715,10 @@ functions:
         expected: 2 を返し、標準出力が空で、標準エラーに渡したパス
         exception: なし（終了コード 2）
     refs:
-      - MOD-26#functions[indexable_files]
+      - to: MOD-26
+        item: functions[indexable_files]
+        type: references
+        when: 未確定
   - name: start_loading
     title: 配信元の読み込みの開始
     container: project_index/main.py
@@ -911,8 +914,14 @@ functions:
         expected: 2 を返し、標準出力が空で、標準エラーに渡したパス
         exception: なし（終了コード 2）
     refs:
-      - MOD-106-6#functions[outline_files]
-      - MOD-106-6#functions[to_json_line]
+      - to: MOD-106-6
+        item: functions[outline_files]
+        type: references
+        when: 未確定
+      - to: MOD-106-6
+        item: functions[to_json_line]
+        type: references
+        when: 未確定
   - name: run_changed
     title: 中身が変わったファイルの一覧の実行
     container: project_index/main.py
@@ -979,7 +988,10 @@ functions:
         expected: 2 を返し、標準出力が空で、標準エラーに `checked_at`
         exception: なし（終了コード 2・checkpoint）
     refs:
-      - MOD-106-8#functions[find_changed]
+      - to: MOD-106-8
+        item: functions[find_changed]
+        type: references
+        when: 未確定
   - name: run_checkpoint
     title: 確認の時点の記録の実行
     container: project_index/main.py
@@ -1038,6 +1050,11 @@ functions:
         expected: 2 を返し、標準エラーに `missing.md`
         exception: なし（終了コード 2・見直したファイル）
     refs:
-      - MOD-106-9#functions[record_checkpoint]
+      - to: MOD-106-9
+        item: functions[record_checkpoint]
+        type: references
+        when: 未確定
 refs:
-  - IF-15#
+  - to: IF-15
+    type: references
+    when: 未確定

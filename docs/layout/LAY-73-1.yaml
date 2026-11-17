@@ -329,9 +329,16 @@ gitignore:
   - pattern: .env
     reason: 秘匿値
 refs:
-  - ARCH-1#repository
-  - CMD-1#
-  - TP-1#
+  - to: ARCH-1
+    item: repository
+    type: references
+    when: 未確定
+  - to: CMD-1
+    type: references
+    when: 未確定
+  - to: TP-1
+    type: references
+    when: 未確定
 notes:
   Git で管理する生成物: |-
     `docs/` の `README.md` と `docs/_theme/_data/nav.project.yml` は GitHub と Pages で目次として表示するため、生成物でも Git で管理する。

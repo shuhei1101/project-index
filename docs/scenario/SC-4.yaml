@@ -724,7 +724,10 @@ scenarios:
       - その後の最初の文書の一覧の取得は、要求の中で `main` の commit を書き出し直して 200 を返却し、ログの `リビジョンを書き出した` が 1 行出る。書き出し直しも上限を超えたときは、画面のサーバーが文書を読むの異常シナリオ（リビジョンの書き出しが上限を超える）と同じエラーを返却する
     test: test_error_when_background_export_times_out
     refs:
-      - SC-11#scenarios[異常シナリオ（リビジョンの書き出しが上限を超える）]
+      - to: SC-11
+        item: scenarios[異常シナリオ（リビジョンの書き出しが上限を超える）]
+        type: references
+        when: 未確定
   - name: 正常シナリオ（disk を指定した配信元を Git を参照せずに配信する）
     setup:
       - name: Mock
@@ -799,7 +802,6 @@ tags:
   - name: topic:サーバー
     main: true
   - name: action:起動
-issue: 14
 primary_actor: 利用者
 stakeholders:
   - name: 利用者
@@ -815,6 +817,12 @@ minimal_guarantee: 検証に失敗した配信元があっても、他の配信�
 frequency: 端末の起動ごと・project-index の更新ごと
 priority: 高
 refs:
-  - SC-1#scenarios[正常シナリオ]
-  - SC-1#scenarios[異常シナリオ（配信できない配信元がある）]
+  - to: SC-1
+    item: scenarios[正常シナリオ]
+    type: references
+    when: 未確定
+  - to: SC-1
+    item: scenarios[異常シナリオ（配信できない配信元がある）]
+    type: references
+    when: 未確定
 test_file: tests/e2e/単一ユースケース/test_起動する.py

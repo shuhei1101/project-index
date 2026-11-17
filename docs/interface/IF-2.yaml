@@ -550,7 +550,10 @@ flows:
       - 2 回目が `rule-index` の 1 件を返し、その `kind` が `index` になる
     test: test_normal_when_excluded_name
     refs:
-      - SC-6#scenarios[正常シナリオ（除外の名前に当たるファイルを外す）]
+      - to: SC-6
+        item: scenarios[正常シナリオ（除外の名前に当たるファイルを外す）]
+        type: references
+        when: 未確定
   - name: 正常系（列名の違う種類を共通のキーで引く）
     summary: 行の `metadata` の対応で、列名の違う文書を共通のキーで絞り、共通のキーで返す
     setup:
@@ -1392,8 +1395,20 @@ constraints:
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、作業場所が `worktrees[]` に当たっても登録したフォルダの文書を返す。`ref`・`worktree` を指定すると `InvalidArgumentError`。ファイルの日時は文書の `created`・`updated` の値（無ければ空）'
 refs:
-  - SC-6#scenarios[正常シナリオ]
-  - SC-9#scenarios[正常シナリオ]
-  - SC-6#scenarios[正常シナリオ（当たった数で並べて絞る）]
-  - SC-6#scenarios[正常シナリオ（本文の一部を読む）]
+  - to: SC-6
+    item: scenarios[正常シナリオ]
+    type: references
+    when: 未確定
+  - to: SC-9
+    item: scenarios[正常シナリオ]
+    type: references
+    when: 未確定
+  - to: SC-6
+    item: scenarios[正常シナリオ（当たった数で並べて絞る）]
+    type: references
+    when: 未確定
+  - to: SC-6
+    item: scenarios[正常シナリオ（本文の一部を読む）]
+    type: references
+    when: 未確定
 test_file: tests/integration/server/test_search_docs.py

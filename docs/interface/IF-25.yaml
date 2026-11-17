@@ -186,7 +186,10 @@ flows:
       - 状態のフォルダに書き出しの途中のフォルダが残らない
     test: test_error_when_revision_export_times_out
     refs:
-      - SC-11#scenarios[異常シナリオ（リビジョンの書き出しが上限を超える）]
+      - to: SC-11
+        item: scenarios[異常シナリオ（リビジョンの書き出しが上限を超える）]
+        type: references
+        when: 未確定
   - name: 正常系（disk の配信元でリビジョンを指す）
     summary: disk の配信元は `ref` を無視して登録したフォルダの文書を返す
     setup:

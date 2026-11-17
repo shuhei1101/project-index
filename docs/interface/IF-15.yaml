@@ -872,7 +872,10 @@ flows:
       - ログの `リビジョンを書き出した` が `main` の commit で 1 行で、文書の一覧の取得の後も増えない
     test: test_normal_when_default_ref_exported_in_background
     refs:
-      - SC-4#scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
+      - to: SC-4
+        item: scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
+        type: references
+        when: 未確定
   - name: 正常系（裏のリビジョンの書き出しが上限を超える）
     summary: 裏の書き出しが上限で止まっても配信を続け、次の要求が書き出し直す
     setup:
@@ -902,7 +905,10 @@ flows:
       - 文書の一覧の取得が 200 を返し、ログの `リビジョンを書き出した` が 1 行出る
     test: test_normal_when_background_export_times_out
     refs:
-      - SC-4#scenarios[異常シナリオ（裏のリビジョンの書き出しが上限を超える）]
+      - to: SC-4
+        item: scenarios[異常シナリオ（裏のリビジョンの書き出しが上限を超える）]
+        type: references
+        when: 未確定
   - name: 正常系（disk の配信元を Git を参照せずに配信する）
     summary: Git のリポジトリの中の disk の配信元を、登録したフォルダの設定・スキーマ・スクリプトで配信する
     setup:
@@ -1148,5 +1154,8 @@ constraints:
     constraint: 端末の設定の行の `storage.type`（`git`・`disk`）で決める。省略すると、配信元のフォルダが Git の作業ツリーの中なら `git`、外なら `disk`。Git の作業ツリーの外部のフォルダに `git` を指定した行は、その配信元だけを配信せず、エラーログに `sources[{添字}].storage.type` とフォルダが Git の作業ツリーの中に無い理由を残す
     notes: 端末の設定のスキーマの違反（プロセスを止める）ではなく、配信元の検証の失敗として扱う
 refs:
-  - SC-4#scenarios[正常シナリオ]
+  - to: SC-4
+    item: scenarios[正常シナリオ]
+    type: references
+    when: 未確定
 test_file: tests/integration/server/test_serve.py

@@ -63,6 +63,9 @@ functions:
         expected: 1 を返し、標準出力が空で、標準エラーに読めない理由
         exception: なし（終了コード 1）
     refs:
-      - MOD-41#functions[convert_prompt]
+      - to: MOD-41
+        item: functions[convert_prompt]
+        type: references
+        when: 未確定
 notes:
   決まり: 標準入力を変換して標準出力に出し、失敗を終了コードにする。

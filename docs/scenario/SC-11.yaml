@@ -392,7 +392,6 @@ tags:
     main: true
   - name: action:読み取り
   - name: tool:dev-docs
-issue: 14
 visibility: internal
 primary_actor: dev-docs の画面のサーバー
 stakeholders:
@@ -408,8 +407,14 @@ minimal_guarantee: 読み取り API の呼び出しは配信元のファイル�
 frequency: 利用者が画面を操作するたび
 priority: 高
 refs:
-  - SC-1#scenarios[正常シナリオ]
-  - SC-1#scenarios[異常シナリオ（配信できない配信元がある）]
+  - to: SC-1
+    item: scenarios[正常シナリオ]
+    type: references
+    when: 未確定
+  - to: SC-1
+    item: scenarios[異常シナリオ（配信できない配信元がある）]
+    type: references
+    when: 未確定
 notes:
   差分: 2 つのリビジョンの差分は、dev-docs の画面のサーバーが 2 つのリビジョンの文書の取得の結果から作る。
 test_file: tests/e2e/単一ユースケース/test_画面のサーバーが文書を読む.py

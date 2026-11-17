@@ -78,8 +78,6 @@ functions:
         mock: 手順の配置先
         expected: '`MigrationFailedError`'
         exception: 操作が選択肢の外
-    callers:
-      - MOD-37#functions[plan_migration]
   - name: apply_step
     title: 手順の適用
     kind: 関数
@@ -171,7 +169,5 @@ functions:
         mock: なし
         expected: '`MigrationFailedError`'
         exception: 改名先がある
-    callers:
-      - MOD-37#functions[apply_migration]
 notes:
   決まり: ファイルには書かない。

@@ -510,6 +510,12 @@ constraints:
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、登録したフォルダから消し、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく、`documents[].writable` が削除を許さない種類は `DeleteNotAllowedError`。`worktree` を指定すると `InvalidArgumentError`'
 refs:
-  - SC-7#scenarios[正常シナリオ（参照も外して消す）]
-  - SC-7#scenarios[異常シナリオ（参照されている文書を消す）]
+  - to: SC-7
+    item: scenarios[正常シナリオ（参照も外して消す）]
+    type: references
+    when: 未確定
+  - to: SC-7
+    item: scenarios[異常シナリオ（参照されている文書を消す）]
+    type: references
+    when: 未確定
 test_file: tests/integration/server/test_delete_docs.py

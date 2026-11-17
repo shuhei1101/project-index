@@ -193,7 +193,6 @@ tags:
   - name: topic:セットアップ
     main: true
   - name: action:更新
-issue: 14
 primary_actor: 利用者
 stakeholders:
   - name: 利用者
@@ -209,5 +208,8 @@ minimal_guarantee: '`git pull` に失敗したときは、前のバージョン�
 frequency: project-index の新しいバージョンが出るたび
 priority: 中
 refs:
-  - SC-1#scenarios[正常シナリオ]
+  - to: SC-1
+    item: scenarios[正常シナリオ]
+    type: references
+    when: 未確定
 test_file: tests/e2e/単一ユースケース/test_project-indexを更新する.py

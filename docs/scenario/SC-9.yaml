@@ -107,7 +107,6 @@ tags:
     main: true
   - name: action:編集
   - name: topic:キャッシュ
-issue: 14
 primary_actor: 利用者
 stakeholders:
   - name: 利用者
@@ -123,6 +122,12 @@ minimal_guarantee: 読んだときのバージョンでの書き込みは、直�
 frequency: 不定（利用者が手で直すとき）
 priority: 中
 refs:
-  - SC-1#scenarios[正常シナリオ]
-  - SC-6#scenarios[正常シナリオ]
+  - to: SC-1
+    item: scenarios[正常シナリオ]
+    type: references
+    when: 未確定
+  - to: SC-6
+    item: scenarios[正常シナリオ]
+    type: references
+    when: 未確定
 test_file: tests/e2e/単一ユースケース/test_YAMLを直接編集した.py

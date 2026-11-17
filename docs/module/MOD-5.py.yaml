@@ -339,7 +339,9 @@ functions:
         expected: 2 秒以内に `TimeoutError`
         exception: TimeoutError
 refs:
-  - IF-19#
+  - to: IF-19
+    type: references
+    when: 未確定
 notes:
   決まり: |-
     ポートにつながらなければ `project-index serve` を切り離して起動し、つながれば文脈を入れず、`/clear`・圧縮のときだけ `POST /_admin/session-start` で返却済みの記録の削除を依頼する。

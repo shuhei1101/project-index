@@ -58,9 +58,9 @@ functions:
         mock: なし
         expected: 422 の Problem Details で `reason` の違反を含む
         exception: 入力の違反
-    callers:
-      - MOD-90#functions[build_app]
     callees:
       - MOD-62#functions[start_session]
 refs:
-  - IF-21#
+  - to: IF-21
+    type: references
+    when: 未確定
