@@ -79,7 +79,13 @@ def apply_operation(
                 _violation(f"set.{path}", violation.rule) for violation in error.violations
             )
     for path in operation.unset:
-        delete_field(content, path)
+        try:
+            delete_field(content, path, schema=schema)
+        except InvalidArgumentError as error:
+            # 要素の選び方を含む・`#` で始まるパスを解けない: 理由を `unset.{要素}` の違反にする
+            violations.extend(
+                _violation(f"unset.{path}", violation.rule) for violation in error.violations
+            )
     violations.extend(_add_to(content, operation.add_to, schema))
     violations.extend(_remove_from(content, operation.remove_from, schema))
     violations.extend(_text_edits(content, operation.text_edits, schema))

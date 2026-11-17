@@ -408,9 +408,16 @@ def _put(
     current[last] = value
 
 
-def delete_field(data: MutableMapping[str, Any], path: str) -> bool:
+def delete_field(
+    data: MutableMapping[str, Any], path: str, *, schema: Mapping[str, Any] | None = None
+) -> bool:
     """項目のパスで指した値を削除する。"""
-    tokens = _plain_tokens(path, "は削除できません")
+    # `#` で始まるパス: スキーマの `x-key` の値で要素を指す（解けなければ送る）
+    if path.startswith(REF_PATH_PREFIX):
+        tokens = resolve_ref_path(data, schema or {}, path[len(REF_PATH_PREFIX) :])
+    else:
+        # `#` で始まらないパス: 要素の選び方を含めば削除先が 1 つに決まらないため拒否する
+        tokens = _plain_tokens(path, "は削除できません")
     found, parent = _walk(data, tokens[:-1])
     if not found:
         return False
