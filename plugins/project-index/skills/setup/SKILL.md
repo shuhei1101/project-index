@@ -97,6 +97,7 @@ argument-hint: "[path]"
      - `{clone}/templates/project-index.yaml` の `prompts` の行の `paths` をそのフォルダにした `documents` の行。プラグインのルートの行は `id` を `prompts-{ルートのフォルダ名}` にする
      - `converters[]` に `prompt-doc` の行が無ければ、雛形の `prompt-doc` の行
      - `nav` の、プロンプトの行を `auto` で並べ `group_by: kind` でまとめる `プロンプト` のタブ。`nav` が無ければ、今の `documents` の行ごとの `auto` のタブ（`title` は行の `title`）を先に並べる
+     - 共通の型のコピー先 `{path}/schemas/common.schema.yaml`（ローカル運用は `common.schema.local.yaml`）が既にあり `$defs.id` を持たなければ、候補の表を示す前に、そのことを示して止まる。何も書き換えない
    - 追加・削除・改名と、仮のメタデータ・メタデータの偏りの見直し・関連・プロンプトの行の候補を表で示し、記載してよいかを聞く。断られたら何も書き換えずに止まる
      - 仮のメタデータの行には、決めた段階を出す。既存のタグと段階 1 の語彙のどちらにも無いタグは、新しいタグとしてまとめて示す
      - 中身が変わったファイルの行は、今の値と新しい案を並べて示し、了承された行だけを書き換える
@@ -104,6 +105,8 @@ argument-hint: "[path]"
 5. 確認が済んだものを記載する。
    - `{config}` が無い場合、`{clone}/templates/project-index.yaml` から `{config}` を作り、1 行目のスキーマの行のタグを `{tag}` に、`name`・`description`・`files` の行の `paths` を決めた値にする。雛形の `prompts` の行と `converters[]` は削除する。`{clone}/templates/files.schema.yaml` を `{path}/schemas/files.schema.yaml`（ローカル運用は `files.schema.local.yaml`）にコピーする。ローカル運用では、`files` の行の `paths`・`schema` を `files.local.yaml`・`schemas/files.schema.local.yaml` にする
    - プロンプトの行の候補が了承された場合、`{config}` に `documents`・`converters[]`・`nav` の行を記載し、`{clone}/schemas/prompt.schema.yaml` を `{path}/schemas/prompt.schema.yaml`（ローカル運用は `prompt.schema.local.yaml`）にコピーする
+     - その `$ref` が指す `{clone}/schemas/common.schema.yaml` を `{path}/schemas/common.schema.yaml`（ローカル運用は `common.schema.local.yaml`）にコピーする。コピー先が既にあればコピーしない
+     - ローカル運用では、コピーした `prompt.schema.local.yaml` の `$ref` の `common.schema.yaml` を `common.schema.local.yaml` に書き換える
    - 管理用の YAML の行は、`write_docs` で記載する（配信元が登録済みのとき）。登録前の配信元は、`templates/files.schema.yaml` に沿って `files.yaml`（ローカル運用は `files.local.yaml`）を直接書く
    - ローカル運用では、`git -C {path} rev-parse --git-path info/exclude` の指すファイルに `*.local.*` の行が無ければ追加する。`.gitignore` は書き換えない
    - 管理用の YAML ごとに `{clone}/.venv/bin/python -m project_index checkpoint --root {path} --files-yaml {管理用の YAML}` で確認の時点を記録する。見直したファイルのうち commit していない変更を持つものを `--reviewed` で渡す（繰り返せる）
