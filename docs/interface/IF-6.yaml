@@ -1417,6 +1417,49 @@ flows:
       - '1 回目は `isError: true` で、添字 0 の違反に文書 2 の `id` と `name` のパス・決まり・修正方法があり、文書 1 も文書 2 も変わらない'
       - 2 回目は `replace_text` の行が `failed` で文書 1・文書 2 は変わらず、`update` の文書だけが書き換わる
     test: test_error_when_replace_text_validation_failed
+  - name: 正常系（ワークツリーの設定でスキーマの参照を変えた種類を検査する）
+    summary: ワークツリーの `project-index.yaml` で行の `schema.ref` をほかの配信元の別のリビジョンへ変えた種類の文書を、変えた後のリビジョンのスキーマで検査して書き込む
+    setup:
+      - name: スキーマの配信元
+        description: 種類 `rule` のスキーマを持つ git リポジトリ。タグ `v1` では `properties.refs.items` が文字列、タグ `v2` ではオブジェクト（`to`・`type`）
+        notes: id `schemas`
+      - name: サンプルの配信元
+        description: '正常系の sample の行 `rule` の `schema` が、スキーマの配信元の `ref: v1` を指す。ワークツリー x の `project-index.yaml` だけ `ref: v2` に変えて commit していない'
+        notes: 'クローン本体の `project-index.yaml` は `ref: v1` のまま。呼ぶ前に、クローン本体を指す `search_docs` を 1 回呼び、起動時のスキーマを解かせておく'
+      - name: 入力
+        description: '`worktree` にワークツリー x のパス、文書 1 の `update`（`set: {refs: [{to: 文書 2, type: references}]}`）'
+      - name: 設定を変えていないワークツリー
+        description: 'sample の `.claude/worktrees/y`。`project-index.yaml` はクローン本体と同じ `ref: v1` のまま'
+      - name: Mock
+        description: なし（ワークツリーの設定を再読み込みするときに参照先の配信元 schemas を引き当てるため、環境変数 `PROJECT_INDEX_CONFIG` にテストの端末の設定を指定する）
+    flow: |-
+      <!-- map: {"title": "正常系（ワークツリーの設定でスキーマの参照を変えた種類を検査する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+        participant WY as ワークツリー y
+
+        C->>T: worktree: x, operations: update 文書 1
+        T->>WT: ワークツリーの project-index.yaml で配信元の設定を再読み込みする
+        T->>T: ワークツリーの設定が指す v2 のスキーマと validators に通す
+        T->>WT: 一時ファイルに書いてから置き換える
+        T-->>C: applied: true、書き込んだ後の version
+        C->>T: worktree: y, operations: update 文書 1（refs が文字列の並び）
+        T->>T: ワークツリー y の設定が指す v1 のスキーマと validators に通す
+        T->>WY: 一時ファイルに書いてから置き換える
+        T-->>C: applied: true
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`applied: true` で、文書 1 の `status` が `updated`'
+      - ワークツリー x の文書 1 の `refs` が `set` の値になる
+      - '続けてワークツリー y の文書 1 へ `refs: [文書 2]`（文字列の並び）の `update` を呼ぶと、v1 のスキーマで検査して `applied: true` になる'
+      - '同じ `set` を `refs: [文書 2]`（文字列の並び）にした呼び出しは、`isError: true` の `ValidationFailedError` で、違反の `rule` が v2 のスキーマの型（要素が `object`）を求める'
+    test: test_normal_when_schema_ref_changed_in_worktree
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書

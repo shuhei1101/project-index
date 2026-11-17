@@ -1005,6 +1005,39 @@ flows:
       - クローン本体の設定で集めた文書を返さない
       - '`cwd` がクローン本体で `worktree` を省くと、これまでどおり文書を返す'
     test: test_error_when_worktree_config_invalid
+  - name: 正常系（ワークツリーの設定でメタデータの対応を変えた）
+    summary: ワークツリーを読み込んだ後にワークツリーの `project-index.yaml` で行の `metadata` を変えると、次の呼び出しから変えた後の対応で共通のメタデータを返却する
+    setup:
+      - name: Mock
+        description: なし
+      - name: ワークツリー
+        description: sample の `.claude/worktrees/x`。文書 1 は列 `refs` に文書 2 を持ち、行の `metadata` は `related` を対応付けていない
+      - name: 入力
+        description: '`worktree` に x のパス、`filter`（id が文書 1）・`fields: [related]`。1 回呼んだ後、ワークツリー x の `project-index.yaml` の行の `metadata` に `related: refs` を追加し（commit しない）、同じ入力でもう 1 回呼ぶ'
+    flow: |-
+      <!-- map: {"title": "正常系（ワークツリーの設定でメタデータの対応を変えた）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+        participant WT as ワークツリー x
+
+        C->>T: worktree: x, fields: related
+        T-->>WT: 設定と文書を読み込む
+        T-->>C: 文書 1（related が空）
+        Note over WT: 行の metadata に related: refs を追加する
+        C->>T: worktree: x, fields: related
+        T-->>WT: 変わった設定の行で、行の定義が変わった文書を再読み込みする
+        T-->>C: 文書 1（related が文書 2）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目は文書 1 の `related` が空、2 回目は `related` に文書 2 を返却する
+      - '`reload` も再起動も呼ばない'
+      - クローン本体を指す呼び出しは、続けて呼んでも文書 1 の `related` が空
+    test: test_normal_when_worktree_metadata_changed
 lead: '条件に該当する文書の取得・一覧・件数・集計を返却する `search_docs` の入出力を定め、`search_docs` を修正するときに参照する。'
 tags:
   - name: topic:クエリ

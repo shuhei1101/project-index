@@ -1,0 +1,51 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: run_only
+    detail: worktree で文書の行のスキーマの参照を変えた後の書き込みが、変えた後のスキーマで検査される。シナリオの流れは変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: run_only
+    detail: worktree で文書の行のメタデータの対応を変えた後の検索・関連のたどりが、変えた後の対応で返る。シナリオの流れは変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: none
+    detail: 配信中の設定を変えて reload する流れは変わらない（worktree の設定は reload を要さずに次の呼び出しで効く）
+    depends_on: []
+docs:
+  - page: docs/interface/IF-6.yaml
+    new: false
+    change: worktree の設定で行の schema.ref を変えた後の書き込みを、変えた後のスキーマで検査する正常系を追加
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T16:05:21.800581+00:00'
+  - page: docs/interface/IF-2.yaml
+    new: false
+    change: worktree の設定で行の metadata を変えた後の読み取りが、変えた後の対応で共通のメタデータを返却する正常系を追加
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T16:05:21.800581+00:00'
+  - page: docs/interface/IF-3.yaml
+    new: false
+    change: worktree の設定で行の metadata を変えた後の関連のたどりの正常系を追加
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T16:05:21.800581+00:00'
+  - page: docs/module/MOD-29.py.yaml
+    new: false
+    change: _files と _startup_schemas のキーに文書の行の定義のハッシュを加え、load と schema の手順と単体テストを更新
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T16:17:54.824730+00:00'
+scope_out:
+  - item: dev-docs#280 で YAML を直接編集した 4 文書（ARCH-155-1・CMD-155-1・NFR-155-1・SCR-155-1）の確認
+    reason: 配信元 dev-docs の作業 PR の範囲で、project-index の修正には含まれない
+    plan: none
+  - item: '#171 の store.py の読み込みの変更との重なり'
+    reason: '#171 は未マージで、同じ _load_table を変える予定。先にマージされた側に合わせて作業PRの最新化で取り込む'
+    plan: none
+  - item: '検査の読み取りの結果のキャッシュ（validation/service.py の _read_cache。キー: 配信元の ID・種類・validator の ID・文書のバージョン）が、worktree の設定で validators の行やスクリプトを変えても前の結果を返却しうる'
+    reason: 起点 Issue はスキーマの参照とメタデータの対応を扱い、validators の変更は要件に無い。今回修正する文書のストアとは別のキャッシュで、独立に修正できる（インターフェース定義のレビューで to_file に確定）
+    plan: '#178'
