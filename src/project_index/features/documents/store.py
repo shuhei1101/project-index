@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import difflib
+import functools
 import hashlib
 import logging
 import os
@@ -379,51 +380,27 @@ class DocumentStore:
             paths = sorted({d.body_path for d in found if d.body_path is not None})
             return tuple((path, blobs.get(from_repo(path), "")) for path in paths)
 
-        def read(
-            path: str, key: _RevisionKey, blob: str
-        ) -> tuple[list[Document], list[LoadProblem]]:
-            """キャッシュが新しければキャッシュを、古ければファイルを再読み込みしてキャッシュする。"""
-            with self._lock:
-                cached = self._revision_files.get(key)
-            if cached is not None and _revision_fresh(
-                cached, blob, body_blobs(cached[3]), _date_stamps(path, cached[3], dates)
-            ):
-                return cached[3], cached[4]
-            # 書き出しを読む / 書き出さずに commit の blob の内容から読む
+        def load(path: str, blob: str) -> tuple[list[Document], list[LoadProblem]]:
+            """書き出しを読む / 書き出さずに commit の blob の内容から読む。"""
             if reader is None:
-                found, issues = load_file(root, path, table, source_id=source.id, dates=dates)
-            else:
-                found, issues = _documents_from_blob(
-                    reader,
-                    blob,
-                    _body_reader(reader, blobs, from_repo),
-                    root,
-                    path,
-                    table,
-                    source_id=source.id,
-                    dates=dates,
-                )
-            with self._lock:
-                self._revision_files[key] = (
-                    blob,
-                    body_blobs(found),
-                    _date_stamps(path, found, dates),
-                    found,
-                    issues,
-                )
-            return found, issues
+                return load_file(root, path, table, source_id=source.id, dates=dates)
+            return _documents_from_blob(
+                reader,
+                blob,
+                _body_reader(reader, blobs, from_repo),
+                root,
+                path,
+                table,
+                source_id=source.id,
+                dates=dates,
+            )
 
         documents: list[Document] = []
         problems: list[LoadProblem] = []
         seen: set[str] = set()
-        # 同じ commit と行の定義の収集の結果を使い回す
-        collected_key = (repo_root, source.id, commit, table_hash)
-        with self._lock:
-            collected = self._collected.get(collected_key)
-        if collected is None:
-            collected = list(collect_files(root, table, files=files))
-            with self._lock:
-                self._collected[collected_key] = collected
+        collected = self._collected_files(
+            (repo_root, source.id, commit, table_hash), root, table, files
+        )
         # ファイル 1 件ごとの照合と読み込みを、裏の処理の 1 件にする（要求のスレッドでは何もしない）
         for path in self.gate.each(collected):
             relative = from_repo(path)
@@ -431,12 +408,54 @@ class DocumentStore:
             if blob is None:
                 continue
             seen.add(relative)
-            found, issues = read(path, (repo_root, source.id, relative, table.id, table_hash), blob)
+            found, issues = self._read_revision(
+                (repo_root, source.id, relative, table.id, table_hash),
+                blob,
+                body_blobs,
+                functools.partial(_date_stamps, path, dates=dates),
+                functools.partial(load, path, blob),
+            )
             documents.extend(found)
             problems.extend(issues)
         # 今の commit に無いファイルと、行の定義が変わった結果を捨てる
         self._discard_revisions((repo_root, source.id), table.id, seen, table_hash)
         return documents, problems
+
+    def _read_revision(
+        self,
+        key: _RevisionKey,
+        blob: str,
+        body_blobs: Callable[[Sequence[Document]], _BodyBlobs],
+        stamps: Callable[[Sequence[Document]], _DateStamps],
+        load: Callable[[], tuple[list[Document], list[LoadProblem]]],
+    ) -> tuple[list[Document], list[LoadProblem]]:
+        """キャッシュが新しければキャッシュを、古ければファイルを再読み込みしてキャッシュする。"""
+        with self._lock:
+            cached = self._revision_files.get(key)
+        if cached is not None and _revision_fresh(
+            cached, blob, body_blobs(cached[3]), stamps(cached[3])
+        ):
+            return cached[3], cached[4]
+        found, issues = load()
+        with self._lock:
+            self._revision_files[key] = (blob, body_blobs(found), stamps(found), found, issues)
+        return found, issues
+
+    def _collected_files(
+        self,
+        key: tuple[Path, str, str, str],
+        root: Path,
+        table: DocumentTable,
+        files: Sequence[str],
+    ) -> list[str]:
+        """同じ commit と行の定義のファイルの収集の結果を使い回す（無ければ集めて記録する）。"""
+        with self._lock:
+            collected = self._collected.get(key)
+        if collected is None:
+            collected = list(collect_files(root, table, files=files))
+            with self._lock:
+                self._collected[key] = collected
+        return collected
 
     def _discard_revisions(
         self, owner: tuple[Path, str], table_id: str, seen: set[str], table_hash: str
