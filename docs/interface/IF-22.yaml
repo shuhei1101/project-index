@@ -55,24 +55,24 @@ flows:
     summary: '`include_loading=true` のとき、読み込みが終わっていない配信元を `loading` で返す'
     setup:
       - name: Mock
-        description: 配信元 slow の読み込み（`load_source`）だけを、テストが合図を出すまで止めるものに差し替える
+        description: 配信元 slow と 3 行目の読み込み（`load_source`）を、テストが出す 1 つの合図まで止めるものに差し替える
         notes: 合図は `threading.Event`
       - name: 端末の設定
-        description: 配信元 slow・sample の 2 行（この順）と、`id` を持たずに同じく止める 3 行目
+        description: 配信元 slow・sample の 2 行（この順）と、`id` を持たずに配信元の設定の ID が `third` の 3 行目
     flow: |-
       ```mermaid
       sequenceDiagram
         participant C as クライアント
         participant E as GET /sources
 
-        C->>E: GET /sources?include_loading=true（slow を止めている）
+        C->>E: GET /sources?include_loading=true（slow と 3 行目を止めている）
         E-->>C: 200 slow が loading
-        C->>E: slow の読み込みの合図を出し、GET /sources
+        C->>E: slow と 3 行目の読み込みの合図を出し、GET /sources
         E-->>C: 200 全ての行の読み込みの後の状態
       ```
     expected:
       - 合図の前の `include_loading=true` の要求が、待たずに 200 で slow を `loading`、3 行目を `sources[2]` の ID の `loading` で、端末の設定の順に返す
-      - 合図の後の `include_loading` を渡さない要求が、`loading` を含まずに slow・sample を `serving` で返す
+      - 合図の後の `include_loading` を渡さない要求が、`loading` を含まずに slow・sample・third（3 行目。配信元の設定の ID）を `serving` で、端末の設定の順に返す
     test: test_normal_when_include_loading
 lead: 配信元ごとの ID・状態・配信していない理由を返却する読み取り API の入出力を定め、配信元の一覧と状態を修正するときに参照する。
 identifier: list_sources
