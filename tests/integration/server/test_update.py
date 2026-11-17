@@ -44,7 +44,7 @@ UPDATE_CALL = json.dumps(
 )
 NO_RESTART_WAIT_SEC = 3
 NPM_DEVELOP = "install -g github:shuhei1101/mdmark#develop"
-REINSTALLED_DEVELOP = {"ref": "develop", "reinstalled": True, "error": None}
+REINSTALLED_DEVELOP = {"ref": "develop", "reinstalled": True}
 
 
 @dataclass(frozen=True)
@@ -369,7 +369,7 @@ def test_normal_when_mdmark_absent(
     data = result["structuredContent"]
     assert data["updated"] is True
     assert data["restarting"] is True
-    assert data["mdmark"] is None
+    assert "mdmark" not in data
     assert tools.npm_calls() == []
 
 
