@@ -35,7 +35,7 @@ flows:
       - '`updated: true`・`migration_needed: false`・`restarting: true`'
       - クローンの HEAD が上流の commit と同じ
       - 起動し直した後の `status` の `version` が新しいバージョン
-      - '`mdmark` が `{"ref": "develop", "reinstalled": true, "error": null}`'
+      - '`mdmark` が `{"ref": "develop", "reinstalled": true}`（`error` を持たない）'
       - '`npm` が `install -g github:shuhei1101/mdmark#develop` の引数で 1 回呼ばれる'
     test: test_normal
   - name: 正常系（新しい commit が無い）
@@ -171,13 +171,13 @@ flows:
         C->>T: 引数なし
         T->>G: git pull --ff-only・uv sync
         T-->>G: migrate --plan
-        T-->>C: updated・restarting・mdmark: null
+        T-->>C: updated・restarting（mdmark を持たない）
         T->>T: 起動し直す
       ```
 
       <!-- /map -->
     expected:
-      - '`updated: true`・`restarting: true`・`mdmark: null`'
+      - '`updated: true`・`restarting: true` で、`mdmark` を持たない'
       - '`npm` が呼ばれない'
     test: test_normal_when_mdmark_absent
   - name: 正常系（mdmark の CLI を入れ直せない）
@@ -287,7 +287,7 @@ response:
   - name: mdmark
     type: dict | None
     description: mdmark の CLI を入れ直した結果
-    notes: '`git pull --ff-only` が成功し、`PATH` に `mdmark` があるときだけ持つ。無いときは `null`'
+    notes: '`git pull --ff-only` が成功し、`PATH` に `mdmark` があるときだけ持つ。無いときはキーを持たない（管理の MCP の結果は `None` の値のキーを落とす）'
   - name: mdmark.ref
     type: str
     description: 入れた mdmark の参照（端末の設定の `mdmark_ref`。無ければ `develop`）
@@ -298,10 +298,10 @@ response:
   - name: mdmark.error
     type: str | None
     description: 入れ直せなかったときの、実行したコマンドと標準エラーの末尾（`npm` が見つからない・制限時間を超えたときはその旨）
-    notes: '`reinstalled: true` のときは `null`'
+    notes: '`reinstalled: true` のときはキーを持たない'
 response_example: |-
   ```json
-  {"previous_version": "0.2.0", "version": "0.3.0", "updated": true, "migration_needed": false, "restarting": true, "mdmark": {"ref": "develop", "reinstalled": true, "error": null}}
+  {"previous_version": "0.2.0", "version": "0.3.0", "updated": true, "migration_needed": false, "restarting": true, "mdmark": {"ref": "develop", "reinstalled": true}}
   ```
 response_notes: '配信できなかった配信元と、配信元の設定のバージョンの新旧は、起動し直した後の `status` の `version_state` で確かめる。`migration_needed: true` のときは、利用者が `project-index migrate` を実行してから `restart` を呼ぶ。'
 exceptions:
