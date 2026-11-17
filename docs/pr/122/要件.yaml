@@ -12,20 +12,28 @@ use_cases:
 docs:
   - page: docs/layout/LAY-73-1.yaml
     new: false
-    change: templates の files.schema.yaml のエントリを、書き出すスキーマの持ち方の決定に合わせる
-    status: todo
+    change: 案 A で templates/files.schema.yaml の配置と中身の種類が変わらないため修正なし（エントリが結果と一致することを確認した）
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T07:13:05.094034+00:00'
   - page: docs/guide/設定.md
     new: false
-    change: 管理用の YAML のキーの一覧と、コピーするスキーマの記述を合わせる
-    status: todo
+    change: 管理用の YAML のキーの表に files[].id・files[].aliases・files[].inject_when・files[].category・checkpoint を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T07:13:05.094034+00:00'
   - page: docs/guide/配信元を配信する.md
     new: false
-    change: 配信元へコピーする templates/files.schema.yaml の手順を合わせる
-    status: todo
+    change: 案 A でコピーする templates/files.schema.yaml のパスと手順が変わらないため修正なし
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T07:13:05.094034+00:00'
   - page: docs/guide/コアコンセプト-文書のメタデータ.md
     new: false
-    change: 管理用の YAML のスキーマの参照先の記述を合わせる
-    status: todo
+    change: キーの一覧は設定.md を指すだけで、スキーマのパスも変わらないため修正なし
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T07:13:05.094034+00:00'
 scope_out:
   - item: setup がプロンプトのスキーマの $ref 先の common.schema.yaml を配信元へコピーしないこと
     reason: プロンプトのスキーマのコピーの不具合で、管理用の YAML のスキーマとは別のファイル。この作業 PR がマージされなくても同じ内容で成り立つ
