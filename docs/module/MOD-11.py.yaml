@@ -140,7 +140,7 @@ data_models:
   - name: NotServedItem
     title: 配信していない配信元
     container: project_index/features/admin/types.py
-    usecase: 設定の読み直し
+    usecase: 設定の再読み込み
     role: DTO
     summary: 検証に失敗した配信元の ID と理由
     description: '`dataclass(frozen=True)`。'
@@ -154,9 +154,9 @@ data_models:
         type: list[str]
         description: '`{キーのパス}: {理由}`'
   - name: ReloadResult
-    title: 読み直しの結果
+    title: 再読み込みの結果
     container: project_index/features/admin/types.py
-    usecase: 設定の読み直し
+    usecase: 設定の再読み込み
     role: DTO
     summary: '`reload` の結果'
     description: '`dataclass(frozen=True)`。'
@@ -164,19 +164,19 @@ data_models:
       - name: added
         title: 配信を始めた配信元
         type: list[str]
-        description: 読み直す前に配信していなかった `serving` の ID
+        description: 再読み込みする前に配信していなかった `serving` の ID
       - name: removed
         title: 配信をやめた配信元
         type: list[str]
-        description: 読み直す前に `serving` で、読み直した後に `serving` でない ID
+        description: 再読み込みする前に `serving` で、再読み込みした後に `serving` でない ID
       - name: not_served
         title: 配信していない配信元
         type: list[NotServedItem]
-        description: 読み直した後の `not_served`
+        description: 再読み込みした後の `not_served`
       - name: sources
         title: 配信元
         type: list[SourceState]
-        description: 読み直した後の状態（`status` と同じ作り）
+        description: 再読み込みした後の状態（`status` と同じ作り）
   - name: ScriptErrorItem
     title: スクリプトの確かめの失敗
     container: project_index/features/admin/types.py
@@ -473,3 +473,4 @@ constants:
     usecase: 配信元の検査
     summary: '`check_project` が返す同期のずれの内訳の件数'
     value: '50'
+visibility: internal

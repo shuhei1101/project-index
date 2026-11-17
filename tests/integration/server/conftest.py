@@ -136,7 +136,7 @@ class ServerEnv:
     settings_extra: str = ""
 
     def rewrite_settings(self, *specs: SourceSpec) -> None:
-        """起動後に端末の設定の `sources` を手で書き換えたことにする（配信元は読み直さない）。"""
+        """起動後に端末の設定の `sources` を手で書き換えたことにする（配信元は再読み込みしない）。"""
         self.settings_path.write_text(
             _settings_text(self.root, self.state_dir, list(specs), self.settings_extra),
             encoding="utf-8",

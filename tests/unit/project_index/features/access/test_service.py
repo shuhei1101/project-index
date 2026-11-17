@@ -591,7 +591,7 @@ def test_resolve_write_target_when_worktree_config(
     make_registry: Callable[..., Any],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """ワークツリーの設定で読み直した配信元を使う（正常系）。"""
+    """ワークツリーの設定で再読み込みした配信元を使う（正常系）。"""
     # 準備
     registry = make_registry(sample)
     reloaded = make_served_source(id="sample", root=Path("/r/.claude/worktrees/x"))
@@ -616,7 +616,7 @@ def test_resolve_write_target_when_folder_not_reloaded(
     make_registry: Callable[..., Any],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Git の管理外は読み直さない（正常系）。"""
+    """Git の管理外は再読み込みしない（正常系）。"""
     # 準備
     notes = make_served_source(id="notes", root=Path("/n"), is_git=False, scope_write=["/c"])
     registry = make_registry(notes)

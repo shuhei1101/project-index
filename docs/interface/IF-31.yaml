@@ -28,7 +28,7 @@ flows:
         C->>E: expectedVersion, sources: sample, extra
         E->>E: オリジンを確かめ、保存後の端末の設定をスキーマで検証する
         E->>CF: settings.yaml の sources を書き換える
-        E->>E: 配信元を読み直す
+        E->>E: 配信元を再読み込みする
         E-->>C: 200 配信元ごとの状態
       ```
 
@@ -60,7 +60,7 @@ flows:
 
         C->>E: expectedVersion, sources: sample, extra（enabled: false）
         E->>CF: settings.yaml を書き換える
-        E->>E: 配信元を読み直す
+        E->>E: 配信元を再読み込みする
         E-->>C: 200（extra は disabled）
       ```
 
@@ -90,7 +90,7 @@ flows:
 
         C->>E: expectedVersion, sources: sample
         E->>CF: settings.yaml から extra の行を除く
-        E->>E: 配信元を読み直す
+        E->>E: 配信元を再読み込みする
         E-->>C: 200（sample だけ）
       ```
 
@@ -101,7 +101,7 @@ flows:
       - '`/sources/extra/docs` が 404 を返す'
     test: test_normal_when_source_deleted
   - name: 正常系（追加した配信元が検証に通らない）
-    summary: 端末の設定は保存し、読み直しの検証で配信元を外す
+    summary: 端末の設定は保存し、再読み込みの検証で配信元を外す
     setup:
       - name: Mock
         description: なし
@@ -121,7 +121,7 @@ flows:
 
         C->>E: expectedVersion, sources: sample, broken
         E->>CF: settings.yaml を書き換える
-        E->>E: 読み直し、起動時と同じ検証で broken を外す
+        E->>E: 再読み込みし、起動時と同じ検証で broken を外す
         E-->>C: 200（broken は not_served）
       ```
 
@@ -150,7 +150,7 @@ flows:
         C->>E: expectedVersion, sources: sample
         E->>E: 保存後の端末の設定をスキーマで検証する（mindstella は違反にしない）
         E->>CF: settings.yaml の sources を書き換える
-        E->>E: 配信元を読み直す
+        E->>E: 配信元を再読み込みする
         E-->>C: 200 配信元ごとの状態と警告
       ```
     expected:
@@ -232,7 +232,7 @@ flows:
 
         C->>E: expectedVersion, sources: sample（enabled: false）, extra
         E->>CF: 同じ配信元の行の今の値で送信しなかったキーを埋めて settings.yaml を書き換える
-        E->>E: 配信元を読み直す
+        E->>E: 配信元を再読み込みする
         E-->>C: 200（sample は disabled）
       ```
 
@@ -263,7 +263,7 @@ flows:
 
         C->>E: expectedVersion, sources: sample, extra（outside_read: true）
         E->>CF: 送信した値で settings.yaml を書き換える
-        E->>E: 配信元を読み直す
+        E->>E: 配信元を再読み込みする
         E-->>C: 200
       ```
 
@@ -293,7 +293,7 @@ flows:
         C->>E: expectedVersion, sources: sample
         E-->>CF: 今の内容のバージョンを求めて照合する
         E->>CF: settings.yaml の sources を書き換える
-        E->>E: 配信元を読み直す
+        E->>E: 配信元を再読み込みする
         E-->>C: 200（新しい version）
       ```
 
@@ -378,7 +378,7 @@ flows:
 
         C->>E: expectedVersion, sources: sample（enabled: false）, company
         E->>CF: 同じ配信元の行の今の値で storage を埋めて settings.yaml を書き換える
-        E->>E: 配信元を読み直す
+        E->>E: 配信元を再読み込みする
         E-->>C: 200（company は serving）
       ```
 
@@ -386,9 +386,9 @@ flows:
     expected:
       - 200 で、company が `serving`
       - '`settings.yaml` の company の行に `storage.type: disk` が残る'
-      - '読み直した後も `/sources/company/refs` が `git: false` を返す'
+      - '再読み込みした後も `/sources/company/refs` が `git: false` を返す'
     test: test_normal_when_unsent_storage_kept
-lead: '`sources[]` を丸ごと受けて端末の設定を書き換え、配信元を読み直す端末の設定の API の入出力を定め、端末の設定の保存を修正するときに参照する。'
+lead: '`sources[]` を丸ごと受けて端末の設定を書き換え、配信元を再読み込みする端末の設定の API の入出力を定め、端末の設定の保存を修正するときに参照する。'
 tags:
   - name: topic:設定
     main: true
@@ -398,8 +398,8 @@ tags:
 identifier: put_settings_sources
 permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ'
 idempotent: true
-side_effects: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml` の `sources` を書き換え、配信元を読み直す。配信元のフォルダのファイルは変えない'
-exclusivity: 端末の設定の排他ロックの中で、内容のバージョンの照合・検証・書き込み・読み直しを行う。読み直しの間の要求は、読み直す前の配信元で応える。読み直した配信元の裏の検査はロックの外で実行する
+side_effects: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml` の `sources` を書き換え、配信元を再読み込みする。配信元のフォルダのファイルは変えない'
+exclusivity: 端末の設定の排他ロックの中で、内容のバージョンの照合・検証・書き込み・再読み込みを行う。再読み込みの間の要求は、再読み込みする前の配信元で応える。再読み込みした配信元の裏の検査はロックの外で実行する
 request:
   - name: sources
     type: list[Source]
@@ -500,7 +500,7 @@ response_example: |-
 response_notes: 配信元の設定が検証に通らない配信元も、端末の設定がスキーマに通れば保存し、`not_served` として返す。
 status_codes:
   - code: '200'
-    condition: 保存して配信元を読み直した（読み直しで外した配信元があっても 200）
+    condition: 保存して配信元を再読み込みした（再読み込みで外した配信元があっても 200）
   - code: '403'
     condition: project-index と別のオリジンの `Origin` を持つ要求か、`Origin` が無く `Sec-Fetch-Site` が `cross-site`・`same-site` の要求
   - code: '422'
@@ -521,7 +521,7 @@ constraints:
     constraint: '`settings.yaml` の `sources` だけを書き換え、他のキーとコメントを保つ。一時ファイルに書いてから置き換える'
   - item: 端末の設定の知らないキー
     constraint: 起動の制約「端末の設定の知らないキー」と同じ。最上位の知らないキーを `warnings[]` で返却し、違反にしない
-  - item: 読み直しの検証
+  - item: 再読み込みの検証
     constraint: 起動時と同じ検証（スキーマ・スクリプトを実行できるか）
   - item: 認可
     constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
@@ -537,8 +537,9 @@ constraints:
   - item: 内容のバージョンの照合
     constraint: '排他ロックを取った後に `settings.yaml` の内容のバージョンと照合し、スキーマの検証より前に断る。フローの `expectedVersion` は、直前に `GET /settings/sources` で取得した `version`'
   - item: 検査とリビジョンの書き出し
-    constraint: 応答は配信元の一覧を差し替えた時点で返し、読み直した配信元の検査と `default_ref` の commit の書き出しは裏で実行して待たない。応答の配信元ごとの状態は検査の前の値（`sync` は `null`）
+    constraint: 応答は配信元の一覧を差し替えた時点で返し、再読み込みした配信元の検査と `default_ref` の commit の書き出しは裏で実行して待たない。応答の配信元ごとの状態は検査の前の値（`sync` は `null`）
     notes: 管理の MCP の `reload` と同じ。検査が済んだかは管理の MCP の `status` の `checking` で確かめる
 test_file: tests/integration/server/test_put_settings_sources.py
 callers:
   - SC-12#scenarios[正常シナリオ]
+visibility: internal

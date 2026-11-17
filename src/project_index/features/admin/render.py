@@ -74,7 +74,7 @@ def render_status(status: ServerStatus) -> str:
 
 
 def render_reload(result: ReloadResult) -> str:
-    """読み直しの結果を Markdown にする。"""
+    """再読み込みの結果を Markdown にする。"""
     not_served = "、".join(f"{item.id}（{'、'.join(item.errors)}）" for item in result.not_served)
     lines = [
         f"追加: {'、'.join(result.added) or 'なし'}",

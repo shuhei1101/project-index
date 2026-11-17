@@ -273,7 +273,7 @@ classes:
         returns:
           type: None
           description: '-'
-        process: 1. `_read_cache` を空にする（起動の『配信元の読み直し』が呼ぶ）
+        process: 1. `_read_cache` を空にする（起動の『配信元の再読み込み』が呼ぶ）
 constants:
   - name: VALIDATOR_ON_READ_CACHE
     title: 読み取りの検査の結果の数
@@ -281,3 +281,4 @@ constants:
     usecase: 共通
     summary: 読み取りの `validators[]` の結果をキャッシュする件数の上限。超えたら使ったのが古いものから捨てる
     value: '4096'
+visibility: internal

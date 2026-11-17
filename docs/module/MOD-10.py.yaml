@@ -73,12 +73,12 @@ functions:
       - '#functions[_source_states]'
       - '#functions[version_state]'
   - name: reload_config
-    title: 設定の読み直し
+    title: 設定の再読み込み
     kind: 関数
     container: project_index/features/admin/service.py
-    usecase: 設定の読み直し
+    usecase: 設定の再読み込み
     role: サービス
-    summary: 端末の設定と配信元の設定を読み直し、前後の差を返す
+    summary: 端末の設定と配信元の設定を再読み込みし、前後の差を返す
     scope: public
     is_async: false
     thread_safe: true
@@ -92,18 +92,18 @@ functions:
         description: 起動時に作った部品
     returns:
       type: ReloadResult
-      description: 読み直しの結果
+      description: 再読み込みの結果
     process: |-
       1. `handlers.settings_lock` を取る（端末の設定の保存と同じロック）
-      2. 読み直す前の `serving` の ID を記録する（`handlers.registry.statuses()`）
+      2. 再読み込みする前の `serving` の ID を記録する（`handlers.registry.statuses()`）
       3. `handlers.terminal.file` を読む（端末の設定の読み込み）
-      4. 配信元を読み直す（`handlers.reload_sources`）
-      5. 読み直した後の `serving` の ID と比べ、`added`・`removed`・`not_served` を作る
+      4. 配信元を再読み込みする（`handlers.reload_sources`）
+      5. 再読み込みした後の `serving` の ID と比べ、`added`・`removed`・`not_served` を作る
       6. 配信元ごとの状態を、同期の件数を含めずに作る（配信元の状態の一覧。`with_sync=False`。裏の検査が済んでいても `sync` は `None`）
-         - `[INFO]` 読み直した（追加・削除・配信していない件数）
+         - `[INFO]` 再読み込みした（追加・削除・配信していない件数）
     exceptions:
       - name: TerminalConfigInvalidError
-        condition: 端末の設定が無い・スキーマに違反する（配信元の一覧は読み直す前のまま）
+        condition: 端末の設定が無い・スキーマに違反する（配信元の一覧は再読み込みする前のまま）
         message: 端末の設定の読み込みのメッセージ
     unit_tests:
       - name: test_reload_config
@@ -121,7 +121,7 @@ functions:
         exception: 端末の設定が違反する
       - name: test_reload_config_when_checked_before_response
         case: 正常
-        summary: 応答を組み立てる前に裏の検査が済んでも、読み直した配信元の `sync` を持たない
+        summary: 応答を組み立てる前に裏の検査が済んでも、再読み込みした配信元の `sync` を持たない
         condition: 起動時は `a` が `serving`。`handlers.reload_sources` を、本物を呼んだ後に `a` の検査の終了を待つ関数に差し替える
         mock: '`handlers.reload_sources`（本物を呼び、検査の終了を待つ）'
         expected: '`sources[]` の `a` の行の `sync` が `None`'
@@ -535,7 +535,7 @@ functions:
         required: false
         default: 'True'
         passing: keyword
-        description: '`False` のときは検査の結果を参照せず、`serving` の行の `sync` を `None` にする（読み直しの応答）'
+        description: '`False` のときは検査の結果を参照せず、`serving` の行の `sync` を `None` にする（再読み込みの応答）'
     returns:
       type: list[SourceState]
       description: '`sources[]` の順の配信元の状態'
@@ -631,3 +631,4 @@ constants:
     value: '"dev-docs.yaml"'
 notes:
   決まり: 配信中の部品（`Handlers`）を読むだけで、`reload_config` 以外は配信元の状態を変えない。
+visibility: internal

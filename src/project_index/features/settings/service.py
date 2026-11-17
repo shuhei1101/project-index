@@ -166,7 +166,7 @@ def _write_and_reload(
     path: Path,
     reload: Callable[[TerminalConfig], list[SourceStatus]],
 ) -> SourceWriteResult:
-    """書き換えた端末の設定を書き、読み直して配信元の状態と書いた後の内容のバージョンを返す。"""
+    """書き換えた端末の設定を書き、再読み込みして配信元の状態と書いた後の内容のバージョンを返す。"""
     replace_file(path, dump_roundtrip(document))
     text, version = read_settings_file(path)
     statuses = reload(load_terminal_config(path, text=text))
@@ -181,7 +181,7 @@ def save_sources(
     reload: Callable[[TerminalConfig], list[SourceStatus]],
     lock: threading.Lock,
 ) -> SourceWriteResult:
-    """`settings.yaml` の `sources` だけを書き換え、検証に通ったら書いて配信元を読み直す。"""
+    """`settings.yaml` の `sources` だけを書き換え、検証に通ったら書いて配信元を再読み込みする。"""
     with lock:
         # 取得した後に書き換えられていないかを照合する
         text, current = read_settings_file(path)
@@ -207,7 +207,7 @@ def add_source(
     reload: Callable[[TerminalConfig], list[SourceStatus]],
     lock: threading.Lock,
 ) -> SourceAddResult:
-    """同じ id の行が無ければ `sources` の末尾に 1 行追加して読み直し、あれば内容が同じかを返す。"""
+    """同じ id の行が無ければ `sources` の末尾に 1 行追加して再読み込みし、あれば内容が同じかを返す。"""
     with lock:
         # 取得した後に書き換えられていないかを、同じ id の行の確認より前に照合する
         text, current_version = read_settings_file(path)
@@ -244,7 +244,7 @@ def patch_source(
     reload: Callable[[TerminalConfig], list[SourceStatus]],
     lock: threading.Lock,
 ) -> SourceWriteResult:
-    """指した 1 行に送ったキーだけを重ねて `settings.yaml` を書き換え、変わった行の配信元を読み直す。"""
+    """指した 1 行に送ったキーだけを重ねて `settings.yaml` を書き換え、変わった行の配信元を再読み込みする。"""
     with lock:
         # 取得した後に書き換えられていないかを、行の検索より前に照合する
         text, current = read_settings_file(path)
@@ -255,7 +255,7 @@ def patch_source(
         )
         index, entry = _find_row(rows, source_id)
         patched = _apply_patch(entry, patch)
-        # id を省いた行の配信元の ID が変わる: 読み直す配信元が 1 つに決まらないため断る
+        # id を省いた行の配信元の ID が変わる: 再読み込みする配信元が 1 つに決まらないため断る
         if entry.id is None:
             new_id = entry_source_id(patched)
             if new_id != source_id:

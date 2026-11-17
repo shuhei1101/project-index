@@ -129,7 +129,7 @@ functions:
       description: 同じなら何も返さない
     process: |-
       1. 文字列なら `document.version` と比べる。辞書なら項目ごとに今の値の値のハッシュと比べる
-      2. 違う場合、今のバージョンと、`last_read` があればその内容と今の本文の差分の行（変更.差分の行）を添えた `VersionMismatchError` を送る（`next_steps` に読み直して呼び直すこと）
+      2. 違う場合、今のバージョンと、`last_read` があればその内容と今の本文の差分の行（変更.差分の行）を添えた `VersionMismatchError` を送る（`next_steps` に `search_docs` で再取得して呼び直すこと）
     exceptions:
       - name: VersionMismatchError
         condition: バージョンが違う
@@ -557,3 +557,4 @@ refs:
   - to: IF-7
     type: requires
     when: インターフェース定義『文書の削除』の入出力を変えるときに、この設計書の関数と型を合わせる。
+visibility: internal

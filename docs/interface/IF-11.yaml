@@ -233,7 +233,7 @@ flows:
         participant T as update
 
         C->>T: 引数なし
-        T->>T: 端末の設定を読み直す（違反）
+        T->>T: 端末の設定を再読み込みする（違反）
         T-->>C: isError（mdmark_ref の違反）
       ```
 
@@ -329,5 +329,6 @@ constraints:
     constraint: クローンに commit していない変更があって `git pull --ff-only` が失敗したときも、変更に触らず `UpdateFailedError` を返す
   - item: mdmark の CLI の入れ直し
     constraint: '`git pull --ff-only` が成功した後（新しい commit が無いとき・移し替えが要るときも含む）、`PATH` に `mdmark` があれば `npm install -g github:shuhei1101/mdmark#{mdmark_ref}` を実行する。失敗しても `UpdateFailedError` にせず、`mdmark.error` に入れて更新と再起動を続ける'
-    notes: '`mdmark_ref` は `update` を呼んだ時点で端末の設定のファイルを読み直した値（`reload` は要らない）。無ければ `develop`。タイムアウトは `git pull` と同じ 300 秒'
+    notes: '`mdmark_ref` は `update` を呼んだ時点で端末の設定のファイルを再読み込みした値（`reload` は要らない）。無ければ `develop`。タイムアウトは `git pull` と同じ 300 秒'
 test_file: tests/integration/server/test_update.py
+visibility: internal

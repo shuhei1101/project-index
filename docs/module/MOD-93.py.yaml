@@ -27,13 +27,13 @@ diagrams:
         管理の MCP の組み立て ..> ツールの結果
         管理の MCP の組み立て ..> ツールのエラーの変換
         管理の MCP の組み立て ..> 状態の取得
-        管理の MCP の組み立て ..> 設定の読み直し
+        管理の MCP の組み立て ..> 設定の再読み込み
         管理の MCP の組み立て ..> 配信元の検査
         管理の MCP の組み立て ..> 試しの変換
         管理の MCP の組み立て ..> 再起動の制御
         管理の MCP の組み立て ..> クローンの更新
         管理の MCP の組み立て ..> 状態の文
-        管理の MCP の組み立て ..> 読み直しの文
+        管理の MCP の組み立て ..> 再読み込みの文
         管理の MCP の組み立て ..> 検査の文
         class 管理の MCP の組み立て {
           <<function>>
@@ -47,7 +47,7 @@ diagrams:
         class 状態の取得 {
           <<function>>
         }
-        class 設定の読み直し {
+        class 設定の再読み込み {
           <<function>>
         }
         class 配信元の検査 {
@@ -65,7 +65,7 @@ diagrams:
         class 状態の文 {
           <<function>>
         }
-        class 読み直しの文 {
+        class 再読み込みの文 {
           <<function>>
         }
         class 検査の文 {
@@ -74,13 +74,13 @@ diagrams:
         click ツールの結果 href "id:MOD-95#functions[to_tool_result]"
         click ツールのエラーの変換 href "id:MOD-95#functions[tool_error]"
         click 状態の取得 href "id:MOD-10#functions[get_status]"
-        click 設定の読み直し href "id:MOD-10#functions[reload_config]"
+        click 設定の再読み込み href "id:MOD-10#functions[reload_config]"
         click 配信元の検査 href "id:MOD-10#functions[check_project]"
         click 試しの変換 href "id:MOD-10#functions[try_convert]"
         click 再起動の制御 href "id:MOD-34#classes[RestartControl]"
         click クローンの更新 href "id:MOD-36#functions[update_clone]"
         click 状態の文 href "id:MOD-9#functions[render_status]"
-        click 読み直しの文 href "id:MOD-9#functions[render_reload]"
+        click 再読み込みの文 href "id:MOD-9#functions[render_reload]"
         click 検査の文 href "id:MOD-9#functions[render_check]"
 constants:
   - name: ADMIN_MCP_NAME
@@ -113,9 +113,9 @@ functions:
       2. `ADMIN_TOOL_NAMES` のツールを、`description` を `handlers.prompts.render(tool_prompt_id("admin", 名前))` にして `TOOL_ANNOTATIONS` の注釈で登録する（今の説明の文は各ツールの YAML へ移す）。引数はインターフェース定義の `request` をキーワード引数で受ける
       3. 各ツールは次のサービスを `asyncio.to_thread` で呼び、結果をツールの結果にする。`status`・`restart` 以外は、呼ぶ前に `await handlers.registry.wait_loaded()` で配信元の読み込みを待つ
          - `status`: 状態の取得（`env` は `os.environ`）。`render` は状態の文
-         - `reload`: 設定の読み直し。`render` は読み直しの文
+         - `reload`: 設定の再読み込み。`render` は再読み込みの文
          - `restart`: 再起動の制御の再起動の要求（`handlers.restart.request()`）。`render` は `None`
-         - `update`: クローンの更新（クローンは端末の設定の `clone`、`control` は `handlers.restart`、`mdmark_ref` は呼ばれた時点で端末の設定のファイル `handlers.terminal.file` を読み直した値（端末の設定の読み込み））。読み直しが `TerminalConfigInvalidError` を送出したらクローンの更新を呼ばずに伝える。`render` は `None`
+         - `update`: クローンの更新（クローンは端末の設定の `clone`、`control` は `handlers.restart`、`mdmark_ref` は呼ばれた時点で端末の設定のファイル `handlers.terminal.file` を再読み込みした値（端末の設定の読み込み））。再読み込みが `TerminalConfigInvalidError` を送出したらクローンの更新を呼ばずに伝える。`render` は `None`
          - `check_project`: 配信元の検査。`render` は検査の文
          - `try_convert`: 試しの変換。`render` は `None`
          - `write_nav`: 画面の構成の書き込み。`render` は画面の構成の書き込みの文
@@ -146,3 +146,4 @@ functions:
         condition: '`list_tools` と `initialize` を呼ぶ'
         mock: 配線済みの関数（偽物。`prompts` は同梱した YAML を読んだ一式）
         expected: 7 つのツールの説明がそれぞれ `prompts.render(tool_prompt_id("admin", 名前))` と同じで、`instructions` が無い
+visibility: internal

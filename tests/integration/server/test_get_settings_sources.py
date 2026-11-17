@@ -64,7 +64,7 @@ def test_normal_when_source_not_served(
 def test_normal_when_pending_reload(
     make_source: Callable[..., Any], make_server: Callable[..., Any]
 ) -> None:
-    """手で直して読み直していない行を pending_reload で返す（正常系）。"""
+    """手で直して再読み込みしていない行を pending_reload で返す（正常系）。"""
     # 準備
     sample = make_source("sample")
     other = make_source("other")

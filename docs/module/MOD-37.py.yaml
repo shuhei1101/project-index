@@ -164,13 +164,13 @@ functions:
       description: バックアップのパス
     process: |-
       1. 手順に破壊的なものがあり `allow_destructive` が `False` の場合、`DestructiveStepBlockedError` を送出する
-      2. ファイルを読み直して `data` と同じ内容かを比べ、ハッシュを記録する（`content_hash`）
+      2. ファイルを再読み込みして `data` と同じ内容かを比べ、ハッシュを記録する（`content_hash`）
          - 違う場合、`MigrationFailedError` を送出する
       3. 手順を順に当てる（手順の適用）
       4. `version` を `target.current` にする
       5. 新しいスキーマで検証する（`settings` は `validate_terminal_config`、`project-index` は `validate_source_config`）
          - 違反がある場合、`MigrationFailedError` を送出する（ファイルには書かない）。`project-index` は末尾に `手順で移せない設定です。/project-index:setup で移し替えてください` の行を置く
-      6. ファイルを読み直してハッシュを比べる
+      6. ファイルを再読み込みしてハッシュを比べる
          - 変わっている場合、`MigrationFailedError` を送出する
       7. 同じフォルダに `BACKUP_FORMAT` の名前で元の内容を保存する
       8. 対象を書き換える（`dump_roundtrip`・`replace_file`）
@@ -236,3 +236,4 @@ functions:
       - MOD-38#functions[apply_step]
 notes:
   決まり: 動いているサーバーには反映しない。
+visibility: internal

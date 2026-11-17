@@ -55,7 +55,7 @@ def settings_path(tmp_path: Path) -> Path:
 def fake_reload(
     make_status: Callable[..., SourceStatus],
 ) -> tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]]:
-    """`serving` を 2 つ返し、呼ばれた端末の設定を記録する配信元の読み直しの偽物。"""
+    """`serving` を 2 つ返し、呼ばれた端末の設定を記録する配信元の再読み込みの偽物。"""
     calls: list[TerminalConfig] = []
 
     def _reload(terminal: TerminalConfig) -> list[SourceStatus]:
@@ -311,7 +311,7 @@ def test_add_source(
     fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
     make_entry: Callable[..., SourceEntry],
 ) -> None:
-    """末尾に追加して読み直す（正常系）。"""
+    """末尾に追加して再読み込みする（正常系）。"""
     # 準備
     reload, calls = fake_reload
     entry = make_entry("/tmp/b/project-index.yaml", source_id="b")

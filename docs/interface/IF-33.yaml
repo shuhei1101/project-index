@@ -12,12 +12,12 @@ tags:
 identifier: patch_settings_source
 permissions: '`Origin` を持たない要求（サーバーの側や端末のほかのプロセスからの呼び出し）か、project-index と同じオリジンからの要求だけ'
 idempotent: true
-side_effects: '`settings.yaml` の `sources` の指した 1 行だけを書き換え、その行の配信元だけを読み直す（ほかの配信元は読み直さず、配信を続ける）。配信元のフォルダのファイルは変えない'
+side_effects: '`settings.yaml` の `sources` の指した 1 行だけを書き換え、その行の配信元だけを再読み込みする（ほかの配信元は再読み込みせず、配信を続ける）。配信元のフォルダのファイルは変えない'
 callers:
   - SC-12#scenarios[正常シナリオ（1 行を変更する）]
   - SC-12#scenarios[異常シナリオ（指した行が無い）]
   - SC-12#scenarios[正常シナリオ（端末の設定の最上位に知らないキーがある）]
-exclusivity: 端末の設定の保存と同じ排他ロックの中で、内容のバージョンの照合・行の検索・検証・書き込み・読み直しを行う
+exclusivity: 端末の設定の保存と同じ排他ロックの中で、内容のバージョンの照合・行の検索・検証・書き込み・再読み込みを行う
 request:
   - name: id
     type: str
@@ -80,7 +80,7 @@ response:
     description: 配信元の ID
   - name: sources[].status
     type: Literal['serving', 'not_served', 'disabled']
-    description: 読み直した後の状態。変更した行の配信元もここに並ぶ
+    description: 再読み込みした後の状態。変更した行の配信元もここに並ぶ
   - name: sources[].errors
     type: 'list[{path: str, reason: str}]'
     description: 検証で除外した理由
@@ -98,7 +98,7 @@ response_example: |-
   ```
 status_codes:
   - code: '200'
-    condition: 変更してその行の配信元を読み直した（読み直しで除外した配信元があっても 200）
+    condition: 変更してその行の配信元を再読み込みした（再読み込みで除外した配信元があっても 200）
   - code: '403'
     condition: project-index と別のオリジンの `Origin` を持つ要求か、`Origin` が無く `Sec-Fetch-Site` が `cross-site`・`same-site` の要求
   - code: '404'
@@ -124,8 +124,8 @@ constraints:
     constraint: 排他ロックを取った後に `settings.yaml` の内容のバージョンと照合し、行の検索より前に断る
   - item: 書き込みの範囲
     constraint: '`settings.yaml` の指した 1 行だけを書き換え、ほかの行・他のキー・コメントを保つ。一時ファイルに書いてから置き換える'
-  - item: 読み直しの範囲
-    constraint: 変更した行の配信元だけを読み直し、ほかの配信元は読み直さない
+  - item: 再読み込みの範囲
+    constraint: 変更した行の配信元だけを再読み込みし、ほかの配信元は再読み込みしない
   - item: 認可
     constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
     decided_by: NFR-1#requirements[通信]
@@ -135,10 +135,10 @@ constraints:
     constraint: '`{tag}-{関数名}` の `settings-patch_settings_source`'
   - item: 配信元の ID が変わる変更
     constraint: '`id` を省いた行の `config` を、配信元の設定の `name` がパスの `id` と違う設定へ変える要求は 422 で断る'
-    notes: 差し替えるときは、端末の設定の配信元の 1 行の削除と追加を呼ぶ。読み直しの範囲を 1 つの配信元に保ち、ID の重なりを起こさない
+    notes: 差し替えるときは、端末の設定の配信元の 1 行の削除と追加を呼ぶ。再読み込みの範囲を 1 つの配信元に保ち、ID の重なりを起こさない
 flows:
   - name: 正常系
-    summary: 指した行の送信したキーだけを変更し、その配信元だけを読み直す
+    summary: 指した行の送信したキーだけを変更し、その配信元だけを再読み込みする
     setup:
       - name: Mock
         description: なし（一時フォルダに端末の設定と配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
@@ -160,7 +160,7 @@ flows:
         C->>E: expectedVersion, source: outside_read false
         E-->>CF: 内容のバージョンを照合し、extra の行を探す
         E->>CF: extra の行だけを書き換える
-        E->>E: extra の配信元だけを読み直す
+        E->>E: extra の配信元だけを再読み込みする
         E-->>C: 200（version・配信元ごとの状態）
       ```
 
@@ -169,7 +169,7 @@ flows:
       - 200 で、`version` が `expectedVersion` と違う値で、`sources` に extra が `serving` で並ぶ
       - '`settings.yaml` の extra の行に `outside_read: false` が入り、`scope.read`・`scope.write` は変わらない'
       - sample の行・他のキー・コメントは変わらない
-      - 変更の前後で sample の配信元を読み直さず、`/sources/sample/docs` が 200 を返却し続ける
+      - 変更の前後で sample の配信元を再読み込みせず、`/sources/sample/docs` が 200 を返却し続ける
       - '`GET /settings/sources` が返却する extra の行の `outsideRead` が `false`'
     test: test_normal
   - name: 正常系（id を省いた行を指す）
@@ -365,7 +365,7 @@ flows:
       - '`settings.yaml` が変わらない'
     test: test_error_when_argument_invalid
   - name: 正常系（読み書きの方法を変更する）
-    summary: 1 行の `storage.type` を `disk` に変え、その配信元を disk の配信元として読み直す
+    summary: 1 行の `storage.type` を `disk` に変え、その配信元を disk の配信元として再読み込みする
     setup:
       - name: Mock
         description: なし
@@ -384,7 +384,7 @@ flows:
 
         C->>E: PATCH /settings/sources/sample（storage.type: disk）
         E->>CF: sample の行だけを書き換える
-        E->>E: sample だけを読み直す
+        E->>E: sample だけを再読み込みする
         E-->>C: 200（新しい version）
       ```
 
@@ -396,3 +396,4 @@ flows:
     test: test_normal_when_storage_changed
 test_file: tests/integration/server/test_patch_settings_source.py
 id: IF-33
+visibility: internal
