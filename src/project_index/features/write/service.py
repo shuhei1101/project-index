@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import posixpath
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
@@ -22,6 +23,9 @@ from project_index.features.documents.fields import (
 from project_index.features.documents.loader import documents_from_text, resolve_body_path
 from project_index.features.documents.store import DocumentStore, not_found_error
 from project_index.features.documents.types import Document
+from project_index.features.search.fields import known_fields
+from project_index.features.search.filters import check_filter, match_filter
+from project_index.features.search.types import SearchRequest
 from project_index.features.seen.types import LastRead, SessionKey
 from project_index.features.sources.types import DocumentTable
 from project_index.features.write.apply import (
@@ -34,6 +38,8 @@ from project_index.features.write.apply import (
 from project_index.features.write.hints import attach_schema_hints
 from project_index.features.write.ids import generate_id
 from project_index.features.write.placement import new_document_path
+from project_index.features.write.references import renamed_path, rewrite_references
+from project_index.features.write.replace import replace_in_values
 from project_index.features.write.types import (
     OPERATIONS_MAX,
     DeleteRequest,
@@ -121,12 +127,32 @@ def _check_operations(operations: list[Operation]) -> None:
         "create": ("kind", "data"),
         "update": ("id", "expected_version"),
         "replace": ("id", "expected_version", "data"),
+        "rename": ("id", "expected_version"),
+        "replace_text": ("filter", "old", "new"),
     }
     violations = [
         Violation(path=f"operations[{index}].{name}", rule=f"{operation.op} には {name} が要ります")
         for index, operation in enumerate(operations)
         for name in required[operation.op]
         if getattr(operation, name) is None
+    ]
+    violations += [
+        Violation(
+            path=f"operations[{index}].new_id",
+            rule="rename には new_id か new_path が要ります",
+            fix="改名後の ID（new_id）かパス（new_path）を指定してください",
+        )
+        for index, operation in enumerate(operations)
+        if operation.op == "rename" and operation.new_id is None and operation.new_path is None
+    ]
+    violations += [
+        Violation(
+            path=f"operations[{index}].old",
+            rule="old は空にできません",
+            fix="置換する前の文字列を指定してください",
+        )
+        for index, operation in enumerate(operations)
+        if operation.op == "replace_text" and operation.old == ""
     ]
     if violations:
         raise _invalid(violations)
@@ -135,6 +161,16 @@ def _check_operations(operations: list[Operation]) -> None:
 def _related_column(table: DocumentTable) -> str:
     """参照を持つ列（種類の行の `metadata.related` の列名。無ければ `related`）。"""
     return table.metadata.get("related", "related")
+
+
+@dataclass(frozen=True)
+class _Snapshot:
+    """操作の前の作業状態。"""
+
+    docs: dict[str, Document]
+    pending: dict[str, str | None]
+    bodies: dict[str, str | None]
+    markdown_stopped: str | None
 
 
 @dataclass
@@ -216,6 +252,22 @@ class _Session:
         }
         if text is not None:
             self.docs.update({d.id: d for d in self.build(path, text, table)})
+
+    def snapshot(self) -> _Snapshot:
+        """操作の前の状態を返す（失敗した操作の変更を戻すため）。"""
+        return _Snapshot(
+            docs=dict(self.docs),
+            pending=dict(self.pending),
+            bodies=dict(self.bodies),
+            markdown_stopped=self.markdown_stopped,
+        )
+
+    def restore(self, snapshot: _Snapshot) -> None:
+        """操作の前の状態へ戻す。"""
+        self.docs = snapshot.docs
+        self.pending = snapshot.pending
+        self.bodies = snapshot.bodies
+        self.markdown_stopped = snapshot.markdown_stopped
 
     def write_pending(self) -> list[Path]:
         """記録した内容をファイルへ書き、消す予定のファイルを消して、触ったパスを返す。"""
@@ -717,14 +769,15 @@ def _apply_operations(
     applied = _Applied()
     created_ids: set[str] = set()
     for index, operation in enumerate(operations):
+        # 複数の文書を書き換える操作は、途中で失敗したら操作の前の状態へ戻す
+        snapshot = session.snapshot()
         try:
-            item, table = _apply_one(
-                session, checker, operation, index, last_reads, created_ids, now
-            )
+            done = _apply_one(session, checker, operation, index, last_reads, created_ids, now)
         except WriteDeadlineExceededError:
             # 期限の超過は操作の失敗にせず、`atomic` によらず全体を止める
             raise
         except ProjectIndexError as error:
+            session.restore(snapshot)
             applied.failures.append((index, error))
             applied.results.append(
                 WriteResultItem(
@@ -732,9 +785,10 @@ def _apply_operations(
                 )
             )
             continue
-        applied.results.append(item)
-        applied.ids.append(item.id or "")
-        applied.tables.append(table)
+        for item, table in done:
+            applied.results.append(item)
+            applied.ids.append(item.id or "")
+            applied.tables.append(table)
     return applied
 
 
@@ -796,11 +850,15 @@ def _apply_one(
     last_reads: Mapping[str, LastRead],
     created_ids: set[str],
     now: datetime,
-) -> tuple[WriteResultItem, DocumentTable]:
-    """操作 1 件を当てて検査し、通れば記録する。"""
+) -> list[tuple[WriteResultItem, DocumentTable]]:
+    """操作 1 件を当てて検査し、通れば記録する（結果の行は、書き換えた文書ごと）。"""
     if operation.op == "create":
-        return _apply_create_one(session, checker, operation, index, created_ids, now)
-    return _apply_existing_one(session, checker, operation, index, last_reads, now)
+        return [_apply_create_one(session, checker, operation, index, created_ids, now)]
+    if operation.op == "rename":
+        return _apply_rename_one(session, checker, operation, index, last_reads, now)
+    if operation.op == "replace_text":
+        return _apply_replace_text_one(session, checker, operation, index, now)
+    return [_apply_existing_one(session, checker, operation, index, last_reads, now)]
 
 
 def _apply_create_one(
@@ -909,6 +967,359 @@ def _apply_existing_one(
         ),
         table,
     )
+
+
+def _skip_columns(table: DocumentTable) -> list[str]:
+    """参照の書き換えと置換で触らない列（ID の列と `body_file` の列）。"""
+    columns = [table.metadata.get("id", "id")]
+    if table.body_file is not None:
+        columns.append(table.body_file)
+    return columns
+
+
+def _rename_invalid(rule: str, fix: str, path: str = "new_path") -> InvalidArgumentError:
+    """改名の引数の誤り。"""
+    return _invalid([Violation(path=path, rule=rule, fix=fix)])
+
+
+@dataclass(frozen=True)
+class _RenamePlan:
+    """改名の前後の ID とパス。"""
+
+    old_id: str
+    new_id: str
+    # 1 ファイル 1 文書の YAML のパス（`records` の文書は管理用の YAML のパスのまま）
+    file_path: str
+    # パスが変わるときの（改名前のパス, 改名後のパス）
+    moved: tuple[str, str] | None
+
+
+def _plan_body_move(
+    session: _Session, operation: Operation, table: DocumentTable, existing: Document
+) -> tuple[str, str] | None:
+    """`body_file` の文書の本文のファイルの移し先を確かめ、（改名前, 改名後）を返す。"""
+    if operation.new_path is None or existing.body_path is None:
+        return None
+    new_path = posixpath.normpath(operation.new_path)
+    relative = posixpath.relpath(new_path, posixpath.dirname(existing.path) or ".")
+    if resolve_body_path(existing.path, relative) != new_path:
+        raise _rename_invalid(
+            f"new_path（{operation.new_path}）が配信元の外を指します",
+            "配信元の直下からのパスを指定してください",
+        )
+    if new_path == existing.body_path:
+        return None
+    if session.body_exists(new_path):
+        raise _rename_invalid(f"new_path（{new_path}）は既にあります", "別のパスを指定してください")
+    return existing.body_path, new_path
+
+
+def _plan_file_move(
+    session: _Session, operation: Operation, table: DocumentTable, existing: Document
+) -> tuple[str, str] | None:
+    """1 ファイル 1 文書の YAML の移し先を確かめ、（改名前, 改名後）を返す。"""
+    if operation.new_path is not None:
+        new_path = posixpath.normpath(operation.new_path)
+    elif operation.new_id is not None:
+        new_path = renamed_path(existing.path, old_id=existing.id, new_id=operation.new_id)
+        if new_path is None:
+            return None
+    else:
+        return None
+    if new_path == existing.path:
+        return None
+    if not table.matches(new_path):
+        raise _rename_invalid(
+            f"new_path（{new_path}）が {table.id} の paths に該当しないか exclude に該当します",
+            f"{table.id} の documents[].paths に該当するパスを指定してください",
+        )
+    if session.exists(new_path):
+        raise _rename_invalid(f"new_path（{new_path}）は既にあります", "別のパスを指定してください")
+    return existing.path, new_path
+
+
+def _id_exists(new_id: str) -> ValidationFailedError:
+    """改名後の ID が既にある文書と重なる違反。"""
+    return ValidationFailedError(
+        message="検査に通らない操作があります: 1 件",
+        violations=[
+            Violation(path="new_id", rule=f"{new_id} は既にあります", fix="別の ID にしてください")
+        ],
+    )
+
+
+def _plan_rename(
+    session: _Session, operation: Operation, table: DocumentTable, existing: Document
+) -> _RenamePlan:
+    """改名の前後の ID とパスを決める（引数の誤りは `InvalidArgumentError`）。"""
+    id_column = table.metadata.get("id", "id")
+    has_id = get_field(existing.data, id_column) is not None
+    if operation.new_id is not None and not has_id:
+        raise _rename_invalid(
+            f"{existing.id} は ID がパスの文書のため new_id を受けません",
+            "new_path で改名してください",
+            path="new_id",
+        )
+    # ID の重なりは、移し先のファイルの重なりより先に ID の違反として返す
+    if operation.new_id not in (None, existing.id) and operation.new_id in session.docs:
+        raise _id_exists(operation.new_id)
+    if table.records is not None and table.body_file is None and operation.new_path is not None:
+        raise _rename_invalid(
+            f"{table.id} は本文のファイル（body_file）を持たないため new_path を受けません",
+            "new_path を除いてください",
+        )
+    if table.records is not None:
+        moved = _plan_body_move(session, operation, table, existing)
+        file_path = existing.path
+    else:
+        moved = _plan_file_move(session, operation, table, existing)
+        file_path = existing.path if moved is None else moved[1]
+    if has_id:
+        new_id = operation.new_id or existing.id
+    else:
+        new_id = existing.id if moved is None else moved[1]
+    if new_id != existing.id and new_id in session.docs:
+        raise _id_exists(new_id)
+    return _RenamePlan(old_id=existing.id, new_id=new_id, file_path=file_path, moved=moved)
+
+
+def _renamed_content(
+    session: _Session,
+    table: DocumentTable,
+    existing: Document,
+    plan: _RenamePlan,
+    now: datetime,
+) -> str:
+    """改名した文書の新しい内容（ID・本文のファイルの列・自分を指す参照を書き換えたもの）。"""
+    text = session.text(existing.path)
+    current, container = _content_for(table, text, existing, existing.path)
+    id_column = table.metadata.get("id", "id")
+    if get_field(current, id_column) is not None and plan.new_id != plan.old_id:
+        set_field(current, id_column, plan.new_id)
+    if table.body_file is not None and plan.moved is not None:
+        relative = posixpath.relpath(plan.moved[1], posixpath.dirname(existing.path) or ".")
+        set_field(current, table.body_file, relative)
+    # 改名した文書の中の、自分を指す参照（パスは解き直さない）
+    rewrite_references(
+        current,
+        related_column=_related_column(table),
+        old_id=plan.old_id,
+        new_id=plan.new_id,
+        moved=None,
+        base_dir=posixpath.dirname(existing.path),
+        skip=_skip_columns(table),
+    )
+    if not session.target.source.is_git:
+        _stamp(current, "update", now, None)
+    return _finish(table, current, container, existing, text)
+
+
+def _rewrite_referrers(
+    session: _Session,
+    checker: DocumentChecker,
+    plan: _RenamePlan,
+    index: int,
+    now: datetime,
+) -> list[tuple[WriteResultItem, DocumentTable]]:
+    """同じ配信元のほかの文書の、改名前の ID・パスを指す箇所を書き換える。"""
+    done: list[tuple[WriteResultItem, DocumentTable]] = []
+    for doc_id in list(session.docs):
+        document = session.docs.get(doc_id)
+        if document is None or doc_id == plan.new_id:
+            continue
+        table = session.target.source.table(document.kind)
+        text = session.text(document.path)
+        current, container = _content_for(table, text, document, document.path)
+        changes = rewrite_references(
+            current,
+            related_column=_related_column(table),
+            old_id=plan.old_id,
+            new_id=plan.new_id,
+            moved=plan.moved,
+            base_dir=posixpath.dirname(document.path),
+            skip=_skip_columns(table),
+        )
+        if not changes:
+            continue
+        table = _writable(table, "id")
+        if not session.target.source.is_git:
+            _stamp(current, "update", now, None)
+        new_text = _finish(table, current, container, document, text)
+        new_document, unchecked = _check_and_commit(
+            session,
+            checker,
+            table,
+            document.path,
+            new_text,
+            index=document.record_index,
+            doc_id=None,
+            new=False,
+            previous=document.data,
+        )
+        done.append(
+            (
+                WriteResultItem(
+                    index=index,
+                    id=new_document.id,
+                    status="updated",
+                    version=new_document.version,
+                    diff=_diff(document, new_document, {}),
+                    unchecked=unchecked,
+                    references=changes,
+                ),
+                table,
+            )
+        )
+    return done
+
+
+def _apply_rename_one(
+    session: _Session,
+    checker: DocumentChecker,
+    operation: Operation,
+    index: int,
+    last_reads: Mapping[str, LastRead],
+    now: datetime,
+) -> list[tuple[WriteResultItem, DocumentTable]]:
+    """`rename` 1 件を当てて、改名した文書と参照元を検査し、通れば記録する。"""
+    if operation.id is None or operation.expected_version is None:
+        msg = "rename に id か expected_version がありません"
+        raise RuntimeError(msg)
+    existing = session.docs.get(operation.id)
+    if existing is None:
+        raise not_found_error(session.source_id, [operation.id], list(session.docs))
+    table = _writable(session.target.source.table(existing.kind), "id")
+    check_version(existing, operation.expected_version, last_read=last_reads.get(existing.id))
+    plan = _plan_rename(session, operation, table, existing)
+    text = _renamed_content(session, table, existing, plan, now)
+    body: dict[str, str | None] = {}
+    if table.body_file is not None and plan.moved is not None:
+        body = {plan.moved[1]: existing.body, plan.moved[0]: None}
+    if table.records is None and plan.file_path != existing.path:
+        session.commit(existing.path, None, table)
+    renamed, unchecked = _check_and_commit(
+        session,
+        checker,
+        table,
+        plan.file_path,
+        text,
+        index=existing.record_index,
+        doc_id=plan.new_id,
+        new=False,
+        previous=existing.data,
+        bodies=body,  # type: ignore[arg-type]
+    )
+    item = WriteResultItem(
+        index=index,
+        id=renamed.id,
+        status="renamed",
+        version=renamed.version,
+        diff=_diff(existing, renamed, {}),
+        unchecked=unchecked,
+        path=renamed.body_path or renamed.path,
+        renamed_from=existing.id,
+    )
+    return [(item, table), *_rewrite_referrers(session, checker, plan, index, now)]
+
+
+def _columns(paths: list[str] | None, table: DocumentTable) -> list[str] | None:
+    """項目のパスの先頭の共通のキーを、種類の行の列名へ読み替える。"""
+    if paths is None:
+        return None
+    result: list[str] = []
+    for path in paths:
+        head, dot, rest = path.partition(".")
+        column = table.metadata.get(head, head)
+        result.append(f"{column}{dot}{rest}")
+    return result
+
+
+def _matched(session: _Session, checker: DocumentChecker, operation: Operation) -> list[str]:
+    """`filter` に該当する、書き込みを許す種類の文書の ID を返す。"""
+    source = session.target.source
+    schemas = [
+        checker.store.row_schema(session.target, table.id)
+        for table in source.config.documents
+        if table.enabled
+    ]
+    fields = known_fields(schemas)
+    violations = check_filter(SearchRequest(filter=operation.filter), fields)
+    if violations:
+        raise _invalid(violations)
+    today = datetime.now(UTC).astimezone().date()
+    return [
+        document.id
+        for document in session.docs.values()
+        if source.table(document.kind).is_writable
+        and match_filter(operation.filter, document, fields=fields, today=today)
+    ]
+
+
+def _apply_replace_text_one(
+    session: _Session,
+    checker: DocumentChecker,
+    operation: Operation,
+    index: int,
+    now: datetime,
+) -> list[tuple[WriteResultItem, DocumentTable]]:
+    """`replace_text` 1 件を、`filter` に該当する文書ごとに当てて検査し、全て通れば記録する。"""
+    if operation.old is None or operation.new is None:
+        msg = "replace_text に old か new がありません"
+        raise RuntimeError(msg)
+    done: list[tuple[WriteResultItem, DocumentTable]] = []
+    for doc_id in _matched(session, checker, operation):
+        document = session.docs[doc_id]
+        table = session.target.source.table(document.kind)
+        text = session.text(document.path)
+        current, container = _content_for(table, text, document, document.path)
+        count = replace_in_values(
+            current,
+            old=operation.old,
+            new=operation.new,
+            fields=_columns(operation.fields, table),
+            skip=_skip_columns(table),
+        )
+        if count == 0:
+            continue
+        if not session.target.source.is_git:
+            _stamp(current, "update", now, None)
+        new_text = _finish(table, current, container, document, text)
+        try:
+            new_document, unchecked = _check_and_commit(
+                session,
+                checker,
+                table,
+                document.path,
+                new_text,
+                index=document.record_index,
+                doc_id=None,
+                new=False,
+                previous=document.data,
+            )
+        except ValidationFailedError as error:
+            # どの文書の違反かを、項目のパスの前に文書の ID を付けて示す
+            raise ValidationFailedError(
+                message=error.message,
+                violations=[
+                    dataclasses.replace(violation, path=f"{doc_id}#{violation.path}")
+                    for violation in error.violations
+                ],
+            ) from error
+        done.append(
+            (
+                WriteResultItem(
+                    index=index,
+                    id=new_document.id,
+                    status="updated",
+                    version=new_document.version,
+                    diff=_diff(document, new_document, {}),
+                    unchecked=unchecked,
+                    count=count,
+                ),
+                table,
+            )
+        )
+    return done
 
 
 def _points_to(row: object, ids: set[str]) -> bool:

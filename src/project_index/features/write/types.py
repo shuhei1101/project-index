@@ -8,6 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from project_index.features.access.types import CWD_DESCRIPTION
+from project_index.features.search.types import Condition, Group
 from project_index.features.validation.markdown import UncheckedKey
 from project_index.shared.errors import Violation
 
@@ -38,7 +39,7 @@ class Operation(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    op: Literal["create", "update", "replace"]
+    op: Literal["create", "update", "replace", "rename", "replace_text"]
     kind: str | None = None
     id: str | None = None
     expected_version: str | dict[str, str] | None = None
@@ -48,6 +49,12 @@ class Operation(BaseModel):
     add_to: dict[str, list[Any]] = Field(default_factory=dict[str, list[Any]])
     remove_from: dict[str, list[Any]] = Field(default_factory=dict[str, list[Any]])
     text_edits: list[TextEdit] = Field(default_factory=list[TextEdit])
+    new_id: str | None = None
+    new_path: str | None = None
+    filter: Condition | Group | None = None
+    old: str | None = None
+    new: str | None = None
+    fields: list[str] | None = None
 
 
 class WriteRequest(BaseModel):
@@ -66,16 +73,29 @@ class WriteRequest(BaseModel):
 
 
 @dataclass(frozen=True)
+class ReferenceChange:
+    """`rename` で書き換えた参照元の 1 か所。"""
+
+    path: str
+    before: str
+    after: str
+
+
+@dataclass(frozen=True)
 class WriteResultItem:
     """操作 1 件の結果。"""
 
     index: int
     id: str | None
-    status: Literal["created", "updated", "replaced", "deleted", "failed"]
+    status: Literal["created", "updated", "replaced", "renamed", "deleted", "failed"]
     version: str | None = None
     diff: str | None = None
     errors: list[Violation] = field(default_factory=list[Violation])
     unchecked: list[UncheckedKey] = field(default_factory=list[UncheckedKey])
+    path: str | None = None
+    renamed_from: str | None = None
+    references: list[ReferenceChange] = field(default_factory=list[ReferenceChange])
+    count: int | None = None
 
 
 @dataclass(frozen=True)
