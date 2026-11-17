@@ -179,6 +179,26 @@ classes:
             condition: '`foreground` の中で、別のスレッドが `background` の中で 3 要素のジェネレータを `each` で回し、要素を作る処理と呼び出し側の処理に `clock` を 0.5 秒ずつ進める'
             mock: 時計と休み（偽物）
             expected: 3 要素を順に返し、休みが 9 秒で 3 回呼ばれる
+      - name: in_background
+        title: 裏の処理のスレッドか
+        kind: メソッド
+        summary: 今のスレッドが `background` の中かを返す（`property`。テストが確認に使用する）
+        scope: public
+        thread_safe: true
+        returns:
+          type: bool
+          description: 今のスレッドの裏の処理の深さが 1 以上なら `True`
+        process: 1. 今のスレッドの裏の処理の深さが 0 より大きいかを返す
+      - name: in_unit
+        title: 裏の処理の 1 件の中か
+        kind: メソッド
+        summary: 今のスレッドが裏の処理の 1 件（`unit`）の中かを返す（`property`。テストが確認に使用する）
+        scope: public
+        thread_safe: true
+        returns:
+          type: bool
+          description: 今のスレッドの 1 件の入れ子の深さが 1 以上なら `True`
+        process: 1. 今のスレッドの 1 件の入れ子の深さが 0 より大きいかを返す
 constants:
   - name: BACKGROUND_SHARE
     title: 応答中の裏の処理の時間の割合
