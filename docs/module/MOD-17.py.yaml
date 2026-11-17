@@ -34,7 +34,7 @@ classes:
     usecase: 文書の取得
     role: サービス
     summary: 文書の種類が指す `converters[]` のスクリプトで、文書を Markdown にする
-    description: '`converters[]` の結果は (配信元, 種類, 変換の ID, 文書のバージョン, `run` の値のハッシュ, project-index のバージョン（動いているバージョン）) を名前にしたファイルで `{state_dir}/converted` に保存し、同じ文書・バージョンは 1 回だけ変換する。`converters[]` の行の `cache` が `False` の変換は変換の結果のキャッシュを参照も保存もせず、要求のたびにスクリプトを動かす。'
+    description: '`converters[]` の結果は (配信元, 種類, 変換の ID, 文書のバージョン, `run` の値のハッシュ, project-index のバージョン（動いているバージョン）, 変換のスクリプトの状態) を名前にしたファイルで `{state_dir}/converted` に保存し、同じ文書・バージョン・スクリプトは 1 回だけ変換する。`converters[]` の行の `cache` が `False` の変換は変換の結果のキャッシュを参照も保存もせず、要求のたびにスクリプトを動かす。'
     kind: クラス
     properties:
       - name: cache_dir
@@ -59,7 +59,7 @@ classes:
         kind: メソッド
         scope: public
         thread_safe: true
-        side_effects: '`converters[]` のスクリプトを動かす。`cache_dir` に書く'
+        side_effects: '`converters[]` のスクリプトを動かす。`cache_dir` に書く。`cache` が `True` の行で、クローン本体の `config_commit` からスクリプトを取り出さない場所では、スクリプトのフォルダの配下のファイルの `stat` を取る'
         args:
           - name: target
             title: 読み書きの場所
@@ -79,7 +79,7 @@ classes:
         process: |-
           1. 文書の行を引く（`target.source.table(document.kind)`）
              - 行が `converter` を持たない場合、`ConverterNotDefinedError` を送出する
-          2. 行（`target.source.script("converters", converter)`）の `cache` が `True` で `cache_dir` のキャッシュがあればそれを使う。無ければスクリプトの実行（`cwd=target.config_base`（設定ファイルのフォルダ）・`stdin` に文書の YAML・制限時間 `timeout_sec`・`at`・`env`。`at` は `target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`）。`env` は `{COMMIT_ENV: target.commit}` で、`target.commit` が `None` ならサーバーの環境の `COMMIT_ENV` を除く）の標準出力を使い、`cache` が `True` なら一時ファイルから置き換えてキャッシュする。キャッシュが `CONVERT_CACHE_KEEP` を超えたら古いものを消す。`cache` が `False` ならキャッシュに保存しない
+          2. 行（`target.source.script("converters", converter)`）の `cache` が `True` なら『キャッシュのファイル』（`_cache_path`）でキャッシュのファイルを決め、そのファイルがあればそれを使う。無ければスクリプトの実行（`cwd=target.config_base`（設定ファイルのフォルダ）・`stdin` に文書の YAML・制限時間 `timeout_sec`・`at`・`env`。`at` は `target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`）。`env` は `{COMMIT_ENV: target.commit}` で、`target.commit` が `None` ならサーバーの環境の `COMMIT_ENV` を除く）の標準出力を使い、`cache` が `True` なら一時ファイルから置き換えてキャッシュする。キャッシュが `CONVERT_CACHE_KEEP` を超えたら古いものを消す。`cache` が `False` ならキャッシュに保存しない
              - `ScriptTimeoutError`・`ScriptFailedError`・実行できない `ScriptError` の場合、`reason` が `timeout`・`exit`・`not_runnable` の `ConvertFailure` を返す
           3. スクリプトの標準出力を `markdown` にした `Converted` を返す
 
@@ -131,6 +131,20 @@ classes:
             mock: '`run_script`（受け取った `env` を記録する）'
             expected: '`commit` を持つ場所は `env` が `{"PROJECT_INDEX_COMMIT": commit}`、持たない場所は `{"PROJECT_INDEX_COMMIT": None}`'
             exception: '-'
+          - name: test_convert_service_convert_when_script_changed
+            case: 正常
+            summary: スクリプトのファイルを書き換えたら、書き換えた後のスクリプトで再び変換する
+            condition: Git の管理外の配信元で `# v1` を出す `scripts/convert.py` を指す行の同じ文書を 2 回変換し、`scripts/convert.py` を `# v2` を出す内容に書き換えて 3 回目を変換する
+            mock: なし（一時フォルダの配信元と実際のスクリプト）
+            expected: 1 回目と 2 回目は `# v1`、3 回目は `# v2`
+            exception: '-'
+          - name: test_convert_service_convert_when_config_commit_changed
+            case: 正常
+            summary: スクリプトを取り出す commit が変わったら、その commit のスクリプトで再び変換する
+            condition: クローン本体の同じ文書を、`config_commit` を commit 1 にした場所で 2 回、commit 2 にした場所で 1 回変換する（同じ `cache_dir`）
+            mock: '`run_script`（受け取った `at` を記録する）'
+            expected: スクリプトは 2 回呼ばれ、1 回目の `at` が commit 1、2 回目の `at` が commit 2
+            exception: '-'
         exceptions:
           - name: ConverterNotDefinedError
             condition: 文書の種類の行が `converter` を持たない
@@ -147,6 +161,46 @@ classes:
           type: None
           description: '-'
         process: 1. `cache_dir` の下のファイルを削除する（起動の『配信元の再読み込み』が呼ぶ）
+      - name: _cache_path
+        title: キャッシュのファイル
+        summary: '`converters[]` の結果のキャッシュのファイルを返却する'
+        kind: メソッド
+        scope: internal
+        thread_safe: true
+        side_effects: クローン本体の `config_commit` からスクリプトを取り出さない場所では、スクリプトのフォルダの配下のファイルの `stat` を取る
+        args:
+          - name: target
+            title: 読み書きの場所
+            type: Target
+            required: true
+            passing: positional
+            description: スクリプトを動かす場所
+          - name: document
+            title: 文書
+            type: Document
+            required: true
+            passing: positional
+            description: 変換する文書
+          - name: converter
+            title: 変換の ID
+            type: str
+            required: true
+            passing: positional
+            description: 文書の行の `converter`
+          - name: run
+            title: コマンド
+            type: list[str]
+            required: true
+            passing: positional
+            description: '`converters[]` の行の `run`'
+        returns:
+          type: Path
+          description: '`cache_dir` の下の `{ハッシュ}.md`'
+        process: |-
+          1. 変換のスクリプトの状態を作る
+             - `script_at(target)` が commit を返却する場合（クローン本体で `config_commit` がある）、その commit の SHA にする（スクリプトはその commit から取り出して動かす）
+             - それ以外（ワークツリー・disk・Git の管理外の配信元）の場合、スクリプトの実行の『スクリプトの状態』（`script_stamp(target.config_base, run, use_git=target.source.is_git)`）にする
+          2. (配信元の ID, 種類, 変換の ID, 文書のバージョン, `run` の『値のハッシュ』, `RUNNING_VERSION`, スクリプトの状態) を NUL でつないだ SHA-256 の先頭 32 文字を名前にした `cache_dir` の下の `.md` のパスを返却する
 constants:
   - name: CONVERT_CACHE_KEEP
     title: 変換の結果を残す数
