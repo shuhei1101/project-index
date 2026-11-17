@@ -9,7 +9,14 @@ from typing import TYPE_CHECKING
 
 from project_index import DIST_NAME
 from project_index.features.prompt_doc.cli import run_prompt_doc
-from project_index.main import run_files, run_migrate, run_serve
+from project_index.main import (
+    run_changed,
+    run_checkpoint,
+    run_files,
+    run_migrate,
+    run_outline,
+    run_serve,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -45,6 +52,40 @@ def build_parser() -> argparse.ArgumentParser:
     )
     files.add_argument("--exclude", action="append", default=[], help="除外するファイル名の glob")
     files.set_defaults(handler=run_files)
+    outline = subparsers.add_parser(
+        "outline", help="範囲のファイルごとのアウトラインと次の段階へ進むかを 1 行の JSON で出す"
+    )
+    outline.add_argument("--root", required=True, help="配信元のフォルダ")
+    outline.add_argument(
+        "--paths",
+        required=True,
+        action="append",
+        help="範囲の glob かファイルのパス（--root からの相対）",
+    )
+    outline.add_argument("--exclude", action="append", default=[], help="除外するファイル名の glob")
+    outline.set_defaults(handler=run_outline)
+    changed = subparsers.add_parser(
+        "changed", help="確認の時点の後に中身が変わった管理用の YAML の行のファイルを出す"
+    )
+    changed.add_argument("--root", required=True, help="配信元のフォルダ")
+    changed.add_argument(
+        "--files-yaml", required=True, help="管理用の YAML のパス（--root からの相対）"
+    )
+    changed.set_defaults(handler=run_changed)
+    checkpoint = subparsers.add_parser(
+        "checkpoint", help="管理用の YAML の checkpoint に確認の時点を記録する"
+    )
+    checkpoint.add_argument("--root", required=True, help="配信元のフォルダ")
+    checkpoint.add_argument(
+        "--files-yaml", required=True, help="管理用の YAML のパス（--root からの相対）"
+    )
+    checkpoint.add_argument(
+        "--reviewed",
+        action="append",
+        default=[],
+        help="見直したファイルのうち commit していない変更を持つファイルのパス",
+    )
+    checkpoint.set_defaults(handler=run_checkpoint)
     prompt_doc = subparsers.add_parser(
         "prompt-doc", help="標準入力のプロンプトの YAML を Markdown にして標準出力に出す"
     )
