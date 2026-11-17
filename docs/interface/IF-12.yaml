@@ -545,6 +545,39 @@ flows:
       - '`sync.duplicate_files` が 0'
       - '`violations` が空'
     test: test_normal_when_ids_overlap
+  - name: 正常系（.git のファイルと Git が無視するファイルを数えない）
+    summary: ワークツリーの名前が `.git` のファイルと、Git の配信元で Git が無視するファイルを索引に無いファイルとして数えない
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに Git の配信元とワークツリーを作り、project-index のアプリをテストのクライアントで呼ぶ）
+      - name: 配信元
+        description: '検証に通る sample。行 `root`（`paths: [files.yaml]`・`records: files`・`body_file: path`。`exclude` を持たない）の `files.yaml` が追跡するファイルを全て記載し、`.gitignore` が `.pytest_cache/` と `dist/` を無視する'
+        notes: '`path` はワークツリーの `project-index.yaml`'
+      - name: 範囲のファイル
+        description: ワークツリーに `.pytest_cache/x`・`dist/app.js`・追跡するが管理用の YAML に無い `docs/new.md` を置く。直下の `.git` は本体を指す 1 行のファイル
+        notes: '`docs/new.md` だけが数える対象'
+    flow: |-
+      <!-- map: {"title": "正常系（.git のファイルと Git が無視するファイルを数えない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as check_project
+        participant F as 配信元のフォルダ
+        participant G as git
+
+        C->>T: path
+        T-->>F: 管理用の YAML とそのフォルダの配下のファイルを読む（名前が .git のファイルをたどらない）
+        T->>G: Git が無視するファイルの一覧を得る
+        T->>T: 除外の条件と Git が無視するファイルを外す
+        T-->>C: 同期の件数と内訳
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`sync.unindexed_files` が 1 で、`sync.items` が `docs/new.md` だけ'
+      - '`sync.items` に `.git`・`.pytest_cache/x`・`dist/app.js` が無い'
+    test: test_normal_when_git_file_and_ignored_files
 lead: 配信元の設定・管理用の YAML・スクリプトを検証する管理の MCP の `check_project` の入出力を定め、`check_project` を修正するときに参照する。
 tags:
   - name: action:検査
@@ -627,7 +660,7 @@ response:
     description: '種類の行の `metadata` に書いた列が無い文書の件数'
   - name: sync.unindexed_files
     type: int
-    description: 管理用の YAML に無いファイルの件数。除外の条件（バイナリ・空のファイル・`*.local.*` の名前のファイル）に当たるファイルは数えない
+    description: 管理用の YAML に無いファイルの件数。除外の条件（バイナリ・空のファイル・`*.local.*` の名前のファイル）に当たるファイルと、Git の配信元で Git が無視するファイルは数えない
   - name: sync.missing_body_files
     type: int
     description: ファイルが無い行の件数
@@ -721,5 +754,8 @@ constraints:
   - item: 文書の ID の重なり
     constraint: 先の文書は `documents[]` の行の順とファイルのパスの順で先に読んだ文書とする。ファイルは、`body_file` の行では要素の `body_file` が指すファイル、それ以外の行では文書のファイルとする。除外した文書と先の文書が別の行で、同じファイルの重なりに数えた同じファイルを文書にするときは数えない。起動時の警告・状態の取得・引数なしの `describe` も同じ判定を使用する
     notes: 同じファイルの重なりは `duplicate_files` が行の ID つきで示すため、1 つの配置の誤りを 2 つの件数に出さない
+  - item: Git が無視するファイル
+    constraint: 'Git の配信元（端末の設定の `storage.type` が `git`）では、読む作業ツリーで Git が無視するファイル（`.gitignore`・`info/exclude`・グローバルの除外）を `unindexed_files` に数えない。起動時の警告・状態の取得も同じ判定を使う。`storage.type: disk` と Git 管理外の配信元では数える。`project-index files` と文書の収集は Git の無視を参照しない'
+    notes: 無視の一覧を git から取れないときは除かずに数え、違反・警告にしない
 test_file: tests/integration/server/test_check_project.py
 visibility: internal

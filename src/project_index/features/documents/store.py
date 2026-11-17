@@ -26,7 +26,7 @@ from project_index.features.documents.schema import (
 from project_index.features.documents.types import Document, LoadProblem, LoadResult, SyncReport
 from project_index.features.history.query import file_dates, resolve_ref
 from project_index.features.history.types import FileDates
-from project_index.integrations.git import GitError, run_git
+from project_index.integrations.git import GitError, ignored_paths, run_git
 from project_index.shared.errors import DocumentNotFoundError
 from project_index.shared.narrowing import is_dict
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
@@ -685,7 +685,11 @@ def _row_files(
 
 
 def _unindexed(
-    source: ServedSource, table: DocumentTable, documents: list[Document], files: list[str]
+    source: ServedSource,
+    table: DocumentTable,
+    documents: list[Document],
+    files: list[str],
+    ignored: Collection[str],
 ) -> list[str]:
     """`records`・`body_file` の行の索引ごとに、索引に無い本文のファイルを集める。"""
     unindexed: list[str] = []
@@ -714,6 +718,7 @@ def _unindexed(
                 files=files,
                 others=others,
                 nested_dirs=_nested_dirs(posixpath.dirname(index_path) or ".", index_dirs),
+                ignored=ignored,
             )
         )
     return unindexed
@@ -738,11 +743,13 @@ def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
         for document in result.documents
         for key, field in missing_ref_fields(document.data, source.table(document.kind))
     ]
+    # Git の配信元だけ、Git が無視するパスを 1 回だけ求めて索引に無いファイルから除く
+    ignored = (ignored_paths(source.root) or []) if source.is_git else []
     unindexed = [
         line
         for table in source.config.documents
         if table.enabled and table.records is not None and table.body_file is not None
-        for line in _unindexed(source, table, result.documents, files)
+        for line in _unindexed(source, table, result.documents, files, ignored)
     ]
     missing_body_files = [
         f"{problem.path}: {problem.detail}"

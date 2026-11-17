@@ -1262,6 +1262,43 @@ scenarios:
       - 直下の `files.yaml` に `LICENSE` の行が追加され、`src/files.yaml` に `new.py` の行が追加される
       - '`check_project` が索引の同期の件数を 0 で返す'
     test: test_normal_when_root_files_yaml_with_nested_index
+  - name: 正常シナリオ（ワークツリーの .git と Git が無視するファイルを数えない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 配信元にするリポジトリ
+        description: 直下の管理用の YAML（`files.yaml`。行の `paths` は `[files.yaml]` で `exclude` を持たない）に追跡するファイルを全て記載し、`.gitignore` で `.pytest_cache/` と `dist/` を無視する Git のリポジトリ。ワークツリー `.claude/worktrees/develop` を持つ
+        notes: ワークツリーに `.pytest_cache/x` と `dist/app.js` を置く。ワークツリーの直下の `.git` は本体を指す 1 行のファイル
+      - name: 端末の設定
+        description: '`sources[].config` がワークツリーの `project-index.yaml` を指す'
+        notes: '`storage` は書かない（Git の作業ツリーなので `git`）'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（ワークツリーの .git と Git が無視するファイルを数えない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant CL as project-index の CLI
+        participant AD as 管理の MCP
+        participant G as 配信元のリポジトリ
+
+        U->>CL: project-index files --root {ワークツリー} --paths **/*
+        CL-->>U: 記載するファイル（名前が .git のファイルを含まない）
+        U->>AD: check_project（ワークツリーの project-index.yaml）
+        AD->>G: Git が無視するファイルの一覧を得る
+        AD-->>U: 違反 0 件・索引の同期の件数 0
+        U->>AD: reload
+        U->>AD: status
+        AD-->>U: 配信元の管理用の YAML に無いファイルの件数 0
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`project-index files` の結果に `.git` が無く、`.pytest_cache/x`・`dist/app.js` はある（`project-index files` は `.gitignore` を参照しない）'
+      - '`check_project` の索引の同期の管理用の YAML に無いファイルが 0 件（`.git`・`.pytest_cache/x`・`dist/app.js` を数えない）'
+      - '`reload` の後の `status` の配信元の管理用の YAML に無いファイルの件数が 0'
+      - 追跡していて管理用の YAML に無いファイル（`docs/new.md`）を足すと、`check_project` はそのファイルだけを 1 件数える
+    test: test_normal_when_worktree_git_and_ignored_files
 lead: 利用者が `/project-index:setup` でフォルダを配信元として登録し、管理用の YAML を範囲のファイルに合わせるシナリオを定め、配信元の追加の流れを変えるときに参照する。
 tags:
   - name: topic:配信元

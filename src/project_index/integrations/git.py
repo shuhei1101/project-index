@@ -107,3 +107,21 @@ def is_ignored(path: Path, top: Path) -> bool:
         # 無視されていない（終了コード 1）と、失敗（128）は区別しない
         return False
     return True
+
+
+def ignored_paths(root: Path) -> list[str] | None:
+    """フォルダの配下で Git が無視するファイルとフォルダを、`root` からのパスの昇順で返す。
+
+    無視のパターンに当たるフォルダは中のファイルを並べず `/` で終わる 1 行になる。
+    Git の作業ツリーでないなど一覧を取れないときは `None` を返す。
+    """
+    try:
+        # `--directory` で無視されたフォルダを 1 行にまとめ、返る行の数をフォルダの単位に抑える
+        output = run_git(
+            ["ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--directory"],
+            cwd=root,
+        )
+    except GitError, FileNotFoundError, NotADirectoryError:
+        return None
+    text = output if isinstance(output, str) else output.decode("utf-8")
+    return sorted(path for path in text.split("\0") if path)

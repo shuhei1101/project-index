@@ -239,3 +239,35 @@ def test_walk_tree(tmp_path: Path, write_files: Callable[[Path, dict[str, str]],
     # 検証
     assert sorted(files) == ["a.yaml", "rules/b.yaml"]
     assert folders == expected_folders
+
+
+def test_walk_files_when_git_file(
+    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """名前が `.git` のファイルを返さない（正常系）。"""
+    # 準備
+    write_files(
+        tmp_path,
+        {
+            "a.md": "# a\n",
+            ".git": "gitdir: /repo/.git/worktrees/wt\n",
+            "sub/.git": "gitdir: /repo/.git/modules/sub\n",
+            "sub/b.md": "# b\n",
+        },
+    )
+    # 実行
+    result = sorted(walk_files(tmp_path))
+    # 検証
+    assert result == ["a.md", "sub/b.md"]
+
+
+def test_walk_tree_when_git_file(
+    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """名前が `.git` のファイルを返さない（正常系）。"""
+    # 準備
+    write_files(tmp_path, {"a.yaml": "a\n", ".git": "gitdir: /repo/.git/worktrees/wt\n"})
+    # 実行
+    files, _ = walk_tree(tmp_path)
+    # 検証
+    assert files == ["a.yaml"]

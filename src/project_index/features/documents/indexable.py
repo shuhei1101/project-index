@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 SKIP_DIRS = frozenset({".git", "node_modules", "__pycache__", ".venv"})
 # ファイルをたどるときに中に入らないフォルダの `root` からのパス（配信元の設定の `worktrees` の既定と同じ場所）
 SKIP_PATHS = frozenset({".claude/worktrees"})
+# ファイルをたどるときに返さないファイル名（ワークツリーとサブモジュールの、本体を指す 1 行の `.git`）
+SKIP_FILES = frozenset({".git"})
 # その端末だけで使用する（Git に無視させる）ファイルの名前
 LOCAL_FILE_PATTERN = "*.local.*"
 # 先頭のこのバイト数に NUL バイトがあればバイナリとみなす
@@ -35,6 +37,9 @@ def walk_files(root: Path, *, start: str = ".") -> Iterator[str]:
             if name not in SKIP_DIRS and _join(relative_folder, name) not in SKIP_PATHS
         ]
         for name in filenames:
+            # ワークツリーの `.git` などのファイルは返さない
+            if name in SKIP_FILES:
+                continue
             yield _join(relative_folder, name)
 
 
@@ -56,7 +61,8 @@ def walk_tree(root: Path) -> tuple[list[str], dict[str, int]]:
             for name in dirnames
             if name not in SKIP_DIRS and _join(relative_folder, name) not in SKIP_PATHS
         ]
-        files.extend(_join(relative_folder, name) for name in filenames)
+        # ワークツリーの `.git` などのファイルは返さない（中をたどるファイルの列挙と同じ）
+        files.extend(_join(relative_folder, name) for name in filenames if name not in SKIP_FILES)
     return files, folders
 
 

@@ -555,3 +555,107 @@ def test_apply_operation_when_text_edit_ref_path_unresolved() -> None:
     with pytest.raises(InvalidArgumentError) as exc_info:
         apply_operation(current, operation, schema=_FUNCTIONS_SCHEMA)
     assert exc_info.value.violations[0].path == "text_edits[0].field"
+
+
+_MODELS_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "models": {
+            "type": "array",
+            "x-key": "name",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "properties": {"type": "array", "items": {"type": "string"}},
+                },
+            },
+        },
+    },
+}
+
+
+def _models_content() -> dict[str, Any]:
+    """`x-key` の配列 `models` を持つ内容を返す。"""
+    return {
+        "models": [
+            {"name": "Row", "properties": ["a"]},
+            {"name": "Col", "properties": ["b"]},
+        ]
+    }
+
+
+def test_apply_operation_when_add_to_ref_path() -> None:
+    """参照の型の項目のパスで要素の中の配列へ追加・削除する（正常系）。"""
+    # 準備
+    operation = Operation(
+        op="update",
+        id="doc-1",
+        expected_version="v1",
+        add_to={"#models[Row].properties": ["c"]},
+        remove_from={"#models[Row].properties": ["a"]},
+    )
+    # 実行
+    result = apply_operation(_models_content(), operation, schema=_MODELS_SCHEMA)
+    # 検証
+    assert result == {
+        "models": [
+            {"name": "Row", "properties": ["c"]},
+            {"name": "Col", "properties": ["b"]},
+        ]
+    }
+
+
+def test_apply_operation_when_add_to_selector_path() -> None:
+    """`#` で始まらず要素の選び方を含むキー（異常系）。"""
+    # 準備
+    current = _models_content()
+    operation = Operation(
+        op="update",
+        id="doc-1",
+        expected_version="v1",
+        add_to={"models[Row].properties": ["d"]},
+        remove_from={"models[Row].properties": ["a"]},
+    )
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError) as exc_info:
+        apply_operation(current, operation, schema=_MODELS_SCHEMA)
+    assert [violation.path for violation in exc_info.value.violations] == [
+        "add_to.models[Row].properties",
+        "remove_from.models[Row].properties",
+    ]
+    assert current == _models_content()
+
+
+def test_apply_operation_when_add_to_ref_path_unresolved() -> None:
+    """参照の型の項目のパスを解けない・配列でない（異常系）。"""
+    # 準備
+    operation = Operation(
+        op="update",
+        id="doc-1",
+        expected_version="v1",
+        add_to={"#models[Zzz].properties": ["d"]},
+        remove_from={"#models[Row].name": ["d"]},
+    )
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError) as exc_info:
+        apply_operation(_models_content(), operation, schema=_MODELS_SCHEMA)
+    assert [violation.path for violation in exc_info.value.violations] == [
+        "add_to.#models[Zzz].properties",
+        "remove_from.#models[Row].name",
+    ]
+
+
+def test_apply_operation_when_add_to_index_path() -> None:
+    """位置で指すキーは今までどおり（正常系）。"""
+    # 準備
+    operation = Operation(
+        op="update",
+        id="doc-1",
+        expected_version="v1",
+        add_to={"functions[0].refs": ["x"]},
+    )
+    # 実行
+    result = apply_operation({"functions": [{"name": "f"}]}, operation)
+    # 検証
+    assert result == {"functions": [{"name": "f", "refs": ["x"]}]}

@@ -677,6 +677,41 @@ scenarios:
       - クローン本体への書き込みを断るエラー（`worktree` でワークツリーを指す案内）を返却しない
       - '`writable: false` の種類の文書の `delete_docs` が `isError: true` で、その種類は削除できない理由を返却し、ファイルは残る'
     test: test_normal_when_disk_storage_clone_written
+  - name: 正常シナリオ（配列の要素を x-key の値で指して追加・削除する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: x-key の配列を持つ種類
+        description: 'sample の種類のスキーマが、`x-key: name` の配列 `models` を持ち、要素ごとに文字列の配列 `properties` を持つ'
+        notes: '文書 1 の `models` は `{name: Row, properties: [a]}` と `{name: Col, properties: [b]}`'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` にワークツリー x のパスを渡す'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（配列の要素を x-key の値で指して追加・削除する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: write_docs(update 文書 1, add_to: #models[Row].properties に c)
+        M->>M: 種類のスキーマの x-key で models の Row の要素の properties を文書の中の配列へ解決する
+        M->>WT: Row の properties を [a, c] で書く
+        M-->>A: applied: true と新しい version
+        A->>M: write_docs(update 文書 1, remove_from: #models[Row].properties から a)
+        M->>WT: Row の properties を [c] で書く
+        M-->>A: applied: true と新しい version
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`add_to` の後、ワークツリー x の文書 1 の Row の `properties` が `[a, c]` で、Col の `properties` は `[b]` のまま'
+      - '`remove_from` の後、Row の `properties` が `[c]`'
+      - '`#` で始まらず要素の選び方を含むパス（`models[Row].properties`）の `add_to`・`remove_from` は、`isError: true` で `add_to.models[Row].properties`（`remove_from.` も同じ）の違反を返し、ファイルは変わらない'
+      - 無い要素（`#models[Zzz].properties`）・`x-key` の無い配列・配列でない項目を指す `#` で始まるパスも、違反を返して書き込まない
+    test: test_normal_when_add_to_keyed_element
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 tags:
   - name: topic:文書

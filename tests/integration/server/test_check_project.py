@@ -634,3 +634,57 @@ def test_normal_when_local_files_excluded(
     assert not result.is_error
     assert result.data["sync"]["unindexed_files"] == 0
     assert "items" not in result.data["sync"]
+
+
+def test_normal_when_git_file_and_ignored_files(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_sync_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+    write_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    """ワークツリーの .git のファイルと、Git の配信元で Git が無視するファイルを数えない（正常系）。"""
+    # 準備
+    files = sample_sync_file_set(0)
+    root_row = (
+        "  - id: root\n"
+        "    paths: [files.yaml]\n"
+        "    schema: schemas/files.schema.yaml\n"
+        "    records: files\n"
+        "    body_file: path\n"
+    )
+    src_row = (
+        "  - id: src\n"
+        "    paths: [src/files.yaml]\n"
+        "    schema: schemas/files.schema.yaml\n"
+        "    records: files\n"
+        "    body_file: path\n"
+    )
+    files.update(
+        {
+            "project-index.yaml": sample_config_text(root_row + src_row, version="3"),
+            ".gitignore": ".pytest_cache/\ndist/\n",
+            "files.yaml": (
+                "files:\n"
+                "  - path: .gitignore\n"
+                "  - path: project-index.yaml\n"
+                "  - path: schemas/files.schema.yaml\n"
+                "  - path: schemas/sample.schema.yaml\n"
+            ),
+        }
+    )
+    sample = make_source("sample", files)
+    worktree = add_worktree(sample.folder, "x")
+    write_files(
+        worktree,
+        {".pytest_cache/x": "x\n", "dist/app.js": "app\n", "docs/new.md": "# new\n"},
+    )
+    env = make_server(sample)
+    # 実行
+    result = env.call_admin("check_project", path=str(worktree), format="json")
+    # 検証
+    assert not result.is_error
+    assert (worktree / ".git").is_file()
+    assert result.data["sync"]["unindexed_files"] == 1
+    assert [item["path"] for item in result.data["sync"]["items"]] == ["root: docs/new.md"]

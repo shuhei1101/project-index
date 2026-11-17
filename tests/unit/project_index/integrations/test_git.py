@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from project_index.integrations import git as git_module
-from project_index.integrations.git import GitError, is_ignored, repo_root, run_git
+from project_index.integrations.git import GitError, ignored_paths, is_ignored, repo_root, run_git
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -143,3 +143,40 @@ def test_is_ignored_when_not_ignored(git_repo: Callable[..., Path]) -> None:
     result = is_ignored(root / "project-index.yaml", root)
     # 検証
     assert result is False
+
+
+def test_ignored_paths(
+    git_repo: Callable[..., Path], write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """無視されたファイルとフォルダ（正常系）。"""
+    # 準備
+    root = git_repo({".gitignore": "dist/\n*.log\n"})
+    write_files(root, {"dist/app.js": "a\n", "dist/sub/b.js": "b\n", "a.log": "l\n", "b.md": "m\n"})
+    # 実行
+    result = ignored_paths(root)
+    # 検証
+    assert result == ["a.log", "dist/"]
+
+
+def test_ignored_paths_when_subfolder(
+    git_repo: Callable[..., Path], write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """サブフォルダからのパス（正常系）。"""
+    # 準備
+    root = git_repo({".gitignore": "dist/\n*.log\n", "docs/keep.md": "k\n"})
+    write_files(root, {"docs/x.log": "x\n"})
+    # 実行
+    result = ignored_paths(root / "docs")
+    # 検証
+    assert result == ["x.log"]
+
+
+def test_ignored_paths_when_not_repo(tmp_path: Path) -> None:
+    """Git の作業ツリーでない（正常系）。"""
+    # 準備
+    folder = tmp_path / "plain"
+    folder.mkdir()
+    # 実行
+    result = ignored_paths(folder)
+    # 検証
+    assert result is None

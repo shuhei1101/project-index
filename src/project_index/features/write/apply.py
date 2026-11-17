@@ -9,8 +9,10 @@ from typing import TYPE_CHECKING, Any, cast
 
 from project_index.features.documents.fields import (
     ANY_DEPTH_PREFIX,
+    REF_PATH_PREFIX,
     delete_field,
     get_field,
+    resolve_array,
     resolve_ref_path,
     set_field,
     set_field_at,
@@ -44,8 +46,6 @@ def _set(content: MutableMapping[str, Any], path: str, value: object) -> None:
         set_field(content, path, copy.deepcopy(value))
 
 
-# `text_edits[].field` の参照の型の項目のパスの先頭
-REF_PATH_PREFIX = "#"
 # 本文のファイルの内容を受けるキー（`data`・`set` のキーと `text_edits[].field`）
 BODY_KEY = "@body"
 
@@ -80,22 +80,25 @@ def apply_operation(
             )
     for path in operation.unset:
         delete_field(content, path)
-    violations.extend(_add_to(content, operation.add_to))
-    violations.extend(_remove_from(content, operation.remove_from))
+    violations.extend(_add_to(content, operation.add_to, schema))
+    violations.extend(_remove_from(content, operation.remove_from, schema))
     violations.extend(_text_edits(content, operation.text_edits, schema))
     if violations:
         raise InvalidArgumentError(message="操作を適用できません", violations=violations)
     return content
 
 
-def _add_to(content: dict[str, Any], add_to: Mapping[str, list[Any]]) -> list[Violation]:
-    """配列の項目へ値を追加する（項目が無ければ空の配列を作る）。"""
+def _add_to(
+    content: dict[str, Any], add_to: Mapping[str, list[Any]], schema: Mapping[str, Any] | None
+) -> list[Violation]:
+    """配列の項目へ値を追加する（`#` で始まらないキーの項目が無ければ空の配列を作る）。"""
     violations: list[Violation] = []
     for path, values in add_to.items():
-        existing = get_field(content, path)
-        if existing is None:
-            set_field(content, path, [])
-            existing = get_field(content, path)
+        try:
+            existing = resolve_array(content, schema or {}, path, create=True)
+        except InvalidArgumentError as error:
+            violations.extend(_violation(f"add_to.{path}", item.rule) for item in error.violations)
+            continue
         if not is_list(existing):
             violations.append(_violation(f"add_to.{path}", "配列ではない項目へは追加できません"))
             continue
@@ -103,11 +106,21 @@ def _add_to(content: dict[str, Any], add_to: Mapping[str, list[Any]]) -> list[Vi
     return violations
 
 
-def _remove_from(content: dict[str, Any], remove_from: Mapping[str, list[Any]]) -> list[Violation]:
+def _remove_from(
+    content: dict[str, Any],
+    remove_from: Mapping[str, list[Any]],
+    schema: Mapping[str, Any] | None,
+) -> list[Violation]:
     """配列の項目から値を削除する（項目が無ければ何もしない）。"""
     violations: list[Violation] = []
     for path, values in remove_from.items():
-        existing = get_field(content, path)
+        try:
+            existing = resolve_array(content, schema or {}, path, create=False)
+        except InvalidArgumentError as error:
+            violations.extend(
+                _violation(f"remove_from.{path}", item.rule) for item in error.violations
+            )
+            continue
         if existing is None:
             continue
         if not is_list(existing):
