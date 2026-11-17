@@ -203,28 +203,29 @@ functions:
       type: Operation
       description: 書き戻した新しい操作（`operation` は書き換えない）
     process: |-
-      1. `table.metadata` のうち、列名が `{配列}[].{項目}`（全ての要素のキー。例 `tags: tags[].name`）か `{配列}[{真偽値のキー}].{項目}`（選んだ要素のキー。例 `main_tags: tags[main].name`）の共通のキーを集める。無ければ `operation` をそのまま返す
-      2. `text_edits[].field` が集めたキーを指す場合、`path` が `operations[{index}].text_edits[{n}].field`、`rule` が `{共通のキー} は文字列の項目ではありません` の違反にする
-      3. `data`・`set`・`add_to`・`remove_from` の集めたキーの値が、要素が全て文字列のリストでない場合（オブジェクトの配列・文字列 1 つなど）、`path` が `operations[{index}].{項目}.{共通のキー}`、`rule` が `{共通のキー} は名前（文字列）の配列で指定します` の違反にする
-      4. 2・3 の違反があれば、操作を当てずに `InvalidArgumentError` で送る
-      5. 配列ごとに、元の配列を複製する。`update` は `current` の値、`create`・`replace` は `data` の列名の値（無ければ空の配列）
-      6. 全ての要素のキーへの操作を当てる
+      1. `table.metadata` のうち、列名が `**.` で始まる共通のキー（どの深さの列もまとめるキー。例 `related: **.refs[]`）を集める。`data`・`set`・`add_to`・`remove_from` のキー、`unset` の要素、`text_edits[].field` のうち、項目のパスの先頭のキーが集めたキーのものを、`path` が `operations[{index}].{項目}.{キー}`（`unset` は `operations[{index}].unset`、`text_edits` は `operations[{index}].text_edits[{n}].field`）、`rule` が `{共通のキー} は文書の中の複数の列（{列名}）をまとめたキーで、書き込めません`、`fix` が列名の項目のパス（`refs`・`functions[0].refs` など）で指定することの違反にし、違反があれば操作を当てずに `InvalidArgumentError` で送る
+      2. `table.metadata` のうち、列名が `**.` で始まらず `{配列}[].{項目}`（全ての要素のキー。例 `tags: tags[].name`）か `{配列}[{真偽値のキー}].{項目}`（選んだ要素のキー。例 `main_tags: tags[main].name`）の共通のキーを集める。無ければ `operation` をそのまま返す
+      3. `text_edits[].field` が集めたキーを指す場合、`path` が `operations[{index}].text_edits[{n}].field`、`rule` が `{共通のキー} は文字列の項目ではありません` の違反にする
+      4. `data`・`set`・`add_to`・`remove_from` の集めたキーの値が、要素が全て文字列のリストでない場合（オブジェクトの配列・文字列 1 つなど）、`path` が `operations[{index}].{項目}.{共通のキー}`、`rule` が `{共通のキー} は名前（文字列）の配列で指定します` の違反にする
+      5. 3・4 の違反があれば、操作を当てずに `InvalidArgumentError` で送る
+      6. 配列ごとに、元の配列を複製する。`update` は `current` の値、`create`・`replace` は `data` の列名の値（無ければ空の配列）
+      7. 全ての要素のキーへの操作を当てる
          - `set` は渡した名前の並びで配列を作り直す。元からあった名前の要素は `main` を含む他のキーを保ち、無い名前は `{項目: 名前}` の要素にする
          - `add_to` は配列に無い名前を `{項目: 名前}` の要素で末尾に追加する
          - `remove_from` は項目が渡した名前の要素を削除する
          - `unset` は配列の列を削除する
          - `create`・`replace` の `data` の値は `set` と同じに当てる
-      7. 選んだ要素のキーへの操作を当てる
+      8. 選んだ要素のキーへの操作を当てる
          - `set` は渡した名前の要素の真偽値のキーを `true` にし、他の要素の真偽値のキーを削除する
          - `add_to` は渡した名前の要素の真偽値のキーを `true` にする
          - `remove_from` は渡した名前の要素の真偽値のキーを削除する（無い名前は飛ばす）
          - `unset` は全ての要素の真偽値のキーを削除する
          - `set`・`add_to`・`data` に配列に無い名前がある場合、`path` が `operations[{index}].{項目}.{共通のキー}`、`rule` が `{名前} は {全ての要素のキー} にありません` の違反にする
-      8. 7 の違反があれば `InvalidArgumentError` で送る
-      9. 集めたキーを各項目から除き、配列の列名へ作り直した配列を書く操作（`update` は `set`、`create`・`replace` は `data`。`unset` で列を削除したときは `unset`）にして返す
+      9. 8 の違反があれば `InvalidArgumentError` で送る
+      10. 集めたキーを各項目から除き、配列の列名へ作り直した配列を書く操作（`update` は `set`、`create`・`replace` は `data`。`unset` で列を削除したときは `unset`）にして返す
     exceptions:
       - name: InvalidArgumentError
-        condition: 集めたキーに名前（文字列）の配列でない値を渡した、選んだ要素のキーに配列に無い名前を渡した、または `text_edits` で指した
+        condition: 列名が `**.` で始まる共通のキーへの操作を渡した、集めたキーに名前（文字列）の配列でない値を渡した、選んだ要素のキーに配列に無い名前を渡した、または `text_edits` で指した
         message: '`引数が正しくありません: {違反の数} 件`'
     unit_tests:
       - name: test_expand_array_keys
@@ -276,6 +277,13 @@ functions:
         mock: なし
         expected: どちらも `InvalidArgumentError` で、違反の `path` が `operations[0].set.tags`・`operations[0].set.main_tags`。`a` の 1 文字のタグを書かない
         exception: 集めたキーに名前（文字列）の配列でない値を渡した、選んだ要素のキーに配列に無い名前を渡した、または `text_edits` で指した
+      - name: test_expand_array_keys_when_any_depth
+        case: 異常
+        summary: どの深さの列もまとめるキーへの操作
+        condition: '`metadata` が `{related: "**.refs[]"}` で `index=0`。`set: {related: []}`・`unset: [related]`・`create` の `data: {related: []}`・`text_edits: [{field: related, old: a, new: b}]` を別々に当てる。もう 1 つは `set: {refs: []}`'
+        mock: なし
+        expected: '4 つは `InvalidArgumentError` で、違反の `path` が `operations[0].set.related`・`operations[0].unset`・`operations[0].data.related`・`operations[0].text_edits[0].field`、`rule` に `**.refs[]`。`set: {refs: []}` は渡した操作のまま'
+        exception: 列名が `**.` で始まる共通のキーへの操作を渡した、集めたキーに名前（文字列）の配列でない値を渡した、選んだ要素のキーに配列に無い名前を渡した、または `text_edits` で指した
   - name: apply_body
     title: 本文の適用
     kind: 関数
