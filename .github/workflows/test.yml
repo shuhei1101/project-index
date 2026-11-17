@@ -1,8 +1,6 @@
 name: test
 
 on:
-  push:
-    branches: [chore/ci/run-tests-on-github-actions]
   workflow_dispatch:
     inputs:
       layer:
@@ -21,13 +19,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: test-${{ github.ref }}-${{ (inputs.layer || 'integration') }}
+  group: test-${{ github.ref }}-${{ inputs.layer }}
   cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ fromJSON('{"unit":5,"integration":29}')[inputs.layer || 'integration'] }}
+    timeout-minutes: ${{ fromJSON('{"unit":5,"integration":29}')[inputs.layer] }}
     steps:
       - name: ブランチを取得する
         uses: actions/checkout@v7
@@ -40,7 +38,7 @@ jobs:
 
       - name: 層の全件を回す
         env:
-          LAYER: ${{ (inputs.layer || 'integration') }}
+          LAYER: ${{ inputs.layer }}
           PATHS: ${{ inputs.paths }}
         run: |
           case "$LAYER" in
