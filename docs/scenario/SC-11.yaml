@@ -235,7 +235,7 @@ scenarios:
         participant PI as project-index（読み取り API）
         participant SRC as sample
 
-        PI->>SRC: 配信元の読み込みと検査の後に、裏で default_ref の commit を書き出す
+        PI->>SRC: 配信元の読み込みの後に、検査の終了を待たずに裏で default_ref の commit を書き出す
         DD->>PI: 管理の MCP の status で、裏の書き出しが済んだことを確認する
         DD->>PI: 配信元の一覧と状態を取得する
         PI-->>DD: sample が配信中
@@ -252,7 +252,7 @@ scenarios:
         PI-->>DD: 新しい commit の文書の一覧
       ```
     expected:
-      - リビジョンの書き出しは、配信元の読み込みと検査の後に、最初の取得を待たずに行い、ログの `リビジョンを書き出した` が `main` の commit で 1 行出る
+      - リビジョンの書き出しは、配信元の読み込みの後に、検査の終了と最初の取得を待たずに行い、ログの `リビジョンを書き出した` が `main` の commit で 1 行出る
       - '`status` が裏の書き出しの最中であることを返却し、書き出しが済んだ後は最中でないことを返却する'
       - 書き出しが済んだ後の最初の配信元の設定の取得と文書の一覧の取得が 200 を返却し、その間にリビジョンの書き出しのログが増えない
       - '`main` が進んだ後の組み立て直しで、追加した commit の `リビジョンを書き出した` が 1 行出て、その後の文書の一覧の取得の間にリビジョンの書き出しのログが増えない'
@@ -306,7 +306,7 @@ scenarios:
         participant PI as project-index（読み取り API）
         participant SRC as sample
 
-        PI->>SRC: 配信元の読み込みと検査の後に、裏で default_ref の commit を書き出し始める
+        PI->>SRC: 配信元の読み込みの後に、検査の終了を待たずに裏で default_ref の commit を書き出し始める
         DD->>PI: 管理の MCP の status で、裏の書き出しの最中であることを確認する
         DD->>PI: sample の文書の一覧を取得する（リビジョンを省く）
         PI->>PI: 同じ commit の裏の書き出しの終了を待つ
