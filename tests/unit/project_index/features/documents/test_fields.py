@@ -509,6 +509,77 @@ def test_resolve_ref_path_when_unresolved(path: str, message: str) -> None:
         resolve_ref_path(data, _REF_SCHEMA, path)
 
 
+_NESTED_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "request": {
+            "type": "array",
+            "x-key": "name",
+            "items": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}, "description": {"type": "string"}},
+            },
+        },
+        "notes": {"type": "object", "additionalProperties": {"type": "string"}},
+    },
+}
+
+
+def _nested_data() -> dict[str, Any]:
+    """値に `[` `]` を含む参照の型の項目のパスのテストに使う内容を返す。"""
+    return {
+        "request": [
+            {"name": "operations[].fields", "description": "x"},
+            {"name": "operations[].fields", "description": "x"},
+        ],
+        "notes": {"a[b]": "x"},
+    }
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        pytest.param(
+            "request[operations[].fields].description",
+            ["request", 0, "description"],
+            id="element",
+        ),
+        pytest.param(
+            "request[operations[].fields#2].description",
+            ["request", 1, "description"],
+            id="order",
+        ),
+        pytest.param("notes[a[b]]", ["notes", "a[b]"], id="dict_key"),
+    ],
+)
+def test_resolve_ref_path_when_nested_brackets(path: str, expected: list[str | int]) -> None:
+    """対応の取れた `[` `]` を含む値で要素とキーを指す（正常系）。"""
+    # 準備
+    data = _nested_data()
+    # 実行
+    result = resolve_ref_path(data, _NESTED_SCHEMA, path)
+    # 検証
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        pytest.param("request[operations[.description", id="unclosed"),
+        pytest.param("request[a]].description", id="extra_close"),
+        pytest.param("notes]", id="close_without_open"),
+        pytest.param("request[x]y", id="name_after_close"),
+    ],
+)
+def test_resolve_ref_path_when_unbalanced_brackets(path: str) -> None:
+    """`[` `]` の対応が取れない（異常系）。"""
+    # 準備
+    data = _nested_data()
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError, match="記載方法が誤っています"):
+        resolve_ref_path(data, _NESTED_SCHEMA, path)
+
+
 def test_set_field_at() -> None:
     """`.` を含むキーへ書く（正常系）。"""
     # 準備
