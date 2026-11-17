@@ -280,7 +280,7 @@ YAML として読めないファイルがあっても、そのファイルを除
 | `new_path` | `rename` | 改名後のファイルの配信元の直下からのパス。`records`・`body_file` の行の文書は本文のファイルのパス |
 | `filter` | `replace_text`（必須） | 置換する文書の条件。`search_docs` の `filter` と同じ |
 | `old`・`new` | `replace_text`（必須） | 置換する前と後の文字列。`old` は空にできない |
-| `fields` | `replace_text` | 置換する項目のパス。省くと全ての項目と本文のファイル。`@body` は本文のファイルを指す |
+| `fields` | `replace_text` | 置換する項目のパス。省くと全ての項目と拡張子が `.md` の本文のファイル。`@body` は本文のファイルを指す |
 
 <!-- /table -->
 
