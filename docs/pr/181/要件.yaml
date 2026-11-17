@@ -12,5 +12,5 @@ use_cases:
 scope_out:
   - item: 変換の結果のキャッシュ（`src/project_index/features/convert/service.py` の `_cache_path`）のキーにスクリプトの内容を含めること（キーは行の `run` を含むが、スクリプトのファイルを書き換えても文書のバージョンが変わらない限り前の結果を返却する）
     reason: 要望は検査の読み取りの結果のキャッシュに限る。スクリプトの内容をキーにする値の作り方をこの作業 PR のモジュール構成設計で決めるため、変換もその作り方へ寄せる後続にする
-    plan: to_file
+    plan: '#182'
 docs: []
