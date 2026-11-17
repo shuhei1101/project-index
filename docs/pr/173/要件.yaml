@@ -10,3 +10,6 @@ scope_out:
   - item: 'layer: unit での paths の指定'
     reason: 要望は結合テストの層の範囲で、単体テストは全件を回す（テンプレートのテスト結果の単体は全部実行）
     plan: none
+  - item: write_docs の remove_from が x-key を持つオブジェクトの配列の要素を除外しない不具合
+    reason: この PR の要望（test.yml の paths）と無関係な write_docs の不具合で、この PR がマージされなくても成り立つ
+    plan: '#177'
