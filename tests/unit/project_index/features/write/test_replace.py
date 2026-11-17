@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from project_index.features.write.replace import replace_in_values
+import pytest
+
+from project_index.features.write.replace import replace_in_body, replace_in_values
 
 from project_index.shared.yaml_io import load_roundtrip
 
@@ -45,3 +47,18 @@ def test_replace_in_values_when_skipped() -> None:
     assert content["path"] == "旧語.md"
     assert content["name"] == "新語"
     assert count == 1
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        pytest.param("# 旧語\n\n旧語と別の語\n", ("# 新語\n\n新語と別の語\n", 2), id="found"),
+        pytest.param("# 別の語\n", ("# 別の語\n", 0), id="not_found"),
+    ],
+)
+def test_replace_in_body(body: str, expected: tuple[str, int]) -> None:
+    """本文の単語を全て置換する（正常系）。"""
+    # 実行
+    result = replace_in_body(body, old="旧語", new="新語")
+    # 検証
+    assert result == expected
