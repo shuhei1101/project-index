@@ -231,11 +231,14 @@ entries:
         contents: プロンプトファイルのスキーマ。配信元とこのリポジトリの `content/prompts/` が指す
         content_types:
           - config_schema
+          - server
+          - plugin
       - type: file
         name: common.schema.yaml
         contents: プロンプトのスキーマが `$ref` で指す共通の型
         content_types:
           - config_schema
+          - server
   - type: folder
     name: src
     contents: コード（src レイアウトのため、パッケージ 1 つと管理用の YAML だけを配置する）
