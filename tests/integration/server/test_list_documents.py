@@ -340,9 +340,18 @@ def test_normal_when_background_check_running(
     # 検証
     held = [at for at in reads if held_from <= at <= released_at]
     after = [at for at in reads if at > released_at]
-    held_rate = len(held) / (released_at - held_from)
-    after_rate = len(after) / (after[-1] - released_at)
+    checked = env.handlers.checks.get("large")
+    # 休まない検査の結果（要求のスレッドで流すため、関所は休まない）
+    [served] = [source for source in env.handlers.registry.served() if source.id == "large"]
+    unpaused = check_sync(env.handlers.store, served)
     assert reached
     assert [response.status_code for response in responses] == [200]
     assert len(reads) == count
+    # 応答の最中も止まらずに進み、合図の後も検査が続いた
+    assert held
+    assert after
+    held_rate = len(held) / (released_at - held_from)
+    after_rate = len(after) / (after[-1] - released_at)
     assert held_rate <= 0.2 * after_rate
+    assert checked is not None
+    assert checked.report == unpaused
