@@ -273,7 +273,7 @@ YAML として読めないファイルがあっても、そのファイルを除
 | `data` | `create`・`replace`（必須） | 文書の全項目 |
 | `set` | `update` | 項目に値を入れる。オブジェクトは再帰的にマージし、配列と値は置き換える |
 | `unset` | `update` | 消す項目のパスの配列 |
-| `add_to` | `update` | 配列の項目の末尾へ要素を追加する |
+| `add_to` | `update` | 配列の項目の末尾へ要素を追加する。`x-key` を持つ配列に既にある `x-key` の値の要素も、違反にせず追加する |
 | `remove_from` | `update` | 配列の項目から一致する要素を削除する。`x-key` を持つ配列は `x-key` の値でも要素を指し、削除する要素が無い値は `InvalidArgumentError` |
 | `text_edits` | `update` | `[{field, old, new, replace_all}]`。`replace_all` が `false` のとき `old` が 1 か所だけ一致すること |
 | `new_id` | `rename` | 改名後の ID。`new_id`・`new_path` の少なくとも 1 つを指定する |
@@ -283,6 +283,11 @@ YAML として読めないファイルがあっても、そのファイルを除
 | `fields` | `replace_text` | 置換する項目のパス。省くと全ての項目と拡張子が `.md` の本文のファイル。`@body` は本文のファイルを指す |
 
 <!-- /table -->
+
+`update` の 1 つの操作は、`set` → `unset` → `remove_from` → `add_to` → `text_edits` の順に適用します。
+`x-key` を持つ配列の要素を置き換えるときは、1 つの `update` の `remove_from` に置き換える要素の `x-key` の値を、`add_to` に置き換えた後の要素を指定します（置き換えた要素は配列の末尾に移ります）。
+`x-key` の値で指すと同じ値の要素を全て削除するので、同じ値の要素のうち 1 つだけを置き換えるときは、`remove_from` に置き換える要素のオブジェクトを指定します。
+配列全体を置き換えるときは `set` を使用します。
 
 `data`・`set`・`add_to`・`remove_from` のキーと、`unset`・`text_edits[].field` の項目のパスの先頭のキーは、種類の行の `metadata` に書いた共通のキー（`name` など）なら、対応する列名（入れ子は `.` でつないだパス）に読み替えてから当てます。
 列名をそのまま渡したキーと、`metadata` に書いていないキーは読み替えません。

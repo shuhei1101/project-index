@@ -247,6 +247,44 @@ flows:
       - '`ref` を省いた取得は 200 で、`markdown` が `default_ref` を解いた commit の SHA（40 文字）'
       - どちらもサーバーのプロセスの環境変数の値 `outer` を出さない
     test: test_normal_when_converter_given_commit
+  - name: 正常系（変換のスクリプトを書き換えた）
+    summary: 変換のスクリプトのファイルを書き換えると、文書が変わらなくても次の取得から書き換えた後のスクリプトの Markdown を返却する
+    setup:
+      - name: Mock
+        description: なし
+      - name: 変換を持つ disk の配信元
+        description: '`storage.type: disk` の配信元。`converters[]`（`cache` を記載しない）を指す種類 `prompt` の文書 `prompts/a.yaml` と、`# v1` を標準出力に出すスクリプト `scripts/convert.py` を持つ sample'
+      - name: 入力
+        description: '`prompts/a.yaml` を 2 回取得した後、`scripts/convert.py` を `# v2` を出す内容に書き換えて 3 回目を取得する'
+        notes: '`prompts/a.yaml` は変えない'
+    flow: |-
+      <!-- map: {"title": "正常系（変換のスクリプトを書き換えた）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs/{path}
+        participant X as converters[] のスクリプト
+
+        C->>E: GET /sources/sample/docs/prompts/a.yaml
+        E->>X: 文書を標準入力に渡して動かす
+        X-->>E: # v1
+        E-->>C: 200 markdown
+        C->>E: GET /sources/sample/docs/prompts/a.yaml
+        E-->>C: 200 キャッシュの markdown
+        Note over X: scripts/convert.py を # v2 を出す内容に書き換える
+        C->>E: GET /sources/sample/docs/prompts/a.yaml
+        E->>X: 書き換えた後のスクリプトを動かす
+        X-->>E: # v2
+        E-->>C: 200 markdown
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目と 2 回目は 200 で `markdown` が `# v1` で、2 回目はスクリプトを動かさない
+      - 3 回目は 200 で `markdown` が `# v2`
+      - '`reload` も再起動も呼ばない'
+    test: test_normal_when_converter_script_changed
 lead: 指定のリビジョンの文書の値・種類のスキーマ・メタデータ・変換の結果を返却する読み取り API の入出力を定め、文書の取得を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -361,8 +399,8 @@ constraints:
     constraint: '`converters[]` のスクリプトを制限時間で止める'
     decided_by: NFR-1#requirements[スクリプトの制限時間]
   - item: 変換の結果のキャッシュ
-    constraint: '`converters[]` の行の `cache` が `true`（既定）なら、変換の結果のキャッシュがあればスクリプトを動かさずにキャッシュを返却し、無ければ動かしてキャッシュに保存する。`false` なら変換の結果のキャッシュを参照も保存もせず、要求のたびにスクリプトを動かす'
-    notes: 'キャッシュのキーは本文の外のファイルを含まない。本文の外のファイルを読む変換は `cache: false` にする'
+    constraint: '`converters[]` の行の `cache` が `true`（既定）なら、変換の結果のキャッシュがあればスクリプトを動かさずにキャッシュを返却し、無ければ動かしてキャッシュに保存する。キャッシュは文書・`converters[]` の行・変換のスクリプトの状態ごとに分け、disk の配信元と Git の管理外の配信元では変換のスクリプトのファイルを書き換えた後、Git の配信元では `default_ref` の commit が進んで変換のスクリプトが変わった後、`reload`・再起動を待たずに次の取得から変わった後のスクリプトで変換する。`false` なら変換の結果のキャッシュを参照も保存もせず、要求のたびにスクリプトを動かす'
+    notes: '変換のスクリプトの状態は、Git の配信元ではスクリプトを取り出す `default_ref` の commit、disk の配信元と Git の管理外の配信元では `run` が指すファイルのフォルダの配下のファイルの状態で表す。キャッシュのキーはそれ以外の本文の外のファイルを含まない。本文の外のファイルを読む変換は `cache: false` にする'
   - item: 再読み込み
     constraint: ファイルの更新日時か大きさが変わった文書は、次の要求で再読み込みする
   - item: 認可

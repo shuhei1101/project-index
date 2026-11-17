@@ -1,0 +1,16 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: run_only
+    detail: 画面のサーバーが変換を持つ種類の文書を読むとき、変換のスクリプトを書き換えた後は書き換えた後のスクリプトの結果を受け取る。シナリオの流れは変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: run_only
+    detail: 利用者かエージェントが変換のスクリプトを変えた後の、文書の変換の結果が変わる。シナリオの流れは変わらない
+    depends_on: []
+scope_out:
+  - item: 変換のスクリプトが読む本文の外のファイル（スクリプトのフォルダの外のファイル・`git show` で参照するファイル）の変更を変換の結果のキャッシュのキーに含めること
+    reason: '要望は変換のスクリプトのファイルの書き換えに限る。本文の外のファイルを読む変換は、今までどおり `converters[].cache: false` で扱う（IF-25 の制約）'
+    plan: none
+docs: []
