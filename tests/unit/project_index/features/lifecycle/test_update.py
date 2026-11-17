@@ -105,7 +105,7 @@ def test_update_clone(
 def test_update_clone_when_up_to_date(
     monkeypatch: pytest.MonkeyPatch, clone: Path, control: RestartControl
 ) -> None:
-    """新しい commit が無ければ何もしない（正常系）。"""
+    """新しい commit が無ければ mdmark の CLI だけを入れ直す（正常系）。"""
     # 準備
     fake = FakeRun(_ok("aaa\n"), _ok(), _ok("aaa\n"), _ok())
     _install(monkeypatch, fake)
@@ -324,3 +324,17 @@ def test_reinstall_mdmark_when_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result.reinstalled is False
     assert result.error is not None
     assert "300 秒で打ち切りました" in result.error
+
+
+def test_reinstall_mdmark_when_os_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """npm を実行できない（正常系）。"""
+    # 準備
+    fake = FakeRun(PermissionError("Permission denied"))
+    _install(monkeypatch, fake)
+    _install_mdmark(monkeypatch, "/usr/local/bin/mdmark")
+    # 実行
+    result = _reinstall_mdmark("develop")
+    # 検証
+    assert result is not None
+    assert result.reinstalled is False
+    assert result.error == "npm install -g github:shuhei1101/mdmark#develop: Permission denied"
