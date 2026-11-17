@@ -16,18 +16,31 @@ request:
     type: list[str]
     required: true
     location: argument
-    description: 管理用の YAML のパス。繰り返して渡せる
-    notes: 渡した全ての管理用の YAML の行を 1 つのまとまりとして数える
+    description: 管理用の YAML のパス（`--root` からの相対か絶対パス）。繰り返して渡せる
+    notes: 渡した全ての管理用の YAML の行を 1 つのまとまりとして数える。行は `--root` からのパス（管理用の YAML のフォルダ + 行の `path`）で見分ける
   - name: --draft
     type: str
     required: false
     default: なし（管理用の YAML の行だけで数える）
     location: argument
-    description: まだ記載していない行の案の JSON Lines のファイルのパス。1 行が `path`・`description`・`tags` を持つ
+    description: まだ記載していない行の案の JSON Lines のファイルのパス。1 行が `path`（`--root` からのパス）・`description`・`tags` を持つ
     notes: 同じ `path` の行が管理用の YAML にあれば、案の値で置き換えて数える
+  - name: --root
+    type: str
+    required: true
+    location: argument
+    description: 配信元のフォルダのパス
+    notes: 入力の行の案の `path` と出力のパスは全て `--root` からのパス
+  - name: --only-draft
+    type: bool
+    required: false
+    default: false（全ての組を比べる）
+    location: argument
+    description: '`similar_descriptions` を、`--draft` の行を含む組だけにする'
+    notes: 2 回目以降の setup で、追加・見直した行を含まない組を再び出さない
 request_example: |-
   ```bash
-  project-index skew --files-yaml ~/repo/sample/docs/files.yaml --draft /tmp/draft.jsonl
+  project-index skew --root ~/repo/sample --files-yaml docs/files.yaml --files-yaml src/files.yaml --draft /tmp/draft.jsonl
   ```
 response:
   - name: 標準出力
@@ -39,7 +52,7 @@ response:
     description: 数えた行の数
   - name: similar_descriptions[].paths
     type: list[str]
-    description: ほぼ同じ `description` を持つ 2 行のパス
+    description: ほぼ同じ `description` を持つ 2 行の `--root` からのパス
     notes: 組は `similarity` の降順、同じ値はパスの昇順
   - name: similar_descriptions[].similarity
     type: float
@@ -50,17 +63,17 @@ response:
     notes: タグの昇順
   - name: singleton_tags[].path
     type: str
-    description: そのタグが付いた行のパス
+    description: そのタグが付いた行の `--root` からのパス
   - name: dominant_tags[].tag
     type: str
-    description: 半数以上の行に付いているタグ
+    description: 半数以上の行に付いているタグ。`singleton_tags` に出たタグは除く
     notes: 付いた行の数の降順、同じ数はタグの昇順
   - name: dominant_tags[].count
     type: int
     description: そのタグが付いた行の数
   - name: 終了コード
     type: int
-    description: 0 正常（偏りが無いときも 0）・2 `--files-yaml` か `--draft` が無いか読めない
+    description: 0 正常（偏りが無いときも 0）・2 `--root` がフォルダでないか、`--files-yaml` か `--draft` が無いか読めない
     notes: '`project-index files` の引数の誤りと同じ値'
 response_example: |-
   ```json
@@ -70,7 +83,7 @@ exceptions:
   - name: なし（正常終了）
     condition: 偏りを出し終えた（終了コード 0）
   - name: InputNotFound
-    condition: '`--files-yaml` か `--draft` のファイルが無いか、YAML・JSON Lines として読めない（終了コード 2）'
+    condition: '`--root` がフォルダでないか、`--files-yaml` か `--draft` のファイルが無いか、YAML・JSON Lines として読めない（終了コード 2）'
     notes: 読めなかったパスと理由を stderr に出す
 constraints:
   - item: 類似度
@@ -88,6 +101,9 @@ constraints:
   - item: タグの書き方
     constraint: '`tags` の要素が文字列でも `{name: ...}` のオブジェクトでも、名前で数える'
     notes: 管理用の YAML のスキーマの両方の書き方
+  - item: 比べる組
+    constraint: '`--only-draft` を渡さないときは全ての組、渡したときは `--draft` の行を含む組'
+    notes: 所要時間は 6824 行の全ての組で約 17 秒、`--draft` 50 行 × 6824 行で約 0.3 秒（`docs/pr/113/しきい値の測定/README.md`。行の数は端末の配信元で最もファイルの多い ai-monitor の Git 管理のファイルの数）
 flows:
   - name: 正常系
     summary: 管理用の YAML と行の案から、偏りを 3 種類とも出す
@@ -108,7 +124,7 @@ flows:
         participant M as project-index skew
         participant F as 管理用の YAML と行の案
 
-        C->>M: --files-yaml files.yaml --draft draft.jsonl
+        C->>M: --root {フォルダ} --files-yaml files.yaml --draft draft.jsonl
         M-->>F: 行を読む
         M->>M: description の類似度とタグの行の数を数える
         M-->>C: 偏りの JSON（終了コード 0）
@@ -138,7 +154,7 @@ flows:
         participant C as クライアント
         participant M as project-index skew
 
-        C->>M: --files-yaml files.yaml
+        C->>M: --root {フォルダ} --files-yaml files.yaml
         M-->>C: 偏りの JSON（終了コード 0）
       ```
 
@@ -148,6 +164,60 @@ flows:
       - '`rows` が 5'
       - 終了コードが 0
     test: test_normal_when_no_skew
+  - name: 正常系（2 つの管理用の YAML が同じ path の行を持つ）
+    summary: 管理用の YAML ごとの相対パスが同じ行を、`--root` からのパスで別の行として出す
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 管理用の YAML
+        description: '`docs/files.yaml` と `src/files.yaml` が、どちらも `README.md` の 1 行を持つ。`docs/files.yaml` の行は `topic:d`、`src/files.yaml` の行は `topic:s` を持ち、`description` は似ていない'
+        notes: 2 つを `--files-yaml` に渡す
+    flow: |-
+      <!-- map: {"title": "正常系（2 つの管理用の YAML が同じ path の行を持つ）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index skew
+
+        C->>M: --root {フォルダ} --files-yaml docs/files.yaml --files-yaml src/files.yaml
+        M-->>C: 偏りの JSON（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`rows` が 2'
+      - '`singleton_tags` が `topic:d`（`docs/README.md`）と `topic:s`（`src/README.md`）の 2 件'
+      - '`dominant_tags` が空（`singleton_tags` に出たタグを除く）'
+      - 終了コードが 0
+    test: test_normal_when_same_path_in_files_yamls
+  - name: 正常系（行の案を含む組だけを比べる）
+    summary: '`--only-draft` を渡すと、行の案を含む組だけを `similar_descriptions` に出す'
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 管理用の YAML
+        description: '`a.md`・`b.md` の 2 行を持つ `files.yaml`。互いの `description` は助詞 1 字だけが違う'
+      - name: 行の案
+        description: '`a.md`・`b.md` と助詞 1 字だけが違う `description` を持つ `c.md` の 1 行'
+        notes: '`--draft` と `--only-draft` を渡す'
+    flow: |-
+      <!-- map: {"title": "正常系（行の案を含む組だけを比べる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index skew
+
+        C->>M: --root {フォルダ} --files-yaml files.yaml --draft draft.jsonl --only-draft
+        M-->>C: 偏りの JSON（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`similar_descriptions` が `a.md`・`c.md` と `b.md`・`c.md` の 2 組だけで、`a.md`・`b.md` の組を含まない'
+      - 終了コードが 0
+    test: test_normal_when_only_draft
   - name: 異常系（管理用の YAML が無い・InputNotFound）
     summary: '`--files-yaml` のファイルが無いと終了コード 2 で終える'
     setup:
@@ -163,7 +233,7 @@ flows:
         participant C as クライアント
         participant M as project-index skew
 
-        C->>M: --files-yaml {無いパス}
+        C->>M: --root {フォルダ} --files-yaml {無いパス}
         M-->>C: stderr に渡したパスと理由（終了コード 2）
       ```
 

@@ -940,7 +940,7 @@ scenarios:
       - name: Mock
         description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion の見直しの質問には「`description` の組の案だけ了承し、タグの案は断る」、ほかは既定の選択肢で答える）
       - name: 登録済みの配信元
-        description: 管理用の YAML が Markdown 6 件の行を持つ配信元。`a.md` と `b.md` の `description` は助詞 1 字だけが違い、`topic:x` は `c.md` の行だけに付き、`topic:doc` は 6 件全ての行に付く
+        description: 管理用の YAML が Markdown 6 件の行を持ち、確認の時点の記録（`checkpoint`）を持たない配信元。`a.md` と `b.md` の `description` は助詞 1 字だけが違い、`topic:x` は `c.md` の行だけに付き、`topic:doc` は 6 件全ての行に付く
         notes: Markdown を 1 件追加して commit し、その commit でワークツリーを作る
     flow: |-
       <!-- map: {"title": "正常シナリオ（仮のメタデータの偏りを見直す）"} -->
@@ -954,7 +954,7 @@ scenarios:
 
         U->>SK: 配信元のワークツリーで /project-index:setup
         SK->>SK: 追加したファイルに仮のメタデータを付ける
-        SK->>CL: 管理用の YAML の行と追加する行の案から、メタデータの偏りを洗い出す
+        SK->>CL: 管理用の YAML の行と追加する行の案から、メタデータの偏りを洗い出す（確認の時点の記録が無いため全ての組を比べる）
         CL-->>SK: ほぼ同じ description の組（a.md・b.md）・1 件だけのタグ（topic:x）・半数以上に付くタグ（topic:doc）
         SK-->>U: 追加の行と、偏りごとの見直しの案（今の値と新しい案）を表で示して確かめる
         U-->>SK: a.md・b.md の description の案だけを了承

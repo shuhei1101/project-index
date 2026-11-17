@@ -74,8 +74,8 @@ constraints:
     constraint: Markdown のファイルは本文、YAML のファイルは全ての文字列の値から、`[文字](先)` の先を取り出す。`http:`・`https:`・`mailto:`・`id:` で始まる先と `#` 以降は除く。先は指す側のファイルのフォルダからの相対パスとして解く
     notes: '-'
   - item: パスの取り出し
-    constraint: リンクの外の文字列のうち、`/` を含み拡張子で終わる空白と引用符を含まない部分を取り出し、`--root` からの相対パスとして解く
-    notes: インラインコードの中も対象にする
+    constraint: リンクの外の文字列から、`--root` の中のファイル（辿らないフォルダの下を除く）のうち `/` を含む `--root` からのパスを部分文字列として探し、同じ位置では最も長く一致するものを取る。一致の直前が ASCII の英数字・`_`・`-`・`.`・`/`、直後が ASCII の英数字・`_`・`-`・`/` のときは一致としない。`./`・`../` で始まる箇所は、指す側のファイルのフォルダから解き、実在するファイルのパスのうち最も長く一致するものを取る
+    notes: 区切り文字に依らず、空白を挟まない日本語の文の中とインラインコードの中のパスも取り出す。照合は全てのパスを 1 回の走査で探す（Aho-Corasick など）
   - item: 指す先の条件
     constraint: 解いたパスが `--root` の中の実在するファイルで、辿らないフォルダの下になく、指す側のファイル自身でないものだけを出す
     notes: 除外の条件に当たるファイルも、実在すれば出す
@@ -89,7 +89,7 @@ flows:
       - name: Mock
         description: なし（`main(["links", ...])` を同じプロセスで呼ぶ）
       - name: 配信元のフォルダ
-        description: 一時フォルダ。`[API](./api.md)` と `[外](https://example.com)` と `[自分](#見出し)` を本文に持つ `docs/guide.md`、リンクを持たない `docs/api.md`、`description` の値に `src/tasks/util.py` と、無いパス `src/none.py` を書いた `design/util.yaml`、`src/tasks/util.py` を置く
+        description: 一時フォルダ。`[API](./api.md)` と `[外](https://example.com)` と `[自分](#見出し)` と、インラインコードの `` `src/tasks/util.py` `` を本文に持つ `docs/guide.md`、リンクを持たない `docs/api.md`、`description` の値に空白を挟まない日本語の文 `実装はsrc/tasks/util.pyにある` と、無いパス `src/none.py` を書いた `design/util.yaml`、`src/tasks/util.py` を置く
         notes: '`--paths` は `**/*`'
     flow: |-
       <!-- map: {"title": "正常系"} -->
@@ -110,7 +110,7 @@ flows:
     expected:
       - 標準出力が 2 行で、`design/util.yaml`・`docs/guide.md` の順に並ぶ
       - '`design/util.yaml` の `targets` が `src/tasks/util.py`（`via: path`）の 1 件だけで、`src/none.py` を含まない'
-      - '`docs/guide.md` の `targets` が `docs/api.md`（`via: link`）の 1 件だけ'
+      - '`docs/guide.md` の `targets` が `docs/api.md`（`via: link`）と `src/tasks/util.py`（`via: path`）の 2 件だけ'
       - '`docs/api.md` と `src/tasks/util.py` の行は無い'
       - 終了コードが 0
     test: test_normal
