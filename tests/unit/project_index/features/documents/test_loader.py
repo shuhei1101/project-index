@@ -646,3 +646,34 @@ def test_unindexed_files_when_files_given(
     # 検証
     assert result == ["src/d.py"]
     assert walked == []
+
+
+def test_unindexed_files_when_ignored_given(
+    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """Git が無視するパスを数えない（正常系）。"""
+    # 準備
+    write_files(
+        tmp_path,
+        {
+            "files.yaml": "files:\n  - path: a.py\n",
+            "a.py": "a = 1\n",
+            "d.py": "d = 1\n",
+            "dist/app.js": "app\n",
+            ".pytest_cache/x": "x\n",
+            "dist2/b.js": "b\n",
+        },
+    )
+    table = DocumentTable(
+        id="root",
+        paths=["files.yaml"],
+        schema_path="schemas/files.schema.yaml",
+        records="files",
+        body_file="path",
+    )
+    # 実行
+    result = loader_module.unindexed_files(
+        tmp_path, "files.yaml", ["a.py"], table, ignored=[".pytest_cache/", "dist/"]
+    )
+    # 検証
+    assert result == ["d.py", "dist2/b.js"]

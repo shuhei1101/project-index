@@ -211,6 +211,37 @@ def test_render_check_when_violations() -> None:
     assert [line for line in lines if line.startswith("索引の同期")] == []
 
 
+def test_render_check_when_duplicate_ids() -> None:
+    """ID が重なる文書の件数と内訳を並べる（正常系）。"""
+    # 準備
+    check = CheckProjectResult(
+        path="/home/u/repo/sample",
+        registered_id="sample",
+        config_version="1",
+        version_state="current",
+        violations=[],
+        missing_paths=[],
+        script_errors=[],
+        sync=CheckSync(
+            missing_refs=0,
+            unindexed_files=0,
+            missing_body_files=0,
+            unresolved_related=0,
+            duplicate_ids=1,
+            items=[
+                SyncItem(kind="duplicate_ids", path="a: rules（docs/a.yaml）・rules（docs/b.yaml）")
+            ],
+        ),
+    )
+    # 実行
+    result = render_check(check)
+    # 検証
+    assert result.splitlines()[3:] == [
+        "索引の同期: ID が重なる文書 1 件",
+        "- duplicate_ids: a: rules（docs/a.yaml）・rules（docs/b.yaml）",
+    ]
+
+
 def test_render_check_when_items_truncated() -> None:
     """内訳を切ったことを示す（正常系）。"""
     # 準備

@@ -153,3 +153,67 @@ def test_nav_warnings_when_records_filter(
     result = nav_warnings(store, source, today=TODAY)
     # 検証
     assert result == []
+
+
+def test_nav_auto_counts_when_metadata_column(make_document: Callable[..., Document]) -> None:
+    """行の metadata で対応付けた列で数える（正常系）。"""
+    from project_index.features.read.nav import nav_auto_counts
+
+    # 準備
+    documents = [
+        make_document(id="guide/a", kind="guide", path="guide/a.md", data={"section": "使い方"}),
+        make_document(id="guide/b", kind="guide", path="guide/b.md", data={"section": "はじめに"}),
+    ]
+    nav = {
+        "tabs": [
+            {
+                "title": "使い方",
+                "items": [
+                    {
+                        "auto": {
+                            "document": "guide",
+                            "filter": {"field": "category", "op": "eq", "values": ["使い方"]},
+                        }
+                    }
+                ],
+            }
+        ]
+    }
+    # 実行
+    result = nav_auto_counts(
+        nav,
+        documents,
+        fields={"category": "string"},
+        today=TODAY,
+        columns={"guide": {"category": "section"}},
+    )
+    # 検証
+    assert [count.count for count in result] == [1]
+
+
+AREA_FILTER = {"field": "area", "op": "eq", "values": ["使い方"]}
+
+
+def test_nav_warnings_when_metadata_filter(
+    make_records_nav_source_dir: Callable[..., Path],
+    make_entry: Callable[..., SourceEntry],
+    tmp_path: Path,
+) -> None:
+    """行の metadata で対応付けたキーの条件を警告しない（正常系）。"""
+    from project_index.features.read.nav import nav_warnings
+
+    # 準備
+    config = make_records_nav_source_dir(
+        "section",
+        "string",
+        {"a": "使い方"},
+        nav_filter=AREA_FILTER,
+        metadata={"area": "section"},
+    )
+    source, _ = load_source(make_entry(str(config), source_id="sample"), index=0)
+    assert source is not None
+    store = DocumentStore(SnapshotStore(tmp_path / "snapshots"))
+    # 実行
+    result = nav_warnings(store, source, today=TODAY)
+    # 検証
+    assert result == []

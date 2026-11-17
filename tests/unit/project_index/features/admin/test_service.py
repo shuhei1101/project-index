@@ -851,6 +851,46 @@ def test_write_nav_when_records_filter(
     assert result.warnings == []
 
 
+def test_write_nav_when_metadata_filter(
+    make_records_nav_source_dir: Callable[..., Path],
+    make_terminal_config: Callable[..., TerminalConfig],
+) -> None:
+    """行の metadata で対応付けたキーの条件（正常系）。"""
+    from project_index.features.admin.service import write_nav
+    from project_index.features.admin.types import NavOperation, WriteNavRequest
+
+    # 準備
+    config = make_records_nav_source_dir(
+        "section", "string", {"a": "使い方"}, metadata={"area": "section"}
+    )
+    handlers = _handlers(make_terminal_config)
+    request = WriteNavRequest(
+        path=str(config.parent),
+        operations=[
+            NavOperation(
+                op="add",
+                tab="files",
+                value={
+                    "title": "files",
+                    "items": [
+                        {
+                            "auto": {
+                                "document": "notes",
+                                "filter": {"field": "area", "op": "eq", "values": ["使い方"]},
+                            }
+                        }
+                    ],
+                },
+            )
+        ],
+    )
+    # 実行
+    result = write_nav(request, handlers=handlers)
+    # 検証
+    assert [(count.tab, count.count) for count in result.counts] == [("files", 1)]
+    assert result.warnings == []
+
+
 def test_write_nav_when_invalid_filter(
     nav_source: Path, make_terminal_config: Callable[..., TerminalConfig]
 ) -> None:

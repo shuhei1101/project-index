@@ -139,7 +139,7 @@ project-index files --root ~/repo/sample --paths 'src/**'
 載せるファイルが 0 件のときも、空の出力で終了コード 0 です。
 
 除外の条件は [文書のメタデータ](./コアコンセプト-文書のメタデータ.md) の「載せるファイルの判定」にあります。
-`.git`・`node_modules`・`__pycache__`・`.venv`・`.claude/worktrees` のフォルダとシンボリックリンクは辿りません。
+`.git`・`node_modules`・`__pycache__`・`.venv`・`.claude/worktrees` のフォルダとシンボリックリンクは辿りません。名前が `.git` のファイル（ワークツリーの `.git`）も出しません。
 
 | 終了コード | 意味 |
 | --- | --- |

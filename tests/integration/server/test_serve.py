@@ -424,6 +424,8 @@ def test_normal_when_metadata_out_of_sync(
             "schemas/files.schema.yaml": FILES_SCHEMA.read_text(encoding="utf-8"),
             "docs/doc-1.yaml": "id: doc-1\nname: 文書 1\ntitle: 文書 1\n",
             "docs/doc-2.yaml": "id: doc-2\nname: 文書 2\n",
+            # `docs/doc-1.yaml` と ID が重なり、配信から除外する文書
+            "docs/doc-3.yaml": "id: doc-1\nname: 文書 3\ntitle: 文書 3\n",
             "src/files.yaml": (
                 "files:\n"
                 "  - path: a.py\n"
@@ -448,7 +450,7 @@ def test_normal_when_metadata_out_of_sync(
     warnings = [record.getMessage() for record in caplog.records]
     sample_warnings = [message for message in warnings if message.startswith("sample:")]
     assert env.client.get("/sources/sample/docs").status_code == 200
-    assert len(sample_warnings) == 5
+    assert len(sample_warnings) == 6
     assert any("metadata の列の欠け 1 件" in m and "name（title）" in m for m in sample_warnings)
     assert any(
         "管理用の YAML に無いファイル 2 件" in m and "src/d.py" in m and "src/sub/e.py" in m
@@ -462,6 +464,10 @@ def test_normal_when_metadata_out_of_sync(
     assert any(
         "2 つ以上の行が文書にするファイル 1 件" in m and "src/a.py: src・py" in m
         for m in sample_warnings
+    )
+    assert (
+        "sample: ID が重なる文書 1 件: doc-1: sample（docs/doc-1.yaml）・sample（docs/doc-3.yaml）"
+        in sample_warnings
     )
     assert not any("src: src/files.yaml" in m for m in sample_warnings)
     assert [message for message in warnings if message.startswith("clean:")] == []

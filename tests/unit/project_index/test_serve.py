@@ -1119,6 +1119,34 @@ def test_log_source_check_when_duplicate_files(
     assert "src/a.py: src・py" in warnings[0]
 
 
+def test_log_source_check_when_duplicate_ids(
+    make_served_source: Callable[..., ServedSource],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """重なった ID を警告のログに書く（正常系）。"""
+    # 準備
+    from project_index.features.describe.source_checks import SourceCheck
+    from project_index.features.documents.types import SyncReport
+    from project_index.main import log_source_check
+
+    source = make_served_source(id="sample")
+    check = SourceCheck(
+        report=SyncReport(
+            source_id="sample", duplicate_ids=["a: rules（docs/a.yaml）・rules（docs/b.yaml）"]
+        ),
+        nav=[],
+    )
+    # 実行
+    with caplog.at_level(logging.WARNING):
+        log_source_check(source, check)
+    # 検証
+    warnings = _warnings(caplog)
+    assert len(warnings) == 1
+    assert "ID が重なる文書" in warnings[0]
+    assert "1" in warnings[0]
+    assert "a: rules（docs/a.yaml）・rules（docs/b.yaml）" in warnings[0]
+
+
 def test_check_and_export_later(
     tmp_path: Path,
     git_repo: Callable[..., Path],

@@ -12,7 +12,7 @@ data_models:
     container: project_index/features/admin/types.py
     usecase: 共通
     role: DTO
-    summary: 文書のストアの『メタデータのずれ』の 5 つの並びの件数
+    summary: 文書のストアの『メタデータのずれ』の 6 つの並びの件数
     description: '`dataclass(frozen=True)`。`of(report)` で `SyncReport` から作る。'
     properties:
       - name: missing_refs
@@ -35,6 +35,10 @@ data_models:
         title: 重なったファイル
         type: int
         description: '`SyncReport.duplicate_files` の件数'
+      - name: duplicate_ids
+        title: 重なった ID
+        type: int
+        description: '`SyncReport.duplicate_ids` の件数'
   - name: SyncItem
     title: 同期のずれの内訳
     container: project_index/features/admin/types.py
@@ -45,7 +49,7 @@ data_models:
     properties:
       - name: kind
         title: 種類
-        type: Literal['missing_refs', 'unindexed_files', 'missing_body_files', 'unresolved_related', 'duplicate_files']
+        type: Literal['missing_refs', 'unindexed_files', 'missing_body_files', 'unresolved_related', 'duplicate_files', 'duplicate_ids']
         description: どの並びのずれか
       - name: path
         title: パス
@@ -357,7 +361,7 @@ data_models:
       - name: items
         title: 内訳
         type: list[SyncItem]
-        description: '`missing_refs`・`unindexed_files`・`missing_body_files`・`unresolved_related`・`duplicate_files` の順に並べ、先頭 `SYNC_ITEMS_LIMIT` 件まで'
+        description: '`missing_refs`・`unindexed_files`・`missing_body_files`・`unresolved_related`・`duplicate_files`・`duplicate_ids` の順に並べ、先頭 `SYNC_ITEMS_LIMIT` 件まで'
   - name: FormatRequest
     title: 返却する形式の指定
     container: project_index/features/admin/types.py

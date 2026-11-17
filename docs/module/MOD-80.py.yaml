@@ -74,13 +74,14 @@ functions:
       3. `update` は `current` の深いコピーに順に当てる
          - `set` の値は、オブジェクトなら今の値へ再帰でマージし、配列とスカラーは置き換える（項目の書き込み）
          - `unset` は項目の削除。無い項目は飛ばす
-         - `add_to` は配列の末尾へ足す（無ければ作る。配列でなければ違反）
-         - `remove_from` は等しい要素を全て除く
+         - `add_to` はキーを『配列の項目の解決』（`create=True`。`schema` が `None` なら空のスキーマ）で解いた配列の末尾へ足す（配列でなければ違反。`#` で始まるキーは項目を作らない）
+         - `remove_from` はキーを『配列の項目の解決』（`create=False`）で解いた配列から等しい要素を全て除く（`None` なら何もしない。配列でなければ違反）
+         - `add_to`・`remove_from` のキーを解けない（`InvalidArgumentError`）場合は、送られた理由で `add_to.{キー}`・`remove_from.{キー}` の違反にする
          - `text_edits` は文字列の項目の `old` を `new` にする。`field` が `#` で始まる場合は、`#` の後を『参照の型の項目のパスの解決』で `schema` と今の内容からキーと位置の並びに解き、その並びで取得して『並びで指した項目の書き込み』で書く（解けなければ `text_edits[{n}].field` の違反。`schema` が `None` なら空のスキーマで解き、配列は `x-key` を持たない違反になる）。`replace_all` が `False` で一致が 1 か所でない場合は違反
       4. 違反は `Violation`（`path` は `set.a.b`・`text_edits[0].old` など。`fix` に一致した数と、`replace_all` か前後の文字を含めること）を集めて `InvalidArgumentError` で送る
     exceptions:
       - name: InvalidArgumentError
-        condition: 配列でない項目への追加・削除、文字列でない項目への置き換え、`old` の一致が 1 か所でない
+        condition: 配列でない項目への追加・削除、`add_to`・`remove_from` のキーを解けない（要素の選び方を含む・`#` で始まるパスを解けない）、文字列でない項目への置き換え、`old` の一致が 1 か所でない
         message: '`操作を適用できません`'
     unit_tests:
       - name: test_apply_operation
@@ -121,6 +122,32 @@ functions:
         mock: なし
         expected: '`InvalidArgumentError` の違反の `path` が `text_edits[0].field`'
         exception: 該当する要素が無い
+      - name: test_apply_operation_when_add_to_ref_path
+        case: 正常
+        summary: 参照の型の項目のパスで要素の中の配列へ追加・削除する
+        condition: '`models`（`x-key: name`）が `{name: Row, properties: [a]}`・`{name: Col, properties: [b]}` の内容とスキーマに、`add_to: {"#models[Row].properties": [c]}`・`remove_from: {"#models[Row].properties": [a]}`'
+        mock: なし
+        expected: Row の `properties` が `[c]` で、Col の `properties` は `[b]` のまま
+      - name: test_apply_operation_when_add_to_selector_path
+        case: 異常
+        summary: '`#` で始まらず要素の選び方を含むキー'
+        condition: '同じ内容に `add_to: {"models[Row].properties": [d]}` と、`remove_from: {"models[Row].properties": [a]}`'
+        mock: なし
+        expected: '`InvalidArgumentError` の違反の `path` が `add_to.models[Row].properties`・`remove_from.models[Row].properties`'
+        exception: 要素の選び方を含む
+      - name: test_apply_operation_when_add_to_ref_path_unresolved
+        case: 異常
+        summary: 参照の型の項目のパスを解けない・配列でない
+        condition: '同じ内容に `add_to: {"#models[Zzz].properties": [d]}` と `remove_from: {"#models[Row].name": [d]}`'
+        mock: なし
+        expected: '`InvalidArgumentError` の違反の `path` が `add_to.#models[Zzz].properties`・`remove_from.#models[Row].name`'
+        exception: 要素が無い・配列でない
+      - name: test_apply_operation_when_add_to_index_path
+        case: 正常
+        summary: 位置で指すキーは今までどおり
+        condition: '`{functions: [{name: f}]}` に `add_to: {"functions[0].refs": [x]}`'
+        mock: なし
+        expected: '`{functions: [{name: f, refs: [x]}]}`'
   - name: to_columns
     title: 列名への読み替え
     kind: 関数

@@ -214,6 +214,12 @@ data_models:
         access: 公開
         default: '[]'
         description: '`{ファイル}: {行の id}・{行の id}` の並び。ファイルのパスの昇順で、2 つ以上の有効な行が文書にするファイル'
+      - name: duplicate_ids
+        title: 重なった ID
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: '`{文書の id}: {先の文書の行の id}（{ファイル}）・{除外した文書の行の id}（{ファイル}）` の並び。除外した文書のパスの昇順で、ID が先の文書と重なり配信から除外した文書（別の行で `duplicate_files` に数えた同じファイルを文書にするものを除く）'
   - name: AliasEntry
     title: エイリアス
     container: project_index/features/documents/types.py

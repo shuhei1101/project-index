@@ -242,6 +242,32 @@ def _set_tokens(
     _put(current, tokens[-1], value, path, tokens[:-1])
 
 
+# 参照の型の項目のパスの先頭
+REF_PATH_PREFIX = "#"
+
+
+def resolve_array(
+    data: MutableMapping[str, Any], schema: Mapping[str, Any], path: str, *, create: bool
+) -> object | None:
+    """`add_to`・`remove_from` のキーの項目のパスを、文書の中の 1 つの値へ解いて返す。"""
+    # `#` で始まるパス: スキーマの `x-key` の値で要素を指し、項目を作らない
+    if path.startswith(REF_PATH_PREFIX):
+        tokens = resolve_ref_path(data, schema, path[len(REF_PATH_PREFIX) :])
+        return _walk(data, tokens)[1]
+    # `#` で始まらないパス: 要素の選び方を含めば、選んだ要素の値を集めた新規のリストになるため拒否する
+    tokens = _plain_tokens(
+        path, "は配列として指せません。`#` で始めて x-key の値で要素を指してください"
+    )
+    found, value = _walk(data, tokens)
+    if found:
+        return value
+    # 項目が無い: 追加では空の配列を作り、削除では何もしない
+    if not create:
+        return None
+    _set_tokens(data, tokens, [], path)
+    return _walk(data, tokens)[1]
+
+
 REF_PATH_EXAMPLE = (
     "例 `#functions[save].process`・`#functions[save#2].process`・`#notes[main.py の補足]`"
 )
