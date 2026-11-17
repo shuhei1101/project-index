@@ -1,0 +1,255 @@
+id: MOD-113-6
+title: 索引のサーバー / メタデータの偏り / service.py
+lead: 管理用の YAML と行の案の読み込み・`description` の類似度・偏りの洗い出しと JSON への変換を受け持ち、メタデータの偏りの service.py を修正するときに参照する。
+constants:
+  - name: SIMILARITY_THRESHOLD
+    title: ほぼ同じとみなすしきい値
+    container: project_index/features/skew/service.py
+    usecase: メタデータの偏りの一覧
+    summary: 類似度がこれ以上の組をほぼ同じとみなす
+    value: '0.9'
+    notes:
+      導き方: '`docs/pr/113/しきい値の測定/README.md`。project-index で 251 行中 29 組、0.85 だと 82 組'
+  - name: SIMILARITY_DIGITS
+    title: 類似度の小数の桁数
+    container: project_index/features/skew/service.py
+    usecase: メタデータの偏りの一覧
+    summary: JSON に出す類似度を丸める桁数
+    value: '3'
+  - name: IGNORED_CHARS
+    title: 比べない文字
+    container: project_index/features/skew/service.py
+    usecase: メタデータの偏りの一覧
+    summary: 類似度を求める前に除く空白と記号
+    value: re.compile(r"[\s\W_]+")
+functions:
+  - name: load_rows
+    title: 行の読み込み
+    kind: 関数
+    container: project_index/features/skew/service.py
+    usecase: メタデータの偏りの一覧
+    role: 読み込み
+    summary: 管理用の YAML の行と行の案を `--root` からのパスで読み、行の案で置き換えた行と行の案のパスを返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: root
+        title: 配信元のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: '`--root` のフォルダ'
+      - name: files_yamls
+        title: 管理用の YAML
+        type: Sequence[str]
+        required: true
+        passing: positional
+        description: '`--root` からの相対か絶対パス'
+      - name: draft
+        title: 行の案
+        type: str | None
+        required: false
+        default: None
+        passing: keyword
+        description: 行の案の JSON Lines のファイルのパス
+    returns:
+      type: tuple[list[MetadataRow], frozenset[str]]
+      description: パスの昇順の行と、行の案のパス
+    process: |-
+      1. 管理用の YAML ごとに、`root` から解いて `yaml.safe_load` で読み、`files[]` の行ごとに `MetadataRow` にする
+         - `path` は、管理用の YAML のフォルダの `root` からのパスと行の `path` をつないだパス
+         - `tags` は、要素が文字列ならそのまま、辞書なら `name` の値を取る
+         - ファイルが無い場合、`SkewInputError(path, "ファイルがありません")` を送る
+         - `yaml.YAMLError` か、`files` が配列でない場合、`SkewInputError(path, 理由)` を送る
+      2. `draft` があれば、`root` から解いて 1 行ずつ `json.loads` し、`path`・`description`・`tags` を `MetadataRow` にして、同じ `path` の行を置き換えるか加える
+         - ファイルが無い場合・`json.JSONDecodeError` の場合・`path` が無い行がある場合、`SkewInputError` を送る
+      3. パスの昇順の行と、行の案のパスを返す
+    exceptions:
+      - name: SkewInputError
+        condition: 管理用の YAML か行の案のファイルが無いか、読めない
+        message: '`path` と `reason`'
+    unit_tests:
+      - name: test_load_rows
+        case: 正常
+        summary: 管理用の YAML ごとの相対パスを root からのパスにする
+        condition: '`docs/files.yaml` と `src/files.yaml` がどちらも `README.md` の行を持ち、`docs` の行の `tags` が `["topic:a"]`、`src` の行の `tags` が `[{"name": "topic:b"}]`'
+        mock: なし（`tmp_path`）
+        expected: 行が `docs/README.md`（`("topic:a",)`）・`src/README.md`（`("topic:b",)`）の 2 件、行の案のパスが空
+        exception: '-'
+      - name: test_load_rows_when_draft
+        case: 正常
+        summary: 行の案で置き換え、加える
+        condition: '`files.yaml` が `a.md`（`description: 旧`）を持ち、行の案が `a.md`（`description: 新`）と `b.md` を持つ'
+        mock: なし（`tmp_path`）
+        expected: 行が `a.md`（`新`）・`b.md` の 2 件、行の案のパスが `{"a.md", "b.md"}`
+        exception: '-'
+      - name: test_load_rows_when_files_yaml_missing
+        case: 異常
+        summary: 管理用の YAML が無い
+        condition: '`files_yamls` に無いパス'
+        mock: なし（`tmp_path`）
+        expected: '`SkewInputError` を送り、`path` が渡したパス'
+        exception: 管理用の YAML か行の案のファイルが無いか、読めない
+      - name: test_load_rows_when_draft_invalid
+        case: 異常
+        summary: 行の案が JSON Lines として読めない
+        condition: 行の案のファイルが `{` の 1 行
+        mock: なし（`tmp_path`）
+        expected: '`SkewInputError` を送る'
+        exception: 管理用の YAML か行の案のファイルが無いか、読めない
+  - name: similarity
+    title: 類似度
+    kind: 関数
+    container: project_index/features/skew/service.py
+    usecase: メタデータの偏りの一覧
+    role: 計算
+    summary: 2 つの `description` の文字 bigram の Dice 係数を返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: left
+        title: 左
+        type: str
+        required: true
+        passing: positional
+        description: '`description`'
+      - name: right
+        title: 右
+        type: str
+        required: true
+        passing: positional
+        description: '`description`'
+    returns:
+      type: float
+      description: 0〜1
+    process: |-
+      1. それぞれ NFKC・casefold にし、`IGNORED_CHARS` を除く
+      2. 隣り合う 2 文字の集合を作る。1 文字以下ならその文字列 1 つの集合にする
+      3. `2 × 共通の要素の数 ÷ (左の要素の数 + 右の要素の数)` を返す。両方とも空文字なら `0.0`
+    unit_tests:
+      - name: test_similarity_when_particle_differs
+        case: 正常
+        summary: 助詞 1 字だけが違う
+        condition: '`タスクの保存と取得を受け持ち、保存先や検索の条件を変えるときに参照する` と、`ときに` を `ときを` にした文字列'
+        mock: なし
+        expected: 0.9 以上（0.9375）
+        exception: '-'
+      - name: test_similarity_when_normalized
+        case: 正常
+        summary: 全角・大文字・記号の違いを無視する
+        condition: '`ＡＢＣ の設定。` と `abcの設定`'
+        mock: なし
+        expected: '1.0'
+        exception: '-'
+      - name: test_similarity_when_empty
+        case: 正常
+        summary: 空文字
+        condition: '`""` と `"。"`'
+        mock: なし
+        expected: '0.0'
+        exception: '-'
+  - name: find_skew
+    title: 偏りの洗い出し
+    kind: 関数
+    container: project_index/features/skew/service.py
+    usecase: メタデータの偏りの一覧
+    role: サービス
+    summary: 行から、ほぼ同じ `description` の組・1 件だけのタグ・半数以上に付くタグを返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: rows
+        title: 行
+        type: Sequence[MetadataRow]
+        required: true
+        passing: positional
+        description: 数える行
+      - name: draft_paths
+        title: 行の案のパス
+        type: frozenset[str]
+        required: false
+        default: frozenset()
+        passing: keyword
+        description: 行の案のパス
+      - name: only_draft
+        title: 行の案を含む組だけ
+        type: bool
+        required: false
+        default: 'False'
+        passing: keyword
+        description: '`True` なら、`draft_paths` の行を含む組だけを比べる'
+    returns:
+      type: SkewResult
+      description: 偏りの一覧
+    process: |-
+      1. `description` を持つ行の組ごとに類似度（`similarity`）を求め、`SIMILARITY_THRESHOLD` 以上の組を `SimilarPair`（類似度は `SIMILARITY_DIGITS` 桁に丸める）にする
+         - `only_draft` が `True` の場合、どちらかの行が `draft_paths` にある組だけを比べる
+      2. タグごとに付いた行を数える
+         - 1 行だけのタグを `SingletonTag` にする
+         - 付いた行の数の 2 倍が `len(rows)` 以上で、`SingletonTag` にないタグを `DominantTag` にする
+      3. それぞれを並べ替え、`rows` を `len(rows)` にした `SkewResult` を返す
+    callees:
+      - MOD-113-6#functions[similarity]
+    unit_tests:
+      - name: test_find_skew
+        case: 正常
+        summary: 3 種類の偏りを出す
+        condition: 7 行。`a.md`・`b.md` の `description` が助詞 1 字だけ違い、`topic:x` が `c.md` だけ、`topic:doc` が 7 行全て
+        mock: なし
+        expected: '`similar_descriptions` が `(a.md, b.md)` の 1 組、`singleton_tags` が `topic:x`（`c.md`）、`dominant_tags` が `topic:doc`（`count` 7）、`rows` が 7'
+        exception: '-'
+      - name: test_find_skew_when_only_draft
+        case: 正常
+        summary: 行の案を含む組だけ比べる
+        condition: 互いに助詞 1 字だけ違う `a.md`・`b.md`・`c.md`、`draft_paths` が `{"c.md"}`、`only_draft=True`
+        mock: なし
+        expected: '`similar_descriptions` が `(a.md, c.md)`・`(b.md, c.md)` の 2 組だけ'
+        exception: '-'
+      - name: test_find_skew_when_singleton_also_half
+        case: 正常
+        summary: 1 件だけのタグは半数以上に出さない
+        condition: 2 行。`topic:d` が 1 行目だけ、`topic:s` が 2 行目だけ
+        mock: なし
+        expected: '`singleton_tags` が 2 件、`dominant_tags` が空'
+        exception: '-'
+      - name: test_find_skew_when_no_description
+        case: 正常
+        summary: description を持たない行は比べない
+        condition: '`description` が `None` の 2 行'
+        mock: なし
+        expected: '`similar_descriptions` が空、`rows` が 2'
+        exception: '-'
+  - name: to_json
+    title: JSON
+    kind: 関数
+    container: project_index/features/skew/service.py
+    usecase: メタデータの偏りの一覧
+    role: 変換
+    summary: 偏りの一覧をインターフェース定義の形の JSON にする
+    scope: public
+    thread_safe: true
+    args:
+      - name: result
+        title: 偏りの一覧
+        type: SkewResult
+        required: true
+        passing: positional
+        description: 洗い出しの結果
+    returns:
+      type: str
+      description: 改行を含まない JSON（`ensure_ascii=False`）
+    process: |-
+      1. `dataclasses.asdict` で辞書にし、tuple を list にする
+      2. `json.dumps(ensure_ascii=False)` で返す
+    unit_tests:
+      - name: test_to_json
+        case: 正常
+        summary: インターフェース定義の形
+        condition: '`rows` 2・`similar_descriptions` が `(あ.md, い.md)`（0.95）・タグの偏りが空'
+        mock: なし
+        expected: '`json.loads` した結果が `{"rows": 2, "similar_descriptions": [{"paths": ["あ.md", "い.md"], "similarity": 0.95}], "singleton_tags": [], "dominant_tags": []}` で、日本語がエスケープされない'
+        exception: '-'
+tags:
+  - name: topic:メタデータ
+    main: true
+  - name: topic:タグ
