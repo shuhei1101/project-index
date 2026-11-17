@@ -651,6 +651,7 @@ def test_source_registry_load_when_requested(
 ) -> None:
     """待っている要求が指す行を先に読み込む（正常系）。"""
     # 準備
+    monkeypatch.setattr(registry_module, "LOAD_WORKERS", 1)
     loader = _Loader(make_served_source, make_status, blocked=("a", "b"))
     monkeypatch.setattr(registry_module, "load_source", loader)
     terminal = make_terminal_config(sources=_entries(make_entry, "a", "b", "c"))
@@ -717,6 +718,7 @@ def test_source_registry_load_when_duplicate_loaded_later(
 ) -> None:
     """後の行が先に読み込まれて ID が重なる（正常系）。"""
     # 準備
+    monkeypatch.setattr(registry_module, "LOAD_WORKERS", 1)
     from project_index.features.settings.types import SourceScope
 
     loader = _Loader(make_served_source, make_status, blocked=("z",), names={"x": "a", "y": "a"})
@@ -760,6 +762,7 @@ def test_source_registry_load_when_duplicate_loaded_later_with_on_rebuilt(
 ) -> None:
     """後の行が先に読み込まれて ID が重なると、入れ替えた後の処理を呼ぶ（正常系）。"""
     # 準備
+    monkeypatch.setattr(registry_module, "LOAD_WORKERS", 1)
     from project_index.features.settings.types import SourceScope
 
     loader = _Loader(make_served_source, make_status, blocked=("z",), names={"x": "a", "y": "a"})
@@ -977,6 +980,7 @@ def test_source_registry_get_when_row_loading(
 ) -> None:
     """読み込んでいない行の ID を引くと、その行の読み込みを待つ（正常系）。"""
     # 準備
+    monkeypatch.setattr(registry_module, "LOAD_WORKERS", 1)
     loader = _Loader(make_served_source, make_status, blocked=("a",))
     monkeypatch.setattr(registry_module, "load_source", loader)
     terminal = make_terminal_config(sources=_entries(make_entry, "a", "b"))
