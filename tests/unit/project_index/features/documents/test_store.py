@@ -1488,3 +1488,80 @@ def test_document_store_schema_when_cleared_during_resolve(
     document_store.schema(workspace, "rules")
     # 検証
     assert calls == ["rules", "rules"]
+
+
+def _root_table() -> DocumentTable:
+    """直下の管理用の YAML を読む行を返す。"""
+    return DocumentTable(
+        id="root",
+        paths=["files.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        records="files",
+        body_file="path",
+    )
+
+
+_IGNORED_FILES = {"dist/app.js": "app\n", ".pytest_cache/x": "x\n", "docs/new.md": "# new\n"}
+
+
+def test_check_sync_when_git_ignored(
+    document_store: DocumentStore,
+    git_repo: Callable[..., Path],
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+) -> None:
+    """Git の配信元で Git が無視するファイルを数えない（正常系）。"""
+    # 準備
+    root = git_repo(
+        {
+            ".gitignore": "dist/\n.pytest_cache/\n",
+            "files.yaml": "files:\n  - path: README.md\n  - path: .gitignore\n",
+            "README.md": "# readme\n",
+        }
+    )
+    write_files(root, _IGNORED_FILES)
+    source = make_served_source(
+        root=root,
+        is_git=True,
+        repo_root=root,
+        config=make_source_config(documents=[_root_table()]),
+    )
+    # 実行
+    report = store_module.check_sync(document_store, source)
+    # 検証
+    assert report.unindexed_files == ["root: docs/new.md"]
+
+
+def test_check_sync_when_not_git_ignored(
+    document_store: DocumentStore,
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Git でない配信元では Git が無視するファイルも数える（正常系）。"""
+    # 準備
+    root = tmp_path / "ws"
+    write_files(
+        root,
+        {
+            ".gitignore": "dist/\n.pytest_cache/\n",
+            "files.yaml": "files:\n  - path: README.md\n  - path: .gitignore\n",
+            "README.md": "# readme\n",
+            **_IGNORED_FILES,
+        },
+    )
+    calls: list[Path] = []
+    monkeypatch.setattr(store_module, "ignored_paths", lambda path: calls.append(path) or [])
+    source = make_served_source(root=root, config=make_source_config(documents=[_root_table()]))
+    # 実行
+    report = store_module.check_sync(document_store, source)
+    # 検証
+    assert report.unindexed_files == [
+        "root: .pytest_cache/x",
+        "root: dist/app.js",
+        "root: docs/new.md",
+    ]
+    assert calls == []
