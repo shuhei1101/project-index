@@ -157,7 +157,7 @@ functions:
       - name: test_apply_operation_when_unset_unresolved
         case: 異常
         summary: '`unset` の要素を解けない'
-        condition: '同じ内容に `unset: ["models[Row].properties", "#models[Zzz].properties"]`'
+        condition: '同じ内容とスキーマに `unset: ["models[Row].properties", "#models[Zzz].properties"]`'
         mock: なし
         expected: '`InvalidArgumentError` の違反の `path` が `unset.models[Row].properties`・`unset.#models[Zzz].properties`'
         exception: 要素の選び方を含む・要素が無い
