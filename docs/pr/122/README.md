@@ -1,0 +1,1 @@
+# templates/files.schema.yaml を knowledge の knowledge-files.schema.yaml に合わせる
