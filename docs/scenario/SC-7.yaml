@@ -682,7 +682,7 @@ scenarios:
       - name: Mock
         description: なし（実環境で実行）
       - name: 参照されている文書
-        description: ワークツリー x の文書 2（`docs/doc-2.yaml`）。文書 1 が、`related` の `to`・参照の型の項目の値（`doc-2#items[a]`）・Markdown の値のリンク（`[文書 2](id:doc-2)`）で文書 2 を指す
+        description: ワークツリー x の文書 2（`docs/doc-2.yaml`）。文書 1 が、`related` の `to`・参照の型の項目の値（`doc-2#items[a]`）・Markdown の値のリンク（`[文書 2](id:doc-2)`）・同じ Markdown の値のクラス図の `click` の `href`（`"id:doc-2#items[a]"`）で文書 2 を指す
         notes: 文書 3 は文書 2 を指さない
       - name: project-index
         description: sample を配信している project-index
@@ -707,9 +707,9 @@ scenarios:
 
       <!-- /map -->
     expected:
-      - '`dry_run: true` の結果が、改名後のパス `docs/doc-9.yaml` と、参照元の文書 1 の 3 か所（`related`・参照の型の項目・Markdown の値のリンク）を返却し、`applied` が `false` で、ワークツリー x のファイルは変わらない'
+      - '`dry_run: true` の結果が、改名後のパス `docs/doc-9.yaml` と、参照元の文書 1 の 4 か所（`related`・参照の型の項目・Markdown の値のリンク・クラス図の `click` の `href`）を返却し、`applied` が `false` で、ワークツリー x のファイルは変わらない'
       - 改名の後、ワークツリー x に `docs/doc-9.yaml` があり、`docs/doc-2.yaml` が無く、`docs/doc-9.yaml` の `id` が `doc-9` で、ほかの項目は改名の前と同じ
-      - 文書 1 の `related` の `to`・参照の型の項目の値・Markdown の値のリンクが `doc-9` を指し、文書 1 のほかの項目は変わらない
+      - 文書 1 の `related` の `to`・参照の型の項目の値・Markdown の値のリンク・クラス図の `click` の `href` が `doc-9` を指し、文書 1 のほかの項目は変わらない
       - 文書 3 は変わらない
       - '次の `search_docs` が `doc-9` を返却し、`doc-2` を返却しない。`trace_related` で `doc-9` から `direction: in` でたどると文書 1 を返却する'
     test: test_normal_when_rename
@@ -801,6 +801,38 @@ scenarios:
       - '`isError: true` で、文書 2 の `id` と違反したパス・決まり・修正方法を返却する'
       - 文書 1 も文書 2 も書き換わらない
     test: test_error_when_replace_words_validation_failed
+  - name: 正常シナリオ（本文のファイルを持つ文書を改名する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 本文のファイルを持つ行
+        description: '正常シナリオ（本文のファイルを持つ文書を書く）と同じ行 `notes`（`notes/index.yaml`・`records: items`・`body_file: path`）。要素 n1 の `path` が `n1.md` で、`notes/n1.md` を指す'
+        notes: 文書 1 の `related` が n1 を指す
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` にワークツリー x のパスを指定する。n1 の改名後の ID に n9、本文のファイルのパスに `n9.md` を指定する'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（本文のファイルを持つ文書を改名する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: write_docs(operations: 改名・n1・expected_version・改名後の ID n9・本文のファイルのパス n9.md)
+        M->>M: n1 を指す参照元を探し、書き換えた後の文書を検査する
+        M->>WT: notes/index.yaml の要素の path を書き換え、notes/n1.md を notes/n9.md へ移し、文書 1 を書き換える
+        M-->>A: 改名した文書と参照元の文書の id と書き込んだ後の version
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`notes/index.yaml` の要素の `path` が `n9.md` を指し、ほかの要素は変わらない'
+      - ワークツリー x に `notes/n9.md` があり、内容が改名の前の `notes/n1.md` と同じで、`notes/n1.md` が無い
+      - 文書 1 の `related` が n9 を指す
+      - 改名の後の `check_project` の管理用の YAML に無いファイルに、`notes/n1.md`・`notes/n9.md` のどちらも出ない
+    test: test_normal_when_rename_body_file
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 tags:
   - name: topic:文書
