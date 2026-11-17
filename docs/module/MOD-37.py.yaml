@@ -164,7 +164,7 @@ functions:
       description: バックアップのパス
     process: |-
       1. 手順に破壊的なものがあり `allow_destructive` が `False` の場合、`DestructiveStepBlockedError` を送出する
-      2. ファイルを再読み込みして `data` と同じ内容かを比べ、ハッシュを記録する（`content_hash`）
+      2. ファイルを再読み込みして `data` と同じ内容かを比べ、ハッシュを記録する（`content_hash`）。比べる両方は、再読み込みした文字列を `original` に渡した往復編集の書き出し（`dump_roundtrip`）で文字列にする
          - 違う場合、`MigrationFailedError` を送出する
       3. 手順を順に当てる（手順の適用）
       4. `version` を `target.current` にする
@@ -173,7 +173,7 @@ functions:
       6. ファイルを再読み込みしてハッシュを比べる
          - 変わっている場合、`MigrationFailedError` を送出する
       7. 同じフォルダに `BACKUP_FORMAT` の名前で元の内容を保存する
-      8. 対象を書き換える（`dump_roundtrip`・`replace_file`）
+      8. 対象を書き換える（`dump_roundtrip`・`replace_file`。`dump_roundtrip` の `original` は手順 2 で再読み込みした文字列）
          - `[INFO]` 設定を移し替えた（ファイル・前のバージョン・後のバージョン・バックアップ）
     exceptions:
       - name: DestructiveStepBlockedError
@@ -232,6 +232,12 @@ functions:
         condition: '`version: "1"` で改名前のキーと、最上位に `mindstella: {threads: 3}` を持つ端末の設定'
         mock: 手順の配置先をテスト用のフォルダに monkeypatch
         expected: '移し替えに成功し、書き換えた端末の設定の `mindstella` が `{threads: 3}` のまま'
+      - name: test_apply_migration_when_indent_preserved
+        case: 正常
+        summary: 元のファイルの配列の字下げを保つ
+        condition: '`version: "1"` で `sources:` の直下に `- ` を字下げ無しで 2 行並べる端末の設定に、空の手順を当てる（`version` だけを書き換える）'
+        mock: 新しいスキーマの検証（違反なしを返す）
+        expected: 書き換えたファイルは `version` の行だけが元のファイルと違い、`sources` の `- ` が字下げ無しのまま
     callees:
       - MOD-38#functions[apply_step]
 notes:
