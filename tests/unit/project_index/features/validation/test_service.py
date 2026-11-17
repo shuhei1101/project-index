@@ -594,14 +594,14 @@ def test_document_checker_check_when_stamps_shared(
     """1 回の要求の中でスクリプトの状態を使い回す（正常系）。"""
     # 準備
     _count_runs(monkeypatch)
-    folder_calls: list[Path] = []
-    real = service_module._folder_stamps  # pyright: ignore[reportPrivateUsage]
+    stamp_calls: list[Path] = []
+    real = service_module.script_stamp  # pyright: ignore[reportAttributeAccessIssue]
 
-    def counting(base: Path, folder: Path, **kwargs: Any) -> Any:
-        folder_calls.append(folder)
-        return real(base, folder, **kwargs)
+    def counting(base: Path, run: Any, **kwargs: Any) -> Any:
+        stamp_calls.append(base)
+        return real(base, run, **kwargs)
 
-    monkeypatch.setattr(service_module, "_folder_stamps", counting)
+    monkeypatch.setattr(service_module, "script_stamp", counting, raising=False)
     root = tmp_path / "ws"
     (root / "scripts").mkdir(parents=True)
     (root / "scripts" / "check.py").write_text("a\n", encoding="utf-8")
@@ -615,7 +615,7 @@ def test_document_checker_check_when_stamps_shared(
     checker.check(target, make_document(id="doc-1"), on="read", stamps=stamps)
     checker.check(target, make_document(id="doc-2", version="aaaaaa"), on="read", stamps=stamps)
     # 検証
-    assert len(folder_calls) == 1
+    assert len(stamp_calls) == 1
 
 
 def test_document_checker_check_when_script_outside_repository(

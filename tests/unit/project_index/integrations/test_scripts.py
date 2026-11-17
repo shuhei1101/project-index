@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from project_index.integrations import scripts as scripts_module
 from project_index.integrations.scripts import (
     ScriptFailedError,
     ScriptNotFoundError,
@@ -151,3 +152,29 @@ def test_run_script_when_at(git_repo: Callable[..., Path], run_git: Callable[...
     )
     # 検証
     assert result.stdout == "develop\n"
+
+
+def test_script_stamp_when_script_changed(tmp_path: Path) -> None:
+    """スクリプトのファイルを書き換えると状態が変わる（正常系）。"""
+    # 準備
+    script = tmp_path / "scripts" / "a.py"
+    script.parent.mkdir()
+    script.write_text('print("a")\n', encoding="utf-8")
+    os.utime(script, ns=(1_000_000_000, 1_000_000_000))
+    before = scripts_module.script_stamp(tmp_path, ["python3", "scripts/a.py"], use_git=False)
+    script.write_text('print("bb")\n', encoding="utf-8")
+    os.utime(script, ns=(2_000_000_000, 2_000_000_000))
+    # 実行
+    after = scripts_module.script_stamp(tmp_path, ["python3", "scripts/a.py"], use_git=False)
+    # 検証
+    assert before != ""
+    assert after != ""
+    assert before != after
+
+
+def test_script_stamp_when_command_only(tmp_path: Path) -> None:
+    """作業ツリーのファイルを指さない `run` は空の文字列（正常系）。"""
+    # 実行
+    result = scripts_module.script_stamp(tmp_path, ["project-index", "prompt-doc"], use_git=False)
+    # 検証
+    assert result == ""
