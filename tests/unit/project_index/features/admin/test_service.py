@@ -151,6 +151,11 @@ def test_get_status(
     assert status.sources[2].sync is None
 
 
+def _no_check(source_id: str) -> None:
+    """検査の結果を持たない偽物。"""
+    del source_id
+
+
 def test_get_status_when_loading(
     monkeypatch: pytest.MonkeyPatch,
     make_terminal_config: Callable[..., TerminalConfig],
@@ -186,7 +191,7 @@ def test_get_status_when_loading(
     handlers = make_handlers(
         terminal=terminal,
         registry=registry,
-        checks=SimpleNamespace(checking=False, get=lambda _source_id: None),
+        checks=SimpleNamespace(checking=False, get=_no_check),
         snapshots=SimpleNamespace(exporting=False),
     )
     # 実行
