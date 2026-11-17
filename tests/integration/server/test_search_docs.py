@@ -422,6 +422,45 @@ def test_normal_when_worktree_adds_row(
     assert not by_clone.data.get("items")
 
 
+def test_normal_when_worktree_metadata_changed(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_config_text: Callable[..., str],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_doc_text: Callable[..., str],
+) -> None:
+    """ワークツリーの設定でメタデータの対応を変えると、次の呼び出しから変えた後の対応で返す（正常系）。"""
+    # 準備
+    refs = [{"to": "doc-2", "type": "references"}]
+    files = sample_file_set(**{"docs/doc-1.yaml": sample_doc_text("doc-1", "文書 1", refs=refs)})
+    source = make_source("sample", files)
+    worktree = add_worktree(source.folder, "x")
+    env = make_server(source)
+    arguments = {
+        "cwd": str(source.folder),
+        "filter": {"field": "id", "op": "eq", "values": ["doc-1"]},
+        "fields": ["related"],
+        "format": "json",
+    }
+    before = env.call("search_docs", worktree=str(worktree), **arguments)
+    # ワークツリーの設定だけ、行の metadata に related: refs を追加し、commit しない
+    (worktree / "project-index.yaml").write_text(
+        sample_config_text().replace(
+            "    schema: schemas/sample.schema.yaml\n",
+            "    schema: schemas/sample.schema.yaml\n    metadata:\n      related: refs\n",
+        ),
+        encoding="utf-8",
+    )
+    # 実行
+    after = env.call("search_docs", worktree=str(worktree), **arguments)
+    by_clone = env.call("search_docs", **arguments)
+    # 検証
+    assert not before.data["items"][0]["values"].get("related")
+    assert after.data["items"][0]["values"]["related"] == [{"to": "doc-2", "type": "references"}]
+    assert not by_clone.data["items"][0]["values"].get("related")
+
+
 def test_error_when_worktree_config_invalid(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
