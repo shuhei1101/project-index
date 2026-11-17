@@ -43,6 +43,6 @@ argument-hint: "[クローンのパス]"
 
 7. 結果を示す。
    - 作ったもの（端末の設定のパス・env に記載したキー）と、つながった結果を出す
-   - mdmark の CLI が無かったときは、`npm install -g github:shuhei1101/mdmark`（Node 24 以降）で入れると `write_docs` が Markdown の値を点検することを案内する
+   - mdmark の CLI が無かったときは、`npm install -g github:shuhei1101/mdmark#{mdmark_ref}`（`{mdmark_ref}` は端末の設定の `mdmark_ref`。無ければ `develop`。Node 24 以降）で入れると `write_docs` が Markdown の値を点検することを案内する
    - このセッションで文書の MCP を使用するには `/mcp` で再接続することを案内する
    - 配信元を登録する `/project-index:setup` を案内する
