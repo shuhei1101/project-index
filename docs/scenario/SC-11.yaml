@@ -422,8 +422,6 @@ scenarios:
     test: test_normal_when_opened_during_background_check
   - name: 正常シナリオ（ほかの配信元の読み込みの最中に開く）
     setup:
-      - name: Mock
-        description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが読み取り API を呼ぶ）
       - name: 大きな配信元
         description: 文書の種類の行を多く持ち、配信元の読み込みが sample の文書の一覧の応答より長くかかる git リポジトリ
         notes: id `large`。行の数は、読み込みが 3 秒以上かかる数にする
@@ -432,6 +430,9 @@ scenarios:
         notes: id `sample`
       - name: project-index
         description: 状態のフォルダを空にし、large・sample の順に端末の設定に並べて起動した project-index
+      - name: Mock
+        description: sample の文書の一覧の処理を、テストが合図を出すまで止まるものに差し替える（応答の最中の状態を保つ）。large の行の読み込みの文書の行ごとの検証を実行した時刻を記録する包みを配置する。dev-docs の画面のサーバーの代わりにテストのコードが読み取り API を呼ぶ
+        notes: 合図は、large の検証が始まってから 1 秒の後に出す。sample の読み込みとそのほかの処理は差し替えない
     flow: |-
       ```mermaid
       sequenceDiagram
@@ -440,15 +441,18 @@ scenarios:
         participant SRC as large・sample
 
         PI->>SRC: 起動の後に、large と sample を裏で読み込み始める
-        DD->>PI: sample の文書の一覧を取得する（リビジョンを省く）
-        PI->>PI: large の読み込みを休ませ、sample の読み込みを先に済ませる
+        DD->>PI: sample の文書の一覧を取得する（リビジョンを省く。合図まで応答の最中になる）
+        PI->>PI: 応答の最中は large の行の読み込みを休みを挟んで進める
+        DD->>PI: テストが合図を出す
         PI-->>DD: sample の文書の一覧
+        PI->>SRC: 応答の後は large の行の読み込みを休まずに進める
         DD->>PI: 配信元の一覧と状態を取得する
         PI-->>DD: large・sample が配信中
       ```
     expected:
-      - sample の文書の一覧の取得が、large の読み込みの終了を待たずに 200 を返却する
-      - 応答の最中も large の読み込みは止まらず、応答の後に large と sample が配信中になる
+      - 応答の最中に large の文書の行の検証が 1 秒あたりに進んだ数が、合図の後の 2 割以下
+      - 応答の最中も、large の文書の行の検証が 1 件以上進む（止まらない）
+      - 合図の後に sample の文書の一覧が 200 を返却し、large の読み込みが済むと large と sample が配信中になる
     test: test_normal_when_opened_while_other_sources_loading
 lead: dev-docs の画面のサーバーが読み取り API で配信元と文書を取得するシナリオを定め、画面のサーバーからの読み取りの流れを変えるときに参照する。
 tags:
