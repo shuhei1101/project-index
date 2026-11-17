@@ -73,3 +73,6 @@ scope_out:
   - item: AI Monitor v0.4.0 の反映作業のスクリプト（各プロジェクトのスキーマの参照への移行/実行.py）をそのまま流すこと
     reason: スクリプトは dev-docs.yaml を書き換える前提で、このリポジトリの設定は project-index.yaml のため。同じ内容を作業 PR の変更として手で行う
     plan: none
+  - item: setup のスキルが、プロンプトのスキーマの $ref 先の common.schema.yaml を配信元へコピーしないこと（plugins/project-index/skills/setup/SKILL.md の手順 5）
+    reason: 配信元でプロンプトのスキーマの $ref を解決できない不具合で、配置先を整える今回の要望に含まれない
+    plan: '#115'
