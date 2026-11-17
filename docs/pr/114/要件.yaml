@@ -1,0 +1,71 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: changed
+    detail: 配信元を追加するときに書き出す設定のスキーマの参照先と、プロンプトのスキーマをコピーする元が、配布する設定のスキーマの新しい配置先に変わる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: run_only
+    detail: 起動時のプロンプトの検査と、設計書の種類のスキーマの読み込みが、配置先と参照先の変更の後も通る
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: run_only
+    detail: 配信元の設定のスキーマの参照を変えた後も、管理の MCP で確認してから配信に入れられる
+    depends_on: []
+docs:
+  - page: project-index.yaml
+    new: false
+    change: documents[].schema を knowledge の schemas/design/{種類}.schema.yaml と schemas/knowledge-files.schema.yaml の参照（source・path・ref）へ切り替える
+    status: todo
+  - page: docs/layout/LAY-73-1.yaml
+    new: false
+    change: schemas・templates のエントリと ai-monitor-version.ini の行を、コピーの削除と配布する設定のスキーマの配置先に合わせる
+    status: todo
+  - page: docs/dev-command/CMD-1.yaml
+    new: false
+    change: 配布のスキーマの生成の出力先を新しい配置先にする
+    status: todo
+  - page: docs/module/MOD-43.py.yaml
+    new: false
+    change: PROMPT_SCHEMA_PATH・COMMON_SCHEMA_PATH の値と説明を新しい配置先に合わせる
+    status: todo
+  - page: docs/module/MOD-70.py.yaml
+    new: false
+    change: source_schema_json の出力を commit する先のパスを新しい配置先に合わせる
+    status: todo
+  - page: docs/interface/IF-15.yaml
+    new: false
+    change: プロンプトのスキーマのパスを新しい配置先に合わせる
+    status: todo
+  - page: docs/guide/設定.md
+    new: false
+    change: 1 行目の $schema の URL・管理用の YAML のスキーマの例・templates/prompt.schema.yaml の説明を新しい配置先と参照に合わせる
+    status: todo
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: プロンプトのスキーマをコピーする元のパスとスキーマの例を新しい配置先と参照に合わせる
+    status: todo
+  - page: docs/guide/CLI.md
+    new: false
+    change: prompt-doc のキーの説明が指すスキーマのパスを新しい配置先に合わせる
+    status: todo
+  - page: plugins/project-index/skills/setup/SKILL.md
+    new: false
+    change: 1 行目の $schema の URL と、コピーする雛形のスキーマのパスを新しい配置先に合わせる
+    status: todo
+  - page: templates/project-index.yaml
+    new: false
+    change: 1 行目の $schema の URL を新しい配置先に合わせる
+    status: todo
+scope_out:
+  - item: templates/files.schema.yaml を knowledge の knowledge-files.schema.yaml に合わせること
+    reason: '#76 の本文で #75 が決める範囲とされている'
+    plan: '#75'
+  - item: リポジトリの直下の project-index.yaml の 1 行目の $schema を project-index のスキーマへ向けること
+    reason: '目的が別の Issue。#76 で配置先を決めた後に #26 で行う'
+    plan: '#26'
+  - item: AI Monitor v0.4.0 の反映作業のスクリプト（各プロジェクトのスキーマの参照への移行/実行.py）をそのまま流すこと
+    reason: スクリプトは dev-docs.yaml を書き換える前提で、このリポジトリの設定は project-index.yaml のため。同じ内容を作業 PR の変更として手で行う
+    plan: none
