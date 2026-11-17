@@ -386,23 +386,23 @@ functions:
         expected: 何も送らず、`has_worktree`・`load` が呼ばれない
 refs:
   - to: IF-2
-    type: references
-    when: 未確定
+    type: requires
+    when: インターフェース定義『文書の検索』の入出力を変えるときに、この設計書の関数と型を合わせる。
   - to: IF-6
-    type: references
-    when: 未確定
+    type: requires
+    when: インターフェース定義『文書の書き込み』の入出力を変えるときに、この設計書の関数と型を合わせる。
   - to: IF-7
-    type: references
-    when: 未確定
+    type: requires
+    when: インターフェース定義『文書の削除』の入出力を変えるときに、この設計書の関数と型を合わせる。
   - to: IF-4
-    type: references
-    when: 未確定
+    type: requires
+    when: インターフェース定義『変更の一覧』の入出力を変えるときに、この設計書の関数と型を合わせる。
   - to: IF-3
-    type: references
-    when: 未確定
+    type: requires
+    when: インターフェース定義『関連のたどり』の入出力を変えるときに、この設計書の関数と型を合わせる。
   - to: IF-1
-    type: references
-    when: 未確定
+    type: requires
+    when: インターフェース定義『配信元の説明』の入出力を変えるときに、この設計書の関数と型を合わせる。
 notes:
   instructions のプロンプトの変数: '`content/prompts/mcp/docs/instructions.yaml` は `vars` に `sources`（`id`・`when` を持つ辞書の並び）と `omitted`（載せなかった件数）を持ち、条件 `sources or omitted` の部品で、配信元と使う場面の一覧（`` `{id}`: {when} `` の行）と、`omitted` が 1 以上のときの載せなかった件数と `describe(outside_scope: true)` の案内（作業場所から使える配信元と作業範囲の外で参照できる配信元の使う場面を引ける）を描く。コードは文を持たない'
   trace_related のツールの説明: '`content/prompts/mcp/docs/tools/trace-related.yaml` は「起点の文書やコードのパスから、related をたどって関連する文書を返す。設計書を起点に direction: in で呼ぶと、via.type が implements の文書がその設計書を実装するコード、コードを起点にすると tests の文書がそのテストになる。」を持つ（インターフェース定義『関連のたどり』の `direction` の補足）'

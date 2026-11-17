@@ -340,8 +340,8 @@ functions:
         exception: TimeoutError
 refs:
   - to: IF-19
-    type: references
-    when: 未確定
+    type: requires
+    when: インターフェース定義『セッション開始のフック』の入出力を変えるときに、この設計書の関数と型を合わせる。
 notes:
   決まり: |-
     ポートにつながらなければ `project-index serve` を切り離して起動し、つながれば文脈を入れず、`/clear`・圧縮のときだけ `POST /_admin/session-start` で返却済みの記録の削除を依頼する。

@@ -570,7 +570,7 @@ flows:
       - to: SC-7
         item: scenarios[異常シナリオ（配置先が除外の名前に当たる）]
         type: references
-        when: 未確定
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『エージェントが書き込む』の対応する流れと期待値を確認する。
   - name: 正常系（共通のキー名で書く）
     summary: 共通のキー名で渡した値を、行の `metadata` の対応で元の列に書く
     setup:
@@ -1345,9 +1345,9 @@ refs:
   - to: SC-7
     item: scenarios[正常シナリオ]
     type: references
-    when: 未確定
+    when: このインターフェースの入出力やフローを変えるときに、シナリオ『エージェントが書き込む』の対応する流れと期待値を確認する。
   - to: SC-9
     item: scenarios[異常シナリオ（読んだ後に変わった文書へ書き込む）]
     type: references
-    when: 未確定
+    when: このインターフェースの入出力やフローを変えるときに、シナリオ『YAMLを直接編集した』の対応する流れと期待値を確認する。
 test_file: tests/integration/server/test_write_docs.py

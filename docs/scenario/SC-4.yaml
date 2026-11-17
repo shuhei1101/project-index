@@ -727,7 +727,7 @@ scenarios:
       - to: SC-11
         item: scenarios[異常シナリオ（リビジョンの書き出しが上限を超える）]
         type: references
-        when: 未確定
+        when: このシナリオの流れを変えるときに、関わるシナリオ『画面のサーバーが文書を読む』の対応する流れと期待値を確認する。
   - name: 正常シナリオ（disk を指定した配信元を Git を参照せずに配信する）
     setup:
       - name: Mock
@@ -819,10 +819,10 @@ priority: 高
 refs:
   - to: SC-1
     item: scenarios[正常シナリオ]
-    type: references
-    when: 未確定
+    type: part_of
+    when: このシナリオの前後の流れを、複合ユースケースの中で確認するときに参照する。
   - to: SC-1
     item: scenarios[異常シナリオ（配信できない配信元がある）]
-    type: references
-    when: 未確定
+    type: part_of
+    when: このシナリオの前後の流れを、複合ユースケースの中で確認するときに参照する。
 test_file: tests/e2e/単一ユースケース/test_起動する.py

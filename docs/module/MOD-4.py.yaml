@@ -99,8 +99,8 @@ functions:
         expected: 戻り値に `agent_id` が無い
 refs:
   - to: IF-20
-    type: references
-    when: 未確定
+    type: requires
+    when: インターフェース定義『ツール実行前のフック』の入出力を変えるときに、この設計書の関数と型を合わせる。
 notes:
   決まり: |-
     文書の MCP のツールの入力に `cwd`・`session_id`・`agent_id` を上書きで入れ、`updatedInput` と `permissionDecision: allow` で返す。

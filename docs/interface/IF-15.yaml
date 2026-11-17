@@ -875,7 +875,7 @@ flows:
       - to: SC-4
         item: scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
         type: references
-        when: 未確定
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『起動する』の対応する流れと期待値を確認する。
   - name: 正常系（裏のリビジョンの書き出しが上限を超える）
     summary: 裏の書き出しが上限で止まっても配信を続け、次の要求が書き出し直す
     setup:
@@ -908,7 +908,7 @@ flows:
       - to: SC-4
         item: scenarios[異常シナリオ（裏のリビジョンの書き出しが上限を超える）]
         type: references
-        when: 未確定
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『起動する』の対応する流れと期待値を確認する。
   - name: 正常系（disk の配信元を Git を参照せずに配信する）
     summary: Git のリポジトリの中の disk の配信元を、登録したフォルダの設定・スキーマ・スクリプトで配信する
     setup:
@@ -1157,5 +1157,5 @@ refs:
   - to: SC-4
     item: scenarios[正常シナリオ]
     type: references
-    when: 未確定
+    when: このインターフェースの入出力やフローを変えるときに、シナリオ『起動する』の対応する流れと期待値を確認する。
 test_file: tests/integration/server/test_serve.py

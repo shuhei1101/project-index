@@ -409,12 +409,12 @@ priority: 高
 refs:
   - to: SC-1
     item: scenarios[正常シナリオ]
-    type: references
-    when: 未確定
+    type: part_of
+    when: このシナリオの前後の流れを、複合ユースケースの中で確認するときに参照する。
   - to: SC-1
     item: scenarios[異常シナリオ（配信できない配信元がある）]
-    type: references
-    when: 未確定
+    type: part_of
+    when: このシナリオの前後の流れを、複合ユースケースの中で確認するときに参照する。
 notes:
   差分: 2 つのリビジョンの差分は、dev-docs の画面のサーバーが 2 つのリビジョンの文書の取得の結果から作る。
 test_file: tests/e2e/単一ユースケース/test_画面のサーバーが文書を読む.py
