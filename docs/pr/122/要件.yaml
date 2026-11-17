@@ -47,3 +47,6 @@ scope_out:
   - item: 単体テストの test_check_port 系がランナーでときどき PortInUseError で fail すること
     reason: ポートの競合による既存の不安定なテストで、この作業 PR の変更と関係しない。この作業 PR がマージされなくても同じ内容で成り立つ
     plan: '#126'
+  - item: 結合テストの test_normal_when_rechecked_after_write・test_error_when_unexpected・test_normal_when_warned の fail
+    reason: develop で既に fail している既存の不具合で、この作業 PR の変更と関係しない
+    plan: '#117'
