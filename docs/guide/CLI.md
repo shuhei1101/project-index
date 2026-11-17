@@ -1,10 +1,10 @@
 # CLI
 
-project-index serve・project-index migrate・project-index files・project-index prompt-doc のサブコマンド・引数・終了コード
+project-index serve・project-index migrate・project-index files・project-index outline・project-index changed・project-index checkpoint・project-index prompt-doc のサブコマンド・引数・終了コード
 
 ## 共通
 
-`project-index` コマンドは `serve`・`migrate`・`files`・`prompt-doc` のサブコマンドを持ちます。
+`project-index` コマンドは `serve`・`migrate`・`files`・`outline`・`changed`・`checkpoint`・`prompt-doc` のサブコマンドを持ちます。
 `project-index --version` で project-index のバージョンを表示します。
 
 ## project-index serve
@@ -143,6 +143,90 @@ project-index files --root ~/repo/sample --paths 'src/**'
 | 終了コード | 意味 |
 | --- | --- |
 | 2 | `--root` が無いか、フォルダでない。標準エラーに渡したパスを出す。`project-index migrate` の設定の違反と同じ値 |
+
+## project-index outline
+
+範囲のファイルごとに、既に持つ説明・見出し・コードの定義などのアウトラインと、名前と説明を決めるために次の段階へ進むかの判定を出します。
+対象は `project-index files` と同じファイルで、ファイルは書き換えません。
+`/project-index:setup` が、仮のメタデータを付けるのに使います。
+
+| オプション | 必須 | 既定 | 説明 |
+| --- | --- | --- | --- |
+| `--root` | ✅ | - | 配信元のフォルダのパス |
+| `--paths` | ✅ | - | 範囲の glob かファイルのパス（`--root` からの相対）。繰り返して渡せる |
+| `--exclude` | - | なし（除外の条件だけで外す） | 外すファイル名の glob。繰り返して渡せる |
+
+```bash
+project-index outline --root ~/repo/sample --paths 'docs/**/*.md'
+```
+
+標準出力に、1 ファイル 1 行の JSON をパスの昇順で出します。
+
+| キー | 中身 |
+| --- | --- |
+| `path`・`size` | `--root` からのパスとバイト数 |
+| `existing_description` | フロントマターの `title`・`description`、モジュールの docstring、package.json の `name`・`description`（`source` に出所）。無ければ `null` |
+| `headings`・`code_block_ratio`・`code_languages`・`link_count`・`image_count`・`japanese_ratio` | Markdown のコードブロックの外の見出し・コードブロックの行の割合と言語・リンクと画像の数・日本語の文字の割合 |
+| `functions`・`classes`・`imports` | Python・TypeScript・JavaScript の最上位の関数とクラス、import しているモジュール |
+| `next_stage`・`reasons` | 次の段階へ進むかと理由（`few_headings`・`mostly_code`・`not_japanese`・`no_definitions`・`unsupported_format`） |
+
+| 終了コード | 意味 |
+| --- | --- |
+| 2 | `--root` が無いか、フォルダでない。標準エラーに渡したパスを出す |
+
+## project-index changed
+
+管理用の YAML の行のファイルのうち、確認の時点の後に中身が変わったファイルを出します。
+ファイルは書き換えません。
+`/project-index:setup` が、2 回目以降にメタデータを見直すファイルを求めるのに使います。
+
+| オプション | 必須 | 既定 | 説明 |
+| --- | --- | --- | --- |
+| `--root` | ✅ | - | 配信元のフォルダのパス |
+| `--files-yaml` | ✅ | - | 管理用の YAML のパス（`--root` からの相対） |
+
+```bash
+project-index changed --root ~/repo/sample --files-yaml files.yaml
+```
+
+標準出力に、起点（`base.kind`・`base.value`）と変わったファイル（`files`）の JSON を出します。
+
+| 起点（`base.kind`） | 選ぶ条件 | 変わったファイル |
+| --- | --- | --- |
+| `checkpoint_commit` | 管理用の YAML の `checkpoint.commit` がリポジトリにある | その commit から作業ツリーまでの差分に出るファイル（commit していない変更を含む） |
+| `checkpoint_time` | `checkpoint.checked_at` がある（Git 管理外の配信元） | その日時より後に変更されたファイル |
+| `files_yaml_commit` | 記録が無いか記録した commit が無く、管理用の YAML が Git で追跡されている | 管理用の YAML を最後に変更した commit から作業ツリーまでの差分に出るファイル |
+| `files_yaml_mtime` | 記録が無く、管理用の YAML が Git で追跡されていない（ローカル運用・Git 管理外） | Git の配信元は管理用の YAML の変更日時より後の commit の差分と commit していない変更、Git 管理外は変更日時より後に変更されたファイル |
+
+- 改名したファイルは改名先のパスで出し、削除したファイルは出しません
+- `checkpoint.reviewed` のファイルのうち、中身が記録したハッシュと同じものは出しません
+- 記録した commit がリポジトリに無いとき（squash merge・rebase で消えたとき）は、起点を切り替えた旨を標準エラーに出します
+
+| 終了コード | 意味 |
+| --- | --- |
+| 2 | `--root` か `--files-yaml` が無い。標準エラーに渡したパスを出す |
+
+## project-index checkpoint
+
+管理用の YAML の直下の `checkpoint` に、確認を済ませた時点を記録します。
+`checkpoint` 以外のキー・行・コメントは書き換えません。
+`/project-index:setup` が、管理用の YAML を記載した後に呼びます。
+
+| オプション | 必須 | 既定 | 説明 |
+| --- | --- | --- | --- |
+| `--root` | ✅ | - | 配信元のフォルダのパス |
+| `--files-yaml` | ✅ | - | 管理用の YAML のパス（`--root` からの相対） |
+| `--reviewed` | - | なし | 見直したファイルのうち commit していない変更を持つファイルのパス。繰り返して渡せる |
+
+```bash
+project-index checkpoint --root ~/repo/sample --files-yaml files.yaml --reviewed src/tasks.py
+```
+
+Git の配信元は HEAD の commit（`commit`）と `--reviewed` のファイルの中身の SHA-256（`reviewed`）、Git 管理外の配信元は日時（`checked_at`）を記録し、記録した値を JSON で標準出力に出します。
+
+| 終了コード | 意味 |
+| --- | --- |
+| 2 | `--root` か `--files-yaml` が無い。標準エラーに渡したパスを出す |
 
 ## project-index prompt-doc
 
