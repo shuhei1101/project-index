@@ -1,0 +1,10 @@
+id: MOD-113-4
+title: 索引のサーバー / メタデータの偏り
+lead: setup が仮のメタデータを付けた後に、ほぼ同じ `description` の組・1 件だけのタグ・半数以上に付くタグを洗い出すメタデータの偏りの分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
+notes:
+  受け持つこと: ファイルを書き換えない。管理用の YAML はスキーマの検査をしないで `files[]` の `path`・`description`・`tags` だけを読む（検査は `check_project` が担う）。見直しの案は作らない（setup が作る）。
+tags:
+  - name: topic:メタデータ
+    main: true
+  - name: topic:タグ
+  - name: topic:cli

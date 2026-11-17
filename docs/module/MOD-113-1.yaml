@@ -1,0 +1,10 @@
+id: MOD-113-1
+title: 索引のサーバー / 本文のリンク
+lead: setup が関連の候補を作るときに、Markdown と YAML の本文のリンクとパスが指す配信元の中のファイルを取り出す本文のリンクの分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
+notes:
+  受け持つこと: ファイルを書き換えない。対象のファイルは `project-index files` と同じ判定（文書のストアの `indexable_files`）で選び、指す先の候補は文書のストアの `walk_files` で集め、共通の接頭辞をまとめた 1 つの正規表現で照合する（依存を増やさない）。関連の `type` は決めない（setup が決める）。
+tags:
+  - name: topic:関連
+    main: true
+  - name: topic:リンク
+  - name: topic:cli

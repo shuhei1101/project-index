@@ -1,0 +1,93 @@
+name: test
+
+on:
+  workflow_dispatch:
+    inputs:
+      layer:
+        description: 全件を回す層
+        type: choice
+        required: true
+        options:
+          - unit
+          - integration
+      paths:
+        description: 回す結合テストのファイルかフォルダを空白で区切って並べたもの（layer が integration のときだけ使用し、省くと全件）
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}-${{ inputs.layer }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON('{"unit":5,"integration":29}')[inputs.layer] }}
+    steps:
+      - name: ブランチを取得する
+        uses: actions/checkout@v7
+
+      - name: uv を入れる
+        uses: astral-sh/setup-uv@v10.3.3
+
+      - name: Python の依存を入れる
+        run: uv sync
+
+      - name: 層の全件を回す
+        env:
+          LAYER: ${{ inputs.layer }}
+          PATHS: ${{ inputs.paths }}
+        run: |
+          case "$LAYER" in
+            unit) limit=20 ;;
+            integration) limit=203 ;;
+          esac
+          : > test.log
+          # 回す範囲: paths を指定したときは結合テストの層の下のパスだけ、省いたときは層のフォルダの全件
+          targets="tests/$LAYER/"
+          if [ -n "$PATHS" ]; then
+            if [ "$LAYER" != integration ]; then
+              echo "paths は結合テストの層（integration）でだけ指定できる: layer=$LAYER" >> test.log
+              exit 1
+            fi
+            for p in $PATHS; do
+              case "$p" in
+                *..*|*,*|*\;*|*:*) echo "paths の値が層のフォルダの外か、空白以外の区切りを含む: $p" >> test.log; exit 1 ;;
+                tests/integration/*) ;;
+                *) echo "paths の値が層のフォルダの外: $p" >> test.log; exit 1 ;;
+              esac
+            done
+            targets="$PATHS"
+          fi
+          # pytest を裏で起動し、test.log の大きさが上限を超えて変わらなければ止める
+          PYTHONUNBUFFERED=1 setsid uv run pytest $targets -v >> test.log 2>&1 &
+          pid=$!
+          last=-1
+          idle=0
+          while kill -0 "$pid" 2> /dev/null; do
+            sleep 10
+            size=$(stat -c %s test.log)
+            if [ "$size" = "$last" ]; then
+              idle=$((idle + 10))
+            else
+              idle=0
+              last=$size
+            fi
+            if [ "$idle" -gt "$limit" ]; then
+              kill -- "-$pid"
+              echo "出力が ${limit} 秒変わらなかったため、pytest を止めた" >> test.log
+              exit 1
+            fi
+          done
+          wait "$pid"
+
+      - name: ログを成果物に上げる
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-log
+          path: test.log
+          if-no-files-found: ignore

@@ -1,0 +1,252 @@
+id: IF-113-2
+title: メタデータの偏りの一覧
+entry:
+  kind: operation
+  value: '`project-index skew`（CLI）'
+lead: 管理用の YAML の行と追加する行の案から、ほぼ同じ `description` の組・1 件だけのタグ・半数以上に付くタグを出す `project-index skew` の入出力を定め、メタデータの偏りの判定の基準を修正するときに参照する。
+identifier: skew
+permissions: 管理用の YAML を読める利用者
+idempotent: true
+side_effects: なし（ファイルを書き換えない）
+callers:
+  - SC-5#scenarios[正常シナリオ（仮のメタデータの偏りを見直す）]
+exclusivity: 読み取りだけで排他しない
+request:
+  - name: --files-yaml
+    type: list[str]
+    required: true
+    location: argument
+    description: 管理用の YAML のパス（`--root` からの相対か絶対パス）。繰り返して渡せる
+    notes: 渡した全ての管理用の YAML の行を 1 つのまとまりとして数える。行は `--root` からのパス（管理用の YAML のフォルダ + 行の `path`）で見分ける
+  - name: --draft
+    type: str
+    required: false
+    default: なし（管理用の YAML の行だけで数える）
+    location: argument
+    description: まだ記載していない行の案の JSON Lines のファイルのパス。1 行が `path`（`--root` からのパス）・`description`・`tags` を持つ
+    notes: 同じ `path` の行が管理用の YAML にあれば、案の値で置き換えて数える
+  - name: --root
+    type: str
+    required: true
+    location: argument
+    description: 配信元のフォルダのパス
+    notes: 入力の行の案の `path` と出力のパスは全て `--root` からのパス
+  - name: --only-draft
+    type: bool
+    required: false
+    default: false（全ての組を比べる）
+    location: argument
+    description: '`similar_descriptions` を、`--draft` の行を含む組だけにする'
+    notes: 2 回目以降の setup で、追加・見直した行を含まない組を再び出さない
+request_example: |-
+  ```bash
+  project-index skew --root ~/repo/sample --files-yaml docs/files.yaml --files-yaml src/files.yaml --draft /tmp/draft.jsonl
+  ```
+response:
+  - name: 標準出力
+    type: str
+    description: 1 つの JSON のオブジェクト
+    notes: '-'
+  - name: rows
+    type: int
+    description: 数えた行の数
+  - name: similar_descriptions[].paths
+    type: list[str]
+    description: ほぼ同じ `description` を持つ 2 行の `--root` からのパス
+    notes: 組は `similarity` の降順、同じ値はパスの昇順
+  - name: similar_descriptions[].similarity
+    type: float
+    description: 2 行の `description` の類似度（0〜1。小数第 3 位まで）
+  - name: singleton_tags[].tag
+    type: str
+    description: 1 行にだけ付いているタグ
+    notes: タグの昇順
+  - name: singleton_tags[].path
+    type: str
+    description: そのタグが付いた行の `--root` からのパス
+  - name: dominant_tags[].tag
+    type: str
+    description: 半数以上の行に付いているタグ。`singleton_tags` に出たタグは除く
+    notes: 付いた行の数の降順、同じ数はタグの昇順
+  - name: dominant_tags[].count
+    type: int
+    description: そのタグが付いた行の数
+  - name: 終了コード
+    type: int
+    description: 0 正常（偏りが無いときも 0）・2 `--root` がフォルダでないか、`--files-yaml` か `--draft` が無いか読めない
+    notes: '`project-index files` の引数の誤りと同じ値'
+response_example: |-
+  ```json
+  {"rows": 7, "similar_descriptions": [{"paths": ["a.md", "b.md"], "similarity": 0.938}], "singleton_tags": [{"tag": "topic:x", "path": "c.md"}], "dominant_tags": [{"tag": "topic:doc", "count": 7}]}
+  ```
+exceptions:
+  - name: なし（正常終了）
+    condition: 偏りを出し終えた（終了コード 0）
+  - name: InputNotFound
+    condition: '`--root` がフォルダでないか、`--files-yaml` か `--draft` のファイルが無いか、YAML・JSON Lines として読めない（終了コード 2）'
+    notes: 読めなかったパスと理由を stderr に出す
+constraints:
+  - item: 類似度
+    constraint: '`description` を NFKC・casefold にし、空白と記号を除いた文字列の、文字 bigram の Dice 係数'
+    notes: '-'
+  - item: ほぼ同じとみなすしきい値
+    constraint: 類似度が 0.9 以上
+    notes: 導いた記録は `docs/pr/113/しきい値の測定/README.md`（project-index で 251 行中 29 組、knowledge で 17 行中 0 組）
+  - item: 半数以上
+    constraint: タグが付いた行の数の 2 倍が、数えた行の数以上
+    notes: '-'
+  - item: 数えない行
+    constraint: '`description` を持たない行は類似度の比較から、`tags` を持たない行はタグの数から除く。`rows` には含める'
+    notes: '-'
+  - item: タグの書き方
+    constraint: '`tags` の要素が文字列でも `{name: ...}` のオブジェクトでも、名前で数える'
+    notes: 管理用の YAML のスキーマの両方の書き方
+  - item: 比べる組
+    constraint: '`--only-draft` を渡さないときは全ての組、渡したときは `--draft` の行を含む組'
+    notes: 所要時間は 6824 行の全ての組で約 17 秒、`--draft` 50 行 × 6824 行で約 0.3 秒（`docs/pr/113/しきい値の測定/README.md`。行の数は端末の配信元で最もファイルの多い ai-monitor の Git 管理のファイルの数）
+flows:
+  - name: 正常系
+    summary: 管理用の YAML と行の案から、偏りを 3 種類とも出す
+    setup:
+      - name: Mock
+        description: なし（`main(["skew", ...])` を同じプロセスで呼ぶ）
+      - name: 管理用の YAML
+        description: 6 行を持つ `files.yaml`。`a.md` と `b.md` の `description` は助詞 1 字だけが違い、`topic:x` は `c.md` だけに付き、`topic:doc` は 6 行全てに付く
+      - name: 行の案
+        description: '`g.md` の 1 行（`tags` に `topic:doc`）を持つ JSON Lines のファイル'
+        notes: '`--draft` に渡す'
+    flow: |-
+      <!-- map: {"title": "正常系"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index skew
+        participant F as 管理用の YAML と行の案
+
+        C->>M: --root {フォルダ} --files-yaml files.yaml --draft draft.jsonl
+        M-->>F: 行を読む
+        M->>M: description の類似度とタグの行の数を数える
+        M-->>C: 偏りの JSON（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`rows` が 7'
+      - '`similar_descriptions` が `a.md`・`b.md` の 1 組だけで、`similarity` が 0.9 以上'
+      - '`singleton_tags` が `topic:x`（`c.md`）の 1 件だけ'
+      - '`dominant_tags` が `topic:doc`（`count` が 7）の 1 件だけ'
+      - 終了コードが 0
+    test: test_normal
+  - name: 正常系（偏りが無い）
+    summary: 偏りが無いと、似た組と 1 件だけのタグを空で出す
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 管理用の YAML
+        description: '`description` が互いに似ていない 5 行を持ち、タグ `topic:a` を 2 行、`topic:b` を 2 行に付けた `files.yaml`'
+        notes: 2 行は 5 行の半数に満たない
+    flow: |-
+      <!-- map: {"title": "正常系（偏りが無い）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index skew
+
+        C->>M: --root {フォルダ} --files-yaml files.yaml
+        M-->>C: 偏りの JSON（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`similar_descriptions`・`singleton_tags`・`dominant_tags` が空'
+      - '`rows` が 5'
+      - 終了コードが 0
+    test: test_normal_when_no_skew
+  - name: 正常系（2 つの管理用の YAML が同じ path の行を持つ）
+    summary: 管理用の YAML ごとの相対パスが同じ行を、`--root` からのパスで別の行として出す
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 管理用の YAML
+        description: '`docs/files.yaml` と `src/files.yaml` が、どちらも `README.md` の 1 行を持つ。`docs/files.yaml` の行は `topic:d`、`src/files.yaml` の行は `topic:s` を持ち、`description` は似ていない'
+        notes: 2 つを `--files-yaml` に渡す
+    flow: |-
+      <!-- map: {"title": "正常系（2 つの管理用の YAML が同じ path の行を持つ）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index skew
+
+        C->>M: --root {フォルダ} --files-yaml docs/files.yaml --files-yaml src/files.yaml
+        M-->>C: 偏りの JSON（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`rows` が 2'
+      - '`singleton_tags` が `topic:d`（`docs/README.md`）と `topic:s`（`src/README.md`）の 2 件'
+      - '`dominant_tags` が空（`singleton_tags` に出たタグを除く）'
+      - 終了コードが 0
+    test: test_normal_when_same_path_in_files_yamls
+  - name: 正常系（行の案を含む組だけを比べる）
+    summary: '`--only-draft` を渡すと、行の案を含む組だけを `similar_descriptions` に出す'
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 管理用の YAML
+        description: '`a.md`・`b.md` の 2 行を持つ `files.yaml`。互いの `description` は助詞 1 字だけが違う'
+      - name: 行の案
+        description: '`a.md`・`b.md` と助詞 1 字だけが違う `description` を持つ `c.md` の 1 行'
+        notes: '`--draft` と `--only-draft` を渡す'
+    flow: |-
+      <!-- map: {"title": "正常系（行の案を含む組だけを比べる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index skew
+
+        C->>M: --root {フォルダ} --files-yaml files.yaml --draft draft.jsonl --only-draft
+        M-->>C: 偏りの JSON（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`similar_descriptions` が `a.md`・`c.md` と `b.md`・`c.md` の 2 組だけで、`a.md`・`b.md` の組を含まない'
+      - 終了コードが 0
+    test: test_normal_when_only_draft
+  - name: 異常系（管理用の YAML が無い・InputNotFound）
+    summary: '`--files-yaml` のファイルが無いと終了コード 2 で終える'
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 引数
+        description: '`--files-yaml` に存在しないパス'
+    flow: |-
+      <!-- map: {"title": "異常系（管理用の YAML が無い・InputNotFound）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index skew
+
+        C->>M: --root {フォルダ} --files-yaml {無いパス}
+        M-->>C: stderr に渡したパスと理由（終了コード 2）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 2
+      - 標準出力が空で、stderr に渡したパスがある
+    test: test_error_when_input_not_found
+test_file: tests/integration/server/test_skew.py
+aliases:
+  - project-index skew
+tags:
+  - name: topic:メタデータ
+    main: true
+  - name: topic:タグ
+  - name: topic:cli

@@ -359,7 +359,7 @@ functions:
       - name: test_unindexed_files_when_matching_exclusion
         case: 正常
         summary: 除外の条件に当たるファイルは数えない
-        condition: '`src/files.yaml`・`src/a.py`・`src/d.py`・空の `src/pkg/__init__.py`・`src/uv.lock`・`src/vendor/v.py` を置き、`body_paths` が `[src/a.py]`'
+        condition: '`src/files.yaml`・`src/a.py`・`src/d.py`・空の `src/pkg/__init__.py`・先頭に NUL バイトを持つ `src/logo.png`・`src/settings.local.json` を置き、`body_paths` が `[src/a.py]`'
         mock: なし（`tmp_path`）
         expected: '`["src/d.py"]`'
         exception: '-'

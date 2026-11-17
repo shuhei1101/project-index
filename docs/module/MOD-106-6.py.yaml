@@ -89,9 +89,9 @@ functions:
       - name: test_outline_files
         case: 正常
         summary: 載せるファイルだけを昇順で返す
-        condition: '`docs/b.md`・`docs/a.md`・`uv.lock` を置き、`paths=["**"]`'
+        condition: '`docs/b.md`・`docs/a.md` と、先頭に NUL バイトを持つ `logo.png` を置き、`paths=["**"]`'
         mock: なし（`tmp_path`）
-        expected: '`docs/a.md`・`docs/b.md` の 2 件の順で、`uv.lock` を含まない'
+        expected: '`docs/a.md`・`docs/b.md` の 2 件の順で、`logo.png` を含まない'
   - name: outline_file
     title: ファイルのアウトライン
     kind: 関数

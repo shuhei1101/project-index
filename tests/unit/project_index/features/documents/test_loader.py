@@ -492,10 +492,10 @@ def test_unindexed_files_when_matching_exclusion(
             "src/a.py": "a = 1\n",
             "src/d.py": "d = 4\n",
             "src/pkg/__init__.py": "",
-            "src/uv.lock": "version = 1\n",
-            "src/vendor/v.py": "v = 1\n",
+            "src/settings.local.json": "{}\n",
         },
     )
+    (tmp_path / "src/logo.png").write_bytes(b"\x00PNG\r\n")
     table = DocumentTable(
         id="src",
         paths=["src/files.yaml"],

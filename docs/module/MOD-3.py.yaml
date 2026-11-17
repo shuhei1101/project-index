@@ -37,6 +37,8 @@ functions:
          - `outline` を登録する。引数は `files` と同じ（`--root`・`--paths`・`--exclude`）で、`handler` は起動の『ファイルのアウトラインの実行』（`main.run_outline`）
          - `changed` を登録する。`--root`（必須）、`--files-yaml`（必須）を持ち、`handler` は起動の『中身が変わったファイルの一覧の実行』（`main.run_changed`）
          - `checkpoint` を登録する。`--root`（必須）、`--files-yaml`（必須）、`--reviewed`（`action="append"`、既定 `[]`）を持ち、`handler` は起動の『確認の時点の記録の実行』（`main.run_checkpoint`）
+         - `links` を登録する。引数は `files` と同じ（`--root`・`--paths`・`--exclude`）で、`handler` は起動の『本文が指すファイルの一覧の実行』（`main.run_links`）
+         - `skew` を登録する。`--root`（必須）、`--files-yaml`（必須・`action="append"`）、`--draft`（既定 `None`）、`--only-draft`（`store_true`）を持ち、`handler` は起動の『メタデータの偏りの一覧の実行』（`main.run_skew`）
          - `prompt-doc` を登録する。引数は持たず（標準入力を読む）、`handler` はプロンプトの文書の変換の『プロンプトの文書の変換の実行』（`features.prompt_doc.cli.run_prompt_doc`）
       4. 解析器を返す
     unit_tests:
@@ -94,6 +96,20 @@ functions:
         condition: '`["checkpoint", "--root", "/tmp/a", "--files-yaml", "files.yaml", "--reviewed", "a.md"]` を解析する'
         mock: なし
         expected: '`cmd` が `"checkpoint"`、`reviewed` が `["a.md"]`、`handler` が `project_index.main.run_checkpoint`'
+      - name: test_build_parser_when_links
+        case: 正常
+        summary: links の引数と処理を引く
+        condition: '`["links", "--root", "/tmp/a", "--paths", "docs/**"]` を解析する'
+        mock: なし
+        expected: '`cmd` が `"links"`、`paths` が `["docs/**"]`、`exclude` が `[]`、`handler` が `project_index.main.run_links`'
+        exception: '-'
+      - name: test_build_parser_when_skew
+        case: 正常
+        summary: skew の引数と処理を引く
+        condition: '`["skew", "--root", "/tmp/a", "--files-yaml", "docs/files.yaml", "--files-yaml", "src/files.yaml", "--only-draft"]` を解析する'
+        mock: なし
+        expected: '`cmd` が `"skew"`、`files_yaml` が `["docs/files.yaml", "src/files.yaml"]`、`draft` が `None`、`only_draft` が `True`、`handler` が `project_index.main.run_skew`'
+        exception: '-'
   - name: main
     title: 入口
     kind: 関数
@@ -145,4 +161,4 @@ functions:
         mock: なし
         expected: '`SystemExit` のコードが 2、標準エラーに `cmd` が要る旨が出る'
 notes:
-  サブコマンド: サブコマンドは `serve`・`migrate`・`files`・`outline`・`changed`・`checkpoint`・`prompt-doc` で、処理は起動の『待ち受けの開始』・『設定の移し替えの実行』・『載せるファイルの一覧の実行』・『ファイルのアウトラインの実行』・『中身が変わったファイルの一覧の実行』・『確認の時点の記録の実行』と、プロンプトの文書の変換の『プロンプトの文書の変換の実行』が持つ。`__main__.py` は `if __name__ == "__main__":` で `sys.exit(main())` を呼ぶ。
+  サブコマンド: サブコマンドは `serve`・`migrate`・`files`・`outline`・`changed`・`checkpoint`・`links`・`skew`・`prompt-doc` で、処理は起動の『待ち受けの開始』・『設定の移し替えの実行』・『載せるファイルの一覧の実行』・『ファイルのアウトラインの実行』・『中身が変わったファイルの一覧の実行』・『確認の時点の記録の実行』・『本文が指すファイルの一覧の実行』・『メタデータの偏りの一覧の実行』と、プロンプトの文書の変換の『プロンプトの文書の変換の実行』が持つ。`__main__.py` は `if __name__ == "__main__":` で `sys.exit(main())` を呼ぶ。
