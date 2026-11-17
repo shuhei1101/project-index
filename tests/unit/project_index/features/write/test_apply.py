@@ -803,3 +803,22 @@ def test_apply_operation_when_remove_then_add() -> None:
         ],
         "notes": ["a"],
     }
+
+
+def test_expand_array_keys_when_remove_then_add() -> None:
+    """同じ名前を remove_from と add_to に渡す（正常系）。"""
+    from project_index.features.write.apply import expand_array_keys
+
+    # 準備
+    current = {"tags": [{"name": "a", "main": True}, {"name": "b"}]}
+    operation = Operation(
+        op="update",
+        id="r1",
+        expected_version="v1",
+        remove_from={"tags": ["b"], "main_tags": ["a"]},
+        add_to={"tags": ["b"], "main_tags": ["a"]},
+    )
+    # 実行
+    result = expand_array_keys(operation, _tags_table(), current, index=0)
+    # 検証
+    assert result.set["tags"] == [{"name": "a", "main": True}, {"name": "b"}]
