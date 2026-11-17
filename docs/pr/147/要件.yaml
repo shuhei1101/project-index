@@ -1,0 +1,24 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: changed
+    detail: 起動の後の裏のリビジョンの書き出しの進め方を、利用者が開いた配信元の文書の一覧を待たせない進め方へ変える（正常シナリオ（default_ref のリビジョンを先に書き出す）の期待値）
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: changed
+    detail: 起動の直後、ほかの配信元の裏の書き出しの最中に配信元を開いても、文書の一覧がほかの配信元の書き出しを待たずに返ることを期待値に加える（正常シナリオ（裏の書き出しの最中に開く））
+    depends_on:
+      - docs/scenario/SC-4.yaml
+docs:
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: '`default_ref` の commit の裏の書き出しの説明（`exporting` の行と、再読み込みの後に裏で実行する処理の説明）を、新しい書き出しの進め方に合わせる'
+    status: todo
+scope_out:
+  - item: dev-docs の画面のサーバーが文書の一覧の問い合わせを打ち切る 45 秒の制限時間の見直し
+    reason: dev-docs の画面のサーバーの値で、project-index の変更ではない。依頼元の dev-docs#225（作業 PR dev-docs#262）が扱う
+    plan: none
+  - item: 書き出しが済んだ後の文書の一覧の応答時間（2〜6 秒）の短縮
+    reason: 要望は起動の直後の待ちに限る。書き出しが済んだ後の応答は本文の計測で数秒で返っている
+    plan: none
