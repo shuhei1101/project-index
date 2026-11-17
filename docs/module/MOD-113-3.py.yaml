@@ -103,7 +103,7 @@ functions:
         expected: '`design/x.yaml`・`docs/a.md` の 2 件の順で、`src/x.py`（コード）と `docs/b.md` を含まない'
         exception: '-'
     notes:
-      所要時間: ai-monitor の develop のワークツリー（候補のパス 8644 件・指す側 6258 件）で、正規表現の組み立て 0.14 秒・照合の全体 1.55 秒・最も大きい文書（82 万文字）で 0.009 秒。`docs/pr/113/しきい値の測定/README.md`
+      所要時間: ai-monitor の develop のワークツリー（候補のパス 8644 件・指す側 6258 件）で、正規表現の組み立て 0.14 秒・照合の全体 0.51 秒（ファイルが OS のキャッシュに無い初回は 1.55 秒。パスを並べた選択の正規表現では 385 秒）・最も大きい文書（82 万文字）で 0.009 秒。`docs/pr/113/しきい値の測定/README.md`
   - name: file_links
     title: ファイルの指す先
     kind: 関数
