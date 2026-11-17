@@ -371,7 +371,10 @@ scenarios:
 
         PI->>SRC: 裏で slow を読み込み始める（包みの git が待たせる）
         DD->>PI: 配信元の一覧と状態を取得する
-        PI-->>DD: slow は読み込み中、sample は読み込み中か配信中
+        PI-->>DD: slow は読み込み中
+        PI->>PI: slow の読み込みを待たずに sample を読み込む
+        DD->>PI: sample が配信中になるまで、配信元の一覧と状態を繰り返し取得する
+        PI-->>DD: slow は読み込み中、sample は配信中
         DD->>PI: sample の文書の一覧を取得する
         PI-->>DD: 文書の一覧
         SRC->>SRC: テストが一時ファイルを配置し、包みの git が本物の git を呼ぶ
@@ -380,7 +383,7 @@ scenarios:
       ```
     expected:
       - slow の読み込みが終わる前の配信元の一覧の取得が、slow の読み込みを待たずに 2 秒以内に 200 を返却し、slow を読み込み中として端末の設定の順に並べる
-      - slow の読み込みが終わる前でも、sample の文書の一覧の取得が 200 を返却する
+      - slow の読み込みが終わる前に、配信元の一覧が sample を配信中として返却し、sample の文書の一覧の取得が 200 を返却する
       - slow の読み込みが終わった後の配信元の一覧の取得が、slow と sample を配信中として返却する
     test: test_normal_when_listed_right_after_start
 lead: dev-docs の画面のサーバーが読み取り API で配信元と文書を取得するシナリオを定め、画面のサーバーからの読み取りの流れを変えるときに参照する。
