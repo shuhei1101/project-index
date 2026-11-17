@@ -1,0 +1,635 @@
+# 単体テスト（Red）: テストコードの commit 51b1a25
+
+## ランナー（TP-1 の run_runner）
+
+$ gh workflow run test.yml --ref bug/read/docs-list-load-latency -f layer=unit （run_runner のとおり）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 1241 items / 3 errors
+
+==================================== ERRORS ====================================
+_ ERROR collecting tests/unit/project_index/features/documents/test_indexable.py _
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/documents/test_indexable.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/documents/test_indexable.py:5: in <module>
+    from project_index.features.documents.indexable import (
+E   ImportError: cannot import name 'is_walked' from 'project_index.features.documents.indexable' (/home/runner/work/project-index/project-index/src/project_index/features/documents/indexable.py)
+___ ERROR collecting tests/unit/project_index/features/history/test_blob.py ____
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/history/test_blob.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/history/test_blob.py:6: in <module>
+    from project_index.features.history.blob import BlobReader
+E   ModuleNotFoundError: No module named 'project_index.features.history.blob'
+_______ ERROR collecting tests/unit/project_index/shared/test_yaml_io.py _______
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/shared/test_yaml_io.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/shared/test_yaml_io.py:10: in <module>
+    from project_index.shared.yaml_io import (
+E   ImportError: cannot import name 'c_loader_available' from 'project_index.shared.yaml_io' (/home/runner/work/project-index/project-index/src/project_index/shared/yaml_io.py)
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/documents/test_indexable.py
+ERROR tests/unit/project_index/features/history/test_blob.py
+ERROR tests/unit/project_index/shared/test_yaml_io.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!!
+============================== 3 errors in 2.41s ===============================
+exit=1
+
+## 手元（collection の誤りで止めずに全件を回す）
+
+ランナーは import の誤り 3 件で collection を止めたため、同じ commit の detached worktree で、collection の誤りの後も続けて全件を回した。
+tests/unit/plugins/project_index/hooks/test_session_start.py::test_start_server は今回の変更の対象外（プラグインのフック）の失敗で、実装の後の全件実行で確かめ直す。
+
+$ uv run pytest tests/unit/ --continue-on-collection-errors -q -p no:cacheprovider --basetemp=/tmp/pr171-basetemp-XXXX
+....................F................................................... [  5%]
+........................................................................ [ 11%]
+........................................................................ [ 17%]
+........................................................................ [ 23%]
+........................................................................ [ 29%]
+......................FFFF.............................................. [ 34%]
+........................................................................ [ 40%]
+........................................................................ [ 46%]
+........................................................................ [ 52%]
+........................................................................ [ 58%]
+........................................................................ [ 63%]
+...F.......F............................................................ [ 69%]
+....FF.................................................................. [ 75%]
+........................................................................ [ 81%]
+........................................................................ [ 87%]
+.........................................................FEFE........... [ 92%]
+........................................................................ [ 98%]
+...................                                                      [100%]
+==================================== ERRORS ====================================
+_ ERROR collecting tests/unit/project_index/features/documents/test_indexable.py _
+ImportError while importing test module '/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/tests/unit/project_index/features/documents/test_indexable.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/documents/test_indexable.py:5: in <module>
+    from project_index.features.documents.indexable import (
+E   ImportError: cannot import name 'is_walked' from 'project_index.features.documents.indexable' (/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/src/project_index/features/documents/indexable.py)
+___ ERROR collecting tests/unit/project_index/features/history/test_blob.py ____
+ImportError while importing test module '/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/tests/unit/project_index/features/history/test_blob.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/history/test_blob.py:6: in <module>
+    from project_index.features.history.blob import BlobReader
+E   ModuleNotFoundError: No module named 'project_index.features.history.blob'
+_______ ERROR collecting tests/unit/project_index/shared/test_yaml_io.py _______
+ImportError while importing test module '/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/tests/unit/project_index/shared/test_yaml_io.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/shared/test_yaml_io.py:10: in <module>
+    from project_index.shared.yaml_io import (
+E   ImportError: cannot import name 'c_loader_available' from 'project_index.shared.yaml_io' (/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/src/project_index/shared/yaml_io.py)
+________ ERROR at teardown of test_background_gate_yield_unit_when_idle ________
+  + Exception Group Traceback (most recent call last):
+  |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/_pytest/runner.py", line 361, in from_call
+  |     result: TResult | None = func()
+  |                              ~~~~^^
+  |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/_pytest/runner.py", line 250, in <lambda>
+  |     lambda: runtest_hook(item=item, **kwds),
+  |             ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/pluggy/_caller.py", line 197, in __call__
+  |     return self._hookexec(
+  |            ~~~~~~~~~~~~~~^
+  |         self.name, self._hookimpls.copy(), call_kwargs, firstresult
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |     )
+  |     ^
+  |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/pluggy/_manager.py", line 183, in _hookexec
+  |     return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+  |            ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/_pytest/logging.py", line 886, in pytest_runtest_teardown
+  |     yield
+  |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/_pytest/capture.py", line 911, in pytest_runtest_teardown
+  |     return (yield)
+  |             ^^^^^
+  |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/_pytest/threadexception.py", line 148, in pytest_runtest_teardown
+  |     collect_thread_exception(item.config)
+  |     ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/_pytest/threadexception.py", line 68, in collect_thread_exception
+  |     raise ExceptionGroup("multiple thread exception warnings", errors)
+  | ExceptionGroup: multiple thread exception warnings (2 sub-exceptions)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/tests/unit/project_index/shared/test_background.py", line 200, in work
+    |     with gate.background(), gate.yield_unit():
+    |                             ^^^^^^^^^^^^^^^
+    | AttributeError: 'BackgroundGate' object has no attribute 'yield_unit'
+    | 
+    | The above exception was the direct cause of the following exception:
+    | 
+    | Traceback (most recent call last):
+    |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/_pytest/threadexception.py", line 54, in collect_thread_exception
+    |     warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+    |     ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    | pytest.PytestUnhandledThreadExceptionWarning: Exception in thread Thread-141 (work)
+    | Enable tracemalloc to get traceback where the object was allocated.
+    | See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    +---------------- 2 ----------------
+    | Traceback (most recent call last):
+    |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/tests/unit/project_index/shared/test_background.py", line 200, in work
+    |     with gate.background(), gate.yield_unit():
+    |                             ^^^^^^^^^^^^^^^
+    | AttributeError: 'BackgroundGate' object has no attribute 'yield_unit'
+    | 
+    | The above exception was the direct cause of the following exception:
+    | 
+    | Traceback (most recent call last):
+    |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/_pytest/threadexception.py", line 54, in collect_thread_exception
+    |     warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+    |     ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    | pytest.PytestUnhandledThreadExceptionWarning: Exception in thread Thread-140 (work)
+    | Enable tracemalloc to get traceback where the object was allocated.
+    | See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    +------------------------------------
+_ ERROR at teardown of test_background_gate_yield_unit_when_foreground_active __
+  + Exception Group Traceback (most recent call last):
+  |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/_pytest/runner.py", line 361, in from_call
+  |     result: TResult | None = func()
+  |                              ~~~~^^
+  |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/_pytest/runner.py", line 250, in <lambda>
+  |     lambda: runtest_hook(item=item, **kwds),
+  |             ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/pluggy/_caller.py", line 197, in __call__
+  |     return self._hookexec(
+  |            ~~~~~~~~~~~~~~^
+  |         self.name, self._hookimpls.copy(), call_kwargs, firstresult
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |     )
+  |     ^
+  |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/pluggy/_manager.py", line 183, in _hookexec
+  |     return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+  |            ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/_pytest/logging.py", line 886, in pytest_runtest_teardown
+  |     yield
+  |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/_pytest/capture.py", line 911, in pytest_runtest_teardown
+  |     return (yield)
+  |             ^^^^^
+  |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/_pytest/threadexception.py", line 148, in pytest_runtest_teardown
+  |     collect_thread_exception(item.config)
+  |     ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/_pytest/threadexception.py", line 68, in collect_thread_exception
+  |     raise ExceptionGroup("multiple thread exception warnings", errors)
+  | ExceptionGroup: multiple thread exception warnings (2 sub-exceptions)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/tests/unit/project_index/shared/test_background.py", line 227, in work
+    |     with gate.yield_unit():
+    |          ^^^^^^^^^^^^^^^
+    | AttributeError: 'BackgroundGate' object has no attribute 'yield_unit'
+    | 
+    | The above exception was the direct cause of the following exception:
+    | 
+    | Traceback (most recent call last):
+    |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/_pytest/threadexception.py", line 54, in collect_thread_exception
+    |     warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+    |     ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    | pytest.PytestUnhandledThreadExceptionWarning: Exception in thread Thread-143 (work)
+    | Enable tracemalloc to get traceback where the object was allocated.
+    | See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    +---------------- 2 ----------------
+    | Traceback (most recent call last):
+    |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/tests/unit/project_index/shared/test_background.py", line 227, in work
+    |     with gate.yield_unit():
+    |          ^^^^^^^^^^^^^^^
+    | AttributeError: 'BackgroundGate' object has no attribute 'yield_unit'
+    | 
+    | The above exception was the direct cause of the following exception:
+    | 
+    | Traceback (most recent call last):
+    |   File "/home/shuhei2441/repo/project-index/.claude/worktrees/pr171-red/.venv/lib/python3.14/site-packages/_pytest/threadexception.py", line 54, in collect_thread_exception
+    |     warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+    |     ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    | pytest.PytestUnhandledThreadExceptionWarning: Exception in thread Thread-142 (work)
+    | Enable tracemalloc to get traceback where the object was allocated.
+    | See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    +------------------------------------
+=================================== FAILURES ===================================
+______________________________ test_start_server _______________________________
+
+load_hook = <function load_hook.<locals>._load at 0x79d83e4116f0>
+tmp_path = PosixPath('/tmp/pr171-basetemp-cXGt/test_start_server0')
+
+    @pytest.mark.filterwarnings("ignore:subprocess .* is still running:ResourceWarning")
+    def test_start_server(load_hook: Callable[[str], ModuleType], tmp_path: Path) -> None:
+        """切り離して起動する（正常系）。"""
+        # 準備
+        hook = load_hook("session_start")
+        clone = tmp_path / "clone"
+        python = clone / ".venv" / "bin" / "python"
+        python.parent.mkdir(parents=True)
+        record = tmp_path / "args.txt"
+        python.write_text(f'#!/bin/sh\necho "$@" > "{record}"\n', encoding="utf-8")
+        python.chmod(0o755)
+        # 実行
+        hook.start_server(clone)
+        # 検証
+        deadline = time.monotonic() + 5
+        while not record.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+>       assert record.read_text(encoding="utf-8").strip() == "-m project_index serve"
+E       AssertionError: assert '' == '-m project_index serve'
+E         
+E         - -m project_index serve
+
+tests/unit/plugins/project_index/hooks/test_session_start.py:330: AssertionError
+___________________ test_document_store_load_when_from_blobs ___________________
+
+tmp_path = PosixPath('/tmp/pr171-basetemp-cXGt/test_document_store_load_when_17')
+git_repo = <function git_repo.<locals>._create at 0x79d83e6d71c0>
+run_git = <function run_git.<locals>._run at 0x79d83e6d54e0>
+make_source_config = <function make_source_config.<locals>._make at 0x79d83e6d6cf0>
+make_served_source = <function make_served_source.<locals>._make at 0x79d83e6d7060>
+make_target = <function make_target.<locals>._make at 0x79d83e6d6fb0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x79d83cee1a90>
+
+    def test_document_store_load_when_from_blobs(
+        tmp_path: Path,
+        git_repo: Callable[..., Path],
+        run_git: Callable[..., str],
+        make_source_config: Callable[..., SourceConfig],
+        make_served_source: Callable[..., ServedSource],
+        make_target: Callable[..., Target],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """書き出さずに commit の blob から読む（正常系）。"""
+        # 準備
+        root = git_repo(
+            {
+                "rules/a.yaml": "id: a\nname: A\n",
+                "notes/files.yaml": "files:\n  - path: x.md\n",
+                "notes/x.md": "# X\n",
+            },
+            date=OCT_01,
+        )
+        first = run_git(root, "rev-parse", "HEAD").strip()
+        source = make_served_source(
+            root=root,
+            is_git=True,
+            repo_root=root,
+            config=make_source_config(documents=[RULES_TABLE, NOTES_TABLE], default_ref="develop"),
+        )
+        target = make_target(source, ref="develop", commit=first)
+        checkouts = _recording_checkout(monkeypatch)
+        from_blobs = DocumentStore(SnapshotStore(tmp_path / "snapshots-blobs"))
+        exported = DocumentStore(SnapshotStore(tmp_path / "snapshots-export"))
+        # 実行
+>       blobs_result = from_blobs.load(target, from_blobs=True)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: DocumentStore.load() got an unexpected keyword argument 'from_blobs'
+
+tests/unit/project_index/features/documents/test_store.py:1834: TypeError
+_______________ test_document_store_load_when_from_blobs_symlink _______________
+
+tmp_path = PosixPath('/tmp/pr171-basetemp-cXGt/test_document_store_load_when_18')
+git_repo = <function git_repo.<locals>._create at 0x79d83e6e4040>
+run_git = <function run_git.<locals>._run at 0x79d83e6d7690>
+make_source_config = <function make_source_config.<locals>._make at 0x79d83e6e43b0>
+make_served_source = <function make_served_source.<locals>._make at 0x79d83e6e4720>
+make_target = <function make_target.<locals>._make at 0x79d83e6e4300>
+
+    def test_document_store_load_when_from_blobs_symlink(
+        tmp_path: Path,
+        git_repo: Callable[..., Path],
+        run_git: Callable[..., str],
+        make_source_config: Callable[..., SourceConfig],
+        make_served_source: Callable[..., ServedSource],
+        make_target: Callable[..., Target],
+    ) -> None:
+        """シンボリックリンクは書き出しと同じくリンク先の内容で読む（正常系）。"""
+        # 準備
+        root = git_repo({"rules/a.yaml": "name: A\n"})
+        os.symlink("a.yaml", root / "rules" / "b.yaml")
+        os.symlink("missing.yaml", root / "rules" / "c.yaml")
+        run_git(root, "add", "-A")
+        run_git(root, "commit", "-m", "links")
+        commit = run_git(root, "rev-parse", "HEAD").strip()
+        source = _git_source(root, root, make_source_config, make_served_source)
+        target = make_target(source, ref="develop", commit=commit)
+        from_blobs = DocumentStore(SnapshotStore(tmp_path / "snapshots-blobs"))
+        exported = DocumentStore(SnapshotStore(tmp_path / "snapshots-export"))
+        # 実行
+>       blobs_result = from_blobs.load(target, from_blobs=True)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: DocumentStore.load() got an unexpected keyword argument 'from_blobs'
+
+tests/unit/project_index/features/documents/test_store.py:1867: TypeError
+______________ test_document_store_load_when_from_blobs_not_utf8 _______________
+
+tmp_path = PosixPath('/tmp/pr171-basetemp-cXGt/test_document_store_load_when_19')
+git_repo = <function git_repo.<locals>._create at 0x79d83e6f8eb0>
+run_git = <function run_git.<locals>._run at 0x79d83e6e47d0>
+make_source_config = <function make_source_config.<locals>._make at 0x79d83e6fa820>
+make_served_source = <function make_served_source.<locals>._make at 0x79d83e6f8670>
+make_target = <function make_target.<locals>._make at 0x79d83e6fb1c0>
+
+    def test_document_store_load_when_from_blobs_not_utf8(
+        tmp_path: Path,
+        git_repo: Callable[..., Path],
+        run_git: Callable[..., str],
+        make_source_config: Callable[..., SourceConfig],
+        make_served_source: Callable[..., ServedSource],
+        make_target: Callable[..., Target],
+    ) -> None:
+        """UTF-8 で読めないファイル（正常系）。"""
+        # 準備
+        root = git_repo({"rules/a.yaml": "id: a\n"})
+        (root / "rules" / "x.yaml").write_bytes("name: 日本\n".encode("shift_jis"))
+        run_git(root, "add", "-A")
+        run_git(root, "commit", "-m", "sjis")
+        commit = run_git(root, "rev-parse", "HEAD").strip()
+        source = _git_source(root, root, make_source_config, make_served_source)
+        store = DocumentStore(SnapshotStore(tmp_path / "snapshots"))
+        # 実行
+>       result = store.load(make_target(source, ref="develop", commit=commit), from_blobs=True)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: DocumentStore.load() got an unexpected keyword argument 'from_blobs'
+
+tests/unit/project_index/features/documents/test_store.py:1898: TypeError
+________________ test_document_store_load_when_collected_reused ________________
+
+git_repo = <function git_repo.<locals>._create at 0x79d83e6fb320>
+run_git = <function run_git.<locals>._run at 0x79d83e6f89e0>
+commit_all = <function commit_all.<locals>._commit at 0x79d83e6fb690>
+make_source_config = <function make_source_config.<locals>._make at 0x79d83e6fbb60>
+make_served_source = <function make_served_source.<locals>._make at 0x79d83e6fbe20>
+make_target = <function make_target.<locals>._make at 0x79d83e51c250>
+document_store = <project_index.features.documents.store.DocumentStore object at 0x79d83d239fd0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x79d83eb03d20>
+
+    def test_document_store_load_when_collected_reused(
+        git_repo: Callable[..., Path],
+        run_git: Callable[..., str],
+        commit_all: Callable[..., str],
+        make_source_config: Callable[..., SourceConfig],
+        make_served_source: Callable[..., ServedSource],
+        make_target: Callable[..., Target],
+        document_store: DocumentStore,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """同じ commit の 2 回目は集め直さない（正常系）。"""
+        # 準備
+        root = git_repo({"rules/a.yaml": "id: a\n", "rules/b.yaml": "id: b\n"})
+        first = run_git(root, "rev-parse", "HEAD").strip()
+        second = commit_all(root, {"rules/c.yaml": "id: c\n"})
+        source = _git_source(root, root, make_source_config, make_served_source)
+        calls = _recording_collect_files(monkeypatch)
+>       first_result = document_store.load(
+            make_target(source, ref="develop", commit=first), from_blobs=True
+        )
+E       TypeError: DocumentStore.load() got an unexpected keyword argument 'from_blobs'
+
+tests/unit/project_index/features/documents/test_store.py:1922: TypeError
+_____________________ test_source_registry_load_when_gated _____________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x79d83c1d19b0>
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x79d83c1862a0>
+make_entry = <function make_entry.<locals>._make at 0x79d83c186350>
+make_served_source = <function make_served_source.<locals>._make at 0x79d83c1868d0>
+make_status = <function make_status.<locals>._make at 0x79d83c185900>
+
+    def test_source_registry_load_when_gated(
+        monkeypatch: pytest.MonkeyPatch,
+        make_terminal_config: Callable[..., TerminalConfig],
+        make_entry: Callable[..., SourceEntry],
+        make_served_source: Callable[..., ServedSource],
+        make_status: Callable[..., SourceStatus],
+    ) -> None:
+        """要求が待っていない行だけを関所で休ませる（正常系）。"""
+        # 準備
+        slept: list[float] = []
+        gate = BackgroundGate(sleep=slept.append)
+        waiting = threading.Event()
+        gated_loader = _UnitLoader(gate, make_served_source, make_status, hold={"a": waiting})
+>       registry = SourceRegistry(loading=True, on_waiting=waiting.set, gate=gate)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: SourceRegistry.__init__() got an unexpected keyword argument 'gate'
+
+tests/unit/project_index/features/sources/test_registry.py:1174: TypeError
+_______________________ test_read_schema_ref_when_cached _______________________
+
+schemas_repo = PosixPath('/tmp/pr171-basetemp-cXGt/test_read_schema_ref_when_cach0/schemas')
+commit_all = <function commit_all.<locals>._commit at 0x79d83c184bf0>
+run_git = <function run_git.<locals>._run at 0x79d83c187480>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x79d82f771b00>
+
+    def test_read_schema_ref_when_cached(
+        schemas_repo: Path,
+        commit_all: Callable[..., str],
+        run_git: Callable[..., str],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """同じ commit の 2 回目は読み直さない（正常系）。"""
+        # 準備
+        calls: list[str] = []
+        real = schema_ref_module.read_file_at
+    
+        def recording(repo: Path, commit: str, path: str) -> Any:
+            calls.append(path)
+            return real(repo, commit, path)
+    
+        monkeypatch.setattr(schema_ref_module, "read_file_at", recording)
+        lookup = _lookup({"schemas": schemas_repo / "project-index.yaml"})
+        tag_ref = SchemaRef(source="schemas", path="schemas/note.schema.yaml", ref="v1")
+        branch_ref = SchemaRef(source="schemas", path="schemas/note.schema.yaml", ref="develop")
+        first_tag = read_schema_ref(tag_ref, lookup=lookup)
+        calls.clear()
+        # 実行
+        second_tag = read_schema_ref(tag_ref, lookup=lookup)
+        tag_calls = list(calls)
+        read_schema_ref(branch_ref, lookup=lookup)
+        moved = commit_all(schemas_repo, {"schemas/note.schema.yaml": "title: moved\ntype: object\n"})
+        after_move = read_schema_ref(branch_ref, lookup=lookup)
+        # 検証
+>       assert tag_calls == []
+E       AssertionError: assert ['schemas/not....schema.yaml'] == []
+E         
+E         Left contains 2 more items, first extra item: 'schemas/note.schema.yaml'
+E         Use -v to get more diff
+
+tests/unit/project_index/features/sources/test_schema_ref.py:205: AssertionError
+__________________________ test_load_source_when_unit __________________________
+
+tmp_path = PosixPath('/tmp/pr171-basetemp-cXGt/test_load_source_when_unit0')
+write_files = <function write_files.<locals>._write at 0x79d83c149e80>
+make_entry = <function make_entry.<locals>._make at 0x79d83c149bc0>
+
+    def test_load_source_when_unit(
+        tmp_path: Path,
+        write_files: Callable[[Path, dict[str, str]], None],
+        make_entry: Callable[..., SourceEntry],
+    ) -> None:
+        """文書の行ごとのスキーマの確かめと読み込みを 1 件ずつ包む（正常系）。"""
+        # 準備
+        config = (
+            "name: units\n"
+            "documents:\n"
+            "  - id: a\n    paths: [a/*.yaml]\n    schema: schemas/a.schema.yaml\n"
+            "  - id: b\n    paths: [b/*.yaml]\n    schema: schemas/b.schema.yaml\n"
+            "  - id: c\n    paths: [c/*.yaml]\n    schema: schemas/c.schema.yaml\n"
+        )
+        root = tmp_path / "units"
+        write_files(
+            root,
+            {
+                "project-index.yaml": config,
+                "schemas/a.schema.yaml": "title: a\ntype: object\n",
+                "schemas/b.schema.yaml": "title: b\ntype: object\n",
+                "schemas/c.schema.yaml": "title: c\ntype: object\n",
+            },
+        )
+        entry = make_entry(str(root / "project-index.yaml"))
+        entered: list[str] = []
+    
+        @contextlib.contextmanager
+        def unit() -> Iterator[None]:
+            entered.append("unit")
+            yield
+    
+        plain, _ = load_source(entry, index=0)
+        # 実行
+>       served, status = load_source(entry, index=0, unit=unit)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: load_source() got an unexpected keyword argument 'unit'
+
+tests/unit/project_index/features/sources/test_service.py:1323: TypeError
+_____________ test_validate_source_config_when_schema_checked_once _____________
+
+tmp_path = PosixPath('/tmp/pr171-basetemp-cXGt/test_validate_source_config_wh15')
+write_files = <function write_files.<locals>._write at 0x79d83c148b40>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x79d83e4de270>
+
+    def test_validate_source_config_when_schema_checked_once(
+        tmp_path: Path,
+        write_files: Callable[[Path, dict[str, str]], None],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """同じ内容のスキーマの検査を使い回す（正常系）。"""
+        # 準備
+        root = tmp_path / "root"
+        valid = "title: checked-once-valid\ntype: object\n"
+        broken = "title: checked-once-broken\ntype: 1\n"
+        write_files(
+            root,
+            {
+                "schemas/a.schema.yaml": valid,
+                "schemas/b.schema.yaml": valid,
+                "schemas/c.schema.yaml": broken,
+                "schemas/d.schema.yaml": broken,
+            },
+        )
+        value = _config_value(
+            documents=[
+                {"id": "a", "paths": ["a/*.yaml"], "schema": "schemas/a.schema.yaml"},
+                {"id": "b", "paths": ["b/*.yaml"], "schema": "schemas/b.schema.yaml"},
+                {"id": "c", "paths": ["c/*.yaml"], "schema": "schemas/c.schema.yaml"},
+                {"id": "d", "paths": ["d/*.yaml"], "schema": "schemas/d.schema.yaml"},
+            ]
+        )
+        calls: list[object] = []
+        real = Draft202012Validator.check_schema
+    
+        def counting(cls: type[Draft202012Validator], schema: Any, **kwargs: Any) -> None:
+            calls.append(schema)
+            real(schema, **kwargs)
+    
+        monkeypatch.setattr(Draft202012Validator, "check_schema", classmethod(counting))
+        # 実行
+        first = validate_source_config(value, root=root)
+        second = validate_source_config(value, root=root)
+        # 検証
+>       assert len(calls) == 2
+E       AssertionError: assert 8 == 2
+E        +  where 8 = len([{'title': 'checked-once-valid', 'type': 'object'}, {'title': 'checked-once-valid', 'type': 'object'}, {'title': 'chec... 'type': 1}, {'title': 'checked-once-valid', 'type': 'object'}, {'title': 'checked-once-valid', 'type': 'object'}, ...])
+
+tests/unit/project_index/features/sources/test_service.py:1371: AssertionError
+__________________ test_background_gate_yield_unit_when_idle ___________________
+
+    def test_background_gate_yield_unit_when_idle() -> None:
+        """応答中でなければ 2 本の 1 件が重なって進む（正常系）。"""
+        # 準備
+        gate, _, slept = _gate()
+        both_inside = threading.Barrier(2, timeout=5)
+        finished: list[str] = []
+    
+        def work(name: str) -> None:
+            with gate.background(), gate.yield_unit():
+                both_inside.wait()
+                finished.append(name)
+    
+        threads = [threading.Thread(target=work, args=(name,)) for name in ("x", "y")]
+        # 実行
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+        # 検証
+>       assert sorted(finished) == ["x", "y"]
+E       AssertionError: assert [] == ['x', 'y']
+E         
+E         Right contains 2 more items, first extra item: 'x'
+E         Use -v to get more diff
+
+tests/unit/project_index/shared/test_background.py:211: AssertionError
+____________ test_background_gate_yield_unit_when_foreground_active ____________
+
+    def test_background_gate_yield_unit_when_foreground_active() -> None:
+        """応答中は 1 件ずつにして休む（正常系）。"""
+        # 準備
+        gate, clock, slept = _gate()
+        running = 0
+        seen: list[int] = []
+        lock = threading.Lock()
+    
+        def work() -> None:
+            nonlocal running
+            with gate.background():
+                for _ in range(3):
+                    with gate.yield_unit():
+                        with lock:
+                            running += 1
+                            seen.append(running)
+                            clock.advance(1.0)
+                        threading.Event().wait(0.001)
+                        with lock:
+                            running -= 1
+    
+        threads = [threading.Thread(target=work) for _ in range(2)]
+        # 実行
+        with gate.foreground():
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=10)
+        # 検証
+>       assert max(seen) == 1
+               ^^^^^^^^^
+E       ValueError: max() iterable argument is empty
+
+tests/unit/project_index/shared/test_background.py:244: ValueError
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/documents/test_indexable.py
+ERROR tests/unit/project_index/features/history/test_blob.py
+ERROR tests/unit/project_index/shared/test_yaml_io.py
+ERROR tests/unit/project_index/shared/test_background.py::test_background_gate_yield_unit_when_idle
+ERROR tests/unit/project_index/shared/test_background.py::test_background_gate_yield_unit_when_foreground_active
+FAILED tests/unit/plugins/project_index/hooks/test_session_start.py::test_start_server
+FAILED tests/unit/project_index/features/documents/test_store.py::test_document_store_load_when_from_blobs
+FAILED tests/unit/project_index/features/documents/test_store.py::test_document_store_load_when_from_blobs_symlink
+FAILED tests/unit/project_index/features/documents/test_store.py::test_document_store_load_when_from_blobs_not_utf8
+FAILED tests/unit/project_index/features/documents/test_store.py::test_document_store_load_when_collected_reused
+FAILED tests/unit/project_index/features/sources/test_registry.py::test_source_registry_load_when_gated
+FAILED tests/unit/project_index/features/sources/test_schema_ref.py::test_read_schema_ref_when_cached
+FAILED tests/unit/project_index/features/sources/test_service.py::test_load_source_when_unit
+FAILED tests/unit/project_index/features/sources/test_service.py::test_validate_source_config_when_schema_checked_once
+FAILED tests/unit/project_index/shared/test_background.py::test_background_gate_yield_unit_when_idle
+FAILED tests/unit/project_index/shared/test_background.py::test_background_gate_yield_unit_when_foreground_active
+11 failed, 1230 passed, 5 errors in 36.45s
+exit=1
