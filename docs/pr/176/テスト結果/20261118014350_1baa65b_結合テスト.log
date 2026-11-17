@@ -1,0 +1,21 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=integration -f paths="tests/integration/server/test_write_docs.py::test_normal_when_schema_ref_changed_in_worktree tests/integration/server/test_search_docs.py::test_normal_when_worktree_metadata_changed tests/integration/server/test_trace_related.py::test_normal_when_worktree_metadata_changed tests/integration/server/test_search_docs.py::test_normal_when_worktree tests/integration/server/test_search_docs.py::test_normal_when_worktree_adds_row tests/integration/server/test_search_docs.py::test_normal_when_new_worktree tests/integration/server/test_write_docs.py::test_normal_when_kind_added_in_worktree" | grep -o 'https://[^ ]*/actions/runs/[0-9]*') && run_id=${run_url##*/} && (n=0; until gh api "repos/{owner}/{repo}/actions/runs/$run_id?exclude_pull_requests=true" > /dev/null 2>&1; do n=$((n+1)); if [ $n -ge 10 ]; then echo "実行 $run_id を 10 秒参照できません" >&2; exit 1; fi; sleep 1; done) && (rc=0; gh run watch "$run_id" --exit-status > /dev/null || rc=1; if gh run download "$run_id" -n test-log -D "/tmp/test-log-$run_id"; then cat "/tmp/test-log-$run_id/test.log"; else gh run view "$run_id" --log-failed; fi; exit $rc)
+# 回した commit: ad2d1ca（テストコードの最後の commit 1baa65b の後は docs/pr/176/ だけを変えている）
+
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 7 items
+
+tests/integration/server/test_write_docs.py::test_normal_when_schema_ref_changed_in_worktree PASSED [ 14%]
+tests/integration/server/test_search_docs.py::test_normal_when_worktree_metadata_changed PASSED [ 28%]
+tests/integration/server/test_trace_related.py::test_normal_when_worktree_metadata_changed PASSED [ 42%]
+tests/integration/server/test_search_docs.py::test_normal_when_worktree PASSED [ 57%]
+tests/integration/server/test_search_docs.py::test_normal_when_worktree_adds_row PASSED [ 71%]
+tests/integration/server/test_search_docs.py::test_normal_when_new_worktree PASSED [ 85%]
+tests/integration/server/test_write_docs.py::test_normal_when_kind_added_in_worktree PASSED [100%]
+
+============================== 7 passed in 3.10s ===============================
+exit=0
