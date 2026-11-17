@@ -265,8 +265,8 @@ functions:
     thread_safe: true
     returns:
       type: bool
-      description: '`ruamel.yaml.cyaml` の C の解析（`CParser`）を import できれば `True`'
-    process: 1. `ruamel.yaml.cyaml` の `CParser` を import し、`ImportError` なら `False`、それ以外は `True` を返す
+      description: '`YAML(typ="safe", pure=False).Parser` が C の解析（`ruamel.yaml.cyaml.CParser`）なら `True`'
+    process: 1. `YAML(typ="safe", pure=False)` を作り、`Parser` が `ruamel.yaml.cyaml.CParser` なら `True`、それ以外（Python 実装の `Parser` のまま。`ruamel.yaml.cyaml` を import できないときを含む）は `False` を返す
     unit_tests:
       - name: test_c_loader_available
         case: 正常

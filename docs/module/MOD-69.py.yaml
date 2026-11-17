@@ -197,7 +197,7 @@ classes:
           1. `_waiters_lock` を持って `_rows` を `sources[]` にし、`_rows_done` を行の数だけ立てずに作り、`_rows_started` を行の数だけ `False` で作る。続けて `terminal_lookup(terminal)` でほかの配信元のスキーマの参照先の引き当てを作り、`_reload_lock` を持って `_lookup` に持たせる
           2. `min(LOAD_WORKERS, 行の数)` 個のスレッド（`concurrent.futures.ThreadPoolExecutor`、名前の頭 `project-index-loading`）で、それぞれ読み始めていない行が無くなるまで、次の行を選んで読み込む。全てのスレッドが終わるまで待つ
              - 次の行は、`_waiters_lock` を持って、`_requested` の先頭から見て読み始めていない最初の行。無ければ、読み始めていない行のうち位置が一番小さい行。選んだ行の `_rows_started` を同じロックの中で `True` にする
-             - 行を配信元の読み込み（`lookup` に手順 1 の引き当て、`unit` にその行の『行の読み込みの 1 件』）で読む。行の読み込みの 1 件は、入るたびに `_waiters_lock` を持ってその行が `_requested` にあるかを確かめ、あれば何もしない。無ければ裏の処理の関所の裏の処理のスレッド（`gate.background`）と 1 件（`gate.unit`）を重ねた文脈にし、要求の応答中（読み込みを待っている要求を含む）は 1 件の後に休む。読み始めた後に待ちを受けた行は、次の 1 件から休まない。例外の場合、`[error]` 配信元の行の読み込みに失敗した（行の位置・例外のスタックトレース）を書き、状態を `not_served`・ID を行の `id`（無ければ `sources[{n}]`）・違反を `Violation(path="sources[{n}]", rule="読み込みに失敗しました（{例外の型}: {本文}）", fix="エラーログを確かめ、reload で再読み込みしてください")` にする
+             - 行を配信元の読み込み（`lookup` に手順 1 の引き当て、`unit` にその行の『行の読み込みの 1 件』）で読む。行の読み込みの 1 件は、入るたびに `_waiters_lock` を持ってその行が `_requested` にあるかを確かめ、あれば何もしない。無ければ裏の処理の関所の裏の処理のスレッド（`gate.background`）と応答中だけ譲る 1 件（`gate.yield_unit`）を重ねた文脈にし、要求の応答中（読み込みを待っている要求を含む）だけ 1 件ずつ進めて 1 件の後に休む。応答中でなければ、行の読み込みのスレッドは排他を取らずに並んで進む。読み始めた後に待ちを受けた行は、次の 1 件から休まない。例外の場合、`[error]` 配信元の行の読み込みに失敗した（行の位置・例外のスタックトレース）を書き、状態を `not_served`・ID を行の `id`（無ければ `sources[{n}]`）・違反を `Violation(path="sources[{n}]", rule="読み込みに失敗しました（{例外の型}: {本文}）", fix="エラーログを確かめ、reload で再読み込みしてください")` にする
           3. 読み込んだ行ごとに `_reload_lock` を取り、今の組に行を加えた新しい組を作って `_snapshot` と `_entries` を入れ替える。状態は行の位置の順に並べる
              - 配信する配信元の ID が、先の位置の行の配信中の ID と重なる場合、その行を `sources[{n}].id` の重複の違反を持つ `not_served` にする
              - 後の位置の行が先に読み込まれて同じ ID で配信中の場合、その後の行を同じ違反の `not_served` に替え、この行を配信する。組を入れ替えた後、`_reload_lock` を持ったまま `_on_rebuilt` をこの行の配信元で呼ぶ
@@ -270,9 +270,9 @@ classes:
           - name: test_source_registry_load_when_gated
             case: 正常
             summary: 要求が待っていない行だけを関所で休ませる
-            condition: '`LOAD_WORKERS` を 1 にした `SourceRegistry(loading=True, gate=関所)`。行 a・b で、a を `wait_for(ids=["a"])` で待たせる。配信元の読み込みの偽物は、受け取った `unit` に 2 回入り、その中で関所の 1 件の中かを記録する。関所の `foreground` の中で `load` する'
+            condition: '`LOAD_WORKERS` を 1 にした `SourceRegistry(loading=True, gate=関所)`。行 a・b で、a を `wait_for(ids=["a"])` で待たせる。配信元の読み込みの偽物は、受け取った `unit` に 2 回入り、その中で関所の 1 件の中かを記録する。関所の `foreground` の中で `load` する。あわせて、`LOAD_WORKERS` を 2 にし、`foreground` の外で、行 b・c の読み込みの偽物が `unit` の中で相手の行が `unit` に入るのを合図で待つ `load` をする'
             mock: 配信元の読み込み（偽物）、関所の休み（偽物。呼ばれた回数を数える）
-            expected: a の 2 回は 1 件の外で、b の 2 回は 1 件の中。休みが 2 回呼ばれる
+            expected: a の 2 回は 1 件の外で、b の 2 回は 1 件の中。休みが 2 回呼ばれる。`foreground` の外の `load` は、b と c の 1 件が重なって進み（合図を受けて終わり）、休みが呼ばれない
       - name: wait_for
         title: 指す行の待ち
         kind: メソッド

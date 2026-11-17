@@ -201,6 +201,34 @@ classes:
           type: bool
           description: 今のスレッドの 1 件の入れ子の深さが 1 以上なら `True`
         process: 1. 今のスレッドの 1 件の入れ子の深さが 0 より大きいかを返す
+      - name: yield_unit
+        title: 応答中だけ譲る 1 件
+        kind: メソッド
+        summary: 裏の処理のスレッドでは、要求の応答中だけ 1 件を他の裏の処理と重ならずに実行して休み、応答中でなければ排他を取らずに実行する（`contextmanager`）
+        description: 配信元の行の読み込みが使用する。応答中でないときは、行の読み込みのスレッドどうしと、裏の検査・書き出しの 1 件と重なって進む（同時に読み込む行の数を保つ）。応答中は `unit` と同じく 1 件ずつにして、裏の処理の全体の時間を `BACKGROUND_SHARE` に抑える。
+        scope: public
+        thread_safe: true
+        side_effects: 応答中は、休む間、他の裏の処理の 1 件を待たせる
+        returns:
+          type: Iterator[None]
+          description: なし
+        process: |-
+          1. 今のスレッドが裏の処理のスレッドでない場合、呼び出し側の処理だけを実行して終える
+          2. 応答中の要求が無い（`active` が `False`）場合、排他を取らずに呼び出し側の処理を実行して終える（1 件の途中で応答が始まっても休まない）
+          3. 応答中の要求がある場合、`unit` と同じく実行する（`_turn` を取り、測りながら実行し、1 件の後に休む）
+        unit_tests:
+          - name: test_background_gate_yield_unit_when_idle
+            case: 正常
+            summary: 応答中でなければ 2 本の 1 件が重なって進む
+            condition: '`foreground` の外で、2 つのスレッドがそれぞれ `background` の中で、相手が 1 件に入るのを合図で待つ処理を `yield_unit` で実行する'
+            mock: 時計と休み（偽物）
+            expected: 2 本とも合図を受けて終わり（実行中の数の最大が 2）、休みが呼ばれない
+          - name: test_background_gate_yield_unit_when_foreground_active
+            case: 正常
+            summary: 応答中は 1 件ずつにして休む
+            condition: '`foreground` の中で、2 つのスレッドがそれぞれ `background` の中で、実行中の数を数えて `clock` を 1 秒進める処理を `yield_unit` で 3 回ずつ実行する'
+            mock: 時計と休み（偽物。休みは渡された秒数を記録する）
+            expected: 実行中の数の最大が 1 で、休みが 9 秒で 6 回呼ばれる
 constants:
   - name: BACKGROUND_SHARE
     title: 応答中の裏の処理の時間の割合
