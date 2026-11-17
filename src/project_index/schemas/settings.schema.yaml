@@ -108,3 +108,11 @@ properties:
     title: ワークツリーの読み込みを待つ上限
     description: 文書の MCP が、初めて指されたワークツリーの読み込みを待つ上限（秒）。
     minimum: 1
+  mdmark_ref:
+    type: string
+    title: mdmark の参照
+    description: 管理の MCP の `update` が mdmark の CLI を入れ直す参照（ブランチ・`v{MAJOR}.{MINOR}.{PATCH}` のタグ・commit の SHA）。既定は `develop`。
+    pattern: ^[A-Za-z0-9][A-Za-z0-9._/-]*$
+    examples:
+      - develop
+      - v0.13.0

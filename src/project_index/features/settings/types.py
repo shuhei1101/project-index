@@ -87,6 +87,8 @@ class TerminalConfig(BaseModel):
     write_deadline_sec: int = 32
     # 初めて指されたワークツリーの読み込みを待つ上限（秒）
     worktree_load_wait_sec: int = 22
+    # `update` が mdmark の CLI を入れ直す参照（ブランチ・タグ・commit の SHA）
+    mdmark_ref: str = "develop"
     # スキーマの properties に無い最上位のキー（ファイルの順）。値は持たない
     unknown_keys: list[str] = Field(default_factory=list[str])
 
