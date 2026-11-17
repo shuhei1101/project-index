@@ -1,0 +1,47 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: changed
+    detail: 管理用の YAML に無いファイルへ仮のメタデータを付けるとき、目次のページで語彙を決めてから、安い読み方から順に段階的に中身を参照する。2 回目以降は、前回の確認の後に中身が変わったファイルだけを見直し、今の値と新しい案を並べて了承を得る
+    depends_on: []
+docs:
+  - page: plugins/project-index/skills/setup/SKILL.md
+    new: false
+    change: 手順 4 の仮のメタデータの付け方を段階的な参照にし、次の段階へ進む判定を取り出す手段の出力に従わせる。2 回目以降に変わったファイルを見つけて見直す手順と、確認の時点の記録を加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T03:18:30.907982+00:00'
+  - page: docs/guide/CLI.md
+    new: false
+    change: アウトラインの取り出しと変わったファイルの一覧のサブコマンドを加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T03:18:30.907982+00:00'
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: setup の 2 回目以降に、変わったファイルのメタデータを見直すことを加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T03:18:30.907982+00:00'
+scope_out:
+  - item: setup が推奨する検索の範囲を全てのファイルにする
+    reason: 別の要望で、同じ SKILL.md の別の箇所を扱う
+    plan: '#102'
+  - item: 既存の配信元の検索の対象とメタデータの見直し
+    reason: この作業 PR が入った後に行う
+    plan: '#104'
+  - item: 取り出す手段を MCP のツールにする
+    reason: setup のときしか使用しないため、既に setup が呼ぶ CLI のサブコマンドにする
+    plan: none
+  - item: 見出しの並びが同じファイル群は 1〜2 件だけ参照して型を決める
+    reason: アウトラインで決まらないファイルだけが深い段階へ進むため、型でまとめても参照する量はほとんど減らない
+    plan: none
+  - item: '`git log` のコミットの題名をメタデータの材料にする'
+    reason: 題名はその変更の理由で、ファイルが受け持つことを表さないことが多く、`name`・`description` の材料にならない
+    plan: none
+  - item: 付けた後に、ほぼ同じ `description` の組・1 件にしか付いていないタグ・半数以上に付いているタグを洗い出す
+    reason: 今回入れる取り出す手段と段階的な付与を前提にした後続で、要望の中心（中身に合った付与と変わったファイルの見直し）とは別に扱う
+    plan: '#110'
+  - item: 変更の前後のアウトラインを比べ、変わったファイルだけを見直しの候補にする
+    reason: アウトラインが変わらない本文だけの変更でも `description` が古くなるため、中身が変わったファイルは全て見直しの候補にする
+    plan: none

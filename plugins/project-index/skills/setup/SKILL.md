@@ -1,6 +1,6 @@
 ---
 name: setup
-description: フォルダを project-index の配信元として端末の設定に登録する。2 回目以降は、範囲のファイルと管理用の YAML を突き合わせて追加・削除・改名を修正する
+description: フォルダを project-index の配信元として端末の設定に登録する。2 回目以降は、範囲のファイルと管理用の YAML を突き合わせて追加・削除・改名を修正し、中身が変わったファイルのメタデータを見直す
 argument-hint: "[path]"
 ---
 
@@ -55,10 +55,18 @@ argument-hint: "[path]"
      | 1 行目が `# yaml-language-server: $schema=https://raw.githubusercontent.com/shuhei1101/project-index/{tag}/schemas/project-index.schema.json` でない（行が無い・タグが `{tag}` と違う） | 1 行目をその行にする（行が無ければ 1 行目に入れる） |
      | `type: markdown` の行・`defaults[]`・`alias_type` 以外の固定値の `metadata` | 範囲の Markdown のフロントマターと `defaults[]` の値を管理用の YAML の行へ移し、`documents` の行を管理用の YAML を参照する行（`records: files`・`body_file: path`）にする。Markdown からフロントマターを削除し、`version` を新しくする |
 
-   - 仮のメタデータは、見出しと冒頭から付ける。管理用の YAML の行が既にメタデータを持つファイルには付けない
+   - 仮のメタデータは、次の段階で中身を参照して付ける。管理用の YAML の行が既にメタデータを持つファイルには付けない
+     1. 範囲に目次のページ（`index`・`README`・ファイルへのリンクを多く持つページ）があれば全文を読み、分類とタグの語彙を決める。ファイルを指すリンクの文字列と同じ行の説明は、そのファイルの `name`・`description` の材料にする。目次のページが無ければ飛ばし、タグは既存のタグだけから選ぶ
+     2. `{clone}/.venv/bin/python -m project_index outline --root {path} --paths {ファイル}`（`--paths` は繰り返せる）の出力（1 ファイル 1 行の JSON）で付ける。`existing_description` があれば材料にする。`next_stage` が `true` のファイルだけ次の段階へ進む
+     3. 各見出しの直下の最初の段落を読む
+     4. 決められなければ、コードブロックの外の文章を読む
+     5. 決められなければ、全文を読む
      - `name`: 何のファイルかを表す日本語の名詞句。クラス名・ファイル名の繰り返しにしない
      - `description`: 「何を受け持つか」と「どんなときに参照するか」の 1 文。関数の一覧・実装の手順は入れない
-     - `tags`: `topic`（扱う概念）と `tool`（使用するライブラリ・外部サービス）で、付けるタグがあるときだけ付ける
+     - `tags`: `topic`（扱う概念）と `tool`（使用するライブラリ・外部サービス）で、付けるタグがあるときだけ付ける。既存のタグ（`search_docs` の `group_by: tags`）と段階 1 の語彙から選ぶ
+   - `{config}` があるときは、`records: files` の行ごとに `{clone}/.venv/bin/python -m project_index changed --root {path} --files-yaml {管理用の YAML}` で、確認の時点の後に中身が変わった行のファイルを求める
+     - 出力の `files` を上の段階 2〜5 で読み、メタデータの新しい案を作る。`files` に無いファイルは読まない
+     - 標準エラーに起点を切り替えた旨が出たら、候補の表と一緒に示す
    - 追加する行があり、まだ聞いていないときは、実装のパスを持つ設計書の種類とキーを聞く（既定は無し）
    - 追加する行に関連の候補を付ける
 
@@ -72,12 +80,15 @@ argument-hint: "[path]"
      - `converters[]` に `prompt-doc` の行が無ければ、雛形の `prompt-doc` の行
      - `nav` の、プロンプトの行を `auto` で並べ `group_by: kind` でまとめる `プロンプト` のタブ。`nav` が無ければ、今の `documents` の行ごとの `auto` のタブ（`title` は行の `title`）を先に並べる
    - 追加・削除・改名と、仮のメタデータ・関連・プロンプトの行の候補を表で示し、記載してよいかを聞く。断られたら何も書き換えずに止まる
+     - 仮のメタデータの行には、決めた段階を出す。既存のタグと段階 1 の語彙のどちらにも無いタグは、新しいタグとしてまとめて示す
+     - 中身が変わったファイルの行は、今の値と新しい案を並べて示し、了承された行だけを書き換える
 
 5. 確認が済んだものを記載する。
    - `{config}` が無い場合、`{clone}/templates/project-index.yaml` から `{config}` を作り、1 行目のスキーマの行のタグを `{tag}` に、`name`・`description`・`files` の行の `paths` を決めた値にする。雛形の `prompts` の行と `converters[]` は削除する。`{clone}/templates/files.schema.yaml` を `{path}/schemas/files.schema.yaml`（ローカル運用は `files.schema.local.yaml`）にコピーする。ローカル運用では、`files` の行の `paths`・`schema` を `files.local.yaml`・`schemas/files.schema.local.yaml` にする
    - プロンプトの行の候補が了承された場合、`{config}` に `documents`・`converters[]`・`nav` の行を記載し、`{clone}/templates/prompt.schema.yaml` を `{path}/schemas/prompt.schema.yaml`（ローカル運用は `prompt.schema.local.yaml`）にコピーする
    - 管理用の YAML の行は、`write_docs` で記載する（配信元が登録済みのとき）。登録前の配信元は、`templates/files.schema.yaml` に沿って `files.yaml`（ローカル運用は `files.local.yaml`）を直接書く
    - ローカル運用では、`git -C {path} rev-parse --git-path info/exclude` の指すファイルに `*.local.*` の行が無ければ追加する。`.gitignore` は書き換えない
+   - 管理用の YAML ごとに `{clone}/.venv/bin/python -m project_index checkpoint --root {path} --files-yaml {管理用の YAML}` で確認の時点を記録する。見直したファイルのうち commit していない変更を持つものを `--reviewed` で渡す（繰り返せる）
    - `check_project` を呼び、違反が無いことを確認する。違反があれば示して止まり、端末の設定は書き換えない
 
 6. 端末の設定の `sources[]` に行を記載し、配信を始める。

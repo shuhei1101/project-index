@@ -1,0 +1,209 @@
+id: MOD-106-3
+title: 索引のサーバー / アウトライン / types.py
+lead: アウトラインと次の段階へ進む理由の型を受け持ち、アウトラインの types.py を修正するときに参照する。
+enums:
+  - name: NextStageReason
+    title: 次の段階へ進む理由
+    container: project_index/features/outline/types.py
+    usecase: ファイルのアウトライン
+    role: DTO
+    summary: アウトラインだけでは名前と説明を決めにくい理由
+    description: '`StrEnum`。値はそのまま JSON の `reasons[]` に出す。'
+    values:
+      - value: few_headings
+        member: FEW_HEADINGS
+        title: 見出しが少ない
+        description: Markdown の見出しが `MIN_HEADINGS` 未満
+      - value: mostly_code
+        member: MOSTLY_CODE
+        title: コードやログが大半
+        description: Markdown の `code_block_ratio` が `MAX_CODE_BLOCK_RATIO` 以上
+      - value: not_japanese
+        member: NOT_JAPANESE
+        title: 日本語以外
+        description: Markdown の `japanese_ratio` が `MIN_JAPANESE_RATIO` 未満
+      - value: no_definitions
+        member: NO_DEFINITIONS
+        title: 定義が無い
+        description: コードに既に持つ説明が無く、関数もクラスも無い
+      - value: unsupported_format
+        member: UNSUPPORTED_FORMAT
+        title: 未対応の形式
+        description: Markdown・Python・TypeScript・JavaScript・package.json 以外
+data_models:
+  - name: ExistingDescription
+    title: 既に持つ説明
+    container: project_index/features/outline/types.py
+    usecase: ファイルのアウトライン
+    role: DTO
+    summary: ファイルが既に持つ説明（フロントマター・docstring・package.json）
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: source
+        title: 出所
+        type: Literal['front_matter', 'docstring', 'package_json']
+        access: 公開
+        description: 説明を取り出した場所
+      - name: title
+        title: タイトル
+        type: str | None
+        access: 公開
+        description: フロントマターの `title`・docstring の 1 行目・package.json の `name`
+      - name: description
+        title: 説明
+        type: str | None
+        access: 公開
+        description: フロントマターの `description`・docstring の 2 段落目以降・package.json の `description`
+  - name: MarkdownOutline
+    title: Markdown のアウトライン
+    container: project_index/features/outline/types.py
+    usecase: ファイルのアウトライン
+    role: DTO
+    summary: Markdown 1 つから取り出したアウトライン
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: existing_description
+        title: 既に持つ説明
+        type: ExistingDescription | None
+        access: 公開
+        description: フロントマターの `title`・`description`
+      - name: headings
+        title: 見出し
+        type: tuple[str, ...]
+        access: 公開
+        description: コードブロックとフロントマターの外の見出しの行（`#` を残す）
+      - name: code_block_ratio
+        title: コードブロックの割合
+        type: float
+        access: 公開
+        description: フロントマターを除いた行のうちコードブロックの中の行（フェンスの行を含む）の割合
+      - name: code_languages
+        title: コードブロックの言語
+        type: tuple[str, ...]
+        access: 公開
+        description: フェンスの言語の一覧（出た順・重複なし。言語の無いフェンスは入れない）
+      - name: link_count
+        title: リンクの数
+        type: int
+        access: 公開
+        description: コードブロックの外の `[...](...)`（画像を除く）の数
+      - name: image_count
+        title: 画像の数
+        type: int
+        access: 公開
+        description: コードブロックの外の `![...](...)` の数
+      - name: japanese_ratio
+        title: 日本語の割合
+        type: float
+        access: 公開
+        description: コードブロックの外の、空白と Markdown の記号を除いた文字のうち、ひらがな・カタカナ・漢字の割合。文字が無ければ 0
+  - name: CodeOutline
+    title: コードのアウトライン
+    container: project_index/features/outline/types.py
+    usecase: ファイルのアウトライン
+    role: DTO
+    summary: コード 1 つから取り出したアウトライン
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: existing_description
+        title: 既に持つ説明
+        type: ExistingDescription | None
+        access: 公開
+        description: モジュールの docstring か package.json の `name`・`description`
+      - name: functions
+        title: 関数
+        type: tuple[str, ...]
+        access: 公開
+        description: 最上位の関数名（出た順）
+      - name: classes
+        title: クラス
+        type: tuple[str, ...]
+        access: 公開
+        description: 最上位のクラス名（出た順）
+      - name: imports
+        title: import
+        type: tuple[str, ...]
+        access: 公開
+        description: import しているモジュール名（出た順・重複なし）
+  - name: FileOutline
+    title: ファイルのアウトライン
+    container: project_index/features/outline/types.py
+    usecase: ファイルのアウトライン
+    role: DTO
+    summary: '`project-index outline` が 1 行の JSON にするファイル 1 つ分の結果'
+    description: '`dataclass(frozen=True)`。項目はインターフェース定義のレスポンスの `[]` の列と同じ名前にする。'
+    properties:
+      - name: path
+        title: パス
+        type: str
+        access: 公開
+        description: '`--root` からのパス'
+      - name: size
+        title: 大きさ
+        type: int
+        access: 公開
+        description: ファイルのバイト数
+      - name: existing_description
+        title: 既に持つ説明
+        type: ExistingDescription | None
+        access: 公開
+        description: Markdown かコードのアウトラインのもの
+      - name: headings
+        title: 見出し
+        type: tuple[str, ...]
+        access: 公開
+        description: Markdown 以外は空
+      - name: code_block_ratio
+        title: コードブロックの割合
+        type: float
+        access: 公開
+        description: Markdown 以外は 0
+      - name: code_languages
+        title: コードブロックの言語
+        type: tuple[str, ...]
+        access: 公開
+        description: Markdown 以外は空
+      - name: link_count
+        title: リンクの数
+        type: int
+        access: 公開
+        description: Markdown 以外は 0
+      - name: image_count
+        title: 画像の数
+        type: int
+        access: 公開
+        description: Markdown 以外は 0
+      - name: japanese_ratio
+        title: 日本語の割合
+        type: float
+        access: 公開
+        description: Markdown 以外は 0
+      - name: functions
+        title: 関数
+        type: tuple[str, ...]
+        access: 公開
+        description: コード以外は空
+      - name: classes
+        title: クラス
+        type: tuple[str, ...]
+        access: 公開
+        description: コード以外は空
+      - name: imports
+        title: import
+        type: tuple[str, ...]
+        access: 公開
+        description: コード以外は空
+      - name: next_stage
+        title: 次の段階へ進むか
+        type: bool
+        access: 公開
+        description: '`reasons` が空でなければ `True`'
+      - name: reasons
+        title: 理由
+        type: tuple[NextStageReason, ...]
+        access: 公開
+        description: 次の段階へ進む理由（`NextStageReason` の定義の順）
+tags:
+  - name: topic:アウトライン
+    main: true
+  - name: topic:型ヒント

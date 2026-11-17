@@ -1,0 +1,146 @@
+id: MOD-106-7
+title: 索引のサーバー / 確認の時点 / types.py
+lead: 確認の時点の記録・起点・変わったファイルの一覧と管理用の YAML が無い例外の型を受け持ち、確認の時点の types.py を修正するときに参照する。
+enums:
+  - name: BaseKind
+    title: 起点の種類
+    container: project_index/features/checkpoint/types.py
+    usecase: 中身が変わったファイルの一覧
+    role: DTO
+    summary: 変わったファイルを比べる起点にしたもの
+    description: '`StrEnum`。値はそのまま JSON の `base.kind` に出す。'
+    values:
+      - value: checkpoint_commit
+        member: CHECKPOINT_COMMIT
+        title: 記録した commit
+        description: '`checkpoint.commit`'
+      - value: checkpoint_time
+        member: CHECKPOINT_TIME
+        title: 記録した日時
+        description: '`checkpoint.checked_at`'
+      - value: files_yaml_commit
+        member: FILES_YAML_COMMIT
+        title: 管理用の YAML を最後に変更した commit
+        description: 記録が無いか記録した commit が無く、管理用の YAML が Git で追跡されている
+      - value: files_yaml_mtime
+        member: FILES_YAML_MTIME
+        title: 管理用の YAML の変更日時
+        description: 記録が無く、管理用の YAML が Git で追跡されていない
+data_models:
+  - name: ReviewedFile
+    title: 見直し済みのファイル
+    container: project_index/features/checkpoint/types.py
+    usecase: 共通
+    role: DTO
+    summary: 見直した未 commit のファイルとその中身のハッシュ
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: path
+        title: パス
+        type: str
+        access: 公開
+        description: '`--root` からのパス'
+      - name: sha256
+        title: ハッシュ
+        type: str
+        access: 公開
+        description: 見直したときの中身の SHA-256（16 進）
+  - name: Checkpoint
+    title: 確認の時点
+    container: project_index/features/checkpoint/types.py
+    usecase: 共通
+    role: DTO
+    summary: 管理用の YAML の `checkpoint` の値
+    description: '`dataclass(frozen=True)`。Git の配信元は `commit` と `reviewed`、Git 管理外は `checked_at` だけを持つ。'
+    properties:
+      - name: commit
+        title: commit
+        type: str | None
+        access: 公開
+        description: 記録した HEAD の commit の ID
+      - name: reviewed
+        title: 見直し済みのファイル
+        type: tuple[ReviewedFile, ...]
+        access: 公開
+        default: ()
+        description: 見直した未 commit のファイル
+      - name: checked_at
+        title: 記録した日時
+        type: datetime | None
+        access: 公開
+        description: UTC のタイムゾーン付き
+  - name: ChangedBase
+    title: 起点
+    container: project_index/features/checkpoint/types.py
+    usecase: 中身が変わったファイルの一覧
+    role: DTO
+    summary: 変わったファイルを比べた起点
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: kind
+        title: 種類
+        type: BaseKind
+        access: 公開
+        description: 起点の種類
+      - name: value
+        title: 値
+        type: str
+        access: 公開
+        description: commit の ID か ISO 8601 の日時
+  - name: ChangedResult
+    title: 変わったファイルの一覧
+    container: project_index/features/checkpoint/types.py
+    usecase: 中身が変わったファイルの一覧
+    role: DTO
+    summary: '`project-index changed` が JSON にする結果'
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: base
+        title: 起点
+        type: ChangedBase
+        access: 公開
+        description: 比べた起点
+      - name: files
+        title: ファイル
+        type: tuple[str, ...]
+        access: 公開
+        description: '`--root` からのパス（昇順）'
+      - name: missing_commit
+        title: 見つからなかった commit
+        type: str | None
+        access: 公開
+        default: None
+        description: 記録した commit がリポジトリに無く起点を切り替えたとき、その commit の ID
+classes:
+  - name: FilesYamlNotFoundError
+    title: 管理用の YAML が無い
+    container: project_index/features/checkpoint/types.py
+    usecase: 共通
+    role: 例外
+    summary: '`--files-yaml` のファイルが無いことを表す'
+    kind: クラス
+    inherits: Exception
+    properties:
+      - name: path
+        title: パス
+        type: Path
+        access: 公開
+        description: 渡されたパス
+  - name: ReviewedFileNotFoundError
+    title: 見直したファイルが無い
+    container: project_index/features/checkpoint/types.py
+    usecase: 確認の時点の記録
+    role: 例外
+    summary: '`--reviewed` のファイルが無いことを表す'
+    kind: クラス
+    inherits: Exception
+    properties:
+      - name: path
+        title: パス
+        type: Path
+        access: 公開
+        description: 無かったファイルのパス
+tags:
+  - name: topic:確認の時点
+    main: true
+  - name: topic:型ヒント

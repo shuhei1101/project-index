@@ -1,0 +1,48 @@
+$ TMPDIR=/tmp/pi106-tmp uv run pytest tests/unit/
+# /tmp/pytest-of-shuhei2441 が root の所有で pytest の一時フォルダを作れないため、TMPDIR だけを差し替えて実行した
+ERROR tests/unit/project_index/features/checkpoint/test_changed.py
+ERROR tests/unit/project_index/features/checkpoint/test_record.py
+ERROR tests/unit/project_index/features/outline/test_code.py
+ERROR tests/unit/project_index/features/outline/test_markdown.py
+ERROR tests/unit/project_index/features/outline/test_service.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 5 errors during collection !!!!!!!!!!!!!!!!!!!!
+5 errors in 1.33s
+
+# 収集の誤り（全件の実行が止まる）の中身
+E   ModuleNotFoundError: No module named 'project_index.features.checkpoint'
+E   ModuleNotFoundError: No module named 'project_index.features.checkpoint'
+E   ModuleNotFoundError: No module named 'project_index.features.outline'
+E   ModuleNotFoundError: No module named 'project_index.features.outline'
+E   ModuleNotFoundError: No module named 'project_index.features.outline'
+
+$ TMPDIR=/tmp/pi106-tmp uv run pytest tests/unit/project_index/test_main.py
+E           argparse.ArgumentError: argument cmd: invalid choice: 'outline' (choose from serve, migrate, files, prompt-doc)
+E       SystemExit: 2
+E           argparse.ArgumentError: argument cmd: invalid choice: 'changed' (choose from serve, migrate, files, prompt-doc)
+E       SystemExit: 2
+E           argparse.ArgumentError: argument cmd: invalid choice: 'checkpoint' (choose from serve, migrate, files, prompt-doc)
+E       SystemExit: 2
+FAILED tests/unit/project_index/test_main.py::test_build_parser_when_outline
+FAILED tests/unit/project_index/test_main.py::test_build_parser_when_changed
+FAILED tests/unit/project_index/test_main.py::test_build_parser_when_checkpoint
+3 failed, 9 passed in 0.09s
+
+$ TMPDIR=/tmp/pi106-tmp uv run pytest tests/unit/project_index/test_serve.py
+E       AttributeError: module 'project_index.main' has no attribute 'run_outline'
+E       AttributeError: module 'project_index.main' has no attribute 'run_outline'
+E       ModuleNotFoundError: No module named 'project_index.features.checkpoint'
+E       ModuleNotFoundError: No module named 'project_index.features.checkpoint'
+E       AttributeError: module 'project_index.main' has no attribute 'run_changed'
+E       ModuleNotFoundError: No module named 'project_index.features.checkpoint'
+E                   ImportError: import error in project_index.features.checkpoint: No module named 'project_index.features.checkpoint'
+E       ModuleNotFoundError: No module named 'project_index.features.checkpoint'
+E       AttributeError: module 'project_index.main' has no attribute 'run_checkpoint'
+FAILED tests/unit/project_index/test_serve.py::test_run_outline - AttributeEr...
+FAILED tests/unit/project_index/test_serve.py::test_run_outline_when_root_not_found
+FAILED tests/unit/project_index/test_serve.py::test_run_changed - ModuleNotFo...
+FAILED tests/unit/project_index/test_serve.py::test_run_changed_when_commit_missing
+FAILED tests/unit/project_index/test_serve.py::test_run_changed_when_files_yaml_not_found
+FAILED tests/unit/project_index/test_serve.py::test_run_changed_when_checkpoint_invalid
+FAILED tests/unit/project_index/test_serve.py::test_run_checkpoint - ModuleNo...
+FAILED tests/unit/project_index/test_serve.py::test_run_checkpoint_when_files_yaml_not_found
+8 failed, 31 passed in 1.58s

@@ -1,0 +1,205 @@
+id: IF-106-1
+title: ファイルのアウトライン
+entry:
+  kind: operation
+  value: '`project-index outline`（CLI）'
+lead: 範囲のファイルごとに、既に持つ説明・見出し・コードの定義などのアウトラインと、仮のメタデータを付けるときに次の段階へ進むかの判定を出す `project-index outline` の入出力を定め、アウトラインの取り出しや判定の基準を修正するときに参照する。
+identifier: outline
+permissions: 配信元のフォルダを読める利用者
+idempotent: true
+side_effects: なし（ファイルを書き換えない）
+callers:
+  - SC-5#scenarios[正常シナリオ（仮のメタデータを段階的に付ける）]
+  - SC-5#scenarios[正常シナリオ（2 回目以降で中身が変わったファイルを見直す）]
+exclusivity: 読み取りだけで排他しない
+request:
+  - name: --root
+    type: str
+    required: true
+    location: argument
+    description: 配信元のフォルダのパス
+    notes: '-'
+  - name: --paths
+    type: list[str]
+    required: true
+    location: argument
+    description: 範囲の glob かファイルのパス（`--root` からの相対）。繰り返して渡せる
+    notes: '`project-index files` と同じ書き方。2 回目以降は `project-index changed` が出したパスを渡す'
+  - name: --exclude
+    type: list[str]
+    required: false
+    default: なし（除外の条件だけで外す）
+    location: argument
+    description: 除外するファイル名の glob。繰り返して渡せる
+    notes: '`project-index files` と同じ'
+request_example: |-
+  ```bash
+  project-index outline --root ~/repo/sample --paths 'docs/**/*.md' --paths 'src/**/*.py'
+  ```
+response:
+  - name: 標準出力
+    type: str
+    description: 1 ファイル 1 行の JSON（JSON Lines）を、パスの昇順で出す
+    notes: 対象は `project-index files` が出すファイルと同じ
+  - name: '[].path'
+    type: str
+    description: '`--root` からのパス'
+  - name: '[].size'
+    type: int
+    description: ファイルのバイト数
+  - name: '[].existing_description'
+    type: dict | None
+    description: ファイルが既に持つ説明。`source`（`front_matter` / `docstring` / `package_json`）と `title`・`description`
+    notes: 無ければ `null`
+  - name: '[].headings'
+    type: list[str]
+    description: Markdown のコードブロックの外の見出し（`#` の数を残す）
+    notes: Markdown 以外は空
+  - name: '[].code_block_ratio'
+    type: float
+    description: Markdown の行のうちコードブロックの中の行の割合（0〜1）
+    notes: Markdown 以外は `0`
+  - name: '[].code_languages'
+    type: list[str]
+    description: コードブロックの言語の一覧（重複なし）
+  - name: '[].link_count'
+    type: int
+    description: Markdown のリンクの数
+  - name: '[].image_count'
+    type: int
+    description: Markdown の画像の数
+  - name: '[].japanese_ratio'
+    type: float
+    description: コードブロックの外の文字のうち、ひらがな・カタカナ・漢字の割合（0〜1）
+  - name: '[].functions'
+    type: list[str]
+    description: コードの最上位の関数名
+    notes: Python・TypeScript・JavaScript だけ
+  - name: '[].classes'
+    type: list[str]
+    description: コードの最上位のクラス名
+    notes: 同上
+  - name: '[].imports'
+    type: list[str]
+    description: import しているモジュール名（重複なし）
+    notes: '`tool:` のタグの材料。同上'
+  - name: '[].next_stage'
+    type: bool
+    description: アウトラインだけでは `name`・`description` を決めにくく、次の段階へ進むか
+  - name: '[].reasons'
+    type: list[str]
+    description: '`next_stage` が `true` の理由。`few_headings` / `mostly_code` / `not_japanese` / `no_definitions` / `unsupported_format`'
+    notes: '`false` のときは空'
+  - name: 終了コード
+    type: int
+    description: 0 正常（対象が 0 件のときも 0）・2 `--root` が無いかフォルダでない
+    notes: '`project-index files` と同じ値'
+response_example: |-
+  ```json
+  {"path": "docs/log.md", "size": 5120, "existing_description": null, "headings": ["# 実行ログ"], "code_block_ratio": 0.82, "code_languages": ["text"], "link_count": 0, "image_count": 0, "japanese_ratio": 0.4, "functions": [], "classes": [], "imports": [], "next_stage": true, "reasons": ["few_headings", "mostly_code"]}
+  ```
+exceptions:
+  - name: なし（正常終了）
+    condition: アウトラインを出し終えた（終了コード 0）
+  - name: RootNotFound
+    condition: '`--root` が無いかフォルダでない（終了コード 2）'
+    notes: 渡したパスを stderr に出す
+constraints:
+  - item: 対象のファイル
+    constraint: '`project-index files` と同じ判定（除外の条件・辿らないフォルダ）で選ぶ'
+    notes: '-'
+  - item: 次の段階へ進む判定
+    constraint: Markdown は、見出しが 2 未満（`few_headings`）・`code_block_ratio` が 0.5 以上（`mostly_code`）・`japanese_ratio` が 0.1 未満（`not_japanese`）のどれかで `true`。コードは、既に持つ説明が無く関数もクラスも無いとき（`no_definitions`）に `true`。Markdown・Python・TypeScript・JavaScript 以外は常に `true`（`unsupported_format`）
+    notes: しきい値はモジュール構成で定数にする。導いた記録は `docs/pr/106/しきい値の測定/README.md`（project-index で 151 件中 6 件、knowledge で 498 件中 26 件が `true`）
+  - item: 読み取る量
+    constraint: ファイル 1 つにつき全文を 1 回読む。1 MiB を超えるファイルは先頭 1 MiB だけ読む
+    notes: 'project-index・knowledge の範囲のファイルは、lint のログ 1 件（約 1.6 MB）を除き 300 KB 未満。2 番目に大きいファイルの約 5 倍を上限にした（`docs/pr/106/しきい値の測定/README.md`）'
+flows:
+  - name: 正常系
+    summary: ファイルごとのアウトラインと次の段階へ進むかの判定を出す
+    setup:
+      - name: Mock
+        description: なし（`main(["outline", ...])` を同じプロセスで呼ぶ）
+      - name: 配信元のフォルダ
+        description: 一時フォルダ。見出し 3 つの日本語の `docs/guide.md`、見出し 1 つで 8 割がコードブロックの `docs/log.md`、英語の `docs/en.md`、モジュールの docstring と関数 1 つ・クラス 1 つ・`import yaml` を持つ `src/tasks.py` を置く
+        notes: '`--paths` は `**`'
+    flow: |-
+      <!-- map: {"title": "正常系"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index outline
+        participant F as 配信元のフォルダ
+
+        C->>M: --root {フォルダ} --paths **
+        M-->>F: 対象のファイルを読む
+        M->>M: アウトラインを取り出し、次の段階へ進むかを判定する
+        M-->>C: 1 ファイル 1 行の JSON（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 標準出力が 4 行で、`path` の昇順に並ぶ
+      - '`docs/guide.md` の `next_stage` が `false`'
+      - '`docs/log.md` の `next_stage` が `true` で、`reasons` に `few_headings` と `mostly_code` がある'
+      - '`docs/en.md` の `next_stage` が `true` で、`reasons` に `not_japanese` がある'
+      - '`src/tasks.py` の `existing_description.source` が `docstring`・`functions` と `classes` が 1 件ずつ・`imports` が `yaml` で、`next_stage` が `false`'
+      - 終了コードが 0
+    test: test_normal
+  - name: 正常系（フロントマターの説明を持つ）
+    summary: フロントマターの `title`・`description` を既に持つ説明として出す
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元のフォルダ
+        description: フロントマターに `title` と `description` を持つ `docs/a.md` だけを置く
+    flow: |-
+      <!-- map: {"title": "正常系（フロントマターの説明を持つ）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index outline
+
+        C->>M: --root {フォルダ} --paths docs/a.md
+        M-->>C: 1 行の JSON（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`existing_description` が `source: front_matter` とフロントマターの `title`・`description` を持つ'
+      - '`headings` にフロントマターの中の行が入らない'
+    test: test_normal_when_front_matter_given
+  - name: 異常系（フォルダが無い・RootNotFound）
+    summary: '`--root` が無いと終了コード 2 で終える'
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 引数
+        description: '`--root` に存在しないパス'
+    flow: |-
+      <!-- map: {"title": "異常系（フォルダが無い・RootNotFound）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index outline
+
+        C->>M: --root {無いパス} --paths **
+        M-->>C: stderr に渡したパス（終了コード 2）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 2
+      - 標準出力が空で、stderr に渡したパスがある
+    test: test_error_when_root_not_found
+test_file: tests/integration/server/test_outline.py
+aliases:
+  - project-index outline
+tags:
+  - name: topic:アウトライン
+    main: true
+  - name: topic:メタデータ
+  - name: topic:cli
