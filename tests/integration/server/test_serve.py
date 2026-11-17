@@ -1278,7 +1278,7 @@ def test_normal_when_background_export_times_out(
     time_out_archive: Callable[..., list[str]],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """裏の書き出しが上限で止まっても配信を続け、次の要求が書き出し直す（正常系）。"""
+    """裏の書き出しが上限で止まっても配信を続け、文書の一覧は書き出さずに返し、次の文書の取得が書き出し直す（正常系）。"""
     # 準備
     sample = make_source("sample")
     commit = run_git(sample.folder, "rev-parse", "develop").strip()
@@ -1290,6 +1290,8 @@ def test_normal_when_background_export_times_out(
     status = env.call_admin("status", format="json")
     exported_before = _exported(caplog)
     response = env.client.get("/sources/sample/docs")
+    exported_after_list = _exported(caplog)
+    document = env.client.get("/sources/sample/docs/docs/doc-1.yaml")
     # 検証
     stopped = [r.getMessage() for r in caplog.records if STOPPED_LINE in r.getMessage()]
     assert failed == [commit]
@@ -1302,6 +1304,8 @@ def test_normal_when_background_export_times_out(
     assert status.data["exporting"] is False
     assert exported_before == []
     assert response.status_code == 200
+    assert exported_after_list == []
+    assert document.status_code == 200
     assert len(_exported(caplog)) == 1
 
 
