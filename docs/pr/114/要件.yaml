@@ -25,39 +25,35 @@ docs:
     status: todo
   - page: docs/dev-command/CMD-1.yaml
     new: false
-    change: 配布のスキーマの生成の出力先を新しい配置先にする
+    change: schemas/ の中身の説明を、配布する設定のスキーマだけに合わせる（生成の出力先 schemas/project-index.schema.json は変えない）
     status: todo
   - page: docs/module/MOD-43.py.yaml
     new: false
-    change: PROMPT_SCHEMA_PATH・COMMON_SCHEMA_PATH の値と説明を新しい配置先に合わせる
+    change: PROMPT_SCHEMA_PATH を schemas/prompt.schema.yaml にし、COMMON_SCHEMA_PATH の説明を合わせる
     status: todo
   - page: docs/module/MOD-70.py.yaml
     new: false
-    change: source_schema_json の出力を commit する先のパスを新しい配置先に合わせる
+    change: source_schema_json の出力先 schemas/project-index.schema.json は変えない。説明が設計書のスキーマのコピーを前提にしていれば合わせる
     status: todo
   - page: docs/interface/IF-15.yaml
     new: false
-    change: プロンプトのスキーマのパスを新しい配置先に合わせる
+    change: プロンプトのスキーマのパスを schemas/prompt.schema.yaml にする
     status: todo
   - page: docs/guide/設定.md
     new: false
-    change: 1 行目の $schema の URL・管理用の YAML のスキーマの例・templates/prompt.schema.yaml の説明を新しい配置先と参照に合わせる
+    change: templates/prompt.schema.yaml の行を schemas/prompt.schema.yaml にする（配信元側の schemas/files.schema.yaml の例は変えない）
     status: todo
   - page: docs/guide/配信元を配信する.md
     new: false
-    change: プロンプトのスキーマをコピーする元のパスとスキーマの例を新しい配置先と参照に合わせる
+    change: 配信元へコピーするプロンプトのスキーマの元のパスを schemas/prompt.schema.yaml にする（配信元側の schemas/files.schema.yaml の例は変えない）
     status: todo
   - page: docs/guide/CLI.md
     new: false
-    change: prompt-doc のキーの説明が指すスキーマのパスを新しい配置先に合わせる
+    change: prompt-doc のキーの説明が指すスキーマのパスを schemas/prompt.schema.yaml にする
     status: todo
   - page: plugins/project-index/skills/setup/SKILL.md
     new: false
-    change: 1 行目の $schema の URL と、コピーする雛形のスキーマのパスを新しい配置先に合わせる
-    status: todo
-  - page: templates/project-index.yaml
-    new: false
-    change: 1 行目の $schema の URL を新しい配置先に合わせる
+    change: コピーするプロンプトのスキーマのパスを schemas/prompt.schema.yaml にする
     status: todo
 scope_out:
   - item: templates/files.schema.yaml を knowledge の knowledge-files.schema.yaml に合わせること
