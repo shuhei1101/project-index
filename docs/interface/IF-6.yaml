@@ -1224,8 +1224,8 @@ flows:
       - 2 回目の後、`docs/doc-9.yaml` があり `id` が `doc-9` でほかの項目は改名の前と同じで、`docs/doc-2.yaml` が無い
       - 文書 1 の `related` の `to`・`doc-9#items[a]`・`[文書 2](id:doc-9)`・`click N href "id:doc-9#items[a]"` になり、`[文書 20](id:doc-20)` とほかの項目は変わらず、変更していない行の引用符の種類も保つ
       - 文書 3 は変わらず、次の `search_docs` が `doc-9` を返却し `doc-2` を返却しない
-      - '1 回目の `results` に、n1 の `id`・`index: 0`・`status: updated` の行があり、`references` が `{path: @body, before: id:doc-2#items[a], after: id:doc-9#items[a]}` と `{path: @body, before: ../docs/doc-2.yaml, after: ../docs/doc-9.yaml}` の 2 か所で、`diff` に `@@ notes/n1.md` の行がある'
       - 2 回目の後、`notes/n1.md` の 2 つのリンクが `id:doc-9#items[a]`・`../docs/doc-9.yaml` を指し、`[文書 20](id:doc-20)`・リンクでない文の `doc-2`・ほかの行と `notes/index.yaml` は変わらず、n1 の行の `version` が書き込みの前と違う
+      - '1 回目の `results` に、n1 の `id`・`index: 0`・`status: updated` の行があり、`references` が `{path: @body, before: id:doc-2, after: id:doc-9}` と `{path: @body, before: ../docs/doc-2.yaml, after: ../docs/doc-9.yaml}` の 2 か所で、`diff` に `@@ notes/n1.md` の行がある'
     test: test_normal_when_rename
   - name: 正常系（ID を変えずにファイル名だけを改名する）
     summary: '`new_path` だけの `rename` でファイルを移し、パスで指す参照元を書き換える'
