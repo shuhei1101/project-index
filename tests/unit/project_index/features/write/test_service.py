@@ -176,6 +176,57 @@ def make_env(
     return _make
 
 
+UNINDENTED_DOC = (
+    "id: doc-1\nname: 文書 1\nitems:\n- key: k1\n  label: 名称 1\n- key: k2\n  label: 名称 2\n"
+)
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        Operation(
+            op="update",
+            id="doc-1",
+            expected_version=content_hash(UNINDENTED_DOC),
+            add_to={"items": [{"key": "k3", "label": "名称 3"}]},
+        ),
+        Operation(
+            op="replace",
+            id="doc-1",
+            expected_version=content_hash(UNINDENTED_DOC),
+            data={
+                "id": "doc-1",
+                "name": "文書 1",
+                "items": [
+                    {"key": "k1", "label": "名称 1"},
+                    {"key": "k2", "label": "名称 2"},
+                    {"key": "k3", "label": "名称 3"},
+                ],
+            },
+        ),
+    ],
+    ids=["add_to", "replace"],
+)
+def test_write_docs_when_indent_preserved(
+    make_env: Callable[..., WriteEnv], operation: Operation
+) -> None:
+    """元のファイルの配列の字下げを保つ（正常系）。"""
+    # 準備
+    env = make_env(
+        {
+            "docs/rule/doc-1.yaml": UNINDENTED_DOC,
+            "docs/rule/doc-2.yaml": DOC_2,
+            "schemas/rule.schema.yaml": SCHEMA,
+        }
+    )
+    # 実行
+    result = env.write(operations=[operation])
+    # 検証
+    text = (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8")
+    assert text == UNINDENTED_DOC + "- key: k3\n  label: 名称 3\n"
+    assert result.results[0].diff == "+ - key: k3\n+   label: 名称 3"
+
+
 def test_check_version_when_fields(make_document: Callable[..., Document]) -> None:
     """項目ごとのハッシュ（正常系）。"""
     # 準備
@@ -668,6 +719,30 @@ def test_delete_docs_when_unlink(make_env: Callable[..., WriteEnv]) -> None:
     assert not (env.worktree / "docs/rule/doc-2.yaml").exists()
     assert "doc-2" not in text
     assert result.unlinked == [("doc-1", content_hash(text))]
+
+
+def test_delete_docs_when_unlink_indent_preserved(make_env: Callable[..., WriteEnv]) -> None:
+    """参照を外した文書の配列の字下げを保つ（正常系）。"""
+    # 準備
+    doc_1 = "id: doc-1\nname: 文書 1\n"
+    doc_2 = (
+        "id: doc-2\nname: 文書 2\nrelated:\n- to: doc-1\n  type: references\n"
+        "- to: doc-3\n  type: references\n"
+    )
+    env = make_env(
+        {
+            "docs/rule/doc-1.yaml": doc_1,
+            "docs/rule/doc-2.yaml": doc_2,
+            "docs/rule/doc-3.yaml": "id: doc-3\nname: 文書 3\n",
+            "schemas/rule.schema.yaml": SCHEMA,
+        }
+    )
+    targets = [DeleteTarget(id="doc-1", expected_version=content_hash(doc_1))]
+    # 実行
+    env.delete(targets=targets, on_referenced="unlink")
+    # 検証
+    text = (env.worktree / "docs/rule/doc-2.yaml").read_text(encoding="utf-8")
+    assert text == "id: doc-2\nname: 文書 2\nrelated:\n- to: doc-3\n  type: references\n"
 
 
 def test_delete_docs_when_unlink_nested(make_env: Callable[..., WriteEnv]) -> None:
