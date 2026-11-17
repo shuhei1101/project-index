@@ -1,0 +1,26 @@
+docs:
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: setup の了承の説明と「プロンプトを配信する」の手順 1 のコピーに、共通の型 common.schema.yaml を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T07:02:19.894140+00:00'
+  - page: docs/guide/設定.md
+    new: false
+    change: '`## 雛形` の表に schemas/common.schema.yaml の行を追加する'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T07:02:19.894140+00:00'
+scope_out:
+  - item: プロンプトのスキーマ自体のコピー先に既にファイルがあるときの扱い
+    reason: 要望は共通の型のコピーの欠けで、プロンプトのスキーマのコピーの扱いは変えない
+    plan: none
+  - item: setup の初回で範囲を既定の **/* にすると、content/prompts/ の YAML を管理用の YAML の行とプロンプトの行の 2 つの文書として配信する（SKILL.md の手順 3・4・5）
+    reason: 同じファイルを 2 つの文書として配信する不具合で、今回の要望（共通の型のコピー）に含まれない
+    plan: '#124'
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: changed
+    detail: プロンプトのフォルダを見つけて了承したとき、プロンプトのスキーマと参照先の共通の型を配信元へ配置する
+    depends_on: []

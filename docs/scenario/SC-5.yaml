@@ -360,7 +360,7 @@ scenarios:
         FS-->>SK: content/prompts/ と plugins/sample/content/prompts/
         SK-->>U: 見つけたフォルダごとの documents の行（paths・schema・converter・metadata）と、プロンプトのスキーマ・converters[]・nav の行を候補の表で示して確かめる
         U-->>SK: 了承
-        SK->>FS: プロンプトのスキーマを置き、project-index.yaml に候補の行を書く
+        SK->>FS: プロンプトのスキーマと、その $ref が指す共通の型を schemas/ に配置し、project-index.yaml に候補の行を書く
         SK->>AD: check_project
         SK->>AD: reload
         SK-->>U: 書いた行と結果を出す
@@ -372,6 +372,7 @@ scenarios:
       - '`nav` に、プロンプトの行を `auto` で並べ `group_by: kind` で種類ごとにまとめる項目がある'
       - '`check_project` が違反を 0 件で返す'
       - '`reload` の後の `search_docs` が 2 件のプロンプトを YAML の `name` で返す'
+      - 配信元の `schemas/` に `prompt.schema.yaml` と、その `$ref` が指す `common.schema.yaml` がある
     test: test_normal_when_prompt_folder_found
   - name: 正常シナリオ（content/prompts/ の行が既にある）
     setup:
@@ -1062,6 +1063,72 @@ scenarios:
       - スキルの応答に alias-inject の候補が出ない
       - alias-inject の端末の設定のファイルを作らない
     test: test_normal_when_alias_inject_not_installed
+  - name: 異常シナリオ（共通の型のコピー先に $defs.id が無い）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
+      - name: 共通の型と名前が重なるスキーマを持つ配信元
+        description: 登録済みの配信元。直下の `content/prompts/` に A-42 の例 2 のプロンプトを配置し、`project-index.yaml` にプロンプトの documents の行は無い。`schemas/common.schema.yaml` に、`$defs.id` を持たない別のスキーマを配置する
+        notes: id `sample`
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（共通の型のコピー先に $defs.id が無い）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant FS as 配信元のフォルダ
+
+        U->>SK: /project-index:setup {sample のパス}
+        SK->>FS: 直下とプラグインのルートの content/prompts/ を探す
+        FS-->>SK: content/prompts/
+        SK->>FS: 共通の型のコピー先 schemas/common.schema.yaml を確認する
+        FS-->>SK: $defs.id を持たないスキーマ
+        SK-->>U: 候補の表を示す前に、schemas/common.schema.yaml が $defs.id を持たないことを示して止まる
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`project-index.yaml` と `schemas/common.schema.yaml` が変わらず、`schemas/prompt.schema.yaml` が無い'
+      - スキルの応答に、`schemas/common.schema.yaml` が `$defs.id` を持たないことが出る
+    test: test_error_when_common_schema_lacks_id
+  - name: 正常シナリオ（ローカル運用で content/prompts/ を見つける）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
+      - name: プロンプトを持つローカル運用の配信元
+        description: '`正常シナリオ（ローカル運用で追加する）` を終えた後の company の直下の `content/prompts/` に A-42 の例 2 のプロンプト（`kind: llm`）を配置する。`project-index.local.yaml` にプロンプトの documents の行は無い'
+        notes: 'id `company`。`storage.type: disk`'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（ローカル運用で content/prompts/ を見つける）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant FS as company
+        participant AD as 管理の MCP
+
+        U->>SK: /project-index:setup {company のパス}
+        SK->>FS: 直下とプラグインのルートの content/prompts/ を探す
+        FS-->>SK: content/prompts/
+        SK-->>U: documents の行と、プロンプトのスキーマ・converters[]・nav の行を候補の表で示して確認する
+        U-->>SK: 了承
+        SK->>FS: schemas/prompt.schema.local.yaml と schemas/common.schema.local.yaml を配置し、prompt.schema.local.yaml の $ref を common.schema.local.yaml へ書き換える
+        SK->>FS: project-index.local.yaml に候補の行を書く
+        SK->>AD: check_project（project-index.local.yaml の絶対パス, storage.type: disk）
+        SK->>AD: reload
+        SK-->>U: 書いた行と結果を出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - company の `schemas/` に `prompt.schema.local.yaml`・`common.schema.local.yaml` があり、`prompt.schema.yaml`・`common.schema.yaml` は無い
+      - '`prompt.schema.local.yaml` の `$ref` は全て `common.schema.local.yaml#/$defs/id` を指す（`common.schema.yaml` を指す `$ref` が無い）'
+      - '`project-index.local.yaml` の documents に、`paths` が `content/prompts/**/*.yaml`、`schema` が `schemas/prompt.schema.local.yaml` の行がある'
+      - '`check_project` が違反を 0 件で返す'
+      - '`reload` の後の `search_docs` がプロンプトを YAML の `name` で返す'
+    test: test_normal_when_prompt_folder_found_in_local_operation
 lead: 利用者が `/project-index:setup` でフォルダを配信元として登録し、管理用の YAML を範囲のファイルに合わせるシナリオを定め、配信元の追加の流れを変えるときに参照する。
 tags:
   - name: topic:配信元
