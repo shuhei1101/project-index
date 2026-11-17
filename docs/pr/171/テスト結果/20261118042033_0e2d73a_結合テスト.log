@@ -1,0 +1,24 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=integration -f paths="tests/integration/server/test_get_status.py tests/integration/server/test_list_sources.py tests/integration/server/test_session_start.py" ...) （TP-1 の TL-2 の run_runner。run 44157403742）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 12 items
+
+tests/integration/server/test_get_status.py::test_normal PASSED          [  8%]
+tests/integration/server/test_get_status.py::test_normal_when_loading PASSED [ 16%]
+tests/integration/server/test_get_status.py::test_normal_when_checking PASSED [ 25%]
+tests/integration/server/test_get_status.py::test_normal_when_reload_checking PASSED [ 33%]
+tests/integration/server/test_get_status.py::test_normal_when_exporting PASSED [ 41%]
+tests/integration/server/test_list_sources.py::test_normal PASSED        [ 50%]
+tests/integration/server/test_list_sources.py::test_normal_when_no_source PASSED [ 58%]
+tests/integration/server/test_list_sources.py::test_normal_when_include_loading PASSED [ 66%]
+tests/integration/server/test_session_start.py::test_normal_when_cleared PASSED [ 75%]
+tests/integration/server/test_session_start.py::test_normal_when_not_forget_reason PASSED [ 83%]
+tests/integration/server/test_session_start.py::test_normal_when_loading PASSED [ 91%]
+tests/integration/server/test_session_start.py::test_error_when_input_invalid PASSED [100%]
+
+============================== 12 passed in 2.52s ==============================
+exit=0
