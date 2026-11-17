@@ -65,7 +65,11 @@ def _install(monkeypatch: pytest.MonkeyPatch, fake: FakeRun) -> None:
 
 def _install_mdmark(monkeypatch: pytest.MonkeyPatch, path: str | None) -> None:
     """`PATH` の mdmark の CLI を探す `shutil.which` を、`path` を返す偽物に差し替える。"""
-    monkeypatch.setattr("project_index.features.lifecycle.update.shutil.which", lambda name: path)
+
+    def which(name: str) -> str | None:
+        return path
+
+    monkeypatch.setattr("project_index.features.lifecycle.update.shutil.which", which)
 
 
 def test_update_clone(
