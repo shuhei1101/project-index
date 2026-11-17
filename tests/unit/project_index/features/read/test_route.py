@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -7,6 +8,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from project_index.features.read.route import build_read_router
+from project_index.features.sources import registry as registry_module
+from project_index.features.sources.registry import SourceRegistry
 from project_index.features.sources.types import DocumentTable
 from project_index.server.error_handlers import register_error_handlers
 
@@ -14,6 +17,9 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
     from types import SimpleNamespace
+
+    from project_index.features.settings.types import SourceEntry, TerminalConfig
+    from project_index.features.sources.types import ServedSource, SourceStatus
 
 
 def _client(handlers: Any) -> TestClient:
@@ -124,3 +130,42 @@ def test_build_read_router_when_not_found(
     assert response.status_code == 404
     assert response.headers["content-type"].startswith("application/problem+json")
     assert response.json()["missing"] == missing
+
+
+def test_build_read_router_when_include_loading(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+    make_handlers: Callable[..., Any],
+) -> None:
+    """include_loading で読み込みを待たずに返す（正常系）。"""
+    # 準備
+    entered = threading.Event()
+    release = threading.Event()
+
+    def load_source(entry: SourceEntry, *, index: int, lookup: object) -> tuple[Any, Any]:
+        del lookup
+        entered.set()
+        release.wait(timeout=5)
+        return make_served_source(id=entry.id), make_status(entry.id, index)
+
+    monkeypatch.setattr(registry_module, "load_source", load_source)
+    terminal = make_terminal_config(
+        sources=[make_entry("/tmp/slow/project-index.yaml", source_id="slow")]
+    )
+    registry = SourceRegistry(loading=True)
+    worker = threading.Thread(target=registry.load, args=(terminal,))
+    worker.start()
+    entered.wait(timeout=5)
+    client = _client(make_handlers(terminal=terminal, registry=registry))
+    # 実行
+    response = client.get("/sources?include_loading=true")
+    release.set()
+    worker.join(timeout=5)
+    # 検証
+    assert response.status_code == 200
+    assert response.json()["sources"] == [
+        {"id": "slow", "status": "loading", "errors": [], "configVersion": None}
+    ]

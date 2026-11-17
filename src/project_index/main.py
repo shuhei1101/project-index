@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import errno
+import json
 import logging
 import os
 import socket
@@ -45,6 +46,7 @@ EXIT_CONFIG_INVALID = 2
 EXIT_PORT_IN_USE = 3
 EXIT_PROMPT_INVALID = 4
 EXIT_ROOT_NOT_FOUND = 2
+EXIT_FILES_YAML_INVALID = 2
 LOG_FILE = "project-index.log"
 LOG_MAX_BYTES = 5_000_000
 LOG_BACKUPS = 3
@@ -425,6 +427,85 @@ def run_files(args: argparse.Namespace) -> int:
         return EXIT_ROOT_NOT_FOUND
     for path in indexable_files(root, args.paths, exclude=args.exclude):
         print(path)
+    return 0
+
+
+def run_outline(args: argparse.Namespace) -> int:
+    """`project-index outline` の解析結果でアウトラインを取り出し、1 ファイル 1 行の JSON で出す。"""
+    from project_index.features.outline.service import outline_files, to_json_line
+
+    root = Path(args.root)
+    if not root.is_dir():
+        print(f"{root}: フォルダがありません", file=sys.stderr)
+        return EXIT_ROOT_NOT_FOUND
+    for outline in outline_files(root, args.paths, exclude=args.exclude):
+        print(to_json_line(outline))
+    return 0
+
+
+def run_changed(args: argparse.Namespace) -> int:
+    """`project-index changed` の解析結果で変わったファイルを集め、起点とあわせて JSON で出す。"""
+    from project_index.features.checkpoint import changed as changed_module
+    from project_index.features.checkpoint.types import FilesYamlNotFoundError
+
+    root = Path(args.root)
+    if not root.is_dir():
+        print(f"{root}: フォルダがありません", file=sys.stderr)
+        return EXIT_ROOT_NOT_FOUND
+    try:
+        result = changed_module.find_changed(root, args.files_yaml)
+    except FilesYamlNotFoundError as error:
+        print(str(error), file=sys.stderr)
+        return EXIT_FILES_YAML_INVALID
+    except ValueError as error:
+        # 確認の時点の形が違う: キーと期待する型を示して終える
+        print(f"{root / args.files_yaml}: checkpoint の {error}", file=sys.stderr)
+        return EXIT_FILES_YAML_INVALID
+    if result.missing_commit is not None:
+        print(
+            f"記録した commit {result.missing_commit} が無いため、"
+            f"起点を {result.base.kind.value} に切り替えました",
+            file=sys.stderr,
+        )
+    payload = {
+        "base": {"kind": result.base.kind.value, "value": result.base.value},
+        "files": list(result.files),
+    }
+    print(json.dumps(payload, ensure_ascii=False))
+    return 0
+
+
+def run_checkpoint(args: argparse.Namespace) -> int:
+    """`project-index checkpoint` の解析結果で確認の時点を記録し、記録した値を JSON で出す。"""
+    from project_index.features.checkpoint import record as record_module
+    from project_index.features.checkpoint.types import (
+        FilesYamlNotFoundError,
+        ReviewedFileNotFoundError,
+    )
+
+    root = Path(args.root)
+    if not root.is_dir():
+        print(f"{root}: フォルダがありません", file=sys.stderr)
+        return EXIT_ROOT_NOT_FOUND
+    try:
+        checkpoint = record_module.record_checkpoint(
+            root, args.files_yaml, reviewed=args.reviewed, now=datetime.now(UTC)
+        )
+    except (FilesYamlNotFoundError, ReviewedFileNotFoundError) as error:
+        print(str(error), file=sys.stderr)
+        return EXIT_FILES_YAML_INVALID
+    # Git の配信元は commit と reviewed、Git 管理外は checked_at を出す
+    if checkpoint.commit is not None:
+        payload: dict[str, object] = {
+            "commit": checkpoint.commit,
+            "reviewed": [
+                {"path": item.path, "sha256": item.sha256} for item in checkpoint.reviewed
+            ],
+        }
+    else:
+        checked_at = checkpoint.checked_at.isoformat() if checkpoint.checked_at else None
+        payload = {"checked_at": checked_at}
+    print(json.dumps(payload, ensure_ascii=False))
     return 0
 
 

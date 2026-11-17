@@ -111,8 +111,6 @@ functions:
         condition: '`git pull --ff-only` が終了コード 1。`shutil.which("mdmark")` がパスを返す'
         mock: '`subprocess.run`・`shutil.which`'
         expected: '`UpdateFailedError`。`npm` を呼ばない'
-    callers:
-      - MOD-93#functions[build_admin_mcp]
     callees:
       - '#functions[_run]'
       - '#functions[_reinstall_mdmark]'
@@ -188,8 +186,6 @@ functions:
         mock: '`subprocess.run`'
         expected: '`UpdateFailedError`'
         exception: コマンドが見つからない
-    callers:
-      - '#functions[update_clone]'
   - name: _reinstall_mdmark
     title: mdmark の CLI の入れ直し
     kind: 関数
@@ -254,7 +250,5 @@ functions:
         condition: '`subprocess.run` が `TimeoutExpired` を送出する'
         mock: '`subprocess.run`・`shutil.which`'
         expected: '`reinstalled` が `False`、`error` に `300 秒で打ち切りました` が入る'
-    callers:
-      - '#functions[update_clone]'
 notes:
   決まり: '`git pull --ff-only`・`uv sync` で更新し、新しいコードで移し替えの要否を確かめる。'

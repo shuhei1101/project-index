@@ -69,8 +69,9 @@ def test_normal_when_loading(
     after = env.call_admin("status", format="json")
     # 検証
     assert before.data["loading"] is True
-    # 空の値は MCP の結果から落ちる
-    assert "sources" not in before.data
+    assert [(item["id"], item["status"]) for item in before.data["sources"]] == [
+        ("sample", "loading")
+    ]
     assert LOADING_LINE in markdown.text
     assert after.data["loading"] is False
     assert [(item["id"], item["status"]) for item in after.data["sources"]] == [

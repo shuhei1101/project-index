@@ -8,14 +8,6 @@ tags:
   - name: action:移行
 test_files:
   - tests/unit/project_index/features/migrate/test_steps.py
-directory: |-
-  ```text
-  src/project_index/migrations/
-  ├── settings/{バージョン}/steps.yaml   # 端末の設定をそのバージョンへ上げる手順
-  └── project-index/{バージョン}/steps.yaml   # 配信元の設定をそのバージョンへ上げる手順
-      ├── 2/steps.yaml                  # documents[].type: yaml の削除 → metadata.alias_type（type: custom）を行の alias_type へ引き上げ → metadata.*（type: ref）を列名へ取り出し
-      └── 3/steps.yaml                  # tags（タグのマスター）の削除（value を持たない delete。破壊的）
-  ```
 functions:
   - name: load_steps
     title: 手順の読み込み
@@ -78,8 +70,6 @@ functions:
         mock: 手順の配置先
         expected: '`MigrationFailedError`'
         exception: 操作が選択肢の外
-    callers:
-      - MOD-37#functions[plan_migration]
   - name: apply_step
     title: 手順の適用
     kind: 関数
@@ -171,7 +161,13 @@ functions:
         mock: なし
         expected: '`MigrationFailedError`'
         exception: 改名先がある
-    callers:
-      - MOD-37#functions[apply_migration]
 notes:
+  移し替えの手順のファイル: |-
+    ```text
+    src/project_index/migrations/
+    ├── settings/{バージョン}/steps.yaml   # 端末の設定をそのバージョンへ上げる手順
+    └── project-index/{バージョン}/steps.yaml   # 配信元の設定をそのバージョンへ上げる手順
+        ├── 2/steps.yaml                  # documents[].type: yaml の削除 → metadata.alias_type（type: custom）を行の alias_type へ引き上げ → metadata.*（type: ref）を列名へ取り出し
+        └── 3/steps.yaml                  # tags（タグのマスター）の削除（value を持たない delete。破壊的）
+    ```
   決まり: ファイルには書かない。

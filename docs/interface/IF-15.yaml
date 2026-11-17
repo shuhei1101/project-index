@@ -686,13 +686,13 @@ flows:
     summary: 読み込み中に要求が届いた配信元を、端末の設定の順より先に読み込む
     setup:
       - name: Mock
-        description: 配信元の読み込み（`load_source`）を、読み込んだ配信元の順を記録し、1 件目だけテストが合図を出すまで止めるものに差し替える
+        description: 配信元の読み込み（`load_source`）を、読み込んだ配信元の順を記録し、a の行をテストが合図を出すまで止めるものに差し替える
         notes: 合図は `threading.Event`
       - name: 待ちの受け取りの記録
         description: 配信元の一覧が、配信元を指す要求の待ちを受け取ったときに立てる `threading.Event` を差し込む
         notes: テストは、この Event が立ってから読み込みの合図を出す
       - name: 端末の設定
-        description: 配信元 a・b・c の 3 行（この順）
+        description: 同時に読み込む行の数と同じ数の配信元 a の行と、配信元 b・c の行（この順）
         notes: '-'
     flow: |-
       <!-- map: {"title": "正常系（待っている要求が指す配信元を先に読み込む）"} -->
@@ -703,17 +703,17 @@ flows:
         participant T as project-index serve
 
         T->>T: 待ち受ける
-        T->>T: a を読み始める（止まっている）
+        T->>T: a の行を同時に読み始める（止まっている）
         C->>T: search_docs（source: c）
         T->>T: c を待っている要求として受け取る（待ちの受け取りの記録が立つ）
         C->>T: 待ちの受け取りの記録が立つのを待ち、配信元の読み込みの合図を出す
-        T->>T: a・c・b の順に読み込む
+        T->>T: a の行の後に c・b の順に読み始める
         T-->>C: c の文書
       ```
 
       <!-- /map -->
     expected:
-      - 読み込んだ配信元の順が a・c・b
+      - 読み始めた配信元の順が a の行・c・b
       - '`source: c` の `search_docs` が、b を読み込む前に c の文書を返す'
     test: test_normal_when_requested_source_loaded_first
   - name: 異常系（ある行の読み込みが例外で止まる・SourceNotServedError）
@@ -872,7 +872,10 @@ flows:
       - ログの `リビジョンを書き出した` が `main` の commit で 1 行で、文書の一覧の取得の後も増えない
     test: test_normal_when_default_ref_exported_in_background
     refs:
-      - SC-4#scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
+      - to: SC-4
+        item: scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
+        type: references
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『起動する』の対応する流れと期待値を確認する。
   - name: 正常系（裏のリビジョンの書き出しが上限を超える）
     summary: 裏の書き出しが上限で止まっても配信を続け、次の要求が書き出し直す
     setup:
@@ -902,7 +905,10 @@ flows:
       - 文書の一覧の取得が 200 を返し、ログの `リビジョンを書き出した` が 1 行出る
     test: test_normal_when_background_export_times_out
     refs:
-      - SC-4#scenarios[異常シナリオ（裏のリビジョンの書き出しが上限を超える）]
+      - to: SC-4
+        item: scenarios[異常シナリオ（裏のリビジョンの書き出しが上限を超える）]
+        type: references
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『起動する』の対応する流れと期待値を確認する。
   - name: 正常系（disk の配信元を Git を参照せずに配信する）
     summary: Git のリポジトリの中の disk の配信元を、登録したフォルダの設定・スキーマ・スクリプトで配信する
     setup:
@@ -966,6 +972,36 @@ flows:
       - '`/sources/notes/docs` が 404、`/sources/sample/docs` と `/mcp` は応答する'
       - エラーログに notes の id・`sources[1].storage.type`・フォルダが Git の作業ツリーの中に無い理由がある
     test: test_normal_when_git_storage_outside_work_tree
+  - name: 正常系（読み込みの遅い行がほかの行を止めない）
+    summary: 読み込みの遅い行が止まっていても、後ろの行を並列に読み込んで配信する
+    setup:
+      - name: Mock
+        description: 配信元 slow の読み込み（`load_source`）だけを、テストが合図を出すまで止めるものに差し替える
+        notes: 合図は `threading.Event`
+      - name: 端末の設定
+        description: 配信元 slow・sample の 2 行（この順）
+        notes: '-'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as project-index serve
+
+        T->>T: 待ち受ける
+        T->>T: slow を読み始める（止まっている）
+        T->>T: slow を待たずに sample を読み込む
+        C->>T: search_docs（source: sample）
+        T-->>C: sample の文書
+        C->>T: status
+        T-->>C: loading: true
+        C->>T: slow の読み込みの合図を出す
+        C->>T: status
+        T-->>C: loading: false・slow と sample が serving
+      ```
+    expected:
+      - 'slow の合図の前に、`source: sample` の `search_docs` が sample の文書を返却する'
+      - 'slow の合図の前の `status` が `loading: true` を返却し、合図の後に全ての行を読み込んだ `status` が `loading: false` で slow と sample を `serving` で返却する'
+    test: test_normal_when_slow_source_not_blocking
 lead: 端末の設定を読み、検証に合格した配信元を 1 プロセス・1 ポートで配信する `project-index serve` の入出力を定め、起動を修正するときに参照する。
 tags:
   - name: topic:サーバー
@@ -1059,7 +1095,7 @@ exceptions:
     condition: ポートで待ち受けられない
     notes: 標準エラーにポートの番号と `PROJECT_INDEX_PORT` で変えられることを出し、終了コード 3 で終わる
   - name: PromptInvalidError
-    condition: プロンプトの YAML（文書の MCP の instructions・文書の MCP と管理の MCP のツールの description）が無い・読めない・`templates/prompt.schema.yaml` に違反する・Jinja2 として解釈できない
+    condition: プロンプトの YAML（文書の MCP の instructions・文書の MCP と管理の MCP のツールの description）が無い・読めない・`schemas/prompt.schema.yaml` に違反する・Jinja2 として解釈できない
     notes: '標準エラーに `{ファイル}: {キーのパス}: {理由}` を全て出し、待ち受けずに終了コード 4 で終わる。代わりの文は持たない'
   - name: SourceNotServedError
     condition: ある行の読み込みが例外で止まった後に、その行の配信元を指す要求が届いた
@@ -1105,7 +1141,7 @@ constraints:
     decided_by: NFR-1#requirements[起動から接続を受け付けるまでの時間]
     notes: MCP の初期化・ツールの一覧、管理の MCP の `status`、`POST /_admin/session-start` は読み込みを待たずに答える（`status` は読み込み中であることを返す）。ある行の読み込みが例外で止まったときの扱いは、配信元の読み込みの単位の notes
   - item: 配信元の読み込みの単位
-    constraint: 配信元は端末の設定の行ごとに読み込み、読み込み終えた行から配信を始める。文書の MCP と読み取り API の要求は、要求が指す配信元の行の読み込みだけを待つ。待っている要求が指す行は、端末の設定の順より先に読み込む。検査は全ての行を読み込んだ後に行ごとに実行し、行の読み込みも要求も検査を待たない
+    constraint: 配信元は端末の設定の行ごとに、同時に読み込む行の数まで並列に読み込み、読み込み終えた行から配信を始める。読み込みの遅い行は、ほかの行の読み込みを止めない。文書の MCP と読み取り API の要求は、要求が指す配信元の行の読み込みだけを待つ。待っている要求が指す行は、まだ読み始めていない行のうち端末の設定の順より先に読み始める。検査は全ての行を読み込んだ後に行ごとに実行し、行の読み込みも要求も検査を待たない
     notes: 指す配信元は、`source` の ID（`"*"` は全ての行）、`source` を省いたときは作業場所が端末の設定の `scope` に該当する行（どの行の `scope` にも該当しないときは全ての行。ワークツリーの照合は配信元を読み込むまでできない）。ID を持たない行は、読み込むまで ID が決まらないため、ID で指す要求はその行の読み込みも待つ。`describe` の作業範囲の外の一覧と、画面の設定の API、管理の MCP の `status` 以外のツールは全ての行の読み込みを待つ。`status` の `loading` は全ての行を読み込むまで `true` で、`sync` は検査が済んだ行から埋まる。ある行の読み込みが例外で止まったときはエラーログに残し、その行を配信しないままその行の待ちを解いて、残りの行を読み込み続ける。その行は `status` で `not_served`（`errors` に読み込みの失敗の理由）になり、その行を指す要求は `SourceNotServedError` を返す。`id` を持たない行は ID が決まらないため `sources[{n}]` の ID で `not_served` にする
   - item: ほかの配信元のスキーマの参照
     constraint: '`documents[].schema` でほかの配信元を指す行は、配信元の検査の制約「ほかの配信元のスキーマの参照」のとおりに読む'
@@ -1118,5 +1154,8 @@ constraints:
     constraint: 端末の設定の行の `storage.type`（`git`・`disk`）で決める。省略すると、配信元のフォルダが Git の作業ツリーの中なら `git`、外なら `disk`。Git の作業ツリーの外部のフォルダに `git` を指定した行は、その配信元だけを配信せず、エラーログに `sources[{添字}].storage.type` とフォルダが Git の作業ツリーの中に無い理由を残す
     notes: 端末の設定のスキーマの違反（プロセスを止める）ではなく、配信元の検証の失敗として扱う
 refs:
-  - SC-4#scenarios[正常シナリオ]
+  - to: SC-4
+    item: scenarios[正常シナリオ]
+    type: references
+    when: このインターフェースの入出力やフローを変えるときに、シナリオ『起動する』の対応する流れと期待値を確認する。
 test_file: tests/integration/server/test_serve.py

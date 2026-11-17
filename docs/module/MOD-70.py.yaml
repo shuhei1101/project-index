@@ -660,10 +660,6 @@ functions:
         condition: Git 管理外のフォルダの設定、`storage="git"`
         mock: なし（一時ディレクトリ）
         expected: '`(None, None, 違反 1 件)` で、違反のパスが `storage.type`'
-    callers:
-      - '#functions[load_source]'
-      - '#functions[load_source_at]'
-      - MOD-10#functions[_load_candidate]
     callees:
       - MOD-68#functions[merge_configs]
       - '#functions[validate_source_config]'
@@ -804,4 +800,6 @@ functions:
         mock: なし（一時フォルダ）
         expected: 順に `given`・`local`・`None`
 refs:
-  - IF-15#
+  - to: IF-15
+    type: requires
+    when: インターフェース定義『起動』の入出力を変えるときに、この設計書の関数と型を合わせる。

@@ -10,13 +10,6 @@ tags:
   - name: tool:claude-code
 test_files:
   - tests/unit/plugins/project_index/hooks/test_session_start.py
-directory: |-
-  ```text
-  plugins/project-index/
-  ├─ hooks/
-  │  ├─ hooks.json          # SessionStart（timeout 6）・PreToolUse（timeout 5）の登録
-  │  └─ session_start.py    # main / is_listening / read_clone / start_server / request_forget
-  ```
 constants:
   - name: DEFAULT_PORT
     title: 既定のポート
@@ -339,7 +332,9 @@ functions:
         expected: 2 秒以内に `TimeoutError`
         exception: TimeoutError
 refs:
-  - IF-19#
+  - to: IF-19
+    type: requires
+    when: インターフェース定義『セッション開始のフック』の入出力を変えるときに、この設計書の関数と型を合わせる。
 notes:
   決まり: |-
     ポートにつながらなければ `project-index serve` を切り離して起動し、つながれば文脈を入れず、`/clear`・圧縮のときだけ `POST /_admin/session-start` で返却済みの記録の削除を依頼する。

@@ -153,7 +153,6 @@ tags:
     main: true
   - name: action:レビュー
   - name: tool:git
-issue: 14
 primary_actor: レビュアー（エージェント・利用者）
 stakeholders:
   - name: レビュアーのエージェント
@@ -167,6 +166,12 @@ minimal_guarantee: 解決できない区間は、差分を返さずにどの値�
 frequency: レビューのたび
 priority: 高
 refs:
-  - SC-1#scenarios[正常シナリオ]
-  - SC-7#scenarios[正常シナリオ]
+  - to: SC-1
+    item: scenarios[正常シナリオ]
+    type: part_of
+    when: このシナリオの前後の流れを、複合ユースケースの中で確認するときに参照する。
+  - to: SC-7
+    item: scenarios[正常シナリオ]
+    type: references
+    when: このシナリオの流れを変えるときに、関わるシナリオ『エージェントが書き込む』の対応する流れと期待値を確認する。
 test_file: tests/e2e/単一ユースケース/test_変更をレビューする.py

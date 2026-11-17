@@ -223,7 +223,7 @@ data_models:
         title: 配信元
         type: list[SourceStatusItem]
         access: 公開
-        description: '`id`・`status`（`serving` / `not_served` / `disabled`）・`errors[]`（`{path, reason}`。`not_served` のときだけ）・`config_version`（`{config, server}`。設定のバージョンが古いときだけ）'
+        description: '`id`・`status`（`serving` / `not_served` / `disabled` / `loading`。`loading` は読み取り API の `GET /sources?include_loading=true` だけが返す）・`errors[]`（`{path, reason}`。`not_served` のときだけ）・`config_version`（`{config, server}`。設定のバージョンが古いときだけ）'
       - name: warnings
         title: 警告
         type: list[SettingsWarning]

@@ -59,3 +59,33 @@ properties:
           type: string
           title: 状態
           description: '`deprecated` など、検索で除外したい状態だけを入れる。'
+  checkpoint:
+    type: object
+    title: 確認の時点
+    description: '`/project-index:setup` が `project-index checkpoint` で記録する。Git の配信元は `commit` と `reviewed`、Git 管理外は `checked_at` を持つ。次の `project-index changed` がここからの変更を見つける。'
+    properties:
+      commit:
+        type: string
+        title: 確認した commit
+        description: 確認を済ませたときの HEAD の commit の ID。
+      reviewed:
+        type: array
+        title: 見直した未 commit のファイル
+        description: 見直したファイルのうち commit していない変更を持っていたファイルと、その中身の SHA-256。
+        items:
+          type: object
+          required:
+            - path
+            - sha256
+          properties:
+            path:
+              type: string
+              title: ファイルのパス
+            sha256:
+              type: string
+              title: 中身の SHA-256（16 進）
+      checked_at:
+        type: string
+        format: date-time
+        title: 確認した日時
+        description: Git 管理外の配信元で、確認を済ませた日時（UTC のタイムゾーン付き ISO 8601）。

@@ -567,7 +567,10 @@ flows:
       - ワークツリー x に `docs/rule/index.yaml` が作られない
     test: test_error_when_placement_excluded
     refs:
-      - SC-7#scenarios[異常シナリオ（配置先が除外の名前に当たる）]
+      - to: SC-7
+        item: scenarios[異常シナリオ（配置先が除外の名前に当たる）]
+        type: references
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『エージェントが書き込む』の対応する流れと期待値を確認する。
   - name: 正常系（共通のキー名で書く）
     summary: 共通のキー名で渡した値を、行の `metadata` の対応で元の列に書く
     setup:
@@ -1339,6 +1342,12 @@ constraints:
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、作業場所が `scope.write` に当たれば登録したフォルダへ書き、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく `created`・`updated` を付ける。`worktree` を指定すると `InvalidArgumentError`'
 refs:
-  - SC-7#scenarios[正常シナリオ]
-  - SC-9#scenarios[異常シナリオ（読んだ後に変わった文書へ書き込む）]
+  - to: SC-7
+    item: scenarios[正常シナリオ]
+    type: references
+    when: このインターフェースの入出力やフローを変えるときに、シナリオ『エージェントが書き込む』の対応する流れと期待値を確認する。
+  - to: SC-9
+    item: scenarios[異常シナリオ（読んだ後に変わった文書へ書き込む）]
+    type: references
+    when: このインターフェースの入出力やフローを変えるときに、シナリオ『YAMLを直接編集した』の対応する流れと期待値を確認する。
 test_file: tests/integration/server/test_write_docs.py

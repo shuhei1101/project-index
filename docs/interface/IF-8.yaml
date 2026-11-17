@@ -50,7 +50,7 @@ flows:
         participant T as status
 
         C->>T: format: json
-        T-->>C: loading: true・sources: []
+        T-->>C: loading: true・sample が loading
         C->>T: 配信元の読み込みの合図を出す
         C->>T: format: json
         T-->>C: loading: false・sample が serving
@@ -58,7 +58,7 @@ flows:
 
       <!-- /map -->
     expected:
-      - '合図の前の `status` が読み込みを待たずに `loading: true` と空の `sources` を返す'
+      - '合図の前の `status` が読み込みを待たずに `loading: true` と、sample を `loading` で並べた `sources` を返す'
       - 合図の前の markdown に、読み込み中であることと、読み込みが終わっていない配信元を指す文書の MCP の呼び出しが待たされることが出る
       - '合図の後の `status` が `loading: false` で、sample が `serving`'
     test: test_normal_when_loading
@@ -123,7 +123,10 @@ flows:
       - '合図の後の `status` が `checking: false` で、`sync` に件数がある'
     test: test_normal_when_reload_checking
     refs:
-      - SC-10#scenarios[正常シナリオ]
+      - to: SC-10
+        item: scenarios[正常シナリオ]
+        type: references
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『設定・スクリプトを変える』の対応する流れと期待値を確認する。
   - name: 正常系（裏でリビジョンを書き出している）
     summary: 裏のリビジョンの書き出しが済むまで、書き出しの最中であることを返す
     setup:
@@ -150,8 +153,14 @@ flows:
       - '合図の後の `status` が `exporting: false` を返す'
     test: test_normal_when_exporting
     refs:
-      - SC-4#scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
-      - SC-11#scenarios[正常シナリオ（配信元を読み込んだ直後に開く）]
+      - to: SC-4
+        item: scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
+        type: references
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『起動する』の対応する流れと期待値を確認する。
+      - to: SC-11
+        item: scenarios[正常シナリオ（配信元を読み込んだ直後に開く）]
+        type: references
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『画面のサーバーが文書を読む』の対応する流れと期待値を確認する。
 lead: 待ち受けのアドレス・バージョン・端末の設定・配信元ごとの状態を返却する管理の MCP の `status` の入出力を定め、`status` を修正するときに参照する。
 tags:
   - name: topic:サーバー
@@ -201,8 +210,8 @@ response:
     type: str
     description: 配信元の ID
   - name: sources[].status
-    type: Literal['serving', 'not_served', 'disabled']
-    description: '配信中・検証で外した・`enabled: false`'
+    type: Literal['serving', 'not_served', 'disabled', 'loading']
+    description: '配信中・検証で外した・`enabled: false`・読み込み中'
   - name: sources[].errors[]
     type: str
     description: '配信しない理由（`{キーのパス}: {理由}`）'
@@ -232,7 +241,7 @@ response:
     description: '`related[].to` が配信元のどの文書の ID にも当たらない関連の件数（`check_project` と同じ）'
   - name: loading
     type: bool
-    description: 配信元を読み込んでいる間は `true`。その間は `sources` が空で、markdown に読み込み中であることと、読み込みが終わっていない配信元を指す文書の MCP の呼び出しが待たされることを出す
+    description: 配信元を読み込んでいる間は `true`。その間は、読み込み済みの行と、読み込みが終わっていない行を `loading` で、端末の設定の順に `sources` に並べ（読み込み中の行の ID は `GET /sources?include_loading=true` と同じ）、markdown に読み込み中であることと、読み込みが終わっていない配信元を指す文書の MCP の呼び出しが待たされることを出す
     notes: '-'
   - name: checking
     type: bool

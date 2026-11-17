@@ -96,12 +96,18 @@ def version_state(mine: str, current: str) -> VersionState:
     return "old" if left < right else "newer"
 
 
-def _source_states(handlers: Handlers, *, with_sync: bool = True) -> list[SourceState]:
+def _source_states(
+    handlers: Handlers, *, with_sync: bool = True, loading: bool = False
+) -> list[SourceState]:
     """登録簿の状態を配信元の状態の行にする。"""
     states: list[SourceState] = []
     # 配信元ごとの `default_ref` の commit を確かめず、いま配信中の組を読む
     served = {source.id: source for source in handlers.registry.served()}
-    for status in handlers.registry.statuses():
+    # 読み込み中は、読み込みが終わっていない行を `loading` で並べる
+    statuses = (
+        handlers.registry.statuses_with_loading() if loading else handlers.registry.statuses()
+    )
+    for status in statuses:
         # 配信中だけ、設定のバージョンの新旧と索引の同期の件数を持つ
         if status.status == "serving" and status.id in served:
             source = served[status.id]
@@ -146,7 +152,7 @@ def get_status(handlers: Handlers, *, env: Mapping[str, str]) -> ServerStatus:
             file=str(handlers.terminal.file),
             version_state=version_state(handlers.terminal.version, SETTINGS_VERSION),
         ),
-        sources=[] if loading else _source_states(handlers),
+        sources=_source_states(handlers, loading=loading),
         loading=loading,
         checking=handlers.checks.checking,
         exporting=handlers.snapshots.exporting,

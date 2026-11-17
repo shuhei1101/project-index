@@ -119,6 +119,8 @@ class SourceSpec:
     outside_read: bool | None = None
     # 端末の設定の行の `storage.type`。None は行に書かない
     storage: str | None = None
+    # False のときは端末の設定の行に `id` を書かず、配信元の設定の `name` を ID にする
+    with_id: bool = True
 
 
 @dataclass
@@ -452,7 +454,8 @@ def make_local_source(
 
 def _source_lines(spec: SourceSpec) -> list[str]:
     """端末の設定の `sources[]` の 1 行の YAML の行を組み立てる。"""
-    lines = [f"  - id: {spec.id}", "    config:"]
+    lines = [f"  - id: {spec.id}"] if spec.with_id else ["  -"]
+    lines.append("    config:")
     lines.extend(f"      - {path}" for path in spec.config)
     if not spec.enabled:
         lines.append("    enabled: false")
@@ -635,16 +638,18 @@ def make_loading_server(
         waiting = threading.Event()
 
         def load(entry: Any, *, index: int, lookup: Any = None) -> Any:
-            order.append(entry.id)
-            if blocked is None or entry.id in blocked:
+            # `id` を持たない行は、配信元のフォルダの名前で見分ける
+            name = entry.id or Path(entry.config[0]).parent.name
+            order.append(name)
+            if blocked is None or name in blocked:
                 release.wait(timeout=LOADING_WAIT_SEC)
-            if entry.id in held:
+            if name in held:
                 hold.wait(timeout=LOADING_WAIT_SEC)
-            if entry.id in failing:
-                msg = f"{entry.id} を読み込めない"
+            if name in failing:
+                msg = f"{name} を読み込めない"
                 raise RuntimeError(msg)
             result = original(entry, index=index, lookup=lookup)
-            loaded.append(entry.id)
+            loaded.append(name)
             return result
 
         monkeypatch.setattr(registry_module, "load_source", load)
@@ -851,6 +856,7 @@ CLONE_FILES = (
     "src",
     "content",
     "templates",
+    "schemas",
     "pyproject.toml",
     "uv.lock",
     ".python-version",

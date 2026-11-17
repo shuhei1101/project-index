@@ -42,5 +42,8 @@
 | [端末の設定の配信元の 1 行の追加](./IF-32.yaml) | 端末の設定の配信元の 1 行の追加（POST /settings/sources） |
 | [端末の設定の配信元の 1 行の変更](./IF-33.yaml) | 端末の設定の配信元の 1 行の変更（PATCH /settings/sources/{id}） |
 | [端末の設定の配信元の 1 行の削除](./IF-34.yaml) | 端末の設定の配信元の 1 行の削除（DELETE /settings/sources/{id}） |
+| [ファイルのアウトライン](./IF-106-1.yaml) | ファイルのアウトライン（project-index outline（CLI）） |
+| [中身が変わったファイルの一覧](./IF-106-2.yaml) | 中身が変わったファイルの一覧（project-index changed（CLI）） |
+| [確認の時点の記録](./IF-106-3.yaml) | 確認の時点の記録（project-index checkpoint（CLI）） |
 
 <!-- /table -->

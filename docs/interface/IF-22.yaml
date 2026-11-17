@@ -51,6 +51,29 @@ flows:
     expected:
       - 200 で、`sources` が空
     test: test_normal_when_no_source
+  - name: 正常系（読み込みを待たずに返す）
+    summary: '`include_loading=true` のとき、読み込みが終わっていない配信元を `loading` で返す'
+    setup:
+      - name: Mock
+        description: 配信元 slow と 3 行目の読み込み（`load_source`）を、テストが出す 1 つの合図まで止めるものに差し替える
+        notes: 合図は `threading.Event`
+      - name: 端末の設定
+        description: 配信元 slow・sample の 2 行（この順）と、`id` を持たずに配信元の設定の ID が `third` の 3 行目
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources
+
+        C->>E: GET /sources?include_loading=true（slow と 3 行目を止めている）
+        E-->>C: 200 slow が loading
+        C->>E: slow と 3 行目の読み込みの合図を出し、GET /sources
+        E-->>C: 200 全ての行の読み込みの後の状態
+      ```
+    expected:
+      - 合図の前の `include_loading=true` の要求が、待たずに 200 で slow を `loading`、3 行目を `sources[2]` の ID の `loading` で、端末の設定の順に返す
+      - 合図の後の `include_loading` を渡さない要求が、`loading` を含まずに slow・sample・third（3 行目。配信元の設定の ID）を `serving` で、端末の設定の順に返す
+    test: test_normal_when_include_loading
 lead: 配信元ごとの ID・状態・配信していない理由を返却する読み取り API の入出力を定め、配信元の一覧と状態を修正するときに参照する。
 tags:
   - name: topic:配信元
@@ -65,19 +88,25 @@ side_effects: なし
 callers:
   - SC-11#scenarios[正常シナリオ]
   - SC-11#scenarios[異常シナリオ（配信していない配信元を指す）]
+  - SC-11#scenarios[正常シナリオ（起動の直後に配信元の一覧を取得する）]
 exclusivity: 読み取りだけで排他しない
-request: []
+request:
+  - name: include_loading
+    type: bool
+    required: false
+    description: '`true` のとき、全ての行の読み込みを待たずに返し、読み込みが終わっていない配信元を `loading` で返す'
+    notes: 既定は `false`。`false` のときは、全ての行の読み込みが終わるまで待ってから返す（`loading` を返さない）
 request_example: |-
   ```text
-  GET /sources
+  GET /sources?include_loading=true
   ```
 response:
   - name: sources[].id
     type: str
     description: 配信元の ID
   - name: sources[].status
-    type: Literal['serving', 'not_served', 'disabled']
-    description: 配信中・配信していない・無効
+    type: Literal['serving', 'not_served', 'disabled', 'loading']
+    description: 配信中・配信していない・無効・読み込み中
   - name: sources[].errors
     type: 'list[{path: str, reason: str}]'
     description: 配信していない理由
@@ -87,7 +116,8 @@ response_example: |-
   {"sources": [
     {"id": "sample", "status": "serving"},
     {"id": "broken", "status": "not_served", "errors": [{"path": "documents[0].paths", "reason": "'paths' is a required property"}]},
-    {"id": "archive", "status": "disabled"}
+    {"id": "archive", "status": "disabled"},
+    {"id": "slow", "status": "loading"}
   ]}
   ```
 status_codes:
@@ -96,10 +126,12 @@ status_codes:
 error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）
 constraints:
   - item: 読み込み中
-    constraint: 読み込みが終わっていない配信元は、その配信元の読み込みが終わるまで待ってから返す
+    constraint: '`include_loading` が `false` のときは、全ての行の読み込みが終わるまで待ってから返す。`true` のときは待たずに、読み込みが終わっていない行を `loading` で端末の設定の順に並べて返す。`id` を持たない行は読み込むまで ID が決まらないため、`sources[{n}]` の ID で返す'
   - item: 認可
     constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
     decided_by: NFR-1#requirements[通信]
   - item: JSON のキー
     constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名は変えない
+  - item: 互換
+    constraint: '`include_loading` を渡さない要求には `loading` を返さず、今の利用側（dev-docs の画面のサーバー）の状態の値の並びを壊さない'
 test_file: tests/integration/server/test_list_sources.py

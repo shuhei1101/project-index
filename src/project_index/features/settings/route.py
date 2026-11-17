@@ -98,7 +98,8 @@ def _settings_view(handlers: Handlers) -> SettingsSourcesView:
                 config=list(entry.config),
                 enabled=entry.enabled,
                 scope=entry.scope,
-                status=item.status,
+                # 読み込みの済んでいない行は、読み直していない行と同じく `pending_reload` にする
+                status="pending_reload" if item.status == "loading" else item.status,
                 errors=item.errors,
                 config_version=item.config_version,
                 outside_read=entry.outside_read,

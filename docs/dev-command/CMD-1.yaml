@@ -68,10 +68,15 @@ categories:
       detail: 作業 PR の worktree で配信元 `ai-monitor` を持つ端末の設定とポート 8796 で起動し、`/sources` が `serving` を返却して `/mcp` の `search_docs` が応えること、停止でポートが閉じることを確認した
   - name: テスト
     refs:
-      - TP-1#
+      - to: TP-1
+        type: references
+        when: この分類のコマンドを実行・追加するときに、テストの層ごとの前提と実行方法を確認する。
   - name: 静的検査
     refs:
-      - TP-1#layers[lint]
+      - to: TP-1
+        item: layers[lint]
+        type: references
+        when: この分類のコマンドを実行・追加するときに、テストの層ごとの前提と実行方法を確認する。
   - name: ビルド・生成
     prerequisites:
       - AI Monitor のクローンがある（`uv` で AI Monitor の依存を入れてある）
@@ -84,14 +89,23 @@ categories:
 
       2. 配信元の設定のスキーマの原本（`src/project_index/schemas/project-index.schema.yaml`）を変えたら、配布する `schemas/project-index.schema.json` を再作成し、原本と一緒に commit する（コマンドは `refs` の『配布のスキーマの生成』）
     refs:
-      - MOD-70#functions[source_schema_json]
+      - to: MOD-70
+        item: functions[source_schema_json]
+        type: references
+        when: 配布のスキーマを生成するコマンドを変えるときに、生成する関数の出力を確認する。
     verification:
       state: 未確認
       detail: 1 は、AI Monitor が配信元の設定を `dev-docs.yaml` の名前でだけ読み込み、`project-index.yaml` のこのリポジトリでは `No such file or directory` で止まるため確認していない（shuhei1101/ai-monitor#3441 で修正する）。2 の『配布のスキーマの生成』のコマンドは作業 PR の worktree で実行し、終了コード 0 で、出力が commit 済みの `schemas/project-index.schema.json` と一致した（2026-11-14）
   - name: 取り込み前の検査
     refs:
-      - TP-1#layers[単体テスト（バック）]
-      - TP-1#layers[lint]
+      - to: TP-1
+        item: layers[単体テスト（バック）]
+        type: references
+        when: この分類のコマンドを実行・追加するときに、テストの層ごとの前提と実行方法を確認する。
+      - to: TP-1
+        item: layers[lint]
+        type: references
+        when: この分類のコマンドを実行・追加するときに、テストの層ごとの前提と実行方法を確認する。
   - name: 管理作業
     commands: |-
       1. 配信元の設定のバージョンを移し替える手順を確認する（`--plan` を除くと書き換える）

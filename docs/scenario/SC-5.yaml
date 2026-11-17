@@ -722,13 +722,184 @@ scenarios:
       - '`files.local.yaml` に足した Markdown の行が入り、改名したファイルの行はパスだけが新しくなり、メタデータは元の値を保つ'
       - '`project-index.yaml`・`files.yaml` を作らず、`info/exclude` の `*.local.*` の行は 1 行のまま'
     test: test_normal_when_local_operation_rerun
+  - name: 正常シナリオ（仮のメタデータを段階的に付ける）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
+        notes: '-'
+      - name: project-index
+        description: 正常シナリオと同じ
+        notes: '-'
+      - name: 中身の分かりにくさが違うファイルを持つ配信元
+        description: '`project-index.yaml` も管理用の YAML も無い git リポジトリ。`docs/` に、各ファイルへのリンクと 1 行の説明を並べた `docs/README.md`、見出しを 3 つ以上持つ日本語の `docs/guide.md`、見出しが 1 つで本文の大半がコードブロックの `docs/log.md`、英語の `docs/en.md`、モジュールの docstring と関数・クラスを持つ `src/tasks.py` を置く'
+        notes: 範囲の質問に `docs/**/*.md` と `src/**/*.py` を答える
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（仮のメタデータを段階的に付ける）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant CL as project-index の CLI
+        participant FS as 配信元のフォルダ
+        participant AD as 管理の MCP
+        participant CF as 端末の設定
+
+        U->>SK: /project-index:setup {配信元のパス}
+        SK->>U: scope・範囲を聞く
+        U-->>SK: 既定の値と範囲
+        SK->>CL: project-index files（載せるファイル）
+        SK->>FS: 目次のページ docs/README.md の全文を参照し、分類とタグの語彙を決める
+        SK->>CL: 載せるファイルのアウトラインを取り出す
+        CL-->>SK: ファイルごとの既存の説明・見出し・コードブロックの割合・リンクの数・関数名とクラス名と import と、次の段階へ進むかの判定と理由
+        SK->>FS: 次へ進むと判定されたファイルだけ、見出しの直下の最初の段落、コードブロックの外の文章、全文の順に、名前と説明が決まるまで参照する
+        SK-->>U: 載せる行を、仮のメタデータと決めた段階・新しいタグつきの表で示して確かめる
+        U-->>SK: 了承
+        SK->>FS: 管理用の YAML を書き、確認の時点を記録する
+        SK->>AD: check_project
+        SK->>CF: sources に行を書く
+        SK->>AD: reload
+        SK-->>U: 追加した配信元と結果を出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - 確認の表の各行に、メタデータを決めた段階が出る
+      - '`docs/guide.md` と `src/tasks.py` はアウトラインの段階で決まり、`docs/log.md` と `docs/en.md` はアウトラインより後の段階で決まる'
+      - '`src/tasks.py` の `description` の材料に、モジュールの docstring が使用される'
+      - '`docs/README.md` で決めた語彙と既存のタグに無いタグは、確認の表で新しいタグとしてまとめて出る'
+      - 管理用の YAML の行が `templates/files.schema.yaml` の検証に通り、`check_project` が違反を 0 件で返す
+      - 確認の時点が記録される
+    test: test_normal_when_metadata_staged
+  - name: 正常シナリオ（2 回目以降で中身が変わったファイルを見直す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: 登録済みの配信元
+        description: '`正常シナリオ（仮のメタデータを段階的に付ける）` を終えた後の配信元'
+        notes: 前のシナリオで書いた `project-index.yaml`・管理用の YAML を commit し、`docs/guide.md` の見出しと本文を書き換えて commit する。その commit でワークツリーを作り、ワークツリーの `src/tasks.py` に関数を追加して commit しない。`docs/en.md` は変えない
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（2 回目以降で中身が変わったファイルを見直す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant CL as project-index の CLI
+        participant DM as 文書の MCP
+        participant AD as 管理の MCP
+
+        U->>SK: 配信元のワークツリーで /project-index:setup
+        SK->>SK: 既にある sources の行と管理用の YAML を参照する
+        SK->>CL: 確認の時点の後に中身が変わったファイルを引く
+        CL-->>SK: docs/guide.md・src/tasks.py
+        SK->>CL: 変わったファイルのアウトラインを取り出す
+        SK-->>U: 変わったファイルの今のメタデータと新しい案を並べた表で示して確かめる
+        U-->>SK: docs/guide.md の案だけを了承
+        SK->>DM: write_docs（了承された行を書き換える）
+        SK->>SK: 確認の時点（HEAD の commit と、見直した未 commit の src/tasks.py の中身のハッシュ）を記録し直す
+        SK->>AD: check_project
+        SK->>AD: reload
+        SK-->>U: 書き換えた行と結果を出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - 見直しの表に `docs/guide.md` と `src/tasks.py` が出て、`docs/en.md` は出ない（commit していない作業ツリーの変更も対象に入る）
+      - 変わっていないファイルは中身を参照しない
+      - 見直しの表の各行に、今の値と新しい案が並ぶ
+      - 了承した `docs/guide.md` の行だけが書き換わり、`src/tasks.py` の行は元の値のまま
+      - 確認の時点が今の HEAD の commit に進み、見直した未 commit の `src/tasks.py` の中身のハッシュが記録される
+      - その後に `src/tasks.py` を同じ中身のまま commit して setup を回すと、`src/tasks.py` は見直しの表に出ない
+    test: test_normal_when_rerun_with_changed_files
+  - name: 正常シナリオ（確認の時点の記録が無い Git の配信元の 2 回目以降）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: 記録の無い配信元
+        description: 管理用の YAML を持ち、確認の時点の記録を持たない登録済みの配信元。管理用の YAML を最後に変更した commit の後に 1 件の Markdown の中身を変えて commit する
+        notes: '-'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（確認の時点の記録が無い Git の配信元の 2 回目以降）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant CL as project-index の CLI
+
+        U->>SK: /project-index:setup {配信元のパス}
+        SK->>CL: 確認の時点の後に中身が変わったファイルを引く
+        CL-->>SK: 記録が無いため、管理用の YAML を最後に変更した commit から HEAD までの差分と、作業ツリーの未 commit の変更
+        SK-->>U: 変わったファイルの今のメタデータと新しい案を並べた表で示して確かめる
+      ```
+
+      <!-- /map -->
+    expected:
+      - 見直しの表に、変更した 1 件だけが出る
+    test: test_normal_when_rerun_without_checkpoint
+  - name: 正常シナリオ（確認の時点の記録が無い Git 管理外の配信元の 2 回目以降）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: 記録の無い Git 管理外の配信元
+        description: 管理用の YAML を持ち、確認の時点の記録を持たない登録済みの Git 管理外のフォルダ。管理用の YAML の変更日時より後に 1 件の Markdown の中身を変える
+        notes: '-'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（確認の時点の記録が無い Git 管理外の配信元の 2 回目以降）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant CL as project-index の CLI
+
+        U->>SK: /project-index:setup {配信元のパス}
+        SK->>CL: 確認の時点の後に中身が変わったファイルを引く
+        CL-->>SK: 記録が無いため、管理用の YAML の変更日時より後に変更されたファイル
+        SK-->>U: 変わったファイルの今のメタデータと新しい案を並べた表で示して確かめる
+      ```
+
+      <!-- /map -->
+    expected:
+      - 見直しの表に、管理用の YAML の変更日時より後に変更した 1 件だけが出る
+    test: test_normal_when_rerun_without_checkpoint_outside_git
+  - name: 正常シナリオ（確認の時点の記録が無いローカル運用の 2 回目以降）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: 記録の無いローカル運用の配信元
+        description: '`正常シナリオ（ローカル運用で追加する）` を終えた後の git リポジトリで、`files.local.yaml` は確認の時点の記録を持たない'
+        notes: '`files.local.yaml` の変更日時より後に Markdown を 1 件変えて commit し、別の 1 件を変えて commit しない。変更日時より前の commit で変えた 1 件も置く'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（確認の時点の記録が無いローカル運用の 2 回目以降）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant CL as project-index の CLI
+
+        U->>SK: /project-index:setup {配信元のパス}
+        SK->>CL: 確認の時点の後に中身が変わったファイルを引く
+        CL-->>SK: 記録が無いため、files.local.yaml の変更日時より後の commit の差分と、作業ツリーの未 commit の変更
+        SK-->>U: 変わったファイルの今のメタデータと新しい案を並べた表で示して確かめる
+      ```
+
+      <!-- /map -->
+    expected:
+      - 見直しの表に、変更日時より後に commit した 1 件と commit していない 1 件が出て、変更日時より前の commit で変えた 1 件は出ない
+    test: test_normal_when_local_operation_rerun_without_checkpoint
 lead: 利用者が `/project-index:setup` でフォルダを配信元として登録し、管理用の YAML を範囲のファイルに合わせるシナリオを定め、配信元の追加の流れを変えるときに参照する。
 tags:
   - name: topic:配信元
     main: true
   - name: action:追加
   - name: topic:設定
-issue: 14
 primary_actor: 利用者
 stakeholders:
   - name: 利用者
@@ -744,5 +915,8 @@ minimal_guarantee: '`check_project` が違反を返したときと、利用者�
 frequency: 配信元ごとに 1 回。範囲のファイルを大きく増減・改名したとき
 priority: 高
 refs:
-  - SC-1#scenarios[正常シナリオ]
+  - to: SC-1
+    item: scenarios[正常シナリオ]
+    type: part_of
+    when: このシナリオの前後の流れを、複合ユースケースの中で確認するときに参照する。
 test_file: tests/e2e/単一ユースケース/test_配信元を追加する.py

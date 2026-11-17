@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../schemas/files.schema.yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/shuhei1101/knowledge/design-schemas/v9.2.0/schemas/knowledge-files.schema.yaml
 files:
 - path: project_index/__init__.py
   name: インストール済みのパッケージからバージョンを引くときの配布名
@@ -87,6 +87,33 @@ files:
   - topic:変更
   related:
   - to: MOD-15
+    type: implements
+- path: project_index/features/checkpoint/changed.py
+  name: 中身が変わったファイルの一覧
+  description: 確認の時点の読み取りと、起点の選択・中身が変わった行のファイルの一覧を受け持ち、確認の時点の changed.py を修正するときに参照する。
+  tags:
+  - topic:確認の時点
+  - topic:変更
+  - tool:git
+  related:
+  - to: MOD-106-8
+    type: implements
+- path: project_index/features/checkpoint/record.py
+  name: 確認の時点の記録
+  description: 管理用の YAML の `checkpoint` への確認の時点の書き込みを受け持ち、確認の時点の record.py を修正するときに参照する。
+  tags:
+  - topic:確認の時点
+  - tool:ruamel-yaml
+  related:
+  - to: MOD-106-9
+    type: implements
+- path: project_index/features/checkpoint/types.py
+  name: 確認の時点・起点・変わったファイルの一覧の型
+  description: 確認の時点の記録・起点・変わったファイルの一覧と管理用の YAML が無い例外の型を受け持ち、確認の時点の types.py を修正するときに参照する。
+  tags:
+  - topic:確認の時点
+  related:
+  - to: MOD-106-7
     type: implements
 - path: project_index/features/convert/decisions.py
   name: 配信元の `decisions.folders` から検討事項の文書を探す処理
@@ -279,6 +306,41 @@ files:
   - topic:設定の移し替え
   related:
   - to: MOD-39
+    type: implements
+- path: project_index/features/outline/code.py
+  name: コードと package.json のアウトラインの取り出し
+  description: Python・TypeScript・JavaScript の関数・クラス・import と docstring、package.json の説明の取り出しを受け持ち、アウトラインの code.py を修正するときに参照する。
+  tags:
+  - topic:アウトライン
+  - tool:ast
+  related:
+  - to: MOD-106-5
+    type: implements
+- path: project_index/features/outline/markdown.py
+  name: Markdown のアウトラインの取り出し
+  description: Markdown の見出し・コードブロック・リンク・日本語の割合とフロントマターの説明の取り出しを受け持ち、アウトラインの markdown.py を修正するときに参照する。
+  tags:
+  - topic:アウトライン
+  - topic:markdown
+  related:
+  - to: MOD-106-4
+    type: implements
+- path: project_index/features/outline/service.py
+  name: アウトラインの対象の選択と次の段階へ進む判定
+  description: アウトラインを取り出す対象の選択・読み取り・次の段階へ進む判定と、1 行の JSON への変換を受け持ち、アウトラインの service.py を修正するときに参照する。
+  tags:
+  - topic:アウトライン
+  - topic:メタデータ
+  related:
+  - to: MOD-106-6
+    type: implements
+- path: project_index/features/outline/types.py
+  name: アウトラインと次の段階へ進む理由の型
+  description: アウトラインと次の段階へ進む理由の型を受け持ち、アウトラインの types.py を修正するときに参照する。
+  tags:
+  - topic:アウトライン
+  related:
+  - to: MOD-106-3
     type: implements
 - path: project_index/features/prompt_doc/cli.py
   name: '`project-index prompt-doc` の処理'

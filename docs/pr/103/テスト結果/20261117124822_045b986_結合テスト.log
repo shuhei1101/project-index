@@ -1,0 +1,14 @@
+$ TMPDIR=/tmp/pi97/tmp uv run pytest tests/integration/server/test_get_status.py::test_normal_when_checking tests/integration/server/test_session_start.py::test_normal_when_loading
+（/tmp/pytest-of-shuhei2441 が別のユーザーの持ち物のため、TMPDIR だけを変えて実行した。conftest.py の make_loading_server を使う残りのテスト）
+
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/fix-server-startup-sources-response
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 2 items
+
+tests/integration/server/test_get_status.py .                            [ 50%]
+tests/integration/server/test_session_start.py .                         [100%]
+
+============================== 2 passed in 0.66s ===============================

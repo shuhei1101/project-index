@@ -142,7 +142,9 @@ def build_read_router(handlers: Handlers) -> APIRouter:
     router = APIRouter(tags=["read"])
 
     @router.get("/sources", name="list_sources")
-    async def sources() -> SettingsSourcesResponse:
+    async def sources(include_loading: bool = False) -> SettingsSourcesResponse:
+        if include_loading:
+            return SettingsSourcesResponse.from_statuses(handlers.registry.statuses_with_loading())
         await handlers.registry.wait_loaded()
         return SettingsSourcesResponse.from_statuses(handlers.registry.statuses())
 

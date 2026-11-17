@@ -1,0 +1,14 @@
+$ TMPDIR=/tmp/claude-1000/pytmp114 uv run pytest tests/integration/server/test_serve.py tests/integration/server/test_restart.py tests/integration/server/test_update.py
+# /tmp/pytest-of-shuhei2441 が root 所有で pytest の一時フォルダを作れないため、TMPDIR だけを自分のフォルダへ向けた。並列数 1（TL-2 は parallel: false）
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/refactor-schemas-switch-design-schemas-to-knowledge
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 38 items
+
+tests/integration/server/test_serve.py ...............................   [ 81%]
+tests/integration/server/test_restart.py ..                              [ 86%]
+tests/integration/server/test_update.py .....                            [100%]
+
+============================= 38 passed in 52.60s ==============================

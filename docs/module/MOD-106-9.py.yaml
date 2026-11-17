@@ -1,0 +1,98 @@
+id: MOD-106-9
+title: 索引のサーバー / 確認の時点 / record.py
+lead: 管理用の YAML の `checkpoint` への確認の時点の書き込みを受け持ち、確認の時点の record.py を修正するときに参照する。
+functions:
+  - name: record_checkpoint
+    title: 確認の時点の記録
+    kind: 関数
+    container: project_index/features/checkpoint/record.py
+    usecase: 確認の時点の記録
+    role: 書き込み
+    summary: 管理用の YAML の `checkpoint` を今の確認の時点で置き換える
+    scope: public
+    side_effects: 管理用の YAML の `checkpoint` を書き換える
+    args:
+      - name: root
+        title: 配信元のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: '`--root` のフォルダ'
+      - name: files_yaml
+        title: 管理用の YAML
+        type: str
+        required: true
+        passing: positional
+        description: '`--root` からのパス'
+      - name: reviewed
+        title: 見直したファイル
+        type: Sequence[str]
+        required: false
+        default: ()
+        passing: keyword
+        description: 見直した未 commit のファイルの `root` からのパス
+      - name: now
+        title: 今の日時
+        type: datetime
+        required: true
+        passing: keyword
+        description: Git 管理外で記録する日時（UTC のタイムゾーン付き）
+    returns:
+      type: Checkpoint
+      description: 記録した値
+    process: |-
+      1. 管理用の YAML を往復編集で読む（`load_roundtrip`）
+         - ファイルが無い場合、`FilesYamlNotFoundError` を送る
+      2. `root` のリポジトリの直下（`repo_root`）で記録を作る
+         - `reviewed` に無いファイルがある場合、書き換える前に `ReviewedFileNotFoundError` を送る
+         - Git の中の場合、`rev-parse HEAD` の commit と、`reviewed` の各ファイルの中身の SHA-256（`hashlib.sha256` の 16 進）を持つ記録
+         - Git の外の場合、`now` を ISO 8601 にした `checked_at` だけを持つ記録
+      3. マッピングの `checkpoint` を記録で置き換え（無ければ末尾に追加）、`dump_roundtrip` した文字列でファイルを置き換える（`replace_file`）
+      4. 記録を返す
+    exceptions:
+      - name: FilesYamlNotFoundError
+        condition: 管理用の YAML が無い
+        message: '`{パス}: 管理用の YAML がありません`'
+      - name: ReviewedFileNotFoundError
+        condition: '`reviewed` のファイルが無い'
+        message: '`{パス}: ファイルがありません`'
+    callees:
+      - MOD-104#functions[load_roundtrip]
+      - MOD-104#functions[dump_roundtrip]
+      - MOD-99#functions[replace_file]
+      - MOD-86#functions[run_git]
+      - MOD-86#functions[repo_root]
+    unit_tests:
+      - name: test_record_checkpoint
+        case: 正常
+        summary: Git の配信元で commit とハッシュを書く
+        condition: コメント付きの `files.yaml` を commit した一時リポジトリで、未 commit の `src/tasks.py` を `reviewed` に渡す
+        mock: なし（`tmp_path` で `git init`）
+        expected: '`checkpoint.commit` が HEAD、`reviewed` が `src/tasks.py` と中身の SHA-256 の 1 件、`files` の行とコメントが変わらない'
+      - name: test_record_checkpoint_when_outside_git
+        case: 正常
+        summary: Git 管理外で日時を書く
+        condition: 古い `checkpoint.checked_at` を持つ `files.yaml`、`now` に 2026-11-17T00:00:00+00:00
+        mock: なし（`tmp_path`）
+        expected: '`checkpoint` が `checked_at: "2026-11-17T00:00:00+00:00"` だけを持つ'
+      - name: test_record_checkpoint_when_files_yaml_missing
+        case: 異常
+        summary: 管理用の YAML が無い
+        condition: '`files_yaml` に無いパス'
+        mock: なし（`tmp_path`）
+        expected: '`FilesYamlNotFoundError`、フォルダにファイルが作られない'
+        exception: 管理用の YAML が無い
+      - name: test_record_checkpoint_when_reviewed_missing
+        case: 異常
+        summary: 見直したファイルが無い
+        condition: '`files.yaml` を commit した一時リポジトリで `reviewed=["missing.md"]`'
+        mock: なし（`tmp_path` で `git init`）
+        expected: '`ReviewedFileNotFoundError` のメッセージに `missing.md`、`files.yaml` が変わらない'
+        exception: '`reviewed` のファイルが無い'
+tags:
+  - name: topic:確認の時点
+    main: true
+  - name: action:記録
+  - name: tool:ruamel-yaml
+test_files:
+  - tests/unit/project_index/features/checkpoint/test_record.py
