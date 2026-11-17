@@ -510,3 +510,53 @@ functions:
         mock: なし
         expected: どちらも `[]`
         exception: '-'
+  - name: field_arrays
+    title: 列名の指す配列の取得
+    kind: 関数
+    container: project_index/features/documents/fields.py
+    usecase: 書き込み
+    role: 読み取り
+    summary: 列名が指す配列を、文書の中の元の配列のまま出現順に返す
+    description: 参照元の `related` の列から行を除く処理が、返った配列をその場で書き換える。`**.` で始まる列名では、最上位と入れ子の全ての配列を返す。
+    scope: public
+    thread_safe: true
+    args:
+      - name: data
+        title: 内容
+        type: Mapping[str, Any]
+        required: true
+        passing: positional
+        description: 文書の内容
+      - name: path
+        title: 列名
+        type: str
+        required: true
+        passing: positional
+        description: '`related`・`meta.refs`・`**.refs[]` の形の列名。末尾の `[]` は配列そのものを指すものとして扱う'
+    returns:
+      type: list[list[Any]]
+      description: 列名が指す配列（複製しない元の配列）の並び。配列でない値・たどれない場所は含めない
+    process: |-
+      1. 『項目のパスの分解』で分け、末尾の `ArraySelector(key=None)` を 1 つ除く。残りに `ArraySelector` があれば `InvalidArgumentError` を送る
+      2. 先頭が `AnyDepth` の場合、『項目の取得』と同じ順で文書の中の全ての辞書をたどり、辞書ごとに残りのパスをたどった値が配列なら並べる
+      3. それ以外は、パスをたどった値が配列ならその 1 つを並べる
+      4. 並びを返す
+    exceptions:
+      - name: InvalidArgumentError
+        condition: 末尾以外に `[]`・`[{キー}]` を含むか、パスの書式が誤っている
+        message: '{path}: 配列を指す列名ではありません'
+    unit_tests:
+      - name: test_field_arrays
+        case: 正常
+        summary: 最上位と入れ子の配列を元のまま返す
+        condition: '`{"refs": [1], "functions": [{"refs": [2]}, {"name": "g"}]}` を `**.refs[]`、同じ内容を `refs`'
+        mock: なし
+        expected: '`**.refs[]` が 2 つの配列で、返った 2 つ目の配列を空にすると内容の `functions[0].refs` も空になる。`refs` は最上位の配列 1 つ'
+        exception: '-'
+      - name: test_field_arrays_when_not_list
+        case: 正常
+        summary: 配列でない・無い列
+        condition: '`{"refs": "x"}` を `refs`、`{}` を `**.refs[]`'
+        mock: なし
+        expected: どちらも `[]`
+        exception: '-'
