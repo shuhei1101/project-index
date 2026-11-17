@@ -230,7 +230,7 @@ Git の配信元は HEAD の commit（`commit`）と `--reviewed` のファイ�
 
 ## project-index prompt-doc
 
-標準入力のプロンプトの YAML 1 件（キーは `schemas/prompt.schema.yaml`）を Markdown にして標準出力に出します。
+標準入力のプロンプトの YAML 1 件（キーは project-index の `schemas/prompt.schema.yaml`）を Markdown にして標準出力に出します。
 配信元の `converters[].run` から呼ぶ変換で、引数は持たず、ファイルは書き換えません。
 行の書き方は [設定](./設定.md) の「雛形」にあります。
 
