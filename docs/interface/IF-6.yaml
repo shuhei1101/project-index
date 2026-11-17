@@ -1067,9 +1067,9 @@ flows:
         description: 'sample の種類のスキーマが `functions`（`x-key: name` の配列。要素は `name`・`process` を持つ）と、値が文字列の辞書 `notes` を定める'
         notes: '`functions` の定義は `$ref` で別の定義を指す'
       - name: 文書 1
-        description: '`functions` が `load`・`save`・`save` の順の 3 要素で、どれも `process` に `書き出す` を含む。`notes` はキー `main.py の補足` の値に `書き出す` を含む'
+        description: '`functions` が `load`・`save`・`save`・`items[].name` の順の 4 要素で、どれも `process` に `書き出す` を含む。`notes` はキー `main.py の補足` の値に `書き出す` を含む'
       - name: 入力
-        description: '1 回目は `text_edits: [{field: "#functions[save].process", old: 書き出す, new: 保存する}]`。2 回目は `field` を `#functions[save#2].process` にした同じ操作。3 回目は `field` を `functions[save].process` にした同じ操作。4 回目は `field` を `#notes[main.py の補足]` にした同じ操作'
+        description: '1 回目は `text_edits: [{field: "#functions[save].process", old: 書き出す, new: 保存する}]`。2 回目は `field` を `#functions[save#2].process` にした同じ操作。3 回目は `field` を `functions[save].process` にした同じ操作。4 回目は `field` を `#notes[main.py の補足]` にした同じ操作。5 回目は `field` を `#functions[items[].name].process` にした同じ操作'
         notes: 3 回目は `#` で始まらない既存の項目のパス（`[save]` はキー `save` が真の要素を選ぶ）
     flow: |-
       <!-- map: {"title": "正常系（参照の型の項目のパスで配列の要素の中を置き換える）"} -->
@@ -1092,6 +1092,9 @@ flows:
         C->>T: update 文書 1（text_edits #notes[main.py の補足]）
         T->>T: 辞書のキー main.py の補足 を 1 階層として解決して置き換える
         T-->>C: updated
+        C->>T: update 文書 1（text_edits #functions[items[].name].process）
+        T->>T: 対応の取れた [ ] を値の一部として読み、functions[3].process に解決して置き換える
+        T-->>C: updated
       ```
 
       <!-- /map -->
@@ -1099,17 +1102,17 @@ flows:
       - 1 回目は 1 つ目の `save` の `process` の `書き出す` だけが `保存する` になり、`load` と 2 つ目の `save` は変わらない
       - 2 回目は 2 つ目の `save` の `process` だけが置き換わる
       - 3 回目は既存の項目のパスのまま読み、`text_edits[0].field` の「文字列ではない項目は置き換えられません」を返却し、ファイルを書き換えない
-      - 4 回目は `notes` のキー `main.py の補足` の値だけが置き換わり、`.` で区切らずに 1 階層のキーとして読む
+      - 4 回目は `notes` のキー `main.py の補足` の値だけが置き換わり、`.` で区切らずに 1 階層のキーとして読む。5 回目は `items[].name` の要素の `process` だけが置き換わる
     test: test_normal_when_text_edits_ref_path
   - name: 異常系（参照の型の項目のパスが要素を指せない・InvalidArgumentError）
-    summary: '`x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す参照の型の項目のパスを断る'
+    summary: '`x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指すパスと、`[...]` の中の `[` `]` の対応が取れない参照の型の項目のパスを断る'
     setup:
       - name: Mock
         description: なし
       - name: 種類のスキーマと文書 1
         description: 正常系（参照の型の項目のパスで配列の要素の中を置き換える）と同じ。スキーマは `x-key` を持たない配列 `steps`（要素は `name`・`body`）も定め、文書 1 は `steps` に 1 要素を持つ
       - name: 入力
-        description: '`text_edits` の `field` を、順に `#steps[a].body`・`#functions[missing].process`・`#functions[save#3].process`・`#notes[missing]` にした 4 回の `update`'
+        description: '`text_edits` の `field` を、順に `#steps[a].body`・`#functions[missing].process`・`#functions[save#3].process`・`#notes[missing]`・`#functions[save[1].process` にした 5 回の `update`'
     flow: |-
       <!-- map: {"title": "異常系（参照の型の項目のパスが要素を指せない・InvalidArgumentError）"} -->
 
@@ -1126,6 +1129,8 @@ flows:
         T-->>C: isError（無い順番）
         C->>T: update 文書 1（text_edits #notes[missing]）
         T-->>C: isError（無いキー）
+        C->>T: update 文書 1（text_edits #functions[save[1].process）
+        T-->>C: isError（記載方法の誤り）
       ```
 
       <!-- /map -->
@@ -1134,7 +1139,7 @@ flows:
       - 2 回目は `text_edits[0].field` の違反で、`functions` に `name` が `missing` の要素が無いことを返却する
       - 3 回目は `text_edits[0].field` の違反で、`name` が `save` の要素が 2 つしか無いことを返却する
       - いずれもファイルを書き換えない
-      - 4 回目は `text_edits[0].field` の違反で、`notes` にキー `missing` が無いことを返却する
+      - 4 回目は `text_edits[0].field` の違反で、`notes` にキー `missing` が無いことを返却する。5 回目は `text_edits[0].field` の違反で、`[` の対応が取れず項目のパスの記載方法が誤っていることを返却する
     test: test_error_when_text_edits_ref_path_unresolved
   - name: 正常系（参照の型の項目のパスで配列へ追加・削除する）
     summary: '`add_to`・`remove_from` のキーに `#` で始まる参照の型の項目のパスを渡し、`x-key` の値で指した配列の要素の中の配列へ追加・削除する。`unset` の要素の `#` で始まるパスで、指した項目を削除する'
@@ -1792,7 +1797,7 @@ constraints:
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、作業場所が `scope.write` に当たれば登録したフォルダへ書き、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく `created`・`updated` を付ける。`worktree` を指定すると `InvalidArgumentError`'
   - item: 参照の型の項目のパス
-    constraint: '`text_edits[].field` が `#` で始まるとき、`#` の後を種類のスキーマ（`$ref` を解決した後）と文書でたどり、位置で指す項目のパスに解決してから既存の取得・書き込みで置き換える。配列の項目の `[{値}]` はスキーマの `x-key` のキーがその値の最初の要素、`[{値}#{順番}]` は同じ値の要素のその順番の要素（同じ値の要素が無く、末尾が `#{整数}` のときだけ）、辞書の項目の `[{キー}]` はそのキー（`.` や空白を含んでも 1 階層）を指す。`[]` の外の `.` で区切った名前は辞書のキー。共通のキーの列名への読み替えはしない。`text_edits[].field`・`add_to`・`remove_from` のキーと `unset` の要素だけが受け付け、`set` と `metadata` の列名・`search_docs`・`list_changes` の項目のパスの読み方は変えない'
+    constraint: '`text_edits[].field` が `#` で始まるとき、`#` の後を種類のスキーマ（`$ref` を解決した後）と文書でたどり、位置で指す項目のパスに解決してから既存の取得・書き込みで置き換える。配列の項目の `[{値}]` はスキーマの `x-key` のキーがその値の最初の要素、`[{値}#{順番}]` は同じ値の要素のその順番の要素（同じ値の要素が無く、末尾が `#{整数}` のときだけ）、辞書の項目の `[{キー}]` はそのキー（`.` や空白を含んでも 1 階層）を指す。`[...]` の中の `[` と `]` は対応を数え、対応の取れた `[` `]` は値の一部として読む（`#request[operations[].fields].description` は `x-key` の値が `operations[].fields` の要素）。対応の取れない `[` `]` を含むパスは記載方法の誤り。`[]` の外の `.` で区切った名前は辞書のキー。共通のキーの列名への読み替えはしない。`text_edits[].field`・`add_to`・`remove_from` のキーと `unset` の要素だけが受け付け、`set` と `metadata` の列名・`search_docs`・`list_changes` の項目のパスの読み方は変えない'
     notes: 書き方は設計書の参照の型（`{ID}#{項目のパス}`）の `#` から後と同じ。`#` で始まらない既存の `[{キー}]`（キーが真の要素）とは `#` の有無で分ける
   - item: add_to・remove_from の項目のパス
     constraint: '`add_to`・`remove_from` のキーが `#` で始まるとき、「参照の型の項目のパス」と同じ読み方で文書の中の 1 つの配列へ解決し、その配列へ追加・削除する。解決できないパス（無い要素・`x-key` の無い配列・無いキー）と、解決した値が配列でないパスは `add_to.{パス}`・`remove_from.{パス}` の違反にする。`#` で始まらないキーに要素の選び方（`[...]`・`**.`）を含めると、書き込まずに同じ違反にする'
