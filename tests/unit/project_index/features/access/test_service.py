@@ -349,6 +349,39 @@ def test_resolve_read_targets_when_worktree_cwd(
     assert result[0].worktree == Path("/r/.claude/worktrees/x")
 
 
+def test_resolve_read_targets_when_reload_disabled(
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """再読み込みしないときは配信中の配信元のまま（正常系）。"""
+    # 準備
+    source = make_served_source(
+        id="sample",
+        root=Path("/r/docs-src"),
+        is_git=True,
+        repo_root=Path("/r"),
+        scope_write=["/r/docs-src"],
+        worktree_globs=WORKTREE_GLOBS,
+    )
+    registry = make_registry(source)
+    calls: list[Path] = []
+
+    def record_load(item: ServedSource, root: Path) -> ServedSource:
+        calls.append(root)
+        return item
+
+    monkeypatch.setattr(service_module, "load_source_at", record_load)
+    # 実行
+    result = resolve_read_targets(
+        registry=registry, cwd="/r/.claude/worktrees/x", reload_worktree=False
+    )
+    # 検証
+    assert result[0].source is source
+    assert result[0].worktree == Path("/r/.claude/worktrees/x")
+    assert calls == []
+
+
 def test_resolve_read_targets_when_worktree_reloads_config(
     make_served_source: Callable[..., ServedSource],
     make_source_config: Callable[..., SourceConfig],
@@ -500,6 +533,32 @@ def test_resolve_write_target(
     # 検証
     assert result.worktree == Path("/r/.claude/worktrees/x")
     assert result.access == "write"
+
+
+def test_resolve_write_target_when_reload_disabled(
+    sample: ServedSource, make_registry: Callable[..., Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """再読み込みしないときは配信中の配信元のまま（正常系）。"""
+    # 準備
+    registry = make_registry(sample)
+    calls: list[Path] = []
+
+    def record_load(source: ServedSource, root: Path) -> ServedSource:
+        calls.append(root)
+        return source
+
+    monkeypatch.setattr(service_module, "load_source_at", record_load)
+    # 実行
+    result = resolve_write_target(
+        registry=registry,
+        worktree="/r/.claude/worktrees/x",
+        cwd="/r/.claude/worktrees/x/docs",
+        reload_worktree=False,
+    )
+    # 検証
+    assert result.source is sample
+    assert result.worktree == Path("/r/.claude/worktrees/x")
+    assert calls == []
 
 
 def test_resolve_write_target_when_folder(
