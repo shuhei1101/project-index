@@ -25,6 +25,9 @@ diagrams:
         文書の書き込み ..> 文字列からの文書の組み立て
         文書の書き込み ..> 文書の検査
         文書の書き込み ..> ファイルの置き換え
+        文書の書き込み ..> 改名後のパス : rename
+        文書の書き込み ..> 参照の書き換え : rename
+        文書の書き込み ..> 文字列の値の置換 : replace_text
         文書の書き込み ..> スクリプトの実行 : generators[]
         文書の書き込み ..> 会話の記録 : edited
         文書の削除 ..> 書く場所の解決
@@ -80,6 +83,18 @@ diagrams:
         class 会話の記録 {
           <<class>>
         }
+        class 改名後のパス {
+          <<function>>
+        }
+        class 参照の書き換え {
+          <<function>>
+        }
+        class 文字列の値の置換 {
+          <<function>>
+        }
+        click 改名後のパス href "id:MOD-130#functions[renamed_path]"
+        click 参照の書き換え href "id:MOD-130#functions[rewrite_references]"
+        click 文字列の値の置換 href "id:MOD-131#functions[replace_in_values]"
         click 文書の書き込み href "id:MOD-84#functions[write_docs]"
         click 書く場所の解決 href "id:MOD-7#functions[resolve_write_target]"
         click 配信元ごとの排他 href "id:MOD-82#classes[SourceLocks]"

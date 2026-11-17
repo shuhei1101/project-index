@@ -48,9 +48,9 @@ data_models:
     properties:
       - name: op
         title: 操作
-        type: Literal['create', 'update', 'replace']
+        type: Literal['create', 'update', 'replace', 'rename', 'replace_text']
         access: 公開
-        description: 作る・部分更新・置き換え
+        description: 作る・部分更新・置き換え・改名・一括置換
       - name: kind
         title: 種類
         type: str | None
@@ -62,13 +62,13 @@ data_models:
         type: str | None
         access: 公開
         default: None
-        description: '`update`・`replace` で必須。`create` で省くと `ids.format` から作る'
+        description: '`update`・`replace`・`rename` で必須。`create` で省くと `ids.format` から作る'
       - name: expected_version
         title: 読んだときのバージョン
         type: str | dict[str, str] | None
         access: 公開
         default: None
-        description: '`update`・`replace` で必須。`update` は項目のパス → 値のハッシュも受ける'
+        description: '`update`・`replace`・`rename` で必須。`update` は項目のパス → 値のハッシュも受ける'
       - name: data
         title: 全項目
         type: dict[str, Any] | None
@@ -105,6 +105,42 @@ data_models:
         access: 公開
         default: '[]'
         description: '`update` だけ'
+      - name: new_id
+        title: 改名後の ID
+        type: str | None
+        access: 公開
+        default: None
+        description: '`rename` だけ。`new_id`・`new_path` の少なくとも 1 つが必須'
+      - name: new_path
+        title: 改名後のパス
+        type: str | None
+        access: 公開
+        default: None
+        description: '`rename` だけ。配信元の直下からのパス'
+      - name: filter
+        title: 置換する文書の条件
+        type: Condition | Group | None
+        access: 公開
+        default: None
+        description: '`replace_text` で必須。型は [検索の types.py](id:MOD-58) の条件の木'
+      - name: old
+        title: 置換する前
+        type: str | None
+        access: 公開
+        default: None
+        description: '`replace_text` で必須。空の文字列は受けない'
+      - name: new
+        title: 置換した後
+        type: str | None
+        access: 公開
+        default: None
+        description: '`replace_text` で必須'
+      - name: fields
+        title: 置換する項目
+        type: list[str] | None
+        access: 公開
+        default: None
+        description: '`replace_text` だけ。`None` は全ての項目'
   - name: WriteRequest
     title: 書き込みの要求
     container: project_index/features/write/types.py
@@ -194,7 +230,7 @@ data_models:
         description: 作れなかった ID は `None`
       - name: status
         title: 結果
-        type: Literal['created', 'updated', 'replaced', 'failed']
+        type: Literal['created', 'updated', 'replaced', 'renamed', 'failed']
         access: 公開
         description: 操作の結果
       - name: version
@@ -221,6 +257,30 @@ data_models:
         access: 公開
         default: '[]'
         description: mdmark で点検できなかった Markdown のキーと理由（検査.点検できなかったキー）。`failed` では空。空の並びは JSON に出さない
+      - name: path
+        title: 改名後のパス
+        type: str | None
+        access: 公開
+        default: None
+        description: '`renamed` のときだけ'
+      - name: renamed_from
+        title: 改名の前の ID
+        type: str | None
+        access: 公開
+        default: None
+        description: '`renamed` のときだけ'
+      - name: references
+        title: 書き換えた参照
+        type: list[ReferenceChange]
+        access: 公開
+        default: '[]'
+        description: '`rename` の参照元の行だけ。空の並びは JSON に出さない'
+      - name: count
+        title: 置換の件数
+        type: int | None
+        access: 公開
+        default: None
+        description: '`replace_text` の行だけ'
   - name: WriteResult
     title: 書き込みの結果
     container: project_index/features/write/types.py
@@ -330,6 +390,29 @@ data_models:
         access: 公開
         default: '[]'
         description: (ID, 外した後のバージョン)。JSON では `{id, version}`
+  - name: ReferenceChange
+    title: 書き換えた参照
+    container: project_index/features/write/types.py
+    usecase: 書き込み
+    role: DTO
+    summary: '`rename` で書き換えた参照元の 1 か所'
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: path
+        title: 項目のパス
+        type: str
+        access: 公開
+        description: 参照元の文書の中の項目のパス（`a.b[0].c`）
+      - name: before
+        title: 書き換える前
+        type: str
+        access: 公開
+        description: 書き換える前の値
+      - name: after
+        title: 書き換えた後
+        type: str
+        access: 公開
+        description: 書き換えた後の値
 constants:
   - name: OPERATIONS_MAX
     title: 1 回の操作の上限

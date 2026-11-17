@@ -1,0 +1,158 @@
+id: MOD-130
+title: 索引のサーバー / 書き込み / references.py
+lead: '`rename` の改名後のパスの決定と、参照元の文書の旧 ID・旧パスを指す箇所の書き換えを受け持ち、書き込みの references.py を修正するときに参照する。'
+test_files:
+  - tests/unit/project_index/features/write/test_references.py
+diagrams:
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        文書の書き込み ..> 改名後のパス
+        文書の書き込み ..> 参照の書き換え
+        class 文書の書き込み {
+          <<function>>
+        }
+        class 改名後のパス {
+          <<function>>
+        }
+        class 参照の書き換え {
+          <<function>>
+        }
+        click 文書の書き込み href "id:MOD-84#functions[write_docs]"
+functions:
+  - name: renamed_path
+    title: 改名後のパス
+    kind: 関数
+    container: project_index/features/write/references.py
+    usecase: 書き込み
+    role: 判定
+    summary: '`new_path` を省いた `rename` の改名後のファイルのパスを決める'
+    scope: public
+    thread_safe: true
+    args:
+      - name: path
+        title: 改名前のパス
+        type: str
+        required: true
+        passing: positional
+        description: 1 ファイル 1 文書の YAML の配信元の直下からのパス
+      - name: old_id
+        title: 改名前の ID
+        type: str
+        required: true
+        passing: keyword
+        description: 改名する文書の ID
+      - name: new_id
+        title: 改名後の ID
+        type: str
+        required: true
+        passing: keyword
+        description: '`new_id`'
+    returns:
+      type: str | None
+      description: 改名後のパス。ファイル名が旧 ID で始まらないときは `None`（パスを変えない）
+    process: |-
+      1. ファイル名を最初の `.` で分け、前が `old_id` と一致しなければ `None` を返す
+      2. 前を `new_id` にし、`.` から後をそのまま続けたファイル名を、同じフォルダのパスにして返す
+    unit_tests:
+      - name: test_renamed_path
+        case: 正常
+        summary: ファイル名の ID の部分だけを変える
+        condition: '`docs/interface/IF-6.yaml` と `docs/module/MOD-1.py.yaml` を `IF-9`・`MOD-2` へ'
+        mock: なし
+        expected: '`docs/interface/IF-9.yaml` と `docs/module/MOD-2.py.yaml`'
+      - name: test_renamed_path_when_name_differs
+        case: 正常
+        summary: ファイル名が旧 ID で始まらない
+        condition: '`docs/rule/ドキュメント管理.yaml` と `docs/interface/IF-60.yaml`（`old_id` は `IF-6`）'
+        mock: なし
+        expected: どちらも `None`
+  - name: rewrite_references
+    title: 参照の書き換え
+    kind: 関数
+    container: project_index/features/write/references.py
+    usecase: 書き込み
+    role: 変換
+    summary: 文書 1 件の内容のうち、旧 ID・旧パスを指す箇所をその場で書き換え、書き換えた箇所を返す
+    scope: public
+    thread_safe: false
+    args:
+      - name: content
+        title: 文書の内容
+        type: CommentedMap
+        required: true
+        passing: positional
+        description: 往復編集で読んだ参照元の文書の内容（`records` の文書は要素）。その場で書き換える
+      - name: related_column
+        title: 関連の列
+        type: str
+        required: true
+        passing: keyword
+        description: 種類の行の `metadata.related` の列名（無ければ `related`）
+      - name: old_id
+        title: 改名前の ID
+        type: str
+        required: true
+        passing: keyword
+        description: 改名する文書の ID
+      - name: new_id
+        title: 改名後の ID
+        type: str
+        required: true
+        passing: keyword
+        description: ID を変えないときは `old_id` と同じ
+      - name: moved
+        title: パスの変更
+        type: tuple[str, str] | None
+        required: true
+        passing: keyword
+        description: (改名前のパス, 改名後のパス)。どちらも配信元の直下から。パスが変わらないときは `None`
+      - name: base_dir
+        title: 参照元のフォルダ
+        type: str
+        required: true
+        passing: keyword
+        description: 参照元の文書の YAML のフォルダの配信元の直下からのパス。相対のパスを解く基準
+      - name: skip
+        title: 書き換えない列
+        type: Collection[str]
+        required: true
+        passing: keyword
+        description: 種類の行の ID の列と `body_file` の列（最上位のキー）
+    returns:
+      type: list[ReferenceChange]
+      description: 書き換えた箇所の項目のパスと前後の値。無ければ空
+    process: |-
+      1. `related_column` の配列の要素のうち、`source` を持たず `to` が `old_id` の要素の `to` を `new_id` にする
+      2. 最上位の `skip` のキーを除いて、辞書の値と配列の要素をたどり、文字列の値ごとに次を当てる
+         - 値の全体が `{old_id}#` で始まれば、その部分を `{new_id}#` にする
+         - `id:{old_id}` の直後が `#`・`)`・`"`・`'`・空白・文字列の末尾の箇所を `id:{new_id}` にする
+         - `moved` があれば、値の全体と Markdown のリンクの先（`](...)`）のうち、`base_dir` から解くと改名前のパスになるものを、`base_dir` から改名後のパスへの相対のパスにする。`./` で始まる値は `./` を保つ
+      3. 値を変えた箇所ごとに、項目のパス（`a.b[0].c`）と前後の値を返す。引用符の種類は元のスカラーの型で保つ
+    unit_tests:
+      - name: test_rewrite_references
+        case: 正常
+        summary: ID で指す 4 種類の箇所
+        condition: '`related: [{to: doc-2}, {to: doc-2, source: other}]`、`ref: doc-2#items[a]`、`body` に `[文書 2](id:doc-2)`・`click N href "id:doc-2#items[a]"`・`[文書 20](id:doc-20)`。`doc-2` → `doc-9`、`moved` は `None`'
+        mock: なし
+        expected: '`source` を持たない `related` の要素・`ref`・`body` の 2 か所が `doc-9` を指し、`source: other` の要素と `id:doc-20` は変わらず、返り値が 4 件'
+      - name: test_rewrite_references_when_moved
+        case: 正常
+        summary: パスで指す値
+        condition: '`base_dir` が `docs`、`items: [{page: doc-2.yaml}, {page: doc-20.yaml}]`、`body` に `[文書 2](./doc-2.yaml)` と文の途中の `doc-2.yaml`。`moved` は `(docs/doc-2.yaml, docs/old/doc-2.yaml)`'
+        mock: なし
+        expected: '`items[0].page` が `old/doc-2.yaml`、リンクが `./old/doc-2.yaml` になり、`doc-20.yaml` と文の途中の `doc-2.yaml` は変わらない'
+      - name: test_rewrite_references_when_skipped
+        case: 正常
+        summary: ID の列と body_file の列は書き換えない
+        condition: '`skip` に `id`・`path`、`id: doc-2#x`・`path: doc-2.yaml`'
+        mock: なし
+        expected: どちらも変わらず、返り値が空
+visibility: internal
+tags:
+  - name: topic:文書
+    main: true
+  - name: action:書き込み
+  - name: action:改名
+  - name: topic:参照
