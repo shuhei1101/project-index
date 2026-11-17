@@ -76,7 +76,7 @@ functions:
         expected: '`version` が `0.3.0`、`updated`・`restarting` が `True`、`control.requested` が `True`。呼んだコマンドが `rev-parse`・`pull --ff-only`・`rev-parse`・`uv sync`・`migrate --plan`・`npm install -g github:shuhei1101/mdmark#develop` の順。`mdmark.reinstalled` が `True`'
       - name: test_update_clone_when_up_to_date
         case: 正常
-        summary: 新しい commit が無ければ何もしない
+        summary: 新しい commit が無ければ mdmark の CLI だけを入れ直す
         condition: '`git pull` の前後で HEAD が同じ'
         mock: '`subprocess.run`・`shutil.which`'
         expected: '`updated`・`restarting` が `False`、`uv sync` を呼ばず `npm install -g` を 1 回呼ぶ、`mdmark.reinstalled` が `True`、`control.requested` が `False`'
@@ -216,6 +216,7 @@ functions:
          - 終了コード 0 の場合、`reinstalled` を `True`、`error` を `None` にする
          - `FileNotFoundError` の場合、`error` を `{コマンド}: コマンドが見つかりません` にする
          - `TimeoutExpired` の場合、`error` を `{コマンド}: {COMMAND_TIMEOUT_SEC} 秒で打ち切りました` にする
+         - それ以外の `OSError`（実行の権限が無い 等）の場合、`error` を `{コマンド}: {例外の文}` にする
          - 終了コードが 0 以外の場合、`error` を `{コマンド}: 終了コード {コード}` と標準エラーの末尾 `STDERR_TAIL_CHARS` 文字を改行でつないだ文にする
          - `reinstalled` が `False` の場合、`[WARNING]` mdmark の CLI を入れ直せなかった（error）
       4. `MdmarkReinstallResult(ref=mdmark_ref, reinstalled=..., error=...)` を返す
@@ -250,5 +251,11 @@ functions:
         condition: '`subprocess.run` が `TimeoutExpired` を送出する'
         mock: '`subprocess.run`・`shutil.which`'
         expected: '`reinstalled` が `False`、`error` に `300 秒で打ち切りました` が入る'
+      - name: test_reinstall_mdmark_when_os_error
+        case: 正常
+        summary: npm を実行できない
+        condition: '`subprocess.run` が `PermissionError("Permission denied")` を送出する'
+        mock: '`subprocess.run`・`shutil.which`'
+        expected: '`reinstalled` が `False`、`error` が `npm install -g github:shuhei1101/mdmark#develop: Permission denied`'
 notes:
   決まり: '`git pull --ff-only`・`uv sync` で更新し、新しいコードで移し替えの要否を確かめる。'
