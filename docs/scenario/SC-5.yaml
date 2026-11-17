@@ -1161,7 +1161,7 @@ scenarios:
         SK->>SK: プロンプトの行の paths に当たるファイルを、管理用の YAML の追加の候補から外す
         SK-->>U: 管理用の YAML の追加の候補（src/app.py）とプロンプトの行の候補を表で示して確かめる
         U-->>SK: 了承
-        SK->>FS: project-index.yaml・管理用の YAML を作り、プロンプトの行を記載する
+        SK->>FS: project-index.yaml・管理用の YAML を作り、プロンプトのスキーマと、その $ref が指す共通の型を schemas/ に配置して、プロンプトの行を記載する
         SK->>AD: check_project（配信元のパス）
         AD-->>SK: 違反 0 件・索引の同期の件数 0
         SK->>CF: sources に行を書く
@@ -1183,7 +1183,7 @@ scenarios:
         description: なし（実環境で実行）
       - name: プロンプトを管理用の YAML の行に持つ配信元
         description: '直下の `content/prompts/` に A-42 の例 2 のプロンプト（`kind: llm`）を置き、`project-index.yaml` が直下の管理用の YAML を読む行（`paths: [files.yaml]`・`records: files`・`body_file: path`）だけを持ち、管理用の YAML がそのプロンプトの YAML の行を持つ、端末の設定に登録済みの git リポジトリ'
-        notes: プロンプトの documents の行は無い
+        notes: プロンプトの documents の行は無い。その commit でワークツリーを作る（クローン本体には `write_docs` で書き込めない）
     flow: |-
       <!-- map: {"title": "正常シナリオ（管理用の YAML にプロンプトの YAML の行がある）"} -->
 
@@ -1195,13 +1195,13 @@ scenarios:
         participant DM as 文書の MCP
         participant AD as 管理の MCP
 
-        U->>SK: /project-index:setup {配信元のパス}
+        U->>SK: 配信元のワークツリーで /project-index:setup
         SK->>FS: 直下とプラグインのルートの content/prompts/ を探す
         FS-->>SK: content/prompts/
         SK->>SK: 管理用の YAML の行のうち、プロンプトの行の paths に当たるファイルの行を削除の候補にする
         SK-->>U: プロンプトの行の候補と、管理用の YAML の行の削除の候補を表で示して確かめる
         U-->>SK: 了承
-        SK->>FS: project-index.yaml にプロンプトの行を記載する
+        SK->>FS: プロンプトのスキーマと、その $ref が指す共通の型を schemas/ に配置し、project-index.yaml にプロンプトの行を記載する
         SK->>DM: write_docs（管理用の YAML のプロンプトの YAML の行を削除する）
         SK->>AD: check_project
         AD-->>SK: 違反 0 件・索引の同期の件数 0
@@ -1215,6 +1215,7 @@ scenarios:
       - 管理用の YAML に `content/prompts/` の YAML の行が無い
       - '`check_project` が違反と索引の同期の件数を 0 で返す'
       - '`reload` の後の `search_docs` が、プロンプトを 1 件だけ（プロンプトの行の文書として）返す'
+      - '`project-index.yaml` の documents に、`paths` が `content/prompts/**/*.yaml` の行があり、配信元の `schemas/` に `prompt.schema.yaml` と、その `$ref` が指す `common.schema.yaml` がある'
     test: test_normal_when_files_yaml_has_prompt_rows
 lead: 利用者が `/project-index:setup` でフォルダを配信元として登録し、管理用の YAML を範囲のファイルに合わせるシナリオを定め、配信元の追加の流れを変えるときに参照する。
 tags:
