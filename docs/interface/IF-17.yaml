@@ -81,6 +81,32 @@ flows:
       - 終了コードが 2
       - 標準出力が空で、stderr に渡したパスがある
     test: test_error_when_root_not_found
+  - name: 正常系（除外するパスを渡す）
+    summary: '`--exclude-path` の glob に当たるパスのファイルも外す'
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元のフォルダ
+        description: 正常系のフォルダに、プロンプトの YAML `content/prompts/p.yaml` を加える
+        notes: "`--paths **` と `--exclude-path 'content/prompts/**/*.yaml'` を渡す"
+    flow: |-
+      <!-- map: {"title": "正常系（除外するパスを渡す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index files
+
+        C->>M: --root {フォルダ} --paths ** --exclude-path content/prompts/**/*.yaml
+        M->>M: 除外の条件と --exclude-path に当たるファイルを外す
+        M-->>C: 載せるファイルのパス（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 標準出力が `src/a.py`・`src/b.py`・`src/uv.lock` の 3 行だけで、`content/prompts/p.yaml` を含まない
+      - 終了コードが 0
+    test: test_normal_when_exclude_path_given
 lead: 範囲の glob のうち管理用の YAML に記載するファイルを返却する `project-index files` の入出力を定め、記載するファイルの判定を修正するときに参照する。
 tags:
   - name: topic:ファイル
@@ -96,6 +122,7 @@ side_effects: なし（ファイルを書き換えない）
 callers:
   - SC-5#scenarios[正常シナリオ（除外の条件と関連の候補）]
   - SC-5#scenarios[正常シナリオ（YAML でない範囲を加える）]
+  - SC-5#scenarios[正常シナリオ（初回の範囲が content/prompts/ を含む）]
 exclusivity: 読み取りだけで排他しない
 request:
   - name: --root
@@ -117,6 +144,13 @@ request:
     location: argument
     description: 除外するファイル名の glob。繰り返して渡せる
     notes: '`documents[].exclude[]` と同じ書き方'
+  - name: --exclude-path
+    type: list[str]
+    required: false
+    default: なし
+    location: argument
+    description: 除外するパスの glob（`--root` からの相対）。繰り返して渡せる
+    notes: '`documents[].paths` と同じ書き方。setup が、ほかの documents の行（プロンプトの行など）の `paths` を渡して、その行の文書になるファイルを管理用の YAML の候補から外す。`project-index.yaml` がまだ無い初回でも、候補の行の `paths` を渡せる'
 request_example: |-
   ```bash
   project-index files --root ~/repo/sample --paths 'src/**'
