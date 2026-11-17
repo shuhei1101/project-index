@@ -62,6 +62,45 @@ def test_build_parser_when_files() -> None:
     assert args.handler is main_module.run_files
 
 
+def test_build_parser_when_outline() -> None:
+    """outline の引数と処理を引く（正常系）。"""
+    # 準備
+    parser = build_parser()
+    # 実行
+    args = parser.parse_args(["outline", "--root", "/tmp/a", "--paths", "docs/**"])
+    # 検証
+    assert args.cmd == "outline"
+    assert args.paths == ["docs/**"]
+    assert args.exclude == []
+    assert args.handler is main_module.run_outline
+
+
+def test_build_parser_when_changed() -> None:
+    """changed の引数と処理を引く（正常系）。"""
+    # 準備
+    parser = build_parser()
+    # 実行
+    args = parser.parse_args(["changed", "--root", "/tmp/a", "--files-yaml", "files.yaml"])
+    # 検証
+    assert args.cmd == "changed"
+    assert args.files_yaml == "files.yaml"
+    assert args.handler is main_module.run_changed
+
+
+def test_build_parser_when_checkpoint() -> None:
+    """checkpoint の引数と処理を引く（正常系）。"""
+    # 準備
+    parser = build_parser()
+    # 実行
+    args = parser.parse_args(
+        ["checkpoint", "--root", "/tmp/a", "--files-yaml", "files.yaml", "--reviewed", "a.md"]
+    )
+    # 検証
+    assert args.cmd == "checkpoint"
+    assert args.reviewed == ["a.md"]
+    assert args.handler is main_module.run_checkpoint
+
+
 def test_build_parser_when_prompt_doc() -> None:
     """prompt-doc の処理を引く（正常系）。"""
     # 準備
