@@ -586,7 +586,7 @@ functions:
       type: None
       description: なし
     process: |-
-      1. 検査の結果の並び（`missing_refs`・`unindexed_files`・`missing_body_files`・`unresolved_related`・`duplicate_files`）のうち 0 件でないものを、配信元の ID・ずれの種類・件数・並びの値で警告のログに書く。`alias_violations` は文書のパス・キー・理由で、nav の警告（読み取り API）はキーのパスと理由で警告のログに書く
+      1. 検査の結果の並び（`missing_refs`・`unindexed_files`・`missing_body_files`・`unresolved_related`・`duplicate_files`・`duplicate_ids`）のうち 0 件でないものを、配信元の ID・ずれの種類・件数・並びの値で警告のログに書く。`alias_violations` は文書のパス・キー・理由で、nav の警告（読み取り API）はキーのパスと理由で警告のログに書く
     unit_tests:
       - name: test_log_source_check
         case: 正常
@@ -600,6 +600,12 @@ functions:
         condition: '`duplicate_files` が `["src/a.py: src・py"]` だけの検査の結果'
         mock: なし（`caplog`）
         expected: '`warning` の行が 1 件で、「2 つ以上の行が文書にするファイル」・件数 1・`src/a.py: src・py` を含む'
+      - name: test_log_source_check_when_duplicate_ids
+        case: 正常
+        summary: 重なった ID を警告のログに書く
+        condition: '`duplicate_ids` が `["a: rules（docs/a.yaml）・rules（docs/b.yaml）"]` だけの検査の結果'
+        mock: なし（`caplog`）
+        expected: '`warning` の行が 1 件で、「ID が重なる文書」・件数 1・`a: rules（docs/a.yaml）・rules（docs/b.yaml）` を含む'
   - name: run_migrate
     title: 設定の移し替えの実行
     container: project_index/main.py

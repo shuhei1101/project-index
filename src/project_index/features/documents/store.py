@@ -631,8 +631,10 @@ def _unique(
     return unique
 
 
-def _duplicate_files(source: ServedSource, result: LoadResult, files: list[str]) -> list[str]:
-    """2 つ以上の有効な行が文書にするファイルを、`{ファイル}: {行の id}・{行の id}` で返す。"""
+def _shared_files(
+    source: ServedSource, result: LoadResult, files: list[str]
+) -> dict[str, list[str]]:
+    """2 つ以上の有効な行が文書にするファイルと、その行の ID（`documents[]` の順）を返す。"""
     rows: dict[str, list[str]] = {}
     for table in source.config.documents:
         if not table.enabled:
@@ -641,7 +643,28 @@ def _duplicate_files(source: ServedSource, result: LoadResult, files: list[str])
             ids = rows.setdefault(path, [])
             if table.id not in ids:
                 ids.append(table.id)
-    return [f"{path}: {'・'.join(ids)}" for path, ids in sorted(rows.items()) if len(ids) > 1]
+    return {path: ids for path, ids in sorted(rows.items()) if len(ids) > 1}
+
+
+def _duplicate_ids(result: LoadResult, shared: Collection[str]) -> list[str]:
+    """ID が先の文書と重なり除外した文書を、先の文書との組で返す（同じファイルの重なりに数えたものを除く）。"""
+    first = {document.id: document for document in result.documents}
+    pairs: list[str] = []
+    for document in sorted(result.duplicates, key=lambda duplicate: duplicate.path):
+        earlier = first[document.id]
+        earlier_file = earlier.body_path or earlier.path
+        document_file = document.body_path or document.path
+        # 別の行が同じファイルを文書にした重なりは duplicate_files が示すため数えない
+        if (
+            earlier.kind != document.kind
+            and earlier_file == document_file
+            and document_file in shared
+        ):
+            continue
+        pairs.append(
+            f"{document.id}: {earlier.kind}（{earlier_file}）・{document.kind}（{document_file}）"
+        )
+    return pairs
 
 
 def _row_files(
@@ -706,7 +729,7 @@ def _nested_dirs(start: str, index_dirs: Collection[str]) -> list[str]:
 
 
 def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
-    """配信元の文書を読み、`metadata` の列の欠け・管理用の YAML のずれ・当たらない関連・同じファイルの重なり・エイリアスのキーの違反を求める。"""
+    """配信元の文書を読み、`metadata` の列の欠け・管理用の YAML のずれ・当たらない関連・同じファイルの重なり・文書の ID の重なり・エイリアスのキーの違反を求める。"""
     # 配信元のフォルダは 1 回だけたどり、文書の収集と索引に無いファイルの検出で使い回す
     files = list(walk_files(source.root))
     result = store.load(Target(source, source.root, None, None, "read"), files=files)
@@ -733,6 +756,8 @@ def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
         for document in result.documents
         for to in unresolved_related(document.metadata, ids)
     ]
+    # 2 つ以上の行が文書にするファイルは、同じファイルの重なりと ID の重なりの除外で使い回す
+    shared = _shared_files(source, result, files)
     return SyncReport(
         source_id=source.id,
         missing_refs=missing_refs,
@@ -740,5 +765,6 @@ def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
         missing_body_files=missing_body_files,
         unresolved_related=unresolved,
         alias_violations=collect_aliases(source, result.documents).violations,
-        duplicate_files=_duplicate_files(source, result, files),
+        duplicate_files=[f"{path}: {'・'.join(ids)}" for path, ids in shared.items()],
+        duplicate_ids=_duplicate_ids(result, shared),
     )

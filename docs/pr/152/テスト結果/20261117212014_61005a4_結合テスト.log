@@ -1,0 +1,22 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=integration -f paths="tests/integration/server/test_check_project.py::test_normal_when_ids_overlap tests/integration/server/test_check_project.py::test_normal_when_rows_share_file tests/integration/server/test_serve.py::test_normal_when_metadata_out_of_sync tests/integration/server/test_get_status.py::test_normal tests/integration/server/test_describe.py::test_normal_when_warned" | ...)  # TL-2 の run_runner（実行 44081905538）
+
+paths の値が層のフォルダの外か、空白以外の区切りを含む: tests/integration/server/test_check_project.py::test_normal_when_ids_overlap
+
+# ランナーで回せなかった理由: workflow の paths はテストの関数（::）の指定を受け付けず、合格した実行範囲の表はテストの関数の単位のため。同じ範囲を手元の個別実行（TL-2 の run_one）で回した
+
+$ uv run pytest tests/integration/server/test_check_project.py::test_normal_when_ids_overlap tests/integration/server/test_check_project.py::test_normal_when_rows_share_file tests/integration/server/test_serve.py::test_normal_when_metadata_out_of_sync tests/integration/server/test_get_status.py::test_normal tests/integration/server/test_describe.py::test_normal_when_warned -v
+
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0 -- /home/shuhei2441/repo/project-index/.claude/worktrees/feat-documents-report-duplicate-id/.venv/bin/python
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/feat-documents-report-duplicate-id
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 5 items
+
+tests/integration/server/test_check_project.py::test_normal_when_ids_overlap PASSED [ 20%]
+tests/integration/server/test_check_project.py::test_normal_when_rows_share_file PASSED [ 40%]
+tests/integration/server/test_serve.py::test_normal_when_metadata_out_of_sync PASSED [ 60%]
+tests/integration/server/test_get_status.py::test_normal PASSED          [ 80%]
+tests/integration/server/test_describe.py::test_normal_when_warned PASSED [100%]
+
+============================== 5 passed in 1.63s ===============================
