@@ -80,3 +80,18 @@ def test_record_checkpoint_when_reviewed_missing(git_repo: Callable[..., Path]) 
             repo, "files.yaml", reviewed=["missing.md"], now=datetime(2026, 11, 17, tzinfo=UTC)
         )
     assert (repo / "files.yaml").read_text(encoding="utf-8") == FILES_YAML
+
+
+def test_record_checkpoint_when_indent_preserved(
+    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """管理用の YAML の配列の字下げを保つ（正常系）。"""
+    # 準備
+    original = "files:\n- path: a.md\n  name: A\n- path: b.md\n  name: B\n"
+    write_files(tmp_path, {"files.yaml": original})
+    # 実行
+    record_checkpoint(tmp_path, "files.yaml", now=datetime(2026, 11, 17, tzinfo=UTC))
+    # 検証
+    assert (tmp_path / "files.yaml").read_text(encoding="utf-8") == (
+        original + "checkpoint:\n  checked_at: '2026-11-17T00:00:00+00:00'\n"
+    )
