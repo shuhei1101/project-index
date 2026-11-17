@@ -480,6 +480,7 @@ flows:
       - '`sync.items` に `duplicate_files` の `src/a.yaml: src・yaml` があり、`src/b.py`・`src/files.yaml` を含まない'
       - 文書の ID の重なりで片方の文書を除外しても、重なりを数える
       - '`violations` が空'
+      - '`sync.duplicate_ids` が 0（`src/a.yaml` の 2 つの文書の ID の重なりは、同じファイルの重なりのため数えない）'
     test: test_normal_when_rows_share_file
   - name: 正常系（深い管理用の YAML の範囲と exclude のパスを数えない）
     summary: 直下の管理用の YAML で、より深いフォルダの管理用の YAML の範囲と、`exclude` のパスの glob に当たるファイルを索引に無いファイルとして数えない
@@ -512,6 +513,38 @@ flows:
       - '`sync.unindexed_files` が 1 で、`sync.items` が `src: src/b.py` だけ（`root:` で始まる行が無い）'
       - '`violations` が空（`exclude` の `/` を含む値を違反にしない）'
     test: test_normal_when_nested_index_and_exclude_path
+  - name: 正常系（文書の ID が重なる）
+    summary: ID が先の文書と重なり配信から除外した文書を、同期の件数と内訳で返却する
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+      - name: 配信元
+        description: '検証に通る sample。行 `rules`（`paths: [docs/*.yaml]`）と行 `notes`（`paths: [notes/*.yaml]`）を `documents[]` のこの順に配置する'
+      - name: 範囲のファイル
+        description: '`docs/a.yaml`（`id: a`）・`docs/b.yaml`（`id: a`）・`notes/c.yaml`（`id: a`）・`notes/d.yaml`（`id: d`）を配置する'
+        notes: '`docs/b.yaml` は同じ行、`notes/c.yaml` は別の行の文書で、どちらも `docs/a.yaml` と別のファイル'
+    flow: |-
+      <!-- map: {"title": "正常系（文書の ID が重なる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as check_project
+        participant F as 配信元のフォルダ
+
+        C->>T: path
+        T-->>F: 文書を読む
+        T->>T: ID が先の文書と重なる文書を除外し、除外した文書と先の文書の組を数える
+        T-->>C: 同期の件数と内訳
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`sync.duplicate_ids` が 2'
+      - '`sync.items` に `duplicate_ids` の `a: rules（docs/a.yaml）・rules（docs/b.yaml）` と `a: rules（docs/a.yaml）・notes（notes/c.yaml）` がこの順にあり、`notes/d.yaml` を含まない'
+      - '`sync.duplicate_files` が 0'
+      - '`violations` が空'
+    test: test_normal_when_ids_overlap
 lead: 配信元の設定・管理用の YAML・スクリプトを検証する管理の MCP の `check_project` の入出力を定め、`check_project` を修正するときに参照する。
 tags:
   - name: action:検査
@@ -623,6 +656,10 @@ response:
     type: int
     description: 2 つ以上の有効な documents の行が文書にするファイルの件数
     notes: '`sync.items[]` の要素は `{ファイル}: {行の id}・{行の id}`（行は `documents[]` の順）'
+  - name: sync.duplicate_ids
+    type: int
+    description: ID が先の文書と重なり、配信から除外した文書の件数
+    notes: '`sync.items[]` の要素は `{文書の id}: {先の文書の行の id}（{ファイル}）・{除外した文書の行の id}（{ファイル}）`（除外した文書のパスの順）'
 response_example: |-
   ```markdown
   /home/u/repo/sample（登録済み: sample）
@@ -681,5 +718,8 @@ constraints:
   - item: exclude のパス
     constraint: '`documents[].exclude[]` の `/` を含む値は、`paths` の基準のフォルダからのパスの glob として当てる。`/` を含まない値はファイル名に当てる。どちらも行の文書の集め方と `unindexed_files` の判定に使う'
     notes: '`docs/pr/**` のように、どの行の文書でもないフォルダを管理用の YAML の範囲から外すときに使う'
+  - item: 文書の ID の重なり
+    constraint: 先の文書は `documents[]` の行の順とファイルのパスの順で先に読んだ文書とする。ファイルは、`body_file` の行では要素の `body_file` が指すファイル、それ以外の行では文書のファイルとする。除外した文書と先の文書が別の行で、同じファイルの重なりに数えた同じファイルを文書にするときは数えない。起動時の警告・状態の取得・引数なしの `describe` も同じ判定を使用する
+    notes: 同じファイルの重なりは `duplicate_files` が行の ID つきで示すため、1 つの配置の誤りを 2 つの件数に出さない
 test_file: tests/integration/server/test_check_project.py
 visibility: internal
