@@ -1,0 +1,26 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: エージェントが文書を改名して参照元を追随させるシナリオと、複数の文書の単語を一括で置き換えるシナリオ（試しに書く・検査に通らないを含む）を追加
+    depends_on: []
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: none
+    detail: 書き込みの単一ユースケースの中で操作が増えるだけで、連鎖は変わらない
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: '`write_docs` の節に改名と一括置換の操作・引数・応答を追加し、ツールの一覧の行の説明を更新'
+    status: todo
+scope_out:
+  - item: ほかの配信元から `source` 付きの `related` や参照で改名した文書を指す箇所の追随
+    reason: Issue の要望は同じ配信元の参照元の追随で、ほかの配信元は書き込みの `scope.write` とワークツリーが別になる
+    plan: none
+  - item: Markdown の本文のファイル（`records`・`body_file` の行の本文）と配信の範囲の外のファイル（コード・規約の本文）の中の旧 ID・旧パスの追随と単語の置換
+    reason: 要望は文書の YAML の項目が対象。本文のファイルを対象に含めるかは判断が分かれるため、インターフェース定義設計のレビューで確定する
+    plan: to_file
+  - item: AI Monitor の規約『ドキュメント管理』の操作の表と改名の手順の修正
+    reason: 起票元の shuhei1101/ai-monitor#3239 で、この操作がリリースされた後に直す
+    plan: none
