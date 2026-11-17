@@ -578,6 +578,70 @@ def test_source_registry_load_when_row_loading(
     assert loading is True
 
 
+def test_source_registry_load_when_slow_row(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """読み込みの遅い行がほかの行の読み込みを止めない（正常系）。"""
+    # 準備
+    loader = _Loader(make_served_source, make_status, blocked=("slow",))
+    monkeypatch.setattr(registry_module, "load_source", loader)
+    terminal = make_terminal_config(sources=_entries(make_entry, "slow", "a"))
+    registry = SourceRegistry(loading=True)
+    worker = threading.Thread(target=registry.load, args=(terminal,))
+    worker.start()
+    loader.entered["slow"].wait(timeout=5)
+    # 実行
+    a_done = registry._rows_done[1].wait(timeout=5)
+    result = registry.get("a")
+    loading = registry.loading
+    loader.release["slow"].set()
+    worker.join(timeout=5)
+    # 検証
+    assert a_done is True
+    assert result.id == "a"
+    assert loading is True
+    assert [source.id for source in registry.served()] == ["slow", "a"]
+
+
+def test_source_registry_statuses_with_loading(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """読み込み中の行を loading で並べる（正常系）。"""
+    # 準備
+    loader = _Loader(make_served_source, make_status, blocked=("b",))
+    monkeypatch.setattr(registry_module, "load_source", loader)
+    entries = [
+        make_entry("/tmp/a/project-index.yaml", source_id="a"),
+        make_entry("/tmp/b/project-index.yaml", source_id=None),
+    ]
+    terminal = make_terminal_config(sources=entries)
+    registry = SourceRegistry(loading=True)
+    worker = threading.Thread(target=registry.load, args=(terminal,))
+    worker.start()
+    loader.entered["b"].wait(timeout=5)
+    registry._rows_done[0].wait(timeout=5)
+    # 実行
+    result = registry.statuses_with_loading()
+    statuses = registry.statuses()
+    loader.release["b"].set()
+    worker.join(timeout=5)
+    # 検証
+    assert [(status.id, status.index, status.status) for status in result] == [
+        ("a", 0, "serving"),
+        ("sources[1]", 1, "loading"),
+    ]
+    assert result[1].config == tuple(entries[1].config)
+    assert [status.id for status in statuses] == ["a"]
+
+
 def test_source_registry_load_when_requested(
     monkeypatch: pytest.MonkeyPatch,
     make_terminal_config: Callable[..., TerminalConfig],
