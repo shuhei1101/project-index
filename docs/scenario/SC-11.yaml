@@ -242,7 +242,7 @@ scenarios:
         DD->>PI: sample の配信元の設定を、解いたスキーマを求めて取得する
         PI-->>DD: 書き出したリビジョンから読んだ設定とスキーマ
         DD->>PI: sample の文書の一覧を、値とバージョンと共通のキーを求めて取得する（リビジョンを省く）
-        PI-->>DD: 書き出したリビジョンから読んだ文書の一覧
+        PI-->>DD: default_ref の commit から読んだ文書の一覧
         SRC->>SRC: 利用者が main に commit を追加する
         DD->>PI: sample の文書の一覧を取得する（リビジョンを省く）
         PI-->>DD: 配信中の組の文書の一覧
@@ -309,12 +309,13 @@ scenarios:
         PI->>SRC: 配信元の読み込みの後に、検査の終了を待たずに裏で default_ref の commit を書き出し始める
         DD->>PI: 管理の MCP の status で、裏の書き出しの最中であることを確認する
         DD->>PI: sample の文書の一覧を取得する（リビジョンを省く）
-        PI->>PI: 同じ commit の裏の書き出しの終了を待つ
-        PI-->>DD: 書き出したリビジョンから読んだ文書の一覧
+        PI->>SRC: 書き出しを待たずに、default_ref の commit のファイルを読み込む
+        PI-->>DD: default_ref の commit から読んだ文書の一覧
+        DD->>PI: 管理の MCP の status で、まだ裏の書き出しの最中であることを確認する
       ```
     expected:
-      - 文書の一覧の取得が、裏の書き出しの終了の後に 200 を返却する
-      - 包みの git の `archive` の呼び出しが `main` の commit で 1 回だけで、ログの `リビジョンを書き出した` も 1 行のまま
+      - 文書の一覧の取得が、裏の書き出しの終了を待たずに 200 を返却し、応答の直後の `status` が裏の書き出しの最中であることを返却する
+      - 包みの git の `archive` の呼び出しが `main` の commit で 1 回だけ（裏の書き出しの分）で、ログの `リビジョンを書き出した` も 1 行のまま
     test: test_normal_when_opened_during_background_export
   - name: 正常シナリオ（disk の配信元を読む）
     setup:
@@ -419,6 +420,36 @@ scenarios:
       - '合図の後、裏の検査が済んだ `status` が `checking: false` を返却し、large と sample の `sync` が検査を止めずに済ませたときと同じ件数になる'
       - 文書の一覧が、裏の検査が済んだ後に取得した一覧と同じ文書を返却する
     test: test_normal_when_opened_during_background_check
+  - name: 正常シナリオ（ほかの配信元の読み込みの最中に開く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが読み取り API を呼ぶ）
+      - name: 大きな配信元
+        description: 文書の種類の行を多く持ち、配信元の読み込みが sample の文書の一覧の応答より長くかかる git リポジトリ
+        notes: id `large`。行の数は、読み込みが 3 秒以上かかる数にする
+      - name: サンプルの配信元
+        description: 正常シナリオと同じ配信元
+        notes: id `sample`
+      - name: project-index
+        description: 状態のフォルダを空にし、large・sample の順に端末の設定に並べて起動した project-index
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant DD as dev-docs の画面のサーバー
+        participant PI as project-index（読み取り API）
+        participant SRC as large・sample
+
+        PI->>SRC: 起動の後に、large と sample を裏で読み込み始める
+        DD->>PI: sample の文書の一覧を取得する（リビジョンを省く）
+        PI->>PI: large の読み込みを休ませ、sample の読み込みを先に済ませる
+        PI-->>DD: sample の文書の一覧
+        DD->>PI: 配信元の一覧と状態を取得する
+        PI-->>DD: large・sample が配信中
+      ```
+    expected:
+      - sample の文書の一覧の取得が、large の読み込みの終了を待たずに 200 を返却する
+      - 応答の最中も large の読み込みは止まらず、応答の後に large と sample が配信中になる
+    test: test_normal_when_opened_while_other_sources_loading
 lead: dev-docs の画面のサーバーが読み取り API で配信元と文書を取得するシナリオを定め、画面のサーバーからの読み取りの流れを変えるときに参照する。
 tags:
   - name: topic:api
