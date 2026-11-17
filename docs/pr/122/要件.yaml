@@ -1,0 +1,36 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: changed
+    detail: 配信元を追加するときに書き出す管理用の YAML のスキーマが、knowledge の管理用の YAML のスキーマと同じキーを持つ
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: following
+    detail: 調べる配信元の前提の管理用の YAML のスキーマの記述が、配信元を追加するときの変更に追随する
+    depends_on:
+      - docs/scenario/SC-5.yaml
+docs:
+  - page: docs/layout/LAY-73-1.yaml
+    new: false
+    change: templates の files.schema.yaml のエントリを、書き出すスキーマの持ち方の決定に合わせる
+    status: todo
+  - page: docs/guide/設定.md
+    new: false
+    change: 管理用の YAML のキーの一覧と、コピーするスキーマの記述を合わせる
+    status: todo
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: 配信元へコピーする templates/files.schema.yaml の手順を合わせる
+    status: todo
+  - page: docs/guide/コアコンセプト-文書のメタデータ.md
+    new: false
+    change: 管理用の YAML のスキーマの参照先の記述を合わせる
+    status: todo
+scope_out:
+  - item: setup がプロンプトのスキーマの $ref 先の common.schema.yaml を配信元へコピーしないこと
+    reason: プロンプトのスキーマのコピーの不具合で、管理用の YAML のスキーマとは別のファイル。この作業 PR がマージされなくても同じ内容で成り立つ
+    plan: '#115'
+  - item: このリポジトリの管理用の YAML（src/files.yaml・tests/files.yaml・plugins/project-index/files.yaml・docs/guide/files.yml）のスキーマの参照
+    reason: '#114 で knowledge の knowledge-files.schema.yaml の参照へ切り替え済み'
+    plan: none
