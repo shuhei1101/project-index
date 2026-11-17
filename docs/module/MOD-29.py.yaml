@@ -138,6 +138,12 @@ classes:
         type: int
         access: 内部 (_)
         description: '`clear` のたびに 1 つ増やす。`clear` の前に解き始めた起動時のスキーマを `_startup_schemas` に書き戻さないために使う'
+      - name: gate
+        title: 裏の処理の関所
+        type: BackgroundGate
+        access: 公開
+        default: BackgroundGate()
+        description: 裏の検査が読むとき、要求の応答中はファイル 1 件ごとに休ませる（起動のときに `Handlers.gate` を渡す）
     methods:
       - name: load
         title: 文書を集める
@@ -176,7 +182,7 @@ classes:
              - `target.ref` がある場合、読む場所の commit（下の「読む場所の commit」）を `snapshots.checkout` で書き出し、その下に `source.root` の `repo_root` からの相対パスをつなぐ
           2. 文書の行を決める。`kinds` があれば `source.table` で引き（無い種類は `UnknownKindError`）、無ければ `enabled` の全ての行
           3. Git の配信元の場合、履歴の『ファイルの日時』を `_dates` から作業ツリー・commit・配信元の `root` の `repo_root` からの相対パスで引く。無ければ、作業ツリー（ワークツリーか `repo_root`）と commit（`ref` があれば読む場所の commit、無ければ作業ツリーの `HEAD` を解いた SHA）で呼び、配信元の直下からのパスに直してキャッシュする
-          4. 読むフォルダのファイルを、`files` が無ければ `walk_files` で 1 回だけたどって得る。行ごとにそのパスを渡して『ファイルの収集』でファイルを集める
+          4. 読むフォルダのファイルを、`files` が無ければ `walk_files` で 1 回だけたどって得る。行ごとにそのパスを渡して『ファイルの収集』でファイルを集める。集めたファイル 1 件ごとの照合と読み込み（下の 2 つ）は、裏の処理の関所の裏の処理の 1 件（`gate.unit`。裏の処理のスレッドでなければ何もしない）の中で行う
              - `target.worktree` があり `target.ref` と `files` が `None` の場合、手順 4・5 をワークツリーごとの排他（`_worktree_locks`）の中で行い、たどった結果を `_worktrees` に持つ
                - `_worktrees` に無い場合、『フォルダごとの列挙』でたどり、ファイルの一覧と、フォルダごとの更新日時を記録する。手順 7 の前に `[info]` ワークツリーを読み込んだ（配信元・ワークツリーのパス・秒数）を書く
                - `_worktrees` にある場合、記録したフォルダごとに `stat` を取る。更新日時が変わった・無くなったフォルダがあればたどり直して置き換え、無ければ記録したファイルの一覧を使う（たどり直しではログを書かない）
@@ -301,6 +307,12 @@ classes:
             condition: '`WORKTREE_KEEP` を 1 にして、ワークツリー x、y の順に `load` する'
             mock: なし（`tmp_path`）
             expected: '`has_worktree` が x は `False`、y は `True`'
+          - name: test_document_store_load_when_background
+            case: 正常
+            summary: 裏の処理のスレッドでは、要求の応答中はファイルごとに休む
+            condition: 文書 3 件の配信元を、関所の `foreground` の中で、別のスレッドの `background` の中と、要求のスレッド（`background` の外）で 1 回ずつ読む（それぞれ別のストア）
+            mock: 関所の休み（偽物。呼ばれた回数を数える）
+            expected: 裏の処理のスレッドの読み込みで休みが 3 回、要求のスレッドの読み込みで 0 回呼ばれ、どちらも文書 3 件を返す
       - name: get
         title: ID で引く
         summary: ID の並びの順に文書を返す
