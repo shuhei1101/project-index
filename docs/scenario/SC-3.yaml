@@ -10,9 +10,9 @@ scenarios:
         notes: 上流に 1 つ新しいバージョンの commit がある。端末の設定の移し替えの手順は無い
       - name: 端末の設定
         description: '`sources` に sample と notes の 2 行'
+        notes: '`mdmark_ref` が無い（既定の `develop`）'
       - name: mdmark の CLI
         description: '`PATH` に `mdmark` がある'
-        notes: 端末の設定に `mdmark_ref` が無い（既定の `develop`）
     flow: |-
       <!-- map: {"title": "正常シナリオ"} -->
 
@@ -49,7 +49,9 @@ scenarios:
         notes: 新しいバージョンが端末の設定のキーを 1 つ改名する移し替えの手順を持つ
       - name: mdmark の CLI
         description: '`PATH` に `mdmark` がある'
-        notes: 端末の設定に `mdmark_ref` が無い（既定の `develop`）
+      - name: 端末の設定
+        description: 正常シナリオと同じ `sources`
+        notes: '`mdmark_ref` が無い（既定の `develop`）'
     flow: |-
       <!-- map: {"title": "正常シナリオ（端末の設定が古くなる）"} -->
 
