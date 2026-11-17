@@ -212,32 +212,31 @@ functions:
         required: true
         passing: positional
         description: 使える項目の結果
-      - name: tables
-        title: 文書の行
-        type: Iterable[DocumentTable]
+      - name: rows
+        title: 文書の行と行の使える項目
+        type: Iterable[tuple[DocumentTable, Mapping[str, str]]]
         required: true
         passing: positional
-        description: 有効な `documents[]` の行
+        description: 有効な `documents[]` の行と、その行の文書に当てるスキーマだけで作った使える項目の組
     returns:
       type: dict[str, str]
       description: 項目のパス → 型。`fields` の複製にキーを加えたもの
     process: |-
       1. `fields` を複製する
-      2. 行ごとに `metadata` のキーと列名をたどり、`fields` に無いキーを加える（`METADATA_KEYS` とスキーマの項目の型は変えない）
-         - 型は、列名から先頭の `**.` と配列の指定（`[]`・`[0]`・`[main]`）を除外したパスの `fields` の型。無ければ `string`
-         - 先に加えた行と型が食い違う同じキーは `string` にする
+      2. 行の並びの順に `metadata` のキーと列名をたどり、複製に無いキーを加える（`METADATA_KEYS`・スキーマの項目と、先の行で加えたキーは変えない）
+         - 型は、その行の使える項目の列名（そのままの文字列）の型。無ければ `string`
       3. 加えた結果を返却する
     unit_tests:
       - name: test_with_metadata_fields
         case: 正常
         summary: 対応付けた列の型で加える
-        condition: '`fields` に `section: string`・`labels: array` を持つ使える項目、行の `metadata` が `{category: section, kinds: labels, area: meta.area, name: title}`'
+        condition: '行の使える項目が `section: string`・`labels: array`、行の `metadata` が `{category: section, kinds: labels, area: meta.area, all: "**.section", name: title}`'
         mock: なし
-        expected: '`category` が `string`、`kinds` が `array`、`area` が `string`（列が無い）、`name` は `fields` のまま。引数の `fields` は変わらない'
-      - name: test_with_metadata_fields_when_type_conflict
+        expected: '`category` が `string`、`kinds` が `array`、`area` と `all` が `string`（そのままの列名が行の使える項目に無い）、`name` は `fields` のまま。引数の `fields` は変わらない'
+      - name: test_with_metadata_fields_when_rows_differ
         case: 正常
-        summary: 行ごとに型が食い違うキー
-        condition: '行 A の `metadata` が `{category: section}`（`section: string`）、行 B が `{category: labels}`（`labels: array`）'
+        summary: 行ごとに型が食い違うキーと他の行のスキーマ
+        condition: '行 A（使える項目に `section` が無い）の `metadata` が `{order: section}`、行 B（`section: number`・`labels: array`）の `metadata` が `{order: labels}`。`fields` は両方の行を合わせた使える項目'
         mock: なし
-        expected: '`category` が `string`'
+        expected: '`order` が `string`（先の行 A の型。行 B の `section: number` は使用しない）'
 visibility: internal

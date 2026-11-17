@@ -181,7 +181,7 @@ functions:
       description: 警告。`nav` が無い配信元は空
     process: |-
       1. `source.config.nav` が無ければ空を返す
-      2. `Target(source, source.root, None, None, "read")` で文書を集め（文書のストア.文書を集める）、有効な文書の行ごとの文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）から使える項目（検索）を作り、行の metadata の項目（検索）で有効な行の `metadata` のキーを加える
+      2. `Target(source, source.root, None, None, "read")` で文書を集め（文書のストア.文書を集める）、有効な文書の行ごとの文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）から使える項目（検索）を作り、行の metadata の項目（検索。有効な行と、その行のスキーマだけで作った使える項目の組を指定する）で有効な行の `metadata` のキーを加える
       3. nav の条件の確かめの違反を加える
       4. nav の条件の数え（`columns` は有効な行の ID → その行の `metadata`）で `count` が 0 の `auto` ごとに、`path` を `{auto のパス}.filter`（`filter` が無ければ `auto` のパス）、`rule` を `{タブの名前}: 条件 {filter を JSON にした文字列} に該当する文書がありません` にした警告を加える
       5. 警告を返す
