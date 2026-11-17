@@ -699,3 +699,107 @@ def test_apply_operation_when_unset_unresolved() -> None:
         "unset.#models[Zzz].properties",
     ]
     assert current == _models_content()
+
+
+_FLOWS_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "flows": {
+            "type": "array",
+            "x-key": "name",
+            "items": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}, "summary": {"type": "string"}},
+            },
+        },
+        "notes": {"type": "array", "items": {"type": "string"}},
+    },
+}
+
+
+def _flows_content() -> dict[str, Any]:
+    """`x-key` の配列 `flows` を持つ内容を返す。"""
+    return {
+        "flows": [
+            {"name": "A", "summary": "s1"},
+            {"name": "B", "summary": "s2"},
+            {"name": "C", "summary": "s3"},
+        ]
+    }
+
+
+def test_apply_operation_when_remove_from_x_key() -> None:
+    """x-key の値と要素のオブジェクトで削除する（正常系）。"""
+    # 準備
+    operation = Operation(
+        op="update",
+        id="doc-1",
+        expected_version="v1",
+        remove_from={"flows": ["B", {"name": "C", "summary": "s3"}, "B"]},
+    )
+    # 実行
+    result = apply_operation(_flows_content(), operation, schema=_FLOWS_SCHEMA)
+    # 検証
+    assert result == {"flows": [{"name": "A", "summary": "s1"}]}
+
+
+def test_apply_operation_when_remove_from_x_key_missing() -> None:
+    """x-key を持つ配列に削除する要素が無い値（異常系）。"""
+    # 準備
+    current = _flows_content()
+    operation = Operation(
+        op="update",
+        id="doc-1",
+        expected_version="v1",
+        remove_from={"flows": ["A", "Z", {"name": "A", "summary": "x"}]},
+    )
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError) as exc_info:
+        apply_operation(current, operation, schema=_FLOWS_SCHEMA)
+    violations = exc_info.value.violations
+    assert [violation.path for violation in violations] == [
+        "remove_from.flows",
+        "remove_from.flows",
+    ]
+    assert "Z" in violations[0].rule
+    assert "summary" in violations[1].rule
+    assert "x" in violations[1].rule
+    assert current == _flows_content()
+
+
+def test_apply_operation_when_remove_from_without_x_key() -> None:
+    """x-key を持たない配列は今までどおり（正常系）。"""
+    # 準備
+    operation = Operation(
+        op="update",
+        id="doc-1",
+        expected_version="v1",
+        remove_from={"notes": ["b", "z"]},
+    )
+    # 実行
+    result = apply_operation({"notes": ["a", "b"]}, operation, schema=_FLOWS_SCHEMA)
+    # 検証
+    assert result == {"notes": ["a"]}
+
+
+def test_apply_operation_when_remove_then_add() -> None:
+    """1 つの操作で削除してから追加する（正常系）。"""
+    # 準備
+    operation = Operation(
+        op="update",
+        id="doc-1",
+        expected_version="v1",
+        remove_from={"flows": ["A"], "notes": ["a"]},
+        add_to={"flows": [{"name": "A", "summary": "s9"}], "notes": ["a"]},
+    )
+    # 実行
+    result = apply_operation({**_flows_content(), "notes": ["a"]}, operation, schema=_FLOWS_SCHEMA)
+    # 検証
+    assert result == {
+        "flows": [
+            {"name": "B", "summary": "s2"},
+            {"name": "C", "summary": "s3"},
+            {"name": "A", "summary": "s9"},
+        ],
+        "notes": ["a"],
+    }
