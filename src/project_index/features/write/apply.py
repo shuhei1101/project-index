@@ -7,7 +7,12 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
-from project_index.features.documents.fields import delete_field, get_field, set_field
+from project_index.features.documents.fields import (
+    ANY_DEPTH_PREFIX,
+    delete_field,
+    get_field,
+    set_field,
+)
 from project_index.shared.errors import InvalidArgumentError, Violation
 from project_index.shared.narrowing import is_dict, is_list
 
@@ -432,9 +437,6 @@ def _raise_if(violations: list[Violation]) -> None:
         raise InvalidArgumentError(
             message=f"引数が正しくありません: {len(violations)} 件", violations=violations
         )
-
-
-ANY_DEPTH_PREFIX = "**."
 
 
 def _head_key(path: str) -> str:

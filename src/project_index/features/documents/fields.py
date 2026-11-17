@@ -42,6 +42,7 @@ PART_PATTERN = re.compile(r"^([^.\[\]]+)((?:\[(?:\d+|[A-Za-z][A-Za-z0-9_]*)?\])*
 INDEX_PATTERN = re.compile(r"\[(\d+|[A-Za-z][A-Za-z0-9_]*)?\]")
 PATH_EXAMPLE = "例 `a.b[0].c`・`tags[].name`・`tags[main].name`・`**.refs[]`"
 ANY_DEPTH = "**"
+ANY_DEPTH_PREFIX = f"{ANY_DEPTH}."
 
 
 @dataclass(frozen=True, slots=True)
