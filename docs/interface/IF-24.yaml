@@ -127,8 +127,8 @@ flows:
       - 無い配信元は 404 で `missing` が `source`
       - 無いリビジョンは 404 で `missing` が `ref`、`detail` にリビジョンの名前 `no-such-branch` がある
     test: test_error_when_not_found
-  - name: 異常系（リビジョンの書き出しが上限を超える・504）
-    summary: 指したリビジョンの書き出しが上限を超えたとき、止めた処理と理由を返す
+  - name: 正常系（リビジョンの書き出しが上限を超える commit を指す）
+    summary: 文書の一覧はリビジョンを書き出さずに commit の blob を読み込むため、書き出しが上限を超える commit でも一覧を返す
     setup:
       - name: Mock
         description: git の実行を、`archive` の引数が親の commit のときだけ待ち時間の上限を超えたときと同じ失敗（`GitError` の `timed_out`）を返すものに差し替える
@@ -141,14 +141,14 @@ flows:
         participant E as GET /sources/{source}/docs
 
         C->>E: GET /sources/sample/docs?ref={親の commit}
-        E->>E: 親の commit の書き出しが上限を超えて止まる
-        E-->>C: 504 problem+json
+        E->>E: 書き出さずに、親の commit のファイルを blob から読み込む
+        E-->>C: 200 親の commit の文書の一覧
       ```
     expected:
-      - 504 で、`title` が `RevisionExportTimeoutError`、`operation` が `revision_export`、`commit` が親の commit、`limitSec` が `git archive` の待ち時間の上限
-      - '`detail` に、止めた処理がリビジョンの書き出しであることと上限の秒数がある'
-      - 状態のフォルダに書き出しの途中のフォルダが残らず、その後の `main` の文書の一覧は 200 を返す
-    test: test_error_when_revision_export_times_out
+      - 200 で、`documents` が正常系（リビジョンを指す）と同じ親の commit の文書の一覧
+      - 包みの git の `archive` を文書の一覧の要求の中で呼ばない
+      - 状態のフォルダに親の commit の書き出しができない
+    test: test_normal_when_revision_export_times_out
     refs:
       - to: SC-11
         item: scenarios[異常シナリオ（リビジョンの書き出しが上限を超える）]
@@ -217,6 +217,88 @@ flows:
         item: constraints[裏の処理の譲り方]
         type: requires
         when: 休みの長さや確認の単位を変えるときに、起動の制約と合うかを確認する。
+  - name: 正常系（ほかの配信元の読み込みの最中に応答する）
+    summary: 応答の最中は、要求が指さない配信元の行の読み込みが休みを挟んで進む
+    setup:
+      - name: Mock
+        description: sample の文書の一覧の処理を、テストが合図を出すまで止まるものに差し替える。large の行の読み込みで文書の行ごとのスキーマの検証を実行した時刻を記録する包みを配置する
+        notes: 合図は、large の検証が始まってから 1 秒の後に出す
+      - name: 大きな配信元
+        description: 文書の種類の行を多く持ち、合図の後も行の読み込みが 1 秒以上続く large。行の数は、テストが始めに休まない検証の 1 件あたりの時間を測り、1 秒をその時間で割った数の 2 倍にする
+      - name: サンプルの配信元
+        description: 正常系と同じ sample。端末の設定で large の後に並べる
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs
+        participant L as 配信元の行の読み込み
+
+        L->>L: large と sample を読み込み始める
+        C->>E: GET /sources/sample/docs（合図まで応答の最中になる）
+        L->>L: large の文書の行ごとに休みを挟んで進む
+        C->>E: 合図を出す
+        E-->>C: 200 文書の一覧
+        L->>L: 休みを挟まずに large を読み込み終える
+      ```
+    expected:
+      - 応答の最中に large の文書の行の検証が 1 秒あたりに進んだ数が、合図の後の 2 割以下
+      - 応答の最中も、large の文書の行の検証が 1 件以上進む（止まらない）
+      - 合図の後に 200 で sample の文書の一覧を返却し、large の配信元の設定と種類のスキーマが休まずに読み込んだときと同じ
+    test: test_normal_when_other_sources_loading
+    refs:
+      - to: SC-11
+        item: scenarios[正常シナリオ（ほかの配信元の読み込みの最中に開く）]
+        type: references
+        when: このインターフェースのフローを変えるときに、シナリオ『画面のサーバーが文書を読む』の対応する流れと期待値を確認する。
+      - to: IF-15
+        item: constraints[裏の処理の譲り方]
+        type: requires
+        when: 休みの長さや休む単位を変えるときに、起動の制約と合うかを確認する。
+  - name: 正常系（同じ commit を 2 回取得する）
+    summary: 同じ commit の 2 回目は、ファイルと文書の行のパターンの照合をやり直さない
+    setup:
+      - name: Mock
+        description: 文書の行のパターンとファイルの照合の呼び出しの回数を数える包みを配置する
+      - name: サンプルの配信元
+        description: 正常系と同じ sample
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs
+
+        C->>E: GET /sources/sample/docs?values=true
+        E-->>C: 200 文書の一覧
+        C->>E: GET /sources/sample/docs?values=true（同じ commit）
+        E-->>C: 200 文書の一覧
+      ```
+    expected:
+      - 2 回とも 200 で、同じ `documents` を返す
+      - 2 回目の要求の中の、文書の行のパターンとファイルの照合の呼び出しが 0 回
+      - '`main` に commit を追加した後の文書の一覧は、照合をやり直して追加した文書を返す'
+    test: test_normal_when_same_commit_listed_twice
+  - name: 正常系（C の読み込みで読めない YAML を含む）
+    summary: C の読み込みで読めない YAML も、pure で読み直して同じ値で返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: サンプルの配信元
+        description: '正常系と同じ sample。`files.yaml` の行に flow の中の `:` を含む plain scalar（`tags: [scope:a, topic:b]`）を持たせる'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs
+
+        C->>E: GET /sources/sample/docs?values=true
+        E->>E: C で読めない files.yaml を pure で読み直す
+        E-->>C: 200 文書の一覧
+      ```
+    expected:
+      - 200 で、`files.yaml` の行の文書の `tags` が `scope:a`・`topic:b`
+      - '`documents` の各要素の `value` が、pure の読み込みだけで読んだときと同じ'
+    test: test_normal_when_yaml_unreadable_by_c
 lead: 指定のリビジョンの文書の一覧を返却する読み取り API の入出力を定め、文書の一覧を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -315,9 +397,6 @@ status_codes:
   - code: '404'
     condition: 配信元が無い・配信していない、リビジョンを解決できない
     notes: '`missing`（`source`・`not_served`・`ref`）と値'
-  - code: '504'
-    condition: リビジョンの書き出し（`git archive`）が待ち時間の上限を超えて止まった
-    notes: '`title` が `RevisionExportTimeoutError`。`operation`（`revision_export`）・`commit`・`limitSec`'
 error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）
 constraints:
   - item: 並び
@@ -331,5 +410,8 @@ constraints:
     constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名と、`value`・`commonKeys` の中身は変えない
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、`ref` を無視して登録したフォルダの文書を返し、応答の `ref` を空にする'
+  - item: リビジョンの読み込み
+    constraint: commit を状態のフォルダへ書き出さずに、commit のファイルの一覧（`ls-tree`）と、変わったファイルの blob の内容（`cat-file --batch`）から読み込む。同じ commit の 2 回目は、ファイルと文書の行のパターンの照合の結果を使い回す
+    notes: 文書の取得・語での検索・配信元の設定の取得は今どおり書き出しを読む。書き出しの最中でも、文書の一覧はその終了を待たない
 test_file: tests/integration/server/test_list_documents.py
 visibility: internal
