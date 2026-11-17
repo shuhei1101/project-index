@@ -1,6 +1,11 @@
 id: MOD-32
 title: 索引のサーバー / 履歴 / snapshot.py
 lead: リビジョンの書き出しを受け持ち、履歴の snapshot.py を修正するときに参照する。
+tags:
+  - name: topic:履歴
+    main: true
+  - name: topic:リビジョン
+  - name: tool:git
 test_files:
   - tests/unit/project_index/features/history/test_snapshot.py
 diagrams:
@@ -15,7 +20,7 @@ diagrams:
         class リビジョンの書き出し {
           +書き出す(リポジトリ, commit) Path
         }
-        click gitの実行 href "./MOD-86.py.yaml#gitの実行"
+        click gitの実行 href "id:MOD-86#functions[run_git]"
 classes:
   - name: SnapshotStore
     title: リビジョンの書き出し
@@ -29,7 +34,7 @@ classes:
     kind: クラス
     properties:
       - name: dir
-        title: 書き出しの置き場所
+        title: 書き出しの配置先
         type: Path
         access: 公開
         description: '`{state_dir}/snapshots`'

@@ -168,7 +168,7 @@ def test_search_docs(make_env: Callable[..., SearchEnv]) -> None:
 
 
 def test_search_docs_when_full_and_seen(make_env: Callable[..., SearchEnv]) -> None:
-    """本文と返し済み（正常系）。"""
+    """本文と返却済み（正常系）。"""
     # 準備
     env = make_env(TWO_DOCS)
     condition = Condition(field="id", op="eq", values=["doc-1"])
@@ -361,7 +361,7 @@ def test_search_docs_when_matches_under_not(make_env: Callable[..., SearchEnv]) 
 
 
 def test_search_docs_when_part_of_body(make_env: Callable[..., SearchEnv]) -> None:
-    """本文の一部と返し済み（正常系）。"""
+    """本文の一部と返却済み（正常系）。"""
     # 準備
     env = make_env(PART_NOTES, documents=[_notes_table()])
     condition = Condition(field="id", op="eq", values=["notes/a.md"])

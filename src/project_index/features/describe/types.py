@@ -41,7 +41,7 @@ class KindSummary:
 
 @dataclass(frozen=True)
 class OutsideSource:
-    """作業範囲の外で読める配信元の一覧の 1 行。"""
+    """作業範囲の外で参照できる配信元の一覧の 1 行。"""
 
     id: str
     description: str

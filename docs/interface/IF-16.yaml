@@ -8,7 +8,7 @@ flows:
     summary: 古い端末の設定に手順を当て、バックアップを残して `version` を上げる
     setup:
       - name: Mock
-        description: 手順の置き場所をテスト用のフォルダに、`SETTINGS_VERSION`・`SOURCE_CONFIG_VERSION` を `2` に monkeypatch で差し替え、`main(["migrate", ...])` を同じプロセスで呼ぶ。端末の設定は一時フォルダに置き `PROJECT_INDEX_CONFIG` で指す
+        description: 手順の配置先をテスト用のフォルダに、`SETTINGS_VERSION`・`SOURCE_CONFIG_VERSION` を `2` に monkeypatch で差し替え、`main(["migrate", ...])` を同じプロセスで呼ぶ。端末の設定は一時フォルダに置き `PROJECT_INDEX_CONFIG` で指す
       - name: 移し替えの手順
         description: テスト用の手順のフォルダに、`version` 1 → 2 でキーを改名する手順を 1 つ置く
       - name: 端末の設定
@@ -248,6 +248,14 @@ flows:
       - '`project-index.yaml` の中身が適用前と同じ（`documents[0]` も書き換わらない）'
     test: test_error_when_source_config_unmigratable
 lead: 端末の設定か配信元の設定の `version` を比べて移し替えの手順を適用する `project-index migrate` の入出力を定め、設定の移し替えを修正するときに参照する。
+tags:
+  - name: topic:設定
+    main: true
+  - name: topic:バージョン
+  - name: action:移行
+  - name: topic:cli
+aliases:
+  - 'project-index migrate'
 identifier: migrate
 permissions: 対象の設定ファイルを書き換えられる利用者
 idempotent: true
@@ -307,13 +315,13 @@ exceptions:
     condition: 当てる手順に破壊的なものがあり、`--allow-destructive` が無い（終了コード 5）
     notes: ファイルに触らず、破壊的な手順を stderr に出す
   - name: ConfigNewer
-    condition: 対象の `version` が project-index が読めるバージョンより新しい（終了コード 6）
+    condition: 対象の `version` が project-index が参照できるバージョンより新しい（終了コード 6）
     notes: project-index の更新を案内する
 constraints:
-  - item: 手順の置き場所
+  - item: 手順の配置先
     constraint: '`src/project_index/migrations/{settings|project-index}/{バージョン}/steps.yaml`。パッケージに同梱し、`importlib.resources` で読む'
   - item: 当てる順
-    constraint: 対象の `version` より新しく、project-index が読めるバージョン以下の手順を古い順に全て当てる。途中で止めず、全て当ててから 1 回だけ書き込む
+    constraint: 対象の `version` より新しく、project-index が参照できるバージョン以下の手順を古い順に全て当てる。途中で止めず、全て当ててから 1 回だけ書き込む
   - item: バックアップ
     constraint: 適用の前に必ず取る。成功しても消さない
   - item: 反映

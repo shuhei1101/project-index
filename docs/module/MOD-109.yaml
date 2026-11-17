@@ -2,6 +2,11 @@ id: MOD-109
 title: 索引のサーバー / 変換
 lead: |-
   `converters[]` を指す種類の文書を、配信元のスクリプトで Markdown にする変換の分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
+tags:
+  - name: action:変換
+    main: true
+  - name: topic:markdown
+  - name: tool:mdmark
 directory: |-
   ```text
   src/project_index/features/convert/
@@ -31,9 +36,9 @@ diagrams:
         class 変換の失敗 {
           +理由: str
         }
-        click 変換 href "./MOD-17.py.yaml#変換"
-        click スクリプトの実行 href "./MOD-88.py.yaml#スクリプトの実行"
-        click 変換の結果 href "./MOD-18.py.yaml#変換の結果"
+        click 変換 href "id:MOD-17#classes[ConvertService]"
+        click スクリプトの実行 href "id:MOD-88#functions[run_script]"
+        click 変換の結果 href "id:MOD-18#data_models[Converted]"
 notes:
   受け持つこと: |-
     変換の結果をキャッシュする。

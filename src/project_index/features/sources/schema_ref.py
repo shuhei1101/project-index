@@ -64,11 +64,11 @@ def _config_name(config: Path) -> str | None:
 def terminal_lookup(terminal: TerminalConfig) -> SchemaRefLookup:
     """端末の設定の `sources[]` から、配信元の ID → 先頭の設定のファイルの引き当てを作る。"""
     table: dict[str, Path] = {}
-    # `enabled` によらず全ての行を載せ、配信していない参照先も読めるようにする
+    # `enabled` によらず全ての行を載せ、配信していない参照先も参照できるようにする
     for entry in terminal.sources:
         config = Path(entry.config[0]).expanduser()
         source_id = entry.id or _config_name(config)
-        # `id` も読める `name` も無い行は引けない
+        # `id` も参照できる `name` も無い行は引けない
         if source_id is None:
             continue
         table.setdefault(source_id, config)

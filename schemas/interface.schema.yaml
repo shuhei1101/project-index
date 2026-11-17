@@ -25,6 +25,14 @@ properties:
     $ref: common.schema.yaml#/$defs/doc_visibility
     title: 公開範囲
     description: 文書を Pages に出すか（`public` / `internal`）。
+  tags:
+    $ref: common.schema.yaml#/$defs/tags
+    title: タグ
+    description: 文書を検索で絞り込むタグ。
+  aliases:
+    $ref: common.schema.yaml#/$defs/aliases
+    title: 別名
+    description: 文書を指す別の名前（略称・英語名・ツール名など）。
   title:
     type: string
     title: タイトル
@@ -126,8 +134,8 @@ properties:
           description: 省略時の値。省略できて既定の値が無いときは `なし（{省略時の挙動}）`。
         location:
           type: string
-          title: 置き場所
-          description: HTTP のパラメータの置き場所。MCP ツール・関数の引数は `argument`。
+          title: 配置先
+          description: HTTP のパラメータの配置先。MCP ツール・関数の引数は `argument`。
           enum:
           - path
           - query

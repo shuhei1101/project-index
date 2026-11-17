@@ -1,6 +1,12 @@
 id: MOD-59
 title: 索引のサーバー / 会話の記録 / store.py
-lead: 会話キーごとの返し済み・前回読んだ内容・閲覧と編集の SQLite への記録と読み出しを受け持ち、会話の記録の store.py を修正するときに参照する。
+lead: 会話キーごとの返却済み・前回読んだ内容・閲覧と編集の SQLite への記録と読み出しを受け持ち、会話の記録の store.py を修正するときに参照する。
+tags:
+  - name: topic:会話
+    main: true
+  - name: action:記録
+  - name: topic:履歴
+  - name: topic:データストア
 test_files:
   - tests/unit/project_index/features/seen/test_store.py
 diagrams:
@@ -12,7 +18,7 @@ diagrams:
         会話の記録 ..> 前回読んだ内容 : 返す
         会話の記録 ..> 閲覧と編集 : 返す
         class 会話の記録 {
-          +返し済み(会話キー, 配信元, 種類, バージョン) set
+          +返却済み(会話キー, 配信元, 種類, バージョン) set
           +返したことを記録する(会話キー, 配信元, 種類, 文書) None
           +前回読んだ内容(会話キー, 配信元, ID) dict
           +閲覧と編集を記録する(会話キー, 配信元, ID, 種類) None
@@ -34,16 +40,16 @@ diagrams:
           +種類: str
           +日時: datetime
         }
-        click 会話キー href "./MOD-60.py.yaml#会話キー"
-        click 前回読んだ内容 href "./MOD-60.py.yaml#前回読んだ内容"
-        click 閲覧と編集 href "./MOD-60.py.yaml#閲覧と編集"
+        click 会話キー href "id:MOD-60#data_models[SessionKey]"
+        click 前回読んだ内容 href "id:MOD-60#data_models[LastRead]"
+        click 閲覧と編集 href "id:MOD-60#data_models[Activity]"
 classes:
   - name: SeenStore
     title: 会話の記録
     container: project_index/features/seen/store.py
     usecase: 共通
     role: リポジトリ
-    summary: 会話キーごとの返し済み・前回読んだ内容・閲覧と編集を SQLite に読み書きする
+    summary: 会話キーごとの返却済み・前回読んだ内容・閲覧と編集を SQLite に読み書きする
     description: |-
       ファイルは `{state_dir}/seen.sqlite3`（起動の『部品の配線』が作る）。
       接続は 1 つを `check_same_thread=False`・`journal_mode=WAL` で開き、`_lock` で 1 つずつ使う。
@@ -72,8 +78,8 @@ classes:
         description: '`_conn` を守る'
     methods:
       - name: returned
-        title: 返し済み
-        summary: 同じバージョンをこの会話で返し済みの文書の ID を返す
+        title: 返却済み
+        summary: 同じバージョンをこの会話で返却済みの文書の ID を返す
         kind: メソッド
         scope: public
         thread_safe: true
@@ -111,7 +117,7 @@ classes:
         unit_tests:
           - name: test_seen_store_returned
             case: 正常
-            summary: 同じバージョンだけ返し済み
+            summary: 同じバージョンだけ返却済み
             condition: '`doc-1@v1`・`doc-2@v1` を `body` で記録し、`{doc-1: v1, doc-2: v2}` を引く'
             mock: なし（一時フォルダの SQLite）
             expected: '`{"doc-1"}`'

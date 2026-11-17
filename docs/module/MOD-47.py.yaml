@@ -1,6 +1,10 @@
 id: MOD-47
 title: 索引のサーバー / 関連 / service.py
 lead: '`trace_related` の関連のたどりと関連の候補を受け持ち、関連の service.py を修正するときに参照する。'
+tags:
+  - name: topic:関連
+    main: true
+  - name: action:追跡
 test_files:
   - tests/unit/project_index/features/related/test_service.py
 diagrams:
@@ -12,7 +16,7 @@ diagrams:
         関連のたどり ..> 文書を集める
         関連のたどり ..> 関連をたどる
         関連のたどり ..> 関連の候補
-        関連のたどり ..> 会話の記録 : 返し済み
+        関連のたどり ..> 会話の記録 : 返却済み
         class 関連のたどり {
           <<function>>
         }
@@ -31,11 +35,11 @@ diagrams:
         class 会話の記録 {
           <<class>>
         }
-        click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
-        click 文書を集める href "./MOD-29.py.yaml#文書のストア"
-        click 関連をたどる href "./MOD-45.py.yaml#関連をたどる"
-        click 関連の候補 href "./MOD-48.py.yaml#関連の候補"
-        click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
+        click 読む場所の解決 href "id:MOD-7#functions[resolve_read_targets]"
+        click 文書を集める href "id:MOD-29#classes[DocumentStore]"
+        click 関連をたどる href "id:MOD-45#functions[walk_related]"
+        click 関連の候補 href "id:MOD-48#functions[suggest_related]"
+        click 会話の記録 href "id:MOD-59#classes[SeenStore]"
 functions:
   - name: trace_related
     title: 関連のたどり
@@ -71,7 +75,7 @@ functions:
         type: SeenStore
         required: true
         passing: injected
-        description: 返し済みの省略・閲覧と編集
+        description: 返却済みの省略・閲覧と編集
     returns:
       type: RelatedResult
       description: 関連のたどりの結果
@@ -83,7 +87,7 @@ functions:
          - `from_ids` の場合、無い ID があれば近い候補を添えた `DocumentNotFoundError`
          - `code_paths` の場合、正規化したパスと `body_path` が同じ文書。文書の無いパスがあれば `DocumentNotFoundError`（`missing` にパス）
       5. 関連をたどる。別の配信元の文書は、その配信元を読む場所の解決（同じ `cwd`・`outside_scope`）で解き、ID で引く（`SourceNotReadableError` など解けないときは `None`）
-      6. `repeat_seen` が `False` なら、会話の記録.返し済み（`related`）に当たる相手の名前・概要文を `SEEN_MARK` にする
+      6. `repeat_seen` が `False` なら、会話の記録.返却済み（`related`）に当たる相手の名前・概要文を `SEEN_MARK` にする
          - `SEEN_MARK` にしなかった相手は、その文書を読んだ場所で `path` を文書の場所（文書のストア.文書の場所）にし、`path` があれば `scope` を `summary` にする
       7. `suggest` なら、起点の `body_path`（無ければ `path`）で一緒に変わったファイル（Git の配信元だけ）と、会話の記録.閲覧と編集を引き、関連の候補を選ぶ（`exclude` は起点とたどった文書）
       8. 名前・概要文を返した相手を会話の記録に `related` で残す
@@ -113,7 +117,7 @@ functions:
         expected: '`src/a.py` を本文に持つ文書を起点にたどる'
       - name: test_trace_related_when_seen
         case: 正常
-        summary: 返し済みの相手
+        summary: 返却済みの相手
         condition: '同じ `session_id` で 2 回、3 回目は `repeat_seen: true`'
         mock: なし
         expected: 2 回目の名前・概要文が `SEEN_MARK` で `path`・`scope` が `None`、3 回目は名前

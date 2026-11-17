@@ -119,7 +119,7 @@ def test_trace_related_when_code_paths(make_env: Callable[..., RelatedEnv]) -> N
 
 
 def test_trace_related_when_seen(make_env: Callable[..., RelatedEnv]) -> None:
-    """返し済みの相手（正常系）。"""
+    """返却済みの相手（正常系）。"""
     # 準備
     env = make_env(CHAIN)
     # 実行

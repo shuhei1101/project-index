@@ -2,6 +2,11 @@ id: MOD-106
 title: 索引のサーバー / 会話の記録
 lead: |-
   会話キーごとに返却した文書・前回参照した内容・閲覧と編集を SQLite に記録する会話の記録の分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
+tags:
+  - name: topic:会話
+    main: true
+  - name: action:記録
+  - name: topic:履歴
 directory: |-
   ```text
   src/project_index/features/seen/
@@ -18,7 +23,7 @@ diagrams:
         会話の記録 ..> 前回読んだ内容 : 返す
         会話の記録 ..> 閲覧と編集 : 返す
         class 会話の記録 {
-          +返し済み(会話キー, 配信元, 種類, バージョン) set
+          +返却済み(会話キー, 配信元, 種類, バージョン) set
           +返したことを記録する(会話キー, 配信元, 種類, 文書) None
           +前回読んだ内容(会話キー, 配信元, ID) dict
           +閲覧と編集を記録する(会話キー, 配信元, ID, 種類) None
@@ -40,10 +45,10 @@ diagrams:
           +種類: str
           +日時: datetime
         }
-        click 会話の記録 href "./MOD-59.py.yaml#会話の記録"
-        click 会話キー href "./MOD-60.py.yaml#会話キー"
-        click 前回読んだ内容 href "./MOD-60.py.yaml#前回読んだ内容"
-        click 閲覧と編集 href "./MOD-60.py.yaml#閲覧と編集"
+        click 会話の記録 href "id:MOD-59#classes[SeenStore]"
+        click 会話キー href "id:MOD-60#data_models[SessionKey]"
+        click 前回読んだ内容 href "id:MOD-60#data_models[LastRead]"
+        click 閲覧と編集 href "id:MOD-60#data_models[Activity]"
 notes:
   受け持つこと: |-
     1 セッション 1 回の省略・`list_changes` の前回読んだ時点・`trace_related` の関連の候補が読む。

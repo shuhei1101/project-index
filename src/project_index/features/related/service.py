@@ -145,7 +145,7 @@ def _items(
     returned: dict[str, list[Document]] = {}
     for document, level, via_from, via_type, via_direction in found:
         already = document.id in seen_ids.get(document.source_id, set())
-        # 読んだ場所での絶対パス（`ref` を渡した呼び出し・返し済みの文書は持たない）
+        # 読んだ場所での絶対パス（`ref` を渡した呼び出し・返却済みの文書は持たない）
         read_target = (
             target
             if document.source_id == target.source.id
@@ -178,7 +178,7 @@ def _items(
 def _seen_ids(
     request: RelatedRequest, seen: SeenStore, key: SessionKey | None, found: list[Found]
 ) -> dict[str, set[str]]:
-    """この会話で同じバージョンを返し済みの文書の ID を、配信元ごとに引く。"""
+    """この会話で同じバージョンを返却済みの文書の ID を、配信元ごとに引く。"""
     if request.repeat_seen:
         return {}
     return {

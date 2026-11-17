@@ -22,6 +22,14 @@ properties:
     $ref: common.schema.yaml#/$defs/doc_visibility
     title: 公開範囲
     description: 文書を Pages に出すか（`public` / `internal`）。
+  tags:
+    $ref: common.schema.yaml#/$defs/tags
+    title: タグ
+    description: 文書を検索で絞り込むタグ。
+  aliases:
+    $ref: common.schema.yaml#/$defs/aliases
+    title: 別名
+    description: 文書を指す別の名前（略称・英語名・ツール名など）。
   title:
     type: string
     title: タイトル
