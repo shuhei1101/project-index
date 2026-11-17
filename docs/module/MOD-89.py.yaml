@@ -869,5 +869,153 @@ functions:
         condition: Git の配信元 a と Git 管理外の配信元 b
         mock: なし（一時フォルダで `git init`）
         expected: 返ったスレッドを join した後、`checks.get` が a・b の結果を返し、状態のフォルダに a の `config_commit` の書き出しだけがある
+  - name: run_outline
+    title: ファイルのアウトラインの実行
+    container: project_index/main.py
+    usecase: ファイルのアウトライン
+    role: 入口
+    summary: '`project-index outline` の解析結果でアウトラインを取り出し、1 ファイル 1 行の JSON で出す'
+    kind: 関数
+    scope: public
+    side_effects: 標準出力・標準エラーに書く
+    args:
+      - name: args
+        title: 解析結果
+        type: argparse.Namespace
+        required: true
+        passing: positional
+        description: '`outline` の解析結果（`root`・`paths`・`exclude`）'
+    returns:
+      type: int
+      description: 終了コード。出し終えたとき 0
+    process: |-
+      1. `root` を `Path` にし、フォルダでなければ「`{root}: フォルダがありません`」を標準エラーに出して 2 を返す
+      2. ファイルのアウトラインの一覧（`outline_files`）を作り、1 件ずつ 1 行の JSON（`to_json_line`）で標準出力に出して 0 を返す
+    exceptions:
+      - name: なし（終了コード 2）
+        condition: '`--root` が無いかフォルダでない（インターフェース定義の `RootNotFound`）'
+        message: '`{root}: フォルダがありません`'
+    unit_tests:
+      - name: test_run_outline
+        case: 正常
+        summary: 1 ファイル 1 行の JSON を出す
+        condition: '`docs/a.md`・`docs/b.md` を置き、`paths=["docs/**"]`・`exclude=[]`'
+        mock: なし（`tmp_path`・`capsys`）
+        expected: 0 を返し、標準出力が 2 行で、各行を `json.loads` した `path` が `docs/a.md`・`docs/b.md`
+        exception: '-'
+      - name: test_run_outline_when_root_not_found
+        case: 異常
+        summary: フォルダが無い
+        condition: '`root` に無いパス'
+        mock: なし（`capsys`）
+        expected: 2 を返し、標準出力が空で、標準エラーに渡したパス
+        exception: なし（終了コード 2）
+    refs:
+      - MOD-106-6#functions[outline_files]
+      - MOD-106-6#functions[to_json_line]
+  - name: run_changed
+    title: 中身が変わったファイルの一覧の実行
+    container: project_index/main.py
+    usecase: 中身が変わったファイルの一覧
+    role: 入口
+    summary: '`project-index changed` の解析結果で変わったファイルを集め、起点とあわせて 1 つの JSON で出す'
+    kind: 関数
+    scope: public
+    side_effects: 標準出力・標準エラーに書く
+    args:
+      - name: args
+        title: 解析結果
+        type: argparse.Namespace
+        required: true
+        passing: positional
+        description: '`changed` の解析結果（`root`・`files_yaml`）'
+    returns:
+      type: int
+      description: 終了コード。出し終えたとき 0
+    process: |-
+      1. `root` を `Path` にし、フォルダでなければ「`{root}: フォルダがありません`」を標準エラーに出して 2 を返す
+      2. 中身が変わったファイルの一覧（`find_changed`）を作る
+         - `FilesYamlNotFoundError` の場合、「`{パス}: 管理用の YAML がありません`」を標準エラーに出して 2 を返す
+      3. `missing_commit` があれば、「記録した commit `{commit}` が無いため、起点を `{base.kind}` に切り替えました」を標準エラーに出す
+      4. `{"base": {"kind", "value"}, "files": [...]}` を `json.dumps(ensure_ascii=False)` で標準出力に出して 0 を返す
+    exceptions:
+      - name: なし（終了コード 2）
+        condition: '`--root` が無いかフォルダでない（`RootNotFound`）'
+        message: '`{root}: フォルダがありません`'
+      - name: なし（終了コード 2・管理用の YAML）
+        condition: '`--files-yaml` が無い（`FilesYamlNotFound`）'
+        message: '`{パス}: 管理用の YAML がありません`'
+    unit_tests:
+      - name: test_run_changed
+        case: 正常
+        summary: 起点とファイルを JSON で出す
+        condition: '`find_changed` が `base=(CHECKPOINT_COMMIT, "abc")`・`files=("a.md",)` を返す'
+        mock: '`find_changed`（monkeypatch）'
+        expected: '0 を返し、標準出力を `json.loads` した結果が `{"base": {"kind": "checkpoint_commit", "value": "abc"}, "files": ["a.md"]}`、標準エラーが空'
+        exception: '-'
+      - name: test_run_changed_when_commit_missing
+        case: 正常
+        summary: 起点を切り替えた旨を出す
+        condition: '`find_changed` が `missing_commit="dead"` を持つ結果を返す'
+        mock: '`find_changed`（monkeypatch）'
+        expected: 0 を返し、標準エラーに `dead` と起点の種類
+        exception: '-'
+      - name: test_run_changed_when_files_yaml_not_found
+        case: 異常
+        summary: 管理用の YAML が無い
+        condition: '`files_yaml` に無いパス'
+        mock: なし（`tmp_path`・`capsys`）
+        expected: 2 を返し、標準出力が空で、標準エラーに渡したパス
+        exception: なし（終了コード 2・管理用の YAML）
+    refs:
+      - MOD-106-8#functions[find_changed]
+  - name: run_checkpoint
+    title: 確認の時点の記録の実行
+    container: project_index/main.py
+    usecase: 確認の時点の記録
+    role: 入口
+    summary: '`project-index checkpoint` の解析結果で確認の時点を記録し、記録した値を JSON で出す'
+    kind: 関数
+    scope: public
+    side_effects: 管理用の YAML を書き換え、標準出力・標準エラーに書く
+    args:
+      - name: args
+        title: 解析結果
+        type: argparse.Namespace
+        required: true
+        passing: positional
+        description: '`checkpoint` の解析結果（`root`・`files_yaml`・`reviewed`）'
+    returns:
+      type: int
+      description: 終了コード。記録したとき 0
+    process: |-
+      1. `root` を `Path` にし、フォルダでなければ「`{root}: フォルダがありません`」を標準エラーに出して 2 を返す
+      2. 確認の時点の記録（`record_checkpoint`。`now` は `datetime.now(UTC)`）を呼ぶ
+         - `FilesYamlNotFoundError` の場合、「`{パス}: 管理用の YAML がありません`」を標準エラーに出して 2 を返す
+      3. 記録した値（Git の配信元は `commit`・`reviewed`、Git 管理外は `checked_at`）を `json.dumps(ensure_ascii=False)` で標準出力に出して 0 を返す
+    exceptions:
+      - name: なし（終了コード 2）
+        condition: '`--root` が無いかフォルダでない（`RootNotFound`）'
+        message: '`{root}: フォルダがありません`'
+      - name: なし（終了コード 2・管理用の YAML）
+        condition: '`--files-yaml` が無い（`FilesYamlNotFound`）'
+        message: '`{パス}: 管理用の YAML がありません`'
+    unit_tests:
+      - name: test_run_checkpoint
+        case: 正常
+        summary: 記録した値を JSON で出す
+        condition: '`record_checkpoint` が `commit="abc"`・`reviewed=()` を返す'
+        mock: '`record_checkpoint`（monkeypatch。渡された引数を控える）'
+        expected: '0 を返し、標準出力が `{"commit": "abc", "reviewed": []}`、`now` が UTC のタイムゾーン付き'
+        exception: '-'
+      - name: test_run_checkpoint_when_files_yaml_not_found
+        case: 異常
+        summary: 管理用の YAML が無い
+        condition: '`files_yaml` に無いパス'
+        mock: なし（`tmp_path`・`capsys`）
+        expected: 2 を返し、標準エラーに渡したパス
+        exception: なし（終了コード 2・管理用の YAML）
+    refs:
+      - MOD-106-9#functions[record_checkpoint]
 refs:
   - IF-15#

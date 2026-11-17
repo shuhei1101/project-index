@@ -1,0 +1,19 @@
+id: MOD-106-1
+title: 索引のサーバー / アウトライン
+lead: setup が仮のメタデータを付けるときに、ファイルごとのアウトラインと次の段階へ進むかの判定を取り出すアウトラインの分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
+directory: |-
+  ```text
+  src/project_index/features/outline/
+  ├─ __init__.py   # 空
+  ├─ types.py      # NextStageReason / ExistingDescription / MarkdownOutline / CodeOutline / FileOutline
+  ├─ markdown.py   # outline_markdown（Markdown のアウトライン）
+  ├─ code.py       # outline_python / outline_script / outline_package_json（コードと package.json のアウトライン）
+  └─ service.py    # outline_files / outline_file / judge_next_stage / to_json_line（対象の選択・読み取り・判定・出力の形）
+  ```
+notes:
+  受け持つこと: ファイルを書き換えない。対象のファイルは `project-index files` と同じ判定（文書のストアの `indexable_files`）で選ぶ。
+tags:
+  - name: topic:アウトライン
+    main: true
+  - name: topic:メタデータ
+  - name: topic:cli

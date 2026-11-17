@@ -1,0 +1,253 @@
+id: MOD-106-6
+title: 索引のサーバー / アウトライン / service.py
+lead: アウトラインを取り出す対象の選択・読み取り・次の段階へ進む判定と、1 行の JSON への変換を受け持ち、アウトラインの service.py を修正するときに参照する。
+constants:
+  - name: MIN_HEADINGS
+    title: 見出しの下限
+    container: project_index/features/outline/service.py
+    usecase: ファイルのアウトライン
+    summary: Markdown の見出しがこれ未満なら `few_headings`
+    value: '2'
+    notes:
+      導き方: '`docs/pr/106/しきい値の測定/README.md`。3 にすると判定の件数が 4〜7 倍になる'
+  - name: MAX_CODE_BLOCK_RATIO
+    title: コードブロックの割合の上限
+    container: project_index/features/outline/service.py
+    usecase: ファイルのアウトライン
+    summary: Markdown の `code_block_ratio` がこれ以上なら `mostly_code`
+    value: '0.5'
+    notes:
+      導き方: '`docs/pr/106/しきい値の測定/README.md`。0.4 と 0.5 で件数が変わらない'
+  - name: MIN_JAPANESE_RATIO
+    title: 日本語の割合の下限
+    container: project_index/features/outline/service.py
+    usecase: ファイルのアウトライン
+    summary: Markdown の `japanese_ratio` がこれ未満なら `not_japanese`
+    value: '0.1'
+    notes:
+      導き方: '`docs/pr/106/しきい値の測定/README.md`。0.2 にすると英語の識別子が多い日本語のページが入る'
+  - name: MAX_READ_BYTES
+    title: 読み取りの上限
+    container: project_index/features/outline/service.py
+    usecase: ファイルのアウトライン
+    summary: 1 ファイルから読むバイト数の上限
+    value: '1_048_576'
+    notes:
+      導き方: '`docs/pr/106/しきい値の測定/README.md`。lint のログ 1 件を除く全てのファイルが 300 KB 未満で、2 番目に大きいファイルの約 5 倍'
+  - name: MARKDOWN_SUFFIXES
+    title: Markdown の拡張子
+    container: project_index/features/outline/service.py
+    usecase: ファイルのアウトライン
+    summary: Markdown として読む拡張子
+    value: frozenset({".md", ".markdown"})
+  - name: SCRIPT_SUFFIXES
+    title: TypeScript・JavaScript の拡張子
+    container: project_index/features/outline/service.py
+    usecase: ファイルのアウトライン
+    summary: TypeScript・JavaScript として読む拡張子
+    value: frozenset({".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"})
+functions:
+  - name: outline_files
+    title: ファイルのアウトラインの一覧
+    kind: 関数
+    container: project_index/features/outline/service.py
+    usecase: ファイルのアウトライン
+    role: サービス
+    summary: 範囲の glob のうち載せるファイルのアウトラインを、パスの昇順で返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: root
+        title: 配信元のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: '`--root` のフォルダ'
+      - name: paths
+        title: 範囲
+        type: Sequence[str]
+        required: true
+        passing: positional
+        description: 範囲の glob かファイルのパス
+      - name: exclude
+        title: 除外
+        type: Sequence[str]
+        required: false
+        default: ()
+        passing: keyword
+        description: 除外するファイル名の glob
+    returns:
+      type: list[FileOutline]
+      description: パスの昇順のアウトライン
+    process: |-
+      1. 載せるファイルの一覧（`indexable_files`）で対象のパスを集める
+      2. パスごとにファイルのアウトライン（`outline_file`）を作って返す
+    callees:
+      - MOD-26#functions[indexable_files]
+      - MOD-106-6#functions[outline_file]
+    unit_tests:
+      - name: test_outline_files
+        case: 正常
+        summary: 載せるファイルだけを昇順で返す
+        condition: '`docs/b.md`・`docs/a.md`・`uv.lock` を置き、`paths=["**"]`'
+        mock: なし（`tmp_path`）
+        expected: '`docs/a.md`・`docs/b.md` の 2 件の順で、`uv.lock` を含まない'
+  - name: outline_file
+    title: ファイルのアウトライン
+    kind: 関数
+    container: project_index/features/outline/service.py
+    usecase: ファイルのアウトライン
+    role: サービス
+    summary: ファイル 1 つを読み、形式に合ったアウトラインと次の段階へ進む判定を返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: root
+        title: 配信元のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: '`--root` のフォルダ'
+      - name: path
+        title: パス
+        type: str
+        required: true
+        passing: positional
+        description: '`root` からのパス'
+    returns:
+      type: FileOutline
+      description: ファイル 1 つ分の結果
+    process: |-
+      1. ファイルの大きさを引き、先頭 `MAX_READ_BYTES` バイトを読んで UTF-8（`errors="replace"`）の文字列にする
+      2. 形式でアウトラインを分ける
+         - 拡張子が `MARKDOWN_SUFFIXES` の場合、Markdown のアウトライン（`outline_markdown`）
+         - 拡張子が `.py` の場合、Python のアウトライン（`outline_python`）
+         - 拡張子が `SCRIPT_SUFFIXES` の場合、TypeScript・JavaScript のアウトライン（`outline_script`）
+         - ファイル名が `package.json` の場合、package.json のアウトライン（`outline_package_json`）
+         - それ以外の場合、アウトラインを持たない
+      3. 次の段階へ進む判定（`judge_next_stage`）で理由を求め、`FileOutline` にして返す
+    callees:
+      - MOD-106-4#functions[outline_markdown]
+      - MOD-106-5#functions[outline_python]
+      - MOD-106-5#functions[outline_script]
+      - MOD-106-5#functions[outline_package_json]
+      - MOD-106-6#functions[judge_next_stage]
+    unit_tests:
+      - name: test_outline_file_when_markdown
+        case: 正常
+        summary: Markdown
+        condition: 見出し 3 つの日本語の `a.md`
+        mock: なし（`tmp_path`）
+        expected: '`headings` が 3 件、`size` がファイルのバイト数、`next_stage` が `False`'
+      - name: test_outline_file_when_python
+        case: 正常
+        summary: Python
+        condition: 関数 1 つの `a.py`
+        mock: なし（`tmp_path`）
+        expected: '`functions` が `("f",)`、`headings` が空、`next_stage` が `False`'
+      - name: test_outline_file_when_package_json
+        case: 正常
+        summary: package.json
+        condition: '`description` を持つ `package.json`'
+        mock: なし（`tmp_path`）
+        expected: '`existing_description.source` が `package_json`、`next_stage` が `False`'
+      - name: test_outline_file_when_unsupported
+        case: 正常
+        summary: 未対応の形式
+        condition: '`a.toml`'
+        mock: なし（`tmp_path`）
+        expected: '`reasons` が `(NextStageReason.UNSUPPORTED_FORMAT,)`'
+      - name: test_outline_file_when_large
+        case: 正常
+        summary: 読み取りの上限を超える
+        condition: '`MAX_READ_BYTES` を 10 に monkeypatch し、先頭 10 バイトの後に見出しを持つ `a.md`'
+        mock: なし（`tmp_path`）
+        expected: '`size` がファイル全体のバイト数、`headings` に 10 バイトより後の見出しを含まない'
+  - name: judge_next_stage
+    title: 次の段階へ進む判定
+    kind: 関数
+    container: project_index/features/outline/service.py
+    usecase: ファイルのアウトライン
+    role: 判定
+    summary: アウトラインから次の段階へ進む理由を返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: outline
+        title: アウトライン
+        type: MarkdownOutline | CodeOutline | None
+        required: true
+        passing: positional
+        description: 形式ごとのアウトライン。未対応の形式は `None`
+    returns:
+      type: tuple[NextStageReason, ...]
+      description: 理由（`NextStageReason` の定義の順）。空なら進まない
+    process: |-
+      1. アウトラインの種類で分ける
+         - `None` の場合、`(UNSUPPORTED_FORMAT,)` を返す
+         - Markdown の場合、見出しが `MIN_HEADINGS` 未満なら `FEW_HEADINGS`、`code_block_ratio` が `MAX_CODE_BLOCK_RATIO` 以上なら `MOSTLY_CODE`、`japanese_ratio` が `MIN_JAPANESE_RATIO` 未満なら `NOT_JAPANESE` を並べて返す
+         - コードの場合、既に持つ説明が無く関数もクラスも無ければ `(NO_DEFINITIONS,)`、そうでなければ空を返す
+    unit_tests:
+      - name: test_judge_next_stage_when_markdown
+        case: 正常
+        summary: Markdown の 3 つのしきい値
+        condition: 見出し 1・`code_block_ratio` 0.5・`japanese_ratio` 0.09 の Markdown のアウトライン
+        mock: なし
+        expected: '`(FEW_HEADINGS, MOSTLY_CODE, NOT_JAPANESE)`'
+      - name: test_judge_next_stage_when_markdown_enough
+        case: 正常
+        summary: しきい値の境目で進まない
+        condition: 見出し 2・`code_block_ratio` 0.49・`japanese_ratio` 0.1
+        mock: なし
+        expected: 空
+      - name: test_judge_next_stage_when_code_without_definitions
+        case: 正常
+        summary: 定義も説明も無いコード
+        condition: 関数・クラス・説明の無いコードのアウトライン
+        mock: なし
+        expected: '`(NO_DEFINITIONS,)`'
+      - name: test_judge_next_stage_when_code_with_description
+        case: 正常
+        summary: 説明だけを持つコード
+        condition: 関数・クラスが無く、既に持つ説明があるコードのアウトライン
+        mock: なし
+        expected: 空
+      - name: test_judge_next_stage_when_unsupported
+        case: 正常
+        summary: 未対応の形式
+        condition: '`None`'
+        mock: なし
+        expected: '`(UNSUPPORTED_FORMAT,)`'
+  - name: to_json_line
+    title: 1 行の JSON
+    kind: 関数
+    container: project_index/features/outline/service.py
+    usecase: ファイルのアウトライン
+    role: 変換
+    summary: ファイルのアウトラインをインターフェース定義の形の 1 行の JSON にする
+    scope: public
+    thread_safe: true
+    args:
+      - name: outline
+        title: アウトライン
+        type: FileOutline
+        required: true
+        passing: positional
+        description: ファイル 1 つ分の結果
+    returns:
+      type: str
+      description: 改行を含まない JSON（`ensure_ascii=False`）
+    process: |-
+      1. `dataclasses.asdict` で辞書にし、tuple を list、`NextStageReason` を値の文字列、割合を小数第 2 位に丸めた値にする
+      2. `json.dumps(ensure_ascii=False)` で返す
+    unit_tests:
+      - name: test_to_json_line
+        case: 正常
+        summary: インターフェース定義の形
+        condition: '`existing_description` が `None`・`reasons` が `(MOSTLY_CODE,)`・`code_block_ratio` が 0.8234 のアウトライン'
+        mock: なし
+        expected: '`json.loads` した結果が `existing_description: null`・`reasons: ["mostly_code"]`・`code_block_ratio: 0.82` で、日本語がエスケープされない'
+tags:
+  - name: topic:アウトライン
+    main: true
+  - name: topic:メタデータ

@@ -1,0 +1,115 @@
+id: MOD-106-5
+title: 索引のサーバー / アウトライン / code.py
+lead: Python・TypeScript・JavaScript の関数・クラス・import と docstring、package.json の説明の取り出しを受け持ち、アウトラインの code.py を修正するときに参照する。
+functions:
+  - name: outline_python
+    title: Python のアウトライン
+    kind: 関数
+    container: project_index/features/outline/code.py
+    usecase: ファイルのアウトライン
+    role: 変換
+    summary: Python のソースから最上位の関数・クラス・import とモジュールの docstring を取り出す
+    scope: public
+    thread_safe: true
+    args:
+      - name: text
+        title: ソース
+        type: str
+        required: true
+        passing: positional
+        description: Python のソースの全文
+    returns:
+      type: CodeOutline
+      description: 取り出したアウトライン
+    process: |-
+      1. `ast.parse` で読む
+         - `SyntaxError` の場合、関数・クラス・import と説明が空のアウトラインを返す（判定で `no_definitions` になる）
+      2. `ast.get_docstring` でモジュールの docstring を引き、あれば 1 行目を `title`、空行の後を `description` にした `source` が `docstring` の既に持つ説明にする
+      3. 最上位の `FunctionDef`・`AsyncFunctionDef` の名前を関数、`ClassDef` の名前をクラスにする
+      4. ファイル全体の `Import` の名前と `ImportFrom` の `module`（相対 import は `.` を付けたまま）を、出た順・重複なしで import にする
+      5. アウトラインを返す
+    unit_tests:
+      - name: test_outline_python
+        case: 正常
+        summary: 関数・クラス・import・docstring
+        condition: docstring `"""タスク。\n\n保存を受け持つ。"""`・`import yaml`・`from .a import b`・関数 `f`・`async def g`・クラス `C`（中にメソッド `m`）
+        mock: なし
+        expected: '`functions` が `("f", "g")`、`classes` が `("C",)`、`imports` が `("yaml", ".a")`、`existing_description` の `title` が `タスク。`・`description` が `保存を受け持つ。`'
+      - name: test_outline_python_when_syntax_error
+        case: 正常
+        summary: 読めないソース
+        condition: '`def (:`'
+        mock: なし
+        expected: 全ての項目が空、例外を送らない
+  - name: outline_script
+    title: TypeScript・JavaScript のアウトライン
+    kind: 関数
+    container: project_index/features/outline/code.py
+    usecase: ファイルのアウトライン
+    role: 変換
+    summary: TypeScript・JavaScript のソースから最上位の関数・クラス・import と先頭の説明のコメントを取り出す
+    scope: public
+    thread_safe: true
+    args:
+      - name: text
+        title: ソース
+        type: str
+        required: true
+        passing: positional
+        description: TypeScript・JavaScript のソースの全文
+    returns:
+      type: CodeOutline
+      description: 取り出したアウトライン
+    process: |-
+      1. ファイルの先頭（空行を除く）が `/**` で始まる場合、`*/` までの各行の頭の `*` を除き、1 行目を `title`、残りを `description` にした `source` が `docstring` の既に持つ説明にする
+      2. 行頭（インデントなし）の `export`・`default`・`async` を除いた `function {名前}` と、`const {名前} = (` か `const {名前} = async (` の名前を関数にする
+      3. 行頭の `class {名前}`（`export`・`default`・`abstract` を除く）の名前をクラスにする
+      4. `import ... from '{モジュール}'`・`import '{モジュール}'`・`require('{モジュール}')` のモジュールを、出た順・重複なしで import にする
+      5. アウトラインを返す
+    unit_tests:
+      - name: test_outline_script
+        case: 正常
+        summary: 関数・クラス・import・先頭の説明
+        condition: 先頭に `/** 画面の部品。 */`、`import React from 'react'`、`export function A()`、`const b = () =>`、`export default class C`、関数の中の `function inner()`
+        mock: なし
+        expected: '`functions` が `("A", "b")`、`classes` が `("C",)`、`imports` が `("react",)`、`existing_description` の `title` が `画面の部品。`'
+  - name: outline_package_json
+    title: package.json のアウトライン
+    kind: 関数
+    container: project_index/features/outline/code.py
+    usecase: ファイルのアウトライン
+    role: 変換
+    summary: package.json の `name`・`description` を既に持つ説明として取り出す
+    scope: public
+    thread_safe: true
+    args:
+      - name: text
+        title: 本文
+        type: str
+        required: true
+        passing: positional
+        description: package.json の全文
+    returns:
+      type: CodeOutline
+      description: 既に持つ説明だけを持つアウトライン
+    process: |-
+      1. JSON として読む
+         - 読めない・オブジェクトでない場合、説明の無いアウトラインを返す
+      2. `description` が文字列なら、`name` を `title`・`description` を `description` にした `source` が `package_json` の既に持つ説明にして返す。無ければ説明の無いアウトラインを返す
+    unit_tests:
+      - name: test_outline_package_json
+        case: 正常
+        summary: description を持つ
+        condition: '`{"name": "lint", "description": "文書の検査"}`'
+        mock: なし
+        expected: '`existing_description` が `source="package_json"`・`title="lint"`・`description="文書の検査"`'
+      - name: test_outline_package_json_when_no_description
+        case: 正常
+        summary: description が無い
+        condition: '`{"name": "lint"}`'
+        mock: なし
+        expected: '`existing_description` が `None`'
+tags:
+  - name: topic:アウトライン
+    main: true
+  - name: tool:ast

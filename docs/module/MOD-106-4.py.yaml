@@ -1,0 +1,76 @@
+id: MOD-106-4
+title: 索引のサーバー / アウトライン / markdown.py
+lead: Markdown の見出し・コードブロック・リンク・日本語の割合とフロントマターの説明の取り出しを受け持ち、アウトラインの markdown.py を修正するときに参照する。
+functions:
+  - name: outline_markdown
+    title: Markdown のアウトライン
+    kind: 関数
+    container: project_index/features/outline/markdown.py
+    usecase: ファイルのアウトライン
+    role: 変換
+    summary: Markdown の文字列からアウトラインを取り出す
+    scope: public
+    thread_safe: true
+    args:
+      - name: text
+        title: 本文
+        type: str
+        required: true
+        passing: positional
+        description: Markdown の全文（読み取りの上限で切ったもの）
+    returns:
+      type: MarkdownOutline
+      description: 取り出したアウトライン
+    process: |-
+      1. 1 行目が `---` なら、次の `---` の行までをフロントマターとして切り離す
+         - フロントマターを YAML として読み、マッピングで `title` か `description` を文字列で持つ場合、`source` が `front_matter` の既に持つ説明にする
+         - YAML として読めない・マッピングでない場合、既に持つ説明を `None` にする（本文の扱いは変えない）
+         - 閉じる `---` が無い場合、フロントマターとして扱わず全文を本文にする
+      2. 本文を 1 行ずつ見て、行頭（空白の後）が ``` か `~~~` の行でコードブロックの中と外を切り替える
+         - 開く行の後ろの語を言語として控える（出た順・重複なし）
+         - フェンスの行とコードブロックの中の行を数える
+      3. コードブロックの外の行のうち、`#{1,6}` と空白で始まる行を見出しにする
+      4. コードブロックの外の行で `![...](...)` を画像、それ以外の `[...](...)` をリンクとして数える
+      5. コードブロックの外の文字から空白と Markdown の記号（`|-*#`[]()>:.,_/`）を除き、ひらがな・カタカナ・漢字の割合を求める（文字が無ければ 0）
+      6. コードブロックの行の数を本文の行の数で割った割合（行が無ければ 0）とあわせて返す
+    unit_tests:
+      - name: test_outline_markdown
+        case: 正常
+        summary: 見出し・コードブロック・リンク・画像・日本語の割合を取り出す
+        condition: 見出し 3 つ・`python` のコードブロック 1 つ（中に `# 見出しではない` の行）・リンク 2 つ・画像 1 つの日本語の Markdown
+        mock: なし
+        expected: '`headings` が 3 件でコードブロックの中の行を含まない、`code_languages` が `("python",)`、`link_count` が 2、`image_count` が 1、`japanese_ratio` が 0.5 より大きい、`existing_description` が `None`'
+      - name: test_outline_markdown_when_front_matter
+        case: 正常
+        summary: フロントマターの説明を取り出し、見出しから除く
+        condition: 'フロントマターに `title: A`・`description: B` と `# x` の行を持ち、本文に見出し 1 つ'
+        mock: なし
+        expected: '`existing_description` が `source="front_matter"`・`title="A"`・`description="B"`、`headings` が本文の 1 件だけ'
+      - name: test_outline_markdown_when_front_matter_unreadable
+        case: 正常
+        summary: 読めないフロントマターは説明にしない
+        condition: 'フロントマターが `: :` だけ'
+        mock: なし
+        expected: '`existing_description` が `None`、例外を送らない'
+      - name: test_outline_markdown_when_mostly_code
+        case: 正常
+        summary: コードブロックの割合
+        condition: 10 行のうちフェンスを含め 8 行がコードブロック
+        mock: なし
+        expected: '`code_block_ratio` が 0.8'
+      - name: test_outline_markdown_when_english
+        case: 正常
+        summary: 英語の本文
+        condition: 英語の文だけの Markdown
+        mock: なし
+        expected: '`japanese_ratio` が 0'
+      - name: test_outline_markdown_when_empty
+        case: 正常
+        summary: 空の本文
+        condition: 空文字
+        mock: なし
+        expected: '`headings` が空、`code_block_ratio`・`japanese_ratio` が 0'
+tags:
+  - name: topic:アウトライン
+    main: true
+  - name: topic:markdown

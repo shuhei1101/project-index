@@ -1,0 +1,163 @@
+id: MOD-106-8
+title: 索引のサーバー / 確認の時点 / changed.py
+lead: 確認の時点の読み取りと、起点の選択・中身が変わった行のファイルの一覧を受け持ち、確認の時点の changed.py を修正するときに参照する。
+functions:
+  - name: read_checkpoint
+    title: 確認の時点の読み取り
+    kind: 関数
+    container: project_index/features/checkpoint/changed.py
+    usecase: 共通
+    role: 変換
+    summary: 管理用の YAML の値から `checkpoint` を読む
+    scope: public
+    thread_safe: true
+    args:
+      - name: data
+        title: 管理用の YAML の値
+        type: Mapping[str, object]
+        required: true
+        passing: positional
+        description: 管理用の YAML を読んだマッピング
+    returns:
+      type: Checkpoint | None
+      description: '`checkpoint` が無ければ `None`'
+    process: |-
+      1. `checkpoint` が無ければ `None` を返す
+      2. `commit`（文字列）・`reviewed[]`（`path`・`sha256`）・`checked_at`（ISO 8601 の文字列）を読み、`Checkpoint` にして返す
+         - `checkpoint` がマッピングでない・値の型が違う・`checked_at` が日時として読めない場合、`ValueError` を送る
+    exceptions:
+      - name: ValueError
+        condition: '`checkpoint` の形が違う'
+        message: '`{キー}: {期待する型}`'
+    unit_tests:
+      - name: test_read_checkpoint
+        case: 正常
+        summary: commit と見直し済みのファイル
+        condition: '`{checkpoint: {commit: "abc", reviewed: [{path: "a.md", sha256: "00"}]}}`'
+        mock: なし
+        expected: '`commit` が `"abc"`、`reviewed` が 1 件、`checked_at` が `None`'
+      - name: test_read_checkpoint_when_missing
+        case: 正常
+        summary: 記録が無い
+        condition: '`{files: []}`'
+        mock: なし
+        expected: '`None`'
+      - name: test_read_checkpoint_when_invalid
+        case: 異常
+        summary: 形が違う
+        condition: '`{checkpoint: {checked_at: "x"}}`'
+        mock: なし
+        expected: '`ValueError` のメッセージに `checked_at`'
+        exception: '`checkpoint` の形が違う'
+  - name: find_changed
+    title: 中身が変わったファイルの一覧
+    kind: 関数
+    container: project_index/features/checkpoint/changed.py
+    usecase: 中身が変わったファイルの一覧
+    role: サービス
+    summary: 確認の時点の後に中身が変わった、管理用の YAML の行のファイルを返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: root
+        title: 配信元のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: '`--root` のフォルダ'
+      - name: files_yaml
+        title: 管理用の YAML
+        type: str
+        required: true
+        passing: positional
+        description: '`--root` からのパス'
+    returns:
+      type: ChangedResult
+      description: 起点と変わったファイル
+    process: |-
+      1. 管理用の YAML を読む
+         - ファイルが無い場合、`FilesYamlNotFoundError` を送る
+      2. 確認の時点を読み（`read_checkpoint`）、行の `path` を管理用の YAML のフォルダから `root` からのパスに直した集合を作る
+      3. `root` のリポジトリの直下（`repo_root`）を引き、起点を決める
+         - 記録の `commit` があり、`cat-file -e {commit}^{commit}` が通る場合、`CHECKPOINT_COMMIT`
+         - 記録の `commit` があり、リポジトリに無い場合、見つからなかった commit として控え、記録が無いときと同じ選び方へ進む
+           - `[warning]` 記録した commit がリポジトリに無いため起点を切り替えた（commit・管理用の YAML）
+         - 記録の `checked_at` がある場合、`CHECKPOINT_TIME`
+         - 記録が無く、Git の中で管理用の YAML を変更した commit が `log -1 --format=%H -- {管理用の YAML}` で引ける場合、`FILES_YAML_COMMIT`
+         - それ以外の場合、管理用の YAML の変更日時で `FILES_YAML_MTIME`
+      4. 変わったファイルを集める
+         - Git の中で起点が commit の場合、`diff --name-status -M -z {commit} --` で起点と作業ツリーを比べる
+         - Git の中で起点が日時の場合、`rev-list -1 --before={日時} HEAD`（committer の日時）で起点の commit を引き、同じく比べる。引けなければ空のツリー（`hash-object -t tree /dev/null`）と比べる
+         - Git の外の場合、行のファイルのうち変更日時が起点の日時より後のもの
+      5. 比べた結果を行に絞る
+         - `R`（改名）は改名前のパスが行にあれば改名先のパスを入れる
+         - `D`（削除）は入れない
+         - それ以外は行にあるパスだけを入れる
+      6. `reviewed[]` のパスで、今の中身の SHA-256 が記録した値と一致するものを除き、昇順にして返す
+    exceptions:
+      - name: FilesYamlNotFoundError
+        condition: 管理用の YAML が無い
+        message: '`{パス}: 管理用の YAML がありません`'
+    callees:
+      - MOD-106-8#functions[read_checkpoint]
+      - MOD-86#functions[run_git]
+      - MOD-86#functions[repo_root]
+    test_setup:
+      - name: git_repo
+        description: '`tmp_path` で `git init` し、`user.name`・`user.email` を設定した一時リポジトリ'
+        notes: fixture `git_repo`
+    unit_tests:
+      - name: test_find_changed
+        case: 正常
+        summary: 記録した commit の後の commit と未 commit の変更
+        condition: 行に `a.md`・`b.md`・`c.md` を持つ `files.yaml` と `checkpoint.commit` を commit。その後 `a.md` を変えて commit、`b.md` を変えて commit しない
+        mock: なし（`git_repo`）
+        expected: '`base.kind` が `CHECKPOINT_COMMIT`、`files` が `("a.md", "b.md")`'
+      - name: test_find_changed_when_reviewed_same_content
+        case: 正常
+        summary: 見直し済みで中身が同じファイルを除く
+        condition: 未 commit の `d.md` の SHA-256 を `reviewed` に記録し、同じ中身のまま commit
+        mock: なし（`git_repo`）
+        expected: '`files` に `d.md` を含まない'
+      - name: test_find_changed_when_renamed_and_deleted
+        case: 正常
+        summary: 改名と削除
+        condition: 行に `e.md`・`g.md`。記録の後に `e.md` を `f.md` へ改名して 1 行変え、`g.md` を削除して commit
+        mock: なし（`git_repo`）
+        expected: '`files` が `("f.md",)`'
+      - name: test_find_changed_when_commit_missing
+        case: 正常
+        summary: 記録した commit が無い
+        condition: '`checkpoint.commit` に無い ID を記録した `files.yaml` を commit し、`a.md` を変えて commit'
+        mock: なし（`git_repo`）
+        expected: '`base.kind` が `FILES_YAML_COMMIT`、`missing_commit` が記録した ID、`files` が `("a.md",)`'
+      - name: test_find_changed_when_no_checkpoint_in_git
+        case: 正常
+        summary: 記録が無い Git の配信元
+        condition: '`checkpoint` の無い `files.yaml` を commit し、`a.md` を変えて commit'
+        mock: なし（`git_repo`）
+        expected: '`base.kind` が `FILES_YAML_COMMIT`、`files` が `("a.md",)`'
+      - name: test_find_changed_when_untracked_files_yaml
+        case: 正常
+        summary: Git に無視される管理用の YAML
+        condition: '`info/exclude` に `*.local.*` を書き、`files.local.yaml` の変更日時を `os.utime` で T にする。committer の日時が T より前の commit で `a.md`、後の commit で `b.md` を変え、`c.md` を commit せずに変える（`GIT_COMMITTER_DATE` で日時を決める）'
+        mock: なし（`git_repo`）
+        expected: '`base.kind` が `FILES_YAML_MTIME`、`files` が `("b.md", "c.md")`'
+      - name: test_find_changed_when_outside_git
+        case: 正常
+        summary: Git 管理外
+        condition: '`checkpoint.checked_at` に T を記録し、`a.md` の変更日時を T より前、`b.md` を後にする'
+        mock: なし（`tmp_path`）
+        expected: '`base.kind` が `CHECKPOINT_TIME`、`files` が `("b.md",)`'
+      - name: test_find_changed_when_files_yaml_missing
+        case: 異常
+        summary: 管理用の YAML が無い
+        condition: '`files_yaml` に無いパス'
+        mock: なし（`tmp_path`）
+        expected: '`FilesYamlNotFoundError` の `path` が渡したパス'
+        exception: 管理用の YAML が無い
+tags:
+  - name: topic:確認の時点
+    main: true
+  - name: topic:変更
+  - name: tool:git
