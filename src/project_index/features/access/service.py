@@ -294,6 +294,33 @@ def _revision_target(item: ServedSource, ref: str, access: AccessLevel, outside:
     return Target(item, item.root, ref, None, access, outside_scope=outside, commit=commit)
 
 
+def _write_worktree(item: ServedSource, worktree: str | None, path: Path | None) -> Path | None:
+    """書くワークツリーを決める（Git 管理外の配信元は `None`）。"""
+    _reject_disk_arguments(item, worktree=worktree)
+    # `worktree` を渡された: そのパスがワークツリーに当たらなければ断る
+    if worktree is not None:
+        wt = find_worktree(item, normalize_path(worktree))
+        if wt is None:
+            raise WorktreeNotMatchedError(
+                message=f"{worktree} は {item.id} のワークツリーに該当しません",
+                given=worktree,
+                patterns=item.worktree_globs,
+            )
+    # 渡されていない: 作業場所がワークツリーの中ならそのワークツリー
+    else:
+        wt = find_worktree(item, path) if path is not None else None
+    # Git の配信元はワークツリーにだけ書く
+    if wt is None and item.is_git:
+        # 設定をワークツリーから読む配信元でも、ワークツリーの親のクローン本体を返す
+        clone = item.main_root or item.repo_root or item.root
+        raise TargetIsCloneError(
+            message=f"{clone} はクローン本体です。worktree でワークツリーを指してください",
+            clone=str(clone),
+            next_steps=["worktree 引数にワークツリーのパスを指定してください"],
+        )
+    return wt
+
+
 def resolve_write_target(
     *,
     registry: SourceRegistry,
@@ -324,26 +351,7 @@ def resolve_write_target(
             available=available_sources(cwd, registry=registry),
             next_steps=[DESCRIBE_HINT],
         )
-    _reject_disk_arguments(item, worktree=worktree)
-    if worktree is not None:
-        wt = find_worktree(item, normalize_path(worktree))
-        if wt is None:
-            raise WorktreeNotMatchedError(
-                message=f"{worktree} は {item.id} のワークツリーに該当しません",
-                given=worktree,
-                patterns=item.worktree_globs,
-            )
-    else:
-        wt = find_worktree(item, path) if path is not None else None
-    # Git の配信元はワークツリーにだけ書く
-    if wt is None and item.is_git:
-        # 設定をワークツリーから読む配信元でも、ワークツリーの親のクローン本体を返す
-        clone = item.main_root or item.repo_root or item.root
-        raise TargetIsCloneError(
-            message=f"{clone} はクローン本体です。worktree でワークツリーを指してください",
-            clone=str(clone),
-            next_steps=["worktree 引数にワークツリーのパスを指定してください"],
-        )
+    wt = _write_worktree(item, worktree, path)
     # ワークツリーへ書き、ワークツリーの設定を再読み込みするか
     if wt is not None and reload_worktree:
         # 書く: 種類・配置先をそのワークツリーの設定で参照するため、配信元を再読み込みする
