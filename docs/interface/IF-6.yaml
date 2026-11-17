@@ -985,6 +985,43 @@ flows:
       - '`TargetIsCloneError` にならない'
       - 続けての `update` で `updated` だけが新しい日時になり、`created` は変わらない
     test: test_normal_when_disk_storage
+  - name: 異常系（どの深さの列もまとめる共通のキーへ書く・InvalidArgumentError）
+    summary: '`**.{列名}` の対応を持つ共通のキーは、書き込む場所を 1 つに決められないため断る'
+    setup:
+      - name: Mock
+        description: なし
+        notes: '-'
+      - name: 入れ子の関連を持つ種類
+        description: ワークツリー x の `nested/n1.yaml` が最上位の `refs` と `functions[0].refs` を持つ
+        notes: '行 `nested` は `metadata: {related: "**.refs[]"}`'
+      - name: 入力
+        description: '1 回目は `update`（`id: n1`・`set: {related: [{to: n2, type: references}]}`）。2 回目は `update`（`unset: [related]`）。3 回目は `create`（`kind: nested`・`data` に `related`）。4 回目は `update`（`set: {refs: [{to: n2, type: references}]}`）'
+        notes: 4 回目は列名をそのまま渡す
+    flow: |-
+      <!-- map: {"title": "異常系（どの深さの列もまとめる共通のキーへ書く・InvalidArgumentError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: update n1・set {related: [...]}
+        T->>T: related の列名 **.refs[] が書き込む場所を 1 つに決めない
+        T-->>C: isError（operations[0].set.related は書き込めない。列名で渡す）
+        C->>T: update n1・set {refs: [...]}
+        T->>WT: n1 の最上位の refs を書き換える
+        T-->>C: status updated・diff
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].set.related` で、n1 を書き換えない
+      - 2 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].unset` で、n1 を書き換えない
+      - 3 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].data.related` で、文書を作らない
+      - どの違反も、直し方に列名（`refs`・`functions[0].refs` など）で渡すことを示す
+      - 4 回目の `diff` が n1 の最上位の `refs` だけを書き換え、`functions[0].refs` は変わらない
+    test: test_error_when_recursive_metadata_key_written
 lead: 文書の作成・部分更新・置き換えを検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 identifier: write_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーにだけ書く
@@ -1212,7 +1249,7 @@ exceptions:
     condition: '`update`・`replace` の `id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
   - name: InvalidArgumentError
-    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の置き場所のファイル名が行の `exclude[]` に当たる・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した'
+    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の置き場所のファイル名が行の `exclude[]` に当たる・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した'
   - name: SourceNotServedError
     condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
   - name: WorktreeNotMatchedError
