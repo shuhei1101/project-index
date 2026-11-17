@@ -254,10 +254,11 @@ def unindexed_files(
     table: DocumentTable,
     *,
     files: Sequence[str] | None = None,
+    others: Sequence[DocumentTable] = (),
 ) -> list[str]:
     """管理用の YAML のフォルダの配下で、どの行も指していないファイルを `root` からのパスで返す。
 
-    行の `exclude` に当たるファイルと、除外の条件に当たるファイルは数えない。
+    行の `exclude` に当たるファイルと、除外の条件に当たるファイルと、`others` のどれかの行の文書になるファイルは数えない。
     `files` は呼び出し元が `walk_files(root)` でたどったパスで、渡されたらフォルダをたどらない。
     """
     start = posixpath.dirname(index_path) or "."
@@ -275,5 +276,9 @@ def unindexed_files(
     return sorted(
         path
         for path in candidates
-        if path not in excluded and not table.excludes(path) and not is_excluded_file(root, path)
+        if path not in excluded
+        and not table.excludes(path)
+        and not is_excluded_file(root, path)
+        # ほかの行の文書として配信するファイルは、管理用の YAML に記載しない
+        and not any(other.matches(path) for other in others)
     )

@@ -631,6 +631,8 @@ def _unindexed(
 ) -> list[str]:
     """`records`・`body_file` の行の索引ごとに、索引に無い本文のファイルを集める。"""
     unindexed: list[str] = []
+    # その行でない有効な行の文書になるファイルは、索引に無いファイルに数えない
+    others = [other for other in source.config.documents if other.enabled and other.id != table.id]
     for index_path in collect_files(source.root, table, files=files):
         body_paths = {
             document.body_path
@@ -639,7 +641,9 @@ def _unindexed(
         }
         unindexed.extend(
             f"{table.id}: {path}"
-            for path in unindexed_files(source.root, index_path, body_paths, table, files=files)
+            for path in unindexed_files(
+                source.root, index_path, body_paths, table, files=files, others=others
+            )
         )
     return unindexed
 
