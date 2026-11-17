@@ -349,6 +349,40 @@ scenarios:
       - '`master` を指した文書 1 の取得が、エラーにせず、company のクローン本体の文書 1 の値を返却し、応答の `ref` が空'
       - 文書の一覧が、`files.local.yaml` の行の文書を含む登録したフォルダの文書を返却し、応答の `ref` が空
     test: test_normal_when_disk_storage_source
+  - name: 正常シナリオ（起動の直後に配信元の一覧を取得する）
+    setup:
+      - name: Mock
+        description: PATH の先頭に包みの git を配置する。作業場所が slow のリポジトリのときだけ、一時ファイルが配置されるまで待ってから本物の git を呼ぶ
+        notes: slow 以外の作業場所と、一時ファイルを配置した後は本物の git をそのまま呼ぶ
+      - name: サンプルの配信元
+        description: 正常シナリオと同じ配信元
+        notes: id `sample`
+      - name: 読み込みの遅い配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ git リポジトリ
+        notes: id `slow`
+      - name: project-index
+        description: slow・sample の順に端末の設定に並べて起動した project-index
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant DD as dev-docs の画面のサーバー
+        participant PI as project-index（読み取り API）
+        participant SRC as slow
+
+        PI->>SRC: 裏で slow を読み込み始める（包みの git が待たせる）
+        DD->>PI: 配信元の一覧と状態を取得する
+        PI-->>DD: slow は読み込み中、sample は読み込み中か配信中
+        DD->>PI: sample の文書の一覧を取得する
+        PI-->>DD: 文書の一覧
+        SRC->>SRC: テストが一時ファイルを配置し、包みの git が本物の git を呼ぶ
+        DD->>PI: 配信元の一覧と状態を取得する
+        PI-->>DD: slow・sample が配信中
+      ```
+    expected:
+      - slow の読み込みが終わる前の配信元の一覧の取得が、slow の読み込みを待たずに 2 秒以内に 200 を返却し、slow を読み込み中として端末の設定の順に並べる
+      - slow の読み込みが終わる前でも、sample の文書の一覧の取得が 200 を返却する
+      - slow の読み込みが終わった後の配信元の一覧の取得が、slow と sample を配信中として返却する
+    test: test_normal_when_listed_right_after_start
 lead: dev-docs の画面のサーバーが読み取り API で配信元と文書を取得するシナリオを定め、画面のサーバーからの読み取りの流れを変えるときに参照する。
 issue: 14
 visibility: internal

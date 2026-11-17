@@ -1,15 +1,14 @@
 use_cases:
   - kind: single
     scenario: docs/scenario/SC-4.yaml
-    impact: changed
-    detail: 起動の後の全ての配信元の読み込みを短くし、配信元の一覧と状態の取得が起動の後すぐに応答する
+    impact: run_only
+    detail: 起動の流れは変わらないが、配信元の読み込みの待ち方の変更が起動の後の配信を壊しうる
     depends_on: []
   - kind: single
     scenario: docs/scenario/SC-11.yaml
     impact: changed
-    detail: 画面のサーバーが起動の直後に配信元の一覧を取得しても、全ての配信元の読み込みを待たずに応答を受け取る
-    depends_on:
-      - docs/scenario/SC-4.yaml
+    detail: 画面のサーバーが起動の直後に配信元の一覧を取得しても、全ての配信元の読み込みを待たずに、読み込み中の配信元を読み込み中として受け取る
+    depends_on: []
 docs:
   - page: docs/guide/読み取りAPI.md
     new: false
