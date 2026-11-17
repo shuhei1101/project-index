@@ -54,6 +54,18 @@ docs:
     new: false
     change: root の行の exclude から、#155 で写したキャッシュ・生成物の行（.pytest_cache/**・.ruff_cache/**・.mypy_cache/**・dist/**・docs/generated/**・.env）を削除し、docs/pr/** だけを残す
     status: todo
+  - page: docs/guide/CLI.md
+    new: false
+    change: project-index files が辿らないものに、名前が .git のファイルを加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T13:07:21.040749+00:00'
+  - page: docs/guide/設定.md
+    new: false
+    change: 起動時・再読み込みの警告の索引に無いファイルの数えないものに、名前が .git のファイルと Git の配信元で Git が無視するファイルを加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T13:07:21.040749+00:00'
 scope_out:
   - item: update の unset で x-key の値で配列の要素を指すことと、要素の選び方を含むパスの InvalidArgumentError を unset.{パス} の違反へ変換すること（#151 の task-reviewer の任意の指摘）
     reason: '今の判断は含めない。#151 の完了の条件は add_to・remove_from で、unset は書き込まずに applied: true を返す不具合ではなく、例外で止まるため。含めるかは設計のレビューで確定する'
