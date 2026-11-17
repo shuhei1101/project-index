@@ -1,0 +1,16 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=integration -f paths="tests/integration/server/test_write_docs.py::test_normal_when_operations_combined tests/integration/server/test_write_docs.py::test_normal_when_add_to_ref_path tests/integration/server/test_write_docs.py::test_normal_when_tags_are_objects tests/integration/server/test_write_docs.py::test_normal_when_remove_from_x_key" | grep -o 'https://[^ ]*/actions/runs/[0-9]*') && run_id=${run_url##*/} && (n=0; until gh api "repos/{owner}/{repo}/actions/runs/$run_id?exclude_pull_requests=true" > /dev/null 2>&1; do n=$((n+1)); if [ $n -ge 10 ]; then echo "実行 $run_id を 10 秒参照できません" >&2; exit 1; fi; sleep 1; done) && (rc=0; gh run watch "$run_id" --exit-status > /dev/null || rc=1; if gh run download "$run_id" -n test-log -D "/tmp/test-log-$run_id"; then cat "/tmp/test-log-$run_id/test.log"; else gh run view "$run_id" --log-failed; fi; exit $rc)
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 4 items
+
+tests/integration/server/test_write_docs.py::test_normal_when_operations_combined PASSED [ 25%]
+tests/integration/server/test_write_docs.py::test_normal_when_add_to_ref_path PASSED [ 50%]
+tests/integration/server/test_write_docs.py::test_normal_when_tags_are_objects PASSED [ 75%]
+tests/integration/server/test_write_docs.py::test_normal_when_remove_from_x_key PASSED [100%]
+
+============================== 4 passed in 1.97s ===============================
+rc=0
