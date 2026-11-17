@@ -54,7 +54,7 @@ def test_blob_reader_read_bytes_when_process_exited(
     blob = _blob(run_git, root, "a.yaml")
     reader = BlobReader(root)
     reader.read_bytes(blob)
-    process = reader._process  # noqa: SLF001
+    process = reader._process
     assert process is not None
     process.kill()
     process.wait(timeout=5)

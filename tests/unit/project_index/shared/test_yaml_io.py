@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from ruamel.yaml.parser import Parser
 from ruamel.yaml.comments import CommentedMap
+from ruamel.yaml.parser import Parser
 
 from project_index.shared import yaml_io as yaml_io_module
 from project_index.shared.yaml_io import (
