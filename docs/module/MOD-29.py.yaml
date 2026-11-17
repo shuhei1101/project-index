@@ -685,6 +685,8 @@ functions:
       7. 手順 1 の `duplicates` を `path` の昇順（同じパスは `duplicates` の順）に並べ、除外した文書ごとに手順 1 の `documents` から同じ ID の先の文書を参照する。文書のファイルは `body_path` があれば `body_path`、無ければ `path` とする。2 つの文書の `kind` が違い、ファイルが同じで、そのファイルを手順 6 で `duplicate_files` に数えたときは飛ばし、それ以外は `{文書の id}: {先の文書の kind}（{先の文書のファイル}）・{除外した文書の kind}（{除外した文書のファイル}）` で `duplicate_ids` に加える
       8. 手順 1 の文書でエイリアスの集めをし、`violations` を `alias_violations` にする
       9. `SyncReport` を返す
+
+      手順 1〜8 は全て、文書のストアの裏の処理の関所（`store.gate`）の裏の処理の 1 件の中で行う。手順 1 の `walk_files` はファイル 1 件ごと、手順 2・5 は文書 1 件ごと、手順 3 は管理用の YAML 1 件ごとに裏の処理の繰り返し（`gate.each`）で回し、`ignored_paths`・手順 6・7・8 はそれぞれ 1 件（`gate.unit`）にする。裏の処理のスレッドでなければ関所は何もしない
     unit_tests:
       - name: test_check_sync
         case: 正常
@@ -769,4 +771,10 @@ functions:
         mock: '`ignored_paths`（呼ばれないことを確かめる）'
         expected: '`unindexed_files` に `root: dist/app.js`・`root: .pytest_cache/x`・`root: docs/new.md` があり、`ignored_paths` を呼ばない'
         exception: '-'
+      - name: test_check_sync_when_background
+        case: 正常
+        summary: 裏の処理のスレッドでは、読み込みの外の処理も休みを挟んで進む
+        condition: 文書 3 件の配信元を、関所の `foreground` の中で、別のスレッドの `background` の中で検査する。関所の 1 件の中にいない間に文書の重なりを求める処理が呼ばれたかを記録する
+        mock: 関所の休み（偽物。呼ばれた回数を数える）、`missing_ref_fields`・`unresolved_related`（呼ばれたときに関所の 1 件の中かを記録してから本物を呼ぶ包み）
+        expected: 結果が関所を使わないときと同じで、包みの呼び出しが全て 1 件の中。休みが文書の数より多く呼ばれる
 visibility: internal

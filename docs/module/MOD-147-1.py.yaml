@@ -153,6 +153,32 @@ classes:
           type: bool
           description: 応答中の要求の数が 1 以上なら `True`
         process: 1. `_guard` を取り、応答中の要求の数が 0 より大きいかを返す
+      - name: each
+        title: 裏の処理の繰り返し
+        kind: メソッド
+        summary: 繰り返しの要素 1 つごとに、要素を取り出す処理と呼び出し側の 1 回分の処理を裏の処理の 1 件にする（ジェネレータ）
+        scope: public
+        thread_safe: true
+        args:
+          - name: items
+            title: 繰り返し
+            type: Iterable[T]
+            required: true
+            passing: positional
+            description: リストかジェネレータ（`walk_files` など）
+        returns:
+          type: Iterator[T]
+          description: '`items` の要素を順に返す'
+        process: |-
+          1. `items` から反復子を作る
+          2. 要素ごとに、裏の処理の 1 件（`unit`）の中で次の要素を取り出し、要素を返して呼び出し側の 1 回分の処理が戻るまで 1 件を続ける。要素が無くなったら終える
+        unit_tests:
+          - name: test_background_gate_each_when_foreground_active
+            case: 正常
+            summary: 要素ごとに休む
+            condition: '`foreground` の中で、別のスレッドが `background` の中で 3 要素のジェネレータを `each` で回し、要素を作る処理と呼び出し側の処理に `clock` を 0.5 秒ずつ進める'
+            mock: 時計と休み（偽物）
+            expected: 3 要素を順に返し、休みが 9 秒で 3 回呼ばれる
 constants:
   - name: BACKGROUND_SHARE
     title: 応答中の裏の処理の時間の割合
