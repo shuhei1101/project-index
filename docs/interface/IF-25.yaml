@@ -376,3 +376,4 @@ constraints:
     constraint: Git の配信元の `converters[]` のスクリプトは、環境変数 `PROJECT_INDEX_COMMIT` に応答の `ref` を解いた commit の SHA（40 文字）を受け取る。disk の配信元と Git の管理外の配信元では、`PROJECT_INDEX_COMMIT` を持たない。どちらもサーバーのプロセスの環境変数 `PROJECT_INDEX_COMMIT` は引き継がず、ほかの環境変数は引き継ぐ
     notes: 'スクリプトを動かす場所は変えない。本文以外のファイルは `git show {commit}:{path}` でそのリビジョンから参照する。キャッシュのキーに commit を含めないため、本文以外のファイルを参照する変換は `cache: false` にする'
 test_file: tests/integration/server/test_get_document.py
+visibility: internal

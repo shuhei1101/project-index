@@ -86,3 +86,4 @@ functions:
         condition: '`details()` が `{"settings_path": "x", "missing": {"source_id": "a"}, "candidates": {"tests/test_main": ["rule-auth"]}}` を返す `ProjectIndexError` を送るルートを GET'
         mock: なし（テスト用のルート）
         expected: 本文に `settingsPath`・`missing.sourceId`・`nextSteps` があり、snake_case のフィールド名が無い。`candidates` のキーは `tests/test_main` のまま
+visibility: internal

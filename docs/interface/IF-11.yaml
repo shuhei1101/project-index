@@ -331,3 +331,4 @@ constraints:
     constraint: '`git pull --ff-only` が成功した後（新しい commit が無いとき・移し替えが要るときも含む）、`PATH` に `mdmark` があれば `npm install -g github:shuhei1101/mdmark#{mdmark_ref}` を実行する。失敗しても `UpdateFailedError` にせず、`mdmark.error` に入れて更新と再起動を続ける'
     notes: '`mdmark_ref` は `update` を呼んだ時点で端末の設定のファイルを再読み込みした値（`reload` は要らない）。無ければ `develop`。タイムアウトは `git pull` と同じ 300 秒'
 test_file: tests/integration/server/test_update.py
+visibility: internal
