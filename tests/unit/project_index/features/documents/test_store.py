@@ -918,6 +918,45 @@ def test_check_sync(
     assert "c.py" in report.missing_body_files[0]
 
 
+def test_check_sync_when_file_belongs_to_other_row(
+    document_store: DocumentStore,
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+) -> None:
+    """ほかの行の文書になるファイルを索引に無いファイルに数えない（正常系）。"""
+    # 準備
+    root = tmp_path / "ws"
+    write_files(
+        root,
+        {
+            "files.yaml": "files:\n  - path: src/a.py\n",
+            "src/a.py": "a = 1\n",
+            "content/prompts/p.yaml": "id: p\n",
+        },
+    )
+    documents = [
+        DocumentTable(
+            id="files",
+            paths=["files.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            records="files",
+            body_file="path",
+        ),
+        DocumentTable(
+            id="prompts",
+            paths=["content/prompts/**/*.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+        ),
+    ]
+    source = make_served_source(root=root, config=make_source_config(documents=documents))
+    # 実行
+    report = store_module.check_sync(document_store, source)
+    # 検証
+    assert report.unindexed_files == []
+
+
 def test_check_sync_when_clean(
     document_store: DocumentStore,
     tmp_path: Path,

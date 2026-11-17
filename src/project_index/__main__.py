@@ -53,6 +53,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--paths", required=True, action="append", help="範囲の glob（--root からの相対）"
     )
     files.add_argument("--exclude", action="append", default=[], help="除外するファイル名の glob")
+    files.add_argument(
+        "--exclude-path",
+        action="append",
+        default=[],
+        help="除外するパスの glob（--root からの相対。documents[].paths と同じ書き方）",
+    )
     files.set_defaults(handler=run_files)
     outline = subparsers.add_parser(
         "outline", help="範囲のファイルごとのアウトラインと次の段階へ進むかを 1 行の JSON で出す"

@@ -480,6 +480,43 @@ def test_unindexed_files_when_excluded(
     assert result == ["src/d.py"]
 
 
+def test_unindexed_files_when_other_row_matches(
+    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """ほかの行の文書になるファイルは数えない（正常系）。"""
+    # 準備
+    write_files(
+        tmp_path,
+        {
+            "files.yaml": "files:\n  - path: src/a.py\n",
+            "src/a.py": "a = 1\n",
+            "src/d.py": "d = 4\n",
+            "content/prompts/p.yaml": "id: p\n",
+            "content/prompts/note.md": "# note\n",
+        },
+    )
+    table = DocumentTable(
+        id="files",
+        paths=["files.yaml"],
+        schema_path="schemas/files.schema.yaml",
+        records="files",
+        body_file="path",
+    )
+    others = [
+        DocumentTable(
+            id="prompts",
+            paths=["content/prompts/**/*.yaml"],
+            schema_path="schemas/prompt.schema.yaml",
+        )
+    ]
+    # 実行
+    result = loader_module.unindexed_files(
+        tmp_path, "files.yaml", ["src/a.py"], table, others=others
+    )
+    # 検証
+    assert result == ["content/prompts/note.md", "src/d.py"]
+
+
 def test_unindexed_files_when_matching_exclusion(
     tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
 ) -> None:

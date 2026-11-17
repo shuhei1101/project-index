@@ -129,6 +129,7 @@ project-index migrate --source ~/repo/sample/project-index.yaml --allow-destruct
 | `--root` | ✅ | - | 配信元のフォルダのパス |
 | `--paths` | ✅ | - | 範囲の glob（`--root` からの相対）。繰り返して渡せる。`documents[].paths` に記載する値と同じ書き方 |
 | `--exclude` | - | なし（除外の条件だけで外す） | 外すファイル名の glob。繰り返して渡せる。`documents[].exclude[]` と同じ書き方 |
+| `--exclude-path` | - | なし | 外すパスの glob（`--root` からの相対）。繰り返して渡せる。`documents[].paths` と同じ書き方で、ほかの documents の行の文書になるファイルを外すのに使う |
 
 ```bash
 project-index files --root ~/repo/sample --paths 'src/**'

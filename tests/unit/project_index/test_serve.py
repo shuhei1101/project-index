@@ -703,7 +703,7 @@ def test_run_migrate_when_config_invalid(
 
 def _files_args(**overrides: Any) -> argparse.Namespace:
     """`files` の解析結果を作る。"""
-    values: dict[str, Any] = {"root": "", "paths": ["src/**"], "exclude": []}
+    values: dict[str, Any] = {"root": "", "paths": ["src/**"], "exclude": [], "exclude_path": []}
     values.update(overrides)
     return argparse.Namespace(**values)
 
@@ -719,6 +719,28 @@ def test_run_files(
     (tmp_path / "src/logo.png").write_bytes(b"\x00PNG\r\n")
     # 実行
     code = main_module.run_files(_files_args(root=str(tmp_path), paths=["src/**"], exclude=[]))
+    # 検証
+    assert code == 0
+    assert capsys.readouterr().out == "src/a.py\n"
+
+
+def test_run_files_when_exclude_path_given(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    write_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    """除外のパスを渡す（正常系）。"""
+    # 準備
+    write_files(tmp_path, {"src/a.py": "a = 1\n", "content/prompts/p.yaml": "id: p\n"})
+    # 実行
+    code = main_module.run_files(
+        _files_args(
+            root=str(tmp_path),
+            paths=["**"],
+            exclude=[],
+            exclude_path=["content/prompts/**/*.yaml"],
+        )
+    )
     # 検証
     assert code == 0
     assert capsys.readouterr().out == "src/a.py\n"
