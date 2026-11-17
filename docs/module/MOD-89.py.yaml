@@ -260,6 +260,8 @@ functions:
       - name: なし（終了コード 4）
         condition: プロンプトの YAML が無い・読めない・スキーマに違反する・描画できない
         message: '標準エラーに `{ファイル}: {キーのパス}: {理由}` を全て'
+    callees:
+      - MOD-34#classes[RestartControl].methods[requested]
     unit_tests:
       - name: test_run_serve
         case: 正常

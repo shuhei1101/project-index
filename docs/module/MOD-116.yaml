@@ -7,20 +7,6 @@ tags:
     main: true
   - name: action:検索
   - name: action:絞り込み
-directory: |-
-  ```text
-  src/project_index/features/search/
-  ├─ __init__.py   # 公開する型と関数の再エクスポート
-  ├─ types.py      # Condition / Group / OrderKey / Snippets / LineRange / SearchRequest / MatchWordsRequest / MatchWordsResult / Snippet / SnippetLine / BodyRange / Heading / SearchItem / GroupCount / SearchResult
-  ├─ fields.py     # field_values / known_fields / heading_lines（項目の値・計算項目・使える項目・見出しの行）
-  ├─ filters.py    # check_filter / match_filter / match_words / compile_regex / parse_compare_value
-  ├─ snippets.py   # split_lines / find_snippets / count_matches / snippet_lines（行の分割・抜粋の検索・当たった行の数・一致した箇所の抜き出し）
-  ├─ body_parts.py # select_ranges / join_ranges（本文の切り出し）
-  ├─ cursor.py     # encode_cursor / decode_cursor
-  ├─ render.py     # render_search_markdown
-  ├─ terms.py      # list_match_words / render_match_words_markdown（用語の一覧）
-  └─ service.py    # search_docs
-  ```
 diagrams:
   - name: 全体
     diagram: |-
