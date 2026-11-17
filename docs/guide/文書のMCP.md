@@ -284,6 +284,11 @@ YAML として読めないファイルがあっても、そのファイルを除
 共通のキーとその列名を同じ操作に両方渡すと、`InvalidArgumentError` です。
 種類ごとの対応は `describe(source, kind)` で引けます。
 
+`text_edits[].field` は、`#` で始まる参照の型の項目のパス（`#functions[apply_migration].process`）も受け付けます。
+配列の要素を種類のスキーマの `x-key` の値で指し、同じ値の 2 つ目以降は `[{値}#{順番}]`、辞書のキーは `[{キー}]`（`.` や空白を含んでも 1 階層）で指します。
+`#` で始まるパスは共通のキーへ読み替えません。
+`x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指すと `InvalidArgumentError` です。
+
 `records`・`body_file` の行の文書は、本文のファイルを `@body` で書きます。
 `@body` は種類の列名と重ならないキーで、`body_file` の列の名前が `body` の配信元でも `body` は列を指します。
 
@@ -469,7 +474,7 @@ Git 管理外の配信元と `storage.type: disk` の配信元では、種類の
 | SourceNotServedError | 起動時の検証で外したか `enabled: false` の配信元を指した | 違反したキーのパスと理由 |
 | WorktreeNotMatchedError | `worktree` が配信元の `worktrees` に当たらない | 渡したパスと `worktrees` の値 |
 | TargetIsCloneError | Git の配信元（`storage.type: disk` を除く）で、書く先がクローン本体になる | クローン本体のパス（配信元の設定をワークツリーから読んでいても、ワークツリーの親のクローン本体）と、`worktree` でワークツリーを指すこと |
-| InvalidArgumentError | `filter`・`order_by`・`group_by`・Operation の中の知らない項目・型の合わない値、50 件を超える操作、必須のキーの欠け、`text_edits` の `old` が 1 か所に一致しない、`ref` を渡せない配信元に `ref`・`from`・`to` を渡した、`storage.type: disk` の配信元に `worktree` を渡した、`create` の配置先のファイル名が `documents[].exclude[]` に当たる、共通のキーとその列名を同じ操作に両方渡した、束が `and`・`or`・`not` のキーを 2 つ以上持つ、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない、`main_tags` の `set`・`add_to` に `tags` に無い名前を渡した | 項目のパス・期待する型・実際の値と、`describe(source, kind)` でスキーマを見ること |
+| InvalidArgumentError | `filter`・`order_by`・`group_by`・Operation の中の知らない項目・型の合わない値、50 件を超える操作、必須のキーの欠け、`text_edits` の `old` が 1 か所に一致しない、`ref` を渡せない配信元に `ref`・`from`・`to` を渡した、`storage.type: disk` の配信元に `worktree` を渡した、`create` の配置先のファイル名が `documents[].exclude[]` に当たる、共通のキーとその列名を同じ操作に両方渡した、束が `and`・`or`・`not` のキーを 2 つ以上持つ、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない、`main_tags` の `set`・`add_to` に `tags` に無い名前を渡した、`text_edits[].field` の `#` で始まる項目のパスが要素・キーを指せない | 項目のパス・期待する型・実際の値と、`describe(source, kind)` でスキーマを見ること |
 | RefNotFoundError | `ref`・`from`・`to` を commit に解決できない | 解決できなかった値 |
 | UnknownKindError | `kind` が配信元の種類に無い | その配信元の種類の一覧 |
 | DocumentNotFoundError | 指した ID の文書が無い | 見つからなかった ID と、近い ID の候補 |
