@@ -125,6 +125,13 @@ functions:
         default: None
         passing: keyword
         description: （リポジトリの直下, commit）。渡すと、`run` のうちそのリビジョンにあるファイルを取り出したものに置き換えて動かす
+      - name: env
+        title: 環境変数
+        type: Mapping[str, str | None] | None
+        required: false
+        default: None
+        passing: keyword
+        description: サーバーのプロセスの環境変数に重ねる値。値が `None` のキーは子プロセスの環境から除く。`None` ならサーバーの環境をそのまま引き継ぐ
     args_example: |-
       ```python
       run_script(["uv", "run", "python", "scripts/arch_to_md.py"], cwd=root, stdin=text, timeout_sec=30)
@@ -135,7 +142,7 @@ functions:
     process: |-
       1. `at` がある場合、`run` の要素のうち `cwd` からの相対パスで commit にファイルがあるもののフォルダをリビジョンのフォルダの取り出しで取り出し、その要素を取り出したファイルの絶対パスに置き換える（抜けたら一時フォルダは削除される）。`cwd` は変えない
       2. 『実行できるかの確かめ』でコマンドを解く（実行できるかの確かめ）
-      3. `subprocess.Popen` を `shell=False`・`cwd`・新しいプロセスグループで起動し、`stdin` を UTF-8 で渡して `timeout_sec` まで待つ
+      3. `subprocess.Popen` を `shell=False`・`cwd`・新しいプロセスグループと、`env` がある場合はサーバーの環境変数に `env` を重ねた環境（値が `None` のキーを除く）で起動し、`stdin` を UTF-8 で渡して `timeout_sec` まで待つ
          - 制限時間を超えた場合、プロセスグループに SIGTERM を送り、`KILL_GRACE_SEC` 秒待って残っていれば SIGKILL を送ってから `ScriptTimeoutError` を送る
            - `[warning]` スクリプトを制限時間で止めた（コマンド・`cwd`・秒数）
       4. 終了コードが 0 以外の場合、`ScriptFailedError` を送る
@@ -183,6 +190,13 @@ functions:
         condition: '`scripts/a.py` を `print("develop")` で commit した後、作業ツリーで `print("disk")` に書き換え、`at` に commit を渡す'
         mock: なし（一時フォルダで `git init`）
         expected: 標準出力が `develop`
+        exception: '-'
+      - name: test_run_script_when_env
+        case: 正常
+        summary: 環境変数を重ねて動かす
+        condition: 'サーバーの環境に `A=outer`・`B=outer` を入れ、`env={"A": "inner", "B": None}` で `A` と `B` の値（無ければ `none`）を出すコマンド'
+        mock: '`monkeypatch.setenv` で `A`・`B`'
+        expected: 標準出力が `inner none`
         exception: '-'
   - name: check_runnable
     title: 実行できるかの確かめ

@@ -28,8 +28,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 CONVERT_CACHE_KEEP = 2000
+# converters[] のスクリプトへ、参照しているリビジョンを解いた commit を指定する環境変数の名前
+COMMIT_ENV = "PROJECT_INDEX_COMMIT"
 
-__all__ = ["CONVERT_CACHE_KEEP", "ConvertService", "run_script"]
+__all__ = ["COMMIT_ENV", "CONVERT_CACHE_KEEP", "ConvertService", "run_script"]
 
 
 class ConvertService:
@@ -81,6 +83,8 @@ class ConvertService:
                 stdin=document.body,
                 timeout_sec=self.timeout_sec,
                 at=script_at(target),
+                # commit が無い場所では、サーバーの環境の同じ名前の値も除く
+                env={COMMIT_ENV: target.commit},
             )
         except ScriptTimeoutError:
             return ConvertFailure(

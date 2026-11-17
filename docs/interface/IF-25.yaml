@@ -212,6 +212,38 @@ flows:
       - 200 で、登録したフォルダの文書 1 の `value` を返す
       - '`ref` が空の文字列'
     test: test_normal_when_disk_storage
+  - name: 正常系（変換のスクリプトへ参照しているリビジョンの commit を指定する）
+    summary: Git の配信元の `converters[]` のスクリプトは、環境変数 `PROJECT_INDEX_COMMIT` で応答の `ref` を解いた commit を受け取る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 変換を持つ Git の配信元
+        description: '`converters[]`（`cache: false`）を指す種類 `prompt` の文書 `prompts/a.yaml` を持つ sample。スクリプトは環境変数 `PROJECT_INDEX_COMMIT` の値（無ければ `none`）を標準出力に出す。`main` に 2 つの commit があり、サーバーのプロセスの環境変数 `PROJECT_INDEX_COMMIT` に `outer` を入れて起動する'
+    flow: |-
+      <!-- map: {"title": "正常系（変換のスクリプトへ参照しているリビジョンの commit を指定する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs/{path}
+        participant X as converters[] のスクリプト
+
+        C->>E: GET /sources/sample/docs/prompts/a.yaml?ref={親の commit}
+        E->>X: PROJECT_INDEX_COMMIT={親の commit} で動かす
+        X-->>E: 親の commit
+        E-->>C: 200 markdown
+        C->>E: GET /sources/sample/docs/prompts/a.yaml
+        E->>X: PROJECT_INDEX_COMMIT={default_ref の commit} で動かす
+        X-->>E: default_ref の commit
+        E-->>C: 200 markdown
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`ref` に親の commit を指した取得は 200 で、`markdown` が親の commit の SHA（40 文字）'
+      - '`ref` を省いた取得は 200 で、`markdown` が `default_ref` を解いた commit の SHA（40 文字）'
+      - どちらもサーバーのプロセスの環境変数の値 `outer` を出さない
+    test: test_normal_when_converter_given_commit
 lead: 指定のリビジョンの文書の値・種類のスキーマ・メタデータ・変換の結果を返却する読み取り API の入出力を定め、文書の取得を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -337,4 +369,7 @@ constraints:
     constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名と、`value`・`schema`・`metadata.commonKeys` の中身は変えない
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、`ref` を無視して登録したフォルダの文書を返し、応答の `ref` を空にする'
+  - item: 変換のスクリプトのリビジョン
+    constraint: Git の配信元の `converters[]` のスクリプトは、環境変数 `PROJECT_INDEX_COMMIT` に応答の `ref` を解いた commit の SHA（40 文字）を受け取る。disk の配信元と Git の管理外の配信元では、`PROJECT_INDEX_COMMIT` を持たない。どちらもサーバーのプロセスの環境変数 `PROJECT_INDEX_COMMIT` は引き継がず、ほかの環境変数は引き継ぐ
+    notes: 'スクリプトを動かす場所は変えない。本文以外のファイルは `git show {commit}:{path}` でそのリビジョンから参照する。キャッシュのキーに commit を含めないため、本文以外のファイルを参照する変換は `cache: false` にする'
 test_file: tests/integration/server/test_get_document.py

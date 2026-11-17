@@ -39,6 +39,22 @@ def test_run_script_when_cwd(tmp_path: Path) -> None:
     assert Path(result.stdout.strip()).resolve() == tmp_path.resolve()
 
 
+def test_run_script_when_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """環境変数を重ねて動かす（正常系）。"""
+    # 準備
+    monkeypatch.setenv("A", "outer")
+    monkeypatch.setenv("B", "outer")
+    run = [
+        sys.executable,
+        "-c",
+        "import os; print(os.environ.get('A', 'none'), os.environ.get('B', 'none'))",
+    ]
+    # 実行
+    result = run_script(run, cwd=tmp_path, timeout_sec=10, env={"A": "inner", "B": None})
+    # 検証
+    assert result.stdout == "inner none\n"
+
+
 def test_run_script_when_timeout(tmp_path: Path) -> None:
     """制限時間を超える（異常系）。"""
     # 準備

@@ -1,0 +1,28 @@
+$ uv run pytest tests/integration/server/test_get_document.py tests/integration/server/test_try_convert.py
+# /tmp/pytest-of-shuhei2441 が root の所有で pytest の一時フォルダを作れないため、TMPDIR=/tmp/pi-pr105-tmp を付けて実行した
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0 -- /home/shuhei2441/repo/project-index/.claude/worktrees/chore-convert-converter-commit-env/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/chore-convert-converter-commit-env
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 16 items
+
+tests/integration/server/test_get_document.py::test_normal PASSED        [  6%]
+tests/integration/server/test_get_document.py::test_normal_when_ref_given PASSED [ 12%]
+tests/integration/server/test_get_document.py::test_normal_when_body_path_given PASSED [ 18%]
+tests/integration/server/test_get_document.py::test_normal_when_id_given PASSED [ 25%]
+tests/integration/server/test_get_document.py::test_normal_when_converter_kind PASSED [ 31%]
+tests/integration/server/test_get_document.py::test_normal_when_converter_given_commit PASSED [ 37%]
+tests/integration/server/test_get_document.py::test_error_when_not_found PASSED [ 43%]
+tests/integration/server/test_get_document.py::test_error_when_revision_export_times_out PASSED [ 50%]
+tests/integration/server/test_get_document.py::test_normal_when_disk_storage PASSED [ 56%]
+tests/integration/server/test_try_convert.py::test_normal PASSED         [ 62%]
+tests/integration/server/test_try_convert.py::test_error_when_document_not_found PASSED [ 68%]
+tests/integration/server/test_try_convert.py::test_error_when_converter_not_defined PASSED [ 75%]
+tests/integration/server/test_try_convert.py::test_error_when_convert_script_fails PASSED [ 81%]
+tests/integration/server/test_try_convert.py::test_error_when_config_not_found PASSED [ 87%]
+tests/integration/server/test_try_convert.py::test_error_when_invalid_config PASSED [ 93%]
+tests/integration/server/test_try_convert.py::test_error_when_config_parse_error PASSED [100%]
+
+============================== 16 passed in 3.57s ==============================
