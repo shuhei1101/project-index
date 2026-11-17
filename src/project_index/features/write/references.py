@@ -158,7 +158,7 @@ def rewrite_references(
                 )
     rewrite = _Rewriter(old_id=old_id, new_id=new_id, moved=moved, base_dir=base_dir)
     for key in list(content):
-        if key in skip or key == related_column:
+        if key in skip:
             continue
         _rewrite_slot(content, key, str(key), rewrite, changes)
     return changes
