@@ -227,6 +227,22 @@ def test_write_docs_when_indent_preserved(
     assert result.results[0].diff == "+ - key: k3\n+   label: 名称 3"
 
 
+def test_write_docs_when_records_indent_preserved(make_env: Callable[..., WriteEnv]) -> None:
+    """`records` への追加で管理用の YAML の配列の字下げを保つ（正常系）。"""
+    # 準備
+    notes = "items:\n- id: n1\n  path: n1.md\n"
+    files = {**_notes_files(), "notes/index.yaml": notes}
+    env = make_env(files, tables=[_notes_table(), _rules_table()])
+    operation = Operation(
+        op="create", kind="notes", data={"id": "n2", "path": "n2.md", "@body": "# n2\n"}
+    )
+    # 実行
+    env.write(operations=[operation])
+    # 検証
+    text = (env.worktree / "notes/index.yaml").read_text(encoding="utf-8")
+    assert text == notes + "- id: n2\n  path: n2.md\n"
+
+
 def test_check_version_when_fields(make_document: Callable[..., Document]) -> None:
     """項目ごとのハッシュ（正常系）。"""
     # 準備
@@ -777,6 +793,32 @@ def test_delete_docs_when_unlink_nested(make_env: Callable[..., WriteEnv]) -> No
     assert data["refs"] == [{"to": "n3", "type": "references"}]
     assert data["functions"][0]["refs"] == []
     assert result.unlinked == [("n1", content_hash(text))]
+
+
+def test_delete_docs_when_records_indent_preserved(make_env: Callable[..., WriteEnv]) -> None:
+    """`records` の要素の削除で管理用の YAML の配列の字下げを保つ（正常系）。"""
+    # 準備
+    files = {
+        "data/list.yaml": "items:\n- id: a\n  path: a.txt\n- id: b\n  path: b.txt\n",
+        "data/a.txt": "a\n",
+        "data/b.txt": "b\n",
+    }
+    table = DocumentTable(
+        id="items",
+        paths=["data/list.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        records="items",
+        body_file="path",
+    )
+    env = make_env(files, tables=[table])
+    targets = [
+        DeleteTarget(id="b", expected_version=value_hash([{"id": "b", "path": "b.txt"}, "b\n"]))
+    ]
+    # 実行
+    env.delete(targets=targets)
+    # 検証
+    text = (env.worktree / "data/list.yaml").read_text(encoding="utf-8")
+    assert text == "items:\n- id: a\n  path: a.txt\n"
 
 
 def test_delete_docs_when_records(
