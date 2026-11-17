@@ -63,3 +63,29 @@ def span(event: str, **fields: Any) -> Iterator[dict[str, Any]]:
 def text(name: str) -> str | None:
     """PoC の切り替えの環境変数の文字列を返す（無ければ `None`）。"""
     return os.environ.get(name) or None
+
+
+# 構成 4: 行の読み込みを関所で休ませるための、起動の部品と今のスレッドが読む行
+GATE: Any = None
+REGISTRY: Any = None
+_ROW = threading.local()
+
+
+def set_row(index: int | None) -> None:
+    """今のスレッドが読み込む配信元の行の位置を記録する。"""
+    _ROW.index = index
+
+
+@contextlib.contextmanager
+def row_unit() -> Iterator[None]:
+    """構成 4: 要求が待っていない行の読み込みの 1 件を、関所の裏の処理の 1 件にする。"""
+    index = getattr(_ROW, "index", None)
+    if not flag("POC_GATE_ROWS") or GATE is None or index is None:
+        yield
+        return
+    # 待っている要求が指す行は休ませない
+    if REGISTRY is not None and index in REGISTRY._requested:  # noqa: SLF001
+        yield
+        return
+    with GATE.background(), GATE.unit():
+        yield

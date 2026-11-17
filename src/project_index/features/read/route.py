@@ -75,7 +75,15 @@ async def _run[T](
     """配信元の読み込みを待って処理を別のスレッドで呼び、見つからなかったものを 404 にする。"""
     from project_index import poc_timing
 
-    with poc_timing.span("api_wait", source=source, name=getattr(work, "func", work).__name__):
+    import contextlib
+
+    waiting = (
+        handlers.gate.foreground() if poc_timing.flag("POC_GATE_ROWS") else contextlib.nullcontext()
+    )
+    with (
+        waiting,
+        poc_timing.span("api_wait", source=source, name=getattr(work, "func", work).__name__),
+    ):
         await handlers.registry.wait_for(ids=[source])
     try:
         # サービスの処理の間は要求の応答中として数え、裏の検査と書き出しを休ませる

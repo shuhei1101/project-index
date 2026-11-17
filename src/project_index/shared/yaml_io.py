@@ -63,6 +63,12 @@ def _error_from(error: Exception, file: str | None, text: str) -> YamlLoadError:
 
 def load_yaml(text: str, *, file: str | None = None) -> object:
     """YAML の文字列を素の値で読む。"""
+    # PoC 構成 3b: C 拡張で読み、読めなかったときだけ pure で読み直す
+    if os.environ.get("POC_YAML_C3B") == "1":
+        try:
+            return YAML(typ="safe", pure=False).load(text)
+        except Exception:  # noqa: BLE001, S110
+            pass
     # PoC 構成 3: C 拡張（ruamel.yaml.clib）で読む
     yaml = YAML(typ="safe", pure=os.environ.get("POC_YAML_C") != "1")
     try:

@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from analyze import analyze  # noqa: E402
 
 RUNS = Path("/tmp/poc171/runs")
-CONFIGS = ["c0", "c1a", "c1b", "c2", "c12a", "c12b", "c3"]
+CONFIGS = (sys.argv[1].split(",") if len(sys.argv) > 1 else ["c0", "c1a", "c1b", "c2", "c12a", "c12b", "c3"])
 SOURCES = "dev-docs claude-balancer aituber knowledge mdmark ai-monitor voice-input gui-support mindstella observability project-index alias-inject rule-inject shuhdev-gateway".split()
 METRICS = [("api", "API"), ("wait", "読み込み待ち"), ("row_wall", "行の経過"), ("row_cpu", "行の CPU"),
            ("revision_root", "書き出し"), ("load_file", "load_file"), ("load_cpu", "load_file の CPU"), ("work", "処理")]
@@ -38,7 +38,7 @@ def loadavg(config: str) -> str:
 
 def same_bodies(config: str) -> list[str]:
     """構成 0 の 1 回目と、構成の各回の 1 回目の応答が違う配信元を返す。"""
-    base = RUNS / "c0-1" / "body"
+    base = RUNS / (sys.argv[2] if len(sys.argv) > 2 else "c0-1") / "body"
     diffs = []
     for run in runs_of(config):
         for source in SOURCES:

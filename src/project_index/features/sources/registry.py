@@ -203,8 +203,12 @@ class SourceRegistry:
             entry = self._rows[index]
             from project_index import poc_timing
 
-            with poc_timing.span("row_load", source=entry.id or str(index), index=index):
-                served, status = self._load_row(entry, index, lookup)
+            poc_timing.set_row(index)
+            try:
+                with poc_timing.span("row_load", source=entry.id or str(index), index=index):
+                    served, status = self._load_row(entry, index, lookup)
+            finally:
+                poc_timing.set_row(None)
             self._publish(entry, index, served, status)
             self._rows_done[index].set()
             self._finish_waiters(every=False)

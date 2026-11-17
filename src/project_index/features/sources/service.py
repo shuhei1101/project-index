@@ -149,7 +149,19 @@ def _ref_reader(lookup: SchemaRefLookup | None) -> ReadRef:
         if not resolved:
             resolved.append(_settings_lookup())
         if ref not in cache:
-            cache[ref] = read_schema_ref(ref, lookup=resolved[0])
+            from project_index import poc_timing
+
+            # 構成 6: 行をまたいで、同じ参照先のスキーマを 1 回だけ読む
+            if poc_timing.flag("POC_SCHEMA_CACHE"):
+                with _POC_SCHEMA_LOCK:
+                    found = _POC_SCHEMA_REFS.get(ref)
+                if found is None:
+                    found = read_schema_ref(ref, lookup=resolved[0])
+                    with _POC_SCHEMA_LOCK:
+                        _POC_SCHEMA_REFS[ref] = found
+                cache[ref] = found
+            else:
+                cache[ref] = read_schema_ref(ref, lookup=resolved[0])
         return cache[ref]
 
     return _read
@@ -197,9 +209,12 @@ def _validate(
     for name, rows in tables.items():
         violations.extend(_duplicate_ids(name, rows))
     ids = {name: {row["id"] for row in value.get(name, [])} for name in SCRIPT_TABLES}
+    from project_index import poc_timing
+
     for index, row in enumerate(documents):
         violations.extend(_document_row_violations(index, row, ids))
-        found = _schema_violation(read_text, read_ref, index, row["schema"])
+        with poc_timing.row_unit():
+            found = _schema_violation(read_text, read_ref, index, row["schema"])
         if found is not None:
             violations.append(found)
     violations.extend(_paths_base_violations(value.get("paths_base"), config_root))
@@ -303,14 +318,37 @@ def _check_schema_file(read_text: ReadText, key_path: str, relative: str) -> Vio
     return _check_schema(key_path, load_yaml(read_text(relative) or ""))
 
 
+_POC_SCHEMA_REFS: dict = {}
+_POC_CHECKED: dict = {}
+_POC_SCHEMA_LOCK = __import__("threading").Lock()
+
 def _check_schema(key_path: str, schema: object) -> Violation | None:
     """スキーマが JSON Schema（Draft 2020-12）として正しいかを確かめる。"""
+    from project_index import poc_timing
+
+    # 構成 6: 同じ内容のスキーマの検査の結果を、行をまたいで使い回す
+    key = None
+    if poc_timing.flag("POC_SCHEMA_CACHE"):
+        import hashlib
+        import json
+
+        key = hashlib.sha256(
+            json.dumps(schema, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
+        with _POC_SCHEMA_LOCK:
+            if key in _POC_CHECKED:
+                message = _POC_CHECKED[key]
+                return None if message is None else Violation(path=key_path, rule=message)
+    message = None
     try:
         # 辞書・真偽値でない値も、メタスキーマの検査に渡して SchemaError の理由を得る
         Draft202012Validator.check_schema(cast("Any", schema))
     except SchemaError as error:
-        return Violation(path=key_path, rule=f"スキーマが正しくありません: {error.message}")
-    return None
+        message = f"スキーマが正しくありません: {error.message}"
+    if key is not None:
+        with _POC_SCHEMA_LOCK:
+            _POC_CHECKED[key] = message
+    return None if message is None else Violation(path=key_path, rule=message)
 
 
 def check_scripts(config: SourceConfig, *, root: Path) -> list[Violation]:
@@ -628,12 +666,17 @@ def _row_schemas(
     config: SourceConfig, read_text: ReadText, read_ref: ReadRef
 ) -> dict[str, dict[str, Any]]:
     """種類の行ごとのスキーマを読む（ほかの配信元の参照は、検証で読んだ `$ref` まで解いたスキーマ）。"""
-    return {
-        row.id: _as_schema(load_yaml(read_text(row.schema_path) or ""))
-        if isinstance(row.schema_path, str)
-        else read_ref(row.schema_path).schema
-        for row in config.documents
-    }
+    from project_index import poc_timing
+
+    schemas: dict[str, dict[str, Any]] = {}
+    for row in config.documents:
+        with poc_timing.row_unit():
+            schemas[row.id] = (
+                _as_schema(load_yaml(read_text(row.schema_path) or ""))
+                if isinstance(row.schema_path, str)
+                else read_ref(row.schema_path).schema
+            )
+    return schemas
 
 
 def _log_violations(source_id: str, violations: list[Violation]) -> None:

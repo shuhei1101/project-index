@@ -256,6 +256,10 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
         )
 
     registry = SourceRegistry(on_rebuilt=on_rebuilt, loading=True)
+    from project_index import poc_timing
+
+    poc_timing.GATE = gate
+    poc_timing.REGISTRY = registry
 
     def reload(new_terminal: TerminalConfig) -> list[SourceStatus]:
         statuses = reload_sources(

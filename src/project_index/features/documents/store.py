@@ -150,6 +150,7 @@ class DocumentStore:
         self._worktree_locks: dict[Path, threading.Lock] = {}
         self._startup_schemas: dict[tuple[str, str], dict[str, Any]] = {}
         self._poc_catfiles: dict[Path, _PocCatFile] = {}
+        self._poc_collected: dict[tuple, list[str]] = {}
         # `clear` のたびに増やし、`clear` の前に解き始めたスキーマを書き戻さない
         self._generation = 0
         self._lock = threading.Lock()
@@ -364,7 +365,19 @@ class DocumentStore:
         problems: list[LoadProblem] = []
         seen: set[str] = set()
         # ファイル 1 件ごとの照合と読み込みを、裏の処理の 1 件にする（要求のスレッドでは何もしない）
-        for path in self.gate.each(collect_files(root, table, files=files)):
+        from project_index import poc_timing
+
+        if poc_timing.flag("POC_COLLECT_CACHE"):
+            collect_key = (repo_root, source.id, commit, table_hash)
+            with self._lock:
+                collected = self._poc_collected.get(collect_key)
+            if collected is None:
+                collected = list(collect_files(root, table, files=files))
+                with self._lock:
+                    self._poc_collected[collect_key] = collected
+        else:
+            collected = collect_files(root, table, files=files)
+        for path in self.gate.each(collected):
             relative = from_repo(path)
             blob = blobs.get(relative)
             if blob is None:
