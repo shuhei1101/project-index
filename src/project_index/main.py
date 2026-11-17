@@ -443,6 +443,38 @@ def run_outline(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_links(args: argparse.Namespace) -> int:
+    """`project-index links` の解析結果で本文が指すファイルを集め、1 ファイル 1 行の JSON で出す。"""
+    from project_index.features.links.service import links_files, to_json_line
+
+    root = Path(args.root)
+    if not root.is_dir():
+        print(f"{root}: フォルダがありません", file=sys.stderr)
+        return EXIT_ROOT_NOT_FOUND
+    for file_links in links_files(root, args.paths, exclude=args.exclude):
+        print(to_json_line(file_links))
+    return 0
+
+
+def run_skew(args: argparse.Namespace) -> int:
+    """`project-index skew` の解析結果で行を読み、偏りを 1 つの JSON で出す。"""
+    from project_index.features.skew.service import find_skew, load_rows, to_json
+    from project_index.features.skew.types import SkewInputError
+
+    root = Path(args.root)
+    if not root.is_dir():
+        print(f"{root}: フォルダがありません", file=sys.stderr)
+        return EXIT_ROOT_NOT_FOUND
+    try:
+        rows, draft_paths = load_rows(root, args.files_yaml, draft=args.draft)
+    except SkewInputError as error:
+        print(f"{error.path}: {error.reason}", file=sys.stderr)
+        return EXIT_FILES_YAML_INVALID
+    result = find_skew(rows, draft_paths=draft_paths, only_draft=args.only_draft)
+    print(to_json(result))
+    return 0
+
+
 def run_changed(args: argparse.Namespace) -> int:
     """`project-index changed` の解析結果で変わったファイルを集め、起点とあわせて JSON で出す。"""
     from project_index.features.checkpoint import changed as changed_module

@@ -58,46 +58,36 @@ def test_walk_files_when_symlink_folder(
     assert result == ["a/x.md"]
 
 
-def test_is_excluded_file_when_lock(
+def test_is_excluded_file_when_generated_and_lock(
     tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
 ) -> None:
-    """ロックファイル（正常系）。"""
+    """生成物・ロック・ベンダーのコードは載せる（正常系）。"""
     # 準備
-    write_files(tmp_path, {"uv.lock": "version = 1\n", "package-lock.json": "{}\n"})
+    write_files(
+        tmp_path,
+        {
+            "uv.lock": "version = 1\n",
+            "package-lock.json": "{}\n",
+            "src/vendor/a.py": "a = 1\n",
+            "web/dist/app.js": "var a;\n",
+            "api_pb2.py": "a = 1\n",
+            "app.min.js": "var a;\n",
+        },
+    )
     # 実行
     uv_lock = is_excluded_file(tmp_path, "uv.lock")
     package_lock = is_excluded_file(tmp_path, "package-lock.json")
-    # 検証
-    assert uv_lock is True
-    assert package_lock is True
-
-
-def test_is_excluded_file_when_vendor(
-    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
-) -> None:
-    """ベンダー・生成物のフォルダの下（正常系）。"""
-    # 準備
-    write_files(tmp_path, {"src/vendor/a.py": "a = 1\n", "web/dist/app.js": "var a;\n"})
-    # 実行
     vendor = is_excluded_file(tmp_path, "src/vendor/a.py")
     dist = is_excluded_file(tmp_path, "web/dist/app.js")
-    # 検証
-    assert vendor is True
-    assert dist is True
-
-
-def test_is_excluded_file_when_generated_suffix(
-    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
-) -> None:
-    """生成物のファイル名（正常系）。"""
-    # 準備
-    write_files(tmp_path, {"api_pb2.py": "a = 1\n", "app.min.js": "var a;\n"})
-    # 実行
     protobuf = is_excluded_file(tmp_path, "api_pb2.py")
     minified = is_excluded_file(tmp_path, "app.min.js")
     # 検証
-    assert protobuf is True
-    assert minified is True
+    assert uv_lock is False
+    assert package_lock is False
+    assert vendor is False
+    assert dist is False
+    assert protobuf is False
+    assert minified is False
 
 
 def test_is_excluded_file_when_local_name(
@@ -136,16 +126,16 @@ def test_is_excluded_file_when_binary(tmp_path: Path) -> None:
     assert result is True
 
 
-def test_is_excluded_file_when_reexport_init(
+def test_is_excluded_file_when_empty(
     tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
 ) -> None:
-    """空・再エクスポートだけの `__init__.py`（正常系）。"""
+    """空のファイル（正常系）。"""
     # 準備
     write_files(
         tmp_path,
         {
             "a/__init__.py": "",
-            "b/__init__.py": '"""公開する型。"""\n\nfrom .x import y\n\n__all__ = ["y"]\n',
+            "b/__init__.py": '"""公開する型。"""\n\nfrom .x import y\n',
         },
     )
     # 実行
@@ -153,19 +143,7 @@ def test_is_excluded_file_when_reexport_init(
     reexport = is_excluded_file(tmp_path, "b/__init__.py")
     # 検証
     assert empty is True
-    assert reexport is True
-
-
-def test_is_excluded_file_when_init_has_logic(
-    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
-) -> None:
-    """処理を持つ `__init__.py` は載せる（正常系）。"""
-    # 準備
-    write_files(tmp_path, {"c/__init__.py": "def f() -> None: ...\n"})
-    # 実行
-    result = is_excluded_file(tmp_path, "c/__init__.py")
-    # 検証
-    assert result is False
+    assert reexport is False
 
 
 def test_is_excluded_file_when_source(
@@ -200,7 +178,7 @@ def test_indexable_files(
     # 実行
     result = indexable_files(tmp_path, ["**"])
     # 検証
-    assert result == ["src/a.py", "src/b.py"]
+    assert result == ["src/a.py", "src/b.py", "src/uv.lock"]
 
 
 def test_indexable_files_when_exclude_given(

@@ -1,0 +1,148 @@
+id: IF-113-1
+title: 本文が指すファイルの一覧
+entry:
+  kind: operation
+  value: '`project-index links`（CLI）'
+lead: 範囲の Markdown と YAML のファイルごとに、本文のリンクとパスが指す配信元の中のファイルを出す `project-index links` の入出力を定め、関連の候補の材料の取り出し方を修正するときに参照する。
+identifier: links
+permissions: 配信元のフォルダを読める利用者
+idempotent: true
+side_effects: なし（ファイルを書き換えない）
+callers:
+  - SC-5#scenarios[正常シナリオ（本文のパスとリンクから関連の候補を出す）]
+exclusivity: 読み取りだけで排他しない
+request:
+  - name: --root
+    type: str
+    required: true
+    location: argument
+    description: 配信元のフォルダのパス
+    notes: '-'
+  - name: --paths
+    type: list[str]
+    required: true
+    location: argument
+    description: 範囲の glob かファイルのパス（`--root` からの相対）。繰り返して渡せる
+    notes: '`project-index files` と同じ書き方'
+  - name: --exclude
+    type: list[str]
+    required: false
+    default: なし（除外の条件だけで外す）
+    location: argument
+    description: 除外するファイル名の glob。繰り返して渡せる
+    notes: '`project-index files` と同じ'
+request_example: |-
+  ```bash
+  project-index links --root ~/repo/sample --paths 'docs/**' --paths 'design/**'
+  ```
+response:
+  - name: 標準出力
+    type: str
+    description: 指す先を 1 件以上持つファイルを 1 ファイル 1 行の JSON（JSON Lines）で、`path` の昇順に出す
+    notes: 指す先が 0 件のファイルは出さない
+  - name: '[].path'
+    type: str
+    description: 指す側のファイルの `--root` からのパス
+  - name: '[].targets[].path'
+    type: str
+    description: 指される側のファイルの `--root` からのパス
+    notes: '`path` の昇順で、重複なし'
+  - name: '[].targets[].via'
+    type: Literal['link', 'path']
+    description: '`link` は Markdown のリンク（`[文字](先)`）、`path` は本文に出るパスの文字列から取り出した'
+    notes: 同じ先をどちらでも取り出したときは `link`
+  - name: 終了コード
+    type: int
+    description: 0 正常（対象が 0 件のときも 0）・2 `--root` が無いかフォルダでない
+    notes: '`project-index files` と同じ値'
+response_example: |-
+  ```json
+  {"path": "design/util.yaml", "targets": [{"path": "src/tasks/util.py", "via": "path"}]}
+  {"path": "docs/guide.md", "targets": [{"path": "docs/api.md", "via": "link"}]}
+  ```
+exceptions:
+  - name: なし（正常終了）
+    condition: 一覧を出し終えた（終了コード 0）
+  - name: RootNotFound
+    condition: '`--root` が無いかフォルダでない（終了コード 2）'
+    notes: 渡したパスを stderr に出す
+constraints:
+  - item: 対象のファイル
+    constraint: '`project-index files` と同じ判定（除外の条件・辿らないフォルダ）で選んだファイルのうち、拡張子が `.md`・`.yaml`・`.yml` のもの'
+    notes: コードの import で分かる依存は関連にしない（`templates/files.schema.yaml` の `related`）ため、コードの本文は読まない
+  - item: リンクの取り出し
+    constraint: Markdown のファイルは本文、YAML のファイルは全ての文字列の値から、`[文字](先)` の先を取り出す。`http:`・`https:`・`mailto:`・`id:` で始まる先と `#` 以降は除く。先は指す側のファイルのフォルダからの相対パスとして解く
+    notes: '-'
+  - item: パスの取り出し
+    constraint: リンクの外の文字列から、`--root` の中のファイル（辿らないフォルダの下を除く）のうち `/` を含む `--root` からのパスを部分文字列として探し、同じ位置では最も長く一致するものを取る。一致の直前が ASCII の英数字・`_`・`-`・`.`・`/`、直後が ASCII の英数字・`_`・`-`・`/` のときは一致としない。`./`・`../` で始まる箇所は、指す側のファイルのフォルダから解き、実在するファイルのパスのうち最も長く一致するものを取る
+    notes: 区切り文字に依らず、空白を挟まない日本語の文の中とインラインコードの中のパスも取り出す。照合は全てのパスを 1 回の走査で探す（Aho-Corasick など）
+  - item: 指す先の条件
+    constraint: 解いたパスが `--root` の中の実在するファイルで、辿らないフォルダの下になく、指す側のファイル自身でないものだけを出す
+    notes: 除外の条件に当たるファイルも、実在すれば出す
+  - item: 読み取る量
+    constraint: ファイル 1 つにつき全文を 1 回読む。1 MiB を超えるファイルは先頭 1 MiB だけ読む
+    notes: '`project-index outline` と同じ上限'
+flows:
+  - name: 正常系
+    summary: Markdown のリンクと YAML の値のパスから、指す先のファイルを出す
+    setup:
+      - name: Mock
+        description: なし（`main(["links", ...])` を同じプロセスで呼ぶ）
+      - name: 配信元のフォルダ
+        description: 一時フォルダ。`[API](./api.md)` と `[外](https://example.com)` と `[自分](#見出し)` と、インラインコードの `` `src/tasks/util.py` `` を本文に持つ `docs/guide.md`、リンクを持たない `docs/api.md`、`description` の値に空白を挟まない日本語の文 `実装はsrc/tasks/util.pyにある` と、無いパス `src/none.py` を書いた `design/util.yaml`、`src/tasks/util.py` を置く
+        notes: '`--paths` は `**/*`'
+    flow: |-
+      <!-- map: {"title": "正常系"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index links
+        participant F as 配信元のフォルダ
+
+        C->>M: --root {フォルダ} --paths **/*
+        M-->>F: Markdown と YAML のファイルを読む
+        M->>M: リンクとパスを取り出し、実在するファイルだけに絞る
+        M-->>C: 1 ファイル 1 行の JSON（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 標準出力が 2 行で、`design/util.yaml`・`docs/guide.md` の順に並ぶ
+      - '`design/util.yaml` の `targets` が `src/tasks/util.py`（`via: path`）の 1 件だけで、`src/none.py` を含まない'
+      - '`docs/guide.md` の `targets` が `docs/api.md`（`via: link`）と `src/tasks/util.py`（`via: path`）の 2 件だけ'
+      - '`docs/api.md` と `src/tasks/util.py` の行は無い'
+      - 終了コードが 0
+    test: test_normal
+  - name: 異常系（フォルダが無い・RootNotFound）
+    summary: '`--root` が無いと終了コード 2 で終える'
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 引数
+        description: '`--root` に存在しないパス'
+    flow: |-
+      <!-- map: {"title": "異常系（フォルダが無い・RootNotFound）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index links
+
+        C->>M: --root {無いパス} --paths **/*
+        M-->>C: stderr に渡したパス（終了コード 2）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 2
+      - 標準出力が空で、stderr に渡したパスがある
+    test: test_error_when_root_not_found
+test_file: tests/integration/server/test_links.py
+aliases:
+  - project-index links
+tags:
+  - name: topic:関連
+    main: true
+  - name: topic:リンク
+  - name: topic:cli

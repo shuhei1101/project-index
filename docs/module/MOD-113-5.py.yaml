@@ -1,0 +1,133 @@
+id: MOD-113-5
+title: 索引のサーバー / メタデータの偏り / types.py
+lead: 数える行・ほぼ同じ `description` の組・偏ったタグ・結果と入力を読めない例外の型を受け持ち、メタデータの偏りの types.py を修正するときに参照する。
+data_models:
+  - name: MetadataRow
+    title: 数える行
+    container: project_index/features/skew/types.py
+    usecase: メタデータの偏りの一覧
+    role: DTO
+    summary: 管理用の YAML の行か行の案 1 つ
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: path
+        title: パス
+        type: str
+        access: 公開
+        description: '`--root` からのパス（管理用の YAML のフォルダ + 行の `path`）'
+      - name: description
+        title: 説明
+        type: str | None
+        access: 公開
+        description: 行の `description`。無ければ `None`
+      - name: tags
+        title: タグ
+        type: tuple[str, ...]
+        access: 公開
+        description: 行のタグの名前（重複なし、出た順）
+  - name: SimilarPair
+    title: ほぼ同じ description の組
+    container: project_index/features/skew/types.py
+    usecase: メタデータの偏りの一覧
+    role: DTO
+    summary: 類似度がしきい値以上の 2 行
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: paths
+        title: パス
+        type: tuple[str, str]
+        access: 公開
+        description: 2 行のパス（昇順）
+      - name: similarity
+        title: 類似度
+        type: float
+        access: 公開
+        description: 0〜1
+  - name: SingletonTag
+    title: 1 件だけのタグ
+    container: project_index/features/skew/types.py
+    usecase: メタデータの偏りの一覧
+    role: DTO
+    summary: 1 行にだけ付いているタグとその行
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: tag
+        title: タグ
+        type: str
+        access: 公開
+        description: タグの名前
+      - name: path
+        title: パス
+        type: str
+        access: 公開
+        description: タグが付いた行のパス
+  - name: DominantTag
+    title: 半数以上に付くタグ
+    container: project_index/features/skew/types.py
+    usecase: メタデータの偏りの一覧
+    role: DTO
+    summary: 半数以上の行に付いているタグとその数
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: tag
+        title: タグ
+        type: str
+        access: 公開
+        description: タグの名前
+      - name: count
+        title: 数
+        type: int
+        access: 公開
+        description: タグが付いた行の数
+  - name: SkewResult
+    title: 偏りの一覧
+    container: project_index/features/skew/types.py
+    usecase: メタデータの偏りの一覧
+    role: DTO
+    summary: '`project-index skew` が JSON にする結果'
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: rows
+        title: 行の数
+        type: int
+        access: 公開
+        description: 数えた行の数
+      - name: similar_descriptions
+        title: ほぼ同じ description の組
+        type: tuple[SimilarPair, ...]
+        access: 公開
+        description: '`similarity` の降順、同じ値はパスの昇順'
+      - name: singleton_tags
+        title: 1 件だけのタグ
+        type: tuple[SingletonTag, ...]
+        access: 公開
+        description: タグの昇順
+      - name: dominant_tags
+        title: 半数以上に付くタグ
+        type: tuple[DominantTag, ...]
+        access: 公開
+        description: '`count` の降順、同じ数はタグの昇順'
+classes:
+  - name: SkewInputError
+    title: 入力を読めない
+    container: project_index/features/skew/types.py
+    usecase: メタデータの偏りの一覧
+    role: 例外
+    summary: '`--files-yaml` か `--draft` のファイルが無いか読めないことを表す'
+    kind: クラス
+    inherits: Exception
+    properties:
+      - name: path
+        title: パス
+        type: Path
+        access: 公開
+        description: 読めなかったファイルのパス
+      - name: reason
+        title: 理由
+        type: str
+        access: 公開
+        description: '`ファイルがありません` か、読めなかった理由'
+tags:
+  - name: topic:メタデータ
+    main: true
+  - name: topic:型ヒント

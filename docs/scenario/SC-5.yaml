@@ -49,8 +49,8 @@ scenarios:
         description: 正常シナリオと同じ
         notes: '-'
       - name: Markdown を持つ配信元
-        description: '`docs/` に Markdown 2 件と、ベンダーのコードの Markdown `docs/vendor/lib.md` を持ち、ワークツリーの Markdown `.claude/worktrees/wt/docs/a.md` を置き、`project-index.yaml` も管理用の YAML も無い git リポジトリ'
-        notes: 範囲の質問に既定の `**/*.md` を答える
+        description: '`docs/` に Markdown 2 件と画像 `docs/logo.png`（先頭に NUL バイト）、`src/app.py`、`.gitignore` で無視する `dist/app.js`、`node_modules/x/index.js` を持ち、ワークツリーの Markdown `.claude/worktrees/wt/docs/a.md` を置き、`project-index.yaml` も管理用の YAML も無い git リポジトリ'
+        notes: 範囲の質問に既定の `**/*` を答える。コミットする運用の Git の配信元のため、Git が無視するファイルを除外するかは聞かれない
     flow: |-
       <!-- map: {"title": "正常シナリオ（YAML でない範囲を加える）"} -->
 
@@ -67,8 +67,9 @@ scenarios:
         SK->>FS: project-index.yaml が無いことを確かめる（バージョンの比較を飛ばす）
         SK->>U: scope・範囲・仮のメタデータを聞く
         U-->>SK: 既定の値
-        SK->>CL: project-index files --root {配信元のパス} --paths **/*.md
-        CL-->>SK: 載せるファイル（docs/vendor/ と .claude/worktrees/ の下を含まない）
+        SK->>CL: project-index files --root {配信元のパス} --paths **/*
+        CL-->>SK: 載せるファイル（docs/logo.png と node_modules/・.claude/worktrees/ の下を含まない）
+        SK->>SK: git ls-files で Git が無視するファイル（dist/app.js）を載せるファイルから除く
         SK-->>U: project-index.yaml・管理用の YAML・sources の行を表で示して確かめる
         U-->>SK: 了承
         SK->>FS: 雛形から project-index.yaml を作る（1 行目にクローンのバージョンのタグのスキーマの行。管理用の YAML を読む documents の行。records: files）
@@ -82,13 +83,13 @@ scenarios:
 
       <!-- /map -->
     expected:
-      - 配信元に `project-index.yaml` と管理用の YAML ができ、管理用の YAML に Markdown 2 件の行が仮のメタデータつきで並ぶ
+      - 配信元に `project-index.yaml` と管理用の YAML ができ、管理用の YAML に Markdown 2 件・`src/app.py` の行が仮のメタデータつきで並ぶ
       - '`project-index.yaml` の 1 行目が `# yaml-language-server: $schema=https://raw.githubusercontent.com/shuhei1101/project-index/v{クローンのバージョン}/schemas/project-index.schema.json` で、`documents[]` の行が `type` を持たない'
       - 管理用の YAML の行が `templates/files.schema.yaml` の検証に通る
-      - '`reload` の後、`search_docs` が Markdown 2 件を返す'
+      - '`reload` の後、`search_docs` が Markdown 2 件・`src/app.py` を返す'
       - "`reload` の後の `search_docs` の `notes` に、スキーマの違反（`'files' is a required property` など）が付かない"
       - 範囲から `.git`・`node_modules`・`.claude/worktrees` の下のファイルは除かれる
-      - 管理用の YAML に `docs/vendor/lib.md` の行は無い（初回の setup でも除外の条件が当たる）
+      - 管理用の YAML に `docs/logo.png` の行は無い（初回の setup でも除外の条件が当たる）。Git が無視する `dist/app.js` の行も無い（`default_ref` に無く配信できない）
     test: test_normal_when_non_yaml_range
   - name: 正常シナリオ（2 回目以降）
     setup:
@@ -297,7 +298,7 @@ scenarios:
         notes: '`project-index.yaml` は `related.types[]` を書かない'
       - name: 範囲のファイル
         description: '`src/` に `tasks/repo.py`・`tasks/test_repo.py`・空の `tasks/__init__.py`・`uv.lock`・`logo.png` を置き commit する。`tasks/settings.local.json` を commit せずに置く（`.gitignore` に当たらない）。その commit でワークツリーを作る'
-        notes: 実装のパスを持つ設計書の質問に、種類 `design`・キー `implementation` を答える
+        notes: 実装のパスを持つ設計書の種類とキーの質問に、既定の回答で答える
     flow: |-
       <!-- map: {"title": "正常シナリオ（除外の条件と関連の候補）"} -->
 
@@ -313,10 +314,11 @@ scenarios:
         SK->>CL: project-index files --root {配信元のパス} --paths src/**
         CL-->>SK: 載せるファイル（除外の条件に当たるファイルは含まない）
         SK->>SK: 載せるファイルのうち管理用の YAML に行が無いものを追加する行にする
-        SK->>U: 実装のパスを持つ設計書の種類とキーを聞く（既定は無し）
-        U-->>SK: 種類 design、キー implementation
-        SK->>DM: search_docs(filter: kind が design, format: json)
+        SK->>DM: search_docs(filter: kind が YAML の文書の行の種類, format: json)
         DM-->>SK: design/repo（implementation は src/tasks/repo.py）
+        SK->>SK: 範囲のファイルのパスと一致する値を持つ種類とキーを求める
+        SK->>U: 実装のパスを持つ設計書の種類とキーを聞く（既定は design・implementation）
+        U-->>SK: 既定の回答
         SK->>SK: テストに tests、キーの値とパスが一致するコードに implements の候補を付ける
         SK-->>U: 追加する行と関連の候補を表で示して確かめる
         U-->>SK: 了承
@@ -329,11 +331,11 @@ scenarios:
 
       <!-- /map -->
     expected:
-      - 管理用の YAML に `tasks/repo.py` と `tasks/test_repo.py` の 2 行だけが並び、`tasks/__init__.py`・`uv.lock`・`logo.png`・`tasks/settings.local.json` の行は無い
+      - 管理用の YAML に `tasks/repo.py`・`tasks/test_repo.py`・`uv.lock` の 3 行だけが並び、`tasks/__init__.py`・`logo.png`・`tasks/settings.local.json` の行は無い
       - '`tasks/repo.py` の行が `related: [{to: design/repo, type: implements}]` を持つ'
       - '`tasks/test_repo.py` の行が `related: [{to: src/tasks/repo.py, type: tests}]` を持つ（`to` は関連先のファイルの配信元の直下からのパスで、拡張子を含む）'
       - 確認の表に `implements`・`tests` の候補が出る
-      - '`check_project` が違反と索引の同期の件数を 0 で返す（除外した 3 件と `*.local.*` の名前の `tasks/settings.local.json` を索引に無いファイルとして数えず、付けた関連の `to` はどれも文書に当たる）'
+      - '`check_project` が違反と索引の同期の件数を 0 で返す（除外した 2 件と `*.local.*` の名前の `tasks/settings.local.json` を索引に無いファイルとして数えず、付けた関連の `to` はどれも文書に当たる）'
       - '`reload` の後、`design/repo` を起点にした `direction: in` の `trace_related` が `src/tasks/repo.py` を返す'
     test: test_normal_when_excluded_and_related_candidates
   - name: 正常シナリオ（content/prompts/ を見つける）
@@ -650,8 +652,8 @@ scenarios:
       - name: project-index
         description: '端末の設定（`sources: []`）で待ち受けている project-index'
       - name: 配信元にするリポジトリ
-        description: commit 済みの Markdown 2 件と、commit していない `.env`・`settings.local.json` を持ち、project-index のファイルを持たない Git のリポジトリ `company`。クローン本体は `develop` を checkout する
-        notes: 引数に渡すパス。`.env` は `.gitignore` で無視され、`settings.local.json` は `.gitignore` に当たらず未追跡
+        description: commit 済みの Markdown 2 件と、commit していない `.env`・`dist/app.js`・`settings.local.json` を持ち、project-index のファイルを持たない Git のリポジトリ `company`。クローン本体は `develop` を checkout する
+        notes: 引数に渡すパス。`.env`・`dist/app.js` は `.gitignore` で無視され、`settings.local.json` は `.gitignore` に当たらず未追跡
     flow: |-
       <!-- map: {"title": "正常シナリオ（ローカル運用で追加する）"} -->
 
@@ -667,8 +669,8 @@ scenarios:
         SK->>CF: config が company にある行を探す（無い）
         SK->>U: 運用（コミットする・ローカル運用）を聞く
         U-->>SK: ローカル運用
-        SK->>U: 検索できるようにするファイルと、Git が無視するファイル（.env）を除外するかを聞く
-        U-->>SK: 既定の値（除外する）
+        SK->>U: 検索できるようにするファイルと、Git が無視するファイルを除外するか（既定は除外しない。.env の名前のファイルは除外する）を聞く
+        U-->>SK: 既定の値
         SK->>G: project-index.local.yaml・files.local.yaml・schemas/files.schema.local.yaml を作る
         SK->>G: git rev-parse --git-path info/exclude のファイルに *.local.* を追加する
         SK->>AD: check_project（project-index.local.yaml の絶対パス, storage.type: disk）
@@ -686,7 +688,7 @@ scenarios:
       - '`info/exclude` に `*.local.*` の行が 1 行だけあり、`.gitignore` は変わらない'
       - company の `git status --porcelain` が空（作ったファイルを Git が無視する）
       - 端末の設定の company の行の `config` が `project-index.local.yaml`、`storage.type` が `disk` になっている
-      - '`files.local.yaml` は Markdown 2 件の行を持ち、`*.local.*` の名前のファイル（`settings.local.json` を含む）と `.env` の行を持たない'
+      - '`files.local.yaml` は Markdown 2 件と Git が無視する `dist/app.js` の行を持ち、`*.local.*` の名前のファイル（`settings.local.json` を含む）と `.env` の行を持たない'
       - company のフォルダで呼んだ `describe` が `company`（読み書き）を返却し、`check_project` が違反と索引の同期の件数を 0 で返却する
     test: test_normal_when_local_operation
   - name: 正常シナリオ（ローカル運用の 2 回目以降）
@@ -894,6 +896,172 @@ scenarios:
     expected:
       - 見直しの表に、変更日時より後に commit した 1 件と commit していない 1 件が出て、変更日時より前の commit で変えた 1 件は出ない
     test: test_normal_when_local_operation_rerun_without_checkpoint
+  - name: 正常シナリオ（本文のパスとリンクから関連の候補を出す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
+      - name: 登録済みの配信元
+        description: '`正常シナリオ（除外の条件と関連の候補）` の配信元に、`design/util.yaml`（id `design/util`。説明の値に `src/tasks/util.py` を記載し、`implementation` を持たない）と、`docs/` の Markdown 2 件（`docs/guide.md` が本文で `[API](./api.md)` と `docs/api.md` へリンクし、`docs/api.md` はリンクを持たない）を追加する。`docs/files.yaml` は 2 件の行を `related` なしで持ち、`src/files.yaml` は `tasks/util.py` の行を `related` なしで持つ'
+        notes: その状態を commit し、その commit でワークツリーを作る。`tasks/repo.py` の行は `implements` の関連を持ったまま。`design` は `design/repo` が `implementation` を持つため、既定の回答の実装のパスを持つ種類に当たる
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（本文のパスとリンクから関連の候補を出す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant CL as project-index の CLI
+        participant DM as 文書の MCP
+        participant AD as 管理の MCP
+
+        U->>SK: 配信元のワークツリーで /project-index:setup
+        SK->>SK: 既にある sources の行と管理用の YAML を読み、関連を持たない行を求める
+        SK->>CL: 範囲の文書の本文から、配信元の中のファイルを指すパスとリンクを取り出す
+        CL-->>SK: design/util が src/tasks/util.py、docs/guide.md が docs/api.md を指す
+        SK->>SK: 関連の張り方で type を選び、関連を持たない行に関連の候補を付ける
+        SK-->>U: 既にある行への関連の候補を表で示して確かめる
+        U-->>SK: 了承
+        SK->>DM: write_docs（管理用の YAML の行に related を追加する）
+        SK->>AD: check_project
+        SK->>AD: reload
+        SK-->>U: 追加した関連と結果を出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - 確認の表に、既にある `tasks/util.py` の行への `implements`（`design/util` を指す）と、`docs/guide.md` の行への `see_also`（`docs/api.md` を指す）の候補が出る
+      - 関連を既に持つ `tasks/repo.py` の行と、指す先の無い `docs/api.md` の行には候補が出ない
+      - 設計書 → コードの向きの関連（`design/util` に `src/tasks/util.py` を指す関連）は候補に出ない
+      - '了承の後、`tasks/util.py` の行が `related: [{to: design/util, type: implements}]`、`docs/guide.md` の行が `related: [{to: docs/api.md, type: see_also}]` を持ち、`check_project` が違反を 0 件で返す'
+      - '`reload` の後、`design/util` を起点にした `direction: in` の `trace_related` が `src/tasks/util.py` を返す'
+    test: test_normal_when_related_candidates_from_body
+  - name: 正常シナリオ（仮のメタデータの偏りを見直す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion の見直しの質問には「`description` の組の案だけ了承し、タグの案は断る」、ほかは既定の選択肢で答える）
+      - name: 登録済みの配信元
+        description: 管理用の YAML が Markdown 6 件の行を持ち、確認の時点の記録（`checkpoint`）を持たない配信元。`a.md` と `b.md` の `description` は助詞 1 字だけが違い、`topic:x` は `c.md` の行だけに付き、`topic:doc` は 6 件全ての行に付く
+        notes: Markdown を 1 件追加して commit し、その commit でワークツリーを作る
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（仮のメタデータの偏りを見直す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant CL as project-index の CLI
+        participant DM as 文書の MCP
+
+        U->>SK: 配信元のワークツリーで /project-index:setup
+        SK->>SK: 追加したファイルに仮のメタデータを付ける
+        SK->>CL: 管理用の YAML の行と追加する行の案から、メタデータの偏りを洗い出す（確認の時点の記録が無いため全ての組を比べる）
+        CL-->>SK: ほぼ同じ description の組（a.md・b.md）・1 件だけのタグ（topic:x）・半数以上に付くタグ（topic:doc）
+        SK-->>U: 追加の行と、偏りごとの見直しの案（今の値と新しい案）を表で示して確かめる
+        U-->>SK: a.md・b.md の description の案だけを了承
+        SK->>DM: write_docs（追加の行と、了承された行を書き換える）
+        SK-->>U: 書き換えた行と結果を出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - 確認の表に、ほぼ同じ `description` の組として `a.md`・`b.md`、1 件だけのタグとして `topic:x`、半数以上に付くタグとして `topic:doc` が、見直しの案つきで出る
+      - 了承した `a.md`・`b.md` の `description` だけが書き換わり、`topic:x`・`topic:doc` は元のまま
+      - 追加したファイルの行が管理用の YAML に加わる
+    test: test_normal_when_metadata_skew_reviewed
+  - name: 正常シナリオ（alias-inject の設定とずれている）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
+      - name: 配信元
+        description: '`project-index.yaml` に `alias_type` を持つ documents の行がある git リポジトリ。`.claude/worktrees/develop` に `develop` を checkout したワークツリーを持つ。端末の設定に登録済みで、`sources[].config` はメインのリポジトリの `project-index.yaml` を指す'
+        notes: id `sample`
+      - name: alias-inject の端末の設定
+        description: '`global.repositories[]` が、sample のワークツリーの改名前の設定のファイル `{sample のパス}/.claude/worktrees/develop/dev-docs.yaml`（ファイルは無い）を指す行と、ほかの配信元の行を持つ'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（alias-inject の設定とずれている）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant AI as alias-inject の端末の設定
+        participant CF as 端末の設定
+        participant AD as 管理の MCP
+
+        U->>SK: /project-index:setup {sample のパス}
+        SK->>CF: sources の sample の行を確かめる
+        SK->>AD: reload
+        SK->>AI: repositories[].config を読む
+        SK->>SK: sample の設定のファイルと突き合わせる（同じ Git のリポジトリの別の名前の行がある）
+        SK-->>U: repositories の行のファイル名を project-index.yaml にする修正の候補を示して確かめる
+        U-->>SK: 了承
+        SK->>AI: バックアップを取り、行の config を書き換える
+        SK-->>U: 追加した配信元と、書き換えた alias-inject の行を出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - スキルの応答に、alias-inject の `repositories` の行のパスが sample の設定のファイルとずれていることと、修正の候補が出る
+      - 了承の後、alias-inject の端末の設定の sample の行の `config` が `{sample のパス}/.claude/worktrees/develop/project-index.yaml` になり（行が指すワークツリーは変えない）、ほかの行と `repositories` 以外の値は変わらない
+      - alias-inject の端末の設定と同じフォルダに `settings.yaml.bak-{日時}` のバックアップがある
+    test: test_normal_when_alias_inject_path_mismatch
+  - name: 正常シナリオ（alias-inject の設定に行が無い）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
+      - name: 配信元
+        description: '`正常シナリオ（alias-inject の設定とずれている）` と同じ sample'
+      - name: alias-inject の端末の設定
+        description: '`global.repositories[]` が、ほかの配信元の行だけを持つ'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（alias-inject の設定に行が無い）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant AI as alias-inject の端末の設定
+
+        U->>SK: /project-index:setup {sample のパス}
+        SK->>AI: repositories[].config を読む
+        SK->>SK: sample の設定のファイルと突き合わせる（同じ Git のリポジトリを指す行が無い）
+        SK-->>U: sample の設定のファイルを指す行の追加を候補で示して確かめる
+        U-->>SK: 了承
+        SK->>AI: バックアップを取り、行を追加する
+      ```
+
+      <!-- /map -->
+    expected:
+      - スキルの応答に、alias-inject の `repositories` に sample の行が無いことと、追加の候補が出る
+      - 了承の後、`repositories[]` の末尾に `config` が `{sample のパス}/project-index.yaml` の行が追加され、ほかの行は変わらない
+    test: test_normal_when_alias_inject_row_missing
+  - name: 正常シナリオ（alias-inject を入れていない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
+      - name: 配信元
+        description: '`正常シナリオ（alias-inject の設定とずれている）` と同じ sample'
+      - name: alias-inject の端末の設定
+        description: 無い
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（alias-inject を入れていない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant AI as alias-inject の端末の設定
+
+        U->>SK: /project-index:setup {sample のパス}
+        SK->>AI: 端末の設定が無いことを確かめる
+        SK-->>U: alias-inject の候補を出さずに結果を出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - スキルの応答に alias-inject の候補が出ない
+      - alias-inject の端末の設定のファイルを作らない
+    test: test_normal_when_alias_inject_not_installed
 lead: 利用者が `/project-index:setup` でフォルダを配信元として登録し、管理用の YAML を範囲のファイルに合わせるシナリオを定め、配信元の追加の流れを変えるときに参照する。
 tags:
   - name: topic:配信元

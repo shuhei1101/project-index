@@ -1,0 +1,61 @@
+id: MOD-113-2
+title: 索引のサーバー / 本文のリンク / types.py
+lead: 本文が指すファイルと取り出し方の型を受け持ち、本文のリンクの types.py を修正するときに参照する。
+enums:
+  - name: LinkVia
+    title: 取り出し方
+    container: project_index/features/links/types.py
+    usecase: 本文が指すファイルの一覧
+    role: DTO
+    summary: 指す先を取り出した方法
+    description: '`StrEnum`。値はそのまま JSON の `targets[].via` に出す。同じ先を両方で取り出したときは `LINK` を取る。'
+    values:
+      - value: link
+        member: LINK
+        title: リンク
+        description: Markdown のリンク（`[文字](先)`）の先
+      - value: path
+        member: PATH
+        title: パス
+        description: リンクの外の文字列に出るパス
+data_models:
+  - name: LinkTarget
+    title: 指す先
+    container: project_index/features/links/types.py
+    usecase: 本文が指すファイルの一覧
+    role: DTO
+    summary: 指される側のファイル 1 つ
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: path
+        title: パス
+        type: str
+        access: 公開
+        description: '`--root` からのパス'
+      - name: via
+        title: 取り出し方
+        type: LinkVia
+        access: 公開
+        description: 取り出した方法
+  - name: FileLinks
+    title: ファイルの指す先
+    container: project_index/features/links/types.py
+    usecase: 本文が指すファイルの一覧
+    role: DTO
+    summary: 指す側のファイル 1 つと、その指す先
+    description: '`dataclass(frozen=True)`。JSON Lines の 1 行に当たる。'
+    properties:
+      - name: path
+        title: パス
+        type: str
+        access: 公開
+        description: 指す側の `--root` からのパス
+      - name: targets
+        title: 指す先
+        type: tuple[LinkTarget, ...]
+        access: 公開
+        description: '`path` の昇順で、重複なし'
+tags:
+  - name: topic:関連
+    main: true
+  - name: topic:型ヒント

@@ -167,7 +167,7 @@ flows:
         notes: '-'
       - name: 範囲のファイル
         description: '`src/` に `a.py`・`b.py`・空の `pkg/__init__.py`・`uv.lock`・`logo.png`（先頭に NUL バイト）を置く'
-        notes: '`a.py`・`b.py` だけが除外の条件に当たらない'
+        notes: '`a.py`・`b.py`・`uv.lock` だけが除外の条件に当たらない'
     flow: |-
       <!-- map: {"title": "正常系（除外の条件に当たるファイルを数えない）"} -->
 
@@ -185,8 +185,8 @@ flows:
 
       <!-- /map -->
     expected:
-      - '`sync.unindexed_files` が 2'
-      - '`sync.items` が `src/a.py`・`src/b.py` の 2 件だけで、`src/pkg/__init__.py`・`src/uv.lock`・`src/logo.png` を含まない'
+      - '`sync.unindexed_files` が 3'
+      - '`sync.items` が `src/a.py`・`src/b.py`・`src/uv.lock` の 3 件だけで、`src/pkg/__init__.py`・`src/logo.png` を含まない'
     test: test_normal_when_files_excluded
   - name: 正常系（エイリアスのキーと nav の条件を点検する）
     summary: エイリアスのキーの違反を文書のパスとともに、どの文書にも当たらない `nav` の条件を警告として返す
@@ -499,7 +499,7 @@ response:
     description: '種類の行の `metadata` に書いた列が無い文書の件数'
   - name: sync.unindexed_files
     type: int
-    description: 管理用の YAML に無いファイルの件数。除外の条件（生成物・ロック・バイナリ・ベンダーのコード・再エクスポートや空の `__init__`）に当たるファイルは数えない
+    description: 管理用の YAML に無いファイルの件数。除外の条件（バイナリ・空のファイル・`*.local.*` の名前のファイル）に当たるファイルは数えない
   - name: sync.missing_body_files
     type: int
     description: ファイルが無い行の件数
@@ -552,7 +552,7 @@ constraints:
   - item: タイムアウト
     constraint: スクリプトの確かめは `script_timeout_sec` で打ち切り、`script_errors` に入れる
   - item: 除外の条件
-    constraint: 生成物・ロック・バイナリ・ベンダーのコード・再エクスポートや空の `__init__` だけのファイル・`*.local.*` の名前のファイルを `unindexed_files` に数えない。起動時の警告・状態の取得・`project-index files` も同じ判定を使う
+    constraint: バイナリ・空のファイル・`*.local.*` の名前のファイルを `unindexed_files` に数えない。起動時の警告・状態の取得・`project-index files` も同じ判定を使う
     notes: 見分け方はモジュール構成『文書のストア / indexable.py』の `is_excluded_file`。配信元固有の除外は `documents[].exclude[]`
   - item: nav の auto の group_by
     constraint: "`group_by` の `'@folder'` は項目のパスとして検査せず、違反・警告にしない"

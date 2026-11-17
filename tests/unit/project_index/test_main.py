@@ -155,3 +155,41 @@ def test_main_when_no_command(capsys: pytest.CaptureFixture[str]) -> None:
     # 検証
     assert exc_info.value.code == 2
     assert "cmd" in capsys.readouterr().err
+
+
+def test_build_parser_when_links() -> None:
+    """links の引数と処理を引く（正常系）。"""
+    # 準備
+    parser = build_parser()
+    # 実行
+    args = parser.parse_args(["links", "--root", "/tmp/a", "--paths", "docs/**"])
+    # 検証
+    assert args.cmd == "links"
+    assert args.paths == ["docs/**"]
+    assert args.exclude == []
+    assert args.handler is main_module.run_links
+
+
+def test_build_parser_when_skew() -> None:
+    """skew の引数と処理を引く（正常系）。"""
+    # 準備
+    parser = build_parser()
+    # 実行
+    args = parser.parse_args(
+        [
+            "skew",
+            "--root",
+            "/tmp/a",
+            "--files-yaml",
+            "docs/files.yaml",
+            "--files-yaml",
+            "src/files.yaml",
+            "--only-draft",
+        ]
+    )
+    # 検証
+    assert args.cmd == "skew"
+    assert args.files_yaml == ["docs/files.yaml", "src/files.yaml"]
+    assert args.draft is None
+    assert args.only_draft is True
+    assert args.handler is main_module.run_skew

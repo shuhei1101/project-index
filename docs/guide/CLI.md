@@ -228,6 +228,70 @@ Git の配信元は HEAD の commit（`commit`）と `--reviewed` のファイ�
 | --- | --- |
 | 2 | `--root` か `--files-yaml` が無い。標準エラーに渡したパスを出す |
 
+## project-index links
+
+範囲の Markdown と YAML のファイルごとに、本文のリンクとパスが指す配信元の中のファイルを出します。
+対象は `project-index files` と同じファイルのうち拡張子が `.md`・`.yaml`・`.yml` のもので、ファイルは書き換えません。
+`/project-index:setup` が、関連の候補を作るのに使います。
+
+| オプション | 必須 | 既定 | 説明 |
+| --- | --- | --- | --- |
+| `--root` | ✅ | - | 配信元のフォルダのパス |
+| `--paths` | ✅ | - | 範囲の glob かファイルのパス（`--root` からの相対）。繰り返して渡せる |
+| `--exclude` | - | なし（除外の条件だけで外す） | 外すファイル名の glob。繰り返して渡せる |
+
+```bash
+project-index links --root ~/repo/sample --paths 'docs/**' --paths 'design/**'
+```
+
+標準出力に、指す先を 1 件以上持つファイルを 1 ファイル 1 行の JSON で、パスの昇順に出します。
+
+| キー | 中身 |
+| --- | --- |
+| `path` | 指す側の `--root` からのパス |
+| `targets[].path` | 指される側の `--root` からのパス（昇順・重複なし） |
+| `targets[].via` | `link`（`[文字](先)` のリンク）か `path`（本文に出るパス） |
+
+リンクの先は、指す側のファイルのフォルダから解きます。`http:`・`https:`・`mailto:`・`id:` で始まる先は解きません。
+本文に出るパスは、配信元に実在するファイルのパスを本文の中から探して取り出します。空白を挟まない日本語の文の中とインラインコードの中のパスも取り出し、`./`・`../` で始まる箇所は指す側のフォルダから解きます。
+実在しないファイルと、指す側のファイル自身は出しません。
+
+| 終了コード | 意味 |
+| --- | --- |
+| 2 | `--root` が無いか、フォルダでない。標準エラーに渡したパスを出す |
+
+## project-index skew
+
+管理用の YAML の行と、まだ記載していない行の案から、ほぼ同じ `description` の組・1 件だけのタグ・半数以上に付くタグを出します。
+ファイルは書き換えません。
+`/project-index:setup` が、仮のメタデータの偏りを見直すのに使います。
+
+| オプション | 必須 | 既定 | 説明 |
+| --- | --- | --- | --- |
+| `--root` | ✅ | - | 配信元のフォルダのパス |
+| `--files-yaml` | ✅ | - | 管理用の YAML のパス（`--root` からの相対か絶対パス）。繰り返して渡せ、渡した全ての行を 1 つのまとまりとして数える |
+| `--draft` | - | なし（管理用の YAML の行だけで数える） | 行の案の JSON Lines のファイル。1 行が `path`（`--root` からのパス）・`description`・`tags` を持ち、同じ `path` の行を置き換える |
+| `--only-draft` | - | 指定しない（全ての組を比べる） | ほぼ同じ `description` の組を、行の案を含む組だけにする |
+
+```bash
+project-index skew --root ~/repo/sample --files-yaml docs/files.yaml --files-yaml src/files.yaml --draft /tmp/draft.jsonl
+```
+
+標準出力に、1 つの JSON を出します。パスは全て `--root` からのパスです。
+
+| キー | 中身 |
+| --- | --- |
+| `rows` | 数えた行の数 |
+| `similar_descriptions[]` | ほぼ同じ `description` の 2 行の `paths` と `similarity`（0〜1） |
+| `singleton_tags[]` | 1 行にだけ付いているタグ（`tag`）とその行（`path`） |
+| `dominant_tags[]` | 半数以上の行に付いているタグ（`tag`）と行の数（`count`）。`singleton_tags` に出たタグは除く |
+
+「ほぼ同じ」は、`description` を NFKC・casefold にして空白と記号を除いた文字列の、文字 bigram の Dice 係数が 0.9 以上です。
+
+| 終了コード | 意味 |
+| --- | --- |
+| 2 | `--root` がフォルダでないか、`--files-yaml`・`--draft` のファイルが無いか読めない。標準エラーにパスと理由を出す |
+
 ## project-index prompt-doc
 
 標準入力のプロンプトの YAML 1 件（キーは project-index の `schemas/prompt.schema.yaml`）を Markdown にして標準出力に出します。
