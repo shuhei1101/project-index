@@ -665,7 +665,7 @@ functions:
     process: |-
       1. `source.root` を `walk_files` で 1 回だけたどり、そのパスを `files` に渡して `Target(source, source.root, None, None, "read")` で文書を集める（文書のストア.文書を集める）
       2. 文書ごとに、その行で metadataの列の欠けを求め、`{行の id}: {文書の id}: {キー}（{列名}）` で `missing_refs` に加える
-      3. `records` と `body_file` を持つ行ごとに、行に当たる管理用の YAML（手順 1 のパスを渡したファイルの収集）ごとに、その YAML から作った文書の `body_path` と行と手順 1 のパスと、その行でない有効な行（`others`）を渡して索引に無いファイルを求め、`{行の id}: {パス}` で `unindexed_files` に加える
+      3. `records` と `body_file` を持つ行ごとに、行に当たる管理用の YAML（手順 1 のパスを渡したファイルの収集）ごとに、その YAML から作った文書の `body_path` と行と手順 1 のパスと、その行でない有効な行（`others`）と、有効な `records`・`body_file` の行に当たる管理用の YAML のうち、その YAML のフォルダより深いフォルダにあるもののフォルダ（`nested_dirs`）を渡して索引に無いファイルを求め、`{行の id}: {パス}` で `unindexed_files` に加える
       4. 手順 1 の `problems` のうち `reason` が `missing_body_file` のものを `{path}: {detail}` で `missing_body_files` に加える
       5. 手順 1 の文書の ID の集合を 1 回だけ作り、文書ごとに当たらない関連を求めて `{行の id}: {文書の id}: {to}` で `unresolved_related` に加える
       6. 手順 1 の文書でエイリアスの集めをし、`violations` を `alias_violations` にする
@@ -711,5 +711,12 @@ functions:
         condition: '行 `files`（`paths: [files.yaml]`・`records: files`・`body_file: path`）の直下の `files.yaml` が `src/a.py` を持ち、行 `prompts`（`paths: [content/prompts/**/*.yaml]`）を持つ配信元に、`src/a.py`・`content/prompts/p.yaml` を置く'
         mock: なし（一時フォルダの配信元）
         expected: '`unindexed_files` が空'
+        exception: '-'
+      - name: test_check_sync_when_nested_index
+        case: 正常
+        summary: 深い管理用の YAML の範囲を直下の管理用の YAML で数えない
+        condition: '行 `root`（`paths: [files.yaml]`）の直下の `files.yaml` が `README.md` を持ち、行 `src`（`paths: [src/files.yaml]`）の `src/files.yaml` が `a.py` を持つ配信元に、`README.md`・`src/a.py`・`src/b.py` を置く'
+        mock: なし（一時フォルダの配信元）
+        expected: '`unindexed_files` が `["src: src/b.py"]` だけ（`root:` で始まる行が無い）'
         exception: '-'
 visibility: internal

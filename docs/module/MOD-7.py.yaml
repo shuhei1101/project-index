@@ -412,8 +412,9 @@ functions:
          - どちらも無く、`cwd` が配信元のワークツリーの中の場合、そのワークツリーを `ref` なしで読む
          - どちらも無く、作業中の配信元か Git の管理外の配信元の場合、`root` を `ref` なしで読む
          - それ以外は `root` を `default_ref` で読む
-      5. `ref` で読む場所は、`ref` を履歴の『リビジョンの解決』（`date_base` は配信元の `default_ref`）で 1 回だけ解き、解いた commit を `Target.commit` に持たせる。ブランチ名の `ref` も要求ごとに解き直し、要求をまたいで commit をキャッシュしない
-      6. `Target` の並びを返す
+      5. ワークツリーを `ref` なしで読む場所は、配信元の『作業場所の配信元の読み込み』（`load_source_at`）でそのワークツリーの設定から作り直した配信元を `Target.source` に持たせる。`ValidationFailedError` はそのまま伝える
+      6. `ref` で読む場所は、`ref` を履歴の『リビジョンの解決』（`date_base` は配信元の `default_ref`）で 1 回だけ解き、解いた commit を `Target.commit` に持たせる。ブランチ名の `ref` も要求ごとに解き直し、要求をまたいで commit をキャッシュしない
+      7. `Target` の並びを返す
     exceptions:
       - name: SourceNotReadableError
         condition: '`cwd` が配信元の `scope` に当たらない（`outside_scope` が `True` のときは、加えて `outside_read` が偽か `source` が ID 1 つでない）、または `source` を省いて作業中の配信元が無い'
@@ -428,6 +429,9 @@ functions:
       - name: RefNotFoundError
         condition: '`ref`（渡されなければ `default_ref`）を commit に解けない'
         message: 履歴の『リビジョンの解決』のまま
+      - name: ValidationFailedError
+        condition: 読むワークツリーの配信元の設定が検証に通らない
+        message: 配信元の『作業場所の配信元の読み込み』のまま
     unit_tests:
       - name: test_resolve_read_targets
         case: 正常
@@ -529,6 +533,20 @@ functions:
         mock: なし
         expected: どちらも `InvalidArgumentError`
         exception: disk の配信元に ref・worktree を渡した
+      - name: test_resolve_read_targets_when_worktree_reloads_config
+        case: 正常
+        summary: ワークツリーの設定で作り直した配信元を持たせる
+        condition: 1 回目は `worktree` に sample のワークツリー、2 回目は `cwd` をそのワークツリーの中にする
+        mock: 配信元の一覧（偽物）、配信元の『作業場所の配信元の読み込み』（行 `notes` を足した配信元を返す偽物）
+        expected: どちらも `Target.source.config.documents` に行 `notes` があり、読み込みがワークツリーのパスで呼ばれる
+        exception: '-'
+      - name: test_resolve_read_targets_when_worktree_config_invalid
+        case: 異常
+        summary: ワークツリーの設定が検証に通らない
+        condition: '`worktree` に sample のワークツリー'
+        mock: 配信元の一覧（偽物）、配信元の『作業場所の配信元の読み込み』（`ValidationFailedError` を送る偽物）
+        expected: '`ValidationFailedError` がそのまま伝わる'
+        exception: ワークツリーの設定が検証に通らない
   - name: resolve_write_target
     title: 書く場所の解決
     kind: 関数

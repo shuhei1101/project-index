@@ -165,10 +165,10 @@ functions:
         expected: '`documents[0].paths[0]` の違反'
       - name: test_validate_source_config_when_exclude_has_slash
         case: 正常
-        summary: 除外の名前に `/` を含む
+        summary: 除外の名前に `/` を含む値を許す
         condition: '`documents[0].exclude: [a/README.md]`'
         mock: なし
-        expected: '`documents[0].exclude[0]` の違反'
+        expected: '違反が無い（`/` を含む値はパスの glob）'
       - name: test_validate_source_config_when_legacy_keys
         case: 正常
         summary: 前の形式のキー
@@ -520,11 +520,12 @@ functions:
       type: ServedSource
       description: '`root` の設定で作った配信元（ID・`scope_read`・`scope_write`・`outside_read` は `source` のまま）'
     process: |-
-      1. `source.config_files` を `source.repo_root`（無ければ `source.root`）からの相対パスにし、`root` の下の同じパスにする
+      1. 配信元の ID と `root` のキャッシュがあり、元の配信元が `source` と同じオブジェクトで、記録したファイルの `mtime_ns`・`size` がどれも同じなら、キャッシュの配信元を返す（キャッシュの読み書きはロックで守る）
+      2. `source.config_files` を `source.repo_root`（無ければ `source.root`）からの相対パスにし、`root` の下の同じパスにする
          - `root` の下の同じパスにファイルが無く、元のファイルが無視されている場合（無視されているファイル）、元のファイル（クローン本体のディスク）を使う
-      2. `source.config_root` の `repo_root`（無ければ `source.root`）からの相対パスを `root` の下につないだフォルダを設定ファイルのフォルダにし、配信元の読み込みの手順 2〜6・8〜9 を、ディスクの設定・スキーマ・スクリプトで（`default_ref` を読まずに）、配信元の読み込みと同じ内部の関数で行う（設定のバージョンは比べない）
+      3. `source.config_root` の `repo_root`（無ければ `source.root`）からの相対パスを `root` の下につないだフォルダを設定ファイルのフォルダにし、配信元の読み込みの手順 2〜6・8〜9 を、ディスクの設定・スキーマ・スクリプトで（`default_ref` を読まずに）、配信元の読み込みと同じ内部の関数で行う（設定のバージョンは比べない）
          - 違反がある場合、その違反を持つ `ValidationFailedError` を送る
-      3. 作った配信元を返す
+      4. 作った配信元を、配信元の ID と `root` をキーに、元の配信元・手順 2 の設定のファイルと作った配信元が読んだスキーマのファイルの `mtime_ns`・`size` と一緒にキャッシュへ入れ、返す
     exceptions:
       - name: ValidationFailedError
         condition: '`root` の設定が無い・読めない・検証に通らない・スクリプトが無い'
@@ -563,6 +564,20 @@ functions:
         condition: '`paths_base: ../../..` の配信元を、`git worktree add` したワークツリーで再読み込みする'
         mock: なし（一時フォルダで `git init` と `git worktree add`）
         expected: '`root` がワークツリーの直下、`config_dir` が元の配信元と同じ'
+      - name: test_load_source_at_when_unchanged
+        case: 正常
+        summary: 設定が変わっていなければ作り直さない
+        condition: 同じ配信元とワークツリーで 2 回呼ぶ
+        mock: 配信元の組み立て（本物を包んで呼ばれた回数を記録する）
+        expected: 2 回目は 1 回目と同じオブジェクトを返し、組み立てが 1 回だけ呼ばれる
+        exception: '-'
+      - name: test_load_source_at_when_config_changed
+        case: 正常
+        summary: 設定が変われば作り直す
+        condition: 1 回目の後にワークツリーの `project-index.yaml` に行を足し、もう一度呼ぶ。別の呼び出しでは、元の配信元を再読み込みした別のオブジェクトにして呼ぶ
+        mock: なし（一時フォルダで `git init` と `git worktree add`）
+        expected: どちらも作り直した配信元を返し、足した行が `config.documents` にある
+        exception: '-'
   - name: assemble_source
     title: 配信元の組み立て
     kind: 関数
