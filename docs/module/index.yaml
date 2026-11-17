@@ -9,7 +9,7 @@ items:
 - page: MOD-4.py.yaml
   summary: PreToolUse のフック。文書の MCP のツールの入力に `cwd`・`session_id`・`agent_id` を上書きで入れ、`updatedInput` で返す。
 - page: MOD-5.py.yaml
-  summary: SessionStart のフック。ポートにつながらなければ `project-index serve` を切り離して起動し、つながれば文脈を入れず、`/clear`・圧縮のときだけ `POST /_admin/session-start` で返し済みの記録の削除を依頼する。
+  summary: SessionStart のフック。ポートにつながらなければ `project-index serve` を切り離して起動し、つながれば文脈を入れず、`/clear`・圧縮のときだけ `POST /_admin/session-start` で返却済みの記録の削除を依頼する。
 - page: MOD-6.py.yaml
   summary: インストール済みのパッケージからバージョンを引くときの配布名。
 - page: MOD-7.py.yaml
@@ -117,15 +117,15 @@ items:
 - page: MOD-58.py.yaml
   summary: '`search_docs`・用語の一覧の要求と結果の型。'
 - page: MOD-59.py.yaml
-  summary: 会話キーごとの返し済み・前回読んだ内容・閲覧と編集の SQLite への記録と読み出し。
+  summary: 会話キーごとの返却済み・前回読んだ内容・閲覧と編集の SQLite への記録と読み出し。
 - page: MOD-60.py.yaml
   summary: 会話の記録の会話キー・前回読んだ内容・閲覧と編集の記録の型。
 - page: MOD-61.py.yaml
   summary: '`POST /_admin/session-start` のルート。'
 - page: MOD-62.py.yaml
-  summary: '`/clear`・圧縮の後に、その会話の返し済みの記録を削除する。'
+  summary: '`/clear`・圧縮の後に、その会話の返却済みの記録を削除する。'
 - page: MOD-63.py.yaml
-  summary: '`POST /_admin/session-start` の本文と応答の型と、返し済みの記録を削除する理由。'
+  summary: '`POST /_admin/session-start` の本文と応答の型と、返却済みの記録を削除する理由。'
 - page: MOD-64.py.yaml
   summary: 端末の設定の場所・読み込みと検証・待ち受けのポート。
 - page: MOD-65.py.yaml
@@ -165,7 +165,7 @@ items:
 - page: MOD-82.py.yaml
   summary: 配信元ごとの書き込みの排他。
 - page: MOD-83.py.yaml
-  summary: 新しい文書の置き場所。
+  summary: 新しい文書の配置先。
 - page: MOD-84.py.yaml
   summary: '`write_docs`・`delete_docs` の操作の適用・検査・書き換えと、バージョンの確かめ。'
 - page: MOD-85.py.yaml

@@ -1,6 +1,11 @@
 id: MOD-102
 title: 索引のサーバー / 共通 / schema_check.py
 lead: JSON Schema の違反を、項目のパスつきの `Violation` にする処理を受け持ち、共通の schema_check.py を修正するときに参照する。
+tags:
+  - name: topic:ユーティリティ
+    main: true
+  - name: topic:スキーマ
+  - name: tool:jsonschema
 test_files:
   - tests/unit/project_index/shared/test_schema_check.py
 diagrams:
@@ -24,7 +29,7 @@ diagrams:
         class 必須のキーの読み込み {
           <<function>>
         }
-        click 違反 href "./MOD-98.py.yaml#違反"
+        click 違反 href "id:MOD-98#data_models[Violation]"
 functions:
   - name: format_path
     title: 項目のパスへの変換

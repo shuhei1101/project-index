@@ -1,6 +1,12 @@
 id: MOD-22
 title: 索引のサーバー / 説明 / types.py
 lead: '`describe` の要求と結果の型を受け持ち、説明の types.py を修正するときに参照する。'
+tags:
+  - name: topic:配信元
+    main: true
+  - name: topic:警告
+  - name: action:案内
+  - name: topic:型ヒント
 data_models:
   - name: DescribeRequest
     title: 説明の要求
@@ -83,7 +89,7 @@ data_models:
         access: 公開
         description: 使える配信元の結果
       - name: outside_sources
-        title: 作業範囲の外で読める配信元
+        title: 作業範囲の外で参照できる配信元
         type: list[OutsideSource] | None
         access: 公開
         default: None
@@ -95,11 +101,11 @@ data_models:
         default: '[]'
         description: '警告の収集の結果。`format: json` は空のリストを落とすので、0 件のときは `warnings` のキーを持たない'
   - name: OutsideSource
-    title: 作業範囲の外で読める配信元
+    title: 作業範囲の外で参照できる配信元
     container: project_index/features/describe/types.py
     usecase: 説明
     role: DTO
-    summary: 作業範囲の外で読める配信元の一覧の 1 行
+    summary: 作業範囲の外で参照できる配信元の一覧の 1 行
     description: '`dataclass(frozen=True)`。'
     properties:
       - name: id

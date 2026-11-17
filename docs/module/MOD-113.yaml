@@ -2,6 +2,11 @@ id: MOD-113
 title: 索引のサーバー / 文書のストア
 lead: |-
   `documents[]` の行ごとにファイルを集めて文書にし、メタデータ・バージョン・日時を付ける文書のストアの分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
+tags:
+  - name: topic:文書
+    main: true
+  - name: topic:キャッシュ
+  - name: action:読み込み
 directory: |
   ```text
   src/project_index/features/documents/
@@ -74,19 +79,19 @@ diagrams:
         class 読めなかったファイル {
           <<dataclass>>
         }
-        click 文書のストア href "./MOD-29.py.yaml#文書のストア"
-        click ファイルの収集 href "./MOD-27.py.yaml#ファイルの収集"
-        click ファイルの読み込み href "./MOD-27.py.yaml#ファイルの読み込み"
-        click 文書 href "./MOD-30.py.yaml#文書"
-        click 読み込みの結果 href "./MOD-30.py.yaml#読み込みの結果"
-        click メタデータの解決 href "./MOD-25.py.yaml#メタデータの解決"
-        click スキーマの参照の解決 href "./MOD-28.py.yaml#スキーマの参照の解決"
-        click 項目の取得 href "./MOD-25.py.yaml#項目の取得"
-        click 読めなかったファイル href "./MOD-30.py.yaml#読めなかったファイル"
-        click メタデータのずれの確かめ href "./MOD-29.py.yaml#メタデータのずれの確かめ"
-        click metadataの列の欠け href "./MOD-25.py.yaml#metadataの列の欠け"
-        click 索引に無いファイル href "./MOD-27.py.yaml#索引に無いファイル"
-        click メタデータのずれ href "./MOD-30.py.yaml#メタデータのずれ"
+        click 文書のストア href "id:MOD-29#classes[DocumentStore]"
+        click ファイルの収集 href "id:MOD-27#functions[collect_files]"
+        click ファイルの読み込み href "id:MOD-27#functions[load_file]"
+        click 文書 href "id:MOD-30#data_models[Document]"
+        click 読み込みの結果 href "id:MOD-30#data_models[LoadResult]"
+        click メタデータの解決 href "id:MOD-25#functions[resolve_metadata]"
+        click スキーマの参照の解決 href "id:MOD-28#functions[resolve_schema_refs]"
+        click 項目の取得 href "id:MOD-25#functions[get_field]"
+        click 読めなかったファイル href "id:MOD-30#data_models[LoadProblem]"
+        click メタデータのずれの確かめ href "id:MOD-29#functions[check_sync]"
+        click metadataの列の欠け href "id:MOD-25#functions[missing_ref_fields]"
+        click 索引に無いファイル href "id:MOD-27#functions[unindexed_files]"
+        click メタデータのずれ href "id:MOD-30#data_models[SyncReport]"
 notes:
   受け持つこと: |-
     `records` の要素も 1 件の文書にする。

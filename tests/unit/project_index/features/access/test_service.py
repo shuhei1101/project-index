@@ -344,7 +344,7 @@ def test_resolve_read_targets_when_all(
     make_served_source: Callable[..., ServedSource],
     make_registry: Callable[..., Any],
 ) -> None:
-    """`*` は読める配信元だけ（正常系）。"""
+    """`*` は参照できる配信元だけ（正常系）。"""
     # 準備
     notes = make_served_source(id="notes", root=Path("/n"), scope_read=["/r"], scope_write=[])
     other = make_served_source(id="other", root=Path("/o"), scope_read=["/zzz"], scope_write=[])
@@ -558,7 +558,7 @@ def test_resolve_read_targets_when_not_readable_guides_outside(
     make_served_source: Callable[..., ServedSource],
     make_registry: Callable[..., Any],
 ) -> None:
-    """外から読めることを案内する（異常系）。"""
+    """外から参照できることを案内する（異常系）。"""
     # 準備
     other = make_served_source(
         id="other", root=Path("/o"), scope_read=["/zzz"], scope_write=[], outside_read=True

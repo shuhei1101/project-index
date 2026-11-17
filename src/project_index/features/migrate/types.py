@@ -72,6 +72,6 @@ class DestructiveStepBlockedError(MigrationError):
 
 
 class ConfigNewerError(MigrationError):
-    """対象の `version` が読めるバージョンより新しい。"""
+    """対象の `version` が参照できるバージョンより新しい。"""
 
     exit_code = EXIT_CONFIG_NEWER

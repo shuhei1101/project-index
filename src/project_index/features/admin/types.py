@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 # `check_project` が返す同期のずれの内訳の件数
 SYNC_ITEMS_LIMIT = 50
 
-# 設定の `version` と project-index が読めるバージョンの比較
+# 設定の `version` と project-index が参照できるバージョンの比較
 type VersionState = Literal["current", "old", "newer"]
 
 

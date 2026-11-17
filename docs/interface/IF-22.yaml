@@ -52,6 +52,12 @@ flows:
       - 200 で、`sources` が空
     test: test_normal_when_no_source
 lead: 配信元ごとの ID・状態・配信していない理由を返却する読み取り API の入出力を定め、配信元の一覧と状態を修正するときに参照する。
+tags:
+  - name: topic:配信元
+    main: true
+  - name: topic:状態
+  - name: topic:api
+  - name: action:読み取り
 identifier: list_sources
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true

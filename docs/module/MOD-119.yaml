@@ -1,6 +1,11 @@
 id: MOD-119
 title: 索引のサーバー / 説明
 lead: '`describe` で使用できる配信元の一覧・説明書と種類・種類のスキーマを返却する説明の分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。'
+tags:
+  - name: topic:配信元
+    main: true
+  - name: topic:警告
+  - name: action:案内
 directory: |-
   ```text
   src/project_index/features/describe/
@@ -37,9 +42,9 @@ diagrams:
         class 文書の行を引く {
           <<method>>
         }
-        click 配信元の説明 href "./MOD-20.py.yaml#配信元の説明"
-        click 作業場所の説明 href "./MOD-7.py.yaml#作業場所の説明"
-        click 使える配信元 href "./MOD-7.py.yaml#使える配信元"
-        click 読む場所の解決 href "./MOD-7.py.yaml#読む場所の解決"
-        click 作業場所の配信元の読み込み href "./MOD-70.py.yaml#作業場所の配信元の読み込み"
-        click 文書の行を引く href "./MOD-71.py.yaml#文書の行を引く"
+        click 配信元の説明 href "id:MOD-20#functions[describe]"
+        click 作業場所の説明 href "id:MOD-7#functions[describe_workplace]"
+        click 使える配信元 href "id:MOD-7#functions[available_sources]"
+        click 読む場所の解決 href "id:MOD-7#functions[resolve_read_targets]"
+        click 作業場所の配信元の読み込み href "id:MOD-70#functions[load_source_at]"
+        click 文書の行を引く href "id:MOD-71#data_models[ServedSource].methods[table]"

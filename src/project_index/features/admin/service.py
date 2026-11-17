@@ -89,7 +89,7 @@ DOCUMENT_SEPARATOR = "\n\n---\n\n"
 
 
 def version_state(mine: str, current: str) -> VersionState:
-    """設定のバージョンを project-index が読めるバージョンと比べる。"""
+    """設定のバージョンを project-index が参照できるバージョンと比べる。"""
     left, right = int(mine), int(current)
     if left == right:
         return "current"

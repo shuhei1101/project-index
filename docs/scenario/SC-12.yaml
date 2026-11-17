@@ -621,6 +621,12 @@ scenarios:
       - '1 行の変更の後、`settings.yaml` の sample の行に `storage.type: disk` が入り、再起動せずに読み取り API の sample のリビジョンの一覧が `git: false` を返却する'
     test: test_normal_when_storage_kept_and_changed
 lead: dev-docs の画面のサーバーと端末のほかのプロセスが端末の設定の API で配信元を丸ごとか 1 行ずつ変更し、再起動せずに配信へ反映するシナリオを定め、端末の設定の配信元の変更の流れを変えるときに参照する。
+tags:
+  - name: topic:設定
+    main: true
+  - name: topic:配信元
+  - name: action:変更
+  - name: topic:端末
 issue: 14
 visibility: internal
 primary_actor: dev-docs の画面のサーバー

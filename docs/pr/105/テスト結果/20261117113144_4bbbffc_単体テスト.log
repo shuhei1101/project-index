@@ -1,0 +1,256 @@
+$ uv run pytest tests/unit/
+# /tmp/pytest-of-shuhei2441 が root の所有で pytest の一時フォルダを作れないため、TMPDIR=/tmp/pi-pr105-tmp を付けて実行した
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/chore-convert-converter-commit-env
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 1025 items
+
+tests/unit/plugins/project_index/hooks/test_pre_tool_use.py ....         [  0%]
+tests/unit/plugins/project_index/hooks/test_session_start.py ........... [  1%]
+.........                                                                [  2%]
+tests/unit/project_index/features/access/test_service.py ............... [  3%]
+...........................                                              [  6%]
+tests/unit/project_index/features/access/test_types.py .                 [  6%]
+tests/unit/project_index/features/admin/test_render.py .............     [  7%]
+tests/unit/project_index/features/admin/test_service.py ................ [  9%]
+..........................                                               [ 11%]
+tests/unit/project_index/features/changes/test_compare.py .....          [ 12%]
+tests/unit/project_index/features/changes/test_render.py ....            [ 12%]
+tests/unit/project_index/features/changes/test_service.py .............. [ 14%]
+                                                                         [ 14%]
+tests/unit/project_index/features/convert/test_decisions.py ...          [ 14%]
+tests/unit/project_index/features/convert/test_service.py ....FF..       [ 15%]
+tests/unit/project_index/features/describe/test_render.py ........       [ 16%]
+tests/unit/project_index/features/describe/test_service.py ............  [ 17%]
+tests/unit/project_index/features/describe/test_source_checks.py ....... [ 17%]
+                                                                         [ 17%]
+tests/unit/project_index/features/describe/test_warnings.py ......       [ 18%]
+tests/unit/project_index/features/documents/test_aliases.py ..........   [ 19%]
+tests/unit/project_index/features/documents/test_fields.py ............. [ 20%]
+..........................                                               [ 23%]
+tests/unit/project_index/features/documents/test_indexable.py .......... [ 24%]
+....                                                                     [ 24%]
+tests/unit/project_index/features/documents/test_loader.py ............. [ 25%]
+..........                                                               [ 26%]
+tests/unit/project_index/features/documents/test_schema.py ............. [ 28%]
+                                                                         [ 28%]
+tests/unit/project_index/features/documents/test_store.py .............. [ 29%]
+..........................                                               [ 32%]
+tests/unit/project_index/features/history/test_query.py ................ [ 33%]
+.                                                                        [ 33%]
+tests/unit/project_index/features/history/test_snapshot.py .......       [ 34%]
+tests/unit/project_index/features/lifecycle/test_control.py ...          [ 34%]
+tests/unit/project_index/features/lifecycle/test_update.py ..........    [ 35%]
+tests/unit/project_index/features/migrate/test_service.py .............  [ 36%]
+tests/unit/project_index/features/migrate/test_steps.py ...........      [ 37%]
+tests/unit/project_index/features/prompt_doc/test_cli.py ..              [ 38%]
+tests/unit/project_index/features/prompt_doc/test_markdown.py .......... [ 39%]
+.......                                                                  [ 39%]
+tests/unit/project_index/features/prompt_doc/test_render.py ............ [ 40%]
+...                                                                      [ 41%]
+tests/unit/project_index/features/prompt_doc/test_runtime.py ........... [ 42%]
+.                                                                        [ 42%]
+tests/unit/project_index/features/read/test_nav.py .....                 [ 42%]
+tests/unit/project_index/features/read/test_paths.py ........            [ 43%]
+tests/unit/project_index/features/read/test_route.py .....               [ 44%]
+tests/unit/project_index/features/read/test_search.py ..                 [ 44%]
+tests/unit/project_index/features/read/test_service.py ................. [ 46%]
+..                                                                       [ 46%]
+tests/unit/project_index/features/related/test_graph.py ...              [ 46%]
+tests/unit/project_index/features/related/test_service.py .......        [ 47%]
+tests/unit/project_index/features/related/test_suggest.py .              [ 47%]
+tests/unit/project_index/features/search/test_body_parts.py ....         [ 47%]
+tests/unit/project_index/features/search/test_cursor.py ..               [ 47%]
+tests/unit/project_index/features/search/test_fields.py ..               [ 48%]
+tests/unit/project_index/features/search/test_filters.py .............   [ 49%]
+tests/unit/project_index/features/search/test_render.py .....            [ 49%]
+tests/unit/project_index/features/search/test_service.py ............... [ 51%]
+......                                                                   [ 51%]
+tests/unit/project_index/features/search/test_snippets.py ........       [ 52%]
+tests/unit/project_index/features/search/test_terms.py ...               [ 52%]
+tests/unit/project_index/features/seen/test_store.py ......              [ 53%]
+tests/unit/project_index/features/seen/test_types.py .                   [ 53%]
+tests/unit/project_index/features/session_start/test_route.py ..         [ 53%]
+tests/unit/project_index/features/session_start/test_service.py ...      [ 54%]
+tests/unit/project_index/features/settings/test_query.py ............... [ 55%]
+...................                                                      [ 57%]
+tests/unit/project_index/features/settings/test_route.py ...........     [ 58%]
+tests/unit/project_index/features/settings/test_service.py ............. [ 59%]
+................                                                         [ 61%]
+tests/unit/project_index/features/sources/test_merge.py ....             [ 61%]
+tests/unit/project_index/features/sources/test_registry.py ............. [ 63%]
+..................                                                       [ 64%]
+tests/unit/project_index/features/sources/test_schema_ref.py .......     [ 65%]
+tests/unit/project_index/features/sources/test_service.py .............. [ 66%]
+................................................                         [ 71%]
+tests/unit/project_index/features/sources/test_types.py ..........       [ 72%]
+tests/unit/project_index/features/validation/test_markdown.py .......... [ 73%]
+..                                                                       [ 73%]
+tests/unit/project_index/features/validation/test_rules.py .........     [ 74%]
+tests/unit/project_index/features/validation/test_scripts.py ....        [ 74%]
+tests/unit/project_index/features/validation/test_service.py ..........  [ 75%]
+tests/unit/project_index/features/write/test_apply.py .................. [ 77%]
+..................                                                       [ 79%]
+tests/unit/project_index/features/write/test_hints.py ....               [ 79%]
+tests/unit/project_index/features/write/test_ids.py ..                   [ 80%]
+tests/unit/project_index/features/write/test_locks.py .                  [ 80%]
+tests/unit/project_index/features/write/test_placement.py ...            [ 80%]
+tests/unit/project_index/features/write/test_service.py ................ [ 81%]
+................                                                         [ 83%]
+tests/unit/project_index/integrations/test_git.py ..........             [ 84%]
+tests/unit/project_index/integrations/test_mdmark.py .......             [ 85%]
+tests/unit/project_index/integrations/test_scripts.py ..F........        [ 86%]
+tests/unit/project_index/server/mcp/test_admin.py ....                   [ 86%]
+tests/unit/project_index/server/mcp/test_docs.py ...................     [ 88%]
+tests/unit/project_index/server/mcp/test_result.py ...........           [ 89%]
+tests/unit/project_index/server/test_app.py .........                    [ 90%]
+tests/unit/project_index/server/test_error_handlers.py .....             [ 90%]
+tests/unit/project_index/server/test_lifespan.py .                       [ 91%]
+tests/unit/project_index/server/test_origin.py .....                     [ 91%]
+tests/unit/project_index/shared/test_deadline.py .....                   [ 92%]
+tests/unit/project_index/shared/test_errors.py ..                        [ 92%]
+tests/unit/project_index/shared/test_files.py ...                        [ 92%]
+tests/unit/project_index/shared/test_hashing.py ..                       [ 92%]
+tests/unit/project_index/shared/test_narrowing.py ..........             [ 93%]
+tests/unit/project_index/shared/test_paths.py .....                      [ 94%]
+tests/unit/project_index/shared/test_schema_check.py .............       [ 95%]
+tests/unit/project_index/shared/test_yaml_io.py .......                  [ 96%]
+tests/unit/project_index/test_main.py .........                          [ 96%]
+tests/unit/project_index/test_serve.py ...............................   [100%]
+
+=================================== FAILURES ===================================
+_______________ test_convert_service_convert_when_commit[commit] _______________
+
+tmp_path = PosixPath('/tmp/pi-pr105-tmp/pytest-of-shuhei2441/pytest-1/test_convert_service_convert_w4')
+make_converted_target = <function make_converted_target.<locals>._make at 0x7cde98183740>
+make_document = <function make_document.<locals>._make at 0x7cde98183530>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cde9645ba80>
+commit = '0123456789abcdef0123456789abcdef01234567'
+expected = {'PROJECT_INDEX_COMMIT': '0123456789abcdef0123456789abcdef01234567'}
+
+    @pytest.mark.parametrize(
+        ("commit", "expected"),
+        [
+            pytest.param(
+                "0123456789abcdef0123456789abcdef01234567",
+                {"PROJECT_INDEX_COMMIT": "0123456789abcdef0123456789abcdef01234567"},
+                id="commit",
+            ),
+            pytest.param(None, {"PROJECT_INDEX_COMMIT": None}, id="no_commit"),
+        ],
+    )
+    def test_convert_service_convert_when_commit(
+        tmp_path: Path,
+        make_converted_target: Callable[..., Target],
+        make_document: Callable[..., Document],
+        monkeypatch: pytest.MonkeyPatch,
+        commit: str | None,
+        expected: dict[str, str | None],
+    ) -> None:
+        """参照している commit を環境変数で指定する（正常系）。"""
+        # 準備
+        envs: list[object] = []
+    
+        def fake_run_script(run: Any, **kwargs: Any) -> ScriptResult:
+            envs.append(kwargs.get("env"))
+            return ScriptResult(stdout="# 変換した\n", stderr="")
+    
+        monkeypatch.setattr(service_module, "run_script", fake_run_script)
+        target = replace(
+            make_converted_target(
+                converter="c",
+                converters=[ScriptEntry(id="c", run=["python3", "scripts/c.py"], cache=False)],
+            ),
+            commit=commit,
+        )
+        # 実行
+        _service(tmp_path, {}).convert(target, make_document())
+        # 検証
+>       assert envs == [expected]
+E       AssertionError: assert [None] == [{'PROJECT_IN...def01234567'}]
+E         
+E         At index 0 diff: None != {'PROJECT_INDEX_COMMIT': '0123456789abcdef0123456789abcdef01234567'}
+E         Use -v to get more diff
+
+tests/unit/project_index/features/convert/test_service.py:221: AssertionError
+_____________ test_convert_service_convert_when_commit[no_commit] ______________
+
+tmp_path = PosixPath('/tmp/pi-pr105-tmp/pytest-of-shuhei2441/pytest-1/test_convert_service_convert_w5')
+make_converted_target = <function make_converted_target.<locals>._make at 0x7cde981d6fb0>
+make_document = <function make_document.<locals>._make at 0x7cde981d6ae0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cde965b0e50>
+commit = None, expected = {'PROJECT_INDEX_COMMIT': None}
+
+    @pytest.mark.parametrize(
+        ("commit", "expected"),
+        [
+            pytest.param(
+                "0123456789abcdef0123456789abcdef01234567",
+                {"PROJECT_INDEX_COMMIT": "0123456789abcdef0123456789abcdef01234567"},
+                id="commit",
+            ),
+            pytest.param(None, {"PROJECT_INDEX_COMMIT": None}, id="no_commit"),
+        ],
+    )
+    def test_convert_service_convert_when_commit(
+        tmp_path: Path,
+        make_converted_target: Callable[..., Target],
+        make_document: Callable[..., Document],
+        monkeypatch: pytest.MonkeyPatch,
+        commit: str | None,
+        expected: dict[str, str | None],
+    ) -> None:
+        """参照している commit を環境変数で指定する（正常系）。"""
+        # 準備
+        envs: list[object] = []
+    
+        def fake_run_script(run: Any, **kwargs: Any) -> ScriptResult:
+            envs.append(kwargs.get("env"))
+            return ScriptResult(stdout="# 変換した\n", stderr="")
+    
+        monkeypatch.setattr(service_module, "run_script", fake_run_script)
+        target = replace(
+            make_converted_target(
+                converter="c",
+                converters=[ScriptEntry(id="c", run=["python3", "scripts/c.py"], cache=False)],
+            ),
+            commit=commit,
+        )
+        # 実行
+        _service(tmp_path, {}).convert(target, make_document())
+        # 検証
+>       assert envs == [expected]
+E       AssertionError: assert [None] == [{'PROJECT_IN...OMMIT': None}]
+E         
+E         At index 0 diff: None != {'PROJECT_INDEX_COMMIT': None}
+E         Use -v to get more diff
+
+tests/unit/project_index/features/convert/test_service.py:221: AssertionError
+___________________________ test_run_script_when_env ___________________________
+
+tmp_path = PosixPath('/tmp/pi-pr105-tmp/pytest-of-shuhei2441/pytest-1/test_run_script_when_env0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cde955db620>
+
+    def test_run_script_when_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """環境変数を重ねて動かす（正常系）。"""
+        # 準備
+        monkeypatch.setenv("A", "outer")
+        monkeypatch.setenv("B", "outer")
+        run = [
+            sys.executable,
+            "-c",
+            "import os; print(os.environ.get('A', 'none'), os.environ.get('B', 'none'))",
+        ]
+        # 実行
+>       result = run_script(run, cwd=tmp_path, timeout_sec=10, env={"A": "inner", "B": None})
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: run_script() got an unexpected keyword argument 'env'
+
+tests/unit/project_index/integrations/test_scripts.py:53: TypeError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/convert/test_service.py::test_convert_service_convert_when_commit[commit]
+FAILED tests/unit/project_index/features/convert/test_service.py::test_convert_service_convert_when_commit[no_commit]
+FAILED tests/unit/project_index/integrations/test_scripts.py::test_run_script_when_env
+======================= 3 failed, 1022 passed in 25.90s ========================
