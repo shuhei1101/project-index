@@ -21,13 +21,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: test-${{ github.ref }}-${{ (inputs.layer || 'unit') }}
+  group: test-${{ github.ref }}-${{ (inputs.layer || 'integration') }}
   cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ fromJSON('{"unit":5,"integration":29}')[inputs.layer || 'unit'] }}
+    timeout-minutes: ${{ fromJSON('{"unit":5,"integration":29}')[inputs.layer || 'integration'] }}
     steps:
       - name: ブランチを取得する
         uses: actions/checkout@v7
@@ -40,7 +40,7 @@ jobs:
 
       - name: 層の全件を回す
         env:
-          LAYER: ${{ (inputs.layer || 'unit') }}
+          LAYER: ${{ (inputs.layer || 'integration') }}
           PATHS: ${{ inputs.paths }}
         run: |
           case "$LAYER" in
