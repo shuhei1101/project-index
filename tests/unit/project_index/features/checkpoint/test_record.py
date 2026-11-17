@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import hashlib
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
+from ruamel.yaml import YAML
+
 from project_index.features.checkpoint.record import record_checkpoint
 from project_index.features.checkpoint.types import FilesYamlNotFoundError
-from ruamel.yaml import YAML
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -32,7 +33,7 @@ def test_record_checkpoint(
     )
     # 検証
     text = (repo / "files.yaml").read_text(encoding="utf-8")
-    data = YAML(typ="safe").load(text)
+    data: dict[str, Any] = YAML(typ="safe").load(text)  # pyright: ignore[reportAssignmentType]
     digest = hashlib.sha256(b"a = 2\n").hexdigest()
     assert result.commit == head
     assert data["checkpoint"]["commit"] == head
@@ -52,7 +53,9 @@ def test_record_checkpoint_when_outside_git(
     # 実行
     record_checkpoint(tmp_path, "files.yaml", now=datetime(2026, 11, 17, tzinfo=UTC))
     # 検証
-    data = YAML(typ="safe").load((tmp_path / "files.yaml").read_text(encoding="utf-8"))
+    data: dict[str, Any] = YAML(typ="safe").load(  # pyright: ignore[reportAssignmentType]
+        (tmp_path / "files.yaml").read_text(encoding="utf-8")
+    )
     assert data["checkpoint"] == {"checked_at": "2026-11-17T00:00:00+00:00"}
 
 

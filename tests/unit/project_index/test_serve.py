@@ -799,7 +799,8 @@ def test_run_changed(
         base=ChangedBase(kind=BaseKind.CHECKPOINT_COMMIT, value="abc"), files=("a.md",)
     )
     monkeypatch.setattr(
-        "project_index.features.checkpoint.changed.find_changed", lambda root, files_yaml: result
+        "project_index.features.checkpoint.changed.find_changed",
+        lambda root, files_yaml: result,  # pyright: ignore[reportUnknownLambdaType, reportUnknownArgumentType]
     )
     # 実行
     code = main_module.run_changed(_changed_args(root=str(tmp_path)))
@@ -826,7 +827,8 @@ def test_run_changed_when_commit_missing(
         missing_commit="dead",
     )
     monkeypatch.setattr(
-        "project_index.features.checkpoint.changed.find_changed", lambda root, files_yaml: result
+        "project_index.features.checkpoint.changed.find_changed",
+        lambda root, files_yaml: result,  # pyright: ignore[reportUnknownLambdaType, reportUnknownArgumentType]
     )
     # 実行
     code = main_module.run_changed(_changed_args(root=str(tmp_path)))

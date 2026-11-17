@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
+
 from project_index.features.checkpoint.changed import find_changed, read_checkpoint
 from project_index.features.checkpoint.types import BaseKind, FilesYamlNotFoundError
 
