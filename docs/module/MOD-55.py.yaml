@@ -151,7 +151,7 @@ functions:
           - `snippets` がある場合、本文の条件で抜粋の検索をし（`before`・`after` は `None` なら `context_lines`、`max_count` は `max_per_doc`、`ranges` は切り出した範囲）、`body` を返さない
           - 文字列の値が項目の文字数を超えたら切る（切り出した本文は切り出した後に切る）
           - `view` が `summary`・`full` で `ref` が無く、`body` を `SEEN_MARK` にしていない場合、`path` を文書の場所（文書のストア.文書の場所）にし、`scope` を次のとおり決める。`body` を返さない（`snippets` も無い）なら `summary`、`snippets` を返すか `sections`・`lines` で切り出したか `body` を切ったか `records` の要素で `body_path` が無いなら `section`、それ以外は `full`
-      13. 返した文書を順に読み取りの検査（文書の検査.検査する、`on="read"`）にかけ、違反を `{id}: {rule}（{path}）` で `notes` に足す
+      13. 返した文書を順に読み取りの検査（文書の検査.検査する、`on="read"`。`stamps` にはこの呼び出しで 1 つ作った空の辞書を渡し、文書の間で使い回す）にかけ、違反を `{id}: {rule}（{path}）` で `notes` に足す
       14. 文書を足すごとに結果の文字数（抜粋は各行の `{行番号}:{行}` の文字数）を数え、`max_chars` を超える文書の手前で止める。止めたら `truncated` を `True` にし、`notes` に打ち切ったことと、`cursor` で続きを取るか `fields` を絞るか `view: ids` で取り直すことを足す
       15. 返していない文書が残れば、続きの位置を作る（`next_cursor`）
       16. `sections`・`lines` が無い場合、本文を返した文書（`SEEN_MARK` にしたものを除く）を会話の記録に `body` で残す（会話キーは `session_id`・`agent_id`）

@@ -21,6 +21,7 @@ diagrams:
         文書の検査 ..> 違反 : 返す
         文書の検査 ..> 変えたMarkdownの値
         文書の検査 ..> Markdownの値の点検
+        文書の検査 ..> 値のハッシュ : 読み取りのキー
         class 文書の検査 {
           <<class>>
         }
@@ -48,6 +49,9 @@ diagrams:
         class Markdownの値の点検 {
           <<function>>
         }
+        class 値のハッシュ {
+          <<function>>
+        }
         click スキーマの検査 href "id:MOD-73#functions[check_schema]"
         click IDの形の検査 href "id:MOD-73#functions[check_id_format]"
         click 関連の種類の検査 href "id:MOD-73#functions[check_related]"
@@ -56,6 +60,7 @@ diagrams:
         click 違反 href "id:MOD-98#data_models[Violation]"
         click 変えたMarkdownの値 href "id:MOD-72#functions[changed_markdown]"
         click Markdownの値の点検 href "id:MOD-72#functions[check_markdown_values]"
+        click 値のハッシュ href "id:MOD-100#functions[value_hash]"
 classes:
   - name: DocumentChecker
     title: 文書の検査
@@ -64,7 +69,7 @@ classes:
     role: サービス
     summary: 1 件の文書に全ての検査を通し、違反をまとめて返す
     description: |-
-      読み取りの `validators[]` の結果は (配信元, 種類, 検査の ID, 文書のバージョン) でキャッシュし、同じ内容でスクリプトを動かし直さない。
+      読み取りの `validators[]` の結果は (配信元, 種類, 検査の ID, 文書のバージョン, 検査の行の定義, スクリプトの状態, 参照する場所) でキャッシュし、同じ内容でスクリプトを動かし直さない。
       書き込みの検査はキャッシュせず、毎回動かす。
     kind: クラス
     properties:
@@ -80,9 +85,9 @@ classes:
         description: 端末の設定の `script_timeout_sec`
       - name: _read_cache
         title: 読み取りの結果
-        type: OrderedDict[tuple[str, str, str, str], list[Violation]]
+        type: OrderedDict[tuple[str, str, str, str, str, str, str], list[Violation]]
         access: 内部 (_)
-        description: 上限は `VALIDATOR_ON_READ_CACHE`
+        description: キーは `_read_key` で作る。上限は `VALIDATOR_ON_READ_CACHE`
       - name: _lock
         title: 排他
         type: threading.Lock
@@ -129,6 +134,13 @@ classes:
             default: None
             passing: keyword
             description: 書き込み・削除の検査で渡す。`None` は期限を持たない（読み取りの検査）
+          - name: stamps
+            title: スクリプトの状態のメモ
+            type: dict[tuple[str, tuple[str, ...], bool], str] | None
+            required: false
+            default: None
+            passing: keyword
+            description: 読み取りの検査で、(基準のフォルダ, `run`, Git の配信元か) ごとのスクリプトの状態を使い回す辞書。呼び出し元の 1 回の要求の中で同じ辞書を渡す。`None` は使い回さない
         returns:
           type: list[Violation]
           description: 違反。検査の順に並ぶ
@@ -137,7 +149,7 @@ classes:
           2. `new` なら『IDの形の検査』を通す
           3. 『関連の種類の検査』をメタデータに通す
           4. 行の `validators` の ID ごとに `source.script("validators", id)` を引き、`on` が行の `on` にあるものだけを通す
-             - `on` が `read` の場合、`_read_cache` にキャッシュがあればそれを使う
+             - `on` が `read` の場合、`_read_key`（`stamps` を渡す）で作ったキーで `_read_cache` にキャッシュがあればそれを使う
              - `deadline` がある場合、動かす前に『期限』.期限の確認を呼ぶ（過ぎていれば `WriteDeadlineExceededError` が伝わる）
              - スクリプトの実行の『スクリプトの実行』を `cwd=target.config_base`（設定ファイルのフォルダ）・`stdin`（`body`）・制限時間（`deadline` があれば『期限』.制限時間の切り詰めに `timeout_sec` を渡した値、無ければ `timeout_sec`）・`at` で呼び（`at` は `target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`））、『検査の出力の解釈』で違反にする
              - `ScriptError` の場合、`path` が `$`、`rule` が `{id}: 検査を実行できませんでした（{メッセージ}）` の違反にする（キャッシュしない）
@@ -199,6 +211,54 @@ classes:
             condition: '`timeout_sec=1`、残りの時間が 30 秒の `deadline`。スクリプトの実行が時計を 1 秒進めて `ScriptTimeoutError("制限時間（1 秒）を超えたため、スクリプトを止めました。")` を送る'
             mock: スクリプトの実行（送る偽物）・時計（偽物）
             expected: '違反 1 件、`rule` が `{id}: 検査を実行できませんでした（制限時間（1 秒）を超えたため、スクリプトを止めました。）`'
+          - name: test_document_checker_check_when_validator_entry_changed
+            case: 正常
+            summary: 検査の行を変えると動かし直す
+            condition: 同じ文書を `on="read"` で、`check` の `run` だけが違う 2 つの配信元の設定の読み書きの場所で 1 回ずつ、続けて 1 つ目の場所でもう 1 回
+            mock: '`run_script`（呼ばれた数を数える）'
+            expected: '`run_script` が 2 回呼ばれる（3 回目は 1 回目のキャッシュを使う）'
+          - name: test_document_checker_check_when_script_file_changed
+            case: 正常
+            summary: ワークツリーのスクリプトを書き換えると動かし直す
+            condition: ワークツリーを指す読み書きの場所で同じ文書を `on="read"` で 2 回呼び、続けて `run` が指すスクリプトのファイルを書き換えて 1 回、さらに同じフォルダのサブフォルダのファイルを書き換えて 1 回、最後に `__pycache__` にファイルを置いて 1 回。書き換えはどれも大きさを変える
+            mock: '`run_script`（呼ばれた数を数える）'
+            expected: '`run_script` が 3 回呼ばれる（2 回目と `__pycache__` の後の 5 回目はキャッシュを使う）'
+          - name: test_document_checker_check_when_worktree_and_main_clone
+            case: 正常
+            summary: ワークツリーとクローン本体のキャッシュを分ける
+            condition: 行・スクリプト・文書が同じで、`worktree` があるものと無いもの（`config_commit` あり）の 2 つの読み書きの場所で `on="read"` を 1 回ずつ
+            mock: '`run_script`（呼ばれた数を数える）'
+            expected: '`run_script` が 2 回呼ばれる'
+          - name: test_document_checker_check_when_config_commit_changed
+            case: 正常
+            summary: クローン本体のスクリプトを取り出す commit が進むと動かし直す
+            condition: クローン本体を指す読み書きの場所で `config_commit` を `a` にして `on="read"` を 2 回、`b` に変えて 1 回
+            mock: '`run_script`（呼ばれた数を数える）'
+            expected: '`run_script` が 2 回呼ばれる'
+          - name: test_document_checker_check_when_script_folder_ignored
+            case: 正常
+            summary: Git が無視するファイルの書き換えでは動かし直さない
+            condition: Git の配信元のワークツリーで、`.gitignore` が `scripts/node_modules/` を無視する。同じ文書を `on="read"` で 1 回呼び、`scripts/node_modules/a.js` を書き換えて 1 回、commit していない `scripts/new.py` を置いて 1 回
+            mock: '`run_script`（呼ばれた数を数える）'
+            expected: '`run_script` が 2 回呼ばれる（無視するファイルの後はキャッシュを使い、追跡していないが無視していないファイルの後は動かす）'
+          - name: test_document_checker_check_when_script_folder_has_broken_link
+            case: 正常
+            summary: 状態を取れないファイルがあってもキーを作れる
+            condition: Git の管理外の配信元で、スクリプトのフォルダにリンク先の無いシンボリックリンクを置き、同じ文書を `on="read"` で 2 回
+            mock: '`run_script`（呼ばれた数を数える）'
+            expected: 例外を送らず、`run_script` が 1 回呼ばれる
+          - name: test_document_checker_check_when_stamps_shared
+            case: 正常
+            summary: 1 回の要求の中でスクリプトの状態を使い回す
+            condition: ワークツリーを指す読み書きの場所で、違う 2 件の文書を同じ `stamps` を渡して `on="read"` で 1 回ずつ
+            mock: '`_folder_stamps`（呼ばれた数を数える）・`run_script`'
+            expected: '`_folder_stamps` が 1 回だけ呼ばれる'
+          - name: test_document_checker_check_when_script_outside_repository
+            case: 正常
+            summary: Git のリポジトリの外のスクリプトを指す `run` でもキーを作れる
+            condition: Git の配信元のワークツリーで、`run` がリポジトリの外のフォルダのスクリプト（`../shared/check.py`）を指す。同じ文書を `on="read"` で 1 回呼び、そのスクリプトを書き換えて 1 回
+            mock: '`run_script`（呼ばれた数を数える）'
+            expected: 例外を送らず、`run_script` が 2 回呼ばれる（リポジトリの外のフォルダはたどって状態を作る）
         exceptions:
           - name: WriteDeadlineExceededError
             condition: '`deadline` があり、検査のスクリプトを動かす前か動かした後に期限を過ぎている'
@@ -274,6 +334,51 @@ classes:
           type: None
           description: '-'
         process: 1. `_read_cache` を空にする（起動の『配信元の再読み込み』が呼ぶ）
+      - name: _read_key
+        title: 読み取りのキーを作る
+        summary: 読み取りの `validators[]` の結果をキャッシュするキーを作る
+        kind: メソッド
+        scope: internal
+        thread_safe: true
+        side_effects: ワークツリー・Git の管理外では、スクリプトのフォルダの配下のファイルの `stat` を取る
+        args:
+          - name: target
+            title: 読み書きの場所
+            type: Target
+            required: true
+            passing: positional
+            description: スクリプトを動かす場所
+          - name: document
+            title: 文書
+            type: Document
+            required: true
+            passing: positional
+            description: 検査する文書
+          - name: entry
+            title: 検査の行
+            type: ScriptEntry
+            required: true
+            passing: positional
+            description: '`source.script("validators", id)` で引いた行'
+          - name: stamps
+            title: スクリプトの状態のメモ
+            type: dict[tuple[str, tuple[str, ...], bool], str] | None
+            required: true
+            passing: keyword
+            description: 検査するの `stamps`
+        returns:
+          type: tuple[str, str, str, str, str, str, str]
+          description: (配信元の ID, 種類, 検査の ID, 文書のバージョン, 検査の行の定義のハッシュ, スクリプトの状態, 参照する場所)
+        process: |-
+          1. 検査の行の定義のハッシュを、行の全ての項目（`id`・`run`・`on`・`cache`）から『値のハッシュ』で作る
+          2. スクリプトの状態を作る
+             - `script_at(target)` が commit を返す場合（クローン本体で `config_commit` がある）、その commit の SHA にする（スクリプトはその commit から取り出して動かす）
+             - それ以外（ワークツリー・`config_commit` の無い配信元）の場合、`stamps` に (`config_base`, `run`, `target.source.is_git`) の状態があればそれを使い、無ければ `_script_stamp`（`use_git` は `target.source.is_git`）で作って `stamps` に入れる（`_cached_stamp`）。`_script_stamp` は、`run` の要素のうち `-` で始まらない相対パスで、`target.config_base` から解いてファイルがあるものごとに、そのファイルのフォルダの配下（サブフォルダを含む。`__pycache__` のフォルダは除き、Git の配信元では Git が管理・無視していないファイルだけ）のファイルの (`config_base` からの相対パス, `st_mtime_ns`, `st_size`) をパスの順に並べ、『値のハッシュ』で作る。該当するファイルが無ければ空の文字列
+          3. 参照する場所を、`target.worktree` があればその絶対パス、無ければ空の文字列にする
+          4. (配信元の ID, 種類, 検査の ID, 文書のバージョン, 行の定義のハッシュ, スクリプトの状態, 参照する場所) を返す
+        notes:
+          フォルダの直下のファイルを見る理由: スクリプトの実行（`run_script` の `at`）は `run` の要素のファイルのフォルダごと取り出して動かすため、同じフォルダから import するファイルの書き換えでも結果が変わる。
+          フォルダの配下のファイルを見る理由: スクリプトの実行（`run_script` の `at`）は `run` の要素のファイルのフォルダをサブフォルダごと取り出して動かすため、その配下から import するファイルの書き換えでも結果が変わる。`__pycache__` はスクリプトの実行で書かれるため除き、実行のたびにキーが変わらないようにする。
 constants:
   - name: VALIDATOR_ON_READ_CACHE
     title: 読み取りの検査の結果の数
@@ -282,3 +387,198 @@ constants:
     summary: 読み取りの `validators[]` の結果をキャッシュする件数の上限。超えたら使ったのが古いものから捨てる
     value: '4096'
 visibility: internal
+functions:
+  - name: _script_stamp
+    title: スクリプトの状態
+    container: project_index/features/validation/service.py
+    usecase: 共通
+    summary: '`run` が指すファイルのフォルダの配下（`__pycache__` を除く）の `stat` のハッシュを返す'
+    kind: 関数
+    scope: internal
+    args:
+      - name: base
+        title: 基準のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: '`run` の相対パスを解くフォルダ（`target.config_base`）'
+      - name: run
+        title: コマンド
+        type: list[str]
+        required: true
+        passing: positional
+        description: 検査の行の `run`
+      - name: use_git
+        title: Git の配信元か
+        type: bool
+        required: true
+        passing: keyword
+        description: '`target.source.is_git`'
+    returns:
+      type: str
+      description: ハッシュ。`run` が作業ツリーのファイルを指さなければ空の文字列
+    process: |-
+      1. `_script_folders` で `run` が指すファイルのフォルダを洗い出す。無ければ空の文字列を返す
+      2. フォルダごとに `_folder_stamps`（`use_git` を渡す）を呼んで並べ、『値のハッシュ』を返す
+  - name: _script_folders
+    title: スクリプトのフォルダ
+    container: project_index/features/validation/service.py
+    usecase: 共通
+    summary: '`run` の要素のうち基準のフォルダから解いてファイルがあるものの、フォルダを返す'
+    kind: 関数
+    scope: internal
+    args:
+      - name: base
+        title: 基準のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: '`run` の相対パスを解くフォルダ'
+      - name: run
+        title: コマンド
+        type: list[str]
+        required: true
+        passing: positional
+        description: 検査の行の `run`
+    returns:
+      type: set[Path]
+      description: フォルダ
+    process: |-
+      1. `run` の要素のうち、`-` で始まるものと絶対パスを除く
+      2. 残りを `base` から解き、ファイルがあればそのフォルダを加える
+  - name: _folder_stamps
+    title: フォルダの配下の状態
+    container: project_index/features/validation/service.py
+    usecase: 共通
+    summary: フォルダの配下のファイルの (基準のフォルダからの相対パス, 更新時刻, 大きさ) をパスの順に返す
+    kind: 関数
+    scope: internal
+    side_effects: フォルダの配下のファイルの `stat` を取る
+    args:
+      - name: base
+        title: 基準のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: 相対パスの基準
+      - name: folder
+        title: フォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: たどるフォルダ
+      - name: use_git
+        title: Git の配信元か
+        type: bool
+        required: true
+        passing: keyword
+        description: 真なら Git が管理・無視していないファイルだけを走査する
+    returns:
+      type: list[tuple[str, int, int]]
+      description: (相対パス, `st_mtime_ns`, `st_size`) の並び
+    process: |-
+      1. フォルダの配下のファイルを `_folder_files` で列挙する
+         - `use_git` が真の場合、フォルダで `git ls-files -z --cached --others --exclude-standard -- .` を呼ぶ（Git が管理するファイルと、追跡していないが無視していないファイル。`git archive` が取り出す範囲と揃える）
+         - 偽の場合（Git の管理外の配信元）、サブフォルダまでたどる
+         - どちらも `__pycache__` のフォルダの配下は除く
+      2. ファイルごとに (相対パス, `st_mtime_ns`, `st_size`) をパスの順に並べる。`stat` が `OSError`（列挙の後に消えた・リンク先が無い）のファイルは (相対パス, -1, -1) にして続ける
+  - name: _cached_stamp
+    title: 使い回すスクリプトの状態
+    container: project_index/features/validation/service.py
+    usecase: 共通
+    summary: 作業ツリーのスクリプトの状態を、`stamps` にあれば使い回し、無ければ作って入れる
+    kind: 関数
+    scope: internal
+    args:
+      - name: target
+        title: 読み書きの場所
+        type: Target
+        required: true
+        passing: positional
+        description: '`config_base` と `source.is_git` を使う'
+      - name: entry
+        title: 検査の行
+        type: ScriptEntry
+        required: true
+        passing: positional
+        description: '`run` を使う'
+      - name: stamps
+        title: スクリプトの状態のメモ
+        type: ScriptStamps | None
+        required: true
+        passing: positional
+        description: '`None` は使い回さない'
+    returns:
+      type: str
+      description: スクリプトの状態
+    process: |-
+      1. (`config_base`, `run`, `source.is_git`) が `stamps` にあればその値を返す
+      2. 無ければ `_script_stamp` で作り、`stamps` があれば入れて返す
+  - name: _folder_files
+    title: フォルダの配下のファイル
+    container: project_index/features/validation/service.py
+    usecase: 共通
+    summary: フォルダの配下のファイルを、`__pycache__` の配下を除いてパスの順に返す
+    kind: 関数
+    scope: internal
+    args:
+      - name: folder
+        title: フォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: 列挙するフォルダ
+      - name: use_git
+        title: Git の配信元か
+        type: bool
+        required: true
+        passing: keyword
+        description: 真なら `_git_files`、偽なら `_walked_files` で列挙する
+    returns:
+      type: list[Path]
+      description: ファイルの絶対パス
+    process: |-
+      1. `use_git` が真なら `_git_files`、偽なら `_walked_files` で列挙する
+         - `_git_files` が `GitError` を送った場合（フォルダが Git のリポジトリの外にある・git が待ち時間の上限を超えた）、WARNING のログを出し、そのフォルダは `_walked_files` で列挙して続ける
+      2. フォルダからの相対パスに `__pycache__` を含むものを除き、パスの順に返す
+  - name: _git_files
+    title: Git の対象のファイル
+    container: project_index/features/validation/service.py
+    usecase: 共通
+    summary: Git が管理するファイルと、追跡していないが無視していないファイルを返す
+    kind: 関数
+    scope: internal
+    side_effects: git を子プロセスで 1 回呼ぶ
+    args:
+      - name: folder
+        title: フォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: git を呼ぶフォルダ
+    returns:
+      type: list[Path]
+      description: ファイルの絶対パス
+    process: |-
+      1. フォルダで `git ls-files -z --cached --others --exclude-standard -- .` を呼ぶ（`GitError` はそのまま伝わり、`_folder_files` が扱う）
+      2. 出力を NUL で分け、フォルダにつないだパスを返す
+  - name: _walked_files
+    title: たどったファイル
+    container: project_index/features/validation/service.py
+    usecase: 共通
+    summary: サブフォルダまでたどったファイルを返す（`__pycache__` のフォルダはたどらない）
+    kind: 関数
+    scope: internal
+    args:
+      - name: folder
+        title: フォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: たどるフォルダ
+    returns:
+      type: list[Path]
+      description: ファイルの絶対パス
+    process: |-
+      1. `os.walk` でサブフォルダまでたどり、`__pycache__` のフォルダはたどらない
+      2. ファイルのパスを返す
