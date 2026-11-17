@@ -480,7 +480,7 @@ classes:
             summary: records の行は 1 行のスキーマ
             condition: '行 `notes`（`records: files`）の `schema` が `templates/files.schema.yaml` のコピー'
             mock: なし（`tmp_path`）
-            expected: '`required` が `[path]` の `files` の `items`'
+            expected: '`required` が `[path]` で、`properties` のキーが `files` の `items` と同じで、最上位の `$defs`（`inject_when` の型）のキーを持つスキーマ'
           - name: test_document_store_row_schema_when_records_defs
             case: 正常
             summary: records の行は最上位の $defs を残す

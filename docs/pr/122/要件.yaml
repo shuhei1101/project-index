@@ -1,0 +1,52 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: changed
+    detail: 配信元を追加するときに書き出す管理用の YAML のスキーマが、knowledge の管理用の YAML のスキーマと同じキーを持つ
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: none
+    detail: 調べる配信元の前提の管理用の YAML のスキーマは引き続き templates/files.schema.yaml で、記述は変わらない
+    depends_on: []
+docs:
+  - page: docs/layout/LAY-73-1.yaml
+    new: false
+    change: 案 A で templates/files.schema.yaml の配置と中身の種類が変わらないため修正なし（エントリが結果と一致することを確認した）
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T07:13:05.094034+00:00'
+  - page: docs/guide/設定.md
+    new: false
+    change: 管理用の YAML のキーの表に files[].id・files[].aliases・files[].inject_when・files[].category・checkpoint を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T07:13:05.094034+00:00'
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: 案 A でコピーする templates/files.schema.yaml のパスと手順が変わらないため修正なし
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T07:13:05.094034+00:00'
+  - page: docs/guide/コアコンセプト-文書のメタデータ.md
+    new: false
+    change: キーの一覧は設定.md を指すだけで、スキーマのパスも変わらないため修正なし
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T07:13:05.094034+00:00'
+scope_out:
+  - item: setup がプロンプトのスキーマの $ref 先の common.schema.yaml を配信元へコピーしないこと
+    reason: プロンプトのスキーマのコピーの不具合で、管理用の YAML のスキーマとは別のファイル。この作業 PR がマージされなくても同じ内容で成り立つ
+    plan: '#115'
+  - item: このリポジトリの管理用の YAML（src/files.yaml・tests/files.yaml・plugins/project-index/files.yaml・docs/guide/files.yml）のスキーマの参照
+    reason: '#114 で knowledge の knowledge-files.schema.yaml の参照へ切り替え済み'
+    plan: none
+  - item: templates/files.schema.yaml のキーが knowledge の knowledge-files.schema.yaml とずれたことを検知する単体テスト
+    reason: 単体テストが knowledge のタグのファイル（ネットワークか knowledge のクローン）に依存する。雛形はモジュールでなく、対応するモジュール構成のテスト表も無い。knowledge のタグを上げる作業で合わせ直す
+    plan: none
+  - item: 単体テストの test_check_port 系がランナーでときどき PortInUseError で fail すること
+    reason: ポートの競合による既存の不安定なテストで、この作業 PR の変更と関係しない。この作業 PR がマージされなくても同じ内容で成り立つ
+    plan: '#126'
+  - item: 結合テストの test_normal_when_rechecked_after_write・test_error_when_unexpected・test_normal_when_warned の fail
+    reason: develop で既に fail している既存の不具合で、この作業 PR の変更と関係しない
+    plan: '#117'

@@ -1,0 +1,310 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=integration -f paths="tests/integration/server/test_add_settings_source.py tests/integration/server/test_check_project.py tests/integration/server/test_describe.py tests/integration/server/test_get_status.py tests/integration/server/test_list_documents.py tests/integration/server/test_reload.py tests/integration/server/test_search_docs.py tests/integration/server/test_serve.py" | grep -o 'https://[^ ]*/actions/runs/[0-9]*') && run_id=${run_url##*/} && (rc=0; gh run watch "$run_id" --exit-status > /dev/null || rc=1; if gh run download "$run_id" -n test-log -D "/tmp/test-log-$run_id"; then cat "/tmp/test-log-$run_id/test.log"; else gh run view "$run_id" --log-failed; fi; exit $rc)
+# run: https://github.com/shuhei1101/project-index/actions/runs/44040995349
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 117 items
+
+tests/integration/server/test_add_settings_source.py::test_normal PASSED [  0%]
+tests/integration/server/test_add_settings_source.py::test_error_when_same_id_exists PASSED [  1%]
+tests/integration/server/test_add_settings_source.py::test_error_when_schema_invalid PASSED [  2%]
+tests/integration/server/test_add_settings_source.py::test_error_when_version_outdated PASSED [  3%]
+tests/integration/server/test_add_settings_source.py::test_normal_when_unknown_top_level_key_kept PASSED [  4%]
+tests/integration/server/test_add_settings_source.py::test_error_when_version_missing PASSED [  5%]
+tests/integration/server/test_add_settings_source.py::test_normal_when_storage_given PASSED [  5%]
+tests/integration/server/test_check_project.py::test_normal PASSED       [  6%]
+tests/integration/server/test_check_project.py::test_normal_when_files_excluded PASSED [  7%]
+tests/integration/server/test_check_project.py::test_normal_when_related_unresolved PASSED [  8%]
+tests/integration/server/test_check_project.py::test_normal_when_records_schema_mismatch PASSED [  9%]
+tests/integration/server/test_check_project.py::test_normal_when_config_has_violations PASSED [ 10%]
+tests/integration/server/test_check_project.py::test_normal_when_config_legacy PASSED [ 11%]
+tests/integration/server/test_check_project.py::test_normal_when_legacy_config_name PASSED [ 11%]
+tests/integration/server/test_check_project.py::test_error_when_config_not_found PASSED [ 12%]
+tests/integration/server/test_check_project.py::test_error_when_config_unparsable PASSED [ 13%]
+tests/integration/server/test_check_project.py::test_normal_when_alias_and_nav_checked PASSED [ 14%]
+tests/integration/server/test_check_project.py::test_normal_when_schema_from_other_source PASSED [ 15%]
+tests/integration/server/test_check_project.py::test_normal_when_schema_ref_not_found PASSED [ 16%]
+tests/integration/server/test_check_project.py::test_normal_when_paths_base_or_paths_out_of_range PASSED [ 17%]
+tests/integration/server/test_check_project.py::test_normal_when_disk_storage PASSED [ 17%]
+tests/integration/server/test_check_project.py::test_normal_when_local_files_excluded PASSED [ 18%]
+tests/integration/server/test_describe.py::test_normal PASSED            [ 19%]
+tests/integration/server/test_describe.py::test_normal_when_warned FAILED [ 20%]
+tests/integration/server/test_describe.py::test_normal_when_no_source_available PASSED [ 21%]
+tests/integration/server/test_describe.py::test_normal_when_rechecked_after_write FAILED [ 22%]
+tests/integration/server/test_describe.py::test_normal_when_source PASSED [ 23%]
+tests/integration/server/test_describe.py::test_normal_when_kind PASSED  [ 23%]
+tests/integration/server/test_describe.py::test_error_when_source_not_readable PASSED [ 24%]
+tests/integration/server/test_describe.py::test_error_when_source_not_served PASSED [ 25%]
+tests/integration/server/test_describe.py::test_error_when_unknown_kind PASSED [ 26%]
+tests/integration/server/test_describe.py::test_normal_when_outside_scope PASSED [ 27%]
+tests/integration/server/test_describe.py::test_error_when_outside_read_disabled PASSED [ 28%]
+tests/integration/server/test_describe.py::test_normal_when_outside_list PASSED [ 29%]
+tests/integration/server/test_describe.py::test_normal_when_source_when_changed PASSED [ 29%]
+tests/integration/server/test_describe.py::test_normal_when_refs_and_worktrees PASSED [ 30%]
+tests/integration/server/test_describe.py::test_normal_when_kind_from_other_source PASSED [ 31%]
+tests/integration/server/test_describe.py::test_normal_when_disk_storage PASSED [ 32%]
+tests/integration/server/test_get_status.py::test_normal PASSED          [ 33%]
+tests/integration/server/test_get_status.py::test_normal_when_loading PASSED [ 34%]
+tests/integration/server/test_get_status.py::test_normal_when_checking PASSED [ 35%]
+tests/integration/server/test_get_status.py::test_normal_when_reload_checking PASSED [ 35%]
+tests/integration/server/test_get_status.py::test_normal_when_exporting PASSED [ 36%]
+tests/integration/server/test_list_documents.py::test_normal PASSED      [ 37%]
+tests/integration/server/test_list_documents.py::test_normal_when_values_requested PASSED [ 38%]
+tests/integration/server/test_list_documents.py::test_normal_when_common_keys_requested PASSED [ 39%]
+tests/integration/server/test_list_documents.py::test_normal_when_ref_given PASSED [ 40%]
+tests/integration/server/test_list_documents.py::test_error_when_not_found PASSED [ 41%]
+tests/integration/server/test_list_documents.py::test_error_when_revision_export_times_out PASSED [ 41%]
+tests/integration/server/test_list_documents.py::test_normal_when_disk_storage PASSED [ 42%]
+tests/integration/server/test_reload.py::test_normal PASSED              [ 43%]
+tests/integration/server/test_reload.py::test_normal_when_source_becomes_invalid PASSED [ 44%]
+tests/integration/server/test_reload.py::test_error_when_terminal_config_invalid PASSED [ 45%]
+tests/integration/server/test_reload.py::test_normal_when_terminal_config_has_unknown_top_level_key PASSED [ 46%]
+tests/integration/server/test_reload.py::test_normal_when_reloaded_before_checks_finish PASSED [ 47%]
+tests/integration/server/test_search_docs.py::test_normal PASSED         [ 47%]
+tests/integration/server/test_search_docs.py::test_normal_when_full PASSED [ 48%]
+tests/integration/server/test_search_docs.py::test_normal_when_snippets PASSED [ 49%]
+tests/integration/server/test_search_docs.py::test_normal_when_count_grouped PASSED [ 50%]
+tests/integration/server/test_search_docs.py::test_normal_when_ordered_and_limited PASSED [ 51%]
+tests/integration/server/test_search_docs.py::test_normal_when_source_all PASSED [ 52%]
+tests/integration/server/test_search_docs.py::test_normal_when_worktree PASSED [ 52%]
+tests/integration/server/test_search_docs.py::test_normal_when_seen PASSED [ 53%]
+tests/integration/server/test_search_docs.py::test_normal_when_files_index PASSED [ 54%]
+tests/integration/server/test_search_docs.py::test_normal_when_file_unreadable PASSED [ 55%]
+tests/integration/server/test_search_docs.py::test_error_when_source_not_readable PASSED [ 56%]
+tests/integration/server/test_search_docs.py::test_error_when_source_not_served PASSED [ 57%]
+tests/integration/server/test_search_docs.py::test_error_when_worktree_not_matched PASSED [ 58%]
+tests/integration/server/test_search_docs.py::test_error_when_invalid_argument PASSED [ 58%]
+tests/integration/server/test_search_docs.py::test_error_when_ref_not_found PASSED [ 59%]
+tests/integration/server/test_search_docs.py::test_normal_when_excluded_name PASSED [ 60%]
+tests/integration/server/test_search_docs.py::test_normal_when_ordered_by_matches PASSED [ 61%]
+tests/integration/server/test_search_docs.py::test_normal_when_part_of_body PASSED [ 62%]
+tests/integration/server/test_search_docs.py::test_normal_when_metadata_mapped PASSED [ 63%]
+tests/integration/server/test_search_docs.py::test_normal_when_outside_scope PASSED [ 64%]
+tests/integration/server/test_search_docs.py::test_error_when_outside_read_disabled PASSED [ 64%]
+tests/integration/server/test_search_docs.py::test_normal_when_term PASSED [ 65%]
+tests/integration/server/test_search_docs.py::test_normal_when_tags_are_objects PASSED [ 66%]
+tests/integration/server/test_search_docs.py::test_normal_when_relative_ref_in_defs PASSED [ 67%]
+tests/integration/server/test_search_docs.py::test_normal_when_cyclic_ref_in_other_file PASSED [ 68%]
+tests/integration/server/test_search_docs.py::test_normal_when_schema_ref_unresolvable PASSED [ 69%]
+tests/integration/server/test_search_docs.py::test_normal_when_new_worktree PASSED [ 70%]
+tests/integration/server/test_search_docs.py::test_error_when_worktree_loading PASSED [ 70%]
+tests/integration/server/test_search_docs.py::test_error_when_unexpected FAILED [ 71%]
+tests/integration/server/test_search_docs.py::test_normal_when_disk_storage PASSED [ 72%]
+tests/integration/server/test_search_docs.py::test_error_when_ref_given_to_disk_source PASSED [ 73%]
+tests/integration/server/test_serve.py::test_normal PASSED               [ 74%]
+tests/integration/server/test_serve.py::test_normal_when_mcp_path_without_slash PASSED [ 75%]
+tests/integration/server/test_serve.py::test_normal_when_configs_merged PASSED [ 76%]
+tests/integration/server/test_serve.py::test_normal_when_config_version_old PASSED [ 76%]
+tests/integration/server/test_serve.py::test_normal_when_source_invalid PASSED [ 77%]
+tests/integration/server/test_serve.py::test_normal_when_schema_from_other_source PASSED [ 78%]
+tests/integration/server/test_serve.py::test_normal_when_metadata_out_of_sync PASSED [ 79%]
+tests/integration/server/test_serve.py::test_normal_when_source_config_legacy PASSED [ 80%]
+tests/integration/server/test_serve.py::test_error_when_terminal_config_invalid PASSED [ 81%]
+tests/integration/server/test_serve.py::test_error_when_port_in_use PASSED [ 82%]
+tests/integration/server/test_serve.py::test_normal_when_config_read_from_default_ref PASSED [ 82%]
+tests/integration/server/test_serve.py::test_normal_when_alias_and_nav_warned PASSED [ 83%]
+tests/integration/server/test_serve.py::test_normal_when_mcp_text_from_prompts PASSED [ 84%]
+tests/integration/server/test_serve.py::test_normal_when_source_guide_listed PASSED [ 85%]
+tests/integration/server/test_serve.py::test_normal_when_source_guide_exceeds_limit PASSED [ 86%]
+tests/integration/server/test_serve.py::test_normal_when_source_guide_changed_before_connect PASSED [ 87%]
+tests/integration/server/test_serve.py::test_error_when_prompt_invalid PASSED [ 88%]
+tests/integration/server/test_serve.py::test_normal_when_requested_while_loading PASSED [ 88%]
+tests/integration/server/test_serve.py::test_normal_when_other_source_loading PASSED [ 89%]
+tests/integration/server/test_serve.py::test_normal_when_requested_source_loaded_first PASSED [ 90%]
+tests/integration/server/test_serve.py::test_normal_when_slow_source_not_blocking PASSED [ 91%]
+tests/integration/server/test_serve.py::test_error_when_source_load_failed PASSED [ 92%]
+tests/integration/server/test_serve.py::test_normal_when_ignored_config_first PASSED [ 93%]
+tests/integration/server/test_serve.py::test_normal_when_first_config_not_committed PASSED [ 94%]
+tests/integration/server/test_serve.py::test_normal_when_xdg_dirs_set PASSED [ 94%]
+tests/integration/server/test_serve.py::test_normal_when_paths_base_set PASSED [ 95%]
+tests/integration/server/test_serve.py::test_normal_when_terminal_config_has_unknown_top_level_key PASSED [ 96%]
+tests/integration/server/test_serve.py::test_normal_when_default_ref_exported_in_background PASSED [ 97%]
+tests/integration/server/test_serve.py::test_normal_when_background_export_times_out PASSED [ 98%]
+tests/integration/server/test_serve.py::test_normal_when_disk_storage PASSED [ 99%]
+tests/integration/server/test_serve.py::test_normal_when_git_storage_outside_work_tree PASSED [100%]
+
+=================================== FAILURES ===================================
+___________________________ test_normal_when_warned ____________________________
+
+make_source = <function make_source.<locals>._make at 0x70b3c2f581a0>
+make_server = <function make_server.<locals>._make at 0x70b3c2f589e0>
+sample_sync_file_set = <function sample_sync_files at 0x70b3c4100b40>
+sample_file_set = <function sample_files at 0x70b3c41009e0>
+sample_config_text = <function sample_config at 0x70b3c4100460>
+
+    def test_normal_when_warned(
+        make_source: Callable[..., Any],
+        make_server: Callable[..., Any],
+        sample_sync_file_set: Callable[..., dict[str, str]],
+        sample_file_set: Callable[..., dict[str, str]],
+        sample_config_text: Callable[..., str],
+    ) -> None:
+        """引数なしで、使える配信元の一覧に続けて、同期のずれ・古い設定・配信していない配信元の警告を返す（正常系）。"""
+        # 準備
+        sample = make_source("sample", sample_sync_file_set(1))
+        notes = make_source("notes", git=False, scope_read=[sample.folder])
+        other = make_source("other")
+        old = make_source(
+            "old",
+            sample_file_set(**{"project-index.yaml": sample_config_text(name="old", version="0")}),
+            scope_read=[sample.folder],
+        )
+        broken = make_source(
+            "broken", {"project-index.yaml": BROKEN_CONFIG}, scope_read=[sample.folder]
+        )
+        env = make_server(sample, notes, other, old, broken)
+        # 実行
+        result = env.call("describe", cwd=str(sample.folder))
+        as_json = env.call("describe", cwd=str(sample.folder), format="json")
+        # 検証
+        lines = result.text.splitlines()
+        notes_at = lines.index(WARNINGS_LINE)
+        warnings = [line for line in lines[notes_at + 1 :] if line.startswith("- ")]
+        assert not result.is_error
+        assert notes_at > lines.index(next(line for line in lines if line.startswith("| sample |")))
+>       assert any(
+            line.startswith("- sample: 管理用の YAML に無いファイルが 1 件") for line in warnings
+        )
+E       assert False
+E        +  where False = any(<generator object test_normal_when_warned.<locals>.<genexpr> at 0x70b3c38ab920>)
+
+tests/integration/server/test_describe.py:92: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  project_index.features.sources.service:service.py:727 配信元の設定のバージョンが古い（old・設定 0・サーバーが参照できる 3）
+ERROR    project_index.features.sources.service:service.py:640 broken: documents[0].paths: 必須のキーが無い
+WARNING  project_index.main:main.py:405 sample: 管理用の YAML に無いファイル 1 件: src: src/extra0.py
+____________________ test_normal_when_rechecked_after_write ____________________
+
+make_source = <function make_source.<locals>._make at 0x70b3c2d92610>
+make_server = <function make_server.<locals>._make at 0x70b3c2d90300>
+sample_sync_file_set = <function sample_sync_files at 0x70b3c4100b40>
+
+    def test_normal_when_rechecked_after_write(
+        make_source: Callable[..., Any],
+        make_server: Callable[..., Any],
+        sample_sync_file_set: Callable[..., dict[str, str]],
+    ) -> None:
+        """`write_docs` を当てた後に裏で流し直した検査の結果で、引数なしの警告が変わる（正常系）。"""
+        # 準備
+        sample = make_source("sample")
+        memo = make_source(
+            "memo",
+            sample_sync_file_set(1),
+            git=False,
+            scope_read=[sample.folder],
+            scope_write=[sample.folder],
+        )
+        env = make_server(sample, memo)
+        cwd = str(sample.folder)
+        before = env.call("describe", cwd=cwd)
+        # 実行
+        written = env.call(
+            "write_docs",
+            cwd=cwd,
+            source="memo",
+            operations=[
+                {"op": "create", "kind": "src", "id": "src/extra0.py", "data": {"path": "extra0.py"}}
+            ],
+        )
+        # 裏の検査が終わるまで、警告が消えるのを待つ
+        deadline = time.monotonic() + RECHECK_WAIT_SEC
+        after = env.call("describe", cwd=cwd)
+        while MEMO_WARNING in after.text and time.monotonic() < deadline:
+            time.sleep(0.1)
+            after = env.call("describe", cwd=cwd)
+        # 検証
+>       assert written.data["applied"] is True
+               ^^^^^^^^^^^^
+
+tests/integration/server/test_describe.py:172: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/integration/server/conftest.py:106: in data
+    return json.loads(self.text)
+           ^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/json/__init__.py:352: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/json/decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.decoder.JSONDecoder object at 0x70b3c9192120>
+s = 'InvalidArgumentError: 引数が正しくありません: 1 件\nviolations:\n- fix: data に @body を加えてください\n  index: 0\n  path: operations[0].data.@body\n  rule: src の文書の作成には本文（@body）が要ります'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+            obj, end = self.scan_once(s, idx)
+        except StopIteration as err:
+>           raise JSONDecodeError("Expecting value", s, err.value) from None
+E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+/usr/lib/python3.14/json/decoder.py:363: JSONDecodeError
+------------------------------ Captured log call -------------------------------
+WARNING  project_index.main:main.py:405 memo: 管理用の YAML に無いファイル 1 件: src: src/extra0.py
+__________________________ test_error_when_unexpected __________________________
+
+make_source = <function make_source.<locals>._make at 0x70b3c10222a0>
+make_server = <function make_server.<locals>._make at 0x70b3c1021f30>
+run_git = <function run_git.<locals>._run at 0x70b3c1fee560>
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_error_when_unexpected0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70b3c0dbd9a0>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x70b3c2886850>
+
+    def test_error_when_unexpected(
+        make_source: Callable[..., Any],
+        make_server: Callable[..., Any],
+        run_git: Callable[..., str],
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """`ProjectIndexError` でない例外を、例外の型と内容を持つ `isError` の応答にする（異常系）。"""
+        # 準備
+        source = make_source("sample")
+        previous = run_git(source.folder, "rev-parse", "HEAD").strip()
+        (source.folder / "docs" / "doc-3.yaml").write_text(
+            "id: doc-3\nname: 文書 3\n", encoding="utf-8"
+        )
+        run_git(source.folder, "add", "-A")
+        run_git(source.folder, "commit", "-m", "文書 3")
+        env = make_server(source)
+        _put_git(
+            tmp_path / "bin",
+            'for arg in "$@"; do [ "$arg" = archive ] && exec sleep 25; done',
+            monkeypatch,
+        )
+        caplog.set_level(logging.ERROR)
+        # 実行
+        result = env.call("search_docs", cwd=str(source.folder), ref=previous, view="summary")
+        without_ref = env.call("search_docs", cwd=str(source.folder), view="summary")
+        # 検証
+        assert result.is_error is True
+>       assert result.text.startswith("UnexpectedError: GitError:")
+E       AssertionError: assert False
+E        +  where False = <built-in method startswith of str object at 0x3041b3a0>('UnexpectedError: GitError:')
+E        +    where <built-in method startswith of str object at 0x3041b3a0> = 'RevisionExportTimeoutError: リビジョンの書き出し（13c1b0913c05e4d8985991bb2fce33130f0f51d5）が 20 秒を超えたため止めました\ncommit: 13c1b0913c05e4d8985991bb2fce33130f0f51d5\nlimit_sec: 20\noperation: revision_export\n- 時間を空けて同じ呼び出しを再実行してください'.startswith
+E        +      where 'RevisionExportTimeoutError: リビジョンの書き出し（13c1b0913c05e4d8985991bb2fce33130f0f51d5）が 20 秒を超えたため止めました\ncommit: 13c1b0913c05e4d8985991bb2fce33130f0f51d5\nlimit_sec: 20\noperation: revision_export\n- 時間を空けて同じ呼び出しを再実行してください' = ToolResult(is_error=True, text='RevisionExportTimeoutError: リビジョンの書き出し（13c1b0913c05e4d8985991bb2fce33130f0f51d5）が 20 秒を超えたため止めました\ncommit: 13c1b0913c05e4d8985991bb2fce33130f0f51d5\nlimit_sec: 20\noperation: revision_export\n- 時間を空けて同じ呼び出しを再実行してください', structured=None).text
+
+tests/integration/server/test_search_docs.py:1246: AssertionError
+=========================== short test summary info ============================
+FAILED tests/integration/server/test_describe.py::test_normal_when_warned - assert False
+ +  where False = any(<generator object test_normal_when_warned.<locals>.<genexpr> at 0x70b3c38ab920>)
+FAILED tests/integration/server/test_describe.py::test_normal_when_rechecked_after_write - json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+FAILED tests/integration/server/test_search_docs.py::test_error_when_unexpected - AssertionError: assert False
+ +  where False = <built-in method startswith of str object at 0x3041b3a0>('UnexpectedError: GitError:')
+ +    where <built-in method startswith of str object at 0x3041b3a0> = 'RevisionExportTimeoutError: リビジョンの書き出し（13c1b0913c05e4d8985991bb2fce33130f0f51d5）が 20 秒を超えたため止めました\ncommit: 13c1b0913c05e4d8985991bb2fce33130f0f51d5\nlimit_sec: 20\noperation: revision_export\n- 時間を空けて同じ呼び出しを再実行してください'.startswith
+ +      where 'RevisionExportTimeoutError: リビジョンの書き出し（13c1b0913c05e4d8985991bb2fce33130f0f51d5）が 20 秒を超えたため止めました\ncommit: 13c1b0913c05e4d8985991bb2fce33130f0f51d5\nlimit_sec: 20\noperation: revision_export\n- 時間を空けて同じ呼び出しを再実行してください' = ToolResult(is_error=True, text='RevisionExportTimeoutError: リビジョンの書き出し（13c1b0913c05e4d8985991bb2fce33130f0f51d5）が 20 秒を超えたため止めました\ncommit: 13c1b0913c05e4d8985991bb2fce33130f0f51d5\nlimit_sec: 20\noperation: revision_export\n- 時間を空けて同じ呼び出しを再実行してください', structured=None).text
+=================== 3 failed, 114 passed in 99.22s (0:01:39) ===================
