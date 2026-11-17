@@ -336,7 +336,7 @@ classes:
           1. 検査の行の定義のハッシュを、行の全ての項目（`id`・`run`・`on`・`cache`）から『値のハッシュ』で作る
           2. スクリプトの状態を作る
              - `script_at(target)` が commit を返す場合（クローン本体で `config_commit` がある）、その commit の SHA にする（スクリプトはその commit から取り出して動かす）
-             - それ以外（ワークツリー・`config_commit` の無い配信元）の場合、`run` の要素のうち `-` で始まらない相対パスで、`target.config_base` から解いてファイルがあるものごとに、そのファイルのフォルダの配下（サブフォルダを含む。`__pycache__` のフォルダは除く）のファイルの (`config_base` からの相対パス, `st_mtime_ns`, `st_size`) をパスの順に並べ、『値のハッシュ』で作る。該当するファイルが無ければ空の文字列
+             - それ以外（ワークツリー・`config_commit` の無い配信元）の場合、`_script_stamp` で、`run` の要素のうち `-` で始まらない相対パスで、`target.config_base` から解いてファイルがあるものごとに、そのファイルのフォルダの配下（サブフォルダを含む。`__pycache__` のフォルダは除く）のファイルの (`config_base` からの相対パス, `st_mtime_ns`, `st_size`) をパスの順に並べ、『値のハッシュ』で作る。該当するファイルが無ければ空の文字列
           3. 参照する場所を、`target.worktree` があればその絶対パス、無ければ空の文字列にする
           4. (配信元の ID, 種類, 検査の ID, 文書のバージョン, 行の定義のハッシュ, スクリプトの状態, 参照する場所) を返す
         notes:
@@ -350,3 +350,83 @@ constants:
     summary: 読み取りの `validators[]` の結果をキャッシュする件数の上限。超えたら使ったのが古いものから捨てる
     value: '4096'
 visibility: internal
+functions:
+  - name: _script_stamp
+    title: スクリプトの状態
+    container: project_index/features/validation/service.py
+    usecase: 共通
+    summary: '`run` が指すファイルのフォルダの配下（`__pycache__` を除く）の `stat` のハッシュを返す'
+    kind: 関数
+    scope: internal
+    args:
+      - name: base
+        title: 基準のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: '`run` の相対パスを解くフォルダ（`target.config_base`）'
+      - name: run
+        title: コマンド
+        type: list[str]
+        required: true
+        passing: positional
+        description: 検査の行の `run`
+    returns:
+      type: str
+      description: ハッシュ。`run` が作業ツリーのファイルを指さなければ空の文字列
+    process: |-
+      1. `_script_folders` で `run` が指すファイルのフォルダを洗い出す。無ければ空の文字列を返す
+      2. フォルダごとに `_folder_stamps` を呼んで並べ、『値のハッシュ』を返す
+  - name: _script_folders
+    title: スクリプトのフォルダ
+    container: project_index/features/validation/service.py
+    usecase: 共通
+    summary: '`run` の要素のうち基準のフォルダから解いてファイルがあるものの、フォルダを返す'
+    kind: 関数
+    scope: internal
+    args:
+      - name: base
+        title: 基準のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: '`run` の相対パスを解くフォルダ'
+      - name: run
+        title: コマンド
+        type: list[str]
+        required: true
+        passing: positional
+        description: 検査の行の `run`
+    returns:
+      type: set[Path]
+      description: フォルダ
+    process: |-
+      1. `run` の要素のうち、`-` で始まるものと絶対パスを除く
+      2. 残りを `base` から解き、ファイルがあればそのフォルダを加える
+  - name: _folder_stamps
+    title: フォルダの配下の状態
+    container: project_index/features/validation/service.py
+    usecase: 共通
+    summary: フォルダの配下のファイルの (基準のフォルダからの相対パス, 更新時刻, 大きさ) をパスの順に返す
+    kind: 関数
+    scope: internal
+    side_effects: フォルダの配下のファイルの `stat` を取る
+    args:
+      - name: base
+        title: 基準のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: 相対パスの基準
+      - name: folder
+        title: フォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: たどるフォルダ
+    returns:
+      type: list[tuple[str, int, int]]
+      description: (相対パス, `st_mtime_ns`, `st_size`) の並び
+    process: |-
+      1. フォルダをサブフォルダまでたどる（`__pycache__` のフォルダはたどらない）
+      2. ファイルごとに (相対パス, `st_mtime_ns`, `st_size`) を並べる
