@@ -15,7 +15,7 @@
 
 | エンドポイント | 返すもの | 主なエラー |
 | --- | --- | --- |
-| `GET /sources` | 配信元ごとの ID・状態（`serving`・`not_served`・`disabled`）・配信していない理由 | - |
+| `GET /sources?include_loading=` | 配信元ごとの ID・状態（`serving`・`not_served`・`disabled`）・配信していない理由。全ての配信元の読み込みが終わるまで待って返す。`include_loading=true` で待たずに返し、読み込みが終わっていない配信元を `loading` で返す | - |
 | `GET /sources/{source}/config?schemas=` | 配信元の設定のうち `nav`・`documents[]`（スクリプトのコマンドを除く）・`decisions.folders`・`github`・`diff`。`schemas=true` で `documents[]` の行ごとの `$ref` を解いた種類のスキーマも返す | 404（無い・配信していない配信元）・504（`schemas=true` で、リビジョンの書き出しが待ち時間の上限を超えた。`RevisionExportTimeoutError`） |
 | `GET /sources/{source}/docs?ref=&values=&common_keys=` | 指したリビジョン（省くと `default_ref`。`storage.type: disk` の配信元は `ref` を無視して登録したフォルダを読み、応答の `ref` は空）の文書の ID・パス・種類・メタデータ・バージョン。`values=true` で文書の値も返す。`common_keys=true` で、配信元の設定の行の `metadata`・`alias_type` で解決した共通のキーも返す | 404（配信元・リビジョン）・504（リビジョンの書き出しが待ち時間の上限を超えた。`RevisionExportTimeoutError`） |
 | `GET /sources/{source}/docs/{path}?ref=&id=` | 文書の値・種類のスキーマ・メタデータ（解決した共通のキーを含む）。管理用の YAML の行の文書は本文の文字列と本文のファイルのパスも返す。`converters[]` を指す種類は、スクリプトが出した Markdown か変換の失敗 | 404（配信元・リビジョン・文書）・504（リビジョンの書き出しが待ち時間の上限を超えた。`RevisionExportTimeoutError`） |
