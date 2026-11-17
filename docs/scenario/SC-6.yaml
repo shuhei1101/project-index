@@ -965,6 +965,42 @@ scenarios:
       - '`from` を指定した `list_changes` が `isError: true` で、company は区間を指定できない理由を返却する'
       - 文書 2 を編集した後の区間を省いた `list_changes` が、文書 2 だけを返却し、文書 1 を返却しない
     test: test_error_when_ref_given_to_disk_source
+  - name: 正常シナリオ（入れ子の項目の中の関連をたどる）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+        notes: '-'
+      - name: 入れ子の関連を持つ文書
+        description: sample の `nested/` に YAML の文書を 3 件置く。文書 n1 は最上位の `refs` に n2 への関連を、`functions[0].refs` に n3 への関連を持つ
+        notes: '`refs` の要素は `to`・`type` を持つ'
+      - name: 文書の行
+        description: 'sample の `project-index.yaml` の行 `nested`（`paths: [nested/*.yaml]`・`metadata: {related: "**.refs[]"}`）'
+        notes: '-'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（入れ子の項目の中の関連をたどる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant ST as 配信元の文書
+
+        A->>M: trace_related(from_ids: n1, direction: out)
+        M->>ST: n1 を参照し、**.refs[] の対応で最上位と入れ子の refs の要素を 1 つの related にまとめる
+        M-->>A: n1 から related でたどった n2 と n3
+        A->>M: trace_related(from_ids: n3, direction: in)
+        M-->>A: n3 を指す n1
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`direction: out` の `trace_related` が、n1 の最上位の `refs` の相手 n2 と、`functions[0].refs` の相手 n3 の両方を返却する'
+      - '`direction: in` の `trace_related` が、n3 を指す文書として n1 を返却する'
+      - '`search_docs` の `fields: [related]` で、n1 の `related` が最上位と入れ子の `refs` の要素を 1 つの並びで持つ'
+    test: test_normal_when_nested_related
 lead: エージェントが文書の MCP で、作業場所から使用できる配信元の文書を探して参照するシナリオを定め、調査の流れを変えるときに参照する。
 issue: 14
 primary_actor: エージェント（Claude Code）
