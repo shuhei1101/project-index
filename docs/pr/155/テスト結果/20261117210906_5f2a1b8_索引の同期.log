@@ -1,0 +1,24 @@
+$ uv run python -I /tmp/pi-check/check.py "$PWD"  # load_source（storage: disk）+ check_sync を worktree に当てる
+# import sys, tempfile
+# from pathlib import Path
+# from project_index.features.settings.types import SourceEntry
+# from project_index.features.sources.service import load_source
+# from project_index.features.documents.store import DocumentStore, check_sync
+# from project_index.features.history.snapshot import SnapshotStore
+# root = Path(sys.argv[1])
+# entry = SourceEntry.model_validate({"config": [str(root / "project-index.yaml")], "storage": {"type": "disk"}})
+# source, status = load_source(entry, index=0)
+# print(status.status, getattr(status, "errors", None))
+# store = DocumentStore(SnapshotStore(Path(tempfile.mkdtemp()) / "s"))
+# r = check_sync(store, source)
+# for k in ["missing_refs","unindexed_files","missing_body_files","unresolved_related","alias_violations","duplicate_files"]:
+#     v = getattr(r, k); print(k, len(v)); [print("  ", x) for x in v[:30]]
+スキーマの循環する参照を解かずに残した（schemas/design/layout.schema.yaml・#/$defs/entry）
+serving []
+missing_refs 0
+unindexed_files 1
+   root: .git
+missing_body_files 0
+unresolved_related 0
+alias_violations 0
+duplicate_files 0
