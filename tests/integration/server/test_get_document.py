@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -324,3 +325,47 @@ def test_normal_when_disk_storage(
     assert response.status_code == 200
     assert body["ref"] == ""
     assert body["value"]["title"] == "手元"
+
+
+# 呼ばれた回数を記録し、`{heading}` の見出しを出す
+CONVERT_VERSION = (
+    "with open({calls!r}, 'a', encoding='utf-8') as log:\n"
+    "    log.write('called\\n')\n"
+    "print({heading!r})\n"
+)
+
+
+def test_normal_when_converter_script_changed(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    write_files: Callable[[Path, dict[str, str]], None],
+    tmp_path: Path,
+) -> None:
+    """変換のスクリプトのファイルを書き換えると、文書が変わらなくても次の取得から書き換えた後のスクリプトの Markdown を返却する（正常系）。"""
+    # 準備（disk の配信元。`cache` を記載しない行のスクリプトは `# v1` を出す）
+    calls = tmp_path / "calls.log"
+    files = {
+        "project-index.yaml": PROMPT_CONFIG,
+        "schemas/prompt.schema.yaml": PROMPT_SCHEMA,
+        "scripts/convert_prompt.py": CONVERT_VERSION.format(calls=str(calls), heading="# v1"),
+        "prompts/a.yaml": "id: a\nname: 普通\n",
+    }
+    source = make_source("sample", files, branch="main", storage="disk")
+    env = make_server(source)
+    first = env.client.get("/sources/sample/docs/prompts/a.yaml")
+    second = env.client.get("/sources/sample/docs/prompts/a.yaml")
+    called = calls.read_text(encoding="utf-8").count("called")
+    write_files(
+        source.folder,
+        {"scripts/convert_prompt.py": CONVERT_VERSION.format(calls=str(calls), heading="# v2")},
+    )
+    os.utime(source.folder / "scripts/convert_prompt.py", ns=(2_000_000_000, 2_000_000_000))
+    # 実行
+    third = env.client.get("/sources/sample/docs/prompts/a.yaml")
+    # 検証
+    assert first.status_code == 200
+    assert first.json()["markdown"] == "# v1\n"
+    assert second.json()["markdown"] == "# v1\n"
+    assert called == 1
+    assert third.status_code == 200
+    assert third.json()["markdown"] == "# v2\n"

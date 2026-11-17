@@ -273,4 +273,186 @@ functions:
         mock: '`monkeypatch` で `PATH` を空のフォルダだけにし、`sys.executable` を一時フォルダの `bin/python` にする'
         expected: 先頭が一時フォルダの `bin/project-index`、後ろが `prompt-doc`
         exception: '-'
+  - name: script_stamp
+    title: スクリプトの状態
+    kind: 関数
+    container: project_index/integrations/scripts.py
+    usecase: 共通
+    role: 状態の取得
+    summary: '`run` が指すファイルのフォルダの配下（`__pycache__` を除く）の `stat` のハッシュを返却する'
+    scope: public
+    thread_safe: true
+    side_effects: フォルダの配下のファイルの `stat` を取る。`use_git` が真なら git を子プロセスでフォルダごとに 1 回呼ぶ
+    args:
+      - name: base
+        title: 基準のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: '`run` の相対パスを解くフォルダ（`target.config_base`）'
+      - name: run
+        title: コマンド
+        type: Sequence[str]
+        required: true
+        passing: positional
+        description: 検査・変換の行の `run`
+      - name: use_git
+        title: Git の配信元か
+        type: bool
+        required: true
+        passing: keyword
+        description: '`target.source.is_git`'
+    returns:
+      type: str
+      description: ハッシュ。`run` が作業ツリーのファイルを指さなければ空の文字列
+    process: |-
+      1. `_script_folders` で `run` が指すファイルのフォルダを洗い出す。無ければ空の文字列を返却する
+      2. フォルダごとに `_folder_stamps`（`use_git` を渡す）を呼んで並べ、『値のハッシュ』を返却する
+    notes:
+      フォルダの配下のファイルを見る理由: スクリプトの実行（`run_script` の `at`）は `run` の要素のファイルのフォルダをサブフォルダごと取り出して動かすため、その配下から import するファイルの書き換えでも結果が変わる。`__pycache__` はスクリプトの実行で書かれるため除き、実行のたびに状態が変わらないようにする。
+    unit_tests:
+      - name: test_script_stamp_when_script_changed
+        case: 正常
+        summary: スクリプトのファイルを書き換えると状態が変わる
+        condition: '`["python3", "scripts/a.py"]` で状態を取り、`scripts/a.py` の内容と更新時刻を変えてもう一度取る（`use_git=False`）'
+        mock: なし（一時フォルダ）
+        expected: 2 つの状態が異なり、どちらも空でない
+        exception: '-'
+      - name: test_script_stamp_when_command_only
+        case: 正常
+        summary: 作業ツリーのファイルを指さない `run` は空の文字列
+        condition: '`["project-index", "prompt-doc"]`（基準のフォルダに同じ名前のファイルが無い）'
+        mock: なし（一時フォルダ）
+        expected: 空の文字列
+        exception: '-'
+  - name: _script_folders
+    title: スクリプトのフォルダ
+    container: project_index/integrations/scripts.py
+    usecase: 共通
+    summary: '`run` の要素のうち基準のフォルダから解いてファイルがあるものの、フォルダを返却する'
+    kind: 関数
+    scope: internal
+    args:
+      - name: base
+        title: 基準のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: '`run` の相対パスを解くフォルダ'
+      - name: run
+        title: コマンド
+        type: Sequence[str]
+        required: true
+        passing: positional
+        description: 検査・変換の行の `run`
+    returns:
+      type: set[Path]
+      description: フォルダ
+    process: |-
+      1. `run` の要素のうち、`-` で始まるものと絶対パスを除く
+      2. 残りを `base` から解き、ファイルがあればそのフォルダを加える
+  - name: _folder_stamps
+    title: フォルダの配下の状態
+    container: project_index/integrations/scripts.py
+    usecase: 共通
+    summary: フォルダの配下のファイルの (基準のフォルダからの相対パス, 更新時刻, 大きさ) をパスの順に返却する
+    kind: 関数
+    scope: internal
+    side_effects: フォルダの配下のファイルの `stat` を取る
+    args:
+      - name: base
+        title: 基準のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: 相対パスの基準
+      - name: folder
+        title: フォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: たどるフォルダ
+      - name: use_git
+        title: Git の配信元か
+        type: bool
+        required: true
+        passing: keyword
+        description: 真なら Git が管理・無視していないファイルだけを走査する
+    returns:
+      type: list[tuple[str, int, int]]
+      description: (相対パス, `st_mtime_ns`, `st_size`) の並び
+    process: |-
+      1. フォルダの配下のファイルを `_folder_files` で列挙する
+         - `use_git` が真の場合、フォルダで `git ls-files -z --cached --others --exclude-standard -- .` を呼ぶ（Git が管理するファイルと、追跡していないが無視していないファイル。`git archive` が取り出す範囲と揃える）
+         - 偽の場合（Git の管理外の配信元）、サブフォルダまでたどる
+         - どちらも `__pycache__` のフォルダの配下は除く
+      2. ファイルごとに (相対パス, `st_mtime_ns`, `st_size`) をパスの順に並べる。`stat` が `OSError`（列挙の後に消えた・リンク先が無い）のファイルは (相対パス, -1, -1) にして続ける
+  - name: _folder_files
+    title: フォルダの配下のファイル
+    container: project_index/integrations/scripts.py
+    usecase: 共通
+    summary: フォルダの配下のファイルを、`__pycache__` の配下を除いてパスの順に返却する
+    kind: 関数
+    scope: internal
+    args:
+      - name: folder
+        title: フォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: 列挙するフォルダ
+      - name: use_git
+        title: Git の配信元か
+        type: bool
+        required: true
+        passing: keyword
+        description: 真なら `_git_files`、偽なら `_walked_files` で列挙する
+    returns:
+      type: list[Path]
+      description: ファイルの絶対パス
+    process: |-
+      1. `use_git` が真なら `_git_files`、偽なら `_walked_files` で列挙する
+         - `_git_files` が `GitError` を送った場合（フォルダが Git のリポジトリの外にある・git が待ち時間の上限を超えた）、WARNING のログを出し、そのフォルダは `_walked_files` で列挙して続ける
+      2. フォルダからの相対パスに `__pycache__` を含むものを除き、パスの順に返却する
+  - name: _git_files
+    title: Git の対象のファイル
+    container: project_index/integrations/scripts.py
+    usecase: 共通
+    summary: Git が管理するファイルと、追跡していないが無視していないファイルを返却する
+    kind: 関数
+    scope: internal
+    side_effects: git を子プロセスで 1 回呼ぶ
+    args:
+      - name: folder
+        title: フォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: git を呼ぶフォルダ
+    returns:
+      type: list[Path]
+      description: ファイルの絶対パス
+    process: |-
+      1. フォルダで `git ls-files -z --cached --others --exclude-standard -- .` を呼ぶ（`GitError` はそのまま伝わり、`_folder_files` が扱う）
+      2. 出力を NUL で分け、フォルダにつないだパスを返却する
+  - name: _walked_files
+    title: たどったファイル
+    container: project_index/integrations/scripts.py
+    usecase: 共通
+    summary: サブフォルダまでたどったファイルを返却する（`__pycache__` のフォルダはたどらない）
+    kind: 関数
+    scope: internal
+    args:
+      - name: folder
+        title: フォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: たどるフォルダ
+    returns:
+      type: list[Path]
+      description: ファイルの絶対パス
+    process: |-
+      1. `os.walk` でサブフォルダまでたどり、`__pycache__` のフォルダはたどらない
+      2. ファイルのパスを返却する
 visibility: internal

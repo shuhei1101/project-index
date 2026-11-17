@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from dataclasses import replace
 from types import SimpleNamespace
@@ -276,6 +277,81 @@ def test_convert_service_convert_when_default_ref(
     # 検証
     assert result.failure is None
     assert result.markdown.strip() == "# develop"
+
+
+def test_convert_service_convert_when_script_changed(
+    tmp_path: Path,
+    make_converted_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+) -> None:
+    """スクリプトのファイルを書き換えたら、書き換えた後のスクリプトで再び変換する（正常系）。"""
+    # 準備
+    target = make_converted_target(
+        converter="c",
+        converters=[ScriptEntry(id="c", run=[sys.executable, "scripts/convert.py"])],
+    )
+    script = target.config_base / "scripts" / "convert.py"
+    script.parent.mkdir(parents=True)
+    script.write_text('print("# v1")\n', encoding="utf-8")
+    os.utime(script, ns=(1_000_000_000, 1_000_000_000))
+    service = _service(tmp_path, {})
+    document = make_document()
+    first = service.convert(target, document)
+    second = service.convert(target, document)
+    script.write_text('print("# v2")\n', encoding="utf-8")
+    os.utime(script, ns=(2_000_000_000, 2_000_000_000))
+    # 実行
+    third = service.convert(target, document)
+    # 検証
+    assert first.markdown.strip() == "# v1"
+    assert second.markdown.strip() == "# v1"
+    assert third.markdown.strip() == "# v2"
+
+
+def test_convert_service_convert_when_config_commit_changed(
+    tmp_path: Path,
+    make_converted_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """スクリプトを取り出す commit が変わったら、その commit のスクリプトで再び変換する（正常系）。"""
+    # 準備
+    ats: list[object] = []
+
+    def fake_run_script(run: Any, **kwargs: Any) -> ScriptResult:
+        ats.append(kwargs.get("at"))
+        return ScriptResult(stdout="# 変換した\n", stderr="")
+
+    monkeypatch.setattr(service_module, "run_script", fake_run_script)
+    base = make_converted_target(
+        converter="c", converters=[ScriptEntry(id="c", run=["python3", "scripts/c.py"])]
+    )
+    root = base.source.root
+    first = replace(
+        base,
+        source=replace(
+            base.source,
+            is_git=True,
+            repo_root=root,
+            main_root=root,
+            config_commit="1111111111111111111111111111111111111111",
+        ),
+    )
+    second = replace(
+        first,
+        source=replace(first.source, config_commit="2222222222222222222222222222222222222222"),
+    )
+    service = _service(tmp_path, {})
+    document = make_document()
+    # 実行
+    service.convert(first, document)
+    service.convert(first, document)
+    service.convert(second, document)
+    # 検証
+    assert ats == [
+        (root, "1111111111111111111111111111111111111111"),
+        (root, "2222222222222222222222222222222222222222"),
+    ]
 
 
 # 本文の `body` と、`x-heading: 処理の流れ` の `flow` を持つスキーマ

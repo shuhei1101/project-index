@@ -13,6 +13,9 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
+from project_index.integrations.git import GitError, run_git
+from project_index.shared.hashing import value_hash
+
 if TYPE_CHECKING:
     from collections.abc import Generator, Mapping, Sequence
 
@@ -21,6 +24,10 @@ logger = logging.getLogger(__name__)
 STDERR_TAIL_LINES = 5
 KILL_GRACE_SEC = 2
 SCRIPT_SUFFIXES = (".py", ".sh", ".js", ".ts")
+# スクリプトの実行で書かれ、スクリプトの状態に含めないフォルダ
+_SCRIPT_CACHE_DIR = "__pycache__"
+# 状態を取れなかったファイルの更新時刻と大きさ
+_UNKNOWN_STAT = -1
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -210,3 +217,79 @@ def _run(
             stdout=out_text,
         )
     return ScriptResult(stdout=out_text, stderr=err_text)
+
+
+def script_stamp(base: Path, run: Sequence[str], *, use_git: bool) -> str:
+    """`run` が指すファイルのフォルダの配下（`__pycache__` を除く）の `stat` のハッシュを返す。"""
+    folders = _script_folders(base, run)
+    # 作業ツリーにスクリプトのファイルが無い（コマンドだけの `run`）
+    if not folders:
+        return ""
+    stamps: list[tuple[str, int, int]] = []
+    for folder in sorted(folders):
+        stamps.extend(_folder_stamps(base, folder, use_git=use_git))
+    return value_hash(stamps)
+
+
+def _script_folders(base: Path, run: Sequence[str]) -> set[Path]:
+    """`run` の要素のうち `base` から解いてファイルがあるものの、フォルダを返す。"""
+    folders: set[Path] = set()
+    for item in run:
+        # オプションと絶対パス（インタープリターなど）は作業ツリーのスクリプトではない
+        if item.startswith("-") or Path(item).is_absolute():
+            continue
+        path = base / item
+        if path.is_file():
+            folders.add(path.parent)
+    return folders
+
+
+def _folder_files(folder: Path, *, use_git: bool) -> list[Path]:
+    """フォルダの配下のファイルを、`__pycache__` の配下を除いてパスの順に返す。"""
+    # Git の配信元は `git archive` が取り出す範囲、管理外はサブフォルダまで全て
+    if use_git:
+        try:
+            files = _git_files(folder)
+        except GitError as error:
+            # リポジトリの外のフォルダ・git の待ち時間の超過: たどって状態を作り、検索を止めない
+            logger.warning("スクリプトのフォルダを git で列挙できない（%s）: %s", folder, error)
+            files = _walked_files(folder)
+    else:
+        files = _walked_files(folder)
+    return sorted(
+        {path for path in files if _SCRIPT_CACHE_DIR not in path.relative_to(folder).parts}
+    )
+
+
+def _git_files(folder: Path) -> list[Path]:
+    """Git が管理するファイルと、追跡していないが無視していないファイルを返す。"""
+    output = run_git(
+        ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "."],
+        cwd=folder,
+    )
+    text = output if isinstance(output, str) else output.decode("utf-8")
+    return [folder / name for name in text.split("\0") if name]
+
+
+def _walked_files(folder: Path) -> list[Path]:
+    """サブフォルダまでたどったファイルを返す（`__pycache__` のフォルダはたどらない）。"""
+    files: list[Path] = []
+    for current, dirs, names in os.walk(folder):
+        dirs[:] = [name for name in dirs if name != _SCRIPT_CACHE_DIR]
+        files.extend(Path(current) / name for name in names)
+    return files
+
+
+def _folder_stamps(base: Path, folder: Path, *, use_git: bool) -> list[tuple[str, int, int]]:
+    """フォルダの配下のファイルの (`base` からの相対パス, 更新時刻, 大きさ) をパスの順に返す。"""
+    stamps: list[tuple[str, int, int]] = []
+    for path in _folder_files(folder, use_git=use_git):
+        relative = Path(os.path.relpath(path, base)).as_posix()
+        try:
+            stat = path.stat()
+        except OSError:
+            # 列挙の後に消えた・リンク先が無い: 取れなかったことを値にして続ける
+            stamps.append((relative, _UNKNOWN_STAT, _UNKNOWN_STAT))
+            continue
+        stamps.append((relative, stat.st_mtime_ns, stat.st_size))
+    return stamps
