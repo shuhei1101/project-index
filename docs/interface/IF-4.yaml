@@ -550,6 +550,9 @@ constraints:
     notes: '`git log -S`（正規表現は `--pickaxe-regex`）と同じ当て方で、マージ commit も見ない。語を含む行を書き換えただけで出現数が同じ commit、マージの競合の解消で入った語は返さない'
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、前回読んだ時点からの変更だけを返す。`from`・`to`・`worktree` を指定すると `InvalidArgumentError`'
+  - item: ワークツリーの配信元の設定
+    constraint: '`worktree` を指定したときと `cwd` がワークツリーの中のときは、今の内容をそのワークツリーの配信元の設定（`documents` の行）で集める'
+    notes: 文書の検索の同じ制約と同じ読み込みを使う
 refs:
   - to: SC-8
     item: scenarios[正常シナリオ]

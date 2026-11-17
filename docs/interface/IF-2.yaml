@@ -945,6 +945,37 @@ flows:
       - '`isError: true` で、company が disk の配信元のため `ref` を指定できない理由を返す'
       - '`worktree` を指定しても同じ理由の `isError: true` を返す'
     test: test_error_when_ref_given_to_disk_source
+  - name: 正常系（ワークツリーにだけある行）
+    summary: ワークツリーの配信元の設定にだけある documents の行の文書を返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: ワークツリー
+        description: 'sample の `.claude/worktrees/x`。配信元の設定に、クローン本体に無い行 `notes`（`paths: [notes/*.yaml]`）と、その行の文書 `notes/N-1.yaml` を加えてある'
+        notes: サーバーを起動した後に加え、`reload` は呼ばない
+      - name: 入力
+        description: 1 回目は `worktree` に x のパス、2 回目は `cwd` を x の中にして `worktree` を省く。どちらも `filter` は `kind` が `notes`
+    flow: |-
+      <!-- map: {"title": "正常系（ワークツリーにだけある行）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+        participant WT as ワークツリー x
+
+        C->>T: worktree: x, filter（kind が notes）
+        T->>T: worktree が worktrees に当たる
+        T-->>WT: 配信元の設定を再読み込みし、その documents の行で文書を読む
+        T-->>C: N-1
+      ```
+
+      <!-- /map -->
+    expected:
+      - どちらの呼び出しも `N-1` を返す
+      - '`worktree` を渡した `group_by: kind` の集計に `notes` がある'
+      - '`cwd` がクローン本体で `worktree` を省くと、`N-1` を返さない'
+    test: test_normal_when_worktree_adds_row
 lead: '条件に該当する文書の取得・一覧・件数・集計を返却する `search_docs` の入出力を定め、`search_docs` を修正するときに参照する。'
 tags:
   - name: topic:クエリ
@@ -1394,6 +1425,9 @@ constraints:
     notes: 文書の MCP の全てのツールに共通する
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、作業場所が `worktrees[]` に当たっても登録したフォルダの文書を返す。`ref`・`worktree` を指定すると `InvalidArgumentError`。ファイルの日時は文書の `created`・`updated` の値（無ければ空）'
+  - item: ワークツリーの配信元の設定
+    constraint: '`worktree` を指定したときと `cwd` がワークツリーの中のときは、そのワークツリーの配信元の設定（`documents` の行）で文書を集める'
+    notes: 設定はワークツリーの文書の読み込みと同じく、ファイルが変わっていなければ再読み込みしない
 refs:
   - to: SC-6
     item: scenarios[正常シナリオ]
