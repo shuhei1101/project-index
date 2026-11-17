@@ -27,6 +27,20 @@ PROMPT_ROWS = (
     "    schema: schemas/prompt.schema.yaml\n"
 )
 
+# 行 `rules`（`docs/`）と行 `notes`（`notes/`）を、この順に持つ配信元の設定
+IDS_OVERLAP_CONFIG = (
+    'version: "3"\n'
+    "name: sample\n"
+    "default_ref: develop\n"
+    "documents:\n"
+    "  - id: rules\n"
+    "    paths: [docs/*.yaml]\n"
+    "    schema: schemas/sample.schema.yaml\n"
+    "  - id: notes\n"
+    "    paths: [notes/*.yaml]\n"
+    "    schema: schemas/sample.schema.yaml\n"
+)
+
 
 # 行 `src`（管理用の YAML）・行 `yaml`（src の YAML）・無効の行 `off` が、`src/` の同じファイルを指す
 SHARED_FILE_ROWS = (
@@ -176,6 +190,45 @@ def test_normal_when_rows_share_file(
     assert result.data["sync"]["duplicate_files"] == 1
     items = [item for item in result.data["sync"]["items"] if item["kind"] == "duplicate_files"]
     assert [item["path"] for item in items] == ["src/a.yaml: src・yaml"]
+    # `src/a.yaml` の 2 つの文書の ID の重なりは、同じファイルの重なりのため数えない
+    assert result.data["sync"]["duplicate_ids"] == 0
+
+
+def test_normal_when_ids_overlap(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """ID が先の文書と重なり配信から除外した文書を、同期の件数と内訳で返却する（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "project-index.yaml": IDS_OVERLAP_CONFIG,
+            "docs/a.yaml": "id: a\nname: A\n",
+            "docs/b.yaml": "id: a\nname: B\n",
+            "notes/c.yaml": "id: a\nname: C\n",
+            "notes/d.yaml": "id: d\nname: D\n",
+        }
+    )
+    del files["docs/doc-1.yaml"]
+    del files["docs/doc-2.yaml"]
+    sample = make_source("sample", files, git=False)
+    env = make_server(sample)
+    # 実行
+    result = env.call_admin("check_project", path=str(sample.folder), format="json")
+    # 検証
+    assert not result.is_error
+    assert "violations" not in result.data
+    assert result.data["sync"]["duplicate_ids"] == 2
+    assert result.data["sync"]["duplicate_files"] == 0
+    items = [
+        item["path"] for item in result.data["sync"]["items"] if item["kind"] == "duplicate_ids"
+    ]
+    assert items == [
+        "a: rules（docs/a.yaml）・rules（docs/b.yaml）",
+        "a: rules（docs/a.yaml）・notes（notes/c.yaml）",
+    ]
+    assert not any("notes/d.yaml" in item["path"] for item in result.data["sync"]["items"])
 
 
 def test_normal_when_nested_index_and_exclude_path(
