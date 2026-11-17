@@ -45,6 +45,15 @@ files:
   related:
   - to: IF-32
     type: tests
+- path: integration/server/test_changed.py
+  name: 中身が変わったファイルの一覧の結合テスト
+  description: '`changed` の結合テストを受け持ち、中身が変わったファイルの一覧の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-106-2
+    type: tests
 - path: integration/server/test_check_project.py
   name: 配信元の検査の結合テスト
   description: '`check_project` の結合テストを受け持ち、配信元の検査の振る舞いのテストを修正するときに参照する。'
@@ -53,6 +62,15 @@ files:
   - tool:pytest
   related:
   - to: IF-12
+    type: tests
+- path: integration/server/test_checkpoint.py
+  name: 確認の時点の記録の結合テスト
+  description: '`checkpoint` の結合テストを受け持ち、確認の時点の記録の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-106-3
     type: tests
 - path: integration/server/test_delete_docs.py
   name: 文書の削除の結合テスト
@@ -197,6 +215,15 @@ files:
   - tool:pytest
   related:
   - to: IF-16
+    type: tests
+- path: integration/server/test_outline.py
+  name: ファイルのアウトラインの結合テスト
+  description: '`outline` の結合テストを受け持ち、ファイルのアウトラインの振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-106-1
     type: tests
 - path: integration/server/test_patch_settings_source.py
   name: 端末の設定の配信元の 1 行の変更の結合テスト
