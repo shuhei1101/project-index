@@ -31,6 +31,7 @@ SYNC_LABELS = {
     "missing_body_files": "ファイルが無い行",
     "unresolved_related": "どの文書にも該当しない関連",
     "duplicate_files": "2 つ以上の行が文書にするファイル",
+    "duplicate_ids": "ID が重なる文書",
 }
 
 
@@ -51,6 +52,7 @@ def _source_row(state: SourceState) -> str:
             + state.sync.missing_body_files
             + state.sync.unresolved_related
             + state.sync.duplicate_files
+            + state.sync.duplicate_ids
         )
     return f"| {state.id} | {status} | {version} | {sync} |"
 
@@ -135,6 +137,7 @@ def _sync_lines(sync: CheckSync) -> list[str]:
         "missing_body_files": sync.missing_body_files,
         "unresolved_related": sync.unresolved_related,
         "duplicate_files": sync.duplicate_files,
+        "duplicate_ids": sync.duplicate_ids,
     }
     gaps = [f"{SYNC_LABELS[kind]} {count} 件" for kind, count in counts.items() if count]
     lines = [f"索引の同期: {'、'.join(gaps) if gaps else 'ずれなし'}"]

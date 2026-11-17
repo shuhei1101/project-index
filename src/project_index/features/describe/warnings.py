@@ -65,6 +65,7 @@ def _sync_warnings(source_id: str, check: SourceCheck) -> list[str]:
             ("ファイルが無い行", report.missing_body_files),
             ("どの文書にも該当しない関連", report.unresolved_related),
             ("2 つ以上の行が文書にするファイル", report.duplicate_files),
+            ("ID が重なる文書", report.duplicate_ids),
         )
         if values
     ]
