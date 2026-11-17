@@ -1,0 +1,19 @@
+docs:
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: setup の了承の説明と「プロンプトを配信する」の手順 1 のコピーに、共通の型 common.schema.yaml を追加する
+    status: todo
+  - page: docs/guide/設定.md
+    new: false
+    change: '`## 雛形` の表に schemas/common.schema.yaml の行を追加する'
+    status: todo
+scope_out:
+  - item: プロンプトのスキーマ自体のコピー先に既にファイルがあるときの扱い
+    reason: 要望は共通の型のコピーの欠けで、プロンプトのスキーマのコピーの扱いは変えない
+    plan: none
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: changed
+    detail: プロンプトのフォルダを見つけて了承したとき、プロンプトのスキーマと参照先の共通の型を配信元へ配置する
+    depends_on: []
