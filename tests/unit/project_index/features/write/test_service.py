@@ -1226,7 +1226,9 @@ def _body_words() -> dict[str, str]:
     [
         pytest.param(None, [(0, "n1", "updated", 2)], "# 新語\n新語と別の語\n", id="all"),
         pytest.param(["name"], [], "# 旧語\n旧語と別の語\n", id="name_only"),
-        pytest.param(["@body"], [(0, "n1", "updated", 2)], "# 新語\n新語と別の語\n", id="body_only"),
+        pytest.param(
+            ["@body"], [(0, "n1", "updated", 2)], "# 新語\n新語と別の語\n", id="body_only"
+        ),
     ],
 )
 def test_write_docs_when_replace_text_body(

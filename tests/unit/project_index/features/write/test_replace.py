@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 
 from project_index.features.write.replace import replace_in_body, replace_in_values
-
 from project_index.shared.yaml_io import load_roundtrip
 
 CONTENT = "description: 旧語\nitems:\n  - text: 旧語と旧語\nnotes:\n  旧語: 旧語\ncount: 3\n"
