@@ -531,6 +531,9 @@ exceptions:
   - name: SourceNotReadableError
     condition: '`cwd` が配信元の `scope.read`・`scope.write` に当たらない（`outside_scope: true` のときは、加えて `outside_read` が偽）'
     notes: '`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に参照できることを添える'
+  - name: ValidationFailedError
+    condition: '`worktree` か `cwd` が指すワークツリーの配信元の設定が検証に通らない'
+    notes: 文書の検索と同じ返却。結合テストは文書の検索に置く
 constraints:
   - item: 件数
     constraint: '`limit` は最大 100'

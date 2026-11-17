@@ -976,6 +976,35 @@ flows:
       - '`worktree` を渡した `group_by: kind` の集計に `notes` がある'
       - '`cwd` がクローン本体で `worktree` を省くと、`N-1` を返さない'
     test: test_normal_when_worktree_adds_row
+  - name: 異常系（ワークツリーの設定が検証に通らない・ValidationFailedError）
+    summary: ワークツリーの配信元の設定が検証に通らなければ、違反を添えて断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: ワークツリー
+        description: 'sample の `.claude/worktrees/x`。配信元の設定の documents の行に、知らないキー `typo: x` を加えてある'
+        notes: クローン本体の設定は検証に通る
+    flow: |-
+      <!-- map: {"title": "異常系（ワークツリーの設定が検証に通らない・ValidationFailedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+        participant WT as ワークツリー x
+
+        C->>T: worktree: x
+        T-->>WT: 配信元の設定を再読み込みする
+        T->>T: 設定が検証に通らない
+        T-->>C: isError（ValidationFailedError・違反）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、`ValidationFailedError` と、`documents[0].typo` の違反を返す'
+      - クローン本体の設定で集めた文書を返さない
+      - '`cwd` がクローン本体で `worktree` を省くと、これまでどおり文書を返す'
+    test: test_error_when_worktree_config_invalid
 lead: '条件に該当する文書の取得・一覧・件数・集計を返却する `search_docs` の入出力を定め、`search_docs` を修正するときに参照する。'
 tags:
   - name: topic:クエリ
@@ -1370,6 +1399,9 @@ exceptions:
   - name: UnexpectedError
     condition: '`ProjectIndexError` でない例外（`GitError` など）で処理を終了できなかった'
     notes: 例外の型と内容を返却する。サーバーのログには例外のトレースバックを残す
+  - name: ValidationFailedError
+    condition: '`worktree` か `cwd` が指すワークツリーの配信元の設定が検証に通らない'
+    notes: 違反ごとのパス・決まりを添える。クローン本体の設定で集め直さない（書き込みと同じ扱い）
 constraints:
   - item: 件数
     constraint: '`limit` は最大 100'
