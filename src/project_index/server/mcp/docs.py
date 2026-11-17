@@ -180,7 +180,10 @@ def _wait_target(request: BaseModel) -> dict[str, Any]:
 
 
 def _worktree_target(
-    request: SearchRequest | WriteRequest | DeleteRequest, handlers: Handlers
+    request: SearchRequest | WriteRequest | DeleteRequest,
+    handlers: Handlers,
+    *,
+    reload_worktree: bool,
 ) -> Target | None:
     """要求が指すワークツリーの場所を解く（ワークツリーでなければ `None`）。"""
     if isinstance(request, SearchRequest):
@@ -190,6 +193,7 @@ def _worktree_target(
             worktree=request.worktree,
             cwd=request.cwd,
             outside_scope=request.outside_scope,
+            reload_worktree=reload_worktree,
         )
         # 複数の配信元を横断する要求は、ワークツリーを指さない
         if len(targets) != 1:
@@ -201,8 +205,21 @@ def _worktree_target(
             source=request.source,
             worktree=request.worktree,
             cwd=request.cwd,
+            reload_worktree=reload_worktree,
         )
     return target if target.worktree is not None else None
+
+
+def _load_worktree(
+    request: SearchRequest | WriteRequest | DeleteRequest, handlers: Handlers
+) -> object:
+    """ワークツリーの設定を再読み込みして場所を解き直し、まだ読み込んでいなければ文書を集める。"""
+    # 再読み込みは設定が変わっていなければキャッシュで返り、検証に通らなければ例外を伝える
+    target = _worktree_target(request, handlers, reload_worktree=True)
+    # 解き直した場所がワークツリーでないか、読み込み済みなら集めない
+    if target is None or handlers.store.has_worktree(target):
+        return None
+    return handlers.store.load(target)
 
 
 async def _ensure_worktree(
@@ -214,17 +231,19 @@ async def _ensure_worktree(
     if isinstance(request, SearchRequest) and request.ref is not None:
         return
     try:
-        target = await asyncio.to_thread(_worktree_target, request, handlers)
+        # 待つワークツリーを決めるだけなので、ワークツリーの設定は再読み込みしない
+        target = await asyncio.to_thread(_worktree_target, request, handlers, reload_worktree=False)
     except ProjectIndexError:
         # 解けない要求は、サービスが同じ解決で同じエラーを返す
         return
-    if target is None or handlers.store.has_worktree(target):
+    if target is None:
         return
     root = target.base
     task = loads.get(root)
     # 同じワークツリーの読み込みは 1 つだけ動かし、後の要求は同じ読み込みを待つ
     if task is None or task.done():
-        task = asyncio.ensure_future(asyncio.to_thread(handlers.store.load, target))
+        # 設定の再読み込みと文書の読み込みを、待ちの上限の内で待つ 1 つのタスクにする
+        task = asyncio.ensure_future(asyncio.to_thread(_load_worktree, request, handlers))
         loads[root] = task
 
         def forget(done: asyncio.Future[object], root: Path = root) -> None:

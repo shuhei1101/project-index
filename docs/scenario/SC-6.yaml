@@ -1004,6 +1004,39 @@ scenarios:
       - '`search_docs` の `fields: [related]` で、n1 の `related` が最上位と入れ子の `refs` の要素を 1 つの並びで持つ'
       - '`search_docs` の `fields: [related]` で、`refs` を持たない n2 は `related` を持たない'
     test: test_normal_when_nested_related
+  - name: 正常シナリオ（ワークツリーにだけある行の文書を引く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+      - name: ワークツリー
+        description: 'sample の `.claude/worktrees/x`。配信元の設定に、クローン本体に無い documents の行 `notes`（`paths: [notes/*.yaml]`）を加え、その行の文書 `notes/N-1.yaml` と、`notes/N-1.yaml` を `related` で指す文書 1 を置いて commit してある'
+        notes: 配信元の設定の `worktrees` は既定（`[./.claude/worktrees/*]`）。`list_changes` は `from` にワークツリーの分岐元の commit を渡す
+      - name: project-index
+        description: sample を配信している project-index
+        notes: 起動した後にワークツリーの設定を変え、`reload` は呼ばない。`cwd` は sample のクローン本体
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（ワークツリーにだけある行の文書を引く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: search_docs(worktree: ワークツリー x のパス, filter: kind が notes)
+        M->>M: worktree が worktrees に当たる
+        M->>WT: 配信元の設定を再読み込みし、その documents の行で文書を読む
+        M-->>A: notes/N-1.yaml の文書
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`worktree` を渡した `search_docs` が、`kind` で絞っても `group_by: kind` でも、行 `notes` の文書 `N-1` を返す'
+      - '`worktree` を省き `cwd` をワークツリー x の中にした `search_docs` も、`N-1` を返す'
+      - '`worktree` を渡した `trace_related`（`from_ids` に文書 1、`direction: out`）が `N-1` を返す'
+      - '`worktree` を渡した `list_changes` が、追加した文書に `N-1` を返す'
+      - '`worktree` も省き `cwd` がクローン本体の `search_docs` は、`N-1` を返さない'
+    test: test_normal_when_worktree_adds_row
 lead: エージェントが文書の MCP で、作業場所から使用できる配信元の文書を探して参照するシナリオを定め、調査の流れを変えるときに参照する。
 tags:
   - name: topic:クエリ

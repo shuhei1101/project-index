@@ -1,0 +1,70 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: changed
+    detail: 初回の setup の後に索引の同期の件数が 0 になり、直下の管理用の YAML の候補に深い管理用の YAML の範囲と記載しないフォルダのファイルが出ない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: changed
+    detail: ワークツリーを指定した調査で、そのワークツリーの配信元の設定に加えた行の文書も見つかる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: run_only
+    detail: ワークツリーにだけある行の文書を読んでから書き換えられる。書き込みの場所の解決は変えないが、読み取りの場所の解決を共有する
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: run_only
+    detail: 配信元の設定を変えた後の check_project の索引の同期の判定が変わる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-8.yaml
+    impact: run_only
+    detail: ワークツリーを指定した変更の一覧の読み取りの場所の解決が変わる
+    depends_on: []
+docs:
+  - page: docs/guide/設定.md
+    new: false
+    change: '`documents[].exclude[]` の書き方（`/` を含む値）と、「索引に無いファイル」の数えないファイルに深い管理用の YAML の範囲を加える（要件の #133 の案で確定した内容）'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T10:22:18.890745+00:00'
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: '`unindexed_files` の説明の数えないファイルを、判定の修正に合わせる'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T10:22:18.890745+00:00'
+  - page: docs/guide/CLI.md
+    new: false
+    change: '`project-index files` の `--exclude` の書き方を、`documents[].exclude[]` の修正に合わせる'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T10:22:18.890745+00:00'
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: setup の初回に作る `project-index.yaml`・`schemas/*.yaml` の扱いと、直下の管理用の YAML の範囲の説明を、決めた案に合わせる
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T10:22:18.890745+00:00'
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: '`worktree` の説明に、そのワークツリーの配信元の設定の行で文書を集めることを加える'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T10:22:18.890745+00:00'
+  - page: plugins/project-index/skills/setup/SKILL.md
+    new: false
+    change: 手順 4 の `--exclude` の指定と、手順 5 の初回に作るファイルの扱いを、決めた案に合わせる
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T10:22:18.890745+00:00'
+scope_out:
+  - item: project-index 自身の配信元に直下の管理用の YAML を配置し、直下の 10 件と `docs/` 直下の 2 件を記載する
+    reason: この作業 PR は判定の修正だけを扱う。配信元の設定の見直しは、修正した判定を前提にする後続の作業
+    plan: '#149'
+  - item: 2 つの documents の行が同じファイルを文書にする配置を check_project で検出する
+    reason: 索引の同期でなく設定の検査の不具合で、要望に含まれない
+    plan: '#136'

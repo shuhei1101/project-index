@@ -134,7 +134,7 @@ data_models:
         type: list[str]
         access: 公開
         default: '[]'
-        description: '`paths` に当たったファイルのうち、ファイル名（最後の段）が当たれば行の文書にしない glob の並び'
+        description: '`paths` に当たったファイルのうち、当たれば行の文書にしない glob の並び。`/` を含まない値はファイル名（最後の段）、含む値は配信元の直下からのパスに当てる'
       - name: alias_type
         title: 引用の種類
         type: str | None
@@ -157,7 +157,7 @@ data_models:
         returns:
           type: bool
           description: 当たれば `True`
-        process: 1. `PurePosixPath(PurePosixPath(path).name)` が `exclude` のどれかに `full_match` で当たれば `True` を返す（`*` は名前の中だけに当たる）
+        process: 1. `exclude` の値ごとに、`/` を含まない値は `PurePosixPath(PurePosixPath(path).name)`、含む値は `PurePosixPath(path)` が `full_match` で当たるかを確かめ、どれかに当たれば `True` を返す（`*` は名前の中だけ、`**` は 0 個以上のフォルダに当たる）
         unit_tests:
           - name: test_document_table_excludes
             case: 正常
@@ -165,6 +165,13 @@ data_models:
             condition: '`exclude: [README.md, "_*.yaml"]` で `docs/a/README.md`・`docs/_x.yaml`・`docs/README.md/a.md`'
             mock: なし
             expected: '`True`・`True`・`False`'
+            exception: '-'
+          - name: test_document_table_excludes_when_path_pattern
+            case: 正常
+            summary: '`/` を含む値はパスで当てる'
+            condition: '`exclude: ["docs/pr/**", README.md]` で `docs/pr/1/a.md`・`docs/prx/a.md`・`x/docs/pr/a.md`・`docs/README.md`'
+            mock: なし
+            expected: '`True`・`False`・`False`・`True`'
             exception: '-'
       - name: matches
         title: 行に当たるか

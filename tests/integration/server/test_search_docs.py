@@ -382,6 +382,74 @@ def test_normal_when_worktree(
     assert f'<document path="{source.folder}/docs/doc-1.yaml" scope="full">' in by_clone.text
 
 
+def test_normal_when_worktree_adds_row(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_config_text: Callable[..., str],
+    sample_doc_text: Callable[..., str],
+) -> None:
+    """ワークツリーの配信元の設定にだけある documents の行の文書を返す（正常系）。"""
+    # 準備
+    source = make_source("sample")
+    worktree = add_worktree(source.folder, "x")
+    env = make_server(source)
+    notes_row = "  - id: notes\n    paths: [notes/*.yaml]\n    schema: schemas/sample.schema.yaml\n"
+    (worktree / "project-index.yaml").write_text(sample_config_text(notes_row), encoding="utf-8")
+    (worktree / "notes").mkdir()
+    (worktree / "notes" / "N-1.yaml").write_text(
+        sample_doc_text("N-1", "ノート 1"), encoding="utf-8"
+    )
+    notes = {"field": "kind", "op": "eq", "values": ["notes"]}
+    # 実行
+    by_worktree = env.call(
+        "search_docs", cwd=str(source.folder), worktree=str(worktree), filter=notes, format="json"
+    )
+    by_cwd = env.call("search_docs", cwd=str(worktree), filter=notes, format="json")
+    grouped = env.call(
+        "search_docs",
+        cwd=str(source.folder),
+        worktree=str(worktree),
+        view="count",
+        group_by="kind",
+        format="json",
+    )
+    by_clone = env.call("search_docs", cwd=str(source.folder), filter=notes, format="json")
+    # 検証
+    assert [item["id"] for item in by_worktree.data["items"]] == ["N-1"]
+    assert [item["id"] for item in by_cwd.data["items"]] == ["N-1"]
+    assert {"value": "notes", "count": 1} in grouped.data["groups"]
+    assert not by_clone.data.get("items")
+
+
+def test_error_when_worktree_config_invalid(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """ワークツリーの配信元の設定が検証に通らなければ、違反を添えて断る（異常系）。"""
+    # 準備
+    source = make_source("sample")
+    worktree = add_worktree(source.folder, "x")
+    env = make_server(source)
+    (worktree / "project-index.yaml").write_text(
+        sample_config_text().replace(
+            "    paths: [docs/*.yaml]\n", "    paths: [docs/*.yaml]\n    typo: x\n"
+        ),
+        encoding="utf-8",
+    )
+    # 実行
+    by_worktree = env.call("search_docs", cwd=str(source.folder), worktree=str(worktree))
+    by_clone = env.call("search_docs", cwd=str(source.folder), filter=DOC_1)
+    # 検証
+    assert by_worktree.is_error
+    assert "ValidationFailedError" in by_worktree.text
+    assert "documents[0].typo" in by_worktree.text
+    assert not by_clone.is_error
+    assert "doc-1" in by_clone.text
+
+
 def test_normal_when_seen(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],

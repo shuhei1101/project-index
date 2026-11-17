@@ -85,6 +85,19 @@ def test_normal_when_exclude_path_given(
     assert capsys.readouterr().out == "src/a.py\nsrc/b.py\nsrc/uv.lock\n"
 
 
+def test_normal_when_exclude_has_path(
+    range_folder: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`--exclude` の `/` を含む値に当たるパスのファイルを外す（正常系）。"""
+    # 準備
+    arguments = ["files", "--root", str(range_folder), "--paths", "**", "--exclude", "src/b.py"]
+    # 実行
+    code = main(arguments)
+    # 検証
+    assert code == 0
+    assert capsys.readouterr().out == "src/a.py\nsrc/uv.lock\n"
+
+
 def test_error_when_root_not_found(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """`--root` が無いと終了コード 2 で終える（異常系）。"""
     # 準備

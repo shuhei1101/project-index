@@ -255,10 +255,12 @@ def unindexed_files(
     *,
     files: Sequence[str] | None = None,
     others: Sequence[DocumentTable] = (),
+    nested_dirs: Collection[str] = (),
 ) -> list[str]:
     """管理用の YAML のフォルダの配下で、どの行も指していないファイルを `root` からのパスで返す。
 
-    行の `exclude` に当たるファイルと、除外の条件に当たるファイルと、`others` のどれかの行の文書になるファイルは数えない。
+    行の `exclude` に当たるファイルと、除外の条件に当たるファイルと、`others` のどれかの行の文書になるファイルと、
+    `nested_dirs`（より深いフォルダの管理用の YAML のフォルダ）の配下のファイルは数えない。
     `files` は呼び出し元が `walk_files(root)` でたどったパスで、渡されたらフォルダをたどらない。
     """
     start = posixpath.dirname(index_path) or "."
@@ -273,6 +275,7 @@ def unindexed_files(
         prefix = f"{start}/"
         candidates = [path for path in files if path.startswith(prefix)]
     excluded = {index_path, *body_paths}
+    nested_prefixes = tuple(f"{folder}/" for folder in nested_dirs)
     return sorted(
         path
         for path in candidates
@@ -281,4 +284,6 @@ def unindexed_files(
         and not is_excluded_file(root, path)
         # ほかの行の文書として配信するファイルは、管理用の YAML に記載しない
         and not any(other.matches(path) for other in others)
+        # より深いフォルダの管理用の YAML の範囲は、その管理用の YAML の側で数える
+        and not path.startswith(nested_prefixes)
     )

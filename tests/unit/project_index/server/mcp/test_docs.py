@@ -5,6 +5,7 @@ import dataclasses
 import logging
 import re
 import threading
+import time
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
@@ -594,6 +595,53 @@ def test_ensure_worktree_when_write(
     # 検証
     assert isinstance(result, WorktreeLoadingError)
     assert store.calls == [target]
+
+
+def test_ensure_worktree_when_reload_slow(
+    tmp_path: Path,
+    make_mcp_handlers: Callable[..., Any],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ワークツリーの設定の再読み込みも待ちの上限の内で待つ（異常系）。"""
+    # 準備
+    target = _worktree_target(tmp_path, make_served_source, make_target)
+    release = threading.Event()
+    reloads: list[object] = []
+
+    def slow_reload(**kwargs: object) -> list[Target]:
+        reloads.append(kwargs.get("reload_worktree", True))
+        # 再読み込みつきの解決だけ、合図するまで終わらない
+        if kwargs.get("reload_worktree", True):
+            release.wait(timeout=10)
+        return [target]
+
+    monkeypatch.setattr(docs_module, "resolve_read_targets", slow_reload, raising=False)
+    store = _fake_store(loaded=False)
+    handlers = make_mcp_handlers(
+        store=store, terminal=make_terminal_config(worktree_load_wait_sec=1)
+    )
+    loads: dict[Path, Any] = {}
+    ensure = docs_module._ensure_worktree  # pyright: ignore[reportPrivateUsage]
+
+    async def scenario() -> tuple[BaseException | None, float]:
+        started = time.monotonic()
+        result = await asyncio.gather(
+            ensure(SearchRequest(source="sample"), handlers, loads), return_exceptions=True
+        )
+        elapsed = time.monotonic() - started
+        release.set()
+        await asyncio.gather(*loads.values(), return_exceptions=True)
+        return result[0], elapsed
+
+    # 実行
+    result, elapsed = asyncio.run(scenario())
+    # 検証
+    assert isinstance(result, WorktreeLoadingError)
+    assert elapsed < 3
+    assert reloads == [False, True]
 
 
 def test_ensure_worktree_when_unresolved(
