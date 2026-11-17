@@ -110,10 +110,10 @@ constraints:
     notes: '-'
   - item: 次の段階へ進む判定
     constraint: Markdown は、見出しが 2 未満（`few_headings`）・`code_block_ratio` が 0.5 以上（`mostly_code`）・`japanese_ratio` が 0.1 未満（`not_japanese`）のどれかで `true`。コードは、既に持つ説明が無く関数もクラスも無いとき（`no_definitions`）に `true`。Markdown・Python・TypeScript・JavaScript 以外は常に `true`（`unsupported_format`）
-    notes: しきい値はモジュール構成で定数にする
+    notes: しきい値はモジュール構成で定数にする。導いた記録は `docs/pr/106/しきい値の測定/README.md`（project-index で 151 件中 6 件、knowledge で 498 件中 26 件が `true`）
   - item: 読み取る量
     constraint: ファイル 1 つにつき全文を 1 回読む。1 MiB を超えるファイルは先頭 1 MiB だけ読む
-    notes: '-'
+    notes: 'project-index・knowledge の範囲のファイルは、lint のログ 1 件（約 1.6 MB）を除き 300 KB 未満。2 番目に大きいファイルの約 5 倍を上限にした（`docs/pr/106/しきい値の測定/README.md`）'
 flows:
   - name: 正常系
     summary: ファイルごとのアウトラインと次の段階へ進むかの判定を出す
