@@ -660,6 +660,71 @@ scenarios:
     test: test_normal_when_terminal_config_has_unknown_top_level_key
     decisions:
       - D-308
+  - name: 正常シナリオ（default_ref のリビジョンを先に書き出す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`project-index serve` を子プロセスで起動する）
+      - name: サンプルの配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ git リポジトリ
+        notes: id `sample`。`default_ref` は `main`
+      - name: 読み取りだけの配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
+        notes: id `notes`
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample と notes の 2 行。`state_dir` は空のフォルダ'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
+        participant SRC as sample
+
+        U->>DD: project-index serve
+        DD->>DD: 127.0.0.1:8786 で待ち受ける
+        DD->>DD: 裏で配信元を読み込み、検査する
+        DD->>SRC: 裏で sample の default_ref の commit を書き出す
+        DD-->>U: 待ち受けたアドレスと配信している配信元を標準出力に出す
+      ```
+    expected:
+      - 待ち受けと配信元の読み込みは、リビジョンの書き出しの終了を待たない（書き出しの最中も、管理の MCP の `status` が配信元の読み込みが済んだことと、裏の書き出しの最中であることを返却する）
+      - ログの `リビジョンを書き出した` が sample の `main` の commit で 1 行出る
+      - Git 管理外の notes は書き出さない
+      - 状態のフォルダの下に sample の `main` の commit の書き出しがあり、その後の読み取り API の sample の文書の取得が書き出し直さずに 200 を返却する
+    test: test_normal_when_default_ref_exported_in_background
+  - name: 異常シナリオ（裏のリビジョンの書き出しが上限を超える）
+    setup:
+      - name: Mock
+        description: PATH の先頭に包みの git を配置する。`archive` の 1 回目の呼び出しだけ、`git archive` の待ち時間の上限より長く待ってから本物の git を呼ぶ
+        notes: 呼び出しの回数は包みが一時ファイルで数える。2 回目以降と `archive` 以外は本物の git をそのまま呼ぶ
+      - name: サンプルの配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ git リポジトリ
+        notes: id `sample`。`default_ref` は `main`
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample の 1 行。`state_dir` は空のフォルダ'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
+        participant SRC as sample
+
+        U->>DD: project-index serve
+        DD->>DD: 裏で配信元を読み込み、検査する
+        DD->>SRC: 裏で sample の default_ref の commit を書き出す
+        DD->>DD: 書き出しが上限を超えたので止め、警告のログに残す
+        U->>DD: 読み取り API で sample の文書の一覧を取得する
+        DD->>SRC: 要求の中で default_ref の commit を書き出し直す
+        DD-->>U: 文書の一覧
+      ```
+    expected:
+      - 警告のログに、止めた git の引数（`main` の commit）と上限の秒数が 1 行残る
+      - 裏の書き出しを止めた後も、sample は配信中のままで、管理の MCP の `status` は裏の書き出しの最中でないことを返却する
+      - その後の最初の文書の一覧の取得は、要求の中で `main` の commit を書き出し直して 200 を返却し、ログの `リビジョンを書き出した` が 1 行出る。書き出し直しも上限を超えたときは、画面のサーバーが文書を読むの異常シナリオ（リビジョンの書き出しが上限を超える）と同じエラーを返却する
+    test: test_error_when_background_export_times_out
+    refs:
+      - SC-11#scenarios[異常シナリオ（リビジョンの書き出しが上限を超える）]
   - name: 正常シナリオ（disk を指定した配信元を Git を参照せずに配信する）
     setup:
       - name: Mock

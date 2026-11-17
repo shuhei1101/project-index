@@ -163,6 +163,30 @@ flows:
       - 無い文書は 404 で `missing` が `doc`
       - '`path` の文書に `id` が一致する文書が無いときは 404 で `missing` が `doc`'
     test: test_error_when_not_found
+  - name: 異常系（リビジョンの書き出しが上限を超える・504）
+    summary: 指したリビジョンの書き出しが上限を超えたとき、止めた処理と理由を返す
+    setup:
+      - name: Mock
+        description: git の実行を、`archive` の引数が親の commit のときだけ待ち時間の上限を超えたときと同じ失敗（`GitError` の `timed_out`）を返すものに差し替える
+      - name: サンプルの配信元
+        description: 正常系（リビジョンを指す）と同じ sample
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs/{path}
+
+        C->>E: GET /sources/sample/docs/{文書 1 のパス}?ref={親の commit}
+        E->>E: 親の commit の書き出しが上限を超えて止まる
+        E-->>C: 504 problem+json
+      ```
+    expected:
+      - 504 で、`title` が `RevisionExportTimeoutError`、`operation` が `revision_export`、`commit` が親の commit、`limitSec` が `git archive` の待ち時間の上限
+      - '`detail` に、止めた処理がリビジョンの書き出しであることと上限の秒数がある'
+      - 状態のフォルダに書き出しの途中のフォルダが残らない
+    test: test_error_when_revision_export_times_out
+    refs:
+      - SC-11#scenarios[異常シナリオ（リビジョンの書き出しが上限を超える）]
   - name: 正常系（disk の配信元でリビジョンを指す）
     summary: disk の配信元は `ref` を無視して登録したフォルダの文書を返す
     setup:
@@ -201,6 +225,7 @@ callers:
   - SC-11#scenarios[異常シナリオ（配信していない配信元を指す）]
   - SC-12#scenarios[正常シナリオ]
   - SC-4#scenarios[正常シナリオ]
+  - SC-11#scenarios[異常シナリオ（リビジョンの書き出しが上限を超える）]
 exclusivity: 読み取りだけで排他しない
 request:
   - name: source
@@ -282,6 +307,9 @@ status_codes:
   - code: '404'
     condition: 配信元が無い・配信していない、リビジョンを解決できない、文書が無い
     notes: '`missing`（`source`・`not_served`・`ref`・`doc`）と値、配信していない配信元は `errors[]` に外した理由'
+  - code: '504'
+    condition: リビジョンの書き出し（`git archive`）が待ち時間の上限を超えて止まった
+    notes: '`title` が `RevisionExportTimeoutError`。`operation`（`revision_export`）・`commit`・`limitSec`'
 error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`）
 constraints:
   - item: 変換の分担

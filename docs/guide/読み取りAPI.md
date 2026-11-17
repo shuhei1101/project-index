@@ -16,12 +16,12 @@
 | エンドポイント | 返すもの | 主なエラー |
 | --- | --- | --- |
 | `GET /sources` | 配信元ごとの ID・状態（`serving`・`not_served`・`disabled`）・配信していない理由 | - |
-| `GET /sources/{source}/config?schemas=` | 配信元の設定のうち `nav`・`documents[]`（スクリプトのコマンドを除く）・`decisions.folders`・`github`・`diff`。`schemas=true` で `documents[]` の行ごとの `$ref` を解いた種類のスキーマも返す | 404（無い・配信していない配信元） |
-| `GET /sources/{source}/docs?ref=&values=&common_keys=` | 指したリビジョン（省くと `default_ref`。`storage.type: disk` の配信元は `ref` を無視して登録したフォルダを読み、応答の `ref` は空）の文書の ID・パス・種類・メタデータ・バージョン。`values=true` で文書の値も返す。`common_keys=true` で、配信元の設定の行の `metadata`・`alias_type` で解決した共通のキーも返す | 404（配信元・リビジョン） |
-| `GET /sources/{source}/docs/{path}?ref=&id=` | 文書の値・種類のスキーマ・メタデータ（解決した共通のキーを含む）。管理用の YAML の行の文書は本文の文字列と本文のファイルのパスも返す。`converters[]` を指す種類は、スクリプトが出した Markdown か変換の失敗 | 404（配信元・リビジョン・文書） |
+| `GET /sources/{source}/config?schemas=` | 配信元の設定のうち `nav`・`documents[]`（スクリプトのコマンドを除く）・`decisions.folders`・`github`・`diff`。`schemas=true` で `documents[]` の行ごとの `$ref` を解いた種類のスキーマも返す | 404（無い・配信していない配信元）・504（`schemas=true` で、リビジョンの書き出しが待ち時間の上限を超えた。`RevisionExportTimeoutError`） |
+| `GET /sources/{source}/docs?ref=&values=&common_keys=` | 指したリビジョン（省くと `default_ref`。`storage.type: disk` の配信元は `ref` を無視して登録したフォルダを読み、応答の `ref` は空）の文書の ID・パス・種類・メタデータ・バージョン。`values=true` で文書の値も返す。`common_keys=true` で、配信元の設定の行の `metadata`・`alias_type` で解決した共通のキーも返す | 404（配信元・リビジョン）・504（リビジョンの書き出しが待ち時間の上限を超えた。`RevisionExportTimeoutError`） |
+| `GET /sources/{source}/docs/{path}?ref=&id=` | 文書の値・種類のスキーマ・メタデータ（解決した共通のキーを含む）。管理用の YAML の行の文書は本文の文字列と本文のファイルのパスも返す。`converters[]` を指す種類は、スクリプトが出した Markdown か変換の失敗 | 404（配信元・リビジョン・文書）・504（リビジョンの書き出しが待ち時間の上限を超えた。`RevisionExportTimeoutError`） |
 | `GET /sources/{source}/decisions` | `decisions.folders` にある検討事項の ID と、ID ごとに当たるフォルダの数 | 404（配信元） |
 | `GET /sources/{source}/decisions/{id}` | ちょうど 1 つのフォルダにある検討事項の文書の本文 | 404（当たるフォルダが 0 個か 2 個以上。`reason` に `not_found`・`ambiguous`） |
-| `GET /sources/{source}/search?q=&ref=&limit=` | 語を含む文書の ID・文書のファイルのパスと一致した箇所 | 400（語が空・長すぎる）・404 |
+| `GET /sources/{source}/search?q=&ref=&limit=` | 語を含む文書の ID・文書のファイルのパスと一致した箇所 | 400（語が空・長すぎる）・404・504（リビジョンの書き出しが待ち時間の上限を超えた。`RevisionExportTimeoutError`） |
 | `GET /sources/{source}/refs?commits=` | ブランチ・タグ・最近の commit。Git 管理外の配信元と `storage.type: disk` の配信元は `git: false` | 404（配信元） |
 
 <!-- /table -->
@@ -48,6 +48,7 @@
 保存は `settings.yaml` の `sources` だけを書き換え、他のキーとコメントを残します。
 `PUT` で行に含めなかったキー（`enabled`・`scope.read`・`scope.write`・`outside_read`・`storage`）は、ファイルの同じ配信元の行（`id`、無ければ配信元の設定の `name` で照合します）の今の値で残ります。
 `GET` の行は、端末の設定の `outside_read` を `outsideRead` で返します。
+`PUT`・`POST`・`PATCH` の読み直しは、管理の MCP の `reload` と同じく、配信元の一覧を差し替えた時点で応答します（[管理のMCP](./管理のMCP.md) の `## reload`）。
 `storage` は記載した行だけが `storage.type`（`git`・`disk`）で返し、`git`・`disk` 以外の値を送った書き換えは 422 で断ります。
 `GET` と書き換えの応答は、端末の設定の内容のバージョンを `version` で返します。
 書き換えの要求の `expectedVersion`（`DELETE` はクエリ）が今の内容のバージョンと違うと、書き換えずに 409 で断り、今の内容のバージョンを `current` で返します。

@@ -1,0 +1,13 @@
+# /tmp/pytest-of-shuhei2441 が別のユーザーの持ち物のため、TMPDIR だけを私用のフォルダに向けて実行した（並列数 1）。レビューの指摘で修正した test_reload.py だけを実行した
+$ uv run pytest tests/integration/server/test_reload.py
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/fix-server-first-query-and-reload-response
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 5 items
+
+tests/integration/server/test_reload.py .....                            [100%]
+
+============================== 5 passed in 1.43s ===============================
+exit=0
