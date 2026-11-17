@@ -78,7 +78,7 @@ functions:
       1. 管理用の YAML を読む
          - ファイルが無い場合、`FilesYamlNotFoundError` を送る
       2. 確認の時点を読み（`read_checkpoint`）、行の `path` を管理用の YAML のフォルダから `root` からのパスに直した集合を作る
-      3. `root` のリポジトリの直下（`repo_root`）を引き、起点を決める
+      3. `root` が Git の作業ツリーの中かを `repo_root` で確認し、起点を決める。この関数の git は全て `run_git` の `cwd` を `root` にして呼ぶ
          - 記録の `commit` があり、`cat-file -e {commit}^{commit}` が通る場合、`CHECKPOINT_COMMIT`
          - 記録の `commit` があり、リポジトリに無い場合、見つからなかった commit として控え、記録が無いときと同じ選び方へ進む
            - `[warning]` 記録した commit がリポジトリに無いため起点を切り替えた（commit・管理用の YAML）
@@ -86,7 +86,7 @@ functions:
          - 記録が無く、Git の中で管理用の YAML を変更した commit が `log -1 --format=%H -- {管理用の YAML}` で引ける場合、`FILES_YAML_COMMIT`
          - それ以外の場合、管理用の YAML の変更日時で `FILES_YAML_MTIME`
       4. 変わったファイルを集める
-         - Git の中で起点が commit の場合、`diff --name-status -M -z {commit} --` で起点と作業ツリーを比べる
+         - Git の中で起点が commit の場合、`diff --name-status -M -z --relative {commit} -- .` で、`root` の下だけを `root` からのパスで起点と作業ツリーを比べる
          - Git の中で起点が日時の場合、`rev-list -1 --before={日時} HEAD`（committer の日時）で起点の commit を引き、同じく比べる。引けなければ空のツリー（`hash-object -t tree /dev/null`）と比べる
          - Git の外の場合、行のファイルのうち変更日時が起点の日時より後のもの
       5. 比べた結果を行に絞る
@@ -156,6 +156,12 @@ functions:
         mock: なし（`tmp_path`）
         expected: '`FilesYamlNotFoundError` の `path` が渡したパス'
         exception: 管理用の YAML が無い
+      - name: test_find_changed_when_root_is_subfolder
+        case: 正常
+        summary: リポジトリの下のフォルダを配信元にする
+        condition: '`git_repo/docs` を `root` にし、`docs/files.yaml` の行に `a.md` を持たせて `checkpoint.commit` を commit。その後 `docs/a.md` と `docs` の外の `other.md` を変えて commit'
+        mock: なし（`git_repo`）
+        expected: '`files` が `("a.md",)`'
 tags:
   - name: topic:確認の時点
     main: true
