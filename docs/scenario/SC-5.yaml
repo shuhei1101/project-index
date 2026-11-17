@@ -653,7 +653,7 @@ scenarios:
       - name: project-index
         description: '端末の設定（`sources: []`）で待ち受けている project-index'
       - name: 配信元にするリポジトリ
-        description: commit 済みの Markdown 2 件と、直下の `content/prompts/` の A-42 の例 2 のプロンプト 1 件と、commit していない `.env`・`dist/app.js`・`settings.local.json` を持ち、project-index のファイルを持たない Git のリポジトリ `company`。クローン本体は `develop` を checkout する
+        description: commit 済みの Markdown 2 件と、commit していない `.env`・`dist/app.js`・`settings.local.json` を持ち、project-index のファイルを持たない Git のリポジトリ `company`。クローン本体は `develop` を checkout する
         notes: 引数に渡すパス。`.env`・`dist/app.js` は `.gitignore` で無視され、`settings.local.json` は `.gitignore` に当たらず未追跡
     flow: |-
       <!-- map: {"title": "正常シナリオ（ローカル運用で追加する）"} -->
@@ -672,7 +672,7 @@ scenarios:
         U-->>SK: ローカル運用
         SK->>U: 検索できるようにするファイルと、Git が無視するファイルを除外するか（既定は除外しない。.env の名前のファイルは除外する）を聞く
         U-->>SK: 既定の値
-        SK->>G: project-index.local.yaml・files.local.yaml・schemas/files.schema.local.yaml と、プロンプトの行・schemas/prompt.schema.local.yaml・schemas/common.schema.local.yaml を作り、prompt.schema.local.yaml の $ref を common.schema.local.yaml へ書き換える
+        SK->>G: project-index.local.yaml・files.local.yaml・schemas/files.schema.local.yaml を作る
         SK->>G: git rev-parse --git-path info/exclude のファイルに *.local.* を追加する
         SK->>AD: check_project（project-index.local.yaml の絶対パス, storage.type: disk）
         AD-->>SK: 違反 0 件
@@ -691,7 +691,6 @@ scenarios:
       - 端末の設定の company の行の `config` が `project-index.local.yaml`、`storage.type` が `disk` になっている
       - '`files.local.yaml` は Markdown 2 件と Git が無視する `dist/app.js` の行を持ち、`*.local.*` の名前のファイル（`settings.local.json` を含む）と `.env` の行を持たない'
       - company のフォルダで呼んだ `describe` が `company`（読み書き）を返却し、`check_project` が違反と索引の同期の件数を 0 で返却する
-      - company の `schemas/` に `prompt.schema.local.yaml`・`common.schema.local.yaml` があり、`prompt.schema.local.yaml` の `$ref` は全て `common.schema.local.yaml#/$defs/id` を指す（`common.schema.yaml` を指す `$ref` が無い）
     test: test_normal_when_local_operation
   - name: 正常シナリオ（ローカル運用の 2 回目以降）
     setup:
@@ -1093,6 +1092,43 @@ scenarios:
       - '`project-index.yaml` と `schemas/common.schema.yaml` が変わらず、`schemas/prompt.schema.yaml` が無い'
       - スキルの応答に、`schemas/common.schema.yaml` が `$defs.id` を持たないことが出る
     test: test_error_when_common_schema_lacks_id
+  - name: 正常シナリオ（ローカル運用で content/prompts/ を見つける）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かし、AskUserQuestion には既定の選択肢で答える）
+      - name: プロンプトを持つローカル運用の配信元
+        description: '`正常シナリオ（ローカル運用で追加する）` を終えた後の company の直下の `content/prompts/` に A-42 の例 2 のプロンプト（`kind: llm`）を配置する。`project-index.local.yaml` にプロンプトの documents の行は無い'
+        notes: 'id `company`。`storage.type: disk`'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（ローカル運用で content/prompts/ を見つける）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant FS as company
+        participant AD as 管理の MCP
+
+        U->>SK: /project-index:setup {company のパス}
+        SK->>FS: 直下とプラグインのルートの content/prompts/ を探す
+        FS-->>SK: content/prompts/
+        SK-->>U: documents の行と、プロンプトのスキーマ・converters[]・nav の行を候補の表で示して確認する
+        U-->>SK: 了承
+        SK->>FS: schemas/prompt.schema.local.yaml と schemas/common.schema.local.yaml を配置し、prompt.schema.local.yaml の $ref を common.schema.local.yaml へ書き換える
+        SK->>FS: project-index.local.yaml に候補の行を書く
+        SK->>AD: check_project（project-index.local.yaml の絶対パス, storage.type: disk）
+        SK->>AD: reload
+        SK-->>U: 書いた行と結果を出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - company の `schemas/` に `prompt.schema.local.yaml`・`common.schema.local.yaml` があり、`prompt.schema.yaml`・`common.schema.yaml` は無い
+      - '`prompt.schema.local.yaml` の `$ref` は全て `common.schema.local.yaml#/$defs/id` を指す（`common.schema.yaml` を指す `$ref` が無い）'
+      - '`project-index.local.yaml` の documents に、`paths` が `content/prompts/**/*.yaml`、`schema` が `schemas/prompt.schema.local.yaml` の行がある'
+      - '`check_project` が違反を 0 件で返す'
+      - '`reload` の後の `search_docs` がプロンプトを YAML の `name` で返す'
+    test: test_normal_when_prompt_folder_found_in_local_operation
 lead: 利用者が `/project-index:setup` でフォルダを配信元として登録し、管理用の YAML を範囲のファイルに合わせるシナリオを定め、配信元の追加の流れを変えるときに参照する。
 tags:
   - name: topic:配信元
