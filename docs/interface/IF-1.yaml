@@ -43,7 +43,7 @@ flows:
       - name: 配信元
         description: 正常系と同じ sample・notes・other に、`project-index.yaml` の `version` が古い old（`scope.read` は sample のフォルダ）と、検証で外れる broken を加える。sample は管理用の YAML に無いファイルを 1 件持つ
       - name: 入力
-        description: 引数なし。`cwd` は sample のクローン本体
+        description: '引数なし。`cwd` は sample のクローン本体。起動の後の裏の検査を終えてから（管理の MCP の `status` が `checking: false` を返してから）呼ぶ'
     flow: |-
       <!-- map: {"title": "正常系（使える配信元の警告）"} -->
 
@@ -101,7 +101,7 @@ flows:
       - name: 配信元
         description: sample と、Git 管理外で管理用の YAML に無いファイル `src/extra0.py` を 1 件持つ memo（`scope.read`・`scope.write` は sample のフォルダ）
       - name: 入力
-        description: '`write_docs` で memo の `src` の行に `extra0.py` を作り、引数なしの `describe` を呼ぶ。`cwd` は sample のクローン本体'
+        description: '起動の後の裏の検査を終えてから（管理の MCP の `status` が `checking: false` を返してから）引数なしの `describe` を呼び、`write_docs` で memo の `src` の行に `extra0.py` を作り（`data: {path: extra0.py, @body: extra0.py の今の内容}`）、引数なしの `describe` を呼ぶ。`cwd` は sample のクローン本体'
     flow: |-
       <!-- map: {"title": "正常系（書き込みの後の警告）"} -->
 
