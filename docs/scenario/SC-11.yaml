@@ -389,10 +389,11 @@ scenarios:
   - name: 正常シナリオ（裏の検査の最中に開く）
     setup:
       - name: Mock
-        description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが読み取り API と管理の MCP を HTTP で呼ぶ）
+        description: large の裏の検査（`check_sync`）を、テストが合図を出すまで止まるものに差し替える。dev-docs の画面のサーバーの代わりにテストのコードが読み取り API と管理の MCP を呼ぶ
+        notes: 合図は、sample の文書の一覧の応答と、応答の直後の `status` を受けた後に出す。sample の検査とそのほかの処理は差し替えない
       - name: 大きな配信元
-        description: 裏の検査に数秒かかる量の文書を持つ git リポジトリ
-        notes: id `large`。文書 3,000 件。`default_ref` は `main`
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ git リポジトリ
+        notes: id `large`。`default_ref` は `main`
       - name: サンプルの配信元
         description: 正常シナリオと同じ配信元
         notes: id `sample`。`default_ref` は `main`
@@ -405,17 +406,17 @@ scenarios:
         participant PI as project-index（読み取り API）
         participant SRC as large・sample
 
-        PI->>SRC: 配信元の読み込みの後に、裏で large と sample を順に検査し始める
+        PI->>SRC: 配信元の読み込みの後に、裏で検査し始める（large の検査は合図まで止まる）
         DD->>PI: 管理の MCP の status で、裏の検査の最中であることを確認する
         DD->>PI: sample の文書の一覧を取得する（リビジョンを省く）
-        PI->>PI: 応答の間は裏の検査を止める
         PI-->>DD: sample の文書の一覧
-        PI->>SRC: 応答の後に裏の検査を続ける
+        DD->>PI: 管理の MCP の status で、まだ検査の最中であることを確認する
+        DD->>PI: テストが合図を出し、large の検査を続けさせる
         DD->>PI: 管理の MCP の status で、裏の検査が済んだことを確認する
       ```
     expected:
       - '文書の一覧の取得が、裏の検査の終了を待たずに 200 を返却し、応答の直後の `status` が `checking: true` を返却する'
-      - '裏の検査が済んだ後の `status` が `checking: false` を返却し、large と sample の `sync` が検査を止めずに済ませたときと同じ件数になる'
+      - '合図の後、裏の検査が済んだ `status` が `checking: false` を返却し、large と sample の `sync` が検査を止めずに済ませたときと同じ件数になる'
       - 文書の一覧が、裏の検査が済んだ後に取得した一覧と同じ文書を返却する
     test: test_normal_when_opened_during_background_check
 lead: dev-docs の画面のサーバーが読み取り API で配信元と文書を取得するシナリオを定め、画面のサーバーからの読み取りの流れを変えるときに参照する。

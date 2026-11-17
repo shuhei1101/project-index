@@ -691,7 +691,7 @@ scenarios:
       - ログの `リビジョンを書き出した` が sample の `main` の commit で 1 行出る
       - Git 管理外の notes は書き出さない
       - 状態のフォルダの下に sample の `main` の commit の書き出しがあり、その後の読み取り API の sample の文書の取得が書き出し直さずに 200 を返却する
-      - 裏の検査は配信元を 1 件ずつ順に行い、読み取り API と文書の MCP の要求に応答している間は止まり、応答の後に続ける。検査が済むまで管理の MCP の `status` の `checking` は `true` のまま
+      - 裏の検査の最中に受けた読み取り API と文書の MCP の要求は、検査の終了を待たずに応答し、検査はその後に済む。検査が済むまで管理の MCP の `status` の `checking` は `true` のまま
     test: test_normal_when_default_ref_exported_in_background
   - name: 異常シナリオ（裏のリビジョンの書き出しが上限を超える）
     setup:
