@@ -1004,7 +1004,7 @@ def test_normal_when_indent_preserved(
     )
     source, env, worktree = _setup(make_source, make_server, add_worktree, files)
     added = {"items": [{"key": "k3", "label": "名称 3"}]}
-    results = {}
+    results: dict[str, Any] = {}
     # 実行
     for doc_id in ("doc-1", "doc-2"):
         target = worktree / "docs" / f"{doc_id}.yaml"
