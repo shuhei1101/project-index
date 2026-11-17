@@ -159,6 +159,12 @@ data_models:
         type: list[LoadProblem]
         access: 公開
         description: ファイルのパスの昇順
+      - name: duplicates
+        title: ID の重なった文書
+        type: list[Document]
+        access: 公開
+        default: '[]'
+        description: 先に現れた文書と ID が重なり `documents` から除外した文書。`documents[]` の行の順。同じファイルの重なりの検出で使用する
   - name: SyncReport
     title: メタデータのずれ
     container: project_index/features/documents/types.py
@@ -202,6 +208,12 @@ data_models:
         access: 公開
         default: '[]'
         description: '`{行の id}: {文書の id}: {to}` の並び。`source` を持たない `related[].to` が配信元のどの文書の ID にも当たらないもの'
+      - name: duplicate_files
+        title: 重なったファイル
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: '`{ファイル}: {行の id}・{行の id}` の並び。ファイルのパスの昇順で、2 つ以上の有効な行が文書にするファイル'
   - name: AliasEntry
     title: エイリアス
     container: project_index/features/documents/types.py

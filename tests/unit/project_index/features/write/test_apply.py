@@ -496,3 +496,62 @@ def test_expand_array_keys_when_any_depth_column_name() -> None:
     result = expand_array_keys(operation, _nested_table(), current, index=0)
     # 検証
     assert result == operation
+
+
+_FUNCTIONS_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "functions": {
+            "type": "array",
+            "x-key": "name",
+            "items": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}, "process": {"type": "string"}},
+            },
+        },
+    },
+}
+
+
+def test_apply_operation_when_text_edit_ref_path() -> None:
+    """参照の型の項目のパスで配列の要素の中を置き換える（正常系）。"""
+    # 準備
+    current = {
+        "functions": [
+            {"name": "load", "process": "a書き出す"},
+            {"name": "save", "process": "a書き出す"},
+            {"name": "save", "process": "a書き出す"},
+        ]
+    }
+    operation = Operation(
+        op="update",
+        id="doc-1",
+        expected_version="v1",
+        text_edits=[TextEdit(field="#functions[save#2].process", old="書き出す", new="保存する")],
+    )
+    # 実行
+    result = apply_operation(current, operation, schema=_FUNCTIONS_SCHEMA)
+    # 検証
+    assert result == {
+        "functions": [
+            {"name": "load", "process": "a書き出す"},
+            {"name": "save", "process": "a書き出す"},
+            {"name": "save", "process": "a保存する"},
+        ]
+    }
+
+
+def test_apply_operation_when_text_edit_ref_path_unresolved() -> None:
+    """参照の型の項目のパスが要素を指せない（異常系）。"""
+    # 準備
+    current = {"functions": [{"name": "load", "process": "a"}]}
+    operation = Operation(
+        op="update",
+        id="doc-1",
+        expected_version="v1",
+        text_edits=[TextEdit(field="#functions[missing].process", old="a", new="b")],
+    )
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError) as exc_info:
+        apply_operation(current, operation, schema=_FUNCTIONS_SCHEMA)
+    assert exc_info.value.violations[0].path == "text_edits[0].field"

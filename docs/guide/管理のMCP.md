@@ -44,6 +44,7 @@
 | `unindexed_files` | 管理用の YAML に無いファイルの件数。除外の条件（バイナリ・空のファイル・`*.local.*` の名前のファイル）・行の `exclude[]`・ほかの行の文書・より深いフォルダの管理用の YAML の範囲に当たるファイルは数えない |
 | `missing_body_files` | ファイルが無い行の件数 |
 | `unresolved_related` | `related[].to` が配信元のどの文書の ID にも当たらない関連の件数。`source` を持つ関連は数えない。内訳は `{行の id}: {文書の id}: {to}` |
+| `duplicate_files` | 2 つ以上の有効な documents の行が文書にするファイルの件数。`records` の行の管理用の YAML 自体は数えない。内訳は `{ファイル}: {行の id}・{行の id}` |
 
 呼ばれるたびに、起動時と同じ関数で求め直します。
 
@@ -202,7 +203,7 @@ http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
 | `missing_paths[]` | list[str] | `documents[].paths` などが指して無いフォルダ・ファイル |
 | `script_errors[].script` | str | 確かめに失敗したスクリプトのパス |
 | `script_errors[].reason` | str | 終了コードと標準エラーの要約 |
-| `sync` | obj | 索引の同期の件数。`metadata` の列の欠け・索引に無いファイル・ファイルが無い行・どの文書にも当たらない関連。`*.local.*` の名前のファイルは索引に無いファイルに数えない |
+| `sync` | obj | 索引の同期の件数。`metadata` の列の欠け・索引に無いファイル・ファイルが無い行・どの文書にも当たらない関連・2 つ以上の行が文書にするファイル。`*.local.*` の名前のファイルは索引に無いファイルに数えない |
 | `sync.items[]` | list | 件数の内訳（種類とパス）。先頭 50 件まで。件数は全件を数える |
 | `warnings[].path` | str | 警告したキーのパス（`nav.tabs[2].items[0].auto.filter`） |
 | `warnings[].rule` | str | 警告の理由。`nav` の `auto` の条件がどの文書にも当たらないときは、タブの名前と条件 |

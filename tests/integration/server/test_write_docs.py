@@ -7,13 +7,13 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import pytest
+
 from project_index.shared.hashing import content_hash, value_hash
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-    import pytest
 
 
 def load_yaml(text: str) -> Any:
@@ -156,6 +156,48 @@ TREE_COMMON_SCHEMA = (
     "        items: {$ref: '#/$defs/tree'}\n"
 )
 TREE = {"name": "a", "children": [{"name": "b", "children": [{"name": "c"}]}]}
+
+
+# `functions`（`$ref` で `x-key: name` の配列）・`x-key` を持たない `steps`・値が文字列の辞書 `notes` を持つスキーマ
+REF_PATH_SCHEMA = (
+    "type: object\n"
+    "title: サンプル\n"
+    "properties:\n"
+    "  id: {type: string}\n"
+    "  name: {type: string}\n"
+    "  functions: {$ref: '#/$defs/functions'}\n"
+    "  steps:\n"
+    "    type: array\n"
+    "    items: {type: object}\n"
+    "  notes:\n"
+    "    type: object\n"
+    "    additionalProperties: {type: string}\n"
+    "$defs:\n"
+    "  functions:\n"
+    "    type: array\n"
+    "    x-key: name\n"
+    "    items:\n"
+    "      type: object\n"
+    "      properties:\n"
+    "        name: {type: string}\n"
+    "        process: {type: string}\n"
+)
+REF_PATH_DOC = (
+    "id: doc-1\n"
+    "name: 文書 1\n"
+    "functions:\n"
+    "  - name: load\n"
+    "    process: 1 書き出す\n"
+    "  - name: save\n"
+    "    process: 2 書き出す\n"
+    "  - name: save\n"
+    "    process: 3 書き出す\n"
+    "steps:\n"
+    "  - name: a\n"
+    "    body: x\n"
+    "notes:\n"
+    "  main.py の補足: 4 書き出す\n"
+)
 
 
 def _setup(
@@ -598,6 +640,119 @@ def test_error_when_version_mismatch(
 def _version_of(text: str) -> str:
     """文書の内容のバージョンを返す。"""
     return content_hash(text)
+
+
+def _edit(field: str) -> dict[str, str]:
+    """`書き出す` を `保存する` に置き換える `text_edits` の 1 件を作る。"""
+    return {"field": field, "old": "書き出す", "new": "保存する"}
+
+
+def test_normal_when_text_edits_ref_path(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """参照の型の項目のパスで、x-key の値で指した配列の要素の中の文字列の一部を置き換える（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{"schemas/sample.schema.yaml": REF_PATH_SCHEMA, "docs/doc-1.yaml": REF_PATH_DOC}
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    path = worktree / "docs" / "doc-1.yaml"
+    arguments = {"cwd": str(source.folder), "worktree": str(worktree)}
+    # 実行
+    first = env.call(
+        "write_docs",
+        operations=[
+            _update("doc-1", _version(path), text_edits=[_edit("#functions[save].process")])
+        ],
+        **arguments,
+    )
+    after_first = load_yaml(path.read_text(encoding="utf-8"))
+    second = env.call(
+        "write_docs",
+        operations=[
+            _update("doc-1", _version(path), text_edits=[_edit("#functions[save#2].process")])
+        ],
+        **arguments,
+    )
+    after_second = load_yaml(path.read_text(encoding="utf-8"))
+    before_third = path.read_text(encoding="utf-8")
+    third = env.call(
+        "write_docs",
+        operations=[
+            _update("doc-1", _version(path), text_edits=[_edit("functions[save].process")])
+        ],
+        **arguments,
+    )
+    after_third = path.read_text(encoding="utf-8")
+    fourth = env.call(
+        "write_docs",
+        operations=[_update("doc-1", _version(path), text_edits=[_edit("#notes[main.py の補足]")])],
+        **arguments,
+    )
+    after_fourth = load_yaml(path.read_text(encoding="utf-8"))
+    # 検証
+    assert [item["status"] for item in first.data["results"]] == ["updated"]
+    assert [item["process"] for item in after_first["functions"]] == [
+        "1 書き出す",
+        "2 保存する",
+        "3 書き出す",
+    ]
+    assert [item["status"] for item in second.data["results"]] == ["updated"]
+    assert [item["process"] for item in after_second["functions"]] == [
+        "1 書き出す",
+        "2 保存する",
+        "3 保存する",
+    ]
+    assert third.is_error
+    assert "text_edits[0].field" in third.text
+    assert "文字列ではない項目は置き換えられません" in third.text
+    assert after_third == before_third
+    assert [item["status"] for item in fourth.data["results"]] == ["updated"]
+    assert after_fourth["notes"] == {"main.py の補足": "4 保存する"}
+
+
+@pytest.mark.parametrize(
+    ("field", "message"),
+    [
+        pytest.param("#steps[a].body", "x-key を持たない配列です", id="no_x_key"),
+        pytest.param(
+            "#functions[missing].process", "name が missing の要素がありません", id="missing"
+        ),
+        pytest.param("#functions[save#3].process", "name が save の要素は 2 個です", id="order"),
+        pytest.param("#notes[missing]", "キー missing がありません", id="no_key"),
+    ],
+)
+def test_error_when_text_edits_ref_path_unresolved(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    field: str,
+    message: str,
+) -> None:
+    """x-key の無い配列・該当する要素の無い値・無い順番・無いキーを指す参照の型の項目のパスを断る（異常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{"schemas/sample.schema.yaml": REF_PATH_SCHEMA, "docs/doc-1.yaml": REF_PATH_DOC}
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    path = worktree / "docs" / "doc-1.yaml"
+    before = path.read_text(encoding="utf-8")
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(source.folder),
+        worktree=str(worktree),
+        operations=[_update("doc-1", _version(path), text_edits=[_edit(field)])],
+    )
+    # 検証
+    assert result.is_error
+    assert "text_edits[0].field" in result.text
+    assert message in result.text
+    assert path.read_text(encoding="utf-8") == before
 
 
 def test_error_when_unknown_kind(

@@ -462,11 +462,12 @@ class DocumentStore:
             problems.extend(issues)
         # 削除されたファイルのキャッシュを捨てる
         self._discard_files(root, kind_ids, seen_keys)
-        unique = _unique(documents, problems)
+        duplicates: list[Document] = []
+        unique = _unique(documents, problems, duplicates)
         problems.sort(key=lambda problem: problem.path)
         for problem in problems:
             logger.debug("%s: %s: %s", target.source.id, problem.path, problem.reason)
-        return LoadResult(documents=unique, problems=problems)
+        return LoadResult(documents=unique, problems=problems, duplicates=duplicates)
 
     def get(
         self, target: Target, ids: Sequence[str], *, kinds: Sequence[str] | None = None
@@ -607,8 +608,10 @@ def _revision_fresh(
     )
 
 
-def _unique(documents: list[Document], problems: list[LoadProblem]) -> list[Document]:
-    """ID が先の文書と重なる文書を除き、重なりを `problems` に足す。"""
+def _unique(
+    documents: list[Document], problems: list[LoadProblem], duplicates: list[Document]
+) -> list[Document]:
+    """ID が先の文書と重なる文書を除き、重なりを `problems` に、除いた文書を `duplicates` に足す。"""
     first: dict[str, Document] = {}
     unique: list[Document] = []
     for document in documents:
@@ -624,7 +627,38 @@ def _unique(documents: list[Document], problems: list[LoadProblem]) -> list[Docu
                 detail=f"ID {document.id} は先の文書（{earlier.path}）と重なります",
             )
         )
+        duplicates.append(document)
     return unique
+
+
+def _duplicate_files(source: ServedSource, result: LoadResult, files: list[str]) -> list[str]:
+    """2 つ以上の有効な行が文書にするファイルを、`{ファイル}: {行の id}・{行の id}` で返す。"""
+    rows: dict[str, list[str]] = {}
+    for table in source.config.documents:
+        if not table.enabled:
+            continue
+        for path in _row_files(source, table, result, files):
+            ids = rows.setdefault(path, [])
+            if table.id not in ids:
+                ids.append(table.id)
+    return [f"{path}: {'・'.join(ids)}" for path, ids in sorted(rows.items()) if len(ids) > 1]
+
+
+def _row_files(
+    source: ServedSource, table: DocumentTable, result: LoadResult, files: list[str]
+) -> set[str]:
+    """行が文書にするファイル（`body_file` の無い `records` の行は空）を返す。"""
+    # 読めず文書にならないファイルも、その行が文書にするファイルに数える
+    if table.records is None:
+        return set(collect_files(source.root, table, files=files))
+    if table.body_file is None:
+        return set()
+    # ID が重なり除いた文書の本文のファイルも数える
+    return {
+        document.body_path
+        for document in [*result.documents, *result.duplicates]
+        if document.kind == table.id and document.body_path
+    }
 
 
 def _unindexed(
@@ -672,7 +706,7 @@ def _nested_dirs(start: str, index_dirs: Collection[str]) -> list[str]:
 
 
 def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
-    """配信元の文書を読み、`metadata` の列の欠け・管理用の YAML のずれ・当たらない関連・エイリアスのキーの違反を求める。"""
+    """配信元の文書を読み、`metadata` の列の欠け・管理用の YAML のずれ・当たらない関連・同じファイルの重なり・エイリアスのキーの違反を求める。"""
     # 配信元のフォルダは 1 回だけたどり、文書の収集と索引に無いファイルの検出で使い回す
     files = list(walk_files(source.root))
     result = store.load(Target(source, source.root, None, None, "read"), files=files)
@@ -706,4 +740,5 @@ def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
         missing_body_files=missing_body_files,
         unresolved_related=unresolved,
         alias_violations=collect_aliases(source, result.documents).violations,
+        duplicate_files=_duplicate_files(source, result, files),
     )

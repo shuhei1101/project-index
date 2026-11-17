@@ -413,6 +413,10 @@ def test_normal_when_metadata_out_of_sync(
         "    schema: schemas/files.schema.yaml\n"
         "    records: files\n"
         "    body_file: path\n"
+        # 行 `src` の `a.py` と同じファイルを文書にする行
+        "  - id: py\n"
+        "    paths: [src/a.py]\n"
+        "    schema: schemas/files.schema.yaml\n"
     )
     files = sample_file_set(
         **{
@@ -444,7 +448,7 @@ def test_normal_when_metadata_out_of_sync(
     warnings = [record.getMessage() for record in caplog.records]
     sample_warnings = [message for message in warnings if message.startswith("sample:")]
     assert env.client.get("/sources/sample/docs").status_code == 200
-    assert len(sample_warnings) == 4
+    assert len(sample_warnings) == 5
     assert any("metadata の列の欠け 1 件" in m and "name（title）" in m for m in sample_warnings)
     assert any(
         "管理用の YAML に無いファイル 2 件" in m and "src/d.py" in m and "src/sub/e.py" in m
@@ -453,6 +457,10 @@ def test_normal_when_metadata_out_of_sync(
     assert any("ファイルが無い行 1 件" in m and "c.py" in m for m in sample_warnings)
     assert any(
         "どの文書にも該当しない関連 1 件" in m and "src: src/a.py: src/z.py" in m
+        for m in sample_warnings
+    )
+    assert any(
+        "2 つ以上の行が文書にするファイル 1 件" in m and "src/a.py: src・py" in m
         for m in sample_warnings
     )
     assert not any("src: src/files.yaml" in m for m in sample_warnings)

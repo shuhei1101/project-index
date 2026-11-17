@@ -47,7 +47,7 @@ functions:
          - `reviewed` に無いファイルがある場合、書き換える前に `ReviewedFileNotFoundError` を送る
          - Git の中の場合、`rev-parse HEAD` の commit と、`reviewed` の各ファイルの中身の SHA-256（`hashlib.sha256` の 16 進）を持つ記録
          - Git の外の場合、`now` を ISO 8601 にした `checked_at` だけを持つ記録
-      3. マッピングの `checkpoint` を記録で置き換え（無ければ末尾に追加）、`dump_roundtrip` した文字列でファイルを置き換える（`replace_file`）
+      3. マッピングの `checkpoint` を記録で置き換え（無ければ末尾に追加）、`dump_roundtrip`（`original` は手順 1 で読んだ管理用の YAML の文字列）した文字列でファイルを置き換える（`replace_file`）
       4. 記録を返す
     exceptions:
       - name: FilesYamlNotFoundError
@@ -89,6 +89,12 @@ functions:
         mock: なし（`tmp_path` で `git init`）
         expected: '`ReviewedFileNotFoundError` のメッセージに `missing.md`、`files.yaml` が変わらない'
         exception: '`reviewed` のファイルが無い'
+      - name: test_record_checkpoint_when_indent_preserved
+        case: 正常
+        summary: 管理用の YAML の配列の字下げを保つ
+        condition: '`files:` の直下に `- ` を字下げ無しで 2 行並べ、`checkpoint` を持たない `files.yaml`、Git 管理外で `now` に 2026-11-17T00:00:00+00:00'
+        mock: なし（`tmp_path`）
+        expected: '`files.yaml` は元の行が全て書き込みの前の文字列と一致し、末尾に `checkpoint` の行だけが加わる'
 tags:
   - name: topic:確認の時点
     main: true

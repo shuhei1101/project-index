@@ -84,7 +84,7 @@ functions:
       4. `sources` だけを埋めた後の行に置き換える。`config` は要素の数によらず配列で書く。既定値と同じキー（`enabled: true`・`outside_read: true`・空の `scope.read` など）は書かない
       5. 置き換えた値を検証する（端末の設定の検証）
          - 違反がある場合、ファイルを書かずに `TerminalConfigInvalidError` を送る
-      6. 一時ファイルに書いてから置き換える（往復編集の書き出し・ファイルの置き換え）
+      6. 一時ファイルに書いてから置き換える（往復編集の書き出し・ファイルの置き換え。往復編集の書き出しの `original` は手順 2 で読んだ本文）
          - `[info]` 端末の設定の sources を保存した（パス・行数）
       7. 書いた後の端末の設定の内容のバージョンを求め（端末の設定の内容の読み込み）、端末の設定を再読み込みして（端末の設定の読み込み）、`reload` で配信元を再読み込みし、状態と内容のバージョンを返す（起動の『配信元の再読み込み』）
     exceptions:
@@ -171,6 +171,12 @@ functions:
         condition: 'ファイルの company の行が `storage: {type: disk}`、送る行は `storage` を持たない'
         mock: '`reload` を stub'
         expected: '書いた company の行に `storage: {type: disk}` が残る'
+      - name: test_save_sources_when_indent_preserved
+        case: 正常
+        summary: 端末の設定の配列の字下げを保つ
+        condition: '`sources:` の直下に `- ` を字下げ無しで sample の 1 行を並べる `settings.yaml` に、同じ sample の 1 行を保存する'
+        mock: 配信元の再読み込み（偽物）
+        expected: 保存した `settings.yaml` が保存の前の文字列と一致する
   - name: add_source
     title: 配信元の 1 行の追加
     kind: 関数
@@ -223,7 +229,7 @@ functions:
       4. `sources` の末尾に行を加える。書き方は配信元の保存と同じ（`config` は配列、既定値と同じキーは書かない）
       5. 加えた値を検証する（端末の設定の検証）
          - 違反がある場合、ファイルを書かずに `TerminalConfigInvalidError` を送る
-      6. 一時ファイルに書いてから置き換え、書いた後の内容のバージョンを求め、端末の設定を再読み込みして `reload` で変わった行の配信元だけを再読み込みし、`added` と状態と内容のバージョンを返す（起動の『変わった配信元の再読み込み』）
+      6. 一時ファイルに書いてから置き換え（往復編集の書き出しの `original` は手順 2 で読んだ本文）、書いた後の内容のバージョンを求め、端末の設定を再読み込みして `reload` で変わった行の配信元だけを再読み込みし、`added` と状態と内容のバージョンを返す（起動の『変わった配信元の再読み込み』）
          - `[info]` 端末の設定の sources に 1 行追加した（パス・id）
     exceptions:
       - name: TerminalConfigInvalidError
@@ -272,6 +278,12 @@ functions:
         condition: 最上位に `mindstella`（入れ子の値とコメント）を持つ `settings.yaml` に、extra の 1 行を追加する
         mock: なし（一時フォルダ。`reload` は状態を返す偽物）
         expected: '`added` で、`settings.yaml` の `mindstella` の値とコメントが追加の前と同じ'
+      - name: test_add_source_when_indent_preserved
+        case: 正常
+        summary: 端末の設定の配列の字下げを保って 1 行を追加する
+        condition: '`sources:` の直下に `- ` を字下げ無しで sample の 1 行を並べる `settings.yaml` に、extra の 1 行を追加する'
+        mock: '`reload`（状態を返す偽物）'
+        expected: '`settings.yaml` は元の行が全て追加の前の文字列と一致し、末尾に字下げ無しの `- ` で始まる extra の行だけが加わる'
       - name: test_add_source_when_version_outdated
         case: 異常
         summary: 内容のバージョンが古い
@@ -339,7 +351,7 @@ functions:
       6. 見つけた行の位置だけを、重ねた後の行に置き換える。書き方は配信元の保存と同じ
       7. 置き換えた値を検証する（端末の設定の検証）
          - 違反がある場合、ファイルを書かずに `TerminalConfigInvalidError` を送る
-      8. 一時ファイルに書いてから置き換え、書いた後の内容のバージョンを求め、端末の設定を再読み込みして `reload` で変わった行の配信元だけを再読み込みし、状態と内容のバージョンを返す（起動の『変わった配信元の再読み込み』）
+      8. 一時ファイルに書いてから置き換え（往復編集の書き出しの `original` は手順 2 で読んだ本文）、書いた後の内容のバージョンを求め、端末の設定を再読み込みして `reload` で変わった行の配信元だけを再読み込みし、状態と内容のバージョンを返す（起動の『変わった配信元の再読み込み』）
          - `[info]` 端末の設定の sources の 1 行を変更した（パス・id）
     exceptions:
       - name: SettingsVersionMismatchError
@@ -456,7 +468,7 @@ functions:
          - 無い場合、`SourceRowNotFoundError` を送る
       4. 見つけた行だけを `sources` から削除し、削除した後の値を検証する（端末の設定の検証）
          - 違反がある場合、ファイルを書かずに `TerminalConfigInvalidError` を送る
-      5. 一時ファイルに書いてから置き換え、書いた後の内容のバージョンを求め、端末の設定を再読み込みして `reload` で配信元の一覧から削除した行の配信元を除き、状態と内容のバージョンを返す（起動の『変わった配信元の再読み込み』）
+      5. 一時ファイルに書いてから置き換え（往復編集の書き出しの `original` は手順 2 で読んだ本文）、書いた後の内容のバージョンを求め、端末の設定を再読み込みして `reload` で配信元の一覧から削除した行の配信元を除き、状態と内容のバージョンを返す（起動の『変わった配信元の再読み込み』）
          - `[info]` 端末の設定の sources から 1 行削除した（パス・id）
     exceptions:
       - name: SettingsVersionMismatchError

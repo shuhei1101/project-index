@@ -58,6 +58,13 @@ functions:
         required: true
         passing: positional
         description: 当てる操作
+      - name: schema
+        title: スキーマ
+        type: Mapping[str, Any] | None
+        required: false
+        default: None
+        passing: keyword
+        description: 文書 1 件の内容に当てるスキーマ（文書のストアの `row_schema`）。`text_edits[].field` の参照の型の項目のパスの解決に使用する
     returns:
       type: dict[str, Any]
       description: 新しい内容（`current` は書き換えない）
@@ -69,7 +76,7 @@ functions:
          - `unset` は項目の削除。無い項目は飛ばす
          - `add_to` は配列の末尾へ足す（無ければ作る。配列でなければ違反）
          - `remove_from` は等しい要素を全て除く
-         - `text_edits` は文字列の項目の `old` を `new` にする。`replace_all` が `False` で一致が 1 か所でない場合は違反
+         - `text_edits` は文字列の項目の `old` を `new` にする。`field` が `#` で始まる場合は、`#` の後を『参照の型の項目のパスの解決』で `schema` と今の内容からキーと位置の並びに解き、その並びで取得して『並びで指した項目の書き込み』で書く（解けなければ `text_edits[{n}].field` の違反。`schema` が `None` なら空のスキーマで解き、配列は `x-key` を持たない違反になる）。`replace_all` が `False` で一致が 1 か所でない場合は違反
       4. 違反は `Violation`（`path` は `set.a.b`・`text_edits[0].old` など。`fix` に一致した数と、`replace_all` か前後の文字を含めること）を集めて `InvalidArgumentError` で送る
     exceptions:
       - name: InvalidArgumentError
@@ -101,6 +108,19 @@ functions:
         condition: '`create` の `data: {id: n2, path: n2.md, @body: 本文}` と、`update` の `set: {@body: x}`・`text_edits: [{field: @body, old: a, new: b}]`'
         mock: なし
         expected: '`create` の結果が `{id: n2, path: n2.md}` で、`update` の結果が `current` と同じ'
+      - name: test_apply_operation_when_text_edit_ref_path
+        case: 正常
+        summary: 参照の型の項目のパスで配列の要素の中を置き換える
+        condition: '`functions`（`x-key: name`）が `load`・`save`・`save` でどれも `process: a書き出す` の内容に、`text_edits: [{field: "#functions[save#2].process", old: 書き出す, new: 保存する}]` とスキーマ'
+        mock: なし
+        expected: 3 つ目の要素の `process` だけが `a保存する` になる
+      - name: test_apply_operation_when_text_edit_ref_path_unresolved
+        case: 異常
+        summary: 参照の型の項目のパスが要素を指せない
+        condition: 同じ内容に `#functions[missing].process` の `text_edits`
+        mock: なし
+        expected: '`InvalidArgumentError` の違反の `path` が `text_edits[0].field`'
+        exception: 該当する要素が無い
   - name: to_columns
     title: 列名への読み替え
     kind: 関数

@@ -229,7 +229,7 @@ functions:
          - 操作を、`create` は `kind` の行、`update`・`replace` は文書の種類の行で、オブジェクトの配列への書き戻し（`update` は今の内容を渡す）にかけてから列名への読み替えにかける。`create` の ID は行の `metadata.id` の列（無ければ `id`）に入れる
          - `@body` を受け付けるかを確かめる。種類の行が `body_file` を持たない文書への `@body`、`unset`・`add_to`・`remove_from` の `@body`、`body_file` の行の `create` で `data` に `@body` が無いこと、`update`・`replace` で `body_file` の列の値が今の値と違うことは、添字つきの違反で `InvalidArgumentError` にする
          - `body_file` の行の文書は、本文の適用（`current_body` は `update`・`replace` が今の文書の本文、`create` が `None`）で新しい本文を求める。本文のファイルのパスは文書のストアの本文のファイルのパスの解決で解き、`create` で `None`（配信元の外）か、作業ツリーに既にあるファイル・同じ呼び出しの前の `create` が作る本文のファイルなら、`path` が `body_file` の列名の違反を `failed` の行に入れる（手順 6 では `ValidationFailedError` として送る）。新しい本文は、本文のファイルのパス → 本文で持ち、後の操作が同じ本文のファイルに当たるときは当てた後の本文に重ねる
-         - 操作を当てる。`records` の文書は配列の要素を、それ以外はファイルの内容を置き換える
+         - 操作を当てる。`records` の文書は配列の要素を、それ以外はファイルの内容を置き換える。`update`・`replace` は文書のストアの `row_schema` で引いた種類の 1 文書のスキーマを `schema` に渡す
          - 変更を当てた後のファイルの内容を往復編集の書き出し（`original` は、既にあるファイルに当てるときはそのファイルの作業ツリーの文字列、新しいファイルを作る `create` は `None`）で文字列にし、文字列からの文書の組み立て（`read_body` は、新しい本文を持つ本文のファイルならその本文、無ければ作業ツリーのファイルを返す）で文書にして、文書の検査.検査する（`on="write"`、`create` は `new=True`、`deadline` は `limits` があれば `limits.write_deadline`）。違反はスキーマの説明の添付にかけ（スキーマは文書のストア.文書に当てるスキーマ）、添字を付けて `failed` の行に入れる。添字を付けるときは `schema` を保つ
          - 検査するで違反が無ければ、文書の検査.Markdownの値を点検する（`deadline` は検査すると同じ。`previous` は `update`・`replace` が操作の前の文書の `data`、`create` が `None`。`stopped` は同じ呼び出しの前の点検が返した `stopped`）。違反は添字を付けて `failed` の行に入れ、点検できなかったキーは成功した行の `unchecked` に入れる。返った `stopped` を次の操作へ引き継ぐ
          - 後の操作が同じファイルに当たるときは、当てた後の内容に重ねる

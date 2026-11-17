@@ -1,0 +1,186 @@
+# Red の確認（追加・変更したテストのファイルの個別実行。/tmp/pytest-of-* が別ユーザーの持ち物のため --basetemp を指定）
+$ uv run pytest tests/unit/project_index/features/documents/test_fields.py tests/unit/project_index/features/documents/test_store.py tests/unit/project_index/features/write/test_apply.py tests/unit/project_index/test_serve.py -p no:cacheprovider --basetemp=/tmp/pi143-tmp/bt --continue-on-collection-errors
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/feat-project-index-same-file-check-and-x-key-field
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 126 items / 1 error
+
+tests/unit/project_index/features/documents/test_store.py ...F.......... [ 11%]
+...............F............                                             [ 33%]
+tests/unit/project_index/features/write/test_apply.py .................. [ 47%]
+..................FF                                                     [ 63%]
+tests/unit/project_index/test_serve.py ................................. [ 89%]
+....F........                                                            [100%]
+
+==================================== ERRORS ====================================
+_ ERROR collecting tests/unit/project_index/features/documents/test_fields.py __
+ImportError while importing test module '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-project-index-same-file-check-and-x-key-field/tests/unit/project_index/features/documents/test_fields.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/documents/test_fields.py:8: in <module>
+    from project_index.features.documents.fields import (
+E   ImportError: cannot import name 'resolve_ref_path' from 'project_index.features.documents.fields' (/home/shuhei2441/repo/project-index/.claude/worktrees/feat-project-index-same-file-check-and-x-key-field/src/project_index/features/documents/fields.py)
+=================================== FAILURES ===================================
+__________________ test_document_store_load_when_duplicate_id __________________
+
+document_store = <project_index.features.documents.store.DocumentStore object at 0x7b081bae3360>
+workspace = Target(source=ServedSource(id='sample', root=PosixPath('/tmp/pi143-tmp/bt/test_document_store_load_when_2/ws'), config...tmp/bt/test_document_store_load_when_2/ws'), ref=None, worktree=None, access='write', outside_scope=False, commit=None)
+write_files = <function write_files.<locals>._write at 0x7b081b9f5900>
+
+    def test_document_store_load_when_duplicate_id(
+        document_store: DocumentStore,
+        workspace: Target,
+        write_files: Callable[[Path, dict[str, str]], None],
+    ) -> None:
+        """重なった ID（正常系）。"""
+        # 準備
+        write_files(
+            workspace.base, {"rules/a.yaml": "id: x\nname: A\n", "rules/b.yaml": "id: x\nname: B\n"}
+        )
+        # 実行
+        result = document_store.load(workspace, kinds=["rules"])
+        # 検証
+        assert [doc.path for doc in result.documents] == ["rules/a.yaml"]
+        assert [(p.path, p.reason) for p in result.problems] == [("rules/b.yaml", "duplicate_id")]
+>       assert [doc.path for doc in result.duplicates] == ["rules/b.yaml"]
+                                    ^^^^^^^^^^^^^^^^^
+E       AttributeError: 'LoadResult' object has no attribute 'duplicates'
+
+tests/unit/project_index/features/documents/test_store.py:203: AttributeError
+_____________________ test_check_sync_when_rows_share_file _____________________
+
+document_store = <project_index.features.documents.store.DocumentStore object at 0x7b081b9ca6d0>
+tmp_path = PosixPath('/tmp/pi143-tmp/bt/test_check_sync_when_rows_shar0')
+write_files = <function write_files.<locals>._write at 0x7b081b9c9900>
+make_source_config = <function make_source_config.<locals>._make at 0x7b081b9c9430>
+make_served_source = <function make_served_source.<locals>._make at 0x7b081b9c94e0>
+
+    def test_check_sync_when_rows_share_file(
+        document_store: DocumentStore,
+        tmp_path: Path,
+        write_files: Callable[[Path, dict[str, str]], None],
+        make_source_config: Callable[..., SourceConfig],
+        make_served_source: Callable[..., ServedSource],
+    ) -> None:
+        """2 つの行が同じファイルを文書にする（正常系）。"""
+        # 準備
+        root = tmp_path / "ws"
+        write_files(
+            root,
+            {
+                "src/files.yaml": "files:\n  - path: a.yaml\n  - path: b.py\n  - path: c.py\n",
+                "src/a.yaml": "id: src/a.yaml\n",
+                "src/b.py": "b = 1\n",
+                "src/c.py": "a = 1\n",
+            },
+        )
+        documents = [
+            DocumentTable(
+                id="src",
+                paths=["src/files.yaml"],
+                schema_path="schemas/rule.schema.yaml",
+                records="files",
+                body_file="path",
+            ),
+            DocumentTable(
+                id="yaml",
+                paths=["src/*.yaml"],
+                schema_path="schemas/rule.schema.yaml",
+            ),
+            DocumentTable(
+                id="off",
+                paths=["src/b.py"],
+                schema_path="schemas/rule.schema.yaml",
+                enabled=False,
+            ),
+            DocumentTable(
+                id="py",
+                paths=["src/c.py"],
+                schema_path="schemas/rule.schema.yaml",
+            ),
+        ]
+        source = make_served_source(root=root, config=make_source_config(documents=documents))
+        # 実行
+        report = store_module.check_sync(document_store, source)
+        # 検証
+>       assert report.duplicate_files == ["src/a.yaml: src・yaml", "src/c.py: src・py"]
+               ^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'SyncReport' object has no attribute 'duplicate_files'
+
+tests/unit/project_index/features/documents/test_store.py:1009: AttributeError
+_________________ test_apply_operation_when_text_edit_ref_path _________________
+
+    def test_apply_operation_when_text_edit_ref_path() -> None:
+        """参照の型の項目のパスで配列の要素の中を置き換える（正常系）。"""
+        # 準備
+        current = {
+            "functions": [
+                {"name": "load", "process": "a書き出す"},
+                {"name": "save", "process": "a書き出す"},
+                {"name": "save", "process": "a書き出す"},
+            ]
+        }
+        operation = Operation(
+            op="update",
+            id="doc-1",
+            expected_version="v1",
+            text_edits=[TextEdit(field="#functions[save#2].process", old="書き出す", new="保存する")],
+        )
+        # 実行
+>       result = apply_operation(current, operation, schema=_FUNCTIONS_SCHEMA)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: apply_operation() got an unexpected keyword argument 'schema'
+
+tests/unit/project_index/features/write/test_apply.py:533: TypeError
+___________ test_apply_operation_when_text_edit_ref_path_unresolved ____________
+
+    def test_apply_operation_when_text_edit_ref_path_unresolved() -> None:
+        """参照の型の項目のパスが要素を指せない（異常系）。"""
+        # 準備
+        current = {"functions": [{"name": "load", "process": "a"}]}
+        operation = Operation(
+            op="update",
+            id="doc-1",
+            expected_version="v1",
+            text_edits=[TextEdit(field="#functions[missing].process", old="a", new="b")],
+        )
+        # 実行・検証
+        with pytest.raises(InvalidArgumentError) as exc_info:
+>           apply_operation(current, operation, schema=_FUNCTIONS_SCHEMA)
+E           TypeError: apply_operation() got an unexpected keyword argument 'schema'
+
+tests/unit/project_index/features/write/test_apply.py:556: TypeError
+__________________ test_log_source_check_when_duplicate_files __________________
+
+make_served_source = <function make_served_source.<locals>._make at 0x7b08196166c0>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x7b08197e4af0>
+
+    def test_log_source_check_when_duplicate_files(
+        make_served_source: Callable[..., ServedSource],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """重なったファイルを警告のログに書く（正常系）。"""
+        # 準備
+        from project_index.features.describe.source_checks import SourceCheck
+        from project_index.features.documents.types import SyncReport
+        from project_index.main import log_source_check
+    
+        source = make_served_source(id="sample")
+        check = SourceCheck(
+>           report=SyncReport(source_id="sample", duplicate_files=["src/a.py: src・py"]),
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            nav=[],
+        )
+E       TypeError: SyncReport.__init__() got an unexpected keyword argument 'duplicate_files'
+
+tests/unit/project_index/test_serve.py:1091: TypeError
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/documents/test_fields.py
+FAILED tests/unit/project_index/features/documents/test_store.py::test_document_store_load_when_duplicate_id
+FAILED tests/unit/project_index/features/documents/test_store.py::test_check_sync_when_rows_share_file
+FAILED tests/unit/project_index/features/write/test_apply.py::test_apply_operation_when_text_edit_ref_path
+FAILED tests/unit/project_index/features/write/test_apply.py::test_apply_operation_when_text_edit_ref_path_unresolved
+FAILED tests/unit/project_index/test_serve.py::test_log_source_check_when_duplicate_files
+==================== 5 failed, 121 passed, 1 error in 2.05s ====================

@@ -321,11 +321,12 @@ def _apply_existing(
     document: Document,
     table: DocumentTable,
     now: datetime,
+    schema: Mapping[str, Any],
 ) -> tuple[str, str]:
     """`update`・`replace` を当てた、(ファイルのパス, 新しい内容) を返す。"""
     text = session.text(document.path)
     current, container = _content_for(table, text, document, document.path)
-    new_content = apply_operation(current, operation)
+    new_content = apply_operation(current, operation, schema=schema)
     if operation.op == "replace":
         new_content = CommentedMap(new_content)
     if not session.target.source.is_git:
@@ -883,7 +884,8 @@ def _apply_existing_one(
         else None
     )
     body = {} if existing.body_path is None or new_body is None else {existing.body_path: new_body}
-    path, text = _apply_existing(session, operation, existing, table, now)
+    schema = checker.store.row_schema(session.target, existing.kind)
+    path, text = _apply_existing(session, operation, existing, table, now, schema)
     new_document, unchecked = _check_and_commit(
         session,
         checker,

@@ -335,6 +335,7 @@ def check_project(request: CheckProjectRequest, *, handlers: Handlers) -> CheckP
         ("unindexed_files", report.unindexed_files),
         ("missing_body_files", report.missing_body_files),
         ("unresolved_related", report.unresolved_related),
+        ("duplicate_files", report.duplicate_files),
     )
     items = [SyncItem(kind=kind, path=path) for kind, paths in entries for path in paths]  # type: ignore[arg-type]
     counts = SyncCounts.of(report)
@@ -351,6 +352,7 @@ def check_project(request: CheckProjectRequest, *, handlers: Handlers) -> CheckP
             unindexed_files=counts.unindexed_files,
             missing_body_files=counts.missing_body_files,
             unresolved_related=counts.unresolved_related,
+            duplicate_files=counts.duplicate_files,
             items=items[:SYNC_ITEMS_LIMIT],
         ),
         warnings=nav_warnings(handlers.store, source),
@@ -596,7 +598,8 @@ def write_nav(request: WriteNavRequest, *, handlers: Handlers) -> WriteNavResult
             next_steps=["/project-index:setup で配信元を追加してください"],
         )
     try:
-        doc = load_roundtrip(config_file.read_text(encoding="utf-8"), file=str(config_file))
+        original = config_file.read_text(encoding="utf-8")
+        doc = load_roundtrip(original, file=str(config_file))
     except YamlLoadError as error:
         raise ConfigParseError(
             message=f"配信元の設定を読み込めません: {config_file}（{error}）",
@@ -625,7 +628,8 @@ def write_nav(request: WriteNavRequest, *, handlers: Handlers) -> WriteNavResult
     for index, operation in enumerate(request.operations):
         _apply_nav_operation(nav, operation, index)
     doc["nav"] = nav
-    text = dump_roundtrip(doc)
+    # 読んだ設定のファイルの配列の字下げで書く
+    text = dump_roundtrip(doc, original=original)
     # 書いた後の設定を使い捨てのフォルダに置き、配信元を組み立てて確かめる
     with tempfile.TemporaryDirectory() as directory:
         file = Path(directory) / CONFIG_FILE
