@@ -29,7 +29,7 @@ def _row(source: Any, **overrides: Any) -> dict[str, Any]:
 
 
 def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]) -> None:
-    """同じ id の行が無ければ末尾に追加し、配信元を読み直す（正常系）。"""
+    """同じ id の行が無ければ末尾に追加し、配信元を再読み込みする（正常系）。"""
     # 準備
     sample = make_source("sample")
     extra = make_source("extra")

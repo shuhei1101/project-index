@@ -568,7 +568,7 @@ functions:
         description: 作業場所
     returns:
       type: Target
-      description: 書き込む場所（`ref` は常に `None`、`access` は `write`。ワークツリーへ書くときの `source` はそのワークツリーの設定で読み直した配信元）
+      description: 書き込む場所（`ref` は常に `None`、`access` は `write`。ワークツリーへ書くときの `source` はそのワークツリーの設定で再読み込みした配信元）
     process: |-
       1. `cwd` を正規化し、配信元を決める。`None` なら作業中の配信元、無ければ使える配信元を添えた `SourceNotWritableError` を送る
       2. 権限が `write` でなければ、使える配信元を添えた `SourceNotWritableError` を送る
@@ -577,8 +577,8 @@ functions:
          - `worktree` を渡された場合、当たらなければ `WorktreeNotMatchedError` を送る
          - 渡されず、`cwd` がワークツリーの中ならそのワークツリー
       4. ワークツリーが無く、配信元が Git の配信元の場合、`clone` にクローン本体（`main_root`、無ければ `repo_root`）を入れた `TargetIsCloneError` を送る
-      5. ワークツリーへ書く場合、配信元をワークツリーの設定で読み直す（作業場所の配信元の読み込み）。検証に通らなければ `ValidationFailedError` を送る
-      6. Git の管理外は登録済みの配信元と `root`、ワークツリーは読み直した配信元とその `base` を `Target` にして返す
+      5. ワークツリーへ書く場合、配信元をワークツリーの設定で再読み込みする（作業場所の配信元の読み込み）。検証に通らなければ `ValidationFailedError` を送る
+      6. Git の管理外は登録済みの配信元と `root`、ワークツリーは再読み込みした配信元とその `base` を `Target` にして返す
     exceptions:
       - name: SourceNotWritableError
         condition: '`cwd` が配信元の `scope.write` に当たらない'
@@ -631,13 +631,13 @@ functions:
         exception: 書く先がクローン本体
       - name: test_resolve_write_target_when_worktree_config
         case: 正常
-        summary: ワークツリーの設定で読み直した配信元を使う
+        summary: ワークツリーの設定で再読み込みした配信元を使う
         condition: '`worktree` に sample のワークツリーを指定する'
         mock: 配信元の一覧（偽物）・作業場所の配信元の読み込み（ワークツリーの設定の配信元を返す偽物）
         expected: '`source` が作業場所の配信元の読み込みの返した配信元そのもので、作業場所の配信元の読み込みが sample とそのワークツリーで 1 回呼ばれる'
       - name: test_resolve_write_target_when_folder_not_reloaded
         case: 正常
-        summary: Git の管理外は読み直さない
+        summary: Git の管理外は再読み込みしない
         condition: Git の管理外の notes、`cwd` が `scope.write` に当たる
         mock: 配信元の一覧（偽物）・作業場所の配信元の読み込み（呼ばれたら失敗する偽物）
         expected: '`source` が登録済みの notes のまま、作業場所の配信元の読み込みが呼ばれない'
@@ -671,3 +671,4 @@ refs:
   - to: IF-1
     type: requires
     when: インターフェース定義『配信元の説明』の入出力を変えるときに、この設計書の関数と型を合わせる。
+visibility: internal

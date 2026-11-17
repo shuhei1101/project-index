@@ -121,7 +121,7 @@ def make_env(
     """git リポジトリとそのワークツリー x を持つ配信元と、書き込みの部品を作る関数を返す。"""
 
     def keep_source(source: ServedSource, _root: Path) -> ServedSource:
-        # 配信元はメモリ上の設定で作るため、ワークツリーの設定の読み直しは受け取った配信元のまま返す
+        # 配信元はメモリ上の設定で作るため、ワークツリーの設定の再読み込みは受け取った配信元のまま返す
         return source
 
     monkeypatch.setattr(access_service, "load_source_at", keep_source)

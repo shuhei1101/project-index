@@ -69,9 +69,9 @@ classes:
     role: キャッシュ
     summary: 読む場所（`Target`）ごとに文書を集め、ファイルごとに結果をキャッシュする
     description: |-
-      キャッシュのキーはファイルの絶対パスと文書の行の ID。更新日時（`st_mtime_ns`）と大きさが変わったファイルだけを読み直す。
+      キャッシュのキーはファイルの絶対パスと文書の行の ID。更新日時（`st_mtime_ns`）と大きさが変わったファイルだけを再読み込みする。
       `ref` を持つ読む場所は、ファイルの blob の SHA と日時をキーの照合に使い、commit をまたいで変わらないファイルの結果を使い回す（`_revision_files`）。
-      配信元の読み直しで文書の行が変わったときは、行の内容がキーに含まれないので、起動の設定の読み直しで `clear` を呼ぶ。
+      配信元の再読み込みで文書の行が変わったときは、行の内容がキーに含まれないので、起動の設定の再読み込みで `clear` を呼ぶ。
     kind: クラス
     properties:
       - name: snapshots
@@ -181,7 +181,7 @@ classes:
                - `_worktrees` に無い場合、『フォルダごとの列挙』でたどり、ファイルの一覧と、フォルダごとの更新日時を記録する。手順 7 の前に `[info]` ワークツリーを読み込んだ（配信元・ワークツリーのパス・秒数）を書く
                - `_worktrees` にある場合、記録したフォルダごとに `stat` を取る。更新日時が変わった・無くなったフォルダがあればたどり直して置き換え、無ければ記録したファイルの一覧を使う（たどり直しではログを書かない）
                - 『ファイルの収集』の結果を、行の定義のハッシュごとに `_worktrees` に持ち、ファイルの一覧が変わらなければ集め直さない
-               - 読み込みを終えたら `_worktrees` の末尾に入れ（使った順）、`WORKTREE_KEEP` 件を超えたら先頭から捨てる（そのワークツリーの `_worktree_locks` も除く）。捨てたワークツリーは、次に指されたときに初めての読み込みとして読み直す
+               - 読み込みを終えたら `_worktrees` の末尾に入れ（使った順）、`WORKTREE_KEEP` 件を超えたら先頭から捨てる（そのワークツリーの `_worktree_locks` も除く）。捨てたワークツリーは、次に指されたときに初めての読み込みとして再読み込みする
              - `target.ref` が `None` の場合、ファイルごとに `stat` を取る。`_files` の更新日時と大きさが同じで、理由に `missing_body_file` が無く、本文のファイルの (パス, 更新日時, 大きさ) も同じならキャッシュした結果を使い、それ以外は『ファイルの読み込み』で読んで `_files` を置き換える
              - `target.ref` がある場合、読む場所の commit のファイルの blob の SHA を `_trees` から引く（無ければ `git ls-tree -r --full-tree {commit}` を 1 回だけ起動してキャッシュする）。`_revision_files` の blob の SHA が同じで、理由に `missing_body_file` が無く、本文のファイルの (パス, blob の SHA) と、ファイルと本文のファイルの日時（手順 3）も同じならキャッシュした結果を使い、それ以外は『ファイルの読み込み』で読んで `_revision_files` を置き換える。blob の SHA が無いファイルは読まない
           5. 収集で当たらなかった `_files` のキーのうち、読むフォルダの下にあるものを削除する（削除されたファイル）。
@@ -208,7 +208,7 @@ classes:
             exception: '-'
           - name: test_document_store_load_when_cached
             case: 正常
-            summary: 変わったファイルだけ読み直す
+            summary: 変わったファイルだけ再読み込みする
             condition: 2 回呼ぶ間に `rules/a.yaml` だけを書き換える
             mock: '`load_file`（本物を包んで呼ばれたパスを記録する）'
             expected: 2 回目に `load_file` が呼ばれたのは `rules/a.yaml` だけで、結果に書き換えた内容が載る
@@ -242,19 +242,19 @@ classes:
             expected: 最初の commit の内容を返し、リビジョンの解決が呼ばれない
           - name: test_document_store_load_when_revision_reused
             case: 正常
-            summary: 新しい commit でも変わったファイルだけ読み直す
+            summary: 新しい commit でも変わったファイルだけ再読み込みする
             condition: Git の配信元で `rules/a.yaml`・`rules/b.yaml` を commit し、最初の commit を持つ読む場所で `load` した後、`rules/a.yaml` だけを書き換えた 2 つ目の commit を持つ読む場所で `load` する
             mock: '`load_file`（本物を包んで呼ばれたパスを記録する）'
             expected: 2 回目に `load_file` が呼ばれたのは `rules/a.yaml` だけで、`rules/a.yaml` の文書が書き換えた内容と 2 つ目の commit の日時、`rules/b.yaml` の文書が最初の内容を返す
           - name: test_document_store_load_when_revision_reused_after_clear
             case: 正常
-            summary: 配信元の組み立て直しの後も変わったファイルだけ読み直す
+            summary: 配信元の組み立て直しの後も変わったファイルだけ再読み込みする
             condition: test_document_store_load_when_revision_reused と同じ配信元で、最初の commit を持つ読む場所で `load` し、`clear` を呼んだ後、`rules/a.yaml` だけを書き換えた 2 つ目の commit を持つ読む場所で `load` する
             mock: '`load_file`（本物を包んで呼ばれたパスを記録する）'
             expected: 2 回目に `load_file` が呼ばれたのは `rules/a.yaml` だけ
           - name: test_document_store_load_when_revision_table_changed
             case: 正常
-            summary: 文書の行の定義が変われば読み直す
+            summary: 文書の行の定義が変われば再読み込みする
             condition: 'Git の配信元で `rules/a.yaml`（`title` を持つ）を commit し、同じ commit を持つ読む場所で、行 `rules` の `metadata` を `{}` にした配信元と `{name: title}` にした配信元で順に `load` する'
             mock: '`load_file`（本物を包んで呼ばれたパスを記録する）'
             expected: 2 回とも `load_file` が `rules/a.yaml` で呼ばれ、2 回目の文書の `name` が `title` の値
@@ -385,7 +385,7 @@ classes:
           3. `target.ref` がある場合、`repo_root`・読む場所の commit（`load` と同じ）・スキーマのファイル（設定ファイルのフォルダからの相対パスを `source.config_path` で `root` からにしたもの）の `repo_root` からの相対パスで `_revision_schemas` を引き、当たればそのまま返す（リビジョンの書き出しとファイルの `stat` をしない）。
              当たらなければ、`load` と同じ読むフォルダの `source.config_path(schema_path)` を『YAMLの読み込み』で読み、`$ref` を解いた結果を `_revision_schemas` にキャッシュする
              - ファイルが無い・読めない場合、手順 2 のスキーマを使い、キャッシュしない
-          4. ワークツリーの場合、読むフォルダの `source.config_path(schema_path)` を `_schemas` から引き、更新日時か大きさが違えば『YAMLの読み込み』で読み直す
+          4. ワークツリーの場合、読むフォルダの `source.config_path(schema_path)` を `_schemas` から引き、更新日時か大きさが違えば『YAMLの読み込み』で再読み込みする
              - ファイルが無い・読めない場合、手順 2 のスキーマを使う
           5. `$ref` を解いたスキーマを返す（スキーマの参照の解決。基準は手順 2〜4 で使った `schema_path`）。ワークツリーで解いた結果は `_schemas` にキャッシュする
         exceptions:
@@ -537,7 +537,7 @@ classes:
           type: None
           description: '-'
         process: |-
-          1. `_files`・`_schemas`・`_revision_schemas`・`_dates`・`_startup_schemas`・`_worktrees` を空にし、`_generation` を 1 つ増やす（起動の『配信元の読み直し』と『配信元のキャッシュの破棄』が呼ぶ）
+          1. `_files`・`_schemas`・`_revision_schemas`・`_dates`・`_startup_schemas`・`_worktrees` を空にし、`_generation` を 1 つ増やす（起動の『配信元の再読み込み』と『配信元のキャッシュの破棄』が呼ぶ）
           2. `_revision_files`・`_trees` は、commit の blob と文書の行の定義で中身が決まり古くならないので残す
       - name: location
         title: 文書の場所
@@ -642,7 +642,7 @@ functions:
     usecase: 起動
     role: サービス
     summary: 配信元のクローン本体の文書を読み、`metadata` の列の欠け・管理用の YAML のずれ・当たらない関連・エイリアスのキーの違反を求める
-    description: 起動時と読み直しのときに呼ぶ。[shuhei1101/dev-docs#4 管理用のプラグインを作る](https://github.com/shuhei1101/dev-docs/issues/4) の `check_project` も呼ばれるたびにこの関数で求め直す。
+    description: 起動時と再読み込みのときに呼ぶ。[shuhei1101/dev-docs#4 管理用のプラグインを作る](https://github.com/shuhei1101/dev-docs/issues/4) の `check_project` も呼ばれるたびにこの関数で求め直す。
     kind: 関数
     scope: public
     thread_safe: true
@@ -712,3 +712,4 @@ functions:
         mock: なし（一時フォルダの配信元）
         expected: '`unindexed_files` が空'
         exception: '-'
+visibility: internal

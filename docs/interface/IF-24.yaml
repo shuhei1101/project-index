@@ -285,7 +285,7 @@ constraints:
   - item: 並び
     constraint: '`documents[]` の行の順、行の中はパスの順'
   - item: 値の読み込み
-    constraint: '`value`・`version`・`commonKeys` は文書のストアが読み込み済みの文書から返し、文書ごとにファイルを読み直さない'
+    constraint: '`value`・`version`・`commonKeys` は文書のストアが読み込み済みの文書から返し、文書ごとにファイルを再読み込みしない'
   - item: 認可
     constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
     decided_by: NFR-1#requirements[通信]
@@ -294,3 +294,4 @@ constraints:
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、`ref` を無視して登録したフォルダの文書を返し、応答の `ref` を空にする'
 test_file: tests/integration/server/test_list_documents.py
+visibility: internal

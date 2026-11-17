@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/shuhei1101/knowledge/design-schemas/v9.2.0/schemas/knowledge-files.schema.yaml
+files:
+- path: common.schema.yaml
+  name: プロンプトのスキーマが参照する共通の型
+  description: プロンプトのスキーマが `$ref` で参照する ID などの共通の型を受け持ち、setup が配信元へ配置する共通の型を修正するときに参照する。
+  tags:
+  - topic:スキーマ
+  - topic:プロンプト
+  related:
+  - to: MOD-43
+    type: see_also
+- path: project-index.schema.json
+  name: 配信元の設定の JSON Schema
+  description: '`project-index.yaml` のキーの JSON Schema を受け持ち、エディタの補完と配信元の設定の 1 行目の `$schema` が指すスキーマを修正するときに参照する。'
+  tags:
+  - topic:スキーマ
+  - topic:設定
+  - tool:jsonschema
+  related:
+  - to: MOD-70
+    type: see_also
+- path: prompt.schema.yaml
+  name: プロンプトの YAML のスキーマ
+  description: '`content/prompts/` のプロンプトの部品・変数・例のスキーマを受け持ち、プロンプトの YAML のキーを追加・修正するときに参照する。'
+  tags:
+  - topic:スキーマ
+  - topic:プロンプト
+  related:
+  - to: MOD-43
+    type: see_also
+  - to: LIB-8
+    type: see_also
+checkpoint:
+  commit: b993fd808f7e5508c0f2e02101c1f615d2b4674b
+  reviewed: []

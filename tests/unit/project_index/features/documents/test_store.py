@@ -154,7 +154,7 @@ def test_document_store_load_when_cached(
     write_files: Callable[[Path, dict[str, str]], None],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """変わったファイルだけ読み直す（正常系）。"""
+    """変わったファイルだけ再読み込みする（正常系）。"""
     # 準備
     calls: list[str] = []
     real = store_module.load_file
@@ -306,7 +306,7 @@ def test_document_store_load_when_revision_reused(
     document_store: DocumentStore,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """新しい commit でも変わったファイルだけ読み直す（正常系）。"""
+    """新しい commit でも変わったファイルだけ再読み込みする（正常系）。"""
     # 準備
     root, first, second = _two_commits(git_repo, write_files, run_git)
     source = _git_source(root, root, make_source_config, make_served_source)
@@ -333,7 +333,7 @@ def test_document_store_load_when_revision_reused_after_clear(
     document_store: DocumentStore,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """配信元の組み立て直しの後も変わったファイルだけ読み直す（正常系）。"""
+    """配信元の組み立て直しの後も変わったファイルだけ再読み込みする（正常系）。"""
     # 準備
     root, first, second = _two_commits(git_repo, write_files, run_git)
     source = _git_source(root, root, make_source_config, make_served_source)
@@ -356,7 +356,7 @@ def test_document_store_load_when_revision_table_changed(
     document_store: DocumentStore,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """文書の行の定義が変われば読み直す（正常系）。"""
+    """文書の行の定義が変われば再読み込みする（正常系）。"""
     # 準備
     root = git_repo({"rules/a.yaml": "id: a\ntitle: T\n"})
     head = run_git(root, "rev-parse", "HEAD").strip()

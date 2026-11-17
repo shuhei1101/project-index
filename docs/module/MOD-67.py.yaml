@@ -261,7 +261,7 @@ data_models:
         title: 状態
         type: Literal['serving', 'not_served', 'disabled', 'pending_reload']
         access: 公開
-        description: 配信元の状態の `status`。当たる配信元の状態が無い行（読み直していない行）は `pending_reload`
+        description: 配信元の状態の `status`。当たる配信元の状態が無い行（再読み込みしていない行）は `pending_reload`
       - name: errors
         title: 除外した理由
         type: list[dict[str, str]]
@@ -353,7 +353,7 @@ data_models:
         title: 配信元の状態
         type: list[SourceStatus]
         access: 公開
-        description: '`added` のとき、読み直した後の状態'
+        description: '`added` のとき、再読み込みした後の状態'
       - name: version
         title: 内容のバージョン
         type: str
@@ -381,7 +381,7 @@ data_models:
         title: 配信元の状態
         type: list[SourceStatusItem]
         access: 公開
-        description: '`added` のとき、読み直した後の状態'
+        description: '`added` のとき、再読み込みした後の状態'
       - name: warnings
         title: 警告
         type: list[SettingsWarning]
@@ -460,7 +460,7 @@ data_models:
         title: 配信元の状態
         type: list[SourceStatus]
         access: 公開
-        description: 読み直した後の配信元の状態
+        description: 再読み込みした後の配信元の状態
       - name: version
         title: 内容のバージョン
         type: str
@@ -545,3 +545,4 @@ classes:
         type: str
         access: 公開
         description: パスの `id`
+visibility: internal

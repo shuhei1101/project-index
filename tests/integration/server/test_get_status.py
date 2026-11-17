@@ -137,7 +137,7 @@ def test_normal_when_reload_checking(
 
     def blocked_check(store: Any, source: Any) -> Any:
         calls.append(source.id)
-        # 起動の後の 1 回はそのまま通し、読み直しの後の検査は合図まで止める
+        # 起動の後の 1 回はそのまま通し、再読み込みの後の検査は合図まで止める
         if len(calls) > 1:
             release.wait(timeout=CHECK_WAIT_SEC)
         return check_sync(store, source)

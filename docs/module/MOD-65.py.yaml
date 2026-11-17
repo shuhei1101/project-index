@@ -48,8 +48,8 @@ functions:
       description: 5 つのルートを持つルーター
     process: |-
       1. 全てのルートは、先頭で `await handlers.registry.wait_loaded()` を呼び、配信元の初回の読み込みが終わるまで待つ（起動.待ち受けまでの順番）
-      2. GET `/settings/sources` は、排他を取らずに `handlers.terminal.file` を 1 回だけ読んで本文と内容のバージョンを求め（端末の設定の内容の読み込み）、同じ本文を端末の設定の読み込みに `text` で渡して行にする。`handlers.terminal.file` を `settings_path` にし、`sources[]` の各行に、`config`（行に `id` があれば `id` も）が同じ配信元の状態の `id`・`status`・`errors`・`config_version` を重ねた（行の `config`・`enabled`・`scope`・`outside_read` はそのまま返す）（1 つの状態は 1 行にだけ重ねる。当たる状態が無い行は `status` を `pending_reload`・`id` を行の `id` にする） `SettingsSourcesView` を、内容のバージョンを `version` にして返す（配信元の一覧.状態の一覧）。`warnings` は読み直した端末の設定の知らないキーの警告（知らないキーの警告）
-      3. PUT `/settings/sources` は、同じオリジンの確認を依存に持ち（同じオリジンの確認）、本文を `SettingsSourcesRequest` で受けて『配信元の保存』を `expected_version`・`reload=handlers.reload_sources`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼び、`SettingsSourcesWriteResponse` を返す（配信元の保存）。`warnings` は保存の後の `handlers.terminal`（読み直しで差し替わる）の知らないキーの警告
+      2. GET `/settings/sources` は、排他を取らずに `handlers.terminal.file` を 1 回だけ読んで本文と内容のバージョンを求め（端末の設定の内容の読み込み）、同じ本文を端末の設定の読み込みに `text` で渡して行にする。`handlers.terminal.file` を `settings_path` にし、`sources[]` の各行に、`config`（行に `id` があれば `id` も）が同じ配信元の状態の `id`・`status`・`errors`・`config_version` を重ねた（行の `config`・`enabled`・`scope`・`outside_read` はそのまま返す）（1 つの状態は 1 行にだけ重ねる。当たる状態が無い行は `status` を `pending_reload`・`id` を行の `id` にする） `SettingsSourcesView` を、内容のバージョンを `version` にして返す（配信元の一覧.状態の一覧）。`warnings` は再読み込みした端末の設定の知らないキーの警告（知らないキーの警告）
+      3. PUT `/settings/sources` は、同じオリジンの確認を依存に持ち（同じオリジンの確認）、本文を `SettingsSourcesRequest` で受けて『配信元の保存』を `expected_version`・`reload=handlers.reload_sources`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼び、`SettingsSourcesWriteResponse` を返す（配信元の保存）。`warnings` は保存の後の `handlers.terminal`（再読み込みで差し替わる）の知らないキーの警告
          - `TerminalConfigInvalidError` は例外の変換で 422、`SettingsVersionMismatchError` は 409 の problem+json になる
       4. POST `/settings/sources` は、同じオリジンの確認を依存に持ち、本文を `SettingsSourceAddRequest` で受けて『配信元の 1 行の追加』を `expected_version`・`reload=handlers.reload_changed`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼ぶ。`added` は 201、`exists` は 409 で `SettingsSourceAddResponse` を返す。`warnings` は PUT と同じ
       5. PATCH `/settings/sources/{source_id}` は、同じオリジンの確認を依存に持ち、本文を `SettingsSourcePatchRequest` で受けて『配信元の 1 行の変更』を `reload=handlers.reload_changed`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼び、200 で `SettingsSourcesWriteResponse` を返す。`warnings` は PUT と同じ
@@ -71,7 +71,7 @@ functions:
         expected: 200 で `sources[].status`。`save_sources` に送った行と `expected_version` が渡る
       - name: test_build_settings_router_when_pending_reload
         case: 正常
-        summary: 読み直していない行を pending_reload で返す
+        summary: 再読み込みしていない行を pending_reload で返す
         condition: GET `/settings/sources`、ファイルは状態より行が 1 つ多く、既存の 2 行の並びが状態と逆
         mock: 配線済みの関数（偽物）
         expected: 200 でファイルの順に 3 行。追加した行は `pending_reload`、他の 2 行は自分の `config` の状態
@@ -139,3 +139,4 @@ refs:
   - to: IF-34
     type: requires
     when: インターフェース定義『端末の設定の配信元の 1 行の削除』の入出力を変えるときに、この設計書の関数と型を合わせる。
+visibility: internal

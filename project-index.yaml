@@ -197,7 +197,7 @@ documents:
   - id: files_guide
     title: 公開ドキュメントの Markdown
     paths: ["docs/guide/files.yml"]
-    exclude: ["*.yaml", README.md, はじめに.md, 使い方.md, リファレンス.md]
+    exclude: ["*.yaml"]
     schema:
       source: knowledge
       path: schemas/knowledge-files.schema.yaml
@@ -210,7 +210,6 @@ documents:
   - id: src
     title: 索引のサーバーのコード
     paths: [src/files.yaml]
-    exclude: ["*.schema.yaml", aliases.source.yaml, steps.yaml]
     schema:
       source: knowledge
       path: schemas/knowledge-files.schema.yaml
@@ -227,15 +226,63 @@ documents:
     records: files
     body_file: path
   - id: plugin
-    title: プラグインのフックのコード
+    title: プラグイン
     paths: [plugins/project-index/files.yaml]
-    exclude: ["*.json", "*.md"]
     schema:
       source: knowledge
       path: schemas/knowledge-files.schema.yaml
       ref: design-schemas/v9.2.0
     records: files
     body_file: path
+  - id: docs_folder
+    title: 文書のフォルダの目次と画面の設定
+    paths:
+      - docs/_theme/files.yml
+      - docs/architecture/files.yml
+      - docs/config/files.yml
+      - docs/dev-command/files.yml
+      - docs/external-api/files.yml
+      - docs/glossary/files.yml
+      - docs/interface/files.yml
+      - docs/layout/files.yml
+      - docs/library/files.yml
+      - docs/module/files.yml
+      - docs/nonfunctional/files.yml
+      - docs/scenario/files.yml
+      - docs/test-procedure/files.yml
+    exclude: ["*.yaml"]
+    schema:
+      source: knowledge
+      path: schemas/knowledge-files.schema.yaml
+      ref: design-schemas/v9.2.0
+    records: files
+    body_file: path
+  - id: repo
+    title: スキーマ・雛形・型・CI・マーケットプレイス
+    paths:
+      - .claude-plugin/files.yaml
+      - .github/files.yaml
+      - schemas/files.yaml
+      - templates/files.yaml
+      - typings/files.yaml
+    schema:
+      source: knowledge
+      path: schemas/knowledge-files.schema.yaml
+      ref: design-schemas/v9.2.0
+    records: files
+    body_file: path
+  - id: prompts
+    title: プロンプト
+    paths: [content/prompts/**/*.yaml]
+    schema: schemas/prompt.schema.yaml
+    converter: prompt-doc
+    metadata:
+      name: name
+      description: description
+      tags: tags
+converters:
+  - id: prompt-doc
+    run: [project-index, prompt-doc]
 nav:
   tabs:
     - title: はじめに
@@ -582,6 +629,12 @@ nav:
         - group: テスト
           items:
             - auto: {document: tests, group_by: tags}
+        - group: プロンプト
+          items:
+            - auto: {document: prompts, group_by: kind}
+        - group: スキーマ・雛形・CI
+          items:
+            - auto: {document: repo}
     - title: リファレンス
       items:
         - group: MCP と API

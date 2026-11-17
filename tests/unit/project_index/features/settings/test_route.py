@@ -101,7 +101,7 @@ def test_build_settings_router_when_pending_reload(
     make_terminal_config: Callable[..., TerminalConfig],
     make_status: Callable[..., SourceStatus],
 ) -> None:
-    """読み直していない行を pending_reload で返す（正常系）。"""
+    """再読み込みしていない行を pending_reload で返す（正常系）。"""
     # 準備
     settings = (
         'version: "1"\n'

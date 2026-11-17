@@ -128,7 +128,7 @@ files:
     type: tests
 - path: integration/server/test_get_settings_sources.py
   name: 端末の設定の取得の結合テスト
-  description: '`get_settings_sources` の結合テストを受け持ち、端末の設定の取得の振る舞いのテストを修正するときに参照する。'
+  description: '`GET /settings/sources` が端末の設定の行に配信元の状態を重ね、再読み込みしていない行・読み書きの方法・作業範囲の外の行・知らないキーを返却することを確認する結合テストを受け持ち、端末の設定の取得の応答を変えるときに参照する。'
   tags:
   - topic:結合テスト
   - tool:pytest
@@ -254,7 +254,7 @@ files:
     type: tests
 - path: integration/server/test_put_settings_sources.py
   name: 端末の設定の保存の結合テスト
-  description: '`put_settings_sources` の結合テストを受け持ち、端末の設定の保存の振る舞いのテストを修正するときに参照する。'
+  description: '`PUT /settings/sources` が送信しなかったキーを残して `sources[]` を書き換え、内容のバージョンの照合で更新前のバージョンの要求を断ることを確認する結合テストを受け持ち、端末の設定の保存の応答と排他を変えるときに参照する。'
   tags:
   - topic:結合テスト
   - tool:pytest
@@ -262,8 +262,8 @@ files:
   - to: IF-31
     type: tests
 - path: integration/server/test_reload.py
-  name: 設定の読み直しの結合テスト
-  description: '`reload` の結合テストを受け持ち、設定の読み直しの振る舞いのテストを修正するときに参照する。'
+  name: 設定の再読み込みの結合テスト
+  description: '`reload` の結合テストを受け持ち、設定の再読み込みの振る舞いのテストを修正するときに参照する。'
   tags:
   - topic:結合テスト
   - tool:pytest
@@ -419,7 +419,7 @@ files:
     type: tests
 - path: unit/project_index/features/admin/test_render.py
   name: '管理の MCP の `format: markdown` の応答の文の単体テスト'
-  description: 管理の render.py の単体テストを受け持ち、管理の render.py のテストを修正するときに参照する。
+  description: '`status`・`reload`・`check_project`・`write_nav` の応答の Markdown の行と表を確認する単体テストを受け持ち、管理の MCP の Markdown の応答の文を変えるときに参照する。'
   tags:
   - topic:管理
   - tool:pytest
@@ -428,7 +428,7 @@ files:
     type: tests
 - path: unit/project_index/features/admin/test_service.py
   name: 管理の MCP の `status`・`reload`・`check_project`・`try_convert` の中身の単体テスト
-  description: 管理の service.py の単体テストを受け持ち、管理の service.py のテストを修正するときに参照する。
+  description: '`check_project` の違反と索引の同期・`try_convert`・`write_nav`・`reload` の前後の差を確認する単体テストを受け持ち、管理の MCP の各ツールの判定を変えるときに参照する。'
   tags:
   - topic:管理
   - tool:pytest
@@ -446,7 +446,7 @@ files:
     type: tests
 - path: unit/project_index/features/changes/test_render.py
   name: '`list_changes` の結果の Markdownの単体テスト'
-  description: 変更の render.py の単体テストを受け持ち、変更の render.py のテストを修正するときに参照する。
+  description: '`list_changes` の変わった文書・キー・差分の行の Markdown を確認する単体テストを受け持ち、変更の一覧の表示を変えるときに参照する。'
   tags:
   - topic:変更
   - tool:pytest
@@ -455,7 +455,7 @@ files:
     type: tests
 - path: unit/project_index/features/changes/test_service.py
   name: '`list_changes` の区間か前回読んだ時点からの変わった文書と差分の単体テスト'
-  description: 変更の service.py の単体テストを受け持ち、変更の service.py のテストを修正するときに参照する。
+  description: '`list_changes` の区間の解決・前回参照した時点からの変更・`contains` の単語の出現数の変化を確認する単体テストを受け持ち、変わった文書の求め方を変えるときに参照する。'
   tags:
   - topic:変更
   - tool:pytest
@@ -491,7 +491,7 @@ files:
     type: tests
 - path: unit/project_index/features/convert/test_service.py
   name: '`converters[]` の実行と結果のキャッシュの単体テスト'
-  description: 変換の service.py の単体テストを受け持ち、変換の service.py のテストを修正するときに参照する。
+  description: '`converters[]` のスクリプトの実行とタイムアウト・結果のキャッシュの再利用を確認する単体テストを受け持ち、配信元の変換の実行とキャッシュを変えるときに参照する。'
   tags:
   - topic:変換
   - tool:pytest
@@ -500,7 +500,7 @@ files:
     type: tests
 - path: unit/project_index/features/describe/test_render.py
   name: '`describe` の結果の Markdownの単体テスト'
-  description: 説明の render.py の単体テストを受け持ち、説明の render.py のテストを修正するときに参照する。
+  description: '`describe` の配信元の一覧・警告・種類の表・ワークツリーの表の Markdown を確認する単体テストを受け持ち、配信元の説明の表示を変えるときに参照する。'
   tags:
   - topic:説明
   - tool:pytest
@@ -509,7 +509,7 @@ files:
     type: tests
 - path: unit/project_index/features/describe/test_service.py
   name: '`describe` の使える配信元・説明書と種類・種類のスキーマの単体テスト'
-  description: 説明の service.py の単体テストを受け持ち、説明の service.py のテストを修正するときに参照する。
+  description: '`describe` の作業場所ごとの配信元の一覧・作業範囲の外・ワークツリーの読み替え・警告と種類のスキーマを確認する単体テストを受け持ち、配信元の説明の中身を変えるときに参照する。'
   tags:
   - topic:説明
   - tool:pytest
@@ -782,7 +782,7 @@ files:
     type: tests
 - path: unit/project_index/features/related/test_service.py
   name: '`trace_related` の関連のたどりと関連の候補の単体テスト'
-  description: 関連の service.py の単体テストを受け持ち、関連の service.py のテストを修正するときに参照する。
+  description: '`trace_related` の向き・深さ・コードのパスからのたどりと関連の候補を確認する単体テストを受け持ち、関連のたどり方を変えるときに参照する。'
   tags:
   - topic:関連
   - tool:pytest
@@ -836,7 +836,7 @@ files:
     type: tests
 - path: unit/project_index/features/search/test_render.py
   name: '`search_docs` の結果の Markdownの単体テスト'
-  description: 検索の render.py の単体テストを受け持ち、検索の render.py のテストを修正するときに参照する。
+  description: '`search_docs` の件数・一覧・本文・該当した行の Markdown を確認する単体テストを受け持ち、文書の検索の表示を変えるときに参照する。'
   tags:
   - topic:検索
   - tool:pytest
@@ -845,7 +845,7 @@ files:
     type: tests
 - path: unit/project_index/features/search/test_service.py
   name: '`search_docs` の条件の木・並べ替え・集計・量の上限の単体テスト'
-  description: 検索の service.py の単体テストを受け持ち、検索の service.py のテストを修正するときに参照する。
+  description: '`search_docs` の条件の木・並べ替え・集計・該当した行・量の上限と、`records` の行の文書の検索を確認する単体テストを受け持ち、文書の検索の条件と量を変えるときに参照する。'
   tags:
   - topic:検索
   - tool:pytest
@@ -952,7 +952,7 @@ files:
   - to: src/project_index/features/sources/merge.py
     type: tests
 - path: unit/project_index/features/sources/test_registry.py
-  name: 配信する配信元の一覧と読み直しの単体テスト
+  name: 配信する配信元の一覧と再読み込みの単体テスト
   description: 配信元の registry.py の単体テストを受け持ち、配信元の registry.py のテストを修正するときに参照する。
   tags:
   - topic:配信元
@@ -1016,7 +1016,7 @@ files:
     type: tests
 - path: unit/project_index/features/validation/test_service.py
   name: 検査をまとめて実行する処理と、読み取りの結果のキャッシュの単体テスト
-  description: 検査の service.py の単体テストを受け持ち、検査の service.py のテストを修正するときに参照する。
+  description: 配信元の `validators[]` をまとめて実行した結果と読み取りの結果のキャッシュを確認する単体テストを受け持ち、書き込みの前の検査の実行を変えるときに参照する。
   tags:
   - topic:検査
   - tool:pytest
@@ -1241,7 +1241,7 @@ files:
     type: tests
 - path: unit/project_index/test_main.py
   name: '`project-index` コマンドの引数の組み立てと mainの単体テスト'
-  description: 入口の __main__.py の単体テストを受け持ち、入口の __main__.py のテストを修正するときに参照する。
+  description: '`project-index` のサブコマンドごとの引数の組み立てと `--version`・`--help`・引数なしの終了を確認する単体テストを受け持ち、コマンドの引数を追加・変更するときに参照する。'
   tags:
   - topic:入口
   - tool:pytest
@@ -1249,11 +1249,14 @@ files:
   - to: src/project_index/__main__.py
     type: tests
 - path: unit/project_index/test_serve.py
-  name: '`project-index serve`・`project-index migrate` の部品の配線と、配信元の読み直しの単体テスト'
-  description: 起動の main.py の単体テストを受け持ち、起動の main.py のテストを修正するときに参照する。
+  name: '`project-index serve`・`project-index migrate` の部品の配線と、配信元の再読み込みの単体テスト'
+  description: '`serve`・`migrate`・`changed`・`checkpoint` の実行と、部品の配線・配信元の再読み込み・待ち受けのポートの検査を確認する単体テストを受け持ち、起動と配線を変えるときに参照する。'
   tags:
   - topic:起動
   - tool:pytest
   related:
   - to: src/project_index/main.py
     type: tests
+checkpoint:
+  commit: b993fd808f7e5508c0f2e02101c1f615d2b4674b
+  reviewed: []
