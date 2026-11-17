@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from project_index import poc_timing
+
 import difflib
 import hashlib
 import logging
@@ -165,7 +167,8 @@ class DocumentStore:
         """commit を書き出したフォルダの下の、配信元の直下を返す。"""
         source = target.source
         repo_root = source.repo_root or source.root
-        checkout = self.snapshots.checkout(repo_root, commit)
+        with poc_timing.span("store_revision_root", source=source.id, commit=commit):
+            checkout = self.snapshots.checkout(repo_root, commit)
         return checkout / source.root.relative_to(repo_root)
 
     def location(self, target: Target, document: Document) -> str | None:

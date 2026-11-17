@@ -9,8 +9,10 @@ import os
 import shutil
 import tarfile
 import threading
+import time
 from typing import TYPE_CHECKING
 
+from project_index import poc_timing
 from project_index.integrations.git import GIT_ARCHIVE_TIMEOUT_SEC, GitError, run_git
 from project_index.shared.errors import RevisionExportTimeoutError
 
@@ -51,9 +53,20 @@ class SnapshotStore:
 
         def work() -> None:
             try:
-                # 検査を終えてから書き出す
-                for thread in after:
-                    thread.join()
+                # PoC: 裏の書き出しを止める
+                if poc_timing.flag("POC_NO_EXPORT"):
+                    poc_timing.emit("export_skipped")
+                    return
+                after_sec = poc_timing.number("POC_EXPORT_AFTER")
+                if after_sec is not None:
+                    at = (poc_timing.number("POC_T0") or time.time()) + after_sec
+                    # PoC: 検査を待たず、指定の時刻まで待ってから書き出す
+                    time.sleep(max(0.0, at - time.time()))
+                else:
+                    # 検査を終えてから書き出す
+                    for thread in after:
+                        thread.join()
+                poc_timing.emit("export_begin", count=len(targets))
                 for repo_root, commit in targets:
                     try:
                         self.checkout(repo_root, commit)
@@ -66,6 +79,7 @@ class SnapshotStore:
                             error,
                         )
             finally:
+                poc_timing.emit("export_end")
                 with self._guard:
                     self._background -= 1
 
@@ -85,25 +99,33 @@ class SnapshotStore:
         if target.is_dir():
             os.utime(target)
             return target
-        with self._lock_for(target):
+        lock = self._lock_for(target)
+        with poc_timing.span("checkout_lock_wait", repo=str(repo_root), commit=commit):
+            lock.acquire()
+        try:
             # 排他を待つ間に、他のスレッドが書き出したかもしれない
             if target.is_dir():
                 os.utime(target)
+                poc_timing.emit("checkout_done_by_other", repo=str(repo_root), commit=commit)
                 return target
             temp = repo_dir / f"{commit}.tmp"
             shutil.rmtree(temp, ignore_errors=True)
             temp.mkdir(parents=True)
             try:
-                data = run_git(
-                    ["archive", "--format=tar", commit],
-                    cwd=repo_root,
-                    binary=True,
-                    timeout=GIT_ARCHIVE_TIMEOUT_SEC,
-                )
+                with poc_timing.span("checkout_archive", repo=str(repo_root), commit=commit):
+                    data = run_git(
+                        ["archive", "--format=tar", commit],
+                        cwd=repo_root,
+                        binary=True,
+                        timeout=GIT_ARCHIVE_TIMEOUT_SEC,
+                    )
                 if not isinstance(data, bytes):
                     msg = "git archive の出力がバイト列ではありません"
                     raise RuntimeError(msg)
-                with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+                with (
+                    poc_timing.span("checkout_extract", repo=str(repo_root), commit=commit),
+                    tarfile.open(fileobj=io.BytesIO(data)) as archive,
+                ):
                     archive.extractall(temp, filter="data")
             except GitError as error:
                 shutil.rmtree(temp, ignore_errors=True)
@@ -128,6 +150,8 @@ class SnapshotStore:
                 sum(1 for item in target.rglob("*") if item.is_file()),
             )
             self._prune(repo_dir, target)
+        finally:
+            lock.release()
         return target
 
     def _prune(self, repo_dir: Path, current: Path) -> None:

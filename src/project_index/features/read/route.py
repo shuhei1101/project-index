@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import time
+
+from project_index import poc_timing
+
 import asyncio
 import dataclasses
 from functools import partial
@@ -73,9 +77,20 @@ async def _run[T](
     handlers: Handlers, source: str, value: str, work: Callable[[], T]
 ) -> T | Response:
     """配信元の読み込みを待って処理を別のスレッドで呼び、見つからなかったものを 404 にする。"""
-    await handlers.registry.wait_for(ids=[source])
+    with poc_timing.span("api_wait_loaded", source=source, value=value):
+        await handlers.registry.wait_for(ids=[source])
+    queued = time.perf_counter()
+
+    def timed() -> T:
+        # PoC: スレッドの空きを待った秒数と、処理の経過時間・CPU 時間を記録する
+        with poc_timing.span(
+            "api_work", source=source, name=getattr(work, "func", work).__name__, value=value
+        ) as extra:
+            extra["queue"] = time.perf_counter() - queued
+            return work()
+
     try:
-        return await asyncio.to_thread(work)
+        return await asyncio.to_thread(timed)
     except ProjectIndexError as error:
         fields = _not_found_fields(error, source, value)
         # 404 にしないエラー: 例外の変換に任せる
@@ -94,8 +109,10 @@ def _documents(
     handlers: Handlers, source: str, ref: str | None, values: bool, common_keys: bool
 ) -> DocumentListResponse:
     """リビジョンの文書の一覧を返す。"""
-    target, _ = read_target(source, ref, registry=handlers.registry)
-    return list_documents(target, store=handlers.store, values=values, common_keys=common_keys)
+    with poc_timing.span("docs_read_target", source=source):
+        target, _ = read_target(source, ref, registry=handlers.registry)
+    with poc_timing.span("docs_list_documents", source=source):
+        return list_documents(target, store=handlers.store, values=values, common_keys=common_keys)
 
 
 def _document(

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from project_index import poc_timing
+
 import logging
 import threading
 from dataclasses import dataclass
@@ -62,7 +64,8 @@ class SourceChecks:
             number = self._started.get(source.id, 0) + 1
             self._started[source.id] = number
         # 配信元のフォルダをたどる検査はロックの外で流す
-        check = SourceCheck(report=check_sync(store, source), nav=nav_warnings(store, source))
+        with poc_timing.span("source_check", source=source.id):
+            check = SourceCheck(report=check_sync(store, source), nav=nav_warnings(store, source))
         with self._lock:
             # 持っている結果より後に始めた検査のときだけ置き換える
             held = self._results.get(source.id)
@@ -84,6 +87,10 @@ class SourceChecks:
     ) -> list[threading.Thread]:
         """裏で検査していない配信元を裏のスレッドで検査し直し、待たずに戻る。"""
         starting: list[ServedSource] = []
+        # PoC: 裏の検査を止める
+        if poc_timing.flag("POC_NO_CHECKS"):
+            poc_timing.emit("checks_skipped")
+            return []
         with self._lock:
             for source in sources:
                 # 検査中の配信元は、終えた後にもう 1 回流すよう要求だけを立てる
