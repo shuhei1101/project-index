@@ -46,7 +46,9 @@ def test_source_registry_reload(
         (None, make_status("c", 2, "disabled")),
     ]
 
-    def fake_load(entry: object, *, index: int, lookup: object = None) -> object:
+    def fake_load(
+        entry: object, *, index: int, lookup: object = None, unit: object = None
+    ) -> object:
         return results[index]
 
     monkeypatch.setattr(registry_module, "load_source", fake_load)
@@ -71,7 +73,9 @@ def test_source_registry_reload_when_duplicate_name(
     """既定の ID が重なる（正常系）。"""
 
     # 準備
-    def fake_load(entry: object, *, index: int, lookup: object = None) -> object:
+    def fake_load(
+        entry: object, *, index: int, lookup: object = None, unit: object = None
+    ) -> object:
         return make_served_source(id="a"), make_status("a", index)
 
     monkeypatch.setattr(registry_module, "load_source", fake_load)
@@ -103,7 +107,9 @@ def test_source_registry_reload_when_reading(
     release = threading.Event()
     served: list[ServedSource] = [old, new]
 
-    def blocking_load(entry: SourceEntry, *, index: int, lookup: object = None) -> LoadResult:
+    def blocking_load(
+        entry: SourceEntry, *, index: int, lookup: object = None, unit: object = None
+    ) -> LoadResult:
         source = served.pop(0)
         if source is new:
             entered.set()
@@ -335,7 +341,9 @@ def test_source_registry_reload_when_loading(
     entered = threading.Event()
     release = threading.Event()
 
-    def blocking_load(entry: SourceEntry, *, index: int, lookup: object = None) -> LoadResult:
+    def blocking_load(
+        entry: SourceEntry, *, index: int, lookup: object = None, unit: object = None
+    ) -> LoadResult:
         entered.set()
         release.wait(timeout=5)
         return make_served_source(id="a"), make_status("a", index)
@@ -382,7 +390,9 @@ def test_source_registry_reload_when_failed(
     """読み込みが例外で止まっても待ちを解く（異常系）。"""
 
     # 準備
-    def failing_load(entry: SourceEntry, *, index: int, lookup: object = None) -> LoadResult:
+    def failing_load(
+        entry: SourceEntry, *, index: int, lookup: object = None, unit: object = None
+    ) -> LoadResult:
         msg = "読めない"
         raise RuntimeError(msg)
 
@@ -484,7 +494,7 @@ def test_source_registry_load(
         (None, make_status("c", 2, "disabled")),
     ]
 
-    def fake_load(entry: object, *, index: int, lookup: object) -> object:
+    def fake_load(entry: object, *, index: int, lookup: object, unit: object = None) -> object:
         return results[index]
 
     monkeypatch.setattr(registry_module, "load_source", fake_load)

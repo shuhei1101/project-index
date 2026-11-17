@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from ruamel.yaml.comments import CommentedMap
@@ -14,6 +14,9 @@ from project_index.shared.yaml_io import (
     load_roundtrip,
     load_yaml,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def test_load_yaml() -> None:
@@ -138,7 +141,7 @@ def test_load_yaml_when_c(monkeypatch: pytest.MonkeyPatch) -> None:
     """C の解析で読む（正常系）。"""
     # 準備
     calls: list[str] = []
-    real = Parser.__init__
+    real: Callable[..., None] = vars(Parser)["__init__"]
 
     def counting(self: Parser, *args: Any, **kwargs: Any) -> None:
         calls.append("parser")

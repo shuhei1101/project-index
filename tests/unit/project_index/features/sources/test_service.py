@@ -23,7 +23,7 @@ from project_index.features.sources.types import ScriptEntry, ServedSource, Sour
 from project_index.shared.errors import ValidationFailedError, Violation
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Generator
 
     from project_index.features.settings.types import SourceEntry
 
@@ -1314,7 +1314,7 @@ def test_load_source_when_unit(
     entered: list[str] = []
 
     @contextlib.contextmanager
-    def unit() -> Iterator[None]:
+    def unit() -> Generator[None]:
         entered.append("unit")
         yield
 
