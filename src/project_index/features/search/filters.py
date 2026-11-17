@@ -10,7 +10,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any
 
-from project_index.features.search.fields import as_datetime, field_values
+from project_index.features.search.fields import NO_COLUMNS, as_datetime, field_values
 from project_index.features.search.types import Condition, Group, SearchRequest
 from project_index.shared.errors import Violation
 
@@ -281,10 +281,14 @@ def _test(
 
 
 def _match_condition(
-    condition: Condition, document: Document, fields: Mapping[str, str], today: date
+    condition: Condition,
+    document: Document,
+    fields: Mapping[str, str],
+    today: date,
+    columns: Mapping[str, str],
 ) -> bool:
     """条件 1 つに当たるかを判定する。"""
-    values = field_values(document, condition.field)
+    values = field_values(document, condition.field, columns=columns)
     if condition.op == "exists":
         return bool(values)
     if condition.op == "not_exists":
@@ -302,23 +306,24 @@ def match_filter(
     *,
     fields: Mapping[str, str],
     today: date,
+    columns: Mapping[str, str] = NO_COLUMNS,
 ) -> bool:
     """文書が条件の木に当たるかを判定する。"""
     if node is None:
         return True
     if isinstance(node, Group):
+        # 束の子は同じ文書・同じ対応付けで照合する
+        def match(child: Condition | Group) -> bool:
+            return match_filter(child, document, fields=fields, today=today, columns=columns)
+
         if node.all_of is not None:
-            return all(
-                match_filter(child, document, fields=fields, today=today) for child in node.all_of
-            )
+            return all(match(child) for child in node.all_of)
         if node.any_of is not None:
-            return any(
-                match_filter(child, document, fields=fields, today=today) for child in node.any_of
-            )
+            return any(match(child) for child in node.any_of)
         if node.not_ is not None:
-            return not match_filter(node.not_, document, fields=fields, today=today)
+            return not match(node.not_)
         return True
-    return _match_condition(node, document, fields, today)
+    return _match_condition(node, document, fields, today, columns)
 
 
 def match_words(document: Document, words: Sequence[str]) -> bool:
