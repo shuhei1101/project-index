@@ -1,18 +1,22 @@
 from __future__ import annotations
 
 import json
+import os
 import socket
+import stat
 import threading
 import time
+from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import httpx
+import pytest
 
 from project_index.shared.version import RUNNING_VERSION
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from pathlib import Path
 
 SETTINGS_QUERY = "src/project_index/features/settings/query.py"
 MIGRATION_STEPS = (
@@ -39,6 +43,53 @@ UPDATE_CALL = json.dumps(
     }
 )
 NO_RESTART_WAIT_SEC = 3
+NPM_DEVELOP = "install -g github:shuhei1101/mdmark#develop"
+REINSTALLED_DEVELOP = {"ref": "develop", "reinstalled": True, "error": None}
+
+
+@dataclass(frozen=True)
+class FakeTools:
+    """`PATH` の先頭に置いた `npm`・`mdmark` の偽物と、`npm` が受けた引数の記録。"""
+
+    log: Path
+
+    def npm_calls(self) -> list[str]:
+        """`npm` が受けた引数を、呼ばれた順に 1 回 1 行で返す。"""
+        if not self.log.exists():
+            return []
+        return self.log.read_text(encoding="utf-8").splitlines()
+
+
+def _write_script(path: Path, body: str) -> None:
+    """実行できるシェルスクリプトを書く。"""
+    path.write_text(f"#!/bin/sh\n{body}", encoding="utf-8")
+    path.chmod(path.stat().st_mode | stat.S_IXUSR)
+
+
+@pytest.fixture
+def fake_tools(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Callable[..., FakeTools]:
+    """`npm`（と任意で `mdmark`）の偽物を `PATH` の先頭に置く関数を返す。
+
+    元の `PATH` から `mdmark` を持つフォルダを除くので、端末の mdmark の CLI は見えない。
+    """
+
+    def _install(*, mdmark: bool = True, npm_exit: int = 0, npm_stderr: str = "") -> FakeTools:
+        bin_dir = tmp_path / "fake-bin"
+        bin_dir.mkdir(exist_ok=True)
+        log = tmp_path / "npm-calls.log"
+        stderr = f"echo '{npm_stderr}' >&2\n" if npm_stderr else ""
+        _write_script(bin_dir / "npm", f'echo "$*" >> {log}\n{stderr}exit {npm_exit}\n')
+        if mdmark:
+            _write_script(bin_dir / "mdmark", "exit 0\n")
+        rest = [
+            folder
+            for folder in os.environ.get("PATH", "").split(os.pathsep)
+            if folder and not (Path(folder) / "mdmark").exists()
+        ]
+        monkeypatch.setenv("PATH", os.pathsep.join([str(bin_dir), *rest]))
+        return FakeTools(log)
+
+    return _install
 
 
 def _slow_update(port: int) -> tuple[socket.socket, bytes]:
@@ -77,9 +128,11 @@ def test_normal(
     call_tool: Callable[..., dict[str, Any]],
     started_count: Callable[[Path], int],
     wait_for_restart: Callable[..., None],
+    fake_tools: Callable[..., FakeTools],
 ) -> None:
     """新しい commit を取り込み、依存を入れ直して起動し直す（正常系）。"""
     # 準備
+    tools = fake_tools()
     settings = write_settings(make_source("sample"))
     state_dir = settings.parent / "state"
     port = free_port()
@@ -100,9 +153,11 @@ def test_normal(
         "updated": True,
         "migration_needed": False,
         "restarting": True,
+        "mdmark": REINSTALLED_DEVELOP,
     }
     assert project_index_clone.head() == upstream
     assert status["structuredContent"]["version"] == "0.3.0"
+    assert tools.npm_calls() == [NPM_DEVELOP]
 
 
 def test_normal_when_up_to_date(
@@ -114,9 +169,11 @@ def test_normal_when_up_to_date(
     wait_until_serving: Callable[..., None],
     call_tool: Callable[..., dict[str, Any]],
     started_count: Callable[[Path], int],
+    fake_tools: Callable[..., FakeTools],
 ) -> None:
-    """上流に新しい commit が無ければ、何も変えずに返す（正常系）。"""
+    """上流に新しい commit が無いと、クローンを変えずに mdmark の CLI だけを入れ直して返す（正常系）。"""
     # 準備
+    tools = fake_tools()
     settings = write_settings(make_source("sample"))
     state_dir = settings.parent / "state"
     port = free_port()
@@ -133,6 +190,8 @@ def test_normal_when_up_to_date(
     assert data["updated"] is False
     assert data["restarting"] is False
     assert data["version"] == data["previous_version"]
+    assert data["mdmark"] == REINSTALLED_DEVELOP
+    assert tools.npm_calls() == [NPM_DEVELOP]
     assert project_index_clone.head() == head
     assert started_count(state_dir) == started
     assert process.poll() is None
@@ -147,9 +206,11 @@ def test_normal_when_migration_needed(
     wait_until_serving: Callable[..., None],
     call_tool: Callable[..., dict[str, Any]],
     started_count: Callable[[Path], int],
+    fake_tools: Callable[..., FakeTools],
 ) -> None:
     """新しいバージョンに移し替えの手順があると、再起動せずに返す（正常系）。"""
     # 準備
+    tools = fake_tools()
     settings = write_settings(make_source("sample"))
     state_dir = settings.parent / "state"
     port = free_port()
@@ -177,6 +238,8 @@ def test_normal_when_migration_needed(
     assert data["updated"] is True
     assert data["migration_needed"] is True
     assert data["restarting"] is False
+    assert data["mdmark"] == REINSTALLED_DEVELOP
+    assert tools.npm_calls() == [NPM_DEVELOP]
     assert settings.read_text(encoding="utf-8") == before
     assert status["structuredContent"]["version"] == RUNNING_VERSION
     assert started_count(state_dir) == started
@@ -191,9 +254,11 @@ def test_error_when_pull_fails(
     wait_until_serving: Callable[..., None],
     call_tool: Callable[..., dict[str, Any]],
     started_count: Callable[[Path], int],
+    fake_tools: Callable[..., FakeTools],
 ) -> None:
     """fast-forward できないと、クローンに触らず再起動もしない（異常系）。"""
     # 準備
+    tools = fake_tools()
     settings = write_settings(make_source("sample"))
     state_dir = settings.parent / "state"
     port = free_port()
@@ -213,6 +278,7 @@ def test_error_when_pull_fails(
     assert text.startswith("UpdateFailedError")
     assert "git pull --ff-only" in text
     assert "fast-forward" in text
+    assert tools.npm_calls() == []
     assert project_index_clone.head() == head
     assert started_count(state_dir) == started
     assert process.poll() is None
@@ -271,3 +337,116 @@ def test_error_when_restart_in_progress(
     assert result["isError"] is True
     assert result["content"][0]["text"].startswith("RestartInProgressError")
     assert project_index_clone.head() == head
+
+
+def test_normal_when_mdmark_absent(
+    make_source: Callable[..., Any],
+    write_settings: Callable[..., Path],
+    free_port: Callable[[], int],
+    project_index_clone: Any,
+    start_serve_from_clone: Callable[..., Any],
+    wait_until_serving: Callable[..., None],
+    call_tool: Callable[..., dict[str, Any]],
+    started_count: Callable[[Path], int],
+    wait_for_restart: Callable[..., None],
+    fake_tools: Callable[..., FakeTools],
+) -> None:
+    """`PATH` に mdmark の CLI が無いと、入れ直さずに更新する（正常系）。"""
+    # 準備
+    tools = fake_tools(mdmark=False)
+    settings = write_settings(make_source("sample"))
+    state_dir = settings.parent / "state"
+    port = free_port()
+    process = start_serve_from_clone(project_index_clone.clone, settings, port)
+    wait_until_serving(process, port)
+    project_index_clone.push_upstream(project_index_clone.bump_version("0.3.0"), "bump")
+    started = started_count(state_dir)
+    # 実行
+    with httpx.Client(timeout=300) as client:
+        result = call_tool(client, port, "/_admin/mcp/", "update")
+    wait_for_restart(state_dir, port, started)
+    # 検証
+    data = result["structuredContent"]
+    assert data["updated"] is True
+    assert data["restarting"] is True
+    assert data["mdmark"] is None
+    assert tools.npm_calls() == []
+
+
+def test_normal_when_mdmark_reinstall_fails(
+    make_source: Callable[..., Any],
+    write_settings: Callable[..., Path],
+    free_port: Callable[[], int],
+    project_index_clone: Any,
+    start_serve_from_clone: Callable[..., Any],
+    wait_until_serving: Callable[..., None],
+    call_tool: Callable[..., dict[str, Any]],
+    started_count: Callable[[Path], int],
+    wait_for_restart: Callable[..., None],
+    fake_tools: Callable[..., FakeTools],
+) -> None:
+    """`npm` が失敗しても、理由を応答に入れて更新と再起動を続ける（正常系）。"""
+    # 準備
+    tools = fake_tools(npm_exit=1, npm_stderr="npm error code ENOTFOUND")
+    settings = write_settings(make_source("sample"), extra="mdmark_ref: v0.13.0")
+    state_dir = settings.parent / "state"
+    port = free_port()
+    process = start_serve_from_clone(project_index_clone.clone, settings, port)
+    wait_until_serving(process, port)
+    project_index_clone.push_upstream(project_index_clone.bump_version("0.3.0"), "bump")
+    started = started_count(state_dir)
+    # 実行
+    with httpx.Client(timeout=300) as client:
+        result = call_tool(client, port, "/_admin/mcp/", "update")
+    wait_for_restart(state_dir, port, started)
+    with httpx.Client(timeout=30) as client:
+        status = call_tool(client, port, "/_admin/mcp/", "status", format="json")
+    # 検証
+    data = result["structuredContent"]
+    assert result.get("isError") is not True
+    assert data["updated"] is True
+    assert data["restarting"] is True
+    assert data["mdmark"]["ref"] == "v0.13.0"
+    assert data["mdmark"]["reinstalled"] is False
+    assert "npm install -g github:shuhei1101/mdmark#v0.13.0" in data["mdmark"]["error"]
+    assert "npm error code ENOTFOUND" in data["mdmark"]["error"]
+    assert tools.npm_calls() == ["install -g github:shuhei1101/mdmark#v0.13.0"]
+    assert status["structuredContent"]["version"] == "0.3.0"
+
+
+def test_error_when_terminal_config_invalid(
+    make_source: Callable[..., Any],
+    write_settings: Callable[..., Path],
+    free_port: Callable[[], int],
+    project_index_clone: Any,
+    start_serve_from_clone: Callable[..., Any],
+    wait_until_serving: Callable[..., None],
+    call_tool: Callable[..., dict[str, Any]],
+    started_count: Callable[[Path], int],
+    fake_tools: Callable[..., FakeTools],
+) -> None:
+    """端末の設定がスキーマに違反すると、クローンに触らずに違反を返す（異常系）。"""
+    # 準備
+    tools = fake_tools()
+    settings = write_settings(make_source("sample"))
+    state_dir = settings.parent / "state"
+    port = free_port()
+    process = start_serve_from_clone(project_index_clone.clone, settings, port)
+    wait_until_serving(process, port)
+    head = project_index_clone.head()
+    project_index_clone.push_upstream(project_index_clone.bump_version("0.3.0"), "upstream")
+    settings.write_text(settings.read_text(encoding="utf-8") + "mdmark_ref: -x\n", encoding="utf-8")
+    started = started_count(state_dir)
+    # 実行
+    with httpx.Client(timeout=300) as client:
+        result = call_tool(client, port, "/_admin/mcp/", "update")
+    time.sleep(NO_RESTART_WAIT_SEC)
+    # 検証
+    text = result["content"][0]["text"]
+    assert result["isError"] is True
+    assert text.startswith("TerminalConfigInvalidError")
+    assert "mdmark_ref" in text
+    assert project_index_clone.head() == head
+    assert tools.npm_calls() == []
+    assert started_count(state_dir) == started
+    assert process.poll() is None
