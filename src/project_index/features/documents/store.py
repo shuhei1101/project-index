@@ -631,7 +631,9 @@ def _unique(
     return unique
 
 
-def _shared_files(source: ServedSource, result: LoadResult, files: list[str]) -> dict[str, list[str]]:
+def _shared_files(
+    source: ServedSource, result: LoadResult, files: list[str]
+) -> dict[str, list[str]]:
     """2 つ以上の有効な行が文書にするファイルと、その行の ID（`documents[]` の順）を返す。"""
     rows: dict[str, list[str]] = {}
     for table in source.config.documents:
@@ -653,7 +655,11 @@ def _duplicate_ids(result: LoadResult, shared: Collection[str]) -> list[str]:
         earlier_file = earlier.body_path or earlier.path
         document_file = document.body_path or document.path
         # 別の行が同じファイルを文書にした重なりは duplicate_files が示すため数えない
-        if earlier.kind != document.kind and earlier_file == document_file and document_file in shared:
+        if (
+            earlier.kind != document.kind
+            and earlier_file == document_file
+            and document_file in shared
+        ):
             continue
         pairs.append(
             f"{document.id}: {earlier.kind}（{earlier_file}）・{document.kind}（{document_file}）"
