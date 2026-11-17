@@ -1,0 +1,1 @@
+# write_docs の rename・replace_text を、records・body_file の行の本文のファイルの中の旧 ID・旧パスと単語にも当てる
