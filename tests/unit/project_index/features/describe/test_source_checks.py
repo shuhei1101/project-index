@@ -8,6 +8,7 @@ from project_index.features.describe import source_checks as source_checks_modul
 from project_index.features.describe.source_checks import SourceChecks
 from project_index.features.documents.types import SyncReport
 from project_index.main import Handlers, build_handlers
+from project_index.shared.background import BackgroundGate
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -202,3 +203,54 @@ def test_source_checks_forget(
     checks.forget(["sample"])
     # 検証
     assert checks.get("sample") is None
+
+
+def _recording_check_sync(
+    monkeypatch: pytest.MonkeyPatch, gate: BackgroundGate
+) -> tuple[list[str], list[int], list[bool]]:
+    """呼ばれた配信元の ID・同時に実行中の数・関所の裏の処理のスレッドかを記録する偽物に差し替える。"""
+    order: list[str] = []
+    running_seen: list[int] = []
+    background_seen: list[bool] = []
+    running = 0
+    lock = threading.Lock()
+
+    def fake_check_sync(store: Any, source: Any) -> SyncReport:
+        nonlocal running
+        with lock:
+            running += 1
+            order.append(source.id)
+            running_seen.append(running)
+            background_seen.append(gate.in_background)
+        threading.Event().wait(0.01)
+        with lock:
+            running -= 1
+        return _report(source.id, 0)
+
+    monkeypatch.setattr(source_checks_module, "check_sync", fake_check_sync)
+    monkeypatch.setattr(source_checks_module, "nav_warnings", _no_nav_warnings)
+    return order, running_seen, background_seen
+
+
+def test_source_checks_refresh_later_when_many(
+    monkeypatch: pytest.MonkeyPatch,
+    make_served_source: Callable[..., ServedSource],
+) -> None:
+    """複数の配信元を 1 本のスレッドで順に検査する（正常系）。"""
+    # 準備
+    gate = BackgroundGate()
+    order, running_seen, background_seen = _recording_check_sync(monkeypatch, gate)
+    sources = [
+        make_served_source(id="a", root=Path("/w/a")),
+        make_served_source(id="b", root=Path("/w/b")),
+        make_served_source(id="c", root=Path("/w/c")),
+    ]
+    checks = SourceChecks(gate=gate)
+    # 実行
+    threads = checks.refresh_later(None, sources)  # type: ignore[arg-type]
+    threads[0].join(timeout=10)
+    # 検証
+    assert len(threads) == 1
+    assert order == ["a", "b", "c"]
+    assert max(running_seen) == 1
+    assert background_seen == [True, True, True]

@@ -7,6 +7,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from project_index.features.read import route as route_module
 from project_index.features.read.route import build_read_router
 from project_index.features.sources import registry as registry_module
 from project_index.features.sources.registry import SourceRegistry
@@ -63,6 +64,29 @@ def test_build_read_router(make_view_env: Callable[..., SimpleNamespace]) -> Non
     assert responses["/sources/sample/decisions"].json()["decisions"] == [
         {"id": "D-1", "folders": 1}
     ]
+
+
+def test_build_read_router_when_foreground(
+    make_view_env: Callable[..., SimpleNamespace], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """サービスの処理の間だけ要求の応答中になる（正常系）。"""
+    # 準備
+    env = make_view_env()
+    seen: list[bool] = []
+    original = route_module.list_documents
+
+    def recording_list_documents(*args: Any, **kwargs: Any) -> Any:
+        seen.append(env.handlers.gate.active)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(route_module, "list_documents", recording_list_documents)
+    client = _client(env.handlers)
+    # 実行
+    response = client.get("/sources/sample/docs")
+    # 検証
+    assert response.status_code == 200
+    assert seen == [True]
+    assert env.handlers.gate.active is False
 
 
 def test_build_read_router_when_queries(make_view_env: Callable[..., SimpleNamespace]) -> None:

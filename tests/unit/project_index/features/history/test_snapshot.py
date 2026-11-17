@@ -10,6 +10,7 @@ import pytest
 
 from project_index.features.history import snapshot as snapshot_module
 from project_index.features.history.snapshot import SnapshotStore
+from project_index.shared.background import BackgroundGate
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -137,7 +138,8 @@ def test_snapshot_store_checkout_when_over_keep(
 
 def _timing_out_archive(monkeypatch: pytest.MonkeyPatch, commits: set[str]) -> None:
     """`commits` の `git archive` だけ、待ち時間の上限を超えたときと同じ失敗を送る包みに差し替える。"""
-    from project_index.integrations.git import GitError
+    from project_index.shared.background import BackgroundGate
+from project_index.integrations.git import GitError
 
     real = snapshot_module.run_git
 
@@ -179,17 +181,23 @@ def test_snapshot_store_checkout_later(
     tmp_path: Path,
     git_repo: Callable[..., Path],
     run_git: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """先のスレッドの後に裏で書き出す（正常系）。"""
+    """裏で書き出す（正常系）。"""
     # 準備
     root = git_repo({"a.yaml": "a: 1\n"})
     commit = run_git(root, "rev-parse", "HEAD").strip()
     store = SnapshotStore(tmp_path / "snapshots")
     gate = threading.Event()
-    before = threading.Thread(target=gate.wait, args=(10,), daemon=True)
-    before.start()
+    original = store.checkout
+
+    def gated_checkout(repo_root: Path, target: str) -> Path:
+        gate.wait(10)
+        return original(repo_root, target)
+
+    monkeypatch.setattr(store, "checkout", gated_checkout)
     # 実行
-    thread = store.checkout_later([(root, commit)], after=[before])
+    thread = store.checkout_later([(root, commit)])
     exporting_before = store.exporting
     exported_before = list((tmp_path / "snapshots").glob(f"*/{commit}"))
     gate.set()
@@ -225,3 +233,27 @@ def test_snapshot_store_checkout_later_when_timed_out(
     assert len(list((tmp_path / "snapshots").glob(f"*/{second}"))) == 1
     assert len([record for record in caplog.records if record.levelno == logging.WARNING]) == 1
     assert store.exporting is False
+
+
+def test_snapshot_store_checkout_later_when_foreground(
+    tmp_path: Path,
+    git_repo: Callable[..., Path],
+    commit_all: Callable[..., str],
+    run_git: Callable[..., str],
+) -> None:
+    """要求の応答中は commit ごとに休む（正常系）。"""
+    # 準備
+    root = git_repo({"a.yaml": "a: 1\n"})
+    first = run_git(root, "rev-parse", "HEAD").strip()
+    second = commit_all(root, {"a.yaml": "a: 2\n"})
+    slept: list[float] = []
+    gate = BackgroundGate(sleep=slept.append)
+    store = SnapshotStore(tmp_path / "snapshots", gate=gate)
+    # 実行
+    with gate.foreground():
+        thread = store.checkout_later([(root, first), (root, second)])
+        thread.join(timeout=30)
+    # 検証
+    assert len(list((tmp_path / "snapshots").glob(f"*/{first}"))) == 1
+    assert len(list((tmp_path / "snapshots").glob(f"*/{second}"))) == 1
+    assert len(slept) == 2

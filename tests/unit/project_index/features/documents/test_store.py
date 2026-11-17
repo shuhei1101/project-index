@@ -19,6 +19,7 @@ from project_index.features.history import snapshot as snapshot_module
 from project_index.features.history.snapshot import SnapshotStore
 from project_index.features.sources.types import DocumentTable, ServedSource, SourceConfig
 from project_index.integrations import git as git_module
+from project_index.shared.background import BackgroundGate
 from project_index.shared.errors import DocumentNotFoundError, UnknownKindError
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
@@ -1570,3 +1571,95 @@ def test_check_sync_when_not_git_ignored(
         "root: docs/new.md",
     ]
     assert calls == []
+
+
+def _load_in_thread(store: DocumentStore, target: Target, gate: BackgroundGate) -> list[Document]:
+    """別のスレッドを関所の裏の処理のスレッドにして文書を集め、集めた文書を返す。"""
+    found: list[Document] = []
+
+    def work() -> None:
+        with gate.background():
+            found.extend(store.load(target).documents)
+
+    thread = threading.Thread(target=work)
+    thread.start()
+    thread.join(timeout=30)
+    return found
+
+
+def test_document_store_load_when_background(tmp_path: Path, workspace: Target) -> None:
+    """裏の処理のスレッドでは、要求の応答中はファイルごとに休む（正常系）。"""
+    # 準備
+    background_slept: list[float] = []
+    foreground_slept: list[float] = []
+    background_gate = BackgroundGate(sleep=background_slept.append)
+    foreground_gate = BackgroundGate(sleep=foreground_slept.append)
+    background_store = DocumentStore(SnapshotStore(tmp_path / "s1"), gate=background_gate)
+    foreground_store = DocumentStore(SnapshotStore(tmp_path / "s2"), gate=foreground_gate)
+    # 実行
+    with background_gate.foreground():
+        background_found = _load_in_thread(background_store, workspace, background_gate)
+    with foreground_gate.foreground():
+        foreground_found = foreground_store.load(workspace).documents
+    # 検証
+    assert len(background_slept) == 3
+    assert foreground_slept == []
+    assert len(background_found) == 4
+    assert len(foreground_found) == 4
+
+
+def test_check_sync_when_background(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """裏の処理のスレッドでは、読み込みの外の処理も休みを挟んで進む（正常系）。"""
+    # 準備
+    root = tmp_path / "ws"
+    write_files(
+        root,
+        {
+            "rules/a.yaml": "id: a\ntitle: A\n",
+            "rules/b.yaml": "id: b\n",
+            "rules/c.yaml": "id: c\ntitle: C\n",
+            "src/files.yaml": "files:\n  - path: a.py\n",
+            "src/a.py": "a = 1\n",
+        },
+    )
+    source = _sync_source(root, make_source_config, make_served_source)
+    expected = store_module.check_sync(DocumentStore(SnapshotStore(tmp_path / "s0")), source)
+    slept: list[float] = []
+    gate = BackgroundGate(sleep=slept.append)
+    store = DocumentStore(SnapshotStore(tmp_path / "s1"), gate=gate)
+    in_unit: list[bool] = []
+    original_missing = store_module.missing_ref_fields
+    original_unresolved = store_module.unresolved_related
+
+    def recording_missing(*args: Any, **kwargs: Any) -> Any:
+        in_unit.append(gate.in_unit)
+        return original_missing(*args, **kwargs)
+
+    def recording_unresolved(*args: Any, **kwargs: Any) -> Any:
+        in_unit.append(gate.in_unit)
+        return original_unresolved(*args, **kwargs)
+
+    monkeypatch.setattr(store_module, "missing_ref_fields", recording_missing)
+    monkeypatch.setattr(store_module, "unresolved_related", recording_unresolved)
+    reports: list[Any] = []
+
+    def work() -> None:
+        with gate.background():
+            reports.append(store_module.check_sync(store, source))
+
+    # 実行
+    with gate.foreground():
+        thread = threading.Thread(target=work)
+        thread.start()
+        thread.join(timeout=30)
+    # 検証
+    assert reports == [expected]
+    assert set(in_unit) == {True}
+    assert len(in_unit) == 8
+    assert len(slept) > 4
