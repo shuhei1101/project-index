@@ -73,10 +73,11 @@ def test_normal_when_files_excluded(
     result = env.call_admin("check_project", path=str(sample.folder), format="json")
     # 検証
     assert not result.is_error
-    assert result.data["sync"]["unindexed_files"] == 2
+    assert result.data["sync"]["unindexed_files"] == 3
     assert [item["path"] for item in result.data["sync"]["items"]] == [
         "src: src/a.py",
         "src: src/b.py",
+        "src: src/uv.lock",
     ]
 
 

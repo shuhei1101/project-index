@@ -47,7 +47,7 @@ def test_normal(range_folder: Path, capsys: pytest.CaptureFixture[str]) -> None:
     # 検証
     captured = capsys.readouterr()
     assert code == 0
-    assert captured.out == "src/a.py\nsrc/b.py\n"
+    assert captured.out == "src/a.py\nsrc/b.py\nsrc/uv.lock\n"
     assert _listing(range_folder) == before
 
 
@@ -57,7 +57,7 @@ def test_normal_when_exclude_given(range_folder: Path, capsys: pytest.CaptureFix
     code = main(["files", "--root", str(range_folder), "--paths", "src/**", "--exclude", "b.py"])
     # 検証
     assert code == 0
-    assert capsys.readouterr().out == "src/a.py\n"
+    assert capsys.readouterr().out == "src/a.py\nsrc/uv.lock\n"
 
 
 def test_error_when_root_not_found(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
