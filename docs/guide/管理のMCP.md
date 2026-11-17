@@ -203,7 +203,7 @@ http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
 | `missing_paths[]` | list[str] | `documents[].paths` などが指して無いフォルダ・ファイル |
 | `script_errors[].script` | str | 確かめに失敗したスクリプトのパス |
 | `script_errors[].reason` | str | 終了コードと標準エラーの要約 |
-| `sync` | obj | 索引の同期の件数。`metadata` の列の欠け・索引に無いファイル・ファイルが無い行・どの文書にも当たらない関連。`*.local.*` の名前のファイルは索引に無いファイルに数えない |
+| `sync` | obj | 索引の同期の件数。`metadata` の列の欠け・索引に無いファイル・ファイルが無い行・どの文書にも当たらない関連・2 つ以上の行が文書にするファイル。`*.local.*` の名前のファイルは索引に無いファイルに数えない |
 | `sync.items[]` | list | 件数の内訳（種類とパス）。先頭 50 件まで。件数は全件を数える |
 | `warnings[].path` | str | 警告したキーのパス（`nav.tabs[2].items[0].auto.filter`） |
 | `warnings[].rule` | str | 警告の理由。`nav` の `auto` の条件がどの文書にも当たらないときは、タブの名前と条件 |
