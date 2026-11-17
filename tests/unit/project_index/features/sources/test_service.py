@@ -173,7 +173,7 @@ def test_validate_source_config_when_outside_root(source_root: Path) -> None:
 
 
 def test_validate_source_config_when_exclude_has_slash(source_root: Path) -> None:
-    """除外の名前に `/` を含む（正常系）。"""
+    """除外の名前に `/` を含む値を許す（正常系）。"""
     # 準備
     row = {
         "id": "rules",
@@ -185,7 +185,7 @@ def test_validate_source_config_when_exclude_has_slash(source_root: Path) -> Non
     # 実行
     result = validate_source_config(value, root=source_root)
     # 検証
-    assert [v.path for v in result] == ["documents[0].exclude[0]"]
+    assert result == []
 
 
 def test_validate_source_config_when_legacy_keys(source_root: Path) -> None:
@@ -585,6 +585,85 @@ def test_load_source_at_when_invalid(cloned_source: ServedSource, worktree: Path
     with pytest.raises(ValidationFailedError) as exc_info:
         load_source_at(cloned_source, worktree)
     assert [v.path for v in exc_info.value.violations] == ["documents[0].paths"]
+
+
+def test_load_source_at_when_unchanged(
+    cloned_source: ServedSource, worktree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """設定が変わっていなければ作り直さない（正常系）。"""
+    # 準備
+    calls: list[Path | None] = []
+    original = service_module.assemble_source
+
+    def counting_assemble_source(*args: Any, **kwargs: Any) -> Any:
+        calls.append(kwargs.get("root_override"))
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(service_module, "assemble_source", counting_assemble_source)
+    # 実行
+    first = load_source_at(cloned_source, worktree)
+    second = load_source_at(cloned_source, worktree)
+    # 検証
+    assert second is first
+    assert calls == [worktree]
+
+
+def test_load_source_at_when_config_changed(
+    cloned_source: ServedSource,
+    worktree: Path,
+    sample_files: dict[str, str],
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+    make_served_source: Callable[..., ServedSource],
+    tmp_path: Path,
+) -> None:
+    """設定が変われば作り直す（正常系）。"""
+    # 準備
+    extra = "  - id: notes\n    paths: [docs/note/*.yaml]\n    schema: schemas/rule.schema.yaml\n"
+    first = load_source_at(cloned_source, worktree)
+    (worktree / "project-index.yaml").write_text(
+        sample_files["project-index.yaml"] + extra, encoding="utf-8"
+    )
+    # 実行（ワークツリーの設定を変えた）
+    changed = load_source_at(cloned_source, worktree)
+    # 実行（元の配信元を再読み込みした別のオブジェクト）
+    reloaded_base = make_served_source(
+        id="sample",
+        root=cloned_source.root,
+        config_files=[cloned_source.root / "project-index.yaml"],
+        is_git=True,
+        repo_root=cloned_source.root,
+    )
+    rebuilt = load_source_at(reloaded_base, worktree)
+    # 準備（無視した先頭の設定がワークツリーに無い配信元）
+    files = {k: v for k, v in sample_files.items() if k != "project-index.yaml"}
+    ignored_root = git_repo({**files, ".gitignore": "project-index.local.yaml\n"}, name="ignored")
+    local = ignored_root / "project-index.local.yaml"
+    local.write_text(sample_files["project-index.yaml"], encoding="utf-8")
+    ignored_source = make_served_source(
+        id="ignored",
+        root=ignored_root,
+        config_files=[local],
+        is_git=True,
+        repo_root=ignored_root,
+    )
+    ignored_worktree = tmp_path / "ignored-wt"
+    run_git(ignored_root, "worktree", "add", "-b", "feat/y", str(ignored_worktree))
+    before_local = load_source_at(ignored_source, ignored_worktree)
+    (ignored_worktree / "project-index.local.yaml").write_text(
+        sample_files["project-index.yaml"] + extra, encoding="utf-8"
+    )
+    # 実行（ワークツリーの同じパスに無視した設定を置いた）
+    after_local = load_source_at(ignored_source, ignored_worktree)
+    # 検証
+    assert changed is not first
+    assert [row.id for row in changed.config.documents] == ["rules", "notes"]
+    assert rebuilt is not changed
+    assert [row.id for row in rebuilt.config.documents] == ["rules", "notes"]
+    assert before_local.config_files[0] == local
+    assert after_local is not before_local
+    assert after_local.config_files[0] == ignored_worktree / "project-index.local.yaml"
+    assert [row.id for row in after_local.config.documents] == ["rules", "notes"]
 
 
 def test_assemble_source(

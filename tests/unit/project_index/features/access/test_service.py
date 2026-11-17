@@ -20,6 +20,7 @@ from project_index.features.access.service import (
 )
 from project_index.features.access.types import SourceAccess
 from project_index.features.history.types import ResolvedRef
+from project_index.features.sources.types import DocumentTable
 from project_index.shared.errors import (
     InvalidArgumentError,
     RefNotFoundError,
@@ -27,6 +28,7 @@ from project_index.shared.errors import (
     SourceNotWritableError,
     TargetIsCloneError,
     ValidationFailedError,
+    Violation,
     WorktreeNotMatchedError,
 )
 
@@ -319,7 +321,9 @@ def test_resolve_read_targets_when_ref_not_found(
 
 
 def test_resolve_read_targets_when_worktree_cwd(
-    make_served_source: Callable[..., ServedSource], make_registry: Callable[..., Any]
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """ワークツリーの中から読む（正常系）。"""
     # 準備
@@ -332,11 +336,127 @@ def test_resolve_read_targets_when_worktree_cwd(
         worktree_globs=WORKTREE_GLOBS,
     )
     registry = make_registry(source)
+
+    def keep_source(item: ServedSource, _root: Path) -> ServedSource:
+        # 配信元はメモリ上の設定で作るため、ワークツリーの設定の再読み込みは受け取った配信元のまま返す
+        return item
+
+    monkeypatch.setattr(service_module, "load_source_at", keep_source)
     # 実行
     result = resolve_read_targets(registry=registry, cwd="/r/.claude/worktrees/x")
     # 検証
     assert result[0].base == Path("/r/.claude/worktrees/x/docs-src")
     assert result[0].worktree == Path("/r/.claude/worktrees/x")
+
+
+def test_resolve_read_targets_when_reload_disabled(
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """再読み込みしないときは配信中の配信元のまま（正常系）。"""
+    # 準備
+    source = make_served_source(
+        id="sample",
+        root=Path("/r/docs-src"),
+        is_git=True,
+        repo_root=Path("/r"),
+        scope_write=["/r/docs-src"],
+        worktree_globs=WORKTREE_GLOBS,
+    )
+    registry = make_registry(source)
+    calls: list[Path] = []
+
+    def record_load(item: ServedSource, root: Path) -> ServedSource:
+        calls.append(root)
+        return item
+
+    monkeypatch.setattr(service_module, "load_source_at", record_load)
+    # 実行
+    result = resolve_read_targets(
+        registry=registry, cwd="/r/.claude/worktrees/x", reload_worktree=False
+    )
+    # 検証
+    assert result[0].source is source
+    assert result[0].worktree == Path("/r/.claude/worktrees/x")
+    assert calls == []
+
+
+def test_resolve_read_targets_when_worktree_reloads_config(
+    make_served_source: Callable[..., ServedSource],
+    make_source_config: Callable[..., SourceConfig],
+    make_registry: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ワークツリーの設定で作り直した配信元を持たせる（正常系）。"""
+    # 準備
+    source = make_served_source(
+        id="sample",
+        root=Path("/r/docs-src"),
+        is_git=True,
+        repo_root=Path("/r"),
+        scope_write=["/r/docs-src"],
+        worktree_globs=WORKTREE_GLOBS,
+    )
+    registry = make_registry(source)
+    notes = DocumentTable(
+        id="notes", paths=["notes/*.yaml"], schema_path="schemas/rule.schema.yaml"
+    )
+    reloaded = make_served_source(
+        id="sample",
+        root=Path("/r/.claude/worktrees/x/docs-src"),
+        config=make_source_config(documents=[notes]),
+        is_git=True,
+        repo_root=Path("/r/.claude/worktrees/x"),
+        worktree_globs=WORKTREE_GLOBS,
+    )
+    calls: list[Path] = []
+
+    def fake_load_source_at(item: ServedSource, root: Path) -> ServedSource:
+        calls.append(root)
+        return reloaded
+
+    monkeypatch.setattr(service_module, "load_source_at", fake_load_source_at)
+    # 実行
+    by_worktree = resolve_read_targets(
+        registry=registry, worktree="/r/.claude/worktrees/x", cwd="/r/.claude/worktrees/x"
+    )
+    by_cwd = resolve_read_targets(registry=registry, cwd="/r/.claude/worktrees/x")
+    # 検証
+    assert [row.id for row in by_worktree[0].source.config.documents] == ["notes"]
+    assert [row.id for row in by_cwd[0].source.config.documents] == ["notes"]
+    assert calls == [Path("/r/.claude/worktrees/x"), Path("/r/.claude/worktrees/x")]
+
+
+def test_resolve_read_targets_when_worktree_config_invalid(
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ワークツリーの設定が検証に通らない（異常系）。"""
+    # 準備
+    source = make_served_source(
+        id="sample",
+        root=Path("/r/docs-src"),
+        is_git=True,
+        repo_root=Path("/r"),
+        scope_write=["/r/docs-src"],
+        worktree_globs=WORKTREE_GLOBS,
+    )
+    registry = make_registry(source)
+
+    def fake_load_source_at(item: ServedSource, root: Path) -> ServedSource:
+        raise ValidationFailedError(
+            message="sample: documents[0].typo: 知らないキー",
+            violations=[Violation(path="documents[0].typo", rule="知らないキー")],
+        )
+
+    monkeypatch.setattr(service_module, "load_source_at", fake_load_source_at)
+    # 実行・検証
+    with pytest.raises(ValidationFailedError, match="documents\\[0\\]\\.typo"):
+        resolve_read_targets(
+            registry=registry, worktree="/r/.claude/worktrees/x", cwd="/r/.claude/worktrees/x"
+        )
 
 
 def test_resolve_read_targets_when_all(
@@ -413,6 +533,32 @@ def test_resolve_write_target(
     # 検証
     assert result.worktree == Path("/r/.claude/worktrees/x")
     assert result.access == "write"
+
+
+def test_resolve_write_target_when_reload_disabled(
+    sample: ServedSource, make_registry: Callable[..., Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """再読み込みしないときは配信中の配信元のまま（正常系）。"""
+    # 準備
+    registry = make_registry(sample)
+    calls: list[Path] = []
+
+    def record_load(source: ServedSource, root: Path) -> ServedSource:
+        calls.append(root)
+        return source
+
+    monkeypatch.setattr(service_module, "load_source_at", record_load)
+    # 実行
+    result = resolve_write_target(
+        registry=registry,
+        worktree="/r/.claude/worktrees/x",
+        cwd="/r/.claude/worktrees/x/docs",
+        reload_worktree=False,
+    )
+    # 検証
+    assert result.source is sample
+    assert result.worktree == Path("/r/.claude/worktrees/x")
+    assert calls == []
 
 
 def test_resolve_write_target_when_folder(

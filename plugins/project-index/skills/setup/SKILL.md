@@ -45,6 +45,7 @@ argument-hint: "[path]"
      - 除外しないと回答した場合は、`--exclude .env --exclude '.env.*'` を渡す
      - `{config}` があるときは、`records: files` の行ごとに 1 回ずつ呼び、範囲の glob を `{管理用の YAML のフォルダ}/**` にする（行の `paths` の値は指定しない）。その行の `exclude` を 1 つずつ `--exclude` で指定する。行をまとめて 1 回で呼ばない
      - 呼ぶ前に、この手順の後半の `content/prompts/` の探し方でフォルダを探し、プロンプトの行（`{config}` に既にある行と、候補として加える行）の `paths` を 1 つずつ `--exclude-path` で指定する。そのファイルはプロンプトの行の文書になる
+     - `{config}` があるときは、ほかの有効な `documents` の行の `paths` と、`records: files` の行（同じ行を含む）の管理用の YAML のうち範囲のフォルダより深いフォルダにあるもののフォルダ（`{フォルダ}/**`）も、1 つずつ `--exclude-path` で指定する。そのファイルはほかの行の文書か、深い管理用の YAML の範囲になる
    - 結果は次の候補にする
 
      | 突き合わせの結果 | 候補 |
@@ -109,6 +110,7 @@ argument-hint: "[path]"
    - プロンプトの行の候補が了承された場合、`{config}` に `documents`・`converters[]`・`nav` の行を記載し、`{clone}/schemas/prompt.schema.yaml` を `{path}/schemas/prompt.schema.yaml`（ローカル運用は `prompt.schema.local.yaml`）にコピーする
      - その `$ref` が指す `{clone}/schemas/common.schema.yaml` を `{path}/schemas/common.schema.yaml`（ローカル運用は `common.schema.local.yaml`）にコピーする。コピー先が既にあればコピーしない
      - ローカル運用では、コピーした `prompt.schema.local.yaml` の `$ref` の `common.schema.yaml` を `common.schema.local.yaml` に書き換える
+   - この手順で作った `{config}` とコピーしたスキーマのうち、管理用の YAML の範囲にあり `*.local.*` の名前でないものは、仮のメタデータで管理用の YAML の行に加える
    - 管理用の YAML の行は、`write_docs` で記載する（配信元が登録済みのとき）。登録前の配信元は、`templates/files.schema.yaml` に沿って `files.yaml`（ローカル運用は `files.local.yaml`）を直接書く
    - ローカル運用では、`git -C {path} rev-parse --git-path info/exclude` の指すファイルに `*.local.*` の行が無ければ追加する。`.gitignore` は書き換えない
    - 管理用の YAML ごとに `{clone}/.venv/bin/python -m project_index checkpoint --root {path} --files-yaml {管理用の YAML}` で確認の時点を記録する。見直したファイルのうち commit していない変更を持つものを `--reviewed` で渡す（繰り返せる）

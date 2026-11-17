@@ -1009,6 +1009,85 @@ def test_check_sync_when_rows_share_file(
     assert report.duplicate_files == ["src/a.yaml: src・yaml", "src/c.py: src・py"]
 
 
+def test_check_sync_when_nested_index(
+    document_store: DocumentStore,
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+) -> None:
+    """深い管理用の YAML の範囲を直下の管理用の YAML で数えない（正常系）。"""
+    # 準備
+    root = tmp_path / "ws"
+    write_files(
+        root,
+        {
+            "files.yaml": "files:\n  - path: README.md\n",
+            "README.md": "# readme\n",
+            "src/files.yaml": "files:\n  - path: a.py\n",
+            "src/a.py": "a = 1\n",
+            "src/b.py": "b = 2\n",
+        },
+    )
+    documents = [
+        DocumentTable(
+            id="root",
+            paths=["files.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            records="files",
+            body_file="path",
+        ),
+        DocumentTable(
+            id="src",
+            paths=["src/files.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            records="files",
+            body_file="path",
+        ),
+    ]
+    source = make_served_source(root=root, config=make_source_config(documents=documents))
+    # 実行
+    report = store_module.check_sync(document_store, source)
+    # 検証
+    assert report.unindexed_files == ["src: src/b.py"]
+
+
+def test_check_sync_when_same_row_nested_index(
+    document_store: DocumentStore,
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+) -> None:
+    """同じ行の深い管理用の YAML の範囲も浅い管理用の YAML で数えない（正常系）。"""
+    # 準備
+    root = tmp_path / "ws"
+    write_files(
+        root,
+        {
+            "notes/files.yaml": "files:\n  - path: x.md\n",
+            "notes/x.md": "# x\n",
+            "notes/a/files.yaml": "files:\n  - path: y.md\n",
+            "notes/a/y.md": "# y\n",
+            "notes/a/z.md": "# z\n",
+        },
+    )
+    documents = [
+        DocumentTable(
+            id="notes",
+            paths=["notes/**/files.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            records="files",
+            body_file="path",
+        ),
+    ]
+    source = make_served_source(root=root, config=make_source_config(documents=documents))
+    # 実行
+    report = store_module.check_sync(document_store, source)
+    # 検証
+    assert report.unindexed_files == ["notes: notes/a/z.md"]
+
+
 def test_check_sync_when_clean(
     document_store: DocumentStore,
     tmp_path: Path,

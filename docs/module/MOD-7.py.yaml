@@ -393,6 +393,13 @@ functions:
         default: 'False'
         passing: keyword
         description: '`True` のとき、`source` が ID 1 つで権限の無い配信元を、`outside_read` が真なら読む'
+      - name: reload_worktree
+        title: ワークツリーの設定を再読み込みするか
+        type: bool
+        required: false
+        default: 'True'
+        passing: keyword
+        description: '`False` のとき、ワークツリーを読む場所でも配信中の配信元のまま返す（文書の MCP の『ワークツリーの読み込みの待ち』が、待つワークツリーを先に決めるときに使う）'
     returns:
       type: list[Target]
       description: 読む配信元ごとの場所（`source` の順、`*` は `sources[]` の順）
@@ -412,8 +419,9 @@ functions:
          - どちらも無く、`cwd` が配信元のワークツリーの中の場合、そのワークツリーを `ref` なしで読む
          - どちらも無く、作業中の配信元か Git の管理外の配信元の場合、`root` を `ref` なしで読む
          - それ以外は `root` を `default_ref` で読む
-      5. `ref` で読む場所は、`ref` を履歴の『リビジョンの解決』（`date_base` は配信元の `default_ref`）で 1 回だけ解き、解いた commit を `Target.commit` に持たせる。ブランチ名の `ref` も要求ごとに解き直し、要求をまたいで commit をキャッシュしない
-      6. `Target` の並びを返す
+      5. ワークツリーを `ref` なしで読む場所は、配信元の『作業場所の配信元の読み込み』（`load_source_at`）でそのワークツリーの設定から作り直した配信元を `Target.source` に持たせる。`ValidationFailedError` はそのまま伝える。`reload_worktree` が `False` なら再読み込みせず、配信中の配信元を持たせる
+      6. `ref` で読む場所は、`ref` を履歴の『リビジョンの解決』（`date_base` は配信元の `default_ref`）で 1 回だけ解き、解いた commit を `Target.commit` に持たせる。ブランチ名の `ref` も要求ごとに解き直し、要求をまたいで commit をキャッシュしない
+      7. `Target` の並びを返す
     exceptions:
       - name: SourceNotReadableError
         condition: '`cwd` が配信元の `scope` に当たらない（`outside_scope` が `True` のときは、加えて `outside_read` が偽か `source` が ID 1 つでない）、または `source` を省いて作業中の配信元が無い'
@@ -428,6 +436,9 @@ functions:
       - name: RefNotFoundError
         condition: '`ref`（渡されなければ `default_ref`）を commit に解けない'
         message: 履歴の『リビジョンの解決』のまま
+      - name: ValidationFailedError
+        condition: 読むワークツリーの配信元の設定が検証に通らない
+        message: 配信元の『作業場所の配信元の読み込み』のまま
     unit_tests:
       - name: test_resolve_read_targets
         case: 正常
@@ -529,6 +540,27 @@ functions:
         mock: なし
         expected: どちらも `InvalidArgumentError`
         exception: disk の配信元に ref・worktree を渡した
+      - name: test_resolve_read_targets_when_worktree_reloads_config
+        case: 正常
+        summary: ワークツリーの設定で作り直した配信元を持たせる
+        condition: 1 回目は `worktree` に sample のワークツリー、2 回目は `cwd` をそのワークツリーの中にする
+        mock: 配信元の一覧（偽物）、配信元の『作業場所の配信元の読み込み』（行 `notes` を足した配信元を返す偽物）
+        expected: どちらも `Target.source.config.documents` に行 `notes` があり、読み込みがワークツリーのパスで呼ばれる
+        exception: '-'
+      - name: test_resolve_read_targets_when_worktree_config_invalid
+        case: 異常
+        summary: ワークツリーの設定が検証に通らない
+        condition: '`worktree` に sample のワークツリー'
+        mock: 配信元の一覧（偽物）、配信元の『作業場所の配信元の読み込み』（`ValidationFailedError` を送る偽物）
+        expected: '`ValidationFailedError` がそのまま伝わる'
+        exception: ワークツリーの設定が検証に通らない
+      - name: test_resolve_read_targets_when_reload_disabled
+        case: 正常
+        summary: 再読み込みしないときは配信中の配信元のまま
+        condition: '`cwd` を sample のワークツリーの中にし、`reload_worktree=False`'
+        mock: 配信元の一覧（偽物）、配信元の『作業場所の配信元の読み込み』（呼ばれた回数を記録する偽物）
+        expected: '`Target.source` が配信中の sample のままで、`worktree` がそのワークツリー。読み込みは呼ばれない'
+        exception: '-'
   - name: resolve_write_target
     title: 書く場所の解決
     kind: 関数
@@ -566,6 +598,13 @@ functions:
         default: None
         passing: keyword
         description: 作業場所
+      - name: reload_worktree
+        title: ワークツリーの設定を再読み込みするか
+        type: bool
+        required: false
+        default: 'True'
+        passing: keyword
+        description: '`False` のとき、ワークツリーへ書く場所でも配信中の配信元のまま返す（文書の MCP の『ワークツリーの読み込みの待ち』が、待つワークツリーを先に決めるときに使う）'
     returns:
       type: Target
       description: 書き込む場所（`ref` は常に `None`、`access` は `write`。ワークツリーへ書くときの `source` はそのワークツリーの設定で再読み込みした配信元）
@@ -577,7 +616,7 @@ functions:
          - `worktree` を渡された場合、当たらなければ `WorktreeNotMatchedError` を送る
          - 渡されず、`cwd` がワークツリーの中ならそのワークツリー
       4. ワークツリーが無く、配信元が Git の配信元の場合、`clone` にクローン本体（`main_root`、無ければ `repo_root`）を入れた `TargetIsCloneError` を送る
-      5. ワークツリーへ書く場合、配信元をワークツリーの設定で再読み込みする（作業場所の配信元の読み込み）。検証に通らなければ `ValidationFailedError` を送る
+      5. ワークツリーへ書く場合で `reload_worktree` が `True` なら、配信元をワークツリーの設定で再読み込みする（作業場所の配信元の読み込み）。検証に通らなければ `ValidationFailedError` を送る
       6. Git の管理外は登録済みの配信元と `root`、ワークツリーは再読み込みした配信元とその `base` を `Target` にして返す
     exceptions:
       - name: SourceNotWritableError
@@ -661,6 +700,13 @@ functions:
         mock: なし
         expected: '`InvalidArgumentError`'
         exception: disk の配信元に worktree を渡した
+      - name: test_resolve_write_target_when_reload_disabled
+        case: 正常
+        summary: 再読み込みしないときは配信中の配信元のまま
+        condition: '`worktree` に sample のワークツリー、`reload_worktree=False`'
+        mock: 配信元の一覧（偽物）、配信元の『作業場所の配信元の読み込み』（呼ばれた回数を記録する偽物）
+        expected: '`Target.source` が配信中の sample のままで、`worktree` がそのワークツリー。読み込みは呼ばれない'
+        exception: '-'
 refs:
   - to: IF-2
     type: requires

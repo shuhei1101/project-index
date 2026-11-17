@@ -6,7 +6,9 @@ import json
 import logging
 import os
 import tempfile
+import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, cast
@@ -739,10 +741,36 @@ def load_source(
     )
 
 
-def load_source_at(source: ServedSource, root: Path) -> ServedSource:
-    """配信中の配信元の設定を、作業ツリーかワークツリーの同じ場所から再読み込みする。"""
+@dataclass(frozen=True)
+class _SourceAtEntry:
+    """作業場所の配信元の読み込みのキャッシュの 1 件。"""
+
+    # 作り直しの元にした配信中の配信元（`reload` で作り直されたら別のオブジェクトになる）
+    base: ServedSource
+    # 見張るファイルと、作ったときの `mtime_ns`・`size`（ファイルが無ければ `None`）
+    stamps: tuple[tuple[Path, tuple[int, int] | None], ...]
+    served: ServedSource
+
+
+# 配信元の ID と読む場所ごとの、作業場所の配信元の読み込みの結果
+_SOURCE_AT_CACHE: dict[tuple[str, Path], _SourceAtEntry] = {}
+_SOURCE_AT_LOCK = threading.Lock()
+
+
+def _file_stamp(path: Path) -> tuple[int, int] | None:
+    """ファイルの `mtime_ns`・`size` を返す（無ければ `None`）。"""
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return (stat.st_mtime_ns, stat.st_size)
+
+
+def _config_files_at(source: ServedSource, root: Path) -> tuple[list[Path], list[Path]]:
+    """`root` の下の設定のファイルと、クローン本体へ切り替えた設定の `root` の側のパスを返す。"""
     base = source.repo_root or source.root
     files: list[Path] = []
+    switched: list[Path] = []
     for file in source.config_files:
         try:
             target = root / file.relative_to(base)
@@ -753,8 +781,33 @@ def load_source_at(source: ServedSource, root: Path) -> ServedSource:
         # 無視されている設定はワークツリーに無いので、クローン本体のファイルを使う
         if not target.is_file() and source.repo_root and is_ignored(file, source.repo_root):
             files.append(file)
+            # 後から `root` の側に置かれたら作り直すため、`root` の側のパスも見張る
+            switched.append(target)
             continue
         files.append(target)
+    return files, switched
+
+
+def _cached_source_at(source: ServedSource, root: Path) -> ServedSource | None:
+    """見張るファイルが変わっていなければ、前回作った配信元を返す。"""
+    with _SOURCE_AT_LOCK:
+        entry = _SOURCE_AT_CACHE.get((source.id, root))
+    # 前回が無いか、元の配信元が作り直されていれば使わない
+    if entry is None or entry.base is not source:
+        return None
+    # 見張るファイルのどれかが変わっていれば使わない
+    if any(_file_stamp(path) != stamp for path, stamp in entry.stamps):
+        return None
+    return entry.served
+
+
+def load_source_at(source: ServedSource, root: Path) -> ServedSource:
+    """配信中の配信元の設定を、作業ツリーかワークツリーの同じ場所から再読み込みする。"""
+    cached = _cached_source_at(source, root)
+    if cached is not None:
+        return cached
+    base = source.repo_root or source.root
+    files, switched = _config_files_at(source, root)
     # 設定ファイルのフォルダを、作業ツリー・ワークツリーの同じ場所に置き換える
     config_root = source.config_root
     relative_root = config_root.relative_to(base) if config_root.is_relative_to(base) else Path()
@@ -771,4 +824,18 @@ def load_source_at(source: ServedSource, root: Path) -> ServedSource:
             message="; ".join(f"{source.id}: {v.path}: {v.rule}" for v in violations),
             violations=violations,
         )
+    # 設定のファイル・切り替えたパス・作った配信元が読んだスキーマのファイルを見張る
+    schema_files = [
+        served.config_root / row.schema_path
+        for row in served.config.documents
+        if isinstance(row.schema_path, str)
+    ]
+    watched = [*files, *switched, *schema_files]
+    entry = _SourceAtEntry(
+        base=source,
+        stamps=tuple((path, _file_stamp(path)) for path in watched),
+        served=served,
+    )
+    with _SOURCE_AT_LOCK:
+        _SOURCE_AT_CACHE[(source.id, root)] = entry
     return served

@@ -481,6 +481,37 @@ flows:
       - 文書の ID の重なりで片方の文書を除外しても、重なりを数える
       - '`violations` が空'
     test: test_normal_when_rows_share_file
+  - name: 正常系（深い管理用の YAML の範囲と exclude のパスを数えない）
+    summary: 直下の管理用の YAML で、より深いフォルダの管理用の YAML の範囲と、`exclude` のパスの glob に当たるファイルを索引に無いファイルとして数えない
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+      - name: 配信元
+        description: "検証に通る sample。行 `root`（`paths: [files.yaml]`・`records: files`・`body_file: path`・`exclude: ['docs/pr/**']`）と行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`）を持ち、直下の `files.yaml` が直下の `project-index.yaml`・`schemas/` のスキーマの行、`src/files.yaml` が `a.py` の行を持つ"
+        notes: 行 `src` の管理用の YAML のフォルダ `src/` は、行 `root` の管理用の YAML のフォルダより深い
+      - name: 範囲のファイル
+        description: '`src/a.py`・`src/b.py` と、PR ドキュメント `docs/pr/1/README.md` を置く'
+        notes: '`src/b.py` はどちらの管理用の YAML にも無い'
+    flow: |-
+      <!-- map: {"title": "正常系（深い管理用の YAML の範囲と exclude のパスを数えない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as check_project
+        participant F as 配信元のフォルダ
+
+        C->>T: path
+        T-->>F: 管理用の YAML とそのフォルダの配下のファイルを読む
+        T->>T: 行 root の候補から src/ の下と docs/pr/ の下を外す
+        T-->>C: 同期の件数と内訳
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`sync.unindexed_files` が 1 で、`sync.items` が `src: src/b.py` だけ（`root:` で始まる行が無い）'
+      - '`violations` が空（`exclude` の `/` を含む値を違反にしない）'
+    test: test_normal_when_nested_index_and_exclude_path
 lead: 配信元の設定・管理用の YAML・スクリプトを検証する管理の MCP の `check_project` の入出力を定め、`check_project` を修正するときに参照する。
 tags:
   - name: action:検査
@@ -644,5 +675,11 @@ constraints:
   - item: 同じファイルの重なり
     constraint: '行が文書にするファイルは、`records` を持たない行では `paths` に該当し `exclude` に該当しないファイル、`records`・`body_file` の行では要素の `body_file` が指すファイルとする。`records` の行の管理用の YAML 自体・`body_file` の無い `records` の行・`enabled: false` の行は数えない。文書の ID の重なりで片方の文書を除外しても数える。起動時の警告・状態の取得・引数なしの `describe` も同じ判定を使用する'
     notes: 管理用の YAML を目次の種類の文書として別の行で配信する配置を重なりにしないため、管理用の YAML 自体は数えない
+  - item: より深い管理用の YAML の範囲
+    constraint: '`records`・`body_file` の行の管理用の YAML ごとに、有効な `records`・`body_file` の行（同じ行を含む）のほかの管理用の YAML のうち、より深いフォルダにあるもののフォルダの配下を `unindexed_files` に数えない。起動時の警告・状態の取得も同じ判定を使う'
+    notes: そのファイルは深い管理用の YAML の側で数える。同じフォルダの管理用の YAML どうしは除かない
+  - item: exclude のパス
+    constraint: '`documents[].exclude[]` の `/` を含む値は、`paths` の基準のフォルダからのパスの glob として当てる。`/` を含まない値はファイル名に当てる。どちらも行の文書の集め方と `unindexed_files` の判定に使う'
+    notes: '`docs/pr/**` のように、どの行の文書でもないフォルダを管理用の YAML の範囲から外すときに使う'
 test_file: tests/integration/server/test_check_project.py
 visibility: internal
