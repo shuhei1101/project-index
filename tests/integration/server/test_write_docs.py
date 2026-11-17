@@ -192,11 +192,14 @@ REF_PATH_DOC = (
     "    process: 2 書き出す\n"
     "  - name: save\n"
     "    process: 3 書き出す\n"
+    "  - name: items[].name\n"
+    "    process: 5 書き出す\n"
     "steps:\n"
     "  - name: a\n"
     "    body: x\n"
     "notes:\n"
     "  main.py の補足: 4 書き出す\n"
+    "  a[b]: 6 書き出す\n"
 )
 
 
@@ -693,25 +696,50 @@ def test_normal_when_text_edits_ref_path(
         **arguments,
     )
     after_fourth = load_yaml(path.read_text(encoding="utf-8"))
+    fifth = env.call(
+        "write_docs",
+        operations=[
+            _update("doc-1", _version(path), text_edits=[_edit("#functions[items[].name].process")])
+        ],
+        **arguments,
+    )
+    after_fifth = load_yaml(path.read_text(encoding="utf-8"))
+    sixth = env.call(
+        "write_docs",
+        operations=[_update("doc-1", _version(path), text_edits=[_edit("#notes[a[b]]")])],
+        **arguments,
+    )
+    after_sixth = load_yaml(path.read_text(encoding="utf-8"))
     # 検証
     assert [item["status"] for item in first.data["results"]] == ["updated"]
     assert [item["process"] for item in after_first["functions"]] == [
         "1 書き出す",
         "2 保存する",
         "3 書き出す",
+        "5 書き出す",
     ]
     assert [item["status"] for item in second.data["results"]] == ["updated"]
     assert [item["process"] for item in after_second["functions"]] == [
         "1 書き出す",
         "2 保存する",
         "3 保存する",
+        "5 書き出す",
     ]
     assert third.is_error
     assert "text_edits[0].field" in third.text
     assert "文字列ではない項目は置き換えられません" in third.text
     assert after_third == before_third
     assert [item["status"] for item in fourth.data["results"]] == ["updated"]
-    assert after_fourth["notes"] == {"main.py の補足": "4 保存する"}
+    assert after_fourth["notes"] == {"main.py の補足": "4 保存する", "a[b]": "6 書き出す"}
+    assert [item["status"] for item in fifth.data["results"]] == ["updated"]
+    assert [item["process"] for item in after_fifth["functions"]] == [
+        "1 書き出す",
+        "2 保存する",
+        "3 保存する",
+        "5 保存する",
+    ]
+    assert [item["status"] for item in sixth.data["results"]] == ["updated"]
+    assert after_sixth["notes"] == {"main.py の補足": "4 保存する", "a[b]": "6 保存する"}
 
 
 @pytest.mark.parametrize(
@@ -723,6 +751,9 @@ def test_normal_when_text_edits_ref_path(
         ),
         pytest.param("#functions[save#3].process", "name が save の要素は 2 個です", id="order"),
         pytest.param("#notes[missing]", "キー missing がありません", id="no_key"),
+        pytest.param(
+            "#functions[save[1].process", "記載方法が誤っています", id="unbalanced_brackets"
+        ),
     ],
 )
 def test_error_when_text_edits_ref_path_unresolved(
@@ -733,7 +764,7 @@ def test_error_when_text_edits_ref_path_unresolved(
     field: str,
     message: str,
 ) -> None:
-    """x-key の無い配列・該当する要素の無い値・無い順番・無いキーを指す参照の型の項目のパスを断る（異常系）。"""
+    """x-key の無い配列・該当する要素の無い値・無い順番・無いキーを指すパスと、`[...]` の中の `[` `]` の対応が取れない参照の型の項目のパスを断る（異常系）。"""
     # 準備
     files = sample_file_set(
         **{"schemas/sample.schema.yaml": REF_PATH_SCHEMA, "docs/doc-1.yaml": REF_PATH_DOC}
