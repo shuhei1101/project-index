@@ -367,7 +367,7 @@ classes:
           1. 検査の行の定義のハッシュを、行の全ての項目（`id`・`run`・`on`・`cache`）から『値のハッシュ』で作る
           2. スクリプトの状態を作る
              - `script_at(target)` が commit を返す場合（クローン本体で `config_commit` がある）、その commit の SHA にする（スクリプトはその commit から取り出して動かす）
-             - それ以外（ワークツリー・`config_commit` の無い配信元）の場合、`stamps` に (`config_base`, `run`, `target.source.is_git`) の状態があればそれを使い、無ければ `_script_stamp`（`use_git` は `target.source.is_git`）で作って `stamps` に入れる。`_script_stamp` は、`run` の要素のうち `-` で始まらない相対パスで、`target.config_base` から解いてファイルがあるものごとに、そのファイルのフォルダの配下（サブフォルダを含む。`__pycache__` のフォルダは除き、Git の配信元では Git が管理・無視していないファイルだけ）のファイルの (`config_base` からの相対パス, `st_mtime_ns`, `st_size`) をパスの順に並べ、『値のハッシュ』で作る。該当するファイルが無ければ空の文字列
+             - それ以外（ワークツリー・`config_commit` の無い配信元）の場合、`stamps` に (`config_base`, `run`, `target.source.is_git`) の状態があればそれを使い、無ければ `_script_stamp`（`use_git` は `target.source.is_git`）で作って `stamps` に入れる（`_cached_stamp`）。`_script_stamp` は、`run` の要素のうち `-` で始まらない相対パスで、`target.config_base` から解いてファイルがあるものごとに、そのファイルのフォルダの配下（サブフォルダを含む。`__pycache__` のフォルダは除き、Git の配信元では Git が管理・無視していないファイルだけ）のファイルの (`config_base` からの相対パス, `st_mtime_ns`, `st_size`) をパスの順に並べ、『値のハッシュ』で作る。該当するファイルが無ければ空の文字列
           3. 参照する場所を、`target.worktree` があればその絶対パス、無ければ空の文字列にする
           4. (配信元の ID, 種類, 検査の ID, 文書のバージョン, 行の定義のハッシュ, スクリプトの状態, 参照する場所) を返す
         notes:
@@ -471,8 +471,107 @@ functions:
       type: list[tuple[str, int, int]]
       description: (相対パス, `st_mtime_ns`, `st_size`) の並び
     process: |-
-      1. フォルダの配下のファイルを列挙する
+      1. フォルダの配下のファイルを `_folder_files` で列挙する
          - `use_git` が真の場合、フォルダで `git ls-files -z --cached --others --exclude-standard -- .` を呼ぶ（Git が管理するファイルと、追跡していないが無視していないファイル。`git archive` が取り出す範囲と揃える）
          - 偽の場合（Git の管理外の配信元）、サブフォルダまでたどる
          - どちらも `__pycache__` のフォルダの配下は除く
       2. ファイルごとに (相対パス, `st_mtime_ns`, `st_size`) をパスの順に並べる。`stat` が `OSError`（列挙の後に消えた・リンク先が無い）のファイルは (相対パス, -1, -1) にして続ける
+  - name: _cached_stamp
+    title: 使い回すスクリプトの状態
+    container: project_index/features/validation/service.py
+    usecase: 共通
+    summary: 作業ツリーのスクリプトの状態を、`stamps` にあれば使い回し、無ければ作って入れる
+    kind: 関数
+    scope: internal
+    args:
+      - name: target
+        title: 読み書きの場所
+        type: Target
+        required: true
+        passing: positional
+        description: '`config_base` と `source.is_git` を使う'
+      - name: entry
+        title: 検査の行
+        type: ScriptEntry
+        required: true
+        passing: positional
+        description: '`run` を使う'
+      - name: stamps
+        title: スクリプトの状態のメモ
+        type: ScriptStamps | None
+        required: true
+        passing: positional
+        description: '`None` は使い回さない'
+    returns:
+      type: str
+      description: スクリプトの状態
+    process: |-
+      1. (`config_base`, `run`, `source.is_git`) が `stamps` にあればその値を返す
+      2. 無ければ `_script_stamp` で作り、`stamps` があれば入れて返す
+  - name: _folder_files
+    title: フォルダの配下のファイル
+    container: project_index/features/validation/service.py
+    usecase: 共通
+    summary: フォルダの配下のファイルを、`__pycache__` の配下を除いてパスの順に返す
+    kind: 関数
+    scope: internal
+    args:
+      - name: folder
+        title: フォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: 列挙するフォルダ
+      - name: use_git
+        title: Git の配信元か
+        type: bool
+        required: true
+        passing: keyword
+        description: 真なら `_git_files`、偽なら `_walked_files` で列挙する
+    returns:
+      type: list[Path]
+      description: ファイルの絶対パス
+    process: |-
+      1. `use_git` が真なら `_git_files`、偽なら `_walked_files` で列挙する
+      2. フォルダからの相対パスに `__pycache__` を含むものを除き、パスの順に返す
+  - name: _git_files
+    title: Git の対象のファイル
+    container: project_index/features/validation/service.py
+    usecase: 共通
+    summary: Git が管理するファイルと、追跡していないが無視していないファイルを返す
+    kind: 関数
+    scope: internal
+    side_effects: git を子プロセスで 1 回呼ぶ
+    args:
+      - name: folder
+        title: フォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: git を呼ぶフォルダ
+    returns:
+      type: list[Path]
+      description: ファイルの絶対パス
+    process: |-
+      1. フォルダで `git ls-files -z --cached --others --exclude-standard -- .` を呼ぶ（`GitError` はそのまま伝わる）
+      2. 出力を NUL で分け、フォルダにつないだパスを返す
+  - name: _walked_files
+    title: たどったファイル
+    container: project_index/features/validation/service.py
+    usecase: 共通
+    summary: サブフォルダまでたどったファイルを返す（`__pycache__` のフォルダはたどらない）
+    kind: 関数
+    scope: internal
+    args:
+      - name: folder
+        title: フォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: たどるフォルダ
+    returns:
+      type: list[Path]
+      description: ファイルの絶対パス
+    process: |-
+      1. `os.walk` でサブフォルダまでたどり、`__pycache__` のフォルダはたどらない
+      2. ファイルのパスを返す
