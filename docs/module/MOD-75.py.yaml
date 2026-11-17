@@ -134,6 +134,13 @@ classes:
             default: None
             passing: keyword
             description: 書き込み・削除の検査で渡す。`None` は期限を持たない（読み取りの検査）
+          - name: stamps
+            title: スクリプトの状態のメモ
+            type: dict[tuple[str, tuple[str, ...], bool], str] | None
+            required: false
+            default: None
+            passing: keyword
+            description: 読み取りの検査で、(基準のフォルダ, `run`, Git の配信元か) ごとのスクリプトの状態を使い回す辞書。呼び出し元の 1 回の要求の中で同じ辞書を渡す。`None` は使い回さない
         returns:
           type: list[Violation]
           description: 違反。検査の順に並ぶ
@@ -142,7 +149,7 @@ classes:
           2. `new` なら『IDの形の検査』を通す
           3. 『関連の種類の検査』をメタデータに通す
           4. 行の `validators` の ID ごとに `source.script("validators", id)` を引き、`on` が行の `on` にあるものだけを通す
-             - `on` が `read` の場合、`_read_key` で作ったキーで `_read_cache` にキャッシュがあればそれを使う
+             - `on` が `read` の場合、`_read_key`（`stamps` を渡す）で作ったキーで `_read_cache` にキャッシュがあればそれを使う
              - `deadline` がある場合、動かす前に『期限』.期限の確認を呼ぶ（過ぎていれば `WriteDeadlineExceededError` が伝わる）
              - スクリプトの実行の『スクリプトの実行』を `cwd=target.config_base`（設定ファイルのフォルダ）・`stdin`（`body`）・制限時間（`deadline` があれば『期限』.制限時間の切り詰めに `timeout_sec` を渡した値、無ければ `timeout_sec`）・`at` で呼び（`at` は `target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`））、『検査の出力の解釈』で違反にする
              - `ScriptError` の場合、`path` が `$`、`rule` が `{id}: 検査を実行できませんでした（{メッセージ}）` の違反にする（キャッシュしない）
@@ -228,6 +235,24 @@ classes:
             condition: クローン本体を指す読み書きの場所で `config_commit` を `a` にして `on="read"` を 2 回、`b` に変えて 1 回
             mock: '`run_script`（呼ばれた数を数える）'
             expected: '`run_script` が 2 回呼ばれる'
+          - name: test_document_checker_check_when_script_folder_ignored
+            case: 正常
+            summary: Git が無視するファイルの書き換えでは動かし直さない
+            condition: Git の配信元のワークツリーで、`.gitignore` が `scripts/node_modules/` を無視する。同じ文書を `on="read"` で 1 回呼び、`scripts/node_modules/a.js` を書き換えて 1 回、commit していない `scripts/new.py` を置いて 1 回
+            mock: '`run_script`（呼ばれた数を数える）'
+            expected: '`run_script` が 2 回呼ばれる（無視するファイルの後はキャッシュを使い、追跡していないが無視していないファイルの後は動かす）'
+          - name: test_document_checker_check_when_script_folder_has_broken_link
+            case: 正常
+            summary: 状態を取れないファイルがあってもキーを作れる
+            condition: Git の管理外の配信元で、スクリプトのフォルダにリンク先の無いシンボリックリンクを置き、同じ文書を `on="read"` で 2 回
+            mock: '`run_script`（呼ばれた数を数える）'
+            expected: 例外を送らず、`run_script` が 1 回呼ばれる
+          - name: test_document_checker_check_when_stamps_shared
+            case: 正常
+            summary: 1 回の要求の中でスクリプトの状態を使い回す
+            condition: ワークツリーを指す読み書きの場所で、違う 2 件の文書を同じ `stamps` を渡して `on="read"` で 1 回ずつ
+            mock: '`_folder_stamps`（呼ばれた数を数える）・`run_script`'
+            expected: '`_folder_stamps` が 1 回だけ呼ばれる'
         exceptions:
           - name: WriteDeadlineExceededError
             condition: '`deadline` があり、検査のスクリプトを動かす前か動かした後に期限を過ぎている'
@@ -329,6 +354,12 @@ classes:
             required: true
             passing: positional
             description: '`source.script("validators", id)` で引いた行'
+          - name: stamps
+            title: スクリプトの状態のメモ
+            type: dict[tuple[str, tuple[str, ...], bool], str] | None
+            required: true
+            passing: keyword
+            description: 検査するの `stamps`
         returns:
           type: tuple[str, str, str, str, str, str, str]
           description: (配信元の ID, 種類, 検査の ID, 文書のバージョン, 検査の行の定義のハッシュ, スクリプトの状態, 参照する場所)
@@ -336,7 +367,7 @@ classes:
           1. 検査の行の定義のハッシュを、行の全ての項目（`id`・`run`・`on`・`cache`）から『値のハッシュ』で作る
           2. スクリプトの状態を作る
              - `script_at(target)` が commit を返す場合（クローン本体で `config_commit` がある）、その commit の SHA にする（スクリプトはその commit から取り出して動かす）
-             - それ以外（ワークツリー・`config_commit` の無い配信元）の場合、`_script_stamp` で、`run` の要素のうち `-` で始まらない相対パスで、`target.config_base` から解いてファイルがあるものごとに、そのファイルのフォルダの配下（サブフォルダを含む。`__pycache__` のフォルダは除く）のファイルの (`config_base` からの相対パス, `st_mtime_ns`, `st_size`) をパスの順に並べ、『値のハッシュ』で作る。該当するファイルが無ければ空の文字列
+             - それ以外（ワークツリー・`config_commit` の無い配信元）の場合、`stamps` に (`config_base`, `run`, `target.source.is_git`) の状態があればそれを使い、無ければ `_script_stamp`（`use_git` は `target.source.is_git`）で作って `stamps` に入れる。`_script_stamp` は、`run` の要素のうち `-` で始まらない相対パスで、`target.config_base` から解いてファイルがあるものごとに、そのファイルのフォルダの配下（サブフォルダを含む。`__pycache__` のフォルダは除き、Git の配信元では Git が管理・無視していないファイルだけ）のファイルの (`config_base` からの相対パス, `st_mtime_ns`, `st_size`) をパスの順に並べ、『値のハッシュ』で作る。該当するファイルが無ければ空の文字列
           3. 参照する場所を、`target.worktree` があればその絶対パス、無ければ空の文字列にする
           4. (配信元の ID, 種類, 検査の ID, 文書のバージョン, 行の定義のハッシュ, スクリプトの状態, 参照する場所) を返す
         notes:
@@ -371,12 +402,18 @@ functions:
         required: true
         passing: positional
         description: 検査の行の `run`
+      - name: use_git
+        title: Git の配信元か
+        type: bool
+        required: true
+        passing: keyword
+        description: '`target.source.is_git`'
     returns:
       type: str
       description: ハッシュ。`run` が作業ツリーのファイルを指さなければ空の文字列
     process: |-
       1. `_script_folders` で `run` が指すファイルのフォルダを洗い出す。無ければ空の文字列を返す
-      2. フォルダごとに `_folder_stamps` を呼んで並べ、『値のハッシュ』を返す
+      2. フォルダごとに `_folder_stamps`（`use_git` を渡す）を呼んで並べ、『値のハッシュ』を返す
   - name: _script_folders
     title: スクリプトのフォルダ
     container: project_index/features/validation/service.py
@@ -424,9 +461,18 @@ functions:
         required: true
         passing: positional
         description: たどるフォルダ
+      - name: use_git
+        title: Git の配信元か
+        type: bool
+        required: true
+        passing: keyword
+        description: 真なら Git が管理・無視していないファイルだけを走査する
     returns:
       type: list[tuple[str, int, int]]
       description: (相対パス, `st_mtime_ns`, `st_size`) の並び
     process: |-
-      1. フォルダをサブフォルダまでたどる（`__pycache__` のフォルダはたどらない）
-      2. ファイルごとに (相対パス, `st_mtime_ns`, `st_size`) を並べる
+      1. フォルダの配下のファイルを列挙する
+         - `use_git` が真の場合、フォルダで `git ls-files -z --cached --others --exclude-standard -- .` を呼ぶ（Git が管理するファイルと、追跡していないが無視していないファイル。`git archive` が取り出す範囲と揃える）
+         - 偽の場合（Git の管理外の配信元）、サブフォルダまでたどる
+         - どちらも `__pycache__` のフォルダの配下は除く
+      2. ファイルごとに (相対パス, `st_mtime_ns`, `st_size`) をパスの順に並べる。`stat` が `OSError`（列挙の後に消えた・リンク先が無い）のファイルは (相対パス, -1, -1) にして続ける
