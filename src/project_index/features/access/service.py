@@ -181,8 +181,12 @@ def resolve_read_targets(
     worktree: str | None = None,
     cwd: str | None = None,
     outside_scope: bool = False,
+    reload_worktree: bool = True,
 ) -> list[Target]:
-    """MCP の `source`・`ref`・`worktree`・`cwd` から、読む配信元ごとの場所を解く。"""
+    """MCP の `source`・`ref`・`worktree`・`cwd` から、読む配信元ごとの場所を解く。
+
+    `reload_worktree` が `False` のときは、ワークツリーを読む場所でも配信中の配信元のまま返す。
+    """
     path = _normalize(cwd)
     sources = _readable_sources(registry, source, cwd, outside_scope=outside_scope)
     if len(sources) >= MULTI_SOURCE_MIN and (ref is not None or worktree is not None):
@@ -203,7 +207,9 @@ def resolve_read_targets(
         if access is None:
             msg = "読む場所の権限が決まっていません"
             raise RuntimeError(msg)
-        targets.append(_target_of(item, access, outside, ref, worktree, path, current))
+        targets.append(
+            _target_of(item, access, outside, ref, worktree, path, current, reload_worktree)
+        )
     return targets
 
 
@@ -235,6 +241,7 @@ def _target_of(
     worktree: str | None,
     path: Path | None,
     current: tuple[ServedSource, Path | None] | None,
+    reload_worktree: bool = True,
 ) -> Target:
     """1 つの配信元の読む場所を決める。"""
     _reject_disk_arguments(item, ref=ref, worktree=worktree)
@@ -246,7 +253,7 @@ def _target_of(
                 given=worktree,
                 patterns=item.worktree_globs,
             )
-        return Target(item, _base_of(item, wt), None, wt, access, outside_scope=outside)
+        return _worktree_target(item, wt, access, outside, reload_worktree=reload_worktree)
     if ref is not None:
         if not item.is_git:
             raise InvalidArgumentError(
@@ -262,10 +269,22 @@ def _target_of(
         return _revision_target(item, ref, access, outside)
     wt = find_worktree(item, path) if path is not None else None
     if wt is not None:
-        return Target(item, _base_of(item, wt), None, wt, access, outside_scope=outside)
+        return _worktree_target(item, wt, access, outside, reload_worktree=reload_worktree)
     if (current is not None and current[0].id == item.id) or not item.is_git:
         return Target(item, item.root, None, None, access, outside_scope=outside)
     return _revision_target(item, item.config.default_ref, access, outside)
+
+
+def _worktree_target(
+    item: ServedSource, wt: Path, access: AccessLevel, outside: bool, *, reload_worktree: bool
+) -> Target:
+    """ワークツリーを読む場所を、そのワークツリーの設定で作り直した配信元で作る。"""
+    # 再読み込みしない: 待つワークツリーを決めるだけなので、配信中の配信元のまま返す
+    if not reload_worktree:
+        return Target(item, _base_of(item, wt), None, wt, access, outside_scope=outside)
+    # 種類と文書の行をワークツリーの設定で参照するため、配信元を再読み込みする（検証に通らなければ伝える）
+    reloaded = load_source_at(item, wt)
+    return Target(reloaded, _base_of(reloaded, wt), None, wt, access, outside_scope=outside)
 
 
 def _revision_target(item: ServedSource, ref: str, access: AccessLevel, outside: bool) -> Target:
@@ -275,14 +294,45 @@ def _revision_target(item: ServedSource, ref: str, access: AccessLevel, outside:
     return Target(item, item.root, ref, None, access, outside_scope=outside, commit=commit)
 
 
+def _write_worktree(item: ServedSource, worktree: str | None, path: Path | None) -> Path | None:
+    """書くワークツリーを決める（Git 管理外の配信元は `None`）。"""
+    _reject_disk_arguments(item, worktree=worktree)
+    # `worktree` を渡された: そのパスがワークツリーに当たらなければ断る
+    if worktree is not None:
+        wt = find_worktree(item, normalize_path(worktree))
+        if wt is None:
+            raise WorktreeNotMatchedError(
+                message=f"{worktree} は {item.id} のワークツリーに該当しません",
+                given=worktree,
+                patterns=item.worktree_globs,
+            )
+    # 渡されていない: 作業場所がワークツリーの中ならそのワークツリー
+    else:
+        wt = find_worktree(item, path) if path is not None else None
+    # Git の配信元はワークツリーにだけ書く
+    if wt is None and item.is_git:
+        # 設定をワークツリーから読む配信元でも、ワークツリーの親のクローン本体を返す
+        clone = item.main_root or item.repo_root or item.root
+        raise TargetIsCloneError(
+            message=f"{clone} はクローン本体です。worktree でワークツリーを指してください",
+            clone=str(clone),
+            next_steps=["worktree 引数にワークツリーのパスを指定してください"],
+        )
+    return wt
+
+
 def resolve_write_target(
     *,
     registry: SourceRegistry,
     source: str | None = None,
     worktree: str | None = None,
     cwd: str | None = None,
+    reload_worktree: bool = True,
 ) -> Target:
-    """MCP の `source`・`worktree`・`cwd` から、書き込む場所を解く。"""
+    """MCP の `source`・`worktree`・`cwd` から、書き込む場所を解く。
+
+    `reload_worktree` が `False` のときは、ワークツリーへ書く場所でも配信中の配信元のまま返す。
+    """
     path = _normalize(cwd)
     if source is None:
         current = current_source(registry.served(), path)
@@ -301,28 +351,9 @@ def resolve_write_target(
             available=available_sources(cwd, registry=registry),
             next_steps=[DESCRIBE_HINT],
         )
-    _reject_disk_arguments(item, worktree=worktree)
-    if worktree is not None:
-        wt = find_worktree(item, normalize_path(worktree))
-        if wt is None:
-            raise WorktreeNotMatchedError(
-                message=f"{worktree} は {item.id} のワークツリーに該当しません",
-                given=worktree,
-                patterns=item.worktree_globs,
-            )
-    else:
-        wt = find_worktree(item, path) if path is not None else None
-    # Git の配信元はワークツリーにだけ書く
-    if wt is None and item.is_git:
-        # 設定をワークツリーから読む配信元でも、ワークツリーの親のクローン本体を返す
-        clone = item.main_root or item.repo_root or item.root
-        raise TargetIsCloneError(
-            message=f"{clone} はクローン本体です。worktree でワークツリーを指してください",
-            clone=str(clone),
-            next_steps=["worktree 引数にワークツリーのパスを指定してください"],
-        )
-    # ワークツリーへ書くか
-    if wt is not None:
+    wt = _write_worktree(item, worktree, path)
+    # ワークツリーへ書き、ワークツリーの設定を再読み込みするか
+    if wt is not None and reload_worktree:
         # 書く: 種類・配置先をそのワークツリーの設定で参照するため、配信元を再読み込みする
         item = load_source_at(item, wt)
     return Target(item, _base_of(item, wt), None, wt, "write")

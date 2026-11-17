@@ -486,6 +486,9 @@ exceptions:
   - name: SourceNotReadableError
     condition: '`cwd` が起点の配信元の `scope.read`・`scope.write` に当たらない（`outside_scope: true` のときは、加えて `outside_read` が偽）'
     notes: '`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に参照できることを添える'
+  - name: ValidationFailedError
+    condition: '`worktree` か `cwd` が指すワークツリーの配信元の設定が検証に通らない'
+    notes: 文書の検索と同じ返却。結合テストは文書の検索に置く
 constraints:
   - item: 深さ
     constraint: 最大 4
@@ -502,6 +505,9 @@ constraints:
     notes: 共通の処理で解決するため、結合テストは [文書の検索](id:IF-2) が持つ
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、一緒に変わったファイルを返さない。`ref`・`worktree` を指定すると `InvalidArgumentError`'
+  - item: ワークツリーの配信元の設定
+    constraint: '`worktree` を指定したときと `cwd` がワークツリーの中のときは、そのワークツリーの配信元の設定（`documents` の行）で文書を集め、関連をたどる'
+    notes: 文書の検索の同じ制約と同じ読み込みを使う
 refs:
   - to: SC-6
     item: scenarios[正常シナリオ]

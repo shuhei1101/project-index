@@ -74,6 +74,27 @@ def test_document_table_excludes() -> None:
     assert by_folder is False
 
 
+def test_document_table_excludes_when_path_pattern() -> None:
+    """`/` を含む値はパスで当てる（正常系）。"""
+    # 準備
+    table = DocumentTable(
+        id="root",
+        paths=["files.yaml"],
+        schema_path="schemas/files.schema.yaml",
+        exclude=["docs/pr/**", "README.md"],
+    )
+    # 実行
+    under_folder = table.excludes("docs/pr/1/a.md")
+    similar_folder = table.excludes("docs/prx/a.md")
+    deeper_folder = table.excludes("x/docs/pr/a.md")
+    by_name = table.excludes("docs/README.md")
+    # 検証
+    assert under_folder is True
+    assert similar_folder is False
+    assert deeper_folder is False
+    assert by_name is True
+
+
 def test_document_table_matches() -> None:
     """paths に当たる（正常系）。"""
     # 準備

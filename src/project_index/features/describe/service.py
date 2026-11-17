@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import dataclasses
 from io import StringIO
 from typing import TYPE_CHECKING, Any
 
@@ -24,7 +23,6 @@ from project_index.features.describe.types import (
 )
 from project_index.features.describe.warnings import collect_warnings
 from project_index.features.history.query import list_refs, list_worktrees
-from project_index.features.sources.service import load_source_at
 from project_index.shared.errors import InvalidArgumentError, Violation
 
 if TYPE_CHECKING:
@@ -160,9 +158,6 @@ def describe(
         cwd=request.cwd,
         outside_scope=request.outside_scope,
     )[0]
-    # 作業ツリーかワークツリーを読むときは、その場所の設定を再読み込みした配信元を使う
-    if target.worktree is not None and target.ref is None:
-        target = dataclasses.replace(target, source=load_source_at(target.source, target.worktree))
     if request.kind is None:
         return _source_guide(store, target)
     return _kind_schema(store, target, request.kind)

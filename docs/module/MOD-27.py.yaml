@@ -342,12 +342,19 @@ functions:
         default: ()
         passing: keyword
         description: 同じ配信元の、`table` でない有効な文書の行。どれかの行の文書になる（`matches` が `True`）パスを数えない
+      - name: nested_dirs
+        title: 深い管理用の YAML のフォルダ
+        type: Collection[str]
+        required: false
+        default: ()
+        passing: keyword
+        description: '`index_path` のフォルダより深い、ほかの管理用の YAML のフォルダ（`root` からのパス）。その配下のパスを数えない'
     returns:
       type: list[str]
       description: '`root` からのパスの昇順'
     process: |-
       1. `files` があればそのうち `index_path` のフォルダの配下のパス（フォルダが `root` なら全て）、無ければ中をたどるファイルの列挙（`walk_files`）で `index_path` のフォルダの配下のファイルを `root` からのパスで得る
-      2. `index_path` 自身と `body_paths` にあるパスと、文書の行.除外の名前に当たるかが `True` のパスと、除外の条件に当たるか（`is_excluded_file`）が `True` のパスと、`others` のどれかの行の文書になるか（文書の行.`matches`）が `True` のパスを除き、昇順で返す
+      2. `index_path` 自身と `body_paths` にあるパスと、文書の行.除外の名前に当たるかが `True` のパスと、除外の条件に当たるか（`is_excluded_file`）が `True` のパスと、`others` のどれかの行の文書になるか（文書の行.`matches`）が `True` のパスと、`nested_dirs` のどれかのフォルダの配下のパスを除き、昇順で返す
     unit_tests:
       - name: test_unindexed_files
         case: 正常
@@ -382,6 +389,20 @@ functions:
         condition: '`files.yaml`・`src/a.py`・`src/d.py`・`content/prompts/p.yaml`・`content/prompts/note.md` を置き、`index_path` が `files.yaml`、`body_paths` が `[src/a.py]`、`others` が `paths: [content/prompts/**/*.yaml]` の行 1 つ'
         mock: なし（`tmp_path`）
         expected: '`["content/prompts/note.md", "src/d.py"]`'
+        exception: '-'
+      - name: test_unindexed_files_when_nested_dirs_given
+        case: 正常
+        summary: 深い管理用の YAML のフォルダの配下を数えない
+        condition: '`files.yaml`・`README.md`・`LICENSE`・`src/files.yaml`・`src/a.py`・`srcx/b.py` を置き、`index_path` が `files.yaml`、`body_paths` が `[README.md]`、`nested_dirs` が `[src]`'
+        mock: なし（`tmp_path`）
+        expected: '`["LICENSE", "srcx/b.py"]`（`src/` の下を含まず、名前が `src` で始まる別のフォルダは数える）'
+        exception: '-'
+      - name: test_unindexed_files_when_exclude_has_path
+        case: 正常
+        summary: 行の `exclude` のパスの glob に当たるファイルを数えない
+        condition: '`files.yaml`・`README.md`・`docs/pr/1/README.md`・`docs/a.md` を置き、`index_path` が `files.yaml`、`body_paths` が `[README.md]`、行の `exclude` が `[docs/pr/**]`'
+        mock: なし（`tmp_path`）
+        expected: '`["docs/a.md"]`'
         exception: '-'
   - name: resolve_body_path
     title: 本文のファイルのパスの解決

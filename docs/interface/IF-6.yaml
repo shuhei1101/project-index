@@ -1353,7 +1353,7 @@ exceptions:
   - name: なし（正常終了）
     condition: '全ての操作を書いた（`atomic: false` で一部が失敗したときも、失敗分を `failed` として返して正常終了）'
   - name: ValidationFailedError
-    condition: '変更を当てた後の文書がスキーマか `validators[]` に通らないか、種類のスキーマの `$ref` を解決できないか、変えた Markdown のキーの値に mdmark の描画時の書き方の警告があるか、本文のファイルのパスが配信元の外・`create` で既にあるファイルを指す（`atomic: true`）'
+    condition: '変更を当てた後の文書がスキーマか `validators[]` に通らないか、種類のスキーマの `$ref` を解決できないか、変えた Markdown のキーの値に mdmark の描画時の書き方の警告があるか、本文のファイルのパスが配信元の外・`create` で既にあるファイルを指す（`atomic: true`）か、書き込むワークツリーの配信元の設定が検証に通らない'
     notes: '違反ごとの添字・パス・決まり・直し方を添える。スキーマの違反には、違反した項目のスキーマの説明（`schema`）も添える'
   - name: SourceNotWritableError
     condition: '`cwd` が配信元の `scope.write` に当たらない'
@@ -1371,7 +1371,7 @@ exceptions:
     condition: '`update`・`replace` の `id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
   - name: InvalidArgumentError
-    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先のファイル名が行の `exclude[]` に当たる・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す'
+    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先が行の `exclude[]` に当たる（`/` を含む値はパス、含まない値はファイル名で当てる）・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す'
   - name: SourceNotServedError
     condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
   - name: WorktreeNotMatchedError

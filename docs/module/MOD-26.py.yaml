@@ -183,7 +183,7 @@ functions:
         required: false
         default: '[]'
         passing: keyword
-        description: ファイル名の glob（`documents[].exclude[]` と同じ書き方）
+        description: ファイル名の glob。`/` を含む値は `root` からのパスの glob（`documents[].exclude[]` と同じ書き方）
       - name: exclude_paths
         title: 除外のパス
         type: list[str]
@@ -218,6 +218,13 @@ functions:
         condition: '`src/a.py`・`content/prompts/p.yaml`・`content/readme.md` を置き、`paths=["**"]`・`exclude_paths=["content/prompts/**/*.yaml"]`'
         mock: なし（`tmp_path`）
         expected: '`["content/readme.md", "src/a.py"]`'
+        exception: '-'
+      - name: test_indexable_files_when_exclude_has_path
+        case: 正常
+        summary: 除外の名前に `/` を含む値はパスで当てる
+        condition: '`src/a.py`・`src/b.py`・`lib/b.py` を置き、`paths=["**"]`・`exclude=["src/b.py"]`'
+        mock: なし（`tmp_path`）
+        expected: '`["lib/b.py", "src/a.py"]`'
         exception: '-'
   - name: walk_tree
     title: フォルダごとの列挙

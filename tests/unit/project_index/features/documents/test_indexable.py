@@ -212,6 +212,18 @@ def test_indexable_files_when_exclude_paths_given(
     assert result == ["content/readme.md", "src/a.py"]
 
 
+def test_indexable_files_when_exclude_has_path(
+    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """除外の名前に `/` を含む値はパスで当てる（正常系）。"""
+    # 準備
+    write_files(tmp_path, {"src/a.py": "a = 1\n", "src/b.py": "b = 2\n", "lib/b.py": "b = 3\n"})
+    # 実行
+    result = indexable_files(tmp_path, ["**"], exclude=["src/b.py"])
+    # 検証
+    assert result == ["lib/b.py", "src/a.py"]
+
+
 def test_walk_tree(tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]) -> None:
     """ファイルとフォルダの更新日時（正常系）。"""
     # 準備

@@ -38,7 +38,7 @@ YAML を書き換えたときは、再起動で反映します。
 | --- | --- | --- | --- |
 | `source` | str（`search_docs`・`list_changes` は list[str] も可） | 配信元の ID（端末の設定の `sources[].id`） | 省略すると作業中の配信元。`scope` に当たらない配信元はエラー（`outside_scope` を除く）。`search_docs`・`list_changes` は配列か `*`（参照できる全配信元）も受ける |
 | `ref` | str | 読むリビジョン（ブランチ・コミット・タグ） | 省略すると配信元の `default_ref`。作業中の配信元は作業ツリー。Git 管理外の配信元・`storage.type: disk` の配信元と、複数の配信元を指したときは渡せない |
-| `worktree` | str | 読み書きするワークツリーのパス | 配信元の `worktrees` に当たるパスだけ。省略して `cwd` がワークツリーの中なら、そのワークツリー。`storage.type: disk` の配信元には渡せず、`cwd` がワークツリーの中でも登録したフォルダを読み書きする |
+| `worktree` | str | 読み書きするワークツリーのパス | 配信元の `worktrees` に当たるパスだけ。省略して `cwd` がワークツリーの中なら、そのワークツリー。そのワークツリーの `project-index.yaml` の行で文書を集め、設定が検証に通らなければ `ValidationFailedError` を返す。`storage.type: disk` の配信元には渡せず、`cwd` がワークツリーの中でも登録したフォルダを読み書きする |
 | `format` | `markdown` / `json` | 返す形式 | 既定 `markdown` |
 | `cwd` | str | 作業場所 | プラグインのフックがセッションの作業場所で上書きする。エージェントが指定した値は使わない。ワークツリーを指すときは `worktree` を指定する |
 | `session_id`・`agent_id` | str | 会話キー | 同じ。メインの会話は `agent_id` が空 |

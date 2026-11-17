@@ -517,6 +517,65 @@ def test_unindexed_files_when_other_row_matches(
     assert result == ["content/prompts/note.md", "src/d.py"]
 
 
+def test_unindexed_files_when_nested_dirs_given(
+    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """深い管理用の YAML のフォルダの配下を数えない（正常系）。"""
+    # 準備
+    write_files(
+        tmp_path,
+        {
+            "files.yaml": "files:\n  - path: README.md\n",
+            "README.md": "# readme\n",
+            "LICENSE": "MIT\n",
+            "src/files.yaml": "files:\n  - path: a.py\n",
+            "src/a.py": "a = 1\n",
+            "srcx/b.py": "b = 2\n",
+        },
+    )
+    table = DocumentTable(
+        id="root",
+        paths=["files.yaml"],
+        schema_path="schemas/files.schema.yaml",
+        records="files",
+        body_file="path",
+    )
+    # 実行
+    result = loader_module.unindexed_files(
+        tmp_path, "files.yaml", ["README.md"], table, nested_dirs=["src"]
+    )
+    # 検証
+    assert result == ["LICENSE", "srcx/b.py"]
+
+
+def test_unindexed_files_when_exclude_has_path(
+    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """行の `exclude` のパスの glob に当たるファイルを数えない（正常系）。"""
+    # 準備
+    write_files(
+        tmp_path,
+        {
+            "files.yaml": "files:\n  - path: README.md\n",
+            "README.md": "# readme\n",
+            "docs/pr/1/README.md": "# pr\n",
+            "docs/a.md": "# a\n",
+        },
+    )
+    table = DocumentTable(
+        id="root",
+        paths=["files.yaml"],
+        schema_path="schemas/files.schema.yaml",
+        records="files",
+        body_file="path",
+        exclude=["docs/pr/**"],
+    )
+    # 実行
+    result = loader_module.unindexed_files(tmp_path, "files.yaml", ["README.md"], table)
+    # 検証
+    assert result == ["docs/a.md"]
+
+
 def test_unindexed_files_when_matching_exclusion(
     tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
 ) -> None:
