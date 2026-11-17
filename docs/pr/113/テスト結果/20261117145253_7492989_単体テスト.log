@@ -1,0 +1,587 @@
+$ TMPDIR=/tmp/pi113tmp uv run pytest tests/unit/ --continue-on-collection-errors
+# TMPDIR は、共有の /tmp/pytest-of-{ユーザー} が別のユーザーの持ち物で pytest が一時フォルダを作れないため、作業 PR 専用のフォルダを渡した
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/feat-setup-scope-relations-alias-review
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 1082 items / 2 errors
+
+tests/unit/plugins/project_index/hooks/test_pre_tool_use.py ....         [  0%]
+tests/unit/plugins/project_index/hooks/test_session_start.py ........... [  1%]
+.........                                                                [  2%]
+tests/unit/project_index/features/access/test_service.py ............... [  3%]
+...........................                                              [  6%]
+tests/unit/project_index/features/access/test_types.py .                 [  6%]
+tests/unit/project_index/features/admin/test_render.py .............     [  7%]
+tests/unit/project_index/features/admin/test_service.py ................ [  8%]
+..........................                                               [ 11%]
+tests/unit/project_index/features/changes/test_compare.py .....          [ 11%]
+tests/unit/project_index/features/changes/test_render.py ....            [ 12%]
+tests/unit/project_index/features/changes/test_service.py .............. [ 13%]
+                                                                         [ 13%]
+tests/unit/project_index/features/checkpoint/test_changed.py ........... [ 14%]
+.                                                                        [ 14%]
+tests/unit/project_index/features/checkpoint/test_record.py ....         [ 14%]
+tests/unit/project_index/features/convert/test_decisions.py ...          [ 15%]
+tests/unit/project_index/features/convert/test_service.py ........       [ 15%]
+tests/unit/project_index/features/describe/test_render.py ........       [ 16%]
+tests/unit/project_index/features/describe/test_service.py ............  [ 17%]
+tests/unit/project_index/features/describe/test_source_checks.py ....... [ 18%]
+                                                                         [ 18%]
+tests/unit/project_index/features/describe/test_warnings.py ......       [ 18%]
+tests/unit/project_index/features/documents/test_aliases.py ..........   [ 19%]
+tests/unit/project_index/features/documents/test_fields.py ............. [ 21%]
+..........................                                               [ 23%]
+tests/unit/project_index/features/documents/test_indexable.py ...F..F.F. [ 24%]
+.                                                                        [ 24%]
+tests/unit/project_index/features/documents/test_loader.py ............. [ 25%]
+..........                                                               [ 26%]
+tests/unit/project_index/features/documents/test_schema.py ............. [ 27%]
+                                                                         [ 27%]
+tests/unit/project_index/features/documents/test_store.py .............. [ 29%]
+..........................                                               [ 31%]
+tests/unit/project_index/features/history/test_query.py ................ [ 32%]
+.                                                                        [ 33%]
+tests/unit/project_index/features/history/test_snapshot.py .......       [ 33%]
+tests/unit/project_index/features/lifecycle/test_control.py ...          [ 34%]
+tests/unit/project_index/features/lifecycle/test_update.py ..........    [ 34%]
+tests/unit/project_index/features/migrate/test_service.py .............  [ 36%]
+tests/unit/project_index/features/migrate/test_steps.py ...........      [ 37%]
+tests/unit/project_index/features/outline/test_code.py .....             [ 37%]
+tests/unit/project_index/features/outline/test_markdown.py ......        [ 38%]
+tests/unit/project_index/features/outline/test_service.py ............   [ 39%]
+tests/unit/project_index/features/prompt_doc/test_cli.py ..              [ 39%]
+tests/unit/project_index/features/prompt_doc/test_markdown.py .......... [ 40%]
+.......                                                                  [ 41%]
+tests/unit/project_index/features/prompt_doc/test_render.py ............ [ 42%]
+...                                                                      [ 42%]
+tests/unit/project_index/features/prompt_doc/test_runtime.py ........... [ 43%]
+.                                                                        [ 43%]
+tests/unit/project_index/features/read/test_nav.py .....                 [ 43%]
+tests/unit/project_index/features/read/test_paths.py ........            [ 44%]
+tests/unit/project_index/features/read/test_route.py ......              [ 45%]
+tests/unit/project_index/features/read/test_search.py ..                 [ 45%]
+tests/unit/project_index/features/read/test_service.py ................. [ 47%]
+..                                                                       [ 47%]
+tests/unit/project_index/features/related/test_graph.py ...              [ 47%]
+tests/unit/project_index/features/related/test_service.py .......        [ 48%]
+tests/unit/project_index/features/related/test_suggest.py .              [ 48%]
+tests/unit/project_index/features/search/test_body_parts.py ....         [ 48%]
+tests/unit/project_index/features/search/test_cursor.py ..               [ 48%]
+tests/unit/project_index/features/search/test_fields.py ..               [ 48%]
+tests/unit/project_index/features/search/test_filters.py .............   [ 50%]
+tests/unit/project_index/features/search/test_render.py .....            [ 50%]
+tests/unit/project_index/features/search/test_service.py ............... [ 52%]
+......                                                                   [ 52%]
+tests/unit/project_index/features/search/test_snippets.py ........       [ 53%]
+tests/unit/project_index/features/search/test_terms.py ...               [ 53%]
+tests/unit/project_index/features/seen/test_store.py ......              [ 54%]
+tests/unit/project_index/features/seen/test_types.py .                   [ 54%]
+tests/unit/project_index/features/session_start/test_route.py ..         [ 54%]
+tests/unit/project_index/features/session_start/test_service.py ...      [ 54%]
+tests/unit/project_index/features/settings/test_query.py ............... [ 56%]
+...................                                                      [ 57%]
+tests/unit/project_index/features/settings/test_route.py ...........     [ 58%]
+tests/unit/project_index/features/settings/test_service.py ............. [ 60%]
+................                                                         [ 61%]
+tests/unit/project_index/features/sources/test_merge.py ....             [ 61%]
+tests/unit/project_index/features/sources/test_registry.py ............. [ 63%]
+....................                                                     [ 64%]
+tests/unit/project_index/features/sources/test_schema_ref.py .......     [ 65%]
+tests/unit/project_index/features/sources/test_service.py .............. [ 66%]
+................................................                         [ 71%]
+tests/unit/project_index/features/sources/test_types.py ..........       [ 72%]
+tests/unit/project_index/features/validation/test_markdown.py .......... [ 73%]
+..                                                                       [ 73%]
+tests/unit/project_index/features/validation/test_rules.py .........     [ 74%]
+tests/unit/project_index/features/validation/test_scripts.py ....        [ 74%]
+tests/unit/project_index/features/validation/test_service.py ..........  [ 75%]
+tests/unit/project_index/features/write/test_apply.py .................. [ 77%]
+..................                                                       [ 78%]
+tests/unit/project_index/features/write/test_hints.py ....               [ 79%]
+tests/unit/project_index/features/write/test_ids.py ..                   [ 79%]
+tests/unit/project_index/features/write/test_locks.py .                  [ 79%]
+tests/unit/project_index/features/write/test_placement.py ...            [ 79%]
+tests/unit/project_index/features/write/test_service.py ................ [ 81%]
+................                                                         [ 82%]
+tests/unit/project_index/integrations/test_git.py ..........             [ 83%]
+tests/unit/project_index/integrations/test_mdmark.py .......             [ 84%]
+tests/unit/project_index/integrations/test_scripts.py ...........        [ 85%]
+tests/unit/project_index/server/mcp/test_admin.py ....                   [ 85%]
+tests/unit/project_index/server/mcp/test_docs.py ...................     [ 87%]
+tests/unit/project_index/server/mcp/test_result.py ...........           [ 88%]
+tests/unit/project_index/server/test_app.py .........                    [ 89%]
+tests/unit/project_index/server/test_error_handlers.py .....             [ 89%]
+tests/unit/project_index/server/test_lifespan.py .                       [ 89%]
+tests/unit/project_index/server/test_origin.py .....                     [ 90%]
+tests/unit/project_index/shared/test_deadline.py .....                   [ 90%]
+tests/unit/project_index/shared/test_errors.py ..                        [ 90%]
+tests/unit/project_index/shared/test_files.py ...                        [ 91%]
+tests/unit/project_index/shared/test_hashing.py ..                       [ 91%]
+tests/unit/project_index/shared/test_narrowing.py ..........             [ 92%]
+tests/unit/project_index/shared/test_paths.py .....                      [ 92%]
+tests/unit/project_index/shared/test_schema_check.py .............       [ 93%]
+tests/unit/project_index/shared/test_yaml_io.py .......                  [ 94%]
+tests/unit/project_index/test_main.py ............FF                     [ 95%]
+tests/unit/project_index/test_serve.py ................................. [ 98%]
+.......FFFF                                                              [100%]
+
+==================================== ERRORS ====================================
+___ ERROR collecting tests/unit/project_index/features/links/test_service.py ___
+ImportError while importing test module '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-setup-scope-relations-alias-review/tests/unit/project_index/features/links/test_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/links/test_service.py:6: in <module>
+    from project_index.features.links.service import (
+E   ModuleNotFoundError: No module named 'project_index.features.links'
+___ ERROR collecting tests/unit/project_index/features/skew/test_service.py ____
+ImportError while importing test module '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-setup-scope-relations-alias-review/tests/unit/project_index/features/skew/test_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/skew/test_service.py:8: in <module>
+    from project_index.features.skew.service import find_skew, load_rows, similarity, to_json
+E   ModuleNotFoundError: No module named 'project_index.features.skew'
+=================================== FAILURES ===================================
+________________ test_is_excluded_file_when_generated_and_lock _________________
+
+tmp_path = PosixPath('/tmp/pi113tmp/pytest-of-shuhei2441/pytest-0/test_is_excluded_file_when_gen0')
+write_files = <function write_files.<locals>._write at 0x7a3e7f0c0720>
+
+    def test_is_excluded_file_when_generated_and_lock(
+        tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+    ) -> None:
+        """生成物・ロック・ベンダーのコードは載せる（正常系）。"""
+        # 準備
+        write_files(
+            tmp_path,
+            {
+                "uv.lock": "version = 1\n",
+                "package-lock.json": "{}\n",
+                "src/vendor/a.py": "a = 1\n",
+                "web/dist/app.js": "var a;\n",
+                "api_pb2.py": "a = 1\n",
+                "app.min.js": "var a;\n",
+            },
+        )
+        # 実行
+        uv_lock = is_excluded_file(tmp_path, "uv.lock")
+        package_lock = is_excluded_file(tmp_path, "package-lock.json")
+        vendor = is_excluded_file(tmp_path, "src/vendor/a.py")
+        dist = is_excluded_file(tmp_path, "web/dist/app.js")
+        protobuf = is_excluded_file(tmp_path, "api_pb2.py")
+        minified = is_excluded_file(tmp_path, "app.min.js")
+        # 検証
+>       assert uv_lock is False
+E       assert True is False
+
+tests/unit/project_index/features/documents/test_indexable.py:85: AssertionError
+_______________________ test_is_excluded_file_when_empty _______________________
+
+tmp_path = PosixPath('/tmp/pi113tmp/pytest-of-shuhei2441/pytest-0/test_is_excluded_file_when_emp0')
+write_files = <function write_files.<locals>._write at 0x7a3e7f0b2c40>
+
+    def test_is_excluded_file_when_empty(
+        tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+    ) -> None:
+        """空のファイル（正常系）。"""
+        # 準備
+        write_files(
+            tmp_path,
+            {
+                "a/__init__.py": "",
+                "b/__init__.py": '"""公開する型。"""\n\nfrom .x import y\n',
+            },
+        )
+        # 実行
+        empty = is_excluded_file(tmp_path, "a/__init__.py")
+        reexport = is_excluded_file(tmp_path, "b/__init__.py")
+        # 検証
+        assert empty is True
+>       assert reexport is False
+E       assert True is False
+
+tests/unit/project_index/features/documents/test_indexable.py:146: AssertionError
+_____________________________ test_indexable_files _____________________________
+
+tmp_path = PosixPath('/tmp/pi113tmp/pytest-of-shuhei2441/pytest-0/test_indexable_files0')
+write_files = <function write_files.<locals>._write at 0x7a3e7f0b1fe0>
+
+    def test_indexable_files(
+        tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+    ) -> None:
+        """除外の条件に当たるファイルを除く（正常系）。"""
+        # 準備
+        write_files(
+            tmp_path,
+            {
+                "src/a.py": "a = 1\n",
+                "src/b.py": "b = 2\n",
+                "src/pkg/__init__.py": "",
+                "src/uv.lock": "version = 1\n",
+                ".claude/worktrees/wt/src/c.py": "c = 3\n",
+            },
+        )
+        # 実行
+        result = indexable_files(tmp_path, ["**"])
+        # 検証
+>       assert result == ["src/a.py", "src/b.py", "src/uv.lock"]
+E       AssertionError: assert ['src/a.py', 'src/b.py'] == ['src/a.py', ...'src/uv.lock']
+E         
+E         Right contains one more item: 'src/uv.lock'
+E         Use -v to get more diff
+
+tests/unit/project_index/features/documents/test_indexable.py:181: AssertionError
+_________________________ test_build_parser_when_links _________________________
+
+self = ArgumentParser(prog='project-index', usage=None, description=None, formatter_class=<class 'argparse.HelpFormatter'>, conflict_handler='error', add_help=True)
+args = ['links', '--root', '/tmp/a', '--paths', 'docs/**']
+namespace = Namespace(cmd=None), intermixed = False
+
+    def _parse_known_args2(self, args, namespace, intermixed):
+        if args is None:
+            # args default to the system args
+            args = _sys.argv[1:]
+        else:
+            # make sure that args are mutable
+            args = list(args)
+    
+        # default Namespace built from parser defaults
+        if namespace is None:
+            namespace = Namespace()
+    
+        # add any action defaults that aren't present
+        for action in self._actions:
+            if action.dest is not SUPPRESS:
+                if not hasattr(namespace, action.dest):
+                    if action.default is not SUPPRESS:
+                        setattr(namespace, action.dest, action.default)
+    
+        # add any parser defaults that aren't present
+        for dest in self._defaults:
+            if not hasattr(namespace, dest):
+                setattr(namespace, dest, self._defaults[dest])
+    
+        # parse the arguments and exit if there are any errors
+        if self.exit_on_error:
+            try:
+>               namespace, args = self._parse_known_args(args, namespace, intermixed)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2042: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2274: in _parse_known_args
+    positionals_end_index = consume_positionals(start_index)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2249: in consume_positionals
+    take_action(action, args)
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2103: in take_action
+    argument_values = self._get_values(action, argument_strings)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2629: in _get_values
+    self._check_value(action, value[0])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ArgumentParser(prog='project-index', usage=None, description=None, formatter_class=<class 'argparse.HelpFormatter'>, conflict_handler='error', add_help=True)
+action = _SubParsersAction(option_strings=[], dest='cmd', nargs='A...', const=None, default=None, type=None, choices={'serve': ...e.HelpFormatter'>, conflict_handler='error', add_help=True)}, required=True, help=None, metavar=None, deprecated=False)
+value = 'links'
+
+    def _check_value(self, action, value):
+        # converted value must be one of the choices (if specified)
+        choices = action.choices
+        if choices is None:
+            return
+    
+        if isinstance(choices, str):
+            choices = iter(choices)
+    
+        if value not in choices:
+            args = {'value': str(value),
+                    'choices': ', '.join(map(str, action.choices))}
+            msg = _('invalid choice: %(value)r (choose from %(choices)s)')
+    
+            if self.suggest_on_error and isinstance(value, str):
+                if all(isinstance(choice, str) for choice in action.choices):
+                    import difflib
+                    suggestions = difflib.get_close_matches(value, action.choices, 1)
+                    if suggestions:
+                        args['closest'] = suggestions[0]
+                        msg = _('invalid choice: %(value)r, maybe you meant %(closest)r? '
+                                '(choose from %(choices)s)')
+    
+>           raise ArgumentError(action, msg % args)
+E           argparse.ArgumentError: argument cmd: invalid choice: 'links' (choose from serve, migrate, files, outline, changed, checkpoint, prompt-doc)
+
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2691: ArgumentError
+
+During handling of the above exception, another exception occurred:
+
+    def test_build_parser_when_links() -> None:
+        """links の引数と処理を引く（正常系）。"""
+        # 準備
+        parser = build_parser()
+        # 実行
+>       args = parser.parse_args(["links", "--root", "/tmp/a", "--paths", "docs/**"])
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/test_main.py:165: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2003: in parse_args
+    args, argv = self.parse_known_args(args, namespace)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2013: in parse_known_args
+    return self._parse_known_args2(args, namespace, intermixed=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2044: in _parse_known_args2
+    self.error(str(err))
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2780: in error
+    self.exit(2, _('%(prog)s: error: %(message)s\n') % args)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ArgumentParser(prog='project-index', usage=None, description=None, formatter_class=<class 'argparse.HelpFormatter'>, conflict_handler='error', add_help=True)
+status = 2
+message = "project-index: error: argument cmd: invalid choice: 'links' (choose from serve, migrate, files, outline, changed, checkpoint, prompt-doc)\n"
+
+    def exit(self, status=0, message=None):
+        if message:
+            self._print_message(message, _sys.stderr)
+>       _sys.exit(status)
+E       SystemExit: 2
+
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2767: SystemExit
+----------------------------- Captured stderr call -----------------------------
+usage: project-index [-h] [--version]
+                     {serve,migrate,files,outline,changed,checkpoint,prompt-doc} ...
+project-index: error: argument cmd: invalid choice: 'links' (choose from serve, migrate, files, outline, changed, checkpoint, prompt-doc)
+_________________________ test_build_parser_when_skew __________________________
+
+self = ArgumentParser(prog='project-index', usage=None, description=None, formatter_class=<class 'argparse.HelpFormatter'>, conflict_handler='error', add_help=True)
+args = ['skew', '--root', '/tmp/a', '--files-yaml', 'docs/files.yaml', '--files-yaml', ...]
+namespace = Namespace(cmd=None), intermixed = False
+
+    def _parse_known_args2(self, args, namespace, intermixed):
+        if args is None:
+            # args default to the system args
+            args = _sys.argv[1:]
+        else:
+            # make sure that args are mutable
+            args = list(args)
+    
+        # default Namespace built from parser defaults
+        if namespace is None:
+            namespace = Namespace()
+    
+        # add any action defaults that aren't present
+        for action in self._actions:
+            if action.dest is not SUPPRESS:
+                if not hasattr(namespace, action.dest):
+                    if action.default is not SUPPRESS:
+                        setattr(namespace, action.dest, action.default)
+    
+        # add any parser defaults that aren't present
+        for dest in self._defaults:
+            if not hasattr(namespace, dest):
+                setattr(namespace, dest, self._defaults[dest])
+    
+        # parse the arguments and exit if there are any errors
+        if self.exit_on_error:
+            try:
+>               namespace, args = self._parse_known_args(args, namespace, intermixed)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2042: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2274: in _parse_known_args
+    positionals_end_index = consume_positionals(start_index)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2249: in consume_positionals
+    take_action(action, args)
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2103: in take_action
+    argument_values = self._get_values(action, argument_strings)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2629: in _get_values
+    self._check_value(action, value[0])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ArgumentParser(prog='project-index', usage=None, description=None, formatter_class=<class 'argparse.HelpFormatter'>, conflict_handler='error', add_help=True)
+action = _SubParsersAction(option_strings=[], dest='cmd', nargs='A...', const=None, default=None, type=None, choices={'serve': ...e.HelpFormatter'>, conflict_handler='error', add_help=True)}, required=True, help=None, metavar=None, deprecated=False)
+value = 'skew'
+
+    def _check_value(self, action, value):
+        # converted value must be one of the choices (if specified)
+        choices = action.choices
+        if choices is None:
+            return
+    
+        if isinstance(choices, str):
+            choices = iter(choices)
+    
+        if value not in choices:
+            args = {'value': str(value),
+                    'choices': ', '.join(map(str, action.choices))}
+            msg = _('invalid choice: %(value)r (choose from %(choices)s)')
+    
+            if self.suggest_on_error and isinstance(value, str):
+                if all(isinstance(choice, str) for choice in action.choices):
+                    import difflib
+                    suggestions = difflib.get_close_matches(value, action.choices, 1)
+                    if suggestions:
+                        args['closest'] = suggestions[0]
+                        msg = _('invalid choice: %(value)r, maybe you meant %(closest)r? '
+                                '(choose from %(choices)s)')
+    
+>           raise ArgumentError(action, msg % args)
+E           argparse.ArgumentError: argument cmd: invalid choice: 'skew' (choose from serve, migrate, files, outline, changed, checkpoint, prompt-doc)
+
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2691: ArgumentError
+
+During handling of the above exception, another exception occurred:
+
+    def test_build_parser_when_skew() -> None:
+        """skew の引数と処理を引く（正常系）。"""
+        # 準備
+        parser = build_parser()
+        # 実行
+>       args = parser.parse_args(
+            [
+                "skew",
+                "--root",
+                "/tmp/a",
+                "--files-yaml",
+                "docs/files.yaml",
+                "--files-yaml",
+                "src/files.yaml",
+                "--only-draft",
+            ]
+        )
+
+tests/unit/project_index/test_main.py:178: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2003: in parse_args
+    args, argv = self.parse_known_args(args, namespace)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2013: in parse_known_args
+    return self._parse_known_args2(args, namespace, intermixed=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2044: in _parse_known_args2
+    self.error(str(err))
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2780: in error
+    self.exit(2, _('%(prog)s: error: %(message)s\n') % args)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ArgumentParser(prog='project-index', usage=None, description=None, formatter_class=<class 'argparse.HelpFormatter'>, conflict_handler='error', add_help=True)
+status = 2
+message = "project-index: error: argument cmd: invalid choice: 'skew' (choose from serve, migrate, files, outline, changed, checkpoint, prompt-doc)\n"
+
+    def exit(self, status=0, message=None):
+        if message:
+            self._print_message(message, _sys.stderr)
+>       _sys.exit(status)
+E       SystemExit: 2
+
+../../../../../.local/share/uv/python/cpython-3.14.3-linux-x86_64-gnu/lib/python3.14/argparse.py:2767: SystemExit
+----------------------------- Captured stderr call -----------------------------
+usage: project-index [-h] [--version]
+                     {serve,migrate,files,outline,changed,checkpoint,prompt-doc} ...
+project-index: error: argument cmd: invalid choice: 'skew' (choose from serve, migrate, files, outline, changed, checkpoint, prompt-doc)
+________________________________ test_run_links ________________________________
+
+tmp_path = PosixPath('/tmp/pi113tmp/pytest-of-shuhei2441/pytest-0/test_run_links0')
+capsys = <_pytest.capture.CaptureFixture object at 0x7a3e7ed3c750>
+write_files = <function write_files.<locals>._write at 0x7a3e7ed8bd70>
+
+    def test_run_links(
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+        write_files: Callable[[Path, dict[str, str]], None],
+    ) -> None:
+        """1 ファイル 1 行の JSON を出す（正常系）。"""
+        # 準備
+        write_files(tmp_path, {"docs/a.md": "[B](./b.md)\n", "docs/b.md": "# b\n"})
+        # 実行
+>       code = main_module.run_links(_links_args(root=str(tmp_path), paths=["docs/**"], exclude=[]))
+               ^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.main' has no attribute 'run_links'. Did you mean: 'run_files'?
+
+tests/unit/project_index/test_serve.py:1229: AttributeError
+______________________ test_run_links_when_root_not_found ______________________
+
+tmp_path = PosixPath('/tmp/pi113tmp/pytest-of-shuhei2441/pytest-0/test_run_links_when_root_not_f0')
+capsys = <_pytest.capture.CaptureFixture object at 0x7a3e7ecb7cd0>
+
+    def test_run_links_when_root_not_found(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """フォルダが無い（異常系）。"""
+        # 準備
+        missing = tmp_path / "missing"
+        # 実行
+>       code = main_module.run_links(_links_args(root=str(missing)))
+               ^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.main' has no attribute 'run_links'. Did you mean: 'run_files'?
+
+tests/unit/project_index/test_serve.py:1243: AttributeError
+________________________________ test_run_skew _________________________________
+
+tmp_path = PosixPath('/tmp/pi113tmp/pytest-of-shuhei2441/pytest-0/test_run_skew0')
+capsys = <_pytest.capture.CaptureFixture object at 0x7a3e7eb347d0>
+write_files = <function write_files.<locals>._write at 0x7a3e7ed8bab0>
+
+    def test_run_skew(
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+        write_files: Callable[[Path, dict[str, str]], None],
+    ) -> None:
+        """偏りを JSON で出す（正常系）。"""
+        # 準備
+        write_files(
+            tmp_path,
+            {
+                "files.yaml": (
+                    "files:\n"
+                    "  - path: a.md\n"
+                    "    description: 設定の読み込みを受け持つ\n"
+                    "    tags: [topic:x]\n"
+                    "  - path: b.md\n"
+                    "    description: 画面の部品の並びを受け持つ\n"
+                    "  - path: c.md\n"
+                    "    description: 検索の条件の解釈を受け持つ\n"
+                )
+            },
+        )
+        # 実行
+>       code = main_module.run_skew(
+               ^^^^^^^^^^^^^^^^^^^^
+            _skew_args(root=str(tmp_path), files_yaml=["files.yaml"], draft=None, only_draft=False)
+        )
+E       AttributeError: module 'project_index.main' has no attribute 'run_skew'
+
+tests/unit/project_index/test_serve.py:1274: AttributeError
+______________________ test_run_skew_when_input_not_found ______________________
+
+tmp_path = PosixPath('/tmp/pi113tmp/pytest-of-shuhei2441/pytest-0/test_run_skew_when_input_not_f0')
+capsys = <_pytest.capture.CaptureFixture object at 0x7a3e7f5c4650>
+
+    def test_run_skew_when_input_not_found(
+        tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """管理用の YAML が無い（異常系）。"""
+        # 準備
+        missing = "missing/files.yaml"
+        # 実行
+>       code = main_module.run_skew(_skew_args(root=str(tmp_path), files_yaml=[missing]))
+               ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.main' has no attribute 'run_skew'
+
+tests/unit/project_index/test_serve.py:1292: AttributeError
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/links/test_service.py
+ERROR tests/unit/project_index/features/skew/test_service.py
+FAILED tests/unit/project_index/features/documents/test_indexable.py::test_is_excluded_file_when_generated_and_lock
+FAILED tests/unit/project_index/features/documents/test_indexable.py::test_is_excluded_file_when_empty
+FAILED tests/unit/project_index/features/documents/test_indexable.py::test_indexable_files
+FAILED tests/unit/project_index/test_main.py::test_build_parser_when_links - ...
+FAILED tests/unit/project_index/test_main.py::test_build_parser_when_skew - S...
+FAILED tests/unit/project_index/test_serve.py::test_run_links - AttributeErro...
+FAILED tests/unit/project_index/test_serve.py::test_run_links_when_root_not_found
+FAILED tests/unit/project_index/test_serve.py::test_run_skew - AttributeError...
+FAILED tests/unit/project_index/test_serve.py::test_run_skew_when_input_not_found
+================== 9 failed, 1073 passed, 2 errors in 24.39s ===================

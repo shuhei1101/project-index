@@ -1,0 +1,448 @@
+id: MOD-113-3
+title: 索引のサーバー / 本文のリンク / service.py
+lead: 本文のリンクとパスの取り出しと、実在するファイルへの解決・1 行の JSON への変換を受け持ち、本文のリンクの service.py を修正するときに参照する。
+constants:
+  - name: TARGET_SUFFIXES
+    title: 読む拡張子
+    container: project_index/features/links/service.py
+    usecase: 本文が指すファイルの一覧
+    summary: 指す側として読むファイルの拡張子
+    value: frozenset({".md", ".yaml", ".yml"})
+  - name: YAML_SUFFIXES
+    title: YAML の拡張子
+    container: project_index/features/links/service.py
+    usecase: 本文が指すファイルの一覧
+    summary: 文字列の値だけを読む拡張子
+    value: frozenset({".yaml", ".yml"})
+  - name: MAX_READ_BYTES
+    title: 読み取りの上限
+    container: project_index/features/links/service.py
+    usecase: 本文が指すファイルの一覧
+    summary: 1 ファイルから読むバイト数の上限
+    value: '1_048_576'
+    notes:
+      導き方: アウトラインの `MAX_READ_BYTES` と同じ値（`docs/pr/106/しきい値の測定/README.md`）
+  - name: SKIP_LINK_PREFIXES
+    title: 解かないリンクの先
+    container: project_index/features/links/service.py
+    usecase: 本文が指すファイルの一覧
+    summary: この文字列で始まるリンクの先は配信元の中のファイルとして解かない
+    value: ("http:", "https:", "mailto:", "id:")
+  - name: LINK_PATTERN
+    title: リンクの正規表現
+    container: project_index/features/links/service.py
+    usecase: 本文が指すファイルの一覧
+    summary: Markdown のリンクと画像の先。タイトル（`"..."`）と `<...>` の囲みを除いた先をグループ 1 に取る
+    value: re.compile(r'!?\[[^\]\n]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)')
+  - name: PATH_BOUNDARY_BEFORE
+    title: パスの前に続かない文字
+    container: project_index/features/links/service.py
+    usecase: 本文が指すファイルの一覧
+    summary: 一致の直前がこの文字なら一致としない
+    value: r"[A-Za-z0-9_\-./]"
+  - name: PATH_BOUNDARY_AFTER
+    title: パスの後ろに続かない文字
+    container: project_index/features/links/service.py
+    usecase: 本文が指すファイルの一覧
+    summary: 一致の直後がこの文字なら一致としない
+    value: r"[A-Za-z0-9_\-/]"
+  - name: RELATIVE_PATTERN
+    title: 相対パスの正規表現
+    container: project_index/features/links/service.py
+    usecase: 本文が指すファイルの一覧
+    summary: '`./`・`../` で始まる箇所。空白・引用符・バッククォート・括弧の前までを取る'
+    value: re.compile(r"(?<![A-Za-z0-9_\-./])(\.\.?/[^\s\"'`<>()\[\]]+)")
+functions:
+  - name: links_files
+    title: 本文が指すファイルの一覧
+    kind: 関数
+    container: project_index/features/links/service.py
+    usecase: 本文が指すファイルの一覧
+    role: サービス
+    summary: 範囲の Markdown と YAML のファイルのうち、指す先を 1 件以上持つものをパスの昇順で返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: root
+        title: 配信元のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: '`--root` のフォルダ'
+      - name: paths
+        title: 範囲
+        type: Sequence[str]
+        required: true
+        passing: positional
+        description: 範囲の glob かファイルのパス
+      - name: exclude
+        title: 除外
+        type: Sequence[str]
+        required: false
+        default: ()
+        passing: keyword
+        description: 除外するファイル名の glob
+    returns:
+      type: list[FileLinks]
+      description: パスの昇順。指す先が 0 件のファイルを含まない
+    process: |-
+      1. 載せるファイルの一覧（`indexable_files`）のうち、拡張子が `TARGET_SUFFIXES` のものを指す側にする
+      2. `root` の配下のファイル（`walk_files`）を実在するファイルの集合にし、そのうち `/` を含むパスから、パスの正規表現の組み立て（`build_path_pattern`）で正規表現を作る
+      3. 指す側のパスごとにファイルの指す先（`file_links`）を作り、`targets` が空でないものを返す
+    callees:
+      - MOD-26#functions[indexable_files]
+      - MOD-26#functions[walk_files]
+      - MOD-113-3#functions[build_path_pattern]
+      - MOD-113-3#functions[file_links]
+    unit_tests:
+      - name: test_links_files
+        case: 正常
+        summary: 指す先を持つ Markdown と YAML だけを昇順で返す
+        condition: '`[B](./b.md)` を持つ `docs/a.md`、リンクを持たない `docs/b.md`、値に `src/x.py` を持つ `design/x.yaml`、`docs/a.md` を本文に書いた `src/x.py` を置き、`paths=["**/*"]`'
+        mock: なし（`tmp_path`）
+        expected: '`design/x.yaml`・`docs/a.md` の 2 件の順で、`src/x.py`（コード）と `docs/b.md` を含まない'
+        exception: '-'
+    notes:
+      所要時間: ai-monitor の develop のワークツリー（候補のパス 8644 件・指す側 6258 件）で、正規表現の組み立て 0.14 秒・照合の全体 0.51 秒（ファイルが OS のキャッシュに無い初回は 1.55 秒。パスを並べた選択の正規表現では 385 秒）・最も大きい文書（82 万文字）で 0.009 秒。`docs/pr/113/しきい値の測定/README.md`
+  - name: file_links
+    title: ファイルの指す先
+    kind: 関数
+    container: project_index/features/links/service.py
+    usecase: 本文が指すファイルの一覧
+    role: サービス
+    summary: ファイル 1 つを読み、本文が指す実在するファイルを返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: root
+        title: 配信元のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: '`--root` のフォルダ'
+      - name: path
+        title: パス
+        type: str
+        required: true
+        passing: positional
+        description: 指す側の `root` からのパス
+      - name: existing
+        title: 実在するファイル
+        type: frozenset[str]
+        required: true
+        passing: positional
+        description: '`root` の配下のファイルの `root` からのパス'
+      - name: path_pattern
+        title: パスの正規表現
+        type: re.Pattern[str] | None
+        required: true
+        passing: positional
+        description: '`links_files` が作った、`/` を含む実在するパスの選択の正規表現。候補が無ければ `None`'
+    returns:
+      type: FileLinks
+      description: 指す側 1 つ分の結果。指す先が無ければ `targets` が空
+    process: |-
+      1. 先頭 `MAX_READ_BYTES` バイトを読み、UTF-8（`errors="replace"`）の文字列にする
+         - `OSError` の場合、`targets` が空の `FileLinks` を返す
+      2. 拡張子が `YAML_SUFFIXES` の場合、YAML の文字列の値（`collect_yaml_strings`）を読む文字列にする。それ以外は本文全体を 1 つの文字列にする
+      3. 文字列ごとに、リンクの取り出し（`extract_links`）でリンクの先とリンクを除いた文字列を得る
+         - リンクの先が `SKIP_LINK_PREFIXES` で始まる場合、飛ばす
+         - `#` 以降を除き、指す側のフォルダから `posixpath.normpath` で解く。`existing` にあれば `LinkVia.LINK` の先にする
+      4. リンクを除いた文字列から、パスの取り出し（`find_paths`）で得たパスを `LinkVia.PATH` の先にする
+      5. 指す側のパス自身を除き、同じ先は `LinkVia.LINK` を取って `path` の昇順に並べ、`FileLinks` にして返す
+    callees:
+      - MOD-113-3#functions[collect_yaml_strings]
+      - MOD-113-3#functions[extract_links]
+      - MOD-113-3#functions[find_paths]
+    unit_tests:
+      - name: test_file_links_when_markdown
+        case: 正常
+        summary: リンクとパスを両方取り出す
+        condition: '`docs/guide.md` が `[API](./api.md)`・`[外](https://example.com)`・`[自分](#見出し)`・インラインコードの `src/a.py`・本文 `詳細はdocs/api.mdを参照` を持ち、`docs/api.md`・`src/a.py` が実在する'
+        mock: なし（`tmp_path`）
+        expected: '`targets` が `docs/api.md`（`LINK`）・`src/a.py`（`PATH`）の 2 件'
+        exception: '-'
+      - name: test_file_links_when_yaml
+        case: 正常
+        summary: YAML の文字列の値から取り出す
+        condition: '`design/x.yaml` が `description: 実装はsrc/a.pyにある` と実在しない `src/none.py` を持ち、`src/a.py` が実在する'
+        mock: なし（`tmp_path`）
+        expected: '`targets` が `src/a.py`（`PATH`）の 1 件だけ'
+        exception: '-'
+      - name: test_file_links_when_self
+        case: 正常
+        summary: 自分自身を指すパスは除く
+        condition: '`docs/a.md` が本文に `docs/a.md` と `[自分](./a.md)` を持つ'
+        mock: なし（`tmp_path`）
+        expected: '`targets` が空'
+        exception: '-'
+  - name: collect_yaml_strings
+    title: YAML の文字列の値
+    kind: 関数
+    container: project_index/features/links/service.py
+    usecase: 本文が指すファイルの一覧
+    role: 変換
+    summary: YAML の文字列を読み、全ての文字列の値を返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: text
+        title: 文字列
+        type: str
+        required: true
+        passing: positional
+        description: YAML のファイルの中身
+    returns:
+      type: list[str]
+      description: 文字列の値（辞書のキーを除く。辞書・配列を深さ優先でたどった順）
+    process: |-
+      1. 共通の YAML の読み込み（`shared.yaml_io.load_yaml`）で読む
+         - `YamlLoadError` の場合、`[text]`（中身全体）を返す
+      2. 辞書の値と配列の要素をたどり、文字列の値を集めて返す
+    unit_tests:
+      - name: test_collect_yaml_strings
+        case: 正常
+        summary: 入れ子の文字列の値を集める
+        condition: '`{"a": "x", "b": ["y", {"c": "z"}], "d": 1}` の YAML'
+        mock: なし
+        expected: '`["x", "y", "z"]`'
+        exception: '-'
+      - name: test_collect_yaml_strings_when_invalid
+        case: 正常
+        summary: 読めない YAML
+        condition: '`a: [` の文字列'
+        mock: なし
+        expected: '`["a: ["]`'
+        exception: '-'
+  - name: extract_links
+    title: リンクの取り出し
+    kind: 関数
+    container: project_index/features/links/service.py
+    usecase: 本文が指すファイルの一覧
+    role: 変換
+    summary: 文字列から Markdown のリンクの先と、リンクを空白に置き換えた文字列を返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: text
+        title: 文字列
+        type: str
+        required: true
+        passing: positional
+        description: 本文か YAML の文字列の値
+    returns:
+      type: tuple[list[str], str]
+      description: リンクの先（出た順）と、リンクを同じ長さの空白に置き換えた文字列
+    process: |-
+      1. `LINK_PATTERN` に当たる箇所ごとに、先を集め、その箇所を同じ長さの空白に置き換える
+      2. 先の一覧と置き換えた文字列を返す
+    unit_tests:
+      - name: test_extract_links
+        case: 正常
+        summary: リンクと画像の先を取り出す
+        condition: '`[A](./a.md) と ![図](img/x.png "t") と src/b.py`'
+        mock: なし
+        expected: 先が `["./a.md", "img/x.png"]` で、置き換えた文字列が `src/b.py` を含み `./a.md` を含まない
+        exception: '-'
+  - name: find_paths
+    title: パスの取り出し
+    kind: 関数
+    container: project_index/features/links/service.py
+    usecase: 本文が指すファイルの一覧
+    role: 変換
+    summary: リンクの外の文字列から、実在するファイルのパスを返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: text
+        title: 文字列
+        type: str
+        required: true
+        passing: positional
+        description: リンクを除いた文字列
+      - name: source_dir
+        title: 指す側のフォルダ
+        type: str
+        required: true
+        passing: positional
+        description: 指す側のファイルのフォルダの `root` からのパス（直下は空文字）
+      - name: existing
+        title: 実在するファイル
+        type: frozenset[str]
+        required: true
+        passing: positional
+        description: '`root` の配下のファイルの `root` からのパス'
+      - name: path_pattern
+        title: パスの正規表現
+        type: re.Pattern[str] | None
+        required: true
+        passing: positional
+        description: '`/` を含む実在するパスの選択の正規表現'
+    returns:
+      type: set[str]
+      description: 実在するファイルの `root` からのパス
+    process: |-
+      1. `path_pattern` があれば、一致したパスを集める（接頭辞をまとめた正規表現は、同じ位置では最も長い一致を取る）
+      2. `RELATIVE_PATTERN` に当たる箇所ごとに、相対パスの解決（`resolve_relative`）で実在するファイルを求め、あれば加える
+      3. 集めたパスを返す
+    callees:
+      - MOD-113-3#functions[resolve_relative]
+    unit_tests:
+      - name: test_find_paths_when_japanese
+        case: 正常
+        summary: 空白を挟まない日本語の文の中のパス
+        condition: '`設定はdocs/guide/設定.mdを参照する`、`docs/guide/設定.md` が実在する'
+        mock: なし
+        expected: '`{"docs/guide/設定.md"}`'
+        exception: '-'
+      - name: test_find_paths_when_longest
+        case: 正常
+        summary: 同じ位置では最も長い一致を取る
+        condition: '`src/a.py.bak` を含む文字列、`src/a.py`・`src/a.py.bak` が実在する'
+        mock: なし
+        expected: '`{"src/a.py.bak"}`'
+        exception: '-'
+      - name: test_find_paths_when_boundary
+        case: 正常
+        summary: 英数字に続く一致は取らない
+        condition: '`xsrc/a.py` と `src/a.pyc` を含む文字列、`src/a.py` が実在する'
+        mock: なし
+        expected: 空
+        exception: '-'
+      - name: test_find_paths_when_relative
+        case: 正常
+        summary: 相対パスは指す側のフォルダから解く
+        condition: '`source_dir` が `docs/guide`、文字列 `../api.mdを参照`、`docs/api.md` が実在する'
+        mock: なし
+        expected: '`{"docs/api.md"}`'
+        exception: '-'
+  - name: resolve_relative
+    title: 相対パスの解決
+    kind: 関数
+    container: project_index/features/links/service.py
+    usecase: 本文が指すファイルの一覧
+    role: 変換
+    summary: '`./`・`../` で始まる文字列を指す側のフォルダから解き、最も長く一致する実在するファイルを返す'
+    scope: public
+    thread_safe: true
+    args:
+      - name: fragment
+        title: 文字列
+        type: str
+        required: true
+        passing: positional
+        description: '`RELATIVE_PATTERN` に当たった文字列'
+      - name: source_dir
+        title: 指す側のフォルダ
+        type: str
+        required: true
+        passing: positional
+        description: 指す側のファイルのフォルダ
+      - name: existing
+        title: 実在するファイル
+        type: frozenset[str]
+        required: true
+        passing: positional
+        description: '`root` の配下のファイル'
+    returns:
+      type: str | None
+      description: 実在するファイルの `root` からのパス。無ければ `None`
+    process: |-
+      1. `fragment` の末尾を 1 文字ずつ削りながら、`source_dir` とつないで `posixpath.normpath` で解いたパスが `existing` にあるかを確かめる
+      2. 最初に見つかった（最も長い）パスを返す。解いたパスが `..` で始まる（`root` の外）場合は `None` を返す
+    unit_tests:
+      - name: test_resolve_relative
+        case: 正常
+        summary: 後ろに続く文字を削って解く
+        condition: '`fragment` が `./api.mdを参照`、`source_dir` が `docs`、`docs/api.md` が実在する'
+        mock: なし
+        expected: '`"docs/api.md"`'
+        exception: '-'
+      - name: test_resolve_relative_when_outside_root
+        case: 正常
+        summary: root の外を指す
+        condition: '`fragment` が `../../x.md`、`source_dir` が `docs`'
+        mock: なし
+        expected: '`None`'
+        exception: '-'
+  - name: to_json_line
+    title: 1 行の JSON
+    kind: 関数
+    container: project_index/features/links/service.py
+    usecase: 本文が指すファイルの一覧
+    role: 変換
+    summary: ファイルの指す先をインターフェース定義の形の 1 行の JSON にする
+    scope: public
+    thread_safe: true
+    args:
+      - name: file_links
+        title: ファイルの指す先
+        type: FileLinks
+        required: true
+        passing: positional
+        description: 指す側 1 つ分の結果
+    returns:
+      type: str
+      description: 改行を含まない JSON（`ensure_ascii=False`）
+    process: |-
+      1. `{"path": ..., "targets": [{"path": ..., "via": ...}]}` の辞書にし、`via` を値の文字列にする
+      2. `json.dumps(ensure_ascii=False)` で返す
+    unit_tests:
+      - name: test_to_json_line
+        case: 正常
+        summary: インターフェース定義の形
+        condition: '`path` が `docs/設定.md`、`targets` が `docs/api.md`（`LINK`）の 1 件'
+        mock: なし
+        expected: '`json.loads` した結果が `{"path": "docs/設定.md", "targets": [{"path": "docs/api.md", "via": "link"}]}` で、日本語がエスケープされない'
+        exception: '-'
+  - name: build_path_pattern
+    title: パスの正規表現の組み立て
+    kind: 関数
+    container: project_index/features/links/service.py
+    usecase: 本文が指すファイルの一覧
+    role: 変換
+    summary: パスの集合を、共通の接頭辞をまとめた 1 つの正規表現にする
+    scope: public
+    thread_safe: true
+    args:
+      - name: paths
+        title: パス
+        type: Iterable[str]
+        required: true
+        passing: positional
+        description: '`/` を含む実在するファイルの `root` からのパス'
+    returns:
+      type: re.Pattern[str] | None
+      description: グループ 1 に一致したパスを取る正規表現。パスが 0 件なら `None`
+    process: |-
+      1. パスを 1 文字ずつたどる trie（辞書の入れ子。パスの終わりに終端のマーカー）を作る
+      2. trie を根からたどり、ノードごとに子の文字を `re.escape` して `(?:子|子)` の選択にする。終端のマーカーを持つノードの続きは `(?:...)?` にして、長い一致を先に試す
+      3. 前に `PATH_BOUNDARY_BEFORE` の否定の後読み、後ろに `PATH_BOUNDARY_AFTER` の否定の先読みを付けて `re.compile` して返す。パスが 0 件なら `None` を返す
+    unit_tests:
+      - name: test_build_path_pattern
+        case: 正常
+        summary: 接頭辞を共有するパスを両方取る
+        condition: '`docs/a.md`・`docs/api.md`・`src/a.py` の正規表現で、`docs/a.md と docs/api.md と src/a.py` を照合する'
+        mock: なし
+        expected: 一致が `docs/a.md`・`docs/api.md`・`src/a.py` の 3 件
+        exception: '-'
+      - name: test_build_path_pattern_when_prefix_of_another
+        case: 正常
+        summary: 別のパスの接頭辞になるパスは長い方を取る
+        condition: '`src/a.py`・`src/a.py.bak` の正規表現で、`src/a.py.bak` と `src/a.pyを` を照合する'
+        mock: なし
+        expected: 一致が `src/a.py.bak`・`src/a.py` の 2 件
+        exception: '-'
+      - name: test_build_path_pattern_when_empty
+        case: 正常
+        summary: パスが 0 件
+        condition: 空の並び
+        mock: なし
+        expected: '`None`'
+        exception: '-'
+tags:
+  - name: topic:関連
+    main: true
+  - name: topic:リンク
+test_files:
+  - tests/unit/project_index/features/links/test_service.py

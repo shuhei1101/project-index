@@ -715,7 +715,8 @@ def test_run_files(
 ) -> None:
     """載せるファイルを 1 行ずつ出す（正常系）。"""
     # 準備
-    write_files(tmp_path, {"src/a.py": "a = 1\n", "src/uv.lock": "version = 1\n"})
+    write_files(tmp_path, {"src/a.py": "a = 1\n"})
+    (tmp_path / "src/logo.png").write_bytes(b"\x00PNG\r\n")
     # 実行
     code = main_module.run_files(_files_args(root=str(tmp_path), paths=["src/**"], exclude=[]))
     # 検証
@@ -1195,3 +1196,100 @@ def test_build_handlers_when_unknown_key_reloaded_changed(
     # 検証
     assert handlers.terminal.unknown_keys == ["mindstella"]
     assert any("mindstella" in record.getMessage() for record in caplog.records)
+
+
+def _links_args(**overrides: Any) -> argparse.Namespace:
+    """`links` の解析結果を作る。"""
+    values: dict[str, Any] = {"root": "", "paths": ["docs/**"], "exclude": []}
+    values.update(overrides)
+    return argparse.Namespace(**values)
+
+
+def _skew_args(**overrides: Any) -> argparse.Namespace:
+    """`skew` の解析結果を作る。"""
+    values: dict[str, Any] = {
+        "root": "",
+        "files_yaml": ["files.yaml"],
+        "draft": None,
+        "only_draft": False,
+    }
+    values.update(overrides)
+    return argparse.Namespace(**values)
+
+
+def test_run_links(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    write_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    """1 ファイル 1 行の JSON を出す（正常系）。"""
+    # 準備
+    write_files(tmp_path, {"docs/a.md": "[B](./b.md)\n", "docs/b.md": "# b\n"})
+    # 実行
+    code = main_module.run_links(_links_args(root=str(tmp_path), paths=["docs/**"], exclude=[]))
+    # 検証
+    lines = capsys.readouterr().out.splitlines()
+    assert code == 0
+    assert [json.loads(line) for line in lines] == [
+        {"path": "docs/a.md", "targets": [{"path": "docs/b.md", "via": "link"}]}
+    ]
+
+
+def test_run_links_when_root_not_found(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """フォルダが無い（異常系）。"""
+    # 準備
+    missing = tmp_path / "missing"
+    # 実行
+    code = main_module.run_links(_links_args(root=str(missing)))
+    # 検証
+    captured = capsys.readouterr()
+    assert code == 2
+    assert captured.out == ""
+    assert str(missing) in captured.err
+
+
+def test_run_skew(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    write_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    """偏りを JSON で出す（正常系）。"""
+    # 準備
+    write_files(
+        tmp_path,
+        {
+            "files.yaml": (
+                "files:\n"
+                "  - path: a.md\n"
+                "    description: 設定の読み込みを受け持つ\n"
+                "    tags: [topic:x]\n"
+                "  - path: b.md\n"
+                "    description: 画面の部品の並びを受け持つ\n"
+                "  - path: c.md\n"
+                "    description: 検索の条件の解釈を受け持つ\n"
+            )
+        },
+    )
+    # 実行
+    code = main_module.run_skew(
+        _skew_args(root=str(tmp_path), files_yaml=["files.yaml"], draft=None, only_draft=False)
+    )
+    # 検証
+    output = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert output["rows"] == 3
+    assert output["singleton_tags"] == [{"tag": "topic:x", "path": "a.md"}]
+    assert output["dominant_tags"] == []
+
+
+def test_run_skew_when_input_not_found(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """管理用の YAML が無い（異常系）。"""
+    # 準備
+    missing = "missing/files.yaml"
+    # 実行
+    code = main_module.run_skew(_skew_args(root=str(tmp_path), files_yaml=[missing]))
+    # 検証
+    captured = capsys.readouterr()
+    assert code == 2
+    assert captured.out == ""
+    assert missing in captured.err

@@ -45,9 +45,8 @@ def _markdown_outline(
 def test_outline_files(tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]) -> None:
     """載せるファイルだけを昇順で返す（正常系）。"""
     # 準備
-    write_files(
-        tmp_path, {"docs/b.md": GUIDE_MD, "docs/a.md": GUIDE_MD, "uv.lock": "version = 1\n"}
-    )
+    write_files(tmp_path, {"docs/b.md": GUIDE_MD, "docs/a.md": GUIDE_MD})
+    (tmp_path / "logo.png").write_bytes(b"\x00PNG\r\n")
     # 実行
     result = outline_files(tmp_path, ["**"])
     # 検証
