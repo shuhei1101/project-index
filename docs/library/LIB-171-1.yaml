@@ -1,0 +1,58 @@
+title: ruamel.yaml.clib
+kind: ライブラリ
+lead: ruamel.yaml の読み込みの字句の解析と構文の解析を C（libyaml）で行う拡張。`YAML(pure=False)` のときに ruamel.yaml が使用する。
+version:
+  current: 0.2.15
+  latest: 0.2.15
+  checked_on: '2026-11-18'
+  source: pyproject.toml・uv.lock
+  pinning: pyproject.toml の `ruamel-yaml[oldlibyaml]==0.19.1`（ruamel.yaml の公式の extra）
+catalogs:
+  - name: API
+    version: 0.19.1
+    entries:
+      - name: YAML(typ="safe", pure=False)
+        kind: クラス
+        purpose: 字句と構文の解析を C（`CParser`）で行い、値の解決は ruamel.yaml の YAML 1.2（`VersionedResolver`）のままで読み込む
+      - name: YAML.Parser
+        kind: 属性
+        purpose: 起動時に `CParser` かを確認し、入れ忘れで pure へ黙って戻ることを検知する
+      - name: YAMLError
+        kind: 例外
+        purpose: C で読み込めないときに受け、`YAML(typ="safe", pure=True)` で読み直す
+purl: pkg:pypi/ruamel.yaml.clib
+dependency_scope: 必須
+adoption: 採用
+license: MIT
+official_url: https://sourceforge.net/p/ruamel-yaml-clib/code/ci/default/tree/
+docs_url: https://pypi.org/project/ruamel.yaml.clib/
+verification:
+  state: 済
+  date: '2026-11-18'
+  detail: 'PoC PR #174 で、Python 3.14 に 0.2.15 を入れて `YAML(typ="safe", pure=False)` で読み、`YAMLError` のときだけ pure で読み直した。同じ commit で 14 件の配信元の行の読み込みの結果と文書の一覧が pure と一致し、ai-monitor の文書の読み込みの CPU が 0.29 倍になった。flow の中の `:` を含む plain scalar（`[scope:はじめに, x]`）は C で `ScannerError` になり、pure の読み直しで読めた'
+selection:
+  candidates: ruamel.yaml.clib 0.2.15・PyYAML 6.0.3 の CParser と YAML 1.2 の自作 Loader・yamlrocks 0.7.1・py-yaml12 0.2.1・fastyaml-rs 0.8.0 を比べた（[案のレビュー](https://github.com/shuhei1101/project-index/pull/171#discussion_r4603352699)）。
+  decision: 値の解決を ruamel.yaml 自身に任せられ、pure と同じ値になるため。Rust 製の 3 件は下線入りの数・2 進数・日時・重複キーの値が違い、PyYAML は YAML 1.2 の規則を写して持つ必要がある。
+  consequences: 読み込みは C で試し、`YAMLError` のときだけ pure で読み直す。起動時に `CParser` かを確認する。書き込み（rt）は pure のまま。
+install: |-
+  ```bash
+  uv add 'ruamel.yaml[oldlibyaml]==0.19.1'
+  ```
+limitations:
+  - item: 保守
+    content: 作者は後継の ruamel.yaml.clibz へ移る方針で、2026 年のチケットに返信が無い。Python 3.15 の wheel が出ないときは pure で動き続ける（遅くなるが壊れない）
+  - item: 後継の clibz
+    content: ruamel.yaml 0.19.1 の `[libyaml]`（ruamel.yaml.clibz 0.3.7）では、`YAML(typ="safe", pure=False)` の Parser は pure のままで速くならない（2026-11-18 に reviewer が確認）。3.15 で見直すときの起点にする
+  - item: C で読めない入力
+    content: flow の中の `:` を含む plain scalar、U+0085・U+2028 を含む plain scalar は `ScannerError` になる（pure で読み直す）
+  - item: C で値が変わる入力
+    content: '`%YAML 1.1` の指示子を無視し、値の前のタブ（`a:\t1`）を読む。今の配信元の文書には無い'
+  - item: セキュリティ
+    content: '未初期化のメモリの読み取りの報告（チケット #54）が未修正。読むのは配信元の文書とスキーマだけ'
+visibility: internal
+tags:
+  - name: topic:ライブラリ
+    main: true
+  - name: tool:ruamel.yaml
+  - name: tool:yaml
+id: LIB-171-1
