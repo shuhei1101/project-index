@@ -15,17 +15,17 @@ diagrams:
         端末の設定の入口 ..> 同じオリジンの確認 : PUT の前
         配信元の保存 ..> 端末の設定の検証 : 書く前
         端末の設定の読み込み ..> 端末の設定の検証 : 読んだ後
-        配信元の保存 ..> 配信元の読み直し : 書いた後
+        配信元の保存 ..> 配信元の再読み込み : 書いた後
         端末の設定の入口 ..> 配信元の1行の変更 : PATCH
-        配信元の1行の変更 ..> 変わった配信元の読み直し : 書いた後
+        配信元の1行の変更 ..> 変わった配信元の再読み込み : 書いた後
         class 配信元の1行の変更 {
           <<function>>
         }
-        class 変わった配信元の読み直し {
+        class 変わった配信元の再読み込み {
           <<function>>
         }
         click 配信元の1行の変更 href "id:MOD-66#functions[patch_source]"
-        click 変わった配信元の読み直し href "id:MOD-89#functions[reload_changed_sources]"
+        click 変わった配信元の再読み込み href "id:MOD-89#functions[reload_changed_sources]"
         端末の設定の読み込み ..> 端末の設定 : 返す
         class 端末の設定の入口 {
           <<function>>
@@ -42,7 +42,7 @@ diagrams:
         class 同じオリジンの確認 {
           <<function>>
         }
-        class 配信元の読み直し {
+        class 配信元の再読み込み {
           <<function>>
         }
         class 端末の設定 {
@@ -54,7 +54,7 @@ diagrams:
         click 同じオリジンの確認 href "id:MOD-96#functions[require_same_origin]"
         click 端末の設定の検証 href "id:MOD-64#functions[validate_terminal_config]"
         click 端末の設定の読み込み href "id:MOD-64#functions[load_terminal_config]"
-        click 配信元の読み直し href "id:MOD-89#functions[reload_sources]"
+        click 配信元の再読み込み href "id:MOD-89#functions[reload_sources]"
         click 端末の設定 href "id:MOD-67#data_models[TerminalConfig]"
 notes:
   受け持つこと: |-

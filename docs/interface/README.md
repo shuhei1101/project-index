@@ -16,7 +16,7 @@
 | [文書の書き込み](./IF-6.yaml) | 文書の書き込み（write_docs） |
 | [文書の削除](./IF-7.yaml) | 文書の削除（delete_docs） |
 | [状態の取得](./IF-8.yaml) | 状態の取得（status） |
-| [設定の読み直し](./IF-9.yaml) | 設定の読み直し（reload） |
+| [設定の再読み込み](./IF-9.yaml) | 設定の再読み込み（reload） |
 | [再起動](./IF-10.yaml) | 再起動（restart） |
 | [更新](./IF-11.yaml) | 更新（update） |
 | [配信元の検査](./IF-12.yaml) | 配信元の検査（check_project） |

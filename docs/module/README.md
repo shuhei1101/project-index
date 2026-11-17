@@ -76,7 +76,7 @@
 | [索引のサーバー / 端末の設定 / service.py](./MOD-66.py.yaml) | `sources[]` の保存。 |
 | [索引のサーバー / 端末の設定 / types.py](./MOD-67.py.yaml) | 端末の設定と、端末の設定の API の `sources[]` の要求と結果の型。 |
 | [索引のサーバー / 配信元 / merge.py](./MOD-68.py.yaml) | 設定の YAML のマージ。 |
-| [索引のサーバー / 配信元 / registry.py](./MOD-69.py.yaml) | 配信する配信元の一覧と読み直し。 |
+| [索引のサーバー / 配信元 / registry.py](./MOD-69.py.yaml) | 配信する配信元の一覧と再読み込み。 |
 | [索引のサーバー / 配信元 / service.py](./MOD-70.py.yaml) | 配信元の設定の読み込みと検証、スクリプトとバージョンの確かめ。 |
 | [索引のサーバー / 配信元 / types.py](./MOD-71.py.yaml) | 配信元の設定・文書の行・スクリプト・配信中の配信元・状態の型。 |
 | [索引のサーバー / 検査 / markdown.py](./MOD-72.py.yaml) | スキーマで Markdown と宣言したキーのうち操作で変えた値を mdmark の点検に通し、描画時の書き方の警告を違反にする。 |
@@ -96,7 +96,7 @@
 | [索引のサーバー / 履歴 / git.py](./MOD-86.py.yaml) | git の実行と、リポジトリの直下の解決。 |
 | [索引のサーバー / スクリプトの実行 / mdmark.py](./MOD-87.py.yaml) | mdmark の CLI の `check --text -` で Markdown の文字列を点検し、出力をずれの並びにする。 |
 | [索引のサーバー / スクリプトの実行 / scripts.py](./MOD-88.py.yaml) | `validators[]`・`converters[]`・`generators[]` のスクリプトの制限時間つきの実行と、実行できるかの確かめ。 |
-| [索引のサーバー / 起動 / main.py](./MOD-89.py.yaml) | `project-index serve`・`project-index migrate` の部品の配線と、配信元の読み直し。 |
+| [索引のサーバー / 起動 / main.py](./MOD-89.py.yaml) | `project-index serve`・`project-index migrate` の部品の配線と、配信元の再読み込み。 |
 | [索引のサーバー / 起動 / app.py](./MOD-90.py.yaml) | ルートと MCP のマウントをまとめたアプリの組み立て。 |
 | [索引のサーバー / 起動 / error_handlers.py](./MOD-91.py.yaml) | 例外の problem+json への変換。 |
 | [索引のサーバー / 起動 / lifespan.py](./MOD-92.py.yaml) | MCP のセッションの管理と、記録の削除。 |

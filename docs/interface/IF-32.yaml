@@ -5,7 +5,7 @@ entry:
   value: POST `/settings/sources`
 flows:
   - name: 正常系
-    summary: 同じ id の行が無ければ末尾に追加し、配信元を読み直す
+    summary: 同じ id の行が無ければ末尾に追加し、配信元を再読み込みする
     setup:
       - name: Mock
         description: なし（一時フォルダに端末の設定を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
@@ -30,10 +30,10 @@ flows:
 
       <!-- /map -->
     expected:
-      - 201 で、`result` が `added`、`sources` に読み直した後の状態がある
+      - 201 で、`result` が `added`、`sources` に再読み込みした後の状態がある
       - '`settings.yaml` の `sources` が sample・extra の順で、sample の行と他のキー・コメントは変わらない'
       - '`version` が追加した後の `settings.yaml` の内容のバージョン'
-      - 追加の前後で sample の配信元を読み直さず、`/sources/sample/docs` が 200 を返却し続ける
+      - 追加の前後で sample の配信元を再読み込みせず、`/sources/sample/docs` が 200 を返却し続ける
     test: test_normal
   - name: 正常系（端末の設定の最上位に知らないキーがある）
     summary: 最上位の知らないキーを違反にせずに 1 行を追加し、ファイルの値とコメントを残して警告で返却する
@@ -53,7 +53,7 @@ flows:
 
         C->>E: expectedVersion, extra の行
         E->>E: 追加後の端末の設定をスキーマで検証する（mindstella は違反にしない）
-        E->>F: sources の末尾に追加し、配信元を読み直す
+        E->>F: sources の末尾に追加し、配信元を再読み込みする
         E-->>C: 201 added と警告
       ```
     expected:
@@ -211,7 +211,7 @@ tags:
 identifier: add_settings_source
 permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ'
 idempotent: false
-side_effects: '`settings.yaml` の `sources` の末尾に 1 行追加し、追加した行の配信元だけを読み込む（ほかの配信元は読み直さず、配信を続ける）'
+side_effects: '`settings.yaml` の `sources` の末尾に 1 行追加し、追加した行の配信元だけを読み込む（ほかの配信元は再読み込みせず、配信を続ける）'
 callers:
   - SC-12#scenarios[正常シナリオ（1 行を追加する）]
   - SC-12#scenarios[正常シナリオ（同じ id の行がある）]
@@ -243,10 +243,10 @@ response:
     description: 同じ id の行の内容が同じか（`exists` のときだけ）
   - name: sources[].id
     type: str
-    description: 配信元の ID（`added` のとき、読み直した後の状態）
+    description: 配信元の ID（`added` のとき、再読み込みした後の状態）
   - name: sources[].status
     type: Literal['serving', 'not_served', 'disabled']
-    description: 読み直した後の状態
+    description: 再読み込みした後の状態
   - name: version
     type: str
     description: 追加した後の端末の設定の内容のバージョン。`exists` のときは今の内容のバージョン
@@ -294,6 +294,6 @@ constraints:
     constraint: レスポンスのキーは camelCase。行のキーは端末の設定のキーのまま
   - item: 内容のバージョンの照合
     constraint: '排他ロックを取った後に `settings.yaml` の内容のバージョンと照合し、同じ id の行の確認より前に断る。フローの `expectedVersion` は、直前に `GET /settings/sources` で取得した `version`'
-  - item: 読み直しの範囲
-    constraint: 追加した行の配信元だけを読み込み、ほかの配信元は読み直さない
+  - item: 再読み込みの範囲
+    constraint: 追加した行の配信元だけを読み込み、ほかの配信元は再読み込みしない
 test_file: tests/integration/server/test_add_settings_source.py

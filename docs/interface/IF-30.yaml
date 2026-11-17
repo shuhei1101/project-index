@@ -66,16 +66,16 @@ flows:
       - legacy の `configVersion` に設定のバージョンとサーバーが参照できるバージョンがある
       - archive が `disabled`
     test: test_normal_when_source_not_served
-  - name: 正常系（読み直していない行がある）
-    summary: 手で直して読み直していない行を `pending_reload` で返し、他の行は自分の状態で返す
+  - name: 正常系（再読み込みしていない行がある）
+    summary: 手で直して再読み込みしていない行を `pending_reload` で返し、他の行は自分の状態で返す
     setup:
       - name: Mock
         description: なし
       - name: 端末の設定
-        description: sample と notes の 2 行で起動した後、ファイルを fresh・notes・sample の順に書き換え、読み直さない
+        description: sample と notes の 2 行で起動した後、ファイルを fresh・notes・sample の順に書き換え、再読み込みしない
         notes: fresh は `id` を省いた新しい行
     flow: |-
-      <!-- map: {"title": "正常系（読み直していない行がある）"} -->
+      <!-- map: {"title": "正常系（再読み込みしていない行がある）"} -->
 
       sequenceDiagram
         participant C as クライアント
@@ -193,7 +193,7 @@ response:
     notes: '`write` を省いた行は `null`（既定値の配信元のフォルダだけから書ける）'
   - name: sources[].status
     type: Literal['serving', 'not_served', 'disabled', 'pending_reload']
-    description: '配信中・起動時か読み直しの検証で外した・`enabled: false`・ファイルにあるが読み直していない行。行は `config`（`id` を書いた行は `id` も）が同じ配信元の状態と突き合わせる'
+    description: '配信中・起動時か再読み込みの検証で外した・`enabled: false`・ファイルにあるが再読み込みしていない行。行は `config`（`id` を書いた行は `id` も）が同じ配信元の状態と突き合わせる'
   - name: sources[].errors
     type: 'list[{path: str, reason: str}]'
     description: 検証で除外した理由

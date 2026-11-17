@@ -25,7 +25,7 @@ scenarios:
 
         U->>WT: 文書 1 の YAML をエディタで直して保存する
         A->>M: search_docs(filter: id が文書 1, view: full)
-        M->>WT: ファイルが変わっているので読み直す
+        M->>WT: ファイルが変わっているので再読み込みする
         M->>M: 内容のハッシュが変わったので、返却済みとして省かない
         M-->>A: 直した内容と新しい version
       ```
@@ -58,7 +58,7 @@ scenarios:
         A->>M: write_docs(operations: update 文書 1・読んだときの expected_version)
         M->>WT: 今の文書 1 を読む
         M->>M: 今のバージョンと expected_version が違う
-        M-->>A: エラー（今のバージョンと差分、読み直して呼び直すこと）
+        M-->>A: エラー（今のバージョンと差分、再読み込みして呼び直すこと）
         A->>M: search_docs(filter: id が文書 1, view: full)
         M-->>A: 直接編集した内容と今の version
         A->>M: write_docs(operations: update 文書 1・今の expected_version)
@@ -67,9 +67,9 @@ scenarios:
 
       <!-- /map -->
     expected:
-      - '1 回目の `write_docs` が `isError: true` で、今のバージョン・読んだときとの差分・読み直して呼び直すことを返す'
+      - '1 回目の `write_docs` が `isError: true` で、今のバージョン・読んだときとの差分・再読み込みして呼び直すことを返す'
       - 1 回目の後、文書 1 の YAML は直接編集した内容のまま
-      - 読み直した `version` での `write_docs` は書き込め、直接編集した内容のうち `set` しなかった項目が残る
+      - 再読み込みした `version` での `write_docs` は書き込め、直接編集した内容のうち `set` しなかった項目が残る
       - '`delete_docs` も読んだときの `expected_version` では同じエラーを返し、消さない'
     test: test_error_when_version_mismatch
   - name: 異常シナリオ（YAML を壊した）
@@ -91,7 +91,7 @@ scenarios:
         participant WT as ワークツリー x
 
         A->>M: search_docs(view: summary)
-        M->>WT: 変わった文書 1 を読み直し、読めない
+        M->>WT: 変わった文書 1 を再読み込みし、読めない
         M-->>A: 文書 2 と、読めなかったファイルの知らせ
       ```
 
@@ -101,7 +101,7 @@ scenarios:
       - 結果の `notes` に、読めなかった文書 1 のファイルのパスと理由（行と列）がある
       - 壊れた内容を `default_ref` へ commit した後は、読み取り API で取得した文書 1 のエラーに、読めなかったファイルのパスと理由が入る
     test: test_error_when_yaml_broken
-lead: 利用者が YAML を直接編集した後、次の取得が読み直した内容を返却するシナリオを定め、直接編集の後の振る舞いを変えるときに参照する。
+lead: 利用者が YAML を直接編集した後、次の取得が再読み込みした内容を返却するシナリオを定め、直接編集の後の振る舞いを変えるときに参照する。
 tags:
   - name: topic:文書
     main: true
@@ -117,7 +117,7 @@ trigger: 利用者が配信元の YAML をエディタで直接編集する
 preconditions:
   - project-index が起動し、配信元を配信している
   - エージェントが編集の前にその文書を `search_docs` で読んでいる
-success_guarantee: 次の取得が、変わったファイルを読み直した内容と新しいバージョンを返す。
+success_guarantee: 次の取得が、変わったファイルを再読み込みした内容と新しいバージョンを返す。
 minimal_guarantee: 読んだときのバージョンでの書き込みは、直接編集した内容を上書きしない。読めなくなったファイルがあっても、他の文書は返る。
 frequency: 不定（利用者が手で直すとき）
 priority: 中

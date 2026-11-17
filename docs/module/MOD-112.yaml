@@ -77,13 +77,13 @@ diagrams:
         管理の MCP の組み立て ..> ツールの結果
         管理の MCP の組み立て ..> ツールのエラーの変換
         管理の MCP の組み立て ..> 状態の取得
-        管理の MCP の組み立て ..> 設定の読み直し
+        管理の MCP の組み立て ..> 設定の再読み込み
         管理の MCP の組み立て ..> 配信元の検査
         管理の MCP の組み立て ..> 試しの変換
         管理の MCP の組み立て ..> 再起動の制御
         管理の MCP の組み立て ..> クローンの更新
         管理の MCP の組み立て ..> 状態の文
-        管理の MCP の組み立て ..> 読み直しの文
+        管理の MCP の組み立て ..> 再読み込みの文
         管理の MCP の組み立て ..> 検査の文
         class 管理の MCP の組み立て {
           <<function>>
@@ -97,7 +97,7 @@ diagrams:
         class 状態の取得 {
           <<function>>
         }
-        class 設定の読み直し {
+        class 設定の再読み込み {
           <<function>>
         }
         class 配信元の検査 {
@@ -115,7 +115,7 @@ diagrams:
         class 状態の文 {
           <<function>>
         }
-        class 読み直しの文 {
+        class 再読み込みの文 {
           <<function>>
         }
         class 検査の文 {
@@ -125,13 +125,13 @@ diagrams:
         click ツールの結果 href "id:MOD-95#functions[to_tool_result]"
         click ツールのエラーの変換 href "id:MOD-95#functions[tool_error]"
         click 状態の取得 href "id:MOD-10#functions[get_status]"
-        click 設定の読み直し href "id:MOD-10#functions[reload_config]"
+        click 設定の再読み込み href "id:MOD-10#functions[reload_config]"
         click 配信元の検査 href "id:MOD-10#functions[check_project]"
         click 試しの変換 href "id:MOD-10#functions[try_convert]"
         click 再起動の制御 href "id:MOD-34#classes[RestartControl]"
         click クローンの更新 href "id:MOD-36#functions[update_clone]"
         click 状態の文 href "id:MOD-9#functions[render_status]"
-        click 読み直しの文 href "id:MOD-9#functions[render_reload]"
+        click 再読み込みの文 href "id:MOD-9#functions[render_reload]"
         click 検査の文 href "id:MOD-9#functions[render_check]"
 notes:
   受け持つこと: |-

@@ -32,7 +32,7 @@ data_models:
     usecase: プロンプトの読み込み
     role: サービス
     summary: 起動のときに読んだプロンプトを ID で引いて描画する
-    description: '`dataclass(frozen=True, slots=True, kw_only=True)`。起動の後は読み直さない（YAML を書き換えたときは再起動で効かせる）。'
+    description: '`dataclass(frozen=True, slots=True, kw_only=True)`。起動の後は再読み込みしない（YAML を書き換えたときは再起動で効かせる）。'
     properties:
       - name: prompts
         title: プロンプト

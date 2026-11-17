@@ -94,7 +94,7 @@ flows:
       - '`status` を 2 回呼んでも、`check_sync` を呼んだ回数は起動の後の検査の 1 回のまま'
       - '合図の前の `status` が `loading: false`・`checking: true` を返し、合図の後の `status` が `checking: false` を返す'
     test: test_normal_when_checking
-  - name: 正常系（読み直した配信元を検査している）
+  - name: 正常系（再読み込みした配信元を検査している）
     summary: '`reload` の後の裏の検査が済むまで、検査の最中であることを返す'
     setup:
       - name: Mock
@@ -110,7 +110,7 @@ flows:
         participant T as status
 
         C->>R: 引数なし
-        R-->>C: 読み直した配信元
+        R-->>C: 再読み込みした配信元
         C->>T: format: json
         T-->>C: checking: true・sample が serving・sync: null
         C->>T: 検査の合図を出す
@@ -119,7 +119,7 @@ flows:
       ```
     expected:
       - '合図の前の `status` が `checking: true` で、sample を `serving`・`sync: null` で返す'
-      - 合図の前の markdown に、読み直しの最中であることが出る
+      - 合図の前の markdown に、再読み込みの最中であることが出る
       - '合図の後の `status` が `checking: false` で、`sync` に件数がある'
     test: test_normal_when_reload_checking
     refs:
@@ -176,7 +176,7 @@ callers:
   - SC-3#scenarios[正常シナリオ]
   - SC-4#scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
   - SC-10#scenarios[正常シナリオ]
-  - SC-10#scenarios[正常シナリオ（読み直しの検査が済む前に読み直す）]
+  - SC-10#scenarios[正常シナリオ（再読み込みの検査が済む前に再読み込みする）]
   - SC-11#scenarios[正常シナリオ（配信元を読み込んだ直後に開く）]
 exclusivity: '読み取りだけで排他しない（`readOnlyHint: true`）'
 request:
@@ -267,7 +267,7 @@ constraints:
   - item: 注釈
     constraint: '`readOnlyHint: true`'
   - item: 同期の件数
-    constraint: 配信元の読み込み・読み直し・`default_ref` の組み立て直しの後と、`write_docs`・`delete_docs` の後に裏で実行する検査の最後の結果を読み、`status` は配信元のファイルをたどらない
+    constraint: 配信元の読み込み・再読み込み・`default_ref` の組み立て直しの後と、`write_docs`・`delete_docs` の後に裏で実行する検査の最後の結果を読み、`status` は配信元のファイルをたどらない
     notes: 直接編集したファイルのずれは、次の検査まで件数に出ない。今のファイルで求め直すときは `check_project`
   - item: 配信中の配信元の組
     constraint: 配信元ごとの `default_ref` の commit を確かめず、いま配信中の組の設定を読む（組み立て直さない）

@@ -1,5 +1,5 @@
 id: IF-9
-title: "設定の読み直し"
+title: "設定の再読み込み"
 entry:
   kind: mcp_tool
   value: reload
@@ -24,19 +24,19 @@ flows:
         T-->>CF: 端末の設定と配信元の設定を読む
         T->>T: 配信元の一覧を差し替える
         T-->>C: added・removed・not_served・sources（検査の前）
-        T->>T: 裏で読み直した配信元を検査し、default_ref の commit を書き出す
+        T->>T: 裏で再読み込みした配信元を検査し、default_ref の commit を書き出す
       ```
 
       <!-- /map -->
     expected:
       - '`added` が `[notes]`、`removed` と `not_served` が空'
-      - '読み直した後の `search_docs(source: notes)` が文書を返す'
-      - 読み直す前に張った `/mcp` のセッションで、続けて `describe` を呼べる
+      - '再読み込みした後の `search_docs(source: notes)` が文書を返す'
+      - 再読み込みする前に張った `/mcp` のセッションで、続けて `describe` を呼べる
       - 応答の `sources[]` の sample・notes の `sync` が `null`
-      - '裏の検査が済んだ後の `status` が `checking: false` と sample・notes の `sync` の件数を返す（検査の最中の `checking: true` は IF-8 の `正常系（読み直した配信元を検査している）` で確かめる）'
+      - '裏の検査が済んだ後の `status` が `checking: false` と sample・notes の `sync` の件数を返す（検査の最中の `checking: true` は IF-8 の `正常系（再読み込みした配信元を検査している）` で確かめる）'
     test: test_normal
   - name: 正常系（検証に失敗する配信元がある）
-    summary: 配信元の設定を壊して読み直すと、その配信元を外して返す
+    summary: 配信元の設定を壊して再読み込みすると、その配信元を外して返す
     setup:
       - name: Mock
         description: なし
@@ -61,7 +61,7 @@ flows:
       - '`search_docs(source: sample)` が `SourceNotServedError` を返す'
     test: test_normal_when_source_becomes_invalid
   - name: 正常系（端末の設定の最上位に知らないキーがある）
-    summary: 端末の設定の最上位に知らないキーがあっても読み直し、キーのパスを警告のログと引数なしの `describe` の警告に残す
+    summary: 端末の設定の最上位に知らないキーがあっても再読み込みし、キーのパスを警告のログと引数なしの `describe` の警告に残す
     setup:
       - name: Mock
         description: なし（project-index のアプリをテストのクライアントで呼ぶ）
@@ -82,7 +82,7 @@ flows:
       ```
     expected:
       - '`isError` を返却せず、`not_served` が空'
-      - '読み直した後の `describe(source: sample)` が書き換えた `description` を返却する'
+      - '再読み込みした後の `describe(source: sample)` が書き換えた `description` を返却する'
       - 引数なしの `describe()` の `warnings` に、知らないキーのパス `mindstella` を持つ 1 件がある
       - 警告のログに、端末の設定のファイルと知らないキーのパス `mindstella` がある
     test: test_normal_when_terminal_config_has_unknown_top_level_key
@@ -112,11 +112,11 @@ flows:
       - '`isError: true` で `sources[0].config` の違反を返す'
       - 'その後の `search_docs(source: sample)` が文書を返す'
     test: test_error_when_terminal_config_invalid
-  - name: 正常系（前の読み直しの検査が済む前に読み直す）
+  - name: 正常系（前の再読み込みの検査が済む前に再読み込みする）
     summary: 前の検査を待たずに応答し、前の検査の結果で後の結果を上書きしない
     setup:
       - name: Mock
-        description: 配信元の検査（`check_sync`）を差し替える。1 回目の読み直しの検査はテストが合図を出すまで止めてから管理用の YAML に無いファイル 5 件の結果を、それ以外は本物の結果を返す
+        description: 配信元の検査（`check_sync`）を差し替える。1 回目の再読み込みの検査はテストが合図を出すまで止めてから管理用の YAML に無いファイル 5 件の結果を、それ以外は本物の結果を返す
         notes: 合図は `threading.Event`
       - name: 配信元
         description: Git 管理外の sample の 1 行（管理用の YAML に無いファイル 1 件）
@@ -141,10 +141,10 @@ flows:
     test: test_normal_when_reloaded_before_checks_finish
     refs:
       - to: SC-10
-        item: scenarios[正常シナリオ（読み直しの検査が済む前に読み直す）]
+        item: scenarios[正常シナリオ（再読み込みの検査が済む前に再読み込みする）]
         type: references
         when: このインターフェースの入出力やフローを変えるときに、シナリオ『設定・スクリプトを変える』の対応する流れと期待値を確認する。
-lead: 端末の設定と配信元の設定を読み直す管理の MCP の `reload` の入出力を定め、`reload` を修正するときに参照する。
+lead: 端末の設定と配信元の設定を再読み込みする管理の MCP の `reload` の入出力を定め、`reload` を修正するときに参照する。
 tags:
   - name: topic:設定
     main: true
@@ -158,9 +158,9 @@ callers:
   - SC-5#scenarios[正常シナリオ]
   - SC-10#scenarios[正常シナリオ]
   - SC-5#scenarios[正常シナリオ（.gitignore した設定を指して追加する）]
-  - SC-10#scenarios[正常シナリオ（端末の設定の最上位に知らないキーがある状態で読み直す）]
-  - SC-10#scenarios[正常シナリオ（読み直しの検査が済む前に読み直す）]
-exclusivity: 端末の設定の保存と同じロック（`settings_lock`）で一度に 1 つだけ読み直す。ロックは配信元の一覧を差し替えるまでで、裏の検査はロックの外で実行する。前の読み直しの検査は止めずに最後まで実行し、後に始めた検査の結果を上書きしない
+  - SC-10#scenarios[正常シナリオ（端末の設定の最上位に知らないキーがある状態で再読み込みする）]
+  - SC-10#scenarios[正常シナリオ（再読み込みの検査が済む前に再読み込みする）]
+exclusivity: 端末の設定の保存と同じロック（`settings_lock`）で一度に 1 つだけ再読み込みする。ロックは配信元の一覧を差し替えるまでで、裏の検査はロックの外で実行する。前の再読み込みの検査は止めずに最後まで実行し、後に始めた検査の結果を上書きしない
 request:
   - name: format
     type: Literal['markdown', 'json']
@@ -187,21 +187,21 @@ response:
     description: '`{キーのパス}: {理由}`'
   - name: sources[]
     type: list[SourceState]
-    description: 読み直した後の配信元ごとの状態
-    notes: '`status` の `sources[]` と同じスキーマ。検査を待たずに返すので、読み直した配信元の `sync` は `null`。検査が済んだかは `status` の `checking` で確かめる'
+    description: 再読み込みした後の配信元ごとの状態
+    notes: '`status` の `sources[]` と同じスキーマ。検査を待たずに返すので、再読み込みした配信元の `sync` は `null`。検査が済んだかは `status` の `checking` で確かめる'
 exceptions:
   - name: なし（正常終了）
-    condition: 読み直せた（検証に失敗した配信元があっても、外して正常終了）
+    condition: 再読み込みできた（検証に失敗した配信元があっても、外して正常終了）
   - name: TerminalConfigInvalidError
     condition: 端末の設定が無い・スキーマに違反する（最上位の知らないキーは違反にしない）
-    notes: '`isError: true` で違反を全て返す。配信元の一覧は読み直す前のまま'
+    notes: '`isError: true` で違反を全て返す。配信元の一覧は再読み込みする前のまま'
 constraints:
   - item: セッション
-    constraint: 読み直しの前後で `/mcp`・`/_admin/mcp` の接続を切らない
-  - item: 読み直す対象
-    constraint: 端末の設定の `sources` と各配信元の設定。`bind`・`port`・`state_dir` など反映が `restart` のキーは読み直さない
+    constraint: 再読み込みの前後で `/mcp`・`/_admin/mcp` の接続を切らない
+  - item: 再読み込みする対象
+    constraint: 端末の設定の `sources` と各配信元の設定。`bind`・`port`・`state_dir` など反映が `restart` のキーは再読み込みしない
   - item: 端末の設定の知らないキー
-    constraint: 起動の制約「端末の設定の知らないキー」と同じ。読み直した端末の設定の知らないキーで、引数なしの `describe` の警告を置き換える
+    constraint: 起動の制約「端末の設定の知らないキー」と同じ。再読み込みした端末の設定の知らないキーで、引数なしの `describe` の警告を置き換える
     notes: '`reload` の応答には記載しない'
   - item: タイムアウト
     constraint: 制限なし（スクリプトの確かめは配信元ごとに `script_timeout_sec` で打ち切る）。応答は配信元の一覧を差し替えた時点で返し、検査とリビジョンの書き出しは待たない

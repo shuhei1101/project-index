@@ -12,7 +12,7 @@ tags:
 identifier: delete_settings_source
 permissions: '`Origin` を持たない要求（サーバーの側や端末のほかのプロセスからの呼び出し）か、project-index と同じオリジンからの要求だけ'
 idempotent: false
-side_effects: '`settings.yaml` の `sources` から指した 1 行だけを削除し、その配信元を配信から除外する（ほかの配信元は読み直さず、配信を続ける）。配信元のフォルダのファイルは変えない'
+side_effects: '`settings.yaml` の `sources` から指した 1 行だけを削除し、その配信元を配信から除外する（ほかの配信元は再読み込みせず、配信を続ける）。配信元のフォルダのファイルは変えない'
 callers:
   - SC-12#scenarios[正常シナリオ（1 行を削除する）]
   - SC-12#scenarios[異常シナリオ（利用者が端末の設定を手で書き換えた）]
@@ -79,8 +79,8 @@ constraints:
     constraint: 排他ロックを取った後に `settings.yaml` の内容のバージョンと照合し、行の検索より前に断る
   - item: 書き込みの範囲
     constraint: '`settings.yaml` の指した 1 行だけを削除し、ほかの行・他のキー・コメントを保つ。一時ファイルに書いてから置き換える'
-  - item: 読み直しの範囲
-    constraint: 削除した行の配信元を配信から除外するだけで、ほかの配信元は読み直さない
+  - item: 再読み込みの範囲
+    constraint: 削除した行の配信元を配信から除外するだけで、ほかの配信元は再読み込みしない
   - item: 認可
     constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）
     decided_by: NFR-1#requirements[通信]
@@ -120,7 +120,7 @@ flows:
       - 200 で、`version` が `expectedVersion` と違う値で、`sources` に extra が無い
       - '`settings.yaml` の `sources` が sample の行だけで、sample の行・他のキー・コメントは変わらない'
       - extra のフォルダのファイルは変わらない
-      - '`/sources/extra/docs` が 404、`/sources/sample/docs` が 200 を返却し、sample の配信元は読み直さない'
+      - '`/sources/extra/docs` が 404、`/sources/sample/docs` が 200 を返却し、sample の配信元は再読み込みしない'
     test: test_normal
   - name: 正常系（端末の設定の最上位に知らないキーがある）
     summary: 最上位の知らないキーを違反にせずに 1 行を削除し、ファイルの値とコメントを残して警告で返却する

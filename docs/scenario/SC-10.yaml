@@ -23,9 +23,9 @@ scenarios:
         AD-->>A: 変換のスクリプトが出した Markdown
         A->>AD: reload
         AD-->>A: 一覧を差し替えた時点の配信元（検査の前の状態）
-        AD->>AD: 裏で読み直した配信元を検査する
-        A->>AD: status（読み直しが済むまで繰り返す）
-        AD-->>A: 読み直しが済んだことと索引の同期の件数
+        AD->>AD: 裏で再読み込みした配信元を検査する
+        A->>AD: status（再読み込みが済むまで繰り返す）
+        AD-->>A: 再読み込みが済んだことと索引の同期の件数
         A->>DM: describe
         DM-->>A: 新しい description
       ```
@@ -36,8 +36,8 @@ scenarios:
       - '`try_convert` が sample の `converters[]` を指す種類の文書を、変換のスクリプトが出した Markdown で返し、sample のフォルダは変わらない'
       - '`reload` の後の `describe` が書き換えた `description` を返す'
       - '`reload` の前後で `/mcp` のセッションが切れない'
-      - '`reload` が、配信元の一覧を差し替えた時点で、読み直した配信元の検査の終了を待たずに応答し、応答の `sources[]` の索引の同期の件数は検査の前の状態（`null`）になる'
-      - '`reload` の後の `status` が、検査が済むまで読み直しの最中であることを返却し、済んだ後は最中でないことと索引の同期の件数を返却する'
+      - '`reload` が、配信元の一覧を差し替えた時点で、再読み込みした配信元の検査の終了を待たずに応答し、応答の `sources[]` の索引の同期の件数は検査の前の状態（`null`）になる'
+      - '`reload` の後の `status` が、検査が済むまで再読み込みの最中であることを返却し、済んだ後は最中でないことと索引の同期の件数を返却する'
     test: test_normal
   - name: 正常シナリオ（設定のバージョンが古い）
     setup:
@@ -337,7 +337,7 @@ scenarios:
     test: test_error_when_paths_base_or_paths_out_of_range
     decisions:
       - D-189
-  - name: 正常シナリオ（端末の設定の最上位に知らないキーがある状態で読み直す）
+  - name: 正常シナリオ（端末の設定の最上位に知らないキーがある状態で再読み込みする）
     setup:
       - name: Mock
         description: なし（実環境で実行）
@@ -353,21 +353,21 @@ scenarios:
 
         A->>AD: reload
         AD->>AD: 端末の設定を検証し、最上位の知らないキーのパスを警告のログに残す
-        AD-->>A: 読み直した配信元
+        AD-->>A: 再読み込みした配信元
         A->>DM: describe
         DM-->>A: 新しい description と、知らないキーの警告
       ```
     expected:
-      - '`reload` がエラーにならず、sample を読み直した配信元として返却する'
+      - '`reload` がエラーにならず、sample を再読み込みした配信元として返却する'
       - '`reload` の後の `describe` が書き換えた `description` を返却し、引数なしの `describe()` の警告に `mindstella` が載る'
       - 警告のログに、端末の設定のファイルと知らないキーのパス `mindstella` が残る
     test: test_normal_when_reloaded_with_unknown_top_level_key
     decisions:
       - D-308
-  - name: 正常シナリオ（読み直しの検査が済む前に読み直す）
+  - name: 正常シナリオ（再読み込みの検査が済む前に再読み込みする）
     setup:
       - name: Mock
-        description: 配信元の検査（`check_sync`）を差し替える。1 回目の読み直しの検査は、テストが合図を出すまで止めてから管理用の YAML に無いファイル 5 件の結果を返却し、2 回目以降は本物の検査の結果を返却する
+        description: 配信元の検査（`check_sync`）を差し替える。1 回目の再読み込みの検査は、テストが合図を出すまで止めてから管理用の YAML に無いファイル 5 件の結果を返却し、2 回目以降は本物の検査の結果を返却する
         notes: project-index のアプリをテストのクライアントで呼ぶ。合図は `threading.Event`
       - name: サンプルの配信元
         description: 配信中の配信元 sample（Git 管理外のフォルダ。管理用の YAML に無いファイル 1 件）
@@ -381,22 +381,22 @@ scenarios:
 
         A->>AD: reload
         AD-->>A: 一覧を差し替えた時点の配信元（検査の前の状態）
-        AD->>AD: 裏で 1 回目に読み直した配信元を検査し始め、合図まで止まる
+        AD->>AD: 裏で 1 回目に再読み込みした配信元を検査し始め、合図まで止まる
         A->>A: sample の project-index.yaml の description をもう一度書き換える
         A->>AD: reload
         AD-->>A: 1 回目の検査を待たずに、一覧を差し替えた時点の配信元
-        AD->>AD: 裏で 2 回目に読み直した配信元を検査する
+        AD->>AD: 裏で 2 回目に再読み込みした配信元を検査する
         A->>AD: 1 回目の検査に合図を出す
         AD->>AD: 1 回目の検査は最後まで実行し、結果は 2 回目より前に始めた検査のものとして捨てる
-        A->>AD: status（読み直しが済むまで繰り返す）
-        AD-->>A: 読み直しが済んだことと索引の同期の件数
+        A->>AD: status（再読み込みが済むまで繰り返す）
+        AD-->>A: 再読み込みが済んだことと索引の同期の件数
         A->>DM: describe
         DM-->>A: 2 回目に書き換えた description
       ```
     expected:
       - 2 回目の `reload` が、1 回目の検査が合図で止まっている間に応答する
-      - 合図の前の `status` が読み直しの最中であることを返却する
-      - 読み直しが済んだ後の `status` の sample の管理用の YAML に無いファイルの件数が 1 で、1 回目の検査の結果（5 件）で上書きされない
+      - 合図の前の `status` が再読み込みの最中であることを返却する
+      - 再読み込みが済んだ後の `status` の sample の管理用の YAML に無いファイルの件数が 1 で、1 回目の検査の結果（5 件）で上書きされない
       - '`describe` が 2 回目に書き換えた `description` を返却する'
       - '`reload` の前後で `/mcp` のセッションが切れない'
     test: test_normal_when_reloaded_before_checks_finish

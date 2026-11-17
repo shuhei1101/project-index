@@ -22,7 +22,7 @@ diagrams:
         配信元の読み込み ..> 配信中の配信元 : 作る
         配信元の読み込み ..> 配信元の状態 : 作る
         class 配信元の一覧 {
-          +読み直す(端末の設定) list
+          +再読み込みする(端末の設定) list
           +引く(配信元の ID) 配信中の配信元
           +配信中() list
           +状態の一覧() list
@@ -301,7 +301,7 @@ functions:
         required: false
         default: None
         passing: keyword
-        description: 読み直す端末の設定から作った引き当て（配信元の設定の検証へ渡す。`None` は端末の設定のファイルから作る）
+        description: 再読み込みする端末の設定から作った引き当て（配信元の設定の検証へ渡す。`None` は端末の設定のファイルから作る）
     returns:
       type: tuple[ServedSource | None, SourceStatus]
       description: 配信するときは配信中の配信元と `serving` の状態、配信しないときは `None` と `not_served` か `disabled` の状態
@@ -500,7 +500,7 @@ functions:
     container: project_index/features/sources/service.py
     usecase: 説明
     role: サービス
-    summary: 配信中の配信元の設定を、作業ツリーかワークツリーの同じ場所から読み直した配信元を作る
+    summary: 配信中の配信元の設定を、作業ツリーかワークツリーの同じ場所から再読み込みした配信元を作る
     scope: public
     thread_safe: true
     args:
@@ -509,7 +509,7 @@ functions:
         type: ServedSource
         required: true
         passing: positional
-        description: 読み直す配信元
+        description: 再読み込みする配信元
       - name: root
         title: 読む場所の直下
         type: Path
@@ -546,7 +546,7 @@ functions:
       - name: test_load_source_at_when_ignored_config
         case: 正常
         summary: 無視した先頭の設定はクローン本体のものを使う
-        condition: クローン本体の直下に `.gitignore` した `project-index.local.yaml` を先頭に持つ配信元を、`git worktree add` したワークツリーで読み直す
+        condition: クローン本体の直下に `.gitignore` した `project-index.local.yaml` を先頭に持つ配信元を、`git worktree add` したワークツリーで再読み込みする
         mock: なし（一時フォルダで `git init` と `git worktree add`）
         expected: '`config_files` の先頭がクローン本体の `project-index.local.yaml` で、`root` がワークツリーの直下'
         exception: '-'
@@ -560,7 +560,7 @@ functions:
       - name: test_load_source_at_when_paths_base_set
         case: 正常
         summary: ワークツリーでも基準のフォルダを解く
-        condition: '`paths_base: ../../..` の配信元を、`git worktree add` したワークツリーで読み直す'
+        condition: '`paths_base: ../../..` の配信元を、`git worktree add` したワークツリーで再読み込みする'
         mock: なし（一時フォルダで `git init` と `git worktree add`）
         expected: '`root` がワークツリーの直下、`config_dir` が元の配信元と同じ'
   - name: assemble_source
@@ -634,7 +634,7 @@ functions:
       4. paths の基準のフォルダを解く（『paths の基準のフォルダの解決』。範囲の違反は手順 2 の検証で返している）
       5. スキーマ・ワークツリーの glob を解いて配信中の配信元を作る
 
-      `root_override` は設定ファイルのフォルダを置き換える（作業ツリー・ワークツリーの同じ場所で読み直すとき）。
+      `root_override` は設定ファイルのフォルダを置き換える（作業ツリー・ワークツリーの同じ場所で再読み込みするとき）。
     unit_tests:
       - name: test_assemble_source
         case: 正常

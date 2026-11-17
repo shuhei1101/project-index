@@ -373,7 +373,7 @@ data_models:
     usecase: 共通
     role: DTO
     summary: 検証を通した 1 つの配信元と、読み書きに要る解いた値
-    description: '`dataclass(frozen=True)`。読み直しでは作り直し、書き換えない。'
+    description: '`dataclass(frozen=True)`。再読み込みでは作り直し、書き換えない。'
     properties:
       - name: id
         title: 配信元の ID
@@ -448,7 +448,7 @@ data_models:
         title: 種類のスキーマ
         type: dict[str, dict[str, Any]]
         access: 公開
-        description: '`documents[].id` → 読んだスキーマ（設定ファイルのフォルダからの相対パスのファイルを起動時に読む。作業中のワークツリーを読むときは文書のストアが読み直す）。`schema_path` が `SchemaRef` の行は、参照先のスキーマの読み取りで `$ref` まで解いたスキーマ'
+        description: '`documents[].id` → 読んだスキーマ（設定ファイルのフォルダからの相対パスのファイルを起動時に読む。作業中のワークツリーを読むときは文書のストアが再読み込みする）。`schema_path` が `SchemaRef` の行は、参照先のスキーマの読み取りで `$ref` まで解いたスキーマ'
       - name: storage
         title: 読み書きの方法
         type: StorageType | None
@@ -593,7 +593,7 @@ data_models:
         type: tuple[str, ...]
         access: 公開
         default: ()
-        description: 読み直したときの行の `config`。端末の設定の取得が行と状態を突き合わせる
+        description: 再読み込みしたときの行の `config`。端末の設定の取得が行と状態を突き合わせる
 enums:
   - name: SourceStatusKind
     title: 配信元の状態の種類
@@ -607,7 +607,7 @@ enums:
         description: 検証を通って配信している
       - value: not_served
         title: 配信していない
-        description: 起動時か読み直しの検証で外した
+        description: 起動時か再読み込みの検証で外した
       - value: disabled
         title: 無効
         description: '端末の設定か配信元の設定で `enabled: false`'
