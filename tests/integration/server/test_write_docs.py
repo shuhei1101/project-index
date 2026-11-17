@@ -1838,3 +1838,395 @@ def test_error_when_recursive_metadata_key_written(
     after = load_yaml(target.read_text(encoding="utf-8"))
     assert after["refs"] == link
     assert after["functions"] == load_yaml(before)["functions"]
+
+
+# 文書 1 が、関連・参照の型の値・Markdown のリンク・クラス図の click で文書 2 を指す
+REFERRER_DOC = (
+    "id: doc-1\n"
+    "name: 文書 1\n"
+    "ref: 'doc-2#items[a]'\n"
+    "related:\n"
+    "  - to: doc-2\n"
+    "    type: references\n"
+    "description: |-\n"
+    "  [文書 2](id:doc-2) と [文書 20](id:doc-20)\n"
+    '  click N href "id:doc-2#items[a]"\n'
+)
+# 目次の種類（`docs/index.yaml`）を持ち、sample から目次を除く配信元の設定
+INDEX_CONFIG = (
+    "name: sample\n"
+    "default_ref: develop\n"
+    "documents:\n"
+    "  - id: sample\n"
+    "    paths: [docs/*.yaml]\n"
+    "    exclude: [index.yaml]\n"
+    "    schema: schemas/sample.schema.yaml\n"
+    "  - id: index\n"
+    "    paths: [docs/index.yaml]\n"
+    "    schema: schemas/index.schema.yaml\n"
+    "    metadata:\n"
+    "      id: page_id\n"
+)
+INDEX_SCHEMA = "type: object\n"
+INDEX_DOC = "items:\n  - page: doc-2.yaml\n  - page: doc-1.yaml\n"
+# ID の列の値を持たない（ID がパスの）本文のファイルを持つ行
+PATH_ID_ROW = (
+    "  - id: files\n"
+    "    paths: [notes/files.yaml]\n"
+    "    schema: schemas/files.schema.yaml\n"
+    "    records: files\n"
+    "    body_file: path\n"
+)
+PATH_ID_FILES = "files:\n  - path: n1.md\n    name: メモ 1\n  - path: n2.md\n    name: メモ 2\n"
+
+
+def _rename(doc_id: str, version: str, **operation: Any) -> dict[str, Any]:
+    """`rename` の操作を作る。"""
+    return {"op": "rename", "id": doc_id, "expected_version": version, **operation}
+
+
+def test_normal_when_rename(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_doc_text: Callable[..., str],
+) -> None:
+    """`rename` で ID とファイル名を変え、同じ配信元の参照元を書き換える（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "docs/doc-1.yaml": REFERRER_DOC,
+            "docs/doc-3.yaml": sample_doc_text("doc-3", "文書 3"),
+        }
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    common = {"cwd": str(source.folder), "worktree": str(worktree)}
+    operation = _rename("doc-2", _version(worktree / "docs" / "doc-2.yaml"), new_id="doc-9")
+    doc_3 = (worktree / "docs" / "doc-3.yaml").read_text(encoding="utf-8")
+    # 実行
+    tried = env.call("write_docs", **common, operations=[operation], dry_run=True)
+    tried_exists = (worktree / "docs" / "doc-2.yaml").exists()
+    renamed = env.call("write_docs", **common, operations=[operation])
+    searched = env.call(
+        "search_docs",
+        **common,
+        filter={"field": "id", "op": "eq", "values": ["doc-2", "doc-9"]},
+        format="json",
+    )
+    # 検証
+    first, referrer = tried.data["results"]
+    text = (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8")
+    assert tried.data["applied"] is False
+    assert tried_exists
+    assert first["status"] == "renamed"
+    assert first["id"] == "doc-9"
+    assert first["renamed_from"] == "doc-2"
+    assert first["path"] == "docs/doc-9.yaml"
+    assert referrer["index"] == 0
+    assert referrer["id"] == "doc-1"
+    assert referrer["status"] == "updated"
+    assert len(referrer["references"]) == 4
+    assert not renamed.is_error
+    assert not (worktree / "docs" / "doc-2.yaml").exists()
+    assert load_yaml((worktree / "docs" / "doc-9.yaml").read_text(encoding="utf-8")) == {
+        "id": "doc-9",
+        "name": "文書 2",
+        "description": "2 件目",
+        "tags": ["a", "b"],
+    }
+    assert text == (
+        "id: doc-1\n"
+        "name: 文書 1\n"
+        "ref: 'doc-9#items[a]'\n"
+        "related:\n"
+        "  - to: doc-9\n"
+        "    type: references\n"
+        "description: |-\n"
+        "  [文書 2](id:doc-9) と [文書 20](id:doc-20)\n"
+        '  click N href "id:doc-9#items[a]"\n'
+    )
+    assert (worktree / "docs" / "doc-3.yaml").read_text(encoding="utf-8") == doc_3
+    assert [item["id"] for item in searched.data["items"]] == ["doc-9"]
+
+
+def test_normal_when_rename_path_only(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """`new_path` だけの `rename` でファイルを移し、パスで指す参照元を書き換える（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "project-index.yaml": INDEX_CONFIG,
+            "schemas/index.schema.yaml": INDEX_SCHEMA,
+            "docs/index.yaml": INDEX_DOC,
+            "docs/doc-1.yaml": REFERRER_DOC,
+        }
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    doc_1 = (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8")
+    operation = _rename(
+        "doc-2", _version(worktree / "docs" / "doc-2.yaml"), new_path="docs/doc-2-old.yaml"
+    )
+    # 実行
+    result = env.call(
+        "write_docs", cwd=str(source.folder), worktree=str(worktree), operations=[operation]
+    )
+    # 検証
+    assert not result.is_error
+    assert result.data["results"][0]["id"] == "doc-2"
+    assert result.data["results"][0]["path"] == "docs/doc-2-old.yaml"
+    assert not (worktree / "docs" / "doc-2.yaml").exists()
+    assert load_yaml((worktree / "docs" / "doc-2-old.yaml").read_text(encoding="utf-8"))["id"] == (
+        "doc-2"
+    )
+    assert (worktree / "docs" / "index.yaml").read_text(encoding="utf-8") == (
+        "items:\n  - page: doc-2-old.yaml\n  - page: doc-1.yaml\n"
+    )
+    assert (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8") == doc_1
+
+
+def test_normal_when_rename_body_file(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+    sample_doc_text: Callable[..., str],
+) -> None:
+    """`records`・`body_file` の行の文書を `new_path` で改名し、要素と本文のファイルを移す（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "project-index.yaml": sample_config_text(PATH_ID_ROW),
+            "schemas/files.schema.yaml": INDEX_SCHEMA,
+            "notes/files.yaml": PATH_ID_FILES,
+            "notes/n1.md": "# n1\n",
+            "notes/n2.md": "# n2\n",
+            "docs/doc-1.yaml": sample_doc_text(
+                "doc-1", "文書 1", related=[{"to": "notes/n1.md", "type": "references"}]
+            ),
+        }
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    common = {"cwd": str(source.folder), "worktree": str(worktree)}
+    version = value_hash([{"path": "n1.md", "name": "メモ 1"}, "# n1\n"])
+    # 実行
+    renamed = env.call(
+        "write_docs",
+        **common,
+        operations=[_rename("notes/n1.md", version, new_path="notes/sub/n9.md")],
+    )
+    refused = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            _rename(
+                "notes/n2.md",
+                value_hash([{"path": "n2.md", "name": "メモ 2"}, "# n2\n"]),
+                new_id="n2",
+            )
+        ],
+    )
+    checked = env.call_admin("check_project", path=str(worktree), format="json")
+    # 検証
+    assert not renamed.is_error
+    assert renamed.data["results"][0]["id"] == "notes/sub/n9.md"
+    assert load_yaml((worktree / "notes" / "files.yaml").read_text(encoding="utf-8")) == {
+        "files": [{"path": "sub/n9.md", "name": "メモ 1"}, {"path": "n2.md", "name": "メモ 2"}]
+    }
+    assert (worktree / "notes" / "sub" / "n9.md").read_text(encoding="utf-8") == "# n1\n"
+    assert not (worktree / "notes" / "n1.md").exists()
+    assert load_yaml((worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8"))["related"] == [
+        {"to": "notes/sub/n9.md", "type": "references"}
+    ]
+    assert "notes/n1.md" not in checked.text
+    assert "notes/sub/n9.md" not in checked.text
+    assert refused.is_error
+    assert "InvalidArgumentError" in refused.text
+    assert (worktree / "notes" / "n2.md").exists()
+
+
+def test_error_when_rename_id_exists(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+) -> None:
+    """`new_id` が既にある文書の ID と重なる `rename` を断る（異常系）。"""
+    # 準備
+    source, env, worktree = _setup(make_source, make_server, add_worktree)
+    doc_1 = (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8")
+    doc_2 = (worktree / "docs" / "doc-2.yaml").read_text(encoding="utf-8")
+    operation = _rename("doc-2", _version(worktree / "docs" / "doc-2.yaml"), new_id="doc-1")
+    # 実行
+    result = env.call(
+        "write_docs", cwd=str(source.folder), worktree=str(worktree), operations=[operation]
+    )
+    # 検証
+    assert result.is_error
+    assert "ValidationFailedError" in result.text
+    assert "operations[0].new_id" in result.text
+    assert "doc-1 は既にあります" in result.text
+    assert (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8") == doc_1
+    assert (worktree / "docs" / "doc-2.yaml").read_text(encoding="utf-8") == doc_2
+
+
+@pytest.mark.parametrize(
+    ("new_path", "reason"),
+    [
+        pytest.param("other/doc-2.yaml", "paths に該当しない", id="outside_paths"),
+        pytest.param("docs/doc-1.yaml", "既にあります", id="exists"),
+    ],
+)
+def test_error_when_rename_path_invalid(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    new_path: str,
+    reason: str,
+) -> None:
+    """配置先に該当しない `new_path` と既にあるファイルを指す `new_path` を断る（異常系）。"""
+    # 準備
+    source, env, worktree = _setup(make_source, make_server, add_worktree)
+    doc_2 = (worktree / "docs" / "doc-2.yaml").read_text(encoding="utf-8")
+    operation = _rename("doc-2", _version(worktree / "docs" / "doc-2.yaml"), new_path=new_path)
+    # 実行
+    result = env.call(
+        "write_docs", cwd=str(source.folder), worktree=str(worktree), operations=[operation]
+    )
+    # 検証
+    assert result.is_error
+    assert "InvalidArgumentError" in result.text
+    assert new_path in result.text
+    assert reason in result.text
+    assert (worktree / "docs" / "doc-2.yaml").read_text(encoding="utf-8") == doc_2
+    assert not (worktree / "other").exists()
+
+
+WORD_DOC_1 = (
+    "id: doc-1\n"
+    "name: 文書 1\n"
+    "# コメントは残す\n"
+    "description: '旧語'\n"
+    "tags: [a]\n"
+    "items:\n"
+    "  - key: k1\n"
+    "    label: 旧語と旧語\n"
+    "notes:\n"
+    "  旧語: 旧語\n"
+)
+WORD_DOC_2 = "id: doc-2\nname: 旧語\ntags: [a]\n"
+WORD_DOC_3 = "id: doc-3\nname: 旧語\n"
+
+
+def _replace_text(**operation: Any) -> dict[str, Any]:
+    """タグ `a` の文書の `旧語` を置換する `replace_text` の操作を作る。"""
+    return {
+        "op": "replace_text",
+        "filter": {"field": "tags", "op": "eq", "values": ["a"]},
+        "old": "旧語",
+        **operation,
+    }
+
+
+def _word_files(sample_file_set: Callable[..., dict[str, str]]) -> dict[str, str]:
+    """タグ `a` の文書 2 件と持たない文書 1 件が `旧語` を持つ配信元のファイル一式を返す。"""
+    return sample_file_set(
+        **{
+            "docs/doc-1.yaml": WORD_DOC_1,
+            "docs/doc-2.yaml": WORD_DOC_2,
+            "docs/doc-3.yaml": WORD_DOC_3,
+        }
+    )
+
+
+def test_normal_when_replace_text(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """`replace_text` で `filter` に該当する文書の配下の文字列を置換し、文書ごとの件数を返す（正常系）。"""
+    # 準備
+    files = _word_files(sample_file_set)
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    common = {"cwd": str(source.folder), "worktree": str(worktree)}
+    # 実行
+    tried = env.call("write_docs", **common, operations=[_replace_text(new="新語")], dry_run=True)
+    tried_text = (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8")
+    replaced = env.call("write_docs", **common, operations=[_replace_text(new="新語")])
+    replaced_1 = (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8")
+    replaced_2 = (worktree / "docs" / "doc-2.yaml").read_text(encoding="utf-8")
+    # 置換の前の内容に戻してから、`fields` で項目を絞る
+    (worktree / "docs" / "doc-1.yaml").write_text(WORD_DOC_1, encoding="utf-8")
+    (worktree / "docs" / "doc-2.yaml").write_text(WORD_DOC_2, encoding="utf-8")
+    narrowed = env.call(
+        "write_docs", **common, operations=[_replace_text(new="新語", fields=["items"])]
+    )
+    # 検証
+    assert tried.data["applied"] is False
+    assert [(i["index"], i["id"], i["status"], i["count"]) for i in tried.data["results"]] == [
+        (0, "doc-1", "updated", 4),
+        (0, "doc-2", "updated", 1),
+    ]
+    assert all(item["diff"] for item in tried.data["results"])
+    assert tried_text == WORD_DOC_1
+    assert not replaced.is_error
+    assert replaced_1 == (
+        WORD_DOC_1.replace("'旧語'", "'新語'")
+        .replace("旧語と旧語", "新語と新語")
+        .replace("  旧語: 旧語\n", "  旧語: 新語\n")
+    )
+    assert replaced_2 == "id: doc-2\nname: 新語\ntags: [a]\n"
+    assert (worktree / "docs" / "doc-3.yaml").read_text(encoding="utf-8") == WORD_DOC_3
+    assert [(item["id"], item["count"]) for item in narrowed.data["results"]] == [("doc-1", 2)]
+    assert (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8") == (
+        WORD_DOC_1.replace("旧語と旧語", "新語と新語")
+    )
+    assert (worktree / "docs" / "doc-2.yaml").read_text(encoding="utf-8") == WORD_DOC_2
+
+
+def test_error_when_replace_text_validation_failed(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """置換した文書が 1 件でも検査に合格しなければ、どの文書も書き換えない（異常系）。"""
+    # 準備
+    one_line_name = SAMPLE_SCHEMA_ONE_LINE_NAME
+    files = {**_word_files(sample_file_set), "schemas/sample.schema.yaml": one_line_name}
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    common = {"cwd": str(source.folder), "worktree": str(worktree)}
+    doc_3 = _version(worktree / "docs" / "doc-3.yaml")
+    update = _update("doc-3", doc_3, set={"description": "書き換えた"})
+    # 実行
+    failed = env.call("write_docs", **common, operations=[_replace_text(new="新\n語")])
+    partial = env.call(
+        "write_docs",
+        **common,
+        operations=[_replace_text(new="新\n語"), update],
+        atomic=False,
+    )
+    # 検証
+    assert failed.is_error
+    assert "ValidationFailedError" in failed.text
+    assert "doc-2#name" in failed.text
+    assert (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8") == WORD_DOC_1
+    assert (worktree / "docs" / "doc-2.yaml").read_text(encoding="utf-8") == WORD_DOC_2
+    assert [item["status"] for item in partial.data["results"]] == ["failed", "updated"]
+    assert (worktree / "docs" / "doc-2.yaml").read_text(encoding="utf-8") == WORD_DOC_2
+    assert "書き換えた" in (worktree / "docs" / "doc-3.yaml").read_text(encoding="utf-8")
+
+
+# `name` に改行を許可しないスキーマ
+SAMPLE_SCHEMA_ONE_LINE_NAME = (
+    "type: object\n"
+    "required: [id, name]\n"
+    "properties:\n"
+    "  id: {type: string}\n"
+    "  name: {type: string, pattern: '^[^\\n]+$'}\n"
+)
