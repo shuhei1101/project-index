@@ -539,5 +539,5 @@ def make_records_nav_source_dir(
 
 
 def _no_reload(terminal: object) -> list[object]:
-    """配信元を読み直さない偽物。"""
+    """配信元を再読み込みしない偽物。"""
     return []

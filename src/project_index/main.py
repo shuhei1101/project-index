@@ -82,7 +82,7 @@ class Handlers:
     restart: RestartControl
     prompts: PromptSet
     checks: SourceChecks
-    # 配信元の 1 行の追加・変更・削除の後に、変わった行の配信元だけを読み直す
+    # 配信元の 1 行の追加・変更・削除の後に、変わった行の配信元だけを再読み込みする
     reload_changed: Callable[[TerminalConfig], list[SourceStatus]]
 
 
@@ -264,7 +264,7 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
         )
         # 端末の設定の API が起動時の一覧ではなく保存した一覧を返すよう、起動時の端末の設定の一覧を差し替える
         terminal.sources[:] = new_terminal.sources
-        # 引数なしの describe と端末の設定の API が、読み直した端末の設定の知らないキーを返すよう差し替える
+        # 引数なしの describe と端末の設定の API が、再読み込みした端末の設定の知らないキーを返すよう差し替える
         terminal.unknown_keys[:] = new_terminal.unknown_keys
         # 起動時の配信元の読み込みは起動の端末の設定のままで、知らないキーは起動のときに書いている
         if new_terminal is not terminal:
@@ -316,7 +316,7 @@ def reload_sources(
     checks: SourceChecks,
     snapshots: SnapshotStore,
 ) -> list[SourceStatus]:
-    """配信元の一覧を読み直し、配信元の内容をキャッシュした部品のキャッシュを捨てる。"""
+    """配信元の一覧を再読み込みし、配信元の内容をキャッシュした部品のキャッシュを捨てる。"""
     statuses = registry.reload(terminal)
     # 裏の検査と書き出しは待たない
     discard_source_caches(
@@ -340,7 +340,7 @@ def reload_changed_sources(
     checks: SourceChecks,
     snapshots: SnapshotStore,
 ) -> list[SourceStatus]:
-    """配信元の一覧の変わった行だけを読み直し、新しく読んだ配信元だけでキャッシュを作り直す。"""
+    """配信元の一覧の変わった行だけを再読み込みし、新しく読んだ配信元だけでキャッシュを作り直す。"""
     before = {id(source) for source in registry.served()}
     statuses = registry.reload_changed(terminal)
     # 使い回した配信元は検査のキャッシュが今のままなので、新しく読んだ配信元だけを検査する

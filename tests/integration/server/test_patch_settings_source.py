@@ -31,7 +31,7 @@ def _append_unnamed_row(env: Any, source: Any) -> None:
 
 
 def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]) -> None:
-    """指した行の送信したキーだけを変更し、その配信元だけを読み直す（正常系）。"""
+    """指した行の送信したキーだけを変更し、その配信元だけを再読み込みする（正常系）。"""
     # 準備
     sample = make_source("sample")
     extra = make_source("extra")
@@ -222,7 +222,7 @@ def test_normal_when_unknown_top_level_key_kept(
 def test_normal_when_storage_changed(
     make_source: Callable[..., Any], make_server: Callable[..., Any]
 ) -> None:
-    """1 行の storage.type を disk に変え、その配信元を disk の配信元として読み直す（正常系）。"""
+    """1 行の storage.type を disk に変え、その配信元を disk の配信元として再読み込みする（正常系）。"""
     # 準備
     env = make_server(make_source("sample"))
     before = load_yaml(env.settings_path.read_text(encoding="utf-8"))["sources"][0]

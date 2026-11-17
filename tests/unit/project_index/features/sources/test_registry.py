@@ -93,7 +93,7 @@ def test_source_registry_reload_when_reading(
     make_served_source: Callable[..., ServedSource],
     make_status: Callable[..., SourceStatus],
 ) -> None:
-    """読み直しの間は古い一覧で応える（正常系）。"""
+    """再読み込みの間は古い一覧で応える（正常系）。"""
     # 準備
     old = make_served_source(id="a", root=tmp_path / "old")
     new = make_served_source(id="a", root=tmp_path / "new")
@@ -1081,7 +1081,7 @@ def test_source_registry_reload_changed_when_not_served(
     make_served_source: Callable[..., ServedSource],
     make_status: Callable[..., SourceStatus],
 ) -> None:
-    """配信していなかった行は値が同じでも読み直す（正常系）。"""
+    """配信していなかった行は値が同じでも再読み込みする（正常系）。"""
     # 準備
     order: list[str] = []
     results: dict[str, LoadResult] = {

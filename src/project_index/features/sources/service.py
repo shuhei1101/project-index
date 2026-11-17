@@ -740,7 +740,7 @@ def load_source(
 
 
 def load_source_at(source: ServedSource, root: Path) -> ServedSource:
-    """配信中の配信元の設定を、作業ツリーかワークツリーの同じ場所から読み直す。"""
+    """配信中の配信元の設定を、作業ツリーかワークツリーの同じ場所から再読み込みする。"""
     base = source.repo_root or source.root
     files: list[Path] = []
     for file in source.config_files:

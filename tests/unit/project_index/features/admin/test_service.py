@@ -264,7 +264,7 @@ def test_reload_config_when_checked_before_response(
     write_settings: Callable[..., Path],
     make_real_handlers: Callable[[Path], Handlers],
 ) -> None:
-    """応答を組み立てる前に裏の検査が済んでも、読み直した配信元の `sync` を持たない（正常系）。"""
+    """応答を組み立てる前に裏の検査が済んでも、再読み込みした配信元の `sync` を持たない（正常系）。"""
     # 準備
     from dataclasses import replace
 

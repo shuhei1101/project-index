@@ -55,7 +55,7 @@ def test_normal_when_source_becomes_invalid(
     make_server: Callable[..., Any],
     sample_file_set: Callable[..., dict[str, str]],
 ) -> None:
-    """配信元の設定を壊して読み直すと、その配信元を外して返す（正常系）。"""
+    """配信元の設定を壊して再読み込みすると、その配信元を外して返す（正常系）。"""
     # 準備
     sample = make_source("sample", sample_file_set(), git=False)
     env = make_server(sample)
@@ -101,7 +101,7 @@ def test_normal_when_terminal_config_has_unknown_top_level_key(
     sample_config_text: Callable[..., str],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """端末の設定の最上位に知らないキーがあっても読み直し、キーのパスを警告のログと引数なしの describe の警告に残す（正常系）。"""
+    """端末の設定の最上位に知らないキーがあっても再読み込みし、キーのパスを警告のログと引数なしの describe の警告に残す（正常系）。"""
     # 準備
     sample = make_source("sample", sample_file_set(), git=False)
     env = make_server(sample)
@@ -140,7 +140,7 @@ def test_normal_when_reloaded_before_checks_finish(
     def stale_check(store: Any, source: Any) -> Any:
         calls.append(source.id)
         report = check_sync(store, source)
-        # 起動の後の 1 回と 2 回目の読み直しの検査は本物の結果、1 回目の読み直しの検査は合図まで止めて 5 件の結果
+        # 起動の後の 1 回と 2 回目の再読み込みの検査は本物の結果、1 回目の再読み込みの検査は合図まで止めて 5 件の結果
         if len(calls) != 2:
             return report
         entered.set()

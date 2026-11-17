@@ -450,7 +450,7 @@ def test_reload_sources(
     make_terminal_config: Callable[..., TerminalConfig],
     make_status: Callable[..., SourceStatus],
 ) -> None:
-    """読み直してからキャッシュを捨てる（正常系）。"""
+    """再読み込みしてからキャッシュを捨てる（正常系）。"""
     # 準備
     calls: list[str] = []
     statuses = [make_status("sample", 0)]
@@ -1132,7 +1132,7 @@ def test_reload_changed_sources(
     make_served_source: Callable[..., ServedSource],
     make_status: Callable[..., SourceStatus],
 ) -> None:
-    """変わった行を読み直してから、新しく読んだ配信元だけでキャッシュを捨てる（正常系）。"""
+    """変わった行を再読み込みしてから、新しく読んだ配信元だけでキャッシュを捨てる（正常系）。"""
     # 準備
     calls: list[str] = []
     a = make_served_source(id="a")
@@ -1168,7 +1168,7 @@ def test_build_handlers_when_unknown_key_reloaded(
     make_terminal_config: Callable[..., TerminalConfig],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """読み直しで知らないキーを差し替える（正常系）。"""
+    """再読み込みで知らないキーを差し替える（正常系）。"""
     # 準備
     terminal = make_terminal_config()
     handlers = build_handlers(terminal)
@@ -1185,7 +1185,7 @@ def test_build_handlers_when_unknown_key_reloaded_changed(
     make_terminal_config: Callable[..., TerminalConfig],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """変わった配信元の読み直しでも知らないキーを差し替える（正常系）。"""
+    """変わった配信元の再読み込みでも知らないキーを差し替える（正常系）。"""
     # 準備
     terminal = make_terminal_config(unknown_keys=["old"])
     handlers = build_handlers(terminal)

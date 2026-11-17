@@ -220,7 +220,7 @@ class DocumentStore:
         files: Sequence[str],
         collected: Sequence[str] | None = None,
     ) -> tuple[list[Document], list[LoadProblem], set[tuple[Path, str]]]:
-        """1 つの文書の行のファイルを集め、変わったファイルだけ読み直す。"""
+        """1 つの文書の行のファイルを集め、変わったファイルだけ再読み込みする。"""
         documents: list[Document] = []
         problems: list[LoadProblem] = []
         seen: set[tuple[Path, str]] = set()
@@ -302,7 +302,7 @@ class DocumentStore:
         def read(
             path: str, key: _RevisionKey, blob: str
         ) -> tuple[list[Document], list[LoadProblem]]:
-            """キャッシュが新しければキャッシュを、古ければファイルを読み直してキャッシュする。"""
+            """キャッシュが新しければキャッシュを、古ければファイルを再読み込みしてキャッシュする。"""
             with self._lock:
                 cached = self._revision_files.get(key)
             if cached is not None and _revision_fresh(

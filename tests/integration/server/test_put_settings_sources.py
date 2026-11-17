@@ -124,7 +124,7 @@ def test_normal_when_source_deleted(
 def test_normal_when_added_source_invalid(
     make_source: Callable[..., Any], make_server: Callable[..., Any]
 ) -> None:
-    """端末の設定は保存し、読み直しの検証で配信元を外す（正常系）。"""
+    """端末の設定は保存し、再読み込みの検証で配信元を外す（正常系）。"""
     # 準備
     sample = make_source("sample")
     broken = make_source("broken", {"project-index.yaml": BROKEN_CONFIG})
