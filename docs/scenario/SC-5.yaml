@@ -1154,11 +1154,10 @@ scenarios:
         U->>SK: /project-index:setup {配信元のパス}
         SK->>U: scope・範囲を聞く
         U-->>SK: 既定の値（範囲は **/*）
-        SK->>CL: project-index files --root {配信元のパス} --paths **/*
-        CL-->>SK: 管理用の YAML に記載するファイル
         SK->>FS: 直下とプラグインのルートの content/prompts/ を探す
         FS-->>SK: content/prompts/
-        SK->>SK: プロンプトの行の paths に当たるファイルを、管理用の YAML の追加の候補から外す
+        SK->>CL: project-index files --root {配信元のパス} --paths **/* --exclude-path content/prompts/**/*.yaml
+        CL-->>SK: 管理用の YAML に記載するファイル（content/prompts/ の YAML を含まない）
         SK-->>U: 管理用の YAML の追加の候補（src/app.py）とプロンプトの行の候補を表で示して確かめる
         U-->>SK: 了承
         SK->>FS: project-index.yaml・管理用の YAML を作り、プロンプトのスキーマと、その $ref が指す共通の型を schemas/ に配置して、プロンプトの行を記載する
