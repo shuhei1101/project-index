@@ -193,7 +193,7 @@ flows:
         description: なし
         notes: '-'
       - name: 列の欠けた文書
-        description: 'sample の行 `rules` が `metadata: {name: title}` を持ち、2 件のうち 1 件に `title` が無い'
+        description: 'sample の行 `sample` が `metadata: {name: title}` を持ち、2 件のうち 1 件に `title` が無い'
         notes: '`metadata` に書いていないキー（同じ名前の列）の欠けは数えない'
       - name: ずれた管理用の YAML
         description: 'sample の `src/files.yaml` が `a.py` と `c.py` の 2 行を持ち、`src/` には `a.py` と `d.py`、`src/sub/e.py` を置く。行 `src` は `records: files`・`body_file: path`。`a.py` の行が `related: [{to: src/z.py, type: tests}]` を持つ'
@@ -222,7 +222,7 @@ flows:
       <!-- /map -->
     expected:
       - '`/sources/sample/docs` が 200 を返す'
-      - 警告のログに sample の行 `rules` の `metadata` の列の欠け 1 件（`name` の `title`）がある
+      - 警告のログに sample の行 `sample` の `metadata` の列の欠け 1 件（`name` の `title`）がある
       - 警告のログに行 `src` の索引に無いファイル 2 件（`src/d.py`・`src/sub/e.py`）とファイルが無い行 1 件（`c.py`）があり、`src/files.yaml` 自身は数えない
       - '警告のログにどの文書にも該当しない関連 1 件（`src: src/a.py: src/z.py`）がある'
       - '警告のログに 2 つ以上の行が文書にするファイル 1 件（`src/a.py: src・py`）がある'
