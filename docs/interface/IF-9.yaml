@@ -140,7 +140,10 @@ flows:
       - 検査が済んだ後の `status` の sample の `sync.unindexed_files` が 1 で、1 回目の検査の結果（5）で上書きされない
     test: test_normal_when_reloaded_before_checks_finish
     refs:
-      - SC-10#scenarios[正常シナリオ（読み直しの検査が済む前に読み直す）]
+      - to: SC-10
+        item: scenarios[正常シナリオ（読み直しの検査が済む前に読み直す）]
+        type: references
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『設定・スクリプトを変える』の対応する流れと期待値を確認する。
 lead: 端末の設定と配信元の設定を読み直す管理の MCP の `reload` の入出力を定め、`reload` を修正するときに参照する。
 tags:
   - name: topic:設定

@@ -340,6 +340,12 @@ constants:
         PRIMARY KEY (session_id, agent_id, source_id, doc_id, kind));
       ```
 refs:
-  - IF-2#
-  - IF-4#
-  - IF-3#
+  - to: IF-2
+    type: requires
+    when: インターフェース定義『文書の検索』の入出力を変えるときに、この設計書の関数と型を合わせる。
+  - to: IF-4
+    type: requires
+    when: インターフェース定義『変更の一覧』の入出力を変えるときに、この設計書の関数と型を合わせる。
+  - to: IF-3
+    type: requires
+    when: インターフェース定義『関連のたどり』の入出力を変えるときに、この設計書の関数と型を合わせる。

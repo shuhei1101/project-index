@@ -8,15 +8,6 @@ tags:
   - name: action:起動
   - name: action:配線
   - name: tool:fastapi
-directory: |-
-  ```text
-  src/project_index/
-  ├─ main.py                    # Handlers / build_handlers / reload_sources / discard_source_caches / run_serve / run_migrate / PortInUseError
-  └─ server/
-     ├─ app.py                  # build_app / route_operation_id / SlashlessMcpPathMiddleware（ルートと MCP のマウント）
-     ├─ lifespan.py             # build_lifespan（MCP のセッションの管理と記録の削除）
-     ├─ error_handlers.py       # register_error_handlers（problem+json）
-  ```
 diagrams:
   - name: 全体
     diagram: |-

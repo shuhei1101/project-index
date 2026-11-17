@@ -85,7 +85,7 @@ argument-hint: "[path]"
 
 5. 確認が済んだものを記載する。
    - `{config}` が無い場合、`{clone}/templates/project-index.yaml` から `{config}` を作り、1 行目のスキーマの行のタグを `{tag}` に、`name`・`description`・`files` の行の `paths` を決めた値にする。雛形の `prompts` の行と `converters[]` は削除する。`{clone}/templates/files.schema.yaml` を `{path}/schemas/files.schema.yaml`（ローカル運用は `files.schema.local.yaml`）にコピーする。ローカル運用では、`files` の行の `paths`・`schema` を `files.local.yaml`・`schemas/files.schema.local.yaml` にする
-   - プロンプトの行の候補が了承された場合、`{config}` に `documents`・`converters[]`・`nav` の行を記載し、`{clone}/templates/prompt.schema.yaml` を `{path}/schemas/prompt.schema.yaml`（ローカル運用は `prompt.schema.local.yaml`）にコピーする
+   - プロンプトの行の候補が了承された場合、`{config}` に `documents`・`converters[]`・`nav` の行を記載し、`{clone}/schemas/prompt.schema.yaml` を `{path}/schemas/prompt.schema.yaml`（ローカル運用は `prompt.schema.local.yaml`）にコピーする
    - 管理用の YAML の行は、`write_docs` で記載する（配信元が登録済みのとき）。登録前の配信元は、`templates/files.schema.yaml` に沿って `files.yaml`（ローカル運用は `files.local.yaml`）を直接書く
    - ローカル運用では、`git -C {path} rev-parse --git-path info/exclude` の指すファイルに `*.local.*` の行が無ければ追加する。`.gitignore` は書き換えない
    - 管理用の YAML ごとに `{clone}/.venv/bin/python -m project_index checkpoint --root {path} --files-yaml {管理用の YAML}` で確認の時点を記録する。見直したファイルのうち commit していない変更を持つものを `--reviewed` で渡す（繰り返せる）

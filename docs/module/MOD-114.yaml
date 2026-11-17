@@ -8,17 +8,6 @@ tags:
   - name: action:書き込み
   - name: action:検証
   - name: tool:ruamel.yaml
-directory: |-
-  ```text
-  src/project_index/features/write/
-  ├─ __init__.py    # 公開する型と関数の再エクスポート
-  ├─ types.py       # Operation / TextEdit / WriteRequest / WriteResult / DeleteTarget / DeleteRequest / DeleteResult
-  ├─ apply.py       # apply_operation（項目の操作を当てる）/ to_columns（共通のキーを列名へ読み替える）/ expand_array_keys（オブジェクトの配列の列へ書き戻す）
-  ├─ ids.py         # generate_id（ids.format から ID を作る）
-  ├─ placement.py   # new_document_path（新しい文書の配置先）
-  ├─ locks.py       # SourceLocks（配信元ごとの排他）
-  └─ service.py     # write_docs / delete_docs / check_version
-  ```
 diagrams:
   - name: 全体
     diagram: |-

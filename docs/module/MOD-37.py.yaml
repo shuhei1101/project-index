@@ -52,8 +52,6 @@ functions:
         condition: '`source` が `~/repo/a/project-index.yaml`'
         mock: なし
         expected: '`kind` が `project-index`、`file` が `~` を展開したパス'
-    callers:
-      - MOD-89#functions[run_migrate]
   - name: plan_migration
     title: 当てる手順の一覧
     kind: 関数
@@ -115,8 +113,6 @@ functions:
         mock: なし
         expected: '`MigrationConfigInvalidError`'
         exception: 対象の設定の違反
-    callers:
-      - MOD-89#functions[run_migrate]
     callees:
       - MOD-38#functions[load_steps]
       - MOD-10#functions[version_state]
@@ -236,8 +232,6 @@ functions:
         condition: '`version: "1"` で改名前のキーと、最上位に `mindstella: {threads: 3}` を持つ端末の設定'
         mock: 手順の配置先をテスト用のフォルダに monkeypatch
         expected: '移し替えに成功し、書き換えた端末の設定の `mindstella` が `{threads: 3}` のまま'
-    callers:
-      - MOD-89#functions[run_migrate]
     callees:
       - MOD-38#functions[apply_step]
 notes:

@@ -90,9 +90,9 @@ functions:
         condition: '`available` が空、端末の設定の `unknown_keys` が `["mindstella", "prot"]`'
         mock: なし
         expected: 警告が 1 件で、端末の設定のファイルと `mindstella, prot` を持つ
-    callers:
-      - MOD-20#functions[describe]
     callees:
       - MOD-10#functions[version_state]
 refs:
-  - IF-1#
+  - to: IF-1
+    type: requires
+    when: インターフェース定義『配信元の説明』の入出力を変えるときに、この設計書の関数と型を合わせる。

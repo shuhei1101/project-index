@@ -1011,7 +1011,6 @@ tags:
   - name: action:検索
   - name: topic:エージェント
   - name: tool:mcp
-issue: 14
 primary_actor: エージェント（Claude Code）
 stakeholders:
   - name: エージェント（Claude Code）
@@ -1027,6 +1026,12 @@ minimal_guarantee: '読めない配信元・配信していない配信元・誤
 frequency: 作業のたび
 priority: 高
 refs:
-  - SC-1#scenarios[正常シナリオ]
-  - SC-1#scenarios[異常シナリオ（配信できない配信元がある）]
+  - to: SC-1
+    item: scenarios[正常シナリオ]
+    type: part_of
+    when: このシナリオの前後の流れを、複合ユースケースの中で確認するときに参照する。
+  - to: SC-1
+    item: scenarios[異常シナリオ（配信できない配信元がある）]
+    type: part_of
+    when: このシナリオの前後の流れを、複合ユースケースの中で確認するときに参照する。
 test_file: tests/e2e/単一ユースケース/test_エージェントが調べる.py

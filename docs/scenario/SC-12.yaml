@@ -627,7 +627,6 @@ tags:
   - name: topic:配信元
   - name: action:変更
   - name: topic:端末
-issue: 14
 visibility: internal
 primary_actor: dev-docs の画面のサーバー
 stakeholders:
@@ -645,5 +644,8 @@ minimal_guarantee: スキーマに合格しない保存、別のオリジンか�
 frequency: 配信元を追加・停止・削除するとき。端末のほかのプロセスが自分の作業場所を作る・閉じる・削除するたび
 priority: 中
 refs:
-  - SC-1#scenarios[正常シナリオ]
+  - to: SC-1
+    item: scenarios[正常シナリオ]
+    type: part_of
+    when: このシナリオの前後の流れを、複合ユースケースの中で確認するときに参照する。
 test_file: tests/e2e/単一ユースケース/test_端末の設定の配信元を変える.py

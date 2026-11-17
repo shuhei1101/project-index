@@ -103,7 +103,10 @@ flows:
       - 状態のフォルダに書き出しの途中のフォルダが残らない
     test: test_error_when_revision_export_times_out
     refs:
-      - SC-11#scenarios[異常シナリオ（リビジョンの書き出しが上限を超える）]
+      - to: SC-11
+        item: scenarios[異常シナリオ（リビジョンの書き出しが上限を超える）]
+        type: references
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『画面のサーバーが文書を読む』の対応する流れと期待値を確認する。
 lead: 配信元の設定のうち画面が使用するキーを返却する読み取り API の入出力を定め、配信元の設定の取得を修正するときに参照する。
 tags:
   - name: topic:設定

@@ -77,6 +77,9 @@ functions:
         mock: なし
         expected: どれも `schema` を持たない
 refs:
-  - IF-6#constraints[違反へ添えるスキーマの説明]
+  - to: IF-6
+    item: constraints[違反へ添えるスキーマの説明]
+    type: requires
+    when: インターフェース定義『文書の書き込み』の入出力を変えるときに、この設計書の関数と型を合わせる。
 test_files:
   - tests/unit/project_index/features/write/test_hints.py

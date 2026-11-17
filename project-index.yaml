@@ -13,7 +13,10 @@ documents:
     alias_type: doc
     paths: ["docs/architecture/*.yaml"]
     exclude: [index.yaml]
-    schema: schemas/architecture.schema.yaml
+    schema:
+      source: knowledge
+      path: schemas/design/architecture.schema.yaml
+      ref: design-schemas/v9.2.0
     metadata:
       name: title
       description: lead
@@ -25,7 +28,10 @@ documents:
     alias_type: doc
     paths: ["docs/nonfunctional/*.yaml"]
     exclude: [index.yaml]
-    schema: schemas/nonfunctional.schema.yaml
+    schema:
+      source: knowledge
+      path: schemas/design/nonfunctional.schema.yaml
+      ref: design-schemas/v9.2.0
     metadata:
       name: title
       description: lead
@@ -37,7 +43,10 @@ documents:
     alias_type: doc
     paths: ["docs/scenario/*.yaml"]
     exclude: [index.yaml]
-    schema: schemas/scenario.schema.yaml
+    schema:
+      source: knowledge
+      path: schemas/design/scenario.schema.yaml
+      ref: design-schemas/v9.2.0
     metadata:
       name: title
       description: lead
@@ -49,7 +58,10 @@ documents:
     alias_type: doc
     paths: ["docs/interface/*.yaml"]
     exclude: [index.yaml]
-    schema: schemas/interface.schema.yaml
+    schema:
+      source: knowledge
+      path: schemas/design/interface.schema.yaml
+      ref: design-schemas/v9.2.0
     metadata:
       name: title
       description: lead
@@ -61,7 +73,10 @@ documents:
     alias_type: doc
     paths: ["docs/module/*.yaml"]
     exclude: [index.yaml]
-    schema: schemas/module.schema.yaml
+    schema:
+      source: knowledge
+      path: schemas/design/module.schema.yaml
+      ref: design-schemas/v9.2.0
     metadata:
       name: title
       description: lead
@@ -73,7 +88,10 @@ documents:
     alias_type: doc
     paths: ["docs/config/*.yaml"]
     exclude: [index.yaml]
-    schema: schemas/config.schema.yaml
+    schema:
+      source: knowledge
+      path: schemas/design/config.schema.yaml
+      ref: design-schemas/v9.2.0
     metadata:
       name: title
       description: lead
@@ -85,7 +103,10 @@ documents:
     alias_type: doc
     paths: ["docs/external-api/*.yaml"]
     exclude: [index.yaml]
-    schema: schemas/external-api.schema.yaml
+    schema:
+      source: knowledge
+      path: schemas/design/external_api.schema.yaml
+      ref: design-schemas/v9.2.0
     metadata:
       name: title
       description: lead
@@ -97,7 +118,10 @@ documents:
     alias_type: doc
     paths: ["docs/library/*.yaml"]
     exclude: [index.yaml]
-    schema: schemas/library.schema.yaml
+    schema:
+      source: knowledge
+      path: schemas/design/library.schema.yaml
+      ref: design-schemas/v9.2.0
     metadata:
       name: title
       description: lead
@@ -109,7 +133,10 @@ documents:
     alias_type: doc
     paths: ["docs/test-procedure/*.yaml"]
     exclude: [index.yaml]
-    schema: schemas/test-procedure.schema.yaml
+    schema:
+      source: knowledge
+      path: schemas/design/test_procedure.schema.yaml
+      ref: design-schemas/v9.2.0
     metadata:
       name: title
       description: lead
@@ -121,7 +148,10 @@ documents:
     alias_type: doc
     paths: ["docs/dev-command/*.yaml"]
     exclude: [index.yaml]
-    schema: schemas/dev-command.schema.yaml
+    schema:
+      source: knowledge
+      path: schemas/design/dev_command.schema.yaml
+      ref: design-schemas/v9.2.0
     metadata:
       name: title
       description: lead
@@ -136,7 +166,7 @@ documents:
     schema:
       source: knowledge
       path: schemas/design/layout.schema.yaml
-      ref: design-schemas/v8.2.0
+      ref: design-schemas/v9.2.0
     metadata:
       name: title
       description: lead
@@ -147,7 +177,10 @@ documents:
     title: 用語集
     paths: ["docs/glossary/*.yaml"]
     exclude: [index.yaml]
-    schema: schemas/glossary.schema.yaml
+    schema:
+      source: knowledge
+      path: schemas/design/glossary.schema.yaml
+      ref: design-schemas/v9.2.0
     records: terms
     alias_type: term
   - id: index
@@ -155,14 +188,20 @@ documents:
     paths:
       - docs/index.yaml
       - "docs/*/index.yaml"
-    schema: schemas/index.schema.yaml
+    schema:
+      source: knowledge
+      path: schemas/design/index.schema.yaml
+      ref: design-schemas/v9.2.0
     metadata:
       description: summary
   - id: files_guide
     title: 公開ドキュメントの Markdown
     paths: ["docs/guide/files.yml"]
     exclude: ["*.yaml", README.md, はじめに.md, 使い方.md, リファレンス.md]
-    schema: schemas/files.schema.yaml
+    schema:
+      source: knowledge
+      path: schemas/knowledge-files.schema.yaml
+      ref: design-schemas/v9.2.0
     records: files
     body_file: path
     metadata:
@@ -172,20 +211,29 @@ documents:
     title: 索引のサーバーのコード
     paths: [src/files.yaml]
     exclude: ["*.schema.yaml", aliases.source.yaml, steps.yaml]
-    schema: schemas/files.schema.yaml
+    schema:
+      source: knowledge
+      path: schemas/knowledge-files.schema.yaml
+      ref: design-schemas/v9.2.0
     records: files
     body_file: path
   - id: tests
     title: テスト
     paths: [tests/files.yaml]
-    schema: schemas/files.schema.yaml
+    schema:
+      source: knowledge
+      path: schemas/knowledge-files.schema.yaml
+      ref: design-schemas/v9.2.0
     records: files
     body_file: path
   - id: plugin
     title: プラグインのフックのコード
     paths: [plugins/project-index/files.yaml]
     exclude: ["*.json", "*.md"]
-    schema: schemas/files.schema.yaml
+    schema:
+      source: knowledge
+      path: schemas/knowledge-files.schema.yaml
+      ref: design-schemas/v9.2.0
     records: files
     body_file: path
 nav:
