@@ -262,6 +262,10 @@ functions:
         message: '標準エラーに `{ファイル}: {キーのパス}: {理由}` を全て'
     callees:
       - MOD-34#classes[RestartControl].methods[requested]
+    test_setup:
+      - name: background_threads_joined
+        description: 各テストの後に、テストが起動した `project-index-` で始まる名前のスレッドを全て join する（読み込みのスレッドが起動する子プロセスが、後のテストのソケットの fd を exec まで持ち続けないようにする）
+        notes: test_serve.py の autouse の fixture `_join_background_threads`
     unit_tests:
       - name: test_run_serve
         case: 正常
@@ -293,7 +297,7 @@ functions:
       - name: test_run_serve_when_restart
         case: 正常
         summary: 再起動の要求で同じプロセスを置き換える
-        condition: 配信できる配信元 1 つの端末の設定。`uvicorn.Server.run` の中で `handlers.restart.request()` を呼ぶ。`run_serve` の後に読み込みのスレッドを join する
+        condition: 配信できる配信元 1 つの端末の設定。`uvicorn.Server.run` の中で `handlers.restart.request()` を呼ぶ
         mock: '`uvicorn.Server.run`（`started` を `True` にして再起動を要求して戻る）・`os.execv`（呼ばれた引数を記録する偽物）'
         expected: '`os.execv` が `sys.executable` と `[sys.executable, "-m", "project_index", "serve"]` で 1 回呼ばれる。`uvicorn.Config` の `timeout_graceful_shutdown` が `script_timeout_sec * 1.5`'
   - name: check_port
@@ -327,11 +331,15 @@ functions:
       - name: PortInUseError
         condition: bind に失敗する
         message: '`{bind}:{port} は使用中です`'
+    test_setup:
+      - name: background_threads_joined
+        description: 各テストの後に、テストが起動した `project-index-` で始まる名前のスレッドを全て join する（読み込みのスレッドが起動する子プロセスが、後のテストのソケットの fd を exec まで持ち続けないようにする）
+        notes: test_serve.py の autouse の fixture `_join_background_threads`
     unit_tests:
       - name: test_check_port
         case: 正常
         summary: 空いているポート
-        condition: 前のテストが起動した `project-index-` で始まる名前のスレッドを join した後に、OS が払い出して閉じたポート
+        condition: OS が払い出して閉じたポート
         mock: なし
         expected: 送らない
       - name: test_check_port_when_in_use
@@ -344,7 +352,7 @@ functions:
       - name: test_check_port_when_time_wait
         case: 正常
         summary: 閉じたばかりの接続が残るポート
-        condition: '前のテストが起動した `project-index-` で始まる名前のスレッドを join した後に、`SO_REUSEADDR` 付きで待ち受けて 1 本受け、サーバー側から接続と待ち受けを閉じた直後のポート'
+        condition: '`SO_REUSEADDR` 付きで待ち受けて 1 本受け、サーバー側から接続と待ち受けを閉じた直後のポート'
         mock: なし
         expected: 送らない
   - name: build_handlers
