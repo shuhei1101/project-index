@@ -234,3 +234,18 @@ def test_compile_regex() -> None:
     # 検証
     assert insensitive is not None
     assert sensitive is None
+
+
+def test_match_filter_when_columns(make_document: Callable[..., Document]) -> None:
+    """行の metadata で対応付けた列で照合する（正常系）。"""
+    # 準備
+    node = Condition(field="category", op="eq", values=["使い方"])
+    document = make_document(data={"section": "使い方"})
+    # 実行
+    with_columns = match_filter(
+        node, document, fields=FIELDS, today=TODAY, columns={"category": "section"}
+    )
+    without_columns = match_filter(node, document, fields=FIELDS, today=TODAY)
+    # 検証
+    assert with_columns is True
+    assert without_columns is False
