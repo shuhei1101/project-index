@@ -45,5 +45,7 @@
 | [ファイルのアウトライン](./IF-106-1.yaml) | ファイルのアウトライン（project-index outline（CLI）） |
 | [中身が変わったファイルの一覧](./IF-106-2.yaml) | 中身が変わったファイルの一覧（project-index changed（CLI）） |
 | [確認の時点の記録](./IF-106-3.yaml) | 確認の時点の記録（project-index checkpoint（CLI）） |
+| [本文が指すファイルの一覧](./IF-113-1.yaml) | 本文が指すファイルの一覧（project-index links（CLI）） |
+| [メタデータの偏りの一覧](./IF-113-2.yaml) | メタデータの偏りの一覧（project-index skew（CLI）） |
 
 <!-- /table -->

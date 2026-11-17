@@ -11,7 +11,7 @@ flows:
         description: なし（`main(["files", ...])` を同じプロセスで呼ぶ）
       - name: 配信元のフォルダ
         description: '`project-index.yaml` も管理用の YAML も無い一時フォルダ。`src/` に `a.py`・`b.py`・空の `pkg/__init__.py`・`uv.lock`・`logo.png`（先頭に NUL バイト）を置き、ワークツリーのファイル `.claude/worktrees/wt/src/c.py` を置く'
-        notes: '`a.py`・`b.py` だけが除外の条件・辿らないフォルダに当たらない。`--paths` は `**`'
+        notes: '`a.py`・`b.py`・`uv.lock` だけが除外の条件・辿らないフォルダに当たらない。`--paths` は `**`'
     flow: |-
       <!-- map: {"title": "正常系"} -->
 
@@ -29,7 +29,7 @@ flows:
 
       <!-- /map -->
     expected:
-      - 標準出力が `src/a.py`・`src/b.py` の 2 行だけで、`.claude/worktrees/wt/src/c.py` を含まない
+      - 標準出力が `src/a.py`・`src/b.py`・`src/uv.lock` の 3 行だけで、`src/pkg/__init__.py`・`src/logo.png`・`.claude/worktrees/wt/src/c.py` を含まない
       - 終了コードが 0
       - フォルダのファイルが変わらない
     test: test_normal
@@ -138,7 +138,7 @@ exceptions:
     notes: 渡したパスを stderr に出す
 constraints:
   - item: 除外の条件
-    constraint: 生成物・ロック・バイナリ・ベンダーのコード・再エクスポートや空の `__init__` だけのファイルを出さない。`check_project` の `unindexed_files` と同じ判定を使う
+    constraint: バイナリ（先頭 8192 バイトに NUL バイトがある）・空のファイル（0 バイト）・`*.local.*` の名前のファイルを出さない。生成物・ロック・ベンダーのコードは出す。`check_project` の `unindexed_files` と同じ判定を使う
     notes: 見分け方はモジュール構成『文書のストア / indexable.py』の `is_excluded_file`
   - item: 辿らないフォルダ
     constraint: '`.git`・`node_modules`・`__pycache__`・`.venv`・`.claude/worktrees` とシンボリックリンク。文書の収集・`unindexed_files` と同じ'
