@@ -1147,13 +1147,9 @@ def test_write_docs_when_replace_text(make_env: Callable[..., WriteEnv]) -> None
 def test_write_docs_when_replace_text_invalid(make_env: Callable[..., WriteEnv]) -> None:
     """置換した文書が検査に合格しない（異常系）。"""
     # 準備
-    env = make_env(_with_words())
     # 2 件目の文書だけが置換した `name` に改行を持ち、スキーマに合格しない
-    env.source.schemas["rules"] = {
-        "type": "object",
-        "required": ["id", "name"],
-        "properties": {"name": {"type": "string", "pattern": "^[^\\n]+$"}},
-    }
+    one_line = SCHEMA + "properties:\n  name:\n    type: string\n    pattern: '^[^\\n]+$'\n"
+    env = make_env({**_with_words(), "schemas/rule.schema.yaml": one_line})
     operation = Operation(
         op="replace_text",
         filter={"field": "tags", "op": "eq", "values": ["topic:a"]},
