@@ -1038,6 +1038,46 @@ flows:
       - '`reload` も再起動も呼ばない'
       - クローン本体を指す呼び出しは、続けて呼んでも文書 1 の `related` が空
     test: test_normal_when_worktree_metadata_changed
+  - name: 正常系（ワークツリーの設定で読み取りの検査を変えた）
+    summary: 'ワークツリーで `on: [read]` の検査のスクリプトや validators の行を変えると、文書が変わらなくても次の呼び出しから変えた後の検査の違反を `notes` に返却する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: ワークツリー
+        description: 'sample の `.claude/worktrees/x`。文書 1 の行の `validators` に `on: [read]` の検査 `check` を持ち、`check` の `run` は `scripts/check.py`（違反を出さない）を動かす'
+        notes: クローン本体の設定とスクリプトは、ワークツリーと同じ内容で commit してある
+      - name: 入力
+        description: '`worktree` に x のパス、`filter`（id が文書 1）。1 回呼んだ後、ワークツリー x の `scripts/check.py` を違反 `rule-a` を出す内容に書き換えて 2 回目を呼び、続けてワークツリー x の `project-index.yaml` の `check` の `run` を、違反 `rule-b` を出す `scripts/check_b.py` に変えて 3 回目を呼ぶ'
+        notes: どれも commit しない。文書 1 は変えない
+    flow: |-
+      <!-- map: {"title": "正常系（ワークツリーの設定で読み取りの検査を変えた）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+        participant WT as ワークツリー x
+
+        C->>T: worktree: x, filter（id が文書 1）
+        T-->>WT: 検査 check を動かす
+        T-->>C: 文書 1（notes に違反なし）
+        Note over WT: scripts/check.py を rule-a を出す内容に書き換える
+        C->>T: worktree: x, filter（id が文書 1）
+        T-->>WT: 書き換えた後のスクリプトで検査 check を動かし直す
+        T-->>C: 文書 1（notes に rule-a）
+        Note over WT: check の run を scripts/check_b.py に変える
+        C->>T: worktree: x, filter（id が文書 1）
+        T-->>WT: 変えた後の行で検査 check を動かし直す
+        T-->>C: 文書 1（notes に rule-b）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目は `notes` に文書 1 の違反が無い
+      - '2 回目は `notes` に `文書 1: check: rule-a（$）` があり、3 回目は `notes` に `文書 1: check: rule-b（$）` があって `rule-a` が無い'
+      - '`reload` も再起動も呼ばない'
+      - 3 回目の後に `cwd` がクローン本体で `worktree` を省いて呼ぶと、`notes` に文書 1 の違反が無い
+    test: test_normal_when_worktree_validator_changed
 lead: '条件に該当する文書の取得・一覧・件数・集計を返却する `search_docs` の入出力を定め、`search_docs` を修正するときに参照する。'
 tags:
   - name: topic:クエリ
