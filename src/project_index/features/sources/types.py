@@ -11,7 +11,7 @@ from project_index.shared.errors import UnknownKindError, Violation
 
 SOURCE_CONFIG_VERSION = "3"
 
-type SourceStatusKind = Literal["serving", "not_served", "disabled"]
+type SourceStatusKind = Literal["serving", "not_served", "disabled", "loading"]
 
 # 配信元の読み書きの方法（`git` は default_ref から参照、`disk` は登録したフォルダのファイルを参照する）
 type StorageType = Literal["git", "disk"]

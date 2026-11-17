@@ -162,7 +162,7 @@ class SettingsSourceStatus(ApiModel):
     """再読み込みした後の配信元 1 つの状態。"""
 
     id: str
-    status: Literal["serving", "not_served", "disabled"]
+    status: Literal["serving", "not_served", "disabled", "loading"]
     errors: list[SourceViolation] = Field(default_factory=list[SourceViolation])
     config_version: SourceConfigVersion | None = None
 
