@@ -20,7 +20,7 @@ functions:
     scope: public
     is_async: false
     thread_safe: true
-    side_effects: クローンの commit と `.venv` を書き換える。再起動を要求する
+    side_effects: クローンの commit と `.venv` を書き換える。`PATH` に `mdmark` があれば端末の全体の mdmark を入れ直す。再起動を要求する
     args:
       - name: clone
         title: クローン
@@ -34,22 +34,29 @@ functions:
         required: true
         passing: keyword
         description: '`handlers.restart`'
+      - name: mdmark_ref
+        title: mdmark の参照
+        type: str
+        required: true
+        passing: keyword
+        description: 端末の設定の `mdmark_ref`
     returns:
       type: UpdateResult
       description: 更新の結果
     process: |-
       1. `control.update_lock` を非ブロッキングで取る
          - 取れない場合、または `control.requested` が `True` の場合、`RestartInProgressError` を送出する
-      2. 手順 3〜9 を `try` に入れ、`finally` で `update_lock` を放す（返す経路・`UpdateFailedError` の経路を含む）
+      2. 手順 3〜10 を `try` に入れ、`finally` で `update_lock` を放す（返す経路・`UpdateFailedError` の経路を含む）
       3. `previous_version` を 起動時に読んだ値（動いているバージョン。更新で配布のメタデータが入れ替わっても変わらない） で得る
       4. `git rev-parse HEAD` を実行して前の HEAD を記録し、`git pull --ff-only` を実行する（コマンドの実行）
          - `[INFO]` クローンを更新する（clone）
       5. もう一度 `git rev-parse HEAD` を実行する
-         - 前の HEAD と同じ場合、`updated`・`migration_needed`・`restarting` を `False`、`version` を `previous_version` にして返す
+         - 前の HEAD と同じ場合、mdmark の CLI を入れ直し（mdmark の CLI の入れ直し）、`updated`・`migration_needed`・`restarting` を `False`、`version` を `previous_version`、`mdmark` を入れ直した結果にして返す
       6. `uv sync` を実行する（コマンドの実行）
       7. `version` を `{clone}/pyproject.toml` の `project.version` から `tomllib` で読む
       8. `{clone}/.venv/bin/python -m project_index migrate --plan` を実行し、標準出力が空でなければ `migration_needed` を `True` にする（コマンドの実行、終了コード 0 だけを成功とする）
-      9. `migration_needed` に応じて分ける
+      9. mdmark の CLI を入れ直す（mdmark の CLI の入れ直し）
+      10. `migration_needed` に応じて分ける
          - `True` の場合、`restarting` を `False` にする
            - `[WARNING]` 移し替えが要るため再起動しない（version）
          - `False` の場合、再起動を要求し `restarting` を `True` にする（`RestartControl.request`）
@@ -64,21 +71,21 @@ functions:
       - name: test_update_clone
         case: 正常
         summary: 取り込んで移し替えが要らなければ再起動を要求する
-        condition: HEAD が変わる。`migrate --plan` の標準出力が空。`pyproject.toml` の `version` が `0.3.0`
-        mock: '`subprocess.run`（コマンドごとの終了コードと標準出力）'
-        expected: '`version` が `0.3.0`、`updated`・`restarting` が `True`、`control.requested` が `True`。呼んだコマンドが `rev-parse`・`pull --ff-only`・`rev-parse`・`uv sync`・`migrate --plan` の順'
+        condition: HEAD が変わる。`migrate --plan` の標準出力が空。`pyproject.toml` の `version` が `0.3.0`。`mdmark_ref` が `develop`。`shutil.which("mdmark")` がパスを返す
+        mock: '`subprocess.run`（コマンドごとの終了コードと標準出力）・`shutil.which`'
+        expected: '`version` が `0.3.0`、`updated`・`restarting` が `True`、`control.requested` が `True`。呼んだコマンドが `rev-parse`・`pull --ff-only`・`rev-parse`・`uv sync`・`migrate --plan`・`npm install -g github:shuhei1101/mdmark#develop` の順。`mdmark.reinstalled` が `True`'
       - name: test_update_clone_when_up_to_date
         case: 正常
         summary: 新しい commit が無ければ何もしない
         condition: '`git pull` の前後で HEAD が同じ'
-        mock: '`subprocess.run`'
-        expected: '`updated`・`restarting` が `False`、`uv sync` を呼ばない、`control.requested` が `False`'
+        mock: '`subprocess.run`・`shutil.which`'
+        expected: '`updated`・`restarting` が `False`、`uv sync` を呼ばず `npm install -g` を 1 回呼ぶ、`mdmark.reinstalled` が `True`、`control.requested` が `False`'
       - name: test_update_clone_when_migration_needed
         case: 正常
         summary: 移し替えが要れば再起動しない
         condition: '`migrate --plan` の標準出力が `2: rename ...`'
-        mock: '`subprocess.run`'
-        expected: '`migration_needed` が `True`、`restarting` が `False`、`control.requested` が `False`'
+        mock: '`subprocess.run`・`shutil.which`'
+        expected: '`migration_needed` が `True`、`restarting` が `False`、`control.requested` が `False`、`npm install -g` を 1 回呼ぶ'
       - name: test_update_clone_when_in_progress
         case: 異常
         summary: 再起動を要求済みなら断る
@@ -98,10 +105,17 @@ functions:
         condition: 1 回目は `git pull --ff-only` が終了コード 1、2 回目は HEAD が同じ
         mock: '`subprocess.run`（呼ぶごとに応答を変える）'
         expected: 1 回目が `UpdateFailedError`、2 回目は `RestartInProgressError` にならず `updated` が `False`
+      - name: test_update_clone_when_pull_fails
+        case: 異常
+        summary: 取り込みに失敗したら mdmark を入れ直さない
+        condition: '`git pull --ff-only` が終了コード 1。`shutil.which("mdmark")` がパスを返す'
+        mock: '`subprocess.run`・`shutil.which`'
+        expected: '`UpdateFailedError`。`npm` を呼ばない'
     callers:
       - MOD-93#functions[build_admin_mcp]
     callees:
       - '#functions[_run]'
+      - '#functions[_reinstall_mdmark]'
   - name: _run
     title: コマンドの実行
     kind: 関数
@@ -174,6 +188,72 @@ functions:
         mock: '`subprocess.run`'
         expected: '`UpdateFailedError`'
         exception: コマンドが見つからない
+    callers:
+      - '#functions[update_clone]'
+  - name: _reinstall_mdmark
+    title: mdmark の CLI の入れ直し
+    kind: 関数
+    container: project_index/features/lifecycle/update.py
+    usecase: 更新
+    role: 実行
+    summary: '`PATH` に mdmark の CLI があれば `npm install -g` で入れ直し、結果を返す'
+    scope: internal
+    is_async: false
+    thread_safe: true
+    side_effects: 子プロセスの `npm` が端末の全体の mdmark を書き換える
+    args:
+      - name: mdmark_ref
+        title: mdmark の参照
+        type: str
+        required: true
+        passing: positional
+        description: 入れる mdmark のブランチ・タグ・commit の SHA
+    returns:
+      type: MdmarkReinstallResult | None
+      description: 入れ直した結果。`PATH` に `mdmark` が無いときは `None`
+    process: |-
+      1. `shutil.which("mdmark")` で `PATH` の mdmark の CLI を探す
+         - 無い場合、`None` を返す
+      2. `["npm", "install", "-g", f"{MDMARK_PACKAGE}#{mdmark_ref}"]` を `subprocess.run(argv, capture_output=True, text=True, timeout=COMMAND_TIMEOUT_SEC)` で実行する
+         - `[INFO]` mdmark の CLI を入れ直す（mdmark_ref）
+      3. 結果で分ける
+         - 終了コード 0 の場合、`reinstalled` を `True`、`error` を `None` にする
+         - `FileNotFoundError` の場合、`error` を `{コマンド}: コマンドが見つかりません` にする
+         - `TimeoutExpired` の場合、`error` を `{コマンド}: {COMMAND_TIMEOUT_SEC} 秒で打ち切りました` にする
+         - 終了コードが 0 以外の場合、`error` を `{コマンド}: 終了コード {コード}` と標準エラーの末尾 `STDERR_TAIL_CHARS` 文字を改行でつないだ文にする
+         - `reinstalled` が `False` の場合、`[WARNING]` mdmark の CLI を入れ直せなかった（error）
+      4. `MdmarkReinstallResult(ref=mdmark_ref, reinstalled=..., error=...)` を返す
+    unit_tests:
+      - name: test_reinstall_mdmark
+        case: 正常
+        summary: 参照を付けて入れ直す
+        condition: '`shutil.which("mdmark")` がパスを返す。`npm` が終了コード 0。`mdmark_ref` が `v0.13.0`'
+        mock: '`subprocess.run`・`shutil.which`'
+        expected: '`ref` が `v0.13.0`・`reinstalled` が `True`・`error` が `None`。`subprocess.run` の引数が `["npm", "install", "-g", "github:shuhei1101/mdmark#v0.13.0"]`、`timeout` が `COMMAND_TIMEOUT_SEC`'
+      - name: test_reinstall_mdmark_when_absent
+        case: 正常
+        summary: mdmark の CLI が無ければ入れ直さない
+        condition: '`shutil.which("mdmark")` が `None`'
+        mock: '`subprocess.run`・`shutil.which`'
+        expected: '`None`。`subprocess.run` を呼ばない'
+      - name: test_reinstall_mdmark_when_failed
+        case: 正常
+        summary: npm が失敗しても例外にせず理由を返す
+        condition: '`npm` が終了コード 1、標準エラー `npm error code ENOTFOUND`'
+        mock: '`subprocess.run`・`shutil.which`'
+        expected: '`reinstalled` が `False`、`error` に `npm install -g github:shuhei1101/mdmark#develop: 終了コード 1` と `npm error code ENOTFOUND` が入る'
+      - name: test_reinstall_mdmark_when_npm_not_found
+        case: 正常
+        summary: npm が無い
+        condition: '`subprocess.run` が `FileNotFoundError` を送出する'
+        mock: '`subprocess.run`・`shutil.which`'
+        expected: '`reinstalled` が `False`、`error` が `npm install -g github:shuhei1101/mdmark#develop: コマンドが見つかりません`'
+      - name: test_reinstall_mdmark_when_timeout
+        case: 正常
+        summary: 打ち切る
+        condition: '`subprocess.run` が `TimeoutExpired` を送出する'
+        mock: '`subprocess.run`・`shutil.which`'
+        expected: '`reinstalled` が `False`、`error` に `300 秒で打ち切りました` が入る'
     callers:
       - '#functions[update_clone]'
 notes:

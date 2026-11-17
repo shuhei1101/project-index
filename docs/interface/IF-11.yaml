@@ -42,11 +42,9 @@ flows:
     summary: 上流に新しい commit が無いと、クローンを変えずに mdmark の CLI だけを入れ直して返す
     setup:
       - name: Mock
-        description: なし
+        description: 正常系と同じ `npm` と `mdmark` のスクリプト
       - name: 上流
         description: クローンと同じ commit
-      - name: mdmark の CLI
-        description: 正常系と同じ `npm` と `mdmark` のスクリプト
     flow: |-
       <!-- map: {"title": "正常系（新しい commit が無い）"} -->
 
@@ -73,11 +71,9 @@ flows:
     summary: 新しいバージョンに移し替えの手順があると、再起動せずに返す
     setup:
       - name: Mock
-        description: なし
+        description: 正常系と同じ `npm` と `mdmark` のスクリプト
       - name: 上流
         description: 端末の設定の `version` を上げる移し替えの手順を持つ commit
-      - name: mdmark の CLI
-        description: 正常系と同じ `npm` と `mdmark` のスクリプト
     flow: |-
       <!-- map: {"title": "正常系（移し替えが要る）"} -->
 
@@ -106,11 +102,9 @@ flows:
     summary: fast-forward できないと、クローンに触らず再起動もしない
     setup:
       - name: Mock
-        description: なし
+        description: 正常系と同じ `npm` と `mdmark` のスクリプト
       - name: クローン
         description: 上流と分岐した commit を 1 つ積んでおく
-      - name: mdmark の CLI
-        description: 正常系と同じ `npm` と `mdmark` のスクリプト
     flow: |-
       <!-- map: {"title": "異常系（取り込みに失敗する・UpdateFailedError）"} -->
 
@@ -303,5 +297,5 @@ constraints:
     constraint: クローンに commit していない変更があって `git pull --ff-only` が失敗したときも、変更に触らず `UpdateFailedError` を返す
   - item: mdmark の CLI の入れ直し
     constraint: '`git pull --ff-only` が成功した後（新しい commit が無いとき・移し替えが要るときも含む）、`PATH` に `mdmark` があれば `npm install -g github:shuhei1101/mdmark#{mdmark_ref}` を実行する。失敗しても `UpdateFailedError` にせず、`mdmark.error` に入れて更新と再起動を続ける'
-    notes: '`mdmark_ref` は端末の設定の値。無ければ `develop`。タイムアウトは `git pull` と同じ 300 秒'
+    notes: '`mdmark_ref` は `update` を呼んだ時点で端末の設定のファイルを読み直した値（`reload` は要らない）。無ければ `develop`。タイムアウトは `git pull` と同じ 300 秒'
 test_file: tests/integration/server/test_update.py
