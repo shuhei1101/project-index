@@ -26,4 +26,7 @@ scope_out:
   - item: 新しいファイルを作る write_docs の create の書き出し
     reason: 元の文字列が無く、#121 のとおり YAML_INDENT で書く
     plan: none
+  - item: write_docs の text_edits で配列の要素の中の文字列の項目を部分更新できない
+    reason: この作業 PR の字下げの修正と独立した不具合。モジュール構成設計では YAML を直接編集して進めた
+    plan: '#138'
 docs: []
