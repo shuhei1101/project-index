@@ -1,0 +1,85 @@
+diff --git a/src/project_index/features/read/route.py b/src/project_index/features/read/route.py
+index 362fc08..83c45f9 100644
+--- a/src/project_index/features/read/route.py
++++ b/src/project_index/features/read/route.py
+@@ -76,8 +76,14 @@ async def _run[T](
+     await handlers.registry.wait_for(ids=[source])
+     try:
+         # サービスの処理の間は要求の応答中として数え、裏の検査と書き出しを休ませる
++        from project_index.shared.background import _poc
++        import time as _t
++        t_in = _t.time()
+         with handlers.gate.foreground():
+-            return await asyncio.to_thread(work)
++            try:
++                return await asyncio.to_thread(work)
++            finally:
++                _poc({"ev": "req", "source": source, "value": value, "work": getattr(getattr(work, "func", None), "__name__", "?"), "t0": t_in, "t1": _t.time()})
+     except ProjectIndexError as error:
+         fields = _not_found_fields(error, source, value)
+         # 404 にしないエラー: 例外の変換に任せる
+diff --git a/src/project_index/shared/background.py b/src/project_index/shared/background.py
+index 2d45a32..90d0ebe 100644
+--- a/src/project_index/shared/background.py
++++ b/src/project_index/shared/background.py
+@@ -5,6 +5,9 @@ from __future__ import annotations
+ import contextlib
+ import threading
+ import time
++import json as _json
++import os as _os
++import traceback as _tb
+ from typing import TYPE_CHECKING
+ 
+ if TYPE_CHECKING:
+@@ -16,6 +19,17 @@ BACKGROUND_SHARE = 0.1
+ __all__ = ["BACKGROUND_SHARE", "BackgroundGate"]
+ 
+ 
++_LOG = _os.environ.get("POC_TIMING_LOG")
++_LOCK = threading.Lock()
++
++
++def _poc(event: dict) -> None:
++    if not _LOG:
++        return
++    with _LOCK, open(_LOG, "a") as f:
++        f.write(_json.dumps(event, ensure_ascii=False) + "\n")
++
++
+ class BackgroundGate:
+     """要求の応答中は、裏の処理を 1 件ずつ順に進め、1 件の後に休ませて使用する時間を抑える。"""
+ 
+@@ -56,11 +70,13 @@ class BackgroundGate:
+         """要求の処理の間、応答中の要求の数を 1 つ進める。"""
+         with self._guard:
+             self._active += 1
++        _poc({"ev": "fg_in", "t": time.time(), "tid": threading.get_ident()})
+         try:
+             yield
+         finally:
+             with self._guard:
+                 self._active -= 1
++            _poc({"ev": "fg_out", "t": time.time(), "tid": threading.get_ident()})
+ 
+     @contextlib.contextmanager
+     def background(self) -> Generator[None]:
+@@ -82,11 +98,18 @@ class BackgroundGate:
+             depth = getattr(self._local, "units", 0)
+             self._local.units = depth + 1
+             started = self.clock()
++            wall0 = time.time()
++            cpu0 = time.thread_time()
+             try:
+                 yield
+             finally:
+                 self._local.units = depth
+             # 入れ子の一番外の 1 件で、応答中の要求があれば、使用した時間の割合が上限になるまで休む
++            if depth == 0:
++                frames = [f for f in _tb.extract_stack(limit=6)[:-3] if "contextlib" not in f.filename]
++                where = f"{_os.path.basename(frames[-1].filename)}:{frames[-1].lineno}" if frames else "?"
++                active = self.active
++                _poc({"ev": "unit", "t0": wall0, "t1": time.time(), "cpu": time.thread_time() - cpu0, "where": where, "thread": threading.current_thread().name, "active_at_end": active})
+             if depth == 0 and self.active:
+                 elapsed = self.clock() - started
+                 self.sleep(elapsed * (1 - BACKGROUND_SHARE) / BACKGROUND_SHARE)
