@@ -8,7 +8,7 @@ flows:
     summary: 新しい commit を取り込み、依存を入れ直して起動し直す
     setup:
       - name: Mock
-        description: なし（一時フォルダに bare リポジトリと project-index のクローンを作る）
+        description: '`npm` と `mdmark`（`PATH` の先頭の一時フォルダに、受けた引数を記録して終了コード 0 で終わるスクリプトを置く）。一時フォルダに bare リポジトリと project-index のクローンを作る'
       - name: 上流
         description: クローンより 1 つ新しい commit（バージョンを上げ、移し替えの手順は無い）を bare リポジトリに置く
     flow: |-
@@ -19,12 +19,14 @@ flows:
         participant C as クライアント
         participant T as update
         participant G as project-index のクローン
+        participant N as npm
 
         C->>T: 引数なし
         T->>G: git pull --ff-only
         T->>G: uv sync
         T-->>G: migrate --plan
-        T-->>C: updated・migration_needed: false・restarting
+        T->>N: install -g github:shuhei1101/mdmark#develop
+        T-->>C: updated・migration_needed: false・restarting・mdmark
         T->>T: 起動し直す
       ```
 
@@ -33,14 +35,18 @@ flows:
       - '`updated: true`・`migration_needed: false`・`restarting: true`'
       - クローンの HEAD が上流の commit と同じ
       - 起動し直した後の `status` の `version` が新しいバージョン
+      - '`mdmark` が `{"ref": "develop", "reinstalled": true, "error": null}`'
+      - '`npm` が `install -g github:shuhei1101/mdmark#develop` の引数で 1 回呼ばれる'
     test: test_normal
   - name: 正常系（新しい commit が無い）
-    summary: 上流に新しい commit が無いと、何も変えずに返す
+    summary: 上流に新しい commit が無いと、クローンを変えずに mdmark の CLI だけを入れ直して返す
     setup:
       - name: Mock
         description: なし
       - name: 上流
         description: クローンと同じ commit
+      - name: mdmark の CLI
+        description: 正常系と同じ `npm` と `mdmark` のスクリプト
     flow: |-
       <!-- map: {"title": "正常系（新しい commit が無い）"} -->
 
@@ -49,16 +55,19 @@ flows:
         participant C as クライアント
         participant T as update
         participant G as project-index のクローン
+        participant N as npm
 
         C->>T: 引数なし
         T->>G: git pull --ff-only
-        T-->>C: updated: false・restarting: false
+        T->>N: install -g github:shuhei1101/mdmark#develop
+        T-->>C: updated: false・restarting: false・mdmark
       ```
 
       <!-- /map -->
     expected:
       - '`updated: false`・`restarting: false`・`version` が `previous_version` と同じ'
       - プロセスが起動し直さない（ログの起動の行が増えない）
+      - '`mdmark.reinstalled` が `true` で、`npm` が 1 回呼ばれる'
     test: test_normal_when_up_to_date
   - name: 正常系（移し替えが要る）
     summary: 新しいバージョンに移し替えの手順があると、再起動せずに返す
@@ -67,6 +76,8 @@ flows:
         description: なし
       - name: 上流
         description: 端末の設定の `version` を上げる移し替えの手順を持つ commit
+      - name: mdmark の CLI
+        description: 正常系と同じ `npm` と `mdmark` のスクリプト
     flow: |-
       <!-- map: {"title": "正常系（移し替えが要る）"} -->
 
@@ -75,11 +86,13 @@ flows:
         participant C as クライアント
         participant T as update
         participant G as project-index のクローン
+        participant N as npm
 
         C->>T: 引数なし
         T->>G: git pull --ff-only・uv sync
         T-->>G: migrate --plan
-        T-->>C: migration_needed: true・restarting: false
+        T->>N: install -g github:shuhei1101/mdmark#develop
+        T-->>C: migration_needed: true・restarting: false・mdmark
       ```
 
       <!-- /map -->
@@ -87,6 +100,7 @@ flows:
       - '`updated: true`・`migration_needed: true`・`restarting: false`'
       - 端末の設定が変わらない
       - 動いているプロセスの `status` の `version` は前のバージョンのまま
+      - '`mdmark.reinstalled` が `true` で、`npm` が 1 回呼ばれる'
     test: test_normal_when_migration_needed
   - name: 異常系（取り込みに失敗する・UpdateFailedError）
     summary: fast-forward できないと、クローンに触らず再起動もしない
@@ -95,6 +109,8 @@ flows:
         description: なし
       - name: クローン
         description: 上流と分岐した commit を 1 つ積んでおく
+      - name: mdmark の CLI
+        description: 正常系と同じ `npm` と `mdmark` のスクリプト
     flow: |-
       <!-- map: {"title": "異常系（取り込みに失敗する・UpdateFailedError）"} -->
 
@@ -114,6 +130,7 @@ flows:
       - '`isError: true` で `git pull --ff-only` と stderr を返す'
       - クローンの HEAD が変わらない
       - プロセスが起動し直さない
+      - '`npm` が呼ばれない'
     test: test_error_when_pull_fails
   - name: 異常系（再起動の途中で呼ばれる・RestartInProgressError）
     summary: '`restart` の停止を待っている間に `update` を呼ぶと、クローンに触らずに断る'
@@ -140,6 +157,69 @@ flows:
       - '`isError: true` で再起動の途中であることを返す'
       - クローンの HEAD が変わらない
     test: test_error_when_restart_in_progress
+  - name: 正常系（mdmark の CLI が無い）
+    summary: '`PATH` に mdmark の CLI が無いと、入れ直さずに更新する'
+    setup:
+      - name: Mock
+        description: '`npm`（`PATH` の先頭に、受けた引数を記録して終了コード 0 で終わるスクリプトを置く）'
+        notes: '`PATH` に `mdmark` を置かない'
+      - name: 上流
+        description: 正常系と同じ
+    flow: |-
+      <!-- map: {"title": "正常系（mdmark の CLI が無い）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as update
+        participant G as project-index のクローン
+
+        C->>T: 引数なし
+        T->>G: git pull --ff-only・uv sync
+        T-->>G: migrate --plan
+        T-->>C: updated・restarting・mdmark: null
+        T->>T: 起動し直す
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`updated: true`・`restarting: true`・`mdmark: null`'
+      - '`npm` が呼ばれない'
+    test: test_normal_when_mdmark_absent
+  - name: 正常系（mdmark の CLI を入れ直せない）
+    summary: '`npm` が失敗しても、理由を応答に入れて更新と再起動を続ける'
+    setup:
+      - name: Mock
+        description: '`npm`（標準エラーに `npm error code ENOTFOUND` を出して終了コード 1 で終わるスクリプト）と `mdmark`（正常系と同じ）を `PATH` の先頭に置く'
+      - name: 上流
+        description: 正常系と同じ
+      - name: 端末の設定
+        description: '`mdmark_ref` にタグを書いた端末の設定'
+        notes: '`mdmark_ref: v0.13.0`'
+    flow: |-
+      <!-- map: {"title": "正常系（mdmark の CLI を入れ直せない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as update
+        participant G as project-index のクローン
+        participant N as npm
+
+        C->>T: 引数なし
+        T->>G: git pull --ff-only・uv sync
+        T-->>G: migrate --plan
+        T->>N: install -g github:shuhei1101/mdmark#v0.13.0（失敗）
+        T-->>C: updated・restarting・mdmark（reinstalled: false・error）
+        T->>T: 起動し直す
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError` ではなく、`updated: true`・`restarting: true`'
+      - '`mdmark` が `ref: v0.13.0`・`reinstalled: false` で、`error` に `npm install -g github:shuhei1101/mdmark#v0.13.0` と標準エラーの `npm error code ENOTFOUND` が入る'
+      - 起動し直した後の `status` の `version` が新しいバージョン
+    test: test_normal_when_mdmark_reinstall_fails
 lead: クローンを `git pull --ff-only` と `uv sync` で更新して再起動する管理の MCP の `update` の入出力を定め、`update` を修正するときに参照する。
 tags:
   - name: topic:サーバー
@@ -151,10 +231,12 @@ tags:
 identifier: update
 permissions: なし（`127.0.0.1` でだけ待ち受ける）
 idempotent: true
-side_effects: project-index のクローンの作業ツリーと `.venv` を書き換える。新しい commit があり移し替えが要らないときは `restart` と同じく起動し直す
+side_effects: project-index のクローンの作業ツリーと `.venv` を書き換える。`PATH` に mdmark の CLI があるときは、`npm install -g` で端末の全体の mdmark を入れ直す。新しい commit があり移し替えが要らないときは `restart` と同じく起動し直す
 callers:
   - SC-3#scenarios[正常シナリオ]
   - SC-3#scenarios[正常シナリオ（端末の設定が古くなる）]
+  - SC-3#scenarios[正常シナリオ（project-index に新しい commit が無い）]
+  - SC-3#scenarios[正常シナリオ（mdmark の CLI を入れ直せない）]
 exclusivity: '`restart` と同じく、再起動を始めた後の呼び出しは `RestartInProgressError` で断る。更新の途中の 2 回目も同じ例外で断る'
 request: []
 request_example: |-
@@ -179,9 +261,24 @@ response:
   - name: restarting
     type: bool
     description: 応答の後に起動し直すか
+  - name: mdmark
+    type: dict | None
+    description: mdmark の CLI を入れ直した結果
+    notes: '`git pull --ff-only` が成功し、`PATH` に `mdmark` があるときだけ持つ。無いときは `null`'
+  - name: mdmark.ref
+    type: str
+    description: 入れた mdmark の参照（端末の設定の `mdmark_ref`。無ければ `develop`）
+    example: develop
+  - name: mdmark.reinstalled
+    type: bool
+    description: '`npm install -g` が終了コード 0 で終わったか'
+  - name: mdmark.error
+    type: str | None
+    description: 入れ直せなかったときの、実行したコマンドと標準エラーの末尾（`npm` が見つからない・制限時間を超えたときはその旨）
+    notes: '`reinstalled: true` のときは `null`'
 response_example: |-
   ```json
-  {"previous_version": "0.2.0", "version": "0.3.0", "updated": true, "migration_needed": false, "restarting": true}
+  {"previous_version": "0.2.0", "version": "0.3.0", "updated": true, "migration_needed": false, "restarting": true, "mdmark": {"ref": "develop", "reinstalled": true, "error": null}}
   ```
 response_notes: '配信できなかった配信元と、配信元の設定のバージョンの新旧は、起動し直した後の `status` の `version_state` で確かめる。`migration_needed: true` のときは、利用者が `project-index migrate` を実行してから `restart` を呼ぶ。'
 exceptions:
@@ -204,4 +301,7 @@ constraints:
     notes: 未実測。結合テストで測って見直す
   - item: 作業ツリーの変更
     constraint: クローンに commit していない変更があって `git pull --ff-only` が失敗したときも、変更に触らず `UpdateFailedError` を返す
+  - item: mdmark の CLI の入れ直し
+    constraint: '`git pull --ff-only` が成功した後（新しい commit が無いとき・移し替えが要るときも含む）、`PATH` に `mdmark` があれば `npm install -g github:shuhei1101/mdmark#{mdmark_ref}` を実行する。失敗しても `UpdateFailedError` にせず、`mdmark.error` に入れて更新と再起動を続ける'
+    notes: '`mdmark_ref` は端末の設定の値。無ければ `develop`。タイムアウトは `git pull` と同じ 300 秒'
 test_file: tests/integration/server/test_update.py
