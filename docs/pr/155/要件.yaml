@@ -1,0 +1,20 @@
+docs:
+  - page: project-index.yaml
+    new: false
+    change: '直下の管理用の YAML（files.yaml）の行（records: files・body_file: path）を追加する。docs/pr/** と .gitignore が追跡から除外するキャッシュ・生成物を exclude のパスで除外する'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T12:08:57.444276+00:00'
+  - page: files.yaml
+    new: true
+    change: 直下のファイル 10 件と docs/ 直下の 2 件（docs/README.md・docs/_config.yml）を記載する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T12:08:57.444276+00:00'
+scope_out:
+  - item: worktree から配信したときに、worktree の .git（ファイル）を直下の管理用の YAML に無いファイルに数える不具合
+    reason: 判定の不具合で、配信元の設定と記載だけを扱うこの PR の要望に含まれない
+    plan: '#154'
+  - item: 管理用の YAML に無いファイルの判定で、.gitignore に該当するファイルを数えない修正（root の行の exclude にコピーしたキャッシュ・生成物の行を不要にする）
+    reason: 判定のコードの変更で、配信元の設定と記載だけを扱うこの PR の要望に含まれない
+    plan: '#156'
