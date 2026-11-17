@@ -309,14 +309,14 @@ functions:
       6. 配列ごとに、元の配列を複製する。`update` は `current` の値、`create`・`replace` は `data` の列名の値（無ければ空の配列）
       7. 全ての要素のキーへの操作を当てる
          - `set` は渡した名前の並びで配列を作り直す。元からあった名前の要素は `main` を含む他のキーを保ち、無い名前は `{項目: 名前}` の要素にする
-         - `add_to` は配列に無い名前を `{項目: 名前}` の要素で末尾に追加する
          - `remove_from` は項目が渡した名前の要素を削除する
+         - `add_to` は配列に無い名前を `{項目: 名前}` の要素で末尾に追加する（`remove_from` の後に当てる）
          - `unset` は配列の列を削除する
          - `create`・`replace` の `data` の値は `set` と同じに当てる
       8. 選んだ要素のキーへの操作を当てる
          - `set` は渡した名前の要素の真偽値のキーを `true` にし、他の要素の真偽値のキーを削除する
-         - `add_to` は渡した名前の要素の真偽値のキーを `true` にする
          - `remove_from` は渡した名前の要素の真偽値のキーを削除する（無い名前は飛ばす）
+         - `add_to` は渡した名前の要素の真偽値のキーを `true` にする（`remove_from` の後に当てる）
          - `unset` は全ての要素の真偽値のキーを削除する
          - `set`・`add_to`・`data` に配列に無い名前がある場合、`path` が `operations[{index}].{項目}.{共通のキー}`、`rule` が `{名前} は {全ての要素のキー} にありません` の違反にする
       9. 8 の違反があれば `InvalidArgumentError` で送る
@@ -388,6 +388,13 @@ functions:
         condition: '`metadata` が `{related: "**.refs[]"}` で `set: {refs: []}`'
         mock: なし
         expected: 渡した操作のまま
+        exception: '-'
+      - name: test_expand_array_keys_when_remove_then_add
+        case: 正常
+        summary: 同じ名前を remove_from と add_to に渡す
+        condition: '`{tags: [{name: a, main: true}, {name: b}]}` に `remove_from: {tags: [b], main_tags: [a]}` と `add_to: {tags: [b], main_tags: [a]}`'
+        mock: なし
+        expected: '`tags` が `[{name: a, main: true}, {name: b}]`（削除してから追加し、`b` も `a` の `main` も残る）'
         exception: '-'
   - name: apply_body
     title: 本文の適用
