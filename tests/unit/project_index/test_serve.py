@@ -1076,6 +1076,32 @@ def test_log_source_check(
     assert "src: src/d.py" in warnings[0]
 
 
+def test_log_source_check_when_duplicate_files(
+    make_served_source: Callable[..., ServedSource],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """重なったファイルを警告のログに書く（正常系）。"""
+    # 準備
+    from project_index.features.describe.source_checks import SourceCheck
+    from project_index.features.documents.types import SyncReport
+    from project_index.main import log_source_check
+
+    source = make_served_source(id="sample")
+    check = SourceCheck(
+        report=SyncReport(source_id="sample", duplicate_files=["src/a.py: src・py"]),
+        nav=[],
+    )
+    # 実行
+    with caplog.at_level(logging.WARNING):
+        log_source_check(source, check)
+    # 検証
+    warnings = _warnings(caplog)
+    assert len(warnings) == 1
+    assert "2 つ以上の行が文書にするファイル" in warnings[0]
+    assert "1" in warnings[0]
+    assert "src/a.py: src・py" in warnings[0]
+
+
 def test_check_and_export_later(
     tmp_path: Path,
     git_repo: Callable[..., Path],

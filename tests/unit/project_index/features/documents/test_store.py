@@ -200,6 +200,7 @@ def test_document_store_load_when_duplicate_id(
     # 検証
     assert [doc.path for doc in result.documents] == ["rules/a.yaml"]
     assert [(p.path, p.reason) for p in result.problems] == [("rules/b.yaml", "duplicate_id")]
+    assert [doc.path for doc in result.duplicates] == ["rules/b.yaml"]
 
 
 def test_document_store_load_when_ref(
@@ -955,6 +956,57 @@ def test_check_sync_when_file_belongs_to_other_row(
     report = store_module.check_sync(document_store, source)
     # 検証
     assert report.unindexed_files == []
+
+
+def test_check_sync_when_rows_share_file(
+    document_store: DocumentStore,
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+) -> None:
+    """2 つの行が同じファイルを文書にする（正常系）。"""
+    # 準備
+    root = tmp_path / "ws"
+    write_files(
+        root,
+        {
+            "src/files.yaml": "files:\n  - path: a.yaml\n  - path: b.py\n  - path: c.py\n",
+            "src/a.yaml": "id: src/a.yaml\n",
+            "src/b.py": "b = 1\n",
+            "src/c.py": "a = 1\n",
+        },
+    )
+    documents = [
+        DocumentTable(
+            id="src",
+            paths=["src/files.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            records="files",
+            body_file="path",
+        ),
+        DocumentTable(
+            id="yaml",
+            paths=["src/*.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+        ),
+        DocumentTable(
+            id="off",
+            paths=["src/b.py"],
+            schema_path="schemas/rule.schema.yaml",
+            enabled=False,
+        ),
+        DocumentTable(
+            id="py",
+            paths=["src/c.py"],
+            schema_path="schemas/rule.schema.yaml",
+        ),
+    ]
+    source = make_served_source(root=root, config=make_source_config(documents=documents))
+    # 実行
+    report = store_module.check_sync(document_store, source)
+    # 検証
+    assert report.duplicate_files == ["src/a.yaml: src・yaml", "src/c.py: src・py"]
 
 
 def test_check_sync_when_clean(
