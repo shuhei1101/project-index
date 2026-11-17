@@ -149,11 +149,6 @@ flows:
       - 包みの git の `archive` を文書の一覧の要求の中で呼ばない
       - 状態のフォルダに親の commit の書き出しができない
     test: test_normal_when_revision_export_times_out
-    refs:
-      - to: SC-11
-        item: scenarios[異常シナリオ（リビジョンの書き出しが上限を超える）]
-        type: references
-        when: このインターフェースの入出力やフローを変えるときに、シナリオ『画面のサーバーが文書を読む』の対応する流れと期待値を確認する。
   - name: 正常系（disk の配信元でリビジョンを指す）
     summary: disk の配信元は `ref` を無視して登録したフォルダの文書を返す
     setup:
