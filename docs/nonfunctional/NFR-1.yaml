@@ -215,7 +215,7 @@ requirements:
     breakdown:
       - part: 行ごとの読み込みの時間（レイテンシ）
         value: '4.05'
-        notes: スレッド 1 で 14 件を読み込んだ実時間 56.7 秒 ÷ 14
+        notes: スレッド 1 で 14 件を読み込んだ実時間 56.7 秒 ÷ 14。CPU の時間と同じ回の計測で、rationale のスレッド 1 の 58.9 秒はスレッドの数を変えた別の回
       - part: 行ごとの CPU の時間
         value: '0.44'
         notes: スレッド 1 の CPU の時間（`time.process_time`）6.1 秒 ÷ 14。GIL のため、この部分は並列にしても足し合わせになる
