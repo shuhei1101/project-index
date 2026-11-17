@@ -430,3 +430,69 @@ def test_expand_array_keys_when_string(change: dict[str, Any], expected_path: st
     with pytest.raises(InvalidArgumentError, match="引数が正しくありません") as exc_info:
         expand_array_keys(operation, _tags_table(), current, index=0)
     assert exc_info.value.violations[0].path == expected_path
+
+
+def _nested_table() -> DocumentTable:
+    """`related` をどの深さの `refs` もまとめる列名にした文書の行を返す。"""
+    return DocumentTable(
+        id="nested",
+        paths=["nested/*.yaml"],
+        schema_path="schemas/nested.schema.yaml",
+        metadata={"related": "**.refs[]"},
+    )
+
+
+@pytest.mark.parametrize(
+    ("operation", "expected_path"),
+    [
+        pytest.param(
+            Operation(op="update", id="n1", expected_version="v1", set={"related": []}),
+            "operations[0].set.related",
+            id="set",
+        ),
+        pytest.param(
+            Operation(op="update", id="n1", expected_version="v1", unset=["related"]),
+            "operations[0].unset",
+            id="unset",
+        ),
+        pytest.param(
+            Operation(op="create", kind="nested", data={"id": "n4", "related": []}),
+            "operations[0].data.related",
+            id="data",
+        ),
+        pytest.param(
+            Operation(
+                op="update",
+                id="n1",
+                expected_version="v1",
+                text_edits=[TextEdit(field="related", old="a", new="b")],
+            ),
+            "operations[0].text_edits[0].field",
+            id="text-edits",
+        ),
+    ],
+)
+def test_expand_array_keys_when_any_depth(operation: Operation, expected_path: str) -> None:
+    """どの深さの列もまとめるキーへの操作（異常系）。"""
+    from project_index.features.write.apply import expand_array_keys
+
+    # 準備
+    current = {"id": "n1", "refs": [], "functions": [{"refs": []}]}
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError, match="引数が正しくありません") as exc_info:
+        expand_array_keys(operation, _nested_table(), current, index=0)
+    assert exc_info.value.violations[0].path == expected_path
+    assert "**.refs[]" in exc_info.value.violations[0].rule
+
+
+def test_expand_array_keys_when_any_depth_column_name() -> None:
+    """どの深さの列もまとめるキーの列名をそのまま渡す（正常系）。"""
+    from project_index.features.write.apply import expand_array_keys
+
+    # 準備
+    current = {"id": "n1", "refs": [], "functions": [{"refs": []}]}
+    operation = Operation(op="update", id="n1", expected_version="v1", set={"refs": []})
+    # 実行
+    result = expand_array_keys(operation, _nested_table(), current, index=0)
+    # 検証
+    assert result == operation

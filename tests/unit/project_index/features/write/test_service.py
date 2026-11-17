@@ -670,6 +670,40 @@ def test_delete_docs_when_unlink(make_env: Callable[..., WriteEnv]) -> None:
     assert result.unlinked == [("doc-1", content_hash(text))]
 
 
+def test_delete_docs_when_unlink_nested(make_env: Callable[..., WriteEnv]) -> None:
+    """入れ子の参照も外す（正常系）。"""
+    # 準備
+    n1 = (
+        "id: n1\nname: n1\nrefs:\n  - to: n2\n    type: references\n"
+        "  - to: n3\n    type: references\nfunctions:\n  - name: f\n"
+        "    refs:\n      - to: n2\n        type: references\n"
+    )
+    n2 = "id: n2\nname: n2\n"
+    files = {
+        "nested/n1.yaml": n1,
+        "nested/n2.yaml": n2,
+        "nested/n3.yaml": "id: n3\nname: n3\n",
+        "schemas/rule.schema.yaml": SCHEMA,
+    }
+    table = DocumentTable(
+        id="rules",
+        paths=["nested/*.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        metadata={"related": "**.refs[]"},
+    )
+    env = make_env(files, tables=[table])
+    targets = [DeleteTarget(id="n2", expected_version=content_hash(n2))]
+    # 実行
+    result = env.delete(targets=targets, on_referenced="unlink")
+    # 検証
+    text = (env.worktree / "nested/n1.yaml").read_text(encoding="utf-8")
+    data = load_yaml(text)
+    assert not (env.worktree / "nested/n2.yaml").exists()
+    assert data["refs"] == [{"to": "n3", "type": "references"}]
+    assert data["functions"][0]["refs"] == []
+    assert result.unlinked == [("n1", content_hash(text))]
+
+
 def test_delete_docs_when_records(
     make_env: Callable[..., WriteEnv],
 ) -> None:
