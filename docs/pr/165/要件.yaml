@@ -21,3 +21,6 @@ scope_out:
   - item: 配信の範囲の外のファイル（コード・規約の本文）の中の旧 ID・旧パスの追随と単語の置換
     reason: 要望は `records`・`body_file` の行の本文のファイルが対象で、配信の範囲の外のファイルは文書として読み書きしない
     plan: none
+  - item: '`write_docs` の参照の型の項目のパスで、`x-key` の値に `[]` を含む要素（`request[operations[].fields]` など）を指せない不具合'
+    reason: 要望に含まれない。#165 では該当の 4 か所を YAML の直接編集で修正した
+    plan: '#167'
