@@ -227,7 +227,7 @@ classes:
           - name: test_source_registry_load_when_requested
             case: 正常
             summary: 待っている要求が指す行を先に読み込む
-            condition: '`SourceRegistry(loading=True, on_waiting=...)`。行 a・b・c で、a の読み込みの偽物が止まっている間に、イベントループで `wait_for(ids=["c"])` を待たせ、`on_waiting` が呼ばれてから a を進める'
+            condition: '`LOAD_WORKERS` を 1 にした `SourceRegistry(loading=True, on_waiting=...)`。行 a・b・c で、a の読み込みの偽物が止まっている間に、イベントループで `wait_for(ids=["c"])` を待たせ、`on_waiting` が呼ばれてから a を進める'
             mock: 配信元の読み込み（読んだ行の順を記録し、a だけ止められる偽物）
             expected: 読んだ行の順が a・c・b で、`wait_for` が b を読む前に済む
           - name: test_source_registry_load_when_row_failed
@@ -240,7 +240,7 @@ classes:
           - name: test_source_registry_load_when_duplicate_loaded_later
             case: 正常
             summary: 後の行が先に読み込まれて ID が重なる
-            condition: 3 行の設定の 2・3 行目が `id` を省き `name` がどちらも `a`。1 行目の読み込みを止めている間に、3 行目の scope に当たる作業場所で `wait_for` を呼び、3 行目を 2 行目より先に読み込ませる
+            condition: '`LOAD_WORKERS` を 1 にし、3 行の設定の 2・3 行目が `id` を省き `name` がどちらも `a`。1 行目の読み込みを止めている間に、3 行目の scope に当たる作業場所で `wait_for` を呼び、3 行目を 2 行目より先に読み込ませる'
             mock: 配信元の読み込み（偽物）
             expected: 読み込みの順が 1・3・2 行目で、全ての行を読み込んだ後に、2 行目が `serving`、3 行目が `not_served` で違反が `sources[2].id`。`get("a")` が 2 行目の配信元を返す
           - name: test_source_registry_load_when_duplicate_loaded_later_with_on_rebuilt
@@ -396,7 +396,7 @@ classes:
           - name: test_source_registry_get_when_row_loading
             case: 正常
             summary: 読み込んでいない行の ID を引くと、その行の読み込みを待つ
-            condition: '`SourceRegistry(loading=True)`。行 a・b で、`load` が a の読み込みで止まっている間に、別のスレッドから `get("b")`'
+            condition: '`LOAD_WORKERS` を 1 にした `SourceRegistry(loading=True)`。行 a・b で、`load` が a の読み込みで止まっている間に、別のスレッドから `get("b")`'
             mock: 配信元の読み込み（a だけ止められる偽物）
             expected: '`get("b")` が a を進めるまで戻らず、進めた後に b の配信元を返す。読んだ行の順が a・b'
             exception: '-'
