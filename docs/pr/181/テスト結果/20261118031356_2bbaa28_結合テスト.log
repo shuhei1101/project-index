@@ -1,0 +1,16 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=integration -f paths="tests/integration/server/test_search_docs.py::test_normal_when_worktree_validator_changed tests/integration/server/test_write_docs.py::test_error_when_write_deadline_exceeded tests/integration/server/test_write_docs.py::test_error_when_validator_timed_out" | grep -o 'https://[^ ]*/actions/runs/[0-9]*') && run_id=${run_url##*/} && (n=0; until gh api "repos/shuhei1101/project-index/actions/runs/$run_id?exclude_pull_requests=true" > /dev/null 2>&1; do n=$((n+1)); if [ $n -ge 10 ]; then echo "実行 $run_id を 10 秒参照できません" >&2; exit 1; fi; sleep 1; done) && (rc=0; gh run watch "$run_id" --exit-status > /dev/null || rc=1; if gh run download "$run_id" -n test-log -D "/tmp/test-log-$run_id"; then cat "/tmp/test-log-$run_id/test.log"; else gh run view "$run_id" --log-failed; fi; exit $rc)
+# 回した commit: 2bbaa28
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 3 items
+
+tests/integration/server/test_search_docs.py::test_normal_when_worktree_validator_changed PASSED [ 33%]
+tests/integration/server/test_write_docs.py::test_error_when_write_deadline_exceeded PASSED [ 66%]
+tests/integration/server/test_write_docs.py::test_error_when_validator_timed_out PASSED [100%]
+
+============================== 3 passed in 8.38s ===============================
+exit=0

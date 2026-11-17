@@ -1,0 +1,140 @@
+$ uv run pytest tests/unit/project_index/features/documents/test_fields.py tests/unit/project_index/features/write/test_apply.py
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/bug-write-remove-from-x-key
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 115 items
+
+tests/unit/project_index/features/documents/test_fields.py ............. [ 11%]
+...................................................FFF                   [ 58%]
+tests/unit/project_index/features/write/test_apply.py .................. [ 73%]
+..........................FF.F                                           [100%]
+
+=================================== FAILURES ===================================
+_______________________________ test_array_x_key _______________________________
+
+    def test_array_x_key() -> None:
+        """x-key を持つ配列（正常系）。"""
+        # 準備
+        data: dict[str, Any] = {"flows": [{"name": "A"}], **_models_data()}
+        # 実行
+>       flows = fields_module.array_x_key(data, _FLOWS_SCHEMA, "flows")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.documents.fields' has no attribute 'array_x_key'
+
+tests/unit/project_index/features/documents/test_fields.py:738: AttributeError
+__________________________ test_array_x_key_when_ref ___________________________
+
+    def test_array_x_key_when_ref() -> None:
+        """`$ref` を解決した配列（正常系）。"""
+        # 準備
+        schema: dict[str, Any] = {
+            "type": "object",
+            "properties": {"steps": {"$ref": "#/$defs/steps"}},
+            "$defs": {
+                "steps": {
+                    "type": "array",
+                    "x-key": "name",
+                    "items": {"type": "object", "properties": {"name": {"type": "string"}}},
+                }
+            },
+        }
+        data: dict[str, Any] = {"steps": [{"name": "s1"}]}
+        # 実行
+>       result = fields_module.array_x_key(data, schema, "steps")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.documents.fields' has no attribute 'array_x_key'
+
+tests/unit/project_index/features/documents/test_fields.py:763: AttributeError
+_______________________ test_array_x_key_when_no_schema ________________________
+
+    def test_array_x_key_when_no_schema() -> None:
+        """スキーマに無い項目（正常系）。"""
+        # 準備
+        data: dict[str, Any] = {"flows": [{"name": "A"}]}
+        # 実行
+>       result = fields_module.array_x_key(data, {}, "flows")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.documents.fields' has no attribute 'array_x_key'
+
+tests/unit/project_index/features/documents/test_fields.py:773: AttributeError
+_________________ test_apply_operation_when_remove_from_x_key __________________
+
+    def test_apply_operation_when_remove_from_x_key() -> None:
+        """x-key の値と要素のオブジェクトで削除する（正常系）。"""
+        # 準備
+        operation = Operation(
+            op="update",
+            id="doc-1",
+            expected_version="v1",
+            remove_from={"flows": ["B", {"name": "C", "summary": "s3"}, "B"]},
+        )
+        # 実行
+        result = apply_operation(_flows_content(), operation, schema=_FLOWS_SCHEMA)
+        # 検証
+>       assert result == {"flows": [{"name": "A", "summary": "s1"}]}
+E       AssertionError: assert {'flows': [{'...mary': 's2'}]} == {'flows': [{'...mary': 's1'}]}
+E         
+E         Differing items:
+E         {'flows': [{'name': 'A', 'summary': 's1'}, {'name': 'B', 'summary': 's2'}]} != {'flows': [{'name': 'A', 'summary': 's1'}]}
+E         Use -v to get more diff
+
+tests/unit/project_index/features/write/test_apply.py:743: AssertionError
+_____________ test_apply_operation_when_remove_from_x_key_missing ______________
+
+    def test_apply_operation_when_remove_from_x_key_missing() -> None:
+        """x-key を持つ配列に削除する要素が無い値（異常系）。"""
+        # 準備
+        current = _flows_content()
+        operation = Operation(
+            op="update",
+            id="doc-1",
+            expected_version="v1",
+            remove_from={"flows": ["A", "Z", {"name": "A", "summary": "x"}]},
+        )
+        # 実行・検証
+>       with pytest.raises(InvalidArgumentError) as exc_info:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE InvalidArgumentError
+
+tests/unit/project_index/features/write/test_apply.py:757: Failed
+__________________ test_apply_operation_when_remove_then_add ___________________
+
+    def test_apply_operation_when_remove_then_add() -> None:
+        """1 つの操作で削除してから追加する（正常系）。"""
+        # 準備
+        operation = Operation(
+            op="update",
+            id="doc-1",
+            expected_version="v1",
+            remove_from={"flows": ["A"], "notes": ["a"]},
+            add_to={"flows": [{"name": "A", "summary": "s9"}], "notes": ["a"]},
+        )
+        # 実行
+        result = apply_operation({**_flows_content(), "notes": ["a"]}, operation, schema=_FLOWS_SCHEMA)
+        # 検証
+>       assert result == {
+            "flows": [
+                {"name": "B", "summary": "s2"},
+                {"name": "C", "summary": "s3"},
+                {"name": "A", "summary": "s9"},
+            ],
+            "notes": ["a"],
+        }
+E       AssertionError: assert {'flows': [{'..., 'notes': []} == {'flows': [{'...notes': ['a']}
+E         
+E         Differing items:
+E         {'notes': []} != {'notes': ['a']}
+E         {'flows': [{'name': 'A', 'summary': 's1'}, {'name': 'B', 'summary': 's2'}, {'name': 'C', 'summary': 's3'}, {'name': 'A', 'summary': 's9'}]} != {'flows': [{'name': 'B', 'summary': 's2'}, {'name': 'C', 'summary': 's3'}, {'name': 'A', 'summary': 's9'}]}
+E         Use -v to get more diff
+
+tests/unit/project_index/features/write/test_apply.py:798: AssertionError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_array_x_key
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_array_x_key_when_ref
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_array_x_key_when_no_schema
+FAILED tests/unit/project_index/features/write/test_apply.py::test_apply_operation_when_remove_from_x_key
+FAILED tests/unit/project_index/features/write/test_apply.py::test_apply_operation_when_remove_from_x_key_missing
+FAILED tests/unit/project_index/features/write/test_apply.py::test_apply_operation_when_remove_then_add
+======================== 6 failed, 109 passed in 0.13s =========================

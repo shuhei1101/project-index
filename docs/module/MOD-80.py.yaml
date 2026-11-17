@@ -64,7 +64,7 @@ functions:
         required: false
         default: None
         passing: keyword
-        description: 文書 1 件の内容に当てるスキーマ（文書のストアの `row_schema`）。`text_edits[].field`・`add_to`・`remove_from` のキー・`unset` の要素の参照の型の項目のパスの解決に使用する
+        description: 文書 1 件の内容に当てるスキーマ（文書のストアの `row_schema`）。`text_edits[].field`・`add_to`・`remove_from` のキー・`unset` の要素の参照の型の項目のパスの解決と、`remove_from` の配列の `x-key` の取得に使用する
     returns:
       type: dict[str, Any]
       description: 新しい内容（`current` は書き換えない）
@@ -74,14 +74,18 @@ functions:
       3. `update` は `current` の深いコピーに順に当てる
          - `set` の値は、オブジェクトなら今の値へ再帰でマージし、配列とスカラーは置き換える（項目の書き込み）
          - `unset` は要素を『項目の削除』（`schema` を渡す）で削除する。無い項目は飛ばす。要素を解けない（`InvalidArgumentError`。要素の選び方を含む・`#` で始まるパスを解けない）場合は、送られた理由で `unset.{要素}` の違反にする
-         - `add_to` はキーを『配列の項目の解決』（`create=True`。`schema` が `None` なら空のスキーマ）で解いた配列の末尾へ足す（配列でなければ違反。`#` で始まるキーは項目を作らない）
-         - `remove_from` はキーを『配列の項目の解決』（`create=False`）で解いた配列から等しい要素を全て除く（`None` なら何もしない。配列でなければ違反）
+         - `remove_from` はキーを『配列の項目の解決』（`create=False`。`schema` が `None` なら空のスキーマ）で解いた配列から削除する（`None` なら何もしない。配列でなければ違反）
+           - 『配列の x-key の取得』が `None` の配列は、渡した値と等しい要素を全て除く（該当しない値は何もしない）
+           - `x-key` を持つ配列は、オブジェクトの値はその値と等しい要素、オブジェクトでない値は要素が辞書で `x-key` のキーの値がその値と等しい要素を、削除する要素とする
+           - 削除する要素が有るかは、除く前の配列で値ごとに判定する。1 つも無い値があれば、値ごとに `remove_from.{キー}` の違反（`rule` に削除する要素が無い値を入れる）にし、その配列は除かない
+           - 違反が無ければ、どれかの値の削除する要素に当たる要素を全て除く
+         - `add_to` はキーを『配列の項目の解決』（`create=True`。`schema` が `None` なら空のスキーマ）で解いた配列の末尾へ足す（配列でなければ違反。`#` で始まるキーは項目を作らない）。`remove_from` の後に当てる
          - `add_to`・`remove_from` のキーを解けない（`InvalidArgumentError`）場合は、送られた理由で `add_to.{キー}`・`remove_from.{キー}` の違反にする
          - `text_edits` は文字列の項目の `old` を `new` にする。`field` が `#` で始まる場合は、`#` の後を『参照の型の項目のパスの解決』で `schema` と今の内容からキーと位置の並びに解き、その並びで取得して『並びで指した項目の書き込み』で書く（解けなければ `text_edits[{n}].field` の違反。`schema` が `None` なら空のスキーマで解き、配列は `x-key` を持たない違反になる）。`replace_all` が `False` で一致が 1 か所でない場合は違反
       4. 違反は `Violation`（`path` は `set.a.b`・`text_edits[0].old` など。`fix` に一致した数と、`replace_all` か前後の文字を含めること）を集めて `InvalidArgumentError` で送る
     exceptions:
       - name: InvalidArgumentError
-        condition: 配列でない項目への追加・削除、`add_to`・`remove_from` のキーと `unset` の要素を解けない（要素の選び方を含む・`#` で始まるパスを解けない）、文字列でない項目への置き換え、`old` の一致が 1 か所でない
+        condition: 配列でない項目への追加・削除、`x-key` を持つ配列への `remove_from` の値に削除する要素が無い、`add_to`・`remove_from` のキーと `unset` の要素を解けない（要素の選び方を含む・`#` で始まるパスを解けない）、文字列でない項目への置き換え、`old` の一致が 1 か所でない
         message: '`操作を適用できません`'
     unit_tests:
       - name: test_apply_operation
@@ -161,6 +165,34 @@ functions:
         mock: なし
         expected: '`InvalidArgumentError` の違反の `path` が `unset.models[Row].properties`・`unset.#models[Zzz].properties`'
         exception: 要素の選び方を含む・要素が無い
+      - name: test_apply_operation_when_remove_from_x_key
+        case: 正常
+        summary: x-key の値と要素のオブジェクトで削除する
+        condition: '`flows`（`x-key: name`）が `{name: A, summary: s1}`・`{name: B, summary: s2}`・`{name: C, summary: s3}` の内容とスキーマに、`remove_from: {flows: [B, {name: C, summary: s3}, B]}`'
+        mock: なし
+        expected: '`flows` が `{name: A, summary: s1}` の 1 要素（同じ要素を指す値が 2 つあっても違反にしない）'
+        exception: '-'
+      - name: test_apply_operation_when_remove_from_x_key_missing
+        case: 異常
+        summary: x-key を持つ配列に削除する要素が無い値
+        condition: '同じ内容とスキーマに `remove_from: {flows: [A, Z, {name: A, summary: x}]}`'
+        mock: なし
+        expected: '`InvalidArgumentError` の違反が 2 件で、`path` がどちらも `remove_from.flows`、`rule` に `Z` と `{name: A, summary: x}` が入る。`current` は変わらない'
+        exception: 削除する要素が無い
+      - name: test_apply_operation_when_remove_from_without_x_key
+        case: 正常
+        summary: x-key を持たない配列は今までどおり
+        condition: '`notes`（`x-key` を持たない文字列の配列）が `[a, b]` の内容とスキーマに `remove_from: {notes: [b, z]}`'
+        mock: なし
+        expected: '`notes` が `[a]` で違反は無い'
+        exception: '-'
+      - name: test_apply_operation_when_remove_then_add
+        case: 正常
+        summary: 1 つの操作で削除してから追加する
+        condition: '`flows` の同じ内容とスキーマに `remove_from: {flows: [A]}` と `add_to: {flows: [{name: A, summary: s9}]}`、`x-key` を持たない `notes: [a]` に `remove_from: {notes: [a]}` と `add_to: {notes: [a]}`'
+        mock: なし
+        expected: '`flows` が B・C・`{name: A, summary: s9}` の順、`notes` が `[a]`'
+        exception: '-'
   - name: to_columns
     title: 列名への読み替え
     kind: 関数
@@ -277,14 +309,14 @@ functions:
       6. 配列ごとに、元の配列を複製する。`update` は `current` の値、`create`・`replace` は `data` の列名の値（無ければ空の配列）
       7. 全ての要素のキーへの操作を当てる
          - `set` は渡した名前の並びで配列を作り直す。元からあった名前の要素は `main` を含む他のキーを保ち、無い名前は `{項目: 名前}` の要素にする
-         - `add_to` は配列に無い名前を `{項目: 名前}` の要素で末尾に追加する
          - `remove_from` は項目が渡した名前の要素を削除する
+         - `add_to` は配列に無い名前を `{項目: 名前}` の要素で末尾に追加する（`remove_from` の後に当てる）
          - `unset` は配列の列を削除する
          - `create`・`replace` の `data` の値は `set` と同じに当てる
       8. 選んだ要素のキーへの操作を当てる
          - `set` は渡した名前の要素の真偽値のキーを `true` にし、他の要素の真偽値のキーを削除する
-         - `add_to` は渡した名前の要素の真偽値のキーを `true` にする
          - `remove_from` は渡した名前の要素の真偽値のキーを削除する（無い名前は飛ばす）
+         - `add_to` は渡した名前の要素の真偽値のキーを `true` にする（`remove_from` の後に当てる）
          - `unset` は全ての要素の真偽値のキーを削除する
          - `set`・`add_to`・`data` に配列に無い名前がある場合、`path` が `operations[{index}].{項目}.{共通のキー}`、`rule` が `{名前} は {全ての要素のキー} にありません` の違反にする
       9. 8 の違反があれば `InvalidArgumentError` で送る
@@ -356,6 +388,13 @@ functions:
         condition: '`metadata` が `{related: "**.refs[]"}` で `set: {refs: []}`'
         mock: なし
         expected: 渡した操作のまま
+        exception: '-'
+      - name: test_expand_array_keys_when_remove_then_add
+        case: 正常
+        summary: 同じ名前を remove_from と add_to に渡す
+        condition: '`{tags: [{name: a, main: true}, {name: b}]}` に `remove_from: {tags: [b], main_tags: [a]}` と `add_to: {tags: [b], main_tags: [a]}`'
+        mock: なし
+        expected: '`tags` が `[{name: a, main: true}, {name: b}]`（削除してから追加し、`b` も `a` の `main` も残る）'
         exception: '-'
   - name: apply_body
     title: 本文の適用

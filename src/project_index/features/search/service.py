@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 
     from project_index.features.seen.store import SeenStore
     from project_index.features.sources.registry import SourceRegistry
-    from project_index.features.validation.service import DocumentChecker
+    from project_index.features.validation.service import DocumentChecker, ScriptStamps
 
 NONE_LABEL = "（なし）"
 MULTI_SOURCE_MIN = 2
@@ -517,10 +517,12 @@ def search_docs(
         seen_ids=_seen_ids(request, seen, key, targets, window),
     )
     page = _page(build, window, max_chars, notes)
+    # 返す文書の間で、同じスクリプトの状態を走査し直さない
+    stamps: ScriptStamps = {}
     for hit in page.used:
         notes.extend(
             f"{hit.document.id}: {violation.rule}（{violation.path}）"
-            for violation in checker.check(hit.target, hit.document, on="read")
+            for violation in checker.check(hit.target, hit.document, on="read", stamps=stamps)
         )
     next_position = base + len(page.items)
     has_rest = next_position < len(ordered) and (
