@@ -46,6 +46,8 @@ jobs:
             integration) limit=203 ;;
           esac
           : > test.log
+          # paths のノード ID の [{id}] をパス名の展開で置き換えさせない
+          set -f
           # 回す範囲: paths を指定したときは結合テストの層の下のパスだけ、省いたときは層のフォルダの全件
           targets="tests/$LAYER/"
           if [ -n "$PATHS" ]; then
@@ -55,7 +57,24 @@ jobs:
             fi
             for p in $PATHS; do
               case "$p" in
-                *..*|*,*|*\;*|*:*) echo "paths の値が層のフォルダの外か、空白以外の区切りを含む: $p" >> test.log; exit 1 ;;
+                *..*|*,*|*\;*) echo "paths の値が層のフォルダの外か、空白以外の区切りを含む: $p" >> test.log; exit 1 ;;
+              esac
+              # : は {.py のファイル}::{関数} の書式のときだけ受け付ける
+              case "$p" in
+                *:*)
+                  file="${p%%::*}"
+                  func="${p#*::}"
+                  case "$file" in
+                    *:*) echo "paths の値がノード ID の書式に合わない : を含む: $p" >> test.log; exit 1 ;;
+                    *.py) ;;
+                    *) echo "paths の値がノード ID の書式に合わない : を含む: $p" >> test.log; exit 1 ;;
+                  esac
+                  case "$func" in
+                    ''|*:*) echo "paths の値がノード ID の書式に合わない : を含む: $p" >> test.log; exit 1 ;;
+                  esac
+                  ;;
+              esac
+              case "$p" in
                 tests/integration/*) ;;
                 *) echo "paths の値が層のフォルダの外: $p" >> test.log; exit 1 ;;
               esac
