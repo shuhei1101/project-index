@@ -44,6 +44,7 @@ functions:
       1. 管理用の YAML を往復編集で読む（`load_roundtrip`）
          - ファイルが無い場合、`FilesYamlNotFoundError` を送る
       2. `root` のリポジトリの直下（`repo_root`）で記録を作る
+         - `reviewed` に無いファイルがある場合、書き換える前に `ReviewedFileNotFoundError` を送る
          - Git の中の場合、`rev-parse HEAD` の commit と、`reviewed` の各ファイルの中身の SHA-256（`hashlib.sha256` の 16 進）を持つ記録
          - Git の外の場合、`now` を ISO 8601 にした `checked_at` だけを持つ記録
       3. マッピングの `checkpoint` を記録で置き換え（無ければ末尾に追加）、`dump_roundtrip` した文字列でファイルを置き換える（`replace_file`）
@@ -52,6 +53,9 @@ functions:
       - name: FilesYamlNotFoundError
         condition: 管理用の YAML が無い
         message: '`{パス}: 管理用の YAML がありません`'
+      - name: ReviewedFileNotFoundError
+        condition: '`reviewed` のファイルが無い'
+        message: '`{パス}: ファイルがありません`'
     callees:
       - MOD-104#functions[load_roundtrip]
       - MOD-104#functions[dump_roundtrip]
@@ -78,6 +82,13 @@ functions:
         mock: なし（`tmp_path`）
         expected: '`FilesYamlNotFoundError`、フォルダにファイルが作られない'
         exception: 管理用の YAML が無い
+      - name: test_record_checkpoint_when_reviewed_missing
+        case: 異常
+        summary: 見直したファイルが無い
+        condition: '`files.yaml` を commit した一時リポジトリで `reviewed=["missing.md"]`'
+        mock: なし（`tmp_path` で `git init`）
+        expected: '`ReviewedFileNotFoundError` のメッセージに `missing.md`、`files.yaml` が変わらない'
+        exception: '`reviewed` のファイルが無い'
 tags:
   - name: topic:確認の時点
     main: true

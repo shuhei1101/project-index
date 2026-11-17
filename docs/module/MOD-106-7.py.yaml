@@ -126,6 +126,20 @@ classes:
         type: Path
         access: 公開
         description: 渡されたパス
+  - name: ReviewedFileNotFoundError
+    title: 見直したファイルが無い
+    container: project_index/features/checkpoint/types.py
+    usecase: 確認の時点の記録
+    role: 例外
+    summary: '`--reviewed` のファイルが無いことを表す'
+    kind: クラス
+    inherits: Exception
+    properties:
+      - name: path
+        title: パス
+        type: Path
+        access: 公開
+        description: 無かったファイルのパス
 tags:
   - name: topic:確認の時点
     main: true

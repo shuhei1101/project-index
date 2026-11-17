@@ -64,3 +64,11 @@ class FilesYamlNotFoundError(Exception):
     def __init__(self, path: Path) -> None:
         super().__init__(f"{path}: 管理用の YAML がありません")
         self.path = path
+
+
+class ReviewedFileNotFoundError(Exception):
+    """`--reviewed` のファイルが無いことを表す。"""
+
+    def __init__(self, path: Path) -> None:
+        super().__init__(f"{path}: ファイルがありません")
+        self.path = path

@@ -12,6 +12,7 @@ from project_index.features.checkpoint.types import (
     Checkpoint,
     FilesYamlNotFoundError,
     ReviewedFile,
+    ReviewedFileNotFoundError,
 )
 from project_index.integrations.git import repo_root, run_git
 from project_index.shared.files import replace_file
@@ -30,6 +31,10 @@ def record_checkpoint(
     yaml_path = root / files_yaml
     if not yaml_path.is_file():
         raise FilesYamlNotFoundError(yaml_path)
+    # 見直したファイルが無ければ、管理用の YAML を書き換える前に止める
+    for path in reviewed:
+        if not (root / path).is_file():
+            raise ReviewedFileNotFoundError(root / path)
     doc = load_roundtrip(yaml_path.read_text(encoding="utf-8"), file=str(yaml_path))
     value = CommentedMap()
     if repo_root(root) is not None:

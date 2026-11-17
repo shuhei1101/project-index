@@ -478,7 +478,10 @@ def run_changed(args: argparse.Namespace) -> int:
 def run_checkpoint(args: argparse.Namespace) -> int:
     """`project-index checkpoint` の解析結果で確認の時点を記録し、記録した値を JSON で出す。"""
     from project_index.features.checkpoint import record as record_module
-    from project_index.features.checkpoint.types import FilesYamlNotFoundError
+    from project_index.features.checkpoint.types import (
+        FilesYamlNotFoundError,
+        ReviewedFileNotFoundError,
+    )
 
     root = Path(args.root)
     if not root.is_dir():
@@ -488,7 +491,7 @@ def run_checkpoint(args: argparse.Namespace) -> int:
         checkpoint = record_module.record_checkpoint(
             root, args.files_yaml, reviewed=args.reviewed, now=datetime.now(UTC)
         )
-    except FilesYamlNotFoundError as error:
+    except (FilesYamlNotFoundError, ReviewedFileNotFoundError) as error:
         print(str(error), file=sys.stderr)
         return EXIT_FILES_YAML_INVALID
     # Git の配信元は commit と reviewed、Git 管理外は checked_at を出す

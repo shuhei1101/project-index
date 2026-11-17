@@ -8,7 +8,10 @@ import pytest
 from ruamel.yaml import YAML
 
 from project_index.features.checkpoint.record import record_checkpoint
-from project_index.features.checkpoint.types import FilesYamlNotFoundError
+from project_index.features.checkpoint.types import (
+    FilesYamlNotFoundError,
+    ReviewedFileNotFoundError,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -65,3 +68,15 @@ def test_record_checkpoint_when_files_yaml_missing(tmp_path: Path) -> None:
     with pytest.raises(FilesYamlNotFoundError):
         record_checkpoint(tmp_path, "files.yaml", now=datetime(2026, 11, 17, tzinfo=UTC))
     assert list(tmp_path.iterdir()) == []
+
+
+def test_record_checkpoint_when_reviewed_missing(git_repo: Callable[..., Path]) -> None:
+    """見直したファイルが無い（異常系）。"""
+    # 準備
+    repo = git_repo({"files.yaml": FILES_YAML})
+    # 実行・検証
+    with pytest.raises(ReviewedFileNotFoundError, match="missing.md"):
+        record_checkpoint(
+            repo, "files.yaml", reviewed=["missing.md"], now=datetime(2026, 11, 17, tzinfo=UTC)
+        )
+    assert (repo / "files.yaml").read_text(encoding="utf-8") == FILES_YAML

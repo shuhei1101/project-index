@@ -1003,6 +1003,7 @@ functions:
       1. `root` を `Path` にし、フォルダでなければ「`{root}: フォルダがありません`」を標準エラーに出して 2 を返す
       2. 確認の時点の記録（`record_checkpoint`。`now` は `datetime.now(UTC)`）を呼ぶ
          - `FilesYamlNotFoundError` の場合、「`{パス}: 管理用の YAML がありません`」を標準エラーに出して 2 を返す
+         - `ReviewedFileNotFoundError` の場合、「`{パス}: ファイルがありません`」を標準エラーに出して 2 を返す
       3. 記録した値（Git の配信元は `commit`・`reviewed`、Git 管理外は `checked_at`）を `json.dumps(ensure_ascii=False)` で標準出力に出して 0 を返す
     exceptions:
       - name: なし（終了コード 2）
@@ -1011,6 +1012,9 @@ functions:
       - name: なし（終了コード 2・管理用の YAML）
         condition: '`--files-yaml` が無い（`FilesYamlNotFound`）'
         message: '`{パス}: 管理用の YAML がありません`'
+      - name: なし（終了コード 2・見直したファイル）
+        condition: '`--reviewed` のファイルが無い（`ReviewedFileNotFound`）'
+        message: '`{パス}: ファイルがありません`'
     unit_tests:
       - name: test_run_checkpoint
         case: 正常
@@ -1026,6 +1030,13 @@ functions:
         mock: なし（`tmp_path`・`capsys`）
         expected: 2 を返し、標準エラーに渡したパス
         exception: なし（終了コード 2・管理用の YAML）
+      - name: test_run_checkpoint_when_reviewed_missing
+        case: 異常
+        summary: 見直したファイルが無い
+        condition: '`files.yaml` を置いた Git 管理外のフォルダで `reviewed=["missing.md"]`'
+        mock: なし（`tmp_path`・`capsys`）
+        expected: 2 を返し、標準エラーに `missing.md`
+        exception: なし（終了コード 2・見直したファイル）
     refs:
       - MOD-106-9#functions[record_checkpoint]
 refs:

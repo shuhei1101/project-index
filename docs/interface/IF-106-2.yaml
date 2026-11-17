@@ -80,6 +80,9 @@ constraints:
   - item: 見直し済みの除外
     constraint: '`checkpoint.reviewed[]` のパスのうち、今の中身の SHA-256 が記録した値と一致するファイルは出さない'
     notes: 未 commit で見直したファイルを同じ中身で commit したとき
+  - item: 追跡していないファイル
+    constraint: Git の配信元で `git add` していないファイル（untracked）は、行にあっても `git add` か commit するまで出さない
+    notes: 新しいファイルの行は setup の突き合わせが追加の候補にし、その場で中身を参照してメタデータを付ける。commit した後は差分に `A` で出る
 flows:
   - name: 正常系
     summary: 記録した commit の後に変わったファイルを、未 commit の変更を含めて出す

@@ -58,7 +58,7 @@ response:
     notes: Git 管理外の配信元だけ
   - name: 終了コード
     type: int
-    description: 0 正常・2 `--root` か `--files-yaml` が無い
+    description: 0 正常・2 `--root` か `--files-yaml` か `--reviewed` のファイルが無い
 response_example: |-
   ```json
   {"commit": "a1b2c3d4e5f6", "reviewed": [{"path": "src/tasks.py", "sha256": "9f86d0..."}]}
@@ -72,6 +72,9 @@ exceptions:
   - name: FilesYamlNotFound
     condition: '`--files-yaml` のファイルが無い（終了コード 2）'
     notes: 渡したパスを stderr に出す
+  - name: ReviewedFileNotFound
+    condition: '`--reviewed` のファイルが無い（終了コード 2）'
+    notes: 無いパスを stderr に出し、管理用の YAML は書き換えない
 constraints:
   - item: 記録の置き場所
     constraint: 管理用の YAML の直下のキー `checkpoint`。前の記録は丸ごと置き換える
@@ -160,6 +163,32 @@ flows:
       - 終了コードが 2
       - フォルダにファイルが作られない
     test: test_error_when_files_yaml_not_found
+  - name: 異常系（見直したファイルが無い・ReviewedFileNotFound）
+    summary: '`--reviewed` のファイルが無いと終了コード 2 で終え、管理用の YAML を書き換えない'
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元のリポジトリ
+        description: '`files.yaml` を commit した一時フォルダの git リポジトリ'
+        notes: '`--reviewed missing.md`（無いファイル）を渡す'
+    flow: |-
+      <!-- map: {"title": "異常系（見直したファイルが無い・ReviewedFileNotFound）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index checkpoint
+
+        C->>M: --root {リポジトリ} --files-yaml files.yaml --reviewed missing.md
+        M-->>C: stderr に無いパス（終了コード 2）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 2
+      - stderr に `missing.md` がある
+      - '`files.yaml` が変わらない'
+    test: test_error_when_reviewed_file_not_found
 test_file: tests/integration/server/test_checkpoint.py
 aliases:
   - project-index checkpoint

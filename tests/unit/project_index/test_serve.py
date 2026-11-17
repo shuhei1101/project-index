@@ -907,6 +907,19 @@ def test_run_checkpoint_when_files_yaml_not_found(
     assert "missing.yaml" in capsys.readouterr().err
 
 
+def test_run_checkpoint_when_reviewed_missing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """見直したファイルが無い（異常系）。"""
+    # 準備
+    (tmp_path / "files.yaml").write_text("files: []\n", encoding="utf-8")
+    # 実行
+    code = main_module.run_checkpoint(_checkpoint_args(root=str(tmp_path), reviewed=["missing.md"]))
+    # 検証
+    assert code == 2
+    assert "missing.md" in capsys.readouterr().err
+
+
 def test_reload_sources_when_alias_and_nav(
     tmp_path: Path,
     make_alias_source_dir: Callable[..., Path],
