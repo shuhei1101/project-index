@@ -807,4 +807,65 @@ functions:
         mock: なし
         expected: '`InvalidArgumentError`'
         exception: 要素が無い
+  - name: array_x_key
+    title: 配列の x-key の取得
+    kind: 関数
+    container: project_index/features/documents/fields.py
+    usecase: 書き込み
+    role: 読み取り
+    summary: '`add_to`・`remove_from` のキーの項目のパスが指す配列のスキーマの `x-key` を返す'
+    scope: public
+    thread_safe: true
+    args:
+      - name: data
+        title: 内容
+        type: Mapping[str, Any]
+        required: true
+        passing: positional
+        description: 操作を当てている内容。`#` で始まるパスの要素の位置の解決に使用する
+      - name: schema
+        title: スキーマ
+        type: Mapping[str, Any]
+        required: true
+        passing: positional
+        description: 文書 1 件の内容に当てるスキーマ
+      - name: path
+        title: 項目のパス
+        type: str
+        required: true
+        passing: positional
+        description: 『配列の項目の解決』で解決できたパス
+    returns:
+      type: str | None
+      description: 配列のスキーマ（`$ref` を解決した後）の `x-key` の値。スキーマが無い・`x-key` を持たない・`x-key` が文字列でないときは `None`
+    process: |-
+      1. `path` が `#` で始まる場合は、`#` の後を『参照の型の項目のパスの解決』でキーと位置の並びに解く。それ以外は要素の選び方を含まないパスをキーと位置の並びに分ける
+      2. スキーマの最上位から並びを順にたどる。キーは辞書のスキーマのその項目（無ければ `additionalProperties`）、位置は配列のスキーマの `items` へ進み、進むたびに `$ref` を解決する
+      3. たどった先のスキーマの `x-key` が文字列なら返し、それ以外は `None` を返す
+    exceptions:
+      - name: InvalidArgumentError
+        condition: '`path` を解けない（『配列の項目の解決』で解けたパスには起きない）'
+        message: 『参照の型の項目のパスの解決』・『項目のパスの分解』が送る理由
+    unit_tests:
+      - name: test_array_x_key
+        case: 正常
+        summary: x-key を持つ配列
+        condition: '`flows`（`x-key: name`）と `models`（`x-key: name`。要素の `properties` は `x-key` を持たない）のスキーマに、`flows`・`#models[Row].properties`・`models[0].properties`'
+        mock: なし
+        expected: '`flows` は `name`、`#models[Row].properties`・`models[0].properties` は `None`'
+        exception: '-'
+      - name: test_array_x_key_when_ref
+        case: 正常
+        summary: '`$ref` を解決した配列'
+        condition: '`steps` が `{$ref: "#/$defs/steps"}` で、`$defs.steps` が `x-key: name` の配列のスキーマに `steps`'
+        mock: なし
+        expected: '`name`'
+        exception: '-'
+      - name: test_array_x_key_when_no_schema
+        case: 正常
+        summary: スキーマに無い項目
+        condition: 空のスキーマに `flows`
+        mock: なし
+        expected: '`None`'
+        exception: '-'
 visibility: internal

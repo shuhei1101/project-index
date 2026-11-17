@@ -1460,6 +1460,53 @@ flows:
       - '続けてワークツリー y の文書 1 へ `refs: [文書 2]`（文字列の並び）の `update` を呼ぶと、v1 のスキーマで検査して `applied: true` になる'
       - '同じ `set` を `refs: [文書 2]`（文字列の並び）にした呼び出しは、`isError: true` の `ValidationFailedError` で、違反の `rule` が v2 のスキーマの型（要素が `object`）を求める'
     test: test_normal_when_schema_ref_changed_in_worktree
+  - name: 正常系（x-key の値で配列の要素を削除する）
+    summary: '`remove_from` で `x-key` を持つ配列の要素を `x-key` の値と要素のオブジェクトで指して削除し、削除する要素が無い値を断る。同じ操作の `add_to` は `remove_from` の後に当てる'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 種類のスキーマ
+        description: 'sample の種類のスキーマが `flows`（`x-key: name` の配列。要素は `name`・`summary` を持つ）と、`x-key` を持たない文字列の配列 `notes` を定める'
+      - name: 文書 1
+        description: '`flows` が `{name: 正常系, summary: s1}`・`{name: 異常系, summary: s2}`・`{name: 準正常系, summary: s3}`、`notes` が `[a]`'
+      - name: 入力
+        description: '1 回目は `remove_from: {flows: [異常系]}`。2 回目は `remove_from: {flows: [{name: 準正常系, summary: s3}]}`。3 回目は `remove_from: {flows: [正常系, 無い名前]}`。4 回目は `remove_from: {notes: [z]}`。5 回目は `remove_from: {flows: [正常系, {name: 正常系, summary: s1}]}` と `add_to: {flows: [{name: 正常系, summary: s9}]}` を持つ 1 つの `update`'
+        notes: 3 回目は削除する要素が無い値を含む。4 回目は `x-key` を持たない配列に無い値。5 回目は同じ要素を指す 2 つの値と、削除する要素と同じ `x-key` の値の要素の追加
+    flow: |-
+      <!-- map: {"title": "正常系（x-key の値で配列の要素を削除する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: update 文書 1（remove_from flows: [異常系]）
+        T->>T: flows のスキーマの x-key（name）が 異常系 の要素を削除する
+        T->>WT: YAML を書き換える
+        T-->>C: updated
+        C->>T: update 文書 1（remove_from flows: [準正常系の要素]）
+        T->>T: 渡したオブジェクトと等しい要素を削除する
+        T->>WT: YAML を書き換える
+        T-->>C: updated
+        C->>T: update 文書 1（remove_from flows: [正常系, 無い名前]）
+        T-->>C: isError（remove_from.flows）
+        C->>T: update 文書 1（remove_from notes: [z]）
+        T-->>C: updated（何も変えない）
+        C->>T: update 文書 1（remove_from flows: [正常系, 正常系の要素]・add_to flows: [正常系 s9]）
+        T->>T: remove_from を当てる前の配列で判定して 正常系 を削除し、その後に add_to を当てる
+        T->>WT: YAML を書き換える
+        T-->>C: updated
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目の後、`flows` が 正常系・準正常系 の 2 要素で、`version` が書き込み前と違う
+      - 2 回目の後、`flows` が 正常系 の 1 要素
+      - 3 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].remove_from.flows` で、決まりに削除する要素が無い値 `無い名前` が入る。文書 1 を書き換えず、`flows` に 正常系 が残る
+      - 4 回目は `status` が `updated` で、`notes` が `[a]` のまま
+      - '5 回目の後、`flows` が `{name: 正常系, summary: s9}` の 1 要素'
+    test: test_normal_when_remove_from_x_key
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -1567,8 +1614,8 @@ request:
     required: false
     default: なし
     location: argument
-    description: 配列の項目から一致する要素を削除する
-    notes: '`update` だけ'
+    description: 配列の項目から一致する要素を削除する。`x-key` を持つ配列は `x-key` の値でも要素を指す
+    notes: '`update` だけ。`x-key` を持つ配列で削除する要素が無い値は違反にする（制約「remove_from の x-key を持つ配列」）'
   - name: operations[].text_edits
     type: 'list[{field: str, old: str, new: str, replace_all: bool}]'
     required: false
@@ -1761,7 +1808,7 @@ exceptions:
     condition: '`update`・`replace` の `id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
   - name: InvalidArgumentError
-    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先が行の `exclude[]` に当たる（`/` を含む値はパス、含まない値はファイル名で当てる）・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`rename` に `new_id`・`new_path` がどちらも無い・ID がパスの文書に `new_id` を渡した・`body_file` を持たない `records` の行の文書に `new_path` を渡した・`new_path` が種類の行の `paths` に当たらないか `exclude[]` に当たるか既にあるファイルを指す・`replace_text` に `filter`・`old`・`new` のどれかが無いか `old` が空・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す・`unset` の要素の参照の型の項目のパスを解決できないか、`#` で始まらない要素に要素の選び方（`[...]`・`**.`）を含む'
+    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先が行の `exclude[]` に当たる（`/` を含む値はパス、含まない値はファイル名で当てる）・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`rename` に `new_id`・`new_path` がどちらも無い・ID がパスの文書に `new_id` を渡した・`body_file` を持たない `records` の行の文書に `new_path` を渡した・`new_path` が種類の行の `paths` に当たらないか `exclude[]` に当たるか既にあるファイルを指す・`replace_text` に `filter`・`old`・`new` のどれかが無いか `old` が空・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す・`unset` の要素の参照の型の項目のパスを解決できないか、`#` で始まらない要素に要素の選び方（`[...]`・`**.`）を含む・`x-key` を持つ配列への `remove_from` の値に削除する要素が無い'
   - name: SourceNotServedError
     condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
   - name: WorktreeNotMatchedError
@@ -1866,6 +1913,12 @@ constraints:
   - item: unset の項目のパス
     constraint: '`unset` の要素が `#` で始まるとき、「参照の型の項目のパス」と同じ読み方で文書の中の 1 つの項目へ解決し、その項目を削除する。解決できないパス（無い要素・`x-key` の無い配列・無い順番・無いキー）は `unset.{パス}` の違反にする。`#` で始まらない要素に要素の選び方（`[...]`・`**.`）を含めると、書き込まずに同じ違反にする'
     notes: '`#` で始まらず要素の選び方を含まない要素は今までどおりで、項目が無ければ何もしない。解決した項目は配列でなくても削除する。共通のキーの列名への読み替えは `#` で始まる要素にはしない'
+  - item: remove_from の x-key を持つ配列
+    constraint: '`remove_from` のキーを解決した配列のスキーマ（`$ref` を解決した後）が `x-key` を持つとき、オブジェクトでない値は `x-key` のキーの値がその値と等しい要素を、オブジェクトの値はその値と等しい要素を削除する。等しい要素が複数あれば全て削除する。削除する要素が 1 つも無い値は `remove_from.{キー}` の違反にし、書き込まない。削除する要素が有るかは、`remove_from` を当てる前の配列で値ごとに判定する（同じ要素を指す値を 2 つ渡しても違反にしない）'
+    notes: '`x-key` を持たない配列は今までどおり渡した値と等しい要素を削除し、該当しない値は何もしない。制約「オブジェクトの配列のタグの書き戻し」の共通のキー（`tags`・`main_tags`）の読み方と、`#` で始まらないキーの項目が無いときに何もしない扱いは変えない'
+  - item: 1 つの操作の中の適用順
+    constraint: '`update` の 1 つの操作は、`set` → `unset` → `remove_from` → `add_to` → `text_edits` の順に当てる。同じ配列の要素を `remove_from` と `add_to` に渡すと、削除してから追加する'
+    notes: '`x-key` を持たない配列で同じ値を `remove_from` と `add_to` の両方に渡したときは、今までの「削除される」から「追加した要素が残る」に変わる'
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]

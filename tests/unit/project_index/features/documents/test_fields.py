@@ -712,3 +712,64 @@ def test_delete_field_when_ref_path_unresolved(path: str) -> None:
     with pytest.raises(InvalidArgumentError):
         delete_field(data, path, schema=_MODELS_SCHEMA)
     assert data == _models_data()
+
+
+_FLOWS_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "flows": {
+            "type": "array",
+            "x-key": "name",
+            "items": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}, "summary": {"type": "string"}},
+            },
+        },
+        "models": _MODELS_SCHEMA["properties"]["models"],
+    },
+}
+
+
+def test_array_x_key() -> None:
+    """x-key を持つ配列（正常系）。"""
+    # 準備
+    data: dict[str, Any] = {"flows": [{"name": "A"}], **_models_data()}
+    # 実行
+    flows = fields_module.array_x_key(data, _FLOWS_SCHEMA, "flows")
+    ref_path = fields_module.array_x_key(data, _FLOWS_SCHEMA, "#models[Row].properties")
+    index_path = fields_module.array_x_key(data, _FLOWS_SCHEMA, "models[0].properties")
+    # 検証
+    assert flows == "name"
+    assert ref_path is None
+    assert index_path is None
+
+
+def test_array_x_key_when_ref() -> None:
+    """`$ref` を解決した配列（正常系）。"""
+    # 準備
+    schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {"steps": {"$ref": "#/$defs/steps"}},
+        "$defs": {
+            "steps": {
+                "type": "array",
+                "x-key": "name",
+                "items": {"type": "object", "properties": {"name": {"type": "string"}}},
+            }
+        },
+    }
+    data: dict[str, Any] = {"steps": [{"name": "s1"}]}
+    # 実行
+    result = fields_module.array_x_key(data, schema, "steps")
+    # 検証
+    assert result == "name"
+
+
+def test_array_x_key_when_no_schema() -> None:
+    """スキーマに無い項目（正常系）。"""
+    # 準備
+    data: dict[str, Any] = {"flows": [{"name": "A"}]}
+    # 実行
+    result = fields_module.array_x_key(data, {}, "flows")
+    # 検証
+    assert result is None

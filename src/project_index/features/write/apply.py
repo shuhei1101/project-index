@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, cast
 from project_index.features.documents.fields import (
     ANY_DEPTH_PREFIX,
     REF_PATH_PREFIX,
+    array_x_key,
     delete_field,
     get_field,
     resolve_array,
@@ -79,8 +80,10 @@ def apply_operation(
                 _violation(f"set.{path}", violation.rule) for violation in error.violations
             )
     violations.extend(_unset(content, operation.unset, schema))
+    # 同じ配列の要素を削除してから追加する（違反は add_to・remove_from の順に並べる）
+    removed = _remove_from(content, operation.remove_from, schema)
     violations.extend(_add_to(content, operation.add_to, schema))
-    violations.extend(_remove_from(content, operation.remove_from, schema))
+    violations.extend(removed)
     violations.extend(_text_edits(content, operation.text_edits, schema))
     if violations:
         raise InvalidArgumentError(message="操作を適用できません", violations=violations)
@@ -129,6 +132,7 @@ def _remove_from(
     for path, values in remove_from.items():
         try:
             existing = resolve_array(content, schema or {}, path, create=False)
+            key = array_x_key(content, schema or {}, path)
         except InvalidArgumentError as error:
             violations.extend(
                 _violation(f"remove_from.{path}", item.rule) for item in error.violations
@@ -141,8 +145,41 @@ def _remove_from(
                 _violation(f"remove_from.{path}", "配列ではない項目からは削除できません")
             )
             continue
-        existing[:] = [item for item in existing if item not in values]
+        violations.extend(_remove_values(existing, values, key, path))
     return violations
+
+
+def _remove_values(
+    existing: list[Any], values: list[Any], key: str | None, path: str
+) -> list[Violation]:
+    """1 つの配列から `remove_from` の値の要素を除き、削除する要素が無い値の違反を返す。"""
+    # x-key を持たない配列: 渡した値と等しい要素を除く（該当しない値は何もしない）
+    if key is None:
+        existing[:] = [item for item in existing if item not in values]
+        return []
+    # x-key を持つ配列: 除く前の配列で、値ごとに削除する要素が有るかを確かめる
+    missing = [
+        value for value in values if not any(_matches(item, value, key) for item in existing)
+    ]
+    if missing:
+        # 削除する要素が無い値がある: 値ごとの違反にして、この配列は除かない
+        return [
+            _violation(f"remove_from.{path}", f"{path} に {value!r} の要素がありません")
+            for value in missing
+        ]
+    existing[:] = [
+        item for item in existing if not any(_matches(item, value, key) for value in values)
+    ]
+    return []
+
+
+def _matches(item: object, value: object, key: str) -> bool:
+    """`x-key` を持つ配列の要素が、`remove_from` の値の削除する要素かを返す。"""
+    # オブジェクトの値: 要素そのものと等しいか
+    if is_dict(value):
+        return item == value
+    # オブジェクトでない値: 要素の x-key のキーの値と等しいか
+    return is_dict(item) and key in item and item[key] == value
 
 
 def _text_edits(
@@ -379,15 +416,16 @@ def _apply_all_key(
         elements = _rebuild(elements, item, data[key])
     if key in operation.set:
         elements = _rebuild(elements, item, operation.set[key])
+    # 同じ名前を削除してから追加する
+    if key in operation.remove_from:
+        removed = operation.remove_from[key]
+        elements = [element for element in elements if element.get(item) not in removed]
     if key in operation.add_to:
         present = {element.get(item) for element in elements}
         for name in operation.add_to[key]:
             if name not in present:
                 elements.append({item: name})
                 present.add(name)
-    if key in operation.remove_from:
-        removed = operation.remove_from[key]
-        elements = [element for element in elements if element.get(item) not in removed]
     return elements, key in operation.unset
 
 
@@ -449,15 +487,16 @@ def _apply_selected_key(
             chosen, missing = _known(values[key], by_name, where, problem)
             violations.extend(missing)
             _mark(elements, flag, item, set(chosen))
+    # 同じ名前の真偽値のキーを削除してから立てる
+    if key in operation.remove_from:
+        for name in operation.remove_from[key]:
+            if name in by_name:
+                by_name[name].pop(flag, None)
     if key in operation.add_to:
         chosen, missing = _known(operation.add_to[key], by_name, "add_to", problem)
         violations.extend(missing)
         for name in chosen:
             by_name[name][flag] = True
-    if key in operation.remove_from:
-        for name in operation.remove_from[key]:
-            if name in by_name:
-                by_name[name].pop(flag, None)
     if key in operation.unset:
         _mark(elements, flag, item, set())
     return violations
