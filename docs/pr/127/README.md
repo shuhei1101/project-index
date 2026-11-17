@@ -1,0 +1,1 @@
+# 単体テストの test_check_port 系がランナーでときどき PortInUseError で fail する不具合を修正する
