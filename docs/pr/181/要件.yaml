@@ -1,0 +1,16 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: run_only
+    detail: エージェントが worktree を指して文書を調べるとき、読み取りの検査が変えた後の validators の行とスクリプトの結果を返却する。シナリオの流れは変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: run_only
+    detail: 利用者かエージェントが検査のスクリプトを変えた後の読み取りの検査の結果が変わる。シナリオの流れは変わらない
+    depends_on: []
+scope_out:
+  - item: 変換の結果のキャッシュ（`src/project_index/features/convert/service.py` の `_cache_path`）のキーにスクリプトの内容を含めること（キーは行の `run` を含むが、スクリプトのファイルを書き換えても文書のバージョンが変わらない限り前の結果を返却する）
+    reason: 要望は検査の読み取りの結果のキャッシュに限る。スクリプトの内容をキーにする値の作り方をこの作業 PR のモジュール構成設計で決めるため、変換もその作り方へ寄せる後続にする
+    plan: to_file
+docs: []
