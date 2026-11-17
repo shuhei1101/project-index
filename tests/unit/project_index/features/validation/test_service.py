@@ -595,13 +595,13 @@ def test_document_checker_check_when_stamps_shared(
     # 準備
     _count_runs(monkeypatch)
     stamp_calls: list[Path] = []
-    real = service_module.script_stamp  # pyright: ignore[reportAttributeAccessIssue]
+    real = service_module.script_stamp
 
     def counting(base: Path, run: Any, **kwargs: Any) -> Any:
         stamp_calls.append(base)
         return real(base, run, **kwargs)
 
-    monkeypatch.setattr(service_module, "script_stamp", counting, raising=False)
+    monkeypatch.setattr(service_module, "script_stamp", counting)
     root = tmp_path / "ws"
     (root / "scripts").mkdir(parents=True)
     (root / "scripts" / "check.py").write_text("a\n", encoding="utf-8")
