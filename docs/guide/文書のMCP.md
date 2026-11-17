@@ -12,7 +12,7 @@
 | ツール | 種類 | 役割 |
 | --- | --- | --- |
 | `search_docs` | 読み取り | 検索・取得・一覧・件数・集計 |
-| `write_docs` | 書き込み | 作成・部分更新・置き換え（一括） |
+| `write_docs` | 書き込み | 作成・部分更新・置き換え・改名・一括置換（一括） |
 | `delete_docs` | 書き込み（`destructiveHint: true`） | 削除（一括） |
 | `describe` | 読み取り | 使える配信元の一覧・説明書・種類・スキーマ |
 | `list_changes` | 読み取り | 区間か前回読んだ時点からの変更 |
@@ -253,7 +253,7 @@ YAML として読めないファイルがあっても、そのファイルを除
 
 ## write_docs
 
-文書の作成・部分更新・置き換えを配列で受け、変更を当てた後の文書を配信元のスキーマと `validators[]` に通してから書き込みます。
+文書の作成・部分更新・置き換え・改名と、複数の文書の文字列の一括置換を配列で受け、変更を当てた後の文書を配信元のスキーマと `validators[]` に通してから書き込みます。
 書き込みの先は [配信元と権限](./コアコンセプト-配信元と権限.md) の「書き込みの先」のとおりです。
 
 | 引数 | 型 | 既定 | 説明 |
@@ -266,16 +266,21 @@ YAML として読めないファイルがあっても、そのファイルを除
 
 | Operation のキー | 使える `op` | 説明 |
 | --- | --- | --- |
-| `op` | すべて | `create`（新しい文書）・`update`（部分更新）・`replace`（全項目の置き換え）。upsert は無い |
+| `op` | すべて | `create`（新しい文書）・`update`（部分更新）・`replace`（全項目の置き換え）・`rename`（改名）・`replace_text`（一括置換）。upsert は無い |
 | `kind` | `create`（必須） | 種類（`documents[].id`）。スキーマと配置先を決める |
-| `id` | `update`・`replace`（必須）、`create`（省略可） | 対象の文書の ID。`create` で省くと `ids.format` から作る |
-| `expected_version` | `update`・`replace`（必須） | 読んだときのバージョン。`update` では項目のパスごとのハッシュも受ける |
+| `id` | `update`・`replace`・`rename`（必須）、`create`（省略可） | 対象の文書の ID。`create` で省くと `ids.format` から作る |
+| `expected_version` | `update`・`replace`・`rename`（必須） | 読んだときのバージョン。`update` では項目のパスごとのハッシュも受ける |
 | `data` | `create`・`replace`（必須） | 文書の全項目 |
 | `set` | `update` | 項目に値を入れる。オブジェクトは再帰的にマージし、配列と値は置き換える |
 | `unset` | `update` | 消す項目のパスの配列 |
 | `add_to` | `update` | 配列の項目の末尾へ要素を追加する |
 | `remove_from` | `update` | 配列の項目から一致する要素を削除する |
 | `text_edits` | `update` | `[{field, old, new, replace_all}]`。`replace_all` が `false` のとき `old` が 1 か所だけ一致すること |
+| `new_id` | `rename` | 改名後の ID。`new_id`・`new_path` の少なくとも 1 つを指定する |
+| `new_path` | `rename` | 改名後のファイルの配信元の直下からのパス。`records`・`body_file` の行の文書は本文のファイルのパス |
+| `filter` | `replace_text`（必須） | 置換する文書の条件。`search_docs` の `filter` と同じ |
+| `old`・`new` | `replace_text`（必須） | 置換する前と後の文字列。`old` は空にできない |
+| `fields` | `replace_text` | 置換する項目のパス。省くと全ての項目 |
 
 <!-- /table -->
 
@@ -334,7 +339,26 @@ YAML として読めないファイルがあっても、そのファイルを除
 mdmark の CLI が `PATH` に無いか、点検が端末の設定の `script_timeout_sec` を超えた・結果を出さずに終わったときは、点検せずに書き込み、そのキーと理由を `results[].unchecked` に返します。
 
 レスポンスは `applied`（1 件以上を書いたか。`dry_run` は常に `false`）と `results[]` です。
-`results[]` は `index`・`id`・`status`（`created`・`updated`・`replaced`・`failed`）・`version`・`diff`（`updated`・`replaced` と `dry_run`）・`errors`（`failed` のとき、項目のパス・決まり・直し方と、スキーマの違反では違反した項目のスキーマの `title`・`description`・`x-rules`・`examples`・`x-bad-examples` のうちスキーマが持つものを入れた `schema`）・`unchecked`（mdmark で点検できなかったキーのパスと理由）を持ちます。
+`results[]` は `index`・`id`・`status`（`created`・`updated`・`replaced`・`renamed`・`failed`）・`version`・`diff`（`updated`・`replaced` と `dry_run`）・`errors`（`failed` のとき、項目のパス・決まり・直し方と、スキーマの違反では違反した項目のスキーマの `title`・`description`・`x-rules`・`examples`・`x-bad-examples` のうちスキーマが持つものを入れた `schema`）・`unchecked`（mdmark で点検できなかったキーのパスと理由）を持ちます。
+`rename` は改名した文書の `renamed` の行（`path`・`renamed_from` つき）と、参照元ごとの `updated` の行（書き換えた箇所の `references` つき）を同じ `index` で返します。
+`replace_text` は置換した文書ごとの `updated` の行（置換の件数の `count` つき）を同じ `index` で返し、置換が 0 件の文書の行は返しません。
+
+### 改名
+
+`rename` は文書の ID とファイルを変え、同じ配信元の文書のうち旧 ID・旧パスを指す箇所を書き換えます。
+
+- `new_path` を省くと、ファイル名の最初の `.` より前が旧 ID の 1 ファイル 1 文書だけ、その部分を `new_id` にしたパスへ移します（`IF-6.yaml` → `IF-9.yaml`）
+- ID の列の値を持たない文書（ID がパスの文書）は `new_id` を受けず、`new_path` で ID も変わります
+- 書き換える参照元の箇所は、`related` の `to`（`source` を持たない行）・値の全体が `{旧 ID}#{項目のパス}` の値・文字列の中の `id:{旧 ID}`（Markdown のリンクと `click` の `href`）・パスが変わるときは値の全体と Markdown のリンクの先のうちその文書のフォルダから改名前のパスを指す値（`index.yaml` の `page` など）です。改名した文書自身の中の参照も書き換えます
+- 本文のファイルの中と、ほかの配信元からの参照は書き換えません
+- 改名後の ID が既にある文書と重なるとき・`ids.format` に合わないときは `new_id` の違反、`new_path` が種類の行の `paths` に該当しないか `exclude[]` に該当するとき・既にあるファイルを指すときは `InvalidArgumentError` です
+
+### 一括置換
+
+`replace_text` は `filter` に該当する文書の、文字列の値（配列の要素・辞書の値の配下を含む）の `old` を全て `new` にします。
+
+- 辞書のキー・文字列でない値・種類の行の ID の列と `body_file` の列・本文のファイルは置換しません
+- 置換した文書が 1 件でも検査に合格しなければ、その操作では文書を 1 件も書き込みません（`atomic: false` でも同じ）
 
 ## delete_docs
 

@@ -1178,7 +1178,219 @@ flows:
       - 2 回目の後、Row の `properties` が `[c]`
       - '3・4・5 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].add_to.{キー}` で、文書 1 を書き換えない（`applied: true` を返さない）'
     test: test_normal_when_add_to_ref_path
-lead: 文書の作成・部分更新・置き換えを検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
+  - name: 正常系（文書を改名して参照元を追随させる）
+    summary: '`rename` で ID とファイル名を変え、同じ配信元の参照元を書き換える。`dry_run` では書き換わる箇所だけを返却する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 参照されている文書
+        description: ワークツリー x の文書 2（`docs/doc-2.yaml`）。文書 1 が `related` の `to`・参照の型の項目の値 `doc-2#items[a]`・Markdown の値の `[文書 2](id:doc-2)` とクラス図の `click N href "id:doc-2#items[a]"` で文書 2 を指す
+        notes: 文書 1 は `doc-20` を指す `[文書 20](id:doc-20)` も持つ。文書 3 は文書 2 を指さない
+      - name: 入力
+        description: '1 回目は `rename`・`id: doc-2`・`new_id: doc-9`・`dry_run: true`。2 回目は同じ操作を `dry_run` なしで指定する'
+    flow: |-
+      <!-- map: {"title": "正常系（文書を改名して参照元を追随させる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: rename doc-2 → doc-9, dry_run: true
+        T->>T: 同じ配信元の文書から doc-2 を指す箇所を探し、書き換えた後の文書を検査する
+        T-->>C: applied: false、renamed と参照元の updated（references）
+        C->>T: rename doc-2 → doc-9
+        T->>WT: docs/doc-9.yaml を作成して docs/doc-2.yaml を削除し、文書 1 を書き換える
+        T-->>C: applied: true、renamed と参照元の updated
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目は `applied: false` で、`results[0]` が `status: renamed`・`id: doc-9`・`renamed_from: doc-2`・`path: docs/doc-9.yaml`、`results[1]` が `index: 0`・文書 1 の `id`・`status: updated` で `references` に 4 か所を持ち、ワークツリー x のファイルは変わらない'
+      - 2 回目の後、`docs/doc-9.yaml` があり `id` が `doc-9` でほかの項目は改名の前と同じで、`docs/doc-2.yaml` が無い
+      - 文書 1 の `related` の `to`・`doc-9#items[a]`・`[文書 2](id:doc-9)`・`click N href "id:doc-9#items[a]"` になり、`[文書 20](id:doc-20)` とほかの項目は変わらず、変更していない行の引用符の種類も保つ
+      - 文書 3 は変わらず、次の `search_docs` が `doc-9` を返却し `doc-2` を返却しない
+    test: test_normal_when_rename
+  - name: 正常系（ID を変えずにファイル名だけを改名する）
+    summary: '`new_path` だけの `rename` でファイルを移し、パスで指す参照元を書き換える'
+    setup:
+      - name: Mock
+        description: なし
+      - name: パスで指す目次
+        description: 'ワークツリー x の `docs/index.yaml`（目次の種類の文書）が `items[].page: doc-2.yaml` で文書 2 を指す'
+        notes: 文書 1 の `related` は文書 2 を ID で指す
+      - name: 入力
+        description: '`rename`・`id: doc-2`・`new_path: docs/doc-2-old.yaml`'
+    flow: |-
+      <!-- map: {"title": "正常系（ID を変えずにファイル名だけを改名する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: rename doc-2、new_path: docs/doc-2-old.yaml
+        T->>T: 改名前のパスを指す箇所を探し、検査する
+        T->>WT: docs/doc-2-old.yaml を作成して docs/doc-2.yaml を削除し、docs/index.yaml を書き換える
+        T-->>C: renamed と参照元の updated
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`docs/doc-2-old.yaml` があり `id` は `doc-2` のままで、`docs/doc-2.yaml` が無い'
+      - '`docs/index.yaml` の `page` が `doc-2-old.yaml` になり、文書 1 は変わらない'
+    test: test_normal_when_rename_path_only
+  - name: 正常系（本文のファイルを持つ文書を改名する）
+    summary: '`records`・`body_file` の行の文書を `new_path` で改名し、要素の `body_file` の列と本文のファイルを移す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 本文のファイルを持つ行
+        description: '行 `files`（`paths: [notes/files.yaml]`・`records: files`・`body_file: path`、要素は ID の列の値を持たない）。要素 1 件の `path` が `n1.md`'
+        notes: 文書の ID は本文のファイルのパス `notes/n1.md`。文書 1 の `related` が `notes/n1.md` を指す
+      - name: 入力
+        description: '1 回目は `rename`・`id: notes/n1.md`・`new_path: notes/sub/n9.md`。2 回目は別の文書に `new_id` だけを指定する'
+    flow: |-
+      <!-- map: {"title": "正常系（本文のファイルを持つ文書を改名する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: rename notes/n1.md、new_path: notes/sub/n9.md
+        T->>T: notes/n1.md を指す参照元を探し、検査する
+        T->>WT: notes/files.yaml の path を sub/n9.md にし、notes/n1.md を notes/sub/n9.md へ移し、文書 1 を書き換える
+        T-->>C: renamed（id: notes/sub/n9.md）と参照元の updated
+        C->>T: rename 別の文書、new_id だけ
+        T-->>C: isError（ID がパスの文書に new_id は指定できない、new_path を使用すること）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目の後、`notes/files.yaml` の要素の `path` が `sub/n9.md` で、ほかの列とほかの要素は変わらない
+      - '`notes/sub/n9.md` の内容が改名の前の `notes/n1.md` と同じで、`notes/n1.md` が無い'
+      - 文書 1 の `related` が `notes/sub/n9.md` を指し、`check_project` の `unindexed_files` に `notes/n1.md`・`notes/sub/n9.md` が出ない
+      - '2 回目は `isError: true`（InvalidArgumentError）で、ファイルは変わらない'
+    test: test_normal_when_rename_body_file
+  - name: 異常系（改名後の ID が既にある・ValidationFailedError）
+    summary: '`new_id` が既にある文書の ID と重なる `rename` を断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`rename`・`id: doc-2`・`new_id: doc-1`'
+    flow: |-
+      <!-- map: {"title": "異常系（改名後の ID が既にある・ValidationFailedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: rename doc-2 → doc-1
+        T->>T: doc-1 が既にある
+        T-->>C: isError（添字 0・new_id の重複）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、添字 0 の `new_id` の違反として `doc-1` が既にあることを返却する'
+      - ワークツリー x のファイルは変わらず、`docs/doc-1.yaml` も上書きされない
+    test: test_error_when_rename_id_exists
+  - name: 異常系（改名後のパスが配置先に該当しない・InvalidArgumentError）
+    summary: 種類の行の `paths` に該当しない `new_path` と、既にあるファイルを指す `new_path` を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '1 回目は `rename`・`id: doc-2`・`new_path: other/doc-2.yaml`（種類の `paths` は `docs/*.yaml`）。2 回目は `new_path: docs/doc-3.yaml`（既にある）'
+    flow: |-
+      <!-- map: {"title": "異常系（改名後のパスが配置先に該当しない・InvalidArgumentError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: rename doc-2、new_path: other/doc-2.yaml
+        T-->>C: isError（種類の paths に該当しない）
+        C->>T: rename doc-2、new_path: docs/doc-3.yaml
+        T-->>C: isError（既にあるファイル）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 'どちらも `isError: true` で、`new_path` と断った理由を返却する'
+      - ワークツリー x のファイルは変わらない
+    test: test_error_when_rename_path_invalid
+  - name: 正常系（複数の文書の単語を一括で置換する）
+    summary: '`replace_text` で `filter` に該当する文書の配下の文字列を置換し、文書ごとの件数を返却する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 単語を持つ文書
+        description: 文書 1 は `description` に `旧語` を 1 つ、配列 `items[].text` に 2 つ、辞書 `notes` の値に 1 つ持ち、キー名 `旧語` の辞書のキーを持つ。文書 2 は `name` に 1 つ持つ。文書 3 も `旧語` を持つ
+        notes: 文書 1・文書 2 はタグ `topic:a` を持ち、文書 3 は持たない
+      - name: 入力
+        description: '1 回目は `replace_text`・`filter: {field: tags, op: eq, values: [topic:a]}`・`old: 旧語`・`new: 新語`・`dry_run: true`。2 回目は `dry_run` なし。3 回目は 1 回目の前の状態に `fields: [items]` を指定する'
+    flow: |-
+      <!-- map: {"title": "正常系（複数の文書の単語を一括で置換する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: replace_text topic:a、旧語 → 新語、dry_run: true
+        T->>T: filter に該当する文書の文字列の値をたどって置換し、検査する
+        T-->>C: applied: false、文書ごとの count と diff
+        C->>T: replace_text topic:a、旧語 → 新語
+        T->>WT: 文書 1・文書 2 を書き換える
+        T-->>C: applied: true、文書ごとの count と version
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目は `applied: false` で、`results` が `index: 0` の 2 行（文書 1 は `count: 4`、文書 2 は `count: 1`、どちらも `status: updated` と `diff`）で、ファイルは変わらない'
+      - 2 回目の後、文書 1・文書 2 の値の `旧語` が全て `新語` になり、辞書のキー `旧語` と文書 3 は変わらず、変更していない行のコメントと引用符の種類も保つ
+      - '3 回目は文書 1 の `items[].text` だけが置換され `count: 2` で、文書 2 の行は返却しない'
+    test: test_normal_when_replace_text
+  - name: 異常系（一括置換の後の文書が検査に合格しない・ValidationFailedError）
+    summary: 置換した文書が 1 件でも検査に合格しなければ、どの文書も書き換えない
+    setup:
+      - name: Mock
+        description: なし
+      - name: 単語を持つ文書
+        description: 正常系（複数の文書の単語を一括で置換する）と同じ文書 1・文書 2
+        notes: 文書 2 の `name` のスキーマは改行を許可しない `pattern` を持つ
+      - name: 入力
+        description: '1 回目は `replace_text`・`new` に改行を含む値。2 回目は同じ操作と、通る `update` 1 件を `atomic: false` で指定する'
+    flow: |-
+      <!-- map: {"title": "異常系（一括置換の後の文書が検査に合格しない・ValidationFailedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: replace_text（new に改行）
+        T->>T: 文書 2 が検査に合格しない
+        T-->>C: isError（添字 0・文書 2 の id・違反したパス）
+        C->>T: replace_text と update、atomic: false
+        T-->>C: replace_text は failed、update は updated
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目は `isError: true` で、添字 0 の違反に文書 2 の `id` と `name` のパス・決まり・修正方法があり、文書 1 も文書 2 も変わらない'
+      - 2 回目は `replace_text` の行が `failed` で文書 1・文書 2 は変わらず、`update` の文書だけが書き換わる
+    test: test_error_when_replace_text_validation_failed
+lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
     main: true
@@ -1200,6 +1412,11 @@ callers:
   - SC-7#scenarios[異常シナリオ（検査のスクリプトが制限時間を超える）]
   - SC-7#scenarios[正常シナリオ（本文のファイルを持つ文書を書く）]
   - SC-7#scenarios[異常シナリオ（本文のファイルを書き込めない）]
+  - SC-7#scenarios[正常シナリオ（文書を改名して参照元を追随させる）]
+  - SC-7#scenarios[異常シナリオ（改名先の ID が既にある）]
+  - SC-7#scenarios[正常シナリオ（本文のファイルを持つ文書を改名する）]
+  - SC-7#scenarios[正常シナリオ（複数の文書の単語を一括で置換する）]
+  - SC-7#scenarios[異常シナリオ（一括置換の後の文書が検査に合格しない）]
 exclusivity: 配信元ごとの排他ロックの中で、読み込み・バージョンの確認・検査・書き込みを行う。後から来た呼び出しはロックを待つ
 request:
   - name: source
@@ -1223,10 +1440,10 @@ request:
     description: 並べた順に適用する操作
     constraints: 1〜50 件
   - name: operations[].op
-    type: Literal['create', 'update', 'replace']
+    type: Literal['create', 'update', 'replace', 'rename', 'replace_text']
     required: true
     location: argument
-    description: '`create` は新しい文書、`update` は部分更新、`replace` は全項目の置き換え'
+    description: '`create` は新しい文書、`update` は部分更新、`replace` は全項目の置き換え、`rename` は文書の ID・パスの変更と参照元の追随、`replace_text` は `filter` に該当する文書の文字列の値の一括置換'
     notes: upsert は置かない
   - name: operations[].kind
     type: str
@@ -1237,14 +1454,14 @@ request:
   - name: operations[].id
     type: str
     required: false
-    default: なし（`update`・`replace` では必須。`create` で省くと `ids.format` から作る）
+    default: なし（`update`・`replace`・`rename` では必須。`create` で省くと `ids.format` から作る）
     location: argument
     description: 対象の文書の ID
     constraints: '`ids.format` に合い、配信元の中で重複しない'
   - name: operations[].expected_version
     type: str | dict[str, str]
     required: false
-    default: なし（`update`・`replace` では必須）
+    default: なし（`update`・`replace`・`rename` では必須）
     location: argument
     description: 読んだときのバージョン
     notes: '`update` では項目のパスごとのハッシュも受ける'
@@ -1343,6 +1560,51 @@ request:
     location: argument
     description: 置き換える文字列の項目のパス。`@body` は本文のファイルの一部を置き換える。`#` で始まるパスは参照の型の項目のパス（`#functions[apply_migration].process`）で、配列の要素を種類のスキーマの `x-key` の値で指す
     notes: '`@body` は `records`・`body_file` の行の文書だけ。参照の型の項目のパスの読み方は制約の「参照の型の項目のパス」'
+  - name: operations[].new_id
+    type: str
+    required: false
+    default: なし（ID を変えない）
+    location: argument
+    description: 改名後の ID
+    constraints: '`ids.format` に合い、配信元の中で重複しない。ID の列（種類の行の `metadata.id`。省くと `id`）の値を持たない文書（ID がパスの文書）では受けない'
+    notes: '`rename` だけ。`new_id`・`new_path` の少なくとも 1 つを指定する'
+  - name: operations[].new_path
+    type: str
+    required: false
+    default: なし（制約の「改名後のパス」で決める）
+    location: argument
+    description: 改名後のファイルの配信元の直下からのパス。1 ファイル 1 文書は YAML のファイル、`records`・`body_file` の行の文書は本文のファイル
+    constraints: 種類の行の `paths` に該当し `exclude[]` に該当しない（`body_file` の行は配信元の中）。既にあるファイルを指さない。`body_file` を持たない `records` の行の文書では受けない
+    notes: '`rename` だけ'
+  - name: operations[].filter
+    type: Condition | Group
+    required: false
+    default: なし（`replace_text` では必須）
+    location: argument
+    description: 置換する文書の条件。[文書の検索](id:IF-2) の `filter` と同じ記載方法と意味
+    notes: '`replace_text` だけ'
+  - name: operations[].old
+    type: str
+    required: false
+    default: なし（`replace_text` では必須）
+    location: argument
+    description: 置換する前の文字列。大文字小文字を区別して文字列のまま一致させる
+    constraints: 空でない
+    notes: '`replace_text` だけ'
+  - name: operations[].new
+    type: str
+    required: false
+    default: なし（`replace_text` では必須）
+    location: argument
+    description: 置換した後の文字列
+    notes: '`replace_text` だけ。空の文字列で `old` を削除する'
+  - name: operations[].fields
+    type: list[str]
+    required: false
+    default: なし（制約の「一括置換の対象」の全ての項目）
+    location: argument
+    description: 置換する項目のパス。項目の配下の文字列も置換する
+    notes: '`replace_text` だけ。共通のキーは列名へ読み替える'
 request_example: |-
   ```json
   {
@@ -1365,7 +1627,7 @@ response:
     type: str
     description: 文書の ID
   - name: results[].status
-    type: Literal['created', 'updated', 'replaced', 'failed']
+    type: Literal['created', 'updated', 'replaced', 'renamed', 'failed']
     description: 操作の結果
   - name: results[].version
     type: str
@@ -1383,6 +1645,22 @@ response:
     type: 'list[{path: str, reason: str}]'
     description: mdmark の点検に通す Markdown のキーのうち、点検できなかったキーのパスと理由
     notes: '点検できなかったキーがあるときだけ。`failed` では返さない'
+  - name: results[].path
+    type: str
+    description: 改名後のファイルの配信元の直下からのパス
+    notes: '`renamed` のときだけ'
+  - name: results[].renamed_from
+    type: str
+    description: 改名の前の ID
+    notes: '`renamed` のときだけ'
+  - name: results[].references
+    type: 'list[{path: str, before: str, after: str}]'
+    description: 改名で書き換えた参照元の箇所（項目のパスと、書き換える前後の値）
+    notes: '`rename` の参照元の文書の行だけ。`rename` の参照元は、改名した文書の行と同じ `index` で `status` が `updated` の行になる'
+  - name: results[].count
+    type: int
+    description: 文書ごとの置換の件数
+    notes: '`replace_text` だけ。置換した文書ごとに同じ `index` で 1 行ずつ返却し、置換が 0 件の文書の行は返却しない'
 response_example: |-
   ```json
   {"applied": true, "results": [
@@ -1395,7 +1673,7 @@ exceptions:
   - name: なし（正常終了）
     condition: '全ての操作を書いた（`atomic: false` で一部が失敗したときも、失敗分を `failed` として返して正常終了）'
   - name: ValidationFailedError
-    condition: '変更を当てた後の文書がスキーマか `validators[]` に通らないか、種類のスキーマの `$ref` を解決できないか、変えた Markdown のキーの値に mdmark の描画時の書き方の警告があるか、本文のファイルのパスが配信元の外・`create` で既にあるファイルを指す（`atomic: true`）か、書き込むワークツリーの配信元の設定が検証に通らない'
+    condition: '変更を当てた後の文書（`rename` の参照元と `replace_text` で置換した文書を含む）がスキーマか `validators[]` に通らないか、`rename` の `new_id` が `ids.format` に合わないか既にある文書と重なるか、種類のスキーマの `$ref` を解決できないか、変えた Markdown のキーの値に mdmark の描画時の書き方の警告があるか、本文のファイルのパスが配信元の外・`create` で既にあるファイルを指す（`atomic: true`）か、書き込むワークツリーの配信元の設定が検証に通らない'
     notes: '違反ごとの添字・パス・決まり・直し方を添える。スキーマの違反には、違反した項目のスキーマの説明（`schema`）も添える'
   - name: SourceNotWritableError
     condition: '`cwd` が配信元の `scope.write` に当たらない'
@@ -1413,7 +1691,7 @@ exceptions:
     condition: '`update`・`replace` の `id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
   - name: InvalidArgumentError
-    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先が行の `exclude[]` に当たる（`/` を含む値はパス、含まない値はファイル名で当てる）・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す'
+    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先が行の `exclude[]` に当たる（`/` を含む値はパス、含まない値はファイル名で当てる）・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`rename` に `new_id`・`new_path` がどちらも無い・ID がパスの文書に `new_id` を渡した・`body_file` を持たない `records` の行の文書に `new_path` を渡した・`new_path` が種類の行の `paths` に当たらないか `exclude[]` に当たるか既にあるファイルを指す・`replace_text` に `filter`・`old`・`new` のどれかが無いか `old` が空・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す'
   - name: SourceNotServedError
     condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
   - name: WorktreeNotMatchedError
@@ -1500,6 +1778,21 @@ constraints:
   - item: add_to・remove_from の項目のパス
     constraint: '`add_to`・`remove_from` のキーが `#` で始まるとき、「参照の型の項目のパス」と同じ読み方で文書の中の 1 つの配列へ解決し、その配列へ追加・削除する。解決できないパス（無い要素・`x-key` の無い配列・無いキー）と、解決した値が配列でないパスは `add_to.{パス}`・`remove_from.{パス}` の違反にする。`#` で始まらないキーに要素の選び方（`[...]`・`**.`）を含めると、書き込まずに同じ違反にする'
     notes: '`#` で始まらない要素の選び方を含まないキーは今までどおりで、項目が無ければ `add_to` は空の配列を作り、`remove_from` は何もしない。`#` で始まるキーは配列を作らない。共通のキーの列名への読み替えは `#` で始まるキーにはしない'
+  - item: 改名後のパス
+    constraint: '`new_path` を省いた `rename` は、ファイル名の最初の `.` より前が旧 ID と一致する 1 ファイル 1 文書だけ、同じフォルダでその部分を `new_id` にしたパスへ移す（`IF-6.yaml` → `IF-9.yaml`、`MOD-1.py.yaml` → `MOD-2.py.yaml`）。一致しない文書と `records` の要素の文書はパスを変えない'
+    notes: '`new_id` を省いた `rename` は ID を変えない。ID がパスの文書は、`new_path` で ID も変わる'
+  - item: 改名の書き込み
+    constraint: 1 ファイル 1 文書は、改名後のパスに YAML を作成して改名前のファイルを削除する。`records`・`body_file` の行の文書は、管理用の YAML の要素の `body_file` の列を管理用の YAML のフォルダからの相対で書き換え、本文のファイルを移す。移すファイルの内容は変えない
+    notes: どちらも、全ての検査に合格してから一時ファイルを経由して置き換える。project-index は `git mv` しない
+  - item: 改名の参照元
+    constraint: "同じ配信元の全ての文書から、次の箇所を書き換える。(1) 種類の行の `metadata.related` の列の、`source` を持たず `to` が旧 ID の行の `to`。(2) 文字列の値の全体が `{旧 ID}#{項目のパス}` の値の ID の部分。(3) 文字列の値の中の `id:{旧 ID}` のうち、直後が `#`・`)`・`\"`・`'`・空白・文字列の末尾のものの ID の部分（Markdown のリンク・mermaid の `click` の `href`）。(4) パスが変わるとき、文字列の値の全体と Markdown のリンクの先のうち、その文書のファイルのフォルダから解くと改名前のパスになる値を、同じフォルダから改名後のパスを指す相対の値（`index.yaml` の `page: IF-6.yaml` など）"
+    notes: 本文のファイルの中と、ほかの配信元からの参照は書き換えない。書き換えた参照元の文書も検査と mdmark の点検に合格させる
+  - item: 一括置換の対象
+    constraint: '`filter` に該当する文書の、文字列の値（配列の要素・辞書の値の配下を含む）の `old` を全て `new` にする。辞書のキー・文字列でない値・種類の行の ID の列と `body_file` の列・本文のファイルは置換しない'
+    notes: '`old` を含まない文書は書き換えず、検査しない。置換した文書が 1 件も無いときは `results` に行を返却せず正常終了する'
+  - item: 一括置換の失敗
+    constraint: 置換した文書が 1 件でも検査に合格しなければ、その `replace_text` の操作全体を失敗にする。違反には合格しなかった文書の `id` を添える
+    notes: '`atomic: false` でも、同じ操作の合格した文書だけを書き込むことはしない'
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]

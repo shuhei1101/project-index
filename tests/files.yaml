@@ -1068,6 +1068,24 @@ files:
   related:
   - to: src/project_index/features/write/placement.py
     type: tests
+- path: unit/project_index/features/write/test_references.py
+  name: '`rename` の改名後のパスと、参照元の旧 ID・旧パスを指す箇所の書き換えの単体テスト'
+  description: 書き込みの references.py の単体テストを受け持ち、書き込みの references.py のテストを修正するときに参照する。
+  tags:
+  - topic:書き込み
+  - tool:pytest
+  related:
+  - to: src/project_index/features/write/references.py
+    type: tests
+- path: unit/project_index/features/write/test_replace.py
+  name: '`replace_text` の文書の配下の文字列の値の置換の単体テスト'
+  description: 書き込みの replace.py の単体テストを受け持ち、書き込みの replace.py のテストを修正するときに参照する。
+  tags:
+  - topic:書き込み
+  - tool:pytest
+  related:
+  - to: src/project_index/features/write/replace.py
+    type: tests
 - path: unit/project_index/features/write/test_service.py
   name: '`write_docs`・`delete_docs` の操作の適用・検査・書き換えと、バージョンの確かめの単体テスト'
   description: 書き込みの service.py の単体テストを受け持ち、書き込みの service.py のテストを修正するときに参照する。
