@@ -65,9 +65,7 @@ def _install(monkeypatch: pytest.MonkeyPatch, fake: FakeRun) -> None:
 
 def _install_mdmark(monkeypatch: pytest.MonkeyPatch, path: str | None) -> None:
     """`PATH` の mdmark の CLI を探す `shutil.which` を、`path` を返す偽物に差し替える。"""
-    monkeypatch.setattr(
-        "project_index.features.lifecycle.update.shutil.which", lambda name: path
-    )
+    monkeypatch.setattr("project_index.features.lifecycle.update.shutil.which", lambda name: path)
 
 
 def test_update_clone(
@@ -304,7 +302,9 @@ def test_reinstall_mdmark_when_npm_not_found(monkeypatch: pytest.MonkeyPatch) ->
     # 検証
     assert result is not None
     assert result.reinstalled is False
-    assert result.error == "npm install -g github:shuhei1101/mdmark#develop: コマンドが見つかりません"
+    assert (
+        result.error == "npm install -g github:shuhei1101/mdmark#develop: コマンドが見つかりません"
+    )
 
 
 def test_reinstall_mdmark_when_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
