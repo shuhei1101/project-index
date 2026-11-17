@@ -138,8 +138,7 @@ def test_snapshot_store_checkout_when_over_keep(
 
 def _timing_out_archive(monkeypatch: pytest.MonkeyPatch, commits: set[str]) -> None:
     """`commits` の `git archive` だけ、待ち時間の上限を超えたときと同じ失敗を送る包みに差し替える。"""
-    from project_index.shared.background import BackgroundGate
-from project_index.integrations.git import GitError
+    from project_index.integrations.git import GitError
 
     real = snapshot_module.run_git
 

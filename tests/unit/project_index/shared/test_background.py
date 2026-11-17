@@ -58,8 +58,9 @@ def test_background_gate_foreground_when_raised() -> None:
     # 準備
     gate, _, _ = _gate()
     # 実行・検証
+    message = "boom"
     with pytest.raises(RuntimeError, match="boom"), gate.foreground():
-        raise RuntimeError("boom")
+        raise RuntimeError(message)
     assert gate.active is False
 
 
