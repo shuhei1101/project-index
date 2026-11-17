@@ -454,8 +454,8 @@ flows:
       - name: Mock
         description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
       - name: 配信元
-        description: '検証に通る sample。行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`）の `src/files.yaml` が `a.yaml`・`b.py` の 2 行を持つ。行 `yaml`（`paths: [src/*.yaml]`・`exclude: [src/files.yaml]`）と、`enabled: false` の行 `off`（`paths: [src/b.py]`）を配置する'
-        notes: '`src/a.yaml` は行 `src` と行 `yaml` の文書になる。`src/b.py` は行 `off` が無効なので重ならない'
+        description: '検証に通る sample。行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`）の `src/files.yaml` が `a.yaml`・`b.py` の 2 行を持つ。行 `yaml`（`paths: [src/*.yaml]`。スキーマは `src/files.yaml` も通す）と、`enabled: false` の行 `off`（`paths: [src/b.py]`）を配置する'
+        notes: '`src/a.yaml` は行 `src` と行 `yaml` の文書になる。`src/files.yaml` は行 `yaml` の文書だが、行 `src` の管理用の YAML 自体なので数えない。`src/b.py` は行 `off` が無効なので重ならない'
       - name: 範囲のファイル
         description: '`src/a.yaml`（`id: src/a.yaml`）と `src/b.py` を配置する'
         notes: 2 つの行の `src/a.yaml` の文書の ID も重なる

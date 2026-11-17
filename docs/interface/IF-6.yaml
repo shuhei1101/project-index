@@ -1064,12 +1064,12 @@ flows:
       - name: Mock
         description: なし
       - name: 種類のスキーマ
-        description: 'sample の種類のスキーマが `functions`（`x-key: name` の配列。要素は `name`・`process` を持つ）を定める'
+        description: 'sample の種類のスキーマが `functions`（`x-key: name` の配列。要素は `name`・`process` を持つ）と、値が文字列の辞書 `notes` を定める'
         notes: '`functions` の定義は `$ref` で別の定義を指す'
       - name: 文書 1
-        description: '`functions` が `load`・`save`・`save` の順の 3 要素で、どれも `process` に `書き出す` を含む'
+        description: '`functions` が `load`・`save`・`save` の順の 3 要素で、どれも `process` に `書き出す` を含む。`notes` はキー `main.py の補足` の値に `書き出す` を含む'
       - name: 入力
-        description: '1 回目は `text_edits: [{field: "#functions[save].process", old: 書き出す, new: 保存する}]`。2 回目は `field` を `#functions[save#2].process` にした同じ操作。3 回目は `field` を `functions[save].process` にした同じ操作'
+        description: '1 回目は `text_edits: [{field: "#functions[save].process", old: 書き出す, new: 保存する}]`。2 回目は `field` を `#functions[save#2].process` にした同じ操作。3 回目は `field` を `functions[save].process` にした同じ操作。4 回目は `field` を `#notes[main.py の補足]` にした同じ操作'
         notes: 3 回目は `#` で始まらない既存の項目のパス（`[save]` はキー `save` が真の要素を選ぶ）
     flow: |-
       <!-- map: {"title": "正常系（参照の型の項目のパスで配列の要素の中を置き換える）"} -->
@@ -1089,6 +1089,9 @@ flows:
         T-->>C: updated
         C->>T: update 文書 1（text_edits functions[save].process）
         T-->>C: isError（文字列ではない項目）
+        C->>T: update 文書 1（text_edits #notes[main.py の補足]）
+        T->>T: 辞書のキー main.py の補足 を 1 階層として解決して置き換える
+        T-->>C: updated
       ```
 
       <!-- /map -->
@@ -1096,16 +1099,17 @@ flows:
       - 1 回目は 1 つ目の `save` の `process` の `書き出す` だけが `保存する` になり、`load` と 2 つ目の `save` は変わらない
       - 2 回目は 2 つ目の `save` の `process` だけが置き換わる
       - 3 回目は既存の項目のパスのまま読み、`text_edits[0].field` の「文字列ではない項目は置き換えられません」を返却し、ファイルを書き換えない
+      - 4 回目は `notes` のキー `main.py の補足` の値だけが置き換わり、`.` で区切らずに 1 階層のキーとして読む
     test: test_normal_when_text_edits_ref_path
   - name: 異常系（参照の型の項目のパスが要素を指せない・InvalidArgumentError）
-    summary: '`x-key` の無い配列・該当する要素の無い値・無い順番を指す参照の型の項目のパスを断る'
+    summary: '`x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す参照の型の項目のパスを断る'
     setup:
       - name: Mock
         description: なし
       - name: 種類のスキーマと文書 1
         description: 正常系（参照の型の項目のパスで配列の要素の中を置き換える）と同じ。スキーマは `x-key` を持たない配列 `steps`（要素は `name`・`body`）も定め、文書 1 は `steps` に 1 要素を持つ
       - name: 入力
-        description: '`text_edits` の `field` を、順に `#steps[a].body`・`#functions[missing].process`・`#functions[save#3].process` にした 3 回の `update`'
+        description: '`text_edits` の `field` を、順に `#steps[a].body`・`#functions[missing].process`・`#functions[save#3].process`・`#notes[missing]` にした 4 回の `update`'
     flow: |-
       <!-- map: {"title": "異常系（参照の型の項目のパスが要素を指せない・InvalidArgumentError）"} -->
 
@@ -1120,6 +1124,8 @@ flows:
         T-->>C: isError（該当する要素が無い）
         C->>T: update 文書 1（text_edits #functions[save#3].process）
         T-->>C: isError（無い順番）
+        C->>T: update 文書 1（text_edits #notes[missing]）
+        T-->>C: isError（無いキー）
       ```
 
       <!-- /map -->
@@ -1128,6 +1134,7 @@ flows:
       - 2 回目は `text_edits[0].field` の違反で、`functions` に `name` が `missing` の要素が無いことを返却する
       - 3 回目は `text_edits[0].field` の違反で、`name` が `save` の要素が 2 つしか無いことを返却する
       - いずれもファイルを書き換えない
+      - 4 回目は `text_edits[0].field` の違反で、`notes` にキー `missing` が無いことを返却する
     test: test_error_when_text_edits_ref_path_unresolved
 lead: 文書の作成・部分更新・置き換えを検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
