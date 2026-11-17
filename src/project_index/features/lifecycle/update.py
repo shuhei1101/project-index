@@ -74,6 +74,8 @@ def _reinstall_mdmark(mdmark_ref: str) -> MdmarkReinstallResult | None:
         error = f"{command}: コマンドが見つかりません"
     except subprocess.TimeoutExpired:
         error = f"{command}: {COMMAND_TIMEOUT_SEC} 秒で打ち切りました"
+    except OSError as os_error:
+        error = f"{command}: {os_error}"
     else:
         if result.returncode != 0:
             error = (
