@@ -361,9 +361,7 @@ class DocumentStore:
             ]:
                 del self._revision_files[key]
 
-    def _discard_files(
-        self, root: Path, kind_ids: set[str], seen_keys: set[_FileKey]
-    ) -> None:
+    def _discard_files(self, root: Path, kind_ids: set[str], seen_keys: set[_FileKey]) -> None:
         """作業ツリーから消えたファイルのキャッシュを捨てる。"""
         with self._lock:
             for key in [
