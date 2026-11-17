@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import contextlib
+import hashlib
 import json
 import logging
 import os
 import tempfile
 import threading
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path, PurePosixPath
@@ -128,6 +131,8 @@ def _file_violation(
 
 
 type ReadRef = Callable[[SchemaRef], RefSchema]
+# 文書の行 1 つ分のスキーマの確かめと読み込みを包む文脈を返す関数
+type _Unit = Callable[[], AbstractContextManager[None]]
 
 
 def _settings_lookup() -> SchemaRefLookup:
@@ -183,7 +188,11 @@ def _schema_violation(
 
 
 def _validate(
-    value: dict[str, Any], read_text: ReadText, read_ref: ReadRef, config_root: Path
+    value: dict[str, Any],
+    read_text: ReadText,
+    read_ref: ReadRef,
+    config_root: Path,
+    unit: _Unit = contextlib.nullcontext,
 ) -> list[Violation]:
     """配信元の設定の検証を、ファイルを `read_text` で読んで行う。"""
     violations = schema_violations(_source_schema(), value)
@@ -199,7 +208,9 @@ def _validate(
     ids = {name: {row["id"] for row in value.get(name, [])} for name in SCRIPT_TABLES}
     for index, row in enumerate(documents):
         violations.extend(_document_row_violations(index, row, ids))
-        found = _schema_violation(read_text, read_ref, index, row["schema"])
+        # 文書の行 1 つ分のスキーマの確かめを 1 件にする（配信元の一覧が休ませる単位）
+        with unit():
+            found = _schema_violation(read_text, read_ref, index, row["schema"])
         if found is not None:
             violations.append(found)
     violations.extend(_paths_base_violations(value.get("paths_base"), config_root))
@@ -303,14 +314,31 @@ def _check_schema_file(read_text: ReadText, key_path: str, relative: str) -> Vio
     return _check_schema(key_path, load_yaml(read_text(relative) or ""))
 
 
+# スキーマの内容のハッシュ → `check_schema` の違反の理由（違反が無ければ `None`）。内容だけで決まるので捨てない
+_checked: dict[str, str | None] = {}
+_checked_lock = threading.Lock()
+
+
 def _check_schema(key_path: str, schema: object) -> Violation | None:
-    """スキーマが JSON Schema（Draft 2020-12）として正しいかを確かめる。"""
-    try:
-        # 辞書・真偽値でない値も、メタスキーマの検査に渡して SchemaError の理由を得る
-        Draft202012Validator.check_schema(cast("Any", schema))
-    except SchemaError as error:
-        return Violation(path=key_path, rule=f"スキーマが正しくありません: {error.message}")
-    return None
+    """スキーマが JSON Schema（Draft 2020-12）として正しいかを確かめる（同じ内容の結果は使い回す）。"""
+    text = json.dumps(
+        schema, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str
+    )
+    key = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    with _checked_lock:
+        found = key in _checked
+        rule = _checked.get(key)
+    # 初めての内容: メタスキーマで検査して結果を記録する
+    if not found:
+        rule = None
+        try:
+            # 辞書・真偽値でない値も、メタスキーマの検査に渡して SchemaError の理由を得る
+            Draft202012Validator.check_schema(cast("Any", schema))
+        except SchemaError as error:
+            rule = f"スキーマが正しくありません: {error.message}"
+        with _checked_lock:
+            _checked[key] = rule
+    return None if rule is None else Violation(path=key_path, rule=rule)
 
 
 def check_scripts(config: SourceConfig, *, root: Path) -> list[Violation]:
@@ -575,6 +603,7 @@ def _assemble(
     at: tuple[str, str] | None = None,
     lookup: SchemaRefLookup | None = None,
     storage: StorageType | None = None,
+    unit: _Unit = contextlib.nullcontext,
 ) -> tuple[ServedSource | None, SourceConfig | None, list[Violation]]:
     """配信元の組み立て。`at` は（`default_ref` の commit, そのリビジョンの先頭の設定の内容）。"""
     values, violations = _read_configs(files, at[1] if at else None)
@@ -588,7 +617,7 @@ def _assemble(
     read_text = _commit_reader(root, top, commit) if top and commit else _disk_reader(root)
     merged = merge_configs(values)
     read_ref = _ref_reader(lookup)
-    violations = _validate(merged, read_text, read_ref, root)
+    violations = _validate(merged, read_text, read_ref, root, unit)
     if violations:
         return None, None, violations
     config = build_source_config(merged)
@@ -602,7 +631,7 @@ def _assemble(
     base = main_root or top or root
     # 文書の基準のフォルダ（範囲は検証で確かめてある）。設定ファイルのフォルダはそこからの相対パスで持つ
     docs_root, _ = _resolve_paths_base(config.paths_base, root, top)
-    schemas = _row_schemas(config, read_text, read_ref)
+    schemas = _row_schemas(config, read_text, read_ref, unit)
     served = ServedSource(
         id=source_id or config.name,
         root=docs_root,
@@ -625,15 +654,22 @@ def _assemble(
 
 
 def _row_schemas(
-    config: SourceConfig, read_text: ReadText, read_ref: ReadRef
+    config: SourceConfig,
+    read_text: ReadText,
+    read_ref: ReadRef,
+    unit: _Unit = contextlib.nullcontext,
 ) -> dict[str, dict[str, Any]]:
     """種類の行ごとのスキーマを読む（ほかの配信元の参照は、検証で読んだ `$ref` まで解いたスキーマ）。"""
-    return {
-        row.id: _as_schema(load_yaml(read_text(row.schema_path) or ""))
-        if isinstance(row.schema_path, str)
-        else read_ref(row.schema_path).schema
-        for row in config.documents
-    }
+    schemas: dict[str, dict[str, Any]] = {}
+    for row in config.documents:
+        # 文書の行 1 つ分のスキーマの読み込みを 1 件にする（配信元の一覧が休ませる単位）
+        with unit():
+            schemas[row.id] = (
+                _as_schema(load_yaml(read_text(row.schema_path) or ""))
+                if isinstance(row.schema_path, str)
+                else read_ref(row.schema_path).schema
+            )
+    return schemas
 
 
 def _log_violations(source_id: str, violations: list[Violation]) -> None:
@@ -662,9 +698,16 @@ def entry_source_id(entry: SourceEntry) -> str | None:
 
 
 def load_source(
-    entry: SourceEntry, *, index: int, lookup: SchemaRefLookup | None = None
+    entry: SourceEntry,
+    *,
+    index: int,
+    lookup: SchemaRefLookup | None = None,
+    unit: _Unit | None = None,
 ) -> tuple[ServedSource | None, SourceStatus]:
-    """端末の設定の 1 行から配信元の設定を読んで検証し、配信中の配信元と状態を作る。"""
+    """端末の設定の 1 行から配信元の設定を読んで検証し、配信中の配信元と状態を作る。
+
+    `unit` は、文書の行 1 つ分のスキーマの確かめと読み込みを包む文脈を返す関数（配信元の一覧が休ませる単位）。
+    """
     fallback_id = entry.id or f"sources[{index}]"
     config_files = tuple(entry.config)
     # 端末の設定で無効な行は、設定を読まない
@@ -694,6 +737,7 @@ def load_source(
         at=at,
         lookup=lookup,
         storage=storage,
+        unit=unit or contextlib.nullcontext,
     )
     violations = _entry_storage_violations(violations, index)
     source_id = entry.id or (config.name if config else fallback_id)

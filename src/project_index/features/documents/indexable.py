@@ -43,6 +43,16 @@ def walk_files(root: Path, *, start: str = ".") -> Iterator[str]:
             yield _join(relative_folder, name)
 
 
+def is_walked(path: str) -> bool:
+    """`root` からのパスが、中をたどるファイルの列挙の返すパスに当たるかを、フォルダをたどらずに判定する。"""
+    *folders, name = path.split("/")
+    # ワークツリーの `.git` などのファイルと、たどらない名前のフォルダの配下は返さない
+    if name in SKIP_FILES or any(folder in SKIP_DIRS for folder in folders):
+        return False
+    # たどらないパスのフォルダの配下は返さない
+    return not any(path.startswith(f"{skip}/") for skip in SKIP_PATHS)
+
+
 def walk_tree(root: Path) -> tuple[list[str], dict[str, int]]:
     """中をたどるファイルの一覧と、たどったフォルダごとの更新日時（`st_mtime_ns`）を返す。"""
     files: list[str] = []

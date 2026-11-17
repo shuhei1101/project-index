@@ -14,6 +14,7 @@ from project_index.features.history.query import resolve_ref
 from project_index.features.sources.schema_ref import SchemaRefLookup, terminal_lookup
 from project_index.features.sources.service import load_source
 from project_index.features.sources.types import ServedSource, SourceStatus
+from project_index.shared.background import BackgroundGate
 from project_index.shared.errors import (
     ProjectIndexError,
     SourceNotServedError,
@@ -23,7 +24,7 @@ from project_index.shared.errors import (
 from project_index.shared.paths import match_glob, normalize_path
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Generator, Sequence
 
     from project_index.features.settings.types import SourceEntry, TerminalConfig
 
@@ -47,6 +48,7 @@ class SourceRegistry:
         *,
         loading: bool = False,
         on_waiting: Callable[[], None] | None = None,
+        gate: BackgroundGate | None = None,
     ) -> None:
         self._snapshot: tuple[dict[str, ServedSource], list[SourceStatus]] = ({}, [])
         self._reload_lock = threading.Lock()
@@ -65,6 +67,8 @@ class SourceRegistry:
         self._rows_started: list[bool] = []
         self._requested: list[int] = []
         self._on_waiting = on_waiting
+        # 起動の読み込みで、要求が待っていない行を要求の応答中に休ませる関所
+        self.gate = gate if gate is not None else BackgroundGate()
         # 裏のスレッドで default_ref の commit を確認している配信元の ID
         self._refreshing: set[str] = set()
         self._refreshing_lock = threading.Lock()
@@ -201,7 +205,7 @@ class SourceRegistry:
         """読み始めていない行が無くなるまで、次の行を選んで読み込む（読み込みのスレッドの 1 つ）。"""
         while (index := self._next_row()) is not None:
             entry = self._rows[index]
-            served, status = self._load_row(entry, index, lookup)
+            served, status = self._load_row(entry, index, lookup, self._row_unit(index))
             self._publish(entry, index, served, status)
             self._rows_done[index].set()
             self._finish_waiters(every=False)
@@ -216,13 +220,33 @@ class SourceRegistry:
                     return index
         return None
 
+    def _row_unit(self, index: int) -> Callable[[], contextlib.AbstractContextManager[None]]:
+        """行の読み込みの 1 件を包む文脈を返す関数を作る（要求が待つ行は休ませない）。"""
+
+        @contextlib.contextmanager
+        def unit() -> Generator[None]:
+            with self._waiters_lock:
+                requested = index in self._requested
+            # 要求が待っている行: 休まずに読み込む
+            if requested:
+                yield
+                return
+            # 要求が待っていない行: 要求の応答中だけ 1 件ずつ進めて休む
+            with self.gate.background(), self.gate.yield_unit():
+                yield
+
+        return unit
+
     @staticmethod
     def _load_row(
-        entry: SourceEntry, index: int, lookup: SchemaRefLookup
+        entry: SourceEntry,
+        index: int,
+        lookup: SchemaRefLookup,
+        unit: Callable[[], contextlib.AbstractContextManager[None]],
     ) -> tuple[ServedSource | None, SourceStatus]:
         """行を読む。例外のときは、その行を配信しない状態にする。"""
         try:
-            return load_source(entry, index=index, lookup=lookup)
+            return load_source(entry, index=index, lookup=lookup, unit=unit)
         except Exception as error:
             logger.exception("配信元の行の読み込みに失敗した（sources[%s]）", index)
             return None, SourceStatus(

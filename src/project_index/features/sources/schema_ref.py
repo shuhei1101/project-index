@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -20,6 +21,10 @@ if TYPE_CHECKING:
     from project_index.features.settings.types import TerminalConfig
 
 type SchemaRefLookup = Callable[[str], Path | None]
+
+# (参照先の配信元の ID, リポジトリの直下, 解いた commit, パス) → 読んだスキーマ。commit の中身は変わらないので捨てない
+_resolved: dict[tuple[str, Path, str, str], RefSchema] = {}
+_resolved_lock = threading.Lock()
 
 
 class SchemaRef(BaseModel):
@@ -90,6 +95,20 @@ def read_schema_ref(ref: SchemaRef, *, lookup: SchemaRefLookup) -> RefSchema:
     except RefNotFoundError as error:
         msg = f"配信元 {ref.source} に {ref.ref} がありません"
         raise SchemaRefError(msg) from error
+    # 同じ commit のスキーマは、行の読み込みと組み立て直しをまたいで読み直さない
+    key = (ref.source, top, commit, ref.path)
+    with _resolved_lock:
+        cached = _resolved.get(key)
+    if cached is not None:
+        return cached
+    found = RefSchema(schema=_read_at(ref, top, commit), commit=commit)
+    with _resolved_lock:
+        _resolved[key] = found
+    return found
+
+
+def _read_at(ref: SchemaRef, top: Path, commit: str) -> dict[str, Any]:
+    """commit の `ref.path` のスキーマを読み、同じ commit のファイルで `$ref` を解く。"""
     text = read_file_at(top, commit, ref.path)
     if text is None:
         msg = f"{ref.ref} に {ref.path} がありません"
@@ -117,4 +136,4 @@ def read_schema_ref(ref: SchemaRef, *, lookup: SchemaRefLookup) -> RefSchema:
     if missing:
         msg = f"{ref.ref} に {missing[0]} がありません"
         raise SchemaRefError(msg)
-    return RefSchema(schema=schema, commit=commit)
+    return schema

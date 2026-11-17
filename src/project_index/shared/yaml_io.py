@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import contextlib
+import importlib
 import re
 from io import StringIO
 from typing import TYPE_CHECKING
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
-from ruamel.yaml.error import MarkedYAMLError
+from ruamel.yaml.error import MarkedYAMLError, YAMLError
 
 if TYPE_CHECKING:
     from ruamel.yaml.main import Representer
@@ -60,12 +62,25 @@ def _error_from(error: Exception, file: str | None, text: str) -> YamlLoadError:
 
 
 def load_yaml(text: str, *, file: str | None = None) -> object:
-    """YAML の文字列を素の値で読む。"""
+    """YAML の文字列を素の値で読む（C の解析で読み、読めなければ Python 実装で読み直す）。"""
+    with contextlib.suppress(YAMLError):
+        return YAML(typ="safe", pure=False).load(text)
     yaml = YAML(typ="safe", pure=True)
     try:
         return yaml.load(text)
     except MarkedYAMLError as error:
         raise _error_from(error, file, text) from error
+
+
+def c_loader_available() -> bool:
+    """ruamel.yaml.clib の C の解析を使用できるかを返す。"""
+    try:
+        cyaml = importlib.import_module("ruamel.yaml.cyaml")
+    except ImportError:
+        return False
+    # ruamel.yaml.clib が無いと、`pure=False` でも Python 実装の Parser のまま
+    parser: object = getattr(YAML(typ="safe", pure=False), "Parser", None)
+    return parser is getattr(cyaml, "CParser", object())
 
 
 def load_roundtrip(text: str, *, file: str | None = None) -> CommentedMap:
