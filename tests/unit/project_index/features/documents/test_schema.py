@@ -266,6 +266,7 @@ def test_records_item_schema() -> None:
     # 検証
     assert result is not None
     assert result["required"] == ["path"]
+    assert {"id", "aliases", "inject_when", "category"} <= result["properties"].keys()
 
 
 @pytest.mark.parametrize(
