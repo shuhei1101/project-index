@@ -20,7 +20,7 @@ scope_out:
     plan: none
   - item: '`migrate`・`settings`・`admin`（`write_nav`）・`checkpoint` の往復編集の書き出しで、元のファイルの配列の字下げを保つこと'
     reason: '#118 は `write_docs` の事象。今回は `dump_roundtrip` に `original` を受ける口だけを入れ、`write_docs`・`delete_docs` で渡す。他の呼び出し元は今回の引数を前提にする'
-    plan: to_file
+    plan: '#128'
   - item: TP-1 の `run_runner` が `gh workflow run` の直後に `gh run watch` を呼び、run を API で引けない間は 404 で終わってランナーの結果を受け取れないこと
     reason: '#116 で入ったテストの実行方法の不具合で、今回の要望に含まれない（reviewer の対象外の不具合の報告）'
-    plan: to_file
+    plan: '#129'
