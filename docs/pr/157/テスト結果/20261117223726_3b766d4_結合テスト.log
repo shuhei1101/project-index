@@ -1,0 +1,20 @@
+$ run_runner（layer=integration、paths に表の範囲、commit 3b766d4）
+paths の値が層のフォルダの外か、空白以外の区切りを含む: tests/integration/server/test_serve.py::test_normal_when_mcp_text_from_prompts
+exit=1 run=https://github.com/shuhei1101/project-index/actions/runs/44094418477
+
+# ランナーの workflow は paths に test_serve.py::test_normal_when_mcp_text_from_prompts（テストの節の指定）を受け付けず、テストの step まで進まなかったため、手元の個別実行で同じ範囲を回した
+$ uv run pytest tests/integration/server/test_write_docs.py tests/integration/server/test_delete_docs.py tests/integration/server/test_serve.py::test_normal_when_mcp_text_from_prompts
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/feat-write-rename-and-replace-words
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 62 items
+
+tests/integration/server/test_write_docs.py ............................ [ 45%]
+....................                                                     [ 77%]
+tests/integration/server/test_delete_docs.py .............               [ 98%]
+tests/integration/server/test_serve.py .                                 [100%]
+
+============================= 62 passed in 22.56s ==============================
+exit=0
