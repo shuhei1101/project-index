@@ -200,5 +200,17 @@ requirements:
     rationale: 読み込みを待った後に検索して応答を組み立てるため、読み込みの待ちと検索を内側の待ち、応答の上限を外側の待ちとする入れ子の待ち（規約『資源の値の決め方』）で導く。端末の設定の `worktree_load_wait_sec` で変えられる
     overflow: 上限までに読み込みが終了しなければ `WorktreeLoadingError` を返却し、読み込みは続ける。次の呼び出しは同じ読み込みの終了を待つ
     status: planned
+  - id: NFR-13
+    name: 同時に読み込む行の数
+    english_name: load_workers
+    category: 性能
+    external_constraint: WSL の `/mnt/c`（9P）の読み込みの待ち。ext4 では行の読み込みが CPU（YAML の解析と JSON Schema の検証）で決まり、スレッドを増やしても短くならない
+    source_kind: 実行基盤の制限
+    value: '8'
+    unit: 行
+    overflow: 行の数が上回る分は、読み終えたスレッドが続けて読む
+    measurement: 起動の後の全ての行の読み込みにかかる時間（配信元の読み込みを `ThreadPoolExecutor` で流した計測）
+    rationale: スループット × レイテンシで導く。`/mnt/c` の配信元 4 件で、スレッド 1 は 23.4 秒・2 は 17.4 秒・3 は 10.1 秒・4 は 9.1 秒（一番遅い行 9.1 秒で頭打ち）で、行ごとの待ちが読み込みの大半を占めるため、行の数までスレッドを増やすほど短くなる。ext4 の配信元 15 件では、スレッド 1 が 14.6〜16.5 秒・8 が 15.8 秒で、増やしても延びない。端末の CPU の数（8）を上限にし、`/mnt/c` の行が 8 を超えても CPU の取り合いを増やさない
+    status: planned
 id: NFR-1
 visibility: internal

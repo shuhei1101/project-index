@@ -34,7 +34,7 @@ functions:
       1. アドレスを `http://{terminal.bind}:{ポート}/` にする（待ち受けのポートの決定）
       2. バージョンを 起動時に読んだ値（動いているバージョン。更新で配布のメタデータが入れ替わっても変わらない）、プロセス ID を `os.getpid()` で得る
       3. 端末の設定の `version` を `SETTINGS_VERSION` と比べる（バージョンの新旧）
-      4. 配信元の一覧が読み込み中（`registry.loading`）なら、`loading` を `True`、`sources` を空にする。そうでなければ `loading` を `False` にし、配信元ごとの状態を作る（配信元の状態の一覧）
+      4. `loading` を配信元の一覧の読み込み中（`registry.loading`）にし、配信元ごとの状態を作る（配信元の状態の一覧）。読み込み中は、状態を `registry.statuses_with_loading()` から作り、`loading` の行は `sync`・設定のバージョンを持たない
       5. `checking` を配信元の検査のキャッシュの検査の最中（`checks.checking`）、`exporting` をリビジョンの書き出しの書き出しの最中（`snapshots.exporting`）にする
     exceptions:
       - name: TerminalConfigInvalidError
@@ -56,9 +56,9 @@ functions:
       - name: test_get_status_when_loading
         case: 正常
         summary: 読み込み中は配信元を待たずに返す
-        condition: '`SourceRegistry(loading=True)` でまだ読み直していない配信元の一覧を持つ `Handlers`'
-        mock: なし
-        expected: 待たずに戻り、`loading` が `True`、`sources` が空
+        condition: '配信元の読み込みの偽物が 2 行目だけ `threading.Event` で止まっている間に、別のスレッドで `load` を実行している `SourceRegistry(loading=True)` を持つ `Handlers`'
+        mock: 配信元の読み込み（2 行目だけ止められる偽物）
+        expected: 待たずに戻り、`loading` が `True`、`sources` が 1 行目を `serving`、2 行目を `loading` で並べる
       - name: test_get_status_when_checking_and_exporting
         case: 正常
         summary: 裏の検査と書き出しの最中を返す

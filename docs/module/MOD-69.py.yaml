@@ -17,6 +17,7 @@ diagrams:
           +裏での確認の実行(配信元の ID の並び) list
           +配信中() list
           +状態の一覧() list
+          +読み込み中を含めた状態の一覧() list
         }
         class 配信元の読み込み {
           <<function>>
@@ -32,7 +33,7 @@ classes:
     description: |-
       一覧は `dict[str, ServedSource]` と `list[SourceStatus]` の組を 1 つの属性で持ち、読み直しは新しい組を作り終えてから属性を入れ替える。
       読む側は入れ替えの前後どちらかの組だけを見るので、ロックを取らない。読み直し同士は `_reload_lock` で順にする。
-      起動の読み込み（`load`）は行ごとに読み込み、読み込み終えた行を組に加えて入れ替える。要求は指す行の読み込みだけを待つ（インターフェース定義『起動』の配信元の読み込みの単位）。
+      起動の読み込み（`load`）は行ごとに、同時に読み込む行の数（`LOAD_WORKERS`）のスレッドで並列に読み込み、読み込み終えた行を組に加えて入れ替える。要求は指す行の読み込みだけを待つ（インターフェース定義『起動』の配信元の読み込みの単位）。
     kind: クラス
     properties:
       - name: _snapshot
@@ -99,6 +100,12 @@ classes:
         access: 内部 (_)
         default: set()
         description: '`refresh_later` が裏のスレッドで `default_ref` の commit を確認している配信元の ID。`_refreshing_lock`（`threading.Lock`）を持って足し引きする'
+      - name: _rows_started
+        title: 行の読み始め
+        type: list[bool]
+        access: 内部 (_)
+        default: '[]'
+        description: '`_rows` と同じ順の、行を読み始めたか。`load` が `False` で作り、次の行を選んだスレッドが `_waiters_lock` を持って `True` にする。`reload` は全て `True` で作る'
     methods:
       - name: reload
         title: 読み直す
@@ -123,7 +130,7 @@ classes:
           3. 配信する配信元の ID が先の行と重なる場合（`id` を省いて設定の `name` が同じなど）、後の行を `sources[{n}].id` の重複の違反を持つ `not_served` にする
           4. 新しい組を作り、`_snapshot` を入れ替える
              - `[info]` 配信元を読み直した（配信中の ID の並び・外した数）
-          5. `_rows` を `sources[]` に替え、`_rows_done` を行の数だけ立てて作り、`_ready` を立て、`_waiters_lock` を持って `_waiters` を取り出して空にし、待ち手ごとに `loop.call_soon_threadsafe` で Future を済ませて（済んだ Future と閉じたループは飛ばす）、状態を返す
+          5. `_rows` を `sources[]` に替え、`_rows_done` を行の数だけ立てて作り、`_rows_started` を行の数だけ `True` で作り、`_ready` を立て、`_waiters_lock` を持って `_waiters` を取り出して空にし、待ち手ごとに `loop.call_soon_threadsafe` で Future を済ませて（済んだ Future と閉じたループは飛ばす）、状態を返す
              - 手順 2〜4 で例外が起きた場合も `_ready` を立てて待ち手を済ませてから送り直す（`_snapshot` は入れ替えない）
         unit_tests:
           - name: test_source_registry_reload
@@ -159,8 +166,8 @@ classes:
       - name: load
         title: 行ごとに読み込む
         kind: メソッド
-        summary: 起動のときに、端末の設定の行を 1 つずつ読み込み、読み込み終えた行から配信する
-        description: 起動の裏のスレッドが 1 回だけ呼ぶ。行の読み込み（配信元の読み込み）は `_reload_lock` の外で行い、組の入れ替えだけを `_reload_lock` の中で行う
+        summary: 起動のときに、端末の設定の行を並列に読み込み、読み込み終えた行から配信する
+        description: 起動の裏のスレッドが 1 回だけ呼ぶ。組の入れ替えは行ごとに `_reload_lock` で順にするので、並列に読み込んだ行が互いの入れ替えを消さない。行の読み込み（配信元の読み込み）は `_reload_lock` の外で行い、組の入れ替えだけを `_reload_lock` の中で行う
         scope: public
         thread_safe: true
         side_effects: 一覧を行ごとに入れ替える。待っている要求の待ちを解く
@@ -175,9 +182,9 @@ classes:
           type: None
           description: なし
         process: |-
-          1. `_waiters_lock` を持って `_rows` を `sources[]` にし、`_rows_done` を行の数だけ立てずに作る。続けて `terminal_lookup(terminal)` でほかの配信元のスキーマの参照先の引き当てを作り、`_reload_lock` を持って `_lookup` に持たせる
-          2. 読み込みの済んでいない行が無くなるまで、次の行を選んで読み込む
-             - 次の行は、`_requested` の先頭から見て読み込みの済んでいない最初の行。無ければ、読み込みの済んでいない行のうち位置が一番小さい行
+          1. `_waiters_lock` を持って `_rows` を `sources[]` にし、`_rows_done` を行の数だけ立てずに作り、`_rows_started` を行の数だけ `False` で作る。続けて `terminal_lookup(terminal)` でほかの配信元のスキーマの参照先の引き当てを作り、`_reload_lock` を持って `_lookup` に持たせる
+          2. `min(LOAD_WORKERS, 行の数)` 個のスレッド（`concurrent.futures.ThreadPoolExecutor`、名前の頭 `project-index-loading`）で、それぞれ読み始めていない行が無くなるまで、次の行を選んで読み込む。全てのスレッドが終わるまで待つ
+             - 次の行は、`_waiters_lock` を持って、`_requested` の先頭から見て読み始めていない最初の行。無ければ、読み始めていない行のうち位置が一番小さい行。選んだ行の `_rows_started` を同じロックの中で `True` にする
              - 行を配信元の読み込み（`lookup` に手順 1 の引き当て）で読む。例外の場合、`[error]` 配信元の行の読み込みに失敗した（行の位置・例外のスタックトレース）を書き、状態を `not_served`・ID を行の `id`（無ければ `sources[{n}]`）・違反を `Violation(path="sources[{n}]", rule="読み込みに失敗しました（{例外の型}: {本文}）", fix="エラーログを確かめ、reload で読み直してください")` にする
           3. 読み込んだ行ごとに `_reload_lock` を取り、今の組に行を加えた新しい組を作って `_snapshot` と `_entries` を入れ替える。状態は行の位置の順に並べる
              - 配信する配信元の ID が、先の位置の行の配信中の ID と重なる場合、その行を `sources[{n}].id` の重複の違反を持つ `not_served` にする
@@ -242,6 +249,12 @@ classes:
             condition: '`on_rebuilt` に呼ばれた配信元を記録する関数を指定した `SourceRegistry(loading=True)`。2 行の設定がどちらも `id` を省き `name` が `a` で、位置の順に読み込む'
             mock: 配信元の読み込み（偽物）
             expected: '`on_rebuilt` が呼ばれず、2 行目が `not_served` で違反が `sources[1].id`'
+          - name: test_source_registry_load_when_slow_row
+            case: 正常
+            summary: 読み込みの遅い行がほかの行の読み込みを止めない
+            condition: '`SourceRegistry(loading=True)`。`sources` に slow・a の 2 行。slow の読み込みの偽物が `threading.Event` で止まっている間に、別のスレッドの `load` で a の `_rows_done` が立つのを待つ'
+            mock: 配信元の読み込み（slow だけ止められる偽物）
+            expected: 合図の前に `get("a")` が a の配信元を返し、`loading` が `True`。合図の後に `load` が戻り、`served()` が slow・a の順に 2 つ
       - name: wait_for
         title: 指す行の待ち
         kind: メソッド
@@ -519,3 +532,32 @@ classes:
             condition: a・broken を読んだ後（broken は `not_served`）、同じ端末の設定で `reload_changed`
             mock: 配信元の読み込み（読んだ行を記録する偽物）
             expected: 読まれたのは broken だけ
+      - name: statuses_with_loading
+        title: 読み込み中を含めた状態の一覧
+        kind: メソッド
+        summary: 読み込みの済んだ行の状態と、読み込みが終わっていない行の `loading` を `sources[]` の順に返す
+        scope: public
+        thread_safe: true
+        side_effects: なし
+        args: []
+        returns:
+          type: list[SourceStatus]
+          description: '`sources[]` の順の状態'
+        process: |-
+          1. `_waiters_lock` を持って `_rows` と `_rows_done` を取り、`_snapshot` の状態を行の位置で引き当てる
+          2. 行ごとに、状態があればその状態、無ければ `SourceStatus(id=行の id（無ければ sources[{n}]）, index=位置, status="loading", config=行の config)` を並べて返す
+          3. `load` を呼ぶ前（`_rows` が空）は空を返す
+        unit_tests:
+          - name: test_source_registry_statuses_with_loading
+            case: 正常
+            summary: 読み込み中の行を loading で並べる
+            condition: '`SourceRegistry(loading=True)`。`sources` に `id` が a の行と `id` を持たない行。2 行目の読み込みの偽物が `threading.Event` で止まっている間に `statuses_with_loading()`'
+            mock: 配信元の読み込み（2 行目だけ止められる偽物）
+            expected: a が `serving`、2 行目が ID `sources[1]` の `loading` で、行の順に 2 つ。`statuses()` は a だけ
+constants:
+  - name: LOAD_WORKERS
+    title: 同時に読み込む行の数
+    container: project_index/features/sources/registry.py
+    usecase: 共通
+    summary: 起動の後の `load` が同時に読み込む行の数の上限（非機能要件の同時に読み込む行の数）
+    value: '8'
