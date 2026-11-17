@@ -33,3 +33,6 @@ scope_out:
   - item: このリポジトリの管理用の YAML（src/files.yaml・tests/files.yaml・plugins/project-index/files.yaml・docs/guide/files.yml）のスキーマの参照
     reason: '#114 で knowledge の knowledge-files.schema.yaml の参照へ切り替え済み'
     plan: none
+  - item: templates/files.schema.yaml のキーが knowledge の knowledge-files.schema.yaml とずれたことを検知する単体テスト
+    reason: 単体テストが knowledge のタグのファイル（ネットワークか knowledge のクローン）に依存する。雛形はモジュールでなく、対応するモジュール構成のテスト表も無い。knowledge のタグを上げる作業で合わせ直す
+    plan: none
