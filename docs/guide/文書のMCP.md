@@ -289,12 +289,14 @@ YAML として読めないファイルがあっても、そのファイルを除
 共通のキーとその列名を同じ操作に両方渡すと、`InvalidArgumentError` です。
 種類ごとの対応は `describe(source, kind)` で引けます。
 
-`text_edits[].field` と `add_to`・`remove_from` のキーは、`#` で始まる参照の型の項目のパス（`#functions[apply_migration].process`）も受け付けます。
+`text_edits[].field`・`add_to`・`remove_from` のキーと `unset` の要素は、`#` で始まる参照の型の項目のパス（`#functions[apply_migration].process`）も受け付けます。
 配列の要素を種類のスキーマの `x-key` の値で指し、同じ値の 2 つ目以降は `[{値}#{順番}]`、辞書のキーは `[{キー}]`（`.` や空白を含んでも 1 階層）で指します。
 `#` で始まるパスは共通のキーへ読み替えません。
 `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指すと `InvalidArgumentError` です。
 `add_to`・`remove_from` の `#` で始まるキーは配列を作らず、配列でない項目を指すと `InvalidArgumentError` です。
 `#` で始まらない `add_to`・`remove_from` のキーに `[]`・`[{キー}]`・`**.` を含めると、書き込まずに `InvalidArgumentError` です（`functions[0].refs` のように位置で指すキーは使用できます）。
+`unset` の `#` で始まる要素は、配列でない項目も削除します。
+`#` で始まらない `unset` の要素に `[]`・`[{キー}]`・`**.` を含めたときも、書き込まずに `InvalidArgumentError` です。
 
 `records`・`body_file` の行の文書は、本文のファイルを `@body` で書きます。
 `@body` は種類の列名と重ならないキーで、`body_file` の列の名前が `body` の配信元でも `body` は列を指します。

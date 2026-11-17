@@ -1,0 +1,20 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: unset で x-key の値で配列の要素を指して項目を削除でき、1 つの項目に解決できない項目のパスは違反で止まる
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: 'unset が # で始まる参照の型の項目のパス（x-key の値で配列の要素を指す）を受け付けることと、解決できないパス・# で始まらず要素の選び方を含むパスが違反になることを記載する'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T14:16:47.368043+00:00'
+scope_out:
+  - item: tests/unit/project_index/features/write/test_references.py・test_replace.py の import の並びの ruff の違反（I001）
+    reason: develop で lint 層の ruff check が通らない。作業 PR の変更ファイルの外で、今回の要望に含まれない
+    plan: '#168'
+  - item: IF-6 のフロー『正常系（参照の型の項目のパスで配列へ追加・削除する）』とテスト関数の名前を unset を含む中身に合わせる
+    reason: reviewer の任意の指摘。名前を変えると既存のテストと参照も変わり、要望に含まれない
+    plan: none

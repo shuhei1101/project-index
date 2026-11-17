@@ -659,3 +659,43 @@ def test_apply_operation_when_add_to_index_path() -> None:
     result = apply_operation({"functions": [{"name": "f"}]}, operation)
     # 検証
     assert result == {"functions": [{"name": "f", "refs": ["x"]}]}
+
+
+def test_apply_operation_when_unset_ref_path() -> None:
+    """参照の型の項目のパスで要素の中の項目を削除する（正常系）。"""
+    # 準備
+    operation = Operation(
+        op="update",
+        id="doc-1",
+        expected_version="v1",
+        unset=["#models[Col].properties"],
+    )
+    # 実行
+    result = apply_operation(_models_content(), operation, schema=_MODELS_SCHEMA)
+    # 検証
+    assert result == {
+        "models": [
+            {"name": "Row", "properties": ["a"]},
+            {"name": "Col"},
+        ]
+    }
+
+
+def test_apply_operation_when_unset_unresolved() -> None:
+    """`unset` の要素を解けない（異常系）。"""
+    # 準備
+    current = _models_content()
+    operation = Operation(
+        op="update",
+        id="doc-1",
+        expected_version="v1",
+        unset=["models[Row].properties", "#models[Zzz].properties"],
+    )
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError) as exc_info:
+        apply_operation(current, operation, schema=_MODELS_SCHEMA)
+    assert [violation.path for violation in exc_info.value.violations] == [
+        "unset.models[Row].properties",
+        "unset.#models[Zzz].properties",
+    ]
+    assert current == _models_content()
