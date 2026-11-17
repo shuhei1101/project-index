@@ -342,7 +342,7 @@ functions:
         description: Git の作業ツリーの中のフォルダ（配信元の直下）
     returns:
       type: list[str] | None
-      description: '`root` からのパスの昇順。無視されたフォルダは中のファイルを並べず `/` で終わる 1 行にする。取れなければ `None`'
+      description: '`root` からのパスの昇順。無視のパターンに当たるフォルダは中のファイルを並べず `/` で終わる 1 行になる。追跡していないフォルダの中が全て無視されているときは、フォルダの行と中のファイルの行が両方並ぶ（`root` 自身がそのフォルダなら `./`）。無視しないファイルを含むフォルダはフォルダの行にならない。取れなければ `None`'
     process: |-
       1. `root` で `ls-files -z --others --ignored --exclude-standard --directory` を呼ぶ（gitの実行）。`--directory` で無視されたフォルダを 1 行にまとめ、返る行の数をフォルダの単位に抑える
       2. 標準出力を NUL で分け、空の値を除いて昇順で返す
@@ -358,7 +358,7 @@ functions:
       - name: test_ignored_paths_when_subfolder
         case: 正常
         summary: サブフォルダからのパス
-        condition: 同じリポジトリの `docs/` に `docs/x.log` を置き、`root` を `docs`
+        condition: 同じリポジトリの `docs/` に、commit した `docs/keep.md` と `docs/x.log` を置き、`root` を `docs`
         mock: なし（一時フォルダで `git init`）
         expected: '`["x.log"]`'
         exception: '-'
