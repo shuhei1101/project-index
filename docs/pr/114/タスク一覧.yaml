@@ -71,7 +71,10 @@ tasks:
     updated_by: planner
     updated_at: '2026-11-17T04:50:07.449755+00:00'
   - process: 単体テスト作成
-    status: todo
+    status: skipped
+    reason: モジュール構成設計で変えたのは MOD-43 の定数の値だけで、unit_tests の行を足しも変えもしていない。既存の単体テストは移すファイルのパスを直接指さないため、実装の後に全件を回して確かめる
+    updated_by: planner
+    updated_at: '2026-11-17T04:53:31.847020+00:00'
   - process: 実装
     status: todo
   - process: 結合テスト作成
