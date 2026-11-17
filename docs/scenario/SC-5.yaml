@@ -360,7 +360,7 @@ scenarios:
         FS-->>SK: content/prompts/ と plugins/sample/content/prompts/
         SK-->>U: 見つけたフォルダごとの documents の行（paths・schema・converter・metadata）と、プロンプトのスキーマ・converters[]・nav の行を候補の表で示して確かめる
         U-->>SK: 了承
-        SK->>FS: プロンプトのスキーマを置き、project-index.yaml に候補の行を書く
+        SK->>FS: プロンプトのスキーマと、その $ref が指す共通の型を schemas/ に配置し、project-index.yaml に候補の行を書く
         SK->>AD: check_project
         SK->>AD: reload
         SK-->>U: 書いた行と結果を出す
@@ -372,6 +372,7 @@ scenarios:
       - '`nav` に、プロンプトの行を `auto` で並べ `group_by: kind` で種類ごとにまとめる項目がある'
       - '`check_project` が違反を 0 件で返す'
       - '`reload` の後の `search_docs` が 2 件のプロンプトを YAML の `name` で返す'
+      - 配信元の `schemas/` に `prompt.schema.yaml` と、その `$ref` が指す `common.schema.yaml` がある
     test: test_normal_when_prompt_folder_found
   - name: 正常シナリオ（content/prompts/ の行が既にある）
     setup:
