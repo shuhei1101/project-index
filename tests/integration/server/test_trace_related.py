@@ -311,3 +311,79 @@ def test_normal_when_outside_scope(
     assert any(cwd in message and "other" in message for message in logs)
     assert refused.is_error
     assert "SourceNotReadableError" in refused.text
+
+
+def test_normal_when_disk_storage(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_doc_text: Callable[..., str],
+    commit_all: Callable[..., str],
+) -> None:
+    """disk の配信元は related だけをたどり、一緒に変わったファイルを返さない（正常系）。"""
+    # 準備（文書 2 が文書 1 を指し、文書 1 と文書 3 を同じ commit で変える）
+    files = sample_file_set(
+        **{
+            "docs/doc-2.yaml": sample_doc_text("doc-2", "文書 2", related=_link("doc-1")),
+            "docs/doc-3.yaml": sample_doc_text("doc-3", "文書 3"),
+        }
+    )
+    company = make_source("company", files, storage="disk")
+    commit_all(
+        company.folder,
+        {
+            "docs/doc-1.yaml": sample_doc_text("doc-1", "文書 1 改"),
+            "docs/doc-3.yaml": sample_doc_text("doc-3", "文書 3 改"),
+        },
+        "docs: 1 と 3 を一緒に変える",
+    )
+    env = make_server(company)
+    arguments = {"cwd": str(company.folder), "source": "company", "from_ids": ["doc-1"]}
+    # 実行
+    result = env.call("trace_related", suggest=True, format="json", **arguments)
+    by_ref = env.call("trace_related", ref="develop", **arguments)
+    # 検証
+    assert not result.is_error
+    assert [item["id"] for item in result.data["items"]] == ["doc-2"]
+    assert all("co_change" not in item["signals"] for item in result.data.get("suggestions", []))
+    assert by_ref.is_error
+    assert "company は disk の配信元のため ref を指定できません" in by_ref.text
+
+
+# 最上位の refs と functions[0].refs を持つ n1
+NESTED_N1 = (
+    "id: n1\nname: n1\nrefs:\n  - {to: n2, type: references}\n"
+    "functions:\n  - name: f\n    refs:\n      - {to: n3, type: references}\n"
+)
+
+
+def test_normal_when_nested_related(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    nested_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """**.refs[] の対応で最上位と入れ子の refs をまとめた related を、両方向にたどる（正常系）。"""
+    # 準備
+    source = make_source("sample", nested_file_set(NESTED_N1))
+    env = make_server(source)
+    # 実行
+    out = env.call(
+        "trace_related",
+        format="json",
+        cwd=str(source.folder),
+        from_ids=["n1"],
+        direction="out",
+        depth=1,
+    )
+    incoming = env.call(
+        "trace_related",
+        format="json",
+        cwd=str(source.folder),
+        from_ids=["n3"],
+        direction="in",
+        depth=1,
+    )
+    # 検証
+    assert [(item["id"], item["depth"]) for item in out.data["items"]] == [("n2", 1), ("n3", 1)]
+    assert [item["via"]["type"] for item in out.data["items"]] == ["references", "references"]
+    assert [(item["id"], item["depth"]) for item in incoming.data["items"]] == [("n1", 1)]

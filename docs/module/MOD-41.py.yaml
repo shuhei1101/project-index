@@ -120,14 +120,14 @@ functions:
       4. `## テンプレート` に部品ごとの `### {id}` を置き、`role`・`tags`・`when` のバッジの後に言語ごとの本文（`template_html` を `<!-- html -->` で囲む）を言語のタブ（`lang_tabs`）で置く
          - 構文の誤りのある部品は、該当する言語のタブ（`when` の誤りは全ての言語のタブ）の本文の前に `[!CAUTION]` で場所・行・理由を置く
          - その言語の本文が無い部品は「{lang} の本文はありません。」を置く
-      5. `## 例` に「既定の例」と `examples` の組ごとの `### {名前}` を置き（2 つ目以降は見出しの後に `<!-- section: closed -->`）、言語ごとの描画の結果（`render_example` を `example_body` で Markdown にする）を言語のタブで置く
+      5. `## 例` に「既定の例」と `examples` の組ごとの `### {名前}` を置き（2 つ目以降は見出しの後に `<!-- section: {"open": false} -->`）、言語ごとの描画の結果（`render_example` を `example_body` で Markdown にする）を言語のタブで置く
     unit_tests:
       - name: test_prompt_to_markdown
         case: 正常
         summary: 見出しとセクションの並び
         condition: A-42 の例 2（`examples` に `no-logs`）
         mock: なし
-        expected: '`badge:kind: llm`・`badge:lang: en` があり、`### 既定の例` の後の `### ログが無い` の直後に `<!-- section: closed -->`、部品ごとの `###` が `parts` の順'
+        expected: '`badge:kind: llm`・`badge:lang: en` があり、`### 既定の例` の後の `### ログが無い` の直後に `<!-- section: {"open": false} -->`、部品ごとの `###` が `parts` の順'
       - name: test_prompt_to_markdown_when_part_syntax_invalid
         case: 正常
         summary: 構文の誤った部品だけを注意書きにする
@@ -311,14 +311,14 @@ functions:
       description: 行
     process: |-
       1. 言語が 1 つの場合、その言語の中身だけを返す
-      2. `<!-- tabs: group={LANG_TAB_GROUP} -->` の後に、言語ごとに `#### {言語}` と中身を置き、`<!-- /tabs -->` で閉じる
+      2. `<!-- tabs: {"group": "{LANG_TAB_GROUP}"} -->` の後に、言語ごとに `#### {言語}` と中身を置き、`<!-- /tabs -->` で閉じる
     unit_tests:
       - name: test_lang_tabs
         case: 正常
         summary: 言語が 2 つ
         condition: '`["en", "ja"]`'
         mock: なし
-        expected: '`<!-- tabs: group=lang -->`・`#### en`・`#### ja`・`<!-- /tabs -->` がこの順にある'
+        expected: '`<!-- tabs: {"group": "lang"} -->`・`#### en`・`#### ja`・`<!-- /tabs -->` がこの順にある'
       - name: test_lang_tabs_when_single_language
         case: 正常
         summary: 言語が 1 つ

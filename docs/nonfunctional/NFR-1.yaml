@@ -128,5 +128,82 @@ requirements:
       date: '2026-11-12'
       result: 合格
     status: planned
+  - id: NFR-10
+    name: 文書の MCP の応答の上限
+    english_name: tool_response_limit
+    category: 可用性
+    external_constraint: Claude Code の HTTP の MCP サーバーへの要求 1 回の待ち時間 60 秒。サーバーの行の `timeout` と `MCP_TOOL_TIMEOUT` は 60 秒より短い値を 60 秒に切り上げる。待ち時間を過ぎると接続を切り、取り消しの通知を送信しない
+    source_kind: 実行基盤の制限
+    source: https://github.com/shuhei1101/project-index/blob/fix/docs-mcp/timeout-write-and-worktree-read/docs/pr/82/%E7%B4%A2%E5%BC%95%E3%81%AE%E3%82%B5%E3%83%BC%E3%83%90%E3%83%BC.md
+    value: '48'
+    unit: 秒
+    measurement: 要求を記録するだけの HTTP の MCP サーバーに 80 秒かかるツールを配置し、Claude Code（`claude -p`）から 1 回呼び、時間切れまでの時間とサーバーが受けた要求を記録する
+    breakdown:
+      - part: 外部の上限
+        value: '60'
+        notes: Claude Code 2.1.325 の HTTP の要求の待ち時間の既定値。実測でも約 1 分で `The operation timed out.` になった
+      - part: 安全率
+        value: 20%
+        notes: 要求の送受信と端末の負荷で、クライアントが測る時間はサーバーが測る時間より長い
+      - part: アプリの決定値
+        value: '48'
+        notes: 60 × 0.8
+    rationale: 時間切れの後もサーバーは処理を続けるため、クライアントが時間切れにする前に応答を返却する。書き込みの期限・書き込み後の生成の制限時間・ワークツリーの読み込みを待つ上限は、この値から差し引いて決める
+    overflow: 上限を過ぎた応答は、Claude Code の側で時間切れになる。書き込みは期限を過ぎたらファイルを置き換えずに時間切れを返却し、読み取りはワークツリーの読み込み中である旨を返却する
+    verification:
+      device: WSL2 の Ubuntu（Windows 11）
+      version: Linux 6.6.87.2-microsoft-standard-WSL2、Claude Code 2.1.325
+      date: '2026-11-15'
+      result: 合格
+    status: planned
+  - id: NFR-11
+    name: 書き込みの期限
+    english_name: write_deadline
+    category: 可用性
+    external_constraint: 文書の MCP の応答の上限 48 秒
+    source_kind: 実行基盤の制限
+    source: NFR-1#requirements[文書の MCP の応答の上限]
+    value: '32'
+    unit: 秒
+    measurement: '`write_deadline_sec` より長く待つ検査のスクリプトを持つ種類へ `write_docs` を送信し、応答までの時間と、ファイルが書き換わっていないことを測る'
+    breakdown:
+      - part: 外側の待ち
+        value: '48'
+        notes: 文書の MCP の応答の上限
+      - part: 余裕（置き換え・書き込み後の生成・応答の組み立て）
+        value: '16'
+        notes: 実測が無いため、内側の待ち（書き込みの期限）の 50%。置き換えから応答までの所要時間を測り、p99.9 で差し替える。生成は応答の上限までの残りの時間を制限時間にするため、余裕が足りなくても応答は上限を超えない
+      - part: アプリの決定値
+        value: '32'
+        notes: 32 × 1.5 = 48
+    rationale: 置き換えを始めた後は最後まで書き込むため、検査と置き換えの開始を期限までに収め、応答の上限を外側の待ちとする入れ子の待ち（規約『資源の値の決め方』）で導く。端末の設定の `write_deadline_sec` で変えられる
+    overflow: 期限を過ぎたら、ファイルを 1 つも書き換えずに `WriteDeadlineExceededError` を返却する
+    status: planned
+  - id: NFR-12
+    name: ワークツリーの読み込みを待つ上限
+    english_name: worktree_load_wait
+    category: 可用性
+    external_constraint: 文書の MCP の応答の上限 48 秒
+    source_kind: 実行基盤の制限
+    source: NFR-1#requirements[文書の MCP の応答の上限]
+    value: '22'
+    unit: 秒
+    measurement: 読み込みを遅らせたワークツリーを指す `search_docs` を送信し、応答までの時間を測る
+    breakdown:
+      - part: 外側の待ち
+        value: '48'
+        notes: 文書の MCP の応答の上限
+      - part: 読み込んだ後の検索
+        value: '10'
+        notes: 作業範囲の外の配信元の検索の所要時間の決定値。読み込んだ後の検索は文書の数によらず数秒
+      - part: 余裕（応答の組み立てと端末の負荷）
+        value: '16'
+        notes: 実測が無いため、内側の待ち（読み込みの待ち + 検索）の 50%。応答の組み立ての所要時間を測り、p99.9 で差し替える
+      - part: アプリの決定値
+        value: '22'
+        notes: (22 + 10) × 1.5 = 48
+    rationale: 読み込みを待った後に検索して応答を組み立てるため、読み込みの待ちと検索を内側の待ち、応答の上限を外側の待ちとする入れ子の待ち（規約『資源の値の決め方』）で導く。端末の設定の `worktree_load_wait_sec` で変えられる
+    overflow: 上限までに読み込みが終了しなければ `WorktreeLoadingError` を返却し、読み込みは続ける。次の呼び出しは同じ読み込みの終了を待つ
+    status: planned
 id: NFR-1
 visibility: internal

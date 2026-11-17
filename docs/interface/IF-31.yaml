@@ -25,7 +25,7 @@ flows:
         participant E as PUT /settings/sources
         participant CF as 端末の設定
 
-        C->>E: sources: sample, extra
+        C->>E: expectedVersion, sources: sample, extra
         E->>E: オリジンを確かめ、保存後の端末の設定をスキーマで検証する
         E->>CF: settings.yaml の sources を書き換える
         E->>E: 配信元を読み直す
@@ -58,7 +58,7 @@ flows:
         participant E as PUT /settings/sources
         participant CF as 端末の設定
 
-        C->>E: sources: sample, extra（enabled: false）
+        C->>E: expectedVersion, sources: sample, extra（enabled: false）
         E->>CF: settings.yaml を書き換える
         E->>E: 配信元を読み直す
         E-->>C: 200（extra は disabled）
@@ -88,7 +88,7 @@ flows:
         participant E as PUT /settings/sources
         participant CF as 端末の設定
 
-        C->>E: sources: sample
+        C->>E: expectedVersion, sources: sample
         E->>CF: settings.yaml から extra の行を除く
         E->>E: 配信元を読み直す
         E-->>C: 200（sample だけ）
@@ -119,7 +119,7 @@ flows:
         participant E as PUT /settings/sources
         participant CF as 端末の設定
 
-        C->>E: sources: sample, broken
+        C->>E: expectedVersion, sources: sample, broken
         E->>CF: settings.yaml を書き換える
         E->>E: 読み直し、起動時と同じ検証で broken を外す
         E-->>C: 200（broken は not_served）
@@ -147,7 +147,7 @@ flows:
         participant E as PUT /settings/sources
         participant CF as 端末の設定
 
-        C->>E: sources: sample
+        C->>E: expectedVersion, sources: sample
         E->>E: 保存後の端末の設定をスキーマで検証する（mindstella は違反にしない）
         E->>CF: settings.yaml の sources を書き換える
         E->>E: 配信元を読み直す
@@ -184,6 +184,7 @@ flows:
       - 403 を返す
       - '`settings.yaml` が変わらず、`/sources/sample/docs` は 200 を返す'
       - '`Origin` が無く `Sec-Fetch-Site: cross-site` の要求も 403'
+      - '`expectedVersion` を持たない要求も、400 ではなく 403 を返す'
     test: test_error_when_cross_origin
   - name: 異常系（スキーマに通らない・422）
     summary: スキーマに通らない保存を断り、違反を全て返す
@@ -200,8 +201,8 @@ flows:
         participant C as クライアント
         participant E as PUT /settings/sources
 
-        C->>E: sources: sample, 違反を含む行
-        E->>E: スキーマで検証して失敗する
+        C->>E: expectedVersion, sources: sample, 違反を含む行
+        E->>E: 内容のバージョンを照合し、スキーマで検証して失敗する
         E-->>C: 422 problem+json（違反したキーと理由）
       ```
 
@@ -229,7 +230,7 @@ flows:
         participant E as PUT /settings/sources
         participant CF as 端末の設定
 
-        C->>E: sources: sample（enabled: false）, extra
+        C->>E: expectedVersion, sources: sample（enabled: false）, extra
         E->>CF: 同じ配信元の行の今の値で送信しなかったキーを埋めて settings.yaml を書き換える
         E->>E: 配信元を読み直す
         E-->>C: 200（sample は disabled）
@@ -260,7 +261,7 @@ flows:
         participant E as PUT /settings/sources
         participant CF as 端末の設定
 
-        C->>E: sources: sample, extra（outside_read: true）
+        C->>E: expectedVersion, sources: sample, extra（outside_read: true）
         E->>CF: 送信した値で settings.yaml を書き換える
         E->>E: 配信元を読み直す
         E-->>C: 200
@@ -331,6 +332,62 @@ flows:
       - 409 で、`current` が extra を追加した後の内容のバージョン
       - '`settings.yaml` に extra の行が残り、`/sources/extra/docs` が 200 を返却する'
     test: test_error_when_version_outdated
+  - name: 異常系（内容のバージョンが無い・400）
+    summary: 内容のバージョンを添えない保存を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample の 1 行'
+      - name: 入力
+        description: '`expectedVersion` を持たない、sample と extra の 2 行'
+    flow: |-
+      <!-- map: {"title": "異常系（内容のバージョンが無い・400）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as PUT /settings/sources
+
+        C->>E: sources: sample, extra（expectedVersion なし）
+        E-->>C: 400 problem+json（errors に expectedVersion）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 400 で、`errors[]` に `expectedVersion` のパスと理由がある
+      - '`settings.yaml` が変わらず、`/sources/extra/docs` が 404 を返す'
+    test: test_error_when_version_missing
+  - name: 正常系（送信しなかった読み書きの方法を残す）
+    summary: 行に含めなかった `storage` を、ファイルの同じ配信元の行の今の値で残す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample と company（`storage.type: disk`）の 2 行'
+      - name: 入力
+        description: '`GET /settings/sources` で取得した `version` を `expectedVersion` にし、sample の行を `enabled: false` にした 2 行。どちらの行にも `storage` を含めない'
+    flow: |-
+      <!-- map: {"title": "正常系（送信しなかった読み書きの方法を残す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as PUT /settings/sources
+        participant CF as 端末の設定
+
+        C->>E: expectedVersion, sources: sample（enabled: false）, company
+        E->>CF: 同じ配信元の行の今の値で storage を埋めて settings.yaml を書き換える
+        E->>E: 配信元を読み直す
+        E-->>C: 200（company は serving）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 200 で、company が `serving`
+      - '`settings.yaml` の company の行に `storage.type: disk` が残る'
+      - '読み直した後も `/sources/company/refs` が `git: false` を返す'
+    test: test_normal_when_unsent_storage_kept
 lead: '`sources[]` を丸ごと受けて端末の設定を書き換え、配信元を読み直す端末の設定の API の入出力を定め、端末の設定の保存を修正するときに参照する。'
 tags:
   - name: topic:設定
@@ -342,7 +399,7 @@ identifier: put_settings_sources
 permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ'
 idempotent: true
 side_effects: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml` の `sources` を書き換え、配信元を読み直す。配信元のフォルダのファイルは変えない'
-exclusivity: 端末の設定の排他ロックの中で、内容のバージョンの照合・検証・書き込み・読み直しを行う。読み直しの間の要求は、読み直す前の配信元で応える
+exclusivity: 端末の設定の排他ロックの中で、内容のバージョンの照合・検証・書き込み・読み直しを行う。読み直しの間の要求は、読み直す前の配信元で応える。読み直した配信元の裏の検査はロックの外で実行する
 request:
   - name: sources
     type: list[Source]
@@ -393,16 +450,20 @@ request:
     location: body
     description: '`scope` に当たらない作業場所からも `outside_scope: true` で作業範囲の外（参考）として参照できるか'
     notes: '`false` の配信元は `scope` の外から一切読めない'
+  - name: sources[].storage.type
+    type: Literal['git', 'disk']
+    required: false
+    default: ファイルの同じ配信元の行の今の値（同じ配信元の行が無ければ書かない）
+    location: body
+    description: 配信元の読み書きの方法
   - name: expectedVersion
     type: str
-    required: false
-    default: なし（照合せずに書き換える）
+    required: true
     location: body
     description: 取得したときの端末の設定の内容のバージョン。今の内容のバージョンと違えば書き換えない
-    notes: dev-docs の設定の画面が送信するようになるまでは省ける
 request_example: |-
   ```json
-  {"sources": [
+  {"expectedVersion": "a1b2c3", "sources": [
     {"id": "sample", "config": "/path/to/sample/project-index.yaml", "scope": {"read": ["/path/to/sample/**"]}},
     {"id": "extra", "config": "/path/to/extra/project-index.yaml", "scope": {"read": ["/path/to/extra/**"]}}
   ]}
@@ -443,11 +504,14 @@ status_codes:
   - code: '403'
     condition: project-index と別のオリジンの `Origin` を持つ要求か、`Origin` が無く `Sec-Fetch-Site` が `cross-site`・`same-site` の要求
   - code: '422'
-    condition: 保存後の端末の設定がスキーマに通らない（最上位の知らないキーは違反にしない）
+    condition: 保存後の端末の設定がスキーマに通らない（`storage.type` が `git`・`disk` 以外を含む。最上位の知らないキーは違反にしない）
     notes: '`errors[]` に違反したキーのパスと理由を全て並べる'
   - code: '409'
     condition: '`expectedVersion` が今の端末の設定の内容のバージョンと違う'
     notes: problem+json の拡張メンバー `current` に今の内容のバージョンを入れる
+  - code: '400'
+    condition: '`expectedVersion` が無い'
+    notes: 要求の型の検証の失敗。起動の『例外の変換の登録』が `InvalidArgumentError` の problem+json にし、`errors[]` にキーのパスと理由を並べる
 error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`・`current`）。検証の違反は `errors[]` に `{path, reason}` で並べる（`path` は `sources[1].id` の形）
 constraints:
   - item: オリジンの確認
@@ -468,9 +532,13 @@ constraints:
   - item: operationId
     constraint: '`{tag}-{関数名}` の `settings-put_settings_sources`'
   - item: 送信しなかったキー
-    constraint: 送信した行ごとに、ファイルの同じ配信元の行（`id`、無ければ配信元の設定の `name` で照合する）を探し、行に含めなかった `enabled`・`scope.read`・`scope.write`・`outside_read` をその行の今の値で埋めてから記載する。同じ配信元の行が無い行は既定値で記載する
+    constraint: 送信した行ごとに、ファイルの同じ配信元の行（`id`、無ければ配信元の設定の `name` で照合する）を探し、行に含めなかった `enabled`・`scope.read`・`scope.write`・`outside_read`・`storage` をその行の今の値で埋めてから記載する。同じ配信元の行が無い行は既定値で記載する
     notes: 取得した行の一部のキーだけを送信する呼び出し側でも、送信しなかったキーが既定値に戻らない
   - item: 内容のバージョンの照合
-    constraint: '`expectedVersion` を送信したときだけ、排他ロックを取った後に `settings.yaml` の内容のバージョンと照合し、スキーマの検証より前に断る'
-    notes: dev-docs の設定の画面が送信するようになった後に必須へ切り替える
+    constraint: '排他ロックを取った後に `settings.yaml` の内容のバージョンと照合し、スキーマの検証より前に断る。フローの `expectedVersion` は、直前に `GET /settings/sources` で取得した `version`'
+  - item: 検査とリビジョンの書き出し
+    constraint: 応答は配信元の一覧を差し替えた時点で返し、読み直した配信元の検査と `default_ref` の commit の書き出しは裏で実行して待たない。応答の配信元ごとの状態は検査の前の値（`sync` は `null`）
+    notes: 管理の MCP の `reload` と同じ。検査が済んだかは管理の MCP の `status` の `checking` で確かめる
 test_file: tests/integration/server/test_put_settings_sources.py
+callers:
+  - SC-12#scenarios[正常シナリオ]

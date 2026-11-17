@@ -32,7 +32,7 @@ classes:
     usecase: 説明
     role: 状態
     summary: 配信元の ID ごとに最後の検査の結果を持つ
-    description: 起動のときに 1 つだけ作り、`Handlers.checks` に持たせる。結果・始めた順の番号・裏で検査している配信元・やり直しの要求は 1 つのロックで読み書きする。
+    description: 起動のときに 1 つだけ作り、`Handlers.checks` に持たせる。結果・始めた順の番号・裏で検査している配信元・やり直しの要求は 1 つのロックで読み書きする。作るときに、検査を終えた配信元と結果を受け取る `on_checked`（警告のログを書く関数。省けば呼ばない）を指定する。
     methods:
       - name: refresh
         title: 検査の流し直し
@@ -60,7 +60,9 @@ classes:
         process: |-
           1. ロックを取り、配信元の ID の始めた順の番号を 1 つ進めて記録する
           2. 同期のずれ（`check_sync`）と `nav` の警告（`nav_warnings`）を求める（ロックの外）
-          3. ロックを取り、記録した番号が持っている結果の番号より新しいときだけ結果を置き換え、求めた結果を返す
+          3. ロックを取り、記録した番号が持っている結果の番号より新しいときだけ結果を置き換える
+          4. 結果を置き換えた場合だけ、`on_checked` を配信元と結果で呼ぶ（ロックの外）
+          5. 求めた結果を返す
         unit_tests:
           - name: test_source_checks_refresh
             case: 正常
@@ -121,8 +123,8 @@ classes:
           type: list[threading.Thread]
           description: 起動したスレッド（裏で検査中の配信元の分は含まない）
         process: |-
-          1. ロックを取り、配信元ごとに、裏で検査中ならやり直しの要求を立てて飛ばし、そうでなければ検査中にする
-          2. 検査中にした配信元ごとに daemon のスレッドを起動して返す。スレッドは検査の流し直しを呼び、終えた後にロックを取って、やり直しの要求があれば要求を下ろしてもう 1 回流し、無ければ検査中を解いて終える
+          1. ロックを取り、配信元ごとに、裏で検査中ならやり直しの要求をその配信元のオブジェクトで置き換えて飛ばし、そうでなければ検査中にする
+          2. 検査中にした配信元ごとに daemon のスレッドを起動して返す。スレッドは検査の流し直しを呼び、終えた後にロックを取って、やり直しの要求があれば要求を下ろして、要求に置いた配信元（読み直した後の最新のもの）でもう 1 回流し、無ければ検査中を解いて終える
              - 検査が例外を送った場合、`[ERROR]` 配信元の検査に失敗した（配信元の ID）をログに書き、やり直しの要求の扱いは同じにする
         unit_tests:
           - name: test_source_checks_refresh_later
@@ -137,5 +139,59 @@ classes:
             condition: 1 回目の検査を合図まで止め、その間に `refresh_later` を 2 回呼んでから合図を出す
             mock: '`check_sync`（呼んだ回数を数え、1 回目だけ合図まで止める）'
             expected: 2 回目と 3 回目の `refresh_later` が空のリストを返し、`check_sync` を呼んだ回数が 2 で、`get("sample")` が 2 回目の検査の結果
+      - name: checking
+        title: 検査の最中
+        kind: メソッド
+        summary: 裏で検査している配信元があるかを返す（`property`）
+        scope: public
+        thread_safe: true
+        returns:
+          type: bool
+          description: 裏で検査中の配信元が 1 つ以上あれば `True`
+        process: 1. ロックを取り、裏で検査中の配信元が空でないかを返す
+        unit_tests:
+          - name: test_source_checks_checking
+            case: 正常
+            summary: 裏の検査の間だけ True
+            condition: 1 回目の検査を合図まで止め、`refresh_later` で sample を検査する
+            mock: '`check_sync`（合図まで止める）'
+            expected: 合図の前は `checking` が `True`、合図の後にスレッドを join すると `False`
+      - name: forget
+        title: 結果の破棄
+        kind: メソッド
+        summary: 渡した配信元の ID の結果を捨てる
+        scope: public
+        thread_safe: true
+        side_effects: その配信元の結果を捨てる（始めた順の番号は残す）
+        args:
+          - name: source_ids
+            title: 配信元の ID
+            type: Iterable[str]
+            required: true
+            passing: positional
+            description: 読み直した配信元の ID
+        returns:
+          type: None
+          description: なし
+        process: 1. ロックを取り、渡した ID の結果を捨てる。始めた順の番号は残し、捨てる前に始めた検査が後に終えても、後に始めた検査の結果を上書きしない
+        unit_tests:
+          - name: test_source_checks_forget
+            case: 正常
+            summary: 結果を捨てる
+            condition: sample を検査した後に `forget(["sample"])`
+            mock: なし
+            expected: '`get("sample")` が `None`'
+    properties:
+      - name: on_checked
+        title: 検査を終えたときの処理
+        type: Callable[[ServedSource, SourceCheck], None] | None
+        access: 公開
+        default: None
+        description: 結果を置き換えた検査ごとに呼ぶ（起動では警告のログを書く関数）
+      - name: _requested
+        title: やり直しの要求
+        type: dict[str, ServedSource]
+        access: 内部 (_)
+        description: 裏で検査中に要求された配信元の ID → 最後に要求された配信元
 refs:
   - IF-1#

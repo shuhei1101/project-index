@@ -196,7 +196,14 @@ def load_terminal_config(
     log_dir = normalize_path(str(log_value)) if "log_dir" in data else state_dir / "logs"
     values = {
         key: data[key]
-        for key in ("port", "bind", "seen_retention_days", "script_timeout_sec")
+        for key in (
+            "port",
+            "bind",
+            "seen_retention_days",
+            "script_timeout_sec",
+            "write_deadline_sec",
+            "worktree_load_wait_sec",
+        )
         if key in data
     }
     return TerminalConfig.model_validate(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import os
+from fnmatch import fnmatch
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
@@ -24,6 +25,8 @@ LOCK_FILES = frozenset(
 VENDOR_DIRS = frozenset({"vendor", "third_party", "generated", "__generated__", "dist"})
 # ファイル名がこの末尾のファイルを生成物とみなす
 GENERATED_SUFFIXES = ("_pb2.py", "_pb2_grpc.py", ".min.js", ".min.css", ".map")
+# その端末だけで使用する（Git に無視させる）ファイルの名前
+LOCAL_FILE_PATTERN = "*.local.*"
 # 先頭のこのバイト数に NUL バイトがあればバイナリとみなす
 BINARY_SNIFF_BYTES = 8192
 
@@ -44,6 +47,28 @@ def walk_files(root: Path, *, start: str = ".") -> Iterator[str]:
             yield _join(relative_folder, name)
 
 
+def walk_tree(root: Path) -> tuple[list[str], dict[str, int]]:
+    """中をたどるファイルの一覧と、たどったフォルダごとの更新日時（`st_mtime_ns`）を返す。"""
+    files: list[str] = []
+    folders: dict[str, int] = {}
+    for folder, dirnames, filenames in os.walk(root, followlinks=False):
+        relative_folder = Path(folder).relative_to(root).as_posix()
+        # フォルダの中のファイルの追加・削除・改名で、フォルダの更新日時が変わる
+        try:
+            folders[relative_folder] = os.stat(folder).st_mtime_ns
+        except OSError:
+            # たどる途中で無くなったフォルダは記録しない
+            continue
+        # たどらない名前・パスのフォルダは中に入らない（中をたどるファイルの列挙と同じ）
+        dirnames[:] = [
+            name
+            for name in dirnames
+            if name not in SKIP_DIRS and _join(relative_folder, name) not in SKIP_PATHS
+        ]
+        files.extend(_join(relative_folder, name) for name in filenames)
+    return files, folders
+
+
 def _join(relative_folder: str, name: str) -> str:
     """`root` からのフォルダのパスと名前をつなぐ（`root` 直下は名前だけ）。"""
     return name if relative_folder == "." else f"{relative_folder}/{name}"
@@ -60,6 +85,9 @@ def is_excluded_file(root: Path, path: str) -> bool:
         return True
     # 生成物のファイル名か
     if target.name.endswith(GENERATED_SUFFIXES):
+        return True
+    # その端末だけで使用するファイルの名前か
+    if fnmatch(target.name, LOCAL_FILE_PATTERN):
         return True
     try:
         with (root / path).open("rb") as file:

@@ -118,7 +118,7 @@ functions:
     process: |-
       1. `to` があって `from_` が無い場合、`InvalidArgumentError`（`to` には `from` が要ります）を送る
       2. `contains.regex` が真で `contains.value` を `compile_regex` で読めない場合、`InvalidArgumentError`（`path` は `contains.value`、`rule` は `正規表現として読み込めません（{エラー}）`）を送る
-      3. 読む場所を解く（読む場所の解決。`ref` は渡さず、`outside_scope` を渡す。結果の `outside_scope` は読んだ場所のどれかが作業範囲の外なら `True`）。`from_` があり Git 管理外の配信元を含む場合、`InvalidArgumentError` を送る
+      3. 読む場所を解く（読む場所の解決。`ref` は渡さず、`outside_scope` を渡す。結果の `outside_scope` は読んだ場所のどれかが作業範囲の外なら `True`）。`from_` があり Git 管理外の配信元を含む場合、`InvalidArgumentError`（`path` は `from`、`rule` は `storage` が `disk` の配信元なら `{id} は disk の配信元のため区間を指定できません`、それ以外は `{id} は Git の管理外なので区間を指せません`）を送る
       4. 配信元ごとに前と後の文書を作る
          - `from_` がある場合、始点・終点をリビジョンの解決（`argument` は `from`・`to`）で commit にし、2 つの commit（終点が無ければ作業ツリー）の間の前後の文書を作る。文書の行に当たる変わったファイル（`enabled` の行を上から見て、文書の行.行に当たるかが `True` の最初の行）ごとに、前はリビジョンのファイル、後は終点の commit のリビジョンのファイルか作業ツリーのファイルを、文字列からの文書の組み立てで文書にする（この組み立ては次の `contains` の commit ごとの比較でも使う）。`body_file` の本文は、ファイルと同じ端（前は始点の commit、後は終点の commit のリビジョンのファイルか作業ツリーのファイル）から読む（文字列からの文書の組み立ての `read_body`）。変わったファイルが今の文書（文書のストア.読み込み）の `body_path` に当たる場合、その文書の索引のファイル（`path`）も変わったファイルに加える
          - `from_` が無い場合、会話の記録.前回読んだ内容を引く（会話キーが無い・全ての配信元で空なら `LastReadNotFoundError`）。前は記録の内容（`doc_kind` の行が `records` を持つなら、今の文書の `data`・メタデータに記録の内容を `body` にした文書を作る（`body_file` を持たない行は、記録の内容を YAML として読んだ辞書を `data` にする。読めなければ今の `data`）。今の文書が無ければ記録の内容だけを `body` にした文書にする。それ以外の行は文字列からの文書の組み立てにかける）、後は今の文書（文書のストア.ID で引く。無ければ消した）
@@ -140,7 +140,7 @@ functions:
         condition: '`from` を省き、この会話で本文を読んだ記録が無い'
         message: '`この会話で参照した記録がありません。from を指定してください`'
       - name: InvalidArgumentError
-        condition: Git 管理外の配信元への区間・`from` の無い `to`・知らない項目・正規表現として読めない `contains.value`
+        condition: Git 管理外の配信元（`storage` が `disk` の配信元を含む）への区間・`from` の無い `to`・知らない項目・正規表現として読めない `contains.value`
         message: '`引数が正しくありません: {違反の数} 件`'
       - name: SourceNotReadableError
         condition: 読む場所の解決が送る

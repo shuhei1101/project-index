@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -99,7 +101,16 @@ def _handlers(
     terminal = make_terminal_config(sources=list(entries), **overrides)
     handlers = build_handlers(terminal)
     handlers.reload_sources(terminal)
+    _wait_checked(handlers)
     return handlers
+
+
+def _wait_checked(handlers: Handlers) -> None:
+    """裏の検査とリビジョンの書き出しが済むまで待つ（30 秒を超えたら AssertionError）。"""
+    deadline = time.monotonic() + 30
+    while handlers.checks.checking or handlers.snapshots.exporting:
+        assert time.monotonic() < deadline, "待ち時間の上限を超えた"
+        time.sleep(0.05)
 
 
 def test_get_status(
@@ -147,7 +158,12 @@ def test_get_status_when_loading(
     terminal = make_terminal_config(
         sources=[make_entry(str(make_source_dir("alpha")), source_id="alpha")]
     )
-    handlers = make_handlers(terminal=terminal, registry=SourceRegistry(loading=True))
+    handlers = make_handlers(
+        terminal=terminal,
+        registry=SourceRegistry(loading=True),
+        checks=SimpleNamespace(checking=False),
+        snapshots=SimpleNamespace(exporting=False),
+    )
     # 実行
     status = get_status(handlers, env={})
     # 検証
@@ -206,6 +222,33 @@ def test_reload_config_when_invalid(
     with pytest.raises(TerminalConfigInvalidError):
         reload_config(handlers)
     assert handlers.registry.statuses() == before
+
+
+def test_reload_config_when_checked_before_response(
+    make_source_dir: Callable[..., Path],
+    write_settings: Callable[..., Path],
+    make_real_handlers: Callable[[Path], Handlers],
+) -> None:
+    """応答を組み立てる前に裏の検査が済んでも、読み直した配信元の `sync` を持たない（正常系）。"""
+    # 準備
+    from dataclasses import replace
+
+    row = {"id": "a", "config": str(make_source_dir("a"))}
+    handlers = make_real_handlers(write_settings([row]))
+    _wait_checked(handlers)
+    reload_sources = handlers.reload_sources
+
+    def reload_and_wait(terminal: TerminalConfig) -> Any:
+        statuses = reload_sources(terminal)
+        _wait_checked(handlers)
+        return statuses
+
+    handlers = replace(handlers, reload_sources=reload_and_wait)
+    # 実行
+    result = reload_config(handlers)
+    # 検証
+    assert handlers.checks.get("a") is not None
+    assert [(item.id, item.sync) for item in result.sources] == [("a", None)]
 
 
 def test_check_project(
@@ -908,6 +951,24 @@ def test_source_states_without_refresh(
     assert calls == []
 
 
+def test_source_states_without_sync(
+    make_source_dir: Callable[..., Path],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """同期の件数を含めない指定では、検査の結果があっても `sync` を持たない（正常系）。"""
+    # 準備
+    alpha = make_source_dir("alpha", unindexed=1)
+    handlers = _handlers(make_terminal_config, make_entry(str(alpha), source_id="alpha"))
+    assert handlers.checks.get("alpha") is not None
+    # 実行
+    states = _source_states(handlers, with_sync=False)
+    # 検証
+    assert [(state.id, state.status, state.sync) for state in states] == [
+        ("alpha", "serving", None)
+    ]
+
+
 def test_check_project_when_paths_base_invalid(
     tmp_path: Path,
     write_files: Callable[[Path, dict[str, str]], None],
@@ -939,3 +1000,50 @@ def test_check_project_when_paths_base_invalid(
         "paths_base",
     ]
     assert result.sync is None
+
+
+def test_get_status_when_checking_and_exporting(
+    make_handlers: Callable[..., Any],
+) -> None:
+    """裏の検査と書き出しの最中を返す（正常系）。"""
+    # 準備
+    handlers = make_handlers(
+        registry=SourceRegistry(),
+        checks=SimpleNamespace(checking=True),
+        snapshots=SimpleNamespace(exporting=True),
+    )
+    # 実行
+    status = get_status(handlers, env={})
+    # 検証
+    assert status.checking is True
+    assert status.exporting is True
+    assert status.loading is False
+
+
+def test_check_project_when_disk_storage(
+    git_repo: Callable[..., Path],
+    write_files: Callable[[Path, dict[str, str]], None],
+    sample_files: dict[str, str],
+    make_terminal_config: Callable[..., TerminalConfig],
+) -> None:
+    """disk を指定して commit していない設定を検査する（正常系）。"""
+    # 準備
+    root = git_repo({"README.md": "readme\n"})
+    write_files(
+        root,
+        {
+            "project-index.local.yaml": sample_files["project-index.yaml"],
+            "schemas/rule.schema.yaml": sample_files["schemas/rule.schema.yaml"],
+            "docs/rule/doc-1.yaml": sample_files["docs/rule/doc-1.yaml"],
+        },
+    )
+    handlers = _handlers(make_terminal_config)
+    request = CheckProjectRequest(path=str(root / "project-index.local.yaml"), storage_type="disk")
+    # 実行
+    result = check_project(request, handlers=handlers)
+    # 検証
+    assert result.violations == []
+    assert result.sync is not None
+    assert result.sync.missing_refs == 0
+    assert result.sync.unindexed_files == 0
+    assert result.sync.missing_body_files == 0

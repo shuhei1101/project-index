@@ -39,6 +39,7 @@ functions:
       2. バージョンを 起動時に読んだ値（動いているバージョン。更新で配布のメタデータが入れ替わっても変わらない）、プロセス ID を `os.getpid()` で得る
       3. 端末の設定の `version` を `SETTINGS_VERSION` と比べる（バージョンの新旧）
       4. 配信元の一覧が読み込み中（`registry.loading`）なら、`loading` を `True`、`sources` を空にする。そうでなければ `loading` を `False` にし、配信元ごとの状態を作る（配信元の状態の一覧）
+      5. `checking` を配信元の検査のキャッシュの検査の最中（`checks.checking`）、`exporting` をリビジョンの書き出しの書き出しの最中（`snapshots.exporting`）にする
     exceptions:
       - name: TerminalConfigInvalidError
         condition: '`PROJECT_INDEX_PORT` がポートの範囲の外'
@@ -62,6 +63,12 @@ functions:
         condition: '`SourceRegistry(loading=True)` でまだ読み直していない配信元の一覧を持つ `Handlers`'
         mock: なし
         expected: 待たずに戻り、`loading` が `True`、`sources` が空
+      - name: test_get_status_when_checking_and_exporting
+        case: 正常
+        summary: 裏の検査と書き出しの最中を返す
+        condition: '`checks.checking` と `snapshots.exporting` が `True` の `Handlers`'
+        mock: 配信元の検査のキャッシュ・リビジョンの書き出し（最中を返す偽物）
+        expected: '`checking` と `exporting` が `True`、`loading` が `False`'
     callers:
       - MOD-93#functions[build_admin_mcp]
     callees:
@@ -94,7 +101,7 @@ functions:
       3. `handlers.terminal.file` を読む（端末の設定の読み込み）
       4. 配信元を読み直す（`handlers.reload_sources`）
       5. 読み直した後の `serving` の ID と比べ、`added`・`removed`・`not_served` を作る
-      6. 配信元ごとの状態を作る（配信元の状態の一覧）
+      6. 配信元ごとの状態を、同期の件数を含めずに作る（配信元の状態の一覧。`with_sync=False`。裏の検査が済んでいても `sync` は `None`）
          - `[INFO]` 読み直した（追加・削除・配信していない件数）
     exceptions:
       - name: TerminalConfigInvalidError
@@ -114,6 +121,12 @@ functions:
         mock: なし
         expected: '`TerminalConfigInvalidError`。`handlers.registry.statuses()` は呼ぶ前と同じ'
         exception: 端末の設定が違反する
+      - name: test_reload_config_when_checked_before_response
+        case: 正常
+        summary: 応答を組み立てる前に裏の検査が済んでも、読み直した配信元の `sync` を持たない
+        condition: 起動時は `a` が `serving`。`handlers.reload_sources` を、本物を呼んだ後に `a` の検査の終了を待つ関数に差し替える
+        mock: '`handlers.reload_sources`（本物を呼び、検査の終了を待つ）'
+        expected: '`sources[]` の `a` の行の `sync` が `None`'
     callers:
       - MOD-93#functions[build_admin_mcp]
     callees:
@@ -145,7 +158,7 @@ functions:
       type: CheckProjectResult
       description: 検査の結果
     process: |-
-      1. 配信元を読む（検査する配信元の読み込み）
+      1. 配信元を読む（検査する配信元の読み込み。`storage` は `request.storage_type`）
       2. 端末の設定の `sources[]` のうち、`config` の先頭のファイルのフォルダが設定ファイルのフォルダ（`config_root`）と同じ行の ID を `registered_id` にする
       3. `config_version` があれば新旧を求める（バージョンの新旧）
       4. 取り得た値に応じて分ける
@@ -211,6 +224,12 @@ functions:
         condition: '`paths_base: sub`（設定ファイルのフォルダの下。`sub` はある）と、`documents[0].paths: [docs/a/*.yaml, docs/b/*.yaml, ../outside/*.yaml]` を持つ設定'
         mock: 配線済みの関数（偽物）
         expected: '`violations` に `paths_base` と `documents[0].paths[2]` がそれぞれ理由と一緒にあり、`sync` が `None`'
+      - name: test_check_project_when_disk_storage
+        case: 正常
+        summary: disk を指定して commit していない設定を検査する
+        condition: Git のリポジトリの中に commit していない `project-index.local.yaml` を置き、`path` にその絶対パス、`storage_type="disk"`
+        mock: なし（一時ディレクトリの git リポジトリ）
+        expected: '`violations` が空で、`sync` の件数が 0'
     callers:
       - MOD-93#functions[build_admin_mcp]
     callees:
@@ -437,6 +456,12 @@ functions:
         required: true
         passing: keyword
         description: '`None` はファイルを読む'
+      - name: storage
+        title: 読み書きの方法
+        type: StorageType | None
+        default: None
+        passing: keyword
+        description: '`assemble_source` へ渡す。`disk` は Git を参照せずに組み立てる'
     returns:
       type: CandidateSource
       description: 検査する配信元
@@ -449,7 +474,7 @@ functions:
       3. 文字列を YAML として読み、辞書なら `version` を文字列にして `config_version` にする（`load_yaml`）
          - 読めない場合、`ConfigParseError` を送出する
       4. `config` がある場合、一時フォルダに `project-index.yaml` を書き、そのファイルを読む対象にする
-      5. 配信元を組み立てる（`assemble_source`、`root_override` は `root`、`scope_read` は空、`scope_write` は `None`、`lookup` はサーバーの端末の設定から作った引き当て（端末の設定からの引き当て））
+      5. 配信元を組み立てる（`assemble_source`、`root_override` は `root`、`scope_read` は空、`scope_write` は `None`、`lookup` はサーバーの端末の設定から作った引き当て（端末の設定からの引き当て）、`storage` は引数の `storage`）
       6. 戻り値を分ける
          - 設定が `None` の場合、違反を `violations` に入れる
          - 設定があり配信元が `None` の場合、違反を `script_violations` に入れる
@@ -515,12 +540,19 @@ functions:
         required: true
         passing: positional
         description: 登録簿と配信元の検査のキャッシュを使う
+      - name: with_sync
+        title: 同期の件数を含めるか
+        type: bool
+        required: false
+        default: 'True'
+        passing: keyword
+        description: '`False` のときは検査の結果を参照せず、`serving` の行の `sync` を `None` にする（読み直しの応答）'
     returns:
       type: list[SourceState]
       description: '`sources[]` の順の配信元の状態'
     process: |-
       1. `handlers.registry.statuses()` の行ごとに作る
-         - `serving` の場合、`registry.served()` の同じ ID の配信元（`default_ref` の commit を確かめない） の `config.version` を `config_version` にし、新旧を求め（バージョンの新旧）、`handlers.checks.get(id)` の最後の検査の結果があればその `report` から索引の同期の件数を作る。検査の結果が無ければ `sync` を `None` にする。配信元のファイルはたどらない（`check_sync` を呼ばない）
+         - `serving` の場合、`registry.served()` の同じ ID の配信元（`default_ref` の commit を確かめない） の `config.version` を `config_version` にし、新旧を求め（バージョンの新旧）、`with_sync` が真で `handlers.checks.get(id)` の最後の検査の結果があればその `report` から索引の同期の件数を作る。`with_sync` が偽か検査の結果が無ければ `sync` を `None` にする。配信元のファイルはたどらない（`check_sync` を呼ばない）
          - `not_served` の場合、`errors` を `{path}: {rule}` の文字列にし、他は `None` にする
          - `disabled` の場合、`errors` を空、他は `None` にする
     unit_tests:
@@ -542,6 +574,12 @@ functions:
         condition: '`serving` の 1 行で、`registry.get` を呼ぶと失敗する偽物に差し替える'
         mock: '`registry.get`（呼ばれたら `AssertionError` を送る偽物）'
         expected: '`serving` の行の `config_version` が配信中の配信元の設定のバージョンで、`registry.get` が呼ばれない'
+      - name: test_source_states_without_sync
+        case: 正常
+        summary: 同期の件数を含めない指定では、検査の結果があっても `sync` を持たない
+        condition: '`serving` の 1 行で、配信元の検査のキャッシュに結果がある。`with_sync=False`'
+        mock: なし
+        expected: '`serving` の行の `sync` が `None`'
     callers:
       - '#functions[get_status]'
       - '#functions[reload_config]'

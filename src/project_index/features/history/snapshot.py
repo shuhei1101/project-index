@@ -12,8 +12,10 @@ import threading
 from typing import TYPE_CHECKING
 
 from project_index.integrations.git import GIT_ARCHIVE_TIMEOUT_SEC, GitError, run_git
+from project_index.shared.errors import RevisionExportTimeoutError
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -31,6 +33,45 @@ class SnapshotStore:
         self.keep = keep
         self._locks: dict[Path, threading.Lock] = {}
         self._guard = threading.Lock()
+        # 裏の書き出しの開始が起こして終えていないスレッドの数
+        self._background = 0
+
+    @property
+    def exporting(self) -> bool:
+        """裏の書き出しが終わっていないかを返す。"""
+        with self._guard:
+            return self._background > 0
+
+    def checkout_later(
+        self, targets: list[tuple[Path, str]], *, after: Sequence[threading.Thread] = ()
+    ) -> threading.Thread:
+        """渡したスレッドの終了を待ってから、渡した commit を裏のスレッドで順に書き出す。"""
+        with self._guard:
+            self._background += 1
+
+        def work() -> None:
+            try:
+                # 検査を終えてから書き出す
+                for thread in after:
+                    thread.join()
+                for repo_root, commit in targets:
+                    try:
+                        self.checkout(repo_root, commit)
+                    except (RevisionExportTimeoutError, GitError) as error:
+                        # 止めた commit は次の要求が書き出し直すので、ログに残して次へ進む
+                        logger.warning(
+                            "裏のリビジョンの書き出しを止めた（%s・%s・%s）",
+                            repo_root,
+                            commit,
+                            error,
+                        )
+            finally:
+                with self._guard:
+                    self._background -= 1
+
+        thread = threading.Thread(target=work, name="project-index-revision-export", daemon=True)
+        thread.start()
+        return thread
 
     def _lock_for(self, target: Path) -> threading.Lock:
         """commit ごとの排他を引く（無ければ作る）。"""
@@ -64,8 +105,19 @@ class SnapshotStore:
                     raise RuntimeError(msg)
                 with tarfile.open(fileobj=io.BytesIO(data)) as archive:
                     archive.extractall(temp, filter="data")
-            except GitError:
+            except GitError as error:
                 shutil.rmtree(temp, ignore_errors=True)
+                # 待ち時間の上限を超えたときは、止めた処理と理由を持つエラーにして送る
+                if error.timed_out:
+                    raise RevisionExportTimeoutError(
+                        message=(
+                            f"リビジョンの書き出し（{commit}）が "
+                            f"{GIT_ARCHIVE_TIMEOUT_SEC:g} 秒を超えたため止めました"
+                        ),
+                        next_steps=["時間を空けて同じ呼び出しを再実行してください"],
+                        commit=commit,
+                        limit_sec=GIT_ARCHIVE_TIMEOUT_SEC,
+                    ) from error
                 raise
             temp.rename(target)
             os.utime(target)

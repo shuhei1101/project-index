@@ -37,7 +37,14 @@ def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]
     before = load_yaml(env.settings_path.read_text(encoding="utf-8"))["sources"][0]
     served = env.handlers.registry.get("sample")
     # 実行
-    response = env.client.post("/settings/sources", json={"source": _row(extra)}, headers=ORIGIN)
+    response = env.client.post(
+        "/settings/sources",
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "source": _row(extra),
+        },
+        headers=ORIGIN,
+    )
     # 検証
     text = env.settings_path.read_text(encoding="utf-8")
     body = response.json()
@@ -67,10 +74,20 @@ def test_error_when_same_id_exists(
     env = make_server(sample, extra)
     before = env.settings_path.read_text(encoding="utf-8")
     # 実行
-    same = env.client.post("/settings/sources", json={"source": _row(extra)}, headers=ORIGIN)
+    same = env.client.post(
+        "/settings/sources",
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "source": _row(extra),
+        },
+        headers=ORIGIN,
+    )
     other = env.client.post(
         "/settings/sources",
-        json={"source": _row(extra, config=[str(sample.config[0])])},
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "source": _row(extra, config=[str(sample.config[0])]),
+        },
         headers=ORIGIN,
     )
     # 検証
@@ -91,7 +108,12 @@ def test_error_when_schema_invalid(
     before = env.settings_path.read_text(encoding="utf-8")
     # 実行
     response = env.client.post(
-        "/settings/sources", json={"source": _row(extra, id="Sample Docs")}, headers=ORIGIN
+        "/settings/sources",
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "source": _row(extra, id="Sample Docs"),
+        },
+        headers=ORIGIN,
     )
     # 検証
     assert response.status_code == 422
@@ -135,10 +157,60 @@ def test_normal_when_unknown_top_level_key_kept(
     extra = make_source("extra")
     env = make_server(sample, settings_extra=UNKNOWN_KEY_EXTRA)
     # 実行
-    response = env.client.post("/settings/sources", json={"source": _row(extra)})
+    response = env.client.post(
+        "/settings/sources",
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "source": _row(extra),
+        },
+    )
     # 検証
     body = response.json()
     assert response.status_code == 201
     assert body["result"] == "added"
     assert [warning["path"] for warning in body["warnings"]] == ["mindstella"]
     assert UNKNOWN_KEY_EXTRA in env.settings_path.read_text(encoding="utf-8")
+
+
+def test_error_when_version_missing(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """内容のバージョンを添えない追加を断る（異常系）。"""
+    # 準備
+    sample = make_source("sample")
+    extra = make_source("extra")
+    env = make_server(sample)
+    before = env.settings_path.read_bytes()
+    # 実行
+    response = env.client.post("/settings/sources", json={"source": _row(extra)}, headers=ORIGIN)
+    # 検証
+    assert response.status_code == 400
+    assert [error["path"] for error in response.json()["errors"]] == ["expectedVersion"]
+    assert env.settings_path.read_bytes() == before
+
+
+def test_normal_when_storage_given(
+    make_source: Callable[..., Any],
+    make_local_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+) -> None:
+    """storage.type: disk を持つ行を追加し、disk の配信元として読み込む（正常系）。"""
+    # 準備
+    company = make_local_source()
+    env = make_server(make_source("sample"))
+    # 実行
+    response = env.client.post(
+        "/settings/sources",
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "source": _row(company, storage={"type": "disk"}),
+        },
+        headers=ORIGIN,
+    )
+    # 検証
+    rows = load_yaml(env.settings_path.read_text(encoding="utf-8"))["sources"]
+    assert response.status_code == 201
+    assert ("company", "serving") in [
+        (row["id"], row["status"]) for row in response.json()["sources"]
+    ]
+    assert rows[1]["storage"] == {"type": "disk"}

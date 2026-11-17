@@ -5,14 +5,17 @@ from __future__ import annotations
 import difflib
 import hashlib
 import logging
+import os
 import threading
+import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from project_index.features.access.types import Target
 from project_index.features.documents.aliases import collect_aliases
 from project_index.features.documents.fields import missing_ref_fields, unresolved_related
-from project_index.features.documents.indexable import walk_files
+from project_index.features.documents.indexable import walk_files, walk_tree
 from project_index.features.documents.loader import collect_files, load_file, unindexed_files
 from project_index.features.documents.schema import (
     records_item_schema,
@@ -38,11 +41,14 @@ logger = logging.getLogger(__name__)
 CANDIDATE_COUNT = 5
 CANDIDATE_CUTOFF = 0.6
 TREE_KEEP = 20
+# 保持するワークツリーのたどった結果の数（超えたら古く使ったものから捨てる）
+WORKTREE_KEEP = 20
 
 __all__ = [
     "CANDIDATE_COUNT",
     "CANDIDATE_CUTOFF",
     "TREE_KEEP",
+    "WORKTREE_KEEP",
     "DocumentStore",
     "check_sync",
     "collect_files",
@@ -71,6 +77,27 @@ type _BodyBlobs = tuple[tuple[str, str], ...]
 type _DateStamps = tuple[tuple[str, FileDates | None], ...]
 type _RevisionKey = tuple[Path, str, str, str, str]
 type _CachedRevisionFile = tuple[str, _BodyBlobs, _DateStamps, list[Document], list[LoadProblem]]
+
+
+@dataclass(slots=True)
+class _WorktreeWalk:
+    """ワークツリーをたどった結果（ファイルの一覧・フォルダの更新日時・行ごとの収集の結果）。"""
+
+    files: list[str]
+    folders: dict[str, int]
+    # 行の定義のハッシュ → 『ファイルの収集』の結果
+    collected: dict[str, list[str]]
+
+
+def _folders_fresh(root: Path, folders: dict[str, int]) -> bool:
+    """記録したフォルダの更新日時が全て同じか（無くなったフォルダがあれば `False`）。"""
+    for relative, mtime in folders.items():
+        try:
+            if os.stat(root / relative).st_mtime_ns != mtime:
+                return False
+        except OSError:
+            return False
+    return True
 
 
 def _table_hash(table: DocumentTable) -> str:
@@ -109,6 +136,11 @@ class DocumentStore:
         self._revision_files: dict[_RevisionKey, _CachedRevisionFile] = {}
         self._trees: dict[tuple[Path, str], dict[str, str]] = {}
         self._dates: dict[tuple[Path, str, str], dict[str, FileDates]] = {}
+        self._worktrees: dict[Path, _WorktreeWalk] = {}
+        self._worktree_locks: dict[Path, threading.Lock] = {}
+        self._startup_schemas: dict[tuple[str, str], dict[str, Any]] = {}
+        # `clear` のたびに増やし、`clear` の前に解き始めたスキーマを書き戻さない
+        self._generation = 0
         self._lock = threading.Lock()
 
     def read_root(self, target: Target) -> Path:
@@ -186,12 +218,15 @@ class DocumentStore:
         source_id: str,
         dates: dict[str, FileDates],
         files: Sequence[str],
+        collected: Sequence[str] | None = None,
     ) -> tuple[list[Document], list[LoadProblem], set[tuple[Path, str]]]:
         """1 つの文書の行のファイルを集め、変わったファイルだけ読み直す。"""
         documents: list[Document] = []
         problems: list[LoadProblem] = []
         seen: set[tuple[Path, str]] = set()
-        for path in collect_files(root, table, files=files):
+        # 集め済みのパスがあればそれを使い、無ければ行の範囲で集める
+        paths = collect_files(root, table, files=files) if collected is None else collected
+        for path in paths:
             absolute = root / path
             key = (absolute, table.id)
             seen.add(key)
@@ -342,6 +377,65 @@ class DocumentStore:
         revision = None if target.ref is None else self._commit_of(target)
         root = target.base if revision is None else self._revision_root(target, revision)
         tables = self._tables(target, kinds)
+        # ワークツリーを読む: ワークツリーごとの排他の中で、たどった結果を使い回す
+        if revision is None and target.worktree is not None and files is None:
+            with self._worktree_lock(root):
+                return self._load_worktree(target, root, tables)
+        return self._load_walked(target, root, tables, revision, files)
+
+    def _worktree_lock(self, root: Path) -> threading.Lock:
+        """ワークツリーごとの排他を返す（無ければ作る）。"""
+        with self._lock:
+            return self._worktree_locks.setdefault(root, threading.Lock())
+
+    def _load_worktree(self, target: Target, root: Path, tables: list[DocumentTable]) -> LoadResult:
+        """ワークツリーの文書を、たどった結果を使い回して集める（ワークツリーごとの排他の中で呼ぶ）。"""
+        started = time.monotonic()
+        with self._lock:
+            walk = self._worktrees.pop(root, None)
+            # 使った順の末尾へ移す（上限を超えたら先頭から捨てる）
+            if walk is not None:
+                self._worktrees[root] = walk
+        cold = walk is None
+        # 初めて読む・フォルダの中のファイルが増減した: たどり直す
+        if walk is None or not _folders_fresh(root, walk.folders):
+            files, folders = walk_tree(root)
+            walk = _WorktreeWalk(files=files, folders=folders, collected={})
+        collected: dict[str, list[str]] = {}
+        for table in tables:
+            key = _table_hash(table)
+            if key not in walk.collected:
+                walk.collected[key] = list(collect_files(root, table, files=walk.files))
+            collected[table.id] = walk.collected[key]
+        result = self._load_walked(target, root, tables, None, walk.files, collected)
+        # 読み込みを終えてから記録し、読み込み中のワークツリーを読み込み済みとみなさない
+        with self._lock:
+            self._worktrees.pop(root, None)
+            self._worktrees[root] = walk
+            # 上限を超えたら、古く使ったワークツリーの記録から捨てる
+            while len(self._worktrees) > WORKTREE_KEEP:
+                dropped = next(iter(self._worktrees))
+                del self._worktrees[dropped]
+                self._worktree_locks.pop(dropped, None)
+        if cold:
+            logger.info(
+                "ワークツリーを読み込んだ（%s・%s・%.1f 秒）",
+                target.source.id,
+                root,
+                time.monotonic() - started,
+            )
+        return result
+
+    def _load_walked(
+        self,
+        target: Target,
+        root: Path,
+        tables: list[DocumentTable],
+        revision: str | None,
+        files: Sequence[str] | None,
+        collected: dict[str, list[str]] | None = None,
+    ) -> LoadResult:
+        """読むフォルダのファイルから、文書の行ごとに文書を集める。"""
         dates = self._file_dates(target, revision)
         walked = list(walk_files(root)) if files is None else files
         documents: list[Document] = []
@@ -350,7 +444,14 @@ class DocumentStore:
         seen_keys: set[tuple[Path, str]] = set()
         for table in tables:
             if revision is None:
-                found, issues, seen = self._load_table(root, table, target.source.id, dates, walked)
+                found, issues, seen = self._load_table(
+                    root,
+                    table,
+                    target.source.id,
+                    dates,
+                    walked,
+                    None if collected is None else collected[table.id],
+                )
                 seen_keys |= seen
             else:
                 found, issues = self._load_revision_table(
@@ -384,7 +485,7 @@ class DocumentStore:
         if (target.ref is None and target.worktree is None) or not isinstance(
             table.schema_path, str
         ):
-            return startup_schema(source, table)
+            return self._startup_schema(source, table)
         startup = source.schemas.get(kind, {})
         # スキーマは設定ファイルのフォルダからの相対パスなので、root からの相対パスにして読む
         schema_path = source.config_path(table.schema_path)
@@ -395,7 +496,7 @@ class DocumentStore:
         try:
             stat = path.stat()
         except OSError:
-            return startup_schema(source, table)
+            return self._startup_schema(source, table)
         with self._lock:
             cached = self._schemas.get(path)
         if cached is not None and cached[:2] == (stat.st_mtime_ns, stat.st_size):
@@ -403,13 +504,28 @@ class DocumentStore:
         try:
             raw = load_yaml(path.read_text(encoding="utf-8"), file=str(path))
         except OSError, UnicodeDecodeError, YamlLoadError:
-            return startup_schema(source, table)
+            return self._startup_schema(source, table)
         if not is_dict(raw):
-            return startup_schema(source, table)
+            return self._startup_schema(source, table)
         # YAML から読んだ辞書のキーは文字列として扱う
         resolved = resolve_schema_refs(cast("dict[str, Any]", raw), path)
         with self._lock:
             self._schemas[path] = (stat.st_mtime_ns, stat.st_size, resolved)
+        return resolved
+
+    def _startup_schema(self, source: ServedSource, table: DocumentTable) -> dict[str, Any]:
+        """起動時のスキーマの `$ref` を解いた結果を、配信元と行ごとに 1 回だけ作って返す。"""
+        key = (source.id, table.id)
+        with self._lock:
+            cached = self._startup_schemas.get(key)
+            generation = self._generation
+        if cached is not None:
+            return cached
+        resolved = startup_schema(source, table)
+        with self._lock:
+            # 解いている間に `clear` された: 古い配信元のスキーマかもしれないので記録しない
+            if generation == self._generation:
+                self._startup_schemas[key] = resolved
         return resolved
 
     def _revision_schema(
@@ -452,6 +568,11 @@ class DocumentStore:
         defs = schema.get("$defs")
         return {**item, "$defs": defs} if defs is not None else item
 
+    def has_worktree(self, target: Target) -> bool:
+        """読む場所のワークツリーを一度でも読み込み終えたかを返す（ファイルの `stat` をしない）。"""
+        with self._lock:
+            return target.base in self._worktrees
+
     def invalidate(self, paths: Iterable[Path]) -> None:
         """書き込んだファイルのキャッシュを捨てる。"""
         targets = set(paths)
@@ -468,6 +589,9 @@ class DocumentStore:
             self._schemas.clear()
             self._revision_schemas.clear()
             self._dates.clear()
+            self._startup_schemas.clear()
+            self._worktrees.clear()
+            self._generation += 1
 
 
 def _revision_fresh(

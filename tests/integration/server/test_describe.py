@@ -525,3 +525,26 @@ def test_normal_when_kind_from_other_source(
     # 検証
     assert not result.is_error
     assert result.data["schema"]["properties"]["body"] == {"type": "string"}
+
+
+def test_normal_when_disk_storage(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Any],
+) -> None:
+    """disk の配信元はブランチ・タグ・ワークツリーを返さない（正常系）。"""
+    # 準備
+    company = make_source("company", storage="disk")
+    worktree = add_worktree(company.folder, "x")
+    env = make_server(company)
+    cwd = str(company.folder)
+    # 実行
+    result = env.call("describe", cwd=cwd, source="company", format="json")
+    in_worktree = env.call("describe", cwd=cwd, source="company", worktree=str(worktree))
+    # 検証
+    assert not result.is_error
+    assert result.data["kinds"]
+    assert "refs" not in result.data
+    assert "worktrees" not in result.data
+    assert in_worktree.is_error
+    assert "company は disk の配信元のため worktree を指定できません" in in_worktree.text

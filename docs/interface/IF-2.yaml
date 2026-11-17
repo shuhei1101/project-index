@@ -789,6 +789,159 @@ flows:
       - '`notes` に、文書 1 の ID と、解決できなかった `$ref`（`missing.schema.yaml#/$defs/summary`）と、スキーマのファイルのパスがある'
       - '`isError` ではない'
     test: test_normal_when_schema_ref_unresolvable
+  - name: 正常系（作った直後のワークツリー）
+    summary: サーバーの起動後に作ったワークツリーを 1 回だけ読み込み、2 回目以降の呼び出しは読み込んだ内容で返却する
+    setup:
+      - name: Mock
+        description: なし
+      - name: ファイルの多い配信元
+        description: sample に、管理用の YAML に記載していないファイル 500 件を範囲の glob に該当する場所へ配置して commit したもの
+      - name: ワークツリー
+        description: project-index の起動後に `git worktree add` で作った sample の `.claude/worktrees/y`。文書 1 の `name` をクローン本体と変えてある
+      - name: 入力
+        description: '`worktree` に y のパス、1 回目は `view: ids`、2 回目は `view: summary`、3 回目は文書 1 の `view: full`'
+    flow: |-
+      <!-- map: {"title": "正常系（作った直後のワークツリー）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+        participant WT as ワークツリー y
+
+        C->>T: worktree: y, view: ids
+        T->>WT: 設定と文書を読み込み、ワークツリーごとに保持する
+        T-->>C: ワークツリーの文書の ID
+        C->>T: worktree: y, view: summary
+        T->>T: 保持した内容で検索する
+        T-->>C: ワークツリーの文書の一覧
+      ```
+
+      <!-- /map -->
+    expected:
+      - 3 回の呼び出しがどれも `isError` でなく、端末の設定の `worktree_load_wait_sec`（既定）の内に返却される
+      - サーバーのログの `ワークツリーを読み込んだ（sample・{ワークツリー y のパス}・{秒数} 秒）` の行が、3 回の呼び出しの後も 1 行だけ
+      - 3 回目の文書 1 が、ワークツリー y の `name` を返却する
+      - ワークツリー y の文書 2 のファイルを書き換えた後の呼び出しは、書き換えた文書 2 を返却する
+    test: test_normal_when_new_worktree
+  - name: 異常系（ワークツリーの読み込み中・WorktreeLoadingError）
+    summary: ワークツリーの読み込みが待ちの上限までに終了しなければ、読み込みを続けたまま読み込み中である旨を返却する
+    setup:
+      - name: Mock
+        description: project-index を起動する環境の `PATH` の先頭に、作業場所がワークツリー y の中のときだけ 3 秒待ってから本物の `git` を実行する `git` のスクリプトを配置する。端末の設定の `worktree_load_wait_sec` を 1 にする
+      - name: ワークツリー
+        description: 正常系（作った直後のワークツリー）と同じワークツリー y
+      - name: 入力
+        description: '`worktree` に y のパス、文書 1 の `view: summary`。読み込み中の応答の後は、1 秒おきに同じ呼び出しを送信する'
+    flow: |-
+      <!-- map: {"title": "異常系（ワークツリーの読み込み中・WorktreeLoadingError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+        participant WT as ワークツリー y
+
+        C->>T: worktree: y
+        T->>WT: 読み込みを始める
+        T->>T: worktree_load_wait_sec までに読み込みが終了しない
+        T-->>C: isError（読み込み中。時間を空けて同じ呼び出しを送信すること）
+        T->>WT: 読み込みを続ける
+        C->>T: 同じ呼び出し
+        T-->>C: ワークツリーの文書 1
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目が、送信してから 3 秒の内に `isError: true` で、`WorktreeLoadingError`、ワークツリー y のパス、読み込み中であることと、時間を空けて同じ呼び出しを送信する次の手を返却する'
+      - 読み込み中の応答は、クローン本体の文書 1 を返却しない
+      - 読み込み中の応答の後、同じ呼び出しが 30 秒の内にワークツリー y の文書 1 を返却する
+      - サーバーのログの `ワークツリーを読み込んだ（sample・{ワークツリー y のパス}・{秒数} 秒）` の行が 1 行だけ（読み込み中の呼び出しごとに読み込みを始め直していない）
+    test: test_error_when_worktree_loading
+  - name: 異常系（想定外の例外・UnexpectedError）
+    summary: '`ProjectIndexError` でない例外を、例外の型と内容を持つ `isError` の応答にする'
+    setup:
+      - name: Mock
+        description: project-index を起動する環境の `PATH` の先頭に、`archive` の呼び出しだけ git の書き出しの待ち時間の上限（20 秒）より長く待つ `git` のスクリプトを配置する
+      - name: 入力
+        description: '`ref` に sample の 1 つ前の commit、`view: summary`'
+    flow: |-
+      <!-- map: {"title": "異常系（想定外の例外・UnexpectedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+
+        C->>T: ref: 1 つ前の commit
+        T->>T: リビジョンの書き出しの git archive が待ち時間の上限で止まる（GitError）
+        T-->>C: isError（UnexpectedError・例外の型と内容）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、本文が `UnexpectedError: GitError:` で始まり、止まった git のコマンド（`git archive`）と `20 秒を超えたため止めました` を含む'
+      - 応答が `Error executing tool` で始まらない
+      - サーバーのログに `ツールの処理に失敗した（search_docs）` と例外のトレースバックが残る
+      - 続けての `ref` を省いた `search_docs` は文書を返却する
+    test: test_error_when_unexpected
+  - name: 正常系（disk の配信元をワークツリーの作業場所から引く）
+    summary: disk の配信元はワークツリーに読み替えず、登録したフォルダの文書と文書の日時を返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: ローカル運用の配信元
+        description: 'Git のリポジトリの中の `storage.type: disk` の配信元。文書 1（`created`・`updated` を持つ）と文書 2（持たない）'
+        notes: id `company`。`scope.read` は `{company のクローン本体}/**`（ワークツリーを配信元のフォルダとみなさないため）。`.claude/worktrees/x` のワークツリーは project-index のファイルを持たない
+      - name: 入力
+        description: '`cwd` をワークツリー x にした `source: company`・`view: full`・`fields: [id, created, updated]`'
+    flow: |-
+      <!-- map: {"title": "正常系（disk の配信元をワークツリーの作業場所から引く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+        participant F as company のクローン本体
+
+        C->>T: cwd: ワークツリー x, source: company
+        T->>T: worktrees に当たってもワークツリーに読み替えない
+        T-->>F: 登録したフォルダの文書を読む
+        T-->>C: 文書 1・文書 2
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`items[].path` が company のクローン本体の中の絶対パス'
+      - 文書 1 の `created`・`updated` が文書の値で、文書 2 は空
+    test: test_normal_when_disk_storage
+  - name: 異常系（disk の配信元に ref を指定する・InvalidArgumentError）
+    summary: disk の配信元への `ref`・`worktree` の指定を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: ローカル運用の配信元
+        description: 正常系（disk の配信元をワークツリーの作業場所から引く）と同じ company
+        notes: '`develop` ブランチがある'
+      - name: 入力
+        description: '`source: company`・`ref: develop`'
+    flow: |-
+      <!-- map: {"title": "異常系（disk の配信元に ref を指定する・InvalidArgumentError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+
+        C->>T: source: company, ref: develop
+        T-->>C: isError（company は ref を指定できない）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、company が disk の配信元のため `ref` を指定できない理由を返す'
+      - '`worktree` を指定しても同じ理由の `isError: true` を返す'
+    test: test_error_when_ref_given_to_disk_source
 lead: '条件に該当する文書の取得・一覧・件数・集計を返却する `search_docs` の入出力を定め、`search_docs` を修正するときに参照する。'
 tags:
   - name: topic:クエリ
@@ -805,6 +958,9 @@ side_effects: '会話キー（`session_id`・`agent_id`）ごとに、本文を�
 callers:
   - SC-6#scenarios[正常シナリオ]
   - SC-6#scenarios[正常シナリオ（使われているタグを数える）]
+  - SC-6#scenarios[正常シナリオ（作った直後のワークツリーを指す）]
+  - SC-6#scenarios[異常シナリオ（ワークツリーの読み込みが上限までに終了しない）]
+  - SC-6#scenarios[異常シナリオ（git の実行が失敗する）]
 exclusivity: '読み取りだけで排他しない（`readOnlyHint: true` で並列に呼ばれる）'
 request:
   - name: source
@@ -1170,10 +1326,16 @@ exceptions:
   - name: WorktreeNotMatchedError
     condition: '`worktree` が配信元の `worktrees` に当たらない'
   - name: InvalidArgumentError
-    condition: '知らない項目・型の合わない値を条件・並べ替え・`group_by` に渡した、束に `and`・`or`・`not` のキーを 2 つ以上持たせた、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満'
+    condition: '知らない項目・型の合わない値を条件・並べ替え・`group_by` に渡した、束に `and`・`or`・`not` のキーを 2 つ以上持たせた、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満、`storage.type: disk` の配信元に `ref`・`worktree` を渡した'
     notes: 項目のパス・期待する型・実際の値と、`describe(source, kind)` でスキーマを見ることを添える
   - name: RefNotFoundError
     condition: '`ref` を commit に解決できない'
+  - name: WorktreeLoadingError
+    condition: '`worktree` か `cwd` が指すワークツリーの読み込みが、端末の設定の `worktree_load_wait_sec` までに終了しなかった'
+    notes: ワークツリーのパスと、時間を空けて同じ呼び出しを送信することを添える。読み込みは止めずに続ける
+  - name: UnexpectedError
+    condition: '`ProjectIndexError` でない例外（`GitError` など）で処理を終了できなかった'
+    notes: 例外の型と内容を返却する。サーバーのログには例外のトレースバックを残す
 constraints:
   - item: 件数
     constraint: '`limit` は最大 100'
@@ -1185,8 +1347,6 @@ constraints:
     constraint: strict tool use は使わず、サーバーが検証して直し方を返す
   - item: 読み直し
     constraint: ファイルの更新日時か大きさが変わった文書は、次の呼び出しで読み直す
-  - item: タイムアウト
-    constraint: 制限なし
   - item: 範囲の決め方
     constraint: '本文を切らずに返したら `full`。`max_chars_per_field` で切った本文・`snippets`・`sections`・`lines` で切り出した本文・`body_file` の無い `records` の要素（本文が管理用の YAML の 1 要素）は `section`。本文を返さない呼び出し（`view: summary`、`exclude_fields` で `body` を除いた `view: full`）は `summary`'
     notes: rule-inject は `full` だけを既読にする（D-125）
@@ -1220,6 +1380,17 @@ constraints:
     constraint: '種類のスキーマの `$ref` は、最上位の `$defs` の中の相対パスの `$ref` を含めて、スキーマのファイルのフォルダを基準に解決してから検査に当てる。種類のスキーマの中で循環する参照は `#/$defs/...` のまま、参照先の別のファイルの中で循環する参照はそのファイルの定義を指したまま検査に当てる'
   - item: 解決できないスキーマの参照
     constraint: '読み取りの検査で種類のスキーマの `$ref` を解決できない文書は、結果に含め、`notes` に文書の ID・解決できなかった `$ref`・スキーマのファイルのパスを入れる'
+  - item: ワークツリーの読み込みの保持
+    constraint: ワークツリーの設定・ファイルの一覧・本文のパス・スキーマの参照の解決をワークツリーごとに保持し、同じワークツリーを指す 2 回目以降の呼び出しで再度読み込まない。ワークツリーのファイルが変わったら、次の呼び出しで変わった分だけを再度読み込む。読み込みを終えたらサーバーのログに INFO で `ワークツリーを読み込んだ（{配信元}・{ワークツリーのパス}・{秒数} 秒）` を出す
+    notes: ファイルが変わったかの確認の方法はモジュール構成で決める
+  - item: ワークツリーの読み込みの待ち
+    constraint: ワークツリーの読み込みを、要求を受けてから端末の設定の `worktree_load_wait_sec`（既定は [非機能要件](id:NFR-1) のワークツリーの読み込みを待つ上限）まで待つ。終了しなければ `WorktreeLoadingError` を返却し、読み込みは止めずに続ける。読み込み中のワークツリーを指す後続の呼び出しは、同じ読み込みの終了を待つ
+    notes: クローン本体の文書をワークツリーの文書の代わりに返却しない
+  - item: 想定外の例外
+    constraint: '`ProjectIndexError` でない例外は、`UnexpectedError: {例外の型}: {内容}` を本文にした `isError: true` の応答にする。`Error executing tool` だけの応答にしない'
+    notes: 文書の MCP の全てのツールに共通する
+  - item: disk の配信元
+    constraint: '端末の設定の行が `storage.type: disk` の配信元は、作業場所が `worktrees[]` に当たっても登録したフォルダの文書を返す。`ref`・`worktree` を指定すると `InvalidArgumentError`。ファイルの日時は文書の `created`・`updated` の値（無ければ空）'
 refs:
   - SC-6#scenarios[正常シナリオ]
   - SC-9#scenarios[正常シナリオ]

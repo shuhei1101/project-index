@@ -4,7 +4,7 @@
 
 ## 目次
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | ページ | 概要 |
 | --- | --- |
@@ -105,6 +105,7 @@
 | [索引のサーバー / 文書のMCP / result.py](./MOD-95.py.yaml) | ツールの結果・エラーの変換と、2 つの MCP のツール名とプロンプトの ID。 |
 | [索引のサーバー / 共通 / origin.py](./MOD-96.py.yaml) | 端末の設定の API への、ブラウザからの別のオリジンの書き込みの確認。 |
 | [索引のサーバー / 共通 / api_model.py](./MOD-97.py.yaml) | 読み取り API の DTO の基底（キーは camelCase）。 |
+| [索引のサーバー / 共通 / deadline.py](./MOD-129.py.yaml) | 1 回のツールの呼び出しの書き込みの期限・応答の上限と、取り消しの合図。 |
 | [索引のサーバー / 共通 / errors.py](./MOD-98.py.yaml) | `ProjectIndexError` と、MCP・読み取り API が返すエラーの階層。 |
 | [索引のサーバー / 共通 / files.py](./MOD-99.py.yaml) | 一時ファイルからのファイルの置き換え。 |
 | [索引のサーバー / 共通 / hashing.py](./MOD-100.py.yaml) | 内容のハッシュ（文書のバージョン）。 |

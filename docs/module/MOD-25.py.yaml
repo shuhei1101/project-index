@@ -46,6 +46,13 @@ data_models:
         type: str | None
         access: 公開
         description: '`None` は全ての要素（`[]`）。文字列は、そのキーの値が真の辞書の要素（`[main]`）'
+  - name: AnyDepth
+    title: どの深さでも
+    container: project_index/features/documents/fields.py
+    usecase: 共通
+    role: 値オブジェクト
+    summary: 項目のパスの先頭の `**` が表す、文書の中のどの深さの辞書からも残りのパスをたどるマーカー
+    properties: []
 constants:
   - name: METADATA_KEYS
     title: 共通のキー
@@ -60,7 +67,7 @@ functions:
     container: project_index/features/documents/fields.py
     usecase: 共通
     role: 変換
-    summary: ドット記法・`[n]`・`[]`・`[{キー}]` の項目のパスを、キー・位置・要素の選び方の並びにする
+    summary: ドット記法・`[n]`・`[]`・`[{キー}]`・先頭の `**.` の項目のパスを、キー・位置・要素の選び方・どの深さでもの並びにする
     scope: public
     thread_safe: true
     args:
@@ -69,19 +76,20 @@ functions:
         type: str
         required: true
         passing: positional
-        description: '`a.b[0].c`・`tags[].name`・`tags[main].name` の形の項目のパス'
+        description: '`a.b[0].c`・`tags[].name`・`tags[main].name`・`**.refs[]` の形の項目のパス'
     returns:
-      type: list[str | int | ArraySelector]
-      description: 辞書のキーは `str`、配列の位置は `int`、`[]`・`[{キー}]` は `ArraySelector`
+      type: list[str | int | ArraySelector | AnyDepth]
+      description: 辞書のキーは `str`、配列の位置は `int`、`[]`・`[{キー}]` は `ArraySelector`、先頭の `**` は `AnyDepth`
     process: |-
-      1. `.` で区切り、各区切りの末尾の `[...]` を切り出す（`b[0][1]` は `b`・`0`・`1`）
-      2. `[n]` は位置、`[]` は `ArraySelector(key=None)`、`[{キー}]`（英字で始まる英数字と `_`）は `ArraySelector(key={キー})` にする
-      3. 空のキー・閉じていない `[`・位置にもキーにも当たらない中身がある場合、`InvalidArgumentError` を送る
-      4. 並びを返す
+      1. `.` で区切る。先頭の区切りが `**` で後ろに区切りがあれば `AnyDepth()` にして、残りの区切りを続けて分ける
+      2. 各区切りの末尾の `[...]` を切り出す（`b[0][1]` は `b`・`0`・`1`）
+      3. `[n]` は位置、`[]` は `ArraySelector(key=None)`、`[{キー}]`（英字で始まる英数字と `_`）は `ArraySelector(key={キー})` にする
+      4. 空のキー・閉じていない `[`・位置にもキーにも当たらない中身がある場合と、`*` を含む区切りが先頭以外にある・`**` の後ろに区切りが無い場合、`InvalidArgumentError` を送る
+      5. 並びを返す
     exceptions:
       - name: InvalidArgumentError
         condition: パスの書式が誤っている
-        message: 項目のパス {path} の記載方法が誤っています（例 `a.b[0].c`・`tags[].name`・`tags[main].name`）
+        message: 項目のパス {path} の記載方法が誤っています（例 `a.b[0].c`・`tags[].name`・`tags[main].name`・`**.refs[]`）
     unit_tests:
       - name: test_parse_field_path
         case: 正常
@@ -104,6 +112,20 @@ functions:
         mock: なし
         expected: どちらも `InvalidArgumentError` で、`violations[0].path` が渡したパス
         exception: パスの書式が誤っている
+      - name: test_parse_field_path_when_any_depth
+        case: 正常
+        summary: 先頭の `**`
+        condition: '`**.refs[]` と `**.a.b`'
+        mock: なし
+        expected: '`[AnyDepth(), "refs", ArraySelector(key=None)]` と `[AnyDepth(), "a", "b"]`'
+        exception: '-'
+      - name: test_parse_field_path_when_any_depth_misplaced
+        case: 異常
+        summary: 先頭でない `**`・`**` だけ・2 つの `**`
+        condition: '`a.**.b`・`**`・`**.**.b`'
+        mock: なし
+        expected: どれも `InvalidArgumentError` で、`violations[0].path` が渡したパス
+        exception: パスの書式が誤っている
   - name: get_field
     title: 項目の取得
     kind: 関数
@@ -125,7 +147,7 @@ functions:
         type: str
         required: true
         passing: positional
-        description: ドット記法・`[n]`・`[]`・`[{キー}]`
+        description: ドット記法・`[n]`・`[]`・`[{キー}]`・先頭の `**.`
       - name: default
         title: 無いときの値
         type: object
@@ -135,12 +157,13 @@ functions:
         description: 途中のキーが無い・位置が範囲の外・型が辞書や配列でないときに返す値
     returns:
       type: object
-      description: 指した値か `default`。パスが `ArraySelector` を含むときは、選んだ要素ごとに残りのパスをたどった値の配列（たどれない要素は除く）
+      description: 指した値か `default`。パスが `ArraySelector` を含むときは、選んだ要素ごとに残りのパスをたどった値の配列（たどれない要素は除く）。パスが `AnyDepth` で始まるときは、たどれた値を文書の中の出現順に並べた配列（どこにもたどれなければ `default`）
     process: |-
       1. 『項目のパスの分解』で分ける
-      2. 先頭からたどり、キーは辞書から、位置は配列から引く。たどれない場合は `default` を返す
-      3. `ArraySelector` に当たった場合、値が配列でなければ `default` を返す。配列なら、`key` が `None` は全ての要素、`key` があればそのキーの値が真の辞書の要素を選び、要素ごとに残りのパスをたどった値を並べた配列を返す（残りのパスに `ArraySelector` があれば、その配列を平らにつなぐ）
-      4. たどり着いた値を返す
+      2. 先頭が `AnyDepth` の場合、`data` とその中の全ての辞書を、辞書の値はキーの並びの順、配列は要素の順に深さ優先でたどる（辞書は中の値より先に確認する）。たどった辞書ごとに残りのパスを 3・4 のとおりたどり、たどれた値を並べる。残りのパスが `ArraySelector` を含むときは、辞書ごとの配列を平らにつなぐ。並びが空なら `default`、空でなければ並びを返す
+      3. 先頭からたどり、キーは辞書から、位置は配列から引く。たどれない場合は `default` を返す
+      4. `ArraySelector` に当たった場合、値が配列でなければ `default` を返す。配列なら、`key` が `None` は全ての要素、`key` があればそのキーの値が真の辞書の要素を選び、要素ごとに残りのパスをたどった値を並べた配列を返す（残りのパスに `ArraySelector` があれば、その配列を平らにつなぐ）
+      5. たどり着いた値を返す
     exceptions:
       - name: InvalidArgumentError
         condition: パスの書式が誤っている
@@ -166,6 +189,13 @@ functions:
         condition: '`{"tags": [{"name": "a", "main": true}, {"name": "b"}, "c"]}` を `tags[].name` と `tags[main].name`、`{"tags": "x"}` を `tags[].name`'
         mock: なし
         expected: '`["a", "b"]`・`["a"]`・`None`'
+        exception: '-'
+      - name: test_get_field_when_any_depth
+        case: 正常
+        summary: どの深さの同じ名前の列も集める
+        condition: '`{"refs": [{"to": "a"}], "functions": [{"name": "f", "refs": [{"to": "b"}]}, {"name": "g"}], "meta": {"refs": [{"to": "c"}]}}` を `**.refs[]` と `**.refs[].to`、どこにも `refs` が無い `{"a": 1}` を `**.refs[]`'
+        mock: なし
+        expected: '`[{"to": "a"}, {"to": "b"}, {"to": "c"}]`・`["a", "b", "c"]`・`None`'
         exception: '-'
   - name: set_field
     title: 項目の書き込み
@@ -200,7 +230,7 @@ functions:
       type: None
       description: '-'
     process: |-
-      1. 『項目のパスの分解』で分ける。`ArraySelector` を含む場合、`InvalidArgumentError` を送る
+      1. 『項目のパスの分解』で分ける。`AnyDepth`・`ArraySelector` を含む場合、`InvalidArgumentError` を送る
       2. 最後の手前までたどり、途中のキーが無ければ空の辞書を作って進む
       3. 途中の値が辞書でない（キーのとき）・配列でない（位置のとき）場合、`InvalidArgumentError` を送る
       4. 位置が配列の長さと同じなら末尾へ追加し、長さより大きければ `InvalidArgumentError` を送る
@@ -213,8 +243,8 @@ functions:
         condition: 位置が配列の長さを超える
         message: '{path}: 位置 {n} は配列の長さ {length} を超えています'
       - name: InvalidArgumentError
-        condition: パスが `[]`・`[{キー}]` を含む
-        message: '{path}: `[]`・`[{キー}]` を含む項目のパスには書き込めません'
+        condition: パスが `**`・`[]`・`[{キー}]` を含む
+        message: '{path}: `**`・`[]`・`[{キー}]` を含む項目のパスには書き込めません'
     unit_tests:
       - name: test_set_field
         case: 正常
@@ -251,6 +281,13 @@ functions:
         mock: なし
         expected: '`InvalidArgumentError`'
         exception: パスが `[]`・`[{キー}]` を含む
+      - name: test_set_field_when_any_depth
+        case: 異常
+        summary: どの深さでもを含むパス
+        condition: '`{}` へ `**.refs` = `[]`'
+        mock: なし
+        expected: '`InvalidArgumentError` で内容は変わらない'
+        exception: パスが `**`・`[]`・`[{キー}]` を含む
   - name: delete_field
     title: 項目の削除
     kind: 関数
@@ -278,7 +315,7 @@ functions:
       type: bool
       description: 削除したら `True`、指した値が無ければ `False`
     process: |-
-      1. 『項目のパスの分解』で分ける。`ArraySelector` を含む場合、`InvalidArgumentError` を送る
+      1. 『項目のパスの分解』で分ける。`AnyDepth`・`ArraySelector` を含む場合、`InvalidArgumentError` を送る
       2. 最後の手前までたどり、たどれない場合は `False` を返す
       3. 最後がキーなら辞書から、位置なら配列から削除して `True` を返す
     exceptions:
@@ -286,8 +323,8 @@ functions:
         condition: パスの書式が誤っている
         message: 『項目のパスの分解』のまま
       - name: InvalidArgumentError
-        condition: パスが `[]`・`[{キー}]` を含む
-        message: '{path}: `[]`・`[{キー}]` を含む項目のパスは削除できません'
+        condition: パスが `**`・`[]`・`[{キー}]` を含む
+        message: '{path}: `**`・`[]`・`[{キー}]` を含む項目のパスは削除できません'
     unit_tests:
       - name: test_delete_field
         case: 正常
@@ -303,6 +340,13 @@ functions:
         mock: なし
         expected: '`False` で内容は変わらない'
         exception: '-'
+      - name: test_delete_field_when_any_depth
+        case: 異常
+        summary: どの深さでもを含むパス
+        condition: '`{"refs": []}` から `**.refs`'
+        mock: なし
+        expected: '`InvalidArgumentError` で内容は変わらない'
+        exception: パスが `**`・`[]`・`[{キー}]` を含む
   - name: resolve_metadata
     title: メタデータの解決
     kind: 関数
@@ -329,7 +373,7 @@ functions:
       type: dict[str, Any]
       description: 共通のキー → 値。値が無いキーは含まない
     process: |-
-      1. `METADATA_KEYS` のキーごとに、`table.metadata` の列名（書かれていないキーは同じ名前の列）の値を『項目の取得』で取る。列名が `[]`・`[{キー}]` を含むときは選んだ要素の値の配列になる（`tags: tags[].name`・`main_tags: tags[main].name`）
+      1. `METADATA_KEYS` のキーごとに、`table.metadata` の列名（書かれていないキーは同じ名前の列）の値を『項目の取得』で取る。列名が `[]`・`[{キー}]` を含むときは選んだ要素の値の配列（`tags: tags[].name`・`main_tags: tags[main].name`）、先頭が `**.` のときは文書の中のどの深さからも集めた値の配列（`related: **.refs[]`）になる
       2. `table.alias_type` がある場合、`alias_type` の値をその値にする
       3. 値が `None` のキーを除いて返す
     unit_tests:
@@ -353,6 +397,13 @@ functions:
         condition: '`metadata` が `{tags: tags[].name, main_tags: tags[main].name}`、内容が `{"tags": [{"name": "mcp", "main": true}, {"name": "設計"}]}`'
         mock: なし
         expected: '`tags` が `["mcp", "設計"]`、`main_tags` が `["mcp"]`'
+        exception: '-'
+      - name: test_resolve_metadata_when_any_depth
+        case: 正常
+        summary: 最上位と入れ子の関連をまとめる
+        condition: '`metadata` が `{related: "**.refs[]"}`、内容が `{"id": "n1", "refs": [{"to": "n2", "type": "references"}], "functions": [{"refs": [{"to": "n3", "type": "references"}]}]}`。もう 1 つは `refs` を持たない `{"id": "n2"}`'
+        mock: なし
+        expected: '`related` が `[{"to": "n2", "type": "references"}, {"to": "n3", "type": "references"}]`。n2 の結果は `related` を持たない'
         exception: '-'
   - name: missing_ref_fields
     title: 'metadataの列の欠け'
@@ -461,6 +512,56 @@ functions:
         case: 正常
         summary: related が配列でない
         condition: '`related` が無いメタデータと、`related` が文字列のメタデータ'
+        mock: なし
+        expected: どちらも `[]`
+        exception: '-'
+  - name: field_arrays
+    title: 列名の指す配列の取得
+    kind: 関数
+    container: project_index/features/documents/fields.py
+    usecase: 書き込み
+    role: 読み取り
+    summary: 列名が指す配列を、文書の中の元の配列のまま出現順に返す
+    description: 参照元の `related` の列から行を除く処理が、返った配列をその場で書き換える。`**.` で始まる列名では、最上位と入れ子の全ての配列を返す。
+    scope: public
+    thread_safe: true
+    args:
+      - name: data
+        title: 内容
+        type: Mapping[str, Any]
+        required: true
+        passing: positional
+        description: 文書の内容
+      - name: path
+        title: 列名
+        type: str
+        required: true
+        passing: positional
+        description: '`related`・`meta.refs`・`**.refs[]` の形の列名。末尾の `[]` は配列そのものを指すものとして扱う'
+    returns:
+      type: list[list[Any]]
+      description: 列名が指す配列（複製しない元の配列）の並び。配列でない値・たどれない場所は含めない
+    process: |-
+      1. 『項目のパスの分解』で分け、末尾の `ArraySelector(key=None)` を 1 つ除く。残りに `ArraySelector` があれば `InvalidArgumentError` を送る
+      2. 先頭が `AnyDepth` の場合、『項目の取得』と同じ順で文書の中の全ての辞書をたどり、辞書ごとに残りのパスをたどった値が配列なら並べる
+      3. それ以外は、パスをたどった値が配列ならその 1 つを並べる
+      4. 並びを返す
+    exceptions:
+      - name: InvalidArgumentError
+        condition: 末尾以外に `[]`・`[{キー}]` を含むか、パスの書式が誤っている
+        message: '{path}: 配列を指す列名ではありません'
+    unit_tests:
+      - name: test_field_arrays
+        case: 正常
+        summary: 最上位と入れ子の配列を元のまま返す
+        condition: '`{"refs": [1], "functions": [{"refs": [2]}, {"name": "g"}]}` を `**.refs[]`、同じ内容を `refs`'
+        mock: なし
+        expected: '`**.refs[]` が 2 つの配列で、返った 2 つ目の配列を空にすると内容の `functions[0].refs` も空になる。`refs` は最上位の配列 1 つ'
+        exception: '-'
+      - name: test_field_arrays_when_not_list
+        case: 正常
+        summary: 配列でない・無い列
+        condition: '`{"refs": "x"}` を `refs`、`{}` を `**.refs[]`'
         mock: なし
         expected: どちらも `[]`
         exception: '-'

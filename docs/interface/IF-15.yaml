@@ -846,6 +846,126 @@ flows:
     test: test_normal_when_terminal_config_has_unknown_top_level_key
     decisions:
       - D-308
+  - name: 正常系（default_ref のリビジョンを先に書き出す）
+    summary: 読み込みと検査の後に、Git の配信元の default_ref の commit を裏で書き出す
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+      - name: 配信元
+        description: git リポジトリの sample（`default_ref` は `main`）と Git 管理外の notes
+        notes: 状態のフォルダは空
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant S as project-index serve
+        participant G as git
+
+        S->>S: 配信元を読み込み、検査する
+        S->>G: 裏で sample の main の commit を書き出す
+        C->>S: 管理の MCP の status（exporting が false になるまで繰り返す）
+        C->>S: 読み取り API で sample の文書の一覧を取得する
+        S-->>C: 200 文書の一覧
+      ```
+    expected:
+      - 状態のフォルダの下に sample の `main` の commit の書き出しがあり、notes の書き出しは無い
+      - ログの `リビジョンを書き出した` が `main` の commit で 1 行で、文書の一覧の取得の後も増えない
+    test: test_normal_when_default_ref_exported_in_background
+    refs:
+      - SC-4#scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
+  - name: 正常系（裏のリビジョンの書き出しが上限を超える）
+    summary: 裏の書き出しが上限で止まっても配信を続け、次の要求が書き出し直す
+    setup:
+      - name: Mock
+        description: git の実行を、`archive` の 1 回目だけ待ち時間の上限を超えたときと同じ失敗（`GitError` の `timed_out`）を返すものに差し替える
+      - name: 配信元
+        description: git リポジトリの sample（`default_ref` は `main`）
+        notes: 状態のフォルダは空
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant S as project-index serve
+        participant G as git
+
+        S->>G: 裏で sample の main の commit を書き出す
+        S->>S: 上限を超えたので止め、警告のログに残す
+        C->>S: 管理の MCP の status
+        S-->>C: sample が serving・exporting: false
+        C->>S: 読み取り API で sample の文書の一覧を取得する
+        S->>G: 要求の中で main の commit を書き出し直す
+        S-->>C: 200 文書の一覧
+      ```
+    expected:
+      - 警告のログに、止めた git の引数（`main` の commit）と上限の秒数が 1 行ある
+      - '`status` が sample を `serving`、`exporting: false` で返す'
+      - 文書の一覧の取得が 200 を返し、ログの `リビジョンを書き出した` が 1 行出る
+    test: test_normal_when_background_export_times_out
+    refs:
+      - SC-4#scenarios[異常シナリオ（裏のリビジョンの書き出しが上限を超える）]
+  - name: 正常系（disk の配信元を Git を参照せずに配信する）
+    summary: Git のリポジトリの中の disk の配信元を、登録したフォルダの設定・スキーマ・スクリプトで配信する
+    setup:
+      - name: Mock
+        description: なし
+      - name: ローカル運用の配信元
+        description: Git のリポジトリ `company`。クローン本体の直下に `project-index.local.yaml`・`files.local.yaml`・`schemas/files.schema.local.yaml`・`scripts/check.local.py` を置き、どのブランチにも commit しない
+        notes: '`project-index.local.yaml` は `default_ref` を持たず、`develop` ブランチはある'
+      - name: 端末の設定
+        description: '`sources` に company の 1 行'
+        notes: '`config` は `project-index.local.yaml`、`storage.type` は `disk`'
+    flow: |-
+      <!-- map: {"title": "正常系（disk の配信元を Git を参照せずに配信する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant U as クライアント
+        participant T as project-index serve
+        participant F as company のフォルダ
+
+        U->>T: project-index serve
+        T->>T: company の行の storage.type が disk
+        T-->>F: project-index.local.yaml・スキーマ・スクリプトをディスクから読む
+        T->>T: default_ref を求めずに検証して配信元に加える
+        T-->>U: company を配信する
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`/sources/company/docs` が 200 で、`files.local.yaml` の行の文書を返す'
+      - '`/sources/company/refs` が `git: false` を返す'
+      - 'エラーログに `config[0]: develop に project-index.local.yaml がありません` が無い'
+    test: test_normal_when_disk_storage
+  - name: 正常系（Git の作業ツリーの外部のフォルダに git を指定する）
+    summary: 'Git の作業ツリーの外部のフォルダに `storage.type: git` を指定した配信元を外して配信する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: Git 管理外の配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
+        notes: id `notes`
+      - name: 端末の設定
+        description: '`sources` に sample と notes の 2 行'
+        notes: notes の行（`sources[1]`）の `storage.type` は `git`
+    flow: |-
+      <!-- map: {"title": "正常系（Git の作業ツリーの外部のフォルダに git を指定する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant U as クライアント
+        participant T as project-index serve
+
+        U->>T: project-index serve
+        T->>T: notes のフォルダが Git の作業ツリーの中に無いのに storage.type が git
+        T->>T: notes を配信せず、エラーログに残す
+        T-->>U: sample だけを配信する
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`/sources/notes/docs` が 404、`/sources/sample/docs` と `/mcp` は応答する'
+      - エラーログに notes の id・`sources[1].storage.type`・フォルダが Git の作業ツリーの中に無い理由がある
+    test: test_normal_when_git_storage_outside_work_tree
 lead: 端末の設定を読み、検証に合格した配信元を 1 プロセス・1 ポートで配信する `project-index serve` の入出力を定め、起動を修正するときに参照する。
 tags:
   - name: topic:サーバー
@@ -871,6 +991,8 @@ callers:
   - SC-6#scenarios[正常シナリオ（使う場面を書き換えた後に接続する）]
   - SC-4#scenarios[正常シナリオ（paths の基準のフォルダを指定する）]
   - SC-4#scenarios[正常シナリオ（端末の設定の最上位に知らないキーがある）]
+  - SC-4#scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
+  - SC-4#scenarios[異常シナリオ（裏のリビジョンの書き出しが上限を超える）]
 exclusivity: 同じポートで待ち受けるプロセスは 1 つだけ（後からの起動はポート使用中で終わる）
 request:
   - name: PROJECT_INDEX_CONFIG
@@ -960,7 +1082,7 @@ constraints:
     constraint: 管理用の YAML のフォルダの配下（下のフォルダを含む）のファイルから、管理用の YAML 自身と `SKIP_DIRS` を除いたもの
     notes: 件数は配信元を受け取って求める関数で求め、配信元の状態には持たない。読み直しのときも同じ関数で求め直す
   - item: 設定・スキーマ・スクリプトの読み元
-    constraint: Git の配信元は、ディスクの `project-index.yaml` から `default_ref` だけを読み（ディスクに無いか読めないときは既定の `develop`）、`project-index.yaml`・`documents[].schema` のスキーマ・`validators`・`converters` のスクリプトを `default_ref` から読む（`generators` は書き込み先のワークツリーのスクリプトで動く）。要求ごとに `default_ref` の commit を確かめ、変わっていれば配信元を組み立て直す。Git でない配信元はディスクの設定を読む。先頭の設定が `default_ref` に無く、`git check-ignore` で無視されていれば、先頭の設定はディスクから読み、スキーマとスクリプトは `default_ref` から読む。無視されていなければ `config[0]` の `{default_ref} に {パス} がありません` で配信しない
+    constraint: 'Git の配信元は、ディスクの `project-index.yaml` から `default_ref` だけを読み（ディスクに無いか読めないときは既定の `develop`）、`project-index.yaml`・`documents[].schema` のスキーマ・`validators`・`converters` のスクリプトを `default_ref` から読む（`generators` は書き込み先のワークツリーのスクリプトで動く）。要求ごとに `default_ref` の commit を確かめ、変わっていれば配信元を組み立て直す。Git でない配信元と、端末の設定の行が `storage.type: disk` の配信元は、ディスクの設定・スキーマ・スクリプトを読み、`default_ref`・リポジトリの直下・メインのリポジトリを求めない。先頭の設定が `default_ref` に無く、`git check-ignore` で無視されていれば、先頭の設定はディスクから読み、スキーマとスクリプトは `default_ref` から読む。無視されていなければ `config[0]` の `{default_ref} に {パス} がありません` で配信しない'
     notes: '`worktree` の引数で作業ツリー・ワークツリーを指して読むときは、そのフォルダの設定とスクリプトを使う。そのフォルダに無く、無視されている設定のファイルは、クローン本体のディスクのファイルを使う'
   - item: paths の基準のフォルダ
     constraint: '配信元の設定の `paths_base` を設定ファイル（`config` の先頭）のフォルダから解き、`documents[].paths` をそのフォルダから解く。返却する文書のパスと `exclude[]`・管理用の YAML の同期のパスも基準のフォルダからの相対パスにする。`paths_base` を省くと設定ファイルのフォルダ。`documents[].schema`・`validators`・`converters`・`generators` などのほかの相対パス、`scope.write` の既定、作業中の配信元の判定は設定ファイルのフォルダで解く。Git の配信元は `default_ref` の commit からも基準のフォルダからの相対パスで参照する'
@@ -971,7 +1093,7 @@ constraints:
     constraint: 端末の設定は `PROJECT_INDEX_CONFIG`、無ければ `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`。状態の置き場は `PROJECT_INDEX_STATE_DIR` → 端末の設定の `state_dir` → `${XDG_STATE_HOME:-~/.local/state}/project-index` の順。ログの置き場は端末の設定の `log_dir`、無ければ決めた状態の置き場の `logs`。`XDG_CONFIG_HOME`・`XDG_STATE_HOME` が空の文字列か相対パスなら未設定として扱う
     notes: 環境変数が端末の設定より先に有効になる並びは `PROJECT_INDEX_CONFIG`・`PROJECT_INDEX_PORT` と同じ。相対パスの扱いは XDG Base Directory Specification に従う。セッション開始のフックも同じ規則で端末の設定のパスを決める
   - item: ワークツリーの数え方
-    constraint: '`worktrees[]` の相対パスは、`git rev-parse --git-common-dir` の親（メインのリポジトリの直下）から数える'
+    constraint: '`worktrees[]` の相対パスは、`git rev-parse --git-common-dir` の親（メインのリポジトリの直下）から数える。`storage.type: disk` の配信元は `worktrees[]` を使用しない'
   - item: MCP の文の出どころ
     constraint: '文書の MCP の instructions（`kind: instructions`）と、文書の MCP・管理の MCP のツールごとの description（`kind: tool`）を、起動のときにプロンプトの YAML から読んで描画する。コードは文を持たない。instructions は 4,096 字以内'
     notes: ツールの名前・引数・返り値は変えない。YAML を書き換えたときは再起動で効かせる。instructions の配信元と使う場面の一覧は、下の「instructions の配信元と使う場面の一覧」のとおり接続ごとに描画する
@@ -989,6 +1111,12 @@ constraints:
     constraint: '`documents[].schema` でほかの配信元を指す行は、配信元の検査の制約「ほかの配信元のスキーマの参照」のとおりに読む'
   - item: 参照先が見つからない配信元
     constraint: 参照先のスキーマを読めない行を持つ配信元は、`documents[{番号}].schema` の違反として配信から外し、エラーログに残す（違反の条件は配信元の検査と同じ）
+  - item: リビジョンの先の書き出し
+    constraint: 全ての行の読み込みと検査の後に、Git の配信元ごとに `default_ref` の commit を裏のスレッドで書き出す。`reload`・端末の設定の保存の後と、`default_ref` が進んで配信元を組み立て直した後も同じく書き出す。待ち受け・配信元の読み込み・要求は書き出しを待たない。同じ commit を読む要求は、書き出しの最中ならその終了を待ち、書き出し直さない
+    notes: 書き出しが `git archive` の待ち時間の上限を超えたときは警告のログに残して止め、配信元は配信し続ける。その commit を読む次の要求が書き出し直す。書き出しの最中かは管理の MCP の `status` の `exporting` で返す
+  - item: 読み書きの方法
+    constraint: 端末の設定の行の `storage.type`（`git`・`disk`）で決める。省略すると、配信元のフォルダが Git の作業ツリーの中なら `git`、外なら `disk`。Git の作業ツリーの外部のフォルダに `git` を指定した行は、その配信元だけを配信せず、エラーログに `sources[{添字}].storage.type` とフォルダが Git の作業ツリーの中に無い理由を残す
+    notes: 端末の設定のスキーマの違反（プロセスを止める）ではなく、配信元の検証の失敗として扱う
 refs:
   - SC-4#scenarios[正常シナリオ]
 test_file: tests/integration/server/test_serve.py

@@ -80,10 +80,10 @@ flows:
         participant T as status
 
         C->>T: format: json
-        T-->>C: sample が serving・sync: null
+        T-->>C: checking: true・sample が serving・sync: null
         C->>T: 配信元の検査の合図を出す
         C->>T: format: json
-        T-->>C: sample が serving・sync.unindexed_files: 1
+        T-->>C: checking: false・sample が serving・sync.unindexed_files: 1
       ```
 
       <!-- /map -->
@@ -92,7 +92,66 @@ flows:
       - 合図の前の markdown の索引の同期の列に、検査中であることが出る
       - '合図の後の `status` の `sync.unindexed_files` が 1'
       - '`status` を 2 回呼んでも、`check_sync` を呼んだ回数は起動の後の検査の 1 回のまま'
+      - '合図の前の `status` が `loading: false`・`checking: true` を返し、合図の後の `status` が `checking: false` を返す'
     test: test_normal_when_checking
+  - name: 正常系（読み直した配信元を検査している）
+    summary: '`reload` の後の裏の検査が済むまで、検査の最中であることを返す'
+    setup:
+      - name: Mock
+        description: 配信元の検査（`check_sync`）を、起動の後の 1 回はそのまま通し、その後はテストが合図を出すまで止めるものに差し替える
+        notes: 合図は `threading.Event`
+      - name: 配信元
+        description: Git 管理外の sample の 1 行
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant R as reload
+        participant T as status
+
+        C->>R: 引数なし
+        R-->>C: 読み直した配信元
+        C->>T: format: json
+        T-->>C: checking: true・sample が serving・sync: null
+        C->>T: 検査の合図を出す
+        C->>T: format: json
+        T-->>C: checking: false・sync.unindexed_files を持つ
+      ```
+    expected:
+      - '合図の前の `status` が `checking: true` で、sample を `serving`・`sync: null` で返す'
+      - 合図の前の markdown に、読み直しの最中であることが出る
+      - '合図の後の `status` が `checking: false` で、`sync` に件数がある'
+    test: test_normal_when_reload_checking
+    refs:
+      - SC-10#scenarios[正常シナリオ]
+  - name: 正常系（裏でリビジョンを書き出している）
+    summary: 裏のリビジョンの書き出しが済むまで、書き出しの最中であることを返す
+    setup:
+      - name: Mock
+        description: リビジョンの書き出し（`SnapshotStore.checkout`）を、テストが合図を出すまで止めるものに差し替える
+        notes: 合図は `threading.Event`
+      - name: 配信元
+        description: git リポジトリの sample の 1 行
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as status
+
+        C->>T: format: json
+        T-->>C: loading: false・exporting: true
+        C->>T: 書き出しの合図を出す
+        C->>T: format: json
+        T-->>C: exporting: false
+      ```
+    expected:
+      - '合図の前の `status` が書き出しを待たずに `loading: false`・`exporting: true` を返す'
+      - 合図の前の markdown に、リビジョンの書き出しの最中であることが出る
+      - '合図の後の `status` が `exporting: false` を返す'
+    test: test_normal_when_exporting
+    refs:
+      - SC-4#scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
+      - SC-11#scenarios[正常シナリオ（配信元を読み込んだ直後に開く）]
 lead: 待ち受けのアドレス・バージョン・端末の設定・配信元ごとの状態を返却する管理の MCP の `status` の入出力を定め、`status` を修正するときに参照する。
 tags:
   - name: topic:サーバー
@@ -106,6 +165,10 @@ idempotent: true
 side_effects: なし
 callers:
   - SC-3#scenarios[正常シナリオ]
+  - SC-4#scenarios[正常シナリオ（default_ref のリビジョンを先に書き出す）]
+  - SC-10#scenarios[正常シナリオ]
+  - SC-10#scenarios[正常シナリオ（読み直しの検査が済む前に読み直す）]
+  - SC-11#scenarios[正常シナリオ（配信元を読み込んだ直後に開く）]
 exclusivity: '読み取りだけで排他しない（`readOnlyHint: true`）'
 request:
   - name: format
@@ -171,6 +234,14 @@ response:
     type: bool
     description: 配信元を読み込んでいる間は `true`。その間は `sources` が空で、markdown に読み込み中であることと、読み込みが終わっていない配信元を指す文書の MCP の呼び出しが待たされることを出す
     notes: '-'
+  - name: checking
+    type: bool
+    description: 配信元の裏の検査が済んでいない間は `true`。markdown に検査の最中であることを出す
+    notes: '起動の後・`reload`・端末の設定の保存の後に裏で実行する全ての検査が対象。起動の後は、全ての行の読み込みが済んで `loading` が `false` になった後も、検査が済むまで `true`'
+  - name: exporting
+    type: bool
+    description: 裏のリビジョンの書き出し（配信元ごとの `default_ref` の commit）が済んでいない間は `true`。markdown に書き出しの最中であることを出す
+    notes: 上限を超えて止めた書き出しも済んだものとして扱う
 response_example: |-
   ```markdown
   http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）

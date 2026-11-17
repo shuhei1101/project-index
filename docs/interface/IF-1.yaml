@@ -455,6 +455,31 @@ flows:
       - '`worktrees` に `.claude/worktrees/x` の絶対パスと `branch: feat/x` があり、`../outside` は無い'
       - Git 管理外の配信元では `refs`・`worktrees` を返さない
     test: test_normal_when_refs_and_worktrees
+  - name: 正常系（disk の配信元の説明書）
+    summary: disk の配信元はブランチ・タグ・ワークツリーを返さない
+    setup:
+      - name: Mock
+        description: なし
+      - name: ローカル運用の配信元
+        description: 'Git のリポジトリの中の `storage.type: disk` の配信元'
+        notes: id `company`。`develop` ブランチと `.claude/worktrees/x` のワークツリーがある
+    flow: |-
+      <!-- map: {"title": "正常系（disk の配信元の説明書）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as describe
+
+        C->>T: source: company
+        T-->>C: 説明書と種類の一覧（refs・worktrees が無い）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 説明書と種類の一覧を返し、`refs`・`worktrees` を返さない
+      - '`worktree` に `.claude/worktrees/x` を指定すると `isError: true` で、company は `worktree` を指定できない理由を返す'
+    test: test_normal_when_disk_storage
 lead: '引数の数で配信元の一覧・説明書と種類・種類のスキーマを返却する `describe` の入出力を定め、`describe` を修正するときに参照する。'
 tags:
   - name: topic:配信元
@@ -622,6 +647,8 @@ exceptions:
   - name: UnknownKindError
     condition: '`kind` が配信元の種類に無い'
     notes: その配信元の種類の一覧を添える
+  - name: InvalidArgumentError
+    condition: '`storage.type: disk` の配信元に `worktree` を指定した'
 constraints:
   - item: 注釈
     constraint: '`readOnlyHint: true`'
@@ -639,6 +666,8 @@ constraints:
     constraint: '`outside_scope: true` で作業範囲の外の配信元を読んだ呼び出しは、作業場所（`cwd`）と配信元の ID を要求のログに残す'
   - item: ほかの配信元のスキーマの参照
     constraint: '`documents[].schema` でほかの配信元を指す行は、配信元の検査の制約「ほかの配信元のスキーマの参照」のとおりに読む'
+  - item: disk の配信元
+    constraint: '端末の設定の行が `storage.type: disk` の配信元は、`refs`・`worktrees` を返さない。`worktree` を指定すると `InvalidArgumentError`'
 refs:
   - SC-6#scenarios[正常シナリオ]
 test_file: tests/integration/server/test_describe.py

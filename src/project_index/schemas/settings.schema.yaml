@@ -72,6 +72,15 @@ properties:
         outside_read:
           type: boolean
           title: 作業範囲の外から参照できるか
+        storage:
+          type: object
+          title: 読み書きの方法
+          additionalProperties: false
+          required: [type]
+          properties:
+            type:
+              enum: [git, disk]
+              title: 種類
   state_dir:
     type: string
     title: 状態の配置先
@@ -88,4 +97,14 @@ properties:
     type: integer
     title: スクリプトの制限時間
     description: 検査・変換・生成のスクリプト 1 回の上限（秒）。
+    minimum: 1
+  write_deadline_sec:
+    type: integer
+    title: 書き込みの期限
+    description: 文書の MCP の書き込み・削除で、要求を受けてからファイルを書き換え始めてよい上限（秒）。
+    minimum: 1
+  worktree_load_wait_sec:
+    type: integer
+    title: ワークツリーの読み込みを待つ上限
+    description: 文書の MCP が、初めて指されたワークツリーの読み込みを待つ上限（秒）。
     minimum: 1

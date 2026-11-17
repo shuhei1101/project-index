@@ -42,6 +42,8 @@ functions:
       1. 1 行目に `{address} project-index {version}（pid {pid}）`、2 行目に `端末の設定: {file}（{version_state}）` を置く
       2. 配信元ごとに表の行を作る（配信元の行）
          - `loading` が `True` の場合、表の代わりに `配信元: 読み込み中（読み込みが終わっていない配信元を指す文書の MCP の呼び出しは待たされます）` を置く
+         - `checking` が `True` の場合、表の前に `検査: 検査中（索引の同期の件数は検査が済んだ後に出ます）` を置く
+         - `exporting` が `True` の場合、表の前に `リビジョンの書き出し: 書き出し中（書き出し中のリビジョンを読む要求は待たされます）` を置く
          - 配信元が 0 件の場合、表の代わりに `配信元: なし` を置く
     unit_tests:
       - name: test_render_status
@@ -62,6 +64,12 @@ functions:
         condition: '`loading` が `True`、`sources` が空'
         mock: なし
         expected: '3 行目が `配信元: 読み込み中（読み込みが終わっていない配信元を指す文書の MCP の呼び出しは待たされます）`'
+      - name: test_render_status_when_checking_and_exporting
+        case: 正常
+        summary: 検査と書き出しの最中を出す
+        condition: '`checking` と `exporting` が `True`、`sources` に sample の 1 行'
+        mock: なし
+        expected: 検査中の行と書き出し中の行が表の前にあり、sample の行がある
     callers:
       - MOD-93#functions[build_admin_mcp]
     callees:

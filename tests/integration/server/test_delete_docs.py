@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from project_index.shared.hashing import content_hash
+from project_index.shared.hashing import content_hash, value_hash
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
@@ -337,3 +337,144 @@ def test_normal_when_unlink_quotes_preserved(
     assert referrer.read_text(encoding="utf-8").startswith(
         "id: doc-1\nname: \"A: b\"\ndescription: '2020-12'\n"
     )
+
+
+NOTES_ROW = (
+    "  - id: notes\n"
+    "    paths: [notes/index.yaml]\n"
+    "    schema: schemas/notes.schema.yaml\n"
+    "    records: items\n"
+    "    body_file: path\n"
+)
+NOTES_SCHEMA = (
+    "type: object\n"
+    "properties:\n"
+    "  items:\n"
+    "    type: array\n"
+    "    items:\n"
+    "      type: object\n"
+    "      properties:\n"
+    "        id: {type: string}\n"
+    "        path: {type: string}\n"
+)
+NOTES = (
+    "items:\n"
+    "  - id: n1\n    path: n1.md\n"
+    "  - id: n2\n    path: n2.md\n"
+    "  - id: n3\n    path: n1.md\n"
+)
+
+
+def test_normal_when_body_file(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """`records`・`body_file` の行の文書を、要素と本文のファイルごと削除する（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "project-index.yaml": sample_config_text(NOTES_ROW),
+            "schemas/notes.schema.yaml": NOTES_SCHEMA,
+            "notes/index.yaml": NOTES,
+            "notes/n1.md": "# n1\n",
+            "notes/n2.md": "# n2\n",
+        }
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    common = {"cwd": str(source.folder), "worktree": str(worktree)}
+    # 実行
+    first = env.call(
+        "delete_docs",
+        **common,
+        targets=[
+            {"id": "n2", "expected_version": value_hash([{"id": "n2", "path": "n2.md"}, "# n2\n"])}
+        ],
+    )
+    second = env.call(
+        "delete_docs",
+        **common,
+        targets=[
+            {"id": "n3", "expected_version": value_hash([{"id": "n3", "path": "n1.md"}, "# n1\n"])}
+        ],
+    )
+    checked = env.call_admin("check_project", path=str(worktree), format="json")
+    # 検証
+    assert not first.is_error
+    assert not second.is_error
+    assert load_yaml((worktree / "notes" / "index.yaml").read_text(encoding="utf-8")) == {
+        "items": [{"id": "n1", "path": "n1.md"}]
+    }
+    assert not (worktree / "notes" / "n2.md").exists()
+    assert (worktree / "notes" / "n1.md").read_text(encoding="utf-8") == "# n1\n"
+    assert "notes/n2.md" not in checked.text
+
+
+def test_error_when_disk_storage_delete_not_allowed(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """disk の配信元で writable が削除を許さない種類の文書を消さない（異常系）。"""
+    # 準備
+    config = sample_config_text(name="company").replace(
+        "  - id: sample\n    paths: [docs/*.yaml]\n    schema: schemas/sample.schema.yaml\n",
+        WRITABLE_FALSE_ROW,
+    )
+    company = make_source(
+        "company", sample_file_set(**{"project-index.yaml": config}), storage="disk"
+    )
+    env = make_server(company)
+    target = company.folder / "docs" / "doc-2.yaml"
+    # 実行
+    result = env.call(
+        "delete_docs",
+        cwd=str(company.folder),
+        source="company",
+        targets=[{"id": "doc-2", "expected_version": _version(target)}],
+    )
+    # 検証
+    assert result.is_error
+    assert "DeleteNotAllowedError" in result.text
+    assert "TargetIsCloneError" not in result.text
+    assert "writable" in result.text
+    assert target.is_file()
+
+
+# 最上位の refs と functions[0].refs を持つ n1
+NESTED_N1 = (
+    "id: n1\nname: n1\nrefs:\n  - {to: n2, type: references}\n"
+    "  - {to: n3, type: references}\nfunctions:\n  - name: f\n"
+    "    refs:\n      - {to: n2, type: references}\n"
+)
+
+
+def test_normal_when_unlink_nested_related(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    nested_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """on_referenced: unlink が最上位と入れ子の refs の両方から参照を外す（正常系）。"""
+    # 準備
+    files = nested_file_set(NESTED_N1)
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    target = worktree / "nested" / "n2.yaml"
+    referrer = worktree / "nested" / "n1.yaml"
+    # 実行
+    result = env.call(
+        "delete_docs",
+        cwd=str(source.folder),
+        worktree=str(worktree),
+        targets=[{"id": "n2", "expected_version": _version(target)}],
+        on_referenced="unlink",
+    )
+    # 検証
+    data = load_yaml(referrer.read_text(encoding="utf-8"))
+    assert not target.exists()
+    assert data["refs"] == [{"to": "n3", "type": "references"}]
+    assert data["functions"][0]["refs"] == []
+    assert result.data["unlinked"] == [{"id": "n1", "version": _version(referrer)}]

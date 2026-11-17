@@ -40,7 +40,10 @@ def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]
     # 実行
     response = env.client.put(
         "/settings/sources",
-        json={"sources": [_row(sample), _row(extra, config=str(extra.config[0]))]},
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "sources": [_row(sample), _row(extra, config=str(extra.config[0]))],
+        },
         headers=ORIGIN,
     )
     # 検証
@@ -73,7 +76,10 @@ def test_normal_when_source_disabled(
     # 実行
     response = env.client.put(
         "/settings/sources",
-        json={"sources": [_row(sample), _row(extra, enabled=False)]},
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "sources": [_row(sample), _row(extra, enabled=False)],
+        },
         headers=ORIGIN,
     )
     # 検証
@@ -98,7 +104,14 @@ def test_normal_when_source_deleted(
     env = make_server(sample, extra)
     extra_files = sorted(str(path) for path in extra.folder.rglob("*.yaml"))
     # 実行
-    response = env.client.put("/settings/sources", json={"sources": [_row(sample)]}, headers=ORIGIN)
+    response = env.client.put(
+        "/settings/sources",
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "sources": [_row(sample)],
+        },
+        headers=ORIGIN,
+    )
     # 検証
     text = env.settings_path.read_text(encoding="utf-8")
     assert response.status_code == 200
@@ -119,7 +132,10 @@ def test_normal_when_added_source_invalid(
     # 実行
     response = env.client.put(
         "/settings/sources",
-        json={"sources": [_row(sample), _row(broken)]},
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "sources": [_row(sample), _row(broken)],
+        },
         headers=ORIGIN,
     )
     # 検証
@@ -172,7 +188,11 @@ def test_error_when_schema_invalid(
         ]
     }
     # 実行
-    response = env.client.put("/settings/sources", json=body, headers=ORIGIN)
+    response = env.client.put(
+        "/settings/sources",
+        json={"expectedVersion": env.client.get("/settings/sources").json()["version"], **body},
+        headers=ORIGIN,
+    )
     # 検証
     paths = [error["path"] for error in response.json()["errors"]]
     assert response.status_code == 422
@@ -195,7 +215,10 @@ def test_normal_when_unsent_keys_kept(
     # 実行
     response = env.client.put(
         "/settings/sources",
-        json={"sources": [_row(sample, enabled=False), _row(extra)]},
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "sources": [_row(sample, enabled=False), _row(extra)],
+        },
         headers=ORIGIN,
     )
     # 検証
@@ -221,7 +244,10 @@ def test_normal_when_sent_keys_override(
     # 実行
     response = env.client.put(
         "/settings/sources",
-        json={"sources": [_row(sample), _row(extra, outside_read=True)]},
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "sources": [_row(sample), _row(extra, outside_read=True)],
+        },
         headers=ORIGIN,
     )
     listed = env.client.get("/settings/sources")
@@ -263,7 +289,12 @@ def test_error_when_version_outdated(
     env = make_server(sample)
     version = env.client.get("/settings/sources").json()["version"]
     added = env.client.post(
-        "/settings/sources", json={"source": _row(extra)}, headers=ORIGIN
+        "/settings/sources",
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "source": _row(extra),
+        },
+        headers=ORIGIN,
     ).json()["version"]
     # 実行
     response = env.client.put(
@@ -289,10 +320,61 @@ def test_normal_when_unknown_top_level_key_kept(
     sample = make_source("sample")
     env = make_server(sample, settings_extra=UNKNOWN_KEY_EXTRA)
     # 実行
-    response = env.client.put("/settings/sources", json={"sources": [_row(sample)]})
+    response = env.client.put(
+        "/settings/sources",
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "sources": [_row(sample)],
+        },
+    )
     # 検証
     body = response.json()
     assert response.status_code == 200
     assert [(row["id"], row["status"]) for row in body["sources"]] == [("sample", "serving")]
     assert [warning["path"] for warning in body["warnings"]] == ["mindstella"]
     assert UNKNOWN_KEY_EXTRA in env.settings_path.read_text(encoding="utf-8")
+
+
+def test_error_when_version_missing(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """内容のバージョンを添えない保存を断る（異常系）。"""
+    # 準備
+    sample = make_source("sample")
+    extra = make_source("extra")
+    env = make_server(sample)
+    before = env.settings_path.read_bytes()
+    # 実行
+    response = env.client.put(
+        "/settings/sources", json={"sources": [_row(sample), _row(extra)]}, headers=ORIGIN
+    )
+    # 検証
+    assert response.status_code == 400
+    assert [error["path"] for error in response.json()["errors"]] == ["expectedVersion"]
+    assert env.settings_path.read_bytes() == before
+    assert env.client.get("/sources/extra/docs").status_code == 404
+
+
+def test_normal_when_unsent_storage_kept(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """行に含めなかった storage を、ファイルの同じ配信元の行の今の値で残す（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    company = make_source("company", storage="disk")
+    env = make_server(sample, company)
+    # 実行
+    response = env.client.put(
+        "/settings/sources",
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "sources": [_row(sample, enabled=False), _row(company)],
+        },
+        headers=ORIGIN,
+    )
+    # 検証
+    rows = load_yaml(env.settings_path.read_text(encoding="utf-8"))["sources"]
+    assert response.status_code == 200
+    assert {row["id"]: row["status"] for row in response.json()["sources"]}["company"] == "serving"
+    assert rows[1]["storage"] == {"type": "disk"}
+    assert env.client.get("/sources/company/refs").json()["git"] is False

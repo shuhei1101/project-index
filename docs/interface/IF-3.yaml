@@ -250,6 +250,64 @@ flows:
       - 要求のログに sample のクローン本体のパスと `other` が残る
       - '`outside_read: false` の other では `SourceNotReadableError` を返す'
     test: test_normal_when_outside_scope
+  - name: 正常系（disk の配信元をたどる）
+    summary: disk の配信元は related だけをたどり、一緒に変わったファイルを返さない
+    setup:
+      - name: Mock
+        description: なし
+      - name: ローカル運用の配信元
+        description: '`storage.type: disk` の配信元。文書 2 の `related` が文書 1 を指し、文書 1 と文書 3 を同じ commit で commit する'
+        notes: id `company`
+    flow: |-
+      <!-- map: {"title": "正常系（disk の配信元をたどる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as trace_related
+
+        C->>T: source: company, from_ids: [文書 1]
+        T-->>C: related で文書 1 を指す文書 2
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`items` に文書 2 があり、同じ commit で変わった文書 3 を一緒に変わったファイルとして返さない'
+      - '`ref: develop` を指定すると `isError: true` で、company は `ref` を指定できない理由を返す'
+    test: test_normal_when_disk_storage
+  - name: 正常系（入れ子の項目の中の関連）
+    summary: '`**.refs[]` の対応で最上位と入れ子の `refs` をまとめた `related` を、両方向にたどる'
+    setup:
+      - name: Mock
+        description: なし
+        notes: '-'
+      - name: 入れ子の関連を持つ種類
+        description: 'sample に行 `nested`（`paths: [nested/*.yaml]`・`schema: nested.schema.yaml`・`metadata: {related: "**.refs[]"}`）を加える。n1 は最上位の `refs` に n2、`functions[0].refs` に n3 を指す要素を持ち、n2・n3 は `refs` を持たない'
+        notes: '`refs` の要素は `to` と `type: references`'
+      - name: 入力
+        description: '1 回目は `from_ids: [n1]`・`direction: out`。2 回目は `from_ids: [n3]`・`direction: in`'
+        notes: '-'
+    flow: |-
+      <!-- map: {"title": "正常系（入れ子の項目の中の関連）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as trace_related
+        participant ST as 配信元の文書
+
+        C->>T: from_ids: n1, direction: out
+        T-->>ST: n1 の最上位と入れ子の refs をまとめた related をたどる
+        T-->>C: n2 と n3（深さ 1）
+        C->>T: from_ids: n3, direction: in
+        T-->>C: n1（深さ 1）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目が n2 と n3 を深さ 1 で返却し、どちらの行もたどった関係の種類が `references`
+      - 2 回目が n1 を深さ 1 で返却する
+    test: test_normal_when_nested_related
 lead: '`related` をたどって関連する文書と関連の候補を返却する `trace_related` の入出力を定め、`trace_related` を修正するときに参照する。'
 tags:
   - name: topic:関連
@@ -265,6 +323,7 @@ side_effects: 会話キーごとに、名前・概要文を返した関連の相
 callers:
   - SC-6#scenarios[正常シナリオ]
   - SC-6#scenarios[正常シナリオ（設計書を実装するコードを引く）]
+  - SC-6#scenarios[正常シナリオ（入れ子の項目の中の関連をたどる）]
 exclusivity: '読み取りだけで排他しない（`readOnlyHint: true`）'
 request:
   - name: source
@@ -423,7 +482,7 @@ exceptions:
     condition: '`from_ids` の文書が無い、または `code_paths` を本文に持つ文書が無い'
     notes: 見つからなかった ID・パスと近い候補を添える
   - name: InvalidArgumentError
-    condition: '`from_ids` と `code_paths` を両方渡した、またはどちらも渡さない'
+    condition: '`from_ids` と `code_paths` を両方渡した、またはどちらも渡さない、`storage.type: disk` の配信元に `ref`・`worktree` を渡した'
   - name: SourceNotReadableError
     condition: '`cwd` が起点の配信元の `scope.read`・`scope.write` に当たらない（`outside_scope: true` のときは、加えて `outside_read` が偽）'
     notes: '`outside_read` が真で `outside_scope` を渡していないときは、`fix` に `outside_scope: true` で作業範囲の外を参考に参照できることを添える'
@@ -441,6 +500,8 @@ constraints:
   - item: 配信元・ワークツリーの解決
     constraint: '`search_docs` と同じ（配信していない配信元・当たらないワークツリーのエラーも同じ）'
     notes: 共通の処理で解決するため、結合テストは [文書の検索](id:IF-2) が持つ
+  - item: disk の配信元
+    constraint: '端末の設定の行が `storage.type: disk` の配信元は、一緒に変わったファイルを返さない。`ref`・`worktree` を指定すると `InvalidArgumentError`'
 refs:
   - SC-6#scenarios[正常シナリオ]
   - SC-6#scenarios[正常シナリオ（同じ本文を 2 回取る）]

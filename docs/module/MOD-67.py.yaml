@@ -79,6 +79,12 @@ data_models:
         access: 公開
         default: 'True'
         description: '`False` で、`scope` に当たらない作業場所から `outside_scope: true` で読むのを断る'
+      - name: storage
+        title: 読み書きの方法
+        type: SourceStorage | None
+        access: 公開
+        default: None
+        description: '`None` は、配信元のフォルダが Git の作業ツリーの中なら `git`、外なら `disk` として扱う'
   - name: TerminalConfig
     title: 端末の設定
     container: project_index/features/settings/types.py
@@ -150,6 +156,18 @@ data_models:
         access: 公開
         default: '[]'
         description: スキーマの `properties` に無い最上位のキー（ファイルの順）。値は持たない
+      - name: write_deadline_sec
+        title: 書き込みの期限
+        type: int
+        access: 公開
+        default: 非機能要件の `write_deadline` の決定値
+        description: 文書の MCP の書き込み・削除で、要求を受けてから作業ツリーのファイルを置き換え始めてよい上限（秒）。1 以上
+      - name: worktree_load_wait_sec
+        title: ワークツリーの読み込みを待つ上限
+        type: int
+        access: 公開
+        default: 非機能要件の `worktree_load_wait` の決定値
+        description: '`search_docs` がワークツリーの読み込みを待つ上限（秒）。1 以上'
   - name: SettingsSourcesRequest
     title: 配信元の保存の要求
     container: project_index/features/settings/types.py
@@ -165,10 +183,9 @@ data_models:
         description: 保存する `sources[]` の全行
       - name: expected_version
         title: 取得したときの内容のバージョン
-        type: str | None
+        type: str
         access: 公開
-        default: None
-        description: JSON のキーは `expectedVersion`。`None` は照合しない
+        description: JSON のキーは `expectedVersion`。必須
   - name: SettingsWarning
     title: 端末の設定の警告
     container: project_index/features/settings/types.py
@@ -255,6 +272,12 @@ data_models:
         type: bool
         access: 公開
         description: 行の `outside_read`
+      - name: storage
+        title: 読み書きの方法
+        type: SourceStorage | None
+        access: 公開
+        default: None
+        description: 行の `storage`。書いていない行は `None`（JSON ではキーを出さない）
   - name: SettingsSourcesView
     title: 端末の設定の取得の応答
     container: project_index/features/settings/types.py
@@ -298,10 +321,9 @@ data_models:
         description: 追加する行
       - name: expected_version
         title: 取得したときの内容のバージョン
-        type: str | None
+        type: str
         access: 公開
-        default: None
-        description: JSON のキーは `expectedVersion`。`None` は照合しない
+        description: JSON のキーは `expectedVersion`。必須
   - name: SourceAddResult
     title: 1 行の追加の結果
     container: project_index/features/settings/types.py
@@ -395,6 +417,12 @@ data_models:
         access: 公開
         default: None
         description: 送ったときだけ置き換える
+      - name: storage
+        title: 読み書きの方法
+        type: SourceStorage | None
+        access: 公開
+        default: None
+        description: 送ったときだけ置き換える
   - name: SettingsSourcePatchRequest
     title: 1 行の変更の要求
     container: project_index/features/settings/types.py
@@ -445,6 +473,19 @@ data_models:
         type: str
         access: 公開
         description: 書き換えた後の端末の設定の内容のバージョン
+  - name: SourceStorage
+    title: 配信元の読み書きの方法
+    container: project_index/features/settings/types.py
+    usecase: 端末の設定
+    role: DTO
+    summary: 端末の設定の `sources[].storage`
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。端末の設定のスキーマ（`schemas/settings.schema.yaml`）の `sources[].storage` も同じ形にする'
+    properties:
+      - name: type
+        title: 種類
+        type: StorageType
+        access: 公開
+        description: '`git`・`disk`'
 classes:
   - name: TerminalConfigInvalidError
     title: 端末の設定の違反

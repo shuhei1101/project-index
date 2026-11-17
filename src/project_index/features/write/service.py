@@ -6,20 +6,31 @@ import dataclasses
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from ruamel.yaml.comments import CommentedMap
 
 from project_index.features.access.service import resolve_write_target
 from project_index.features.access.types import Target
 from project_index.features.changes.compare import diff_lines
-from project_index.features.documents.fields import get_field, resolve_metadata, set_field
-from project_index.features.documents.loader import documents_from_text
+from project_index.features.documents.fields import (
+    field_arrays,
+    get_field,
+    resolve_metadata,
+    set_field,
+)
+from project_index.features.documents.loader import documents_from_text, resolve_body_path
 from project_index.features.documents.store import DocumentStore, not_found_error
 from project_index.features.documents.types import Document
 from project_index.features.seen.types import LastRead, SessionKey
 from project_index.features.sources.types import DocumentTable
-from project_index.features.write.apply import apply_operation, expand_array_keys, to_columns
+from project_index.features.write.apply import (
+    BODY_KEY,
+    apply_body,
+    apply_operation,
+    expand_array_keys,
+    to_columns,
+)
 from project_index.features.write.hints import attach_schema_hints
 from project_index.features.write.ids import generate_id
 from project_index.features.write.placement import new_document_path
@@ -34,6 +45,7 @@ from project_index.features.write.types import (
     WriteResultItem,
 )
 from project_index.integrations.scripts import ScriptError, run_script
+from project_index.shared.deadline import Deadline
 from project_index.shared.errors import (
     DeleteNotAllowedError,
     DocumentReferencedError,
@@ -42,6 +54,7 @@ from project_index.shared.errors import (
     ValidationFailedError,
     VersionMismatchError,
     Violation,
+    WriteDeadlineExceededError,
 )
 from project_index.shared.files import replace_file
 from project_index.shared.hashing import value_hash
@@ -57,6 +70,7 @@ if TYPE_CHECKING:
     from project_index.features.validation.markdown import UncheckedKey
     from project_index.features.validation.service import DocumentChecker
     from project_index.features.write.locks import SourceLocks
+    from project_index.shared.deadline import CallLimits
 
 logger = logging.getLogger(__name__)
 
@@ -131,9 +145,13 @@ class _Session:
     target: Target
     docs: dict[str, Document] = field(default_factory=dict[str, Document])
     pending: dict[str, str | None] = field(default_factory=dict[str, str | None])
+    # 本文のファイルの新しい内容（`None` は消す）。管理用の YAML より先に書く
+    bodies: dict[str, str | None] = field(default_factory=dict[str, str | None])
     tables: dict[str, DocumentTable] = field(default_factory=dict[str, DocumentTable])
     # mdmark の CLI が無い・制限時間を超えたときの理由。後の操作の点検を飛ばす
     markdown_stopped: str | None = None
+    # 書き込みの期限（文書の MCP から呼ばれたときだけ）。検査と点検の制限時間を切る
+    deadline: Deadline | None = None
 
     def __post_init__(self) -> None:
         self.docs = {document.id: document for document in self.store.load(self.target).documents}
@@ -155,10 +173,36 @@ class _Session:
             return self.pending[path] is not None
         return (self.target.base / path).is_file()
 
-    def build(self, path: str, text: str, table: DocumentTable) -> list[Document]:
-        """内容から文書を組み立てる（書かずに確かめる）。"""
+    def read_body(self, path: str, bodies: Mapping[str, str | None] | None = None) -> str | None:
+        """本文のファイルの内容（書く予定の内容があればそれ。無いファイルは `None`）。"""
+        for overlay in (bodies or {}, self.bodies):
+            if path in overlay:
+                return overlay[path]
+        absolute = self.target.base / path
+        try:
+            return absolute.read_text(encoding="utf-8") if absolute.is_file() else None
+        except OSError, UnicodeDecodeError:
+            return None
+
+    def body_exists(self, path: str) -> bool:
+        """本文のファイルがあるか（書く予定のものを含む）。"""
+        return self.read_body(path) is not None
+
+    def build(
+        self,
+        path: str,
+        text: str,
+        table: DocumentTable,
+        bodies: Mapping[str, str | None] | None = None,
+    ) -> list[Document]:
+        """内容から文書を組み立てる（書かずに確かめる）。本文は書く予定の内容で読む。"""
         found, _ = documents_from_text(
-            text, self.target.base, path, table, source_id=self.source_id
+            text,
+            self.target.base,
+            path,
+            table,
+            source_id=self.source_id,
+            read_body=lambda body_path: self.read_body(body_path, bodies),
         )
         return found
 
@@ -176,7 +220,8 @@ class _Session:
     def write_pending(self) -> list[Path]:
         """記録した内容をファイルへ書き、消す予定のファイルを消して、触ったパスを返す。"""
         touched: list[Path] = []
-        for path, text in self.pending.items():
+        # 本文のファイルを先に書き、管理用の YAML が指すファイルを先にそろえる
+        for path, text in [*self.bodies.items(), *self.pending.items()]:
             absolute = self.target.base / path
             if text is None:
                 absolute.unlink(missing_ok=True)
@@ -340,21 +385,28 @@ def _check_and_commit(
     doc_id: str | None,
     new: bool,
     previous: Mapping[str, Any] | None,
+    bodies: Mapping[str, str] | None = None,
 ) -> tuple[Document, list[UncheckedKey]]:
     """新しい内容を文書にして検査し、通れば記録する（点検できなかった Markdown のキーも返す）。"""
-    documents = session.build(path, text, table)
+    documents = session.build(path, text, table, bodies)
     if not documents:
         raise ValidationFailedError(
             message="検査に通らない操作があります: 1 件",
             violations=[Violation(path="$", rule="文書として読み込めません")],
         )
     document = _new_document(documents, index, doc_id)
-    violations = checker.check(session.target, document, on="write", new=new)
+    violations = checker.check(
+        session.target, document, on="write", new=new, deadline=session.deadline
+    )
     unchecked: list[UncheckedKey] = []
     # 検査に通った文書だけ、変えた Markdown の値を mdmark の点検に通す
     if not violations:
         markdown = checker.check_markdown(
-            session.target, document, previous=previous, stopped=session.markdown_stopped
+            session.target,
+            document,
+            previous=previous,
+            stopped=session.markdown_stopped,
+            deadline=session.deadline,
         )
         session.markdown_stopped = markdown.stopped
         violations = markdown.violations
@@ -368,8 +420,151 @@ def _check_and_commit(
         raise ValidationFailedError(
             message=f"検査に通らない操作があります: {len(hinted)} 件", violations=hinted
         )
+    session.bodies.update(bodies or {})
     session.commit(path, text, table)
     return document, unchecked
+
+
+def _body_paths(operation: Operation) -> list[str]:
+    """操作が `@body` を指す箇所の、違反の項目のパスを返す。"""
+    paths = [
+        f"{item}.{BODY_KEY}"
+        for item, given in (("data", operation.data or {}), ("set", operation.set))
+        if BODY_KEY in given
+    ]
+    paths += [
+        f"text_edits[{n}].field"
+        for n, edit in enumerate(operation.text_edits)
+        if edit.field == BODY_KEY
+    ]
+    return paths
+
+
+def _check_body(operation: Operation, table: DocumentTable, existing: Document | None) -> None:
+    """`@body` を受け付ける操作かと、`body_file` の列の値を変えないかを確かめる。"""
+    violations = _misplaced_body(operation)
+    if table.body_file is None:
+        violations.extend(
+            Violation(
+                path=path,
+                rule=f"{table.id} は本文のファイル（body_file）を持たないため {BODY_KEY} を受けません",
+                fix=f"{BODY_KEY} を除いてください",
+            )
+            for path in _body_paths(operation)
+        )
+    elif operation.op == "create":
+        violations.extend(_missing_body(operation, table))
+    elif existing is not None:
+        violations.extend(_moved_body(operation, table.body_file, existing))
+    if violations:
+        raise _invalid(violations)
+
+
+def _misplaced_body(operation: Operation) -> list[Violation]:
+    """`unset`・`add_to`・`remove_from` に渡した `@body` の違反。"""
+    violations: list[Violation] = []
+    if BODY_KEY in operation.unset:
+        violations.append(
+            Violation(path="unset", rule=f"{BODY_KEY} は消せません", fix="unset から除いてください")
+        )
+    violations.extend(
+        Violation(
+            path=f"{item}.{BODY_KEY}",
+            rule=f"{BODY_KEY} は配列の項目ではありません",
+            fix=f"本文は set.{BODY_KEY} か text_edits で書いてください",
+        )
+        for item, given in (("add_to", operation.add_to), ("remove_from", operation.remove_from))
+        if BODY_KEY in given
+    )
+    return violations
+
+
+def _missing_body(operation: Operation, table: DocumentTable) -> list[Violation]:
+    """`body_file` の行の `create` に本文が無いときの違反。"""
+    if BODY_KEY in (operation.data or {}):
+        return []
+    return [
+        Violation(
+            path=f"data.{BODY_KEY}",
+            rule=f"{table.id} の文書の作成には本文（{BODY_KEY}）が要ります",
+            fix=f"data に {BODY_KEY} を加えてください",
+        )
+    ]
+
+
+def _moved_body(operation: Operation, column: str, existing: Document) -> list[Violation]:
+    """`update`・`replace` で `body_file` の列の値を変えるときの違反。"""
+    item, given = (
+        ("set", operation.set) if operation.op == "update" else ("data", operation.data or {})
+    )
+    current = get_field(existing.data, column)
+    if column not in given or given[column] == current:
+        return []
+    return [
+        Violation(
+            path=f"{item}.{column}",
+            rule=f"{column}（本文のファイルのパス）は変えられません",
+            fix=f"{column} を除くか、今の値（{current}）にしてください",
+        )
+    ]
+
+
+def _create_body(
+    session: _Session,
+    operation: Operation,
+    table: DocumentTable,
+    path: str,
+    index: int,
+) -> dict[str, str]:
+    """`create` の本文のファイルのパスを解き、(パス → 本文) を返す（作れなければ違反）。"""
+    column = table.body_file
+    if column is None:
+        return {}
+    value = get_field(operation.data or {}, column)
+    body_path = resolve_body_path(path, value)
+    if body_path is None or session.body_exists(body_path):
+        rule = (
+            f"本文のファイルのパス（{value}）が配信元の外を指します"
+            if body_path is None
+            else f"本文のファイル {body_path} は既にあります"
+        )
+        raise ValidationFailedError(
+            message="検査に通らない操作があります: 1 件",
+            violations=[
+                Violation(
+                    path=column,
+                    rule=rule,
+                    fix=f"{column} に、管理用の YAML のフォルダからの相対で、配信元の中の新しいファイルのパスを指定してください",
+                )
+            ],
+        )
+    body = apply_body(None, operation, index=index)
+    if body is None:
+        msg = "create に本文がありません"
+        raise RuntimeError(msg)
+    return {body_path: body}
+
+
+def _diff(before: Document | None, after: Document, body: Mapping[str, str]) -> str:
+    """差分の行。本文のファイルを持つ文書は、要素の差分の後に本文のファイルの差分を並べる。"""
+    if after.body_path is None:
+        return diff_lines("" if before is None else before.body, after.body)
+    element = diff_lines(
+        "" if before is None else _element_text(before.data), _element_text(after.data)
+    )
+    if after.body_path not in body:
+        return element
+    lines = [element] if element else []
+    lines += [
+        f"@@ {after.body_path}",
+        diff_lines("" if before is None else before.body, after.body),
+    ]
+    return "\n".join(lines)
+
+
+def _element_text(data: Mapping[str, Any]) -> str:
+    """`records` の要素を YAML に書き出した文字列。"""
+    return dump_roundtrip(data if isinstance(data, CommentedMap) else CommentedMap(data))
 
 
 def _unique(tables: list[DocumentTable]) -> list[DocumentTable]:
@@ -378,22 +573,35 @@ def _unique(tables: list[DocumentTable]) -> list[DocumentTable]:
 
 
 def _run_generators(
-    target: Target, tables: list[DocumentTable], paths: list[Path], timeout_sec: float
+    target: Target,
+    tables: list[DocumentTable],
+    paths: list[Path],
+    timeout_sec: float,
+    respond_by: Deadline | None = None,
 ) -> None:
-    """`after_write` の生成を、ID の重なりを除いて順に動かす。"""
+    """`after_write` の生成を、ID の重なりを除いて順に動かす（応答の上限までの時間で切る）。"""
     done: set[str] = set()
     for table in tables:
         for generator_id in table.after_write:
             if generator_id in done:
                 continue
             done.add(generator_id)
+            limit = timeout_sec if respond_by is None else respond_by.cap(timeout_sec)
+            # 応答の上限まで時間が無い: 生成を動かさない（書き込みの結果は変えない）
+            if limit <= 0:
+                logger.warning(
+                    "応答の上限までの時間が無いため書き込み後の生成を実行しなかった（%s・%s）",
+                    target.source.id,
+                    generator_id,
+                )
+                continue
             try:
                 entry = target.source.script("generators", generator_id)
                 run_script(
                     entry.run,
                     cwd=target.config_base,
                     args=[str(path) for path in paths],
-                    timeout_sec=timeout_sec,
+                    timeout_sec=limit,
                 )
             except (ScriptError, KeyError) as error:
                 logger.warning(
@@ -402,6 +610,12 @@ def _run_generators(
                     generator_id,
                     error,
                 )
+
+
+def _check_before_write(limits: CallLimits | None) -> None:
+    """ファイルを置き換える前に書き込みの期限を確かめる（過ぎていれば何も書かずに超過を送る）。"""
+    if limits is not None:
+        limits.write_deadline.check()
 
 
 def _atomic_error(failures: list[tuple[int, ProjectIndexError]]) -> ProjectIndexError:
@@ -440,6 +654,7 @@ def write_docs(
     locks: SourceLocks,
     timeout_sec: float,
     now: datetime | None = None,
+    limits: CallLimits | None = None,
 ) -> WriteResult:
     """`write_docs` の要求を処理して書き込みの結果を返す。"""
     now = now or datetime.now(UTC)
@@ -450,39 +665,73 @@ def write_docs(
     source = target.source
     key = SessionKey.of(request.session_id, request.agent_id)
     with locks.hold(source.id):
-        session = _Session(store, target)
-        last_reads = seen.last_read(key, source.id)
-        results: list[WriteResultItem] = []
-        failures: list[tuple[int, ProjectIndexError]] = []
-        written_ids: list[str] = []
-        written_tables: list[DocumentTable] = []
-        created_ids: set[str] = set()
-        for index, operation in enumerate(request.operations):
-            try:
-                item = _apply_one(session, checker, operation, index, last_reads, created_ids, now)
-            except ProjectIndexError as error:
-                failures.append((index, error))
-                results.append(
-                    WriteResultItem(
-                        index=index,
-                        id=operation.id,
-                        status="failed",
-                        errors=_prefixed(index, error),
-                    )
-                )
-                continue
-            results.append(item[0])
-            written_ids.append(item[0].id or "")
-            written_tables.append(item[1])
-        if failures and request.atomic:
-            raise _atomic_error(failures)
+        session = _Session(
+            store, target, deadline=None if limits is None else limits.write_deadline
+        )
+        applied = _apply_operations(
+            session, checker, request.operations, seen.last_read(key, source.id), now
+        )
+        results = applied.results
+        if applied.failures and request.atomic:
+            raise _atomic_error(applied.failures)
         succeeded = [item for item in results if item.status != "failed"]
         if request.dry_run or not succeeded:
             return WriteResult(applied=False, results=results)
+        _check_before_write(limits)
         touched = session.write_pending()
-        _run_generators(target, _unique(written_tables), touched, timeout_sec)
-        seen.record_activity(key, source.id, [i for i in written_ids if i], "edited")
+        _run_generators(
+            target,
+            _unique(applied.tables),
+            touched,
+            timeout_sec,
+            None if limits is None else limits.respond_by,
+        )
+        seen.record_activity(key, source.id, [i for i in applied.ids if i], "edited")
         return WriteResult(applied=True, results=results)
+
+
+@dataclass
+class _Applied:
+    """操作を順に当てた結果（行・失敗・書いた文書の ID と種類の行）。"""
+
+    results: list[WriteResultItem] = field(default_factory=list[WriteResultItem])
+    failures: list[tuple[int, ProjectIndexError]] = field(
+        default_factory=list[tuple[int, ProjectIndexError]]
+    )
+    ids: list[str] = field(default_factory=list[str])
+    tables: list[DocumentTable] = field(default_factory=list[DocumentTable])
+
+
+def _apply_operations(
+    session: _Session,
+    checker: DocumentChecker,
+    operations: list[Operation],
+    last_reads: Mapping[str, LastRead],
+    now: datetime,
+) -> _Applied:
+    """操作を順に当てる。失敗した操作は `failed` の行にして次へ進む。"""
+    applied = _Applied()
+    created_ids: set[str] = set()
+    for index, operation in enumerate(operations):
+        try:
+            item, table = _apply_one(
+                session, checker, operation, index, last_reads, created_ids, now
+            )
+        except WriteDeadlineExceededError:
+            # 期限の超過は操作の失敗にせず、`atomic` によらず全体を止める
+            raise
+        except ProjectIndexError as error:
+            applied.failures.append((index, error))
+            applied.results.append(
+                WriteResultItem(
+                    index=index, id=operation.id, status="failed", errors=_prefixed(index, error)
+                )
+            )
+            continue
+        applied.results.append(item)
+        applied.ids.append(item.id or "")
+        applied.tables.append(table)
+    return applied
 
 
 def _writable(table: DocumentTable, path: str) -> DocumentTable:
@@ -565,10 +814,12 @@ def _apply_create_one(
     table = _writable(session.target.source.table(operation.kind), "kind")
     operation = expand_array_keys(operation, table, None, index=index)
     operation = to_columns(operation, table, index=index)
+    _check_body(operation, table, None)
     doc_id = _new_id(
         session, operation, table, resolve_metadata(operation.data or {}, table), created_ids
     )
     path, text, appended = _apply_create(session, operation, table, doc_id, now)
+    body = _create_body(session, operation, table, path, index)
     # 配列へ追加した文書は、配列の末尾の要素
     index_in_file = (
         len(_records(load_roundtrip(text), table.records or "")) - 1 if appended else None
@@ -583,6 +834,7 @@ def _apply_create_one(
         doc_id=doc_id,
         new=True,
         previous=None,
+        bodies=body,
     )
     created_ids.add(document.id)
     return (
@@ -591,7 +843,7 @@ def _apply_create_one(
             id=document.id,
             status="created",
             version=document.version,
-            diff=diff_lines("", document.body),
+            diff=_diff(None, document, body),
             unchecked=unchecked,
         ),
         table,
@@ -621,6 +873,13 @@ def _apply_existing_one(
         msg = "操作に expected_version がありません"
         raise RuntimeError(msg)
     check_version(existing, operation.expected_version, last_read=last_reads.get(existing.id))
+    _check_body(operation, table, existing)
+    new_body = (
+        apply_body(existing.body, operation, index=index)
+        if existing.body_path is not None
+        else None
+    )
+    body = {} if existing.body_path is None or new_body is None else {existing.body_path: new_body}
     path, text = _apply_existing(session, operation, existing, table, now)
     new_document, unchecked = _check_and_commit(
         session,
@@ -632,6 +891,7 @@ def _apply_existing_one(
         doc_id=None,
         new=False,
         previous=existing.data,
+        bodies=body,
     )
     return (
         WriteResultItem(
@@ -639,7 +899,7 @@ def _apply_existing_one(
             id=new_document.id,
             status="updated" if operation.op == "update" else "replaced",
             version=new_document.version,
-            diff=diff_lines(existing.body, new_document.body),
+            diff=_diff(existing, new_document, body),
             unchecked=unchecked,
         ),
         table,
@@ -672,11 +932,13 @@ def _unlink(session: _Session, referrer: Document, removed: set[str]) -> tuple[s
     column = _related_column(table)
     text = session.text(referrer.path)
     current, container = _content_for(table, text, referrer, referrer.path)
-    rows = get_field(current, column)
-    if not is_list(rows):
+    arrays = field_arrays(current, column)
+    if not arrays:
         msg = "related の列が配列ではありません"
         raise RuntimeError(msg)
-    rows[:] = [row for row in rows if not _points_to(row, removed)]
+    # `**.` の列名では、最上位と入れ子の全ての配列から除く
+    for rows in arrays:
+        rows[:] = [row for row in rows if not _points_to(row, removed)]
     return referrer.path, _finish(table, current, container, referrer)
 
 
@@ -698,6 +960,26 @@ def _remove_documents(session: _Session, documents: list[Document]) -> None:
         file_map = load_roundtrip(session.text(document.path), file=document.path)
         del _records(file_map, table.records)[document.record_index or 0]
         session.commit(document.path, dump_roundtrip(file_map), table)
+    _remove_bodies(session, [document for document in records if document.body_path is not None])
+
+
+def _remove_bodies(session: _Session, documents: list[Document]) -> None:
+    """消した要素の本文のファイルを、同じ管理用の YAML の残る要素が指していなければ消す。"""
+    source = session.target.source
+    for document in documents:
+        table = source.table(document.kind)
+        if table.records is None or table.body_file is None or document.body_path is None:
+            continue
+        file_map = load_roundtrip(session.text(document.path), file=document.path)
+        remaining = {
+            resolve_body_path(
+                document.path, get_field(cast("Mapping[str, Any]", row), table.body_file)
+            )
+            for row in _records(file_map, table.records)
+            if is_dict(row)
+        }
+        if document.body_path not in remaining and session.body_exists(document.body_path):
+            session.bodies[document.body_path] = None
 
 
 def _delete_target(
@@ -739,7 +1021,7 @@ def _apply_unlinks(
         changed = _new_document(
             session.build(path, text, table), referrer.record_index, referrer.id
         )
-        violations = checker.check(target, changed, on="write")
+        violations = checker.check(target, changed, on="write", deadline=session.deadline)
         if violations:
             raise ValidationFailedError(
                 message=f"検査に通らない操作があります: {len(violations)} 件",
@@ -756,6 +1038,7 @@ def delete_docs(
     checker: DocumentChecker,
     locks: SourceLocks,
     timeout_sec: float,
+    limits: CallLimits | None = None,
 ) -> DeleteResult:
     """`delete_docs` の要求を処理して削除の結果を返す。"""
     if not 1 <= len(request.targets) <= OPERATIONS_MAX:
@@ -773,7 +1056,9 @@ def delete_docs(
     )
     source = target.source
     with locks.hold(source.id):
-        session = _Session(store, target)
+        session = _Session(
+            store, target, deadline=None if limits is None else limits.write_deadline
+        )
         leaving = {item.id for item in request.targets}
         results: list[WriteResultItem] = []
         failures: list[tuple[int, ProjectIndexError]] = []
@@ -801,6 +1086,7 @@ def delete_docs(
         unlinked = [(referrer_id, session.docs[referrer_id].version) for referrer_id in unlink_plan]
         if request.dry_run or not accepted:
             return DeleteResult(applied=False, results=results, unlinked=unlinked)
+        _check_before_write(limits)
         _remove_documents(session, accepted)
         touched = session.write_pending()
         _run_generators(
@@ -808,5 +1094,6 @@ def delete_docs(
             _unique([source.table(d.kind) for d in accepted]),
             touched,
             timeout_sec,
+            None if limits is None else limits.respond_by,
         )
         return DeleteResult(applied=True, results=results, unlinked=unlinked)

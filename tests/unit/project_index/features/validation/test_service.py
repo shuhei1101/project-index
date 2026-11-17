@@ -18,6 +18,9 @@ from project_index.features.sources.types import (
 from project_index.features.validation import service as service_module
 from project_index.features.validation.markdown import MarkdownCheck
 from project_index.features.validation.service import DocumentChecker
+from project_index.integrations.scripts import ScriptTimeoutError
+from project_index.shared.deadline import Deadline
+from project_index.shared.errors import WriteDeadlineExceededError
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
@@ -254,3 +257,97 @@ def test_document_checker_check_markdown_when_unchanged(
     # 検証
     assert result == MarkdownCheck(violations=[], unchecked=[])
     assert calls == []
+
+
+class _Clock:
+    """テストが進める時計。"""
+
+    def __init__(self, now: float) -> None:
+        self.now = now
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def test_document_checker_check_when_deadline_capped(
+    make_checked_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """期限までの残りの時間でスクリプトを止める（異常系）。"""
+    # 準備
+    clock = _Clock(0)
+    received: list[float] = []
+
+    def stopping(run: Any, **kwargs: Any) -> Any:
+        received.append(kwargs["timeout_sec"])
+        clock.now = 3
+        raise ScriptTimeoutError(
+            list(run), "制限時間（2 秒）を超えたため、スクリプトを止めました。"
+        )
+
+    monkeypatch.setattr(service_module, "run_script", stopping)
+    target = make_checked_target(
+        [ScriptEntry(id="v", run=_script([]), on=["write"])], row_validators=["v"]
+    )
+    checker = DocumentChecker(_checker({}).store, timeout_sec=30)
+    deadline = Deadline(limit_sec=2, started=0, clock=clock)
+    # 実行・検証
+    with pytest.raises(WriteDeadlineExceededError, match="書き込みの期限"):
+        checker.check(target, make_document(), on="write", deadline=deadline)
+    assert received == [2]
+
+
+def test_document_checker_check_when_deadline_passed(
+    make_checked_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """期限を過ぎた後はスクリプトを動かさない（異常系）。"""
+    # 準備
+    calls: list[Any] = []
+
+    def counting(run: Any, **kwargs: Any) -> Any:
+        calls.append(run)
+        raise AssertionError
+
+    monkeypatch.setattr(service_module, "run_script", counting)
+    target = make_checked_target(
+        [ScriptEntry(id="v", run=_script([]), on=["write"])], row_validators=["v"]
+    )
+    deadline = Deadline(limit_sec=0, started=0, clock=_Clock(0))
+    # 実行・検証
+    with pytest.raises(WriteDeadlineExceededError, match="書き込みの期限"):
+        _checker({}).check(target, make_document(), on="write", deadline=deadline)
+    assert calls == []
+
+
+def test_document_checker_check_when_script_timed_out(
+    make_checked_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`script_timeout_sec` で止めたスクリプトは違反（正常系）。"""
+    # 準備
+    clock = _Clock(0)
+
+    def stopping(run: Any, **kwargs: Any) -> Any:
+        clock.now = 1
+        raise ScriptTimeoutError(
+            list(run), "制限時間（1 秒）を超えたため、スクリプトを止めました。"
+        )
+
+    monkeypatch.setattr(service_module, "run_script", stopping)
+    target = make_checked_target(
+        [ScriptEntry(id="v", run=_script([]), on=["write"])], row_validators=["v"]
+    )
+    checker = DocumentChecker(_checker({}).store, timeout_sec=1)
+    deadline = Deadline(limit_sec=30, started=0, clock=clock)
+    # 実行
+    result = checker.check(target, make_document(), on="write", deadline=deadline)
+    # 検証
+    assert len(result) == 1
+    assert (
+        result[0].rule
+        == "v: 検査を実行できませんでした（制限時間（1 秒）を超えたため、スクリプトを止めました。）"
+    )

@@ -33,6 +33,7 @@ from project_index.features.sources.types import (
     ServedSource,
     SourceConfig,
     SourceStatus,
+    StorageType,
 )
 from project_index.integrations.git import is_ignored, main_repo_root
 from project_index.integrations.git import repo_root as git_repo_root
@@ -514,6 +515,7 @@ def assemble_source(
     outside_read: bool = True,
     root_override: Path | None = None,
     lookup: SchemaRefLookup | None = None,
+    storage: StorageType | None = None,
 ) -> tuple[ServedSource | None, SourceConfig | None, list[Violation]]:
     """設定を読み、マージ・検証・スクリプトの確かめをして、配信中の配信元を作る。"""
     return _assemble(
@@ -524,7 +526,40 @@ def assemble_source(
         outside_read=outside_read,
         root_override=root_override,
         lookup=lookup,
+        storage=storage,
     )
+
+
+def _entry_default_ref_config(first: Path, storage: StorageType | None) -> tuple[str, str] | None:
+    """行の読み書きの方法に従い、`default_ref` のリビジョンの先頭の設定を読む。"""
+    # disk の行は Git を参照しないので、default_ref の設定を読まない
+    if storage == "disk":
+        return None
+    return read_default_ref_config(first)
+
+
+def _entry_storage_violations(violations: list[Violation], index: int) -> list[Violation]:
+    """読み書きの方法の違反を、端末の設定の行のキーのパスにする。"""
+    return [
+        Violation(path=f"sources[{index}].{item.path}", rule=item.rule, fix=item.fix)
+        if item.path == "storage.type"
+        else item
+        for item in violations
+    ]
+
+
+def _storage_top(root: Path, storage: StorageType | None) -> tuple[Path | None, list[Violation]]:
+    """読み書きの方法から、Git のリポジトリの直下（Git を参照しないときは None）を決める。"""
+    # disk は Git の作業ツリーの中でも Git を参照しない
+    if storage == "disk":
+        return None, []
+    top = git_repo_root(root)
+    # git を指定したのに Git の作業ツリーの外のフォルダ
+    if storage == "git" and top is None:
+        return None, [
+            Violation(path="storage.type", rule="フォルダが Git の作業ツリーの中にありません")
+        ]
+    return top, []
 
 
 def _assemble(
@@ -537,13 +572,16 @@ def _assemble(
     root_override: Path | None = None,
     at: tuple[str, str] | None = None,
     lookup: SchemaRefLookup | None = None,
+    storage: StorageType | None = None,
 ) -> tuple[ServedSource | None, SourceConfig | None, list[Violation]]:
     """配信元の組み立て。`at` は（`default_ref` の commit, そのリビジョンの先頭の設定の内容）。"""
     values, violations = _read_configs(files, at[1] if at else None)
     if violations:
         return None, None, violations
     root = root_override or files[0].parent
-    top = git_repo_root(root)
+    top, violations = _storage_top(root, storage)
+    if violations:
+        return None, None, violations
     commit = at[0] if at and top is not None else None
     read_text = _commit_reader(root, top, commit) if top and commit else _disk_reader(root)
     merged = merge_configs(values)
@@ -572,12 +610,14 @@ def _assemble(
         repo_root=top,
         scope_read=list(scope_read),
         scope_write=list(scope_write) if scope_write else [str(root)],
-        worktree_globs=_worktree_globs(config.worktrees, base),
+        # disk は worktrees を使用しない
+        worktree_globs=[] if storage == "disk" else _worktree_globs(config.worktrees, base),
         schemas=schemas,
         main_root=main_root,
         config_commit=commit,
         outside_read=outside_read,
         config_dir=PurePosixPath(root.relative_to(docs_root).as_posix()),
+        storage=storage,
     )
     return served, config, []
 
@@ -631,8 +671,9 @@ def load_source(
             id=fallback_id, index=index, status="disabled", config=config_files
         )
     files = [Path(item).expanduser() for item in entry.config]
+    storage = entry.storage.type if entry.storage is not None else None
     try:
-        at = read_default_ref_config(files[0])
+        at = _entry_default_ref_config(files[0], storage)
     except ValidationFailedError as error:
         _log_violations(fallback_id, error.violations)
         return None, SourceStatus(
@@ -650,7 +691,9 @@ def load_source(
         outside_read=entry.outside_read,
         at=at,
         lookup=lookup,
+        storage=storage,
     )
+    violations = _entry_storage_violations(violations, index)
     source_id = entry.id or (config.name if config else fallback_id)
     if violations:
         _log_violations(source_id, violations)

@@ -86,6 +86,12 @@ constants:
     usecase: 共通
     summary: 文書の MCP の instructions 全体の字数の上限（インターフェース定義『起動』の制約「MCP の文の出どころ」）
     value: '4096'
+  - name: TOOL_RESPONSE_LIMIT_SEC
+    title: 文書の MCP の応答の上限
+    container: project_index/server/mcp/docs.py
+    usecase: 共通
+    summary: 要求を受けてから応答を返すまでの上限（秒）。書き込み後の生成の制限時間を切り詰める
+    value: 非機能要件の `tool_response_limit` の決定値
 classes:
   - name: DocsMCPServer
     title: 接続ごとに instructions を描く文書の MCP
@@ -166,12 +172,14 @@ functions:
          - 今のツールの説明（`search_docs`・`write_docs`・`list_changes` の引数の説明の文と `trace_related` の説明を含む）は、削らずに各ツールの YAML へ移す
          - 引数の型の誤り・`Literal` に無い値は、SDK が関数を呼ぶ前に `isError` の結果にする。入力のスキーマに無いキーは SDK が捨てる
       3. 各ツールは次の順で処理する
+         - 要求を受けた時刻を `time.monotonic()` で記録し、呼び出しの期限（`write_deadline` は `limit_sec` が `handlers.terminal.write_deadline_sec`、`respond_by` は `TOOL_RESPONSE_LIMIT_SEC`）を作る
          - 引数で要求のモデル（`SearchRequest` など）を作る
          - 要求が指す配信元を決め（指す配信元の決定）、`await handlers.registry.wait_for(...)` でその行の読み込みだけを待つ（初期化とツールの一覧は待たない）
-         - サービスを `asyncio.to_thread` で呼ぶ（引数は `handlers` の属性）
+         - `search_docs`・`write_docs`・`delete_docs` の場合、ワークツリーの読み込みの待ちを await する
+         - サービスを `asyncio.to_thread` で呼ぶ（引数は `handlers` の属性。`write_docs`・`delete_docs` は `limits` に呼び出しの期限）
          - `write_docs`・`delete_docs` の結果の `applied` が `True` の場合、`cwd` から書ける配信元を裏で検査し直す（配信元の検査のキャッシュ.裏での検査の流し直し）
          - 結果をツールの結果にする（`write_docs`・`delete_docs` の `render` は `None`。`search_docs` は `functools.partial(render_search_markdown, source_label=result.source_label)`、`list_changes` は `functools.partial(render_changes_markdown, source_label=request.source or "作業中の配信元")`、`list_match_words` は用語の一覧の文を渡す）
-         - `ProjectIndexError` と `pydantic.ValidationError` はツールのエラーの変換の `CallToolResult(is_error=True)` をそのまま返す。それ以外の例外は `[error]` ツールの処理に失敗した（ツール名・例外）を書いて MCP の既定に任せる
+         - `ProjectIndexError` と `pydantic.ValidationError` はツールのエラーの変換の `CallToolResult(is_error=True)` をそのまま返す。それ以外の例外（`asyncio.CancelledError` を除く）は `[error]` ツールの処理に失敗した（ツール名・例外のトレースバック）を書き、想定外の例外の変換の結果を返す
       4. 作った MCP を返す
     unit_tests:
       - name: test_build_docs_mcp
@@ -210,6 +218,18 @@ functions:
         condition: '`SourceRegistry(loading=True)` のまま `search_docs(source="sample")` を 13 本並べて呼び、`tools/list` を呼ぶ。その後 `reload` する'
         mock: なし（一時フォルダの配信元）
         expected: '`reload` の前に `tools/list` が答え、`search_docs` はまだ答えない（既定の executor のスレッドを使っていない）。`reload` の後に 13 本とも結果を返す'
+      - name: test_build_docs_mcp_when_unexpected_error
+        case: 正常
+        summary: 想定外の例外を isError にする
+        condition: サービスが `GitError` を送る
+        mock: '`search_docs`（送る偽物）'
+        expected: '`isError` が `True`、text が `UnexpectedError: GitError:` で始まり、ログに `ツールの処理に失敗した（search_docs）` とトレースバック'
+      - name: test_build_docs_mcp_when_limits
+        case: 正常
+        summary: 書き込みに呼び出しの期限を渡す
+        condition: '`write_deadline_sec=32` の端末の設定で `write_docs` を呼ぶ'
+        mock: '`write_docs`（受けた `limits` を記録する偽物）'
+        expected: '`limits.write_deadline.limit_sec` が 32、`limits.respond_by.limit_sec` が `TOOL_RESPONSE_LIMIT_SEC`'
   - name: _docs_instructions
     title: 文書の MCP の instructions の描画
     kind: 関数
@@ -287,6 +307,83 @@ functions:
         condition: '`SearchRequest(source="a")`・`SearchRequest(source=["a", "*"])`・`DescribeRequest(outside_scope=True)`・`WriteRequest(cwd="/w/a", operations=[])`・`DescribeRequest()`'
         mock: なし
         expected: '`{"ids": ["a"]}`・`{"every": True}`・`{"every": True}`・`{"cwd": "/w/a"}`・`{}`'
+  - name: _ensure_worktree
+    title: ワークツリーの読み込みの待ち
+    kind: 関数
+    container: project_index/server/mcp/docs.py
+    usecase: 読み取り
+    role: 待ち
+    summary: '`search_docs`・`write_docs`・`delete_docs` が指すワークツリーの初めての読み込みを上限まで待ち、終わらなければ読み込み中のエラーを送る'
+    scope: internal
+    is_async: true
+    args:
+      - name: request
+        title: 要求
+        type: SearchRequest | WriteRequest | DeleteRequest
+        required: true
+        passing: positional
+        description: '`source`・`worktree`・`cwd`・`ref`（`SearchRequest` だけ）を使う'
+      - name: handlers
+        title: 配線済みの関数
+        type: Handlers
+        required: true
+        passing: injected
+        description: '`registry`・`store`・`terminal.worktree_load_wait_sec` を使う'
+      - name: loads
+        title: 読み込み中のタスク
+        type: dict[Path, asyncio.Task[object]]
+        required: true
+        passing: injected
+        description: 文書の MCP の組み立てが 1 つ作り、ワークツリーのパスごとに読み込みのタスクを持つ（イベントループの中だけで触る）
+    returns:
+      type: None
+      description: '-'
+    process: |-
+      1. `request.ref` がある場合、何もしない
+      2. `asyncio.to_thread` で場所を解く。`SearchRequest` は権限と作業場所の『読む場所の解決』を `source`・`worktree`・`cwd`・`outside_scope` で、`WriteRequest`・`DeleteRequest` は『書く場所の解決』を `source`・`worktree`・`cwd` で呼ぶ。場所を解けない（`ProjectIndexError`）、場所が 1 つでない、または `worktree` が `None` なら何もしない（解けないときは、サービスが同じ解決で同じエラーを返す）
+      3. 文書のストア.ワークツリーを読み込んだかが `True` なら何もしない
+      4. `loads` にそのワークツリーの終わっていないタスクが無ければ、`asyncio.to_thread(handlers.store.load, 読む場所)` のタスクを作って入れ、終わったら `loads` から除くコールバックを付ける
+      5. `async with asyncio.timeout(handlers.terminal.worktree_load_wait_sec)` の中でタスクを `asyncio.shield` で包んで await する
+         - `TimeoutError` の場合、タスクは止めずに `WorktreeLoadingError`（`worktree` はワークツリーのパス）を送る
+           - `[info]` ワークツリーを読み込み中のため待たずに返した（配信元・ワークツリー・秒数）
+         - タスクが送った例外はそのまま伝わる
+    exceptions:
+      - name: WorktreeLoadingError
+        condition: 初めての読み込みが `worktree_load_wait_sec` までに終わらない
+        message: '`{ワークツリーのパス} を読み込み中です`'
+    unit_tests:
+      - name: test_ensure_worktree
+        case: 正常
+        summary: 初めての読み込みを待つ
+        condition: 読み込んでいないワークツリー x を指す要求。`load` はすぐ終わる
+        mock: 文書のストア（`has_worktree` が `False`、`load` の呼ばれた回数を記録する偽物）
+        expected: 何も送らず、`load` が 1 回呼ばれ、`loads` が空になる
+      - name: test_ensure_worktree_when_loaded
+        case: 正常
+        summary: 読み込み済みのワークツリーは待たない
+        condition: '`has_worktree` が `True`'
+        mock: 文書のストア（偽物）
+        expected: '`load` が呼ばれない'
+      - name: test_ensure_worktree_when_slow
+        case: 異常
+        summary: 上限までに終わらない読み込み
+        condition: '`worktree_load_wait_sec=1`、`load` が外から合図するまで終わらない。同じワークツリーの要求を 2 つ続けて送り、合図した後に 3 つ目を送る'
+        mock: 文書のストア（`load` を合図まで止める偽物）
+        expected: 1 つ目と 2 つ目が `WorktreeLoadingError`、`load` は 1 回だけ呼ばれる。3 つ目は何も送らない
+        exception: 初めての読み込みが `worktree_load_wait_sec` までに終わらない
+      - name: test_ensure_worktree_when_write
+        case: 異常
+        summary: 書き込みでも初めての読み込みを上限まで待つ
+        condition: '`worktree_load_wait_sec=1`、`load` が外から合図するまで終わらない。ワークツリー x を指す `WriteRequest`'
+        mock: 文書のストア（`load` を合図まで止める偽物）
+        expected: '`WorktreeLoadingError`、`load` に渡った場所が書く場所の解決の結果'
+        exception: 初めての読み込みが `worktree_load_wait_sec` までに終わらない
+      - name: test_ensure_worktree_when_unresolved
+        case: 正常
+        summary: 場所を解けない要求は待たずにサービスへ渡す
+        condition: '配信元の無い配信元の一覧で、`source: sample` の `SearchRequest`'
+        mock: 文書のストア（呼ばれた回数を記録する偽物）
+        expected: 何も送らず、`has_worktree`・`load` が呼ばれない
 refs:
   - IF-2#
   - IF-6#

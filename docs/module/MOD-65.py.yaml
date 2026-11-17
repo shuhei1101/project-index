@@ -66,9 +66,9 @@ functions:
       - name: test_build_settings_router_when_put
         case: 正常
         summary: 保存して状態を返す
-        condition: 'PUT `/settings/sources` を `Sec-Fetch-Site: same-origin` で'
+        condition: 'PUT `/settings/sources` を `Sec-Fetch-Site: same-origin` で、`expectedVersion` を添えて'
         mock: 配線済みの関数（`save_sources` が状態を返す偽物）
-        expected: 200 で `sources[].status`。`save_sources` に送った行が渡る
+        expected: 200 で `sources[].status`。`save_sources` に送った行と `expected_version` が渡る
       - name: test_build_settings_router_when_pending_reload
         case: 正常
         summary: 読み直していない行を pending_reload で返す
@@ -84,7 +84,7 @@ functions:
       - name: test_build_settings_router_when_post
         case: 正常
         summary: 1 行を追加して 201、同じ id は 409
-        condition: 'POST `/settings/sources` を `Origin` なしで 2 回（2 回目は同じ id）'
+        condition: 'POST `/settings/sources` を `Origin` なしで、`expectedVersion` を添えて 2 回（2 回目は同じ id）'
         mock: 配線済みの関数（`add_source` が `added`・`exists` を返す偽物）
         expected: 1 回目は 201 で `result` が `added`、2 回目は 409 で `result` が `exists` と `same`
       - name: test_build_settings_router_when_get_version
@@ -117,6 +117,12 @@ functions:
         condition: 端末の設定の最上位に `mindstella` を持ち、GET・PUT・POST `/settings/sources` と PATCH・DELETE `/settings/sources/a` を送る
         mock: 配線済みの関数（偽物。`handlers.terminal.unknown_keys` は `["mindstella"]`）
         expected: '5 つの応答の `warnings` が `[{"path": "mindstella", "reason": UNKNOWN_KEY_REASON}]`'
+      - name: test_build_settings_router_when_write_without_version
+        case: 異常
+        summary: 保存・1 行の追加に expectedVersion が無い
+        condition: PUT・POST `/settings/sources` を `Origin` なしで、`expectedVersion` を含めずに送る
+        mock: 配線済みの関数（`save_sources`・`add_source` の呼ばれた数を数える偽物）
+        expected: どちらも 400 で `errors[]` に `expectedVersion` があり、`save_sources`・`add_source` は呼ばれない
 refs:
   - IF-30#
   - IF-31#

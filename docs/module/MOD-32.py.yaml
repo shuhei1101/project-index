@@ -49,6 +49,12 @@ classes:
         type: dict[Path, threading.Lock]
         access: 内部 (_)
         description: 同じ commit の書き出しを 1 回にする
+      - name: _background
+        title: 裏の書き出しの数
+        type: int
+        access: 内部 (_)
+        default: '0'
+        description: 裏の書き出しの開始が起こして終えていないスレッドの数。`_guard` で読み書きする
     methods:
       - name: checkout
         title: 書き出す
@@ -77,6 +83,7 @@ classes:
           1. 書き出し先があれば更新日時を今にして返す
           2. commit ごとの排他を取り、取った後にもう一度書き出し先を確かめる
           3. `{commit}.tmp` を空にして作り、`git archive --format=tar {commit}` を `timeout=GIT_ARCHIVE_TIMEOUT_SEC` で呼び、出力を `tarfile`（`filter="data"`）で展開する（gitの実行）
+             - `GitError` が待ち時間の上限を超えたもの（`timed_out`）の場合、`{commit}.tmp` を削除して `RevisionExportTimeoutError`（`operation="revision_export"`・`commit`・`limit_sec=GIT_ARCHIVE_TIMEOUT_SEC`）を送る
           4. `{commit}.tmp` を `{commit}` に名前を変える
              - `[info]` リビジョンを書き出した（リポジトリ・commit・ファイル数）
           5. リポジトリの書き出しが `keep` を超えたら、更新日時が古いものから `shutil.rmtree` する（今書き出したものは残す）
@@ -86,6 +93,10 @@ classes:
             condition: '`git archive` が失敗する'
             message: git の標準エラー
             notes: '`{commit}.tmp` を削除してから伝える'
+          - name: RevisionExportTimeoutError
+            condition: '`git archive` が待ち時間の上限を超えた（`GitError` の `timed_out`）'
+            message: リビジョンの書き出し（{commit}）が {limit_sec} 秒を超えたため止めました
+            notes: '`{commit}.tmp` を削除してから送る'
         unit_tests:
           - name: test_snapshot_store_checkout
             case: 正常
@@ -111,6 +122,67 @@ classes:
             condition: '`keep=2` で 3 つの commit を順に'
             mock: なし
             expected: 最初の commit のフォルダが無く、後の 2 つが残る
+          - name: test_snapshot_store_checkout_when_timed_out
+            case: 異常
+            summary: 待ち時間の上限を超えたら止めた処理と理由を送る
+            condition: 1 つの commit を持つ一時リポジトリ
+            mock: gitの実行（`archive` のとき `timed_out` の `GitError` を送る）
+            expected: '`RevisionExportTimeoutError`（`operation` が `revision_export`、`commit` が渡した commit、`limit_sec` が `GIT_ARCHIVE_TIMEOUT_SEC`）。`{commit}` も `{commit}.tmp` も残らない'
+            exception: '`git archive` が待ち時間の上限を超えた'
+      - name: checkout_later
+        title: 裏の書き出しの開始
+        kind: メソッド
+        summary: 渡したスレッドの終了を待ってから、渡した commit を裏のスレッドで順に書き出し、待たずに戻る
+        scope: public
+        thread_safe: true
+        side_effects: daemon のスレッドを 1 つ起こす。`dir` の下にフォルダを作る
+        args:
+          - name: targets
+            title: 書き出す commit
+            type: list[tuple[Path, str]]
+            required: true
+            passing: positional
+            description: リポジトリの直下と commit の組の並び
+          - name: after
+            title: 先に終えるスレッド
+            type: Sequence[threading.Thread]
+            required: false
+            default: ()
+            passing: keyword
+            description: 書き出しの前に `join` するスレッド（配信元の検査）
+        returns:
+          type: threading.Thread
+          description: 起こしたスレッド（テストが join する）
+        process: |-
+          1. `_guard` を取り、裏の書き出しの数を 1 つ進める
+          2. 次を実行する daemon のスレッド（名前 `project-index-revision-export`）を起こして返す
+             - `after` のスレッドを全て `join` する
+             - `targets` を順に書き出す（書き出す）
+               - `RevisionExportTimeoutError`・`GitError` の場合、`[warning]` 裏のリビジョンの書き出しを止めた（リポジトリ・commit・理由）を書き、次の commit へ進む
+             - 最後に `_guard` を取り、裏の書き出しの数を 1 つ戻す（例外のときも）
+        unit_tests:
+          - name: test_snapshot_store_checkout_later
+            case: 正常
+            summary: 先のスレッドの後に裏で書き出す
+            condition: 合図まで止まるスレッドを `after` に渡し、一時リポジトリの commit 1 つを書き出す
+            mock: なし（一時フォルダで `git init`）
+            expected: 合図の前は書き出しが無く `exporting` が `True`。合図の後に返ったスレッドを join すると書き出しがあり `exporting` が `False`
+          - name: test_snapshot_store_checkout_later_when_timed_out
+            case: 正常
+            summary: 上限で止まった書き出しを飛ばして次へ進む
+            condition: commit 2 つのうち 1 つ目の `archive` が上限を超える
+            mock: gitの実行（指定の commit の `archive` のとき `timed_out` の `GitError` を送る）
+            expected: join の後、2 つ目の書き出しだけがあり、`caplog` に `warning` の行が 1 件で `exporting` が `False`
+      - name: exporting
+        title: 書き出しの最中
+        kind: メソッド
+        summary: 裏の書き出しが終わっていないかを返す（`property`）
+        scope: public
+        thread_safe: true
+        returns:
+          type: bool
+          description: 裏の書き出しの数が 1 以上なら `True`
+        process: 1. `_guard` を取り、裏の書き出しの数が 0 より大きいかを返す
 constants:
   - name: SNAPSHOT_KEEP
     title: 残す書き出しの数

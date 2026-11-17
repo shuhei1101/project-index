@@ -22,6 +22,7 @@ from project_index.features.sources.types import (
 )
 from project_index.features.validation.markdown import MarkdownCheck, UncheckedKey
 from project_index.features.validation.service import DocumentChecker
+from project_index.features.write import service as write_service
 from project_index.features.write.locks import SourceLocks
 from project_index.features.write.service import check_version, delete_docs, write_docs
 from project_index.features.write.types import (
@@ -29,9 +30,11 @@ from project_index.features.write.types import (
     DeleteResult,
     DeleteTarget,
     Operation,
+    TextEdit,
     WriteRequest,
     WriteResult,
 )
+from project_index.shared.deadline import CallLimits, Deadline
 from project_index.shared.errors import (
     DeleteNotAllowedError,
     DocumentReferencedError,
@@ -39,6 +42,7 @@ from project_index.shared.errors import (
     ValidationFailedError,
     VersionMismatchError,
     Violation,
+    WriteDeadlineExceededError,
 )
 from project_index.shared.hashing import content_hash, value_hash
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
@@ -73,7 +77,11 @@ class WriteEnv:
     clone: Path
     worktree: Path
 
-    def write(self, now: datetime | None = None, **request: Any) -> WriteResult:
+    def write(
+        self, now: datetime | None = None, limits: CallLimits | None = None, **request: Any
+    ) -> WriteResult:
+        # 期限を渡すテストだけ `limits` を渡す
+        extra: dict[str, Any] = {} if limits is None else {"limits": limits}
         return write_docs(
             WriteRequest(cwd=str(self.worktree), **request),
             registry=self.registry,
@@ -83,9 +91,12 @@ class WriteEnv:
             locks=self.locks,
             timeout_sec=10,
             now=now,
+            **extra,
         )
 
-    def delete(self, **request: Any) -> DeleteResult:
+    def delete(self, limits: CallLimits | None = None, **request: Any) -> DeleteResult:
+        # 期限を渡すテストだけ `limits` を渡す
+        extra: dict[str, Any] = {} if limits is None else {"limits": limits}
         return delete_docs(
             DeleteRequest(cwd=str(self.worktree), **request),
             registry=self.registry,
@@ -93,6 +104,7 @@ class WriteEnv:
             checker=self.checker,
             locks=self.locks,
             timeout_sec=10,
+            **extra,
         )
 
 
@@ -468,6 +480,160 @@ def test_write_docs_when_mdmark_unavailable(
     assert previous == [{"id": "doc-1", "name": "文書 1"}, {"id": "doc-2", "name": "文書 2"}]
 
 
+NOTES = "items:\n  - id: n1\n    path: n1.md\n"
+NOTE_1 = "# n1\n古い行\n"
+
+
+def _notes_table() -> DocumentTable:
+    """本文のファイルを持つ `records`・`body_file` の行を返す。"""
+    return DocumentTable(
+        id="notes",
+        paths=["notes/index.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        records="items",
+        body_file="path",
+    )
+
+
+def _notes_files() -> dict[str, str]:
+    """本文のファイルを持つ行と、`body_file` を持たない行の文書を持つ配信元のファイルを返す。"""
+    return {
+        "notes/index.yaml": NOTES,
+        "notes/n1.md": NOTE_1,
+        "docs/rule/doc-1.yaml": DOC_1,
+        "schemas/rule.schema.yaml": SCHEMA,
+    }
+
+
+def _rules_table() -> DocumentTable:
+    """`body_file` を持たない行を返す。"""
+    return DocumentTable(
+        id="rules", paths=["docs/rule/*.yaml"], schema_path="schemas/rule.schema.yaml"
+    )
+
+
+def test_write_docs_when_body_file(make_env: Callable[..., WriteEnv]) -> None:
+    """本文のファイルの作成・一部の置き換え・全体の置き換え（正常系）。"""
+    # 準備
+    env = make_env(_notes_files(), tables=[_notes_table(), _rules_table()])
+    n1_version = value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1])
+    create = Operation(
+        op="create", kind="notes", data={"id": "n2", "path": "n2.md", "@body": "本文\n"}
+    )
+    edit = Operation(
+        op="update",
+        id="n1",
+        expected_version=n1_version,
+        text_edits=[TextEdit(field="@body", old="古い行", new="新しい行")],
+    )
+    # 実行
+    created = env.write(operations=[create])
+    tried = env.write(operations=[edit], dry_run=True)
+    edited = env.write(operations=[edit])
+    n2_version = created.results[0].version
+    replaced = env.write(
+        operations=[
+            Operation(
+                op="update", id="n2", expected_version=n2_version, set={"@body": "置き換えた本文\n"}
+            )
+        ]
+    )
+    # 検証
+    index = (env.worktree / "notes/index.yaml").read_text(encoding="utf-8")
+    assert created.results[0].status == "created"
+    assert "path: n2.md" in index
+    assert "@body" not in index
+    assert "@@ notes/n1.md" in (tried.results[0].diff or "")
+    assert "新しい行" in (tried.results[0].diff or "")
+    assert edited.results[0].status == "updated"
+    assert edited.results[0].version == value_hash(
+        [{"id": "n1", "path": "n1.md"}, "# n1\n新しい行\n"]
+    )
+    assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == "# n1\n新しい行\n"
+    assert replaced.results[0].status == "updated"
+    assert (env.worktree / "notes/n2.md").read_text(encoding="utf-8") == "置き換えた本文\n"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        pytest.param("../../outside/n3.md", id="outside_source"),
+        pytest.param("n1.md", id="existing_file"),
+    ],
+)
+def test_write_docs_when_body_file_rejected(make_env: Callable[..., WriteEnv], path: str) -> None:
+    """配信元の外・既にあるファイルを指す本文のファイル（異常系）。"""
+    # 準備
+    env = make_env(_notes_files(), tables=[_notes_table(), _rules_table()])
+    operations = [
+        Operation(op="create", kind="notes", data={"id": "n3", "path": path, "@body": "本文\n"}),
+        Operation(op="create", kind="notes", data={"id": "n4", "path": "n4.md", "@body": "本文\n"}),
+    ]
+    # 実行・検証
+    with pytest.raises(ValidationFailedError) as exc_info:
+        env.write(operations=operations)
+    assert [(v.index, v.path) for v in exc_info.value.violations] == [(0, "operations[0].path")]
+    assert (env.worktree / "notes/index.yaml").read_text(encoding="utf-8") == NOTES
+    assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == NOTE_1
+    assert not (env.worktree / "notes/n4.md").exists()
+    assert not (env.clone.parent / "outside").exists()
+
+
+@pytest.mark.parametrize(
+    ("operation", "expected_path"),
+    [
+        pytest.param(
+            Operation(
+                op="update",
+                id="doc-1",
+                expected_version=content_hash(DOC_1),
+                set={"@body": "x"},
+            ),
+            "operations[0].set.@body",
+            id="no_body_file",
+        ),
+        pytest.param(
+            Operation(op="create", kind="notes", data={"id": "n2", "path": "n2.md"}),
+            "operations[0].data.@body",
+            id="create_without_body",
+        ),
+        pytest.param(
+            Operation(
+                op="update",
+                id="n1",
+                expected_version=value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1]),
+                set={"path": "other.md"},
+            ),
+            "operations[0].set.path",
+            id="body_file_column_changed",
+        ),
+        pytest.param(
+            Operation(
+                op="update",
+                id="n1",
+                expected_version=value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1]),
+                unset=["@body"],
+            ),
+            "operations[0].unset",
+            id="unset_body",
+        ),
+    ],
+)
+def test_write_docs_when_body_not_accepted(
+    make_env: Callable[..., WriteEnv], operation: Operation, expected_path: str
+) -> None:
+    """@body を受け付けない操作（異常系）。"""
+    # 準備
+    env = make_env(_notes_files(), tables=[_notes_table(), _rules_table()])
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError) as exc_info:
+        env.write(operations=[operation])
+    assert [v.path for v in exc_info.value.violations] == [expected_path]
+    assert (env.worktree / "notes/index.yaml").read_text(encoding="utf-8") == NOTES
+    assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == NOTE_1
+    assert (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
+
+
 def _with_related() -> dict[str, str]:
     """文書 1 の `related` が文書 2 を指す配信元のファイルを返す。"""
     return {
@@ -504,6 +670,40 @@ def test_delete_docs_when_unlink(make_env: Callable[..., WriteEnv]) -> None:
     assert result.unlinked == [("doc-1", content_hash(text))]
 
 
+def test_delete_docs_when_unlink_nested(make_env: Callable[..., WriteEnv]) -> None:
+    """入れ子の参照も外す（正常系）。"""
+    # 準備
+    n1 = (
+        "id: n1\nname: n1\nrefs:\n  - to: n2\n    type: references\n"
+        "  - to: n3\n    type: references\nfunctions:\n  - name: f\n"
+        "    refs:\n      - to: n2\n        type: references\n"
+    )
+    n2 = "id: n2\nname: n2\n"
+    files = {
+        "nested/n1.yaml": n1,
+        "nested/n2.yaml": n2,
+        "nested/n3.yaml": "id: n3\nname: n3\n",
+        "schemas/rule.schema.yaml": SCHEMA,
+    }
+    table = DocumentTable(
+        id="rules",
+        paths=["nested/*.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        metadata={"related": "**.refs[]"},
+    )
+    env = make_env(files, tables=[table])
+    targets = [DeleteTarget(id="n2", expected_version=content_hash(n2))]
+    # 実行
+    result = env.delete(targets=targets, on_referenced="unlink")
+    # 検証
+    text = (env.worktree / "nested/n1.yaml").read_text(encoding="utf-8")
+    data = load_yaml(text)
+    assert not (env.worktree / "nested/n2.yaml").exists()
+    assert data["refs"] == [{"to": "n3", "type": "references"}]
+    assert data["functions"][0]["refs"] == []
+    assert result.unlinked == [("n1", content_hash(text))]
+
+
 def test_delete_docs_when_records(
     make_env: Callable[..., WriteEnv],
 ) -> None:
@@ -522,14 +722,41 @@ def test_delete_docs_when_records(
         body_file="path",
     )
     env = make_env(files, tables=[table])
-    targets = [DeleteTarget(id="b", expected_version=value_hash({"id": "b", "path": "b.txt"}))]
+    targets = [
+        DeleteTarget(id="b", expected_version=value_hash([{"id": "b", "path": "b.txt"}, "b\n"]))
+    ]
     # 実行
     env.delete(targets=targets)
     # 検証
     text = (env.worktree / "data/list.yaml").read_text(encoding="utf-8")
     assert "id: a" in text
     assert "id: b" not in text
-    assert (env.worktree / "data/b.txt").exists()
+    assert not (env.worktree / "data/b.txt").exists()
+    assert (env.worktree / "data/a.txt").read_text(encoding="utf-8") == "a\n"
+
+
+def test_delete_docs_when_body_file_shared(
+    make_env: Callable[..., WriteEnv],
+) -> None:
+    """ほかの要素も指す本文のファイルを残す（正常系）。"""
+    # 準備
+    files = {
+        "notes/index.yaml": "items:\n  - id: n1\n    path: n1.md\n  - id: n3\n    path: n1.md\n",
+        "notes/n1.md": "# n1\n",
+    }
+    env = make_env(files, tables=[_notes_table()])
+    targets = [
+        DeleteTarget(
+            id="n3", expected_version=value_hash([{"id": "n3", "path": "n1.md"}, "# n1\n"])
+        )
+    ]
+    # 実行
+    env.delete(targets=targets)
+    # 検証
+    text = (env.worktree / "notes/index.yaml").read_text(encoding="utf-8")
+    assert "id: n1" in text
+    assert "id: n3" not in text
+    assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == "# n1\n"
 
 
 def test_delete_docs_when_referenced(make_env: Callable[..., WriteEnv]) -> None:
@@ -625,3 +852,95 @@ def test_write_docs_when_tags_are_objects(make_env: Callable[..., WriteEnv]) -> 
         {"name": "b"},
         {"name": "c", "main": True},
     ]
+
+
+def _limits(write_remaining: float, respond_remaining: float = 48) -> CallLimits:
+    """残りの時間を決めた呼び出しの期限を作る（時計は 0 のまま進まない）。"""
+    return CallLimits(
+        write_deadline=Deadline(limit_sec=write_remaining, started=0, clock=lambda: 0),
+        respond_by=Deadline(limit_sec=respond_remaining, started=0, clock=lambda: 0),
+    )
+
+
+def test_write_docs_when_deadline_passed(make_env: Callable[..., WriteEnv]) -> None:
+    """置き換える前に期限を過ぎている（異常系）。"""
+    # 準備
+    env = make_env()
+    operation = Operation(
+        op="update", id="doc-1", expected_version=content_hash(DOC_1), set={"name": "新しい名前"}
+    )
+    # 実行・検証
+    with pytest.raises(WriteDeadlineExceededError, match="書き込みの期限"):
+        env.write(operations=[operation], session_id="s1", limits=_limits(0))
+    assert (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
+    assert env.seen.activity(SessionKey.of("s1", None), "sample") == []
+
+
+def test_write_docs_when_deadline_passed_not_atomic(
+    make_env: Callable[..., WriteEnv], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`atomic: false` でも期限の超過は全体を止める（異常系）。"""
+    # 準備
+    env = make_env()
+
+    def _passed(target: Target, document: Document, **kwargs: Any) -> list[Violation]:
+        raise WriteDeadlineExceededError(
+            message="書き込みの期限（32 秒）を超えたため、ファイルを書き換えずに止めました（経過 33.0 秒）",
+            deadline_sec=32,
+            elapsed_sec=33.0,
+        )
+
+    monkeypatch.setattr(env.checker, "check", _passed)
+    operations = [
+        Operation(
+            op="update", id="doc-1", expected_version=content_hash(DOC_1), set={"name": "一"}
+        ),
+        Operation(
+            op="update", id="doc-2", expected_version=content_hash(DOC_2), set={"name": "二"}
+        ),
+    ]
+    # 実行・検証
+    with pytest.raises(WriteDeadlineExceededError, match="書き込みの期限"):
+        env.write(operations=operations, atomic=False, limits=_limits(30))
+    assert (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
+    assert (env.worktree / "docs/rule/doc-2.yaml").read_text(encoding="utf-8") == DOC_2
+
+
+def test_write_docs_when_no_time_for_generators(
+    make_env: Callable[..., WriteEnv], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """応答の上限まで時間が無ければ生成を動かさない（正常系）。"""
+    # 準備
+    calls: list[Any] = []
+
+    def counting(run: Any, **kwargs: Any) -> Any:
+        calls.append(run)
+        raise AssertionError
+
+    monkeypatch.setattr(write_service, "run_script", counting)
+    generators = [ScriptEntry(id="index", run=[sys.executable, "-c", "pass"])]
+    table = DocumentTable(
+        id="rules",
+        paths=["docs/rule/*.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        after_write=["index"],
+    )
+    env = make_env(tables=[table], generators=generators, ids_format="{kind}-{slug}")
+    operation = Operation(op="create", kind="rules", data={"name": "Doc Three"})
+    # 実行
+    result = env.write(operations=[operation], limits=_limits(30, 0))
+    # 検証
+    assert result.applied is True
+    assert (env.worktree / "docs/rule/rules-doc-three.yaml").exists()
+    assert calls == []
+
+
+def test_delete_docs_when_deadline_passed(make_env: Callable[..., WriteEnv]) -> None:
+    """消す前に期限を過ぎている（異常系）。"""
+    # 準備
+    env = make_env()
+    targets = [DeleteTarget(id="doc-2", expected_version=content_hash(DOC_2))]
+    # 実行・検証
+    with pytest.raises(WriteDeadlineExceededError, match="書き込みの期限"):
+        env.delete(targets=targets, limits=_limits(0))
+    assert (env.worktree / "docs/rule/doc-2.yaml").exists()

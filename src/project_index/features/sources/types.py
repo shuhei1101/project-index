@@ -13,6 +13,9 @@ SOURCE_CONFIG_VERSION = "3"
 
 type SourceStatusKind = Literal["serving", "not_served", "disabled"]
 
+# 配信元の読み書きの方法（`git` は default_ref から参照、`disk` は登録したフォルダのファイルを参照する）
+type StorageType = Literal["git", "disk"]
+
 
 @dataclass(frozen=True)
 class DocumentTable:
@@ -115,6 +118,8 @@ class ServedSource:
     outside_read: bool = True
     # `root` から先頭の設定の YAML のフォルダへの相対パス。`paths_base` を省いた配信元は `.`
     config_dir: PurePosixPath = field(default_factory=PurePosixPath)
+    # 端末の設定の行の storage.type。disk のときは is_git が偽、worktree_globs が空
+    storage: StorageType | None = None
 
     @property
     def config_root(self) -> Path:

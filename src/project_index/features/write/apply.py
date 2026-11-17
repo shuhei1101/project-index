@@ -7,7 +7,12 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
-from project_index.features.documents.fields import delete_field, get_field, set_field
+from project_index.features.documents.fields import (
+    ANY_DEPTH_PREFIX,
+    delete_field,
+    get_field,
+    set_field,
+)
 from project_index.shared.errors import InvalidArgumentError, Violation
 from project_index.shared.narrowing import is_dict, is_list
 
@@ -37,6 +42,10 @@ def _set(content: MutableMapping[str, Any], path: str, value: object) -> None:
         set_field(content, path, copy.deepcopy(value))
 
 
+# 本文のファイルの内容を受けるキー（`data`・`set` のキーと `text_edits[].field`）
+BODY_KEY = "@body"
+
+
 def _violation(path: str, rule: str, fix: str = "") -> Violation:
     """操作を当てられない違反 1 件を作る。"""
     return Violation(path=path, rule=rule, fix=fix)
@@ -44,12 +53,16 @@ def _violation(path: str, rule: str, fix: str = "") -> Violation:
 
 def apply_operation(current: Mapping[str, Any] | None, operation: Operation) -> dict[str, Any]:
     """文書の内容に 1 件の操作を当てた新しい内容を返す。"""
+    # 本文は要素に当てない（本文の適用が当てる）
     if operation.op in ("create", "replace"):
-        return copy.deepcopy(operation.data or {})
+        data = {key: value for key, value in (operation.data or {}).items() if key != BODY_KEY}
+        return copy.deepcopy(data)
     # 往復編集の内容（CommentedMap）は型を保ったまま複製する
     content = cast("dict[str, Any]", copy.deepcopy(current if current is not None else {}))
     violations: list[Violation] = []
     for path, value in operation.set.items():
+        if path == BODY_KEY:
+            continue
         try:
             _set(content, path, value)
         except InvalidArgumentError as error:
@@ -101,6 +114,8 @@ def _text_edits(content: dict[str, Any], edits: list[TextEdit]) -> list[Violatio
     """文字列の項目の一部を置き換える。"""
     violations: list[Violation] = []
     for index, edit in enumerate(edits):
+        if edit.field == BODY_KEY:
+            continue
         text = get_field(content, edit.field)
         prefix = f"text_edits[{index}]"
         if not isinstance(text, str):
@@ -122,6 +137,54 @@ def _text_edits(content: dict[str, Any], edits: list[TextEdit]) -> list[Violatio
             continue
         set_field(content, edit.field, text.replace(edit.old, edit.new))
     return violations
+
+
+def apply_body(current_body: str | None, operation: Operation, *, index: int) -> str | None:
+    """操作の `@body` を本文に当てて、新しい本文を返す（本文を変えない操作は `None`）。"""
+    item, given = (
+        ("data", operation.data or {})
+        if operation.op in ("create", "replace")
+        else ("set", operation.set)
+    )
+    if BODY_KEY in given and not isinstance(given[BODY_KEY], str):
+        raise InvalidArgumentError(
+            message="操作を適用できません",
+            violations=[
+                _violation(
+                    f"operations[{index}].{item}.{BODY_KEY}",
+                    f"{BODY_KEY} は文字列で指定します",
+                    "本文の全体を文字列で指定してください",
+                )
+            ],
+        )
+    if item == "data":
+        return given.get(BODY_KEY)
+    edits = [(n, edit) for n, edit in enumerate(operation.text_edits) if edit.field == BODY_KEY]
+    if BODY_KEY not in given and not edits:
+        return None
+    return _edit_body(given.get(BODY_KEY, current_body or ""), edits, index=index)
+
+
+def _edit_body(body: str, edits: list[tuple[int, TextEdit]], *, index: int) -> str:
+    """本文に `text_edits` を順に当てる（一致の判定は項目の `text_edits` と同じ）。"""
+    violations: list[Violation] = []
+    for n, edit in edits:
+        count = body.count(edit.old) if edit.old else 0
+        # 一致が無いか、replace_all を付けずに複数に一致した: 置き換える箇所が決まらない
+        if count == 0 or (count > 1 and not edit.replace_all):
+            violations.append(
+                _violation(
+                    f"operations[{index}].text_edits[{n}].old",
+                    f"old の一致が {count} か所です",
+                    f"一致が 1 か所になるよう前後の文字を含めるか、replace_all を true にしてください"
+                    f"（一致 {count} 件）",
+                )
+            )
+            continue
+        body = body.replace(edit.old, edit.new)
+    if violations:
+        raise InvalidArgumentError(message="操作を適用できません", violations=violations)
+    return body
 
 
 HEAD_PATTERN = re.compile(r"^([^.\[\]]+)(.*)$")
@@ -206,6 +269,9 @@ def _array_keys(
     all_keys: dict[str, tuple[str, str]] = {}
     selected_keys: dict[str, tuple[str, str, str]] = {}
     for key, column in metadata.items():
+        # `**.` の列名はどの深さの列もまとめるキーで、配列の要素へ書き戻さない
+        if column.startswith(ANY_DEPTH_PREFIX):
+            continue
         if matched := ALL_KEY_PATTERN.match(column):
             all_keys[key] = (matched["array"], matched["item"])
         elif matched := SELECTED_KEY_PATTERN.match(column):
@@ -373,10 +439,52 @@ def _raise_if(violations: list[Violation]) -> None:
         )
 
 
+def _head_key(path: str) -> str:
+    """項目のパスの先頭のキー。"""
+    return re.split(r"[.\[]", path, maxsplit=1)[0]
+
+
+def _any_depth_violations(
+    operation: Operation, metadata: Mapping[str, str], *, index: int
+) -> list[Violation]:
+    """列名が `**.` で始まる共通のキーへの操作を違反にする。"""
+    columns = {
+        key: column for key, column in metadata.items() if column.startswith(ANY_DEPTH_PREFIX)
+    }
+    if not columns:
+        return []
+    targets: list[tuple[str, str]] = [
+        (f"operations[{index}].{field}.{path}", path)
+        for field, values in (
+            ("data", operation.data or {}),
+            ("set", operation.set),
+            ("add_to", operation.add_to),
+            ("remove_from", operation.remove_from),
+        )
+        for path in values
+    ]
+    targets += [(f"operations[{index}].unset", path) for path in operation.unset]
+    targets += [
+        (f"operations[{index}].text_edits[{number}].field", edit.field)
+        for number, edit in enumerate(operation.text_edits)
+    ]
+    return [
+        Violation(
+            path=where,
+            rule=(f"{key} は文書の中の複数の列（{columns[key]}）をまとめたキーで、書き込めません"),
+            fix="列名の項目のパス（`refs`・`functions[0].refs` など）で指定してください",
+        )
+        for where, path in targets
+        if (key := _head_key(path)) in columns
+    ]
+
+
 def expand_array_keys(
     operation: Operation, table: DocumentTable, current: Mapping[str, Any] | None, *, index: int
 ) -> Operation:
     """列名が `[]`・`[{キー}]` を含む共通のキーへの操作を、オブジェクトの配列の列の置き換えにした操作を返す。"""
+    # どの深さの列もまとめるキーは、書き込む場所を 1 つに決められない
+    _raise_if(_any_depth_violations(operation, table.metadata, index=index))
     all_keys, selected_keys = _array_keys(table.metadata)
     collected = set(all_keys) | set(selected_keys)
     if not collected:

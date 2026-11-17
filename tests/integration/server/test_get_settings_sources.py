@@ -119,3 +119,18 @@ def test_normal_when_unknown_top_level_key(
     assert [(row["id"], row["status"]) for row in body["sources"]] == [("sample", "serving")]
     assert [warning["path"] for warning in body["warnings"]] == ["mindstella"]
     assert without.json()["warnings"] == []
+
+
+def test_normal_when_storage_given(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """storage を持つ行だけに storage.type を返す（正常系）。"""
+    # 準備
+    env = make_server(make_source("sample"), make_source("company", storage="disk"))
+    # 実行
+    response = env.client.get("/settings/sources")
+    # 検証
+    rows = {row["id"]: row for row in response.json()["sources"]}
+    assert response.status_code == 200
+    assert rows["company"]["storage"] == {"type": "disk"}
+    assert "storage" not in rows["sample"]

@@ -649,3 +649,91 @@ def test_resolve_write_target_when_worktree_config_invalid(
             registry=registry, worktree="/r/.claude/worktrees/x", cwd="/r/.claude/worktrees/x"
         )
     assert exc_info.value is error
+
+
+def test_resolve_read_targets_when_disk_storage_worktree_cwd(
+    make_served_source: Callable[..., ServedSource], make_registry: Callable[..., Any]
+) -> None:
+    """disk の配信元はワークツリーに読み替えない（正常系）。"""
+    # 準備
+    source = make_served_source(
+        id="company",
+        root=Path("/r"),
+        is_git=False,
+        repo_root=None,
+        scope_read=["/r/**"],
+        scope_write=["/r"],
+        worktree_globs=[],
+        storage="disk",
+    )
+    registry = make_registry(source)
+    # 実行
+    result = resolve_read_targets(registry=registry, source="company", cwd="/r/.claude/worktrees/x")
+    # 検証
+    assert result[0].base == Path("/r")
+    assert result[0].worktree is None
+    assert result[0].commit is None
+
+
+@pytest.mark.parametrize(
+    ("ref", "worktree"),
+    [
+        pytest.param("develop", None, id="ref"),
+        pytest.param(None, "/r/.claude/worktrees/x", id="worktree"),
+    ],
+)
+def test_resolve_read_targets_when_disk_storage_ref(
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., Any],
+    ref: str | None,
+    worktree: str | None,
+) -> None:
+    """disk の配信元に ref・worktree を渡す（異常系）。"""
+    # 準備
+    source = make_served_source(
+        id="company", root=Path("/r"), scope_write=["/r"], worktree_globs=[], storage="disk"
+    )
+    registry = make_registry(source)
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError, match="disk"):
+        resolve_read_targets(
+            registry=registry, source="company", ref=ref, worktree=worktree, cwd="/r"
+        )
+
+
+def test_resolve_write_target_when_disk_storage(
+    make_served_source: Callable[..., ServedSource], make_registry: Callable[..., Any]
+) -> None:
+    """disk の配信元はクローン本体へ書く（正常系）。"""
+    # 準備
+    source = make_served_source(
+        id="company",
+        root=Path("/r"),
+        is_git=False,
+        repo_root=None,
+        scope_write=["/r"],
+        worktree_globs=[],
+        storage="disk",
+    )
+    registry = make_registry(source)
+    # 実行
+    result = resolve_write_target(registry=registry, source="company", cwd="/r")
+    # 検証
+    assert result.base == Path("/r")
+    assert result.worktree is None
+
+
+def test_resolve_write_target_when_disk_storage_worktree(
+    make_served_source: Callable[..., ServedSource], make_registry: Callable[..., Any]
+) -> None:
+    """disk の配信元に worktree を渡す（異常系）。"""
+    # 準備
+    source = make_served_source(
+        id="company", root=Path("/r"), scope_write=["/r"], worktree_globs=[], storage="disk"
+    )
+    registry = make_registry(source)
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError, match="disk"):
+        resolve_write_target(
+            registry=registry, source="company", worktree="/r/.claude/worktrees/x", cwd="/r"
+        )

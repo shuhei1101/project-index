@@ -33,9 +33,9 @@ flows:
       - '`name` の見出しのあとに `kind`・`lang` のバッジ、`description`、タグと出力の行がある'
       - 変数の表に `character.display_name`・`traits[].name` のパスの行があり、列が変数・型・必須・例・説明・出典
       - '`## テンプレート` に部品ごとの `###` のセクションがあり、`role`・`tags`・`when` のバッジと、`{{ character.display_name }}` に `data-hint`（`character.display_name`・表示名・`string`・ひな）の付いた本文がある'
-      - '`## 例` に「既定の例」と「ログが無い」の `###` のセクションがあり、「ログが無い」の前に `<!-- section: closed -->` がある'
+      - '`## 例` に「既定の例」と「ログが無い」の `###` のセクションがあり、「ログが無い」の見出しの直後に `<!-- section: {"open": false} -->` がある'
       - 各組が `system`・`user` のメッセージに分かれ、使用しなかった部品（既定の例は `no-logs`、ログが無いは `logs`）と `注入する本文（en）` の字数の行がある
-      - 各セクションの言語のタブが `en`・`ja` の順で、`group=lang` を持ち、タブ名に「注入」「訳」が付かない
+      - '各セクションの言語のタブが `en`・`ja` の順で、`{"group": "lang"}` を持ち、タブ名に「注入」「訳」が付かない'
       - 描画結果の変数の値がマーカーと `data-hint` の要素で囲まれている
       - '`[!WARNING]` と `[!CAUTION]` が無い'
       - 部品 `role` の本文と描画結果の `<rules>` が Markdown の中で `&lt;rules&gt;` になり、字数の行はエスケープ前の文字数
@@ -227,7 +227,7 @@ response:
   - name: 標準出力
     type: str
     description: mdmark で描く Markdown。見出し（`name`）・`kind` と `lang` のバッジ・`description`・タグと出力の行のあとに、`## 変数`・`## テンプレート`・`## 例` のセクションを並べる
-    notes: '部品と例の組は `###` のセクション。例の組の 2 つ目以降は `<!-- section: closed -->`'
+    notes: '部品と例の組は `###` のセクション。例の組の 2 つ目以降は `<!-- section: {"open": false} -->`'
   - name: 終了コード
     type: int
     description: 0 正常（描画できない組・字数を超えた組があっても 0）・1 YAML として読めないか、変換に使うキーが無い・型が違う
@@ -245,7 +245,7 @@ constraints:
   - item: 変数の表のパス
     constraint: '`vars` を深さ優先で辿り、配列の要素は `{名前}[].{キー}`、オブジェクトのキーは `{名前}.{キー}` で 1 行にする。列は変数・型・必須・例・説明・出典'
   - item: 言語のタブ
-    constraint: '各 `###` のセクションに `<!-- tabs: group=lang -->` を置き、タブ名は言語のタグだけにする。注入する言語（`lang`）を先頭に並べる。全ての部品の言語が 1 つだけの文書はタブを置かず中身だけを出す'
+    constraint: '各 `###` のセクションに `<!-- tabs: {"group": "lang"} -->` を置き、タブ名は言語のタグだけにする。注入する言語（`lang`）を先頭に並べる。全ての部品の言語が 1 つだけの文書はタブを置かず中身だけを出す'
     notes: 注入する言語はバッジと字数の行（`注入する本文（{lang}）`）で示す
   - item: 描画
     constraint: 'Jinja2 の `StrictUndefined`・`trim_blocks`・`lstrip_blocks` の Environment で、`when` が真の部品を並び順に描画してつなぐ。`kind: llm` は `role` ごとのメッセージに分ける'

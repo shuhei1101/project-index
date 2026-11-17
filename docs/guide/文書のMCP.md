@@ -7,7 +7,7 @@
 接続先は `http://127.0.0.1:${PROJECT_INDEX_PORT:-8786}/mcp` の 1 つで、トランスポートは HTTP（Streamable HTTP）です。
 ツールは全配信元で共通で、配信元は引数 `source` で指します。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | ツール | 種類 | 役割 |
 | --- | --- | --- |
@@ -32,13 +32,13 @@ YAML を書き換えたときは、再起動で反映します。
 
 ### 共通の引数
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 引数 | 型 | 説明 | 補足 |
 | --- | --- | --- | --- |
 | `source` | str（`search_docs`・`list_changes` は list[str] も可） | 配信元の ID（端末の設定の `sources[].id`） | 省略すると作業中の配信元。`scope` に当たらない配信元はエラー（`outside_scope` を除く）。`search_docs`・`list_changes` は配列か `*`（参照できる全配信元）も受ける |
-| `ref` | str | 読むリビジョン（ブランチ・コミット・タグ） | 省略すると配信元の `default_ref`。作業中の配信元は作業ツリー。Git 管理外の配信元と、複数の配信元を指したときは渡せない |
-| `worktree` | str | 読み書きするワークツリーのパス | 配信元の `worktrees` に当たるパスだけ。省略して `cwd` がワークツリーの中なら、そのワークツリー |
+| `ref` | str | 読むリビジョン（ブランチ・コミット・タグ） | 省略すると配信元の `default_ref`。作業中の配信元は作業ツリー。Git 管理外の配信元・`storage.type: disk` の配信元と、複数の配信元を指したときは渡せない |
+| `worktree` | str | 読み書きするワークツリーのパス | 配信元の `worktrees` に当たるパスだけ。省略して `cwd` がワークツリーの中なら、そのワークツリー。`storage.type: disk` の配信元には渡せず、`cwd` がワークツリーの中でも登録したフォルダを読み書きする |
 | `format` | `markdown` / `json` | 返す形式 | 既定 `markdown` |
 | `cwd` | str | 作業場所 | プラグインのフックがセッションの作業場所で上書きする。エージェントが指定した値は使わない。ワークツリーを指すときは `worktree` を指定する |
 | `session_id`・`agent_id` | str | 会話キー | 同じ。メインの会話は `agent_id` が空 |
@@ -81,7 +81,7 @@ rule-inject は、この `path` と `scope` で文書を既読にします。
 `body_file` のある `records` の要素は、`body_file` が指すファイルのパスになります。
 メタデータのキー `path`（`values` の中。管理用の YAML では `files[].path` の値）とは別の項目です。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | `scope` | 返したもの | 該当する呼び出し |
 | --- | --- | --- |
@@ -114,7 +114,7 @@ rule-inject は、この `path` と `scope` で文書を既読にします。
 メタデータの `created`・`updated` は次の順で決めます。
 
 1. Git の履歴があれば、そのファイルの最初と最後のコミットの日時
-2. 無ければ、文書のメタデータの `created`・`updated`。Git 管理外の配信元では `write_docs` が付ける
+2. 無ければ、文書のメタデータの `created`・`updated`。Git 管理外の配信元と `storage.type: disk` の配信元では `write_docs` が付ける（`disk` の配信元は Git の履歴を使わず、この値だけを使う）
 3. どちらも無ければ空。並べ替えでは末尾
 
 ### バージョン
@@ -128,7 +128,7 @@ rule-inject は、この `path` と `scope` で文書を既読にします。
 条件に当たる文書を、指定した項目・量・順で返します。
 ID で絞れば取得、`view: summary` で一覧、`view: count` で件数、`group_by` で集計になります。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 引数 | 型 | 既定 | 説明 |
 | --- | --- | --- | --- |
@@ -158,7 +158,7 @@ Group     = {"and": [Group | Condition, ...]} | {"or": [Group | Condition, ...]}
 Condition = {"field": str, "op": enum, "values": [str, ...], "match": "any" | "all", "case_sensitive": bool}
 ```
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 項目 | 説明 |
 | --- | --- |
@@ -174,7 +174,7 @@ Condition = {"field": str, "op": enum, "values": [str, ...], "match": "any" | "a
 
 ### レスポンス
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | フィールド | 説明 |
 | --- | --- |
@@ -262,7 +262,7 @@ YAML として読めないファイルがあっても、そのファイルを除
 | `atomic` | bool | `true` | `true` は 1 件でも失敗したら何も書かない。`false` は成功分を書き、失敗分を添字付きで返す |
 | `dry_run` | bool | `false` | 本番と同じ検証・バージョンの確認・差分を返し、書き込まない |
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | Operation のキー | 使える `op` | 説明 |
 | --- | --- | --- |
@@ -284,6 +284,21 @@ YAML として読めないファイルがあっても、そのファイルを除
 共通のキーとその列名を同じ操作に両方渡すと、`InvalidArgumentError` です。
 種類ごとの対応は `describe(source, kind)` で引けます。
 
+`records`・`body_file` の行の文書は、本文のファイルを `@body` で書きます。
+`@body` は種類の列名と重ならないキーで、`body_file` の列の名前が `body` の配信元でも `body` は列を指します。
+
+| 操作 | 本文のファイル |
+| --- | --- |
+| `create` | `data` の `body_file` の列（管理用の YAML のフォルダからの相対）に、`data.@body` の内容で作成する。`@body` は必須 |
+| `update` の `set` | `@body` の内容で全体を置き換える |
+| `update` の `text_edits` | `field: @body` で一部を置き換える |
+| `replace` | `data` に `@body` があれば置き換え、無ければ変えない |
+
+本文のファイルのパスが配信元の外を指すとき・`create` で既にあるファイルを指すときは、`body_file` の列の違反で、要素も本文のファイルも書き込みません。
+`body_file` の列の値を変える操作と、`body_file` を持たない行の文書への `@body` は `InvalidArgumentError` です。
+本文のファイルはスキーマ・`validators[]`・mdmark の点検に通しません。
+これらの文書の `version` は要素と本文のファイルの両方から求め、`diff` は要素の差分の行に続けて `@@ {本文のファイルのパス}` の行と本文のファイルの差分の行を並べます。
+
 行の `metadata` が `tags: tags[].name` のとき、`tags` への操作はオブジェクトの配列へ書き戻し、元の要素の `main` などのキーを保ちます。
 
 | 操作 | `tags` | `main_tags`（`tags[main].name`） |
@@ -295,8 +310,16 @@ YAML として読めないファイルがあっても、そのファイルを除
 
 `main_tags` の `set`・`add_to` に `tags` に無い名前を渡すと、`InvalidArgumentError` です。
 
+行の `metadata` が `related: "**.refs[]"` のように `**.` で始まる列名のとき、`related` への操作（`data`・`set`・`add_to`・`remove_from`・`unset`・`text_edits`）は書き込む場所が 1 つに決まらないため `InvalidArgumentError` です。
+`refs`・`functions[0].refs` などの列名で渡します。
+
 全ての操作を当ててから 1 回だけ検証し、通ったときだけ一時ファイルに書いてから置き換えます。
 読み込み・検査・書き込みは配信元ごとの排他ロックの中で行い、書いた後に `generators[]` を流します。
+
+要求を受けてから端末の設定の `write_deadline_sec` を過ぎても検査が終わらないときは、検査のスクリプトを止め、ファイルを 1 つも書き換えずに `WriteDeadlineExceededError` を返します。
+検査のスクリプトと mdmark の点検の制限時間は、`script_timeout_sec` と、この期限までの残りの時間の短い方です。
+`script_timeout_sec` で止めた検査のスクリプトは、`{検査の ID}: 検査を実行できませんでした（制限時間（{秒} 秒）を超えたため、スクリプトを止めました。）` の違反になります。
+ファイルの書き換えを始めた後は、期限を過ぎても全てのファイルを書き終えます。
 
 種類のスキーマで `contentMediaType: text/markdown` を持つキーは Markdown のキーで、操作で値を変えたキー（`create` は値を持つ全てのキー）を mdmark の点検（`mdmark check --text -`）に通します。
 点検のずれのうち描画時の書き方の警告（`diagram_invalid`・`syntax_warning`）は、項目のパス・`mdmark の {種類}（{行} 行目）`・mdmark の内容の違反になり、スキーマの違反と同じく書き込みを止めます。
@@ -318,7 +341,8 @@ Git の配信元で消した文書は Git で戻せます。
 | `atomic`・`dry_run` | bool | `true`・`false` | `write_docs` と同じ |
 
 レスポンスは `applied` と `results[]`（`status` は `deleted`・`failed`）、`on_referenced: unlink` のときの `unlinked[]`（参照を外した文書の `id`・`version`）です。
-Git 管理外の配信元では、種類の `documents[].writable` が削除を許していることが要ります。
+Git 管理外の配信元と `storage.type: disk` の配信元では、種類の `documents[].writable` が削除を許していることが要ります。
+`records`・`body_file` の行の文書は、本文のファイルも削除します。同じ管理用の YAML のほかの要素が同じ本文のファイルを指すときは残します。
 
 ## describe
 
@@ -328,7 +352,7 @@ Git 管理外の配信元では、種類の `documents[].writable` が削除を�
 | --- | --- |
 | なし | 今の作業場所から使える配信元の一覧（`id`・権限 `read` / `write`・作業中か・`description`・`when`）と、作業場所、使える配信元の警告（`warnings[]`） |
 | `outside_scope: true`（`source` なし） | 引数なしと同じ一覧に加えて、作業範囲の外（参考）で参照できる配信元（`scope` に当たらず `sources[].outside_read` が真）の一覧（`outside_sources[]` の `id`・`description`・`when`） |
-| `source` | その配信元の使う場面（`when`）・説明書（`instructions`）と種類（`kinds[]`）の一覧。Git の配信元は、ブランチ・タグ（`refs.branches[]`・`refs.tags[]`）と、`worktrees` に当たるワークツリー（`worktrees[]` の `path`・`branch`）の一覧も返す |
+| `source` | その配信元の使う場面（`when`）・説明書（`instructions`）と種類（`kinds[]`）の一覧。Git の配信元（`storage.type: disk` を除く）は、ブランチ・タグ（`refs.branches[]`・`refs.tags[]`）と、`worktrees` に当たるワークツリー（`worktrees[]` の `path`・`branch`）の一覧も返す |
 | `source`・`kind` | その種類の共通のキーと列名の対応（`metadata`）と、スキーマ（YAML のまま） |
 
 `when` は、`markdown` では一覧の表の `when` 列（行を `<br>` でつなぐ）と、説明書の前の「使う場面:」の箇条書きで出し、`json` では記載の無い配信元のキーを持ちません。
@@ -368,11 +392,11 @@ Git 管理外の配信元では、種類の `documents[].writable` が削除を�
 
 区間か、この会話で前回読んだ時点から今までに変わった文書・変わったキー・差分の行を返します。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 引数 | 型 | 既定 | 説明 |
 | --- | --- | --- | --- |
-| `from` | str | この会話で前回読んだ時点 | 区間の始点（commit・日時・ブランチ・タグ）。日時はその時点の最後の commit に解決する。Git 管理外の配信元では渡せない |
+| `from` | str | この会話で前回読んだ時点 | 区間の始点（commit・日時・ブランチ・タグ）。日時はその時点の最後の commit に解決する。Git 管理外の配信元と `storage.type: disk` の配信元では渡せない |
 | `to` | str | 今の作業ツリー | 区間の終点。`from` を渡したときだけ |
 | `filter` | Group か Condition | 全件 | `search_docs` と同じ条件で、対象の文書を絞る |
 | `contains` | {`value`, `regex`, `case_sensitive`} | なし | 語の出現数が変わった文書だけを返し、語が入った・消えた区間を添える。`filter` と同時に渡すと両方に当たる文書を返す。下の「語の当て方」 |
@@ -411,7 +435,7 @@ Git 管理外の配信元では、種類の `documents[].writable` が削除を�
 
 起点の文書かコードのパスから `related` をたどって、関連する文書を返します。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 引数 | 型 | 既定 | 説明 |
 | --- | --- | --- | --- |
@@ -419,7 +443,7 @@ Git 管理外の配信元では、種類の `documents[].writable` が削除を�
 | `code_paths` | list[str] | なし | 起点のコードのパス（配信元の直下から）。`records`・`body_file` の行で、そのパスを本文に持つ文書を起点にする |
 | `depth` | int | 2 | たどる深さ。1〜4 で、超えたら 4 に丸めて `notes` で知らせる |
 | `direction` | `out` / `in` / `both` | `both` | `out` は起点の `related` が指す先、`in` は起点を `related` で指す文書 |
-| `suggest` | bool | `false` | `true` で、関連の候補（同じ commit での変更・同じ会話での編集と閲覧）を上位 3 件返す |
+| `suggest` | bool | `false` | `true` で、関連の候補（同じ commit での変更・同じ会話での編集と閲覧）を上位 3 件返す。`storage.type: disk` の配信元は同じ commit での変更を使わない |
 | `repeat_seen` | bool | `false` | この会話で返却済みの相手の名前・概要文も返す |
 
 <!-- /table -->
@@ -436,7 +460,7 @@ Git 管理外の配信元では、種類の `documents[].writable` が削除を�
 
 エラーは `isError: true` のツール結果で返し、本文に原因と次の手を記載します。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | エラー | 発生条件 | 本文に記載すること |
 | --- | --- | --- |
@@ -444,16 +468,19 @@ Git 管理外の配信元では、種類の `documents[].writable` が削除を�
 | SourceNotWritableError | `cwd` が配信元の `scope.write` に当たらない | 今の作業場所から使える配信元の一覧 |
 | SourceNotServedError | 起動時の検証で外したか `enabled: false` の配信元を指した | 違反したキーのパスと理由 |
 | WorktreeNotMatchedError | `worktree` が配信元の `worktrees` に当たらない | 渡したパスと `worktrees` の値 |
-| TargetIsCloneError | Git の配信元で、書く先がクローン本体になる | クローン本体のパス（配信元の設定をワークツリーから読んでいても、ワークツリーの親のクローン本体）と、`worktree` でワークツリーを指すこと |
-| InvalidArgumentError | `filter`・`order_by`・`group_by`・Operation の中の知らない項目・型の合わない値、50 件を超える操作、必須のキーの欠け、`text_edits` の `old` が 1 か所に一致しない、`ref` を渡せない配信元に `ref`・`from`・`to` を渡した、`create` の配置先のファイル名が `documents[].exclude[]` に当たる、共通のキーとその列名を同じ操作に両方渡した、束が `and`・`or`・`not` のキーを 2 つ以上持つ、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない、`main_tags` の `set`・`add_to` に `tags` に無い名前を渡した | 項目のパス・期待する型・実際の値と、`describe(source, kind)` でスキーマを見ること |
+| TargetIsCloneError | Git の配信元（`storage.type: disk` を除く）で、書く先がクローン本体になる | クローン本体のパス（配信元の設定をワークツリーから読んでいても、ワークツリーの親のクローン本体）と、`worktree` でワークツリーを指すこと |
+| InvalidArgumentError | `filter`・`order_by`・`group_by`・Operation の中の知らない項目・型の合わない値、50 件を超える操作、必須のキーの欠け、`text_edits` の `old` が 1 か所に一致しない、`ref` を渡せない配信元に `ref`・`from`・`to` を渡した、`storage.type: disk` の配信元に `worktree` を渡した、`create` の配置先のファイル名が `documents[].exclude[]` に当たる、共通のキーとその列名を同じ操作に両方渡した、束が `and`・`or`・`not` のキーを 2 つ以上持つ、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない、`main_tags` の `set`・`add_to` に `tags` に無い名前を渡した | 項目のパス・期待する型・実際の値と、`describe(source, kind)` でスキーマを見ること |
 | RefNotFoundError | `ref`・`from`・`to` を commit に解決できない | 解決できなかった値 |
 | UnknownKindError | `kind` が配信元の種類に無い | その配信元の種類の一覧 |
 | DocumentNotFoundError | 指した ID の文書が無い | 見つからなかった ID と、近い ID の候補 |
 | VersionMismatchError | `expected_version` が今のバージョンと違う | 今のバージョンと差分、読み直して呼び直すこと |
 | ValidationFailedError | 変更を当てた後の文書がスキーマか `validators[]` に通らない、または種類のスキーマの `$ref` を解決できない（`atomic: true`） | 違反ごとの添字・パス・決まり・直し方。スキーマの違反には、違反した項目のスキーマの `title`・`description`・`x-rules`・`examples`・`x-bad-examples` のうちスキーマが持つもの |
 | DocumentReferencedError | `on_referenced: fail` で、消す文書が他の文書の `related` から参照されている | 参照元の ID と `on_referenced: unlink` |
-| DeleteNotAllowedError | Git 管理外の配信元で、種類の `documents[].writable` が削除を許していない | 種類の ID と `documents[].writable` のパス |
+| DeleteNotAllowedError | Git 管理外の配信元か `storage.type: disk` の配信元で、種類の `documents[].writable` が削除を許していない | 種類の ID と `documents[].writable` のパス |
 | LastReadNotFoundError | `list_changes` の `from` を省いたが、この会話で本文を読んだ記録が無い | `from` を渡すこと |
+| WriteDeadlineExceededError | `write_docs`・`delete_docs` で、ファイルを書き換える前に端末の設定の `write_deadline_sec` を過ぎた | 書き込みの期限・経過した秒数・ファイルを書き換えていないことと、検査のスクリプトの所要時間を確かめてから再実行すること |
+| WorktreeLoadingError | `search_docs`・`write_docs`・`delete_docs` が指すワークツリーの初めての読み込みが、端末の設定の `worktree_load_wait_sec` までに終わらない。読み込みは止めずに続ける | ワークツリーのパスと、時間を空けて同じ呼び出しを再実行すること |
+| UnexpectedError | どのツールでも、上のエラーでない例外（`GitError` など）で処理を終えられない | `UnexpectedError: {例外の型}: {内容}` |
 
 <!-- /table -->
 

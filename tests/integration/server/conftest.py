@@ -18,9 +18,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from project_index import main as main_module
+from project_index.features.history import snapshot as snapshot_module
 from project_index.features.settings.query import load_terminal_config
 from project_index.features.sources import registry as registry_module
 from project_index.features.sources.registry import SourceRegistry
+from project_index.integrations.git import GitError
 from project_index.main import Handlers, build_handlers, start_loading
 from project_index.server.app import build_app
 
@@ -30,6 +32,8 @@ if TYPE_CHECKING:
 LOCAL_BASE_URL = "http://127.0.0.1:8786"
 # 読み込みを止めた配信元の合図を待つ上限と、読み込みのスレッドの終わりを待つ上限
 LOADING_WAIT_SEC = 60
+# 裏の検査とリビジョンの書き出しが済むのを待つ上限
+BACKGROUND_WAIT_SEC = 30
 MCP_HEADERS = {
     "Accept": "application/json, text/event-stream",
     "Content-Type": "application/json",
@@ -113,6 +117,8 @@ class SourceSpec:
     scope_write: list[Path] | None = None
     enabled: bool = True
     outside_read: bool | None = None
+    # 端末の設定の行の `storage.type`。None は行に書かない
+    storage: str | None = None
 
 
 @dataclass
@@ -133,6 +139,15 @@ class ServerEnv:
             _settings_text(self.root, self.state_dir, list(specs), self.settings_extra),
             encoding="utf-8",
         )
+
+    def wait_background(self) -> None:
+        """裏の検査とリビジョンの書き出しが済むまで待つ（上限を超えたら AssertionError）。"""
+        deadline = time.monotonic() + BACKGROUND_WAIT_SEC
+        while self.handlers.checks.checking or self.handlers.snapshots.exporting:
+            if time.monotonic() > deadline:
+                message = "裏の検査とリビジョンの書き出しが上限の時間までに済まなかった"
+                raise AssertionError(message)
+            time.sleep(0.05)
 
     def call(self, name: str, **arguments: Any) -> ToolResult:
         """`/mcp` のツールを HTTP で呼ぶ。"""
@@ -283,10 +298,53 @@ def alias_file_set() -> Callable[..., dict[str, str]]:
     return alias_files
 
 
+NESTED_ROW = (
+    "  - id: nested\n"
+    "    paths: [nested/*.yaml]\n"
+    "    schema: nested.schema.yaml\n"
+    "    metadata:\n"
+    '      related: "**.refs[]"\n'
+)
+NESTED_SCHEMA = (
+    "type: object\n"
+    "required: [id, name]\n"
+    "properties:\n"
+    "  id: {type: string}\n"
+    "  name: {type: string}\n"
+    "  refs: {type: array}\n"
+    "  functions:\n"
+    "    type: array\n"
+    "    items:\n"
+    "      type: object\n"
+    "      properties:\n"
+    "        name: {type: string}\n"
+    "        refs: {type: array}\n"
+)
+
+
+def nested_files(n1: str) -> dict[str, str]:
+    """`related: "**.refs[]"` の行と、本文が `n1` の n1・refs を持たない n2・n3 の配信元のファイル一式を返す。"""
+    return sample_files(
+        **{
+            "project-index.yaml": sample_config(NESTED_ROW),
+            "nested.schema.yaml": NESTED_SCHEMA,
+            "nested/n1.yaml": n1,
+            "nested/n2.yaml": "id: n2\nname: n2\n",
+            "nested/n3.yaml": "id: n3\nname: n3\n",
+        }
+    )
+
+
 @pytest.fixture
 def sample_sync_file_set() -> Callable[..., dict[str, str]]:
     """管理用の YAML に無いファイルを持つ配信元のファイル一式を作る関数を返す。"""
     return sample_sync_files
+
+
+@pytest.fixture
+def nested_file_set() -> Callable[..., dict[str, str]]:
+    """最上位と入れ子の refs を `**.refs[]` でまとめる配信元のファイル一式を作る関数を返す。"""
+    return nested_files
 
 
 @pytest.fixture
@@ -327,6 +385,7 @@ def make_source(
         date: str | None = None,
         outside_read: bool | None = None,
         branch: str = "develop",
+        storage: str | None = None,
     ) -> SourceSpec:
         content = files if files is not None else sample_files()
         if git:
@@ -342,9 +401,71 @@ def make_source(
             scope_write=scope_write,
             enabled=enabled,
             outside_read=outside_read,
+            storage=storage,
         )
 
     return _make
+
+
+# ローカル運用の配信元の設定（`default_ref` を持たず、追加するファイルを全て `*.local.*` の名前にする）
+LOCAL_CONFIG = (
+    "name: company\n"
+    "documents:\n"
+    "  - id: src\n"
+    "    paths: [files.local.yaml]\n"
+    "    schema: schemas/files.schema.local.yaml\n"
+    "    records: files\n"
+    "    body_file: path\n"
+    "    validators: [check]\n"
+    "validators:\n"
+    "  - id: check\n"
+    "    run: [python3, scripts/check.local.py]\n"
+)
+LOCAL_FILES = {
+    "project-index.local.yaml": LOCAL_CONFIG,
+    "schemas/files.schema.local.yaml": FILES_SCHEMA_TEMPLATE.read_text(encoding="utf-8"),
+    "files.local.yaml": "files:\n  - path: src/app.py\n    name: アプリの入口\n",
+    "scripts/check.local.py": "import sys\nsys.stdin.read()\nprint('[]')\n",
+}
+
+
+@pytest.fixture
+def make_local_source(
+    git_repo: Callable[..., Path],
+    write_files: Callable[[Path, dict[str, str]], None],
+) -> Callable[..., SourceSpec]:
+    """`src/app.py` を commit したリポジトリに `*.local.*` のファイルを commit せずに置き、disk の配信元の行を返す関数を返す。"""
+
+    def _make(source_id: str = "company", *, storage: str | None = "disk") -> SourceSpec:
+        folder = git_repo({"src/app.py": "print('app')\n"}, name=source_id)
+        write_files(folder, LOCAL_FILES)
+        return SourceSpec(
+            id=source_id,
+            folder=folder,
+            config=[folder / "project-index.local.yaml"],
+            scope_read=[folder],
+            storage=storage,
+        )
+
+    return _make
+
+
+def _source_lines(spec: SourceSpec) -> list[str]:
+    """端末の設定の `sources[]` の 1 行の YAML の行を組み立てる。"""
+    lines = [f"  - id: {spec.id}", "    config:"]
+    lines.extend(f"      - {path}" for path in spec.config)
+    if not spec.enabled:
+        lines.append("    enabled: false")
+    if spec.outside_read is not None:
+        lines.append(f"    outside_read: {str(spec.outside_read).lower()}")
+    if spec.storage is not None:
+        lines.extend(["    storage:", f"      type: {spec.storage}"])
+    lines.extend(["    scope:", "      read:"])
+    lines.extend(f"        - {path}" for path in spec.scope_read)
+    if spec.scope_write is not None:
+        lines.append("      write:")
+        lines.extend(f"        - {path}" for path in spec.scope_write)
+    return lines
 
 
 def _settings_text(root: Path, state_dir: Path, specs: list[SourceSpec], extra: str) -> str:
@@ -357,19 +478,7 @@ def _settings_text(root: Path, state_dir: Path, specs: list[SourceSpec], extra: 
         "sources:" if specs else "sources: []",
     ]
     for spec in specs:
-        lines.append(f"  - id: {spec.id}")
-        lines.append("    config:")
-        lines.extend(f"      - {path}" for path in spec.config)
-        if not spec.enabled:
-            lines.append("    enabled: false")
-        if spec.outside_read is not None:
-            lines.append(f"    outside_read: {str(spec.outside_read).lower()}")
-        lines.append("    scope:")
-        lines.append("      read:")
-        lines.extend(f"        - {path}" for path in spec.scope_read)
-        if spec.scope_write is not None:
-            lines.append("      write:")
-            lines.extend(f"        - {path}" for path in spec.scope_write)
+        lines.extend(_source_lines(spec))
     return "\n".join(line for line in lines if line != "") + "\n"
 
 
@@ -899,3 +1008,34 @@ def wait_for_restart(started_count: Callable[[Path], int]) -> Callable[..., None
         raise AssertionError(message)
 
     return _wait
+
+
+@pytest.fixture
+def time_out_archive(monkeypatch: pytest.MonkeyPatch) -> Callable[..., list[str]]:
+    """リビジョンの書き出しの `git archive` を、待ち時間の上限を超えたときと同じ失敗にする関数を返す。
+
+    `commits` を渡すとその commit だけ、`times` を渡すと最初のその回数だけ失敗させる。
+    返す並びには、失敗させた commit を順に入れる。
+    """
+
+    def _patch(*, commits: set[str] | None = None, times: int | None = None) -> list[str]:
+        failed: list[str] = []
+        original = snapshot_module.run_git
+
+        def run(
+            args: list[str], *, cwd: Path, binary: bool = False, timeout: float | None = None
+        ) -> str | bytes:
+            # 書き出しの対象の commit で、失敗させる回数が残っているときだけ時間切れにする
+            if (
+                args[0] == "archive"
+                and (commits is None or args[-1] in commits)
+                and (times is None or len(failed) < times)
+            ):
+                failed.append(args[-1])
+                raise GitError(list(args), -9, "", timed_out=True)
+            return original(args, cwd=cwd, binary=binary, timeout=timeout)
+
+        monkeypatch.setattr(snapshot_module, "run_git", run)
+        return failed
+
+    return _patch

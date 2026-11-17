@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from project_index.integrations.git import GIT_ARCHIVE_TIMEOUT_SEC
 from tests.integration.server.test_list_documents import main_files
 
 if TYPE_CHECKING:
@@ -223,3 +224,53 @@ def test_error_when_not_found(
     assert (no_ref.status_code, no_ref.json()["missing"]) == (404, "ref")
     assert (no_doc.status_code, no_doc.json()["missing"]) == (404, "doc")
     assert (no_id.status_code, no_id.json()["missing"]) == (404, "doc")
+
+
+def test_error_when_revision_export_times_out(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    commit_all: Callable[..., str],
+    run_git: Callable[..., str],
+    time_out_archive: Callable[..., list[str]],
+) -> None:
+    """親の commit の書き出しが上限を超えたとき、止めた処理と理由を返す（異常系）。"""
+    # 準備
+    source = make_source("sample", main_files(), branch="main")
+    parent = run_git(source.folder, "rev-parse", "HEAD").strip()
+    commit_all(source.folder, {"design/D-3.yaml": "id: D-3\nname: 設計 3\n"}, "docs: 追加")
+    time_out_archive(commits={parent})
+    env = make_server(source)
+    env.wait_background()
+    # 実行
+    response = env.client.get("/sources/sample/docs/design/D-1.yaml", params={"ref": parent})
+    # 検証
+    body = response.json()
+    assert response.status_code == 504
+    assert body["title"] == "RevisionExportTimeoutError"
+    assert body["operation"] == "revision_export"
+    assert body["commit"] == parent
+    assert body["limitSec"] == GIT_ARCHIVE_TIMEOUT_SEC
+    assert "リビジョンの書き出し" in body["detail"]
+    assert f"{GIT_ARCHIVE_TIMEOUT_SEC:g} 秒" in body["detail"]
+    assert list((env.state_dir / "snapshots").glob("*/*.tmp")) == []
+
+
+def test_normal_when_disk_storage(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+    write_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    """disk の配信元は ref を無視して登録したフォルダの文書を返す（正常系）。"""
+    # 準備（master には D-3 が無く、登録したフォルダにだけ D-3 を置く）
+    company = make_source("company", main_files(), branch="main", storage="disk")
+    run_git(company.folder, "branch", "master")
+    write_files(company.folder, {"design/D-3.yaml": "id: D-3\nname: 設計 3\ntitle: 手元\n"})
+    env = make_server(company)
+    # 実行
+    response = env.client.get("/sources/company/docs/design/D-3.yaml", params={"ref": "master"})
+    # 検証
+    body = response.json()
+    assert response.status_code == 200
+    assert body["ref"] == ""
+    assert body["value"]["title"] == "手元"

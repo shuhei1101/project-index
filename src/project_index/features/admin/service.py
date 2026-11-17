@@ -77,7 +77,7 @@ from project_index.shared.yaml_io import YamlLoadError, dump_roundtrip, load_rou
 if TYPE_CHECKING:
     from project_index.features.convert.types import Converted
     from project_index.features.documents.types import Document
-    from project_index.features.sources.types import DocumentTable
+    from project_index.features.sources.types import DocumentTable, StorageType
     from project_index.main import Handlers
 
 logger = logging.getLogger(__name__)
@@ -96,7 +96,7 @@ def version_state(mine: str, current: str) -> VersionState:
     return "old" if left < right else "newer"
 
 
-def _source_states(handlers: Handlers) -> list[SourceState]:
+def _source_states(handlers: Handlers, *, with_sync: bool = True) -> list[SourceState]:
     """登録簿の状態を配信元の状態の行にする。"""
     states: list[SourceState] = []
     # 配信元ごとの `default_ref` の commit を確かめず、いま配信中の組を読む
@@ -106,8 +106,9 @@ def _source_states(handlers: Handlers) -> list[SourceState]:
         if status.status == "serving" and status.id in served:
             source = served[status.id]
             config_version = source.config.version
-            # 裏で実行した検査の最後の結果を読み、配信元のファイルはたどらない
-            check = handlers.checks.get(status.id)
+            # 裏で実行した検査の最後の結果を読み、配信元のファイルはたどらない。
+            # 同期の件数を含めない指定（読み直しの応答）のときは結果を参照しない
+            check = handlers.checks.get(status.id) if with_sync else None
             states.append(
                 SourceState(
                     id=status.id,
@@ -147,6 +148,8 @@ def get_status(handlers: Handlers, *, env: Mapping[str, str]) -> ServerStatus:
         ),
         sources=[] if loading else _source_states(handlers),
         loading=loading,
+        checking=handlers.checks.checking,
+        exporting=handlers.snapshots.exporting,
     )
 
 
@@ -168,7 +171,8 @@ def reload_config(handlers: Handlers) -> ReloadResult:
                 for status in statuses
                 if status.status == "not_served"
             ],
-            sources=_source_states(handlers),
+            # 裏の検査が済んでいても、読み直しの応答には同期の件数を含めない
+            sources=_source_states(handlers, with_sync=False),
         )
     logger.info(
         "設定を読み直した（追加 %s・削除 %s・配信していない %s）",
@@ -195,7 +199,11 @@ def _config_file(root: Path) -> Path:
 
 
 def _load_candidate(
-    path: str, *, config: str | None, lookup: SchemaRefLookup | None = None
+    path: str,
+    *,
+    config: str | None,
+    lookup: SchemaRefLookup | None = None,
+    storage: StorageType | None = None,
 ) -> CandidateSource:
     """パスか書く前の設定の文字列から、端末の設定によらず配信元を組み立てる。"""
     target = normalize_path(path)
@@ -231,6 +239,7 @@ def _load_candidate(
             scope_write=None,
             root_override=root,
             lookup=lookup,
+            storage=storage,
         )
     if loaded is None:
         return CandidateSource(
@@ -275,7 +284,10 @@ def _registered_id(handlers: Handlers, root: Path) -> str | None:
 def check_project(request: CheckProjectRequest, *, handlers: Handlers) -> CheckProjectResult:
     """端末の設定に無い配信元も含め、設定・スクリプト・索引の同期を検査する。"""
     candidate = _load_candidate(
-        request.path, config=request.config, lookup=terminal_lookup(handlers.terminal)
+        request.path,
+        config=request.config,
+        lookup=terminal_lookup(handlers.terminal),
+        storage=request.storage_type,
     )
     registered_id = _registered_id(handlers, candidate.root)
     state = (

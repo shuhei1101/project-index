@@ -45,6 +45,13 @@ constants:
     usecase: 共通
     summary: 先頭のこのバイト数に NUL バイトがあればバイナリとみなす
     value: '8192'
+  - name: LOCAL_FILE_PATTERN
+    title: ローカル運用のファイル名
+    container: project_index/features/documents/indexable.py
+    usecase: 共通
+    summary: 管理用の YAML に載せない `*.local.*` のファイル名の glob
+    value: "'*.local.*'"
+    description: ローカル運用の設定・管理用の YAML・スキーマと、Git が追跡しない `settings.local.json` などを除く。`fnmatch` でファイル名だけに当てる
 functions:
   - name: walk_files
     title: 中をたどるファイルの列挙
@@ -127,7 +134,7 @@ functions:
     process: |-
       1. パスの途中のフォルダ名に `VENDOR_DIRS` のどれかがあれば `True`
       2. ファイル名が `LOCK_FILES` にあるか、末尾が `.lock` なら `True`
-      3. ファイル名の末尾が `GENERATED_SUFFIXES` のどれかなら `True`
+      3. ファイル名の末尾が `GENERATED_SUFFIXES` のどれかか、ファイル名が `LOCAL_FILE_PATTERN`（`*.local.*`）に当たれば `True`
       4. ファイルの先頭 `BINARY_SNIFF_BYTES` バイトを読み、NUL バイトがあれば `True`
       5. ファイル名が `__init__.py` の場合、UTF-8 で読んで `ast.parse` し、文が空か、import 文・先頭の docstring・`__all__` への代入だけなら `True`
       6. それ以外は `False`
@@ -183,6 +190,13 @@ functions:
         mock: なし（`tmp_path`）
         expected: どちらも `False`
         exception: '-'
+      - name: test_is_excluded_file_when_local_name
+        case: 正常
+        summary: '`*.local.*` の名前のファイル'
+        condition: '`files.local.yaml`・`src/settings.local.json` を置き、比べるために `local.py`・`docs/locale.md` も置く'
+        mock: なし（`tmp_path`）
+        expected: '`files.local.yaml`・`src/settings.local.json` が `True`、`local.py`・`docs/locale.md` が `False`'
+        exception: '-'
   - name: indexable_files
     title: 載せるファイルの一覧
     container: project_index/features/documents/indexable.py
@@ -233,3 +247,33 @@ functions:
         mock: なし（`tmp_path`）
         expected: '`["src/a.py"]`'
         exception: '-'
+  - name: walk_tree
+    title: フォルダごとの列挙
+    kind: 関数
+    container: project_index/features/documents/indexable.py
+    usecase: 読み取り
+    role: 列挙
+    summary: 中をたどるファイルの一覧と、たどったフォルダごとの更新日時を返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: root
+        title: 読むフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: たどるフォルダ
+    returns:
+      type: tuple[list[str], dict[str, int]]
+      description: (`root` からのファイルのパスの一覧, `root` からのフォルダのパス（`root` は `.`）→ `st_mtime_ns`)
+    process: |-
+      1. 中をたどるファイルの列挙と同じに `os.walk` でたどり、同じフォルダを飛ばす
+      2. たどったフォルダごとに `os.stat` の `st_mtime_ns` を記録する（たどる途中で無くなったフォルダは記録しない）
+      3. ファイルの一覧とフォルダの更新日時を返す
+    unit_tests:
+      - name: test_walk_tree
+        case: 正常
+        summary: ファイルとフォルダの更新日時
+        condition: '`a.yaml`・`rules/b.yaml`・空のフォルダ `empty/`・`node_modules/x.js` を置く'
+        mock: なし（`tmp_path`）
+        expected: ファイルは `a.yaml`・`rules/b.yaml`、フォルダは `.`・`rules`・`empty` で、それぞれの `st_mtime_ns` を持ち、`node_modules` は無い

@@ -20,10 +20,12 @@ from project_index.features.admin.types import (
 )
 from project_index.features.changes.types import ChangesRequest
 from project_index.features.describe.types import DescribeRequest
+from project_index.features.history import snapshot as snapshot_module
 from project_index.features.prompt_doc.runtime import DEFAULT_PROMPTS_DIR, PromptSet, load_prompts
 from project_index.features.related.types import RelatedRequest
 from project_index.features.search.types import MatchWordsRequest, SearchRequest
 from project_index.features.write.types import DeleteRequest, WriteRequest
+from project_index.integrations.git import GIT_ARCHIVE_TIMEOUT_SEC
 from project_index.server.app import build_app
 from project_index.server.mcp.admin import NoArguments
 from project_index.server.mcp.result import (
@@ -436,6 +438,7 @@ def test_normal_when_metadata_out_of_sync(
     caplog.set_level(logging.WARNING)
     # 実行
     env = make_server(sample, clean)
+    env.wait_background()
     # 検証
     warnings = [record.getMessage() for record in caplog.records]
     sample_warnings = [message for message in warnings if message.startswith("sample:")]
@@ -1185,3 +1188,115 @@ def test_normal_when_terminal_config_has_unknown_top_level_key(
     unknown = [w for w in described["warnings"] if "mindstella" in w]
     assert len(unknown) == 1
     assert "prot" in unknown[0]
+
+
+EXPORTED_LINE = "リビジョンを書き出した"
+STOPPED_LINE = "裏のリビジョンの書き出しを止めた"
+
+
+def _exported(caplog: pytest.LogCaptureFixture) -> list[str]:
+    """ログの『リビジョンを書き出した』の行を返す。"""
+    return [
+        record.getMessage() for record in caplog.records if EXPORTED_LINE in record.getMessage()
+    ]
+
+
+def test_normal_when_default_ref_exported_in_background(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """読み込みと検査の後に、Git の配信元の default_ref の commit を裏で書き出す（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    notes = make_source("notes", git=False)
+    commit = run_git(sample.folder, "rev-parse", "develop").strip()
+    caplog.set_level(logging.INFO, logger=snapshot_module.__name__)
+    env = make_server(sample, notes)
+    # 実行
+    env.wait_background()
+    exported_before = _exported(caplog)
+    response = env.client.get("/sources/sample/docs")
+    # 検証
+    snapshots = env.state_dir / "snapshots"
+    assert [path.name for path in snapshots.glob("*/*")] == [commit]
+    assert len(exported_before) == 1
+    assert commit in exported_before[0]
+    assert response.status_code == 200
+    assert _exported(caplog) == exported_before
+
+
+def test_normal_when_background_export_times_out(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+    time_out_archive: Callable[..., list[str]],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """裏の書き出しが上限で止まっても配信を続け、次の要求が書き出し直す（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    commit = run_git(sample.folder, "rev-parse", "develop").strip()
+    failed = time_out_archive(times=1)
+    caplog.set_level(logging.INFO, logger=snapshot_module.__name__)
+    env = make_server(sample)
+    env.wait_background()
+    # 実行
+    status = env.call_admin("status", format="json")
+    exported_before = _exported(caplog)
+    response = env.client.get("/sources/sample/docs")
+    # 検証
+    stopped = [r.getMessage() for r in caplog.records if STOPPED_LINE in r.getMessage()]
+    assert failed == [commit]
+    assert len(stopped) == 1
+    assert commit in stopped[0]
+    assert f"{GIT_ARCHIVE_TIMEOUT_SEC:g} 秒" in stopped[0]
+    assert [(item["id"], item["status"]) for item in status.data["sources"]] == [
+        ("sample", "serving")
+    ]
+    assert status.data["exporting"] is False
+    assert exported_before == []
+    assert response.status_code == 200
+    assert len(_exported(caplog)) == 1
+
+
+def test_normal_when_disk_storage(
+    make_local_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Git のリポジトリの中の disk の配信元を、登録したフォルダの設定・スキーマ・スクリプトで配信する（正常系）。"""
+    # 準備
+    company = make_local_source()
+    caplog.set_level(logging.ERROR)
+    # 実行
+    env = make_server(company)
+    docs = env.client.get("/sources/company/docs")
+    refs = env.client.get("/sources/company/refs")
+    # 検証
+    assert docs.status_code == 200
+    assert [row["bodyPath"] for row in docs.json()["documents"]] == ["src/app.py"]
+    assert refs.json()["git"] is False
+    assert "config[0]: develop に project-index.local.yaml がありません" not in caplog.text
+
+
+def test_normal_when_git_storage_outside_work_tree(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Git の作業ツリーの外部のフォルダに storage.type: git を指定した配信元を外して配信する（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    notes = make_source("notes", git=False, storage="git")
+    caplog.set_level(logging.ERROR)
+    # 実行
+    env = make_server(sample, notes)
+    # 検証
+    assert env.client.get("/sources/notes/docs").status_code == 404
+    assert env.client.get("/sources/sample/docs").status_code == 200
+    assert env.call("describe", cwd=str(sample.folder)).is_error is False
+    assert (
+        "notes: sources[1].storage.type: フォルダが Git の作業ツリーの中にありません" in caplog.text
+    )

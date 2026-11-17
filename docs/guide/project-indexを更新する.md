@@ -71,7 +71,7 @@ update と project-index migrate で project-index を更新し、端末の設�
 
 ## 失敗したとき
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 事象 | 動き |
 | --- | --- |

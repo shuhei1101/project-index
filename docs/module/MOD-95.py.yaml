@@ -286,3 +286,30 @@ functions:
         condition: 引数なし
         mock: なし
         expected: 15 件で、先頭が `mcp/docs/instructions`、`mcp/admin/tools/check-project` を含む
+  - name: tool_unexpected_error
+    title: 想定外の例外の変換
+    kind: 関数
+    container: project_index/server/mcp/result.py
+    usecase: 共通
+    role: 変換
+    summary: '`ProjectIndexError` でない例外を、例外の型と内容を持つ `isError: true` の結果にする'
+    scope: public
+    thread_safe: true
+    args:
+      - name: error
+        title: 例外
+        type: Exception
+        required: true
+        passing: positional
+        description: サービスが送った想定外の例外
+    returns:
+      type: mcp.types.CallToolResult
+      description: '`isError: true` の結果'
+    process: '1. text を `UnexpectedError: {例外のクラス名}: {str(error)}` の 1 行にし、`isError=True` で返す'
+    unit_tests:
+      - name: test_tool_unexpected_error
+        case: 正常
+        summary: GitError
+        condition: '`GitError(["archive", "abc"], -1, "20 秒を超えたため止めました", timed_out=True)`'
+        mock: なし
+        expected: '`isError` が `True`、text が `UnexpectedError: GitError: git archive abc: 20 秒を超えたため止めました`'

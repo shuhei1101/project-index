@@ -1,0 +1,21 @@
+$ TMPDIR=/home/shuhei2441/.cache/pi-pytest-tmp uv run pytest tests/unit/
+# /tmp/pytest-of-shuhei2441 が root の所有で pytest の一時フォルダを作れないため、TMPDIR で一時フォルダの場所だけを変えて実行した
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_parse_field_path_when_any_depth
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_parse_field_path_when_any_depth_misplaced[not-head]
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_parse_field_path_when_any_depth_misplaced[alone]
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_parse_field_path_when_any_depth_misplaced[twice]
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_get_field_when_any_depth[elements]
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_get_field_when_any_depth[items]
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_set_field_when_any_depth
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_delete_field_when_any_depth
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_resolve_metadata_when_any_depth
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_field_arrays
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_field_arrays_when_not_list[not-list]
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_field_arrays_when_not_list[missing]
+FAILED tests/unit/project_index/features/write/test_apply.py::test_expand_array_keys_when_any_depth[set]
+FAILED tests/unit/project_index/features/write/test_apply.py::test_expand_array_keys_when_any_depth[unset]
+FAILED tests/unit/project_index/features/write/test_apply.py::test_expand_array_keys_when_any_depth[data]
+FAILED tests/unit/project_index/features/write/test_apply.py::test_expand_array_keys_when_any_depth[text-edits]
+FAILED tests/unit/project_index/features/write/test_service.py::test_delete_docs_when_unlink_nested
+======================= 17 failed, 1005 passed in 24.31s =======================

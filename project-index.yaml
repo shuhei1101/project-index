@@ -128,6 +128,21 @@ documents:
       visibility: visibility
       tags: tags[].name
       main_tags: tags[main].name
+  - id: layout
+    title: フォルダ構成
+    alias_type: doc
+    paths: ["docs/layout/*.yaml"]
+    exclude: [index.yaml]
+    schema:
+      source: knowledge
+      path: schemas/design/layout.schema.yaml
+      ref: design-schemas/v8.2.0
+    metadata:
+      name: title
+      description: lead
+      visibility: visibility
+      tags: tags[].name
+      main_tags: tags[main].name
   - id: glossary
     title: 用語集
     paths: ["docs/glossary/*.yaml"]

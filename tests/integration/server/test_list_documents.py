@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from project_index.integrations.git import GIT_ARCHIVE_TIMEOUT_SEC
 from tests.integration.server.conftest import FILES_SCHEMA_TEMPLATE
 
 if TYPE_CHECKING:
@@ -180,3 +181,55 @@ def test_error_when_not_found(
     assert no_ref.status_code == 404
     assert no_ref.json()["missing"] == "ref"
     assert "no-such-branch" in no_ref.json()["detail"]
+
+
+def test_error_when_revision_export_times_out(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    commit_all: Callable[..., str],
+    run_git: Callable[..., str],
+    time_out_archive: Callable[..., list[str]],
+) -> None:
+    """親の commit の書き出しが上限を超えたとき、止めた処理と理由を返す（異常系）。"""
+    # 準備
+    source = make_source("sample", main_files(), branch="main")
+    parent = run_git(source.folder, "rev-parse", "HEAD").strip()
+    commit_all(source.folder, {"design/D-3.yaml": "id: D-3\nname: 設計 3\n"}, "docs: 追加")
+    time_out_archive(commits={parent})
+    env = make_server(source)
+    env.wait_background()
+    # 実行
+    response = env.client.get("/sources/sample/docs", params={"ref": parent})
+    latest = env.client.get("/sources/sample/docs")
+    # 検証
+    body = response.json()
+    assert response.status_code == 504
+    assert body["title"] == "RevisionExportTimeoutError"
+    assert body["operation"] == "revision_export"
+    assert body["commit"] == parent
+    assert body["limitSec"] == GIT_ARCHIVE_TIMEOUT_SEC
+    assert "リビジョンの書き出し" in body["detail"]
+    assert f"{GIT_ARCHIVE_TIMEOUT_SEC:g} 秒" in body["detail"]
+    assert list((env.state_dir / "snapshots").glob("*/*.tmp")) == []
+    assert latest.status_code == 200
+
+
+def test_normal_when_disk_storage(
+    make_local_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """disk の配信元は ref を無視して登録したフォルダの文書を返す（正常系）。"""
+    # 準備
+    company = make_local_source()
+    run_git(company.folder, "branch", "master")
+    env = make_server(company)
+    # 実行
+    response = env.client.get("/sources/company/docs", params={"ref": "master"})
+    # 検証
+    body = response.json()
+    assert response.status_code == 200
+    assert body["ref"] == ""
+    assert [(row["path"], row["bodyPath"]) for row in body["documents"]] == [
+        ("files.local.yaml", "src/app.py")
+    ]

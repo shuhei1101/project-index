@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from project_index.features.documents.store import DocumentStore
     from project_index.features.documents.types import Document
     from project_index.features.sources.schema_ref import SchemaRef
+    from project_index.shared.deadline import Deadline
 
 VALIDATOR_ON_READ_CACHE = 4096
 
@@ -50,22 +51,35 @@ class DocumentChecker:
         self._lock = threading.Lock()
 
     def _run_validator(
-        self, target: Target, document: Document, validator_id: str
+        self,
+        target: Target,
+        document: Document,
+        validator_id: str,
+        deadline: Deadline | None = None,
     ) -> tuple[list[Violation], bool]:
         """検査のスクリプト 1 つを動かし、違反と、動かせたかを返す。"""
         entry = target.source.script("validators", validator_id)
+        # 書き込みの期限がある: 過ぎていれば動かさず、制限時間を残りの時間で切る
+        if deadline is not None:
+            deadline.check()
+        timeout_sec = self.timeout_sec if deadline is None else deadline.cap(self.timeout_sec)
         try:
             result = run_script(
                 entry.run,
                 cwd=target.config_base,
                 stdin=document.body,
-                timeout_sec=self.timeout_sec,
+                timeout_sec=timeout_sec,
                 at=script_at(target),
             )
         except ScriptError as error:
+            # 期限で止めたスクリプトは、違反ではなく期限の超過にする
+            if deadline is not None:
+                deadline.check()
             message = " ".join(error.reason.split())
             rule = f"{validator_id}: 検査を実行できませんでした（{message}）"
             return [Violation(path="$", rule=rule)], False
+        if deadline is not None:
+            deadline.check()
         return parse_validator_output(result.stdout, validator_id=validator_id), True
 
     def check(
@@ -75,6 +89,7 @@ class DocumentChecker:
         *,
         on: Literal["read", "write"],
         new: bool = False,
+        deadline: Deadline | None = None,
     ) -> list[Violation]:
         """スキーマ・ID の形・関連の種類・`validators[]` を順に通す。"""
         source = target.source
@@ -91,11 +106,19 @@ class DocumentChecker:
         violations.extend(check_related(document.metadata, source.config.related_types))
         for validator_id in table.validators:
             if on in source.script("validators", validator_id).on:
-                violations.extend(self._validate(target, document, validator_id, on=on))
+                violations.extend(
+                    self._validate(target, document, validator_id, on=on, deadline=deadline)
+                )
         return violations
 
     def _validate(
-        self, target: Target, document: Document, validator_id: str, *, on: Literal["read", "write"]
+        self,
+        target: Target,
+        document: Document,
+        validator_id: str,
+        *,
+        on: Literal["read", "write"],
+        deadline: Deadline | None = None,
     ) -> list[Violation]:
         """`validators[]` の 1 行を通す（読み取りの結果は文書のバージョンごとにキャッシュする）。"""
         key = (target.source.id, document.kind, validator_id, document.version)
@@ -106,7 +129,7 @@ class DocumentChecker:
                     self._read_cache.move_to_end(key)
             if cached is not None:
                 return cached
-        found, ran = self._run_validator(target, document, validator_id)
+        found, ran = self._run_validator(target, document, validator_id, deadline)
         # 動かせなかった結果はキャッシュしない
         if on == "read" and ran:
             with self._lock:
@@ -122,6 +145,7 @@ class DocumentChecker:
         *,
         previous: Mapping[str, Any] | None,
         stopped: str | None = None,
+        deadline: Deadline | None = None,
     ) -> MarkdownCheck:
         """書き込む文書の変えた Markdown の値を mdmark の点検に通す。"""
         schema = self.store.row_schema(target, document.kind)
@@ -130,7 +154,11 @@ class DocumentChecker:
         if not values:
             return MarkdownCheck(violations=[], unchecked=[], stopped=stopped)
         return check_markdown_values(
-            values, cwd=target.base, timeout_sec=self.timeout_sec, stopped=stopped
+            values,
+            cwd=target.base,
+            timeout_sec=self.timeout_sec,
+            stopped=stopped,
+            deadline=deadline,
         )
 
     def clear(self) -> None:

@@ -61,6 +61,12 @@ request:
     default: なし（今の値を残す）
     location: body
     description: '`scope` に当たらない作業場所からも `outside_scope: true` で作業範囲の外（参考）として参照できるか'
+  - name: source.storage.type
+    type: Literal['git', 'disk']
+    required: false
+    default: なし（今の値を残す）
+    location: body
+    description: 配信元の読み書きの方法
 request_example: |-
   ```json
   {"expectedVersion": "a1b2c3", "source": {"outside_read": false}}
@@ -358,5 +364,35 @@ flows:
       - 2 つとも 400 で、`errors` に違反したキーのパスと理由がある
       - '`settings.yaml` が変わらない'
     test: test_error_when_argument_invalid
+  - name: 正常系（読み書きの方法を変更する）
+    summary: 1 行の `storage.type` を `disk` に変え、その配信元を disk の配信元として読み直す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample（`storage` 無し、git リポジトリ）の 1 行'
+      - name: 入力
+        description: '取得した `expectedVersion` と `source.storage.type: disk`'
+    flow: |-
+      <!-- map: {"title": "正常系（読み書きの方法を変更する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as PATCH /settings/sources/{id}
+        participant CF as 端末の設定
+
+        C->>E: PATCH /settings/sources/sample（storage.type: disk）
+        E->>CF: sample の行だけを書き換える
+        E->>E: sample だけを読み直す
+        E-->>C: 200（新しい version）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 200 で、取得したバージョンと違う `version` を返す
+      - '`settings.yaml` の sample の行に `storage.type: disk` が入り、ほかのキーは変わらない'
+      - '再起動せずに `/sources/sample/refs` が `git: false` を返す'
+    test: test_normal_when_storage_changed
 test_file: tests/integration/server/test_patch_settings_source.py
 id: IF-33

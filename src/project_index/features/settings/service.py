@@ -52,6 +52,8 @@ def _to_yaml_row(entry: SourceEntry) -> dict[str, Any]:
         row["enabled"] = False
     if not entry.outside_read:
         row["outside_read"] = False
+    if entry.storage is not None:
+        row["storage"] = {"type": entry.storage.type}
     scope: dict[str, Any] = {}
     if entry.scope.read:
         scope["read"] = list(entry.scope.read)
@@ -88,7 +90,9 @@ def _fill_unsent(entry: SourceEntry, current: Mapping[str, SourceEntry]) -> Sour
         return entry
     sent = entry.model_fields_set
     updates: dict[str, Any] = {
-        key: getattr(found, key) for key in ("enabled", "outside_read") if key not in sent
+        key: getattr(found, key)
+        for key in ("enabled", "outside_read", "storage")
+        if key not in sent
     }
     # scope は read・write を別々に、送られたかで決める
     scope_sent = entry.scope.model_fields_set if "scope" in sent else set[str]()
@@ -111,9 +115,9 @@ def _validate_or_raise(document: object, path: Path) -> None:
         )
 
 
-def _check_version(current: str, expected: str | None) -> None:
-    """要求の内容のバージョンを今の内容のバージョンと照合し、違えば断る（`None` は照合しない）。"""
-    if expected is not None and expected != current:
+def _check_version(current: str, expected: str) -> None:
+    """要求の内容のバージョンを今の内容のバージョンと照合し、違えば断る。"""
+    if expected != current:
         raise SettingsVersionMismatchError(
             message=f"端末の設定が取得した後に書き換えられています（今の内容のバージョン: {current}）",
             next_steps=["端末の設定の配信元を取得し直してから、もう一度書き換えてください"],
@@ -143,7 +147,9 @@ def _apply_patch(entry: SourceEntry, patch: SourcePatch) -> SourceEntry:
     """行に、変更で送ったキーだけを重ねる。"""
     sent = patch.model_fields_set
     updates: dict[str, Any] = {
-        key: getattr(patch, key) for key in ("config", "enabled", "outside_read") if key in sent
+        key: getattr(patch, key)
+        for key in ("config", "enabled", "outside_read", "storage")
+        if key in sent
     }
     # scope は read・write を別々に、送られたかで決める
     if "scope" in sent and patch.scope is not None:
@@ -170,7 +176,7 @@ def _write_and_reload(
 def save_sources(
     sources: Sequence[SourceEntry],
     *,
-    expected_version: str | None = None,
+    expected_version: str,
     path: Path,
     reload: Callable[[TerminalConfig], list[SourceStatus]],
     lock: threading.Lock,
@@ -196,7 +202,7 @@ def save_sources(
 def add_source(
     source: SourceEntry,
     *,
-    expected_version: str | None = None,
+    expected_version: str,
     path: Path,
     reload: Callable[[TerminalConfig], list[SourceStatus]],
     lock: threading.Lock,

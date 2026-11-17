@@ -8,7 +8,7 @@
 `127.0.0.1` だけで待ち受け、作業場所（`cwd`）での絞り込みは持たず、全ての配信元を扱います。
 文書の MCP のツールに入る `cwd`・`session_id`・`agent_id` は、管理の MCP のツールには入りません。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | ツール | 種類 | 役割 |
 | --- | --- | --- |
@@ -55,7 +55,7 @@
 | --- | --- | --- | --- |
 | `format` | `markdown` / `json` | `markdown` | 返す形式 |
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 返すフィールド | 型 | 説明 |
 | --- | --- | --- |
@@ -71,6 +71,8 @@
 | `sources[].version_state` | `current` / `old` / `newer` / null | 配信元の設定の `version` の比較 |
 | `sources[].sync` | obj / null | 索引の同期の件数。`serving` のとき。配信元の検査が済んでいなければ `null` |
 | `loading` | bool | 配信元を読み込んでいる間は `true`。その間の `sources[]` は空 |
+| `checking` | bool | 起動の後・`reload`・端末の設定の保存の後に裏で実行する配信元の検査が済んでいない間は `true` |
+| `exporting` | bool | 配信元ごとの `default_ref` の commit を裏で書き出している間は `true` |
 
 <!-- /table -->
 
@@ -97,6 +99,12 @@ http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
 
 `bind`・`port`・`state_dir` など、反映が「再起動」のキーは読み直しません。
 読み直しは、端末の設定の保存と同じロックで一度に 1 つだけ行います。
+
+`reload` は、配信元の一覧を差し替えた時点で応答します。
+読み直した配信元の検査と、`default_ref` の commit の書き出しは、応答の後に裏で実行します。
+このため、応答の `sources[]` の `sync` は `null` です。
+読み直しが済んだかは、`status` の `checking` が `false` になったことで確認します。
+検査の最中にもう一度 `reload` を呼んでも前の検査を待たずに応答し、索引の同期の件数は後に読み直した設定の検査の結果になります。
 
 | 引数 | 型 | 既定 | 説明 |
 | --- | --- | --- | --- |
@@ -175,11 +183,12 @@ http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
 
 | 引数 | 型 | 必須 | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
-| `path` | str | ✅ | - | 配信元のフォルダか、その `project-index.yaml` の絶対パス |
+| `path` | str | ✅ | - | 配信元のフォルダか、配信元の設定のファイル（`project-index.yaml`・`project-index.local.yaml` など）の絶対パス |
+| `storage_type` | `git` / `disk` | - | `path` が Git の作業ツリーの中なら `git`、外なら `disk` | 配信元の読み書きの方法。`disk` は Git を参照せず、ディスクの設定・スキーマ・スクリプト・文書で検査する。ローカル運用の配信元を端末の設定に記載する前に確かめるときに渡す |
 | `config` | str | - | `path` の `project-index.yaml` を読む | ファイルに記載する前の `project-index.yaml` の中身（YAML の文字列）。記載する前の設定を確かめるときに渡す |
 | `format` | `markdown` / `json` | - | `markdown` | 返す形式 |
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 返すフィールド | 型 | 説明 |
 | --- | --- | --- |
@@ -193,7 +202,7 @@ http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
 | `missing_paths[]` | list[str] | `documents[].paths` などが指して無いフォルダ・ファイル |
 | `script_errors[].script` | str | 確かめに失敗したスクリプトのパス |
 | `script_errors[].reason` | str | 終了コードと標準エラーの要約 |
-| `sync` | obj | 索引の同期の件数。`metadata` の列の欠け・索引に無いファイル・ファイルが無い行・どの文書にも当たらない関連 |
+| `sync` | obj | 索引の同期の件数。`metadata` の列の欠け・索引に無いファイル・ファイルが無い行・どの文書にも当たらない関連。`*.local.*` の名前のファイルは索引に無いファイルに数えない |
 | `sync.items[]` | list | 件数の内訳（種類とパス）。先頭 50 件まで。件数は全件を数える |
 | `warnings[].path` | str | 警告したキーのパス（`nav.tabs[2].items[0].auto.filter`） |
 | `warnings[].rule` | str | 警告の理由。`nav` の `auto` の条件がどの文書にも当たらないときは、タブの名前と条件 |
@@ -250,7 +259,7 @@ http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
 `nav` 以外のキーとコメントはそのまま残し、commit はしません。
 配信中の配信元には、`default_ref` へ commit された後の要求から入ります。
 
-<!-- table: data -->
+<!-- table: {"kind": "data"} -->
 
 | 引数 | 型 | 必須 | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

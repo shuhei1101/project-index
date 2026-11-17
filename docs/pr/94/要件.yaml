@@ -1,0 +1,47 @@
+use_cases:
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: run_only
+    detail: 画面のサーバーの参照と設定の変更の流れは変わらないが、最初の参照と読み直しの応答の時点が変わるため回帰を確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: changed
+    detail: 配信元ごとの最初の参照も 2 回目以降と同じ程度の時間で返り、上限を超えて止めたときは止めた処理と理由が伝わる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: changed
+    detail: 起動の後の配信元の読み込みで、最初の参照に要る準備を先に済ませる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: changed
+    detail: 読み直しが配信元の一覧を差し替えた時点で応答し、読み直しの完了を状態の取得で確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-12.yaml
+    impact: following
+    detail: 端末の設定の配信元を丸ごと変えたときの読み直しも、同じく差し替えた時点で応答する
+    depends_on:
+      - docs/scenario/SC-10.yaml
+docs:
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: '`## reload` に応答の時点と、読み直しが済んだかを `status` で確かめる方法を書き、`## status` に読み直し・検査の最中を表す値を足す'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-16T17:03:52.952024+00:00'
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: 読み取り API の設定・文書の一覧・文書の取得・検索の主なエラーに 504（`RevisionExportTimeoutError`）を足し、端末の設定の API の読み直しの応答の時点を管理の MCP の `reload` への参照で記載する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-16T17:08:08.971649+00:00'
+scope_out:
+  - item: 起動から `GET /sources` に 2 秒以内に応答するまでの時間（#85 の計測で 506.7 秒）
+    reason: '#85 の終わりの条件は配信元ごとの最初の問い合わせで、起動の後の全ての配信元の読み込みにかかる時間は含まないと判断した。ただし、先に書き出しを済ませると起動の後の読み込みが延びうるため、スコープに含めるかはレビューで確定する'
+    plan: '#97'
+  - item: dev-docs の側の 2 回目以降の取得の短縮と、文書の取得全体の制限時間
+    reason: dev-docs のリポジトリの対処で、shuhei1101/dev-docs#230 が進めている
+    plan: none

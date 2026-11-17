@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
 from project_index.features.access.types import SourceAccess
@@ -30,7 +31,16 @@ def _loaded_handlers(terminal: TerminalConfig) -> Handlers:
     """部品を本物で配線し、配信元を読んだ配線済みの関数を作る。"""
     handlers = build_handlers(terminal)
     handlers.reload_sources(terminal)
+    _wait_checked(handlers)
     return handlers
+
+
+def _wait_checked(handlers: Handlers) -> None:
+    """裏の検査とリビジョンの書き出しが済むまで待つ（30 秒を超えたら AssertionError）。"""
+    deadline = time.monotonic() + 30
+    while handlers.checks.checking or handlers.snapshots.exporting:
+        assert time.monotonic() < deadline, "待ち時間の上限を超えた"
+        time.sleep(0.05)
 
 
 def _access(source_id: str, access: str = "write", description: str = "") -> SourceAccess:
