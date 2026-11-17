@@ -310,6 +310,9 @@ YAML として読めないファイルがあっても、そのファイルを除
 
 `main_tags` の `set`・`add_to` に `tags` に無い名前を渡すと、`InvalidArgumentError` です。
 
+行の `metadata` が `related: "**.refs[]"` のように `**.` で始まる列名のとき、`related` への操作（`data`・`set`・`add_to`・`remove_from`・`unset`・`text_edits`）は書き込む場所が 1 つに決まらないため `InvalidArgumentError` です。
+`refs`・`functions[0].refs` などの列名で渡します。
+
 全ての操作を当ててから 1 回だけ検証し、通ったときだけ一時ファイルに書いてから置き換えます。
 読み込み・検査・書き込みは配信元ごとの排他ロックの中で行い、書いた後に `generators[]` を流します。
 
