@@ -198,6 +198,9 @@ flows:
       - name: ずれた管理用の YAML
         description: 'sample の `src/files.yaml` が `a.py` と `c.py` の 2 行を持ち、`src/` には `a.py` と `d.py`、`src/sub/e.py` を置く。行 `src` は `records: files`・`body_file: path`。`a.py` の行が `related: [{to: src/z.py, type: tests}]` を持つ'
         notes: '`c.py` はファイルが無い行、`d.py` と `sub/e.py` は索引に無いファイル、`src/z.py` はどの文書にも該当しない関連'
+      - name: 同じファイルを文書にする行
+        description: 'sample の行 `py`（`paths: [src/a.py]`）を配置する'
+        notes: '`src/a.py` は行 `src` と行 `py` の文書になる'
     flow: |-
       <!-- map: {"title": "正常系（メタデータと管理用の YAML がずれている）"} -->
 
@@ -219,6 +222,7 @@ flows:
       - 警告のログに sample の行 `rules` の `metadata` の列の欠け 1 件（`name` の `title`）がある
       - 警告のログに行 `src` の索引に無いファイル 2 件（`src/d.py`・`src/sub/e.py`）とファイルが無い行 1 件（`c.py`）があり、`src/files.yaml` 自身は数えない
       - '警告のログにどの文書にも該当しない関連 1 件（`src: src/a.py: src/z.py`）がある'
+      - '警告のログに 2 つ以上の行が文書にするファイル 1 件（`src/a.py: src・py`）がある'
       - ずれが無い配信元では件数の警告を残さない
     test: test_normal_when_metadata_out_of_sync
   - name: 正常系（前の形式の配信元）

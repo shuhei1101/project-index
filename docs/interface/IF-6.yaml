@@ -1058,6 +1058,77 @@ flows:
       - 書き換えた文書 2 の YAML は、元の 2 要素の全ての行が書き込み前の文字列と一致し、追加した要素の `- ` を 2 文字の字下げで配置し、続きの行（`label:`）が元の要素の続きの行と同じ列に並ぶ
       - 2 件とも `results[0].diff` が追加した要素の 2 行の `+` だけを持つ
     test: test_normal_when_indent_preserved
+  - name: 正常系（参照の型の項目のパスで配列の要素の中を置き換える）
+    summary: '`text_edits` の `field` に `#` で始まる参照の型の項目のパスを渡し、`x-key` の値で指した配列の要素の中の文字列の一部を置き換える'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 種類のスキーマ
+        description: 'sample の種類のスキーマが `functions`（`x-key: name` の配列。要素は `name`・`process` を持つ）を定める'
+        notes: '`functions` の定義は `$ref` で別の定義を指す'
+      - name: 文書 1
+        description: '`functions` が `load`・`save`・`save` の順の 3 要素で、どれも `process` に `書き出す` を含む'
+      - name: 入力
+        description: '1 回目は `text_edits: [{field: "#functions[save].process", old: 書き出す, new: 保存する}]`。2 回目は `field` を `#functions[save#2].process` にした同じ操作。3 回目は `field` を `functions[save].process` にした同じ操作'
+        notes: 3 回目は `#` で始まらない既存の項目のパス（`[save]` はキー `save` が真の要素を選ぶ）
+    flow: |-
+      <!-- map: {"title": "正常系（参照の型の項目のパスで配列の要素の中を置き換える）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: update 文書 1（text_edits #functions[save].process）
+        T->>T: 種類のスキーマの x-key で functions[1].process に解決して置き換える
+        T->>WT: YAML を書き換える
+        T-->>C: updated
+        C->>T: update 文書 1（text_edits #functions[save#2].process）
+        T->>T: functions[2].process に解決して置き換える
+        T-->>C: updated
+        C->>T: update 文書 1（text_edits functions[save].process）
+        T-->>C: isError（文字列ではない項目）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目は 1 つ目の `save` の `process` の `書き出す` だけが `保存する` になり、`load` と 2 つ目の `save` は変わらない
+      - 2 回目は 2 つ目の `save` の `process` だけが置き換わる
+      - 3 回目は既存の項目のパスのまま読み、`text_edits[0].field` の「文字列ではない項目は置き換えられません」を返却し、ファイルを書き換えない
+    test: test_normal_when_text_edits_ref_path
+  - name: 異常系（参照の型の項目のパスが要素を指せない・InvalidArgumentError）
+    summary: '`x-key` の無い配列・該当する要素の無い値・無い順番を指す参照の型の項目のパスを断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 種類のスキーマと文書 1
+        description: 正常系（参照の型の項目のパスで配列の要素の中を置き換える）と同じ。スキーマは `x-key` を持たない配列 `steps`（要素は `name`・`body`）も定め、文書 1 は `steps` に 1 要素を持つ
+      - name: 入力
+        description: '`text_edits` の `field` を、順に `#steps[a].body`・`#functions[missing].process`・`#functions[save#3].process` にした 3 回の `update`'
+    flow: |-
+      <!-- map: {"title": "異常系（参照の型の項目のパスが要素を指せない・InvalidArgumentError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: update 文書 1（text_edits #steps[a].body）
+        T-->>C: isError（x-key の無い配列）
+        C->>T: update 文書 1（text_edits #functions[missing].process）
+        T-->>C: isError（該当する要素が無い）
+        C->>T: update 文書 1（text_edits #functions[save#3].process）
+        T-->>C: isError（無い順番）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目は `text_edits[0].field` の違反で、`steps` が `x-key` を持たないことを返却する
+      - 2 回目は `text_edits[0].field` の違反で、`functions` に `name` が `missing` の要素が無いことを返却する
+      - 3 回目は `text_edits[0].field` の違反で、`name` が `save` の要素が 2 つしか無いことを返却する
+      - いずれもファイルを書き換えない
+    test: test_error_when_text_edits_ref_path_unresolved
 lead: 文書の作成・部分更新・置き換えを検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -1221,8 +1292,8 @@ request:
     type: str
     required: true
     location: argument
-    description: 置き換える文字列の項目のパス。`@body` は本文のファイルの一部を置き換える
-    notes: '`@body` は `records`・`body_file` の行の文書だけ'
+    description: 置き換える文字列の項目のパス。`@body` は本文のファイルの一部を置き換える。`#` で始まるパスは参照の型の項目のパス（`#functions[apply_migration].process`）で、配列の要素を種類のスキーマの `x-key` の値で指す
+    notes: '`@body` は `records`・`body_file` の行の文書だけ。参照の型の項目のパスの読み方は制約の「参照の型の項目のパス」'
 request_example: |-
   ```json
   {
@@ -1293,7 +1364,7 @@ exceptions:
     condition: '`update`・`replace` の `id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
   - name: InvalidArgumentError
-    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先のファイル名が行の `exclude[]` に当たる・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した'
+    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先のファイル名が行の `exclude[]` に当たる・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す'
   - name: SourceNotServedError
     condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
   - name: WorktreeNotMatchedError
@@ -1374,6 +1445,9 @@ constraints:
     notes: 今は要素の値だけから求めているため、`records`・`body_file` の行の文書の `version` はこの変更で 1 度だけ変わる
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、作業場所が `scope.write` に当たれば登録したフォルダへ書き、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく `created`・`updated` を付ける。`worktree` を指定すると `InvalidArgumentError`'
+  - item: 参照の型の項目のパス
+    constraint: '`text_edits[].field` が `#` で始まるとき、`#` の後を種類のスキーマ（`$ref` を解決した後）と文書でたどり、位置で指す項目のパスに解決してから既存の取得・書き込みで置き換える。配列の項目の `[{値}]` はスキーマの `x-key` のキーがその値の最初の要素、`[{値}#{順番}]` は同じ値の要素のその順番の要素（同じ値の要素が無く、末尾が `#{整数}` のときだけ）、辞書の項目の `[{キー}]` はそのキー（`.` や空白を含んでも 1 階層）を指す。`[]` の外の `.` で区切った名前は辞書のキー。共通のキーの列名への読み替えはしない。`text_edits[].field` だけが受け付け、`set`・`unset`・`add_to`・`remove_from` と `metadata` の列名・`search_docs`・`list_changes` の項目のパスの読み方は変えない'
+    notes: 書き方は設計書の参照の型（`{ID}#{項目のパス}`）の `#` から後と同じ。`#` で始まらない既存の `[{キー}]`（キーが真の要素）とは `#` の有無で分ける
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]
