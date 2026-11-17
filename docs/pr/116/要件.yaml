@@ -35,7 +35,7 @@ scope_out:
     reason: テスト実行方法のスキーマの run_runner の決まりで、workflow は workflow_dispatch だけで起動する
     plan: none
   - item: develop で結合テスト 2 件（`test_describe.py::test_normal_when_rechecked_after_write`・`test_search_docs.py::test_error_when_unexpected`）が毎回 fail し、1 件（`test_describe.py::test_normal_when_warned`）がときどき fail する
-    reason: 結合テストが base のままで fail する不具合で、今回の要望（テストを回す場所の整備）に含まれない
+    reason: '結合テストが base のままで fail する不具合で、今回の要望（テストを回す場所の整備）に含まれない。ランナーでだけ fail する `test_try_convert.py::test_error_when_invalid_config` も #117 に追記した'
     plan: '#117'
   - item: '`write_docs` で目次の `items` に行を追加すると、既存の全ての行の字下げが変わる'
     reason: 規約『既存文章の維持』の「差分は意図のある変更だけ」に反する差分を出す不具合で、今回の要望に含まれない。この PR では `docs/interface/index.yaml` を手で 2 行追記した
