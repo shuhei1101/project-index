@@ -1,0 +1,1 @@
+# write_docs の add_to・remove_from で x-key の値で配列の要素を指し、管理用の YAML に無いファイルの判定で .git のファイルと .gitignore に当たるファイルを数えない
