@@ -203,6 +203,7 @@ def load_terminal_config(
             "script_timeout_sec",
             "write_deadline_sec",
             "worktree_load_wait_sec",
+            "mdmark_ref",
         )
         if key in data
     }

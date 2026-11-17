@@ -54,6 +54,31 @@ data_models:
         title: 起動し直すか
         type: bool
         description: '`updated` で `migration_needed` でなければ `True`'
+      - name: mdmark
+        title: mdmark の CLI の入れ直し
+        type: MdmarkReinstallResult | None
+        default: None
+        description: '`git pull` が成功し、`PATH` に `mdmark` があるときの入れ直した結果'
+  - name: MdmarkReinstallResult
+    title: mdmark の CLI の入れ直しの結果
+    container: project_index/features/lifecycle/types.py
+    usecase: 更新
+    role: DTO
+    summary: '`update` が mdmark の CLI を入れ直した結果'
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: ref
+        title: 参照
+        type: str
+        description: 入れた mdmark の参照（端末の設定の `mdmark_ref`）
+      - name: reinstalled
+        title: 入れ直せたか
+        type: bool
+        description: '`npm install -g` が終了コード 0 で終わったら `True`'
+      - name: error
+        title: 入れ直せなかった理由
+        type: str | None
+        description: 実行したコマンドと、終了コード・打ち切り・コマンドが無いこと・標準エラーの末尾。`reinstalled` が `True` のときは `None`
 constants:
   - name: COMMAND_TIMEOUT_SEC
     title: 更新のコマンドの打ち切り
@@ -73,3 +98,9 @@ constants:
     usecase: 再起動
     summary: '`os.execv` に渡す `sys.executable` の後ろの引数'
     value: ('-m', 'project_index', 'serve')
+  - name: MDMARK_PACKAGE
+    title: mdmark の配布元
+    container: project_index/features/lifecycle/types.py
+    usecase: 更新
+    summary: '`npm install -g` に渡す mdmark の配布元（`#` の後ろに `mdmark_ref` をつなぐ）'
+    value: '"github:shuhei1101/mdmark"'
