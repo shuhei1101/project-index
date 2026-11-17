@@ -349,7 +349,7 @@ mdmark の CLI が `PATH` に無いか、点検が端末の設定の `script_tim
 - ID の列の値を持たない文書（ID がパスの文書）は `new_id` を受けず、`new_path` で ID も変わります
 - 書き換える参照元の箇所は、`related` の `to`（`source` を持たない行）・値の全体が `{旧 ID}#{項目のパス}` の値・文字列の中の `id:{旧 ID}`（Markdown のリンクと `click` の `href`）・パスが変わるときは値の全体と Markdown のリンクの先のうちその文書のフォルダから改名前のパスを指す値（`index.yaml` の `page` など）です。改名した文書自身の中の参照も書き換えます
 - 本文のファイルの中と、ほかの配信元からの参照は書き換えません
-- 改名後の ID が既にある文書と重なるとき・`ids.format` に合わないときは `new_id` の違反、`new_path` が種類の行の `paths` に該当しないとき・既にあるファイルを指すときは `InvalidArgumentError` です
+- 改名後の ID が既にある文書と重なるとき・`ids.format` に合わないときは `new_id` の違反、`new_path` が種類の行の `paths` に該当しないか `exclude[]` に該当するとき・既にあるファイルを指すときは `InvalidArgumentError` です
 
 ### 一括置換
 
