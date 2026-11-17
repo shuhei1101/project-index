@@ -465,10 +465,9 @@ def test_normal_when_metadata_out_of_sync(
         "2 つ以上の行が文書にするファイル 1 件" in m and "src/a.py: src・py" in m
         for m in sample_warnings
     )
-    assert any(
-        "ID が重なる文書 1 件" in m
-        and "doc-1: sample（docs/doc-1.yaml）・sample（docs/doc-3.yaml）" in m
-        for m in sample_warnings
+    assert (
+        "sample: ID が重なる文書 1 件: doc-1: sample（docs/doc-1.yaml）・sample（docs/doc-3.yaml）"
+        in sample_warnings
     )
     assert not any("src: src/files.yaml" in m for m in sample_warnings)
     assert [message for message in warnings if message.startswith("clean:")] == []
