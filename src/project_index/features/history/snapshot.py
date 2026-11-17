@@ -12,10 +12,10 @@ import threading
 from typing import TYPE_CHECKING
 
 from project_index.integrations.git import GIT_ARCHIVE_TIMEOUT_SEC, GitError, run_git
+from project_index.shared.background import BackgroundGate
 from project_index.shared.errors import RevisionExportTimeoutError
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
     from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -28,9 +28,13 @@ __all__ = ["SNAPSHOT_KEEP", "SnapshotStore", "run_git"]
 class SnapshotStore:
     """commit のファイルを `state_dir` の下に書き出し、同じ commit は書き出したフォルダを返す。"""
 
-    def __init__(self, dir: Path, keep: int = SNAPSHOT_KEEP) -> None:
+    def __init__(
+        self, dir: Path, keep: int = SNAPSHOT_KEEP, *, gate: BackgroundGate | None = None
+    ) -> None:
         self.dir = dir
         self.keep = keep
+        # 裏の書き出しを、要求の応答中は commit 1 件ごとに休ませる関所
+        self.gate = gate if gate is not None else BackgroundGate()
         self._locks: dict[Path, threading.Lock] = {}
         self._guard = threading.Lock()
         # 裏の書き出しの開始が起こして終えていないスレッドの数
@@ -42,29 +46,17 @@ class SnapshotStore:
         with self._guard:
             return self._background > 0
 
-    def checkout_later(
-        self, targets: list[tuple[Path, str]], *, after: Sequence[threading.Thread] = ()
-    ) -> threading.Thread:
-        """渡したスレッドの終了を待ってから、渡した commit を裏のスレッドで順に書き出す。"""
+    def checkout_later(self, targets: list[tuple[Path, str]]) -> threading.Thread:
+        """渡した commit を裏のスレッドで順に書き出し、待たずに戻る。"""
         with self._guard:
             self._background += 1
 
         def work() -> None:
             try:
-                # 検査を終えてから書き出す
-                for thread in after:
-                    thread.join()
-                for repo_root, commit in targets:
-                    try:
-                        self.checkout(repo_root, commit)
-                    except (RevisionExportTimeoutError, GitError) as error:
-                        # 止めた commit は次の要求が書き出し直すので、ログに残して次へ進む
-                        logger.warning(
-                            "裏のリビジョンの書き出しを止めた（%s・%s・%s）",
-                            repo_root,
-                            commit,
-                            error,
-                        )
+                # commit 1 件ごとに、要求の応答中は関所で休みを挟む
+                with self.gate.background():
+                    for repo_root, commit in targets:
+                        self._checkout_unit(repo_root, commit)
             finally:
                 with self._guard:
                     self._background -= 1
@@ -72,6 +64,20 @@ class SnapshotStore:
         thread = threading.Thread(target=work, name="project-index-revision-export", daemon=True)
         thread.start()
         return thread
+
+    def _checkout_unit(self, repo_root: Path, commit: str) -> None:
+        """裏の処理の 1 件として commit を書き出し、止まった書き出しはログに残して戻る。"""
+        with self.gate.unit():
+            try:
+                self.checkout(repo_root, commit)
+            except (RevisionExportTimeoutError, GitError) as error:
+                # 止めた commit は次の要求が書き出し直すので、ログに残して次へ進む
+                logger.warning(
+                    "裏のリビジョンの書き出しを止めた（%s・%s・%s）",
+                    repo_root,
+                    commit,
+                    error,
+                )
 
     def _lock_for(self, target: Path) -> threading.Lock:
         """commit ごとの排他を引く（無ければ作る）。"""

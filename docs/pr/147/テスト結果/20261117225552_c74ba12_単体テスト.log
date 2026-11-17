@@ -1,0 +1,46 @@
+$ gh workflow run test.yml --ref fix/project-index/startup-docs-list-wait -f layer=unit （TP-1 の TL-1 の run_runner）
+run: https://github.com/shuhei1101/project-index/actions/runs/44097535098
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 1131 items / 4 errors
+
+==================================== ERRORS ====================================
+_ ERROR collecting tests/unit/project_index/features/describe/test_source_checks.py _
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/describe/test_source_checks.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/describe/test_source_checks.py:11: in <module>
+    from project_index.shared.background import BackgroundGate
+E   ModuleNotFoundError: No module named 'project_index.shared.background'
+__ ERROR collecting tests/unit/project_index/features/documents/test_store.py __
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/documents/test_store.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/documents/test_store.py:22: in <module>
+    from project_index.shared.background import BackgroundGate
+E   ModuleNotFoundError: No module named 'project_index.shared.background'
+_ ERROR collecting tests/unit/project_index/features/history/test_snapshot.py __
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/history/test_snapshot.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/history/test_snapshot.py:13: in <module>
+    from project_index.shared.background import BackgroundGate
+E   ModuleNotFoundError: No module named 'project_index.shared.background'
+_____ ERROR collecting tests/unit/project_index/shared/test_background.py ______
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/shared/test_background.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/shared/test_background.py:8: in <module>
+    from project_index.shared.background import BackgroundGate
+E   ModuleNotFoundError: No module named 'project_index.shared.background'
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/describe/test_source_checks.py
+ERROR tests/unit/project_index/features/documents/test_store.py
+ERROR tests/unit/project_index/features/history/test_snapshot.py
+ERROR tests/unit/project_index/shared/test_background.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 4 errors during collection !!!!!!!!!!!!!!!!!!!!
+============================== 4 errors in 2.65s ===============================

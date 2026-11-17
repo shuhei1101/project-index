@@ -141,13 +141,16 @@ def nav_warnings(
     today = today or datetime.now(UTC).astimezone().date()
     target = Target(source, source.root, None, None, "read")
     documents = store.load(target).documents
-    fields, columns = nav_fields(store, target, source)
+    # 裏の処理のスレッドでは、手順ごとに裏の処理の 1 件にする（要求のスレッドでは何もしない）
+    gate = store.gate
+    with gate.unit():
+        fields, columns = nav_fields(store, target, source)
     table_ids = [row.id for row in source.config.documents if row.enabled]
-    counts = nav_auto_counts(nav, documents, fields=fields, today=today, columns=columns)
-    return [
-        *check_nav_filters(nav, table_ids=table_ids, fields=fields),
-        *zero_count_warnings(counts),
-    ]
+    with gate.unit():
+        filter_warnings = check_nav_filters(nav, table_ids=table_ids, fields=fields)
+    with gate.unit():
+        counts = nav_auto_counts(nav, documents, fields=fields, today=today, columns=columns)
+    return [*filter_warnings, *zero_count_warnings(counts)]
 
 
 def nav_fields(

@@ -55,6 +55,12 @@ classes:
         access: 内部 (_)
         default: '0'
         description: 裏の書き出しの開始が起こして終えていないスレッドの数。`_guard` で読み書きする
+      - name: gate
+        title: 裏の処理の関所
+        type: BackgroundGate
+        access: 公開
+        default: BackgroundGate()
+        description: 裏の書き出しを、要求の応答中は commit 1 件ごとに休ませる（起動のときに `Handlers.gate` を渡す）
     methods:
       - name: checkout
         title: 書き出す
@@ -132,7 +138,7 @@ classes:
       - name: checkout_later
         title: 裏の書き出しの開始
         kind: メソッド
-        summary: 渡したスレッドの終了を待ってから、渡した commit を裏のスレッドで順に書き出し、待たずに戻る
+        summary: 渡した commit を裏のスレッドで順に書き出し、待たずに戻る
         scope: public
         thread_safe: true
         side_effects: daemon のスレッドを 1 つ起こす。`dir` の下にフォルダを作る
@@ -143,29 +149,21 @@ classes:
             required: true
             passing: positional
             description: リポジトリの直下と commit の組の並び
-          - name: after
-            title: 先に終えるスレッド
-            type: Sequence[threading.Thread]
-            required: false
-            default: ()
-            passing: keyword
-            description: 書き出しの前に `join` するスレッド（配信元の検査）
         returns:
           type: threading.Thread
           description: 起こしたスレッド（テストが join する）
         process: |-
           1. `_guard` を取り、裏の書き出しの数を 1 つ進める
           2. 次を実行する daemon のスレッド（名前 `project-index-revision-export`）を起こして返す
-             - `after` のスレッドを全て `join` する
-             - `targets` を順に書き出す（書き出す）
+             - 裏の処理の関所の裏の処理のスレッド（`gate.background`）の中で、`targets` を順に、commit ごとに裏の処理の 1 件（`gate.unit`）の中で書き出す（書き出す）
                - `RevisionExportTimeoutError`・`GitError` の場合、`[warning]` 裏のリビジョンの書き出しを止めた（リポジトリ・commit・理由）を書き、次の commit へ進む
              - 最後に `_guard` を取り、裏の書き出しの数を 1 つ戻す（例外のときも）
         unit_tests:
           - name: test_snapshot_store_checkout_later
             case: 正常
-            summary: 先のスレッドの後に裏で書き出す
-            condition: 合図まで止まるスレッドを `after` に渡し、一時リポジトリの commit 1 つを書き出す
-            mock: なし（一時フォルダで `git init`）
+            summary: 裏で書き出す
+            condition: '`checkout` を合図まで止める包みにして、一時リポジトリの commit 1 つを書き出す'
+            mock: 書き出す（合図まで止めてから本物を呼ぶ包み）
             expected: 合図の前は書き出しが無く `exporting` が `True`。合図の後に返ったスレッドを join すると書き出しがあり `exporting` が `False`
           - name: test_snapshot_store_checkout_later_when_timed_out
             case: 正常
@@ -173,6 +171,12 @@ classes:
             condition: commit 2 つのうち 1 つ目の `archive` が上限を超える
             mock: gitの実行（指定の commit の `archive` のとき `timed_out` の `GitError` を送る）
             expected: join の後、2 つ目の書き出しだけがあり、`caplog` に `warning` の行が 1 件で `exporting` が `False`
+          - name: test_snapshot_store_checkout_later_when_foreground
+            case: 正常
+            summary: 要求の応答中は commit ごとに休む
+            condition: 関所の `foreground` の中で、一時リポジトリの commit 2 つを書き出して join する
+            mock: 関所の休み（偽物。呼ばれた回数を数える）
+            expected: 2 つの書き出しがあり、休みが 2 回呼ばれる
       - name: exporting
         title: 書き出しの最中
         kind: メソッド

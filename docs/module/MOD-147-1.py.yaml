@@ -1,0 +1,220 @@
+id: MOD-147-1
+title: 索引のサーバー / 共通 / background.py
+lead: 読み取り API・文書の MCP の要求の応答中に、裏の検査と書き出しが使用する時間を抑える関所を受け持ち、共通の background.py を修正するときに参照する。
+diagrams:
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        読み取りAPI ..> 裏の処理の関所 : 要求の応答中
+        文書のMCP ..> 裏の処理の関所 : 要求の応答中
+        配信元の検査 ..> 裏の処理の関所 : 裏の処理のスレッド
+        文書のストア ..> 裏の処理の関所 : ファイル 1 件
+        リビジョンの書き出し ..> 裏の処理の関所 : commit 1 件
+        class 裏の処理の関所 {
+          +要求の応答中()
+          +裏の処理のスレッド()
+          +裏の処理の1件()
+        }
+        click 読み取りAPI href "id:MOD-126"
+        click 文書のMCP href "id:MOD-94"
+        click 配信元の検査 href "id:MOD-21#classes[SourceChecks]"
+        click 文書のストア href "id:MOD-29"
+        click リビジョンの書き出し href "id:MOD-32#classes[SnapshotStore]"
+classes:
+  - name: BackgroundGate
+    title: 裏の処理の関所
+    container: project_index/shared/background.py
+    usecase: 共通
+    role: 状態
+    summary: 要求の応答中は、裏の処理を 1 件ずつ順に進め、1 件の後に休ませて使用する時間を `BACKGROUND_SHARE` に抑える
+    description: 起動のときに 1 つだけ作り、`Handlers.gate` と、リビジョンの書き出し・文書のストア・配信元の検査に渡す。応答中の要求の数は `_guard` で読み書きする。裏の処理のスレッドかはスレッドごとの値（`threading.local`）で持ち、裏の処理のスレッドでなければ 1 件は何もしない（要求のスレッドが同じ読み込みを通っても休まない）。
+    properties:
+      - name: clock
+        title: 時計
+        type: Callable[[], float]
+        access: 公開
+        default: time.perf_counter
+        description: 1 件にかかった時間を測る。テストで差し替える
+      - name: sleep
+        title: 休み
+        type: Callable[[float], None]
+        access: 公開
+        default: time.sleep
+        description: 指定の秒数だけ休む（GIL を手放す）。テストで差し替える
+      - name: _active
+        title: 応答中の要求の数
+        type: int
+        access: 内部 (_)
+        default: '0'
+        description: '`foreground` の中にいる要求の数'
+      - name: _turn
+        title: 裏の処理の順番
+        type: threading.RLock
+        access: 内部 (_)
+        description: 裏の処理の 1 件とその後の休みを 1 つのスレッドだけが行うための排他。入れ子の 1 件も通す
+    methods:
+      - name: foreground
+        title: 要求の応答中
+        kind: メソッド
+        summary: 要求の処理の間、応答中の要求の数を 1 つ進める（`contextmanager`）
+        scope: public
+        thread_safe: true
+        side_effects: 応答中の要求の数を増やし、抜けるときに戻す
+        returns:
+          type: Iterator[None]
+          description: なし
+        process: |-
+          1. `_guard` を取り、応答中の要求の数を 1 つ進める
+          2. 呼び出し側の処理を実行する
+          3. 抜けるとき（例外のときも）に `_guard` を取り、数を 1 つ戻す
+        unit_tests:
+          - name: test_background_gate_foreground
+            case: 正常
+            summary: 応答中の間だけ active
+            condition: '`foreground` を 2 重に入れ、内側だけ抜けた後と、両方抜けた後に `active` を読む'
+            mock: なし
+            expected: 内側を抜けた後は `True`、両方抜けた後は `False`
+          - name: test_background_gate_foreground_when_raised
+            case: 異常
+            summary: 例外で抜けても数を戻す
+            condition: '`foreground` の中で `RuntimeError` を送る'
+            mock: なし
+            expected: '`RuntimeError` が伝わり、`active` が `False`'
+            exception: 呼び出し側の処理が例外を送る
+      - name: background
+        title: 裏の処理のスレッド
+        kind: メソッド
+        summary: このスレッドを、中にいる間だけ裏の処理のスレッドにする（`contextmanager`）
+        scope: public
+        thread_safe: true
+        side_effects: 今のスレッドの値を書き換え、抜けるときに戻す
+        returns:
+          type: Iterator[None]
+          description: なし
+        process: |-
+          1. 今のスレッドの裏の処理の深さを 1 つ進める
+          2. 呼び出し側の処理を実行する
+          3. 抜けるとき（例外のときも）に深さを 1 つ戻す
+      - name: unit
+        title: 裏の処理の 1 件
+        kind: メソッド
+        summary: 裏の処理のスレッドでは、1 件を他の裏の処理と重ならずに実行し、応答中なら 1 件の後に休む（`contextmanager`）
+        scope: public
+        thread_safe: true
+        side_effects: 休む間、他の裏の処理の 1 件を待たせる
+        returns:
+          type: Iterator[None]
+          description: なし
+        process: |-
+          1. 今のスレッドが裏の処理のスレッドでない場合、呼び出し側の処理だけを実行して終える
+          2. `_turn` を取る（他の裏の処理の 1 件と休みが終わるまで待つ）
+          3. `clock` で測りながら呼び出し側の処理を実行する
+          4. 入れ子の一番外の 1 件で、応答中の要求が 1 つ以上あれば、かかった時間 × `(1 - BACKGROUND_SHARE) / BACKGROUND_SHARE` 秒だけ `sleep` で休む（例外のときは休まない）
+          5. `_turn` を放す
+        unit_tests:
+          - name: test_background_gate_unit_when_foreground_active
+            case: 正常
+            summary: 応答中は 1 件の時間の 9 倍だけ休む
+            condition: '`foreground` の中で、別のスレッドが `background` の中に入り、`clock` を 1 秒進める処理を `unit` で実行する'
+            mock: 時計と休み（偽物。休みは渡された秒数を記録する）
+            expected: 休みが 9 秒で 1 回呼ばれる
+          - name: test_background_gate_unit_when_idle
+            case: 正常
+            summary: 応答中でなければ休まない
+            condition: '`foreground` の外で、`background` の中の `unit` を実行する'
+            mock: 時計と休み（偽物）
+            expected: 休みが呼ばれない
+          - name: test_background_gate_unit_when_not_background
+            case: 正常
+            summary: 裏の処理のスレッドでなければ何もしない
+            condition: '`foreground` の中で、`background` に入らずに `unit` を実行する'
+            mock: 時計と休み（偽物）
+            expected: 処理が実行され、休みが呼ばれない
+          - name: test_background_gate_unit_when_nested
+            case: 正常
+            summary: 入れ子の 1 件では一番外だけ休む
+            condition: '`foreground` の中で、`background` の中の `unit` の中でもう 1 つ `unit` に入り、内側で `clock` を 1 秒進める'
+            mock: 時計と休み（偽物）
+            expected: 休みが 9 秒で 1 回だけ呼ばれる
+          - name: test_background_gate_unit_when_concurrent
+            case: 正常
+            summary: 2 本の裏の処理の 1 件が重ならない
+            condition: 2 つのスレッドがそれぞれ `background` の中で、実行中の数を数える `unit` を 20 回ずつ実行する
+            mock: なし
+            expected: 実行中の数の最大が 1
+      - name: active
+        title: 要求の応答中か
+        kind: メソッド
+        summary: 応答中の要求があるかを返す（`property`）
+        scope: public
+        thread_safe: true
+        returns:
+          type: bool
+          description: 応答中の要求の数が 1 以上なら `True`
+        process: 1. `_guard` を取り、応答中の要求の数が 0 より大きいかを返す
+      - name: each
+        title: 裏の処理の繰り返し
+        kind: メソッド
+        summary: 繰り返しの要素 1 つごとに、要素を取り出す処理と呼び出し側の 1 回分の処理を裏の処理の 1 件にする（ジェネレータ）
+        scope: public
+        thread_safe: true
+        args:
+          - name: items
+            title: 繰り返し
+            type: Iterable[T]
+            required: true
+            passing: positional
+            description: リストかジェネレータ（`walk_files` など）
+        returns:
+          type: Iterator[T]
+          description: '`items` の要素を順に返す'
+        process: |-
+          1. `items` から反復子を作る
+          2. 要素ごとに、裏の処理の 1 件（`unit`）の中で次の要素を取り出し、要素を返して呼び出し側の 1 回分の処理が戻るまで 1 件を続ける。要素が無くなったら終える
+        unit_tests:
+          - name: test_background_gate_each_when_foreground_active
+            case: 正常
+            summary: 要素ごとに休む
+            condition: '`foreground` の中で、別のスレッドが `background` の中で 3 要素のジェネレータを `each` で回し、要素を作る処理と呼び出し側の処理に `clock` を 0.5 秒ずつ進める'
+            mock: 時計と休み（偽物）
+            expected: 3 要素を順に返し、休みが 9 秒で 3 回呼ばれる
+      - name: in_background
+        title: 裏の処理のスレッドか
+        kind: メソッド
+        summary: 今のスレッドが `background` の中かを返す（`property`。テストが確認に使用する）
+        scope: public
+        thread_safe: true
+        returns:
+          type: bool
+          description: 今のスレッドの裏の処理の深さが 1 以上なら `True`
+        process: 1. 今のスレッドの裏の処理の深さが 0 より大きいかを返す
+      - name: in_unit
+        title: 裏の処理の 1 件の中か
+        kind: メソッド
+        summary: 今のスレッドが裏の処理の 1 件（`unit`）の中かを返す（`property`。テストが確認に使用する）
+        scope: public
+        thread_safe: true
+        returns:
+          type: bool
+          description: 今のスレッドの 1 件の入れ子の深さが 1 以上なら `True`
+        process: 1. 今のスレッドの 1 件の入れ子の深さが 0 より大きいかを返す
+constants:
+  - name: BACKGROUND_SHARE
+    title: 応答中の裏の処理の時間の割合
+    container: project_index/shared/background.py
+    usecase: 共通
+    summary: 要求の応答中に、裏の検査と書き出しが合わせて使用する時間の割合の上限
+    value: '0.1'
+test_files:
+  - tests/unit/project_index/shared/test_background.py
+refs:
+  - to: IF-15
+    item: constraints[裏の処理の譲り方]
+    type: requires
+    when: 割合・1 件の単位・休み方を変えるときに、起動の制約と合うかを確認する。
+visibility: internal
+tags:
+  - name: topic:検査
+    main: true
+  - name: topic:性能

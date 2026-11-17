@@ -113,6 +113,27 @@ def test_build_docs_mcp_when_call(
     assert result.structured_content is not None
 
 
+def test_build_docs_mcp_when_foreground(
+    make_mcp_handlers: Callable[..., Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """サービスの処理の間だけ要求の応答中になる（正常系）。"""
+    # 準備
+    handlers = make_mcp_handlers()
+    seen: list[bool] = []
+
+    def fake_search_docs(request: SearchRequest, **kwargs: Any) -> SearchResult:
+        seen.append(handlers.gate.active)
+        return SearchResult(total_count=0, returned=0, view="summary")
+
+    monkeypatch.setattr(docs_module, "search_docs", fake_search_docs)
+    mcp = build_docs_mcp(handlers)
+    # 実行
+    asyncio.run(mcp.call_tool("search_docs", {"source": "sample", "format": "json"}))
+    # 検証
+    assert seen == [True]
+    assert handlers.gate.active is False
+
+
 def test_build_docs_mcp_when_error(
     make_mcp_handlers: Callable[..., Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:

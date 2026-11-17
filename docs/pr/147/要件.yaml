@@ -1,0 +1,35 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: changed
+    detail: 起動の後の裏の検査の進め方を、利用者が開いた配信元の文書の一覧を CPU の取り合いで待たせない進め方へ変える
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: changed
+    detail: 起動の直後、裏の検査の最中に配信元を開いても、文書の一覧が検査との取り合いで待たされずに返ることを期待値に加える
+    depends_on:
+      - docs/scenario/SC-4.yaml
+docs:
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: 再読み込み・起動の後に裏で実行する検査の説明を、新しい検査の進め方（読み取りの要求との取り合いを避ける）に合わせる
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-17T13:47:30.399605+00:00'
+scope_out:
+  - item: dev-docs の画面のサーバーが文書の一覧の問い合わせを打ち切る 45 秒の制限時間の見直し
+    reason: dev-docs の画面のサーバーの値で、project-index の変更ではない。依頼元の dev-docs#225（作業 PR dev-docs#262）が扱う
+    plan: none
+  - item: 書き出しが済んだ後の文書の一覧の応答時間（2〜6 秒）の短縮
+    reason: 要望は起動の直後の待ちに限る。書き出しが済んだ後の応答は本文の計測で数秒で返っている
+    plan: none
+  - item: 起動の直後に最初に開いた配信元の、配信元の読み込みの完了待ちと要求の中の git archive（dev-docs で約 17 秒）
+    reason: 裏の検査との競合と別の待ちで、競合を除いても残る。確認ログの要件の見直し（推奨案 A）で別の Issue にした
+    plan: '#160'
+  - item: 文書の多い配信元（ai-monitor）の文書の一覧の読み込みの時間（1 回目約 12 秒・2 回目 6〜9 秒）
+    reason: 裏の検査との競合と別の待ちで、競合を除いても残る。確認ログの要件の見直し（推奨案 A）で別の Issue にした
+    plan: '#161'
+  - item: write の単体テスト 2 ファイル（test_references.py・test_replace.py）の import の並びの lint の違反（ruff の I001）
+    reason: ruff の I001 の違反で、#157 で develop に入った。今回の要望に含まれない
+    plan: '#166'

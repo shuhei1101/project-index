@@ -27,6 +27,7 @@ from project_index.features.documents.types import Document, LoadProblem, LoadRe
 from project_index.features.history.query import file_dates, resolve_ref
 from project_index.features.history.types import FileDates
 from project_index.integrations.git import GitError, ignored_paths, run_git
+from project_index.shared.background import BackgroundGate
 from project_index.shared.errors import DocumentNotFoundError
 from project_index.shared.narrowing import is_dict
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
@@ -129,8 +130,10 @@ def _body_stamps(root: Path, documents: Sequence[Document]) -> _BodyStamps:
 class DocumentStore:
     """読む場所ごとに文書を集め、ファイルごとに結果をキャッシュする。"""
 
-    def __init__(self, snapshots: SnapshotStore) -> None:
+    def __init__(self, snapshots: SnapshotStore, *, gate: BackgroundGate | None = None) -> None:
         self.snapshots = snapshots
+        # 裏の検査が読むとき、要求の応答中はファイル 1 件ごとに休ませる関所
+        self.gate = gate if gate is not None else BackgroundGate()
         self._files: dict[tuple[Path, str], _CachedFile] = {}
         self._schemas: dict[Path, tuple[int, int, dict[str, Any]]] = {}
         self._revision_schemas: dict[tuple[Path, str, str], dict[str, Any]] = {}
@@ -227,7 +230,8 @@ class DocumentStore:
         seen: set[tuple[Path, str]] = set()
         # 集め済みのパスがあればそれを使い、無ければ行の範囲で集める
         paths = collect_files(root, table, files=files) if collected is None else collected
-        for path in paths:
+        # ファイル 1 件ごとの照合と読み込みを、裏の処理の 1 件にする（要求のスレッドでは何もしない）
+        for path in self.gate.each(paths):
             absolute = root / path
             key = (absolute, table.id)
             seen.add(key)
@@ -324,7 +328,8 @@ class DocumentStore:
         documents: list[Document] = []
         problems: list[LoadProblem] = []
         seen: set[str] = set()
-        for path in collect_files(root, table, files=files):
+        # ファイル 1 件ごとの照合と読み込みを、裏の処理の 1 件にする（要求のスレッドでは何もしない）
+        for path in self.gate.each(collect_files(root, table, files=files)):
             relative = from_repo(path)
             blob = blobs.get(relative)
             if blob is None:
@@ -735,21 +740,24 @@ def _nested_dirs(start: str, index_dirs: Collection[str]) -> list[str]:
 
 def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
     """配信元の文書を読み、`metadata` の列の欠け・管理用の YAML のずれ・当たらない関連・同じファイルの重なり・文書の ID の重なり・エイリアスのキーの違反を求める。"""
+    # 裏の処理のスレッドでは、手順ごと・要素ごとに裏の処理の 1 件にする（全体を 1 つの 1 件で包まない）
+    gate = store.gate
     # 配信元のフォルダは 1 回だけたどり、文書の収集と索引に無いファイルの検出で使い回す
-    files = list(walk_files(source.root))
+    files = list(gate.each(walk_files(source.root)))
     result = store.load(Target(source, source.root, None, None, "read"), files=files)
     missing_refs = [
         f"{document.kind}: {document.id}: {key}（{field}）"
-        for document in result.documents
+        for document in gate.each(result.documents)
         for key, field in missing_ref_fields(document.data, source.table(document.kind))
     ]
     # Git の配信元だけ、Git が無視するパスを 1 回だけ求めて索引に無いファイルから除く
-    ignored = (ignored_paths(source.root) or []) if source.is_git else []
+    with gate.unit():
+        ignored = (ignored_paths(source.root) or []) if source.is_git else []
     unindexed = [
         line
         for table in source.config.documents
         if table.enabled and table.records is not None and table.body_file is not None
-        for line in _unindexed(source, table, result.documents, files, ignored)
+        for line in gate.each(_unindexed(source, table, result.documents, files, ignored))
     ]
     missing_body_files = [
         f"{problem.path}: {problem.detail}"
@@ -757,21 +765,27 @@ def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
         if problem.reason == "missing_body_file"
     ]
     # 文書の ID の集合は 1 回だけ作り、全ての文書の関連の照合で使い回す
-    ids = {document.id for document in result.documents}
+    with gate.unit():
+        ids = {document.id for document in result.documents}
     unresolved = [
         f"{document.kind}: {document.id}: {to}"
-        for document in result.documents
+        for document in gate.each(result.documents)
         for to in unresolved_related(document.metadata, ids)
     ]
     # 2 つ以上の行が文書にするファイルは、同じファイルの重なりと ID の重なりの除外で使い回す
-    shared = _shared_files(source, result, files)
+    with gate.unit():
+        shared = _shared_files(source, result, files)
+    with gate.unit():
+        duplicate_ids = _duplicate_ids(result, shared)
+    with gate.unit():
+        alias_violations = collect_aliases(source, result.documents).violations
     return SyncReport(
         source_id=source.id,
         missing_refs=missing_refs,
         unindexed_files=unindexed,
         missing_body_files=missing_body_files,
         unresolved_related=unresolved,
-        alias_violations=collect_aliases(source, result.documents).violations,
+        alias_violations=alias_violations,
         duplicate_files=[f"{path}: {'・'.join(ids)}" for path, ids in shared.items()],
-        duplicate_ids=_duplicate_ids(result, shared),
+        duplicate_ids=duplicate_ids,
     )

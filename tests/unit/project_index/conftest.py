@@ -163,6 +163,7 @@ def make_handlers(make_terminal_config: Callable[..., TerminalConfig]) -> Callab
     import threading
 
     from project_index.main import Handlers
+    from project_index.shared.background import BackgroundGate
 
     def _make(**overrides: Any) -> Handlers:
         values: dict[str, Any] = {field.name: None for field in dataclasses.fields(Handlers)}
@@ -171,6 +172,7 @@ def make_handlers(make_terminal_config: Callable[..., TerminalConfig]) -> Callab
                 "terminal": make_terminal_config(),
                 "settings_lock": threading.Lock(),
                 "reload_sources": _no_reload,
+                "gate": BackgroundGate(),
             }
         )
         values.update(overrides)

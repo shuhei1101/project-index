@@ -189,6 +189,8 @@ functions:
       3. nav の条件の確かめの違反を加える
       4. nav の条件の数え（`columns` は有効な行の ID → その行の `metadata`）で `count` が 0 の `auto` ごとに、`path` を `{auto のパス}.filter`（`filter` が無ければ `auto` のパス）、`rule` を `{タブの名前}: 条件 {filter を JSON にした文字列} に該当する文書がありません` にした警告を加える
       5. 警告を返す
+
+      手順 2 の項目と `metadata` の作成・手順 3・手順 4 の数えは、それぞれ文書のストアの裏の処理の関所（`store.gate`）の裏の処理の 1 件（`gate.unit`）にする（裏の処理のスレッドでなければ何もしない）
     unit_tests:
       - name: test_nav_warnings
         case: 正常

@@ -1,0 +1,16 @@
+# develop の取り込み（9fe838a）の後に回し直した。ランナーで回さなかった理由と --basetemp は 20261117231736_c014524_結合テスト.log と同じ
+$ uv run pytest tests/integration/server/test_list_documents.py tests/integration/server/test_get_status.py::test_normal_when_checking tests/integration/server/test_get_status.py::test_normal_when_reload_checking tests/integration/server/test_get_status.py::test_normal_when_exporting tests/integration/server/test_serve.py::test_normal_when_default_ref_exported_in_background tests/integration/server/test_serve.py::test_normal_when_background_export_times_out tests/integration/server/test_serve.py::test_normal_when_metadata_out_of_sync tests/integration/server/test_reload.py::test_normal_when_reloaded_before_checks_finish tests/integration/server/test_describe.py::test_normal_when_rechecked_after_write tests/integration/server/test_describe.py::test_normal_when_warned --basetemp=/tmp/pi147-pytest
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/fix-project-index-startup-docs-list-wait
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 17 items
+
+tests/integration/server/test_list_documents.py ........                 [ 47%]
+tests/integration/server/test_get_status.py ...                          [ 64%]
+tests/integration/server/test_serve.py ...                               [ 82%]
+tests/integration/server/test_reload.py .                                [ 88%]
+tests/integration/server/test_describe.py ..                             [100%]
+
+============================== 17 passed in 9.80s ==============================

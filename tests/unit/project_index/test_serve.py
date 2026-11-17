@@ -316,6 +316,9 @@ def test_build_handlers(
     assert len(handlers.registry.statuses()) == 2
     assert "session-context" not in handlers.prompts.prompts
     assert "mcp/docs/instructions" in handlers.prompts.prompts
+    assert handlers.snapshots.gate is handlers.gate
+    assert handlers.store.gate is handlers.gate
+    assert handlers.checks.gate is handlers.gate
 
 
 def test_build_handlers_when_prompt_invalid(
@@ -1147,6 +1150,13 @@ def test_log_source_check_when_duplicate_ids(
     assert "a: rules（docs/a.yaml）・rules（docs/b.yaml）" in warnings[0]
 
 
+def _wait_checked(checks: SourceChecks) -> None:
+    """裏の検査が済むまで、上限 30 秒で待つ。"""
+    deadline = time.monotonic() + 30
+    while checks.checking and time.monotonic() < deadline:
+        time.sleep(0.05)
+
+
 def test_check_and_export_later(
     tmp_path: Path,
     git_repo: Callable[..., Path],
@@ -1155,7 +1165,7 @@ def test_check_and_export_later(
     make_terminal_config: Callable[..., TerminalConfig],
     make_entry: Callable[..., SourceEntry],
 ) -> None:
-    """検査の後に Git の配信元だけを書き出す（正常系）。"""
+    """裏で検査し、Git の配信元だけを書き出す（正常系）。"""
     # 準備
     from project_index.main import check_and_export_later
 
@@ -1189,6 +1199,7 @@ def test_check_and_export_later(
         registry.served(), store=store, checks=checks, snapshots=snapshots
     )
     thread.join(timeout=30)
+    _wait_checked(checks)
     # 検証
     assert checks.get("a") is not None
     assert checks.get("b") is not None

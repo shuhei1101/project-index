@@ -1,12 +1,23 @@
 from __future__ import annotations
 
+import math
+import threading
+import time
 from typing import TYPE_CHECKING, Any
 
+from project_index.features.documents import store as store_module
+from project_index.features.documents.store import check_sync
+from project_index.features.read import route as route_module
+from project_index.features.settings.query import load_terminal_config
 from project_index.integrations.git import GIT_ARCHIVE_TIMEOUT_SEC
-from tests.integration.server.conftest import FILES_SCHEMA_TEMPLATE
+from project_index.main import build_handlers
+from tests.integration.server.conftest import BACKGROUND_WAIT_SEC, FILES_SCHEMA_TEMPLATE
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
+
+    import pytest
 
 DESIGN_SCHEMA = (
     "type: object\n"
@@ -233,3 +244,114 @@ def test_normal_when_disk_storage(
     assert [(row["path"], row["bodyPath"]) for row in body["documents"]] == [
         ("files.local.yaml", "src/app.py")
     ]
+
+
+# 裏の検査が始まってから、文書の一覧の応答を返させる合図を出すまでの秒数
+SIGNAL_AFTER_SEC = 1.0
+# 1 件あたりの時間を測る配信元の文書の数
+CALIBRATION_COUNT = 200
+# 裏の検査のスレッドの名前
+CHECK_THREAD = "project-index-source-checks"
+
+
+def large_files(count: int) -> dict[str, str]:
+    """種類 `design` の YAML を `count` 件持つ配信元のファイル一式を返す。"""
+    files = {
+        "project-index.yaml": (
+            "name: large\n"
+            "documents:\n"
+            "  - id: design\n"
+            "    paths: [design/*.yaml]\n"
+            "    schema: schemas/design.schema.yaml\n"
+        ),
+        "schemas/design.schema.yaml": DESIGN_SCHEMA,
+        "schemas/common.schema.yaml": COMMON_SCHEMA,
+    }
+    for number in range(count):
+        files[f"design/D-{number}.yaml"] = (
+            f"id: D-{number}\nname: 設計 {number}\ntags: [a, b]\ntitle: {number} 件目\n"
+        )
+    return files
+
+
+def _check_seconds_per_file(
+    make_source: Callable[..., Any], write_settings: Callable[..., Path]
+) -> float:
+    """休まない検査の、同じ形の文書 1 件あたりの秒数を測る。"""
+    spec = make_source("calibration", large_files(CALIBRATION_COUNT), git=False)
+    terminal = load_terminal_config(write_settings(spec, name="calibration.yaml"))
+    handlers = build_handlers(terminal)
+    handlers.registry.load(terminal)
+    [source] = handlers.registry.served()
+    # 要求のスレッドで流すため、関所は休まない
+    started = time.perf_counter()
+    check_sync(handlers.store, source)
+    return (time.perf_counter() - started) / CALIBRATION_COUNT
+
+
+def test_normal_when_background_check_running(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    write_settings: Callable[..., Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """応答の最中は、裏の検査が休みを挟んで進む（正常系）。"""
+    # 準備
+    per_file = _check_seconds_per_file(make_source, write_settings)
+    # 合図までの 1 秒に 1 割の速さで読む分を引いても、合図の後に 1 秒以上残る件数
+    count = math.ceil(2 * SIGNAL_AFTER_SEC / per_file)
+    large = make_source("large", large_files(count), git=False)
+    entered = threading.Event()
+    release = threading.Event()
+    reads: list[float] = []
+    real_list_documents = route_module.list_documents
+    real_load_file = store_module.load_file
+
+    def held_list_documents(target: Any, **kwargs: Any) -> Any:
+        # sample の一覧だけを、合図まで応答の最中に保つ
+        if target.source.id == "sample":
+            entered.set()
+            release.wait(timeout=BACKGROUND_WAIT_SEC)
+        return real_list_documents(target, **kwargs)
+
+    def recorded_load_file(root: Path, path: str, table: Any, **kwargs: Any) -> Any:
+        # 裏の検査が large の文書のファイルを読み込んだ時刻を記録する
+        if threading.current_thread().name == CHECK_THREAD and kwargs["source_id"] == "large":
+            reads.append(time.perf_counter())
+        return real_load_file(root, path, table, **kwargs)
+
+    monkeypatch.setattr(route_module, "list_documents", held_list_documents)
+    monkeypatch.setattr(store_module, "load_file", recorded_load_file)
+    # large を先に並べ、起動の直後の裏の検査で先に検査させる
+    env = make_server(large, make_source("sample", main_files(), branch="main"))
+    responses: list[Any] = []
+    request = threading.Thread(
+        target=lambda: responses.append(env.client.get("/sources/sample/docs"))
+    )
+    # 実行
+    request.start()
+    reached = entered.wait(timeout=BACKGROUND_WAIT_SEC)
+    held_from = time.perf_counter()
+    time.sleep(max(0.0, (reads[0] if reads else held_from) + SIGNAL_AFTER_SEC - held_from))
+    released_at = time.perf_counter()
+    release.set()
+    request.join(timeout=BACKGROUND_WAIT_SEC)
+    env.wait_background()
+    # 検証
+    held = [at for at in reads if held_from <= at <= released_at]
+    after = [at for at in reads if at > released_at]
+    checked = env.handlers.checks.get("large")
+    # 休まない検査の結果（要求のスレッドで流すため、関所は休まない）
+    [served] = [source for source in env.handlers.registry.served() if source.id == "large"]
+    unpaused = check_sync(env.handlers.store, served)
+    assert reached
+    assert [response.status_code for response in responses] == [200]
+    assert len(reads) == count
+    # 応答の最中も止まらずに進み、合図の後も検査が続いた
+    assert held
+    assert after
+    held_rate = len(held) / (released_at - held_from)
+    after_rate = len(after) / (after[-1] - released_at)
+    assert held_rate <= 0.2 * after_rate
+    assert checked is not None
+    assert checked.report == unpaused

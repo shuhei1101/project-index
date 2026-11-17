@@ -1,0 +1,25 @@
+confirmations:
+  - topic: PoC 検証の不成立を受けた要件の見直し
+    decision: この PR は裏の検査との取り合いだけを除き、配信元ごとの上限の表を基準にする。ai-monitor の読み込みと dev-docs の起動の直後の待ちは別の Issue に起票する（推奨案 A）
+    decided_by: thumbs_up
+    approver: shuhei1101
+    commit: d3af58d
+    thread: https://github.com/shuhei1101/project-index/pull/147#discussion_r4599385986
+  - topic: 計測で dev-docs が上限を超えた扱い
+    decision: 'dev-docs の画面の 1 回目は #160 で扱い、この PR の基準から dev-docs を除外する（推奨案 A）'
+    decided_by: thumbs_up
+    approver: shuhei1101
+    commit: e9b6e4c
+    thread: https://github.com/shuhei1101/project-index/pull/147#discussion_r4601322532
+  - topic: 計測で dev-docs 以外の配信元が上限を超えた扱い
+    decision: 超えた回を測り直しとし、負荷の平均が 12 以下の間に、配信元の develop が進まないうちに測り直す。測り直しても超える配信元があれば改めて相談する（推奨案 A）
+    decided_by: thumbs_up
+    approver: shuhei1101
+    commit: e9b6e4c
+    thread: https://github.com/shuhei1101/project-index/pull/147#discussion_r4601323864
+  - topic: 測り直しでも shuhdev-gateway が上限を超えた扱い
+    decision: shuhdev-gateway の上限を、計測の最大（6.3 秒）を含む値に見直す（案 B）
+    decided_by: reply
+    approver: shuhei1101
+    commit: 6cb1ff3
+    thread: https://github.com/shuhei1101/project-index/pull/147#discussion_r4601532804

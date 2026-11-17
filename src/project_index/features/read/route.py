@@ -75,7 +75,9 @@ async def _run[T](
     """配信元の読み込みを待って処理を別のスレッドで呼び、見つからなかったものを 404 にする。"""
     await handlers.registry.wait_for(ids=[source])
     try:
-        return await asyncio.to_thread(work)
+        # サービスの処理の間は要求の応答中として数え、裏の検査と書き出しを休ませる
+        with handlers.gate.foreground():
+            return await asyncio.to_thread(work)
     except ProjectIndexError as error:
         fields = _not_found_fields(error, source, value)
         # 404 にしないエラー: 例外の変換に任せる
