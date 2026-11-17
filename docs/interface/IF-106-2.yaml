@@ -1,0 +1,302 @@
+id: IF-106-2
+title: 中身が変わったファイルの一覧
+entry:
+  kind: operation
+  value: '`project-index changed`（CLI）'
+lead: 管理用の YAML の行のファイルのうち、確認の時点の後に中身が変わったファイルを出す `project-index changed` の入出力を定め、変わったファイルの見つけ方を修正するときに参照する。
+identifier: changed
+permissions: 配信元のフォルダを読める利用者
+idempotent: true
+side_effects: なし（ファイルを書き換えない）
+callers:
+  - SC-5#scenarios[正常シナリオ（2 回目以降で中身が変わったファイルを見直す）]
+  - SC-5#scenarios[正常シナリオ（確認の時点の記録が無い Git の配信元の 2 回目以降）]
+  - SC-5#scenarios[正常シナリオ（確認の時点の記録が無い Git 管理外の配信元の 2 回目以降）]
+  - SC-5#scenarios[正常シナリオ（確認の時点の記録が無いローカル運用の 2 回目以降）]
+exclusivity: 読み取りだけで排他しない
+request:
+  - name: --root
+    type: str
+    required: true
+    location: argument
+    description: 配信元のフォルダのパス
+    notes: '-'
+  - name: --files-yaml
+    type: str
+    required: true
+    location: argument
+    description: 管理用の YAML のパス（`--root` からの相対）
+    notes: ローカル運用は `files.local.yaml`
+request_example: |-
+  ```bash
+  project-index changed --root ~/repo/sample --files-yaml files.yaml
+  ```
+response:
+  - name: 標準出力
+    type: str
+    description: 1 つの JSON のオブジェクト
+  - name: base.kind
+    type: Literal['checkpoint_commit', 'checkpoint_time', 'files_yaml_commit', 'files_yaml_mtime']
+    description: 起点にしたもの。記録した commit・記録した日時・管理用の YAML を最後に変更した commit・管理用の YAML の変更日時
+  - name: base.value
+    type: str
+    description: 起点の commit の ID か ISO 8601 の日時
+  - name: files
+    type: list[str]
+    description: 管理用の YAML の行のファイルのうち中身が変わったファイルの、`--root` からのパス（昇順）
+    notes: 管理用の YAML に行が無いファイルは含めない（追加の候補は `project-index files` との突き合わせで出す）
+  - name: 終了コード
+    type: int
+    description: 0 正常（変わったファイルが 0 件のときも 0）・2 `--root` か `--files-yaml` が無いか、`checkpoint` の形が違う
+response_example: |-
+  ```json
+  {"base": {"kind": "checkpoint_commit", "value": "a1b2c3d"}, "files": ["docs/guide.md", "src/tasks.py"]}
+  ```
+exceptions:
+  - name: なし（正常終了）
+    condition: 一覧を出し終えた（終了コード 0）
+  - name: RootNotFound
+    condition: '`--root` が無いかフォルダでない（終了コード 2）'
+    notes: 渡したパスを stderr に出す
+  - name: FilesYamlNotFound
+    condition: '`--files-yaml` のファイルが無い（終了コード 2）'
+    notes: 渡したパスを stderr に出す
+  - name: なし（記録した commit が無い）
+    condition: '`checkpoint.commit` がリポジトリに無い（終了コード 0）'
+    notes: 記録が無いときと同じ起点で一覧を出し、stderr に切り替えた旨を出す
+  - name: InvalidCheckpoint
+    condition: 管理用の YAML の `checkpoint` がマッピングでない・値の型が違う・`checked_at` が日時として読めない（終了コード 2）
+    notes: キーと期待する型を stderr に出す
+constraints:
+  - item: 起点の選び方
+    constraint: 管理用の YAML の `checkpoint` に `commit` があればその commit、`checked_at` があればその日時。無ければ、管理用の YAML が Git で追跡されていればそれを最後に変更した commit、追跡されていなければ管理用の YAML の変更日時。記録した commit がリポジトリに無いとき（squash merge・rebase で消えたとき）は、記録が無いときと同じ起点に切り替え、stderr に切り替えた旨と記録した commit を出す
+    notes: 要件.md の起点の表
+  - item: 変わったファイル（Git の配信元）
+    constraint: 起点の commit から HEAD までの差分と作業ツリーの未 commit の変更に出るファイル。起点が日時のときは、committer の日時（`git log --since` が比べる日時）がその日時より後の commit の差分と未 commit の変更に出るファイル
+    notes: 改名は改名前のパスで行と突き合わせ、改名先のパスで出す。削除したファイルは出さない（setup の突き合わせが削除の候補にする）
+  - item: 変わったファイル（Git 管理外の配信元）
+    constraint: 起点の日時より後に変更日時が新しくなったファイル
+    notes: '-'
+  - item: 見直し済みの除外
+    constraint: '`checkpoint.reviewed[]` のパスのうち、今の中身の SHA-256 が記録した値と一致するファイルは出さない'
+    notes: 未 commit で見直したファイルを同じ中身で commit したとき
+  - item: 追跡していないファイル
+    constraint: Git の配信元で `git add` していないファイル（untracked）は、行にあっても `git add` か commit するまで出さない
+    notes: 新しいファイルの行は setup の突き合わせが追加の候補にし、その場で中身を参照してメタデータを付ける。commit した後は差分に `A` で出る
+flows:
+  - name: 正常系
+    summary: 記録した commit の後に変わったファイルを、未 commit の変更を含めて出す
+    setup:
+      - name: Mock
+        description: なし（`main(["changed", ...])` を同じプロセスで呼ぶ）
+      - name: 配信元のリポジトリ
+        description: 一時フォルダの git リポジトリ。`files.yaml` の行に `a.md`・`b.md`・`c.md`・`d.md` を持ち、`d.md` を未 commit で変えた状態で `checkpoint` に HEAD の commit と `d.md` の中身の SHA-256 を記録する
+        notes: その後に `d.md` を同じ中身のまま commit し、`a.md` を変えて commit し、`b.md` を変えて commit しない。`c.md` は変えない
+    flow: |-
+      <!-- map: {"title": "正常系"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index changed
+        participant G as 配信元のリポジトリ
+
+        C->>M: --root {リポジトリ} --files-yaml files.yaml
+        M-->>G: checkpoint を読む
+        M-->>G: 記録した commit から HEAD までの差分と未 commit の変更
+        M->>M: 行のファイルに絞り、見直し済みで中身が同じファイルを外す
+        M-->>C: base と files（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`base.kind` が `checkpoint_commit` で、`base.value` が記録した commit'
+      - '`files` が `a.md`・`b.md` の 2 件で、`c.md`・`d.md` を含まない'
+      - 終了コードが 0
+    test: test_normal
+  - name: 正常系（記録が無い Git の配信元）
+    summary: 管理用の YAML を最後に変更した commit を起点にする
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元のリポジトリ
+        description: '`checkpoint` を持たない `files.yaml` を commit した git リポジトリ'
+        notes: その後に `a.md` を変えて commit する
+    flow: |-
+      <!-- map: {"title": "正常系（記録が無い Git の配信元）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index changed
+
+        C->>M: --root {リポジトリ} --files-yaml files.yaml
+        M-->>C: base と files（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`base.kind` が `files_yaml_commit`'
+      - '`files` が `a.md` の 1 件'
+    test: test_normal_when_no_checkpoint_in_git
+  - name: 正常系（記録が無いローカル運用）
+    summary: Git に無視される管理用の YAML の変更日時より後の commit と未 commit の変更を出す
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元のリポジトリ
+        description: '`info/exclude` で無視する `files.local.yaml`（`checkpoint` なし）を持つ git リポジトリ'
+        notes: '`files.local.yaml` の変更日時の前に `a.md` を変えて commit し、後に `b.md` を変えて commit し、`c.md` を変えて commit しない'
+    flow: |-
+      <!-- map: {"title": "正常系（記録が無いローカル運用）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index changed
+
+        C->>M: --root {リポジトリ} --files-yaml files.local.yaml
+        M-->>C: base と files（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`base.kind` が `files_yaml_mtime`'
+      - '`files` が `b.md`・`c.md` の 2 件で、`a.md` を含まない'
+    test: test_normal_when_no_checkpoint_local_operation
+  - name: 正常系（Git 管理外の配信元）
+    summary: 記録した日時より後に変更されたファイルを出す
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元のフォルダ
+        description: Git 管理外の一時フォルダ。`files.yaml` の `checkpoint.checked_at` に日時を記録する
+        notes: 記録した日時の前に `a.md`、後に `b.md` の変更日時を設定する
+    flow: |-
+      <!-- map: {"title": "正常系（Git 管理外の配信元）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index changed
+
+        C->>M: --root {フォルダ} --files-yaml files.yaml
+        M-->>C: base と files（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`base.kind` が `checkpoint_time`'
+      - '`files` が `b.md` の 1 件'
+    test: test_normal_when_outside_git
+  - name: 異常系（管理用の YAML が無い・FilesYamlNotFound）
+    summary: '`--files-yaml` が無いと終了コード 2 で終える'
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 引数
+        description: '`--files-yaml` に存在しないパス'
+    flow: |-
+      <!-- map: {"title": "異常系（管理用の YAML が無い・FilesYamlNotFound）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index changed
+
+        C->>M: --root {フォルダ} --files-yaml {無いパス}
+        M-->>C: stderr に渡したパス（終了コード 2）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 2
+      - 標準出力が空で、stderr に渡したパスがある
+    test: test_error_when_files_yaml_not_found
+  - name: 正常系（記録した commit が無い）
+    summary: 記録した commit が消えていると、管理用の YAML を最後に変更した commit を起点にする
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元のリポジトリ
+        description: '`checkpoint.commit` に存在しない commit の ID を記録した `files.yaml` を commit した git リポジトリ'
+        notes: その後に `a.md` を変えて commit する
+    flow: |-
+      <!-- map: {"title": "正常系（記録した commit が無い）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index changed
+        participant G as 配信元のリポジトリ
+
+        C->>M: --root {リポジトリ} --files-yaml files.yaml
+        M-->>G: 記録した commit を探す（無い）
+        M-->>G: files.yaml を最後に変更した commit から HEAD までの差分と未 commit の変更
+        M-->>C: base と files、stderr に切り替えた旨（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`base.kind` が `files_yaml_commit`'
+      - '`files` が `a.md` の 1 件'
+      - stderr に記録した commit の ID と起点を切り替えた旨がある
+      - 終了コードが 0
+    test: test_normal_when_checkpoint_commit_missing
+  - name: 正常系（改名と削除を含む）
+    summary: 改名したファイルは改名先のパスで出し、削除したファイルは出さない
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元のリポジトリ
+        description: '`files.yaml` の行に `e.md`・`g.md` を持ち、`checkpoint.commit` に HEAD を記録して commit した git リポジトリ'
+        notes: その後に `e.md` を `git mv` で `f.md` に改名して中身を 1 行変え、`g.md` を削除して commit する。`files.yaml` は変えない
+    flow: |-
+      <!-- map: {"title": "正常系（改名と削除を含む）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index changed
+
+        C->>M: --root {リポジトリ} --files-yaml files.yaml
+        M-->>C: base と files（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`files` が `f.md` の 1 件で、`e.md`・`g.md` を含まない'
+    test: test_normal_when_renamed_and_deleted
+  - name: 異常系（記録の形が違う・InvalidCheckpoint）
+    summary: 壊れた `checkpoint` では終了コード 2 で終え、キーと期待する型を出す
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元のフォルダ
+        description: '`checkpoint: {checked_at: x}` を持つ `files.yaml` を置いた一時フォルダ'
+    flow: |-
+      <!-- map: {"title": "異常系（記録の形が違う・InvalidCheckpoint）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index changed
+
+        C->>M: --root {フォルダ} --files-yaml files.yaml
+        M-->>C: stderr にキーと期待する型（終了コード 2）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 2
+      - 標準出力が空で、stderr に `checked_at` がある
+    test: test_error_when_checkpoint_invalid
+test_file: tests/integration/server/test_changed.py
+aliases:
+  - project-index changed
+tags:
+  - name: topic:確認の時点
+    main: true
+  - name: topic:変更
+  - name: topic:cli
+  - name: tool:git

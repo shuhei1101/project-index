@@ -1,0 +1,19 @@
+id: MOD-106-2
+title: 索引のサーバー / 確認の時点
+lead: 管理用の YAML の `checkpoint` に確認の時点を記録し、その後に中身が変わった行のファイルを見つける確認の時点の分類のファイルの並びと決まりを定め、この分類のファイルを追加・移動するときに参照する。
+directory: |-
+  ```text
+  src/project_index/features/checkpoint/
+  ├─ __init__.py   # 空
+  ├─ types.py      # BaseKind / ReviewedFile / Checkpoint / ChangedBase / ChangedResult / FilesYamlNotFoundError
+  ├─ changed.py    # read_checkpoint / find_changed（起点の選択と変わったファイルの一覧）
+  └─ record.py     # record_checkpoint（checkpoint の書き込み）
+  ```
+notes:
+  受け持つこと: git は履歴の `run_git`・`repo_root` で呼ぶ。管理用の YAML を書き換えるのは `record_checkpoint` だけで、`checkpoint` 以外のキーと行は変えない。
+tags:
+  - name: topic:確認の時点
+    main: true
+  - name: topic:変更
+  - name: topic:cli
+  - name: tool:git

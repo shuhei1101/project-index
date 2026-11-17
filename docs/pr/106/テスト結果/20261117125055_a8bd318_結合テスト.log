@@ -1,0 +1,17 @@
+$ TMPDIR=/tmp/pi106-tmp uv run pytest tests/integration/server/test_outline.py tests/integration/server/test_changed.py tests/integration/server/test_checkpoint.py tests/integration/server/test_files.py tests/integration/server/test_check_project.py
+# /tmp/pytest-of-shuhei2441 が root の所有で pytest の一時フォルダを作れないため、TMPDIR だけを差し替えて実行した。層は parallel: false のため並列数 1
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/feat-setup-staged-metadata
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 33 items
+
+tests/integration/server/test_outline.py ...                             [  9%]
+tests/integration/server/test_changed.py ........                        [ 33%]
+tests/integration/server/test_checkpoint.py ....                         [ 45%]
+tests/integration/server/test_files.py ...                               [ 54%]
+tests/integration/server/test_check_project.py ...............           [100%]
+
+============================== 33 passed in 2.84s ==============================
+exit=0

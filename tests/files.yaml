@@ -45,6 +45,15 @@ files:
   related:
   - to: IF-32
     type: tests
+- path: integration/server/test_changed.py
+  name: 中身が変わったファイルの一覧の結合テスト
+  description: '`changed` の結合テストを受け持ち、中身が変わったファイルの一覧の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-106-2
+    type: tests
 - path: integration/server/test_check_project.py
   name: 配信元の検査の結合テスト
   description: '`check_project` の結合テストを受け持ち、配信元の検査の振る舞いのテストを修正するときに参照する。'
@@ -53,6 +62,15 @@ files:
   - tool:pytest
   related:
   - to: IF-12
+    type: tests
+- path: integration/server/test_checkpoint.py
+  name: 確認の時点の記録の結合テスト
+  description: '`checkpoint` の結合テストを受け持ち、確認の時点の記録の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-106-3
     type: tests
 - path: integration/server/test_delete_docs.py
   name: 文書の削除の結合テスト
@@ -197,6 +215,15 @@ files:
   - tool:pytest
   related:
   - to: IF-16
+    type: tests
+- path: integration/server/test_outline.py
+  name: ファイルのアウトラインの結合テスト
+  description: '`outline` の結合テストを受け持ち、ファイルのアウトラインの振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-106-1
     type: tests
 - path: integration/server/test_patch_settings_source.py
   name: 端末の設定の配信元の 1 行の変更の結合テスト
@@ -417,6 +444,24 @@ files:
   related:
   - to: src/project_index/features/changes/service.py
     type: tests
+- path: unit/project_index/features/checkpoint/test_changed.py
+  name: 中身が変わったファイルの一覧の単体テスト
+  description: 確認の時点の changed.py の単体テストを受け持ち、確認の時点の changed.py のテストを修正するときに参照する。
+  tags:
+  - topic:確認の時点
+  - tool:pytest
+  related:
+  - to: src/project_index/features/checkpoint/changed.py
+    type: tests
+- path: unit/project_index/features/checkpoint/test_record.py
+  name: 確認の時点の記録の単体テスト
+  description: 確認の時点の record.py の単体テストを受け持ち、確認の時点の record.py のテストを修正するときに参照する。
+  tags:
+  - topic:確認の時点
+  - tool:pytest
+  related:
+  - to: src/project_index/features/checkpoint/record.py
+    type: tests
 - path: unit/project_index/features/convert/test_decisions.py
   name: 配信元の `decisions.folders` から検討事項の文書を探す処理の単体テスト
   description: 変換の decisions.py の単体テストを受け持ち、変換の decisions.py のテストを修正するときに参照する。
@@ -578,6 +623,33 @@ files:
   - tool:pytest
   related:
   - to: src/project_index/features/migrate/steps.py
+    type: tests
+- path: unit/project_index/features/outline/test_code.py
+  name: コードと package.json のアウトラインの取り出しの単体テスト
+  description: アウトラインの code.py の単体テストを受け持ち、アウトラインの code.py のテストを修正するときに参照する。
+  tags:
+  - topic:アウトライン
+  - tool:pytest
+  related:
+  - to: src/project_index/features/outline/code.py
+    type: tests
+- path: unit/project_index/features/outline/test_markdown.py
+  name: Markdown のアウトラインの取り出しの単体テスト
+  description: アウトラインの markdown.py の単体テストを受け持ち、アウトラインの markdown.py のテストを修正するときに参照する。
+  tags:
+  - topic:アウトライン
+  - tool:pytest
+  related:
+  - to: src/project_index/features/outline/markdown.py
+    type: tests
+- path: unit/project_index/features/outline/test_service.py
+  name: アウトラインの対象の選択と次の段階へ進む判定の単体テスト
+  description: アウトラインの service.py の単体テストを受け持ち、アウトラインの service.py のテストを修正するときに参照する。
+  tags:
+  - topic:アウトライン
+  - tool:pytest
+  related:
+  - to: src/project_index/features/outline/service.py
     type: tests
 - path: unit/project_index/features/prompt_doc/conftest.py
   name: プロンプトの文書の変換の単体テストの共通の準備

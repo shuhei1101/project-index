@@ -1,0 +1,199 @@
+id: IF-106-3
+title: 確認の時点の記録
+entry:
+  kind: operation
+  value: '`project-index checkpoint`（CLI）'
+lead: setup で確認を済ませた時点を管理用の YAML の `checkpoint` に記録する `project-index checkpoint` の入出力を定め、確認の時点の記録の形を修正するときに参照する。
+identifier: checkpoint
+permissions: 配信元のフォルダに書き込める利用者
+idempotent: false
+side_effects: 管理用の YAML の直下の `checkpoint` を書き換える（他のキーと行・コメントはそのまま）
+callers:
+  - SC-5#scenarios[正常シナリオ（仮のメタデータを段階的に付ける）]
+  - SC-5#scenarios[正常シナリオ（2 回目以降で中身が変わったファイルを見直す）]
+exclusivity: 排他しない（setup が 1 つずつ呼ぶ）
+request:
+  - name: --root
+    type: str
+    required: true
+    location: argument
+    description: 配信元のフォルダのパス
+    notes: '-'
+  - name: --files-yaml
+    type: str
+    required: true
+    location: argument
+    description: 管理用の YAML のパス（`--root` からの相対）
+    notes: '-'
+  - name: --reviewed
+    type: list[str]
+    required: false
+    default: なし（見直し済みのハッシュを記録しない）
+    location: argument
+    description: 見直したファイルのうち未 commit の変更を持つファイルのパス（`--root` からの相対）。繰り返して渡せる
+    notes: Git 管理外の配信元では使用しない
+request_example: |-
+  ```bash
+  project-index checkpoint --root ~/repo/sample --files-yaml files.yaml --reviewed src/tasks.py
+  ```
+response:
+  - name: 標準出力
+    type: str
+    description: 記録した `checkpoint` の値の JSON
+  - name: checkpoint.commit
+    type: str
+    description: 記録した HEAD の commit の ID
+    notes: Git の配信元だけ
+  - name: checkpoint.reviewed[].path
+    type: str
+    description: '`--reviewed` で渡したパス'
+    notes: Git の配信元だけ。`--reviewed` が無ければ空の並び
+  - name: checkpoint.reviewed[].sha256
+    type: str
+    description: そのファイルの今の中身の SHA-256（16 進）
+  - name: checkpoint.checked_at
+    type: str
+    format: date-time
+    description: 記録した日時（ISO 8601、タイムゾーン付き）
+    notes: Git 管理外の配信元だけ
+  - name: 終了コード
+    type: int
+    description: 0 正常・2 `--root` か `--files-yaml` か `--reviewed` のファイルが無い
+response_example: |-
+  ```json
+  {"commit": "a1b2c3d4e5f6", "reviewed": [{"path": "src/tasks.py", "sha256": "9f86d0..."}]}
+  ```
+exceptions:
+  - name: なし（正常終了）
+    condition: 記録を書き終えた（終了コード 0）
+  - name: RootNotFound
+    condition: '`--root` が無いかフォルダでない（終了コード 2）'
+    notes: 渡したパスを stderr に出す
+  - name: FilesYamlNotFound
+    condition: '`--files-yaml` のファイルが無い（終了コード 2）'
+    notes: 渡したパスを stderr に出す
+  - name: ReviewedFileNotFound
+    condition: '`--reviewed` のファイルが無い（終了コード 2）'
+    notes: 無いパスを stderr に出し、管理用の YAML は書き換えない
+constraints:
+  - item: 記録の置き場所
+    constraint: 管理用の YAML の直下のキー `checkpoint`。前の記録は丸ごと置き換える
+    notes: '`templates/files.schema.yaml` に任意のキーとして追加する'
+  - item: 書き換え
+    constraint: ruamel.yaml の round-trip で読み書きし、`files` の行・コメント・キーの並びを変えない。一時ファイルから置き換える
+    notes: 共通の files.py の置き換えを使う
+flows:
+  - name: 正常系
+    summary: Git の配信元で HEAD の commit と見直したファイルのハッシュを記録する
+    setup:
+      - name: Mock
+        description: なし（`main(["checkpoint", ...])` を同じプロセスで呼ぶ）
+      - name: 配信元のリポジトリ
+        description: 一時フォルダの git リポジトリ。コメント付きの `files.yaml`（`checkpoint` なし）を commit し、`src/tasks.py` を変えて commit しない
+        notes: '`--reviewed src/tasks.py` を渡す'
+    flow: |-
+      <!-- map: {"title": "正常系"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index checkpoint
+        participant G as 配信元のリポジトリ
+
+        C->>M: --root {リポジトリ} --files-yaml files.yaml --reviewed src/tasks.py
+        M-->>G: HEAD の commit と src/tasks.py の中身
+        M->>G: files.yaml の checkpoint を書く
+        M-->>C: 記録した値（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`files.yaml` の `checkpoint.commit` が HEAD の commit'
+      - '`checkpoint.reviewed` が `src/tasks.py` と今の中身の SHA-256 の 1 件'
+      - '`files.yaml` の `files` の行とコメントが変わらない'
+      - 終了コードが 0
+    test: test_normal
+  - name: 正常系（Git 管理外の配信元）
+    summary: Git 管理外では日時を記録する
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元のフォルダ
+        description: Git 管理外の一時フォルダで、`files.yaml` が古い `checkpoint.checked_at` を持つ
+    flow: |-
+      <!-- map: {"title": "正常系（Git 管理外の配信元）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index checkpoint
+        participant F as 配信元のフォルダ
+
+        C->>M: --root {フォルダ} --files-yaml files.yaml
+        M->>F: files.yaml の checkpoint を書く
+        M-->>C: 記録した値（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`checkpoint` が `checked_at` だけを持ち、呼んだ時刻以降の日時になる'
+      - 前の `checked_at` が残らない
+    test: test_normal_when_outside_git
+  - name: 異常系（管理用の YAML が無い・FilesYamlNotFound）
+    summary: '`--files-yaml` が無いと終了コード 2 で終え、何も書かない'
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 引数
+        description: '`--files-yaml` に存在しないパス'
+    flow: |-
+      <!-- map: {"title": "異常系（管理用の YAML が無い・FilesYamlNotFound）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index checkpoint
+
+        C->>M: --root {フォルダ} --files-yaml {無いパス}
+        M-->>C: stderr に渡したパス（終了コード 2）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 2
+      - フォルダにファイルが作られない
+    test: test_error_when_files_yaml_not_found
+  - name: 異常系（見直したファイルが無い・ReviewedFileNotFound）
+    summary: '`--reviewed` のファイルが無いと終了コード 2 で終え、管理用の YAML を書き換えない'
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元のリポジトリ
+        description: '`files.yaml` を commit した一時フォルダの git リポジトリ'
+        notes: '`--reviewed missing.md`（無いファイル）を渡す'
+    flow: |-
+      <!-- map: {"title": "異常系（見直したファイルが無い・ReviewedFileNotFound）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index checkpoint
+
+        C->>M: --root {リポジトリ} --files-yaml files.yaml --reviewed missing.md
+        M-->>C: stderr に無いパス（終了コード 2）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 2
+      - stderr に `missing.md` がある
+      - '`files.yaml` が変わらない'
+    test: test_error_when_reviewed_file_not_found
+test_file: tests/integration/server/test_checkpoint.py
+aliases:
+  - project-index checkpoint
+tags:
+  - name: topic:確認の時点
+    main: true
+  - name: action:記録
+  - name: topic:cli
