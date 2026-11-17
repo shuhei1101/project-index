@@ -743,6 +743,7 @@ scenarios:
         participant CL as project-index の CLI
         participant FS as 配信元のフォルダ
         participant AD as 管理の MCP
+        participant CF as 端末の設定
 
         U->>SK: /project-index:setup {配信元のパス}
         SK->>U: scope・範囲を聞く
@@ -756,6 +757,7 @@ scenarios:
         U-->>SK: 了承
         SK->>FS: 管理用の YAML を書き、確認の時点を記録する
         SK->>AD: check_project
+        SK->>CF: sources に行を書く
         SK->>AD: reload
         SK-->>U: 追加した配信元と結果を出す
       ```
@@ -776,7 +778,7 @@ scenarios:
         notes: '-'
       - name: 登録済みの配信元
         description: '`正常シナリオ（仮のメタデータを段階的に付ける）` を終えた後の配信元'
-        notes: その後に `docs/guide.md` の見出しと本文を書き換えて commit し、`src/tasks.py` に関数を追加して commit せずに置く。`docs/en.md` は変えない
+        notes: 前のシナリオで書いた `project-index.yaml`・管理用の YAML を commit し、`docs/guide.md` の見出しと本文を書き換えて commit する。その commit でワークツリーを作り、ワークツリーの `src/tasks.py` に関数を追加して commit しない。`docs/en.md` は変えない
     flow: |-
       <!-- map: {"title": "正常シナリオ（2 回目以降で中身が変わったファイルを見直す）"} -->
 
@@ -796,7 +798,7 @@ scenarios:
         SK-->>U: 変わったファイルの今のメタデータと新しい案を並べた表で示して確かめる
         U-->>SK: docs/guide.md の案だけを了承
         SK->>DM: write_docs（了承された行を書き換える）
-        SK->>SK: 確認の時点を記録し直す
+        SK->>SK: 確認の時点（HEAD の commit と、見直した未 commit の src/tasks.py の中身のハッシュ）を記録し直す
         SK->>AD: check_project
         SK->>AD: reload
         SK-->>U: 書き換えた行と結果を出す
@@ -808,18 +810,19 @@ scenarios:
       - 変わっていないファイルは中身を参照しない
       - 見直しの表の各行に、今の値と新しい案が並ぶ
       - 了承した `docs/guide.md` の行だけが書き換わり、`src/tasks.py` の行は元の値のまま
-      - 確認の時点が今の時点に進む
+      - 確認の時点が今の HEAD の commit に進み、見直した未 commit の `src/tasks.py` の中身のハッシュが記録される
+      - その後に `src/tasks.py` を同じ中身のまま commit して setup を回すと、`src/tasks.py` は見直しの表に出ない
     test: test_normal_when_rerun_with_changed_files
-  - name: 正常シナリオ（確認の時点の記録が無い配信元の 2 回目以降）
+  - name: 正常シナリオ（確認の時点の記録が無い Git の配信元の 2 回目以降）
     setup:
       - name: Mock
         description: なし（実環境で実行）
         notes: '-'
       - name: 記録の無い配信元
         description: 管理用の YAML を持ち、確認の時点の記録を持たない登録済みの配信元。管理用の YAML を最後に変更した commit の後に 1 件の Markdown の中身を変えて commit する
-        notes: Git 管理外のフォルダでも同じく、管理用の YAML の変更日時より後に 1 件を変更する
+        notes: '-'
     flow: |-
-      <!-- map: {"title": "正常シナリオ（確認の時点の記録が無い配信元の 2 回目以降）"} -->
+      <!-- map: {"title": "正常シナリオ（確認の時点の記録が無い Git の配信元の 2 回目以降）"} -->
 
       ```mermaid
       sequenceDiagram
@@ -829,15 +832,68 @@ scenarios:
 
         U->>SK: /project-index:setup {配信元のパス}
         SK->>CL: 確認の時点の後に中身が変わったファイルを引く
-        CL-->>SK: 記録が無いため、管理用の YAML を最後に変更した commit（Git 管理外は変更日時）からの変更
+        CL-->>SK: 記録が無いため、管理用の YAML を最後に変更した commit から HEAD までの差分と、作業ツリーの未 commit の変更
         SK-->>U: 変わったファイルの今のメタデータと新しい案を並べた表で示して確かめる
       ```
 
       <!-- /map -->
     expected:
       - 見直しの表に、変更した 1 件だけが出る
-      - Git 管理外のフォルダでは、管理用の YAML の変更日時より後に変更した 1 件だけが出る
     test: test_normal_when_rerun_without_checkpoint
+  - name: 正常シナリオ（確認の時点の記録が無い Git 管理外の配信元の 2 回目以降）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: 記録の無い Git 管理外の配信元
+        description: 管理用の YAML を持ち、確認の時点の記録を持たない登録済みの Git 管理外のフォルダ。管理用の YAML の変更日時より後に 1 件の Markdown の中身を変える
+        notes: '-'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（確認の時点の記録が無い Git 管理外の配信元の 2 回目以降）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant CL as project-index の CLI
+
+        U->>SK: /project-index:setup {配信元のパス}
+        SK->>CL: 確認の時点の後に中身が変わったファイルを引く
+        CL-->>SK: 記録が無いため、管理用の YAML の変更日時より後に変更されたファイル
+        SK-->>U: 変わったファイルの今のメタデータと新しい案を並べた表で示して確かめる
+      ```
+
+      <!-- /map -->
+    expected:
+      - 見直しの表に、管理用の YAML の変更日時より後に変更した 1 件だけが出る
+    test: test_normal_when_rerun_without_checkpoint_outside_git
+  - name: 正常シナリオ（確認の時点の記録が無いローカル運用の 2 回目以降）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+        notes: '-'
+      - name: 記録の無いローカル運用の配信元
+        description: '`正常シナリオ（ローカル運用で追加する）` を終えた後の git リポジトリで、`files.local.yaml` は確認の時点の記録を持たない'
+        notes: '`files.local.yaml` の変更日時より後に Markdown を 1 件変えて commit し、別の 1 件を変えて commit しない。変更日時より前の commit で変えた 1 件も置く'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（確認の時点の記録が無いローカル運用の 2 回目以降）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant CL as project-index の CLI
+
+        U->>SK: /project-index:setup {配信元のパス}
+        SK->>CL: 確認の時点の後に中身が変わったファイルを引く
+        CL-->>SK: 記録が無いため、files.local.yaml の変更日時より後の commit の差分と、作業ツリーの未 commit の変更
+        SK-->>U: 変わったファイルの今のメタデータと新しい案を並べた表で示して確かめる
+      ```
+
+      <!-- /map -->
+    expected:
+      - 見直しの表に、変更日時より後に commit した 1 件と commit していない 1 件が出て、変更日時より前の commit で変えた 1 件は出ない
+    test: test_normal_when_local_operation_rerun_without_checkpoint
 lead: 利用者が `/project-index:setup` でフォルダを配信元として登録し、管理用の YAML を範囲のファイルに合わせるシナリオを定め、配信元の追加の流れを変えるときに参照する。
 issue: 14
 primary_actor: 利用者
