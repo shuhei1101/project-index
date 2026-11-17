@@ -477,7 +477,7 @@ def test_expand_array_keys_when_any_depth(operation: Operation, expected_path: s
     from project_index.features.write.apply import expand_array_keys
 
     # 準備
-    current = {"id": "n1", "refs": [], "functions": [{"refs": []}]}
+    current: dict[str, Any] = {"id": "n1", "refs": [], "functions": [{"refs": []}]}
     # 実行・検証
     with pytest.raises(InvalidArgumentError, match="引数が正しくありません") as exc_info:
         expand_array_keys(operation, _nested_table(), current, index=0)
@@ -490,7 +490,7 @@ def test_expand_array_keys_when_any_depth_column_name() -> None:
     from project_index.features.write.apply import expand_array_keys
 
     # 準備
-    current = {"id": "n1", "refs": [], "functions": [{"refs": []}]}
+    current: dict[str, Any] = {"id": "n1", "refs": [], "functions": [{"refs": []}]}
     operation = Operation(op="update", id="n1", expected_version="v1", set={"refs": []})
     # 実行
     result = expand_array_keys(operation, _nested_table(), current, index=0)

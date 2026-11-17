@@ -53,7 +53,6 @@ def test_parse_field_path_when_selector() -> None:
     ]
 
 
-
 def test_parse_field_path_when_any_depth() -> None:
     """先頭の `**`（正常系）。"""
     from project_index.features.documents.fields import AnyDepth, ArraySelector
@@ -81,6 +80,7 @@ def test_parse_field_path_when_any_depth_misplaced(path: str) -> None:
     with pytest.raises(InvalidArgumentError, match="記載方法が誤っています") as exc_info:
         parse_field_path(path)
     assert exc_info.value.violations[0].path == path
+
 
 def test_get_field() -> None:
     """入れ子と位置（正常系）。"""
@@ -117,7 +117,6 @@ def test_get_field_when_selector() -> None:
     assert results == [["a", "b"], ["a"], None]
 
 
-
 @pytest.mark.parametrize(
     ("data", "path", "expected"),
     [
@@ -150,6 +149,7 @@ def test_get_field_when_any_depth(data: dict[str, Any], path: str, expected: obj
     result = get_field(data, path)
     # 検証
     assert result == expected
+
 
 def test_set_field() -> None:
     """途中の辞書を作る（正常系）。"""
@@ -198,7 +198,6 @@ def test_set_field_when_selector() -> None:
         set_field(data, "tags[].name", "a")
 
 
-
 def test_set_field_when_any_depth() -> None:
     """どの深さでもを含むパス（異常系）。"""
     # 準備
@@ -207,6 +206,7 @@ def test_set_field_when_any_depth() -> None:
     with pytest.raises(InvalidArgumentError, match="を含む項目のパスには書き込めません"):
         set_field(data, "**.refs", [])
     assert data == {}
+
 
 def test_delete_field() -> None:
     """キーと位置（正常系）。"""
@@ -232,7 +232,6 @@ def test_delete_field_when_missing() -> None:
     assert data == {}
 
 
-
 def test_delete_field_when_any_depth() -> None:
     """どの深さでもを含むパス（異常系）。"""
     # 準備
@@ -241,6 +240,7 @@ def test_delete_field_when_any_depth() -> None:
     with pytest.raises(InvalidArgumentError, match="を含む項目のパスは削除できません"):
         delete_field(data, "**.refs")
     assert data == {"refs": []}
+
 
 def test_resolve_metadata() -> None:
     """列名の対応と同じ名前の列（正常系）。"""
@@ -281,7 +281,6 @@ def test_resolve_metadata_when_nested_field() -> None:
     assert result["description"] == "s"
 
 
-
 def test_resolve_metadata_when_any_depth() -> None:
     """最上位と入れ子の関連をまとめる（正常系）。"""
     # 準備
@@ -305,6 +304,7 @@ def test_resolve_metadata_when_any_depth() -> None:
         {"to": "n3", "type": "references"},
     ]
     assert "related" not in results[1]
+
 
 def test_resolve_metadata_when_object_array() -> None:
     """オブジェクトの配列のタグ（正常系）。"""
@@ -411,7 +411,10 @@ def test_field_arrays() -> None:
 
 @pytest.mark.parametrize(
     ("data", "path"),
-    [pytest.param({"refs": "x"}, "refs", id="not-list"), pytest.param({}, "**.refs[]", id="missing")],
+    [
+        pytest.param({"refs": "x"}, "refs", id="not-list"),
+        pytest.param({}, "**.refs[]", id="missing"),
+    ],
 )
 def test_field_arrays_when_not_list(data: dict[str, Any], path: str) -> None:
     """配列でない・無い列（正常系）。"""
