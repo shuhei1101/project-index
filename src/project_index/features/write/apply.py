@@ -145,24 +145,32 @@ def _remove_from(
                 _violation(f"remove_from.{path}", "配列ではない項目からは削除できません")
             )
             continue
-        # x-key を持たない配列: 渡した値と等しい要素を除く（該当しない値は何もしない）
-        if key is None:
-            existing[:] = [item for item in existing if item not in values]
-            continue
-        # x-key を持つ配列: 除く前の配列で、値ごとに削除する要素が有るかを確かめる
-        missing = [
-            value for value in values if not any(_matches(item, value, key) for item in existing)
-        ]
-        if missing:
-            violations.extend(
-                _violation(f"remove_from.{path}", f"{path} に {value!r} の要素がありません")
-                for value in missing
-            )
-            continue
-        existing[:] = [
-            item for item in existing if not any(_matches(item, value, key) for value in values)
-        ]
+        violations.extend(_remove_values(existing, values, key, path))
     return violations
+
+
+def _remove_values(
+    existing: list[Any], values: list[Any], key: str | None, path: str
+) -> list[Violation]:
+    """1 つの配列から `remove_from` の値の要素を除き、削除する要素が無い値の違反を返す。"""
+    # x-key を持たない配列: 渡した値と等しい要素を除く（該当しない値は何もしない）
+    if key is None:
+        existing[:] = [item for item in existing if item not in values]
+        return []
+    # x-key を持つ配列: 除く前の配列で、値ごとに削除する要素が有るかを確かめる
+    missing = [
+        value for value in values if not any(_matches(item, value, key) for item in existing)
+    ]
+    if missing:
+        # 削除する要素が無い値がある: 値ごとの違反にして、この配列は除かない
+        return [
+            _violation(f"remove_from.{path}", f"{path} に {value!r} の要素がありません")
+            for value in missing
+        ]
+    existing[:] = [
+        item for item in existing if not any(_matches(item, value, key) for value in values)
+    ]
+    return []
 
 
 def _matches(item: object, value: object, key: str) -> bool:
