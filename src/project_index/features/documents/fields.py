@@ -271,9 +271,8 @@ def resolve_array(
 REF_PATH_EXAMPLE = (
     "例 `#functions[save].process`・`#functions[save#2].process`・`#notes[main.py の補足]`"
 )
-# 名前で始まり、`[...]` か `.名前` が続く参照の型の項目のパス
-REF_PATH_PATTERN = re.compile(r"[^.\[\]]+(?:\[[^\]]*\]|\.[^.\[\]]+)*")
-REF_PART_PATTERN = re.compile(r"\[([^\]]*)\]|([^.\[\]]+)")
+# 参照の型の項目のパスの名前（`[`・`]`・`.` を含まない）
+REF_NAME_PATTERN = re.compile(r"[^.\[\]]+")
 ORDER_PATTERN = re.compile(r"(.*)#(\d+)")
 
 
@@ -281,27 +280,69 @@ def resolve_ref_path(
     data: Mapping[str, Any], schema: Mapping[str, Any], path: str
 ) -> list[str | int]:
     """参照の型の項目のパス（`#` の後）を、文書と種類のスキーマでキーと位置の並びに解く。"""
-    if REF_PATH_PATTERN.fullmatch(path) is None:
-        raise _invalid(path, f"項目のパス {path} の記載方法が誤っています（{REF_PATH_EXAMPLE}）")
     tokens: list[str | int] = []
     current: object = data
     node = _schema_node(schema, schema)
-    for matched in REF_PART_PATTERN.finditer(path):
-        bracket, name = matched.group(1), matched.group(2)
+    for key, bracketed in _split_ref_path(path):
         # 配列に対する `[...]` は、スキーマの `x-key` の値で要素を選ぶ
-        if bracket is not None and is_list(current):
-            position = _element_position(current, node, bracket, path, tokens)
+        if bracketed and is_list(current):
+            position = _element_position(current, node, key, path, tokens)
             tokens.append(position)
             current = current[position]
             node = _schema_node(schema, node.get("items"))
             continue
-        key = name if bracket is None else bracket
         if not is_dict(current) or key not in current:
             raise _invalid(path, f"{path}: {_join(tokens) or '最上位'} にキー {key} がありません")
         tokens.append(key)
         current = current[key]
         node = _schema_node(schema, _property_schema(node, key))
     return tokens
+
+
+def _split_ref_path(path: str) -> list[tuple[str, bool]]:
+    """参照の型の項目のパスを、`[...]` の値か `.` で区切った名前の並びに分ける。
+
+    `[...]` の中の対応の取れた `[` `]` は値の一部にする。
+    要素は `(値, True)`（`[...]`）か `(名前, False)`。
+    """
+    invalid = _invalid(path, f"項目のパス {path} の記載方法が誤っています（{REF_PATH_EXAMPLE}）")
+    # 先頭は名前
+    head = REF_NAME_PATTERN.match(path)
+    if head is None:
+        raise invalid
+    parts: list[tuple[str, bool]] = [(head.group(), False)]
+    position = head.end()
+    while position < len(path):
+        # `[...]`: 対応する `]` までを値にする
+        if path[position] == "[":
+            end = _closing_bracket(path, position)
+            if end is None:
+                raise invalid
+            parts.append((path[position + 1 : end], True))
+            position = end + 1
+            continue
+        # `.名前`: `.` の後に空でない名前が要る
+        name = REF_NAME_PATTERN.match(path, position + 1) if path[position] == "." else None
+        if name is None:
+            # 対応する `[` の無い `]`・`]` の直後の名前・空の名前
+            raise invalid
+        parts.append((name.group(), False))
+        position = name.end()
+    return parts
+
+
+def _closing_bracket(path: str, start: int) -> int | None:
+    """`start` の `[` に対応する `]` の位置を返す（閉じなければ `None`）。"""
+    depth = 0
+    for index in range(start, len(path)):
+        # `[` で 1 段深く、`]` で 1 段浅くなり、0 に戻った `]` が対応する `]`
+        if path[index] == "[":
+            depth += 1
+        elif path[index] == "]":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
 
 
 def _element_position(
