@@ -16,3 +16,55 @@ files:
   related:
   - to: MOD-5
     type: implements
+- path: .claude-plugin/plugin.json
+  name: プラグインの定義
+  description: プラグイン project-index の名前と説明を受け持ち、Claude Code に表示するプラグインの情報を修正するときに参照する。
+  tags:
+  - topic:プラグイン
+  - tool:claude-code
+  related:
+  - to: MOD-2
+    type: see_also
+- path: .mcp.json
+  name: プラグインが配る MCP の接続先
+  description: 文書の MCP と管理の MCP の接続先の URL を受け持ち、待ち受けのポートや接続先を修正するときに参照する。
+  tags:
+  - topic:プラグイン
+  - tool:mcp
+  related:
+  - to: CFG-1
+    type: see_also
+  - to: MOD-2
+    type: see_also
+- path: hooks/hooks.json
+  name: プラグインのフックの登録
+  description: SessionStart と PreToolUse のフックの登録を受け持ち、フックを呼ぶ出来事や対象のツールを修正するときに参照する。
+  tags:
+  - topic:フック
+  - topic:プラグイン
+  - tool:claude-code
+  related:
+  - to: IF-19
+    type: see_also
+  - to: IF-20
+    type: see_also
+- path: skills/global-setup/SKILL.md
+  name: 端末に project-index を用意するスキル
+  description: 端末ごとに 1 回、クローン・依存・端末の設定・Claude Code の env・起動を用意する手順を受け持ち、導入と更新の手順を修正するときに参照する。
+  tags:
+  - topic:セットアップ
+  - topic:端末の設定
+  - tool:claude-code
+  related:
+  - to: SC-2
+    type: see_also
+- path: skills/setup/SKILL.md
+  name: フォルダを配信元として登録するスキル
+  description: 範囲と権限を聞いて配信元を登録し、管理用の YAML の行と仮のメタデータ・関連の候補を記載する手順を受け持ち、配信元の登録と見直しの手順を修正するときに参照する。
+  tags:
+  - topic:セットアップ
+  - topic:配信元
+  - topic:メタデータ
+  related:
+  - to: SC-5
+    type: see_also

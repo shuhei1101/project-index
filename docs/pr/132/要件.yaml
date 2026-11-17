@@ -82,3 +82,6 @@ scope_out:
   - item: 端末の設定に登録済みで設定ファイルが無い mindstella-nandemo-kaiwa の 2 つの配信元
     reason: リポジトリの外の端末の設定の行で、配信元の検索の対象とメタデータの見直しに含まれない
     plan: none
+  - item: 直下の 10 件（README.md・pyproject.toml など）と docs/README.md・docs/_config.yml を検索の対象に入れること
+    reason: 管理用の YAML の範囲が配置したフォルダの配下の全てのファイルで、exclude はファイル名だけに該当するため、今の project-index では記載できない。判定の変更を別の Issue で入れる（確認ログの推奨案 A）
+    plan: '#133'

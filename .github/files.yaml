@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/shuhei1101/knowledge/design-schemas/v9.2.0/schemas/knowledge-files.schema.yaml
+files:
+- path: workflows/test.yml
+  name: テストの全件実行の workflow
+  description: テスト実行方法の層のテストを GitHub Actions のランナーで回してログを成果物に上げる処理を受け持ち、ランナーでのテストの実行を修正するときに参照する。
+  tags:
+  - topic:ci
+  - tool:github
+  - tool:pytest
+  related:
+  - to: IF-116-1
+    type: implements

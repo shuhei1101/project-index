@@ -949,3 +949,68 @@ files:
   related:
   - to: MOD-104
     type: implements
+- path: project_index/migrations/project-index/2/steps.yaml
+  name: 配信元の設定のバージョン 2 への移し替えの手順
+  description: '`documents[].type` の削除と `metadata` の固定値・参照の持ち替えを受け持ち、`project-index migrate` のバージョン 2 の手順を修正するときに参照する。'
+  tags:
+  - topic:設定の移し替え
+  - action:移行
+  related:
+  - to: IF-16
+    type: see_also
+  - to: MOD-37
+    type: see_also
+- path: project_index/migrations/project-index/3/steps.yaml
+  name: 配信元の設定のバージョン 3 への移し替えの手順
+  description: タグのマスター（`tags`）の削除を受け持ち、`project-index migrate` のバージョン 3 の手順を修正するときに参照する。
+  tags:
+  - topic:設定の移し替え
+  - action:移行
+  related:
+  - to: IF-16
+    type: see_also
+  - to: MOD-37
+    type: see_also
+- path: project_index/schemas/aliases.schema.yaml
+  name: alias-inject から取り込んだエイリアスのキーのスキーマ
+  description: '`alias_type` を持つ行の文書のエイリアスのキーを検証するスキーマを受け持ち、取り込んだスキーマを更新するときに参照する。'
+  tags:
+  - topic:エイリアス
+  - topic:スキーマ
+  - tool:alias-inject
+  related:
+  - to: LIB-9
+    type: see_also
+  - to: MOD-24
+    type: see_also
+- path: project_index/schemas/aliases.source.yaml
+  name: エイリアスのキーのスキーマの取り込み元
+  description: エイリアスのキーのスキーマを取り込む alias-inject のリポジトリ・タグ・パスを受け持ち、取り込むスキーマのタグを変えるときに参照する。
+  tags:
+  - topic:エイリアス
+  - tool:alias-inject
+  related:
+  - to: LIB-9
+    type: see_also
+- path: project_index/schemas/project-index.schema.yaml
+  name: 配信元の設定の検証のスキーマ
+  description: サーバーが `project-index.yaml` を検証するスキーマを受け持ち、配信元の設定のキーを追加・修正するときに参照する。
+  tags:
+  - topic:スキーマ
+  - topic:設定
+  - tool:jsonschema
+  related:
+  - to: MOD-70
+    type: see_also
+- path: project_index/schemas/settings.schema.yaml
+  name: 端末の設定の検証のスキーマ
+  description: サーバーが端末の設定 `settings.yaml` を検証するスキーマを受け持ち、端末の設定のキーを追加・修正するときに参照する。
+  tags:
+  - topic:スキーマ
+  - topic:端末の設定
+  - tool:jsonschema
+  related:
+  - to: MOD-64
+    type: see_also
+  - to: MOD-67
+    type: see_also
