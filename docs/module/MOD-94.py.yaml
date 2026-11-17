@@ -340,10 +340,11 @@ functions:
       description: '-'
     process: |-
       1. `request.ref` がある場合、何もしない
-      2. `asyncio.to_thread` で場所を解く。`SearchRequest` は権限と作業場所の『読む場所の解決』を `source`・`worktree`・`cwd`・`outside_scope` で、`WriteRequest`・`DeleteRequest` は『書く場所の解決』を `source`・`worktree`・`cwd` で呼ぶ。場所を解けない（`ProjectIndexError`）、場所が 1 つでない、または `worktree` が `None` なら何もしない（解けないときは、サービスが同じ解決で同じエラーを返す）
-      3. 文書のストア.ワークツリーを読み込んだかが `True` なら何もしない
-      4. `loads` にそのワークツリーの終わっていないタスクが無ければ、`asyncio.to_thread(handlers.store.load, 読む場所)` のタスクを作って入れ、終わったら `loads` から除くコールバックを付ける
-      5. `async with asyncio.timeout(handlers.terminal.worktree_load_wait_sec)` の中でタスクを `asyncio.shield` で包んで await する
+      2. `asyncio.to_thread` で、ワークツリーの設定を再読み込みせずに（`reload_worktree=False`）場所を解く。`SearchRequest` は権限と作業場所の『読む場所の解決』を `source`・`worktree`・`cwd`・`outside_scope` で、`WriteRequest`・`DeleteRequest` は『書く場所の解決』を `source`・`worktree`・`cwd` で呼ぶ。場所を解けない（`ProjectIndexError`）、場所が 1 つでない、または `worktree` が `None` なら何もしない（解けないときは、サービスが同じ解決で同じエラーを返す）
+      3. `loads` にそのワークツリーの終わっていないタスクが無ければ、次を `asyncio.to_thread` で行うタスクを作って入れ、終わったら `loads` から除くコールバックを付ける
+         - 手順 2 と同じ解決を、ワークツリーの設定を再読み込みして（`reload_worktree=True`）呼び直す（設定が変わっていなければ配信元の『作業場所の配信元の読み込み』のキャッシュで返る）
+         - 文書のストア.ワークツリーを読み込んだかが `False` なら、解き直した場所で文書のストア.文書を集める（`load`）を呼ぶ
+      4. `async with asyncio.timeout(handlers.terminal.worktree_load_wait_sec)` の中でタスクを `asyncio.shield` で包んで await する
          - `TimeoutError` の場合、タスクは止めずに `WorktreeLoadingError`（`worktree` はワークツリーのパス）を送る
            - `[info]` ワークツリーを読み込み中のため待たずに返した（配信元・ワークツリー・秒数）
          - タスクが送った例外はそのまま伝わる
@@ -384,6 +385,12 @@ functions:
         condition: '配信元の無い配信元の一覧で、`source: sample` の `SearchRequest`'
         mock: 文書のストア（呼ばれた回数を記録する偽物）
         expected: 何も送らず、`has_worktree`・`load` が呼ばれない
+      - name: test_ensure_worktree_when_reload_slow
+        case: 異常
+        summary: ワークツリーの設定の再読み込みも待ちの上限の内で待つ
+        condition: '`worktree_load_wait_sec=1`、読む場所の解決が `reload_worktree=True` のときだけ外から合図するまで終わらない。ワークツリー x を指す `SearchRequest`'
+        mock: 権限と作業場所の『読む場所の解決』（`reload_worktree` を記録する偽物）、文書のストア（`has_worktree` が `False`）
+        expected: 上限の 1 秒で `WorktreeLoadingError` を送り、解決が `reload_worktree=False`・`True` の順に呼ばれる
 refs:
   - to: IF-2
     type: requires
