@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import dataclasses
+import os
 import threading
 from collections import OrderedDict
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from project_index.features.access.types import Target, script_at
@@ -20,6 +23,7 @@ from project_index.features.validation.rules import (
 from project_index.features.validation.scripts import parse_validator_output
 from project_index.integrations.scripts import ScriptError, run_script
 from project_index.shared.errors import Violation
+from project_index.shared.hashing import value_hash
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -27,9 +31,15 @@ if TYPE_CHECKING:
     from project_index.features.documents.store import DocumentStore
     from project_index.features.documents.types import Document
     from project_index.features.sources.schema_ref import SchemaRef
+    from project_index.features.sources.types import ScriptEntry
     from project_index.shared.deadline import Deadline
 
 VALIDATOR_ON_READ_CACHE = 4096
+
+# スクリプトの実行で書かれ、スクリプトの状態に含めないフォルダ
+_SCRIPT_CACHE_DIR = "__pycache__"
+
+type _ReadKey = tuple[str, str, str, str, str, str, str]
 
 __all__ = ["VALIDATOR_ON_READ_CACHE", "DocumentChecker", "run_script"]
 
@@ -47,7 +57,7 @@ class DocumentChecker:
     def __init__(self, store: DocumentStore, timeout_sec: float) -> None:
         self.store = store
         self.timeout_sec = timeout_sec
-        self._read_cache: OrderedDict[tuple[str, str, str, str], list[Violation]] = OrderedDict()
+        self._read_cache: OrderedDict[_ReadKey, list[Violation]] = OrderedDict()
         self._lock = threading.Lock()
 
     def _run_validator(
@@ -120,9 +130,14 @@ class DocumentChecker:
         on: Literal["read", "write"],
         deadline: Deadline | None = None,
     ) -> list[Violation]:
-        """`validators[]` の 1 行を通す（読み取りの結果は文書のバージョンごとにキャッシュする）。"""
-        key = (target.source.id, document.kind, validator_id, document.version)
-        if on == "read":
+        """`validators[]` の 1 行を通す（読み取りの結果は文書・行・スクリプト・参照する場所ごとにキャッシュする）。"""
+        # 書き込みの検査はキャッシュしないため、キーを作らない
+        key = (
+            self._read_key(target, document, target.source.script("validators", validator_id))
+            if on == "read"
+            else None
+        )
+        if key is not None:
             with self._lock:
                 cached = self._read_cache.get(key)
                 if cached is not None:
@@ -131,12 +146,31 @@ class DocumentChecker:
                 return cached
         found, ran = self._run_validator(target, document, validator_id, deadline)
         # 動かせなかった結果はキャッシュしない
-        if on == "read" and ran:
+        if key is not None and ran:
             with self._lock:
                 self._read_cache[key] = found
                 while len(self._read_cache) > VALIDATOR_ON_READ_CACHE:
                     self._read_cache.popitem(last=False)
         return found
+
+    def _read_key(self, target: Target, document: Document, entry: ScriptEntry) -> _ReadKey:
+        """読み取りの `validators[]` の結果をキャッシュするキーを作る。"""
+        # 行の全ての項目（`run`・`on` など）が変われば別の結果にする
+        entry_hash = value_hash(dataclasses.asdict(entry))
+        at = script_at(target)
+        # クローン本体で config_commit があればスクリプトはその commit から取り出して動かすため commit で、
+        # それ以外（ワークツリー・config_commit の無い配信元）は作業ツリーのスクリプトの状態で区別する
+        script_state = at[1] if at is not None else _script_stamp(target.config_base, entry.run)
+        location = str(target.worktree) if target.worktree is not None else ""
+        return (
+            target.source.id,
+            document.kind,
+            entry.id,
+            document.version,
+            entry_hash,
+            script_state,
+            location,
+        )
 
     def check_markdown(
         self,
@@ -165,3 +199,29 @@ class DocumentChecker:
         """読み取りの結果のキャッシュを捨てる。"""
         with self._lock:
             self._read_cache.clear()
+
+
+def _script_stamp(base: Path, run: list[str]) -> str:
+    """`run` が指すファイルのフォルダの配下（`__pycache__` を除く）の `stat` のハッシュを返す。"""
+    folders: set[Path] = set()
+    for item in run:
+        # オプションと絶対パス（インタープリターなど）は作業ツリーのスクリプトではない
+        if item.startswith("-") or Path(item).is_absolute():
+            continue
+        path = base / item
+        if path.is_file():
+            folders.add(path.parent)
+    if not folders:
+        return ""
+    stamps: list[tuple[str, int, int]] = []
+    for folder in sorted(folders):
+        for current, dirs, files in os.walk(folder):
+            # 実行で書かれるキャッシュのフォルダはたどらない
+            dirs[:] = sorted(name for name in dirs if name != _SCRIPT_CACHE_DIR)
+            for name in sorted(files):
+                path = Path(current) / name
+                stat = path.stat()
+                stamps.append(
+                    (Path(os.path.relpath(path, base)).as_posix(), stat.st_mtime_ns, stat.st_size)
+                )
+    return value_hash(stamps)
