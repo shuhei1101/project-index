@@ -44,3 +44,6 @@ scope_out:
   - item: templates/files.schema.yaml のキーが knowledge の knowledge-files.schema.yaml とずれたことを検知する単体テスト
     reason: 単体テストが knowledge のタグのファイル（ネットワークか knowledge のクローン）に依存する。雛形はモジュールでなく、対応するモジュール構成のテスト表も無い。knowledge のタグを上げる作業で合わせ直す
     plan: none
+  - item: 単体テストの test_check_port 系がランナーでときどき PortInUseError で fail すること
+    reason: ポートの競合による既存の不安定なテストで、この作業 PR の変更と関係しない。この作業 PR がマージされなくても同じ内容で成り立つ
+    plan: '#126'
