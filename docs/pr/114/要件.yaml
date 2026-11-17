@@ -1,8 +1,8 @@
 use_cases:
   - kind: single
     scenario: docs/scenario/SC-5.yaml
-    impact: changed
-    detail: 配信元を追加するときに書き出す設定のスキーマの参照先と、プロンプトのスキーマをコピーする元が、配布する設定のスキーマの新しい配置先に変わる
+    impact: run_only
+    detail: setup がコピーするプロンプトのスキーマの元が schemas/prompt.schema.yaml に変わった後も、配信元を追加する流れが通る
     depends_on: []
   - kind: single
     scenario: docs/scenario/SC-4.yaml
@@ -58,7 +58,7 @@ docs:
     change: コピーするプロンプトのスキーマのパスを schemas/prompt.schema.yaml にする
     status: todo
 scope_out:
-  - item: templates/files.schema.yaml を knowledge の knowledge-files.schema.yaml に合わせること
+  - item: templates/files.schema.yaml の配置先と、knowledge の knowledge-files.schema.yaml に合わせること
     reason: '#76 の本文で #75 が決める範囲とされている'
     plan: '#75'
   - item: リポジトリの直下の project-index.yaml の 1 行目の $schema を project-index のスキーマへ向けること
