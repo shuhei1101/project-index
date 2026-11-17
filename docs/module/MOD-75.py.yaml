@@ -251,8 +251,8 @@ classes:
             case: 正常
             summary: 1 回の要求の中でスクリプトの状態を使い回す
             condition: ワークツリーを指す読み書きの場所で、違う 2 件の文書を同じ `stamps` を渡して `on="read"` で 1 回ずつ
-            mock: '`_folder_stamps`（呼ばれた数を数える）・`run_script`'
-            expected: '`_folder_stamps` が 1 回だけ呼ばれる'
+            mock: '検査の service.py が import する `script_stamp`（呼ばれた数を数える）・`run_script`'
+            expected: '`script_stamp` が 1 回だけ呼ばれる'
           - name: test_document_checker_check_when_script_outside_repository
             case: 正常
             summary: Git のリポジトリの外のスクリプトを指す `run` でもキーを作れる
@@ -376,9 +376,6 @@ classes:
              - それ以外（ワークツリー・`config_commit` の無い配信元）の場合、`stamps` に (`config_base`, `run`, `target.source.is_git`) の状態があればそれを使い、無ければスクリプトの実行の『スクリプトの状態』（`script_stamp(target.config_base, run, use_git=target.source.is_git)`）で作って `stamps` に入れる（`_cached_stamp`）
           3. 参照する場所を、`target.worktree` があればその絶対パス、無ければ空の文字列にする
           4. (配信元の ID, 種類, 検査の ID, 文書のバージョン, 行の定義のハッシュ, スクリプトの状態, 参照する場所) を返す
-        notes:
-          フォルダの直下のファイルを見る理由: スクリプトの実行（`run_script` の `at`）は `run` の要素のファイルのフォルダごと取り出して動かすため、同じフォルダから import するファイルの書き換えでも結果が変わる。
-          フォルダの配下のファイルを見る理由: スクリプトの実行（`run_script` の `at`）は `run` の要素のファイルのフォルダをサブフォルダごと取り出して動かすため、その配下から import するファイルの書き換えでも結果が変わる。`__pycache__` はスクリプトの実行で書かれるため除き、実行のたびにキーが変わらないようにする。
 constants:
   - name: VALIDATOR_ON_READ_CACHE
     title: 読み取りの検査の結果の数
