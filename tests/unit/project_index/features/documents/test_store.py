@@ -1763,3 +1763,176 @@ def test_check_sync_when_background(
     assert set(in_unit) == {True}
     assert len(in_unit) == 8
     assert len(slept) > 4
+
+
+NOTES_TABLE = DocumentTable(
+    id="notes",
+    paths=["notes/files.yaml"],
+    schema_path="schemas/rule.schema.yaml",
+    records="files",
+    body_file="path",
+)
+
+
+def _recording_checkout(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """本物のリビジョンの書き出しを包んで書き出した commit を記録し、その並びを返す。"""
+    calls: list[str] = []
+    real = SnapshotStore.checkout
+
+    def recording(self: SnapshotStore, repo_root: Path, commit: str) -> Path:
+        calls.append(commit)
+        return real(self, repo_root, commit)
+
+    monkeypatch.setattr(SnapshotStore, "checkout", recording)
+    return calls
+
+
+def _recording_collect_files(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """本物の『ファイルの収集』を包んで呼ばれた行の ID を記録し、その並びを返す。"""
+    calls: list[str] = []
+    real = loader_module.collect_files
+
+    def recording(root: Path, table: DocumentTable, **kwargs: Any) -> Any:
+        calls.append(table.id)
+        return real(root, table, **kwargs)
+
+    monkeypatch.setattr(store_module, "collect_files", recording)
+    return calls
+
+
+def test_document_store_load_when_from_blobs(
+    tmp_path: Path,
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """書き出さずに commit の blob から読む（正常系）。"""
+    # 準備
+    root = git_repo(
+        {
+            "rules/a.yaml": "id: a\nname: A\n",
+            "notes/files.yaml": "files:\n  - path: x.md\n",
+            "notes/x.md": "# X\n",
+        },
+        date=OCT_01,
+    )
+    first = run_git(root, "rev-parse", "HEAD").strip()
+    source = make_served_source(
+        root=root,
+        is_git=True,
+        repo_root=root,
+        config=make_source_config(documents=[RULES_TABLE, NOTES_TABLE], default_ref="develop"),
+    )
+    target = make_target(source, ref="develop", commit=first)
+    checkouts = _recording_checkout(monkeypatch)
+    from_blobs = DocumentStore(SnapshotStore(tmp_path / "snapshots-blobs"))
+    exported = DocumentStore(SnapshotStore(tmp_path / "snapshots-export"))
+    # 実行
+    blobs_result = from_blobs.load(target, from_blobs=True)
+    blobs_checkouts = list(checkouts)
+    export_result = exported.load(target)
+    # 検証
+    assert blobs_checkouts == []
+    assert checkouts == [first]
+    assert blobs_result.documents == export_result.documents
+    assert [document.body for document in blobs_result.documents if document.kind == "notes"] == [
+        "# X\n"
+    ]
+
+
+def test_document_store_load_when_from_blobs_symlink(
+    tmp_path: Path,
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+) -> None:
+    """シンボリックリンクは書き出しと同じくリンク先の内容で読む（正常系）。"""
+    # 準備
+    root = git_repo({"rules/a.yaml": "name: A\n"})
+    os.symlink("a.yaml", root / "rules" / "b.yaml")
+    os.symlink("missing.yaml", root / "rules" / "c.yaml")
+    run_git(root, "add", "-A")
+    run_git(root, "commit", "-m", "links")
+    commit = run_git(root, "rev-parse", "HEAD").strip()
+    source = _git_source(root, root, make_source_config, make_served_source)
+    target = make_target(source, ref="develop", commit=commit)
+    from_blobs = DocumentStore(SnapshotStore(tmp_path / "snapshots-blobs"))
+    exported = DocumentStore(SnapshotStore(tmp_path / "snapshots-export"))
+    # 実行
+    blobs_result = from_blobs.load(target, from_blobs=True)
+    export_result = exported.load(target)
+    # 検証
+    assert [(document.path, document.data) for document in blobs_result.documents] == [
+        ("rules/a.yaml", {"name": "A"}),
+        ("rules/b.yaml", {"name": "A"}),
+    ]
+    assert [(document.path, document.data) for document in export_result.documents] == [
+        ("rules/a.yaml", {"name": "A"}),
+        ("rules/b.yaml", {"name": "A"}),
+    ]
+
+
+def test_document_store_load_when_from_blobs_not_utf8(
+    tmp_path: Path,
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+) -> None:
+    """UTF-8 で読めないファイル（正常系）。"""
+    # 準備
+    root = git_repo({"rules/a.yaml": "id: a\n"})
+    (root / "rules" / "x.yaml").write_bytes("name: 日本\n".encode("shift_jis"))
+    run_git(root, "add", "-A")
+    run_git(root, "commit", "-m", "sjis")
+    commit = run_git(root, "rev-parse", "HEAD").strip()
+    source = _git_source(root, root, make_source_config, make_served_source)
+    store = DocumentStore(SnapshotStore(tmp_path / "snapshots"))
+    # 実行
+    result = store.load(make_target(source, ref="develop", commit=commit), from_blobs=True)
+    # 検証
+    assert [(problem.path, problem.reason) for problem in result.problems] == [
+        ("rules/x.yaml", "unreadable")
+    ]
+
+
+def test_document_store_load_when_collected_reused(
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+    commit_all: Callable[..., str],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    document_store: DocumentStore,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """同じ commit の 2 回目は集め直さない（正常系）。"""
+    # 準備
+    root = git_repo({"rules/a.yaml": "id: a\n", "rules/b.yaml": "id: b\n"})
+    first = run_git(root, "rev-parse", "HEAD").strip()
+    second = commit_all(root, {"rules/c.yaml": "id: c\n"})
+    source = _git_source(root, root, make_source_config, make_served_source)
+    calls = _recording_collect_files(monkeypatch)
+    first_result = document_store.load(
+        make_target(source, ref="develop", commit=first), from_blobs=True
+    )
+    calls.clear()
+    # 実行
+    second_result = document_store.load(
+        make_target(source, ref="develop", commit=first), from_blobs=True
+    )
+    second_calls = list(calls)
+    third_result = document_store.load(
+        make_target(source, ref="develop", commit=second), from_blobs=True
+    )
+    # 検証
+    assert second_calls == []
+    assert second_result.documents == first_result.documents
+    assert calls == ["rules"]
+    assert sorted(document.id for document in third_result.documents) == ["a", "b", "c"]

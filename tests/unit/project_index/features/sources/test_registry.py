@@ -10,10 +10,12 @@ import pytest
 from project_index.features.sources import registry as registry_module
 from project_index.features.sources.registry import SourceRegistry
 from project_index.features.sources.types import ServedSource, SourceStatus
+from project_index.shared.background import BackgroundGate
 from project_index.shared.errors import SourceNotServedError, UnknownSourceError, Violation
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from contextlib import AbstractContextManager
 
     from project_index.features.settings.types import SourceEntry, TerminalConfig
     from project_index.features.sources.schema_ref import SchemaRefLookup
@@ -432,7 +434,14 @@ class _Loader:
         self._make_served_source = make_served_source
         self._make_status = make_status
 
-    def __call__(self, entry: SourceEntry, *, index: int, lookup: SchemaRefLookup) -> LoadResult:
+    def __call__(
+        self,
+        entry: SourceEntry,
+        *,
+        index: int,
+        lookup: SchemaRefLookup,
+        unit: Callable[[], AbstractContextManager[None]] | None = None,
+    ) -> LoadResult:
         # 設定のパス `/tmp/{名前}/project-index.yaml` から名前を取る
         name = Path(entry.config[0]).parent.name
         self.order.append(name)
@@ -1102,3 +1111,95 @@ def test_source_registry_reload_changed_when_not_served(
     registry.reload_changed(terminal)
     # 検証
     assert order == ["broken"]
+
+
+class _UnitLoader:
+    """受け取った `unit` に 2 回入り、入るたびに関所の 1 件の中かを行の名前ごとに記録する配信元の読み込みの偽物。"""
+
+    def __init__(
+        self,
+        gate: BackgroundGate,
+        make_served_source: Callable[..., ServedSource],
+        make_status: Callable[..., SourceStatus],
+        *,
+        hold: dict[str, threading.Event] | None = None,
+        together: threading.Barrier | None = None,
+    ) -> None:
+        self.inside: dict[str, list[bool]] = {}
+        self._gate = gate
+        self._hold = hold or {}
+        self.started = {name: threading.Event() for name in self._hold}
+        self._together = together
+        self._make_served_source = make_served_source
+        self._make_status = make_status
+
+    def __call__(
+        self,
+        entry: SourceEntry,
+        *,
+        index: int,
+        lookup: SchemaRefLookup,
+        unit: Callable[[], AbstractContextManager[None]] | None = None,
+    ) -> LoadResult:
+        name = Path(entry.config[0]).parent.name
+        if name in self._hold:
+            self.started[name].set()
+            self._hold[name].wait(timeout=5)
+        assert unit is not None
+        records = self.inside.setdefault(name, [])
+        for _ in range(2):
+            with unit():
+                records.append(self._gate.in_unit)
+                if self._together is not None:
+                    self._together.wait()
+        return (
+            self._make_served_source(id=name, root=Path("/tmp") / name),
+            self._make_status(name, index),
+        )
+
+
+def test_source_registry_load_when_gated(
+    monkeypatch: pytest.MonkeyPatch,
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """要求が待っていない行だけを関所で休ませる（正常系）。"""
+    # 準備
+    slept: list[float] = []
+    gate = BackgroundGate(sleep=slept.append)
+    waiting = threading.Event()
+    gated_loader = _UnitLoader(gate, make_served_source, make_status, hold={"a": waiting})
+    registry = SourceRegistry(loading=True, on_waiting=waiting.set, gate=gate)
+    idle_slept: list[float] = []
+    idle_gate = BackgroundGate(sleep=idle_slept.append)
+    idle_loader = _UnitLoader(
+        idle_gate, make_served_source, make_status, together=threading.Barrier(2, timeout=5)
+    )
+    idle_registry = SourceRegistry(loading=True, gate=idle_gate)
+
+    async def scenario() -> None:
+        worker = threading.Thread(
+            target=registry.load,
+            args=(make_terminal_config(sources=_entries(make_entry, "a", "b")),),
+        )
+        worker.start()
+        await asyncio.to_thread(gated_loader.started["a"].wait, 5)
+        await registry.wait_for(ids=["a"])
+        await asyncio.to_thread(worker.join, 5)
+
+    # 実行
+    monkeypatch.setattr(registry_module, "LOAD_WORKERS", 1)
+    monkeypatch.setattr(registry_module, "load_source", gated_loader)
+    with gate.foreground():
+        asyncio.run(scenario())
+    monkeypatch.setattr(registry_module, "LOAD_WORKERS", 2)
+    monkeypatch.setattr(registry_module, "load_source", idle_loader)
+    idle_registry.load(make_terminal_config(sources=_entries(make_entry, "b", "c")))
+    # 検証
+    assert gated_loader.inside == {"a": [False, False], "b": [True, True]}
+    assert len(slept) == 2
+    assert [status.status for status in idle_registry.statuses()] == ["serving", "serving"]
+    assert sorted(idle_loader.inside) == ["b", "c"]
+    assert idle_slept == []

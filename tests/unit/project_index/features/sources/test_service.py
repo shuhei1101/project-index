@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from project_index.features.sources import service as service_module
 from project_index.features.sources.service import (
@@ -21,7 +23,7 @@ from project_index.features.sources.types import ScriptEntry, ServedSource, Sour
 from project_index.shared.errors import ValidationFailedError, Violation
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
     from project_index.features.settings.types import SourceEntry
 
@@ -1282,3 +1284,91 @@ def test_load_source_when_git_storage_outside_work_tree(
     assert served is None
     assert status.status == "not_served"
     assert [violation.path for violation in status.errors] == ["sources[1].storage.type"]
+
+
+def test_load_source_when_unit(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """文書の行ごとのスキーマの確かめと読み込みを 1 件ずつ包む（正常系）。"""
+    # 準備
+    config = (
+        "name: units\n"
+        "documents:\n"
+        "  - id: a\n    paths: [a/*.yaml]\n    schema: schemas/a.schema.yaml\n"
+        "  - id: b\n    paths: [b/*.yaml]\n    schema: schemas/b.schema.yaml\n"
+        "  - id: c\n    paths: [c/*.yaml]\n    schema: schemas/c.schema.yaml\n"
+    )
+    root = tmp_path / "units"
+    write_files(
+        root,
+        {
+            "project-index.yaml": config,
+            "schemas/a.schema.yaml": "title: a\ntype: object\n",
+            "schemas/b.schema.yaml": "title: b\ntype: object\n",
+            "schemas/c.schema.yaml": "title: c\ntype: object\n",
+        },
+    )
+    entry = make_entry(str(root / "project-index.yaml"))
+    entered: list[str] = []
+
+    @contextlib.contextmanager
+    def unit() -> Iterator[None]:
+        entered.append("unit")
+        yield
+
+    plain, _ = load_source(entry, index=0)
+    # 実行
+    served, status = load_source(entry, index=0, unit=unit)
+    # 検証
+    assert status.status == "serving"
+    assert served is not None
+    assert plain is not None
+    assert entered == ["unit"] * 6
+    assert served.schemas == plain.schemas
+
+
+def test_validate_source_config_when_schema_checked_once(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """同じ内容のスキーマの検査を使い回す（正常系）。"""
+    # 準備
+    root = tmp_path / "root"
+    valid = "title: checked-once-valid\ntype: object\n"
+    broken = "title: checked-once-broken\ntype: 1\n"
+    write_files(
+        root,
+        {
+            "schemas/a.schema.yaml": valid,
+            "schemas/b.schema.yaml": valid,
+            "schemas/c.schema.yaml": broken,
+            "schemas/d.schema.yaml": broken,
+        },
+    )
+    value = _config_value(
+        documents=[
+            {"id": "a", "paths": ["a/*.yaml"], "schema": "schemas/a.schema.yaml"},
+            {"id": "b", "paths": ["b/*.yaml"], "schema": "schemas/b.schema.yaml"},
+            {"id": "c", "paths": ["c/*.yaml"], "schema": "schemas/c.schema.yaml"},
+            {"id": "d", "paths": ["d/*.yaml"], "schema": "schemas/d.schema.yaml"},
+        ]
+    )
+    calls: list[object] = []
+    real = Draft202012Validator.check_schema
+
+    def counting(cls: type[Draft202012Validator], schema: Any, **kwargs: Any) -> None:
+        calls.append(schema)
+        real(schema, **kwargs)
+
+    monkeypatch.setattr(Draft202012Validator, "check_schema", classmethod(counting))
+    # 実行
+    first = validate_source_config(value, root=root)
+    second = validate_source_config(value, root=root)
+    # 検証
+    assert len(calls) == 2
+    assert [v.path for v in first] == ["documents[2].schema", "documents[3].schema"]
+    assert first[0].rule == first[1].rule
+    assert [(v.path, v.rule) for v in second] == [(v.path, v.rule) for v in first]
