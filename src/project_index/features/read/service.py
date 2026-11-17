@@ -111,15 +111,21 @@ def list_documents(
     target: Target, *, store: DocumentStore, values: bool = False, common_keys: bool = False
 ) -> DocumentListResponse:
     """読み取りの場所の文書の ID・パス・種類・メタデータ・バージョンを、`documents[]` の行の順に返す。"""
-    loaded = store.load(target)
+    from project_index import poc_timing
+
+    with poc_timing.span("list_load", source=target.source.id):
+        loaded = store.load(target)
     order = {row.id: index for index, row in enumerate(target.source.config.documents)}
     documents = sorted(
         loaded.documents, key=lambda found: (order.get(found.kind, len(order)), found.path)
     )
-    return DocumentListResponse(
-        ref=_ref_name(target),
-        documents=[_entry(found, values=values, common_keys=common_keys) for found in documents],
-    )
+    with poc_timing.span("list_build", source=target.source.id, count=len(documents)):
+        return DocumentListResponse(
+            ref=_ref_name(target),
+            documents=[
+                _entry(found, values=values, common_keys=common_keys) for found in documents
+            ],
+        )
 
 
 def _unreadable(problems: Sequence[LoadProblem], path: str) -> LoadProblem | None:

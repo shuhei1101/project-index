@@ -73,11 +73,20 @@ async def _run[T](
     handlers: Handlers, source: str, value: str, work: Callable[[], T]
 ) -> T | Response:
     """配信元の読み込みを待って処理を別のスレッドで呼び、見つからなかったものを 404 にする。"""
-    await handlers.registry.wait_for(ids=[source])
+    from project_index import poc_timing
+
+    with poc_timing.span("api_wait", source=source, name=getattr(work, "func", work).__name__):
+        await handlers.registry.wait_for(ids=[source])
     try:
         # サービスの処理の間は要求の応答中として数え、裏の検査と書き出しを休ませる
         with handlers.gate.foreground():
-            return await asyncio.to_thread(work)
+            def timed() -> T:
+                with poc_timing.span(
+                    "api_work", source=source, name=getattr(work, "func", work).__name__
+                ):
+                    return work()
+
+            return await asyncio.to_thread(timed)
     except ProjectIndexError as error:
         fields = _not_found_fields(error, source, value)
         # 404 にしないエラー: 例外の変換に任せる
@@ -96,8 +105,26 @@ def _documents(
     handlers: Handlers, source: str, ref: str | None, values: bool, common_keys: bool
 ) -> DocumentListResponse:
     """リビジョンの文書の一覧を返す。"""
-    target, _ = read_target(source, ref, registry=handlers.registry)
+    from project_index import poc_timing
+
+    with poc_timing.span("read_target", source=source):
+        target, _ = read_target(source, ref, registry=handlers.registry)
+    profile_dir = poc_timing.text("POC_PROFILE_DIR")
+    if profile_dir is not None and source in (poc_timing.text("POC_PROFILE_SOURCES") or "").split(","):
+        import cProfile
+        import itertools
+
+        counter = _PROFILE_COUNT.setdefault(source, itertools.count(1))
+        profiler = cProfile.Profile()
+        result = profiler.runcall(
+            list_documents, target, store=handlers.store, values=values, common_keys=common_keys
+        )
+        profiler.dump_stats(f"{profile_dir}/{source}-{next(counter)}.prof")
+        return result
     return list_documents(target, store=handlers.store, values=values, common_keys=common_keys)
+
+
+_PROFILE_COUNT: dict = {}
 
 
 def _document(

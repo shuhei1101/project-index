@@ -100,16 +100,22 @@ class SnapshotStore:
             shutil.rmtree(temp, ignore_errors=True)
             temp.mkdir(parents=True)
             try:
-                data = run_git(
-                    ["archive", "--format=tar", commit],
-                    cwd=repo_root,
-                    binary=True,
-                    timeout=GIT_ARCHIVE_TIMEOUT_SEC,
-                )
+                from project_index import poc_timing
+
+                with poc_timing.span("archive", repo=str(repo_root), commit=commit):
+                    data = run_git(
+                        ["archive", "--format=tar", commit],
+                        cwd=repo_root,
+                        binary=True,
+                        timeout=GIT_ARCHIVE_TIMEOUT_SEC,
+                    )
                 if not isinstance(data, bytes):
                     msg = "git archive の出力がバイト列ではありません"
                     raise RuntimeError(msg)
-                with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+                with (
+                    poc_timing.span("extract", repo=str(repo_root), commit=commit),
+                    tarfile.open(fileobj=io.BytesIO(data)) as archive,
+                ):
                     archive.extractall(temp, filter="data")
             except GitError as error:
                 shutil.rmtree(temp, ignore_errors=True)

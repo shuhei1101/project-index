@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 __all__ = ["LOAD_WORKERS", "SourceRegistry", "load_source"]
 
 # 起動の後の `load` が同時に読み込む行の数の上限（非機能要件の同時に読み込む行の数）
-LOAD_WORKERS = 10
+LOAD_WORKERS = int(__import__("os").environ.get("POC_LOAD_WORKERS") or 10)
 
 
 type _Waiter = tuple[asyncio.AbstractEventLoop, asyncio.Future[None], frozenset[int] | None]
@@ -201,13 +201,35 @@ class SourceRegistry:
         """読み始めていない行が無くなるまで、次の行を選んで読み込む（読み込みのスレッドの 1 つ）。"""
         while (index := self._next_row()) is not None:
             entry = self._rows[index]
-            served, status = self._load_row(entry, index, lookup)
+            from project_index import poc_timing
+
+            with poc_timing.span("row_load", source=entry.id or str(index), index=index):
+                served, status = self._load_row(entry, index, lookup)
             self._publish(entry, index, served, status)
             self._rows_done[index].set()
             self._finish_waiters(every=False)
 
     def _next_row(self) -> int | None:
         """次に読み込む行を選び、読み始めた印を付ける。待っている要求が指す行を先にし、無ければ位置の順。"""
+        from project_index import poc_timing
+
+        # PoC 1a: 待っている要求の行が全て読み始め済みなら、新しい行を読み始めない（読み込み中の行は止めない）
+        if poc_timing.flag("POC_PAUSE_ROWS"):
+            paused = False
+            while True:
+                with self._waiters_lock:
+                    pending = [w[2] for w in self._waiters if w[2] is not None]
+                    blocked = bool(pending) and all(
+                        self._rows_started[i] for rows in pending for i in rows
+                    )
+                if not blocked:
+                    break
+                if not paused:
+                    poc_timing.emit("row_pause_begin")
+                    paused = True
+                __import__("time").sleep(0.02)
+            if paused:
+                poc_timing.emit("row_pause_end")
         with self._waiters_lock:
             candidates: list[int] = [*self._requested, *range(len(self._rows))]
             for index in candidates:

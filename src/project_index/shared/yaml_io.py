@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import re
 from io import StringIO
 from typing import TYPE_CHECKING
@@ -61,7 +63,8 @@ def _error_from(error: Exception, file: str | None, text: str) -> YamlLoadError:
 
 def load_yaml(text: str, *, file: str | None = None) -> object:
     """YAML の文字列を素の値で読む。"""
-    yaml = YAML(typ="safe", pure=True)
+    # PoC 構成 3: C 拡張（ruamel.yaml.clib）で読む
+    yaml = YAML(typ="safe", pure=os.environ.get("POC_YAML_C") != "1")
     try:
         return yaml.load(text)
     except MarkedYAMLError as error:

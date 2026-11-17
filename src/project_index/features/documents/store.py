@@ -17,7 +17,13 @@ from project_index.features.access.types import Target
 from project_index.features.documents.aliases import collect_aliases
 from project_index.features.documents.fields import missing_ref_fields, unresolved_related
 from project_index.features.documents.indexable import walk_files, walk_tree
-from project_index.features.documents.loader import collect_files, load_file, unindexed_files
+from project_index.features.documents.indexable import SKIP_DIRS, SKIP_FILES, SKIP_PATHS
+from project_index.features.documents.loader import (
+    collect_files,
+    documents_from_text,
+    load_file,
+    unindexed_files,
+)
 from project_index.features.documents.schema import (
     records_item_schema,
     resolve_schema_refs,
@@ -143,6 +149,7 @@ class DocumentStore:
         self._worktrees: dict[Path, _WorktreeWalk] = {}
         self._worktree_locks: dict[Path, threading.Lock] = {}
         self._startup_schemas: dict[tuple[str, str], dict[str, Any]] = {}
+        self._poc_catfiles: dict[Path, _PocCatFile] = {}
         # `clear` のたびに増やし、`clear` の前に解き始めたスキーマを書き戻さない
         self._generation = 0
         self._lock = threading.Lock()
@@ -289,12 +296,19 @@ class DocumentStore:
         dates: dict[str, FileDates],
         files: Sequence[str],
         commit: str,
+        *,
+        stats: dict[str, Any] | None = None,
+        catfile: _PocCatFile | None = None,
     ) -> tuple[list[Document], list[LoadProblem]]:
         """リビジョンの 1 つの文書の行のファイルを集め、blob・日時・行の定義が変わったファイルだけ読む。"""
         source = target.source
         repo_root = source.repo_root or source.root
         prefix = source.root.relative_to(repo_root).as_posix()
+        stats = {} if stats is None else stats
+        stats.update(files=0, loaded=0, cached=0, load_wall=0.0, load_cpu=0.0, fresh_wall=0.0)
+        ls0 = time.perf_counter()
         blobs = self._blobs(repo_root, commit)
+        stats["ls_tree_wall"] = time.perf_counter() - ls0
         table_hash = _table_hash(table)
 
         def from_repo(path: str) -> str:
@@ -308,13 +322,34 @@ class DocumentStore:
             path: str, key: _RevisionKey, blob: str
         ) -> tuple[list[Document], list[LoadProblem]]:
             """キャッシュが新しければキャッシュを、古ければファイルを再読み込みしてキャッシュする。"""
+            fresh0 = time.perf_counter()
             with self._lock:
                 cached = self._revision_files.get(key)
             if cached is not None and _revision_fresh(
                 cached, blob, body_blobs(cached[3]), _date_stamps(path, cached[3], dates)
             ):
+                stats["fresh_wall"] += time.perf_counter() - fresh0
+                stats["cached"] += 1
                 return cached[3], cached[4]
-            found, issues = load_file(root, path, table, source_id=source.id, dates=dates)
+            stats["fresh_wall"] += time.perf_counter() - fresh0
+            load0 = time.perf_counter()
+            cpu0 = time.thread_time()
+            if catfile is None:
+                found, issues = load_file(root, path, table, source_id=source.id, dates=dates)
+            else:
+                text = catfile.read(blob)
+                found, issues = documents_from_text(
+                    text,
+                    source.root,
+                    path,
+                    table,
+                    source_id=source.id,
+                    dates=dates,
+                    read_body=lambda body: catfile.read_text(blobs.get(from_repo(body))),
+                )
+            stats["load_wall"] += time.perf_counter() - load0
+            stats["load_cpu"] += time.thread_time() - cpu0
+            stats["loaded"] += 1
             with self._lock:
                 self._revision_files[key] = (
                     blob,
@@ -335,6 +370,7 @@ class DocumentStore:
             if blob is None:
                 continue
             seen.add(relative)
+            stats["files"] += 1
             found, issues = read(path, (repo_root, source.id, relative, table.id, table_hash), blob)
             documents.extend(found)
             problems.extend(issues)
@@ -380,14 +416,61 @@ class DocumentStore:
         `files` は呼び出し元が読むフォルダを `walk_files` でたどったパス。
         無ければここで 1 回だけたどり、行ごとにたどり直さない。
         """
+        from project_index import poc_timing
+
         revision = None if target.ref is None else self._commit_of(target)
-        root = target.base if revision is None else self._revision_root(target, revision)
         tables = self._tables(target, kinds)
+        # PoC 構成 2: default_ref を書き出さずに、集めたファイルだけ cat-file --batch で読み込む
+        if revision is not None and files is None and poc_timing.flag("POC_CATFILE"):
+            return self._poc_load_catfile(target, tables, revision)
+        with poc_timing.span("revision_root", source=target.source.id):
+            root = target.base if revision is None else self._revision_root(target, revision)
         # ワークツリーを読む: ワークツリーごとの排他の中で、たどった結果を使い回す
         if revision is None and target.worktree is not None and files is None:
             with self._worktree_lock(root):
                 return self._load_worktree(target, root, tables)
         return self._load_walked(target, root, tables, revision, files)
+
+    def _poc_load_catfile(
+        self, target: Target, tables: list[DocumentTable], revision: str
+    ) -> LoadResult:
+        """PoC 構成 2: commit のファイルを書き出さずに、ls-tree のパスと cat-file --batch で読み込む。"""
+        from project_index import poc_timing
+
+        source = target.source
+        repo_root = source.repo_root or source.root
+        prefix = source.root.relative_to(repo_root).as_posix()
+        with poc_timing.span("file_dates", source=source.id):
+            dates = self._file_dates(target, revision)
+        with poc_timing.span("ls_tree_files", source=source.id) as extra:
+            blobs = self._blobs(repo_root, revision)
+            files = [
+                path
+                for path in (
+                    full if prefix == "." else full.removeprefix(f"{prefix}/")
+                    for full in blobs
+                    if prefix == "." or full.startswith(f"{prefix}/")
+                )
+                if _poc_walkable(path)
+            ]
+            extra["count"] = len(files)
+        with self._lock:
+            catfile = self._poc_catfiles.get(repo_root)
+            if catfile is None:
+                catfile = self._poc_catfiles[repo_root] = _PocCatFile(repo_root)
+        documents: list[Document] = []
+        problems: list[LoadProblem] = []
+        for table in tables:
+            with poc_timing.span("revision_table", source=source.id, table=table.id) as extra:
+                found, issues = self._load_revision_table(
+                    target, source.root, table, dates, files, revision, stats=extra, catfile=catfile
+                )
+            documents.extend(found)
+            problems.extend(issues)
+        duplicates: list[Document] = []
+        unique = _unique(documents, problems, duplicates)
+        problems.sort(key=lambda problem: problem.path)
+        return LoadResult(documents=unique, problems=problems, duplicates=duplicates)
 
     def _worktree_lock(self, root: Path) -> threading.Lock:
         """ワークツリーごとの排他を返す（無ければ作る）。"""
@@ -442,8 +525,13 @@ class DocumentStore:
         collected: dict[str, list[str]] | None = None,
     ) -> LoadResult:
         """読むフォルダのファイルから、文書の行ごとに文書を集める。"""
-        dates = self._file_dates(target, revision)
-        walked = list(walk_files(root)) if files is None else files
+        from project_index import poc_timing
+
+        with poc_timing.span("file_dates", source=target.source.id):
+            dates = self._file_dates(target, revision)
+        with poc_timing.span("walk_files", source=target.source.id) as extra:
+            walked = list(walk_files(root)) if files is None else files
+            extra["count"] = len(walked)
         documents: list[Document] = []
         problems: list[LoadProblem] = []
         kind_ids = {table.id for table in tables}
@@ -460,9 +548,12 @@ class DocumentStore:
                 )
                 seen_keys |= seen
             else:
-                found, issues = self._load_revision_table(
-                    target, root, table, dates, walked, revision
-                )
+                with poc_timing.span(
+                    "revision_table", source=target.source.id, table=table.id
+                ) as extra:
+                    found, issues = self._load_revision_table(
+                        target, root, table, dates, walked, revision, stats=extra
+                    )
             documents.extend(found)
             problems.extend(issues)
         # 削除されたファイルのキャッシュを捨てる
@@ -789,3 +880,59 @@ def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
         duplicate_files=[f"{path}: {'・'.join(ids)}" for path, ids in shared.items()],
         duplicate_ids=duplicate_ids,
     )
+
+
+def _poc_walkable(path: str) -> bool:
+    """PoC: walk_files がたどるファイルと同じ判定（たどらないフォルダ・ファイル名を除く）。"""
+    parts = path.split("/")
+    if parts[-1] in SKIP_FILES:
+        return False
+    if any(part in SKIP_DIRS for part in parts[:-1]):
+        return False
+    return not any(path == skip or path.startswith(f"{skip}/") for skip in SKIP_PATHS)
+
+
+class _PocCatFile:
+    """PoC: 1 つのリポジトリの `git cat-file --batch` を常駐させ、blob の内容を返す。"""
+
+    def __init__(self, repo_root: Path) -> None:
+        import subprocess
+
+        self._process = subprocess.Popen(  # noqa: S603
+            ["git", "cat-file", "--batch"],  # noqa: S607
+            cwd=repo_root,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        self._lock = threading.Lock()
+
+    def read_bytes(self, blob: str) -> bytes | None:
+        """blob の内容を返す（無ければ `None`）。"""
+        process = self._process
+        assert process.stdin is not None and process.stdout is not None
+        with self._lock:
+            process.stdin.write(f"{blob}\n".encode())
+            process.stdin.flush()
+            header = process.stdout.readline().decode().split()
+            if len(header) < 3 or header[1] == "missing":
+                return None
+            data = process.stdout.read(int(header[2]))
+            process.stdout.read(1)
+        return data
+
+    def read(self, blob: str) -> str:
+        """blob の内容を文字列で返す。"""
+        data = self.read_bytes(blob)
+        return "" if data is None else data.decode("utf-8")
+
+    def read_text(self, blob: str | None) -> str | None:
+        """本文のファイルの blob を文字列で返す（無い・読めないなら `None`）。"""
+        if not blob:
+            return None
+        data = self.read_bytes(blob)
+        if data is None:
+            return None
+        try:
+            return data.decode("utf-8")
+        except UnicodeDecodeError:
+            return None

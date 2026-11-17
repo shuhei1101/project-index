@@ -388,7 +388,15 @@ def check_and_export_later(
     snapshots: SnapshotStore,
 ) -> threading.Thread:
     """渡した配信元を裏で検査し、検査の終了を待たずに Git の配信元の default_ref の commit を裏で書き出す。"""
-    checks.refresh_later(store, sources)
+    from project_index import poc_timing
+
+    if not poc_timing.flag("POC_NO_CHECKS"):
+        checks.refresh_later(store, sources)
+    if poc_timing.flag("POC_NO_EXPORT"):
+        poc_timing.emit("export_skipped")
+        thread = threading.Thread(target=lambda: None, daemon=True)
+        thread.start()
+        return thread
     # Git の配信元だけが default_ref の commit を持つ
     targets = [
         (source.repo_root, source.config_commit)
