@@ -48,4 +48,4 @@ scope_out:
     plan: none
   - item: '検査の読み取りの結果のキャッシュ（validation/service.py の _read_cache。キー: 配信元の ID・種類・validator の ID・文書のバージョン）が、worktree の設定で validators の行やスクリプトを変えても前の結果を返却しうる'
     reason: 起点 Issue はスキーマの参照とメタデータの対応を扱い、validators の変更は要件に無い。今回修正する文書のストアとは別のキャッシュで、独立に修正できる（インターフェース定義のレビューで to_file に確定）
-    plan: to_file
+    plan: '#178'
