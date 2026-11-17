@@ -33,7 +33,7 @@ functions:
       3. サブコマンドの登録先を `dest="cmd"`・`required=True` で作る。各サブコマンドは `handler`（`argparse.Namespace` を受けて終了コードを返す関数）を既定値に持つ
          - `serve` を登録する。引数は持たず（設定は環境変数で渡す）、`handler` は起動の『待ち受けの開始』（`main.run_serve`）
          - `migrate` を登録する。`--plan` と `--record` は排他のグループ（`store_true`）、`--source`（配信元の `project-index.yaml` のパス、既定 `None`）、`--allow-destructive`（`store_true`）を持ち、`handler` は起動の『設定の移し替えの実行』（`main.run_migrate`）
-         - `files` を登録する。`--root`（必須）、`--paths`（必須・`action="append"`）、`--exclude`（`action="append"`、既定 `[]`）を持ち、`handler` は起動の『載せるファイルの一覧の実行』（`main.run_files`）
+         - `files` を登録する。`--root`（必須）、`--paths`（必須・`action="append"`）、`--exclude`（`action="append"`、既定 `[]`）、`--exclude-path`（`action="append"`、既定 `[]`）を持ち、`handler` は起動の『載せるファイルの一覧の実行』（`main.run_files`）
          - `outline` を登録する。引数は `files` と同じ（`--root`・`--paths`・`--exclude`）で、`handler` は起動の『ファイルのアウトラインの実行』（`main.run_outline`）
          - `changed` を登録する。`--root`（必須）、`--files-yaml`（必須）を持ち、`handler` は起動の『中身が変わったファイルの一覧の実行』（`main.run_changed`）
          - `checkpoint` を登録する。`--root`（必須）、`--files-yaml`（必須）、`--reviewed`（`action="append"`、既定 `[]`）を持ち、`handler` は起動の『確認の時点の記録の実行』（`main.run_checkpoint`）
@@ -110,6 +110,12 @@ functions:
         mock: なし
         expected: '`cmd` が `"skew"`、`files_yaml` が `["docs/files.yaml", "src/files.yaml"]`、`draft` が `None`、`only_draft` が `True`、`handler` が `project_index.main.run_skew`'
         exception: '-'
+      - name: test_build_parser_when_files_exclude_path
+        case: 正常
+        summary: files の除外のパスを引く
+        condition: '`["files", "--root", "/tmp/a", "--paths", "**", "--exclude-path", "content/prompts/**/*.yaml"]` を解析する'
+        mock: なし
+        expected: '`exclude_path` が `["content/prompts/**/*.yaml"]`、`exclude` が `[]`'
   - name: main
     title: 入口
     kind: 関数

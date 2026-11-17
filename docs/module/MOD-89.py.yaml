@@ -690,13 +690,13 @@ functions:
         type: argparse.Namespace
         required: true
         passing: positional
-        description: '`files` の解析結果（`root`・`paths`・`exclude`）'
+        description: '`files` の解析結果（`root`・`paths`・`exclude`・`exclude_path`）'
     returns:
       type: int
       description: 終了コード。出し終えたとき 0
     process: |-
       1. `root` を `Path` にし、フォルダでなければ「`{root}: フォルダがありません`」を標準エラーに出して 2 を返す
-      2. 載せるファイルの一覧（`indexable_files`。`paths`・`exclude` は解析結果）で集め、パスを 1 行ずつ標準出力に出して 0 を返す
+      2. 載せるファイルの一覧（`indexable_files`。`paths`・`exclude`・`exclude_paths`（解析結果の `exclude_path`）は解析結果）で集め、パスを 1 行ずつ標準出力に出して 0 を返す
     exceptions:
       - name: なし（終了コード 2）
         condition: '`--root` が無いかフォルダでない（インターフェース定義の `RootNotFound`）'
@@ -716,6 +716,13 @@ functions:
         mock: なし（`capsys`）
         expected: 2 を返し、標準出力が空で、標準エラーに渡したパス
         exception: なし（終了コード 2）
+      - name: test_run_files_when_exclude_path_given
+        case: 正常
+        summary: 除外のパスを渡す
+        condition: '`src/a.py`・`content/prompts/p.yaml` を置き、`paths=["**"]`・`exclude=[]`・`exclude_path=["content/prompts/**/*.yaml"]`'
+        mock: なし（`tmp_path`・`capsys`）
+        expected: 0 を返し、標準出力が `src/a.py` の 1 行だけ
+        exception: '-'
     refs:
       - to: MOD-26
         item: functions[indexable_files]

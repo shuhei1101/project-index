@@ -160,7 +160,7 @@ functions:
     container: project_index/features/documents/indexable.py
     usecase: 載せるファイルの一覧
     role: 読み取り
-    summary: 範囲の glob に当たるファイルのうち、除外の名前と除外の条件に当たらないものを返す
+    summary: 範囲の glob に当たるファイルのうち、除外の名前・除外のパス・除外の条件に当たらないものを返す
     kind: 関数
     scope: public
     thread_safe: true
@@ -184,12 +184,19 @@ functions:
         default: '[]'
         passing: keyword
         description: ファイル名の glob（`documents[].exclude[]` と同じ書き方）
+      - name: exclude_paths
+        title: 除外のパス
+        type: list[str]
+        required: false
+        default: '[]'
+        passing: keyword
+        description: '`root` からのパスの glob（`documents[].paths` と同じ書き方）'
     returns:
       type: list[str]
       description: '`root` からのパスの昇順'
     process: |-
       1. `paths`・`exclude` を持つ文書の行（`DocumentTable`。`id` は `files`、`schema_path` は空）を作り、ファイルの収集（`collect_files`）で集める
-      2. 除外の条件の判定（`is_excluded_file`）が `True` のパスを除いて返す
+      2. `exclude_paths` のどれかにパス全体が当たる（`PurePosixPath.full_match`。文書の行の `paths` と同じ判定）パスと、除外の条件の判定（`is_excluded_file`）が `True` のパスを除いて返す
     unit_tests:
       - name: test_indexable_files
         case: 正常
@@ -204,6 +211,13 @@ functions:
         condition: '`src/a.py`・`src/b.py` を置き、`paths=["src/**"]`・`exclude=["b.py"]`'
         mock: なし（`tmp_path`）
         expected: '`["src/a.py"]`'
+        exception: '-'
+      - name: test_indexable_files_when_exclude_paths_given
+        case: 正常
+        summary: 除外のパスに当たるファイルも除く
+        condition: '`src/a.py`・`content/prompts/p.yaml`・`content/readme.md` を置き、`paths=["**"]`・`exclude_paths=["content/prompts/**/*.yaml"]`'
+        mock: なし（`tmp_path`）
+        expected: '`["content/readme.md", "src/a.py"]`'
         exception: '-'
   - name: walk_tree
     title: フォルダごとの列挙

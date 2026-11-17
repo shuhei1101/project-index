@@ -335,12 +335,19 @@ functions:
         default: None
         passing: keyword
         description: '`walk_files(root)` で得たパス。渡されたら、そのうち `index_path` のフォルダの配下のパスを使う。`None` はその場でたどる'
+      - name: others
+        title: ほかの文書の行
+        type: Sequence[DocumentTable]
+        required: false
+        default: ()
+        passing: keyword
+        description: 同じ配信元の、`table` でない有効な文書の行。どれかの行の文書になる（`matches` が `True`）パスを数えない
     returns:
       type: list[str]
       description: '`root` からのパスの昇順'
     process: |-
       1. `files` があればそのうち `index_path` のフォルダの配下のパス（フォルダが `root` なら全て）、無ければ中をたどるファイルの列挙（`walk_files`）で `index_path` のフォルダの配下のファイルを `root` からのパスで得る
-      2. `index_path` 自身と `body_paths` にあるパスと、文書の行.除外の名前に当たるかが `True` のパスと、除外の条件に当たるか（`is_excluded_file`）が `True` のパスを除き、昇順で返す
+      2. `index_path` 自身と `body_paths` にあるパスと、文書の行.除外の名前に当たるかが `True` のパスと、除外の条件に当たるか（`is_excluded_file`）が `True` のパスと、`others` のどれかの行の文書になるか（文書の行.`matches`）が `True` のパスを除き、昇順で返す
     unit_tests:
       - name: test_unindexed_files
         case: 正常
@@ -369,6 +376,13 @@ functions:
         condition: '`src/files.yaml`・`src/a.py`・`src/d.py`・`docs/x.md` を置き、`files` にその 4 件、`body_paths` が `[src/a.py]`'
         mock: '`walk_files`（呼ばれないことを確かめる）'
         expected: '`["src/d.py"]` で、`walk_files` を呼ばない'
+      - name: test_unindexed_files_when_other_row_matches
+        case: 正常
+        summary: ほかの行の文書になるファイルは数えない
+        condition: '`files.yaml`・`src/a.py`・`src/d.py`・`content/prompts/p.yaml`・`content/prompts/note.md` を置き、`index_path` が `files.yaml`、`body_paths` が `[src/a.py]`、`others` が `paths: [content/prompts/**/*.yaml]` の行 1 つ'
+        mock: なし（`tmp_path`）
+        expected: '`["content/prompts/note.md", "src/d.py"]`'
+        exception: '-'
   - name: resolve_body_path
     title: 本文のファイルのパスの解決
     kind: 関数
