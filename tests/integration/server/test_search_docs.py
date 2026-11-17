@@ -461,6 +461,65 @@ def test_normal_when_worktree_metadata_changed(
     assert not by_clone.data["items"][0]["values"].get("related")
 
 
+# `on: [read]` の検査 `check` を行 `sample` に持たせる設定の追記
+READ_VALIDATOR = (
+    "    validators: [check]\n"
+    "validators:\n"
+    "  - id: check\n"
+    "    run: [python3, scripts/{script}]\n"
+    "    on: [read]\n"
+)
+
+
+def _violations_script(rule: str | None) -> str:
+    """標準入力を読み、`rule` があればその違反を 1 件出す検査のスクリプトを返す。"""
+    found = f'[{{"rule": "{rule}"}}]' if rule else "[]"
+    return f"import sys\nsys.stdin.read()\nprint('{found}')\n"
+
+
+def test_normal_when_worktree_validator_changed(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_config_text: Callable[..., str],
+    sample_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """ワークツリーで読み取りの検査のスクリプトや行を変えると、次の呼び出しから変えた後の違反を返す（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "project-index.yaml": sample_config_text(READ_VALIDATOR.format(script="check.py")),
+            "scripts/check.py": _violations_script(None),
+            "scripts/check_b.py": _violations_script("rule-b"),
+        }
+    )
+    source = make_source("sample", files)
+    worktree = add_worktree(source.folder, "x")
+    env = make_server(source)
+    arguments = {
+        "cwd": str(source.folder),
+        "filter": {"field": "id", "op": "eq", "values": ["doc-1"]},
+        "format": "json",
+    }
+    # 実行
+    first = env.call("search_docs", worktree=str(worktree), **arguments)
+    # ワークツリーのスクリプトだけを書き換え、commit しない
+    (worktree / "scripts" / "check.py").write_text(_violations_script("rule-a"), encoding="utf-8")
+    second = env.call("search_docs", worktree=str(worktree), **arguments)
+    # ワークツリーの設定の行の run だけを変え、commit しない
+    (worktree / "project-index.yaml").write_text(
+        sample_config_text(READ_VALIDATOR.format(script="check_b.py")), encoding="utf-8"
+    )
+    third = env.call("search_docs", worktree=str(worktree), **arguments)
+    by_clone = env.call("search_docs", **arguments)
+    # 検証
+    assert not [note for note in first.data.get("notes", []) if note.startswith("doc-1:")]
+    assert "doc-1: check: rule-a（$）" in second.data.get("notes", [])
+    assert "doc-1: check: rule-b（$）" in third.data.get("notes", [])
+    assert not [note for note in third.data.get("notes", []) if "rule-a" in note]
+    assert not [note for note in by_clone.data.get("notes", []) if note.startswith("doc-1:")]
+
+
 def test_error_when_worktree_config_invalid(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
