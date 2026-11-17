@@ -370,7 +370,9 @@ class SourceRegistry:
                 self._rows_done = [threading.Event() for _ in self._rows]
                 self._rows_started = [True for _ in self._rows]
             logger.info(
-                "変わった行の配信元を再読み込みした（読んだ行: %s・配信中: %s）", loaded, list(sources)
+                "変わった行の配信元を再読み込みした（読んだ行: %s・配信中: %s）",
+                loaded,
+                list(sources),
             )
             return statuses
 
