@@ -298,10 +298,53 @@ def alias_file_set() -> Callable[..., dict[str, str]]:
     return alias_files
 
 
+NESTED_ROW = (
+    "  - id: nested\n"
+    "    paths: [nested/*.yaml]\n"
+    "    schema: nested.schema.yaml\n"
+    "    metadata:\n"
+    '      related: "**.refs[]"\n'
+)
+NESTED_SCHEMA = (
+    "type: object\n"
+    "required: [id, name]\n"
+    "properties:\n"
+    "  id: {type: string}\n"
+    "  name: {type: string}\n"
+    "  refs: {type: array}\n"
+    "  functions:\n"
+    "    type: array\n"
+    "    items:\n"
+    "      type: object\n"
+    "      properties:\n"
+    "        name: {type: string}\n"
+    "        refs: {type: array}\n"
+)
+
+
+def nested_files(n1: str) -> dict[str, str]:
+    """`related: "**.refs[]"` の行と、本文が `n1` の n1・refs を持たない n2・n3 の配信元のファイル一式を返す。"""
+    return sample_files(
+        **{
+            "project-index.yaml": sample_config(NESTED_ROW),
+            "nested.schema.yaml": NESTED_SCHEMA,
+            "nested/n1.yaml": n1,
+            "nested/n2.yaml": "id: n2\nname: n2\n",
+            "nested/n3.yaml": "id: n3\nname: n3\n",
+        }
+    )
+
+
 @pytest.fixture
 def sample_sync_file_set() -> Callable[..., dict[str, str]]:
     """管理用の YAML に無いファイルを持つ配信元のファイル一式を作る関数を返す。"""
     return sample_sync_files
+
+
+@pytest.fixture
+def nested_file_set() -> Callable[..., dict[str, str]]:
+    """最上位と入れ子の refs を `**.refs[]` でまとめる配信元のファイル一式を作る関数を返す。"""
+    return nested_files
 
 
 @pytest.fixture

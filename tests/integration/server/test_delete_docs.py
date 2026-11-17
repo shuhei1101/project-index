@@ -442,3 +442,39 @@ def test_error_when_disk_storage_delete_not_allowed(
     assert "TargetIsCloneError" not in result.text
     assert "writable" in result.text
     assert target.is_file()
+
+
+# 最上位の refs と functions[0].refs を持つ n1
+NESTED_N1 = (
+    "id: n1\nname: n1\nrefs:\n  - {to: n2, type: references}\n"
+    "  - {to: n3, type: references}\nfunctions:\n  - name: f\n"
+    "    refs:\n      - {to: n2, type: references}\n"
+)
+
+
+def test_normal_when_unlink_nested_related(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    nested_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """on_referenced: unlink が最上位と入れ子の refs の両方から参照を外す（正常系）。"""
+    # 準備
+    files = nested_file_set(NESTED_N1)
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    target = worktree / "nested" / "n2.yaml"
+    referrer = worktree / "nested" / "n1.yaml"
+    # 実行
+    result = env.call(
+        "delete_docs",
+        cwd=str(source.folder),
+        worktree=str(worktree),
+        targets=[{"id": "n2", "expected_version": _version(target)}],
+        on_referenced="unlink",
+    )
+    # 検証
+    data = load_yaml(referrer.read_text(encoding="utf-8"))
+    assert not target.exists()
+    assert data["refs"] == [{"to": "n3", "type": "references"}]
+    assert data["functions"][0]["refs"] == []
+    assert result.data["unlinked"] == [{"id": "n1", "version": _version(referrer)}]

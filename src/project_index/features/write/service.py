@@ -13,7 +13,12 @@ from ruamel.yaml.comments import CommentedMap
 from project_index.features.access.service import resolve_write_target
 from project_index.features.access.types import Target
 from project_index.features.changes.compare import diff_lines
-from project_index.features.documents.fields import get_field, resolve_metadata, set_field
+from project_index.features.documents.fields import (
+    field_arrays,
+    get_field,
+    resolve_metadata,
+    set_field,
+)
 from project_index.features.documents.loader import documents_from_text, resolve_body_path
 from project_index.features.documents.store import DocumentStore, not_found_error
 from project_index.features.documents.types import Document
@@ -927,11 +932,13 @@ def _unlink(session: _Session, referrer: Document, removed: set[str]) -> tuple[s
     column = _related_column(table)
     text = session.text(referrer.path)
     current, container = _content_for(table, text, referrer, referrer.path)
-    rows = get_field(current, column)
-    if not is_list(rows):
+    arrays = field_arrays(current, column)
+    if not arrays:
         msg = "related の列が配列ではありません"
         raise RuntimeError(msg)
-    rows[:] = [row for row in rows if not _points_to(row, removed)]
+    # `**.` の列名では、最上位と入れ子の全ての配列から除く
+    for rows in arrays:
+        rows[:] = [row for row in rows if not _points_to(row, removed)]
     return referrer.path, _finish(table, current, container, referrer)
 
 

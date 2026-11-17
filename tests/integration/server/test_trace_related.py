@@ -348,3 +348,42 @@ def test_normal_when_disk_storage(
     assert all("co_change" not in item["signals"] for item in result.data.get("suggestions", []))
     assert by_ref.is_error
     assert "company は disk の配信元のため ref を指定できません" in by_ref.text
+
+
+# 最上位の refs と functions[0].refs を持つ n1
+NESTED_N1 = (
+    "id: n1\nname: n1\nrefs:\n  - {to: n2, type: references}\n"
+    "functions:\n  - name: f\n    refs:\n      - {to: n3, type: references}\n"
+)
+
+
+def test_normal_when_nested_related(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    nested_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """**.refs[] の対応で最上位と入れ子の refs をまとめた related を、両方向にたどる（正常系）。"""
+    # 準備
+    source = make_source("sample", nested_file_set(NESTED_N1))
+    env = make_server(source)
+    # 実行
+    out = env.call(
+        "trace_related",
+        format="json",
+        cwd=str(source.folder),
+        from_ids=["n1"],
+        direction="out",
+        depth=1,
+    )
+    incoming = env.call(
+        "trace_related",
+        format="json",
+        cwd=str(source.folder),
+        from_ids=["n3"],
+        direction="in",
+        depth=1,
+    )
+    # 検証
+    assert [(item["id"], item["depth"]) for item in out.data["items"]] == [("n2", 1), ("n3", 1)]
+    assert [item["via"]["type"] for item in out.data["items"]] == ["references", "references"]
+    assert [(item["id"], item["depth"]) for item in incoming.data["items"]] == [("n1", 1)]

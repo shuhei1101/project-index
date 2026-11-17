@@ -443,7 +443,7 @@ functions:
          - 文書が無ければ近い ID を添えた `DocumentNotFoundError`
          - Git 管理外の配信元で種類の行が `writable` でなければ `DeleteNotAllowedError`
          - バージョンの確かめ（前回読んだ内容は無し）
-         - 同じ配信元の残る文書のうち、メタデータの `related` に `to` が消す文書の ID で `source` の無い行を持つ文書を集める。あれば `on_referenced` が `fail` なら参照元を添えた `DocumentReferencedError`、`unlink` なら参照元の `related` の列（種類の行の `metadata.related` の列名。無ければ `related`）からその行を除く操作を作る
+         - 同じ配信元の残る文書のうち、メタデータの `related` に `to` が消す文書の ID で `source` の無い行を持つ文書を集める。あれば `on_referenced` が `fail` なら参照元を添えた `DocumentReferencedError`、`unlink` なら参照元の `related` の列（種類の行の `metadata.related` の列名。無ければ `related`）からその行を除く操作を作る。除く配列は『列名の指す配列の取得』で取り、列名が `**.` で始まるときは最上位と入れ子の全ての配列から除く
       4. `atomic` が `True` で `failed` があれば、最初の失敗の例外を送る
       5. 参照を外した文書を文書の検査に通す（違反は `ValidationFailedError`。`deadline` は `limits` があれば `limits.write_deadline`）
       6. `dry_run` なら `applied=False` で、`unlinked` に参照を外す文書と外した後のバージョンを入れて返す
@@ -513,6 +513,13 @@ functions:
         condition: '`records`・`body_file` の行で、要素 n1・n3 が同じ `n1.md` を指す。n3 を消す'
         mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: 配列が n1 だけになり、`n1.md` は変わらない
+      - name: test_delete_docs_when_unlink_nested
+        case: 正常
+        summary: 入れ子の参照も外す
+        condition: '行の `metadata` が `{related: "**.refs[]"}`。文書 n1 の最上位の `refs` と `functions[0].refs` がどちらも n2 を指し、最上位の `refs` は n3 も指す。n2 を `on_referenced: unlink` で消す'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        expected: n1 の最上位の `refs` が n3 だけになり、`functions[0].refs` が空になる。`unlinked` に n1
+        exception: '-'
 refs:
   - IF-6#
   - IF-7#

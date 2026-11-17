@@ -1,0 +1,17 @@
+$ TMPDIR=/home/shuhei2441/.cache/pi-pytest-tmp uv run pytest tests/integration/server/test_trace_related.py tests/integration/server/test_write_docs.py tests/integration/server/test_delete_docs.py
+# /tmp/pytest-of-shuhei2441 が root の所有で pytest の一時フォルダを作れないため、TMPDIR で一時フォルダの場所だけを変えて実行した。TL-2 は parallel: false のため並列数 1
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/chore-documents-metadata-recursive-field
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 58 items
+
+tests/integration/server/test_trace_related.py ...........               [ 18%]
+tests/integration/server/test_write_docs.py ............................ [ 67%]
+......                                                                   [ 77%]
+tests/integration/server/test_delete_docs.py .............               [100%]
+
+============================= 58 passed in 20.89s ==============================
+
+[exited with code 0]

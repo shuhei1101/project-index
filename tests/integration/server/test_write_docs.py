@@ -1582,3 +1582,61 @@ def test_normal_when_disk_storage(
     assert updated.data["results"][0]["status"] == "updated"
     assert second["created"] == first["created"]
     assert str(second["updated"]) > str(first["updated"])
+
+
+# 最上位の refs と functions[0].refs を持つ n1
+NESTED_N1 = (
+    "id: n1\nname: n1\nrefs:\n  - {to: n2, type: references}\n"
+    "functions:\n  - name: f\n    refs:\n      - {to: n3, type: references}\n"
+)
+
+
+def test_error_when_recursive_metadata_key_written(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    nested_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """**.{列名} の対応を持つ共通のキーは、書き込む場所を 1 つに決められないため断る（異常系）。"""
+    # 準備
+    files = nested_file_set(NESTED_N1)
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    target = worktree / "nested" / "n1.yaml"
+    before = target.read_text(encoding="utf-8")
+    link = [{"to": "n2", "type": "references"}]
+    arguments = {"cwd": str(source.folder), "worktree": str(worktree)}
+    # 実行
+    first = env.call(
+        "write_docs",
+        operations=[_update("n1", _version(target), set={"related": link})],
+        **arguments,
+    )
+    second = env.call(
+        "write_docs", operations=[_update("n1", _version(target), unset=["related"])], **arguments
+    )
+    third = env.call(
+        "write_docs",
+        operations=[
+            {"op": "create", "kind": "nested", "data": {"id": "n4", "name": "n4", "related": link}}
+        ],
+        **arguments,
+    )
+    unchanged = target.read_text(encoding="utf-8")
+    fourth = env.call(
+        "write_docs", operations=[_update("n1", _version(target), set={"refs": link})], **arguments
+    )
+    # 検証
+    assert first.is_error
+    assert "InvalidArgumentError" in first.text
+    assert "operations[0].set.related" in first.text
+    assert second.is_error
+    assert "operations[0].unset" in second.text
+    assert third.is_error
+    assert "operations[0].data.related" in third.text
+    assert not (worktree / "nested" / "n4.yaml").exists()
+    assert unchanged == before
+    assert all("functions[0].refs" in result.text for result in (first, second, third))
+    assert not fourth.is_error
+    after = load_yaml(target.read_text(encoding="utf-8"))
+    assert after["refs"] == link
+    assert after["functions"] == load_yaml(before)["functions"]
