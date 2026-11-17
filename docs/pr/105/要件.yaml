@@ -1,0 +1,15 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: run_only
+    detail: 画面のサーバーがリビジョンを指して文書を取得する流れは変わらないが、変換のスクリプトを動かす環境が変わるため回帰を確かめる
+    depends_on: []
+docs:
+  - page: docs/guide/設定.md
+    new: false
+    change: '`converters[].run` の説明に、リビジョンを指して参照するときに環境変数 `PROJECT_INDEX_COMMIT` へ commit を指定すること・指定しないとき・`git show {commit}:{path}` で本文以外のファイルを参照できることを加える'
+    status: todo
+scope_out:
+  - item: '`validators[]`・`generators[]` のスクリプトへ `PROJECT_INDEX_COMMIT` を指定すること'
+    reason: 要望は `converters[]` の参照先のリビジョンで、`validators[]`・`generators[]` を使う側の要望が無い。`generators[]` は書き込みで作業ツリーを書き換えるため、指定するリビジョンも無い
+    plan: none
