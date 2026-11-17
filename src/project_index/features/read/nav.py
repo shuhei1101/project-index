@@ -141,7 +141,7 @@ def nav_warnings(
     today = today or datetime.now(UTC).astimezone().date()
     target = Target(source, source.root, None, None, "read")
     documents = store.load(target).documents
-    fields, columns = _nav_fields(store, target, source)
+    fields, columns = nav_fields(store, target, source)
     table_ids = [row.id for row in source.config.documents if row.enabled]
     counts = nav_auto_counts(nav, documents, fields=fields, today=today, columns=columns)
     return [
@@ -150,7 +150,7 @@ def nav_warnings(
     ]
 
 
-def _nav_fields(
+def nav_fields(
     store: DocumentStore, target: Target, source: ServedSource
 ) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
     """`nav` の条件の使える項目と、行の ID → その行の `metadata` を返す。"""

@@ -45,10 +45,10 @@ from project_index.features.documents.store import check_sync
 from project_index.features.read.nav import (
     check_nav_filters,
     nav_auto_counts,
+    nav_fields,
     nav_warnings,
     zero_count_warnings,
 )
-from project_index.features.search.fields import known_fields, with_metadata_fields
 from project_index.features.settings.query import (
     SETTINGS_VERSION,
     listen_port,
@@ -579,17 +579,11 @@ def _overlaid_nav(handlers: Handlers, config_file: Path) -> Path | None:
 def _nav_documents(
     handlers: Handlers, source: ServedSource
 ) -> tuple[list[Any], dict[str, str], dict[str, dict[str, str]]]:
-    """配信元の文書と、使える項目に行の `metadata` のキーを加えた項目と、行の ID → `metadata` を返す。"""
+    """配信元の文書と、nav の条件の使える項目と、行の ID → `metadata` を返す。"""
     target = Target(source, source.root, None, None, "read")
     documents = handlers.store.load(target).documents
-    rows = [row for row in source.config.documents if row.enabled]
-    schemas = {row.id: handlers.store.row_schema(target, row.id) for row in rows}
-    fields = with_metadata_fields(
-        known_fields(schemas.values()),
-        # 型は行ごとに、その行のスキーマだけで作った使える項目から引く
-        ((row, known_fields([schemas[row.id]])) for row in rows),
-    )
-    return documents, fields, {row.id: dict(row.metadata) for row in rows}
+    fields, columns = nav_fields(handlers.store, target, source)
+    return documents, fields, columns
 
 
 def write_nav(request: WriteNavRequest, *, handlers: Handlers) -> WriteNavResult:
