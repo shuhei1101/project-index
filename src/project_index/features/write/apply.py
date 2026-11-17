@@ -11,13 +11,15 @@ from project_index.features.documents.fields import (
     ANY_DEPTH_PREFIX,
     delete_field,
     get_field,
+    resolve_ref_path,
     set_field,
+    set_field_at,
 )
 from project_index.shared.errors import InvalidArgumentError, Violation
 from project_index.shared.narrowing import is_dict, is_list
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping, MutableMapping
+    from collections.abc import Callable, Iterable, Mapping, MutableMapping
 
     from project_index.features.sources.types import DocumentTable
     from project_index.features.write.types import Operation, TextEdit
@@ -42,6 +44,8 @@ def _set(content: MutableMapping[str, Any], path: str, value: object) -> None:
         set_field(content, path, copy.deepcopy(value))
 
 
+# `text_edits[].field` の参照の型の項目のパスの先頭
+REF_PATH_PREFIX = "#"
 # 本文のファイルの内容を受けるキー（`data`・`set` のキーと `text_edits[].field`）
 BODY_KEY = "@body"
 
@@ -51,7 +55,12 @@ def _violation(path: str, rule: str, fix: str = "") -> Violation:
     return Violation(path=path, rule=rule, fix=fix)
 
 
-def apply_operation(current: Mapping[str, Any] | None, operation: Operation) -> dict[str, Any]:
+def apply_operation(
+    current: Mapping[str, Any] | None,
+    operation: Operation,
+    *,
+    schema: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """文書の内容に 1 件の操作を当てた新しい内容を返す。"""
     # 本文は要素に当てない（本文の適用が当てる）
     if operation.op in ("create", "replace"):
@@ -73,7 +82,7 @@ def apply_operation(current: Mapping[str, Any] | None, operation: Operation) -> 
         delete_field(content, path)
     violations.extend(_add_to(content, operation.add_to))
     violations.extend(_remove_from(content, operation.remove_from))
-    violations.extend(_text_edits(content, operation.text_edits))
+    violations.extend(_text_edits(content, operation.text_edits, schema))
     if violations:
         raise InvalidArgumentError(message="操作を適用できません", violations=violations)
     return content
@@ -110,33 +119,64 @@ def _remove_from(content: dict[str, Any], remove_from: Mapping[str, list[Any]]) 
     return violations
 
 
-def _text_edits(content: dict[str, Any], edits: list[TextEdit]) -> list[Violation]:
+def _text_edits(
+    content: dict[str, Any], edits: list[TextEdit], schema: Mapping[str, Any] | None
+) -> list[Violation]:
     """文字列の項目の一部を置き換える。"""
     violations: list[Violation] = []
     for index, edit in enumerate(edits):
         if edit.field == BODY_KEY:
             continue
-        text = get_field(content, edit.field)
         prefix = f"text_edits[{index}]"
+        try:
+            text, write = _edit_target(content, edit.field, schema)
+        except InvalidArgumentError as error:
+            violations.extend(_violation(f"{prefix}.field", item.rule) for item in error.violations)
+            continue
         if not isinstance(text, str):
             violations.append(
                 _violation(f"{prefix}.field", "文字列ではない項目は置き換えられません")
             )
             continue
-        count = text.count(edit.old) if edit.old else 0
-        # 一致が無いか、replace_all を付けずに複数に一致した: 置き換える箇所が決まらない
-        if count == 0 or (count > 1 and not edit.replace_all):
-            violations.append(
-                _violation(
-                    f"{prefix}.old",
-                    f"old の一致が {count} か所です",
-                    f"一致が 1 か所になるよう前後の文字を含めるか、replace_all を true にしてください"
-                    f"（一致 {count} 件）",
-                )
-            )
+        mismatch = _old_violation(text, edit, prefix)
+        if mismatch is not None:
+            violations.append(mismatch)
             continue
-        set_field(content, edit.field, text.replace(edit.old, edit.new))
+        write(text.replace(edit.old, edit.new))
     return violations
+
+
+def _old_violation(text: str, edit: TextEdit, prefix: str) -> Violation | None:
+    """`old` の一致が置き換える箇所を決められない場合の違反を返す。"""
+    count = text.count(edit.old) if edit.old else 0
+    # 一致が無いか、replace_all を付けずに複数に一致した: 置き換える箇所が決まらない
+    if count == 0 or (count > 1 and not edit.replace_all):
+        return _violation(
+            f"{prefix}.old",
+            f"old の一致が {count} か所です",
+            f"一致が 1 か所になるよう前後の文字を含めるか、replace_all を true にしてください"
+            f"（一致 {count} 件）",
+        )
+    return None
+
+
+def _edit_target(
+    content: dict[str, Any], field: str, schema: Mapping[str, Any] | None
+) -> tuple[object, Callable[[str], None]]:
+    """置き換える項目の今の値と、新しい値を書く関数を返す。"""
+    # `#` で始まらない項目のパスは、今までどおり項目のパスで読み書きする
+    if not field.startswith(REF_PATH_PREFIX):
+        return get_field(content, field), lambda text: set_field(content, field, text)
+    tokens = resolve_ref_path(content, schema or {}, field[len(REF_PATH_PREFIX) :])
+    return _value_at(content, tokens), lambda text: set_field_at(content, tokens, text)
+
+
+def _value_at(content: Mapping[str, Any], tokens: list[str | int]) -> object:
+    """解いた並びで指した値を返す（解いた並びは必ずたどれる）。"""
+    current: Any = content
+    for token in tokens:
+        current = current[token]
+    return current
 
 
 def apply_body(current_body: str | None, operation: Operation, *, index: int) -> str | None:

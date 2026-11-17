@@ -220,13 +220,128 @@ def field_arrays(data: Mapping[str, Any], path: str) -> list[list[object]]:
 
 def set_field(data: MutableMapping[str, Any], path: str, value: object) -> None:
     """項目のパスで指した場所へ値を書く。"""
-    tokens = _plain_tokens(path, "には書き込めません")
+    _set_tokens(data, _plain_tokens(path, "には書き込めません"), value, path)
+
+
+def set_field_at(
+    data: MutableMapping[str, Any], tokens: Sequence[str | int], value: object
+) -> None:
+    """キーと位置の並びで指した場所へ値を書く（`.` を含むキーも 1 つのキー）。"""
+    _set_tokens(data, tokens, value, _join(tokens))
+
+
+def _set_tokens(
+    data: MutableMapping[str, Any], tokens: Sequence[str | int], value: object, path: str
+) -> None:
+    """キーと位置の並びをたどって値を書く。違反の文には `path` を使う。"""
     current: object = data
     for depth, token in enumerate(tokens[:-1]):
         # 途中のキー・位置が無ければ、次のトークンに合わせて空の配列か辞書を作る
         empty: object = [] if isinstance(tokens[depth + 1], int) else {}
         current = _child(current, token, empty, path, tokens[:depth])
     _put(current, tokens[-1], value, path, tokens[:-1])
+
+
+REF_PATH_EXAMPLE = (
+    "例 `#functions[save].process`・`#functions[save#2].process`・`#notes[main.py の補足]`"
+)
+# 名前で始まり、`[...]` か `.名前` が続く参照の型の項目のパス
+REF_PATH_PATTERN = re.compile(r"[^.\[\]]+(?:\[[^\]]*\]|\.[^.\[\]]+)*")
+REF_PART_PATTERN = re.compile(r"\[([^\]]*)\]|([^.\[\]]+)")
+ORDER_PATTERN = re.compile(r"(.*)#(\d+)")
+
+
+def resolve_ref_path(
+    data: Mapping[str, Any], schema: Mapping[str, Any], path: str
+) -> list[str | int]:
+    """参照の型の項目のパス（`#` の後）を、文書と種類のスキーマでキーと位置の並びに解く。"""
+    if REF_PATH_PATTERN.fullmatch(path) is None:
+        raise _invalid(path, f"項目のパス {path} の記載方法が誤っています（{REF_PATH_EXAMPLE}）")
+    tokens: list[str | int] = []
+    current: object = data
+    node = _schema_node(schema, schema)
+    for matched in REF_PART_PATTERN.finditer(path):
+        bracket, name = matched.group(1), matched.group(2)
+        # 配列に対する `[...]` は、スキーマの `x-key` の値で要素を選ぶ
+        if bracket is not None and is_list(current):
+            position = _element_position(current, node, bracket, path, tokens)
+            tokens.append(position)
+            current = current[position]
+            node = _schema_node(schema, node.get("items"))
+            continue
+        key = name if bracket is None else bracket
+        if not is_dict(current) or key not in current:
+            raise _invalid(path, f"{path}: {_join(tokens) or '最上位'} にキー {key} がありません")
+        tokens.append(key)
+        current = current[key]
+        node = _schema_node(schema, _property_schema(node, key))
+    return tokens
+
+
+def _element_position(
+    elements: list[object],
+    node: Mapping[str, Any],
+    value: str,
+    path: str,
+    parents: Sequence[str | int],
+) -> int:
+    """配列のスキーマの `x-key` のキーが `value` の要素の位置を返す（`{値}#{順番}` は順番目）。"""
+    key = node.get("x-key")
+    if not isinstance(key, str):
+        raise _invalid(path, f"{path}: {_join(parents)} は x-key を持たない配列です")
+    matches = _positions(elements, key, value)
+    if matches:
+        return matches[0]
+    ordered = ORDER_PATTERN.fullmatch(value)
+    if ordered is not None:
+        same = _positions(elements, key, ordered.group(1))
+        order = int(ordered.group(2))
+        if same and 1 <= order <= len(same):
+            return same[order - 1]
+        if same:
+            raise _invalid(path, f"{path}: {key} が {ordered.group(1)} の要素は {len(same)} 個です")
+    raise _invalid(path, f"{path}: {_join(parents)} に {key} が {value} の要素がありません")
+
+
+def _positions(elements: list[object], key: str, value: str) -> list[int]:
+    """`key` の値を文字列にしたものが `value` の要素の位置を並べる。"""
+    return [
+        index
+        for index, element in enumerate(elements)
+        if is_dict(element) and element.get(key) is not None and str(element[key]) == value
+    ]
+
+
+def _property_schema(node: Mapping[str, Any], key: str) -> object:
+    """辞書のスキーマから `key` の項目のスキーマを返す（無ければ `additionalProperties`）。"""
+    properties = node.get("properties")
+    if is_dict(properties) and key in properties:
+        return properties[key]
+    return node.get("additionalProperties")
+
+
+def _schema_node(root: Mapping[str, Any], node: object) -> dict[str, Any]:
+    """スキーマの `$ref`（`#/...`）を最上位から解き、`$ref` 以外のキーを重ねた辞書を返す。"""
+    current = node
+    seen: set[str] = set()
+    while is_dict(current) and isinstance(current.get("$ref"), str):
+        reference = str(current["$ref"])
+        # 最上位の外を指す参照と、循環する参照は解かない
+        if not reference.startswith("#/") or reference in seen:
+            break
+        seen.add(reference)
+        target = _pointer(root, reference)
+        rest = {key: value for key, value in current.items() if key != "$ref"}
+        current = {**target, **rest} if is_dict(target) else rest
+    return {str(key): value for key, value in current.items()} if is_dict(current) else {}
+
+
+def _pointer(root: Mapping[str, Any], reference: str) -> object:
+    """`#/a/b` の参照が指す値を返す（たどれなければ `None`）。"""
+    target: object = root
+    for part in reference[2:].split("/"):
+        target = target.get(part) if is_dict(target) else None
+    return target
 
 
 def _child(

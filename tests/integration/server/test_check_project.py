@@ -28,6 +28,23 @@ PROMPT_ROWS = (
 )
 
 
+# 行 `src`（管理用の YAML）・行 `yaml`（src の YAML）・無効の行 `off` が、`src/` の同じファイルを指す
+SHARED_FILE_ROWS = (
+    "  - id: src\n"
+    "    paths: [src/files.yaml]\n"
+    "    schema: schemas/files.schema.yaml\n"
+    "    records: files\n"
+    "    body_file: path\n"
+    "  - id: yaml\n"
+    "    paths: [src/*.yaml]\n"
+    "    schema: schemas/loose.schema.yaml\n"
+    "  - id: off\n"
+    "    paths: [src/b.py]\n"
+    "    schema: schemas/loose.schema.yaml\n"
+    "    enabled: false\n"
+)
+
+
 def _listing(folder: Path) -> dict[str, str]:
     """フォルダの下のファイルのパスと中身を集める。"""
     return {
@@ -127,6 +144,38 @@ def test_normal_when_file_belongs_to_other_row(
     assert "violations" not in result.data
     assert result.data["sync"]["unindexed_files"] == 0
     assert "items" not in result.data["sync"]
+
+
+def test_normal_when_rows_share_file(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_sync_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """2 つ以上の有効な documents の行が文書にする同じファイルを、同期の件数と内訳で返却する（正常系）。"""
+    # 準備
+    files = sample_sync_file_set(0)
+    files.update(
+        {
+            "project-index.yaml": sample_config_text(SHARED_FILE_ROWS, version="3"),
+            "schemas/loose.schema.yaml": "title: 緩いスキーマ\ntype: object\n",
+            "src/files.yaml": "files:\n  - path: a.yaml\n  - path: b.py\n",
+            # 行 `src` と行 `yaml` の文書の ID も重なる
+            "src/a.yaml": "id: src/a.yaml\nname: A\n",
+            "src/b.py": "b = 1\n",
+        }
+    )
+    del files["src/a.py"]
+    sample = make_source("sample", files, git=False)
+    env = make_server(sample)
+    # 実行
+    result = env.call_admin("check_project", path=str(sample.folder), format="json")
+    # 検証
+    assert not result.is_error
+    assert "violations" not in result.data
+    assert result.data["sync"]["duplicate_files"] == 1
+    items = [item for item in result.data["sync"]["items"] if item["kind"] == "duplicate_files"]
+    assert [item["path"] for item in items] == ["src/a.yaml: src・yaml"]
 
 
 def test_normal_when_related_unresolved(

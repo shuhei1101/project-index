@@ -198,6 +198,9 @@ flows:
       - name: ずれた管理用の YAML
         description: 'sample の `src/files.yaml` が `a.py` と `c.py` の 2 行を持ち、`src/` には `a.py` と `d.py`、`src/sub/e.py` を置く。行 `src` は `records: files`・`body_file: path`。`a.py` の行が `related: [{to: src/z.py, type: tests}]` を持つ'
         notes: '`c.py` はファイルが無い行、`d.py` と `sub/e.py` は索引に無いファイル、`src/z.py` はどの文書にも該当しない関連'
+      - name: 同じファイルを文書にする行
+        description: 'sample の行 `py`（`paths: [src/a.py]`）を配置する'
+        notes: '`src/a.py` は行 `src` と行 `py` の文書になる'
     flow: |-
       <!-- map: {"title": "正常系（メタデータと管理用の YAML がずれている）"} -->
 
@@ -219,6 +222,7 @@ flows:
       - 警告のログに sample の行 `rules` の `metadata` の列の欠け 1 件（`name` の `title`）がある
       - 警告のログに行 `src` の索引に無いファイル 2 件（`src/d.py`・`src/sub/e.py`）とファイルが無い行 1 件（`c.py`）があり、`src/files.yaml` 自身は数えない
       - '警告のログにどの文書にも該当しない関連 1 件（`src: src/a.py: src/z.py`）がある'
+      - '警告のログに 2 つ以上の行が文書にするファイル 1 件（`src/a.py: src・py`）がある'
       - ずれが無い配信元では件数の警告を残さない
     test: test_normal_when_metadata_out_of_sync
   - name: 正常系（前の形式の配信元）
@@ -1080,7 +1084,7 @@ response:
     description: '検証に失敗した配信元ごとに `{id}: {キーのパス}: {理由}`。その配信元の設定の `version` が古いときは、`project-index migrate --source` で移し替えられることも出す'
   - name: 警告のログ
     type: str
-    description: 設定のバージョンが古い配信元の ID・設定のバージョン・サーバーが参照できるバージョン。配信元と documents の行ごとに、`metadata` に書いた列が無い文書の件数・管理用の YAML に無いファイル・ファイルが無い行（`missing_body_file`）・どの文書にも当たらない `related[].to`（`source` を持たない行）が 0 件でなければ、その件数とパス。`alias_type` を持つ行の文書のエイリアスのキーの違反（文書のパスと内容）と、どの文書にも当たらない `nav` の `auto` の条件（タブと条件）。端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパス）
+    description: 設定のバージョンが古い配信元の ID・設定のバージョン・サーバーが参照できるバージョン。配信元と documents の行ごとに、`metadata` に書いた列が無い文書の件数・管理用の YAML に無いファイル・ファイルが無い行（`missing_body_file`）・どの文書にも当たらない `related[].to`（`source` を持たない行）・2 つ以上の有効な documents の行が文書にするファイルが 0 件でなければ、その件数とパス。`alias_type` を持つ行の文書のエイリアスのキーの違反（文書のパスと内容）と、どの文書にも当たらない `nav` の `auto` の条件（タブと条件）。端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパス）
   - name: 終了コード
     type: int
     description: 起動できないとき 0 以外

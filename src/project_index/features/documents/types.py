@@ -51,6 +51,8 @@ class SyncReport:
     # source を持たない related[].to が配信元のどの文書の ID にも当たらないもの（`{行の id}: {文書の id}: {to}`）
     unresolved_related: list[str] = field(default_factory=list[str])
     alias_violations: list[Violation] = field(default_factory=list[Violation])
+    # 2 つ以上の有効な行が文書にするファイル（`{ファイル}: {行の id}・{行の id}`）
+    duplicate_files: list[str] = field(default_factory=list[str])
 
 
 @dataclass(frozen=True)
@@ -59,6 +61,8 @@ class LoadResult:
 
     documents: list[Document] = field(default_factory=list[Document])
     problems: list[LoadProblem] = field(default_factory=list[LoadProblem])
+    # 先の文書と ID が重なり `documents` から除いた文書（行の順）
+    duplicates: list[Document] = field(default_factory=list[Document])
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

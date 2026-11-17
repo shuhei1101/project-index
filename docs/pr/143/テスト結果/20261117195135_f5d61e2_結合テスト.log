@@ -1,0 +1,20 @@
+# ランナーの run_runner の paths は `::` を含む値を断る（.github/workflows/test.yml）ため、合意した関数単位の範囲を手元の個別実行（run_one）で回した。/tmp/pytest-of-* が別ユーザーの持ち物のため --basetemp を指定した
+$ uv run pytest -p no:cacheprovider --basetemp=/tmp/pi143-tmp/it -v tests/integration/server/test_check_project.py::test_normal_when_rows_share_file tests/integration/server/test_serve.py::test_normal_when_metadata_out_of_sync tests/integration/server/test_write_docs.py::test_normal_when_text_edits_ref_path tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved tests/integration/server/test_describe.py::test_normal_when_warned tests/integration/server/test_get_status.py::test_normal
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0 -- /home/shuhei2441/repo/project-index/.claude/worktrees/feat-project-index-same-file-check-and-x-key-field/.venv/bin/python
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/feat-project-index-same-file-check-and-x-key-field
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 9 items
+
+tests/integration/server/test_check_project.py::test_normal_when_rows_share_file PASSED [ 11%]
+tests/integration/server/test_serve.py::test_normal_when_metadata_out_of_sync PASSED [ 22%]
+tests/integration/server/test_write_docs.py::test_normal_when_text_edits_ref_path PASSED [ 33%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[no_x_key] PASSED [ 44%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[missing] PASSED [ 55%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[order] PASSED [ 66%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[no_key] PASSED [ 77%]
+tests/integration/server/test_describe.py::test_normal_when_warned PASSED [ 88%]
+tests/integration/server/test_get_status.py::test_normal PASSED          [100%]
+
+============================== 9 passed in 2.72s ===============================

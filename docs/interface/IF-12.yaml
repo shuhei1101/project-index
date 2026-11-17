@@ -448,6 +448,39 @@ flows:
       - '`sync.unindexed_files` が 0 で、`sync.items` に `content/prompts/p.yaml` が無い'
       - '`violations` が空'
     test: test_normal_when_file_belongs_to_other_row
+  - name: 正常系（2 つの行が同じファイルを文書にする）
+    summary: 2 つ以上の有効な documents の行が文書にする同じファイルを、同期の件数と内訳で返却する
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元を作り、project-index のアプリをテストのクライアントで呼ぶ）
+      - name: 配信元
+        description: '検証に通る sample。行 `src`（`paths: [src/files.yaml]`・`records: files`・`body_file: path`）の `src/files.yaml` が `a.yaml`・`b.py` の 2 行を持つ。行 `yaml`（`paths: [src/*.yaml]`。スキーマは `src/files.yaml` も通す）と、`enabled: false` の行 `off`（`paths: [src/b.py]`）を配置する'
+        notes: '`src/a.yaml` は行 `src` と行 `yaml` の文書になる。`src/files.yaml` は行 `yaml` の文書だが、行 `src` の管理用の YAML 自体なので数えない。`src/b.py` は行 `off` が無効なので重ならない'
+      - name: 範囲のファイル
+        description: '`src/a.yaml`（`id: src/a.yaml`）と `src/b.py` を配置する'
+        notes: 2 つの行の `src/a.yaml` の文書の ID も重なる
+    flow: |-
+      <!-- map: {"title": "正常系（2 つの行が同じファイルを文書にする）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as check_project
+        participant F as 配信元のフォルダ
+
+        C->>T: path
+        T-->>F: 管理用の YAML と文書を読む
+        T->>T: 有効な行ごとに文書にするファイルを集め、2 つ以上の行に該当するファイルを数える
+        T-->>C: 同期の件数と内訳
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`sync.duplicate_files` が 1'
+      - '`sync.items` に `duplicate_files` の `src/a.yaml: src・yaml` があり、`src/b.py`・`src/files.yaml` を含まない'
+      - 文書の ID の重なりで片方の文書を除外しても、重なりを数える
+      - '`violations` が空'
+    test: test_normal_when_rows_share_file
 lead: 配信元の設定・管理用の YAML・スクリプトを検証する管理の MCP の `check_project` の入出力を定め、`check_project` を修正するときに参照する。
 tags:
   - name: action:検査
@@ -555,6 +588,10 @@ response:
     type: int
     description: '`related[].to` が配信元のどの文書の ID にも当たらない関連の件数。`source` を持つ関連は数えない'
     notes: '`sync.items[]` の要素は `{行の id}: {文書の id}: {to}`'
+  - name: sync.duplicate_files
+    type: int
+    description: 2 つ以上の有効な documents の行が文書にするファイルの件数
+    notes: '`sync.items[]` の要素は `{ファイル}: {行の id}・{行の id}`（行は `documents[]` の順）'
 response_example: |-
   ```markdown
   /home/u/repo/sample（登録済み: sample）
@@ -604,5 +641,8 @@ constraints:
   - item: ほかの行の文書になるファイル
     constraint: '`records`・`body_file` の行の管理用の YAML のフォルダの配下でも、ほかの documents の行の `paths` に当たり、その行の `exclude` に当たらないファイルを `unindexed_files` に数えない。起動時の警告・状態の取得も同じ判定を使う'
     notes: そのファイルはほかの行の文書として配信するため、管理用の YAML に記載しない
+  - item: 同じファイルの重なり
+    constraint: '行が文書にするファイルは、`records` を持たない行では `paths` に該当し `exclude` に該当しないファイル、`records`・`body_file` の行では要素の `body_file` が指すファイルとする。`records` の行の管理用の YAML 自体・`body_file` の無い `records` の行・`enabled: false` の行は数えない。文書の ID の重なりで片方の文書を除外しても数える。起動時の警告・状態の取得・引数なしの `describe` も同じ判定を使用する'
+    notes: 管理用の YAML を目次の種類の文書として別の行で配信する配置を重なりにしないため、管理用の YAML 自体は数えない
 test_file: tests/integration/server/test_check_project.py
 visibility: internal

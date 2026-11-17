@@ -10,7 +10,9 @@ from project_index.features.documents.fields import (
     get_field,
     parse_field_path,
     resolve_metadata,
+    resolve_ref_path,
     set_field,
+    set_field_at,
 )
 from project_index.features.sources.types import DocumentTable
 from project_index.shared.errors import InvalidArgumentError
@@ -424,3 +426,93 @@ def test_field_arrays_when_not_list(data: dict[str, Any], path: str) -> None:
     result = field_arrays(data, path)
     # 検証
     assert result == []
+
+
+_REF_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "functions": {"$ref": "#/$defs/functions"},
+        "steps": {"type": "array", "items": {"type": "object"}},
+        "notes": {"type": "object", "additionalProperties": {"type": "string"}},
+    },
+    "$defs": {
+        "functions": {
+            "type": "array",
+            "x-key": "name",
+            "items": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}, "process": {"type": "string"}},
+            },
+        },
+    },
+}
+
+
+def _ref_data() -> dict[str, Any]:
+    """参照の型の項目のパスのテストに使う内容を返す。"""
+    return {
+        "functions": [
+            {"name": "load", "process": "x"},
+            {"name": "save", "process": "x"},
+            {"name": "save", "process": "x"},
+        ],
+        "steps": [{"name": "a", "body": "x"}],
+        "notes": {"main.py の補足": "x"},
+    }
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        pytest.param("functions[save].process", ["functions", 1, "process"], id="first"),
+        pytest.param("functions[save#2].process", ["functions", 2, "process"], id="second"),
+    ],
+)
+def test_resolve_ref_path(path: str, expected: list[str | int]) -> None:
+    """x-key の値と順番で要素を指す（正常系）。"""
+    # 準備
+    data = _ref_data()
+    # 実行
+    result = resolve_ref_path(data, _REF_SCHEMA, path)
+    # 検証
+    assert result == expected
+
+
+def test_resolve_ref_path_when_dict_key() -> None:
+    """`.` を含む辞書のキー（正常系）。"""
+    # 準備
+    data = {"notes": {"main.py の補足": "x"}}
+    # 実行
+    result = resolve_ref_path(data, _REF_SCHEMA, "notes[main.py の補足]")
+    # 検証
+    assert result == ["notes", "main.py の補足"]
+
+
+@pytest.mark.parametrize(
+    ("path", "message"),
+    [
+        pytest.param("steps[a].body", "x-key を持たない配列です", id="no_x_key"),
+        pytest.param(
+            "functions[missing].process", "name が missing の要素がありません", id="missing"
+        ),
+        pytest.param("functions[save#3].process", "name が save の要素は 2 個です", id="order"),
+        pytest.param("notes[missing]", "キー missing がありません", id="no_key"),
+    ],
+)
+def test_resolve_ref_path_when_unresolved(path: str, message: str) -> None:
+    """要素・キーを指せない（異常系）。"""
+    # 準備
+    data = _ref_data()
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError, match=message):
+        resolve_ref_path(data, _REF_SCHEMA, path)
+
+
+def test_set_field_at() -> None:
+    """`.` を含むキーへ書く（正常系）。"""
+    # 準備
+    data: dict[str, Any] = {"notes": {"main.py の補足": "x"}}
+    # 実行
+    set_field_at(data, ["notes", "main.py の補足"], "y")
+    # 検証
+    assert data == {"notes": {"main.py の補足": "y"}}

@@ -284,6 +284,11 @@ YAML として読めないファイルがあっても、そのファイルを除
 共通のキーとその列名を同じ操作に両方渡すと、`InvalidArgumentError` です。
 種類ごとの対応は `describe(source, kind)` で引けます。
 
+`text_edits[].field` は、`#` で始まる参照の型の項目のパス（`#functions[apply_migration].process`）も受け付けます。
+配列の要素を種類のスキーマの `x-key` の値で指し、同じ値の 2 つ目以降は `[{値}#{順番}]`、辞書のキーは `[{キー}]`（`.` や空白を含んでも 1 階層）で指します。
+`#` で始まるパスは共通のキーへ読み替えません。
+`x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指すと `InvalidArgumentError` です。
+
 `records`・`body_file` の行の文書は、本文のファイルを `@body` で書きます。
 `@body` は種類の列名と重ならないキーで、`body_file` の列の名前が `body` の配信元でも `body` は列を指します。
 
@@ -358,7 +363,7 @@ Git 管理外の配信元と `storage.type: disk` の配信元では、種類の
 `when` は、`markdown` では一覧の表の `when` 列（行を `<br>` でつなぐ）と、説明書の前の「使う場面:」の箇条書きで出し、`json` では記載の無い配信元のキーを持ちません。
 引数なしの一覧はその時点の配信元で答え、一覧に出した配信元の `default_ref` の commit の確認と組み立て直しを裏で行います。
 
-`warnings[]` は、使える配信元の同期のずれ（metadata の列の欠け・管理用の YAML に無いファイル・ファイルが無い行・どの文書にも当たらない関連）・エイリアスのキーの違反・どの文書にも当たらない `nav` の条件、配信元と端末の設定のバージョンが古いこと、検証で外した配信元、端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパスを 1 件にまとめる）です。
+`warnings[]` は、使える配信元の同期のずれ（metadata の列の欠け・管理用の YAML に無いファイル・ファイルが無い行・どの文書にも当たらない関連・2 つ以上の行が文書にするファイル）・エイリアスのキーの違反・どの文書にも当たらない `nav` の条件、配信元と端末の設定のバージョンが古いこと、検証で外した配信元、端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパスを 1 件にまとめる）です。
 `markdown` では配信元の表の後に「注意」の見出しの下に 1 行ずつ出し、0 件のときは見出しごと出しません。
 使える配信元が無い作業場所では、表の代わりに `/project-index:setup` で配信元にできることを返し、端末の設定のバージョン・端末の設定の最上位の知らないキーと検証で外した配信元の警告は載せます。
 詳しい内容は管理の MCP の `check_project` で確認します。
@@ -469,7 +474,7 @@ Git 管理外の配信元と `storage.type: disk` の配信元では、種類の
 | SourceNotServedError | 起動時の検証で外したか `enabled: false` の配信元を指した | 違反したキーのパスと理由 |
 | WorktreeNotMatchedError | `worktree` が配信元の `worktrees` に当たらない | 渡したパスと `worktrees` の値 |
 | TargetIsCloneError | Git の配信元（`storage.type: disk` を除く）で、書く先がクローン本体になる | クローン本体のパス（配信元の設定をワークツリーから読んでいても、ワークツリーの親のクローン本体）と、`worktree` でワークツリーを指すこと |
-| InvalidArgumentError | `filter`・`order_by`・`group_by`・Operation の中の知らない項目・型の合わない値、50 件を超える操作、必須のキーの欠け、`text_edits` の `old` が 1 か所に一致しない、`ref` を渡せない配信元に `ref`・`from`・`to` を渡した、`storage.type: disk` の配信元に `worktree` を渡した、`create` の配置先のファイル名が `documents[].exclude[]` に当たる、共通のキーとその列名を同じ操作に両方渡した、束が `and`・`or`・`not` のキーを 2 つ以上持つ、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない、`main_tags` の `set`・`add_to` に `tags` に無い名前を渡した | 項目のパス・期待する型・実際の値と、`describe(source, kind)` でスキーマを見ること |
+| InvalidArgumentError | `filter`・`order_by`・`group_by`・Operation の中の知らない項目・型の合わない値、50 件を超える操作、必須のキーの欠け、`text_edits` の `old` が 1 か所に一致しない、`ref` を渡せない配信元に `ref`・`from`・`to` を渡した、`storage.type: disk` の配信元に `worktree` を渡した、`create` の配置先のファイル名が `documents[].exclude[]` に当たる、共通のキーとその列名を同じ操作に両方渡した、束が `and`・`or`・`not` のキーを 2 つ以上持つ、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない、`main_tags` の `set`・`add_to` に `tags` に無い名前を渡した、`text_edits[].field` の `#` で始まる項目のパスが要素・キーを指せない | 項目のパス・期待する型・実際の値と、`describe(source, kind)` でスキーマを見ること |
 | RefNotFoundError | `ref`・`from`・`to` を commit に解決できない | 解決できなかった値 |
 | UnknownKindError | `kind` が配信元の種類に無い | その配信元の種類の一覧 |
 | DocumentNotFoundError | 指した ID の文書が無い | 見つからなかった ID と、近い ID の候補 |

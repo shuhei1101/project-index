@@ -400,6 +400,7 @@ def log_source_check(source: ServedSource, check: SourceCheck) -> None:
         ("管理用の YAML に無いファイル", report.unindexed_files),
         ("ファイルが無い行", report.missing_body_files),
         ("どの文書にも該当しない関連", report.unresolved_related),
+        ("2 つ以上の行が文書にするファイル", report.duplicate_files),
     ):
         if values:
             logger.warning(
