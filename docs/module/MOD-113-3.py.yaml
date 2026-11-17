@@ -196,8 +196,8 @@ functions:
       type: list[str]
       description: 文字列の値（辞書のキーを除く。辞書・配列を深さ優先でたどった順）
     process: |-
-      1. `yaml.safe_load_all` で全ての文書を読む
-         - `yaml.YAMLError` の場合、`[text]`（中身全体）を返す
+      1. 共通の YAML の読み込み（`shared.yaml_io.load_yaml`）で読む
+         - `YamlLoadError` の場合、`[text]`（中身全体）を返す
       2. 辞書の値と配列の要素をたどり、文字列の値を集めて返す
     unit_tests:
       - name: test_collect_yaml_strings

@@ -13,9 +13,11 @@ from project_index.main import (
     run_changed,
     run_checkpoint,
     run_files,
+    run_links,
     run_migrate,
     run_outline,
     run_serve,
+    run_skew,
 )
 
 if TYPE_CHECKING:
@@ -86,6 +88,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="見直したファイルのうち commit していない変更を持つファイルのパス",
     )
     checkpoint.set_defaults(handler=run_checkpoint)
+    links = subparsers.add_parser(
+        "links", help="範囲の Markdown と YAML ごとに本文が指すファイルを 1 行の JSON で出す"
+    )
+    links.add_argument("--root", required=True, help="配信元のフォルダ")
+    links.add_argument(
+        "--paths",
+        required=True,
+        action="append",
+        help="範囲の glob かファイルのパス（--root からの相対）",
+    )
+    links.add_argument("--exclude", action="append", default=[], help="除外するファイル名の glob")
+    links.set_defaults(handler=run_links)
+    skew = subparsers.add_parser(
+        "skew", help="ほぼ同じ description の組・1 件だけのタグ・半数以上に付くタグを JSON で出す"
+    )
+    skew.add_argument("--root", required=True, help="配信元のフォルダ")
+    skew.add_argument(
+        "--files-yaml",
+        required=True,
+        action="append",
+        help="管理用の YAML のパス（--root からの相対か絶対パス）",
+    )
+    skew.add_argument("--draft", default=None, help="まだ記載していない行の案の JSON Lines のパス")
+    skew.add_argument("--only-draft", action="store_true", help="行の案の行を含む組だけを比べる")
+    skew.set_defaults(handler=run_skew)
     prompt_doc = subparsers.add_parser(
         "prompt-doc", help="標準入力のプロンプトの YAML を Markdown にして標準出力に出す"
     )

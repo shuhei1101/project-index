@@ -606,6 +606,15 @@ files:
   related:
   - to: src/project_index/features/lifecycle/update.py
     type: tests
+- path: unit/project_index/features/links/test_service.py
+  name: 本文のリンクとパスの取り出しの単体テスト
+  description: 本文のリンクの service.py の単体テストを受け持ち、本文のリンクの service.py のテストを修正するときに参照する。
+  tags:
+  - topic:関連
+  - tool:pytest
+  related:
+  - to: src/project_index/features/links/service.py
+    type: tests
 - path: unit/project_index/features/migrate/test_service.py
   name: '`project-index migrate` の対象と適用する手順を決め、バックアップを取ってから 1 回だけ書き込む処理の単体テスト'
   description: 設定の移し替えの service.py の単体テストを受け持ち、設定の移し替えの service.py のテストを修正するときに参照する。
@@ -905,6 +914,15 @@ files:
   - tool:pytest
   related:
   - to: src/project_index/features/settings/service.py
+    type: tests
+- path: unit/project_index/features/skew/test_service.py
+  name: メタデータの偏りの洗い出しの単体テスト
+  description: メタデータの偏りの service.py の単体テストを受け持ち、メタデータの偏りの service.py のテストを修正するときに参照する。
+  tags:
+  - topic:メタデータ
+  - tool:pytest
+  related:
+  - to: src/project_index/features/skew/service.py
     type: tests
 - path: unit/project_index/features/sources/test_merge.py
   name: 設定の YAML のマージの単体テスト

@@ -283,6 +283,23 @@ files:
   related:
   - to: MOD-36
     type: implements
+- path: project_index/features/links/service.py
+  name: 本文のリンクとパスの取り出し
+  description: 本文のリンクとパスの取り出しと、実在するファイルへの解決・1 行の JSON への変換を受け持ち、本文のリンクの service.py を修正するときに参照する。
+  tags:
+  - topic:関連
+  - topic:リンク
+  related:
+  - to: MOD-113-3
+    type: implements
+- path: project_index/features/links/types.py
+  name: 本文が指すファイルと取り出し方の型
+  description: 本文が指すファイルと取り出し方の型を受け持ち、本文のリンクの types.py を修正するときに参照する。
+  tags:
+  - topic:関連
+  related:
+  - to: MOD-113-2
+    type: implements
 - path: project_index/features/migrate/service.py
   name: '`project-index migrate` の対象と適用する手順を決め、バックアップを取ってから 1 回だけ書き込む処理'
   description: '`project-index migrate` の対象と適用する手順を決め、バックアップを取ってから 1 回だけ書き込む処理を受け持ち、設定の移し替えの service.py を修正するときに参照する。'
@@ -342,6 +359,11 @@ files:
   related:
   - to: MOD-106-3
     type: implements
+- path: project_index/features/prompt_doc/__init__.py
+  name: プロンプトの文書の変換のパッケージ
+  description: プロンプトの文書の変換のパッケージの説明を受け持ち、パッケージの受け持つことを確かめるときに参照する。
+  tags:
+  - topic:プロンプトの文書の変換
 - path: project_index/features/prompt_doc/cli.py
   name: '`project-index prompt-doc` の処理'
   description: '`project-index prompt-doc` の処理を受け持ち、プロンプトの文書の変換の cli.py を修正するときに参照する。'
@@ -613,6 +635,23 @@ files:
   - topic:端末の設定
   related:
   - to: MOD-67
+    type: implements
+- path: project_index/features/skew/service.py
+  name: メタデータの偏りの洗い出し
+  description: 管理用の YAML と行の案の読み込み・`description` の類似度・偏りの洗い出しと JSON への変換を受け持ち、メタデータの偏りの service.py を修正するときに参照する。
+  tags:
+  - topic:メタデータ
+  - topic:タグ
+  related:
+  - to: MOD-113-6
+    type: implements
+- path: project_index/features/skew/types.py
+  name: メタデータの偏りの型
+  description: 数える行・ほぼ同じ `description` の組・偏ったタグ・結果と入力を読めない例外の型を受け持ち、メタデータの偏りの types.py を修正するときに参照する。
+  tags:
+  - topic:メタデータ
+  related:
+  - to: MOD-113-5
     type: implements
 - path: project_index/features/sources/merge.py
   name: 設定の YAML のマージ

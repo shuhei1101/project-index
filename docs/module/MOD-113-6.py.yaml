@@ -56,11 +56,11 @@ functions:
       type: tuple[list[MetadataRow], frozenset[str]]
       description: パスの昇順の行と、行の案のパス
     process: |-
-      1. 管理用の YAML ごとに、`root` から解いて `yaml.safe_load` で読み、`files[]` の行ごとに `MetadataRow` にする
+      1. 管理用の YAML ごとに、`root` から解いて共通の YAML の読み込み（`shared.yaml_io.load_yaml`）で読み、`files[]` の行ごとに `MetadataRow` にする
          - `path` は、管理用の YAML のフォルダの `root` からのパスと行の `path` をつないだパス
          - `tags` は、要素が文字列ならそのまま、辞書なら `name` の値を取る
          - ファイルが無い場合、`SkewInputError(path, "ファイルがありません")` を送る
-         - `yaml.YAMLError` か、`files` が配列でない場合、`SkewInputError(path, 理由)` を送る
+         - `YamlLoadError` か、`files` が配列でない場合、`SkewInputError(path, 理由)` を送る
       2. `draft` があれば、`root` から解いて 1 行ずつ `json.loads` し、`path`・`description`・`tags` を `MetadataRow` にして、同じ `path` の行を置き換えるか加える
          - ファイルが無い場合・`json.JSONDecodeError` の場合・`path` が無い行がある場合、`SkewInputError` を送る
       3. パスの昇順の行と、行の案のパスを返す
