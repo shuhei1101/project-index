@@ -39,3 +39,6 @@ scope_out:
   - item: content/prompts/ 以外で、2 つの documents の行（管理用の YAML の行と YAML の文書の行）の paths が同じファイルに当たる配置の検出
     reason: 要望はプロンプトの行を記載するときの重なりに限る。一般の重なりの検出に広げるかは、設計で直し方を決めるときに判断する
     plan: to_file
+  - item: setup の初回で配信元の直下に管理用の YAML を作ると、setup が作る project-index.yaml・schemas/*.yaml を管理用の YAML に記載せず、索引の同期の件数が 0 にならない（SKILL.md の手順 4・5、loader.py の unindexed_files、SC-5 の正常シナリオ（YAML でない範囲を加える））
+    reason: SC-5 の正常シナリオ（YAML でない範囲を加える）の期待値（索引の同期の件数 0）から外れる不具合。今回の要望（プロンプトの YAML を 1 つの文書として配信する）に含まれない
+    plan: '#135'
