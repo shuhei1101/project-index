@@ -264,6 +264,9 @@ def _array_keys(
     all_keys: dict[str, tuple[str, str]] = {}
     selected_keys: dict[str, tuple[str, str, str]] = {}
     for key, column in metadata.items():
+        # `**.` の列名はどの深さの列もまとめるキーで、配列の要素へ書き戻さない
+        if column.startswith(ANY_DEPTH_PREFIX):
+            continue
         if matched := ALL_KEY_PATTERN.match(column):
             all_keys[key] = (matched["array"], matched["item"])
         elif matched := SELECTED_KEY_PATTERN.match(column):
@@ -431,10 +434,55 @@ def _raise_if(violations: list[Violation]) -> None:
         )
 
 
+ANY_DEPTH_PREFIX = "**."
+
+
+def _head_key(path: str) -> str:
+    """項目のパスの先頭のキー。"""
+    return re.split(r"[.\[]", path, maxsplit=1)[0]
+
+
+def _any_depth_violations(
+    operation: Operation, metadata: Mapping[str, str], *, index: int
+) -> list[Violation]:
+    """列名が `**.` で始まる共通のキーへの操作を違反にする。"""
+    columns = {
+        key: column for key, column in metadata.items() if column.startswith(ANY_DEPTH_PREFIX)
+    }
+    if not columns:
+        return []
+    targets: list[tuple[str, str]] = [
+        (f"operations[{index}].{field}.{path}", path)
+        for field, values in (
+            ("data", operation.data or {}),
+            ("set", operation.set),
+            ("add_to", operation.add_to),
+            ("remove_from", operation.remove_from),
+        )
+        for path in values
+    ]
+    targets += [(f"operations[{index}].unset", path) for path in operation.unset]
+    targets += [
+        (f"operations[{index}].text_edits[{number}].field", edit.field)
+        for number, edit in enumerate(operation.text_edits)
+    ]
+    return [
+        Violation(
+            path=where,
+            rule=(f"{key} は文書の中の複数の列（{columns[key]}）をまとめたキーで、書き込めません"),
+            fix="列名の項目のパス（`refs`・`functions[0].refs` など）で指定してください",
+        )
+        for where, path in targets
+        if (key := _head_key(path)) in columns
+    ]
+
+
 def expand_array_keys(
     operation: Operation, table: DocumentTable, current: Mapping[str, Any] | None, *, index: int
 ) -> Operation:
     """列名が `[]`・`[{キー}]` を含む共通のキーへの操作を、オブジェクトの配列の列の置き換えにした操作を返す。"""
+    # どの深さの列もまとめるキーは、書き込む場所を 1 つに決められない
+    _raise_if(_any_depth_violations(operation, table.metadata, index=index))
     all_keys, selected_keys = _array_keys(table.metadata)
     collected = set(all_keys) | set(selected_keys)
     if not collected:

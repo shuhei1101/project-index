@@ -11,7 +11,7 @@ from project_index.shared.errors import InvalidArgumentError, Violation
 from project_index.shared.narrowing import is_dict, is_list
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, MutableMapping, Sequence, Set
+    from collections.abc import Iterator, Mapping, MutableMapping, Sequence, Set
 
     from project_index.features.documents.types import Document
     from project_index.features.sources.types import DocumentTable
@@ -40,7 +40,8 @@ METADATA_KEYS = (
 
 PART_PATTERN = re.compile(r"^([^.\[\]]+)((?:\[(?:\d+|[A-Za-z][A-Za-z0-9_]*)?\])*)$")
 INDEX_PATTERN = re.compile(r"\[(\d+|[A-Za-z][A-Za-z0-9_]*)?\]")
-PATH_EXAMPLE = "例 `a.b[0].c`・`tags[].name`・`tags[main].name`"
+PATH_EXAMPLE = "例 `a.b[0].c`・`tags[].name`・`tags[main].name`・`**.refs[]`"
+ANY_DEPTH = "**"
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,7 +51,12 @@ class ArraySelector:
     key: str | None
 
 
-Token = str | int | ArraySelector
+@dataclass(frozen=True, slots=True)
+class AnyDepth:
+    """項目のパスの先頭の `**` が表す、文書の中のどの深さの辞書からも残りのパスをたどるマーカー。"""
+
+
+Token = str | int | ArraySelector | AnyDepth
 
 
 def _invalid(path: str, message: str) -> InvalidArgumentError:
@@ -59,11 +65,17 @@ def _invalid(path: str, message: str) -> InvalidArgumentError:
 
 
 def parse_field_path(path: str) -> list[Token]:
-    """ドット記法・`[n]`・`[]`・`[{キー}]` の項目のパスを、キー・位置・要素の選び方の並びにする。"""
+    """ドット記法・`[n]`・`[]`・`[{キー}]`・先頭の `**.` の項目のパスを、トークンの並びにする。"""
     tokens: list[Token] = []
-    for part in path.split("."):
+    parts = path.split(".")
+    # 先頭の `**` は、後ろに区切りがあるときだけ「どの深さでも」になる
+    if parts[0] == ANY_DEPTH and len(parts) > 1:
+        tokens.append(AnyDepth())
+        parts = parts[1:]
+    for part in parts:
         matched = PART_PATTERN.match(part)
-        if matched is None:
+        # `*` を含む区切りは、先頭の `**` 以外の位置には書けない
+        if matched is None or "*" in matched.group(1):
             raise _invalid(path, f"項目のパス {path} の記載方法が誤っています（{PATH_EXAMPLE}）")
         tokens.append(matched.group(1))
         for inner in INDEX_PATTERN.findall(matched.group(2)):
@@ -79,9 +91,9 @@ def parse_field_path(path: str) -> list[Token]:
 def _plain_tokens(path: str, verb: str) -> list[str | int]:
     """要素の選び方を含まないパスを分ける。含めば `InvalidArgumentError` を送る。"""
     tokens = parse_field_path(path)
-    if any(isinstance(token, ArraySelector) for token in tokens):
-        raise _invalid(path, f"{path}: `[]`・`[{{キー}}]` を含む項目のパス{verb}")
-    return [token for token in tokens if not isinstance(token, ArraySelector)]
+    if any(isinstance(token, ArraySelector | AnyDepth) for token in tokens):
+        raise _invalid(path, f"{path}: `**`・`[]`・`[{{キー}}]` を含む項目のパス{verb}")
+    return _plain(tokens)
 
 
 def _select(data: object, tokens: Sequence[Token], default: object) -> object:
@@ -120,7 +132,7 @@ def _select_elements(
 
 def _plain(tokens: Sequence[Token]) -> list[str | int]:
     """要素の選び方を含まない並びを、キーと位置の並びとして読む。"""
-    return [token for token in tokens if not isinstance(token, ArraySelector)]
+    return [token for token in tokens if not isinstance(token, ArraySelector | AnyDepth)]
 
 
 def _walk(data: object, tokens: Sequence[str | int]) -> tuple[bool, object]:
@@ -151,7 +163,58 @@ def _join(tokens: Sequence[str | int]) -> str:
 
 def get_field(data: Mapping[str, Any], path: str, *, default: object = None) -> object:
     """項目のパスで指した値を返す。"""
-    return _select(data, parse_field_path(path), default)
+    tokens = parse_field_path(path)
+    if isinstance(tokens[0], AnyDepth):
+        return _select_any_depth(data, tokens[1:], default)
+    return _select(data, tokens, default)
+
+
+def _dicts(data: object) -> Iterator[dict[object, object]]:
+    """値とその中の全ての辞書を、文書の中の出現順（深さ優先。辞書は中の値より先）に返す。"""
+    if is_dict(data):
+        yield data
+        for value in data.values():
+            yield from _dicts(value)
+    elif is_list(data):
+        for value in data:
+            yield from _dicts(value)
+
+
+_MISSING = object()
+
+
+def _select_any_depth(data: object, rest: Sequence[Token], default: object) -> object:
+    """全ての辞書で残りのパスをたどり、たどれた値を出現順に並べる。"""
+    spread = any(isinstance(token, ArraySelector) for token in rest)
+    values: list[object] = []
+    for found in _dicts(data):
+        picked = _select(found, rest, _MISSING)
+        if picked is _MISSING:
+            continue
+        # 残りのパスが要素を選ぶときは、辞書ごとの配列を平らにつなぐ
+        if spread and is_list(picked):
+            values.extend(picked)
+        elif not spread:
+            values.append(picked)
+    return values or default
+
+
+def field_arrays(data: Mapping[str, Any], path: str) -> list[list[object]]:
+    """列名が指す配列を、文書の中の元の配列のまま出現順に返す。"""
+    tokens = parse_field_path(path)
+    # 末尾の `[]` は配列そのものを指すものとして扱う
+    if tokens[-1] == ArraySelector(key=None):
+        tokens = tokens[:-1]
+    if any(isinstance(token, ArraySelector) for token in tokens):
+        raise _invalid(path, f"{path}: 配列を指す列名ではありません")
+    sources: list[object] = list(_dicts(data)) if isinstance(tokens[0], AnyDepth) else [data]
+    rest = _plain(tokens)
+    arrays: list[list[object]] = []
+    for source in sources:
+        found, value = _walk(source, rest)
+        if found and is_list(value):
+            arrays.append(value)
+    return arrays
 
 
 def set_field(data: MutableMapping[str, Any], path: str, value: object) -> None:
