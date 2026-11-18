@@ -20,6 +20,7 @@ FIX_NEEDS_GLOB = "documents[].paths の先頭を glob にしてください"
 FIX_FILENAME_SINGLE_STAR = (
     "documents[].paths の先頭のファイル名の glob を * の 1 つだけにしてください"
 )
+FIX_FOLDER_RECURSIVE = "documents[].paths の先頭のフォルダの階層の glob を ** にしてください"
 
 
 def _undecided(table: DocumentTable, fix: str) -> InvalidArgumentError:
@@ -78,4 +79,8 @@ def new_document_path(table: DocumentTable, doc_id: str) -> tuple[str, bool]:
     # 配置先のファイル名が除外の名前に当たると、書いても文書にならない
     if table.excludes(path):
         raise _excluded(table, path)
+    # `**` 以外の glob を含むフォルダの階層を取り除いた配置先は、`paths` に当たらず書いても文書にならない
+    if not table.matches(path):
+        # フォルダの階層の glob を `**` にさせる（`**` の階層は取り除いても `paths` に当たる）
+        raise _undecided(table, FIX_FOLDER_RECURSIVE)
     return path, False
