@@ -1078,6 +1078,40 @@ flows:
       - '`reload` も再起動も呼ばない'
       - 3 回目の後に `cwd` がクローン本体で `worktree` を省いて呼ぶと、`notes` に文書 1 の違反が無い
     test: test_normal_when_worktree_validator_changed
+  - name: 正常系（本文のファイルを持たない要素がある）
+    summary: '`body_file` の列が無い・空の要素を要素を本文にした文書として返し、指すファイルが無い要素の知らせを 1 行にまとめる'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 本文のファイルを持つ行
+        description: "sample の行 `notes`（`paths: [notes/index.yaml]`・`records: items`・`body_file: path`）。`items[0]` の n1 は `path: n1.md` で `notes/n1.md` を指し、`items[1]` は `path` の列を持たず、`items[2]` の n3 は `path: ''`、`items[3]` の n4 と `items[4]` の n5 は無いファイル（`n4.md`・`n5.md`）を指す"
+        notes: 行のスキーマは `path` を必須にしない。`items[1]` は `id`・`name` の列を持たない
+      - name: 入力
+        description: '`filter`: `kind` が `notes`、`view: full`、`format: json`'
+    flow: |-
+      <!-- map: {"title": "正常系（本文のファイルを持たない要素がある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+        participant ST as 配信元の文書
+
+        C->>T: filter kind notes・view full
+        T-->>ST: notes/index.yaml と n1.md を読む
+        T->>T: path が無い・空の要素は要素を本文にした文書にする
+        T->>T: 無いファイルを指す n4・n5 を除き、知らせを 1 行にまとめる
+        T-->>C: 3 件の文書と notes 1 行
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`items` が n1・`items[1]`・n3 の 3 件で、n4・n5 を含まない'
+      - n1 の本文は `notes/n1.md` の内容で `path` は `notes/n1.md` の絶対パス。`items[1]`・n3 の本文は要素を YAML に書き出した文字列で、`path` は `notes/index.yaml` の絶対パス、`scope` は `section`
+      - '`items[1]` の文書の `id` と `name` が `notes/index.yaml#1`'
+      - '`notes` に `notes/index.yaml` の本文のファイルが無い要素の知らせが、件数 2 と先頭の要素（`items[3]`）の詳細を持つ 1 行だけある'
+      - '`isError` ではない'
+    test: test_normal_when_body_file_absent
 lead: '条件に該当する文書の取得・一覧・件数・集計を返却する `search_docs` の入出力を定め、`search_docs` を修正するときに参照する。'
 tags:
   - name: topic:クエリ
@@ -1097,6 +1131,7 @@ callers:
   - SC-6#scenarios[正常シナリオ（作った直後のワークツリーを指す）]
   - SC-6#scenarios[異常シナリオ（ワークツリーの読み込みが上限までに終了しない）]
   - SC-6#scenarios[異常シナリオ（git の実行が失敗する）]
+  - SC-6#scenarios[正常シナリオ（本文のファイルを持たない要素を引く）]
 exclusivity: '読み取りだけで排他しない（`readOnlyHint: true` で並列に呼ばれる）'
 request:
   - name: source
@@ -1487,10 +1522,10 @@ constraints:
   - item: 再読み込み
     constraint: ファイルの更新日時か大きさが変わった文書は、次の呼び出しで再読み込みする
   - item: 範囲の決め方
-    constraint: '本文を切らずに返したら `full`。`max_chars_per_field` で切った本文・`snippets`・`sections`・`lines` で切り出した本文・`body_file` の無い `records` の要素（本文が管理用の YAML の 1 要素）は `section`。本文を返さない呼び出し（`view: summary`、`exclude_fields` で `body` を除いた `view: full`）は `summary`'
+    constraint: '本文を切らずに返したら `full`。`max_chars_per_field` で切った本文・`snippets`・`sections`・`lines` で切り出した本文・`body_file` の無い `records` の要素と本文のファイルを持たない要素（本文が管理用の YAML の 1 要素）は `section`。本文を返さない呼び出し（`view: summary`、`exclude_fields` で `body` を除いた `view: full`）は `summary`'
     notes: rule-inject は `full` だけを既読にする（D-125）
   - item: 名前の既定
-    constraint: メタデータの `name` が空なら、ファイル名から拡張子を除いた名前にする。`records` の要素は `body_file` が指すファイルの名前、`body_file` が無ければ文書の `id`
+    constraint: メタデータの `name` が空なら、ファイル名から拡張子を除いた名前にする。`records` の要素は `body_file` が指すファイルの名前、`body_file` が無いか要素が本文のファイルを持たなければ文書の `id`
     notes: '行の `metadata` の列名の対応で共通のキーを読んだ後に当てる'
   - item: 抜粋の書式
     constraint: '`format: markdown` は grep の `-n` と同じく、当たった行を `{行番号}:{行}`、前後の行を `{行番号}-{行}` で出し、抜粋の間に `--` の行を置く'
@@ -1513,7 +1548,7 @@ constraints:
     constraint: '`records` を持つ行の `schema` はファイル全体のスキーマとし、要素 1 つずつの検査と項目の一覧には `properties.{records}.items` を当てる'
     notes: 書き込み（`write_docs`）・`check_project` も同じ当て方
   - item: ID の既定
-    constraint: メタデータの `id` が空なら、配信元の直下からのファイルのパス（拡張子付き）にする。`records` の要素は `body_file` が指すファイルのパス、`body_file` が無ければ `{管理用の YAML のパス}#{位置}`
+    constraint: メタデータの `id` が空なら、配信元の直下からのファイルのパス（拡張子付き）にする。`records` の要素は `body_file` が指すファイルのパス、`body_file` が無いか要素が本文のファイルを持たなければ `{管理用の YAML のパス}#{位置}`
     notes: 同じ名前で拡張子の違うファイルも別の文書になる
   - item: スキーマの参照の解決
     constraint: '種類のスキーマの `$ref` は、最上位の `$defs` の中の相対パスの `$ref` を含めて、スキーマのファイルのフォルダを基準に解決してから検査に当てる。種類のスキーマの中で循環する参照は `#/$defs/...` のまま、参照先の別のファイルの中で循環する参照はそのファイルの定義を指したまま検査に当てる'
@@ -1533,6 +1568,12 @@ constraints:
   - item: ワークツリーの配信元の設定
     constraint: '`worktree` を指定したときと `cwd` がワークツリーの中のときは、そのワークツリーの配信元の設定（`documents` の行）で文書を集める'
     notes: 設定はワークツリーの文書の読み込みと同じく、ファイルが変わっていなければ再読み込みしない
+  - item: 読めなかったファイルの知らせ
+    constraint: 読み込みで除いた文書の知らせは、ファイルと理由ごとに 1 行にまとめ、除いた文書の件数と先頭の 1 件の詳細を添える。件数が 1 のときはその 1 件の詳細だけを出す
+    notes: '`records` の行で同じファイルの要素が多く除かれても、`notes` が要素の数だけ並ばない'
+  - item: 本文のファイルを持たない要素
+    constraint: '`records`・`body_file` の行で `body_file` の列が無いか値が空の文字列の要素は、`body_file` を持たない `records` の行の要素と同じ本文・`path`・範囲・ID と名前の既定で返す。列の値があって指すファイルが無いか配信元の外を指す要素だけを除き、`notes` で知らせる'
+    notes: 文字列でない値（数・配列）は、今どおり指すファイルが無い要素として除く
 refs:
   - to: SC-6
     item: scenarios[正常シナリオ]

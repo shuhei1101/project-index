@@ -360,6 +360,36 @@ flows:
       - n1 の最上位の `refs` が n3 だけを指し、`functions[0].refs` が n2 を指さない
       - '`unlinked` が n1 の `id` と新しい `version` を返却する'
     test: test_normal_when_unlink_nested_related
+  - name: 正常系（本文のファイルを持たない要素を削除する）
+    summary: '`records`・`body_file` の行で、`body_file` の列を持たない要素を、管理用の YAML の要素だけを除いて削除する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 本文のファイルを持つ行
+        description: 正常系（本文のファイルを持つ文書を消す）と同じ行 `notes`。要素 n1 の `path` が `n1.md` で、要素 n4 は `path` の列を持たない
+        notes: 行のスキーマは `path` を必須にしない
+      - name: 入力
+        description: '`targets: [n4]`'
+    flow: |-
+      <!-- map: {"title": "正常系（本文のファイルを持たない要素を削除する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
+        participant WT as ワークツリー
+
+        C->>T: targets n4
+        T->>WT: notes/index.yaml から n4 の要素を除く（本文のファイルは削除しない）
+        T-->>C: deleted
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`notes/index.yaml` から n4 の要素だけが除かれ、n1 の要素は変わらない'
+      - '`notes/` のファイル（`notes/n1.md`）は削除されない'
+      - 結果の `status` が `deleted`
+    test: test_normal_when_body_file_absent
 lead: 文書を物理削除し、`related` からの参照を拒否するか除外する `delete_docs` の入出力を定め、`delete_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -371,11 +401,12 @@ aliases:
 identifier: delete_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーだけ。Git 管理外の配信元は種類の `documents[].writable` が削除を許すこと
 idempotent: false
-side_effects: '作業ツリー（Git 管理外の配信元はそのフォルダ）の文書のファイルと、`records`・`body_file` の行の文書の本文のファイルを削除する。`on_referenced: unlink` のときは参照元の文書の `related` も書き換える。`generators[]` を流す。'
+side_effects: '作業ツリー（Git 管理外の配信元はそのフォルダ）の文書のファイルと、`records`・`body_file` の行の文書の本文のファイルを削除する（本文のファイルを持たない要素は要素だけを除く）。`on_referenced: unlink` のときは参照元の文書の `related` も書き換える。`generators[]` を流す。'
 callers:
   - SC-7#scenarios[正常シナリオ（参照も外して消す）]
   - SC-7#scenarios[正常シナリオ（変更していない項目の引用符を保つ）]
   - SC-7#scenarios[正常シナリオ（本文のファイルを持つ文書を消す）]
+  - SC-7#scenarios[正常シナリオ（本文のファイルを持たない要素を書く）]
 exclusivity: '`write_docs` と同じ配信元ごとの排他ロックの中で行う'
 request:
   - name: source
