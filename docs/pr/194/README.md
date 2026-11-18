@@ -1,0 +1,1 @@
+# records を持たない行で create の配置先が paths に該当しないときを違反にする
