@@ -1618,14 +1618,14 @@ flows:
       - 4 回目の後、要素の `id` が n9 になり、文書 1 の `related` が n9 を指し、`notes/` のファイルは作成・移動されない
     test: test_normal_when_body_file_absent
   - name: 異常系（本文のファイルを持たない要素に本文だけを渡す・InvalidArgumentError）
-    summary: 本文のファイルのパスを伴わない `@body` と、本文のファイルを持たない要素への `new_path` を断る
+    summary: 本文のファイルの有無を片方だけで切り替える操作と、本文のファイルを持たない要素への `new_path` を断る
     setup:
       - name: Mock
         description: なし
-      - name: 本文のファイルを持たない要素
-        description: 正常系（本文のファイルを持たない要素を書く）と同じ行 `notes` の n3
+      - name: 本文のファイルの有無が違う要素
+        description: '正常系（本文のファイルを持たない要素を書く）と同じ行 `notes` の n3（`path` の列を持たない）と n1（`path: n1.md`）'
       - name: 入力
-        description: '`create`（`data: {id: n6, @body: 本文}`）、n3 の `update`（`set: {@body: 本文}`）、n3 の `rename`（`new_path: notes/n7.md`）を 1 件ずつ呼ぶ'
+        description: '`create`（`data: {id: n6, @body: 本文}`）、n3 の `update`（`set: {@body: 本文}`）、n3 の `update`（`set: {path: n3.md}`）、n3 の `update`（`text_edits: [{field: @body, old: a, new: b}]`）、n3 の `rename`（`new_path: notes/n7.md`）、n1 の `update`（`unset: [path]`）、n1 の `replace`（`data` に `path` が無い）を 1 件ずつ呼ぶ'
     flow: |-
       <!-- map: {"title": "異常系（本文のファイルを持たない要素に本文だけを渡す・InvalidArgumentError）"} -->
 
@@ -1638,14 +1638,22 @@ flows:
         T-->>C: isError（本文のファイルのパスが無い）
         C->>T: update n3（set @body だけ）
         T-->>C: isError（本文のファイルのパスが無い）
+        C->>T: update n3（set path だけ）
+        T-->>C: isError（@body が無い）
+        C->>T: update n3（text_edits @body）
+        T-->>C: isError（本文のファイルのパスが無い）
         C->>T: rename n3（new_path）
         T-->>C: isError（本文のファイルを持たない要素）
+        C->>T: update n1（unset path）
+        T-->>C: isError（body_file の列は変えられない）
+        C->>T: replace n1（data に path が無い）
+        T-->>C: isError（body_file の列は変えられない）
       ```
 
       <!-- /map -->
     expected:
-      - 3 回とも `InvalidArgumentError` で、違反の `path` がそれぞれ `operations[0].data.path`・`operations[0].set.path`・`operations[0].new_path`
-      - どのファイルも変わらない
+      - 7 回とも `InvalidArgumentError` で、違反の `path` がそれぞれ `operations[0].data.path`・`operations[0].set.path`・`operations[0].set.@body`・`operations[0].text_edits[0].field`・`operations[0].new_path`・`operations[0].unset.path`・`operations[0].data.path`
+      - 'どのファイルも変わらず、n1 は `path: n1.md` を持ち続け、`notes/n1.md` も残る'
     test: test_error_when_body_without_body_file
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
@@ -2020,7 +2028,7 @@ constraints:
     constraint: '[文書の検索](id:IF-2) の制約「ワークツリーの読み込みの待ち」と同じ。終了しなければ何も書き込まずに `WorktreeLoadingError` を返却する'
     notes: 共通の処理のため、結合テストは文書の検索が持つ
   - item: 本文のファイル
-    constraint: '`records`・`body_file` の行の文書の本文は `@body` で受ける。`create` は `body_file` の列の値（管理用の YAML のフォルダからの相対）に本文のファイルを作成し、`set` の `@body` は全体を、`text_edits` の `field: @body` は一部を置き換える。`replace` は `data` に `@body` があれば置き換え、無ければ本文のファイルを変えない。本文のファイルを持つ要素の `body_file` の列の値を変える `update`・`replace` は受けない。本文のファイルを持たない要素は制約「本文のファイルを持たない要素」'
+    constraint: '`records`・`body_file` の行の文書の本文は `@body` で受ける。`create` は `body_file` の列の値（管理用の YAML のフォルダからの相対）に本文のファイルを作成し、`set` の `@body` は全体を、`text_edits` の `field: @body` は一部を置き換える。`replace` は `data` に `@body` があれば置き換え、無ければ本文のファイルを変えない。本文のファイルを持つ要素の `body_file` の列の値を変える `update`・`replace`（`unset` で列を外す `update` と、列を含まない `data` の `replace` を含む）は受けない。本文のファイルを外す操作は持たない。本文のファイルを持たない要素は制約「本文のファイルを持たない要素」'
     notes: '`@body` は種類の列名と重ならない。`body_file` の列の名前が `body` の配信元でも、`body` は列を指す'
   - item: 本文のファイルの検査
     constraint: 本文のファイルの内容は、スキーマ・`validators[]`・mdmark の点検に通さない。パスを読み込みと同じく管理用の YAML のフォルダから解き、配信元の外を指すときと、`create` で既にあるファイルを指すときは `body_file` の列の違反にする
@@ -2071,7 +2079,7 @@ constraints:
     constraint: 'Git 管理外の配信元と `storage.type: disk` の配信元では、書き換える文書（`create`・`update`・`replace`・`rename` の対象と、改名の参照元・`replace_text` で書き換える文書）に `created`・`updated` を付けてから検査する。付けるかは、操作の対象でなく書き換える文書の種類の `documents[].write_dates`（省くと `true`）で決める。`false` の種類の文書には付けず、既にある `created`・`updated` の値も書き換えない'
     notes: Git の配信元では `write_dates` に関わらず付けない
   - item: 本文のファイルを持たない要素
-    constraint: '`records`・`body_file` の行で `body_file` の列が無いか空の要素は、`body_file` を持たない `records` の行の文書と同じく要素だけを書き換える。`create` は `data` に `body_file` の列と `@body` のどちらも無ければ要素だけを追加し、`@body` だけがあれば `body_file` の列の違反、`body_file` の列だけがあれば `@body` の違反にする。`update`・`replace` は `body_file` の列の値と `@body` を同時に指定したときだけ本文のファイルを作成し（「本文のファイルの検査」の `create` と同じ検査）、`@body` だけは `body_file` の列の違反にする。`rename` は `new_id` だけを受け、`new_path` は引数の誤りにする。どの操作も本文のファイルを削除・移動しない'
+    constraint: '`records`・`body_file` の行で `body_file` の列が無いか空の要素は、`body_file` を持たない `records` の行の文書と同じく要素だけを書き換える。`create` は `data` に `body_file` の列と `@body` のどちらも無ければ要素だけを追加し、`@body` だけがあれば `body_file` の列の違反、`body_file` の列だけがあれば `@body` の違反にする。`update`・`replace` は `body_file` の列の値と `@body` を同時に指定したときだけ本文のファイルを作成し（「本文のファイルの検査」の `create` と同じ検査）、`@body` だけは `body_file` の列の違反、`body_file` の列の値だけは `@body` の違反にする。`text_edits` の `field: @body` は、本文のファイルが無いことを決まりにした `text_edits[{n}].field` の違反にする。`rename` は `new_id` だけを受け、`new_path` は引数の誤りにする。どの操作も本文のファイルを削除・移動しない'
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]
