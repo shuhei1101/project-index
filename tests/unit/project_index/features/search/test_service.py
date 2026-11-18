@@ -450,12 +450,12 @@ def test_search_docs_when_problems_grouped(make_env: Callable[..., SearchEnv]) -
     # 実行
     result = env.search()
     # 検証
-    loading = [note for note in result.notes if "読み込めない" in note]
+    loading = sorted(note for note in result.notes if "読み込めない" in note)
     assert len(loading) == 2
-    assert loading[0].startswith(
+    assert loading[0].startswith("docs/b.yaml を読み込めないので除きました（")
+    assert loading[1].startswith(
         "notes/files.yaml の 3 件を読み込めないので除きました（先頭: files[1] の path（x1.md）"
     )
-    assert loading[1].startswith("docs/b.yaml を読み込めないので除きました（")
 
 
 def test_search_docs_when_read_validator(make_env: Callable[..., SearchEnv]) -> None:

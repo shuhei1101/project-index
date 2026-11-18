@@ -479,7 +479,7 @@ def test_write_docs_when_without_dates(
         (False, False),
         (False, False),
     ]
-    assert "updated: 2026-11-18" in (root / "memos/m1.yaml").read_text(encoding="utf-8")
+    assert "updated: '2026-11-18T10:00:00+00:00'" in (root / "memos/m2.yaml").read_text(encoding="utf-8")
 
 
 def test_write_docs_when_invalid(make_env: Callable[..., WriteEnv]) -> None:
