@@ -891,7 +891,7 @@ scenarios:
         description: なし（実環境で実行）
       - name: 書ける配信元
         description: '正常シナリオ（Git 管理外の配信元に書く）と同じ memo に、`documents[].write_dates: false` の種類 `items` を追加したもの'
-        notes: '`items` のスキーマは `additionalProperties: false` で、`created`・`updated` を持たない。memo のほかの種類は `write_dates` を省く'
+        notes: '`items` のスキーマは `additionalProperties: false` で、`created`・`updated` を持たず、`related` を持つ。memo のほかの種類 `memos` は `write_dates` を省き、文書 m1 を持つ。`items` の文書 i1 は `related` で m1 を指し、単語 `旧語` を持つ'
       - name: project-index
         description: sample と memo を配信している project-index
         notes: '`cwd` は sample のクローン本体'
@@ -908,18 +908,28 @@ scenarios:
         M->>M: items の write_dates が false なので、created・updated を付けずにスキーマと validators に通す
         M->>MF: YAML を書く
         M-->>A: id と version
-        A->>M: write_docs(source: memo, operations: update 作った文書・set)
-        M->>M: created・updated を付けずにスキーマと validators に通す
-        M->>MF: YAML を書く
+        A->>M: write_docs(source: memo, operations: update・replace i1)
+        M->>MF: created・updated を付けずに i1 を書き換える
         M-->>A: 新しい version
+        A->>M: write_docs(source: memo, operations: 改名・i1・改名後の ID i9)
+        M->>MF: created・updated を付けずに i9 を書く
+        M-->>A: 改名した文書の id と version
+        A->>M: write_docs(source: memo, operations: 改名・m1・改名後の ID m9)
+        M->>M: 参照元 i9 は items の指定で日時を付けず、m9 は memos の指定で日時を付ける
+        M->>MF: m9 を書き、i9 の related を m9 へ書き換える
+        M-->>A: 改名した文書と参照元の id と version
+        A->>M: write_docs(source: memo, operations: 一括置換・旧語 → 新語)
+        M->>MF: created・updated を付けずに i9 を書き換える
+        M-->>A: 文書ごとの置換の件数と version
       ```
 
       <!-- /map -->
     expected:
-      - 'create と update の結果が `applied: true` で、`isError` にならない'
-      - memo のフォルダの作った文書の YAML が `created`・`updated` を持たない
-      - '`search_docs` の `fields: [id, created, updated]` が、作った文書の `created`・`updated` を空で返却する'
-      - '`write_dates` を省いた memo の種類への create は、正常シナリオ（Git 管理外の配信元に書く）と同じく `created`・`updated` を付ける'
+      - 'create・update・replace・改名・一括置換の結果が `applied: true` で、`isError` にならない'
+      - memo のフォルダの `items` の文書の YAML（作った文書・i9）が、どの操作の後も `created`・`updated` を持たない
+      - m1 の改名で参照元として書き換えた i9 は `related` が m9 を指し、`created`・`updated` を持たない。改名した m9 は `updated` が書いた日時になる。日時を付けるかは、操作の対象でなく書き換える文書の種類の指定で決まる
+      - '`search_docs` の `fields: [id, created, updated]` が、`items` の文書の `created`・`updated` を空で返却する'
+      - '`write_dates` を省いた `memos` への create は、正常シナリオ（Git 管理外の配信元に書く）と同じく `created`・`updated` を付ける'
     test: test_normal_when_non_git_source_without_dates
   - name: 正常シナリオ（本文のファイルを持たない要素を書く）
     setup:
@@ -927,7 +937,7 @@ scenarios:
         description: なし（実環境で実行）
       - name: 本文のファイルを持つ行
         description: '正常シナリオ（本文のファイルを持つ文書を書く）と同じ行 `notes`（`notes/index.yaml`・`records: items`・`body_file: path`）。要素 n1 の `path` が `n1.md` で、要素 n3 は `path` の列を持たない'
-        notes: 行のスキーマは `path` を必須にしない
+        notes: 行のスキーマは `path` を必須にしない。要素 n5 も `path` の列を持たず、文書 1 の `related` が n5 を指す
       - name: project-index
         description: sample を配信している project-index
         notes: '`worktree` にワークツリー x のパスを指定する'
@@ -944,6 +954,10 @@ scenarios:
         M->>M: 本文のファイルを持たない要素として検査に通す
         M->>WT: notes/index.yaml に要素 n4 を追加する（本文のファイルは作らない）
         M-->>A: 作った文書の id と version
+        A->>M: write_docs(operations: create・kind notes・本文だけ（本文のファイルのパス無し）)
+        M-->>A: エラー（添字 0・本文のファイルのパスが無いこと）
+        A->>M: write_docs(operations: create・kind notes・本文のファイルのパスだけ（本文無し）)
+        M-->>A: エラー（添字 0・@body が無いこと）
         A->>M: write_docs(operations: update n3・set 要素のキー)
         M->>WT: notes/index.yaml の n3 を書き換える
         M-->>A: 新しい version と差分
@@ -952,15 +966,25 @@ scenarios:
         M-->>A: 新しい version と差分
         A->>M: write_docs(operations: update n4・set 本文だけ)
         M-->>A: エラー（添字 0・本文のファイルのパスが無いこと）
+        A->>M: write_docs(operations: 改名・n5・改名後の ID n9)
+        M->>WT: notes/index.yaml の n5 の ID を n9 にし、文書 1 の related を n9 へ書き換える
+        M-->>A: 改名した文書と参照元の id と version
+        A->>M: delete_docs(targets: n4)
+        M->>WT: notes/index.yaml から n4 の要素を除く
+        M-->>A: 消した文書
       ```
 
       <!-- /map -->
     expected:
       - create の後、ワークツリー x の `notes/index.yaml` に n4 の要素が `path` の列を持たずに加わり、`notes/` に本文のファイルが増えない
+      - '本文だけで本文のファイルのパスを持たない create は、`isError: true` で添字 0 の違反として本文のファイルのパスが無いことを返却し、ファイルは変わらない'
+      - 本文のファイルのパスだけを持ち本文を持たない create は、今どおり `@body` が無い違反を返却し、ファイルは変わらない
       - n3 の `set` の後、`notes/index.yaml` の n3 だけが書き換わる
       - '本文のファイルのパスと本文を同時に指定した update の後、n3 の要素が `path: n3.md` を持ち、`notes/n3.md` の内容が指定した本文になる。次の `search_docs` が n3 の本文としてその内容を返却する'
       - '本文のファイルのパスを持たない n4 への本文だけの update は、`isError: true` で添字 0 の違反として本文のファイルのパスが無いことを返却し、ファイルは変わらない'
-      - 本文のファイルのパスだけを持ち本文を持たない create は、今どおり `@body` が無い違反を返却する
+      - n5 の改名の後、`notes/index.yaml` の要素の ID だけが n9 になり、文書 1 の `related` が n9 を指す。`notes/` のファイルは作成・移動されない。本文のファイルを持たない要素への `new_path` は、`body_file` を持たない `records` の行の文書と同じく引数の誤りを返却する
+      - n4 の `delete_docs` の後、`notes/index.yaml` から n4 の要素だけが除かれ、`notes/` のファイルは削除されない
+      - 改名と削除の後の `check_project` の管理用の YAML に無いファイルとファイルが無い行に、書き込みの前からの差分が出ない
     test: test_normal_when_body_file_absent_written
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 tags:
