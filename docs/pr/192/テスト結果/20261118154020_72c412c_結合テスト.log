@@ -1,0 +1,21 @@
+$ gh workflow run test.yml --ref feat/write/text-edits-field-fix -f layer=integration -f paths="tests/integration/server/test_write_docs.py::test_normal_when_text_edits_ref_path tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved" （TP-1 の TL-2 の run_runner）
+
+補足: 先頭の failed to get run は gh run watch の api.github.com への接続のタイムアウト。実行 44252952213 は conclusion: success で、全ての step が success（gh run view で確認）
+
+failed to get run: Get "https://api.github.com/repos/shuhei1101/project-index/actions/runs/44252952213?exclude_pull_requests=true": dial tcp 20.27.177.116:443: i/o timeout
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 6 items
+
+tests/integration/server/test_write_docs.py::test_normal_when_text_edits_ref_path PASSED [ 16%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[no_x_key] PASSED [ 33%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[missing] PASSED [ 50%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[order] PASSED [ 66%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[no_key] PASSED [ 83%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[unbalanced_brackets] PASSED [100%]
+
+============================== 6 passed in 1.27s ===============================
