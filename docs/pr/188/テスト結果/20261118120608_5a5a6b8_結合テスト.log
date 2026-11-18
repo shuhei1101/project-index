@@ -1,0 +1,13 @@
+$ gh workflow run test.yml --ref fix/write/placement-undecided-fix-by-records -f layer=integration -f paths="tests/integration/server/test_write_docs.py::test_error_when_placement_undecided tests/integration/server/test_write_docs.py::test_error_when_placement_excluded" （TP-1 の TL-2 の run_runner）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 2 items
+
+tests/integration/server/test_write_docs.py::test_error_when_placement_undecided PASSED [ 50%]
+tests/integration/server/test_write_docs.py::test_error_when_placement_excluded PASSED [100%]
+
+============================== 2 passed in 0.60s ===============================

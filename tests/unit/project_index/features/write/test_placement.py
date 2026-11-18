@@ -59,3 +59,39 @@ def test_new_document_path_when_records_excluded() -> None:
         new_document_path(table, "x")
     assert exc_info.value.violations[0].path == "kind"
     assert "src/files.yaml" in exc_info.value.violations[0].rule
+
+
+def test_new_document_path_when_records_glob() -> None:
+    """records を持つ行で先頭が glob のため配置先を決められない（異常系）。"""
+    # 準備
+    table = DocumentTable(
+        id="items",
+        paths=["data/*.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        records="items",
+    )
+    # 実行・検証
+    with pytest.raises(
+        InvalidArgumentError, match="items の新しい文書の配置先を決められません"
+    ) as exc_info:
+        new_document_path(table, "item-1")
+    assert exc_info.value.violations[0].path == "kind"
+    assert (
+        exc_info.value.violations[0].fix
+        == "documents[].paths の先頭を glob を含まない 1 つのファイルにしてください"
+    )
+
+
+def test_new_document_path_when_no_glob() -> None:
+    """records を持たない行で先頭が glob を含まないため配置先を決められない（異常系）。"""
+    # 準備
+    table = DocumentTable(
+        id="sample", paths=["docs/list.yaml"], schema_path="schemas/rule.schema.yaml"
+    )
+    # 実行・検証
+    with pytest.raises(
+        InvalidArgumentError, match="sample の新しい文書の配置先を決められません"
+    ) as exc_info:
+        new_document_path(table, "sample-doc")
+    assert exc_info.value.violations[0].path == "kind"
+    assert exc_info.value.violations[0].fix == "documents[].paths の先頭を glob にしてください"

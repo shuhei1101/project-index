@@ -1,0 +1,11 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: none
+    detail: 作成で配置先を決められないときに返す直し方の文言だけが変わり、シナリオの流れと期待値は変わらない
+    depends_on: []
+docs: []
+scope_out:
+  - item: 'records を持たない行で、paths の先頭の最後の段の * を 1 つ ID に置き換えた後のファイル名に glob が残るとき（例: docs/*-*.yaml）の修正案'
+    reason: '起点 Issue #187 が records を持たない行の修正案を変えないと記載しており、含めると要件の追加になるため、reviewer の判断でこの PR に含めない'
+    plan: '#189'
