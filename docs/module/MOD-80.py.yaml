@@ -196,10 +196,17 @@ functions:
       - name: test_apply_operation_when_text_edit_not_string
         case: 異常
         summary: 文字列でない項目を指す
-        condition: 同じ内容に `#` で始まらない `functions[save].process` の `text_edits`（`[save]` はキー `save` が真の要素を選び、値が配列になる）
+        condition: '`functions`（`x-key: name`）が `load`・`save`・`save` の内容に、`#` で始まらない `functions[save].process` の `text_edits`（`[save]` はキー `save` が真の要素を選び、該当する要素が無いので値が空の配列になる）'
         mock: なし
         expected: '`InvalidArgumentError` の違反の `path` が `text_edits[0].field`、`rule` が `文字列ではない項目は置き換えられません`、`fix` が `test_apply_operation_when_text_edit_ref_path_unresolved` と同じ案内'
         exception: 文字列でない項目への置き換え
+      - name: test_apply_operation_when_text_edit_path_invalid
+        case: 異常
+        summary: '# で始まらない項目のパスの記載方法の誤り'
+        condition: '`functions`（`x-key: name`）が `load`・`save`・`save` の内容に、`functions[send-form].process` の `text_edits`（`[...]` の中に記号を含む）'
+        mock: なし
+        expected: '`InvalidArgumentError` の違反の `path` が `text_edits[0].field`、`rule` に `記載方法が誤っています`、`fix` が `test_apply_operation_when_text_edit_ref_path_unresolved` と同じ案内'
+        exception: 項目のパスを解けない
   - name: to_columns
     title: 列名への読み替え
     kind: 関数
