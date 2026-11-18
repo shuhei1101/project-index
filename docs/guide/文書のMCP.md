@@ -315,7 +315,9 @@ YAML として読めないファイルがあっても、そのファイルを除
 | `replace` | `data` に `@body` があれば置き換え、無ければ変えない |
 
 本文のファイルのパスが配信元の外を指すとき・`create` で既にあるファイルを指すときは、`body_file` の列の違反で、要素も本文のファイルも書き込みません。
-`body_file` の列の値を変える操作と、`body_file` を持たない行の文書への `@body` は `InvalidArgumentError` です。
+`body_file` の列の値を変える操作（`unset` で列を除外する `update` と、列を含まない `data` の `replace` を含む）と、`body_file` を持たない行の文書への `@body` は `InvalidArgumentError` です。
+本文のファイルはスキーマ・`validators[]`・mdmark の点検に通しません。
+これらの文書の `version` は要素と本文のファイルの両方から求め、`diff` は要素の差分の行に続けて `@@ {本文のファイルのパス}` の行と本文のファイルの差分の行を並べます。
 
 `body_file` の列が無いか値が `null`・空の文字列の要素は、本文のファイルを持たない文書で、要素だけを書き換えます。
 
@@ -325,8 +327,6 @@ YAML として読めないファイルがあっても、そのファイルを除
 | `update`・`replace` | `body_file` の列の値と `@body` を同時に指定したときだけ本文のファイルを作成する。片方だけは違反 |
 | `update` の `text_edits` | `field: @body` は違反 |
 | `rename` | `new_id` だけを受け付け、`new_path` は `InvalidArgumentError` |
-本文のファイルはスキーマ・`validators[]`・mdmark の点検に通しません。
-これらの文書の `version` は要素と本文のファイルの両方から求め、`diff` は要素の差分の行に続けて `@@ {本文のファイルのパス}` の行と本文のファイルの差分の行を並べます。
 
 行の `metadata` が `tags: tags[].name` のとき、`tags` への操作はオブジェクトの配列へ書き戻し、元の要素の `main` などのキーを保ちます。
 
