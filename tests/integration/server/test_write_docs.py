@@ -1265,6 +1265,39 @@ def test_error_when_placement_excluded(
     assert not (worktree / "docs" / "rule" / "index.yaml").exists()
 
 
+def test_error_when_placement_undecided(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """records を持つ行の paths の先頭が glob のとき、create の配置先を決められず、何も書き込まずに断る（異常系）。"""
+    # 準備
+    items_row = (
+        "  - id: items\n"
+        "    paths: [data/*.yaml]\n"
+        "    schema: schemas/sample.schema.yaml\n"
+        "    records: items\n"
+    )
+    files = sample_file_set(**{"project-index.yaml": sample_config_text(items_row)})
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(source.folder),
+        worktree=str(worktree),
+        operations=[{"op": "create", "kind": "items", "id": "item-1", "data": {"name": "要素 1"}}],
+    )
+    # 検証
+    assert result.is_error
+    assert "InvalidArgumentError" in result.text
+    assert "operations[0].kind" in result.text
+    assert "items の新しい文書の配置先を決められません" in result.text
+    assert "documents[].paths の先頭を glob を含まない 1 つのファイルにしてください" in result.text
+    assert not (worktree / "data").exists()
+
+
 def test_normal_when_metadata_mapped(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
