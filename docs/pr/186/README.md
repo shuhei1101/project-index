@@ -1,0 +1,1 @@
+# 手元のテストの実行を observability の pytest のプラグインで観測基盤へ送信する
