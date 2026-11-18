@@ -410,7 +410,9 @@ def test_write_docs_when_without_dates(
         schema_path="schemas/item.schema.yaml",
         write_dates=False,
     )
-    memos = DocumentTable(id="memos", paths=["memos/*.yaml"], schema_path="schemas/memo.schema.yaml")
+    memos = DocumentTable(
+        id="memos", paths=["memos/*.yaml"], schema_path="schemas/memo.schema.yaml"
+    )
     item_schema = {
         "type": "object",
         "additionalProperties": False,
@@ -474,12 +476,16 @@ def test_write_docs_when_without_dates(
     assert renamed.results[0].status == "renamed"
     assert memo_renamed.results[0].status == "renamed"
     assert text_replaced.results[0].status == "updated"
-    item_texts = [path.read_text(encoding="utf-8") for path in sorted((root / "items").glob("*.yaml"))]
+    item_texts = [
+        path.read_text(encoding="utf-8") for path in sorted((root / "items").glob("*.yaml"))
+    ]
     assert [("created:" in text, "updated:" in text) for text in item_texts] == [
         (False, False),
         (False, False),
     ]
-    assert "updated: '2026-11-18T10:00:00+00:00'" in (root / "memos/m2.yaml").read_text(encoding="utf-8")
+    assert "updated: '2026-11-18T10:00:00+00:00'" in (root / "memos/m2.yaml").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_write_docs_when_invalid(make_env: Callable[..., WriteEnv]) -> None:
