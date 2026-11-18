@@ -34,6 +34,8 @@ class DocumentTable:
     search: bool = True
     records: str | None = None
     body_file: str | None = None
+    # 偽なら Git 管理外の配信元でも、この行の文書を書き換えるときに `created`・`updated` を付けない
+    write_dates: bool = True
     metadata: dict[str, str] = field(default_factory=dict[str, str])
     exclude: list[str] = field(default_factory=list[str])
     alias_type: str | None = None

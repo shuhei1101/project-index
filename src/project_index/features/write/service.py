@@ -20,7 +20,11 @@ from project_index.features.documents.fields import (
     resolve_metadata,
     set_field,
 )
-from project_index.features.documents.loader import documents_from_text, resolve_body_path
+from project_index.features.documents.loader import (
+    documents_from_text,
+    lacks_body_file,
+    resolve_body_path,
+)
 from project_index.features.documents.store import DocumentStore, not_found_error
 from project_index.features.documents.types import Document
 from project_index.features.search.fields import known_fields
@@ -327,6 +331,11 @@ def _stamp(
     set_field(content, "updated", stamp)
 
 
+def _writes_dates(session: _Session, table: DocumentTable) -> bool:
+    """書き換える文書に `created`・`updated` を付けるか（Git 管理外で、種類の行が許すとき）。"""
+    return not session.target.source.is_git and table.write_dates
+
+
 def _records(file_map: CommentedMap, records: str) -> list[object]:
     """ファイルの内容から `records` の配列を返す。"""
     rows = get_field(file_map, records)
@@ -386,7 +395,7 @@ def _apply_existing(
     new_content = apply_operation(current, operation, schema=schema)
     if operation.op == "replace":
         new_content = CommentedMap(new_content)
-    if not session.target.source.is_git:
+    if _writes_dates(session, table):
         _stamp(new_content, operation.op, now, current)
     return document.path, _finish(table, new_content, container, document, text)
 
@@ -402,7 +411,7 @@ def _apply_create(
     path, append = new_document_path(table, doc_id)
     data = apply_operation(None, operation)
     set_field(data, table.metadata.get("id", "id"), doc_id)
-    if not session.target.source.is_git:
+    if _writes_dates(session, table):
         _stamp(data, "create", now, None)
     if append:
         text = session.text(path) if session.exists(path) else ""
@@ -514,11 +523,53 @@ def _check_body(operation: Operation, table: DocumentTable, existing: Document |
             for path in _body_paths(operation)
         )
     elif operation.op == "create":
-        violations.extend(_missing_body(operation, table))
+        violations.extend(_one_sided_body(operation, table, "data", operation.data or {}))
+    elif existing is not None and existing.body_path is None:
+        # 本文のファイルを持たない要素: 列の値と本文を同時に渡したときだけ本文のファイルを作る
+        item, given = _given(operation)
+        violations.extend(_one_sided_body(operation, table, item, given))
+        violations.extend(
+            Violation(
+                path=path,
+                rule=f"{existing.id} は本文のファイルを持たないため {BODY_KEY} を一部だけ書き換えられません",
+                fix=f"本文を作るときは set に {table.body_file} と {BODY_KEY} を指定してください",
+            )
+            for path in _body_paths(operation)
+            if path.startswith("text_edits[")
+        )
     elif existing is not None:
         violations.extend(_moved_body(operation, table.body_file, existing))
     if violations:
         raise _invalid(violations)
+
+
+def _given(operation: Operation) -> tuple[str, Mapping[str, Any]]:
+    """`update` は `set`、`create`・`replace` は `data` の (項目名, 値)。"""
+    if operation.op == "update":
+        return "set", operation.set
+    return "data", operation.data or {}
+
+
+def _one_sided_body(
+    operation: Operation, table: DocumentTable, item: str, given: Mapping[str, Any]
+) -> list[Violation]:
+    """`body_file` の列の値と `@body` の片方だけを渡したときの違反（両方とも無ければ本文なし）。"""
+    column = table.body_file or ""
+    has_column = not lacks_body_file(given, column)
+    has_body = BODY_KEY in given
+    # 本文だけ: 本文のファイルのパスが決まらない
+    if has_body and not has_column:
+        return [
+            Violation(
+                path=f"{item}.{column}",
+                rule=f"{BODY_KEY} を書くには本文のファイルのパス（{column}）が要ります",
+                fix=f"{item} に {column} を加えるか、{BODY_KEY} を除いてください",
+            )
+        ]
+    # 列の値だけ: 作る本文のファイルの中身が無い
+    if has_column and not has_body:
+        return _missing_body(operation, table, item)
+    return []
 
 
 def _misplaced_body(operation: Operation) -> list[Violation]:
@@ -540,25 +591,42 @@ def _misplaced_body(operation: Operation) -> list[Violation]:
     return violations
 
 
-def _missing_body(operation: Operation, table: DocumentTable) -> list[Violation]:
-    """`body_file` の行の `create` に本文が無いときの違反。"""
-    if BODY_KEY in (operation.data or {}):
+def _missing_body(operation: Operation, table: DocumentTable, item: str) -> list[Violation]:
+    """本文のファイルのパスを渡したのに本文が無いときの違反。"""
+    _, given = _given(operation)
+    if BODY_KEY in given:
         return []
     return [
         Violation(
-            path=f"data.{BODY_KEY}",
-            rule=f"{table.id} の文書の作成には本文（{BODY_KEY}）が要ります",
-            fix=f"data に {BODY_KEY} を加えてください",
+            path=f"{item}.{BODY_KEY}",
+            rule=f"{table.id} の本文のファイルの作成には本文（{BODY_KEY}）が要ります",
+            fix=f"{item} に {BODY_KEY} を加えるか、{table.body_file} を除いてください",
         )
     ]
 
 
 def _moved_body(operation: Operation, column: str, existing: Document) -> list[Violation]:
-    """`update`・`replace` で `body_file` の列の値を変えるときの違反。"""
-    item, given = (
-        ("set", operation.set) if operation.op == "update" else ("data", operation.data or {})
-    )
+    """`update`・`replace` で `body_file` の列の値を変える（除くことを含む）ときの違反。"""
+    item, given = _given(operation)
     current = get_field(existing.data, column)
+    # `unset` で列を除く: 本文のファイルを外す操作は無い
+    if operation.op == "update" and column in operation.unset:
+        return [
+            Violation(
+                path=f"unset.{column}",
+                rule=f"{column}（本文のファイルのパス）は除けません",
+                fix=f"unset から {column} を除いてください",
+            )
+        ]
+    # `replace` の data に列が無い: 置き換えで列が無くなる
+    if operation.op == "replace" and column not in given:
+        return [
+            Violation(
+                path=f"data.{column}",
+                rule=f"{column}（本文のファイルのパス）は除けません",
+                fix=f"data に今の値（{current}）の {column} を加えてください",
+            )
+        ]
     if column not in given or given[column] == current:
         return []
     return [
@@ -581,7 +649,11 @@ def _create_body(
     column = table.body_file
     if column is None:
         return {}
-    value = get_field(operation.data or {}, column)
+    _, given = _given(operation)
+    # 列の値も本文も無い: 本文のファイルを持たない要素のまま
+    if lacks_body_file(given, column) and BODY_KEY not in given:
+        return {}
+    value = get_field(given, column)
     body_path = resolve_body_path(path, value)
     if body_path is None or session.body_exists(body_path):
         rule = (
@@ -601,7 +673,7 @@ def _create_body(
         )
     body = apply_body(None, operation, index=index)
     if body is None:
-        msg = "create に本文がありません"
+        msg = "本文のファイルを作る操作に本文がありません"
         raise RuntimeError(msg)
     return {body_path: body}
 
@@ -618,7 +690,7 @@ def _diff(before: Document | None, after: Document, body: Mapping[str, str]) -> 
     lines = [element] if element else []
     lines += [
         f"@@ {after.body_path}",
-        diff_lines("" if before is None else before.body, after.body),
+        diff_lines("" if before is None or before.body_path is None else before.body, after.body),
     ]
     return "\n".join(lines)
 
@@ -941,12 +1013,12 @@ def _apply_existing_one(
         raise RuntimeError(msg)
     check_version(existing, operation.expected_version, last_read=last_reads.get(existing.id))
     _check_body(operation, table, existing)
-    new_body = (
-        apply_body(existing.body, operation, index=index)
-        if existing.body_path is not None
-        else None
-    )
-    body = {} if existing.body_path is None or new_body is None else {existing.body_path: new_body}
+    # 本文のファイルを持つ文書は本文を当て、持たない要素は列の値と本文があれば本文のファイルを作る
+    if existing.body_path is not None:
+        new_body = apply_body(existing.body, operation, index=index)
+        body = {} if new_body is None else {existing.body_path: new_body}
+    else:
+        body = _create_body(session, operation, table, existing.path, index)
     schema = checker.store.row_schema(session.target, existing.kind)
     path, text = _apply_existing(session, operation, existing, table, now, schema)
     new_document, unchecked = _check_and_commit(
@@ -1106,6 +1178,9 @@ def _plan_rename(
             rule,
             "new_path を除いてください",
         )
+    if table.body_file is not None and existing.body_path is None and operation.new_path is not None:
+        rule = f"{existing.id} は本文のファイルを持たないため new_path を受けません"
+        raise _rename_invalid(rule, "new_path を除いてください")
     if table.records is not None:
         moved = _plan_body_move(session, operation, table, existing)
         file_path = existing.path
@@ -1142,7 +1217,7 @@ def _renamed_content(
         base_dir=posixpath.dirname(existing.path),
         skip=_skip_columns(table),
     )
-    if not session.target.source.is_git:
+    if _writes_dates(session, table):
         _stamp(current, "update", now, None)
     return _finish(table, current, container, existing, text)
 
@@ -1198,7 +1273,7 @@ def _rewrite_referrers(
         if not changes:
             continue
         table = _writable(table, "id")
-        if not session.target.source.is_git:
+        if _writes_dates(session, table):
             _stamp(current, "update", now, None)
         new_text = _finish(table, current, container, document, text)
         new_document, unchecked = _check_and_commit(
@@ -1392,7 +1467,7 @@ def _apply_replace_text_one(
         count += found
         if count == 0:
             continue
-        if not session.target.source.is_git:
+        if _writes_dates(session, table):
             _stamp(current, "update", now, None)
         new_text = _finish(table, current, container, document, text)
         new_document, unchecked = _commit_replaced(

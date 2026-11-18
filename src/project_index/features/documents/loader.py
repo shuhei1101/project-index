@@ -64,6 +64,12 @@ def resolve_body_path(path: str, value: object) -> str | None:
     return relative
 
 
+def lacks_body_file(data: Mapping[str, Any], column: str) -> bool:
+    """`body_file` の行の要素が、本文のファイルを持たない要素か（列が無いか値が `None`・空の文字列）。"""
+    value = get_field(data, column)
+    return value is None or value == ""
+
+
 def _body_file(
     root: Path,
     path: str,
@@ -199,7 +205,9 @@ def _record_documents(
             continue
         data = cast("dict[str, Any]", record)
         body_path: str | None = None
-        if table.body_file is not None:
+        # 本文のファイルを持つ行で、要素が本文のファイルを指すか
+        if table.body_file is not None and not lacks_body_file(data, table.body_file):
+            # 指す: 本文のファイルを読み、無い・配信元の外を指すなら除く
             value = get_field(data, table.body_file)
             found = _body_file(root, path, value, read_body)
             if found is None:
@@ -214,6 +222,7 @@ def _record_documents(
             body_path, body = found
             fallback_id = body_path
         else:
+            # 本文のファイルを持たない行と要素: 要素を本文にする
             body = dump_roundtrip(record)  # type: ignore[arg-type]
             fallback_id = f"{path}#{index}"
         documents.append(
