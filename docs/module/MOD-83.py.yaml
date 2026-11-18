@@ -49,7 +49,7 @@ functions:
       type: tuple[str, bool]
       description: (配信元の直下からのパス, `records` の配列へ足すか)
     process: |-
-      1. `records` がある場合、`paths[0]` が glob を含まなければ `(paths[0], True)` とし、含めば違反にする
+      1. `records` がある場合、`paths[0]` が glob を含まなければ `(paths[0], True)` とし、`paths` が空か glob を含めば違反にする
       2. `records` が無い場合、`paths[0]` の最後の段の `*` を `doc_id` に置き換え、`**/` を除いたパスにする（例 `docs/**/*.yaml` → `docs/{doc_id}.yaml`）。glob を含まないパスは違反にする
       3. 決めたパスに文書の行.除外の名前に当たるかが `True` なら違反にする。当たらなければ返す
       4. 違反は `path` が `operations[{i}].kind` の `InvalidArgumentError` で送る。配置先を決められないときは `rule` が `{kind} の新しい文書の配置先を決められません`、`fix` が `records` を持つ行では `documents[].paths の先頭を glob を含まない 1 つのファイルにしてください`、持たない行では `documents[].paths の先頭を glob にしてください`、除外の名前に当たるときは `rule` が `配置先 {パス} が {kind} の exclude に該当します`、`fix` が `id を変えるか、documents[].exclude から削除してください`
