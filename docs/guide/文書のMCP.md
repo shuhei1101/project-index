@@ -114,7 +114,7 @@ rule-inject は、この `path` と `scope` で文書を既読にします。
 メタデータの `created`・`updated` は次の順で決めます。
 
 1. Git の履歴があれば、そのファイルの最初と最後のコミットの日時
-2. 無ければ、文書のメタデータの `created`・`updated`。Git 管理外の配信元と `storage.type: disk` の配信元では `write_docs` が付ける（`disk` の配信元は Git の履歴を使わず、この値だけを使う）
+2. 無ければ、文書のメタデータの `created`・`updated`。Git 管理外の配信元と `storage.type: disk` の配信元では `write_docs` が付ける（`disk` の配信元は Git の履歴を使わず、この値だけを使う）。書き換える文書の種類の `documents[].write_dates` が `false` なら付けない
 3. どちらも無ければ空。並べ替えでは末尾
 
 ### バージョン
@@ -316,6 +316,15 @@ YAML として読めないファイルがあっても、そのファイルを除
 
 本文のファイルのパスが配信元の外を指すとき・`create` で既にあるファイルを指すときは、`body_file` の列の違反で、要素も本文のファイルも書き込みません。
 `body_file` の列の値を変える操作と、`body_file` を持たない行の文書への `@body` は `InvalidArgumentError` です。
+
+`body_file` の列が無いか値が `null`・空の文字列の要素は、本文のファイルを持たない文書で、要素だけを書き換えます。
+
+| 操作 | 本文のファイルを持たない要素 |
+| --- | --- |
+| `create` | `data` に `body_file` の列と `@body` のどちらも無ければ要素だけを追加する。片方だけは違反 |
+| `update`・`replace` | `body_file` の列の値と `@body` を同時に指定したときだけ本文のファイルを作成する。片方だけは違反 |
+| `update` の `text_edits` | `field: @body` は違反 |
+| `rename` | `new_id` だけを受け付け、`new_path` は `InvalidArgumentError` |
 本文のファイルはスキーマ・`validators[]`・mdmark の点検に通しません。
 これらの文書の `version` は要素と本文のファイルの両方から求め、`diff` は要素の差分の行に続けて `@@ {本文のファイルのパス}` の行と本文のファイルの差分の行を並べます。
 
@@ -383,7 +392,7 @@ Git の配信元で消した文書は Git で戻せます。
 
 レスポンスは `applied` と `results[]`（`status` は `deleted`・`failed`）、`on_referenced: unlink` のときの `unlinked[]`（参照を外した文書の `id`・`version`）です。
 Git 管理外の配信元と `storage.type: disk` の配信元では、種類の `documents[].writable` が削除を許していることが要ります。
-`records`・`body_file` の行の文書は、本文のファイルも削除します。同じ管理用の YAML のほかの要素が同じ本文のファイルを指すときは残します。
+`records`・`body_file` の行の文書は、本文のファイルも削除します。同じ管理用の YAML のほかの要素が同じ本文のファイルを指すときは残します。本文のファイルを持たない要素は、要素だけを削除します。
 
 ## describe
 

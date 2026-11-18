@@ -42,7 +42,7 @@
 | --- | --- |
 | `missing_refs` | `metadata` に書いた列が無い文書の件数 |
 | `unindexed_files` | 管理用の YAML に無いファイルの件数。除外の条件（バイナリ・空のファイル・`*.local.*` の名前のファイル）・行の `exclude[]`・ほかの行の文書・より深いフォルダの管理用の YAML の範囲に当たるファイルと、名前が `.git` のファイルは数えない。Git の配信元（`storage.type` が `git`）では、Git が無視するファイルも数えない |
-| `missing_body_files` | ファイルが無い行の件数 |
+| `missing_body_files` | ファイルが無い行の件数。`body_file` の列の値があって指すファイルが無いか配信元の外を指す行を数え、列が無いか値が `null`・空の文字列の行は数えない |
 | `unresolved_related` | `related[].to` が配信元のどの文書の ID にも当たらない関連の件数。`source` を持つ関連は数えない。内訳は `{行の id}: {文書の id}: {to}` |
 | `duplicate_files` | 2 つ以上の有効な documents の行が文書にするファイルの件数。`records` の行の管理用の YAML 自体は数えない。内訳は `{ファイル}: {行の id}・{行の id}` |
 | `duplicate_ids` | ID が先の文書と重なり、配信から除外した文書の件数。別の行が `duplicate_files` に数えた同じファイルを文書にするものは数えない。内訳は `{文書の id}: {先の文書の行の id}（{ファイル}）・{除外した文書の行の id}（{ファイル}）` |
