@@ -11,10 +11,9 @@ use_cases:
     depends_on: []
   - kind: single
     scenario: docs/scenario/SC-4.yaml
-    impact: following
-    detail: 起動時の索引の同期で、ファイルが無い行に本文のファイルを持たない要素を数えなくなることに追随する
-    depends_on:
-      - docs/scenario/SC-6.yaml
+    impact: run_only
+    detail: 起動時の索引の同期が数えるファイルが無い行から、本文のファイルを持たない要素が外れる。シナリオの記述は変わらない
+    depends_on: []
   - kind: single
     scenario: docs/scenario/SC-11.yaml
     impact: run_only

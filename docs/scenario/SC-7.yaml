@@ -885,6 +885,83 @@ scenarios:
       - 文書 1 の `related` が n9 を指す
       - 改名の後の `check_project` の管理用の YAML に無いファイルに、`notes/n1.md`・`notes/n9.md` のどちらも出ない
     test: test_normal_when_rename_body_file
+  - name: 正常シナリオ（日時を付けない種類に Git 管理外の配信元で書く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 書ける配信元
+        description: '正常シナリオ（Git 管理外の配信元に書く）と同じ memo に、`documents[].write_dates: false` の種類 `items` を追加したもの'
+        notes: '`items` のスキーマは `additionalProperties: false` で、`created`・`updated` を持たない。memo のほかの種類は `write_dates` を省く'
+      - name: project-index
+        description: sample と memo を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（日時を付けない種類に Git 管理外の配信元で書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant MF as memo のフォルダ
+
+        A->>M: write_docs(source: memo, operations: create・kind items)
+        M->>M: items の write_dates が false なので、created・updated を付けずにスキーマと validators に通す
+        M->>MF: YAML を書く
+        M-->>A: id と version
+        A->>M: write_docs(source: memo, operations: update 作った文書・set)
+        M->>M: created・updated を付けずにスキーマと validators に通す
+        M->>MF: YAML を書く
+        M-->>A: 新しい version
+      ```
+
+      <!-- /map -->
+    expected:
+      - 'create と update の結果が `applied: true` で、`isError` にならない'
+      - memo のフォルダの作った文書の YAML が `created`・`updated` を持たない
+      - '`search_docs` の `fields: [id, created, updated]` が、作った文書の `created`・`updated` を空で返却する'
+      - '`write_dates` を省いた memo の種類への create は、正常シナリオ（Git 管理外の配信元に書く）と同じく `created`・`updated` を付ける'
+    test: test_normal_when_non_git_source_without_dates
+  - name: 正常シナリオ（本文のファイルを持たない要素を書く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 本文のファイルを持つ行
+        description: '正常シナリオ（本文のファイルを持つ文書を書く）と同じ行 `notes`（`notes/index.yaml`・`records: items`・`body_file: path`）。要素 n1 の `path` が `n1.md` で、要素 n3 は `path` の列を持たない'
+        notes: 行のスキーマは `path` を必須にしない
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` にワークツリー x のパスを指定する'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（本文のファイルを持たない要素を書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: write_docs(operations: create・kind notes・要素のキーだけ（本文のファイルのパスも本文も無し）)
+        M->>M: 本文のファイルを持たない要素として検査に通す
+        M->>WT: notes/index.yaml に要素 n4 を追加する（本文のファイルは作らない）
+        M-->>A: 作った文書の id と version
+        A->>M: write_docs(operations: update n3・set 要素のキー)
+        M->>WT: notes/index.yaml の n3 を書き換える
+        M-->>A: 新しい version と差分
+        A->>M: write_docs(operations: update n3・set 本文のファイルのパス n3.md と本文)
+        M->>WT: notes/index.yaml の n3 に path を追加し、notes/n3.md を作る
+        M-->>A: 新しい version と差分
+        A->>M: write_docs(operations: update n4・set 本文だけ)
+        M-->>A: エラー（添字 0・本文のファイルのパスが無いこと）
+      ```
+
+      <!-- /map -->
+    expected:
+      - create の後、ワークツリー x の `notes/index.yaml` に n4 の要素が `path` の列を持たずに加わり、`notes/` に本文のファイルが増えない
+      - n3 の `set` の後、`notes/index.yaml` の n3 だけが書き換わる
+      - '本文のファイルのパスと本文を同時に指定した update の後、n3 の要素が `path: n3.md` を持ち、`notes/n3.md` の内容が指定した本文になる。次の `search_docs` が n3 の本文としてその内容を返却する'
+      - '本文のファイルのパスを持たない n4 への本文だけの update は、`isError: true` で添字 0 の違反として本文のファイルのパスが無いことを返却し、ファイルは変わらない'
+      - 本文のファイルのパスだけを持ち本文を持たない create は、今どおり `@body` が無い違反を返却する
+    test: test_normal_when_body_file_absent_written
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 tags:
   - name: topic:文書

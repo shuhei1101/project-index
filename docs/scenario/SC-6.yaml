@@ -1037,6 +1037,42 @@ scenarios:
       - '`worktree` を渡した `list_changes` が、追加した文書に `N-1` を返す'
       - '`worktree` も省き `cwd` がクローン本体の `search_docs` は、`N-1` を返さない'
     test: test_normal_when_worktree_adds_row
+  - name: 正常シナリオ（本文のファイルを持たない要素を引く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+      - name: 本文のファイルを持つ行
+        description: "sample の `project-index.yaml` の行 `notes`（`paths: [notes/index.yaml]`・`records: items`・`body_file: path`）。`items[0]` の n1 は `path: n1.md` で `notes/n1.md` を指し、`items[1]` の n2 は `path` の列を持たず、`items[2]` の n3 は `path: ''`、`items[3]` の n4 と `items[4]` の n5 は無いファイル（`n4.md`・`n5.md`）を指す"
+        notes: n2 の `related` が n1 を指す。行のスキーマは `path` を必須にしない
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（本文のファイルを持たない要素を引く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant ST as 配信元の文書
+
+        A->>M: search_docs(filter: kind が notes, view: full)
+        M->>ST: notes/index.yaml を読み、items の要素ごとに文書にする
+        M->>M: path の列が無い・空の要素は、要素を本文にした文書にする
+        M->>M: 指すファイルが無い要素は配信から除き、ファイルと理由ごとに警告を 1 行にまとめる
+        M-->>A: n1・n2・n3 の文書と警告 1 行
+        A->>M: trace_related(from_ids: n2, direction: out)
+        M-->>A: n1
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`search_docs` が n1・n2・n3 の 3 件を返却し、n4・n5 を返却しない'
+      - n1 の本文は `notes/n1.md` の内容。n2・n3 の本文は要素を YAML に書き出した文字列で、`path` は `notes/index.yaml` の絶対パス
+      - 応答の `notes` に、`notes/index.yaml` の本文のファイルが無い要素の警告が、件数 2 と先頭の要素の詳細を持つ 1 行だけ入る。n2・n3 の警告は入らない
+      - '`trace_related` が n2 から n1 を返却する'
+      - 管理の MCP の `check_project` のファイルが無い行に、n4・n5 だけが入り、n2・n3 は入らない
+    test: test_normal_when_body_file_absent
 lead: エージェントが文書の MCP で、作業場所から使用できる配信元の文書を探して参照するシナリオを定め、調査の流れを変えるときに参照する。
 tags:
   - name: topic:クエリ
