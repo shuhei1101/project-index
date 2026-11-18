@@ -647,6 +647,79 @@ def test_normal_when_files_index(
     assert "'files' is a required property" not in everything.text
 
 
+ABSENT_ROW = (
+    "  - id: notes\n"
+    "    paths: [notes/index.yaml]\n"
+    "    schema: schemas/notes.schema.yaml\n"
+    "    records: items\n"
+    "    body_file: path\n"
+)
+ABSENT_SCHEMA = (
+    "type: object\n"
+    "properties:\n"
+    "  items:\n"
+    "    type: array\n"
+    "    items:\n"
+    "      type: object\n"
+    "      properties:\n"
+    "        id: {type: string}\n"
+    "        path: {type: string}\n"
+)
+ABSENT_INDEX = (
+    "items:\n"
+    "  - id: n1\n    path: n1.md\n"
+    "  - title: 本文なし\n"
+    "  - id: n3\n    path: ''\n"
+    "  - id: n4\n    path: n4.md\n"
+    "  - id: n5\n    path: n5.md\n"
+)
+
+
+def test_normal_when_body_file_absent(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """`body_file` の列が無い・空の要素を要素を本文にした文書として返し、無いファイルの知らせを 1 行にまとめる（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "project-index.yaml": sample_config_text(ABSENT_ROW),
+            "schemas/notes.schema.yaml": ABSENT_SCHEMA,
+            "notes/index.yaml": ABSENT_INDEX,
+            "notes/n1.md": "# n1\n",
+        }
+    )
+    source = make_source("sample", files)
+    env = make_server(source)
+    # 実行
+    result = env.call(
+        "search_docs",
+        cwd=str(source.folder),
+        filter={"field": "kind", "op": "eq", "values": ["notes"]},
+        view="full",
+        format="json",
+    )
+    # 検証
+    items = {item["id"]: item for item in result.data["items"]}
+    index_path = f"{source.folder}/notes/index.yaml"
+    loading = [note for note in result.data["notes"] if "notes/index.yaml" in note]
+    assert not result.is_error
+    assert sorted(items) == ["n1", "n3", "notes/index.yaml#1"]
+    assert items["n1"]["values"]["body"] == "# n1\n"
+    assert items["n1"]["path"] == f"{source.folder}/notes/n1.md"
+    assert items["notes/index.yaml#1"]["values"]["body"] == "title: 本文なし\n"
+    assert items["notes/index.yaml#1"]["values"]["name"] == "notes/index.yaml#1"
+    assert items["n3"]["values"]["body"] == "id: n3\npath: ''\n"
+    assert [items[key]["path"] for key in ("notes/index.yaml#1", "n3")] == [index_path] * 2
+    assert [items[key]["scope"] for key in ("notes/index.yaml#1", "n3")] == ["section"] * 2
+    assert len(loading) == 1
+    assert loading[0].startswith(
+        "notes/index.yaml の 2 件を読み込めないので除きました（先頭: items[3]"
+    )
+
+
 def test_normal_when_file_unreadable(
     make_source: Callable[..., Any], make_server: Callable[..., Any]
 ) -> None:
