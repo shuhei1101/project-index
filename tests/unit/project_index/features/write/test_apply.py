@@ -552,9 +552,68 @@ def test_apply_operation_when_text_edit_ref_path_unresolved() -> None:
         text_edits=[TextEdit(field="#functions[missing].process", old="a", new="b")],
     )
     # 実行・検証
-    with pytest.raises(InvalidArgumentError) as exc_info:
+    with pytest.raises(InvalidArgumentError, match="操作を適用できません") as exc_info:
         apply_operation(current, operation, schema=_FUNCTIONS_SCHEMA)
-    assert exc_info.value.violations[0].path == "text_edits[0].field"
+    violation = exc_info.value.violations[0]
+    assert violation.path == "text_edits[0].field"
+    _assert_field_fix(violation.fix)
+
+
+def _assert_field_fix(fix: str) -> None:
+    """`text_edits[{n}].field` の違反の `fix` が、項目のパスの指し方の 3 つの案内を持つことを確認する。"""
+    # `x-key` の値で指す書き方
+    assert "#functions[save].process" in fix
+    # 位置で指す書き方
+    assert "flows[35].expected[2]" in fix
+    # 配列・オブジェクトそのものを書き換える操作
+    assert "`set`・`add_to`・`remove_from`" in fix
+
+
+def _functions_content() -> dict[str, Any]:
+    """`x-key` の配列 `functions` が `load`・`save`・`save` の内容を返却する。"""
+    return {
+        "functions": [
+            {"name": "load", "process": "a書き出す"},
+            {"name": "save", "process": "a書き出す"},
+            {"name": "save", "process": "a書き出す"},
+        ]
+    }
+
+
+def test_apply_operation_when_text_edit_not_string() -> None:
+    """文字列でない項目を指す（異常系）。"""
+    # 準備
+    operation = Operation(
+        op="update",
+        id="doc-1",
+        expected_version="v1",
+        text_edits=[TextEdit(field="functions[save].process", old="書き出す", new="保存する")],
+    )
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError, match="操作を適用できません") as exc_info:
+        apply_operation(_functions_content(), operation, schema=_FUNCTIONS_SCHEMA)
+    violation = exc_info.value.violations[0]
+    assert violation.path == "text_edits[0].field"
+    assert violation.rule == "文字列ではない項目は置き換えられません"
+    _assert_field_fix(violation.fix)
+
+
+def test_apply_operation_when_text_edit_path_invalid() -> None:
+    """# で始まらない項目のパスの記載方法の誤り（異常系）。"""
+    # 準備
+    operation = Operation(
+        op="update",
+        id="doc-1",
+        expected_version="v1",
+        text_edits=[TextEdit(field="functions[send-form].process", old="書き出す", new="保存する")],
+    )
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError, match="操作を適用できません") as exc_info:
+        apply_operation(_functions_content(), operation, schema=_FUNCTIONS_SCHEMA)
+    violation = exc_info.value.violations[0]
+    assert violation.path == "text_edits[0].field"
+    assert "記載方法が誤っています" in violation.rule
+    _assert_field_fix(violation.fix)
 
 
 _MODELS_SCHEMA: dict[str, Any] = {
