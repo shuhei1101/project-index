@@ -1,0 +1,14 @@
+観測基盤への到着の確認:
+  説明: 書き換えた TL-1 の run_all（`~/repo/observability` を指す）を手元で 1 回回し、テストの実行が観測基盤へ届くことを確かめる。observability の pytest のプラグイン（shuhei1101/observability#113）が master へ入って `~/repo/observability` に取り込まれ、WSL の側の収集のコレクター（127.0.0.1:14317）が起動していることが前提
+  タグ: [送信の確認]
+  実行者: planner
+  時期: マージの前
+  回数: 1 回限り
+  可逆: true
+  疎通確認: 観測基盤への到着の確認/疎通確認.sh
+  実行: 観測基盤への到着の確認/実行.sh
+  確認: 観測基盤への到着の確認/確認.sh
+  切り戻し: null
+  失敗時: 前提確認の failed は前提がそろうまで待つ。単体テストの実行と送信の failed は 1 回だけ流し直し、2 回連続で失敗したら原因を調べて依頼元へ返す
+  確認方法: Prometheus（127.0.0.1:9090）の `test_session_duration_seconds{repository="project-index"}` が 1 つ以上の系列を返す
+  状態: 未
