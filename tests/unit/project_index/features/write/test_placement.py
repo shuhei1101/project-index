@@ -95,3 +95,21 @@ def test_new_document_path_when_no_glob() -> None:
         new_document_path(table, "sample-doc")
     assert exc_info.value.violations[0].path == "kind"
     assert exc_info.value.violations[0].fix == "documents[].paths の先頭を glob にしてください"
+
+
+def test_new_document_path_when_filename_glob_remains() -> None:
+    """records を持たない行で置き換えた後のファイル名に glob が残るため配置先を決められない（異常系）。"""
+    # 準備
+    table = DocumentTable(
+        id="sample", paths=["docs/*-*.yaml"], schema_path="schemas/rule.schema.yaml"
+    )
+    # 実行・検証
+    with pytest.raises(
+        InvalidArgumentError, match="sample の新しい文書の配置先を決められません"
+    ) as exc_info:
+        new_document_path(table, "sample-doc")
+    assert exc_info.value.violations[0].path == "kind"
+    assert (
+        exc_info.value.violations[0].fix
+        == "documents[].paths の先頭のファイル名の glob を * の 1 つだけにしてください"
+    )
