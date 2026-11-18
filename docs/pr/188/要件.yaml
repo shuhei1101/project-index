@@ -7,5 +7,5 @@ use_cases:
 docs: []
 scope_out:
   - item: 'records を持たない行で、paths の先頭の最後の段の * を 1 つ ID に置き換えた後のファイル名に glob が残るとき（例: docs/*-*.yaml）の修正案'
-    reason: 今の修正案（先頭を glob にしてください）は既に glob の先頭に対して的外れになる。同じ _undecided の修正で分けられるが、起点 Issue は records を持たない行の修正案を変えないと書いているため、含めるかは判断が分かれる。現時点の判断は、同じ関数の同じ型の誤りなので含める（ファイル名の段に * を 1 つだけ置く旨の修正案にする）
-    plan: to_file
+    reason: '起点 Issue #187 が records を持たない行の修正案を変えないと記載しており、含めると要件の追加になるため、reviewer の判断でこの PR に含めない'
+    plan: '#189'
