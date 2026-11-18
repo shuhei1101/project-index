@@ -50,6 +50,14 @@ def _set(content: MutableMapping[str, Any], path: str, value: object) -> None:
 # 本文のファイルの内容を受けるキー（`data`・`set` のキーと `text_edits[].field`）
 BODY_KEY = "@body"
 
+# `text_edits[].field` が文字列の項目を指せないときの、項目のパスの指し方の案内
+TEXT_EDIT_FIELD_FIX = (
+    "通る配列が全て x-key を持つときは `#` で始めて x-key の値で指し（`#functions[save].process`）、"
+    "x-key を持たない配列を 1 つでも通るときは `#` を付けずに全ての配列を位置で指してください"
+    "（`flows[35].expected[2]`）。"
+    "配列・オブジェクトそのものは text_edits ではなく `set`・`add_to`・`remove_from` で書き換えてください"
+)
+
 
 def _violation(path: str, rule: str, fix: str = "") -> Violation:
     """操作を当てられない違反 1 件を作る。"""
@@ -194,11 +202,18 @@ def _text_edits(
         try:
             text, write = _edit_target(content, edit.field, schema)
         except InvalidArgumentError as error:
-            violations.extend(_violation(f"{prefix}.field", item.rule) for item in error.violations)
+            # 項目のパスを解けない: 理由はそのままに、指し方の案内を添える
+            violations.extend(
+                _violation(f"{prefix}.field", item.rule, TEXT_EDIT_FIELD_FIX)
+                for item in error.violations
+            )
             continue
+        # 指した値が文字列でない（配列・オブジェクト・無い項目）: 指し方の案内を添える
         if not isinstance(text, str):
             violations.append(
-                _violation(f"{prefix}.field", "文字列ではない項目は置き換えられません")
+                _violation(
+                    f"{prefix}.field", "文字列ではない項目は置き換えられません", TEXT_EDIT_FIELD_FIX
+                )
             )
             continue
         mismatch = _old_violation(text, edit, prefix)
