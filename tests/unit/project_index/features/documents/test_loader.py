@@ -9,6 +9,7 @@ from project_index.features.documents import loader as loader_module
 from project_index.features.documents.loader import (
     collect_files,
     documents_from_text,
+    lacks_body_file,
     load_file,
     resolve_body_path,
 )
@@ -239,6 +240,63 @@ def test_documents_from_text_when_body_file_version(tmp_path: Path) -> None:
     # 検証
     assert first[0].version != second[0].version
     assert records[0].version == value_hash({"path": "a.md"})
+
+
+def test_documents_from_text_when_body_file_absent(
+    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+) -> None:
+    """本文のファイルを持たない要素（正常系）。"""
+    # 準備
+    write_files(tmp_path, {"notes/a.md": "本文 a\n"})
+    text = "items:\n  - path: a.md\n  - title: b\n  - path: ''\n  - path: none.md\n  - path: 3\n"
+    table = DocumentTable(
+        id="notes",
+        paths=["notes/index.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        records="items",
+        body_file="path",
+    )
+    # 実行
+    documents, problems = documents_from_text(
+        text, tmp_path, "notes/index.yaml", table, source_id="sample"
+    )
+    # 検証
+    assert [doc.record_index for doc in documents] == [0, 1, 2]
+    assert [doc.body_path for doc in documents] == ["notes/a.md", None, None]
+    assert [doc.body for doc in documents[1:]] == ["title: b\n", "path: ''\n"]
+    assert [doc.id for doc in documents[1:]] == ["notes/index.yaml#1", "notes/index.yaml#2"]
+    assert [doc.metadata["name"] for doc in documents[1:]] == [
+        "notes/index.yaml#1",
+        "notes/index.yaml#2",
+    ]
+    assert [doc.version for doc in documents[1:]] == [
+        value_hash({"title": "b"}),
+        value_hash({"path": ""}),
+    ]
+    assert [(problem.reason, problem.detail.split(" ")[0]) for problem in problems] == [
+        ("missing_body_file", "items[3]"),
+        ("missing_body_file", "items[4]"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        pytest.param({}, True, id="no_column"),
+        pytest.param({"path": None}, True, id="null"),
+        pytest.param({"path": ""}, True, id="empty"),
+        pytest.param({"path": "a.md"}, False, id="value"),
+        pytest.param({"path": 3}, False, id="not_string"),
+    ],
+)
+def test_lacks_body_file(data: dict[str, object], expected: bool) -> None:
+    """列の有無と値（正常系）。"""
+    # 準備
+    column = "path"
+    # 実行
+    result = lacks_body_file(data, column)
+    # 検証
+    assert result is expected
 
 
 @pytest.mark.parametrize(

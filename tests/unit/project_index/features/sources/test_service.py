@@ -159,6 +159,24 @@ def test_validate_source_config_when_body_file_without_records(source_root: Path
     ]
 
 
+def test_validate_source_config_when_write_dates(source_root: Path) -> None:
+    """`write_dates` の型（正常系）。"""
+    # 準備
+    row = {
+        "id": "rules",
+        "paths": ["docs/rule/*.yaml"],
+        "schema": "schemas/rule.schema.yaml",
+    }
+    valid = _config_value(documents=[{**row, "write_dates": False}])
+    invalid = _config_value(documents=[{**row, "write_dates": "no"}])
+    # 実行
+    valid_result = validate_source_config(valid, root=source_root)
+    invalid_result = validate_source_config(invalid, root=source_root)
+    # 検証
+    assert valid_result == []
+    assert [v.path for v in invalid_result] == ["documents[0].write_dates"]
+
+
 def test_validate_source_config_when_outside_root(source_root: Path) -> None:
     """配信元の外を指す（正常系）。"""
     # 準備
