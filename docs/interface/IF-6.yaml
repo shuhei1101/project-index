@@ -1951,7 +1951,7 @@ constraints:
     constraint: '`add_to` のキーを解決した配列のスキーマ（`$ref` を解決した後）が `x-key` を持つときも、指定した要素を既にある要素の `x-key` の値と照合せずに末尾へ追加する。既にある要素と同じ `x-key` の値の要素も違反にせず追加し、同じ値の要素が複数になる（2 つ目以降は参照の型の項目のパスの `[{値}#{順番}]` で指す）'
     notes: 要素を置き換えるときは、1 つの `update` の `remove_from` に置き換える要素の `x-key` の値を、`add_to` に置き換えた後の要素を指定する（制約「1 つの操作の中の適用順」で削除してから追加するので、置き換えた要素は配列の末尾に移る）。`x-key` の値で指すと同じ値の要素を全て削除するので、同じ値の要素のうち 1 つだけを置き換えるときは、`remove_from` に置き換える要素のオブジェクトを指定する。配列全体を置き換えるときは `set` を使用する
   - item: text_edits の field の違反の修正方法
-    constraint: '`text_edits[{n}].field` の違反（項目のパスを解決できない・指した項目が文字列でない）の `fix` は、`x-key` を持つ配列の要素は `#` で始めて `x-key` の値で指す（`#functions[save].process`）こと、`x-key` を持たない配列の要素は `#` を付けずに位置で指す（`steps[0].body`）こと、配列・オブジェクトそのものは `text_edits` ではなく `set`・`add_to`・`remove_from` で書き換えることを案内する。違反になる条件と `rule`・`path` は変えない'
+    constraint: '`text_edits[{n}].field` の違反（項目のパスを解決できない・指した項目が文字列でない）の `fix` は、通る配列が全て `x-key` を持つときは `#` で始めて `x-key` の値で指す（`#functions[save].process`）こと、`x-key` を持たない配列を 1 つでも通るときは `#` を付けずに全ての配列を位置で指す（`flows[35].expected[2]`）こと、配列・オブジェクトそのものは `text_edits` ではなく `set`・`add_to`・`remove_from` で書き換えることを案内する。違反になる条件と `rule`・`path` は変えない'
     notes: '`set`・`unset`・`add_to`・`remove_from` と `search_docs` の項目のパスの違反には付けない'
 refs:
   - to: SC-7
