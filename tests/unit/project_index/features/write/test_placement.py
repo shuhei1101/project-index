@@ -113,3 +113,38 @@ def test_new_document_path_when_filename_glob_remains() -> None:
         exc_info.value.violations[0].fix
         == "documents[].paths の先頭のファイル名の glob を * の 1 つだけにしてください"
     )
+
+
+def test_new_document_path_when_recursive_folder() -> None:
+    """フォルダの階層が `**` だけで `paths` に当たる配置先は、ID がファイル名に入らなくても返却する（正常系）。"""
+    # 準備
+    table = DocumentTable(
+        id="sample", paths=["docs/**/index.yaml"], schema_path="schemas/rule.schema.yaml"
+    )
+    # 実行
+    result = new_document_path(table, "sample-doc")
+    # 検証
+    assert result == ("docs/index.yaml", False)
+
+
+@pytest.mark.parametrize(
+    "first",
+    [
+        pytest.param("docs/*/README.md", id="no-star-in-filename"),
+        pytest.param("docs/*/*.yaml", id="star-in-filename"),
+    ],
+)
+def test_new_document_path_when_outside_paths(first: str) -> None:
+    """records を持たない行で決めたパスが paths に当たらないため配置先を決められない（異常系）。"""
+    # 準備
+    table = DocumentTable(id="sample", paths=[first], schema_path="schemas/rule.schema.yaml")
+    # 実行・検証
+    with pytest.raises(
+        InvalidArgumentError, match="sample の新しい文書の配置先を決められません"
+    ) as exc_info:
+        new_document_path(table, "sample-doc")
+    assert exc_info.value.violations[0].path == "kind"
+    assert (
+        exc_info.value.violations[0].fix
+        == "documents[].paths の先頭のフォルダの階層の glob を ** にしてください"
+    )
