@@ -131,7 +131,7 @@ functions:
       description: 検索の結果
     process: |-
       1. 読む場所を解く（読む場所の解決。`source`・`ref`・`worktree`・`cwd`・`outside_scope`）。結果の `outside_scope` は読んだ場所のどれかが作業範囲の外なら `True`
-      2. 場所ごとに文書を集める（文書のストア.文書を集める）。`problems` は `notes` に `{path} を読み込めないので除きました（{detail}）` で足す
+      2. 場所ごとに文書を集める（文書のストア.文書を集める）。`problems` は `path` と `reason` の組ごとに最初に出た順でまとめ、件数が 1 なら `{path} を読み込めないので除きました（{detail}）`、2 以上なら `{path} の {件数} 件を読み込めないので除きました（先頭: {先頭の detail}）` で `notes` に足す
       3. 有効な文書の行ごとの文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）で使える項目を作り、条件の確かめをする
          - 違反がある場合、違反と `describe(source, kind)` でスキーマを見ることを添えた `InvalidArgumentError` を送る
       4. `limit` が `LIMIT_MAX` を超えれば丸め、`max_chars` が `MAX_CHARS_LIMIT` を超えれば丸めて、それぞれ `notes` で知らせる。`limit` が 1 未満なら `InvalidArgumentError` を送る
@@ -305,6 +305,12 @@ functions:
         condition: '行 `notes`（`records: files`、`schema` が `templates/files.schema.yaml` のコピーの `files.items.properties` に `owner: {type: string}` を追加したもの）に要素 `{path: a.md, owner: alice}`・`{path: b.md, owner: bob}`、`filter` が `owner = alice`'
         mock: なし
         expected: '`a.md` の要素 1 件で、`InvalidArgumentError` を送らない'
+      - name: test_search_docs_when_problems_grouped
+        case: 正常
+        summary: 同じファイルの同じ理由の読み込みの誤りをまとめる
+        condition: '`records: items`・`body_file: path` の行の `notes/index.yaml` の要素のうち 3 件が無いファイルを指し、別のファイル `docs/b.yaml` が YAML として読めない'
+        mock: なし（一時フォルダの配信元）
+        expected: '`notes` の読み込みの知らせが 2 行で、`notes/index.yaml の 3 件を読み込めないので除きました（先頭: ...）` と `docs/b.yaml を読み込めないので除きました（...）`'
 refs:
   - to: IF-2
     type: requires
