@@ -249,7 +249,7 @@ functions:
          - `replace_text` の場合、`filter` を検索の条件の確かめで確かめ、今の文書のうち条件の照合に当たる書き込みを許す種類の文書ごとに、`fields` から `@body` を除いて列名への読み替えにかけて文字列の値の置換（`skip` は ID の列と `body_file` の列。`fields` が `@body` だけのときは空の並び）を当てる。`fields` が無いか `@body` を含み、本文のファイルの拡張子が `.md` で、同じ本文のファイルを前に扱っていなければ、書く予定の内容で読んだ本文を本文の置換にかけ、件数を足して置換した本文を本文のファイルのパス → 本文で持つ。件数が 0 の文書は飛ばす。Git 管理外の配信元では、置換した文書の種類の行の `write_dates` が真なら `updated` に `now` を入れる。置換した文書を検査し、1 件でも違反があれば違反に文書の `id` を添えてその操作全体を `failed` にし、どの文書の変更も持たない。結果は置換した文書ごとの `updated`（`count` つき）の行を同じ添字で並べる
          - `update`・`replace` の場合、文書が無ければ近い ID を添えた `DocumentNotFoundError`。バージョンの確かめ（前回読んだ内容は会話の記録）。Git 管理外の配信元で、文書の種類の行の `write_dates` が真なら `updated` に `now` を入れ、`replace` は `created` を引き継ぐ
          - 操作を、`create` は `kind` の行、`update`・`replace` は文書の種類の行で、オブジェクトの配列への書き戻し（`update` は今の内容を渡す）にかけてから列名への読み替えにかける。`create` の ID は行の `metadata.id` の列（無ければ `id`）に入れる
-         - `@body` を受け付けるかを確かめる。種類の行が `body_file` を持たない文書への `@body`、`unset`・`add_to`・`remove_from` の `@body`、`body_file` の行の `create` で `data` に `body_file` の列と `@body` の片方だけがあること（列だけは `data.@body`、`@body` だけは `data.{列}` の違反。どちらも無ければ本文のファイルを持たない要素を作る）、本文のファイルを持つ文書への `update`・`replace` で `body_file` の列の値が今の値と違うこと（`unset` で列を外すことと、`replace` の `data` に列が無いことを含む）、本文のファイルを持たない要素（『本文のファイルを持たない要素の判定』）への `update`・`replace` で列の値と `@body` の片方だけを渡すこと（`create` と同じ違反）と `text_edits` の `field: @body`（`text_edits[{n}].field` の違反）は、添字つきの違反で `InvalidArgumentError` にする
+         - `@body` を受け付けるかを確かめる。種類の行が `body_file` を持たない文書への `@body`、`unset`・`add_to`・`remove_from` の `@body`、`body_file` の行の `create` で `data` に `body_file` の列と `@body` の片方だけがあること（列だけは `data.@body`、`@body` だけは `data.{列}` の違反。どちらも無ければ本文のファイルを持たない要素を作る）、本文のファイルを持つ文書への `update`・`replace` で `body_file` の列の値が今の値と違うこと（`unset` で列を外すことと、`replace` の `data` に列が無いことを含む）、本文のファイルを持たない要素（『本文のファイルを持たない要素の判定』）への `update`・`replace` で列の値と `@body` の片方だけを渡すこと（`create` と同じ違反）と `text_edits` の `field: @body`（`text_edits[{n}].field` の違反）は、添字つきの違反で `InvalidArgumentError` にする。列の有無と値は、`update` の `set`・`unset` は項目のパスのキーの一致で、`create`・`replace` の `data` は項目のパスをたどって決める
          - `body_file` の行の文書は、本文の適用（`current_body` は `update`・`replace` が今の文書の本文、`create` が `None`）で新しい本文を求める。本文のファイルを持たない要素は、`create` と、列の値と `@body` を持たない `update`・`replace` では新しい本文を持たず、列の値と `@body` を持つ `update`・`replace` は `create` と同じく本文のファイルを作る。本文のファイルのパスは文書のストアの本文のファイルのパスの解決で解き、`create`（本文のファイルを作る `update`・`replace` を含む）で `None`（配信元の外）か、作業ツリーに既にあるファイル・同じ呼び出しの前の `create` が作る本文のファイルなら、`path` が `body_file` の列名の違反を `failed` の行に入れる（手順 6 では `ValidationFailedError` として送る）。新しい本文は、本文のファイルのパス → 本文で持ち、後の操作が同じ本文のファイルに当たるときは当てた後の本文に重ねる
          - 操作を当てる。`records` の文書は配列の要素を、それ以外はファイルの内容を置き換える。`update`・`replace` は文書のストアの `row_schema` で引いた種類の 1 文書のスキーマを `schema` に渡す
          - 変更を当てた後のファイルの内容を往復編集の書き出し（`original` は、既にあるファイルに当てるときはそのファイルの作業ツリーの文字列、新しいファイルを作る `create` は `None`）で文字列にし、文字列からの文書の組み立て（`read_body` は、新しい本文を持つ本文のファイルならその本文、無ければ作業ツリーのファイルを返す）で文書にして、文書の検査.検査する（`on="write"`、`create` は `new=True`、`deadline` は `limits` があれば `limits.write_deadline`）。違反はスキーマの説明の添付にかけ（スキーマは文書のストア.文書に当てるスキーマ）、添字を付けて `failed` の行に入れる。添字を付けるときは `schema` を保つ
@@ -473,6 +473,18 @@ functions:
         condition: '同じ行で、`data: {id: n6, @body: x}` の `create`、本文のファイルを持たない n3 への `set: {@body: x}`・`set: {path: n3.md}`・`text_edits: [{field: @body}]`・`new_path`、本文のファイルを持つ n1 への `unset: [path]` と `path` の無い `data` の `replace` を 1 件ずつ'
         mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: 7 件とも `InvalidArgumentError` で、違反の `path` が `data.path`・`set.path`・`set.@body`・`text_edits[0].field`・`new_path`・`unset.path`・`data.path`。ファイルは変わらない
+      - name: test_write_docs_when_nested_body_file
+        case: 正常
+        summary: 入れ子の `body_file` の列の置き換え・更新・本文の付与
+        condition: '`body_file: meta.path` の行で、本文のファイルを持つ n1（`meta: {path: n1.md}`）と持たない n3。n1 の `data: {id: n1, meta: {path: n1.md}, title: t}` の `replace`、n1 の `set: {meta.path: n1.md, title: u}`、n3 の `set: {meta.path: n3.md, @body: 本文}` を順に呼ぶ'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        expected: 3 件とも通り、n1 の `title` が `u`、`notes/n3.md` が作られ、`notes/n1.md` は変わらない
+      - name: test_write_docs_when_nested_body_file_rejected
+        case: 異常
+        summary: 入れ子の `body_file` の列を除く・片方だけを渡す操作
+        condition: '同じ行で、n1 への `data: {id: n1}` の `replace`・`unset: [meta.path]`、n3 への `set: {@body: x}` を 1 件ずつ'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        expected: 3 件とも `InvalidArgumentError` で、違反の `path` が `data.meta.path`・`unset.meta.path`・`set.meta.path`。管理用の YAML は変わらない
   - name: delete_docs
     title: 文書の削除
     kind: 関数
