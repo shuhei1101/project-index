@@ -235,7 +235,7 @@ response:
     description: 管理用の YAML に無いファイルの件数。除外の条件に当たるファイルと、ほかの documents の行の文書になるファイルは数えない（`check_project` と同じ）
   - name: sources[].sync.missing_body_files
     type: int
-    description: ファイルが無い行の件数（`check_project` と同じ。`body_file` の列が無いか空の要素は数えない）
+    description: ファイルが無い行の件数（`check_project` と同じ。`body_file` の列が無いか値が `null`・空の文字列の要素は数えない）
   - name: sources[].sync.unresolved_related
     type: int
     description: '`related[].to` が配信元のどの文書の ID にも当たらない関連の件数（`check_project` と同じ）'

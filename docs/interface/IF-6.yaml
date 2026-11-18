@@ -2079,7 +2079,7 @@ constraints:
     constraint: 'Git 管理外の配信元と `storage.type: disk` の配信元では、書き換える文書（`create`・`update`・`replace`・`rename` の対象と、改名の参照元・`replace_text` で書き換える文書）に `created`・`updated` を付けてから検査する。付けるかは、操作の対象でなく書き換える文書の種類の `documents[].write_dates`（省くと `true`）で決める。`false` の種類の文書には付けず、既にある `created`・`updated` の値も書き換えない'
     notes: Git の配信元では `write_dates` に関わらず付けない
   - item: 本文のファイルを持たない要素
-    constraint: '`records`・`body_file` の行で `body_file` の列が無いか空の要素は、`body_file` を持たない `records` の行の文書と同じく要素だけを書き換える。`create` は `data` に `body_file` の列と `@body` のどちらも無ければ要素だけを追加し、`@body` だけがあれば `body_file` の列の違反、`body_file` の列だけがあれば `@body` の違反にする。`update`・`replace` は `body_file` の列の値と `@body` を同時に指定したときだけ本文のファイルを作成し（「本文のファイルの検査」の `create` と同じ検査）、`@body` だけは `body_file` の列の違反、`body_file` の列の値だけは `@body` の違反にする。`text_edits` の `field: @body` は、本文のファイルが無いことを決まりにした `text_edits[{n}].field` の違反にする。`rename` は `new_id` だけを受け、`new_path` は引数の誤りにする。どの操作も本文のファイルを削除・移動しない'
+    constraint: '`records`・`body_file` の行で `body_file` の列が無いか値が `null`・空の文字列の要素は、`body_file` を持たない `records` の行の文書と同じく要素だけを書き換える。`create` は `data` に `body_file` の列と `@body` のどちらも無ければ要素だけを追加し、`@body` だけがあれば `body_file` の列の違反、`body_file` の列だけがあれば `@body` の違反にする。`update`・`replace` は `body_file` の列の値と `@body` を同時に指定したときだけ本文のファイルを作成し（「本文のファイルの検査」の `create` と同じ検査）、`@body` だけは `body_file` の列の違反、`body_file` の列の値だけは `@body` の違反にする。`text_edits` の `field: @body` は、本文のファイルが無いことを決まりにした `text_edits[{n}].field` の違反にする。`rename` は `new_id` だけを受け、`new_path` は引数の誤りにする。どの操作も本文のファイルを削除・移動しない'
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]

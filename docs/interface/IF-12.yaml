@@ -663,7 +663,7 @@ response:
     description: 管理用の YAML に無いファイルの件数。除外の条件（バイナリ・空のファイル・`*.local.*` の名前のファイル）に当たるファイルと、Git の配信元で Git が無視するファイルは数えない
   - name: sync.missing_body_files
     type: int
-    description: ファイルが無い行の件数。`body_file` の列の値があって指すファイルが無いか配信元の外を指す要素を数え、列が無いか空の要素は数えない
+    description: ファイルが無い行の件数。`body_file` の列の値があって指すファイルが無いか配信元の外を指す要素を数え、列が無いか値が `null`・空の文字列の要素は数えない
   - name: sync.items[]
     type: list[SyncItem]
     description: 件数の内訳（種類とパス）
