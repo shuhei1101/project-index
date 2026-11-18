@@ -1,0 +1,1 @@
+# write_docs の text_edits の field の違反に、# で始まる参照の型の項目のパスと位置での指し方を案内する fix を付ける
