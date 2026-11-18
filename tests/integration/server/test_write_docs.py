@@ -591,6 +591,144 @@ def test_normal_when_non_git_source(
     assert str(second["updated"]) > str(first["updated"])
 
 
+ITEMS_ROWS = (
+    "  - id: items\n"
+    "    paths: [items/*.yaml]\n"
+    "    schema: schemas/items.schema.yaml\n"
+    "    write_dates: false\n"
+    "  - id: memos\n"
+    "    paths: [memos/*.yaml]\n"
+    "    schema: schemas/memos.schema.yaml\n"
+)
+ITEMS_SCHEMA = (
+    "type: object\n"
+    "additionalProperties: false\n"
+    "required: [id, name]\n"
+    "properties:\n"
+    "  id: {type: string}\n"
+    "  name: {type: string}\n"
+    "  description: {type: string}\n"
+    "  related:\n"
+    "    type: array\n"
+    "    items:\n"
+    "      type: object\n"
+    "      properties:\n"
+    "        to: {type: string}\n"
+    "        type: {type: string}\n"
+)
+ITEM_1 = "id: i1\nname: I1\ndescription: 旧語\nrelated:\n  - to: m1\n    type: references\n"
+
+
+def test_normal_when_non_git_source_without_dates(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """`write_dates: false` の種類の文書は、どの操作で書き換えても日時を付けない（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    memo = make_source(
+        "memo",
+        sample_file_set(
+            **{
+                "project-index.yaml": sample_config_text(ITEMS_ROWS, name="memo"),
+                "schemas/items.schema.yaml": ITEMS_SCHEMA,
+                "schemas/memos.schema.yaml": "type: object\n",
+                "items/i1.yaml": ITEM_1,
+                "memos/m1.yaml": "id: m1\nname: M1\n",
+            }
+        ),
+        git=False,
+        scope_read=[sample.folder],
+        scope_write=[sample.folder],
+    )
+    env = make_server(sample, memo)
+    common = {"cwd": str(sample.folder), "source": "memo"}
+    items = memo.folder / "items"
+    memos = memo.folder / "memos"
+    # 実行
+    created = env.call(
+        "write_docs",
+        **common,
+        operations=[{"op": "create", "kind": "items", "data": {"id": "i2", "name": "I2"}}],
+    )
+    updated = env.call(
+        "write_docs",
+        **common,
+        operations=[_update("i1", _version(items / "i1.yaml"), set={"name": "I1b"})],
+    )
+    replaced = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            {
+                "op": "replace",
+                "id": "i1",
+                "expected_version": _version(items / "i1.yaml"),
+                "data": load_yaml(ITEM_1),
+            }
+        ],
+    )
+    renamed = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            {
+                "op": "rename",
+                "id": "i1",
+                "expected_version": _version(items / "i1.yaml"),
+                "new_id": "i9",
+            }
+        ],
+    )
+    memo_renamed = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            {
+                "op": "rename",
+                "id": "m1",
+                "expected_version": _version(memos / "m1.yaml"),
+                "new_id": "m9",
+            }
+        ],
+    )
+    text_replaced = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            {
+                "op": "replace_text",
+                "filter": {"field": "kind", "op": "eq", "values": ["items"]},
+                "old": "旧語",
+                "new": "新語",
+            }
+        ],
+    )
+    memo_created = env.call(
+        "write_docs",
+        **common,
+        operations=[{"op": "create", "kind": "memos", "data": {"id": "m2", "name": "M2"}}],
+    )
+    # 検証
+    results = [created, updated, replaced, renamed, memo_renamed, text_replaced, memo_created]
+    assert [result.is_error for result in results] == [False] * 7
+    assert [result.data["applied"] for result in results] == [True] * 7
+    assert all(row["status"] != "failed" for result in results for row in result.data["results"])
+    item_2 = load_yaml((items / "i2.yaml").read_text(encoding="utf-8"))
+    item_9 = load_yaml((items / "i9.yaml").read_text(encoding="utf-8"))
+    memo_9 = load_yaml((memos / "m9.yaml").read_text(encoding="utf-8"))
+    memo_2 = load_yaml((memos / "m2.yaml").read_text(encoding="utf-8"))
+    assert sorted(item_2) == ["id", "name"]
+    assert sorted(item_9) == ["description", "id", "name", "related"]
+    assert item_9["description"] == "新語"
+    assert item_9["related"] == [{"to": "m9", "type": "references"}]
+    assert memo_9["updated"]
+    assert memo_2["created"]
+    assert memo_2["updated"]
+
+
 def test_error_when_validation_failed(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
@@ -2013,6 +2151,154 @@ def test_normal_when_body_file(
     assert "VersionMismatchError" in stale.text
     assert not replaced.is_error
     assert (worktree / "notes" / "n2.md").read_text(encoding="utf-8") == "置き換えた本文\n"
+
+
+ABSENT_NOTES = "items:\n  - id: n1\n    path: n1.md\n  - id: n3\n  - id: n5\n"
+
+
+def _absent_files(
+    sample_file_set: Callable[..., dict[str, str]], sample_config_text: Callable[..., str]
+) -> dict[str, str]:
+    """本文のファイルを持つ n1 と、持たない n3・n5 の行 `notes` と、n5 を指す文書 1 を持つ配信元のファイル一式を返す。"""
+    return {
+        **_notes_files(sample_file_set, sample_config_text),
+        "notes/index.yaml": ABSENT_NOTES,
+        "docs/doc-1.yaml": (
+            "id: doc-1\nname: 文書 1\nrelated:\n  - to: n5\n    type: references\n"
+        ),
+    }
+
+
+def _note_files(worktree: Path) -> list[str]:
+    """ワークツリーの `notes/` のファイル名を並べて返す。"""
+    return sorted(path.name for path in (worktree / "notes").iterdir())
+
+
+def test_normal_when_body_file_absent(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """`body_file` の列を持たない要素を作成・更新・改名し、後から本文のファイルを付ける（正常系）。"""
+    # 準備
+    files = _absent_files(sample_file_set, sample_config_text)
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    common = {"cwd": str(source.folder), "worktree": str(worktree)}
+    before = _note_files(worktree)
+    # 実行
+    created = env.call(
+        "write_docs", **common, operations=[{"op": "create", "kind": "notes", "data": {"id": "n4"}}]
+    )
+    after_create = (
+        _note_files(worktree),
+        (worktree / "notes" / "index.yaml").read_text(encoding="utf-8"),
+    )
+    titled = env.call(
+        "write_docs",
+        **common,
+        operations=[_update("n3", value_hash({"id": "n3"}), set={"title": "t"})],
+    )
+    after_title = (
+        _note_files(worktree),
+        (worktree / "notes" / "index.yaml").read_text(encoding="utf-8"),
+    )
+    bodied = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            _update(
+                "n3",
+                titled.data["results"][0]["version"],
+                set={"path": "n3.md", "@body": "本文\n"},
+            )
+        ],
+    )
+    after_body = _note_files(worktree)
+    renamed = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            {
+                "op": "rename",
+                "id": "n5",
+                "expected_version": value_hash({"id": "n5"}),
+                "new_id": "n9",
+            }
+        ],
+    )
+    # 検証
+    assert not created.is_error
+    assert created.data["results"][0]["id"] == "n4"
+    assert after_create[0] == before
+    assert load_yaml(after_create[1])["items"][-1] == {"id": "n4"}
+    assert not titled.is_error
+    assert after_title[0] == before
+    assert load_yaml(after_title[1])["items"][1] == {"id": "n3", "title": "t"}
+    assert not bodied.is_error
+    assert "@@ notes/n3.md" in bodied.data["results"][0]["diff"]
+    assert (worktree / "notes" / "n3.md").read_text(encoding="utf-8") == "本文\n"
+    assert not renamed.is_error
+    index = load_yaml((worktree / "notes" / "index.yaml").read_text(encoding="utf-8"))
+    assert index["items"] == [
+        {"id": "n1", "path": "n1.md"},
+        {"id": "n3", "title": "t", "path": "n3.md"},
+        {"id": "n9"},
+        {"id": "n4"},
+    ]
+    doc_1 = load_yaml((worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8"))
+    assert doc_1["related"] == [{"to": "n9", "type": "references"}]
+    assert _note_files(worktree) == after_body
+
+
+def test_error_when_body_without_body_file(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """本文のファイルの有無を片方だけで切り替える操作と、本文のファイルを持たない要素への `new_path` を断る（異常系）。"""
+    # 準備
+    files = _absent_files(sample_file_set, sample_config_text)
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    common = {"cwd": str(source.folder), "worktree": str(worktree)}
+    n3 = value_hash({"id": "n3"})
+    n1 = value_hash([{"id": "n1", "path": "n1.md"}, NOTE_1])
+    operations = [
+        {"op": "create", "kind": "notes", "data": {"id": "n6", "@body": "本文\n"}},
+        _update("n3", n3, set={"@body": "本文\n"}),
+        _update("n3", n3, set={"path": "n3.md"}),
+        _update("n3", n3, text_edits=[{"field": "@body", "old": "a", "new": "b"}]),
+        {"op": "rename", "id": "n3", "expected_version": n3, "new_path": "notes/n7.md"},
+        _update("n1", n1, unset=["path"]),
+        {"op": "replace", "id": "n1", "expected_version": n1, "data": {"id": "n1"}},
+    ]
+    # 実行
+    results = [env.call("write_docs", **common, operations=[operation]) for operation in operations]
+    # 検証
+    assert [result.is_error for result in results] == [True] * 7
+    assert ["InvalidArgumentError" in result.text for result in results] == [True] * 7
+    assert [
+        path in result.text
+        for path, result in zip(
+            [
+                "operations[0].data.path",
+                "operations[0].set.path",
+                "operations[0].set.@body",
+                "operations[0].text_edits[0].field",
+                "operations[0].new_path",
+                "operations[0].unset.path",
+                "operations[0].data.path",
+            ],
+            results,
+            strict=True,
+        )
+    ] == [True] * 7
+    assert (worktree / "notes" / "index.yaml").read_text(encoding="utf-8") == ABSENT_NOTES
+    assert (worktree / "notes" / "n1.md").read_text(encoding="utf-8") == NOTE_1
+    assert _note_files(worktree) == ["index.yaml", "n1.md"]
 
 
 def test_error_when_body_file_outside_source(

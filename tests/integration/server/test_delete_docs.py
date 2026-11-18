@@ -412,6 +412,40 @@ def test_normal_when_body_file(
     assert "notes/n2.md" not in checked.text
 
 
+def test_normal_when_body_file_absent(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """`body_file` の列を持たない要素を、管理用の YAML の要素だけを除いて削除する（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "project-index.yaml": sample_config_text(NOTES_ROW),
+            "schemas/notes.schema.yaml": NOTES_SCHEMA,
+            "notes/index.yaml": "items:\n  - id: n1\n    path: n1.md\n  - id: n4\n",
+            "notes/n1.md": "# n1\n",
+        }
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    # 実行
+    result = env.call(
+        "delete_docs",
+        cwd=str(source.folder),
+        worktree=str(worktree),
+        targets=[{"id": "n4", "expected_version": value_hash({"id": "n4"})}],
+    )
+    # 検証
+    assert not result.is_error
+    assert result.data["results"][0]["status"] == "deleted"
+    assert load_yaml((worktree / "notes" / "index.yaml").read_text(encoding="utf-8")) == {
+        "items": [{"id": "n1", "path": "n1.md"}]
+    }
+    assert (worktree / "notes" / "n1.md").read_text(encoding="utf-8") == "# n1\n"
+
+
 def test_error_when_disk_storage_delete_not_allowed(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],

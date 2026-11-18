@@ -218,6 +218,12 @@ functions:
         condition: '内容の同じスキーマを別のファイルで指す文書の行 2 つと、正しくないスキーマ（`type: 1`）を指す行 2 つを持つ設定を、検証した後にもう 1 回検証する'
         mock: '`Draft202012Validator.check_schema`（本物を包んで呼ばれた回数を記録する）'
         expected: '`check_schema` が合わせて 2 回だけ呼ばれ、2 回の検証とも正しくないスキーマの 2 行に同じ理由の違反がある'
+      - name: test_validate_source_config_when_write_dates
+        case: 正常
+        summary: '`write_dates` の型'
+        condition: '`documents[0]` に `write_dates: false` を記載した設定と、`write_dates: "no"` を記載した設定'
+        mock: なし（一時フォルダ）
+        expected: 1 つ目は空。2 つ目は `documents[0].write_dates` のスキーマの違反
   - name: check_scripts
     title: スクリプトの確かめ
     kind: 関数

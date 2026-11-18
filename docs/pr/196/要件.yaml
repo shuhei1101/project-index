@@ -1,0 +1,65 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: Git 管理外の配信元で、日時を付けない指定をした種類の文書を、日時を追加せずに書き込む流れと、本文のファイルを持たない要素を作成・更新する流れを追加する
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: changed
+    detail: 本文のファイルを持たない要素を文書として検索・参照し、同じファイルの警告が要素の数だけ並ばない流れを追加する
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: run_only
+    detail: 起動時の索引の同期が数えるファイルが無い行から、本文のファイルを持たない要素が外れる。シナリオの記述は変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: run_only
+    detail: 画面のサーバーが読む文書の一覧・文書に、本文のファイルを持たない要素が加わる
+    depends_on: []
+docs:
+  - page: docs/guide/設定.md
+    new: false
+    change: 日時を付けない指定のキーを配信元の設定のキーの表に追加し、`documents[].body_file` の説明に列を持たない要素の扱いを追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-18T14:06:56.338663+00:00'
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: メタデータの `created`・`updated` の決め方に日時を付けない指定を、`write_docs` の `@body` の説明に本文のファイルを持たない要素の扱いを追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-18T14:06:56.338663+00:00'
+  - page: docs/guide/コアコンセプト-文書のメタデータ.md
+    new: false
+    change: 日時の決め方と `body_file` の文書の説明があれば、日時を付けない指定と本文のファイルを持たない要素の扱いに合わせる
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-18T14:06:56.338663+00:00'
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: '`body_file` の行の説明に、列を持たない要素を本文なしの文書として配信することを追加する'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-18T14:06:56.338663+00:00'
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: '`missing_body_files` の説明を、列の値があってファイルが無い行に合わせる'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-18T14:06:56.338663+00:00'
+  - page: schemas/project-index.schema.json
+    new: false
+    change: 日時を付けない指定のキーを追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-18T14:24:28.181671+00:00'
+scope_out:
+  - item: MindStella の設定（`dev-docs.yaml`）への日時を付けない指定の記載と、MindStella の側の残りの修正
+    reason: MindStella のリポジトリの作業で、この PR で決まった範囲の残りを後続で修正する
+    plan: shuhei1101/mindstella#583
+  - item: 'Git 管理外で `additionalProperties: false` のスキーマを持つほかの配信元の洗い出し'
+    reason: 指定を省いた配信元の振る舞いは変わらず、必要な配信元が設定に記載すれば足りる
+    plan: none

@@ -436,6 +436,28 @@ def test_search_docs_when_unreadable_file(make_env: Callable[..., SearchEnv]) ->
     assert any("docs/broken.yaml" in note for note in result.notes)
 
 
+def test_search_docs_when_problems_grouped(make_env: Callable[..., SearchEnv]) -> None:
+    """同じファイルの同じ理由の読み込みの誤りをまとめる（正常系）。"""
+    # 準備
+    files = {
+        "notes/files.yaml": (
+            "files:\n  - path: a.md\n  - path: x1.md\n  - path: x2.md\n  - path: x3.md\n"
+        ),
+        "notes/a.md": "本文\n",
+        "docs/b.yaml": "a: [1\n",
+    }
+    env = make_env(files, documents=[_notes_table(), _yaml_table()])
+    # 実行
+    result = env.search()
+    # 検証
+    loading = sorted(note for note in result.notes if "読み込めない" in note)
+    assert len(loading) == 2
+    assert loading[0].startswith("docs/b.yaml を読み込めないので除きました（")
+    assert loading[1].startswith(
+        "notes/files.yaml の 3 件を読み込めないので除きました（先頭: files[1] の path（x1.md）"
+    )
+
+
 def test_search_docs_when_read_validator(make_env: Callable[..., SearchEnv]) -> None:
     """読み取りの検査の警告（正常系）。"""
     # 準備

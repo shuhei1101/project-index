@@ -273,12 +273,13 @@ functions:
          - 本文はファイルの内容。バージョンはファイルの内容の『内容のハッシュ』
       3. `table.records` がある場合、『項目の取得』で配列を取り、要素ごとに文書を作る（配列が無ければ 0 件）
          - 要素が辞書でない場合、その要素は `not_mapping` にして飛ばす
-         - `table.body_file` があれば、要素のその列の値を本文のファイルのパスの解決で解き、`read_body`（`None` なら `root` のファイル）で読んで本文と `body_path` にする。無いファイル（`read_body` が `None` を返す）・`root` の外を指す場合、その要素は `missing_body_file` にして飛ばす
+         - `table.body_file` があり、要素がその列を持たないか値が `None`・空の文字列なら（『本文のファイルを持たない要素の判定』）、`body_file` が無い行の要素と同じく文書にする（本文・ID・名前・バージョンも同じ）
+         - `table.body_file` があり、要素がその列の値を持つ場合、値を本文のファイルのパスの解決で解き、`read_body`（`None` なら `root` のファイル）で読んで本文と `body_path` にする。無いファイル（`read_body` が `None` を返す）・`root` の外を指す場合、その要素は `missing_body_file` にして飛ばす
          - `body_file` が無ければ、要素を YAML に書き出した文字列を本文にする
          - バージョンは、`body_file` があれば要素と本文の組（`[要素, 本文]`）の『値のハッシュ』、無ければ要素の『値のハッシュ』
       4. 文書ごとに『メタデータの解決』を当てる
-      5. ID はメタデータの `id`。無ければ、`body_path` か `path` を拡張子付きのまま（`records` で `body_file` が無ければ末尾に `#{位置}`）にする
-         - メタデータの `name` が空なら、`body_path`（無ければ `path`）のファイル名から拡張子を除いた名前を入れる。`records` で `body_file` が無ければ ID を入れる
+      5. ID はメタデータの `id`。無ければ、`body_path` か `path` を拡張子付きのまま（`records` で `body_path` が無ければ末尾に `#{位置}`）にする
+         - メタデータの `name` が空なら、`body_path`（無ければ `path`）のファイル名から拡張子を除いた名前を入れる。`records` で `body_path` が無ければ ID を入れる
       6. `created` / `updated` は、`dates` の `body_path`（無ければ `path`）の値、内容の同じ名前の項目（ISO 8601 の文字列か日時）の順に最初にある値を使う。どちらも無ければ `None`
       7. 文書と理由を返す
     unit_tests:
@@ -294,6 +295,12 @@ functions:
         condition: '`records`・`body_file` の行の索引の YAML（要素の `body_file` が `a.md`）に、`a.md` を `本文 1` と返す `read_body` と `本文 2` と返す `read_body` をそれぞれ渡す'
         mock: なし（`tmp_path`）
         expected: 2 つの文書の `version` が違う。`body_file` を持たない `records` の行の文書の `version` は要素の『値のハッシュ』のまま
+      - name: test_documents_from_text_when_body_file_absent
+        case: 正常
+        summary: 本文のファイルを持たない要素
+        condition: "`records: items`・`body_file: path` の行の `notes/index.yaml` が `items: [{path: a.md}, {title: b}, {path: ''}, {path: none.md}, {path: 3}]` で、`notes/a.md` だけを置く"
+        mock: なし（`tmp_path`）
+        expected: 文書は 3 件（`items[0]`・`items[1]`・`items[2]`）。`items[1]`・`items[2]` は `body_path` が `None`、`body` が要素を YAML に書き出した文字列、`id`・`metadata.name` が `notes/index.yaml#1`・`notes/index.yaml#2`、`version` が要素の『値のハッシュ』。`missing_body_file` の `LoadProblem` は `items[3]`・`items[4]` の 2 件
   - name: unindexed_files
     title: 索引に無いファイル
     container: project_index/features/documents/loader.py
@@ -454,4 +461,40 @@ functions:
         condition: '`path` が `notes/index.yaml` で、`value` が `n1.md`・`../../outside/n3.md`・`../a.md`・空の文字列・`1`'
         mock: なし
         expected: '`notes/n1.md`・`None`・`a.md`・`None`・`None`'
+  - name: lacks_body_file
+    title: 本文のファイルを持たない要素の判定
+    kind: 関数
+    container: project_index/features/documents/loader.py
+    usecase: 文書の読み込み・書き込み
+    role: 判定
+    summary: '`body_file` の行の要素が、本文のファイルを持たない要素かを返す'
+    description: 読み込み（文字列からの文書の組み立て）と書き込み（`@body` の確かめ）が同じ判定を使う。
+    scope: public
+    thread_safe: true
+    args:
+      - name: data
+        title: 要素
+        type: Mapping[str, Any]
+        required: true
+        passing: positional
+        description: '`records` の配列の 1 要素'
+      - name: column
+        title: 本文のファイルの列
+        type: str
+        required: true
+        passing: positional
+        description: 行の `body_file`（`.` でつないだ入れ子の列も受ける）
+    returns:
+      type: bool
+      description: 列が無いか値が `None`・空の文字列なら `True`
+    process: |-
+      1. 『項目の取得』で `column` の値を取る
+      2. 値が `None` か空の文字列なら `True`、それ以外（文字列でない値を含む）は `False` を返す
+    unit_tests:
+      - name: test_lacks_body_file
+        case: 正常
+        summary: 列の有無と値
+        condition: "`column` が `path` で、`data` が `{}`・`{path: null}`・`{path: ''}`・`{path: a.md}`・`{path: 3}`"
+        mock: なし
+        expected: '`True`・`True`・`True`・`False`・`False`'
 visibility: internal

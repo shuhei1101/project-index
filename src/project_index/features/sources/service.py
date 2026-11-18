@@ -462,6 +462,7 @@ def _build_table(row: dict[str, Any]) -> DocumentTable:
         search=row.get("search", True),
         records=row.get("records"),
         body_file=row.get("body_file"),
+        write_dates=row.get("write_dates", True),
         metadata=dict(row.get("metadata", {})),
         exclude=list(row.get("exclude", [])),
         alias_type=row.get("alias_type"),

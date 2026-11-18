@@ -1535,6 +1535,126 @@ flows:
       - '`isError: true` で、違反の `path` が `operations[0].kind`、決まりが `items の新しい文書の配置先を決められません`、`fix` が `documents[].paths の先頭を glob を含まない 1 つのファイルにしてください` であること'
       - ワークツリー x の `data/` にファイルが作られない
     test: test_error_when_placement_undecided
+  - name: 正常系（日時を付けない種類に Git 管理外の配信元で書く）
+    summary: '`documents[].write_dates: false` の種類の文書は、どの操作で書き換えても `created`・`updated` を付けない'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 書ける配信元
+        description: '正常系（Git 管理外の配信元に書く）と同じ memo に、`write_dates: false` の種類 `items`（スキーマは `additionalProperties: false` で `created`・`updated` を持たず `related` を持つ）と、`write_dates` を省いた種類 `memos` を追加したもの'
+        notes: '`memos` の文書 m1。`items` の文書 i1 が `related` で m1 を指し、単語 `旧語` を持つ'
+      - name: 入力
+        description: '`source: memo` で、`items` の `create`、i1 の `update` と `replace`、i1 の `rename`（`new_id: i9`）、m1 の `rename`（`new_id: m9`）、`replace_text`（`旧語` → `新語`）、`memos` の `create` を順に呼ぶ'
+    flow: |-
+      <!-- map: {"title": "正常系（日時を付けない種類に Git 管理外の配信元で書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant MF as memo のフォルダ
+
+        C->>T: items の create
+        T->>T: items の write_dates が false なので日時を付けずに検査する
+        T->>MF: YAML を書く
+        T-->>C: created・version
+        C->>T: i1 の update・replace・rename（i9）
+        T->>MF: 日時を付けずに書き換える
+        T-->>C: updated・replaced・renamed
+        C->>T: m1 の rename（m9）
+        T->>T: m9 は memos の指定で日時を付け、参照元 i9 は items の指定で付けない
+        T->>MF: m9 を書き、i9 の related を書き換える
+        T-->>C: renamed・updated
+        C->>T: replace_text（旧語 → 新語）
+        T->>MF: 日時を付けずに i9 を書き換える
+        T-->>C: updated・count
+      ```
+
+      <!-- /map -->
+    expected:
+      - 'どの呼び出しも `applied: true` で `failed` の行が無い'
+      - '`items` の文書（作った文書・i9）の YAML が、どの操作の後も `created`・`updated` を持たない'
+      - m9 の YAML の `updated` が改名した日時になり、i9 の `related` が m9 を指す
+      - '`memos` の `create` で作った文書の YAML が `created`・`updated` を持つ'
+    test: test_normal_when_non_git_source_without_dates
+  - name: 正常系（本文のファイルを持たない要素を書く）
+    summary: '`records`・`body_file` の行で、`body_file` の列を持たない要素を作成・更新・改名し、後から本文のファイルを付ける'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 本文のファイルを持つ行
+        description: 正常系（本文のファイルを持つ文書を書く）と同じ行 `notes`。要素 n3・n5 は `path` の列を持たない
+        notes: 行のスキーマは `path` を必須にしない。文書 1 の `related` が n5 を指す
+      - name: 入力
+        description: '1 回目は `create`（`data: {id: n4}`）。2 回目は n3 の `update`（`set: {title: t}`）。3 回目は n3 の `update`（`set: {path: n3.md, @body: 本文}`）。4 回目は n5 の `rename`（`new_id: n9`）'
+    flow: |-
+      <!-- map: {"title": "正常系（本文のファイルを持たない要素を書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー
+
+        C->>T: create n4（path も @body も無し）
+        T->>WT: notes/index.yaml に要素だけを追加する
+        T-->>C: created・version
+        C->>T: update n3（set title）
+        T->>WT: notes/index.yaml の n3 を書き換える
+        T-->>C: updated
+        C->>T: update n3（set path・@body）
+        T->>WT: n3 に path を入れ、notes/n3.md を作る
+        T-->>C: updated
+        C->>T: rename n5（new_id n9）
+        T->>WT: n5 の id と文書 1 の related を書き換える
+        T-->>C: renamed・updated
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目の後、`notes/index.yaml` に `{id: n4}` の要素があり、`notes/` にファイルが増えない。結果の `id` は n4'
+      - 2 回目の後、n3 の `title` だけが変わり、`notes/` にファイルが増えない
+      - '3 回目の後、n3 の要素が `path: n3.md` を持ち、`notes/n3.md` の内容が渡した本文。`diff` に `@@ notes/n3.md` の行がある'
+      - 4 回目の後、要素の `id` が n9 になり、文書 1 の `related` が n9 を指し、`notes/` のファイルは作成・移動されない
+    test: test_normal_when_body_file_absent
+  - name: 異常系（本文のファイルを持たない要素に本文だけを渡す・InvalidArgumentError）
+    summary: 本文のファイルの有無を片方だけで切り替える操作と、本文のファイルを持たない要素への `new_path` を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 本文のファイルの有無が違う要素
+        description: '正常系（本文のファイルを持たない要素を書く）と同じ行 `notes` の n3（`path` の列を持たない）と n1（`path: n1.md`）'
+      - name: 入力
+        description: '`create`（`data: {id: n6, @body: 本文}`）、n3 の `update`（`set: {@body: 本文}`）、n3 の `update`（`set: {path: n3.md}`）、n3 の `update`（`text_edits: [{field: @body, old: a, new: b}]`）、n3 の `rename`（`new_path: notes/n7.md`）、n1 の `update`（`unset: [path]`）、n1 の `replace`（`data` に `path` が無い）を 1 件ずつ呼ぶ'
+    flow: |-
+      <!-- map: {"title": "異常系（本文のファイルを持たない要素に本文だけを渡す・InvalidArgumentError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: create n6（@body だけ）
+        T-->>C: isError（本文のファイルのパスが無い）
+        C->>T: update n3（set @body だけ）
+        T-->>C: isError（本文のファイルのパスが無い）
+        C->>T: update n3（set path だけ）
+        T-->>C: isError（@body が無い）
+        C->>T: update n3（text_edits @body）
+        T-->>C: isError（本文のファイルのパスが無い）
+        C->>T: rename n3（new_path）
+        T-->>C: isError（本文のファイルを持たない要素）
+        C->>T: update n1（unset path）
+        T-->>C: isError（body_file の列は変えられない）
+        C->>T: replace n1（data に path が無い）
+        T-->>C: isError（body_file の列は変えられない）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 7 回とも `InvalidArgumentError` で、違反の `path` がそれぞれ `operations[0].data.path`・`operations[0].set.path`・`operations[0].set.@body`・`operations[0].text_edits[0].field`・`operations[0].new_path`・`operations[0].unset.path`・`operations[0].data.path`
+      - 'どのファイルも変わらず、n1 は `path: n1.md` を持ち続け、`notes/n1.md` も残る'
+    test: test_error_when_body_without_body_file
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -1547,7 +1667,7 @@ aliases:
 identifier: write_docs
 permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーにだけ書く
 idempotent: false
-side_effects: 作業ツリー（Git 管理外の配信元はそのフォルダ）の文書の YAML と、`records`・`body_file` の行の文書の本文のファイルを作る・書き換える。`generators[]` のスクリプトを流して生成物を書き出す。Git 管理外の配信元ではメタデータの `created`・`updated` を付ける。
+side_effects: 作業ツリー（Git 管理外の配信元はそのフォルダ）の文書の YAML と、`records`・`body_file` の行の文書の本文のファイルを作る・書き換える。`generators[]` のスクリプトを流して生成物を書き出す。Git 管理外の配信元では、`documents[].write_dates` が `false` の種類を除いてメタデータの `created`・`updated` を付ける。
 callers:
   - SC-7#scenarios[正常シナリオ]
   - SC-7#scenarios[正常シナリオ（変更していない項目の引用符を保つ）]
@@ -1562,6 +1682,8 @@ callers:
   - SC-7#scenarios[正常シナリオ（本文のファイルを持つ文書を改名する）]
   - SC-7#scenarios[正常シナリオ（複数の文書の単語を一括で置換する）]
   - SC-7#scenarios[異常シナリオ（一括置換の後の文書が検査に合格しない）]
+  - SC-7#scenarios[正常シナリオ（日時を付けない種類に Git 管理外の配信元で書く）]
+  - SC-7#scenarios[正常シナリオ（本文のファイルを持たない要素を書く）]
 exclusivity: 配信元ごとの排他ロックの中で、読み込み・バージョンの確認・検査・書き込みを行う。後から来た呼び出しはロックを待つ
 request:
   - name: source
@@ -1688,7 +1810,7 @@ request:
   - name: operations[].data.@body
     type: str
     required: false
-    default: なし（`records`・`body_file` の行の `create` では必須）
+    default: なし（`records`・`body_file` の行の `create` では、`data` に `body_file` の列があれば必須。無ければ本文のファイルを持たない要素を作る）
     location: argument
     description: 本文のファイルの内容
     notes: '`records`・`body_file` の行の文書だけ。本文のファイルのパスは `data` の `body_file` の列に、管理用の YAML のフォルダからの相対で渡す'
@@ -1719,7 +1841,7 @@ request:
     default: なし（制約の「改名後のパス」で決める）
     location: argument
     description: 改名後のファイルの配信元の直下からのパス。1 ファイル 1 文書は YAML のファイル、`records`・`body_file` の行の文書は本文のファイル
-    constraints: 種類の行の `paths` に該当し `exclude[]` に該当しない（`body_file` の行は配信元の中）。既にあるファイルを指さない。`body_file` を持たない `records` の行の文書では受けない
+    constraints: 種類の行の `paths` に該当し `exclude[]` に該当しない（`body_file` の行は配信元の中）。既にあるファイルを指さない。`body_file` を持たない `records` の行の文書と、本文のファイルを持たない要素では受けない
     notes: '`rename` だけ'
   - name: operations[].filter
     type: Condition | Group
@@ -1906,7 +2028,7 @@ constraints:
     constraint: '[文書の検索](id:IF-2) の制約「ワークツリーの読み込みの待ち」と同じ。終了しなければ何も書き込まずに `WorktreeLoadingError` を返却する'
     notes: 共通の処理のため、結合テストは文書の検索が持つ
   - item: 本文のファイル
-    constraint: '`records`・`body_file` の行の文書の本文は `@body` で受ける。`create` は `body_file` の列の値（管理用の YAML のフォルダからの相対）に本文のファイルを作成し、`set` の `@body` は全体を、`text_edits` の `field: @body` は一部を置き換える。`replace` は `data` に `@body` があれば置き換え、無ければ本文のファイルを変えない。`body_file` の列の値を変える `update`・`replace` は受けない'
+    constraint: '`records`・`body_file` の行の文書の本文は `@body` で受ける。`create` は `body_file` の列の値（管理用の YAML のフォルダからの相対）に本文のファイルを作成し、`set` の `@body` は全体を、`text_edits` の `field: @body` は一部を置き換える。`replace` は `data` に `@body` があれば置き換え、無ければ本文のファイルを変えない。本文のファイルを持つ要素の `body_file` の列の値を変える `update`・`replace`（`unset` で列を外す `update` と、列を含まない `data` の `replace` を含む）は受けない。本文のファイルを外す操作は持たない。本文のファイルを持たない要素は制約「本文のファイルを持たない要素」'
     notes: '`@body` は種類の列名と重ならない。`body_file` の列の名前が `body` の配信元でも、`body` は列を指す'
   - item: 本文のファイルの検査
     constraint: 本文のファイルの内容は、スキーマ・`validators[]`・mdmark の点検に通さない。パスを読み込みと同じく管理用の YAML のフォルダから解き、配信元の外を指すときと、`create` で既にあるファイルを指すときは `body_file` の列の違反にする
@@ -1916,7 +2038,7 @@ constraints:
     constraint: 要素の値と本文のファイルの内容の両方から求める（読み取りの `version` も同じ値）。本文のファイルだけを書き換えてもバージョンが変わる
     notes: 今は要素の値だけから求めているため、`records`・`body_file` の行の文書の `version` はこの変更で 1 度だけ変わる
   - item: disk の配信元
-    constraint: '端末の設定の行が `storage.type: disk` の配信元は、作業場所が `scope.write` に当たれば登録したフォルダへ書き、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく `created`・`updated` を付ける。`worktree` を指定すると `InvalidArgumentError`'
+    constraint: '端末の設定の行が `storage.type: disk` の配信元は、作業場所が `scope.write` に当たれば登録したフォルダへ書き、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく、制約「日時の付与」で `created`・`updated` を付ける。`worktree` を指定すると `InvalidArgumentError`'
   - item: 参照の型の項目のパス
     constraint: '`text_edits[].field` が `#` で始まるとき、`#` の後を種類のスキーマ（`$ref` を解決した後）と文書でたどり、位置で指す項目のパスに解決してから既存の取得・書き込みで置き換える。配列の項目の `[{値}]` はスキーマの `x-key` のキーがその値の最初の要素、`[{値}#{順番}]` は同じ値の要素のその順番の要素（同じ値の要素が無く、末尾が `#{整数}` のときだけ）、辞書の項目の `[{キー}]` はそのキー（`.` や空白を含んでも 1 階層）を指す。`[...]` の中の `[` と `]` は対応を数え、対応の取れた `[` `]` は値の一部として読む（`#request[operations[].fields].description` は `x-key` の値が `operations[].fields` の要素）。対応の取れない `[` `]` を含むパスは記載方法の誤り。`[]` の外の `.` で区切った名前は辞書のキー。共通のキーの列名への読み替えはしない。`text_edits[].field`・`add_to`・`remove_from` のキーと `unset` の要素だけが受け付け、`set` と `metadata` の列名・`search_docs`・`list_changes` の項目のパスの読み方は変えない'
     notes: 書き方は設計書の参照の型（`{ID}#{項目のパス}`）の `#` から後と同じ。`#` で始まらない既存の `[{キー}]`（キーが真の要素）とは `#` の有無で分ける
@@ -1953,6 +2075,11 @@ constraints:
   - item: text_edits の field の違反の修正方法
     constraint: '`text_edits[{n}].field` の違反（項目のパスを解決できない・指した項目が文字列でない）の `fix` は、通る配列が全て `x-key` を持つときは `#` で始めて `x-key` の値で指す（`#functions[save].process`）こと、`x-key` を持たない配列を 1 つでも通るときは `#` を付けずに全ての配列を位置で指す（`flows[35].expected[2]`）こと、配列・オブジェクトそのものは `text_edits` ではなく `set`・`add_to`・`remove_from` で書き換えることを案内する。違反になる条件と `rule`・`path` は変えない'
     notes: '`set`・`unset`・`add_to`・`remove_from` と `search_docs` の項目のパスの違反には付けない'
+  - item: 日時の付与
+    constraint: 'Git 管理外の配信元と `storage.type: disk` の配信元では、書き換える文書（`create`・`update`・`replace`・`rename` の対象と、改名の参照元・`replace_text` で書き換える文書）に `created`・`updated` を付けてから検査する。付けるかは、操作の対象でなく書き換える文書の種類の `documents[].write_dates`（省くと `true`）で決める。`false` の種類の文書には付けず、既にある `created`・`updated` の値も書き換えない'
+    notes: Git の配信元では `write_dates` に関わらず付けない
+  - item: 本文のファイルを持たない要素
+    constraint: '`records`・`body_file` の行で `body_file` の列が無いか値が `null`・空の文字列の要素は、`body_file` を持たない `records` の行の文書と同じく要素だけを書き換える。`create` は `data` に `body_file` の列と `@body` のどちらも無ければ要素だけを追加し、`@body` だけがあれば `body_file` の列の違反、`body_file` の列だけがあれば `@body` の違反にする。`update`・`replace` は `body_file` の列の値と `@body` を同時に指定したときだけ本文のファイルを作成し（「本文のファイルの検査」の `create` と同じ検査）、`@body` だけは `body_file` の列の違反、`body_file` の列の値だけは `@body` の違反にする。`text_edits` の `field: @body` は、本文のファイルが無いことを決まりにした `text_edits[{n}].field` の違反にする。`rename` は `new_id` だけを受け、`new_path` は引数の誤りにする。どの操作も本文のファイルを削除・移動しない'
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]

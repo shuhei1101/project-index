@@ -13,7 +13,7 @@ from project_index.features.access.types import Target
 from project_index.features.documents.aliases import collect_aliases, term_ids
 from project_index.features.documents.fields import is_markdown_body
 from project_index.features.documents.store import DocumentStore
-from project_index.features.documents.types import Document
+from project_index.features.documents.types import Document, LoadProblem
 from project_index.features.search.body_parts import join_ranges, select_ranges
 from project_index.features.search.cursor import decode_cursor, encode_cursor
 from project_index.features.search.fields import field_values, known_fields
@@ -239,6 +239,21 @@ def _cut_body(
     return join_ranges(lines, ranges), ranges, len(lines)
 
 
+def _problem_notes(problems: Sequence[LoadProblem]) -> list[str]:
+    """読み込めなかった文書の知らせを、ファイルと理由の組ごとに 1 行にまとめる。"""
+    groups: dict[tuple[str, str], list[LoadProblem]] = {}
+    for problem in problems:
+        groups.setdefault((problem.path, problem.reason), []).append(problem)
+    return [
+        # 1 件だけなら、その詳細をそのまま出す
+        f"{path} を読み込めないので除きました（{items[0].detail}）"
+        if len(items) == 1
+        # 2 件以上なら、件数と先頭の詳細を出す
+        else f"{path} の {len(items)} 件を読み込めないので除きました（先頭: {items[0].detail}）"
+        for (path, _reason), items in groups.items()
+    ]
+
+
 def _load_targets(
     request: SearchRequest, store: DocumentStore, targets: list[Target], notes: list[str]
 ) -> tuple[list[tuple[int, Target, list[Document]]], list[dict[str, Any]]]:
@@ -247,10 +262,7 @@ def _load_targets(
     schemas: list[dict[str, Any]] = []
     for index, target in enumerate(targets):
         result = store.load(target)
-        notes.extend(
-            f"{problem.path} を読み込めないので除きました（{problem.detail}）"
-            for problem in result.problems
-        )
+        notes.extend(_problem_notes(result.problems))
         documents = result.documents
         if request.term is not None:
             collection = collect_aliases(target.source, documents)

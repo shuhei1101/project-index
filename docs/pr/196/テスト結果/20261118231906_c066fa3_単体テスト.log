@@ -1,0 +1,974 @@
+# 単体テスト（Red）: c066fa3
+# 実行環境: /tmp/pytest-of-shuhei2441 が root の所有で使えないため TMPDIR=/tmp/planner-196-tmp を付けて実行した
+
+$ TMPDIR=/tmp/planner-196-tmp uv run pytest tests/unit/
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/feat-documents-optional-dates-and-body
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 1272 items / 1 error
+
+==================================== ERRORS ====================================
+_ ERROR collecting tests/unit/project_index/features/documents/test_loader.py __
+ImportError while importing test module '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-documents-optional-dates-and-body/tests/unit/project_index/features/documents/test_loader.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/documents/test_loader.py:9: in <module>
+    from project_index.features.documents.loader import (
+E   ImportError: cannot import name 'lacks_body_file' from 'project_index.features.documents.loader' (/home/shuhei2441/repo/project-index/.claude/worktrees/feat-documents-optional-dates-and-body/src/project_index/features/documents/loader.py)
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/documents/test_loader.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+=============================== 1 error in 1.53s ===============================
+
+# test_loader.py の収集エラー（lacks_body_file が無い）で全件が止まるため、残りの結果を見るために収集エラーを続けて回した
+$ TMPDIR=/tmp/planner-196-tmp uv run pytest tests/unit/ --continue-on-collection-errors -q
+........................................................................ [  5%]
+........................................................................ [ 11%]
+........................................................................ [ 16%]
+........................................................................ [ 22%]
+........................................................................ [ 28%]
+........................................................................ [ 33%]
+........................................................................ [ 39%]
+........................................................................ [ 45%]
+.............................................................F.......... [ 50%]
+........................................................................ [ 56%]
+........................................................................ [ 62%]
+.................F...................................................... [ 67%]
+........................................................................ [ 73%]
+........................................................................ [ 79%]
+....F.............FFFFFFFF.......F...................................... [ 84%]
+........................................................................ [ 90%]
+........................................................................ [ 96%]
+................................................                         [100%]
+==================================== ERRORS ====================================
+_ ERROR collecting tests/unit/project_index/features/documents/test_loader.py __
+ImportError while importing test module '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-documents-optional-dates-and-body/tests/unit/project_index/features/documents/test_loader.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/documents/test_loader.py:9: in <module>
+    from project_index.features.documents.loader import (
+E   ImportError: cannot import name 'lacks_body_file' from 'project_index.features.documents.loader' (/home/shuhei2441/repo/project-index/.claude/worktrees/feat-documents-optional-dates-and-body/src/project_index/features/documents/loader.py)
+=================================== FAILURES ===================================
+____________________ test_search_docs_when_problems_grouped ____________________
+
+make_env = <function make_env.<locals>._make at 0x7aca049b8f60>
+
+    def test_search_docs_when_problems_grouped(make_env: Callable[..., SearchEnv]) -> None:
+        """同じファイルの同じ理由の読み込みの誤りをまとめる（正常系）。"""
+        # 準備
+        files = {
+            "notes/files.yaml": (
+                "files:\n  - path: a.md\n  - path: x1.md\n  - path: x2.md\n  - path: x3.md\n"
+            ),
+            "notes/a.md": "本文\n",
+            "docs/b.yaml": "a: [1\n",
+        }
+        env = make_env(files, documents=[_notes_table(), _yaml_table()])
+        # 実行
+        result = env.search()
+        # 検証
+        loading = [note for note in result.notes if "読み込めない" in note]
+>       assert len(loading) == 2
+E       assert 4 == 2
+E        +  where 4 = len(["docs/b.yaml を読み込めないので除きました（docs/b.yaml:1:1: while parsing a flow sequence: expected ',' or ']', but got '<stream end...いので除きました（files[2] の path（x2.md）が指すファイルがありません）', 'notes/files.yaml を読み込めないので除きました（files[3] の path（x3.md）が指すファイルがありません）'])
+
+tests/unit/project_index/features/search/test_service.py:454: AssertionError
+_________________ test_validate_source_config_when_write_dates _________________
+
+source_root = PosixPath('/tmp/planner-196-tmp/pytest-of-shuhei2441/pytest-1/test_validate_source_config_wh7/root')
+
+    def test_validate_source_config_when_write_dates(source_root: Path) -> None:
+        """`write_dates` の型（正常系）。"""
+        # 準備
+        row = {
+            "id": "rules",
+            "paths": ["docs/rule/*.yaml"],
+            "schema": "schemas/rule.schema.yaml",
+        }
+        valid = _config_value(documents=[{**row, "write_dates": False}])
+        invalid = _config_value(documents=[{**row, "write_dates": "no"}])
+        # 実行
+        valid_result = validate_source_config(valid, root=source_root)
+        invalid_result = validate_source_config(invalid, root=source_root)
+        # 検証
+>       assert valid_result == []
+E       AssertionError: assert [Violation(pa...ne, doc=None)] == []
+E         
+E         Left contains one more item: Violation(path='documents[0].write_dates', rule='知らないキー', fix='', index=None, doc=None)
+E         Use -v to get more diff
+
+tests/unit/project_index/features/sources/test_service.py:176: AssertionError
+______________________ test_write_docs_when_without_dates ______________________
+
+tmp_path = PosixPath('/tmp/planner-196-tmp/pytest-of-shuhei2441/pytest-1/test_write_docs_when_without_d0')
+write_files = <function write_files.<locals>._write at 0x7aca048671c0>
+make_source_config = <function make_source_config.<locals>._make at 0x7aca079a2e50>
+make_served_source = <function make_served_source.<locals>._make at 0x7aca079a33d0>
+make_registry = <function make_registry.<locals>._make at 0x7aca079a2f00>
+
+    def test_write_docs_when_without_dates(
+        tmp_path: Path,
+        write_files: Callable[[Path, dict[str, str]], None],
+        make_source_config: Callable[..., SourceConfig],
+        make_served_source: Callable[..., ServedSource],
+        make_registry: Callable[..., SourceRegistry],
+    ) -> None:
+        """日時を付けない種類（正常系）。"""
+        # 準備
+        root = tmp_path / "memo"
+        write_files(root, {"items/i1.yaml": ITEM_1, "memos/m1.yaml": MEMO_1})
+>       items = DocumentTable(
+            id="items",
+            paths=["items/*.yaml"],
+            schema_path="schemas/item.schema.yaml",
+            write_dates=False,
+        )
+E       TypeError: DocumentTable.__init__() got an unexpected keyword argument 'write_dates'
+
+tests/unit/project_index/features/write/test_service.py:407: TypeError
+____________________ test_write_docs_when_body_file_absent _____________________
+
+make_env = <function make_env.<locals>._make at 0x7aca07652cf0>
+
+    def test_write_docs_when_body_file_absent(make_env: Callable[..., WriteEnv]) -> None:
+        """本文のファイルを持たない要素の作成・更新・改名・本文の付与（正常系）。"""
+        # 準備
+        env = make_env(_absent_files(), tables=[_notes_table()])
+        # 実行
+>       created = env.write(operations=[Operation(op="create", kind="notes", data={"id": "n4"})])
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/write/test_service.py:816: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/project_index/features/write/test_service.py:87: in write
+    return write_docs(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+request = WriteRequest(operations=[Operation(op='create', kind='notes', id=None, expected_version=None, data={'id': 'n4'}, set={...ytest-of-shuhei2441/pytest-1/test_write_docs_when_body_file3/repo/.claude/worktrees/x', session_id=None, agent_id=None)
+registry = <tests.unit.project_index.conftest.FakeRegistry object at 0x7aca0481c590>
+store = <project_index.features.documents.store.DocumentStore object at 0x7aca047e75f0>
+checker = <project_index.features.validation.service.DocumentChecker object at 0x7aca07ad75b0>
+seen = <project_index.features.seen.store.SeenStore object at 0x7aca07a6e970>
+locks = <project_index.features.write.locks.SourceLocks object at 0x7aca05764d70>
+timeout_sec = 10
+now = datetime.datetime(2026, 11, 18, 14, 18, 48, 340581, tzinfo=datetime.timezone.utc)
+limits = None
+
+    def write_docs(
+        request: WriteRequest,
+        *,
+        registry: SourceRegistry,
+        store: DocumentStore,
+        checker: DocumentChecker,
+        seen: SeenStore,
+        locks: SourceLocks,
+        timeout_sec: float,
+        now: datetime | None = None,
+        limits: CallLimits | None = None,
+    ) -> WriteResult:
+        """`write_docs` の要求を処理して書き込みの結果を返す。"""
+        now = now or datetime.now(UTC)
+        _check_operations(request.operations)
+        target = resolve_write_target(
+            registry=registry, source=request.source, worktree=request.worktree, cwd=request.cwd
+        )
+        source = target.source
+        key = SessionKey.of(request.session_id, request.agent_id)
+        with locks.hold(source.id):
+            session = _Session(
+                store, target, deadline=None if limits is None else limits.write_deadline
+            )
+            applied = _apply_operations(
+                session, checker, request.operations, seen.last_read(key, source.id), now
+            )
+            results = applied.results
+            if applied.failures and request.atomic:
+>               raise _atomic_error(applied.failures)
+E               project_index.shared.errors.InvalidArgumentError: 引数が正しくありません: 1 件
+
+src/project_index/features/write/service.py:737: InvalidArgumentError
+_______ test_write_docs_when_body_file_absent_rejected[create_body_only] _______
+
+make_env = <function make_env.<locals>._make at 0x7aca06079010>
+operation = Operation(op='create', kind='notes', id=None, expected_version=None, data={'id': 'n6', '@body': 'x'}, set={}, unset=[], add_to={}, remove_from={}, text_edits=[], new_id=None, new_path=None, filter=None, old=None, new=None, fields=None)
+expected_path = 'operations[0].data.path'
+
+    @pytest.mark.parametrize(
+        ("operation", "expected_path"),
+        [
+            pytest.param(
+                Operation(op="create", kind="notes", data={"id": "n6", "@body": "x"}),
+                "operations[0].data.path",
+                id="create_body_only",
+            ),
+            pytest.param(
+                Operation(op="update", id="n3", expected_version=N3_VERSION, set={"@body": "x"}),
+                "operations[0].set.path",
+                id="update_body_only",
+            ),
+            pytest.param(
+                Operation(op="update", id="n3", expected_version=N3_VERSION, set={"path": "n3.md"}),
+                "operations[0].set.@body",
+                id="update_column_only",
+            ),
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="n3",
+                    expected_version=N3_VERSION,
+                    text_edits=[TextEdit(field="@body", old="a", new="b")],
+                ),
+                "operations[0].text_edits[0].field",
+                id="text_edits_body",
+            ),
+            pytest.param(
+                Operation(op="rename", id="n3", expected_version=N3_VERSION, new_path="notes/n3.md"),
+                "operations[0].new_path",
+                id="rename_new_path",
+            ),
+            pytest.param(
+                Operation(op="update", id="n1", expected_version=N1_VERSION, unset=["path"]),
+                "operations[0].unset.path",
+                id="unset_column",
+            ),
+            pytest.param(
+                Operation(op="replace", id="n1", expected_version=N1_VERSION, data={"id": "n1"}),
+                "operations[0].data.path",
+                id="replace_without_column",
+            ),
+        ],
+    )
+    def test_write_docs_when_body_file_absent_rejected(
+        make_env: Callable[..., WriteEnv], operation: Operation, expected_path: str
+    ) -> None:
+        """本文のファイルの有無を片方だけで切り替える操作（異常系）。"""
+        # 準備
+        env = make_env(_absent_files(), tables=[_notes_table()])
+        # 実行・検証
+        with pytest.raises(InvalidArgumentError) as exc_info:
+>           env.write(operations=[operation])
+
+tests/unit/project_index/features/write/test_service.py:913: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/project_index/features/write/test_service.py:87: in write
+    return write_docs(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+request = WriteRequest(operations=[Operation(op='create', kind='notes', id=None, expected_version=None, data={'id': 'n6', '@body...ytest-of-shuhei2441/pytest-1/test_write_docs_when_body_file4/repo/.claude/worktrees/x', session_id=None, agent_id=None)
+registry = <tests.unit.project_index.conftest.FakeRegistry object at 0x7aca0482b850>
+store = <project_index.features.documents.store.DocumentStore object at 0x7aca047e4870>
+checker = <project_index.features.validation.service.DocumentChecker object at 0x7aca0492dc50>
+seen = <project_index.features.seen.store.SeenStore object at 0x7aca0492e0b0>
+locks = <project_index.features.write.locks.SourceLocks object at 0x7aca052dfcb0>
+timeout_sec = 10
+now = datetime.datetime(2026, 11, 18, 14, 18, 48, 414678, tzinfo=datetime.timezone.utc)
+limits = None
+
+    def write_docs(
+        request: WriteRequest,
+        *,
+        registry: SourceRegistry,
+        store: DocumentStore,
+        checker: DocumentChecker,
+        seen: SeenStore,
+        locks: SourceLocks,
+        timeout_sec: float,
+        now: datetime | None = None,
+        limits: CallLimits | None = None,
+    ) -> WriteResult:
+        """`write_docs` の要求を処理して書き込みの結果を返す。"""
+        now = now or datetime.now(UTC)
+        _check_operations(request.operations)
+        target = resolve_write_target(
+            registry=registry, source=request.source, worktree=request.worktree, cwd=request.cwd
+        )
+        source = target.source
+        key = SessionKey.of(request.session_id, request.agent_id)
+        with locks.hold(source.id):
+            session = _Session(
+                store, target, deadline=None if limits is None else limits.write_deadline
+            )
+            applied = _apply_operations(
+                session, checker, request.operations, seen.last_read(key, source.id), now
+            )
+            results = applied.results
+            if applied.failures and request.atomic:
+>               raise _atomic_error(applied.failures)
+E               project_index.shared.errors.ValidationFailedError: 検査に通らない操作があります: 1 件
+
+src/project_index/features/write/service.py:737: ValidationFailedError
+_______ test_write_docs_when_body_file_absent_rejected[update_body_only] _______
+
+make_env = <function make_env.<locals>._make at 0x7aca072494e0>
+operation = Operation(op='update', kind=None, id='n3', expected_version='362ae2', data=None, set={'@body': 'x'}, unset=[], add_to={}, remove_from={}, text_edits=[], new_id=None, new_path=None, filter=None, old=None, new=None, fields=None)
+expected_path = 'operations[0].set.path'
+
+    @pytest.mark.parametrize(
+        ("operation", "expected_path"),
+        [
+            pytest.param(
+                Operation(op="create", kind="notes", data={"id": "n6", "@body": "x"}),
+                "operations[0].data.path",
+                id="create_body_only",
+            ),
+            pytest.param(
+                Operation(op="update", id="n3", expected_version=N3_VERSION, set={"@body": "x"}),
+                "operations[0].set.path",
+                id="update_body_only",
+            ),
+            pytest.param(
+                Operation(op="update", id="n3", expected_version=N3_VERSION, set={"path": "n3.md"}),
+                "operations[0].set.@body",
+                id="update_column_only",
+            ),
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="n3",
+                    expected_version=N3_VERSION,
+                    text_edits=[TextEdit(field="@body", old="a", new="b")],
+                ),
+                "operations[0].text_edits[0].field",
+                id="text_edits_body",
+            ),
+            pytest.param(
+                Operation(op="rename", id="n3", expected_version=N3_VERSION, new_path="notes/n3.md"),
+                "operations[0].new_path",
+                id="rename_new_path",
+            ),
+            pytest.param(
+                Operation(op="update", id="n1", expected_version=N1_VERSION, unset=["path"]),
+                "operations[0].unset.path",
+                id="unset_column",
+            ),
+            pytest.param(
+                Operation(op="replace", id="n1", expected_version=N1_VERSION, data={"id": "n1"}),
+                "operations[0].data.path",
+                id="replace_without_column",
+            ),
+        ],
+    )
+    def test_write_docs_when_body_file_absent_rejected(
+        make_env: Callable[..., WriteEnv], operation: Operation, expected_path: str
+    ) -> None:
+        """本文のファイルの有無を片方だけで切り替える操作（異常系）。"""
+        # 準備
+        env = make_env(_absent_files(), tables=[_notes_table()])
+        # 実行・検証
+        with pytest.raises(InvalidArgumentError) as exc_info:
+>           env.write(operations=[operation])
+
+tests/unit/project_index/features/write/test_service.py:913: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/project_index/features/write/test_service.py:87: in write
+    return write_docs(
+src/project_index/features/write/service.py:737: in write_docs
+    raise _atomic_error(applied.failures)
+src/project_index/features/write/service.py:780: in _apply_operations
+    done = _apply_one(session, checker, operation, index, last_reads, created_ids, now)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/project_index/features/write/service.py:866: in _apply_one
+    return [_apply_existing_one(session, checker, operation, index, last_reads, now)]
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+session = _Session(store=<project_index.features.documents.store.DocumentStore object at 0x7aca04524120>, target=Target(source=S...timezone(datetime.timedelta(seconds=32400))))}, pending={}, bodies={}, tables={}, markdown_stopped=None, deadline=None)
+checker = <project_index.features.validation.service.DocumentChecker object at 0x7aca0492d1d0>
+operation = Operation(op='update', kind=None, id='n3', expected_version='362ae2', data=None, set={'@body': 'x'}, unset=[], add_to={}, remove_from={}, text_edits=[], new_id=None, new_path=None, filter=None, old=None, new=None, fields=None)
+index = 0, last_reads = {}
+now = datetime.datetime(2026, 11, 18, 14, 18, 48, 489245, tzinfo=datetime.timezone.utc)
+
+    def _apply_existing_one(
+        session: _Session,
+        checker: DocumentChecker,
+        operation: Operation,
+        index: int,
+        last_reads: Mapping[str, LastRead],
+        now: datetime,
+    ) -> tuple[WriteResultItem, DocumentTable]:
+        """`update`・`replace` 1 件を当てて検査し、通れば記録する。"""
+        if operation.id is None:
+            msg = "操作に id がありません"
+            raise RuntimeError(msg)
+        existing = session.docs.get(operation.id)
+        if existing is None:
+>           raise not_found_error(session.source_id, [operation.id], list(session.docs))
+E           project_index.shared.errors.DocumentNotFoundError: sample: 文書 n3 はありません
+
+src/project_index/features/write/service.py:934: DocumentNotFoundError
+______ test_write_docs_when_body_file_absent_rejected[update_column_only] ______
+
+make_env = <function make_env.<locals>._make at 0x7aca073f6fb0>
+operation = Operation(op='update', kind=None, id='n3', expected_version='362ae2', data=None, set={'path': 'n3.md'}, unset=[], add_to={}, remove_from={}, text_edits=[], new_id=None, new_path=None, filter=None, old=None, new=None, fields=None)
+expected_path = 'operations[0].set.@body'
+
+    @pytest.mark.parametrize(
+        ("operation", "expected_path"),
+        [
+            pytest.param(
+                Operation(op="create", kind="notes", data={"id": "n6", "@body": "x"}),
+                "operations[0].data.path",
+                id="create_body_only",
+            ),
+            pytest.param(
+                Operation(op="update", id="n3", expected_version=N3_VERSION, set={"@body": "x"}),
+                "operations[0].set.path",
+                id="update_body_only",
+            ),
+            pytest.param(
+                Operation(op="update", id="n3", expected_version=N3_VERSION, set={"path": "n3.md"}),
+                "operations[0].set.@body",
+                id="update_column_only",
+            ),
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="n3",
+                    expected_version=N3_VERSION,
+                    text_edits=[TextEdit(field="@body", old="a", new="b")],
+                ),
+                "operations[0].text_edits[0].field",
+                id="text_edits_body",
+            ),
+            pytest.param(
+                Operation(op="rename", id="n3", expected_version=N3_VERSION, new_path="notes/n3.md"),
+                "operations[0].new_path",
+                id="rename_new_path",
+            ),
+            pytest.param(
+                Operation(op="update", id="n1", expected_version=N1_VERSION, unset=["path"]),
+                "operations[0].unset.path",
+                id="unset_column",
+            ),
+            pytest.param(
+                Operation(op="replace", id="n1", expected_version=N1_VERSION, data={"id": "n1"}),
+                "operations[0].data.path",
+                id="replace_without_column",
+            ),
+        ],
+    )
+    def test_write_docs_when_body_file_absent_rejected(
+        make_env: Callable[..., WriteEnv], operation: Operation, expected_path: str
+    ) -> None:
+        """本文のファイルの有無を片方だけで切り替える操作（異常系）。"""
+        # 準備
+        env = make_env(_absent_files(), tables=[_notes_table()])
+        # 実行・検証
+        with pytest.raises(InvalidArgumentError) as exc_info:
+>           env.write(operations=[operation])
+
+tests/unit/project_index/features/write/test_service.py:913: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/project_index/features/write/test_service.py:87: in write
+    return write_docs(
+src/project_index/features/write/service.py:737: in write_docs
+    raise _atomic_error(applied.failures)
+src/project_index/features/write/service.py:780: in _apply_operations
+    done = _apply_one(session, checker, operation, index, last_reads, created_ids, now)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/project_index/features/write/service.py:866: in _apply_one
+    return [_apply_existing_one(session, checker, operation, index, last_reads, now)]
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+session = _Session(store=<project_index.features.documents.store.DocumentStore object at 0x7aca047e7a00>, target=Target(source=S...timezone(datetime.timedelta(seconds=32400))))}, pending={}, bodies={}, tables={}, markdown_stopped=None, deadline=None)
+checker = <project_index.features.validation.service.DocumentChecker object at 0x7aca0492e7b0>
+operation = Operation(op='update', kind=None, id='n3', expected_version='362ae2', data=None, set={'path': 'n3.md'}, unset=[], add_to={}, remove_from={}, text_edits=[], new_id=None, new_path=None, filter=None, old=None, new=None, fields=None)
+index = 0, last_reads = {}
+now = datetime.datetime(2026, 11, 18, 14, 18, 48, 558401, tzinfo=datetime.timezone.utc)
+
+    def _apply_existing_one(
+        session: _Session,
+        checker: DocumentChecker,
+        operation: Operation,
+        index: int,
+        last_reads: Mapping[str, LastRead],
+        now: datetime,
+    ) -> tuple[WriteResultItem, DocumentTable]:
+        """`update`・`replace` 1 件を当てて検査し、通れば記録する。"""
+        if operation.id is None:
+            msg = "操作に id がありません"
+            raise RuntimeError(msg)
+        existing = session.docs.get(operation.id)
+        if existing is None:
+>           raise not_found_error(session.source_id, [operation.id], list(session.docs))
+E           project_index.shared.errors.DocumentNotFoundError: sample: 文書 n3 はありません
+
+src/project_index/features/write/service.py:934: DocumentNotFoundError
+_______ test_write_docs_when_body_file_absent_rejected[text_edits_body] ________
+
+make_env = <function make_env.<locals>._make at 0x7aca049bb480>
+operation = Operation(op='update', kind=None, id='n3', expected_version='362ae2', data=None, set={}, unset=[], add_to={}, remove_f...body', old='a', new='b', replace_all=False)], new_id=None, new_path=None, filter=None, old=None, new=None, fields=None)
+expected_path = 'operations[0].text_edits[0].field'
+
+    @pytest.mark.parametrize(
+        ("operation", "expected_path"),
+        [
+            pytest.param(
+                Operation(op="create", kind="notes", data={"id": "n6", "@body": "x"}),
+                "operations[0].data.path",
+                id="create_body_only",
+            ),
+            pytest.param(
+                Operation(op="update", id="n3", expected_version=N3_VERSION, set={"@body": "x"}),
+                "operations[0].set.path",
+                id="update_body_only",
+            ),
+            pytest.param(
+                Operation(op="update", id="n3", expected_version=N3_VERSION, set={"path": "n3.md"}),
+                "operations[0].set.@body",
+                id="update_column_only",
+            ),
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="n3",
+                    expected_version=N3_VERSION,
+                    text_edits=[TextEdit(field="@body", old="a", new="b")],
+                ),
+                "operations[0].text_edits[0].field",
+                id="text_edits_body",
+            ),
+            pytest.param(
+                Operation(op="rename", id="n3", expected_version=N3_VERSION, new_path="notes/n3.md"),
+                "operations[0].new_path",
+                id="rename_new_path",
+            ),
+            pytest.param(
+                Operation(op="update", id="n1", expected_version=N1_VERSION, unset=["path"]),
+                "operations[0].unset.path",
+                id="unset_column",
+            ),
+            pytest.param(
+                Operation(op="replace", id="n1", expected_version=N1_VERSION, data={"id": "n1"}),
+                "operations[0].data.path",
+                id="replace_without_column",
+            ),
+        ],
+    )
+    def test_write_docs_when_body_file_absent_rejected(
+        make_env: Callable[..., WriteEnv], operation: Operation, expected_path: str
+    ) -> None:
+        """本文のファイルの有無を片方だけで切り替える操作（異常系）。"""
+        # 準備
+        env = make_env(_absent_files(), tables=[_notes_table()])
+        # 実行・検証
+        with pytest.raises(InvalidArgumentError) as exc_info:
+>           env.write(operations=[operation])
+
+tests/unit/project_index/features/write/test_service.py:913: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/project_index/features/write/test_service.py:87: in write
+    return write_docs(
+src/project_index/features/write/service.py:737: in write_docs
+    raise _atomic_error(applied.failures)
+src/project_index/features/write/service.py:780: in _apply_operations
+    done = _apply_one(session, checker, operation, index, last_reads, created_ids, now)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/project_index/features/write/service.py:866: in _apply_one
+    return [_apply_existing_one(session, checker, operation, index, last_reads, now)]
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+session = _Session(store=<project_index.features.documents.store.DocumentStore object at 0x7aca045247a0>, target=Target(source=S...timezone(datetime.timedelta(seconds=32400))))}, pending={}, bodies={}, tables={}, markdown_stopped=None, deadline=None)
+checker = <project_index.features.validation.service.DocumentChecker object at 0x7aca0492cec0>
+operation = Operation(op='update', kind=None, id='n3', expected_version='362ae2', data=None, set={}, unset=[], add_to={}, remove_f...body', old='a', new='b', replace_all=False)], new_id=None, new_path=None, filter=None, old=None, new=None, fields=None)
+index = 0, last_reads = {}
+now = datetime.datetime(2026, 11, 18, 14, 18, 48, 620560, tzinfo=datetime.timezone.utc)
+
+    def _apply_existing_one(
+        session: _Session,
+        checker: DocumentChecker,
+        operation: Operation,
+        index: int,
+        last_reads: Mapping[str, LastRead],
+        now: datetime,
+    ) -> tuple[WriteResultItem, DocumentTable]:
+        """`update`・`replace` 1 件を当てて検査し、通れば記録する。"""
+        if operation.id is None:
+            msg = "操作に id がありません"
+            raise RuntimeError(msg)
+        existing = session.docs.get(operation.id)
+        if existing is None:
+>           raise not_found_error(session.source_id, [operation.id], list(session.docs))
+E           project_index.shared.errors.DocumentNotFoundError: sample: 文書 n3 はありません
+
+src/project_index/features/write/service.py:934: DocumentNotFoundError
+_______ test_write_docs_when_body_file_absent_rejected[rename_new_path] ________
+
+make_env = <function make_env.<locals>._make at 0x7aca049bb320>
+operation = Operation(op='rename', kind=None, id='n3', expected_version='362ae2', data=None, set={}, unset=[], add_to={}, remove_from={}, text_edits=[], new_id=None, new_path='notes/n3.md', filter=None, old=None, new=None, fields=None)
+expected_path = 'operations[0].new_path'
+
+    @pytest.mark.parametrize(
+        ("operation", "expected_path"),
+        [
+            pytest.param(
+                Operation(op="create", kind="notes", data={"id": "n6", "@body": "x"}),
+                "operations[0].data.path",
+                id="create_body_only",
+            ),
+            pytest.param(
+                Operation(op="update", id="n3", expected_version=N3_VERSION, set={"@body": "x"}),
+                "operations[0].set.path",
+                id="update_body_only",
+            ),
+            pytest.param(
+                Operation(op="update", id="n3", expected_version=N3_VERSION, set={"path": "n3.md"}),
+                "operations[0].set.@body",
+                id="update_column_only",
+            ),
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="n3",
+                    expected_version=N3_VERSION,
+                    text_edits=[TextEdit(field="@body", old="a", new="b")],
+                ),
+                "operations[0].text_edits[0].field",
+                id="text_edits_body",
+            ),
+            pytest.param(
+                Operation(op="rename", id="n3", expected_version=N3_VERSION, new_path="notes/n3.md"),
+                "operations[0].new_path",
+                id="rename_new_path",
+            ),
+            pytest.param(
+                Operation(op="update", id="n1", expected_version=N1_VERSION, unset=["path"]),
+                "operations[0].unset.path",
+                id="unset_column",
+            ),
+            pytest.param(
+                Operation(op="replace", id="n1", expected_version=N1_VERSION, data={"id": "n1"}),
+                "operations[0].data.path",
+                id="replace_without_column",
+            ),
+        ],
+    )
+    def test_write_docs_when_body_file_absent_rejected(
+        make_env: Callable[..., WriteEnv], operation: Operation, expected_path: str
+    ) -> None:
+        """本文のファイルの有無を片方だけで切り替える操作（異常系）。"""
+        # 準備
+        env = make_env(_absent_files(), tables=[_notes_table()])
+        # 実行・検証
+        with pytest.raises(InvalidArgumentError) as exc_info:
+>           env.write(operations=[operation])
+
+tests/unit/project_index/features/write/test_service.py:913: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/project_index/features/write/test_service.py:87: in write
+    return write_docs(
+src/project_index/features/write/service.py:737: in write_docs
+    raise _atomic_error(applied.failures)
+src/project_index/features/write/service.py:780: in _apply_operations
+    done = _apply_one(session, checker, operation, index, last_reads, created_ids, now)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/project_index/features/write/service.py:863: in _apply_one
+    return _apply_rename_one(session, checker, operation, index, last_reads, now)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+session = _Session(store=<project_index.features.documents.store.DocumentStore object at 0x7aca047e7ad0>, target=Target(source=S...timezone(datetime.timedelta(seconds=32400))))}, pending={}, bodies={}, tables={}, markdown_stopped=None, deadline=None)
+checker = <project_index.features.validation.service.DocumentChecker object at 0x7aca052f6e40>
+operation = Operation(op='rename', kind=None, id='n3', expected_version='362ae2', data=None, set={}, unset=[], add_to={}, remove_from={}, text_edits=[], new_id=None, new_path='notes/n3.md', filter=None, old=None, new=None, fields=None)
+index = 0, last_reads = {}
+now = datetime.datetime(2026, 11, 18, 14, 18, 48, 685250, tzinfo=datetime.timezone.utc)
+
+    def _apply_rename_one(
+        session: _Session,
+        checker: DocumentChecker,
+        operation: Operation,
+        index: int,
+        last_reads: Mapping[str, LastRead],
+        now: datetime,
+    ) -> list[tuple[WriteResultItem, DocumentTable]]:
+        """`rename` 1 件を当てて、改名した文書と参照元を検査し、通れば記録する。"""
+        if operation.id is None or operation.expected_version is None:
+            msg = "rename に id か expected_version がありません"
+            raise RuntimeError(msg)
+        existing = session.docs.get(operation.id)
+        if existing is None:
+>           raise not_found_error(session.source_id, [operation.id], list(session.docs))
+E           project_index.shared.errors.DocumentNotFoundError: sample: 文書 n3 はありません
+
+src/project_index/features/write/service.py:1247: DocumentNotFoundError
+_________ test_write_docs_when_body_file_absent_rejected[unset_column] _________
+
+make_env = <function make_env.<locals>._make at 0x7aca046c5010>
+operation = Operation(op='update', kind=None, id='n1', expected_version='eba65c', data=None, set={}, unset=['path'], add_to={}, remove_from={}, text_edits=[], new_id=None, new_path=None, filter=None, old=None, new=None, fields=None)
+expected_path = 'operations[0].unset.path'
+
+    @pytest.mark.parametrize(
+        ("operation", "expected_path"),
+        [
+            pytest.param(
+                Operation(op="create", kind="notes", data={"id": "n6", "@body": "x"}),
+                "operations[0].data.path",
+                id="create_body_only",
+            ),
+            pytest.param(
+                Operation(op="update", id="n3", expected_version=N3_VERSION, set={"@body": "x"}),
+                "operations[0].set.path",
+                id="update_body_only",
+            ),
+            pytest.param(
+                Operation(op="update", id="n3", expected_version=N3_VERSION, set={"path": "n3.md"}),
+                "operations[0].set.@body",
+                id="update_column_only",
+            ),
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="n3",
+                    expected_version=N3_VERSION,
+                    text_edits=[TextEdit(field="@body", old="a", new="b")],
+                ),
+                "operations[0].text_edits[0].field",
+                id="text_edits_body",
+            ),
+            pytest.param(
+                Operation(op="rename", id="n3", expected_version=N3_VERSION, new_path="notes/n3.md"),
+                "operations[0].new_path",
+                id="rename_new_path",
+            ),
+            pytest.param(
+                Operation(op="update", id="n1", expected_version=N1_VERSION, unset=["path"]),
+                "operations[0].unset.path",
+                id="unset_column",
+            ),
+            pytest.param(
+                Operation(op="replace", id="n1", expected_version=N1_VERSION, data={"id": "n1"}),
+                "operations[0].data.path",
+                id="replace_without_column",
+            ),
+        ],
+    )
+    def test_write_docs_when_body_file_absent_rejected(
+        make_env: Callable[..., WriteEnv], operation: Operation, expected_path: str
+    ) -> None:
+        """本文のファイルの有無を片方だけで切り替える操作（異常系）。"""
+        # 準備
+        env = make_env(_absent_files(), tables=[_notes_table()])
+        # 実行・検証
+        with pytest.raises(InvalidArgumentError) as exc_info:
+>           env.write(operations=[operation])
+
+tests/unit/project_index/features/write/test_service.py:913: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/project_index/features/write/test_service.py:87: in write
+    return write_docs(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+request = WriteRequest(operations=[Operation(op='update', kind=None, id='n1', expected_version='eba65c', data=None, set={}, unse...ytest-of-shuhei2441/pytest-1/test_write_docs_when_body_file9/repo/.claude/worktrees/x', session_id=None, agent_id=None)
+registry = <tests.unit.project_index.conftest.FakeRegistry object at 0x7aca0794bd90>
+store = <project_index.features.documents.store.DocumentStore object at 0x7aca04526d00>
+checker = <project_index.features.validation.service.DocumentChecker object at 0x7aca052f6cf0>
+seen = <project_index.features.seen.store.SeenStore object at 0x7aca052f7150>
+locks = <project_index.features.write.locks.SourceLocks object at 0x7aca048c1a30>
+timeout_sec = 10
+now = datetime.datetime(2026, 11, 18, 14, 18, 48, 756468, tzinfo=datetime.timezone.utc)
+limits = None
+
+    def write_docs(
+        request: WriteRequest,
+        *,
+        registry: SourceRegistry,
+        store: DocumentStore,
+        checker: DocumentChecker,
+        seen: SeenStore,
+        locks: SourceLocks,
+        timeout_sec: float,
+        now: datetime | None = None,
+        limits: CallLimits | None = None,
+    ) -> WriteResult:
+        """`write_docs` の要求を処理して書き込みの結果を返す。"""
+        now = now or datetime.now(UTC)
+        _check_operations(request.operations)
+        target = resolve_write_target(
+            registry=registry, source=request.source, worktree=request.worktree, cwd=request.cwd
+        )
+        source = target.source
+        key = SessionKey.of(request.session_id, request.agent_id)
+        with locks.hold(source.id):
+            session = _Session(
+                store, target, deadline=None if limits is None else limits.write_deadline
+            )
+            applied = _apply_operations(
+                session, checker, request.operations, seen.last_read(key, source.id), now
+            )
+            results = applied.results
+            if applied.failures and request.atomic:
+>               raise _atomic_error(applied.failures)
+E               project_index.shared.errors.ValidationFailedError: 検査に通らない操作があります: 1 件
+
+src/project_index/features/write/service.py:737: ValidationFailedError
+____ test_write_docs_when_body_file_absent_rejected[replace_without_column] ____
+
+make_env = <function make_env.<locals>._make at 0x7aca046c4300>
+operation = Operation(op='replace', kind=None, id='n1', expected_version='eba65c', data={'id': 'n1'}, set={}, unset=[], add_to={}, remove_from={}, text_edits=[], new_id=None, new_path=None, filter=None, old=None, new=None, fields=None)
+expected_path = 'operations[0].data.path'
+
+    @pytest.mark.parametrize(
+        ("operation", "expected_path"),
+        [
+            pytest.param(
+                Operation(op="create", kind="notes", data={"id": "n6", "@body": "x"}),
+                "operations[0].data.path",
+                id="create_body_only",
+            ),
+            pytest.param(
+                Operation(op="update", id="n3", expected_version=N3_VERSION, set={"@body": "x"}),
+                "operations[0].set.path",
+                id="update_body_only",
+            ),
+            pytest.param(
+                Operation(op="update", id="n3", expected_version=N3_VERSION, set={"path": "n3.md"}),
+                "operations[0].set.@body",
+                id="update_column_only",
+            ),
+            pytest.param(
+                Operation(
+                    op="update",
+                    id="n3",
+                    expected_version=N3_VERSION,
+                    text_edits=[TextEdit(field="@body", old="a", new="b")],
+                ),
+                "operations[0].text_edits[0].field",
+                id="text_edits_body",
+            ),
+            pytest.param(
+                Operation(op="rename", id="n3", expected_version=N3_VERSION, new_path="notes/n3.md"),
+                "operations[0].new_path",
+                id="rename_new_path",
+            ),
+            pytest.param(
+                Operation(op="update", id="n1", expected_version=N1_VERSION, unset=["path"]),
+                "operations[0].unset.path",
+                id="unset_column",
+            ),
+            pytest.param(
+                Operation(op="replace", id="n1", expected_version=N1_VERSION, data={"id": "n1"}),
+                "operations[0].data.path",
+                id="replace_without_column",
+            ),
+        ],
+    )
+    def test_write_docs_when_body_file_absent_rejected(
+        make_env: Callable[..., WriteEnv], operation: Operation, expected_path: str
+    ) -> None:
+        """本文のファイルの有無を片方だけで切り替える操作（異常系）。"""
+        # 準備
+        env = make_env(_absent_files(), tables=[_notes_table()])
+        # 実行・検証
+        with pytest.raises(InvalidArgumentError) as exc_info:
+>           env.write(operations=[operation])
+
+tests/unit/project_index/features/write/test_service.py:913: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/project_index/features/write/test_service.py:87: in write
+    return write_docs(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+request = WriteRequest(operations=[Operation(op='replace', kind=None, id='n1', expected_version='eba65c', data={'id': 'n1'}, set...test-of-shuhei2441/pytest-1/test_write_docs_when_body_file10/repo/.claude/worktrees/x', session_id=None, agent_id=None)
+registry = <tests.unit.project_index.conftest.FakeRegistry object at 0x7aca078290f0>
+store = <project_index.features.documents.store.DocumentStore object at 0x7aca0455a8f0>
+checker = <project_index.features.validation.service.DocumentChecker object at 0x7aca052f6ac0>
+seen = <project_index.features.seen.store.SeenStore object at 0x7aca052f74d0>
+locks = <project_index.features.write.locks.SourceLocks object at 0x7aca049902f0>
+timeout_sec = 10
+now = datetime.datetime(2026, 11, 18, 14, 18, 48, 831231, tzinfo=datetime.timezone.utc)
+limits = None
+
+    def write_docs(
+        request: WriteRequest,
+        *,
+        registry: SourceRegistry,
+        store: DocumentStore,
+        checker: DocumentChecker,
+        seen: SeenStore,
+        locks: SourceLocks,
+        timeout_sec: float,
+        now: datetime | None = None,
+        limits: CallLimits | None = None,
+    ) -> WriteResult:
+        """`write_docs` の要求を処理して書き込みの結果を返す。"""
+        now = now or datetime.now(UTC)
+        _check_operations(request.operations)
+        target = resolve_write_target(
+            registry=registry, source=request.source, worktree=request.worktree, cwd=request.cwd
+        )
+        source = target.source
+        key = SessionKey.of(request.session_id, request.agent_id)
+        with locks.hold(source.id):
+            session = _Session(
+                store, target, deadline=None if limits is None else limits.write_deadline
+            )
+            applied = _apply_operations(
+                session, checker, request.operations, seen.last_read(key, source.id), now
+            )
+            results = applied.results
+            if applied.failures and request.atomic:
+>               raise _atomic_error(applied.failures)
+E               project_index.shared.errors.ValidationFailedError: 検査に通らない操作があります: 1 件
+
+src/project_index/features/write/service.py:737: ValidationFailedError
+____________________ test_delete_docs_when_body_file_absent ____________________
+
+make_env = <function make_env.<locals>._make at 0x7aca077341a0>
+
+    def test_delete_docs_when_body_file_absent(make_env: Callable[..., WriteEnv]) -> None:
+        """本文のファイルを持たない要素を削除する（正常系）。"""
+        # 準備
+        files = {
+            "notes/index.yaml": "items:\n  - id: n1\n    path: n1.md\n  - id: n4\n",
+            "notes/n1.md": "# n1\n",
+        }
+        env = make_env(files, tables=[_notes_table()])
+        targets = [DeleteTarget(id="n4", expected_version=value_hash({"id": "n4"}))]
+        # 実行
+>       env.delete(targets=targets)
+
+tests/unit/project_index/features/write/test_service.py:1105: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/project_index/features/write/test_service.py:102: in delete
+    return delete_docs(
+src/project_index/features/write/service.py:1593: in delete_docs
+    raise failures[0][1]
+src/project_index/features/write/service.py:1579: in delete_docs
+    document, referrers = _delete_target(session, item, leaving, request.on_referenced)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+session = _Session(store=<project_index.features.documents.store.DocumentStore object at 0x7aca047e4600>, target=Target(source=S...timezone(datetime.timedelta(seconds=32400))))}, pending={}, bodies={}, tables={}, markdown_stopped=None, deadline=None)
+item = DeleteTarget(id='n4', expected_version='347dcc'), leaving = {'n4'}
+on_referenced = 'fail'
+
+    def _delete_target(
+        session: _Session, item: DeleteTarget, leaving: set[str], on_referenced: str
+    ) -> tuple[Document, list[Document]]:
+        """消す文書と、その文書を参照している文書を返す（消せなければ例外を送る）。"""
+        source = session.target.source
+        document = session.docs.get(item.id)
+        if document is None:
+>           raise not_found_error(session.source_id, [item.id], list(session.docs))
+E           project_index.shared.errors.DocumentNotFoundError: sample: 文書 n4 はありません
+
+src/project_index/features/write/service.py:1502: DocumentNotFoundError
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/documents/test_loader.py
+FAILED tests/unit/project_index/features/search/test_service.py::test_search_docs_when_problems_grouped
+FAILED tests/unit/project_index/features/sources/test_service.py::test_validate_source_config_when_write_dates
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_without_dates
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_body_file_absent
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_body_file_absent_rejected[create_body_only]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_body_file_absent_rejected[update_body_only]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_body_file_absent_rejected[update_column_only]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_body_file_absent_rejected[text_edits_body]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_body_file_absent_rejected[rename_new_path]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_body_file_absent_rejected[unset_column]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_body_file_absent_rejected[replace_without_column]
+FAILED tests/unit/project_index/features/write/test_service.py::test_delete_docs_when_body_file_absent
+12 failed, 1260 passed, 1 error in 24.85s

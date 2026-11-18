@@ -141,6 +141,12 @@ data_models:
         access: 公開
         default: None
         description: alias-inject の引用の種類。行の全文書のメタデータの `alias_type` になる
+      - name: write_dates
+        title: 書き込みの日時を付けるか
+        type: bool
+        access: 公開
+        default: 'True'
+        description: '`False` なら、Git 管理外の配信元と `storage.type: disk` の配信元でも、この行の文書を書き換えるときに `created`・`updated` を付けない'
     methods:
       - name: excludes
         title: 除外の名前に当たるか
