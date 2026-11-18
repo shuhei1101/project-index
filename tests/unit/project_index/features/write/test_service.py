@@ -923,6 +923,112 @@ def test_write_docs_when_body_file_absent_rejected(
     assert not (env.worktree / "notes/n3.md").exists()
 
 
+NESTED_NOTES = "items:\n  - id: n1\n    meta:\n      path: n1.md\n  - id: n3\n"
+NESTED_N1_VERSION = value_hash([{"id": "n1", "meta": {"path": "n1.md"}}, NOTE_1])
+
+
+def _nested_table() -> DocumentTable:
+    """`body_file` が入れ子の列（`meta.path`）の `records` の行を返す。"""
+    return DocumentTable(
+        id="notes",
+        paths=["notes/index.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        records="items",
+        body_file="meta.path",
+    )
+
+
+def _nested_files() -> dict[str, str]:
+    """入れ子の列で本文のファイルを持つ n1 と、持たない n3 を持つ配信元のファイルを返す。"""
+    return {
+        "notes/index.yaml": NESTED_NOTES,
+        "notes/n1.md": NOTE_1,
+        "schemas/rule.schema.yaml": SCHEMA,
+    }
+
+
+def test_write_docs_when_nested_body_file(make_env: Callable[..., WriteEnv]) -> None:
+    """入れ子の `body_file` の列の置き換え・更新・本文の付与（正常系）。"""
+    # 準備
+    env = make_env(_nested_files(), tables=[_nested_table()])
+    # 実行
+    replaced = env.write(
+        operations=[
+            Operation(
+                op="replace",
+                id="n1",
+                expected_version=NESTED_N1_VERSION,
+                data={"id": "n1", "meta": {"path": "n1.md"}, "title": "t"},
+            )
+        ]
+    )
+    updated = env.write(
+        operations=[
+            Operation(
+                op="update",
+                id="n1",
+                expected_version=replaced.results[0].version,
+                set={"meta.path": "n1.md", "title": "u"},
+            )
+        ]
+    )
+    bodied = env.write(
+        operations=[
+            Operation(
+                op="update",
+                id="n3",
+                expected_version=value_hash({"id": "n3"}),
+                set={"meta.path": "n3.md", "@body": "本文\n"},
+            )
+        ]
+    )
+    # 検証
+    index = (env.worktree / "notes/index.yaml").read_text(encoding="utf-8")
+    assert replaced.results[0].status == "replaced"
+    assert updated.results[0].status == "updated"
+    assert "title: u" in index
+    assert bodied.results[0].status == "updated"
+    assert (env.worktree / "notes/n3.md").read_text(encoding="utf-8") == "本文\n"
+    assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == NOTE_1
+
+
+@pytest.mark.parametrize(
+    ("operation", "expected_path"),
+    [
+        pytest.param(
+            Operation(op="replace", id="n1", expected_version=NESTED_N1_VERSION, data={"id": "n1"}),
+            "operations[0].data.meta.path",
+            id="replace_without_column",
+        ),
+        pytest.param(
+            Operation(
+                op="update", id="n1", expected_version=NESTED_N1_VERSION, unset=["meta.path"]
+            ),
+            "operations[0].unset.meta.path",
+            id="unset_column",
+        ),
+        pytest.param(
+            Operation(
+                op="update", id="n3", expected_version=value_hash({"id": "n3"}), set={"@body": "x"}
+            ),
+            "operations[0].set.meta.path",
+            id="update_body_only",
+        ),
+    ],
+)
+def test_write_docs_when_nested_body_file_rejected(
+    make_env: Callable[..., WriteEnv], operation: Operation, expected_path: str
+) -> None:
+    """入れ子の `body_file` の列を除く・片方だけを渡す操作（異常系）。"""
+    # 準備
+    env = make_env(_nested_files(), tables=[_nested_table()])
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError) as exc_info:
+        env.write(operations=[operation])
+    assert [v.path for v in exc_info.value.violations] == [expected_path]
+    assert (env.worktree / "notes/index.yaml").read_text(encoding="utf-8") == NESTED_NOTES
+
+
 def _with_related() -> dict[str, str]:
     """文書 1 の `related` が文書 2 を指す配信元のファイルを返す。"""
     return {
