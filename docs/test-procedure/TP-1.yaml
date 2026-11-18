@@ -11,7 +11,7 @@ layers:
     name: 単体テスト（バック）
     run_all: |-
       ```bash
-      uv run pytest tests/unit/
+      uv run --with-editable {observability のクローン} pytest tests/unit/
       ```
     description: pytest で実行する。プロセスの外のもの（ネットワーク・常駐のサーバー）に依存しない。
     prerequisites:
@@ -20,7 +20,7 @@ layers:
       label: ファイル
       command: |-
         ```bash
-        uv run pytest {単体テストファイルパス}
+        uv run --with-editable {observability のクローン} pytest {単体テストファイルパス}
         ```
     parallel: true
     location: runner
@@ -32,7 +32,7 @@ layers:
     name: 結合テスト（バック）
     run_all: |-
       ```bash
-      uv run pytest tests/integration/
+      uv run --with-editable {observability のクローン} pytest tests/integration/
       ```
     description: |-
       pytest で実行する。一時フォルダに git の配信元を作り、アプリを HTTP のテストのクライアントで呼ぶ。起動・再起動・更新のテストは `project-index serve` を子プロセスで空きポートに起動する。
@@ -44,7 +44,7 @@ layers:
       label: ファイル
       command: |-
         ```bash
-        uv run pytest {結合テストのパス}
+        uv run --with-editable {observability のクローン} pytest {結合テストのパス}
         ```
     parallel: false
     location: runner
@@ -75,3 +75,4 @@ id: TP-1
 visibility: internal
 prerequisites:
   - Python 3.14 と uv（`uv sync` で開発の依存を入れておく）
+  - '`run_all`・`run_one` の `{observability のクローン}` は observability のクローンのパス（例: `~/repo/observability`）にする。observability の pytest のプラグインがテストの実行を観測基盤へ送信する。クローンが無い環境では `uv run pytest` で回す'
