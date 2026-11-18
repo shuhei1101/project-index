@@ -550,12 +550,36 @@ def _given(operation: Operation) -> tuple[str, Mapping[str, Any]]:
     return "data", operation.data or {}
 
 
+_ABSENT = object()
+
+
+def _column_value(operation: Operation, column: str) -> tuple[bool, object]:
+    """操作が `body_file` の列を持つかと、その値を返す。
+
+    `update` の `set` は項目のパス（`meta.path`）をキーに持つため、キーの一致で引く。
+    `create`・`replace` の `data` は入れ子の辞書のため、項目のパスをたどって引く。
+    """
+    if operation.op == "update":
+        return column in operation.set, operation.set.get(column)
+    value = get_field(operation.data or {}, column, default=_ABSENT)
+    return value is not _ABSENT, None if value is _ABSENT else value
+
+
+def _has_body_path(operation: Operation, column: str) -> bool:
+    """操作が `body_file` の列に、本文のファイルのパスになりうる値（`None`・空の文字列でない）を持つか。"""
+    if operation.op == "update":
+        value = operation.set.get(column)
+        return value is not None and value != ""
+    # `data` は読み込みと同じ判定（『本文のファイルを持たない要素の判定』）
+    return not lacks_body_file(operation.data or {}, column)
+
+
 def _one_sided_body(
     operation: Operation, table: DocumentTable, item: str, given: Mapping[str, Any]
 ) -> list[Violation]:
     """`body_file` の列の値と `@body` の片方だけを渡したときの違反（両方とも無ければ本文なし）。"""
     column = table.body_file or ""
-    has_column = not lacks_body_file(given, column)
+    has_column = _has_body_path(operation, column)
     has_body = BODY_KEY in given
     # 本文だけ: 本文のファイルのパスが決まらない
     if has_body and not has_column:
@@ -607,7 +631,8 @@ def _missing_body(operation: Operation, table: DocumentTable, item: str) -> list
 
 def _moved_body(operation: Operation, column: str, existing: Document) -> list[Violation]:
     """`update`・`replace` で `body_file` の列の値を変える（除くことを含む）ときの違反。"""
-    item, given = _given(operation)
+    item, _ = _given(operation)
+    present, value = _column_value(operation, column)
     current = get_field(existing.data, column)
     # `unset` で列を除く: 本文のファイルを外す操作は無い
     if operation.op == "update" and column in operation.unset:
@@ -619,7 +644,7 @@ def _moved_body(operation: Operation, column: str, existing: Document) -> list[V
             )
         ]
     # `replace` の data に列が無い: 置き換えで列が無くなる
-    if operation.op == "replace" and column not in given:
+    if operation.op == "replace" and not present:
         return [
             Violation(
                 path=f"data.{column}",
@@ -627,7 +652,7 @@ def _moved_body(operation: Operation, column: str, existing: Document) -> list[V
                 fix=f"data に今の値（{current}）の {column} を加えてください",
             )
         ]
-    if column not in given or given[column] == current:
+    if not present or value == current:
         return []
     return [
         Violation(
@@ -651,9 +676,9 @@ def _create_body(
         return {}
     _, given = _given(operation)
     # 列の値も本文も無い: 本文のファイルを持たない要素のまま
-    if lacks_body_file(given, column) and BODY_KEY not in given:
+    if not _has_body_path(operation, column) and BODY_KEY not in given:
         return {}
-    value = get_field(given, column)
+    _, value = _column_value(operation, column)
     body_path = resolve_body_path(path, value)
     if body_path is None or session.body_exists(body_path):
         rule = (
