@@ -25,6 +25,11 @@ if ! (exec 3<>/dev/tcp/127.0.0.1/14317) 2>/dev/null; then
   echo "exec 3<>/dev/tcp/127.0.0.1/14317"
   exit 1
 fi
+if ! (exec 3<>/dev/tcp/127.0.0.1/4317) 2>/dev/null; then
+  echo "前提確認: failed"
+  echo "exec 3<>/dev/tcp/127.0.0.1/4317"
+  exit 1
+fi
 echo "前提確認: ok"
 
 # 計画（--dry-run もここを通る）

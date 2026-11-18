@@ -20,6 +20,14 @@ else
   rc=1
 fi
 
+if (exec 3<>/dev/tcp/127.0.0.1/4317) 2>/dev/null; then
+  echo "観測基盤の Collector 127.0.0.1:4317: ok"
+else
+  echo "観測基盤の Collector 127.0.0.1:4317: failed"
+  echo "exec 3<>/dev/tcp/127.0.0.1/4317"
+  rc=1
+fi
+
 if err=$(curl -sS -m 5 -o /dev/null 'http://127.0.0.1:9090/-/ready' 2>&1); then
   echo "Prometheus 127.0.0.1:9090: ok"
 else
