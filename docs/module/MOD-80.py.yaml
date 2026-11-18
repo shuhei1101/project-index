@@ -81,8 +81,8 @@ functions:
            - 違反が無ければ、どれかの値の削除する要素に当たる要素を全て除く
          - `add_to` はキーを『配列の項目の解決』（`create=True`。`schema` が `None` なら空のスキーマ）で解いた配列の末尾へ足す（配列でなければ違反。`#` で始まるキーは項目を作らない）。`remove_from` の後に当てる
          - `add_to`・`remove_from` のキーを解けない（`InvalidArgumentError`）場合は、送られた理由で `add_to.{キー}`・`remove_from.{キー}` の違反にする
-         - `text_edits` は文字列の項目の `old` を `new` にする。`field` が `#` で始まる場合は、`#` の後を『参照の型の項目のパスの解決』で `schema` と今の内容からキーと位置の並びに解き、その並びで取得して『並びで指した項目の書き込み』で書く（解けなければ `text_edits[{n}].field` の違反。`schema` が `None` なら空のスキーマで解き、配列は `x-key` を持たない違反になる）。`replace_all` が `False` で一致が 1 か所でない場合は違反
-      4. 違反は `Violation`（`path` は `set.a.b`・`text_edits[0].old` など。`fix` に一致した数と、`replace_all` か前後の文字を含めること）を集めて `InvalidArgumentError` で送る
+         - `text_edits` は文字列の項目の `old` を `new` にする。`field` が `#` で始まる場合は、`#` の後を『参照の型の項目のパスの解決』で `schema` と今の内容からキーと位置の並びに解き、その並びで取得して『並びで指した項目の書き込み』で書く（解けなければ `text_edits[{n}].field` の違反。`schema` が `None` なら空のスキーマで解き、配列は `x-key` を持たない違反になる）。`#` で始まらない項目のパスを解けない場合と、取得した値が文字列でない場合も `text_edits[{n}].field` の違反。この 3 つの違反は `rule` をそのままにし、`fix` に『項目のパスの指し方の案内』（通る配列が全て `x-key` を持つときは `#` と `x-key` の値で指す、`x-key` を持たない配列を 1 つでも通るときは `#` を付けずに全ての配列を位置で指す、配列・オブジェクトそのものは `set`・`add_to`・`remove_from` で書き換える）を入れる。`replace_all` が `False` で一致が 1 か所でない場合は違反
+      4. 違反は `Violation`（`path` は `set.a.b`・`text_edits[0].old` など。`old` の違反の `fix` に一致した数と、`replace_all` か前後の文字を含めること。`text_edits[{n}].field` の違反の `fix` は『項目のパスの指し方の案内』）を集めて `InvalidArgumentError` で送る
     exceptions:
       - name: InvalidArgumentError
         condition: 配列でない項目への追加・削除、`x-key` を持つ配列への `remove_from` の値に削除する要素が無い、`add_to`・`remove_from` のキーと `unset` の要素を解けない（要素の選び方を含む・`#` で始まるパスを解けない）、文字列でない項目への置き換え、`old` の一致が 1 か所でない
@@ -124,7 +124,7 @@ functions:
         summary: 参照の型の項目のパスが要素を指せない
         condition: 同じ内容に `#functions[missing].process` の `text_edits`
         mock: なし
-        expected: '`InvalidArgumentError` の違反の `path` が `text_edits[0].field`'
+        expected: '`InvalidArgumentError` の違反の `path` が `text_edits[0].field`、`fix` に `#functions[save].process`・位置で指す書き方・`set`・`add_to`・`remove_from`'
         exception: 該当する要素が無い
       - name: test_apply_operation_when_add_to_ref_path
         case: 正常
@@ -193,6 +193,20 @@ functions:
         mock: なし
         expected: '`flows` が B・C・`{name: A, summary: s9}` の順、`notes` が `[a]`'
         exception: '-'
+      - name: test_apply_operation_when_text_edit_not_string
+        case: 異常
+        summary: 文字列でない項目を指す
+        condition: '`functions`（`x-key: name`）が `load`・`save`・`save` の内容に、`#` で始まらない `functions[save].process` の `text_edits`（`[save]` はキー `save` が真の要素を選び、該当する要素が無いので値が空の配列になる）'
+        mock: なし
+        expected: '`InvalidArgumentError` の違反の `path` が `text_edits[0].field`、`rule` が `文字列ではない項目は置き換えられません`、`fix` が `test_apply_operation_when_text_edit_ref_path_unresolved` と同じ案内'
+        exception: 文字列でない項目への置き換え
+      - name: test_apply_operation_when_text_edit_path_invalid
+        case: 異常
+        summary: '# で始まらない項目のパスの記載方法の誤り'
+        condition: '`functions`（`x-key: name`）が `load`・`save`・`save` の内容に、`functions[send-form].process` の `text_edits`（`[...]` の中に記号を含む）'
+        mock: なし
+        expected: '`InvalidArgumentError` の違反の `path` が `text_edits[0].field`、`rule` に `記載方法が誤っています`、`fix` が `test_apply_operation_when_text_edit_ref_path_unresolved` と同じ案内'
+        exception: 項目のパスを解けない
   - name: to_columns
     title: 列名への読み替え
     kind: 関数

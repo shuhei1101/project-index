@@ -1104,7 +1104,7 @@ flows:
     expected:
       - 1 回目は 1 つ目の `save` の `process` の `書き出す` だけが `保存する` になり、`load` と 2 つ目の `save` は変わらない
       - 2 回目は 2 つ目の `save` の `process` だけが置き換わる
-      - 3 回目は既存の項目のパスのまま読み、`text_edits[0].field` の「文字列ではない項目は置き換えられません」を返却し、ファイルを書き換えない
+      - 3 回目は既存の項目のパスのまま読み、`text_edits[0].field` の「文字列ではない項目は置き換えられません」を返却し、ファイルを書き換えない。違反の `fix` は制約「text_edits の field の違反の修正方法」の 3 つを案内する
       - 4 回目は `notes` のキー `main.py の補足` の値だけが置き換わり、`.` で区切らずに 1 階層のキーとして読む。5 回目は `items[].name` の要素の `process` だけが置き換わる。6 回目は `notes` のキー `a[b]` の値だけが置き換わる
     test: test_normal_when_text_edits_ref_path
   - name: 異常系（参照の型の項目のパスが要素を指せない・InvalidArgumentError）
@@ -1141,7 +1141,7 @@ flows:
       - 1 回目は `text_edits[0].field` の違反で、`steps` が `x-key` を持たないことを返却する
       - 2 回目は `text_edits[0].field` の違反で、`functions` に `name` が `missing` の要素が無いことを返却する
       - 3 回目は `text_edits[0].field` の違反で、`name` が `save` の要素が 2 つしか無いことを返却する
-      - いずれもファイルを書き換えない
+      - いずれもファイルを書き換えない。違反の `fix` は制約「text_edits の field の違反の修正方法」の 3 つを案内する
       - 4 回目は `text_edits[0].field` の違反で、`notes` にキー `missing` が無いことを返却する。5 回目は `text_edits[0].field` の違反で、`[` の対応が取れず項目のパスの記載方法が誤っていることを返却する
     test: test_error_when_text_edits_ref_path_unresolved
   - name: 正常系（参照の型の項目のパスで配列へ追加・削除する）
@@ -1950,6 +1950,9 @@ constraints:
   - item: add_to の x-key を持つ配列
     constraint: '`add_to` のキーを解決した配列のスキーマ（`$ref` を解決した後）が `x-key` を持つときも、指定した要素を既にある要素の `x-key` の値と照合せずに末尾へ追加する。既にある要素と同じ `x-key` の値の要素も違反にせず追加し、同じ値の要素が複数になる（2 つ目以降は参照の型の項目のパスの `[{値}#{順番}]` で指す）'
     notes: 要素を置き換えるときは、1 つの `update` の `remove_from` に置き換える要素の `x-key` の値を、`add_to` に置き換えた後の要素を指定する（制約「1 つの操作の中の適用順」で削除してから追加するので、置き換えた要素は配列の末尾に移る）。`x-key` の値で指すと同じ値の要素を全て削除するので、同じ値の要素のうち 1 つだけを置き換えるときは、`remove_from` に置き換える要素のオブジェクトを指定する。配列全体を置き換えるときは `set` を使用する
+  - item: text_edits の field の違反の修正方法
+    constraint: '`text_edits[{n}].field` の違反（項目のパスを解決できない・指した項目が文字列でない）の `fix` は、通る配列が全て `x-key` を持つときは `#` で始めて `x-key` の値で指す（`#functions[save].process`）こと、`x-key` を持たない配列を 1 つでも通るときは `#` を付けずに全ての配列を位置で指す（`flows[35].expected[2]`）こと、配列・オブジェクトそのものは `text_edits` ではなく `set`・`add_to`・`remove_from` で書き換えることを案内する。違反になる条件と `rule`・`path` は変えない'
+    notes: '`set`・`unset`・`add_to`・`remove_from` と `search_docs` の項目のパスの違反には付けない'
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]

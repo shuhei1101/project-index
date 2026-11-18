@@ -844,6 +844,10 @@ def test_normal_when_text_edits_ref_path(
     assert third.is_error
     assert "text_edits[0].field" in third.text
     assert "文字列ではない項目は置き換えられません" in third.text
+    # fix: x-key の値で指す書き方・位置で指す書き方・配列とオブジェクトを書き換える操作
+    assert "#functions[save].process" in third.text
+    assert "flows[35].expected[2]" in third.text
+    assert "`set`・`add_to`・`remove_from`" in third.text
     assert after_third == before_third
     assert [item["status"] for item in fourth.data["results"]] == ["updated"]
     assert after_fourth["notes"] == {"main.py の補足": "4 保存する", "a[b]": "6 書き出す"}
@@ -899,6 +903,10 @@ def test_error_when_text_edits_ref_path_unresolved(
     assert result.is_error
     assert "text_edits[0].field" in result.text
     assert message in result.text
+    # fix: x-key の値で指す書き方・位置で指す書き方・配列とオブジェクトを書き換える操作
+    assert "#functions[save].process" in result.text
+    assert "flows[35].expected[2]" in result.text
+    assert "`set`・`add_to`・`remove_from`" in result.text
     assert path.read_text(encoding="utf-8") == before
 
 

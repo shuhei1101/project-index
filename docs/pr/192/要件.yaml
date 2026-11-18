@@ -1,0 +1,13 @@
+use_cases:
+- kind: single
+  scenario: docs/scenario/SC-7.yaml
+  impact: none
+  detail: 書き込みで置き換える項目を指し損ねたときに返す直し方の案内だけが増え、シナリオの流れと期待値は変わらない
+  depends_on: []
+docs: []
+scope_out:
+- item: features/documents/fields.py の parse_field_path・_split_ref_path の違反（項目のパス
+    … の記載方法が誤っています）への案内の追加
+  reason: 'search_docs・set・add_to・remove_from・unset と共有しており、text_edits 向けの案内を付けると他のツール・操作の違反に的外れの案内が出るため（Issue
+    #190 の受付判断で確定）'
+  plan: none
