@@ -16,13 +16,20 @@ RECURSIVE = "**/"
 
 def _undecided(table: DocumentTable) -> InvalidArgumentError:
     """配置先を決められないエラーを作る（添字は書き込みが付ける）。"""
+    # records を持つ行か
+    if table.records is not None:
+        # 持つ: 要素を追加する 1 つのファイルを先頭に指定させる
+        fix = "documents[].paths の先頭を glob を含まない 1 つのファイルにしてください"
+    else:
+        # 持たない: ID から 1 ファイルを作る glob を先頭に指定させる
+        fix = "documents[].paths の先頭を glob にしてください"
     return InvalidArgumentError(
         message=f"{table.id} の新しい文書の配置先を決められません",
         violations=[
             Violation(
                 path="kind",
                 rule=f"{table.id} の新しい文書の配置先を決められません",
-                fix="documents[].paths の先頭を glob にしてください",
+                fix=fix,
             )
         ],
     )
