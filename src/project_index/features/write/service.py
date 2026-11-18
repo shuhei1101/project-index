@@ -1178,7 +1178,11 @@ def _plan_rename(
             rule,
             "new_path を除いてください",
         )
-    if table.body_file is not None and existing.body_path is None and operation.new_path is not None:
+    if (
+        table.body_file is not None
+        and existing.body_path is None
+        and operation.new_path is not None
+    ):
         rule = f"{existing.id} は本文のファイルを持たないため new_path を受けません"
         raise _rename_invalid(rule, "new_path を除いてください")
     if table.records is not None:
