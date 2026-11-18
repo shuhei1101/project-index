@@ -52,7 +52,7 @@ functions:
       1. `records` がある場合、`paths[0]` が glob を含まなければ `(paths[0], True)` とし、含めば違反にする
       2. `records` が無い場合、`paths[0]` の最後の段の `*` を `doc_id` に置き換え、`**/` を除いたパスにする（例 `docs/**/*.yaml` → `docs/{doc_id}.yaml`）。glob を含まないパスは違反にする
       3. 決めたパスに文書の行.除外の名前に当たるかが `True` なら違反にする。当たらなければ返す
-      4. 違反は `path` が `operations[{i}].kind` の `InvalidArgumentError` で送る。配置先を決められないときは `fix` が `documents[].paths の先頭を glob にしてください`、除外の名前に当たるときは `rule` が `配置先 {パス} が {kind} の exclude に該当します`、`fix` が `id を変えるか、documents[].exclude から削除してください`
+      4. 違反は `path` が `operations[{i}].kind` の `InvalidArgumentError` で送る。配置先を決められないときは `rule` が `{kind} の新しい文書の配置先を決められません`、`fix` が `records` を持つ行では `documents[].paths の先頭を glob を含まない 1 つのファイルにしてください`、持たない行では `documents[].paths の先頭を glob にしてください`、除外の名前に当たるときは `rule` が `配置先 {パス} が {kind} の exclude に該当します`、`fix` が `id を変えるか、documents[].exclude から削除してください`
     exceptions:
       - name: InvalidArgumentError
         condition: 配置先を決められない
@@ -79,4 +79,16 @@ functions:
         condition: '`paths: [src/files.yaml]`・`records: files`・`body_file: path`・`exclude: [files.yaml]`'
         mock: なし
         expected: '`InvalidArgumentError` の違反の `path` が `kind`、`rule` に `src/files.yaml` を含む'
+      - name: test_new_document_path_when_records_glob
+        case: 異常
+        summary: records を持つ行で先頭が glob のため配置先を決められない
+        condition: '`paths: [data/*.yaml]`・`records: items`'
+        mock: なし
+        expected: '`InvalidArgumentError` の違反の `path` が `kind`、`fix` が `documents[].paths の先頭を glob を含まない 1 つのファイルにしてください`'
+      - name: test_new_document_path_when_no_glob
+        case: 異常
+        summary: records を持たない行で先頭が glob を含まないため配置先を決められない
+        condition: '`paths: [docs/list.yaml]`'
+        mock: なし
+        expected: '`InvalidArgumentError` の違反の `path` が `kind`、`fix` が `documents[].paths の先頭を glob にしてください`'
 visibility: internal
