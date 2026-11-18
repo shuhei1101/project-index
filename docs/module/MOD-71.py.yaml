@@ -178,7 +178,7 @@ data_models:
         kind: メソッド
         scope: public
         summary: ファイルがこの行の文書になるか（`paths` に当たり、除外の名前に当たらない）を返す
-        description: '`paths` で行を判定する箇所（ファイルの収集・変更の一覧・文書のページ）は全てこのメソッドで判定する。新しい文書の配置先は `excludes` で判定する。'
+        description: '`paths` で行を判定する箇所（ファイルの収集・変更の一覧・文書のページ）は全てこのメソッドで判定する。新しい文書の配置先は `excludes` で判定し、`records` を持たない行では続けてこのメソッドで判定する。'
         args:
           - name: path
             title: ファイルのパス
