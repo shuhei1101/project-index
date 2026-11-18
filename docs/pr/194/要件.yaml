@@ -1,0 +1,11 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: none
+    detail: 作成で書き込んでも文書にならない配置先を断る条件が増えるだけで、シナリオの流れと期待値は変わらない
+    depends_on: []
+docs: []
+scope_out:
+  - item: 'records を持たない行で配置先が paths に該当するが ID ごとに配置先が分かれない型（例: docs/**/index.yaml）を違反にするか'
+    reason: 最初の create は paths に該当する文書を書き込めており、違反にすると今書き込める操作を弾く破壊的変更になるため、受付判断で今の振る舞いを維持すると決めた。2 つ目の create は既存の「既にあります」の違反で断る
+    plan: none

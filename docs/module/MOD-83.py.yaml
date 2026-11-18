@@ -51,8 +51,8 @@ functions:
     process: |-
       1. `records` がある場合、`paths[0]` が glob を含まなければ `(paths[0], True)` とし、`paths` が空か glob を含めば違反にする
       2. `records` が無い場合、`paths[0]` の最後の段の `*` を `doc_id` に置き換え、`**/` を除いたパスにする（例 `docs/**/*.yaml` → `docs/{doc_id}.yaml`）。glob を含まないパスと、置き換えた後のファイル名に glob（`*`・`?`・`[`）が残るパス（例 `docs/*-*.yaml`）は違反にする
-      3. 決めたパスに文書の行.除外の名前に当たるかが `True` なら違反にする。当たらなければ返す
-      4. 違反は `path` が `operations[{i}].kind` の `InvalidArgumentError` で送る。配置先を決められないときは `rule` が `{kind} の新しい文書の配置先を決められません`、`fix` が `records` を持つ行では `documents[].paths の先頭を glob を含まない 1 つのファイルにしてください`、持たない行では、先頭が glob を含まないときは `documents[].paths の先頭を glob にしてください`、ファイル名に glob が残るときは `documents[].paths の先頭のファイル名の glob を * の 1 つだけにしてください`、除外の名前に当たるときは `rule` が `配置先 {パス} が {kind} の exclude に該当します`、`fix` が `id を変えるか、documents[].exclude から削除してください`
+      3. 決めたパスに文書の行.除外の名前に当たるかが `True` なら違反にする。`records` が無い場合は、続けて文書の行.この行の文書になるかが `False`（`**` 以外の glob を含むフォルダの階層を取り除いて `paths` のどれにも当たらない。例 `docs/*/README.md` → `docs/README.md`）なら違反にする。どちらも当てはまらなければ返す
+      4. 違反は `path` が `operations[{i}].kind` の `InvalidArgumentError` で送る。配置先を決められないときは `rule` が `{kind} の新しい文書の配置先を決められません`、`fix` が `records` を持つ行では `documents[].paths の先頭を glob を含まない 1 つのファイルにしてください`、持たない行では、先頭が glob を含まないときは `documents[].paths の先頭を glob にしてください`、ファイル名に glob が残るときは `documents[].paths の先頭のファイル名の glob を * の 1 つだけにしてください`、決めたパスが `paths` に当たらないときは `documents[].paths の先頭のフォルダの階層の glob を ** にしてください`、除外の名前に当たるときは `rule` が `配置先 {パス} が {kind} の exclude に該当します`、`fix` が `id を変えるか、documents[].exclude から削除してください`
     exceptions:
       - name: InvalidArgumentError
         condition: 配置先を決められない
@@ -97,4 +97,16 @@ functions:
         condition: '`paths: [docs/*-*.yaml]`'
         mock: なし
         expected: '`InvalidArgumentError` の違反の `path` が `kind`、`fix` が `documents[].paths の先頭のファイル名の glob を * の 1 つだけにしてください`'
+      - name: test_new_document_path_when_recursive_folder
+        case: 正常
+        summary: フォルダの階層が `**` だけで `paths` に当たる配置先は、ID がファイル名に入らなくても返却する
+        condition: '`paths: [docs/**/index.yaml]`'
+        mock: なし
+        expected: '`("docs/index.yaml", False)`'
+      - name: test_new_document_path_when_outside_paths
+        case: 異常
+        summary: records を持たない行で決めたパスが paths に当たらないため配置先を決められない
+        condition: '`paths: [docs/*/README.md]` と `paths: [docs/*/*.yaml]`'
+        mock: なし
+        expected: どちらも `InvalidArgumentError` の違反の `path` が `kind`、`fix` が `documents[].paths の先頭のフォルダの階層の glob を ** にしてください`
 visibility: internal

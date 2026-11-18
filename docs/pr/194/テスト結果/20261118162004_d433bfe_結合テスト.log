@@ -1,0 +1,14 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=integration -f paths="tests/integration/server/test_write_docs.py::test_normal_when_create tests/integration/server/test_write_docs.py::test_normal_when_kind_added_in_worktree" | ...)  # TP-1 の TL-2 の run_runner（実行 44257965949）
+
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 2 items
+
+tests/integration/server/test_write_docs.py::test_normal_when_create PASSED [ 50%]
+tests/integration/server/test_write_docs.py::test_normal_when_kind_added_in_worktree PASSED [100%]
+
+============================== 2 passed in 0.68s ===============================
