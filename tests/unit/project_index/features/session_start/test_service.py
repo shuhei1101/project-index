@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from project_index.features.post_write.notified import NotifiedStore
 from project_index.features.seen.store import SeenStore
 from project_index.features.seen.types import SessionKey
 from project_index.features.session_start.service import start_session
@@ -27,7 +28,7 @@ def test_start_session_when_cleared(tmp_path: Path, make_document: Callable[...,
     seen.mark_returned(key, "sample", "body", [make_document()])
     request = SessionStartRequest(session_id="s1", reason="clear")
     # 実行
-    result = start_session(request, seen=seen)
+    result = start_session(request, seen=seen, notified=NotifiedStore())
     # 検証
     assert result.forgotten is True
     assert seen.last_read(key, "sample") == {}
@@ -45,7 +46,7 @@ def test_start_session_when_compacted(
     seen.mark_returned(main_key, "sample", "body", [make_document()])
     request = SessionStartRequest(session_id="s1", agent_id="a1", reason="compact")
     # 実行
-    result = start_session(request, seen=seen)
+    result = start_session(request, seen=seen, notified=NotifiedStore())
     # 検証
     assert result.forgotten is True
     assert seen.last_read(agent_key, "sample") == {}
@@ -60,7 +61,21 @@ def test_start_session_when_resumed(tmp_path: Path, make_document: Callable[...,
     seen.mark_returned(key, "sample", "body", [make_document()])
     request = SessionStartRequest(session_id="s1", reason="resume")
     # 実行
-    result = start_session(request, seen=seen)
+    result = start_session(request, seen=seen, notified=NotifiedStore())
     # 検証
     assert result.forgotten is False
     assert list(seen.last_read(key, "sample")) == ["doc-1"]
+
+
+def test_start_session_when_notified(tmp_path: Path) -> None:
+    """通知済みの記録も削除する（正常系）。"""
+    # 準備
+    seen = _seen(tmp_path)
+    notified = NotifiedStore()
+    key = SessionKey("s1", "")
+    notified.take_new(key, ["/a"])
+    request = SessionStartRequest(session_id="s1", reason="clear")
+    # 実行
+    start_session(request, seen=seen, notified=notified)
+    # 検証
+    assert notified.take_new(key, ["/a"]) == ["/a"]
