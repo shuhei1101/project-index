@@ -1,0 +1,65 @@
+use_cases:
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: changed
+    detail: 手元のセッションが、データを書き込んだ後にコミットとプッシュまでを 1 回の呼び出しで終え、直後からリモートに残る流れを加える
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: 書き込み・削除にコミットの指定を付けると、既定のブランチへ取り込み・検査・書き込み・コミット・プッシュまでを行い、許可していない種類・ずれのある作業ツリー・断られたプッシュでは元に戻して断る分岐を加える
+    depends_on:
+      - docs/scenario/SC-1.yaml
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: changed
+    detail: 配信元の設定に直コミットを許可する種類を書き、確認してから配信に入れる流れと、誤った設定を確認で知らせる分岐を加える
+    depends_on:
+      - docs/scenario/SC-1.yaml
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: following
+    detail: 配信元の説明に、直コミットを許可した種類を示す記述へ追随する
+    depends_on:
+      - docs/scenario/SC-7.yaml
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: '`write_docs`・`delete_docs` のコミットの指定（引数・結果・断る条件・プッシュが断られたときの戻し方）を追加する'
+    status: todo
+  - page: docs/guide/設定.md
+    new: false
+    change: 直コミットの設定のキー（許可する種類・コミットするブランチ・種類ごとの呼べる作業場所）を追加する
+    status: todo
+  - page: docs/guide/コアコンセプト-配信元と権限.md
+    new: false
+    change: 直コミットの仕組み（使用する場面・許可の範囲・公開のリポジトリでの注意）を追加する
+    status: todo
+  - page: docs/glossary/GLO-1.yaml
+    new: false
+    change: 用語「直コミット」を追加する
+    status: todo
+  - page: docs/guide/用語集.md
+    new: false
+    change: 用語「直コミット」を追加する
+    status: todo
+  - page: schemas/project-index.schema.json
+    new: false
+    change: 直コミットの設定のキーを追加する（置き場所を配信元の設定に決めた場合）
+    status: todo
+scope_out:
+  - item: knowledge のネットミームの種類とスキーマ・直コミットの許可の設定・登録のスキル
+    reason: knowledge リポジトリの作業で、この作業 PR の直コミットの指定を前提にする後続（Issue の `## 依存・後続`）
+    plan: to_file
+  - item: rule-inject の `write_index_entry` と ai-monitor の連絡ボード（shuhei1101/ai-monitor#3404）への直コミットの適用
+    reason: この Issue の後に別に検討すると Issue に決まっている。他のリポジトリのツールで、この作業 PR の方式が決まってから中身が決まる
+    plan: to_file
+  - item: 規約・判定フローチャートなどエージェントの動きを変える文書の直コミット
+    reason: 最初は対象にしないと利用者が決めた（D-776 の案 A）。配信元の設定で種類を許可するだけで対象にできるため、project-index の変更は要らない
+    plan: none
+  - item: プッシュの後の CI の失敗の取得と打ち消しのコミットの提案
+    reason: 呼んだ側の登録のスキルが担う想定（Issue の手元で考えた一案）で、project-index のツールはプッシュの結果までを返す
+    plan: none
+  - item: AI Monitor のエージェントの作業での直コミットの使用
+    reason: 作業 PR の中でコミットの単位を決めるため使用しないと Issue に決まっている
+    plan: none
