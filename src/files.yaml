@@ -235,6 +235,14 @@ files:
   related:
   - to: MOD-30
     type: implements
+- path: project_index/features/history/blob.py
+  name: commit のファイルの blob の内容を、書き出さずに 1 本の `git cat-file --batch` から読む処理
+  description: commit のファイルの blob の内容を、書き出さずに 1 本の `git cat-file --batch` から読む処理を受け持ち、履歴の blob.py を修正するときに参照する。
+  tags:
+  - topic:履歴
+  related:
+  - to: MOD-171-1
+    type: implements
 - path: project_index/features/history/query.py
   name: git によるリビジョンの解決・一覧・変わったファイル・ファイルの日時・ワークツリーの一覧
   description: git によるリビジョンの解決・一覧・変わったファイル・ファイルの日時・ワークツリーの一覧を受け持ち、履歴の query.py を修正するときに参照する。
