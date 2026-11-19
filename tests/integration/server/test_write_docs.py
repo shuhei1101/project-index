@@ -2953,3 +2953,29 @@ SAMPLE_SCHEMA_ONE_LINE_NAME = (
     "  id: {type: string}\n"
     "  name: {type: string, pattern: '^[^\\n]+$'}\n"
 )
+
+
+def test_error_when_builtin_source_written(
+    make_builtin_clone: Callable[[], Path],
+    make_server: Callable[..., Any],
+) -> None:
+    """scope.write を持たない組み込みの配信元への書き込みを断る（異常系）。"""
+    # 準備
+    clone = make_builtin_clone()
+    env = make_server()
+    target = clone / "docs" / "guide" / "files.yml"
+    before = target.read_text(encoding="utf-8")
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(clone),
+        source="project-index",
+        operations=[
+            _update("docs/guide/配信元を登録する.md", "0000000", set={"name": "新しい名前"})
+        ],
+    )
+    # 検証
+    assert result.is_error
+    assert "SourceNotWritableError" in result.text
+    assert "project-index" in result.text
+    assert target.read_text(encoding="utf-8") == before

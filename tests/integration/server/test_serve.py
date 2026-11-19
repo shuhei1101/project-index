@@ -35,6 +35,7 @@ from project_index.server.mcp.result import (
     tool_prompt_id,
 )
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
+from tests.integration.server.conftest import SourceSpec
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -197,6 +198,7 @@ def _mcp(port: int, path: str, payload: dict[str, Any]) -> httpx.Response:
 
 def test_normal(
     make_source: Callable[..., Any],
+    make_builtin_clone: Callable[[], Path],
     write_settings: Callable[..., Path],
     free_port: Callable[[], int],
     start_serve: Callable[..., Any],
@@ -204,6 +206,7 @@ def test_normal(
 ) -> None:
     """端末の設定の 2 つの配信元を配信し始める（正常系）。"""
     # 準備
+    make_builtin_clone()
     sample = make_source("sample")
     notes = make_source("notes", git=False)
     settings = write_settings(sample, notes)
@@ -240,6 +243,7 @@ def test_normal(
     assert f"http://127.0.0.1:{port}/" in output
     assert "sample" in output
     assert "notes" in output
+    assert "project-index（組み込み）" in output
 
 
 def test_normal_when_mcp_path_without_slash(
@@ -1348,3 +1352,105 @@ def test_normal_when_git_storage_outside_work_tree(
     assert (
         "notes: sources[1].storage.type: フォルダが Git の作業ツリーの中にありません" in caplog.text
     )
+
+
+def test_normal_when_builtin_source_added(
+    make_builtin_clone: Callable[[], Path],
+    write_settings: Callable[..., Path],
+    make_server: Callable[..., Any],
+    free_port: Callable[[], int],
+    start_serve: Callable[..., Any],
+    wait_until_serving: Callable[..., None],
+    tmp_path: Path,
+) -> None:
+    """端末の設定に project-index の行が無いとき、クローンのガイドを組み込みの配信元として加える（正常系）。"""
+    # 準備
+    clone = make_builtin_clone()
+    before = {path: path.read_bytes() for path in clone.rglob("*") if path.is_file()}
+    settings = write_settings()
+    settings_text = settings.read_text(encoding="utf-8")
+    port = free_port()
+    process = start_serve(settings, port)
+    wait_until_serving(process, port)
+    # 実行
+    sources = httpx.get(f"http://127.0.0.1:{port}/sources", timeout=10)
+    process.terminate()
+    process.wait(timeout=15)
+    output = process.stdout.read() if process.stdout else ""
+    env = make_server()
+    guide = env.call(
+        "search_docs", cwd=str(tmp_path), source="project-index", outside_scope=True, format="json"
+    )
+    # 検証
+    assert "project-index（組み込み）" in output
+    assert "project-index" not in [row["id"] for row in sources.json()["sources"]]
+    assert not guide.is_error
+    assert sorted(doc["id"] for doc in guide.data["items"]) == [
+        "docs/guide/メタデータを付ける基準.md",
+        "docs/guide/配信元を登録する.md",
+    ]
+    assert guide.data.get("notes", []) == []
+    assert settings.read_text(encoding="utf-8") == settings_text
+    assert {path: path.read_bytes() for path in clone.rglob("*") if path.is_file()} == before
+
+
+def test_normal_when_builtin_source_registered(
+    make_builtin_clone: Callable[[], Path],
+    write_settings: Callable[..., Path],
+    free_port: Callable[[], int],
+    start_serve: Callable[..., Any],
+    wait_until_serving: Callable[..., None],
+) -> None:
+    """端末の設定に project-index の行があるときは、組み込みの配信元を加えない（正常系）。"""
+    # 準備
+    clone = make_builtin_clone()
+    registered = clone / "registered.yaml"
+    registered.write_text(
+        'version: "3"\n'
+        "name: project-index\n"
+        "documents:\n"
+        "  - id: files_guide\n"
+        "    paths: [docs/guide/files.yml]\n"
+        "    schema: templates/files.schema.yaml\n"
+        "    records: files\n"
+        "    body_file: path\n",
+        encoding="utf-8",
+    )
+    spec = SourceSpec(
+        id="project-index", folder=clone, config=[registered], scope_read=[clone], storage="disk"
+    )
+    settings = write_settings(spec)
+    port = free_port()
+    process = start_serve(settings, port)
+    wait_until_serving(process, port)
+    # 実行
+    sources = httpx.get(f"http://127.0.0.1:{port}/sources", timeout=10)
+    process.terminate()
+    process.wait(timeout=15)
+    output = process.stdout.read() if process.stdout else ""
+    # 検証
+    assert output.splitlines().count("project-index") == 1
+    assert "project-index（組み込み）" not in output
+    assert [row["id"] for row in sources.json()["sources"]] == ["project-index"]
+
+
+def test_normal_when_builtin_source_unavailable(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """クローンに project-index.yaml が無いときは、警告を書いて組み込みの配信元を加えずに起動を続ける（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    caplog.set_level(logging.WARNING)
+    # 実行
+    env = make_server(sample)
+    guide = env.call(
+        "search_docs", cwd=str(sample.folder), source="project-index", outside_scope=True
+    )
+    # 検証
+    assert env.client.get("/sources/sample/docs").status_code == 200
+    assert "組み込みの配信元を加えなかった" in caplog.text
+    assert str(tmp_path / "clone" / "project-index.yaml") in caplog.text
+    assert guide.is_error
