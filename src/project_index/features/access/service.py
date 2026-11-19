@@ -46,7 +46,7 @@ def find_worktree(source: ServedSource, path: Path) -> Path | None:
     return None
 
 
-def _base_of(source: ServedSource, worktree: Path | None) -> Path:
+def base_of(source: ServedSource, worktree: Path | None) -> Path:
     """文書の相対パスを解くフォルダ（ワークツリーでは、リポジトリからの相対位置をつなぐ）。"""
     if worktree is None:
         return source.root
@@ -281,10 +281,10 @@ def _worktree_target(
     """ワークツリーを読む場所を、そのワークツリーの設定で作り直した配信元で作る。"""
     # 再読み込みしない: 待つワークツリーを決めるだけなので、配信中の配信元のまま返す
     if not reload_worktree:
-        return Target(item, _base_of(item, wt), None, wt, access, outside_scope=outside)
+        return Target(item, base_of(item, wt), None, wt, access, outside_scope=outside)
     # 種類と文書の行をワークツリーの設定で参照するため、配信元を再読み込みする（検証に通らなければ伝える）
     reloaded = load_source_at(item, wt)
-    return Target(reloaded, _base_of(reloaded, wt), None, wt, access, outside_scope=outside)
+    return Target(reloaded, base_of(reloaded, wt), None, wt, access, outside_scope=outside)
 
 
 def _revision_target(item: ServedSource, ref: str, access: AccessLevel, outside: bool) -> Target:
@@ -356,4 +356,4 @@ def resolve_write_target(
     if wt is not None and reload_worktree:
         # 書く: 種類・配置先をそのワークツリーの設定で参照するため、配信元を再読み込みする
         item = load_source_at(item, wt)
-    return Target(item, _base_of(item, wt), None, wt, "write")
+    return Target(item, base_of(item, wt), None, wt, "write")
