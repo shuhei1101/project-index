@@ -98,10 +98,10 @@ functions:
       type: Notice | None
       description: 通知の対象でなければ `None`
     process: |-
-      1. 配信元ごとに、パスを含むフォルダ（`find_worktree` で見つけたワークツリーのフォルダか、配信元のフォルダ）を求め、最初に含む配信元を選ぶ
+      1. 配信元ごとに、文書の相対パスを解くフォルダを求め、パスを含む最初の配信元を選ぶ。フォルダは `find_worktree` で見つけたワークツリーを `base_of`（`access/service.py` の `_base_of` を public にしたもの。ワークツリーの中なら `worktree / root.relative_to(repo_root)`、無ければ `root`）に渡して求める
          - どの配信元も含まなければ `None` を返す（以降の手順は実行しない）
       2. フォルダからの相対パスが、配信元の設定ファイル（`config_files`）か、`records`・`body_file` を持つ行の管理用の YAML そのものなら `None` を返す
-      3. `records`・`body_file` を持つ行ごとに、行の `paths` に当たる管理用の YAML を求め、相対パスがその範囲に入るか（`unindexed_files` に `files=[相対パス]`・`body_paths=()` を渡して返るか）を、深いフォルダの管理用の YAML から順に確かめる
+      3. `records`・`body_file` を持つ行ごとに、行の `paths` に当たる管理用の YAML を求め、相対パスがその範囲に入るか（`unindexed_files` に `files=[相対パス]`・`body_paths=()` と、`documents/store.py` の同期の検査と同じ `others`（その行以外の文書の行）・`nested_dirs`（より深いフォルダの管理用の YAML のフォルダ）・`ignored`（Git の配信元なら Git が無視するパス）を渡して返るか）を、深いフォルダの管理用の YAML から順に確かめる
          - どの範囲にも入らなければ `None` を返す（YAML の文書・`documents[].paths` に該当しないファイルを含む）
       4. 範囲に入った管理用の YAML の `files[].path` に相対パスがあれば `update_row`、無ければ `add_row` の `Notice` を返す
     unit_tests:
@@ -129,6 +129,18 @@ functions:
         condition: 管理用の YAML・`project-index.yaml`・YAML の文書・`tmp/x.md`（範囲の外）・配信元の外のパス
         mock: なし
         expected: どれも `None`
+      - name: test_classify_path_when_worktree_of_subfolder
+        case: 正常
+        summary: リポジトリの下のフォルダが配信元のワークツリー
+        condition: 配信元のフォルダが `{repo}/docs` で、ワークツリーの `.claude/worktrees/x/docs/guide/a.md`（`docs/guide/files.yml` に `a.md` の行がある）
+        mock: なし（一時ディレクトリの Git の配信元）
+        expected: '`update_row` で、`files_yaml` が `guide/files.yml`'
+      - name: test_classify_path_when_other_table_or_ignored
+        case: 正常
+        summary: ほかの行の文書と Git が無視するファイルは対象外
+        condition: 管理用の YAML の範囲が `**/*` で、範囲の中に YAML の文書の行が当たる `docs/x.yaml` と、`.gitignore` が無視する `docs/out.log` がある Git の配信元
+        mock: なし
+        expected: どちらも `None`
 refs:
   - to: IF-35
     type: requires
