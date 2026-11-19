@@ -1,0 +1,38 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: none
+    detail: エージェントが基準のページをセクションの名前で取得する流れは、既存の見出しを保つため変わらない
+    depends_on: []
+docs:
+  - page: docs/guide/メタデータを付ける基準.md
+    new: false
+    change: 仮のメタデータの段階と関連の候補の基準を判定フローチャートにし、エイリアスを付ける基準のセクションを追加する
+    status: todo
+  - page: docs/guide/配信元を登録する.md
+    new: false
+    change: 手順 4 の基準のセクションを指す行に、エイリアスを付ける基準のセクションを加える
+    status: todo
+  - page: docs/guide/files.yml
+    new: false
+    change: メタデータを付ける基準.md の行のタグに判定フローチャートとエイリアスを加える
+    status: todo
+  - page: docs/guide/index.yaml
+    new: false
+    change: メタデータを付ける基準.md の summary をリードに合わせる（リードを変えたときだけ）
+    status: todo
+  - page: docs/guide/README.md
+    new: false
+    change: index.yaml から生成し直す（summary を変えたときだけ）
+    status: todo
+  - page: docs/guide/使い方.md
+    new: false
+    change: メタデータを付ける基準の行の概要をリードに合わせる（リードを変えたときだけ）
+    status: todo
+scope_out:
+  - item: 配信元の文書へのエイリアスの付与（既存の文書に aliases を書き足す作業）
+    reason: 要望は基準を加えることで、基準に沿った付与は含まない
+    plan: none
+  - item: スキル setup の SKILL.md の書き換え
+    reason: SKILL.md は基準のページを取得して進めるだけで、基準の中身を持たない
+    plan: none
