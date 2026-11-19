@@ -126,7 +126,7 @@ scenarios:
         notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
       - name: 別のブランチのワークツリー
         description: sample のリモートと sample に、`develop` から分けたブランチ `data` を作り、`data` を指すワークツリー `.claude/worktrees/data` を用意する
-        notes: '`.claude/worktrees/data` は sample の `worktrees` に該当する。直コミットの設定のコミットするブランチは `develop` のまま'
+        notes: '`.claude/worktrees/data` は sample の `worktrees` に該当する。直コミットの設定のコミットするブランチは `develop` のままで、上書きできるブランチ（`direct_commit.branches[]`）に `data` を記載する'
     flow: |-
       <!-- map: {"title": "正常シナリオ（コミットするブランチを上書きする）"} -->
 
@@ -138,7 +138,7 @@ scenarios:
         participant R as sample のリモート
 
         A->>M: write_docs(source: sample, operations: create・kind note, commit: message・branch data)
-        M->>M: data を指すワークツリーが worktrees に該当することを確認する
+        M->>M: data が上書きできるブランチに該当し、data を指すワークツリーが worktrees に該当することを確認する
         M->>R: 最新を取得し、data のワークツリーへ origin/data を早送りで取り込む
         M->>M: 書き込み・コミット
         M->>R: data をプッシュする
@@ -149,7 +149,8 @@ scenarios:
     expected:
       - sample のリモートの `data` に作った文書のコミットが 1 つ増え、結果のブランチが `data` になる
       - sample のリモートの `develop` と、develop のワークツリーは変わらない
-      - '`commit` のブランチに、ワークツリーの無いブランチを指定した呼び出しは、異常シナリオ（コミットするブランチのワークツリーが無い）と同じく断られる'
+      - '`commit` のブランチに、上書きできるブランチに該当しない `master` を指定した呼び出しは、`isError: true` で上書きできないブランチであることを返却し、sample のリモートと全てのワークツリーは変わらない'
+      - '`commit` のブランチに、上書きできるブランチに該当するがワークツリーの無いブランチを指定した呼び出しは、異常シナリオ（コミットするブランチのワークツリーが無い）と同じく断られる'
     test: test_normal_when_branch_overridden
   - name: 正常シナリオ（文書を消す）
     setup:
