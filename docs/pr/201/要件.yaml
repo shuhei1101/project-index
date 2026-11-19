@@ -11,8 +11,8 @@ use_cases:
     depends_on: []
   - kind: single
     scenario: docs/scenario/SC-4.yaml
-    impact: following
-    detail: 配信元が無い端末で起動したときに手順のページを返せる状態になる（経路の確定に追随）
+    impact: changed
+    detail: 配信元が無い端末で起動したときに、クローンのガイドを組み込みの配信元として配信し始める
     depends_on:
       - docs/scenario/SC-6.yaml
   - kind: single
@@ -26,6 +26,12 @@ use_cases:
     detail: 配信元の追加の段の流れの変更に追随する
     depends_on:
       - docs/scenario/SC-5.yaml
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: エージェントが組み込みの配信元へ書き込もうとすると、読み取りだけの配信元と同じように断られる
+    depends_on:
+      - docs/scenario/SC-6.yaml
 docs:
   - page: docs/guide/配信元を登録する.md
     new: true
@@ -57,15 +63,15 @@ docs:
     status: todo
   - page: docs/guide/文書のMCP.md
     new: false
-    change: 配信元が登録されていない端末で手順のページを取得する引数と結果を記載する（経路の確定に従う）
+    change: '組み込みの配信元から手順のページを取得する引数（source: project-index・outside_scope: true）と、書き込みのエラーを記載する'
     status: todo
   - page: docs/guide/コアコンセプト-配信元と権限.md
     new: false
-    change: 経路が案 A のとき、組み込みの配信元と権限を記載する
+    change: 組み込みの配信元を加える条件と、読み取りだけ・作業範囲の外（参考）として扱う権限を記載する
     status: todo
   - page: docs/guide/用語集.md
     new: false
-    change: 経路で新しい用語（組み込みの配信元 など）が増えたら追加する
+    change: 用語「組み込みの配信元」を追加する
     status: todo
   - page: plugins/project-index/skills/setup/SKILL.md
     new: false
@@ -78,6 +84,10 @@ docs:
   - page: content/prompts/mcp/docs/instructions.yaml
     new: false
     change: 配信元の文書を足した・書き換えたときに手順と基準のページを取得する方法を伝える
+    status: todo
+  - page: docs/glossary/GLO-1.yaml
+    new: false
+    change: 用語「組み込みの配信元」（端末の設定に行が無いとき、クローンの docs/guide/ を読み取りだけで配信する配信元 project-index）を追加する
     status: todo
 scope_out:
   - item: 書き込みの後のフックの通知から、手順と基準の該当する箇所を指す
