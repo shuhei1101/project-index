@@ -1,0 +1,55 @@
+# 単体テスト（Red）: テストコードの末尾の commit 4868c57
+
+## ランナーでの全件実行（TP-1 の TL-1 の run_runner）
+
+$ gh workflow run test.yml --ref feat/setup/serve-setup-procedure-from-mcp -f layer=unit （run 44495897820）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 1249 items / 2 errors
+
+==================================== ERRORS ====================================
+__ ERROR collecting tests/unit/project_index/features/sources/test_builtin.py __
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/sources/test_builtin.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/sources/test_builtin.py:6: in <module>
+    from project_index.features.sources.builtin import load_builtin_source
+E   ModuleNotFoundError: No module named 'project_index.features.sources.builtin'
+__ ERROR collecting tests/unit/project_index/features/sources/test_service.py __
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/sources/test_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/sources/test_service.py:13: in <module>
+    from project_index.features.sources.service import (
+E   ImportError: cannot import name 'assemble_values' from 'project_index.features.sources.service' (/home/runner/work/project-index/project-index/src/project_index/features/sources/service.py)
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/sources/test_builtin.py
+ERROR tests/unit/project_index/features/sources/test_service.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!!
+============================== 2 errors in 2.51s ===============================
+rc=1 run=44495897820
+
+収集の段で、実装の無い builtin.py と assemble_values の import が失敗して止まる（実装が無いことによる fail）。
+
+## 収集で止まったファイルを除いた個別実行（手元、4868c57）
+
+$ TMPDIR=/tmp/claude-pytest uv run pytest tests/unit/project_index/features/sources/test_registry.py tests/unit/project_index/features/access/test_service.py -q
+FAILED tests/unit/project_index/features/sources/test_registry.py::test_source_registry_docs_served
+FAILED tests/unit/project_index/features/sources/test_registry.py::test_source_registry_get_for_docs
+FAILED tests/unit/project_index/features/sources/test_registry.py::test_source_registry_get_for_docs_when_row
+FAILED tests/unit/project_index/features/sources/test_registry.py::test_source_registry_load_when_builtin
+FAILED tests/unit/project_index/features/access/test_service.py::test_outside_readable_sources_when_builtin
+FAILED tests/unit/project_index/features/access/test_service.py::test_resolve_read_targets_when_builtin_outside
+FAILED tests/unit/project_index/features/access/test_service.py::test_resolve_write_target_when_builtin
+7 failed, 80 passed in 0.93s
+
+fail の理由（件数）:
+      1 AttributeError: 'SourceRegistry' object has no attribute 'docs_served'
+      1 AttributeError: 'SourceRegistry' object has no attribute 'get_for_docs'
+      5 TypeError: ServedSource.__init__() got an unexpected keyword argument 'builtin'
+
+全て実装が無いことによる fail で、実装の前から pass した追加のテストは無い。
