@@ -2,14 +2,13 @@ use_cases:
   - kind: composite
     scenario: docs/scenario/SC-1.yaml
     impact: changed
-    detail: エージェントがファイルを書き換えた後に管理用の YAML の修正の通知を受けて直す流れと、利用者が会話の指摘を登録する流れを、全体の流れに加えるかを決める
+    detail: 正常シナリオに、エージェントが書き込んだ後に範囲のファイルを書き換えて管理用の YAML の修正の通知を受ける工程と、更新の後に利用者が会話の指摘を登録する工程を加える
     depends_on: []
   - kind: single
     scenario: docs/scenario/SC-7.yaml
-    impact: changed
-    detail: エージェントが配信元のフォルダの下のファイルを書き換え・作成した後に、管理用の YAML・エイリアス・ルールの索引の修正の通知を 1 回受け取る
-    depends_on:
-      - docs/scenario/SC-1.yaml
+    impact: none
+    detail: '`write_docs` は管理用の YAML を自分で扱うため通知の対象にしない。通知は新規の単一 UC SC-14 が持ち、SC-7 の記述は変わらない'
+    depends_on: []
   - kind: single
     scenario: docs/scenario/SC-13.yaml
     impact: new
@@ -26,6 +25,12 @@ use_cases:
     impact: run_only
     detail: プラグインのフックの登録が増えるため、利用者がプラグインを入れて global-setup を通す流れが変わらず動くかを確かめる
     depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-14.yaml
+    impact: new
+    detail: エージェントが配信元のフォルダの下のファイルを Write・Edit・MCP のツールで書き換え・作成した後に、管理用の YAML・エイリアス・ルールの索引の修正の通知をファイルごとに 1 回受け取る
+    depends_on:
+      - docs/scenario/SC-1.yaml
 docs:
   - page: docs/guide/コアコンセプト-プラグイン.md
     new: false
