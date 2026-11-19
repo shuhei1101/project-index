@@ -183,7 +183,7 @@ class SourceRegistry:
             self._rows_done = [threading.Event() for _ in self._rows]
             self._rows_started = [False for _ in self._rows]
         try:
-            self._load_builtin(terminal)
+            self._builtin = self._load_builtin(terminal)
             # ほかの配信元のスキーマの参照先は端末の設定から引き、行の読み込みを待たない
             lookup = terminal_lookup(terminal)
             with self._reload_lock:
@@ -312,7 +312,7 @@ class SourceRegistry:
     def _reload(self, terminal: TerminalConfig) -> list[SourceStatus]:
         """全行を読み、一覧を差し替える（例外のときは差し替えない）。"""
         with self._reload_lock:
-            self._load_builtin(terminal)
+            builtin = self._load_builtin(terminal)
             sources: dict[str, ServedSource] = {}
             statuses: list[SourceStatus] = []
             entries: dict[str, tuple[SourceEntry, int]] = {}
@@ -331,6 +331,8 @@ class SourceRegistry:
             self._entries = entries
             self._lookup = lookup
             self._snapshot = (sources, statuses)
+            # 組み込みの配信元も、一覧と同じ時点で入れ替える（例外のときはどちらも差し替えない）
+            self._builtin = builtin
             with self._waiters_lock:
                 self._rows = list(terminal.sources)
                 self._rows_done = [threading.Event() for _ in self._rows]
@@ -366,7 +368,7 @@ class SourceRegistry:
     def _reload_changed(self, terminal: TerminalConfig) -> list[SourceStatus]:
         """変わった行だけを読み、一覧を差し替える（例外のときは差し替えない）。"""
         with self._reload_lock:
-            self._load_builtin(terminal)
+            builtin = self._load_builtin(terminal)
             previous = self._previous_rows()
             used: set[int] = set()
             sources: dict[str, ServedSource] = {}
@@ -395,6 +397,8 @@ class SourceRegistry:
             self._entries = entries
             self._lookup = lookup
             self._snapshot = (sources, statuses)
+            # 組み込みの配信元も、一覧と同じ時点で入れ替える（例外のときはどちらも差し替えない）
+            self._builtin = builtin
             with self._waiters_lock:
                 self._rows = list(terminal.sources)
                 self._rows_done = [threading.Event() for _ in self._rows]
@@ -535,12 +539,13 @@ class SourceRegistry:
             with self._refreshing_lock:
                 self._refreshing.discard(source_id)
 
-    def _load_builtin(self, terminal: TerminalConfig) -> None:
-        """端末の設定から組み込みの配信元を作り直す。加えなかった理由があれば警告を書く。"""
+    @staticmethod
+    def _load_builtin(terminal: TerminalConfig) -> ServedSource | None:
+        """端末の設定から組み込みの配信元を作る。加えなかった理由があれば警告を書く。"""
         builtin, reason = load_builtin_source(terminal)
         if reason is not None:
             logger.warning("組み込みの配信元を加えなかった（%s）", reason)
-        self._builtin = builtin
+        return builtin
 
     def docs_served(self) -> list[ServedSource]:
         """配信中の配信元に、組み込みの配信元を末尾に加えて返す（文書の MCP が使用する）。"""
