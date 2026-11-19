@@ -1,0 +1,242 @@
+id: IF-35
+title: 書き込みの後の通知の判定
+lead: 書き込んだファイルのパスから、管理用の YAML・エイリアス・ルールの索引の修正を促す通知の文面を返す `POST /_admin/post-write` の入出力を定め、書き込みの後の通知の判定を修正するときに参照する。
+aliases:
+  - POST /_admin/post-write
+entry:
+  kind: endpoint
+  value: POST /_admin/post-write
+identifier: post_post_write
+permissions: なし（`127.0.0.1` でだけ待ち受ける）
+idempotent: false
+side_effects: 通知したパスを `session_id`（と `agent_id`）の通知済みの記録に追加する
+callers:
+  - IF-36#flows[正常系]
+exclusivity: 通知済みの記録の読み書きは 1 つのロックで行う
+request:
+  - name: session_id
+    type: str
+    required: true
+    location: body
+    description: Claude Code のセッション ID
+  - name: agent_id
+    type: str
+    required: false
+    default: なし（メインのセッション）
+    location: body
+    description: サブエージェントの ID
+  - name: paths
+    type: list[str]
+    required: true
+    location: body
+    description: 書き込んだファイルの絶対パス。1 件以上
+request_example: |-
+  ```json
+  {"session_id": "8f1c...", "paths": ["/home/u/repo/sample/.claude/worktrees/x/docs/guide.md"]}
+  ```
+response:
+  - name: notices
+    type: list[Notice]
+    description: 今回通知するファイルごとの判定。通知しないファイルは含めない
+  - name: notices[].path
+    type: str
+    description: 通知するファイルの絶対パス
+  - name: notices[].source
+    type: str
+    description: ファイルを含む配信元の ID
+  - name: notices[].action
+    type: Literal['add_row', 'update_row']
+    description: 管理用の YAML に行が無ければ `add_row`、あれば `update_row`
+  - name: notices[].files_yaml
+    type: str
+    description: 行を持つ（持つべき）管理用の YAML の配信元の直下からのパス
+  - name: additional_context
+    type: str
+    description: フックが文脈に追加する通知の文面。`notices` が空なら空文字
+response_example: |-
+  ```json
+  {"notices": [{"path": "/home/u/repo/sample/.claude/worktrees/x/docs/guide.md", "source": "sample", "action": "update_row", "files_yaml": "docs/files.yml"}], "additional_context": "..."}
+  ```
+flows:
+  - name: 正常系
+    summary: 管理用の YAML に行があるファイルを初めて渡すと `update_row` の通知を返し、同じセッションで 2 回目は返さない
+    setup:
+      - name: Mock
+        description: なし（project-index のアプリをテストのクライアントで呼ぶ）
+      - name: 配信元
+        description: 範囲の Markdown 2 件と、そのうち 1 件（文書 1）の行だけを持つ管理用の YAML を持つ配信元 `sample`
+    flow: |-
+      <!-- map: {"title": "正常系"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as POST /_admin/post-write
+        participant I as 配信元の索引
+        participant R as 通知済みの記録
+
+        C->>T: session_id・paths（文書 1）
+        T->>I: パスを含む配信元と管理用の YAML の範囲・行を引く
+        T->>R: session_id で未通知かを確かめ、通知済みに追加する
+        T-->>C: notices（update_row）・additional_context
+        C->>T: 同じ session_id・paths（文書 1）
+        T-->>C: notices が空・additional_context が空文字
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目の `notices` が文書 1 の 1 件で、`action` が `update_row`、`files_yaml` が行を持つ管理用の YAML
+      - 1 回目の `additional_context` が、行の名前・概要文・タグ・関連が中身と合わなくなったときだけ修正する旨と、メタデータを付ける基準を `search_docs` で取得する引数を持つ
+      - 2 回目の `notices` が空で、`additional_context` が空文字
+      - 別の `session_id` で呼ぶと、文書 1 を再び通知する
+    test: test_normal
+  - name: 正常系（行の無いファイル）
+    summary: 管理用の YAML の範囲にあり行の無いファイルは `add_row` の通知を返す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 配信元
+        description: 正常系と同じ `sample`
+    flow: |-
+      <!-- map: {"title": "正常系（行の無いファイル）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as POST /_admin/post-write
+
+        C->>T: session_id・paths（行の無い文書 2）
+        T-->>C: notices（add_row）・additional_context
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`action` が `add_row`'
+      - '`additional_context` が、管理用の YAML に行を追加する旨と、メタデータを付ける基準を `search_docs` で取得する引数を持つ'
+    test: test_normal_when_no_row
+  - name: 正常系（エイリアスとルールの索引を持つ配信元）
+    summary: 配信元の設定に `alias_type` を持つ行があり、配信元のフォルダに rule-inject の索引があると、文面にそれぞれ 1 行を足す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 配信元
+        description: 正常系の `sample` に、`alias_type` を持つ用語の行と、配信元のフォルダの直下の `rules.yaml` を加えたもの
+    flow: |-
+      <!-- map: {"title": "正常系（エイリアスとルールの索引を持つ配信元）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as POST /_admin/post-write
+
+        C->>T: session_id・paths（文書 1）
+        T-->>C: additional_context（エイリアスとルールの索引の行つき）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`additional_context` に、新規の用語・別名が増えたら `alias_type` の行の文書に追加する旨の 1 行と、ファイルに適用するルールが増える・変わるなら `rules.yaml` のエントリを修正する旨の 1 行がある'
+    test: test_normal_when_source_has_aliases_and_rule_index
+  - name: 正常系（通知しないパス）
+    summary: 通知の対象に該当しないパスは `notices` に含めず、通知済みの記録にも追加しない
+    setup:
+      - name: Mock
+        description: なし
+      - name: 配信元
+        description: 正常系の `sample` と、`documents[].paths` に該当しないフォルダ `tmp/`
+      - name: 入力
+        description: 管理用の YAML・`project-index.yaml`・`tmp/` の下のファイル・YAML の文書・どの配信元のフォルダの下にも無いファイルのパス
+    flow: |-
+      <!-- map: {"title": "正常系（通知しないパス）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as POST /_admin/post-write
+
+        C->>T: session_id・paths（通知しないパス 5 件）
+        T-->>C: notices が空・additional_context が空文字
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`notices` が空で、`additional_context` が空文字'
+      - 続けて同じ `session_id` で文書 1 を渡すと、文書 1 を通知する
+    test: test_normal_when_path_not_notified
+  - name: 正常系（配信元を読み込んでいる）
+    summary: 配信元の読み込みを待たずに、通知せずに答える
+    setup:
+      - name: Mock
+        description: 配信元の読み込み（`load_source`）を、テストが合図を出すまで止めるものに差し替える
+        notes: 合図は `threading.Event`
+    flow: |-
+      <!-- map: {"title": "正常系（配信元を読み込んでいる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as POST /_admin/post-write
+
+        C->>T: session_id・paths（文書 1）
+        T-->>C: notices が空・additional_context が空文字
+      ```
+
+      <!-- /map -->
+    expected:
+      - 合図を出す前に 200 を返す
+      - '`notices` が空で、文書 1 は通知済みの記録に追加されない'
+    test: test_normal_when_loading
+  - name: 異常系（入力が不正・422）
+    summary: '`session_id` が無いか `paths` が空だと 422 を返す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: '`paths: []` と `session_id`'
+    flow: |-
+      <!-- map: {"title": "異常系（入力が不正・422）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as POST /_admin/post-write
+
+        C->>T: session_id・paths: []
+        T-->>C: 422（Problem Details）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 422 で `paths` の違反を返す
+    test: test_error_when_input_invalid
+constraints:
+  - item: 公開範囲
+    constraint: 管理の MCP のツールにしない。読み取り API にも載せない
+    notes: フックだけが呼ぶ操作で、エージェントのツール一覧に出さないため
+  - item: 通知の対象
+    constraint: '配信元のフォルダ（ワークツリーを含む）の下で、`records: files` の行の管理用の YAML の範囲（`project-index files` と同じ判定）に該当するファイルだけ。管理用の YAML そのもの・配信元の設定・YAML の文書・範囲に該当しないファイルは通知しない'
+  - item: 通知の 1 回
+    constraint: '`session_id` と `agent_id` の組ごとに、通知したパスを記録する。記録はプロセスのメモリに持ち、再起動で消える'
+    notes: 再起動の後に 1 回通知が重なるだけで、書き込みは止めない
+  - item: 文面
+    constraint: 'メタデータを付ける基準のページを文書の MCP の `search_docs` で取得する引数（`source: project-index`・`outside_scope: true`・`filter` の `id` に基準のページ）を持つ'
+  - item: エイリアスとルールの索引
+    constraint: 配信元の設定に `alias_type` を持つ行があるときと、配信元のフォルダの直下に `rules.yaml` があるときだけ、それぞれ 1 行を足す。alias-inject・rule-inject のコードは呼ばない
+  - item: タイムアウト
+    constraint: 制限なし（呼ぶ側のフックが `NOTICE_TIMEOUT_SEC` 秒で打ち切る）
+  - item: 配信元の読み込みの間
+    constraint: 読み込みを待たずに、通知せずに答える
+status_codes:
+  - code: '200'
+    condition: '受け付けた（通知しないときも `notices: []` で返す）'
+  - code: '422'
+    condition: '`session_id` が無い、または `paths` が空'
+error_format: 読み取り API と同じ RFC 9457 の Problem Details（`application/problem+json`）
+test_file: tests/integration/server/test_post_write.py
+visibility: internal
+tags:
+  - name: topic:通知
+    main: true
+  - name: topic:メタデータ
+  - name: topic:エイリアス
+  - name: topic:api
