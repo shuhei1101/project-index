@@ -1454,3 +1454,5 @@ def test_normal_when_builtin_source_unavailable(
     assert "組み込みの配信元を加えなかった" in caplog.text
     assert str(tmp_path / "clone" / "project-index.yaml") in caplog.text
     assert guide.is_error
+    assert "UnknownSourceError" in guide.text
+    assert "配信元 project-index はありません" in guide.text
