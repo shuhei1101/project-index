@@ -239,9 +239,7 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
     from project_index.features.write.locks import SourceLocks
 
     # プロンプトの YAML が違反するときは、state_dir を作る前に止める
-    prompts = load_prompts(
-        prompts_dir(os.environ), required=[*mcp_prompt_ids(), NOTICE_PROMPT_ID]
-    )
+    prompts = load_prompts(prompts_dir(os.environ), required=[*mcp_prompt_ids(), NOTICE_PROMPT_ID])
     state_dir = terminal.state_dir
     state_dir.mkdir(parents=True, exist_ok=True)
     # C の解析を使用できない: Python 実装で読み続ける（読み込みが遅くなる）

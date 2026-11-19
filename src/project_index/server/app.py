@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 
-from project_index.features.read.route import build_read_router
 from project_index.features.post_write.route import build_post_write_router
+from project_index.features.read.route import build_read_router
 from project_index.features.session_start.route import build_session_start_router
 from project_index.features.settings.route import build_settings_router
 from project_index.server.error_handlers import register_error_handlers
