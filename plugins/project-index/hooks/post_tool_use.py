@@ -75,7 +75,7 @@ def query_notice(event: dict[str, Any], paths: list[str]) -> str | None:
         with urllib.request.urlopen(request, timeout=NOTICE_TIMEOUT_SEC) as response:  # noqa: S310
             body = json.load(response)
     # 接続できない・打ち切った・200 以外・JSON が読めない: 通知しない
-    except OSError, ValueError:
+    except (OSError, ValueError) as _error:
         return None
     if not isinstance(body, dict):
         return None
