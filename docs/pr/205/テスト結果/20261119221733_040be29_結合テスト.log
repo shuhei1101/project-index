@@ -1,0 +1,31 @@
+# 結合テスト: 040be29
+
+## ランナー（run_runner、layer=integration、run_id=44531817196）
+
+$ gh workflow run test.yml --ref feat/plugin/post-write-notice-and-feedback-skill -f layer=integration -f paths="tests/integration/server/test_session_start.py tests/integration/server/test_post_write.py tests/integration/plugin/test_post_tool_use.py" （TP-1 の TL-2 の run_runner。範囲は計画書の結合テストの実行範囲の表、並列数は層の parallel: false のとおり指定しない）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 15 items
+
+tests/integration/server/test_session_start.py::test_normal_when_cleared PASSED [  6%]
+tests/integration/server/test_session_start.py::test_normal_when_not_forget_reason PASSED [ 13%]
+tests/integration/server/test_session_start.py::test_normal_when_loading PASSED [ 20%]
+tests/integration/server/test_session_start.py::test_error_when_input_invalid PASSED [ 26%]
+tests/integration/server/test_post_write.py::test_normal PASSED          [ 33%]
+tests/integration/server/test_post_write.py::test_normal_when_no_row PASSED [ 40%]
+tests/integration/server/test_post_write.py::test_normal_when_source_has_aliases_and_rule_index PASSED [ 46%]
+tests/integration/server/test_post_write.py::test_normal_when_path_not_notified PASSED [ 53%]
+tests/integration/server/test_post_write.py::test_normal_when_loading PASSED [ 60%]
+tests/integration/server/test_post_write.py::test_error_when_input_invalid PASSED [ 66%]
+tests/integration/plugin/test_post_tool_use.py::test_normal PASSED       [ 73%]
+tests/integration/plugin/test_post_tool_use.py::test_normal_when_mcp_tool PASSED [ 80%]
+tests/integration/plugin/test_post_tool_use.py::test_normal_when_tool_not_queried PASSED [ 86%]
+tests/integration/plugin/test_post_tool_use.py::test_normal_when_query_failed PASSED [ 93%]
+tests/integration/plugin/test_post_tool_use.py::test_normal_when_input_unparsable PASSED [100%]
+
+============================== 15 passed in 4.85s ==============================
+exit=0
