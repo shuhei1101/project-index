@@ -802,6 +802,37 @@ scenarios:
     test: test_error_when_git_storage_outside_work_tree
     notes:
       配信元ごとに断る: 端末の設定のスキーマの違反（プロセスを止める）ではなく、フォルダを確かめた結果の違反として、その配信元だけを配信しない。ほかの配信元の配信は続ける。
+  - name: 正常シナリオ（配信元が無い端末で起動する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`project-index serve` を子プロセスで起動する）
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources: []`。`clone` は project-index のクローン'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（配信元が無い端末で起動する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
+        participant CF as 端末の設定・クローンの配信元の設定
+
+        U->>DD: project-index serve
+        DD->>CF: 端末の設定を読み、スキーマで検証する
+        DD->>DD: sources に project-index の行が無いことを確認する
+        DD->>CF: クローンの project-index.yaml から docs/guide/ の行だけを読み込む
+        DD->>DD: 文書の MCP の配信元に組み込みの配信元 project-index として加える
+        DD->>DD: 127.0.0.1:8786 で待ち受ける
+        DD-->>U: 待ち受けたアドレスと、組み込みの配信元を配信していることを標準出力に出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`sources: []` でも起動し、`127.0.0.1:8786` で待ち受ける'
+      - 標準出力に、組み込みの配信元 project-index を配信していることが出る
+      - 端末の設定のファイルは変わらない
+    test: test_normal_when_no_sources
 lead: 利用者が `project-index serve` で端末の設定の配信元を配信し始めるシナリオを定め、起動の流れを変えるときに参照する。
 tags:
   - name: topic:サーバー
