@@ -87,10 +87,12 @@ class ContextServer:
 
 @pytest.fixture
 def context_server() -> Callable[..., AbstractContextManager[ContextServer]]:
-    """決めた応答を返す HTTP サーバーを一時のポートで立てる関数を返す。"""
+    """決めた応答（省くと `{"forgotten": true}`）を返す HTTP サーバーを一時のポートで立てる関数を返す。"""
 
     @contextmanager
-    def _serve(*, hold_sec: float = 0.0) -> Generator[ContextServer]:
+    def _serve(
+        *, hold_sec: float = 0.0, response: dict[str, Any] | None = None
+    ) -> Generator[ContextServer]:
         released = threading.Event()
         holder: list[ContextServer] = []
 
@@ -102,7 +104,7 @@ def context_server() -> Callable[..., AbstractContextManager[ContextServer]]:
                 # 応答しない設定のときは、テストが終わるまで待つ
                 if hold_sec:
                     released.wait(hold_sec)
-                payload = json.dumps({"forgotten": True}).encode("utf-8")
+                payload = json.dumps(response or {"forgotten": True}).encode("utf-8")
                 try:
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
