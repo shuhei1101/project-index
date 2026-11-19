@@ -38,7 +38,7 @@ files:
     type: see_also
 - path: hooks/hooks.json
   name: プラグインのフックの登録
-  description: SessionStart と PreToolUse のフックの登録を受け持ち、フックを呼ぶ出来事や対象のツールを修正するときに参照する。
+  description: SessionStart・PreToolUse・PostToolUse のフックの登録を受け持ち、フックを呼ぶ出来事や対象のツールを修正するときに参照する。
   tags:
   - topic:フック
   - topic:プラグイン
@@ -47,6 +47,29 @@ files:
   - to: IF-19
     type: see_also
   - to: IF-20
+    type: see_also
+  - to: IF-36
+    type: see_also
+- path: hooks/post_tool_use.py
+  name: PostToolUse のフック
+  description: PostToolUse のフックを受け持ち、ツール実行後のフックの post_tool_use.py を修正するときに参照する。
+  tags:
+  - topic:フック
+  - topic:通知
+  related:
+  - to: MOD-177
+    type: implements
+- path: skills/feedback/SKILL.md
+  name: 会話の指摘を登録するスキル
+  description: 会話で利用者が伝えた指摘を、ルール・用語・文書として登録する手順のページを取得して進める起点を受け持ち、指摘の登録の起点を修正するときに参照する。
+  tags:
+  - topic:スキル
+  - topic:用語
+  - topic:ルール
+  - tool:claude-code
+  - action:登録
+  related:
+  - to: SC-13
     type: see_also
 - path: skills/global-setup/SKILL.md
   name: 端末に project-index を用意するスキル
