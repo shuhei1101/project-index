@@ -1102,7 +1102,7 @@ flows:
     expected:
       - 起動は止まらず、sample の配信が続く
       - 警告のログに、組み込みの配信元を加えなかったことと、参照できなかった `clone` のパスが出る
-      - '`search_docs(source: project-index, outside_scope: true)` は、配信していない配信元と同じエラーを返却する'
+      - '`search_docs(source: project-index, outside_scope: true)` は、端末の設定に無い配信元と同じエラー（`UnknownSourceError`、`配信元 project-index はありません`）を返却する。組み込みの配信元を持たない更新前のサーバーも同じエラーを返却する'
     test: test_normal_when_builtin_source_unavailable
 lead: 端末の設定を読み、検証に合格した配信元を 1 プロセス・1 ポートで配信する `project-index serve` の入出力を定め、起動を修正するときに参照する。
 tags:
