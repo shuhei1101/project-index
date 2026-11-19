@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 from project_index.features.history.query import resolve_ref
+from project_index.features.sources.builtin import load_builtin_source
 from project_index.features.sources.schema_ref import SchemaRefLookup, terminal_lookup
 from project_index.features.sources.service import load_source
 from project_index.features.sources.types import ServedSource, SourceStatus
@@ -72,6 +73,8 @@ class SourceRegistry:
         # 裏のスレッドで default_ref の commit を確認している配信元の ID
         self._refreshing: set[str] = set()
         self._refreshing_lock = threading.Lock()
+        # 最後に読み込んだ端末の設定から作った組み込みの配信元（加えないときは None）
+        self._builtin: ServedSource | None = None
 
     @property
     def loading(self) -> bool:
@@ -180,6 +183,7 @@ class SourceRegistry:
             self._rows_done = [threading.Event() for _ in self._rows]
             self._rows_started = [False for _ in self._rows]
         try:
+            self._load_builtin(terminal)
             # ほかの配信元のスキーマの参照先は端末の設定から引き、行の読み込みを待たない
             lookup = terminal_lookup(terminal)
             with self._reload_lock:
@@ -308,6 +312,7 @@ class SourceRegistry:
     def _reload(self, terminal: TerminalConfig) -> list[SourceStatus]:
         """全行を読み、一覧を差し替える（例外のときは差し替えない）。"""
         with self._reload_lock:
+            self._load_builtin(terminal)
             sources: dict[str, ServedSource] = {}
             statuses: list[SourceStatus] = []
             entries: dict[str, tuple[SourceEntry, int]] = {}
@@ -361,6 +366,7 @@ class SourceRegistry:
     def _reload_changed(self, terminal: TerminalConfig) -> list[SourceStatus]:
         """変わった行だけを読み、一覧を差し替える（例外のときは差し替えない）。"""
         with self._reload_lock:
+            self._load_builtin(terminal)
             previous = self._previous_rows()
             used: set[int] = set()
             sources: dict[str, ServedSource] = {}
@@ -528,6 +534,30 @@ class SourceRegistry:
         finally:
             with self._refreshing_lock:
                 self._refreshing.discard(source_id)
+
+    def _load_builtin(self, terminal: TerminalConfig) -> None:
+        """端末の設定から組み込みの配信元を作り直す。加えなかった理由があれば警告を書く。"""
+        builtin, reason = load_builtin_source(terminal)
+        if reason is not None:
+            logger.warning("組み込みの配信元を加えなかった（%s）", reason)
+        self._builtin = builtin
+
+    def docs_served(self) -> list[ServedSource]:
+        """配信中の配信元に、組み込みの配信元を末尾に加えて返す（文書の MCP が使用する）。"""
+        served = self.served()
+        builtin = self._builtin
+        # 組み込みの配信元があり、同じ ID の配信元が配信中に無い: 末尾に加える
+        if builtin is not None and all(source.id != builtin.id for source in served):
+            return [*served, builtin]
+        return served
+
+    def get_for_docs(self, source_id: str) -> ServedSource:
+        """配信中の配信元か組み込みの配信元を ID で引く（文書の MCP が使用する）。"""
+        builtin = self._builtin
+        # 組み込みの配信元の ID: 組み込みの配信元を返す（端末の設定に同じ ID の行があれば作らない）
+        if builtin is not None and builtin.id == source_id:
+            return builtin
+        return self.get(source_id)
 
     def served(self) -> list[ServedSource]:
         """配信中の配信元を `sources[]` の順に返す。"""

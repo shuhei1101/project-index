@@ -130,6 +130,8 @@ class ServedSource:
     config_dir: PurePosixPath = field(default_factory=PurePosixPath)
     # 端末の設定の行の storage.type。disk のときは is_git が偽、worktree_globs が空
     storage: StorageType | None = None
+    # 端末の設定の行でなく、クローンのガイドから作った組み込みの配信元か（文書の MCP だけに出す）
+    builtin: bool = False
 
     @property
     def config_root(self) -> Path:

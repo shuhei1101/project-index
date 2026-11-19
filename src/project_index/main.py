@@ -200,8 +200,9 @@ def start_loading(handlers: Handlers) -> threading.Thread:
                 checks=handlers.checks,
                 snapshots=handlers.snapshots,
             )
-            for source in handlers.registry.served():
-                print(source.id, flush=True)
+            for source in handlers.registry.docs_served():
+                # 組み込みの配信元は、端末の設定の行と見分けられるように印を付ける
+                print(f"{source.id}（組み込み）" if source.builtin else source.id, flush=True)
         except Exception:
             logger.exception("配信元の読み込みに失敗した")
 

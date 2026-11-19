@@ -115,7 +115,7 @@ def outside_readable_sources(cwd: str | None, *, registry: SourceRegistry) -> li
     path = _normalize(cwd)
     return [
         source
-        for source in registry.served()
+        for source in registry.docs_served()
         if access_of(source, path) is None and source.outside_read
     ]
 
@@ -161,7 +161,7 @@ def _readable_sources(
     single = isinstance(source, str)
     result: list[tuple[ServedSource, bool]] = []
     for source_id in ids:
-        item = registry.get(source_id)
+        item = registry.get_for_docs(source_id)
         if access_of(item, path) is not None:
             result.append((item, False))
             continue
@@ -344,7 +344,7 @@ def resolve_write_target(
             )
         item = current[0]
     else:
-        item = registry.get(source)
+        item = registry.get_for_docs(source)
     if access_of(item, path) != "write":
         raise SourceNotWritableError(
             message=f"{item.id} にはこの作業場所（{cwd}）から書き込めません",
