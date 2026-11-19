@@ -1,0 +1,1 @@
+# history/blob.py とそのテストの行を管理用の YAML へ追加する
