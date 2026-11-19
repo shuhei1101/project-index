@@ -28,7 +28,11 @@ def test_main(
     hook = load_hook("post_tool_use")
     target = tmp_path / "a.md"
     target.write_text("# a\n", encoding="utf-8")
-    monkeypatch.setattr(hook, "query_notice", lambda event, paths: "管理用の YAML を確認する")
+
+    def fixed_query(event: dict[str, Any], paths: list[str]) -> str:
+        return "管理用の YAML を確認する"
+
+    monkeypatch.setattr(hook, "query_notice", fixed_query)
     _stdin(
         monkeypatch,
         json.dumps(
