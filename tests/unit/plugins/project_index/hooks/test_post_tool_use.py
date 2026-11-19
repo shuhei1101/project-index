@@ -66,7 +66,8 @@ def test_main_when_skipped_tool(
     target.write_text("id: a\n", encoding="utf-8")
 
     def fail_query(event: dict[str, Any], paths: list[str]) -> str:
-        raise AssertionError("問い合わせてはいけない")
+        message = "問い合わせてはいけない"
+        raise AssertionError(message)
 
     monkeypatch.setattr(hook, "query_notice", fail_query)
     _stdin(

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -13,6 +12,7 @@ from project_index.features.sources.types import DocumentTable
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
     from project_index.features.prompt_doc.runtime import PromptSet
     from project_index.features.sources.types import ServedSource, SourceConfig
@@ -101,9 +101,7 @@ def test_judge_post_write_when_aliases_and_rule_index(
     )
     request = PostWriteRequest(session_id="s1", paths=[str(source.root / "docs/a.md")])
     # 実行
-    result = judge_post_write(
-        request, sources=[source], notified=NotifiedStore(), prompts=prompts
-    )
+    result = judge_post_write(request, sources=[source], notified=NotifiedStore(), prompts=prompts)
     # 検証
     assert "エイリアス" in result.additional_context
     assert "rules.yaml" in result.additional_context
