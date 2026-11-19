@@ -98,10 +98,6 @@ docs:
     status: done
     updated_by: planner
     updated_at: '2026-11-19T12:23:33.453425+00:00'
-  - page: docs/guide/変更履歴.md
-    new: false
-    change: 書き込みの後の通知と指摘を登録するスキルの追加を記載する（タグを打つとき）
-    status: todo
 scope_out:
   - item: Bash の mv・rm・git mv での作成・削除・改名への通知
     reason: コマンドの文字列からの推測になり誤通知が出る。通知で捕捉できない分はスキル setup の突き合わせと describe() の注意の件数が検出する
@@ -118,3 +114,6 @@ scope_out:
   - item: '`src/project_index/features/history/blob.py` と `tests/unit/project_index/features/history/test_blob.py` に管理用の YAML の行が無いこと'
     reason: develop に既にあるずれで、この PR の変更と関係しない（`check_project` の索引の同期で 2 件）
     plan: '#207'
+  - item: '`docs/guide/変更履歴.md` への書き込みの後の通知と指摘を登録するスキルの追記'
+    reason: タグを打つときに記載する
+    plan: none
