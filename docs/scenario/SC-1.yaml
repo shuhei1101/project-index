@@ -17,13 +17,15 @@ stakeholders:
     interest: 配信元の一覧と状態・配信元の設定・文書の一覧・文書・検討事項の ID の一覧と文書・検索の結果・リビジョンの一覧を読み取り API で取得し、端末の設定の配信元を端末の設定の API で保存できる
   - name: 各配信元
     interest: サーバーのコードもプラグインも持たず、配信元の設定（`project-index.yaml`）・スキーマ・検査と変換のスクリプトだけで配信される
+  - name: 手元のセッション（利用者と話している Claude Code）
+    interest: 配信元のフォルダの外部の作業場所から、直コミットを許可した種類の文書を、書き込みからコミット・プッシュまで 1 回の呼び出しで登録できる
 trigger: 利用者が project-index のプラグインを入れ、`/project-index:global-setup` を実行する
 preconditions:
   - 端末に uv・git・Claude Code がある
   - project-index のマーケットプレースを追加し、プラグイン `project-index` をユーザースコープで入れてある
   - 配信する配信元が、YAML の文書とそのスキーマを持つフォルダ（git リポジトリか Git 管理外のフォルダ）である
-success_guarantee: 端末の設定に並べた配信元の文書が、文書の MCP と読み取り API で参照できる。エージェントの書き込みは、`scope.write` に当たる作業場所から呼んだセッションの作業ツリーにだけ反映される。エージェントが配信元の範囲のファイルを書き換えた後に、管理用の YAML の修正の通知がファイルごとに 1 回だけ文脈に入る。利用者が会話で伝えた指摘は、登録した後のセッションの文書の MCP で参照できる。
-minimal_guarantee: 設定・スクリプトの検証に失敗した配信元があっても、他の配信元の配信と管理の MCP・読み取り API は止まらない。検査に合格しない書き込みと、`scope` に当たらない作業場所からの呼び出しは、ファイルを書き換えない。
+success_guarantee: 端末の設定に並べた配信元の文書が、文書の MCP と読み取り API で参照できる。エージェントの書き込みは、`scope.write` に当たる作業場所から呼んだセッションの作業ツリーにだけ反映される。コミットの指定を付けた書き込みは、直コミットを許可した種類の文書だけを、直コミットの設定のブランチへ 1 コミットでプッシュし、直後からリモートに残る。エージェントが配信元の範囲のファイルを書き換えた後に、管理用の YAML の修正の通知がファイルごとに 1 回だけ文脈に入る。利用者が会話で伝えた指摘は、登録した後のセッションの文書の MCP で参照できる。
+minimal_guarantee: 設定・スクリプトの検証に失敗した配信元があっても、他の配信元の配信と管理の MCP・読み取り API は止まらない。検査に合格しない書き込みと、`scope` に当たらない作業場所からの呼び出しは、ファイルを書き換えない。直コミットで断られた呼び出しは、ワークツリーとリモートをリモートの最新と同じ状態に残す。
 frequency: 導入は端末ごとに 1 回。起動はセッションごと。読み書きは作業のたび
 priority: 高
 scenarios:
@@ -49,6 +51,12 @@ scenarios:
       - name: 指摘の置き場所
         description: テスト用の一時フォルダの中の空のフォルダ。`RULE_INJECT_CONFIG`・`ALIAS_INJECT_CONFIG` は、テスト用の一時フォルダの中の無いファイルへ向ける
         notes: S11 の置き場所の確認にこのパスを回答する。テストを実行した端末の既定の置き場所と rule-inject・alias-inject の端末の設定は変わらない
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`develop` を持つ
+        notes: sample のワークツリー `.claude/worktrees/develop` が `develop` を指す。直コミットの設定で、sample の文書の種類の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.write` に該当しない。S4D のセッションをここで始める
     flow: |-
       <!-- map: {"title": "正常シナリオ"} -->
 
@@ -65,6 +73,7 @@ scenarios:
           S3["エージェントが調べる:正常シナリオ"]
           S4["エージェントが書き込む:正常シナリオ"]
           S4N["エージェントが範囲のファイルを書き換える:正常シナリオ"]
+          S4D["手元のセッションが直コミットで登録する:正常シナリオ"]
           S5["変更をレビューする:正常シナリオ"]
           S6["画面のサーバーが文書を読む:正常シナリオ"]
         end
@@ -77,13 +86,14 @@ scenarios:
         subgraph P5["指摘の登録"]
           S11["会話の指摘を登録する:正常シナリオ"]
         end
-        S0 --> S1 --> S2 --> S3 --> S4 --> S4N --> S5 --> S6 --> S7 --> S8 --> S9 --> S10 --> S11
+        S0 --> S1 --> S2 --> S3 --> S4 --> S4N --> S4D --> S5 --> S6 --> S7 --> S8 --> S9 --> S10 --> S11
         click S0 "id:SC-2#scenarios[正常シナリオ]"
         click S1 "id:SC-5#scenarios[正常シナリオ]"
         click S2 "id:SC-4#scenarios[正常シナリオ（待ち受けているサーバーがあるときは文脈を注入しない）]"
         click S3 "id:SC-6#scenarios[正常シナリオ]"
         click S4 "id:SC-7#scenarios[正常シナリオ]"
         click S4N "id:SC-14#scenarios[正常シナリオ]"
+        click S4D "id:SC-15#scenarios[正常シナリオ]"
         click S5 "id:SC-8#scenarios[正常シナリオ]"
         click S6 "id:SC-11#scenarios[正常シナリオ]"
         click S7 "id:SC-9#scenarios[正常シナリオ]"
@@ -104,7 +114,7 @@ scenarios:
       - 文書の MCP のツールは `describe`・`search_docs`・`trace_related`・`list_changes`・`list_match_words`・`write_docs`・`delete_docs` の 7 つで、配信元を追加しても変わらない
       - sample のワークツリーで呼んだ `describe` が、使用できる配信元として `sample`（読み書き）と `notes`（読み取りだけ）を返却する
       - 'sample のワークツリーで `source` を省いて呼んだ `search_docs` がワークツリーの文書を返却し、`source: *` が sample と notes の結果を各行の `source` つきで返却する'
-      - '`write_docs` の変更は sample のワークツリーの YAML だけに入り、sample のクローン本体は変わらない。project-index は commit しない（ワークツリーに増えた commit は、エージェントが commit した 1 件だけ）'
+      - '`commit` を指定しない `write_docs` の変更は sample のワークツリーの YAML だけに入り、sample のクローン本体は変わらない。project-index は commit しない（ワークツリーに増えた commit は、エージェントが commit した 1 件だけ）'
       - '`notes` を指した `write_docs` は断られ、notes のフォルダは変わらない'
       - '`list_changes` がエージェントの commit の変更を返却し、読み取り API でその commit と親の commit を指した文書の取得が、それぞれのリビジョンの値を返却する'
       - 読み取り API の配信元の一覧が sample と notes を配信中として返却し、配信元の設定が sample の `nav` を、文書の取得が sample の文書の値・種類のスキーマ・メタデータを返却する
@@ -117,11 +127,13 @@ scenarios:
       - sample のワークツリーで Edit で管理用の YAML に行がある範囲の Markdown を書き換えた直後の文脈に、行のメタデータを中身に合わせる修正の通知が 1 回入り、同じセッションで同じファイルをもう一度書き換えても入らない
       - '`write_docs` の後と、sample の管理用の YAML・`project-index.yaml` を書き換えた後には、通知が入らない'
       - 指摘を登録するスキルの登録先の選択肢が project-index と登録しないだけで（rule-inject・alias-inject のプラグインと端末の設定のファイルが無い）、端末の設定の `sources` に指摘の置き場所の配信元の行が増え、登録した文書を次のセッションの `search_docs` が返却する。指摘の置き場所と端末の設定以外のファイルは変わらない
+      - 手元の作業場所で始めたセッションが `commit` を付けた `write_docs` で sample の文書を 1 件作ると、sample のリモートの `develop` に、その文書のファイルだけを含む 1 コミットが増え、結果のコミットの SHA と一致する。sample のワークツリー x とクローン本体は変わらず、その後の `search_docs` が作った文書を返却する
     test: test_normal
     notes:
       commit: S4 と S5 の間で、エージェントが `write_docs` の変更をワークツリーで `git commit` する。project-index は commit しない。
       起動したセッション: S0 がサーバーを起動したそのセッションでは MCP の接続が間に合わず、`/mcp` でつなぎ直す。S2 は S1 の後に sample のワークツリーで始めた新しいセッションで、待ち受けているサーバーにつながる。
       指摘の登録: S11 は S10 の後に sample のワークツリーで始めたセッションで、利用者が指摘を 1 件伝えた後にスキルを実行する。最初の確認には、置き場所に指摘の置き場所の一時フォルダ、Git の管理に管理外、有効にする範囲に sample のフォルダを回答し、指摘の登録先には project-index を回答する。`claude -p` では AskUserQuestion を使用できないため、番号つきの選択肢への回答を `--resume` で同じセッションへ送信する。
+      直コミット: S4D は S4N の後に手元の作業場所で始めた新規のセッションで、利用者が登録する内容とコミットの説明を伝える。S5 の `list_changes` の区間は、エージェントの commit だけを指す
     uses:
       - SC-2#scenarios[正常シナリオ]
       - SC-5#scenarios[正常シナリオ]
@@ -136,6 +148,7 @@ scenarios:
       - SC-3#scenarios[正常シナリオ]
       - SC-14#scenarios[正常シナリオ]
       - SC-13#scenarios[正常シナリオ]
+      - SC-15#scenarios[正常シナリオ]
   - name: 異常シナリオ（配信できない配信元がある）
     setup:
       - name: Mock

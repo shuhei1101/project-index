@@ -6,10 +6,9 @@ use_cases:
     depends_on: []
   - kind: single
     scenario: docs/scenario/SC-7.yaml
-    impact: changed
-    detail: 書き込み・削除にコミットの指定を付けると、既定のブランチへ取り込み・検査・書き込み・コミット・プッシュまでを行い、許可していない種類・ずれのある作業ツリー・断られたプッシュでは元に戻して断る分岐を加える
-    depends_on:
-      - docs/scenario/SC-1.yaml
+    impact: run_only
+    detail: コミットの指定を省いた書き込み・削除の流れは変えないが、同じ書き込みの処理と排他を変えるため E2E の対象にする
+    depends_on: []
   - kind: single
     scenario: docs/scenario/SC-10.yaml
     impact: changed
@@ -21,7 +20,13 @@ use_cases:
     impact: following
     detail: 配信元の説明に、直コミットを許可した種類を示す記述へ追随する
     depends_on:
-      - docs/scenario/SC-7.yaml
+      - docs/scenario/SC-15.yaml
+  - kind: single
+    scenario: docs/scenario/SC-15.yaml
+    impact: new
+    detail: 手元のセッションが、配信元のフォルダの外部の作業場所から、直コミットを許可した種類の文書を書き込み・削除し、既定のブランチへコミットしてプッシュする。許可していない種類・ずれのある作業ツリー・秘密の値・断られたプッシュでは元に戻して断る
+    depends_on:
+      - docs/scenario/SC-1.yaml
 docs:
   - page: docs/guide/文書のMCP.md
     new: false
