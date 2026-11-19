@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from tests.integration.server.conftest import sample_sync_files
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from fastapi.testclient import TestClient
 
 ENDPOINT = "/_admin/session-start"
+POST_WRITE = "/_admin/post-write"
 RETURNED = "この会話で返却済み"
 
 
@@ -20,17 +23,21 @@ def _post(env: Any, body: dict[str, Any]) -> Any:
 def test_normal_when_cleared(
     make_source: Callable[..., Any], make_server: Callable[..., Any]
 ) -> None:
-    """/clear の後は、そのセッションの返却済みの記録を削除する（正常系）。"""
+    """/clear の後は、そのセッションの返却済みの記録と通知済みの記録を削除する（正常系）。"""
     # 準備
-    sample = make_source("sample")
+    sample = make_source("sample", sample_sync_files(unindexed=0))
     env = make_server(sample)
     cwd = str(sample.folder)
+    written = {"session_id": "s1", "paths": [str(sample.folder / "src/a.py")]}
     first = env.call("search_docs", cwd=cwd, session_id="s1", ids=["doc-1"], view="full")
     again = env.call("search_docs", cwd=cwd, session_id="s1", ids=["doc-1"], view="full")
+    env.client.post(POST_WRITE, json=written)
     # 実行
     response = _post(env, {"session_id": "s1", "reason": "clear"})
     # 検証
     after = env.call("search_docs", cwd=cwd, session_id="s1", ids=["doc-1"], view="full")
+    renotified = env.client.post(POST_WRITE, json=written)
+    assert len(renotified.json()["notices"]) == 1
     assert response.status_code == 200
     assert response.json() == {"forgotten": True}
     assert RETURNED in again.text
@@ -43,14 +50,18 @@ def test_normal_when_not_forget_reason(
 ) -> None:
     """reason が clear・compact 以外のときは、記録を削除しない（正常系）。"""
     # 準備
-    sample = make_source("sample")
+    sample = make_source("sample", sample_sync_files(unindexed=0))
     env = make_server(sample)
     cwd = str(sample.folder)
+    written = {"session_id": "s1", "paths": [str(sample.folder / "src/a.py")]}
     env.call("search_docs", cwd=cwd, session_id="s1", ids=["doc-1"], view="full")
+    env.client.post(POST_WRITE, json=written)
     # 実行
     response = _post(env, {"session_id": "s1", "reason": "resume"})
     # 検証
     again = env.call("search_docs", cwd=cwd, session_id="s1", ids=["doc-1"], view="full")
+    renotified = env.client.post(POST_WRITE, json=written)
+    assert renotified.json()["notices"] == []
     assert response.status_code == 200
     assert response.json() == {"forgotten": False}
     assert RETURNED in again.text

@@ -1,0 +1,217 @@
+id: IF-36
+title: ツール実行後のフック
+lead: Write・Edit・MCP のツールで書き込んだパスを集めて `POST /_admin/post-write` に問い合わせ、返った通知の文面を文脈に追加する PostToolUse のフックの入出力を定め、ツール実行後のフックを修正するときに参照する。
+aliases:
+  - PostToolUse のフック
+entry:
+  kind: trigger
+  value: Claude Code の PostToolUse（matcher `Write|Edit|NotebookEdit|mcp__.*`）
+identifier: hooks/post_tool_use.py
+permissions: 利用者の権限で動く
+idempotent: false
+side_effects: '`POST /_admin/post-write` が通知したパスを通知済みとして記録する'
+callers:
+  - SC-14#scenarios[正常シナリオ]
+  - SC-14#scenarios[正常シナリオ（MCP のツールで書き込んだ）]
+exclusivity: 状態を持たず排他しない（通知済みの記録はサーバーが持つ）
+request:
+  - name: tool_name
+    type: str
+    required: true
+    location: argument
+    description: 実行したツールの名前
+  - name: tool_input
+    type: dict
+    required: true
+    location: argument
+    description: ツールへの入力
+  - name: session_id
+    type: str
+    required: true
+    location: argument
+    description: Claude Code のセッション ID
+  - name: cwd
+    type: str
+    required: true
+    location: argument
+    description: セッションの作業場所。相対パスの解決に使う
+  - name: agent_id
+    type: str
+    required: false
+    default: なし（`agent_id` を送信しない）
+    location: argument
+    description: サブエージェントの ID
+request_example: |-
+  ```json
+  {"tool_name": "Edit", "tool_input": {"file_path": "/home/u/repo/sample/.claude/worktrees/x/docs/guide.md", "old_string": "a", "new_string": "b"}, "session_id": "8f1c...", "cwd": "/home/u/repo/sample/.claude/worktrees/x", "hook_event_name": "PostToolUse"}
+  ```
+response:
+  - name: hookSpecificOutput.hookEventName
+    type: Literal['PostToolUse']
+    description: 常に `PostToolUse`
+  - name: hookSpecificOutput.additionalContext
+    type: str
+    description: '`POST /_admin/post-write` が返した `additional_context`。空文字のときは何も出力しない'
+  - name: 終了コード
+    type: int
+    description: 常に 0
+response_example: |-
+  ```json
+  {"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": "..."}}
+  ```
+flows:
+  - name: 正常系
+    summary: Edit の `file_path` を送信し、返った文面を `additionalContext` で返す
+    setup:
+      - name: Mock
+        description: '`POST /_admin/post-write` に固定の `additional_context` を返す HTTP サーバー'
+      - name: 入力
+        description: '`tool_name: Edit` と `tool_input.file_path` を持つ JSON'
+    flow: |-
+      <!-- map: {"title": "正常系"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as Claude Code
+        participant H as ツール実行後のフック
+        participant S as POST /_admin/post-write
+
+        C->>H: stdin（tool_name・tool_input・session_id・cwd）
+        H->>S: session_id・paths（file_path）
+        S-->>H: additional_context
+        H-->>C: additionalContext（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - サーバーが受けた `paths` が `file_path` の 1 件で、`session_id` がフックの入力の値
+      - 出力の `additionalContext` がサーバーの `additional_context`
+    test: test_normal
+  - name: 正常系（MCP のツールの引数のパス）
+    summary: MCP のツールの引数の文字列の値のうち、存在するファイルのパスを集めて送信する
+    setup:
+      - name: Mock
+        description: 受けた `paths` を記録する HTTP サーバー
+      - name: 入力
+        description: '`tool_name: mcp__test__write` と、入れ子の引数に絶対パス 1 件・`cwd` からの相対パス 1 件・存在しないパス 1 件・パスでない文字列を持つ JSON'
+    flow: |-
+      <!-- map: {"title": "正常系（MCP のツールの引数のパス）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as Claude Code
+        participant H as ツール実行後のフック
+        participant S as POST /_admin/post-write
+
+        C->>H: stdin（MCP のツールの入力）
+        H->>S: paths（存在するファイルの絶対パス 2 件）
+        S-->>H: additional_context
+        H-->>C: additionalContext
+      ```
+
+      <!-- /map -->
+    expected:
+      - サーバーが受けた `paths` が、絶対パスと `cwd` で解決した相対パスの 2 件
+    test: test_normal_when_mcp_tool
+  - name: 正常系（問い合わせないツール）
+    summary: 文書の MCP のツールと、パスを持たない呼び出しでは問い合わせない
+    setup:
+      - name: Mock
+        description: 受けた要求を記録する HTTP サーバー
+      - name: 入力
+        description: '`tool_name: mcp__plugin_project-index_project-index__write_docs` の JSON と、存在するファイルのパスを持たない MCP のツールの JSON'
+    flow: |-
+      <!-- map: {"title": "正常系（問い合わせないツール）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as Claude Code
+        participant H as ツール実行後のフック
+
+        C->>H: stdin（write_docs の入力）
+        H-->>C: 出力なし（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - サーバーが要求を受けない
+      - stdout が空で終了コード 0
+    test: test_normal_when_tool_not_queried
+  - name: 正常系（問い合わせに失敗した）
+    summary: サーバーが `NOTICE_TIMEOUT_SEC` 秒で返らないか、つながらないか、200 以外を返すと、何も出力せずに終了コード 0 で戻る
+    setup:
+      - name: Mock
+        description: 接続は受けるが `NOTICE_TIMEOUT_SEC` より長く応答しない HTTP サーバー
+        notes: テストは `NOTICE_TIMEOUT_SEC` を短くしてよい
+      - name: 入力
+        description: 正常系と同じ JSON
+    flow: |-
+      <!-- map: {"title": "正常系（問い合わせに失敗した）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as Claude Code
+        participant H as ツール実行後のフック
+        participant S as POST /_admin/post-write
+
+        C->>H: stdin（Edit の入力）
+        H->>S: session_id・paths
+        H->>H: NOTICE_TIMEOUT_SEC 秒で打ち切る
+        H-->>C: 出力なし（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`NOTICE_TIMEOUT_SEC` + 1 秒以内に終了コード 0 で戻る'
+      - stdout が空
+    test: test_normal_when_query_failed
+  - name: 正常系（入力が読めない）
+    summary: stdin が JSON として読めなければ何も出さず終了コード 0 で戻る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 入力
+        description: JSON でない文字列
+    flow: |-
+      <!-- map: {"title": "正常系（入力が読めない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as Claude Code
+        participant H as ツール実行後のフック
+
+        C->>H: stdin（壊れた JSON）
+        H-->>C: 出力なし（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - stdout が空で終了コード 0
+    test: test_normal_when_input_unparsable
+exceptions:
+  - name: なし（問い合わせに失敗した）
+    condition: 接続できない・`NOTICE_TIMEOUT_SEC` 秒で返らない・200 以外・応答の JSON が読めない
+    notes: 何も出力せず終了コード 0 で戻る。書き込みとツールの結果は変えない
+  - name: なし（入力が読めない）
+    condition: stdin が JSON として読めない、または `tool_input` が辞書でない
+    notes: 何も出力せず終了コード 0 で戻る
+constraints:
+  - item: 言語
+    constraint: Python 3.14 の標準ライブラリだけ。`hooks.json` は PATH の `python3` で起動するため、Python 3.12 の文法でも読める書き方にする
+  - item: 集めるパス
+    constraint: Write・Edit は `tool_input.file_path`、NotebookEdit は `tool_input.notebook_path`、MCP のツールは引数の入れ子の文字列の値のうち、絶対パスか `cwd` で解決した相対パスで、存在するファイルを指すもの
+  - item: 問い合わせないツール
+    constraint: 文書の MCP（`mcp__plugin_project-index_project-index__`）と管理の MCP（`mcp__plugin_project-index_project-index-admin__`）のツール
+    notes: '`write_docs`・`delete_docs` は管理用の YAML を自分で扱うため'
+  - item: 問い合わせ
+    constraint: '`urllib.request` で `http://127.0.0.1:${PROJECT_INDEX_PORT:-8786}/_admin/post-write` に JSON（`session_id`・`agent_id`・`paths`）を 1 回送信し、`NOTICE_TIMEOUT_SEC`（3 秒）で打ち切る'
+  - item: タイムアウト
+    constraint: '`hooks.json` の `timeout` は 5 秒'
+    notes: 内側の待ちの 3 秒に 50% を乗せて切り上げた値（規約『資源の値の決め方』の入れ子の待ち）。`NOTICE_TIMEOUT_SEC` を決め直したら合わせて決め直す
+test_file: tests/integration/plugin/test_post_tool_use.py
+visibility: internal
+tags:
+  - name: topic:フック
+    main: true
+  - name: topic:通知
+  - name: tool:claude-code

@@ -20,6 +20,8 @@ from typing import TYPE_CHECKING, Any
 from project_index.features.describe.source_checks import SourceChecks
 from project_index.features.lifecycle.control import RestartControl
 from project_index.features.lifecycle.types import SERVE_ARGV, SHUTDOWN_WAIT_FACTOR
+from project_index.features.post_write.notified import NotifiedStore
+from project_index.features.post_write.types import NOTICE_PROMPT_ID
 from project_index.features.prompt_doc.runtime import PromptSet, load_prompts, prompts_dir
 from project_index.features.prompt_doc.types import PromptInvalidError
 from project_index.features.settings.query import (
@@ -88,6 +90,8 @@ class Handlers:
     reload_changed: Callable[[TerminalConfig], list[SourceStatus]]
     # 読み取り API・文書の MCP の要求の応答中を数え、裏の検査と書き出しを休ませる関所
     gate: BackgroundGate
+    # 会話キーごとに書き込みの後の通知をしたパス（書き込みの後の通知・セッションの開始が使用する）
+    notified: NotifiedStore
 
 
 def _setup_logging(log_dir: Path) -> list[logging.Handler]:
@@ -235,7 +239,7 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
     from project_index.features.write.locks import SourceLocks
 
     # プロンプトの YAML が違反するときは、state_dir を作る前に止める
-    prompts = load_prompts(prompts_dir(os.environ), required=mcp_prompt_ids())
+    prompts = load_prompts(prompts_dir(os.environ), required=[*mcp_prompt_ids(), NOTICE_PROMPT_ID])
     state_dir = terminal.state_dir
     state_dir.mkdir(parents=True, exist_ok=True)
     # C の解析を使用できない: Python 実装で読み続ける（読み込みが遅くなる）
@@ -316,6 +320,7 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
         checks=checks,
         reload_changed=reload_changed,
         gate=gate,
+        notified=NotifiedStore(),
     )
 
 

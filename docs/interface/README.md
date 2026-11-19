@@ -48,5 +48,7 @@
 | [本文が指すファイルの一覧](./IF-113-1.yaml) | 本文が指すファイルの一覧（project-index links（CLI）） |
 | [メタデータの偏りの一覧](./IF-113-2.yaml) | メタデータの偏りの一覧（project-index skew（CLI）） |
 | [テストの全件実行](./IF-116-1.yaml) | テストの全件実行（`.github/workflows/test.yml`（workflow_dispatch）） |
+| [書き込みの後の通知の判定](./IF-35.yaml) | 書き込みの後の通知の判定（POST /_admin/post-write） |
+| [ツール実行後のフック](./IF-36.yaml) | ツール実行後のフック（Claude Code の PostToolUse（matcher Write\|Edit\|NotebookEdit\|mcp__.*）） |
 
 <!-- /table -->

@@ -1,4 +1,4 @@
-"""読み取り API・端末の設定の API・文書の MCP・管理の MCP・セッションの開始を 1 つのアプリにまとめる。"""
+"""読み取り API・端末の設定の API・文書の MCP・管理の MCP・セッションの開始・書き込みの後の通知を 1 つのアプリにまとめる。"""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 
+from project_index.features.post_write.route import build_post_write_router
 from project_index.features.read.route import build_read_router
 from project_index.features.session_start.route import build_session_start_router
 from project_index.features.settings.route import build_settings_router
@@ -50,7 +51,7 @@ def route_operation_id(route: APIRoute) -> str:
 
 
 def build_app(handlers: Handlers) -> FastAPI:
-    """読み取り API・端末の設定の API・文書の MCP・管理の MCP・セッションの開始を 1 つの FastAPI のアプリにまとめる。"""
+    """読み取り API・端末の設定の API・文書の MCP・管理の MCP・セッションの開始・書き込みの後の通知を 1 つの FastAPI のアプリにまとめる。"""
     docs_mcp = build_docs_mcp(handlers)
     admin_mcp = build_admin_mcp(handlers)
     app = FastAPI(
@@ -73,4 +74,5 @@ def build_app(handlers: Handlers) -> FastAPI:
     app.include_router(build_read_router(handlers))
     app.include_router(build_settings_router(handlers))
     app.include_router(build_session_start_router(handlers))
+    app.include_router(build_post_write_router(handlers))
     return app

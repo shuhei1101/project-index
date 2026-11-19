@@ -12,6 +12,15 @@ files:
   tags:
   - topic:テスト補助
   - tool:pytest
+- path: integration/plugin/test_post_tool_use.py
+  name: ツール実行後のフックの結合テスト
+  description: '`hooks/post_tool_use.py` の結合テストを受け持ち、ツール実行後のフックの振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-36
+    type: tests
 - path: integration/plugin/test_pre_tool_use.py
   name: ツール実行前のフックの結合テスト
   description: '`hooks/pre_tool_use.py` の結合テストを受け持ち、ツール実行前のフックの振る舞いのテストを修正するときに参照する。'
@@ -243,6 +252,15 @@ files:
   related:
   - to: IF-33
     type: tests
+- path: integration/server/test_post_write.py
+  name: 書き込みの後の通知の判定の結合テスト
+  description: '`post_post_write` の結合テストを受け持ち、書き込みの後の通知の判定の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-35
+    type: tests
 - path: integration/server/test_prompt_doc.py
   name: プロンプトの文書の変換の結合テスト
   description: '`prompt-doc` の結合テストを受け持ち、プロンプトの文書の変換の振る舞いのテストを修正するときに参照する。'
@@ -375,6 +393,16 @@ files:
   tags:
   - topic:テスト補助
   - tool:pytest
+- path: unit/plugins/project_index/hooks/test_post_tool_use.py
+  name: PostToolUse のフックの単体テスト
+  description: ツール実行後のフックの post_tool_use.py の単体テストを受け持ち、ツール実行後のフックの post_tool_use.py のテストを修正するときに参照する。
+  tags:
+  - topic:フック
+  - topic:通知
+  - tool:pytest
+  related:
+  - to: plugins/project-index/hooks/post_tool_use.py
+    type: tests
 - path: unit/plugins/project_index/hooks/test_pre_tool_use.py
   name: PreToolUse のフックの単体テスト
   description: ツール実行前のフックの pre_tool_use.py の単体テストを受け持ち、ツール実行前のフックの pre_tool_use.py のテストを修正するときに参照する。
@@ -686,6 +714,33 @@ files:
   - tool:pytest
   related:
   - to: src/project_index/features/outline/service.py
+    type: tests
+- path: unit/project_index/features/post_write/test_notified.py
+  name: 書き込みの後の通知をしたパスの記録の単体テスト
+  description: 書き込みの後の通知の notified.py の単体テストを受け持ち、書き込みの後の通知の notified.py のテストを修正するときに参照する。
+  tags:
+  - topic:通知
+  - tool:pytest
+  related:
+  - to: src/project_index/features/post_write/notified.py
+    type: tests
+- path: unit/project_index/features/post_write/test_route.py
+  name: '`POST /_admin/post-write` のルートの単体テスト'
+  description: 書き込みの後の通知の route.py の単体テストを受け持ち、書き込みの後の通知の route.py のテストを修正するときに参照する。
+  tags:
+  - topic:通知
+  - tool:pytest
+  related:
+  - to: src/project_index/features/post_write/route.py
+    type: tests
+- path: unit/project_index/features/post_write/test_service.py
+  name: 書き込んだパスの範囲と行の有無の判定の単体テスト
+  description: 書き込みの後の通知の service.py の単体テストを受け持ち、書き込みの後の通知の service.py のテストを修正するときに参照する。
+  tags:
+  - topic:通知
+  - tool:pytest
+  related:
+  - to: src/project_index/features/post_write/service.py
     type: tests
 - path: unit/project_index/features/prompt_doc/conftest.py
   name: プロンプトの文書の変換の単体テストの共通の準備

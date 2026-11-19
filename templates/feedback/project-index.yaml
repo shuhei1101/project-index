@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/shuhei1101/project-index/v{バージョン}/schemas/project-index.schema.json
+# 会話の指摘の置き場所に配置する project-index.yaml の雛形。/project-index:feedback が 1 行目のタグを書き換える
+# alias-inject が入っていないときは、/project-index:feedback が terms の行を削除する
+version: "3"
+name: feedback
+description: 利用者が会話で伝えた指摘を、ルール・用語・文書として登録した置き場所
+documents:
+  - id: files
+    paths: [files.yaml]
+    title: ファイル
+    schema: schemas/files.schema.yaml
+    records: files
+    body_file: path
+  - id: terms
+    paths: [terms.yaml]
+    title: 用語
+    schema: schemas/terms.schema.yaml
+    records: terms
+    alias_type: term
+nav:
+  tabs:
+    - title: 文書
+      items:
+        - auto:
+            document: files
+    - title: 用語集
+      items:
+        - auto:
+            document: terms

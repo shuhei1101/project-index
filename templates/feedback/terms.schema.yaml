@@ -1,0 +1,49 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: 用語
+description: '会話の指摘から登録した用語の YAML。文書の行の `records: terms`・`alias_type: term` で指し、要素ごとに 1 件の用語にする。'
+type: object
+required:
+  - terms
+properties:
+  terms:
+    type: array
+    title: 用語
+    description: 1 要素が 1 件の用語。
+    items:
+      type: object
+      title: 用語の要素
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - description
+      properties:
+        id:
+          type: string
+          title: 用語の ID
+          description: 英小文字とハイフンの識別子。
+          pattern: ^[a-z][a-z0-9-]*$
+        name:
+          type: string
+          title: 用語
+          description: 文書・会話で使用する正式な単語。
+          minLength: 1
+        description:
+          type: string
+          title: 意味
+          description: 用語が指すものを 1 文で記載する。
+          minLength: 1
+        aliases:
+          type: array
+          title: 別名
+          description: 正式な単語と並べて使用してよい言い方。
+          items:
+            type: string
+            minLength: 1
+        avoid:
+          type: array
+          title: 使用しない言い方
+          description: やめた言い方。
+          items:
+            type: string
+            minLength: 1

@@ -1,0 +1,156 @@
+id: MOD-175
+title: 索引のサーバー / 書き込みの後の通知 / service.py
+lead: 書き込んだパスごとに配信元と管理用の YAML の範囲・行の有無を判定し、未通知のファイルの通知と文面を作る処理を受け持ち、書き込みの後の通知の service.py を修正するときに参照する。
+test_files:
+  - tests/unit/project_index/features/post_write/test_service.py
+functions:
+  - name: judge_post_write
+    title: 書き込みの後の通知の判定
+    kind: 関数
+    container: project_index/features/post_write/service.py
+    usecase: 書き込みの後の通知
+    role: サービス
+    summary: パスごとに通知の対象かを判定し、未通知のファイルの通知と文面を返す
+    scope: public
+    is_async: false
+    thread_safe: true
+    side_effects: 通知したパスを `notified` に記録する
+    args:
+      - name: request
+        title: 要求
+        type: PostWriteRequest
+        required: true
+        passing: positional
+        description: 検証済みの本文
+      - name: sources
+        title: 配信中の配信元
+        type: Sequence[ServedSource]
+        required: true
+        passing: keyword
+        description: '`handlers.registry.served()`'
+      - name: notified
+        title: 通知済みの記録
+        type: NotifiedStore
+        required: true
+        passing: keyword
+        description: '`handlers.notified`'
+      - name: prompts
+        title: プロンプトの一式
+        type: PromptSet
+        required: true
+        passing: keyword
+        description: '`handlers.prompts`'
+    returns:
+      type: PostWriteResponse
+      description: 通知と文面
+    process: |-
+      1. パスごとに通知の判定（`classify_path`）を呼び、`None` でない判定を集める
+      2. 集めた判定のパスを `notified.take_new(SessionKey(session_id, agent_id or ""), ...)` に渡し、返ったパスの判定だけを残す
+         - 残らなければ、`notices` を空・`additional_context` を空文字にして返す（以降の手順は実行しない）
+      3. 残った判定の配信元ごとに、配信元の設定に `alias_type` を持つ行があるかと、配信元のフォルダの直下に `RULE_INDEX_FILE` があるかを求める
+      4. `prompts.render(NOTICE_PROMPT_ID, {notices, aliases, rule_index})` で文面を描画して返す
+         - `[INFO]` 書き込みの後の通知を返した（セッション ID・件数）
+    unit_tests:
+      - name: test_judge_post_write
+        case: 正常
+        summary: 行のあるファイルの通知を 1 回だけ返す
+        condition: 一時ディレクトリの配信元（行のある `docs/a.md` と行の無い `docs/b.md`）で `docs/a.md` を 2 回渡す
+        mock: なし（一時ディレクトリの配信元と `content/prompts` のプロンプト）
+        expected: 1 回目は `update_row` の 1 件で文面が空でない。2 回目は `notices` が空で文面が空文字
+      - name: test_judge_post_write_when_aliases_and_rule_index
+        case: 正常
+        summary: エイリアスとルールの索引の行を足す
+        condition: 配信元の設定に `alias_type` を持つ行があり、直下に `rules.yaml` がある
+        mock: なし
+        expected: 文面にエイリアスの 1 行とルールの索引の 1 行がある
+      - name: test_judge_post_write_when_not_notified
+        case: 正常
+        summary: 対象外のパスは記録しない
+        condition: 管理用の YAML と配信元の外のパスを渡した後、`docs/a.md` を渡す
+        mock: なし
+        expected: 1 回目は `notices` が空、2 回目は `docs/a.md` を通知する
+    callees:
+      - MOD-174#classes[NotifiedStore]
+  - name: classify_path
+    title: 通知の判定
+    kind: 関数
+    container: project_index/features/post_write/service.py
+    usecase: 書き込みの後の通知
+    role: 判定
+    summary: 1 つのパスが通知の対象なら、配信元・促す修正・管理用の YAML を返す
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: path
+        title: パス
+        type: Path
+        required: true
+        passing: positional
+        description: 書き込んだファイルの絶対パス
+      - name: sources
+        title: 配信中の配信元
+        type: Sequence[ServedSource]
+        required: true
+        passing: positional
+        description: 判定に使う配信元
+    returns:
+      type: Notice | None
+      description: 通知の対象でなければ `None`
+    process: |-
+      1. 配信元ごとに、文書の相対パスを解くフォルダを求め、パスを含む最初の配信元を選ぶ。フォルダは `find_worktree` で見つけたワークツリーを `base_of`（`access/service.py` の `_base_of` を public にしたもの。ワークツリーの中なら `worktree / root.relative_to(repo_root)`、無ければ `root`）に渡して求める
+         - どの配信元も含まなければ `None` を返す（以降の手順は実行しない）
+      2. フォルダからの相対パスが、配信元の設定ファイル（`config_files`）か、`records`・`body_file` を持つ行の管理用の YAML そのものなら `None` を返す
+      3. `records`・`body_file` を持つ行ごとに、行の `paths` に当たる管理用の YAML を求め、相対パスがその範囲に入るか（`unindexed_files` に `files=[相対パス]`・`body_paths=()` と、`documents/store.py` の同期の検査と同じ `others`（その行以外の文書の行）・`nested_dirs`（より深いフォルダの管理用の YAML のフォルダ）・`ignored`（Git の配信元なら Git が無視するパス）を渡して返るか）を、深いフォルダの管理用の YAML から順に確かめる
+         - どの範囲にも入らなければ `None` を返す（YAML の文書・`documents[].paths` に該当しないファイルを含む）
+      4. 範囲に入った管理用の YAML の `files[].path` に相対パスがあれば `update_row`、無ければ `add_row` の `Notice` を返す
+    unit_tests:
+      - name: test_classify_path_when_row
+        case: 正常
+        summary: 行のあるファイル
+        condition: '`docs/files.yml` に `a.md` の行がある配信元で `docs/a.md`'
+        mock: なし（一時ディレクトリの配信元）
+        expected: '`action` が `update_row`、`files_yaml` が `docs/files.yml`'
+      - name: test_classify_path_when_no_row
+        case: 正常
+        summary: 行の無いファイル
+        condition: 同じ配信元で `docs/b.md`
+        mock: なし
+        expected: '`action` が `add_row`'
+      - name: test_classify_path_when_worktree
+        case: 正常
+        summary: ワークツリーのファイル
+        condition: 配信元の `worktrees` に当たる `.claude/worktrees/x/docs/a.md`
+        mock: なし
+        expected: '`update_row` で、`files_yaml` がワークツリーの管理用の YAML のパス'
+      - name: test_classify_path_when_not_target
+        case: 正常
+        summary: 対象外のパス
+        condition: 管理用の YAML・`project-index.yaml`・YAML の文書・`tmp/x.md`（範囲の外）・配信元の外のパス
+        mock: なし
+        expected: どれも `None`
+      - name: test_classify_path_when_worktree_of_subfolder
+        case: 正常
+        summary: リポジトリの下のフォルダが配信元のワークツリー
+        condition: 配信元のフォルダが `{repo}/docs` で、ワークツリーの `.claude/worktrees/x/docs/guide/a.md`（`docs/guide/files.yml` に `a.md` の行がある）
+        mock: なし（一時ディレクトリの Git の配信元）
+        expected: '`update_row` で、`files_yaml` が `guide/files.yml`'
+      - name: test_classify_path_when_other_table_or_ignored
+        case: 正常
+        summary: ほかの行の文書と Git が無視するファイルは対象外
+        condition: 管理用の YAML の範囲が `**/*` で、範囲の中に YAML の文書の行が当たる `docs/x.yaml` と、`.gitignore` が無視する `docs/out.log` がある Git の配信元
+        mock: なし
+        expected: どちらも `None`
+refs:
+  - to: IF-35
+    type: requires
+    when: インターフェース定義『書き込みの後の通知の判定』の通知の対象と文面を変えるときに、この設計書の判定を合わせる。
+  - to: IF-17
+    type: references
+    when: 管理用の YAML の範囲の判定を変えるときに、載せるファイルの一覧と同じ判定かを確認する。
+visibility: internal
+tags:
+  - name: topic:通知
+    main: true
+  - name: topic:メタデータ
+  - name: topic:エイリアス

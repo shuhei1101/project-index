@@ -13,16 +13,26 @@ from project_index.features.session_start.types import (
 )
 
 if TYPE_CHECKING:
+    from project_index.features.post_write.notified import NotifiedStore
     from project_index.features.seen.store import SeenStore
 
 logger = logging.getLogger(__name__)
 
 
-def start_session(request: SessionStartRequest, *, seen: SeenStore) -> SessionStartResponse:
-    """`reason` が `FORGET_REASONS` なら、その会話キーの返却済みの記録を削除する。"""
+def start_session(
+    request: SessionStartRequest, *, seen: SeenStore, notified: NotifiedStore
+) -> SessionStartResponse:
+    """`reason` が `FORGET_REASONS` なら、その会話キーの返却済みの記録と通知済みの記録を削除する。"""
     key = SessionKey.of(request.session_id, request.agent_id)
     if request.reason not in FORGET_REASONS or key is None:
         return SessionStartResponse(forgotten=False)
     removed = seen.forget(key)
-    logger.info("返却済みの記録を削除した（%s・%s 件）", request.session_id, removed)
+    # 書き込みの後の通知も、文脈から消えた分をもう一度通知できるようにする
+    notified_removed = notified.forget(key)
+    logger.info(
+        "返却済みの記録を削除した（%s・%s 件・通知済み %s 件）",
+        request.session_id,
+        removed,
+        notified_removed,
+    )
     return SessionStartResponse(forgotten=True)

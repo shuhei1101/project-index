@@ -1,0 +1,188 @@
+id: MOD-177
+title: プラグイン / ツール実行後のフック / post_tool_use.py
+lead: PostToolUse のフックを受け持ち、ツール実行後のフックの post_tool_use.py を修正するときに参照する。
+test_files:
+  - tests/unit/plugins/project_index/hooks/test_post_tool_use.py
+constants:
+  - name: NOTICE_TIMEOUT_SEC
+    title: 問い合わせの打ち切り
+    container: hooks/post_tool_use.py
+    usecase: 書き込みの後の通知
+    summary: '`POST /_admin/post-write` を待つ秒数'
+    value: '3'
+  - name: SKIPPED_TOOL_PREFIXES
+    title: 問い合わせないツール
+    container: hooks/post_tool_use.py
+    usecase: 書き込みの後の通知
+    summary: 管理用の YAML を自分で扱う文書の MCP と、管理の MCP のツールの名前の接頭辞
+    value: ("mcp__plugin_project-index_project-index__", "mcp__plugin_project-index_project-index-admin__")
+  - name: PATH_KEYS
+    title: 組み込みのツールのパスのキー
+    container: hooks/post_tool_use.py
+    usecase: 書き込みの後の通知
+    summary: 組み込みのツールごとの、書き込んだパスを持つ `tool_input` のキー
+    value: '{"Write": "file_path", "Edit": "file_path", "NotebookEdit": "notebook_path"}'
+  - name: DEFAULT_PORT
+    title: 既定のポート
+    container: hooks/post_tool_use.py
+    usecase: 書き込みの後の通知
+    summary: '`PROJECT_INDEX_PORT` が無いときのポート'
+    value: '8786'
+functions:
+  - name: main
+    title: フックの入口
+    container: hooks/post_tool_use.py
+    usecase: 書き込みの後の通知
+    role: 入口
+    summary: stdin の JSON を読み、書き込んだパスを問い合わせて、返った文面を標準出力に出す
+    kind: 関数
+    scope: public
+    is_async: false
+    side_effects: 標準出力に書く。`POST /_admin/post-write` に送信する
+    returns:
+      type: int
+      description: 常に 0
+    process: |-
+      1. stdin を JSON として読む
+         - 読めない・辞書でない・`tool_input` が辞書でない・`session_id` が無い場合、何も出さず 0 を返す
+      2. `tool_name` が `SKIPPED_TOOL_PREFIXES` のどれかで始まる場合、何も出さず 0 を返す
+      3. 書き込んだパスを集める（パスの収集）
+         - 空なら何も出さず 0 を返す
+      4. 問い合わせる（通知の問い合わせ）
+         - 文面が空か `None` なら何も出さず 0 を返す
+      5. `{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": 文面}}` を標準出力に出し、0 を返す
+    unit_tests:
+      - name: test_main
+        case: 正常
+        summary: 返った文面を出す
+        condition: Edit の入力（存在するファイルの `file_path`）
+        mock: 通知の問い合わせを固定の文面を返すものに差し替える
+        expected: 0 を返し、`additionalContext` が固定の文面
+      - name: test_main_when_skipped_tool
+        case: 正常
+        summary: 文書の MCP のツールでは問い合わせない
+        condition: '`tool_name` が `mcp__plugin_project-index_project-index__write_docs`'
+        mock: 通知の問い合わせを呼ばれたら失敗するものに差し替える
+        expected: 0 を返し、標準出力が空
+      - name: test_main_when_input_unparsable
+        case: 異常
+        summary: 読めない入力では何も出さない
+        condition: stdin が `not json`
+        mock: なし
+        expected: 0 を返し、標準出力が空
+      - name: test_main_when_python_312_grammar
+        case: 正常
+        summary: フックを 3.12 の文法で読める
+        condition: '`hooks/` の 3 つのフック（`post_tool_use.py`・`pre_tool_use.py`・`session_start.py`）を `ast.parse(..., feature_version=(3, 12))` で読む'
+        mock: なし
+        expected: どのフックも `SyntaxError` にならない
+  - name: collect_paths
+    title: パスの収集
+    container: hooks/post_tool_use.py
+    usecase: 書き込みの後の通知
+    role: 変換
+    summary: ツールの入力から、存在するファイルの絶対パスを集める
+    kind: 関数
+    scope: public
+    is_async: false
+    args:
+      - name: tool_name
+        title: ツールの名前
+        type: str
+        required: true
+        passing: positional
+        description: 実行したツール
+      - name: tool_input
+        title: ツールへの入力
+        type: dict[str, Any]
+        required: true
+        passing: positional
+        description: フックの入力の `tool_input`
+      - name: cwd
+        title: 作業場所
+        type: str
+        required: true
+        passing: positional
+        description: 相対パスを解決するフォルダ
+    returns:
+      type: list[str]
+      description: 重なりを除いた絶対パス（見つけた順）
+    process: |-
+      1. `tool_name` が `PATH_KEYS` にあれば、そのキーの値だけを候補にする
+      2. `mcp__` で始まれば、`tool_input` の入れ子の辞書・配列をたどり、文字列の値を全て候補にする
+      3. それ以外のツールは空を返す
+      4. 候補ごとに、絶対パスはそのまま、相対パスは `cwd` からのパスにして正規化し、存在するファイルだけを残す
+    unit_tests:
+      - name: test_collect_paths
+        case: 正常
+        summary: Edit の file_path を返す
+        condition: '`Edit` と存在するファイルの `file_path`'
+        mock: なし（一時ディレクトリ）
+        expected: そのパスの 1 件
+      - name: test_collect_paths_when_mcp_tool
+        case: 正常
+        summary: MCP のツールの入れ子の文字列から集める
+        condition: 入れ子に絶対パス・`cwd` からの相対パス・存在しないパス・パスでない文字列を持つ `mcp__test__write`
+        mock: なし
+        expected: 絶対パスと解決した相対パスの 2 件
+      - name: test_collect_paths_when_other_tool
+        case: 正常
+        summary: 対象外のツールは空
+        condition: '`Bash` の入力'
+        mock: なし
+        expected: '`[]`'
+  - name: query_notice
+    title: 通知の問い合わせ
+    container: hooks/post_tool_use.py
+    usecase: 書き込みの後の通知
+    role: アダプター
+    summary: '`POST /_admin/post-write` に送信し、返った `additional_context` を返す'
+    kind: 関数
+    scope: public
+    is_async: false
+    side_effects: HTTP の要求を 1 回送信する
+    args:
+      - name: event
+        title: フックの入力
+        type: dict[str, Any]
+        required: true
+        passing: positional
+        description: '`session_id`・`agent_id` を持つ stdin の JSON'
+      - name: paths
+        title: パス
+        type: list[str]
+        required: true
+        passing: positional
+        description: 集めたパス
+    returns:
+      type: str | None
+      description: 文面。失敗したときは `None`
+    process: |-
+      1. `http://127.0.0.1:${PROJECT_INDEX_PORT:-DEFAULT_PORT}/_admin/post-write` に JSON（`session_id`・`agent_id`（あれば）・`paths`）を `urllib.request` で送信し、`NOTICE_TIMEOUT_SEC` で打ち切る
+      2. 200 の応答の JSON の `additional_context` が文字列なら返す
+         - 接続できない・打ち切った・200 以外・JSON が読めない場合、`None` を返す
+    unit_tests:
+      - name: test_query_notice
+        case: 正常
+        summary: 応答の文面を返す
+        condition: 固定の `additional_context` を返す HTTP サーバー
+        mock: なし（テスト用の HTTP サーバー）
+        expected: 固定の文面を返し、サーバーが受けた本文が `session_id`・`paths` を持つ
+      - name: test_query_notice_when_timeout
+        case: 異常
+        summary: 打ち切ったら None
+        condition: '`NOTICE_TIMEOUT_SEC` より長く応答しない HTTP サーバー（テストは `NOTICE_TIMEOUT_SEC` を短くする）'
+        mock: なし
+        expected: '`None` を返す'
+refs:
+  - to: IF-36
+    type: requires
+    when: インターフェース定義『ツール実行後のフック』の入出力を変えるときに、この設計書の関数と定数を合わせる。
+notes:
+  決まり: Python 3.14 の標準ライブラリだけで、PATH の `python3` が 3.12 でも読める文法で書き、常に終了コード 0 で戻る。判定と文面は索引のサーバーが持ち、フックはパスを集めて問い合わせるだけにする。
+visibility: internal
+tags:
+  - name: topic:フック
+    main: true
+  - name: topic:通知
+  - name: tool:claude-code

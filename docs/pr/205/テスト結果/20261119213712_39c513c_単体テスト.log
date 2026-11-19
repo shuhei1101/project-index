@@ -1,0 +1,330 @@
+# 単体テスト（Red）: テストコード 39c513c
+
+## ランナー（run_runner、layer=unit、run_id=44525446342）
+
+$ gh workflow run test.yml --ref feat/plugin/post-write-notice-and-feedback-skill -f layer=unit （TP-1 の TL-1 の run_runner）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 1327 items / 4 errors
+
+==================================== ERRORS ====================================
+_ ERROR collecting tests/unit/project_index/features/post_write/test_notified.py _
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/post_write/test_notified.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/post_write/test_notified.py:3: in <module>
+    from project_index.features.post_write.notified import NotifiedStore
+E   ModuleNotFoundError: No module named 'project_index.features.post_write'
+_ ERROR collecting tests/unit/project_index/features/post_write/test_route.py __
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/post_write/test_route.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/post_write/test_route.py:8: in <module>
+    from project_index.features.post_write.route import build_post_write_router
+E   ModuleNotFoundError: No module named 'project_index.features.post_write'
+_ ERROR collecting tests/unit/project_index/features/post_write/test_service.py _
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/post_write/test_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/post_write/test_service.py:7: in <module>
+    from project_index.features.post_write.notified import NotifiedStore
+E   ModuleNotFoundError: No module named 'project_index.features.post_write'
+_ ERROR collecting tests/unit/project_index/features/session_start/test_service.py _
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/session_start/test_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/session_start/test_service.py:5: in <module>
+    from project_index.features.post_write.notified import NotifiedStore
+E   ModuleNotFoundError: No module named 'project_index.features.post_write'
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/post_write/test_notified.py
+ERROR tests/unit/project_index/features/post_write/test_route.py
+ERROR tests/unit/project_index/features/post_write/test_service.py
+ERROR tests/unit/project_index/features/session_start/test_service.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 4 errors during collection !!!!!!!!!!!!!!!!!!!!
+============================== 4 errors in 3.42s ===============================
+exit=1
+
+## 補足: ツール実行後のフックのテスト
+
+ランナーは post_write の収集のエラーで打ち切ったため、tests/unit/plugins/project_index/hooks/test_post_tool_use.py は手元の個別実行（run_one）で回した。手元の /tmp/pytest-of-{ユーザー} が別のユーザーの持ち物で pytest の一時フォルダを作れないため、--basetemp だけを加えた。
+
+$ uv run pytest -q --basetemp=/tmp/pr205-pytest/base2 tests/unit/plugins/project_index/hooks/test_post_tool_use.py
+FFFFFFFF                                                                 [100%]
+=================================== FAILURES ===================================
+__________________________________ test_main ___________________________________
+
+load_hook = <function load_hook.<locals>._load at 0x749b0272fcc0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x749b028c9f30>
+capsys = <_pytest.capture.CaptureFixture object at 0x749b028a7cb0>
+tmp_path = PosixPath('/tmp/pr205-pytest/base2/test_main0')
+
+    def test_main(
+        load_hook: Callable[[str], ModuleType],
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+    ) -> None:
+        """返った文面を出す（正常系）。"""
+        # 準備
+>       hook = load_hook("post_tool_use")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/plugins/project_index/hooks/test_post_tool_use.py:28: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/plugins/project_index/hooks/conftest.py:29: in _load
+    spec.loader.exec_module(module)
+<frozen importlib._bootstrap_external>:755: in exec_module
+    ???
+<frozen importlib._bootstrap_external>:892: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <_frozen_importlib_external.SourceFileLoader object at 0x749b028ffef0>
+path = '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-plugin-post-write-notice-and-feedback-skill/plugins/project-index/hooks/post_tool_use.py'
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-plugin-post-write-notice-and-feedback-skill/plugins/project-index/hooks/post_tool_use.py'
+
+<frozen importlib._bootstrap_external>:950: FileNotFoundError
+_________________________ test_main_when_skipped_tool __________________________
+
+load_hook = <function load_hook.<locals>._load at 0x749b0272f110>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x749b028cb490>
+capsys = <_pytest.capture.CaptureFixture object at 0x749b028f8690>
+tmp_path = PosixPath('/tmp/pr205-pytest/base2/test_main_when_skipped_tool0')
+
+    def test_main_when_skipped_tool(
+        load_hook: Callable[[str], ModuleType],
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+    ) -> None:
+        """文書の MCP のツールでは問い合わせない（正常系）。"""
+        # 準備
+>       hook = load_hook("post_tool_use")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/plugins/project_index/hooks/test_post_tool_use.py:68: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/plugins/project_index/hooks/conftest.py:29: in _load
+    spec.loader.exec_module(module)
+<frozen importlib._bootstrap_external>:755: in exec_module
+    ???
+<frozen importlib._bootstrap_external>:892: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <_frozen_importlib_external.SourceFileLoader object at 0x749b027c12b0>
+path = '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-plugin-post-write-notice-and-feedback-skill/plugins/project-index/hooks/post_tool_use.py'
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-plugin-post-write-notice-and-feedback-skill/plugins/project-index/hooks/post_tool_use.py'
+
+<frozen importlib._bootstrap_external>:950: FileNotFoundError
+_______________________ test_main_when_input_unparsable ________________________
+
+load_hook = <function load_hook.<locals>._load at 0x749b0272f060>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x749b02ff2d50>
+capsys = <_pytest.capture.CaptureFixture object at 0x749b028f9d10>
+
+    def test_main_when_input_unparsable(
+        load_hook: Callable[[str], ModuleType],
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """読めない入力では何も出さない（異常系）。"""
+        # 準備
+>       hook = load_hook("post_tool_use")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/plugins/project_index/hooks/test_post_tool_use.py:102: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/plugins/project_index/hooks/conftest.py:29: in _load
+    spec.loader.exec_module(module)
+<frozen importlib._bootstrap_external>:755: in exec_module
+    ???
+<frozen importlib._bootstrap_external>:892: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <_frozen_importlib_external.SourceFileLoader object at 0x749b027c15b0>
+path = '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-plugin-post-write-notice-and-feedback-skill/plugins/project-index/hooks/post_tool_use.py'
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-plugin-post-write-notice-and-feedback-skill/plugins/project-index/hooks/post_tool_use.py'
+
+<frozen importlib._bootstrap_external>:950: FileNotFoundError
+______________________________ test_collect_paths ______________________________
+
+load_hook = <function load_hook.<locals>._load at 0x749b0272eae0>
+tmp_path = PosixPath('/tmp/pr205-pytest/base2/test_collect_paths0')
+
+    def test_collect_paths(load_hook: Callable[[str], ModuleType], tmp_path: Path) -> None:
+        """Edit の file_path を返す（正常系）。"""
+        # 準備
+>       hook = load_hook("post_tool_use")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/plugins/project_index/hooks/test_post_tool_use.py:114: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/plugins/project_index/hooks/conftest.py:29: in _load
+    spec.loader.exec_module(module)
+<frozen importlib._bootstrap_external>:755: in exec_module
+    ???
+<frozen importlib._bootstrap_external>:892: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <_frozen_importlib_external.SourceFileLoader object at 0x749b027c1730>
+path = '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-plugin-post-write-notice-and-feedback-skill/plugins/project-index/hooks/post_tool_use.py'
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-plugin-post-write-notice-and-feedback-skill/plugins/project-index/hooks/post_tool_use.py'
+
+<frozen importlib._bootstrap_external>:950: FileNotFoundError
+_______________________ test_collect_paths_when_mcp_tool _______________________
+
+load_hook = <function load_hook.<locals>._load at 0x749b0272d220>
+tmp_path = PosixPath('/tmp/pr205-pytest/base2/test_collect_paths_when_mcp_to0')
+
+    def test_collect_paths_when_mcp_tool(
+        load_hook: Callable[[str], ModuleType], tmp_path: Path
+    ) -> None:
+        """MCP のツールの入れ子の文字列から集める（正常系）。"""
+        # 準備
+>       hook = load_hook("post_tool_use")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/plugins/project_index/hooks/test_post_tool_use.py:128: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/plugins/project_index/hooks/conftest.py:29: in _load
+    spec.loader.exec_module(module)
+<frozen importlib._bootstrap_external>:755: in exec_module
+    ???
+<frozen importlib._bootstrap_external>:892: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <_frozen_importlib_external.SourceFileLoader object at 0x749b027c1eb0>
+path = '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-plugin-post-write-notice-and-feedback-skill/plugins/project-index/hooks/post_tool_use.py'
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-plugin-post-write-notice-and-feedback-skill/plugins/project-index/hooks/post_tool_use.py'
+
+<frozen importlib._bootstrap_external>:950: FileNotFoundError
+______________________ test_collect_paths_when_other_tool ______________________
+
+load_hook = <function load_hook.<locals>._load at 0x749b02dc7a00>
+tmp_path = PosixPath('/tmp/pr205-pytest/base2/test_collect_paths_when_other_0')
+
+    def test_collect_paths_when_other_tool(
+        load_hook: Callable[[str], ModuleType], tmp_path: Path
+    ) -> None:
+        """対象外のツールは空（正常系）。"""
+        # 準備
+>       hook = load_hook("post_tool_use")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/plugins/project_index/hooks/test_post_tool_use.py:150: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/plugins/project_index/hooks/conftest.py:29: in _load
+    spec.loader.exec_module(module)
+<frozen importlib._bootstrap_external>:755: in exec_module
+    ???
+<frozen importlib._bootstrap_external>:892: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <_frozen_importlib_external.SourceFileLoader object at 0x749b027c2270>
+path = '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-plugin-post-write-notice-and-feedback-skill/plugins/project-index/hooks/post_tool_use.py'
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-plugin-post-write-notice-and-feedback-skill/plugins/project-index/hooks/post_tool_use.py'
+
+<frozen importlib._bootstrap_external>:950: FileNotFoundError
+______________________________ test_query_notice _______________________________
+
+load_hook = <function load_hook.<locals>._load at 0x749b02dc7480>
+context_server = <function context_server.<locals>._serve at 0x749b02dc71c0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x749b02804160>
+
+    def test_query_notice(
+        load_hook: Callable[[str], ModuleType],
+        context_server: Callable[..., Any],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """応答の文面を返す（正常系）。"""
+        # 準備
+>       hook = load_hook("post_tool_use")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/plugins/project_index/hooks/test_post_tool_use.py:164: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/plugins/project_index/hooks/conftest.py:29: in _load
+    spec.loader.exec_module(module)
+<frozen importlib._bootstrap_external>:755: in exec_module
+    ???
+<frozen importlib._bootstrap_external>:892: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <_frozen_importlib_external.SourceFileLoader object at 0x749b027c2870>
+path = '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-plugin-post-write-notice-and-feedback-skill/plugins/project-index/hooks/post_tool_use.py'
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-plugin-post-write-notice-and-feedback-skill/plugins/project-index/hooks/post_tool_use.py'
+
+<frozen importlib._bootstrap_external>:950: FileNotFoundError
+________________________ test_query_notice_when_timeout ________________________
+
+load_hook = <function load_hook.<locals>._load at 0x749b027d41a0>
+context_server = <function context_server.<locals>._serve at 0x749b027d45c0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x749b028046b0>
+
+    def test_query_notice_when_timeout(
+        load_hook: Callable[[str], ModuleType],
+        context_server: Callable[..., Any],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """打ち切ったら None（異常系）。"""
+        # 準備
+>       hook = load_hook("post_tool_use")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/plugins/project_index/hooks/test_post_tool_use.py:181: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/plugins/project_index/hooks/conftest.py:29: in _load
+    spec.loader.exec_module(module)
+<frozen importlib._bootstrap_external>:755: in exec_module
+    ???
+<frozen importlib._bootstrap_external>:892: in get_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <_frozen_importlib_external.SourceFileLoader object at 0x749b027c2e70>
+path = '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-plugin-post-write-notice-and-feedback-skill/plugins/project-index/hooks/post_tool_use.py'
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/shuhei2441/repo/project-index/.claude/worktrees/feat-plugin-post-write-notice-and-feedback-skill/plugins/project-index/hooks/post_tool_use.py'
+
+<frozen importlib._bootstrap_external>:950: FileNotFoundError
+=========================== short test summary info ============================
+FAILED tests/unit/plugins/project_index/hooks/test_post_tool_use.py::test_main
+FAILED tests/unit/plugins/project_index/hooks/test_post_tool_use.py::test_main_when_skipped_tool
+FAILED tests/unit/plugins/project_index/hooks/test_post_tool_use.py::test_main_when_input_unparsable
+FAILED tests/unit/plugins/project_index/hooks/test_post_tool_use.py::test_collect_paths
+FAILED tests/unit/plugins/project_index/hooks/test_post_tool_use.py::test_collect_paths_when_mcp_tool
+FAILED tests/unit/plugins/project_index/hooks/test_post_tool_use.py::test_collect_paths_when_other_tool
+FAILED tests/unit/plugins/project_index/hooks/test_post_tool_use.py::test_query_notice
+FAILED tests/unit/plugins/project_index/hooks/test_post_tool_use.py::test_query_notice_when_timeout
+8 failed in 0.06s
+
+## 判定
+
+- fail は全て実装が無いこと（project_index.features.post_write と plugins/project-index/hooks/post_tool_use.py が無い）による
+- 実装の前から pass したテストは無い

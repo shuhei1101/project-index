@@ -367,6 +367,42 @@ files:
   related:
   - to: MOD-106-3
     type: implements
+- path: project_index/features/post_write/notified.py
+  name: 会話キーごとの、書き込みの後の通知をしたパスの記録
+  description: 会話キーごとに通知したパスをプロセスのメモリに記録し、未通知のパスだけを取り出す処理を受け持ち、書き込みの後の通知の notified.py を修正するときに参照する。
+  tags:
+  - topic:通知
+  - topic:会話
+  related:
+  - to: MOD-174
+    type: implements
+- path: project_index/features/post_write/route.py
+  name: '`POST /_admin/post-write` のルート'
+  description: '`POST /_admin/post-write` のルートを受け持ち、書き込みの後の通知の route.py を修正するときに参照する。'
+  tags:
+  - topic:通知
+  - topic:ルート
+  related:
+  - to: MOD-176
+    type: implements
+- path: project_index/features/post_write/service.py
+  name: 書き込んだパスの管理用の YAML の範囲と行の有無の判定と、通知の文面の作成
+  description: 書き込んだパスごとに配信元と管理用の YAML の範囲・行の有無を判定し、未通知のファイルの通知と文面を作る処理を受け持ち、書き込みの後の通知の service.py を修正するときに参照する。
+  tags:
+  - topic:通知
+  - topic:メタデータ
+  related:
+  - to: MOD-175
+    type: implements
+- path: project_index/features/post_write/types.py
+  name: '`POST /_admin/post-write` の本文と応答の型と、通知の文面のプロンプトの ID'
+  description: '`POST /_admin/post-write` の本文と応答の型と、通知の文面のプロンプトの ID・ルールの索引のファイル名を受け持ち、書き込みの後の通知の types.py を修正するときに参照する。'
+  tags:
+  - topic:通知
+  - topic:型ヒント
+  related:
+  - to: MOD-173
+    type: implements
 - path: project_index/features/prompt_doc/__init__.py
   name: プロンプトの文書の変換のパッケージ
   description: プロンプトの文書の変換のパッケージの説明を受け持ち、パッケージの受け持つことを確かめるときに参照する。
@@ -597,8 +633,8 @@ files:
   - to: MOD-61
     type: implements
 - path: project_index/features/session_start/service.py
-  name: '`/clear`・圧縮の後に、その会話の返却済みの記録を削除する処理'
-  description: '`/clear`・圧縮の後に、その会話の返却済みの記録を削除する処理を受け持ち、セッションの開始の service.py を修正するときに参照する。'
+  name: '`/clear`・圧縮の後に、その会話の返却済みの記録と通知済みの記録を削除する処理'
+  description: '`/clear`・圧縮の後に、その会話の返却済みの記録と通知済みの記録を削除する処理を受け持ち、セッションの開始の service.py を修正するときに参照する。'
   tags:
   - topic:セッションの開始
   related:

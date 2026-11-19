@@ -22,7 +22,7 @@ preconditions:
   - 端末に uv・git・Claude Code がある
   - project-index のマーケットプレースを追加し、プラグイン `project-index` をユーザースコープで入れてある
   - 配信する配信元が、YAML の文書とそのスキーマを持つフォルダ（git リポジトリか Git 管理外のフォルダ）である
-success_guarantee: 端末の設定に並べた配信元の文書が、文書の MCP と読み取り API で参照できる。エージェントの書き込みは、`scope.write` に当たる作業場所から呼んだセッションの作業ツリーにだけ反映される。
+success_guarantee: 端末の設定に並べた配信元の文書が、文書の MCP と読み取り API で参照できる。エージェントの書き込みは、`scope.write` に当たる作業場所から呼んだセッションの作業ツリーにだけ反映される。エージェントが配信元の範囲のファイルを書き換えた後に、管理用の YAML の修正の通知がファイルごとに 1 回だけ文脈に入る。利用者が会話で伝えた指摘は、登録した後のセッションの文書の MCP で参照できる。
 minimal_guarantee: 設定・スクリプトの検証に失敗した配信元があっても、他の配信元の配信と管理の MCP・読み取り API は止まらない。検査に合格しない書き込みと、`scope` に当たらない作業場所からの呼び出しは、ファイルを書き換えない。
 frequency: 導入は端末ごとに 1 回。起動はセッションごと。読み書きは作業のたび
 priority: 高
@@ -41,11 +41,14 @@ scenarios:
         description: '`PROJECT_INDEX_CONFIG` が指す場所（テスト用の一時フォルダの `settings.yaml`）'
         notes: ファイルは無い。S0 が作成する
       - name: サンプルの配信元
-        description: 文書の種類を 1 つ（スキーマと YAML 2 件）と、`converters[]` を指す種類の文書 1 件と、`project-index.yaml` を持つ git リポジトリと、そのワークツリー（`.claude/worktrees/x`）
-        notes: id `sample`。S1 の `/project-index:setup` で `scope.read`・`scope.write` に sample のフォルダを回答する
+        description: '文書の種類を 1 つ（スキーマと YAML 2 件）と、`converters[]` を指す種類の文書 1 件と、範囲の Markdown 1 件とその行を持つ管理用の YAML（それを参照する `records: files` の `documents[]` の行）と、`project-index.yaml` を持つ git リポジトリと、そのワークツリー（`.claude/worktrees/x`）'
+        notes: id `sample`。管理用の YAML は Markdown の行を既に持ち、S1 の突き合わせで行は増えない。S1 の `/project-index:setup` で `scope.read`・`scope.write` に sample のフォルダを回答する
       - name: 読み取りだけの配信元
         description: 文書の種類を 1 つと `project-index.yaml` を持つ Git 管理外のフォルダ
         notes: id `notes`。S1 の `/project-index:setup` で `scope.read` に sample のフォルダを回答し、`scope.write` は回答しない
+      - name: 指摘の置き場所
+        description: テスト用の一時フォルダの中の空のフォルダ。`RULE_INJECT_CONFIG`・`ALIAS_INJECT_CONFIG` は、テスト用の一時フォルダの中の無いファイルへ向ける
+        notes: S11 の置き場所の確認にこのパスを回答する。テストを実行した端末の既定の置き場所と rule-inject・alias-inject の端末の設定は変わらない
     flow: |-
       <!-- map: {"title": "正常シナリオ"} -->
 
@@ -61,6 +64,7 @@ scenarios:
         subgraph P3["読み書き"]
           S3["エージェントが調べる:正常シナリオ"]
           S4["エージェントが書き込む:正常シナリオ"]
+          S4N["エージェントが範囲のファイルを書き換える:正常シナリオ"]
           S5["変更をレビューする:正常シナリオ"]
           S6["画面のサーバーが文書を読む:正常シナリオ"]
         end
@@ -70,18 +74,23 @@ scenarios:
           S9["端末の設定の配信元を変える:正常シナリオ"]
           S10["project-indexを更新する:正常シナリオ"]
         end
-        S0 --> S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7 --> S8 --> S9 --> S10
+        subgraph P5["指摘の登録"]
+          S11["会話の指摘を登録する:正常シナリオ"]
+        end
+        S0 --> S1 --> S2 --> S3 --> S4 --> S4N --> S5 --> S6 --> S7 --> S8 --> S9 --> S10 --> S11
         click S0 "id:SC-2#scenarios[正常シナリオ]"
         click S1 "id:SC-5#scenarios[正常シナリオ]"
         click S2 "id:SC-4#scenarios[正常シナリオ（待ち受けているサーバーがあるときは文脈を注入しない）]"
         click S3 "id:SC-6#scenarios[正常シナリオ]"
         click S4 "id:SC-7#scenarios[正常シナリオ]"
+        click S4N "id:SC-14#scenarios[正常シナリオ]"
         click S5 "id:SC-8#scenarios[正常シナリオ]"
         click S6 "id:SC-11#scenarios[正常シナリオ]"
         click S7 "id:SC-9#scenarios[正常シナリオ]"
         click S8 "id:SC-10#scenarios[正常シナリオ]"
         click S9 "id:SC-12#scenarios[正常シナリオ]"
         click S10 "id:SC-3#scenarios[正常シナリオ]"
+        click S11 "id:SC-13#scenarios[正常シナリオ]"
       ```
 
       <!-- /map -->
@@ -105,10 +114,14 @@ scenarios:
       - 端末の設定の API の取得が sample と notes の行を返却する
       - 端末の設定の API で notes の行を除外して保存すると、応答の配信元の状態と、次の `describe` の使用できる配信元から notes が消える
       - '`update` の後、`status` が新しいバージョンを返却し、`sample` を配信している'
+      - sample のワークツリーで Edit で管理用の YAML に行がある範囲の Markdown を書き換えた直後の文脈に、行のメタデータを中身に合わせる修正の通知が 1 回入り、同じセッションで同じファイルをもう一度書き換えても入らない
+      - '`write_docs` の後と、sample の管理用の YAML・`project-index.yaml` を書き換えた後には、通知が入らない'
+      - 指摘を登録するスキルの登録先の選択肢が project-index と登録しないだけで（rule-inject・alias-inject のプラグインと端末の設定のファイルが無い）、端末の設定の `sources` に指摘の置き場所の配信元の行が増え、登録した文書を次のセッションの `search_docs` が返却する。指摘の置き場所と端末の設定以外のファイルは変わらない
     test: test_normal
     notes:
       commit: S4 と S5 の間で、エージェントが `write_docs` の変更をワークツリーで `git commit` する。project-index は commit しない。
       起動したセッション: S0 がサーバーを起動したそのセッションでは MCP の接続が間に合わず、`/mcp` でつなぎ直す。S2 は S1 の後に sample のワークツリーで始めた新しいセッションで、待ち受けているサーバーにつながる。
+      指摘の登録: S11 は S10 の後に sample のワークツリーで始めたセッションで、利用者が指摘を 1 件伝えた後にスキルを実行する。最初の確認には、置き場所に指摘の置き場所の一時フォルダ、Git の管理に管理外、有効にする範囲に sample のフォルダを回答し、指摘の登録先には project-index を回答する。`claude -p` では AskUserQuestion を使用できないため、番号つきの選択肢への回答を `--resume` で同じセッションへ送信する。
     uses:
       - SC-2#scenarios[正常シナリオ]
       - SC-5#scenarios[正常シナリオ]
@@ -121,6 +134,8 @@ scenarios:
       - SC-10#scenarios[正常シナリオ]
       - SC-12#scenarios[正常シナリオ]
       - SC-3#scenarios[正常シナリオ]
+      - SC-14#scenarios[正常シナリオ]
+      - SC-13#scenarios[正常シナリオ]
   - name: 異常シナリオ（配信できない配信元がある）
     setup:
       - name: Mock

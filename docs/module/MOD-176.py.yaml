@@ -1,0 +1,69 @@
+id: MOD-176
+title: 索引のサーバー / 書き込みの後の通知 / route.py
+lead: '`POST /_admin/post-write` のルートを受け持ち、書き込みの後の通知の route.py を修正するときに参照する。'
+test_files:
+  - tests/unit/project_index/features/post_write/test_route.py
+functions:
+  - name: build_post_write_router
+    title: 書き込みの後の通知のルーター
+    kind: 関数
+    container: project_index/features/post_write/route.py
+    usecase: 書き込みの後の通知
+    role: ルート
+    summary: '`POST /_admin/post-write` を持つルーターを作る'
+    description: セッションの開始のルーターと同じく、フックが Origin を送信しないため `require_same_origin` を掛けず、本文は `dict` で受けて検証の失敗を `ValidationFailedError`（422）で返す。
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: handlers
+        title: 部品
+        type: Handlers
+        required: true
+        passing: positional
+        description: 起動時に作った部品
+    returns:
+      type: APIRouter
+      description: '`POST /_admin/post-write` を持つルーター'
+    process: |-
+      1. `POST /_admin/post-write` を登録する
+      2. 要求ごとに、本文を `PostWriteRequest.model_validate` で検証する
+         - 検証に失敗した場合、違反を `{キー}: {理由}` にして `ValidationFailedError` を送出する
+      3. 配信元の一覧が読み込み中（`handlers.registry.loading`）なら、`notices` を空・`additional_context` を空文字にして返す（以降の手順は実行しない）
+      4. 書き込みの後の通知の判定を `asyncio.to_thread` で呼び、応答にする
+    exceptions:
+      - name: ValidationFailedError
+        condition: '`session_id` が無い、`paths` が空、型が違う'
+        message: '`書き込みの後の通知の入力に違反が {件数} 件あります`'
+    unit_tests:
+      - name: test_build_post_write_router
+        case: 正常
+        summary: 本文を検証して通知を返す
+        condition: 行のある `docs/a.md` の絶対パスを `TestClient` で送信する
+        mock: なし（一時ディレクトリの部品）
+        expected: 200 で `notices` が 1 件
+      - name: test_build_post_write_router_when_loading
+        case: 正常
+        summary: 読み込み中は通知しない
+        condition: '`registry.loading` が `True`'
+        mock: なし
+        expected: 200 で `notices` が空、通知済みの記録が増えない
+      - name: test_build_post_write_router_when_invalid
+        case: 異常
+        summary: 入力の違反を 422 で返す
+        condition: '`paths` が `[]`'
+        mock: なし
+        expected: 422 の Problem Details で `paths` の違反を含む
+        exception: 入力の違反
+    callees:
+      - MOD-175#functions[judge_post_write]
+refs:
+  - to: IF-35
+    type: requires
+    when: インターフェース定義『書き込みの後の通知の判定』の入出力を変えるときに、この設計書の関数を合わせる。
+visibility: internal
+tags:
+  - name: topic:通知
+    main: true
+  - name: topic:ルート
+  - name: tool:fastapi

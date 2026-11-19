@@ -1,0 +1,98 @@
+# yaml-language-server: $schema=../../../schemas/prompt.schema.yaml
+id: hooks/post-write-notice
+name: 書き込みの後の通知
+description: 書き込んだファイルの管理用の YAML の行の追加・見直しと、エイリアス・ルールの索引の見直しを、ツール実行後のフックの文脈で伝える
+kind: hook
+lang: ja
+tags:
+  - tool:claude-code
+  - topic:プロンプト
+  - topic:通知
+vars:
+  notices:
+    type: array
+    required: true
+    description: 今回通知するファイルの判定（書き込んだ順）
+    source: POST /_admin/post-write の notices
+    example:
+      - path: /home/u/repo/sample/docs/guide.md
+        source: sample
+        action: update_row
+        files_yaml: docs/files.yml
+    items:
+      type: object
+      description: 通知するファイル 1 件
+      properties:
+        path:
+          type: string
+          description: 書き込んだファイルの絶対パス
+        source:
+          type: string
+          description: ファイルを含む配信元の ID
+        action:
+          type: string
+          description: 管理用の YAML に行が無ければ add_row、あれば update_row
+          enum: [add_row, update_row]
+        files_yaml:
+          type: string
+          description: 行を持つ（持つべき）管理用の YAML の配信元の直下からのパス
+  aliases:
+    type: array
+    description: 配信元の設定に alias_type を持つ行がある配信元の ID
+    default: []
+    example: []
+    items:
+      type: string
+      description: 配信元の ID
+  rule_index:
+    type: array
+    description: 配信元のフォルダの直下に rules.yaml がある配信元の ID
+    default: []
+    example: []
+    items:
+      type: string
+      description: 配信元の ID
+examples:
+  - id: add-row
+    name: 行の無いファイル
+    values:
+      notices:
+        - path: /home/u/repo/sample/docs/new.md
+          source: sample
+          action: add_row
+          files_yaml: docs/files.yml
+  - id: aliases-and-rule-index
+    name: エイリアスとルールの索引を持つ配信元
+    values:
+      aliases: [sample]
+      rule_index: [sample]
+parts:
+  - id: criteria
+    texts:
+      - lang: ja
+        text: |
+          書き込んだファイルは配信元の管理用の YAML の範囲にあります。
+          メタデータの付け方は、文書の MCP の search_docs（source: "project-index"・outside_scope: true・filter: {"field": "id", "op": "eq", "values": ["docs/guide/メタデータを付ける基準.md"]}・view: "full"）で取得できます。
+  - id: notices
+    texts:
+      - lang: ja
+        text: |
+          {% for notice in notices -%}
+          {% if notice.action == "add_row" -%}
+          - {{ notice.path }}: 配信元 {{ notice.source }} の {{ notice.files_yaml }} に行がありません。行を追加します。
+          {% else -%}
+          - {{ notice.path }}: 配信元 {{ notice.source }} の {{ notice.files_yaml }} の行の名前・概要文・タグ・関連が中身と合わなくなったときだけ、行を修正します。
+          {% endif -%}
+          {% endfor %}
+  - id: aliases
+    when: "{{ aliases }}"
+    texts:
+      - lang: ja
+        text: |
+          配信元 {{ aliases | join("・") }} に、新規の用語・別名（エイリアス）が増えたら、alias_type の行の文書に追加します。
+  - id: rule-index
+    when: "{{ rule_index }}"
+    texts:
+      - lang: ja
+        text: |
+          配信元 {{ rule_index | join("・") }} で、ファイルに適用するルールが増える・変わるなら、rules.yaml のエントリを修正します。

@@ -104,7 +104,7 @@ terms:
     description: '`/mcp` の 1 つの接続先で、7 つのツールを出す'
   - id: plugin
     name: 'プラグイン'
-    description: 'Claude Code のプラグイン `project-index`。`.mcp.json`（文書の MCP・管理の MCP）・SessionStart と PreToolUse のフック・スキルを配り、ユーザースコープで入れる'
+    description: 'Claude Code のプラグイン `project-index`。`.mcp.json`（文書の MCP・管理の MCP）・SessionStart・PreToolUse・PostToolUse のフック・スキルを配り、ユーザースコープで入れる'
   - id: admin-mcp
     name: '管理の MCP'
     description: '`/_admin/mcp` の接続先で、`status`・`reload`・`restart`・`update`・`check_project`・`try_convert`・`write_nav` の 7 つのツールを出す。`127.0.0.1` だけで待ち受け、作業場所では絞らない'
@@ -123,3 +123,9 @@ terms:
   - id: example-set
     name: '例の組'
     description: 'プロンプトの変数に入れる値の組。各変数の `example` で埋めた「既定の例」と、`examples[]` の 1 要素。組ごとに部品を描画した結果を文書の画面に出す'
+  - id: post-write-notice
+    name: '書き込みの後の通知'
+    description: 'PostToolUse のフックが、配信元の範囲のファイルを書き込んだ後に、管理用の YAML の行の修正を促すために、セッションごとに 1 つのファイルにつき 1 回だけ文脈に追加する文面'
+  - id: feedback
+    name: '会話の指摘'
+    description: '利用者が会話で AI に伝えた守ってほしいこと・単語の意味・経緯や判断の理由で、スキル `/project-index:feedback` がルール・エイリアス・文書として登録するもの'

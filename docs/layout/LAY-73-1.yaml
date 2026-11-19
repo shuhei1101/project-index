@@ -90,7 +90,7 @@ entries:
     children:
       - type: folder
         name: prompts
-        contents: MCP の instructions とツールの description のプロンプトファイル（文書の MCP は `mcp/docs/`、管理の MCP は `mcp/admin/`）。ID は `content/prompts/` からのパス
+        contents: MCP の instructions とツールの description、フックの注入文のプロンプトファイル（文書の MCP は `mcp/docs/`、管理の MCP は `mcp/admin/`、フックは `hooks/`）。ID は `content/prompts/` からのパス
         content_types: [prompt, server]
         id_root: true
         convention: prompt-file
@@ -217,12 +217,12 @@ entries:
             content_types: [file_list, plugin]
           - type: folder
             name: hooks
-            contents: フックの登録（`hooks.json`）と、SessionStart・PreToolUse のフックの本体
+            contents: フックの登録（`hooks.json`）と、SessionStart・PreToolUse・PostToolUse のフックの本体
             content_types: [hook, plugin]
             naming: [hooks.json, '{event}.py']
           - type: folder
             name: skills
-            contents: global-setup・setup のスキル
+            contents: global-setup・setup・feedback のスキル
             content_types: [skill, plugin]
             naming: ['{skill}/SKILL.md']
   - type: folder
@@ -271,7 +271,7 @@ entries:
         convention: python-architecture-layout
   - type: folder
     name: templates
-    contents: setup・global-setup のスキルが配信元と端末へ書き出す雛形と、管理用の YAML のスキーマ
+    contents: setup・global-setup・feedback のスキルが配信元と端末へ書き出す雛形と、管理用の YAML のスキーマ
     children:
       - type: file
         name: project-index.yaml
@@ -290,6 +290,12 @@ entries:
         contents: '`templates/` の雛形の管理用の YAML'
         content_types:
           - file_list
+          - plugin
+      - type: folder
+        name: feedback
+        contents: feedback のスキルが会話の指摘の置き場所に書き出す、配信元の設定・用語の YAML とそのスキーマ・rule-inject の索引の雛形
+        content_types:
+          - template
           - plugin
   - type: folder
     name: tests
