@@ -15,11 +15,11 @@ functions:
     container: project_index/features/session_start/service.py
     usecase: セッションの開始
     role: サービス
-    summary: '`reason` が `FORGET_REASONS` なら、その会話キーの返却済みの記録を削除する'
+    summary: '`reason` が `FORGET_REASONS` なら、その会話キーの返却済みの記録と通知済みの記録を削除する'
     scope: public
     is_async: false
     thread_safe: true
-    side_effects: '`reason` が `FORGET_REASONS` なら、その会話キーの返却済みの記録を削除する'
+    side_effects: '`reason` が `FORGET_REASONS` なら、その会話キーの返却済みの記録と、書き込みの後の通知済みの記録を削除する'
     args:
       - name: request
         title: 要求
@@ -33,12 +33,18 @@ functions:
         required: true
         passing: keyword
         description: '`handlers.seen`'
+      - name: notified
+        title: 通知済みの記録
+        type: NotifiedStore
+        required: true
+        passing: keyword
+        description: '`handlers.notified`'
     returns:
       type: SessionStartResponse
       description: 記録を削除したか
     process: |-
       1. `reason` が `FORGET_REASONS` に無い場合、`forgotten` を `False` にして返す（以降の手順は実行しない）
-      2. `SessionKey.of(session_id, agent_id)` の記録を削除し、`forgotten` を `True` にして返す（`SeenStore.forget`）
+      2. `SessionKey.of(session_id, agent_id)` の記録を削除し（`SeenStore.forget`）、同じ会話キーの通知済みの記録も削除して（`NotifiedStore.forget`）、`forgotten` を `True` にして返す
          - `[INFO]` 返却済みの記録を削除した（セッション ID・件数）
     unit_tests:
       - name: test_start_session_when_cleared
@@ -59,6 +65,12 @@ functions:
         condition: '`reason` が `resume`、`session_id` の記録がある'
         mock: なし
         expected: '`forgotten` が `False`、記録が残る'
+      - name: test_start_session_when_notified
+        case: 正常
+        summary: 通知済みの記録も削除する
+        condition: '`reason` が `clear`、同じ会話キーで `/a` を通知済み'
+        mock: なし
+        expected: 同じ会話キーの `NotifiedStore.take_new(["/a"])` が `["/a"]` を返す
 refs:
   - to: IF-21
     type: requires

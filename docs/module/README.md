@@ -157,5 +157,10 @@
 | [索引のサーバー / メタデータの偏り / service.py](./MOD-113-6.py.yaml) | 行の読み込み・類似度・偏りの洗い出し・JSON。 |
 | [索引のサーバー / 書き込み / references.py](./MOD-130.py.yaml) | `rename` の改名後のパスの決定と、参照元の旧 ID・旧パスを指す箇所の書き換え。 |
 | [索引のサーバー / 書き込み / replace.py](./MOD-131.py.yaml) | `replace_text` の文書の配下の文字列の値の置換。 |
+| [索引のサーバー / 書き込みの後の通知 / types.py](./MOD-173.py.yaml) | `POST /_admin/post-write` の本文と応答の型と、通知の文面のプロンプトの ID・ルールの索引のファイル名。 |
+| [索引のサーバー / 書き込みの後の通知 / notified.py](./MOD-174.py.yaml) | 会話キーごとに書き込みの後の通知をしたパスの記録。 |
+| [索引のサーバー / 書き込みの後の通知 / service.py](./MOD-175.py.yaml) | 書き込んだパスの配信元・管理用の YAML の範囲と行の有無の判定と、通知の文面。 |
+| [索引のサーバー / 書き込みの後の通知 / route.py](./MOD-176.py.yaml) | `POST /_admin/post-write` のルート。 |
+| [プラグイン / ツール実行後のフック / post_tool_use.py](./MOD-177.py.yaml) | PostToolUse のフック。書き込んだパスを集めて `POST /_admin/post-write` に問い合わせ、返った文面を `additionalContext` で返す。 |
 
 <!-- /table -->

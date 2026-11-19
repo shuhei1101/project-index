@@ -1,0 +1,102 @@
+id: MOD-174
+title: 索引のサーバー / 書き込みの後の通知 / notified.py
+lead: 会話キーごとに通知したファイルのパスをプロセスのメモリに記録し、未通知のパスだけを取り出す処理を受け持ち、書き込みの後の通知の notified.py を修正するときに参照する。
+test_files:
+  - tests/unit/project_index/features/post_write/test_notified.py
+classes:
+  - name: NotifiedStore
+    title: 通知済みの記録
+    container: project_index/features/post_write/notified.py
+    usecase: 書き込みの後の通知
+    role: リポジトリ
+    summary: 会話キーごとに通知したパスを記録する
+    description: 記録はプロセスのメモリの辞書（会話キー → パスの集合）で、再起動で消える。`_lock`（`threading.Lock`）で 1 つずつ読み書きする。
+    kind: クラス
+    properties:
+      - name: _records
+        title: 記録
+        type: dict[SessionKey, set[str]]
+        access: 内部 (_)
+        description: 会話キーごとの通知したパス
+      - name: _lock
+        title: 排他
+        type: threading.Lock
+        access: 内部 (_)
+        description: '`_records` を守る'
+    methods:
+      - name: take_new
+        title: 未通知のパスの取り出し
+        summary: 記録に無いパスだけを返し、返したパスを記録に追加する
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        args:
+          - name: key
+            title: 会話キー
+            type: SessionKey
+            required: true
+            passing: positional
+            description: 記録の単位
+          - name: paths
+            title: パス
+            type: Sequence[str]
+            required: true
+            passing: positional
+            description: 通知の対象に該当したパス
+        returns:
+          type: list[str]
+          description: 記録に無かったパス（渡した順）
+        process: |-
+          1. `_lock` を取る
+          2. `key` の記録に無いパスを、重なりを除いて渡した順に集める
+          3. 集めたパスを記録に追加し、返す
+        unit_tests:
+          - name: test_take_new
+            case: 正常
+            summary: 2 回目は同じパスを返さない
+            condition: 同じ会話キーで `["/a"]` を 2 回渡す
+            mock: なし
+            expected: 1 回目は `["/a"]`、2 回目は `[]`
+          - name: test_take_new_when_other_key
+            case: 正常
+            summary: 会話キーごとに分ける
+            condition: '`SessionKey("s1")` で `/a` を記録した後、`SessionKey("s1", "a1")` と `SessionKey("s2")` で `/a` を渡す'
+            mock: なし
+            expected: どちらも `["/a"]`
+      - name: forget
+        title: 記録の削除
+        summary: 1 つの会話キーの記録を全て消す
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        args:
+          - name: key
+            title: 会話キー
+            type: SessionKey
+            required: true
+            passing: positional
+            description: 消す記録の単位。`agent_id` が空ならメインのセッションの記録だけ
+        returns:
+          type: int
+          description: 消したパスの数
+        process: |-
+          1. `_lock` を取る
+          2. `key` の記録を取り除き、取り除いたパスの数を返す（記録が無ければ 0）
+        unit_tests:
+          - name: test_forget
+            case: 正常
+            summary: 消した後は再び返す
+            condition: '`/a` を記録した会話キーを `forget` した後、同じ会話キーで `/a` を渡す'
+            mock: なし
+            expected: '`forget` が 1 を返し、`take_new` が `["/a"]` を返す'
+refs:
+  - to: IF-35
+    item: constraints[通知の 1 回]
+    type: requires
+    when: 通知の 1 回の決まりを変えるときに、記録の単位と消える時点を合わせる。
+visibility: internal
+tags:
+  - name: topic:通知
+    main: true
+  - name: topic:会話
+  - name: topic:セッション

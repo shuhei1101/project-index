@@ -147,7 +147,7 @@ functions:
     container: project_index/server/app.py
     usecase: 起動
     role: 合成の起点
-    summary: 読み取り API・端末の設定の API・文書の MCP・管理の MCP・セッションの開始を 1 つの FastAPI のアプリにまとめる
+    summary: 読み取り API・端末の設定の API・文書の MCP・管理の MCP・セッションの開始・書き込みの後の通知を 1 つの FastAPI のアプリにまとめる
     scope: public
     args:
       - name: handlers
@@ -165,7 +165,7 @@ functions:
       3. 例外の変換を登録する（例外の変換の登録）
       4. `DOCS_MCP_PATH` に文書の MCP、`ADMIN_MCP_PATH` に管理の MCP の `streamable_http_app(streamable_http_path="/", stateless_http=True, json_response=True)` をマウントする
       5. `app.add_middleware(SlashlessMcpPathMiddleware, paths=(DOCS_MCP_PATH, ADMIN_MCP_PATH))` で、スラッシュ無しの MCP のパスをルーティングの前に補う（MCP のパスの補い）
-      6. 読み取り API の入口・端末の設定の入口・セッションの開始（セッションの開始のルーター）のルーターを登録する
+      6. 読み取り API の入口・端末の設定の入口・セッションの開始（セッションの開始のルーター）・書き込みの後の通知（書き込みの後の通知のルーター）のルーターを登録する
       7. アプリを返す
     unit_tests:
       - name: test_build_app
