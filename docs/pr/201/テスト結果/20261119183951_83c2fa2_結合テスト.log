@@ -1,0 +1,22 @@
+# 結合テスト（全 pass）: 83c2fa2
+
+$ gh workflow run test.yml --ref feat/setup/serve-setup-procedure-from-mcp -f layer=integration -f paths="tests/integration/server/test_serve.py::test_normal tests/integration/server/test_serve.py::test_normal_when_builtin_source_added tests/integration/server/test_serve.py::test_normal_when_builtin_source_registered tests/integration/server/test_serve.py::test_normal_when_builtin_source_unavailable tests/integration/server/test_describe.py::test_normal_when_outside_list tests/integration/server/test_search_docs.py::test_normal_when_builtin_source_read tests/integration/server/test_write_docs.py::test_error_when_builtin_source_written tests/integration/server/test_delete_docs.py::test_error_when_source_not_writable" （TP-1 の TL-2 の run_runner。並列数 1）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 8 items
+
+tests/integration/server/test_serve.py::test_normal PASSED               [ 12%]
+tests/integration/server/test_serve.py::test_normal_when_builtin_source_added PASSED [ 25%]
+tests/integration/server/test_serve.py::test_normal_when_builtin_source_registered PASSED [ 37%]
+tests/integration/server/test_serve.py::test_normal_when_builtin_source_unavailable PASSED [ 50%]
+tests/integration/server/test_describe.py::test_normal_when_outside_list PASSED [ 62%]
+tests/integration/server/test_search_docs.py::test_normal_when_builtin_source_read PASSED [ 75%]
+tests/integration/server/test_write_docs.py::test_error_when_builtin_source_written PASSED [ 87%]
+tests/integration/server/test_delete_docs.py::test_error_when_source_not_writable PASSED [100%]
+
+============================== 8 passed in 5.53s ===============================
+rc=0 run=44498233962
