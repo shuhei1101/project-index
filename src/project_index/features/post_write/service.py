@@ -52,16 +52,7 @@ def judge_post_write(
     if not notices:
         return PostWriteResponse(notices=[], additional_context="")
     # 残った判定の配信元ごとに、エイリアスの行とルールの索引の有無を求める
-    by_id = {source.id: source for source in sources}
-    source_ids = list(dict.fromkeys(notice.source for notice in notices))
-    aliases = [
-        source_id
-        for source_id in source_ids
-        if any(table.enabled and table.alias_type for table in by_id[source_id].config.documents)
-    ]
-    rule_index = [
-        source_id for source_id in source_ids if (by_id[source_id].root / RULE_INDEX_FILE).is_file()
-    ]
+    aliases, rule_index = _source_lines(notices, sources)
     text = prompts.render(
         NOTICE_PROMPT_ID,
         {
@@ -91,6 +82,29 @@ def classify_path(path: Path, sources: Sequence[ServedSource]) -> Notice | None:
         relative in paths for paths in index_paths.values()
     ):
         return None
+    found = _range_of(source, base, relative, index_tables, index_paths)
+    # どの範囲にも入らない（YAML の文書・documents[].paths に該当しないファイル）
+    if found is None:
+        return None
+    table, index_path = found
+    # 範囲に入った管理用の YAML: 行の有無で促す修正を分ける
+    has_row = _has_row(base, index_path, table, relative)
+    return Notice(
+        path=str(path),
+        source=source.id,
+        action="update_row" if has_row else "add_row",
+        files_yaml=index_path,
+    )
+
+
+def _range_of(
+    source: ServedSource,
+    base: Path,
+    relative: str,
+    index_tables: Sequence[DocumentTable],
+    index_paths: dict[str, list[str]],
+) -> tuple[DocumentTable, str] | None:
+    """相対パスを範囲に持つ管理用の YAML を、深いフォルダから順に探して返す。"""
     # Git の配信元だけ、Git が無視するパスを範囲から除く
     ignored = (ignored_paths(base) or []) if source.is_git else []
     index_dirs = {
@@ -110,17 +124,26 @@ def classify_path(path: Path, sources: Sequence[ServedSource]) -> Notice | None:
             nested_dirs=_deeper_dirs(start, index_dirs),
             ignored=ignored,
         )
-        # 範囲に入った管理用の YAML: 行の有無で促す修正を分ける
         if in_range:
-            has_row = _has_row(base, index_path, table, relative)
-            return Notice(
-                path=str(path),
-                source=source.id,
-                action="update_row" if has_row else "add_row",
-                files_yaml=index_path,
-            )
-    # どの範囲にも入らない（YAML の文書・documents[].paths に該当しないファイル）
+            return table, index_path
     return None
+
+
+def _source_lines(
+    notices: Sequence[Notice], sources: Sequence[ServedSource]
+) -> tuple[list[str], list[str]]:
+    """通知の配信元のうち、alias_type の行を持つものと、直下に rules.yaml を持つものの ID を返す。"""
+    by_id = {source.id: source for source in sources}
+    source_ids = list(dict.fromkeys(notice.source for notice in notices))
+    aliases = [
+        source_id
+        for source_id in source_ids
+        if any(table.enabled and table.alias_type for table in by_id[source_id].config.documents)
+    ]
+    rule_index = [
+        source_id for source_id in source_ids if (by_id[source_id].root / RULE_INDEX_FILE).is_file()
+    ]
+    return aliases, rule_index
 
 
 def _locate(path: Path, sources: Sequence[ServedSource]) -> tuple[ServedSource, Path, str] | None:
