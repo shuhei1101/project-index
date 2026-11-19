@@ -41,23 +41,33 @@ docs:
   - page: docs/guide/会話の指摘を登録する.md
     new: true
     change: 指摘を登録するスキルが文書の MCP で取得して進める手順と、指摘をルール・エイリアス・文書のどれにするかの基準を新規作成する（置き場所はドキュメント配置判定で docs/guide/、形式は既存のガイドと同じ Markdown）
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-19T12:58:40.431795+00:00'
   - page: docs/guide/使い方.md
     new: false
     change: 会話の指摘を登録するページの行を追加する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-19T12:58:40.431795+00:00'
   - page: docs/guide/files.yml
     new: false
     change: 新規作成するガイドのページの行を追加する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-19T12:58:40.431795+00:00'
   - page: docs/guide/index.yaml
     new: false
     change: 新規作成するガイドのページの行を追加する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-19T12:58:40.431795+00:00'
   - page: docs/_theme/_data/nav.project.yml
     new: false
     change: 新規作成するガイドのページをサイドバーに追加する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-19T12:58:40.431795+00:00'
   - page: docs/glossary/GLO-1.yaml
     new: false
     change: 用語『プラグイン』の説明に PostToolUse のフックを追加し、書き込みの後の通知・会話の指摘の新規の用語を追加する
@@ -73,11 +83,15 @@ docs:
   - page: docs/layout/LAY-73-1.yaml
     new: false
     change: plugins/project-index/hooks/ の新規のフック、skills/ の新規のスキル、templates/ の既定の置き場所の雛形のエントリを追加する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-19T12:58:40.431795+00:00'
   - page: plugins/project-index/files.yaml
     new: false
     change: 新規のフックとスキルの行を追加し、hooks.json の行の description を PostToolUse を含む形へ修正する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-19T12:58:40.431795+00:00'
   - page: README.md
     new: false
     change: プラグインが配るスキルを並べている箇所が無いため、修正しない
@@ -101,3 +115,6 @@ scope_out:
   - item: alias-inject・rule-inject のコードの呼び出しと、両プラグイン側の変更
     reason: 緩い依存にするため、配信元の中身と端末の設定のファイルの有無だけで判定する
     plan: none
+  - item: '`src/project_index/features/history/blob.py` と `tests/unit/project_index/features/history/test_blob.py` に管理用の YAML の行が無いこと'
+    reason: develop に既にあるずれで、この PR の変更と関係しない（`check_project` の索引の同期で 2 件）
+    plan: '#207'
