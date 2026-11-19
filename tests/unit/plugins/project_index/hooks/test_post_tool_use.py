@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import ast
 import io
 import json
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+import pytest
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from pathlib import Path
     from types import ModuleType
-
-    import pytest
 
 
 def _stdin(monkeypatch: pytest.MonkeyPatch, text: str) -> None:
@@ -90,6 +91,27 @@ def test_main_when_skipped_tool(
     # 検証
     assert code == 0
     assert capsys.readouterr().out == ""
+
+
+HOOKS_DIR = Path(__file__).parents[5] / "plugins" / "project-index" / "hooks"
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        pytest.param("post_tool_use", id="post_tool_use"),
+        pytest.param("pre_tool_use", id="pre_tool_use"),
+        pytest.param("session_start", id="session_start"),
+    ],
+)
+def test_main_when_python_312_grammar(name: str) -> None:
+    """フックを 3.12 の文法で読める（正常系）。"""
+    # 準備
+    source = (HOOKS_DIR / f"{name}.py").read_text(encoding="utf-8")
+    # 実行
+    tree = ast.parse(source, feature_version=(3, 12))
+    # 検証
+    assert isinstance(tree, ast.Module)
 
 
 def test_main_when_input_unparsable(
