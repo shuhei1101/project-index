@@ -1213,3 +1213,99 @@ def test_source_registry_load_when_gated(
     assert [status.status for status in idle_registry.statuses()] == ["serving", "serving"]
     assert sorted(idle_loader.inside) == ["b", "c"]
     assert idle_slept == []
+
+
+def test_source_registry_docs_served(
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """組み込みの配信元を末尾に加える（正常系）。"""
+    # 準備
+    registry = SourceRegistry()
+    source = make_served_source(id="a")
+    builtin = make_served_source(id="project-index", builtin=True, scope_write=[])
+    registry._snapshot = ({"a": source}, [make_status("a", 0)])
+    registry._builtin = builtin
+    # 実行
+    result = registry.docs_served()
+    # 検証
+    assert [item.id for item in result] == ["a", "project-index"]
+    assert [item.id for item in registry.served()] == ["a"]
+
+
+def test_source_registry_get_for_docs(
+    make_served_source: Callable[..., ServedSource],
+) -> None:
+    """組み込みの配信元を参照する（正常系）。"""
+    # 準備
+    registry = SourceRegistry()
+    builtin = make_served_source(id="project-index", builtin=True, scope_write=[])
+    registry._builtin = builtin
+    # 実行
+    result = registry.get_for_docs("project-index")
+    # 検証
+    assert result is builtin
+    with pytest.raises(UnknownSourceError):
+        registry.get("project-index")
+
+
+def test_source_registry_get_for_docs_when_row(
+    make_served_source: Callable[..., ServedSource],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """行の配信元は get と同じ（正常系）。"""
+    # 準備
+    registry = SourceRegistry()
+    source = make_served_source(id="a")
+    registry._snapshot = ({"a": source}, [make_status("a", 0)])
+    # 実行
+    result = registry.get_for_docs("a")
+    # 検証
+    assert result is source
+
+
+def test_source_registry_load_when_builtin(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """読み込みで組み込みの配信元を作る（正常系）。"""
+    # 準備
+    clone = tmp_path / "clone"
+    files_schema = (
+        Path(__file__).resolve().parents[5] / "templates" / "files.schema.yaml"
+    ).read_text(encoding="utf-8")
+    write_files(
+        clone,
+        {
+            "project-index.yaml": (
+                'version: "3"\n'
+                "name: project-index\n"
+                "documents:\n"
+                "  - id: files_guide\n"
+                "    paths: [docs/guide/files.yml]\n"
+                "    schema: templates/files.schema.yaml\n"
+                "    records: files\n"
+                "    body_file: path\n"
+            ),
+            "templates/files.schema.yaml": files_schema,
+            "docs/guide/files.yml": "files:\n- path: a.md\n",
+            "docs/guide/a.md": "# a\n",
+        },
+    )
+    registry = SourceRegistry(loading=True)
+    terminal = make_terminal_config(clone=clone, sources=[])
+    registered = make_terminal_config(
+        clone=clone,
+        sources=[make_entry(str(clone / "project-index.yaml"), source_id="project-index")],
+    )
+    # 実行
+    registry.load(terminal)
+    loaded = registry.docs_served()
+    served_after_load = registry.served()
+    registry.reload(registered)
+    # 検証
+    assert [(item.id, item.builtin) for item in loaded] == [("project-index", True)]
+    assert served_after_load == []
+    assert registry._builtin is None

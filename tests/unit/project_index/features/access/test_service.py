@@ -883,3 +883,78 @@ def test_resolve_write_target_when_disk_storage_worktree(
         resolve_write_target(
             registry=registry, source="company", worktree="/r/.claude/worktrees/x", cwd="/r"
         )
+
+
+def test_outside_readable_sources_when_builtin(
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., Any],
+) -> None:
+    """組み込みの配信元も並べる（正常系）。"""
+    # 準備
+    other = make_served_source(
+        id="other", root=Path("/w/other"), scope_read=["/zzz"], scope_write=[], outside_read=True
+    )
+    builtin = make_served_source(
+        id="project-index",
+        root=Path("/clone"),
+        scope_read=[],
+        scope_write=[],
+        outside_read=True,
+        builtin=True,
+    )
+    registry = make_registry(other)
+    registry._builtin = builtin
+    # 実行
+    result = outside_readable_sources("/w/sample", registry=registry)
+    # 検証
+    assert [item.id for item in result] == ["other", "project-index"]
+
+
+def test_resolve_read_targets_when_builtin_outside(
+    sample: ServedSource,
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., Any],
+) -> None:
+    """組み込みの配信元を作業範囲の外として参照する（正常系）。"""
+    # 準備
+    builtin = make_served_source(
+        id="project-index",
+        root=Path("/clone"),
+        scope_read=[],
+        scope_write=[],
+        outside_read=True,
+        builtin=True,
+    )
+    registry = make_registry(sample)
+    registry._builtin = builtin
+    # 実行
+    result = resolve_read_targets(
+        registry=registry, source="project-index", cwd="/r", outside_scope=True
+    )
+    every = resolve_read_targets(registry=registry, source="*", cwd="/r", outside_scope=True)
+    # 検証
+    assert [(target.source.id, target.outside_scope, target.access) for target in result] == [
+        ("project-index", True, "read")
+    ]
+    assert [target.source.id for target in every] == ["sample"]
+
+
+def test_resolve_write_target_when_builtin(
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., Any],
+) -> None:
+    """組み込みの配信元には書き込めない（異常系）。"""
+    # 準備
+    builtin = make_served_source(
+        id="project-index",
+        root=Path("/clone"),
+        scope_read=[],
+        scope_write=[],
+        outside_read=True,
+        builtin=True,
+    )
+    registry = make_registry()
+    registry._builtin = builtin
+    # 実行・検証
+    with pytest.raises(SourceNotWritableError, match="project-index"):
+        resolve_write_target(registry=registry, source="project-index", cwd="/clone")
