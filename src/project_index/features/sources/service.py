@@ -58,6 +58,7 @@ __all__ = [
     "SOURCE_CONFIG_VERSION",
     "SOURCE_SCHEMA",
     "assemble_source",
+    "assemble_values",
     "build_source_config",
     "check_scripts",
     "compare_config_version",
@@ -611,12 +612,68 @@ def _assemble(
     if violations:
         return None, None, violations
     root = root_override or files[0].parent
+    return _build(
+        merge_configs(values),
+        files=files,
+        root=root,
+        source_id=source_id,
+        scope_read=scope_read,
+        # 書き込める作業場所を省いた行は、設定のフォルダに書き込める
+        scope_write=list(scope_write) if scope_write else [str(root)],
+        outside_read=outside_read,
+        at=at,
+        lookup=lookup,
+        storage=storage,
+        unit=unit,
+    )
+
+
+def assemble_values(
+    values: dict[str, Any],
+    *,
+    root: Path,
+    source_id: str | None,
+    scope_read: list[str],
+    scope_write: list[str],
+    outside_read: bool,
+    storage: StorageType | None,
+    builtin: bool = False,
+) -> tuple[ServedSource | None, SourceConfig | None, list[Violation]]:
+    """マージ済みの設定の値を検証し、スクリプトを確認して配信中の配信元を作る。"""
+    return _build(
+        values,
+        files=[],
+        root=root,
+        source_id=source_id,
+        scope_read=scope_read,
+        scope_write=scope_write,
+        outside_read=outside_read,
+        storage=storage,
+        builtin=builtin,
+    )
+
+
+def _build(
+    merged: dict[str, Any],
+    *,
+    files: list[Path],
+    root: Path,
+    source_id: str | None,
+    scope_read: list[str],
+    scope_write: list[str],
+    outside_read: bool,
+    at: tuple[str, str] | None = None,
+    lookup: SchemaRefLookup | None = None,
+    storage: StorageType | None = None,
+    builtin: bool = False,
+    unit: _Unit = contextlib.nullcontext,
+) -> tuple[ServedSource | None, SourceConfig | None, list[Violation]]:
+    """マージした設定の値から配信元を組み立てる（`scope_write` はそのまま使用する）。"""
     top, violations = _storage_top(root, storage)
     if violations:
         return None, None, violations
     commit = at[0] if at and top is not None else None
     read_text = _commit_reader(root, top, commit) if top and commit else _disk_reader(root)
-    merged = merge_configs(values)
     read_ref = _ref_reader(lookup)
     violations = _validate(merged, read_text, read_ref, root, unit)
     if violations:
@@ -641,7 +698,7 @@ def _assemble(
         is_git=top is not None,
         repo_root=top,
         scope_read=list(scope_read),
-        scope_write=list(scope_write) if scope_write else [str(root)],
+        scope_write=list(scope_write),
         # disk は worktrees を使用しない
         worktree_globs=[] if storage == "disk" else _worktree_globs(config.worktrees, base),
         schemas=schemas,
@@ -650,6 +707,7 @@ def _assemble(
         outside_read=outside_read,
         config_dir=PurePosixPath(root.relative_to(docs_root).as_posix()),
         storage=storage,
+        builtin=builtin,
     )
     return served, config, []
 

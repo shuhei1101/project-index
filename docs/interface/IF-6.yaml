@@ -1655,6 +1655,33 @@ flows:
       - 7 回とも `InvalidArgumentError` で、違反の `path` がそれぞれ `operations[0].data.path`・`operations[0].set.path`・`operations[0].set.@body`・`operations[0].text_edits[0].field`・`operations[0].new_path`・`operations[0].unset.path`・`operations[0].data.path`
       - 'どのファイルも変わらず、n1 は `path: n1.md` を持ち続け、`notes/n1.md` も残る'
     test: test_error_when_body_without_body_file
+  - name: 異常系（組み込みの配信元・SourceNotWritableError）
+    summary: '`scope.write` を持たない組み込みの配信元への書き込みを断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 配信元
+        description: '`sources: []` で加わった組み込みの配信元 `project-index`'
+      - name: 入力
+        description: '`source: project-index` の `update`、`cwd` はクローンのコピーのフォルダ'
+    flow: |-
+      <!-- map: {"title": "異常系（組み込みの配信元・SourceNotWritableError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: source: project-index, operations: update
+        T->>T: 組み込みの配信元の scope.write が空
+        T-->>C: isError（project-index は読み取りだけ、使える配信元の一覧）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、`project-index` に書き込めないことと、今の作業場所から使用できる配信元の一覧を返却する'
+      - クローンのファイルは変わらない
+    test: test_error_when_builtin_source_written
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書

@@ -557,6 +557,65 @@ def ref_config_text() -> Callable[..., str]:
     return ref_config
 
 
+# 組み込みの配信元の手順と基準のページ（クローンの `docs/guide/` に配置する）
+BUILTIN_PROCEDURE_PAGE = "docs/guide/配信元を登録する.md"
+BUILTIN_CRITERIA_PAGE = "docs/guide/メタデータを付ける基準.md"
+BUILTIN_CRITERIA_BODY = (
+    "# メタデータを付ける基準\n\n基準\n\n"
+    "## 仮のメタデータ\n\n仮のメタデータの段階\n\n"
+    "## 関連の候補\n\n関連の候補の表\n"
+)
+
+
+@pytest.fixture
+def make_builtin_clone(
+    tmp_path: Path, write_files: Callable[[Path, dict[str, str]], None]
+) -> Callable[[], Path]:
+    """端末の設定の `clone`（`{tmp}/clone`）に、ガイドの行を持つクローンを作る関数を返す。
+
+    ガイドの行の `schema` は knowledge の配信元を指し、組み込みの配信元はクローンの雛形のスキーマに差し替える。
+    """
+
+    def _make() -> Path:
+        clone = tmp_path / "clone"
+        write_files(
+            clone,
+            {
+                "project-index.yaml": (
+                    'version: "3"\n'
+                    "name: project-index\n"
+                    "documents:\n"
+                    "  - id: files_guide\n"
+                    "    paths: [docs/guide/files.yml]\n"
+                    "    schema:\n"
+                    "      source: knowledge\n"
+                    "      path: schemas/knowledge-files.schema.yaml\n"
+                    "      ref: design-schemas/v9.2.0\n"
+                    "    records: files\n"
+                    "    body_file: path\n"
+                    "  - id: src\n"
+                    "    paths: [src/files.yaml]\n"
+                    "    schema: templates/files.schema.yaml\n"
+                    "    records: files\n"
+                    "    body_file: path\n"
+                ),
+                "templates/files.schema.yaml": (
+                    REPO_ROOT / "templates" / "files.schema.yaml"
+                ).read_text(encoding="utf-8"),
+                "docs/guide/files.yml": (
+                    "files:\n- path: 配信元を登録する.md\n- path: メタデータを付ける基準.md\n"
+                ),
+                BUILTIN_PROCEDURE_PAGE: "# 配信元を登録する\n\n手順\n",
+                BUILTIN_CRITERIA_PAGE: BUILTIN_CRITERIA_BODY,
+                "src/files.yaml": "files:\n- path: app.py\n",
+                "src/app.py": "print('app')\n",
+            },
+        )
+        return clone
+
+    return _make
+
+
 @pytest.fixture
 def make_server(tmp_path: Path) -> Iterator[Callable[..., ServerEnv]]:
     """端末の設定を書いてアプリを起動し、HTTP のテストのクライアントを持つ環境を作る関数を返す。"""

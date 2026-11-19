@@ -166,6 +166,7 @@ flows:
     expected:
       - '`isError: true` で、notes に書き込めないことと使える配信元の一覧を返す'
       - notes のファイルが残る
+      - 組み込みの配信元 `project-index` を `source` に渡した削除も同じエラーを返却し、クローンのファイルが残る
     test: test_error_when_source_not_writable
   - name: 異常系（消す先がクローン本体・TargetIsCloneError）
     summary: Git の配信元のクローン本体からは消さない

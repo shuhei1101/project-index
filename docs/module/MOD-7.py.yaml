@@ -295,7 +295,7 @@ functions:
       description: '`sources[]` の順。当たる配信元が無ければ空'
     process: |-
       1. `cwd` を正規化する（パスの正規化）
-      2. 配信中の配信元のうち、権限が `None`（権限の判定）で `outside_read` が真のものを並べる
+      2. 文書の MCP の配信中の配信元（配信元の一覧.文書の MCP の配信中。組み込みの配信元を含む）のうち、権限が `None`（権限の判定）で `outside_read` が真のものを並べる
     unit_tests:
       - name: test_outside_readable_sources
         case: 正常
@@ -309,6 +309,12 @@ functions:
         condition: '`cwd` が `None`、other（`outside_read: true`）'
         mock: 配信元の一覧（偽物）
         expected: '`[other]`（どの `scope` にも当たらない）'
+      - name: test_outside_readable_sources_when_builtin
+        case: 正常
+        summary: 組み込みの配信元も並べる
+        condition: 配信中の other と、組み込みの配信元 `project-index`（`scope` が空）を持つ配信元の一覧
+        mock: なし
+        expected: other・`project-index` の順
   - name: describe_workplace
     title: 作業場所の説明
     kind: 関数
@@ -408,7 +414,7 @@ functions:
       2. 読む配信元を決める
          - `None` の場合、作業中の配信元にする。無ければ使える配信元を添えた `SourceNotReadableError` を送る
          - `*` の場合、権限のある配信中の配信元を全てにする（権限の無い配信元は黙って外す）
-         - ID か配列の場合、それぞれを引き（配信元の一覧.引く。`UnknownSourceError`・`SourceNotServedError` はそのまま伝える）、権限が無ければ `SourceNotReadableError` を送る
+         - ID か配列の場合、それぞれを引き（配信元の一覧.文書の MCP で参照する。組み込みの配信元も参照できる。`UnknownSourceError`・`SourceNotServedError` はそのまま伝える）、権限が無ければ `SourceNotReadableError` を送る
          - ID 1 つで権限が無く、`outside_scope` が `True` で配信元の `outside_read` が真の場合、断らずに `access` を `read`、`outside_scope` を `True` にした場所にし、`[info]` 作業範囲の外を読んだ（`cwd`・配信元の ID）を要求のログに書く
          - `SourceNotReadableError` の `fix` は、ID 1 つの配信元の `outside_read` が真で `outside_scope` を渡していないときだけ、`outside_scope: true` で作業範囲の外（参考）として参照できることを案内する
       3. 配信元が 2 つ以上で `ref` か `worktree` を渡された場合、`InvalidArgumentError` を送る
@@ -561,6 +567,12 @@ functions:
         mock: 配信元の一覧（偽物）、配信元の『作業場所の配信元の読み込み』（呼ばれた回数を記録する偽物）
         expected: '`Target.source` が配信中の sample のままで、`worktree` がそのワークツリー。読み込みは呼ばれない'
         exception: '-'
+      - name: test_resolve_read_targets_when_builtin_outside
+        case: 正常
+        summary: 組み込みの配信元を作業範囲の外として参照する
+        condition: '`source: project-index`、`outside_scope: True`。`project-index` は組み込みの配信元'
+        mock: なし
+        expected: '`outside_scope` が `True`、`access` が `read` の場所。`source: *` では含まない'
   - name: resolve_write_target
     title: 書く場所の解決
     kind: 関数
@@ -609,7 +621,7 @@ functions:
       type: Target
       description: 書き込む場所（`ref` は常に `None`、`access` は `write`。ワークツリーへ書くときの `source` はそのワークツリーの設定で再読み込みした配信元）
     process: |-
-      1. `cwd` を正規化し、配信元を決める。`None` なら作業中の配信元、無ければ使える配信元を添えた `SourceNotWritableError` を送る
+      1. `cwd` を正規化し、配信元を決める。`None` なら作業中の配信元、ID なら配信元の一覧.文書の MCP で参照した配信元（組み込みの配信元は `scope.write` が空なので手順 2 で断る）、無ければ使える配信元を添えた `SourceNotWritableError` を送る
       2. 権限が `write` でなければ、使える配信元を添えた `SourceNotWritableError` を送る
       3. 書くワークツリーを決める
          - 配信元の `storage` が `disk` で `worktree` を渡された場合、`InvalidArgumentError` を送る（`disk` は `is_git` が偽のため、手順 4 を通らず `root` へ書く）
@@ -707,6 +719,13 @@ functions:
         mock: 配信元の一覧（偽物）、配信元の『作業場所の配信元の読み込み』（呼ばれた回数を記録する偽物）
         expected: '`Target.source` が配信中の sample のままで、`worktree` がそのワークツリー。読み込みは呼ばれない'
         exception: '-'
+      - name: test_resolve_write_target_when_builtin
+        case: 異常
+        summary: 組み込みの配信元には書き込めない
+        condition: '`source: project-index`。`project-index` は組み込みの配信元で、`cwd` はクローンのフォルダ'
+        mock: なし
+        expected: '`SourceNotWritableError`'
+        exception: '`scope.write` が空'
 refs:
   - to: IF-2
     type: requires

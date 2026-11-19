@@ -197,14 +197,18 @@ def test_error_when_version_mismatch(
 
 
 def test_error_when_source_not_writable(
-    make_source: Callable[..., Any], make_server: Callable[..., Any]
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    make_builtin_clone: Callable[[], Path],
 ) -> None:
     """scope.write に当たらない作業場所からの削除を断る（異常系）。"""
     # 準備
     sample = make_source("sample")
     notes = make_source("notes", git=False, scope_read=[sample.folder])
+    clone = make_builtin_clone()
     env = make_server(sample, notes)
     target = notes.folder / "docs" / "doc-2.yaml"
+    page = clone / "docs" / "guide" / "配信元を登録する.md"
     # 実行
     result = env.call(
         "delete_docs",
@@ -212,12 +216,21 @@ def test_error_when_source_not_writable(
         source="notes",
         targets=[{"id": "doc-2", "expected_version": _version(target)}],
     )
+    builtin = env.call(
+        "delete_docs",
+        cwd=str(clone),
+        source="project-index",
+        targets=[{"id": "docs/guide/配信元を登録する.md", "expected_version": "0000000"}],
+    )
     # 検証
     assert result.is_error
     assert "SourceNotWritableError" in result.text
     assert "notes" in result.text
     assert "sample" in result.text
     assert target.is_file()
+    assert builtin.is_error
+    assert "SourceNotWritableError" in builtin.text
+    assert page.is_file()
 
 
 def test_error_when_target_is_clone(

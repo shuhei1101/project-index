@@ -13,6 +13,9 @@ diagrams:
       classDiagram
         direction TD
         配信元の一覧 ..> 配信元の読み込み : 行ごとに
+        配信元の一覧 ..> 組み込みの配信元の読み込み : 行の前に
+        組み込みの配信元の読み込み ..> 設定の値からの組み立て
+        配信元の読み込み ..> 設定の値からの組み立て
         配信元の読み込み ..> 設定のマージ : config の並び
         配信元の読み込み ..> 配信元の設定の検証
         配信元の読み込み ..> スクリプトの確かめ
@@ -27,9 +30,16 @@ diagrams:
           +再読み込みする(端末の設定) list
           +引く(配信元の ID) 配信中の配信元
           +配信中() list
+          +文書の MCP の配信中() list
           +状態の一覧() list
         }
         class 配信元の読み込み {
+          <<function>>
+        }
+        class 組み込みの配信元の読み込み {
+          <<function>>
+        }
+        class 設定の値からの組み立て {
           <<function>>
         }
         class 設定のマージ {
@@ -71,6 +81,8 @@ diagrams:
         }
         click 配信元の一覧 href "id:MOD-69#classes[SourceRegistry]"
         click 配信元の読み込み href "id:MOD-70#functions[load_source]"
+        click 組み込みの配信元の読み込み href "id:MOD-172#functions[load_builtin_source]"
+        click 設定の値からの組み立て href "id:MOD-70#functions[assemble_values]"
         click 設定のマージ href "id:MOD-68#functions[merge_configs]"
         click 配信元の設定の検証 href "id:MOD-70#functions[validate_source_config]"
         click スクリプトの確かめ href "id:MOD-70#functions[check_scripts]"

@@ -12,6 +12,7 @@ from jsonschema import Draft202012Validator
 from project_index.features.sources import service as service_module
 from project_index.features.sources.service import (
     assemble_source,
+    assemble_values,
     check_scripts,
     compare_config_version,
     entry_source_id,
@@ -1390,3 +1391,56 @@ def test_validate_source_config_when_schema_checked_once(
     assert [v.path for v in first] == ["documents[2].schema", "documents[3].schema"]
     assert first[0].rule == first[1].rule
     assert [(v.path, v.rule) for v in second] == [(v.path, v.rule) for v in first]
+
+
+def test_assemble_values(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    sample_files: dict[str, str],
+) -> None:
+    """値から配信元を組み立てる（正常系）。"""
+    # 準備
+    write_files(tmp_path, sample_files)
+    # 実行
+    served, config, violations = assemble_values(
+        _config_value(),
+        root=tmp_path,
+        source_id="builtin",
+        scope_read=[],
+        scope_write=[],
+        outside_read=True,
+        storage="disk",
+        builtin=True,
+    )
+    # 検証
+    assert violations == []
+    assert config is not None
+    assert served is not None
+    assert served.scope_write == []
+    assert served.builtin is True
+
+
+def test_assemble_values_when_invalid(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    sample_files: dict[str, str],
+) -> None:
+    """検証に通らない値（異常系）。"""
+    # 準備
+    write_files(tmp_path, sample_files)
+    value = _config_value(
+        documents=[{"id": "rules", "schema": "schemas/rule.schema.yaml"}],
+    )
+    # 実行
+    served, _config, violations = assemble_values(
+        value,
+        root=tmp_path,
+        source_id=None,
+        scope_read=[],
+        scope_write=[],
+        outside_read=True,
+        storage="disk",
+    )
+    # 検証
+    assert served is None
+    assert "documents[0].paths" in [violation.path for violation in violations]

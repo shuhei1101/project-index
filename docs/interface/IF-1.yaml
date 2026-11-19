@@ -354,7 +354,7 @@ flows:
       - name: Mock
         description: なし
       - name: 配信元
-        description: '正常系と同じ sample・notes・other（`outside_read` を書かない）に、`scope.read` が closed のフォルダだけで端末の設定の行に `outside_read: false` を持つ closed を加える'
+        description: '正常系と同じ sample・notes・other（`outside_read` を書かない）に、`scope.read` が closed のフォルダだけで端末の設定の行に `outside_read: false` を持つ closed を加える。`sources` に id `project-index` の行は無く、組み込みの配信元が加わっている'
         notes: other の設定の `when` に 2 行
       - name: 入力
         description: '`outside_scope: true`（`source` なし）。`cwd` は sample のクローン本体'
@@ -379,9 +379,11 @@ flows:
       - 作業範囲の外の表の `when` 列が、other の `when` の 2 行を `<br>` でつないだ値
       - '`format: json` の `outside_sources[].when` が other の `when` の 2 行の配列'
       - 作業範囲の外の表に、`scope` に当たる sample・notes と、`outside_read` が偽の closed が無い
-      - '`format: json` の `outside_sources` が other の 1 件だけで、`sources` は引数なしと同じ'
+      - '`format: json` の `outside_sources` が other と組み込みの配信元 `project-index` の 2 件で、`sources` は引数なしと同じ'
       - 要求のログに作業範囲の外の記録を残さない（文書を読まない）
       - '`outside_scope` を省いた引数なしの一覧には、作業範囲の外の表が無い'
+      - 作業範囲の外の表に、other に続けて組み込みの配信元 `project-index` の行がある
+      - 引数なしの一覧の `sources` に組み込みの配信元を記載しない
     test: test_normal_when_outside_list
   - name: 正常系（使う場面を書き換えた後の一覧）
     summary: '`default_ref` に `when` の書き換えを commit した後の引数なしの一覧が、裏の確認の後に、`reload` をしなくても書き換えた `when` を返す'

@@ -1,0 +1,15 @@
+# 結合テスト（全 pass）: 9de5e2d
+
+$ gh workflow run test.yml --ref feat/setup/serve-setup-procedure-from-mcp -f layer=integration -f paths="tests/integration/server/test_serve.py::test_normal_when_builtin_source_unavailable" （TP-1 の TL-2 の run_runner。並列数 1）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 1 item
+
+tests/integration/server/test_serve.py::test_normal_when_builtin_source_unavailable PASSED [100%]
+
+============================== 1 passed in 0.42s ===============================
+rc=0 run=44499094960

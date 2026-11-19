@@ -8,6 +8,7 @@ from project_index.shared.hashing import content_hash
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
     import pytest
 
@@ -395,6 +396,7 @@ def test_error_when_outside_read_disabled(
 def test_normal_when_outside_list(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
+    make_builtin_clone: Callable[[], Path],
     sample_file_set: Callable[..., dict[str, str]],
     sample_config_text: Callable[..., str],
     caplog: pytest.LogCaptureFixture,
@@ -408,6 +410,7 @@ def test_normal_when_outside_list(
     notes = make_source("notes", git=False, scope_read=[sample.folder])
     other = make_source("other", sample_file_set(**{"project-index.yaml": config}))
     closed = make_source("closed", outside_read=False)
+    make_builtin_clone()
     env = make_server(sample, notes, other, closed)
     cwd = str(sample.folder)
     caplog.set_level(logging.INFO)
@@ -426,10 +429,15 @@ def test_normal_when_outside_list(
     assert "| sample |" not in outside
     assert "| notes |" not in outside
     assert "| closed |" not in outside
-    assert as_json.data["outside_sources"] == [
-        {"id": "other", "description": OTHER_DESCRIPTION, "when": list(OTHER_WHEN)}
-    ]
+    assert "| project-index |" in outside
+    assert [row["id"] for row in as_json.data["outside_sources"]] == ["other", "project-index"]
+    assert as_json.data["outside_sources"][0] == {
+        "id": "other",
+        "description": OTHER_DESCRIPTION,
+        "when": list(OTHER_WHEN),
+    }
     assert as_json.data["sources"] == plain_json.data["sources"]
+    assert "project-index" not in [row["source_id"] for row in plain_json.data["sources"]]
     assert logged == []
     assert OUTSIDE_LINE not in listed.text
 

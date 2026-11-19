@@ -1558,3 +1558,40 @@ def test_error_when_ref_given_to_disk_source(
     assert "company は disk の配信元のため ref を指定できません" in by_ref.text
     assert by_worktree.is_error
     assert "company は disk の配信元のため worktree を指定できません" in by_worktree.text
+
+
+def test_normal_when_builtin_source_read(
+    make_builtin_clone: Callable[[], Path],
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+) -> None:
+    """組み込みの配信元の手順のページを、outside_scope: true と sections で一部のセクションだけ返す（正常系）。"""
+    # 準備
+    make_builtin_clone()
+    sample = make_source("sample")
+    env = make_server(sample)
+    cwd = str(sample.folder)
+    criteria = {"field": "id", "op": "eq", "values": ["docs/guide/メタデータを付ける基準.md"]}
+    # 実行
+    part = env.call(
+        "search_docs",
+        cwd=cwd,
+        source="project-index",
+        outside_scope=True,
+        filter=criteria,
+        view="full",
+        sections=["仮のメタデータ"],
+    )
+    refused = env.call("search_docs", cwd=cwd, source="project-index", filter=criteria)
+    everything = env.call(
+        "search_docs", cwd=cwd, source="*", outside_scope=True, view="ids", format="json"
+    )
+    # 検証
+    assert not part.is_error
+    assert part.text.splitlines()[0] == OUTSIDE_LINE
+    assert "仮のメタデータの段階" in part.text
+    assert "関連の候補の表" not in part.text
+    assert refused.is_error
+    assert "SourceNotReadableError" in refused.text
+    assert "outside_scope: true" in refused.text
+    assert {item["id"] for item in everything.data["items"]} == {"doc-1", "doc-2"}

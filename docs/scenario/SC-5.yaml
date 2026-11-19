@@ -17,10 +17,14 @@ scenarios:
       sequenceDiagram
         actor U as 利用者
         participant SK as setup のスキル
+        participant DM as 文書の MCP
         participant AD as 管理の MCP
         participant CF as 端末の設定
 
         U->>SK: /project-index:setup {sample のパス}
+        SK->>DM: 配信元の登録の手順のページを全文で取得する
+        DM-->>SK: 手順のページ（組み込みの配信元。作業範囲の外（参考））
+        SK->>SK: 手順のページを上から進める
         SK->>AD: check_project（sample のパス）
         AD-->>SK: 設定のバージョンの新旧（同じ）・違反 0 件・索引の同期の件数
         SK->>U: scope.write・scope.read を既定の値つきで聞く
@@ -40,6 +44,7 @@ scenarios:
       - '`reload` の前後で `/mcp` のセッションが切れず、ツールは 7 つのまま'
       - スキルの応答に、書き込んだ行の表と `check_project` の結果がある
       - 配信元の `schemas/files.schema.yaml` が、knowledge の `schemas/knowledge-files.schema.yaml` のファイルの行のキー（`id`・`aliases`・`inject_when`・`category`）と `checkpoint` を持ち、配信元のフォルダの外部のファイルを `$ref` で指さない
+      - スキルが、端末の設定の `sources` に project-index の行が無いまま、文書の MCP から配信元の登録の手順のページを取得し、そのページの手順で質問と記載を進める
     test: test_normal
   - name: 正常シナリオ（YAML でない範囲を加える）
     setup:
@@ -1299,6 +1304,66 @@ scenarios:
       - '`reload` の後の `status` の配信元の管理用の YAML に無いファイルの件数が 0'
       - 追跡していて管理用の YAML に無いファイル（`docs/new.md`）を足すと、`check_project` はそのファイルだけを 1 件数える
     test: test_normal_when_worktree_git_and_ignored_files
+  - name: 異常シナリオ（手順のページを取得できない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かす）
+      - name: project-index
+        description: '組み込みの配信元を加えるコードを持たない、更新前のバージョンのクローンで待ち受けている project-index。端末の設定は `sources: []`'
+        notes: プラグイン（スキル `setup`）だけが更新され、クローンは管理の MCP の `update` をまだ実行していない端末
+      - name: サンプルの配信元
+        description: 正常シナリオと同じ sample
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（手順のページを取得できない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant DM as 文書の MCP
+
+        U->>SK: /project-index:setup {sample のパス}
+        SK->>DM: 配信元の登録の手順のページを全文で取得する
+        DM-->>SK: 配信元 project-index が無いエラー（UnknownSourceError）
+        SK-->>U: 手順のページを取得できないことと、管理の MCP の update で project-index を更新する案内を出して止まる
+      ```
+
+      <!-- /map -->
+    expected:
+      - 端末の設定と sample のフォルダのファイルは変わらない
+      - スキルの応答に、手順のページを取得できなかったことと、管理の MCP の `update` の案内が出る
+      - スキルが手順のページの代わりに覚えている手順で質問や記載を進めない
+    test: test_error_when_procedure_page_missing
+  - name: 異常シナリオ（文書の MCP につながらない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かす）
+      - name: project-index
+        description: 待ち受けていない project-index
+        notes: '`project-index serve` を止めた後の状態。文書の MCP の接続が失敗する'
+      - name: サンプルの配信元
+        description: 正常シナリオと同じ sample
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（文書の MCP につながらない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant DM as 文書の MCP
+
+        U->>SK: /project-index:setup {sample のパス}
+        SK->>DM: 配信元の登録の手順のページを全文で取得する
+        DM-->>SK: 接続の失敗
+        SK-->>U: 文書の MCP につながらないことと、/project-index:global-setup の案内を出して止まる
+      ```
+
+      <!-- /map -->
+    expected:
+      - 端末の設定と sample のフォルダのファイルは変わらない
+      - スキルの応答に、文書の MCP につながらないことと、`/project-index:global-setup` の案内が出る
+      - スキルが手順のページの代わりに覚えている手順で質問や記載を進めない
+    test: test_error_when_docs_mcp_unreachable
 lead: 利用者が `/project-index:setup` でフォルダを配信元として登録し、管理用の YAML を範囲のファイルに合わせるシナリオを定め、配信元の追加の流れを変えるときに参照する。
 tags:
   - name: topic:配信元
