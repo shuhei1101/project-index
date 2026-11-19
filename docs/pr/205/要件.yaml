@@ -1,0 +1,90 @@
+use_cases:
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: changed
+    detail: エージェントがファイルを書き換えた後に管理用の YAML の修正の通知を受けて直す流れと、利用者が会話の指摘を登録する流れを、全体の流れに加えるかを決める
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: エージェントが配信元のフォルダの下のファイルを書き換え・作成した後に、管理用の YAML・エイリアス・ルールの索引の修正の通知を 1 回受け取る
+    depends_on:
+      - docs/scenario/SC-1.yaml
+  - kind: single
+    scenario: docs/scenario/SC-13.yaml
+    impact: new
+    detail: 利用者が会話の後にスキルを実行し、指摘を抽象化した案と登録先を確かめて、ルール・エイリアス・文書として登録する
+    depends_on:
+      - docs/scenario/SC-1.yaml
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: run_only
+    detail: 配信元の登録の突き合わせは変えないが、書き込みの後の通知と同じ基準のページを指すため、手順の取得が壊れていないかを確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-2.yaml
+    impact: run_only
+    detail: プラグインのフックの登録が増えるため、利用者がプラグインを入れて global-setup を通す流れが変わらず動くかを確かめる
+    depends_on: []
+docs:
+  - page: docs/guide/コアコンセプト-プラグイン.md
+    new: false
+    change: 配るものの表に PostToolUse のフックと指摘を登録するスキルの行を追加し、書き込みの後の通知の仕組み（対象のツール・1 回の抑止・通知しないファイル）を記載する
+    status: todo
+  - page: docs/guide/会話の指摘を登録する.md
+    new: true
+    change: 指摘を登録するスキルが文書の MCP で取得して進める手順と、指摘をルール・エイリアス・文書のどれにするかの基準を新規作成する（置き場所はドキュメント配置判定で docs/guide/、形式は既存のガイドと同じ Markdown）
+    status: todo
+  - page: docs/guide/使い方.md
+    new: false
+    change: 会話の指摘を登録するページの行を追加する
+    status: todo
+  - page: docs/guide/files.yml
+    new: false
+    change: 新規作成するガイドのページの行を追加する
+    status: todo
+  - page: docs/guide/index.yaml
+    new: false
+    change: 新規作成するガイドのページの行を追加する
+    status: todo
+  - page: docs/_theme/_data/nav.project.yml
+    new: false
+    change: 新規作成するガイドのページをサイドバーに追加する
+    status: todo
+  - page: docs/glossary/GLO-1.yaml
+    new: false
+    change: 用語『プラグイン』の説明に PostToolUse のフックを追加し、書き込みの後の通知・会話の指摘の新規の用語を追加する
+    status: todo
+  - page: docs/architecture/ARCH-1.yaml
+    new: false
+    change: サブシステム『プラグイン』の役割に PostToolUse のフックと指摘を登録するスキルを追加する
+    status: todo
+  - page: docs/layout/LAY-73-1.yaml
+    new: false
+    change: plugins/project-index/hooks/ の新規のフック、skills/ の新規のスキル、templates/ の既定の置き場所の雛形のエントリを追加する
+    status: todo
+  - page: plugins/project-index/files.yaml
+    new: false
+    change: 新規のフックとスキルの行を追加し、hooks.json の行の description を PostToolUse を含む形へ修正する
+    status: todo
+  - page: README.md
+    new: false
+    change: プラグインが配るスキルに指摘を登録するスキルを追加する（スキルを並べている箇所があれば）
+    status: todo
+  - page: docs/guide/変更履歴.md
+    new: false
+    change: 書き込みの後の通知と指摘を登録するスキルの追加を記載する（タグを打つとき）
+    status: todo
+scope_out:
+  - item: Bash の mv・rm・git mv での作成・削除・改名への通知
+    reason: コマンドの文字列からの推測になり誤通知が出る。通知で捕捉できない分はスキル setup の突き合わせと describe() の注意の件数が検出する
+    plan: none
+  - item: 用語・エイリアス・索引のエントリを追加する基準を判定フローチャートの形に整理すること
+    reason: '#203 が同じ内容を持つ。この PR の通知とスキルは、基準のページを文書の ID で指すだけで、基準の中身に依存しない'
+    plan: '#203'
+  - item: 圧縮で消えた会話・会話の記録のファイルからの指摘の検出
+    reason: '#202 の本文が今の文脈に残っている分だけを対象にすると定めている'
+    plan: none
+  - item: alias-inject・rule-inject のコードの呼び出しと、両プラグイン側の変更
+    reason: 緩い依存にするため、配信元の中身と端末の設定のファイルの有無だけで判定する
+    plan: none
