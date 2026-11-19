@@ -166,7 +166,8 @@ scenarios:
       - name: Mock
         description: なし（実環境で実行）
       - name: project-index
-        description: 止めた状態（待ち受けていない）
+        description: 起動していない。`PROJECT_INDEX_PORT` のポートは、接続を受けるが HTTP に応答しないテスト用のサーバーでふさぐ
+        notes: SessionStart のフックはポートにつながるので project-index を起動しない。期待値の 3 つ目は、ふさいだテスト用のサーバーを止めて project-index を起動した後に、同じセッションで別のファイルを書き換えて観測する
       - name: サンプルの配信元
         description: 正常シナリオと同じ sample
     flow: |-

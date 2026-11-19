@@ -22,13 +22,16 @@ scenarios:
         description: なし（実環境で実行。Claude Code は `claude -p` で実行し、選択肢への回答は `--resume` で同じセッションへ送信する）
       - name: Claude Code の設定の場所
         description: '`CLAUDE_CONFIG_DIR` が指すテスト用の一時フォルダ。プラグイン `project-index`・`rule-inject`・`alias-inject` を入れる'
-        notes: '`RULE_INJECT_CONFIG`・`ALIAS_INJECT_CONFIG` はテスト用の一時フォルダの中の無いファイルへ向ける'
+        notes: '`RULE_INJECT_CONFIG`・`ALIAS_INJECT_CONFIG` は、テスト用の一時フォルダの中に配置したそれぞれの端末の設定のファイル（索引・用語の行を持たない最小の内容）へ向ける'
       - name: 指摘の置き場所
         description: テスト用の一時フォルダの中の空のフォルダ
         notes: 置き場所の確認にこのパスを回答する
       - name: 会話
         description: 利用者が、守ってほしいこと 1 件・単語の意味 1 件・判断の理由 1 件を AI に伝えた会話
         notes: スキルはこの会話を `--resume` で続けて実行する
+      - name: sample の配信元
+        description: 範囲の Markdown を持ち、端末の設定に登録した配信元のフォルダ。スキルと次のセッションはこのフォルダを作業場所にして実行する
+        notes: 有効にする範囲の確認にこのフォルダを回答する。守ってほしいことの指摘は sample の Markdown の編集に関するものにし、次のセッションでその Markdown を Read して rule-inject の案内を観測する
     flow: |-
       <!-- map: {"title": "正常シナリオ"} -->
 
@@ -184,7 +187,8 @@ scenarios:
       - name: Mock
         description: なし（実環境で実行）
       - name: project-index
-        description: 止めた状態（待ち受けていない）
+        description: 起動していない。`PROJECT_INDEX_PORT` のポートは、接続を受けるが HTTP に応答しないテスト用のサーバーでふさぐ
+        notes: SessionStart のフックはポートにつながるので project-index を起動せず、文書の MCP は応答しない
       - name: 会話
         description: 正常シナリオと同じ指摘を 3 件伝えた会話
     flow: |-
