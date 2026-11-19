@@ -7,6 +7,8 @@ argument-hint: "[path]"
 # setup
 
 `$ARGUMENTS` は配信元のフォルダ（以降 `{path}`）。省くと今の作業場所。
+質問は AskUserQuestion で、既定値を推奨の選択肢にして聞く。
+管理の MCP のツール（`check_project`・`reload`）は `mcp__plugin_project-index_project-index-admin__` で始まる名前、`write_docs` は文書の MCP（`mcp__plugin_project-index_project-index__write_docs`）にある。
 
 ## 手順
 
