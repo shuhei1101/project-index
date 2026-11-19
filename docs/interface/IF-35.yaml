@@ -216,7 +216,7 @@ constraints:
   - item: 通知の対象
     constraint: '配信元のフォルダ（ワークツリーを含む）の下で、`records: files` の行の管理用の YAML の範囲（`project-index files` と同じ判定）に該当するファイルだけ。管理用の YAML そのもの・配信元の設定・YAML の文書・範囲に該当しないファイルは通知しない'
   - item: 通知の 1 回
-    constraint: '`session_id` と `agent_id` の組ごとに、通知したパスを記録する。記録はプロセスのメモリに持ち、再起動で消える'
+    constraint: '`session_id` と `agent_id` の組ごとに、通知したパスを記録する。記録はプロセスのメモリに持ち、再起動で消える。`/clear`・圧縮の後は、`POST /_admin/session-start` が同じ会話キーの記録を捨てる'
     notes: 再起動の後に 1 回通知が重なるだけで、書き込みは止めない
   - item: 文面
     constraint: 'メタデータを付ける基準のページを文書の MCP の `search_docs` で取得する引数（`source: project-index`・`outside_scope: true`・`filter` の `id` に基準のページ）を持つ'
