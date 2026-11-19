@@ -70,6 +70,12 @@ functions:
         condition: stdin が `not json`
         mock: なし
         expected: 0 を返し、標準出力が空
+      - name: test_main_when_python_312_grammar
+        case: 正常
+        summary: フックを 3.12 の文法で読める
+        condition: '`hooks/` の 3 つのフック（`post_tool_use.py`・`pre_tool_use.py`・`session_start.py`）を `ast.parse(..., feature_version=(3, 12))` で読む'
+        mock: なし
+        expected: どのフックも `SyntaxError` にならない
   - name: collect_paths
     title: パスの収集
     container: hooks/post_tool_use.py
@@ -173,7 +179,7 @@ refs:
     type: requires
     when: インターフェース定義『ツール実行後のフック』の入出力を変えるときに、この設計書の関数と定数を合わせる。
 notes:
-  決まり: Python 3.14 の標準ライブラリだけで書き、常に終了コード 0 で戻る。判定と文面は索引のサーバーが持ち、フックはパスを集めて問い合わせるだけにする。
+  決まり: Python 3.14 の標準ライブラリだけで、PATH の `python3` が 3.12 でも読める文法で書き、常に終了コード 0 で戻る。判定と文面は索引のサーバーが持ち、フックはパスを集めて問い合わせるだけにする。
 visibility: internal
 tags:
   - name: topic:フック

@@ -197,7 +197,7 @@ exceptions:
     notes: 何も出力せず終了コード 0 で戻る
 constraints:
   - item: 言語
-    constraint: Python 3.14 の標準ライブラリだけ
+    constraint: Python 3.14 の標準ライブラリだけ。`hooks.json` は PATH の `python3` で起動するため、Python 3.12 の文法でも読める書き方にする
   - item: 集めるパス
     constraint: Write・Edit は `tool_input.file_path`、NotebookEdit は `tool_input.notebook_path`、MCP のツールは引数の入れ子の文字列の値のうち、絶対パスか `cwd` で解決した相対パスで、存在するファイルを指すもの
   - item: 問い合わせないツール
