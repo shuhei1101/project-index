@@ -846,6 +846,86 @@ functions:
         condition: '`id: given` の行、`id` を省略し `name: sample` と `name: local` の 2 つの設定を指す行、`id` を省略し無い設定を指す行'
         mock: なし（一時フォルダ）
         expected: 順に `given`・`local`・`None`
+  - name: assemble_values
+    title: 設定の値からの配信元の組み立て
+    kind: 関数
+    container: project_index/features/sources/service.py
+    usecase: 起動
+    role: サービス
+    summary: マージ済みの設定の値を検証し、スクリプトを確認して配信中の配信元を作る
+    scope: public
+    thread_safe: true
+    description: 設定のファイルを読み込まず、指定した値で組み立てる。配信元の組み立て（`assemble_source`・`load_source`）も、設定を読み込んでマージした値でこの関数を呼ぶ。
+    args:
+      - name: values
+        title: 設定の値
+        type: dict[str, Any]
+        required: true
+        passing: positional
+        description: マージした配信元の設定の値
+      - name: root
+        title: 設定のフォルダ
+        type: Path
+        required: true
+        passing: keyword
+        description: スキーマ・`paths` を解く基準のフォルダ
+      - name: source_id
+        title: 配信元の ID
+        type: str | None
+        required: true
+        passing: keyword
+        description: 配信元の ID。`None` なら設定の `name`
+      - name: scope_read
+        title: 参照できる作業場所
+        type: list[str]
+        required: true
+        passing: keyword
+        description: '`scope.read`'
+      - name: scope_write
+        title: 書き込める作業場所
+        type: list[str]
+        required: true
+        passing: keyword
+        description: '`scope.write`。空なら書き込めない（省いた行の既定は呼ぶ側が解く）'
+      - name: outside_read
+        title: 作業範囲の外から参照できるか
+        type: bool
+        required: true
+        passing: keyword
+        description: '`outside_read`'
+      - name: storage
+        title: 読み書きの方法
+        type: StorageType | None
+        required: true
+        passing: keyword
+        description: '`storage.type`'
+      - name: builtin
+        title: 組み込みの配信元か
+        type: bool
+        required: false
+        passing: keyword
+        description: 組み込みの配信元のとき `True`（既定 `False`）
+    returns:
+      type: tuple[ServedSource | None, SourceConfig | None, list[Violation]]
+      description: 配信中の配信元・設定・違反。違反があれば配信元は `None`
+    process: |-
+      1. 読み書きの方法から Git のリポジトリの直下を決め、設定の値をスキーマと文書の行で検証する（違反があれば違反を返却する）
+      2. 配信元の設定を作り、スクリプトを確認する
+      3. 行ごとのスキーマを読み込み、`scope_write` をそのまま、`builtin` を持つ配信中の配信元を返却する
+    unit_tests:
+      - name: test_assemble_values
+        case: 正常
+        summary: 値から配信元を組み立てる
+        condition: '文書の行 1 つの設定の値、`scope_write: []`、`builtin: True`、`storage: disk`'
+        mock: なし（一時フォルダ）
+        expected: 違反が 0 件で、配信元の `scope_write` が空、`builtin` が `True`
+      - name: test_assemble_values_when_invalid
+        case: 異常
+        summary: 検証に通らない値
+        condition: '`documents[0].paths` が無い値'
+        mock: なし
+        expected: 配信元が `None` で、違反に `documents[0].paths` が入る
+        exception: '-'
 refs:
   - to: IF-15
     type: requires

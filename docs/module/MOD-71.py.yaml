@@ -468,6 +468,12 @@ data_models:
         access: 公開
         default: None
         description: 端末の設定の行の `storage.type`。`None` は行で省いた（`is_git` で決める）。`disk` のとき `is_git` は `False`、`repo_root`・`main_root` は `None`、`worktree_globs` は空
+      - name: builtin
+        title: 組み込みの配信元か
+        type: bool
+        access: 公開
+        default: 'False'
+        description: 端末の設定の行でなく、クローンのガイドから作った組み込みの配信元なら `True`。配信元の一覧は `True` の配信元を文書の MCP だけに返却する
     methods:
       - name: table
         title: 文書の行を引く

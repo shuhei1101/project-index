@@ -39,6 +39,8 @@ classes:
     description: |-
       一覧は `dict[str, ServedSource]` と `list[SourceStatus]` の組を 1 つの属性で持ち、再読み込みは新しい組を作り終えてから属性を入れ替える。
       読む側は入れ替えの前後どちらかの組だけを見るので、ロックを取らない。再読み込み同士は `_reload_lock` で順にする。
+      起動の読み込み（`load`）・再読み込み（`reload`・`reload_changed`）は、行を読み込む前に組み込みの配信元の読み込みを呼び、結果を `_builtin` に入れる。加えなかった理由があれば `[warning]` 組み込みの配信元を加えなかった（理由）を記録する。
+      組み込みの配信元は `_snapshot` に入れず、`served`・`get`・`statuses`（読み取り API・管理の MCP）には出さない。文書の MCP は `docs_served`・`get_for_docs` で参照する。
       起動の読み込み（`load`）は行ごとに、同時に読み込む行の数（`LOAD_WORKERS`）のスレッドで並列に読み込み、読み込み終えた行を組に加えて入れ替える。要求は指す行の読み込みだけを待つ（インターフェース定義『起動』の配信元の読み込みの単位）。
     kind: クラス
     properties:
@@ -118,6 +120,12 @@ classes:
         access: 公開
         default: BackgroundGate()
         description: 初期化の引数 `gate` で受け取る（起動のときに `Handlers.gate` を渡す）。`load` が、要求が待っていない行の読み込みを文書の行 1 つごとに休ませる。`reload`・`reload_changed` と、要求の中の組み立て直し（`get` からの `_refresh`）は、要求が全ての行を待つため休ませない
+      - name: _builtin
+        title: 組み込みの配信元
+        type: ServedSource | None
+        access: 内部 (_)
+        default: None
+        description: 最後に読み込んだ端末の設定から作った組み込みの配信元。加えないときは `None`
     methods:
       - name: reload
         title: 再読み込みする
@@ -572,6 +580,68 @@ classes:
             condition: '`SourceRegistry(loading=True)`。`sources` に `id` が a の行と `id` を持たない行。2 行目の読み込みの偽物が `threading.Event` で止まっている間に `statuses_with_loading()`'
             mock: 配信元の読み込み（2 行目だけ止められる偽物）
             expected: a が `serving`、2 行目が ID `sources[1]` の `loading` で、行の順に 2 つ。`statuses()` は a だけ
+      - name: docs_served
+        title: 文書の MCP の配信中
+        kind: メソッド
+        summary: 配信中の配信元に、組み込みの配信元を末尾に加えて返却する
+        scope: public
+        thread_safe: true
+        returns:
+          type: list[ServedSource]
+          description: 配信中の配信元と組み込みの配信元
+        process: 1. `served` の結果に、`_builtin` があり同じ ID の配信元が無いときだけ `_builtin` を末尾に加えて返却する
+        unit_tests:
+          - name: test_source_registry_docs_served
+            case: 正常
+            summary: 組み込みの配信元を末尾に加える
+            condition: '`a` が配信中、`_builtin` が `project-index`'
+            mock: なし（`_snapshot`・`_builtin` を直に入れる）
+            expected: '`a`・`project-index` の順。`served` は `a` だけ'
+      - name: get_for_docs
+        title: 文書の MCP で参照する
+        kind: メソッド
+        summary: 配信中の配信元か組み込みの配信元を ID で参照する
+        scope: public
+        thread_safe: true
+        args:
+          - name: source_id
+            title: 配信元の ID
+            type: str
+            required: true
+            passing: positional
+            description: 参照する ID
+        returns:
+          type: ServedSource
+          description: 配信中の配信元か組み込みの配信元
+        process: |-
+          1. `_builtin` があり ID が一致すれば `_builtin` を返却する（組み込みの配信元は、同じ ID の行が端末の設定に無いときだけある）
+          2. それ以外は `get` と同じに参照する（例外も同じ）
+        exceptions:
+          - name: SourceNotServedError
+            condition: 検証で除外したか無効の配信元
+            message: '`{id} は配信していません（{理由}）`'
+          - name: UnknownSourceError
+            condition: 端末の設定にも組み込みの配信元にも無い ID
+            message: '`配信元 {id} はありません`'
+        unit_tests:
+          - name: test_source_registry_get_for_docs
+            case: 正常
+            summary: 組み込みの配信元を参照する
+            condition: '`_builtin` が `project-index`'
+            mock: なし
+            expected: '`get_for_docs("project-index")` が組み込みの配信元を返却し、`get("project-index")` は `UnknownSourceError`'
+          - name: test_source_registry_get_for_docs_when_row
+            case: 正常
+            summary: 行の配信元は get と同じ
+            condition: '`a` が配信中、`_builtin` が `None`'
+            mock: なし
+            expected: '`get_for_docs("a")` が `a` の配信元'
+          - name: test_source_registry_load_when_builtin
+            case: 正常
+            summary: 読み込みで組み込みの配信元を作る
+            condition: '`sources: []` で `clone` にガイドの行を持つ一時フォルダの端末の設定で `load`、続けて id `project-index` の行を追加した端末の設定で `reload`'
+            mock: なし（一時フォルダ）
+            expected: '`load` の後は `docs_served` に `project-index`（`builtin` が真）があり `served` は空。`reload` の後は `_builtin` が `None`'
 constants:
   - name: LOAD_WORKERS
     title: 同時に読み込む行の数

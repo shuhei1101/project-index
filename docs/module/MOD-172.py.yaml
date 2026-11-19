@@ -1,0 +1,84 @@
+id: MOD-172
+title: 索引のサーバー / 配信元 / builtin.py
+lead: クローンのガイドを組み込みの配信元にする処理を受け持ち、配信元の builtin.py を修正するときに参照する。
+test_files:
+  - tests/unit/project_index/features/sources/test_builtin.py
+constants:
+  - name: BUILTIN_SOURCE_ID
+    title: 組み込みの配信元の ID
+    container: project_index/features/sources/builtin.py
+    usecase: 起動
+    summary: 組み込みの配信元の ID と、端末の設定に同じ配信元の行があるかの照合に使用する ID
+    value: '"project-index"'
+  - name: BUILTIN_ROW_ID
+    title: 組み込みの配信元に使用する文書の行
+    container: project_index/features/sources/builtin.py
+    usecase: 起動
+    summary: クローンの `project-index.yaml` から取り出す `documents[]` の行の ID
+    value: '"files_guide"'
+  - name: BUILTIN_SCHEMA_PATH
+    title: 組み込みの配信元のスキーマ
+    container: project_index/features/sources/builtin.py
+    usecase: 起動
+    summary: 取り出した行の `schema` を差し替える、クローンの直下からのスキーマのパス
+    value: '"templates/files.schema.yaml"'
+functions:
+  - name: load_builtin_source
+    title: 組み込みの配信元の読み込み
+    kind: 関数
+    container: project_index/features/sources/builtin.py
+    usecase: 起動
+    role: 変換
+    summary: 端末の設定に project-index の行が無いとき、クローンのガイドの行だけを読み取りだけの配信元にする
+    scope: public
+    thread_safe: true
+    args:
+      - name: terminal
+        title: 端末の設定
+        type: TerminalConfig
+        required: true
+        passing: positional
+        description: 読み込んだ端末の設定（`clone` と `sources[]`）
+    returns:
+      type: tuple[ServedSource | None, str | None]
+      description: （組み込みの配信元、加えなかった理由）。加えたときは理由が `None`、端末の設定に行があるときは両方 `None`
+    process: |-
+      1. `sources[]` の行のうち、配信元の ID（`entry_source_id`）が `BUILTIN_SOURCE_ID` の行があれば `(None, None)` を返却する（`enabled` が偽の行も含める）
+      2. `clone` の直下の `project-index.yaml` を読み込む。無い・YAML として読めない場合、`(None, 理由)` を返却する
+      3. `documents[]` から `id` が `BUILTIN_ROW_ID` の行を取り出す。無い場合、`(None, 理由)` を返却する
+      4. 取り出した行の `schema` を `BUILTIN_SCHEMA_PATH` に差し替え、`version` と `name`（`BUILTIN_SOURCE_ID`）と `documents`（その行だけ）を持つ設定の値を作る（クローンの設定のほかのキーは持たない）
+      5. 設定の値からの配信元の組み立て（`assemble_values`）を、`root` を `clone`・`source_id` を `BUILTIN_SOURCE_ID`・`scope_read` と `scope_write` を空・`outside_read` を真・`storage` を `disk`・`builtin` を真で呼ぶ
+      6. 違反があれば `(None, 違反の 1 件目の理由)`、無ければ `(配信元, None)` を返却する
+    unit_tests:
+      - name: test_load_builtin_source
+        case: 正常
+        summary: ガイドの行だけの読み取りだけの配信元を作る
+        condition: '`sources: []`。`clone` に `files_guide`（`schema` は knowledge の参照）と `src` の 2 行の `project-index.yaml`、`docs/guide/files.yml`、`templates/files.schema.yaml` を配置した一時フォルダ'
+        mock: なし（一時フォルダ）
+        expected: 配信元の `id` が `project-index`、`config.documents` が `files_guide` の 1 行で `schema_path` が `templates/files.schema.yaml`、`scope_read`・`scope_write` が空、`outside_read` が真、`storage` が `disk`、`builtin` が真。理由が `None`
+      - name: test_load_builtin_source_when_registered
+        case: 正常
+        summary: project-index の行があれば加えない
+        condition: '`sources` に id `project-index` の行（`enabled: false`）'
+        mock: なし
+        expected: '`(None, None)`。`clone` のファイルを読み込まない'
+      - name: test_load_builtin_source_when_config_missing
+        case: 異常
+        summary: クローンに設定が無い
+        condition: '`clone` が `project-index.yaml` を持たない一時フォルダ'
+        mock: なし
+        expected: 配信元が `None` で、理由に `clone` の `project-index.yaml` のパスが入る
+        exception: '-'
+      - name: test_load_builtin_source_when_row_missing
+        case: 異常
+        summary: ガイドの行が無い
+        condition: '`clone` の `project-index.yaml` が `src` の行だけ'
+        mock: なし
+        expected: 配信元が `None` で、理由に `files_guide` が入る
+        exception: '-'
+visibility: internal
+tags:
+  - name: topic:配信元
+    main: true
+  - name: topic:ガイド
+  - name: action:読み込み
