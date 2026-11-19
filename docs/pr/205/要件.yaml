@@ -35,7 +35,9 @@ docs:
   - page: docs/guide/コアコンセプト-プラグイン.md
     new: false
     change: 配るものの表に PostToolUse のフックと指摘を登録するスキルの行を追加し、書き込みの後の通知の仕組み（対象のツール・1 回の抑止・通知しないファイル）を記載する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-19T12:23:33.453425+00:00'
   - page: docs/guide/会話の指摘を登録する.md
     new: true
     change: 指摘を登録するスキルが文書の MCP で取得して進める手順と、指摘をルール・エイリアス・文書のどれにするかの基準を新規作成する（置き場所はドキュメント配置判定で docs/guide/、形式は既存のガイドと同じ Markdown）
@@ -59,11 +61,15 @@ docs:
   - page: docs/glossary/GLO-1.yaml
     new: false
     change: 用語『プラグイン』の説明に PostToolUse のフックを追加し、書き込みの後の通知・会話の指摘の新規の用語を追加する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-19T12:23:33.453425+00:00'
   - page: docs/architecture/ARCH-1.yaml
     new: false
     change: サブシステム『プラグイン』の役割に PostToolUse のフックと指摘を登録するスキルを、『索引のサーバー』の役割に書き込みの後の通知の判定を追加する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-19T12:23:33.453425+00:00'
   - page: docs/layout/LAY-73-1.yaml
     new: false
     change: plugins/project-index/hooks/ の新規のフック、skills/ の新規のスキル、templates/ の既定の置き場所の雛形のエントリを追加する
@@ -74,8 +80,10 @@ docs:
     status: todo
   - page: README.md
     new: false
-    change: プラグインが配るスキルに指摘を登録するスキルを追加する（スキルを並べている箇所があれば）
-    status: todo
+    change: プラグインが配るスキルを並べている箇所が無いため、修正しない
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-19T12:23:33.453425+00:00'
   - page: docs/guide/変更履歴.md
     new: false
     change: 書き込みの後の通知と指摘を登録するスキルの追加を記載する（タグを打つとき）
@@ -92,4 +100,7 @@ scope_out:
     plan: none
   - item: alias-inject・rule-inject のコードの呼び出しと、両プラグイン側の変更
     reason: 緩い依存にするため、配信元の中身と端末の設定のファイルの有無だけで判定する
+    plan: none
+  - item: '`write_docs` の create で `records` を持つ行（用語集など、`documents[].paths` が glob）の文書に新しい要素を追加できないこと'
+    reason: 書き込みの不具合で、この PR の通知とスキルの仕組みとは別。用語集の 2 件の用語は Edit で追加した
     plan: none
