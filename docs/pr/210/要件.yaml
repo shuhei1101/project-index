@@ -12,15 +12,14 @@ use_cases:
   - kind: single
     scenario: docs/scenario/SC-10.yaml
     impact: changed
-    detail: 配信元の設定に直コミットを許可する種類を書き、確認してから配信に入れる流れと、誤った設定を確認で知らせる分岐を加える
+    detail: 直コミットの設定が検証に通らないときに、`check_project` が違反と警告で知らせ、配信は続き、直コミットだけが断られる分岐を加える
     depends_on:
       - docs/scenario/SC-1.yaml
   - kind: single
     scenario: docs/scenario/SC-6.yaml
-    impact: following
-    detail: 配信元の説明に、直コミットを許可した種類を示す記述へ追随する
-    depends_on:
-      - docs/scenario/SC-15.yaml
+    impact: none
+    detail: 変えない。直コミットを許可した種類を `describe` で確認する流れは SC-15 の正常シナリオが持つ
+    depends_on: []
   - kind: single
     scenario: docs/scenario/SC-15.yaml
     impact: new

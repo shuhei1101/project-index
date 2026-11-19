@@ -431,6 +431,38 @@ scenarios:
       - '`storage.type: disk` と設定のファイルの絶対パスを指定した `check_project` が、`default_ref` に設定が無い違反を出さずに違反 0 件を返却する'
       - '`reload` の後の `describe` が書き換えた `description` を返却する'
     test: test_normal_when_disk_storage_reloaded
+  - name: 異常シナリオ（直コミットの設定が検証に通らない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: サンプルの配信元
+        description: 配信中の配信元 sample（git リポジトリ）。種類 `note` を持ち、`develop` を指すワークツリー `.claude/worktrees/develop` を持たない
+        notes: 直コミットの設定で、sample に無い種類 `meme` の直コミットを許可し、コミットするブランチを `develop` にしておく
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（直コミットの設定が検証に通らない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 利用者・エージェント
+        participant AD as 管理の MCP
+        participant DM as 文書の MCP
+
+        A->>AD: check_project（sample のパス）
+        AD-->>A: 違反（直コミットを許可する種類 meme が無い）と警告（develop を指すワークツリーが無い）
+        A->>AD: reload
+        AD-->>A: sample を配信中として返す
+        A->>DM: search_docs（source: sample）
+        DM-->>A: 文書
+        A->>DM: write_docs（source: sample, kind: note, commit）
+        DM-->>A: エラー（直コミットの設定に違反がある）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`check_project` が、直コミットを許可する種類 `meme` が sample の種類に無いことを、キーのパスと理由つきの違反で返却する'
+      - '`check_project` が、コミットするブランチ `develop` を指すワークツリーが sample の `worktrees` に無いことを警告で返却する'
+      - '`reload` の後も sample は配信中で、文書を `search_docs` で参照できる。`commit` を指定した `write_docs` は、直コミットの設定に違反があることを理由に断られ、sample のファイルは変わらない'
+    test: test_error_when_direct_commit_config_invalid
 lead: 利用者かエージェントが配信元の設定・スキーマ・スクリプトを変え、管理の MCP で確認してから `reload` で配信に入れるシナリオを定め、設定の変更の流れを変えるときに参照する。
 tags:
   - name: topic:設定
