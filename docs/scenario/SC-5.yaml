@@ -1309,8 +1309,8 @@ scenarios:
       - name: Mock
         description: なし（実環境で実行。Claude Code は `claude -p` で動かす）
       - name: project-index
-        description: 端末の設定の `clone` が、`docs/guide/` に配信元の登録の手順のページを持たないクローンを指して待ち受けている project-index
-        notes: 手順のページを配置する前のバージョンのクローン
+        description: '組み込みの配信元を加えるコードを持たない、更新前のバージョンのクローンで待ち受けている project-index。端末の設定は `sources: []`'
+        notes: プラグイン（スキル `setup`）だけが更新され、クローンは管理の MCP の `update` をまだ実行していない端末
       - name: サンプルの配信元
         description: 正常シナリオと同じ sample
     flow: |-
@@ -1324,7 +1324,7 @@ scenarios:
 
         U->>SK: /project-index:setup {sample のパス}
         SK->>DM: 配信元の登録の手順のページを全文で取得する
-        DM-->>SK: 該当 0 件
+        DM-->>SK: 配信していない配信元のエラー（project-index）
         SK-->>U: 手順のページを取得できないことと、管理の MCP の update で project-index を更新する案内を出して止まる
       ```
 
