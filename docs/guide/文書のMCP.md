@@ -59,6 +59,9 @@ YAML を書き換えたときは、再起動で反映します。
 引数なしの `describe()` の一覧には、作業範囲の外の配信元を載せません。
 作業範囲の外で参照できる配信元の ID は、`source` を省いた `describe(outside_scope: true)` で引けます。
 
+組み込みの配信元 `project-index`（[配信元と権限](./コアコンセプト-配信元と権限.md#組み込みの配信元)）も、`source: project-index` と `outside_scope: true` で読みます。
+`describe(outside_scope: true)` の一覧に出て、`write_docs`・`delete_docs` は SourceNotWritableError で断ります。
+
 ### 返す形式
 
 | ツールの種類 | `markdown`（既定） | `json` |
