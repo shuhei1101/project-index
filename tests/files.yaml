@@ -588,6 +588,15 @@ files:
   related:
   - to: src/project_index/features/documents/store.py
     type: tests
+- path: unit/project_index/features/history/test_blob.py
+  name: commit のファイルの blob の内容を、書き出さずに 1 本の `git cat-file --batch` から読む処理の単体テスト
+  description: 履歴の blob.py の単体テストを受け持ち、履歴の blob.py のテストを修正するときに参照する。
+  tags:
+  - topic:履歴
+  - tool:pytest
+  related:
+  - to: src/project_index/features/history/blob.py
+    type: tests
 - path: unit/project_index/features/history/test_query.py
   name: git によるリビジョンの解決・一覧・変わったファイル・ファイルの日時・ワークツリーの一覧の単体テスト
   description: 履歴の query.py の単体テストを受け持ち、履歴の query.py のテストを修正するときに参照する。
