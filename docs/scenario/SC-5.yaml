@@ -1334,6 +1334,36 @@ scenarios:
       - スキルの応答に、手順のページを取得できなかったことと、管理の MCP の `update` の案内が出る
       - スキルが手順のページの代わりに覚えている手順で質問や記載を進めない
     test: test_error_when_procedure_page_missing
+  - name: 異常シナリオ（文書の MCP につながらない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で動かす）
+      - name: project-index
+        description: 待ち受けていない project-index
+        notes: '`project-index serve` を止めた後の状態。文書の MCP の接続が失敗する'
+      - name: サンプルの配信元
+        description: 正常シナリオと同じ sample
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（文書の MCP につながらない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant SK as setup のスキル
+        participant DM as 文書の MCP
+
+        U->>SK: /project-index:setup {sample のパス}
+        SK->>DM: 配信元の登録の手順のページを全文で取得する
+        DM-->>SK: 接続の失敗
+        SK-->>U: 文書の MCP につながらないことと、/project-index:global-setup の案内を出して止まる
+      ```
+
+      <!-- /map -->
+    expected:
+      - 端末の設定と sample のフォルダのファイルは変わらない
+      - スキルの応答に、文書の MCP につながらないことと、`/project-index:global-setup` の案内が出る
+      - スキルが手順のページの代わりに覚えている手順で質問や記載を進めない
+    test: test_error_when_docs_mcp_unreachable
 lead: 利用者が `/project-index:setup` でフォルダを配信元として登録し、管理用の YAML を範囲のファイルに合わせるシナリオを定め、配信元の追加の流れを変えるときに参照する。
 tags:
   - name: topic:配信元

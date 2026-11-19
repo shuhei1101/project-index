@@ -30,6 +30,7 @@ scenarios:
           DD->>DD: マージした設定をスキーマで検証し、検査・変換・生成のスクリプトを実行できるか確かめる
           DD->>DD: 読み取り API と文書の MCP の配信元に加える
         end
+        DD->>DD: sources に project-index の行が無いので、クローンの docs/guide/ を組み込みの配信元 project-index として文書の MCP に加える
         DD->>DD: 127.0.0.1:8786 で待ち受ける
         DD-->>U: 待ち受けたアドレスと配信している配信元を標準出力に出す
       ```
@@ -40,7 +41,7 @@ scenarios:
       - 読み取り API の sample の文書の取得と読み取り API の notes の文書の取得が 200 を返す
       - '`/mcp` のツールが `search_docs`・`write_docs`・`delete_docs`・`describe`・`list_changes`・`trace_related`・`list_match_words` の 7 つ'
       - '`/_admin/mcp` のツールが `status`・`reload`・`restart`・`update`・`check_project`・`try_convert`・`write_nav` の 7 つ'
-      - 標準出力に待ち受けたアドレスと、配信している配信元の id（sample・notes）が出る
+      - 標準出力に待ち受けたアドレスと、配信している配信元の id（sample・notes と、組み込みの配信元 project-index）が出る
     test: test_normal
   - name: 正常シナリオ（設定の YAML を重ねる）
     setup:

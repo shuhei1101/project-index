@@ -492,7 +492,7 @@ scenarios:
         participant L as 要求のログ
 
         A->>M: describe(outside_scope: true)
-        M-->>A: 作業範囲の外で参照できる配信元の一覧（other と使う場面。作業範囲の外（参考））
+        M-->>A: 作業範囲の外で参照できる配信元の一覧（other と組み込みの配信元 project-index と使う場面。作業範囲の外（参考））
         A->>M: describe(source: other, outside_scope: true)
         M->>M: other の scope.read に cwd が当たらず、outside_read が真
         M-->>A: 説明書と種類の一覧（作業範囲の外（参考））
@@ -516,6 +516,7 @@ scenarios:
       - '`outside_scope` を省いた同じ呼び出しは、異常シナリオ（読めない配信元を指す）と同じエラーを返す'
       - '`source: *` に `outside_scope: true` を渡しても、`scope.read` に当たらない other は対象に含めない'
       - 引数なしの `describe()` は other を一覧に載せない
+      - '端末の設定に project-index の行が無いので、`source` を省いた `describe(outside_scope: true)` の外部の一覧に、other と並んで組み込みの配信元 project-index が出る'
     test: test_normal_when_outside_scope
   - name: 異常シナリオ（作業範囲の外の参照を断る配信元を指す）
     setup:
@@ -540,7 +541,7 @@ scenarios:
         M-->>A: エラー（読めない配信元）
         A->>M: describe(outside_scope: true)
         M->>M: outside_read が偽の other をエラーにせず、作業範囲の外の一覧から除外する
-        M-->>A: 作業範囲の外で参照できる配信元の一覧（other を含まない）
+        M-->>A: 作業範囲の外で参照できる配信元の一覧（other を含まず、組み込みの配信元 project-index を含む）
       ```
 
       <!-- /map -->
@@ -550,6 +551,7 @@ scenarios:
       - other の文書を返さない
       - '`source` を省いた `describe(outside_scope: true)` の作業範囲の外の一覧に other を載せない'
       - 要求のログに外から読んだ記録を残さない
+      - '`source` を省いた `describe(outside_scope: true)` の作業範囲の外の一覧に、組み込みの配信元 project-index は出る'
     test: test_error_when_outside_read_disabled
   - name: 正常シナリオ（ブランチとワークツリーを引く）
     setup:
@@ -1138,6 +1140,34 @@ scenarios:
       - '`describe(outside_scope: true)` の作業範囲の外の一覧に、組み込みの配信元を記載しない'
       - '`search_docs` が、端末の設定の行の配信元の手順のページを返却し、「作業範囲の外（参考）」の表示を付けない'
     test: test_normal_when_builtin_guide_registered
+  - name: 正常シナリオ（project-index を登録した端末で、ほかのプロジェクトから手順と基準を参照する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+      - name: 端末の設定
+        description: '`sources` に、クローンの `project-index.yaml` を `config` に持つ id `project-index` の行と sample の行がある端末の設定'
+        notes: project-index の行の `scope.read` はクローンのフォルダだけで、`outside_read` は書かない（既定 `true`）。`cwd` は sample のクローン本体
+      - name: project-index
+        description: その端末の設定で待ち受けている project-index
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（project-index を登録した端末で、ほかのプロジェクトから手順と基準を参照する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: search_docs(source: project-index, outside_scope: true, メタデータを付ける基準のページ, sections: 仮のメタデータのセクション)
+        M->>M: project-index の行の scope.read に cwd が該当せず、outside_read が真
+        M-->>A: 端末の設定の行の配信元のそのセクションの本文（作業範囲の外（参考））
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`search_docs` が、端末の設定の行の配信元の指定したセクションの本文を「作業範囲の外（参考）」の表示付きで返却する'
+      - '配信元が無い端末と同じ引数（`source: project-index`・`outside_scope: true`）で取得できる'
+      - 組み込みの配信元は加わらず、id `project-index` の配信元は 1 つだけ
+    test: test_normal_when_registered_guide_read_from_other_project
 lead: エージェントが文書の MCP で、作業場所から使用できる配信元の文書を探して参照するシナリオを定め、調査の流れを変えるときに参照する。
 tags:
   - name: topic:クエリ
