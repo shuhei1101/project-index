@@ -1,0 +1,213 @@
+id: SC-14
+title: エージェントが範囲のファイルを書き換える
+lead: エージェントが配信元のフォルダの下のファイルを書き換え・作成した後に、管理用の YAML・エイリアス・ルールの索引の修正の通知を受け取るシナリオを定め、書き込みの後の通知の流れを変えるときに参照する。
+primary_actor: エージェント（Claude Code）
+stakeholders:
+  - name: エージェント（Claude Code）
+    interest: 範囲のファイルを書き換えた・作った直後に、管理用の YAML の行を追加・修正するかを判断できる。同じファイルで通知が繰り返されず、他の文脈が埋もれない
+  - name: 利用者
+    interest: 行の無いファイルと、中身と合わないメタデータが配信元に残らない。alias-inject・rule-inject を入れていなくても、書き込みが止まらない
+trigger: エージェントが Write・Edit か MCP のツールで、配信元のフォルダの下のファイルを書き換える・作る
+preconditions:
+  - プラグイン `project-index` を入れ、project-index が端末の設定の配信元を配信している
+  - 書き換えるファイルが、端末の設定の `sources[]` のどれかの配信元のフォルダの下にある
+success_guarantee: 範囲のファイルを書き換えた・作った直後の文脈に、管理用の YAML の行の有無に合った通知が、ファイルごとにセッションで 1 回だけ入る。通知はメタデータを付ける基準を文書の MCP で取得する引数を持つ。
+minimal_guarantee: 通知の有無によらず、書き込みは止まらず、ツールの結果は変わらない。配信元を検索できないときは何も通知しない。
+frequency: 作業のたび（範囲のファイルを書き換えるたび）
+priority: 中
+scenarios:
+  - name: 正常シナリオ
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で実行する）
+      - name: サンプルの配信元
+        description: '範囲の Markdown 2 件と、そのうち 1 件（文書 1）の行だけを持つ管理用の YAML（`records: files` の `documents[]` の行）と、`project-index.yaml` を持つ git リポジトリと、そのワークツリー（`.claude/worktrees/x`）'
+        notes: id `sample`。`scope.write` にワークツリーが該当する。配信元の設定に `alias_type` を持つ行は無く、rule-inject の索引も無い
+      - name: project-index
+        description: sample を配信している project-index と、プラグイン `project-index` を入れた Claude Code の設定の場所
+    flow: |-
+      <!-- map: {"title": "正常シナリオ"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant WT as ワークツリー x
+        participant H as 書き込みの後のフック
+        participant S as project-index
+
+        A->>WT: Edit で文書 1 を書き換える
+        WT-->>A: 書き換えの結果
+        H->>S: 書き込んだパスを含む配信元のフォルダを検索する
+        S-->>H: sample のフォルダ
+        H->>H: 文書 1 は管理用の YAML に行があり、このセッションで未通知
+        H-->>A: 行のメタデータを中身に合わせる修正の通知（文脈に追加）
+        A->>WT: Edit で文書 1 をもう一度書き換える
+        H->>H: このセッションで通知済み
+        H-->>A: 出力なし
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目の Edit の直後の文脈に、文書 1 の行の名前・概要文・タグ・関連が中身と合わなくなったときだけ修正する旨と、メタデータを付ける基準を `search_docs` で取得する引数を持つ通知が 1 回入る
+      - 2 回目の Edit の直後の文脈には通知が入らない
+      - 通知にエイリアスとルールの索引の行が無い
+      - 2 回の Edit の結果は、フックが無いときと同じで、文書 1 は書き換えた内容になっている
+    test: test_normal
+  - name: 正常シナリオ（行の無いファイルを作った）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: サンプルの配信元
+        description: 正常シナリオと同じ sample
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（行の無いファイルを作った）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant WT as ワークツリー x
+        participant H as 書き込みの後のフック
+
+        A->>WT: Write で範囲に新規の Markdown を作る
+        H->>H: 管理用の YAML に行が無い
+        H-->>A: 管理用の YAML に行を追加する通知（文脈に追加）
+      ```
+
+      <!-- /map -->
+    expected:
+      - Write の直後の文脈に、作ったファイルの行を管理用の YAML に追加する旨と、メタデータを付ける基準を `search_docs` で取得する引数を持つ通知が 1 回入る
+      - 行の無い既存の文書 2 を Edit で書き換えた直後も、行を追加する通知が 1 回入る
+    test: test_normal_when_file_has_no_row
+  - name: 正常シナリオ（エイリアスとルールの索引を持つ配信元）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: サンプルの配信元
+        description: 正常シナリオの sample に、`alias_type` を持つ用語の行と、配信元のフォルダの rule-inject の索引を加えたもの
+      - name: Claude Code の設定の場所
+        description: alias-inject・rule-inject のプラグインを入れない
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（エイリアスとルールの索引を持つ配信元）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant WT as ワークツリー x
+        participant H as 書き込みの後のフック
+
+        A->>WT: Edit で文書 1 を書き換える
+        H->>H: 配信元の設定に alias_type の行があり、配信元のフォルダに rule-inject の索引がある
+        H-->>A: 行の修正の通知に、エイリアスの 1 行とルールの索引の 1 行を加えたもの
+      ```
+
+      <!-- /map -->
+    expected:
+      - 通知に、新規の用語・別名が増えたら `alias_type` の行の文書に追加する旨の 1 行と、書き換えたファイルに適用するルールが増える・変わるなら索引のエントリを修正する旨の 1 行がある
+      - alias-inject・rule-inject のプラグインが無くても、通知が入り、書き込みは止まらない
+    test: test_normal_when_source_has_aliases_and_rule_index
+  - name: 正常シナリオ（MCP のツールで書き込んだ）
+    setup:
+      - name: Mock
+        description: ファイルを書き込むテスト用の MCP サーバー（引数 `path` のファイルに引数 `content` を書き込むツールを 1 つ持つ）
+      - name: サンプルの配信元
+        description: 正常シナリオと同じ sample
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（MCP のツールで書き込んだ）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant T as テスト用の MCP サーバー
+        participant H as 書き込みの後のフック
+
+        A->>T: 書き込みのツール(path: 文書 1 の絶対パス)
+        T-->>A: 書き込みの結果
+        H->>H: 引数の文字列の値に、配信元のフォルダの下のパスがある
+        H-->>A: 行のメタデータを中身に合わせる修正の通知（文脈に追加）
+      ```
+
+      <!-- /map -->
+    expected:
+      - テスト用の MCP サーバーのツールの直後の文脈に、文書 1 の行の修正の通知が 1 回入る
+    test: test_normal_when_written_by_mcp_tool
+  - name: 正常シナリオ（通知しないファイル）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: サンプルの配信元
+        description: 正常シナリオと同じ sample と、`documents[].paths` に該当しないフォルダ `tmp/`
+      - name: 配信元以外のフォルダ
+        description: どの配信元のフォルダの下にも無いテスト用の一時フォルダ
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（通知しないファイル）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant WT as ワークツリー x
+        participant M as 文書の MCP（/mcp）
+        participant H as 書き込みの後のフック
+
+        A->>WT: Edit で管理用の YAML・project-index.yaml を書き換える
+        H-->>A: 出力なし
+        A->>M: write_docs で文書を書き換える
+        H-->>A: 出力なし
+        A->>WT: Write で tmp/ と配信元以外のフォルダにファイルを作る
+        H-->>A: 出力なし
+      ```
+
+      <!-- /map -->
+    expected:
+      - 管理用の YAML・`project-index.yaml`・`write_docs`・`delete_docs`・`documents[].paths` に該当しないファイル・配信元以外のファイルの書き込みの後の文脈に、通知が入らない
+      - どの書き込みも止まらない
+    test: test_normal_when_file_not_notified
+  - name: 異常シナリオ（配信元を検索できない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: project-index
+        description: 止めた状態（待ち受けていない）
+      - name: サンプルの配信元
+        description: 正常シナリオと同じ sample
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（配信元を検索できない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant WT as ワークツリー x
+        participant H as 書き込みの後のフック
+
+        A->>WT: Edit で文書 1 を書き換える
+        H->>H: 配信元のフォルダを検索できない
+        H-->>A: 出力なし（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - Edit の直後の文脈に通知もエラーも入らない
+      - 文書 1 は書き換えた内容になっている
+      - project-index を起動した後に、別のファイルを書き換えると通知が入る
+    test: test_error_when_source_not_found
+refs:
+  - to: SC-1
+    item: scenarios[正常シナリオ]
+    type: part_of
+    when: このシナリオの前後の流れを、複合ユースケースの中で確認するときに参照する。
+  - to: SC-7
+    item: scenarios[正常シナリオ]
+    type: references
+    when: '`write_docs` を通知の対象から除外する理由を、書き込みのシナリオの管理用の YAML の扱いと突き合わせるときに参照する。'
+  - to: SC-5
+    item: scenarios[正常シナリオ]
+    type: references
+    when: 通知で捕捉しない作成・削除・改名を、配信元の登録の突き合わせが検出するかを確認するときに参照する。
+test_file: tests/e2e/単一ユースケース/test_エージェントが範囲のファイルを書き換える.py
+visibility: internal
+tags:
+  - name: topic:フック
+    main: true
+  - name: topic:メタデータ
+  - name: topic:エイリアス
+  - name: topic:通知
+  - name: tool:claude-code

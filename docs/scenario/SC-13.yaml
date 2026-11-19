@@ -1,0 +1,234 @@
+id: SC-13
+title: 会話の指摘を登録する
+lead: 利用者が会話の後にスキルを実行し、その会話で AI に伝えた指摘を、ルール・エイリアス・文書として登録するシナリオを定め、指摘の登録の流れを変えるときに参照する。
+primary_actor: 利用者
+stakeholders:
+  - name: 利用者
+    interest: 会話で伝えた指摘を、次の会話で繰り返さずに済む。置き場所と有効にする範囲を最初に 1 回だけ回答し、指摘ごとの案と登録先を選ぶだけで登録できる。CLAUDE.md と Claude Code の記憶は変わらない
+  - name: エージェント（Claude Code）
+    interest: 登録した指摘を、次の会話で rule-inject の案内・alias-inject の用語・文書の MCP の `search_docs` から参照できる
+trigger: 利用者が会話の後に `/project-index:feedback` を実行する
+preconditions:
+  - プラグイン `project-index` を入れ、project-index が起動している
+  - 今の会話の文脈に、利用者が AI に伝えた指摘が残っている
+success_guarantee: 選んだ登録先に、指摘を他の場面にも適用できる内容に抽象化したルール・用語・文書が登録され、次の会話で参照できる。登録先の設定が無かったときは、置き場所に作られて端末の設定に登録されている。
+minimal_guarantee: 利用者が選ばなかった登録先と、CLAUDE.md・Claude Code の記憶は変わらない。入っていない rule-inject・alias-inject は選択肢に出ず、その設定は作られない。
+frequency: 話し合いの後に利用者が実行するとき
+priority: 中
+scenarios:
+  - name: 正常シナリオ
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。Claude Code は `claude -p` で実行し、選択肢への回答は `--resume` で同じセッションへ送信する）
+      - name: Claude Code の設定の場所
+        description: '`CLAUDE_CONFIG_DIR` が指すテスト用の一時フォルダ。プラグイン `project-index`・`rule-inject`・`alias-inject` を入れる'
+        notes: '`RULE_INJECT_CONFIG`・`ALIAS_INJECT_CONFIG` はテスト用の一時フォルダの中の無いファイルへ向ける'
+      - name: 指摘の置き場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: 置き場所の確認にこのパスを回答する
+      - name: 会話
+        description: 利用者が、守ってほしいこと 1 件・単語の意味 1 件・判断の理由 1 件を AI に伝えた会話
+        notes: スキルはこの会話を `--resume` で続けて実行する
+    flow: |-
+      <!-- map: {"title": "正常シナリオ"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant A as エージェント（スキル）
+        participant M as 文書の MCP（/mcp）
+        participant F as 指摘の置き場所
+        participant C as 端末の設定
+
+        U->>A: /project-index:feedback を実行する
+        A->>M: search_docs で指摘を登録する手順のページを取得する
+        A->>A: 今の文脈から利用者の指摘を 3 件検出する
+        A->>U: 置き場所・Git の管理・有効にする範囲を 1 回だけ確認する
+        U->>A: 一時フォルダ・管理外・sample のフォルダ
+        loop 指摘ごと
+          A->>M: 近い既存のルール・用語・文書を検索する
+          A->>U: 抽象化した案と登録先（rule-inject・alias-inject・project-index・登録しない）を確認する
+          U->>A: 登録先を選ぶ
+        end
+        A->>F: 登録先の設定が無いので雛形から作り、ルール・用語・文書を書き込む
+        A->>C: project-index・rule-inject・alias-inject の端末の設定に置き場所を登録する
+        A-->>U: 登録した内容と登録先の一覧
+      ```
+
+      <!-- /map -->
+    expected:
+      - 置き場所・Git の管理・有効にする範囲の確認が 1 回だけ出る
+      - 指摘 3 件のそれぞれに、会話の具体的な話から他の場面にも適用できる内容へ抽象化した案と、登録先の選択肢（rule-inject・alias-inject・project-index・登録しない）が出る
+      - 指摘の置き場所に、配信元の設定・rule-inject の索引とルールの本文・用語の YAML・文書が作られ、選んだ登録先の分だけ中身がある
+      - project-index・rule-inject・alias-inject の端末の設定に、指摘の置き場所を指す行が増える
+      - 次のセッションで、登録したルールが該当するファイルを触ると rule-inject が案内し、登録した用語を含む入力に alias-inject が用語を追加し、登録した文書を `search_docs` が返却する
+      - Claude Code の設定の場所の `CLAUDE.md` と記憶のフォルダは変わらない
+    test: test_normal
+  - name: 正常シナリオ（近い既存の登録がある）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 指摘の置き場所
+        description: 正常シナリオで登録した後の置き場所
+      - name: 会話
+        description: 正常シナリオで登録したルールと同じ趣旨の指摘を 1 件伝えた会話
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（近い既存の登録がある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant A as エージェント（スキル）
+        participant F as 指摘の置き場所
+
+        U->>A: /project-index:feedback を実行する
+        A->>A: 近い既存のルールを見つける
+        A->>U: 追加ではなく既存のルールの書き換えの案を確認する
+        U->>A: 書き換えを選ぶ
+        A->>F: 既存のルールを書き換える
+        A-->>U: 書き換えた内容
+      ```
+
+      <!-- /map -->
+    expected:
+      - 案が、新規の追加ではなく既存のルールの書き換えとして、書き換える前と後の内容とともに出る
+      - 索引のエントリの数は変わらず、既存のルールの本文が書き換わる
+    test: test_normal_when_similar_entry_exists
+  - name: 正常シナリオ（rule-inject・alias-inject が無い）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: Claude Code の設定の場所
+        description: プラグイン `project-index` だけを入れる
+        notes: '`RULE_INJECT_CONFIG`・`ALIAS_INJECT_CONFIG` はテスト用の一時フォルダの中の無いファイルへ向ける'
+      - name: 会話
+        description: 正常シナリオと同じ指摘を 3 件伝えた会話
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（rule-inject・alias-inject が無い）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant A as エージェント（スキル）
+        participant F as 指摘の置き場所
+
+        U->>A: /project-index:feedback を実行する
+        A->>A: rule-inject・alias-inject のプラグインと端末の設定のファイルが無い
+        A->>U: 指摘ごとの登録先を project-index と登録しないだけで確認する
+        U->>A: project-index を選ぶ
+        A->>F: 配信元の設定と文書を書き込む
+      ```
+
+      <!-- /map -->
+    expected:
+      - 登録先の選択肢が project-index と登録しないだけ
+      - 指摘の置き場所に rule-inject の索引と用語の YAML が作られず、rule-inject・alias-inject の端末の設定のファイルも作られない
+      - 登録した文書を次のセッションの `search_docs` が返却する
+    test: test_normal_when_rule_and_alias_inject_absent
+  - name: 正常シナリオ（1 件だけ置き場所を変える）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 別の置き場所
+        description: テスト用の一時フォルダの中の、指摘の置き場所とは別の空のフォルダ
+      - name: 会話
+        description: 正常シナリオと同じ指摘を 3 件伝えた会話
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（1 件だけ置き場所を変える）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant A as エージェント（スキル）
+        participant F as 指摘の置き場所
+        participant G as 別の置き場所
+
+        U->>A: /project-index:feedback を実行する
+        A->>U: 2 件目の案と登録先を確認する
+        U->>A: 自由記述で、2 件目だけ別の置き場所へ登録するよう指定する
+        A->>G: 2 件目を書き込む
+        A->>F: 1 件目と 3 件目を書き込む
+      ```
+
+      <!-- /map -->
+    expected:
+      - 2 件目だけが別の置き場所に登録され、1 件目と 3 件目は最初に回答した置き場所に登録される
+      - 別の置き場所も端末の設定に登録される
+    test: test_normal_when_one_item_placed_elsewhere
+  - name: 異常シナリオ（指摘が無い）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: 会話
+        description: 利用者が AI に指摘を伝えていない会話
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（指摘が無い）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant A as エージェント（スキル）
+
+        U->>A: /project-index:feedback を実行する
+        A->>A: 今の文脈に利用者の指摘が無い
+        A-->>U: 登録する指摘が無いことを伝えて止まる
+      ```
+
+      <!-- /map -->
+    expected:
+      - 登録する指摘が無いことが出て、置き場所の確認は出ない
+      - 指摘の置き場所と端末の設定は変わらない
+    test: test_error_when_no_feedback
+  - name: 異常シナリオ（文書の MCP につながらない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: project-index
+        description: 止めた状態（待ち受けていない）
+      - name: 会話
+        description: 正常シナリオと同じ指摘を 3 件伝えた会話
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（文書の MCP につながらない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant A as エージェント（スキル）
+        participant M as 文書の MCP（/mcp）
+
+        U->>A: /project-index:feedback を実行する
+        A->>M: search_docs で手順のページを取得する
+        M-->>A: 接続の失敗
+        A-->>U: /project-index:global-setup を案内して止まる
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`/project-index:global-setup` の案内が出て、置き場所の確認は出ない'
+      - 指摘の置き場所と端末の設定は変わらない
+    test: test_error_when_docs_mcp_unreachable
+refs:
+  - to: SC-1
+    item: scenarios[正常シナリオ]
+    type: part_of
+    when: このシナリオの前後の流れを、複合ユースケースの中で確認するときに参照する。
+  - to: SC-5
+    item: scenarios[正常シナリオ]
+    type: references
+    when: 置き場所を配信元として端末の設定に登録する流れを、配信元の登録のシナリオと突き合わせるときに参照する。
+  - to: SC-12
+    item: scenarios[正常シナリオ]
+    type: references
+    when: 端末の設定の配信元の行を追加する手段を、端末の設定の配信元の変更のシナリオと突き合わせるときに参照する。
+notes:
+  既定の置き場所: 置き場所の確認の既定値は `~/.local/share/feedback/`（Git の管理外）にする。
+test_file: tests/e2e/単一ユースケース/test_会話の指摘を登録する.py
+visibility: internal
+tags:
+  - name: topic:プラグイン
+    main: true
+  - name: topic:エイリアス
+  - name: topic:セットアップ
+  - name: topic:配信元
+  - name: tool:claude-code
+  - name: tool:alias-inject
