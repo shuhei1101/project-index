@@ -30,6 +30,7 @@ flows:
           T-->>CF: config を上から順に読んでマージする
           T->>T: スキーマとスクリプトを検証し、配信元に加える
         end
+        T->>T: sources に id project-index の行が無いので、組み込みの配信元を加える
         T-->>U: 配信元を標準出力に出す
         T->>T: 配信元ごとの検査の警告をログに書く
       ```
@@ -40,7 +41,7 @@ flows:
       - '`/sources/sample/docs` と `/sources/notes/docs` が 200 を返す'
       - '`/mcp` のツールが `search_docs`・`write_docs`・`delete_docs`・`describe`・`list_changes`・`trace_related` の 6 つ'
       - '`/_admin/mcp` に MCP のセッションを張れる'
-      - 標準出力に待ち受けたアドレスと sample・notes が出る
+      - 標準出力に待ち受けたアドレスと sample・notes、組み込みの配信元 `project-index（組み込み）` が出る
     test: test_normal
   - name: 正常系（設定の YAML を重ねる）
     summary: '`config` の複数の YAML を上から順にマージする'
@@ -1014,6 +1015,95 @@ flows:
       - 'slow の合図の前に、`source: sample` の `search_docs` が sample の文書を返却する'
       - 'slow の合図の前の `status` が `loading: true` を返却し、合図の後に全ての行を読み込んだ `status` が `loading: false` で slow と sample を `serving` で返却する'
     test: test_normal_when_slow_source_not_blocking
+  - name: 正常系（組み込みの配信元を加える）
+    summary: 端末の設定に id `project-index` の行が無いとき、クローンの `docs/guide/` を読み取りだけの組み込みの配信元として文書の MCP に加える
+    setup:
+      - name: Mock
+        description: なし（`project-index serve` を子プロセスで起動し、空きポートを `PROJECT_INDEX_PORT` に入れる）
+      - name: 端末の設定
+        description: '`sources: []`。`clone` は、`project-index.yaml` に `docs/guide/files.yml` を `paths` に持つ `files_guide` の行と、`templates/files.schema.yaml` を持つクローンのコピー'
+        notes: '`files_guide` の行の `schema` は knowledge の配信元を指す（knowledge は配信していない）'
+    flow: |-
+      <!-- map: {"title": "正常系（組み込みの配信元を加える）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant U as クライアント
+        participant T as project-index serve
+        participant CL as クローン
+
+        U->>T: project-index serve
+        T->>T: 端末の設定を検証し、127.0.0.1 で待ち受ける
+        T->>T: sources に id project-index の行が無いことを確認する
+        T-->>CL: clone の project-index.yaml から files_guide の行を読み込む
+        T->>T: 行の schema を clone の templates/files.schema.yaml に差し替え、組み込みの配信元として加える
+        T-->>U: 待ち受けたアドレスと project-index（組み込み）を標準出力に出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - 標準出力に `project-index（組み込み）` が出る
+      - '文書の MCP の `search_docs(source: project-index, outside_scope: true)` が `docs/guide/files.yml` の行の文書を返却し、クローンのほかの行（設計書・ソースコード）の文書は返却しない'
+      - knowledge の配信元が無くても、組み込みの配信元の文書がスキーマの違反なしで返却される
+      - 読み取り API の `/sources` の一覧に組み込みの配信元を含めない
+      - 端末の設定のファイルとクローンのファイルは変わらない
+    test: test_normal_when_builtin_source_added
+  - name: 正常系（project-index の行がある）
+    summary: 端末の設定に id `project-index` の行があるときは、組み込みの配信元を加えない
+    setup:
+      - name: Mock
+        description: なし（`project-index serve` を子プロセスで起動する）
+      - name: 端末の設定
+        description: '`sources` に、クローンのコピーの `project-index.yaml` を `config` に持つ id `project-index` の 1 行'
+    flow: |-
+      <!-- map: {"title": "正常系（project-index の行がある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant U as クライアント
+        participant T as project-index serve
+
+        U->>T: project-index serve
+        T->>T: sources の project-index の行を配信元に加える
+        T->>T: id project-index の行があるので、組み込みの配信元を加えない
+        T-->>U: 待ち受けたアドレスと project-index を標準出力に出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - 標準出力に `project-index` が 1 つだけ出て、`project-index（組み込み）` は出ない
+      - 文書の MCP の `project-index` は端末の設定の行の `scope` と全ての `documents` の行で配信する
+    test: test_normal_when_builtin_source_registered
+  - name: 正常系（組み込みの配信元を加えられない）
+    summary: クローンに `project-index.yaml` か `files_guide` の行が無いときは、警告をログに書いて組み込みの配信元を加えずに起動を続ける
+    setup:
+      - name: Mock
+        description: なし（`project-index serve` を子プロセスで起動する）
+      - name: 端末の設定
+        description: '`sources` に sample の 1 行。`clone` は `project-index.yaml` を持たないフォルダ'
+    flow: |-
+      <!-- map: {"title": "正常系（組み込みの配信元を加えられない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant U as クライアント
+        participant T as project-index serve
+        participant CL as クローン
+
+        U->>T: project-index serve
+        T->>T: sample を配信元に加える
+        T-->>CL: clone の project-index.yaml を読み込む
+        CL-->>T: ファイルが無い
+        T->>T: 組み込みの配信元を加えない理由を警告のログに書く
+        T-->>U: 待ち受けたアドレスと sample を標準出力に出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - 起動は止まらず、sample の配信が続く
+      - 警告のログに、組み込みの配信元を加えなかったことと、参照できなかった `clone` のパスが出る
+      - '`search_docs(source: project-index, outside_scope: true)` は、配信していない配信元と同じエラーを返却する'
+    test: test_normal_when_builtin_source_unavailable
 lead: 端末の設定を読み、検証に合格した配信元を 1 プロセス・1 ポートで配信する `project-index serve` の入出力を定め、起動を修正するときに参照する。
 tags:
   - name: topic:サーバー
@@ -1174,6 +1264,9 @@ constraints:
   - item: スキーマの読み込みの使い回し
     constraint: 配信元の行の読み込みは、ほかの配信元のスキーマの参照を読み込んだ結果を、参照先のリビジョンを commit に解いた後の、参照先の配信元・commit・パスの組ごとに、JSON Schema として正しいかの検査の結果をスキーマの内容のハッシュごとに、行と組み立て直しをまたいで使い回す。参照先のブランチが進むと解いた commit が変わるため、組み立て直しは進んだ後のスキーマを読み込む
     notes: 多くの配信元が knowledge の同じスキーマを参照するため、行の読み込みの CPU の大半（スキーマの読み込みと `check_schema`）を省ける
+  - item: 組み込みの配信元
+    constraint: '`sources[]` に id `project-index` の行が無いときだけ、`clone` の `project-index.yaml` の `files_guide` の行を id `project-index` の配信元として文書の MCP に加える。読み書きは `disk`、`scope.read`・`scope.write` は空、`outside_read` は `true`、行の `schema` は `clone` の `templates/files.schema.yaml` に差し替える。読み取り API・管理の MCP の配信元の一覧には含めない。`reload` で端末の設定を読み直したときも同じ判定をする'
+    notes: knowledge の配信元を登録していない端末でもスキーマを解決できるように、クローンが持つスキーマに差し替える。`scope` が空のため常に作業範囲の外（参考）として参照し、書き込みは読み取りだけの配信元と同じエラーになる
 refs:
   - to: SC-4
     item: scenarios[正常シナリオ]

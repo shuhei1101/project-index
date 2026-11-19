@@ -1112,6 +1112,36 @@ flows:
       - '`notes` に `notes/index.yaml` の本文のファイルが無い要素の知らせが、件数 2 と先頭の要素（`items[3]`）の詳細を持つ 1 行だけある'
       - '`isError` ではない'
     test: test_normal_when_body_file_absent
+  - name: 正常系（組み込みの配信元を参考に読む）
+    summary: '組み込みの配信元の手順のページを、`outside_scope: true` と `sections` で一部のセクションだけ返却する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 配信元
+        description: '`sources: []` で加わった組み込みの配信元 `project-index`（クローンのコピーの `docs/guide/` に、`## 仮のメタデータ` のセクションを持つ基準のページ）'
+      - name: 入力
+        description: '`source: project-index`, `outside_scope: true`, `filter: id eq 基準のページ`, `view: full`, `sections: [仮のメタデータ]`。`cwd` はどの配信元にも該当しないフォルダ'
+    flow: |-
+      <!-- map: {"title": "正常系（組み込みの配信元を参考に読む）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+        participant ST as クローンの docs/guide/
+
+        C->>T: source: project-index, outside_scope: true, sections: [仮のメタデータ]
+        T->>T: scope が空で cwd が該当せず、outside_read が真
+        T-->>ST: ページを参照する
+        T-->>C: 作業範囲の外（参考）、そのセクションの本文
+      ```
+
+      <!-- /map -->
+    expected:
+      - 先頭の行に「作業範囲の外（参考）」があり、`## 仮のメタデータ` のセクションの本文だけを返却する
+      - '`outside_scope` を省くと、異常系（読めない配信元・SourceNotReadableError）と同じエラーで、`fix` が `outside_scope: true` を案内する'
+      - '`source: *` に `outside_scope: true` を渡しても、組み込みの配信元の文書を返却しない'
+    test: test_normal_when_builtin_source_read
 lead: '条件に該当する文書の取得・一覧・件数・集計を返却する `search_docs` の入出力を定め、`search_docs` を修正するときに参照する。'
 tags:
   - name: topic:クエリ
