@@ -162,5 +162,7 @@
 | [索引のサーバー / 書き込みの後の通知 / service.py](./MOD-175.py.yaml) | 書き込んだパスの配信元・管理用の YAML の範囲と行の有無の判定と、通知の文面。 |
 | [索引のサーバー / 書き込みの後の通知 / route.py](./MOD-176.py.yaml) | `POST /_admin/post-write` のルート。 |
 | [プラグイン / ツール実行後のフック / post_tool_use.py](./MOD-177.py.yaml) | PostToolUse のフック。書き込んだパスを集めて `POST /_admin/post-write` に問い合わせ、返った文面を `additionalContext` で返す。 |
+| [索引のサーバー / 書き込み / direct_commit.py](./MOD-178.py.yaml) | 直コミットの書き込む先の決定と、取得・確認・コミット・プッシュ・照合・戻し。 |
+| [索引のサーバー / 書き込み / secrets.py](./MOD-179.py.yaml) | 直コミットで書き込む値の秘密の値の照合。 |
 
 <!-- /table -->
