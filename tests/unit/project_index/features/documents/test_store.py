@@ -2010,9 +2010,10 @@ def test_document_store_load_when_revision_load_files_given(
     first_result = document_store.load(target)
     # 実行
     second_result = document_store.load(target, files=["rules/a.yaml"])
+    third_result = document_store.load(target)
     # 検証
-    assert [document.id for document in second_result.documents] == ["a"]
     assert second_result is not first_result
+    assert third_result is first_result
 
 
 def _page_source(
