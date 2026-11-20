@@ -1,0 +1,48 @@
+use_cases:
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: run_only
+    detail: 全体の流れは変わらないが、配信を続ける仕組みを変えるため壊しうる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: changed
+    detail: 稼働中に要求と裏の処理の待ち・処理の時間を記録し続け、何時間稼働しても応答の上限の内に応答する
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-3.yaml
+    impact: changed
+    detail: 文書の MCP が詰まっている間も、管理の MCP で状態を確かめて起動し直せる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: run_only
+    detail: 調べる流れは変わらないが、時間切れになった呼び出しの扱いを変えるため壊しうる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: run_only
+    detail: 書き込む流れは変わらないが、時間切れになった呼び出しの扱いを変えるため壊しうる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: run_only
+    detail: 画面のサーバーの読み取りも同じ実行の仕組みを通るため壊しうる
+    depends_on: []
+docs:
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: 文書の MCP が詰まっている間も status・restart が応答することと、劣化したときの起動し直し方
+    status: todo
+  - page: docs/guide/設定.md
+    new: false
+    change: 実行スロットの数・保持の上限・記録の間隔など、端末の設定に追加するキー（追加した場合）
+    status: todo
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: 稼働中の記録の場所と、劣化を追うときに参照する項目
+    status: todo
+scope_out:
+  - item: Claude Code が時間切れの後に取り消しの通知を送信しないこと
+    reason: Claude Code の側の振る舞いで、このリポジトリで変えられない。サーバーの側で接続が切れた要求を扱う
+    plan: none
