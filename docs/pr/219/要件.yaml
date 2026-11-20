@@ -7,12 +7,10 @@ use_cases:
 docs:
   - page: docs/guide/文書のMCP.md
     new: false
-    change: search_docs の filter・order_by・group_by・fields に、スキーマの配列の中のオブジェクトのキー（`uses[].id`）を項目として渡せることと、値の比べ方（要素ごとの完全一致・要素ごとの集計）を追記する
-    status: todo
-  - page: docs/guide/変更履歴.md
-    new: false
-    change: 次のバージョンの変更として、search_docs で配列の中のオブジェクトのキーで絞り・集計できるようになったことを追記する
-    status: todo
+    change: search_docs の条件の `field` に、配列の中のオブジェクトのキー（`uses[].id`）を指定できることと、要素ごとに比べて数えることを追記する（`order_by`・`group_by`・`list_changes`・`replace_text` の `filter` はこの条件を参照する）
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T09:24:17.577342+00:00'
 scope_out:
   - item: write_docs の項目のパス（set・add_to・remove_from・unset）での `[]` の扱いの変更
     reason: 要望は検索の絞り込みと集計で、書き込みは含まれない

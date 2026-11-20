@@ -167,7 +167,7 @@ Condition = {"field": str, "op": enum, "values": [str, ...], "match": "any" | "a
 | --- | --- |
 | 入れ子 | 深さの制限は無い |
 | `not` | 中の条件か束に当たらない文書に当たる。`and`・`or` の中にも置ける。束は `and`・`or`・`not` のどれか 1 つのキーだけを持つ。`not` の中の `body`・`*` の条件は、`@matches` と抜粋の判定に使わない |
-| `field` | メタデータのキー（`id`・`kind`・`name`・`tags`・`main_tags`・`updated` など）、種類ごとの項目、`body`（本文）、`*`（全項目）、計算項目（`@chars` 文字数・`@path` ファイルのパス・`@sections` セクションの一覧）。`@matches` は `fields`・`order_by` でだけ使え、条件には使えない |
+| `field` | メタデータのキー（`id`・`kind`・`name`・`tags`・`main_tags`・`updated` など）、種類ごとの項目（オブジェクトの中のキーは `category.id`、配列の中のオブジェクトのキーは `uses[].id`。`uses[].id` は要素ごとの値で比べ、`group_by` でも要素ごとに数える）、`body`（本文）、`*`（全項目）、計算項目（`@chars` 文字数・`@path` ファイルのパス・`@sections` セクションの一覧）。`@matches` は `fields`・`order_by` でだけ使え、条件には使えない |
 | `op` | `eq`・`ne`・`prefix`・`suffix`・`contains`・`not_contains`・`regex`・`glob`・`gt`・`gte`・`lt`・`lte`・`exists`・`not_exists`。`regex` は値の各行に当たる（`^`・`$` は各行の先頭・末尾。値全体の先頭・末尾は `\A`・`\Z`）。パターンには正規化をかけず、`case_sensitive: false` は `re.IGNORECASE` と NFKC にした値で比べる。`glob` は値全体に当て、`**` は `/` をまたぎ、`*`・`?` は `/` をまたがない。`@path` を含む文字列の項目で使える |
 | `values` | 文字列の配列。数値・日付は項目の型で解釈し、日付は `today`・`-7d` も受ける。`exists`・`not_exists` だけ省ける |
 | `match` | `values` の複数を OR（`any`、既定）か AND（`all`）で比べる |
