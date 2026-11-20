@@ -73,6 +73,8 @@ class SourcePatch(BaseModel):
     scope: SourceScope | None = None
     outside_read: bool | None = None
     storage: SourceStorage | None = None
+    # scope・kinds を、SourceDirectCommit の model_fields_set で別々に重ねる
+    direct_commit: SourceDirectCommit | None = None
 
     @field_validator("config", mode="before")
     @classmethod
@@ -260,6 +262,10 @@ class SettingsSourceRow(ApiModel):
     outside_read: bool
     # 書いていない行は JSON にキーを出さない
     storage: SourceStorage | None = Field(default=None, exclude_if=lambda value: value is None)
+    # scope・kinds がどちらも空の行は None にし、JSON にキーを出さない
+    direct_commit: SourceDirectCommit | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
 
 class SettingsSourcesView(ApiModel):

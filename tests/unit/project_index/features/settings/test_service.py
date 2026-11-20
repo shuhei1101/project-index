@@ -943,3 +943,178 @@ def test_add_source_when_indent_preserved(
     assert path.read_text(encoding="utf-8") == (
         INDENTLESS_TEXT + "- id: extra\n  config:\n  - /tmp/b/project-index.yaml\n"
     )
+
+
+DIRECT_COMMIT_TEXT = (
+    'version: "1"\n'
+    "clone: /tmp/clone\n"
+    "sources:\n"
+    "  - id: sample\n"
+    "    config: [/tmp/sample/project-index.yaml]\n"
+    "  - id: extra\n"
+    "    config: [/tmp/extra/project-index.yaml]\n"
+    "    direct_commit:\n"
+    "      scope: [/tmp/work/**]\n"
+    "      kinds:\n"
+    "        note: [/tmp/note/**]\n"
+)
+
+
+def test_save_sources_when_unsent_direct_commit(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """送らなかった direct_commit のキーをファイルの同じ配信元の行の値で埋める（正常系）。"""
+    # 準備
+    reload, _ = fake_reload
+    path = tmp_path / "settings.yaml"
+    path.write_text(DIRECT_COMMIT_TEXT, encoding="utf-8")
+    sent = [
+        SourceEntry.model_validate({"id": "sample", "config": "/tmp/sample/project-index.yaml"}),
+        SourceEntry.model_validate(
+            {
+                "id": "extra",
+                "config": "/tmp/extra/project-index.yaml",
+                "direct_commit": {"scope": ["/tmp/other/**"]},
+            }
+        ),
+    ]
+    # 実行
+    save_sources(
+        sent,
+        expected_version=read_settings_file(path)[1],
+        path=path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
+    # 検証
+    rows = load_yaml(path.read_text(encoding="utf-8"))["sources"]
+    assert "direct_commit" not in rows[0]
+    assert rows[1]["direct_commit"] == {
+        "scope": ["/tmp/other/**"],
+        "kinds": {"note": ["/tmp/note/**"]},
+    }
+
+
+def test_save_sources_when_direct_commit_partial(
+    settings_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """direct_commit の既定値のキーを書かない（正常系）。"""
+    # 準備
+    reload, _ = fake_reload
+    sent = [
+        SourceEntry.model_validate(
+            {
+                "id": "a",
+                "config": "/tmp/a/project-index.yaml",
+                "direct_commit": {"scope": ["/tmp/work/**"], "kinds": {}},
+            }
+        ),
+        SourceEntry.model_validate(
+            {
+                "id": "b",
+                "config": "/tmp/b/project-index.yaml",
+                "direct_commit": {"scope": [], "kinds": {}},
+            }
+        ),
+    ]
+    # 実行
+    save_sources(
+        sent,
+        expected_version=read_settings_file(settings_path)[1],
+        path=settings_path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
+    # 検証
+    rows = load_yaml(settings_path.read_text(encoding="utf-8"))["sources"]
+    assert rows[0]["direct_commit"] == {"scope": ["/tmp/work/**"]}
+    assert "direct_commit" not in rows[1]
+
+
+def test_add_source_when_direct_commit(
+    settings_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """direct_commit を持つ行を追加し、同じ id の比較にも含める（正常系）。"""
+    # 準備
+    reload, _ = fake_reload
+    entry = SourceEntry.model_validate(
+        {
+            "id": "extra",
+            "config": "/tmp/extra/project-index.yaml",
+            "direct_commit": {"scope": ["/tmp/work/**"]},
+        }
+    )
+    other = SourceEntry.model_validate(
+        {
+            "id": "extra",
+            "config": "/tmp/extra/project-index.yaml",
+            "direct_commit": {"scope": ["/tmp/other/**"]},
+        }
+    )
+    # 実行
+    added = add_source(
+        entry,
+        expected_version=read_settings_file(settings_path)[1],
+        path=settings_path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
+    same = add_source(
+        entry,
+        expected_version=read_settings_file(settings_path)[1],
+        path=settings_path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
+    different = add_source(
+        other,
+        expected_version=read_settings_file(settings_path)[1],
+        path=settings_path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
+    # 検証
+    row = load_yaml(settings_path.read_text(encoding="utf-8"))["sources"][1]
+    assert added.result == "added"
+    assert row["direct_commit"] == {"scope": ["/tmp/work/**"]}
+    assert (same.result, same.same) == ("exists", True)
+    assert (different.result, different.same) == ("exists", False)
+
+
+def test_patch_source_when_direct_commit_kinds(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """direct_commit の送ったキーだけを重ねる（正常系）。"""
+    # 準備
+    reload, _ = fake_reload
+    path = tmp_path / "settings.yaml"
+    path.write_text(
+        'version: "1"\n'
+        "clone: /tmp/clone\n"
+        "sources:\n"
+        "  - id: extra\n"
+        "    config: [/tmp/extra/project-index.yaml]\n"
+        "    direct_commit:\n"
+        "      scope: [/tmp/work/**]\n",
+        encoding="utf-8",
+    )
+    patch = SourcePatch.model_validate({"direct_commit": {"kinds": {"note": ["/tmp/note/**"]}}})
+    # 実行
+    patch_source(
+        "extra",
+        patch,
+        expected_version=read_settings_file(path)[1],
+        path=path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
+    # 検証
+    row = load_yaml(path.read_text(encoding="utf-8"))["sources"][0]
+    assert row["direct_commit"] == {
+        "scope": ["/tmp/work/**"],
+        "kinds": {"note": ["/tmp/note/**"]},
+    }

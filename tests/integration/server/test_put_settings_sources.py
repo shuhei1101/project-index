@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import dataclasses
 from typing import TYPE_CHECKING, Any
 
 from project_index.features.settings.query import load_terminal_config
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
+from tests.integration.server.conftest import note_direct_commit_files
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
 
 def load_yaml(text: str) -> Any:
@@ -378,3 +381,39 @@ def test_normal_when_unsent_storage_kept(
     assert {row["id"]: row["status"] for row in response.json()["sources"]}["company"] == "serving"
     assert rows[1]["storage"] == {"type": "disk"}
     assert env.client.get("/sources/company/refs").json()["git"] is False
+
+
+def test_normal_when_unsent_direct_commit_kept(
+    tmp_path: Path, make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """行に含めなかった direct_commit を、ファイルの同じ配信元の行の今の値で残す（正常系）。"""
+    # 準備
+    work = tmp_path / "work"
+    other = tmp_path / "other"
+    note = tmp_path / "note"
+    sample = make_source("sample")
+    extra = dataclasses.replace(
+        make_source("extra", note_direct_commit_files("extra")),
+        direct_commit_scope=[work],
+        direct_commit_kinds={"note": [note]},
+    )
+    env = make_server(sample, extra)
+    # 実行
+    response = env.client.put(
+        "/settings/sources",
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "sources": [
+                _row(sample, enabled=False),
+                _row(extra, direct_commit={"scope": [str(other)]}),
+            ],
+        },
+        headers=ORIGIN,
+    )
+    # 検証
+    rows = load_yaml(env.settings_path.read_text(encoding="utf-8"))["sources"]
+    statuses = {row["id"]: row["status"] for row in response.json()["sources"]}
+    assert response.status_code == 200
+    assert (statuses["sample"], statuses["extra"]) == ("disabled", "serving")
+    assert rows[1]["direct_commit"] == {"scope": [str(other)], "kinds": {"note": [str(note)]}}
+    assert "direct_commit" not in rows[0]

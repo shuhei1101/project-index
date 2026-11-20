@@ -388,6 +388,36 @@ flows:
       - '`settings.yaml` の company の行に `storage.type: disk` が残る'
       - '再読み込みした後も `/sources/company/refs` が `git: false` を返す'
     test: test_normal_when_unsent_storage_kept
+  - name: 正常系（送信しなかった直コミットの作業場所を残す）
+    summary: 行に含めなかった `direct_commit` を、ファイルの同じ配信元の行の今の値で残す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample と extra（`direct_commit.scope` と `direct_commit.kinds.note`）の 2 行'
+      - name: 入力
+        description: '`GET /settings/sources` で取得した `version` を `expectedVersion` にし、sample の行を `enabled: false` にした 2 行。sample の行には `direct_commit` を含めず、extra の行には `direct_commit.scope` だけを別の glob で含める'
+    flow: |-
+      <!-- map: {"title": "正常系（送信しなかった直コミットの作業場所を残す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as PUT /settings/sources
+        participant CF as 端末の設定
+
+        C->>E: expectedVersion, sources: sample（enabled: false）, extra（direct_commit.scope だけ）
+        E->>CF: 同じ配信元の行の今の値で送信しなかった direct_commit.kinds を埋めて settings.yaml を書き換える
+        E->>E: 配信元を再読み込みする
+        E-->>C: 200（sample は disabled）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 200 で、sample が `disabled`、extra が `serving`
+      - '`settings.yaml` の extra の行の `direct_commit.scope` が送信した glob になり、`direct_commit.kinds.note` は元の値が残る'
+      - '`settings.yaml` の sample の行に `direct_commit` が記載されない'
+    test: test_normal_when_unsent_direct_commit_kept
 lead: '`sources[]` を丸ごと受けて端末の設定を書き換え、配信元を再読み込みする端末の設定の API の入出力を定め、端末の設定の保存を修正するときに参照する。'
 tags:
   - name: topic:設定
@@ -461,6 +491,18 @@ request:
     required: true
     location: body
     description: 取得したときの端末の設定の内容のバージョン。今の内容のバージョンと違えば書き換えない
+  - name: sources[].direct_commit.scope
+    type: list[str]
+    required: false
+    default: ファイルの同じ配信元の行の今の値（同じ配信元の行が無ければ `[]`）
+    location: body
+    description: 直コミットを許可した全ての種類の直コミットを呼べる作業場所の glob
+  - name: sources[].direct_commit.kinds
+    type: dict[str, list[str]]
+    required: false
+    default: ファイルの同じ配信元の行の今の値（同じ配信元の行が無ければ `{}`）
+    location: body
+    description: 種類の ID → その種類の直コミットを呼べる作業場所の glob
 request_example: |-
   ```json
   {"expectedVersion": "a1b2c3", "sources": [
@@ -532,7 +574,7 @@ constraints:
   - item: operationId
     constraint: '`{tag}-{関数名}` の `settings-put_settings_sources`'
   - item: 送信しなかったキー
-    constraint: 送信した行ごとに、ファイルの同じ配信元の行（`id`、無ければ配信元の設定の `name` で照合する）を探し、行に含めなかった `enabled`・`scope.read`・`scope.write`・`outside_read`・`storage` をその行の今の値で埋めてから記載する。同じ配信元の行が無い行は既定値で記載する
+    constraint: 送信した行ごとに、ファイルの同じ配信元の行（`id`、無ければ配信元の設定の `name` で照合する）を探し、行に含めなかった `enabled`・`scope.read`・`scope.write`・`outside_read`・`storage`・`direct_commit.scope`・`direct_commit.kinds` をその行の今の値で埋めてから記載する。`direct_commit` は、既定値（`scope` の `[]`・`kinds` の `{}`）でないキーだけを記載し、両方とも既定値の行には `direct_commit` を記載しない。同じ配信元の行が無い行は既定値で記載する
     notes: 取得した行の一部のキーだけを送信する呼び出し側でも、送信しなかったキーが既定値に戻らない
   - item: 内容のバージョンの照合
     constraint: '排他ロックを取った後に `settings.yaml` の内容のバージョンと照合し、スキーマの検証より前に断る。フローの `expectedVersion` は、直前に `GET /settings/sources` で取得した `version`'
@@ -542,4 +584,5 @@ constraints:
 test_file: tests/integration/server/test_put_settings_sources.py
 callers:
   - SC-12#scenarios[正常シナリオ]
+  - SC-12#scenarios[正常シナリオ（直コミットを呼べる作業場所を持つ行を書き込む）]
 visibility: internal

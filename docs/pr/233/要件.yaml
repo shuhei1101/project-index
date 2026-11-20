@@ -1,0 +1,15 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-12.yaml
+    impact: changed
+    detail: 端末の設定の配信元を追加・保存・変更したとき、直コミットを呼べる作業場所も端末の設定に残り、変更しなかったときは今の値が残るケースを加える
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-15.yaml
+    impact: none
+    detail: 直コミットの流れは変わらない。端末の設定の API で登録した配信元でも、直コミットを呼べる作業場所が効くようになる
+    depends_on: []
+scope_out:
+  - item: 'MOD-67 の `SettingsSourceAddRequest.source` の型が `SettingsSourceRow` と記載され、実装（`src/project_index/features/settings/types.py` の `source: SourceEntry`）と食い違う'
+    reason: 今回の変更と無関係な既存の設計書の誤記で、今回の作業 PR がマージされなくても同じ内容で成り立つ
+    plan: '#234'

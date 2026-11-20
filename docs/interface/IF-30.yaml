@@ -162,6 +162,30 @@ flows:
       - company の行の `storage.type` が `disk`
       - sample の行は `storage` を持たない
     test: test_normal_when_storage_given
+  - name: 正常系（直コミットを呼べる作業場所を持つ行がある）
+    summary: '`direct_commit` を持つ行だけに `directCommit` を返却する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample（`direct_commit` 無し）と extra（`direct_commit.scope` と `direct_commit.kinds.note`）の 2 行'
+    flow: |-
+      <!-- map: {"title": "正常系（直コミットを呼べる作業場所を持つ行がある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /settings/sources
+
+        C->>E: GET /settings/sources
+        E-->>C: 200 sample と extra の行
+      ```
+
+      <!-- /map -->
+    expected:
+      - extra の行の `directCommit.scope` と `directCommit.kinds.note` が、`settings.yaml` の extra の行の値と同じ
+      - sample の行は `directCommit` を持たない
+    test: test_normal_when_direct_commit_given
 lead: '端末の設定の配信元と配信元ごとの状態を返却する端末の設定の API の入出力を定め、端末の設定の取得を修正するときに参照する。'
 tags:
   - name: topic:設定
@@ -221,6 +245,10 @@ response:
     type: Literal['git', 'disk'] | None
     description: 端末の設定の行の読み書きの方法
     notes: 書いていない行は `storage` を返さない
+  - name: sources[].directCommit
+    type: '{scope: list[str], kinds: dict[str, list[str]]} | None'
+    description: 端末の設定の行の直コミットを呼べる作業場所（端末の設定の `direct_commit`）
+    notes: '`scope` が `[]` で `kinds` が `{}` の行（記載していない行）は `directCommit` を返却しない'
 status_codes:
   - code: '200'
     condition: 返した（配信元が 0 件でも 200）

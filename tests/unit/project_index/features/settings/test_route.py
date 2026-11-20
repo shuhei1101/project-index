@@ -436,3 +436,34 @@ def test_build_settings_router_when_unknown_top_level_key(
     assert post.json()["warnings"] == expected
     assert patch.json()["warnings"] == expected
     assert delete.json()["warnings"] == expected
+
+
+def test_build_settings_router_when_direct_commit(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_handlers: Callable[..., Any],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """direct_commit を持つ行だけに directCommit を返す（正常系）。"""
+    # 準備
+    write_files(
+        tmp_path,
+        {"settings.yaml": SETTINGS + "    direct_commit:\n      scope: [/tmp/work/**]\n"},
+    )
+    statuses = [
+        make_status("a", 0, config=("/tmp/a/project-index.yaml",)),
+        make_status("b", 1, config=("/tmp/b/project-index.yaml",)),
+    ]
+    terminal = make_terminal_config(file=tmp_path / "settings.yaml")
+    handlers = make_handlers(terminal=terminal, registry=FakeRegistry(statuses))
+    app = FastAPI()
+    app.include_router(build_settings_router(handlers))
+    client = TestClient(app)
+    # 実行
+    response = client.get("/settings/sources")
+    # 検証
+    rows = response.json()["sources"]
+    assert response.status_code == 200
+    assert "directCommit" not in rows[0]
+    assert rows[1]["directCommit"] == {"scope": ["/tmp/work/**"], "kinds": {}}

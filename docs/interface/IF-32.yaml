@@ -201,6 +201,37 @@ flows:
       - 201 で、company が `serving`
       - '`settings.yaml` の company の行に `storage.type: disk` がある'
     test: test_normal_when_storage_given
+  - name: 正常系（直コミットを呼べる作業場所を持つ行を追加する）
+    summary: '`direct_commit` を持つ行を追加し、既定値でないキーだけを端末の設定の行に記載する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットを許可した配信元
+        description: 種類 `note` と、`direct_commit`（`kinds[]` に `note`）を記載した `project-index.yaml` を持つ git リポジトリ
+        notes: id `extra`
+      - name: 入力
+        description: '`GET /settings/sources` で取得した `version` を `expectedVersion` にし、`source` は extra の行（`id`・`config`・`direct_commit.scope`）'
+    flow: |-
+      <!-- map: {"title": "正常系（直コミットを呼べる作業場所を持つ行を追加する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as POST /settings/sources
+        participant CF as 端末の設定
+
+        C->>E: expectedVersion, source: extra（direct_commit.scope）
+        E->>CF: direct_commit つきの extra の行を追加する
+        E->>E: extra を読み込む
+        E-->>C: 201（extra は serving）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 201 で、extra が `serving`
+      - '`settings.yaml` の extra の行に送信した `direct_commit.scope` があり、既定値の `direct_commit.kinds` は記載されない'
+      - 同じ行をもう一度追加すると 409 で `same` が `true`、`direct_commit.scope` だけが違う行は 409 で `same` が `false`
+    test: test_normal_when_direct_commit_given
 lead: 端末の設定へ配信元の行を 1 行追加する端末の設定の API の入出力を定め、配信元の 1 行の追加を修正するときに参照する。
 tags:
   - name: topic:設定
@@ -218,6 +249,7 @@ callers:
   - SC-12#scenarios[正常シナリオ（端末の設定の最上位に知らないキーがある）]
   - SC-12#scenarios[異常シナリオ（取得した後にほかの書き換えが入った）]
   - SC-12#scenarios[異常シナリオ（バージョンを添えずに書き換える）]
+  - SC-12#scenarios[正常シナリオ（直コミットを呼べる作業場所を持つ行を書き込む）]
 exclusivity: 内容のバージョンの照合と端末の設定の書き込みは、端末の設定の保存と同じ排他で 1 つずつ
 request:
   - name: source

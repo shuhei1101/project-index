@@ -230,6 +230,22 @@ def sample_files(**overrides: str) -> dict[str, str]:
     return files
 
 
+def note_direct_commit_files(name: str) -> dict[str, str]:
+    """文書の種類 `note` と、`note` の直コミットを許可する `direct_commit` を持つ配信元のファイル一式を返す。"""
+    config = (
+        f"name: {name}\n"
+        "default_ref: develop\n"
+        "documents:\n"
+        "  - id: note\n"
+        "    paths: [docs/*.yaml]\n"
+        "    schema: schemas/sample.schema.yaml\n"
+        "direct_commit:\n"
+        "  branch: develop\n"
+        "  kinds: [note]\n"
+    )
+    return sample_files(**{"project-index.yaml": config})
+
+
 # `/project-index:setup` が配信元にコピーする管理用の YAML のスキーマ
 FILES_SCHEMA_TEMPLATE = Path(__file__).parents[3] / "templates" / "files.schema.yaml"
 

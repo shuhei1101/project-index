@@ -620,6 +620,53 @@ scenarios:
       - '`storage` を含めない保存の後も、`settings.yaml` の company の行に `storage.type: disk` が残り、company は disk の配信元として配信される'
       - '1 行の変更の後、`settings.yaml` の sample の行に `storage.type: disk` が入り、再起動せずに読み取り API の sample のリビジョンの一覧が `git: false` を返却する'
     test: test_normal_when_storage_kept_and_changed
+  - name: 正常シナリオ（直コミットを呼べる作業場所を持つ行を書き込む）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。端末のほかのプロセスと dev-docs の画面のサーバーの代わりにテストのコードが HTTP で呼ぶ）
+      - name: 直コミットを許可した配信元
+        description: 文書の種類 `note` と、`direct_commit`（`branch` に既定のブランチ、`kinds[]` に `note`）を記載した `project-index.yaml` を持つ git リポジトリ。端末の設定にはまだ無い
+        notes: id `extra`
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す一時フォルダの `settings.yaml`'
+        notes: '`sources` に sample の 1 行'
+      - name: project-index
+        description: 端末の設定で起動した project-index
+      - name: 直コミットの作業場所
+        description: extra の `scope.read` に該当せず、追加する行の `direct_commit.scope` に該当する一時フォルダ
+        notes: 'extra の行は `outside_read: false` で追加する'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（直コミットを呼べる作業場所を持つ行を書き込む）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant OP as 端末のほかのプロセス
+        participant PI as project-index（端末の設定の API）
+        participant CF as 端末の設定
+
+        OP->>PI: 端末の設定の配信元を取得する
+        PI-->>OP: sample の行と、端末の設定の内容のバージョン
+        OP->>PI: 取得したバージョンを添えて、direct_commit.scope に直コミットの作業場所を記載した extra の行を 1 行追加する
+        PI->>CF: sources の末尾に direct_commit つきの extra の行を追加し、配信元を再読み込みする
+        PI-->>OP: 追加したことと、書き換えた後のバージョン
+        OP->>PI: 端末の設定の配信元を取得し直す
+        PI-->>OP: sample と extra の行（extra は direct_commit つき）と、今のバージョン
+        OP->>PI: 書き換えた後のバージョンを添えて、sample の enabled を false にし、どちらの行にも direct_commit を含めない sources を保存する
+        PI->>CF: 送信しなかった direct_commit をファイルの今の値で残して書き換え、配信元を再読み込みする
+        PI-->>OP: 再読み込みした後の配信元の状態と、書き換えた後のバージョン
+        OP->>PI: 書き換えた後のバージョンを添えて、extra の行の direct_commit.kinds だけを、note の作業場所の glob に変更する
+        PI->>CF: extra の行の direct_commit.kinds だけを書き換え、extra の配信元だけを再読み込みする
+        PI-->>OP: extra の配信元の状態と、書き換えた後のバージョン
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 行の追加の後、`settings.yaml` の extra の行に、送信した `direct_commit.scope` が記載される
+      - 1 行の追加の後、project-index を再起動せずに、直コミットの作業場所から呼ぶ引数なしの `describe` の extra の行が、直コミットを許可した種類として `note` を返却する
+      - 取得し直しが extra の行を、送信した `scope` を持つ `directCommit` つきで返却し、sample の行は `directCommit` を返却しない
+      - '`direct_commit` を含めない保存の後も、`settings.yaml` の extra の行の `direct_commit.scope` が残り、sample の行に `direct_commit` は記載されない'
+      - 1 行の変更の後、`settings.yaml` の extra の行に送信した `direct_commit.kinds.note` が記載され、`direct_commit.scope` は変わらない
+    test: test_normal_when_direct_commit_kept_and_changed
 lead: dev-docs の画面のサーバーと端末のほかのプロセスが端末の設定の API で配信元を丸ごとか 1 行ずつ変更し、再起動せずに配信へ反映するシナリオを定め、端末の設定の配信元の変更の流れを変えるときに参照する。
 tags:
   - name: topic:設定

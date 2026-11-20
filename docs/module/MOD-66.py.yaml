@@ -79,9 +79,9 @@ functions:
       1. `lock` を取る
       2. 端末の設定の本文と内容のバージョンを読み（端末の設定の内容の読み込み）、内容のバージョンを照合する（内容のバージョンの照合）
       3. 本文を往復編集の形で読み（往復編集の読み込み）、送られた行ごとに、ファイルの `sources` から配信元の ID（配信元の『行の配信元の ID』。`id`、無ければ設定の `name`）が同じ行を探す
-         - 見つかった場合、送られた行に含めなかったキー（`SourceEntry` の `model_fields_set` に無い `enabled`・`outside_read`・`storage` と、`scope` を含めなかった行か `SourceScope` の `model_fields_set` に無い `scope.read`・`scope.write`）を、見つかった行の値で埋める
+         - 見つかった場合、送られた行に含めなかったキー（`SourceEntry` の `model_fields_set` に無い `enabled`・`outside_read`・`storage` と、`scope` を含めなかった行か `SourceScope` の `model_fields_set` に無い `scope.read`・`scope.write` と、`direct_commit` を含めなかった行か `SourceDirectCommit` の `model_fields_set` に無い `direct_commit.scope`・`direct_commit.kinds`）を、見つかった行の値で埋める
          - ID が求まらない行と、同じ ID の行が無い行は埋めない（既定値のまま）。ファイルの行のうち `SourceEntry` として読めない行（スキーマに通らない行）は探す対象から除く
-      4. `sources` だけを埋めた後の行に置き換える。`config` は要素の数によらず配列で書く。既定値と同じキー（`enabled: true`・`outside_read: true`・空の `scope.read` など）は書かない
+      4. `sources` だけを埋めた後の行に置き換える。`config` は要素の数によらず配列で書く。既定値と同じキー（`enabled: true`・`outside_read: true`・空の `scope.read` など）は書かない。`direct_commit` は空でない `scope`・`kinds` だけを書き、両方とも空の行には `direct_commit` を書かない
       5. 置き換えた値を検証する（端末の設定の検証）
          - 違反がある場合、ファイルを書かずに `TerminalConfigInvalidError` を送る
       6. 一時ファイルに書いてから置き換える（往復編集の書き出し・ファイルの置き換え。往復編集の書き出しの `original` は手順 2 で読んだ本文）
@@ -177,6 +177,18 @@ functions:
         condition: '`sources:` の直下に `- ` を字下げ無しで sample の 1 行を並べる `settings.yaml` に、同じ sample の 1 行を保存する'
         mock: 配信元の再読み込み（偽物）
         expected: 保存した `settings.yaml` が保存の前の文字列と一致する
+      - name: test_save_sources_when_unsent_direct_commit
+        case: 正常
+        summary: 送らなかった direct_commit のキーをファイルの同じ配信元の行の値で埋める
+        condition: ファイルの extra の行に `direct_commit.scope` と `direct_commit.kinds.note`。送る sample の行は `direct_commit` を持たず、extra の行は `direct_commit.scope` だけを別の glob で持つ
+        mock: 配信元の再読み込み（偽物）
+        expected: ファイルの extra の行の `direct_commit.scope` が送った値で、`direct_commit.kinds.note` が元のまま。sample の行に `direct_commit` が無い
+      - name: test_save_sources_when_direct_commit_partial
+        case: 正常
+        summary: direct_commit の既定値のキーを書かない
+        condition: '`direct_commit.scope` だけを持ち `kinds` が空の行と、`scope`・`kinds` がどちらも空の `direct_commit` を持つ行'
+        mock: 配信元の再読み込み（偽物）
+        expected: 1 行目は `direct_commit` に `scope` だけがあり `kinds` が無い。2 行目に `direct_commit` が無い
   - name: add_source
     title: 配信元の 1 行の追加
     kind: 関数
@@ -291,6 +303,12 @@ functions:
         mock: '`reload`（呼ばれた数を数える）'
         expected: '`SettingsVersionMismatchError` で、ファイルは変わらず、`reload` は呼ばれない'
         exception: 内容のバージョンが今と違う
+      - name: test_add_source_when_direct_commit
+        case: 正常
+        summary: direct_commit を持つ行を追加し、同じ id の比較にも含める
+        condition: '`sources` に sample の 1 行の設定に `direct_commit.scope` を持つ extra を追加し、続けて同じ行と `direct_commit.scope` だけが違う行を追加する'
+        mock: '`reload`（状態を返す偽物）'
+        expected: 1 回目は `added` で、ファイルの extra の行に `direct_commit.scope` があり `kinds` が無い。2 回目は `exists`・`same` が `True`、3 回目は `exists`・`same` が `False`
   - name: patch_source
     title: 配信元の 1 行の変更
     kind: 関数
@@ -346,7 +364,7 @@ functions:
       2. 端末の設定の本文と内容のバージョンを読み（端末の設定の内容の読み込み）、内容のバージョンを照合する（内容のバージョンの照合）
       3. 本文を往復編集の形で読み（往復編集の読み込み）、`sources` から配信元の ID（配信元の『行の配信元の ID』）が `source_id` の最初の行を探す。`SourceEntry` として読めない行は探す対象から除く
          - 無い場合、`SourceRowNotFoundError` を送る
-      4. 見つけた行に、`patch` の `model_fields_set` にあるキーだけを重ねる。`scope` は `read`・`write` を `SourceScope` の `model_fields_set` で別々に重ねる
+      4. 見つけた行に、`patch` の `model_fields_set` にあるキーだけを重ねる。`scope` は `read`・`write` を `SourceScope` の `model_fields_set` で、`direct_commit` は `scope`・`kinds` を `SourceDirectCommit` の `model_fields_set` で別々に重ねる
       5. 見つけた行が `id` を省いていて、重ねた後の行の配信元の ID が `source_id` と違う場合、ファイルを書かずに `TerminalConfigInvalidError`（違反のパス `source.config`）を送る
       6. 見つけた行の位置だけを、重ねた後の行に置き換える。書き方は配信元の保存と同じ
       7. 置き換えた値を検証する（端末の設定の検証）
@@ -417,6 +435,12 @@ functions:
         mock: '`reload`（呼ばれた数を数える）'
         expected: '`TerminalConfigInvalidError` で、ファイルは変わらず、`reload` は呼ばれない'
         exception: 置き換えた後がスキーマに通らない
+      - name: test_patch_source_when_direct_commit_kinds
+        case: 正常
+        summary: direct_commit の送ったキーだけを重ねる
+        condition: ファイルの extra の行に `direct_commit.scope`。`direct_commit.kinds`（`note` の glob）だけの変更
+        mock: '`reload`（偽物）'
+        expected: ファイルの extra の行に `direct_commit.kinds.note` が入り、`direct_commit.scope` は元のまま
   - name: delete_source
     title: 配信元の 1 行の削除
     kind: 関数
