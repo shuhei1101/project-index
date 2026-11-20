@@ -25,6 +25,11 @@ diagrams:
         class 配信元ごとの排他 {
           +握る(配信元の ID) ContextManager
         }
+        文書の書き込み ..> リポジトリごとの排他 : 直コミット
+        文書の削除 ..> リポジトリごとの排他 : 直コミット
+        class リポジトリごとの排他 {
+          +握る(リポジトリ, 待ち時間) ContextManager
+        }
         click 文書の書き込み href "id:MOD-84#functions[write_docs]"
         click 文書の削除 href "id:MOD-84#functions[delete_docs]"
 classes:
@@ -72,4 +77,69 @@ classes:
             condition: 2 つのスレッドが同じ配信元を握り、片方が 0.2 秒眠る
             mock: なし
             expected: もう片方は眠り終わるまで入らない。別の配信元は待たない
+  - name: RepositoryLocks
+    title: リポジトリごとの排他
+    container: project_index/features/write/locks.py
+    usecase: 直コミット
+    role: 排他
+    summary: 直コミットの取得からプッシュまでを、リポジトリ（`git rev-parse --git-common-dir`）ごとに 1 つずつにする
+    description: 直コミットと、コミットするブランチを指すワークツリーへの `commit` を省いた書き込み・削除が握る。配信元ごとの排他より先に握り、待ちを書き込みの期限の内に収める。
+    kind: クラス
+    properties:
+      - name: _locks
+        title: 排他
+        type: dict[Path, threading.Lock]
+        access: 内部 (_)
+        description: リポジトリ → 排他
+      - name: _guard
+        title: 辞書の排他
+        type: threading.Lock
+        access: 内部 (_)
+        description: '`_locks` を守る'
+    methods:
+      - name: hold
+        title: 握る
+        summary: リポジトリの排他を、待ち時間の上限つきで握るコンテキストマネージャを返す
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        args:
+          - name: repo
+            title: リポジトリ
+            type: Path
+            required: true
+            passing: positional
+            description: '`git rev-parse --git-common-dir` の絶対パス'
+          - name: timeout
+            title: 待ち時間の上限
+            type: float | None
+            required: false
+            default: None
+            passing: keyword
+            description: 書き込みの期限までの残りの秒数。`None` は待ち続ける
+        returns:
+          type: ContextManager[None]
+          description: 抜けるときに放す
+        process: |-
+          1. `_guard` の中でリポジトリの排他を引く（無ければ作る）
+          2. `acquire(timeout=...)` で握る
+             - 握れない場合、`WriteDeadlineExceededError` を送信する
+        exceptions:
+          - name: WriteDeadlineExceededError
+            condition: 待ち時間の上限までに握れない
+            message: 既存と同じ
+        unit_tests:
+          - name: test_repository_locks_hold
+            case: 正常
+            summary: 同じリポジトリは待つ
+            condition: 2 つのスレッドが同じリポジトリを握り、片方が 0.2 秒眠る
+            mock: なし
+            expected: もう片方は眠り終わるまで入らない。別のリポジトリは待たない
+          - name: test_repository_locks_hold_when_timeout
+            case: 異常
+            summary: 待ち時間の上限を超える
+            condition: 片方が握ったまま、もう片方が `timeout=0.1`
+            mock: なし
+            expected: '`WriteDeadlineExceededError`'
+            exception: 待ち時間の上限までに握れない
 visibility: internal
