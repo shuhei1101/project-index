@@ -1,0 +1,20 @@
+$ gh workflow run test.yml --ref fix/write/set-ref-path -f layer=integration -f paths="tests/integration/server/test_write_docs.py::test_normal_when_set_ref_path tests/integration/server/test_write_docs.py::test_normal_when_text_edits_ref_path tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved tests/integration/server/test_write_docs.py::test_normal_when_add_to_ref_path" ...   # TP-1 の TL-2 の run_runner
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 8 items
+
+tests/integration/server/test_write_docs.py::test_normal_when_set_ref_path PASSED [ 12%]
+tests/integration/server/test_write_docs.py::test_normal_when_text_edits_ref_path PASSED [ 25%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[no_x_key] PASSED [ 37%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[missing] PASSED [ 50%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[order] PASSED [ 62%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[no_key] PASSED [ 75%]
+tests/integration/server/test_write_docs.py::test_error_when_text_edits_ref_path_unresolved[unbalanced_brackets] PASSED [ 87%]
+tests/integration/server/test_write_docs.py::test_normal_when_add_to_ref_path PASSED [100%]
+
+============================== 8 passed in 1.52s ===============================
+rc=0 run=44719017598

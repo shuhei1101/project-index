@@ -38,13 +38,45 @@ def _merge(target: dict[object, object], value: dict[object, object]) -> None:
             target[key] = copy.deepcopy(item)
 
 
-def _set(content: MutableMapping[str, Any], path: str, value: object) -> None:
+def _set(
+    content: MutableMapping[str, Any],
+    path: str,
+    value: object,
+    schema: Mapping[str, Any] | None,
+) -> None:
     """項目のパスへ値を入れる（オブジェクトなら今の値へマージする）。"""
-    existing = get_field(content, path)
-    if is_dict(value) and is_dict(existing):
+    # `#` で始まらない項目のパス: 今までどおり項目のパスで読み書きする（途中の項目は作る）
+    if not path.startswith(REF_PATH_PREFIX):
+        existing = get_field(content, path)
+        if is_dict(value) and is_dict(existing):
+            _merge(existing, value)
+        else:
+            set_field(content, path, copy.deepcopy(value))
+        return
+    # `#` で始まる項目のパス: x-key の値で要素を指して解く（最後の辞書のキーだけは無くてよい）
+    tokens = resolve_ref_path(
+        content, schema or {}, path[len(REF_PATH_PREFIX) :], missing_last=True
+    )
+    found, existing = _find_at(content, tokens)
+    # 最後のキーがあり、今の値と入れる値がどちらもオブジェクト: 今の値へマージする
+    if found and is_dict(value) and is_dict(existing):
         _merge(existing, value)
     else:
-        set_field(content, path, copy.deepcopy(value))
+        # 最後のキーが無い（追加）か、配列・値への置き換え
+        set_field_at(content, tokens, copy.deepcopy(value))
+
+
+def _find_at(content: Mapping[str, Any], tokens: list[str | int]) -> tuple[bool, object]:
+    """解いた並びで指した値を返す。最後のキーが無ければ `(False, None)` を返す。"""
+    parent = _value_at(content, tokens[:-1])
+    last = tokens[-1]
+    # 最後が位置: 解いた並びの要素は必ずある
+    if isinstance(last, int):
+        return True, cast("list[object]", parent)[last]
+    # 最後がキー: 辞書にそのキーがあるかで分ける
+    if is_dict(parent) and last in parent:
+        return True, parent[last]
+    return False, None
 
 
 # 本文のファイルの内容を受けるキー（`data`・`set` のキーと `text_edits[].field`）
@@ -82,7 +114,7 @@ def apply_operation(
         if path == BODY_KEY:
             continue
         try:
-            _set(content, path, value)
+            _set(content, path, value, schema)
         except InvalidArgumentError as error:
             violations.extend(
                 _violation(f"set.{path}", violation.rule) for violation in error.violations

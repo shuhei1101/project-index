@@ -1151,6 +1151,116 @@ def test_normal_when_add_to_ref_path(
     assert after_unset_errors == before_unset_errors
 
 
+SET_SCHEMA = (
+    "type: object\n"
+    "title: サンプル\n"
+    "properties:\n"
+    "  id: {type: string}\n"
+    "  name: {type: string}\n"
+    "  models:\n"
+    "    type: array\n"
+    "    x-key: name\n"
+    "    items:\n"
+    "      type: object\n"
+    "      properties:\n"
+    "        name: {type: string}\n"
+    "        properties:\n"
+    "          type: array\n"
+    "          items: {type: string}\n"
+    "        label: {type: string}\n"
+    "        meta: {type: object}\n"
+    "  steps:\n"
+    "    type: array\n"
+    "    items:\n"
+    "      type: object\n"
+    "      properties:\n"
+    "        name: {type: string}\n"
+    "        body: {type: string}\n"
+    "  notes:\n"
+    "    type: object\n"
+    "    additionalProperties: {type: string}\n"
+)
+SET_DOC = (
+    "id: doc-1\n"
+    "name: 文書 1\n"
+    "models:\n"
+    "  - name: Row\n"
+    "    properties: [a]\n"
+    "    meta:\n"
+    "      x: 1\n"
+    "  - name: Col\n"
+    "    properties: [b]\n"
+    "steps:\n"
+    "  - name: a\n"
+    "    body: x\n"
+    "notes:\n"
+    "  main: m\n"
+)
+
+
+def test_normal_when_set_ref_path(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """set のキーの参照の型の項目のパスで、x-key の値で指した要素に今は無いキーを追加し、解決できないキーを断る（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{"schemas/sample.schema.yaml": SET_SCHEMA, "docs/doc-1.yaml": SET_DOC}
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    path = worktree / "docs" / "doc-1.yaml"
+    arguments = {"cwd": str(source.folder), "worktree": str(worktree)}
+
+    def _call(**operation: Any) -> Any:
+        return env.call(
+            "write_docs", operations=[_update("doc-1", _version(path), **operation)], **arguments
+        )
+
+    # 実行
+    before_first = path.read_text(encoding="utf-8").splitlines()
+    first = _call(set={"#models[Col].label": "l"})
+    after_first_lines = path.read_text(encoding="utf-8").splitlines()
+    second = _call(set={"#models[Col].label": "m"})
+    third = _call(set={"#models[Row].meta": {"y": 2}})
+    after_third = load_yaml(path.read_text(encoding="utf-8"))
+    before_errors = path.read_text(encoding="utf-8")
+    fourth = _call(set={"models[Col].label": "n"})
+    fifth = _call(set={"#models[Zzz].label": "n"})
+    sixth = _call(set={"#steps[a].body": "n"})
+    seventh = _call(set={"#models[Col#2].label": "n"})
+    eighth = _call(set={"#models[Col].other.label": "n"})
+    after_errors = path.read_text(encoding="utf-8")
+    ninth = _call(set={"#notes[a.b]": "v"})
+    after_ninth = load_yaml(path.read_text(encoding="utf-8"))
+    # 検証
+    assert [item["status"] for item in first.data["results"]] == ["updated"]
+    assert [line for line in after_first_lines if line not in before_first] == ["    label: l"]
+    assert len(after_first_lines) == len(before_first) + 1
+    assert [item["status"] for item in second.data["results"]] == ["updated"]
+    assert [item["status"] for item in third.data["results"]] == ["updated"]
+    assert after_third["models"] == [
+        {"name": "Row", "properties": ["a"], "meta": {"x": 1, "y": 2}},
+        {"name": "Col", "properties": ["b"], "label": "m"},
+    ]
+    assert fourth.is_error
+    assert "operations[0].set.models[Col].label" in fourth.text
+    assert "`#` で始めて x-key の値で要素を指してください" in fourth.text
+    assert fifth.is_error
+    assert "operations[0].set.#models[Zzz].label" in fifth.text
+    assert "name が Zzz の要素がありません" in fifth.text
+    assert sixth.is_error
+    assert "x-key を持たない配列です" in sixth.text
+    assert seventh.is_error
+    assert "name が Col の要素は 1 個です" in seventh.text
+    assert eighth.is_error
+    assert "にキー other がありません" in eighth.text
+    assert after_errors == before_errors
+    assert [item["status"] for item in ninth.data["results"]] == ["updated"]
+    assert after_ninth["notes"] == {"main": "m", "a.b": "v"}
+
+
 FLOWS_SCHEMA = (
     "type: object\n"
     "title: サンプル\n"

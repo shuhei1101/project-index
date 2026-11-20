@@ -1,0 +1,320 @@
+$ uv run pytest tests/unit/project_index/features/documents/test_fields.py tests/unit/project_index/features/write/test_apply.py
+....................F.....................FFFF.......................... [ 56%]
+.........................................FFFFF..........                 [100%]
+=================================== FAILURES ===================================
+_________________________ test_set_field_when_selector _________________________
+
+    def test_set_field_when_selector() -> None:
+        """要素の選び方を含むパス（異常系）。"""
+        # 準備
+        data: dict[str, Any] = {"tags": []}
+        # 実行・検証
+>       with pytest.raises(InvalidArgumentError, match="`#` で始めて x-key の値で要素を指してください"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: Regex pattern did not match.
+E         Expected regex: '`#` で始めて x-key の値で要素を指してください'
+E         Actual message: 'tags[].name: `**`・`[]`・`[{キー}]` を含む項目のパスには書き込めません'
+
+tests/unit/project_index/features/documents/test_fields.py:200: AssertionError
+_____________ test_resolve_ref_path_when_missing_last[element_key] _____________
+
+path = 'functions[save].usecase', expected = ['functions', 1, 'usecase']
+
+    @pytest.mark.parametrize(
+        ("path", "expected"),
+        [
+            pytest.param("functions[save].usecase", ["functions", 1, "usecase"], id="element_key"),
+            pytest.param("notes[a.b]", ["notes", "a.b"], id="dict_key"),
+        ],
+    )
+    def test_resolve_ref_path_when_missing_last(path: str, expected: list[str | int]) -> None:
+        """最後の辞書のキーが無くても解く（正常系）。"""
+        # 準備
+        data = _ref_data()
+        # 実行
+>       result = resolve_ref_path(data, _REF_SCHEMA, path, missing_last=True)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: resolve_ref_path() got an unexpected keyword argument 'missing_last'
+
+tests/unit/project_index/features/documents/test_fields.py:510: TypeError
+______________ test_resolve_ref_path_when_missing_last[dict_key] _______________
+
+path = 'notes[a.b]', expected = ['notes', 'a.b']
+
+    @pytest.mark.parametrize(
+        ("path", "expected"),
+        [
+            pytest.param("functions[save].usecase", ["functions", 1, "usecase"], id="element_key"),
+            pytest.param("notes[a.b]", ["notes", "a.b"], id="dict_key"),
+        ],
+    )
+    def test_resolve_ref_path_when_missing_last(path: str, expected: list[str | int]) -> None:
+        """最後の辞書のキーが無くても解く（正常系）。"""
+        # 準備
+        data = _ref_data()
+        # 実行
+>       result = resolve_ref_path(data, _REF_SCHEMA, path, missing_last=True)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: resolve_ref_path() got an unexpected keyword argument 'missing_last'
+
+tests/unit/project_index/features/documents/test_fields.py:510: TypeError
+_________ test_resolve_ref_path_when_missing_last_unresolved[element] __________
+
+path = 'functions[missing]', message = 'name が missing の要素がありません'
+
+    @pytest.mark.parametrize(
+        ("path", "message"),
+        [
+            pytest.param("functions[missing]", "name が missing の要素がありません", id="element"),
+            pytest.param("functions[save].other.usecase", "にキー other がありません", id="middle"),
+        ],
+    )
+    def test_resolve_ref_path_when_missing_last_unresolved(path: str, message: str) -> None:
+        """最後の辞書のキー以外が無い（異常系）。"""
+        # 準備
+        data = _ref_data()
+        # 実行・検証
+        with pytest.raises(InvalidArgumentError, match=message):
+>           resolve_ref_path(data, _REF_SCHEMA, path, missing_last=True)
+E           TypeError: resolve_ref_path() got an unexpected keyword argument 'missing_last'
+
+tests/unit/project_index/features/documents/test_fields.py:528: TypeError
+__________ test_resolve_ref_path_when_missing_last_unresolved[middle] __________
+
+path = 'functions[save].other.usecase', message = 'にキー other がありません'
+
+    @pytest.mark.parametrize(
+        ("path", "message"),
+        [
+            pytest.param("functions[missing]", "name が missing の要素がありません", id="element"),
+            pytest.param("functions[save].other.usecase", "にキー other がありません", id="middle"),
+        ],
+    )
+    def test_resolve_ref_path_when_missing_last_unresolved(path: str, message: str) -> None:
+        """最後の辞書のキー以外が無い（異常系）。"""
+        # 準備
+        data = _ref_data()
+        # 実行・検証
+        with pytest.raises(InvalidArgumentError, match=message):
+>           resolve_ref_path(data, _REF_SCHEMA, path, missing_last=True)
+E           TypeError: resolve_ref_path() got an unexpected keyword argument 'missing_last'
+
+tests/unit/project_index/features/documents/test_fields.py:528: TypeError
+____________________ test_apply_operation_when_set_ref_path ____________________
+
+    def test_apply_operation_when_set_ref_path() -> None:
+        """`#` で始まる `set` のキーで要素へキーを追加・マージする（正常系）。"""
+        # 準備
+        operation = Operation(
+            op="update",
+            id="doc-1",
+            expected_version="v1",
+            set={
+                "#models[Col].label": "l",
+                "#models[Row].meta": {"y": 2},
+                "#notes[a.b]": "v",
+            },
+        )
+        # 実行
+>       result = apply_operation(_set_content(), operation, schema=_SET_SCHEMA)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/write/test_apply.py:714: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+current = {'models': [{'name': 'Row', 'meta': {'x': 1}}, {'name': 'Col'}], 'notes': {'main': 'a'}}
+operation = Operation(op='update', kind=None, id='doc-1', expected_version='v1', data=None, set={'#models[Col].label': 'l', '#mode...[], add_to={}, remove_from={}, text_edits=[], new_id=None, new_path=None, filter=None, old=None, new=None, fields=None)
+schema = {'type': 'object', 'properties': {'models': {'type': 'array', 'x-key': 'name', 'items': {'type': 'object', 'properties...e': 'string'}, 'meta': {'type': 'object'}}}}, 'notes': {'type': 'object', 'additionalProperties': {'type': 'string'}}}}
+
+    def apply_operation(
+        current: Mapping[str, Any] | None,
+        operation: Operation,
+        *,
+        schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """文書の内容に 1 件の操作を当てた新しい内容を返す。"""
+        # 本文は要素に当てない（本文の適用が当てる）
+        if operation.op in ("create", "replace"):
+            data = {key: value for key, value in (operation.data or {}).items() if key != BODY_KEY}
+            return copy.deepcopy(data)
+        # 往復編集の内容（CommentedMap）は型を保ったまま複製する
+        content = cast("dict[str, Any]", copy.deepcopy(current if current is not None else {}))
+        violations: list[Violation] = []
+        for path, value in operation.set.items():
+            if path == BODY_KEY:
+                continue
+            try:
+                _set(content, path, value)
+            except InvalidArgumentError as error:
+                violations.extend(
+                    _violation(f"set.{path}", violation.rule) for violation in error.violations
+                )
+        violations.extend(_unset(content, operation.unset, schema))
+        # 同じ配列の要素を削除してから追加する（違反は add_to・remove_from の順に並べる）
+        removed = _remove_from(content, operation.remove_from, schema)
+        violations.extend(_add_to(content, operation.add_to, schema))
+        violations.extend(removed)
+        violations.extend(_text_edits(content, operation.text_edits, schema))
+        if violations:
+>           raise InvalidArgumentError(message="操作を適用できません", violations=violations)
+E           project_index.shared.errors.InvalidArgumentError: 操作を適用できません
+
+src/project_index/features/write/apply.py:97: InvalidArgumentError
+________________ test_apply_operation_when_set_ref_path_element ________________
+
+    def test_apply_operation_when_set_ref_path_element() -> None:
+        """`#` で始まる `set` のキーで要素そのものへマージする（正常系）。"""
+        # 準備
+        operation = Operation(
+            op="update",
+            id="doc-1",
+            expected_version="v1",
+            set={"#models[Col]": {"kind": "k"}},
+        )
+        # 実行
+>       result = apply_operation(_set_content(), operation, schema=_SET_SCHEMA)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/project_index/features/write/test_apply.py:735: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+current = {'models': [{'name': 'Row', 'meta': {'x': 1}}, {'name': 'Col'}], 'notes': {'main': 'a'}}
+operation = Operation(op='update', kind=None, id='doc-1', expected_version='v1', data=None, set={'#models[Col]': {'kind': 'k'}}, u...[], add_to={}, remove_from={}, text_edits=[], new_id=None, new_path=None, filter=None, old=None, new=None, fields=None)
+schema = {'type': 'object', 'properties': {'models': {'type': 'array', 'x-key': 'name', 'items': {'type': 'object', 'properties...e': 'string'}, 'meta': {'type': 'object'}}}}, 'notes': {'type': 'object', 'additionalProperties': {'type': 'string'}}}}
+
+    def apply_operation(
+        current: Mapping[str, Any] | None,
+        operation: Operation,
+        *,
+        schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """文書の内容に 1 件の操作を当てた新しい内容を返す。"""
+        # 本文は要素に当てない（本文の適用が当てる）
+        if operation.op in ("create", "replace"):
+            data = {key: value for key, value in (operation.data or {}).items() if key != BODY_KEY}
+            return copy.deepcopy(data)
+        # 往復編集の内容（CommentedMap）は型を保ったまま複製する
+        content = cast("dict[str, Any]", copy.deepcopy(current if current is not None else {}))
+        violations: list[Violation] = []
+        for path, value in operation.set.items():
+            if path == BODY_KEY:
+                continue
+            try:
+                _set(content, path, value)
+            except InvalidArgumentError as error:
+                violations.extend(
+                    _violation(f"set.{path}", violation.rule) for violation in error.violations
+                )
+        violations.extend(_unset(content, operation.unset, schema))
+        # 同じ配列の要素を削除してから追加する（違反は add_to・remove_from の順に並べる）
+        removed = _remove_from(content, operation.remove_from, schema)
+        violations.extend(_add_to(content, operation.add_to, schema))
+        violations.extend(removed)
+        violations.extend(_text_edits(content, operation.text_edits, schema))
+        if violations:
+>           raise InvalidArgumentError(message="操作を適用できません", violations=violations)
+E           project_index.shared.errors.InvalidArgumentError: 操作を適用できません
+
+src/project_index/features/write/apply.py:97: InvalidArgumentError
+______ test_apply_operation_when_set_ref_path_unresolved[missing_element] ______
+
+key = '#models[Zzz].label', message = 'name が Zzz の要素がありません'
+
+    @pytest.mark.parametrize(
+        ("key", "message"),
+        [
+            pytest.param("#models[Zzz].label", "name が Zzz の要素がありません", id="missing_element"),
+            pytest.param("#models[Col].other.label", "にキー other がありません", id="missing_middle"),
+            pytest.param(
+                "models[Col].label",
+                "`#` で始めて x-key の値で要素を指してください",
+                id="selector",
+            ),
+        ],
+    )
+    def test_apply_operation_when_set_ref_path_unresolved(key: str, message: str) -> None:
+        """`set` のキーを解けない（異常系）。"""
+        # 準備
+        current = _set_content()
+        operation = Operation(op="update", id="doc-1", expected_version="v1", set={key: "n"})
+        # 実行・検証
+        with pytest.raises(InvalidArgumentError) as exc_info:
+            apply_operation(current, operation, schema=_SET_SCHEMA)
+        assert [violation.path for violation in exc_info.value.violations] == [f"set.{key}"]
+>       assert message in exc_info.value.violations[0].rule
+E       AssertionError: assert 'name が Zzz の要素がありません' in '#models[Zzz].label: `**`・`[]`・`[{キー}]` を含む項目のパスには書き込めません'
+E        +  where '#models[Zzz].label: `**`・`[]`・`[{キー}]` を含む項目のパスには書き込めません' = Violation(path='set.#models[Zzz].label', rule='#models[Zzz].label: `**`・`[]`・`[{キー}]` を含む項目のパスには書き込めません', fix='', index=None, doc=None).rule
+
+tests/unit/project_index/features/write/test_apply.py:764: AssertionError
+______ test_apply_operation_when_set_ref_path_unresolved[missing_middle] _______
+
+key = '#models[Col].other.label', message = 'にキー other がありません'
+
+    @pytest.mark.parametrize(
+        ("key", "message"),
+        [
+            pytest.param("#models[Zzz].label", "name が Zzz の要素がありません", id="missing_element"),
+            pytest.param("#models[Col].other.label", "にキー other がありません", id="missing_middle"),
+            pytest.param(
+                "models[Col].label",
+                "`#` で始めて x-key の値で要素を指してください",
+                id="selector",
+            ),
+        ],
+    )
+    def test_apply_operation_when_set_ref_path_unresolved(key: str, message: str) -> None:
+        """`set` のキーを解けない（異常系）。"""
+        # 準備
+        current = _set_content()
+        operation = Operation(op="update", id="doc-1", expected_version="v1", set={key: "n"})
+        # 実行・検証
+        with pytest.raises(InvalidArgumentError) as exc_info:
+            apply_operation(current, operation, schema=_SET_SCHEMA)
+        assert [violation.path for violation in exc_info.value.violations] == [f"set.{key}"]
+>       assert message in exc_info.value.violations[0].rule
+E       AssertionError: assert 'にキー other がありません' in '#models[Col].other.label: `**`・`[]`・`[{キー}]` を含む項目のパスには書き込めません'
+E        +  where '#models[Col].other.label: `**`・`[]`・`[{キー}]` を含む項目のパスには書き込めません' = Violation(path='set.#models[Col].other.label', rule='#models[Col].other.label: `**`・`[]`・`[{キー}]` を含む項目のパスには書き込めません', fix='', index=None, doc=None).rule
+
+tests/unit/project_index/features/write/test_apply.py:764: AssertionError
+_________ test_apply_operation_when_set_ref_path_unresolved[selector] __________
+
+key = 'models[Col].label', message = '`#` で始めて x-key の値で要素を指してください'
+
+    @pytest.mark.parametrize(
+        ("key", "message"),
+        [
+            pytest.param("#models[Zzz].label", "name が Zzz の要素がありません", id="missing_element"),
+            pytest.param("#models[Col].other.label", "にキー other がありません", id="missing_middle"),
+            pytest.param(
+                "models[Col].label",
+                "`#` で始めて x-key の値で要素を指してください",
+                id="selector",
+            ),
+        ],
+    )
+    def test_apply_operation_when_set_ref_path_unresolved(key: str, message: str) -> None:
+        """`set` のキーを解けない（異常系）。"""
+        # 準備
+        current = _set_content()
+        operation = Operation(op="update", id="doc-1", expected_version="v1", set={key: "n"})
+        # 実行・検証
+        with pytest.raises(InvalidArgumentError) as exc_info:
+            apply_operation(current, operation, schema=_SET_SCHEMA)
+        assert [violation.path for violation in exc_info.value.violations] == [f"set.{key}"]
+>       assert message in exc_info.value.violations[0].rule
+E       AssertionError: assert '`#` で始めて x-key の値で要素を指してください' in 'models[Col].label: `**`・`[]`・`[{キー}]` を含む項目のパスには書き込めません'
+E        +  where 'models[Col].label: `**`・`[]`・`[{キー}]` を含む項目のパスには書き込めません' = Violation(path='set.models[Col].label', rule='models[Col].label: `**`・`[]`・`[{キー}]` を含む項目のパスには書き込めません', fix='', index=None, doc=None).rule
+
+tests/unit/project_index/features/write/test_apply.py:764: AssertionError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_set_field_when_selector
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_resolve_ref_path_when_missing_last[element_key]
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_resolve_ref_path_when_missing_last[dict_key]
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_resolve_ref_path_when_missing_last_unresolved[element]
+FAILED tests/unit/project_index/features/documents/test_fields.py::test_resolve_ref_path_when_missing_last_unresolved[middle]
+FAILED tests/unit/project_index/features/write/test_apply.py::test_apply_operation_when_set_ref_path
+FAILED tests/unit/project_index/features/write/test_apply.py::test_apply_operation_when_set_ref_path_element
+FAILED tests/unit/project_index/features/write/test_apply.py::test_apply_operation_when_set_ref_path_unresolved[missing_element]
+FAILED tests/unit/project_index/features/write/test_apply.py::test_apply_operation_when_set_ref_path_unresolved[missing_middle]
+FAILED tests/unit/project_index/features/write/test_apply.py::test_apply_operation_when_set_ref_path_unresolved[selector]
+10 failed, 118 passed in 0.24s

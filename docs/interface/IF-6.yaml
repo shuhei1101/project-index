@@ -2369,6 +2369,55 @@ flows:
       - 4 回目の決まりは指すファイルが既にあることで、直し方は既にあるファイルを本文のファイルにするなら `@body` を除くこと、`@body` を書くなら新規のファイルのパスにすること
       - どのファイルも変わらない
     test: test_error_when_existing_body_file_not_adoptable
+  - name: 正常系（参照の型の項目のパスで要素へキーを追加する）
+    summary: '`set` のキーに `#` で始まる参照の型の項目のパスを渡し、`x-key` の値で指した配列の要素に今は無いキーを追加する・あるキーの値を置き換える。解決できないパスと、`#` で始まらず要素の選び方を含むキーを断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 種類のスキーマ
+        description: 'sample の種類のスキーマが `models`（`x-key: name` の配列。要素は `name`・文字列の配列 `properties`・文字列 `label`・オブジェクト `meta` を持つ）と、`x-key` を持たない配列 `steps`（要素は `name`・`body`）と、値が文字列の辞書 `notes` を定める'
+      - name: 文書 1
+        description: '`models` が `{name: Row, properties: [a], meta: {x: 1}}`・`{name: Col, properties: [b]}`。`steps` は 1 要素。`notes` はキー `main` だけを持つ'
+      - name: 入力
+        description: '1 回目は `set: {"#models[Col].label": l}`。2 回目は `set: {"#models[Col].label": m}`。3 回目は `set: {"#models[Row].meta": {y: 2}}`。4 回目は `set: {"models[Col].label": n}`。5 回目は `set: {"#models[Zzz].label": n}`。6 回目は `set: {"#steps[a].body": n}`。7 回目は `set: {"#models[Col#2].label": n}`。8 回目は `set: {"#models[Col].other.label": n}`。9 回目は `set: {"#notes[a.b]": v}`'
+        notes: 4 回目は `#` で始まらず要素の選び方を含むキー。5 回目は無い要素、6 回目は `x-key` の無い配列、7 回目は無い順番、8 回目は途中の無いキー。9 回目は最後の区切りが辞書の項目の `[{キー}]` で、`.` を含む今は無いキー
+    flow: |-
+      <!-- map: {"title": "正常系（参照の型の項目のパスで要素へキーを追加する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: update 文書 1（set #models[Col].label = l）
+        T->>T: 種類のスキーマの x-key で models[1] に解決し、label を追加する
+        T->>WT: YAML を書き換える
+        T-->>C: updated
+        C->>T: update 文書 1（set #models[Col].label = m）
+        T->>T: models[1].label を置き換える
+        T-->>C: updated
+        C->>T: update 文書 1（set #models[Row].meta = {y: 2}）
+        T->>T: models[0].meta の今の値へマージする
+        T-->>C: updated
+        C->>T: update 文書 1（set models[Col].label）
+        T-->>C: isError（set.models[Col].label）
+        C->>T: update 文書 1（set #models[Zzz].label など 4 回）
+        T-->>C: isError（set.{キー}）
+        C->>T: update 文書 1（set #notes[a.b] = v）
+        T->>T: 辞書のキー a.b を 1 階層の最後のキーとして追加する
+        T-->>C: updated
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目の後、Col の要素に `label: l` が追加され、ファイルで変わった行は `label` の 1 行だけ。Row の要素は変わらない'
+      - 2 回目の後、Col の `label` が `m`
+      - '3 回目の後、Row の `meta` が `{x: 1, y: 2}`'
+      - 4 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].set.models[Col].label`、`rule` が `#` で始めて `x-key` の値で要素を指す書き方を案内する。文書 1 を書き換えない
+      - 5・6・7・8 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].set.{キー}` で、それぞれ無い要素・`x-key` の無い配列・`name` が `Col` の要素が 1 つしか無いこと・`models[1]` にキー `other` が無いことを返却する。文書 1 を書き換えない
+      - 9 回目の後、`notes` にキー `a.b` が値 `v` で追加され（`a` の下の `b` にはしない）、キー `main` は変わらない
+    test: test_normal_when_set_ref_path
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -2477,7 +2526,7 @@ request:
     default: なし
     location: argument
     description: 項目に値を入れる。オブジェクトは再帰的にマージし、配列と値は置き換える
-    notes: '`update` だけ'
+    notes: '`update` だけ。`#` で始まる参照の型の項目のパスのキーも受ける（制約「set の項目のパス」）'
   - name: operations[].unset
     type: list[str]
     required: false
@@ -2724,7 +2773,7 @@ exceptions:
     condition: '`update`・`replace` の `id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
   - name: InvalidArgumentError
-    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先を行の `paths` の先頭から決められない（`records` を持つ行で先頭が空か glob を含む・持たない行で先頭が glob を含まないか、最後の段の `*` を ID に置き換えた後に glob が残るか、決めた配置先が行の `paths` に当たらない）・`create` の配置先が行の `exclude[]` に当たる（`/` を含む値はパス、含まない値はファイル名で当てる）・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` が無いファイルを指し `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`rename` に `new_id`・`new_path` がどちらも無い・ID がパスの文書に `new_id` を渡した・`body_file` を持たない `records` の行の文書に `new_path` を渡した・`new_path` が種類の行の `paths` に当たらないか `exclude[]` に当たるか既にあるファイルを指す・`replace_text` に `filter`・`old`・`new` のどれかが無いか `old` が空・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す・`unset` の要素の参照の型の項目のパスを解決できないか、`#` で始まらない要素に要素の選び方（`[...]`・`**.`）を含む・`x-key` を持つ配列への `remove_from` の値に削除する要素が無い・`commit` と `atomic: false` を同時に渡した・`commit` と `worktree` を同時に渡した'
+    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先を行の `paths` の先頭から決められない（`records` を持つ行で先頭が空か glob を含む・持たない行で先頭が glob を含まないか、最後の段の `*` を ID に置き換えた後に glob が残るか、決めた配置先が行の `paths` に当たらない）・`create` の配置先が行の `exclude[]` に当たる（`/` を含む値はパス、含まない値はファイル名で当てる）・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` が無いファイルを指し `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`rename` に `new_id`・`new_path` がどちらも無い・ID がパスの文書に `new_id` を渡した・`body_file` を持たない `records` の行の文書に `new_path` を渡した・`new_path` が種類の行の `paths` に当たらないか `exclude[]` に当たるか既にあるファイルを指す・`replace_text` に `filter`・`old`・`new` のどれかが無いか `old` が空・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す・`unset` の要素の参照の型の項目のパスを解決できないか、`#` で始まらない要素に要素の選び方（`[...]`・`**.`）を含む・`set` のキーの参照の型の項目のパスを解決できないか、`#` で始まらないキーに要素の選び方（`[]`・`[{キー}]`・`**.`）を含む・`add_to`・`remove_from` のキーの参照の型の項目のパスを解決できないか解決した値が配列でない、または `#` で始まらないキーに要素の選び方（`[...]`・`**.`）を含む・`x-key` を持つ配列への `remove_from` の値に削除する要素が無い・`commit` と `atomic: false` を同時に渡した・`commit` と `worktree` を同時に渡した'
   - name: SourceNotServedError
     condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
   - name: WorktreeNotMatchedError
@@ -2836,7 +2885,7 @@ constraints:
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、作業場所が `scope.write` に当たれば登録したフォルダへ書き、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく、制約「日時の付与」で `created`・`updated` を付ける。`worktree` を指定すると `InvalidArgumentError`'
   - item: 参照の型の項目のパス
-    constraint: '`text_edits[].field` が `#` で始まるとき、`#` の後を種類のスキーマ（`$ref` を解決した後）と文書でたどり、位置で指す項目のパスに解決してから既存の取得・書き込みで置き換える。配列の項目の `[{値}]` はスキーマの `x-key` のキーがその値の最初の要素、`[{値}#{順番}]` は同じ値の要素のその順番の要素（同じ値の要素が無く、末尾が `#{整数}` のときだけ）、辞書の項目の `[{キー}]` はそのキー（`.` や空白を含んでも 1 階層）を指す。`[...]` の中の `[` と `]` は対応を数え、対応の取れた `[` `]` は値の一部として読む（`#request[operations[].fields].description` は `x-key` の値が `operations[].fields` の要素）。対応の取れない `[` `]` を含むパスは記載方法の誤り。`[]` の外の `.` で区切った名前は辞書のキー。共通のキーの列名への読み替えはしない。`text_edits[].field`・`add_to`・`remove_from` のキーと `unset` の要素だけが受け付け、`set` と `metadata` の列名・`search_docs`・`list_changes` の項目のパスの読み方は変えない'
+    constraint: '`text_edits[].field` が `#` で始まるとき、`#` の後を種類のスキーマ（`$ref` を解決した後）と文書でたどり、位置で指す項目のパスに解決してから既存の取得・書き込みで置き換える。配列の項目の `[{値}]` はスキーマの `x-key` のキーがその値の最初の要素、`[{値}#{順番}]` は同じ値の要素のその順番の要素（同じ値の要素が無く、末尾が `#{整数}` のときだけ）、辞書の項目の `[{キー}]` はそのキー（`.` や空白を含んでも 1 階層）を指す。`[...]` の中の `[` と `]` は対応を数え、対応の取れた `[` `]` は値の一部として読む（`#request[operations[].fields].description` は `x-key` の値が `operations[].fields` の要素）。対応の取れない `[` `]` を含むパスは記載方法の誤り。`[]` の外の `.` で区切った名前は辞書のキー。共通のキーの列名への読み替えはしない。`text_edits[].field`・`set`・`add_to`・`remove_from` のキーと `unset` の要素だけが受け付け、`metadata` の列名・`search_docs`・`list_changes` の項目のパスの読み方は変えない'
     notes: 書き方は設計書の参照の型（`{ID}#{項目のパス}`）の `#` から後と同じ。`#` で始まらない既存の `[{キー}]`（キーが真の要素）とは `#` の有無で分ける
   - item: add_to・remove_from の項目のパス
     constraint: '`add_to`・`remove_from` のキーが `#` で始まるとき、「参照の型の項目のパス」と同じ読み方で文書の中の 1 つの配列へ解決し、その配列へ追加・削除する。解決できないパス（無い要素・`x-key` の無い配列・無いキー）と、解決した値が配列でないパスは `add_to.{パス}`・`remove_from.{パス}` の違反にする。`#` で始まらないキーに要素の選び方（`[...]`・`**.`）を含めると、書き込まずに同じ違反にする'
@@ -2914,6 +2963,9 @@ constraints:
     notes: 取り込んだ要素の `rename`・`delete_docs` は本文のファイルを移動・削除するため、ほかの文書のファイルは取り込まない
   - item: 本文のファイルの違反の直し方
     constraint: '`body_file` の列だけが無いファイルを指す違反の直し方は、`@body` を加えるか先に本文のファイルを作成すること。`@body` を渡して既にあるファイルを指す違反の直し方は、既にあるファイルを本文のファイルにするなら `@body` を除き、本文を記載するなら新規のファイルのパスにすること。配信元のいずれかの文書のファイルを指す違反の直し方は、どの文書のファイルでもないパスを指定すること'
+  - item: set の項目のパス
+    constraint: '`set` のキーが `#` で始まるとき、最後の区切りの手前までを「参照の型の項目のパス」と同じ読み方で文書の中の 1 つの項目へ解決し、その項目の最後のキーへ値を入れる。最後のキーが無ければ追加し、あればオブジェクトの値は今の値へ再帰的にマージし、配列と値は置き換える。最後の区切りが辞書の項目の `[{キー}]` のときは、そのキー（`.` や空白を含んでも 1 階層）を最後のキーとして同じく扱い、無ければ追加する。最後の区切りが配列の項目の `[{値}]`・`[{値}#{順番}]` のときは、解決した要素そのものへ同じく入れ、要素が無ければ違反にする。解決できないパス（無い要素・`x-key` の無い配列・無い順番・途中の無いキー）と、最後のキーの手前が辞書でないパスは `set.{パス}` の違反にする。`#` で始まらないキーに要素の選び方（`[]`・`[{キー}]`・`**.`）を含めると、書き込まずに同じ違反にし、違反の `rule` で `#` で始めて `x-key` の値で要素を指す書き方を案内する'
+    notes: '`#` で始まらず要素の選び方を含まないキーは今までどおりで、途中の項目が無ければ作る。`#` で始まるキーは途中の項目を作らない。共通のキーの列名への読み替えは `#` で始まるキーにはしない'
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]
