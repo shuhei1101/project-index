@@ -1071,7 +1071,7 @@ def test_write_docs_when_existing_body_file_rejected(
     assert (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
 
 
-NESTED_NOTES ="items:\n  - id: n1\n    meta:\n      path: n1.md\n  - id: n3\n"
+NESTED_NOTES = "items:\n  - id: n1\n    meta:\n      path: n1.md\n  - id: n3\n"
 NESTED_N1_VERSION = value_hash([{"id": "n1", "meta": {"path": "n1.md"}}, NOTE_1])
 
 
