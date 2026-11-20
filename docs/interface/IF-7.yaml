@@ -391,6 +391,67 @@ flows:
       - '`notes/` のファイル（`notes/n1.md`）は削除されない'
       - 結果の `status` が `deleted`
     test: test_normal_when_body_file_absent
+  - name: 正常系（直コミットで文書を消す）
+    summary: '`commit` を指定した削除で、develop のワークツリーから文書を消し、削除と生成物の変更だけをコミットしてプッシュする'
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元とテスト用のベアリポジトリを作り、project-index のアプリをテストのクライアントで呼ぶ）
+      - name: 直コミットの配信元
+        description: '[文書の書き込み](id:IF-6) の正常系（直コミットする）の配信元の `develop` に、種類 `note` の文書 1 をコミット済みのもの'
+      - name: 入力
+        description: '`cwd` に手元の作業場所、`targets` に文書 1 と読んだときの `version`、`commit: {message: "docs: note を消す"}`'
+    flow: |-
+      <!-- map: {"title": "正常系（直コミットで文書を消す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
+        participant WT as ワークツリー develop
+        participant R as リモート
+
+        C->>T: cwd: 手元の作業場所, commit: message, targets: 文書 1
+        T->>T: 直コミットの設定・呼べる作業場所・許可する種類を確認する
+        R-->>T: develop を取得する
+        T->>WT: 早送りで取り込み、文書 1 のファイルを削除し、generators を実行する
+        T->>WT: 削除と生成物の変更だけをコミットする
+        T->>R: develop へプッシュする
+        T-->>C: deleted、commit（sha・branch・retried）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`applied: true` で、文書 1 の `status` が `deleted`、`commit.branch` が `develop`'
+      - リモートの `develop` に、文書 1 のファイルの削除と生成物の変更だけを含む 1 コミットが増え、SHA が `commit.sha` と一致する
+      - develop のワークツリーに文書 1 のファイルが無く、`git status` に変更が出ない
+    test: test_normal_when_direct_commit
+  - name: 異常系（直コミットを許可していない種類の文書を消す・ValidationFailedError）
+    summary: 直コミットを許可していない種類の文書を消す `commit` を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットで文書を消す）の配信元の `develop` に、種類 `rule` の文書 r1 をコミット済みのもの
+      - name: 入力
+        description: '`targets` に r1 と `commit`'
+    flow: |-
+      <!-- map: {"title": "異常系（直コミットを許可していない種類の文書を消す・ValidationFailedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
+
+        C->>T: commit: message, targets: r1
+        T->>T: 種類 rule が direct_commit.kinds に無い
+        T-->>C: isError（添字 0・種類 rule は直コミットを許可していない）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、添字 0 の違反として種類 `rule` は直コミットを許可していないことを返却する'
+      - リモートと develop のワークツリーは変わらず、r1 のファイルが残る
+    test: test_error_when_direct_commit_kind_not_allowed
 lead: 文書を物理削除し、`related` からの参照を拒否するか除外する `delete_docs` の入出力を定め、`delete_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -400,15 +461,16 @@ tags:
 aliases:
   - 'delete_docs'
 identifier: delete_docs
-permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーだけ。Git 管理外の配信元は種類の `documents[].writable` が削除を許すこと
+permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーだけ。`commit` を指定した呼び出しは、`write_docs` と同じく `scope.write` の代わりに端末の設定の `sources[].direct_commit` に `cwd` が該当すること。Git 管理外の配信元は種類の `documents[].writable` が削除を許すこと
 idempotent: false
-side_effects: '作業ツリー（Git 管理外の配信元はそのフォルダ）の文書のファイルと、`records`・`body_file` の行の文書の本文のファイルを削除する（本文のファイルを持たない要素は要素だけを除く）。`on_referenced: unlink` のときは参照元の文書の `related` も書き換える。`generators[]` を流す。'
+side_effects: '作業ツリー（Git 管理外の配信元はそのフォルダ）の文書のファイルと、`records`・`body_file` の行の文書の本文のファイルを削除する（本文のファイルを持たない要素は要素だけを除く）。`on_referenced: unlink` のときは参照元の文書の `related` も書き換える。`generators[]` を流す。`commit` を指定した呼び出しは、`write_docs` と同じく、削除したファイル・書き換えた参照元・生成物だけをコミットしてプッシュする。'
 callers:
   - SC-7#scenarios[正常シナリオ（参照も外して消す）]
   - SC-7#scenarios[正常シナリオ（変更していない項目の引用符を保つ）]
   - SC-7#scenarios[正常シナリオ（本文のファイルを持つ文書を消す）]
   - SC-7#scenarios[正常シナリオ（本文のファイルを持たない要素を書く）]
-exclusivity: '`write_docs` と同じ配信元ごとの排他ロックの中で行う'
+  - SC-15#scenarios[正常シナリオ（文書を消す）]
+exclusivity: '`write_docs` と同じ配信元ごとの排他ロックの中で行う。`commit` を指定した呼び出しは、`write_docs` と同じリポジトリの単位の排他も取る'
 request:
   - name: source
     type: str
@@ -455,6 +517,25 @@ request:
     location: argument
     description: セッションの作業場所
     notes: PreToolUse のフックがセッションの作業場所で上書きし、エージェントが指定した値は使わない。ツールの入力のスキーマの `description` にも同じことと、ワークツリーは `worktree` で指すことを載せる
+  - name: commit
+    type: '{message: str, branch: str | None} | None'
+    required: false
+    default: なし（コミットとプッシュをしない）
+    location: argument
+    description: '`write_docs` と同じ。削除の後に、コミットするブランチのワークツリーでコミットしてプッシュする'
+    constraints: '`atomic: true` のときだけ'
+    notes: '`worktree` と同時には受けない'
+  - name: commit.message
+    type: str
+    required: true
+    location: argument
+    description: '`write_docs` と同じ'
+  - name: commit.branch
+    type: str | None
+    required: false
+    default: なし（配信元の設定の `direct_commit.branch`）
+    location: argument
+    description: '`write_docs` と同じ'
 request_example: |-
   ```json
   {
@@ -488,6 +569,15 @@ response:
   - name: unlinked[].version
     type: str
     description: 参照を外した後のバージョン
+  - name: commit.sha
+    type: str
+    description: '`write_docs` と同じ'
+  - name: commit.branch
+    type: str
+    description: '`write_docs` と同じ'
+  - name: commit.retried
+    type: bool
+    description: '`write_docs` と同じ'
 response_example: |-
   ```json
   {"applied": true,
@@ -523,7 +613,37 @@ exceptions:
     condition: 消す先のワークツリーの初めての読み込みが、端末の設定の `worktree_load_wait_sec` までに終了しなかった
     notes: '`write_docs` と同じ'
   - name: InvalidArgumentError
-    condition: '`storage.type: disk` の配信元に `worktree` を渡した'
+    condition: '`storage.type: disk` の配信元に `worktree` を渡した・`commit` と `atomic: false` か `worktree` を同時に渡した'
+  - name: ValidationFailedError
+    condition: '`commit` を指定した呼び出しで、消す文書か参照を外す文書の種類が `direct_commit.kinds[]` に無いか、参照を外した文書が秘密の値の規則に該当する'
+    notes: 違反ごとの添字・パス・決まりを添える
+  - name: DirectCommitNotConfiguredError
+    condition: '`write_docs` と同じ'
+    notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
+  - name: DirectCommitNotPermittedError
+    condition: '`write_docs` と同じ'
+    notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
+  - name: BranchNotAllowedError
+    condition: '`write_docs` と同じ'
+    notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
+  - name: CommitWorktreeNotFoundError
+    condition: '`write_docs` と同じ'
+    notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
+  - name: UnpushedCommitsError
+    condition: '`write_docs` と同じ'
+    notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
+  - name: UncommittedChangesError
+    condition: '`write_docs` と同じ（消すファイルを含む）'
+    notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
+  - name: FetchFailedError
+    condition: '`write_docs` と同じ'
+    notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
+  - name: PushRejectedError
+    condition: '`write_docs` と同じ。戻すときは削除したファイルを元に戻す'
+    notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
+  - name: PushFailedError
+    condition: '`write_docs` と同じ。戻すときは削除したファイルを元に戻す'
+    notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
 constraints:
   - item: 件数
     constraint: 1 回の `targets` は最大 50 件
@@ -541,6 +661,9 @@ constraints:
     constraint: '`records`・`body_file` の行の文書は、管理用の YAML から要素を除き、本文のファイルも削除する。同じ管理用の YAML のほかの要素が同じ本文のファイルを指すときは、本文のファイルを削除しない'
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、登録したフォルダから消し、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく、`documents[].writable` が削除を許さない種類は `DeleteNotAllowedError`。`worktree` を指定すると `InvalidArgumentError`'
+  - item: 直コミット
+    constraint: '`commit` を指定した呼び出しは、[文書の書き込み](id:IF-6) の制約「直コミットの権限」から「直コミットの試しの書き込み」までと同じ。消す文書と参照を外す文書の種類が全て `direct_commit.kinds[]` にあるときだけ進め、削除したファイル・書き換えた参照元・生成物だけをコミットする'
+    notes: 共通の処理のため、直コミットの異常系の結合テストは文書の書き込みが持つ
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ（参照も外して消す）]

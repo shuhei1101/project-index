@@ -261,5 +261,31 @@ requirements:
     rationale: 端末の負荷で秒数が揺れるため、同じ時間帯に測った変更の前の値に対する比で決める。PoC で、取り合いの除去・C の YAML の読み込み・照合とスキーマの使い回しを入れた構成がどの基準も大きな余裕で満たした（dev-docs 0.05 倍・ほかは 0.27〜0.48 倍・ai-monitor 0.31 倍と 0.11 倍）。秒数の上限は決めない
     overflow: 超えても止めない。45 秒を超えた問い合わせは dev-docs の画面の側で打ち切られる
     status: planned
+  - id: NFR-15
+    name: 直コミットの取り込みとプッシュの所要時間の余裕
+    english_name: direct_commit_network_margin
+    category: 可用性
+    external_constraint: 文書の MCP の応答の上限 48 秒
+    source_kind: 実行基盤の制限
+    source: NFR-1#requirements[文書の MCP の応答の上限]
+    value: '8'
+    unit: 秒
+    measurement: プッシュを止めた後に、リモートの追跡ブランチの取得・コミットの取り消し・ファイルの戻し・応答の組み立てを終えるまでの時間を、GitHub のリモートで 10 回測る
+    breakdown:
+      - part: 外側の待ち
+        value: '48'
+        notes: 文書の MCP の応答の上限
+      - part: 止めたプッシュの確認（リモートの追跡ブランチの取得）
+        value: '5'
+        notes: 実測が無いため、小さなリポジトリの取得の見込み。測って p99.9 で差し替える
+      - part: 戻しと応答の組み立て
+        value: '3'
+        notes: コミットの取り消しと書き込んだファイルの戻しは手元の git だけで終わる
+      - part: アプリの決定値
+        value: '8'
+        notes: 5 + 3
+    rationale: 取得は書き込みの期限の中で止める。プッシュはファイルの置き換えの後に始まるため、応答の上限までの残りの時間から、止めたプッシュの確認と戻しと応答の組み立ての分を除いた時間をプッシュの制限時間にする（規約『資源の値の決め方』の入れ子の待ち）
+    overflow: プッシュを制限時間で止め、リモートにコミットが入っていなければ戻して `PushFailedError` を返却する
+    status: planned
 id: NFR-1
 visibility: internal
