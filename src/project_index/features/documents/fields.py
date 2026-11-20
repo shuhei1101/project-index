@@ -220,7 +220,8 @@ def field_arrays(data: Mapping[str, Any], path: str) -> list[list[object]]:
 
 def set_field(data: MutableMapping[str, Any], path: str, value: object) -> None:
     """項目のパスで指した場所へ値を書く。"""
-    _set_tokens(data, _plain_tokens(path, "には書き込めません"), value, path)
+    message = "には書き込めません。`#` で始めて x-key の値で要素を指してください"
+    _set_tokens(data, _plain_tokens(path, message), value, path)
 
 
 def set_field_at(
@@ -295,20 +296,32 @@ ORDER_PATTERN = re.compile(r"(.*)#(\d+)")
 
 
 def resolve_ref_path(
-    data: Mapping[str, Any], schema: Mapping[str, Any], path: str
+    data: Mapping[str, Any],
+    schema: Mapping[str, Any],
+    path: str,
+    *,
+    missing_last: bool = False,
 ) -> list[str | int]:
-    """参照の型の項目のパス（`#` の後）を、文書と種類のスキーマでキーと位置の並びに解く。"""
+    """参照の型の項目のパス（`#` の後）を、文書と種類のスキーマでキーと位置の並びに解く。
+
+    `missing_last` が真のとき、最後の区切りが辞書のキーなら、そのキーが無くても並びに加える。
+    """
     tokens: list[str | int] = []
     current: object = data
     node = _schema_node(schema, schema)
-    for key, bracketed in _split_ref_path(path):
-        # 配列に対する `[...]` は、スキーマの `x-key` の値で要素を選ぶ
+    parts = _split_ref_path(path)
+    for index, (key, bracketed) in enumerate(parts):
+        # 配列に対する `[...]` は、スキーマの `x-key` の値で要素を選ぶ（要素の実在を求める）
         if bracketed and is_list(current):
             position = _element_position(current, node, key, path, tokens)
             tokens.append(position)
             current = current[position]
             node = _schema_node(schema, node.get("items"))
             continue
+        # 最後の区切りが辞書の無いキーで、無いキーを許す: 書き込み先のキーとして加えて終える
+        if missing_last and index == len(parts) - 1 and is_dict(current) and key not in current:
+            tokens.append(key)
+            break
         if not is_dict(current) or key not in current:
             raise _invalid(path, f"{path}: {_join(tokens) or '最上位'} にキー {key} がありません")
         tokens.append(key)
