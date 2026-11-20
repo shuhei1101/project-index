@@ -291,6 +291,12 @@ data_models:
         access: 公開
         default: None
         description: 行の `storage`。書いていない行は `None`（JSON ではキーを出さない）
+      - name: direct_commit
+        title: 直コミットを呼べる作業場所
+        type: SourceDirectCommit | None
+        access: 公開
+        default: None
+        description: 行の `direct_commit`。`scope`・`kinds` がどちらも空の行は `None`（JSON ではキーを出さない）
   - name: SettingsSourcesView
     title: 端末の設定の取得の応答
     container: project_index/features/settings/types.py
@@ -436,6 +442,12 @@ data_models:
         access: 公開
         default: None
         description: 送ったときだけ置き換える
+      - name: direct_commit
+        title: 直コミットを呼べる作業場所
+        type: SourceDirectCommit | None
+        access: 公開
+        default: None
+        description: '`scope`・`kinds` を `SourceDirectCommit` の `model_fields_set` で別々に置き換える。`kinds` は送ったとき丸ごと置き換える'
   - name: SettingsSourcePatchRequest
     title: 1 行の変更の要求
     container: project_index/features/settings/types.py

@@ -48,7 +48,7 @@ functions:
       description: 5 つのルートを持つルーター
     process: |-
       1. 全てのルートは、先頭で `await handlers.registry.wait_loaded()` を呼び、配信元の初回の読み込みが終わるまで待つ（起動.待ち受けまでの順番）
-      2. GET `/settings/sources` は、排他を取らずに `handlers.terminal.file` を 1 回だけ読んで本文と内容のバージョンを求め（端末の設定の内容の読み込み）、同じ本文を端末の設定の読み込みに `text` で渡して行にする。`handlers.terminal.file` を `settings_path` にし、`sources[]` の各行に、`config`（行に `id` があれば `id` も）が同じ配信元の状態の `id`・`status`・`errors`・`config_version` を重ねた（行の `config`・`enabled`・`scope`・`outside_read` はそのまま返す）（1 つの状態は 1 行にだけ重ねる。当たる状態が無い行は `status` を `pending_reload`・`id` を行の `id` にする） `SettingsSourcesView` を、内容のバージョンを `version` にして返す（配信元の一覧.状態の一覧）。`warnings` は再読み込みした端末の設定の知らないキーの警告（知らないキーの警告）
+      2. GET `/settings/sources` は、排他を取らずに `handlers.terminal.file` を 1 回だけ読んで本文と内容のバージョンを求め（端末の設定の内容の読み込み）、同じ本文を端末の設定の読み込みに `text` で渡して行にする。`handlers.terminal.file` を `settings_path` にし、`sources[]` の各行に、`config`（行に `id` があれば `id` も）が同じ配信元の状態の `id`・`status`・`errors`・`config_version` を重ねた（行の `config`・`enabled`・`scope`・`outside_read` はそのまま返す。行の `direct_commit` は `scope`・`kinds` のどちらかが空でないときだけ返し、両方とも空の行は `None` にする）（1 つの状態は 1 行にだけ重ねる。当たる状態が無い行は `status` を `pending_reload`・`id` を行の `id` にする） `SettingsSourcesView` を、内容のバージョンを `version` にして返す（配信元の一覧.状態の一覧）。`warnings` は再読み込みした端末の設定の知らないキーの警告（知らないキーの警告）
       3. PUT `/settings/sources` は、同じオリジンの確認を依存に持ち（同じオリジンの確認）、本文を `SettingsSourcesRequest` で受けて『配信元の保存』を `expected_version`・`reload=handlers.reload_sources`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼び、`SettingsSourcesWriteResponse` を返す（配信元の保存）。`warnings` は保存の後の `handlers.terminal`（再読み込みで差し替わる）の知らないキーの警告
          - `TerminalConfigInvalidError` は例外の変換で 422、`SettingsVersionMismatchError` は 409 の problem+json になる
       4. POST `/settings/sources` は、同じオリジンの確認を依存に持ち、本文を `SettingsSourceAddRequest` で受けて『配信元の 1 行の追加』を `expected_version`・`reload=handlers.reload_changed`・`lock=handlers.settings_lock` で `asyncio.to_thread` で呼ぶ。`added` は 201、`exists` は 409 で `SettingsSourceAddResponse` を返す。`warnings` は PUT と同じ
@@ -123,6 +123,12 @@ functions:
         condition: PUT・POST `/settings/sources` を `Origin` なしで、`expectedVersion` を含めずに送る
         mock: 配線済みの関数（`save_sources`・`add_source` の呼ばれた数を数える偽物）
         expected: どちらも 400 で `errors[]` に `expectedVersion` があり、`save_sources`・`add_source` は呼ばれない
+      - name: test_build_settings_router_when_direct_commit
+        case: 正常
+        summary: direct_commit を持つ行だけに directCommit を返す
+        condition: GET `/settings/sources`、ファイルは `direct_commit.scope` を持つ extra と、`direct_commit` を持たない sample の 2 行
+        mock: 配線済みの関数（偽物。端末の設定は一時フォルダのファイル）
+        expected: 200 で、extra の行の `directCommit.scope` がファイルの値で `directCommit.kinds` が空。sample の行に `directCommit` のキーが無い
 refs:
   - to: IF-30
     type: requires
