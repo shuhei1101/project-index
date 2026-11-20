@@ -1,0 +1,63 @@
+# NFR-17 の計測（スレッド 8 本・ref=c9cd618aa の DATA-3694-1.yaml と ref を省いた DATA-3430-1.yaml を交互に取得し、直列化まで測る）
+# 計測のスクリプト: 配信元 ai-monitor と knowledge だけの端末の設定・空の状態フォルダで、文書の取得のサービスを呼ぶ
+
+## 変更の後（a8bdf97）
+$ PYTHONPATH=src python nfr17.py after 4
+ 15:34:21 up 3 days, 11:02,  0 user,  load average: 7.57, 8.40, 7.57
+after round=1 ref=0.612 default=0.594
+after round=2 ref=0.800 default=0.465
+after round=3 ref=0.985 default=0.526
+after round=4 ref=0.663 default=0.479
+after ref median(2回目以降)=0.800 all=[0.612, 0.8, 0.985, 0.663]
+after default median(2回目以降)=0.479 all=[0.594, 0.465, 0.526, 0.479]
+
+## 変更の前（origin/develop c79ecf5）
+$ PYTHONPATH=<origin/develop の src> timeout 3300 python nfr17.py before 3
+ 15:35:03 up 3 days, 11:03,  0 user,  load average: 8.27, 8.47, 7.63
+before round=1 ref=44.560 default=367.195
+before round=2 ref=504.208 default=684.511
+ 16:25:03 up 3 days, 11:58,  0 user,  load average: 7.24, 7.64, 8.56
+done
+# 3 周目の途中で timeout 3300 秒に達して止まった
+
+## 計測のスクリプト
+"""NFR-17 の計測: スレッド 8 本で、ref を指した文書と ref を省いた文書の取得と直列化を交互に呼ぶ。"""
+import os, sys, time, threading, statistics
+from pathlib import Path
+from project_index.features.settings.query import config_path, load_terminal_config
+from project_index.main import build_handlers
+from project_index.features.read.paths import read_target
+from project_index.features.read import service as svc
+
+LABEL = sys.argv[1]
+ROUNDS = int(sys.argv[2])
+REF = "c9cd618aa"
+terminal = load_terminal_config(config_path(os.environ))
+terminal = terminal.model_copy(update={"sources": [s for s in terminal.sources if s.id in ("ai-monitor", "knowledge")], "state_dir": Path(f"/tmp/pi215/state-{LABEL}")})
+h = build_handlers(terminal)
+h.registry.load(h.terminal)
+
+def one(ref, path):
+    t = time.perf_counter()
+    target, _ = read_target("ai-monitor", ref, registry=h.registry)
+    resp = svc.get_document(target, path, store=h.store, converter=h.converter)
+    resp.model_dump_json(by_alias=True)
+    return time.perf_counter() - t
+
+one(None, "docs/data/DATA-3430-1.yaml"); one(REF, "docs/data/DATA-3694-1.yaml")
+stop = threading.Event()
+def burn():
+    x = 0
+    while not stop.is_set():
+        x += 1
+ts = [threading.Thread(target=burn, daemon=True) for _ in range(8)]
+for t in ts: t.start()
+time.sleep(0.5)
+rows = {"ref": [], "default": []}
+for i in range(ROUNDS):
+    rows["ref"].append(one(REF, "docs/data/DATA-3694-1.yaml"))
+    rows["default"].append(one(None, "docs/data/DATA-3430-1.yaml"))
+    print(f"{LABEL} round={i+1} ref={rows['ref'][-1]:.3f} default={rows['default'][-1]:.3f}", flush=True)
+stop.set()
+for k, v in rows.items():
+    print(f"{LABEL} {k} median(2回目以降)={statistics.median(v[1:]):.3f} all={[round(x,3) for x in v]}", flush=True)
