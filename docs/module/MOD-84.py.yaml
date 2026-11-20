@@ -274,7 +274,7 @@ functions:
       `request.commit` がある場合は、手順 2〜13 の代わりに次のように進める（直コミット）。
 
       1. `atomic` が `False` か `worktree` がある場合、添字を持たない違反で `InvalidArgumentError` を送信する
-      2. 配信元を引き（`source` が `None` なら作業中の配信元）、`committable_kinds` が空なら取得の前に `DirectCommitNotPermittedError` を送信する。直コミットの書き込む先で計画を作る。書く場所は、計画のワークツリーを指定した書く場所の解決（`scope.write` を確認しない）にする
+      2. 配信元を引き（`source` が `None` なら作業中の配信元）、直コミットの書き込む先で計画を作る。続けて `committable_kinds` が空なら、取得の前に許可する種類を添えた `DirectCommitNotPermittedError` を送信する。書く場所は、`write_once` のたびに取り込んだ後の計画のワークツリーの設定で作る（作業場所の配信元の読み込み。`scope.write` を確認しない）
       3. `dry_run` なら、排他を握って手順 4・5 と下の「直コミットの確認」だけを行い、`applied=False` で返す（取得・コミット・プッシュをしない）
       4. リポジトリごとの排他.握る（`timeout` は書き込みの期限までの残り）、配信元ごとの排他.握るの順に握り、直コミットを進めるを呼ぶ。`write_once` は次を行う
          - 手順 4・5・6・7 を行う

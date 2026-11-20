@@ -2612,7 +2612,7 @@ response:
   - name: commit.sha
     type: str
     description: プッシュしたコミットの SHA（40 桁）
-    notes: '`commit` を指定し、`dry_run: false` で書き込んだときだけ'
+    notes: '`commit` を指定し、`dry_run: false` で書き込んだときだけ。操作がどのファイルも書き換えなかったときはコミットせず、コミットするブランチの今の HEAD の SHA にする'
   - name: commit.branch
     type: str
     description: プッシュしたブランチ
