@@ -1,0 +1,1 @@
+# 端末の設定の API の追加・保存・1 行の変更で sources[].direct_commit をファイルの行へ書き出す
