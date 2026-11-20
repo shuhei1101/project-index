@@ -506,9 +506,15 @@ def resolve_metadata(data: Mapping[str, Any], table: DocumentTable) -> dict[str,
 
 def missing_ref_fields(data: Mapping[str, Any], table: DocumentTable) -> list[tuple[str, str]]:
     """`metadata` に書いた列のうち、文書の内容に値が無い列を `(キー, 列名)` で返す。"""
-    return [
-        (key, column) for key, column in table.metadata.items() if get_field(data, column) is None
-    ]
+    missing: list[tuple[str, str]] = []
+    for key, column in table.metadata.items():
+        # `**.` で始まる列: どの深さにも無いのは関連を持たない文書の正常な状態なので数えない
+        if isinstance(parse_field_path(column)[0], AnyDepth):
+            continue
+        # 1 つの列を指す列: 値が無ければ記載漏れとして数える
+        if get_field(data, column) is None:
+            missing.append((key, column))
+    return missing
 
 
 def unresolved_related(metadata: Mapping[str, Any], ids: Set[str]) -> list[str]:
