@@ -1,0 +1,575 @@
+id: MOD-178
+title: 索引のサーバー / 書き込み / direct_commit.py
+lead: 直コミットの書き込む先の決定と、取得・確認・コミット・プッシュ・照合・戻しを受け持ち、書き込みの direct_commit.py を修正するときに参照する。
+visibility: internal
+test_files:
+  - tests/unit/project_index/features/write/test_direct_commit.py
+diagrams:
+  - name: 全体
+    diagram: |-
+      <!-- map -->
+
+      ```mermaid
+      flowchart LR
+        W[文書の書き込み・文書の削除] -.-> P[直コミットの書き込む先]
+        W -.-> R[直コミットを進める]
+        R -.-> S[ワークツリーの取り込み]
+        R -.-> D[未コミットの変更の控え]
+        R -.-> K[未コミットの変更の確認]
+        R -.-> C[コミット]
+        R -.-> U[プッシュと照合]
+        R -.-> B[戻し]
+        P -.-> G[gitの実行]
+        S -.-> G
+        D -.-> G
+        C -.-> G
+        U -.-> G
+        B -.-> G
+      ```
+
+      <!-- /map -->
+constants:
+  - name: DIRECT_COMMIT_MARGIN_SEC
+    title: 直コミットの取り込みとプッシュの所要時間の余裕
+    container: project_index/features/write/direct_commit.py
+    usecase: 直コミット
+    summary: プッシュを止めた後の照合・戻し・応答の組み立てに残す秒数
+    value: '8'
+    notes:
+      導き方: '[非機能要件](id:NFR-1) の NFR-15'
+  - name: DIRECT_COMMIT_PUSH_SEC
+    title: 直コミットのプッシュの所要時間
+    container: project_index/features/write/direct_commit.py
+    usecase: 直コミット
+    summary: 生成の制限時間から除くプッシュの秒数
+    value: '5'
+    notes:
+      導き方: '[非機能要件](id:NFR-1) の NFR-16'
+  - name: REMOTE
+    title: リモートの名前
+    container: project_index/features/write/direct_commit.py
+    usecase: 直コミット
+    summary: 取得とプッシュをするリモート（呼び出しで上書きしない）
+    value: '"origin"'
+data_models:
+  - name: CommitPlan
+    title: 直コミットの計画
+    container: project_index/features/write/direct_commit.py
+    usecase: 直コミット
+    role: 値オブジェクト
+    summary: 1 回の直コミットの配信元・ブランチ・ワークツリー・リポジトリ・説明
+    properties:
+      - name: source_id
+        title: 配信元の ID
+        type: str
+        description: 直コミットする配信元
+      - name: branch
+        title: コミットするブランチ
+        type: str
+        description: '`commit.branch`、省くと `direct_commit.branch`'
+      - name: worktree
+        title: ワークツリー
+        type: Path
+        description: ブランチを HEAD が指すワークツリーの直下
+      - name: repo
+        title: リポジトリ
+        type: Path
+        description: '`git rev-parse --git-common-dir` の絶対パス。排他の単位'
+      - name: message
+        title: コミットの説明
+        type: str
+        description: '`commit.message`'
+  - name: DirtyFiles
+    title: 未コミットの変更の控え
+    container: project_index/features/write/direct_commit.py
+    usecase: 直コミット
+    role: 値オブジェクト
+    summary: 書き込みの前にワークツリーにあった未コミットの変更のパスと内容のハッシュ
+    properties:
+      - name: hashes
+        title: パスとハッシュ
+        type: dict[str, str | None]
+        description: ワークツリーの直下からのパス → 内容のハッシュ（削除されたファイルは `None`）
+  - name: PushOutcome
+    title: プッシュの結末
+    container: project_index/features/write/direct_commit.py
+    usecase: 直コミット
+    role: 値オブジェクト
+    summary: プッシュの結果と、失敗したときの理由
+    properties:
+      - name: state
+        title: 結果
+        type: Literal['pushed', 'rejected', 'failed', 'unknown']
+        description: '`pushed` は届いた、`rejected` はリモートに断られた、`failed` は届いていないことを照合で確認した、`unknown` は照合の取得も失敗した'
+      - name: reason
+        title: 理由
+        type: str
+        default: '""'
+        description: git の標準エラーかリモートが返した理由の末尾
+functions:
+  - name: resolve_commit_plan
+    title: 直コミットの書き込む先
+    kind: 関数
+    container: project_index/features/write/direct_commit.py
+    usecase: 直コミット
+    role: 判定
+    summary: 配信元の直コミットの設定と `commit` から、ブランチとそのワークツリーを決める
+    scope: public
+    thread_safe: true
+    args:
+      - name: source
+        title: 配信元
+        type: ServedSource
+        required: true
+        passing: positional
+        description: 書き込む配信元
+      - name: commit
+        title: コミットの指定
+        type: CommitSpec
+        required: true
+        passing: positional
+        description: '`write_docs`・`delete_docs` の `commit`'
+    returns:
+      type: CommitPlan
+      description: 直コミットの計画
+    process: |-
+      1. 配信元の `storage` が `disk`、`config.direct_commit` が `None`、`direct_commit_problems` に許可する種類の欠けがある場合、`DirectCommitNotConfiguredError` を送る
+      2. ブランチを `commit.branch`（`None` は `direct_commit.branch`）にする
+         - `direct_commit.branch` と違い、`direct_commit.branches` のどの名前・glob（`fnmatch`）にも該当しない場合、`BranchNotAllowedError` を送る
+      3. `worktree list --porcelain` を呼び（gitの実行）、`branch refs/heads/{ブランチ}` を持ち `find_worktree` で配信元のワークツリーに該当する行を選ぶ
+         - 無い場合、`CommitWorktreeNotFoundError` を送る
+      4. `rev-parse --path-format=absolute --git-common-dir` でリポジトリを求め、計画を返す
+    exceptions:
+      - name: DirectCommitNotConfiguredError
+        condition: 直コミットの設定が無い・disk の配信元・許可する種類が `documents[]` に無い
+        message: '`{配信元} は直コミットを使用できません: {理由}`'
+      - name: BranchNotAllowedError
+        condition: ブランチが上書きできない
+        message: '`{ブランチ} は {配信元} の直コミットで上書きできないブランチです`'
+      - name: CommitWorktreeNotFoundError
+        condition: ブランチのワークツリーが無い
+        message: '`{ブランチ} を指すワークツリーがありません`'
+    unit_tests:
+      - name: test_resolve_commit_plan
+        case: 正常
+        summary: 既定のブランチと上書きしたブランチ
+        condition: '`develop` と `data` のワークツリーを持ち `branches: [data]` の一時リポジトリ。`branch` を省く・`data`'
+        mock: なし（一時フォルダで `git init`）
+        expected: それぞれのブランチのワークツリーと、共通のリポジトリの計画
+      - name: test_resolve_commit_plan_when_not_configured
+        case: 異常
+        summary: 設定が無い・disk・種類の欠け
+        condition: '`direct_commit` の無い配信元、`storage: disk` の配信元、`direct_commit_problems` を持つ配信元'
+        mock: なし
+        expected: どれも `DirectCommitNotConfiguredError`
+        exception: 直コミットの設定が無い・disk の配信元・許可する種類が `documents[]` に無い
+      - name: test_resolve_commit_plan_when_branch_not_allowed
+        case: 異常
+        summary: 上書きできないブランチ
+        condition: '`branch: master`'
+        mock: なし
+        expected: '`BranchNotAllowedError`'
+        exception: ブランチが上書きできない
+      - name: test_resolve_commit_plan_when_worktree_missing
+        case: 異常
+        summary: ワークツリーの無いブランチ
+        condition: '`direct_commit.branch: main` で `main` のワークツリーが無い'
+        mock: なし
+        expected: '`CommitWorktreeNotFoundError`'
+        exception: ブランチのワークツリーが無い
+  - name: sync_worktree
+    title: ワークツリーの取り込み
+    kind: 関数
+    container: project_index/features/write/direct_commit.py
+    usecase: 直コミット
+    role: 外部の呼び出し
+    summary: リモートのブランチを取得して早送りで取り込み、HEAD がリモートの追跡ブランチと同じことを確かめる
+    scope: public
+    thread_safe: false
+    args:
+      - name: plan
+        title: 計画
+        type: CommitPlan
+        required: true
+        passing: positional
+        description: 直コミットの計画
+      - name: timeout
+        title: 取得の制限時間
+        type: float
+        required: true
+        passing: keyword
+        description: 書き込みの期限までの残りの秒数
+    returns:
+      type: str
+      description: 取り込んだ後の HEAD の SHA（戻しの基点）
+    process: |-
+      1. 制限時間が 0 以下の場合、`WriteDeadlineExceededError` を送る
+      2. `fetch {REMOTE} {ブランチ}` を `timeout` で呼ぶ
+         - `GitError` の場合、`FetchFailedError` を送る
+      3. `merge --ff-only {REMOTE}/{ブランチ}` を呼ぶ
+         - `GitError` の場合、`UnpushedCommitsError` を送る（早送りで取り込めない）
+      4. `rev-list --left-right --count HEAD...{REMOTE}/{ブランチ}` が `0 0` でない場合、`UnpushedCommitsError` を送る（先行・遅延の数を添える）
+      5. `rev-parse HEAD` を返す
+    exceptions:
+      - name: FetchFailedError
+        condition: 取得に失敗する・制限時間を超える
+        message: '`{REMOTE} の {ブランチ} を取得できません: {標準エラーの末尾}`'
+      - name: UnpushedCommitsError
+        condition: 早送りで取り込めない・HEAD が追跡ブランチと違う
+        message: '`{ワークツリー} にプッシュしていないコミットがあります（先行 {n}・遅延 {m}）`'
+      - name: WriteDeadlineExceededError
+        condition: 書き込みの期限を過ぎている
+        message: 既存と同じ
+    unit_tests:
+      - name: test_sync_worktree
+        case: 正常
+        summary: 先に進んだリモートを取り込む
+        condition: ベアリポジトリの `develop` が 1 コミット先行し、ワークツリーは取り込んでいない
+        mock: なし（一時フォルダのベアリポジトリ）
+        expected: HEAD がリモートの `develop` と同じになり、その SHA を返す
+      - name: test_sync_worktree_when_unpushed
+        case: 異常
+        summary: 未プッシュのコミット
+        condition: ワークツリーに 1 コミット足してプッシュしていない
+        mock: なし
+        expected: '`UnpushedCommitsError` で先行 1。ワークツリーのコミットは残る'
+        exception: 早送りで取り込めない・HEAD が追跡ブランチと違う
+      - name: test_sync_worktree_when_fetch_failed
+        case: 異常
+        summary: リモートに接続できない
+        condition: '`origin` の URL を無いフォルダに向ける'
+        mock: なし
+        expected: '`FetchFailedError`'
+        exception: 取得に失敗する・制限時間を超える
+  - name: snapshot_dirty
+    title: 未コミットの変更の控え
+    kind: 関数
+    container: project_index/features/write/direct_commit.py
+    usecase: 直コミット
+    role: 読み取り
+    summary: 書き込みの前のワークツリーの未コミットの変更（追跡していないファイルを含む）のパスと内容のハッシュを控える
+    scope: public
+    thread_safe: false
+    args:
+      - name: plan
+        title: 計画
+        type: CommitPlan
+        required: true
+        passing: positional
+        description: 直コミットの計画
+    returns:
+      type: DirtyFiles
+      description: 控え
+    process: |-
+      1. `status --porcelain=v1 -z --untracked-files=all --no-renames` を呼ぶ
+      2. 出た行のパスごとに、ファイルがあれば内容のハッシュ、無ければ `None` を控えて返す
+    unit_tests:
+      - name: test_snapshot_dirty
+        case: 正常
+        summary: 書き換えたファイルと追跡していないファイル
+        condition: '`memo.txt` を書き換え、`new.txt` を作ったワークツリー'
+        mock: なし
+        expected: '`memo.txt`・`new.txt` の 2 件とそれぞれのハッシュ'
+  - name: check_clean
+    title: 未コミットの変更の確認
+    kind: 関数
+    container: project_index/features/write/direct_commit.py
+    usecase: 直コミット
+    role: 判定
+    summary: これから書き込むファイルに未コミットの変更が無いことを確かめる
+    scope: public
+    thread_safe: true
+    args:
+      - name: dirty
+        title: 控え
+        type: DirtyFiles
+        required: true
+        passing: positional
+        description: 書き込みの前の控え
+      - name: paths
+        title: 書き込むファイル
+        type: Iterable[str]
+        required: true
+        passing: positional
+        description: ワークツリーの直下からのパス（本文のファイル・削除するファイルを含む）
+    returns:
+      type: None
+      description: '-'
+    process: |-
+      1. `paths` のうち `dirty.hashes` にあるものを集める
+         - 1 つでもある場合、そのパスを添えて `UncommittedChangesError` を送る
+    exceptions:
+      - name: UncommittedChangesError
+        condition: 書き込むファイルに未コミットの変更がある
+        message: '`コミットしていない変更があるファイルには書き込めません: {パス}`'
+    unit_tests:
+      - name: test_check_clean_when_dirty
+        case: 異常
+        summary: 書き込むファイルが控えにある
+        condition: 控えに `docs/n1.yaml`、書き込むファイルに `docs/n1.yaml`
+        mock: なし
+        expected: '`UncommittedChangesError` に `docs/n1.yaml`'
+        exception: 書き込むファイルに未コミットの変更がある
+  - name: commit_written
+    title: コミット
+    kind: 関数
+    container: project_index/features/write/direct_commit.py
+    usecase: 直コミット
+    role: 外部の呼び出し
+    summary: 操作が書き込んだファイルと生成物だけをコミットする
+    scope: public
+    thread_safe: false
+    args:
+      - name: plan
+        title: 計画
+        type: CommitPlan
+        required: true
+        passing: positional
+        description: 直コミットの計画
+      - name: before
+        title: 控え
+        type: DirtyFiles
+        required: true
+        passing: positional
+        description: 書き込みの前の控え
+      - name: written
+        title: 書き込んだファイル
+        type: list[Path]
+        required: true
+        passing: positional
+        description: 操作が書き込み・削除したファイルの絶対パス
+    returns:
+      type: tuple[str, list[str]]
+      description: コミットの SHA と、コミットしたパス
+    process: |-
+      1. `snapshot_dirty` を呼び、書き込みの後の控えを取る
+      2. 控えの前に無く後にあるパスと、`written` のパスを合わせ、コミットするパスにする（生成物は前に無かったパス）
+         - 前の控えにあったパスの内容のハッシュが変わった場合（生成が未コミットの変更のあるファイルを書き換えた）、そのパスを添えて `UncommittedChangesError` を送る
+      3. `add -A -- {パス}` を呼ぶ
+      4. `commit --only -m {説明} -- {パス}` を呼び、他にステージされた変更をコミットに含めない
+      5. `rev-parse HEAD` とコミットしたパスを返す
+    exceptions:
+      - name: UncommittedChangesError
+        condition: 生成が未コミットの変更のあるファイルを書き換えた
+        message: '`コミットしていない変更があるファイルを生成が書き換えました: {パス}`'
+    unit_tests:
+      - name: test_commit_written
+        case: 正常
+        summary: 書き込んだファイルと生成物だけ
+        condition: 前の控えに `memo.txt`。`docs/n1.yaml` を作り、生成物 `docs/index.md` が変わる
+        mock: なし
+        expected: コミットの変更が `docs/n1.yaml`・`docs/index.md` だけで、`memo.txt` は未コミットの変更のまま
+      - name: test_commit_written_when_staged_other
+        case: 正常
+        summary: 他にステージされた変更
+        condition: '`memo.txt` を `git add` 済み'
+        mock: なし
+        expected: コミットに `memo.txt` が入らず、ステージされたまま
+      - name: test_commit_written_when_generator_touched_dirty
+        case: 異常
+        summary: 生成が未コミットの変更のあるファイルを書き換えた
+        condition: 前の控えに `docs/index.md`、生成がその内容を変える
+        mock: なし
+        expected: '`UncommittedChangesError` に `docs/index.md`。コミットしない'
+        exception: 生成が未コミットの変更のあるファイルを書き換えた
+  - name: push_commit
+    title: プッシュと照合
+    kind: 関数
+    container: project_index/features/write/direct_commit.py
+    usecase: 直コミット
+    role: 外部の呼び出し
+    summary: コミットをプッシュし、断られた以外の失敗はリモートを取得し直して届いたかを照合する
+    scope: public
+    thread_safe: false
+    args:
+      - name: plan
+        title: 計画
+        type: CommitPlan
+        required: true
+        passing: positional
+        description: 直コミットの計画
+      - name: sha
+        title: コミット
+        type: str
+        required: true
+        passing: positional
+        description: プッシュするコミットの SHA
+      - name: timeout
+        title: プッシュの制限時間
+        type: float
+        required: true
+        passing: keyword
+        description: 応答の上限までの残りから `DIRECT_COMMIT_MARGIN_SEC` を除いた秒数
+    returns:
+      type: PushOutcome
+      description: プッシュの結末
+    process: |-
+      1. 制限時間が 0 以下の場合、プッシュを始めずに `failed`（理由: プッシュの時間が残っていない）を返す
+      2. `push --porcelain {REMOTE} HEAD:refs/heads/{ブランチ}` を `timeout` で呼ぶ
+         - 成功した場合、`pushed` を返す
+         - 出力の参照の行が `!`（断られた）の場合、`rejected` と理由を返す
+      3. それ以外の失敗（通信の失敗・制限時間で止めた）は、`fetch {REMOTE} {ブランチ}` を `DIRECT_COMMIT_MARGIN_SEC` の半分で呼ぶ
+         - 取得に失敗した場合、`unknown` を返す
+      4. `merge-base --is-ancestor {sha} {REMOTE}/{ブランチ}` が真なら `pushed`、偽なら `failed` を返す
+    unit_tests:
+      - name: test_push_commit
+        case: 正常
+        summary: 届く
+        condition: ベアリポジトリへプッシュ
+        mock: なし
+        expected: '`pushed` で、ベアリポジトリの `develop` が `sha`'
+      - name: test_push_commit_when_rejected
+        case: 正常
+        summary: 断られる
+        condition: '`pre-receive` が全て断るベアリポジトリ'
+        mock: なし
+        expected: '`rejected` と理由'
+      - name: test_push_commit_when_delivered_but_failed
+        case: 正常
+        summary: 届いた後に失敗が返る
+        condition: '`post-receive` が待ち、`timeout` を短くして止める'
+        mock: なし
+        expected: 照合で `pushed`
+      - name: test_push_commit_when_unreachable
+        case: 正常
+        summary: 届かない
+        condition: '`pushurl` を無いフォルダに向ける'
+        mock: なし
+        expected: '`failed`'
+      - name: test_push_commit_when_no_time
+        case: 正常
+        summary: 時間が残っていない
+        condition: '`timeout=0`'
+        mock: なし
+        expected: git を呼ばずに `failed`
+  - name: rollback
+    title: 戻し
+    kind: 関数
+    container: project_index/features/write/direct_commit.py
+    usecase: 直コミット
+    role: 外部の呼び出し
+    summary: 作ったコミットを取り消し、この呼び出しが書き込んだファイルと生成物を書き込みの前の内容に戻す
+    scope: public
+    thread_safe: false
+    args:
+      - name: plan
+        title: 計画
+        type: CommitPlan
+        required: true
+        passing: positional
+        description: 直コミットの計画
+      - name: base
+        title: 基点
+        type: str
+        required: true
+        passing: positional
+        description: '`sync_worktree` が返した SHA'
+      - name: paths
+        title: 戻すパス
+        type: list[str]
+        required: true
+        passing: positional
+        description: 書き込んだファイルと生成物
+    returns:
+      type: None
+      description: '-'
+    process: |-
+      1. HEAD が `base` と違う場合、`reset --mixed {base}` を呼ぶ（他の未コミットの変更は作業ツリーに残る）
+      2. パスごとに、`cat-file -e {base}:{パス}` で基点にあれば `checkout {base} -- {パス}`、無ければファイルを削除する
+    unit_tests:
+      - name: test_rollback
+        case: 正常
+        summary: コミットとファイルを戻す
+        condition: '`docs/n1.yaml` を作り `docs/index.md` を変えてコミットし、`memo.txt` は未コミットの変更'
+        mock: なし
+        expected: HEAD が基点、`docs/n1.yaml` が無く `docs/index.md` が基点の内容、`memo.txt` は変更のまま
+  - name: run_direct_commit
+    title: 直コミットを進める
+    kind: 関数
+    container: project_index/features/write/direct_commit.py
+    usecase: 直コミット
+    role: サービス
+    summary: 取り込み・書き込み・コミット・プッシュを進め、断られたら 1 回だけやり直す
+    description: 呼び出し元が `RepositoryLocks` を握った中で呼ぶ。書き込みは呼び出し元が渡す関数が行う。
+    scope: public
+    thread_safe: false
+    args:
+      - name: plan
+        title: 計画
+        type: CommitPlan
+        required: true
+        passing: positional
+        description: 直コミットの計画
+      - name: write_once
+        title: 書き込み
+        type: Callable[[DirtyFiles], list[Path]]
+        required: true
+        passing: positional
+        description: 控えを受けて操作の適用・検査・`check_clean`・書き込み・生成を行い、書き込んだファイルを返す関数（失敗は例外）
+      - name: limits
+        title: 期限
+        type: CallLimits
+        required: true
+        passing: keyword
+        description: 書き込みの期限と応答の上限
+    returns:
+      type: CommitResult
+      description: SHA・ブランチ・やり直したか
+    process: |-
+      1. 最大 2 回、次を繰り返す
+         1. `sync_worktree`（`timeout` は書き込みの期限までの残り）で基点を得る
+         2. `snapshot_dirty` で控えを取り、`write_once` を呼ぶ
+            - 例外の場合、書き込んだファイルが無ければそのまま送る。あれば `rollback` してから送る
+         3. `commit_written` でコミットする
+            - 例外の場合、`rollback` してから送る
+         4. `push_commit`（`timeout` は応答の上限までの残り − `DIRECT_COMMIT_MARGIN_SEC`）を呼ぶ
+            - `pushed` の場合、結果を返す（2 回目なら `retried: True`）
+            - `rejected` で 1 回目の場合、`rollback` して次の回へ進む。書き込みの期限を過ぎていれば、進まずに `PushRejectedError` を送る
+            - `rejected` で 2 回目の場合、`rollback` して `PushRejectedError` を送る
+            - `failed`・`unknown` の場合、`rollback` して `PushFailedError` を送る（`unknown` は結果が不明であることと SHA を添える）
+    exceptions:
+      - name: PushRejectedError
+        condition: 2 回とも断られる・やり直しの前に期限を過ぎる
+        message: '`{ブランチ} へのプッシュが断られました: {理由}`'
+      - name: PushFailedError
+        condition: 届かない・結果が不明・時間が残っていない
+        message: '`{ブランチ} へプッシュできませんでした: {理由}`（不明のときは `結果は不明です（{SHA}）`）'
+    unit_tests:
+      - name: test_run_direct_commit
+        case: 正常
+        summary: 1 回で届く
+        condition: '`write_once` が `docs/n1.yaml` を書く'
+        mock: なし
+        expected: '`retried: False` で、ベアリポジトリに 1 コミット'
+      - name: test_run_direct_commit_when_rejected_once
+        case: 正常
+        summary: 1 回断られる
+        condition: 最初のプッシュだけ断るベアリポジトリ
+        mock: なし
+        expected: '`write_once` が 2 回呼ばれ、`retried: True`、ベアリポジトリに 1 コミット'
+      - name: test_run_direct_commit_when_rejected_twice
+        case: 異常
+        summary: 2 回断られる
+        condition: 全て断るベアリポジトリ
+        mock: なし
+        expected: '`PushRejectedError`。HEAD が基点で `git status` が空'
+        exception: 2 回とも断られる・やり直しの前に期限を過ぎる
+      - name: test_run_direct_commit_when_write_failed
+        case: 異常
+        summary: 書き込みが例外
+        condition: '`write_once` が生成の失敗を送る'
+        mock: なし
+        expected: 同じ例外を送り、書き込んだファイルが戻る
+        exception: '-'
+      - name: test_run_direct_commit_when_push_failed
+        case: 異常
+        summary: 届かない
+        condition: '`pushurl` を無いフォルダに向ける'
+        mock: なし
+        expected: '`PushFailedError`。HEAD が基点'
+        exception: 届かない・結果が不明・時間が残っていない
+tags:
+  - name: topic:直コミット
+    main: true
+  - name: action:書き込み
+  - name: tool:git
