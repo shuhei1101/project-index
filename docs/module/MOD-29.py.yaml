@@ -381,8 +381,8 @@ classes:
             case: 正常
             summary: 上限を超えた読み込みの結果を最も前に使用したものから捨てる
             condition: '`REVISION_LOAD_KEEP` を 1 にして、commit x・y・x の順に `load` する'
-            mock: ファイルの収集（本物を包んで呼ばれた回数を記録する）
-            expected: 3 回とも収集を呼ぶ（x の結果は y で捨てた）
+            mock: なし（`tmp_path` に `git init`）
+            expected: 3 回目は 1 回目と別の `LoadResult` で（x の結果は y で捨てた）、文書の内容は 1 回目と同じ
           - name: test_document_store_load_when_revision_load_files_given
             case: 正常
             summary: たどったファイルを渡した読み込みは保持した結果を使用しない
