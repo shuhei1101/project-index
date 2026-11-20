@@ -17,6 +17,7 @@ callers:
   - SC-12#scenarios[正常シナリオ（1 行を変更する）]
   - SC-12#scenarios[異常シナリオ（指した行が無い）]
   - SC-12#scenarios[正常シナリオ（端末の設定の最上位に知らないキーがある）]
+  - SC-12#scenarios[正常シナリオ（直コミットを呼べる作業場所を持つ行を書き込む）]
 exclusivity: 端末の設定の保存と同じ排他ロックの中で、内容のバージョンの照合・行の検索・検証・書き込み・再読み込みを行う
 request:
   - name: id
@@ -67,6 +68,18 @@ request:
     default: なし（今の値を残す）
     location: body
     description: 配信元の読み書きの方法
+  - name: source.direct_commit.scope
+    type: list[str]
+    required: false
+    default: なし（今の値を残す）
+    location: body
+    description: 直コミットを許可した全ての種類の直コミットを呼べる作業場所の glob
+  - name: source.direct_commit.kinds
+    type: dict[str, list[str]]
+    required: false
+    default: なし（今の値を残す）
+    location: body
+    description: 種類の ID → その種類の直コミットを呼べる作業場所の glob。送信したときは `kinds` を丸ごと置き換える
 request_example: |-
   ```json
   {"expectedVersion": "a1b2c3", "source": {"outside_read": false}}
@@ -394,6 +407,37 @@ flows:
       - '`settings.yaml` の sample の行に `storage.type: disk` が入り、ほかのキーは変わらない'
       - '再起動せずに `/sources/sample/refs` が `git: false` を返す'
     test: test_normal_when_storage_changed
+  - name: 正常系（直コミットの作業場所の一部を変更する）
+    summary: '`direct_commit` の送信したキーだけを重ね、送信しなかったキーは今の値を残す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 端末の設定
+        description: '`sources` に sample と extra（`direct_commit.scope`）の 2 行'
+      - name: 入力
+        description: 取得した `version` と、`direct_commit.kinds`（`note` の glob）だけの `source`
+        notes: パスの `id` は `extra`
+    flow: |-
+      <!-- map: {"title": "正常系（直コミットの作業場所の一部を変更する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as PATCH /settings/sources/extra
+        participant CF as 端末の設定
+
+        C->>E: expectedVersion, source: direct_commit.kinds だけ
+        E->>CF: extra の行の direct_commit.kinds だけを書き換える
+        E->>E: extra の配信元だけを再読み込みする
+        E-->>C: 200
+      ```
+
+      <!-- /map -->
+    expected:
+      - 200 で、`sources` に extra が `serving` で並ぶ
+      - '`settings.yaml` の extra の行に送信した `direct_commit.kinds.note` が入り、`direct_commit.scope` は変わらない'
+      - '`GET /settings/sources` が返却する extra の行の `directCommit` が、変えていない `scope` と送信した `kinds` を持つ'
+    test: test_normal_when_direct_commit_changed
 test_file: tests/integration/server/test_patch_settings_source.py
 id: IF-33
 visibility: internal
