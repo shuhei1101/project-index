@@ -616,7 +616,7 @@ exceptions:
     condition: '`storage.type: disk` の配信元に `worktree` を渡した・`commit` と `atomic: false` か `worktree` を同時に渡した'
   - name: ValidationFailedError
     condition: '`commit` を指定した呼び出しで、消す文書か参照を外す文書の種類が `direct_commit.kinds[]` に無いか、参照を外した文書が秘密の値の規則に該当する'
-    notes: 違反ごとの添字・パス・決まりを添える
+    notes: 違反ごとの添字・パス・決まりと、`write_docs` と同じく消す文書・参照を外す文書の ID を添える
   - name: DirectCommitNotConfiguredError
     condition: '`write_docs` と同じ'
     notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
@@ -642,6 +642,9 @@ exceptions:
     condition: '`write_docs` と同じ。戻すときは削除したファイルを元に戻す'
     notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
   - name: PushFailedError
+    condition: '`write_docs` と同じ。戻すときは削除したファイルを元に戻す'
+    notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
+  - name: DirectCommitGeneratorError
     condition: '`write_docs` と同じ。戻すときは削除したファイルを元に戻す'
     notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
 constraints:

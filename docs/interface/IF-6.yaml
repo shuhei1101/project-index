@@ -2267,6 +2267,36 @@ flows:
       - '2 回目は `isError: true` で、`commit` と `worktree` は同時に指定できないことを返却する'
       - リモートと develop のワークツリーは変わらない
     test: test_error_when_direct_commit_invalid_arguments
+  - name: 異常系（直コミットで生成が失敗する・DirectCommitGeneratorError）
+    summary: '`generators[]` が失敗したら、コミットせずに書き込んだファイルを戻して断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）の sample の `generators[]` を、終了コード 1 で終わるスクリプトに差し替えたもの
+      - name: 入力
+        description: 正常系（直コミットする）と同じ
+    flow: |-
+      <!-- map: {"title": "異常系（直コミットで生成が失敗する・DirectCommitGeneratorError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー develop
+
+        C->>T: commit: message, operations: create note
+        T->>WT: 文書を書き込み、generators を実行する
+        WT-->>T: 生成が失敗する
+        T->>WT: 書き込んだファイルと生成物を戻す
+        T-->>C: isError（スクリプトのパスと理由）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、生成のスクリプトが失敗したこととそのパスを返却する'
+      - リモートは変わらず、develop のワークツリーの HEAD が `origin/develop` と同じで、`git status` に変更が出ない
+    test: test_error_when_direct_commit_generator_failed
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -2660,8 +2690,11 @@ exceptions:
     condition: やり直した後のプッシュもリモートに断られたか、やり直しの置き換えの前に書き込みの期限を過ぎていた
     notes: リモートが返した理由を添える。この呼び出しが書き込んだファイルと生成物とコミットを戻した後に返却する
   - name: PushFailedError
-    condition: プッシュが通信の失敗か、制約「直コミットの取り込みとプッシュの制限時間」を超えて終わった
-    notes: git の標準エラーの末尾を添える。この呼び出しが書き込んだファイルと生成物とコミットを戻した後に返却する
+    condition: プッシュがリモートに断られた以外の理由（通信の失敗・制限時間で止めた）で終わり、制約「直コミットのプッシュの結果の照合」でリモートにコミットを確認できなかったか、制約「直コミットの取り込み・生成・プッシュの制限時間」でプッシュの時間が残っていなかった
+    notes: git の標準エラーの末尾と、取得し直しも失敗したときはプッシュの結果が不明であることとコミットの SHA を添える。この呼び出しが書き込んだファイルと生成物とコミットを戻した後に返却する
+  - name: DirectCommitGeneratorError
+    condition: '`commit` を指定した呼び出しで、`generators[]` のスクリプトが失敗したか、制限時間で止めたか、生成の時間が残らず実行しなかった'
+    notes: スクリプトのパスと理由を添える。コミットせず、この呼び出しが書き込んだファイルと生成物を戻した後に返却する
 constraints:
   - item: 件数
     constraint: 1 回の `operations` は最大 50 件
@@ -2778,12 +2811,12 @@ constraints:
     notes: 改名・一括の置換で参照元の他の種類の文書が書き換わる場合も同じ
   - item: 直コミットの書き込む先
     constraint: コミットするブランチ（`commit.branch`、省くと `direct_commit.branch`）を HEAD が指すワークツリーのうち、配信元の `worktrees[]` に該当するものに書き込む。種類・配置先・検査は、そのワークツリーの `project-index.yaml` で再読み込みした配信元の設定で行う
-    notes: 該当するワークツリーが無ければ `CommitWorktreeNotFoundError`
+    notes: 該当するワークツリーが無ければ `CommitWorktreeNotFoundError`。`direct_commit` のキー（`branch`・`branches[]`・`kinds[]`）は、起動時と再読み込みで検証した配信元の設定から読む。ワークツリーの `project-index.yaml` は、種類のスキーマ・配置先・検査にだけ使用する
   - item: 直コミットの流れ
     constraint: 制約「直コミットの排他」の中で、(1) リモートの追跡ブランチを取得して早送りで取り込む、(2) HEAD が追跡ブランチと同じこと・書き込むファイルと生成物にコミットしていない変更が無いことを確認する、(3) 操作を適用して検査（今の書き込みと同じ検査・直コミットを許可する種類・秘密の値）を実行する、(4) ファイルを書き込み `generators[]` を実行する、(5) 操作が書き込んだファイルと生成物だけを `git add` してコミットする、(6) プッシュする、の順に進める
     notes: ワークツリーにある他の変更（コミットしていない変更・追跡していないファイル）はコミットに含めず、そのまま残す。コミットの作成者と認証は、索引のサーバーを動かしている利用者の Git の設定
   - item: 直コミットの排他
-    constraint: 取得からプッシュまでを、リポジトリ（`git rev-parse --git-common-dir` が同じ配信元）ごとの 1 つの排他で囲む。同じリポジトリの配信元への `commit` を省いた書き込み・削除も、同じ排他を待つ
+    constraint: 取得からプッシュまでを、リポジトリ（`git rev-parse --git-common-dir` が同じ配信元）ごとの 1 つの排他で囲む。直コミットどうしは 1 つずつ進める。`commit` を省いた書き込み・削除は、書き込む先がコミットするブランチ（`direct_commit.branch` と `direct_commit.branches[]` に該当するブランチ）を指すワークツリーのときだけ同じ排他を待つ
     notes: 排他の待ちは書き込みの期限に含め、置き換えの前に期限を過ぎたら `WriteDeadlineExceededError`
   - item: 秘密の値の検査
     constraint: 書き込む文書の差分の追加の行（本文のファイルを含む）を、project-index が持つ正規表現の規則で照合する。規則の種類は `github-token`・`aws-access-key`・`slack-token`・`openai-api-key`・`anthropic-api-key`・`private-key`・`email-address`。該当すれば、添字・項目のパス・決まり「秘密の値（{種類}）を含む」の違反として `ValidationFailedError` で返却し、値そのものは返却しない
@@ -2791,12 +2824,18 @@ constraints:
   - item: 直コミットのプッシュの再試行
     constraint: プッシュがリモートに断られたら、作ったコミットを取り消し、この呼び出しが書き込んだファイルと生成物を書き込み前の内容に戻してから、取得から 1 回だけやり直す。2 回目も断られたら同じく戻して `PushRejectedError` を返却する
     notes: やり直しでも `expected_version` を確認する。やり直しの置き換えの前に書き込みの期限を過ぎていたら、やり直さずに `PushRejectedError`
-  - item: 直コミットの取り込みとプッシュの制限時間
-    constraint: 取得は書き込みの期限までの残りの時間、プッシュは [非機能要件](id:NFR-1) の文書の MCP の応答の上限までの残りの時間から、直コミットの取り込みとプッシュの所要時間の余裕（8 秒）を除いた時間で止める
-    notes: 止めたプッシュは、リモートの追跡ブランチを取得し直してコミットの SHA と一致すれば成功、違えば `PushFailedError` として戻す
   - item: 直コミットの試しの書き込み
     constraint: '`commit` と `dry_run: true` を同時に指定したときは、取得・コミット・プッシュをせず、権限・ブランチ・ワークツリー・検査（秘密の値を含む）の結果と差分だけを返却する'
     notes: リモートと通信しない
+  - item: 直コミットの取り込み・生成・プッシュの制限時間
+    constraint: 取得は書き込みの期限までの残りの時間で止める。`generators[]` は、`script_timeout_sec` と、[非機能要件](id:NFR-1) の文書の MCP の応答の上限までの残りの時間から直コミットのプッシュの所要時間と直コミットの取り込みとプッシュの所要時間の余裕を除いた時間の短い方で止める。プッシュは、応答の上限までの残りの時間から余裕を除いた時間で止める。やり直しの 2 回目の生成とプッシュも同じ
+    notes: 生成の時間が残っていないときは生成を実行せずに `DirectCommitGeneratorError`、プッシュの時間が残っていないときはプッシュを始めずに `PushFailedError` とし、どちらもコミットと書き込んだファイルと生成物を戻す。制約「書き込み後の生成の制限時間」の「生成を実行しなくても書き込みの結果を変えない」は、`commit` を指定した呼び出しには当てない
+  - item: 直コミットの生成の失敗
+    constraint: '`commit` を指定した呼び出しで `generators[]` のスクリプトが失敗したか制限時間で止めたときは、コミットせずに、この呼び出しが書き込んだファイルと生成物を書き込み前の内容に戻して `DirectCommitGeneratorError` を返却する'
+    notes: 生成物の無いコミットをプッシュしない
+  - item: 直コミットのプッシュの結果の照合
+    constraint: プッシュがリモートに断られた以外の理由（通信の失敗・制限時間で止めた）で終わったときは、リモートの追跡ブランチを取得し直し、コミットの SHA が含まれていれば成功として扱う。含まれていなければ、コミットと書き込んだファイルと生成物を戻して `PushFailedError` を返却する。取得し直しも失敗したときは、同じく戻して、プッシュの結果が不明であることとコミットの SHA を添えた `PushFailedError` を返却する
+    notes: 取得し直しの制限時間は、直コミットの取り込みとプッシュの所要時間の余裕の中に収める。戻した後にリモートに入っていたコミットは、次の直コミットの早送りの取り込みでワークツリーに入る
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]
