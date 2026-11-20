@@ -9,7 +9,4 @@ use_cases:
     impact: none
     detail: 直コミットの流れは変わらない。端末の設定の API で登録した配信元でも、直コミットを呼べる作業場所が効くようになる
     depends_on: []
-scope_out:
-  - item: GET /settings/sources（IF-30）の応答の行に direct_commit を返す
-    reason: 要望は書き出しだけで、取得の応答は挙げていない。保存で direct_commit を含めなければファイルの値を残すため、取得→保存の流れでも値は消えない。ただし画面や API の利用者が今の値を確かめられないため、スコープに含めるかは判断が分かれる。今の判断はスコープ外で、レビューで確定する
-    plan: to_file
+scope_out: []

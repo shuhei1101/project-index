@@ -36,9 +36,9 @@ tasks:
     updated_at: '2026-11-20T14:59:47.370031+00:00'
   - process: 単一ユースケース設計
     status: done
-    note: SC-12 に direct_commit を持つ行の追加・保存・変更のケースを加える
+    note: SC-12 に direct_commit を持つ行の追加・保存・変更のケースを加える。取得の応答に direct_commit を返却する期待値も加える（確認ログの決着）
     updated_by: planner
-    updated_at: '2026-11-20T15:02:43.319785+00:00'
+    updated_at: '2026-11-20T15:16:43.143420+00:00'
   - process: モック作成
     status: skipped
     reason: 画面を持たない API の変更のため対象外
@@ -51,7 +51,7 @@ tasks:
     updated_at: '2026-11-20T14:59:47.370031+00:00'
   - process: インターフェース定義設計
     status: todo
-    note: IF-31・IF-32・IF-33 の direct_commit の書き出しと、送信しなかったときに残す決まり
+    note: IF-30 の取得の応答の direct_commit と、IF-31・IF-32・IF-33 の direct_commit の書き出しと、送信しなかったときに残す決まり
   - process: 部品設計
     status: skipped
     reason: 画面の部品を持たないため対象外
@@ -64,7 +64,7 @@ tasks:
     updated_at: '2026-11-20T14:59:47.370031+00:00'
   - process: モジュール構成設計
     status: todo
-    note: MOD-66 の _to_yaml_row・_fill_unsent・_apply_patch と MOD-67 の SourcePatch
+    note: MOD-66 の _to_yaml_row・_fill_unsent・_apply_patch、MOD-67 の SourcePatch・SettingsSourceRow、MOD-65 の取得の行の組み立て
   - process: ドキュメント修正
     status: skipped
     reason: 公開ドキュメントの設定と読み取り API のページは direct_commit のキーと API の一覧を既に記載しており、変わる記述が無いため対象外
