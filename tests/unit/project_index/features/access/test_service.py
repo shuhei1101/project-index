@@ -11,6 +11,8 @@ from project_index.features.access import service as service_module
 from project_index.features.access.service import (
     access_of,
     available_sources,
+    commit_read_worktree,
+    committable_kinds,
     current_source,
     describe_workplace,
     find_worktree,
@@ -20,7 +22,7 @@ from project_index.features.access.service import (
 )
 from project_index.features.access.types import SourceAccess
 from project_index.features.history.types import ResolvedRef
-from project_index.features.sources.types import DocumentTable
+from project_index.features.sources.types import DirectCommitConfig, DocumentTable
 from project_index.shared.errors import (
     InvalidArgumentError,
     RefNotFoundError,
@@ -116,6 +118,117 @@ def test_access_of_when_none(sample: ServedSource) -> None:
     # 検証
     assert outside is None
     assert without_cwd is None
+
+
+def test_access_of_when_commit(
+    make_served_source: Callable[..., ServedSource],
+    make_source_config: Callable[..., SourceConfig],
+) -> None:
+    """直コミットだけを呼べる（正常系）。"""
+    # 準備
+    source = make_served_source(
+        root=Path("/r"),
+        scope_write=["/r"],
+        config=make_source_config(
+            direct_commit=DirectCommitConfig(branch="develop", kinds=["rules"])
+        ),
+        direct_commit_scope=["/local"],
+    )
+    # 実行
+    result = access_of(source, Path("/local"))
+    # 検証
+    assert result == "commit"
+
+
+def test_committable_kinds(
+    make_served_source: Callable[..., ServedSource],
+    make_source_config: Callable[..., SourceConfig],
+) -> None:
+    """種類ごとの glob が scope に優先する（正常系）。"""
+    # 準備
+    source = make_served_source(
+        root=Path("/r"),
+        config=make_source_config(
+            direct_commit=DirectCommitConfig(branch="develop", kinds=["note", "term"])
+        ),
+        direct_commit_scope=["/local"],
+        direct_commit_kinds={"term": ["/other"]},
+    )
+    # 実行
+    result = committable_kinds(source, Path("/local"))
+    # 検証
+    assert result == frozenset({"note"})
+
+
+def test_committable_kinds_when_default(
+    make_served_source: Callable[..., ServedSource],
+    make_source_config: Callable[..., SourceConfig],
+) -> None:
+    """既定は呼べない（正常系）。"""
+    # 準備
+    source = make_served_source(
+        root=Path("/r"),
+        scope_write=["/r"],
+        config=make_source_config(
+            direct_commit=DirectCommitConfig(branch="develop", kinds=["note"])
+        ),
+    )
+    # 実行
+    result = committable_kinds(source, Path("/r"))
+    # 検証
+    assert result == frozenset()
+
+
+@pytest.fixture
+def commit_source(
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+    make_served_source: Callable[..., ServedSource],
+    make_source_config: Callable[..., SourceConfig],
+) -> ServedSource:
+    """develop と x のワークツリーを持ち、develop へ直コミットする配信元を返す。"""
+    root = git_repo({"project-index.yaml": "name: sample\n"}, branch="master")
+    run_git(root, "branch", "develop")
+    run_git(root, "branch", "x")
+    run_git(root, "worktree", "add", str(root / ".claude" / "worktrees" / "develop"), "develop")
+    run_git(root, "worktree", "add", str(root / ".claude" / "worktrees" / "x"), "x")
+    return make_served_source(
+        root=root,
+        config_files=[root / "project-index.yaml"],
+        is_git=True,
+        repo_root=root,
+        worktree_globs=[str(root / ".claude" / "worktrees" / "*")],
+        config=make_source_config(
+            direct_commit=DirectCommitConfig(branch="develop", kinds=["rules"])
+        ),
+        direct_commit_scope=["/local"],
+    )
+
+
+def test_commit_read_worktree(commit_source: ServedSource) -> None:
+    """既定のブランチのワークツリー（正常系）。"""
+    # 実行
+    result = commit_read_worktree(commit_source, None, None)
+    # 検証
+    assert result.resolve() == (commit_source.root / ".claude" / "worktrees" / "develop").resolve()
+
+
+@pytest.mark.parametrize(
+    ("worktree", "ref"),
+    [
+        pytest.param(".claude/worktrees/x", None, id="other-worktree"),
+        pytest.param(None, "master", id="ref"),
+    ],
+)
+def test_commit_read_worktree_when_other(
+    worktree: str | None, ref: str | None, commit_source: ServedSource
+) -> None:
+    """コミットするブランチでないワークツリー・ref（異常系）。"""
+    # 準備
+    path = None if worktree is None else str(commit_source.root / worktree)
+    # 実行・検証
+    with pytest.raises(SourceNotReadableError, match="コミットするブランチのワークツリーだけ"):
+        commit_read_worktree(commit_source, path, ref)
 
 
 def test_current_source(make_served_source: Callable[..., ServedSource]) -> None:

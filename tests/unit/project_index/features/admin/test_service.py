@@ -347,6 +347,41 @@ def test_check_project_when_script_missing(
     assert result.sync is None
 
 
+DIRECT_COMMIT_CONFIG = (
+    "name: direct\n"
+    "documents:\n"
+    "  - id: note\n"
+    "    paths: [docs/note/*.yaml]\n"
+    "    schema: schemas/rule.schema.yaml\n"
+    "direct_commit:\n"
+    "  branch: develop\n"
+    "  kinds: [note, meme]\n"
+)
+
+
+def test_check_project_when_direct_commit(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_terminal_config: Callable[..., TerminalConfig],
+) -> None:
+    """直コミットの設定の違反と警告（正常系）。"""
+    # 準備
+    write_files(
+        tmp_path,
+        {
+            "project-index.yaml": DIRECT_COMMIT_CONFIG,
+            "schemas/rule.schema.yaml": RULE_SCHEMA,
+            "docs/note/n1.yaml": "id: n1\n",
+        },
+    )
+    handlers = _handlers(make_terminal_config)
+    # 実行
+    result = check_project(CheckProjectRequest(path=str(tmp_path)), handlers=handlers)
+    # 検証
+    assert [item.path for item in result.violations] == ["direct_commit.kinds[1]"]
+    assert "direct_commit.branch" in [item.path for item in result.warnings]
+
+
 def test_check_project_when_missing_paths(
     tmp_path: Path,
     write_files: Callable[[Path, dict[str, str]], None],
