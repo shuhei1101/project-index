@@ -1,0 +1,1 @@
+# search_docs などの使える項目に、スキーマの allOf・anyOf・oneOf と循環する $ref の先のキーを含める
