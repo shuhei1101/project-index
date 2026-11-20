@@ -1,0 +1,20 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: run_only
+    detail: エージェントが、種類のスキーマの allOf・anyOf・oneOf と循環する参照の先で定義した項目で文書を絞り、並べ替え、集計できるようになる。調べる流れは変わらない
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: search_docs の条件の `field` の種類ごとの項目に、スキーマの `allOf`・`anyOf`・`oneOf` と循環する `$ref` の先で定義したキーも指定できることを追記する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T10:29:34.849106+00:00'
+scope_out:
+  - item: 循環しない `$ref` の先のキー（`uses[].id`・`category.id`）を使える項目に含める
+    reason: 文書のストアが `$ref` を参照先の中身に置き換えてから `known_fields` に指定するため、origin/develop（453989b）で既に使用できる。Issue の本文の例はこの記載方法で、変更は要らない
+    plan: none
+  - item: '`write_docs` の項目のパス（set・add_to・remove_from・unset）と、`describe(source, kind)` のスキーマの表示での `allOf`・`anyOf`・`oneOf` の扱い'
+    reason: 要望は使える項目（`known_fields`）を使用する条件・並べ替え・集計・取り出す項目で、書き込みの項目のパスとスキーマの表示は含まれない
+    plan: none

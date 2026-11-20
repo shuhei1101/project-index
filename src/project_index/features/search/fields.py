@@ -6,6 +6,7 @@ import re
 from datetime import date, datetime
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
+from urllib.parse import unquote
 
 from project_index.features.documents.fields import METADATA_KEYS, get_field, is_markdown_body
 from project_index.features.search.types import Heading
@@ -26,6 +27,10 @@ NUMBER_METADATA = ("port",)
 HEADING = re.compile(r"^\s{0,3}(?P<level>#{1,6})\s+(?P<text>.+?)\s*#*\s*$")
 FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
 SCHEMA_TYPES = {"string", "number", "boolean", "array", "object"}
+# 要素のスキーマを同じパスでたどる合成のキー
+COMPOSITION_KEYS = ("allOf", "anyOf", "oneOf")
+# 最上位の `$defs` の定義を指す `$ref` の接頭辞
+DEFS_REF_PREFIX = "#/$defs/"
 # 行の metadata の対応付けを指定しないときの空の対応
 NO_COLUMNS: Mapping[str, str] = MappingProxyType({})
 
@@ -141,29 +146,79 @@ def _schema_type(schema: dict[object, object]) -> str:
     return declared if isinstance(declared, str) and declared in SCHEMA_TYPES else "string"
 
 
-def _walk(schema: object, prefix: str, fields: dict[str, str]) -> None:
+def _defs_target(
+    schema: dict[object, object], defs: Mapping[object, object], visiting: tuple[str, ...]
+) -> tuple[str, object] | None:
+    """最上位の `$defs` を指して残った `$ref` の、たどる定義の名前と中身を返却する。"""
+    ref = schema.get("$ref")
+    if not isinstance(ref, str) or not ref.startswith(DEFS_REF_PREFIX):
+        return None
+    raw = ref.removeprefix(DEFS_REF_PREFIX)
+    # `$defs` の定義の中をさらに指す JSON Pointer は、最上位の定義の名前でないのでたどらない
+    if "/" in raw:
+        return None
+    # JSON Pointer の名前として URL エンコードとエスケープを戻す
+    name = unquote(raw).replace("~1", "/").replace("~0", "~")
+    # たどっている途中の定義へ戻る参照・`$defs` に無い名前は、たどらない
+    if name in visiting or name not in defs:
+        return None
+    return name, defs[name]
+
+
+def _walk_properties(
+    properties: dict[object, object],
+    prefix: str,
+    fields: dict[str, str],
+    defs: Mapping[object, object],
+    visiting: tuple[str, ...],
+) -> None:
+    """`properties` のキーごとに項目のパスと型を追加し、その中をたどる。"""
+    for key, sub in properties.items():
+        if not is_dict(sub):
+            continue
+        path = f"{prefix}{key}"
+        declared = _schema_type(sub)
+        # 型の食い違う同じパスは string にする
+        fields[path] = declared if fields.get(path, declared) == declared else "string"
+        _walk(sub, f"{path}.", fields, defs, visiting)
+
+
+def _walk(
+    schema: object,
+    prefix: str,
+    fields: dict[str, str],
+    defs: Mapping[object, object],
+    visiting: tuple[str, ...] = (),
+) -> None:
     """スキーマの `properties` を再帰でたどり、項目のパスと型を足す。"""
     if not is_dict(schema):
         return
+    # 循環して最上位の `$defs` を指して残った参照は、参照先の定義を同じパスでたどる
+    target = _defs_target(schema, defs, visiting)
+    if target is not None:
+        name, definition = target
+        _walk(definition, prefix, fields, defs, (*visiting, name))
     properties = schema.get("properties")
     if is_dict(properties):
-        for key, sub in properties.items():
-            if not is_dict(sub):
-                continue
-            path = f"{prefix}{key}"
-            declared = _schema_type(sub)
-            # 型の食い違う同じパスは string にする
-            fields[path] = declared if fields.get(path, declared) == declared else "string"
-            _walk(sub, f"{path}.", fields)
+        _walk_properties(properties, prefix, fields, defs, visiting)
+    # allOf・anyOf・oneOf の各要素は、それらを持つスキーマと同じパスでたどる
+    for key in COMPOSITION_KEYS:
+        variants = schema.get(key)
+        if is_list(variants):
+            for variant in variants:
+                _walk(variant, prefix, fields, defs, visiting)
     # 配列の要素のキーは `a[].b` のパスにする（最上位のスキーマの `items` は `[]` を付けない）
-    _walk(schema.get("items"), f"{prefix.removesuffix('.')}[]." if prefix else "", fields)
+    items_prefix = f"{prefix.removesuffix('.')}[]." if prefix else ""
+    _walk(schema.get("items"), items_prefix, fields, defs, visiting)
 
 
 def known_fields(schemas: Iterable[Mapping[str, Any]]) -> dict[str, str]:
     """配信元の種類のスキーマから、条件・並べ替え・集計に使える項目の一覧を作る。"""
     fields = _base_fields()
     for schema in schemas:
-        _walk(dict(schema), "", fields)
+        # 参照先の定義は、たどっているスキーマ自身の最上位の `$defs` だけを参照する
+        defs: object = schema.get("$defs")
+        _walk(dict(schema), "", fields, defs if is_dict(defs) else {})
     return fields
 
 

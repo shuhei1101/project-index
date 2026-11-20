@@ -164,3 +164,97 @@ def test_known_fields_when_array_items() -> None:
     assert fields["category.id"] == "string"
     assert "uses.id" not in fields
     assert "uses.refs.to" not in fields
+
+
+def test_known_fields_when_composition() -> None:
+    """allOf・anyOf・oneOf の要素のキー（正常系）。"""
+    # 準備
+    schema = {
+        "type": "object",
+        "allOf": [{"properties": {"top": {"type": "string"}}}],
+        "properties": {
+            "a": {"allOf": [{"type": "object", "properties": {"x": {"type": "string"}}}]},
+            "b": {
+                "anyOf": [
+                    {"type": "object", "properties": {"y": {"type": "number"}}},
+                    {"type": "null"},
+                ]
+            },
+            "c": {
+                "oneOf": [
+                    {"type": "object", "properties": {"z": {"type": "string"}}},
+                    {"type": "string"},
+                ]
+            },
+            "d": {
+                "anyOf": [
+                    {"type": "object", "properties": {"v": {"type": "string"}}},
+                    {"type": "object", "properties": {"v": {"type": "number"}}},
+                ]
+            },
+        },
+    }
+    # 実行
+    fields = known_fields([schema])
+    # 検証
+    assert fields["top"] == "string"
+    assert fields["a.x"] == "string"
+    assert fields["b.y"] == "number"
+    assert fields["c.z"] == "string"
+    assert fields["d.v"] == "string"
+    assert fields["a"] == "string"
+    assert fields["b"] == "string"
+    assert fields["c"] == "string"
+
+
+def test_known_fields_when_recursive_ref() -> None:
+    """循環して最上位の $defs を指して残った参照（正常系）。"""
+    # 準備
+    schema = {
+        "type": "object",
+        "properties": {
+            "tree": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "children": {"type": "array", "items": {"$ref": "#/$defs/node"}},
+                },
+            },
+        },
+        "$defs": {
+            "node": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "children": {"type": "array", "items": {"$ref": "#/$defs/node"}},
+                },
+            },
+        },
+    }
+    # 実行
+    fields = known_fields([schema])
+    # 検証
+    assert fields["tree.name"] == "string"
+    assert fields["tree.children"] == "array"
+    assert fields["tree.children[].name"] == "string"
+    assert fields["tree.children[].children"] == "array"
+    assert "tree.children[].children[].name" not in fields
+
+
+def test_known_fields_when_unresolvable_ref() -> None:
+    """たどらない参照（正常系）。"""
+    # 準備
+    schema = {
+        "type": "object",
+        "properties": {
+            "x": {"$ref": "other.schema.yaml#/$defs/a"},
+            "y": {"$ref": "#/$defs/missing"},
+        },
+        "$defs": {"present": {"type": "object", "properties": {"p": {"type": "string"}}}},
+    }
+    # 実行
+    fields = known_fields([schema])
+    # 検証
+    assert fields["x"] == "string"
+    assert fields["y"] == "string"
+    assert [path for path in fields if path.startswith(("x.", "y."))] == []
