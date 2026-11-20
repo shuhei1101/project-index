@@ -154,6 +154,11 @@ classes:
         type: dict[tuple[Path, str, str, str], list[str]]
         access: 内部 (_)
         description: (`repo_root`, 配信元の ID, 解いた commit, 文書の行の定義のハッシュ) → 『ファイルの収集』の結果。commit の中身と行の定義で決まり古くならないので `clear` では空にしない。`_trees` から捨てた (`repo_root`, commit) の要素も一緒に捨て、`TREE_KEEP` 件の commit の分に抑える
+      - name: _revision_loads
+        title: リビジョンの読み込みの結果
+        type: dict[tuple[Path, str], OrderedDict[tuple[str, tuple[str, ...]], _RevisionLoad]]
+        access: 内部 (_)
+        description: '(`repo_root`, 配信元の ID) → 使用した順の (解いた commit, 読んだ文書の行の定義のハッシュの並び) → 読み込みの結果。`_RevisionLoad` はこのファイルの中の `@dataclass(slots=True, frozen=True)`（`result: LoadResult`・`pages: dict[str, Document]`・`files: dict[str, Document]`・`file_ids: dict[tuple[str, str], Document]`）。commit の中身と行の定義で決まり古くならないので `clear` では空にしない。(`repo_root`, 配信元の ID) ごとに `REVISION_LOAD_KEEP` 件まで持つ。辞書の読み書きは `_lock` の中でする'
     methods:
       - name: load
         title: 文書を集める
@@ -194,6 +199,8 @@ classes:
           type: LoadResult
           description: 集めた文書と読めなかったファイル
         process: |-
+          `target.ref` があり `files` が `None` の場合、`_revision_loads` を (`repo_root`, 配信元の ID) と (読む場所の commit, 読む文書の行の定義のハッシュの並び) で引き、該当すれば手順 1〜6 をせずに保持した `LoadResult` を返却する（使用した順の末尾へ移す）。`from_blobs` の真偽はキーに含めない（同じ commit と行の定義なら同じ文書になる）
+
           1. 読むフォルダを決める
              - `target.ref` が `None` の場合、`target.base`
              - `target.ref` があり、`from_blobs` が偽か `files` がある場合、読む場所の commit（下の「読む場所の commit」）を `snapshots.checkout` で書き出し、その下に `source.root` の `repo_root` からの相対パスをつなぐ
@@ -213,7 +220,7 @@ classes:
           5. 収集で当たらなかった `_files` のキーのうち、読んだ行の ID を持ち読むフォルダの下にあるものを削除する（削除されたファイルと、行の定義が変わる前のキー）。
              `target.ref` がある場合は、読んだ行ごとに、`_revision_files` のキーのうち `repo_root`・配信元の ID・行の ID が同じで、今回の commit のファイルに当たらないもの、または行の定義のハッシュが違うものを削除する（`_revision_files` を今の commit と行の定義のファイルの数に抑える）
           6. 行の順に文書を並べ、先に現れた ID を残して、後に現れた同じ ID の文書を `duplicate_id` にする（`detail` に ID と先の文書のファイル）。除外した文書は `duplicates` に行の順で入れる
-          7. `LoadResult` を返す
+          7. `target.ref` があり `files` が `None` の場合、結果を文書のページの索引（`find_page` の「文書のページの索引」）とともに `_revision_loads` の末尾に入れ、(`repo_root`, 配信元の ID) ごとに `REVISION_LOAD_KEEP` 件を超えたら先頭（最も前に使用した commit）から捨てる。`LoadResult` を返却する
 
           読む場所の commit は、`target.commit` があればそのまま使い、無ければ `target.ref` を履歴の『リビジョンの解決』（`date_base` は配信元の `default_ref`）で解く。
           1 回の `load` の中では、手順 1 と手順 3 で同じ commit を使い、解き直さない。
@@ -364,6 +371,24 @@ classes:
             condition: Git の配信元で、同じ commit を持つ読む場所を `from_blobs=True` で 2 回読み、`rules/c.yaml` を足した 2 つ目の commit を持つ読む場所で 3 回目を読む
             mock: 『ファイルの収集』（本物を包んで呼ばれた回数を記録する）
             expected: 2 回目は収集が呼ばれず、2 回とも同じ文書。3 回目は収集が呼ばれ、`rules/c.yaml` の文書を返す
+          - name: test_document_store_load_when_revision_load_reused
+            case: 正常
+            summary: 交互に届く 2 つの commit を照合し直さない
+            condition: Git の配信元で `rules/a.yaml` だけが違う 2 つの commit を持つ読む場所を、最初の commit・2 つ目・最初・2 つ目の順に `load` する
+            mock: ファイルの収集・`load_file`（本物を包んで呼ばれた回数を記録する）
+            expected: 3 回目と 4 回目はファイルの収集も `load_file` も呼ばず、それぞれ 1 回目・2 回目と同じ `LoadResult` を返却する
+          - name: test_document_store_load_when_revision_loads_over_keep
+            case: 正常
+            summary: 上限を超えた読み込みの結果を最も前に使用したものから捨てる
+            condition: '`REVISION_LOAD_KEEP` を 1 にして、commit x・y・x の順に `load` する'
+            mock: ファイルの収集（本物を包んで呼ばれた回数を記録する）
+            expected: 3 回とも収集を呼ぶ（x の結果は y で捨てた）
+          - name: test_document_store_load_when_revision_load_files_given
+            case: 正常
+            summary: たどったファイルを渡した読み込みは保持した結果を使用しない
+            condition: commit x を `load` した後、同じ読む場所を `files` に `rules/a.yaml` だけを渡して `load` する
+            mock: なし（`tmp_path` に `git init`）
+            expected: 2 回目の結果は `rules/a.yaml` の文書だけで、1 回目の `LoadResult` と別のもの
       - name: get
         title: ID で引く
         summary: ID の並びの順に文書を返す
@@ -680,6 +705,54 @@ classes:
             condition: ワークツリー x を指す読む場所で、`load` の前と後に呼ぶ
             mock: なし（`tmp_path` に `git init` と `git worktree add`）
             expected: 前が `False`、後が `True`。`clear` の後は `False`
+      - name: find_page
+        title: 文書のページの特定
+        summary: 読む場所の文書から、文書のページのパスに該当する文書を返却する
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        side_effects: '`load` と同じ'
+        args:
+          - name: target
+            title: 読む場所
+            type: Target
+            required: true
+            passing: positional
+            description: 読み取りの場所が返したもの
+          - name: page
+            title: 文書のページのパス
+            type: str
+            required: true
+            passing: positional
+            description: 探すパス
+          - name: doc_id
+            title: 文書の ID
+            type: str | None
+            required: false
+            default: None
+            passing: keyword
+            description: 文書の取得の `id`
+        returns:
+          type: Document | None
+          description: 該当する文書。無ければ `None`
+        process: |-
+          1. `load(target)` を呼ぶ
+          2. `target.ref` がある場合、`_revision_loads` のその読み込みの文書のページの索引で引く（文書の数によらず辞書を 1〜2 回引くだけにする）
+             - `doc_id` がある場合、`file_ids` を (`page`, `doc_id`) で引く
+             - 無い場合、`pages` を `page` で引き、無ければ `files` を `page` で引く
+          3. `target.ref` が無い場合、`load` の文書を順に、索引と同じ規則で照合する
+
+          文書のページの索引は、読み込みの結果の文書を行の順にたどり、同じキーでは先に現れた文書を残して作る。規則は読み取り API の『文書のページの特定』（`find_page`）と同じで、読み取り API のファイルを import しない
+             - `pages`: 文書のファイルのパスから拡張子を外したパス（`record_index` を持つ文書は `{パス}/{文書の ID}`）→ 文書
+             - `files`: 文書のファイルのパスと本文のファイルのパス → 文書
+             - `file_ids`: (文書のファイルのパスか本文のファイルのパス, 文書の ID) → 文書
+        unit_tests:
+          - name: test_document_store_find_page
+            case: 正常
+            summary: 文書のページの特定と同じ文書を返却する
+            condition: Git の配信元で `rules/a.yaml`・`files.yaml` の行（`guide.md` を本文に持つ）・`terms.yaml` の行 `term-1`・`term-2` を commit し、`ref` を持つ読む場所と持たない読む場所で、`rules/a`・`rules/a.yaml`・`guide.md`・`terms.yaml` と `doc_id` `term-2`・無いパスを引く
+            mock: なし（`tmp_path` に `git init`）
+            expected: どの引き方も、読み取り API の `find_page` に `load` の文書を渡した結果と同じ文書（無いパスは `None`）
 constants:
   - name: CANDIDATE_COUNT
     title: 近い ID の候補の数
@@ -705,6 +778,12 @@ constants:
     usecase: 読み取り
     summary: ワークツリーのたどった結果を保持する数。超えたら古く使ったものから捨てる（`TREE_KEEP` と同じ数）
     value: '20'
+  - name: REVISION_LOAD_KEEP
+    title: 保持するリビジョンの読み込みの数
+    container: project_index/features/documents/store.py
+    usecase: 共通
+    summary: 配信元ごとに保持するリビジョンの読み込みの結果の数。超えたら最も前に使用したものから捨てる。読み取り API のログ（2026-11-20）で 1 つの配信元に 10 分の間に届いた `ref` の種類の最大 3（`ref` を省いた要求を含み、文書の MCP の `default_ref` と同じ commit）に安全率 20% を掛けて切り上げた。ai-monitor の commit 1 つ分の保持で増えるメモリは最大 72MB（tracemalloc の実測）で、最大 288MB
+    value: '4'
 functions:
   - name: check_sync
     title: メタデータのずれの確かめ

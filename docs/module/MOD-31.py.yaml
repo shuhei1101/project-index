@@ -72,6 +72,12 @@ constants:
     usecase: 共通
     summary: 一緒に変わったファイルを数えるときにたどる、対象のファイルを変えた最近の commit の数
     value: '50'
+  - name: COMMIT_DATE_KEEP
+    title: 保持する commit の日時の数
+    container: project_index/features/history/query.py
+    usecase: 共通
+    summary: リビジョンの解決が保持する (`repo_root`, commit) → 日時の数。配信元の数（17）× 配信元ごとに保持するリビジョンの読み込みの数（文書のストアの `REVISION_LOAD_KEEP` 4）の 68 を超える 2 のべき乗。要素は数十バイトで、メモリは考えなくてよい
+    value: '128'
 functions:
   - name: resolve_ref
     title: リビジョンの解決
@@ -116,7 +122,7 @@ functions:
          - 空の場合（それより前に commit が無い）、`RefNotFoundError` を送る
       2. それ以外は `rev-parse --verify --quiet {ref}^{commit}` で解く
          - `GitError` の場合、`RefNotFoundError` を送る
-      3. `show -s --format=%cI {commit}` で日時を引き、`ResolvedRef` を返す
+      3. commit の日時を、(`repo_root`, commit) ごとに保持した日時（`functools.lru_cache(maxsize=COMMIT_DATE_KEEP)` の内部の関数）から引く。無ければ `show -s --format=%cI {commit}` で引いて保持する。`ResolvedRef` を返す（commit の日時は変わらないので、同じ commit は要求ごとに git を 1 回だけ呼ぶ）
     exceptions:
       - name: RefNotFoundError
         condition: commit に解けない・その日時より前に commit が無い
@@ -149,6 +155,12 @@ functions:
         mock: なし
         expected: '`RefNotFoundError`'
         exception: その日時より前に commit が無い
+      - name: test_resolve_ref_when_date_cached
+        case: 正常
+        summary: 同じ commit の日時は 2 回目から git で引かない
+        condition: '`main` に commit 1 つの一時リポジトリで、`main` を 2 回解く'
+        mock: git の実行（本物を包んで引数を記録する）
+        expected: 2 回とも同じ `commit` と `date` で、`show` の呼び出しは 1 回だけ、`rev-parse` は 2 回
   - name: list_refs
     title: リビジョンの一覧
     kind: 関数
