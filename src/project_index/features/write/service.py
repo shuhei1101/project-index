@@ -1850,11 +1850,19 @@ def _commit_target(
         source = current[0]
     else:
         source = registry.get_for_docs(source_id)
+    committable = committable_kinds(source, path)
+    # どの種類も直コミットできない作業場所は、取得・取り込みの前に断る
+    if not committable:
+        raise DirectCommitNotPermittedError(
+            message=f"{source.id} にはこの作業場所（{cwd}）から直コミットできません",
+            source_id=source.id,
+            next_steps=["端末の設定の sources[].direct_commit の呼べる作業場所を確認してください"],
+        )
     plan = resolve_commit_plan(source, commit)
     # 種類・配置先をコミットするブランチのワークツリーの設定で参照する（scope.write は確かめない）
     reloaded = access_service.load_source_at(source, plan.worktree)
     target = Target(reloaded, base_of(reloaded, plan.worktree), None, plan.worktree, "commit")
-    return source, plan, target, committable_kinds(source, path)
+    return source, plan, target, committable
 
 
 def _check_commit_content(
