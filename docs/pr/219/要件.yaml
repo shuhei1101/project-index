@@ -18,3 +18,6 @@ scope_out:
   - item: dev-docs の画面の検索（読み取り API の語での検索）での配列の中のキーの絞り込み
     reason: 要望は search_docs の filter と group_by で、画面の検索は含まれない
     plan: none
+  - item: 種類のスキーマの `$ref`・`allOf`（`anyOf`・`oneOf`）の先で定義した項目を、使える項目（`known_fields`、`src/project_index/features/search/fields.py` の `_walk`）に含める
+    reason: 変更前からの不具合で、`$ref`・`allOf` の先の項目が「知らない項目です」になる。今回の要望（配列の中のオブジェクトのキーの指定）に含まれない
+    plan: '#221'
