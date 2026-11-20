@@ -4,10 +4,11 @@ import dataclasses
 from typing import TYPE_CHECKING, Any
 
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
-from tests.integration.server.conftest import sample_config, sample_files
+from tests.integration.server.conftest import note_direct_commit_files, sample_config, sample_files
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
 
 def load_yaml(text: str) -> Any:
@@ -239,3 +240,33 @@ def test_normal_when_storage_changed(
     assert row["storage"] == {"type": "disk"}
     assert {key: value for key, value in row.items() if key != "storage"} == before
     assert env.client.get("/sources/sample/refs").json()["git"] is False
+
+
+def test_normal_when_direct_commit_changed(
+    tmp_path: Path, make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """direct_commit の送信したキーだけを重ね、送信しなかったキーは今の値を残す（正常系）。"""
+    # 準備
+    work = tmp_path / "work"
+    note = tmp_path / "note"
+    extra = dataclasses.replace(
+        make_source("extra", note_direct_commit_files("extra")), direct_commit_scope=[work]
+    )
+    env = make_server(make_source("sample"), extra)
+    # 実行
+    response = env.client.patch(
+        "/settings/sources/extra",
+        json={
+            "expectedVersion": _version(env),
+            "source": {"direct_commit": {"kinds": {"note": [str(note)]}}},
+        },
+    )
+    # 検証
+    row = load_yaml(env.settings_path.read_text(encoding="utf-8"))["sources"][1]
+    got = {item["id"]: item for item in env.client.get("/settings/sources").json()["sources"]}
+    assert response.status_code == 200
+    assert ("extra", "serving") in [
+        (item["id"], item["status"]) for item in response.json()["sources"]
+    ]
+    assert row["direct_commit"] == {"scope": [str(work)], "kinds": {"note": [str(note)]}}
+    assert got["extra"]["directCommit"] == {"scope": [str(work)], "kinds": {"note": [str(note)]}}

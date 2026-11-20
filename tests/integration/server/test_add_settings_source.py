@@ -3,9 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
+from tests.integration.server.conftest import note_direct_commit_files
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
 
 def load_yaml(text: str) -> Any:
@@ -214,3 +216,46 @@ def test_normal_when_storage_given(
         (row["id"], row["status"]) for row in response.json()["sources"]
     ]
     assert rows[1]["storage"] == {"type": "disk"}
+
+
+def test_normal_when_direct_commit_given(
+    tmp_path: Path, make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """direct_commit を持つ行を追加し、既定値でないキーだけを端末の設定の行に記載する（正常系）。"""
+    # 準備
+    work = tmp_path / "work"
+    other = tmp_path / "other"
+    env = make_server(make_source("sample"))
+    extra = make_source("extra", note_direct_commit_files("extra"))
+    # 実行
+    added = env.client.post(
+        "/settings/sources",
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "source": _row(extra, direct_commit={"scope": [str(work)]}),
+        },
+        headers=ORIGIN,
+    )
+    same = env.client.post(
+        "/settings/sources",
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "source": _row(extra, direct_commit={"scope": [str(work)]}),
+        },
+        headers=ORIGIN,
+    )
+    different = env.client.post(
+        "/settings/sources",
+        json={
+            "expectedVersion": env.client.get("/settings/sources").json()["version"],
+            "source": _row(extra, direct_commit={"scope": [str(other)]}),
+        },
+        headers=ORIGIN,
+    )
+    # 検証
+    rows = load_yaml(env.settings_path.read_text(encoding="utf-8"))["sources"]
+    assert added.status_code == 201
+    assert ("extra", "serving") in [(row["id"], row["status"]) for row in added.json()["sources"]]
+    assert rows[1]["direct_commit"] == {"scope": [str(work)]}
+    assert (same.status_code, same.json()["same"]) == (409, True)
+    assert (different.status_code, different.json()["same"]) == (409, False)

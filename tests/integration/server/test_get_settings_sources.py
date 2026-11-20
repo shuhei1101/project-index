@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import dataclasses
 from typing import TYPE_CHECKING, Any
+
+from tests.integration.server.conftest import note_direct_commit_files
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
 BROKEN_CONFIG = "name: broken\ndocuments:\n  - id: sample\n    schema: schemas/sample.schema.yaml\n"
 
@@ -134,3 +138,25 @@ def test_normal_when_storage_given(
     assert response.status_code == 200
     assert rows["company"]["storage"] == {"type": "disk"}
     assert "storage" not in rows["sample"]
+
+
+def test_normal_when_direct_commit_given(
+    tmp_path: Path, make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """direct_commit を持つ行だけに directCommit を返却する（正常系）。"""
+    # 準備
+    work = tmp_path / "work"
+    note = tmp_path / "note"
+    extra = dataclasses.replace(
+        make_source("extra", note_direct_commit_files("extra")),
+        direct_commit_scope=[work],
+        direct_commit_kinds={"note": [note]},
+    )
+    env = make_server(make_source("sample"), extra)
+    # 実行
+    response = env.client.get("/settings/sources")
+    # 検証
+    rows = {row["id"]: row for row in response.json()["sources"]}
+    assert response.status_code == 200
+    assert rows["extra"]["directCommit"] == {"scope": [str(work)], "kinds": {"note": [str(note)]}}
+    assert "directCommit" not in rows["sample"]
