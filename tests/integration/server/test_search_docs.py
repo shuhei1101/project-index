@@ -81,6 +81,51 @@ USES_FILES = {
     "templates/t1.yaml": "id: t1\nname: 素材 1\nuses:\n  - {id: compare}\n  - {id: list}\n",
     "templates/t2.yaml": "id: t2\nname: 素材 2\nuses:\n  - {id: compare-x}\n",
 }
+# allOf・anyOf・oneOf と、自分自身を指す `$ref`（`$defs.node`）で項目を定義した種類の配信元
+COMPOSITION_SCHEMA = (
+    "type: object\n"
+    "allOf:\n"
+    "  - properties:\n"
+    "      top: {type: string}\n"
+    "properties:\n"
+    "  id: {type: string}\n"
+    "  name: {type: string}\n"
+    "  a:\n"
+    "    allOf:\n"
+    "      - type: object\n"
+    "        properties:\n"
+    "          x: {type: string}\n"
+    "  b:\n"
+    "    anyOf:\n"
+    "      - type: object\n"
+    "        properties:\n"
+    "          y: {type: string}\n"
+    "      - type: 'null'\n"
+    "  c:\n"
+    "    oneOf:\n"
+    "      - type: object\n"
+    "        properties:\n"
+    "          z: {type: string}\n"
+    "      - type: string\n"
+    "  tree: {$ref: '#/$defs/node'}\n"
+    "$defs:\n"
+    "  node:\n"
+    "    type: object\n"
+    "    properties:\n"
+    "      name: {type: string}\n"
+    "      children:\n"
+    "        type: array\n"
+    "        items: {$ref: '#/$defs/node'}\n"
+)
+COMPOSITION_FILES = {
+    "project-index.yaml": USES_CONFIG,
+    "schemas/template.schema.yaml": COMPOSITION_SCHEMA,
+    "templates/t1.yaml": (
+        "id: t1\nname: 素材 1\ntop: t1\na: {x: x1}\nb: {y: y1}\nc: {z: z1}\n"
+        "tree: {name: root, children: [{name: leaf}]}\n"
+    ),
+    "templates/t2.yaml": "id: t2\nname: 素材 2\ntop: t2\nb: null\nc: s\n",
+}
 MAIN_TAG_MCP = {"field": "main_tags", "op": "eq", "values": ["mcp"]}
 NOTES_A = {"field": "id", "op": "eq", "values": ["notes/a.md"]}
 
@@ -1701,3 +1746,64 @@ def test_normal_when_direct_commit_workplace(
     assert "r1" in text
     assert other.is_error
     assert "コミットするブランチのワークツリーだけ" in other.text
+
+
+def test_normal_when_schema_composition_keys(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """種類のスキーマの allOf・anyOf・oneOf と循環する $ref の先で定義したキーを項目として指し、絞り、数える（正常系）。"""
+    # 準備
+    source = make_source("sample", COMPOSITION_FILES)
+    env = make_server(source)
+    cwd = str(source.folder)
+    # 実行
+    by_all_of = env.call(
+        "search_docs",
+        cwd=cwd,
+        filter={"field": "a.x", "op": "eq", "values": ["x1"]},
+        view="ids",
+        format="json",
+    )
+    by_top = env.call(
+        "search_docs",
+        cwd=cwd,
+        filter={"field": "top", "op": "eq", "values": ["t1"]},
+        view="ids",
+        format="json",
+    )
+    by_child = env.call(
+        "search_docs",
+        cwd=cwd,
+        filter={"field": "tree.children[].name", "op": "eq", "values": ["leaf"]},
+        view="ids",
+        format="json",
+    )
+    counted = env.call("search_docs", cwd=cwd, view="count", group_by="b.y", format="json")
+    picked = env.call(
+        "search_docs",
+        cwd=cwd,
+        filter={"field": "c.z", "op": "exists"},
+        order_by=[{"field": "tree.name"}],
+        fields=["b.y", "c.z", "tree.name", "tree.children[].name"],
+        format="json",
+    )
+    too_deep = env.call(
+        "search_docs",
+        cwd=cwd,
+        filter={"field": "tree.children[].children[].name", "op": "eq", "values": ["leaf"]},
+    )
+    # 検証
+    assert [item["id"] for item in by_all_of.data["items"]] == ["t1"]
+    assert [item["id"] for item in by_top.data["items"]] == ["t1"]
+    assert [item["id"] for item in by_child.data["items"]] == ["t1"]
+    assert counted.data["groups"] == [
+        {"value": "y1", "count": 1},
+        {"value": "（なし）", "count": 1},
+    ]
+    assert not picked.is_error
+    # 値が 1 つの項目は配列にせず返す
+    assert picked.data["items"][0]["values"]["tree.children[].name"] == "leaf"
+    # 同じ定義へ戻るより深いキーは使える項目にしない
+    assert too_deep.is_error
+    assert "InvalidArgumentError" in too_deep.text
+    assert "tree.children[].children[].name" in too_deep.text
