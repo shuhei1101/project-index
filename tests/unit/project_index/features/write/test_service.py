@@ -758,7 +758,7 @@ def test_write_docs_when_body_file_rejected(make_env: Callable[..., WriteEnv], p
 
 
 @pytest.mark.parametrize(
-    ("operation", "expected_path"),
+    ("operation", "expected_path", "expected_fix"),
     [
         pytest.param(
             Operation(
@@ -768,11 +768,13 @@ def test_write_docs_when_body_file_rejected(make_env: Callable[..., WriteEnv], p
                 set={"@body": "x"},
             ),
             "operations[0].set.@body",
+            "@body を除いてください",
             id="no_body_file",
         ),
         pytest.param(
             Operation(op="create", kind="notes", data={"id": "n2", "path": "n2.md"}),
             "operations[0].data.@body",
+            "先に本文のファイルを作成",
             id="create_without_body",
         ),
         pytest.param(
@@ -783,6 +785,7 @@ def test_write_docs_when_body_file_rejected(make_env: Callable[..., WriteEnv], p
                 set={"path": "other.md"},
             ),
             "operations[0].set.path",
+            "今の値",
             id="body_file_column_changed",
         ),
         pytest.param(
@@ -793,12 +796,13 @@ def test_write_docs_when_body_file_rejected(make_env: Callable[..., WriteEnv], p
                 unset=["@body"],
             ),
             "operations[0].unset",
+            "unset から除いてください",
             id="unset_body",
         ),
     ],
 )
 def test_write_docs_when_body_not_accepted(
-    make_env: Callable[..., WriteEnv], operation: Operation, expected_path: str
+    make_env: Callable[..., WriteEnv], operation: Operation, expected_path: str, expected_fix: str
 ) -> None:
     """@body を受け付けない操作（異常系）。"""
     # 準備
@@ -807,6 +811,7 @@ def test_write_docs_when_body_not_accepted(
     with pytest.raises(InvalidArgumentError) as exc_info:
         env.write(operations=[operation])
     assert [v.path for v in exc_info.value.violations] == [expected_path]
+    assert expected_fix in exc_info.value.violations[0].fix
     assert (env.worktree / "notes/index.yaml").read_text(encoding="utf-8") == NOTES
     assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == NOTE_1
     assert (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
@@ -933,7 +938,140 @@ def test_write_docs_when_body_file_absent_rejected(
     assert not (env.worktree / "notes/n3.md").exists()
 
 
-NESTED_NOTES = "items:\n  - id: n1\n    meta:\n      path: n1.md\n  - id: n3\n"
+EXISTING_BODIES = {"notes/n6.md": "# n6\n", "notes/n7.md": "# n7\n", "notes/n8.md": "# n8\n"}
+
+
+def test_write_docs_when_existing_body_file_adopted(make_env: Callable[..., WriteEnv]) -> None:
+    """既にあるファイルを本文のファイルにする（正常系）。"""
+    # 準備
+    env = make_env({**_absent_files(), **EXISTING_BODIES}, tables=[_notes_table()])
+    # 実行
+    created = env.write(
+        operations=[Operation(op="create", kind="notes", data={"id": "n6", "path": "n6.md"})]
+    )
+    updated = env.write(
+        operations=[
+            Operation(op="update", id="n3", expected_version=N3_VERSION, set={"path": "n7.md"})
+        ]
+    )
+    replaced = env.write(
+        operations=[
+            Operation(
+                op="replace",
+                id="n5",
+                expected_version=value_hash({"id": "n5"}),
+                data={"id": "n5", "path": "n8.md"},
+            )
+        ]
+    )
+    # 検証
+    index = load_yaml((env.worktree / "notes/index.yaml").read_text(encoding="utf-8"))
+    assert index["items"] == [
+        {"id": "n1", "path": "n1.md"},
+        {"id": "n3", "path": "n7.md"},
+        {"id": "n5", "path": "n8.md"},
+        {"id": "n6", "path": "n6.md"},
+    ]
+    assert created.results[0].status == "created"
+    assert updated.results[0].status == "updated"
+    assert replaced.results[0].status == "replaced"
+    assert (env.worktree / "notes/n6.md").read_text(encoding="utf-8") == "# n6\n"
+    assert (env.worktree / "notes/n7.md").read_text(encoding="utf-8") == "# n7\n"
+    assert (env.worktree / "notes/n8.md").read_text(encoding="utf-8") == "# n8\n"
+    assert "@@" not in (created.results[0].diff or "")
+    assert "@@" not in (updated.results[0].diff or "")
+    assert "@@" not in (replaced.results[0].diff or "")
+    assert created.results[0].version == value_hash([{"id": "n6", "path": "n6.md"}, "# n6\n"])
+
+
+@pytest.mark.parametrize(
+    ("operations", "expected_index", "expected_rule", "expected_rule_kind", "expected_fix"),
+    [
+        pytest.param(
+            [Operation(op="create", kind="notes", data={"id": "n10", "path": "n1.md"})],
+            0,
+            "n1",
+            "n1",
+            "どの文書のファイルでもない",
+            id="body_file_of_other_element",
+        ),
+        pytest.param(
+            [Operation(op="create", kind="notes", data={"id": "n11", "path": "index.yaml"})],
+            0,
+            "notes",
+            "管理用の YAML",
+            "どの文書のファイルでもない",
+            id="records_index",
+        ),
+        pytest.param(
+            [
+                Operation(
+                    op="create",
+                    kind="notes",
+                    data={"id": "n12", "path": "../docs/rule/doc-1.yaml"},
+                )
+            ],
+            0,
+            "doc-1",
+            "doc-1",
+            "どの文書のファイルでもない",
+            id="file_of_document",
+        ),
+        pytest.param(
+            [
+                Operation(
+                    op="create", kind="notes", data={"id": "n13", "path": "n6.md", "@body": "x"}
+                )
+            ],
+            0,
+            "既にあります",
+            "既にあります",
+            "@body を除",
+            id="body_with_existing_file",
+        ),
+        pytest.param(
+            [
+                Operation(op="create", kind="notes", data={"id": "n6", "path": "n6.md"}),
+                Operation(op="create", kind="notes", data={"id": "n14", "path": "n6.md"}),
+            ],
+            1,
+            "n6",
+            "n6",
+            "どの文書のファイルでもない",
+            id="adopted_in_same_call",
+        ),
+    ],
+)
+def test_write_docs_when_existing_body_file_rejected(
+    make_env: Callable[..., WriteEnv],
+    operations: list[Operation],
+    expected_index: int,
+    expected_rule: str,
+    expected_rule_kind: str,
+    expected_fix: str,
+) -> None:
+    """既にあるファイルを本文のファイルにできない（異常系）。"""
+    # 準備
+    env = make_env(
+        {**_notes_files(), "notes/n6.md": "# n6\n"}, tables=[_notes_table(), _rules_table()]
+    )
+    # 実行・検証
+    with pytest.raises(ValidationFailedError) as exc_info:
+        env.write(operations=operations)
+    violations = exc_info.value.violations
+    assert [(v.index, v.path) for v in violations] == [
+        (expected_index, f"operations[{expected_index}].path")
+    ]
+    assert expected_rule in violations[0].rule
+    assert expected_rule_kind in violations[0].rule
+    assert expected_fix in violations[0].fix
+    assert (env.worktree / "notes/index.yaml").read_text(encoding="utf-8") == NOTES
+    assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == NOTE_1
+    assert (env.worktree / "notes/n6.md").read_text(encoding="utf-8") == "# n6\n"
+    assert (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
+
+
+NESTED_NOTES ="items:\n  - id: n1\n    meta:\n      path: n1.md\n  - id: n3\n"
 NESTED_N1_VERSION = value_hash([{"id": "n1", "meta": {"path": "n1.md"}}, NOTE_1])
 
 
