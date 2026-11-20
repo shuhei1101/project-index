@@ -244,7 +244,7 @@ functions:
         message: '{path}: 位置 {n} は配列の長さ {length} を超えています'
       - name: InvalidArgumentError
         condition: パスが `**`・`[]`・`[{キー}]` を含む
-        message: '{path}: `**`・`[]`・`[{キー}]` を含む項目のパスには書き込めません'
+        message: '{path}: `**`・`[]`・`[{キー}]` を含む項目のパスには書き込めません。`#` で始めて x-key の値で要素を指してください'
     unit_tests:
       - name: test_set_field
         case: 正常
@@ -279,7 +279,7 @@ functions:
         summary: 要素の選び方を含むパス
         condition: '`{"tags": []}` へ `tags[].name` = `a`'
         mock: なし
-        expected: '`InvalidArgumentError`'
+        expected: '`InvalidArgumentError` で、理由に `#` で始めて x-key の値で要素を指す書き方を含む'
         exception: パスが `[]`・`[{キー}]` を含む
       - name: test_set_field_when_any_depth
         case: 異常
@@ -626,13 +626,20 @@ functions:
         required: true
         passing: positional
         description: '`#` の後（`functions[save#2].process`・`notes[main.py の補足]`・`request[operations[].fields].description`）'
+      - name: missing_last
+        title: 最後のキーが無くてもよい
+        type: bool
+        required: false
+        default: 'False'
+        passing: keyword
+        description: 最後の区切りが辞書のキーのとき、そのキーが無くても解くか（`set` のキーで使用する）
     returns:
       type: list[str | int]
       description: 辞書のキーと配列の位置の並び
     process: |-
       1. 先頭から 1 文字ずつ調べ、`[` と `]` の対応を数えて、最も外側の `[` からそれに対応する `]` までを 1 つの区切りにする。区切りの値は内側の対応の取れた `[` `]` を含む（`request[operations[].fields]` の値は `operations[].fields`）。`[]` の外の `.` で名前を区切る。`[` を閉じない・対応する `[` の無い `]`・区切りの `]` の直後が `.`・`[`・末尾のどれでもない・空の名前・名前で始まらないパスは `InvalidArgumentError`
       2. 内容とスキーマを先頭から一緒にたどる。スキーマの `$ref`（`#/$defs/...`）は最上位の `$defs` で解き、辞書のキーは `properties.{キー}`（無ければ `additionalProperties`）、配列の要素は `items` へ進む
-      3. 名前と、辞書に対する `[{キー}]` はそのキーを並びに加える。値が辞書でない・キーが無い場合は `InvalidArgumentError`
+      3. 名前と、辞書に対する `[{キー}]` はそのキーを並びに加える。値が辞書でない・キーが無い場合は `InvalidArgumentError`。ただし `missing_last` が `True` で最後の区切りのときは、値が辞書ならキーが無くてもそのキーを加える（配列に対する `[{値}]` は 4 のとおり要素の実在を求める）
       4. 配列に対する `[{値}]` は、スキーマの `x-key` のキーがその値の最初の要素の位置を加える。その値の要素が無く、値の末尾が `#{整数}` なら、`#` の前の値の要素のその順番（ 1 始まり）の位置を加える。`x-key` が無い・該当する要素が無い・順番が要素の数を超える場合は `InvalidArgumentError`
       5. 並びを返す
     exceptions:
@@ -687,6 +694,13 @@ functions:
         mock: なし
         expected: どれも記載方法が誤っている `InvalidArgumentError`
         exception: 書式が誤っている
+      - name: test_resolve_ref_path_when_missing_last
+        case: 正常
+        summary: 最後の辞書のキーが無くても解く
+        condition: '`functions`（`x-key: name`）が `load`・`save` で `notes` が `{main: x}` の内容を、`missing_last=True` で `functions[save].usecase`・`notes[a.b]`、同じく `functions[missing]`・`functions[save].other.usecase`'
+        mock: なし
+        expected: '`["functions", 1, "usecase"]`・`["notes", "a.b"]`。配列の無い要素と途中の無いキーは `InvalidArgumentError`'
+        exception: 該当する要素が無い・キーが無い（途中）
   - name: set_field_at
     title: 並びで指した項目の書き込み
     kind: 関数

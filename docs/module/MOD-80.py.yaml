@@ -64,7 +64,7 @@ functions:
         required: false
         default: None
         passing: keyword
-        description: 文書 1 件の内容に当てるスキーマ（文書のストアの `row_schema`）。`text_edits[].field`・`add_to`・`remove_from` のキー・`unset` の要素の参照の型の項目のパスの解決と、`remove_from` の配列の `x-key` の取得に使用する
+        description: 文書 1 件の内容に当てるスキーマ（文書のストアの `row_schema`）。`text_edits[].field`・`set`・`add_to`・`remove_from` のキー・`unset` の要素の参照の型の項目のパスの解決と、`remove_from` の配列の `x-key` の取得に使用する
     returns:
       type: dict[str, Any]
       description: 新しい内容（`current` は書き換えない）
@@ -73,6 +73,8 @@ functions:
       2. `create`・`replace` は `data` の深いコピーを返す
       3. `update` は `current` の深いコピーに順に当てる
          - `set` の値は、オブジェクトなら今の値へ再帰でマージし、配列とスカラーは置き換える（項目の書き込み）
+           - キーが `#` で始まる場合は、`#` の後を『参照の型の項目のパスの解決』（`missing_last=True`。`schema` が `None` なら空のスキーマ）でキーと位置の並びに解き、その並びでたどれた今の値とマージするか、『並びで指した項目の書き込み』で置き換える。最後のキーが無いときはそのキーを追加する。共通のキーの列名へは読み替えない
+           - `set` のキーを解けない（`InvalidArgumentError`。`#` で始まらず要素の選び方を含む・`#` で始まるパスを解けない）場合は、送られた理由で `set.{キー}` の違反にする
          - `unset` は要素を『項目の削除』（`schema` を渡す）で削除する。無い項目は飛ばす。要素を解けない（`InvalidArgumentError`。要素の選び方を含む・`#` で始まるパスを解けない）場合は、送られた理由で `unset.{要素}` の違反にする
          - `remove_from` はキーを『配列の項目の解決』（`create=False`。`schema` が `None` なら空のスキーマ）で解いた配列から削除する（`None` なら何もしない。配列でなければ違反）
            - 『配列の x-key の取得』が `None` の配列は、渡した値と等しい要素を全て除く（該当しない値は何もしない）
@@ -85,7 +87,7 @@ functions:
       4. 違反は `Violation`（`path` は `set.a.b`・`text_edits[0].old` など。`old` の違反の `fix` に一致した数と、`replace_all` か前後の文字を含めること。`text_edits[{n}].field` の違反の `fix` は『項目のパスの指し方の案内』）を集めて `InvalidArgumentError` で送る
     exceptions:
       - name: InvalidArgumentError
-        condition: 配列でない項目への追加・削除、`x-key` を持つ配列への `remove_from` の値に削除する要素が無い、`add_to`・`remove_from` のキーと `unset` の要素を解けない（要素の選び方を含む・`#` で始まるパスを解けない）、文字列でない項目への置き換え、`old` の一致が 1 か所でない
+        condition: 配列でない項目への追加・削除、`x-key` を持つ配列への `remove_from` の値に削除する要素が無い、`set`・`add_to`・`remove_from` のキーと `unset` の要素を解けない（要素の選び方を含む・`#` で始まるパスを解けない）、文字列でない項目への置き換え、`old` の一致が 1 か所でない
         message: '`操作を適用できません`'
     unit_tests:
       - name: test_apply_operation
@@ -207,6 +209,20 @@ functions:
         mock: なし
         expected: '`InvalidArgumentError` の違反の `path` が `text_edits[0].field`、`rule` に `記載方法が誤っています`、`fix` が `test_apply_operation_when_text_edit_ref_path_unresolved` と同じ案内'
         exception: 項目のパスを解けない
+      - name: test_apply_operation_when_set_ref_path
+        case: 正常
+        summary: '`#` で始まる `set` のキーで要素へキーを追加・マージする'
+        condition: '`models`（`x-key: name` の配列）が `{name: Row, meta: {x: 1}}`・`{name: Col}`、`notes` が `{main: a}` の内容へ、`set: {"#models[Col].label": l, "#models[Row].meta": {y: 2}, "#notes[a.b]": v}`'
+        mock: なし
+        expected: 'Col に `label: l` が追加され、Row の `meta` が `{x: 1, y: 2}`、`notes` にキー `a.b` が追加される'
+        exception: '-'
+      - name: test_apply_operation_when_set_ref_path_unresolved
+        case: 異常
+        summary: '`set` のキーを解けない'
+        condition: 同じ内容へ、`set` のキーを `#models[Zzz].label`・`#models[Col].other.label`・`models[Col].label` にした 3 件の操作
+        mock: なし
+        expected: どれも `InvalidArgumentError` で、違反の `path` が `set.{キー}`。`models[Col].label` の `rule` は `#` で始めて x-key の値で要素を指す書き方を案内する
+        exception: '`set` のキーを解けない'
   - name: to_columns
     title: 列名への読み替え
     kind: 関数
