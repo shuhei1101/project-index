@@ -145,6 +145,16 @@ def run_serve(args: argparse.Namespace) -> int:
 
     from project_index.server.app import build_app
 
+    # 環境変数 PI_POC_STACKS があれば、SIGUSR1 で全スレッドのスタックをそのファイルへ追記する
+    stacks_path = os.environ.get("PI_POC_STACKS")
+    if stacks_path:
+        import faulthandler
+        import signal
+
+        faulthandler.register(
+            signal.SIGUSR1, file=open(stacks_path, "a"), all_threads=True  # noqa: SIM115
+        )
+
     try:
         terminal = load_terminal_config(config_path(os.environ))
         port = listen_port(terminal, os.environ)
