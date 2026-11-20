@@ -1,0 +1,18 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: x-key の値で指した配列の要素へ、部分更新で今は無いキーを追加する流れと、指した要素が無いときに断る流れを加える
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: '`#` で始まる参照の型の項目のパスを受け付けるキーに `set` を加え、最後のキーが無ければ追加すること・途中の項目を作らないことを記載する'
+    status: todo
+scope_out:
+  - item: '`#` で始まる `set` のキーで、途中の無いキー・無い要素を作る'
+    reason: 要望は既にある要素へのキーの追加で、x-key の値で指す他の操作も途中の項目を作らない
+    plan: none
+  - item: '`#` で始まらないパスの `[{キー}]`（キーが真の値を持つ要素を選ぶ）を x-key の値で要素を指す書き方として解釈する'
+    reason: 検索・取得で使用している既存の意味を変える破壊的変更になる。x-key の値で指す書き方は `#` で始まるパスに揃える
+    plan: none
