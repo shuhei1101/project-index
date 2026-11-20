@@ -1,0 +1,1 @@
+# search_docs の filter と group_by で、配列の中のオブジェクトのキー（uses[].id など）で絞れるようにする
