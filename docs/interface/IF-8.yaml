@@ -228,7 +228,7 @@ response:
     notes: '`serving` で、配信元の検査が済んでいるとき。検査が済んでいなければ `null` で、markdown に検査中であることを出す'
   - name: sources[].sync.missing_refs
     type: int
-    description: '`metadata` に書いた列が無い文書の件数'
+    description: '`metadata` に書いた列が無い文書の件数（`check_project` と同じ。`**.` で始まる列は、取り出した結果が空の文書も数えない）'
     notes: '`serving` のとき'
   - name: sources[].sync.unindexed_files
     type: int

@@ -457,8 +457,9 @@ functions:
       description: 値が無い `(メタデータのキー, 列名)` の並び（`table.metadata` の順）
     process: |-
       1. `table.metadata` の対応を順に見る（書いていないキーの同じ名前の列は見ない）
-      2. 『項目の取得』で列名の値が `None` なら、そのキーと列名を加える
-      3. 並びを返す
+      2. 列名が `**.` で始まる対応（どの深さの列もまとめて取り出す対応）は、取り出した結果が空でも加えない
+      3. それ以外の対応は、『項目の取得』で列名の値が `None` なら、そのキーと列名を加える
+      4. 並びを返す
     unit_tests:
       - name: test_missing_ref_fields
         case: 正常
@@ -466,6 +467,13 @@ functions:
         condition: '`metadata` が `{name: title, description: summary}`、内容が `{"summary": "s"}`（`tags` も無い）'
         mock: なし
         expected: '`[("name", "title")]`'
+        exception: '-'
+      - name: test_missing_ref_fields_when_any_depth
+        case: 正常
+        summary: '`**.` で始まる列は、取り出した結果が空でも数えない'
+        condition: '`metadata` が `{related: "**.refs[]", name: title}`、内容がどの深さにも `refs`・`title` を持たない `{"id": "n1", "functions": [{"name": "f"}]}`'
+        mock: なし
+        expected: '`[("name", "title")]`（`related` は含まない）'
         exception: '-'
   - name: is_markdown_body
     title: Markdownの本文か
