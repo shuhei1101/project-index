@@ -1,0 +1,1 @@
+# リポジトリの直下の project-index.yaml の 1 行目の $schema を project-index のスキーマへ向ける
