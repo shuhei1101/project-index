@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from project_index.features.search.fields import field_values, heading_lines
+from project_index.features.search.fields import field_values, heading_lines, known_fields
 from project_index.features.search.types import Heading
 
 if TYPE_CHECKING:
@@ -118,3 +118,49 @@ def test_with_metadata_fields_when_rows_differ() -> None:
     )
     # 検証
     assert result["order"] == "string"
+
+
+def test_field_values_when_array_item_keys(make_document: Callable[..., Document]) -> None:
+    """配列の中のオブジェクトのキーの値（正常系）。"""
+    # 準備
+    document = make_document(data={"uses": [{"id": "compare"}, {"id": "list"}, {"name": "x"}]})
+    # 実行
+    result = field_values(document, "uses[].id")
+    # 検証
+    assert result == ["compare", "list"]
+
+
+def test_known_fields_when_array_items() -> None:
+    """配列の中のオブジェクトのキー（正常系）。"""
+    # 準備
+    schema = {
+        "type": "object",
+        "properties": {
+            "uses": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string"},
+                        "refs": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {"to": {"type": "string"}},
+                            },
+                        },
+                    },
+                },
+            },
+            "category": {"type": "object", "properties": {"id": {"type": "string"}}},
+        },
+    }
+    # 実行
+    fields = known_fields([schema])
+    # 検証
+    assert fields["uses"] == "array"
+    assert fields["uses[].id"] == "string"
+    assert fields["uses[].refs[].to"] == "string"
+    assert fields["category.id"] == "string"
+    assert "uses.id" not in fields
+    assert "uses.refs.to" not in fields
