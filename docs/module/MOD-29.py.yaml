@@ -740,10 +740,10 @@ classes:
           2. `target.ref` がある場合、`_revision_loads` のその読み込みの文書のページの索引で引く（文書の数によらず辞書を 1〜2 回引くだけにする）
              - `doc_id` がある場合、`file_ids` を (`page`, `doc_id`) で引く
              - 無い場合、`pages` を `page` で引き、無ければ `files` を `page` で引く
-          3. `target.ref` が無い場合、`load` の文書を順に、索引と同じ規則で照合する
+          3. `target.ref` が無い場合、`load` の文書をこのファイルの関数『文書のページの特定』（`find_page`）で照合する
 
-          文書のページの索引は、読み込みの結果の文書を行の順にたどり、同じキーでは先に現れた文書を残して作る。規則は読み取り API の『文書のページの特定』（`find_page`）と同じで、読み取り API のファイルを import しない
-             - `pages`: 文書のファイルのパスから拡張子を外したパス（`record_index` を持つ文書は `{パス}/{文書の ID}`）→ 文書
+          文書のページの索引は、読み込みの結果の文書を行の順にたどり、同じキーでは先に現れた文書を残して作る。規則はこのファイルの関数『文書のページの特定』（`find_page`）と同じ
+             - `pages`: このファイルの関数『文書のページのパス』（`page_path`）→ 文書
              - `files`: 文書のファイルのパスと本文のファイルのパス → 文書
              - `file_ids`: (文書のファイルのパスか本文のファイルのパス, 文書の ID) → 文書
         unit_tests:
@@ -752,7 +752,7 @@ classes:
             summary: 文書のページの特定と同じ文書を返却する
             condition: Git の配信元で `rules/a.yaml`・`files.yaml` の行（`guide.md` を本文に持つ）・`terms.yaml` の行 `term-1`・`term-2` を commit し、`ref` を持つ読む場所と持たない読む場所で、`rules/a`・`rules/a.yaml`・`guide.md`・`terms.yaml` と `doc_id` `term-2`・無いパスを引く
             mock: なし（`tmp_path` に `git init`）
-            expected: どの引き方も、読み取り API の `find_page` に `load` の文書を渡した結果と同じ文書（無いパスは `None`）
+            expected: '`rules/a`・`rules/a.yaml` は `rules/a.yaml` の文書、`guide.md` は `guide.md` を本文に持つ行の文書、`terms.yaml` と `doc_id` `term-2` は `term-2` の文書、無いパスは `None`。`ref` を持つ読む場所と持たない読む場所で同じ文書'
 constants:
   - name: CANDIDATE_COUNT
     title: 近い ID の候補の数
@@ -914,4 +914,99 @@ functions:
         condition: 文書 3 件の配信元を、関所の `foreground` の中で、別のスレッドの `background` の中で検査する。関所の 1 件の中にいない間に文書の重なりを求める処理が呼ばれたかを記録する
         mock: 関所の休み（偽物。呼ばれた回数を数える）、`missing_ref_fields`・`unresolved_related`（呼ばれたときに関所の 1 件の中かを記録してから本物を呼ぶ包み）
         expected: 結果が関所を使わないときと同じで、包みの呼び出しが全て 1 件の中。休みが文書の数より多く呼ばれる
+  - name: page_path
+    title: 文書のページのパス
+    kind: 関数
+    container: project_index/features/documents/store.py
+    usecase: 文書の取得
+    role: 変換
+    summary: 文書を URL のパスにする（読み取り API の語での検索・サイドバーも使用する）
+    scope: public
+    thread_safe: true
+    args:
+      - name: document
+        title: 文書
+        type: Document
+        required: true
+        passing: positional
+        description: 文書
+    returns:
+      type: str
+      description: '`path` から拡張子を落とした形。`records` の文書は `{拡張子を落とした path}/{id}`'
+    process: 1. `PurePosixPath(path).with_suffix("")` にし、`record_index` があれば `/{id}` を続ける
+    unit_tests:
+      - name: test_page_path
+        case: 正常
+        summary: ファイルと records
+        condition: '`docs/a.yaml` の文書と、`docs/rules.yaml` の `records` の `r-1`'
+        mock: なし
+        expected: '`docs/a` と `docs/rules/r-1`'
+  - name: find_page
+    title: 文書のページの特定
+    kind: 関数
+    container: project_index/features/documents/store.py
+    usecase: 文書の取得
+    role: 判定
+    summary: 文書の並びから、文書のページのパスに当たる文書を探す
+    scope: public
+    thread_safe: true
+    args:
+      - name: documents
+        title: 文書
+        type: Sequence[Document]
+        required: true
+        passing: positional
+        description: 配信元の文書
+      - name: page
+        title: 文書のページのパス
+        type: str
+        required: true
+        passing: positional
+        description: 探すパス
+      - name: doc_id
+        title: 文書の ID
+        type: str | None
+        required: false
+        default: None
+        passing: keyword
+        description: 文書の取得の `id`。指すと、`path` か `body_path` が `page` と同じ文書の中から文書の ID で選ぶ
+    returns:
+      type: Document | None
+      description: 無ければ `None`
+    process: |-
+      1. `doc_id` を指した場合、`path` か `body_path` が `page` と同じで、文書の ID が `doc_id` と同じ最初の文書を返し、無ければ `None` を返す（以降の手順は実行しない）
+      2. 文書のページのパス（`page_path`）が `page` と同じ文書を返す
+      3. 無ければ、`path` か `body_path` が `page` と同じ最初の文書を返す（`try_convert` と同じ引き方）
+      4. どちらにも無ければ `None` を返す
+    unit_tests:
+      - name: test_find_page
+        case: 正常
+        summary: 文書のページのパスで当たる
+        condition: 文書のページのパスが `rules/a` の文書と `page` が `rules/a`
+        mock: なし
+        expected: その文書
+      - name: test_find_page_when_body_path
+        case: 正常
+        summary: 本文のファイルのパスで当たる
+        condition: '`path` が `notes/files.yaml`・`body_path` が `notes/b.md` の管理用の YAML の行の文書と `page` が `notes/b.md`'
+        mock: なし
+        expected: その文書
+      - name: test_find_page_when_missing
+        case: 正常
+        summary: どれにも当たらない
+        condition: '`page` が `no/such`'
+        mock: なし
+        expected: '`None`'
+      - name: test_find_page_when_doc_id
+        case: 正常
+        summary: 文書の ID で行の文書を選ぶ
+        condition: '`path` が `terms.yaml` で `body_path` の無い行の文書 `term-1`・`term-2` と、`page` が `terms.yaml`・`doc_id` が `term-2`'
+        mock: なし
+        expected: '`term-2` の文書。`doc_id` を省くと `term-1`'
+      - name: test_find_page_when_doc_id_missing
+        case: 正常
+        summary: 文書の ID が一致しない
+        condition: '`page` が `terms.yaml`・`doc_id` が `no-such`、`page` が `terms/term-2`（文書のページのパス）・`doc_id` が `term-2`'
+        mock: なし
+        expected: どちらも `None`
 visibility: internal

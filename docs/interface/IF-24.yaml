@@ -407,6 +407,6 @@ constraints:
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、`ref` を無視して登録したフォルダの文書を返し、応答の `ref` を空にする'
   - item: リビジョンの読み込み
     constraint: commit を状態のフォルダへ書き出さずに、commit のファイルの一覧（`ls-tree`）と、変わったファイルの blob の内容（`cat-file --batch`）から読み込む。同じ commit の 2 回目は、ファイルと文書の行のパターンの照合の結果を使い回す
-    notes: 文書の取得・語での検索・配信元の設定の取得は今どおり書き出しを読む。書き出しの最中でも、文書の一覧はその終了を待たない
+    notes: 同じ commit と文書の行の定義の読み込みの結果は、書き出しから読んだか blob から読んだかによらず、文書の取得・語での検索と共有する（文書のストアのリビジョンの読み込みの結果）。種類のスキーマと配信元の設定の取得は今どおり書き出しを読む。書き出しの最中でも、文書の一覧はその終了を待たない
 test_file: tests/integration/server/test_list_documents.py
 visibility: internal

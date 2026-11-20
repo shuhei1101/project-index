@@ -85,7 +85,7 @@
 | [索引のサーバー / 検査 / scripts.py](./MOD-74.py.yaml) | `validators[]` の出力の解釈。 |
 | [索引のサーバー / 検査 / service.py](./MOD-75.py.yaml) | 検査をまとめて通す処理と、読み取りの結果のキャッシュ。 |
 | [索引のサーバー / 読み取り API / nav.py](./MOD-76.py.yaml) | `nav` の `auto` の当たる文書の数・`filter` の検証・警告（管理の MCP と配信元の説明が使う）。タブとサイドバーの組み立ては dev-docs の画面のサーバーが持つ。 |
-| [索引のサーバー / 読み取り API / paths.py](./MOD-77.py.yaml) | 文書のページのパスと、読み取り API が読む場所。 |
+| [索引のサーバー / 読み取り API / paths.py](./MOD-77.py.yaml) | 読み取り API が読む場所。 |
 | [索引のサーバー / 読み取り API / search.py](./MOD-78.py.yaml) | 語での検索。 |
 | [索引のサーバー / 読み取り API / types.py](./MOD-79.py.yaml) | 読み取り API の要求と応答のデータモデル。 |
 | [索引のサーバー / 書き込み / apply.py](./MOD-80.py.yaml) | 項目の操作の適用と、共通のキーの列名への読み替え。 |
