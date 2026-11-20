@@ -1,0 +1,79 @@
+tasks:
+  - process: 初期構築
+    status: skipped
+    reason: 既存リポジトリのため対象外
+    updated_by: planner
+    updated_at: '2026-11-20T01:04:22.239060+00:00'
+  - process: リバースエンジニアリング
+    status: skipped
+    reason: 対象の設計書（MOD-25・IF-12）が既にあるため対象外
+    updated_by: planner
+    updated_at: '2026-11-20T01:04:22.239060+00:00'
+  - process: 方針決め
+    status: skipped
+    reason: 方針決めを依頼する Issue ではない
+    updated_by: planner
+    updated_at: '2026-11-20T01:04:22.239060+00:00'
+  - process: PoC 検証
+    status: skipped
+    reason: 既存の関数の判定の修正で、未検証の技術機構に依存しない
+    updated_by: planner
+    updated_at: '2026-11-20T01:04:22.239060+00:00'
+  - process: 複合ユースケース設計
+    status: skipped
+    reason: 複数のユースケースをまたぐ流れは変わらない
+    updated_by: planner
+    updated_at: '2026-11-20T01:04:22.239060+00:00'
+  - process: デザインスタイル選定
+    status: skipped
+    reason: 画面を持たない変更
+    updated_by: planner
+    updated_at: '2026-11-20T01:04:22.239060+00:00'
+  - process: 画面一覧・画面遷移
+    status: skipped
+    reason: 画面を持たない変更
+    updated_by: planner
+    updated_at: '2026-11-20T01:04:22.239060+00:00'
+  - process: 単一ユースケース設計
+    status: skipped
+    reason: 起動・配信元の検査の流れは変わらず、数える文書の判定だけが変わる。シナリオ（SC-4）の記述は列の欠けの件数を残すだけで変わらない
+    updated_by: planner
+    updated_at: '2026-11-20T01:04:22.239060+00:00'
+  - process: モック作成
+    status: skipped
+    reason: 画面を持たない変更
+    updated_by: planner
+    updated_at: '2026-11-20T01:04:22.239060+00:00'
+  - process: データ設計
+    status: skipped
+    reason: データの構造・設定のキーは変わらない
+    updated_by: planner
+    updated_at: '2026-11-20T01:04:22.239060+00:00'
+  - process: インターフェース定義設計
+    status: todo
+    note: IF-12・IF-8 の missing_refs の説明に、`**.` で始まる列は数えないことを書き足す
+  - process: 部品設計
+    status: skipped
+    reason: 画面を持たない変更
+    updated_by: planner
+    updated_at: '2026-11-20T01:04:22.239060+00:00'
+  - process: 画面設計
+    status: skipped
+    reason: 画面を持たない変更
+    updated_by: planner
+    updated_at: '2026-11-20T01:04:22.239060+00:00'
+  - process: モジュール構成設計
+    status: todo
+    note: MOD-25 の missing_ref_fields の処理と単体テストに、`**.` で始まる列を除く分岐を書き足す
+  - process: ドキュメント修正
+    status: todo
+    note: docs/guide/設定.md・docs/guide/コアコンセプト-文書のメタデータ.md・docs/guide/管理のMCP.md の列の欠けの説明
+  - process: 単体テスト作成
+    status: todo
+  - process: 実装
+    status: todo
+  - process: 結合テスト作成
+    status: skipped
+    reason: 判定は metadataの列の欠け（missing_ref_fields）の関数の中で閉じ、check_project・describe・起動の警告は件数を受け渡すだけで変わらないため、単体テストで確かめる
+    updated_by: planner
+    updated_at: '2026-11-20T01:04:22.239060+00:00'

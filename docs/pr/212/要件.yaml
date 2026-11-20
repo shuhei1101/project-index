@@ -1,0 +1,33 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: run_only
+    detail: 起動時の警告のログに残す metadata の列の欠けの件数から、どの深さにも関連を持たない文書が外れる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: run_only
+    detail: 配信元の検査で確かめる索引の同期の metadata の列の欠けの件数から、どの深さにも関連を持たない文書が外れる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: run_only
+    detail: 配信元を追加して索引の同期を 0 件にそろえるとき、`**.` で関連を集める配信元でも列の欠けが 0 件になる
+    depends_on: []
+docs:
+  - page: docs/guide/設定.md
+    new: false
+    change: 索引の同期の表の metadata の列の欠けの行に、`**.` で始まる列は数えないことを書き足す
+    status: todo
+  - page: docs/guide/コアコンセプト-文書のメタデータ.md
+    new: false
+    change: 索引の同期の表の metadata の列の欠けの行に、`**.` で始まる列は数えないことを書き足す
+    status: todo
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: '`check_project` の `missing_refs` の説明に、`**.` で始まる列は数えないことを書き足す'
+    status: todo
+scope_out:
+  - item: IF-1・IF-15・SC-4・用語集（GLO-1 の索引の同期）の metadata の列の欠けの記述
+    reason: 数える文書の定義は IF-12・IF-8・MOD-25 と設定のガイドが持ち、これらのページは件数を受け渡す・警告に残すことだけを書いていて、記述が変わらない
+    plan: none
