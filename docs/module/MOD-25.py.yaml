@@ -697,9 +697,16 @@ functions:
       - name: test_resolve_ref_path_when_missing_last
         case: 正常
         summary: 最後の辞書のキーが無くても解く
-        condition: '`functions`（`x-key: name`）が `load`・`save` で `notes` が `{main: x}` の内容を、`missing_last=True` で `functions[save].usecase`・`notes[a.b]`、同じく `functions[missing]`・`functions[save].other.usecase`'
+        condition: '`functions`（`x-key: name`）が `load`・`save` で `notes` が `{main: x}` の内容を、`missing_last=True` で `functions[save].usecase`・`notes[a.b]`'
         mock: なし
-        expected: '`["functions", 1, "usecase"]`・`["notes", "a.b"]`。配列の無い要素と途中の無いキーは `InvalidArgumentError`'
+        expected: '`["functions", 1, "usecase"]`・`["notes", "a.b"]`'
+        exception: '-'
+      - name: test_resolve_ref_path_when_missing_last_unresolved
+        case: 異常
+        summary: 最後の辞書のキー以外が無い
+        condition: 同じ内容を `missing_last=True` で `functions[missing]`・`functions[save].other.usecase`
+        mock: なし
+        expected: どちらも `InvalidArgumentError` で、理由が順に要素が無い・キーが無い
         exception: 該当する要素が無い・キーが無い（途中）
   - name: set_field_at
     title: 並びで指した項目の書き込み

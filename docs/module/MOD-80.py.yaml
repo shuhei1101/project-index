@@ -223,6 +223,13 @@ functions:
         mock: なし
         expected: どれも `InvalidArgumentError` で、違反の `path` が `set.{キー}`。`models[Col].label` の `rule` は `#` で始めて x-key の値で要素を指す書き方を案内する
         exception: '`set` のキーを解けない'
+      - name: test_apply_operation_when_set_ref_path_element
+        case: 正常
+        summary: '`#` で始まる `set` のキーで要素そのものへマージする'
+        condition: '同じ内容へ `set: {"#models[Col]": {kind: k}}`'
+        mock: なし
+        expected: 'Col の要素へ `kind: k` がマージされ、既にある `name` は残る'
+        exception: '-'
   - name: to_columns
     title: 列名への読み替え
     kind: 関数
