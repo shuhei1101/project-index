@@ -322,7 +322,7 @@ requirements:
     source: https://github.com/shuhei1101/project-index/issues/215
     value: '0.1'
     unit: 倍（変更の前の計測に対する比）
-    measurement: 配信元 ai-monitor と knowledge だけの端末の設定と空の状態フォルダで、同じプロセスに CPU を使用し続けるスレッドを 8 本立て、`docs/data/DATA-3430-1.yaml` の文書の取得のサービスを `ref` を省いて 6 回呼び、2 回目以降の中央値を測る。変更の前と後を同じ時間帯に測って比べる
+    measurement: 配信元 ai-monitor と knowledge だけの端末の設定と空の状態フォルダで、同じプロセスに CPU を使用し続けるスレッドを 8 本立て、`ref` に `c9cd618aa`（shuhei1101/ai-monitor#3693 のブランチ）を指した `docs/data/DATA-3694-1.yaml` と、`ref` を省いた `docs/data/DATA-3430-1.yaml` の文書の取得のサービスと応答の直列化を交互に 4 回ずつ呼び、2 回目以降の中央値を測る。変更の前と後を同じ時間帯に測って比べる
     breakdown:
       - part: 変更の前（スレッド 0 本）
         value: 0.080 秒
@@ -336,6 +336,12 @@ requirements:
       - part: アプリの決定値
         value: 0.1 倍以下
         notes: 試作の 0.02 倍に対して余裕を持たせる
+      - part: 変更の前（スレッド 0 本・交互）
+        value: 1.23〜1.34 秒
+        notes: 読み込みの照合。交互にしないときの 0.061 秒の約 20 倍で、commit が切り替わるたびに照合と読み込み直しが走る。応答は 21,997 バイト（HTTP では 33,837 バイト）で、直列化は 1 ミリ秒に満たない。報告の約 744KB は project-index の応答では再現しない
+      - part: 稼働中のサーバー（交互）
+        value: 8.8 秒 / 0.5 秒
+        notes: '`ref=c9cd618aa` の取得は、ほかの commit の要求を挟んだ後の 1 回目が 8.8 秒、続けた取得が 0.5 秒前後'
     rationale: 同じプロセスの文書の MCP・ワークツリーの読み込み・裏の検査が CPU を使用する間、要求のスレッドは GIL を待つ。待ちは要求の中で Python が進む量に比例するため、要求ごとに配信元の全てのファイルを照合せず、同じ commit の読み込みの結果を使い回して進む量を減らす。端末の負荷で秒数が揺れるため、同じ時間帯に測った変更の前の値に対する比で決める
     overflow: 超えても止めない。dev-docs の画面の表示が遅れる
     status: planned
