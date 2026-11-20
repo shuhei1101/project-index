@@ -84,6 +84,8 @@ class WriteEnv:
     clone: Path
     worktree: Path
     repo_locks: RepositoryLocks = field(default_factory=RepositoryLocks)
+    # 書き込みの作業場所。`paths_base` の配信元は、ワークツリーの中の配信元のフォルダ
+    workplace: Path | None = None
 
     def write(
         self, now: datetime | None = None, limits: CallLimits | None = None, **request: Any
@@ -91,7 +93,7 @@ class WriteEnv:
         # 期限を渡すテストだけ `limits` を渡す
         extra: dict[str, Any] = {} if limits is None else {"limits": limits}
         return write_docs(
-            WriteRequest(cwd=str(self.worktree), **request),
+            WriteRequest(cwd=str(self.workplace or self.worktree), **request),
             registry=self.registry,
             store=self.store,
             checker=self.checker,
@@ -162,24 +164,19 @@ def make_env(
             )
         ]
         config = make_source_config(documents=rows, generators=generators or [], **config_overrides)
+        # `paths_base` の配信元: 設定のファイルと書き込める作業場所を `root` の下の `config_dir` にする
+        source_folder = clone if config_dir is None else clone / config_dir
         source = make_served_source(
             id="sample",
             root=clone,
             config=config,
             is_git=True,
             repo_root=clone,
-            scope_write=[str(clone)],
+            scope_write=[str(source_folder)],
             worktree_globs=[str(clone / ".claude" / "worktrees" / "*")],
             schemas={"rules": {"type": "object", "required": ["id", "name"]}},
-            # `paths_base` の配信元: 設定のファイルを `root` の下の `config_dir` に配置する
-            **(
-                {}
-                if config_dir is None
-                else {
-                    "config_dir": PurePosixPath(config_dir),
-                    "config_files": [clone / config_dir / "project-index.yaml"],
-                }
-            ),
+            config_dir=PurePosixPath(config_dir or "."),
+            config_files=[source_folder / "project-index.yaml"],
         )
         store = DocumentStore(SnapshotStore(tmp_path / "snapshots"))
         return WriteEnv(
@@ -191,6 +188,7 @@ def make_env(
             source=source,
             clone=clone,
             worktree=worktree,
+            workplace=None if config_dir is None else worktree / config_dir,
         )
 
     return _make
