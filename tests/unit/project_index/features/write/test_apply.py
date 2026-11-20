@@ -665,6 +665,106 @@ def test_apply_operation_when_add_to_ref_path() -> None:
     }
 
 
+_SET_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "models": {
+            "type": "array",
+            "x-key": "name",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "label": {"type": "string"},
+                    "kind": {"type": "string"},
+                    "meta": {"type": "object"},
+                },
+            },
+        },
+        "notes": {"type": "object", "additionalProperties": {"type": "string"}},
+    },
+}
+
+
+def _set_content() -> dict[str, Any]:
+    """`#` で始まる `set` のキーのテストに使う内容を返す。"""
+    return {
+        "models": [
+            {"name": "Row", "meta": {"x": 1}},
+            {"name": "Col"},
+        ],
+        "notes": {"main": "a"},
+    }
+
+
+def test_apply_operation_when_set_ref_path() -> None:
+    """`#` で始まる `set` のキーで要素へキーを追加・マージする（正常系）。"""
+    # 準備
+    operation = Operation(
+        op="update",
+        id="doc-1",
+        expected_version="v1",
+        set={
+            "#models[Col].label": "l",
+            "#models[Row].meta": {"y": 2},
+            "#notes[a.b]": "v",
+        },
+    )
+    # 実行
+    result = apply_operation(_set_content(), operation, schema=_SET_SCHEMA)
+    # 検証
+    assert result == {
+        "models": [
+            {"name": "Row", "meta": {"x": 1, "y": 2}},
+            {"name": "Col", "label": "l"},
+        ],
+        "notes": {"main": "a", "a.b": "v"},
+    }
+
+
+def test_apply_operation_when_set_ref_path_element() -> None:
+    """`#` で始まる `set` のキーで要素そのものへマージする（正常系）。"""
+    # 準備
+    operation = Operation(
+        op="update",
+        id="doc-1",
+        expected_version="v1",
+        set={"#models[Col]": {"kind": "k"}},
+    )
+    # 実行
+    result = apply_operation(_set_content(), operation, schema=_SET_SCHEMA)
+    # 検証
+    assert result["models"] == [
+        {"name": "Row", "meta": {"x": 1}},
+        {"name": "Col", "kind": "k"},
+    ]
+
+
+@pytest.mark.parametrize(
+    ("key", "message"),
+    [
+        pytest.param("#models[Zzz].label", "name が Zzz の要素がありません", id="missing_element"),
+        pytest.param("#models[Col].other.label", "にキー other がありません", id="missing_middle"),
+        pytest.param(
+            "models[Col].label",
+            "`#` で始めて x-key の値で要素を指してください",
+            id="selector",
+        ),
+    ],
+)
+def test_apply_operation_when_set_ref_path_unresolved(key: str, message: str) -> None:
+    """`set` のキーを解けない（異常系）。"""
+    # 準備
+    current = _set_content()
+    operation = Operation(op="update", id="doc-1", expected_version="v1", set={key: "n"})
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError) as exc_info:
+        apply_operation(current, operation, schema=_SET_SCHEMA)
+    assert [violation.path for violation in exc_info.value.violations] == [f"set.{key}"]
+    assert message in exc_info.value.violations[0].rule
+    assert current == _set_content()
+
+
 def test_apply_operation_when_add_to_selector_path() -> None:
     """`#` で始まらず要素の選び方を含むキー（異常系）。"""
     # 準備
