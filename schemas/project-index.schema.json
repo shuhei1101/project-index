@@ -132,6 +132,36 @@
         }
       }
     },
+    "direct_commit": {
+      "type": "object",
+      "title": "直コミット",
+      "additionalProperties": false,
+      "required": [
+        "branch",
+        "kinds"
+      ],
+      "properties": {
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "kinds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
     "nav": {
       "type": "object",
       "title": "画面の構成",
