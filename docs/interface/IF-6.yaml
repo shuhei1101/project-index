@@ -2297,6 +2297,51 @@ flows:
       - '`isError: true` で、生成のスクリプトが失敗したこととそのパスを返却する'
       - リモートは変わらず、develop のワークツリーの HEAD が `origin/develop` と同じで、`git status` に変更が出ない
     test: test_error_when_direct_commit_generator_failed
+  - name: 正常系（参照の型の項目のパスで要素へキーを追加する）
+    summary: '`set` のキーに `#` で始まる参照の型の項目のパスを渡し、`x-key` の値で指した配列の要素に今は無いキーを追加する・あるキーの値を置き換える。解決できないパスと、`#` で始まらず要素の選び方を含むキーを断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 種類のスキーマ
+        description: 'sample の種類のスキーマが `models`（`x-key: name` の配列。要素は `name`・文字列の配列 `properties`・文字列 `label`・オブジェクト `meta` を持つ）と、`x-key` を持たない配列 `steps`（要素は `name`・`body`）を定める'
+      - name: 文書 1
+        description: '`models` が `{name: Row, properties: [a], meta: {x: 1}}`・`{name: Col, properties: [b]}`。`steps` は 1 要素'
+      - name: 入力
+        description: '1 回目は `set: {"#models[Col].label": l}`。2 回目は `set: {"#models[Col].label": m}`。3 回目は `set: {"#models[Row].meta": {y: 2}}`。4 回目は `set: {"models[Col].label": n}`。5 回目は `set: {"#models[Zzz].label": n}`。6 回目は `set: {"#steps[a].body": n}`。7 回目は `set: {"#models[Col#2].label": n}`。8 回目は `set: {"#models[Col].other.label": n}`'
+        notes: 4 回目は `#` で始まらず要素の選び方を含むキー。5 回目は無い要素、6 回目は `x-key` の無い配列、7 回目は無い順番、8 回目は途中の無いキー
+    flow: |-
+      <!-- map: {"title": "正常系（参照の型の項目のパスで要素へキーを追加する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: update 文書 1（set #models[Col].label = l）
+        T->>T: 種類のスキーマの x-key で models[1] に解決し、label を追加する
+        T->>WT: YAML を書き換える
+        T-->>C: updated
+        C->>T: update 文書 1（set #models[Col].label = m）
+        T->>T: models[1].label を置き換える
+        T-->>C: updated
+        C->>T: update 文書 1（set #models[Row].meta = {y: 2}）
+        T->>T: models[0].meta の今の値へマージする
+        T-->>C: updated
+        C->>T: update 文書 1（set models[Col].label）
+        T-->>C: isError（set.models[Col].label）
+        C->>T: update 文書 1（set #models[Zzz].label など 4 回）
+        T-->>C: isError（set.{キー}）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目の後、Col の要素に `label: l` が追加され、ファイルで変わった行は `label` の 1 行だけ。Row の要素は変わらない'
+      - 2 回目の後、Col の `label` が `m`
+      - '3 回目の後、Row の `meta` が `{x: 1, y: 2}`'
+      - 4 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].set.models[Col].label`、`rule` が `#` で始めて `x-key` の値で要素を指す書き方を案内する。文書 1 を書き換えない
+      - 5・6・7・8 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].set.{キー}` で、それぞれ無い要素・`x-key` の無い配列・`name` が `Col` の要素が 1 つしか無いこと・`models[1]` にキー `other` が無いことを返却する。文書 1 を書き換えない
+    test: test_normal_when_set_ref_path
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -2404,7 +2449,7 @@ request:
     default: なし
     location: argument
     description: 項目に値を入れる。オブジェクトは再帰的にマージし、配列と値は置き換える
-    notes: '`update` だけ'
+    notes: '`update` だけ。`#` で始まる参照の型の項目のパスのキーも受ける（制約「set の項目のパス」）'
   - name: operations[].unset
     type: list[str]
     required: false
@@ -2763,7 +2808,7 @@ constraints:
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、作業場所が `scope.write` に当たれば登録したフォルダへ書き、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく、制約「日時の付与」で `created`・`updated` を付ける。`worktree` を指定すると `InvalidArgumentError`'
   - item: 参照の型の項目のパス
-    constraint: '`text_edits[].field` が `#` で始まるとき、`#` の後を種類のスキーマ（`$ref` を解決した後）と文書でたどり、位置で指す項目のパスに解決してから既存の取得・書き込みで置き換える。配列の項目の `[{値}]` はスキーマの `x-key` のキーがその値の最初の要素、`[{値}#{順番}]` は同じ値の要素のその順番の要素（同じ値の要素が無く、末尾が `#{整数}` のときだけ）、辞書の項目の `[{キー}]` はそのキー（`.` や空白を含んでも 1 階層）を指す。`[...]` の中の `[` と `]` は対応を数え、対応の取れた `[` `]` は値の一部として読む（`#request[operations[].fields].description` は `x-key` の値が `operations[].fields` の要素）。対応の取れない `[` `]` を含むパスは記載方法の誤り。`[]` の外の `.` で区切った名前は辞書のキー。共通のキーの列名への読み替えはしない。`text_edits[].field`・`add_to`・`remove_from` のキーと `unset` の要素だけが受け付け、`set` と `metadata` の列名・`search_docs`・`list_changes` の項目のパスの読み方は変えない'
+    constraint: '`text_edits[].field` が `#` で始まるとき、`#` の後を種類のスキーマ（`$ref` を解決した後）と文書でたどり、位置で指す項目のパスに解決してから既存の取得・書き込みで置き換える。配列の項目の `[{値}]` はスキーマの `x-key` のキーがその値の最初の要素、`[{値}#{順番}]` は同じ値の要素のその順番の要素（同じ値の要素が無く、末尾が `#{整数}` のときだけ）、辞書の項目の `[{キー}]` はそのキー（`.` や空白を含んでも 1 階層）を指す。`[...]` の中の `[` と `]` は対応を数え、対応の取れた `[` `]` は値の一部として読む（`#request[operations[].fields].description` は `x-key` の値が `operations[].fields` の要素）。対応の取れない `[` `]` を含むパスは記載方法の誤り。`[]` の外の `.` で区切った名前は辞書のキー。共通のキーの列名への読み替えはしない。`text_edits[].field`・`set`・`add_to`・`remove_from` のキーと `unset` の要素だけが受け付け、`metadata` の列名・`search_docs`・`list_changes` の項目のパスの読み方は変えない'
     notes: 書き方は設計書の参照の型（`{ID}#{項目のパス}`）の `#` から後と同じ。`#` で始まらない既存の `[{キー}]`（キーが真の要素）とは `#` の有無で分ける
   - item: add_to・remove_from の項目のパス
     constraint: '`add_to`・`remove_from` のキーが `#` で始まるとき、「参照の型の項目のパス」と同じ読み方で文書の中の 1 つの配列へ解決し、その配列へ追加・削除する。解決できないパス（無い要素・`x-key` の無い配列・無いキー）と、解決した値が配列でないパスは `add_to.{パス}`・`remove_from.{パス}` の違反にする。`#` で始まらないキーに要素の選び方（`[...]`・`**.`）を含めると、書き込まずに同じ違反にする'
@@ -2836,6 +2881,9 @@ constraints:
   - item: 直コミットのプッシュの結果の照合
     constraint: プッシュがリモートに断られた以外の理由（通信の失敗・制限時間で止めた）で終わったときは、リモートの追跡ブランチを取得し直し、コミットの SHA が含まれていれば成功として扱う。含まれていなければ、コミットと書き込んだファイルと生成物を戻して `PushFailedError` を返却する。取得し直しも失敗したときは、同じく戻して、プッシュの結果が不明であることとコミットの SHA を添えた `PushFailedError` を返却する
     notes: 取得し直しの制限時間は、直コミットの取り込みとプッシュの所要時間の余裕の中に収める。戻した後にリモートに入っていたコミットは、次の直コミットの早送りの取り込みでワークツリーに入る
+  - item: set の項目のパス
+    constraint: '`set` のキーが `#` で始まるとき、最後の区切りの手前までを「参照の型の項目のパス」と同じ読み方で文書の中の 1 つの項目へ解決し、その項目の最後のキーへ値を入れる。最後のキーが無ければ追加し、あればオブジェクトの値は今の値へ再帰的にマージし、配列と値は置き換える。最後の区切りが `[...]` のときは、解決した要素そのものへ同じく入れる。解決できないパス（無い要素・`x-key` の無い配列・無い順番・途中の無いキー）と、最後のキーの手前が辞書でないパスは `set.{パス}` の違反にする。`#` で始まらないキーに要素の選び方（`[]`・`[{キー}]`・`**.`）を含めると、書き込まずに同じ違反にし、違反の `rule` で `#` で始めて `x-key` の値で要素を指す書き方を案内する'
+    notes: '`#` で始まらず要素の選び方を含まないキーは今までどおりで、途中の項目が無ければ作る。`#` で始まるキーは途中の項目を作らない。共通のキーの列名への読み替えは `#` で始まるキーにはしない'
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]
