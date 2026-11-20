@@ -729,9 +729,7 @@ def _create_body(
     if not exists:
         raise _invalid([_missing_body(operation, table, body_path)])
     # 本文なしで既にあるファイル: ほかの文書のファイルでも配信元の文書でないファイルでもなければ、書き換えずに取り込む
-    owner = _file_owner(session, body_path) or _non_document_owner(
-        session.target.source, body_path
-    )
+    owner = _file_owner(session, body_path) or _non_document_owner(session.target.source, body_path)
     if owner is not None:
         raise _body_file_error(
             column,
@@ -768,38 +766,61 @@ def _file_owner(session: _Session, path: str) -> str | None:
             return f"行 {row.id} の管理用の YAML のファイル"
         # 1 ファイル 1 文書のファイル: 読み込めた文書があればその ID、無ければ行の ID で示す
         doc_id = next((d.id for d in session.docs.values() if d.path == path), None)
-        return f"文書 {doc_id} のファイル" if doc_id is not None else f"行 {row.id} の文書のファイル"
+        return (
+            f"文書 {doc_id} のファイル" if doc_id is not None else f"行 {row.id} の文書のファイル"
+        )
     return None
 
 
 def _non_document_owner(source: ServedSource, path: str) -> str | None:
     """配信元の文書でないファイル（設定・スクリプト・除外したファイル・スキーマ）の説明。該当しなければ `None`。
 
-    `path` は `root` からのパス。スクリプトとスキーマのパスは配信元のフォルダからのパスのため、
-    `config_path` で `root` からのパスにしてから比べる。
+    `path` は `root` からのパス。設定・スクリプト・除外したファイル・スキーマの順に照合する。
     """
-    # 配信元の設定のファイル（`root` の外にある設定のファイルは本文のファイルのパスにならない）
+    return (
+        _config_file_owner(source, path)
+        or _script_owner(source, path)
+        or _excluded_owner(source, path)
+        or _schema_owner(source, path)
+    )
+
+
+def _config_file_owner(source: ServedSource, path: str) -> str | None:
+    """配信元の設定のファイルなら説明を返す（`root` の外の設定のファイルは本文のファイルのパスにならない）。"""
     config_paths = {
         config_file.relative_to(source.root).as_posix()
         for config_file in source.config_files
         if config_file.is_relative_to(source.root)
     }
-    if path in config_paths:
-        return "配信元の設定のファイル"
-    # 検査・変換・生成のスクリプト: `run` の要素のうち、配信元のフォルダからのパスとして指すファイル
+    return "配信元の設定のファイル" if path in config_paths else None
+
+
+def _script_owner(source: ServedSource, path: str) -> str | None:
+    """検査・変換・生成の行の `run` の要素が、配信元のフォルダからのパスとして指すファイルなら説明を返す。"""
     for table in SCRIPT_TABLES:
         for entry in getattr(source.config, table):
             if any(_source_path(source, item) == path for item in entry.run):
                 return f"{table}[{entry.id}] のスクリプト"
-    enabled = [row for row in source.config.documents if row.enabled]
-    # 行の `paths` に該当するが `exclude[]` で除外したファイル
-    for row in enabled:
-        in_paths = any(PurePosixPath(path).full_match(pattern) for pattern in row.paths)
-        if in_paths and row.excludes(path):
+    return None
+
+
+def _excluded_owner(source: ServedSource, path: str) -> str | None:
+    """有効な行の `paths` に該当し `exclude[]` で除外したファイルなら説明を返す。"""
+    target = PurePosixPath(path)
+    for row in source.config.documents:
+        in_paths = any(target.full_match(pattern) for pattern in row.paths)
+        if row.enabled and in_paths and row.excludes(path):
             return f"行 {row.id} で除外したファイル"
-    # 文字列の `schema` が指すスキーマ（オブジェクトはほかの配信元の参照のため照合しない）
-    for row in enabled:
-        if isinstance(row.schema_path, str) and _source_path(source, row.schema_path) == path:
+    return None
+
+
+def _schema_owner(source: ServedSource, path: str) -> str | None:
+    """有効な行の文字列の `schema` が指すスキーマなら説明を返す（オブジェクトはほかの配信元の参照のため照合しない）。"""
+    for row in source.config.documents:
+        if not row.enabled or not isinstance(row.schema_path, str):
+            continue
+        # スキーマのパスは配信元のフォルダからのパスのため、`root` からのパスにして比べる
+        if _source_path(source, row.schema_path) == path:
             return f"documents[{row.id}].schema のスキーマ"
     return None
 
