@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import inspect
 import logging
 import os
@@ -46,6 +47,9 @@ if TYPE_CHECKING:
     from project_index.main import Handlers
 
 logger = logging.getLogger(__name__)
+
+# PoC #237: 管理の MCP の専用の実行スロット
+_ADMIN_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="poc-admin")
 
 ADMIN_MCP_NAME = "project-index-admin"
 
@@ -100,7 +104,13 @@ def _register(
             request = model(**arguments)
             if wait_loaded is not None:
                 await wait_loaded()
-            result = await asyncio.to_thread(call, request)
+            # PoC #237: 管理の MCP を専用の実行スロットで動かす変種
+            if os.environ.get("PI_POC_ADMIN_EXECUTOR"):
+                result = await asyncio.get_running_loop().run_in_executor(
+                    _ADMIN_EXECUTOR, call, request
+                )
+            else:
+                result = await asyncio.to_thread(call, request)
             fmt: Literal["markdown", "json"] = getattr(request, "format", "json")
             return to_tool_result(result, fmt, render)
         except (ProjectIndexError, ValidationError) as error:

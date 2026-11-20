@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import os
 import threading
 import time
 from typing import TYPE_CHECKING
@@ -87,7 +88,7 @@ class BackgroundGate:
             finally:
                 self._local.units = depth
             # 入れ子の一番外の 1 件で、応答中の要求があれば、使用した時間の割合が上限になるまで休む
-            if depth == 0 and self.active:
+            if depth == 0 and self.active and not os.environ.get("PI_POC_GATE_NO_SLEEP"):  # PoC #237
                 elapsed = self.clock() - started
                 self.sleep(elapsed * (1 - BACKGROUND_SHARE) / BACKGROUND_SHARE)
 

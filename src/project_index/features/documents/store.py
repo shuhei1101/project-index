@@ -52,7 +52,7 @@ CANDIDATE_COUNT = 5
 CANDIDATE_CUTOFF = 0.6
 TREE_KEEP = 20
 # 保持するワークツリーのたどった結果の数（超えたら古く使ったものから捨てる）
-WORKTREE_KEEP = 20
+WORKTREE_KEEP = int(os.environ.get("PI_POC_WORKTREE_KEEP", "20"))  # PoC #237: 変種で上限を変える
 # 配信元ごとに保持するリビジョンの読み込みの結果の数（超えたら最も前に使用したものから捨てる）
 REVISION_LOAD_KEEP = 4
 
@@ -666,6 +666,10 @@ class DocumentStore:
                 dropped = next(iter(self._worktrees))
                 del self._worktrees[dropped]
                 self._worktree_locks.pop(dropped, None)
+                # PoC #237: 捨てたワークツリーのファイルのキャッシュも捨てる変種
+                if os.environ.get("PI_POC_DROP_EVICTED"):
+                    for file_key in [k for k in self._files if k[0].is_relative_to(dropped)]:
+                        del self._files[file_key]
         if cold:
             logger.info(
                 "ワークツリーを読み込んだ（%s・%s・%.1f 秒）",

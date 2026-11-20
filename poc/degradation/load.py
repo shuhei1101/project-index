@@ -16,6 +16,7 @@ import itertools
 import json
 import os
 import random
+import re
 import signal
 import subprocess
 import time
@@ -55,7 +56,7 @@ class Mcp:
     """stateless の Streamable HTTP の MCP へ tools/call を送る。"""
 
     def __init__(self, base: str, path: str) -> None:
-        self._client = httpx.AsyncClient(base_url=base, timeout=CLIENT_TIMEOUT_SEC)
+        self._client = httpx.AsyncClient(base_url=base, timeout=float(os.environ.get("PI_POC_CLIENT_TIMEOUT", CLIENT_TIMEOUT_SEC)))
         self._path = path
         self._ids = itertools.count(1)
 
@@ -100,6 +101,8 @@ class Load:
         self.ids: dict[str, list[str]] = {}
         self.descriptions: dict[tuple[str, str], str] = {}
         self.marked: dict[tuple[str, str], bool] = {}
+        # 文書のバージョン（配信元・ID → develop の値、worktree・ID → 書き込んだ後の値）
+        self.versions: dict[tuple[str, str], str] = {}
         self.rng = random.Random(args.seed + 1)
 
     def pick_worktree(self) -> tuple[str, str]:
@@ -115,7 +118,7 @@ class Load:
                     {
                         "cwd": path,
                         "filter": {"field": "description", "op": "exists"},
-                        "fields": ["id", "description"],
+                        "fields": ["id", "description", "version"],
                         "format": "json",
                         "limit": 100,
                     },
@@ -137,6 +140,7 @@ class Load:
             self.ids[repo] = [item["id"] for item in items]
             for item in items:
                 self.descriptions[(repo, item["id"])] = item["values"]["description"]
+                self.versions[(repo, item["id"])] = str(item["values"].get("version", ""))
             ids = self.ids[repo]
             self.recorder.write("prepare", repo=repo, ids=len(ids))
 
@@ -166,15 +170,23 @@ class Load:
                 value = original + MARKER if marked else original
                 if real:
                     self.marked[key] = marked
+                version = self.versions.get(key) or self.versions.get((repo, doc_id), "")
                 base |= {
-                    "operations": [{"op": "update", "id": doc_id, "set": {"description": value}}],
+                    "operations": [
+                        {"op": "update", "id": doc_id, "expected_version": version, "set": {"description": value}}
+                    ],
+                    "format": "json",
                     "dry_run": not real,
                 }
             case "delete_docs":
                 base |= {"targets": [{"id": doc_id or "missing", "expected_version": "0"}], "dry_run": not real}
             case "trace_related":
                 base |= {"from_ids": [doc_id] if doc_id else [], "depth": 2}
-            case "list_changes" | "list_match_words" | "describe":
+            case "list_changes":
+                base |= {"from": "HEAD~5", "limit": 20}
+            case "list_match_words":
+                base |= {"source": repo}
+            case "describe":
                 pass
         return base
 
@@ -188,6 +200,8 @@ class Load:
             if is_error:
                 status = "error"
                 detail = text.splitlines()[0][:200] if text else ""
+            if tool == "write_docs":
+                self.track_version(path, arguments, is_error, text)
         except httpx.TimeoutException:
             status = "timeout"
         except httpx.HTTPError as error:
@@ -210,6 +224,19 @@ class Load:
             # 実際に削除できたら、次の呼び出しのために worktree を commit の状態へ戻す
             await asyncio.to_thread(subprocess.run, ["git", "-C", path, "checkout", "-q", "HEAD", "--", "."], check=False)
         return status == "timeout"
+
+    def track_version(self, path: str, arguments: dict[str, object], is_error: bool, text: str) -> None:
+        """書き込みの結果から、worktree の文書の今のバージョンを控える（次の書き込みの expected_version）。"""
+        operation = arguments["operations"][0]  # type: ignore[index]
+        key = (path, operation["id"])
+        current = re.search(r"^current: (\S+)", text, re.MULTILINE) if is_error else None
+        if current:
+            self.versions[key] = current.group(1)
+            # 今の内容に印が付いているかは分からないため、印を付けない値から書き直す
+            self.marked[key] = False
+        elif not is_error and arguments.get("dry_run") is False:
+            for result in json.loads(text).get("results", []):
+                self.versions[key] = str(result.get("version", ""))
 
     async def client(self, index: int, deadline: float) -> None:
         """1 本のクライアント。平均の間隔で呼び出しを続ける。"""

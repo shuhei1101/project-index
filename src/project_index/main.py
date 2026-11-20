@@ -146,6 +146,11 @@ def run_serve(args: argparse.Namespace) -> int:
     from project_index.server.app import build_app
 
     # 環境変数 PI_POC_STACKS があれば、SIGUSR1 で全スレッドのスタックをそのファイルへ追記する
+    # PoC #237: gc を止める変種
+    if os.environ.get("PI_POC_NO_GC"):
+        import gc
+
+        gc.disable()
     stacks_path = os.environ.get("PI_POC_STACKS")
     if stacks_path:
         import faulthandler

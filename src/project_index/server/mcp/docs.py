@@ -6,6 +6,7 @@ import asyncio
 import functools
 import inspect
 import logging
+import os
 import time
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Annotated, Any, Literal
@@ -260,7 +261,8 @@ async def _ensure_worktree(
     wait_sec = handlers.terminal.worktree_load_wait_sec
     try:
         async with asyncio.timeout(wait_sec):
-            await asyncio.shield(task)
+            # PoC #237: shield を外す変種
+            await (task if os.environ.get("PI_POC_NO_SHIELD") else asyncio.shield(task))
     except TimeoutError:
         # 読み込みは止めずに続け、次の要求で同じ読み込みの終わりを待つ
         logger.info(
