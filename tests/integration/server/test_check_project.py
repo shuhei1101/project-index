@@ -2,6 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import pytest
+
+from tests.integration.server.conftest import (
+    DIRECT_RULE_SCHEMA,
+    NOTE_LIST_SCRIPT,
+    NOTE_SCHEMA,
+    direct_commit_config,
+)
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
@@ -688,3 +697,51 @@ def test_normal_when_git_file_and_ignored_files(
     assert (worktree / ".git").is_file()
     assert result.data["sync"]["unindexed_files"] == 1
     assert [item["path"] for item in result.data["sync"]["items"]] == ["root: docs/new.md"]
+
+
+DIRECT_FILES = {
+    "schemas/note.schema.yaml": NOTE_SCHEMA,
+    "schemas/rule.schema.yaml": DIRECT_RULE_SCHEMA,
+    "scripts/list.py": NOTE_LIST_SCRIPT,
+    "notes/n1.yaml": "id: n1\nname: メモ 1\n",
+}
+
+
+@pytest.mark.parametrize(
+    ("config", "expected_violations", "expected_warnings"),
+    [
+        pytest.param(
+            direct_commit_config().replace("kinds: [note]", "kinds: note"),
+            {"direct_commit.kinds": "型が違う（期待: array）"},
+            {},
+            id="type",
+        ),
+        pytest.param(
+            direct_commit_config(kinds=("note", "meme")),
+            {"direct_commit.kinds[1]": "meme は documents[] に無く、直コミットを断る"},
+            {"direct_commit.branch": "develop を指すワークツリーが無いため、直コミットは断られる"},
+            id="missing-kind",
+        ),
+    ],
+)
+def test_normal_when_direct_commit_checked(
+    config: str,
+    expected_violations: dict[str, str],
+    expected_warnings: dict[str, str],
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+) -> None:
+    """直コミットの設定を検査する（正常系）。"""
+    # 準備
+    sample = make_source(
+        "sample", {"project-index.yaml": direct_commit_config(), **DIRECT_FILES}, branch="master"
+    )
+    env = make_server(sample)
+    # 実行
+    result = env.call_admin("check_project", path=str(sample.folder), config=config, format="json")
+    # 検証
+    violations = {item["path"]: item["rule"] for item in result.data["violations"]}
+    warnings = {item["path"]: item["rule"] for item in result.data.get("warnings", [])}
+    assert not result.is_error, result.text
+    assert violations == expected_violations
+    assert warnings == expected_warnings

@@ -121,6 +121,9 @@ class SourceSpec:
     storage: str | None = None
     # False のときは端末の設定の行に `id` を書かず、配信元の設定の `name` を ID にする
     with_id: bool = True
+    # 端末の設定の行の `direct_commit.scope`・`direct_commit.kinds`。None は行に書かない
+    direct_commit_scope: list[Path] | None = None
+    direct_commit_kinds: dict[str, list[Path]] | None = None
 
 
 @dataclass
@@ -468,6 +471,14 @@ def _source_lines(spec: SourceSpec) -> list[str]:
     if spec.scope_write is not None:
         lines.append("      write:")
         lines.extend(f"        - {path}" for path in spec.scope_write)
+    if spec.direct_commit_scope is not None or spec.direct_commit_kinds is not None:
+        lines.extend(["    direct_commit:", "      scope:"])
+        lines.extend(f"        - {path}" for path in spec.direct_commit_scope or [])
+        if spec.direct_commit_kinds:
+            lines.append("      kinds:")
+            for kind, paths in spec.direct_commit_kinds.items():
+                lines.append(f"        {kind}:")
+                lines.extend(f"          - {path}" for path in paths)
     return lines
 
 
@@ -1104,3 +1115,174 @@ def time_out_archive(monkeypatch: pytest.MonkeyPatch) -> Callable[..., list[str]
         return failed
 
     return _patch
+
+
+# 直コミットの配信元（種類 note は直コミットを許可し、種類 rule は許可しない）
+NOTE_SCHEMA = (
+    "type: object\n"
+    "required: [id, name]\n"
+    "properties:\n"
+    "  id: {type: string}\n"
+    "  name: {type: string}\n"
+    "  description: {type: string}\n"
+)
+DIRECT_RULE_SCHEMA = (
+    "type: object\n"
+    "required: [id, name]\n"
+    "properties:\n"
+    "  id: {type: string}\n"
+    "  name: {type: string}\n"
+    "  related:\n"
+    "    type: array\n"
+    "    items:\n"
+    "      type: object\n"
+    "      properties:\n"
+    "        to: {type: string}\n"
+    "        type: {type: string}\n"
+)
+NOTE_LIST_SCRIPT = (
+    "import pathlib\n"
+    "names = sorted(path.stem for path in pathlib.Path('notes').glob('*.yaml'))\n"
+    "out = pathlib.Path('generated')\n"
+    "out.mkdir(exist_ok=True)\n"
+    "(out / 'notes.txt').write_text('\\n'.join(names) + '\\n')\n"
+)
+FAILING_SCRIPT = "raise SystemExit(1)\n"
+
+
+def direct_commit_config(
+    *, branch: str = "develop", branches: tuple[str, ...] = (), kinds: tuple[str, ...] = ("note",)
+) -> str:
+    """種類 note・rule と、文書の一覧を書き出す生成と、直コミットの設定を持つ配信元の設定を作る。"""
+    branches_line = f"  branches: [{', '.join(branches)}]\n" if branches else ""
+    return (
+        "name: sample\n"
+        "default_ref: develop\n"
+        "documents:\n"
+        "  - id: note\n"
+        "    paths: [notes/*.yaml]\n"
+        "    schema: schemas/note.schema.yaml\n"
+        "    after_write: [list]\n"
+        "  - id: rule\n"
+        "    paths: [rules/*.yaml]\n"
+        "    schema: schemas/rule.schema.yaml\n"
+        "generators:\n"
+        "  - id: list\n"
+        "    run: [python3, scripts/list.py]\n"
+        "direct_commit:\n"
+        f"  branch: {branch}\n"
+        f"{branches_line}"
+        f"  kinds: [{', '.join(kinds)}]\n"
+    )
+
+
+@dataclass
+class DirectCommitSource:
+    """直コミットの配信元と、リモート・ワークツリー・手元の作業場所。"""
+
+    spec: SourceSpec
+    bare: Path
+    develop: Path
+    x: Path
+    local: Path
+
+    @property
+    def folder(self) -> Path:
+        """配信元のクローン本体。"""
+        return self.spec.folder
+
+
+@pytest.fixture
+def make_direct_commit_source(
+    tmp_path: Path,
+    make_source: Callable[..., SourceSpec],
+    run_git: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> Callable[..., DirectCommitSource]:
+    """クローン本体（master）・develop と x のワークツリー・ベアリポジトリの origin を持つ直コミットの配信元を作る関数を返す。"""
+    # 索引のサーバーが打つコミットの作成者と、端末の git の設定を読まないこと
+    for name, value in {
+        "GIT_AUTHOR_NAME": "tester",
+        "GIT_AUTHOR_EMAIL": "tester@example.com",
+        "GIT_COMMITTER_NAME": "tester",
+        "GIT_COMMITTER_EMAIL": "tester@example.com",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+    }.items():
+        monkeypatch.setenv(name, value)
+
+    def _make(
+        *,
+        files: dict[str, str] | None = None,
+        config: str | None = None,
+        extra_branches: tuple[str, ...] = (),
+        direct_commit_kinds: dict[str, list[Path]] | None = None,
+        list_script: str = NOTE_LIST_SCRIPT,
+    ) -> DirectCommitSource:
+        content = {
+            "project-index.yaml": config or direct_commit_config(),
+            "schemas/note.schema.yaml": NOTE_SCHEMA,
+            "schemas/rule.schema.yaml": DIRECT_RULE_SCHEMA,
+            "scripts/list.py": list_script,
+            "memo.txt": "memo\n",
+            "notes/.keep": "",
+            "rules/.keep": "",
+            **(files or {}),
+        }
+        local = tmp_path / "local"
+        local.mkdir(exist_ok=True)
+        spec = make_source("sample", content, branch="master")
+        spec.direct_commit_scope = [local]
+        spec.direct_commit_kinds = direct_commit_kinds
+        folder = spec.folder
+        bare = tmp_path / "remote.git"
+        run_git(tmp_path, "init", "--bare", "-b", "master", str(bare))
+        run_git(folder, "remote", "add", "origin", str(bare))
+        branches = ("develop", *extra_branches)
+        for branch in branches:
+            run_git(folder, "branch", branch)
+        run_git(folder, "push", "origin", "master", *branches)
+        worktrees = folder / ".claude" / "worktrees"
+        for branch in branches:
+            path = worktrees / branch
+            run_git(folder, "worktree", "add", str(path), branch)
+            run_git(path, "branch", f"--set-upstream-to=origin/{branch}")
+        x = worktrees / "x"
+        run_git(folder, "worktree", "add", "-b", "feat/x", str(x))
+        return DirectCommitSource(
+            spec=spec, bare=bare, develop=worktrees / "develop", x=x, local=local
+        )
+
+    return _make
+
+
+@pytest.fixture
+def push_from_other_clone(tmp_path: Path, run_git: Callable[..., str]) -> Callable[..., str]:
+    """別のクローンからリモートのブランチへ 1 コミットをプッシュし、その SHA を返す関数を返す。"""
+
+    def _push(bare: Path, files: dict[str, str], branch: str = "develop") -> str:
+        other = tmp_path / f"other-{branch}"
+        if not other.exists():
+            run_git(tmp_path, "clone", "-b", branch, str(bare), str(other))
+        else:
+            run_git(other, "pull", "--ff-only")
+        for name, text in files.items():
+            (other / name).write_text(text, encoding="utf-8")
+        run_git(other, "add", "-A")
+        run_git(other, "commit", "-m", "other")
+        run_git(other, "push", "origin", branch)
+        return run_git(other, "rev-parse", "HEAD").strip()
+
+    return _push
+
+
+@pytest.fixture
+def install_hook() -> Callable[..., None]:
+    """ベアリポジトリにフックを置く関数を返す。"""
+
+    def _install(bare: Path, name: str, script: str) -> None:
+        hook = bare / "hooks" / name
+        hook.write_text(f"#!/bin/sh\n{script}\n", encoding="utf-8")
+        hook.chmod(0o755)
+
+    return _install

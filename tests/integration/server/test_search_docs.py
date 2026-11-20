@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from tests.integration.server.conftest import SourceSpec
+from tests.integration.server.conftest import DirectCommitSource, SourceSpec
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -1595,3 +1595,27 @@ def test_normal_when_builtin_source_read(
     assert "SourceNotReadableError" in refused.text
     assert "outside_scope: true" in refused.text
     assert {item["id"] for item in everything.data["items"]} == {"doc-1", "doc-2"}
+
+
+def test_normal_when_direct_commit_workplace(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    commit_all: Callable[..., str],
+) -> None:
+    """直コミットを呼べる作業場所から読む（正常系）。"""
+    # 準備
+    direct = make_direct_commit_source(files={"rules/r1.yaml": "id: r1\nname: 規約 1\n"})
+    commit_all(direct.develop, {"notes/d1.yaml": "id: d1\nname: develop だけの文書\n"})
+    env = make_server(direct.spec)
+    # 実行
+    found = env.call(
+        "search_docs", cwd=str(direct.local), source="sample", view="ids", format="json"
+    )
+    other = env.call("search_docs", cwd=str(direct.local), source="sample", worktree=str(direct.x))
+    # 検証
+    text = found.text
+    assert not found.is_error, text
+    assert "d1" in text
+    assert "r1" in text
+    assert other.is_error
+    assert "コミットするブランチのワークツリーだけ" in other.text

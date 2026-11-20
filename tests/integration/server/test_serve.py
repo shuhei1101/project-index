@@ -35,7 +35,13 @@ from project_index.server.mcp.result import (
     tool_prompt_id,
 )
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
-from tests.integration.server.conftest import SourceSpec
+from tests.integration.server.conftest import (
+    DIRECT_RULE_SCHEMA,
+    NOTE_LIST_SCRIPT,
+    NOTE_SCHEMA,
+    SourceSpec,
+    direct_commit_config,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -1456,3 +1462,78 @@ def test_normal_when_builtin_source_unavailable(
     assert guide.is_error
     assert "UnknownSourceError" in guide.text
     assert "配信元 project-index はありません" in guide.text
+
+
+def test_normal_when_direct_commit_config_invalid(
+    tmp_path: Path,
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """直コミットの設定の型の誤りは配信元を外し、許可する種類の実在とワークツリーの欠けは配信を続けて直コミットだけを断る（正常系）。"""
+    # 準備
+    local = tmp_path / "local"
+    local.mkdir()
+    files = {
+        "schemas/note.schema.yaml": NOTE_SCHEMA,
+        "schemas/rule.schema.yaml": DIRECT_RULE_SCHEMA,
+        "scripts/list.py": NOTE_LIST_SCRIPT,
+        "notes/n1.yaml": "id: n1\nname: メモ 1\n",
+    }
+    broken = make_source(
+        "broken-dc",
+        {
+            **files,
+            "project-index.yaml": direct_commit_config()
+            .replace("name: sample", "name: broken-dc")
+            .replace("kinds: [note]", "kinds: note"),
+        },
+        branch="master",
+    )
+    sample = make_source(
+        "sample",
+        {**files, "project-index.yaml": direct_commit_config(kinds=("note", "meme"))},
+        branch="master",
+    )
+    sample.direct_commit_scope = [local]
+    sample.direct_commit_kinds = {"note": [local], "rule": [local]}
+    notes2 = make_source(
+        "notes2",
+        {
+            **files,
+            "project-index.yaml": direct_commit_config().replace("name: sample", "name: notes2"),
+        },
+        branch="master",
+    )
+    notes2.direct_commit_scope = [local]
+    # 配信元の default_ref の develop を作る（develop を指すワークツリーは作らない）
+    run_git(broken.folder, "branch", "develop")
+    run_git(sample.folder, "branch", "develop")
+    run_git(notes2.folder, "branch", "develop")
+    caplog.set_level(logging.WARNING)
+    create = {"op": "create", "kind": "note", "data": {"id": "n9", "name": "メモ 9"}}
+    # 実行
+    env = make_server(broken, sample, notes2)
+    broken_docs = env.client.get("/sources/broken-dc/docs")
+    sample_docs = env.client.get("/sources/sample/docs")
+    sample_write = env.call(
+        "write_docs", cwd=str(local), source="sample", operations=[create], commit={"message": "m"}
+    )
+    notes2_write = env.call(
+        "write_docs", cwd=str(local), source="notes2", operations=[create], commit={"message": "m"}
+    )
+    # 検証
+    errors = [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert broken_docs.status_code == 404
+    assert any("broken-dc" in m and "direct_commit.kinds" in m for m in errors)
+    assert sample_docs.status_code == 200
+    assert any(
+        "sample" in m and "direct_commit.kinds[1]" in m and "直コミットだけを断る" in m
+        for m in errors
+    )
+    assert any("notes2" in m and "direct_commit.branch" in m for m in warnings)
+    assert any("sample" in m and "sources[].direct_commit.kinds.rule" in m for m in warnings)
+    assert "DirectCommitNotConfiguredError" in sample_write.text
+    assert "CommitWorktreeNotFoundError" in notes2_write.text
