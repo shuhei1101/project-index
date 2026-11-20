@@ -985,9 +985,17 @@ def test_write_docs_when_existing_body_file_adopted(make_env: Callable[..., Writ
 
 
 @pytest.mark.parametrize(
-    ("operations", "expected_index", "expected_rule", "expected_rule_kind", "expected_fix"),
+    (
+        "notes_index",
+        "operations",
+        "expected_index",
+        "expected_rule",
+        "expected_rule_kind",
+        "expected_fix",
+    ),
     [
         pytest.param(
+            NOTES,
             [Operation(op="create", kind="notes", data={"id": "n10", "path": "n1.md"})],
             0,
             "n1",
@@ -996,6 +1004,7 @@ def test_write_docs_when_existing_body_file_adopted(make_env: Callable[..., Writ
             id="body_file_of_other_element",
         ),
         pytest.param(
+            NOTES,
             [Operation(op="create", kind="notes", data={"id": "n11", "path": "index.yaml"})],
             0,
             "notes",
@@ -1004,6 +1013,7 @@ def test_write_docs_when_existing_body_file_adopted(make_env: Callable[..., Writ
             id="records_index",
         ),
         pytest.param(
+            NOTES,
             [
                 Operation(
                     op="create",
@@ -1018,6 +1028,7 @@ def test_write_docs_when_existing_body_file_adopted(make_env: Callable[..., Writ
             id="file_of_document",
         ),
         pytest.param(
+            NOTES,
             [
                 Operation(
                     op="create", kind="notes", data={"id": "n13", "path": "n6.md", "@body": "x"}
@@ -1030,6 +1041,7 @@ def test_write_docs_when_existing_body_file_adopted(make_env: Callable[..., Writ
             id="body_with_existing_file",
         ),
         pytest.param(
+            NOTES,
             [
                 Operation(op="create", kind="notes", data={"id": "n6", "path": "n6.md"}),
                 Operation(op="create", kind="notes", data={"id": "n14", "path": "n6.md"}),
@@ -1040,10 +1052,20 @@ def test_write_docs_when_existing_body_file_adopted(make_env: Callable[..., Writ
             "どの文書のファイルでもない",
             id="adopted_in_same_call",
         ),
+        pytest.param(
+            "items: []\n",
+            [Operation(op="create", kind="notes", data={"id": "n15", "path": "index.yaml"})],
+            0,
+            "notes",
+            "管理用の YAML",
+            "どの文書のファイルでもない",
+            id="empty_records_index",
+        ),
     ],
 )
 def test_write_docs_when_existing_body_file_rejected(
     make_env: Callable[..., WriteEnv],
+    notes_index: str,
     operations: list[Operation],
     expected_index: int,
     expected_rule: str,
@@ -1053,7 +1075,8 @@ def test_write_docs_when_existing_body_file_rejected(
     """既にあるファイルを本文のファイルにできない（異常系）。"""
     # 準備
     env = make_env(
-        {**_notes_files(), "notes/n6.md": "# n6\n"}, tables=[_notes_table(), _rules_table()]
+        {**_notes_files(), "notes/index.yaml": notes_index, "notes/n6.md": "# n6\n"},
+        tables=[_notes_table(), _rules_table()],
     )
     # 実行・検証
     with pytest.raises(ValidationFailedError) as exc_info:
@@ -1065,7 +1088,7 @@ def test_write_docs_when_existing_body_file_rejected(
     assert expected_rule in violations[0].rule
     assert expected_rule_kind in violations[0].rule
     assert expected_fix in violations[0].fix
-    assert (env.worktree / "notes/index.yaml").read_text(encoding="utf-8") == NOTES
+    assert (env.worktree / "notes/index.yaml").read_text(encoding="utf-8") == notes_index
     assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == NOTE_1
     assert (env.worktree / "notes/n6.md").read_text(encoding="utf-8") == "# n6\n"
     assert (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
