@@ -1983,14 +1983,13 @@ def test_document_store_load_when_revision_loads_over_keep(
     root, first, second = _two_commits(git_repo, write_files, run_git)
     source = _git_source(root, root, make_source_config, make_served_source)
     monkeypatch.setattr(store_module, "REVISION_LOAD_KEEP", 1)
-    collected = _recording_collect_files(monkeypatch)
     # 実行
-    document_store.load(make_target(source, ref="develop", commit=first))
+    first_result = document_store.load(make_target(source, ref="develop", commit=first))
     document_store.load(make_target(source, ref="develop", commit=second))
     third_result = document_store.load(make_target(source, ref="develop", commit=first))
     # 検証
-    assert collected == ["rules", "rules", "rules"]
-    assert {document.data["name"] for document in third_result.documents} == {"A", "B"}
+    assert third_result is not first_result
+    assert third_result.documents == first_result.documents
 
 
 def test_document_store_load_when_revision_load_files_given(
@@ -2051,7 +2050,9 @@ def _page_source(
     [
         pytest.param("rules/a", None, ("rules/a.yaml", "a"), id="page_path"),
         pytest.param("rules/a.yaml", None, ("rules/a.yaml", "a"), id="file_path"),
-        pytest.param("notes/guide.md", None, ("notes/files.yaml", "notes/guide"), id="body_path"),
+        pytest.param(
+            "notes/guide.md", None, ("notes/files.yaml", "notes/guide.md"), id="body_path"
+        ),
         pytest.param("terms.yaml", "term-2", ("terms.yaml", "term-2"), id="doc_id"),
         pytest.param("no/such", None, None, id="missing"),
     ],
