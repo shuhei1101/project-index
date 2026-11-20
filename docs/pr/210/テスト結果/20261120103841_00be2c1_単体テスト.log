@@ -1,0 +1,105 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=unit | ...)   # TP-1 TL-1 の run_runner
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 1177 items / 6 errors
+
+==================================== ERRORS ====================================
+__ ERROR collecting tests/unit/project_index/features/access/test_service.py ___
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/access/test_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/access/test_service.py:11: in <module>
+    from project_index.features.access.service import (
+E   ImportError: cannot import name 'commit_read_worktree' from 'project_index.features.access.service' (/home/runner/work/project-index/project-index/src/project_index/features/access/service.py)
+__ ERROR collecting tests/unit/project_index/features/sources/test_service.py __
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/sources/test_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/sources/test_service.py:13: in <module>
+    from project_index.features.sources.service import (
+E   ImportError: cannot import name 'direct_commit_checks' from 'project_index.features.sources.service' (/home/runner/work/project-index/project-index/src/project_index/features/sources/service.py)
+_ ERROR collecting tests/unit/project_index/features/write/test_direct_commit.py _
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/write/test_direct_commit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_direct_commit.py:9: in <module>
+    from project_index.features.write.direct_commit import (
+E   ModuleNotFoundError: No module named 'project_index.features.write.direct_commit'
+____ ERROR collecting tests/unit/project_index/features/write/test_locks.py ____
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/write/test_locks.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_locks.py:9: in <module>
+    from project_index.features.write.locks import RepositoryLocks, SourceLocks
+E   ImportError: cannot import name 'RepositoryLocks' from 'project_index.features.write.locks' (/home/runner/work/project-index/project-index/src/project_index/features/write/locks.py)
+___ ERROR collecting tests/unit/project_index/features/write/test_secrets.py ___
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/write/test_secrets.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_secrets.py:6: in <module>
+    from project_index.features.write.secrets import SecretFinding, scan_text, secret_findings
+E   ModuleNotFoundError: No module named 'project_index.features.write.secrets'
+___ ERROR collecting tests/unit/project_index/features/write/test_service.py ___
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/write/test_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_service.py:18: in <module>
+    from project_index.features.sources.types import (
+E   ImportError: cannot import name 'DirectCommitConfig' from 'project_index.features.sources.types' (/home/runner/work/project-index/project-index/src/project_index/features/sources/types.py)
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/access/test_service.py
+ERROR tests/unit/project_index/features/sources/test_service.py
+ERROR tests/unit/project_index/features/write/test_direct_commit.py
+ERROR tests/unit/project_index/features/write/test_locks.py
+ERROR tests/unit/project_index/features/write/test_secrets.py
+ERROR tests/unit/project_index/features/write/test_service.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 6 errors during collection !!!!!!!!!!!!!!!!!!!!
+============================== 6 errors in 2.88s ===============================
+
+# 収集で止まったため、管理の check_project のテストを個別に実行した
+$ uv run pytest tests/unit/project_index/features/admin/test_service.py -q -k direct_commit --basetemp=/tmp/pi210-admin2   # 端末の /tmp/pytest-of-* の所有者が違うため basetemp を指定
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________________ test_check_project_when_direct_commit _____________________
+
+tmp_path = PosixPath('/tmp/pi210-admin2/test_check_project_when_direct0')
+write_files = <function write_files.<locals>._write at 0x7a08d5f12980>
+make_terminal_config = <function make_terminal_config.<locals>._make at 0x7a08d5f12b90>
+
+    def test_check_project_when_direct_commit(
+        tmp_path: Path,
+        write_files: Callable[[Path, dict[str, str]], None],
+        make_terminal_config: Callable[..., TerminalConfig],
+    ) -> None:
+        """直コミットの設定の違反と警告（正常系）。"""
+        # 準備
+        write_files(
+            tmp_path,
+            {
+                "project-index.yaml": DIRECT_COMMIT_CONFIG,
+                "schemas/rule.schema.yaml": RULE_SCHEMA,
+                "docs/note/n1.yaml": "id: n1\n",
+            },
+        )
+        handlers = _handlers(make_terminal_config)
+        # 実行
+        result = check_project(CheckProjectRequest(path=str(tmp_path)), handlers=handlers)
+        # 検証
+>       assert [item.path for item in result.violations] == ["direct_commit.kinds[1]"]
+E       AssertionError: assert ['direct_commit'] == ['direct_commit.kinds[1]']
+E         
+E         At index 0 diff: 'direct_commit' != 'direct_commit.kinds[1]'
+E         Use -v to get more diff
+
+tests/unit/project_index/features/admin/test_service.py:381: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  project_index.features.sources.registry:registry.py:547 組み込みの配信元を加えなかった（/tmp/pi210-admin2/test_check_project_when_direct0/clone/project-index.yaml がありません）
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/admin/test_service.py::test_check_project_when_direct_commit
+1 failed, 44 deselected in 0.13s
+
+# 判定: 収集の 6 件の失敗は全て、未実装の名前（direct_commit・secrets・RepositoryLocks・commit_read_worktree・committable_kinds・direct_commit_checks・DirectCommitConfig）の import の失敗。check_project の失敗は、配信元の設定のスキーマに direct_commit が無いことによる。実装の前から pass した直コミットのテストは無い

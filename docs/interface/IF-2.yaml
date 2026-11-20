@@ -1142,6 +1142,35 @@ flows:
       - '`outside_scope` を省くと、異常系（読めない配信元・SourceNotReadableError）と同じエラーで、`fix` が `outside_scope: true` を案内する'
       - '`source: *` に `outside_scope: true` を渡しても、組み込みの配信元の文書を返却しない'
     test: test_normal_when_builtin_source_read
+  - name: 正常系（直コミットを呼べる作業場所から読む）
+    summary: '`scope` に該当しないが直コミットを呼べる作業場所から、コミットするブランチのワークツリーの文書を返す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 配信元
+        description: '[文書の書き込み](id:IF-6) の正常系（直コミットする）の配信元。develop のワークツリーにだけ文書 d1 がある'
+      - name: 入力
+        description: '1 回目は `source: sample`、2 回目は `source: sample` と `worktree`（ワークツリー x）。`cwd` は手元の作業場所'
+    flow: |-
+      <!-- map: {"title": "正常系（直コミットを呼べる作業場所から読む）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+
+        C->>T: source: sample, cwd: 手元の作業場所
+        T->>T: direct_commit.scope に該当し、develop のワークツリーを参照する
+        T-->>C: develop のワークツリーの文書（d1 を含む）
+        C->>T: source: sample, worktree: x
+        T-->>C: isError（コミットするブランチのワークツリーでない）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目の結果に、develop のワークツリーの文書 d1 と、種類 `rule` の文書を含む全ての種類の文書がある
+      - '2 回目は `isError: true` で、ワークツリー x はコミットするブランチのワークツリーでないため参照できないことを返却する'
+    test: test_normal_when_direct_commit_workplace
 lead: '条件に該当する文書の取得・一覧・件数・集計を返却する `search_docs` の入出力を定め、`search_docs` を修正するときに参照する。'
 tags:
   - name: topic:クエリ
@@ -1152,7 +1181,7 @@ tags:
 aliases:
   - 'search_docs'
 identifier: search_docs
-permissions: 対象の配信元の `scope.read` か `scope.write` に `cwd` が当たること
+permissions: 対象の配信元の `scope.read` か `scope.write` に `cwd` が当たること。端末の設定の `sources[].direct_commit` の呼べる作業場所に `cwd` が該当するときは、その配信元のコミットするブランチ（`direct_commit.branch` と `direct_commit.branches[]`）を指すワークツリーだけを参照できる。直コミットの設定に直コミットだけを断る違反がある配信元は、呼べる作業場所からも参照できない
 idempotent: true
 side_effects: '会話キー（`session_id`・`agent_id`）ごとに、本文を返した文書（`sections`・`lines` を渡した呼び出しを除く）の id・ハッシュ・返した時点の内容を `state_dir` に記録する（`list_changes` の前回読んだ時点に使う）。文書のファイルは変えない。'
 callers:
@@ -1162,6 +1191,7 @@ callers:
   - SC-6#scenarios[異常シナリオ（ワークツリーの読み込みが上限までに終了しない）]
   - SC-6#scenarios[異常シナリオ（git の実行が失敗する）]
   - SC-6#scenarios[正常シナリオ（本文のファイルを持たない要素を引く）]
+  - SC-15#scenarios[正常シナリオ]
 exclusivity: '読み取りだけで排他しない（`readOnlyHint: true` で並列に呼ばれる）'
 request:
   - name: source
@@ -1604,6 +1634,9 @@ constraints:
   - item: 本文のファイルを持たない要素
     constraint: '`records`・`body_file` の行で `body_file` の列が無いか値が `null`・空の文字列の要素は、`body_file` を持たない `records` の行の要素と同じ本文・`path`・範囲・ID と名前の既定で返す。列の値があって指すファイルが無いか配信元の外を指す要素だけを除き、`notes` で知らせる'
     notes: 文字列でない値（数・配列）は、今どおり指すファイルが無い要素として除く
+  - item: 直コミットを呼べる作業場所からの参照
+    constraint: '`scope` に該当せず、端末の設定の `sources[].direct_commit` の呼べる作業場所（`scope` か `kinds` のどれかの glob）に `cwd` が該当するときは、`worktree` を省くと `direct_commit.branch` を指すワークツリーを参照する。`worktree` はコミットするブランチ（`direct_commit.branch` と `direct_commit.branches[]` に該当するブランチ）を指すワークツリーだけを受け、それ以外のワークツリー・`ref`・クローン本体は `SourceNotReadableError` にする'
+    notes: 返却する文書は種類で絞らない。直コミットできる種類が `kinds` の glob だけの作業場所も同じ
 refs:
   - to: SC-6
     item: scenarios[正常シナリオ]

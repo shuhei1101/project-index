@@ -9,12 +9,14 @@ from ruamel.yaml import YAML
 
 from project_index.features.access.service import (
     available_sources,
+    committable_kinds,
     describe_workplace,
     outside_readable_sources,
     resolve_read_targets,
 )
 from project_index.features.describe.types import (
     DescribeRequest,
+    DirectCommitGuide,
     KindSchemaResult,
     KindSummary,
     OutsideSource,
@@ -24,6 +26,7 @@ from project_index.features.describe.types import (
 from project_index.features.describe.warnings import collect_warnings
 from project_index.features.history.query import list_refs, list_worktrees
 from project_index.shared.errors import InvalidArgumentError, Violation
+from project_index.shared.paths import normalize_path
 
 if TYPE_CHECKING:
     from project_index.features.access.types import Target
@@ -87,7 +90,22 @@ def _source_list(
     )
 
 
-def _source_guide(store: DocumentStore, target: Target) -> SourceGuideResult:
+def _direct_commit_guide(target: Target, cwd: str | None) -> DirectCommitGuide | None:
+    """今の作業場所から直コミットできる種類があれば、直コミットの案内を作る。"""
+    settings = target.source.config.direct_commit
+    kinds = committable_kinds(target.source, normalize_path(cwd) if cwd else None)
+    if settings is None or not kinds:
+        return None
+    return DirectCommitGuide(
+        branch=settings.branch,
+        branches=list(settings.branches),
+        kinds=[kind for kind in settings.kinds if kind in kinds],
+    )
+
+
+def _source_guide(
+    store: DocumentStore, target: Target, cwd: str | None = None
+) -> SourceGuideResult:
     """配信元の説明書と種類の一覧（Git の配信元はブランチ・タグ・ワークツリーも）を返す。"""
     source = target.source
     kinds = [
@@ -115,6 +133,7 @@ def _source_guide(store: DocumentStore, target: Target) -> SourceGuideResult:
         outside_scope=target.outside_scope,
         refs=refs,
         worktrees=worktrees,
+        direct_commit=_direct_commit_guide(target, cwd),
     )
 
 
@@ -159,5 +178,5 @@ def describe(
         outside_scope=request.outside_scope,
     )[0]
     if request.kind is None:
-        return _source_guide(store, target)
+        return _source_guide(store, target, request.cwd)
     return _kind_schema(store, target, request.kind)

@@ -6,7 +6,14 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from project_index.integrations import git as git_module
-from project_index.integrations.git import GitError, ignored_paths, is_ignored, repo_root, run_git
+from project_index.integrations.git import (
+    GitError,
+    ignored_paths,
+    is_ignored,
+    repo_root,
+    run_git,
+    worktree_heads,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -180,3 +187,20 @@ def test_ignored_paths_when_not_repo(tmp_path: Path) -> None:
     result = ignored_paths(folder)
     # 検証
     assert result is None
+
+
+def test_worktree_heads(git_repo: Callable[..., Path], run_git: Callable[..., str]) -> None:
+    """クローン本体とワークツリーと切り離した HEAD（正常系）。"""
+    # 準備
+    root = git_repo({"a.yaml": "a: 1\n"})
+    feature = root.parent / "wt-feature"
+    detached = root.parent / "wt-detached"
+    run_git(root, "worktree", "add", "-b", "feat/x", str(feature))
+    run_git(root, "worktree", "add", "--detach", str(detached))
+    # 実行
+    result = worktree_heads(root)
+    # 検証
+    assert [(path.resolve(), branch) for path, branch in result] == [
+        (root.resolve(), "develop"),
+        (feature.resolve(), "feat/x"),
+    ]

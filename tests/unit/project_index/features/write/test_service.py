@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -16,6 +17,7 @@ from project_index.features.seen.store import SeenStore
 from project_index.features.seen.types import LastRead, SessionKey
 from project_index.features.sources.registry import SourceRegistry
 from project_index.features.sources.types import (
+    DirectCommitConfig,
     DocumentTable,
     ScriptEntry,
     ServedSource,
@@ -24,9 +26,10 @@ from project_index.features.sources.types import (
 from project_index.features.validation.markdown import MarkdownCheck, UncheckedKey
 from project_index.features.validation.service import DocumentChecker
 from project_index.features.write import service as write_service
-from project_index.features.write.locks import SourceLocks
+from project_index.features.write.locks import RepositoryLocks, SourceLocks
 from project_index.features.write.service import check_version, delete_docs, write_docs
 from project_index.features.write.types import (
+    CommitSpec,
     DeleteRequest,
     DeleteResult,
     DeleteTarget,
@@ -39,6 +42,8 @@ from project_index.features.write.types import (
 from project_index.shared.deadline import CallLimits, Deadline
 from project_index.shared.errors import (
     DeleteNotAllowedError,
+    DirectCommitGeneratorError,
+    DirectCommitNotPermittedError,
     DocumentReferencedError,
     InvalidArgumentError,
     ValidationFailedError,
@@ -78,6 +83,7 @@ class WriteEnv:
     source: ServedSource
     clone: Path
     worktree: Path
+    repo_locks: RepositoryLocks = field(default_factory=RepositoryLocks)
 
     def write(
         self, now: datetime | None = None, limits: CallLimits | None = None, **request: Any
@@ -91,6 +97,7 @@ class WriteEnv:
             checker=self.checker,
             seen=self.seen,
             locks=self.locks,
+            repo_locks=self.repo_locks,
             timeout_sec=10,
             now=now,
             **extra,
@@ -105,6 +112,7 @@ class WriteEnv:
             store=self.store,
             checker=self.checker,
             locks=self.locks,
+            repo_locks=self.repo_locks,
             timeout_sec=10,
             **extra,
         )
@@ -375,6 +383,7 @@ def test_write_docs_when_not_git(
             checker=DocumentChecker(store, timeout_sec=10),
             seen=SeenStore(tmp_path / "seen.sqlite3", retention_days=7),
             locks=SourceLocks(),
+            repo_locks=RepositoryLocks(),
             timeout_sec=10,
             now=now,
         )
@@ -436,6 +445,7 @@ def test_write_docs_when_without_dates(
             checker=DocumentChecker(store, timeout_sec=10),
             seen=SeenStore(tmp_path / "seen.sqlite3", retention_days=7),
             locks=SourceLocks(),
+            repo_locks=RepositoryLocks(),
             timeout_sec=10,
             now=now,
         )
@@ -1266,6 +1276,7 @@ def test_delete_docs_when_not_allowed(
             store=store,
             checker=DocumentChecker(store, timeout_sec=10),
             locks=SourceLocks(),
+            repo_locks=RepositoryLocks(),
             timeout_sec=10,
         )
     assert exc_info.value.kind == "rules"
@@ -1596,3 +1607,253 @@ def test_write_docs_when_replace_text_body(
     assert [(item.index, item.id, item.status, item.count) for item in result.results] == expected
     assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == body
     assert (env.worktree / "notes/n3.py").read_text(encoding="utf-8") == "# 旧語\n"
+
+
+GITHUB_TOKEN = "gh" + "p_" + "A1b2C3d4" * 4 + "E5f6"
+
+
+@dataclass
+class CommitEnv:
+    """直コミットの配信元と、ベアリポジトリ・data のワークツリー・呼べる作業場所。"""
+
+    env: WriteEnv
+    bare: Path
+    develop: Path
+    local: Path
+
+
+@pytest.fixture
+def make_commit_env(
+    tmp_path: Path,
+    run_git: Callable[..., str],
+    make_env: Callable[..., WriteEnv],
+    make_served_source: Callable[..., ServedSource],
+    make_source_config: Callable[..., SourceConfig],
+    make_registry: Callable[..., SourceRegistry],
+    monkeypatch: pytest.MonkeyPatch,
+) -> Callable[..., CommitEnv]:
+    """data へ直コミットする配信元と、ベアリポジトリへプッシュできるクローンを作る関数を返す。"""
+    for name, value in {
+        "GIT_AUTHOR_NAME": "tester",
+        "GIT_AUTHOR_EMAIL": "tester@example.com",
+        "GIT_COMMITTER_NAME": "tester",
+        "GIT_COMMITTER_EMAIL": "tester@example.com",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+    }.items():
+        monkeypatch.setenv(name, value)
+
+    def _make(generators: list[ScriptEntry] | None = None) -> CommitEnv:
+        env = make_env(
+            {
+                "docs/rule/doc-1.yaml": DOC_1,
+                "docs/note/note-1.yaml": "id: note-1\nname: メモ\n",
+                "docs/term/term-1.yaml": "id: term-1\nname: 用語\n",
+                "schemas/rule.schema.yaml": SCHEMA,
+            }
+        )
+        bare = tmp_path / "remote.git"
+        run_git(tmp_path, "init", "--bare", "-b", "data", str(bare))
+        run_git(env.clone, "remote", "add", "origin", str(bare))
+        run_git(env.clone, "push", "origin", "HEAD:data")
+        run_git(env.clone, "fetch", "origin")
+        develop = env.clone / ".claude" / "worktrees" / "data"
+        run_git(env.clone, "worktree", "add", "--track", "-b", "data", str(develop), "origin/data")
+        local = tmp_path / "local"
+        local.mkdir()
+        after_write = ["index"] if generators else []
+        tables = [
+            DocumentTable(
+                id="rules",
+                paths=["docs/rule/*.yaml"],
+                schema_path="schemas/rule.schema.yaml",
+                after_write=after_write,
+            ),
+            DocumentTable(
+                id="notes", paths=["docs/note/*.yaml"], schema_path="schemas/rule.schema.yaml"
+            ),
+            DocumentTable(
+                id="terms", paths=["docs/term/*.yaml"], schema_path="schemas/rule.schema.yaml"
+            ),
+        ]
+        config = make_source_config(
+            documents=tables,
+            generators=generators or [],
+            direct_commit=DirectCommitConfig(branch="data", kinds=["rules", "terms"]),
+        )
+        rule_schema = {"type": "object", "required": ["id", "name"]}
+        source = make_served_source(
+            id="sample",
+            root=env.clone,
+            config=config,
+            is_git=True,
+            repo_root=env.clone,
+            scope_write=[str(env.clone)],
+            worktree_globs=[str(env.clone / ".claude" / "worktrees" / "*")],
+            schemas={"rules": rule_schema, "notes": rule_schema, "terms": rule_schema},
+            storage="git",
+            direct_commit_scope=[str(local)],
+            direct_commit_kinds={"terms": ["/other"]},
+        )
+        env.source = source
+        env.registry = make_registry(source)
+        env.worktree = local
+        return CommitEnv(env=env, bare=bare, develop=develop, local=local)
+
+    return _make
+
+
+def test_write_docs_when_direct_commit_checks(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """直コミットの確認で断る（異常系）。"""
+    # 準備
+    commit_env = make_commit_env()
+    remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
+    commit = CommitSpec(message="docs: 追加する")
+    not_allowed = Operation(op="create", kind="notes", data={"id": "note-2", "name": "メモ 2"})
+    secret = Operation(
+        op="create", kind="rules", data={"id": "doc-9", "name": f"鍵 {GITHUB_TOKEN}"}
+    )
+    not_committable = Operation(op="create", kind="terms", data={"id": "term-2", "name": "用語 2"})
+    # 実行・検証
+    with pytest.raises(ValidationFailedError) as not_allowed_info:
+        commit_env.env.write(operations=[not_allowed], source="sample", commit=commit)
+    with pytest.raises(ValidationFailedError) as secret_info:
+        commit_env.env.write(operations=[secret], source="sample", commit=commit)
+    with pytest.raises(DirectCommitNotPermittedError, match="terms"):
+        commit_env.env.write(operations=[not_committable], source="sample", commit=commit)
+    assert [item.index for item in not_allowed_info.value.violations] == [0]
+    assert [item.index for item in secret_info.value.violations] == [0]
+    assert GITHUB_TOKEN not in repr(secret_info.value)
+    assert run_git(commit_env.develop, "status", "--porcelain").strip() == ""
+    assert run_git(commit_env.develop, "rev-parse", "HEAD").strip() == remote_head
+    assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
+
+
+def test_write_docs_when_direct_commit_generator_failed(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """生成の失敗（異常系）。"""
+    # 準備
+    generators = [ScriptEntry(id="index", run=[sys.executable, "-c", "raise SystemExit(1)"])]
+    commit_env = make_commit_env(generators=generators)
+    remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
+    operation = Operation(op="create", kind="rules", data={"id": "doc-9", "name": "文書 9"})
+    # 実行・検証
+    with pytest.raises(DirectCommitGeneratorError):
+        commit_env.env.write(
+            operations=[operation], source="sample", commit=CommitSpec(message="docs: 追加する")
+        )
+    assert not (commit_env.develop / "docs/rule/doc-9.yaml").exists()
+    assert run_git(commit_env.develop, "rev-parse", "HEAD").strip() == remote_head
+    assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
+
+
+def _not_atomic(_env: CommitEnv) -> dict[str, Any]:
+    """atomic: false の引数。"""
+    return {"atomic": False}
+
+
+def _with_worktree(env: CommitEnv) -> dict[str, Any]:
+    """コミットするブランチのワークツリーを指す worktree の引数。"""
+    return {"worktree": str(env.develop)}
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        pytest.param(_not_atomic, id="not-atomic"),
+        pytest.param(_with_worktree, id="worktree"),
+    ],
+)
+def test_write_docs_when_direct_commit_invalid_arguments(
+    extra: Callable[[CommitEnv], dict[str, Any]], make_commit_env: Callable[..., CommitEnv]
+) -> None:
+    """引数の組み合わせ（異常系）。"""
+    # 準備
+    commit_env = make_commit_env()
+    operation = Operation(op="create", kind="rules", data={"id": "doc-9", "name": "文書 9"})
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError, match="commit"):
+        commit_env.env.write(
+            operations=[operation],
+            source="sample",
+            commit=CommitSpec(message="docs: 追加する"),
+            **extra(commit_env),
+        )
+
+
+def test_write_docs_when_direct_commit_not_permitted_workplace(
+    tmp_path: Path, make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """直コミットを呼べない作業場所は取得の前に断る（異常系）。"""
+    # 準備
+    commit_env = make_commit_env()
+    other = tmp_path / "other"
+    run_git(tmp_path, "clone", "-b", "data", str(commit_env.bare), str(other))
+    (other / "ahead.txt").write_text("ahead\n", encoding="utf-8")
+    run_git(other, "add", "-A")
+    run_git(other, "commit", "-m", "ahead")
+    run_git(other, "push", "origin", "data")
+    tracking = run_git(commit_env.develop, "rev-parse", "origin/data").strip()
+    head = run_git(commit_env.develop, "rev-parse", "HEAD").strip()
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    commit_env.env.worktree = elsewhere
+    operation = Operation(op="create", kind="rules", data={"id": "doc-9", "name": "文書 9"})
+    # 実行・検証
+    with pytest.raises(DirectCommitNotPermittedError, match="直コミットはできません"):
+        commit_env.env.write(
+            operations=[operation], source="sample", commit=CommitSpec(message="docs: 追加する")
+        )
+    assert run_git(commit_env.develop, "rev-parse", "origin/data").strip() == tracking
+    assert run_git(commit_env.develop, "rev-parse", "HEAD").strip() == head
+
+
+def test_write_docs_when_commit_branch_worktree(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """コミットするブランチのワークツリーへの書き込みはリポジトリの排他を待つ（異常系）。"""
+    # 準備
+    commit_env = make_commit_env()
+    env = commit_env.env
+    env.worktree = commit_env.develop
+    repo = Path(
+        run_git(
+            commit_env.develop, "rev-parse", "--path-format=absolute", "--git-common-dir"
+        ).strip()
+    )
+    started = time.monotonic()
+    limits = CallLimits(
+        write_deadline=Deadline(limit_sec=0.2, started=started),
+        respond_by=Deadline(limit_sec=48, started=started),
+    )
+    operation = Operation(
+        op="update", id="doc-1", expected_version=content_hash(DOC_1), set={"name": "待つ"}
+    )
+    # 実行・検証
+    with env.repo_locks.hold(repo), pytest.raises(WriteDeadlineExceededError):
+        env.write(operations=[operation], limits=limits)
+    assert (commit_env.develop / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
+
+
+def test_write_docs_when_other_worktree(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """別のワークツリーへの書き込みは待たない（正常系）。"""
+    # 準備
+    commit_env = make_commit_env()
+    env = commit_env.env
+    other = env.clone / ".claude" / "worktrees" / "x"
+    env.worktree = other
+    repo = Path(run_git(other, "rev-parse", "--path-format=absolute", "--git-common-dir").strip())
+    operation = Operation(
+        op="update", id="doc-1", expected_version=content_hash(DOC_1), set={"name": "待たない"}
+    )
+    # 実行
+    with env.repo_locks.hold(repo):
+        result = env.write(operations=[operation])
+    # 検証
+    assert result.applied is True
+    assert "待たない" in (other / "docs/rule/doc-1.yaml").read_text(encoding="utf-8")

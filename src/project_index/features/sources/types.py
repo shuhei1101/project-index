@@ -77,6 +77,16 @@ class ScriptEntry:
 
 
 @dataclass(frozen=True)
+class DirectCommitConfig:
+    """配信元の設定の `direct_commit`。"""
+
+    branch: str
+    kinds: list[str]
+    # 上書きできるブランチの名前か glob
+    branches: list[str] = field(default_factory=list[str])
+
+
+@dataclass(frozen=True)
 class SourceConfig:
     """マージして検証を通した配信元の設定。"""
 
@@ -106,6 +116,8 @@ class SourceConfig:
     instructions: str = ""
     # 使う場面（どういうときにこの配信元で検索するか）の行
     when: list[str] = field(default_factory=list[str])
+    # `None` は直コミットを許可しない
+    direct_commit: DirectCommitConfig | None = None
 
 
 @dataclass(frozen=True)
@@ -132,6 +144,12 @@ class ServedSource:
     storage: StorageType | None = None
     # 端末の設定の行でなく、クローンのガイドから作った組み込みの配信元か（文書の MCP だけに出す）
     builtin: bool = False
+    # 端末の設定の `sources[].direct_commit.scope` を解いた glob
+    direct_commit_scope: list[str] = field(default_factory=list[str])
+    # 端末の設定の `sources[].direct_commit.kinds` を解いた glob（配信元の `direct_commit.kinds[]` に無い種類は除く）
+    direct_commit_kinds: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
+    # 配信を続け、直コミットだけを断る違反
+    direct_commit_problems: list[Violation] = field(default_factory=list[Violation])
 
     @property
     def config_root(self) -> Path:

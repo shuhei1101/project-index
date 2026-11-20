@@ -2,16 +2,26 @@
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
+import fnmatch
 import logging
 import posixpath
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from ruamel.yaml.comments import CommentedMap
 
-from project_index.features.access.service import resolve_write_target
+from project_index.features.access import service as access_service
+from project_index.features.access.service import (
+    base_of,
+    committable_kinds,
+    current_source,
+    resolve_write_target,
+)
 from project_index.features.access.types import Target
 from project_index.features.changes.compare import diff_lines
 from project_index.features.documents.fields import (
@@ -39,6 +49,15 @@ from project_index.features.write.apply import (
     expand_array_keys,
     to_columns,
 )
+from project_index.features.write.direct_commit import (
+    DIRECT_COMMIT_MARGIN_SEC,
+    DIRECT_COMMIT_PUSH_SEC,
+    CommitPlan,
+    DirtyFiles,
+    check_clean,
+    resolve_commit_plan,
+    run_direct_commit,
+)
 from project_index.features.write.hints import attach_schema_hints
 from project_index.features.write.ids import generate_id
 from project_index.features.write.placement import new_document_path
@@ -48,8 +67,10 @@ from project_index.features.write.references import (
     rewrite_references,
 )
 from project_index.features.write.replace import replace_in_body, replace_in_values
+from project_index.features.write.secrets import secret_findings
 from project_index.features.write.types import (
     OPERATIONS_MAX,
+    CommitSpec,
     DeleteRequest,
     DeleteResult,
     DeleteTarget,
@@ -59,10 +80,13 @@ from project_index.features.write.types import (
     WriteResult,
     WriteResultItem,
 )
+from project_index.integrations.git import GitError, run_git
 from project_index.integrations.scripts import ScriptError, run_script
-from project_index.shared.deadline import Deadline
+from project_index.shared.deadline import CallLimits, Deadline
 from project_index.shared.errors import (
     DeleteNotAllowedError,
+    DirectCommitGeneratorError,
+    DirectCommitNotPermittedError,
     DocumentReferencedError,
     InvalidArgumentError,
     ProjectIndexError,
@@ -74,18 +98,18 @@ from project_index.shared.errors import (
 from project_index.shared.files import replace_file
 from project_index.shared.hashing import value_hash
 from project_index.shared.narrowing import is_dict, is_list
+from project_index.shared.paths import normalize_path
 from project_index.shared.yaml_io import dump_roundtrip, load_roundtrip
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, MutableMapping
-    from pathlib import Path
+    from collections.abc import Generator, Mapping, MutableMapping
 
     from project_index.features.seen.store import SeenStore
     from project_index.features.sources.registry import SourceRegistry
+    from project_index.features.sources.types import ServedSource
     from project_index.features.validation.markdown import UncheckedKey
     from project_index.features.validation.service import DocumentChecker
-    from project_index.features.write.locks import SourceLocks
-    from project_index.shared.deadline import CallLimits
+    from project_index.features.write.locks import RepositoryLocks, SourceLocks
 
 logger = logging.getLogger(__name__)
 
@@ -810,6 +834,7 @@ def write_docs(
     checker: DocumentChecker,
     seen: SeenStore,
     locks: SourceLocks,
+    repo_locks: RepositoryLocks,
     timeout_sec: float,
     now: datetime | None = None,
     limits: CallLimits | None = None,
@@ -817,12 +842,27 @@ def write_docs(
     """`write_docs` の要求を処理して書き込みの結果を返す。"""
     now = now or datetime.now(UTC)
     _check_operations(request.operations)
+    # 直コミット: 取り込み・書き込み・コミット・プッシュを 1 つの排他の中で進める
+    if request.commit is not None:
+        return _write_with_commit(
+            request,
+            request.commit,
+            registry=registry,
+            store=store,
+            checker=checker,
+            seen=seen,
+            locks=locks,
+            repo_locks=repo_locks,
+            timeout_sec=timeout_sec,
+            now=now,
+            limits=limits or _default_limits(),
+        )
     target = resolve_write_target(
         registry=registry, source=request.source, worktree=request.worktree, cwd=request.cwd
     )
     source = target.source
     key = SessionKey.of(request.session_id, request.agent_id)
-    with locks.hold(source.id):
+    with _commit_branch_lock(repo_locks, target, limits), locks.hold(source.id):
         session = _Session(
             store, target, deadline=None if limits is None else limits.write_deadline
         )
@@ -1651,6 +1691,7 @@ def delete_docs(
     store: DocumentStore,
     checker: DocumentChecker,
     locks: SourceLocks,
+    repo_locks: RepositoryLocks,
     timeout_sec: float,
     limits: CallLimits | None = None,
 ) -> DeleteResult:
@@ -1665,49 +1706,478 @@ def delete_docs(
                 )
             ]
         )
+    # 直コミット: 取り込み・削除・コミット・プッシュを 1 つの排他の中で進める
+    if request.commit is not None:
+        return _delete_with_commit(
+            request,
+            request.commit,
+            registry=registry,
+            store=store,
+            checker=checker,
+            locks=locks,
+            repo_locks=repo_locks,
+            timeout_sec=timeout_sec,
+            limits=limits or _default_limits(),
+        )
     target = resolve_write_target(
         registry=registry, source=request.source, worktree=request.worktree, cwd=request.cwd
     )
     source = target.source
-    with locks.hold(source.id):
+    with _commit_branch_lock(repo_locks, target, limits), locks.hold(source.id):
         session = _Session(
             store, target, deadline=None if limits is None else limits.write_deadline
         )
-        leaving = {item.id for item in request.targets}
-        results: list[WriteResultItem] = []
-        failures: list[tuple[int, ProjectIndexError]] = []
-        accepted: list[Document] = []
-        unlink_plan: dict[str, set[str]] = {}
-        for index, item in enumerate(request.targets):
-            try:
-                document, referrers = _delete_target(session, item, leaving, request.on_referenced)
-            except ProjectIndexError as error:
-                failures.append((index, error))
-                results.append(
-                    WriteResultItem(
-                        index=index, id=item.id, status="failed", errors=_prefixed(index, error)
-                    )
-                )
-                continue
-            for referrer in referrers:
-                unlink_plan.setdefault(referrer.id, set()).add(item.id)
-            accepted.append(document)
-            results.append(WriteResultItem(index=index, id=item.id, status="deleted"))
-        if failures and request.atomic:
-            raise failures[0][1]
-        _apply_unlinks(session, checker, unlink_plan)
-        # 参照を外した文書と、外した後のバージョン
-        unlinked = [(referrer_id, session.docs[referrer_id].version) for referrer_id in unlink_plan]
-        if request.dry_run or not accepted:
-            return DeleteResult(applied=False, results=results, unlinked=unlinked)
+        deleted = _apply_deletes(session, checker, request)
+        if request.dry_run or not deleted.accepted:
+            return DeleteResult(applied=False, results=deleted.results, unlinked=deleted.unlinked)
         _check_before_write(limits)
-        _remove_documents(session, accepted)
+        _remove_documents(session, deleted.accepted)
         touched = session.write_pending()
         _run_generators(
             target,
-            _unique([source.table(d.kind) for d in accepted]),
+            _unique([source.table(d.kind) for d in deleted.accepted]),
             touched,
             timeout_sec,
             None if limits is None else limits.respond_by,
         )
-        return DeleteResult(applied=True, results=results, unlinked=unlinked)
+        return DeleteResult(applied=True, results=deleted.results, unlinked=deleted.unlinked)
+
+
+@dataclass
+class _Deleted:
+    """削除の対象を確かめて参照を外した結果。"""
+
+    results: list[WriteResultItem]
+    accepted: list[Document]
+    # 参照を外した文書の ID → 外した後のバージョン
+    unlinked: list[tuple[str, str]]
+    # 参照を外す文書の ID → 外す原因になった消す文書の ID
+    unlink_plan: dict[str, set[str]]
+
+
+def _apply_deletes(session: _Session, checker: DocumentChecker, request: DeleteRequest) -> _Deleted:
+    """削除の対象を確かめ、参照を外す（`atomic` で失敗があれば送る）。"""
+    leaving = {item.id for item in request.targets}
+    results: list[WriteResultItem] = []
+    failures: list[tuple[int, ProjectIndexError]] = []
+    accepted: list[Document] = []
+    unlink_plan: dict[str, set[str]] = {}
+    for index, item in enumerate(request.targets):
+        try:
+            document, referrers = _delete_target(session, item, leaving, request.on_referenced)
+        except ProjectIndexError as error:
+            failures.append((index, error))
+            results.append(
+                WriteResultItem(
+                    index=index, id=item.id, status="failed", errors=_prefixed(index, error)
+                )
+            )
+            continue
+        for referrer in referrers:
+            unlink_plan.setdefault(referrer.id, set()).add(item.id)
+        accepted.append(document)
+        results.append(WriteResultItem(index=index, id=item.id, status="deleted"))
+    if failures and request.atomic:
+        raise failures[0][1]
+    _apply_unlinks(session, checker, unlink_plan)
+    # 参照を外した文書と、外した後のバージョン
+    unlinked = [(referrer_id, session.docs[referrer_id].version) for referrer_id in unlink_plan]
+    return _Deleted(results=results, accepted=accepted, unlinked=unlinked, unlink_plan=unlink_plan)
+
+
+# 呼び出しが期限を渡さないとき（文書の MCP の外からの呼び出し）の書き込みの期限と応答の上限の既定値
+DEFAULT_WRITE_DEADLINE_SEC = 32
+DEFAULT_RESPOND_BY_SEC = 48
+
+
+def _default_limits() -> CallLimits:
+    """直コミットの期限を、既定値で今から数える。"""
+    started = time.monotonic()
+    return CallLimits(
+        write_deadline=Deadline(limit_sec=DEFAULT_WRITE_DEADLINE_SEC, started=started),
+        respond_by=Deadline(limit_sec=DEFAULT_RESPOND_BY_SEC, started=started),
+    )
+
+
+def _git_common_dir(worktree: Path) -> Path:
+    """ワークツリーのリポジトリ（`--git-common-dir` の絶対パス）を返す。"""
+    output = run_git(["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=worktree)
+    text = output if isinstance(output, str) else output.decode("utf-8")
+    return Path(text.strip())
+
+
+def _worktree_branch(worktree: Path) -> str | None:
+    """ワークツリーの HEAD が指すブランチを返す（切り離した HEAD は `None`）。"""
+    try:
+        output = run_git(["symbolic-ref", "--quiet", "--short", "HEAD"], cwd=worktree)
+    except GitError:
+        return None
+    text = output if isinstance(output, str) else output.decode("utf-8")
+    return text.strip() or None
+
+
+def _commit_branch_lock(
+    repo_locks: RepositoryLocks, target: Target, limits: CallLimits | None
+) -> contextlib.AbstractContextManager[None]:
+    """コミットするブランチのワークツリーへ書くときだけ、リポジトリの排他を返す。"""
+    settings = target.source.config.direct_commit
+    if settings is None or target.worktree is None:
+        return contextlib.nullcontext()
+    branch = _worktree_branch(target.worktree)
+    # コミットするブランチ・上書きできるブランチを指すワークツリーでなければ握らない
+    if branch is None or not (
+        branch == settings.branch
+        or any(fnmatch.fnmatchcase(branch, pattern) for pattern in settings.branches)
+    ):
+        return contextlib.nullcontext()
+    timeout = None if limits is None else limits.write_deadline.remaining()
+    return repo_locks.hold(_git_common_dir(target.worktree), timeout=timeout)
+
+
+def _commit_target(
+    registry: SourceRegistry,
+    source_id: str | None,
+    cwd: str | None,
+    commit: CommitSpec,
+) -> tuple[ServedSource, CommitPlan, frozenset[str]]:
+    """直コミットの配信元・計画と、作業場所から直コミットできる種類を決める。"""
+    path = normalize_path(cwd) if cwd else None
+    if source_id is None:
+        current = current_source(registry.served(), path)
+        if current is None:
+            raise DirectCommitNotPermittedError(
+                message=f"この作業場所（{cwd}）に作業中の配信元がありません",
+                next_steps=["source に直コミットする配信元を指定してください"],
+            )
+        source = current[0]
+    else:
+        source = registry.get_for_docs(source_id)
+    # 直コミットの設定とブランチ・ワークツリーを先に確かめる（通信しない）
+    plan = resolve_commit_plan(source, commit)
+    committable = committable_kinds(source, path)
+    # どの種類も直コミットできない作業場所は、取得・取り込みの前に断る
+    if not committable:
+        kinds = list(source.config.direct_commit.kinds) if source.config.direct_commit else []
+        raise DirectCommitNotPermittedError(
+            message=(
+                f"今の作業場所（{cwd}）から {source.id} の直コミットはできません"
+                f"（種類: {', '.join(kinds)}）"
+            ),
+            source_id=source.id,
+            kinds=kinds,
+            next_steps=["端末の設定の sources[].direct_commit の呼べる作業場所を確認してください"],
+        )
+    return source, plan, committable
+
+
+def _commit_write_target(source: ServedSource, plan: CommitPlan) -> Target:
+    """取り込んだ後のコミットするブランチのワークツリーの設定で、書く場所を作る（scope.write は確かめない）。"""
+    reloaded = access_service.load_source_at(source, plan.worktree)
+    return Target(reloaded, base_of(reloaded, plan.worktree), None, plan.worktree, "commit")
+
+
+def _check_commit_content(
+    source: ServedSource,
+    committable: frozenset[str],
+    changed: list[tuple[int, str, str]],
+    before: Mapping[str, Document],
+    after: Mapping[str, Document],
+) -> None:
+    """書き換わる文書の種類が直コミットを許すか、秘密の値の書式に該当する値が無いかを確かめる。"""
+    settings = source.config.direct_commit
+    allowed: set[str] = set(settings.kinds) if settings is not None else set()
+    # 許可する種類のうち、この作業場所から呼べない種類
+    blocked = sorted(
+        {kind for _, _, kind in changed if kind in allowed and kind not in committable}
+    )
+    if blocked:
+        raise DirectCommitNotPermittedError(
+            message=f"{source.id} の {', '.join(blocked)} はこの作業場所から直コミットできません",
+            source_id=source.id,
+            kinds=blocked,
+            next_steps=["端末の設定の sources[].direct_commit の呼べる作業場所を確認してください"],
+        )
+    violations: list[Violation] = []
+    for index, doc_id, kind in changed:
+        # 直コミットを許可していない種類
+        if kind not in allowed:
+            violations.append(
+                Violation(
+                    path="kind",
+                    rule=f"{kind} は直コミットを許可していない種類です",
+                    fix="作業 PR で書き込むか、配信元の設定の direct_commit.kinds を確認してください",
+                    index=index,
+                    doc=doc_id,
+                )
+            )
+        violations.extend(_secret_violations(index, doc_id, before, after))
+    if violations:
+        raise ValidationFailedError(
+            message=f"直コミットできない変更があります: {len(violations)} 件",
+            violations=violations,
+            next_steps=["違反を修正してから再実行してください"],
+        )
+
+
+def _secret_violations(
+    index: int, doc_id: str, before: Mapping[str, Document], after: Mapping[str, Document]
+) -> list[Violation]:
+    """書き換わった文書の値と本文の追加の行から、秘密の値の書式に該当する箇所を違反にする。"""
+    new = after.get(doc_id)
+    # 消す文書は値を書き込まないので照合しない
+    if new is None:
+        return []
+    old = before.get(doc_id)
+    findings = secret_findings(
+        old.data if old is not None else None,
+        new.data,
+        body_before=old.body if old is not None and old.body_path else None,
+        body_after=new.body if new.body_path else None,
+    )
+    return [
+        Violation(
+            path=finding.path,
+            rule=f"秘密の値（{finding.kind}）を含む",
+            fix="値を取り除いてから再実行してください",
+            index=index,
+            doc=doc_id,
+        )
+        for finding in findings
+    ]
+
+
+def _written_documents(
+    applied: _Applied, before: Mapping[str, Document]
+) -> tuple[list[tuple[int, str, str]], dict[str, Document]]:
+    """書き換わる文書の（添字・ID・種類）と、改名の前の ID で引いた書き込む前の文書を返す。"""
+    changed = [
+        (item.index, item.id, table.id)
+        for item, table in zip(applied.results, applied.tables, strict=True)
+        if item.id
+    ]
+    renamed = {item.id: item.renamed_from for item in applied.results if item.renamed_from}
+    previous = {
+        doc_id: before[renamed.get(doc_id) or doc_id]
+        for _, doc_id, _ in changed
+        if (renamed.get(doc_id) or doc_id) in before
+    }
+    return changed, previous
+
+
+def _deleted_documents(
+    request: DeleteRequest, deleted: _Deleted, session: _Session
+) -> list[tuple[int, str, str]]:
+    """消す文書と参照を外す文書の（`targets` の添字・ID・種類）を返す。"""
+    index_of = {item.id: index for index, item in enumerate(request.targets)}
+    changed = [(index_of[document.id], document.id, document.kind) for document in deleted.accepted]
+    # 参照を外す文書は、外す原因になった消す文書の添字を付ける
+    changed.extend(
+        (min(index_of[doc_id] for doc_id in removed), referrer_id, session.docs[referrer_id].kind)
+        for referrer_id, removed in deleted.unlink_plan.items()
+    )
+    return changed
+
+
+def _pending_paths(session: _Session, plan: CommitPlan) -> list[str]:
+    """書く予定のファイル（本文のファイル・消すファイルを含む）の、ワークツリーの直下からのパス。"""
+    return [
+        (session.target.base / path).relative_to(plan.worktree).as_posix()
+        for path in [*session.bodies, *session.pending]
+    ]
+
+
+def _run_commit_generators(
+    target: Target,
+    tables: list[DocumentTable],
+    paths: list[Path],
+    timeout_sec: float,
+    limits: CallLimits,
+) -> None:
+    """直コミットの `after_write` の生成を動かし、動かせない・失敗したら送る。"""
+    done: set[str] = set()
+    for table in tables:
+        for generator_id in table.after_write:
+            if generator_id in done:
+                continue
+            done.add(generator_id)
+            # プッシュと戻しの時間を残した、生成に使える時間
+            limit = min(
+                timeout_sec,
+                limits.respond_by.remaining() - DIRECT_COMMIT_PUSH_SEC - DIRECT_COMMIT_MARGIN_SEC,
+            )
+            if limit <= 0:
+                raise DirectCommitGeneratorError(
+                    message=f"書き込み後の生成 {generator_id} を動かす時間が残っていません",
+                    script=generator_id,
+                    reason="時間が残っていない",
+                    next_steps=["生成の所要時間を確認してから再実行してください"],
+                )
+            try:
+                entry = target.source.script("generators", generator_id)
+            except KeyError as error:
+                raise DirectCommitGeneratorError(
+                    message=f"書き込み後の生成 {generator_id} が配信元にありません",
+                    script=generator_id,
+                    reason="生成が配信元に無い",
+                    next_steps=["配信元の設定の generators[] を確認してください"],
+                ) from error
+            script = " ".join(entry.run)
+            try:
+                run_script(
+                    entry.run,
+                    cwd=target.config_base,
+                    args=[str(path) for path in paths],
+                    timeout_sec=limit,
+                )
+            except ScriptError as error:
+                raise DirectCommitGeneratorError(
+                    message=f"書き込み後の生成 {generator_id}（{script}）が失敗しました: {error}",
+                    script=script,
+                    reason=str(error),
+                    next_steps=["生成のスクリプトを確認してから再実行してください"],
+                ) from error
+
+
+def _commit_arguments_error(*, atomic: bool) -> InvalidArgumentError:
+    """`commit` と同時に指定できない引数（`atomic: false`・`worktree`）のエラーを作る。"""
+    # atomic: false のときと worktree を渡したときで、断る理由を分ける
+    rule = (
+        "commit は atomic: true の書き込みだけで使用できます"
+        if not atomic
+        else "commit と worktree は同時に指定できません"
+    )
+    fix = (
+        "atomic を省いてください"
+        if not atomic
+        else "worktree を省いてください（直コミットはコミットするブランチのワークツリーへ書きます）"
+    )
+    return InvalidArgumentError(
+        message=rule, violations=[Violation(path="commit", rule=rule, fix=fix)]
+    )
+
+
+@contextlib.contextmanager
+def _commit_locks(
+    repo_locks: RepositoryLocks,
+    locks: SourceLocks,
+    plan: CommitPlan,
+    limits: CallLimits,
+) -> Generator[None]:
+    """リポジトリの排他、配信元の排他の順に握る。"""
+    with (
+        repo_locks.hold(plan.repo, timeout=limits.write_deadline.remaining()),
+        locks.hold(plan.source_id),
+    ):
+        yield
+
+
+def _write_with_commit(
+    request: WriteRequest,
+    commit: CommitSpec,
+    *,
+    registry: SourceRegistry,
+    store: DocumentStore,
+    checker: DocumentChecker,
+    seen: SeenStore,
+    locks: SourceLocks,
+    repo_locks: RepositoryLocks,
+    timeout_sec: float,
+    now: datetime,
+    limits: CallLimits,
+) -> WriteResult:
+    """`commit` を指定した `write_docs` を、取り込みからプッシュまで進める。"""
+    if not request.atomic or request.worktree is not None:
+        raise _commit_arguments_error(atomic=request.atomic)
+    source, plan, committable = _commit_target(registry, request.source, request.cwd, commit)
+    key = SessionKey.of(request.session_id, request.agent_id)
+    last_reads = seen.last_read(key, source.id)
+
+    def prepare() -> tuple[_Session, _Applied]:
+        # 取り込んだ後の内容と設定で、操作を当てて直コミットの確認まで進める
+        session = _Session(
+            store, _commit_write_target(source, plan), deadline=limits.write_deadline
+        )
+        before = dict(session.docs)
+        applied = _apply_operations(session, checker, request.operations, last_reads, now)
+        if applied.failures:
+            raise _atomic_error(applied.failures)
+        changed, before_by_new = _written_documents(applied, before)
+        _check_commit_content(source, committable, changed, before_by_new, session.docs)
+        return session, applied
+
+    # 試しの書き込み: 取得・コミット・プッシュをせず、確認だけを行う
+    if request.dry_run:
+        with _commit_locks(repo_locks, locks, plan, limits):
+            _, applied = prepare()
+        return WriteResult(applied=False, results=applied.results)
+    done: list[_Applied] = []
+
+    def write_once(dirty: DirtyFiles) -> list[Path]:
+        session, applied = prepare()
+        check_clean(dirty, _pending_paths(session, plan))
+        _check_before_write(limits)
+        touched = session.write_pending()
+        _run_commit_generators(
+            session.target, _unique(applied.tables), touched, timeout_sec, limits
+        )
+        done[:] = [applied]
+        return touched
+
+    with _commit_locks(repo_locks, locks, plan, limits):
+        result = run_direct_commit(plan, write_once, limits=limits)
+    applied = done[0]
+    seen.record_activity(key, source.id, [i for i in applied.ids if i], "edited")
+    return WriteResult(applied=True, results=applied.results, commit=result)
+
+
+def _delete_with_commit(
+    request: DeleteRequest,
+    commit: CommitSpec,
+    *,
+    registry: SourceRegistry,
+    store: DocumentStore,
+    checker: DocumentChecker,
+    locks: SourceLocks,
+    repo_locks: RepositoryLocks,
+    timeout_sec: float,
+    limits: CallLimits,
+) -> DeleteResult:
+    """`commit` を指定した `delete_docs` を、取り込みからプッシュまで進める。"""
+    if not request.atomic or request.worktree is not None:
+        raise _commit_arguments_error(atomic=request.atomic)
+    source, plan, committable = _commit_target(registry, request.source, request.cwd, commit)
+
+    def prepare() -> tuple[_Session, _Deleted]:
+        # 取り込んだ後の内容と設定で、消す文書と参照を外す文書を決めて直コミットの確認まで進める
+        session = _Session(
+            store, _commit_write_target(source, plan), deadline=limits.write_deadline
+        )
+        before = dict(session.docs)
+        deleted = _apply_deletes(session, checker, request)
+        changed = _deleted_documents(request, deleted, session)
+        _check_commit_content(source, committable, changed, before, session.docs)
+        _remove_documents(session, deleted.accepted)
+        return session, deleted
+
+    if request.dry_run:
+        with _commit_locks(repo_locks, locks, plan, limits):
+            _, deleted = prepare()
+        return DeleteResult(applied=False, results=deleted.results, unlinked=deleted.unlinked)
+    done: list[_Deleted] = []
+
+    def write_once(dirty: DirtyFiles) -> list[Path]:
+        session, deleted = prepare()
+        check_clean(dirty, _pending_paths(session, plan))
+        _check_before_write(limits)
+        touched = session.write_pending()
+        tables = _unique([session.target.source.table(d.kind) for d in deleted.accepted])
+        _run_commit_generators(session.target, tables, touched, timeout_sec, limits)
+        done[:] = [deleted]
+        return touched
+
+    with _commit_locks(repo_locks, locks, plan, limits):
+        result = run_direct_commit(plan, write_once, limits=limits)
+    deleted = done[0]
+    return DeleteResult(
+        applied=True, results=deleted.results, unlinked=deleted.unlinked, commit=result
+    )

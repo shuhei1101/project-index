@@ -1,0 +1,159 @@
+id: MOD-179
+title: 索引のサーバー / 書き込み / secrets.py
+lead: 直コミットで書き込む値の秘密の値の照合を受け持ち、書き込みの secrets.py を修正するときに参照する。
+visibility: internal
+test_files:
+  - tests/unit/project_index/features/write/test_secrets.py
+diagrams:
+  - name: 全体
+    diagram: |-
+      <!-- map -->
+
+      ```mermaid
+      flowchart LR
+        W[文書の書き込み・文書の削除] -.-> V[秘密の値の検出]
+        V -.-> S[文字列の照合]
+      ```
+
+      <!-- /map -->
+constants:
+  - name: SECRET_RULES
+    title: 秘密の値の規則
+    container: project_index/features/write/secrets.py
+    usecase: 直コミット
+    summary: 種類の ID → 照合する正規表現（コンパイル済み）
+    entries:
+      - key: github-token
+        value: '`(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{82}`'
+      - key: aws-access-key
+        value: '`\b(?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z2-7]{16}\b`'
+      - key: slack-token
+        value: '`xox[baprs]-[0-9A-Za-z-]{10,}|https://hooks\.slack\.com/services/[A-Za-z0-9+/]{43,}`'
+      - key: openai-api-key
+        value: '`sk-(?:proj|svcacct|admin)-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20}`'
+      - key: anthropic-api-key
+        value: '`sk-ant-(?:api03|admin01)-[A-Za-z0-9_-]{93}AA`'
+      - key: private-key
+        value: '`-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----`'
+      - key: email-address
+        value: '`(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}`'
+    notes:
+      導き方: gitleaks の既定の規則集（MIT）から移し、`private-key` は見出しだけにし、`email-address` を追加した。ファイルの冒頭に gitleaks の著作権表示と MIT の許諾表示を残す。量指定子を入れ子にしない。`email-address` はローカル部の途中から照合し直さないよう、ローカル部の文字が前に無い位置からだけ始める（英数字が続く長い入力で二乗の時間にならない）
+data_models:
+  - name: SecretFinding
+    title: 秘密の値の検出
+    container: project_index/features/write/secrets.py
+    usecase: 直コミット
+    role: 値オブジェクト
+    summary: 検出した項目のパスと種類（値は持たない）
+    properties:
+      - name: path
+        title: 項目のパス
+        type: str
+        description: 文書の項目のパス（本文のファイルは `@body`）
+      - name: kind
+        title: 種類
+        type: str
+        description: '`SECRET_RULES` のキー'
+functions:
+  - name: scan_text
+    title: 文字列の照合
+    kind: 関数
+    container: project_index/features/write/secrets.py
+    usecase: 直コミット
+    role: 判定
+    summary: 文字列を規則ごとに照合し、該当した種類を返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: text
+        title: 文字列
+        type: str
+        required: true
+        passing: positional
+        description: 照合する文字列
+    returns:
+      type: list[str]
+      description: 該当した種類の ID（`SECRET_RULES` の並び・重なりなし）
+    process: 1. `SECRET_RULES` の規則ごとに `search` し、該当した種類を集めて返す
+    unit_tests:
+      - name: test_scan_text
+        case: 正常
+        summary: 種類ごとに該当する
+        condition: 規則ごとにテストの中で組み立てた値（`parametrize`）
+        mock: なし
+        expected: その種類だけを返す
+      - name: test_scan_text_when_not_secret
+        case: 正常
+        summary: 該当しない
+        condition: SHA・パス・URL・`ghp_` で始まる短い語
+        mock: なし
+        expected: 空
+      - name: test_scan_text_when_long_input
+        case: 正常
+        summary: 長い入力でも期限の内に終わる
+        condition: 規則ごとに、該当しない 1 MB の入力（英数字の連続・`@` と `.` の繰り返し・`-----BEGIN` の繰り返し）
+        mock: なし
+        expected: 書き込みの期限（NFR-11）の 10% 以内に終わる
+  - name: secret_findings
+    title: 秘密の値の検出
+    kind: 関数
+    container: project_index/features/write/secrets.py
+    usecase: 直コミット
+    role: 判定
+    summary: 書き込む前後の文書の値を比べ、変わった値と本文のファイルの追加の行だけを照合する
+    scope: public
+    thread_safe: true
+    args:
+      - name: before
+        title: 書き込む前
+        type: Mapping[str, Any] | None
+        required: true
+        passing: positional
+        description: 書き込む前の文書の値（`create` は `None`）
+      - name: after
+        title: 書き込んだ後
+        type: Mapping[str, Any]
+        required: true
+        passing: positional
+        description: 書き込んだ後の文書の値
+      - name: body_before
+        title: 本文の前
+        type: str | None
+        required: false
+        default: None
+        passing: keyword
+        description: 本文のファイルの書き込む前の内容
+      - name: body_after
+        title: 本文の後
+        type: str | None
+        required: false
+        default: None
+        passing: keyword
+        description: 本文のファイルの書き込んだ後の内容
+    returns:
+      type: list[SecretFinding]
+      description: 検出（値を含まない）
+    process: |-
+      1. `after` の文字列の葉を、配列は添字でつないだ項目のパスと値の組でたどる
+      2. `before` の同じパスの値と違う葉だけ `scan_text` で照合する
+      3. 本文のファイルは、`difflib` で `body_before` に無い行だけを照合し、パスを `@body` にする
+      4. パスと種類の組を重なりなく返す
+    unit_tests:
+      - name: test_secret_findings
+        case: 正常
+        summary: 変えた項目だけ
+        condition: '`before` の `notes` に既にメールアドレス、`after` で `description` に GitHub のトークンを追加する'
+        mock: なし
+        expected: '`description`・`github-token` の 1 件だけ。結果に値の文字列が無い'
+      - name: test_secret_findings_when_body
+        case: 正常
+        summary: 本文の追加の行
+        condition: 本文のファイルに秘密鍵の見出しの行を追加する
+        mock: なし
+        expected: '`@body`・`private-key`'
+tags:
+  - name: topic:直コミット
+  - name: topic:秘密
+    main: true
+  - name: action:検査

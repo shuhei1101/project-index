@@ -235,6 +235,12 @@ functions:
         default: None
         passing: keyword
         description: 文書の MCP が要求ごとに作る期限。`None` は期限を持たない
+      - name: repo_locks
+        title: リポジトリごとの排他
+        type: RepositoryLocks
+        required: true
+        passing: keyword
+        description: 直コミットと、コミットするブランチのワークツリーへの書き込みで握る
     returns:
       type: WriteResult
       description: 書き込みの結果
@@ -264,6 +270,21 @@ functions:
       11. 書いた種類の `after_write` の生成を、ID の重なりを除いて順にスクリプトの実行（`cwd=target.config_base`（設定ファイルのフォルダ）・引数に書いたファイルのパス・制限時間・`at`）で動かす。制限時間は、`limits` があれば `limits.respond_by` の『期限』.制限時間の切り詰めに `timeout_sec` を渡した値、無ければ `timeout_sec`。制限時間が 0 の生成は動かさず `[warning]` 応答の上限までの時間が無いため書き込み後の生成を実行しなかった（配信元・生成の ID）を書き、結果は変えない。`at` は、`target.worktree` が `None` で `source.config_commit` がある場合に（`source.main_root`, `source.config_commit`）。`ScriptError` は `[warning]` 書き込み後の生成に失敗した（配信元・生成の ID・理由）を書き、結果は変えない
       12. 会話の記録に書いた文書を `edited` で残す
       13. `applied=True` で返す
+
+      `request.commit` がある場合は、手順 2〜13 の代わりに次のように進める（直コミット）。
+
+      1. `atomic` が `False` か `worktree` がある場合、添字を持たない違反で `InvalidArgumentError` を送信する
+      2. 配信元を引き（`source` が `None` なら作業中の配信元）、直コミットの書き込む先で計画を作る。続けて `committable_kinds` が空なら、取得の前に許可する種類を添えた `DirectCommitNotPermittedError` を送信する。書く場所は、`write_once` のたびに取り込んだ後の計画のワークツリーの設定で作る（作業場所の配信元の読み込み。`scope.write` を確認しない）
+      3. `dry_run` なら、排他を握って手順 4・5 と下の「直コミットの確認」だけを行い、`applied=False` で返す（取得・コミット・プッシュをしない）
+      4. リポジトリごとの排他.握る（`timeout` は書き込みの期限までの残り）、配信元ごとの排他.握るの順に握り、直コミットを進めるを呼ぶ。`write_once` は次を行う
+         - 手順 4・5・6・7 を行う
+         - 直コミットの確認: 変更を当てた後に書き換わる文書の種類を集め、`committable_kinds` に無い種類が `direct_commit.kinds` にあれば `DirectCommitNotPermittedError` を送信する。`direct_commit.kinds` に無い種類の文書と、`secret_findings`（書き換わる文書ごとに前後の `data` と本文）の検出は、添字と文書の ID を付けた違反にして `ValidationFailedError` を送信する
+         - 書き込むファイル（新しい本文と変わったファイル）を `check_clean` にかけ、手順 9・10 を行う
+         - 手順 11 の生成を、制限時間を `limits.respond_by` の残り − `DIRECT_COMMIT_PUSH_SEC` − `DIRECT_COMMIT_MARGIN_SEC` と `timeout_sec` の短い方にして動かす。制限時間が 0 以下・`ScriptError`・生成が配信元に無い場合は、`[warning]` を書かずに `DirectCommitGeneratorError` を送信する
+         - 書いたファイルを返す
+      5. 会話の記録に書いた文書を `edited` で残し、`applied=True` と `commit` で返す
+
+      `request.commit` が無く、書く場所のワークツリーが指すブランチが `direct_commit.branch` か `direct_commit.branches` に該当する場合は、手順 3 の前にリポジトリごとの排他.握るを呼ぶ
     exceptions:
       - name: InvalidArgumentError
         condition: 件数・必須のキー・`text_edits` の一致・共通のキーと列名の重なり
@@ -485,6 +506,47 @@ functions:
         condition: '同じ行で、n1 への `data: {id: n1}` の `replace`・`unset: [meta.path]`、n3 への `set: {@body: x}` を 1 件ずつ'
         mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: 3 件とも `InvalidArgumentError` で、違反の `path` が `data.meta.path`・`unset.meta.path`・`set.meta.path`。管理用の YAML は変わらない
+      - name: test_write_docs_when_direct_commit_checks
+        case: 異常
+        summary: 直コミットの確認で断る
+        condition: '`commit` つきで、1 回目は許可していない種類の `create`、2 回目は GitHub のトークンを含む `create`、3 回目は `committable_kinds` に無い種類。`run_direct_commit` は実際に呼ぶ'
+        mock: なし（一時フォルダのベアリポジトリ）
+        expected: 1・2 回目は添字 0 の違反の `ValidationFailedError`（2 回目は値を含まない）、3 回目は `DirectCommitNotPermittedError`。ワークツリーとベアリポジトリは変わらない
+        exception: 直コミットの確認に合格しない
+      - name: test_write_docs_when_direct_commit_generator_failed
+        case: 異常
+        summary: 生成の失敗
+        condition: '`commit` つきで、生成が終了コード 1 で終わる'
+        mock: なし
+        expected: '`DirectCommitGeneratorError`。書いたファイルが戻り、コミットが増えない'
+        exception: 生成が失敗する
+      - name: test_write_docs_when_direct_commit_invalid_arguments
+        case: 異常
+        summary: 引数の組み合わせ
+        condition: '`commit` と `atomic: false`、`commit` と `worktree`'
+        mock: なし
+        expected: どちらも `InvalidArgumentError`
+        exception: '`commit` と `atomic: false` か `worktree` を同時に渡した'
+      - name: test_write_docs_when_direct_commit_not_permitted_workplace
+        case: 異常
+        summary: 直コミットを呼べない作業場所は取得の前に断る
+        condition: ベアリポジトリのコミットするブランチを 1 コミット先に進め、`direct_commit_scope` に該当しない作業場所から `commit` つきの `create`
+        mock: なし（一時フォルダのベアリポジトリ）
+        expected: '`DirectCommitNotPermittedError`。クローンの追跡ブランチとワークツリーの HEAD が変わらない（取得していない）'
+        exception: 直コミットを呼べない作業場所
+      - name: test_write_docs_when_commit_branch_worktree
+        case: 異常
+        summary: コミットするブランチのワークツリーへの書き込みはリポジトリの排他を待つ
+        condition: リポジトリの排他を握ったまま、コミットするブランチのワークツリーへ `commit` を省いて書き込む（書き込みの期限を短くする）
+        mock: なし
+        expected: '`WriteDeadlineExceededError`。ファイルは変わらない'
+        exception: 待ち時間の上限までに排他を握れない
+      - name: test_write_docs_when_other_worktree
+        case: 正常
+        summary: 別のワークツリーへの書き込みは待たない
+        condition: リポジトリの排他を握ったまま、コミットするブランチでないワークツリーへ `commit` を省いて書き込む
+        mock: なし
+        expected: '待たずに書き込み、`applied: true`'
   - name: delete_docs
     title: 文書の削除
     kind: 関数
@@ -539,6 +601,12 @@ functions:
         default: None
         passing: keyword
         description: 文書の書き込みと同じ
+      - name: repo_locks
+        title: リポジトリごとの排他
+        type: RepositoryLocks
+        required: true
+        passing: keyword
+        description: 文書の書き込みと同じ
     returns:
       type: DeleteResult
       description: 削除の結果
@@ -557,6 +625,8 @@ functions:
       8. ファイル 1 つの文書はファイルを消し、`records` の文書は配列から要素を除いて、往復編集の書き出し（`original` はそのファイルの作業ツリーの文字列）でファイルを置き換える。`body_file` の行の文書は本文のファイルも消す（本文のファイルを持たない要素は要素だけを除く）。要素を除いた後の同じ管理用の YAML の要素が同じ本文のファイルを指すときと、本文のファイルが無いときは消さない。参照を外した文書を、往復編集の書き出し（`original` は参照元のファイルの作業ツリーの文字列）で書き、文書のストア.キャッシュを捨てる
       9. 消した種類の `after_write` の生成を、文書の書き込みと同じに動かす（引数は消したファイルのパス。制限時間も同じ）
       10. `applied=True` で、`unlinked` に参照を外した文書と新しいバージョンを入れて返す
+
+      `request.commit` がある場合は、文書の書き込みの直コミットと同じに進める（書き換わる文書は消す文書と参照を外す文書。`write_once` は手順 3〜5・7〜9 を行い、消すファイルも `check_clean` にかける）。`commit` が無くコミットするブランチのワークツリーへ書く場合の排他も同じ
     exceptions:
       - name: DocumentReferencedError
         condition: '`on_referenced: fail` で参照されている'

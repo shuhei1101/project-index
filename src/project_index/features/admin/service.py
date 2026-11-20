@@ -55,7 +55,11 @@ from project_index.features.settings.query import (
     load_terminal_config,
 )
 from project_index.features.sources.schema_ref import SchemaRefLookup, terminal_lookup
-from project_index.features.sources.service import assemble_source
+from project_index.features.sources.service import (
+    assemble_source,
+    direct_commit_checks,
+    source_worktree_branches,
+)
 from project_index.features.sources.types import SOURCE_CONFIG_VERSION, ServedSource
 from project_index.shared.errors import (
     ConfigNotFoundError,
@@ -287,6 +291,14 @@ def _registered_id(handlers: Handlers, root: Path) -> str | None:
     return None
 
 
+def _terminal_direct_commit_kinds(handlers: Handlers, root: Path) -> list[str]:
+    """端末の設定の同じ配信元の行の `sources[].direct_commit.kinds` のキーを返す。"""
+    for entry in handlers.terminal.sources:
+        if normalize_path(entry.config[0]).parent == root:
+            return list(entry.direct_commit.kinds)
+    return []
+
+
 def check_project(request: CheckProjectRequest, *, handlers: Handlers) -> CheckProjectResult:
     """端末の設定に無い配信元も含め、設定・スクリプト・索引の同期を検査する。"""
     candidate = _load_candidate(
@@ -340,12 +352,18 @@ def check_project(request: CheckProjectRequest, *, handlers: Handlers) -> CheckP
     )
     items = [SyncItem(kind=kind, path=path) for kind, paths in entries for path in paths]  # type: ignore[arg-type]
     counts = SyncCounts.of(report)
+    # 直コミットの設定の、直コミットだけを断る違反と警告
+    commit_violations, commit_warnings = direct_commit_checks(
+        source.config,
+        worktree_branches=source_worktree_branches(source),
+        terminal_kinds=_terminal_direct_commit_kinds(handlers, candidate.root),
+    )
     return CheckProjectResult(
         path=result.path,
         registered_id=registered_id,
         config_version=candidate.config_version,
         version_state=state,
-        violations=list(report.alias_violations),
+        violations=[*report.alias_violations, *commit_violations],
         missing_paths=missing_paths,
         script_errors=[],
         sync=CheckSync(
@@ -357,7 +375,7 @@ def check_project(request: CheckProjectRequest, *, handlers: Handlers) -> CheckP
             duplicate_ids=counts.duplicate_ids,
             items=items[:SYNC_ITEMS_LIMIT],
         ),
-        warnings=nav_warnings(handlers.store, source),
+        warnings=[*nav_warnings(handlers.store, source), *commit_warnings],
         alias_schema_version=alias_schema_version(),
     )
 

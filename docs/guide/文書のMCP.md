@@ -264,6 +264,7 @@ YAML として読めないファイルがあっても、そのファイルを除
 | `operations` | list[Operation] | 必須 | 並べた順に当てる操作。1 回に 50 件まで |
 | `atomic` | bool | `true` | `true` は 1 件でも失敗したら何も書かない。`false` は成功分を書き、失敗分を添字付きで返す |
 | `dry_run` | bool | `false` | 本番と同じ検証・バージョンの確認・差分を返し、書き込まない |
+| `commit` | {`message`, `branch`} | なし | 書き込みの後にコミットしてプッシュする（「直コミット」）。`atomic: true` のときだけ指定でき、`worktree` と同時には指定できない |
 
 <!-- table: {"kind": "data"} -->
 
@@ -382,6 +383,37 @@ mdmark の CLI が `PATH` に無いか、点検が端末の設定の `script_tim
 - 辞書のキー・文字列でない値・種類の行の ID の列と `body_file` の列・拡張子が `.md` でない本文のファイルは置換しません
 - 置換した文書が 1 件でも検査に合格しなければ、その操作では文書を 1 件も書き込みません（`atomic: false` でも同じ）
 
+### 直コミット
+
+`commit` を指定すると、書き込みの後に、コミットするブランチのワークツリーでコミットしてリモート（`origin`）へプッシュします。
+使用できる配信元・種類・作業場所は [配信元と権限](./コアコンセプト-配信元と権限.md) の「直コミット」のとおりです。
+
+| `commit` のキー | 必須 | 説明 |
+| --- | --- | --- |
+| `message` | ✓ | コミットの説明。空白だけにはできない |
+| `branch` | - | コミットするブランチ。省略すると配信元の設定の `direct_commit.branch`。`direct_commit.branches[]` に該当するブランチだけを指定できる |
+
+```json
+{"operations": [{"op": "create", "kind": "note", "data": {"...": "..."}}], "commit": {"message": "docs: note を追加する"}}
+```
+
+1 回の呼び出しは、リポジトリごとの排他の中で次の順に進みます。
+
+1. リモートのブランチを取得し、早送りで取り込む
+2. ワークツリーにプッシュしていないコミットが無いこと、書き込むファイルにコミットしていない変更が無いことを確認する
+3. 今の書き込みと同じ検査に加えて、書き換わる文書の種類が全て直コミットを許可した種類であること、書き込む値に秘密の値が無いことを確認する
+4. ファイルを書き込み、`generators[]` を実行する
+5. 書き込んだファイルと、配信元のフォルダの配下の生成物だけをコミットする（ワークツリーにある他の変更はそのまま残す）
+6. プッシュする
+
+- プッシュが断られたら、コミットと書き込んだファイルを戻して取得から 1 回だけやり直します。2 回目も断られたら戻して `PushRejectedError` です
+- 通信の失敗などで終わったプッシュは、リモートを取得し直して届いたかを照合し、届いていれば成功として扱います。届いていなければ戻して `PushFailedError` で、照合もできないときは結果が不明であることとコミットの SHA を添えます
+- 生成が失敗したときは、コミットせずに戻して `DirectCommitGeneratorError` です
+- 秘密の値は、GitHub・AWS・Slack・OpenAI・Anthropic のトークン、秘密鍵の見出し、メールアドレスの書式で照合します。見つかると `ValidationFailedError` で、項目のパスと種類だけを返却し、値は返却しません
+- `dry_run: true` と同時に指定すると、取得・コミット・プッシュをせず、検査の結果と差分だけを返却します
+
+レスポンスには `commit`（`sha`・`branch`・`retried`（プッシュをやり直したか））が加わります。
+
 ## delete_docs
 
 文書を配列で受けて物理削除します。
@@ -392,6 +424,7 @@ Git の配信元で消した文書は Git で戻せます。
 | `targets` | list[{`id`, `expected_version`}] | 必須 | 消す文書と読んだときのバージョン。1 回に 50 件まで |
 | `on_referenced` | `fail` / `unlink` | `fail` | 他の文書の `related` から参照されているとき。`unlink` は参照も外して消す |
 | `atomic`・`dry_run` | bool | `true`・`false` | `write_docs` と同じ |
+| `commit` | {`message`, `branch`} | なし | `write_docs` と同じ。削除したファイル・参照を外した文書・生成物だけをコミットする |
 
 レスポンスは `applied` と `results[]`（`status` は `deleted`・`failed`）、`on_referenced: unlink` のときの `unlinked[]`（参照を外した文書の `id`・`version`）です。
 Git 管理外の配信元と `storage.type: disk` の配信元では、種類の `documents[].writable` が削除を許していることが要ります。
@@ -403,9 +436,9 @@ Git 管理外の配信元と `storage.type: disk` の配信元では、種類の
 
 | 引数 | 返すもの |
 | --- | --- |
-| なし | 今の作業場所から使える配信元の一覧（`id`・権限 `read` / `write`・作業中か・`description`・`when`）と、作業場所、使える配信元の警告（`warnings[]`） |
+| なし | 今の作業場所から使える配信元の一覧（`id`・権限 `read` / `write` / `commit`・作業中か・`description`・`when`・直コミットできる種類 `direct_commit_kinds[]`）と、作業場所、使える配信元の警告（`warnings[]`）。`commit` は直コミットだけを呼べる作業場所 |
 | `outside_scope: true`（`source` なし） | 引数なしと同じ一覧に加えて、作業範囲の外（参考）で参照できる配信元（`scope` に当たらず `sources[].outside_read` が真）の一覧（`outside_sources[]` の `id`・`description`・`when`） |
-| `source` | その配信元の使う場面（`when`）・説明書（`instructions`）と種類（`kinds[]`）の一覧。Git の配信元（`storage.type: disk` を除く）は、ブランチ・タグ（`refs.branches[]`・`refs.tags[]`）と、`worktrees` に当たるワークツリー（`worktrees[]` の `path`・`branch`）の一覧も返す |
+| `source` | その配信元の使う場面（`when`）・説明書（`instructions`）と種類（`kinds[]`）の一覧。Git の配信元（`storage.type: disk` を除く）は、ブランチ・タグ（`refs.branches[]`・`refs.tags[]`）と、`worktrees` に当たるワークツリー（`worktrees[]` の `path`・`branch`）の一覧も返す。今の作業場所から直コミットできる種類があれば、`direct_commit`（`branch`・`branches[]`・`kinds[]`）も返す |
 | `source`・`kind` | その種類の共通のキーと列名の対応（`metadata`）と、スキーマ（YAML のまま） |
 
 `when` は、`markdown` では一覧の表の `when` 列（行を `<br>` でつなぐ）と、説明書の前の「使う場面:」の箇条書きで出し、`json` では記載の無い配信元のキーを持ちません。
@@ -533,6 +566,16 @@ Git 管理外の配信元と `storage.type: disk` の配信元では、種類の
 | LastReadNotFoundError | `list_changes` の `from` を省いたが、この会話で本文を読んだ記録が無い | `from` を渡すこと |
 | WriteDeadlineExceededError | `write_docs`・`delete_docs` で、ファイルを書き換える前に端末の設定の `write_deadline_sec` を過ぎた | 書き込みの期限・経過した秒数・ファイルを書き換えていないことと、検査のスクリプトの所要時間を確かめてから再実行すること |
 | WorktreeLoadingError | `search_docs`・`write_docs`・`delete_docs` が指すワークツリーの初めての読み込みが、端末の設定の `worktree_load_wait_sec` までに終わらない。読み込みは止めずに続ける | ワークツリーのパスと、時間を空けて同じ呼び出しを再実行すること |
+| DirectCommitNotConfiguredError | `commit` を指定したが、配信元に直コミットの設定が無い・`storage.type: disk`・許可する種類が `documents[]` に無い | 配信元の ID と理由 |
+| DirectCommitNotPermittedError | `commit` を指定したが、`cwd` が書き換わる文書の種類の直コミットを呼べる作業場所に該当しない | 該当しなかった種類 |
+| BranchNotAllowedError | `commit.branch` が `direct_commit.branch` でも `direct_commit.branches[]` でもない | 上書きできるブランチの一覧 |
+| CommitWorktreeNotFoundError | コミットするブランチを指すワークツリーが `worktrees` に無い | ブランチ名 |
+| UnpushedCommitsError | コミットするブランチのワークツリーにプッシュしていないコミットがあるか、早送りで取り込めない | ワークツリーのパスと先行・遅延のコミット数 |
+| UncommittedChangesError | 書き込むファイル・生成物にコミットしていない変更があるか、コミットしていない変更が早送りで取り込む変更と重なる | 変更のあるファイルのパス |
+| FetchFailedError | リモートから取得できない | git の標準エラーの末尾 |
+| PushRejectedError | やり直した後のプッシュもリモートに断られた | リモートが返した理由 |
+| PushFailedError | 通信の失敗などでプッシュが届かない、届いたかを照合できない、またはプッシュの時間が残っていない | git の標準エラーの末尾と、照合できないときは結果が不明であることとコミットの SHA |
+| DirectCommitGeneratorError | `commit` を指定した書き込みで `generators[]` が失敗した | スクリプトのパスと理由 |
 | UnexpectedError | どのツールでも、上のエラーでない例外（`GitError` など）で処理を終えられない | `UnexpectedError: {例外の型}: {内容}` |
 
 <!-- /table -->

@@ -147,7 +147,8 @@ functions:
     process: |-
       1. `cwd` が `None` の場合、`None` を返す
       2. `cwd` が配信元のワークツリーの中なら（ワークツリーの解決）、照らすパスを `config_root`（設定ファイルのフォルダ）に置き換える
-      3. `scope_write` のどれかに当たれば `write`、`scope_read` のどれかに当たれば `read`、どちらにも当たらなければ `None` を返す（globの照合）
+      3. `scope_write` のどれかに当たれば `write`、`scope_read` のどれかに当たれば `read` を返す（globの照合）
+      4. どちらにも当たらず、`committable_kinds` が空でなければ `commit`、空なら `None` を返す
     unit_tests:
       - name: test_access_of_when_write
         case: 正常
@@ -173,6 +174,12 @@ functions:
         condition: '`cwd` が `/other`、または `None`'
         mock: なし
         expected: '`None`'
+      - name: test_access_of_when_commit
+        case: 正常
+        summary: 直コミットだけを呼べる
+        condition: '`scope` に当たらず、`direct_commit_scope: [/local]`、`cwd` が `/local`'
+        mock: なし
+        expected: '`commit`'
   - name: current_source
     title: 作業中の配信元
     kind: 関数
@@ -422,6 +429,7 @@ functions:
          - 配信元の `storage` が `disk` で `ref` か `worktree` を渡された場合、`InvalidArgumentError` を送る（`disk` の配信元は `worktree_globs` が空のため、`cwd` がワークツリーの中でも `root` を `ref` なしで読む）
          - `worktree` を渡された場合、そのパスがワークツリーに当たらなければ `WorktreeNotMatchedError` を送る。当たればそのワークツリーを `ref` なしで読む
          - `ref` を渡された場合、Git の管理外の配信元なら `InvalidArgumentError` を送る。そうでなければ `root` をその `ref` で読む
+         - 権限が `commit` の場合、`commit_read_worktree` が返すワークツリーを `ref` なしで読む（この行を他の行より先に当てる）
          - どちらも無く、`cwd` が配信元のワークツリーの中の場合、そのワークツリーを `ref` なしで読む
          - どちらも無く、作業中の配信元か Git の管理外の配信元の場合、`root` を `ref` なしで読む
          - それ以外は `root` を `default_ref` で読む
@@ -726,6 +734,100 @@ functions:
         mock: なし
         expected: '`SourceNotWritableError`'
         exception: '`scope.write` が空'
+  - name: committable_kinds
+    title: 直コミットできる種類
+    kind: 関数
+    container: project_index/features/access/service.py
+    usecase: 直コミット
+    role: 読み取り
+    summary: 作業場所から直コミットできる種類を決める
+    scope: public
+    thread_safe: true
+    args:
+      - name: source
+        title: 配信元
+        type: ServedSource
+        required: true
+        passing: positional
+        description: 照らす配信元
+      - name: cwd
+        title: 作業場所
+        type: Path | None
+        required: true
+        passing: positional
+        description: 正規化した作業場所
+    returns:
+      type: frozenset[str]
+      description: 直コミットできる種類の ID
+    process: |-
+      1. `cwd` が `None`、配信元の `config.direct_commit` が `None`、`direct_commit_problems` が空でない場合、空を返す
+      2. `direct_commit.kinds` の種類ごとに、`direct_commit_kinds` に種類があればその glob、無ければ `direct_commit_scope` に `cwd` が当たるものを集めて返す（globの照合）
+    unit_tests:
+      - name: test_committable_kinds
+        case: 正常
+        summary: 種類ごとの glob が scope に優先する
+        condition: '`kinds: [note, term]`、`direct_commit_scope: [/local]`、`direct_commit_kinds: {term: [/other]}`、`cwd` が `/local`'
+        mock: なし
+        expected: '`{note}`'
+      - name: test_committable_kinds_when_default
+        case: 正常
+        summary: 既定は呼べない
+        condition: '`direct_commit_scope` と `direct_commit_kinds` が空、`cwd` が配信元のフォルダ（`scope_write` に当たる）'
+        mock: なし
+        expected: 空
+  - name: commit_read_worktree
+    title: 直コミットの作業場所から読むワークツリー
+    kind: 関数
+    container: project_index/features/access/service.py
+    usecase: 直コミット
+    role: 判定
+    summary: 権限が `commit` の作業場所から読めるワークツリーを決める
+    scope: public
+    thread_safe: true
+    args:
+      - name: source
+        title: 配信元
+        type: ServedSource
+        required: true
+        passing: positional
+        description: 読む配信元
+      - name: worktree
+        title: ワークツリー
+        type: str | None
+        required: true
+        passing: positional
+        description: '`worktree` の引数'
+      - name: ref
+        title: リビジョン
+        type: str | None
+        required: true
+        passing: positional
+        description: '`ref` の引数'
+    returns:
+      type: Path
+      description: 読むワークツリーの直下
+    process: |-
+      1. `ref` を渡された場合、`SourceNotReadableError` を送信する
+      2. `worktree` を省いた場合、`direct_commit.branch` を指すワークツリーを返す（書き込みの『直コミットの書き込む先』と同じ探し方）。無ければ `SourceNotReadableError` を送信する
+      3. `worktree` を渡された場合、そのワークツリーが指すブランチが `direct_commit.branch` か `direct_commit.branches` に該当すればそのパスを返し、該当しなければ `SourceNotReadableError` を送信する
+    exceptions:
+      - name: SourceNotReadableError
+        condition: '`ref` を渡した・コミットするブランチのワークツリーでない'
+        message: '`{配信元} は今の作業場所からコミットするブランチのワークツリーだけを参照できます`'
+    unit_tests:
+      - name: test_commit_read_worktree
+        case: 正常
+        summary: 既定のブランチのワークツリー
+        condition: '`worktree`・`ref` を省く。`develop` のワークツリーがある'
+        mock: なし（一時フォルダで `git init`）
+        expected: '`develop` のワークツリー'
+      - name: test_commit_read_worktree_when_other
+        case: 異常
+        summary: コミットするブランチでないワークツリー・`ref`
+        condition: '`worktree` にワークツリー x、または `ref: master`'
+        mock: なし
+        expected: どちらも `SourceNotReadableError`
+        exception: '`ref` を渡した・コミットするブランチのワークツリーでない'
 refs:
   - to: IF-2
     type: requires

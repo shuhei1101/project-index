@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 
     import pytest
 
+    from tests.integration.server.conftest import DirectCommitSource
+
 BROKEN_CONFIG = "name: broken\ndocuments:\n  - id: sample\n    schema: schemas/sample.schema.yaml\n"
 INSTRUCTIONS = "この配信元の文書は、まず概要を読んでから個別の文書を開く。"
 OUTSIDE_LINE = "作業範囲の外（参考）"
@@ -577,3 +579,31 @@ def _wait_checked(env: Any) -> None:
             message = "起動の後の裏の検査が上限の時間までに済まなかった"
             raise AssertionError(message)
         time.sleep(0.1)
+
+
+def test_normal_when_direct_commit_workplace(
+    tmp_path: Path,
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+) -> None:
+    """直コミットを呼べる作業場所から説明を読む（正常系）。"""
+    # 準備
+    direct = make_direct_commit_source()
+    env = make_server(direct.spec)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    # 実行
+    listed = env.call("describe", cwd=str(direct.local), format="json")
+    guide = env.call("describe", cwd=str(direct.local), source="sample", format="json")
+    guide_text = env.call("describe", cwd=str(direct.local), source="sample")
+    refused = env.call("describe", cwd=str(elsewhere), source="sample")
+    # 検証
+    row = next(item for item in listed.data["sources"] if item["source_id"] == "sample")
+    assert row["access"] == "commit"
+    assert row["direct_commit_kinds"] == ["note"]
+    assert guide.data["direct_commit"]["branch"] == "develop"
+    assert guide.data["direct_commit"]["kinds"] == ["note"]
+    assert "| note |" in guide_text.text
+    assert "直コミット:" in guide_text.text
+    assert refused.is_error
+    assert "SourceNotReadableError" in refused.text

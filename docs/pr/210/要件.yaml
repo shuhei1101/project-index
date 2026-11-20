@@ -1,0 +1,94 @@
+use_cases:
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: changed
+    detail: 手元のセッションが、データを書き込んだ後にコミットとプッシュまでを 1 回の呼び出しで終え、直後からリモートに残る流れを加える
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: run_only
+    detail: コミットの指定を省いた書き込み・削除の流れは変えないが、同じ書き込みの処理と排他を変えるため E2E の対象にする
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: changed
+    detail: 直コミットの設定が検証に通らないときに、`check_project` が違反と警告で知らせ、配信は続き、直コミットだけが断られる分岐を加える
+    depends_on:
+      - docs/scenario/SC-1.yaml
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: none
+    detail: 変えない。直コミットを許可した種類を `describe` で確認する流れは SC-15 の正常シナリオが持つ
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-15.yaml
+    impact: new
+    detail: 手元のセッションが、配信元のフォルダの外部の作業場所から、直コミットを許可した種類の文書を書き込み・削除し、既定のブランチへコミットしてプッシュする。許可していない種類・ずれのある作業ツリー・秘密の値・断られたプッシュでは元に戻して断る
+    depends_on:
+      - docs/scenario/SC-1.yaml
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: '`write_docs`・`delete_docs` のコミットの指定（引数・結果・断る条件・プッシュが断られたときの戻し方）を追加する'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T01:26:22.005603+00:00'
+  - page: docs/guide/設定.md
+    new: false
+    change: 直コミットの設定のキー（許可する種類・コミットするブランチ・種類ごとの呼べる作業場所）を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-19T18:40:13.303171+00:00'
+  - page: docs/guide/コアコンセプト-配信元と権限.md
+    new: false
+    change: 直コミットの仕組み（使用する場面・許可の範囲・公開のリポジトリでの注意）を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T01:26:22.005603+00:00'
+  - page: docs/glossary/GLO-1.yaml
+    new: false
+    change: 用語「直コミット」を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T01:26:22.005603+00:00'
+  - page: docs/guide/用語集.md
+    new: false
+    change: 変更不要。本文は用語集（GLO-1）への案内だけで、用語は GLO-1 に追加した
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T01:26:22.005603+00:00'
+  - page: schemas/project-index.schema.json
+    new: false
+    change: 直コミットの設定のキー（`direct_commit.branch`・`branches`・`kinds`）を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T01:26:22.005603+00:00'
+  - page: content/prompts/mcp/docs/tools/write-docs.yaml
+    change: write_docs のツールの説明へ、commit の指定（直コミット）を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T01:55:53.478742+00:00'
+  - page: content/prompts/mcp/docs/tools/delete-docs.yaml
+    change: delete_docs のツールの説明へ、commit の指定（直コミット）を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T01:55:53.478742+00:00'
+scope_out:
+  - item: knowledge のネットミームの種類とスキーマ・直コミットの許可の設定・登録のスキル
+    reason: knowledge リポジトリの作業で、この作業 PR の直コミットの指定を前提にする後続（Issue の `## 依存・後続`）
+    plan: shuhei1101/knowledge#514
+  - item: rule-inject の `write_index_entry` と ai-monitor の連絡ボード（shuhei1101/ai-monitor#3404）への直コミットの適用
+    reason: この Issue の後に別に検討すると Issue に決まっている。他のリポジトリのツールで、この作業 PR の方式が決まってから中身が決まる
+    plan: shuhei1101/rule-inject#197
+  - item: 規約・判定フローチャートなどエージェントの動きを変える文書の直コミット
+    reason: 最初は対象にしないと利用者が決めた（D-776 の案 A）。配信元の設定で種類を許可するだけで対象にできるため、project-index の変更は要らない
+    plan: none
+  - item: プッシュの後の CI の失敗の取得と打ち消しのコミットの提案
+    reason: 呼んだ側の登録のスキルが担う想定（Issue の手元で考えた一案）で、project-index のツールはプッシュの結果までを返す
+    plan: none
+  - item: AI Monitor のエージェントの作業での直コミットの使用
+    reason: 作業 PR の中でコミットの単位を決めるため使用しないと Issue に決まっている
+    plan: none
+  - item: ai-monitor の連絡ボード（shuhei1101/ai-monitor#3404）への直コミットの適用
+    reason: 上の行の連絡ボードの分。ai-monitor のリポジトリの作業のため、rule-inject と分けて起票した
+    plan: shuhei1101/ai-monitor#3702

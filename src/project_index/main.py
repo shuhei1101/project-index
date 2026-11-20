@@ -80,6 +80,8 @@ class Handlers:
     converter: Any
     seen: Any
     locks: Any
+    # 直コミットをリポジトリごとに 1 つずつにする（書き込み）
+    repo_locks: Any
     settings_lock: threading.Lock
     checker: Any
     reload_sources: Callable[[TerminalConfig], list[SourceStatus]]
@@ -236,7 +238,7 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
     from project_index.features.history.snapshot import SnapshotStore
     from project_index.features.seen.store import SeenStore
     from project_index.features.validation.service import DocumentChecker
-    from project_index.features.write.locks import SourceLocks
+    from project_index.features.write.locks import RepositoryLocks, SourceLocks
 
     # プロンプトの YAML が違反するときは、state_dir を作る前に止める
     prompts = load_prompts(prompts_dir(os.environ), required=[*mcp_prompt_ids(), NOTICE_PROMPT_ID])
@@ -312,6 +314,7 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
         converter=converter,
         seen=seen,
         locks=SourceLocks(),
+        repo_locks=RepositoryLocks(),
         settings_lock=threading.Lock(),
         checker=checker,
         reload_sources=reload,

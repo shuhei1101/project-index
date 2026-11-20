@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from project_index.features.access.types import CWD_DESCRIPTION
 from project_index.features.search.types import Condition, Group
@@ -57,6 +57,35 @@ class Operation(BaseModel):
     fields: list[str] | None = None
 
 
+class CommitSpec(BaseModel):
+    """`write_docs`・`delete_docs` の `commit`。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    message: str
+    # `None` は配信元の設定の `direct_commit.branch`
+    branch: str | None = None
+
+    @field_validator("message")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        """空白だけの説明を断る。"""
+        if not value.strip():
+            message = "コミットの説明が空です"
+            raise ValueError(message)
+        return value
+
+
+@dataclass(frozen=True)
+class CommitResult:
+    """直コミットでプッシュしたコミット。"""
+
+    sha: str
+    branch: str
+    # プッシュが 1 回断られ、取得からやり直したか
+    retried: bool
+
+
 class WriteRequest(BaseModel):
     """`write_docs` の引数。"""
 
@@ -70,6 +99,8 @@ class WriteRequest(BaseModel):
     cwd: str | None = Field(default=None, description=CWD_DESCRIPTION)
     session_id: str | None = None
     agent_id: str | None = None
+    # 直コミット。`None` はコミットとプッシュをしない
+    commit: CommitSpec | None = None
 
 
 @dataclass(frozen=True)
@@ -104,6 +135,8 @@ class WriteResult:
 
     applied: bool
     results: list[WriteResultItem]
+    # `commit` を指定し `dry_run: false` で書き込んだときだけ
+    commit: CommitResult | None = None
 
 
 class DeleteTarget(BaseModel):
@@ -127,6 +160,7 @@ class DeleteRequest(BaseModel):
     atomic: bool = True
     dry_run: bool = False
     cwd: str | None = Field(default=None, description=CWD_DESCRIPTION)
+    commit: CommitSpec | None = None
 
 
 @dataclass(frozen=True)
@@ -136,3 +170,4 @@ class DeleteResult:
     applied: bool
     results: list[WriteResultItem]
     unlinked: list[tuple[str, str]] = field(default_factory=list[tuple[str, str]])
+    commit: CommitResult | None = None

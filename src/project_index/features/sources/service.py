@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import hashlib
 import json
 import logging
 import os
 import tempfile
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from importlib import resources
@@ -33,6 +34,7 @@ from project_index.features.sources.schema_ref import (
 )
 from project_index.features.sources.types import (
     SOURCE_CONFIG_VERSION,
+    DirectCommitConfig,
     DocumentTable,
     ScriptEntry,
     ServedSource,
@@ -40,12 +42,12 @@ from project_index.features.sources.types import (
     SourceStatus,
     StorageType,
 )
-from project_index.integrations.git import is_ignored, main_repo_root
+from project_index.integrations.git import GitError, is_ignored, main_repo_root, worktree_heads
 from project_index.integrations.git import repo_root as git_repo_root
 from project_index.integrations.scripts import ScriptNotFoundError, check_runnable
 from project_index.shared.errors import ProjectIndexError, ValidationFailedError, Violation
 from project_index.shared.narrowing import is_dict
-from project_index.shared.paths import normalize_path
+from project_index.shared.paths import match_glob, normalize_path
 from project_index.shared.schema_check import schema_violations
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
 
@@ -386,6 +388,87 @@ def _script_folders(
     }
 
 
+def direct_commit_checks(
+    config: SourceConfig,
+    *,
+    worktree_branches: set[str],
+    terminal_kinds: Iterable[str] = (),
+) -> tuple[list[Violation], list[Violation]]:
+    """スキーマに合格した直コミットの設定の、直コミットだけを断る違反と警告を求める。"""
+    settings = config.direct_commit
+    if settings is None:
+        return [], []
+    known = {row.id for row in config.documents if row.enabled}
+    violations = [
+        Violation(
+            path=f"direct_commit.kinds[{index}]",
+            rule=f"{kind} は documents[] に無く、直コミットを断る",
+            fix="documents[] の id を指定してください",
+        )
+        for index, kind in enumerate(settings.kinds)
+        if kind not in known
+    ]
+    warnings: list[Violation] = []
+    # コミットするブランチを指すワークツリーが無い
+    if settings.branch not in worktree_branches:
+        warnings.append(
+            Violation(
+                path="direct_commit.branch",
+                rule=f"{settings.branch} を指すワークツリーが無いため、直コミットは断られる",
+                fix=f"worktrees に該当する場所へ {settings.branch} のワークツリーを作ってください",
+            )
+        )
+    # 端末の設定にだけある種類は使用しない
+    warnings.extend(
+        Violation(
+            path=f"sources[].direct_commit.kinds.{kind}",
+            rule=f"{kind} は配信元の direct_commit.kinds[] に無いため使用しない",
+        )
+        for kind in terminal_kinds
+        if kind not in settings.kinds
+    )
+    return violations, warnings
+
+
+def source_worktree_branches(source: ServedSource) -> set[str]:
+    """配信元の worktrees に該当するワークツリーが指すブランチを返す。"""
+    if source.repo_root is None:
+        return set()
+    try:
+        heads = worktree_heads(source.repo_root)
+    except GitError:
+        return set()
+    return {branch for path, branch in heads if match_glob(path, source.worktree_globs)}
+
+
+def _with_direct_commit(source: ServedSource, entry: SourceEntry) -> ServedSource:
+    """端末の設定の行の直コミットの作業場所と、直コミットだけを断る違反を配信元に持たせる。"""
+    settings = source.config.direct_commit
+    if settings is None:
+        return source
+    violations, warnings = direct_commit_checks(
+        source.config,
+        worktree_branches=source_worktree_branches(source),
+        terminal_kinds=entry.direct_commit.kinds.keys(),
+    )
+    for item in violations:
+        logger.error(
+            "%s: %s: %s（配信を続け、直コミットだけを断る）", source.id, item.path, item.rule
+        )
+    for item in warnings:
+        logger.warning("%s: %s: %s", source.id, item.path, item.rule)
+    return dataclasses.replace(
+        source,
+        direct_commit_scope=list(entry.direct_commit.scope),
+        direct_commit_kinds={
+            kind: list(globs)
+            for kind, globs in entry.direct_commit.kinds.items()
+            if kind in settings.kinds
+        },
+        direct_commit_problems=violations,
+    )
+
+
 def compare_config_version(version: str) -> Literal["same", "older", "newer"]:
     """配信元の設定のバージョンをサーバーの参照できるバージョンと比べる。"""
     mine, current = int(version), int(SOURCE_CONFIG_VERSION)
@@ -425,6 +508,13 @@ def build_source_config(value: dict[str, Any]) -> SourceConfig:
         options["ids_format"] = ids["format"]
     if "folders" in decisions:
         options["decision_folders"] = list(decisions["folders"])
+    if "direct_commit" in value:
+        direct = value["direct_commit"]
+        options["direct_commit"] = DirectCommitConfig(
+            branch=direct["branch"],
+            kinds=list(direct["kinds"]),
+            branches=list(direct.get("branches", [])),
+        )
     return SourceConfig(
         name=value["name"],
         description=value.get("description", ""),
@@ -835,7 +925,7 @@ def load_source(
             config.version,
             SOURCE_CONFIG_VERSION,
         )
-    return served, SourceStatus(
+    return _with_direct_commit(served, entry), SourceStatus(
         id=source_id,
         index=index,
         status="serving",
@@ -927,6 +1017,13 @@ def load_source_at(source: ServedSource, root: Path) -> ServedSource:
             message="; ".join(f"{source.id}: {v.path}: {v.rule}" for v in violations),
             violations=violations,
         )
+    # 直コミットの作業場所は端末の設定の行から引き継ぎ、断る違反は読み直した設定で求め直す
+    served = dataclasses.replace(
+        served,
+        direct_commit_scope=source.direct_commit_scope,
+        direct_commit_kinds=source.direct_commit_kinds,
+        direct_commit_problems=direct_commit_checks(served.config, worktree_branches=set())[0],
+    )
     # 設定のファイル・切り替えたパス・作った配信元が読んだスキーマのファイルを見張る
     schema_files = [
         served.config_root / row.schema_path

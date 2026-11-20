@@ -347,7 +347,8 @@ functions:
          - `[warning]` 配信元の設定のバージョンが古い（ID・設定のバージョン・サーバーが参照できるバージョン）
       8. `entry.storage` が `disk` の場合、Git の作業ツリーとして扱わず、直下とメインのリポジトリを引かない。それ以外は設定ファイルのフォルダが Git の作業ツリーかとその直下を引く（履歴の『リポジトリの直下』）。`entry.storage` が `git` で Git の作業ツリーの外の場合、`sources[{index}].storage.type` に「フォルダが Git の作業ツリーの中にありません」の違反を持つ `not_served` を返す。『paths の基準のフォルダの解決』で `root` を決める（範囲の違反は手順 4 の検証で返している）
       9. 種類ごとのスキーマを設定ファイルのフォルダから、文書の行 1 つごとに `unit` の 1 件の中で読み（設定の commit がある場合はそのリビジョンのファイル。`schema_path` が `SchemaRef` の行は参照先のスキーマの読み取りの結果）、`worktrees` をメインのリポジトリの直下（Git でなければ設定ファイルのフォルダ）からの絶対パスにして、`ServedSource` を作る。`config_dir` は `root` から設定ファイルのフォルダへの相対パス、`scope_write` が無ければ `[str(設定ファイルのフォルダ)]`。ID は `entry.id`、無ければ `config.name`。`outside_read` は `entry.outside_read`、`storage` は `entry.storage` の `type`（省いた行は `None`）。`storage` が `disk` の場合、`worktree_globs` は空にする
-      10. `ServedSource` と `serving` を返す
+      10. 設定に `direct_commit` があれば、ワークツリーのブランチ（`source_worktree_branches`）と `entry.direct_commit.kinds` のキーで直コミットの設定の確認を呼ぶ。違反は `[error]`（配信を続け、直コミットだけを断る）、警告は `[warning]` に書き、`direct_commit_scope` に `entry.direct_commit.scope`、`direct_commit_kinds` に `entry.direct_commit.kinds` のうち `direct_commit.kinds` にある種類、`direct_commit_problems` に違反を入れる
+      11. `ServedSource` と `serving` を返す
 
       違反で返すときは `[error]` 配信元を配信しない（違反ごとに `{id}: {パス}: {理由}`）を書く。
     unit_tests:
@@ -557,7 +558,8 @@ functions:
          - `root` の下の同じパスにファイルが無く、元のファイルが無視されている場合（無視されているファイル）、元のファイル（クローン本体のディスク）を使う
       3. `source.config_root` の `repo_root`（無ければ `source.root`）からの相対パスを `root` の下につないだフォルダを設定ファイルのフォルダにし、配信元の読み込みの手順 2〜6・8〜9 を、ディスクの設定・スキーマ・スクリプトで（`default_ref` を読まずに）、配信元の読み込みと同じ内部の関数で行う（設定のバージョンは比べない）
          - 違反がある場合、その違反を持つ `ValidationFailedError` を送る
-      4. 作った配信元を、配信元の ID と `root` をキーに、元の配信元・手順 2 の設定のファイルと作った配信元が読んだスキーマのファイルの `mtime_ns`・`size` と一緒にキャッシュへ入れ、返す。手順 2 でクローン本体のファイルへ切り替えた設定は、`root` の側のパスにファイルが無いことも記録し、手順 1 はそのパスにファイルが現れたらキャッシュを使わない
+      4. 作った配信元の `direct_commit_scope`・`direct_commit_kinds` を `source` から引き継ぎ、`direct_commit_problems` を読み直した設定の直コミットの設定の確認（`worktree_branches` は空）の違反にする
+      5. 作った配信元を、配信元の ID と `root` をキーに、元の配信元・手順 2 の設定のファイルと作った配信元が読んだスキーマのファイルの `mtime_ns`・`size` と一緒にキャッシュへ入れ、返す。手順 2 でクローン本体のファイルへ切り替えた設定は、`root` の側のパスにファイルが無いことも記録し、手順 1 はそのパスにファイルが現れたらキャッシュを使わない
     exceptions:
       - name: ValidationFailedError
         condition: '`root` の設定が無い・読めない・検証に通らない・スクリプトが無い'
@@ -926,6 +928,88 @@ functions:
         mock: なし
         expected: 配信元が `None` で、違反に `documents[0].paths` が入る
         exception: '-'
+  - name: direct_commit_checks
+    title: 直コミットの設定の確認
+    kind: 関数
+    container: project_index/features/sources/service.py
+    usecase: 直コミット
+    role: 検証
+    summary: スキーマに合格した直コミットの設定の、直コミットだけを断る違反と警告を求める
+    description: 型の誤りと必須のキーの欠けは、既存のスキーマの検証（`schemas/project-index.schema.json` に `direct_commit` を追加する）で配信元を外す。この関数は配信を続けるものだけを扱う。`assemble_source` と管理の `check_project` から呼ぶ。
+    scope: public
+    thread_safe: true
+    args:
+      - name: config
+        title: 配信元の設定
+        type: SourceConfig
+        required: true
+        passing: positional
+        description: 検証を通した配信元の設定
+      - name: worktree_branches
+        title: ワークツリーのブランチ
+        type: set[str]
+        required: true
+        passing: keyword
+        description: 配信元の `worktrees` に該当するワークツリーが指すブランチ
+      - name: terminal_kinds
+        title: 端末の設定の種類
+        type: Iterable[str]
+        required: false
+        default: ()
+        passing: keyword
+        description: 端末の設定の `sources[].direct_commit.kinds` のキー
+    returns:
+      type: tuple[list[Violation], list[Violation]]
+      description: 直コミットだけを断る違反と、警告
+    process: |-
+      1. `config.direct_commit` が `None` の場合、空の組を返す
+      2. `direct_commit.kinds` のうち有効な `documents[].id` に無いものごとに、パス `direct_commit.kinds[{n}]` の違反（「{種類} は documents[] に無く、直コミットを断る」）を集める
+      3. `direct_commit.branch` が `worktree_branches` に無い場合、パス `direct_commit.branch` の警告を集める
+      4. `terminal_kinds` のうち `direct_commit.kinds` に無い種類ごとに、パス `sources[].direct_commit.kinds.{種類}` の警告を集める
+      5. 違反と警告を返す
+    unit_tests:
+      - name: test_direct_commit_checks
+        case: 正常
+        summary: 違反と警告を分ける
+        condition: '`kinds: [note, meme]`（`meme` は `documents[]` に無い）、`branch: develop`（ワークツリーが無い）、`terminal_kinds: [rule]`'
+        mock: なし
+        expected: 違反が `direct_commit.kinds[1]` の 1 件、警告が `direct_commit.branch` と `sources[].direct_commit.kinds.rule` の 2 件
+      - name: test_direct_commit_checks_when_absent
+        case: 正常
+        summary: 設定が無い
+        condition: '`direct_commit` が `None`'
+        mock: なし
+        expected: どちらも空
+  - name: source_worktree_branches
+    title: 配信元のワークツリーのブランチ
+    kind: 関数
+    container: project_index/features/sources/service.py
+    usecase: 直コミット
+    role: 読み取り
+    summary: 配信元の `worktrees` に該当するワークツリーが指すブランチを集める
+    description: 配信元の読み込みと管理の `check_project` が、直コミットの設定の確認の `worktree_branches` を作る。
+    scope: public
+    thread_safe: true
+    args:
+      - name: source
+        title: 配信元
+        type: ServedSource
+        required: true
+        passing: positional
+        description: 照らす配信元
+    returns:
+      type: set[str]
+      description: ブランチの名前。Git の管理外・一覧を取れないときは空
+    process: |-
+      1. `repo_root` が `None` の場合、空を返す
+      2. 履歴の『ワークツリーのブランチ』を呼び（`GitError` は空を返す）、`worktree_globs` に該当するワークツリーのブランチを返す
+    unit_tests:
+      - name: test_source_worktree_branches
+        case: 正常
+        summary: worktrees に該当するワークツリーだけ
+        condition: '`master` のクローン本体と、`.claude/worktrees/` の下の `develop` のワークツリー'
+        mock: なし（一時フォルダで `git init`）
+        expected: '`{develop}`'
 refs:
   - to: IF-15
     type: requires

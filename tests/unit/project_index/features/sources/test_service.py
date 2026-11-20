@@ -15,12 +15,20 @@ from project_index.features.sources.service import (
     assemble_values,
     check_scripts,
     compare_config_version,
+    direct_commit_checks,
     entry_source_id,
     load_source,
     load_source_at,
+    source_worktree_branches,
     validate_source_config,
 )
-from project_index.features.sources.types import ScriptEntry, ServedSource, SourceConfig
+from project_index.features.sources.types import (
+    DirectCommitConfig,
+    DocumentTable,
+    ScriptEntry,
+    ServedSource,
+    SourceConfig,
+)
 from project_index.shared.errors import ValidationFailedError, Violation
 
 if TYPE_CHECKING:
@@ -1444,3 +1452,57 @@ def test_assemble_values_when_invalid(
     # 検証
     assert served is None
     assert "documents[0].paths" in [violation.path for violation in violations]
+
+
+def test_direct_commit_checks(make_source_config: Callable[..., SourceConfig]) -> None:
+    """違反と警告を分ける（正常系）。"""
+    # 準備
+    config = make_source_config(
+        documents=[
+            DocumentTable(id="note", paths=["docs/note/*.yaml"], schema_path="schemas/note.yaml")
+        ],
+        direct_commit=DirectCommitConfig(branch="develop", kinds=["note", "meme"]),
+    )
+    # 実行
+    violations, warnings = direct_commit_checks(
+        config, worktree_branches={"master"}, terminal_kinds=["rule"]
+    )
+    # 検証
+    assert [item.path for item in violations] == ["direct_commit.kinds[1]"]
+    assert [item.path for item in warnings] == [
+        "direct_commit.branch",
+        "sources[].direct_commit.kinds.rule",
+    ]
+
+
+def test_direct_commit_checks_when_absent(make_source_config: Callable[..., SourceConfig]) -> None:
+    """設定が無い（正常系）。"""
+    # 準備
+    config = make_source_config(direct_commit=None)
+    # 実行
+    result = direct_commit_checks(config, worktree_branches=set(), terminal_kinds=["rule"])
+    # 検証
+    assert result == ([], [])
+
+
+def test_source_worktree_branches(
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+    make_served_source: Callable[..., ServedSource],
+) -> None:
+    """worktrees に該当するワークツリーだけ（正常系）。"""
+    # 準備
+    root = git_repo({"project-index.yaml": "name: sample\n"}, branch="master")
+    run_git(
+        root, "worktree", "add", "-b", "develop", str(root / ".claude" / "worktrees" / "develop")
+    )
+    source = make_served_source(
+        root=root,
+        is_git=True,
+        repo_root=root,
+        worktree_globs=[str(root / ".claude" / "worktrees" / "*")],
+    )
+    # 実行
+    result = source_worktree_branches(source)
+    # 検証
+    assert result == {"develop"}

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import time
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -11,9 +11,18 @@ import pytest
 
 from project_index.shared.hashing import content_hash, value_hash
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
+from tests.integration.server.conftest import (
+    DIRECT_RULE_SCHEMA,
+    FAILING_SCRIPT,
+    NOTE_LIST_SCRIPT,
+    NOTE_SCHEMA,
+    direct_commit_config,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from tests.integration.server.conftest import DirectCommitSource
 
 
 def load_yaml(text: str) -> Any:
@@ -2979,3 +2988,730 @@ def test_error_when_builtin_source_written(
     assert "SourceNotWritableError" in result.text
     assert "project-index" in result.text
     assert target.read_text(encoding="utf-8") == before
+
+
+NOTE_CREATE = {"op": "create", "kind": "note", "data": {"id": "n1", "name": "メモ 1"}}
+NOTE_COMMIT = {"message": "docs: note を追加する"}
+
+
+def _git_state(direct: DirectCommitSource, run_git: Callable[..., str]) -> tuple[str, str, str]:
+    """リモートの develop・develop のワークツリーの HEAD・git status の組を返す。"""
+    return (
+        run_git(direct.bare, "rev-parse", "develop").strip(),
+        run_git(direct.develop, "rev-parse", "HEAD").strip(),
+        run_git(direct.develop, "status", "--porcelain").strip(),
+    )
+
+
+def test_normal_when_direct_commit(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """直コミットする（正常系）。"""
+    # 準備
+    direct = make_direct_commit_source()
+    env = make_server(direct.spec)
+    remote_before = run_git(direct.bare, "rev-parse", "develop").strip()
+    x_head = run_git(direct.x, "rev-parse", "HEAD").strip()
+    clone_status = run_git(direct.folder, "status", "--porcelain")
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[NOTE_CREATE],
+        commit=NOTE_COMMIT,
+    )
+    # 検証
+    data = result.data
+    remote_after = run_git(direct.bare, "rev-parse", "develop").strip()
+    changed = run_git(direct.bare, "show", "--name-only", "--format=%s", remote_after).split("\n")
+    assert not result.is_error, result.text
+    assert data["applied"] is True
+    assert data["results"][0]["status"] == "created"
+    assert data["commit"]["branch"] == "develop"
+    assert data["commit"]["retried"] is False
+    assert data["commit"]["sha"] == remote_after
+    assert run_git(direct.bare, "rev-parse", f"{remote_after}~1").strip() == remote_before
+    assert changed[0] == "docs: note を追加する"
+    assert sorted(line for line in changed[1:] if line) == ["generated/notes.txt", "notes/n1.yaml"]
+    assert run_git(direct.develop, "rev-parse", "HEAD").strip() == remote_after
+    assert run_git(direct.develop, "status", "--porcelain").strip() == ""
+    assert run_git(direct.x, "rev-parse", "HEAD").strip() == x_head
+    assert run_git(direct.folder, "status", "--porcelain") == clone_status
+
+
+def test_normal_when_direct_commit_keeps_other_changes(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """直コミットで他の未コミットの変更を残す（正常系）。"""
+    # 準備
+    direct = make_direct_commit_source()
+    env = make_server(direct.spec)
+    (direct.develop / "memo.txt").write_text("書きかけ\n", encoding="utf-8")
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[NOTE_CREATE],
+        commit=NOTE_COMMIT,
+    )
+    # 検証
+    sha = result.data["commit"]["sha"]
+    changed = run_git(direct.bare, "show", "--name-only", "--format=", sha).split()
+    assert not result.is_error, result.text
+    assert "memo.txt" not in changed
+    assert run_git(direct.develop, "status", "--porcelain").strip() == "M memo.txt"
+    assert (direct.develop / "memo.txt").read_text(encoding="utf-8") == "書きかけ\n"
+
+
+def test_normal_when_direct_commit_branch_overridden(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """直コミットのブランチを上書きする（正常系）。"""
+    # 準備
+    direct = make_direct_commit_source(
+        config=direct_commit_config(branches=("data",)), extra_branches=("data",)
+    )
+    env = make_server(direct.spec)
+    develop_before = run_git(direct.bare, "rev-parse", "develop").strip()
+    data_before = run_git(direct.bare, "rev-parse", "data").strip()
+    develop_head = run_git(direct.develop, "rev-parse", "HEAD").strip()
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[NOTE_CREATE],
+        commit={**NOTE_COMMIT, "branch": "data"},
+    )
+    # 検証
+    data_after = run_git(direct.bare, "rev-parse", "data").strip()
+    assert not result.is_error, result.text
+    assert result.data["commit"]["branch"] == "data"
+    assert result.data["commit"]["sha"] == data_after
+    assert run_git(direct.bare, "rev-parse", f"{data_after}~1").strip() == data_before
+    assert "notes/n1.yaml" in run_git(direct.bare, "show", "--name-only", "--format=", data_after)
+    assert run_git(direct.bare, "rev-parse", "develop").strip() == develop_before
+    assert run_git(direct.develop, "rev-parse", "HEAD").strip() == develop_head
+
+
+def test_normal_when_direct_commit_remote_ahead(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+    push_from_other_clone: Callable[..., str],
+) -> None:
+    """直コミットでリモートが先に進んでいる（正常系）。"""
+    # 準備
+    direct = make_direct_commit_source()
+    env = make_server(direct.spec)
+    ahead = push_from_other_clone(direct.bare, {"other.txt": "other\n"})
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[NOTE_CREATE],
+        commit=NOTE_COMMIT,
+    )
+    # 検証
+    sha = result.data["commit"]["sha"]
+    assert not result.is_error, result.text
+    assert run_git(direct.bare, "rev-parse", "develop").strip() == sha
+    assert run_git(direct.bare, "rev-parse", f"{sha}~1").strip() == ahead
+    assert result.data["commit"]["retried"] is False
+
+
+def test_normal_when_direct_commit_push_rejected_once(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+    install_hook: Callable[..., None],
+) -> None:
+    """直コミットのプッシュが 1 回断られる（正常系）。"""
+    # 準備
+    direct = make_direct_commit_source()
+    env = make_server(direct.spec)
+    marker = direct.bare / "rejected-once"
+    install_hook(
+        direct.bare,
+        "pre-receive",
+        f'if [ ! -f "{marker}" ]; then touch "{marker}"; echo "try again" >&2; exit 1; fi\nexit 0',
+    )
+    remote_before = run_git(direct.bare, "rev-parse", "develop").strip()
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[NOTE_CREATE],
+        commit=NOTE_COMMIT,
+    )
+    # 検証
+    sha = result.data["commit"]["sha"]
+    assert not result.is_error, result.text
+    assert result.data["commit"]["retried"] is True
+    assert run_git(direct.bare, "rev-parse", "develop").strip() == sha
+    assert run_git(direct.bare, "rev-parse", f"{sha}~1").strip() == remote_before
+    assert run_git(direct.develop, "rev-parse", "HEAD").strip() == sha
+
+
+def test_normal_when_direct_commit_dry_run(
+    tmp_path: Path,
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """直コミットを試しに書く（正常系）。"""
+    # 準備
+    direct = make_direct_commit_source()
+    env = make_server(direct.spec)
+    run_git(direct.folder, "remote", "set-url", "origin", str(tmp_path / "missing.git"))
+    before = _git_state(direct, run_git)
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[NOTE_CREATE],
+        commit=NOTE_COMMIT,
+        dry_run=True,
+    )
+    # 検証
+    assert not result.is_error, result.text
+    assert result.data["applied"] is False
+    assert result.data["results"][0]["diff"]
+    assert "commit" not in result.data
+    assert _git_state(direct, run_git) == before
+
+
+@dataclass
+class _Target:
+    """直コミットを呼ぶ配信元と作業場所。"""
+
+    env: Any
+    source_id: str
+    cwd: Path
+    # 参照（ブランチ・タグ）を比べるリポジトリと、作業ツリーの状態を比べるフォルダ
+    refs: list[Path]
+    trees: list[Path]
+
+
+def _source_without_direct_commit(
+    make_direct: Callable[..., DirectCommitSource], make_server: Callable[..., Any], **_: Any
+) -> _Target:
+    """direct_commit の無い sample。"""
+    direct = make_direct(config=direct_commit_config().split("direct_commit:")[0])
+    return _Target(
+        make_server(direct.spec), "sample", direct.local, [direct.bare], [direct.develop]
+    )
+
+
+def _source_with_missing_kind(
+    make_direct: Callable[..., DirectCommitSource], make_server: Callable[..., Any], **_: Any
+) -> _Target:
+    """direct_commit.kinds に documents[] に無い meme を持つ sample。"""
+    direct = make_direct(config=direct_commit_config(kinds=("note", "meme")))
+    return _Target(
+        make_server(direct.spec), "sample", direct.local, [direct.bare], [direct.develop]
+    )
+
+
+def _disk_source(
+    make_direct: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    *,
+    make_source: Callable[..., Any],
+    tmp_path: Path,
+) -> _Target:
+    """direct_commit を持つ disk の配信元 company。"""
+    local = tmp_path / "local"
+    local.mkdir(exist_ok=True)
+    spec = make_source(
+        "company",
+        {
+            "project-index.yaml": direct_commit_config().replace("name: sample", "name: company"),
+            "schemas/note.schema.yaml": NOTE_SCHEMA,
+            "schemas/rule.schema.yaml": DIRECT_RULE_SCHEMA,
+            "scripts/list.py": NOTE_LIST_SCRIPT,
+        },
+        storage="disk",
+    )
+    spec.direct_commit_scope = [local]
+    return _Target(make_server(spec), "company", local, [spec.folder], [spec.folder])
+
+
+def _tree_state(target: _Target, run_git: Callable[..., str]) -> list[str]:
+    """リポジトリの参照と、作業ツリーの状態を返す。"""
+    return [run_git(path, "for-each-ref") for path in target.refs] + [
+        run_git(path, "status", "--porcelain") for path in target.trees
+    ]
+
+
+@pytest.mark.parametrize(
+    ("build", "reason"),
+    [
+        pytest.param(_source_without_direct_commit, "直コミットの設定が無い", id="absent"),
+        pytest.param(_source_with_missing_kind, "meme", id="missing-kind"),
+        pytest.param(_disk_source, "disk の配信元である", id="disk"),
+    ],
+)
+def test_error_when_direct_commit_not_configured(
+    build: Callable[..., _Target],
+    reason: str,
+    tmp_path: Path,
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """直コミットの設定が無い（異常系）。"""
+    # 準備
+    target = build(
+        make_direct_commit_source, make_server, make_source=make_source, tmp_path=tmp_path
+    )
+    before = _tree_state(target, run_git)
+    # 実行
+    result = target.env.call(
+        "write_docs",
+        cwd=str(target.cwd),
+        source=target.source_id,
+        operations=[NOTE_CREATE],
+        commit=NOTE_COMMIT,
+    )
+    # 検証
+    assert result.is_error
+    assert "DirectCommitNotConfiguredError" in result.text
+    assert target.source_id in result.text
+    assert reason in result.text
+    assert _tree_state(target, run_git) == before
+
+
+def test_error_when_direct_commit_kind_not_allowed(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """直コミットを許可していない種類（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source()
+    env = make_server(direct.spec)
+    before = _git_state(direct, run_git)
+    operation = {"op": "create", "kind": "rule", "data": {"id": "r9", "name": "規約 9"}}
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[operation],
+        commit=NOTE_COMMIT,
+    )
+    # 検証
+    assert result.is_error
+    assert "ValidationFailedError" in result.text
+    assert "rule は直コミットを許可していない種類です" in result.text
+    assert "index: 0" in result.text
+    assert _git_state(direct, run_git) == before
+
+
+def test_error_when_direct_commit_rewrites_other_kind(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """直コミットで許可していない種類の文書が書き換わる（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source(
+        files={
+            "notes/n1.yaml": "id: n1\nname: メモ 1\n",
+            "rules/r1.yaml": "id: r1\nname: 規約 1\nrelated:\n  - to: n1\n    type: references\n",
+        }
+    )
+    env = make_server(direct.spec)
+    before = _git_state(direct, run_git)
+    version = _version(direct.develop / "notes" / "n1.yaml")
+    operation = {"op": "rename", "id": "n1", "expected_version": version, "new_id": "n2"}
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[operation],
+        commit=NOTE_COMMIT,
+    )
+    # 検証
+    assert result.is_error
+    assert "rule は直コミットを許可していない種類です" in result.text
+    assert "r1" in result.text
+    assert _git_state(direct, run_git) == before
+
+
+@pytest.mark.parametrize(
+    ("parts", "kind"),
+    [
+        pytest.param(("gh", "p_", "A1b2C3d4" * 4, "E5f6"), "github-token", id="github-token"),
+        pytest.param(("連絡先 user", "@", "example.com"), "email-address", id="email-address"),
+    ],
+)
+def test_error_when_direct_commit_contains_secret(
+    parts: tuple[str, ...],
+    kind: str,
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """直コミットで秘密の値を含む（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source()
+    env = make_server(direct.spec)
+    before = _git_state(direct, run_git)
+    value = "".join(parts)
+    operation = {
+        "op": "create",
+        "kind": "note",
+        "data": {"id": "n1", "name": "メモ 1", "description": value},
+    }
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[operation],
+        commit=NOTE_COMMIT,
+    )
+    # 検証
+    assert result.is_error
+    assert "description" in result.text
+    assert f"秘密の値（{kind}）を含む" in result.text
+    assert value not in result.text
+    assert value not in str(result.structured)
+    assert _git_state(direct, run_git) == before
+
+
+def _elsewhere(direct: DirectCommitSource, tmp_path: Path) -> Path:
+    """手元の作業場所でない空のフォルダ。"""
+    path = tmp_path / "elsewhere"
+    path.mkdir(exist_ok=True)
+    return path
+
+
+def _clone_folder(direct: DirectCommitSource, _tmp_path: Path) -> Path:
+    """sample のフォルダ（scope.write に該当する）。"""
+    return direct.folder
+
+
+def _local_folder(direct: DirectCommitSource, _tmp_path: Path) -> Path:
+    """手元の作業場所。"""
+    return direct.local
+
+
+@pytest.mark.parametrize(
+    ("cwd_of", "kind_globs"),
+    [
+        pytest.param(_elsewhere, None, id="other-folder"),
+        pytest.param(_clone_folder, None, id="scope-write"),
+        pytest.param(_local_folder, {"note": [Path("/another")]}, id="kind-glob"),
+    ],
+)
+def test_error_when_direct_commit_not_permitted(
+    cwd_of: Callable[[DirectCommitSource, Path], Path],
+    kind_globs: dict[str, list[Path]] | None,
+    tmp_path: Path,
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """直コミットを呼べる作業場所に該当しない（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source(direct_commit_kinds=kind_globs)
+    env = make_server(direct.spec)
+    before = _git_state(direct, run_git)
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(cwd_of(direct, tmp_path)),
+        source="sample",
+        operations=[NOTE_CREATE],
+        commit=NOTE_COMMIT,
+    )
+    # 検証
+    assert result.is_error
+    assert "DirectCommitNotPermittedError" in result.text
+    assert "sample の直コミットはできません" in result.text
+    assert "note" in result.text
+    assert _git_state(direct, run_git) == before
+
+
+def test_error_when_branch_not_allowed(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """上書きできないブランチ（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source(
+        config=direct_commit_config(branches=("data",)), extra_branches=("data",)
+    )
+    env = make_server(direct.spec)
+    refs = run_git(direct.bare, "for-each-ref")
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[NOTE_CREATE],
+        commit={**NOTE_COMMIT, "branch": "master"},
+    )
+    # 検証
+    assert result.is_error
+    assert "BranchNotAllowedError" in result.text
+    assert "master" in result.text
+    assert "develop, data" in result.text
+    assert run_git(direct.bare, "for-each-ref") == refs
+    assert run_git(direct.develop, "status", "--porcelain").strip() == ""
+
+
+def test_error_when_commit_worktree_not_found(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """コミットするブランチのワークツリーが無い（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source(config=direct_commit_config(branch="main"))
+    env = make_server(direct.spec)
+    before = _git_state(direct, run_git)
+    clone_status = run_git(direct.folder, "status", "--porcelain")
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[NOTE_CREATE],
+        commit=NOTE_COMMIT,
+    )
+    # 検証
+    assert result.is_error
+    assert "CommitWorktreeNotFoundError" in result.text
+    assert "main を指すワークツリーがありません" in result.text
+    assert _git_state(direct, run_git) == before
+    assert run_git(direct.folder, "status", "--porcelain") == clone_status
+
+
+def test_error_when_unpushed_commits(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+    commit_all: Callable[..., str],
+) -> None:
+    """直コミットで未プッシュのコミットがある（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source()
+    env = make_server(direct.spec)
+    remote = run_git(direct.bare, "rev-parse", "develop").strip()
+    local = commit_all(direct.develop, {"memo.txt": "未プッシュ\n"})
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[NOTE_CREATE],
+        commit=NOTE_COMMIT,
+    )
+    # 検証
+    assert result.is_error
+    assert "UnpushedCommitsError" in result.text
+    assert "先行 1" in result.text
+    assert run_git(direct.bare, "rev-parse", "develop").strip() == remote
+    assert run_git(direct.develop, "rev-parse", "HEAD").strip() == local
+    assert not (direct.develop / "notes" / "n1.yaml").exists()
+
+
+def test_error_when_uncommitted_changes(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """直コミットで書き込むファイルに未コミットの変更がある（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source(files={"notes/n1.yaml": "id: n1\nname: メモ 1\n"})
+    env = make_server(direct.spec)
+    remote = run_git(direct.bare, "rev-parse", "develop").strip()
+    note = direct.develop / "notes" / "n1.yaml"
+    note.write_text("id: n1\nname: 書きかけ\n", encoding="utf-8")
+    operation = _update("n1", _version(note), set={"name": "直コミット"})
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[operation],
+        commit=NOTE_COMMIT,
+    )
+    # 検証
+    assert result.is_error
+    assert "UncommittedChangesError" in result.text
+    assert "notes/n1.yaml" in result.text
+    assert run_git(direct.bare, "rev-parse", "develop").strip() == remote
+    assert note.read_text(encoding="utf-8") == "id: n1\nname: 書きかけ\n"
+
+
+def test_error_when_fetch_failed(
+    tmp_path: Path,
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """リモートから取得できない（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source()
+    env = make_server(direct.spec)
+    run_git(direct.folder, "remote", "set-url", "origin", str(tmp_path / "missing.git"))
+    head = run_git(direct.develop, "rev-parse", "HEAD").strip()
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[NOTE_CREATE],
+        commit=NOTE_COMMIT,
+    )
+    # 検証
+    assert result.is_error
+    assert "FetchFailedError" in result.text
+    assert "missing.git" in result.text
+    assert run_git(direct.develop, "rev-parse", "HEAD").strip() == head
+    assert not (direct.develop / "notes" / "n1.yaml").exists()
+
+
+def test_error_when_push_rejected(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+    install_hook: Callable[..., None],
+) -> None:
+    """プッシュが 2 回断られる（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source()
+    env = make_server(direct.spec)
+    install_hook(direct.bare, "pre-receive", "echo 'denied by policy' >&2\nexit 1")
+    before = _git_state(direct, run_git)
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[NOTE_CREATE],
+        commit=NOTE_COMMIT,
+    )
+    # 検証
+    assert result.is_error
+    assert "PushRejectedError" in result.text
+    assert "denied by policy" in result.text
+    assert _git_state(direct, run_git) == before
+    assert not (direct.develop / "generated" / "notes.txt").exists()
+
+
+def test_error_when_push_failed(
+    tmp_path: Path,
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """プッシュで通信に失敗する（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source()
+    env = make_server(direct.spec)
+    run_git(direct.folder, "remote", "set-url", "--push", "origin", str(tmp_path / "missing.git"))
+    before = _git_state(direct, run_git)
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[NOTE_CREATE],
+        commit=NOTE_COMMIT,
+    )
+    # 検証
+    assert result.is_error
+    assert "PushFailedError" in result.text
+    assert "missing.git" in result.text
+    assert _git_state(direct, run_git) == before
+    assert not (direct.develop / "notes" / "n1.yaml").exists()
+
+
+def _not_atomic(_direct: DirectCommitSource) -> dict[str, Any]:
+    """atomic: false の引数。"""
+    return {"atomic": False}
+
+
+def _develop_worktree(direct: DirectCommitSource) -> dict[str, Any]:
+    """develop のワークツリーを指す worktree の引数。"""
+    return {"worktree": str(direct.develop)}
+
+
+@pytest.mark.parametrize(
+    ("extra", "rule"),
+    [
+        pytest.param(_not_atomic, "atomic: true の書き込みだけで使用できます", id="not-atomic"),
+        pytest.param(_develop_worktree, "commit と worktree は同時に指定できません", id="worktree"),
+    ],
+)
+def test_error_when_direct_commit_invalid_arguments(
+    extra: Callable[[DirectCommitSource], dict[str, Any]],
+    rule: str,
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """直コミットの引数の組み合わせの誤り（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source()
+    env = make_server(direct.spec)
+    before = _git_state(direct, run_git)
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[NOTE_CREATE],
+        commit=NOTE_COMMIT,
+        **extra(direct),
+    )
+    # 検証
+    assert result.is_error
+    assert "InvalidArgumentError" in result.text
+    assert rule in result.text
+    assert _git_state(direct, run_git) == before
+
+
+def test_error_when_direct_commit_generator_failed(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """直コミットで生成が失敗する（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source(list_script=FAILING_SCRIPT)
+    env = make_server(direct.spec)
+    before = _git_state(direct, run_git)
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[NOTE_CREATE],
+        commit=NOTE_COMMIT,
+    )
+    # 検証
+    assert result.is_error
+    assert "DirectCommitGeneratorError" in result.text
+    assert "scripts/list.py" in result.text
+    assert _git_state(direct, run_git) == before

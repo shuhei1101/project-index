@@ -104,6 +104,16 @@ classes:
       | `WriteDeadlineExceededError` | 書き込みの期限の超過 | `deadline_sec: float`・`elapsed_sec: float` | 504 |
       | `WorktreeLoadingError` | ワークツリーの読み込み中 | `worktree: str` | 503 |
       | `RevisionExportTimeoutError` | リビジョンの書き出しの待ち時間の超過 | `operation: str`・`commit: str`・`limit_sec: float` | 504 |
+      | `DirectCommitNotConfiguredError` | 直コミットを使用できない配信元 | `source_id: str`・`reason: str` | 409 |
+      | `DirectCommitNotPermittedError` | 直コミットを呼べない作業場所 | `source_id: str`・`kinds: list[str]` | 403 |
+      | `BranchNotAllowedError` | 上書きできないブランチ | `branch: str`・`allowed: list[str]` | 403 |
+      | `CommitWorktreeNotFoundError` | コミットするブランチのワークツリーが無い | `branch: str` | 409 |
+      | `UnpushedCommitsError` | ワークツリーの未プッシュのコミット | `worktree: str`・`ahead: int`・`behind: int` | 409 |
+      | `UncommittedChangesError` | 書き込むファイルの未コミットの変更 | `paths: list[str]` | 409 |
+      | `FetchFailedError` | リモートからの取得の失敗 | `stderr: str` | 502 |
+      | `PushRejectedError` | リモートにプッシュを断られた | `reason: str` | 409 |
+      | `PushFailedError` | プッシュの失敗・結果の不明 | `stderr: str`・`unknown: bool`・`commit: str` | 502 |
+      | `DirectCommitGeneratorError` | 直コミットの生成の失敗 | `script: str`・`reason: str` | 500 |
 
       `SourceAccess` は権限と作業場所の『使える配信元』。
       `WriteDeadlineExceededError` の `next_steps` は「検査のスクリプトの所要時間を確認してから再実行してください」、`WorktreeLoadingError` の `message` は `{worktree} を読み込み中です`、`next_steps` は「時間を空けて同じ呼び出しを再実行してください」。

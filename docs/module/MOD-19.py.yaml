@@ -31,8 +31,8 @@ functions:
       description: Markdown
     process: |-
       1. 配信元の説明書と種類のスキーマは、`outside_scope` が `True` なら先頭に `作業範囲の外（参考）` の行を置く
-      2. 使える配信元の一覧は、`作業場所: {cwd}（{配信元} のクローン本体 / ワークツリー）` の行と `| source | 権限 | description | when |` の表（作業中の配信元は権限に `（作業中）`。`when` 列は行を `<br>` でつなぎ、無ければ空）。`outside_sources` が `None` でなければ、空行・`作業範囲の外（参考）` の行・`| source | description | when |` の表を続ける（0 件は表の代わりに `なし` の行）。使える配信元が 0 件のときは、表の代わりに `使用できる配信元はありません。配信元にするときは /project-index:setup を実行します。` の行を置く。`warnings` が空でなければ、空行・`注意:` の行・警告ごとに `- {警告}` の行を続ける
-      3. 配信元の説明書は、`when` が空でなければ `使う場面:` の行と行ごとの `- {行}` を置いて空行を挟み、`instructions` をそのまま置き、`| kind | description |` の表を続ける。`refs` があれば `ブランチ: {,で繋いだ名前}`・`タグ: {同じ}` の行、`worktrees` があれば `| ワークツリー | ブランチ |` の表を続ける
+      2. 使える配信元の一覧は、`作業場所: {cwd}（{配信元} のクローン本体 / ワークツリー）` の行と `| source | 権限 | description | when | 直コミット |` の表（作業中の配信元は権限に `（作業中）`。`when` 列は行を `<br>` でつなぎ、無ければ空。`直コミット` 列は `direct_commit_kinds` を `, ` でつなぎ、無ければ空）。`outside_sources` が `None` でなければ、空行・`作業範囲の外（参考）` の行・`| source | description | when |` の表を続ける（0 件は表の代わりに `なし` の行）。使える配信元が 0 件のときは、表の代わりに `使用できる配信元はありません。配信元にするときは /project-index:setup を実行します。` の行を置く。`warnings` が空でなければ、空行・`注意:` の行・警告ごとに `- {警告}` の行を続ける
+      3. 配信元の説明書は、`when` が空でなければ `使う場面:` の行と行ごとの `- {行}` を置いて空行を挟み、`instructions` をそのまま置き、`| kind | description |` の表を続ける。`direct_commit` があれば、空行・`直コミット:` の行・`- ブランチ: {ブランチ}`・（`branches` があれば）`- 上書きできるブランチ: {, で繋いだ名前}`・`- 種類: {, で繋いだ種類}` の行を続ける。`refs` があれば `ブランチ: {,で繋いだ名前}`・`タグ: {同じ}` の行、`worktrees` があれば `| ワークツリー | ブランチ |` の表を続ける
       4. 種類のスキーマは、`metadata` が空でなければ `| 共通のキー | 列名 |` の表を置き、```yaml でスキーマの YAML を囲む
     unit_tests:
       - name: test_render_describe_markdown_when_source_when
@@ -84,4 +84,10 @@ functions:
         mock: なし
         expected: 先頭の行が `作業範囲の外（参考）`
         exception: '-'
+      - name: test_render_describe_markdown_when_direct_commit
+        case: 正常
+        summary: 直コミットの列と案内
+        condition: '一覧の sample の `direct_commit_kinds` が `[note]`、notes が空。説明書の `direct_commit` が `branch: develop`・`branches: [data]`・`kinds: [note]`'
+        mock: なし
+        expected: 'sample の行の `直コミット` 列が `note`、notes の行が空。説明書は種類の表の後に `直コミット:`・`- ブランチ: develop`・`- 上書きできるブランチ: data`・`- 種類: note` の行がある'
 visibility: internal

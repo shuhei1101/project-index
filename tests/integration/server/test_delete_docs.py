@@ -9,6 +9,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
+    from tests.integration.server.conftest import DirectCommitSource
+
 
 def load_yaml(text: str) -> Any:
     """形の分かっている YAML の文字列を読む。"""
@@ -525,3 +527,68 @@ def test_normal_when_unlink_nested_related(
     assert data["refs"] == [{"to": "n3", "type": "references"}]
     assert data["functions"][0]["refs"] == []
     assert result.data["unlinked"] == [{"id": "n1", "version": _version(referrer)}]
+
+
+def test_normal_when_direct_commit(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """直コミットで文書を消す（正常系）。"""
+    # 準備
+    direct = make_direct_commit_source(
+        files={"notes/n1.yaml": "id: n1\nname: メモ 1\n", "generated/notes.txt": "n1\n"}
+    )
+    env = make_server(direct.spec)
+    note = direct.develop / "notes" / "n1.yaml"
+    remote_before = run_git(direct.bare, "rev-parse", "develop").strip()
+    # 実行
+    result = env.call(
+        "delete_docs",
+        cwd=str(direct.local),
+        source="sample",
+        targets=[{"id": "n1", "expected_version": content_hash(note.read_text(encoding="utf-8"))}],
+        commit={"message": "docs: note を消す"},
+    )
+    # 検証
+    data = result.data
+    remote_after = run_git(direct.bare, "rev-parse", "develop").strip()
+    changed = run_git(direct.bare, "show", "--name-only", "--format=", remote_after).split()
+    assert not result.is_error, result.text
+    assert data["applied"] is True
+    assert data["results"][0]["status"] == "deleted"
+    assert data["commit"]["branch"] == "develop"
+    assert data["commit"]["sha"] == remote_after
+    assert run_git(direct.bare, "rev-parse", f"{remote_after}~1").strip() == remote_before
+    assert sorted(changed) == ["generated/notes.txt", "notes/n1.yaml"]
+    assert not note.exists()
+    assert run_git(direct.develop, "status", "--porcelain").strip() == ""
+
+
+def test_error_when_direct_commit_kind_not_allowed(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """直コミットを許可していない種類の文書を消す（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source(files={"rules/r1.yaml": "id: r1\nname: 規約 1\n"})
+    env = make_server(direct.spec)
+    rule = direct.develop / "rules" / "r1.yaml"
+    remote_before = run_git(direct.bare, "rev-parse", "develop").strip()
+    head = run_git(direct.develop, "rev-parse", "HEAD").strip()
+    # 実行
+    result = env.call(
+        "delete_docs",
+        cwd=str(direct.local),
+        source="sample",
+        targets=[{"id": "r1", "expected_version": content_hash(rule.read_text(encoding="utf-8"))}],
+        commit={"message": "docs: rule を消す"},
+    )
+    # 検証
+    assert result.is_error
+    assert "rule は直コミットを許可していない種類です" in result.text
+    assert "index: 0" in result.text
+    assert run_git(direct.bare, "rev-parse", "develop").strip() == remote_before
+    assert run_git(direct.develop, "rev-parse", "HEAD").strip() == head
+    assert rule.exists()

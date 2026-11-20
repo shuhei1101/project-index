@@ -285,3 +285,93 @@ class RevisionExportTimeoutError(ProjectIndexError):
     operation: str = "revision_export"
     commit: str = ""
     limit_sec: float = 0
+
+
+@dataclass(kw_only=True)
+class DirectCommitNotConfiguredError(ProjectIndexError):
+    """直コミットを使用できない配信元。"""
+
+    status: ClassVar[int] = 409
+    source_id: str = ""
+    reason: str = ""
+
+
+@dataclass(kw_only=True)
+class DirectCommitNotPermittedError(ProjectIndexError):
+    """直コミットを呼べない作業場所。"""
+
+    status: ClassVar[int] = 403
+    source_id: str = ""
+    kinds: list[str] = field(default_factory=list[str])
+
+
+@dataclass(kw_only=True)
+class BranchNotAllowedError(ProjectIndexError):
+    """上書きできないブランチ。"""
+
+    status: ClassVar[int] = 403
+    branch: str = ""
+    allowed: list[str] = field(default_factory=list[str])
+
+
+@dataclass(kw_only=True)
+class CommitWorktreeNotFoundError(ProjectIndexError):
+    """コミットするブランチのワークツリーが無い。"""
+
+    status: ClassVar[int] = 409
+    branch: str = ""
+
+
+@dataclass(kw_only=True)
+class UnpushedCommitsError(ProjectIndexError):
+    """ワークツリーの未プッシュのコミット。"""
+
+    status: ClassVar[int] = 409
+    worktree: str = ""
+    ahead: int = 0
+    behind: int = 0
+
+
+@dataclass(kw_only=True)
+class UncommittedChangesError(ProjectIndexError):
+    """書き込むファイルの未コミットの変更。"""
+
+    status: ClassVar[int] = 409
+    paths: list[str] = field(default_factory=list[str])
+
+
+@dataclass(kw_only=True)
+class FetchFailedError(ProjectIndexError):
+    """リモートからの取得の失敗。"""
+
+    status: ClassVar[int] = 502
+    stderr: str = ""
+
+
+@dataclass(kw_only=True)
+class PushRejectedError(ProjectIndexError):
+    """リモートにプッシュを断られた。"""
+
+    status: ClassVar[int] = 409
+    reason: str = ""
+
+
+@dataclass(kw_only=True)
+class PushFailedError(ProjectIndexError):
+    """プッシュの失敗・結果の不明。"""
+
+    status: ClassVar[int] = 502
+    stderr: str = ""
+    # 届いたかを確かめられなかったか
+    unknown: bool = False
+    # 届いたか不明なときに、作ったコミットの SHA
+    commit: str = ""
+
+
+@dataclass(kw_only=True)
+class DirectCommitGeneratorError(ProjectIndexError):
+    """直コミットの生成の失敗。"""
+
+    status: ClassVar[int] = 500
+    script: str = ""
+    reason: str = ""

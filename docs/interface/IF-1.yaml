@@ -482,6 +482,36 @@ flows:
       - 説明書と種類の一覧を返し、`refs`・`worktrees` を返さない
       - '`worktree` に `.claude/worktrees/x` を指定すると `isError: true` で、company は `worktree` を指定できない理由を返す'
     test: test_normal_when_disk_storage
+  - name: 正常系（直コミットを呼べる作業場所から説明を読む）
+    summary: '`scope` に該当しないが直コミットを呼べる作業場所から、配信元の一覧と説明書を、直コミットできる種類とともに返す'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 配信元
+        description: '[文書の書き込み](id:IF-6) の正常系（直コミットする）の配信元'
+      - name: 入力
+        description: '1 回目は引数なし、2 回目は `source: sample`。`cwd` は手元の作業場所'
+    flow: |-
+      <!-- map: {"title": "正常系（直コミットを呼べる作業場所から説明を読む）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as describe
+
+        C->>T: 引数なし, cwd: 手元の作業場所
+        T->>T: sample の scope に該当せず、direct_commit.scope に該当する
+        T-->>C: sample（access: commit・直コミットできる種類 note）
+        C->>T: source: sample
+        T-->>C: 説明書・種類・直コミット（branch: develop・kinds: note）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '引数なしの結果の sample の行が `access: commit` で、`direct_commit_kinds` が `[note]`'
+      - '`source: sample` の結果が説明書と種類の表に加えて、`direct_commit.branch` が `develop`、`direct_commit.kinds` が `[note]`'
+      - '直コミットの呼べる作業場所でも `scope` でもない作業場所からの `source: sample` は `SourceNotReadableError`'
+    test: test_normal_when_direct_commit_workplace
 lead: '引数の数で配信元の一覧・説明書と種類・種類のスキーマを返却する `describe` の入出力を定め、`describe` を修正するときに参照する。'
 tags:
   - name: topic:配信元
@@ -490,7 +520,7 @@ tags:
   - name: topic:スキーマ
   - name: tool:mcp
 identifier: describe
-permissions: 引数なしは不要。`source` を渡すときはその配信元の `scope.read` か `scope.write` に `cwd` が当たること
+permissions: 引数なしは不要。`source` を渡すときはその配信元の `scope.read` か `scope.write` に `cwd` が当たるか、端末の設定の `sources[].direct_commit` の呼べる作業場所（`scope` か `kinds` のどれかの glob）に `cwd` が該当すること。直コミットの設定に直コミットだけを断る違反がある配信元は、呼べる作業場所からも説明を返却しない
 idempotent: true
 side_effects: なし
 callers:
@@ -501,6 +531,7 @@ callers:
   - SC-6#scenarios[異常シナリオ（作業範囲の外の参照を断る配信元を指す）]
   - SC-6#scenarios[正常シナリオ（instructions の調査の案内を受け取る）]
   - SC-6#scenarios[正常シナリオ（使う場面を書き換えた後に接続する）]
+  - SC-15#scenarios[正常シナリオ]
 exclusivity: '読み取りだけで排他しない（`readOnlyHint: true`）'
 request:
   - name: source
@@ -558,7 +589,7 @@ response:
     description: 配信元の ID
     notes: 引数なしのとき
   - name: sources[].access
-    type: Literal['read', 'write']
+    type: Literal['read', 'write', 'commit']
     description: 今の作業場所からの権限
   - name: sources[].current
     type: bool
@@ -628,6 +659,22 @@ response:
     type: str | None
     description: ワークツリーが checkout しているブランチ
     notes: detached HEAD のときは `null`
+  - name: sources[].direct_commit_kinds[]
+    type: str
+    description: 今の作業場所から直コミットできる種類の ID
+    notes: '引数なしのとき。端末の設定の `sources[].direct_commit` の呼べる作業場所に `cwd` が該当する種類だけ。`scope` に該当せず直コミットだけができる配信元は `access` が `commit`。1 つも無いときはキーを持たない（`format: markdown` は表の `直コミット` 列を空にする）'
+  - name: direct_commit.branch
+    type: str
+    description: 配信元の設定の `direct_commit.branch`
+    notes: '`source` だけのときで、今の作業場所から直コミットできる種類が 1 つ以上あるとき'
+  - name: direct_commit.branches[]
+    type: str
+    description: 配信元の設定の `direct_commit.branches[]`
+    notes: '`direct_commit.branch` と同じ'
+  - name: direct_commit.kinds[]
+    type: str
+    description: 今の作業場所から直コミットできる種類の ID
+    notes: '`direct_commit.branch` と同じ。`format: markdown` は種類の表の後に「直コミット」の見出しと、ブランチ・種類の箇条書きで出す'
 response_example: |-
   ```markdown
   作業場所: /path/to/sample（sample のクローン本体）

@@ -1682,6 +1682,621 @@ flows:
       - '`isError: true` で、`project-index` に書き込めないことと、今の作業場所から使用できる配信元の一覧を返却する'
       - クローンのファイルは変わらない
     test: test_error_when_builtin_source_written
+  - name: 正常系（直コミットする）
+    summary: '`commit` を指定した `create` で、develop のワークツリーに書き込み、書き込んだファイルと生成物だけをコミットしてプッシュする'
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに配信元とテスト用のベアリポジトリを作り、project-index のアプリをテストのクライアントで呼ぶ）
+      - name: 直コミットの配信元
+        description: '正常系の sample に、`develop` を指すワークツリー `.claude/worktrees/develop`・`origin` のベアリポジトリ（`master`・`develop`）・文書の一覧を書き出す `generators[]`・配信元の設定の `direct_commit`（`branch: develop`・`kinds: [note]`）と、端末の設定の `sources[].direct_commit.scope`（手元の作業場所）を加えたもの'
+        notes: 種類 `note` は直コミットを許可し、種類 `rule` は許可しない。develop のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い
+      - name: 入力
+        description: '`cwd` に手元の作業場所、`commit: {message: "docs: note を追加する"}`、種類 `note` の `create`'
+        notes: 手元の作業場所は sample の `scope.write` に該当しない空のフォルダ
+    flow: |-
+      <!-- map: {"title": "正常系（直コミットする）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー develop
+        participant R as リモート
+
+        C->>T: cwd: 手元の作業場所, commit: message, operations: create note
+        T->>T: 直コミットの設定・呼べる作業場所・コミットするブランチのワークツリーを確認する
+        T->>T: リポジトリの排他を取る
+        R-->>T: develop を取得する
+        T->>WT: 早送りで取り込み、HEAD と未コミットの変更を確認する
+        T->>T: スキーマ・validators・許可する種類・秘密の値の検査を実行する
+        T->>WT: 文書を書き込み、generators を実行する
+        T->>WT: 書き込んだファイルと生成物だけをコミットする
+        T->>R: develop へプッシュする
+        T-->>C: applied: true、version、commit（sha・branch・retried）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`applied: true` で、`results[0].status` が `created`、`commit.branch` が `develop`、`commit.retried` が `false`'
+      - リモートの `develop` に 1 コミットが増え、その SHA が `commit.sha` と一致する。コミットの説明は `commit.message` で、変更は作った文書のファイルと生成物だけ
+      - develop のワークツリーの HEAD が `origin/develop` と同じで、`git status` に変更が出ない
+      - ワークツリー x とクローン本体は変わらない
+    test: test_normal_when_direct_commit
+  - name: 正常系（直コミットで他の未コミットの変更を残す）
+    summary: develop のワークツリーにある文書と関係しない未コミットの変更を、コミットに含めずに残す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）と同じ
+      - name: 他の未コミットの変更
+        description: develop のワークツリーで、文書と関係しないファイル `memo.txt` を書き換えてコミットしていない
+      - name: 入力
+        description: 正常系（直コミットする）と同じ
+    flow: |-
+      <!-- map: {"title": "正常系（直コミットで他の未コミットの変更を残す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー develop
+        participant R as リモート
+
+        C->>T: commit: message, operations: create note
+        T->>WT: 書き込むファイルと生成物に未コミットの変更が無いことを確認する（memo.txt は対象外）
+        T->>WT: 文書と生成物だけを git add してコミットする
+        T->>R: develop へプッシュする
+        T-->>C: applied: true、commit
+      ```
+
+      <!-- /map -->
+    expected:
+      - リモートの `develop` に増えた 1 コミットの変更に `memo.txt` が入らない
+      - develop のワークツリーの `memo.txt` は、プッシュの後もコミットしていない変更のまま残る
+    test: test_normal_when_direct_commit_keeps_other_changes
+  - name: 正常系（直コミットのブランチを上書きする）
+    summary: '`commit.branch` に `direct_commit.branches[]` に該当するブランチを指定し、そのブランチのワークツリーでコミットしてプッシュする'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）の sample に、`develop` から分けたブランチ `data`（リモートにも作る）と、`data` を指すワークツリー `.claude/worktrees/data` を加え、配信元の設定の `direct_commit.branches` を `[data]` にしたもの
+        notes: '`direct_commit.branch` は `develop` のまま'
+      - name: 入力
+        description: '正常系（直コミットする）の入力に `commit.branch: data` を加えたもの'
+    flow: |-
+      <!-- map: {"title": "正常系（直コミットのブランチを上書きする）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー data
+        participant R as リモート
+
+        C->>T: commit: message・branch: data, operations: create note
+        T->>T: data が direct_commit.branches に該当し、data のワークツリーがあることを確認する
+        R-->>T: data を取得する
+        T->>WT: 文書を書き込み、書き込んだファイルと生成物だけをコミットする
+        T->>R: data へプッシュする
+        T-->>C: applied: true、commit（branch: data）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`commit.branch` が `data` で、リモートの `data` に作った文書のコミットが 1 つ増える'
+      - リモートの `develop` と、develop のワークツリーは変わらない
+    test: test_normal_when_direct_commit_branch_overridden
+  - name: 正常系（直コミットでリモートが先に進んでいる）
+    summary: リモートの `develop` が先に進んでいるときは、早送りで取り込んでから書き込み、プッシュする
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）と同じ
+      - name: 先に進んだリモート
+        description: 別のクローンから、リモートの `develop` へ文書と関係しないファイルの変更を 1 コミットだけプッシュしておく
+        notes: develop のワークツリーはまだ取り込んでいない
+      - name: 入力
+        description: 正常系（直コミットする）と同じ
+    flow: |-
+      <!-- map: {"title": "正常系（直コミットでリモートが先に進んでいる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー develop
+        participant R as リモート
+
+        C->>T: commit: message, operations: create note
+        R-->>T: 先に進んだ develop を取得する
+        T->>WT: 早送りで取り込む
+        T->>WT: 文書を書き込み、コミットする
+        T->>R: develop へプッシュする
+        T-->>C: applied: true、commit（retried: false）
+      ```
+
+      <!-- /map -->
+    expected:
+      - リモートの `develop` が、先にプッシュしたコミットの上に作った文書のコミットを 1 つ持つ
+      - '`commit.retried` が `false`'
+    test: test_normal_when_direct_commit_remote_ahead
+  - name: 正常系（直コミットのプッシュが 1 回断られる）
+    summary: 1 回目のプッシュが断られたら、コミットとファイルを戻して取得からやり直し、2 回目でプッシュする
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）と同じ
+      - name: 1 回だけ断るリモート
+        description: リモートの `pre-receive` のフックが、マーカーのファイルで回数を数え、最初のプッシュだけを断る
+      - name: 入力
+        description: 正常系（直コミットする）と同じ
+    flow: |-
+      <!-- map: {"title": "正常系（直コミットのプッシュが 1 回断られる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー develop
+        participant R as リモート
+
+        C->>T: commit: message, operations: create note
+        T->>WT: 文書を書き込み、コミットする
+        T->>R: develop へプッシュする
+        R-->>T: 断られる
+        T->>WT: コミットを取り消し、書き込んだファイルと生成物を戻す
+        R-->>T: develop を取得し直す
+        T->>WT: 文書を書き込み直し、コミットする
+        T->>R: develop へプッシュする
+        T-->>C: applied: true、commit（retried: true）
+      ```
+
+      <!-- /map -->
+    expected:
+      - リモートの `develop` に、作った文書のコミットが 1 つだけ増える
+      - '`commit.retried` が `true`'
+      - develop のワークツリーの HEAD が `origin/develop` と同じ
+    test: test_normal_when_direct_commit_push_rejected_once
+  - name: 正常系（直コミットを試しに書く）
+    summary: '`commit` と `dry_run: true` で、リモートと通信せずに検査の結果と差分だけを返却する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）の sample の `origin` の URL を、無いフォルダに向けたもの
+        notes: リモートと通信すると失敗する
+      - name: 入力
+        description: '正常系（直コミットする）の入力に `dry_run: true` を加えたもの'
+    flow: |-
+      <!-- map: {"title": "正常系（直コミットを試しに書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: commit: message, dry_run: true, operations: create note
+        T->>T: 権限・ブランチ・ワークツリー・検査（秘密の値を含む）を確認する
+        T-->>C: applied: false と差分
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`applied` が `false` で、`results[0].diff` に差分があり、`commit` を返却しない'
+      - リモートと develop のワークツリーは変わらない
+    test: test_normal_when_direct_commit_dry_run
+  - name: 異常系（直コミットの設定が無い・DirectCommitNotConfiguredError）
+    summary: 直コミットの設定が無いか使用できない配信元への `commit` を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 配信元
+        description: '1 回目は `direct_commit` の無い sample、2 回目は `direct_commit.kinds` に `documents[]` に無い `meme` を加えた sample、3 回目は `direct_commit` を持つ `storage.type: disk` の配信元 company'
+        notes: 2 回目の sample は配信を続ける（[設定・スクリプトを変える](id:SC-10) の直コミットの設定の違反）
+      - name: 入力
+        description: '正常系（直コミットする）と同じ。3 回目は `source: company`'
+    flow: |-
+      <!-- map: {"title": "異常系（直コミットの設定が無い・DirectCommitNotConfiguredError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: commit: message, operations: create note
+        T->>T: 直コミットの設定が無いか、使用できない
+        T-->>C: isError（配信元の ID と理由）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '3 回とも `isError: true` で、配信元の ID と、設定が無い・`meme` が `documents[]` に無い・`disk` の配信元である理由を返却する'
+      - どの配信元のファイルとリモートも変わらない
+    test: test_error_when_direct_commit_not_configured
+  - name: 異常系（直コミットを許可していない種類・ValidationFailedError）
+    summary: 直コミットを許可していない種類の文書を作る `commit` を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）と同じ
+      - name: 入力
+        description: 正常系（直コミットする）の `create` の `kind` を `rule` にしたもの
+    flow: |-
+      <!-- map: {"title": "異常系（直コミットを許可していない種類・ValidationFailedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: commit: message, operations: create rule
+        T->>T: 種類 rule が direct_commit.kinds に無い
+        T-->>C: isError（添字 0・種類 rule は直コミットを許可していない）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、添字 0 の違反として種類 `rule` は直コミットを許可していないことを返却する'
+      - リモートと develop のワークツリーは変わらない
+    test: test_error_when_direct_commit_kind_not_allowed
+  - name: 異常系（直コミットで許可していない種類の文書が書き換わる・ValidationFailedError）
+    summary: 改名で参照元の許可していない種類の文書が書き換わる `commit` を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）の sample の `develop` に、種類 `note` の文書 1 と、`related` が文書 1 を指す種類 `rule` の文書 r1 をコミット済みのもの
+      - name: 入力
+        description: 文書 1 の `rename`（`new_id`）と `commit`
+    flow: |-
+      <!-- map: {"title": "異常系（直コミットで許可していない種類の文書が書き換わる・ValidationFailedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: commit: message, operations: rename 文書 1
+        T->>T: 参照元の r1（種類 rule）が書き換わる
+        T-->>C: isError（添字 0・r1・種類 rule は直コミットを許可していない）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、改名で書き換わる文書 r1 の種類 `rule` は直コミットを許可していないことを返却する'
+      - リモートと develop のワークツリーは変わらない
+    test: test_error_when_direct_commit_rewrites_other_kind
+  - name: 異常系（直コミットで秘密の値を含む・ValidationFailedError）
+    summary: 書き込む値に秘密の値の規則に該当する値があれば、項目のパスと種類だけを返却して断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）と同じ
+      - name: 入力
+        description: 正常系（直コミットする）の `create` の `data`。1 回目は `description` に `ghp_` で始まる 40 文字の値、2 回目は `description` に `user@example.com` を含む
+        notes: 値はテストの中で組み立て、テストのファイルにトークンの形のまま書かない
+    flow: |-
+      <!-- map: {"title": "異常系（直コミットで秘密の値を含む・ValidationFailedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: commit: message, operations: create note（秘密の値を含む）
+        T->>T: 差分の追加の行が秘密の値の規則に該当する
+        T-->>C: isError（添字 0・項目のパス・秘密の値の種類）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目は `isError: true` で、違反の `path` が `description`、決まりが `秘密の値（github-token）を含む`'
+      - 2 回目の決まりが `秘密の値（email-address）を含む`
+      - 応答のどこにも入力した値の文字列が無い
+      - リモートと develop のワークツリーは変わらない
+    test: test_error_when_direct_commit_contains_secret
+  - name: 異常系（直コミットを呼べる作業場所に該当しない・DirectCommitNotPermittedError）
+    summary: '`cwd` が直コミットの呼べる作業場所に該当しない呼び出しを断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: '正常系（直コミットする）と同じ。3 回目だけ端末の設定の `sources[].direct_commit.kinds` に `note: [別の作業場所]` を加える'
+      - name: 入力
+        description: 正常系（直コミットする）の入力の `cwd` を、1 回目は手元の作業場所でない空のフォルダ、2 回目は sample のフォルダ（`scope.write` に該当する）にしたもの。3 回目は手元の作業場所のまま
+    flow: |-
+      <!-- map: {"title": "異常系（直コミットを呼べる作業場所に該当しない・DirectCommitNotPermittedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: cwd: 別の作業場所, commit: message, operations: create note
+        T->>T: cwd が種類 note の呼べる作業場所に該当しない
+        T-->>C: isError（今の作業場所から直コミットできない・種類 note）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '3 回とも `isError: true` で、今の作業場所から sample の直コミットはできないことと種類 `note` を返却する'
+      - リモートと develop のワークツリーは変わらない
+    test: test_error_when_direct_commit_not_permitted
+  - name: 異常系（上書きできないブランチ・BranchNotAllowedError）
+    summary: '`commit.branch` が `direct_commit.branches[]` に該当しない呼び出しを断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットのブランチを上書きする）と同じ
+      - name: 入力
+        description: '正常系（直コミットする）の入力に `commit.branch: master` を加えたもの'
+    flow: |-
+      <!-- map: {"title": "異常系（上書きできないブランチ・BranchNotAllowedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: commit: message・branch: master, operations: create note
+        T->>T: master が direct_commit.branch でも branches でもない
+        T-->>C: isError（上書きできるブランチの一覧）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、`master` は上書きできないことと、上書きできるブランチ `develop`・`data` を返却する'
+      - リモートと全てのワークツリーは変わらない
+    test: test_error_when_branch_not_allowed
+  - name: 異常系（コミットするブランチのワークツリーが無い・CommitWorktreeNotFoundError）
+    summary: コミットするブランチを指すワークツリーが無いときは、クローン本体を切り替えずに断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）の sample の `direct_commit.branch` を、ワークツリーの無い `main` にしたもの
+      - name: 入力
+        description: 正常系（直コミットする）と同じ
+    flow: |-
+      <!-- map: {"title": "異常系（コミットするブランチのワークツリーが無い・CommitWorktreeNotFoundError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: commit: message, operations: create note
+        T->>T: main を指すワークツリーが worktrees に無い
+        T-->>C: isError（ブランチ main）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、コミットするブランチ `main` を指すワークツリーが無いことを返却する'
+      - リモートと sample のクローン本体・ワークツリーは変わらない
+    test: test_error_when_commit_worktree_not_found
+  - name: 異常系（直コミットで未プッシュのコミットがある・UnpushedCommitsError）
+    summary: develop のワークツリーにプッシュしていないコミットがあれば、何も書き込まずに断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）と同じ
+      - name: 未プッシュのコミット
+        description: develop のワークツリーで、文書と関係しないファイルの変更を 1 コミットだけコミットしてプッシュしていない
+      - name: 入力
+        description: 正常系（直コミットする）と同じ
+    flow: |-
+      <!-- map: {"title": "異常系（直コミットで未プッシュのコミットがある・UnpushedCommitsError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー develop
+        participant R as リモート
+
+        C->>T: commit: message, operations: create note
+        R-->>T: develop を取得する
+        T->>WT: HEAD が origin/develop より 1 コミット先にある
+        T-->>C: isError（ワークツリーのパス・先行のコミット数）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、develop のワークツリーにプッシュしていないコミットが 1 つあることを返却する'
+      - リモートは変わらず、develop のワークツリーの未プッシュのコミットは残る。文書のファイルは作られない
+    test: test_error_when_unpushed_commits
+  - name: 異常系（直コミットで書き込むファイルに未コミットの変更がある・UncommittedChangesError）
+    summary: 書き込む文書のファイルにコミットしていない変更があれば、何も書き込まずに断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）の sample の `develop` に、種類 `note` の文書 1 をコミット済みのもの
+      - name: 未コミットの変更
+        description: develop のワークツリーで文書 1 のファイルを書き換えてコミットしていない
+      - name: 入力
+        description: 文書 1 の `update`（書き換えた後のファイルの `version`）と `commit`
+    flow: |-
+      <!-- map: {"title": "異常系（直コミットで書き込むファイルに未コミットの変更がある・UncommittedChangesError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー develop
+
+        C->>T: commit: message, operations: update 文書 1
+        T->>WT: 文書 1 のファイルにコミットしていない変更がある
+        T-->>C: isError（文書 1 のファイルのパス）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、文書 1 のファイルにコミットしていない変更があることを、そのパスとともに返却する'
+      - リモートは変わらず、develop のワークツリーの文書 1 のファイルはコミットしていない変更のまま
+    test: test_error_when_uncommitted_changes
+  - name: 異常系（リモートから取得できない・FetchFailedError）
+    summary: リモートから取得できなければ、何も書き込まずに断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）の sample の `origin` の URL を、無いフォルダに向けたもの
+      - name: 入力
+        description: 正常系（直コミットする）と同じ
+    flow: |-
+      <!-- map: {"title": "異常系（リモートから取得できない・FetchFailedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant R as リモート
+
+        C->>T: commit: message, operations: create note
+        T->>R: develop を取得する
+        R-->>T: 失敗する
+        T-->>C: isError（git の標準エラーの末尾）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、リモートから取得できないことと、git が返した理由を返却する'
+      - develop のワークツリーは変わらず、文書のファイルは作られない
+    test: test_error_when_fetch_failed
+  - name: 異常系（プッシュが 2 回断られる・PushRejectedError）
+    summary: やり直した後のプッシュも断られたら、コミットとファイルを戻して理由を返却する
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）と同じ
+      - name: 常に断るリモート
+        description: リモートの `pre-receive` のフックが、全てのプッシュを断る
+      - name: 入力
+        description: 正常系（直コミットする）と同じ
+    flow: |-
+      <!-- map: {"title": "異常系（プッシュが 2 回断られる・PushRejectedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー develop
+        participant R as リモート
+
+        C->>T: commit: message, operations: create note
+        T->>R: develop へプッシュする
+        R-->>T: 断られる
+        T->>WT: 戻して取得からやり直す
+        T->>R: develop へプッシュする
+        R-->>T: 断られる
+        T->>WT: コミットを取り消し、書き込んだファイルと生成物を戻す
+        T-->>C: isError（リモートが返した理由）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、2 回ともプッシュが断られたことと、リモートが返した理由を返却する'
+      - リモートは変わらず、develop のワークツリーの HEAD が `origin/develop` と同じで、文書のファイルと生成物の変更が残らない
+    test: test_error_when_push_rejected
+  - name: 異常系（プッシュで通信に失敗する・PushFailedError）
+    summary: プッシュが通信に失敗したら、コミットとファイルを戻して理由を返却する
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）の sample の `origin` の取得の URL はそのままにし、プッシュの URL（`pushurl`）だけを無いフォルダに向けたもの
+      - name: 入力
+        description: 正常系（直コミットする）と同じ
+    flow: |-
+      <!-- map: {"title": "異常系（プッシュで通信に失敗する・PushFailedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー develop
+        participant R as リモート
+
+        C->>T: commit: message, operations: create note
+        T->>R: develop へプッシュする
+        R-->>T: 通信に失敗する
+        T->>WT: コミットを取り消し、書き込んだファイルと生成物を戻す
+        T-->>C: isError（git の標準エラーの末尾）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、プッシュで通信に失敗したことと、git が返した理由を返却する'
+      - develop のワークツリーの HEAD が `origin/develop` と同じで、文書のファイルと生成物の変更が残らない
+    test: test_error_when_push_failed
+  - name: 異常系（直コミットの引数の組み合わせの誤り・InvalidArgumentError）
+    summary: '`commit` を `atomic: false` か `worktree` と同時に指定した呼び出しを断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）と同じ
+      - name: 入力
+        description: '正常系（直コミットする）の入力に、1 回目は `atomic: false`、2 回目は `worktree`（develop のワークツリー）を加えたもの'
+    flow: |-
+      <!-- map: {"title": "異常系（直コミットの引数の組み合わせの誤り・InvalidArgumentError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: commit: message, atomic: false, operations: create note
+        T-->>C: isError（commit は atomic: true の書き込みだけで使用できる）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目は `isError: true` で、コミットの指定は `atomic: true` の書き込みだけで使用できることを返却する'
+      - '2 回目は `isError: true` で、`commit` と `worktree` は同時に指定できないことを返却する'
+      - リモートと develop のワークツリーは変わらない
+    test: test_error_when_direct_commit_invalid_arguments
+  - name: 異常系（直コミットで生成が失敗する・DirectCommitGeneratorError）
+    summary: '`generators[]` が失敗したら、コミットせずに書き込んだファイルを戻して断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（直コミットする）の sample の `generators[]` を、終了コード 1 で終わるスクリプトに差し替えたもの
+      - name: 入力
+        description: 正常系（直コミットする）と同じ
+    flow: |-
+      <!-- map: {"title": "異常系（直コミットで生成が失敗する・DirectCommitGeneratorError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー develop
+
+        C->>T: commit: message, operations: create note
+        T->>WT: 文書を書き込み、generators を実行する
+        WT-->>T: 生成が失敗する
+        T->>WT: 書き込んだファイルと生成物を戻す
+        T-->>C: isError（スクリプトのパスと理由）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、生成のスクリプトが失敗したこととそのパスを返却する'
+      - リモートは変わらず、develop のワークツリーの HEAD が `origin/develop` と同じで、`git status` に変更が出ない
+    test: test_error_when_direct_commit_generator_failed
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -1692,9 +2307,9 @@ tags:
 aliases:
   - 'write_docs'
 identifier: write_docs
-permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーにだけ書く
+permissions: 対象の配信元の `scope.write` に `cwd` が当たること。Git の配信元はワークツリーにだけ書く。`commit` を指定した呼び出しは、`scope.write` の代わりに端末の設定の `sources[].direct_commit` に `cwd` が該当すること
 idempotent: false
-side_effects: 作業ツリー（Git 管理外の配信元はそのフォルダ）の文書の YAML と、`records`・`body_file` の行の文書の本文のファイルを作る・書き換える。`generators[]` のスクリプトを流して生成物を書き出す。Git 管理外の配信元では、`documents[].write_dates` が `false` の種類を除いてメタデータの `created`・`updated` を付ける。
+side_effects: 作業ツリー（Git 管理外の配信元はそのフォルダ）の文書の YAML と、`records`・`body_file` の行の文書の本文のファイルを作る・書き換える。`generators[]` のスクリプトを流して生成物を書き出す。Git 管理外の配信元では、`documents[].write_dates` が `false` の種類を除いてメタデータの `created`・`updated` を付ける。`commit` を指定した呼び出しは、コミットするブランチのワークツリーで操作が書き込んだファイルと生成物をコミットし、リモートへプッシュする。
 callers:
   - SC-7#scenarios[正常シナリオ]
   - SC-7#scenarios[正常シナリオ（変更していない項目の引用符を保つ）]
@@ -1711,7 +2326,25 @@ callers:
   - SC-7#scenarios[異常シナリオ（一括置換の後の文書が検査に合格しない）]
   - SC-7#scenarios[正常シナリオ（日時を付けない種類に Git 管理外の配信元で書く）]
   - SC-7#scenarios[正常シナリオ（本文のファイルを持たない要素を書く）]
-exclusivity: 配信元ごとの排他ロックの中で、読み込み・バージョンの確認・検査・書き込みを行う。後から来た呼び出しはロックを待つ
+  - SC-15#scenarios[正常シナリオ]
+  - SC-15#scenarios[正常シナリオ（ワークツリーに他の未コミットの変更がある）]
+  - SC-15#scenarios[正常シナリオ（コミットするブランチを上書きする）]
+  - SC-15#scenarios[正常シナリオ（リモートが先に進んでいる）]
+  - SC-15#scenarios[正常シナリオ（プッシュが 1 回断られる）]
+  - SC-15#scenarios[正常シナリオ（試しに書く）]
+  - SC-15#scenarios[異常シナリオ（直コミットを許可していない種類）]
+  - SC-15#scenarios[異常シナリオ（呼べる作業場所に該当しない）]
+  - SC-15#scenarios[異常シナリオ（ワークツリーに未プッシュのコミットがある）]
+  - SC-15#scenarios[異常シナリオ（書き込むファイルに未コミットの変更がある）]
+  - SC-15#scenarios[異常シナリオ（秘密の値を含む）]
+  - SC-15#scenarios[異常シナリオ（プッシュが 2 回断られる）]
+  - SC-15#scenarios[異常シナリオ（リモートに接続できない）]
+  - SC-15#scenarios[異常シナリオ（プッシュで通信に失敗する）]
+  - SC-15#scenarios[異常シナリオ（許可していない種類の文書が書き換わる）]
+  - SC-15#scenarios[異常シナリオ（atomic を外して指定する）]
+  - SC-15#scenarios[異常シナリオ（コミットするブランチのワークツリーが無い）]
+  - SC-10#scenarios[異常シナリオ（直コミットの設定が検証に通らない）]
+exclusivity: 配信元ごとの排他ロックの中で、読み込み・バージョンの確認・検査・書き込みを行う。後から来た呼び出しはロックを待つ。`commit` を指定した呼び出しは、制約「直コミットの排他」のリポジトリの単位の排他も取る
 request:
   - name: source
     type: str
@@ -1899,6 +2532,27 @@ request:
     location: argument
     description: 置換する項目のパス。項目の配下の文字列も置換する。`@body` は本文のファイルを指す
     notes: '`replace_text` だけ。`@body` は `records`・`body_file` の行の文書のうち本文のファイルの拡張子が `.md` の文書だけに適用し、ほかの文書では無視する。共通のキーは列名へ読み替える'
+  - name: commit
+    type: '{message: str, branch: str | None} | None'
+    required: false
+    default: なし（コミットとプッシュをしない）
+    location: argument
+    description: 書き込みの後に、コミットするブランチのワークツリーでコミットしてプッシュする指定（直コミット）
+    constraints: '`atomic: true` のときだけ'
+    notes: 書き込む先はコミットするブランチのワークツリーに決定するため、`worktree` と同時には受けない。権限の判定は `scope.write` の代わりに端末の設定の `sources[].direct_commit` で行う（制約「直コミットの権限」）
+  - name: commit.message
+    type: str
+    required: true
+    location: argument
+    description: コミットの説明
+    constraints: 空白だけでない
+  - name: commit.branch
+    type: str | None
+    required: false
+    default: なし（配信元の設定の `direct_commit.branch`）
+    location: argument
+    description: コミットしてプッシュするブランチ。この呼び出しだけ `direct_commit.branch` を上書きする
+    constraints: '`direct_commit.branch` か、`direct_commit.branches[]` の名前・glob に該当するブランチ'
 request_example: |-
   ```json
   {
@@ -1955,6 +2609,18 @@ response:
     type: int
     description: 文書ごとの置換の件数（本文のファイルの件数を含む）
     notes: '`replace_text` だけ。置換した文書ごとに同じ `index` で 1 行ずつ返却し、置換が 0 件の文書の行は返却しない'
+  - name: commit.sha
+    type: str
+    description: プッシュしたコミットの SHA（40 桁）
+    notes: '`commit` を指定し、`dry_run: false` で書き込んだときだけ。操作がどのファイルも書き換えなかったときはコミットせず、コミットするブランチの今の HEAD の SHA にする'
+  - name: commit.branch
+    type: str
+    description: プッシュしたブランチ
+    notes: '`commit.sha` と同じ'
+  - name: commit.retried
+    type: bool
+    description: プッシュが 1 回断られ、取り込みからやり直したか
+    notes: '`commit.sha` と同じ'
 response_example: |-
   ```json
   {"applied": true, "results": [
@@ -1985,7 +2651,7 @@ exceptions:
     condition: '`update`・`replace` の `id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
   - name: InvalidArgumentError
-    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先を行の `paths` の先頭から決められない（`records` を持つ行で先頭が空か glob を含む・持たない行で先頭が glob を含まないか、最後の段の `*` を ID に置き換えた後に glob が残るか、決めた配置先が行の `paths` に当たらない）・`create` の配置先が行の `exclude[]` に当たる（`/` を含む値はパス、含まない値はファイル名で当てる）・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`rename` に `new_id`・`new_path` がどちらも無い・ID がパスの文書に `new_id` を渡した・`body_file` を持たない `records` の行の文書に `new_path` を渡した・`new_path` が種類の行の `paths` に当たらないか `exclude[]` に当たるか既にあるファイルを指す・`replace_text` に `filter`・`old`・`new` のどれかが無いか `old` が空・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す・`unset` の要素の参照の型の項目のパスを解決できないか、`#` で始まらない要素に要素の選び方（`[...]`・`**.`）を含む・`x-key` を持つ配列への `remove_from` の値に削除する要素が無い'
+    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先を行の `paths` の先頭から決められない（`records` を持つ行で先頭が空か glob を含む・持たない行で先頭が glob を含まないか、最後の段の `*` を ID に置き換えた後に glob が残るか、決めた配置先が行の `paths` に当たらない）・`create` の配置先が行の `exclude[]` に当たる（`/` を含む値はパス、含まない値はファイル名で当てる）・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`rename` に `new_id`・`new_path` がどちらも無い・ID がパスの文書に `new_id` を渡した・`body_file` を持たない `records` の行の文書に `new_path` を渡した・`new_path` が種類の行の `paths` に当たらないか `exclude[]` に当たるか既にあるファイルを指す・`replace_text` に `filter`・`old`・`new` のどれかが無いか `old` が空・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す・`unset` の要素の参照の型の項目のパスを解決できないか、`#` で始まらない要素に要素の選び方（`[...]`・`**.`）を含む・`x-key` を持つ配列への `remove_from` の値に削除する要素が無い・`commit` と `atomic: false` を同時に渡した・`commit` と `worktree` を同時に渡した'
   - name: SourceNotServedError
     condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
   - name: WorktreeNotMatchedError
@@ -1999,6 +2665,36 @@ exceptions:
   - name: WorktreeLoadingError
     condition: 書き込むワークツリーの初めての読み込みが、端末の設定の `worktree_load_wait_sec` までに終了しなかった
     notes: 何も書き込まない。ワークツリーのパスと、時間を空けて同じ呼び出しを送信することを添える
+  - name: DirectCommitNotConfiguredError
+    condition: '`commit` を指定した呼び出しで、配信元の設定に `direct_commit` が無いか、端末の設定の `storage.type` が `disk` の配信元か、`direct_commit.kinds[]` に `documents[]` に無い種類がある'
+    notes: 配信元の ID と理由を添える。何も書き込まない
+  - name: DirectCommitNotPermittedError
+    condition: '`commit` を指定した呼び出しで、`cwd` が書き換わる文書の種類の呼べる作業場所（`sources[].direct_commit.kinds` に種類があればその glob、無ければ `sources[].direct_commit.scope`）に該当しない'
+    notes: 今の作業場所から直コミットできないことと、該当しなかった種類を添える。`scope.write` に該当しても直コミットはできない
+  - name: BranchNotAllowedError
+    condition: '`commit.branch` が `direct_commit.branch` でなく、`direct_commit.branches[]` にも該当しない'
+    notes: 上書きできるブランチの一覧を添える
+  - name: CommitWorktreeNotFoundError
+    condition: コミットするブランチを指すワークツリーが、配信元の `worktrees[]` に該当するワークツリーの中に無い
+    notes: ブランチ名を添える。クローン本体のブランチは切り替えない
+  - name: UnpushedCommitsError
+    condition: 取り込んだ後のコミットするブランチのワークツリーの HEAD が、リモートの追跡ブランチと違う（プッシュしていないコミットがあるか、早送りで取り込めない）
+    notes: ワークツリーのパスと、先行・遅延のコミット数を添える。何も書き込まない
+  - name: UncommittedChangesError
+    condition: 書き込む文書のファイル・本文のファイル・`generators[]` の生成物のどれかに、コミットしていない変更がある
+    notes: 変更のあるファイルのパスを添える。何も書き込まない
+  - name: FetchFailedError
+    condition: コミットするブランチのリモートからの取得が失敗したか、制約「直コミットの取り込みとプッシュの制限時間」を超えた
+    notes: git の標準エラーの末尾を添える。何も書き込まない
+  - name: PushRejectedError
+    condition: やり直した後のプッシュもリモートに断られたか、やり直しの置き換えの前に書き込みの期限を過ぎていた
+    notes: リモートが返した理由を添える。この呼び出しが書き込んだファイルと生成物とコミットを戻した後に返却する
+  - name: PushFailedError
+    condition: プッシュがリモートに断られた以外の理由（通信の失敗・制限時間で止めた）で終わり、制約「直コミットのプッシュの結果の照合」でリモートにコミットを確認できなかったか、制約「直コミットの取り込み・生成・プッシュの制限時間」でプッシュの時間が残っていなかった
+    notes: git の標準エラーの末尾と、取得し直しも失敗したときはプッシュの結果が不明であることとコミットの SHA を添える。この呼び出しが書き込んだファイルと生成物とコミットを戻した後に返却する
+  - name: DirectCommitGeneratorError
+    condition: '`commit` を指定した呼び出しで、`generators[]` のスクリプトが失敗したか、制限時間で止めたか、生成の時間が残らず実行しなかった'
+    notes: スクリプトのパスと理由を添える。コミットせず、この呼び出しが書き込んだファイルと生成物を戻した後に返却する
 constraints:
   - item: 件数
     constraint: 1 回の `operations` は最大 50 件
@@ -2022,7 +2718,7 @@ constraints:
     constraint: '終了コード 0 はずれ無し。終了コード 1 で最後の行が `ずれ {件数} 件` のときは、`-:{行}: {種類}: {内容}` の行のうち種類が `diagram_invalid`・`syntax_warning`（描画時の書き方の警告）の行ごとに、パスをキーのパス、決まりを `mdmark の {種類}（{行} 行目）`、直し方を内容にした違反にする。ほかの種類の行（`unknown_mark`・`diagram_` で始まる配置のずれ・`missing_file`）では書き込みを止めない。それ以外（CLI が見つからない・制限時間を超えた・最後の行が `ずれ {件数} 件` でない）は点検できなかったとして `results[].unchecked` に理由を入れ、書き込みは止めない'
     notes: 1 回の呼び出しの中で CLI が見つからなかった・制限時間を超えた後は、残りの値の点検も同じ理由で飛ばす
   - item: commit
-    constraint: project-index は commit しない
+    constraint: '`commit` を省いた呼び出しでは、project-index は commit しない。`commit` を指定した呼び出しは制約「直コミットの流れ」'
   - item: 注釈
     constraint: '`readOnlyHint: false`・`destructiveHint: false`'
   - item: ツールの説明
@@ -2107,6 +2803,39 @@ constraints:
     notes: Git の配信元では `write_dates` に関わらず付けない
   - item: 本文のファイルを持たない要素
     constraint: '`records`・`body_file` の行で `body_file` の列が無いか値が `null`・空の文字列の要素は、`body_file` を持たない `records` の行の文書と同じく要素だけを書き換える。`create` は `data` に `body_file` の列と `@body` のどちらも無ければ要素だけを追加し、`@body` だけがあれば `body_file` の列の違反、`body_file` の列だけがあれば `@body` の違反にする。`update`・`replace` は `body_file` の列の値と `@body` を同時に指定したときだけ本文のファイルを作成し（「本文のファイルの検査」の `create` と同じ検査）、`@body` だけは `body_file` の列の違反、`body_file` の列の値だけは `@body` の違反にする。`text_edits` の `field: @body` は、本文のファイルが無いことを決まりにした `text_edits[{n}].field` の違反にする。`rename` は `new_id` だけを受け、`new_path` は引数の誤りにする。どの操作も本文のファイルを削除・移動しない'
+  - item: 直コミットの権限
+    constraint: '`commit` を指定した呼び出しは、`scope.write` で判定しない。変更を適用した後に書き換わる文書（`rename` の参照元・`replace_text` で置換した文書を含む）の種類ごとに、端末の設定の `sources[].direct_commit.kinds` にその種類があればその glob、無ければ `sources[].direct_commit.scope` に `cwd` が該当することを確認する'
+    notes: 既定は空で、どの作業場所からも呼べない。該当しなければ `DirectCommitNotPermittedError`
+  - item: 直コミットを許可する種類
+    constraint: 書き換わる文書の種類が全て配信元の設定の `direct_commit.kinds[]` にあるときだけ進める。無い種類の文書は、`operations` の添字と文書の ID を付け、決まりを「種類 {kind} は直コミットを許可していない」にした違反として `ValidationFailedError` で返却する
+    notes: 改名・一括の置換で参照元の他の種類の文書が書き換わる場合も同じ
+  - item: 直コミットの書き込む先
+    constraint: コミットするブランチ（`commit.branch`、省くと `direct_commit.branch`）を HEAD が指すワークツリーのうち、配信元の `worktrees[]` に該当するものに書き込む。種類・配置先・検査は、そのワークツリーの `project-index.yaml` で再読み込みした配信元の設定で行う
+    notes: 該当するワークツリーが無ければ `CommitWorktreeNotFoundError`。`direct_commit` のキー（`branch`・`branches[]`・`kinds[]`）は、起動時と再読み込みで検証した配信元の設定から読む。ワークツリーの `project-index.yaml` は、種類のスキーマ・配置先・検査にだけ使用する
+  - item: 直コミットの流れ
+    constraint: 制約「直コミットの排他」の中で、(1) リモートの追跡ブランチを取得して早送りで取り込む、(2) HEAD が追跡ブランチと同じこと・書き込むファイルと生成物にコミットしていない変更が無いことを確認する、(3) 操作を適用して検査（今の書き込みと同じ検査・直コミットを許可する種類・秘密の値）を実行する、(4) ファイルを書き込み `generators[]` を実行する、(5) 操作が書き込んだファイルと生成物だけを `git add` してコミットする、(6) プッシュする、の順に進める
+    notes: ワークツリーにある他の変更（コミットしていない変更・追跡していないファイル）はコミットに含めず、そのまま残す。コミットの作成者と認証は、索引のサーバーを動かしている利用者の Git の設定
+  - item: 直コミットの排他
+    constraint: 取得からプッシュまでを、リポジトリ（`git rev-parse --git-common-dir` が同じ配信元）ごとの 1 つの排他で囲む。直コミットどうしは 1 つずつ進める。`commit` を省いた書き込み・削除は、書き込む先がコミットするブランチ（`direct_commit.branch` と `direct_commit.branches[]` に該当するブランチ）を指すワークツリーのときだけ同じ排他を待つ
+    notes: 排他の待ちは書き込みの期限に含め、置き換えの前に期限を過ぎたら `WriteDeadlineExceededError`
+  - item: 秘密の値の検査
+    constraint: 書き込む文書の差分の追加の行（本文のファイルを含む）を、project-index が持つ正規表現の規則で照合する。規則の種類は `github-token`・`aws-access-key`・`slack-token`・`openai-api-key`・`anthropic-api-key`・`private-key`・`email-address`。該当すれば、添字・項目のパス・決まり「秘密の値（{種類}）を含む」の違反として `ValidationFailedError` で返却し、値そのものは返却しない
+    notes: 検査を抜けるマーカー（行の注釈）は持たない。規則は gitleaks の既定の規則集（MIT）から移し、著作権表示を移したファイルに残す。規則ごとに、該当しない 1 MB の入力を書き込みの期限の内に照合し終えることを単体テストで確認する
+  - item: 直コミットのプッシュの再試行
+    constraint: プッシュがリモートに断られたら、作ったコミットを取り消し、この呼び出しが書き込んだファイルと生成物を書き込み前の内容に戻してから、取得から 1 回だけやり直す。2 回目も断られたら同じく戻して `PushRejectedError` を返却する
+    notes: やり直しでも `expected_version` を確認する。やり直しの置き換えの前に書き込みの期限を過ぎていたら、やり直さずに `PushRejectedError`
+  - item: 直コミットの試しの書き込み
+    constraint: '`commit` と `dry_run: true` を同時に指定したときは、取得・コミット・プッシュをせず、権限・ブランチ・ワークツリー・検査（秘密の値を含む）の結果と差分だけを返却する'
+    notes: リモートと通信しない
+  - item: 直コミットの取り込み・生成・プッシュの制限時間
+    constraint: 取得は書き込みの期限までの残りの時間で止める。`generators[]` は、`script_timeout_sec` と、[非機能要件](id:NFR-1) の文書の MCP の応答の上限までの残りの時間から直コミットのプッシュの所要時間と直コミットの取り込みとプッシュの所要時間の余裕を除いた時間の短い方で止める。プッシュは、応答の上限までの残りの時間から余裕を除いた時間で止める。やり直しの 2 回目の生成とプッシュも同じ
+    notes: 生成の時間が残っていないときは生成を実行せずに `DirectCommitGeneratorError`、プッシュの時間が残っていないときはプッシュを始めずに `PushFailedError` とし、どちらもコミットと書き込んだファイルと生成物を戻す。制約「書き込み後の生成の制限時間」の「生成を実行しなくても書き込みの結果を変えない」は、`commit` を指定した呼び出しには当てない
+  - item: 直コミットの生成の失敗
+    constraint: '`commit` を指定した呼び出しで `generators[]` のスクリプトが失敗したか制限時間で止めたときは、コミットせずに、この呼び出しが書き込んだファイルと生成物を書き込み前の内容に戻して `DirectCommitGeneratorError` を返却する'
+    notes: 生成物の無いコミットをプッシュしない
+  - item: 直コミットのプッシュの結果の照合
+    constraint: プッシュがリモートに断られた以外の理由（通信の失敗・制限時間で止めた）で終わったときは、リモートの追跡ブランチを取得し直し、コミットの SHA が含まれていれば成功として扱う。含まれていなければ、コミットと書き込んだファイルと生成物を戻して `PushFailedError` を返却する。取得し直しも失敗したときは、同じく戻して、プッシュの結果が不明であることとコミットの SHA を添えた `PushFailedError` を返却する
+    notes: 取得し直しの制限時間は、直コミットの取り込みとプッシュの所要時間の余裕の中に収める。戻した後にリモートに入っていたコミットは、次の直コミットの早送りの取り込みでワークツリーに入る
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]
@@ -2116,5 +2845,8 @@ refs:
     item: scenarios[異常シナリオ（読んだ後に変わった文書へ書き込む）]
     type: references
     when: このインターフェースの入出力やフローを変えるときに、シナリオ『YAMLを直接編集した』の対応する流れと期待値を確認する。
+  - to: SC-15
+    type: references
+    when: '`commit` の入出力やフローを変えるときに、シナリオ『手元のセッションが直コミットで登録する』の対応する流れと期待値を確認する。'
 test_file: tests/integration/server/test_write_docs.py
 visibility: internal

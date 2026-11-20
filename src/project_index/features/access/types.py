@@ -8,7 +8,7 @@ from typing import Literal
 
 from project_index.features.sources.types import ServedSource
 
-AccessLevel = Literal["read", "write"]
+AccessLevel = Literal["read", "write", "commit"]
 
 # 文書の MCP のツールの入力のスキーマで、`cwd` の説明に入れる文
 CWD_DESCRIPTION = (
@@ -26,6 +26,8 @@ class SourceAccess:
     current: bool
     description: str
     when: list[str] = field(default_factory=list[str])
+    # 今の作業場所から直コミットできる種類
+    direct_commit_kinds: list[str] = field(default_factory=list[str])
 
 
 @dataclass(frozen=True)

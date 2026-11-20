@@ -1,0 +1,751 @@
+id: SC-15
+title: 手元のセッションが直コミットで登録する
+lead: 利用者と話している手元のセッションが、配信元のフォルダの外部の作業場所から、直コミットを許可した種類の文書を `write_docs`・`delete_docs` で書き込み、既定のブランチへコミットしてプッシュするシナリオを定め、直コミットの流れを変えるときに参照する。
+primary_actor: 手元のセッション（利用者と話している Claude Code）
+stakeholders:
+  - name: 利用者
+    interest: Issue と作業 PR を経ずに、レビューの要らないデータを登録した直後からリモートに残せる
+  - name: 手元のセッション
+    interest: 配信元のフォルダの外部の作業場所から、書き込みからコミット・プッシュまでを 1 回の呼び出しで終えられる
+  - name: 配信元のリポジトリ
+    interest: 直コミットを許可した種類の文書だけが、検査に合格した内容で、既定のブランチに 1 コミットずつ入る。ワークツリーにある他の変更と、許可していない種類の文書は入らない
+trigger: 手元のセッションが、`commit` を指定した `write_docs`・`delete_docs` を呼ぶ
+preconditions:
+  - 配信元の読み書きの方法が `git` で、直コミットの設定を持つ
+  - 直コミットの設定のコミットするブランチを指すワークツリーが、配信元の `worktrees` に該当する
+  - 索引のサーバーを動かしている利用者の Git の認証で、リモートへプッシュできる
+success_guarantee: 直コミットを許可した種類の文書が、検査と秘密の値の検査に合格した内容で、コミットするブランチのリモートに 1 コミットで入る。結果にコミットの SHA・ブランチ・文書のバージョンが返る。コミットに入るのは、その呼び出しが書き込んだファイルと生成物だけ。
+minimal_guarantee: '断られた呼び出しは、リモートを変えず、ワークツリーにこの呼び出しが書き込んだ変更を残さない。ワークツリーにあった未プッシュのコミットと未コミットの変更は消さない。断ったときは `isError: true` で理由を返却する。'
+frequency: 利用者と話しながらデータを登録するたび
+priority: 高
+scenarios:
+  - name: 正常シナリオ
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+    flow: |-
+      <!-- map: {"title": "正常シナリオ"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: describe(source: sample)
+        M->>M: cwd が直コミットの呼べる作業場所に該当する
+        M-->>A: 種類の一覧と、直コミットを許可した種類 note
+        A->>M: write_docs(source: sample, operations: create・kind note, commit: message)
+        M->>M: 直コミットの設定で、種類 note と cwd が許可に該当することを確認する
+        M->>M: リポジトリの排他を取る
+        M->>R: 最新を取得する
+        M->>WT: origin/develop を早送りで取り込む
+        M->>M: HEAD が origin/develop と同じで、書き込むファイルと生成物に未コミットの変更が無いことを確認する
+        M->>M: スキーマと validators に通し、秘密の値が無いことを確認する
+        M->>WT: 文書を書き込み、generators を実行する
+        M->>WT: 書き込んだファイルと生成物だけをコミットする
+        M->>R: develop をプッシュする
+        M->>M: 排他を放す
+        M-->>A: 作った文書の id と version、コミットの SHA とブランチ
+      ```
+
+      <!-- /map -->
+    expected:
+      - '結果が `applied: true` で、文書の `status` が `created`、コミットの SHA とブランチ `develop` を返却する'
+      - sample のリモートの `develop` に 1 コミットが増え、その SHA が結果の SHA と一致する。コミットの説明は `commit.message` で、変更は作った文書のファイルと `generators[]` の生成物だけ
+      - develop のワークツリーの HEAD が `origin/develop` と同じで、`git status` に作った文書のファイルと生成物が出ない
+      - sample のワークツリー x とクローン本体は変わらない
+      - '引数なしの `describe` の sample の行と `describe(source: sample)` が、直コミットを許可した種類として `note` を返却する'
+      - '手元の作業場所から呼んだ `search_docs(source: sample)` が、develop のワークツリーの作った文書と結果の `version` を返却する'
+    test: test_normal
+  - name: 正常シナリオ（ワークツリーに他の未コミットの変更がある）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+      - name: 他の未コミットの変更
+        description: develop のワークツリーで、文書と関係しないファイル `memo.txt` を書き換えてコミットしていない
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（ワークツリーに他の未コミットの変更がある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: write_docs(source: sample, operations: create・kind note, commit: message)
+        M->>M: 書き込むファイルと生成物に未コミットの変更が無いことを確認する（memo.txt は対象外）
+        M->>WT: 文書を書き込み、書き込んだファイルと生成物だけをコミットする
+        M->>R: develop をプッシュする
+        M-->>A: コミットの SHA
+      ```
+
+      <!-- /map -->
+    expected:
+      - sample のリモートの `develop` に増えた 1 コミットの変更に `memo.txt` が入らない
+      - develop のワークツリーの `memo.txt` は、プッシュの後もコミットしていない変更のまま残る
+    test: test_normal_when_other_uncommitted_change
+  - name: 正常シナリオ（コミットするブランチを上書きする）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+      - name: 別のブランチのワークツリー
+        description: sample のリモートと sample に、`develop` から分けたブランチ `data` を作り、`data` を指すワークツリー `.claude/worktrees/data` を用意する
+        notes: '`.claude/worktrees/data` は sample の `worktrees` に該当する。直コミットの設定のコミットするブランチは `develop` のままで、上書きできるブランチ（`direct_commit.branches[]`）に `data` を記載する'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（コミットするブランチを上書きする）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: write_docs(source: sample, operations: create・kind note, commit: message・branch data)
+        M->>M: data が上書きできるブランチに該当し、data を指すワークツリーが worktrees に該当することを確認する
+        M->>R: 最新を取得し、data のワークツリーへ origin/data を早送りで取り込む
+        M->>M: 書き込み・コミット
+        M->>R: data をプッシュする
+        M-->>A: コミットの SHA とブランチ data
+      ```
+
+      <!-- /map -->
+    expected:
+      - sample のリモートの `data` に作った文書のコミットが 1 つ増え、結果のブランチが `data` になる
+      - sample のリモートの `develop` と、develop のワークツリーは変わらない
+      - '`commit` のブランチに、上書きできるブランチに該当しない `master` を指定した呼び出しは、`isError: true` で上書きできないブランチであることを返却し、sample のリモートと全てのワークツリーは変わらない'
+      - '`commit` のブランチに、上書きできるブランチに該当するがワークツリーの無いブランチを指定した呼び出しは、異常シナリオ（コミットするブランチのワークツリーが無い）と同じく断られる'
+    test: test_normal_when_branch_overridden
+  - name: 正常シナリオ（文書を消す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+      - name: 消す文書
+        description: sample の `develop` にコミット済みの種類 `note` の文書 1
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（文書を消す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: search_docs(source: sample, filter: id が文書 1)
+        M-->>A: develop のワークツリーの文書 1 と version
+        A->>M: delete_docs(source: sample, targets: 文書 1・expected_version, commit: message)
+        M->>M: 正常シナリオと同じ確認・排他・取り込み
+        M->>WT: 文書 1 のファイルを消し、generators を実行する
+        M->>WT: 消したファイルと生成物だけをコミットする
+        M->>R: develop をプッシュする
+        M-->>A: 消した文書と、コミットの SHA
+      ```
+
+      <!-- /map -->
+    expected:
+      - sample のリモートの `develop` に、文書 1 のファイルの削除と生成物の変更だけを含む 1 コミットが増え、結果の SHA と一致する
+      - develop のワークツリーに文書 1 のファイルが無く、`git status` に変更が出ない
+    test: test_normal_when_delete
+  - name: 正常シナリオ（リモートが先に進んでいる）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+      - name: 先に進んだリモート
+        description: 別のクローンから、sample のリモートの `develop` へ文書と関係しないファイルの変更を 1 コミットだけプッシュしておく
+        notes: develop のワークツリーはまだ取り込んでいない
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（リモートが先に進んでいる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: write_docs(source: sample, operations: create・kind note, commit: message)
+        M->>R: 最新を取得する
+        M->>WT: origin/develop を早送りで取り込む（先に進んだコミットを含む）
+        M->>WT: 文書を書き込み、コミットする
+        M->>R: develop をプッシュする
+        M-->>A: コミットの SHA（やり直していない）
+      ```
+
+      <!-- /map -->
+    expected:
+      - sample のリモートの `develop` が、先にプッシュしたコミットの上に、作った文書のコミットを 1 つ持つ
+      - 結果が、プッシュをやり直していないことを返却する
+    test: test_normal_when_remote_ahead
+  - name: 正常シナリオ（プッシュが 1 回断られる）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+      - name: 1 回だけ断るリモート
+        description: sample のリモートの `pre-receive` のフックが、印のファイルで回数を数え、最初のプッシュだけを断る
+        notes: 2 回目以降のプッシュは受け付ける
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（プッシュが 1 回断られる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: write_docs(source: sample, operations: create・kind note, commit: message)
+        M->>WT: 取り込み・書き込み・コミット
+        M->>R: develop をプッシュする
+        R-->>M: 断る
+        M->>WT: コミットを取り消し、書き込んだファイルと生成物を元に戻す
+        M->>R: 最新を取得する
+        M->>WT: 早送りで取り込み、検査から書き込み・コミットをやり直す
+        M->>R: develop をプッシュする
+        M-->>A: コミットの SHA と、1 回やり直したこと
+      ```
+
+      <!-- /map -->
+    expected:
+      - sample のリモートの `develop` に、作った文書のコミットが 1 つだけ増える
+      - 結果が、プッシュを 1 回やり直したことを返却する
+      - develop のワークツリーの HEAD が `origin/develop` と同じ
+    test: test_normal_when_push_rejected_once
+  - name: 正常シナリオ（試しに書く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（試しに書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: write_docs(source: sample, operations: create・kind note, commit: message, dry_run: true)
+        M->>M: 直コミットの設定の確認と、スキーマ・validators・秘密の値の検査
+        M-->>A: 書き込んだ場合の結果と差分（取り込み・コミット・プッシュをしない）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 結果に差分があり、`applied` が `false` で、コミットの SHA を返却しない
+      - sample のリモートと develop のワークツリーは変わらない
+    test: test_normal_when_dry_run
+  - name: 異常シナリオ（直コミットを許可していない種類）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（直コミットを許可していない種類）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: write_docs(source: sample, operations: create・kind rule, commit: message)
+        M->>M: 種類 rule は直コミットを許可していない
+        M-->>A: エラー（添字 0・直コミットを許可していない種類）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、添字 0 の違反として種類 `rule` は直コミットを許可していないことを返却する'
+      - sample のリモートと develop のワークツリーは変わらない
+    test: test_error_when_kind_not_allowed
+  - name: 異常シナリオ（呼べる作業場所に該当しない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+      - name: 別の作業場所
+        description: テスト用の一時フォルダの中の、手元の作業場所でない空のフォルダ
+        notes: '`cwd` にこのパスを入れる'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（呼べる作業場所に該当しない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: write_docs(source: sample, operations: create・kind note, commit: message)
+        M->>M: cwd が直コミットの呼べる作業場所に該当しない
+        M-->>A: エラー（今の作業場所から直コミットできない）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、今の作業場所から sample の直コミットはできないことを返却する'
+      - '同じ作業場所から呼んだ `describe(source: sample)`・`search_docs(source: sample)` も、`scope` に該当しない配信元として断られる'
+      - sample のリモートと develop のワークツリーは変わらない
+    test: test_error_when_working_directory_not_allowed
+  - name: 異常シナリオ（ワークツリーに未プッシュのコミットがある）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+      - name: 未プッシュのコミット
+        description: develop のワークツリーで、文書と関係しないファイルの変更を 1 コミットだけコミットしてプッシュしていない
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（ワークツリーに未プッシュのコミットがある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: write_docs(source: sample, operations: create・kind note, commit: message)
+        M->>R: 最新を取得する
+        M->>M: HEAD が origin/develop より進んでいる
+        M-->>A: エラー（develop のワークツリーにプッシュしていないコミットがある）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、develop のワークツリーにプッシュしていないコミットがあることを返却する'
+      - sample のリモートは変わらず、develop のワークツリーの未プッシュのコミットは残る。文書のファイルは作られない
+    test: test_error_when_unpushed_commit
+  - name: 異常シナリオ（書き込むファイルに未コミットの変更がある）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+      - name: 未コミットの変更
+        description: sample の `develop` にコミット済みの種類 `note` の文書 1 のファイルを、develop のワークツリーで書き換えてコミットしていない
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（書き込むファイルに未コミットの変更がある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: search_docs(source: sample, filter: id が文書 1)
+        M-->>A: develop のワークツリーの文書 1 と version
+        A->>M: write_docs(source: sample, operations: update 文書 1・expected_version・set, commit: message)
+        M->>M: 書き込むファイルにコミットしていない変更がある
+        M-->>A: エラー（書き込むファイルとそのパス）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、文書 1 のファイルにコミットしていない変更があることを、そのパスとともに返却する'
+      - sample のリモートは変わらず、develop のワークツリーの文書 1 のファイルはコミットしていない変更のまま
+    test: test_error_when_uncommitted_change
+  - name: 異常シナリオ（秘密の値を含む）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（秘密の値を含む）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: write_docs(source: sample, operations: create・kind note・秘密の値の書式の文字列を含む data, commit: message)
+        M->>M: 秘密の値の検査に通らない
+        M-->>A: エラー（添字 0・項目のパス・検出した値の種類）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、添字 0 の違反として、秘密の値を含む項目のパスと検出した値の種類を返却し、値そのものは返却しない'
+      - sample のリモートは変わらず、develop のワークツリーに文書のファイルは作られない
+    test: test_error_when_secret_detected
+  - name: 異常シナリオ（プッシュが 2 回断られる）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+      - name: 常に断るリモート
+        description: sample のリモートの `pre-receive` のフックが、全てのプッシュを断る
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（プッシュが 2 回断られる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: write_docs(source: sample, operations: create・kind note, commit: message)
+        M->>R: develop をプッシュする
+        R-->>M: 断る
+        M->>WT: コミットを取り消し、書き込んだファイルと生成物を元に戻す
+        M->>WT: 取り込みから 1 回だけやり直す
+        M->>R: develop をプッシュする
+        R-->>M: 断る
+        M->>WT: コミットを取り消し、書き込んだファイルと生成物を元に戻す
+        M-->>A: エラー（プッシュが断られた理由）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、2 回ともプッシュが断られたことと、リモートが返した理由を返却する'
+      - sample のリモートは変わらず、develop のワークツリーの HEAD が `origin/develop` と同じで、文書のファイルと生成物の変更が残らない
+    test: test_error_when_push_rejected_twice
+  - name: 異常シナリオ（リモートに接続できない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+      - name: 接続できないリモート
+        description: sample の `origin` の URL を、無いフォルダに向けておく
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（リモートに接続できない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: write_docs(source: sample, operations: create・kind note, commit: message)
+        M->>R: 最新を取得する
+        R-->>M: 失敗
+        M-->>A: エラー（リモートから取得できない理由）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、リモートから取得できないことと、git が返した理由を返却する'
+      - develop のワークツリーは変わらず、文書のファイルは作られない
+    test: test_error_when_remote_unreachable
+  - name: 異常シナリオ（プッシュで通信に失敗する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+      - name: プッシュできないリモート
+        description: sample の `origin` の取得の URL はそのままにし、プッシュの URL（`pushurl`）だけを無いフォルダに向けておく
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（プッシュで通信に失敗する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: write_docs(source: sample, operations: create・kind note, commit: message)
+        M->>R: 最新を取得する
+        M->>WT: 取り込み・書き込み・コミット
+        M->>R: develop をプッシュする
+        R-->>M: 失敗
+        M->>WT: コミットを取り消し、書き込んだファイルと生成物を元に戻す
+        M-->>A: エラー（プッシュできない理由）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、プッシュで通信に失敗したことと、git が返した理由を返却する'
+      - develop のワークツリーの HEAD が `origin/develop` と同じで、文書のファイルと生成物の変更が残らない
+    test: test_error_when_push_unreachable
+  - name: 異常シナリオ（許可していない種類の文書が書き換わる）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+      - name: 参照する種類 rule の文書
+        description: 種類 `rule` の文書 r1 の `related` が、種類 `note` の文書 1 を指す
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（許可していない種類の文書が書き換わる）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: write_docs(source: sample, operations: 改名・文書 1, commit: message)
+        M->>M: 改名で参照元の文書 r1（種類 rule）が書き換わる
+        M-->>A: エラー（書き換わる、直コミットを許可していない種類の文書）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、改名で書き換わる文書 r1 の種類 `rule` は直コミットを許可していないことを返却する'
+      - sample のリモートと develop のワークツリーは変わらない
+    test: test_error_when_disallowed_kind_rewritten
+  - name: 異常シナリオ（atomic を外して指定する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（atomic を外して指定する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: write_docs(source: sample, operations: create・kind note, commit: message, atomic: false)
+        M-->>A: エラー（コミットの指定は atomic: true だけ）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、コミットの指定は `atomic: true` の書き込みだけで使用できることを返却する'
+      - sample のリモートと develop のワークツリーは変わらない
+    test: test_error_when_not_atomic
+  - name: 異常シナリオ（コミットするブランチのワークツリーが無い）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 直コミットの設定
+        description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当するため、sample の `describe` と、develop のワークツリーを読む `search_docs` は使用できる。`cwd` にこのパスを入れる
+      - name: ワークツリーの無いブランチ
+        description: 直コミットの設定のコミットするブランチを、sample にワークツリーの無い `main` にしておく
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（コミットするブランチのワークツリーが無い）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: write_docs(source: sample, operations: create・kind note, commit: message)
+        M->>M: main を指すワークツリーが sample の worktrees に無い
+        M-->>A: エラー（コミットするブランチのワークツリーが無い）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、コミットするブランチ `main` を指すワークツリーが無いことを返却する'
+      - sample のリモートと sample のクローン本体・ワークツリーは変わらない
+    test: test_error_when_branch_worktree_missing
+refs:
+  - to: SC-1
+    item: scenarios[正常シナリオ]
+    type: part_of
+    when: このシナリオの前後の流れを、複合ユースケースの中で確認するときに参照する。
+  - to: SC-7
+    item: scenarios[正常シナリオ]
+    type: references
+    when: コミットの指定を省いた書き込みの検査と書き込みの流れを、このシナリオと突き合わせるときに参照する。
+test_file: tests/e2e/単一ユースケース/test_手元のセッションが直コミットで登録する.py
+visibility: internal
+tags:
+  - name: topic:文書
+    main: true
+  - name: action:書き込み
+  - name: tool:git
+  - name: topic:ブランチ
+  - name: tool:mcp

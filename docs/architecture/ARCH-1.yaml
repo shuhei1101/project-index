@@ -32,6 +32,9 @@ overview:
     - id: GIT
       label: git
       kind: external
+    - id: RMT
+      label: リモートのリポジトリ
+      kind: external
   edges:
     - from: CC
       to: PLG
@@ -57,6 +60,9 @@ overview:
     - from: SRV
       to: GIT
       label: リビジョン
+    - from: GIT
+      to: RMT
+      label: 取得・プッシュ
   frame:
     label: project-index
     nodes:
@@ -94,7 +100,7 @@ external_systems:
       事前確認: 不要。受ける側で、こちらから費用や時間のかかる処理を始めない
       契約: 入出力は読み取り API と端末の設定の API のインターフェース定義（[配信元の一覧と状態](id:IF-22) など）が持つ
   - name: git
-    purpose: 配信元のリビジョンの解決と、過去のリビジョンのファイルの書き出し
+    purpose: 配信元のリビジョンの解決と、過去のリビジョンのファイルの書き出し。直コミットの取得・早送りの取り込み・コミット・プッシュ・戻し
     direction: 双方向
     protocol: 子プロセスの CLI
     notes:
@@ -105,5 +111,12 @@ external_systems:
     protocol: 子プロセスのコマンド
     notes:
       事前確認: 要。実行する前に、残りの制限時間が足りるかを確認し、足りなければ始めない
+  - name: リモートのリポジトリ
+    purpose: 直コミットで、コミットするブランチを取得し、作ったコミットをプッシュする
+    direction: 双方向
+    protocol: git の子プロセス経由（配信元の `origin` の URL。認証は索引のサーバーを動かしている利用者の Git の設定）
+    notes:
+      事前確認: 要。取得の前に、直コミットの設定・呼べる作業場所・コミットするブランチのワークツリーと、書き込みの期限までの残りの時間を確認し、どれかが欠ければ通信を始めない
+      契約: 入出力は [文書の書き込み](id:IF-6) の直コミットの制約が持つ
 id: ARCH-1
 visibility: internal

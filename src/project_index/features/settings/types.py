@@ -30,6 +30,17 @@ class SourceStorage(BaseModel):
     type: StorageType
 
 
+class SourceDirectCommit(BaseModel):
+    """端末の設定の `sources[].direct_commit`。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # 直コミットを許可した全ての種類の呼べる作業場所の glob。既定はどの作業場所からも呼べない
+    scope: list[str] = Field(default_factory=list[str])
+    # 種類の ID → glob。記載した種類は `scope` の代わりに使用する
+    kinds: dict[str, list[str]] = Field(default_factory=dict[str, list[str]])
+
+
 class SourceEntry(BaseModel):
     """端末の設定の `sources[]` の 1 行。"""
 
@@ -42,6 +53,8 @@ class SourceEntry(BaseModel):
     outside_read: bool = True
     # 省くと、配信元のフォルダが Git の作業ツリーの中なら git、外なら disk として扱う
     storage: SourceStorage | None = None
+    # 配信元の設定の `direct_commit` が無い配信元では使用しない
+    direct_commit: SourceDirectCommit = SourceDirectCommit()
 
     @field_validator("config", mode="before")
     @classmethod

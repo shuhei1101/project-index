@@ -16,6 +16,7 @@ NO_SOURCE_LINE = (
 )
 WARNINGS_LINE = "注意:"
 WHEN_LINE = "使う場面:"
+DIRECT_COMMIT_HEADING = "直コミット:"
 
 
 def _cell(text: str) -> str:
@@ -41,12 +42,17 @@ def _source_list(result: SourceListResult) -> list[str]:
     """使える配信元の一覧（と作業範囲の外の一覧・警告）の行を作る。"""
     lines = [_place(result), ""]
     if result.sources:
-        lines.extend(["| source | 権限 | description | when |", "| --- | --- | --- | --- |"])
+        lines.extend(
+            [
+                "| source | 権限 | description | when | 直コミット |",
+                "| --- | --- | --- | --- | --- |",
+            ]
+        )
         for item in result.sources:
             access = f"{item.access}（作業中）" if item.current else item.access
             lines.append(
                 f"| {_cell(item.source_id)} | {access} | {_cell(item.description)}"
-                f" | {_when_cell(item.when)} |"
+                f" | {_when_cell(item.when)} | {_cell(', '.join(item.direct_commit_kinds))} |"
             )
     else:
         lines.append(NO_SOURCE_LINE)
@@ -80,6 +86,13 @@ def _source_guide(result: SourceGuideResult, head: list[str]) -> list[str]:
         lines.extend([WHEN_LINE, *(f"- {line}" for line in result.when), ""])
     lines.extend([result.instructions, "", "| kind | description |", "| --- | --- |"])
     lines.extend(f"| {_cell(kind.id)} | {_cell(kind.description)} |" for kind in result.kinds)
+    # 直コミットできる種類があれば、種類の表の後にブランチと種類を並べる
+    if result.direct_commit is not None:
+        guide = result.direct_commit
+        lines.extend(["", DIRECT_COMMIT_HEADING, f"- ブランチ: {guide.branch}"])
+        if guide.branches:
+            lines.append(f"- 上書きできるブランチ: {', '.join(guide.branches)}")
+        lines.append(f"- 種類: {', '.join(guide.kinds)}")
     if result.refs is not None:
         lines.extend(
             [
