@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -1781,3 +1782,78 @@ def test_write_docs_when_direct_commit_invalid_arguments(
             commit=CommitSpec(message="docs: 追加する"),
             **extra(commit_env),
         )
+
+
+def test_write_docs_when_direct_commit_not_permitted_workplace(
+    tmp_path: Path, make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """直コミットを呼べない作業場所は取得の前に断る（異常系）。"""
+    # 準備
+    commit_env = make_commit_env()
+    other = tmp_path / "other"
+    run_git(tmp_path, "clone", "-b", "data", str(commit_env.bare), str(other))
+    (other / "ahead.txt").write_text("ahead\n", encoding="utf-8")
+    run_git(other, "add", "-A")
+    run_git(other, "commit", "-m", "ahead")
+    run_git(other, "push", "origin", "data")
+    tracking = run_git(commit_env.develop, "rev-parse", "origin/data").strip()
+    head = run_git(commit_env.develop, "rev-parse", "HEAD").strip()
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    commit_env.env.worktree = elsewhere
+    operation = Operation(op="create", kind="rules", data={"id": "doc-9", "name": "文書 9"})
+    # 実行・検証
+    with pytest.raises(DirectCommitNotPermittedError, match="直コミットできません"):
+        commit_env.env.write(
+            operations=[operation], source="sample", commit=CommitSpec(message="docs: 追加する")
+        )
+    assert run_git(commit_env.develop, "rev-parse", "origin/data").strip() == tracking
+    assert run_git(commit_env.develop, "rev-parse", "HEAD").strip() == head
+
+
+def test_write_docs_when_commit_branch_worktree(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """コミットするブランチのワークツリーへの書き込みはリポジトリの排他を待つ（異常系）。"""
+    # 準備
+    commit_env = make_commit_env()
+    env = commit_env.env
+    env.worktree = commit_env.develop
+    repo = Path(
+        run_git(
+            commit_env.develop, "rev-parse", "--path-format=absolute", "--git-common-dir"
+        ).strip()
+    )
+    started = time.monotonic()
+    limits = CallLimits(
+        write_deadline=Deadline(limit_sec=0.2, started=started),
+        respond_by=Deadline(limit_sec=48, started=started),
+    )
+    operation = Operation(
+        op="update", id="doc-1", expected_version=content_hash(DOC_1), set={"name": "待つ"}
+    )
+    # 実行・検証
+    with env.repo_locks.hold(repo), pytest.raises(WriteDeadlineExceededError):
+        env.write(operations=[operation], limits=limits)
+    assert (commit_env.develop / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
+
+
+def test_write_docs_when_other_worktree(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """別のワークツリーへの書き込みは待たない（正常系）。"""
+    # 準備
+    commit_env = make_commit_env()
+    env = commit_env.env
+    other = env.clone / ".claude" / "worktrees" / "x"
+    env.worktree = other
+    repo = Path(run_git(other, "rev-parse", "--path-format=absolute", "--git-common-dir").strip())
+    operation = Operation(
+        op="update", id="doc-1", expected_version=content_hash(DOC_1), set={"name": "待たない"}
+    )
+    # 実行
+    with env.repo_locks.hold(repo):
+        result = env.write(operations=[operation])
+    # 検証
+    assert result.applied is True
+    assert "待たない" in (other / "docs/rule/doc-1.yaml").read_text(encoding="utf-8")
