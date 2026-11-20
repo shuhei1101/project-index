@@ -81,6 +81,23 @@ properties:
             type:
               enum: [git, disk]
               title: 種類
+        direct_commit:
+          type: object
+          title: 直コミットを呼べる作業場所
+          additionalProperties: false
+          properties:
+            scope:
+              type: array
+              title: 呼べる作業場所
+              items:
+                type: string
+            kinds:
+              type: object
+              title: 種類ごとの呼べる作業場所
+              additionalProperties:
+                type: array
+                items:
+                  type: string
   state_dir:
     type: string
     title: 状態の配置先

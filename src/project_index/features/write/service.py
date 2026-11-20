@@ -2014,16 +2014,25 @@ def _run_commit_generators(
                 )
             try:
                 entry = target.source.script("generators", generator_id)
+            except KeyError as error:
+                raise DirectCommitGeneratorError(
+                    message=f"書き込み後の生成 {generator_id} が配信元にありません",
+                    script=generator_id,
+                    reason="生成が配信元に無い",
+                    next_steps=["配信元の設定の generators[] を確認してください"],
+                ) from error
+            script = " ".join(entry.run)
+            try:
                 run_script(
                     entry.run,
                     cwd=target.config_base,
                     args=[str(path) for path in paths],
                     timeout_sec=limit,
                 )
-            except (ScriptError, KeyError) as error:
+            except ScriptError as error:
                 raise DirectCommitGeneratorError(
-                    message=f"書き込み後の生成 {generator_id} が失敗しました: {error}",
-                    script=generator_id,
+                    message=f"書き込み後の生成 {generator_id}（{script}）が失敗しました: {error}",
+                    script=script,
                     reason=str(error),
                     next_steps=["生成のスクリプトを確認してから再実行してください"],
                 ) from error
