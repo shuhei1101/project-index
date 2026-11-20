@@ -471,14 +471,21 @@ def _source_lines(spec: SourceSpec) -> list[str]:
     if spec.scope_write is not None:
         lines.append("      write:")
         lines.extend(f"        - {path}" for path in spec.scope_write)
-    if spec.direct_commit_scope is not None or spec.direct_commit_kinds is not None:
-        lines.extend(["    direct_commit:", "      scope:"])
-        lines.extend(f"        - {path}" for path in spec.direct_commit_scope or [])
-        if spec.direct_commit_kinds:
-            lines.append("      kinds:")
-            for kind, paths in spec.direct_commit_kinds.items():
-                lines.append(f"        {kind}:")
-                lines.extend(f"          - {path}" for path in paths)
+    lines.extend(_direct_commit_lines(spec))
+    return lines
+
+
+def _direct_commit_lines(spec: SourceSpec) -> list[str]:
+    """端末の設定の行の `direct_commit` の YAML の行を組み立てる（無ければ空）。"""
+    if spec.direct_commit_scope is None and spec.direct_commit_kinds is None:
+        return []
+    lines = ["    direct_commit:", "      scope:"]
+    lines.extend(f"        - {path}" for path in spec.direct_commit_scope or [])
+    if spec.direct_commit_kinds:
+        lines.append("      kinds:")
+        for kind, paths in spec.direct_commit_kinds.items():
+            lines.append(f"        {kind}:")
+            lines.extend(f"          - {path}" for path in paths)
     return lines
 
 
