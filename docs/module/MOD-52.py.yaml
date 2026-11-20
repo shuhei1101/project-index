@@ -145,7 +145,7 @@ functions:
       1. `id`・`kind`・`created`・`updated`・`METADATA_KEYS`・`body`・`*`・`COMPUTED_FIELDS` を入れる
       2. スキーマの `properties` を再帰でたどり、`a.b` のパスと `type`（`format: date`・`date-time` は `date`）を足す。配列の `items` の `properties` は `a[].b` のパスで追加し（入れ子の配列は `a[].b[].c`）、`a.b` のパスでは追加しない。最上位のスキーマの `items` は `[]` を付けずにたどる
          - `allOf`・`anyOf`・`oneOf` の各要素は、それらを持つスキーマと同じパスの接頭辞でたどる（要素の `type` は、それらを持つスキーマのパスの型に使用しない）
-         - `$ref` が最上位の `$defs` を指す（`#/$defs/{名前}`。名前は JSON Pointer として復元する）スキーマは、引数の各スキーマの最上位の `$defs` のその定義を同じパスの接頭辞でたどる。たどっている途中の定義へ戻る `$ref` と、最上位の `$defs` を指さない `$ref`・`$defs` に無い名前を指す `$ref` はたどらない
+         - `$ref` が最上位の `$defs` を指す（`#/$defs/{名前}`。名前は JSON Pointer として復元する）スキーマは、たどっているスキーマ自身の最上位の `$defs`（別の種類のスキーマの `$defs` は参照しない）のその定義を同じパスの接頭辞でたどる。たどっている途中の定義へ戻る `$ref` と、最上位の `$defs` を指さない `$ref`・`$defs` に無い名前を指す `$ref` はたどらない
       3. 型の食い違う同じパスは `string` にする
     unit_tests:
       - name: test_known_fields_when_array_items
