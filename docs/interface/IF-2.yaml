@@ -1181,7 +1181,7 @@ tags:
 aliases:
   - 'search_docs'
 identifier: search_docs
-permissions: 対象の配信元の `scope.read` か `scope.write` に `cwd` が当たること。端末の設定の `sources[].direct_commit` の呼べる作業場所に `cwd` が該当するときは、その配信元のコミットするブランチ（`direct_commit.branch` と `direct_commit.branches[]`）を指すワークツリーだけを参照できる
+permissions: 対象の配信元の `scope.read` か `scope.write` に `cwd` が当たること。端末の設定の `sources[].direct_commit` の呼べる作業場所に `cwd` が該当するときは、その配信元のコミットするブランチ（`direct_commit.branch` と `direct_commit.branches[]`）を指すワークツリーだけを参照できる。直コミットの設定に直コミットだけを断る違反がある配信元は、呼べる作業場所からも参照できない
 idempotent: true
 side_effects: '会話キー（`session_id`・`agent_id`）ごとに、本文を返した文書（`sections`・`lines` を渡した呼び出しを除く）の id・ハッシュ・返した時点の内容を `state_dir` に記録する（`list_changes` の前回読んだ時点に使う）。文書のファイルは変えない。'
 callers:

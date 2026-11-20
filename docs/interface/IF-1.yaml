@@ -520,7 +520,7 @@ tags:
   - name: topic:スキーマ
   - name: tool:mcp
 identifier: describe
-permissions: 引数なしは不要。`source` を渡すときはその配信元の `scope.read` か `scope.write` に `cwd` が当たるか、端末の設定の `sources[].direct_commit` の呼べる作業場所（`scope` か `kinds` のどれかの glob）に `cwd` が該当すること
+permissions: 引数なしは不要。`source` を渡すときはその配信元の `scope.read` か `scope.write` に `cwd` が当たるか、端末の設定の `sources[].direct_commit` の呼べる作業場所（`scope` か `kinds` のどれかの glob）に `cwd` が該当すること。直コミットの設定に直コミットだけを断る違反がある配信元は、呼べる作業場所からも説明を返却しない
 idempotent: true
 side_effects: なし
 callers:
