@@ -17,6 +17,7 @@ from project_index.features.settings.query import (
 from project_index.features.settings.types import (
     SettingsVersionMismatchError,
     SourceAddResult,
+    SourceDirectCommit,
     SourceEntry,
     SourcePatch,
     SourceRowNotFoundError,
@@ -61,6 +62,20 @@ def _to_yaml_row(entry: SourceEntry) -> dict[str, Any]:
         scope["write"] = list(entry.scope.write)
     if scope:
         row["scope"] = scope
+    # direct_commit は両方とも空なら書かない
+    direct_commit = _direct_commit_row(entry.direct_commit)
+    if direct_commit:
+        row["direct_commit"] = direct_commit
+    return row
+
+
+def _direct_commit_row(direct_commit: SourceDirectCommit) -> dict[str, Any]:
+    """`direct_commit` の空でない `scope`・`kinds` だけを持つ辞書にする。"""
+    row: dict[str, Any] = {}
+    if direct_commit.scope:
+        row["scope"] = list(direct_commit.scope)
+    if direct_commit.kinds:
+        row["kinds"] = {kind: list(globs) for kind, globs in direct_commit.kinds.items()}
     return row
 
 
@@ -100,7 +115,22 @@ def _fill_unsent(entry: SourceEntry, current: Mapping[str, SourceEntry]) -> Sour
         read=entry.scope.read if "read" in scope_sent else found.scope.read,
         write=entry.scope.write if "write" in scope_sent else found.scope.write,
     )
+    # direct_commit も scope・kinds を別々に、送られたかで決める
+    direct_sent = entry.direct_commit.model_fields_set if "direct_commit" in sent else set[str]()
+    updates["direct_commit"] = _merge_direct_commit(
+        found.direct_commit, entry.direct_commit, direct_sent
+    )
     return entry.model_copy(update=updates)
+
+
+def _merge_direct_commit(
+    current: SourceDirectCommit, sent: SourceDirectCommit, sent_keys: set[str]
+) -> SourceDirectCommit:
+    """送られた direct_commit のキーだけを今の値に重ねる。"""
+    return SourceDirectCommit(
+        scope=sent.scope if "scope" in sent_keys else current.scope,
+        kinds=sent.kinds if "kinds" in sent_keys else current.kinds,
+    )
 
 
 def _validate_or_raise(document: object, path: Path) -> None:
@@ -157,6 +187,11 @@ def _apply_patch(entry: SourceEntry, patch: SourcePatch) -> SourceEntry:
         updates["scope"] = SourceScope(
             read=patch.scope.read if "read" in scope_sent else entry.scope.read,
             write=patch.scope.write if "write" in scope_sent else entry.scope.write,
+        )
+    # direct_commit も scope・kinds を別々に、送られたかで決める
+    if "direct_commit" in sent and patch.direct_commit is not None:
+        updates["direct_commit"] = _merge_direct_commit(
+            entry.direct_commit, patch.direct_commit, patch.direct_commit.model_fields_set
         )
     return entry.model_copy(update=updates)
 

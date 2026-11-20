@@ -28,6 +28,7 @@ from project_index.features.settings.types import (
     SettingsSourcesResponse,
     SettingsSourcesView,
     SettingsSourcesWriteResponse,
+    SourceDirectCommit,
     SourceEntry,
 )
 from project_index.features.sources.types import SourceStatus
@@ -56,6 +57,13 @@ def _match_status(
             continue
         return status
     return None
+
+
+def _direct_commit_of(entry: SourceEntry) -> SourceDirectCommit | None:
+    """行の direct_commit を、scope・kinds がどちらも空なら None にして返す。"""
+    if not entry.direct_commit.scope and not entry.direct_commit.kinds:
+        return None
+    return entry.direct_commit
 
 
 def _settings_view(handlers: Handlers) -> SettingsSourcesView:
@@ -87,6 +95,7 @@ def _settings_view(handlers: Handlers) -> SettingsSourcesView:
                     status="pending_reload",
                     outside_read=entry.outside_read,
                     storage=entry.storage,
+                    direct_commit=_direct_commit_of(entry),
                 )
             )
             continue
@@ -104,6 +113,7 @@ def _settings_view(handlers: Handlers) -> SettingsSourcesView:
                 config_version=item.config_version,
                 outside_read=entry.outside_read,
                 storage=entry.storage,
+                direct_commit=_direct_commit_of(entry),
             )
         )
     return SettingsSourcesView(
