@@ -1751,6 +1751,8 @@ class _Deleted:
     accepted: list[Document]
     # 参照を外した文書の ID → 外した後のバージョン
     unlinked: list[tuple[str, str]]
+    # 参照を外す文書の ID → 外す原因になった消す文書の ID
+    unlink_plan: dict[str, set[str]]
 
 
 def _apply_deletes(session: _Session, checker: DocumentChecker, request: DeleteRequest) -> _Deleted:
@@ -1780,7 +1782,7 @@ def _apply_deletes(session: _Session, checker: DocumentChecker, request: DeleteR
     _apply_unlinks(session, checker, unlink_plan)
     # 参照を外した文書と、外した後のバージョン
     unlinked = [(referrer_id, session.docs[referrer_id].version) for referrer_id in unlink_plan]
-    return _Deleted(results=results, accepted=accepted, unlinked=unlinked)
+    return _Deleted(results=results, accepted=accepted, unlinked=unlinked, unlink_plan=unlink_plan)
 
 
 # 呼び出しが期限を渡さないとき（文書の MCP の外からの呼び出し）の書き込みの期限と応答の上限の既定値
@@ -1837,8 +1839,8 @@ def _commit_target(
     source_id: str | None,
     cwd: str | None,
     commit: CommitSpec,
-) -> tuple[ServedSource, CommitPlan, Target, frozenset[str]]:
-    """直コミットの配信元・計画・書く場所と、作業場所から直コミットできる種類を決める。"""
+) -> tuple[ServedSource, CommitPlan, frozenset[str]]:
+    """直コミットの配信元・計画と、作業場所から直コミットできる種類を決める。"""
     path = normalize_path(cwd) if cwd else None
     if source_id is None:
         current = current_source(registry.served(), path)
@@ -1850,19 +1852,28 @@ def _commit_target(
         source = current[0]
     else:
         source = registry.get_for_docs(source_id)
+    # 直コミットの設定とブランチ・ワークツリーを先に確かめる（通信しない）
+    plan = resolve_commit_plan(source, commit)
     committable = committable_kinds(source, path)
     # どの種類も直コミットできない作業場所は、取得・取り込みの前に断る
     if not committable:
+        kinds = list(source.config.direct_commit.kinds) if source.config.direct_commit else []
         raise DirectCommitNotPermittedError(
-            message=f"{source.id} にはこの作業場所（{cwd}）から直コミットできません",
+            message=(
+                f"今の作業場所（{cwd}）から {source.id} の直コミットはできません"
+                f"（種類: {', '.join(kinds)}）"
+            ),
             source_id=source.id,
+            kinds=kinds,
             next_steps=["端末の設定の sources[].direct_commit の呼べる作業場所を確認してください"],
         )
-    plan = resolve_commit_plan(source, commit)
-    # 種類・配置先をコミットするブランチのワークツリーの設定で参照する（scope.write は確かめない）
+    return source, plan, committable
+
+
+def _commit_write_target(source: ServedSource, plan: CommitPlan) -> Target:
+    """取り込んだ後のコミットするブランチのワークツリーの設定で、書く場所を作る（scope.write は確かめない）。"""
     reloaded = access_service.load_source_at(source, plan.worktree)
-    target = Target(reloaded, base_of(reloaded, plan.worktree), None, plan.worktree, "commit")
-    return source, plan, target, committable
+    return Target(reloaded, base_of(reloaded, plan.worktree), None, plan.worktree, "commit")
 
 
 def _check_commit_content(
@@ -1926,7 +1937,7 @@ def _secret_violations(
     return [
         Violation(
             path=finding.path,
-            rule=f"秘密の値の書式（{finding.kind}）に該当する値は直コミットできません",
+            rule=f"秘密の値（{finding.kind}）を含む",
             fix="値を取り除いてから再実行してください",
             index=index,
             doc=doc_id,
@@ -1951,6 +1962,20 @@ def _written_documents(
         if (renamed.get(doc_id) or doc_id) in before
     }
     return changed, previous
+
+
+def _deleted_documents(
+    request: DeleteRequest, deleted: _Deleted, session: _Session
+) -> list[tuple[int, str, str]]:
+    """消す文書と参照を外す文書の（`targets` の添字・ID・種類）を返す。"""
+    index_of = {item.id: index for index, item in enumerate(request.targets)}
+    changed = [(index_of[document.id], document.id, document.kind) for document in deleted.accepted]
+    # 参照を外す文書は、外す原因になった消す文書の添字を付ける
+    changed.extend(
+        (min(index_of[doc_id] for doc_id in removed), referrer_id, session.docs[referrer_id].kind)
+        for referrer_id, removed in deleted.unlink_plan.items()
+    )
+    return changed
 
 
 def _pending_paths(session: _Session, plan: CommitPlan) -> list[str]:
@@ -2004,17 +2029,21 @@ def _run_commit_generators(
                 ) from error
 
 
-def _commit_arguments_error() -> InvalidArgumentError:
-    """`commit` と同時に指定できない引数のエラーを作る。"""
+def _commit_arguments_error(*, atomic: bool) -> InvalidArgumentError:
+    """`commit` と同時に指定できない引数（`atomic: false`・`worktree`）のエラーを作る。"""
+    # atomic: false のときと worktree を渡したときで、断る理由を分ける
+    rule = (
+        "commit は atomic: true の書き込みだけで使用できます"
+        if not atomic
+        else "commit と worktree は同時に指定できません"
+    )
+    fix = (
+        "atomic を省いてください"
+        if not atomic
+        else "worktree を省いてください（直コミットはコミットするブランチのワークツリーへ書きます）"
+    )
     return InvalidArgumentError(
-        message="commit は atomic: false・worktree と同時に指定できません",
-        violations=[
-            Violation(
-                path="commit",
-                rule="commit は atomic: false・worktree と同時に指定できません",
-                fix="atomic と worktree を省いてください（直コミットはコミットするブランチのワークツリーへ書きます）",
-            )
-        ],
+        message=rule, violations=[Violation(path="commit", rule=rule, fix=fix)]
     )
 
 
@@ -2049,16 +2078,16 @@ def _write_with_commit(
 ) -> WriteResult:
     """`commit` を指定した `write_docs` を、取り込みからプッシュまで進める。"""
     if not request.atomic or request.worktree is not None:
-        raise _commit_arguments_error()
-    source, plan, target, committable = _commit_target(
-        registry, request.source, request.cwd, commit
-    )
+        raise _commit_arguments_error(atomic=request.atomic)
+    source, plan, committable = _commit_target(registry, request.source, request.cwd, commit)
     key = SessionKey.of(request.session_id, request.agent_id)
     last_reads = seen.last_read(key, source.id)
 
     def prepare() -> tuple[_Session, _Applied]:
-        # 取り込んだ後の内容で、操作を当てて直コミットの確認まで進める
-        session = _Session(store, target, deadline=limits.write_deadline)
+        # 取り込んだ後の内容と設定で、操作を当てて直コミットの確認まで進める
+        session = _Session(
+            store, _commit_write_target(source, plan), deadline=limits.write_deadline
+        )
         before = dict(session.docs)
         applied = _apply_operations(session, checker, request.operations, last_reads, now)
         if applied.failures:
@@ -2079,7 +2108,9 @@ def _write_with_commit(
         check_clean(dirty, _pending_paths(session, plan))
         _check_before_write(limits)
         touched = session.write_pending()
-        _run_commit_generators(target, _unique(applied.tables), touched, timeout_sec, limits)
+        _run_commit_generators(
+            session.target, _unique(applied.tables), touched, timeout_sec, limits
+        )
         done[:] = [applied]
         return touched
 
@@ -2104,23 +2135,17 @@ def _delete_with_commit(
 ) -> DeleteResult:
     """`commit` を指定した `delete_docs` を、取り込みからプッシュまで進める。"""
     if not request.atomic or request.worktree is not None:
-        raise _commit_arguments_error()
-    source, plan, target, committable = _commit_target(
-        registry, request.source, request.cwd, commit
-    )
+        raise _commit_arguments_error(atomic=request.atomic)
+    source, plan, committable = _commit_target(registry, request.source, request.cwd, commit)
 
     def prepare() -> tuple[_Session, _Deleted]:
-        # 取り込んだ後の内容で、消す文書と参照を外す文書を決めて直コミットの確認まで進める
-        session = _Session(store, target, deadline=limits.write_deadline)
+        # 取り込んだ後の内容と設定で、消す文書と参照を外す文書を決めて直コミットの確認まで進める
+        session = _Session(
+            store, _commit_write_target(source, plan), deadline=limits.write_deadline
+        )
         before = dict(session.docs)
         deleted = _apply_deletes(session, checker, request)
-        changed = [
-            (index, document.id, document.kind) for index, document in enumerate(deleted.accepted)
-        ]
-        changed.extend(
-            (index, referrer_id, session.docs[referrer_id].kind)
-            for index, (referrer_id, _) in enumerate(deleted.unlinked)
-        )
+        changed = _deleted_documents(request, deleted, session)
         _check_commit_content(source, committable, changed, before, session.docs)
         _remove_documents(session, deleted.accepted)
         return session, deleted
@@ -2136,8 +2161,8 @@ def _delete_with_commit(
         check_clean(dirty, _pending_paths(session, plan))
         _check_before_write(limits)
         touched = session.write_pending()
-        tables = _unique([target.source.table(d.kind) for d in deleted.accepted])
-        _run_commit_generators(target, tables, touched, timeout_sec, limits)
+        tables = _unique([session.target.source.table(d.kind) for d in deleted.accepted])
+        _run_commit_generators(session.target, tables, touched, timeout_sec, limits)
         done[:] = [deleted]
         return touched
 

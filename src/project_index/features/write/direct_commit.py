@@ -96,7 +96,10 @@ def resolve_commit_plan(source: ServedSource, commit: CommitSpec) -> CommitPlan:
         fnmatch.fnmatchcase(branch, pattern) for pattern in settings.branches
     ):
         raise BranchNotAllowedError(
-            message=f"{branch} は {source.id} の直コミットで上書きできないブランチです",
+            message=(
+                f"{branch} は {source.id} の直コミットで上書きできないブランチです"
+                f"（上書きできるブランチ: {', '.join([settings.branch, *settings.branches])}）"
+            ),
             branch=branch,
             allowed=[settings.branch, *settings.branches],
             next_steps=[
@@ -370,7 +373,7 @@ def _not_configured_reason(source: ServedSource) -> str | None:
     if source.config.direct_commit is None:
         return "直コミットの設定が無い"
     if source.storage == "disk" or not source.is_git:
-        return "読み書きの方法が git でない"
+        return "disk の配信元である"
     if source.direct_commit_problems:
         return "; ".join(f"{item.path}: {item.rule}" for item in source.direct_commit_problems)
     return None
