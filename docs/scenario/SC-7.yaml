@@ -707,6 +707,10 @@ scenarios:
         M->>M: 種類のスキーマの x-key で models の Col の要素の properties へ解決する
         M->>WT: Col の properties を削除して書く
         M-->>A: applied: true と新しい version
+        A->>M: write_docs(update 文書 1, set: #models[Col].label に l)
+        M->>M: 種類のスキーマの x-key で models の Col の要素へ解決する
+        M->>WT: Col の要素に label を追加して書く
+        M-->>A: applied: true と新しい version
       ```
 
       <!-- /map -->
@@ -717,6 +721,8 @@ scenarios:
       - '`#` で始まらず要素の選び方を含むパス（`models[Row].properties`）の `add_to`・`remove_from`・`unset` は、`isError: true` で `add_to.models[Row].properties`（`remove_from.`・`unset.` も同じ）の違反を返し、ファイルは変わらない'
       - '`add_to`・`remove_from` の、無い要素（`#models[Zzz].properties`）・`x-key` の無い配列・配列でない項目を指す `#` で始まるパスも、違反を返して書き込まない'
       - '`unset` の無い要素（`#models[Zzz].properties`）・`x-key` の無い配列を指す `#` で始まるパスも、`unset.{パス}` の違反を返して書き込まない'
+      - '`set` の後、Col の要素に `label: l` が追加され、ファイルで変わった行は `label` の 1 行だけ。Row の要素は変わらない'
+      - '`set` の、無い要素（`#models[Zzz].label`）・`x-key` の無い配列・途中の無いキー（`#models[Col].meta.label`）を指す `#` で始まるパスも、`set.{パス}` の違反を返して書き込まない。`#` で始まらず要素の選び方を含むパス（`models[Col].label`）の違反は、`#` で始めて x-key の値で要素を指す書き方を示す'
     test: test_normal_when_add_to_keyed_element
   - name: 正常シナリオ（文書を改名して参照元を追随させる）
     setup:
