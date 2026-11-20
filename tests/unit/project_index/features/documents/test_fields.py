@@ -197,7 +197,7 @@ def test_set_field_when_selector() -> None:
     # 準備
     data: dict[str, Any] = {"tags": []}
     # 実行・検証
-    with pytest.raises(InvalidArgumentError, match="を含む項目のパスには書き込めません"):
+    with pytest.raises(InvalidArgumentError, match="`#` で始めて x-key の値で要素を指してください"):
         set_field(data, "tags[].name", "a")
 
 
@@ -493,6 +493,39 @@ def test_resolve_ref_path(path: str, expected: list[str | int]) -> None:
     result = resolve_ref_path(data, _REF_SCHEMA, path)
     # 検証
     assert result == expected
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        pytest.param("functions[save].usecase", ["functions", 1, "usecase"], id="element_key"),
+        pytest.param("notes[a.b]", ["notes", "a.b"], id="dict_key"),
+    ],
+)
+def test_resolve_ref_path_when_missing_last(path: str, expected: list[str | int]) -> None:
+    """最後の辞書のキーが無くても解く（正常系）。"""
+    # 準備
+    data = _ref_data()
+    # 実行
+    result = resolve_ref_path(data, _REF_SCHEMA, path, missing_last=True)
+    # 検証
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    ("path", "message"),
+    [
+        pytest.param("functions[missing]", "name が missing の要素がありません", id="element"),
+        pytest.param("functions[save].other.usecase", "にキー other がありません", id="middle"),
+    ],
+)
+def test_resolve_ref_path_when_missing_last_unresolved(path: str, message: str) -> None:
+    """最後の辞書のキー以外が無い（異常系）。"""
+    # 準備
+    data = _ref_data()
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError, match=message):
+        resolve_ref_path(data, _REF_SCHEMA, path, missing_last=True)
 
 
 def test_resolve_ref_path_when_dict_key() -> None:
