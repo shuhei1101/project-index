@@ -342,6 +342,22 @@ def test_missing_ref_fields() -> None:
     assert result == [("name", "title")]
 
 
+def test_missing_ref_fields_when_any_depth() -> None:
+    """`**.` で始まる列は、取り出した結果が空でも数えない（正常系）。"""
+    # 準備
+    table = DocumentTable(
+        id="modules",
+        paths=["docs/*.yaml"],
+        schema_path="schemas/module.schema.yaml",
+        metadata={"related": "**.refs[]", "name": "title"},
+    )
+    data = {"id": "n1", "functions": [{"name": "f"}]}
+    # 実行
+    result = fields_module.missing_ref_fields(data, table)
+    # 検証
+    assert result == [("name", "title")]
+
+
 @pytest.mark.parametrize(
     ("body_path", "expected"),
     [
