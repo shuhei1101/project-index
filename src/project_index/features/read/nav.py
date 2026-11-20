@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import ValidationError
 
 from project_index.features.access.types import Target
-from project_index.features.read.paths import page_path
+from project_index.features.documents.store import page_path
 from project_index.features.read.types import NavAutoCount
 from project_index.features.search.fields import NO_COLUMNS, known_fields, with_metadata_fields
 from project_index.features.search.filters import check_filter, match_filter

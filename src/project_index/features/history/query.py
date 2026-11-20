@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import io
 import logging
 import re
@@ -38,6 +39,8 @@ CO_CHANGE_COMMITS = 50
 DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}([T ].*)?$")
 QUOTE_OFF = ["-c", "core.quotepath=off"]
 NEXT_STEPS = ["`git log` で確認してください"]
+# リビジョンの解決が保持する (`repo_root`, commit) → 日時の数
+COMMIT_DATE_KEEP = 128
 
 
 def _text(args: Sequence[str], cwd: Path) -> str:
@@ -79,8 +82,14 @@ def resolve_ref(repo_root: Path, ref: str, *, date_base: str, argument: str = "r
             ).strip()
         except GitError as error:
             raise _not_found(argument, ref) from error
+    return ResolvedRef(input=ref, commit=commit, date=_commit_date(repo_root, commit))
+
+
+@functools.lru_cache(maxsize=COMMIT_DATE_KEEP)
+def _commit_date(repo_root: Path, commit: str) -> datetime:
+    """commit の日時を返す（commit の日時は変わらないので、同じ commit は git を 1 回だけ呼ぶ）。"""
     stamp_text = _text(["show", "-s", "--format=%cI", commit], repo_root).strip()
-    return ResolvedRef(input=ref, commit=commit, date=datetime.fromisoformat(stamp_text))
+    return datetime.fromisoformat(stamp_text)
 
 
 def list_refs(source: ServedSource, *, commits: int = 20) -> RefList:

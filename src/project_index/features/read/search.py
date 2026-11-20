@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from project_index.features.read.paths import page_path
+from project_index.features.documents.store import page_path
 from project_index.features.read.types import SearchItem, SearchResult
 from project_index.features.search.filters import match_words, normalize
 from project_index.features.search.snippets import snippet_lines

@@ -10,8 +10,9 @@ import os
 import posixpath
 import threading
 import time
+from collections import OrderedDict
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, cast
 
 from project_index.features.access.types import Target
@@ -52,16 +53,21 @@ CANDIDATE_CUTOFF = 0.6
 TREE_KEEP = 20
 # 保持するワークツリーのたどった結果の数（超えたら古く使ったものから捨てる）
 WORKTREE_KEEP = 20
+# 配信元ごとに保持するリビジョンの読み込みの結果の数（超えたら最も前に使用したものから捨てる）
+REVISION_LOAD_KEEP = 4
 
 __all__ = [
     "CANDIDATE_COUNT",
     "CANDIDATE_CUTOFF",
+    "REVISION_LOAD_KEEP",
     "TREE_KEEP",
     "WORKTREE_KEEP",
     "DocumentStore",
     "check_sync",
     "collect_files",
+    "find_page",
     "load_file",
+    "page_path",
 ]
 
 
@@ -98,6 +104,70 @@ class _WorktreeWalk:
     folders: dict[str, int]
     # 行の定義のハッシュ → 『ファイルの収集』の結果
     collected: dict[str, list[str]]
+
+
+@dataclass(slots=True, frozen=True)
+class _RevisionLoad:
+    """リビジョンの読み込みの結果と、文書のページの索引。"""
+
+    result: LoadResult
+    # 文書のページのパス → 文書
+    pages: dict[str, Document]
+    # 文書のファイルのパスと本文のファイルのパス → 文書
+    files: dict[str, Document]
+    # (文書のファイルのパスか本文のファイルのパス, 文書の ID) → 文書
+    file_ids: dict[tuple[str, str], Document]
+
+
+def page_path(document: Document) -> str:
+    """文書を URL のパスにする。"""
+    path = PurePosixPath(document.path).with_suffix("").as_posix()
+    if document.record_index is not None:
+        return f"{path}/{document.id}"
+    return path
+
+
+def find_page(
+    documents: Sequence[Document], page: str, *, doc_id: str | None = None
+) -> Document | None:
+    """文書のページのパスに当たる文書を探す。
+
+    無ければ、文書のファイルか本文のファイルのパスが `page` と同じ最初の文書を返す
+    （呼び出し側が本文の相対リンクを本文のファイルのパスで解決して渡すため）。
+    `doc_id` を指したときは、文書のファイルか本文のファイルのパスが `page` と同じ文書から ID で選ぶ。
+    """
+    if doc_id is not None:
+        return next(
+            (
+                document
+                for document in documents
+                if page in (document.path, document.body_path) and document.id == doc_id
+            ),
+            None,
+        )
+    found = next((document for document in documents if page_path(document) == page), None)
+    if found is not None:
+        return found
+    return next(
+        (document for document in documents if page in (document.path, document.body_path)),
+        None,
+    )
+
+
+def _revision_load(result: LoadResult) -> _RevisionLoad:
+    """読み込みの結果から文書のページの索引を作る（同じキーは先に現れた文書を残す）。"""
+    pages: dict[str, Document] = {}
+    files: dict[str, Document] = {}
+    file_ids: dict[tuple[str, str], Document] = {}
+    for document in result.documents:
+        pages.setdefault(page_path(document), document)
+        for path in (document.path, document.body_path):
+            # 本文のファイルを持たない文書は、文書のファイルのパスだけを索引にする
+            if path is None:
+                continue
+            files.setdefault(path, document)
+            file_ids.setdefault((path, document.id), document)
+    return _RevisionLoad(result=result, pages=pages, files=files, file_ids=file_ids)
 
 
 def _folders_fresh(root: Path, folders: dict[str, int]) -> bool:
@@ -159,6 +229,10 @@ class DocumentStore:
         self._startup_schemas: dict[tuple[str, str, str], dict[str, Any]] = {}
         # `clear` のたびに増やし、`clear` の前に解き始めたスキーマを書き戻さない
         self._generation = 0
+        # (`repo_root`, 配信元の ID) → 使用した順の (commit, 行の定義のハッシュの並び) → 読み込みの結果
+        self._revision_loads: dict[
+            tuple[Path, str], OrderedDict[tuple[str, tuple[str, ...]], _RevisionLoad]
+        ] = {}
         self._lock = threading.Lock()
 
     def read_root(self, target: Target) -> Path:
@@ -497,6 +571,52 @@ class DocumentStore:
         """
         revision = None if target.ref is None else self._commit_of(target)
         tables = self._tables(target, kinds)
+        # リビジョンを丸ごと読む: 同じ commit と行の定義の読み込みの結果があれば照合せずに返す
+        if revision is not None and files is None:
+            return self._revision_load_of(target, revision, tables, from_blobs=from_blobs).result
+        return self._load_uncached(target, tables, revision, files=files, from_blobs=from_blobs)
+
+    def _revision_load_of(
+        self,
+        target: Target,
+        revision: str,
+        tables: list[DocumentTable],
+        *,
+        from_blobs: bool = False,
+    ) -> _RevisionLoad:
+        """リビジョンの読み込みの結果を、保持したものから返し、無ければ読み込んで保持する。"""
+        source = target.source
+        group = (source.repo_root or source.root, source.id)
+        key = (revision, tuple(_table_hash(table) for table in tables))
+        with self._lock:
+            loads = self._revision_loads.get(group)
+            cached = None if loads is None else loads.get(key)
+            # 保持した結果がある: 使用した順の末尾へ移して返す
+            if loads is not None and cached is not None:
+                loads.move_to_end(key)
+                return cached
+        loaded = _revision_load(
+            self._load_uncached(target, tables, revision, files=None, from_blobs=from_blobs)
+        )
+        with self._lock:
+            loads = self._revision_loads.setdefault(group, OrderedDict())
+            loads[key] = loaded
+            loads.move_to_end(key)
+            # 上限を超えたら、最も前に使用した commit の結果から捨てる
+            while len(loads) > REVISION_LOAD_KEEP:
+                loads.popitem(last=False)
+        return loaded
+
+    def _load_uncached(
+        self,
+        target: Target,
+        tables: list[DocumentTable],
+        revision: str | None,
+        *,
+        files: Sequence[str] | None,
+        from_blobs: bool,
+    ) -> LoadResult:
+        """読む場所の文書を、保持した結果を使わずに文書の行ごとに集める。"""
         # 書き出さずに読む: commit のファイルの一覧から、たどるパスを選んで blob を読む
         if revision is not None and from_blobs and files is None:
             source = target.source
@@ -700,6 +820,19 @@ class DocumentStore:
         # 要素の中に残った `#/$defs/...` の参照先を辿れるよう、最上位の `$defs` を残す
         defs = schema.get("$defs")
         return {**item, "$defs": defs} if defs is not None else item
+
+    def find_page(self, target: Target, page: str, *, doc_id: str | None = None) -> Document | None:
+        """読む場所の文書から、文書のページのパスに当たる文書を返す。"""
+        # Git のリビジョン: 保持した読み込みの結果の索引で引き、全ての文書を照合しない
+        if target.ref is not None:
+            loaded = self._revision_load_of(
+                target, self._commit_of(target), self._tables(target, None)
+            )
+            if doc_id is not None:
+                return loaded.file_ids.get((page, doc_id))
+            return loaded.pages.get(page) or loaded.files.get(page)
+        # ワークツリー・Git の管理外: 読み込んだ文書を順に照合する
+        return find_page(self.load(target).documents, page, doc_id=doc_id)
 
     def has_worktree(self, target: Target) -> bool:
         """読む場所のワークツリーを一度でも読み込み終えたかを返す（ファイルの `stat` をしない）。"""

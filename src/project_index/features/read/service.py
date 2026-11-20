@@ -9,7 +9,6 @@ from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any, cast
 
 from project_index.features.convert.decisions import DECISION_DOCS_DIR, DECISION_ID
-from project_index.features.read.paths import find_page
 from project_index.features.read.types import (
     ConversionError,
     DecisionItem,
@@ -159,11 +158,11 @@ def get_document(
 ) -> DocumentValueResponse:
     """パスの文書の値・種類のスキーマ・メタデータを返し、`converters[]` を指す種類だけ変換する。"""
     source = target.source
-    loaded = store.load(target)
-    document = find_page(loaded.documents, path, doc_id=doc_id)
+    # Git のリビジョンは保持した読み込みの結果の索引で引き、配信元の全ての文書を照合しない
+    document = store.find_page(target, path, doc_id=doc_id)
     # 文書が無い: YAML を読めなかったファイルなら読めなかった位置を返し、それも無ければ 404
     if document is None:
-        broken = _unreadable(loaded.problems, path)
+        broken = _unreadable(store.load(target).problems, path)
         if broken is None:
             raise DocumentNotFoundError(message=f"文書がありません: {path}", missing=[path])
         return DocumentValueResponse(

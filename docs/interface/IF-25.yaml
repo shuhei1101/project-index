@@ -413,5 +413,9 @@ constraints:
   - item: 変換のスクリプトのリビジョン
     constraint: Git の配信元の `converters[]` のスクリプトは、環境変数 `PROJECT_INDEX_COMMIT` に応答の `ref` を解いた commit の SHA（40 文字）を受け取る。disk の配信元と Git の管理外の配信元では、`PROJECT_INDEX_COMMIT` を持たない。どちらもサーバーのプロセスの環境変数 `PROJECT_INDEX_COMMIT` は引き継がず、ほかの環境変数は引き継ぐ
     notes: 'スクリプトを動かす場所は変えない。本文以外のファイルは `git show {commit}:{path}` でそのリビジョンから参照する。キャッシュのキーに commit を含めないため、本文以外のファイルを参照する変換は `cache: false` にする'
+  - item: 要求ごとの処理の量
+    constraint: 同じ配信元・同じ commit・同じ文書の行の定義の読み込みの結果と、文書のファイルのパス・本文のファイルのパスの索引を使い回し、要求ごとに配信元の全てのファイルを照合しない。リビジョンの解決は要求ごとに git を 1 回だけ呼び、commit の日時は commit ごとに 1 回だけ取得する
+    notes: commit の中身は変わらないため、使い回した結果は応答を変えない。`default_ref` が進んだら、進んだ後の commit で読み込み直す
+    decided_by: NFR-1#requirements[負荷の高い間の文書 1 件の取得の所要時間]
 test_file: tests/integration/server/test_get_document.py
 visibility: internal

@@ -1,0 +1,68 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: run_only
+    detail: 画面のサーバーが文書 1 件を読む流れは変わらないが、取得の処理を変えるため回帰を確かめる
+    depends_on: []
+docs:
+  - page: docs/nonfunctional/NFR-1.yaml
+    new: false
+    change: 負荷の高い間の文書 1 件の取得の所要時間の決定値を、計測の結果から追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T04:56:12.982482+00:00'
+  - page: docs/interface/IF-25.yaml
+    new: false
+    change: 要求ごとの処理の量の制約（同じ commit の読み込みの結果とパスの索引の使い回し・リビジョンの解決の git の呼び出し 1 回）を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T05:04:05.894622+00:00'
+  - page: docs/module/MOD-29.py.yaml
+    new: false
+    change: リビジョンの読み込みの結果と文書のページの索引の保持（`_revision_loads`・`REVISION_LOAD_KEEP`）と、`find_page` を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T05:52:16.381245+00:00'
+  - page: docs/module/MOD-125.py.yaml
+    new: false
+    change: '`get_document` が文書のストアの `find_page` で文書を引くようにする'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T05:52:16.381245+00:00'
+  - page: docs/module/MOD-31.py.yaml
+    new: false
+    change: '`resolve_ref` が commit の日時を保持する（`COMMIT_DATE_KEEP`）'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T05:52:16.381245+00:00'
+  - page: docs/interface/IF-24.yaml
+    new: false
+    change: 制約「リビジョンの読み込み」の注記を、同じ commit の読み込みの結果を文書の取得・語での検索と共有する内容にする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T05:59:52.687283+00:00'
+  - page: docs/module/MOD-77.py.yaml
+    new: false
+    change: '`page_path`・`find_page` を文書のストア（MOD-29）へ移す'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T05:59:52.687283+00:00'
+  - page: docs/module/MOD-127.yaml
+    new: false
+    change: 図の文書のページの特定のリンク先を MOD-29 にする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T05:59:52.687283+00:00'
+  - page: docs/module/index.yaml
+    new: false
+    change: MOD-77 の概要を読み取り API が読む場所だけにする（README.md も同じ）
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T05:59:52.687283+00:00'
+scope_out:
+  - item: 高負荷の間の worktree を指した write_docs の時間切れと、worktree の読み込みの揺れ
+    reason: 目的が違う（書き込みと worktree の読み込み）。計測で原因が共通と分かったときはレビューでまとめるかを決める
+    plan: '#197'
+  - item: dev-docs 側の文書の一覧の保持と応答の圧縮
+    reason: dev-docs の変更で対応済み
+    plan: none
