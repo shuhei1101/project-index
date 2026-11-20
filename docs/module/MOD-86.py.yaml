@@ -95,6 +95,12 @@ classes:
         access: 公開
         default: 'False'
         description: '待ち時間の上限を超えて止めたか。`True` のとき `returncode` は `-1`'
+      - name: stdout
+        title: 標準出力
+        type: str
+        access: 公開
+        default: '""'
+        description: 失敗した呼び出しの標準出力（直コミットの `push --porcelain` の参照の行を参照する）。待ち時間の超過は空
 constants:
   - name: GIT_TIMEOUT_SEC
     title: git の待ち時間の上限
@@ -369,4 +375,33 @@ functions:
         mock: なし
         expected: '`None`'
         exception: '-'
+  - name: worktree_heads
+    title: ワークツリーのブランチ
+    kind: 関数
+    container: project_index/integrations/git.py
+    usecase: 直コミット
+    role: 読み取り
+    summary: ブランチを指すワークツリーの直下とブランチの名前の組を返す
+    scope: public
+    thread_safe: true
+    args:
+      - name: repo
+        title: リポジトリ
+        type: Path
+        required: true
+        passing: positional
+        description: リポジトリの中のフォルダ
+    returns:
+      type: list[tuple[Path, str]]
+      description: '`worktree list` の順。切り離した HEAD のワークツリーは含めない'
+    process: |-
+      1. `worktree list --porcelain` を呼ぶ（gitの実行）
+      2. `worktree {パス}` の行の後の `branch refs/heads/{ブランチ}` の行ごとに、パスとブランチの組を集めて返す
+    unit_tests:
+      - name: test_worktree_heads
+        case: 正常
+        summary: クローン本体とワークツリーと切り離した HEAD
+        condition: '`develop` のクローン本体、`feat/x` のワークツリー、`--detach` のワークツリー'
+        mock: なし（一時フォルダで `git init`）
+        expected: クローン本体と `develop`、ワークツリーと `feat/x` の 2 件
 visibility: internal

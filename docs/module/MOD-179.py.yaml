@@ -36,9 +36,9 @@ constants:
       - key: private-key
         value: '`-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----`'
       - key: email-address
-        value: '`[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}`'
+        value: '`(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}`'
     notes:
-      導き方: gitleaks の既定の規則集（MIT）から移し、`private-key` は見出しだけにし、`email-address` を追加した。ファイルの冒頭に gitleaks の著作権表示と MIT の許諾表示を残す。量指定子を入れ子にしない
+      導き方: gitleaks の既定の規則集（MIT）から移し、`private-key` は見出しだけにし、`email-address` を追加した。ファイルの冒頭に gitleaks の著作権表示と MIT の許諾表示を残す。量指定子を入れ子にしない。`email-address` はローカル部の途中から照合し直さないよう、ローカル部の文字が前に無い位置からだけ始める（英数字が続く長い入力で二乗の時間にならない）
 data_models:
   - name: SecretFinding
     title: 秘密の値の検出
