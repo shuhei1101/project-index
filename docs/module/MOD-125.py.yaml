@@ -222,7 +222,7 @@ functions:
       type: DocumentValueResponse
       description: 文書の取得の応答
     process: |-
-      1. 文書のストアの『文書のページの特定』（`store.find_page(target, path, doc_id=doc_id)`）で `path` の文書を引く（文書のファイル、無ければ本文のファイルが `path` と同じ最初の文書。`doc_id` を指したときは、そのうち文書の ID が `doc_id` と同じ文書）。`ref` のある読む場所では、保持した読み込みの結果と索引で引き、配信元の全ての文書を照合しない。読めなかったファイルの理由は `store.load(target)` の `problems` から引く
+      1. 文書のストアの『文書のページの特定』（`store.find_page(target, path, doc_id=doc_id)`）で `path` の文書を引く（文書のファイル、無ければ本文のファイルが `path` と同じ最初の文書。`doc_id` を指したときは、そのうち文書の ID が `doc_id` と同じ文書）。`ref` のある読む場所では、保持した読み込みの結果と索引で引き、配信元の全ての文書を照合しない。文書が無い場合だけ、読めなかったファイルの理由を `store.load(target)` の `problems` から引く（`ref` の無い読む場所で読み込みを 2 回走らせない）
          - 無い場合、`DocumentNotFoundError` を送出する
       2. 文書の値・種類のスキーマ（`store.row_schema(target, kind)` の `$ref` を解いた形）・メタデータ（`common_keys` に文書の `metadata` を入れる）・本文と本文のファイルのパス（管理用の YAML の行の文書だけ）を集める
          - YAML として読み込めない文書は、`value` を `None` にし、ファイルのパスと行と列を `conversion_error` に入れる
