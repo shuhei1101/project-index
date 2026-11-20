@@ -821,9 +821,7 @@ class DocumentStore:
         defs = schema.get("$defs")
         return {**item, "$defs": defs} if defs is not None else item
 
-    def find_page(
-        self, target: Target, page: str, *, doc_id: str | None = None
-    ) -> Document | None:
+    def find_page(self, target: Target, page: str, *, doc_id: str | None = None) -> Document | None:
         """読む場所の文書から、文書のページのパスに当たる文書を返す。"""
         # Git のリビジョン: 保持した読み込みの結果の索引で引き、全ての文書を照合しない
         if target.ref is not None:
