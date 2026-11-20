@@ -1,0 +1,20 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: エージェントが、先に作成した本文のファイルを指す文書を作成でき、本文のファイルを持たない文書にも既にあるファイルを付けられる。断るときは取れる方法を示す
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: 本文のファイルの操作の表で、create・update・replace が既にあるファイルを本文のファイルにできる条件と、断る条件を書き直す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T09:25:54.646258+00:00'
+scope_out:
+  - item: 既にあるファイルを指す create で @body を指定したときに、そのファイルを上書きする
+    reason: 要望は既にあるファイルを本文として使うことで、上書きは要望に含まれない。既にあるファイルを消すおそれがある
+    plan: none
+  - item: 取り込める既にあるファイルから、文書でない配信元のファイル（配信元の設定 `project-index.yaml`・`validators[]` のスクリプト・`exclude[]` に該当するファイル）を除く
+    reason: 要望は先に作成した本文のファイルを指す記録の作成で、断る範囲は文書のファイルまでを設計で確定した。取り込んだ要素の delete_docs でこれらのファイルが削除されるおそれは、この作業 PR がマージされた後に取り込める範囲を狭める別の変更で扱う（reviewer の提案 https://github.com/shuhei1101/project-index/pull/220#discussion_r4640809563）
+    plan: '#226'

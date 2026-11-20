@@ -935,7 +935,7 @@ flows:
       - name: Mock
         description: なし
       - name: 入力
-        description: '`body_file` を持たない行の文書 1 への `set: {@body: x}`、行 `notes` への `@body` の無い `create`、n1 の `set: {path: other.md}` を 1 件ずつ呼ぶ'
+        description: '`body_file` を持たない行の文書 1 への `set: {@body: x}`、行 `notes` への無いファイルを指す `@body` の無い `create`、n1 の `set: {path: other.md}` を 1 件ずつ呼ぶ'
     flow: |-
       <!-- map: {"title": "異常系（本文のファイルを持たない文書に本文を渡す・InvalidArgumentError）"} -->
 
@@ -946,8 +946,8 @@ flows:
 
         C->>T: 文書 1 の update（set @body）
         T-->>C: isError（body_file を持たない行）
-        C->>T: notes の create（@body なし）
-        T-->>C: isError（@body が無い）
+        C->>T: notes の create（無いファイル・@body なし）
+        T-->>C: isError（@body が無い・@body を加えるか先に本文のファイルを作成する）
         C->>T: n1 の update（set path）
         T-->>C: isError（body_file の列は変えられない）
       ```
@@ -1625,7 +1625,7 @@ flows:
       - name: 本文のファイルの有無が違う要素
         description: '正常系（本文のファイルを持たない要素を書く）と同じ行 `notes` の n3（`path` の列を持たない）と n1（`path: n1.md`）'
       - name: 入力
-        description: '`create`（`data: {id: n6, @body: 本文}`）、n3 の `update`（`set: {@body: 本文}`）、n3 の `update`（`set: {path: n3.md}`）、n3 の `update`（`text_edits: [{field: @body, old: a, new: b}]`）、n3 の `rename`（`new_path: notes/n7.md`）、n1 の `update`（`unset: [path]`）、n1 の `replace`（`data` に `path` が無い）を 1 件ずつ呼ぶ'
+        description: '`create`（`data: {id: n6, @body: 本文}`）、n3 の `update`（`set: {@body: 本文}`）、n3 の `update`（`set: {path: n3.md}`。`notes/n3.md` は無い）、n3 の `update`（`text_edits: [{field: @body, old: a, new: b}]`）、n3 の `rename`（`new_path: notes/n7.md`）、n1 の `update`（`unset: [path]`）、n1 の `replace`（`data` に `path` が無い）を 1 件ずつ呼ぶ'
     flow: |-
       <!-- map: {"title": "異常系（本文のファイルを持たない要素に本文だけを渡す・InvalidArgumentError）"} -->
 
@@ -2297,6 +2297,78 @@ flows:
       - '`isError: true` で、生成のスクリプトが失敗したこととそのパスを返却する'
       - リモートは変わらず、develop のワークツリーの HEAD が `origin/develop` と同じで、`git status` に変更が出ない
     test: test_error_when_direct_commit_generator_failed
+  - name: 正常系（既にある本文のファイルを指す文書を作る）
+    summary: '`records`・`body_file` の行で、`@body` を渡さず配信元のどの文書のファイルでもない既にあるファイルを指す `create`・`update`・`replace` が、そのファイルを本文のファイルにする'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 本文のファイルを持つ行
+        description: 正常系（本文のファイルを持たない要素を書く）と同じ行 `notes`。要素 n1 の `path` が `n1.md` で、要素 n3・n5 は `path` の列を持たない
+        notes: '`notes/n6.md`・`notes/n7.md`・`notes/n8.md` は、どの要素も指さないファイルとして先に作成してある'
+      - name: 入力
+        description: '1 回目は `create`（`kind: notes`・`data: {id: n6, path: n6.md}`）。2 回目は n3 の `update`（`set: {path: n7.md}`）。3 回目は n5 の `replace`（`data: {id: n5, path: n8.md}`）'
+    flow: |-
+      <!-- map: {"title": "正常系（既にある本文のファイルを指す文書を作る）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー
+
+        C->>T: create n6（path: n6.md・@body 無し）
+        T->>T: notes/n6.md が既にあり、配信元のどの文書のファイルでもないことを確認する
+        T->>WT: notes/index.yaml に要素を追加する（notes/n6.md は書き換えない）
+        T-->>C: created・version
+        C->>T: update n3（set path: n7.md）
+        T->>WT: n3 に path を入れる（notes/n7.md は書き換えない）
+        T-->>C: updated
+        C->>T: replace n5（data に path: n8.md・@body 無し）
+        T->>WT: n5 を置き換える（notes/n8.md は書き換えない）
+        T-->>C: replaced
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目の後、`notes/index.yaml` に `{id: n6, path: n6.md}` の要素があり、`notes/n6.md` の内容は書き込みの前と同じ。`search_docs` の n6 の本文が `notes/n6.md` の内容'
+      - '2 回目の後、n3 の要素が `path: n7.md` を持ち、`notes/n7.md` の内容は書き込みの前と同じ。3 回目の後、n5 の要素が `path: n8.md` を持ち、`notes/n8.md` の内容は書き込みの前と同じ'
+      - 3 回とも `diff` は要素の差分の行だけで、`@@ {本文のファイルのパス}` の行を持たない。`version` は要素の値と本文のファイルの内容の両方から求めた値で、`search_docs` の `version` と同じ
+    test: test_normal_when_existing_body_file_adopted
+  - name: 異常系（既にあるファイルを本文のファイルにできない・ValidationFailedError）
+    summary: 配信元のいずれかの文書のファイルを指す操作と、`@body` を渡して既にあるファイルを指す `create` を断り、直し方に取れる方法を示す
+    setup:
+      - name: Mock
+        description: なし
+      - name: 本文のファイルを持つ行
+        description: 正常系（既にある本文のファイルを指す文書を作る）と同じ行 `notes` と、文書の種類の行（`docs/*.yaml`）の文書 1（`docs/doc-1.yaml`）
+        notes: '`notes/n6.md` は、どの要素も指さないファイル'
+      - name: 入力
+        description: '`create`（`data: {id: n10, path: n1.md}`）、`create`（`data: {id: n11, path: index.yaml}`）、`create`（`data: {id: n12, path: ../docs/doc-1.yaml}`）、`create`（`data: {id: n13, path: n6.md, @body: 本文}`）を 1 件ずつ呼ぶ'
+    flow: |-
+      <!-- map: {"title": "異常系（既にあるファイルを本文のファイルにできない・ValidationFailedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: create n10（path: n1.md）
+        T-->>C: isError（n1 の本文のファイル）
+        C->>T: create n11（path: index.yaml）
+        T-->>C: isError（管理用の YAML）
+        C->>T: create n12（path: ../docs/doc-1.yaml）
+        T-->>C: isError（文書 1 のファイル）
+        C->>T: create n13（path: n6.md・@body）
+        T-->>C: isError（既にあるファイル・@body を除けば使える）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 4 回とも `ValidationFailedError` で、添字 0 の違反の `path` が `body_file` の列 `path`
+      - 1〜3 回目の決まりは、指すファイルがどの文書のファイルか（1 回目は文書の ID `n1`、3 回目は文書の ID `doc-1`、2 回目は行の ID `notes` と管理用の YAML であること）を示し、直し方は配信元のどの文書のファイルでもないパスを指定すること
+      - 4 回目の決まりは指すファイルが既にあることで、直し方は既にあるファイルを本文のファイルにするなら `@body` を除くこと、`@body` を書くなら新規のファイルのパスにすること
+      - どのファイルも変わらない
+    test: test_error_when_existing_body_file_not_adoptable
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -2344,6 +2416,7 @@ callers:
   - SC-15#scenarios[異常シナリオ（atomic を外して指定する）]
   - SC-15#scenarios[異常シナリオ（コミットするブランチのワークツリーが無い）]
   - SC-10#scenarios[異常シナリオ（直コミットの設定が検証に通らない）]
+  - SC-7#scenarios[正常シナリオ（先に作成した本文のファイルを指す文書を作る）]
 exclusivity: 配信元ごとの排他ロックの中で、読み込み・バージョンの確認・検査・書き込みを行う。後から来た呼び出しはロックを待つ。`commit` を指定した呼び出しは、制約「直コミットの排他」のリポジトリの単位の排他も取る
 request:
   - name: source
@@ -2470,7 +2543,7 @@ request:
   - name: operations[].data.@body
     type: str
     required: false
-    default: なし（`records`・`body_file` の行の `create` では、`data` に `body_file` の列があれば必須。無ければ本文のファイルを持たない要素を作る）
+    default: なし（`records`・`body_file` の行の `create` では、`data` の `body_file` の列が無いファイルを指せば必須。既にあるファイルを指せば省き、そのファイルを本文のファイルにする。無ければ本文のファイルを持たない要素を作る）
     location: argument
     description: 本文のファイルの内容
     notes: '`records`・`body_file` の行の文書だけ。本文のファイルのパスは `data` の `body_file` の列に、管理用の YAML のフォルダからの相対で渡す'
@@ -2633,7 +2706,7 @@ exceptions:
   - name: なし（正常終了）
     condition: '全ての操作を書いた（`atomic: false` で一部が失敗したときも、失敗分を `failed` として返して正常終了）'
   - name: ValidationFailedError
-    condition: '変更を当てた後の文書（`rename` の参照元と `replace_text` で置換した文書を含む）がスキーマか `validators[]` に通らないか、`rename` の `new_id` が `ids.format` に合わないか既にある文書と重なるか、種類のスキーマの `$ref` を解決できないか、変えた Markdown のキーの値に mdmark の描画時の書き方の警告があるか、本文のファイルのパスが配信元の外・`create` で既にあるファイルを指す（`atomic: true`）か、書き込むワークツリーの配信元の設定が検証に通らない'
+    condition: '変更を当てた後の文書（`rename` の参照元と `replace_text` で置換した文書を含む）がスキーマか `validators[]` に通らないか、`rename` の `new_id` が `ids.format` に合わないか既にある文書と重なるか、種類のスキーマの `$ref` を解決できないか、変えた Markdown のキーの値に mdmark の描画時の書き方の警告があるか、本文のファイルのパスが配信元の外・`@body` を渡した `create` で既にあるファイル・配信元のいずれかの文書のファイルを指す（`atomic: true`）か、書き込むワークツリーの配信元の設定が検証に通らない'
     notes: '違反ごとの添字・パス・決まり・直し方を添える。スキーマの違反には、違反した項目のスキーマの説明（`schema`）も添える'
   - name: SourceNotWritableError
     condition: '`cwd` が配信元の `scope.write` に当たらない'
@@ -2651,7 +2724,7 @@ exceptions:
     condition: '`update`・`replace` の `id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
   - name: InvalidArgumentError
-    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先を行の `paths` の先頭から決められない（`records` を持つ行で先頭が空か glob を含む・持たない行で先頭が glob を含まないか、最後の段の `*` を ID に置き換えた後に glob が残るか、決めた配置先が行の `paths` に当たらない）・`create` の配置先が行の `exclude[]` に当たる（`/` を含む値はパス、含まない値はファイル名で当てる）・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` に `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`rename` に `new_id`・`new_path` がどちらも無い・ID がパスの文書に `new_id` を渡した・`body_file` を持たない `records` の行の文書に `new_path` を渡した・`new_path` が種類の行の `paths` に当たらないか `exclude[]` に当たるか既にあるファイルを指す・`replace_text` に `filter`・`old`・`new` のどれかが無いか `old` が空・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す・`unset` の要素の参照の型の項目のパスを解決できないか、`#` で始まらない要素に要素の選び方（`[...]`・`**.`）を含む・`x-key` を持つ配列への `remove_from` の値に削除する要素が無い・`commit` と `atomic: false` を同時に渡した・`commit` と `worktree` を同時に渡した'
+    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`create` の配置先を行の `paths` の先頭から決められない（`records` を持つ行で先頭が空か glob を含む・持たない行で先頭が glob を含まないか、最後の段の `*` を ID に置き換えた後に glob が残るか、決めた配置先が行の `paths` に当たらない）・`create` の配置先が行の `exclude[]` に当たる（`/` を含む値はパス、含まない値はファイル名で当てる）・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` が無いファイルを指し `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`rename` に `new_id`・`new_path` がどちらも無い・ID がパスの文書に `new_id` を渡した・`body_file` を持たない `records` の行の文書に `new_path` を渡した・`new_path` が種類の行の `paths` に当たらないか `exclude[]` に当たるか既にあるファイルを指す・`replace_text` に `filter`・`old`・`new` のどれかが無いか `old` が空・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す・`unset` の要素の参照の型の項目のパスを解決できないか、`#` で始まらない要素に要素の選び方（`[...]`・`**.`）を含む・`x-key` を持つ配列への `remove_from` の値に削除する要素が無い・`commit` と `atomic: false` を同時に渡した・`commit` と `worktree` を同時に渡した'
   - name: SourceNotServedError
     condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
   - name: WorktreeNotMatchedError
@@ -2751,10 +2824,10 @@ constraints:
     constraint: '[文書の検索](id:IF-2) の制約「ワークツリーの読み込みの待ち」と同じ。終了しなければ何も書き込まずに `WorktreeLoadingError` を返却する'
     notes: 共通の処理のため、結合テストは文書の検索が持つ
   - item: 本文のファイル
-    constraint: '`records`・`body_file` の行の文書の本文は `@body` で受ける。`create` は `body_file` の列の値（管理用の YAML のフォルダからの相対）に本文のファイルを作成し、`set` の `@body` は全体を、`text_edits` の `field: @body` は一部を置き換える。`replace` は `data` に `@body` があれば置き換え、無ければ本文のファイルを変えない。本文のファイルを持つ要素の `body_file` の列の値を変える `update`・`replace`（`unset` で列を外す `update` と、列を含まない `data` の `replace` を含む）は受けない。本文のファイルを外す操作は持たない。本文のファイルを持たない要素は制約「本文のファイルを持たない要素」'
+    constraint: '`records`・`body_file` の行の文書の本文は `@body` で受ける。`create` は `body_file` の列の値（管理用の YAML のフォルダからの相対）に本文のファイルを作成し（`@body` が無く既にあるファイルを指すときは、制約「既にある本文のファイル」）、`set` の `@body` は全体を、`text_edits` の `field: @body` は一部を置き換える。`replace` は `data` に `@body` があれば置き換え、無ければ本文のファイルを変えない。本文のファイルを持つ要素の `body_file` の列の値を変える `update`・`replace`（`unset` で列を外す `update` と、列を含まない `data` の `replace` を含む）は受けない。本文のファイルを外す操作は持たない。本文のファイルを持たない要素は制約「本文のファイルを持たない要素」'
     notes: '`@body` は種類の列名と重ならない。`body_file` の列の名前が `body` の配信元でも、`body` は列を指す'
   - item: 本文のファイルの検査
-    constraint: 本文のファイルの内容は、スキーマ・`validators[]`・mdmark の点検に通さない。パスを読み込みと同じく管理用の YAML のフォルダから解き、配信元の外を指すときと、`create` で既にあるファイルを指すときは `body_file` の列の違反にする
+    constraint: 本文のファイルの内容は、スキーマ・`validators[]`・mdmark の点検に通さない。パスを読み込みと同じく管理用の YAML のフォルダから解き、配信元の外を指すときと、`@body` を渡した `create` で既にあるファイルを指すときは `body_file` の列の違反にする
   - item: 本文のファイルの書き込み
     constraint: 要素の YAML と本文のファイルは、全ての検査に通ってからそれぞれ一時ファイルに書いて置き換える。書き込みの期限は置き換える前に確認し、始めた後は両方を書き終える
   - item: 本文のファイルを持つ文書のバージョン
@@ -2802,7 +2875,7 @@ constraints:
     constraint: 'Git 管理外の配信元と `storage.type: disk` の配信元では、書き換える文書（`create`・`update`・`replace`・`rename` の対象と、改名の参照元・`replace_text` で書き換える文書）に `created`・`updated` を付けてから検査する。付けるかは、操作の対象でなく書き換える文書の種類の `documents[].write_dates`（省くと `true`）で決める。`false` の種類の文書には付けず、既にある `created`・`updated` の値も書き換えない'
     notes: Git の配信元では `write_dates` に関わらず付けない
   - item: 本文のファイルを持たない要素
-    constraint: '`records`・`body_file` の行で `body_file` の列が無いか値が `null`・空の文字列の要素は、`body_file` を持たない `records` の行の文書と同じく要素だけを書き換える。`create` は `data` に `body_file` の列と `@body` のどちらも無ければ要素だけを追加し、`@body` だけがあれば `body_file` の列の違反、`body_file` の列だけがあれば `@body` の違反にする。`update`・`replace` は `body_file` の列の値と `@body` を同時に指定したときだけ本文のファイルを作成し（「本文のファイルの検査」の `create` と同じ検査）、`@body` だけは `body_file` の列の違反、`body_file` の列の値だけは `@body` の違反にする。`text_edits` の `field: @body` は、本文のファイルが無いことを決まりにした `text_edits[{n}].field` の違反にする。`rename` は `new_id` だけを受け、`new_path` は引数の誤りにする。どの操作も本文のファイルを削除・移動しない'
+    constraint: '`records`・`body_file` の行で `body_file` の列が無いか値が `null`・空の文字列の要素は、`body_file` を持たない `records` の行の文書と同じく要素だけを書き換える。`create` は `data` に `body_file` の列と `@body` のどちらも無ければ要素だけを追加し、`@body` だけがあれば `body_file` の列の違反、`body_file` の列だけがあり無いファイルを指せば `@body` の違反にする。`update`・`replace` は `body_file` の列の値と `@body` を同時に指定したときだけ本文のファイルを作成し（「本文のファイルの検査」の `create` と同じ検査）、`@body` だけは `body_file` の列の違反、`body_file` の列の値だけで無いファイルを指せば `@body` の違反にする。`create`・`update`・`replace` で `body_file` の列の値だけが既にあるファイルを指すときは、制約「既にある本文のファイル」。`text_edits` の `field: @body` は、本文のファイルが無いことを決まりにした `text_edits[{n}].field` の違反にする。`rename` は `new_id` だけを受け、`new_path` は引数の誤りにする。どの操作も本文のファイルを削除・移動しない'
   - item: 直コミットの権限
     constraint: '`commit` を指定した呼び出しは、`scope.write` で判定しない。変更を適用した後に書き換わる文書（`rename` の参照元・`replace_text` で置換した文書を含む）の種類ごとに、端末の設定の `sources[].direct_commit.kinds` にその種類があればその glob、無ければ `sources[].direct_commit.scope` に `cwd` が該当することを確認する'
     notes: 既定は空で、どの作業場所からも呼べない。該当しなければ `DirectCommitNotPermittedError`
@@ -2836,6 +2909,11 @@ constraints:
   - item: 直コミットのプッシュの結果の照合
     constraint: プッシュがリモートに断られた以外の理由（通信の失敗・制限時間で止めた）で終わったときは、リモートの追跡ブランチを取得し直し、コミットの SHA が含まれていれば成功として扱う。含まれていなければ、コミットと書き込んだファイルと生成物を戻して `PushFailedError` を返却する。取得し直しも失敗したときは、同じく戻して、プッシュの結果が不明であることとコミットの SHA を添えた `PushFailedError` を返却する
     notes: 取得し直しの制限時間は、直コミットの取り込みとプッシュの所要時間の余裕の中に収める。戻した後にリモートに入っていたコミットは、次の直コミットの早送りの取り込みでワークツリーに入る
+  - item: 既にある本文のファイル
+    constraint: '`records`・`body_file` の行で、`create` と本文のファイルを持たない要素への `update`・`replace` が `@body` を渡さず、`body_file` の列の値が配信元の中の既にあるファイルを指すときは、要素だけを書き込み、そのファイルを書き換えずに本文のファイルにする。そのファイルが配信元のいずれかの文書のファイル（行の `paths` に該当する 1 ファイル 1 文書のファイル・管理用の YAML・どの行の要素の本文のファイル）のときは `body_file` の列の違反にし、決まりにその文書の ID を含める（管理用の YAML のときは、文書の ID の代わりにその行の ID と管理用の YAML であることを含める）。同じ呼び出しの前の操作が作成・取り込む本文のファイルも、配信元のいずれかの文書のファイルに含める。`diff` は要素の差分の行だけを返却する'
+    notes: 取り込んだ要素の `rename`・`delete_docs` は本文のファイルを移動・削除するため、ほかの文書のファイルは取り込まない
+  - item: 本文のファイルの違反の直し方
+    constraint: '`body_file` の列だけが無いファイルを指す違反の直し方は、`@body` を加えるか先に本文のファイルを作成すること。`@body` を渡して既にあるファイルを指す違反の直し方は、既にあるファイルを本文のファイルにするなら `@body` を除き、本文を記載するなら新規のファイルのパスにすること。配信元のいずれかの文書のファイルを指す違反の直し方は、どの文書のファイルでもないパスを指定すること'
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]

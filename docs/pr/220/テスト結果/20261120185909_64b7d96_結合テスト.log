@@ -1,0 +1,20 @@
+$ run_url=$(gh workflow run test.yml --ref feat/write/create-with-existing-body-file -f layer=integration -f paths="tests/integration/server/test_write_docs.py::test_normal_when_existing_body_file_adopted tests/integration/server/test_write_docs.py::test_error_when_existing_body_file_not_adoptable tests/integration/server/test_write_docs.py::test_error_when_body_not_accepted tests/integration/server/test_write_docs.py::test_error_when_body_without_body_file tests/integration/server/test_write_docs.py::test_error_when_body_file_outside_source tests/integration/server/test_write_docs.py::test_normal_when_body_file tests/integration/server/test_write_docs.py::test_normal_when_body_file_absent" ...)  # TP-2 の run_runner（実行範囲の表の 7 件。並列数は層の parallel: false のため指定なし）
+
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 7 items
+
+tests/integration/server/test_write_docs.py::test_normal_when_existing_body_file_adopted PASSED [ 14%]
+tests/integration/server/test_write_docs.py::test_error_when_existing_body_file_not_adoptable PASSED [ 28%]
+tests/integration/server/test_write_docs.py::test_error_when_body_not_accepted PASSED [ 42%]
+tests/integration/server/test_write_docs.py::test_error_when_body_without_body_file PASSED [ 57%]
+tests/integration/server/test_write_docs.py::test_error_when_body_file_outside_source PASSED [ 71%]
+tests/integration/server/test_write_docs.py::test_normal_when_body_file PASSED [ 85%]
+tests/integration/server/test_write_docs.py::test_normal_when_body_file_absent PASSED [100%]
+
+============================== 7 passed in 1.61s ===============================
+exit=0

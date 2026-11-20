@@ -2399,6 +2399,140 @@ def test_error_when_body_not_accepted(
     assert (worktree / "notes" / "n1.md").read_text(encoding="utf-8") == NOTE_1
 
 
+EXISTING_BODIES = {"notes/n6.md": "# n6\n", "notes/n7.md": "# n7\n", "notes/n8.md": "# n8\n"}
+
+
+def test_normal_when_existing_body_file_adopted(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """`@body` を渡さず既にあるファイルを指す `create`・`update`・`replace` が、そのファイルを本文のファイルにする（正常系）。"""
+    # 準備
+    files = {**_absent_files(sample_file_set, sample_config_text), **EXISTING_BODIES}
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    common = {"cwd": str(source.folder), "worktree": str(worktree)}
+    # 実行
+    created = env.call(
+        "write_docs",
+        **common,
+        operations=[{"op": "create", "kind": "notes", "data": {"id": "n6", "path": "n6.md"}}],
+    )
+    searched = env.call(
+        "search_docs",
+        **common,
+        filter={"field": "id", "op": "eq", "values": ["n6"]},
+        view="full",
+        format="json",
+    )
+    updated = env.call(
+        "write_docs",
+        **common,
+        operations=[_update("n3", value_hash({"id": "n3"}), set={"path": "n7.md"})],
+    )
+    replaced = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            {
+                "op": "replace",
+                "id": "n5",
+                "expected_version": value_hash({"id": "n5"}),
+                "data": {"id": "n5", "path": "n8.md"},
+            }
+        ],
+    )
+    # 検証
+    index = load_yaml((worktree / "notes" / "index.yaml").read_text(encoding="utf-8"))
+    assert not created.is_error
+    assert not updated.is_error
+    assert not replaced.is_error
+    assert index["items"] == [
+        {"id": "n1", "path": "n1.md"},
+        {"id": "n3", "path": "n7.md"},
+        {"id": "n5", "path": "n8.md"},
+        {"id": "n6", "path": "n6.md"},
+    ]
+    assert (worktree / "notes" / "n6.md").read_text(encoding="utf-8") == "# n6\n"
+    assert (worktree / "notes" / "n7.md").read_text(encoding="utf-8") == "# n7\n"
+    assert (worktree / "notes" / "n8.md").read_text(encoding="utf-8") == "# n8\n"
+    assert "# n6" in searched.text
+    assert "@@" not in created.data["results"][0]["diff"]
+    assert "@@" not in updated.data["results"][0]["diff"]
+    assert "@@" not in replaced.data["results"][0]["diff"]
+    assert created.data["results"][0]["version"] == value_hash(
+        [{"id": "n6", "path": "n6.md"}, "# n6\n"]
+    )
+    assert searched.data["items"][0]["values"]["version"] == created.data["results"][0]["version"]
+
+
+def test_error_when_existing_body_file_not_adoptable(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """配信元のいずれかの文書のファイルを指す操作と、`@body` を渡して既にあるファイルを指す `create` を断り、直し方に取れる方法を示す（異常系）。"""
+    # 準備
+    files = {**_notes_files(sample_file_set, sample_config_text), "notes/n6.md": "# n6\n"}
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    common = {"cwd": str(source.folder), "worktree": str(worktree)}
+    doc_1_before = (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8")
+    # 実行
+    other_body = env.call(
+        "write_docs",
+        **common,
+        operations=[{"op": "create", "kind": "notes", "data": {"id": "n10", "path": "n1.md"}}],
+    )
+    records_index = env.call(
+        "write_docs",
+        **common,
+        operations=[{"op": "create", "kind": "notes", "data": {"id": "n11", "path": "index.yaml"}}],
+    )
+    document_file = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            {"op": "create", "kind": "notes", "data": {"id": "n12", "path": "../docs/doc-1.yaml"}}
+        ],
+    )
+    with_body = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            {
+                "op": "create",
+                "kind": "notes",
+                "data": {"id": "n13", "path": "n6.md", "@body": "本文\n"},
+            }
+        ],
+    )
+    # 検証
+    assert other_body.is_error
+    assert "ValidationFailedError" in other_body.text
+    assert "operations[0].path" in other_body.text
+    assert "n1" in other_body.text
+    assert "どの文書のファイルでもない" in other_body.text
+    assert records_index.is_error
+    assert "ValidationFailedError" in records_index.text
+    assert "notes" in records_index.text
+    assert "管理用の YAML" in records_index.text
+    assert document_file.is_error
+    assert "ValidationFailedError" in document_file.text
+    assert "doc-1" in document_file.text
+    assert with_body.is_error
+    assert "ValidationFailedError" in with_body.text
+    assert "既にあります" in with_body.text
+    assert "@body を除き" in with_body.text
+    assert (worktree / "notes" / "index.yaml").read_text(encoding="utf-8") == NOTES
+    assert (worktree / "notes" / "n1.md").read_text(encoding="utf-8") == NOTE_1
+    assert (worktree / "notes" / "n6.md").read_text(encoding="utf-8") == "# n6\n"
+    assert (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8") == doc_1_before
+
+
 def test_normal_when_disk_storage(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
