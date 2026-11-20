@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 
 import pytest
+
 from project_index.features.write.secrets import SecretFinding, scan_text, secret_findings
 
 # 秘密の値の書式の見本は、テストのファイルにトークンの形のまま記載しないため、部品をつないで組み立てる
