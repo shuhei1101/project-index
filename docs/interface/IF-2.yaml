@@ -1200,6 +1200,35 @@ flows:
       - '`view: count, group_by: uses[].id` が `compare` 1・`compare-x` 1・`list` 1 を返却する'
       - '`order_by: [{field: uses[].id}]` と `fields: [uses[].id]` を受け付け、`fields` は文書 1 で `uses[].id: [compare, list]` を返却する'
     test: test_normal_when_array_item_keys
+  - name: 正常系（スキーマの合成と循環する参照の先のキー）
+    summary: 種類のスキーマの `allOf`・`anyOf`・`oneOf` と循環する `$ref` の先で定義したキーを項目として指し、絞り、数える
+    setup:
+      - name: Mock
+        description: なし
+      - name: スキーマの合成と循環する参照
+        description: "sample の種類のスキーマが、最上位の `allOf` の要素に `properties.top: {type: string}`、`a: {allOf: [{type: object, properties: {x: {type: string}}}]}`、`b: {anyOf: [{type: object, properties: {y: {type: string}}}, {type: \"null\"}]}`、`c: {oneOf: [{type: object, properties: {z: {type: string}}}, {type: string}]}`、`tree: {$ref: '#/$defs/node'}` を持ち、`$defs.node` は `properties.name: {type: string}` と `properties.children: {type: array, items: {$ref: '#/$defs/node'}}` を持つ。文書 1 が `top: t1`・`a.x: x1`・`b.y: y1`・`c.z: z1`・`tree: {name: root, children: [{name: leaf}]}`、文書 2 が `top: t2`・`b: null`・`c: s` を持つ"
+      - name: 入力
+        description: '`filter` が `a.x` の `eq` `x1`'
+    flow: |-
+      <!-- map: {"title": "正常系（スキーマの合成と循環する参照の先のキー）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+
+        C->>T: filter: a.x eq x1
+        T->>T: allOf などの要素と、循環する参照の参照先の定義のキーを、使える項目に含める
+        T-->>C: 文書 1
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`a.x` が `x1` の `eq` の条件で文書 1 を返却する'
+      - '`top`・`b.y`・`c.z`・`tree.name`・`tree.children[].name` を `filter`・`order_by`・`group_by`・`fields` で受け付ける（`top` の `t1` の `eq` は文書 1、`tree.children[].name` の `leaf` の `eq` は文書 1 を返却する）'
+      - '`view: count, group_by: b.y` が `y1` 1・（なし）1 を返却する'
+      - '`tree.children[].children[].name` は「知らない項目です」の `InvalidArgumentError` にする'
+    test: test_normal_when_schema_composition_keys
 lead: '条件に該当する文書の取得・一覧・件数・集計を返却する `search_docs` の入出力を定め、`search_docs` を修正するときに参照する。'
 tags:
   - name: topic:クエリ
@@ -1669,6 +1698,9 @@ constraints:
   - item: 配列の中のオブジェクトのキー
     constraint: 種類のスキーマの配列の `items` のキーは、`{配列のキー}[].{キー}`（`uses[].id`）を項目として `filter`・`order_by`・`group_by`・`fields` で使用できる。値は要素ごとの値の配列で、配列の項目と同じく要素ごとに比べ、数える。入れ子の配列は `[]` を重ねる（`a[].b[].c`）。`{配列のキー}.{キー}`（`uses.id`）は項目にしない
     notes: 項目のパスの解釈は `write_docs`・`metadata` の列名の `[]` と同じ
+  - item: スキーマの合成と循環する参照の先のキー
+    constraint: 種類のスキーマの `allOf`・`anyOf`・`oneOf` の各要素が定義したキーは、それらを持つスキーマと同じパスの項目として `filter`・`order_by`・`group_by`・`fields` で使用できる（最上位の `allOf` の要素の `top` は `top`、`a.allOf` の要素の `x` は `a.x`）。循環して最上位の `$defs` を指して残った `$ref`（`#/$defs/...`。別のファイルの中で循環し、最上位の `$defs` へ加えた定義を指す参照も含む）は参照先の定義のキーを項目にし、同じ定義へ戻った時点でそれより深いキーを項目にしない（`tree.children[].name` は項目にし、`tree.children[].children[].name` は項目にしない）。同じパスで型が食い違う項目は `string` にする
+    notes: 解決できずに残った `$ref` の先は項目にしない。循環しない `$ref` は参照先の中身に置き換えてから項目にする（スキーマの参照の解決）
 refs:
   - to: SC-6
     item: scenarios[正常シナリオ]

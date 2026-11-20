@@ -144,6 +144,8 @@ functions:
     process: |-
       1. `id`・`kind`・`created`・`updated`・`METADATA_KEYS`・`body`・`*`・`COMPUTED_FIELDS` を入れる
       2. スキーマの `properties` を再帰でたどり、`a.b` のパスと `type`（`format: date`・`date-time` は `date`）を足す。配列の `items` の `properties` は `a[].b` のパスで追加し（入れ子の配列は `a[].b[].c`）、`a.b` のパスでは追加しない。最上位のスキーマの `items` は `[]` を付けずにたどる
+         - `allOf`・`anyOf`・`oneOf` の各要素は、それらを持つスキーマと同じパスの接頭辞でたどる（要素の `type` は、それらを持つスキーマのパスの型に使用しない）
+         - `$ref` が最上位の `$defs` を指す（`#/$defs/{名前}`。名前は JSON Pointer として復元する）スキーマは、たどっているスキーマ自身の最上位の `$defs`（別の種類のスキーマの `$defs` は参照しない）のその定義を同じパスの接頭辞でたどる。たどっている途中の定義へ戻る `$ref` と、最上位の `$defs` を指さない `$ref`・`$defs` に無い名前を指す `$ref` はたどらない
       3. 型の食い違う同じパスは `string` にする
     unit_tests:
       - name: test_known_fields_when_array_items
@@ -152,6 +154,24 @@ functions:
         condition: 'スキーマが `uses: {type: array, items: {type: object, properties: {id: {type: string}, refs: {type: array, items: {type: object, properties: {to: {type: string}}}}}}}` と `category: {type: object, properties: {id: {type: string}}}` を持つ'
         mock: なし
         expected: '`uses` が `array`、`uses[].id` が `string`、`uses[].refs[].to` が `string`、`category.id` が `string`。`uses.id`・`uses.refs.to` が無い'
+      - name: test_known_fields_when_composition
+        case: 正常
+        summary: allOf・anyOf・oneOf の要素のキー
+        condition: 'スキーマが最上位の `allOf: [{properties: {top: {type: string}}}]`、`a: {allOf: [{type: object, properties: {x: {type: string}}}]}`、`b: {anyOf: [{type: object, properties: {y: {type: number}}}, {type: "null"}]}`、`c: {oneOf: [{type: object, properties: {z: {type: string}}}, {type: string}]}`、`d: {anyOf: [{type: object, properties: {v: {type: string}}}, {type: object, properties: {v: {type: number}}}]}` を持つ'
+        mock: なし
+        expected: '`top`・`a.x`・`c.z` が `string`、`b.y` が `number`、`d.v` が `string`（要素ごとに型が食い違う）。`a`・`b`・`c` は `type` を持たないので `string`'
+      - name: test_known_fields_when_recursive_ref
+        case: 正常
+        summary: 循環して最上位の $defs を指して残った参照
+        condition: "スキーマが `tree: {type: object, properties: {name: {type: string}, children: {type: array, items: {$ref: '#/$defs/node'}}}}` と `$defs.node: {type: object, properties: {name: {type: string}, children: {type: array, items: {$ref: '#/$defs/node'}}}}` を持つ（`$ref` を解決した後の形状）"
+        mock: なし
+        expected: '`tree.name`・`tree.children[].name` が `string`、`tree.children`・`tree.children[].children` が `array`。`tree.children[].children[].name` が無い'
+      - name: test_known_fields_when_unresolvable_ref
+        case: 正常
+        summary: たどらない参照
+        condition: "スキーマが `x: {$ref: 'other.schema.yaml#/$defs/a'}` と `y: {$ref: '#/$defs/missing'}` を持ち、`$defs` に `missing` が無い"
+        mock: なし
+        expected: '`x`・`y` が `string` で、`x.` と `y.` で始まる項目が無い。例外を送出しない'
   - name: heading_lines
     title: 見出しの行
     kind: 関数
