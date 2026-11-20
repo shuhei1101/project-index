@@ -2578,6 +2578,17 @@ def test_normal_when_existing_body_file_adopted(
     assert searched.data["items"][0]["values"]["version"] == created.data["results"][0]["version"]
 
 
+DRAFTS_ROW = (
+    "  - id: drafts\n"
+    "    paths: [drafts/*.yaml]\n"
+    "    exclude: [drafts/skip.yaml]\n"
+    "    schema: schemas/sample.schema.yaml\n"
+)
+GENERATORS = "generators:\n  - id: generate\n    run: [python3, scripts/generate.py]\n"
+GENERATE_SCRIPT = "print('generate')\n"
+SKIPPED_DRAFT = "id: skip\nname: 除外\n"
+
+
 def test_error_when_existing_body_file_not_adoptable(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
@@ -2585,12 +2596,21 @@ def test_error_when_existing_body_file_not_adoptable(
     sample_file_set: Callable[..., dict[str, str]],
     sample_config_text: Callable[..., str],
 ) -> None:
-    """配信元のいずれかの文書のファイルを指す操作と、`@body` を渡して既にあるファイルを指す `create` を断り、直し方に取れる方法を示す（異常系）。"""
+    """配信元のいずれかの文書のファイルか配信元の文書でないファイルを指す操作と、`@body` を渡して既にあるファイルを指す `create` を断り、直し方に取れる方法を示す（異常系）。"""
     # 準備
-    files = {**_notes_files(sample_file_set, sample_config_text), "notes/n6.md": "# n6\n"}
+    files = {
+        **_notes_files(sample_file_set, sample_config_text),
+        # どの行も指さない生成の行と、`exclude[]` を持つ行 `drafts` を加えた配信元の設定
+        "project-index.yaml": sample_config_text(NOTES_ROW + DRAFTS_ROW + GENERATORS),
+        "notes/n6.md": "# n6\n",
+        "scripts/generate.py": GENERATE_SCRIPT,
+        "drafts/skip.yaml": SKIPPED_DRAFT,
+    }
     source, env, worktree = _setup(make_source, make_server, add_worktree, files)
     common = {"cwd": str(source.folder), "worktree": str(worktree)}
     doc_1_before = (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8")
+    config_before = (worktree / "project-index.yaml").read_text(encoding="utf-8")
+    schema_before = (worktree / "schemas" / "notes.schema.yaml").read_text(encoding="utf-8")
     # 実行
     other_body = env.call(
         "write_docs",
@@ -2620,12 +2640,67 @@ def test_error_when_existing_body_file_not_adoptable(
             }
         ],
     )
+    config_file = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            {
+                "op": "create",
+                "kind": "notes",
+                "data": {"id": "n14", "path": "../project-index.yaml"},
+            }
+        ],
+    )
+    script_file = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            {
+                "op": "create",
+                "kind": "notes",
+                "data": {"id": "n15", "path": "../scripts/generate.py"},
+            }
+        ],
+    )
+    excluded_file = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            {"op": "create", "kind": "notes", "data": {"id": "n16", "path": "../drafts/skip.yaml"}}
+        ],
+    )
+    schema_file = env.call(
+        "write_docs",
+        **common,
+        operations=[
+            {
+                "op": "create",
+                "kind": "notes",
+                "data": {"id": "n17", "path": "../schemas/notes.schema.yaml"},
+            }
+        ],
+    )
     # 検証
     assert other_body.is_error
     assert "ValidationFailedError" in other_body.text
     assert "operations[0].path" in other_body.text
     assert "n1" in other_body.text
-    assert "どの文書のファイルでもない" in other_body.text
+    assert "どれでもないパス" in other_body.text
+    assert config_file.is_error
+    assert "ValidationFailedError" in config_file.text
+    assert "operations[0].path" in config_file.text
+    assert "配信元の設定" in config_file.text
+    assert "どれでもないパス" in config_file.text
+    assert script_file.is_error
+    assert "ValidationFailedError" in script_file.text
+    assert "generators[generate]" in script_file.text
+    assert excluded_file.is_error
+    assert "ValidationFailedError" in excluded_file.text
+    assert "drafts" in excluded_file.text
+    assert "除外したファイル" in excluded_file.text
+    assert schema_file.is_error
+    assert "ValidationFailedError" in schema_file.text
+    assert "documents[notes].schema" in schema_file.text
     assert records_index.is_error
     assert "ValidationFailedError" in records_index.text
     assert "notes" in records_index.text
@@ -2641,6 +2716,10 @@ def test_error_when_existing_body_file_not_adoptable(
     assert (worktree / "notes" / "n1.md").read_text(encoding="utf-8") == NOTE_1
     assert (worktree / "notes" / "n6.md").read_text(encoding="utf-8") == "# n6\n"
     assert (worktree / "docs" / "doc-1.yaml").read_text(encoding="utf-8") == doc_1_before
+    assert (worktree / "project-index.yaml").read_text(encoding="utf-8") == config_before
+    assert (worktree / "scripts" / "generate.py").read_text(encoding="utf-8") == GENERATE_SCRIPT
+    assert (worktree / "drafts" / "skip.yaml").read_text(encoding="utf-8") == SKIPPED_DRAFT
+    assert (worktree / "schemas" / "notes.schema.yaml").read_text(encoding="utf-8") == schema_before
 
 
 def test_normal_when_disk_storage(
