@@ -926,6 +926,58 @@ functions:
         mock: なし
         expected: 配信元が `None` で、違反に `documents[0].paths` が入る
         exception: '-'
+  - name: direct_commit_checks
+    title: 直コミットの設定の確認
+    kind: 関数
+    container: project_index/features/sources/service.py
+    usecase: 直コミット
+    role: 検証
+    summary: スキーマに合格した直コミットの設定の、直コミットだけを断る違反と警告を求める
+    description: 型の誤りと必須のキーの欠けは、既存のスキーマの検証（`schemas/project-index.schema.json` に `direct_commit` を追加する）で配信元を外す。この関数は配信を続けるものだけを扱う。`assemble_source` と管理の `check_project` から呼ぶ。
+    scope: public
+    thread_safe: true
+    args:
+      - name: config
+        title: 配信元の設定
+        type: SourceConfig
+        required: true
+        passing: positional
+        description: 検証を通した配信元の設定
+      - name: worktree_branches
+        title: ワークツリーのブランチ
+        type: set[str]
+        required: true
+        passing: keyword
+        description: 配信元の `worktrees` に該当するワークツリーが指すブランチ
+      - name: terminal_kinds
+        title: 端末の設定の種類
+        type: Iterable[str]
+        required: false
+        default: ()
+        passing: keyword
+        description: 端末の設定の `sources[].direct_commit.kinds` のキー
+    returns:
+      type: tuple[list[Violation], list[Violation]]
+      description: 直コミットだけを断る違反と、警告
+    process: |-
+      1. `config.direct_commit` が `None` の場合、空の組を返す
+      2. `direct_commit.kinds` のうち有効な `documents[].id` に無いものごとに、パス `direct_commit.kinds[{n}]` の違反（「{種類} は documents[] に無く、直コミットを断る」）を集める
+      3. `direct_commit.branch` が `worktree_branches` に無い場合、パス `direct_commit.branch` の警告を集める
+      4. `terminal_kinds` のうち `direct_commit.kinds` に無い種類ごとに、パス `sources[].direct_commit.kinds.{種類}` の警告を集める
+      5. 違反と警告を返す
+    unit_tests:
+      - name: test_direct_commit_checks
+        case: 正常
+        summary: 違反と警告を分ける
+        condition: '`kinds: [note, meme]`（`meme` は `documents[]` に無い）、`branch: develop`（ワークツリーが無い）、`terminal_kinds: [rule]`'
+        mock: なし
+        expected: 違反が `direct_commit.kinds[1]` の 1 件、警告が `direct_commit.branch` と `sources[].direct_commit.kinds.rule` の 2 件
+      - name: test_direct_commit_checks_when_absent
+        case: 正常
+        summary: 設定が無い
+        condition: '`direct_commit` が `None`'
+        mock: なし
+        expected: どちらも空
 refs:
   - to: IF-15
     type: requires

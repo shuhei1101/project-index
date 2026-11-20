@@ -85,6 +85,12 @@ data_models:
         access: 公開
         default: None
         description: '`None` は、配信元のフォルダが Git の作業ツリーの中なら `git`、外なら `disk` として扱う'
+      - name: direct_commit
+        title: 直コミットを呼べる作業場所
+        type: SourceDirectCommit
+        access: 公開
+        default: SourceDirectCommit()
+        description: 配信元の設定の `direct_commit` が無い配信元では使用しない
   - name: TerminalConfig
     title: 端末の設定
     container: project_index/features/settings/types.py
@@ -493,6 +499,26 @@ data_models:
         type: StorageType
         access: 公開
         description: '`git`・`disk`'
+  - name: SourceDirectCommit
+    title: 直コミットを呼べる作業場所
+    container: project_index/features/settings/types.py
+    usecase: 直コミット
+    role: 設定
+    summary: 端末の設定の `sources[].direct_commit`
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。キーの意味はガイド『設定』の端末の設定の `sources[].direct_commit`。'
+    properties:
+      - name: scope
+        title: 呼べる作業場所
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: 直コミットを許可した全ての種類の呼べる作業場所の glob。既定はどの作業場所からも呼べない
+      - name: kinds
+        title: 種類ごとの呼べる作業場所
+        type: dict[str, list[str]]
+        access: 公開
+        default: '{}'
+        description: 種類の ID → glob。記載した種類は `scope` の代わりに使用する
 classes:
   - name: TerminalConfigInvalidError
     title: 端末の設定の違反
