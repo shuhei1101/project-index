@@ -21,3 +21,6 @@ scope_out:
   - item: 種類のスキーマの `$ref`・`allOf`（`anyOf`・`oneOf`）の先で定義した項目を、使える項目（`known_fields`、`src/project_index/features/search/fields.py` の `_walk`）に含める
     reason: 変更前からの不具合で、`$ref`・`allOf` の先の項目が「知らない項目です」になる。今回の要望（配列の中のオブジェクトのキーの指定）に含まれない
     plan: '#221'
+  - item: '`tests/unit/project_index/features/write/test_secrets.py` の import の並びの lint 違反（ruff I001）の解消'
+    reason: テスト実行方法の lint 層に違反したまま develop に入っている既存の違反で、今回の要望（配列の中のオブジェクトのキーの指定）に含まれない
+    plan: '#224'
