@@ -1,0 +1,22 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: run_only
+    detail: エージェントが配列の中のオブジェクトのキーの値で文書を完全一致で絞り、集計できるようになる。調べる流れは変わらない
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: search_docs の filter・order_by・group_by・fields に、スキーマの配列の中のオブジェクトのキー（`uses[].id`）を項目として渡せることと、値の比べ方（要素ごとの完全一致・要素ごとの集計）を追記する
+    status: todo
+  - page: docs/guide/変更履歴.md
+    new: false
+    change: 次のバージョンの変更として、search_docs で配列の中のオブジェクトのキーで絞り・集計できるようになったことを追記する
+    status: todo
+scope_out:
+  - item: write_docs の項目のパス（set・add_to・remove_from・unset）での `[]` の扱いの変更
+    reason: 要望は検索の絞り込みと集計で、書き込みは含まれない
+    plan: none
+  - item: dev-docs の画面の検索（読み取り API の語での検索）での配列の中のキーの絞り込み
+    reason: 要望は search_docs の filter と group_by で、画面の検索は含まれない
+    plan: none
