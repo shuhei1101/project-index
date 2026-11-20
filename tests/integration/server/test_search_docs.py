@@ -54,6 +54,33 @@ OBJECT_TAGS_SCHEMA = (
     "        main: {type: boolean}\n"
 )
 TAG_MCP = {"field": "tags", "op": "eq", "values": ["mcp"]}
+# 配列の中のオブジェクトのキー（`uses[].id`）を持つ種類の配信元
+USES_CONFIG = (
+    "name: sample\n"
+    "default_ref: develop\n"
+    "documents:\n"
+    "  - id: templates\n"
+    "    paths: [templates/*.yaml]\n"
+    "    schema: schemas/template.schema.yaml\n"
+)
+USES_SCHEMA = (
+    "type: object\n"
+    "properties:\n"
+    "  id: {type: string}\n"
+    "  name: {type: string}\n"
+    "  uses:\n"
+    "    type: array\n"
+    "    items:\n"
+    "      type: object\n"
+    "      properties:\n"
+    "        id: {type: string}\n"
+)
+USES_FILES = {
+    "project-index.yaml": USES_CONFIG,
+    "schemas/template.schema.yaml": USES_SCHEMA,
+    "templates/t1.yaml": "id: t1\nname: 素材 1\nuses:\n  - {id: compare}\n  - {id: list}\n",
+    "templates/t2.yaml": "id: t2\nname: 素材 2\nuses:\n  - {id: compare-x}\n",
+}
 MAIN_TAG_MCP = {"field": "main_tags", "op": "eq", "values": ["mcp"]}
 NOTES_A = {"field": "id", "op": "eq", "values": ["notes/a.md"]}
 
@@ -836,6 +863,12 @@ def test_error_when_invalid_argument(
     sections_in_summary = env.call(
         "search_docs", cwd=str(source.folder), view="summary", sections=["a"]
     )
+    uses = make_source("uses", USES_FILES)
+    dotted = make_server(uses).call(
+        "search_docs",
+        cwd=str(uses.folder),
+        filter={"field": "uses.id", "op": "eq", "values": ["compare"]},
+    )
     # 検証
     assert unknown_field.is_error
     assert "InvalidArgumentError" in unknown_field.text
@@ -853,6 +886,10 @@ def test_error_when_invalid_argument(
     assert "sections と lines は同時に指定できません" in sections_and_lines.text
     assert sections_in_summary.is_error
     assert "view: full のときだけ指定できます" in sections_in_summary.text
+    # 配列の中のキーを `.` で指すと、近い項目の候補に `uses[].id` を返却する
+    assert dotted.is_error
+    assert "知らない項目です（uses.id）" in dotted.text
+    assert "uses[].id" in dotted.text
 
 
 def test_error_when_ref_not_found(
@@ -1241,6 +1278,51 @@ def test_normal_when_tags_are_objects(
     values = picked.data["items"][0]["values"]
     assert values["tags"] == ["mcp", "設計"]
     assert values["main_tags"] == ["mcp"]
+
+
+def test_normal_when_array_item_keys(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """配列の中のオブジェクトのキーを uses[].id で指し、要素ごとの値で完全一致で絞り、数える（正常系）。"""
+    # 準備
+    source = make_source("sample", USES_FILES)
+    env = make_server(source)
+    cwd = str(source.folder)
+    # 実行
+    compare = env.call(
+        "search_docs",
+        cwd=cwd,
+        filter={"field": "uses[].id", "op": "eq", "values": ["compare"]},
+        view="ids",
+        format="json",
+    )
+    both = env.call(
+        "search_docs",
+        cwd=cwd,
+        filter={"field": "uses[].id", "op": "eq", "values": ["compare", "list"], "match": "all"},
+        view="ids",
+        format="json",
+    )
+    counted = env.call("search_docs", cwd=cwd, view="count", group_by="uses[].id", format="json")
+    picked = env.call(
+        "search_docs",
+        cwd=cwd,
+        filter={"field": "id", "op": "eq", "values": ["t1"]},
+        order_by=[{"field": "uses[].id"}],
+        fields=["uses[].id"],
+        format="json",
+    )
+    # 検証
+    # compare は compare-x に部分一致しない
+    assert [item["id"] for item in compare.data["items"]] == ["t1"]
+    assert [item["id"] for item in both.data["items"]] == ["t1"]
+    assert counted.data["groups"] == [
+        {"value": "compare", "count": 1},
+        {"value": "compare-x", "count": 1},
+        {"value": "list", "count": 1},
+    ]
+    assert not picked.is_error
+    assert picked.data["items"][0]["values"]["uses[].id"] == ["compare", "list"]
 
 
 def test_normal_when_relative_ref_in_defs(

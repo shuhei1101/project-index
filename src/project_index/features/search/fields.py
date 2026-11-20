@@ -155,7 +155,8 @@ def _walk(schema: object, prefix: str, fields: dict[str, str]) -> None:
             # 型の食い違う同じパスは string にする
             fields[path] = declared if fields.get(path, declared) == declared else "string"
             _walk(sub, f"{path}.", fields)
-    _walk(schema.get("items"), prefix, fields)
+    # 配列の要素のキーは `a[].b` のパスにする（最上位のスキーマの `items` は `[]` を付けない）
+    _walk(schema.get("items"), f"{prefix.removesuffix('.')}[]." if prefix else "", fields)
 
 
 def known_fields(schemas: Iterable[Mapping[str, Any]]) -> dict[str, str]:

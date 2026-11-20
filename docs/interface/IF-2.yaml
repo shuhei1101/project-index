@@ -344,7 +344,7 @@ flows:
 
       <!-- /map -->
     expected:
-      - '`isError: true` で、`filter.field` のパス・`nme` と、`describe(source, kind)` でスキーマを見ることを返す'
+      - '`isError: true` で、`filter.field` のパス・`nme` と、`describe(source, kind)` でスキーマを見ることを返す。スキーマの配列 `uses` の中のキー `id` を `uses.id` で指定すると、近い項目の候補に `uses[].id` を返却する'
       - 2 回目は期待する型（数値）と実際の値 `abc` を返す
       - '`sections` と `lines` の同時指定、`view: summary` での `sections`、`{and: [...], not: {...}}` のように 2 つのキーを持つ束、`filter.field` の `@matches` は、それぞれ `isError: true` で引数のパスと直し方を返す'
     test: test_error_when_invalid_argument
@@ -1171,6 +1171,35 @@ flows:
       - 1 回目の結果に、develop のワークツリーの文書 d1 と、種類 `rule` の文書を含む全ての種類の文書がある
       - '2 回目は `isError: true` で、ワークツリー x はコミットするブランチのワークツリーでないため参照できないことを返却する'
     test: test_normal_when_direct_commit_workplace
+  - name: 正常系（配列の中のオブジェクトのキー）
+    summary: スキーマの配列の中のオブジェクトのキーを `{配列のキー}[].{キー}` で指し、要素ごとの値で完全一致で絞り、数える
+    setup:
+      - name: Mock
+        description: なし
+      - name: 配列の中のオブジェクト
+        description: 'sample の種類のスキーマが `uses` を `{type: array, items: {type: object, properties: {id: {type: string}}}}` で持つ。文書 1 が `uses: [{id: compare}, {id: list}]`、文書 2 が `uses: [{id: compare-x}]` を持つ'
+      - name: 入力
+        description: '`filter` が `uses[].id` の `eq` `compare`'
+    flow: |-
+      <!-- map: {"title": "正常系（配列の中のオブジェクトのキー）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+
+        C->>T: filter: uses[].id eq compare
+        T->>T: uses[].id で各要素の id を取り出し、要素ごとに比べる
+        T-->>C: 文書 1
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`uses[].id` が `compare` の `eq` の条件で文書 1 だけを返却する（文書 2 の `compare-x` は該当しない）'
+      - '`uses[].id` が `compare`・`list` の `eq`・`match: all` の条件で文書 1 を返却する'
+      - '`view: count, group_by: uses[].id` が `compare` 1・`compare-x` 1・`list` 1 を返却する'
+      - '`order_by: [{field: uses[].id}]` と `fields: [uses[].id]` を受け付け、`fields` は文書 1 で `uses[].id: [compare, list]` を返却する'
+    test: test_normal_when_array_item_keys
 lead: '条件に該当する文書の取得・一覧・件数・集計を返却する `search_docs` の入出力を定め、`search_docs` を修正するときに参照する。'
 tags:
   - name: topic:クエリ
@@ -1226,7 +1255,7 @@ request:
     type: str
     required: true
     location: argument
-    description: メタデータのキー・種類ごとの項目・`body`・`*`（全項目）・計算項目（`@chars`・`@path`・`@sections`）
+    description: メタデータのキー・種類ごとの項目（スキーマの配列の中のオブジェクトのキーは `{配列のキー}[].{キー}`）・`body`・`*`（全項目）・計算項目（`@chars`・`@path`・`@sections`）
   - name: filter.op
     type: Literal['eq', 'ne', 'prefix', 'suffix', 'contains', 'not_contains', 'regex', 'glob', 'gt', 'gte', 'lt', 'lte', 'exists', 'not_exists']
     required: true
@@ -1637,6 +1666,9 @@ constraints:
   - item: 直コミットを呼べる作業場所からの参照
     constraint: '`scope` に該当せず、端末の設定の `sources[].direct_commit` の呼べる作業場所（`scope` か `kinds` のどれかの glob）に `cwd` が該当するときは、`worktree` を省くと `direct_commit.branch` を指すワークツリーを参照する。`worktree` はコミットするブランチ（`direct_commit.branch` と `direct_commit.branches[]` に該当するブランチ）を指すワークツリーだけを受け、それ以外のワークツリー・`ref`・クローン本体は `SourceNotReadableError` にする'
     notes: 返却する文書は種類で絞らない。直コミットできる種類が `kinds` の glob だけの作業場所も同じ
+  - item: 配列の中のオブジェクトのキー
+    constraint: 種類のスキーマの配列の `items` のキーは、`{配列のキー}[].{キー}`（`uses[].id`）を項目として `filter`・`order_by`・`group_by`・`fields` で使用できる。値は要素ごとの値の配列で、配列の項目と同じく要素ごとに比べ、数える。入れ子の配列は `[]` を重ねる（`a[].b[].c`）。`{配列のキー}.{キー}`（`uses.id`）は項目にしない
+    notes: 項目のパスの解釈は `write_docs`・`metadata` の列名の `[]` と同じ
 refs:
   - to: SC-6
     item: scenarios[正常シナリオ]
