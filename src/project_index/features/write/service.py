@@ -102,7 +102,7 @@ from project_index.shared.paths import normalize_path
 from project_index.shared.yaml_io import dump_roundtrip, load_roundtrip
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Mapping, MutableMapping
+    from collections.abc import Generator, Mapping, MutableMapping
 
     from project_index.features.seen.store import SeenStore
     from project_index.features.sources.registry import SourceRegistry
@@ -1866,7 +1866,7 @@ def _check_commit_content(
 ) -> None:
     """書き換わる文書の種類が直コミットを許すか、秘密の値の書式に該当する値が無いかを確かめる。"""
     settings = source.config.direct_commit
-    allowed = set(settings.kinds) if settings is not None else set()
+    allowed: set[str] = set(settings.kinds) if settings is not None else set()
     # 許可する種類のうち、この作業場所から呼べない種類
     blocked = sorted(
         {kind for _, _, kind in changed if kind in allowed and kind not in committable}
@@ -1925,6 +1925,24 @@ def _secret_violations(
         )
         for finding in findings
     ]
+
+
+def _written_documents(
+    applied: _Applied, before: Mapping[str, Document]
+) -> tuple[list[tuple[int, str, str]], dict[str, Document]]:
+    """書き換わる文書の（添字・ID・種類）と、改名の前の ID で引いた書き込む前の文書を返す。"""
+    changed = [
+        (item.index, item.id, table.id)
+        for item, table in zip(applied.results, applied.tables, strict=True)
+        if item.id
+    ]
+    renamed = {item.id: item.renamed_from for item in applied.results if item.renamed_from}
+    previous = {
+        doc_id: before[renamed.get(doc_id) or doc_id]
+        for _, doc_id, _ in changed
+        if (renamed.get(doc_id) or doc_id) in before
+    }
+    return changed, previous
 
 
 def _pending_paths(session: _Session, plan: CommitPlan) -> list[str]:
@@ -1998,7 +2016,7 @@ def _commit_locks(
     locks: SourceLocks,
     plan: CommitPlan,
     limits: CallLimits,
-) -> Iterator[None]:
+) -> Generator[None]:
     """リポジトリの排他、配信元の排他の順に握る。"""
     with (
         repo_locks.hold(plan.repo, timeout=limits.write_deadline.remaining()),
@@ -2037,17 +2055,7 @@ def _write_with_commit(
         applied = _apply_operations(session, checker, request.operations, last_reads, now)
         if applied.failures:
             raise _atomic_error(applied.failures)
-        changed = [
-            (item.index, item.id, table.id)
-            for item, table in zip(applied.results, applied.tables, strict=True)
-            if item.id
-        ]
-        renamed = {item.id: item.renamed_from for item in applied.results if item.renamed_from}
-        before_by_new = {
-            doc_id: before[renamed.get(doc_id) or doc_id]
-            for _, doc_id, _ in changed
-            if (renamed.get(doc_id) or doc_id) in before
-        }
+        changed, before_by_new = _written_documents(applied, before)
         _check_commit_content(source, committable, changed, before_by_new, session.docs)
         return session, applied
 
