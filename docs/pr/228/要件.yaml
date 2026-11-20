@@ -1,0 +1,15 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: none
+    detail: エージェントが文書を書く流れは変わらない。既にあるファイルを本文のファイルにする操作で、配信元の設定・スクリプト・除外したファイルを指したときだけ断る
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: 本文のファイルの違反になるファイルに、配信元の設定・スクリプト・exclude[] に該当するファイルを加える
+    status: todo
+scope_out:
+  - item: 取り込み済みの要素が文書でないファイルを指しているかの検出（check_project 等での既存データの点検）
+    reason: 要望は取り込む時点で断ることで、#220 のマージ後に取り込んだ要素があるかは要望に含まれない。必要かはレビューで確定する
+    plan: none
