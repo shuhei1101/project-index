@@ -2056,7 +2056,9 @@ def _page_source(
         pytest.param("no/such", None, None, id="missing"),
     ],
 )
-@pytest.mark.parametrize("with_ref", [pytest.param(True, id="ref"), pytest.param(False, id="worktree")])
+@pytest.mark.parametrize(
+    "ref", [pytest.param("develop", id="ref"), pytest.param(None, id="worktree")]
+)
 def test_document_store_find_page(
     git_repo: Callable[..., Path],
     run_git: Callable[..., str],
@@ -2067,7 +2069,7 @@ def test_document_store_find_page(
     page: str,
     doc_id: str | None,
     expected: tuple[str, str] | None,
-    with_ref: bool,
+    ref: str | None,
 ) -> None:
     """文書のページの特定と同じ文書を返却する（正常系）。"""
     # 準備
@@ -2081,9 +2083,7 @@ def test_document_store_find_page(
     )
     head = run_git(root, "rev-parse", "HEAD").strip()
     source = _page_source(root, make_source_config, make_served_source)
-    target = (
-        make_target(source, ref="develop", commit=head) if with_ref else make_target(source)
-    )
+    target = make_target(source, ref=ref, commit=head)
     # 実行
     found = document_store.find_page(target, page, doc_id=doc_id)
     # 検証
