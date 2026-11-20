@@ -1803,7 +1803,7 @@ def test_write_docs_when_direct_commit_not_permitted_workplace(
     commit_env.env.worktree = elsewhere
     operation = Operation(op="create", kind="rules", data={"id": "doc-9", "name": "文書 9"})
     # 実行・検証
-    with pytest.raises(DirectCommitNotPermittedError, match="直コミットできません"):
+    with pytest.raises(DirectCommitNotPermittedError, match="直コミットはできません"):
         commit_env.env.write(
             operations=[operation], source="sample", commit=CommitSpec(message="docs: 追加する")
         )
