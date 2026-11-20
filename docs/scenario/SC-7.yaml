@@ -956,7 +956,7 @@ scenarios:
         M-->>A: 作った文書の id と version
         A->>M: write_docs(operations: create・kind notes・本文だけ（本文のファイルのパス無し）)
         M-->>A: エラー（添字 0・本文のファイルのパスが無いこと）
-        A->>M: write_docs(operations: create・kind notes・本文のファイルのパスだけ（本文無し）)
+        A->>M: write_docs(operations: create・kind notes・本文のファイルのパスだけ（無いファイル・本文無し）)
         M-->>A: エラー（添字 0・@body が無いこと）
         A->>M: write_docs(operations: update n3・set 要素のキー)
         M->>WT: notes/index.yaml の n3 を書き換える
@@ -978,7 +978,7 @@ scenarios:
     expected:
       - create の後、ワークツリー x の `notes/index.yaml` に n4 の要素が `path` の列を持たずに加わり、`notes/` に本文のファイルが増えない
       - '本文だけで本文のファイルのパスを持たない create は、`isError: true` で添字 0 の違反として本文のファイルのパスが無いことを返却し、ファイルは変わらない'
-      - 本文のファイルのパスだけを持ち本文を持たない create は、今どおり `@body` が無い違反を返却し、ファイルは変わらない
+      - 無いファイルを指す本文のファイルのパスだけを持ち本文を持たない create は、今どおり `@body` が無い違反を返却し、ファイルは変わらない
       - n3 の `set` の後、`notes/index.yaml` の n3 だけが書き換わる
       - '本文のファイルのパスと本文を同時に指定した update の後、n3 の要素が `path: n3.md` を持ち、`notes/n3.md` の内容が指定した本文になる。次の `search_docs` が n3 の本文としてその内容を返却する'
       - '本文のファイルのパスを持たない n4 への本文だけの update は、`isError: true` で添字 0 の違反として本文のファイルのパスが無いことを返却し、ファイルは変わらない'
@@ -1032,7 +1032,7 @@ scenarios:
         participant WT as ワークツリー x
 
         A->>M: write_docs(operations: create・kind notes・要素のキー・本文のファイルのパス n6.md（本文無し）)
-        M->>M: n6.md が配信元の中の既にあるファイルで、どの文書の本文のファイルでもないことを確かめ、要素を検査に通す
+        M->>M: n6.md が配信元の中の既にあるファイルで、配信元のどの文書のファイルでもない（ほかの行の文書・管理用の YAML・どの行の要素の本文のファイルでもない）ことを確認し、要素を検査する
         M->>WT: notes/index.yaml に要素を追加する（notes/n6.md は書き換えない）
         M-->>A: 作った文書の id と version
         A->>M: write_docs(operations: update n3・set 本文のファイルのパス n7.md（本文無し）)
@@ -1040,6 +1040,8 @@ scenarios:
         M-->>A: 新しい version と差分
         A->>M: write_docs(operations: create・kind notes・本文のファイルのパス n1.md（本文無し）)
         M-->>A: エラー（添字 0・n1.md が n1 の本文のファイルであること）
+        A->>M: write_docs(operations: create・kind notes・本文のファイルのパス index.yaml（本文無し）)
+        M-->>A: エラー（添字 0・index.yaml が管理用の YAML であること）
         A->>M: write_docs(operations: create・kind notes・本文・本文のファイルのパス n6.md)
         M-->>A: エラー（添字 0・n6.md が既にあること・@body を除けば既にあるファイルを使えること）
         A->>M: write_docs(operations: create・kind notes・本文のファイルのパス n8.md（無いファイル・本文無し）)
@@ -1051,7 +1053,7 @@ scenarios:
       - create の後、ワークツリー x の `notes/index.yaml` に `path` が `n6.md` の要素が加わり、`notes/n6.md` の内容は作成したときのまま変わらない
       - 次の `search_docs` が、作った文書の本文として `notes/n6.md` の内容を返却する
       - 'update の後、n3 の要素が `path: n7.md` を持ち、`notes/n7.md` の内容は変わらない'
-      - 'ほかの文書の本文のファイル `n1.md` を指す create は、`isError: true` で添字 0 の `path` の違反を返却し、ファイルは変わらない'
+      - 'ほかの文書の本文のファイル `n1.md` を指す create と、管理用の YAML `index.yaml` を指す create は、どちらも `isError: true` で添字 0 の `path` の違反を返却し、ファイルは変わらない。ほかの行の `paths` に該当する文書のファイル・ほかの行の要素の本文のファイルを指す create も同じく断る'
       - '本文と既にある `n6.md` を指す create は、今どおり `isError: true` で添字 0 の `path` の違反を返却し、直し方に `@body` を除けば既にあるファイルを使えることが入る。`notes/n6.md` は上書きされない'
       - 無いファイル `n8.md` を指し本文を持たない create は、今どおり `@body` が無い違反を返却し、直し方に `@body` を加えることと、先に本文のファイルを作成することが入る
       - 書き込みの後の `check_project` の管理用の YAML に無いファイルに、`notes/n6.md`・`notes/n7.md` が出ない
