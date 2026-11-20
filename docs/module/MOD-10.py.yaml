@@ -164,6 +164,7 @@ functions:
       5. `documents[].paths[]` のうち、そのパターンだけに絞った行（`exclude` は元の行のまま）で当たるファイルが無いものを `missing_paths` にする（`collect_files`）
       6. `source` があれば、索引の同期を求めて件数と先頭 `SYNC_ITEMS_LIMIT` 件の内訳にする（`check_sync`）。`alias_violations` を `violations` に加え、nav の警告（読み取り API）を `warnings` にする
       7. `alias_schema_version` はエイリアスのスキーマの取り込み元のタグ（文書のストア）にする
+      8. 配信元の設定に `direct_commit` があれば、配信元のワークツリーが指すブランチ（`worktree list --porcelain`）と登録済みの行の `sources[].direct_commit.kinds` のキーで直コミットの設定の確認を呼び、違反を `violations`、警告を `warnings` に加える
     unit_tests:
       - name: test_check_project
         case: 正常
@@ -226,6 +227,12 @@ functions:
         condition: Git のリポジトリの中に commit していない `project-index.local.yaml` を置き、`path` にその絶対パス、`storage_type="disk"`
         mock: なし（一時ディレクトリの git リポジトリ）
         expected: '`violations` が空で、`sync` の件数が 0'
+      - name: test_check_project_when_direct_commit
+        case: 正常
+        summary: 直コミットの設定の違反と警告
+        condition: '`config` に `direct_commit: {branch: develop, kinds: [note, meme]}`（`meme` は `documents[]` に無い。`develop` のワークツリーが無い）'
+        mock: なし
+        expected: '`violations` に `direct_commit.kinds[1]`、`warnings` に `direct_commit.branch`'
     callees:
       - '#functions[_load_candidate]'
       - '#functions[version_state]'

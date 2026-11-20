@@ -71,6 +71,12 @@ data_models:
         access: 公開
         default: '[]'
         description: 配信元の設定の `when`
+      - name: direct_commit_kinds
+        title: 直コミットできる種類
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: 今の作業場所から直コミットできる種類（`committable_kinds`）。使える配信元の一覧で設定する
   - name: Workplace
     title: 作業場所
     container: project_index/features/access/types.py

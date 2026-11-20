@@ -171,6 +171,12 @@ data_models:
         access: 公開
         description: ワークツリーの一覧。Git でない配信元は `None`
         default: None
+      - name: direct_commit
+        title: 直コミット
+        type: DirectCommitGuide | None
+        access: 公開
+        default: None
+        description: 今の作業場所から直コミットできる種類が 1 つ以上あるときだけ
   - name: KindSchemaResult
     title: 種類のスキーマ
     container: project_index/features/describe/types.py
@@ -210,4 +216,27 @@ data_models:
         access: 公開
         default: 'False'
         description: 読んだ場所の `outside_scope`
+  - name: DirectCommitGuide
+    title: 直コミットの案内
+    container: project_index/features/describe/types.py
+    usecase: 直コミット
+    role: DTO
+    summary: '`describe(source)` の `direct_commit`'
+    description: '`dataclass(frozen=True)`。キーの意味はインターフェース定義『配信元の説明』の `response` の `direct_commit.*`。'
+    properties:
+      - name: branch
+        title: コミットするブランチ
+        type: str
+        access: 公開
+        description: '`direct_commit.branch`'
+      - name: branches
+        title: 上書きできるブランチ
+        type: list[str]
+        access: 公開
+        description: '`direct_commit.branches`'
+      - name: kinds
+        title: 直コミットできる種類
+        type: list[str]
+        access: 公開
+        description: 今の作業場所から直コミットできる種類（`committable_kinds`）
 visibility: internal

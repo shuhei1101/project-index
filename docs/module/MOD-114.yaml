@@ -35,6 +35,22 @@ diagrams:
         文書の削除 ..> バージョンの確かめ
         文書の削除 ..> 操作を当てる : related を外す
         文書の削除 ..> 文書の検査
+        文書の書き込み ..> 直コミットを進める : commit
+        文書の書き込み ..> 秘密の値の検出 : commit
+        文書の削除 ..> 直コミットを進める : commit
+        直コミットを進める ..> リポジトリごとの排他
+        class 直コミットを進める {
+          <<function>>
+        }
+        class 秘密の値の検出 {
+          <<function>>
+        }
+        class リポジトリごとの排他 {
+          +握る(リポジトリ, 待ち時間) ContextManager
+        }
+        click 直コミットを進める href "id:MOD-178#functions[run_direct_commit]"
+        click 秘密の値の検出 href "id:MOD-179#functions[secret_findings]"
+        click リポジトリごとの排他 href "id:MOD-82#classes[RepositoryLocks]"
         class 文書の書き込み {
           <<function>>
         }
@@ -114,5 +130,5 @@ diagrams:
 notes:
   受け持つこと: |-
     Git 管理外の配信元はそのフォルダのファイルを書き換える。
-    書き込み・削除は配信元ごとに 1 つずつ行い、commit はしない。
+    書き込み・削除は配信元ごとに 1 つずつ行い、`commit` を省いた呼び出しでは commit しない。`commit` を指定した呼び出しは、リポジトリごとの排他の中で、コミットするブランチのワークツリーへ書き込んでコミットし、プッシュする（直コミット）。
 visibility: internal

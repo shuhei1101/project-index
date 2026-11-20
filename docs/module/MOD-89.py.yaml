@@ -187,6 +187,11 @@ data_models:
         type: NotifiedStore
         access: 公開
         description: 会話キーごとに書き込みの後の通知をしたパス（書き込みの後の通知・セッションの開始が使用する）
+      - name: repo_locks
+        title: リポジトリごとの排他
+        type: RepositoryLocks
+        access: 公開
+        description: 直コミットをリポジトリごとに 1 つずつにする（書き込み）。文書の MCP の `write_docs`・`delete_docs` が `repo_locks` に渡す
 classes:
   - name: PortInUseError
     title: ポートが使用中
