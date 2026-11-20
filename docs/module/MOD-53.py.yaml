@@ -113,6 +113,12 @@ functions:
         condition: '`view: full` で `sections: [a]` と `lines: {offset: 1}` を両方と、`view: summary` で `sections: [a]`'
         mock: なし
         expected: '1 つ目は違反の `path` が `sections`、2 つ目は `path` が `sections` で `rule` が `view: full のときだけ指定できます`'
+      - name: test_check_filter_when_array_item_key_dotted
+        case: 異常
+        summary: 配列の中のキーを `.` で指した項目の候補
+        condition: 使用できる項目に `uses[].id` があり、`filter.field`・`group_by` が `uses.id`
+        mock: なし
+        expected: '`filter.field`・`group_by` のそれぞれに「知らない項目です（uses.id）」の違反があり、`fix` の近い項目に `uses[].id` がある'
   - name: parse_compare_value
     title: 比べる値の解釈
     kind: 関数
