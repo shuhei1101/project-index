@@ -723,7 +723,7 @@ scenarios:
       - '`unset` の無い要素（`#models[Zzz].properties`）・`x-key` の無い配列を指す `#` で始まるパスも、`unset.{パス}` の違反を返して書き込まない'
       - '`set` の後、Col の要素に `label: l` が追加され、ファイルで変わった行は `label` の 1 行だけ。Row の要素は変わらない'
       - '`set` の、無い要素（`#models[Zzz].label`）・`x-key` の無い配列・途中の無いキー（`#models[Col].meta.label`）を指す `#` で始まるパスも、`set.{パス}` の違反を返して書き込まない。`#` で始まらず要素の選び方を含むパス（`models[Col].label`）の違反は、`#` で始めて x-key の値で要素を指す書き方を示す'
-    test: test_normal_when_add_to_keyed_element
+    test: test_normal_when_add_to_ref_path
   - name: 正常シナリオ（文書を改名して参照元を追随させる）
     setup:
       - name: Mock
