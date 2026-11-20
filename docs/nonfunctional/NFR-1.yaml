@@ -313,5 +313,31 @@ requirements:
     rationale: プッシュと生成はファイルの置き換えの後に進むため、書き込みの期限の後に残る時間を、生成・プッシュ・余裕で分ける（規約『資源の値の決め方』の入れ子の待ち）。生成の制限時間は、応答の上限までの残りからこの値と余裕を除いた時間
     overflow: 生成の時間が残らなければ生成を実行せずに戻して `DirectCommitGeneratorError`、プッシュは応答の上限までの残りから余裕を除いた時間で止める
     status: planned
+  - id: NFR-17
+    name: 負荷の高い間の文書 1 件の取得の所要時間
+    english_name: document_get_time_under_load
+    category: 性能
+    external_constraint: dev-docs の画面は文書を差分つきで開くたびに文書 1 件の取得を待つ。ロードアベレージが 8 コアで 15 の間に約 7.8 秒かかった（shuhei1101/project-index#215）
+    source_kind: ユーザー要望
+    source: https://github.com/shuhei1101/project-index/issues/215
+    value: '0.1'
+    unit: 倍（変更の前の計測に対する比）
+    measurement: 配信元 ai-monitor と knowledge だけの端末の設定と空の状態フォルダで、同じプロセスに CPU を使用し続けるスレッドを 8 本立て、`docs/data/DATA-3430-1.yaml` の文書の取得のサービスを `ref` を省いて 6 回呼び、2 回目以降の中央値を測る。変更の前と後を同じ時間帯に測って比べる
+    breakdown:
+      - part: 変更の前（スレッド 0 本）
+        value: 0.080 秒
+        notes: 読み込みの照合 0.061 秒・リビジョンの解決 0.012 秒・文書の引き当て 0.013 秒
+      - part: 変更の前（スレッド 8 本）
+        value: 17.45 秒
+        notes: 読み込みの照合 13.1 秒・リビジョンの解決 1.12 秒。CPU の時間が 0.1 秒に満たない処理が GIL の取り合いで延びる
+      - part: 試作（スレッド 8 本）
+        value: 0.33 秒
+        notes: 読み込みの結果とパスの索引を使い回した。残りは git の 1 回の呼び出し
+      - part: アプリの決定値
+        value: 0.1 倍以下
+        notes: 試作の 0.02 倍に対して余裕を持たせる
+    rationale: 同じプロセスの文書の MCP・ワークツリーの読み込み・裏の検査が CPU を使用する間、要求のスレッドは GIL を待つ。待ちは要求の中で Python が進む量に比例するため、要求ごとに配信元の全てのファイルを照合せず、同じ commit の読み込みの結果を使い回して進む量を減らす。端末の負荷で秒数が揺れるため、同じ時間帯に測った変更の前の値に対する比で決める
+    overflow: 超えても止めない。dev-docs の画面の表示が遅れる
+    status: planned
 id: NFR-1
 visibility: internal
