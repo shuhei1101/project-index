@@ -1,0 +1,34 @@
+$ TMPDIR="$HOME/.cache/pytest-tmp" uv run pytest tests/unit/project_index/features/write/test_service.py
+# /tmp/pytest-of-shuhei2441 が root 所有で pytest の一時フォルダを作れないため、TMPDIR だけを差し替えて実行した
+# Red: fail は全て実装が無いことによる（直し方の文言が設計の新しい文になっていない 5 件、文書でない配信元のファイルを断らない 6 件）
+============================= test session starts ==============================
+=================================== FAILURES ===================================
+E       AssertionError: assert 'どれでもないパス' in 'path に、配信元のどの文書のファイルでもないパスを指定してください'
+E        +  where 'path に、配信元のどの文書のファイルでもないパスを指定してください' = Violation(path='operations[0].path', rule='本文のファイル notes/n1.md は文書 n1 のファイルです', fix='path に、配信元のどの文書のファイルでもないパスを指定してください', index=0, doc=None).fix
+E       AssertionError: assert 'どれでもないパス' in 'path に、配信元のどの文書のファイルでもないパスを指定してください'
+E        +  where 'path に、配信元のどの文書のファイルでもないパスを指定してください' = Violation(path='operations[0].path', rule='本文のファイル notes/index.yaml は行 notes の管理用の YAML のファイルです', fix='path に、配信元のどの文書のファイルでもないパスを指定してください', index=0, doc=None).fix
+E       AssertionError: assert 'どれでもないパス' in 'path に、配信元のどの文書のファイルでもないパスを指定してください'
+E        +  where 'path に、配信元のどの文書のファイルでもないパスを指定してください' = Violation(path='operations[0].path', rule='本文のファイル docs/rule/doc-1.yaml は文書 doc-1 のファイルです', fix='path に、配信元のどの文書のファイルでもないパスを指定してください', index=0, doc=None).fix
+E       AssertionError: assert 'どれでもないパス' in 'path に、配信元のどの文書のファイルでもないパスを指定してください'
+E        +  where 'path に、配信元のどの文書のファイルでもないパスを指定してください' = Violation(path='operations[1].path', rule='本文のファイル notes/n6.md は文書 n6 のファイルです', fix='path に、配信元のどの文書のファイルでもないパスを指定してください', index=1, doc=None).fix
+E       AssertionError: assert 'どれでもないパス' in 'path に、配信元のどの文書のファイルでもないパスを指定してください'
+E        +  where 'path に、配信元のどの文書のファイルでもないパスを指定してください' = Violation(path='operations[0].path', rule='本文のファイル notes/index.yaml は行 notes の管理用の YAML のファイルです', fix='path に、配信元のどの文書のファイルでもないパスを指定してください', index=0, doc=None).fix
+E       Failed: DID NOT RAISE ValidationFailedError
+E       Failed: DID NOT RAISE ValidationFailedError
+E       Failed: DID NOT RAISE ValidationFailedError
+E       Failed: DID NOT RAISE ValidationFailedError
+E       Failed: DID NOT RAISE ValidationFailedError
+E       Failed: DID NOT RAISE ValidationFailedError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_existing_body_file_rejected[body_file_of_other_element]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_existing_body_file_rejected[records_index]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_existing_body_file_rejected[file_of_document]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_existing_body_file_rejected[adopted_in_same_call]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_existing_body_file_rejected[empty_records_index]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_non_document_file_not_adoptable[config]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_non_document_file_not_adoptable[script]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_non_document_file_not_adoptable[excluded]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_non_document_file_not_adoptable[schema]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_non_document_file_not_adoptable[config_under_paths_base]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_non_document_file_not_adoptable[script_under_paths_base]
+======================== 11 failed, 69 passed in 7.56s =========================

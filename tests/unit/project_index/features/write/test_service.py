@@ -4,7 +4,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -84,6 +84,8 @@ class WriteEnv:
     clone: Path
     worktree: Path
     repo_locks: RepositoryLocks = field(default_factory=RepositoryLocks)
+    # 書き込みの作業場所。`paths_base` の配信元は、ワークツリーの中の配信元のフォルダ
+    workplace: Path | None = None
 
     def write(
         self, now: datetime | None = None, limits: CallLimits | None = None, **request: Any
@@ -91,7 +93,7 @@ class WriteEnv:
         # 期限を渡すテストだけ `limits` を渡す
         extra: dict[str, Any] = {} if limits is None else {"limits": limits}
         return write_docs(
-            WriteRequest(cwd=str(self.worktree), **request),
+            WriteRequest(cwd=str(self.workplace or self.worktree), **request),
             registry=self.registry,
             store=self.store,
             checker=self.checker,
@@ -141,6 +143,7 @@ def make_env(
         *,
         tables: list[DocumentTable] | None = None,
         generators: list[ScriptEntry] | None = None,
+        config_dir: str | None = None,
         **config_overrides: Any,
     ) -> WriteEnv:
         clone = git_repo(
@@ -161,15 +164,19 @@ def make_env(
             )
         ]
         config = make_source_config(documents=rows, generators=generators or [], **config_overrides)
+        # `paths_base` の配信元: 設定のファイルと書き込める作業場所を `root` の下の `config_dir` にする
+        source_folder = clone if config_dir is None else clone / config_dir
         source = make_served_source(
             id="sample",
             root=clone,
             config=config,
             is_git=True,
             repo_root=clone,
-            scope_write=[str(clone)],
+            scope_write=[str(source_folder)],
             worktree_globs=[str(clone / ".claude" / "worktrees" / "*")],
             schemas={"rules": {"type": "object", "required": ["id", "name"]}},
+            config_dir=PurePosixPath(config_dir or "."),
+            config_files=[source_folder / "project-index.yaml"],
         )
         store = DocumentStore(SnapshotStore(tmp_path / "snapshots"))
         return WriteEnv(
@@ -181,6 +188,7 @@ def make_env(
             source=source,
             clone=clone,
             worktree=worktree,
+            workplace=None if config_dir is None else worktree / config_dir,
         )
 
     return _make
@@ -1000,7 +1008,7 @@ def test_write_docs_when_existing_body_file_adopted(make_env: Callable[..., Writ
             0,
             "n1",
             "n1",
-            "どの文書のファイルでもない",
+            "どれでもないパス",
             id="body_file_of_other_element",
         ),
         pytest.param(
@@ -1009,7 +1017,7 @@ def test_write_docs_when_existing_body_file_adopted(make_env: Callable[..., Writ
             0,
             "notes",
             "管理用の YAML",
-            "どの文書のファイルでもない",
+            "どれでもないパス",
             id="records_index",
         ),
         pytest.param(
@@ -1024,7 +1032,7 @@ def test_write_docs_when_existing_body_file_adopted(make_env: Callable[..., Writ
             0,
             "doc-1",
             "doc-1",
-            "どの文書のファイルでもない",
+            "どれでもないパス",
             id="file_of_document",
         ),
         pytest.param(
@@ -1049,7 +1057,7 @@ def test_write_docs_when_existing_body_file_adopted(make_env: Callable[..., Writ
             1,
             "n6",
             "n6",
-            "どの文書のファイルでもない",
+            "どれでもないパス",
             id="adopted_in_same_call",
         ),
         pytest.param(
@@ -1058,7 +1066,7 @@ def test_write_docs_when_existing_body_file_adopted(make_env: Callable[..., Writ
             0,
             "notes",
             "管理用の YAML",
-            "どの文書のファイルでもない",
+            "どれでもないパス",
             id="empty_records_index",
         ),
     ],
@@ -1092,6 +1100,116 @@ def test_write_docs_when_existing_body_file_rejected(
     assert (env.worktree / "notes/n1.md").read_text(encoding="utf-8") == NOTE_1
     assert (env.worktree / "notes/n6.md").read_text(encoding="utf-8") == "# n6\n"
     assert (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
+
+
+GENERATE_SCRIPT = "print('generate')\n"
+SKIPPED_DRAFT = "id: skip\nname: 除外\n"
+
+
+def _drafts_table() -> DocumentTable:
+    """`exclude[]` で `drafts/skip.yaml` を除外する行を返す。"""
+    return DocumentTable(
+        id="drafts",
+        paths=["drafts/*.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        exclude=["drafts/skip.yaml"],
+    )
+
+
+@pytest.mark.parametrize(
+    ("config_dir", "config_file", "script_file", "path", "expected_rule", "expected_file"),
+    [
+        pytest.param(
+            None,
+            "project-index.yaml",
+            "scripts/generate.py",
+            "../project-index.yaml",
+            "配信元の設定",
+            "project-index.yaml",
+            id="config",
+        ),
+        pytest.param(
+            None,
+            "project-index.yaml",
+            "scripts/generate.py",
+            "../scripts/generate.py",
+            "generators[generate]",
+            "scripts/generate.py",
+            id="script",
+        ),
+        pytest.param(
+            None,
+            "project-index.yaml",
+            "scripts/generate.py",
+            "../drafts/skip.yaml",
+            "drafts",
+            "drafts/skip.yaml",
+            id="excluded",
+        ),
+        pytest.param(
+            None,
+            "project-index.yaml",
+            "scripts/generate.py",
+            "../schemas/rule.schema.yaml",
+            "documents[notes].schema",
+            "schemas/rule.schema.yaml",
+            id="schema",
+        ),
+        pytest.param(
+            "sub",
+            "sub/project-index.yaml",
+            "sub/scripts/generate.py",
+            "../sub/project-index.yaml",
+            "配信元の設定",
+            "sub/project-index.yaml",
+            id="config_under_paths_base",
+        ),
+        pytest.param(
+            "sub",
+            "sub/project-index.yaml",
+            "sub/scripts/generate.py",
+            "../sub/scripts/generate.py",
+            "generators[generate]",
+            "sub/scripts/generate.py",
+            id="script_under_paths_base",
+        ),
+    ],
+)
+def test_write_docs_when_non_document_file_not_adoptable(
+    make_env: Callable[..., WriteEnv],
+    config_dir: str | None,
+    config_file: str,
+    script_file: str,
+    path: str,
+    expected_rule: str,
+    expected_file: str,
+) -> None:
+    """配信元の文書でないファイルを本文のファイルにできない（異常系）。"""
+    # 準備
+    files = {
+        **_notes_files(),
+        config_file: "name: sample\n",
+        script_file: GENERATE_SCRIPT,
+        "drafts/skip.yaml": SKIPPED_DRAFT,
+    }
+    env = make_env(
+        files,
+        tables=[_notes_table(), _rules_table(), _drafts_table()],
+        generators=[ScriptEntry(id="generate", run=["python3", "scripts/generate.py"])],
+        config_dir=config_dir,
+    )
+    before = (env.worktree / expected_file).read_text(encoding="utf-8")
+    # 実行・検証
+    with pytest.raises(ValidationFailedError) as exc_info:
+        env.write(
+            operations=[Operation(op="create", kind="notes", data={"id": "n20", "path": path})]
+        )
+    violations = exc_info.value.violations
+    assert [(v.index, v.path) for v in violations] == [(0, "operations[0].path")]
+    assert expected_rule in violations[0].rule
+    assert "どれでもないパス" in violations[0].fix
+    assert (env.worktree / "notes/index.yaml").read_text(encoding="utf-8") == NOTES
+    assert (env.worktree / expected_file).read_text(encoding="utf-8") == before
 
 
 NESTED_NOTES = "items:\n  - id: n1\n    meta:\n      path: n1.md\n  - id: n3\n"

@@ -10,7 +10,7 @@ import posixpath
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, cast
 
 from ruamel.yaml.comments import CommentedMap
@@ -41,6 +41,7 @@ from project_index.features.search.fields import known_fields
 from project_index.features.search.filters import check_filter, match_filter
 from project_index.features.search.types import SearchRequest
 from project_index.features.seen.types import LastRead, SessionKey
+from project_index.features.sources.service import SCRIPT_TABLES
 from project_index.features.sources.types import DocumentTable
 from project_index.features.write.apply import (
     BODY_KEY,
@@ -727,13 +728,14 @@ def _create_body(
     # 本文なしで無いファイル: 作る中身が無い
     if not exists:
         raise _invalid([_missing_body(operation, table, body_path)])
-    # 本文なしで既にあるファイル: ほかの文書のファイルでなければ、書き換えずに取り込む
-    owner = _file_owner(session, body_path)
+    # 本文なしで既にあるファイル: ほかの文書のファイルでも配信元の文書でないファイルでもなければ、書き換えずに取り込む
+    owner = _file_owner(session, body_path) or _non_document_owner(session.target.source, body_path)
     if owner is not None:
         raise _body_file_error(
             column,
-            f"本文のファイル {body_path} は{owner}のファイルです",
-            f"{column} に、配信元のどの文書のファイルでもないパスを指定してください",
+            f"本文のファイル {body_path} は{owner}です",
+            f"{column} に、配信元の文書のファイル・設定・スクリプト・除外したファイル・"
+            "スキーマのどれでもないパスを指定してください",
         )
     return {}
 
@@ -754,18 +756,84 @@ def _file_owner(session: _Session, path: str) -> str | None:
     # 要素の本文のファイル
     for document in session.docs.values():
         if document.body_path == path:
-            return f"文書 {document.id} "
+            return f"文書 {document.id} のファイル"
     # 行の `paths` に該当するファイル: 要素が 0 件・読み込めないファイルも、文書の有無によらず断る
     for row in session.target.source.config.documents:
         if not row.enabled or not row.matches(path):
             continue
         # `records` の行の管理用の YAML: ファイル自体は 1 つの文書でないため、行の ID で示す
         if row.records is not None:
-            return f"行 {row.id} の管理用の YAML "
+            return f"行 {row.id} の管理用の YAML のファイル"
         # 1 ファイル 1 文書のファイル: 読み込めた文書があればその ID、無ければ行の ID で示す
         doc_id = next((d.id for d in session.docs.values() if d.path == path), None)
-        return f"文書 {doc_id} " if doc_id is not None else f"行 {row.id} の文書 "
+        return (
+            f"文書 {doc_id} のファイル" if doc_id is not None else f"行 {row.id} の文書のファイル"
+        )
     return None
+
+
+def _non_document_owner(source: ServedSource, path: str) -> str | None:
+    """配信元の文書でないファイル（設定・スクリプト・除外したファイル・スキーマ）の説明。該当しなければ `None`。
+
+    `path` は `root` からのパス。設定・スクリプト・除外したファイル・スキーマの順に照合する。
+    """
+    return (
+        _config_file_owner(source, path)
+        or _script_owner(source, path)
+        or _excluded_owner(source, path)
+        or _schema_owner(source, path)
+    )
+
+
+def _config_file_owner(source: ServedSource, path: str) -> str | None:
+    """配信元の設定のファイルなら説明を返す（`root` の外の設定のファイルは本文のファイルのパスにならない）。"""
+    config_paths = {
+        config_file.relative_to(source.root).as_posix()
+        for config_file in source.config_files
+        if config_file.is_relative_to(source.root)
+    }
+    return "配信元の設定のファイル" if path in config_paths else None
+
+
+def _script_owner(source: ServedSource, path: str) -> str | None:
+    """検査・変換・生成の行の `run` の要素が、配信元のフォルダからのパスとして指すファイルなら説明を返す。"""
+    for table in SCRIPT_TABLES:
+        for entry in getattr(source.config, table):
+            if any(_source_path(source, item) == path for item in entry.run):
+                return f"{table}[{entry.id}] のスクリプト"
+    return None
+
+
+def _excluded_owner(source: ServedSource, path: str) -> str | None:
+    """有効な行の `paths` に該当し `exclude[]` で除外したファイルなら説明を返す。"""
+    target = PurePosixPath(path)
+    for row in source.config.documents:
+        in_paths = any(target.full_match(pattern) for pattern in row.paths)
+        if row.enabled and in_paths and row.excludes(path):
+            return f"行 {row.id} で除外したファイル"
+    return None
+
+
+def _schema_owner(source: ServedSource, path: str) -> str | None:
+    """有効な行の文字列の `schema` が指すスキーマなら説明を返す（オブジェクトはほかの配信元の参照のため照合しない）。"""
+    for row in source.config.documents:
+        if not row.enabled or not isinstance(row.schema_path, str):
+            continue
+        # スキーマのパスは配信元のフォルダからのパスのため、`root` からのパスにして比べる
+        if _source_path(source, row.schema_path) == path:
+            return f"documents[{row.id}].schema のスキーマ"
+    return None
+
+
+def _source_path(source: ServedSource, relative: str) -> str | None:
+    """配信元のフォルダからの相対パスを、正規化した `root` からのパスにする（絶対パス・`root` の外は `None`）。"""
+    if posixpath.isabs(relative):
+        return None
+    normalized = posixpath.normpath(source.config_path(relative))
+    # `root` の外を指す: 本文のファイルのパスにならない
+    if normalized == ".." or normalized.startswith("../"):
+        return None
+    return normalized
 
 
 def _diff(before: Document | None, after: Document, body: Mapping[str, str]) -> str:

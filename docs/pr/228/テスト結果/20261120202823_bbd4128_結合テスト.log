@@ -1,0 +1,15 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=integration -f paths="tests/integration/server/test_write_docs.py::test_error_when_existing_body_file_not_adoptable tests/integration/server/test_write_docs.py::test_normal_when_existing_body_file_adopted" | ...) （TP-1 の TL-2 の run_runner）
+# run: https://github.com/shuhei1101/project-index/actions/runs/44727736008
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 2 items
+
+tests/integration/server/test_write_docs.py::test_error_when_existing_body_file_not_adoptable PASSED [ 50%]
+tests/integration/server/test_write_docs.py::test_normal_when_existing_body_file_adopted PASSED [100%]
+
+============================== 2 passed in 0.67s ===============================
+exit=0
