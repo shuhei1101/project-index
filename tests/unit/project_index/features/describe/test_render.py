@@ -5,6 +5,7 @@ from pathlib import Path
 from project_index.features.access.types import SourceAccess, Workplace
 from project_index.features.describe.render import render_describe_markdown
 from project_index.features.describe.types import (
+    DirectCommitGuide,
     KindSchemaResult,
     OutsideSource,
     SourceGuideResult,
@@ -41,7 +42,7 @@ def test_render_describe_markdown_when_source_when() -> None:
     guide_lines = render_describe_markdown(guide).splitlines()
     plain_markdown = render_describe_markdown(plain)
     # 検証
-    assert "| source | 権限 | description | when |" in listed_markdown
+    assert "| source | 権限 | description | when | 直コミット |" in listed_markdown
     assert "| sample | write（作業中） | サンプル | 規約を確かめるとき<br>設計書を書く前 |" in (
         listed_markdown
     )
@@ -84,7 +85,7 @@ def test_render_describe_markdown_when_warnings() -> None:
     quiet_markdown = render_describe_markdown(quiet)
     # 検証
     lines = markdown.splitlines()
-    assert lines.index("注意:") > lines.index("| sample | write（作業中） | サンプル |  |")
+    assert lines.index("注意:") > lines.index("| sample | write（作業中） | サンプル |  |  |")
     assert "- 警告です" in lines
     assert "注意:" not in quiet_markdown
 
@@ -182,3 +183,41 @@ def test_render_describe_markdown_when_outside_scope() -> None:
     lines = markdown.splitlines()
     assert lines[0] == "作業範囲の外（参考）"
     assert "other の説明書" in lines[1:]
+
+
+def test_render_describe_markdown_when_direct_commit() -> None:
+    """直コミットの列と案内（正常系）。"""
+    # 準備
+    listed = SourceListResult(
+        workplace=Workplace(cwd=Path("/w/local"), source_id=None, worktree=None),
+        sources=[
+            SourceAccess(
+                source_id="sample",
+                access="commit",
+                current=False,
+                description="サンプル",
+                direct_commit_kinds=["note"],
+            ),
+            SourceAccess(source_id="notes", access="read", current=False, description="メモ"),
+        ],
+    )
+    guide = SourceGuideResult(
+        source_id="sample",
+        instructions="説明書",
+        kinds=[],
+        direct_commit=DirectCommitGuide(branch="develop", branches=["data"], kinds=["note"]),
+    )
+    # 実行
+    listed_markdown = render_describe_markdown(listed)
+    guide_lines = render_describe_markdown(guide).splitlines()
+    # 検証
+    assert "| sample | commit | サンプル |  | note |" in listed_markdown
+    assert "| notes | read | メモ |  |  |" in listed_markdown
+    start = guide_lines.index("直コミット:")
+    assert guide_lines[start : start + 4] == [
+        "直コミット:",
+        "- ブランチ: develop",
+        "- 上書きできるブランチ: data",
+        "- 種類: note",
+    ]
+    assert start > guide_lines.index("| kind | description |")

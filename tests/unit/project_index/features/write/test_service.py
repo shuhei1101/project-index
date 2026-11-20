@@ -382,6 +382,7 @@ def test_write_docs_when_not_git(
             checker=DocumentChecker(store, timeout_sec=10),
             seen=SeenStore(tmp_path / "seen.sqlite3", retention_days=7),
             locks=SourceLocks(),
+            repo_locks=RepositoryLocks(),
             timeout_sec=10,
             now=now,
         )
@@ -443,6 +444,7 @@ def test_write_docs_when_without_dates(
             checker=DocumentChecker(store, timeout_sec=10),
             seen=SeenStore(tmp_path / "seen.sqlite3", retention_days=7),
             locks=SourceLocks(),
+            repo_locks=RepositoryLocks(),
             timeout_sec=10,
             now=now,
         )
@@ -1273,6 +1275,7 @@ def test_delete_docs_when_not_allowed(
             store=store,
             checker=DocumentChecker(store, timeout_sec=10),
             locks=SourceLocks(),
+            repo_locks=RepositoryLocks(),
             timeout_sec=10,
         )
     assert exc_info.value.kind == "rules"
