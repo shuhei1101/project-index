@@ -614,9 +614,7 @@ def _one_sided_body(
                 fix=f"{item} に {column} を加えるか、{BODY_KEY} を除いてください",
             )
         ]
-    # 列の値だけ: 作る本文のファイルの中身が無い
-    if has_column and not has_body:
-        return _missing_body(operation, table, item)
+    # 列の値だけ: 指すファイルの有無で決まるため、本文のファイルのパスを解く `_create_body` で確かめる
     return []
 
 
@@ -639,18 +637,14 @@ def _misplaced_body(operation: Operation) -> list[Violation]:
     return violations
 
 
-def _missing_body(operation: Operation, table: DocumentTable, item: str) -> list[Violation]:
-    """本文のファイルのパスを渡したのに本文が無いときの違反。"""
-    _, given = _given(operation)
-    if BODY_KEY in given:
-        return []
-    return [
-        Violation(
-            path=f"{item}.{BODY_KEY}",
-            rule=f"{table.id} の本文のファイルの作成には本文（{BODY_KEY}）が要ります",
-            fix=f"{item} に {BODY_KEY} を加えるか、{table.body_file} を除いてください",
-        )
-    ]
+def _missing_body(operation: Operation, table: DocumentTable, body_path: str) -> Violation:
+    """本文のファイルのパスだけを渡し、指すファイルが無いときの違反。"""
+    item, _ = _given(operation)
+    return Violation(
+        path=f"{item}.{BODY_KEY}",
+        rule=f"{table.id} の本文のファイル {body_path} が無く、作成する本文（{BODY_KEY}）もありません",
+        fix=f"{item} に {BODY_KEY} を加えるか、先に本文のファイルを作成してください",
+    )
 
 
 def _moved_body(operation: Operation, column: str, existing: Document) -> list[Violation]:
@@ -694,37 +688,81 @@ def _create_body(
     path: str,
     index: int,
 ) -> dict[str, str]:
-    """`create` の本文のファイルのパスを解き、(パス → 本文) を返す（作れなければ違反）。"""
+    """`create` の本文のファイルのパスを解き、(パス → 本文) を返す（作れなければ違反）。
+
+    `@body` が無く既にあるファイルを指すときは、そのファイルを本文のファイルとして取り込み、空を返す。
+    """
     column = table.body_file
     if column is None:
         return {}
     _, given = _given(operation)
+    has_body = BODY_KEY in given
     # 列の値も本文も無い: 本文のファイルを持たない要素のまま
-    if not _has_body_path(operation, column) and BODY_KEY not in given:
+    if not _has_body_path(operation, column) and not has_body:
         return {}
     _, value = _column_value(operation, column)
     body_path = resolve_body_path(path, value)
-    if body_path is None or session.body_exists(body_path):
-        rule = (
-            f"本文のファイルのパス（{value}）が配信元の外を指します"
-            if body_path is None
-            else f"本文のファイル {body_path} は既にあります"
+    # 配信元の外: 作ることも取り込むこともできない
+    if body_path is None:
+        raise _body_file_error(
+            column,
+            f"本文のファイルのパス（{value}）が配信元の外を指します",
+            f"{column} に、管理用の YAML のフォルダからの相対で、配信元の中の新しいファイルのパスを指定してください",
         )
-        raise ValidationFailedError(
-            message="検査に通らない操作があります: 1 件",
-            violations=[
-                Violation(
-                    path=column,
-                    rule=rule,
-                    fix=f"{column} に、管理用の YAML のフォルダからの相対で、配信元の中の新しいファイルのパスを指定してください",
-                )
-            ],
+    exists = session.body_exists(body_path)
+    # 本文あり: 新しいファイルを作る。既にあるファイルは上書きしない
+    if has_body:
+        if exists:
+            raise _body_file_error(
+                column,
+                f"本文のファイル {body_path} は既にあります",
+                f"既にあるファイルを本文のファイルにするなら {BODY_KEY} を除き、"
+                f"本文を記載するなら {column} を新しいファイルのパスにしてください",
+            )
+        body = apply_body(None, operation, index=index)
+        if body is None:
+            msg = "本文のファイルを作る操作に本文がありません"
+            raise RuntimeError(msg)
+        return {body_path: body}
+    # 本文なしで無いファイル: 作る中身が無い
+    if not exists:
+        raise _invalid([_missing_body(operation, table, body_path)])
+    # 本文なしで既にあるファイル: ほかの文書のファイルでなければ、書き換えずに取り込む
+    owner = _file_owner(session, body_path)
+    if owner is not None:
+        raise _body_file_error(
+            column,
+            f"本文のファイル {body_path} は{owner}のファイルです",
+            f"{column} に、配信元のどの文書のファイルでもないパスを指定してください",
         )
-    body = apply_body(None, operation, index=index)
-    if body is None:
-        msg = "本文のファイルを作る操作に本文がありません"
-        raise RuntimeError(msg)
-    return {body_path: body}
+    return {}
+
+
+def _body_file_error(column: str, rule: str, fix: str) -> ValidationFailedError:
+    """`body_file` の列の違反 1 件の `ValidationFailedError`。"""
+    return ValidationFailedError(
+        message="検査に通らない操作があります: 1 件",
+        violations=[Violation(path=column, rule=rule, fix=fix)],
+    )
+
+
+def _file_owner(session: _Session, path: str) -> str | None:
+    """ファイルを持つ文書の説明（文書の ID か、管理用の YAML の行）。どの文書のファイルでもなければ `None`。
+
+    同じ呼び出しの前の操作が作る・取り込む本文のファイルも、記録済みの文書の `body_path` に含まれる。
+    """
+    for document in session.docs.values():
+        # 要素の本文のファイル
+        if document.body_path == path:
+            return f"文書 {document.id} "
+        if document.path != path:
+            continue
+        # `records` の行の管理用の YAML: ファイル自体は 1 つの文書でないため、行の ID で示す
+        if session.target.source.table(document.kind).records is not None:
+            return f"行 {document.kind} の管理用の YAML "
+        # 1 ファイル 1 文書のファイル
+        return f"文書 {document.id} "
+    return None
 
 
 def _diff(before: Document | None, after: Document, body: Mapping[str, str]) -> str:
