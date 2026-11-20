@@ -25,13 +25,21 @@ class GitError(Exception):
     """git が 0 以外で終わったか待ち時間の上限を超えたこと。"""
 
     def __init__(
-        self, args_: list[str], returncode: int, stderr: str, *, timed_out: bool = False
+        self,
+        args_: list[str],
+        returncode: int,
+        stderr: str,
+        *,
+        timed_out: bool = False,
+        stdout: str = "",
     ) -> None:
         super().__init__(f"git {' '.join(args_)}: {stderr}")
         self.args_ = args_
         self.returncode = returncode
         self.stderr = stderr
         self.timed_out = timed_out
+        # 失敗した呼び出しの標準出力（`push --porcelain` の参照の行を読む）
+        self.stdout = stdout
 
 
 def _tail(text: str) -> str:
@@ -72,7 +80,8 @@ def run_git(
         ) from error
     if completed.returncode != 0:
         stderr = completed.stderr.decode("utf-8", errors="replace")
-        raise GitError(list(args), completed.returncode, _tail(stderr))
+        stdout = completed.stdout.decode("utf-8", errors="replace")
+        raise GitError(list(args), completed.returncode, _tail(stderr), stdout=stdout)
     if binary:
         return completed.stdout
     return completed.stdout.decode("utf-8")
@@ -125,3 +134,18 @@ def ignored_paths(root: Path) -> list[str] | None:
         return None
     text = output if isinstance(output, str) else output.decode("utf-8")
     return sorted(path for path in text.split("\0") if path)
+
+
+def worktree_heads(repo: Path) -> list[tuple[Path, str]]:
+    """`worktree list --porcelain` から、ブランチを指すワークツリーの直下とブランチの名前の組を返す。"""
+    output = run_git(["worktree", "list", "--porcelain"], cwd=repo)
+    text = output if isinstance(output, str) else output.decode("utf-8")
+    heads: list[tuple[Path, str]] = []
+    path: Path | None = None
+    for line in text.splitlines():
+        if line.startswith("worktree "):
+            path = Path(line.removeprefix("worktree "))
+        # 切り離した HEAD のワークツリーは branch の行を持たないので拾わない
+        elif line.startswith("branch refs/heads/") and path is not None:
+            heads.append((path, line.removeprefix("branch refs/heads/")))
+    return heads

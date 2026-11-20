@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import fnmatch
 import logging
 from typing import TYPE_CHECKING
 
 from project_index.features.access.types import AccessLevel, SourceAccess, Target, Workplace
 from project_index.features.history.query import resolve_ref
 from project_index.features.sources.service import load_source_at
+from project_index.integrations.git import worktree_heads
 from project_index.shared.errors import (
     InvalidArgumentError,
     SourceNotReadableError,
@@ -65,7 +67,62 @@ def access_of(source: ServedSource, cwd: Path | None) -> AccessLevel | None:
         return "write"
     if match_glob(path, source.scope_read):
         return "read"
+    # scope に当たらず、直コミットを呼べる作業場所なら直コミットだけ
+    if committable_kinds(source, cwd):
+        return "commit"
     return None
+
+
+def committable_kinds(source: ServedSource, cwd: Path | None) -> frozenset[str]:
+    """作業場所から直コミットできる種類を決める。"""
+    settings = source.config.direct_commit
+    if cwd is None or settings is None or source.direct_commit_problems:
+        return frozenset()
+    # 種類ごとの glob があればそれを、無ければ配信元の呼べる作業場所を照らす
+    return frozenset(
+        kind
+        for kind in settings.kinds
+        if match_glob(cwd, source.direct_commit_kinds.get(kind, source.direct_commit_scope))
+    )
+
+
+def commit_read_worktree(source: ServedSource, worktree: str | None, ref: str | None) -> Path:
+    """権限が `commit` の作業場所から読めるワークツリーを決める。"""
+    settings = source.config.direct_commit
+    not_readable = SourceNotReadableError(
+        message=f"{source.id} は今の作業場所からコミットするブランチのワークツリーだけを参照できます",
+        next_steps=["ref と worktree を省いてください"],
+    )
+    if ref is not None or settings is None or source.repo_root is None:
+        raise not_readable
+    heads = _worktree_heads(source)
+    # 省いた: 既定のブランチを指すワークツリー
+    if worktree is None:
+        for path, branch in heads:
+            if branch == settings.branch:
+                return path
+        raise not_readable
+    # 渡された: 既定のブランチか上書きできるブランチを指すワークツリーだけ
+    wt = find_worktree(source, normalize_path(worktree))
+    for path, branch in heads:
+        if path != wt:
+            continue
+        if branch == settings.branch or any(
+            fnmatch.fnmatchcase(branch, pattern) for pattern in settings.branches
+        ):
+            return path
+    raise not_readable
+
+
+def _worktree_heads(source: ServedSource) -> list[tuple[Path, str]]:
+    """配信元の worktrees に該当するワークツリーと、HEAD が指すブランチの組を返す。"""
+    if source.repo_root is None:
+        return []
+    return [
+        (path, branch)
+        for path, branch in worktree_heads(source.repo_root)
+        if find_worktree(source, path) is not None
+    ]
 
 
 def current_source(
@@ -105,6 +162,7 @@ def available_sources(cwd: str | None, *, registry: SourceRegistry) -> list[Sour
                 current=current is not None and current[0].id == source.id,
                 description=source.config.description,
                 when=list(source.config.when),
+                direct_commit_kinds=sorted(committable_kinds(source, path)),
             )
         )
     return result
@@ -244,6 +302,10 @@ def _target_of(
     reload_worktree: bool = True,
 ) -> Target:
     """1 つの配信元の読む場所を決める。"""
+    # 直コミットだけを呼べる作業場所は、コミットするブランチのワークツリーだけを読む
+    if access == "commit":
+        wt = commit_read_worktree(item, worktree, ref)
+        return _worktree_target(item, wt, access, outside, reload_worktree=reload_worktree)
     _reject_disk_arguments(item, ref=ref, worktree=worktree)
     if worktree is not None:
         wt = find_worktree(item, normalize_path(worktree))

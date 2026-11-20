@@ -60,6 +60,16 @@ class SourceListResult:
 
 
 @dataclass(frozen=True)
+class DirectCommitGuide:
+    """`describe(source)` の `direct_commit`。"""
+
+    branch: str
+    branches: list[str]
+    # 今の作業場所から直コミットできる種類
+    kinds: list[str]
+
+
+@dataclass(frozen=True)
 class SourceGuideResult:
     """`source` だけの結果。"""
 
@@ -70,6 +80,8 @@ class SourceGuideResult:
     when: list[str] = field(default_factory=list[str])
     refs: dict[str, list[str]] | None = None
     worktrees: list[WorktreeInfo] | None = None
+    # 今の作業場所から直コミットできる種類が 1 つ以上あるときだけ
+    direct_commit: DirectCommitGuide | None = None
 
 
 @dataclass(frozen=True)
