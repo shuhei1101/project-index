@@ -571,10 +571,10 @@ Git 管理外の配信元と `storage.type: disk` の配信元では、種類の
 | BranchNotAllowedError | `commit.branch` が `direct_commit.branch` でも `direct_commit.branches[]` でもない | 上書きできるブランチの一覧 |
 | CommitWorktreeNotFoundError | コミットするブランチを指すワークツリーが `worktrees` に無い | ブランチ名 |
 | UnpushedCommitsError | コミットするブランチのワークツリーにプッシュしていないコミットがあるか、早送りで取り込めない | ワークツリーのパスと先行・遅延のコミット数 |
-| UncommittedChangesError | 書き込むファイル・生成物にコミットしていない変更がある | 変更のあるファイルのパス |
+| UncommittedChangesError | 書き込むファイル・生成物にコミットしていない変更があるか、コミットしていない変更が早送りで取り込む変更と重なる | 変更のあるファイルのパス |
 | FetchFailedError | リモートから取得できない | git の標準エラーの末尾 |
 | PushRejectedError | やり直した後のプッシュもリモートに断られた | リモートが返した理由 |
-| PushFailedError | 通信の失敗などでプッシュが届かない、または届いたかを照合できない | git の標準エラーの末尾と、照合できないときは結果が不明であることとコミットの SHA |
+| PushFailedError | 通信の失敗などでプッシュが届かない、届いたかを照合できない、またはプッシュの時間が残っていない | git の標準エラーの末尾と、照合できないときは結果が不明であることとコミットの SHA |
 | DirectCommitGeneratorError | `commit` を指定した書き込みで `generators[]` が失敗した | スクリプトのパスと理由 |
 | UnexpectedError | どのツールでも、上のエラーでない例外（`GitError` など）で処理を終えられない | `UnexpectedError: {例外の型}: {内容}` |
 
