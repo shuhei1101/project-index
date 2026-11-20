@@ -44,6 +44,31 @@ def test_resolve_ref(
     assert result.input == "main"
 
 
+def test_resolve_ref_when_date_cached(
+    git_repo: Callable[..., Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """同じ commit の日時は 2 回目から git で引かない（正常系）。"""
+    from project_index.features.history import query as query_module
+
+    # 準備
+    root = git_repo({"a.yaml": "a: 1\n"}, branch="main")
+    subcommands: list[str] = []
+    real = query_module.run_git
+
+    def recording(args: Any, **kwargs: Any) -> Any:
+        subcommands.append(next(iter(args)))
+        return real(args, **kwargs)
+
+    monkeypatch.setattr(query_module, "run_git", recording)
+    # 実行
+    first = resolve_ref(root, "main", date_base="main")
+    second = resolve_ref(root, "main", date_base="main")
+    # 検証
+    assert (first.commit, first.date) == (second.commit, second.date)
+    assert subcommands.count("show") == 1
+    assert subcommands.count("rev-parse") == 2
+
+
 def test_resolve_ref_when_date(
     git_repo: Callable[..., Path],
     commit_all: Callable[..., str],

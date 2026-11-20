@@ -1936,3 +1936,230 @@ def test_document_store_load_when_collected_reused(
     assert second_result.documents == first_result.documents
     assert calls == ["rules"]
     assert sorted(document.id for document in third_result.documents) == ["a", "b", "c"]
+
+
+def test_document_store_load_when_revision_load_reused(
+    git_repo: Callable[..., Path],
+    write_files: Callable[[Path, dict[str, str]], None],
+    run_git: Callable[..., str],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    document_store: DocumentStore,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """交互に届く 2 つの commit を照合し直さない（正常系）。"""
+    # 準備
+    root, first, second = _two_commits(git_repo, write_files, run_git)
+    source = _git_source(root, root, make_source_config, make_served_source)
+    collected = _recording_collect_files(monkeypatch)
+    loaded = _recording_load_file(monkeypatch)
+    first_result = document_store.load(make_target(source, ref="develop", commit=first))
+    second_result = document_store.load(make_target(source, ref="develop", commit=second))
+    collected.clear()
+    loaded.clear()
+    # 実行
+    third_result = document_store.load(make_target(source, ref="develop", commit=first))
+    fourth_result = document_store.load(make_target(source, ref="develop", commit=second))
+    # 検証
+    assert collected == []
+    assert loaded == []
+    assert third_result is first_result
+    assert fourth_result is second_result
+
+
+def test_document_store_load_when_revision_loads_over_keep(
+    git_repo: Callable[..., Path],
+    write_files: Callable[[Path, dict[str, str]], None],
+    run_git: Callable[..., str],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    document_store: DocumentStore,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """上限を超えた読み込みの結果を最も前に使用したものから捨てる（正常系）。"""
+    # 準備
+    root, first, second = _two_commits(git_repo, write_files, run_git)
+    source = _git_source(root, root, make_source_config, make_served_source)
+    monkeypatch.setattr(store_module, "REVISION_LOAD_KEEP", 1)
+    collected = _recording_collect_files(monkeypatch)
+    # 実行
+    document_store.load(make_target(source, ref="develop", commit=first))
+    document_store.load(make_target(source, ref="develop", commit=second))
+    third_result = document_store.load(make_target(source, ref="develop", commit=first))
+    # 検証
+    assert collected == ["rules", "rules", "rules"]
+    assert {document.data["name"] for document in third_result.documents} == {"A", "B"}
+
+
+def test_document_store_load_when_revision_load_files_given(
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    document_store: DocumentStore,
+) -> None:
+    """たどったファイルを渡した読み込みは保持した結果を使用しない（正常系）。"""
+    # 準備
+    root = git_repo({"rules/a.yaml": "id: a\n", "rules/b.yaml": "id: b\n"})
+    head = run_git(root, "rev-parse", "HEAD").strip()
+    source = _git_source(root, root, make_source_config, make_served_source)
+    target = make_target(source, ref="develop", commit=head)
+    first_result = document_store.load(target)
+    # 実行
+    second_result = document_store.load(target, files=["rules/a.yaml"])
+    # 検証
+    assert [document.id for document in second_result.documents] == ["a"]
+    assert second_result is not first_result
+
+
+def _page_source(
+    root: Path,
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+) -> ServedSource:
+    """行 rules・管理用の YAML の行 notes・records の行 terms を持つ Git の配信元を返す。"""
+    documents = [
+        RULES_TABLE,
+        DocumentTable(
+            id="notes",
+            paths=["notes/files.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            records="files",
+            body_file="path",
+        ),
+        DocumentTable(
+            id="terms",
+            paths=["terms.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            records="terms",
+        ),
+    ]
+    return make_served_source(
+        root=root,
+        is_git=True,
+        repo_root=root,
+        config=make_source_config(documents=documents, default_ref="develop"),
+    )
+
+
+@pytest.mark.parametrize(
+    ("page", "doc_id", "expected"),
+    [
+        pytest.param("rules/a", None, ("rules/a.yaml", "a"), id="page_path"),
+        pytest.param("rules/a.yaml", None, ("rules/a.yaml", "a"), id="file_path"),
+        pytest.param("notes/guide.md", None, ("notes/files.yaml", "notes/guide"), id="body_path"),
+        pytest.param("terms.yaml", "term-2", ("terms.yaml", "term-2"), id="doc_id"),
+        pytest.param("no/such", None, None, id="missing"),
+    ],
+)
+@pytest.mark.parametrize("with_ref", [pytest.param(True, id="ref"), pytest.param(False, id="worktree")])
+def test_document_store_find_page(
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    document_store: DocumentStore,
+    page: str,
+    doc_id: str | None,
+    expected: tuple[str, str] | None,
+    with_ref: bool,
+) -> None:
+    """文書のページの特定と同じ文書を返却する（正常系）。"""
+    # 準備
+    root = git_repo(
+        {
+            "rules/a.yaml": "id: a\n",
+            "notes/files.yaml": "files:\n  - path: guide.md\n",
+            "notes/guide.md": "# Guide\n",
+            "terms.yaml": "terms:\n  - id: term-1\n  - id: term-2\n",
+        }
+    )
+    head = run_git(root, "rev-parse", "HEAD").strip()
+    source = _page_source(root, make_source_config, make_served_source)
+    target = (
+        make_target(source, ref="develop", commit=head) if with_ref else make_target(source)
+    )
+    # 実行
+    found = document_store.find_page(target, page, doc_id=doc_id)
+    # 検証
+    assert (None if found is None else (found.path, found.id)) == expected
+
+
+def test_page_path(make_document: Callable[..., Document]) -> None:
+    """ファイルと records（正常系）。"""
+    # 準備
+    plain = make_document(id="a", path="docs/a.yaml")
+    record = make_document(id="r-1", path="docs/rules.yaml", record_index=0)
+    # 実行
+    plain_result = store_module.page_path(plain)
+    record_result = store_module.page_path(record)
+    # 検証
+    assert plain_result == "docs/a"
+    assert record_result == "docs/rules/r-1"
+
+
+def test_find_page(make_document: Callable[..., Document]) -> None:
+    """文書のページのパスで当たる（正常系）。"""
+    # 準備
+    document = make_document(id="a", path="rules/a.yaml")
+    other = make_document(id="b", path="rules/b.yaml")
+    # 実行
+    result = store_module.find_page([other, document], "rules/a")
+    # 検証
+    assert result is document
+
+
+def test_find_page_when_body_path(make_document: Callable[..., Document]) -> None:
+    """本文のファイルのパスで当たる（正常系）。"""
+    # 準備
+    plain = make_document(id="a", path="rules/a.yaml")
+    record = make_document(
+        id="notes/b", path="notes/files.yaml", record_index=0, body_path="notes/b.md"
+    )
+    # 実行
+    result = store_module.find_page([plain, record], "notes/b.md")
+    # 検証
+    assert result is record
+
+
+def test_find_page_when_missing(make_document: Callable[..., Document]) -> None:
+    """どれにも当たらない（正常系）。"""
+    # 準備
+    plain = make_document(id="a", path="rules/a.yaml")
+    record = make_document(
+        id="notes/b", path="notes/files.yaml", record_index=0, body_path="notes/b.md"
+    )
+    # 実行
+    result = store_module.find_page([plain, record], "no/such")
+    # 検証
+    assert result is None
+
+
+def test_find_page_when_doc_id(make_document: Callable[..., Document]) -> None:
+    """文書の ID で行の文書を選ぶ（正常系）。"""
+    # 準備
+    first = make_document(id="term-1", path="terms.yaml", record_index=0)
+    second = make_document(id="term-2", path="terms.yaml", record_index=1)
+    # 実行
+    chosen = store_module.find_page([first, second], "terms.yaml", doc_id="term-2")
+    default = store_module.find_page([first, second], "terms.yaml")
+    # 検証
+    assert chosen is second
+    assert default is first
+
+
+def test_find_page_when_doc_id_missing(make_document: Callable[..., Document]) -> None:
+    """文書の ID が一致しない（正常系）。"""
+    # 準備
+    first = make_document(id="term-1", path="terms.yaml", record_index=0)
+    second = make_document(id="term-2", path="terms.yaml", record_index=1)
+    # 実行
+    unknown_id = store_module.find_page([first, second], "terms.yaml", doc_id="no-such")
+    page = store_module.find_page([first, second], "terms/term-2", doc_id="term-2")
+    # 検証
+    assert unknown_id is None
+    assert page is None
