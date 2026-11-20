@@ -79,6 +79,10 @@ data_models:
         title: コミットの説明
         type: str
         description: '`commit.message`'
+      - name: base
+        title: 配信元のフォルダ
+        type: Path
+        description: ワークツリーの中の配信元のフォルダ（権限と作業場所の `base_of`）。生成物とみなすパスの範囲
   - name: DirtyFiles
     title: 未コミットの変更の控え
     container: project_index/features/write/direct_commit.py
@@ -138,7 +142,7 @@ functions:
          - `direct_commit.branch` と違い、`direct_commit.branches` のどの名前・glob（`fnmatch`）にも該当しない場合、`BranchNotAllowedError` を送る
       3. `worktree list --porcelain` を呼び（gitの実行）、`branch refs/heads/{ブランチ}` を持ち `find_worktree` で配信元のワークツリーに該当する行を選ぶ
          - 無い場合、`CommitWorktreeNotFoundError` を送る
-      4. `rev-parse --path-format=absolute --git-common-dir` でリポジトリを求め、計画を返す
+      4. `rev-parse --path-format=absolute --git-common-dir` でリポジトリを、`base_of` でワークツリーの中の配信元のフォルダを求め、計画を返却する
     exceptions:
       - name: DirectCommitNotConfiguredError
         condition: 直コミットの設定が無い・disk の配信元・許可する種類が `documents[]` に無い
@@ -207,7 +211,8 @@ functions:
       2. `fetch {REMOTE} {ブランチ}` を `timeout` で呼ぶ
          - `GitError` の場合、`FetchFailedError` を送る
       3. `merge --ff-only {REMOTE}/{ブランチ}` を呼ぶ
-         - `GitError` の場合、`UnpushedCommitsError` を送る（早送りで取り込めない）
+         - `GitError` の標準エラーに `would be overwritten` を含む場合、標準エラーが挙げるパスを添えた `UncommittedChangesError` を送る（未コミットの変更が取り込む変更と重なる）
+         - それ以外の `GitError` の場合、標準エラーの末尾を添えた `UnpushedCommitsError` を送る（早送りで取り込めない）
       4. `rev-list --left-right --count HEAD...{REMOTE}/{ブランチ}` が `0 0` でない場合、`UnpushedCommitsError` を送る（先行・遅延の数を添える）
       5. `rev-parse HEAD` を返す
     exceptions:
@@ -220,6 +225,9 @@ functions:
       - name: WriteDeadlineExceededError
         condition: 書き込みの期限を過ぎている
         message: 既存と同じ
+      - name: UncommittedChangesError
+        condition: 未コミットの変更が取り込む変更と重なる
+        message: '`コミットしていない変更があるため取り込めません: {パス}`'
     unit_tests:
       - name: test_sync_worktree
         case: 正常
@@ -241,6 +249,13 @@ functions:
         mock: なし
         expected: '`FetchFailedError`'
         exception: 取得に失敗する・制限時間を超える
+      - name: test_sync_worktree_when_overwritten
+        case: 異常
+        summary: 未コミットの変更が取り込む変更と重なる
+        condition: リモートが `memo.txt` を変えた 1 コミット先行し、ワークツリーの `memo.txt` に未コミットの変更
+        mock: なし
+        expected: '`UncommittedChangesError` に `memo.txt`'
+        exception: 未コミットの変更が取り込む変更と重なる
   - name: snapshot_dirty
     title: 未コミットの変更の控え
     kind: 関数
@@ -342,9 +357,8 @@ functions:
       type: tuple[str, list[str]]
       description: コミットの SHA と、コミットしたパス
     process: |-
-      1. `snapshot_dirty` を呼び、書き込みの後の控えを取る
-      2. 控えの前に無く後にあるパスと、`written` のパスを合わせ、コミットするパスにする（生成物は前に無かったパス）
-         - 前の控えにあったパスの内容のハッシュが変わった場合（生成が未コミットの変更のあるファイルを書き換えた）、そのパスを添えて `UncommittedChangesError` を送る
+      1. `changed_paths` でコミットするパスと、生成が書き換えた未コミットの変更のあるパスを求める
+      2. 後者がある場合、そのパスを添えて `UncommittedChangesError` を送る
       3. `add -A -- {パス}` を呼ぶ
       4. `commit --only -m {説明} -- {パス}` を呼び、他にステージされた変更をコミットに含めない
       5. `rev-parse HEAD` とコミットしたパスを返す
@@ -474,15 +488,16 @@ functions:
       type: None
       description: '-'
     process: |-
-      1. HEAD が `base` と違う場合、`reset --mixed {base}` を呼ぶ（他の未コミットの変更は作業ツリーに残る）
-      2. パスごとに、`cat-file -e {base}:{パス}` で基点にあれば `checkout {base} -- {パス}`、無ければファイルを削除する
+      1. HEAD が `base` と違う場合、`reset --soft {base}` で HEAD だけを戻す（他の未コミットの変更とステージは残る）
+      2. パスごとに、`cat-file -e {base}:{パス}` で基点にあれば `checkout {base} -- {パス}` でインデックスと作業ツリーを戻す
+      3. 基点に無いパスは、`rm --cached --ignore-unmatch -- {パス}` の後にファイルを削除する
     unit_tests:
       - name: test_rollback
         case: 正常
         summary: コミットとファイルを戻す
-        condition: '`docs/n1.yaml` を作り `docs/index.md` を変えてコミットし、`memo.txt` は未コミットの変更'
+        condition: '`docs/n1.yaml` を作り `docs/index.md` を変えてコミットし、`memo.txt` は未コミットの変更で `git add` 済み'
         mock: なし
-        expected: HEAD が基点、`docs/n1.yaml` が無く `docs/index.md` が基点の内容、`memo.txt` は変更のまま
+        expected: HEAD が基点、`docs/n1.yaml` が無く `docs/index.md` が基点の内容、`memo.txt` は変更のままステージされている
   - name: run_direct_commit
     title: 直コミットを進める
     kind: 関数
@@ -519,7 +534,7 @@ functions:
       1. 最大 2 回、次を繰り返す
          1. `sync_worktree`（`timeout` は書き込みの期限までの残り）で基点を得る
          2. `snapshot_dirty` で控えを取り、`write_once` を呼ぶ
-            - 例外の場合、書き込んだファイルが無ければそのまま送る。あれば `rollback` してから送る
+            - 例外の場合、`changed_paths`（`written` は空）でこの呼び出しが書き換えたパスを求め、あれば `rollback` してから元の例外を送る。見分けられないパスがあれば戻さず、そのパスを添えた `UncommittedChangesError` を元の例外を原因にして送る
          3. `commit_written` でコミットする
             - 例外の場合、`rollback` してから送る
          4. `push_commit`（`timeout` は応答の上限までの残り − `DIRECT_COMMIT_MARGIN_SEC`）を呼ぶ
@@ -568,6 +583,56 @@ functions:
         mock: なし
         expected: '`PushFailedError`。HEAD が基点'
         exception: 届かない・結果が不明・時間が残っていない
+  - name: changed_paths
+    title: 変わったパス
+    kind: 関数
+    container: project_index/features/write/direct_commit.py
+    usecase: 直コミット
+    role: 判定
+    summary: 書き込みの前後の控えから、この呼び出しが書き換えたパスと、利用者の変更と見分けられないパスを求める
+    description: '`commit_written`（コミットするパス）と `run_direct_commit`（例外の後に戻すパス）が共有する。'
+    scope: public
+    thread_safe: false
+    args:
+      - name: plan
+        title: 計画
+        type: CommitPlan
+        required: true
+        passing: positional
+        description: 直コミットの計画
+      - name: before
+        title: 控え
+        type: DirtyFiles
+        required: true
+        passing: positional
+        description: 書き込みの前の控え
+      - name: written
+        title: 書き込んだファイル
+        type: list[Path]
+        required: true
+        passing: positional
+        description: 操作が書き込み・削除したファイルの絶対パス（例外の後は空）
+    returns:
+      type: tuple[list[str], list[str]]
+      description: この呼び出しが書き換えたパスと、前の控えにあり内容が変わったパス
+    process: |-
+      1. `snapshot_dirty` で書き込みの後の控えを取る
+      2. 前の控えに無く後にあるパスのうち `plan.base` の配下のものと、`written` のパスを合わせ、書き換えたパスにする（`plan.base` の外で出た差は、他のツール・エディタの変更として含めない）
+      3. 前の控えにあり `plan.base` の配下で内容のハッシュが変わったパスを、見分けられないパスにする
+      4. 両方を返す
+    unit_tests:
+      - name: test_changed_paths
+        case: 正常
+        summary: 配信元のフォルダの配下の差だけ
+        condition: 書き込みの間に、配信元のフォルダの配下に生成物 `docs/index.md`、外に `.claude/tmp.txt` が現れる
+        mock: なし
+        expected: 書き換えたパスが `written` と `docs/index.md` だけで、`.claude/tmp.txt` を含まない
+      - name: test_changed_paths_when_dirty_changed
+        case: 正常
+        summary: 見分けられないパス
+        condition: 前の控えに `docs/index.md`、書き込みの間にその内容が変わる
+        mock: なし
+        expected: 見分けられないパスが `docs/index.md`
 tags:
   - name: topic:直コミット
     main: true
