@@ -747,21 +747,24 @@ def _body_file_error(column: str, rule: str, fix: str) -> ValidationFailedError:
 
 
 def _file_owner(session: _Session, path: str) -> str | None:
-    """ファイルを持つ文書の説明（文書の ID か、管理用の YAML の行）。どの文書のファイルでもなければ `None`。
+    """ファイルを持つ文書の説明（文書の ID か、行の管理用の YAML）。どの文書のファイルでもなければ `None`。
 
     同じ呼び出しの前の操作が作る・取り込む本文のファイルも、記録済みの文書の `body_path` に含まれる。
     """
+    # 要素の本文のファイル
     for document in session.docs.values():
-        # 要素の本文のファイル
         if document.body_path == path:
             return f"文書 {document.id} "
-        if document.path != path:
+    # 行の `paths` に該当するファイル: 要素が 0 件・読み込めないファイルも、文書の有無によらず断る
+    for row in session.target.source.config.documents:
+        if not row.enabled or not row.matches(path):
             continue
         # `records` の行の管理用の YAML: ファイル自体は 1 つの文書でないため、行の ID で示す
-        if session.target.source.table(document.kind).records is not None:
-            return f"行 {document.kind} の管理用の YAML "
-        # 1 ファイル 1 文書のファイル
-        return f"文書 {document.id} "
+        if row.records is not None:
+            return f"行 {row.id} の管理用の YAML "
+        # 1 ファイル 1 文書のファイル: 読み込めた文書があればその ID、無ければ行の ID で示す
+        doc_id = next((d.id for d in session.docs.values() if d.path == path), None)
+        return f"文書 {doc_id} " if doc_id is not None else f"行 {row.id} の文書 "
     return None
 
 
