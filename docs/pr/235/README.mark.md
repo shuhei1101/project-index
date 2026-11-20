@@ -1,0 +1,1 @@
+# MOD-67 の SettingsSourceAddRequest.source の型を SourceEntry にする
