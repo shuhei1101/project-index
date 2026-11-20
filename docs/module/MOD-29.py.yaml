@@ -386,9 +386,9 @@ classes:
           - name: test_document_store_load_when_revision_load_files_given
             case: 正常
             summary: たどったファイルを渡した読み込みは保持した結果を使用しない
-            condition: commit x を `load` した後、同じ読む場所を `files` に `rules/a.yaml` だけを渡して `load` する
+            condition: commit x を `load` した後、同じ読む場所を `files` に `rules/a.yaml` だけを渡して `load` し、もう一度 `files` を渡さずに `load` する
             mock: なし（`tmp_path` に `git init`）
-            expected: 2 回目の結果は `rules/a.yaml` の文書だけで、1 回目の `LoadResult` と別のもの
+            expected: 2 回目は 1 回目と別の `LoadResult` で、3 回目は 1 回目と同じ `LoadResult`（`files` を渡した読み込みは保持した結果を返却も置き換えもしない）
       - name: get
         title: ID で引く
         summary: ID の並びの順に文書を返す
