@@ -1,0 +1,26 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: run_only
+    detail: エージェントが配列の中のオブジェクトのキーの値で文書を完全一致で絞り、集計できるようになる。調べる流れは変わらない
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: search_docs の条件の `field` に、配列の中のオブジェクトのキー（`uses[].id`）を指定できることと、要素ごとに比べて数えることを追記する（`order_by`・`group_by`・`list_changes`・`replace_text` の `filter` はこの条件を参照する）
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-20T09:24:17.577342+00:00'
+scope_out:
+  - item: write_docs の項目のパス（set・add_to・remove_from・unset）での `[]` の扱いの変更
+    reason: 要望は検索の絞り込みと集計で、書き込みは含まれない
+    plan: none
+  - item: dev-docs の画面の検索（読み取り API の語での検索）での配列の中のキーの絞り込み
+    reason: 要望は search_docs の filter と group_by で、画面の検索は含まれない
+    plan: none
+  - item: 種類のスキーマの `$ref`・`allOf`（`anyOf`・`oneOf`）の先で定義した項目を、使える項目（`known_fields`、`src/project_index/features/search/fields.py` の `_walk`）に含める
+    reason: 変更前からの不具合で、`$ref`・`allOf` の先の項目が「知らない項目です」になる。今回の要望（配列の中のオブジェクトのキーの指定）に含まれない
+    plan: '#221'
+  - item: '`tests/unit/project_index/features/write/test_secrets.py` の import の並びの lint 違反（ruff I001）の解消'
+    reason: テスト実行方法の lint 層に違反したまま develop に入っている既存の違反で、今回の要望（配列の中のオブジェクトのキーの指定）に含まれない
+    plan: '#224'

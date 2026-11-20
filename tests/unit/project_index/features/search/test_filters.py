@@ -194,6 +194,23 @@ def test_check_filter_when_not_child() -> None:
     assert [violation.path for violation in violations] == ["filter.not.field"]
 
 
+def test_check_filter_when_array_item_key_dotted() -> None:
+    """配列の中のキーを `.` で指した項目の候補（異常系）。"""
+    # 準備
+    fields = {**FIELDS, "uses": "array", "uses[].id": "string"}
+    request = SearchRequest(
+        filter=Condition(field="uses.id", op="eq", values=["compare"]), group_by="uses.id"
+    )
+    # 実行
+    violations = check_filter(request, fields)
+    # 検証
+    assert [(violation.path, violation.rule) for violation in violations] == [
+        ("filter.field", "知らない項目です（uses.id）"),
+        ("group_by", "知らない項目です（uses.id）"),
+    ]
+    assert all("uses[].id" in (violation.fix or "") for violation in violations)
+
+
 def test_check_filter_when_matches() -> None:
     """`@matches` を条件に使う（異常系）。"""
     # 準備

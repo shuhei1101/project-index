@@ -101,7 +101,7 @@ functions:
          - `@chars` は本文の文字数、`@path` は `document.path`（`records` の行は `{path}#{record_index}`）、`@sections` は Markdownの本文かが `True` の文書なら本文の見出しの文字列、それ以外は `data` の最上位のキーの並び
          - `@matches` は条件で決まり文書だけでは決まらないので、値を持たない（文書の検索が当たった行の数で数える）
          - `columns` のキーで `METADATA_KEYS` に無い場合、`data` から対応付けた列（`columns[項目]`）を項目の取得で取得する
-         - それ以外は `data` を項目の取得で引く
+         - それ以外は `data` を項目の取得で引く（`a[].b` は要素ごとの値の配列）
       2. 値が配列なら要素を、`None` なら空、それ以外は 1 要素の並びを返す
     unit_tests:
       - name: test_field_values
@@ -116,6 +116,12 @@ functions:
         condition: '`data.section: 使い方`、`columns: {category: section, name: title}`、`document.metadata.name: a`、項目 `category` と `name`'
         mock: なし
         expected: '`category` が `[使い方]`、`name` が `[a]`（`METADATA_KEYS` のキーは `document.metadata` のまま）'
+      - name: test_field_values_when_array_item_keys
+        case: 正常
+        summary: 配列の中のオブジェクトのキーの値
+        condition: '`data.uses: [{id: compare}, {id: list}, {name: x}]`、項目 `uses[].id`'
+        mock: なし
+        expected: '`[compare, list]`（`id` を持たない要素は入らない）'
   - name: known_fields
     title: 使える項目
     kind: 関数
@@ -137,8 +143,15 @@ functions:
       description: 項目のパス → 型（`string`・`number`・`boolean`・`array`・`object`・`date`）
     process: |-
       1. `id`・`kind`・`created`・`updated`・`METADATA_KEYS`・`body`・`*`・`COMPUTED_FIELDS` を入れる
-      2. スキーマの `properties` を再帰でたどり、`a.b` のパスと `type`（`format: date`・`date-time` は `date`）を足す。配列の要素の `properties` は `a.b` の形で足す
+      2. スキーマの `properties` を再帰でたどり、`a.b` のパスと `type`（`format: date`・`date-time` は `date`）を足す。配列の `items` の `properties` は `a[].b` のパスで追加し（入れ子の配列は `a[].b[].c`）、`a.b` のパスでは追加しない。最上位のスキーマの `items` は `[]` を付けずにたどる
       3. 型の食い違う同じパスは `string` にする
+    unit_tests:
+      - name: test_known_fields_when_array_items
+        case: 正常
+        summary: 配列の中のオブジェクトのキー
+        condition: 'スキーマが `uses: {type: array, items: {type: object, properties: {id: {type: string}, refs: {type: array, items: {type: object, properties: {to: {type: string}}}}}}}` と `category: {type: object, properties: {id: {type: string}}}` を持つ'
+        mock: なし
+        expected: '`uses` が `array`、`uses[].id` が `string`、`uses[].refs[].to` が `string`、`category.id` が `string`。`uses.id`・`uses.refs.to` が無い'
   - name: heading_lines
     title: 見出しの行
     kind: 関数
