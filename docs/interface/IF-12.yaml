@@ -688,7 +688,7 @@ response:
     description: 終了コードと stderr の要約
   - name: sync.missing_refs
     type: int
-    description: '種類の行の `metadata` に書いた列が無い文書の件数'
+    description: '種類の行の `metadata` に書いた列が無い文書の件数。`**.` で始まる列（どの深さの列もまとめて取り出す対応）は、取り出した結果が空の文書も数えない'
   - name: sync.unindexed_files
     type: int
     description: 管理用の YAML に無いファイルの件数。除外の条件（バイナリ・空のファイル・`*.local.*` の名前のファイル）に当たるファイルと、Git の配信元で Git が無視するファイルは数えない
