@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+
+from project_index.features.sources.types import DirectCommitConfig
 from project_index.features.write.direct_commit import (
     CommitPlan,
     DirtyFiles,
@@ -19,8 +21,6 @@ from project_index.features.write.direct_commit import (
     snapshot_dirty,
     sync_worktree,
 )
-
-from project_index.features.sources.types import DirectCommitConfig
 from project_index.features.write.types import CommitSpec
 from project_index.shared.deadline import CallLimits, Deadline
 from project_index.shared.errors import (
@@ -177,19 +177,29 @@ def test_resolve_commit_plan(remote: Remote, direct_source: Callable[..., Served
     assert overridden.repo.resolve() == (remote.clone / ".git").resolve()
 
 
+def _without_config(make_config: Callable[..., SourceConfig]) -> dict[str, object]:
+    """直コミットの設定を持たない配信元の値。"""
+    return {"config": make_config(direct_commit=None)}
+
+
+def _disk_storage(_make_config: Callable[..., SourceConfig]) -> dict[str, object]:
+    """disk の配信元の値。"""
+    return {"storage": "disk"}
+
+
+def _with_problems(_make_config: Callable[..., SourceConfig]) -> dict[str, object]:
+    """許可する種類の欠けを持つ配信元の値。"""
+    return {
+        "direct_commit_problems": [Violation(path="direct_commit.kinds[1]", rule="meme は無い")]
+    }
+
+
 @pytest.mark.parametrize(
     "overrides",
     [
-        pytest.param(lambda make_config: {"config": make_config(direct_commit=None)}, id="absent"),
-        pytest.param(lambda _make_config: {"storage": "disk"}, id="disk"),
-        pytest.param(
-            lambda _make_config: {
-                "direct_commit_problems": [
-                    Violation(path="direct_commit.kinds[1]", rule="meme は無い")
-                ]
-            },
-            id="problems",
-        ),
+        pytest.param(_without_config, id="absent"),
+        pytest.param(_disk_storage, id="disk"),
+        pytest.param(_with_problems, id="problems"),
     ],
 )
 def test_resolve_commit_plan_when_not_configured(

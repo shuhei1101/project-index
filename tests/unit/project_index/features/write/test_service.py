@@ -1749,11 +1749,21 @@ def test_write_docs_when_direct_commit_generator_failed(
     assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
 
 
+def _not_atomic(_env: CommitEnv) -> dict[str, Any]:
+    """atomic: false の引数。"""
+    return {"atomic": False}
+
+
+def _with_worktree(env: CommitEnv) -> dict[str, Any]:
+    """コミットするブランチのワークツリーを指す worktree の引数。"""
+    return {"worktree": str(env.develop)}
+
+
 @pytest.mark.parametrize(
     "extra",
     [
-        pytest.param(lambda _env: {"atomic": False}, id="not-atomic"),
-        pytest.param(lambda env: {"worktree": str(env.develop)}, id="worktree"),
+        pytest.param(_not_atomic, id="not-atomic"),
+        pytest.param(_with_worktree, id="worktree"),
     ],
 )
 def test_write_docs_when_direct_commit_invalid_arguments(
