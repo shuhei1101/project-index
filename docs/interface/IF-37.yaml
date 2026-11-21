@@ -1,0 +1,311 @@
+id: IF-37
+title: SKILL.md の生成
+lead: '`docs/agent-flow/` の `type: skill` のエージェントフローから `skill.path` の SKILL.md を組み立てて書き出し、書き込む前のエージェントフローが SKILL.md を組み立てられるかを検査する `project-index skill-md` の入出力を定め、SKILL.md の生成と検査を修正するときに参照する。'
+aliases:
+  - project-index skill-md
+entry:
+  kind: operation
+  value: '`project-index skill-md`（CLI）。`generators[]`・`validators[]` から配信元の直下で呼ぶ'
+identifier: skill-md
+permissions: 制限なし（配信元のフォルダの中だけを読み書きする）
+idempotent: true
+side_effects: '生成のモードは、`type: skill` のエージェントフローの `skill.path` の SKILL.md のうち、組み立てた中身と違うものを書き換える（無ければフォルダごと作る）。検査のモードはファイルを書き換えない'
+callers:
+  - SC-7#scenarios[正常シナリオ（スキルのエージェントフローを書く）]
+  - SC-7#scenarios[異常シナリオ（SKILL.md を組み立てられないエージェントフローを書く）]
+exclusivity: 制限なし（同じエージェントフローからは同じバイト列を書き出す）。`write_docs` からは配信元ごとの排他ロックの中で呼ばれる
+request:
+  - name: --check
+    type: bool
+    required: false
+    location: argument
+    description: 指定すると検査のモードで動く。省くと生成のモード
+    notes: '`validators[].run` は `[project-index, skill-md, --check]`、`generators[].run` は `[project-index, skill-md]`'
+  - name: 標準入力
+    type: str
+    required: false
+    location: argument
+    description: 検査のモードだけが読む、書き込む前のエージェントフローの YAML 1 件（UTF-8）
+    notes: '`validators[]` の約束（標準入力に文書の YAML）のまま'
+  - name: 位置引数
+    type: list[str]
+    required: false
+    location: argument
+    description: 生成のモードで `generators[].run` が後ろに付与する書き込んだ文書のパス
+    notes: 受け取るが、生成の対象は絞らない
+request_example: |-
+  ```bash
+  project-index skill-md
+  project-index skill-md --check < docs/agent-flow/skill-setup.yaml
+  ```
+response:
+  - name: 標準出力
+    type: str
+    description: 生成のモードは書き換えた SKILL.md の配信元の直下からのパスを 1 行に 1 件、パスの昇順で出す（書き換えが無ければ空）。検査のモードは違反の配列の JSON（`path`・`rule`・`fix`。違反が無ければ `[]`）
+    notes: 検査のモードの `path` は標準入力のエージェントフローの項目のパス。ほかのエージェントフローの違反は `$` にし、`rule` へそのエージェントフローのパスを入れる
+  - name: 標準エラー
+    type: str
+    description: 生成のモードで終了コード 1 のときの理由（原因のエージェントフローのパスと項目）
+  - name: 終了コード
+    type: int
+    description: 生成のモードは 0 正常・1 エージェントフローかスキーマが読み込めない・合わない、`ref` が解決できない、`skill.path` が配信元の外部を指す（どのファイルも書き換えない）。検査のモードは違反の有無によらず 0
+    notes: 引数の誤りは argparse の 2。検査のモードを 0 にするのは、`validators[]` の 0 以外の終了コードが違反ではなく「検査を実行できませんでした」になるため
+exceptions:
+  - name: なし（正常終了）
+    condition: '全ての `type: skill` の SKILL.md を組み立て、中身が違うものを書き出した（生成のモード）。違反の JSON を出した（検査のモード）'
+  - name: InvalidAgentFlow
+    condition: 生成のモードで、エージェントフローかスキーマが読み込めない・合わない、`ref` が解決できない、`skill.path` が配信元の外部を指す（終了コード 1）
+    notes: 標準エラーに全ての原因のエージェントフローのパスと項目を出し、標準出力には何も出さない
+constraints:
+  - item: 生成の対象
+    constraint: 配信元の設定の `agent_flow` の文書の行の `paths` に該当し `exclude` に該当しないファイルのうち、`type` が `skill` のエージェントフロー。`type` が無いか `flow` のエージェントフローは、`ref` の参照先にだけ使用する
+    notes: 書き込んだ文書のパス（位置引数）では絞らない。`ref` で埋め込む工程の修正がほかの SKILL.md に影響するため
+  - item: スキーマの検査
+    constraint: 配信元の設定の `agent_flow` の行の `schema` で全てのエージェントフローを検査する。合わないエージェントフローが 1 件でもあれば、全ての合わないエージェントフローのパスと項目を出す
+  - item: 書き出しの順序
+    constraint: 全てのエージェントフローの読み込み・検査・`ref` の解決・全ての SKILL.md の組み立てを終えてから書き出す。書き出しの前に 1 件でも失敗したら、どのファイルも書き換えない
+  - item: 組み立てる frontmatter と本文
+    constraint: knowledge の IF-312-1『SKILL.md の生成』の制約「組み立てる frontmatter」「組み立てる本文」「工程のセクション」と同じにする。生成元のコメントのパスは、配信元の直下からのエージェントフローのパスにする
+  - item: 工程の埋め込み
+    constraint: '`ref`（`{エージェントフローの id}#steps[{name}]`）を持つ工程は、同じ `id` のエージェントフローの `steps[]` の同じ `name` の工程に置き換える。参照先も `ref` を持てばたどり、同じ工程へ戻る `ref` は解決できないものとして扱う'
+  - item: 書き出す先
+    constraint: 配信元の直下からの `skill.path`。解決したパスが配信元の外部なら失敗にする。文字コードは UTF-8、改行は LF で、末尾を改行 1 つで終える
+  - item: 検査のモード
+    constraint: '配信元のエージェントフローのうち、標準入力の YAML と同じ `id` のものを標準入力の YAML に置き換え（無ければ追加し）、全ての `type: skill` を組み立てる。`ref` が解決できない・`skill.path` が配信元の外部を指す・標準入力が YAML として読めないときに違反を出す。ファイルは書き出さない'
+    notes: スキーマの検査は `write_docs` が先に実行するため、検査のモードでは繰り返さない
+  - item: 検査が参照する文書
+    constraint: 検査のモードは 1 回に標準入力の 1 件だけを書き込む前の中身として扱い、ほかのエージェントフローは配信元のディスクの中身を読む。同じ `write_docs` の呼び出しのほかの操作は参照しない
+    notes: '`ref` される工程の名前を変えるときは、参照先に変更後の名前の工程を追加する・`ref` を修正する・変更前の工程を削除する、の 3 回の書き込みに分ける'
+  - item: タイムアウト
+    constraint: '`script_timeout_sec` の中で終わる'
+    decided_by: NFR-1#requirements[スクリプトの制限時間]
+flows:
+  - name: 正常系
+    summary: 組み立てた中身が今の SKILL.md と違うエージェントフローだけ、SKILL.md を書き出す
+    setup:
+      - name: Mock
+        description: なし（`main(["skill-md"])` を同じプロセスで呼び、作業ディレクトリを一時フォルダにする）
+      - name: 配信元
+        description: '`agent_flow` の行（knowledge の `agent_flow.schema.yaml` を一時フォルダに複製して指す）を持つ `project-index.yaml` と、`docs/agent-flow/` に a・b・c を持つ一時フォルダ。a は `type: skill` で SKILL.md がまだ無い。b は `type: skill` で SKILL.md が今のエージェントフローから生成した状態。c は `type: flow`'
+        notes: a は `skill.arguments` を 1 件、`skill.allowed_tools` を 1 件、`calls`（`command`・`tool`）を持つ工程と持たない工程を 1 つずつ持つ
+    flow: |-
+      <!-- map: {"title": "正常系"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as 呼び出し元
+        participant G as project-index skill-md
+        participant F as 配信元のフォルダ
+
+        C->>G: 配信元の直下で起動する
+        G->>F: project-index.yaml・エージェントフロー・スキーマを読み込む
+        G->>G: 全てのエージェントフローを検査し、type が skill のものを選ぶ
+        G->>G: エージェントフローごとに SKILL.md を組み立てる
+        G->>F: 中身が違う a の skill.path だけを書き出す
+        G-->>C: 書き換えたパスと終了コード 0
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 0
+      - 標準出力が a の `skill.path` の 1 行だけ
+      - a の SKILL.md が制約「組み立てる frontmatter と本文」のとおり
+      - b の SKILL.md のバイト列が実行の前と同じ
+      - c からは SKILL.md を作らない
+      - 続けてもう一度起動すると、標準出力が空で、どのファイルのバイト列も変わらない
+    test: test_normal
+  - name: 正常系（工程の埋め込み）
+    summary: '`ref` を持つ工程は、参照先の工程の中身に置き換えて書き出す'
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元
+        description: '正常系の一時フォルダで、a の工程の 1 つを `ref: c#steps[{c の工程の名前}]` にしたもの'
+    flow: |-
+      <!-- map: {"title": "正常系（工程の埋め込み）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as 呼び出し元
+        participant G as project-index skill-md
+        participant F as 配信元のフォルダ
+
+        C->>G: 配信元の直下で起動する
+        G->>G: ref の工程を c の工程に置き換えて組み立てる
+        G->>F: a の skill.path を書き出す
+        G-->>C: 書き換えたパスと終了コード 0
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 0
+      - a の SKILL.md のその工程のセクションが、c の参照先の工程の `name`・`when`・`body`・`calls` で組み立てたもの
+    test: test_normal_when_step_ref
+  - name: 正常系（検査のモードで違反が無い）
+    summary: 書き込む前のエージェントフローで全ての SKILL.md を組み立てられるときは `[]` を出す
+    setup:
+      - name: Mock
+        description: 正常系と同じ（標準入力を差し替える）
+      - name: 配信元
+        description: 正常系（工程の埋め込み）の一時フォルダ
+      - name: 標準入力
+        description: c の工程の `body` だけを書き換えた YAML
+    flow: |-
+      <!-- map: {"title": "正常系（検査のモードで違反が無い）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as 呼び出し元
+        participant G as project-index skill-md --check
+        participant F as 配信元のフォルダ
+
+        C->>G: 標準入力に書き込む前の c
+        G->>F: エージェントフローを読み込む
+        G->>G: c を標準入力に置き換えて全ての SKILL.md を組み立てる
+        G-->>C: [] と終了コード 0
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 0
+      - 標準出力が `[]`
+      - どのファイルのバイト列も変わらない
+    test: test_normal_when_check_passes
+  - name: 正常系（検査のモードで違反がある）
+    summary: SKILL.md を組み立てられなくなる書き込みは違反の JSON を出す
+    setup:
+      - name: Mock
+        description: 正常系と同じ（標準入力を差し替える）
+      - name: 配信元
+        description: 正常系（工程の埋め込み）の一時フォルダ
+      - name: 標準入力
+        description: a の `ref` を c に無い工程へ向け、`skill.path` を `../outside/SKILL.md` にした YAML
+    flow: |-
+      <!-- map: {"title": "正常系（検査のモードで違反がある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as 呼び出し元
+        participant G as project-index skill-md --check
+
+        C->>G: 標準入力に書き込む前の a
+        G->>G: a を標準入力に置き換えて組み立てる
+        G-->>C: 違反の JSON と終了コード 0
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 0
+      - 標準出力の違反に、`ref` の工程の項目のパスと解決できない `ref` の行と、`skill.path` と配信元の外部を指すことの行がある
+      - どのファイルのバイト列も変わらず、`../outside/SKILL.md` ができない
+    test: test_normal_when_check_finds_violations
+  - name: 異常系（スキーマに合わない・InvalidAgentFlow）
+    summary: スキーマに合わないエージェントフローがあれば、どの SKILL.md も書き換えずに終える
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元
+        description: 正常系の一時フォルダで、b の `skill.path` を削除したもの（a の SKILL.md はまだ無い）
+    flow: |-
+      <!-- map: {"title": "異常系（スキーマに合わない・InvalidAgentFlow）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as 呼び出し元
+        participant G as project-index skill-md
+
+        C->>G: 配信元の直下で起動する
+        G->>G: 全てのエージェントフローをスキーマで検査する
+        G-->>C: 合わないエージェントフローのパスと項目と終了コード 1
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 1
+      - 標準エラーに b のパスと `skill.path` が出る
+      - a の SKILL.md が作られず、b の SKILL.md のバイト列が実行の前と同じ
+    test: test_error_when_schema_invalid
+  - name: 異常系（YAML として読めない・InvalidAgentFlow）
+    summary: 読めないエージェントフローがあれば、どの SKILL.md も書き換えずに終える
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元
+        description: 正常系の一時フォルダで、c を YAML として読めない中身（閉じていない引用符）にしたもの
+    flow: |-
+      <!-- map: {"title": "異常系（YAML として読めない・InvalidAgentFlow）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as 呼び出し元
+        participant G as project-index skill-md
+
+        C->>G: 配信元の直下で起動する
+        G-->>C: 読めないエージェントフローのパスと終了コード 1
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 1
+      - 標準エラーに c のパスが出る
+      - a の SKILL.md が作られず、b の SKILL.md のバイト列が実行の前と同じ
+    test: test_error_when_doc_unreadable
+  - name: 異常系（埋め込む工程が無い・InvalidAgentFlow）
+    summary: '`ref` が指す工程が無ければ、どの SKILL.md も書き換えずに終える'
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元
+        description: '正常系の一時フォルダで、a の工程の 1 つを `ref: c#steps[無い工程]` にしたもの'
+    flow: |-
+      <!-- map: {"title": "異常系（埋め込む工程が無い・InvalidAgentFlow）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as 呼び出し元
+        participant G as project-index skill-md
+
+        C->>G: 配信元の直下で起動する
+        G->>G: ref の工程を c で探す
+        G-->>C: 無い工程の ref と a のパスと終了コード 1
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 1
+      - 標準エラーに a のパスと `c#steps[無い工程]` が出る
+      - a の SKILL.md が作られない
+    test: test_error_when_step_ref_missing
+  - name: 異常系（書き出す先が配信元の外部・InvalidAgentFlow）
+    summary: '`skill.path` が配信元の外部を指せば、どの SKILL.md も書き換えずに終える'
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元
+        description: 正常系の一時フォルダで、a の `skill.path` を `../outside/SKILL.md` にしたもの
+    flow: |-
+      <!-- map: {"title": "異常系（書き出す先が配信元の外部・InvalidAgentFlow）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as 呼び出し元
+        participant G as project-index skill-md
+
+        C->>G: 配信元の直下で起動する
+        G-->>C: a のパスと skill.path と終了コード 1
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 1
+      - 標準エラーに a のパスと `skill.path` が出る
+      - '`../outside/SKILL.md` ができず、b の SKILL.md のバイト列が実行の前と同じ'
+    test: test_error_when_path_outside_source
+test_file: tests/integration/server/test_skill_md.py
+visibility: internal
+tags:
+  - name: topic:スキル
+    main: true
+  - name: action:生成
+  - name: action:検査
+  - name: topic:cli
