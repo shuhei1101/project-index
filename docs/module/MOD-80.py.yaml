@@ -567,4 +567,10 @@ functions:
         condition: '`name: title` の行で、指定した操作が `unset: [name, other]`、集めた並びが `unset.title`・`unset.other`'
         mock: なし
         expected: '`unset.name`・`unset.other`'
+      - name: test_to_given_keys_when_array_column
+        case: 正常
+        summary: 書き戻しが足した配列の列名を共通のキーへ戻す
+        condition: '`labels: items[].name` の行で、指定した操作が `unset: [labels]`、集めた並びが `unset.items`'
+        mock: なし
+        expected: '`unset.labels`'
 visibility: internal
