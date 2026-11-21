@@ -197,7 +197,7 @@ functions:
       1. `steps[]` を順にたどる
          - `ref` が無い工程はそのまま並べる
          - `ref` を持つ工程は `{id}#steps[{name}]` を分け、参照先の工程を探す。参照先も `ref` を持てばたどる
-      2. 参照先のエージェントフロー・工程が無い場合と、たどった工程に戻った場合は、`steps[{位置}].ref` の `Problem` にする（`rule` に `ref` の値）
+      2. 参照先のエージェントフロー・工程が無い場合と、たどった工程に戻った場合は、`steps[{位置}].ref` の `Problem` にする（`rule` に `ref` の値。たどる途中で最初に見つからなかったエージェントフローの `id` を `missing_id` に入れる）
     unit_tests:
       - name: test_resolve_steps
         case: 正常
@@ -219,6 +219,13 @@ functions:
         condition: c の工程が d を、d の工程が c のその工程を `ref` で指す
         mock: なし
         expected: 問題が 1 件で、無限にたどらない
+        exception: '-'
+      - name: test_resolve_steps_when_chain_missing
+        case: 異常
+        summary: 連なる ref の途中のエージェントフローが無い
+        condition: 'a の工程が `ref: c#steps[...]`、c のその工程が `ref: d#steps[...]`、引き当てに c があり d が無い'
+        mock: なし
+        expected: 問題が 1 件で、`path` が a の `steps[{位置}].ref`、`missing_id` が `d`
         exception: '-'
   - name: render_skill_md
     title: SKILL.md の書式への組み立て
@@ -416,8 +423,8 @@ functions:
          - 読めない・辞書でない・`id` が無い場合、`$` の `Problem` 1 件を返却する
       2. `load_agent_flows(root)` で配信元のエージェントフローを読む
          - `InvalidAgentFlowError` の場合、`check_replacement` の手順 4 と同じ変換をして返却する
-      3. `delete_ids`（空なら標準入力の `id`）の `id` を持たないエージェントフローを残し、残りの引き当てと、それに標準入力のエージェントフローを加えた引き当てを作る
-      4. 残った `type: skill` のエージェントフローごとに、`resolve_steps` を 2 つの引き当てで呼ぶ。残りだけの引き当てで出て、標準入力を加えた引き当てでは出ない問題（同じ `path`）を、標準入力のエージェントフローを削除することで解決できなくなる `ref` とする
+      3. `delete_ids`（空なら標準入力の `id`）の `id` を持たないエージェントフローを残し、残りの引き当てを作る
+      4. 残った `type: skill` のエージェントフローごとに、`resolve_steps` を残りの引き当てで呼ぶ。問題のうち `missing_id` が標準入力の `id` のものだけを、標準入力のエージェントフローを削除することで解決できなくなる `ref` とする（もともと解決できない `ref` と、たどった工程に戻る `ref` は違反にしない）
       5. その問題ごとに、`path` が `$`、`rule` が `{パス}（id: {id}）: {問題の path}: {問題の rule}` の `Problem` を返却する（`skill.path`・スキーマの問題は扱わない）
     unit_tests:
       - name: test_check_deletion
@@ -454,6 +461,20 @@ functions:
         condition: '`id: [`'
         mock: なし
         expected: '`path` が `$` の 1 件'
+        exception: '-'
+      - name: test_check_deletion_when_chain
+        case: 異常
+        summary: 連なる ref の参照先をまとめて削除する
+        condition: 'a の工程が `ref: c#steps[...]`、c のその工程が `ref: d#steps[...]`、`delete_ids` が `["c", "d"]`。標準入力が c の場合と d の場合'
+        mock: なし（一時フォルダ）
+        expected: 標準入力が c のときは a の違反 1 件、d のときは空の並び
+        exception: '-'
+      - name: test_check_deletion_when_already_broken
+        case: 正常
+        summary: もともと解決できない ref は違反にしない
+        condition: a の工程が配信元に無い e を `ref` で指し、標準入力が c、`delete_ids` が `["c"]`（c はどの `ref` からも指されない）
+        mock: なし
+        expected: 空の並び
         exception: '-'
 notes:
   決まり: 全てのエージェントフローの読み込み・検査・組み立てを終えてから書き出す。配信元の設定の読み込み・ファイルの集め方・ほかの配信元のスキーマの読み込み・スキーマの検査・ファイルの置き換えは、既存の関数（`build_source_config`・`collect_files`・`read_schema_ref`・`check_schema`・`replace_file`）を使用する。
