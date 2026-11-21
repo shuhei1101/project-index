@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import asyncio
+import functools
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Annotated
 
@@ -131,7 +131,7 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
     @router.get("/settings/sources", name="get_settings_sources")
     async def get_sources() -> SettingsSourcesView:
         await handlers.registry.wait_loaded()
-        return await asyncio.to_thread(_settings_view, handlers)
+        return await handlers.slots.run_docs(functools.partial(_settings_view, handlers))
 
     @router.put(
         "/settings/sources",
@@ -140,13 +140,15 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
     )
     async def put_sources(body: SettingsSourcesRequest) -> SettingsSourcesWriteResponse:
         await handlers.registry.wait_loaded()
-        result = await asyncio.to_thread(
-            save_sources,
-            body.sources,
-            expected_version=body.expected_version,
-            path=handlers.terminal.file,
-            reload=handlers.reload_sources,
-            lock=handlers.settings_lock,
+        result = await handlers.slots.run_docs(
+            functools.partial(
+                save_sources,
+                body.sources,
+                expected_version=body.expected_version,
+                path=handlers.terminal.file,
+                reload=handlers.reload_sources,
+                lock=handlers.settings_lock,
+            )
         )
         # 書き換えの後の再読み込みで差し替わった端末の設定の知らないキーを警告にする
         return SettingsSourcesWriteResponse.from_result(
@@ -163,13 +165,15 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
         body: SettingsSourceAddRequest, response: Response
     ) -> SettingsSourceAddResponse:
         await handlers.registry.wait_loaded()
-        result = await asyncio.to_thread(
-            add_source,
-            body.source,
-            expected_version=body.expected_version,
-            path=handlers.terminal.file,
-            reload=handlers.reload_changed,
-            lock=handlers.settings_lock,
+        result = await handlers.slots.run_docs(
+            functools.partial(
+                add_source,
+                body.source,
+                expected_version=body.expected_version,
+                path=handlers.terminal.file,
+                reload=handlers.reload_changed,
+                lock=handlers.settings_lock,
+            )
         )
         # 同じ id の行があった: 追加せずに 409 で内容が同じかを返す
         if result.result == "exists":
@@ -191,14 +195,16 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
         source_id: str, body: SettingsSourcePatchRequest
     ) -> SettingsSourcesWriteResponse:
         await handlers.registry.wait_loaded()
-        result = await asyncio.to_thread(
-            patch_source,
-            source_id,
-            body.source,
-            expected_version=body.expected_version,
-            path=handlers.terminal.file,
-            reload=handlers.reload_changed,
-            lock=handlers.settings_lock,
+        result = await handlers.slots.run_docs(
+            functools.partial(
+                patch_source,
+                source_id,
+                body.source,
+                expected_version=body.expected_version,
+                path=handlers.terminal.file,
+                reload=handlers.reload_changed,
+                lock=handlers.settings_lock,
+            )
         )
         # 書き換えの後の再読み込みで差し替わった端末の設定の知らないキーを警告にする
         return SettingsSourcesWriteResponse.from_result(
@@ -214,13 +220,15 @@ def build_settings_router(handlers: Handlers) -> APIRouter:
         source_id: str, expected_version: Annotated[str, Query(alias="expectedVersion")]
     ) -> SettingsSourcesWriteResponse:
         await handlers.registry.wait_loaded()
-        result = await asyncio.to_thread(
-            delete_source,
-            source_id,
-            expected_version=expected_version,
-            path=handlers.terminal.file,
-            reload=handlers.reload_changed,
-            lock=handlers.settings_lock,
+        result = await handlers.slots.run_docs(
+            functools.partial(
+                delete_source,
+                source_id,
+                expected_version=expected_version,
+                path=handlers.terminal.file,
+                reload=handlers.reload_changed,
+                lock=handlers.settings_lock,
+            )
         )
         # 書き換えの後の再読み込みで差し替わった端末の設定の知らないキーを警告にする
         return SettingsSourcesWriteResponse.from_result(

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import asyncio
+import functools
 from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Body
@@ -37,8 +37,10 @@ def build_session_start_router(handlers: Handlers) -> APIRouter:
                 message=f"セッションの開始の入力に違反が {len(violations)} 件あります",
                 violations=violations,
             ) from error
-        return await asyncio.to_thread(
-            start_session, request, seen=handlers.seen, notified=handlers.notified
+        return await handlers.slots.run_docs(
+            functools.partial(
+                start_session, request, seen=handlers.seen, notified=handlers.notified
+            )
         )
 
     return router

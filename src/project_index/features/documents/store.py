@@ -38,6 +38,7 @@ from project_index.integrations.git import GitError, ignored_paths, run_git
 from project_index.shared.background import BackgroundGate
 from project_index.shared.errors import DocumentNotFoundError
 from project_index.shared.narrowing import is_dict
+from project_index.shared.runtime import current_record
 from project_index.shared.yaml_io import YamlLoadError, load_yaml
 
 if TYPE_CHECKING:
@@ -214,6 +215,10 @@ class DocumentStore:
         # 裏の検査が読むとき、要求の応答中はファイル 1 件ごとに休ませる関所
         self.gate = gate if gate is not None else BackgroundGate()
         self._files: dict[_FileKey, _CachedFile] = {}
+        # (読むフォルダ, 読んだ行の ID の集合) → 前回の読み込みの収集で当たった `_files` のキー
+        self._seen_keys: dict[tuple[Path, frozenset[str]], set[_FileKey]] = {}
+        # 絶対パス → そのパスを持つ `_files` のキー（`_files` と一緒に更新する）
+        self._keys_by_path: dict[Path, set[_FileKey]] = {}
         self._schemas: dict[Path, tuple[int, int, dict[str, Any]]] = {}
         self._revision_schemas: dict[tuple[Path, str, str], dict[str, Any]] = {}
         self._revision_files: dict[_RevisionKey, _CachedRevisionFile] = {}
@@ -343,6 +348,7 @@ class DocumentStore:
                 stamps = _body_stamps(root, found)
                 with self._lock:
                     self._files[key] = (stat.st_mtime_ns, stat.st_size, found, issues, stamps)
+                    self._keys_by_path.setdefault(key[0], set()).add(key)
             documents.extend(found)
             problems.extend(issues)
         return documents, problems, seen
@@ -546,14 +552,29 @@ class DocumentStore:
                 del self._revision_files[key]
 
     def _discard_files(self, root: Path, kind_ids: set[str], seen_keys: set[_FileKey]) -> None:
-        """作業ツリーから消えたファイルのキャッシュを捨てる。"""
+        """前回の読み込みで当たり今回当たらなかったファイルのキャッシュだけを捨てる。
+
+        `_files` 全体はたどらず、同じ読むフォルダ・同じ行の前回のキーだけをたどる。
+        """
+        group = (root, frozenset(kind_ids))
         with self._lock:
-            for key in [
-                key
-                for key in self._files
-                if key[1] in kind_ids and key not in seen_keys and key[0].is_relative_to(root)
-            ]:
-                del self._files[key]
+            previous = self._seen_keys.get(group, set())
+            for key in previous - seen_keys:
+                self._drop_file(key)
+            self._seen_keys[group] = set(seen_keys)
+        record = current_record()
+        if record is not None:
+            record.add_scanned(len(previous))
+
+    def _drop_file(self, key: _FileKey) -> None:
+        """`_files` と `_keys_by_path` から 1 つのキーを捨てる（`_lock` の中で呼ぶ）。"""
+        self._files.pop(key, None)
+        keys = self._keys_by_path.get(key[0])
+        if keys is not None:
+            keys.discard(key)
+            # パスのキーが無くなったら、パスの行ごと捨てる
+            if not keys:
+                del self._keys_by_path[key[0]]
 
     def load(
         self,
@@ -628,7 +649,12 @@ class DocumentStore:
         root = target.base if revision is None else self._revision_root(target, revision)
         # ワークツリーを読む: ワークツリーごとの排他の中で、たどった結果を使い回す
         if revision is None and target.worktree is not None and files is None:
-            with self._worktree_lock(root):
+            lock = self._worktree_lock(root)
+            waited_from = time.monotonic()
+            with lock:
+                record = current_record()
+                if record is not None:
+                    record.add_lock_wait(time.monotonic() - waited_from)
                 return self._load_worktree(target, root, tables)
         return self._load_walked(target, root, tables, revision, files)
 
@@ -843,8 +869,10 @@ class DocumentStore:
         """書き込んだファイルのキャッシュを捨てる。"""
         targets = set(paths)
         with self._lock:
-            for key in [key for key in self._files if key[0] in targets]:
-                del self._files[key]
+            # パスごとのキーを引き、`_files` 全体はたどらない
+            for path in targets:
+                for key in list(self._keys_by_path.get(path, ())):
+                    self._drop_file(key)
             for path in [path for path in self._schemas if path in targets]:
                 del self._schemas[path]
 
@@ -852,6 +880,8 @@ class DocumentStore:
         """全てのキャッシュを捨てる。"""
         with self._lock:
             self._files.clear()
+            self._seen_keys.clear()
+            self._keys_by_path.clear()
             self._schemas.clear()
             self._revision_schemas.clear()
             self._dates.clear()
