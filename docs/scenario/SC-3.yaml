@@ -270,6 +270,39 @@ scenarios:
       - '`npm` が `install -g github:shuhei1101/mdmark#develop` の引数で 1 回呼ばれる'
       - project-index は再起動せず、`status` が前と同じバージョンを返す
     test: test_normal_when_up_to_date
+  - name: 正常シナリオ（文書の MCP が詰まっている間に再起動する）
+    setup:
+      - name: Mock
+        description: PATH の先頭に包みの git を配置する。worktree のファイルの一覧の取得（`ls-files`）だけ、テストが配置する解除のファイルができるまで待ってから本物の git を呼ぶ
+        notes: 解除のファイルは再起動の確認の後に配置する。ほかの引数は本物の git をそのまま呼ぶ
+      - name: サンプルの配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ git リポジトリ
+        notes: id `sample`。配信元の設定の `worktrees` に該当する worktree を、既定の実行スロットの数より多く持つ
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample の 1 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        actor A as エージェント
+        participant DD as project-index
+        participant AD as 管理の MCP
+
+        A->>DD: worktree ごとに search_docs を同時に呼ぶ（読み込みが進まず実行スロットが埋まる）
+        U->>AD: status
+        AD-->>U: 配信中の配信元
+        U->>AD: restart
+        AD-->>U: 再起動すること
+        AD->>DD: 再起動する
+        U->>AD: status
+        AD-->>U: 配信中の配信元
+      ```
+    expected:
+      - 実行スロットが埋まっている間の `status` が 5 秒の内に返却する
+      - '`restart` が非機能要件『文書の MCP の応答の上限』の内に応答し、再起動の後に `127.0.0.1` のポートを再び待ち受ける'
+      - 再起動の後の `status` が `sample` を配信していることを返却する
+    test: test_normal_when_docs_mcp_clogged
 lead: 利用者が管理の MCP の `update` で project-index を更新し、古くなった設定を `project-index migrate` で移し替えるシナリオを定め、更新の流れを変えるときに参照する。
 tags:
   - name: topic:セットアップ

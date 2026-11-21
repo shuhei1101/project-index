@@ -834,6 +834,39 @@ scenarios:
       - 標準出力に、組み込みの配信元 project-index を配信していることが出る
       - 端末の設定のファイルは変わらない
     test: test_normal_when_no_sources
+  - name: 正常シナリオ（多くの worktree を読み続ける）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: サンプルの配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ git リポジトリ
+        notes: id `sample`。配信元の設定の `worktrees` に該当する worktree を 30 件持つ（ワークツリーのたどった結果を保持する数より多い）
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample の 1 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
+        participant SRC as sample
+
+        U->>DD: project-index serve
+        U->>DD: worktree A を作業場所に search_docs を 2 回呼ぶ
+        DD-->>U: 文書（2 回目は読み込み済みの結果）
+        loop 残りの 29 件の worktree
+          U->>DD: その worktree を作業場所に search_docs を呼ぶ
+          DD->>SRC: worktree を読み込む
+          DD-->>U: 文書
+        end
+        U->>DD: worktree A を作業場所に search_docs を呼ぶ
+        DD-->>U: 文書
+      ```
+    expected:
+      - 全ての `search_docs` が非機能要件『文書の MCP の応答の上限』の内に結果を返却する
+      - 最後の worktree A の `search_docs` の所要時間が、最初の 2 回目（読み込み済み）の所要時間の 3 倍の内に留まる
+      - ログに、要求ごとの実行スロットの待ち・排他の待ち・処理の時間の行と、実行中・待ち中の処理の数と RSS の定期の行が残る
+    test: test_normal_when_many_worktrees_used
 lead: 利用者が `project-index serve` で端末の設定の配信元を配信し始めるシナリオを定め、起動の流れを変えるときに参照する。
 tags:
   - name: topic:サーバー
