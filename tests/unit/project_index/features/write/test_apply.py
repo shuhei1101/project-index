@@ -1064,3 +1064,17 @@ def test_to_given_keys_when_array_column() -> None:
     result = to_given_keys(skipped, given, table)
     # 検証
     assert [item.path for item in result] == ["unset.labels"]
+
+
+def test_to_given_keys_when_selected_key() -> None:
+    """選んだ要素のキーへは戻さない（正常系）。"""
+    from project_index.features.write.apply import to_given_keys
+    from project_index.features.write.types import SkippedOperation
+
+    # 準備
+    given = Operation(op="update", id="r1", expected_version="v1", unset=["main_tags", "tags"])
+    skipped = [SkippedOperation(path="unset.tags", reason="項目がありません")]
+    # 実行
+    result = to_given_keys(skipped, given, _tags_table())
+    # 検証
+    assert [item.path for item in result] == ["unset.tags"]
