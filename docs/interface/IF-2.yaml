@@ -1794,7 +1794,7 @@ constraints:
     constraint: ワークツリーの読み込みで、消えたファイル・書き込んだファイルのキャッシュを捨てるときは、そのワークツリー・そのファイルのキャッシュだけをたどる。要求の中でたどるファイルのキャッシュの件数は、ほかに読み込んだワークツリーの数によらない
     notes: '全てのワークツリーのキャッシュをたどると、使ったワークツリーの数に比例して呼び出しが遅くなる（PR #236 の PoC 結果の No.2）'
   - item: 既定の検索から除く文書
-    constraint: '`include_excluded: false` のとき、文書の行の `search_exclude` の条件に該当する文書を、`filter`・`term` を適用する前に対象から除く。除いた文書は `items`・`total_count`・`view: count`・`group_by` の件数・`next_cursor` のどれにも含めない。条件は `filter` と同じ照合（正規化・`match`・`case_sensitive`）で、文書のメタデータと種類の項目に適用する。`records` の行は要素ごとに適用する'
+    constraint: '`include_excluded: false` のとき、`filter`・`term` に該当した文書のうち、文書の行の `search_exclude` の条件に該当する文書を `items`・`total_count`・`view: count`・`group_by` の件数・`next_cursor` から除き、除いた件数を `excluded_count` にする。条件は `filter` と同じ照合（正規化・`match`・`case_sensitive`）で、文書のメタデータと種類の項目に適用する。`records` の行は要素ごとに適用する'
     notes: '`search_exclude` を持たない行の文書は除かない。複数の配信元を指したときは配信元ごとの設定で除く'
 refs:
   - to: SC-6
