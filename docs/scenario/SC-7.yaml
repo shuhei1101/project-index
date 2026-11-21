@@ -1064,6 +1064,39 @@ scenarios:
       - 無いファイル `n8.md` を指し本文を持たない create は、今どおり `@body` が無い違反を返却し、直し方に `@body` を加えることと、先に本文のファイルを作成することが入る
       - 書き込みの後の `check_project` の管理用の YAML に無いファイルに、`notes/n6.md`・`notes/n7.md` が出ない
     test: test_normal_when_existing_body_file_adopted
+  - name: 正常シナリオ（スキルのエージェントフローを書く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: サンプルの配信元
+        description: '正常シナリオと同じ配信元に、種類 `agent_flow`（knowledge の `agent_flow.schema.yaml`）の行と、`type: skill` のエージェントフロー 1 件（`skill.path` は `skills/a/SKILL.md`）・`type: flow` のエージェントフロー 1 件と、SKILL.md の生成のコマンドを指す `generators[]` の行を追加し、`agent_flow` の行の `after_write[]` でその行を指したもの'
+        notes: '`skills/a/SKILL.md` は今のエージェントフローから生成した中身で配置する'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` にワークツリー x のパスを指定する'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（スキルのエージェントフローを書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: write_docs(operations: update type が skill のエージェントフロー・工程の body を set)
+        M->>M: スキーマと validators で検査する
+        M->>WT: エージェントフローの YAML を書き込む
+        M->>WT: after_write の SKILL.md の生成のコマンドを実行する
+        M-->>A: 書き込んだ後の version と差分
+      ```
+
+      <!-- /map -->
+    expected:
+      - 結果の `status` が `updated` で、書き込み前と違う `version` を返却する
+      - ワークツリー x の `skills/a/SKILL.md` の工程のセクションが、書き込んだ工程の `body` になる
+      - '`type: flow` のエージェントフローから SKILL.md ができない'
+      - SKILL.md の中身が変わらない更新（`tags` だけの `set`）では、`skills/a/SKILL.md` のバイト列が書き込み前と同じ
+    test: test_normal_when_skill_agent_flow_written
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 tags:
   - name: topic:文書
