@@ -44,7 +44,9 @@ docs:
   - page: docs/index.yaml
     new: false
     change: 目次に docs/mcp-server/・docs/agent-flow/ のフォルダの行を追加する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T09:27:36.212738+00:00'
   - page: docs/mcp-server/index.yaml
     new: true
     change: MCP サーバーの定義のフォルダの目次を新設する
@@ -54,11 +56,15 @@ docs:
   - page: docs/agent-flow/index.yaml
     new: true
     change: エージェントフロー（スキル）のフォルダの目次を新設する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T09:27:36.212738+00:00'
   - page: docs/layout/LAY-73-1.yaml
     new: false
     change: docs/ の entries[] に mcp-server/・agent-flow/ のフォルダを追加する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T09:27:36.212738+00:00'
 scope_out:
   - item: LLM の呼び出しの設計書
     reason: src/ に LLM を呼ぶ処理が無い（LLM の名前が出るのは秘密の値の書式などだけ）
@@ -69,3 +75,6 @@ scope_out:
   - item: エージェントの定義・起動の構成の設計書
     reason: このリポジトリはエージェントと起動の構成を持たない（Issue の対象は MCP サーバー・スキル・LLM の呼び出し）
     plan: none
+  - item: 'type: skill のエージェントフローから SKILL.md を生成する仕組み'
+    reason: 要望は設計書の作成と実装の追随で、生成の仕組みの追加を含まない。この PR では SKILL.md を手でエージェントフローに合わせる
+    plan: to_file
