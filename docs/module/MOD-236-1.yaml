@@ -1,0 +1,371 @@
+id: MOD-236-1
+title: 索引のサーバー / 共通 / runtime.py
+lead: 文書の MCP・読み取り API と管理の MCP の専用の実行スロットと、要求ごと・定期の稼働中の記録を受け持ち、共通の runtime.py を修正するときに参照する。
+diagrams:
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        文書のMCP ..> 実行スロット : run_docs
+        読み取りAPI ..> 実行スロット : run_docs
+        管理のMCP ..> 実行スロット : run_admin
+        実行スロット ..> 要求の記録 : 作る
+        文書のストア ..> 要求の記録 : current_record
+        起動 ..> 実行スロット : 作る
+        起動 ..> 定期の記録 : 裏で回す
+        定期の記録 ..> 実行スロット : counts
+        class 実行スロット {
+          +run_docs()
+          +run_admin()
+          +counts()
+        }
+        class 要求の記録 {
+          +add_lock_wait()
+          +add_scanned()
+        }
+        class 定期の記録 {
+          <<function>>
+        }
+        click 文書のMCP href "id:MOD-94"
+        click 管理のMCP href "id:MOD-93"
+        click 文書のストア href "id:MOD-29"
+        click 起動 href "id:MOD-89"
+data_models:
+  - name: RequestRecord
+    title: 要求の記録
+    container: project_index/shared/runtime.py
+    usecase: 共通
+    role: 状態
+    summary: 1 回の要求の待ち・処理の時間と、要求の中でたどったファイルのキャッシュの件数を集める
+    description: '`ExecutionSlots.run_docs` が要求ごとに作り、`contextvars` の値として実行スロットのスレッドへ渡す。文書のストアは `current_record` で引いて書き足す。`@dataclass(slots=True)`。書き足しは要求のスレッドだけが行うため排他を持たない'
+    properties:
+      - name: tool
+        title: ツール
+        type: str
+        description: MCP のツール名か、読み取り API のルートの名前
+      - name: source
+        title: 配信元
+        type: str | None
+        default: None
+        description: 要求が指す配信元の ID。指さないときは `None`
+      - name: slot_wait
+        title: 実行スロットの待ち
+        type: float
+        default: '0.0'
+        description: 実行スロットに入れてから動き始めるまでの秒数
+      - name: lock_wait
+        title: 排他の待ち
+        type: float
+        default: '0.0'
+        description: ワークツリーごとの排他を待った秒数の合計
+      - name: elapsed
+        title: 処理の時間
+        type: float
+        default: '0.0'
+        description: 実行スロットで動き始めてから終わるまでの秒数
+      - name: scanned
+        title: たどったキャッシュの件数
+        type: int
+        default: '0'
+        description: 要求の中で、捨てるかを判定するためにたどったファイルのキャッシュのキーの数の合計
+    methods:
+      - name: add_lock_wait
+        title: 排他の待ちを足す
+        kind: メソッド
+        summary: 排他を待った秒数を足す
+        scope: public
+        args:
+          - name: seconds
+            title: 秒数
+            type: float
+            required: true
+            passing: positional
+            description: 待った秒数
+        returns:
+          type: None
+          description: '-'
+        process: 1. `lock_wait` に `seconds` を足す
+      - name: add_scanned
+        title: たどった件数を足す
+        kind: メソッド
+        summary: たどったキャッシュのキーの数を足す
+        scope: public
+        args:
+          - name: count
+            title: 件数
+            type: int
+            required: true
+            passing: positional
+            description: たどったキーの数
+        returns:
+          type: None
+          description: '-'
+        process: 1. `scanned` に `count` を足す
+classes:
+  - name: ExecutionSlots
+    title: 実行スロット
+    container: project_index/shared/runtime.py
+    usecase: 共通
+    role: 状態
+    summary: 文書の MCP・読み取り API と管理の MCP の要求の処理を、それぞれの専用の `ThreadPoolExecutor` で動かし、実行中・待ち中の数を数える
+    description: 起動のときに 1 つだけ作り、`Handlers.slots` で文書の MCP・管理の MCP・読み取り API・lifespan に渡す。asyncio の既定の実行スロット（`asyncio.to_thread`）は使用しない（『起動』の文書の MCP・読み取り API の実行スロット。既定の実行スロットのスレッドは `asyncio.Runner.close` が最大 300 秒待つため）。そのため knowledge の規約『asyncio 規約』の `asyncio.to_thread` の代わりに `loop.run_in_executor` を使用し、`contextvars.copy_context().run` で呼び出し元の文脈を渡す。
+    properties:
+      - name: docs_executor
+        title: 文書の MCP の実行スロット
+        type: concurrent.futures.ThreadPoolExecutor
+        access: 公開
+        description: '`max_workers=DOCS_WORKERS`・`thread_name_prefix="docs"`'
+      - name: admin_executor
+        title: 管理の MCP の実行スロット
+        type: concurrent.futures.ThreadPoolExecutor
+        access: 公開
+        description: '`max_workers=ADMIN_WORKERS`・`thread_name_prefix="admin"`'
+      - name: clock
+        title: 時計
+        type: Callable[[], float]
+        access: 公開
+        default: time.perf_counter
+        description: 待ち・処理の時間を測る。テストで差し替える
+      - name: _running
+        title: 実行中の数
+        type: int
+        access: 内部 (_)
+        default: '0'
+        description: 文書の MCP の実行スロットで動いている要求の数
+      - name: _waiting
+        title: 待ち中の数
+        type: int
+        access: 内部 (_)
+        default: '0'
+        description: 文書の MCP の実行スロットに入れて、まだ動き始めていない要求の数
+      - name: _guard
+        title: 排他
+        type: threading.Lock
+        access: 内部 (_)
+        description: '`_running`・`_waiting` の読み書きを守る'
+    methods:
+      - name: run_docs
+        title: 文書の MCP の実行スロットで動かす
+        kind: メソッド
+        summary: 関数を文書の MCP の実行スロットで動かし、要求の記録を INFO の 1 行でログに残す（`async`）
+        scope: public
+        thread_safe: true
+        side_effects: ログに 1 行書く
+        args:
+          - name: tool
+            title: ツール
+            type: str
+            required: true
+            passing: positional
+            description: 要求の記録の `tool`
+          - name: func
+            title: 関数
+            type: Callable[..., T]
+            required: true
+            passing: positional
+            description: 実行スロットで動かす同期の関数
+          - name: args
+            title: 引数
+            type: Any
+            required: false
+            passing: positional
+            description: '`*args`。`func` に渡す位置引数'
+          - name: source
+            title: 配信元
+            type: str | None
+            required: false
+            default: None
+            passing: keyword
+            description: 要求の記録の `source`
+        returns:
+          type: T
+          description: '`func` の戻り値'
+        process: |-
+          1. `RequestRecord(tool, source)` を作り、入れた時刻を `clock` で取る。`_guard` の中で `_waiting` を 1 つ進める
+          2. 呼び出し元の文脈を `contextvars.copy_context()` で写し、その中で要求の記録を `current_record` の値にしてから `func(*args)` を呼ぶ関数を、`loop.run_in_executor(docs_executor, ...)` で動かす
+          3. 実行スロットのスレッドで動き始めたら、`_guard` の中で `_waiting` を戻して `_running` を進め、`slot_wait` に入れてからの秒数を入れる
+          4. `func` が終わったら（例外のときも）、`elapsed` に動き始めてからの秒数を入れ、`_guard` の中で `_running` を戻す
+          5. `[info]` 要求を処理した（ツール・配信元・`slot_wait`・`lock_wait`・`elapsed`・`scanned`・成否）を書き、`func` の戻り値を返す（例外はそのまま伝える）
+        unit_tests:
+          - name: test_execution_slots_run_docs
+            case: 正常
+            summary: 戻り値と記録の 1 行
+            condition: キャッシュの件数を 3 足して `"ok"` を返す関数を `run_docs("search_docs", func, source="sample")` で動かす
+            mock: なし（`caplog`）
+            expected: '`"ok"` を返し、INFO の 1 行に `search_docs`・`sample`・`scanned=3` が入る'
+          - name: test_execution_slots_run_docs_when_raised
+            case: 異常
+            summary: 例外でも記録を残して数を戻す
+            condition: '`RuntimeError` を送る関数を `run_docs` で動かす'
+            mock: なし（`caplog`）
+            expected: '`RuntimeError` が伝わり、INFO の 1 行が失敗で残り、`counts()` が `(0, 0)`'
+            exception: '`func` が例外を送る'
+          - name: test_execution_slots_run_docs_when_full
+            case: 正常
+            summary: 埋まっている間は待ち中に数える
+            condition: '`DOCS_WORKERS` 本の要求をイベントで止めたまま、もう 1 本を `run_docs` に入れる'
+            mock: なし
+            expected: 止めている間の `counts()` が `(DOCS_WORKERS, 1)`。イベントを放した後のもう 1 本の記録の `slot_wait` が 0 より大きい
+      - name: run_admin
+        title: 管理の MCP の実行スロットで動かす
+        kind: メソッド
+        summary: 関数を管理の MCP の実行スロットで動かす（`async`）
+        scope: public
+        thread_safe: true
+        args:
+          - name: func
+            title: 関数
+            type: Callable[..., T]
+            required: true
+            passing: positional
+            description: 実行スロットで動かす同期の関数
+          - name: args
+            title: 引数
+            type: Any
+            required: false
+            passing: positional
+            description: '`*args`。`func` に渡す位置引数'
+        returns:
+          type: T
+          description: '`func` の戻り値'
+        process: 1. 呼び出し元の文脈を写し、`loop.run_in_executor(admin_executor, ...)` で `func(*args)` を動かして戻り値を返す。実行中・待ち中の数と要求の記録には入れない
+        unit_tests:
+          - name: test_execution_slots_run_admin_when_docs_full
+            case: 正常
+            summary: 文書の MCP の実行スロットが埋まっていても動く
+            condition: '`DOCS_WORKERS` 本の `run_docs` をイベントで止めたまま、`run_admin` で値を返す関数を動かす'
+            mock: なし
+            expected: イベントを放す前に `run_admin` が値を返す
+      - name: counts
+        title: 実行中・待ち中の数
+        kind: メソッド
+        summary: 文書の MCP の実行スロットの実行中・待ち中の数を返す
+        scope: public
+        thread_safe: true
+        returns:
+          type: tuple[int, int]
+          description: (実行中の数, 待ち中の数)
+        process: 1. `_guard` の中で `_running` と `_waiting` を読んで返す
+functions:
+  - name: current_record
+    title: 今の要求の記録
+    kind: 関数
+    container: project_index/shared/runtime.py
+    usecase: 共通
+    summary: 今の文脈の要求の記録を返す。`run_docs` の外なら `None`
+    scope: public
+    thread_safe: true
+    returns:
+      type: RequestRecord | None
+      description: 要求の記録
+    process: 1. モジュールの `ContextVar`（既定 `None`）の値を返す
+    unit_tests:
+      - name: test_current_record_when_outside
+        case: 正常
+        summary: 要求の外では None
+        condition: '`run_docs` の外で呼ぶ'
+        mock: なし
+        expected: '`None`'
+  - name: read_rss_mb
+    title: RSS の読み取り
+    kind: 関数
+    container: project_index/shared/runtime.py
+    usecase: 共通
+    summary: 今のプロセスの RSS を MB で返す
+    scope: public
+    thread_safe: true
+    returns:
+      type: int | None
+      description: RSS（MB）。読めなければ `None`
+    process: |-
+      1. `/proc/self/statm` の 2 つ目の値（ページ数）× `os.sysconf("SC_PAGE_SIZE")` を MB にして返す
+      2. ファイルが無いか読めない（`OSError`・`ValueError`）場合、`None` を返す
+    unit_tests:
+      - name: test_read_rss_mb
+        case: 正常
+        summary: Linux では正の値
+        condition: そのまま呼ぶ
+        mock: なし
+        expected: 0 より大きい整数
+  - name: record_periodically
+    title: 定期の記録
+    kind: 関数
+    container: project_index/shared/runtime.py
+    usecase: 共通
+    summary: 実行中・待ち中の数と RSS を、間隔ごとに INFO の 1 行でログに残し続ける（`async`）
+    scope: public
+    thread_safe: true
+    side_effects: ログに書く
+    args:
+      - name: slots
+        title: 実行スロット
+        type: ExecutionSlots
+        required: true
+        passing: positional
+        description: 数を読む実行スロット
+      - name: interval
+        title: 間隔
+        type: float
+        required: false
+        default: RUNTIME_RECORD_INTERVAL_SEC
+        passing: keyword
+        description: 書く間隔の秒数
+      - name: read_rss
+        title: RSS の読み取り
+        type: Callable[[], int | None]
+        required: false
+        default: read_rss_mb
+        passing: keyword
+        description: テストで差し替える
+    returns:
+      type: None
+      description: 取り消されるまで戻らない
+    process: |-
+      1. `interval` 秒待つ（`asyncio.sleep`）
+      2. `slots.counts()` と `read_rss()` を読み、`[info]` 稼働中の記録（実行中・待ち中・RSS）を書く
+      3. 手順 1 へ戻る。`CancelledError` はそのまま伝える（lifespan の終わりで取り消す）
+    unit_tests:
+      - name: test_record_periodically
+        case: 正常
+        summary: 間隔ごとに 1 行
+        condition: '`interval=0.01`・RSS を 100 で返す偽物で動かし、3 行書かれた後に取り消す'
+        mock: RSS の読み取り（偽物）
+        expected: INFO の行に実行中・待ち中・`100` が入る。取り消しで `CancelledError` が伝わる
+constants:
+  - name: DOCS_WORKERS
+    title: 文書の MCP の実行スロットの数
+    container: project_index/shared/runtime.py
+    usecase: 共通
+    summary: 非機能要件『文書の MCP の実行スロットの数』
+    value: min(32, (os.cpu_count() or 1) + 4)
+  - name: ADMIN_WORKERS
+    title: 管理の MCP の実行スロットの数
+    container: project_index/shared/runtime.py
+    usecase: 共通
+    summary: 非機能要件『管理の MCP の実行スロットの数』
+    value: '2'
+  - name: RUNTIME_RECORD_INTERVAL_SEC
+    title: 稼働中の記録の間隔
+    container: project_index/shared/runtime.py
+    usecase: 共通
+    summary: 非機能要件『稼働中の記録の間隔』
+    value: '60'
+test_files:
+  - tests/unit/project_index/shared/test_runtime.py
+refs:
+  - to: IF-15
+    item: constraints[文書の MCP・読み取り API の実行スロット]
+    type: requires
+    when: 実行スロットの作り方・停止の扱いを変えるときに、起動の制約と合うかを確認する。
+  - to: IF-15
+    item: constraints[稼働中の記録]
+    type: requires
+    when: 記録の項目・間隔を変えるときに、起動の制約と合うかを確認する。
+  - to: NFR-1
+    type: references
+    when: 実行スロットの数・記録の間隔の値を確認するとき。
+visibility: internal
+tags:
+  - name: topic:サーバー
+  - name: topic:性能
+  - name: topic:ログ

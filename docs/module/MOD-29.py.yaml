@@ -84,6 +84,16 @@ classes:
         type: dict[tuple[Path, str, str], tuple[int, int, list[Document], list[LoadProblem], tuple[tuple[str, int, int], ...]]]
         access: 内部 (_)
         description: (絶対パス, 文書の行の ID, 文書の行の定義のハッシュ) → (更新日時, 大きさ, 文書, 理由, 文書が指す本文のファイルの (パス, 更新日時, 大きさ) のパスの順の並び)
+      - name: _seen_keys
+        title: 読んだ場所ごとの収集のキー
+        type: dict[tuple[Path, frozenset[str]], set[tuple[Path, str, str]]]
+        access: 内部 (_)
+        description: (読むフォルダ, 読んだ行の ID の集合) → 前回の読み込みの収集で当たった `_files` のキー。手順 5 で、前回あって今回無いキーだけを捨てるために使う。辞書の読み書きは `_lock` の中でする
+      - name: _keys_by_path
+        title: パスごとのキー
+        type: dict[Path, set[tuple[Path, str, str]]]
+        access: 内部 (_)
+        description: 絶対パス → そのパスを持つ `_files` のキー（行ごと）。`invalidate` が `_files` 全体をたどらずに引く。`_files` へ入れる・捨てるときに一緒に更新する
       - name: _schemas
         title: スキーマのキャッシュ
         type: dict[Path, tuple[int, int, dict[str, Any]]]
@@ -208,7 +218,7 @@ classes:
           2. 文書の行を決める。`kinds` があれば `source.table` で引き（無い種類は `UnknownKindError`）、無ければ `enabled` の全ての行
           3. Git の配信元の場合、履歴の『ファイルの日時』を `_dates` から作業ツリー・commit・配信元の `root` の `repo_root` からの相対パスで引く。無ければ、作業ツリー（ワークツリーか `repo_root`）と commit（`ref` があれば読む場所の commit、無ければ作業ツリーの `HEAD` を解いた SHA）で呼び、配信元の直下からのパスに直してキャッシュする
           4. 読むフォルダのファイルを、`files` が無ければ `walk_files` で 1 回だけたどって得る。行ごとにそのパスを渡して『ファイルの収集』でファイルを集める。集めたファイル 1 件ごとの照合と読み込み（下の 2 つ）は、裏の処理の関所の裏の処理の 1 件（`gate.unit`。裏の処理のスレッドでなければ何もしない）の中で行う
-             - `target.worktree` があり `target.ref` と `files` が `None` の場合、手順 4・5 をワークツリーごとの排他（`_worktree_locks`）の中で行い、たどった結果を `_worktrees` に持つ
+             - `target.worktree` があり `target.ref` と `files` が `None` の場合、手順 4・5 をワークツリーごとの排他（`_worktree_locks`）の中で行い、たどった結果を `_worktrees` に持つ。排他を待った秒数を今の要求の記録に足す（`current_record().add_lock_wait`。要求の外なら足さない）
                - `_worktrees` に無い場合、『フォルダごとの列挙』でたどり、ファイルの一覧と、フォルダごとの更新日時を記録する。手順 7 の前に `[info]` ワークツリーを読み込んだ（配信元・ワークツリーのパス・秒数）を書く
                - `_worktrees` にある場合、記録したフォルダごとに `stat` を取る。更新日時が変わった・無くなったフォルダがあればたどり直して置き換え、無ければ記録したファイルの一覧を使う（たどり直しではログを書かない）
                - 『ファイルの収集』の結果を、行の定義のハッシュごとに `_worktrees` に持ち、ファイルの一覧が変わらなければ集め直さない
@@ -217,7 +227,7 @@ classes:
              - `target.ref` がある場合、読む場所の commit のファイルの blob の SHA を `_trees` から引く（無ければ `git ls-tree -r --full-tree {commit}` を 1 回だけ起動してキャッシュする）。`_revision_files` の blob の SHA が同じで、理由に `missing_body_file` が無く、本文のファイルの (パス, blob の SHA) と、ファイルと本文のファイルの日時（手順 3）も同じならキャッシュした結果を使い、それ以外は『ファイルの読み込み』で読んで `_revision_files` を置き換える。blob の SHA が無いファイルは読まない
                          - `from_blobs` が真で書き出さない場合、『ファイルの読み込み』の代わりに、ファイルの blob の内容を `_blob_readers` の `repo_root` の blob の読み取り（無ければ作る）の『blobの文字列』で読み、『文字列からの文書の組み立て』（`root` は `source.root`）で文書にする。本文のファイルは、同じ commit の `_trees` の blob を同じ読み取りで読む関数（`read_body`）で読む。UTF-8 で読めないファイルは、『ファイルの読み込み』と同じく `unreadable` の理由にする
                          - 行ごとの『ファイルの収集』の結果を `_collected` に (`repo_root`, 配信元の ID, 読む場所の commit, 行の定義のハッシュ) で持ち、当たれば集め直さない（書き出しを読むときも同じ）
-          5. 収集で当たらなかった `_files` のキーのうち、読んだ行の ID を持ち読むフォルダの下にあるものを削除する（削除されたファイルと、行の定義が変わる前のキー）。
+          5. `_seen_keys` を (読むフォルダ, 読んだ行の ID の集合) で引き、前回の収集で当たり今回当たらなかった `_files` のキーだけを削除する（削除されたファイルと、行の定義が変わる前のキー。`_keys_by_path` からも除く）。今回当たったキーで `_seen_keys` を置き換える。`_files` 全体はたどらず、たどったキーの数（前回のキーの数）を今の要求の記録に足す（`current_record().add_scanned`。要求の外なら足さない）。
              `target.ref` がある場合は、読んだ行ごとに、`_revision_files` のキーのうち `repo_root`・配信元の ID・行の ID が同じで、今回の commit のファイルに当たらないもの、または行の定義のハッシュが違うものを削除する（`_revision_files` を今の commit と行の定義のファイルの数に抑える）
           6. 行の順に文書を並べ、先に現れた ID を残して、後に現れた同じ ID の文書を `duplicate_id` にする（`detail` に ID と先の文書のファイル）。除外した文書は `duplicates` に行の順で入れる
           7. `target.ref` があり `files` が `None` の場合、結果を文書のページの索引（`find_page` の「文書のページの索引」）とともに `_revision_loads` の末尾に入れ、(`repo_root`, 配信元の ID) ごとに `REVISION_LOAD_KEEP` 件を超えたら先頭（最も前に使用した commit）から捨てる。`LoadResult` を返却する
@@ -612,7 +622,9 @@ classes:
         returns:
           type: None
           description: '-'
-        process: 1. 渡されたパスを持つ `_files` のキー（全ての文書の行）と `_schemas` のキーを削除する
+        process: |-
+          1. 渡されたパスごとに `_keys_by_path` から `_files` のキー（全ての文書の行）を取り出して削除する（`_files` 全体はたどらない）
+          2. 渡されたパスの `_schemas` のキーを削除する
         unit_tests:
           - name: test_document_store_invalidate
             case: 正常
@@ -620,6 +632,13 @@ classes:
             condition: '`load` の後、`rules/a.yaml` を同じ大きさで書き換えて `os.utime` で更新日時を戻し、`invalidate` してから `load`'
             mock: なし（`tmp_path`）
             expected: 書き換えた内容を返す
+            exception: '-'
+          - name: test_document_store_invalidate_when_many_worktrees
+            case: 正常
+            summary: ほかのワークツリーのキャッシュをたどらない
+            condition: ワークツリー 30 件を `load` した後、1 件のワークツリーの 1 ファイルを `invalidate` してから同じワークツリーを `load` する
+            mock: なし（`tmp_path`）
+            expected: 書き換えた内容を返し、ほかのワークツリーの `_files` のキーが残る
             exception: '-'
       - name: clear
         title: 全て捨てる

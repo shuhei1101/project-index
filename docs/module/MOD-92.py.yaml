@@ -45,19 +45,26 @@ functions:
         required: true
         passing: keyword
         description: 保持日数を過ぎた記録を削除する
+      - name: slots
+        title: 実行スロット
+        type: ExecutionSlots
+        required: true
+        passing: keyword
+        description: 古い記録の削除を動かし、定期の記録で数を読む
     returns:
       type: Callable[[FastAPI], AbstractAsyncContextManager[None]]
       description: FastAPI の `lifespan` に渡す関数
     process: |-
       1. 返す関数は、`contextlib.AsyncExitStack` に各 MCP の `session_manager.run()` を入れる（マウントした子のアプリの寿命は動かないため）
-      2. 会話の記録の古い記録を `asyncio.to_thread` で削除する（会話の記録.古い記録の削除）
+      2. 会話の記録の古い記録を、文書の MCP の実行スロット（`slots.run_docs`）で削除する（会話の記録.古い記録の削除）
          - `[info]` 古い会話の記録を削除した（件数）
-      3. `yield` し、止まるときにスタックを閉じる
+      3. 共通の『定期の記録』（`record_periodically(slots)`）をタスクにして裏で回す
+      4. `yield` し、止まるときに定期の記録のタスクを取り消して終わりを待ち、スタックを閉じる
     unit_tests:
       - name: test_build_lifespan
         case: 正常
         summary: MCP のセッションの管理を動かす
         condition: 2 つの MCP を渡して寿命に入る
         mock: MCP（`session_manager.run()` が入った・出たを記録する偽物）・会話の記録（偽物）
-        expected: 入ると 2 つとも run が入り、古い記録の削除が 1 回呼ばれ、出ると 2 つとも出る
+        expected: 入ると 2 つとも run が入り、古い記録の削除が 1 回呼ばれ、定期の記録のタスクが動く。出ると 2 つとも出て、定期の記録のタスクが取り消されている
 visibility: internal

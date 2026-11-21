@@ -30,7 +30,7 @@ functions:
       2. 要求ごとに、本文を `PostWriteRequest.model_validate` で検証する
          - 検証に失敗した場合、違反を `{キー}: {理由}` にして `ValidationFailedError` を送出する
       3. 配信元の一覧が読み込み中（`handlers.registry.loading`）なら、`notices` を空・`additional_context` を空文字にして返す（以降の手順は実行しない）
-      4. 書き込みの後の通知の判定を `asyncio.to_thread` で呼び、応答にする
+      4. 書き込みの後の通知の判定を 文書の MCP の実行スロット（`handlers.slots.run_docs`） で呼び、応答にする
     exceptions:
       - name: ValidationFailedError
         condition: '`session_id` が無い、`paths` が空、型が違う'

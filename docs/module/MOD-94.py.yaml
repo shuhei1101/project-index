@@ -176,7 +176,7 @@ functions:
          - 引数で要求のモデル（`SearchRequest` など）を作る
          - 要求が指す配信元を決め（指す配信元の決定）、`await handlers.registry.wait_for(...)` でその行の読み込みだけを待つ（初期化とツールの一覧は待たない）。待つ間も裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中にいて、要求が待っていない行の読み込みを休ませる
          - `search_docs`・`write_docs`・`delete_docs` の場合、ワークツリーの読み込みの待ちを await する
-         - サービスを、裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中で `asyncio.to_thread` で呼ぶ（引数は `handlers` の属性。`write_docs`・`delete_docs` は `limits` に呼び出しの期限）
+         - サービスを、裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中で 文書の MCP の実行スロット（`handlers.slots.run_docs`） で呼ぶ（引数は `handlers` の属性。`write_docs`・`delete_docs` は `limits` に呼び出しの期限）
          - `write_docs`・`delete_docs` の結果の `applied` が `True` の場合、`cwd` から書ける配信元を裏で検査し直す（配信元の検査のキャッシュ.裏での検査の流し直し）
          - 結果をツールの結果にする（`write_docs`・`delete_docs` の `render` は `None`。`search_docs` は `functools.partial(render_search_markdown, source_label=result.source_label)`、`list_changes` は `functools.partial(render_changes_markdown, source_label=request.source or "作業中の配信元")`、`list_match_words` は用語の一覧の文を渡す）
          - `ProjectIndexError` と `pydantic.ValidationError` はツールのエラーの変換の `CallToolResult(is_error=True)` をそのまま返す。それ以外の例外（`asyncio.CancelledError` を除く）は `[error]` ツールの処理に失敗した（ツール名・例外のトレースバック）を書き、想定外の例外の変換の結果を返す
@@ -346,8 +346,8 @@ functions:
       description: '-'
     process: |-
       1. `request.ref` がある場合、何もしない
-      2. `asyncio.to_thread` で、ワークツリーの設定を再読み込みせずに（`reload_worktree=False`）場所を解く。`SearchRequest` は権限と作業場所の『読む場所の解決』を `source`・`worktree`・`cwd`・`outside_scope` で、`WriteRequest`・`DeleteRequest` は『書く場所の解決』を `source`・`worktree`・`cwd` で呼ぶ。場所を解けない（`ProjectIndexError`）、場所が 1 つでない、または `worktree` が `None` なら何もしない（解けないときは、サービスが同じ解決で同じエラーを返す）
-      3. `loads` にそのワークツリーの終わっていないタスクが無ければ、次を `asyncio.to_thread` で行うタスクを作って入れ、終わったら `loads` から除くコールバックを付ける
+      2. 文書の MCP の実行スロット（`handlers.slots.run_docs`） で、ワークツリーの設定を再読み込みせずに（`reload_worktree=False`）場所を解く。`SearchRequest` は権限と作業場所の『読む場所の解決』を `source`・`worktree`・`cwd`・`outside_scope` で、`WriteRequest`・`DeleteRequest` は『書く場所の解決』を `source`・`worktree`・`cwd` で呼ぶ。場所を解けない（`ProjectIndexError`）、場所が 1 つでない、または `worktree` が `None` なら何もしない（解けないときは、サービスが同じ解決で同じエラーを返す）
+      3. `loads` にそのワークツリーの終わっていないタスクが無ければ、次を 文書の MCP の実行スロット（`handlers.slots.run_docs`） で行うタスクを作って入れ、終わったら `loads` から除くコールバックを付ける
          - 手順 2 と同じ解決を、ワークツリーの設定を再読み込みして（`reload_worktree=True`）呼び直す（設定が変わっていなければ配信元の『作業場所の配信元の読み込み』のキャッシュで返る）
          - 文書のストア.ワークツリーを読み込んだかが `False` なら、解き直した場所で文書のストア.文書を集める（`load`）を呼ぶ
       4. `async with asyncio.timeout(handlers.terminal.worktree_load_wait_sec)` の中でタスクを `asyncio.shield` で包んで await する

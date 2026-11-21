@@ -105,8 +105,12 @@ data_models:
     summary: 入口（読み取り API・MCP）が使う部品を 1 回だけ作ってまとめたもの
     description: |-
       `dataclass(frozen=True)`。入口はこの属性から部品を引き、部品を自分で作らない。
-      サービスは同期の関数で、入口は `asyncio.to_thread` で呼ぶ。テストは属性を偽物に差し替えた `Handlers` を作る。
+      サービスは同期の関数で、入口は `slots` の実行スロット（文書の MCP・読み取り API は `run_docs`、管理の MCP は `run_admin`）で呼ぶ。テストは属性を偽物に差し替えた `Handlers` を作る。
     properties:
+      - name: slots
+        title: 実行スロット
+        type: ExecutionSlots
+        description: 共通の『実行スロット』。部品の配線で 1 つだけ作る
       - name: terminal
         title: 端末の設定
         type: TerminalConfig
@@ -240,7 +244,7 @@ functions:
     role: 入口
     summary: 端末の設定を読み、配信元を配線して待ち受け、停止の合図まで動く。再起動を要求されて止まったときは同じプロセスを置き換える
     scope: public
-    side_effects: ポートで待ち受ける。`log_dir` にログを書く。標準出力・標準エラーに書く。再起動のときはプロセスを `os.execv` で置き換える
+    side_effects: ポートで待ち受ける。`log_dir` にログを書く。標準出力・標準エラーに書く。再起動のときはプロセスを `os.execv` で置き換え、止まるときは `os._exit(0)` で終える
     args:
       - name: args
         title: 解析結果
@@ -264,7 +268,7 @@ functions:
          - 確かめた後に他のプロセスがポートを取り、uvicorn が待ち受けに失敗して止まった場合（`server.started` が `False`）、手順 3 と同じ本文を出して `EXIT_PORT_IN_USE` を返す
       7. 止まった後、再起動を要求済み（`handlers.restart.requested`）かで分ける
          - 要求済みの場合、ログのハンドラーを閉じ、`os.execv(sys.executable, [sys.executable, *SERVE_ARGV])` で同じプロセスを置き換える
-         - 要求が無い場合、0 を返す
+         - 要求が無い場合、ログのハンドラーを閉じ、標準出力・標準エラーを flush してから `os._exit(0)` で終える（実行スロットの終わらないスレッドをインタープリタの終了で待たない。『起動』の文書の MCP・読み取り API の実行スロット）
     exceptions:
       - name: なし（終了コード 2）
         condition: 端末の設定が無い・違反する
@@ -315,6 +319,12 @@ functions:
         condition: 配信できる配信元 1 つの端末の設定。`uvicorn.Server.run` の中で `handlers.restart.request()` を呼ぶ
         mock: '`uvicorn.Server.run`（`started` を `True` にして再起動を要求して戻る）・`os.execv`（呼ばれた引数を記録する偽物）'
         expected: '`os.execv` が `sys.executable` と `[sys.executable, "-m", "project_index", "serve"]` で 1 回呼ばれる。`uvicorn.Config` の `timeout_graceful_shutdown` が `script_timeout_sec * 1.5`'
+      - name: test_run_serve_when_stopped
+        case: 正常
+        summary: 再起動の要求が無い停止は os._exit で終える
+        condition: 配信できる配信元 1 つの端末の設定。`uvicorn.Server.run` は `started` を `True` にして再起動を要求せずに戻る
+        mock: '`uvicorn.Server.run`（偽物）・`os._exit`（呼ばれた引数を記録して `SystemExit` を送る偽物）'
+        expected: '`os._exit` が `0` で 1 回呼ばれ、`os.execv` は呼ばれない'
   - name: check_port
     title: ポートの確かめ
     kind: 関数
