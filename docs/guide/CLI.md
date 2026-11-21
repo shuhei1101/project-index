@@ -1,10 +1,10 @@
 # CLI
 
-project-index serve・project-index migrate・project-index files・project-index outline・project-index changed・project-index checkpoint・project-index prompt-doc・project-index skill-md のサブコマンド・引数・終了コード
+project-index serve・project-index migrate・project-index files・project-index outline・project-index changed・project-index checkpoint・project-index links・project-index skew・project-index prompt-doc・project-index skill-md のサブコマンド・引数・終了コード
 
 ## 共通
 
-`project-index` コマンドは `serve`・`migrate`・`files`・`outline`・`changed`・`checkpoint`・`prompt-doc`・`skill-md` のサブコマンドを持ちます。
+`project-index` コマンドは `serve`・`migrate`・`files`・`outline`・`changed`・`checkpoint`・`links`・`skew`・`prompt-doc`・`skill-md` のサブコマンドを持ちます。
 `project-index --version` で project-index のバージョンを表示します。
 
 ## project-index serve
