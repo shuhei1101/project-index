@@ -1,0 +1,30 @@
+$ gh workflow run test.yml -f layer=integration -f paths="tests/integration/server/test_delete_docs.py" ... # TP-1 の run_runner
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 18 items
+
+tests/integration/server/test_delete_docs.py::test_normal PASSED         [  5%]
+tests/integration/server/test_delete_docs.py::test_normal_when_unlink PASSED [ 11%]
+tests/integration/server/test_delete_docs.py::test_normal_when_dry_run PASSED [ 16%]
+tests/integration/server/test_delete_docs.py::test_error_when_referenced PASSED [ 22%]
+tests/integration/server/test_delete_docs.py::test_error_when_version_mismatch PASSED [ 27%]
+tests/integration/server/test_delete_docs.py::test_error_when_source_not_writable PASSED [ 33%]
+tests/integration/server/test_delete_docs.py::test_error_when_target_is_clone PASSED [ 38%]
+tests/integration/server/test_delete_docs.py::test_error_when_delete_not_allowed PASSED [ 44%]
+tests/integration/server/test_delete_docs.py::test_error_when_document_not_found PASSED [ 50%]
+tests/integration/server/test_delete_docs.py::test_normal_when_unlink_quotes_preserved PASSED [ 55%]
+tests/integration/server/test_delete_docs.py::test_normal_when_body_file PASSED [ 61%]
+tests/integration/server/test_delete_docs.py::test_normal_when_body_file_absent PASSED [ 66%]
+tests/integration/server/test_delete_docs.py::test_error_when_disk_storage_delete_not_allowed PASSED [ 72%]
+tests/integration/server/test_delete_docs.py::test_normal_when_unlink_nested_related PASSED [ 77%]
+tests/integration/server/test_delete_docs.py::test_normal_when_direct_commit PASSED [ 83%]
+tests/integration/server/test_delete_docs.py::test_error_when_direct_commit_kind_not_allowed PASSED [ 88%]
+tests/integration/server/test_delete_docs.py::test_error_when_delete_validator_fails PASSED [ 94%]
+tests/integration/server/test_delete_docs.py::test_error_when_delete_validator_fails_retry PASSED [100%]
+
+============================== 18 passed in 3.71s ==============================
+exit=0
