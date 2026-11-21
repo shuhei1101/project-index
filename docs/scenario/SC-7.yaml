@@ -1091,6 +1091,9 @@ scenarios:
         A->>M: write_docs(operations: update b の ref される工程の body を set)
         M->>WT: b の YAML を書き込み、生成のコマンドを実行する
         M-->>A: 書き込んだ後の version と差分
+        A->>M: write_docs(operations: update a の skill.path を skills/a2/SKILL.md に set)
+        M->>WT: a の YAML を書き込み、生成のコマンドを実行して前の skills/a/SKILL.md を削除する
+        M-->>A: 書き込んだ後の version と差分
       ```
 
       <!-- /map -->
@@ -1100,6 +1103,7 @@ scenarios:
       - 2 回目の書き込みの後、`skills/a/SKILL.md` の `ref` の工程のセクションが、b の修正後の `body` になる
       - '`type: flow` の b から SKILL.md ができない'
       - SKILL.md の中身が変わらない更新（`tags` だけの `set`）では、`skills/a/SKILL.md` のバイト列が書き込み前と同じ
+      - 3 回目の書き込みの後、ワークツリー x に `skills/a2/SKILL.md` ができ、`skills/a/SKILL.md` が無い
     test: test_normal_when_skill_agent_flow_written
   - name: 異常シナリオ（SKILL.md を組み立てられないエージェントフローを書く）
     setup:
