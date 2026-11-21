@@ -62,6 +62,36 @@ flows:
       - '2 回目が `isError: true` で再起動の途中であることを返す'
       - 起動し直すのは 1 回だけ（ログの起動の行が 1 つ増える）
     test: test_error_when_restart_in_progress
+  - name: 正常系（文書の MCP が詰まっている）
+    summary: 文書の MCP の実行スロットが埋まっていても応答し、起動し直す
+    setup:
+      - name: Mock
+        description: PATH の先頭に包みの git を配置する。作業場所が sample の worktree のフォルダの配下のときだけ、どの引数でも解除のファイルができるまで待つ
+        notes: 解除のファイルは起動し直した後の `status` の確認の後に配置する
+      - name: 詰まった要求
+        description: 既定の実行スロットの数より多い worktree を指す `search_docs` を同時に呼んでおく
+    flow: |-
+      <!-- map: {"title": "正常系（文書の MCP が詰まっている）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as restart
+        participant S as project-index serve
+
+        C->>T: 引数なし
+        T-->>C: pid・restarting
+        T->>S: 処理中の要求を待つ上限まで待って止める
+        S->>S: 同じプロセスで起動し直す
+        C->>S: status
+        S-->>C: 待ち受けのアドレス・配信元
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`restart` が文書の MCP の応答の上限の内に `pid`・`restarting` を返す'
+      - 起動し直した後の `status` で sample が `serving`
+    test: test_normal_when_docs_mcp_clogged
 lead: 応答の後に同じプロセス ID で `project-index serve` を起動し直す管理の MCP の `restart` の入出力を定め、`restart` を修正するときに参照する。
 tags:
   - name: topic:サーバー
@@ -74,6 +104,7 @@ idempotent: false
 side_effects: 待ち受けを止めて起動し直す。`/mcp`・`/_admin/mcp` の接続は切れる
 callers:
   - SC-3#scenarios[正常シナリオ（端末の設定が古くなる）]
+  - SC-16#scenarios[正常シナリオ（文書の MCP が詰まっている）]
 exclusivity: 再起動を始めた後の呼び出しは `RestartInProgressError` で断る
 request: []
 request_example: |-

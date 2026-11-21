@@ -351,5 +351,27 @@ requirements:
     rationale: 同じプロセスの文書の MCP・ワークツリーの読み込み・裏の検査が CPU を使用する間、要求のスレッドは GIL を待つ。待ちは要求の中で Python が進む量に比例するため、要求ごとに配信元の全てのファイルを照合せず、同じ commit の読み込みの結果を使い回して進む量を減らす。端末の負荷で秒数が揺れるため、同じ時間帯に測った変更の前の値に対する比で決める
     overflow: 超えても止めない。dev-docs の画面の表示が遅れる
     status: planned
+  - id: NFR-18
+    name: 管理の MCP の実行スロットの数
+    english_name: admin_executor_workers
+    category: 可用性
+    external_constraint: 制限なし
+    source_kind: 制限なし
+    value: '2'
+    unit: 本
+    overflow: 2 本とも使用中のときは、次の管理の MCP の要求は空くまで待つ。文書の MCP・読み取り API の実行スロットは使用しない
+    rationale: '管理の MCP の要求は利用者の手で 1 件ずつ呼ぶため、同時に動くのは長い処理（`check_project`・`update` 等）1 件と、その間の `status`・`restart` 1 件まで。文書の MCP と同じ既定の実行スロットを使用すると、文書の MCP が詰まっている間 `status`・`restart` も待つ（PR #236 の PoC 結果の No.4）'
+    status: planned
+  - id: NFR-19
+    name: 稼働中の記録の間隔
+    english_name: runtime_record_interval
+    category: 保守性
+    external_constraint: 制限なし
+    source_kind: 制限なし
+    value: '60'
+    unit: 秒
+    overflow: 記録の 1 行の出力が間隔を超えて遅れたときは、遅れた分を詰めて出さず、次の間隔から出す
+    rationale: '劣化は稼働から数十分〜数時間で表れるため（PR #236 の PoC 結果の No.1）、1 分ごとの記録で始まりを指せる。6 時間で 360 行に収まり、ログの量を抑えられる'
+    status: planned
 id: NFR-1
 visibility: internal
