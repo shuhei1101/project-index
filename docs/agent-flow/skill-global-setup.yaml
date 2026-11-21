@@ -8,9 +8,9 @@ skill:
       hint: '[クローンのパス]'
       description: project-index のクローンのパス。省くと聞く
   allowed_tools:
-    - Bash(*/.venv/bin/python -m project_index migrate --plan)
+    - Bash(*.venv/bin/python -m project_index migrate --plan*)
     - Bash(command -v mdmark)
-    - Bash(*/.venv/bin/python -m project_index serve)
+    - Bash(*.venv/bin/python -m project_index serve*)
 steps:
   - name: 端末の設定のパスを決める
     body: 環境変数 `PROJECT_INDEX_CONFIG` があればその値、無ければ `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`（`XDG_CONFIG_HOME` が空の文字列か相対パスなら `~/.config/project-index/settings.yaml`）にし、ファイルがあるかを確認する。

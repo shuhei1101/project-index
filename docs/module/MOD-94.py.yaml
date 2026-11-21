@@ -167,7 +167,7 @@ functions:
       description: 文書の MCP（`stateless_http`・`json_response` はアプリの組み立てが `streamable_http_app()` の引数で渡す）
     process: |-
       1. `DocsMCPServer(DOCS_MCP_NAME, instructions=functools.partial(_docs_instructions, handlers))` を作る（接続ごとに instructions を描く文書の MCP）
-      2. `DOCS_TOOL_NAMES` のツールを、`description` を `handlers.prompts.render(tool_prompt_id("docs", 名前))` にして `TOOL_ANNOTATIONS` の注釈で登録する。引数はインターフェース定義の `request` をキーワード引数で受ける（`list_changes` の `from` は `from_: Annotated[str | None, Field(validation_alias="from")]` で受け、ツールの入力のスキーマでは `from` を出す。`alias` は関数の呼び出しで `TypeError` になるため使わない）
+      2. `DOCS_TOOL_NAMES` のツールを、`description` を `handlers.prompts.render(tool_prompt_id(DOCS_MCP_SERVER, 名前))` にして `TOOL_ANNOTATIONS` の注釈で登録する。引数はインターフェース定義の `request` をキーワード引数で受ける（`list_changes` の `from` は `from_: Annotated[str | None, Field(validation_alias="from")]` で受け、ツールの入力のスキーマでは `from` を出す。`alias` は関数の呼び出しで `TypeError` になるため使わない）
          - 要求のモデルのフィールドが `description` を持つ場合、その説明を入力のスキーマの項目の説明に出す（`Annotated[型, Field(description=...)]`）
          - 今のツールの説明（`search_docs`・`write_docs`・`list_changes` の引数の説明の文と `trace_related` の説明を含む）は、削らずに各ツールの YAML へ移す
          - 引数の型の誤り・`Literal` に無い値は、SDK が関数を呼ぶ前に `isError` の結果にする。入力のスキーマに無いキーは SDK が捨てる
@@ -205,7 +205,7 @@ functions:
         summary: ツールの説明をプロンプトの YAML から描画する
         condition: '`list_tools` を呼ぶ'
         mock: 配線済みの関数（偽物。`prompts` は同梱した YAML を読んだ一式）
-        expected: '7 つのツールの説明がそれぞれ `prompts.render(tool_prompt_id("docs", 名前))` と同じ。`search_docs` の説明に `not`・`glob`・`@matches`・`sections`・`lines`・`describe(source, kind)`・`group_by: tags`、`list_changes` の説明に `contains`、`write_docs` の説明に `describe(source, kind)`、`trace_related` の説明に `implements` があり、入力のスキーマの `sections`・`lines`・`contains` の項目が `description` を持つ'
+        expected: '7 つのツールの説明がそれぞれ `prompts.render(tool_prompt_id(DOCS_MCP_SERVER, 名前))` と同じ。`search_docs` の説明に `not`・`glob`・`@matches`・`sections`・`lines`・`describe(source, kind)`・`group_by: tags`、`list_changes` の説明に `contains`、`write_docs` の説明に `describe(source, kind)`、`trace_related` の説明に `implements` があり、入力のスキーマの `sections`・`lines`・`contains` の項目が `description` を持つ'
       - name: test_build_docs_mcp_when_instructions
         case: 正常
         summary: instructions をプロンプトの YAML から描画する
@@ -417,6 +417,6 @@ refs:
     type: requires
     when: インターフェース定義『配信元の説明』の入出力を変えるときに、この設計書の関数と型を合わせる。
 notes:
-  instructions のプロンプトの変数: '`content/prompts/mcp/docs/instructions.yaml` は `vars` に `sources`（`id`・`when` を持つ辞書の並び）と `omitted`（載せなかった件数）を持ち、条件 `sources or omitted` の部品で、配信元と使う場面の一覧（`` `{id}`: {when} `` の行）と、`omitted` が 1 以上のときの載せなかった件数と `describe(outside_scope: true)` の案内（作業場所から使える配信元と作業範囲の外で参照できる配信元の使う場面を引ける）を描く。コードは文を持たない'
-  trace_related のツールの説明: '`content/prompts/mcp/docs/tools/trace-related.yaml` は「起点の文書やコードのパスから、related をたどって関連する文書を返す。設計書を起点に direction: in で呼ぶと、via.type が implements の文書がその設計書を実装するコード、コードを起点にすると tests の文書がそのテストになる。」を持つ（インターフェース定義『関連のたどり』の `direction` の補足）'
+  instructions のプロンプトの変数: '`content/prompts/mcp/project-index/instructions.yaml` は `vars` に `sources`（`id`・`when` を持つ辞書の並び）と `omitted`（載せなかった件数）を持ち、条件 `sources or omitted` の部品で、配信元と使う場面の一覧（`` `{id}`: {when} `` の行）と、`omitted` が 1 以上のときの載せなかった件数と `describe(outside_scope: true)` の案内（作業場所から使える配信元と作業範囲の外で参照できる配信元の使う場面を引ける）を描く。コードは文を持たない'
+  trace_related のツールの説明: '`content/prompts/mcp/project-index/tools/trace-related.yaml` は「起点の文書やコードのパスから、related をたどって関連する文書を返す。設計書を起点に direction: in で呼ぶと、via.type が implements の文書がその設計書を実装するコード、コードを起点にすると tests の文書がそのテストになる。」を持つ（インターフェース定義『関連のたどり』の `direction` の補足）'
 visibility: internal
