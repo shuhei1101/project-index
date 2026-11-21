@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from project_index import DIST_NAME
 from project_index.features.prompt_doc.cli import run_prompt_doc
+from project_index.features.skill_md.cli import run_skill_md
 from project_index.main import (
     run_changed,
     run_checkpoint,
@@ -123,6 +124,15 @@ def build_parser() -> argparse.ArgumentParser:
         "prompt-doc", help="標準入力のプロンプトの YAML を Markdown にして標準出力に出す"
     )
     prompt_doc.set_defaults(handler=run_prompt_doc)
+    skill_md = subparsers.add_parser(
+        "skill-md", help="type: skill のエージェントフローから SKILL.md を生成・検査する"
+    )
+    skill_md.add_argument(
+        "--check", action="store_true", help="標準入力のエージェントフローを書き込む前に検査する"
+    )
+    # `generators[].run` が付与する書き込んだ文書のパス（生成の対象は絞らない）
+    skill_md.add_argument("paths", nargs="*")
+    skill_md.set_defaults(handler=run_skill_md)
     return parser
 
 
