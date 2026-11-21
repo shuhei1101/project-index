@@ -23,11 +23,9 @@ from project_index.shared.errors import InvalidArgumentError, Violation
 from project_index.shared.narrowing import is_dict, is_list
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Mapping, MutableMapping
+    from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
 
     from project_index.features.sources.types import DocumentTable
-    from collections.abc import Sequence
-
     from project_index.features.write.types import Operation, TextEdit
 
 
@@ -496,10 +494,7 @@ def _apply_all_key(
         elements = _rebuild(elements, item, operation.set[key])
     # 同じ名前を削除してから追加する
     if key in operation.remove_from:
-        removed = operation.remove_from[key]
-        present = {element.get(item) for element in elements}
-        skipped.extend(_missing_names(removed, present, key))
-        elements = [element for element in elements if element.get(item) not in removed]
+        elements = _remove_names(elements, item, key, operation.remove_from[key], skipped)
     if key in operation.add_to:
         present = {element.get(item) for element in elements}
         for name in operation.add_to[key]:
@@ -507,6 +502,19 @@ def _apply_all_key(
                 elements.append({item: name})
                 present.add(name)
     return elements, key in operation.unset
+
+
+def _remove_names(
+    elements: list[dict[object, object]],
+    item: str,
+    key: str,
+    removed: list[Any],
+    skipped: list[SkippedOperation],
+) -> list[dict[object, object]]:
+    """項目が `removed` の名前の要素を除き、配列に無い名前を `skipped` に足す。"""
+    present = {element.get(item) for element in elements}
+    skipped.extend(_missing_names(removed, present, key))
+    return [element for element in elements if element.get(item) not in removed]
 
 
 def _missing_names(
