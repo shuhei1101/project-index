@@ -1807,3 +1807,47 @@ def test_normal_when_schema_composition_keys(
     assert too_deep.is_error
     assert "InvalidArgumentError" in too_deep.text
     assert "tree.children[].children[].name" in too_deep.text
+
+
+# 要求ごとの記録の行から、たどったファイルのキャッシュの件数を取り出す
+SCANNED = re.compile(r"tool=search_docs .*scanned=(\d+)")
+
+
+def _scanned_counts(caplog: pytest.LogCaptureFixture) -> list[int]:
+    """search_docs の要求ごとの記録の行の scanned を、記録した順に返す。"""
+    return [
+        int(match.group(1))
+        for record in caplog.records
+        if (match := SCANNED.search(record.getMessage()))
+    ]
+
+
+def test_normal_when_many_worktrees_loaded(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_doc_text: Callable[..., str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """ほかのワークツリーを多く読んだ後も、要求の中でたどるキャッシュの件数が変わらない（正常系）。"""
+    # 準備
+    caplog.set_level(logging.INFO)
+    docs = {
+        f"docs/doc-{n:02d}.yaml": sample_doc_text(f"doc-{n:02d}", f"文書 {n}") for n in range(50)
+    }
+    source = make_source("sample", sample_file_set(**docs))
+    worktrees = [add_worktree(source.folder, f"w{n:02d}") for n in range(30)]
+    env = make_server(source)
+    first, *others = worktrees
+    # 実行
+    env.call("search_docs", cwd=str(first), view="count")
+    second = env.call("search_docs", cwd=str(first), view="count")
+    rest = [env.call("search_docs", cwd=str(w), view="count") for w in others]
+    last = env.call("search_docs", cwd=str(first), view="count")
+    # 検証
+    counts = _scanned_counts(caplog)
+    assert not second.is_error
+    assert not last.is_error
+    assert not any(result.is_error for result in rest)
+    assert counts[-1] == counts[1]
