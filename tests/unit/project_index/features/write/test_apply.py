@@ -1004,7 +1004,7 @@ def test_apply_operation_when_skipped() -> None:
     assert skipped == [
         SkippedOperation(path="unset.notes.mcp/server.py の補足", reason="項目がありません"),
         SkippedOperation(path="unset.notes.nonexistent", reason="項目がありません"),
-        SkippedOperation(path="remove_from.labels", reason="'z' の要素がありません"),
+        SkippedOperation(path="remove_from.labels", reason="z の要素がありません"),
         SkippedOperation(path="remove_from.missing", reason="項目がありません"),
     ]
 
@@ -1028,8 +1028,8 @@ def test_expand_array_keys_when_remove_from_missing_name() -> None:
     # 検証
     assert result.set == {"tags": [{"name": "a", "main": True}]}
     assert skipped == [
-        SkippedOperation(path="remove_from.tags", reason="'z' の要素がありません"),
-        SkippedOperation(path="remove_from.main_tags", reason="'y' の要素がありません"),
+        SkippedOperation(path="remove_from.tags", reason="z の要素がありません"),
+        SkippedOperation(path="remove_from.main_tags", reason="y の要素がありません"),
     ]
 
 
