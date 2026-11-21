@@ -789,10 +789,9 @@ def to_given_keys(
 ) -> list[SkippedOperation]:
     """『操作を当てる』が集めた項目のパスを、列名への読み替えの前に指定したキーへ戻す。"""
     plain = {key: column for key, column in table.metadata.items() if "[" not in column}
-    # オブジェクトの配列への書き戻しが足した配列の列名 → 共通のキー
-    array_of = {
-        key: column.split("[", 1)[0] for key, column in table.metadata.items() if "[" in column
-    }
+    # オブジェクトの配列への書き戻しが `unset` に足すのは、全ての要素のキーの配列の列名だけ
+    all_keys, _ = _array_keys(table.metadata)
+    array_of = {key: array for key, (array, _) in all_keys.items()}
     result: list[SkippedOperation] = []
     for item in skipped:
         where, _, rest = item.path.partition(".")
