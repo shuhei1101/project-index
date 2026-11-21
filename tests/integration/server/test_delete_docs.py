@@ -612,6 +612,18 @@ GUARD_ROW = (
     "    run: [python3, scripts/guard.py]\n"
     "    on: [delete]\n"
 )
+# GUARD_ROW に、書き込みの時点（`on: [write]`）だけで常に違反を出す検査 `always-bad` を加えた行
+WRITE_ONLY_ROW = (
+    "    validators: [guard, always-bad]\n"
+    "validators:\n"
+    "  - id: guard\n"
+    "    run: [python3, scripts/guard.py]\n"
+    "    on: [delete]\n"
+    "  - id: always-bad\n"
+    "    run: [python3, scripts/always_bad.py]\n"
+    "    on: [write]\n"
+)
+ALWAYS_BAD_SCRIPT = "import json\nprint(json.dumps([{'path': '$', 'rule': 'always-bad'}]))\n"
 # doc-1 だけに違反を出さない guard（2 回目の削除と、doc-1 が別の違反で failed になる確認に使う）
 LENIENT_GUARD_SCRIPT = GUARD_SCRIPT.replace("doc_id == 'doc-1' or ", "")
 
@@ -627,8 +639,9 @@ def test_error_when_delete_validator_fails(
     # 準備
     files = sample_file_set(
         **{
-            "project-index.yaml": sample_config_text(GUARD_ROW),
+            "project-index.yaml": sample_config_text(WRITE_ONLY_ROW),
             "scripts/guard.py": LENIENT_GUARD_SCRIPT,
+            "scripts/always_bad.py": ALWAYS_BAD_SCRIPT,
         }
     )
     source, env, worktree = _setup(make_source, make_server, add_worktree, files)
@@ -650,6 +663,7 @@ def test_error_when_delete_validator_fails(
     assert first.is_error
     assert "ValidationFailedError" in first.text
     assert "guard" in first.text
+    assert "always-bad" not in first.text
     assert dry.is_error
     assert "guard" in dry.text
     assert not loose.is_error
