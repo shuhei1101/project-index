@@ -7,34 +7,34 @@ skill:
     - name: clone
       hint: '[クローンのパス]'
       description: project-index のクローンのパス。省くと聞く
+  allowed_tools:
+    - Bash(*/.venv/bin/python -m project_index migrate --plan)
+    - Bash(command -v mdmark)
+    - Bash(*/.venv/bin/python -m project_index serve)
 steps:
   - name: 端末の設定のパスを決める
     body: 環境変数 `PROJECT_INDEX_CONFIG` があればその値、無ければ `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`（`XDG_CONFIG_HOME` が空の文字列か相対パスなら `~/.config/project-index/settings.yaml`）にし、ファイルがあるかを確認する。
-  - name: 端末の設定のバージョンを確認する
+  - name: 移し替えの手順を確認する
     when: 端末の設定があるとき
     body: |-
-      `clone` は端末の設定の値。端末の設定に `clone` が無いときは `$clone`、空ならクローンの場所を聞いた値にする（聞いた値は、スキーマの検証で足りないキーを追加するときに再度聞かずに記載する）。
+      `{clone}` は端末の設定の `clone` の値。端末の設定に `clone` が無いときは `$clone`、空ならクローンの場所を聞いた値にする（聞いた値は、スキーマの検証で足りないキーを追加するときに再度聞かずに記載する）。
       終了コード 6（設定が新しい）のときは、設定のバージョンと project-index のバージョンを示し、管理の MCP の `update` で project-index を更新するよう案内して止まる。端末の設定も env も書き換えない。
       標準出力が空のときは、Claude Code の env を記載する工程へ進む。
       標準出力に手順があるときは手順を示し、`[destructive]` の行があれば適用してよいかを聞き、断られたら止まる。
-      適用するときは移し替え（破壊的な手順を許可したときは `--allow-destructive` を付ける）を実行し、適用した手順とバックアップのパスを示す。
-      スキーマの検証で足りないキーがあれば、そのキーだけを聞いて追加する。`sources` の行とほかのキーは変えない。
     calls:
       - type: command
         command: '{clone}/.venv/bin/python -m project_index migrate --plan'
-      - type: command
-        command: '{clone}/.venv/bin/python -m project_index migrate'
+  - name: 移し替えを適用する
+    when: 移し替えの手順があり、適用するとき
+    body: |-
+      `{clone}/.venv/bin/python -m project_index migrate`（破壊的な手順を許可したときは `--allow-destructive` を付ける）を実行し、適用した手順とバックアップのパスを示す。
+      スキーマの検証で足りないキーがあれば、そのキーだけを聞いて追加する。`sources` の行とほかのキーは変えない。
   - name: 端末の設定を作る
     when: 端末の設定が無いとき
     body: |-
       端末の設定の場所を聞く（既定は `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`）。
-      `$clone` が空ならクローンの場所を聞き、クローンが無ければクローンする。
-      クローンで依存を入れ、`{クローン}/templates/settings.yaml` を元に、`clone` をクローンの絶対パスにした端末の設定を作る。`sources` は空にする。
-    calls:
-      - type: command
-        command: git clone https://github.com/shuhei1101/project-index {クローンのパス}
-      - type: command
-        command: uv sync
+      `$clone` が空ならクローンの場所（`{clone}`）を聞き、クローンが無ければ `git clone https://github.com/shuhei1101/project-index {clone}` を実行する。
+      クローンで `uv sync` を実行して依存を入れ、`{clone}/templates/settings.yaml` を元に、`clone` をクローンの絶対パスにした端末の設定を作る。`sources` は空にする。
   - name: Claude Code の env を記載する
     when: 端末の設定の場所が既定と違うとき
     body: '`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json` の `env` に `PROJECT_INDEX_CONFIG` を記載する。`env` のほかのキーと、ファイルのほかの内容は変えない。'
