@@ -12,11 +12,13 @@ use_cases:
 docs:
   - page: docs/guide/文書のMCP.md
     new: false
-    change: 項目のパスの書き方に引用符で囲んだキー `["{キー}"]` を加え、解決できない `unset` の要素の扱いを書き換える
-    status: todo
+    change: 無い項目の `unset` の要素を `results[].skipped_unset` に返すことと、`.` を含む辞書のキーを `#` で始まるパスの `[{キー}]` で指すことを追記し、`results[]` の項目に `skipped_unset` を加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T10:12:33.278945+00:00'
   - page: docs/guide/変更履歴.md
     new: false
-    change: 項目のパスの引用符で囲んだキーと、解決できない `unset` の扱いの変更を次の版の行に追記する
+    change: 無い項目の `unset` の要素を `results[].skipped_unset` に返す変更を次の版の行に追記する
     status: todo
 scope_out:
   - item: 項目のパスの新しい書き方（引用符で囲んだキー `notes["..."]`）
