@@ -339,6 +339,45 @@ flows:
       - 1 回目は関連する文書が無く、2 回目は文書 1 を深さ 1 で返却する
       - '`reload` も再起動も呼ばない'
     test: test_normal_when_worktree_metadata_changed
+  - name: 正常系（既定の検索から除く文書）
+    summary: '`search_exclude` に該当する文書を既定の関連の相手から除き、`include_excluded: true` のときだけ除外の表示を付けて返却する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 文書
+        description: '`c`（`related` に `a1` と `a2`）・`a1`（`state: active`）・`a2`（`state: inactive`、`related` に `d`）・`d`'
+      - name: 文書の行
+        description: '`a1`・`a2` の行 `assets` に `metadata: {status: state}`・`search_exclude: {field: status, op: eq, values: [inactive]}`'
+      - name: 入力
+        description: '1 回目は `from_ids: [c]`・`depth: 2`、2 回目は 1 回目に `include_excluded: true` を加える、3 回目は `from_ids: [a2]`'
+    flow: |-
+      <!-- map: {"title": "正常系（既定の検索から除く文書）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as trace_related
+
+        C->>T: from_ids [c]・depth 2
+        T->>T: a2 を除き、a2 の先はたどらない
+        T-->>C: a1・excluded_count 1
+        C->>T: from_ids [c]・depth 2・include_excluded
+        T-->>C: a1・a2（excluded）・d
+        C->>T: from_ids [a2]
+        T-->>C: d
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目が `a1` だけを返却し、`a2` と `a2` の先の `d` を返却しない。`excluded_count: 1` を返却する'
+      - '2 回目が `a1`・`a2`・`d` を返却し、`a2` だけが `excluded: true` を持つ'
+      - 3 回目は起点の `a2` からたどり、`d` を返却する
+    test: test_normal_when_search_excluded
+    refs:
+      - to: SC-6
+        item: scenarios[正常シナリオ（既定の検索から除く条件に該当する文書を除く）]
+        type: references
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『エージェントが調べる』の対応する流れと期待値を確認する。
 lead: '`related` をたどって関連する文書と関連の候補を返却する `trace_related` の入出力を定め、`trace_related` を修正するときに参照する。'
 tags:
   - name: topic:関連
@@ -450,6 +489,14 @@ request:
     description: '`true` のとき、`cwd` が `scope` に当たらない起点の配信元も、端末の設定の `sources[].outside_read` が真なら作業範囲の外（参考）としてたどる'
     notes: '`format: markdown` は先頭の行に「作業範囲の外（参考）」を出し、`format: json` は `outside_scope: true` を返す。外から読んだ呼び出しは作業場所と配信元の ID を要求のログに残す'
     status: planned
+  - name: include_excluded
+    type: bool
+    required: false
+    default: '`false`'
+    location: argument
+    description: '`true` のとき、配信元の設定の `documents[].search_exclude` に該当する文書も関連の相手として返却し、その先もたどる'
+    notes: '`from_ids`・`code_paths` の起点は、該当しても `false` のまま起点にする'
+    status: planned
 request_example: |-
   ```json
   {"from_ids": ["doc-1"], "depth": 2, "direction": "out", "suggest": true}
@@ -497,6 +544,14 @@ response:
     type: Literal['summary']
     description: 返した範囲。名前と概要文だけを返すため常に `summary`
     notes: '`items[].path` と同じ条件で持たない'
+  - name: excluded_count
+    type: int
+    description: 関連の相手のうち、`documents[].search_exclude` に該当して除いた文書の件数
+    notes: '`include_excluded: false` で 1 件以上除いたときだけ持つ。`notes` にも件数と `include_excluded: true` で取得できることを出す'
+  - name: items[].excluded
+    type: bool
+    description: '`documents[].search_exclude` に該当する文書か'
+    notes: '`include_excluded: true` で、該当する文書だけ `true` を持つ。`format: markdown` は表に `除外` の列を加え、該当する行に ✓ を出す'
 response_example: |-
   ```markdown
   doc-1 から 2 件
@@ -539,6 +594,9 @@ constraints:
   - item: ワークツリーの配信元の設定
     constraint: '`worktree` を指定したときと `cwd` がワークツリーの中のときは、そのワークツリーの配信元の設定（`documents` の行）で文書を集め、関連をたどる'
     notes: 文書の検索の同じ制約と同じ読み込みを使う
+  - item: 既定の検索から除く文書
+    constraint: '`include_excluded: false` のとき、文書の行の `search_exclude` の条件に該当する文書を関連の相手と関連の候補から除き、その文書の先はたどらない。照合は `search_docs` の制約「既定の検索から除く文書」と同じ'
+    notes: 起点に指定した文書は除かない
 refs:
   - to: SC-6
     item: scenarios[正常シナリオ]

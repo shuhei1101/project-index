@@ -314,6 +314,44 @@ flows:
     expected:
       - '`isError: true` で、company が disk の配信元のため区間を指定できない理由を返す'
     test: test_error_when_range_given_to_disk_source
+  - name: 正常系（既定の検索から除く文書）
+    summary: 存在する区間の端の全てで `search_exclude` に該当する文書を既定の結果から除き、区間の中で該当するようになった文書は返却する
+    setup:
+      - name: Mock
+        description: なし
+      - name: 文書の行
+        description: '行 `assets`（`metadata: {status: state}`・`search_exclude: {field: status, op: eq, values: [inactive]}`）と、`a1`（`state: active`）・`a2`（`state: inactive`）・`a3`（`state: active`）'
+      - name: 変更の commit
+        description: '`a1`・`a2` の `name` を変え、`a3` の `state` を `inactive` に変え、`state: inactive` の `a4` を追加した commit'
+      - name: 入力
+        description: '1 回目は `from` に親の commit・`to` に変更の commit、2 回目は 1 回目に `include_excluded: true` を加える'
+    flow: |-
+      <!-- map: {"title": "正常系（既定の検索から除く文書）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as list_changes
+        participant G as git
+
+        C->>T: from・to
+        T->>G: 両端の文書を読む
+        T->>T: 存在する端の全てで該当する a2・a4 を除く
+        T-->>C: a1・a3・excluded_count 2
+        C->>T: from・to・include_excluded
+        T-->>C: a1・a2（excluded）・a3・a4（excluded）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目が `a1` と `a3`（変わったキー `state`）を返却し、`a2`・`a4` を返却しない。`excluded_count: 2` を返却する'
+      - '2 回目が 4 件を返却し、`a2` と `a4` だけが `excluded: true` を持つ'
+    test: test_normal_when_search_excluded
+    refs:
+      - to: SC-8
+        item: scenarios[正常シナリオ（既定の検索から除く条件に該当する文書を除く）]
+        type: references
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『変更をレビューする』の対応する流れと期待値を確認する。
 lead: 区間か前回参照した時点から変わった文書・キー・差分の行を返却する `list_changes` の入出力を定め、`list_changes` を修正するときに参照する。
 tags:
   - name: topic:差分
@@ -458,6 +496,13 @@ request:
     constraints: '`source` に ID を 1 つ渡したときだけ効く'
     notes: '`format: markdown` は先頭の行に「作業範囲の外（参考）」を出し、`format: json` は `outside_scope: true` を返す。外から読んだ呼び出しは作業場所と配信元の ID を要求のログに残す'
     status: planned
+  - name: include_excluded
+    type: bool
+    required: false
+    default: '`false`'
+    location: argument
+    description: '`true` のとき、配信元の設定の `documents[].search_exclude` に該当する文書の変更も返却する'
+    status: planned
 request_example: |-
   ```json
   {"source": "sample", "from": "3f2a9c1", "to": "feat/x", "view": "summary"}
@@ -508,6 +553,14 @@ response:
     type: "list[{kind: Literal['added', 'removed'], from: {commit: str, date: str}, to: {commit: str, date: str}, count_before: int, count_after: int}]"
     description: 語の出現数が増えた（`added`）・減った（`removed`）区間。古い順
     notes: '`contains` を渡したときだけ。`to` を省いた呼び出しの HEAD と作業ツリーの区間は、`to` が `range.to` と同じ `作業ツリー`（commit を持たない）。前回読んだ時点と比べた呼び出しは比べた区間全体の 1 要素で、`from`・`to` は `range` と同じ値'
+  - name: excluded_count
+    type: int
+    description: 変わった文書のうち、`documents[].search_exclude` に該当して除いた文書の件数
+    notes: '`include_excluded: false` で 1 件以上除いたときだけ持つ。`notes` にも件数と `include_excluded: true` で取得できることを出す'
+  - name: items[].excluded
+    type: bool
+    description: 区間の端のうち文書が存在する端の全てで `documents[].search_exclude` に該当する文書か
+    notes: '`include_excluded: true` で、該当する文書だけ `true` を持つ。`format: markdown` は表に `除外` の列を加え、該当する行に ✓ を出す'
 response_example: |-
   ```markdown
   sample: 3f2a9c1（2026-10-26 10:00）→ 8b1d4e0（2026-10-26 11:30）・変わった文書 1 件
@@ -556,6 +609,9 @@ constraints:
   - item: ワークツリーの配信元の設定
     constraint: '`worktree` を指定したときと `cwd` がワークツリーの中のときは、今の内容をそのワークツリーの配信元の設定（`documents` の行）で集める'
     notes: 文書の検索の同じ制約と同じ読み込みを使う
+  - item: 既定の検索から除く文書
+    constraint: '`include_excluded: false` のとき、区間の端のうち文書が存在する端の全てで `search_exclude` の条件に該当する文書を除く。区間の中で該当するようになった・該当しなくなった文書は返却する。区間の中で追加・削除した文書は、存在する片方の端で判定する。前回読んだ時点からの比較と `contains` も同じ規則で除く'
+    notes: 両端の文書には、今の配信元の設定の条件を適用する。照合は `search_docs` の制約「既定の検索から除く文書」と同じ
 refs:
   - to: SC-8
     item: scenarios[正常シナリオ]
