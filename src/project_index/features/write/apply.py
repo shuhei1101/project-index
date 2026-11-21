@@ -18,6 +18,7 @@ from project_index.features.documents.fields import (
     set_field,
     set_field_at,
 )
+from project_index.features.write.types import SkippedOperation
 from project_index.shared.errors import InvalidArgumentError, Violation
 from project_index.shared.narrowing import is_dict, is_list
 
@@ -25,6 +26,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Mapping, MutableMapping
 
     from project_index.features.sources.types import DocumentTable
+    from collections.abc import Sequence
+
     from project_index.features.write.types import Operation, TextEdit
 
 
@@ -81,6 +84,7 @@ def _find_at(content: Mapping[str, Any], tokens: list[str | int]) -> tuple[bool,
 
 # 本文のファイルの内容を受けるキー（`data`・`set` のキーと `text_edits[].field`）
 BODY_KEY = "@body"
+MISSING_FIELD = "項目がありません"
 
 # `text_edits[].field` が文字列の項目を指せないときの、項目のパスの指し方の案内
 TEXT_EDIT_FIELD_FIX = (
@@ -89,6 +93,11 @@ TEXT_EDIT_FIELD_FIX = (
     "（`flows[35].expected[2]`）。"
     "配列・オブジェクトそのものは text_edits ではなく `set`・`add_to`・`remove_from` で書き換えてください"
 )
+
+
+def missing_element(value: object) -> str:
+    """`remove_from` の値・名前に該当する要素が無いことの理由を返す。"""
+    return f"{value} の要素がありません"
 
 
 def _violation(path: str, rule: str, fix: str = "") -> Violation:
@@ -101,8 +110,14 @@ def apply_operation(
     operation: Operation,
     *,
     schema: Mapping[str, Any] | None = None,
+    skipped: list[SkippedOperation] | None = None,
 ) -> dict[str, Any]:
-    """文書の内容に 1 件の操作を当てた新しい内容を返す。"""
+    """文書の内容に 1 件の操作を当てた新しい内容を返す。
+
+    `skipped` があれば、何もしなかった `unset` の要素・`remove_from` のキーを末尾へ足す。
+    """
+    # 集めない呼び出しも同じ手順で当て、集めた並びを捨てる
+    collected: list[SkippedOperation] = skipped if skipped is not None else []
     # 本文は要素に当てない（本文の適用が当てる）
     if operation.op in ("create", "replace"):
         data = {key: value for key, value in (operation.data or {}).items() if key != BODY_KEY}
@@ -119,9 +134,9 @@ def apply_operation(
             violations.extend(
                 _violation(f"set.{path}", violation.rule) for violation in error.violations
             )
-    violations.extend(_unset(content, operation.unset, schema))
+    violations.extend(_unset(content, operation.unset, schema, collected))
     # 同じ配列の要素を削除してから追加する（違反は add_to・remove_from の順に並べる）
-    removed = _remove_from(content, operation.remove_from, schema)
+    removed = _remove_from(content, operation.remove_from, schema, collected)
     violations.extend(_add_to(content, operation.add_to, schema))
     violations.extend(removed)
     violations.extend(_text_edits(content, operation.text_edits, schema))
@@ -131,13 +146,17 @@ def apply_operation(
 
 
 def _unset(
-    content: dict[str, Any], unset: Iterable[str], schema: Mapping[str, Any] | None
+    content: dict[str, Any],
+    unset: Iterable[str],
+    schema: Mapping[str, Any] | None,
+    skipped: list[SkippedOperation],
 ) -> list[Violation]:
-    """項目を削除する（無い項目は飛ばす）。"""
+    """項目を削除する（無い項目は飛ばして `skipped` に足す）。"""
     violations: list[Violation] = []
     for path in unset:
         try:
-            delete_field(content, path, schema=schema)
+            if not delete_field(content, path, schema=schema):
+                skipped.append(SkippedOperation(path=f"unset.{path}", reason=MISSING_FIELD))
         except InvalidArgumentError as error:
             # 要素の選び方を含む・`#` で始まるパスを解けない: 理由を `unset.{要素}` の違反にする
             violations.extend(_violation(f"unset.{path}", item.rule) for item in error.violations)
@@ -166,8 +185,9 @@ def _remove_from(
     content: dict[str, Any],
     remove_from: Mapping[str, list[Any]],
     schema: Mapping[str, Any] | None,
+    skipped: list[SkippedOperation],
 ) -> list[Violation]:
-    """配列の項目から値を削除する（項目が無ければ何もしない）。"""
+    """配列の項目から値を削除する（項目が無ければ何もせず `skipped` に足す）。"""
     violations: list[Violation] = []
     for path, values in remove_from.items():
         try:
@@ -179,22 +199,32 @@ def _remove_from(
             )
             continue
         if existing is None:
+            skipped.append(SkippedOperation(path=f"remove_from.{path}", reason=MISSING_FIELD))
             continue
         if not is_list(existing):
             violations.append(
                 _violation(f"remove_from.{path}", "配列ではない項目からは削除できません")
             )
             continue
-        violations.extend(_remove_values(existing, values, key, path))
+        violations.extend(_remove_values(existing, values, key, path, skipped))
     return violations
 
 
 def _remove_values(
-    existing: list[Any], values: list[Any], key: str | None, path: str
+    existing: list[Any],
+    values: list[Any],
+    key: str | None,
+    path: str,
+    skipped: list[SkippedOperation],
 ) -> list[Violation]:
     """1 つの配列から `remove_from` の値の要素を除き、削除する要素が無い値の違反を返す。"""
-    # x-key を持たない配列: 渡した値と等しい要素を除く（該当しない値は何もしない）
+    # x-key を持たない配列: 渡した値と等しい要素を除く（該当しない値は `skipped` に足す）
     if key is None:
+        skipped.extend(
+            SkippedOperation(path=f"remove_from.{path}", reason=missing_element(value))
+            for value in values
+            if value not in existing
+        )
         existing[:] = [item for item in existing if item not in values]
         return []
     # x-key を持つ配列: 除く前の配列で、値ごとに削除する要素が有るかを確かめる
@@ -457,6 +487,7 @@ def _apply_all_key(
     key: str,
     operation: Operation,
     data: Mapping[str, Any],
+    skipped: list[SkippedOperation],
 ) -> tuple[list[dict[object, object]], bool]:
     """全ての要素のキーへの操作を当て、配列と列を削除したかを返す。"""
     if key in data:
@@ -466,6 +497,8 @@ def _apply_all_key(
     # 同じ名前を削除してから追加する
     if key in operation.remove_from:
         removed = operation.remove_from[key]
+        present = {element.get(item) for element in elements}
+        skipped.extend(_missing_names(removed, present, key))
         elements = [element for element in elements if element.get(item) not in removed]
     if key in operation.add_to:
         present = {element.get(item) for element in elements}
@@ -474,6 +507,17 @@ def _apply_all_key(
                 elements.append({item: name})
                 present.add(name)
     return elements, key in operation.unset
+
+
+def _missing_names(
+    names: Iterable[object], present: set[object], key: str
+) -> list[SkippedOperation]:
+    """`remove_from` の名前のうち、配列に無い名前を何もしなかった操作にする。"""
+    return [
+        SkippedOperation(path=f"remove_from.{key}", reason=missing_element(name))
+        for name in names
+        if name not in present
+    ]
 
 
 def _mark(elements: list[dict[object, object]], flag: str, item: str, chosen: set[object]) -> None:
@@ -522,6 +566,7 @@ def _apply_selected_key(
     *,
     label: str,
     index: int,
+    skipped: list[SkippedOperation],
 ) -> list[Violation]:
     """選んだ要素のキーへの操作を配列へ当て、配列に無い名前の違反を返す。"""
     flag, item = names_of
@@ -536,6 +581,7 @@ def _apply_selected_key(
             _mark(elements, flag, item, set(chosen))
     # 同じ名前の真偽値のキーを削除してから立てる
     if key in operation.remove_from:
+        skipped.extend(_missing_names(operation.remove_from[key], set(by_name), key))
         for name in operation.remove_from[key]:
             if name in by_name:
                 by_name[name].pop(flag, None)
@@ -632,11 +678,18 @@ def _any_depth_violations(
 
 
 def expand_array_keys(
-    operation: Operation, table: DocumentTable, current: Mapping[str, Any] | None, *, index: int
+    operation: Operation,
+    table: DocumentTable,
+    current: Mapping[str, Any] | None,
+    *,
+    index: int,
+    skipped: list[SkippedOperation] | None = None,
 ) -> Operation:
     """列名が `[]`・`[{キー}]` を含む共通のキーへの操作を、オブジェクトの配列の列の置き換えにした操作を返す。"""
     # どの深さの列もまとめるキーは、書き込む場所を 1 つに決められない
     _raise_if(_any_depth_violations(operation, table.metadata, index=index))
+    # 集めない呼び出しも同じ手順で当て、集めた並びを捨てる
+    collected_skips: list[SkippedOperation] = skipped if skipped is not None else []
     all_keys, selected_keys = _array_keys(table.metadata)
     collected = set(all_keys) | set(selected_keys)
     if not collected:
@@ -656,7 +709,9 @@ def expand_array_keys(
     for key in sorted(used & set(all_keys), key=list(all_keys).index):
         array, item = all_keys[key]
         elements = arrays.get(array, _original(operation, current, array))
-        arrays[array], removed = _apply_all_key(elements, item, key, operation, data)
+        arrays[array], removed = _apply_all_key(
+            elements, item, key, operation, data, collected_skips
+        )
         if removed:
             unset_arrays.add(array)
     violations: list[Violation] = []
@@ -669,7 +724,14 @@ def expand_array_keys(
         )
         violations.extend(
             _apply_selected_key(
-                elements, (flag, item), key, operation, data, label=label, index=index
+                elements,
+                (flag, item),
+                key,
+                operation,
+                data,
+                label=label,
+                index=index,
+                skipped=collected_skips,
             )
         )
     _raise_if(violations)
@@ -712,3 +774,24 @@ def _array_update(
 def _without[V](values: Mapping[str, V], keys: set[str]) -> dict[str, V]:
     """`keys` のキーを除いた辞書を返す。"""
     return {key: value for key, value in values.items() if key not in keys}
+
+
+def to_given_keys(
+    skipped: Sequence[SkippedOperation], given: Operation, table: DocumentTable
+) -> list[SkippedOperation]:
+    """『操作を当てる』が集めた項目のパスを、列名への読み替えの前に指定したキーへ戻す。"""
+    plain = {key: column for key, column in table.metadata.items() if "[" not in column}
+    # オブジェクトの配列への書き戻しが足した配列の列名 → 共通のキー
+    array_of = {
+        key: column.split("[", 1)[0] for key, column in table.metadata.items() if "[" in column
+    }
+    result: list[SkippedOperation] = []
+    for item in skipped:
+        where, _, rest = item.path.partition(".")
+        keys = given.unset if where == "unset" else list(given.remove_from)
+        original = next(
+            (key for key in keys if _to_column(key, plain) == rest or array_of.get(key) == rest),
+            rest,
+        )
+        result.append(SkippedOperation(path=f"{where}.{original}", reason=item.reason))
+    return result

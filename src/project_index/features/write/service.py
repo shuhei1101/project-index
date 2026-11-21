@@ -49,6 +49,7 @@ from project_index.features.write.apply import (
     apply_operation,
     expand_array_keys,
     to_columns,
+    to_given_keys,
 )
 from project_index.features.write.direct_commit import (
     DIRECT_COMMIT_MARGIN_SEC,
@@ -77,6 +78,7 @@ from project_index.features.write.types import (
     DeleteTarget,
     Operation,
     ReferenceChange,
+    SkippedOperation,
     WriteRequest,
     WriteResult,
     WriteResultItem,
@@ -413,11 +415,13 @@ def _apply_existing(
     table: DocumentTable,
     now: datetime,
     schema: Mapping[str, Any],
+    *,
+    skipped: list[SkippedOperation] | None = None,
 ) -> tuple[str, str]:
     """`update`・`replace` を当てた、(ファイルのパス, 新しい内容) を返す。"""
     text = session.text(document.path)
     current, container = _content_for(table, text, document, document.path)
-    new_content = apply_operation(current, operation, schema=schema)
+    new_content = apply_operation(current, operation, schema=schema, skipped=skipped)
     if operation.op == "replace":
         new_content = CommentedMap(new_content)
     if _writes_dates(session, table):
@@ -1180,7 +1184,11 @@ def _apply_existing_one(
         raise not_found_error(session.source_id, [operation.id], list(session.docs))
     table = _writable(session.target.source.table(existing.kind), "id")
     current = existing.data if operation.op == "update" else None
-    operation = expand_array_keys(operation, table, current, index=index)
+    given = operation
+    # 何もしなかった操作: 書き戻しの分は指定したキー、操作を当てる分は列名で集まる
+    expand_skips: list[SkippedOperation] = []
+    apply_skips: list[SkippedOperation] = []
+    operation = expand_array_keys(operation, table, current, index=index, skipped=expand_skips)
     operation = to_columns(operation, table, index=index)
     if operation.expected_version is None:
         msg = "操作に expected_version がありません"
@@ -1194,7 +1202,9 @@ def _apply_existing_one(
     else:
         body = _create_body(session, operation, table, existing.path, index)
     schema = checker.store.row_schema(session.target, existing.kind)
-    path, text = _apply_existing(session, operation, existing, table, now, schema)
+    path, text = _apply_existing(
+        session, operation, existing, table, now, schema, skipped=apply_skips
+    )
     new_document, unchecked = _check_and_commit(
         session,
         checker,
@@ -1215,6 +1225,7 @@ def _apply_existing_one(
             version=new_document.version,
             diff=_diff(existing, new_document, body),
             unchecked=unchecked,
+            skipped=[*expand_skips, *to_given_keys(apply_skips, given, table)],
         ),
         table,
     )

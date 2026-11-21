@@ -113,6 +113,14 @@ class ReferenceChange:
 
 
 @dataclass(frozen=True)
+class SkippedOperation:
+    """違反にせず何もしなかった `unset` の要素・`remove_from` のキー 1 件。"""
+
+    path: str
+    reason: str
+
+
+@dataclass(frozen=True)
 class WriteResultItem:
     """操作 1 件の結果。"""
 
@@ -123,6 +131,7 @@ class WriteResultItem:
     diff: str | None = None
     errors: list[Violation] = field(default_factory=list[Violation])
     unchecked: list[UncheckedKey] = field(default_factory=list[UncheckedKey])
+    skipped: list[SkippedOperation] = field(default_factory=list[SkippedOperation])
     path: str | None = None
     renamed_from: str | None = None
     references: list[ReferenceChange] = field(default_factory=list[ReferenceChange])
