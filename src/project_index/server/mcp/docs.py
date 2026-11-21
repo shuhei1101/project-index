@@ -61,6 +61,7 @@ if TYPE_CHECKING:
     from project_index.features.access.types import Target
     from project_index.main import Handlers
     from project_index.shared.background import BackgroundGate
+    from project_index.shared.runtime import ExecutionSlots, RequestRecord
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +125,7 @@ def _register(
     wait_sources: Callable[[BaseModel], Awaitable[None]],
     write_deadline_sec: float,
     gate: BackgroundGate,
+    slots: ExecutionSlots,
     prepare: Callable[[BaseModel], Awaitable[None]] | None = None,
 ) -> None:
     """要求のモデルを引数に持つツールを 1 つ登録する（呼ぶ前に要求が指す配信元の読み込みを待つ）。"""
@@ -135,8 +137,18 @@ def _register(
             write_deadline=Deadline(limit_sec=write_deadline_sec, started=started),
             respond_by=Deadline(limit_sec=TOOL_RESPONSE_LIMIT_SEC, started=started),
         )
+        # ツールの呼び出し 1 回を要求の記録の範囲にし、記録の行を 1 行にする
+        with slots.request(name) as record:
+            return await _call(record, arguments, limits)
+
+    async def _call(
+        record: RequestRecord,
+        arguments: dict[str, object],
+        limits: CallLimits,
+    ) -> CallToolResult:
         try:
             request = model(**arguments)
+            record.source = _record_source(request)
             # 読み込みを待つ間も要求の応答中として数え、要求が待っていない行の読み込みを休ませる
             with gate.foreground():
                 await wait_sources(request)
@@ -145,7 +157,7 @@ def _register(
                 await prepare(request)
             # サービスの処理の間は要求の応答中として数え、裏の検査と書き出しを休ませる
             with gate.foreground():
-                result = await asyncio.to_thread(call, request, limits)
+                result = await slots.run_docs(call, request, limits)
             fmt: Literal["markdown", "json"] = getattr(request, "format", "json")
             # 描画を持つツール: 要求を添えて Markdown にする
             renderer: Callable[[Any], str] | None = None
@@ -228,6 +240,20 @@ def _load_worktree(
     return handlers.store.load(target)
 
 
+async def _load_worktree_recorded(
+    request: SearchRequest | WriteRequest | DeleteRequest, handlers: Handlers, source_id: str
+) -> object:
+    """ワークツリーの読み込みを、呼び出し元と別の要求の記録の範囲で動かす（時間切れの後も 1 行残す）。"""
+    with handlers.slots.request("worktree_load", source=source_id):
+        return await handlers.slots.run_docs(_load_worktree, request, handlers)
+
+
+def _record_source(request: BaseModel) -> str | None:
+    """要求の記録に残す配信元（1 つの ID を指すときだけ）を返す。"""
+    source: object = getattr(request, "source", None)
+    return source if isinstance(source, str) else None
+
+
 async def _ensure_worktree(
     request: SearchRequest | WriteRequest | DeleteRequest,
     handlers: Handlers,
@@ -238,7 +264,9 @@ async def _ensure_worktree(
         return
     try:
         # 待つワークツリーを決めるだけなので、ワークツリーの設定は再読み込みしない
-        target = await asyncio.to_thread(_worktree_target, request, handlers, reload_worktree=False)
+        target = await handlers.slots.run_docs(
+            functools.partial(_worktree_target, request, handlers, reload_worktree=False)
+        )
     except ProjectIndexError:
         # 解けない要求は、サービスが同じ解決で同じエラーを返す
         return
@@ -249,7 +277,7 @@ async def _ensure_worktree(
     # 同じワークツリーの読み込みは 1 つだけ動かし、後の要求は同じ読み込みを待つ
     if task is None or task.done():
         # 設定の再読み込みと文書の読み込みを、待ちの上限の内で待つ 1 つのタスクにする
-        task = asyncio.ensure_future(asyncio.to_thread(_load_worktree, request, handlers))
+        task = asyncio.ensure_future(_load_worktree_recorded(request, handlers, target.source.id))
         loads[root] = task
 
         def forget(done: asyncio.Future[object], root: Path = root) -> None:
@@ -347,6 +375,7 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
         wait_sources=lambda request: handlers.registry.wait_for(**_wait_target(request)),
         write_deadline_sec=handlers.terminal.write_deadline_sec,
         gate=handlers.gate,
+        slots=handlers.slots,
     )
     # ワークツリーのパスごとの読み込み中のタスク（イベントループの中だけで触る）
     loads: dict[Path, asyncio.Future[object]] = {}

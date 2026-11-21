@@ -1229,6 +1229,35 @@ flows:
       - '`view: count, group_by: b.y` が `y1` 1・（なし）1 を返却する'
       - '`tree.children[].children[].name` は「知らない項目です」の `InvalidArgumentError` にする'
     test: test_normal_when_schema_composition_keys
+  - name: 正常系（多くのワークツリーを読んだ後）
+    summary: ほかのワークツリーを多く読んだ後も、要求の中でたどるキャッシュの件数が変わらない
+    setup:
+      - name: Mock
+        description: なし（一時フォルダの端末の設定で `project-index serve` を子プロセスとして起動する）
+      - name: 配信元
+        description: worktree を 30 件持つ配信元 sample
+        notes: worktree ごとに文書を 50 件持つ
+    flow: |-
+      <!-- map: {"title": "正常系（多くのワークツリーを読んだ後）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+
+        C->>T: worktree A を 2 回
+        T-->>C: 文書
+        C->>T: 残りの 29 件の worktree を 1 回ずつ
+        T-->>C: 文書
+        C->>T: worktree A
+        T-->>C: 文書
+      ```
+
+      <!-- /map -->
+    expected:
+      - 要求ごとのログの行の、たどったファイルのキャッシュの件数が、最後の worktree A の呼び出しと最初の 2 回目で同じ
+      - 全ての呼び出しが `isError` を持たずに文書を返す
+    test: test_normal_when_many_worktrees_loaded
 lead: '条件に該当する文書の取得・一覧・件数・集計を返却する `search_docs` の入出力を定め、`search_docs` を修正するときに参照する。'
 tags:
   - name: topic:クエリ
@@ -1250,6 +1279,7 @@ callers:
   - SC-6#scenarios[異常シナリオ（git の実行が失敗する）]
   - SC-6#scenarios[正常シナリオ（本文のファイルを持たない要素を引く）]
   - SC-15#scenarios[正常シナリオ]
+  - SC-6#scenarios[正常シナリオ（多くの worktree を調べ続ける）]
 exclusivity: '読み取りだけで排他しない（`readOnlyHint: true` で並列に呼ばれる）'
 request:
   - name: source
@@ -1701,6 +1731,9 @@ constraints:
   - item: スキーマの合成と循環する参照の先のキー
     constraint: 種類のスキーマの `allOf`・`anyOf`・`oneOf` の各要素が定義したキーは、それらを持つスキーマと同じパスの項目として `filter`・`order_by`・`group_by`・`fields` で使用できる（最上位の `allOf` の要素の `top` は `top`、`a.allOf` の要素の `x` は `a.x`）。循環して最上位の `$defs` を指して残った `$ref`（`#/$defs/...`。別のファイルの中で循環し、最上位の `$defs` へ加えた定義を指す参照も含む）は参照先の定義のキーを項目にし、同じ定義へ戻った時点でそれより深いキーを項目にしない（`tree.children[].name` は項目にし、`tree.children[].children[].name` は項目にしない）。同じパスで型が食い違う項目は `string` にする
     notes: 解決できずに残った `$ref` の先は項目にしない。循環しない `$ref` は参照先の中身に置き換えてから項目にする（スキーマの参照の解決）
+  - item: 要求の中でたどるキャッシュ
+    constraint: ワークツリーの読み込みで、消えたファイル・書き込んだファイルのキャッシュを捨てるときは、そのワークツリー・そのファイルのキャッシュだけをたどる。要求の中でたどるファイルのキャッシュの件数は、ほかに読み込んだワークツリーの数によらない
+    notes: '全てのワークツリーのキャッシュをたどると、使ったワークツリーの数に比例して呼び出しが遅くなる（PR #236 の PoC 結果の No.2）'
 refs:
   - to: SC-6
     item: scenarios[正常シナリオ]

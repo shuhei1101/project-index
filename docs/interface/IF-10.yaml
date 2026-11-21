@@ -62,6 +62,37 @@ flows:
       - '2 回目が `isError: true` で再起動の途中であることを返す'
       - 起動し直すのは 1 回だけ（ログの起動の行が 1 つ増える）
     test: test_error_when_restart_in_progress
+  - name: 正常系（文書の MCP が詰まっている）
+    summary: 文書の MCP の実行スロットが埋まっていても応答し、起動し直す
+    setup:
+      - name: Mock
+        description: PATH の先頭に包みの git を配置する。作業場所が sample の worktree のフォルダの配下のときだけ、どの引数でも解除のファイルができるまで待つ
+        notes: 解除のファイルは起動し直した後の `status` の確認の後に配置する
+      - name: 詰まった要求
+        description: 既定の実行スロットの数より多い worktree を指す `search_docs` を同時に呼んでおく
+    flow: |-
+      <!-- map: {"title": "正常系（文書の MCP が詰まっている）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as restart
+        participant S as project-index serve
+
+        C->>T: 引数なし
+        T-->>C: pid・restarting
+        T->>S: 処理中の要求を停止の待ちの上限まで待ち、待ち受けを止める（実行スロットのスレッドの終了は待たない）
+        S->>S: 同じプロセスで起動し直す
+        C->>S: status
+        S-->>C: 待ち受けのアドレス・配信元
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`restart` が文書の MCP の応答の上限の内に `pid`・`restarting` を返す'
+      - '`restart` の応答から、停止の待ちの上限（`script_timeout_sec` の 1.5 倍）と起動から接続を受け付けるまでの時間の決定値の和の内に、`127.0.0.1` のポートを再び待ち受ける'
+      - 起動し直した後の `status` で sample が `serving`
+    test: test_normal_when_docs_mcp_clogged
 lead: 応答の後に同じプロセス ID で `project-index serve` を起動し直す管理の MCP の `restart` の入出力を定め、`restart` を修正するときに参照する。
 tags:
   - name: topic:サーバー
@@ -74,6 +105,7 @@ idempotent: false
 side_effects: 待ち受けを止めて起動し直す。`/mcp`・`/_admin/mcp` の接続は切れる
 callers:
   - SC-3#scenarios[正常シナリオ（端末の設定が古くなる）]
+  - SC-16#scenarios[正常シナリオ（文書の MCP が詰まっている）]
 exclusivity: 再起動を始めた後の呼び出しは `RestartInProgressError` で断る
 request: []
 request_example: |-
@@ -104,7 +136,7 @@ constraints:
     notes: スクリプトの実行が一番長い要求になるため
   - item: 起動し直す方法
     constraint: uvicorn の停止の後、`os.execv(sys.executable, [sys.executable, "-m", "project_index", "serve"])` で同じプロセスを置き換える
-    notes: SessionStart のフックで切り離して起動したプロセスのまま続くため、親を持たないまま残らない。起動し直した後は『起動』の待ち受けまでの順番に従い、配信元を読む前に待ち受ける
+    notes: SessionStart のフックで切り離して起動したプロセスのまま続くため、親を持たないまま残らない。文書の MCP・読み取り API の専用の実行スロットに終わらないスレッドが残っていても、その終了を待たずに置き換える（『起動』の文書の MCP・読み取り API の実行スロット）。起動し直した後は『起動』の待ち受けまでの順番に従い、配信元を読む前に待ち受ける
   - item: 起動に失敗したとき
     constraint: '`project-index serve` の終了コードで止まり、次のセッションの SessionStart のフックが起動し直す'
   - item: タイムアウト

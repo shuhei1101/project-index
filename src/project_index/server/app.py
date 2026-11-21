@@ -55,7 +55,7 @@ def build_app(handlers: Handlers) -> FastAPI:
     docs_mcp = build_docs_mcp(handlers)
     admin_mcp = build_admin_mcp(handlers)
     app = FastAPI(
-        lifespan=build_lifespan([docs_mcp, admin_mcp], seen=handlers.seen),
+        lifespan=build_lifespan([docs_mcp, admin_mcp], seen=handlers.seen, slots=handlers.slots),
         docs_url=None,
         redoc_url=None,
         openapi_url=None,

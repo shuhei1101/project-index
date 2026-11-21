@@ -22,6 +22,7 @@ from project_index.features.sources.types import DocumentTable, ServedSource, So
 from project_index.integrations import git as git_module
 from project_index.shared.background import BackgroundGate
 from project_index.shared.errors import DocumentNotFoundError, UnknownKindError
+from project_index.shared.runtime import ExecutionSlots
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
@@ -910,6 +911,38 @@ def test_document_store_invalidate(document_store: DocumentStore, workspace: Tar
     result = document_store.load(workspace)
     # 検証
     assert result.documents[0].data["name"] == "Z"
+
+
+def test_document_store_invalidate_when_many_worktrees(
+    document_store: DocumentStore,
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+) -> None:
+    """ほかのワークツリーのキャッシュをたどらない（正常系）。"""
+    # 準備
+    clone = tmp_path / "clone"
+    write_files(clone, {"rules/a.yaml": "id: a\nname: 本体\n"})
+    source = make_served_source(
+        id="sample", root=clone, config=make_source_config(documents=[RULES_TABLE])
+    )
+    worktrees = [clone / ".claude" / "worktrees" / f"w{n:02d}" for n in range(30)]
+    targets = [make_target(source, base=w, worktree=w) for w in worktrees]
+    [write_files(w, {"rules/a.yaml": "id: a\nname: A\n"}) for w in worktrees]
+    [document_store.load(t) for t in targets]
+    edited = worktrees[0] / "rules" / "a.yaml"
+    stat = edited.stat()
+    edited.write_text("id: a\nname: Z\n", encoding="utf-8")
+    os.utime(edited, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+    document_store.invalidate([edited])
+    # 実行
+    with ExecutionSlots().request("search_docs") as record:
+        result = document_store.load(targets[0])
+    # 検証
+    assert result.documents[0].data["name"] == "Z"
+    assert record.scanned == 1
 
 
 def test_document_store_location(

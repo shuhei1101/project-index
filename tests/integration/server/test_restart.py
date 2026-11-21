@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import contextlib
+import os
+import shutil
 import threading
 import time
 from typing import TYPE_CHECKING, Any
 
 import httpx
+
+from project_index.shared.runtime import DOCS_WORKERS
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -152,4 +157,98 @@ def test_error_when_restart_in_progress(
     assert outcomes[1][0] is True
     assert outcomes[1][1].startswith("RestartInProgressError")
     assert started_count(state_dir) == started + 1
+    assert process.poll() is None
+
+
+# 作業場所が止める worktree のフォルダの配下のときだけ、解除のファイルができるまで待ってから本物の git を呼ぶ包み
+BLOCKING_GIT = """#!/bin/sh
+case "$(pwd -P)/" in
+  "{block}"/*) while [ ! -f "{release}" ]; do sleep 0.1; done ;;
+esac
+exec "{git}" "$@"
+"""
+# status が応答する上限（SC-16 の期待値）
+STATUS_LIMIT_SEC = 5
+# restart が応答する上限（非機能要件『文書の MCP の応答の上限』）
+RESTART_LIMIT_SEC = 48
+# このテストの端末の設定の script_timeout_sec
+CLOGGED_SCRIPT_TIMEOUT_SEC = 2
+# restart の応答から待ち受け直すまでの上限（IF-10 の期待値）:
+# 停止の待ちの上限（script_timeout_sec × 1.5 = 3 秒）+ 非機能要件『起動から接続を受け付けるまでの時間』（20 秒）
+RELISTEN_LIMIT_SEC = CLOGGED_SCRIPT_TIMEOUT_SEC * 1.5 + 20
+
+
+def test_normal_when_docs_mcp_clogged(
+    make_source: Callable[..., Any],
+    write_settings: Callable[..., Path],
+    free_port: Callable[[], int],
+    start_serve: Callable[..., Any],
+    wait_until_serving: Callable[..., None],
+    add_worktree: Callable[..., Path],
+    call_tool: Callable[..., dict[str, Any]],
+    started_count: Callable[[Path], int],
+    wait_for_restart: Callable[..., None],
+    tmp_path: Path,
+) -> None:
+    """文書の MCP の実行スロットが埋まっていても応答し、起動し直す（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    worktrees = [add_worktree(sample.folder, f"w{n:02d}") for n in range(DOCS_WORKERS + 2)]
+    release = tmp_path / "release"
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    wrapper = bin_dir / "git"
+    wrapper.write_text(
+        BLOCKING_GIT.format(
+            block=(sample.folder / ".claude" / "worktrees").resolve(),
+            release=release,
+            git=shutil.which("git"),
+        ),
+        encoding="utf-8",
+    )
+    wrapper.chmod(0o755)
+    settings = write_settings(
+        sample,
+        extra=f"script_timeout_sec: {CLOGGED_SCRIPT_TIMEOUT_SEC}\nworktree_load_wait_sec: 1",
+    )
+    state_dir = settings.parent / "state"
+    port = free_port()
+    path = f"{bin_dir}:{os.environ['PATH']}"
+    process = start_serve(settings, port, extra_env={"PATH": path})
+    wait_until_serving(process, port)
+    started = started_count(state_dir)
+
+    def search(worktree: Path) -> None:
+        # 詰まった状態を作るだけで結果は見ない（時間切れと、再起動で切られた空の応答は捨てる）
+        with (
+            httpx.Client(timeout=5) as client,
+            contextlib.suppress(httpx.HTTPError, ValueError, KeyError),
+        ):
+            call_tool(client, port, "/mcp/", "search_docs", cwd=str(worktree), view="count")
+
+    clogging = [threading.Thread(target=search, args=(w,)) for w in worktrees]
+    [thread.start() for thread in clogging]
+    time.sleep(1)
+    # 実行
+    with httpx.Client(timeout=RESTART_LIMIT_SEC + 5) as client:
+        status_started = time.monotonic()
+        call_tool(client, port, "/_admin/mcp/", "status", format="json")
+        status_sec = time.monotonic() - status_started
+        restart_started = time.monotonic()
+        restarted = call_tool(client, port, "/_admin/mcp/", "restart")
+        restart_sec = time.monotonic() - restart_started
+    responded_at = time.monotonic()
+    wait_for_restart(state_dir, port, started)
+    relisten_sec = time.monotonic() - responded_at
+    with httpx.Client(timeout=15) as client:
+        status = _status_after_loading(call_tool, client, port)
+    release.write_text("", encoding="utf-8")
+    [thread.join(timeout=30) for thread in clogging]
+    # 検証
+    sources = {item["id"]: item for item in status["structuredContent"]["sources"]}
+    assert status_sec < STATUS_LIMIT_SEC
+    assert restart_sec < RESTART_LIMIT_SEC
+    assert relisten_sec < RELISTEN_LIMIT_SEC
+    assert restarted["structuredContent"] == {"pid": process.pid, "restarting": True}
+    assert sources["sample"]["status"] == "serving"
     assert process.poll() is None

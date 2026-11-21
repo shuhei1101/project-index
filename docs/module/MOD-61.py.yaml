@@ -39,7 +39,7 @@ functions:
       1. `POST /_admin/session-start` を登録する
       2. 要求ごとに、本文を `SessionStartRequest.model_validate` で検証する
          - 検証に失敗した場合、違反を `{キー}: {理由}` にして `ValidationFailedError` を送出する
-      3. 記録を削除し、応答にする（セッションの開始、`asyncio.to_thread`）
+      3. 記録を削除し、応答にする（セッションの開始、文書の MCP の実行スロット（`handlers.slots.run_docs`））
     exceptions:
       - name: ValidationFailedError
         condition: '`session_id`・`reason` が無い、型が違う、`reason` が選択肢の外'

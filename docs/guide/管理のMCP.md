@@ -24,6 +24,7 @@
 
 `status`・`check_project`・`try_convert` には `readOnlyHint: true` が付きます。
 タイムアウトは設けません。スクリプトを実行する確かめと変換は、配信元ごとに `script_timeout_sec` で打ち切ります。
+管理の MCP のツールは文書の MCP・読み取り API と別の実行スロットで動くため、文書の MCP の要求が詰まっている間も `status`・`restart` は応答します。
 
 `status`・`reload`・`check_project`・`write_nav` は引数 `format`（`markdown` か `json`、既定 `markdown`）を持ちます。
 `json` のときは、同じ中身を structuredContent と text に入れます。
@@ -141,6 +142,8 @@ http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
 処理中の要求は、`script_timeout_sec` の 1.5 倍を上限に待ちます。
 過ぎたら残りの要求を切って止めます。
 起動に失敗したときは、`project-index serve` の終了コードで止まり、次のセッションの SessionStart のフックが起動し直します。
+文書の MCP の要求が終わらないまま上限を過ぎたときも、その処理の終わりを待たずに起動し直します。
+文書の MCP が応答しなくなったときは、プロセスを kill せずに `restart` を呼びます。
 
 引数はありません。
 

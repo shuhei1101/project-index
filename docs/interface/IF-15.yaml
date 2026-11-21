@@ -1297,6 +1297,18 @@ constraints:
   - item: 組み込みの配信元
     constraint: '`sources[]` に id `project-index` の行が無いときだけ、`clone` の `project-index.yaml` の `files_guide` の行を id `project-index` の配信元として文書の MCP に加える。読み書きは `disk`、`scope.read`・`scope.write` は空、`outside_read` は `true`、行の `schema` は `clone` の `templates/files.schema.yaml` に差し替える。読み取り API・管理の MCP の配信元の一覧には含めない。`reload` で端末の設定を読み直したときも同じ判定をする'
     notes: knowledge の配信元を登録していない端末でもスキーマを解決できるように、クローンが持つスキーマに差し替える。`scope` が空のため常に作業範囲の外（参考）として参照し、書き込みは読み取りだけの配信元と同じエラーになる
+  - item: 管理の MCP の実行スロット
+    constraint: 管理の MCP のツールは、文書の MCP・読み取り API と別の専用の実行スロットで動かす。文書の MCP・読み取り API の実行スロットが埋まっていても、管理の MCP の要求は待たない
+    decided_by: NFR-1#requirements[管理の MCP の実行スロットの数]
+    notes: 専用の実行スロットの本数は非機能要件の決定値。`restart` の停止の待ちは今どおり処理中の要求を待つ
+  - item: 稼働中の記録
+    constraint: 文書の MCP・読み取り API の要求ごとに、ツール・配信元・実行スロットの待ち・排他の待ち・処理の時間・要求の中でたどったファイルのキャッシュの件数を INFO の 1 行でログに残す。あわせて、実行中・待ち中の処理の数と RSS を、決定値の間隔ごとに INFO の 1 行でログに残す
+    decided_by: NFR-1#requirements[稼働中の記録の間隔]
+    notes: 'ログだけで劣化の始まりと詰まった処理を指せるようにする（PR #236 の要件 No.4）'
+  - item: 文書の MCP・読み取り API の実行スロット
+    constraint: 文書の MCP・読み取り API の要求の処理は、asyncio の既定の実行スロットでなく、専用の実行スロットで動かす。停止・再起動は、終わらない専用の実行スロットのスレッドの終了を待たない。再起動は `os.execv`、停止（再起動の要求が無い終了）は、uvicorn の停止の後にログを閉じてから `os._exit` で終え、インタープリタの終了の待ちを通らない
+    decided_by: NFR-1#requirements[文書の MCP の実行スロットの数]
+    notes: '`asyncio.Runner.close` は既定の実行スロットのスレッドの終了を `THREAD_JOIN_TIMEOUT`（300 秒）まで待つ。専用の `ThreadPoolExecutor` は `Runner.close` では待たないが、インタープリタの終了（`threading._register_atexit` の `_python_exit`）で上限なく待つため、停止も `os._exit` で終える。`atexit` に登録した後片付けは無い（`src/project_index` に `atexit` の登録が無い）。追加するときは `os._exit` の前に呼ぶ'
 refs:
   - to: SC-4
     item: scenarios[正常シナリオ]

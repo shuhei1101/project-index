@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import asyncio
+import functools
 from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Body
@@ -40,12 +40,14 @@ def build_post_write_router(handlers: Handlers) -> APIRouter:
         # 配信元の一覧を読み込んでいる間: 読み込みを待たずに、通知せずに返す
         if handlers.registry.loading:
             return PostWriteResponse(notices=[], additional_context="")
-        return await asyncio.to_thread(
-            judge_post_write,
-            request,
-            sources=handlers.registry.served(),
-            notified=handlers.notified,
-            prompts=handlers.prompts,
+        return await handlers.slots.run_docs(
+            functools.partial(
+                judge_post_write,
+                request,
+                sources=handlers.registry.served(),
+                notified=handlers.notified,
+                prompts=handlers.prompts,
+            )
         )
 
     return router

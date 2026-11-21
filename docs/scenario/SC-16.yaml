@@ -1,0 +1,63 @@
+id: SC-16
+title: project-indexを起動し直す
+lead: 利用者が管理の MCP の `status` で状態を確認し、`restart` で project-index を起動し直すシナリオを定め、起動し直しの流れを変えるときに参照する。
+primary_actor: 利用者
+stakeholders:
+  - name: 利用者
+    interest: 文書の MCP が応答しないときも、プロセスを kill せずに状態を確認して起動し直せる
+  - name: エージェント（Claude Code）
+    interest: 起動し直した後も、同じ配信元を `/mcp` で使用できる
+trigger: 利用者が管理の MCP の `restart` を呼ぶ
+preconditions:
+  - project-index が待ち受けている
+scenarios:
+  - name: 正常シナリオ（文書の MCP が詰まっている）
+    setup:
+      - name: Mock
+        description: PATH の先頭に包みの git を配置する。作業場所が sample の worktree のフォルダの配下のときだけ、どの引数でもテストが配置する解除のファイルができるまで待ってから本物の git を呼ぶ
+        notes: 解除のファイルは再起動の後の `status` の確認の後に配置する。sample 自体（worktree のフォルダの外）の git は待たずに本物の git を呼ぶ
+      - name: サンプルの配信元
+        description: 文書の種類を 1 つと `project-index.yaml` を持つ git リポジトリ
+        notes: id `sample`。配信元の設定の `worktrees` に該当する worktree を、既定の実行スロットの数より多く持つ
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample の 1 行'
+    flow: |-
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        actor A as エージェント
+        participant DD as project-index
+        participant AD as 管理の MCP
+
+        A->>DD: worktree ごとに search_docs を同時に呼ぶ（読み込みが進まず実行スロットが埋まる）
+        U->>AD: status
+        AD-->>U: 配信中の配信元
+        U->>AD: restart
+        AD-->>U: 再起動すること
+        AD->>DD: 再起動する
+        U->>AD: status
+        AD-->>U: 配信中の配信元
+      ```
+    expected:
+      - 実行スロットが埋まっている間の `status` が 5 秒の内に返却する
+      - '`restart` が非機能要件『文書の MCP の応答の上限』の内に応答し、再起動の後に `127.0.0.1` のポートを再び待ち受ける'
+      - 再起動の後の `status` が `sample` を配信していることを返却する
+    test: test_normal_when_docs_mcp_clogged
+success_guarantee: 起動し直した project-index が同じポートで待ち受け、配信元を配信している。
+minimal_guarantee: 文書の MCP の処理が詰まっていても、管理の MCP の `status`・`restart` は応答する。
+frequency: 文書の MCP が応答しなくなったとき
+priority: 高
+refs:
+  - to: IF-10
+    type: requires
+    when: 起動し直しの流れを変えるときに、`restart` の入出力と突き合わせる。
+  - to: IF-8
+    type: requires
+    when: 状態の確認の流れを変えるときに、`status` の入出力と突き合わせる。
+test_file: tests/e2e/単一ユースケース/test_project-indexを起動し直す.py
+visibility: internal
+tags:
+  - name: topic:サーバー
+    main: true
+  - name: action:起動

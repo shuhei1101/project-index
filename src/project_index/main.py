@@ -35,6 +35,7 @@ from project_index.features.sources.registry import SourceRegistry
 from project_index.features.sources.types import ServedSource, SourceStatus
 from project_index.server.mcp.result import mcp_prompt_ids
 from project_index.shared.background import BackgroundGate
+from project_index.shared.runtime import ExecutionSlots
 from project_index.shared.yaml_io import c_loader_available
 
 if TYPE_CHECKING:
@@ -94,6 +95,8 @@ class Handlers:
     gate: BackgroundGate
     # 会話キーごとに書き込みの後の通知をしたパス（書き込みの後の通知・セッションの開始が使用する）
     notified: NotifiedStore
+    # 文書の MCP・読み取り API と管理の MCP の専用の実行スロット
+    slots: ExecutionSlots
 
 
 def _setup_logging(log_dir: Path) -> list[logging.Handler]:
@@ -188,6 +191,13 @@ def run_serve(args: argparse.Namespace) -> int:
         if handlers.restart.requested:
             _close_logging(log_handlers)
             os.execv(sys.executable, [sys.executable, *SERVE_ARGV])  # noqa: S606
+            return 0
+        # 再起動の要求が無い停止: 実行スロットに終わらないスレッドが残っていても、
+        # インタープリタの終了でその終わりを待たずに終える
+        _close_logging(log_handlers)
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(0)
         return 0
     finally:
         _close_logging(log_handlers)
@@ -324,6 +334,7 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
         reload_changed=reload_changed,
         gate=gate,
         notified=NotifiedStore(),
+        slots=ExecutionSlots(),
     )
 
 

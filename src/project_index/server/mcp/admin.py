@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import asyncio
+import functools
 import inspect
 import logging
 import os
@@ -44,6 +44,7 @@ from project_index.shared.errors import ProjectIndexError
 
 if TYPE_CHECKING:
     from project_index.main import Handlers
+    from project_index.shared.runtime import ExecutionSlots
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,7 @@ def _register(
     call: Callable[[Any], Any],
     render: Callable[[Any], str] | None = None,
     *,
+    slots: ExecutionSlots,
     wait_loaded: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
     """要求のモデルを引数に持つツールを 1 つ登録する（`wait_loaded` があれば呼ぶ前に待つ）。"""
@@ -100,7 +102,8 @@ def _register(
             request = model(**arguments)
             if wait_loaded is not None:
                 await wait_loaded()
-            result = await asyncio.to_thread(call, request)
+            # 文書の MCP の実行スロットが埋まっていても待たない、管理の MCP の専用の実行スロット
+            result = await slots.run_admin(call, request)
             fmt: Literal["markdown", "json"] = getattr(request, "format", "json")
             return to_tool_result(result, fmt, render)
         except (ProjectIndexError, ValidationError) as error:
@@ -117,7 +120,8 @@ def _register(
 def build_admin_mcp(handlers: Handlers) -> MCPServer:
     """6 つのツールを持つ管理の MCP を作る。"""
     mcp = MCPServer(ADMIN_MCP_NAME)
-    _register(
+    register = functools.partial(_register, slots=handlers.slots)
+    register(
         mcp,
         "status",
         handlers.prompts.render(tool_prompt_id("admin", "status")),
@@ -125,7 +129,7 @@ def build_admin_mcp(handlers: Handlers) -> MCPServer:
         lambda request: get_status(handlers, env=os.environ),
         render_status,
     )
-    _register(
+    register(
         mcp,
         "reload",
         handlers.prompts.render(tool_prompt_id("admin", "reload")),
@@ -134,14 +138,14 @@ def build_admin_mcp(handlers: Handlers) -> MCPServer:
         render_reload,
         wait_loaded=lambda: handlers.registry.wait_loaded(),
     )
-    _register(
+    register(
         mcp,
         "restart",
         handlers.prompts.render(tool_prompt_id("admin", "restart")),
         NoArguments,
         lambda request: handlers.restart.request(),
     )
-    _register(
+    register(
         mcp,
         "update",
         handlers.prompts.render(tool_prompt_id("admin", "update")),
@@ -154,7 +158,7 @@ def build_admin_mcp(handlers: Handlers) -> MCPServer:
         ),
         wait_loaded=lambda: handlers.registry.wait_loaded(),
     )
-    _register(
+    register(
         mcp,
         "check_project",
         handlers.prompts.render(tool_prompt_id("admin", "check_project")),
@@ -163,7 +167,7 @@ def build_admin_mcp(handlers: Handlers) -> MCPServer:
         render_check,
         wait_loaded=lambda: handlers.registry.wait_loaded(),
     )
-    _register(
+    register(
         mcp,
         "try_convert",
         handlers.prompts.render(tool_prompt_id("admin", "try_convert")),
@@ -171,7 +175,7 @@ def build_admin_mcp(handlers: Handlers) -> MCPServer:
         lambda request: try_convert(request, handlers=handlers),
         wait_loaded=lambda: handlers.registry.wait_loaded(),
     )
-    _register(
+    register(
         mcp,
         "write_nav",
         handlers.prompts.render(tool_prompt_id("admin", "write_nav")),
