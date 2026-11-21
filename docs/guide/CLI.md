@@ -340,6 +340,7 @@ project-index skill-md --check < docs/agent-flow/skill-setup.yaml
 | --- | --- |
 | （なし） | 生成のモード。全ての `type: skill` を組み立て、中身が今の SKILL.md と違うものだけを書き出し、書き換えたパスを 1 行に 1 件出す |
 | `--check` | 検査のモード。標準入力のエージェントフローで配信元の同じ `id` を置き換えて全ての SKILL.md を組み立て、違反（`path`・`rule`・`fix`）の配列の JSON を出す。ファイルは書き換えない |
+| `--check`（環境変数 `PROJECT_INDEX_VALIDATE_ON=delete`） | 削除の検査。`PROJECT_INDEX_DELETE_IDS` の文書（無ければ標準入力の文書）を除いて全ての SKILL.md を組み立て、標準入力のエージェントフローを指す解決できない `ref` を違反にする。`delete_docs` が `on` に `delete` を持つ `validators[]` から呼ぶ |
 | 位置引数 | `generators[].run` が付与する書き込んだ文書のパス。受け取るが、生成の対象は絞らない |
 
 `agent_flow` の行の `schema` がほかの配信元を指すときは、端末の設定の `sources` の行が指すリポジトリから、`ref` の commit のスキーマを読み込みます。
