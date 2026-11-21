@@ -193,7 +193,7 @@ def test_run_serve_when_prompt_invalid(
     # 準備
     prompts = tmp_path / "prompts"
     shutil.copytree(DEFAULT_PROMPTS_DIR, prompts)
-    broken = prompts / "mcp/docs/tools/search-docs.yaml"
+    broken = prompts / "mcp/project-index/tools/search-docs.yaml"
     value = load_yaml(broken.read_text(encoding="utf-8"))
     del value["kind"]
     broken.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
@@ -352,7 +352,7 @@ def test_build_handlers(
     assert len(handlers.registry.served()) == 1
     assert len(handlers.registry.statuses()) == 2
     assert "session-context" not in handlers.prompts.prompts
-    assert "mcp/docs/instructions" in handlers.prompts.prompts
+    assert "mcp/project-index/instructions" in handlers.prompts.prompts
     assert handlers.snapshots.gate is handlers.gate
     assert handlers.store.gate is handlers.gate
     assert handlers.checks.gate is handlers.gate

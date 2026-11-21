@@ -217,8 +217,8 @@ def test_mcp_prompt_ids() -> None:
     result = mcp_prompt_ids()
     # 検証
     assert len(result) == 15
-    assert result[0] == "mcp/docs/instructions"
-    assert "mcp/admin/tools/check-project" in result
+    assert result[0] == "mcp/project-index/instructions"
+    assert "mcp/project-index-admin/tools/check-project" in result
 
 
 def test_tool_unexpected_error() -> None:
