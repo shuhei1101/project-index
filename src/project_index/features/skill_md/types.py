@@ -36,6 +36,8 @@ class Problem:
     rule: str
     # 検査のモードの違反の `fix`
     fix: str = ""
+    # `ref` をたどる途中で最初に見つからなかったエージェントフローの `id`（工程だけが無い・同じ工程へ戻ったときは空）
+    missing_id: str = ""
 
     def line(self) -> str:
         """`{file}: {path}: {rule}` の 1 行を返却する。"""

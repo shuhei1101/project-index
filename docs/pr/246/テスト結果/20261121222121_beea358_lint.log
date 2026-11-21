@@ -1,0 +1,10 @@
+$ (rc=0; uv run ruff check . || rc=1; uv run ruff format --check . || rc=1; uv run pyright || rc=1; uv run complexipy src tests || rc=1; exit $rc)
+All checks passed!
+685 files already formatted
+0 errors, 0 warnings, 0 informations
+    test_write_docs_when_direct_commit_generator_failed 0  ✅  PASSED  
+    test_run_git_when_failed 0  ✅  PASSED  
+    test_run_script_when_failed 0  ✅  PASSED  
+    test_start_loading_when_failed 2  ✅  PASSED  
+────────────────────────── 🎉 Analysis completed! 🎉 ───────────────────────────
+exit=0

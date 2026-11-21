@@ -69,6 +69,12 @@ data_models:
         access: 公開
         default: '""'
         description: 検査のモードの違反の `fix` にする修正の方法
+      - name: missing_id
+        title: 見つからないエージェントフロー
+        type: str
+        access: 公開
+        default: '""'
+        description: '`ref` をたどる途中で最初に見つからなかったエージェントフローの `id`。工程だけが無いときと、たどった工程に戻ったときは空'
     methods:
       - name: line
         title: 標準エラーの行

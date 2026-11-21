@@ -13,6 +13,7 @@ side_effects: '生成のモードは、`type: skill` のエージェントフロ
 callers:
   - SC-7#scenarios[正常シナリオ（スキルのエージェントフローを書く）]
   - SC-7#scenarios[異常シナリオ（SKILL.md を組み立てられないエージェントフローを書く）]
+  - SC-7#scenarios[異常シナリオ（スキルが工程を埋め込むエージェントフローを消す）]
 exclusivity: 制限なし（同じエージェントフローからは同じバイト列を書き出す）。`write_docs` からは配信元ごとの排他ロックの中で呼ばれる
 request:
   - name: --check
@@ -33,6 +34,18 @@ request:
     location: argument
     description: 生成のモードで `generators[].run` が後ろに付与する書き込んだ文書のパス
     notes: 受け取るが、生成の対象は絞らない
+  - name: 環境変数 PROJECT_INDEX_VALIDATE_ON
+    type: str
+    required: false
+    location: argument
+    description: 検査のモードで `delete` のとき、削除の検査として動く。無いときとほかの値のときは書き込みの検査
+    notes: 環境変数で受け取る。`delete_docs` が `on` に `delete` を持つ `validators[]` に指定する（IF-7 の制約「削除の前の検査」）
+  - name: 環境変数 PROJECT_INDEX_DELETE_IDS
+    type: str
+    required: false
+    location: argument
+    description: 削除の検査で、同じ `delete_docs` の呼び出しが削除する全ての文書の `id`（1 行に 1 件）
+    notes: 環境変数で受け取る。削除の検査で無いときは、標準入力の文書の `id` だけを削除するものとして扱う
 request_example: |-
   ```bash
   project-index skill-md
@@ -72,14 +85,17 @@ constraints:
   - item: 書き出す先
     constraint: 配信元の直下からの `skill.path`。解決したパスが配信元の外部なら失敗にする。文字コードは UTF-8、改行は LF で、末尾を改行 1 つで終える
   - item: 検査のモード
-    constraint: '配信元のエージェントフローのうち、標準入力の YAML と同じ `id` のものを標準入力の YAML に置き換え（無ければ追加し）、全ての `type: skill` を組み立てる。`ref` が解決できない・`skill.path` が配信元の外部を指す・標準入力が YAML として読めないときに違反を出す。ファイルは書き出さない'
+    constraint: '削除の検査（制約「削除の検査」）でないときは、配信元のエージェントフローのうち、標準入力の YAML と同じ `id` のものを標準入力の YAML に置き換え（無ければ追加し）、全ての `type: skill` を組み立てる。`ref` が解決できない・`skill.path` が配信元の外部を指す・標準入力が YAML として読めないときに違反を出す。ファイルは書き出さない'
     notes: スキーマの検査は `write_docs` が先に実行するため、検査のモードでは繰り返さない
   - item: 検査が参照する文書
-    constraint: 検査のモードは 1 回に標準入力の 1 件だけを書き込む前の中身として扱い、ほかのエージェントフローは配信元のディスクの中身を読む。同じ `write_docs` の呼び出しのほかの操作は参照しない
+    constraint: 削除の検査でないときは、検査のモードは 1 回に標準入力の 1 件だけを書き込む前の中身として扱い、ほかのエージェントフローは配信元のディスクの中身を読む。同じ `write_docs` の呼び出しのほかの操作は参照しない
     notes: '`ref` される工程の名前を変えるときは、参照先に変更後の名前の工程を追加する・`ref` を修正する・変更前の工程を削除する、の 3 回の書き込みに分ける'
   - item: タイムアウト
     constraint: '`script_timeout_sec` の中で終わる'
     decided_by: NFR-1#requirements[スクリプトの制限時間]
+  - item: 削除の検査
+    constraint: '検査のモードで `PROJECT_INDEX_VALIDATE_ON` が `delete` のときは、配信元のエージェントフローから `PROJECT_INDEX_DELETE_IDS` の `id` のもの（無ければ標準入力の文書の `id` のもの）を除いて、残る全ての `type: skill` を組み立てる。解決できない `ref` のうち、参照先の `id` が標準入力の文書の `id` のものだけを違反にする。違反の `path` は `$`、`rule` には参照しているエージェントフローのパスと `id`・その工程の `ref` を入れる。ファイルは書き出さない'
+    notes: 参照先で絞るのは、`delete_docs` が削除する文書ごとに検査を実行し、違反をその文書の添字に付けるため
 flows:
   - name: 正常系
     summary: 組み立てた中身が今の SKILL.md と違うエージェントフローだけ、SKILL.md を書き出す
@@ -333,6 +349,39 @@ flows:
       - '標準エラーに `source`・`path`・`ref` が出る（`source: nothing` は端末の設定に無いこと、`ref: v9` は解けないこと）'
       - a の SKILL.md が作られず、b の SKILL.md のバイト列が実行の前と同じ
     test: test_error_when_schema_unresolvable
+  - name: 正常系（削除の検査で違反がある）
+    summary: '`ref` で埋め込まれるエージェントフローを、参照しているスキルを残して削除すると違反の JSON を出す'
+    setup:
+      - name: Mock
+        description: 正常系と同じ（標準入力と環境変数を差し替える）
+      - name: 配信元
+        description: 正常系（工程の埋め込み）の一時フォルダ（a の工程の 1 つが c の工程を `ref` で埋め込む）
+      - name: 標準入力と環境変数
+        description: 標準入力に c の YAML、`PROJECT_INDEX_VALIDATE_ON` に `delete`。`PROJECT_INDEX_DELETE_IDS` は 1 回目が c、2 回目が a と c
+    flow: |-
+      <!-- map: {"title": "正常系（削除の検査で違反がある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as 呼び出し元
+        participant G as project-index skill-md --check
+        participant F as 配信元のフォルダ
+
+        C->>G: 標準入力に c、削除する文書に c
+        G->>F: エージェントフローを読み込む
+        G->>G: 削除する文書を除いて全ての SKILL.md を組み立てる
+        G-->>C: a の ref の違反と終了コード 0
+        C->>G: 標準入力に c、削除する文書に a と c
+        G-->>C: [] と終了コード 0
+      ```
+
+      <!-- /map -->
+    expected:
+      - どちらも終了コードが 0
+      - 1 回目の標準出力の違反が 1 件で、`path` が `$`、`rule` に a のパスと解決できなくなる `ref` が入る
+      - 2 回目の標準出力が `[]`
+      - どのファイルのバイト列も変わらない
+    test: test_normal_when_check_delete
 test_file: tests/integration/server/test_skill_md.py
 visibility: internal
 tags:

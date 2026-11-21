@@ -1,0 +1,37 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: エージェントが、ほかのスキルが工程を埋め込むエージェントフローを削除しようとすると断られ、参照しているエージェントフローを受け取る流れを加える
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-15.yaml
+    impact: run_only
+    detail: 直コミットの削除も同じ削除の前の検査を通るため、直コミットで消す流れが変わらないことを確かめる
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: delete_docs が、スキルの ref の参照先のエージェントフローの削除を断ることと、断ったときの返却を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T12:52:27.213496+00:00'
+  - page: docs/guide/設定.md
+    new: false
+    change: validators[].on に削除の時点 delete と、受け取る環境変数の説明を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T12:52:27.213496+00:00'
+  - page: docs/guide/CLI.md
+    new: false
+    change: project-index skill-md --check の削除の検査（環境変数 PROJECT_INDEX_VALIDATE_ON=delete）を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T12:52:27.213496+00:00'
+scope_out:
+  - item: write_docs の rename でエージェントフローの id を変え、ほかのスキルの ref が解決できなくなる場合の検査
+    reason: 解消済み。rename は同じ配信元の `{旧 ID}#` で始まる文字列の値を全て書き換えるため、工程の ref も新しい ID になる（0bbe47b（#157）で入り、de74698（#165）で最後に変えた IF-6 の制約「改名の参照元」と write/references.py）
+    plan: none
+  - item: '削除した type: skill のエージェントフローの skill.path の SKILL.md を削除すること'
+    reason: 要望に含まれない。project-index skill-md の生成のモードは組み立てた中身と違う SKILL.md を書き換えるだけで、生成元の無い SKILL.md は残る
+    plan: '#248'

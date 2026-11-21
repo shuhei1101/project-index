@@ -656,3 +656,79 @@ def test_document_checker_check_when_script_outside_repository(
     checker.check(target, document, on="read")
     # 検証
     assert len(calls) == 2
+
+
+# check_delete
+
+
+def test_document_checker_check_delete(
+    make_checked_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """削除の時点の検査だけを環境変数つきで実行する（正常系）。"""
+    # 準備
+    calls: list[tuple[list[str], Any]] = []
+
+    def recording(run: Any, **kwargs: Any) -> ScriptResult:
+        calls.append((list(run), kwargs.get("env")))
+        return ScriptResult(stdout="[]", stderr="")
+
+    monkeypatch.setattr(service_module, "run_script", recording)
+    target = make_checked_target(
+        [
+            ScriptEntry(id="d", run=["delete-check"], on=["delete"]),
+            ScriptEntry(id="w", run=["write-check"], on=["write"]),
+        ],
+        row_validators=["d", "w"],
+    )
+    # 実行
+    violations = _checker({}).check_delete(target, make_document(), delete_ids=["a", "b"])
+    # 検証
+    assert violations == []
+    assert calls == [
+        (
+            ["delete-check"],
+            {"PROJECT_INDEX_VALIDATE_ON": "delete", "PROJECT_INDEX_DELETE_IDS": "a\nb"},
+        )
+    ]
+
+
+def test_document_checker_check_delete_when_violation(
+    make_checked_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+) -> None:
+    """検査の違反を返却する（正常系）。"""
+    # 準備
+    violation = {"path": "$", "rule": "参照されています", "fix": "参照元も消す"}
+    target = make_checked_target(
+        [ScriptEntry(id="d", run=_script([violation]), on=["delete"])], row_validators=["d"]
+    )
+    # 実行
+    violations = _checker({}).check_delete(target, make_document(), delete_ids=["a"])
+    # 検証
+    assert [(v.path, v.rule) for v in violations] == [("$", "d: 参照されています")]
+
+
+def test_document_checker_check_delete_when_deadline_passed(
+    make_checked_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """期限を過ぎた後は動かさない（異常系）。"""
+    # 準備
+    calls: list[Any] = []
+
+    def counting(run: Any, **kwargs: Any) -> Any:
+        calls.append(run)
+        raise AssertionError
+
+    monkeypatch.setattr(service_module, "run_script", counting)
+    target = make_checked_target(
+        [ScriptEntry(id="d", run=_script([]), on=["delete"])], row_validators=["d"]
+    )
+    deadline = Deadline(limit_sec=0, started=0, clock=_Clock(0))
+    # 実行・検証
+    with pytest.raises(WriteDeadlineExceededError, match="書き込みの期限"):
+        _checker({}).check_delete(target, make_document(), delete_ids=["a"], deadline=deadline)
+    assert calls == []

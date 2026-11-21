@@ -1129,6 +1129,42 @@ scenarios:
       - '`skill.path` を配信元の外部へ向ける書き込みは `isError: true` で、違反に `skill.path` が入る'
       - どちらの後も、ワークツリー x の a の YAML と `skills/a/SKILL.md` のバイト列が書き込み前と同じで、`../outside/SKILL.md` ができない
     test: test_error_when_skill_unbuildable
+  - name: 異常シナリオ（スキルが工程を埋め込むエージェントフローを消す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: サンプルの配信元
+        description: 異常シナリオ（SKILL.md を組み立てられないエージェントフローを書く）の配信元で、検査のモードを指す `validators[]` の行を削除の時点にも実行するようにしたもの
+        notes: 'a の工程の 1 つが `ref: b#steps[{b の工程の名前}]` で b を埋め込む。a の `related` は b を指さない'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` にワークツリー x のパスを指定する'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（スキルが工程を埋め込むエージェントフローを消す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: delete_docs(targets: b)
+        M->>M: validators の検査のモードで、b を除いた配信元から SKILL.md を組み立てる
+        M-->>A: isError（a の ref が解決できなくなる違反）
+        A->>M: delete_docs(targets: a と b)
+        M->>M: a と b を除いた配信元から SKILL.md を組み立てる
+        M->>WT: a と b のファイルを削除する
+        M-->>A: deleted
+      ```
+
+      <!-- /map -->
+    expected:
+      - 'b だけの削除は `isError: true` で、違反に参照している a の `id` と解決できなくなる `ref` が入る'
+      - b だけの削除の後、ワークツリー x の a・b の YAML と `skills/a/SKILL.md` のバイト列が削除の前と同じ
+      - 'b だけの削除を `dry_run: true` で実行すると、同じ違反を返却する'
+      - 'a と b を同じ `targets` に指定した削除は `applied: true` で、ワークツリー x の a・b の YAML が無い'
+      - a と b を同じ `targets` に指定した削除の後、ワークツリー x の `skills/a/SKILL.md` のバイト列が削除の前と同じ
+    test: test_error_when_delete_skill_ref_target
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 tags:
   - name: topic:文書

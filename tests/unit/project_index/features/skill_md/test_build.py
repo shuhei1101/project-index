@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
+from project_index.features.skill_md import build
 from project_index.features.skill_md.build import (
     build_skill_files,
     check_replacement,
@@ -534,3 +535,185 @@ def test_check_replacement_when_other_ref_broken(
     assert [problem.path for problem in problems] == ["$"]
     assert "docs/agent-flow/a.yaml" in problems[0].rule
     assert "steps[1].ref" in problems[0].rule
+
+
+def test_resolve_steps_when_chain_missing(
+    skill_flow: Callable[..., dict[str, Any]], flow_flow: Callable[..., dict[str, Any]]
+) -> None:
+    """連なる ref の途中のエージェントフローが無い（異常系）。"""
+    # 準備
+    a = _flow(
+        "docs/agent-flow/a.yaml",
+        skill_flow(
+            "a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "c#steps[取得する]"}]
+        ),
+    )
+    c = _flow(
+        "docs/agent-flow/c.yaml",
+        flow_flow("c", steps=[{"name": "取得する", "ref": "d#steps[渡す]"}]),
+    )
+    # 実行
+    _, problems = resolve_steps(a, {"a": a, "c": c})
+    # 検証
+    assert [problem.path for problem in problems] == ["steps[1].ref"]
+    assert [problem.missing_id for problem in problems] == ["d"]
+
+
+# check_deletion
+
+
+def test_check_deletion(
+    tmp_path: Path,
+    write_source: Callable[..., Path],
+    write_flow: Callable[[Path, str, dict[str, Any]], Path],
+    skill_flow: Callable[..., dict[str, Any]],
+    flow_flow: Callable[..., dict[str, Any]],
+) -> None:
+    """参照しているスキルを残して削除する（異常系）。"""
+    # 準備
+    root = _ref_source(tmp_path, write_source, write_flow, skill_flow, flow_flow)
+    text = json.dumps(flow_flow("c"))
+    before = sorted(path.read_bytes() for path in root.rglob("*") if path.is_file())
+    # 実行
+    problems = build.check_deletion(root, text, ["c"])
+    # 検証
+    assert [problem.path for problem in problems] == ["$"]
+    assert "docs/agent-flow/a.yaml" in problems[0].rule
+    assert "id: a" in problems[0].rule
+    assert "steps[1].ref" in problems[0].rule
+    assert sorted(path.read_bytes() for path in root.rglob("*") if path.is_file()) == before
+
+
+def test_check_deletion_when_referrer_deleted(
+    tmp_path: Path,
+    write_source: Callable[..., Path],
+    write_flow: Callable[[Path, str, dict[str, Any]], Path],
+    skill_flow: Callable[..., dict[str, Any]],
+    flow_flow: Callable[..., dict[str, Any]],
+) -> None:
+    """参照しているスキルも削除する（正常系）。"""
+    # 準備
+    root = _ref_source(tmp_path, write_source, write_flow, skill_flow, flow_flow)
+    text = json.dumps(flow_flow("c"))
+    # 実行
+    problems = build.check_deletion(root, text, ["a", "c"])
+    # 検証
+    assert problems == []
+
+
+def test_check_deletion_when_other_target(
+    tmp_path: Path,
+    write_source: Callable[..., Path],
+    write_flow: Callable[[Path, str, dict[str, Any]], Path],
+    skill_flow: Callable[..., dict[str, Any]],
+    flow_flow: Callable[..., dict[str, Any]],
+) -> None:
+    """ほかの削除する文書だけを指す ref は、その文書の検査に任せる（正常系）。"""
+    # 準備
+    write_source(tmp_path)
+    write_flow(
+        tmp_path,
+        "a",
+        skill_flow(
+            "a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "d#steps[取得する]"}]
+        ),
+    )
+    write_flow(tmp_path, "c", flow_flow("c"))
+    write_flow(tmp_path, "d", flow_flow("d"))
+    text = json.dumps(flow_flow("c"))
+    # 実行
+    problems = build.check_deletion(tmp_path, text, ["c", "d"])
+    # 検証
+    assert problems == []
+
+
+def test_check_deletion_when_unreferenced(
+    tmp_path: Path,
+    write_source: Callable[..., Path],
+    write_flow: Callable[[Path, str, dict[str, Any]], Path],
+    skill_flow: Callable[..., dict[str, Any]],
+    flow_flow: Callable[..., dict[str, Any]],
+) -> None:
+    """どの ref からも指されない（正常系）。"""
+    # 準備
+    root = _ref_source(tmp_path, write_source, write_flow, skill_flow, flow_flow)
+    write_flow(root, "b", flow_flow("b"))
+    text = json.dumps(flow_flow("b"))
+    # 実行
+    problems = build.check_deletion(root, text, [])
+    # 検証
+    assert problems == []
+
+
+def test_check_deletion_when_unreadable(
+    tmp_path: Path,
+    write_source: Callable[..., Path],
+    write_flow: Callable[[Path, str, dict[str, Any]], Path],
+    skill_flow: Callable[..., dict[str, Any]],
+    flow_flow: Callable[..., dict[str, Any]],
+) -> None:
+    """標準入力が YAML として読めない（異常系）。"""
+    # 準備
+    root = _ref_source(tmp_path, write_source, write_flow, skill_flow, flow_flow)
+    # 実行
+    problems = build.check_deletion(root, "id: [", ["c"])
+    # 検証
+    assert [problem.path for problem in problems] == ["$"]
+
+
+@pytest.mark.parametrize(
+    ("stdin_id", "expected"),
+    [
+        pytest.param("c", ["$"], id="middle"),
+        pytest.param("d", [], id="end"),
+    ],
+)
+def test_check_deletion_when_chain(
+    tmp_path: Path,
+    write_source: Callable[..., Path],
+    write_flow: Callable[[Path, str, dict[str, Any]], Path],
+    skill_flow: Callable[..., dict[str, Any]],
+    flow_flow: Callable[..., dict[str, Any]],
+    stdin_id: str,
+    expected: list[str],
+) -> None:
+    """連なる ref の参照先をまとめて削除する（異常系）。"""
+    # 準備
+    write_source(tmp_path)
+    write_flow(
+        tmp_path,
+        "a",
+        skill_flow(
+            "a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "c#steps[取得する]"}]
+        ),
+    )
+    write_flow(tmp_path, "c", flow_flow("c", steps=[{"name": "取得する", "ref": "d#steps[渡す]"}]))
+    write_flow(tmp_path, "d", flow_flow("d", steps=[{"name": "渡す", "body": "渡す。"}]))
+    text = json.dumps(flow_flow(stdin_id))
+    # 実行
+    problems = build.check_deletion(tmp_path, text, ["c", "d"])
+    # 検証
+    assert [problem.path for problem in problems] == expected
+
+
+def test_check_deletion_when_already_broken(
+    tmp_path: Path,
+    write_source: Callable[..., Path],
+    write_flow: Callable[[Path, str, dict[str, Any]], Path],
+    skill_flow: Callable[..., dict[str, Any]],
+    flow_flow: Callable[..., dict[str, Any]],
+) -> None:
+    """もともと解決できない ref は違反にしない（正常系）。"""
+    # 準備
+    write_source(tmp_path)
+    write_flow(
+        tmp_path,
+        "a",
+        skill_flow("a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "e#steps[無い]"}]),
+    )
+    write_flow(tmp_path, "c", flow_flow("c"))
+    text = json.dumps(flow_flow("c"))
+    # 実行
+    problems = build.check_deletion(tmp_path, text, ["c"])
+    # 検証
+    assert problems == []

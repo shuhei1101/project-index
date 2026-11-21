@@ -382,3 +382,32 @@ def test_error_when_schema_unresolvable(
     assert expected in err
     assert not (root / "skills/a/SKILL.md").exists()
     assert (root / "skills/b/SKILL.md").read_bytes() == b_before
+
+
+def test_normal_when_check_delete(
+    skill_source: Callable[..., Path],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """ref で埋め込まれるエージェントフローを、参照しているスキルを残して削除すると違反の JSON を出す（正常系）。"""
+    # 準備
+    root = skill_source({"a": _with_ref("取得する"), "b": B_FLOW, "c": C_FLOW})
+    monkeypatch.setenv("PROJECT_INDEX_VALIDATE_ON", "delete")
+    before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
+    # 実行
+    monkeypatch.setenv("PROJECT_INDEX_DELETE_IDS", "c")
+    monkeypatch.setattr(sys, "stdin", io.StringIO(_dump(C_FLOW)))
+    first_code = main(["skill-md", "--check"])
+    first, _ = capsys.readouterr()
+    monkeypatch.setenv("PROJECT_INDEX_DELETE_IDS", "a\nc")
+    monkeypatch.setattr(sys, "stdin", io.StringIO(_dump(C_FLOW)))
+    second_code = main(["skill-md", "--check"])
+    second, _ = capsys.readouterr()
+    # 検証
+    violations = json.loads(first)
+    assert (first_code, second_code) == (0, 0)
+    assert [violation["path"] for violation in violations] == ["$"]
+    assert "docs/agent-flow/a.yaml" in violations[0]["rule"]
+    assert "c#steps[取得する]" in violations[0]["rule"]
+    assert json.loads(second) == []
+    assert {path: path.read_bytes() for path in root.rglob("*") if path.is_file()} == before

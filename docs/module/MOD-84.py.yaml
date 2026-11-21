@@ -602,7 +602,7 @@ functions:
         type: DocumentChecker
         required: true
         passing: injected
-        description: 参照を外した文書の検査
+        description: 参照を外した文書の検査と、削除の前の検査
       - name: locks
         title: 配信元ごとの排他
         type: SourceLocks
@@ -640,6 +640,9 @@ functions:
          - バージョンの確かめ（前回読んだ内容は無し）
          - 同じ配信元の残る文書のうち、メタデータの `related` に `to` が消す文書の ID で `source` の無い行を持つ文書を集める。あれば `on_referenced` が `fail` なら参照元を添えた `DocumentReferencedError`、`unlink` なら参照元の `related` の列（種類の行の `metadata.related` の列名。無ければ `related`）からその行を除く操作を作る。除く配列は『列名の指す配列の取得』で取り、列名が `**.` で始まるときは最上位と入れ子の全ての配列から除く
       4. `atomic` が `True` で `failed` があれば、最初の失敗の例外を送る
+      4.5. 削除の前の検査（`_check_delete_validators`）: 手順 3 で残った対象ごとに、文書の検査.`check_delete` を `delete_ids`（残った対象の `id`）と `deadline`（手順 5 と同じ）で呼ぶ
+         - 違反のあった対象は、添字つきの `ValidationFailedError` で `failed` の行にする。`atomic` が `True` なら、その例外を送る
+         - `atomic` が `False` で違反があった場合、その対象を `delete_ids` から除き、残る対象の検査をやり直す。新規の違反が出なくなるまで繰り返す（最大で対象の件数の回数）。参照を外す操作は、最後まで残った対象の分だけにする
       5. 参照を外した文書を文書の検査に通す（違反は `ValidationFailedError`。`deadline` は `limits` があれば `limits.write_deadline`）
       6. `dry_run` なら `applied=False` で、`unlinked` に参照を外す文書と外した後のバージョンを入れて返す
       7. `limits` がある場合、文書の書き込みの手順 9 と同じに期限を確かめる
@@ -664,6 +667,9 @@ functions:
       - name: WriteDeadlineExceededError
         condition: 検査の前後か、ファイルを消す・置き換える前に `limits.write_deadline` を過ぎている
         message: 『期限』.期限の確認のまま
+      - name: ValidationFailedError
+        condition: '削除の時点（`on` に `delete`）の `validators[]` が違反を返却した（`atomic: true`）'
+        message: 添字つきの違反（検査の出力の `path`・`rule`・`fix`）
     unit_tests:
       - name: test_delete_docs
         case: 正常
@@ -735,6 +741,20 @@ functions:
         condition: '`records: items`・`body_file: path` の行で、要素 n1（`path: n1.md`）と `path` を持たない n4。n4 を消す'
         mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: 配列が n1 だけになり、`notes/n1.md` は残る
+      - name: test_delete_docs_when_delete_validator_fails
+        case: 異常
+        summary: 削除の時点の検査に合格しない
+        condition: '文書 2 に違反を出す `on: [delete]` の検査を持つ行で、文書 2 を削除する'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        expected: '`ValidationFailedError` の違反の `index` が 0、文書 2 のファイルが残る'
+        exception: 削除の時点の `validators[]` が違反を返却した
+      - name: test_delete_docs_when_delete_validator_retry
+        case: 正常
+        summary: 'atomic: false で failed の対象を除いて検査をやり直す'
+        condition: '`on: [delete]` の検査が、文書 1 には常に違反を出し、文書 2 には `PROJECT_INDEX_DELETE_IDS` に文書 1 が無いときだけ違反を出す。文書 1・文書 2・文書 3 を `atomic: false` で削除する'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        expected: 文書 1・文書 2 が `failed`、文書 3 が `deleted` で、文書 1・文書 2 のファイルが残り、文書 3 のファイルが無い
+        exception: '-'
 refs:
   - to: IF-6
     type: requires
