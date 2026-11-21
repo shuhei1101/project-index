@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from ruamel.yaml import YAML
 
+from project_index.features.documents.indexable import walk_files
 from project_index.features.documents.loader import collect_files
 from project_index.features.documents.schema import resolve_schema_refs
 from project_index.features.settings.query import config_path, load_terminal_config
@@ -44,6 +45,13 @@ SOURCE_CONFIG_FILE = "project-index.yaml"
 # SKILL.md の frontmatter の後ろに置く 1 行（`{path}` にエージェントフローのパス）
 GENERATED_COMMENT = (
     "<!-- {path} から生成した。このファイルを修正せず、設計書を修正して再生成する -->"
+)
+# 生成元の無い SKILL.md を探すときに照合するファイル名
+SKILL_FILE_NAME = "SKILL.md"
+# 生成元のコメントの行から `{path}` を取り出す正規表現
+_GENERATED_PATTERN = re.compile(
+    "^" + re.escape(GENERATED_COMMENT).replace(re.escape("{path}"), "(?P<path>.+?)") + "$",
+    re.MULTILINE,
 )
 # 検査のモードで、配信元に同じ `id` が無い標準入力のパス
 STDIN_PATH = "-"
@@ -379,6 +387,37 @@ def write_changed(root: Path, files: Sequence[SkillFile]) -> list[str]:
         replace_file(path, file.text)
         written.append(file.path)
     return sorted(written)
+
+
+def remove_orphans(root: Path, files: Sequence[SkillFile]) -> list[str]:
+    """生成元のコメントが `agent_flow` の行を指し、組み立てたどの SKILL.md でもないファイルを削除する。"""
+    table = _agent_flow_table(root)
+    built = {file.path for file in files}
+    removed: list[str] = []
+    for relative in walk_files(root):
+        *folders, name = relative.split("/")
+        # SKILL.md 以外・`.` で始まるフォルダの配下・今回組み立てたものは対象にしない
+        if name != SKILL_FILE_NAME or relative in built:
+            continue
+        if any(folder.startswith(".") for folder in folders):
+            continue
+        source = _generated_source(root / relative)
+        # 生成元のコメントが無い・エージェントフローの行の外を指すファイルは残す
+        if source is None or not table.matches(source):
+            continue
+        (root / relative).unlink()
+        removed.append(relative)
+    return sorted(removed)
+
+
+def _generated_source(path: Path) -> str | None:
+    """SKILL.md の生成元のコメントが指すパスを返却する（無ければ `None`）。"""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError, UnicodeDecodeError:
+        return None
+    match = _GENERATED_PATTERN.search(text)
+    return match.group("path") if match else None
 
 
 # ---- 書き込む前の検査 ----
