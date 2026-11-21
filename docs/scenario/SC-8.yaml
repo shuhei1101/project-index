@@ -147,6 +147,43 @@ scenarios:
       - 文書 1 に、語が入った区間（commit 1 の親から commit 1）と消えた区間（commit 2 から commit 3）を返す
       - '`contains` を渡さない同じ区間の呼び出しは、区間の両端で変わった文書 2 だけを返す（今と同じ）'
     test: test_normal_when_contains
+  - name: 正常シナリオ（既定の検索から除く条件に該当する文書を除く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+        notes: '-'
+      - name: 文書の行
+        description: 'sample の `project-index.yaml` の行 `assets`（`paths: [assets/*.yaml]`・`metadata: {status: state}`・`search_exclude: {field: status, op: eq, values: [inactive]}`）と、`assets/` の文書 `a1`（`state: active`）・`a2`（`state: inactive`）・`a3`（`state: active`）'
+        notes: '-'
+      - name: 変更の commit
+        description: 'ワークツリー x で `a1` と `a2` の `name` を変え、`a3` の `state` を `inactive` に変え、`state: inactive` の文書 `a4` を追加して `git commit` した commit'
+        notes: 親の commit を `from`、その commit を `to` に指定する
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（既定の検索から除く条件に該当する文書を除く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor R as レビュアー
+        participant M as 文書の MCP（/mcp）
+        participant G as sample の Git の履歴
+
+        R->>M: list_changes(from: 親の commit, to: 変更の commit, view: summary)
+        M->>G: 区間の両端の文書を参照し、文書が存在する端の全てで search_exclude に該当する文書を除く
+        M-->>R: a1 と a3 と、除いた文書の件数
+        R->>M: list_changes(同じ区間, include_excluded: true)
+        M-->>R: a1・a3 と、除外の表示を付けた a2・a4
+      ```
+
+      <!-- /map -->
+    expected:
+      - 既定の `list_changes` が `a1` と `a3` を返却し、区間の両端で除く条件に該当する `a2` と、区間の中で `inactive` のまま追加した `a4` を返却しない
+      - 区間の中で除く条件に該当するようになった `a3` は、変わったキー `state` つきで返却する
+      - '除いた文書が 2 件あることと `include_excluded: true` で取得できることを返却する'
+      - '`include_excluded: true` の `list_changes` が `a1`・`a2`・`a3`・`a4` を返却し、`a2` と `a4` に除外の表示を付ける'
+    test: test_normal_when_search_excluded
 lead: レビュアーが `list_changes` で区間の間に変わった文書と項目を確認するシナリオを定め、変更のレビューの流れを変えるときに参照する。
 tags:
   - name: topic:差分

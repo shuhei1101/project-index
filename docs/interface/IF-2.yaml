@@ -1258,6 +1258,49 @@ flows:
       - 要求ごとのログの行の、たどったファイルのキャッシュの件数が、最後の worktree A の呼び出しと最初の 2 回目で同じ
       - 全ての呼び出しが `isError` を持たずに文書を返す
     test: test_normal_when_many_worktrees_loaded
+  - name: 正常系（既定の検索から除く文書）
+    summary: '行の `search_exclude` に該当する文書を既定の結果から除き、`include_excluded: true` のときだけ除外の表示を付けて返却する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 文書
+        description: 'sample の `assets/` に `a1.yaml`（id `a1`・`state: active`）・`a2.yaml`（id `a2`・`state: inactive`）'
+      - name: 文書の行
+        description: '行 `assets`（`paths: [assets/*.yaml]`・`metadata: {status: state}`・`search_exclude: {field: status, op: eq, values: [inactive]}`）'
+      - name: 入力
+        description: '1 回目は `filter` が `kind` が `assets`、2 回目は `id` が `a2`、3 回目は 1 回目に `include_excluded: true` を加える、4 回目は `group_by: status`'
+    flow: |-
+      <!-- map: {"title": "正常系（既定の検索から除く文書）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+        participant ST as 配信元の文書
+
+        C->>T: filter（kind が assets）
+        T-->>ST: assets の文書を参照し、search_exclude に該当する a2 を除く
+        T-->>C: a1・excluded_count 1
+        C->>T: filter（id が a2）
+        T-->>C: 0 件・excluded_count 1
+        C->>T: filter（kind が assets）・include_excluded
+        T-->>C: a1・a2（excluded）
+        C->>T: group_by（status）
+        T-->>C: active 1 件
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目が `a1` の 1 件と `total_count: 1`・`excluded_count: 1` を返却し、`notes` に `include_excluded: true` で取得できることを出す'
+      - '2 回目が文書を返却せず、`total_count: 0`・`excluded_count: 1` を返却する'
+      - '3 回目が `a1` と `a2` を返却し、`a2` だけが `excluded: true` を持つ'
+      - 4 回目の `groups` が `active` の 1 件だけで、`inactive` を数えない
+    test: test_normal_when_search_excluded
+    refs:
+      - to: SC-6
+        item: scenarios[正常シナリオ（既定の検索から除く条件に該当する文書を除く）]
+        type: references
+        when: このインターフェースの入出力やフローを変えるときに、シナリオ『エージェントが調べる』の対応する流れと期待値を確認する。
 lead: '条件に該当する文書の取得・一覧・件数・集計を返却する `search_docs` の入出力を定め、`search_docs` を修正するときに参照する。'
 tags:
   - name: topic:クエリ
@@ -1529,6 +1572,14 @@ request:
     description: 用語。`alias_type` を持つ documents の行の文書のうち、`name` か `aliases` の値がこの単語に一致する文書に該当する
     notes: 条件の比較と同じ正規化（NFKC と `casefold`）をして完全一致で比べる。`filter` と同時に渡すと両方に当たる文書を返す。`alias_type` を持つ行が無い配信元では 0 件で、`notes` で知らせる
     status: planned
+  - name: include_excluded
+    type: bool
+    required: false
+    default: '`false`'
+    location: argument
+    description: '`true` のとき、配信元の設定の `documents[].search_exclude` に該当する文書も返却する'
+    notes: '`filter` が `id` の `eq` だけの呼び出しでも、`false` なら該当する文書を返却しない'
+    status: planned
 request_example: |-
   ```json
   {
@@ -1617,6 +1668,14 @@ response:
     type: bool
     description: 作業範囲の外から読んだか
     notes: '`format: markdown` は先頭の行に「作業範囲の外（参考）」を出し、`view: full` の `<document>` に `outside_scope="true"` を付ける'
+  - name: excluded_count
+    type: int
+    description: '`filter`・`term` に該当したうち、`documents[].search_exclude` に該当して除いた文書の件数'
+    notes: '`include_excluded: false` で 1 件以上除いたときだけ持つ。`notes` にも件数と `include_excluded: true` で取得できることを出す'
+  - name: items[].excluded
+    type: bool
+    description: '`documents[].search_exclude` に該当する文書か'
+    notes: '`include_excluded: true` で、該当する文書だけ `true` を持つ。`format: markdown` は表に `除外` の列を加え、該当する行に ✓ を出す'
 response_example: |-
   ```markdown
   sample: 該当 2 件・返却した 2 件
@@ -1734,6 +1793,9 @@ constraints:
   - item: 要求の中でたどるキャッシュ
     constraint: ワークツリーの読み込みで、消えたファイル・書き込んだファイルのキャッシュを捨てるときは、そのワークツリー・そのファイルのキャッシュだけをたどる。要求の中でたどるファイルのキャッシュの件数は、ほかに読み込んだワークツリーの数によらない
     notes: '全てのワークツリーのキャッシュをたどると、使ったワークツリーの数に比例して呼び出しが遅くなる（PR #236 の PoC 結果の No.2）'
+  - item: 既定の検索から除く文書
+    constraint: '`include_excluded: false` のとき、`filter`・`term` に該当した文書のうち、文書の行の `search_exclude` の条件に該当する文書を `items`・`total_count`・`view: count`・`group_by` の件数・`next_cursor` から除き、除いた件数を `excluded_count` にする。条件は `filter` と同じ照合（正規化・`match`・`case_sensitive`）で、文書のメタデータと種類の項目に適用する。`records` の行は要素ごとに適用する'
+    notes: '`search_exclude` を持たない行の文書は除かない。複数の配信元を指したときは配信元ごとの設定で除く'
 refs:
   - to: SC-6
     item: scenarios[正常シナリオ]

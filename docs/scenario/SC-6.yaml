@@ -1200,6 +1200,51 @@ scenarios:
       - 要求ごとのログの行に出る、要求の中でたどったファイルのキャッシュの件数が、最後の worktree A の `search_docs` と最初の 2 回目で同じ（ほかに読み込んだ worktree の数によらない）
       - ログに、要求ごとの実行スロットの待ち・排他の待ち・処理の時間の行と、実行中・待ち中の処理の数と RSS の定期の行が残る
     test: test_normal_when_many_worktrees_used
+  - name: 正常シナリオ（既定の検索から除く条件に該当する文書を除く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+        notes: '-'
+      - name: 文書
+        description: 'sample の `assets/` に YAML の文書 `a1.yaml`（id `a1`・`state: active`）と `a2.yaml`（id `a2`・`state: inactive`）を配置し、`docs/rule/` の文書 `c.yaml`（id `c`）の `related` に `a1` と `a2` を記載する'
+        notes: '-'
+      - name: 文書の行
+        description: 'sample の `project-index.yaml` の行 `assets`（`paths: [assets/*.yaml]`・`metadata: {status: state}`・`search_exclude: {field: status, op: eq, values: [inactive]}`）'
+        notes: 条件の構造は `search_docs` の `filter` と同じ
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（既定の検索から除く条件に該当する文書を除く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant ST as 配信元の文書
+
+        A->>M: search_docs(filter: kind が assets, view: summary)
+        M->>ST: assets の文書を参照し、search_exclude に該当する文書を除く
+        M-->>A: a1 と、除いた文書の件数
+        A->>M: search_docs(filter: id が a2)
+        M-->>A: 0 件と、除いた文書の件数
+        A->>M: search_docs(filter: kind が assets, include_excluded: true)
+        M-->>A: a1 と、除外の表示を付けた a2
+        A->>M: trace_related(from_ids: [c])
+        M-->>A: a1 と、除いた文書の件数
+        A->>M: trace_related(from_ids: [c], include_excluded: true)
+        M-->>A: a1 と、除外の表示を付けた a2
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`kind` が `assets` の `search_docs` が `a1` だけを返却し、既定の検索から除いた文書が 1 件あることと `include_excluded: true` で取得できることを返却する'
+      - '`id` が `a2` の `search_docs` が文書を返却せず、同じく除いた文書の件数と `include_excluded: true` を返却する'
+      - '`view: count` と `group_by` の件数にも `a2` を数えない'
+      - '`include_excluded: true` の `search_docs` が `a1` と `a2` を返却し、`a2` に除外の表示を付ける'
+      - '`trace_related` が関連の相手に `a1` だけを返却し、`include_excluded: true` を付けると `a2` も除外の表示を付けて返却する'
+      - '`search_exclude` を記載しない行の文書の結果は、記載する前と変わらない'
+    test: test_normal_when_search_excluded
 lead: エージェントが文書の MCP で、作業場所から使用できる配信元の文書を探して参照するシナリオを定め、調査の流れを変えるときに参照する。
 tags:
   - name: topic:クエリ
@@ -1217,7 +1262,7 @@ trigger: エージェントが作業に要る文書を探す
 preconditions:
   - project-index が起動し、配信元を配信している
   - 呼び出しの引数に、フックが作業場所 `cwd` と会話キー `session_id`・`agent_id` を入れている
-success_guarantee: '`scope.read` に当たる配信元の文書だけが返る。同じ会話で同じバージョンの本文は 2 回返らない。'
+success_guarantee: '`scope.read` に当たる配信元の文書だけが返る。配信元の設定の `documents[].search_exclude` に該当する文書は、`include_excluded: true` を付けた呼び出しだけが返却する。同じ会話で同じバージョンの本文は 2 回返らない。'
 minimal_guarantee: '読めない配信元・配信していない配信元・誤った条件を指した呼び出し、ワークツリーの読み込みが上限までに終了しない呼び出し、内部の処理が失敗した呼び出しは、`isError: true` で原因と次の手を返し、他の配信元の文書を返さない。'
 frequency: 作業のたび
 priority: 高

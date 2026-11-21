@@ -608,6 +608,30 @@ flows:
       - 2 回目の `violations` に `direct_commit.kinds[1]` があり、`rule` に `meme` が `documents[]` に無く直コミットを断ることがある
       - 2 回目の `warnings` に `direct_commit.branch` があり、`rule` に `develop` を指すワークツリーが無く直コミットを断ることがある
     test: test_normal_when_direct_commit_checked
+  - name: 正常系（既定の検索から除く条件に違反がある）
+    summary: '`search_docs` の `filter` に無い比べ方と、比べられない項目を持つ `search_exclude` を違反として返却する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: config
+        description: '`documents[0].search_exclude` が `{field: status, op: like, values: [inactive]}`、`documents[1].search_exclude` が `{field: body, op: contains, values: [廃止]}` の YAML の文字列'
+    flow: |-
+      <!-- map: {"title": "正常系（既定の検索から除く条件に違反がある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as check_project
+
+        C->>T: path・config
+        T-->>C: violations
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`violations` に `documents[0].search_exclude` と、比べ方 `like` を使用できない理由がある'
+      - '`violations` に `documents[1].search_exclude` と、`body` を比べられない理由がある'
+    test: test_normal_when_search_exclude_invalid
 lead: 配信元の設定・管理用の YAML・スクリプトを検証する管理の MCP の `check_project` の入出力を定め、`check_project` を修正するときに参照する。
 tags:
   - name: action:検査
@@ -788,5 +812,7 @@ constraints:
   - item: Git が無視するファイル
     constraint: 'Git の配信元（端末の設定の `storage.type` が `git`）では、読む作業ツリーで Git が無視するファイル（`.gitignore`・`info/exclude`・グローバルの除外）を `unindexed_files` に数えない。起動時の警告・状態の取得も同じ判定を使う。`storage.type: disk` と Git 管理外の配信元では数える。`project-index files` と文書の収集は Git の無視を参照しない'
     notes: 無視の一覧を git から取れないときは除かずに数え、違反・警告にしない
+  - item: 既定の検索から除く条件の検証
+    constraint: '`documents[].search_exclude` を `search_docs` の `filter` と同じ構造（`and`・`or`・`not` と条件）として検証する。`op` が比べ方の一覧に無い・`exists`・`not_exists` 以外で `values` が無い・`field` が共通のメタデータのキーと行の種類の項目のどれでもない（`body`・`*`・計算項目を含む）条件を、`documents[{番号}].search_exclude` の違反にする'
 test_file: tests/integration/server/test_check_project.py
 visibility: internal
