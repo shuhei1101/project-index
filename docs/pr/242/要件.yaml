@@ -1,0 +1,24 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: run_only
+    detail: エージェントが書き込む流れは変えないが、項目のパスの読み方と解決できない項目の削除の返し方が変わり、書き込みの結果を壊しうる
+    depends_on: []
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: run_only
+    detail: 配信元の文書の書き込みを含む全体の流れで、項目のパスの読み方の変更が書き込みを壊さないかを確かめる
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: 項目のパスの書き方に引用符で囲んだキー `["{キー}"]` を加え、解決できない `unset` の要素の扱いを書き換える
+    status: todo
+  - page: docs/guide/変更履歴.md
+    new: false
+    change: 項目のパスの引用符で囲んだキーと、解決できない `unset` の扱いの変更を次の版の行に追記する
+    status: todo
+scope_out:
+  - item: '`#` で始まる参照の型の項目のパスの `[...]` の中での引用符で囲んだキー'
+    reason: 参照の型の項目のパスの `[...]` は `x-key` の値で配列の要素を選ぶ別の読み方で、要望は `.` を含むマップのキーを指すことに限る。含めるかは IF-6 の設計で確かめてレビューで確定する
+    plan: none
