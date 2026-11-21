@@ -50,7 +50,7 @@ STDIN_PATH = "-"
 # `ref` の書式（`{エージェントフローの id}#steps[{工程の名前}]`）
 _STEP_REF = re.compile(r"^(?P<flow>[^\s#]+)#steps\[(?P<name>.+)\]$")
 # `ref` を引いた結果の工程と、引けなかったときの理由
-type _Resolved = tuple[dict[str, Any] | None, str]
+type _Resolved = tuple[dict[str, Any] | None, str, str]
 
 
 # ---- 読み込み ----
@@ -213,9 +213,13 @@ def resolve_steps(
         if not isinstance(ref, str):
             steps.append(step_map)
             continue
-        resolved, reason = _follow_ref(ref, by_id)
+        resolved, reason, missing_id = _follow_ref(ref, by_id)
         if resolved is None:
-            problems.append(Problem(file=flow.path, path=f"steps[{index}].ref", rule=reason))
+            problems.append(
+                Problem(
+                    file=flow.path, path=f"steps[{index}].ref", rule=reason, missing_id=missing_id
+                )
+            )
             continue
         steps.append(resolved)
     return steps, problems
@@ -228,17 +232,25 @@ def _follow_ref(ref: str, by_id: Mapping[str, AgentFlowFile]) -> _Resolved:
     while True:
         # 同じ工程へ戻った
         if current in visited:
-            return None, f"埋め込む工程 {ref} が同じ工程へ戻ります"
+            return None, f"埋め込む工程 {ref} が同じ工程へ戻ります", ""
         visited.add(current)
         target = _find_step(current, by_id)
         if target is None:
-            return None, f"埋め込む工程 {ref} がありません"
+            return None, f"埋め込む工程 {ref} がありません", _missing_flow(current, by_id)
         next_ref = target.get("ref")
         # 参照先も `ref` を持つ: さらにたどる
         if isinstance(next_ref, str):
             current = next_ref
             continue
-        return target, ""
+        return target, "", ""
+
+
+def _missing_flow(ref: str, by_id: Mapping[str, AgentFlowFile]) -> str:
+    """`ref` が指すエージェントフローが無ければその `id` を、あれば空を返却する。"""
+    matched = _STEP_REF.match(ref)
+    if matched is None or matched["flow"] in by_id:
+        return ""
+    return str(matched["flow"])
 
 
 def _find_step(ref: str, by_id: Mapping[str, AgentFlowFile]) -> dict[str, Any] | None:
@@ -398,6 +410,40 @@ def check_replacement(root: Path, text: str) -> list[Problem]:
     except InvalidAgentFlowError as error:
         return _for_stdin(error.problems, stdin_path)
     return []
+
+
+def check_deletion(root: Path, text: str, delete_ids: Sequence[str]) -> list[Problem]:
+    """削除する文書を除いた配信元で、標準入力の文書を指す `ref` が解決できなくなるスキルを返却する。"""
+    try:
+        value = load_yaml(text, file=STDIN_PATH)
+    except YamlLoadError as error:
+        return [Problem(file=STDIN_PATH, path="$", rule=f"YAML として読み込めません（{error}）")]
+    if not is_dict(value) or not isinstance(value.get("id"), str):
+        return [Problem(file=STDIN_PATH, path="$", rule="最上位が id を持つ辞書ではありません")]
+    deleted_id = cast("str", value["id"])
+    removed = set(delete_ids) or {deleted_id}
+    try:
+        flows, _ = load_agent_flows(root)
+    except InvalidAgentFlowError as error:
+        return _for_stdin(error.problems, STDIN_PATH)
+    # 削除する文書を除いた残りだけで工程をたどる
+    remaining = {
+        cast("str", flow.data.get("id")): flow
+        for flow in flows
+        if flow.data.get("id") not in removed
+    }
+    problems: list[Problem] = []
+    for flow in remaining.values():
+        if flow.data.get("type") != "skill":
+            continue
+        _, found = resolve_steps(flow, remaining)
+        # 最初に見つからないのが標準入力の文書の `ref` だけを違反にする
+        for problem in found:
+            if problem.missing_id != deleted_id:
+                continue
+            rule = f"{flow.path}（id: {flow.data.get('id')}）: {problem.path}: {problem.rule}"
+            problems.append(Problem(file=flow.path, path="$", rule=rule))
+    return problems
 
 
 def _for_stdin(problems: Sequence[Problem], stdin_path: str) -> list[Problem]:

@@ -25,7 +25,7 @@ from project_index.shared.errors import Violation
 from project_index.shared.hashing import value_hash
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
 
     from project_index.features.documents.store import DocumentStore
     from project_index.features.documents.types import Document
@@ -36,12 +36,22 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 VALIDATOR_ON_READ_CACHE = 4096
+# 削除の時点の `validators[]` に `delete` を指定する環境変数
+VALIDATE_ON_ENV = "PROJECT_INDEX_VALIDATE_ON"
+# 同じ呼び出しで削除する文書の `id` を 1 行に 1 件で指定する環境変数
+DELETE_IDS_ENV = "PROJECT_INDEX_DELETE_IDS"
 
 type _ReadKey = tuple[str, str, str, str, str, str, str]
 # (基準のフォルダ, `run`, Git の配信元か) → スクリプトの状態
 type ScriptStamps = dict[tuple[str, tuple[str, ...], bool], str]
 
-__all__ = ["VALIDATOR_ON_READ_CACHE", "DocumentChecker", "run_script"]
+__all__ = [
+    "DELETE_IDS_ENV",
+    "VALIDATE_ON_ENV",
+    "VALIDATOR_ON_READ_CACHE",
+    "DocumentChecker",
+    "run_script",
+]
 
 
 def _schema_file(schema_path: str | SchemaRef) -> str:
@@ -66,6 +76,7 @@ class DocumentChecker:
         document: Document,
         validator_id: str,
         deadline: Deadline | None = None,
+        env: Mapping[str, str | None] | None = None,
     ) -> tuple[list[Violation], bool]:
         """検査のスクリプト 1 つを動かし、違反と、動かせたかを返す。"""
         entry = target.source.script("validators", validator_id)
@@ -80,6 +91,7 @@ class DocumentChecker:
                 stdin=document.body,
                 timeout_sec=timeout_sec,
                 at=script_at(target),
+                env=env,
             )
         except ScriptError as error:
             # 期限で止めたスクリプトは、違反ではなく期限の超過にする
@@ -122,6 +134,28 @@ class DocumentChecker:
                         target, document, validator_id, on=on, deadline=deadline, stamps=stamps
                     )
                 )
+        return violations
+
+    def check_delete(
+        self,
+        target: Target,
+        document: Document,
+        *,
+        delete_ids: Sequence[str],
+        deadline: Deadline | None = None,
+    ) -> list[Violation]:
+        """`on` に `delete` を持つ `validators[]` を、削除する文書の `id` を環境変数に指定して実行する。"""
+        source = target.source
+        table = source.table(document.kind)
+        env = {VALIDATE_ON_ENV: "delete", DELETE_IDS_ENV: "\n".join(delete_ids)}
+        violations: list[Violation] = []
+        for validator_id in table.validators:
+            # 削除の時点を持たない検査は実行しない（スキーマ・ID の形・関連の種類も検査しない）
+            if "delete" not in source.script("validators", validator_id).on:
+                continue
+            # 削除の検査はキャッシュしない
+            found, _ = self._run_validator(target, document, validator_id, deadline, env=env)
+            violations.extend(found)
         return violations
 
     def _validate(
