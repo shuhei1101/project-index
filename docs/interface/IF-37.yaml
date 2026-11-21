@@ -97,8 +97,8 @@ constraints:
     constraint: '検査のモードで `PROJECT_INDEX_VALIDATE_ON` が `delete` のときは、配信元のエージェントフローから `PROJECT_INDEX_DELETE_IDS` の `id` のもの（無ければ標準入力の文書の `id` のもの）を除いて、残る全ての `type: skill` を組み立てる。解決できない `ref` のうち、参照先の `id` が標準入力の文書の `id` のものだけを違反にする。違反の `path` は `$`、`rule` には参照しているエージェントフローのパスと `id`・その工程の `ref` を入れる。ファイルは書き出さない'
     notes: 参照先で絞るのは、`delete_docs` が削除する文書ごとに検査を実行し、違反をその文書の添字に付けるため
   - item: 生成元の無い SKILL.md の削除
-    constraint: 生成のモードは、配信元の直下から再帰的に名前が `SKILL.md` のファイルを探し（`.` で始まるフォルダの配下は除く）、制約「組み立てる frontmatter と本文」の生成元のコメントの行を持つもののうち、今回組み立てたどの SKILL.md の `skill.path` でもないものを削除する。削除して空になったフォルダは削除しない
-    notes: エージェントフローの削除のほか、`type` を `skill` から変えた・`skill.path` を変えた後の前の SKILL.md も削除する。生成元のコメントの行を持たない SKILL.md は、エージェントフローから生成していないものとして削除しない
+    constraint: 生成のモードは、配信元の直下から再帰的に名前が `SKILL.md` のファイルを探し（`.` で始まるフォルダの配下は除く）、制約「組み立てる frontmatter と本文」の生成元のコメントの行を持ち、そのパスが `agent_flow` の文書の行の `paths` に該当し `exclude` に該当しない（制約「生成の対象」と同じ判定。ファイルが今は無くてもよい）もののうち、今回組み立てたどの SKILL.md の `skill.path` でもないものを削除する。削除して空になったフォルダは削除しない
+    notes: エージェントフローの削除のほか、`type` を `skill` から変えた・`skill.path` を変えた後の前の SKILL.md も削除する。生成元のコメントの行を持たない SKILL.md と、コメントのパスが `agent_flow` の `paths` の外（knowledge の `docs/skill/` の設計書など）を指す SKILL.md は、エージェントフローから生成していないものとして削除しない
 flows:
   - name: 正常系
     summary: 組み立てた中身が今の SKILL.md と違うエージェントフローだけ、SKILL.md を書き出す
@@ -391,7 +391,7 @@ flows:
       - name: Mock
         description: 正常系と同じ
       - name: 配信元
-        description: 正常系の一時フォルダで、b の SKILL.md を配置したまま b のエージェントフローを削除し、c の `type` を `skill`（`skill.path` は `skills/c/SKILL.md`）にして一度生成した後に `flow` へ戻し、生成元のコメントの行を持たない `skills/manual/SKILL.md` を追加したもの
+        description: 正常系の一時フォルダで、b の SKILL.md を配置したまま b のエージェントフローを削除し、c の `type` を `skill`（`skill.path` は `skills/c/SKILL.md`）にして一度生成した後に `flow` へ戻し、生成元のコメントの行を持たない `skills/manual/SKILL.md` と、`agent_flow` の `paths` の外の `docs/skill/x.yaml` を指す生成元のコメントの行を持つ `skills/x/SKILL.md` を追加したもの
         notes: a の SKILL.md は今のエージェントフローから生成した状態
     flow: |-
       <!-- map: {"title": "正常系（生成元の無い SKILL.md を削除する）"} -->
@@ -414,7 +414,7 @@ flows:
       - 終了コードが 0
       - 標準出力が b と c の SKILL.md のパスの 2 行（パスの昇順）
       - b と c の SKILL.md が無い
-      - a の SKILL.md と `skills/manual/SKILL.md` のバイト列が実行の前と同じ
+      - a の SKILL.md・`skills/manual/SKILL.md`・`skills/x/SKILL.md` のバイト列が実行の前と同じ
       - 続けてもう一度起動すると、標準出力が空で、どのファイルのバイト列も変わらない
     test: test_normal_when_orphan_removed
 test_file: tests/integration/server/test_skill_md.py
