@@ -11,10 +11,9 @@ use_cases:
     depends_on: []
   - kind: single
     scenario: docs/scenario/SC-10.yaml
-    impact: following
-    detail: 配信元の設定に除く条件を記載したときの確認と配信への反映が、設定の変更の流れに含まれる
-    depends_on:
-      - docs/scenario/SC-6.yaml
+    impact: changed
+    detail: 既定の検索から除く条件の構造の誤りを、設定の変更の確認で違反として受け取る
+    depends_on: []
   - kind: composite
     scenario: docs/scenario/SC-1.yaml
     impact: none
