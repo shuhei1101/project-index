@@ -1899,10 +1899,62 @@ def _apply_deletes(session: _Session, checker: DocumentChecker, request: DeleteR
         results.append(WriteResultItem(index=index, id=item.id, status="deleted"))
     if failures and request.atomic:
         raise failures[0][1]
+    rejected = _check_delete_validators(session, checker, request, accepted, results)
+    # 削除の時点の検査に合格しなかった文書は削除せず、その文書のために外す参照も外さない
+    accepted = [document for document in accepted if document.id not in rejected]
+    unlink_plan = {
+        referrer_id: removed - rejected
+        for referrer_id, removed in unlink_plan.items()
+        if removed - rejected
+    }
     _apply_unlinks(session, checker, unlink_plan)
     # 参照を外した文書と、外した後のバージョン
     unlinked = [(referrer_id, session.docs[referrer_id].version) for referrer_id in unlink_plan]
     return _Deleted(results=results, accepted=accepted, unlinked=unlinked, unlink_plan=unlink_plan)
+
+
+def _check_delete_validators(
+    session: _Session,
+    checker: DocumentChecker,
+    request: DeleteRequest,
+    accepted: list[Document],
+    results: list[WriteResultItem],
+) -> set[str]:
+    """削除の時点の `validators[]` を通し、合格しなかった文書の `id` を返す（`atomic` なら送る）。"""
+    index_of = {item.id: index for index, item in enumerate(request.targets)}
+    rejected: set[str] = set()
+    # 違反の出た文書を除いて残りを検査し直し、新規の違反が出なくなるまで繰り返す
+    while True:
+        remaining = [document for document in accepted if document.id not in rejected]
+        delete_ids = [document.id for document in remaining]
+        found: list[tuple[int, ValidationFailedError]] = []
+        for document in remaining:
+            violations = checker.check_delete(
+                session.target, document, delete_ids=delete_ids, deadline=session.deadline
+            )
+            if not violations:
+                continue
+            error = ValidationFailedError(
+                message=f"削除の時点の検査に通らない文書があります: {document.id}",
+                violations=violations,
+                next_steps=["違反を修正してから再実行してください"],
+            )
+            found.append((index_of[document.id], error))
+        # 新規の違反が無い: 残りを削除する
+        if not found:
+            return rejected
+        # 1 件でも違反がある `atomic: true`: 何も削除せずに送る
+        if request.atomic:
+            index, error = found[0]
+            raise dataclasses.replace(error, violations=_prefixed(index, error))
+        for index, error in found:
+            rejected.add(request.targets[index].id)
+            results[index] = WriteResultItem(
+                index=index,
+                id=request.targets[index].id,
+                status="failed",
+                errors=_prefixed(index, error),
+            )
 
 
 # 呼び出しが期限を渡さないとき（文書の MCP の外からの呼び出し）の書き込みの期限と応答の上限の既定値
