@@ -558,7 +558,7 @@ functions:
       description: 項目のパスを戻した並び（順序を保つ）
     process: |-
       1. `path` を最初の `.` で `unset`・`remove_from` と残りのパスに分ける
-      2. `given` の同じ項目（`unset` の要素・`remove_from` のキー）のうち、列名への読み替えの規則（列名に `[` を含まない共通のキーだけを読み替える）で残りのパスと同じになるものがあれば、残りのパスをそれに置き換える。オブジェクトの配列への書き戻しが足した `unset` の配列の列名は、列名がその配列になる共通のキーの `given` の要素に置き換える
+      2. `given` の同じ項目（`unset` の要素・`remove_from` のキー）のうち、列名への読み替えの規則（列名に `[` を含まない共通のキーだけを読み替える）で残りのパスと同じになるものがあれば、残りのパスをそれに置き換える。オブジェクトの配列への書き戻しが足した `unset` の配列の列名は、列名が `{配列}[].{項目}`（全ての要素のキー）でその配列になる共通のキーの `given` の要素に置き換える（選んだ要素のキーは書き戻しが配列の列を `unset` に足さないので対象にしない）
       3. どれにも当たらなければ `path` のまま返す
     unit_tests:
       - name: test_to_given_keys
@@ -573,4 +573,10 @@ functions:
         condition: '`labels: items[].name` の行で、指定した操作が `unset: [labels]`、集めた並びが `unset.items`'
         mock: なし
         expected: '`unset.labels`'
+      - name: test_to_given_keys_when_selected_key
+        case: 正常
+        summary: 選んだ要素のキーへは戻さない
+        condition: '`tags: tags[].name`・`main_tags: tags[main].name` の行で、指定した操作が `unset: [main_tags, tags]`、集めた並びが `unset.tags`'
+        mock: なし
+        expected: '`unset.tags`'
 visibility: internal
