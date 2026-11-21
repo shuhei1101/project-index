@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any
 
 from project_index.shared.hashing import content_hash, value_hash
@@ -592,3 +593,105 @@ def test_error_when_direct_commit_kind_not_allowed(
     assert run_git(direct.bare, "rev-parse", "develop").strip() == remote_before
     assert run_git(direct.develop, "rev-parse", "HEAD").strip() == head
     assert rule.exists()
+
+
+# 削除の時点の検査 `guard`。標準入力の文書が doc-1 なら常に違反を出し、doc-2 なら
+# PROJECT_INDEX_DELETE_IDS に doc-1 が無いときだけ違反を出す（PROJECT_INDEX_VALIDATE_ON が delete のときだけ）
+GUARD_SCRIPT = (
+    "import json, os, sys\n"
+    "doc_id = sys.stdin.read().splitlines()[0].removeprefix('id: ')\n"
+    "ids = os.environ.get('PROJECT_INDEX_DELETE_IDS', '').split()\n"
+    "on_delete = os.environ.get('PROJECT_INDEX_VALIDATE_ON') == 'delete'\n"
+    "bad = on_delete and (doc_id == 'doc-1' or (doc_id == 'doc-2' and 'doc-1' not in ids))\n"
+    "print(json.dumps([{'path': '$', 'rule': 'guard'}] if bad else []))\n"
+)
+GUARD_ROW = (
+    "    validators: [guard]\n"
+    "validators:\n"
+    "  - id: guard\n"
+    "    run: [python3, scripts/guard.py]\n"
+    "    on: [delete]\n"
+)
+# doc-1 だけに違反を出さない guard（2 回目の削除と、doc-1 が別の違反で failed になる確認に使う）
+LENIENT_GUARD_SCRIPT = GUARD_SCRIPT.replace("doc_id == 'doc-1' or ", "")
+
+
+def test_error_when_delete_validator_fails(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """on に delete を持つ validators[] が違反を返却する削除を、ファイルを削除する前に断る（異常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "project-index.yaml": sample_config_text(GUARD_ROW),
+            "scripts/guard.py": LENIENT_GUARD_SCRIPT,
+        }
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    doc_1 = worktree / "docs" / "doc-1.yaml"
+    doc_2 = worktree / "docs" / "doc-2.yaml"
+    only_2 = [{"id": "doc-2", "expected_version": _version(doc_2)}]
+    both = [
+        {"id": "doc-1", "expected_version": _version(doc_1)},
+        {"id": "doc-2", "expected_version": _version(doc_2)},
+    ]
+    call: dict[str, Any] = {"cwd": str(source.folder), "worktree": str(worktree)}
+    # 実行
+    first = env.call("delete_docs", targets=only_2, **call)
+    dry = env.call("delete_docs", targets=only_2, dry_run=True, **call)
+    loose = env.call("delete_docs", targets=only_2, atomic=False, **call)
+    files_after_first = (doc_1.is_file(), doc_2.is_file())
+    second = env.call("delete_docs", targets=both, **call)
+    # 検証
+    assert first.is_error
+    assert "ValidationFailedError" in first.text
+    assert "guard" in first.text
+    assert dry.is_error
+    assert "guard" in dry.text
+    assert not loose.is_error
+    assert [item["status"] for item in loose.data["results"]] == ["failed"]
+    assert "guard" in json.dumps(loose.data["results"][0]["errors"], ensure_ascii=False)
+    assert files_after_first == (True, True)
+    assert not second.is_error
+    assert [item["status"] for item in second.data["results"]] == ["deleted", "deleted"]
+    assert (doc_1.is_file(), doc_2.is_file()) == (False, False)
+
+
+def test_error_when_delete_validator_fails_retry(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """atomic: false で文書 1 が failed になると、文書 1 が消える前提で合格した文書 2 も削除しない（異常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "project-index.yaml": sample_config_text(GUARD_ROW),
+            "scripts/guard.py": GUARD_SCRIPT,
+        }
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    doc_1 = worktree / "docs" / "doc-1.yaml"
+    doc_2 = worktree / "docs" / "doc-2.yaml"
+    targets = [
+        {"id": "doc-1", "expected_version": _version(doc_1)},
+        {"id": "doc-2", "expected_version": _version(doc_2)},
+    ]
+    # 実行
+    result = env.call(
+        "delete_docs",
+        cwd=str(source.folder),
+        worktree=str(worktree),
+        targets=targets,
+        atomic=False,
+    )
+    # 検証
+    assert not result.is_error
+    assert [item["status"] for item in result.data["results"]] == ["failed", "failed"]
+    assert (doc_1.is_file(), doc_2.is_file()) == (True, True)
