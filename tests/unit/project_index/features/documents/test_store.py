@@ -912,6 +912,39 @@ def test_document_store_invalidate(document_store: DocumentStore, workspace: Tar
     assert result.documents[0].data["name"] == "Z"
 
 
+
+def test_document_store_invalidate_when_many_worktrees(
+    document_store: DocumentStore,
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+) -> None:
+    """ほかのワークツリーのキャッシュをたどらない（正常系）。"""
+    # 準備
+    clone = tmp_path / "clone"
+    write_files(clone, {"rules/a.yaml": "id: a\nname: 本体\n"})
+    source = make_served_source(
+        id="sample", root=clone, config=make_source_config(documents=[RULES_TABLE])
+    )
+    worktrees = [clone / ".claude" / "worktrees" / f"w{n:02d}" for n in range(30)]
+    targets = [make_target(source, base=w, worktree=w) for w in worktrees]
+    [write_files(w, {"rules/a.yaml": "id: a\nname: A\n"}) for w in worktrees]
+    [document_store.load(t) for t in targets]
+    edited = worktrees[0] / "rules" / "a.yaml"
+    other = (worktrees[1] / "rules" / "a.yaml").resolve()
+    stat = edited.stat()
+    edited.write_text("id: a\nname: Z\n", encoding="utf-8")
+    os.utime(edited, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+    document_store.invalidate([edited])
+    # 実行
+    result = document_store.load(targets[0])
+    # 検証
+    assert result.documents[0].data["name"] == "Z"
+    assert any(key[0] == other for key in document_store._files)  # noqa: SLF001
+
+
 def test_document_store_location(
     document_store: DocumentStore,
     workspace: Target,

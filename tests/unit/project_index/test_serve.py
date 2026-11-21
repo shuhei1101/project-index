@@ -245,6 +245,36 @@ def test_run_serve_when_restart(serve_settings: Path, monkeypatch: pytest.Monkey
     assert configs[0]["timeout_graceful_shutdown"] == 30 * 1.5
 
 
+
+def test_run_serve_when_stopped(serve_settings: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """再起動の要求が無い停止は os._exit で終える（正常系）。"""
+    # 準備
+    monkeypatch.setenv("PROJECT_INDEX_PORT", str(_free_port()))
+
+    def fake_run(self: uvicorn.Server, *args: Any, **kwargs: Any) -> None:
+        self.started = True
+
+    exited: list[int] = []
+    executed: list[tuple[str, list[str]]] = []
+
+    def fake_exit(code: int) -> None:
+        exited.append(code)
+        raise SystemExit(code)
+
+    def fake_execv(path: str, argv: list[str]) -> None:
+        executed.append((path, argv))
+
+    monkeypatch.setattr(uvicorn.Server, "run", fake_run)
+    monkeypatch.setattr(os, "_exit", fake_exit)
+    monkeypatch.setattr(os, "execv", fake_execv)
+    # 実行
+    with pytest.raises(SystemExit):
+        run_serve(argparse.Namespace())
+    # 検証
+    assert exited == [0]
+    assert executed == []
+
+
 def test_check_port() -> None:
     """空いているポート（正常系）。"""
     # 準備
