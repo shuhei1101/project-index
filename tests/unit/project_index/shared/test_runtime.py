@@ -44,8 +44,7 @@ async def _fill_docs(slots: ExecutionSlots, gate: threading.Event) -> list[async
     """文書の MCP の実行スロットを `DOCS_WORKERS` 本の止まった仕事で埋める。"""
     started = threading.Semaphore(0)
     tasks = [
-        asyncio.create_task(slots.run_docs(_blocker(gate, started)))
-        for _ in range(DOCS_WORKERS)
+        asyncio.create_task(slots.run_docs(_blocker(gate, started))) for _ in range(DOCS_WORKERS)
     ]
     # 全ての仕事が実行スロットのスレッドで動き始めるまで待つ
     for _ in range(DOCS_WORKERS):
@@ -133,7 +132,8 @@ def test_execution_slots_run_docs_when_raised() -> None:
     slots = ExecutionSlots()
 
     def fail() -> None:
-        raise RuntimeError("boom")
+        message = "boom"
+        raise RuntimeError(message)
 
     # 実行・検証
     with pytest.raises(RuntimeError, match="boom"):
@@ -246,12 +246,9 @@ def test_record_periodically(caplog: pytest.LogCaptureFixture) -> None:
     slots = ExecutionSlots()
 
     async def scenario() -> None:
-        task = asyncio.create_task(
-            record_periodically(slots, interval=0.01, read_rss=lambda: 100)
-        )
-        # 3 行書かれるまで待ってから取り消す
-        while len(_periodic_lines(caplog)) < 3:
-            await asyncio.sleep(0.01)
+        task = asyncio.create_task(record_periodically(slots, interval=0.01, read_rss=lambda: 100))
+        # 間隔の 20 倍の間動かしてから取り消す
+        await asyncio.sleep(0.2)
         task.cancel()
         await task
 
