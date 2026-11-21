@@ -219,8 +219,11 @@ def test_normal_when_docs_mcp_clogged(
     started = started_count(state_dir)
 
     def search(worktree: Path) -> None:
-        # 応答を待たずに切る要求もある（詰まった状態を作るだけで、結果は見ない）
-        with httpx.Client(timeout=5) as client, contextlib.suppress(httpx.TimeoutException):
+        # 詰まった状態を作るだけで結果は見ない（時間切れと、再起動で切られた空の応答は捨てる）
+        with (
+            httpx.Client(timeout=5) as client,
+            contextlib.suppress(httpx.HTTPError, ValueError, KeyError),
+        ):
             call_tool(client, port, "/mcp/", "search_docs", cwd=str(worktree), view="count")
 
     clogging = [threading.Thread(target=search, args=(w,)) for w in worktrees]
