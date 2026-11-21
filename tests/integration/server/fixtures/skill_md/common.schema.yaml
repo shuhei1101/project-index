@@ -1,0 +1,883 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: 共通の型
+description: 種別をまたいで使用する型。各種別の Schema から `common.schema.yaml#/$defs/{名前}` の `$ref` で使用する。
+x-rules:
+  - 項目のキーは英語で記載し、画面に出す日本語の名前は `title` で持つ。
+$defs:
+  markdown:
+    type: string
+    title: 本文
+    description: Markdown で記載する本文。定数は `!{名前}` で埋め込める。
+    contentMediaType: text/markdown
+    x-rules:
+      - 他の設計書を指すときは説明文の中にリンクを記載せず、関連は `refs`（`related_item` の配列）に持つ。
+  summary:
+    type: string
+    title: 概要
+    description: 1 行の要約。
+    x-used-by:
+      - 生成で、設計書の一覧と表の 1 行の説明にする。
+    minLength: 1
+    pattern: "^[^\\n]+$"
+  id:
+    type: string
+    title: ID
+    description: 設計書の変わらない ID。最上位の `id` に持つ。
+    x-used-by:
+      - 検査で、ほかの設計書の参照（`{ID}#{項目のパス}`）の解決先にする。
+      - 生成で、ページの名前と、ほかの設計書からのリンク先にする。
+    x-rules:
+      - 設計書を改名・移動しても変えない。
+      - '`{種別の接頭辞}-{連番}`、または設計書を作った PR の番号を挟んだ `{種別の接頭辞}-{PR の番号}-{PR の中の連番}` で振る。'
+    pattern: "^[A-Z]+-\\d+(-\\d+)?$"
+    examples:
+      - "IF-12"
+      - "IF-3038-1"
+  ref:
+    type: string
+    title: 参照
+    description: 設計書の項目を指す。`{ID}#{項目のパス}` で記載する。
+    x-used-by:
+      - 検査で、指す設計書と項目が実在するかを確認する。
+      - 生成で、指す設計書の項目へのリンクにする。
+      - レビューで、関連する設計書をたどって食い違いを確認する。
+    x-rules:
+      - ID は指す設計書の最上位の `id` にする。
+      - 同じ設計書の中は `#{項目のパス}` だけでよい。
+      - リストの項目は、その Schema の `x-key` で宣言したキーの値で `[{値}]` と指す（番号で指さない）。
+      - 設計書全体を指すときは `#` の後を空にする。
+      - 辞書のキーも `[{キー}]` で指し、`.` や空白を含むキーも 1 階層になる（`notes[main.py の補足]`）。
+      - 同じ `x-key` の値の要素の 2 つ目以降は `[{値}#{順番}]` と指す（`functions[main#3]`）。
+      - 同じ値の要素が無く末尾が `#{整数}` のときだけ、`[...]` の中の `#` を順番として扱う。
+    x-bad-examples:
+      - value: IF-12#flows[0]
+        reason: リストの項目を番号で指している
+    pattern: "^(?:[A-Z]+-\\d+(?:-\\d+)?)?#(?:[^\\s\\[]|\\[[^\\]]*\\])*$"
+    examples:
+      - "IF-12#flows[正常系]"
+      - "#functions[resolve_base].exceptions"
+      - "CFG-3#"
+      - "#notes[main.py の補足]"
+      - "#functions[main#3]"
+  related_item:
+    type: object
+    title: 関連
+    description: 別の設計書への関連 1 件。関連先の設計書の ID・項目のパス・関係の種類・いつ参照するかを持つ。
+    x-used-by:
+      - 検査で、`to` の設計書と `item` の項目が実在するかを確認する。
+      - 生成で、関連する設計書の項目へのリンクにする。
+      - レビューで、`when` の場面で関連する設計書をたどって食い違いを確認する。
+    x-shape: attributes
+    additionalProperties: false
+    required:
+    - to
+    - type
+    - when
+    properties:
+      to:
+        type: string
+        title: 相手の ID
+        description: 関連先の設計書の最上位の `id`。項目のパスは `item` に分ける。
+        x-used-by:
+          - 検査で、関連先の設計書が実在するかを確認する。
+          - project-index の `trace_related` で、文書の ID と一致させて関連をたどる。
+        pattern: "^[A-Z]+-\\d+(-\\d+)?$"
+        examples:
+          - "IF-12"
+          - "IF-3038-1"
+      item:
+        type: string
+        title: 項目のパス
+        description: 関連先の項目のパス。設計書全体を指すときは記載しない。
+        x-used-by:
+          - 検査で、`to` の設計書に項目が実在するかを確認する。
+          - 生成で、関連先の項目へのリンクにする。
+        x-rules:
+          - 記載方法は参照（`ref`）の `#` より後と同じにする。
+        pattern: "^(?:[^\\s\\[#]|\\[[^\\]]*\\])(?:[^\\s\\[]|\\[[^\\]]*\\])*$"
+        examples:
+          - "flows[正常系]"
+          - "functions[resolve_base].exceptions"
+      type:
+        type: string
+        title: 関係の種類
+        description: '関係の種類で、`requires`（前提にする）/ `references`（参照する）/ `replaces`（置き換える）/ `part_of`（一部になる）/ `change_together`（同時に修正する）のどれか。'
+        x-used-by:
+          - レビューで、関連先の変更がこの設計書へ及ぶかを判断する。
+          - project-index の `trace_related` で、たどった関連の影響の理由にする。
+        x-rules:
+          - 片側だけに記載し、逆向きはツールで出す。`change_together` だけは両側に記載する。
+          - '`type` と記載する側は、規約『ドキュメント管理』の「関連」と判定フローチャート『関連の張り方』で決める。'
+        enum:
+        - requires
+        - references
+        - replaces
+        - part_of
+        - change_together
+      when:
+        type: string
+        title: いつ参照するか
+        description: 関連先をいつ参照するかの 1 文。
+        x-used-by:
+          - 実装とレビューで、関連先を参照する場面を判断する。
+        x-rules:
+          - '`when` を記載できない関連は張らない。'
+        minLength: 1
+        pattern: "^[^\\n]+$"
+        examples:
+          - "例外の型を変えるときに、呼び出し側の異常系のフローを確認する。"
+      paths:
+        type: array
+        title: 対象のパス
+        description: 機械で判定できるときだけ、関連が該当するファイルの glob を並べる。
+        x-used-by:
+          - 検査で、該当するファイルを変えたときに関連先を確認させる。
+        items:
+          type: string
+          minLength: 1
+        examples:
+          - - "scripts/*.py"
+    examples:
+      - to: "IF-12"
+        item: "flows[正常系]"
+        type: requires
+        when: "入出力を変えるときに、インターフェース定義の正常系のフローと突き合わせる。"
+      - to: "CFG-3"
+        type: references
+        when: "設定値の既定値を確認するとき。"
+  related:
+    type: array
+    title: 関連
+    description: 関連する設計書の一覧。
+    x-used-by:
+      - 生成で、関連する設計書へのリンクにする。
+      - レビューで、関連する設計書をたどって食い違いを確認する。
+    maxItems: 8
+    items:
+      $ref: "#/$defs/related_item"
+  reason:
+    $ref: "#/$defs/markdown"
+    title: 理由
+    description: そうしている理由。参照する側の判断が変わるものだけを記載する。
+    x-used-by:
+      - レビューで、理由が今も成り立つかと、同じ判断を変える変更が無いかを確認する。
+  status:
+    type: string
+    title: 状態
+    description: 項目の状態で、`planned`（予定）/ `implemented`（実装済み）/ `deprecated`（非推奨）/ `removed`（廃止）のどれか。記載しなければ実装済みとして扱う。
+    x-used-by:
+      - 実装で、`planned` の項目を作る対象にし、`deprecated`・`removed` の項目を新しく使用しない。
+      - 生成で、状態の表示にする。
+    enum:
+    - planned
+    - implemented
+    - deprecated
+    - removed
+  verification_state:
+    type: string
+    title: 確認の状態
+    description: 外部 API・外部ライブラリの項目（パラメータ・フィールド・設定のキー）1 つを確認した方法で、`verified`（動かして確認した）/ `docs_only`（公式ドキュメントで確認しただけ）/ `unverified`（確認していない）のどれか。記載しなければ `unverified` として扱う。
+    x-used-by:
+      - 実装で、`docs_only`・`unverified` の値を使用する前に動かして確認し、`verified` へ書き換える。
+      - レビューで、`verified` でない値を確認せずに実装していないかを確認する。
+      - 生成で、表の確認の状態の列にする。
+    enum:
+    - verified
+    - docs_only
+    - unverified
+  verified_at:
+    type: string
+    title: 確認日時
+    description: '`verification_state` を `verified` にした日時（ISO 8601、タイムゾーン付き）。'
+    x-used-by:
+      - 保守で、外部 API・外部ライブラリのバージョンが上がったときに、その後に再確認したかを判断する。
+      - 生成で、表の確認日時の列にする。
+    format: date-time
+    examples:
+    - '2026-11-14T10:00:00+09:00'
+  visibility:
+    type: string
+    title: 公開
+    description: Pages に出すか（`user` はユーザー向けで Pages に出し、`developer` は開発者向けで dev-docs の画面だけで出す）。記載しなければ親の値を引き継ぎ、最上位の既定は `developer`。
+    x-used-by:
+      - 生成で、Pages に出すかを決める。
+    enum:
+    - user
+    - developer
+  doc_visibility:
+    type: string
+    title: 公開範囲
+    description: 文書を Pages に出す（`public`）か出さない（`internal`）かで、記載しなければ `internal` として扱う。項目の公開（`visibility` の `user` / `developer`）とは別。
+    x-used-by:
+      - 生成で、文書を Pages に出すかを決める。
+      - project-index の配信で、文書の公開範囲のメタデータにする。
+    enum:
+    - public
+    - internal
+  aliases:
+    type: array
+    title: 別名
+    description: 検索でヒットさせたい言い換え。
+    x-used-by:
+      - project-index の検索で、文書を名前と同じように検索できる言い換えにする。
+    items:
+      type: string
+      minLength: 1
+  tags:
+    type: array
+    title: タグ
+    description: |-
+      設計書を検索で絞り込むタグで、`name` にタグの名前（`action:`・`topic:`・`tool:` などで始める）、最も分量の多い主題 1 つに `main: true` を記載する。
+      付け方は knowledge の規約『文書のタグと description の記載』に従う。
+    x-used-by:
+      - project-index の検索で、文書をタグで絞り込む。
+    uniqueItems: true
+    items:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          title: タグの名前
+          description: タグの名前。`action:`・`topic:`・`tool:` などで始める。
+          x-used-by:
+            - 検索で、文書をタグで絞り込む値にする。
+          minLength: 1
+        main:
+          type: boolean
+          title: 主題
+          description: 最も分量の多い主題のタグだけ `true` にする。
+          x-used-by:
+            - 検索で、文書の主題のタグとして扱う。
+    examples:
+      - - name: topic:タグ
+          main: true
+        - name: action:記載
+  test:
+    type: string
+    title: テスト
+    description: 対応するテスト関数の名前。
+    x-used-by:
+      - 検査で、テストのファイルにその名前の関数があるかを確認する。
+      - レビューで、項目ごとにテストがあるかを確認する。
+    pattern: "^test_[A-Za-z0-9_]+$"
+  notes:
+    type: object
+    title: 補足
+    description: 項目に分けられない残り。セクションの名前 → 本文。
+    x-used-by:
+      - 実装で、項目に分けられない前提・制約を参照する。
+      - 生成で、セクションの名前を見出しにしたセクションにする。
+    x-rules:
+      - 同じ名前のセクションが多くの設計書に出たら、標準の項目へ格上げする候補にする。
+    additionalProperties:
+      $ref: "#/$defs/markdown"
+  map:
+    $ref: "#/$defs/markdown"
+    title: 図
+    description: mdmark の map の図。`<!-- map -->` から `<!-- /map -->` の範囲に記載した Mermaid の図を、座標を記載せずに自動で配置する。
+    x-used-by:
+      - 生成で、自動で配置した図にする。
+    x-rules:
+      - '`<!-- map -->` から `<!-- /map -->` の範囲に、```mermaid のコードブロックを 1 つ記載する。'
+      - Mermaid の 1 行目は `flowchart` か `sequenceDiagram` にする。
+      - '説明・案内・配置の上書きが要るときだけ、範囲の中に補足 `<!-- map-data: {JSON のオブジェクト} -->` を 1 つ記載する。'
+  flowchart:
+    type: object
+    title: フローチャート
+    description: '`flowchart` の元のデータ。図はこのノード・辺・枠・リンクから生成する。'
+    x-used-by:
+      - 生成で、図にする。
+    x-rules:
+      - '使用する項目の `x-shape: diagram` と `x-diagram` で図の種類を決める。'
+    additionalProperties: false
+    required:
+    - nodes
+    - edges
+    properties:
+      direction:
+        type: string
+        title: 向き
+        description: 図の向き（`TD` = 上から下 / `LR` = 左から右）。記載しなければ図の種類の既定（判定は `TD`、データフロー・アーキテクチャは `LR`）。
+        x-used-by:
+          - 生成で、図の向きにする。
+        enum:
+        - TD
+        - LR
+      nodes:
+        type: array
+        title: ノード
+        description: 図のノード。1 要素 = 1 ノード。
+        x-used-by:
+          - 生成で、図のノードにする。
+        x-key: id
+        items:
+          $ref: "#/$defs/flowchart_node"
+      edges:
+        type: array
+        title: 辺
+        description: 図に描く順の辺。
+        x-used-by:
+          - 生成で、図の矢印にする。
+        items:
+          type: object
+          additionalProperties: false
+          required:
+          - from
+          - to
+          properties:
+            from:
+              type: string
+              title: 元
+              description: 元のノードの `id`。
+              x-used-by:
+                - 生成で、矢印の元にする。
+                - 検査で、`nodes` にある `id` かを確認する。
+            to:
+              type: string
+              title: 先
+              description: 先のノードの `id`。
+              x-used-by:
+                - 生成で、矢印の先にする。
+                - 検査で、`nodes` にある `id` かを確認する。
+            label:
+              type: string
+              title: ラベル
+              description: 矢印のラベル。判定は `YES` / `NO`、データフローは流れるデータの名前。
+              x-used-by:
+                - 生成で、矢印のラベルにする。
+            line:
+              type: string
+              title: 線
+              description: 線の意味（`flow` = 処理の流れ / `read` = 読み取り / `write` = 書き込み / `reply` = 応答 / `loop` = 前の処理へ戻る）。記載しなければ `flow`。
+              x-used-by:
+                - 生成で、線の種類にする。
+              enum:
+              - flow
+              - read
+              - write
+              - reply
+              - loop
+            tip:
+              type: string
+              title: 詳細
+              description: 線のツールチップに出す詳細。ラベルを短く保つために記載する。
+              x-used-by:
+                - 生成で、線のツールチップにする。
+      frame:
+        type: object
+        title: 枠
+        description: 図の中で 1 つのシステムを囲む枠。
+        x-used-by:
+          - 生成で、システムを囲む枠にする。
+        additionalProperties: false
+        required:
+        - label
+        - nodes
+        properties:
+          label:
+            type: string
+            title: 表示
+            description: ノードを囲む枠の見出し。
+            x-used-by:
+              - 生成で、枠の見出しにする。
+          nodes:
+            type: array
+            title: 中のノード
+            description: 枠の中に配置するノードの `id`。
+            x-used-by:
+              - 生成で、枠の中に配置するノードを決める。
+            items:
+              type: string
+      clicks:
+        type: array
+        title: リンク
+        description: ノードを押したときに開くリンク。1 要素 = 1 ノード。
+        x-used-by:
+          - 生成で、ノードを押したときに開くリンクにする。
+        x-key: id
+        items:
+          type: object
+          additionalProperties: false
+          required:
+          - id
+          - href
+          properties:
+            id:
+              type: string
+              title: ノード
+              description: リンクを付けるノードの `id`。
+              x-used-by:
+                - 生成で、リンクを付けるノードを決める。
+            href:
+              type: string
+              title: リンク先
+              description: 押したときに開く先。同じ配信元の設計書を指す `id:{文書の ID}`・`id:{文書の ID}#{項目のパス}` を記載する。
+              x-used-by:
+                - 生成で、リンク先にする。
+              examples:
+                - id:IF-72-3
+                - id:IF-72-3#flows[正常系]
+  flowchart_node:
+    type: object
+    title: ノード
+    additionalProperties: false
+    required:
+    - id
+    - label
+    properties:
+      id:
+        type: string
+        title: ID
+        description: 図の中で一意なノードの ID。空白を含めない。
+        x-used-by:
+          - 生成で、辺・枠・リンクが指すノードを決める。
+        pattern: "^\\S+$"
+      label:
+        type: string
+        title: 表示
+        description: ノードに出す文言。半角の括弧は描画を崩すので全角で記載する。
+        x-used-by:
+          - 生成で、ノードの文言にする。
+      kind:
+        type: string
+        title: 要素の種類
+        description: |-
+          ノードが何を表すか（データフロー・アーキテクチャは `actor` = 人・外部の相手 / `process` = 処理 / `store` = データストア / `system` = システム・サブシステム / `external` = 外部システム、判定は `start` = 開始 / `question` = 質問 / `action` = アクション / `result` = 結果）。
+          記載しなければ `process`。
+        x-used-by:
+          - 生成で、ノードの形状と色にする。
+        enum:
+        - actor
+        - process
+        - store
+        - system
+        - external
+        - start
+        - question
+        - action
+        - result
+      hint:
+        type: string
+        title: 説明
+        description: ノードのツールチップに出す説明の文。表示を短く保つために記載する。
+        x-used-by:
+          - 生成で、ノードのツールチップにする。
+  state_transitions:
+    type: object
+    title: 状態遷移
+    description: 状態の一覧と遷移の表。状態遷移図はここから生成する。
+    x-used-by:
+      - 生成で、Mermaid の `stateDiagram-v2` の状態遷移図と、状態・遷移の表にする。
+      - 実装で、状態の値と許可する遷移の判定にする。
+      - テストで、許可した遷移と許可しない遷移のケースにする。
+    additionalProperties: false
+    required:
+    - states
+    - initial
+    - transitions
+    properties:
+      states:
+        type: array
+        title: 状態
+        description: 取りうる状態。1 要素 = 1 状態。
+        x-used-by:
+          - 実装で、状態の値の一覧にする。
+        x-key: name
+        x-shape: table
+        minItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required:
+          - name
+          - identifier
+          properties:
+            name:
+              type: string
+              title: 状態名
+              description: 業務用語での状態の名前。遷移の元・先はこの名前で指す。
+              x-used-by:
+                - 生成で、図の状態の名前にする。
+                - 設計で、遷移の元・先から状態を指す名前にする。
+            identifier:
+              type: string
+              title: 識別子
+              description: 実装上の値・ラベル・フラグ。
+              x-used-by:
+                - 実装で、状態を表す値・ラベル・フラグにする。
+              examples:
+                - status = draft
+            sub_identifier:
+              type: string
+              title: 備考識別子
+              description: 複数の識別子で状態を表すときの補助の識別子（assignee・補助ラベル 等）。
+              x-used-by:
+                - 実装で、識別子と組み合わせて状態を判定する値にする。
+            entry_condition:
+              type: string
+              title: 入る条件
+              description: この状態に入る条件。
+              x-used-by:
+                - 実装で、状態に入る前に確認する条件にする。
+                - テストで、条件を満たさないときに状態に入らないケースにする。
+            entry_value:
+              type: string
+              title: 入る値
+              description: この状態に入ったときに入る値。
+              x-used-by:
+                - 実装で、状態に入ったときに書き込む値にする。
+              examples:
+                - '`started_at` が入る'
+            on_enter:
+              type: string
+              title: 入る時の処理
+              description: 状態に入ったときに実行する処理。
+              x-used-by:
+                - 実装で、状態に入ったときに実行する処理にする。
+            on_exit:
+              type: string
+              title: 出る時の処理
+              description: 状態を出るときに実行する処理。
+              x-used-by:
+                - 実装で、状態を出るときに実行する処理にする。
+            notes:
+              $ref: "#/$defs/markdown"
+              title: 補足
+              x-used-by:
+                - 実装で、状態に入る・出る前に満たす前提を、検証の処理にする。
+      initial:
+        type: string
+        title: 初期状態
+        description: 作成時に入る状態の名前。
+        x-used-by:
+          - 実装で、作成時に入れる状態にする。
+          - 生成で、図の開始の矢印にする。
+      final:
+        type: array
+        title: 終了状態
+        description: 消える前の最後の状態の名前。
+        x-used-by:
+          - 実装で、遷移を受け付けない状態にする。
+          - 生成で、図の終了の矢印にする。
+        items:
+          type: string
+      transitions:
+        type: array
+        title: 遷移
+        description: 許可された遷移。図はこの並びで描く。
+        x-used-by:
+          - 実装で、許可する遷移の一覧にする。
+          - テストで、遷移ごとのケースにする。
+        x-shape: table
+        minItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required:
+          - from
+          - to
+          properties:
+            from:
+              type: string
+              title: 元
+              description: 元の状態の名前。どの状態からも入る遷移は `全状態`。
+              x-used-by:
+                - 実装で、遷移を許可する元の状態にする。
+            to:
+              type: string
+              title: 先
+              description: 先の状態の名前。入る前の状態へ戻る遷移は `元の状態`。
+              x-used-by:
+                - 実装で、遷移の先の状態にする。
+            trigger:
+              type: string
+              title: きっかけ
+              description: 遷移のきっかけになる操作や出来事。
+              x-used-by:
+                - 実装で、遷移のきっかけになる操作・出来事にする。
+                - 生成で、矢印のラベルにする。
+            condition:
+              type: string
+              title: 条件
+              description: きっかけに付く条件。図では `{きっかけ} [{条件}]` と描く。
+              x-used-by:
+                - 実装で、遷移する前に確認する条件にする。
+                - 生成で、矢印のラベルに添える。
+            action:
+              type: string
+              title: そのときの処理
+              description: 遷移のときに実行する処理。
+              x-used-by:
+                - 実装で、遷移のときに実行する処理にする。
+            self:
+              type: boolean
+              title: 状態を出ない
+              description: 状態を出ずに処理だけを実行する遷移（元と先が同じ）。
+              x-used-by:
+                - 実装で、状態を変えずに処理だけを実行する遷移にする。
+                - 生成で、自分へ戻る矢印にする。
+            representative:
+              type: string
+              title: 代表
+              description: "`全状態` / `元の状態` の遷移を図で代表させる状態の名前。図には代表との遷移だけを描く。"
+              x-used-by:
+                - 生成で、`全状態`・`元の状態` の遷移を描く代表の状態にする。
+            note:
+              type: string
+              title: 注記
+              description: "`全状態` の遷移に図で添える注記。"
+              x-used-by:
+                - 生成で、`全状態` の遷移の注記にする。
+          allOf:
+            - if:
+                properties:
+                  from:
+                    const: 全状態
+                required:
+                - from
+              then:
+                required:
+                - representative
+            - if:
+                properties:
+                  to:
+                    const: 元の状態
+                required:
+                - to
+              then:
+                required:
+                - representative
+  er:
+    type: object
+    title: ER 図
+    description: 実体（テーブルとカラム）と関連。ER 図はここから生成する。
+    x-used-by:
+      - 生成で、Mermaid の `erDiagram` の ER 図にする。
+      - レビューで、テーブルどうしの関連と多重度が要件と合うかを確認する。
+    additionalProperties: false
+    required:
+    - entities
+    properties:
+      entities:
+        type: array
+        title: 実体
+        description: ER 図のテーブル。1 要素 = 1 テーブル。
+        x-used-by:
+          - 生成で、ER 図のテーブルにする。
+        x-key: name
+        items:
+          type: object
+          additionalProperties: false
+          required:
+          - name
+          properties:
+            name:
+              type: string
+              title: 名前
+              description: 図に出すテーブルの論理名。他の分類のテーブルは名前だけで配置する。
+              x-used-by:
+                - 生成で、テーブルの名前にする。
+                - 設計で、関連の元・先からテーブルを指す名前にする。
+            columns:
+              type: array
+              title: カラム
+              description: 図に描くカラム。記載しなければ、同じ設計書のテーブルのカラムから作る。
+              x-used-by:
+                - 生成で、テーブルに描くカラムにする。
+              items:
+                type: object
+                additionalProperties: false
+                required:
+                - type
+                - name
+                properties:
+                  type:
+                    type: string
+                    title: 型
+                    description: カラムの型。
+                    x-used-by:
+                      - 生成で、カラムの型にする。
+                  name:
+                    type: string
+                    title: 名前
+                    description: カラムの物理名。
+                    x-used-by:
+                      - 生成で、カラムの名前にする。
+                      - 設計で、関連の元の列・先の列から指す名前にする。
+                    pattern: "^\\S+$"
+                  key:
+                    type: string
+                    title: キー
+                    description: カラムのキーの種類（`PK`・`FK`・`UK`）。キーでないときは記載しない。
+                    x-used-by:
+                      - 生成で、主キー・外部キー・一意キーのマーカーにする。
+                    enum:
+                    - PK
+                    - FK
+                    - UK
+      relations:
+        type: array
+        title: 関連
+        description: テーブルどうしの関連。1 要素 = 1 本の線。
+        x-used-by:
+          - 生成で、ER 図の関連の線にする。
+        items:
+          type: object
+          additionalProperties: false
+          required:
+          - from
+          - to
+          - from_column
+          - to_column
+          - from_cardinality
+          - to_cardinality
+          properties:
+            from:
+              type: string
+              title: 元
+              description: 線の元のテーブルの名前。
+              x-used-by:
+                - 生成で、線の元のテーブルにする。
+            to:
+              type: string
+              title: 先
+              description: 線の先のテーブルの名前。
+              x-used-by:
+                - 生成で、線の先のテーブルにする。
+            from_column:
+              type: string
+              title: 元の列
+              description: 関連が結ぶ元の実体の列の名前。
+              x-used-by:
+                - 実装で、外部キーが参照する列にする。
+                - 生成で、線の元の列にする。
+            to_column:
+              type: string
+              title: 先の列
+              description: 関連が結ぶ先の実体の列の名前。
+              x-used-by:
+                - 実装で、外部キーの列にする。
+                - 生成で、線の先の列にする。
+            from_cardinality:
+              $ref: "#/$defs/er_cardinality"
+              title: 元の多重度
+            to_cardinality:
+              $ref: "#/$defs/er_cardinality"
+              title: 先の多重度
+            label:
+              type: string
+              title: ラベル
+              description: 関連の意味を表す短い動詞句（`持つ`・`属する` 等）。
+              x-used-by:
+                - 生成で、線のラベルにする。
+  er_cardinality:
+    type: string
+    title: 多重度
+    description: 関連の片端の多重度（`1` = ちょうど 1 / `0..1` = 0 か 1 / `1..n` = 1 以上 / `0..n` = 0 以上）。
+    x-used-by:
+      - 生成で、線の端の多重度のマーカーにする。
+      - 実装で、外部キーの必須・一意の制約にする。
+    enum:
+    - "1"
+    - "0..1"
+    - "1..n"
+    - "0..n"
+    examples:
+      - "0..n"
+  decision:
+    type: string
+    title: 検討事項
+    description: 話し合いの記録の検討事項の ID。本文の文の中に記載せず、この項目に持つ。
+    x-used-by:
+      - 生成で、話し合いの記録の検討事項へのリンクにする。
+      - レビューで、根拠の検討事項の結論と食い違わないかを確認する。
+    pattern: "^[A-Z]+-[0-9]+$"
+    examples:
+      - "D-313"
+  model:
+    type: object
+    title: モデル
+    description: 使用するモデルと、モデルに指定する引数。『エージェントの定義』と『LLM の呼び出し』の `model` が使用する。
+    x-used-by:
+      - 実装で、起動コマンド・呼び出しに指定するモデルと引数にする。
+      - レビューで、ノードの役割に対して費用と質が釣り合うモデルかを確認する。
+    x-shape: attributes
+    additionalProperties: false
+    required:
+    - name
+    properties:
+      name:
+        type: string
+        title: モデルの ID
+        description: 起動の仕組み・呼び出しに指定するモデルの ID。
+        x-used-by:
+          - 実装で、起動コマンド・呼び出しのモデルの指定にする。
+        examples:
+        - claude-opus-5-5
+      params:
+        type: object
+        title: 引数
+        description: 推論の強さ・温度などの、モデルに指定する引数。
+        x-used-by:
+          - 実装で、起動コマンド・呼び出しの引数にする。
+        examples:
+        - effort: medium
+      reason:
+        type: string
+        title: 理由
+        description: そのモデルにする理由。
+        x-used-by:
+          - レビューで、費用と質の釣り合いを確認する。
+        examples:
+        - 進行の判断に推論の質が要るため
+  timeout:
+    type: object
+    title: 待つ上限
+    description: 待つ上限と値の導き方で、判定フローチャート『タイムアウトの決め方』で決める。『起動の構成』と『LLM の呼び出し』の `timeout` が使用する。
+    x-shape: attributes
+    additionalProperties: false
+    required:
+    - seconds
+    - basis
+    properties:
+      seconds:
+        type: integer
+        title: 秒数
+        description: 待つ秒数。
+        x-used-by:
+          - 実装で、待つ上限にする。
+        minimum: 1
+        examples:
+        - 8
+      basis:
+        type: string
+        title: 導き方
+        description: '『タイムアウトの決め方』の結果。`measured_p999`（実測の p99.9 + 50%）/ `published_spec`（公開仕様の値で、計測の作業を残す）/ `no_output`（無出力の時間）/ `measured_x10`（実測の 10 倍か外側の作業の上限）。'
+        x-used-by:
+          - レビューで、値の導き方を確認する。
+        enum:
+        - measured_p999
+        - published_spec
+        - no_output
+        - measured_x10
+      measured:
+        type: string
+        title: 導出の元の値
+        description: 導出の元にした値。`basis` が `published_spec` でないときは必須。
+        x-used-by:
+          - レビューで、値の根拠を確認する。
+        examples:
+        - p99.9 が 5.2 秒（1,200 回）
+    if:
+      properties:
+        basis:
+          not:
+            const: published_spec
+      required:
+      - basis
+    then:
+      required:
+      - measured

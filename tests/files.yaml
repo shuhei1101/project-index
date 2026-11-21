@@ -270,6 +270,27 @@ files:
   related:
   - to: IF-18
     type: tests
+- path: integration/server/fixtures/skill_md/agent_flow.schema.yaml
+  name: SKILL.md の生成の結合テストのエージェントフローのスキーマ
+  description: knowledge の design-schemas/v9.2.0 のエージェントフローのスキーマの複製を受け持ち、SKILL.md の生成の結合テストが参照先の配信元に commit するスキーマを更新するときに参照する。
+  tags:
+  - topic:テスト補助
+  - topic:スキーマ
+- path: integration/server/fixtures/skill_md/common.schema.yaml
+  name: SKILL.md の生成の結合テストの共通の定義のスキーマ
+  description: knowledge の design-schemas/v9.2.0 の設計書の共通の定義のスキーマの複製を受け持ち、SKILL.md の生成の結合テストが参照先の配信元に commit するスキーマを更新するときに参照する。
+  tags:
+  - topic:テスト補助
+  - topic:スキーマ
+- path: integration/server/test_skill_md.py
+  name: SKILL.md の生成の結合テスト
+  description: '`skill-md` の結合テストを受け持ち、SKILL.md の生成と書き込む前の検査の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-37
+    type: tests
 - path: integration/server/test_put_settings_sources.py
   name: 端末の設定の保存の結合テスト
   description: '`PUT /settings/sources` が送信しなかったキーを残して `sources[]` を書き換え、内容のバージョンの照合で更新前のバージョンの要求を断ることを確認する結合テストを受け持ち、端末の設定の保存の応答と排他を変えるときに参照する。'
