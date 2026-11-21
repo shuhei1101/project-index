@@ -6,6 +6,7 @@ import asyncio
 import concurrent.futures
 import contextlib
 import contextvars
+import functools
 import logging
 import os
 import threading
@@ -14,7 +15,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Generator
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,7 @@ class ExecutionSlots:
             return self._running, self._waiting
 
     @contextlib.contextmanager
-    def request(self, tool: str, *, source: str | None = None) -> Iterator[RequestRecord]:
+    def request(self, tool: str, *, source: str | None = None) -> Generator[RequestRecord]:
         """1 回の要求の間、要求の記録を今の文脈に置き、抜けるときに 1 行でログに残す。"""
         record = RequestRecord(tool, source)
         token = _current.set(record)
@@ -179,7 +180,9 @@ class ExecutionSlots:
         """関数を管理の MCP の実行スロットで動かす。"""
         context = contextvars.copy_context()
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(self.admin_executor, context.run, func, *args)
+        return await loop.run_in_executor(
+            self.admin_executor, context.run, functools.partial(func, *args)
+        )
 
 
 def read_rss_mb() -> int | None:
