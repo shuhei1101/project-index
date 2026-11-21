@@ -1163,6 +1163,7 @@ scenarios:
       - b だけの削除の後、ワークツリー x の a・b の YAML と `skills/a/SKILL.md` のバイト列が削除の前と同じ
       - 'b だけの削除を `dry_run: true` で実行すると、同じ違反を返却する'
       - 'a と b を同じ `targets` に指定した削除は `applied: true` で、ワークツリー x の a・b の YAML が無い'
+      - a と b を同じ `targets` に指定した削除の後、ワークツリー x の `skills/a/SKILL.md` のバイト列が削除の前と同じ
     test: test_error_when_delete_skill_ref_target
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 tags:
