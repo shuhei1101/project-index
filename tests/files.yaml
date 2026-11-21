@@ -784,6 +784,39 @@ files:
   related:
   - to: src/project_index/features/prompt_doc/runtime.py
     type: tests
+- path: unit/project_index/features/skill_md/conftest.py
+  name: SKILL.md の生成の単体テストの共通の準備
+  description: 一時の配信元の設定・スキーマ・エージェントフローを作るフィクスチャを受け持ち、SKILL.md の生成の単体テストの準備を修正するときに参照する。
+  tags:
+  - topic:テスト補助
+  - tool:pytest
+- path: unit/project_index/features/skill_md/test_build.py
+  name: エージェントフローの読み込み・SKILL.md の組み立て・書き出し・書き込む前の検査の単体テスト
+  description: SKILL.md の生成の build.py の単体テストを受け持ち、SKILL.md の生成の build.py のテストを修正するときに参照する。
+  tags:
+  - topic:スキル
+  - tool:pytest
+  related:
+  - to: src/project_index/features/skill_md/build.py
+    type: tests
+- path: unit/project_index/features/skill_md/test_cli.py
+  name: '`project-index skill-md` の処理の単体テスト'
+  description: SKILL.md の生成の cli.py の単体テストを受け持ち、SKILL.md の生成の cli.py のテストを修正するときに参照する。
+  tags:
+  - topic:スキル
+  - tool:pytest
+  related:
+  - to: src/project_index/features/skill_md/cli.py
+    type: tests
+- path: unit/project_index/features/skill_md/test_types.py
+  name: SKILL.md の生成の型と例外の単体テスト
+  description: SKILL.md の生成の types.py の単体テストを受け持ち、SKILL.md の生成の types.py のテストを修正するときに参照する。
+  tags:
+  - topic:スキル
+  - tool:pytest
+  related:
+  - to: src/project_index/features/skill_md/types.py
+    type: tests
 - path: unit/project_index/features/read/conftest.py
   name: 読み取り API の単体テストの共通の準備
   description: 読み取り API の表示の環境を作るフィクスチャを受け持ち、読み取り API の単体テストの準備を修正するときに参照する。
