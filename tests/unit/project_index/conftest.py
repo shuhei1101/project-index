@@ -164,6 +164,7 @@ def make_handlers(make_terminal_config: Callable[..., TerminalConfig]) -> Callab
 
     from project_index.main import Handlers
     from project_index.shared.background import BackgroundGate
+    from project_index.shared.runtime import ExecutionSlots
 
     def _make(**overrides: Any) -> Handlers:
         values: dict[str, Any] = {field.name: None for field in dataclasses.fields(Handlers)}
@@ -173,6 +174,7 @@ def make_handlers(make_terminal_config: Callable[..., TerminalConfig]) -> Callab
                 "settings_lock": threading.Lock(),
                 "reload_sources": _no_reload,
                 "gate": BackgroundGate(),
+                "slots": ExecutionSlots(),
             }
         )
         values.update(overrides)
