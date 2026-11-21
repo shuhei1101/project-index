@@ -9,12 +9,13 @@ diagrams:
         文書のMCP ..> 実行スロット : run_docs
         読み取りAPI ..> 実行スロット : run_docs
         管理のMCP ..> 実行スロット : run_admin
-        実行スロット ..> 要求の記録 : 作る
+        実行スロット ..> 要求の記録 : request で作る
         文書のストア ..> 要求の記録 : current_record
         起動 ..> 実行スロット : 作る
         起動 ..> 定期の記録 : 裏で回す
         定期の記録 ..> 実行スロット : counts
         class 実行スロット {
+          +request()
           +run_docs()
           +run_admin()
           +counts()
@@ -37,7 +38,7 @@ data_models:
     usecase: 共通
     role: 状態
     summary: 1 回の要求の待ち・処理の時間と、要求の中でたどったファイルのキャッシュの件数を集める
-    description: '`ExecutionSlots.run_docs` が要求ごとに作り、`contextvars` の値として実行スロットのスレッドへ渡す。文書のストアは `current_record` で引いて書き足す。`@dataclass(slots=True)`。書き足しは要求のスレッドだけが行うため排他を持たない'
+    description: '`ExecutionSlots.request` が要求ごとに 1 つ作り、`contextvars` の値として置く。`run_docs` が文脈を写して実行スロットのスレッドへ渡す。文書のストアは `current_record` で引いて書き足す。`@dataclass(slots=True)`。書き足しは要求のスレッドだけが行うため排他を持たない'
     properties:
       - name: tool
         title: ツール
@@ -144,10 +145,11 @@ classes:
         access: 内部 (_)
         description: '`_running`・`_waiting` の読み書きを守る'
     methods:
-      - name: run_docs
-        title: 文書の MCP の実行スロットで動かす
+      - name: request
+        title: 要求の記録の範囲
         kind: メソッド
-        summary: 関数を文書の MCP の実行スロットで動かし、要求の記録を INFO の 1 行でログに残す（`async`）
+        summary: 1 回の要求の間、要求の記録を今の文脈に置き、抜けるときに INFO の 1 行でログに残す（`contextmanager`）
+        description: 文書の MCP のツールの入口（MOD-94）と読み取り API のルート（MOD-126）が、要求ごとに 1 回だけ入る。中で何回 `run_docs` を呼んでも、記録は 1 つで、行は抜けるときの 1 行だけになる。時間切れの後も続くワークツリーの読み込みのタスクは、タスクの中で自分の範囲（`tool` は `worktree_load`）に入り、別の 1 行を残す
         scope: public
         thread_safe: true
         side_effects: ログに 1 行書く
@@ -157,7 +159,43 @@ classes:
             type: str
             required: true
             passing: positional
-            description: 要求の記録の `tool`
+            description: MCP のツール名か、読み取り API のルートの名前
+          - name: source
+            title: 配信元
+            type: str | None
+            required: false
+            default: None
+            passing: keyword
+            description: 要求が指す配信元の ID
+        returns:
+          type: Iterator[RequestRecord]
+          description: 作った要求の記録
+        process: |-
+          1. `RequestRecord(tool, source)` を作り、`current_record` の `ContextVar` に置く（`set` のトークンを持つ）
+          2. 呼び出し側の処理を実行する
+          3. 抜けるとき、成否（正常は `ok`、`asyncio.CancelledError` は `cancelled`、それ以外の例外は `error`）を決め、`[info]` 要求を処理した（ツール・配信元・`slot_wait`・`lock_wait`・`elapsed`・`scanned`・成否）を書く
+          4. `ContextVar` をトークンで戻し、例外はそのまま伝える
+        unit_tests:
+          - name: test_execution_slots_request
+            case: 正常
+            summary: 1 要求で run_docs を 2 回呼んでも 1 行
+            condition: '`request("search_docs", source="sample")` の中で、キャッシュの件数を 2 足す関数と 3 足す関数を `run_docs` で 1 回ずつ動かす'
+            mock: なし（`caplog`）
+            expected: INFO の行が 1 行だけで、`search_docs`・`sample`・`scanned=5`・`ok` が入る
+          - name: test_execution_slots_request_when_cancelled
+            case: 異常
+            summary: 取り消しも 1 行残す
+            condition: '`request` の中で await しているタスクを取り消す'
+            mock: なし（`caplog`）
+            expected: '`CancelledError` が伝わり、INFO の 1 行に `cancelled` が入る'
+            exception: タスクが取り消される
+      - name: run_docs
+        title: 文書の MCP の実行スロットで動かす
+        kind: メソッド
+        summary: 関数を文書の MCP の実行スロットで動かし、今の要求の記録に実行スロットの待ちと処理の時間を足す（`async`）
+        scope: public
+        thread_safe: true
+        args:
           - name: func
             title: 関数
             type: Callable[..., T]
@@ -170,42 +208,44 @@ classes:
             required: false
             passing: positional
             description: '`*args`。`func` に渡す位置引数'
-          - name: source
-            title: 配信元
-            type: str | None
-            required: false
-            default: None
-            passing: keyword
-            description: 要求の記録の `source`
         returns:
           type: T
           description: '`func` の戻り値'
         process: |-
-          1. `RequestRecord(tool, source)` を作り、入れた時刻を `clock` で取る。`_guard` の中で `_waiting` を 1 つ進める
-          2. 呼び出し元の文脈を `contextvars.copy_context()` で写し、その中で要求の記録を `current_record` の値にしてから `func(*args)` を呼ぶ関数を、`loop.run_in_executor(docs_executor, ...)` で動かす
-          3. 実行スロットのスレッドで動き始めたら、`_guard` の中で `_waiting` を戻して `_running` を進め、`slot_wait` に入れてからの秒数を入れる
-          4. `func` が終わったら（例外のときも）、`elapsed` に動き始めてからの秒数を入れ、`_guard` の中で `_running` を戻す
-          5. `[info]` 要求を処理した（ツール・配信元・`slot_wait`・`lock_wait`・`elapsed`・`scanned`・成否）を書き、`func` の戻り値を返す（例外はそのまま伝える）
+          1. 入れた時刻を `clock` で取り、仕事の状態（`waiting`・`running`・`cancelled` のどれか。このファイルの中の小さな可変の値）を `waiting` で作る。`_guard` の中で `_waiting` を 1 つ進める
+          2. 呼び出し元の文脈を `contextvars.copy_context()` で写し、その中で次を行う関数を `loop.run_in_executor(docs_executor, ...)` で動かして await する
+             - 動き始めたら `_guard` の中で、状態が `waiting` なら `_waiting` を戻し、`cancelled` なら戻さない（手順 3 で戻し済み）。どちらも状態を `running` にして `_running` を進める
+             - `func(*args)` を呼ぶ。終わったら（例外のときも）`_guard` の中で `_running` を戻す
+             - 今の要求の記録（`current_record()`。無ければ足さない）に、`slot_wait`（入れてから動き始めるまで）と `elapsed`（動き始めてから終わるまで）を足す
+          3. await が `asyncio.CancelledError` で終わった場合、`_guard` の中で状態が `waiting` なら `_waiting` を戻して状態を `cancelled` にし、`CancelledError` を伝える（動き始める前に取り消された仕事は `ThreadPoolExecutor` が呼ばない。取り消しが間に合わず動き始めた仕事は、手順 2 が `_running` を進めて終わりに戻す）
+          4. `func` の戻り値を返す（例外はそのまま伝える）
         unit_tests:
           - name: test_execution_slots_run_docs
             case: 正常
-            summary: 戻り値と記録の 1 行
-            condition: キャッシュの件数を 3 足して `"ok"` を返す関数を `run_docs("search_docs", func, source="sample")` で動かす
-            mock: なし（`caplog`）
-            expected: '`"ok"` を返し、INFO の 1 行に `search_docs`・`sample`・`scanned=3` が入る'
+            summary: 戻り値と記録への足し込み
+            condition: '`request("search_docs")` の中で、`"ok"` を返す関数を `run_docs` で動かす'
+            mock: なし
+            expected: '`"ok"` を返し、記録の `elapsed` が 0 以上、`counts()` が `(0, 0)`'
           - name: test_execution_slots_run_docs_when_raised
             case: 異常
-            summary: 例外でも記録を残して数を戻す
+            summary: 例外でも数を戻す
             condition: '`RuntimeError` を送る関数を `run_docs` で動かす'
-            mock: なし（`caplog`）
-            expected: '`RuntimeError` が伝わり、INFO の 1 行が失敗で残り、`counts()` が `(0, 0)`'
+            mock: なし
+            expected: '`RuntimeError` が伝わり、`counts()` が `(0, 0)`'
             exception: '`func` が例外を送る'
           - name: test_execution_slots_run_docs_when_full
             case: 正常
             summary: 埋まっている間は待ち中に数える
-            condition: '`DOCS_WORKERS` 本の要求をイベントで止めたまま、もう 1 本を `run_docs` に入れる'
+            condition: '`DOCS_WORKERS` 本の要求をイベントで止めたまま、もう 1 本を `request` の中の `run_docs` に入れる'
             mock: なし
             expected: 止めている間の `counts()` が `(DOCS_WORKERS, 1)`。イベントを放した後のもう 1 本の記録の `slot_wait` が 0 より大きい
+          - name: test_execution_slots_run_docs_when_cancelled_while_waiting
+            case: 異常
+            summary: 動き始める前の取り消しで待ち中の数を戻す
+            condition: '`DOCS_WORKERS` 本の要求をイベントで止めたまま、`request` の中の `run_docs` に入れたもう 1 本のタスクを取り消し、その後イベントを放す'
+            mock: なし（`caplog`）
+            expected: 取り消しの直後の `counts()` が `(DOCS_WORKERS, 0)`、放した後が `(0, 0)`。取り消した関数は呼ばれず、INFO の 1 行に `cancelled` が入る
+            exception: タスクが取り消される
       - name: run_admin
         title: 管理の MCP の実行スロットで動かす
         kind: メソッド
@@ -252,7 +292,7 @@ functions:
     kind: 関数
     container: project_index/shared/runtime.py
     usecase: 共通
-    summary: 今の文脈の要求の記録を返す。`run_docs` の外なら `None`
+    summary: 今の文脈の要求の記録を返す。`request` の外なら `None`
     scope: public
     thread_safe: true
     returns:
@@ -263,7 +303,7 @@ functions:
       - name: test_current_record_when_outside
         case: 正常
         summary: 要求の外では None
-        condition: '`run_docs` の外で呼ぶ'
+        condition: '`request` の外で呼ぶ'
         mock: なし
         expected: '`None`'
   - name: read_rss_mb
