@@ -1,0 +1,17 @@
+docs:
+  - page: docs/test-procedure/TP-1.yaml
+    new: false
+    change: TL-1・TL-2 の run_all・run_one.command を `uv run --with-editable {observability のクローン} pytest` に書き換え、`{observability のクローン}` の置き換え方と、クローンが無い環境では `uv run pytest` で回してよいことを prerequisites に書く
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-18T01:25:28.958807+00:00'
+scope_out:
+  - item: TL-1・TL-2 の run_runner（GitHub Actions のランナーでの実行）と `.github/workflows/test.yml` の送信
+    reason: ランナーからは手元の観測基盤へ届かず、依存を変えない要望の範囲に入らない
+    plan: none
+  - item: テストを回す場所（各層の location）の変更
+    reason: 要望は手元で回すコマンドの書き換えだけで、テストを回す場所は変えない
+    plan: none
+  - item: TL-6 lint の送信
+    reason: pytest を回さないため pytest のプラグインの対象にならない
+    plan: none
