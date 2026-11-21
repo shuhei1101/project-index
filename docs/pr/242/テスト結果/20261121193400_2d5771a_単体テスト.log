@@ -1,0 +1,63 @@
+$ TMPDIR=/tmp/pi242-tmp uv run pytest tests/unit/
+# /tmp/pytest-of-shuhei2441 が root の所有で使えないため TMPDIR を作業用のフォルダに向けて実行した
+........................................................................ [  4%]
+........................................................................ [  9%]
+........................................................................ [ 14%]
+........................................................................ [ 19%]
+........................................................................ [ 24%]
+........................................................................ [ 29%]
+........................................................................ [ 33%]
+........................................................................ [ 38%]
+........................................................................ [ 43%]
+........................................................................ [ 48%]
+........................................................................ [ 53%]
+........................................................................ [ 58%]
+........................................................................ [ 63%]
+........................................................................ [ 67%]
+........................................................................ [ 72%]
+..................FFFF.................................................. [ 77%]
+........................................................................ [ 82%]
+........................................................................ [ 87%]
+........................................................................ [ 92%]
+........................................................................ [ 97%]
+...........................................                              [100%]
+=================================== FAILURES ===================================
+______________________ test_apply_operation_when_skipped _______________________
+
+    def test_apply_operation_when_skipped() -> None:
+        """何もしなかった unset・remove_from を集める（正常系）。"""
+>       from project_index.features.write.types import SkippedOperation
+E       ImportError: cannot import name 'SkippedOperation' from 'project_index.features.write.types' (/home/shuhei2441/repo/project-index/.claude/worktrees/fix-write-unset-dotted-key/src/project_index/features/write/types.py)
+
+tests/unit/project_index/features/write/test_apply.py:988: ImportError
+_____________ test_expand_array_keys_when_remove_from_missing_name _____________
+
+    def test_expand_array_keys_when_remove_from_missing_name() -> None:
+        """配列に無い名前の remove_from を集める（正常系）。"""
+        from project_index.features.write.apply import expand_array_keys
+>       from project_index.features.write.types import SkippedOperation
+E       ImportError: cannot import name 'SkippedOperation' from 'project_index.features.write.types' (/home/shuhei2441/repo/project-index/.claude/worktrees/fix-write-unset-dotted-key/src/project_index/features/write/types.py)
+
+tests/unit/project_index/features/write/test_apply.py:1015: ImportError
+______________________________ test_to_given_keys ______________________________
+
+    def test_to_given_keys() -> None:
+        """列名の項目のパスを指定したキーへ戻す（正常系）。"""
+>       from project_index.features.write.apply import to_given_keys
+E       ImportError: cannot import name 'to_given_keys' from 'project_index.features.write.apply' (/home/shuhei2441/repo/project-index/.claude/worktrees/fix-write-unset-dotted-key/src/project_index/features/write/apply.py)
+
+tests/unit/project_index/features/write/test_apply.py:1038: ImportError
+_____________________ test_to_given_keys_when_array_column _____________________
+
+    def test_to_given_keys_when_array_column() -> None:
+        """書き戻しが足した配列の列名を共通のキーへ戻す（正常系）。"""
+>       from project_index.features.write.apply import to_given_keys
+E       ImportError: cannot import name 'to_given_keys' from 'project_index.features.write.apply' (/home/shuhei2441/repo/project-index/.claude/worktrees/fix-write-unset-dotted-key/src/project_index/features/write/apply.py)
+
+tests/unit/project_index/features/write/test_apply.py:1056: ImportError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/write/test_apply.py::test_apply_operation_when_skipped
+FAILED tests/unit/project_index/features/write/test_apply.py::test_expand_array_keys_when_remove_from_missing_name
+FAILED tests/unit/project_index/features/write/test_apply.py::test_to_given_keys
+FAILED tests/unit/project_index/features/write/test_apply.py::test_to_given_keys_when_array_column
+4 failed, 1479 passed in 53.06s
