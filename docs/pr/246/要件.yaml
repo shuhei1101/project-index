@@ -26,3 +26,6 @@ scope_out:
   - item: write_docs の rename でエージェントフローの id を変え、ほかのスキルの ref が解決できなくなる場合の検査
     reason: 要望に含まれない。rename は参照元の ref を書き換えるかが設計の工程で分かるため、ここでは判断を確定させずレビューで確かめる
     plan: to_file
+  - item: '削除した type: skill のエージェントフローの skill.path の SKILL.md を削除すること'
+    reason: 要望に含まれない。project-index skill-md の生成のモードは組み立てた中身と違う SKILL.md を書き換えるだけで、生成元の無い SKILL.md は残る
+    plan: to_file
