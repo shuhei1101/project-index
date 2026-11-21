@@ -1306,9 +1306,9 @@ constraints:
     decided_by: NFR-1#requirements[稼働中の記録の間隔]
     notes: 'ログだけで劣化の始まりと詰まった処理を指せるようにする（PR #236 の要件 No.4）'
   - item: 文書の MCP・読み取り API の実行スロット
-    constraint: 文書の MCP・読み取り API の要求の処理は、asyncio の既定の実行スロットでなく、専用の実行スロットで動かす。停止・再起動は、終わらない専用の実行スロットのスレッドの終了を待たない
+    constraint: 文書の MCP・読み取り API の要求の処理は、asyncio の既定の実行スロットでなく、専用の実行スロットで動かす。停止・再起動は、終わらない専用の実行スロットのスレッドの終了を待たない。再起動は `os.execv`、停止（再起動の要求が無い終了）は、uvicorn の停止の後にログを閉じてから `os._exit` で終え、インタープリタの終了の待ちを通らない
     decided_by: NFR-1#requirements[文書の MCP の実行スロットの数]
-    notes: '`asyncio.Runner.close` は既定の実行スロットのスレッドの終了を `THREAD_JOIN_TIMEOUT`（300 秒）まで待つ。専用の実行スロットは待たないため、再起動の `os.execv` で残ったスレッドごとプロセスを置き換える'
+    notes: '`asyncio.Runner.close` は既定の実行スロットのスレッドの終了を `THREAD_JOIN_TIMEOUT`（300 秒）まで待つ。専用の `ThreadPoolExecutor` は `Runner.close` では待たないが、インタープリタの終了（`threading._register_atexit` の `_python_exit`）で上限なく待つため、停止も `os._exit` で終える。`atexit` に登録した後片付けは無い（`src/project_index` に `atexit` の登録が無い）。追加するときは `os._exit` の前に呼ぶ'
 refs:
   - to: SC-4
     item: scenarios[正常シナリオ]
