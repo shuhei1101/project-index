@@ -126,15 +126,23 @@ def test_run_serve(
         threads.append(thread)
         return thread
 
+    exited: list[int] = []
+
+    def fake_exit(code: int) -> None:
+        exited.append(code)
+        raise SystemExit(code)
+
     monkeypatch.setattr(uvicorn, "Config", recording_config)
     monkeypatch.setattr(uvicorn.Server, "run", fake_run)
     monkeypatch.setattr(main_module, "start_loading", recording_start_loading)
+    monkeypatch.setattr(os, "_exit", fake_exit)
     # 実行
-    code = run_serve(argparse.Namespace())
+    with pytest.raises(SystemExit):
+        run_serve(argparse.Namespace())
     threads[0].join(timeout=30)
     # 検証
     lines = capsys.readouterr().out.splitlines()
-    assert code == 0
+    assert exited == [0]
     assert lines.index(f"http://127.0.0.1:{port}/") < lines.index("sample")
     assert configs[0]["host"] == "127.0.0.1"
 
@@ -243,7 +251,6 @@ def test_run_serve_when_restart(serve_settings: Path, monkeypatch: pytest.Monkey
     # 検証
     assert executed == [(sys.executable, [sys.executable, "-m", "project_index", "serve"])]
     assert configs[0]["timeout_graceful_shutdown"] == 30 * 1.5
-
 
 
 def test_run_serve_when_stopped(serve_settings: Path, monkeypatch: pytest.MonkeyPatch) -> None:
