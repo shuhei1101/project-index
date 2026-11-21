@@ -54,14 +54,15 @@ exceptions:
   - name: なし（正常終了）
     condition: '全ての `type: skill` の SKILL.md を組み立て、中身が違うものを書き出した（生成のモード）。違反の JSON を出した（検査のモード）'
   - name: InvalidAgentFlow
-    condition: 生成のモードで、エージェントフローかスキーマが読み込めない・合わない、`ref` が解決できない、`skill.path` が配信元の外部を指す（終了コード 1）
-    notes: 標準エラーに全ての原因のエージェントフローのパスと項目を出し、標準出力には何も出さない
+    condition: 生成のモードで、エージェントフローかスキーマが読み込めない・合わない（ほかの配信元を指すスキーマの `source` が端末の設定に無い・`ref` を解けない・`path` が無いを含む）、`ref` が解決できない、`skill.path` が配信元の外部を指す（終了コード 1）
+    notes: 標準エラーに全ての原因のエージェントフローのパスと項目（スキーマを読み込めないときは `source`・`path`・`ref`）を出し、標準出力には何も出さない
 constraints:
   - item: 生成の対象
     constraint: 配信元の設定の `agent_flow` の文書の行の `paths` に該当し `exclude` に該当しないファイルのうち、`type` が `skill` のエージェントフロー。`type` が無いか `flow` のエージェントフローは、`ref` の参照先にだけ使用する
     notes: 書き込んだ文書のパス（位置引数）では絞らない。`ref` で埋め込む工程の修正がほかの SKILL.md に影響するため
   - item: スキーマの検査
-    constraint: 配信元の設定の `agent_flow` の行の `schema` で全てのエージェントフローを検査する。合わないエージェントフローが 1 件でもあれば、全ての合わないエージェントフローのパスと項目を出す
+    constraint: 配信元の設定の `agent_flow` の行の `schema` で全てのエージェントフローを検査する。`schema` がオブジェクト（`source`・`path`・`ref`）のときは、IF-12 の制約「ほかの配信元のスキーマの参照」と同じく、端末の設定の `sources` の `source` の行が指すリポジトリから、`ref` を commit に解いた `path` を Git のオブジェクトとして読み込む。合わないエージェントフローが 1 件でもあれば、全ての合わないエージェントフローのパスと項目を出す
+    notes: 端末の設定は、`project-index serve` と同じ読み込み先（CFG-1）から読み込む。端末の設定に `source` の行が無い・`ref` を commit に解けない・`path` がその commit に無いときは失敗にし、標準エラーに `source`・`path`・`ref` を出す
   - item: 書き出しの順序
     constraint: 全てのエージェントフローの読み込み・検査・`ref` の解決・全ての SKILL.md の組み立てを終えてから書き出す。書き出しの前に 1 件でも失敗したら、どのファイルも書き換えない
   - item: 組み立てる frontmatter と本文
@@ -86,8 +87,11 @@ flows:
       - name: Mock
         description: なし（`main(["skill-md"])` を同じプロセスで呼び、作業ディレクトリを一時フォルダにする）
       - name: 配信元
-        description: '`agent_flow` の行（knowledge の `agent_flow.schema.yaml` を一時フォルダに複製して指す）を持つ `project-index.yaml` と、`docs/agent-flow/` に a・b・c を持つ一時フォルダ。a は `type: skill` で SKILL.md がまだ無い。b は `type: skill` で SKILL.md が今のエージェントフローから生成した状態。c は `type: flow`'
+        description: '`agent_flow` の行の `schema` をオブジェクト（`source: schemas`・`path: agent_flow.schema.yaml`・`ref: v1`）にした `project-index.yaml` と、`docs/agent-flow/` に a・b・c を持つ一時フォルダ。a は `type: skill` で SKILL.md がまだ無い。b は `type: skill` で SKILL.md が今のエージェントフローから生成した状態。c は `type: flow`'
         notes: a は `skill.arguments` を 1 件、`skill.allowed_tools` を 1 件、`calls`（`command`・`tool`）を持つ工程と持たない工程を 1 つずつ持つ
+      - name: 参照先の配信元と端末の設定
+        description: knowledge の `agent_flow.schema.yaml`・`common.schema.yaml` をタグ `v1` で commit した一時の git リポジトリ schemas と、`sources` に schemas の行を持つ一時の端末の設定
+        notes: 端末の設定の読み込み先を `monkeypatch` で一時の端末の設定へ向ける。schemas の作業ツリーの `agent_flow.schema.yaml` は commit の後に壊しておき、commit の中身を参照することを確認する
     flow: |-
       <!-- map: {"title": "正常系"} -->
 
@@ -301,6 +305,34 @@ flows:
       - 標準エラーに a のパスと `skill.path` が出る
       - '`../outside/SKILL.md` ができず、b の SKILL.md のバイト列が実行の前と同じ'
     test: test_error_when_path_outside_source
+  - name: 異常系（スキーマを読み込めない・InvalidAgentFlow）
+    summary: ほかの配信元を指すスキーマを読み込めなければ、どの SKILL.md も書き換えずに終える
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元
+        description: '正常系の一時フォルダで、`agent_flow` の行の `schema` を `source: nothing`（端末の設定に無い）にしたものと、`ref: v9`（無いタグ）にしたものの 2 つ'
+        notes: a の SKILL.md はまだ無い
+    flow: |-
+      <!-- map: {"title": "異常系（スキーマを読み込めない・InvalidAgentFlow）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as 呼び出し元
+        participant G as project-index skill-md
+        participant S as 端末の設定
+
+        C->>G: 配信元の直下で起動する
+        G->>S: schema の source の行を探す
+        G-->>C: source・path・ref と終了コード 1
+      ```
+
+      <!-- /map -->
+    expected:
+      - どちらも終了コードが 1
+      - '標準エラーに `source`・`path`・`ref` が出る（`source: nothing` は端末の設定に無いこと、`ref: v9` は解けないこと）'
+      - a の SKILL.md が作られず、b の SKILL.md のバイト列が実行の前と同じ
+    test: test_error_when_schema_unresolvable
 test_file: tests/integration/server/test_skill_md.py
 visibility: internal
 tags:
