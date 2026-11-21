@@ -41,6 +41,7 @@ from project_index.features.write.types import (
 )
 from project_index.server.mcp.result import (
     DOCS_INSTRUCTIONS_PROMPT_ID,
+    DOCS_MCP_SERVER,
     TOOL_ANNOTATIONS,
     to_tool_result,
     tool_error,
@@ -387,7 +388,7 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
     register(
         mcp,
         "search_docs",
-        handlers.prompts.render(tool_prompt_id("docs", "search_docs")),
+        handlers.prompts.render(tool_prompt_id(DOCS_MCP_SERVER, "search_docs")),
         SearchRequest,
         lambda request, limits: search_docs(
             request,
@@ -402,7 +403,7 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
     register(
         mcp,
         "describe",
-        handlers.prompts.render(tool_prompt_id("docs", "describe")),
+        handlers.prompts.render(tool_prompt_id(DOCS_MCP_SERVER, "describe")),
         DescribeRequest,
         lambda request, limits: describe(
             request,
@@ -416,7 +417,7 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
     register(
         mcp,
         "list_changes",
-        handlers.prompts.render(tool_prompt_id("docs", "list_changes")),
+        handlers.prompts.render(tool_prompt_id(DOCS_MCP_SERVER, "list_changes")),
         ChangesRequest,
         lambda request, limits: list_changes(
             request, registry=handlers.registry, store=handlers.store, seen=handlers.seen
@@ -428,7 +429,7 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
     register(
         mcp,
         "trace_related",
-        handlers.prompts.render(tool_prompt_id("docs", "trace_related")),
+        handlers.prompts.render(tool_prompt_id(DOCS_MCP_SERVER, "trace_related")),
         RelatedRequest,
         lambda request, limits: trace_related(
             request, registry=handlers.registry, store=handlers.store, seen=handlers.seen
@@ -438,7 +439,7 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
     register(
         mcp,
         "write_docs",
-        handlers.prompts.render(tool_prompt_id("docs", "write_docs")),
+        handlers.prompts.render(tool_prompt_id(DOCS_MCP_SERVER, "write_docs")),
         WriteRequest,
         lambda request, limits: _recheck_after(
             write_docs(
@@ -461,7 +462,7 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
     register(
         mcp,
         "delete_docs",
-        handlers.prompts.render(tool_prompt_id("docs", "delete_docs")),
+        handlers.prompts.render(tool_prompt_id(DOCS_MCP_SERVER, "delete_docs")),
         DeleteRequest,
         lambda request, limits: _recheck_after(
             delete_docs(
@@ -483,7 +484,7 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
     register(
         mcp,
         "list_match_words",
-        handlers.prompts.render(tool_prompt_id("docs", "list_match_words")),
+        handlers.prompts.render(tool_prompt_id(DOCS_MCP_SERVER, "list_match_words")),
         MatchWordsRequest,
         lambda request, limits: list_match_words(
             request, registry=handlers.registry, store=handlers.store

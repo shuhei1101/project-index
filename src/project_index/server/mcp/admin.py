@@ -35,6 +35,7 @@ from project_index.features.admin.types import (
 from project_index.features.lifecycle.update import update_clone
 from project_index.features.settings.query import load_terminal_config
 from project_index.server.mcp.result import (
+    ADMIN_MCP_SERVER,
     TOOL_ANNOTATIONS,
     to_tool_result,
     tool_error,
@@ -124,7 +125,7 @@ def build_admin_mcp(handlers: Handlers) -> MCPServer:
     register(
         mcp,
         "status",
-        handlers.prompts.render(tool_prompt_id("admin", "status")),
+        handlers.prompts.render(tool_prompt_id(ADMIN_MCP_SERVER, "status")),
         FormatRequest,
         lambda request: get_status(handlers, env=os.environ),
         render_status,
@@ -132,7 +133,7 @@ def build_admin_mcp(handlers: Handlers) -> MCPServer:
     register(
         mcp,
         "reload",
-        handlers.prompts.render(tool_prompt_id("admin", "reload")),
+        handlers.prompts.render(tool_prompt_id(ADMIN_MCP_SERVER, "reload")),
         FormatRequest,
         lambda request: reload_config(handlers),
         render_reload,
@@ -141,14 +142,14 @@ def build_admin_mcp(handlers: Handlers) -> MCPServer:
     register(
         mcp,
         "restart",
-        handlers.prompts.render(tool_prompt_id("admin", "restart")),
+        handlers.prompts.render(tool_prompt_id(ADMIN_MCP_SERVER, "restart")),
         NoArguments,
         lambda request: handlers.restart.request(),
     )
     register(
         mcp,
         "update",
-        handlers.prompts.render(tool_prompt_id("admin", "update")),
+        handlers.prompts.render(tool_prompt_id(ADMIN_MCP_SERVER, "update")),
         NoArguments,
         lambda request: update_clone(
             handlers.terminal.clone,
@@ -161,7 +162,7 @@ def build_admin_mcp(handlers: Handlers) -> MCPServer:
     register(
         mcp,
         "check_project",
-        handlers.prompts.render(tool_prompt_id("admin", "check_project")),
+        handlers.prompts.render(tool_prompt_id(ADMIN_MCP_SERVER, "check_project")),
         CheckProjectRequest,
         lambda request: check_project(request, handlers=handlers),
         render_check,
@@ -170,7 +171,7 @@ def build_admin_mcp(handlers: Handlers) -> MCPServer:
     register(
         mcp,
         "try_convert",
-        handlers.prompts.render(tool_prompt_id("admin", "try_convert")),
+        handlers.prompts.render(tool_prompt_id(ADMIN_MCP_SERVER, "try_convert")),
         TryConvertRequest,
         lambda request: try_convert(request, handlers=handlers),
         wait_loaded=lambda: handlers.registry.wait_loaded(),
@@ -178,7 +179,7 @@ def build_admin_mcp(handlers: Handlers) -> MCPServer:
     register(
         mcp,
         "write_nav",
-        handlers.prompts.render(tool_prompt_id("admin", "write_nav")),
+        handlers.prompts.render(tool_prompt_id(ADMIN_MCP_SERVER, "write_nav")),
         WriteNavRequest,
         lambda request: write_nav(request, handlers=handlers),
         render_write_nav,
