@@ -376,6 +376,68 @@ classes:
              - それ以外（ワークツリー・`config_commit` の無い配信元）の場合、`stamps` に (`config_base`, `run`, `target.source.is_git`) の状態があればそれを使い、無ければスクリプトの実行の『スクリプトの状態』（`script_stamp(target.config_base, run, use_git=target.source.is_git)`）で作って `stamps` に入れる（`_cached_stamp`）
           3. 参照する場所を、`target.worktree` があればその絶対パス、無ければ空の文字列にする
           4. (配信元の ID, 種類, 検査の ID, 文書のバージョン, 行の定義のハッシュ, スクリプトの状態, 参照する場所) を返す
+      - name: check_delete
+        title: 削除の前に検査する
+        summary: 文書の種類の行の `validators[]` のうち `on` に `delete` を持つものを、削除する文書の `id` を環境変数に指定して実行する
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        side_effects: '`validators[]` のスクリプトを動かす'
+        args:
+          - name: target
+            title: 読み書きの場所
+            type: Target
+            required: true
+            passing: positional
+            description: '`check` と同じ'
+          - name: document
+            title: 文書
+            type: Document
+            required: true
+            passing: positional
+            description: 削除する文書（削除の前の中身）
+          - name: delete_ids
+            title: 削除する文書
+            type: Sequence[str]
+            required: true
+            passing: keyword
+            description: 同じ呼び出しで削除する全ての文書の `id`（`document` を含む）
+          - name: deadline
+            title: 書き込みの期限
+            type: Deadline | None
+            required: false
+            default: None
+            passing: keyword
+            description: '`check` と同じ'
+        returns:
+          type: list[Violation]
+          description: 違反。行の `validators` の順に並ぶ
+        process: |-
+          1. 行の `validators` の ID ごとに `source.script("validators", id)` を引き、`on` に `delete` を持つものだけを実行する（スキーマ・ ID の形・関連の種類の検査はしない）
+          2. `check` の手順 4 と同じにスクリプトを動かす。ただし、『スクリプトの実行』の `env` に `VALIDATE_ON_ENV` が `delete`、`DELETE_IDS_ENV` が `delete_ids` を改行でつないだ値を指定し、キャッシュしない
+          3. 違反を返却する
+        unit_tests:
+          - name: test_document_checker_check_delete
+            case: 正常
+            summary: 削除の時点の検査だけを環境変数つきで実行する
+            condition: '`on: [delete]` の検査と `on: [write]` の検査を持つ行で、`delete_ids=["a", "b"]`'
+            mock: '`run_script`（受けた `env` を記録する偽物）'
+            expected: '`delete` の検査だけが 1 回呼ばれ、`env` が `{"PROJECT_INDEX_VALIDATE_ON": "delete", "PROJECT_INDEX_DELETE_IDS": "a\nb"}`'
+            exception: '-'
+          - name: test_document_checker_check_delete_when_violation
+            case: 正常
+            summary: 検査の違反を返却する
+            condition: '違反を 1 件出す `on: [delete]` の検査'
+            mock: なし（検査は `sys.executable -c` のスクリプト）
+            expected: 違反 1 件を返却する
+            exception: '-'
+          - name: test_document_checker_check_delete_when_deadline_passed
+            case: 異常
+            summary: 期限を過ぎた後は動かさない
+            condition: 残りの時間が 0 の `deadline`
+            mock: スクリプトの実行（呼ばれた回数を記録する偽物）・時計（偽物）
+            expected: '`WriteDeadlineExceededError`。スクリプトの実行が呼ばれない'
+            exception: '`deadline` があり、検査のスクリプトを動かす前か動かした後に期限を過ぎている'
 constants:
   - name: VALIDATOR_ON_READ_CACHE
     title: 読み取りの検査の結果の数
@@ -383,6 +445,18 @@ constants:
     usecase: 共通
     summary: 読み取りの `validators[]` の結果をキャッシュする件数の上限。超えたら使ったのが古いものから捨てる
     value: '4096'
+  - name: VALIDATE_ON_ENV
+    title: 検査の時点の環境変数
+    container: project_index/features/validation/service.py
+    usecase: 文書の削除
+    summary: 削除の時点の `validators[]` に `delete` を指定する環境変数の名前（IF-7 の制約「削除の前の検査」）
+    value: "'PROJECT_INDEX_VALIDATE_ON'"
+  - name: DELETE_IDS_ENV
+    title: 削除する文書の環境変数
+    container: project_index/features/validation/service.py
+    usecase: 文書の削除
+    summary: 同じ呼び出しで削除する文書の `id` を 1 行に 1 件で指定する環境変数の名前
+    value: "'PROJECT_INDEX_DELETE_IDS'"
 visibility: internal
 functions:
   - name: _cached_stamp

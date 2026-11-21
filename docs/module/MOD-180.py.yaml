@@ -8,6 +8,18 @@ constants:
     usecase: SKILL.md の生成
     summary: 生成のモードでエージェントフローかスキーマが読み込めない・合わない、`ref` が解決できない、`skill.path` が配信元の外部を指すときの終了コード
     value: '1'
+  - name: VALIDATE_ON_ENV
+    title: 検査の時点の環境変数
+    container: project_index/features/skill_md/cli.py
+    usecase: SKILL.md の生成
+    summary: 値が `delete` のとき、検査のモードを削除の検査にする環境変数（IF-37 の `request`）
+    value: "'PROJECT_INDEX_VALIDATE_ON'"
+  - name: DELETE_IDS_ENV
+    title: 削除する文書の環境変数
+    container: project_index/features/skill_md/cli.py
+    usecase: SKILL.md の生成
+    summary: 削除する文書の `id` を 1 行に 1 件で受け取る環境変数（IF-37 の `request`）
+    value: "'PROJECT_INDEX_DELETE_IDS'"
 functions:
   - name: run_skill_md
     title: SKILL.md の生成の実行
@@ -33,7 +45,7 @@ functions:
     process: |-
       1. 配信元の直下を作業ディレクトリ（`Path.cwd()`）にする
       2. `args.check` が真か
-         - 真: 標準入力を UTF-8 で全て読み、`check_replacement` の問題を `path`・`rule`・`fix` の辞書の配列の JSON にして標準出力に出し、0 を返却する
+         - 真: 標準入力を UTF-8 で全て読み、環境変数 `VALIDATE_ON_ENV` が `delete` なら `check_deletion`（`delete_ids` は `DELETE_IDS_ENV` の空でない行）、それ以外なら `check_replacement` の問題を `path`・`rule`・`fix` の辞書の配列の JSON にして標準出力に出し、0 を返却する
          - 偽: 続ける（`args.paths` は使用しない）
       3. `load_agent_flows`・`build_skill_files`・`write_changed` を順に呼ぶ
          - `InvalidAgentFlowError` の場合、問題の行を標準エラーに出して `EXIT_SKILL_INVALID` を返却する（標準出力には何も出さない）
@@ -63,6 +75,13 @@ functions:
         condition: '`check=True`、標準入力に `skill.path` を `../outside/SKILL.md` にした a'
         mock: なし（`monkeypatch.chdir`・`monkeypatch` で `sys.stdin`、`capsys`）
         expected: 0 を返却し、標準出力が `path` が `skill.path` の違反 1 件の JSON の配列
+        exception: '-'
+      - name: test_run_skill_md_when_check_delete
+        case: 正常
+        summary: 削除の検査は環境変数で切り替える
+        condition: '`check=True`、標準入力に a が `ref` で埋め込む c、環境変数 `PROJECT_INDEX_VALIDATE_ON=delete`・`PROJECT_INDEX_DELETE_IDS=c`'
+        mock: なし（`monkeypatch.chdir`・`monkeypatch.setenv`・`monkeypatch` で `sys.stdin`、`capsys`）
+        expected: 0 を返却し、標準出力が `path` が `$` の違反 1 件の JSON の配列
         exception: '-'
     refs:
       - to: MOD-181

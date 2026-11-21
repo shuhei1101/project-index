@@ -709,7 +709,7 @@ constraints:
     constraint: '`commit` を指定した呼び出しは、[文書の書き込み](id:IF-6) の制約「直コミットの権限」から「直コミットの試しの書き込み」までと同じ。消す文書と参照を外す文書の種類が全て `direct_commit.kinds[]` にあるときだけ進め、削除したファイル・書き換えた参照元・生成物だけをコミットする'
     notes: 共通の処理のため、直コミットの異常系の結合テストは文書の書き込みが持つ
   - item: 削除の前の検査
-    constraint: 'バージョン・参照・権限を確認した後、ファイルを削除する前に、`targets` の文書ごとに、その文書の種類の行の `validators[]` のうち `on` に `delete` を持つものを実行する。標準入力にその文書の YAML、環境変数 `PROJECT_INDEX_VALIDATE_ON` に `delete`、`PROJECT_INDEX_DELETE_IDS` に `targets` の全ての文書の `id`（1 行に 1 件）を指定する。違反はその文書の添字の違反にし、`atomic: true` は 1 件でもあれば何も削除しない。`atomic: false` は、違反のあった文書を `failed` にして `PROJECT_INDEX_DELETE_IDS` から除き、残る文書の検査をやり直す。新規の違反が出なくなるまで繰り返し、最後まで違反の無かった文書だけを削除する'
+    constraint: 'バージョン・参照・権限を確認した後、ファイルを削除する前に、`targets` の文書ごとに、その文書の種類の行の `validators[]` のうち `on` に `delete` を持つものを実行する。標準入力にその文書の YAML、環境変数 `PROJECT_INDEX_VALIDATE_ON` に `delete`、`PROJECT_INDEX_DELETE_IDS` に `targets` のうちバージョン・参照・権限の確認に合格した全ての文書の `id`（1 行に 1 件）を指定する。違反はその文書の添字の違反にし、`atomic: true` は 1 件でもあれば何も削除しない。`atomic: false` は、違反のあった文書を `failed` にして `PROJECT_INDEX_DELETE_IDS` から除き、残る文書の検査をやり直す。新規の違反が出なくなるまで繰り返し、最後まで違反の無かった文書だけを削除する'
     notes: 'やり直しは、`failed` になった文書が消える前提で通った文書を削除しないため（例: a が b を、d が a を `ref` で埋め込み、`targets` が a と b のとき、a が `failed` になれば b もやり直しで違反になり削除しない）。やり直しは最大で `targets` の件数の回数で、全ての回を書き込みの期限の中で終える。制限時間は `write_docs` と同じく `script_timeout_sec` と書き込みの期限までの残りの時間の短い方'
 refs:
   - to: SC-7
