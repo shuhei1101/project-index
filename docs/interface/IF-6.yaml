@@ -2427,6 +2427,39 @@ flows:
       - 5・6・7・8 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].set.{キー}` で、それぞれ無い要素・`x-key` の無い配列・`name` が `Col` の要素が 1 つしか無いこと・`models[1]` にキー `other` が無いことを返却する。文書 1 を書き換えない
       - 9 回目の後、`notes` にキー `a.b` が値 `v` で追加され（`a` の下の `b` にはしない）、キー `main` は変わらない
     test: test_normal_when_set_ref_path
+  - name: 正常系（無い項目の unset を返却する）
+    summary: '`#` で始まらない `unset` の要素の項目が無いときは何もせず、その要素を `results[].skipped_unset` に返却する。`.` を含む辞書のキーは `#` で始まる参照の型の項目のパスで削除する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 文書 1
+        description: '`notes` が `{"mcp/server.py の補足": 補足}`'
+      - name: 入力
+        description: '1 回目は `unset: ["notes.mcp/server.py の補足", "notes.nonexistent"]`。2 回目は `unset: ["#notes[mcp/server.py の補足]"]`'
+        notes: 1 回目の 1 つ目の要素は `.` で区切って `notes` → `mcp/server` → `py の補足` と解釈するため、項目が無い
+    flow: |-
+      <!-- map: {"title": "正常系（無い項目の unset を返却する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        C->>T: update 文書 1（unset notes.mcp/server.py の補足・notes.nonexistent）
+        T->>T: どちらの要素も項目が無いので何もしない
+        T-->>C: updated・skipped_unset
+        C->>T: update 文書 1（unset #notes[mcp/server.py の補足]）
+        T->>T: notes のキー mcp/server.py の補足 に解決して削除する
+        T->>WT: YAML を書き換える
+        T-->>C: updated
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目は `results[0].status` が `updated` で、`version` が書き込み前と同じで、`results[0].skipped_unset` が `["notes.mcp/server.py の補足", "notes.nonexistent"]`。文書 1 の `notes` は変わらない
+      - 2 回目の後、文書 1 の `notes` にキー `mcp/server.py の補足` が無く、`results[0].skipped_unset` を返却しない
+    test: test_normal_when_unset_missing_field
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -2752,6 +2785,10 @@ response:
     type: bool
     description: プッシュが 1 回断られ、取り込みからやり直したか
     notes: '`commit.sha` と同じ'
+  - name: results[].skipped_unset
+    type: list[str]
+    description: '`unset` の要素のうち、項目が無いため何もしなかった要素（指定したままの文字列）'
+    notes: 制約「unset の項目のパス」。該当する要素があるときだけ。`failed` では返却しない
 response_example: |-
   ```json
   {"applied": true, "results": [
@@ -2916,7 +2953,7 @@ constraints:
     notes: '`atomic: false` でも、同じ操作の合格した文書だけを書き込むことはしない'
   - item: unset の項目のパス
     constraint: '`unset` の要素が `#` で始まるとき、「参照の型の項目のパス」と同じ読み方で文書の中の 1 つの項目へ解決し、その項目を削除する。解決できないパス（無い要素・`x-key` の無い配列・無い順番・無いキー）は `unset.{パス}` の違反にする。`#` で始まらない要素に要素の選び方（`[...]`・`**.`）を含めると、書き込まずに同じ違反にする'
-    notes: '`#` で始まらず要素の選び方を含まない要素は今までどおりで、項目が無ければ何もしない。解決した項目は配列でなくても削除する。共通のキーの列名への読み替えは `#` で始まる要素にはしない'
+    notes: '`#` で始まらず要素の選び方を含まない要素は今までどおりで、項目が無ければ何もせず、その要素を `results[].skipped_unset` に返却する。`.` を含む辞書のキーは、`#` で始まる参照の型の項目のパスの `[{キー}]`（`#notes[mcp/server.py の補足]`）で指す。解決した項目は配列でなくても削除する。共通のキーの列名への読み替えは `#` で始まる要素にはしない'
   - item: remove_from の x-key を持つ配列
     constraint: '`remove_from` のキーを解決した配列のスキーマ（`$ref` を解決した後）が `x-key` を持つとき、オブジェクトでない値は `x-key` のキーの値がその値と等しい要素を、オブジェクトの値はその値と等しい要素を削除する。等しい要素が複数あれば全て削除する。削除する要素が 1 つも無い値は `remove_from.{キー}` の違反にし、書き込まない。削除する要素が有るかは、`remove_from` を当てる前の配列で値ごとに判定する（同じ要素を指す値を 2 つ渡しても違反にしない）'
     notes: '`x-key` を持たない配列は今までどおり渡した値と等しい要素を削除し、該当しない値は何もしない。制約「オブジェクトの配列のタグの書き戻し」の共通のキー（`tags`・`main_tags`）の読み方と、`#` で始まらないキーの項目が無いときに何もしない扱いは変えない'
