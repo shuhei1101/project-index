@@ -1,0 +1,114 @@
+id: MOD-182
+title: 索引のサーバー / SKILL.md の生成 / types.py
+lead: '`project-index skill-md` が扱うエージェントフロー・組み立てた SKILL.md の型と例外を受け持ち、SKILL.md の生成の types.py を修正するときに参照する。'
+data_models:
+  - name: AgentFlowFile
+    title: エージェントフローのファイル
+    container: project_index/features/skill_md/types.py
+    usecase: SKILL.md の生成
+    role: DTO
+    summary: 読み込んだエージェントフロー 1 件と、配信元の直下からのパス
+    description: '`@dataclass(frozen=True, slots=True, kw_only=True)`。'
+    properties:
+      - name: path
+        title: パス
+        type: str
+        access: 公開
+        description: 配信元の直下からのエージェントフローのパス（POSIX）。検査のモードの標準入力で、配信元に同じ `id` が無いときは `-`
+        example: docs/agent-flow/skill-setup.yaml
+      - name: data
+        title: 中身
+        type: dict[str, Any]
+        access: 公開
+        description: YAML を読み込んだ辞書
+  - name: SkillFile
+    title: 組み立てた SKILL.md
+    container: project_index/features/skill_md/types.py
+    usecase: SKILL.md の生成
+    role: DTO
+    summary: 書き出す先と組み立てた中身
+    description: '`@dataclass(frozen=True, slots=True, kw_only=True)`。'
+    properties:
+      - name: path
+        title: 書き出す先
+        type: str
+        access: 公開
+        description: 配信元の直下からの `skill.path`
+        example: plugins/project-index/skills/setup/SKILL.md
+      - name: text
+        title: 中身
+        type: str
+        access: 公開
+        description: 末尾を改行 1 つで終える SKILL.md の全文
+  - name: Problem
+    title: 組み立てられない理由
+    container: project_index/features/skill_md/types.py
+    usecase: SKILL.md の生成
+    role: DTO
+    summary: 読み込み・検査・組み立てで見つけた 1 件の問題
+    description: '`@dataclass(frozen=True, slots=True, kw_only=True)`。生成のモードは標準エラーの 1 行、検査のモードは違反の JSON の 1 件にする。'
+    properties:
+      - name: file
+        title: ファイル
+        type: str
+        access: 公開
+        description: 原因のエージェントフローのパス。スキーマ・配信元の設定の問題はそのファイル（ほかの配信元のスキーマは `{source}:{path}@{ref}`）
+      - name: path
+        title: 項目のパス
+        type: str
+        access: 公開
+        description: ファイルの中の項目のパス（`skill.path`・`steps[2].ref`）。ファイル全体は `$`
+      - name: rule
+        title: 理由
+        type: str
+        access: 公開
+        description: 何が問題かの 1 文
+      - name: fix
+        title: 修正の方法
+        type: str
+        access: 公開
+        default: '""'
+        description: 検査のモードの違反の `fix` にする修正の方法
+    methods:
+      - name: line
+        title: 標準エラーの行
+        kind: メソッド
+        summary: '`{file}: {path}: {rule}` の 1 行を返却する'
+        scope: public
+        is_async: false
+        thread_safe: true
+        returns:
+          type: str
+          description: 標準エラーに出す 1 行
+        process: '1. `{file}: {path}: {rule}` を返却する'
+        unit_tests:
+          - name: test_problem_line
+            case: 正常
+            summary: ファイル・項目・理由をつなぐ
+            condition: '`Problem(file="docs/agent-flow/a.yaml", path="skill.path", rule="配信元の外部を指しています")`'
+            mock: なし
+            expected: '`docs/agent-flow/a.yaml: skill.path: 配信元の外部を指しています`'
+            exception: '-'
+classes:
+  - name: InvalidAgentFlowError
+    title: 組み立てられないエージェントフロー
+    container: project_index/features/skill_md/types.py
+    usecase: SKILL.md の生成
+    role: 例外
+    summary: 読み込み・検査・組み立てで見つけた全ての問題を持つ例外
+    kind: クラス
+    inherits: Exception
+    description: インターフェース定義の `InvalidAgentFlow` に該当する。メッセージは `problems` の `line()` を改行でつないだもの。
+    properties:
+      - name: problems
+        title: 問題
+        type: list[Problem]
+        access: 公開
+        description: 見つけた全ての問題（1 件以上）
+notes:
+  決まり: 型と例外だけを持ち、処理を持たない。
+visibility: internal
+tags:
+  - name: topic:スキル
+    main: true
+  - name: action:生成
