@@ -452,6 +452,45 @@ flows:
       - '`isError: true` で、添字 0 の違反として種類 `rule` は直コミットを許可していないことを返却する'
       - リモートと develop のワークツリーは変わらず、r1 のファイルが残る
     test: test_error_when_direct_commit_kind_not_allowed
+  - name: 異常系（削除の時点の検査に通らない・ValidationFailedError）
+    summary: '`on` に `delete` を持つ `validators[]` が違反を返却する削除を、ファイルを削除する前に断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 削除の時点の検査
+        description: 'sample の種類の `validators[]` に、`on: [delete]` の検査 `guard` を配置する。`guard` は環境変数 `PROJECT_INDEX_VALIDATE_ON` が `delete` のとき、標準入力の文書の `id` が文書 2 で、環境変数 `PROJECT_INDEX_DELETE_IDS` に文書 1 が無ければ違反を 1 件出す'
+        notes: 文書 1 の `related` は文書 2 を指さない
+      - name: 入力
+        description: 1 回目は `targets` に文書 2、2 回目は `targets` に文書 1 と文書 2
+    flow: |-
+      <!-- map: {"title": "異常系（削除の時点の検査に通らない・ValidationFailedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
+        participant V as 検査 guard
+        participant WT as ワークツリー x
+
+        C->>T: targets: 文書 2
+        T->>V: 標準入力に文書 2、PROJECT_INDEX_DELETE_IDS に文書 2
+        V-->>T: 違反 1 件
+        T-->>C: isError（添字 0・guard の違反）
+        C->>T: targets: 文書 1・文書 2
+        T->>V: 文書ごとに、PROJECT_INDEX_DELETE_IDS に文書 1・文書 2
+        V-->>T: 違反なし
+        T->>WT: 文書 1・文書 2 のファイルを削除する
+        T-->>C: deleted
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1 回目は `isError: true` で、添字 0 の違反として `guard` の違反を返却し、文書 1・文書 2 のファイルが残る'
+      - '1 回目を `dry_run: true` で呼ぶと同じ違反を返却する'
+      - '1 回目を `atomic: false` で呼ぶと、文書 2 の `status` が `failed` で `errors` に `guard` の違反が入り、ファイルが残る'
+      - '2 回目は `applied: true` で、文書 1・文書 2 の `status` が `deleted`'
+      - '`on` に `delete` を持たない `validators[]` は、削除で実行しない'
+    test: test_error_when_delete_validator_fails
 lead: 文書を物理削除し、`related` からの参照を拒否するか除外する `delete_docs` の入出力を定め、`delete_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -470,6 +509,7 @@ callers:
   - SC-7#scenarios[正常シナリオ（本文のファイルを持つ文書を消す）]
   - SC-7#scenarios[正常シナリオ（本文のファイルを持たない要素を書く）]
   - SC-15#scenarios[正常シナリオ（文書を消す）]
+  - SC-7#scenarios[異常シナリオ（スキルが工程を埋め込むエージェントフローを消す）]
 exclusivity: '`write_docs` と同じ配信元ごとの排他ロックの中で行う。`commit` を指定した呼び出しは、`write_docs` と同じリポジトリの単位の排他も取る'
 request:
   - name: source
@@ -615,7 +655,7 @@ exceptions:
   - name: InvalidArgumentError
     condition: '`storage.type: disk` の配信元に `worktree` を渡した・`commit` と `atomic: false` か `worktree` を同時に渡した'
   - name: ValidationFailedError
-    condition: '`commit` を指定した呼び出しで、消す文書か参照を外す文書の種類が `direct_commit.kinds[]` に無いか、参照を外した文書が秘密の値の規則に該当する'
+    condition: '削除の時点（`on` に `delete`）の `validators[]` が違反を返却したか、`commit` を指定した呼び出しで、消す文書か参照を外す文書の種類が `direct_commit.kinds[]` に無いか、参照を外した文書が秘密の値の規則に該当する'
     notes: 違反ごとの添字・パス・決まりと、`write_docs` と同じく消す文書・参照を外す文書の ID を添える
   - name: DirectCommitNotConfiguredError
     condition: '`write_docs` と同じ'
@@ -667,6 +707,9 @@ constraints:
   - item: 直コミット
     constraint: '`commit` を指定した呼び出しは、[文書の書き込み](id:IF-6) の制約「直コミットの権限」から「直コミットの試しの書き込み」までと同じ。消す文書と参照を外す文書の種類が全て `direct_commit.kinds[]` にあるときだけ進め、削除したファイル・書き換えた参照元・生成物だけをコミットする'
     notes: 共通の処理のため、直コミットの異常系の結合テストは文書の書き込みが持つ
+  - item: 削除の前の検査
+    constraint: 'バージョン・参照・権限を確認した後、ファイルを削除する前に、`targets` の文書ごとに、その文書の種類の行の `validators[]` のうち `on` に `delete` を持つものを実行する。標準入力にその文書の YAML、環境変数 `PROJECT_INDEX_VALIDATE_ON` に `delete`、`PROJECT_INDEX_DELETE_IDS` に `targets` の全ての文書の `id`（1 行に 1 件）を指定する。違反はその文書の添字の違反にし、`atomic: true` は 1 件でもあれば何も削除しない。`atomic: false` は違反のあった文書だけを `failed` にし、ほかの文書を削除する'
+    notes: '`atomic: false` でも `PROJECT_INDEX_DELETE_IDS` は `targets` の全ての文書のまま指定する。制限時間は `write_docs` と同じく `script_timeout_sec` と書き込みの期限までの残りの時間の短い方'
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ（参照も外して消す）]
@@ -674,6 +717,10 @@ refs:
     when: このインターフェースの入出力やフローを変えるときに、シナリオ『エージェントが書き込む』の対応する流れと期待値を確認する。
   - to: SC-7
     item: scenarios[異常シナリオ（参照されている文書を消す）]
+    type: references
+    when: このインターフェースの入出力やフローを変えるときに、シナリオ『エージェントが書き込む』の対応する流れと期待値を確認する。
+  - to: SC-7
+    item: scenarios[異常シナリオ（スキルが工程を埋め込むエージェントフローを消す）]
     type: references
     when: このインターフェースの入出力やフローを変えるときに、シナリオ『エージェントが書き込む』の対応する流れと期待値を確認する。
 test_file: tests/integration/server/test_delete_docs.py
