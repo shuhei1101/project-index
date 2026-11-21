@@ -6,8 +6,6 @@ import json
 import sys
 from typing import TYPE_CHECKING, Any
 
-import yaml
-
 from project_index.features.skill_md.cli import run_skill_md
 
 if TYPE_CHECKING:
@@ -75,7 +73,7 @@ def test_run_skill_md_when_check(
     root = write_source(tmp_path / "sample")
     write_flow(root, "a", skill_flow("a"))
     monkeypatch.chdir(root)
-    text = yaml.safe_dump(skill_flow("a", skill={"path": "../outside/SKILL.md"}))
+    text = json.dumps(skill_flow("a", skill={"path": "../outside/SKILL.md"}))
     monkeypatch.setattr(sys, "stdin", io.StringIO(text))
     # 実行
     code = run_skill_md(argparse.Namespace(check=True, paths=[]))

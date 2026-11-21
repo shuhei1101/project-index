@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import json
 import os
 from typing import TYPE_CHECKING, Any
 
 import pytest
-import yaml
-
 from project_index.features.skill_md.build import (
     build_skill_files,
     check_replacement,
@@ -15,6 +14,8 @@ from project_index.features.skill_md.build import (
     write_changed,
 )
 from project_index.features.skill_md.types import AgentFlowFile, InvalidAgentFlowError, SkillFile
+
+from project_index.shared.yaml_io import load_yaml
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -53,7 +54,7 @@ RENDERED_BODY = """\
 def _split(text: str) -> tuple[dict[str, Any], str]:
     """SKILL.md を frontmatter の辞書と本文に分ける。"""
     _, front, body = text.split("---\n", 2)
-    return yaml.safe_load(front), body.removeprefix("\n")
+    return load_yaml(front), body.removeprefix("\n")
 
 
 # load_agent_flows
@@ -100,7 +101,7 @@ def test_load_agent_flows_when_schema_ref(
     (schemas / "agent_flow.schema.yaml").write_text("broken: [", encoding="utf-8")
     settings = tmp_path / "settings.yaml"
     settings.write_text(
-        yaml.safe_dump(
+        json.dumps(
             {
                 "version": "1",
                 "clone": str(tmp_path),
@@ -132,7 +133,7 @@ def test_load_agent_flows_when_schema_unresolvable(
     # 準備
     settings = tmp_path / "settings.yaml"
     settings.write_text(
-        yaml.safe_dump({"version": "1", "clone": str(tmp_path), "sources": []}),
+        json.dumps({"version": "1", "clone": str(tmp_path), "sources": []}),
         encoding="utf-8",
     )
     monkeypatch.setenv("PROJECT_INDEX_CONFIG", str(settings))
@@ -448,7 +449,7 @@ def test_check_replacement(
     """問題が無い（正常系）。"""
     # 準備
     root = _ref_source(tmp_path, write_source, write_flow, skill_flow, flow_flow)
-    text = yaml.safe_dump(flow_flow("c", steps=[{"name": "取得する", "body": "書き換えた。"}]))
+    text = json.dumps(flow_flow("c", steps=[{"name": "取得する", "body": "書き換えた。"}]))
     before = sorted(path.read_bytes() for path in root.rglob("*") if path.is_file())
     # 実行
     problems = check_replacement(root, text)
@@ -467,7 +468,7 @@ def test_check_replacement_when_unbuildable(
     """組み立てられなくなる（異常系）。"""
     # 準備
     root = _ref_source(tmp_path / "sample", write_source, write_flow, skill_flow, flow_flow)
-    text = yaml.safe_dump(
+    text = json.dumps(
         skill_flow(
             "a",
             skill={"path": "../outside/SKILL.md"},
@@ -507,7 +508,7 @@ def test_check_replacement_when_other_unreadable(
     # 準備
     root = _ref_source(tmp_path, write_source, write_flow, skill_flow, flow_flow)
     (root / "docs/agent-flow/c.yaml").write_text('summary: "unterminated\n', encoding="utf-8")
-    text = yaml.safe_dump(skill_flow("a", steps=[{"name": "進める", "body": "書き換えた。"}]))
+    text = json.dumps(skill_flow("a", steps=[{"name": "進める", "body": "書き換えた。"}]))
     # 実行
     problems = check_replacement(root, text)
     # 検証
@@ -525,7 +526,7 @@ def test_check_replacement_when_other_ref_broken(
     """書き込む文書の変更でほかのスキルが組み立てられなくなる（異常系）。"""
     # 準備
     root = _ref_source(tmp_path, write_source, write_flow, skill_flow, flow_flow)
-    text = yaml.safe_dump(flow_flow("c", steps=[{"name": "改名した", "body": "取得する。"}]))
+    text = json.dumps(flow_flow("c", steps=[{"name": "改名した", "body": "取得する。"}]))
     # 実行
     problems = check_replacement(root, text)
     # 検証

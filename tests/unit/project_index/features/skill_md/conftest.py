@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any
 
 import pytest
-import yaml
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -57,7 +57,7 @@ def _source_config(schema: str | dict[str, str]) -> str:
         "schema": schema,
     }
     value = {"version": "3", "name": "sample", "documents": [row]}
-    return yaml.safe_dump(value, allow_unicode=True, sort_keys=False)
+    return json.dumps(value, ensure_ascii=False)
 
 
 @pytest.fixture
@@ -83,7 +83,7 @@ def write_flow() -> Callable[[Path, str, dict[str, Any]], Path]:
     def _write(root: Path, name: str, data: dict[str, Any]) -> Path:
         path = root / "docs" / "agent-flow" / f"{name}.yaml"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
+        path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
         return path
 
     return _write
