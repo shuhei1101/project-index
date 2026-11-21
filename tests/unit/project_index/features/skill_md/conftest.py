@@ -65,7 +65,8 @@ def write_source() -> Callable[..., Path]:
     """配信元の設定とスキーマを記載し、配信元の直下を返却する関数を返却する。"""
 
     def _write(root: Path, schema: str | dict[str, str] = "schemas/agent_flow.schema.yaml") -> Path:
-        # 配信元の設定
+        # 配信元の設定（配信元のフォルダが無ければ作る）
+        root.mkdir(parents=True, exist_ok=True)
         (root / "project-index.yaml").write_text(_source_config(schema), encoding="utf-8")
         # 配信元の中のスキーマ（文字列のスキーマの行が指す）
         (root / "schemas").mkdir(parents=True, exist_ok=True)
