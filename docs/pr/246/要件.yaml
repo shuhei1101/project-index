@@ -30,8 +30,8 @@ docs:
     updated_at: '2026-11-21T12:52:27.213496+00:00'
 scope_out:
   - item: write_docs の rename でエージェントフローの id を変え、ほかのスキルの ref が解決できなくなる場合の検査
-    reason: 要望に含まれない
-    plan: to_file
+    reason: 解消済み。rename は同じ配信元の `{旧 ID}#` で始まる文字列の値を全て書き換えるため、工程の ref も新しい ID になる（0bbe47b（#157）で入り、de74698（#165）で最後に変えた IF-6 の制約「改名の参照元」と write/references.py）
+    plan: none
   - item: '削除した type: skill のエージェントフローの skill.path の SKILL.md を削除すること'
     reason: 要望に含まれない。project-index skill-md の生成のモードは組み立てた中身と違う SKILL.md を書き換えるだけで、生成元の無い SKILL.md は残る
-    plan: to_file
+    plan: '#248'
