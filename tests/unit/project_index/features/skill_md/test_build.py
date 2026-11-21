@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import os
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
+
 from project_index.features.skill_md.build import (
     build_skill_files,
     check_replacement,
@@ -14,7 +15,6 @@ from project_index.features.skill_md.build import (
     write_changed,
 )
 from project_index.features.skill_md.types import AgentFlowFile, InvalidAgentFlowError, SkillFile
-
 from project_index.shared.yaml_io import load_yaml
 
 if TYPE_CHECKING:
@@ -54,7 +54,7 @@ RENDERED_BODY = """\
 def _split(text: str) -> tuple[dict[str, Any], str]:
     """SKILL.md を frontmatter の辞書と本文に分ける。"""
     _, front, body = text.split("---\n", 2)
-    return load_yaml(front), body.removeprefix("\n")
+    return cast("dict[str, Any]", load_yaml(front)), body.removeprefix("\n")
 
 
 # load_agent_flows
@@ -378,15 +378,16 @@ def test_render_skill_md(skill_flow: Callable[..., dict[str, Any]]) -> None:
 def test_render_skill_md_when_minimal() -> None:
     """値が無いキーを置かない（正常系）。"""
     # 準備
-    data = {
+    steps: list[dict[str, Any]] = [{"name": "進める", "body": "進める。"}]
+    data: dict[str, Any] = {
         "id": "minimal",
         "type": "skill",
         "summary": "最小のスキル",
         "skill": {"path": "skills/minimal/SKILL.md"},
-        "steps": [{"name": "進める", "body": "進める。"}],
+        "steps": steps,
     }
     # 実行
-    text = render_skill_md(_flow("docs/agent-flow/minimal.yaml", data), data["steps"])
+    text = render_skill_md(_flow("docs/agent-flow/minimal.yaml", data), steps)
     # 検証
     front, body = _split(text)
     assert front == {"name": "minimal", "description": "最小のスキル"}

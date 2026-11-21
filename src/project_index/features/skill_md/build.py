@@ -42,7 +42,9 @@ AGENT_FLOW_KIND = "agent_flow"
 # 配信元の直下で読み込む設定のファイル
 SOURCE_CONFIG_FILE = "project-index.yaml"
 # SKILL.md の frontmatter の後ろに置く 1 行（`{path}` にエージェントフローのパス）
-GENERATED_COMMENT = "<!-- {path} から生成した。このファイルを修正せず、設計書を修正して再生成する -->"
+GENERATED_COMMENT = (
+    "<!-- {path} から生成した。このファイルを修正せず、設計書を修正して再生成する -->"
+)
 # 検査のモードで、配信元に同じ `id` が無い標準入力のパス
 STDIN_PATH = "-"
 # `ref` の書式（`{エージェントフローの id}#steps[{工程の名前}]`）
@@ -81,7 +83,9 @@ def _agent_flow_table(root: Path) -> DocumentTable:
     except (KeyError, TypeError, ValueError) as error:
         # 必須のキーが無い・型が違う配信元の設定
         rule = f"配信元の設定を読み込めません（{error}）"
-        raise InvalidAgentFlowError([Problem(file=SOURCE_CONFIG_FILE, path="$", rule=rule)]) from error
+        raise InvalidAgentFlowError(
+            [Problem(file=SOURCE_CONFIG_FILE, path="$", rule=rule)]
+        ) from error
     for table in config.documents:
         if table.id == AGENT_FLOW_KIND:
             return table
@@ -94,7 +98,9 @@ def _read_yaml_file(path: Path, relative: str, problems: list[Problem]) -> dict[
     try:
         value = load_yaml(path.read_text(encoding="utf-8"), file=relative)
     except (OSError, UnicodeDecodeError, YamlLoadError) as error:
-        problems.append(Problem(file=relative, path="$", rule=f"YAML として読み込めません（{error}）"))
+        problems.append(
+            Problem(file=relative, path="$", rule=f"YAML として読み込めません（{error}）")
+        )
         return None
     if not is_dict(value):
         problems.append(Problem(file=relative, path="$", rule="最上位が辞書ではありません"))
@@ -136,35 +142,45 @@ def build_skill_files(
     root: Path, flows: Sequence[AgentFlowFile], *, schema: Mapping[str, Any] | None
 ) -> list[SkillFile]:
     """全てのエージェントフローをスキーマで検査し、`type: skill` のものごとに SKILL.md を組み立てる。"""
-    problems: list[Problem] = []
-    invalid: set[str] = set()
     # スキーマの検査（検査のモードでは `write_docs` が先に済ませているので飛ばす）
-    if schema is not None:
-        for flow in flows:
-            violations = check_schema(flow.data, schema, schema_file=AGENT_FLOW_KIND)
-            for violation in violations:
-                problems.append(
-                    Problem(file=flow.path, path=violation.path, rule=violation.rule, fix=violation.fix)
-                )
-            if violations:
-                invalid.add(flow.path)
+    problems = _schema_problems(flows, schema) if schema is not None else []
+    invalid = {problem.file for problem in problems}
     by_id = {str(flow.data.get("id")): flow for flow in flows}
     files: list[SkillFile] = []
     for flow in flows:
         # スキーマに合わないものと `type: skill` でないものは組み立てない
         if flow.path in invalid or flow.data.get("type") != "skill":
             continue
-        skill_path, path_problem = _skill_path(root, flow)
-        steps, step_problems = resolve_steps(flow, by_id)
-        problems.extend(step_problems)
-        if path_problem is not None:
-            problems.append(path_problem)
-            continue
-        if not step_problems:
-            files.append(SkillFile(path=skill_path, text=render_skill_md(flow, steps)))
+        built, flow_problems = _build_one(root, flow, by_id)
+        problems.extend(flow_problems)
+        if built is not None:
+            files.append(built)
     if problems:
         raise InvalidAgentFlowError(problems)
     return sorted(files, key=lambda file: file.path)
+
+
+def _schema_problems(flows: Sequence[AgentFlowFile], schema: Mapping[str, Any]) -> list[Problem]:
+    """全てのエージェントフローをスキーマで検査し、違反を問題にする。"""
+    return [
+        Problem(file=flow.path, path=violation.path, rule=violation.rule, fix=violation.fix)
+        for flow in flows
+        for violation in check_schema(flow.data, schema, schema_file=AGENT_FLOW_KIND)
+    ]
+
+
+def _build_one(
+    root: Path, flow: AgentFlowFile, by_id: Mapping[str, AgentFlowFile]
+) -> tuple[SkillFile | None, list[Problem]]:
+    """1 件の `type: skill` の SKILL.md を組み立てる。問題があれば組み立てずに問題を返却する。"""
+    skill_path, path_problem = _skill_path(root, flow)
+    steps, problems = resolve_steps(flow, by_id)
+    # 書き出す先と埋め込む工程の問題は、両方とも報告する
+    if path_problem is not None:
+        problems.append(path_problem)
+    if problems:
+        return None, problems
+    return SkillFile(path=skill_path, text=render_skill_md(flow, steps)), []
 
 
 def _skill_path(root: Path, flow: AgentFlowFile) -> tuple[str, Problem | None]:
@@ -188,8 +204,7 @@ def resolve_steps(
     """`ref` を持つ工程を参照先の工程に置き換えた工程の並びを返却する。"""
     steps: list[dict[str, Any]] = []
     problems: list[Problem] = []
-    raw_steps = flow.data.get("steps")
-    for index, step in enumerate(raw_steps if isinstance(raw_steps, list) else []):
+    for index, step in enumerate(_list(flow.data.get("steps"))):
         if not is_dict(step):
             continue
         step_map = cast("dict[str, Any]", step)
@@ -232,8 +247,8 @@ def _find_step(ref: str, by_id: Mapping[str, AgentFlowFile]) -> dict[str, Any] |
     if matched is None:
         return None
     flow = by_id.get(matched["flow"])
-    steps = flow.data.get("steps") if flow is not None else None
-    for step in steps if isinstance(steps, list) else []:
+    steps = _list(flow.data.get("steps")) if flow is not None else []
+    for step in steps:
         if is_dict(step) and step.get("name") == matched["name"]:
             return cast("dict[str, Any]", step)
     return None
@@ -273,7 +288,9 @@ def _frontmatter(
 
 def _arguments_section(arguments: list[Any]) -> str:
     """`## 引数` の表を返却する。"""
-    rows = [f"| `${argument.get('name')}` | {argument.get('description')} |" for argument in arguments]
+    rows = [
+        f"| `${argument.get('name')}` | {argument.get('description')} |" for argument in arguments
+    ]
     return "\n".join(["## 引数", "", "| 引数 | 説明 |", "| --- | --- |", *rows])
 
 
@@ -390,5 +407,7 @@ def _for_stdin(problems: Sequence[Problem], stdin_path: str) -> list[Problem]:
         if problem.file == stdin_path:
             converted.append(problem)
         else:
-            converted.append(Problem(file=problem.file, path="$", rule=problem.line(), fix=problem.fix))
+            converted.append(
+                Problem(file=problem.file, path="$", rule=problem.line(), fix=problem.fix)
+            )
     return converted
