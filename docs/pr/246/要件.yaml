@@ -13,15 +13,21 @@ docs:
   - page: docs/guide/文書のMCP.md
     new: false
     change: delete_docs が、スキルの ref の参照先のエージェントフローの削除を断ることと、断ったときの返却を追加する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T12:52:27.213496+00:00'
   - page: docs/guide/設定.md
     new: false
-    change: 検査の仕組みで validators[].on に削除の時点を追加する場合、その値の説明を追加する
-    status: todo
+    change: validators[].on に削除の時点 delete と、受け取る環境変数の説明を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T12:52:27.213496+00:00'
   - page: docs/guide/CLI.md
     new: false
-    change: project-index skill-md --check に削除の入力を追加する場合、その引数と出力を追加する
-    status: todo
+    change: project-index skill-md --check の削除の検査（環境変数 PROJECT_INDEX_VALIDATE_ON=delete）を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T12:52:27.213496+00:00'
 scope_out:
   - item: write_docs の rename でエージェントフローの id を変え、ほかのスキルの ref が解決できなくなる場合の検査
     reason: 要望に含まれない
