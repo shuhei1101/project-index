@@ -1,0 +1,638 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=unit ...) # TP-1 の run_runner
+failed to get jobs: HTTP 404: Not Found (https://api.github.com/repos/shuhei1101/project-index/actions/runs/44907930331/jobs?per_page=100)
+no valid artifacts found to download
+run 44907930331 is still in progress; logs will be available when it is complete
+exit=1
+
+# ランナーでテストの手順まで進まなかったため、手元の全件実行で回した
+$ uv run pytest tests/unit/ --basetemp=/tmp/planner-246-pt/all
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/feat-delete-docs-refuse-skill-ref-target
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 1524 items
+
+tests/unit/plugins/project_index/hooks/test_post_tool_use.py ........... [  0%]
+                                                                         [  0%]
+tests/unit/plugins/project_index/hooks/test_pre_tool_use.py ....         [  0%]
+tests/unit/plugins/project_index/hooks/test_session_start.py ........... [  1%]
+.........                                                                [  2%]
+tests/unit/project_index/features/access/test_service.py ............... [  3%]
+........................................                                 [  5%]
+tests/unit/project_index/features/access/test_types.py .                 [  5%]
+tests/unit/project_index/features/admin/test_render.py ..............    [  6%]
+tests/unit/project_index/features/admin/test_service.py ................ [  7%]
+.............................                                            [  9%]
+tests/unit/project_index/features/changes/test_compare.py .....          [ 10%]
+tests/unit/project_index/features/changes/test_render.py ....            [ 10%]
+tests/unit/project_index/features/changes/test_service.py .............. [ 11%]
+                                                                         [ 11%]
+tests/unit/project_index/features/checkpoint/test_changed.py ........... [ 12%]
+.                                                                        [ 12%]
+tests/unit/project_index/features/checkpoint/test_record.py .....        [ 12%]
+tests/unit/project_index/features/convert/test_decisions.py ...          [ 12%]
+tests/unit/project_index/features/convert/test_service.py ..........     [ 13%]
+tests/unit/project_index/features/describe/test_render.py .........      [ 13%]
+tests/unit/project_index/features/describe/test_service.py ............  [ 14%]
+tests/unit/project_index/features/describe/test_source_checks.py ....... [ 15%]
+.                                                                        [ 15%]
+tests/unit/project_index/features/describe/test_warnings.py ......       [ 15%]
+tests/unit/project_index/features/documents/test_aliases.py ..........   [ 16%]
+tests/unit/project_index/features/documents/test_fields.py ............. [ 17%]
+...........................................................              [ 20%]
+tests/unit/project_index/features/documents/test_indexable.py .......... [ 21%]
+......                                                                   [ 22%]
+tests/unit/project_index/features/documents/test_loader.py ............. [ 22%]
+....................                                                     [ 24%]
+tests/unit/project_index/features/documents/test_schema.py ............. [ 25%]
+                                                                         [ 25%]
+tests/unit/project_index/features/documents/test_store.py .............. [ 25%]
+.............................................................            [ 29%]
+tests/unit/project_index/features/history/test_blob.py .....             [ 30%]
+tests/unit/project_index/features/history/test_query.py ................ [ 31%]
+..                                                                       [ 31%]
+tests/unit/project_index/features/history/test_snapshot.py ........      [ 32%]
+tests/unit/project_index/features/lifecycle/test_control.py ...          [ 32%]
+tests/unit/project_index/features/lifecycle/test_update.py ............. [ 33%]
+....                                                                     [ 33%]
+tests/unit/project_index/features/links/test_service.py ................ [ 34%]
+.                                                                        [ 34%]
+tests/unit/project_index/features/migrate/test_service.py .............. [ 35%]
+                                                                         [ 35%]
+tests/unit/project_index/features/migrate/test_steps.py ...........      [ 36%]
+tests/unit/project_index/features/outline/test_code.py .....             [ 36%]
+tests/unit/project_index/features/outline/test_markdown.py ......        [ 36%]
+tests/unit/project_index/features/outline/test_service.py ............   [ 37%]
+tests/unit/project_index/features/post_write/test_notified.py ...        [ 37%]
+tests/unit/project_index/features/post_write/test_route.py ...           [ 37%]
+tests/unit/project_index/features/post_write/test_service.py ........... [ 38%]
+...                                                                      [ 38%]
+tests/unit/project_index/features/prompt_doc/test_cli.py ..              [ 39%]
+tests/unit/project_index/features/prompt_doc/test_markdown.py .......... [ 39%]
+.......                                                                  [ 40%]
+tests/unit/project_index/features/prompt_doc/test_render.py ............ [ 40%]
+...                                                                      [ 41%]
+tests/unit/project_index/features/prompt_doc/test_runtime.py ........... [ 41%]
+.                                                                        [ 41%]
+tests/unit/project_index/features/read/test_nav.py .......               [ 42%]
+tests/unit/project_index/features/read/test_paths.py ..                  [ 42%]
+tests/unit/project_index/features/read/test_route.py .......             [ 42%]
+tests/unit/project_index/features/read/test_search.py ..                 [ 43%]
+tests/unit/project_index/features/read/test_service.py ................. [ 44%]
+..                                                                       [ 44%]
+tests/unit/project_index/features/related/test_graph.py ...              [ 44%]
+tests/unit/project_index/features/related/test_service.py .......        [ 45%]
+tests/unit/project_index/features/related/test_suggest.py .              [ 45%]
+tests/unit/project_index/features/search/test_body_parts.py ....         [ 45%]
+tests/unit/project_index/features/search/test_cursor.py ..               [ 45%]
+tests/unit/project_index/features/search/test_fields.py ..........       [ 46%]
+tests/unit/project_index/features/search/test_filters.py ............... [ 47%]
+                                                                         [ 47%]
+tests/unit/project_index/features/search/test_render.py .....            [ 47%]
+tests/unit/project_index/features/search/test_service.py ............... [ 48%]
+.......                                                                  [ 48%]
+tests/unit/project_index/features/search/test_snippets.py ........       [ 49%]
+tests/unit/project_index/features/search/test_terms.py ...               [ 49%]
+tests/unit/project_index/features/seen/test_store.py ......              [ 50%]
+tests/unit/project_index/features/seen/test_types.py .                   [ 50%]
+tests/unit/project_index/features/session_start/test_route.py ..         [ 50%]
+tests/unit/project_index/features/session_start/test_service.py ....     [ 50%]
+tests/unit/project_index/features/settings/test_query.py ............... [ 51%]
+...................                                                      [ 52%]
+tests/unit/project_index/features/settings/test_route.py ............    [ 53%]
+tests/unit/project_index/features/settings/test_service.py ............. [ 54%]
+......................                                                   [ 55%]
+tests/unit/project_index/features/skew/test_service.py ............      [ 56%]
+tests/unit/project_index/features/skill_md/test_build.py ............... [ 57%]
+.....FFFFFFFFF                                                           [ 58%]
+tests/unit/project_index/features/skill_md/test_cli.py ...F              [ 58%]
+tests/unit/project_index/features/skill_md/test_types.py .               [ 58%]
+tests/unit/project_index/features/sources/test_builtin.py ....           [ 59%]
+tests/unit/project_index/features/sources/test_merge.py ....             [ 59%]
+tests/unit/project_index/features/sources/test_registry.py ............. [ 60%]
+.........................                                                [ 61%]
+tests/unit/project_index/features/sources/test_schema_ref.py ........    [ 62%]
+tests/unit/project_index/features/sources/test_service.py .............. [ 63%]
+..........................................................               [ 67%]
+tests/unit/project_index/features/sources/test_types.py ...........      [ 67%]
+tests/unit/project_index/features/validation/test_markdown.py .......... [ 68%]
+..                                                                       [ 68%]
+tests/unit/project_index/features/validation/test_rules.py .........     [ 69%]
+tests/unit/project_index/features/validation/test_scripts.py ....        [ 69%]
+tests/unit/project_index/features/validation/test_service.py ........... [ 70%]
+.......FFF                                                               [ 70%]
+tests/unit/project_index/features/write/test_apply.py .................. [ 71%]
+...........................................                              [ 74%]
+tests/unit/project_index/features/write/test_direct_commit.py .......... [ 75%]
+..................                                                       [ 76%]
+tests/unit/project_index/features/write/test_hints.py ....               [ 76%]
+tests/unit/project_index/features/write/test_ids.py ..                   [ 77%]
+tests/unit/project_index/features/write/test_locks.py ...                [ 77%]
+tests/unit/project_index/features/write/test_placement.py .........      [ 77%]
+tests/unit/project_index/features/write/test_references.py ........      [ 78%]
+tests/unit/project_index/features/write/test_replace.py .....            [ 78%]
+tests/unit/project_index/features/write/test_secrets.py ................ [ 79%]
+                                                                         [ 79%]
+tests/unit/project_index/features/write/test_service.py ................ [ 80%]
+................................................................FF       [ 85%]
+tests/unit/project_index/integrations/test_git.py ..............         [ 86%]
+tests/unit/project_index/integrations/test_mdmark.py .......             [ 86%]
+tests/unit/project_index/integrations/test_scripts.py .............      [ 87%]
+tests/unit/project_index/server/mcp/test_admin.py ....                   [ 87%]
+tests/unit/project_index/server/mcp/test_docs.py .....................   [ 88%]
+tests/unit/project_index/server/mcp/test_result.py ...........           [ 89%]
+tests/unit/project_index/server/test_app.py .........                    [ 90%]
+tests/unit/project_index/server/test_error_handlers.py .....             [ 90%]
+tests/unit/project_index/server/test_lifespan.py .                       [ 90%]
+tests/unit/project_index/server/test_origin.py .....                     [ 91%]
+tests/unit/project_index/shared/test_background.py ..........            [ 91%]
+tests/unit/project_index/shared/test_deadline.py .....                   [ 91%]
+tests/unit/project_index/shared/test_errors.py ..                        [ 92%]
+tests/unit/project_index/shared/test_files.py ...                        [ 92%]
+tests/unit/project_index/shared/test_hashing.py ..                       [ 92%]
+tests/unit/project_index/shared/test_narrowing.py ..........             [ 93%]
+tests/unit/project_index/shared/test_paths.py .....                      [ 93%]
+tests/unit/project_index/shared/test_runtime.py ..........               [ 94%]
+tests/unit/project_index/shared/test_schema_check.py .............       [ 94%]
+tests/unit/project_index/shared/test_yaml_io.py .............            [ 95%]
+tests/unit/project_index/test_main.py ................                   [ 96%]
+tests/unit/project_index/test_serve.py ................................. [ 99%]
+...............                                                          [100%]
+
+=================================== FAILURES ===================================
+____________________ test_resolve_steps_when_chain_missing _____________________
+
+skill_flow = <function skill_flow.<locals>._make at 0x7ea376a04a90>
+flow_flow = <function flow_flow.<locals>._make at 0x7ea376a04e00>
+
+    def test_resolve_steps_when_chain_missing(
+        skill_flow: Callable[..., dict[str, Any]], flow_flow: Callable[..., dict[str, Any]]
+    ) -> None:
+        """連なる ref の途中のエージェントフローが無い（異常系）。"""
+        # 準備
+        a = _flow(
+            "docs/agent-flow/a.yaml",
+            skill_flow("a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "c#steps[取得する]"}]),
+        )
+        c = _flow(
+            "docs/agent-flow/c.yaml",
+            flow_flow("c", steps=[{"name": "取得する", "ref": "d#steps[渡す]"}]),
+        )
+        # 実行
+        _, problems = resolve_steps(a, {"a": a, "c": c})
+        # 検証
+        assert [problem.path for problem in problems] == ["steps[1].ref"]
+>       assert [problem.missing_id for problem in problems] == ["d"]
+                ^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'Problem' object has no attribute 'missing_id'
+
+tests/unit/project_index/features/skill_md/test_build.py:557: AttributeError
+_____________________________ test_check_deletion ______________________________
+
+tmp_path = PosixPath('/tmp/planner-246-pt/all/test_check_deletion0')
+write_source = <function write_source.<locals>._write at 0x7ea376a59f30>
+write_flow = <function write_flow.<locals>._write at 0x7ea376a5a140>
+skill_flow = <function skill_flow.<locals>._make at 0x7ea376a5a350>
+flow_flow = <function flow_flow.<locals>._make at 0x7ea376a5a560>
+
+    def test_check_deletion(
+        tmp_path: Path,
+        write_source: Callable[..., Path],
+        write_flow: Callable[[Path, str, dict[str, Any]], Path],
+        skill_flow: Callable[..., dict[str, Any]],
+        flow_flow: Callable[..., dict[str, Any]],
+    ) -> None:
+        """参照しているスキルを残して削除する（異常系）。"""
+        # 準備
+        root = _ref_source(tmp_path, write_source, write_flow, skill_flow, flow_flow)
+        text = json.dumps(flow_flow("c"))
+        before = sorted(path.read_bytes() for path in root.rglob("*") if path.is_file())
+        # 実行
+>       problems = build.check_deletion(root, text, ["c"])
+                   ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.skill_md.build' has no attribute 'check_deletion'
+
+tests/unit/project_index/features/skill_md/test_build.py:576: AttributeError
+__________________ test_check_deletion_when_referrer_deleted ___________________
+
+tmp_path = PosixPath('/tmp/planner-246-pt/all/test_check_deletion_when_refer0')
+write_source = <function write_source.<locals>._write at 0x7ea376a5aa30>
+write_flow = <function write_flow.<locals>._write at 0x7ea376a5ac40>
+skill_flow = <function skill_flow.<locals>._make at 0x7ea376a5ae50>
+flow_flow = <function flow_flow.<locals>._make at 0x7ea376a5b060>
+
+    def test_check_deletion_when_referrer_deleted(
+        tmp_path: Path,
+        write_source: Callable[..., Path],
+        write_flow: Callable[[Path, str, dict[str, Any]], Path],
+        skill_flow: Callable[..., dict[str, Any]],
+        flow_flow: Callable[..., dict[str, Any]],
+    ) -> None:
+        """参照しているスキルも削除する（正常系）。"""
+        # 準備
+        root = _ref_source(tmp_path, write_source, write_flow, skill_flow, flow_flow)
+        text = json.dumps(flow_flow("c"))
+        # 実行
+>       problems = build.check_deletion(root, text, ["a", "c"])
+                   ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.skill_md.build' has no attribute 'check_deletion'
+
+tests/unit/project_index/features/skill_md/test_build.py:597: AttributeError
+____________________ test_check_deletion_when_other_target _____________________
+
+tmp_path = PosixPath('/tmp/planner-246-pt/all/test_check_deletion_when_other0')
+write_source = <function write_source.<locals>._write at 0x7ea376a5b530>
+write_flow = <function write_flow.<locals>._write at 0x7ea376a5b740>
+skill_flow = <function skill_flow.<locals>._make at 0x7ea376a5b950>
+flow_flow = <function flow_flow.<locals>._make at 0x7ea376a5bb60>
+
+    def test_check_deletion_when_other_target(
+        tmp_path: Path,
+        write_source: Callable[..., Path],
+        write_flow: Callable[[Path, str, dict[str, Any]], Path],
+        skill_flow: Callable[..., dict[str, Any]],
+        flow_flow: Callable[..., dict[str, Any]],
+    ) -> None:
+        """ほかの削除する文書だけを指す ref は、その文書の検査に任せる（正常系）。"""
+        # 準備
+        write_source(tmp_path)
+        write_flow(
+            tmp_path,
+            "a",
+            skill_flow("a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "d#steps[取得する]"}]),
+        )
+        write_flow(tmp_path, "c", flow_flow("c"))
+        write_flow(tmp_path, "d", flow_flow("d"))
+        text = json.dumps(flow_flow("c"))
+        # 実行
+>       problems = build.check_deletion(tmp_path, text, ["c", "d"])
+                   ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.skill_md.build' has no attribute 'check_deletion'
+
+tests/unit/project_index/features/skill_md/test_build.py:621: AttributeError
+____________________ test_check_deletion_when_unreferenced _____________________
+
+tmp_path = PosixPath('/tmp/planner-246-pt/all/test_check_deletion_when_unref0')
+write_source = <function write_source.<locals>._write at 0x7ea376aa8250>
+write_flow = <function write_flow.<locals>._write at 0x7ea376aa8460>
+skill_flow = <function skill_flow.<locals>._make at 0x7ea376aa8670>
+flow_flow = <function flow_flow.<locals>._make at 0x7ea376aa8880>
+
+    def test_check_deletion_when_unreferenced(
+        tmp_path: Path,
+        write_source: Callable[..., Path],
+        write_flow: Callable[[Path, str, dict[str, Any]], Path],
+        skill_flow: Callable[..., dict[str, Any]],
+        flow_flow: Callable[..., dict[str, Any]],
+    ) -> None:
+        """どの ref からも指されない（正常系）。"""
+        # 準備
+        root = _ref_source(tmp_path, write_source, write_flow, skill_flow, flow_flow)
+        write_flow(root, "b", flow_flow("b"))
+        text = json.dumps(flow_flow("b"))
+        # 実行
+>       problems = build.check_deletion(root, text, [])
+                   ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.skill_md.build' has no attribute 'check_deletion'
+
+tests/unit/project_index/features/skill_md/test_build.py:639: AttributeError
+_____________________ test_check_deletion_when_unreadable ______________________
+
+tmp_path = PosixPath('/tmp/planner-246-pt/all/test_check_deletion_when_unrea0')
+write_source = <function write_source.<locals>._write at 0x7ea376aa8d50>
+write_flow = <function write_flow.<locals>._write at 0x7ea376aa8f60>
+skill_flow = <function skill_flow.<locals>._make at 0x7ea376aa9170>
+flow_flow = <function flow_flow.<locals>._make at 0x7ea376aa9380>
+
+    def test_check_deletion_when_unreadable(
+        tmp_path: Path,
+        write_source: Callable[..., Path],
+        write_flow: Callable[[Path, str, dict[str, Any]], Path],
+        skill_flow: Callable[..., dict[str, Any]],
+        flow_flow: Callable[..., dict[str, Any]],
+    ) -> None:
+        """標準入力が YAML として読めない（異常系）。"""
+        # 準備
+        root = _ref_source(tmp_path, write_source, write_flow, skill_flow, flow_flow)
+        # 実行
+>       problems = build.check_deletion(root, "id: [", ["c"])
+                   ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.skill_md.build' has no attribute 'check_deletion'
+
+tests/unit/project_index/features/skill_md/test_build.py:655: AttributeError
+____________________ test_check_deletion_when_chain[middle] ____________________
+
+tmp_path = PosixPath('/tmp/planner-246-pt/all/test_check_deletion_when_chain0')
+write_source = <function write_source.<locals>._write at 0x7ea376aa9850>
+write_flow = <function write_flow.<locals>._write at 0x7ea376aa9a60>
+skill_flow = <function skill_flow.<locals>._make at 0x7ea376aa9c70>
+flow_flow = <function flow_flow.<locals>._make at 0x7ea376aa9e80>
+stdin_id = 'c', expected = ['$']
+
+    @pytest.mark.parametrize(
+        ("stdin_id", "expected"),
+        [
+            pytest.param("c", ["$"], id="middle"),
+            pytest.param("d", [], id="end"),
+        ],
+    )
+    def test_check_deletion_when_chain(
+        tmp_path: Path,
+        write_source: Callable[..., Path],
+        write_flow: Callable[[Path, str, dict[str, Any]], Path],
+        skill_flow: Callable[..., dict[str, Any]],
+        flow_flow: Callable[..., dict[str, Any]],
+        stdin_id: str,
+        expected: list[str],
+    ) -> None:
+        """連なる ref の参照先をまとめて削除する（異常系）。"""
+        # 準備
+        write_source(tmp_path)
+        write_flow(
+            tmp_path,
+            "a",
+            skill_flow("a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "c#steps[取得する]"}]),
+        )
+        write_flow(
+            tmp_path, "c", flow_flow("c", steps=[{"name": "取得する", "ref": "d#steps[渡す]"}])
+        )
+        write_flow(tmp_path, "d", flow_flow("d", steps=[{"name": "渡す", "body": "渡す。"}]))
+        text = json.dumps(flow_flow(stdin_id))
+        # 実行
+>       problems = build.check_deletion(tmp_path, text, ["c", "d"])
+                   ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.skill_md.build' has no attribute 'check_deletion'
+
+tests/unit/project_index/features/skill_md/test_build.py:690: AttributeError
+_____________________ test_check_deletion_when_chain[end] ______________________
+
+tmp_path = PosixPath('/tmp/planner-246-pt/all/test_check_deletion_when_chain1')
+write_source = <function write_source.<locals>._write at 0x7ea376aaa090>
+write_flow = <function write_flow.<locals>._write at 0x7ea376aaa560>
+skill_flow = <function skill_flow.<locals>._make at 0x7ea376aaa770>
+flow_flow = <function flow_flow.<locals>._make at 0x7ea376aaa980>
+stdin_id = 'd', expected = []
+
+    @pytest.mark.parametrize(
+        ("stdin_id", "expected"),
+        [
+            pytest.param("c", ["$"], id="middle"),
+            pytest.param("d", [], id="end"),
+        ],
+    )
+    def test_check_deletion_when_chain(
+        tmp_path: Path,
+        write_source: Callable[..., Path],
+        write_flow: Callable[[Path, str, dict[str, Any]], Path],
+        skill_flow: Callable[..., dict[str, Any]],
+        flow_flow: Callable[..., dict[str, Any]],
+        stdin_id: str,
+        expected: list[str],
+    ) -> None:
+        """連なる ref の参照先をまとめて削除する（異常系）。"""
+        # 準備
+        write_source(tmp_path)
+        write_flow(
+            tmp_path,
+            "a",
+            skill_flow("a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "c#steps[取得する]"}]),
+        )
+        write_flow(
+            tmp_path, "c", flow_flow("c", steps=[{"name": "取得する", "ref": "d#steps[渡す]"}])
+        )
+        write_flow(tmp_path, "d", flow_flow("d", steps=[{"name": "渡す", "body": "渡す。"}]))
+        text = json.dumps(flow_flow(stdin_id))
+        # 実行
+>       problems = build.check_deletion(tmp_path, text, ["c", "d"])
+                   ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.skill_md.build' has no attribute 'check_deletion'
+
+tests/unit/project_index/features/skill_md/test_build.py:690: AttributeError
+___________________ test_check_deletion_when_already_broken ____________________
+
+tmp_path = PosixPath('/tmp/planner-246-pt/all/test_check_deletion_when_alrea0')
+write_source = <function write_source.<locals>._write at 0x7ea376aaab90>
+write_flow = <function write_flow.<locals>._write at 0x7ea376aab110>
+skill_flow = <function skill_flow.<locals>._make at 0x7ea376aab320>
+flow_flow = <function flow_flow.<locals>._make at 0x7ea376aab530>
+
+    def test_check_deletion_when_already_broken(
+        tmp_path: Path,
+        write_source: Callable[..., Path],
+        write_flow: Callable[[Path, str, dict[str, Any]], Path],
+        skill_flow: Callable[..., dict[str, Any]],
+        flow_flow: Callable[..., dict[str, Any]],
+    ) -> None:
+        """もともと解決できない ref は違反にしない（正常系）。"""
+        # 準備
+        write_source(tmp_path)
+        write_flow(
+            tmp_path,
+            "a",
+            skill_flow("a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "e#steps[無い]"}]),
+        )
+        write_flow(tmp_path, "c", flow_flow("c"))
+        text = json.dumps(flow_flow("c"))
+        # 実行
+>       problems = build.check_deletion(tmp_path, text, ["c"])
+                   ^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'project_index.features.skill_md.build' has no attribute 'check_deletion'
+
+tests/unit/project_index/features/skill_md/test_build.py:713: AttributeError
+_____________________ test_run_skill_md_when_check_delete ______________________
+
+tmp_path = PosixPath('/tmp/planner-246-pt/all/test_run_skill_md_when_check_d0')
+write_source = <function write_source.<locals>._write at 0x7ea376ad40f0>
+write_flow = <function write_flow.<locals>._write at 0x7ea376ad5850>
+skill_flow = <function skill_flow.<locals>._make at 0x7ea376ad47d0>
+flow_flow = <function flow_flow.<locals>._make at 0x7ea376ad5a60>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ea376a7b770>
+capsys = <_pytest.capture.CaptureFixture object at 0x7ea376ad5de0>
+
+    def test_run_skill_md_when_check_delete(
+        tmp_path: Path,
+        write_source: Callable[..., Path],
+        write_flow: Callable[[Path, str, dict[str, Any]], Path],
+        skill_flow: Callable[..., dict[str, Any]],
+        flow_flow: Callable[..., dict[str, Any]],
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """削除の検査は環境変数で切り替える（正常系）。"""
+        # 準備
+        root = write_source(tmp_path / "sample")
+        write_flow(
+            root,
+            "a",
+            skill_flow("a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "c#steps[取得する]"}]),
+        )
+        write_flow(root, "c", flow_flow("c"))
+        monkeypatch.chdir(root)
+        monkeypatch.setenv("PROJECT_INDEX_VALIDATE_ON", "delete")
+        monkeypatch.setenv("PROJECT_INDEX_DELETE_IDS", "c")
+        monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(flow_flow("c"))))
+        # 実行
+        code = run_skill_md(argparse.Namespace(check=True, paths=[]))
+        # 検証
+        out, _ = capsys.readouterr()
+        assert code == 0
+        violations = json.loads(out)
+>       assert [violation["path"] for violation in violations] == ["$"]
+E       AssertionError: assert [] == ['$']
+E         
+E         Right contains one more item: '$'
+E         Use -v to get more diff
+
+/home/shuhei2441/repo/project-index/.claude/worktrees/feat-delete-docs-refuse-skill-ref-target/tests/unit/project_index/features/skill_md/test_cli.py:116: AssertionError
+______________________ test_document_checker_check_delete ______________________
+
+make_checked_target = <function make_checked_target.<locals>._make at 0x7ea376ad4b40>
+make_document = <function make_document.<locals>._make at 0x7ea376ad5a60>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ea37d2a0c90>
+
+    def test_document_checker_check_delete(
+        make_checked_target: Callable[..., Target],
+        make_document: Callable[..., Document],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """削除の時点の検査だけを環境変数つきで実行する（正常系）。"""
+        # 準備
+        calls: list[tuple[list[str], Any]] = []
+    
+        def recording(run: Any, **kwargs: Any) -> ScriptResult:
+            calls.append((list(run), kwargs.get("env")))
+            return ScriptResult(stdout="[]", stderr="")
+    
+        monkeypatch.setattr(service_module, "run_script", recording)
+        target = make_checked_target(
+            [
+                ScriptEntry(id="d", run=["delete-check"], on=["delete"]),
+                ScriptEntry(id="w", run=["write-check"], on=["write"]),
+            ],
+            row_validators=["d", "w"],
+        )
+        # 実行
+>       violations = _checker({}).check_delete(target, make_document(), delete_ids=["a", "b"])
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'DocumentChecker' object has no attribute 'check_delete'
+
+tests/unit/project_index/features/validation/test_service.py:686: AttributeError
+______________ test_document_checker_check_delete_when_violation _______________
+
+make_checked_target = <function make_checked_target.<locals>._make at 0x7ea376aab320>
+make_document = <function make_document.<locals>._make at 0x7ea376aab060>
+
+    def test_document_checker_check_delete_when_violation(
+        make_checked_target: Callable[..., Target],
+        make_document: Callable[..., Document],
+    ) -> None:
+        """検査の違反を返却する（正常系）。"""
+        # 準備
+        violation = {"path": "$", "rule": "参照されています", "fix": "参照元も消す"}
+        target = make_checked_target(
+            [ScriptEntry(id="d", run=_script([violation]), on=["delete"])], row_validators=["d"]
+        )
+        # 実行
+>       violations = _checker({}).check_delete(target, make_document(), delete_ids=["a"])
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'DocumentChecker' object has no attribute 'check_delete'
+
+tests/unit/project_index/features/validation/test_service.py:708: AttributeError
+___________ test_document_checker_check_delete_when_deadline_passed ____________
+
+make_checked_target = <function make_checked_target.<locals>._make at 0x7ea376aaa2a0>
+make_document = <function make_document.<locals>._make at 0x7ea376aa9fe0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ea376ca5da0>
+
+    def test_document_checker_check_delete_when_deadline_passed(
+        make_checked_target: Callable[..., Target],
+        make_document: Callable[..., Document],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """期限を過ぎた後は動かさない（異常系）。"""
+        # 準備
+        calls: list[Any] = []
+    
+        def counting(run: Any, **kwargs: Any) -> Any:
+            calls.append(run)
+            raise AssertionError
+    
+        monkeypatch.setattr(service_module, "run_script", counting)
+        target = make_checked_target(
+            [ScriptEntry(id="d", run=_script([]), on=["delete"])], row_validators=["d"]
+        )
+        deadline = Deadline(limit_sec=0, started=0, clock=_Clock(0))
+        # 実行・検証
+        with pytest.raises(WriteDeadlineExceededError, match="書き込みの期限"):
+>           _checker({}).check_delete(target, make_document(), delete_ids=["a"], deadline=deadline)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^
+E           AttributeError: 'DocumentChecker' object has no attribute 'check_delete'
+
+tests/unit/project_index/features/validation/test_service.py:733: AttributeError
+_________________ test_delete_docs_when_delete_validator_fails _________________
+
+make_env = <function make_env.<locals>._make at 0x7ea3505c09e0>
+
+    def test_delete_docs_when_delete_validator_fails(make_env: Callable[..., WriteEnv]) -> None:
+        """削除の時点の検査に合格しない（異常系）。"""
+        # 準備
+        env = make_env(tables=_delete_guard_tables(), validators=_delete_guard("doc-2", "-", "-"))
+        targets = [DeleteTarget(id="doc-2", expected_version=content_hash(DOC_2))]
+        # 実行・検証
+>       with pytest.raises(ValidationFailedError) as caught:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValidationFailedError
+
+tests/unit/project_index/features/write/test_service.py:2177: Failed
+_________________ test_delete_docs_when_delete_validator_retry _________________
+
+make_env = <function make_env.<locals>._make at 0x7ea3505de2a0>
+
+    def test_delete_docs_when_delete_validator_retry(make_env: Callable[..., WriteEnv]) -> None:
+        """atomic: false で failed の対象を除いて検査をやり直す（正常系）。"""
+        # 準備
+        doc_3 = "id: doc-3\nname: 文書 3\n"
+        env = make_env(
+            {
+                "docs/rule/doc-1.yaml": DOC_1,
+                "docs/rule/doc-2.yaml": DOC_2,
+                "docs/rule/doc-3.yaml": doc_3,
+                "schemas/rule.schema.yaml": SCHEMA,
+            },
+            tables=_delete_guard_tables(),
+            validators=_delete_guard("doc-1", "doc-2", "doc-1"),
+        )
+        targets = [
+            DeleteTarget(id="doc-1", expected_version=content_hash(DOC_1)),
+            DeleteTarget(id="doc-2", expected_version=content_hash(DOC_2)),
+            DeleteTarget(id="doc-3", expected_version=content_hash(doc_3)),
+        ]
+        # 実行
+        result = env.delete(targets=targets, atomic=False)
+        # 検証
+>       assert [item.status for item in result.results] == ["failed", "failed", "deleted"]
+E       AssertionError: assert ['deleted', '...d', 'deleted'] == ['failed', 'f...d', 'deleted']
+E         
+E         At index 0 diff: 'deleted' != 'failed'
+E         Use -v to get more diff
+
+tests/unit/project_index/features/write/test_service.py:2205: AssertionError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/skill_md/test_build.py::test_resolve_steps_when_chain_missing
+FAILED tests/unit/project_index/features/skill_md/test_build.py::test_check_deletion
+FAILED tests/unit/project_index/features/skill_md/test_build.py::test_check_deletion_when_referrer_deleted
+FAILED tests/unit/project_index/features/skill_md/test_build.py::test_check_deletion_when_other_target
+FAILED tests/unit/project_index/features/skill_md/test_build.py::test_check_deletion_when_unreferenced
+FAILED tests/unit/project_index/features/skill_md/test_build.py::test_check_deletion_when_unreadable
+FAILED tests/unit/project_index/features/skill_md/test_build.py::test_check_deletion_when_chain[middle]
+FAILED tests/unit/project_index/features/skill_md/test_build.py::test_check_deletion_when_chain[end]
+FAILED tests/unit/project_index/features/skill_md/test_build.py::test_check_deletion_when_already_broken
+FAILED tests/unit/project_index/features/skill_md/test_cli.py::test_run_skill_md_when_check_delete
+FAILED tests/unit/project_index/features/validation/test_service.py::test_document_checker_check_delete
+FAILED tests/unit/project_index/features/validation/test_service.py::test_document_checker_check_delete_when_violation
+FAILED tests/unit/project_index/features/validation/test_service.py::test_document_checker_check_delete_when_deadline_passed
+FAILED tests/unit/project_index/features/write/test_service.py::test_delete_docs_when_delete_validator_fails
+FAILED tests/unit/project_index/features/write/test_service.py::test_delete_docs_when_delete_validator_retry
+======================= 15 failed, 1509 passed in 44.10s =======================
+exit=1
