@@ -544,7 +544,9 @@ def test_resolve_steps_when_chain_missing(
     # 準備
     a = _flow(
         "docs/agent-flow/a.yaml",
-        skill_flow("a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "c#steps[取得する]"}]),
+        skill_flow(
+            "a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "c#steps[取得する]"}]
+        ),
     )
     c = _flow(
         "docs/agent-flow/c.yaml",
@@ -612,7 +614,9 @@ def test_check_deletion_when_other_target(
     write_flow(
         tmp_path,
         "a",
-        skill_flow("a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "d#steps[取得する]"}]),
+        skill_flow(
+            "a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "d#steps[取得する]"}]
+        ),
     )
     write_flow(tmp_path, "c", flow_flow("c"))
     write_flow(tmp_path, "d", flow_flow("d"))
@@ -679,11 +683,11 @@ def test_check_deletion_when_chain(
     write_flow(
         tmp_path,
         "a",
-        skill_flow("a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "c#steps[取得する]"}]),
+        skill_flow(
+            "a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "c#steps[取得する]"}]
+        ),
     )
-    write_flow(
-        tmp_path, "c", flow_flow("c", steps=[{"name": "取得する", "ref": "d#steps[渡す]"}])
-    )
+    write_flow(tmp_path, "c", flow_flow("c", steps=[{"name": "取得する", "ref": "d#steps[渡す]"}]))
     write_flow(tmp_path, "d", flow_flow("d", steps=[{"name": "渡す", "body": "渡す。"}]))
     text = json.dumps(flow_flow(stdin_id))
     # 実行

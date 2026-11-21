@@ -100,7 +100,9 @@ def test_run_skill_md_when_check_delete(
     write_flow(
         root,
         "a",
-        skill_flow("a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "c#steps[取得する]"}]),
+        skill_flow(
+            "a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "c#steps[取得する]"}]
+        ),
     )
     write_flow(root, "c", flow_flow("c"))
     monkeypatch.chdir(root)
