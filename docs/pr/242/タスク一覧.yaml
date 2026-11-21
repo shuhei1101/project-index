@@ -50,8 +50,10 @@ tasks:
     updated_by: planner
     updated_at: '2026-11-21T10:06:52.395168+00:00'
   - process: インターフェース定義設計
-    status: todo
-    note: IF-6 の項目のパスと unset の制約・シナリオ、IF-2 の項目のパスの注記を修正し、解決できない unset の返し方を決める
+    status: done
+    note: IF-6 に `results[].skipped_unset` と制約「unset の項目のパス」の案内、シナリオ「正常系（無い項目の unset を返却する）」を追加
+    updated_by: planner
+    updated_at: '2026-11-21T10:11:58.610054+00:00'
   - process: エージェント・MCP サーバー設計
     status: skipped
     reason: MCP サーバーの定義・instructions を変えない（判定フローチャート『機能を呼ぶインターフェースの選び方』の対象のインターフェースは既存のまま）
@@ -79,7 +81,7 @@ tasks:
     updated_at: '2026-11-21T10:06:52.395168+00:00'
   - process: モジュール構成設計
     status: todo
-    note: MOD-25（fields.py の項目のパスの解釈）・MOD-80（apply.py の unset）を修正する
+    note: MOD-80（apply.py の unset）と、結果を組み立てる書き込みのモジュールの設計書を修正する
   - process: ドキュメント修正
     status: todo
     note: 公開ドキュメントのガイド『文書のMCP』の項目のパスと unset の説明
