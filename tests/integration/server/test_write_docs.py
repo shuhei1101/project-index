@@ -4038,3 +4038,62 @@ def test_error_when_direct_commit_generator_failed(
     assert "DirectCommitGeneratorError" in result.text
     assert "scripts/list.py" in result.text
     assert _git_state(direct, run_git) == before
+
+
+SKIPPED_SCHEMA = (
+    "type: object\n"
+    "title: サンプル\n"
+    "properties:\n"
+    "  id: {type: string}\n"
+    "  name: {type: string}\n"
+    "  notes:\n"
+    "    type: object\n"
+    "    additionalProperties: {type: string}\n"
+    "  labels:\n"
+    "    type: array\n"
+    "    items: {type: string}\n"
+)
+SKIPPED_DOC = 'id: doc-1\nname: 文書 1\nnotes:\n  "mcp/server.py の補足": 補足\nlabels: [a]\n'
+
+
+def test_normal_when_operation_skipped(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """何もしなかった unset・remove_from を results[].skipped に返却し、. を含むキーを # の項目のパスで削除する（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{"schemas/sample.schema.yaml": SKIPPED_SCHEMA, "docs/doc-1.yaml": SKIPPED_DOC}
+    )
+    source, env, worktree = _setup(make_source, make_server, add_worktree, files)
+    path = worktree / "docs" / "doc-1.yaml"
+    arguments = {"cwd": str(source.folder), "worktree": str(worktree)}
+
+    def _call(**operation: Any) -> Any:
+        return env.call(
+            "write_docs", operations=[_update("doc-1", _version(path), **operation)], **arguments
+        )
+
+    # 実行
+    first = _call(
+        unset=["notes.mcp/server.py の補足", "notes.nonexistent"],
+        remove_from={"labels": ["a", "z"], "missing": ["x"]},
+    )
+    after_first = load_yaml(path.read_text(encoding="utf-8"))
+    second = _call(unset=["#notes[mcp/server.py の補足]"])
+    after_second = load_yaml(path.read_text(encoding="utf-8"))
+    # 検証
+    assert [item["status"] for item in first.data["results"]] == ["updated"]
+    assert after_first["labels"] == []
+    assert after_first["notes"] == {"mcp/server.py の補足": "補足"}
+    assert first.data["results"][0]["skipped"] == [
+        {"path": "unset.notes.mcp/server.py の補足", "reason": "項目がありません"},
+        {"path": "unset.notes.nonexistent", "reason": "項目がありません"},
+        {"path": "remove_from.labels", "reason": "z の要素がありません"},
+        {"path": "remove_from.missing", "reason": "項目がありません"},
+    ]
+    assert [item["status"] for item in second.data["results"]] == ["updated"]
+    assert "notes" not in after_second or "mcp/server.py の補足" not in after_second["notes"]
+    assert "skipped" not in second.data["results"][0]
