@@ -338,7 +338,7 @@ project-index skill-md --check < docs/agent-flow/skill-setup.yaml
 
 | 引数 | 内容 |
 | --- | --- |
-| （なし） | 生成のモード。全ての `type: skill` を組み立て、中身が今の SKILL.md と違うものだけを書き出し、書き換えたパスを 1 行に 1 件出す |
+| （なし） | 生成のモード。全ての `type: skill` を組み立て、中身が今の SKILL.md と違うものだけを書き出す。あわせて、生成元のコメントが `agent_flow` の行のエージェントフローを指し、組み立てたどの `skill.path` でもない SKILL.md を削除する（`.` で始まるフォルダの配下は探さない）。書き換えたパスと削除したパスを 1 行に 1 件出す |
 | `--check` | 検査のモード。標準入力のエージェントフローで配信元の同じ `id` を置き換えて全ての SKILL.md を組み立て、違反（`path`・`rule`・`fix`）の配列の JSON を出す。ファイルは書き換えない |
 | `--check`（環境変数 `PROJECT_INDEX_VALIDATE_ON=delete`） | 削除の検査。`PROJECT_INDEX_DELETE_IDS` の文書（無ければ標準入力の文書）を除いて全ての SKILL.md を組み立て、標準入力のエージェントフローを指す解決できない `ref` を違反にする。`delete_docs` が `on` に `delete` を持つ `validators[]` から呼ぶ |
 | 位置引数 | `generators[].run` が付与する書き込んだ文書のパス。受け取るが、生成の対象は絞らない |
@@ -348,5 +348,5 @@ project-index skill-md --check < docs/agent-flow/skill-setup.yaml
 | 終了コード | 意味 |
 | --- | --- |
 | 0 | 生成を終えた。検査のモードは違反の有無によらず 0 |
-| 1 | 生成のモードで、エージェントフローかスキーマが読み込めない・合わない、`ref` が解決できない、`skill.path` が配信元の外部を指す。どの SKILL.md も書き換えず、標準エラーに原因のファイルと項目を出す |
+| 1 | 生成のモードで、エージェントフローかスキーマが読み込めない・合わない、`ref` が解決できない、`skill.path` が配信元の外部を指す。どの SKILL.md も書き換え・削除せず、標準エラーに原因のファイルと項目を出す |
 | 2 | 引数の誤り |
