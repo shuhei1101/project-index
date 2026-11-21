@@ -1,0 +1,40 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=unit | grep -o ...) && ... gh run watch ... && cat test.log   # TP-1 TL-1 の run_runner
+# 単体テスト作成の Red の確認（commit 52fca54）。fail は全て実装の無いこと（project_index.features.skill_md が無い）による収集時の ModuleNotFoundError。収集が止まるため tests/unit/project_index/test_main.py::test_build_parser_when_skill_md は実行されていない（skill-md のサブコマンドも未実装）
+
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 1485 items / 3 errors
+
+==================================== ERRORS ====================================
+__ ERROR collecting tests/unit/project_index/features/skill_md/test_build.py ___
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/skill_md/test_build.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/skill_md/test_build.py:8: in <module>
+    from project_index.features.skill_md.build import (
+E   ModuleNotFoundError: No module named 'project_index.features.skill_md'
+___ ERROR collecting tests/unit/project_index/features/skill_md/test_cli.py ____
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/skill_md/test_cli.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/skill_md/test_cli.py:9: in <module>
+    from project_index.features.skill_md.cli import run_skill_md
+E   ModuleNotFoundError: No module named 'project_index.features.skill_md'
+__ ERROR collecting tests/unit/project_index/features/skill_md/test_types.py ___
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/skill_md/test_types.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/skill_md/test_types.py:3: in <module>
+    from project_index.features.skill_md.types import Problem
+E   ModuleNotFoundError: No module named 'project_index.features.skill_md'
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/skill_md/test_build.py
+ERROR tests/unit/project_index/features/skill_md/test_cli.py
+ERROR tests/unit/project_index/features/skill_md/test_types.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!!
+============================== 3 errors in 3.58s ===============================
+exit=1
