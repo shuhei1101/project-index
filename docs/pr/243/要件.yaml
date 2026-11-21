@@ -1,0 +1,37 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: エージェントがスキルのエージェントフローを書き込んだ後に、そのスキルの SKILL.md が生成される流れを加える
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-2.yaml
+    impact: run_only
+    detail: スキル global-setup の SKILL.md を生成物に置き換えるため、導入の流れが変わらないことを確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: run_only
+    detail: スキル setup の SKILL.md を生成物に置き換えるため、配信元の追加の流れが変わらないことを確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-13.yaml
+    impact: run_only
+    detail: スキル feedback の SKILL.md を生成物に置き換えるため、指摘の登録の流れが変わらないことを確かめる
+    depends_on: []
+docs:
+  - page: docs/guide/CLI.md
+    new: false
+    change: 生成のサブコマンドの引数・出力・終了コードを追加する
+    status: todo
+  - page: docs/guide/設定.md
+    new: false
+    change: generators[] に生成のサブコマンドを登録する例を確かめ、要れば追記する
+    status: todo
+scope_out:
+  - item: knowledge の生成のコマンド（IF-312-1）を project-index の生成のコマンドへ寄せ替えること
+    reason: 要望に含まれない。knowledge のリポジトリの変更で、今回入れるコマンドを前提にする
+    plan: to_file
+  - item: agent_flow 以外の種類（agent・launch など）からの生成
+    reason: 要望に含まれない
+    plan: none
