@@ -1,0 +1,29 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=integration -f paths="tests/integration/server/test_skill_md.py tests/integration/server/test_prompt_doc.py" | grep -o ...) && ... gh run watch ... && cat test.log   # TP-1 TL-2 の run_runner（commit 42a46eb）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 17 items
+
+tests/integration/server/test_skill_md.py::test_normal PASSED            [  5%]
+tests/integration/server/test_skill_md.py::test_normal_when_step_ref PASSED [ 11%]
+tests/integration/server/test_skill_md.py::test_normal_when_check_passes PASSED [ 17%]
+tests/integration/server/test_skill_md.py::test_normal_when_check_finds_violations PASSED [ 23%]
+tests/integration/server/test_skill_md.py::test_error_when_schema_invalid PASSED [ 29%]
+tests/integration/server/test_skill_md.py::test_error_when_doc_unreadable PASSED [ 35%]
+tests/integration/server/test_skill_md.py::test_error_when_step_ref_missing PASSED [ 41%]
+tests/integration/server/test_skill_md.py::test_error_when_path_outside_source PASSED [ 47%]
+tests/integration/server/test_skill_md.py::test_error_when_schema_unresolvable[source-missing] PASSED [ 52%]
+tests/integration/server/test_skill_md.py::test_error_when_schema_unresolvable[ref-missing] PASSED [ 58%]
+tests/integration/server/test_prompt_doc.py::test_normal PASSED          [ 64%]
+tests/integration/server/test_prompt_doc.py::test_normal_when_single_language PASSED [ 70%]
+tests/integration/server/test_prompt_doc.py::test_normal_when_example_invalid PASSED [ 76%]
+tests/integration/server/test_prompt_doc.py::test_normal_when_hook_text_too_long PASSED [ 82%]
+tests/integration/server/test_prompt_doc.py::test_normal_when_part_syntax_invalid PASSED [ 88%]
+tests/integration/server/test_prompt_doc.py::test_error_when_yaml_unreadable PASSED [ 94%]
+tests/integration/server/test_prompt_doc.py::test_error_when_required_key_missing PASSED [100%]
+
+============================== 17 passed in 0.59s ==============================
+exit=0
