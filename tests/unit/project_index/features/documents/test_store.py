@@ -22,6 +22,7 @@ from project_index.features.sources.types import DocumentTable, ServedSource, So
 from project_index.integrations import git as git_module
 from project_index.shared.background import BackgroundGate
 from project_index.shared.errors import DocumentNotFoundError, UnknownKindError
+from project_index.shared.runtime import ExecutionSlots
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
 
 if TYPE_CHECKING:
@@ -932,16 +933,16 @@ def test_document_store_invalidate_when_many_worktrees(
     [write_files(w, {"rules/a.yaml": "id: a\nname: A\n"}) for w in worktrees]
     [document_store.load(t) for t in targets]
     edited = worktrees[0] / "rules" / "a.yaml"
-    other = (worktrees[1] / "rules" / "a.yaml").resolve()
     stat = edited.stat()
     edited.write_text("id: a\nname: Z\n", encoding="utf-8")
     os.utime(edited, ns=(stat.st_atime_ns, stat.st_mtime_ns))
     document_store.invalidate([edited])
     # 実行
-    result = document_store.load(targets[0])
+    with ExecutionSlots().request("search_docs") as record:
+        result = document_store.load(targets[0])
     # 検証
     assert result.documents[0].data["name"] == "Z"
-    assert any(key[0] == other for key in document_store._files)
+    assert record.scanned == 1
 
 
 def test_document_store_location(

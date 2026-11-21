@@ -636,9 +636,9 @@ classes:
           - name: test_document_store_invalidate_when_many_worktrees
             case: 正常
             summary: ほかのワークツリーのキャッシュをたどらない
-            condition: ワークツリー 30 件を `load` した後、1 件のワークツリーの 1 ファイルを `invalidate` してから同じワークツリーを `load` する
+            condition: ワークツリー 30 件（各 1 ファイル）を `load` した後、1 件目のワークツリーの 1 ファイルを `invalidate` してから、要求の記録の範囲（`ExecutionSlots().request`）の中で 1 件目のワークツリーを `load` する
             mock: なし（`tmp_path`）
-            expected: 書き換えた内容を返し、ほかのワークツリーの `_files` のキーが残る
+            expected: 書き換えた内容を返し、記録の `scanned` が 1（1 件目のワークツリーの前回のキーの数。ほかのワークツリーの数によらない）
             exception: '-'
       - name: clear
         title: 全て捨てる
