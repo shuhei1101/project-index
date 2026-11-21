@@ -135,6 +135,30 @@ def test_build_parser_when_prompt_doc() -> None:
     assert args.handler is run_prompt_doc
 
 
+def test_build_parser_when_skill_md() -> None:
+    """skill-md の引数と処理を引く（正常系）。"""
+    # 準備
+    from project_index.features.skill_md.cli import run_skill_md
+
+    parser = build_parser()
+    # 実行
+    check = parser.parse_args(["skill-md", "--check"])
+    generate = parser.parse_args(["skill-md", "docs/agent-flow/a.yaml"])
+    # 検証
+    assert (check.cmd, check.handler, check.check, check.paths) == (
+        "skill-md",
+        run_skill_md,
+        True,
+        [],
+    )
+    assert (generate.cmd, generate.handler, generate.check, generate.paths) == (
+        "skill-md",
+        run_skill_md,
+        False,
+        ["docs/agent-flow/a.yaml"],
+    )
+
+
 def test_build_parser_when_plan_and_record() -> None:
     """--plan と --record は同時に渡せない（異常系）。"""
     # 準備

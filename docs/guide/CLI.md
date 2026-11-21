@@ -1,10 +1,10 @@
 # CLI
 
-project-index serve・project-index migrate・project-index files・project-index outline・project-index changed・project-index checkpoint・project-index prompt-doc のサブコマンド・引数・終了コード
+project-index serve・project-index migrate・project-index files・project-index outline・project-index changed・project-index checkpoint・project-index links・project-index skew・project-index prompt-doc・project-index skill-md のサブコマンド・引数・終了コード
 
 ## 共通
 
-`project-index` コマンドは `serve`・`migrate`・`files`・`outline`・`changed`・`checkpoint`・`prompt-doc` のサブコマンドを持ちます。
+`project-index` コマンドは `serve`・`migrate`・`files`・`outline`・`changed`・`checkpoint`・`links`・`skew`・`prompt-doc`・`skill-md` のサブコマンドを持ちます。
 `project-index --version` で project-index のバージョンを表示します。
 
 ## project-index serve
@@ -325,3 +325,27 @@ Markdown は、`name` の見出し・`kind` と `lang` のバッジ・`descripti
 | 0 | 正常。描画できない組・字数を超えた組・構文の誤った部品があっても 0 |
 | 1 | YAML として読めない、または変換に使うキーが無い・型が違う。標準出力には何も出さず、標準エラーに理由とキーのパスを出す |
 | 2 | 引数を渡した |
+
+## project-index skill-md
+
+配信元の `agent_flow` の行の文書のうち `type: skill` のエージェントフローから、`skill.path` の SKILL.md を組み立てて書き出します。
+配信元の直下で動き、`generators[].run` から呼ぶ生成と、`validators[].run` から呼ぶ書き込む前の検査の 2 つのモードを持ちます。
+
+```bash
+project-index skill-md
+project-index skill-md --check < docs/agent-flow/skill-setup.yaml
+```
+
+| 引数 | 内容 |
+| --- | --- |
+| （なし） | 生成のモード。全ての `type: skill` を組み立て、中身が今の SKILL.md と違うものだけを書き出し、書き換えたパスを 1 行に 1 件出す |
+| `--check` | 検査のモード。標準入力のエージェントフローで配信元の同じ `id` を置き換えて全ての SKILL.md を組み立て、違反（`path`・`rule`・`fix`）の配列の JSON を出す。ファイルは書き換えない |
+| 位置引数 | `generators[].run` が付与する書き込んだ文書のパス。受け取るが、生成の対象は絞らない |
+
+`agent_flow` の行の `schema` がほかの配信元を指すときは、端末の設定の `sources` の行が指すリポジトリから、`ref` の commit のスキーマを読み込みます。
+
+| 終了コード | 意味 |
+| --- | --- |
+| 0 | 生成を終えた。検査のモードは違反の有無によらず 0 |
+| 1 | 生成のモードで、エージェントフローかスキーマが読み込めない・合わない、`ref` が解決できない、`skill.path` が配信元の外部を指す。どの SKILL.md も書き換えず、標準エラーに原因のファイルと項目を出す |
+| 2 | 引数の誤り |

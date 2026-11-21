@@ -88,6 +88,12 @@ categories:
       ```
 
       2. 配信元の設定のスキーマの原本（`src/project_index/schemas/project-index.schema.yaml`）を変えたら、配布する `schemas/project-index.schema.json` を再作成し、原本と一緒に commit する（コマンドは `refs` の『配布のスキーマの生成』）
+
+      3. `docs/agent-flow/` の `type: skill` のエージェントフローを `write_docs` を経ずに編集したら、`skill.path` の SKILL.md を再作成し、エージェントフローと一緒に commit する（`write_docs` で書き込んだときは `generators[]` が再作成する）
+
+      ```bash
+      uv run project-index skill-md
+      ```
     refs:
       - to: MOD-70
         item: functions[source_schema_json]
@@ -95,7 +101,7 @@ categories:
         when: 配布のスキーマを生成するコマンドを変えるときに、生成する関数の出力を確認する。
     verification:
       state: 未確認
-      detail: 1 は、AI Monitor が配信元の設定を `dev-docs.yaml` の名前でだけ読み込み、`project-index.yaml` のこのリポジトリでは `No such file or directory` で止まるため確認していない（shuhei1101/ai-monitor#3441 で修正する）。2 の『配布のスキーマの生成』のコマンドは作業 PR の worktree で実行し、終了コード 0 で、出力が commit 済みの `schemas/project-index.schema.json` と一致した（2026-11-14）
+      detail: 1 は、AI Monitor が配信元の設定を `dev-docs.yaml` の名前でだけ読み込み、`project-index.yaml` のこのリポジトリでは `No such file or directory` で止まるため確認していない（shuhei1101/ai-monitor#3441 で修正する）。2 の『配布のスキーマの生成』のコマンドは作業 PR の worktree で実行し、終了コード 0 で、出力が commit 済みの `schemas/project-index.schema.json` と一致した（2026-11-14）。3 は作業 PR の worktree で実行し、終了コード 0 で 3 つの SKILL.md を書き出し、続けてもう一度実行すると標準出力が空でどのファイルも変わらないことを確認した（2026-11-21）
   - name: 取り込み前の検査
     refs:
       - to: TP-1

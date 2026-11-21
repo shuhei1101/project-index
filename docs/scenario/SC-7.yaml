@@ -1064,6 +1064,71 @@ scenarios:
       - 無いファイル `n8.md` を指し本文を持たない create は、今どおり `@body` が無い違反を返却し、直し方に `@body` を加えることと、先に本文のファイルを作成することが入る
       - 書き込みの後の `check_project` の管理用の YAML に無いファイルに、`notes/n6.md`・`notes/n7.md` が出ない
     test: test_normal_when_existing_body_file_adopted
+  - name: 正常シナリオ（スキルのエージェントフローを書く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: サンプルの配信元
+        description: '正常シナリオと同じ配信元に、種類 `agent_flow`（knowledge の `agent_flow.schema.yaml`）の行と、`type: skill` のエージェントフロー a（`skill.path` は `skills/a/SKILL.md`）・`type: flow` のエージェントフロー b と、SKILL.md の生成のコマンドを指す `generators[]` の行を追加し、`agent_flow` の行の `after_write[]` でその行を指したもの'
+        notes: 'a の工程の 1 つは `ref: b#steps[{b の工程の名前}]`。`skills/a/SKILL.md` は今のエージェントフローから生成した中身で配置する'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` にワークツリー x のパスを指定する'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（スキルのエージェントフローを書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: write_docs(operations: update a の工程の body を set)
+        M->>M: スキーマと validators で検査する
+        M->>WT: a の YAML を書き込む
+        M->>WT: after_write の SKILL.md の生成のコマンドを実行する
+        M-->>A: 書き込んだ後の version と差分
+        A->>M: write_docs(operations: update b の ref される工程の body を set)
+        M->>WT: b の YAML を書き込み、生成のコマンドを実行する
+        M-->>A: 書き込んだ後の version と差分
+      ```
+
+      <!-- /map -->
+    expected:
+      - 結果の `status` が `updated` で、書き込み前と違う `version` を返却する
+      - 1 回目の書き込みの後、ワークツリー x の `skills/a/SKILL.md` の工程のセクションが、書き込んだ工程の `body` になる
+      - 2 回目の書き込みの後、`skills/a/SKILL.md` の `ref` の工程のセクションが、b の修正後の `body` になる
+      - '`type: flow` の b から SKILL.md ができない'
+      - SKILL.md の中身が変わらない更新（`tags` だけの `set`）では、`skills/a/SKILL.md` のバイト列が書き込み前と同じ
+    test: test_normal_when_skill_agent_flow_written
+  - name: 異常シナリオ（SKILL.md を組み立てられないエージェントフローを書く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: サンプルの配信元
+        description: 正常シナリオ（スキルのエージェントフローを書く）の配信元に、同じコマンドの検査のモードを指す `validators[]` の行を追加し、`agent_flow` の行の `validators[]` でその行を指したもの
+      - name: project-index
+        description: sample を配信している project-index
+        notes: 書き込む操作は、a の `ref` を b に無い工程へ向ける `set` と、a の `skill.path` を `../outside/SKILL.md` にする `set` の 2 つ（どちらもスキーマには合う）
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（SKILL.md を組み立てられないエージェントフローを書く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: write_docs(operations: update a の ref を無い工程へ向ける set)
+        M->>M: validators の検査のモードで SKILL.md を組み立てる
+        M-->>A: isError（ref が解決できない違反）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`ref` を無い工程へ向ける書き込みは `isError: true` で、違反に a のパスと解決できない `ref` が入る'
+      - '`skill.path` を配信元の外部へ向ける書き込みは `isError: true` で、違反に `skill.path` が入る'
+      - どちらの後も、ワークツリー x の a の YAML と `skills/a/SKILL.md` のバイト列が書き込み前と同じで、`../outside/SKILL.md` ができない
+    test: test_error_when_skill_unbuildable
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 tags:
   - name: topic:文書

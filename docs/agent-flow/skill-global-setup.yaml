@@ -13,7 +13,9 @@ skill:
     - Bash(*.venv/bin/python -m project_index serve*)
 steps:
   - name: 端末の設定のパスを決める
-    body: 環境変数 `PROJECT_INDEX_CONFIG` があればその値、無ければ `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`（`XDG_CONFIG_HOME` が空の文字列か相対パスなら `~/.config/project-index/settings.yaml`）にし、ファイルがあるかを確認する。
+    body: |-
+      環境変数 `PROJECT_INDEX_CONFIG` があればその値、無ければ `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`（`XDG_CONFIG_HOME` が空の文字列か相対パスなら `~/.config/project-index/settings.yaml`）にし、ファイルがあるかを確認する。
+      この後の工程の質問は AskUserQuestion で、既定値を推奨の選択肢にして聞く。
   - name: 移し替えの手順を確認する
     when: 端末の設定があるとき
     body: |-

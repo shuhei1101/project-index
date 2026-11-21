@@ -1,0 +1,390 @@
+id: MOD-181
+title: 索引のサーバー / SKILL.md の生成 / build.py
+lead: 'エージェントフローとそのスキーマの読み込み、`type: skill` の SKILL.md の組み立て、中身が違う SKILL.md の書き出し、書き込む前の検査を受け持ち、SKILL.md の生成の build.py を修正するときに参照する。'
+constants:
+  - name: AGENT_FLOW_KIND
+    title: エージェントフローの種類
+    container: project_index/features/skill_md/build.py
+    usecase: SKILL.md の生成
+    summary: 配信元の設定の文書の行のうち、エージェントフローを持つ行の `id`
+    value: "'agent_flow'"
+  - name: SOURCE_CONFIG_FILE
+    title: 配信元の設定のファイル名
+    container: project_index/features/skill_md/build.py
+    usecase: SKILL.md の生成
+    summary: 配信元の直下で読み込む設定のファイル
+    value: "'project-index.yaml'"
+  - name: GENERATED_COMMENT
+    title: 生成元のコメント
+    container: project_index/features/skill_md/build.py
+    usecase: SKILL.md の生成
+    summary: SKILL.md の frontmatter の後ろに置く 1 行の書式（`{path}` にエージェントフローのパス）
+    value: "'<!-- {path} から生成した。このファイルを修正せず、設計書を修正して再生成する -->'"
+functions:
+  - name: load_agent_flows
+    title: エージェントフローの読み込み
+    container: project_index/features/skill_md/build.py
+    usecase: SKILL.md の生成
+    role: 読み込み
+    summary: 配信元の設定の `agent_flow` の行に該当するエージェントフローと、その行のスキーマを読み込む
+    kind: 関数
+    scope: public
+    is_async: false
+    thread_safe: true
+    side_effects: 配信元のファイルと端末の設定を読み、ほかの配信元を指すスキーマは git を子プロセスで呼ぶ
+    args:
+      - name: root
+        title: 配信元の直下
+        type: Path
+        required: true
+        passing: positional
+        description: '`project-index.yaml` を持つフォルダ（コマンドの作業ディレクトリ）'
+    returns:
+      type: tuple[list[AgentFlowFile], dict[str, Any]]
+      description: パスの昇順のエージェントフローと、`$ref` まで解いたスキーマ
+    process: |-
+      1. `root / SOURCE_CONFIG_FILE` を `load_yaml` で読み、`build_source_config` で文書の行を作る
+         - 無い・読めない場合、そのファイルの `Problem` で `InvalidAgentFlowError` を送る
+      2. `id` が `AGENT_FLOW_KIND` の行を探す
+         - 無い場合、配信元の設定の `Problem` で `InvalidAgentFlowError` を送る
+      3. 行の `schema` を読む
+         - 文字列の場合: 配信元の直下からのファイルを読み、`resolve_schema_refs` で同じフォルダの `$ref` を解く
+         - オブジェクトの場合: `load_terminal_config(config_path(os.environ))` と `terminal_lookup` で引き当てを作り、`read_schema_ref` で読む。`TerminalConfigInvalidError`・`SchemaRefError` は `{source}:{path}@{ref}` の `Problem` にして `InvalidAgentFlowError` を送る
+      4. `collect_files(root, 行)` で該当するファイルを集め、各ファイルを `load_yaml` で読む
+         - 読めない・辞書でないファイルは `Problem` に集め、全て読んだ後で 1 件でもあれば `InvalidAgentFlowError` を送る
+      5. エージェントフローとスキーマを返却する
+    exceptions:
+      - name: InvalidAgentFlowError
+        condition: 配信元の設定が無い・読めない、`agent_flow` の行が無い、スキーマを読み込めない、エージェントフローが YAML として読めない
+        message: 問題の行（`Problem.line()`）を改行でつないだもの
+    unit_tests:
+      - name: test_load_agent_flows
+        case: 正常
+        summary: 文字列のスキーマとエージェントフローを読む
+        condition: '`schema` が配信元の中のファイルの行と、`docs/agent-flow/` に b.yaml・a.yaml・index.yaml（`exclude`）を持つ一時フォルダ'
+        mock: なし（一時フォルダ）
+        expected: エージェントフローが a・b の順で index.yaml を含まず、スキーマの `$ref` が解かれている
+        exception: '-'
+      - name: test_load_agent_flows_when_schema_ref
+        case: 正常
+        summary: ほかの配信元を指すスキーマを commit から読む
+        condition: '`schema` が `source: schemas`・`path: agent_flow.schema.yaml`・`ref: v1` の行と、タグ v1 を持つ一時の git リポジトリ schemas（作業ツリーのスキーマは壊してある）'
+        mock: '`monkeypatch` で環境変数 `PROJECT_INDEX_CONFIG` を schemas の行を持つ一時の端末の設定へ向ける'
+        expected: v1 の commit のスキーマを返却する
+        exception: '-'
+      - name: test_load_agent_flows_when_schema_unresolvable
+        case: 異常
+        summary: 参照先の配信元が端末の設定に無い
+        condition: '`schema` が `source: nothing` の行'
+        mock: test_load_agent_flows_when_schema_ref と同じ
+        expected: '`InvalidAgentFlowError` で、`problems` の `file` が `nothing:agent_flow.schema.yaml@v1`'
+        exception: スキーマを読み込めない
+      - name: test_load_agent_flows_when_unreadable
+        case: 異常
+        summary: 読めないエージェントフローがある
+        condition: c.yaml が閉じていない引用符
+        mock: なし
+        expected: '`InvalidAgentFlowError` で、`problems` に c.yaml のパスがある'
+        exception: エージェントフローが YAML として読めない
+      - name: test_load_agent_flows_when_row_missing
+        case: 異常
+        summary: agent_flow の行が無い
+        condition: '`documents` に `agent_flow` の行を持たない配信元の設定'
+        mock: なし
+        expected: '`InvalidAgentFlowError` で、`problems` の `file` が `project-index.yaml`'
+        exception: '`agent_flow` の行が無い'
+  - name: build_skill_files
+    title: SKILL.md の組み立て
+    container: project_index/features/skill_md/build.py
+    usecase: SKILL.md の生成
+    role: 変換
+    summary: '全てのエージェントフローをスキーマで検査し、`type: skill` のものごとに SKILL.md を組み立てる'
+    kind: 関数
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: root
+        title: 配信元の直下
+        type: Path
+        required: true
+        passing: positional
+        description: '`skill.path` を解くフォルダ'
+      - name: flows
+        title: エージェントフロー
+        type: Sequence[AgentFlowFile]
+        required: true
+        passing: positional
+        description: 組み立てと `ref` の参照先に使用する全てのエージェントフロー
+      - name: schema
+        title: スキーマ
+        type: Mapping[str, Any] | None
+        required: true
+        passing: keyword
+        description: 検査に使用するスキーマ。`None` ならスキーマの検査をしない（検査のモード）
+    returns:
+      type: list[SkillFile]
+      description: '`skill.path` の昇順の組み立てた SKILL.md'
+    process: |-
+      1. `schema` がある場合、全てのエージェントフローを `check_schema` で検査し、違反を `Problem` に集める
+      2. `id` → エージェントフローの引き当てを作る
+      3. `type` が `skill` のエージェントフローごとに
+         - `skill.path` を `root` から解き、`root` の配下でなければ `skill.path` の `Problem` を追加する
+         - `resolve_steps` で工程を解き、解けない `ref` は `steps[{位置}].ref` の `Problem` を追加する
+         - 問題が無ければ `render_skill_md` で組み立てる
+      4. `Problem` が 1 件でもあれば、全てを持つ `InvalidAgentFlowError` を送る
+      5. 組み立てた SKILL.md を返却する
+    exceptions:
+      - name: InvalidAgentFlowError
+        condition: スキーマに合わない、`ref` が解決できない、`skill.path` が配信元の外部を指す
+        message: 問題の行（`Problem.line()`）を改行でつないだもの
+    unit_tests:
+      - name: test_build_skill_files
+        case: 正常
+        summary: 'type: skill だけを組み立てる'
+        condition: '`type: skill` の a と `type: flow` の c'
+        mock: なし
+        expected: a の `skill.path` の 1 件だけを返却する
+        exception: '-'
+      - name: test_build_skill_files_when_schema_invalid
+        case: 異常
+        summary: スキーマに合わない
+        condition: b が `skill.path` を持たない
+        mock: なし
+        expected: '`InvalidAgentFlowError` で、`problems` に b のパスと `skill` の項目がある'
+        exception: スキーマに合わない
+      - name: test_build_skill_files_when_path_outside
+        case: 異常
+        summary: 書き出す先が配信元の外部
+        condition: a の `skill.path` が `../outside/SKILL.md`
+        mock: なし
+        expected: '`InvalidAgentFlowError` で、`problems` の `path` が `skill.path`'
+        exception: '`skill.path` が配信元の外部を指す'
+      - name: test_build_skill_files_when_schema_none
+        case: 正常
+        summary: 検査のモードではスキーマを検査しない
+        condition: '`schema=None` で、a がスキーマに無いキーを持つ'
+        mock: なし
+        expected: a の SKILL.md を返却する
+        exception: '-'
+  - name: resolve_steps
+    title: 工程の埋め込み
+    container: project_index/features/skill_md/build.py
+    usecase: SKILL.md の生成
+    role: 変換
+    summary: '`ref` を持つ工程を参照先の工程に置き換えた工程の並びを返却する'
+    kind: 関数
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: flow
+        title: エージェントフロー
+        type: AgentFlowFile
+        required: true
+        passing: positional
+        description: 工程を解くエージェントフロー
+      - name: by_id
+        title: エージェントフローの引き当て
+        type: Mapping[str, AgentFlowFile]
+        required: true
+        passing: positional
+        description: '`id` → エージェントフロー'
+    returns:
+      type: tuple[list[dict[str, Any]], list[Problem]]
+      description: 置き換えた工程の並びと、解けなかった `ref` の問題
+    process: |-
+      1. `steps[]` を順にたどる
+         - `ref` が無い工程はそのまま並べる
+         - `ref` を持つ工程は `{id}#steps[{name}]` を分け、参照先の工程を探す。参照先も `ref` を持てばたどる
+      2. 参照先のエージェントフロー・工程が無い場合と、たどった工程に戻った場合は、`steps[{位置}].ref` の `Problem` にする（`rule` に `ref` の値）
+    unit_tests:
+      - name: test_resolve_steps
+        case: 正常
+        summary: ref を参照先の工程に置き換える
+        condition: 'a の 2 つ目の工程が `ref: c#steps[取得する]`'
+        mock: なし
+        expected: 2 つ目の工程が c の「取得する」の工程で、問題が空
+        exception: '-'
+      - name: test_resolve_steps_when_missing
+        case: 異常
+        summary: 参照先の工程が無い
+        condition: '`ref: c#steps[無い工程]`'
+        mock: なし
+        expected: 問題が 1 件で、`path` が `steps[1].ref`、`rule` に `c#steps[無い工程]`
+        exception: '-'
+      - name: test_resolve_steps_when_cycle
+        case: 異常
+        summary: 同じ工程へ戻る ref
+        condition: c の工程が d を、d の工程が c のその工程を `ref` で指す
+        mock: なし
+        expected: 問題が 1 件で、無限にたどらない
+        exception: '-'
+  - name: render_skill_md
+    title: SKILL.md の書式への組み立て
+    container: project_index/features/skill_md/build.py
+    usecase: SKILL.md の生成
+    role: 変換
+    summary: '1 件の `type: skill` のエージェントフローと解いた工程から、frontmatter と本文を持つ SKILL.md の全文を組み立てる'
+    kind: 関数
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: flow
+        title: エージェントフロー
+        type: AgentFlowFile
+        required: true
+        passing: positional
+        description: '`type: skill` のエージェントフロー'
+      - name: steps
+        title: 工程
+        type: Sequence[Mapping[str, Any]]
+        required: true
+        passing: positional
+        description: '`resolve_steps` で解いた工程'
+    returns:
+      type: str
+      description: 末尾を改行 1 つで終える SKILL.md の全文
+    process: |-
+      1. frontmatter を IF-37 の制約「組み立てる frontmatter と本文」の並び（`name`・`description`・`argument-hint`・`arguments`・`allowed-tools`・`skill.frontmatter`）で、値の無いキーを除いて YAML にする
+      2. `GENERATED_COMMENT` に `flow.path` を入れた行、`# {title}`（無ければ `name`）、`skill.arguments` があれば `## 引数` の表を並べる
+      3. `## 手順` の下に、工程ごとに `### {name}` と、`when`（`{when}だけ行う。`）・`body`・`calls`（`呼ぶもの:` の箇条書き）を空行で区切って並べる
+      4. 改行を LF にし、末尾を改行 1 つにして返却する
+    unit_tests:
+      - name: test_render_skill_md
+        case: 正常
+        summary: frontmatter と本文の並び
+        condition: '`skill.arguments` 1 件・`skill.allowed_tools` 1 件、`when` と `calls`（`command`・`tool`、`args` あり）を持つ工程と持たない工程'
+        mock: なし
+        expected: frontmatter のキーが `name`・`description`・`argument-hint`・`arguments`・`allowed-tools` の順で、生成元のコメント・`## 引数` の表・`## 手順` の工程のセクションがあり、`args` が 1 行のフロースタイルのインラインコードで、末尾が改行 1 つ
+        exception: '-'
+      - name: test_render_skill_md_when_minimal
+        case: 正常
+        summary: 値が無いキーを置かない
+        condition: '`skill.path` だけを持ち、`title`・`skill.name`・`skill.arguments` を持たない'
+        mock: なし
+        expected: frontmatter が `name`（`skill.path` の親のフォルダ名）と `description` だけで、見出しが `# {name}`、`## 引数` が無い
+        exception: '-'
+  - name: write_changed
+    title: 中身が違う SKILL.md の書き出し
+    container: project_index/features/skill_md/build.py
+    usecase: SKILL.md の生成
+    role: 書き込み
+    summary: 今のファイルと中身が違う SKILL.md だけを書き出し、書き換えたパスを返却する
+    kind: 関数
+    scope: public
+    is_async: false
+    thread_safe: false
+    side_effects: SKILL.md を書き換える（無ければフォルダごと作る）
+    args:
+      - name: root
+        title: 配信元の直下
+        type: Path
+        required: true
+        passing: positional
+        description: 書き出す先を解くフォルダ
+      - name: files
+        title: SKILL.md
+        type: Sequence[SkillFile]
+        required: true
+        passing: positional
+        description: '`build_skill_files` が組み立てた SKILL.md'
+    returns:
+      type: list[str]
+      description: 書き換えた SKILL.md のパス（昇順）
+    process: |-
+      1. SKILL.md ごとに今のファイルのバイト列と、組み立てた中身の UTF-8 のバイト列を比べる
+         - 同じ場合は書き換えない
+         - 違うか無い場合は `replace_file` で書き出す
+      2. 書き換えたパスを昇順で返却する
+    unit_tests:
+      - name: test_write_changed
+        case: 正常
+        summary: 違うものだけを書き出す
+        condition: まだ無い a と、同じ中身の b
+        mock: なし（一時フォルダ）
+        expected: a のパスだけを返却し、a が作られ、b の更新時刻が変わらない
+        exception: '-'
+  - name: check_replacement
+    title: 書き込む前の検査
+    container: project_index/features/skill_md/build.py
+    usecase: SKILL.md の生成
+    role: 検証
+    summary: 標準入力のエージェントフローで配信元の同じ `id` を置き換えて全ての SKILL.md を組み立て、問題を返却する
+    kind: 関数
+    scope: public
+    is_async: false
+    thread_safe: true
+    side_effects: 配信元のファイルを読む（書き換えない）
+    args:
+      - name: root
+        title: 配信元の直下
+        type: Path
+        required: true
+        passing: positional
+        description: '`project-index.yaml` を持つフォルダ'
+      - name: text
+        title: 標準入力
+        type: str
+        required: true
+        passing: positional
+        description: 書き込む前のエージェントフローの YAML
+    returns:
+      type: list[Problem]
+      description: 組み立てられない理由。無ければ空
+    process: |-
+      1. `text` を `load_yaml` で読む
+         - 読めない・辞書でない場合、`$` の `Problem` 1 件を返却する
+      2. `load_agent_flows(root)` で配信元のエージェントフローを読み、同じ `id` のものを標準入力の内容に置き換える（無ければパス `-` で追加する）。置き換えたエージェントフローのパスを標準入力のパスにする
+         - `InvalidAgentFlowError` の場合、その `problems` を手順 4 の変換をして返却する
+      3. `build_skill_files(root, flows, schema=None)` を呼ぶ
+         - `InvalidAgentFlowError` の場合、その `problems` を手順 4 の変換をして返却する
+         - 例外が無ければ空の並びを返却する
+      4. 問題の変換（`_for_stdin`。手順 2・3 の両方が使用する）: `file` が標準入力のパスの問題はそのままにし、それ以外の問題は `path` を `$`、`rule` を `{file}: {path}: {rule}` にする
+    unit_tests:
+      - name: test_check_replacement
+        case: 正常
+        summary: 問題が無い
+        condition: c の工程の `body` だけを書き換えた YAML
+        mock: なし（一時フォルダ）
+        expected: 空の並びで、どのファイルも変わらない
+        exception: '-'
+      - name: test_check_replacement_when_unbuildable
+        case: 異常
+        summary: 組み立てられなくなる
+        condition: a の `ref` を無い工程へ向け、`skill.path` を `../outside/SKILL.md` にした YAML
+        mock: なし
+        expected: '`steps[{位置}].ref` と `skill.path` の 2 件'
+        exception: '-'
+      - name: test_check_replacement_when_unreadable
+        case: 異常
+        summary: 標準入力が YAML として読めない
+        condition: '`id: [`'
+        mock: なし
+        expected: '`path` が `$` の 1 件'
+        exception: '-'
+      - name: test_check_replacement_when_other_unreadable
+        case: 異常
+        summary: 配信元のほかのエージェントフローが読めない
+        condition: 標準入力は a の工程の `body` だけを書き換えた YAML、配信元の c.yaml が閉じていない引用符
+        mock: なし（一時フォルダ）
+        expected: '`path` が `$` で、`rule` が c.yaml のパスで始まる 1 件'
+        exception: '-'
+      - name: test_check_replacement_when_other_ref_broken
+        case: 異常
+        summary: 書き込む文書の変更でほかのスキルが組み立てられなくなる
+        condition: 標準入力は a が `ref` で指す c の工程の `name` を変えた c の YAML
+        mock: なし（一時フォルダ）
+        expected: '`path` が `$` で、`rule` が a のパスと `steps[{位置}].ref` を含む 1 件'
+        exception: '-'
+notes:
+  決まり: 全てのエージェントフローの読み込み・検査・組み立てを終えてから書き出す。配信元の設定の読み込み・ファイルの集め方・ほかの配信元のスキーマの読み込み・スキーマの検査・ファイルの置き換えは、既存の関数（`build_source_config`・`collect_files`・`read_schema_ref`・`check_schema`・`replace_file`）を使用する。
+visibility: internal
+tags:
+  - name: topic:スキル
+    main: true
+  - name: action:生成
+  - name: action:検査
+test_files:
+  - tests/unit/project_index/features/skill_md/test_build.py
