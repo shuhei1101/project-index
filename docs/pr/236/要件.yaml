@@ -6,18 +6,13 @@ use_cases:
     depends_on: []
   - kind: single
     scenario: docs/scenario/SC-4.yaml
-    impact: changed
-    detail: 稼働中に要求と裏の処理の待ち・処理の時間を記録し続け、何時間稼働しても応答の上限の内に応答する
-    depends_on: []
-  - kind: single
-    scenario: docs/scenario/SC-3.yaml
-    impact: changed
-    detail: 文書の MCP が詰まっている間も、管理の MCP で状態を確かめて起動し直せる
+    impact: run_only
+    detail: 起動の流れは変わらないが、記録の起動と管理の MCP の実行スロットの配線を変えるため壊しうる
     depends_on: []
   - kind: single
     scenario: docs/scenario/SC-6.yaml
-    impact: run_only
-    detail: 調べる流れは変わらないが、時間切れになった呼び出しの扱いを変えるため壊しうる
+    impact: changed
+    detail: 多くの worktree を調べ続けても、要求の中でたどるファイルのキャッシュが増えず、応答の上限の内に応答し、待ち・処理の時間を記録する
     depends_on: []
   - kind: single
     scenario: docs/scenario/SC-7.yaml
@@ -29,6 +24,10 @@ use_cases:
     impact: run_only
     detail: 画面のサーバーの読み取りも同じ実行の仕組みを通るため壊しうる
     depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-16.yaml
+    impact: new
+    detail: 文書の MCP が詰まっている間も、管理の MCP で状態を確認して起動し直せる
 docs:
   - page: docs/guide/管理のMCP.md
     new: false
