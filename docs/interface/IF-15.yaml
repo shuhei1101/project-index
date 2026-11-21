@@ -1305,6 +1305,10 @@ constraints:
     constraint: 文書の MCP・読み取り API の要求ごとに、ツール・配信元・実行スロットの待ち・排他の待ち・処理の時間・要求の中でたどったファイルのキャッシュの件数を INFO の 1 行でログに残す。あわせて、実行中・待ち中の処理の数と RSS を、決定値の間隔ごとに INFO の 1 行でログに残す
     decided_by: NFR-1#requirements[稼働中の記録の間隔]
     notes: 'ログだけで劣化の始まりと詰まった処理を指せるようにする（PR #236 の要件 No.4）'
+  - item: 文書の MCP・読み取り API の実行スロット
+    constraint: 文書の MCP・読み取り API の要求の処理は、asyncio の既定の実行スロットでなく、専用の実行スロットで動かす。停止・再起動は、終わらない専用の実行スロットのスレッドの終了を待たない
+    decided_by: NFR-1#requirements[文書の MCP の実行スロットの数]
+    notes: '`asyncio.Runner.close` は既定の実行スロットのスレッドの終了を `THREAD_JOIN_TIMEOUT`（300 秒）まで待つ。専用の実行スロットは待たないため、再起動の `os.execv` で残ったスレッドごとプロセスを置き換える'
 refs:
   - to: SC-4
     item: scenarios[正常シナリオ]

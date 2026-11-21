@@ -81,7 +81,7 @@ flows:
 
         C->>T: 引数なし
         T-->>C: pid・restarting
-        T->>S: 処理中の要求を待つ上限まで待って止める
+        T->>S: 処理中の要求を停止の待ちの上限まで待ち、待ち受けを止める（実行スロットのスレッドの終了は待たない）
         S->>S: 同じプロセスで起動し直す
         C->>S: status
         S-->>C: 待ち受けのアドレス・配信元
@@ -90,6 +90,7 @@ flows:
       <!-- /map -->
     expected:
       - '`restart` が文書の MCP の応答の上限の内に `pid`・`restarting` を返す'
+      - '`restart` の応答から、停止の待ちの上限（`script_timeout_sec` の 1.5 倍）と起動から接続を受け付けるまでの時間の決定値の和の内に、`127.0.0.1` のポートを再び待ち受ける'
       - 起動し直した後の `status` で sample が `serving`
     test: test_normal_when_docs_mcp_clogged
 lead: 応答の後に同じプロセス ID で `project-index serve` を起動し直す管理の MCP の `restart` の入出力を定め、`restart` を修正するときに参照する。
@@ -135,7 +136,7 @@ constraints:
     notes: スクリプトの実行が一番長い要求になるため
   - item: 起動し直す方法
     constraint: uvicorn の停止の後、`os.execv(sys.executable, [sys.executable, "-m", "project_index", "serve"])` で同じプロセスを置き換える
-    notes: SessionStart のフックで切り離して起動したプロセスのまま続くため、親を持たないまま残らない。起動し直した後は『起動』の待ち受けまでの順番に従い、配信元を読む前に待ち受ける
+    notes: SessionStart のフックで切り離して起動したプロセスのまま続くため、親を持たないまま残らない。文書の MCP・読み取り API の専用の実行スロットに終わらないスレッドが残っていても、その終了を待たずに置き換える（『起動』の文書の MCP・読み取り API の実行スロット）。起動し直した後は『起動』の待ち受けまでの順番に従い、配信元を読む前に待ち受ける
   - item: 起動に失敗したとき
     constraint: '`project-index serve` の終了コードで止まり、次のセッションの SessionStart のフックが起動し直す'
   - item: タイムアウト

@@ -373,5 +373,16 @@ requirements:
     overflow: 記録の 1 行の出力が間隔を超えて遅れたときは、遅れた分を詰めて出さず、次の間隔から出す
     rationale: '劣化は稼働から数十分〜数時間で表れるため（PR #236 の PoC 結果の No.1）、1 分ごとの記録で始まりを指せる。6 時間で 360 行に収まり、ログの量を抑えられる'
     status: planned
+  - id: NFR-20
+    name: 文書の MCP の実行スロットの数
+    english_name: docs_executor_workers
+    category: 性能
+    external_constraint: Python の GIL（要求の処理の CPU の部分は同時に 1 つしか進まない）
+    source_kind: 実行基盤の制限
+    value: CPU の数 + 4（最大 32）
+    unit: 本
+    overflow: 全て使用中のときは、次の要求は空くまで待つ。待ちの時間は稼働中の記録の要求ごとの行に残る
+    rationale: '今の既定の実行スロット（`asyncio.to_thread`）と同じ本数。PR #236 の PoC では実行スロットは常に埋まっており、GIL のため本数を増やしても CPU の待ちが増えるだけで、減らすと待ちが増える。既定の実行スロットから分けるのは、再起動で `asyncio.Runner.close` が既定の実行スロットのスレッドの終了を最大 300 秒待つため'
+    status: planned
 id: NFR-1
 visibility: internal
