@@ -171,6 +171,11 @@ exec "{git}" "$@"
 STATUS_LIMIT_SEC = 5
 # restart が応答する上限（非機能要件『文書の MCP の応答の上限』）
 RESTART_LIMIT_SEC = 48
+# このテストの端末の設定の script_timeout_sec
+CLOGGED_SCRIPT_TIMEOUT_SEC = 2
+# restart の応答から待ち受け直すまでの上限（IF-10 の期待値）:
+# 停止の待ちの上限（script_timeout_sec × 1.5 = 3 秒）+ 非機能要件『起動から接続を受け付けるまでの時間』（20 秒）
+RELISTEN_LIMIT_SEC = CLOGGED_SCRIPT_TIMEOUT_SEC * 1.5 + 20
 
 
 def test_normal_when_docs_mcp_clogged(
@@ -202,7 +207,10 @@ def test_normal_when_docs_mcp_clogged(
         encoding="utf-8",
     )
     wrapper.chmod(0o755)
-    settings = write_settings(sample, extra="script_timeout_sec: 2\nworktree_load_wait_sec: 1")
+    settings = write_settings(
+        sample,
+        extra=f"script_timeout_sec: {CLOGGED_SCRIPT_TIMEOUT_SEC}\nworktree_load_wait_sec: 1",
+    )
     state_dir = settings.parent / "state"
     port = free_port()
     path = f"{bin_dir}:{os.environ['PATH']}"
@@ -226,7 +234,9 @@ def test_normal_when_docs_mcp_clogged(
         restart_started = time.monotonic()
         restarted = call_tool(client, port, "/_admin/mcp/", "restart")
         restart_sec = time.monotonic() - restart_started
+    responded_at = time.monotonic()
     wait_for_restart(state_dir, port, started)
+    relisten_sec = time.monotonic() - responded_at
     with httpx.Client(timeout=15) as client:
         status = _status_after_loading(call_tool, client, port)
     release.write_text("", encoding="utf-8")
@@ -235,6 +245,7 @@ def test_normal_when_docs_mcp_clogged(
     sources = {item["id"]: item for item in status["structuredContent"]["sources"]}
     assert status_sec < STATUS_LIMIT_SEC
     assert restart_sec < RESTART_LIMIT_SEC
+    assert relisten_sec < RELISTEN_LIMIT_SEC
     assert restarted["structuredContent"] == {"pid": process.pid, "restarting": True}
     assert sources["sample"]["status"] == "serving"
     assert process.poll() is None
