@@ -1926,20 +1926,10 @@ def _check_delete_validators(
     # 違反の出た文書を除いて残りを検査し直し、新規の違反が出なくなるまで繰り返す
     while True:
         remaining = [document for document in accepted if document.id not in rejected]
-        delete_ids = [document.id for document in remaining]
-        found: list[tuple[int, ValidationFailedError]] = []
-        for document in remaining:
-            violations = checker.check_delete(
-                session.target, document, delete_ids=delete_ids, deadline=session.deadline
-            )
-            if not violations:
-                continue
-            error = ValidationFailedError(
-                message=f"削除の時点の検査に通らない文書があります: {document.id}",
-                violations=violations,
-                next_steps=["違反を修正してから再実行してください"],
-            )
-            found.append((index_of[document.id], error))
+        found = [
+            (index_of[document.id], error)
+            for document, error in _delete_violations(session, checker, remaining)
+        ]
         # 新規の違反が無い: 残りを削除する
         if not found:
             return rejected
@@ -1955,6 +1945,26 @@ def _check_delete_validators(
                 status="failed",
                 errors=_prefixed(index, error),
             )
+
+
+def _delete_violations(
+    session: _Session, checker: DocumentChecker, remaining: list[Document]
+) -> list[tuple[Document, ValidationFailedError]]:
+    """残りの文書を全て削除する前提で、削除の時点の検査に通らない文書と違反を返す。"""
+    delete_ids = [document.id for document in remaining]
+    found: list[tuple[Document, ValidationFailedError]] = []
+    for document in remaining:
+        violations = checker.check_delete(
+            session.target, document, delete_ids=delete_ids, deadline=session.deadline
+        )
+        if violations:
+            error = ValidationFailedError(
+                message=f"削除の時点の検査に通らない文書があります: {document.id}",
+                violations=violations,
+                next_steps=["違反を修正してから再実行してください"],
+            )
+            found.append((document, error))
+    return found
 
 
 # 呼び出しが期限を渡さないとき（文書の MCP の外からの呼び出し）の書き込みの期限と応答の上限の既定値
