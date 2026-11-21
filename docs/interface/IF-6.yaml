@@ -2427,18 +2427,20 @@ flows:
       - 5・6・7・8 回目は `InvalidArgumentError` で、違反の `path` が `operations[0].set.{キー}` で、それぞれ無い要素・`x-key` の無い配列・`name` が `Col` の要素が 1 つしか無いこと・`models[1]` にキー `other` が無いことを返却する。文書 1 を書き換えない
       - 9 回目の後、`notes` にキー `a.b` が値 `v` で追加され（`a` の下の `b` にはしない）、キー `main` は変わらない
     test: test_normal_when_set_ref_path
-  - name: 正常系（無い項目の unset を返却する）
-    summary: '`#` で始まらない `unset` の要素の項目が無いときは何もせず、その要素を `results[].skipped_unset` に返却する。`.` を含む辞書のキーは `#` で始まる参照の型の項目のパスで削除する'
+  - name: 正常系（何もしなかった操作を返却する）
+    summary: '`#` で始まらない `unset` の要素・`remove_from` のキーが無い項目や無い要素を指すときは何もせず、`results[].skipped` に返却する。`.` を含む辞書のキーは `#` で始まる参照の型の項目のパスで削除する'
     setup:
       - name: Mock
         description: なし
+      - name: 種類のスキーマ
+        description: sample の種類のスキーマが `notes`（値が文字列の辞書）と `labels`（`x-key` を持たない文字列の配列）を定める
       - name: 文書 1
-        description: '`notes` が `{"mcp/server.py の補足": 補足}`'
+        description: '`notes` が `{"mcp/server.py の補足": 補足}`、`labels` が `[a]`'
       - name: 入力
-        description: '1 回目は `unset: ["notes.mcp/server.py の補足", "notes.nonexistent"]`。2 回目は `unset: ["#notes[mcp/server.py の補足]"]`'
-        notes: 1 回目の 1 つ目の要素は `.` で区切って `notes` → `mcp/server` → `py の補足` と解釈するため、項目が無い
+        description: '1 回目は `unset: ["notes.mcp/server.py の補足", "notes.nonexistent"]` と `remove_from: {labels: [a, z], missing: [x]}`。2 回目は `unset: ["#notes[mcp/server.py の補足]"]`'
+        notes: 1 回目の `unset` の 1 つ目の要素は `.` で区切って `notes` → `mcp/server` → `py の補足` と解釈するため、項目が無い。`missing` は文書に無い項目
     flow: |-
-      <!-- map: {"title": "正常系（無い項目の unset を返却する）"} -->
+      <!-- map: {"title": "正常系（何もしなかった操作を返却する）"} -->
 
       ```mermaid
       sequenceDiagram
@@ -2446,9 +2448,10 @@ flows:
         participant T as write_docs
         participant WT as ワークツリー x
 
-        C->>T: update 文書 1（unset notes.mcp/server.py の補足・notes.nonexistent）
-        T->>T: どちらの要素も項目が無いので何もしない
-        T-->>C: updated・skipped_unset
+        C->>T: update 文書 1（unset notes.mcp/server.py の補足・notes.nonexistent、remove_from labels・missing）
+        T->>T: labels から a を削除し、ほかは項目・要素が無いので何もしない
+        T->>WT: YAML を書き換える
+        T-->>C: updated・skipped
         C->>T: update 文書 1（unset #notes[mcp/server.py の補足]）
         T->>T: notes のキー mcp/server.py の補足 に解決して削除する
         T->>WT: YAML を書き換える
@@ -2457,9 +2460,9 @@ flows:
 
       <!-- /map -->
     expected:
-      - 1 回目は `results[0].status` が `updated` で、`version` が書き込み前と同じで、`results[0].skipped_unset` が `["notes.mcp/server.py の補足", "notes.nonexistent"]`。文書 1 の `notes` は変わらない
-      - 2 回目の後、文書 1 の `notes` にキー `mcp/server.py の補足` が無く、`results[0].skipped_unset` を返却しない
-    test: test_normal_when_unset_missing_field
+      - 1 回目の後、文書 1 の `labels` が `[]` で、`notes` は変わらない。`results[0].status` が `updated` で、`results[0].skipped` が `unset.notes.mcp/server.py の補足`・`unset.notes.nonexistent`（項目がありません）、`remove_from.labels`（z の要素がありません）、`remove_from.missing`（項目がありません）の 4 行
+      - 2 回目の後、文書 1 の `notes` にキー `mcp/server.py の補足` が無く、`results[0].skipped` を返却しない
+    test: test_normal_when_operation_skipped
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -2785,10 +2788,10 @@ response:
     type: bool
     description: プッシュが 1 回断られ、取り込みからやり直したか
     notes: '`commit.sha` と同じ'
-  - name: results[].skipped_unset
-    type: list[str]
-    description: '`unset` の要素のうち、項目が無いため何もしなかった要素（指定したままの文字列）'
-    notes: 制約「unset の項目のパス」。該当する要素があるときだけ。`failed` では返却しない
+  - name: results[].skipped
+    type: 'list[{path: str, reason: str}]'
+    description: 何もしなかった `unset` の要素・`remove_from` のキーの項目のパス（`unset.{要素}`・`remove_from.{キー}`）と理由
+    notes: 制約「何もしなかった操作の返却」。該当するものがあるときだけ。`failed` では返却しない
 response_example: |-
   ```json
   {"applied": true, "results": [
@@ -2897,7 +2900,7 @@ constraints:
     notes: 共通のキーと列名を同じ操作に両方渡すと `InvalidArgumentError`
   - item: オブジェクトの配列のタグの書き戻し
     constraint: '行の `metadata` が `tags: tags[].name` のとき、`add_to: {tags: [x]}` は `{name: x}` の要素を末尾に追加し、`remove_from: {tags: [x]}` は `name` が `x` の要素を削除する。`set: {tags: [...]}` は渡した名前の並びで配列を置き換え、元からあった名前の要素は `main` を含む他のキーを保つ。`main_tags`（`tags[main].name`）は要素の `main` を書き換える。`set: {main_tags: [...]}` は渡した名前の要素の `main` を `true`、それ以外の要素の `main` を削除する。`add_to: {main_tags: [...]}` は渡した名前の要素に `main: true` を付け、`remove_from: {main_tags: [...]}` は渡した名前の要素の `main` を削除する。`unset: [main_tags]` は全ての要素の `main` を削除する'
-    notes: '`main_tags` の `set`・`add_to` に `tags` に無い名前を渡したときは `InvalidArgumentError` を返す。`remove_from` に無い名前を渡したときは何もしない。`tags`・`main_tags` の `data`・`set`・`add_to`・`remove_from` に名前（文字列）の配列でない値（オブジェクトの配列。`data`・`set` は文字列 1 つも）を渡したときは、配列へ書き戻さず `InvalidArgumentError` を返す'
+    notes: '`main_tags` の `set`・`add_to` に `tags` に無い名前を渡したときは `InvalidArgumentError` を返す。`remove_from` に無い名前を渡したときは何もせず、制約「何もしなかった操作の返却」で返却する。`tags`・`main_tags` の `data`・`set`・`add_to`・`remove_from` に名前（文字列）の配列でない値（オブジェクトの配列。`data`・`set` は文字列 1 つも）を渡したときは、配列へ書き戻さず `InvalidArgumentError` を返す'
   - item: 違反へ添えるスキーマの説明
     constraint: 'スキーマの違反（`validators[]` の違反・引数の誤りは除く）ごとに、違反した項目に当たるスキーマの定義から `title`・`description`・`x-rules`・`examples`・`x-bad-examples` のうちスキーマが持つキーだけを `schema` に入れる。`required` の違反は無かったキーの `properties` の定義、それ以外は違反した値に当てた定義（`$ref` を解いた後）から取る。どのキーも持たない項目は `schema` のキーを出さない'
     notes: 'スキーマの全文は返さない。同じ応答で同じ定義を指す違反が続くときも、違反ごとに添える'
@@ -2935,7 +2938,7 @@ constraints:
     notes: 書き方は設計書の参照の型（`{ID}#{項目のパス}`）の `#` から後と同じ。`#` で始まらない既存の `[{キー}]`（キーが真の要素）とは `#` の有無で分ける
   - item: add_to・remove_from の項目のパス
     constraint: '`add_to`・`remove_from` のキーが `#` で始まるとき、「参照の型の項目のパス」と同じ読み方で文書の中の 1 つの配列へ解決し、その配列へ追加・削除する。解決できないパス（無い要素・`x-key` の無い配列・無いキー）と、解決した値が配列でないパスは `add_to.{パス}`・`remove_from.{パス}` の違反にする。`#` で始まらないキーに要素の選び方（`[...]`・`**.`）を含めると、書き込まずに同じ違反にする'
-    notes: '`#` で始まらない要素の選び方を含まないキーは今までどおりで、項目が無ければ `add_to` は空の配列を作り、`remove_from` は何もしない。`#` で始まるキーは配列を作らない。共通のキーの列名への読み替えは `#` で始まるキーにはしない'
+    notes: '`#` で始まらない要素の選び方を含まないキーは今までどおりで、項目が無ければ `add_to` は空の配列を作り、`remove_from` は何もせず、制約「何もしなかった操作の返却」で返却する。`#` で始まるキーは配列を作らない。共通のキーの列名への読み替えは `#` で始まるキーにはしない'
   - item: 改名後のパス
     constraint: '`new_path` を省いた `rename` は、ファイル名の最初の `.` より前が旧 ID と一致する 1 ファイル 1 文書だけ、同じフォルダでその部分を `new_id` にしたパスへ移す（`IF-6.yaml` → `IF-9.yaml`、`MOD-1.py.yaml` → `MOD-2.py.yaml`）。一致しない文書と `records` の要素の文書はパスを変えない'
     notes: '`new_id` を省いた `rename` は ID を変えない。ID がパスの文書は、`new_path` で ID も変わる'
@@ -2953,10 +2956,10 @@ constraints:
     notes: '`atomic: false` でも、同じ操作の合格した文書だけを書き込むことはしない'
   - item: unset の項目のパス
     constraint: '`unset` の要素が `#` で始まるとき、「参照の型の項目のパス」と同じ読み方で文書の中の 1 つの項目へ解決し、その項目を削除する。解決できないパス（無い要素・`x-key` の無い配列・無い順番・無いキー）は `unset.{パス}` の違反にする。`#` で始まらない要素に要素の選び方（`[...]`・`**.`）を含めると、書き込まずに同じ違反にする'
-    notes: '`#` で始まらず要素の選び方を含まない要素は今までどおりで、項目が無ければ何もせず、その要素を `results[].skipped_unset` に返却する。`.` を含む辞書のキーは、`#` で始まる参照の型の項目のパスの `[{キー}]`（`#notes[mcp/server.py の補足]`）で指す。解決した項目は配列でなくても削除する。共通のキーの列名への読み替えは `#` で始まる要素にはしない'
+    notes: '`#` で始まらず要素の選び方を含まない要素は今までどおりで、項目が無ければ何もせず、制約「何もしなかった操作の返却」で返却する。`.` を含む辞書のキーは、`#` で始まる参照の型の項目のパスの `[{キー}]`（`#notes[mcp/server.py の補足]`）で指す。解決した項目は配列でなくても削除する。共通のキーの列名への読み替えは `#` で始まる要素にはしない'
   - item: remove_from の x-key を持つ配列
     constraint: '`remove_from` のキーを解決した配列のスキーマ（`$ref` を解決した後）が `x-key` を持つとき、オブジェクトでない値は `x-key` のキーの値がその値と等しい要素を、オブジェクトの値はその値と等しい要素を削除する。等しい要素が複数あれば全て削除する。削除する要素が 1 つも無い値は `remove_from.{キー}` の違反にし、書き込まない。削除する要素が有るかは、`remove_from` を当てる前の配列で値ごとに判定する（同じ要素を指す値を 2 つ渡しても違反にしない）'
-    notes: '`x-key` を持たない配列は今までどおり渡した値と等しい要素を削除し、該当しない値は何もしない。制約「オブジェクトの配列のタグの書き戻し」の共通のキー（`tags`・`main_tags`）の読み方と、`#` で始まらないキーの項目が無いときに何もしない扱いは変えない'
+    notes: '`x-key` を持たない配列は今までどおり渡した値と等しい要素を削除し、該当しない値は何もせず、制約「何もしなかった操作の返却」で返却する。制約「オブジェクトの配列のタグの書き戻し」の共通のキー（`tags`・`main_tags`）の読み方と、`#` で始まらないキーの項目が無いときに何もしない扱いは変えない'
   - item: 1 つの操作の中の適用順
     constraint: '`update` の 1 つの操作は、`set` → `unset` → `remove_from` → `add_to` → `text_edits` の順に当てる。同じ配列の要素を `remove_from` と `add_to` に渡すと、削除してから追加する'
     notes: '`x-key` を持たない配列で同じ値を `remove_from` と `add_to` の両方に渡したときは、今までの「削除される」から「追加した要素が残る」に変わる'
@@ -3012,6 +3015,9 @@ constraints:
   - item: set の項目のパス
     constraint: '`set` のキーが `#` で始まるとき、最後の区切りの手前までを「参照の型の項目のパス」と同じ読み方で文書の中の 1 つの項目へ解決し、その項目の最後のキーへ値を入れる。最後のキーが無ければ追加し、あればオブジェクトの値は今の値へ再帰的にマージし、配列と値は置き換える。最後の区切りが辞書の項目の `[{キー}]` のときは、そのキー（`.` や空白を含んでも 1 階層）を最後のキーとして同じく扱い、無ければ追加する。最後の区切りが配列の項目の `[{値}]`・`[{値}#{順番}]` のときは、解決した要素そのものへ同じく入れ、要素が無ければ違反にする。解決できないパス（無い要素・`x-key` の無い配列・無い順番・途中の無いキー）と、最後のキーの手前が辞書でないパスは `set.{パス}` の違反にする。`#` で始まらないキーに要素の選び方（`[]`・`[{キー}]`・`**.`）を含めると、書き込まずに同じ違反にし、違反の `rule` で `#` で始めて `x-key` の値で要素を指す書き方を案内する'
     notes: '`#` で始まらず要素の選び方を含まないキーは今までどおりで、途中の項目が無ければ作る。`#` で始まるキーは途中の項目を作らない。共通のキーの列名への読み替えは `#` で始まるキーにはしない'
+  - item: 何もしなかった操作の返却
+    constraint: 次の操作は違反にせず何もしないで、項目のパスと理由を `results[].skipped` に返却する。(1) `#` で始まらず要素の選び方を含まない `unset` の要素の項目が無い（`unset.{要素}`・「項目がありません」）。(2) `#` で始まらず要素の選び方を含まない `remove_from` のキーの項目が無い（`remove_from.{キー}`・「項目がありません」）。(3) `x-key` を持たない配列の `remove_from` の値に等しい要素が無い（`remove_from.{キー}`・「{値} の要素がありません」。値ごとに 1 行）。(4) 共通のキー `tags`・`main_tags` の `remove_from` に無い名前を指定した（`remove_from.{キー}`・「{名前} の要素がありません」。名前ごとに 1 行）
+    notes: 項目のパスのキーと要素は指定したままの文字列にする（共通のキーを列名へ読み替える前）。文書が変わらなかった `update` も `status` は `updated` で、`version` は書き込み前と同じ
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]
