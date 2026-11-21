@@ -90,7 +90,7 @@ entries:
     children:
       - type: folder
         name: prompts
-        contents: MCP の instructions とツールの description、フックの注入文のプロンプトファイル（文書の MCP は `mcp/docs/`、管理の MCP は `mcp/admin/`、フックは `hooks/`）。ID は `content/prompts/` からのパス
+        contents: MCP の instructions とツールの description、フックの注入文のプロンプトファイル（文書の MCP は `mcp/project-index/`、管理の MCP は `mcp/project-index-admin/`、フックは `hooks/`）。ID は `content/prompts/` からのパス
         content_types: [prompt, server]
         id_root: true
         convention: prompt-file
@@ -131,6 +131,12 @@ entries:
               - file_list
               - pages
       - type: folder
+        name: agent-flow
+        contents: スキルのエージェントフロー
+        content_types: [design_doc]
+        naming: ['skill-{スキルの名前}.yaml', index.yaml]
+        id_root: true
+      - type: folder
         name: architecture
         contents: アーキテクチャ図。設計書のフォルダは、目次の `index.yaml` と、そこから生成した `README.md` と、`README.md` の管理用の YAML（`files.yml`）を持つ
         content_types: [design_doc]
@@ -165,6 +171,11 @@ entries:
         contents: 外部ライブラリ
         content_types: [design_doc]
         naming: ['LIB-{n}.yaml', index.yaml, README.md, files.yml]
+      - type: folder
+        name: mcp-server
+        contents: MCP サーバーの定義
+        content_types: [design_doc]
+        naming: ['MCP-{n}.yaml', index.yaml]
       - type: folder
         name: module
         contents: モジュール構成。Python のファイルごとの設計書は ID の後ろに拡張子を付ける

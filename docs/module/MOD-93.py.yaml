@@ -110,7 +110,7 @@ functions:
       description: 管理の MCP
     process: |-
       1. `MCPServer(ADMIN_MCP_NAME)` を作る
-      2. `ADMIN_TOOL_NAMES` のツールを、`description` を `handlers.prompts.render(tool_prompt_id("admin", 名前))` にして `TOOL_ANNOTATIONS` の注釈で登録する（今の説明の文は各ツールの YAML へ移す）。引数はインターフェース定義の `request` をキーワード引数で受ける
+      2. `ADMIN_TOOL_NAMES` のツールを、`description` を `handlers.prompts.render(tool_prompt_id(ADMIN_MCP_SERVER, 名前))` にして `TOOL_ANNOTATIONS` の注釈で登録する（今の説明の文は各ツールの YAML へ移す）。引数はインターフェース定義の `request` をキーワード引数で受ける
       3. 各ツールは次のサービスを 管理の MCP の実行スロット（`handlers.slots.run_admin`） で呼び、結果をツールの結果にする。`status`・`restart` 以外は、呼ぶ前に `await handlers.registry.wait_loaded()` で配信元の読み込みを待つ
          - `status`: 状態の取得（`env` は `os.environ`）。`render` は状態の文
          - `reload`: 設定の再読み込み。`render` は再読み込みの文
@@ -145,5 +145,5 @@ functions:
         summary: ツールの説明をプロンプトの YAML から描画する
         condition: '`list_tools` と `initialize` を呼ぶ'
         mock: 配線済みの関数（偽物。`prompts` は同梱した YAML を読んだ一式）
-        expected: 7 つのツールの説明がそれぞれ `prompts.render(tool_prompt_id("admin", 名前))` と同じで、`instructions` が無い
+        expected: 7 つのツールの説明がそれぞれ `prompts.render(tool_prompt_id(ADMIN_MCP_SERVER, 名前))` と同じで、`instructions` が無い
 visibility: internal

@@ -1,0 +1,122 @@
+use_cases:
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: run_only
+    detail: MCP の instructions・ツールの説明とスキルの手順を設計書に合わせて書き直すと、導入から読み書きまでの流れを壊しうる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-2.yaml
+    impact: run_only
+    detail: スキル global-setup の手順を設計書に合わせて書き直す
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-5.yaml
+    impact: run_only
+    detail: スキル setup の手順を設計書に合わせて書き直す
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-13.yaml
+    impact: run_only
+    detail: スキル feedback の手順を設計書に合わせて書き直す
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: run_only
+    detail: 文書の MCP の instructions と読み取りのツールの説明を設計書に合わせて書き直す
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: run_only
+    detail: 文書の MCP の書き込みのツールの説明を設計書に合わせて書き直す
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: run_only
+    detail: 管理の MCP のツールの説明を設計書に合わせて書き直す
+    depends_on: []
+docs:
+  - page: project-index.yaml
+    new: false
+    change: shuhei1101/ai-monitor の反映作業『配布先の配信元の設定への種類の行の追加』の実行スクリプトで、documents[] に mcp_server・agent_flow・llm_call などの種類の行を knowledge のスキーマの参照で追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T09:17:36.982611+00:00'
+  - page: docs/index.yaml
+    new: false
+    change: 目次に docs/mcp-server/・docs/agent-flow/ のフォルダの行を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T09:27:36.212738+00:00'
+  - page: docs/mcp-server/index.yaml
+    new: true
+    change: MCP サーバーの定義のフォルダの目次を新設する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T09:17:36.982611+00:00'
+  - page: docs/agent-flow/index.yaml
+    new: true
+    change: エージェントフロー（スキル）のフォルダの目次を新設する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T09:27:36.212738+00:00'
+  - page: docs/layout/LAY-73-1.yaml
+    new: false
+    change: docs/ の entries[] に mcp-server/・agent-flow/ のフォルダを追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T09:27:36.212738+00:00'
+  - page: docs/module/MOD-95.py.yaml
+    new: false
+    change: 定数 DOCS_MCP_SERVER・ADMIN_MCP_SERVER を追加し、プロンプトファイルの id の値と単体テストの期待値をサーバー名に合わせる
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T09:45:25.780992+00:00'
+  - page: docs/module/MOD-93.py.yaml
+    new: false
+    change: tool_prompt_id に渡すサーバー名を ADMIN_MCP_SERVER にする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T09:45:25.780992+00:00'
+  - page: docs/module/MOD-94.py.yaml
+    new: false
+    change: tool_prompt_id に渡すサーバー名を DOCS_MCP_SERVER にし、プロンプトファイルのパスを mcp/project-index/ にする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T09:45:25.780992+00:00'
+  - page: docs/module/MOD-89.py.yaml
+    new: false
+    change: 単体テストのプロンプトファイルのパス・id を mcp/project-index/ にする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T09:45:25.780992+00:00'
+  - page: docs/interface/IF-15.yaml
+    new: false
+    change: instructions のプロンプトの id を mcp/project-index/instructions にする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T09:45:25.780992+00:00'
+  - page: schemas/prompt.schema.yaml
+    new: false
+    change: id の例を mcp/project-index/instructions にする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T09:45:25.780992+00:00'
+  - page: docs/module/MOD-43.py.yaml
+    new: false
+    change: test_load_prompts_when_bundled の期待値の instructions の id を mcp/project-index/instructions にする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T09:48:56.919808+00:00'
+scope_out:
+  - item: LLM の呼び出しの設計書
+    reason: src/ に LLM を呼ぶ処理が無い（LLM の名前が出るのは秘密の値の書式などだけ）
+    plan: none
+  - item: 精度評価の設計書
+    reason: Issue の指示で対象外（精度が大事な客が見るものを持たない）
+    plan: none
+  - item: エージェントの定義・起動の構成の設計書
+    reason: このリポジトリはエージェントと起動の構成を持たない（Issue の対象は MCP サーバー・スキル・LLM の呼び出し）
+    plan: none
+  - item: 'type: skill のエージェントフローから SKILL.md を生成する仕組み'
+    reason: 要望は設計書の作成と実装の追随で、生成の仕組みの追加を含まない。この PR では SKILL.md を手でエージェントフローに合わせる
+    plan: '#241'

@@ -2,11 +2,16 @@
 name: global-setup
 description: 端末ごとに 1 回、project-index のクローン・依存・端末の設定・Claude Code の env・起動を用意する。再インストール・端末の移行・project-index の更新のあとにも使用する
 argument-hint: "[クローンのパス]"
+arguments: [clone]
+allowed-tools:
+  - "Bash(*.venv/bin/python -m project_index migrate --plan*)"
+  - "Bash(command -v mdmark)"
+  - "Bash(*.venv/bin/python -m project_index serve*)"
 ---
 
 # global-setup
 
-`$ARGUMENTS` は project-index のクローンのパス。省くと聞く。
+`$clone` は project-index のクローンのパス。省くと聞く。
 質問は AskUserQuestion で、既定値を推奨の選択肢にして聞く。
 
 ## 手順
@@ -16,7 +21,7 @@ argument-hint: "[クローンのパス]"
    - ファイルがあるかを確認する
 
 2. 端末の設定がある場合、バージョンを確認する。
-   - `{clone}/.venv/bin/python -m project_index migrate --plan` を実行する（`clone` は端末の設定の値。端末の設定に `clone` が無いときは `$ARGUMENTS`、空ならクローンの場所を聞いた値。聞いた値は、スキーマの検証で足りないキーを追加するときに再度聞かずに記載する）
+   - `{clone}/.venv/bin/python -m project_index migrate --plan` を実行する（`clone` は端末の設定の値。端末の設定に `clone` が無いときは `$clone`、空ならクローンの場所を聞いた値。聞いた値は、スキーマの検証で足りないキーを追加するときに再度聞かずに記載する）
    - 終了コード 6（設定が新しい）の場合、設定のバージョンと project-index のバージョンを示し、管理の MCP の `update` で project-index を更新するよう案内して止まる。端末の設定も env も書き換えない
    - 標準出力が空の場合、手順 3 へ進む
    - 標準出力に手順がある場合、手順を示す。`[destructive]` の行があるときは、適用してよいかを聞き、断られたら止まる
@@ -25,7 +30,7 @@ argument-hint: "[クローンのパス]"
 
 3. 端末の設定が無い場合、端末の設定を作る。
    - 端末の設定の場所を聞く（既定は `${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml`）
-   - `$ARGUMENTS` が空ならクローンの場所を聞く
+   - `$clone` が空ならクローンの場所を聞く
    - クローンが無ければ `git clone https://github.com/shuhei1101/project-index {クローンのパス}` を実行する
    - クローンで `uv sync` を実行して依存を入れる
    - `{クローン}/templates/settings.yaml` を元に、`clone` をクローンの絶対パスにした端末の設定を作る。`sources` は空にする
@@ -39,7 +44,7 @@ argument-hint: "[クローンのパス]"
 
 6. project-index を起動して、つながることを確認する。
    - 待ち受けていなければ、`{clone}/.venv/bin/python -m project_index serve` を切り離して起動する。環境変数 `PROJECT_INDEX_CONFIG` に端末の設定のパスを指定する
-   - `http://127.0.0.1:${PROJECT_INDEX_PORT:-8786}/mcp` にツールの一覧（`tools/list`）を要求し、文書の MCP のツールが 6 つ返ることを確認する
+   - `http://127.0.0.1:${PROJECT_INDEX_PORT:-8786}/mcp` にツールの一覧（`tools/list`）を要求し、文書の MCP のツールが全て返ることを確認する
 
 7. 結果を示す。
    - 作ったもの（端末の設定のパス・env に記載したキー）と、つながった結果を出す

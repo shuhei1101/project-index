@@ -1,0 +1,41 @@
+id: MCP-1
+title: 文書の MCP
+lead: 配信元の文書をメタデータと本文で検索・参照・書き込みする。
+server: project-index
+repository: shuhei1101/project-index
+connection:
+  type: http
+  url: http://127.0.0.1:{PROJECT_INDEX_PORT}/mcp
+tools:
+  - name: describe
+    interface: IF-1#
+  - name: search_docs
+    interface: IF-2#
+  - name: trace_related
+    interface: IF-3#
+  - name: list_changes
+    interface: IF-4#
+  - name: list_match_words
+    interface: IF-5#
+  - name: write_docs
+    interface: IF-6#
+  - name: delete_docs
+    interface: IF-7#
+notes:
+  接続: |-
+    プラグインの `.mcp.json` が `alwaysLoad: true` で配る。`PROJECT_INDEX_PORT` の既定は 8786。
+    呼び出しの `cwd`・`session_id`・`agent_id` は、PreToolUse のフックが入れる。
+refs:
+  - to: IF-20
+    type: references
+    when: フックが呼び出しに入れる引数を変えるときに、ツール実行前のフックの入出力を確認する。
+  - to: CFG-1
+    type: references
+    when: 待ち受けのポートの環境変数を変えるとき。
+visibility: internal
+tags:
+  - name: topic:文書のMCP
+    main: true
+  - name: tool:mcp
+  - name: topic:サーバー
+  - name: topic:ツール

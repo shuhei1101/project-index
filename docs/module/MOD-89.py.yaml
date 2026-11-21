@@ -309,7 +309,7 @@ functions:
       - name: test_run_serve_when_prompt_invalid
         case: 異常
         summary: プロンプトの YAML が違反する
-        condition: 配信できる配信元 1 つの端末の設定。同梱した YAML を一時フォルダへ複製して `mcp/docs/tools/search-docs.yaml` から `kind` を削除し、そのフォルダを `PROJECT_INDEX_PROMPTS_DIR` に入れる
+        condition: 配信できる配信元 1 つの端末の設定。同梱した YAML を一時フォルダへ複製して `mcp/project-index/tools/search-docs.yaml` から `kind` を削除し、そのフォルダを `PROJECT_INDEX_PROMPTS_DIR` に入れる
         mock: '`uvicorn.Server.run`（呼ばれた数を数える）'
         expected: 4 を返し、標準エラーに `search-docs.yaml` のパスと `kind` があり、`uvicorn.Server.run` が呼ばれない
         exception: プロンプトの YAML が違反する
@@ -416,7 +416,7 @@ functions:
         summary: 部品を作り配信元は読まない
         condition: '`state_dir` が無い一時フォルダの下、配信できる配信元 1 つと検証に失敗する配信元 1 つ'
         mock: なし
-        expected: '`state_dir` ができ、`registry.loading` が `True` で `registry.statuses()` が空。`handlers.reload_sources(terminal)` の後は `registry.served()` が 1 つ、`registry.statuses()` が 2 つ。`prompts` が `mcp/docs/instructions` を持ち、`session-context` を持たない。`gate` と `snapshots.gate`・`store.gate`・`checks.gate` が同じオブジェクト'
+        expected: '`state_dir` ができ、`registry.loading` が `True` で `registry.statuses()` が空。`handlers.reload_sources(terminal)` の後は `registry.served()` が 1 つ、`registry.statuses()` が 2 つ。`prompts` が `mcp/project-index/instructions` を持ち、`session-context` を持たない。`gate` と `snapshots.gate`・`store.gate`・`checks.gate` が同じオブジェクト'
       - name: test_build_handlers_when_out_of_sync
         case: 正常
         summary: 初回の読み込みでもずれを警告のログに書く

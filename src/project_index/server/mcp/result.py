@@ -63,8 +63,12 @@ ADMIN_TOOL_NAMES = (
     "try_convert",
     "write_nav",
 )
+# 文書の MCP のサーバー名（プラグインの `.mcp.json` のキー）
+DOCS_MCP_SERVER = "project-index"
+# 管理の MCP のサーバー名（プラグインの `.mcp.json` のキー）
+ADMIN_MCP_SERVER = "project-index-admin"
 # 文書の MCP の instructions を描画するプロンプトの ID
-DOCS_INSTRUCTIONS_PROMPT_ID = "mcp/docs/instructions"
+DOCS_INSTRUCTIONS_PROMPT_ID = f"mcp/{DOCS_MCP_SERVER}/instructions"
 
 
 def tool_prompt_id(server: str, tool: str) -> str:
@@ -76,8 +80,8 @@ def mcp_prompt_ids() -> list[str]:
     """2 つの MCP が描画するプロンプトの ID を並べる。"""
     return [
         DOCS_INSTRUCTIONS_PROMPT_ID,
-        *(tool_prompt_id("docs", name) for name in DOCS_TOOL_NAMES),
-        *(tool_prompt_id("admin", name) for name in ADMIN_TOOL_NAMES),
+        *(tool_prompt_id(DOCS_MCP_SERVER, name) for name in DOCS_TOOL_NAMES),
+        *(tool_prompt_id(ADMIN_MCP_SERVER, name) for name in ADMIN_TOOL_NAMES),
     ]
 
 

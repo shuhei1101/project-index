@@ -120,7 +120,19 @@ constants:
     container: project_index/server/mcp/result.py
     usecase: 共通
     summary: 文書の MCP の instructions を描画するプロンプトの ID
-    value: '"mcp/docs/instructions"'
+    value: 'f"mcp/{DOCS_MCP_SERVER}/instructions"'
+  - name: DOCS_MCP_SERVER
+    title: 文書の MCP のサーバー名
+    container: project_index/server/mcp/result.py
+    usecase: 共通
+    summary: 文書の MCP のサーバー名（MCP サーバーの定義の `server`。プラグインの `.mcp.json` のキー）
+    value: '"project-index"'
+  - name: ADMIN_MCP_SERVER
+    title: 管理の MCP のサーバー名
+    container: project_index/server/mcp/result.py
+    usecase: 共通
+    summary: 管理の MCP のサーバー名（MCP サーバーの定義の `server`。プラグインの `.mcp.json` のキー）
+    value: '"project-index-admin"'
 functions:
   - name: to_tool_result
     title: ツールの結果
@@ -247,7 +259,7 @@ functions:
         type: str
         required: true
         passing: positional
-        description: 文書の MCP は `docs`、管理の MCP は `admin`
+        description: 文書の MCP は `DOCS_MCP_SERVER`、管理の MCP は `ADMIN_MCP_SERVER`
       - name: tool
         title: ツール名
         type: str
@@ -278,14 +290,14 @@ functions:
     returns:
       type: list[str]
       description: '`DOCS_INSTRUCTIONS_PROMPT_ID` と、両方の MCP のツールごとの `tool_prompt_id`'
-    process: 1. `DOCS_INSTRUCTIONS_PROMPT_ID`、`DOCS_TOOL_NAMES` の `tool_prompt_id("docs", …)`、`ADMIN_TOOL_NAMES` の `tool_prompt_id("admin", …)` をこの順に並べる
+    process: 1. `DOCS_INSTRUCTIONS_PROMPT_ID`、`DOCS_TOOL_NAMES` の `tool_prompt_id(DOCS_MCP_SERVER, …)`、`ADMIN_TOOL_NAMES` の `tool_prompt_id(ADMIN_MCP_SERVER, …)` をこの順に並べる
     unit_tests:
       - name: test_mcp_prompt_ids
         case: 正常
         summary: instructions と 14 のツール
         condition: 引数なし
         mock: なし
-        expected: 15 件で、先頭が `mcp/docs/instructions`、`mcp/admin/tools/check-project` を含む
+        expected: 15 件で、先頭が `mcp/project-index/instructions`、`mcp/project-index-admin/tools/check-project` を含む
   - name: tool_unexpected_error
     title: 想定外の例外の変換
     kind: 関数

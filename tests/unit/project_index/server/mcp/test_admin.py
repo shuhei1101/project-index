@@ -117,6 +117,7 @@ def test_build_admin_mcp_when_descriptions(
     instructions = asyncio.run(_initialize())
     # 検証
     assert {tool.name: tool.description for tool in tools} == {
-        name: bundled_prompts.render(tool_prompt_id("admin", name)) for name in TOOL_NAMES
+        name: bundled_prompts.render(tool_prompt_id("project-index-admin", name))
+        for name in TOOL_NAMES
     }
     assert instructions is None

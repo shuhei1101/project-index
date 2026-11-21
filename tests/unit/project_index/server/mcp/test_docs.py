@@ -166,7 +166,7 @@ def test_build_docs_mcp_when_descriptions(
     # 検証
     by_name = {tool.name: tool for tool in tools}
     assert {name: tool.description for name, tool in by_name.items()} == {
-        name: bundled_prompts.render(tool_prompt_id("docs", name)) for name in TOOL_NAMES
+        name: bundled_prompts.render(tool_prompt_id("project-index", name)) for name in TOOL_NAMES
     }
     search_description = by_name["search_docs"].description or ""
     for word in (
