@@ -411,3 +411,45 @@ def test_normal_when_check_delete(
     assert "c#steps[取得する]" in violations[0]["rule"]
     assert json.loads(second) == []
     assert {path: path.read_bytes() for path in root.rglob("*") if path.is_file()} == before
+
+
+def test_normal_when_orphan_removed(
+    skill_source: Callable[..., Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """組み立てたどのスキルの skill.path でもない、生成元のコメントを持つ SKILL.md を削除する（正常系）。"""
+    # 準備（b のエージェントフローは無く、b の SKILL.md だけが残る）
+    root = skill_source({"a": A_FLOW, "c": C_FLOW})
+    (root / "skills/a").mkdir(parents=True)
+    (root / "skills/a/SKILL.md").write_text(A_SKILL, encoding="utf-8")
+    # c を type: skill にして生成した SKILL.md（c は flow へ戻した）
+    (root / "skills/c").mkdir(parents=True)
+    (root / "skills/c/SKILL.md").write_text(
+        "---\nname: c\n---\n\n" + GENERATED.format(path="docs/agent-flow/c.yaml") + "\n",
+        encoding="utf-8",
+    )
+    # 生成元のコメントを持たない SKILL.md と、agent_flow の paths の外を指す SKILL.md
+    kept = {
+        "skills/manual/SKILL.md": "# 手で記載した SKILL.md\n",
+        "skills/x/SKILL.md": GENERATED.format(path="docs/skill/x.yaml") + "\n",
+    }
+    for relative, text in kept.items():
+        (root / relative).parent.mkdir(parents=True)
+        (root / relative).write_text(text, encoding="utf-8")
+    a_before = (root / "skills/a/SKILL.md").read_bytes()
+    # 実行
+    code = main(["skill-md"])
+    out, _ = capsys.readouterr()
+    before_again = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
+    again = main(["skill-md"])
+    again_out, _ = capsys.readouterr()
+    # 検証
+    assert code == 0
+    assert out == "skills/b/SKILL.md\nskills/c/SKILL.md\n"
+    assert not (root / "skills/b/SKILL.md").exists()
+    assert not (root / "skills/c/SKILL.md").exists()
+    assert (root / "skills/a/SKILL.md").read_bytes() == a_before
+    for relative, text in kept.items():
+        assert (root / relative).read_text(encoding="utf-8") == text
+    assert again == 0
+    assert again_out == ""
+    assert {path: path.read_bytes() for path in root.rglob("*") if path.is_file()} == before_again

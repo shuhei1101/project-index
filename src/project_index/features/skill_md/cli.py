@@ -13,6 +13,7 @@ from project_index.features.skill_md.build import (
     check_deletion,
     check_replacement,
     load_agent_flows,
+    remove_orphans,
     write_changed,
 )
 from project_index.features.skill_md.types import InvalidAgentFlowError
@@ -56,11 +57,13 @@ def run_skill_md(args: argparse.Namespace) -> int:
     # 生成のモード（`args.paths` は受け取るが、生成の対象は絞らない）
     try:
         flows, schema = load_agent_flows(root)
-        written = write_changed(root, build_skill_files(root, flows, schema=schema))
+        files = build_skill_files(root, flows, schema=schema)
+        written = write_changed(root, files)
+        removed = remove_orphans(root, files)
     except InvalidAgentFlowError as error:
         for problem in error.problems:
             print(problem.line(), file=sys.stderr)
         return EXIT_SKILL_INVALID
-    for path in written:
+    for path in sorted([*written, *removed]):
         print(path)
     return 0

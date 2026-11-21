@@ -1091,6 +1091,9 @@ scenarios:
         A->>M: write_docs(operations: update b の ref される工程の body を set)
         M->>WT: b の YAML を書き込み、生成のコマンドを実行する
         M-->>A: 書き込んだ後の version と差分
+        A->>M: write_docs(operations: update a の skill.path を skills/a2/SKILL.md に set)
+        M->>WT: a の YAML を書き込み、生成のコマンドを実行して前の skills/a/SKILL.md を削除する
+        M-->>A: 書き込んだ後の version と差分
       ```
 
       <!-- /map -->
@@ -1100,6 +1103,7 @@ scenarios:
       - 2 回目の書き込みの後、`skills/a/SKILL.md` の `ref` の工程のセクションが、b の修正後の `body` になる
       - '`type: flow` の b から SKILL.md ができない'
       - SKILL.md の中身が変わらない更新（`tags` だけの `set`）では、`skills/a/SKILL.md` のバイト列が書き込み前と同じ
+      - 3 回目の書き込みの後、ワークツリー x に `skills/a2/SKILL.md` ができ、`skills/a/SKILL.md` が無い
     test: test_normal_when_skill_agent_flow_written
   - name: 異常シナリオ（SKILL.md を組み立てられないエージェントフローを書く）
     setup:
@@ -1154,6 +1158,7 @@ scenarios:
         A->>M: delete_docs(targets: a と b)
         M->>M: a と b を除いた配信元から SKILL.md を組み立てる
         M->>WT: a と b のファイルを削除する
+        M->>WT: generators の SKILL.md の生成のコマンドを実行し、生成元の無い skills/a/SKILL.md を削除する
         M-->>A: deleted
       ```
 
@@ -1163,8 +1168,41 @@ scenarios:
       - b だけの削除の後、ワークツリー x の a・b の YAML と `skills/a/SKILL.md` のバイト列が削除の前と同じ
       - 'b だけの削除を `dry_run: true` で実行すると、同じ違反を返却する'
       - 'a と b を同じ `targets` に指定した削除は `applied: true` で、ワークツリー x の a・b の YAML が無い'
-      - a と b を同じ `targets` に指定した削除の後、ワークツリー x の `skills/a/SKILL.md` のバイト列が削除の前と同じ
+      - a と b を同じ `targets` に指定した削除の後、ワークツリー x に `skills/a/SKILL.md` が無い
     test: test_error_when_delete_skill_ref_target
+  - name: 正常シナリオ（スキルのエージェントフローを消す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: サンプルの配信元
+        description: '異常シナリオ（スキルが工程を埋め込むエージェントフローを消す）の配信元に、どの `ref` からも指されない `type: skill` のエージェントフロー c（`skill.path` は `skills/c/SKILL.md`）と、生成元のコメントの行を持たない `skills/manual/SKILL.md` を追加したもの'
+        notes: '`skills/a/SKILL.md`・`skills/c/SKILL.md` は今のエージェントフローから生成した中身で配置する'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` にワークツリー x のパスを指定する'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（スキルのエージェントフローを消す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: delete_docs(targets: c)
+        M->>M: validators の検査のモードで、c を除いた配信元から SKILL.md を組み立てる
+        M->>WT: c のファイルを削除する
+        M->>WT: generators の SKILL.md の生成のコマンドを実行し、生成元の無い skills/c/SKILL.md を削除する
+        M-->>A: deleted
+      ```
+
+      <!-- /map -->
+    expected:
+      - '結果が `applied: true` で、c の `status` が `deleted`'
+      - 削除の後、ワークツリー x に c の YAML と `skills/c/SKILL.md` が無い
+      - 削除の後も、ワークツリー x の `skills/a/SKILL.md`・`skills/manual/SKILL.md` のバイト列が削除の前と同じ
+      - '`dry_run: true` の削除では、`skills/c/SKILL.md` のバイト列が削除の前と同じ'
+    test: test_normal_when_skill_agent_flow_deleted
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 tags:
   - name: topic:文書

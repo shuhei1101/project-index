@@ -1,0 +1,25 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=integration -f paths="tests/integration/server/test_skill_md.py" | ...) ...（TP-1 の TL-2 の run_runner）
+
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 12 items
+
+tests/integration/server/test_skill_md.py::test_normal PASSED            [  8%]
+tests/integration/server/test_skill_md.py::test_normal_when_step_ref PASSED [ 16%]
+tests/integration/server/test_skill_md.py::test_normal_when_check_passes PASSED [ 25%]
+tests/integration/server/test_skill_md.py::test_normal_when_check_finds_violations PASSED [ 33%]
+tests/integration/server/test_skill_md.py::test_error_when_schema_invalid PASSED [ 41%]
+tests/integration/server/test_skill_md.py::test_error_when_doc_unreadable PASSED [ 50%]
+tests/integration/server/test_skill_md.py::test_error_when_step_ref_missing PASSED [ 58%]
+tests/integration/server/test_skill_md.py::test_error_when_path_outside_source PASSED [ 66%]
+tests/integration/server/test_skill_md.py::test_error_when_schema_unresolvable[source-missing] PASSED [ 75%]
+tests/integration/server/test_skill_md.py::test_error_when_schema_unresolvable[ref-missing] PASSED [ 83%]
+tests/integration/server/test_skill_md.py::test_normal_when_check_delete PASSED [ 91%]
+tests/integration/server/test_skill_md.py::test_normal_when_orphan_removed PASSED [100%]
+
+============================== 12 passed in 0.52s ==============================
+exit=0

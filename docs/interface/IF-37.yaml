@@ -9,7 +9,7 @@ entry:
 identifier: skill-md
 permissions: 制限なし（配信元のフォルダの中だけを読み書きする）
 idempotent: true
-side_effects: '生成のモードは、`type: skill` のエージェントフローの `skill.path` の SKILL.md のうち、組み立てた中身と違うものを書き換える（無ければフォルダごと作る）。検査のモードはファイルを書き換えない'
+side_effects: '生成のモードは、`type: skill` のエージェントフローの `skill.path` の SKILL.md のうち、組み立てた中身と違うものを書き換える（無ければフォルダごと作る）。あわせて、生成元の無い SKILL.md（制約「生成元の無い SKILL.md の削除」）を削除する。検査のモードはファイルを書き換えない'
 callers:
   - SC-7#scenarios[正常シナリオ（スキルのエージェントフローを書く）]
   - SC-7#scenarios[異常シナリオ（SKILL.md を組み立てられないエージェントフローを書く）]
@@ -54,7 +54,7 @@ request_example: |-
 response:
   - name: 標準出力
     type: str
-    description: 生成のモードは書き換えた SKILL.md の配信元の直下からのパスを 1 行に 1 件、パスの昇順で出す（書き換えが無ければ空）。検査のモードは違反の配列の JSON（`path`・`rule`・`fix`。違反が無ければ `[]`）
+    description: 生成のモードは書き換えた・削除した SKILL.md の配信元の直下からのパスを 1 行に 1 件、パスの昇順で出す（書き換えも削除も無ければ空）。検査のモードは違反の配列の JSON（`path`・`rule`・`fix`。違反が無ければ `[]`）
     notes: 検査のモードの `path` は標準入力のエージェントフローの項目のパス。ほかのエージェントフローの違反は `$` にし、`rule` へそのエージェントフローのパスを入れる
   - name: 標準エラー
     type: str
@@ -77,7 +77,7 @@ constraints:
     constraint: 配信元の設定の `agent_flow` の行の `schema` で全てのエージェントフローを検査する。`schema` がオブジェクト（`source`・`path`・`ref`）のときは、IF-12 の制約「ほかの配信元のスキーマの参照」と同じく、端末の設定の `sources` の `source` の行が指すリポジトリから、`ref` を commit に解いた `path` を Git のオブジェクトとして読み込む。合わないエージェントフローが 1 件でもあれば、全ての合わないエージェントフローのパスと項目を出す
     notes: 端末の設定は、`project-index serve` と同じ読み込み先（CFG-1）から読み込む。端末の設定に `source` の行が無い・`ref` を commit に解けない・`path` がその commit に無いときは失敗にし、標準エラーに `source`・`path`・`ref` を出す
   - item: 書き出しの順序
-    constraint: 全てのエージェントフローの読み込み・検査・`ref` の解決・全ての SKILL.md の組み立てを終えてから書き出す。書き出しの前に 1 件でも失敗したら、どのファイルも書き換えない
+    constraint: 全てのエージェントフローの読み込み・検査・`ref` の解決・全ての SKILL.md の組み立てを終えてから、書き出しと生成元の無い SKILL.md の削除をする。書き出しの前に 1 件でも失敗したら、どのファイルも書き換え・削除しない
   - item: 組み立てる frontmatter と本文
     constraint: knowledge の IF-312-1『SKILL.md の生成』の制約「組み立てる frontmatter」「組み立てる本文」「工程のセクション」と同じにする。生成元のコメントのパスは、配信元の直下からのエージェントフローのパスにする
   - item: 工程の埋め込み
@@ -96,6 +96,9 @@ constraints:
   - item: 削除の検査
     constraint: '検査のモードで `PROJECT_INDEX_VALIDATE_ON` が `delete` のときは、配信元のエージェントフローから `PROJECT_INDEX_DELETE_IDS` の `id` のもの（無ければ標準入力の文書の `id` のもの）を除いて、残る全ての `type: skill` を組み立てる。解決できない `ref` のうち、参照先の `id` が標準入力の文書の `id` のものだけを違反にする。違反の `path` は `$`、`rule` には参照しているエージェントフローのパスと `id`・その工程の `ref` を入れる。ファイルは書き出さない'
     notes: 参照先で絞るのは、`delete_docs` が削除する文書ごとに検査を実行し、違反をその文書の添字に付けるため
+  - item: 生成元の無い SKILL.md の削除
+    constraint: 生成のモードは、配信元の直下から再帰的に名前が `SKILL.md` のファイルを探し（`.` で始まるフォルダの配下は除く）、制約「組み立てる frontmatter と本文」の生成元のコメントの行を持ち、そのパスが `agent_flow` の文書の行の `paths` に該当し `exclude` に該当しない（制約「生成の対象」と同じ判定。ファイルが今は無くてもよい）もののうち、今回組み立てたどの SKILL.md の `skill.path` でもないものを削除する。削除して空になったフォルダは削除しない
+    notes: エージェントフローの削除のほか、`type` を `skill` から変えた・`skill.path` を変えた後の前の SKILL.md も削除する。生成元のコメントの行を持たない SKILL.md と、コメントのパスが `agent_flow` の `paths` の外（knowledge の `docs/skill/` の設計書など）を指す SKILL.md は、エージェントフローから生成していないものとして削除しない
 flows:
   - name: 正常系
     summary: 組み立てた中身が今の SKILL.md と違うエージェントフローだけ、SKILL.md を書き出す
@@ -382,6 +385,38 @@ flows:
       - 2 回目の標準出力が `[]`
       - どのファイルのバイト列も変わらない
     test: test_normal_when_check_delete
+  - name: 正常系（生成元の無い SKILL.md を削除する）
+    summary: 組み立てたどのスキルの `skill.path` でもない、生成元のコメントを持つ SKILL.md を削除する
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 配信元
+        description: 正常系の一時フォルダで、b の SKILL.md を配置したまま b のエージェントフローを削除し、c の `type` を `skill`（`skill.path` は `skills/c/SKILL.md`）にして一度生成した後に `flow` へ戻し、生成元のコメントの行を持たない `skills/manual/SKILL.md` と、`agent_flow` の `paths` の外の `docs/skill/x.yaml` を指す生成元のコメントの行を持つ `skills/x/SKILL.md` を追加したもの
+        notes: a の SKILL.md は今のエージェントフローから生成した状態
+    flow: |-
+      <!-- map: {"title": "正常系（生成元の無い SKILL.md を削除する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as 呼び出し元
+        participant G as project-index skill-md
+        participant F as 配信元のフォルダ
+
+        C->>G: 配信元の直下で起動する
+        G->>G: type が skill のエージェントフローの SKILL.md を組み立てる
+        G->>F: 名前が SKILL.md のファイルを探す
+        G->>F: 生成元のコメントを持ち、組み立てたどの skill.path でもない b と c の SKILL.md を削除する
+        G-->>C: 削除したパスと終了コード 0
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 0
+      - 標準出力が b と c の SKILL.md のパスの 2 行（パスの昇順）
+      - b と c の SKILL.md が無い
+      - a の SKILL.md・`skills/manual/SKILL.md`・`skills/x/SKILL.md` のバイト列が実行の前と同じ
+      - 続けてもう一度起動すると、標準出力が空で、どのファイルのバイト列も変わらない
+    test: test_normal_when_orphan_removed
 test_file: tests/integration/server/test_skill_md.py
 visibility: internal
 tags:
