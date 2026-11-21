@@ -31,7 +31,7 @@ functions:
     scope: public
     is_async: false
     thread_safe: false
-    side_effects: 生成のモードは SKILL.md を書き換え、標準出力・標準エラーに書く。検査のモードは標準入力を読み、標準出力に書く
+    side_effects: 生成のモードは SKILL.md を書き換え・削除し、標準出力・標準エラーに書く。検査のモードは標準入力を読み、標準出力に書く
     args:
       - name: args
         title: 解析結果
@@ -47,9 +47,9 @@ functions:
       2. `args.check` が真か
          - 真: 標準入力を UTF-8 で全て読み、環境変数 `VALIDATE_ON_ENV` が `delete` なら `check_deletion`（`delete_ids` は `DELETE_IDS_ENV` の空でない行）、それ以外なら `check_replacement` の問題を `path`・`rule`・`fix` の辞書の配列の JSON にして標準出力に出し、0 を返却する
          - 偽: 続ける（`args.paths` は使用しない）
-      3. `load_agent_flows`・`build_skill_files`・`write_changed` を順に呼ぶ
+      3. `load_agent_flows`・`build_skill_files`・`write_changed`・`remove_orphans` を順に呼ぶ
          - `InvalidAgentFlowError` の場合、問題の行を標準エラーに出して `EXIT_SKILL_INVALID` を返却する（標準出力には何も出さない）
-      4. 書き換えたパスを 1 行に 1 件ずつ標準出力に出し、0 を返却する
+      4. 書き換えたパスと削除したパスを合わせて昇順にし、1 行に 1 件ずつ標準出力に出し、0 を返却する
     exceptions:
       - name: なし（終了コード 1）
         condition: 生成のモードで `InvalidAgentFlowError`（インターフェース定義の `InvalidAgentFlow`）
@@ -82,6 +82,13 @@ functions:
         condition: '`check=True`、標準入力に a が `ref` で埋め込む c、環境変数 `PROJECT_INDEX_VALIDATE_ON=delete`・`PROJECT_INDEX_DELETE_IDS=c`'
         mock: なし（`monkeypatch.chdir`・`monkeypatch.setenv`・`monkeypatch` で `sys.stdin`、`capsys`）
         expected: 0 を返却し、標準出力が `path` が `$` の違反 1 件の JSON の配列
+        exception: '-'
+      - name: test_run_skill_md_when_orphan
+        case: 正常
+        summary: 削除したパスも出す
+        condition: '`check=False`、`type: skill` の a と、`docs/agent-flow/b.yaml`（無い）を指す生成元のコメントを持つ `skills/b/SKILL.md` を持つ一時フォルダを作業ディレクトリにする'
+        mock: なし（`monkeypatch.chdir`、`capsys`）
+        expected: 0 を返却し、標準出力が a の `skill.path` と `skills/b/SKILL.md` の 2 行（昇順）で、`skills/b/SKILL.md` が無い
         exception: '-'
     refs:
       - to: MOD-181

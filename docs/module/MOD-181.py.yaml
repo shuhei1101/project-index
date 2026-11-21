@@ -20,6 +20,12 @@ constants:
     usecase: SKILL.md の生成
     summary: SKILL.md の frontmatter の後ろに置く 1 行の書式（`{path}` にエージェントフローのパス）
     value: "'<!-- {path} から生成した。このファイルを修正せず、設計書を修正して再生成する -->'"
+  - name: SKILL_FILE_NAME
+    title: SKILL.md のファイル名
+    container: project_index/features/skill_md/build.py
+    usecase: SKILL.md の生成
+    summary: 生成元の無い SKILL.md を探すときに照合するファイル名
+    value: "'SKILL.md'"
 functions:
   - name: load_agent_flows
     title: エージェントフローの読み込み
@@ -475,6 +481,59 @@ functions:
         condition: a の工程が配信元に無い e を `ref` で指し、標準入力が c、`delete_ids` が `["c"]`（c はどの `ref` からも指されない）
         mock: なし
         expected: 空の並び
+        exception: '-'
+  - name: remove_orphans
+    title: 生成元の無い SKILL.md の削除
+    container: project_index/features/skill_md/build.py
+    usecase: SKILL.md の生成
+    role: 書き込み
+    summary: 生成元のコメントが `agent_flow` の行のエージェントフローを指し、今回組み立てたどの SKILL.md でもないファイルを削除し、削除したパスを返却する
+    kind: 関数
+    scope: public
+    is_async: false
+    thread_safe: false
+    side_effects: SKILL.md を削除する（空になったフォルダは残す）
+    args:
+      - name: root
+        title: 配信元の直下
+        type: Path
+        required: true
+        passing: positional
+        description: SKILL.md を探すフォルダ
+      - name: files
+        title: SKILL.md
+        type: Sequence[SkillFile]
+        required: true
+        passing: positional
+        description: '`build_skill_files` が組み立てた SKILL.md（削除しないパス）'
+    returns:
+      type: list[str]
+      description: 削除した SKILL.md のパス（昇順）
+    process: |-
+      1. `_agent_flow_table(root)` で `agent_flow` の行を読み、`files` の `path` の集合を作る
+      2. `walk_files(root)` のパスのうち、ファイル名が `SKILL_FILE_NAME` で、`.` で始まるフォルダを含まず、`files` の `path` でないものごとに
+         - UTF-8 で読み、`GENERATED_COMMENT` の `{path}` を取り出す正規表現に一致する行を探す。読めない・一致する行が無い場合は飛ばす
+         - 取り出したパスが `行.matches(パス)` に該当しない場合は飛ばす（ファイルが今あるかは問わない）
+         - 該当する場合はファイルを削除する
+      3. 削除したパスを昇順で返却する
+    exceptions:
+      - name: InvalidAgentFlowError
+        condition: 配信元の設定が無い・読めない、`agent_flow` の行が無い（`_agent_flow_table` が送る）
+        message: 問題の行（`Problem.line()`）を改行でつないだもの
+    unit_tests:
+      - name: test_remove_orphans
+        case: 正常
+        summary: 生成元の無い SKILL.md だけを削除する
+        condition: '`files` に a の SKILL.md だけを渡し、一時フォルダに a・b（`docs/agent-flow/b.yaml` を指すコメント。b.yaml は無い）・`skills/manual/SKILL.md`（コメント無し）・`skills/x/SKILL.md`（`docs/skill/x.yaml` を指すコメント）・`.hidden/SKILL.md`（`docs/agent-flow/h.yaml` を指すコメント）を置く'
+        mock: なし（一時フォルダ）
+        expected: b のパスだけを返却し、b が無く、ほかのファイルのバイト列が変わらず、b のフォルダが残る
+        exception: '-'
+      - name: test_remove_orphans_when_none
+        case: 正常
+        summary: 削除するものが無い
+        condition: '`files` に a の SKILL.md を渡し、一時フォルダに a だけを置く'
+        mock: なし（一時フォルダ）
+        expected: 空の並びを返却し、a のバイト列が変わらない
         exception: '-'
 notes:
   決まり: 全てのエージェントフローの読み込み・検査・組み立てを終えてから書き出す。配信元の設定の読み込み・ファイルの集め方・ほかの配信元のスキーマの読み込み・スキーマの検査・ファイルの置き換えは、既存の関数（`build_source_config`・`collect_files`・`read_schema_ref`・`check_schema`・`replace_file`）を使用する。
