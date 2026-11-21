@@ -336,11 +336,12 @@ functions:
     process: |-
       1. `text` を `load_yaml` で読む
          - 読めない・辞書でない場合、`$` の `Problem` 1 件を返却する
-      2. `load_agent_flows(root)` で配信元のエージェントフローを読み、同じ `id` のものを標準入力の内容に置き換える（無ければパス `-` で追加する）
-         - `InvalidAgentFlowError` の場合、その `problems` を返却する
+      2. `load_agent_flows(root)` で配信元のエージェントフローを読み、同じ `id` のものを標準入力の内容に置き換える（無ければパス `-` で追加する）。置き換えたエージェントフローのパスを標準入力のパスにする
+         - `InvalidAgentFlowError` の場合、その `problems` を手順 4 の変換をして返却する
       3. `build_skill_files(root, flows, schema=None)` を呼ぶ
-         - `InvalidAgentFlowError` の場合、`problems` を返却する（標準入力のエージェントフローのものは項目のパス、ほかのものは `$` にして `rule` へファイルのパスを入れる）
-      4. 空の並びを返却する
+         - `InvalidAgentFlowError` の場合、その `problems` を手順 4 の変換をして返却する
+         - 例外が無ければ空の並びを返却する
+      4. 問題の変換（`_for_stdin`。手順 2・3 の両方が使用する）: `file` が標準入力のパスの問題はそのままにし、それ以外の問題は `path` を `$`、`rule` を `{file}: {path}: {rule}` にする
     unit_tests:
       - name: test_check_replacement
         case: 正常
@@ -362,6 +363,20 @@ functions:
         condition: '`id: [`'
         mock: なし
         expected: '`path` が `$` の 1 件'
+        exception: '-'
+      - name: test_check_replacement_when_other_unreadable
+        case: 異常
+        summary: 配信元のほかのエージェントフローが読めない
+        condition: 標準入力は a の工程の `body` だけを書き換えた YAML、配信元の c.yaml が閉じていない引用符
+        mock: なし（一時フォルダ）
+        expected: '`path` が `$` で、`rule` が c.yaml のパスで始まる 1 件'
+        exception: '-'
+      - name: test_check_replacement_when_other_ref_broken
+        case: 異常
+        summary: 書き込む文書の変更でほかのスキルが組み立てられなくなる
+        condition: 標準入力は a が `ref` で指す c の工程の `name` を変えた c の YAML
+        mock: なし（一時フォルダ）
+        expected: '`path` が `$` で、`rule` が a のパスと `steps[{位置}].ref` を含む 1 件'
         exception: '-'
 notes:
   決まり: 全てのエージェントフローの読み込み・検査・組み立てを終えてから書き出す。配信元の設定の読み込み・ファイルの集め方・ほかの配信元のスキーマの読み込み・スキーマの検査・ファイルの置き換えは、既存の関数（`build_source_config`・`collect_files`・`read_schema_ref`・`check_schema`・`replace_file`）を使用する。
