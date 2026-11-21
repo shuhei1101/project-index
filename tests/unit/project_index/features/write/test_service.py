@@ -2136,3 +2136,73 @@ def test_write_docs_when_other_worktree(
     # 検証
     assert result.applied is True
     assert "待たない" in (other / "docs/rule/doc-1.yaml").read_text(encoding="utf-8")
+
+
+# 削除の時点の検査（`on: [delete]`）。標準入力の文書の id が「常に違反」の id なら違反を出し、
+# 「消える前提」の id なら PROJECT_INDEX_DELETE_IDS にその前提の id が無いときだけ違反を出す
+DELETE_GUARD = (
+    "import json, os, sys\n"
+    "doc = {'id': sys.stdin.read().splitlines()[0].removeprefix('id: ')}\n"
+    "ids = os.environ.get('PROJECT_INDEX_DELETE_IDS', '').split()\n"
+    "always, needs, needed = sys.argv[1], sys.argv[2], sys.argv[3]\n"
+    "bad = doc['id'] == always or (doc['id'] == needs and needed not in ids)\n"
+    "print(json.dumps([{'path': '$', 'rule': 'guard'}] if bad else []))\n"
+)
+
+
+def _delete_guard_tables() -> list[DocumentTable]:
+    """`guard` の検査を持つ行を返す。"""
+    return [
+        DocumentTable(
+            id="rules",
+            paths=["docs/rule/*.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            validators=["guard"],
+        )
+    ]
+
+
+def _delete_guard(always: str, needs: str, needed: str) -> list[ScriptEntry]:
+    """削除の時点の検査 `guard` の行を返す。"""
+    run = [sys.executable, "-c", DELETE_GUARD, always, needs, needed]
+    return [ScriptEntry(id="guard", run=run, on=["delete"])]
+
+
+def test_delete_docs_when_delete_validator_fails(make_env: Callable[..., WriteEnv]) -> None:
+    """削除の時点の検査に合格しない（異常系）。"""
+    # 準備
+    env = make_env(tables=_delete_guard_tables(), validators=_delete_guard("doc-2", "-", "-"))
+    targets = [DeleteTarget(id="doc-2", expected_version=content_hash(DOC_2))]
+    # 実行・検証
+    with pytest.raises(ValidationFailedError) as caught:
+        env.delete(targets=targets)
+    assert [violation.index for violation in caught.value.violations] == [0]
+    assert (env.worktree / "docs/rule/doc-2.yaml").exists()
+
+
+def test_delete_docs_when_delete_validator_retry(make_env: Callable[..., WriteEnv]) -> None:
+    """atomic: false で failed の対象を除いて検査をやり直す（正常系）。"""
+    # 準備
+    doc_3 = "id: doc-3\nname: 文書 3\n"
+    env = make_env(
+        {
+            "docs/rule/doc-1.yaml": DOC_1,
+            "docs/rule/doc-2.yaml": DOC_2,
+            "docs/rule/doc-3.yaml": doc_3,
+            "schemas/rule.schema.yaml": SCHEMA,
+        },
+        tables=_delete_guard_tables(),
+        validators=_delete_guard("doc-1", "doc-2", "doc-1"),
+    )
+    targets = [
+        DeleteTarget(id="doc-1", expected_version=content_hash(DOC_1)),
+        DeleteTarget(id="doc-2", expected_version=content_hash(DOC_2)),
+        DeleteTarget(id="doc-3", expected_version=content_hash(doc_3)),
+    ]
+    # 実行
+    result = env.delete(targets=targets, atomic=False)
+    # 検証
+    assert [item.status for item in result.results] == ["failed", "failed", "deleted"]
+    assert (env.worktree / "docs/rule/doc-1.yaml").exists()
+    assert (env.worktree / "docs/rule/doc-2.yaml").exists()
+    assert not (env.worktree / "docs/rule/doc-3.yaml").exists()

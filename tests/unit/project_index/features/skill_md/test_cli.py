@@ -83,3 +83,34 @@ def test_run_skill_md_when_check(
     violations = json.loads(out)
     assert [violation["path"] for violation in violations] == ["skill.path"]
     assert set(violations[0]) == {"path", "rule", "fix"}
+
+
+def test_run_skill_md_when_check_delete(
+    tmp_path: Path,
+    write_source: Callable[..., Path],
+    write_flow: Callable[[Path, str, dict[str, Any]], Path],
+    skill_flow: Callable[..., dict[str, Any]],
+    flow_flow: Callable[..., dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """削除の検査は環境変数で切り替える（正常系）。"""
+    # 準備
+    root = write_source(tmp_path / "sample")
+    write_flow(
+        root,
+        "a",
+        skill_flow("a", steps=[{"name": "進める"}, {"name": "参照する", "ref": "c#steps[取得する]"}]),
+    )
+    write_flow(root, "c", flow_flow("c"))
+    monkeypatch.chdir(root)
+    monkeypatch.setenv("PROJECT_INDEX_VALIDATE_ON", "delete")
+    monkeypatch.setenv("PROJECT_INDEX_DELETE_IDS", "c")
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(flow_flow("c"))))
+    # 実行
+    code = run_skill_md(argparse.Namespace(check=True, paths=[]))
+    # 検証
+    out, _ = capsys.readouterr()
+    assert code == 0
+    violations = json.loads(out)
+    assert [violation["path"] for violation in violations] == ["$"]
