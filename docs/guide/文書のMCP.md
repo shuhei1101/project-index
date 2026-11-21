@@ -306,6 +306,8 @@ YAML として読めないファイルがあっても、そのファイルを除
 `add_to`・`remove_from` の `#` で始まるキーは配列を作らず、配列でない項目を指すと `InvalidArgumentError` です。
 `#` で始まらない `add_to`・`remove_from` のキーに `[]`・`[{キー}]`・`**.` を含めると、書き込まずに `InvalidArgumentError` です（`functions[0].refs` のように位置で指すキーは使用できます）。
 `unset` の `#` で始まる要素は、配列でない項目も削除します。
+`#` で始まらない `unset` の要素・`remove_from` のキーが無い項目を指すときと、`x-key` を持たない配列・`tags`・`main_tags` の `remove_from` の値に該当する要素が無いときは、何もせず、項目のパス（`unset.{要素}`・`remove_from.{キー}`）と理由を `results[].skipped` に返します。
+`.` を含む辞書のキーは、`#notes[mcp/server.py の補足]` のように `#` で始まるパスの `[{キー}]` で指します。
 `#` で始まらない `unset` の要素に `[]`・`[{キー}]`・`**.` を含めたときも、書き込まずに `InvalidArgumentError` です。
 `set` の `#` で始まるキーは、最後のキー（辞書の項目の `[{キー}]` を含む）が無ければ追加し（`#functions[save].usecase`）、途中の項目は作りません。
 最後が配列の要素の `[{値}]` のときは、その要素へ値を入れます。
@@ -364,7 +366,7 @@ YAML として読めないファイルがあっても、そのファイルを除
 mdmark の CLI が `PATH` に無いか、点検が端末の設定の `script_timeout_sec` を超えた・結果を出さずに終わったときは、点検せずに書き込み、そのキーと理由を `results[].unchecked` に返します。
 
 レスポンスは `applied`（1 件以上を書いたか。`dry_run` は常に `false`）と `results[]` です。
-`results[]` は `index`・`id`・`status`（`created`・`updated`・`replaced`・`renamed`・`failed`）・`version`・`diff`（`updated`・`replaced` と `dry_run`）・`errors`（`failed` のとき、項目のパス・決まり・直し方と、スキーマの違反では違反した項目のスキーマの `title`・`description`・`x-rules`・`examples`・`x-bad-examples` のうちスキーマが持つものを入れた `schema`）・`unchecked`（mdmark で点検できなかったキーのパスと理由）を持ちます。
+`results[]` は `index`・`id`・`status`（`created`・`updated`・`replaced`・`renamed`・`failed`）・`version`・`diff`（`updated`・`replaced` と `dry_run`）・`errors`（`failed` のとき、項目のパス・決まり・直し方と、スキーマの違反では違反した項目のスキーマの `title`・`description`・`x-rules`・`examples`・`x-bad-examples` のうちスキーマが持つものを入れた `schema`）・`unchecked`（mdmark で点検できなかったキーのパスと理由）・`skipped`（何もしなかった `unset`・`remove_from` の項目のパスと理由）を持ちます。
 `rename` は改名した文書の `renamed` の行（`path`・`renamed_from` つき）と、参照元ごとの `updated` の行（書き換えた箇所の `references` つき）を同じ `index` で返します。
 `replace_text` は置換した文書ごとの `updated` の行（置換の件数の `count` つき）を同じ `index` で返し、置換が 0 件の文書の行は返しません。
 

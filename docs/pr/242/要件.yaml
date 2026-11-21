@@ -1,0 +1,22 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: run_only
+    detail: エージェントが書き込む流れは変えないが、項目のパスの読み方と解決できない項目の削除の返し方が変わり、書き込みの結果を壊しうる
+    depends_on: []
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: run_only
+    detail: 配信元の文書の書き込みを含む全体の流れで、項目のパスの読み方の変更が書き込みを壊さないかを確かめる
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: 何もしなかった `unset`・`remove_from` を `results[].skipped` に返すことと、`.` を含む辞書のキーを `#` で始まるパスの `[{キー}]` で指すことを追記し、`results[]` の項目に `skipped` を加える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-21T10:12:33.278945+00:00'
+scope_out:
+  - item: 項目のパスの新しい書き方（引用符で囲んだキー `notes["..."]`）
+    reason: 既存の `#` で始まる参照の型の項目のパスの `[{キー}]` で `.` を含むキーを指せ、同じ対象を指す書き方が 2 つになるため
+    plan: none

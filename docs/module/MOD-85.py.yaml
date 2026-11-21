@@ -287,6 +287,12 @@ data_models:
         access: 公開
         default: None
         description: '`replace_text` の行だけ'
+      - name: skipped
+        title: 何もしなかった操作
+        type: list[SkippedOperation]
+        access: 公開
+        default: '[]'
+        description: 何もしなかった `unset` の要素・`remove_from` のキーの項目のパスと理由（IF-6 の制約「何もしなかった操作の返却」）。`failed` では空。空の並びは JSON に出さない
   - name: WriteResult
     title: 書き込みの結果
     container: project_index/features/write/types.py
@@ -479,6 +485,24 @@ data_models:
         type: bool
         access: 公開
         description: プッシュが 1 回断られ、取得からやり直したか
+  - name: SkippedOperation
+    title: 何もしなかった操作
+    container: project_index/features/write/types.py
+    usecase: 書き込み
+    role: DTO
+    summary: 違反にせず何もしなかった `unset` の要素・`remove_from` のキー 1 件
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: path
+        title: 項目のパス
+        type: str
+        access: 公開
+        description: '`unset.{要素}`・`remove_from.{キー}`。要素とキーは指定したままの文字列（共通のキーを列名へ読み替える前）'
+      - name: reason
+        title: 理由
+        type: str
+        access: 公開
+        description: '`項目がありません`・`{値} の要素がありません`'
 constants:
   - name: OPERATIONS_MAX
     title: 1 回の操作の上限

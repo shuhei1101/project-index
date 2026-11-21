@@ -981,3 +981,100 @@ def test_expand_array_keys_when_remove_then_add() -> None:
     result = expand_array_keys(operation, _tags_table(), current, index=0)
     # 検証
     assert result.set["tags"] == [{"name": "a", "main": True}, {"name": "b"}]
+
+
+def test_apply_operation_when_skipped() -> None:
+    """何もしなかった unset・remove_from を集める（正常系）。"""
+    from project_index.features.write.types import SkippedOperation
+
+    # 準備
+    current = {"notes": {"mcp/server.py の補足": "x"}, "labels": ["a"]}
+    operation = Operation(
+        op="update",
+        id="d1",
+        expected_version="v1",
+        unset=["notes.mcp/server.py の補足", "notes.nonexistent"],
+        remove_from={"labels": ["a", "z"], "missing": ["x"]},
+    )
+    skipped: list[SkippedOperation] = []
+    # 実行
+    result = apply_operation(current, operation, skipped=skipped)
+    # 検証
+    assert result == {"notes": {"mcp/server.py の補足": "x"}, "labels": []}
+    assert skipped == [
+        SkippedOperation(path="unset.notes.mcp/server.py の補足", reason="項目がありません"),
+        SkippedOperation(path="unset.notes.nonexistent", reason="項目がありません"),
+        SkippedOperation(path="remove_from.labels", reason="z の要素がありません"),
+        SkippedOperation(path="remove_from.missing", reason="項目がありません"),
+    ]
+
+
+def test_expand_array_keys_when_remove_from_missing_name() -> None:
+    """配列に無い名前の remove_from を集める（正常系）。"""
+    from project_index.features.write.apply import expand_array_keys
+    from project_index.features.write.types import SkippedOperation
+
+    # 準備
+    current = {"tags": [{"name": "a", "main": True}]}
+    operation = Operation(
+        op="update",
+        id="r1",
+        expected_version="v1",
+        remove_from={"tags": ["z"], "main_tags": ["y"]},
+    )
+    skipped: list[SkippedOperation] = []
+    # 実行
+    result = expand_array_keys(operation, _tags_table(), current, index=0, skipped=skipped)
+    # 検証
+    assert result.set == {"tags": [{"name": "a", "main": True}]}
+    assert skipped == [
+        SkippedOperation(path="remove_from.tags", reason="z の要素がありません"),
+        SkippedOperation(path="remove_from.main_tags", reason="y の要素がありません"),
+    ]
+
+
+def test_to_given_keys() -> None:
+    """列名の項目のパスを指定したキーへ戻す（正常系）。"""
+    from project_index.features.write.apply import to_given_keys
+    from project_index.features.write.types import SkippedOperation
+
+    # 準備
+    given = Operation(op="update", id="d1", expected_version="v1", unset=["name", "other"])
+    table = _decisions_table(metadata={"name": "title"})
+    skipped = [
+        SkippedOperation(path="unset.title", reason="項目がありません"),
+        SkippedOperation(path="unset.other", reason="項目がありません"),
+    ]
+    # 実行
+    result = to_given_keys(skipped, given, table)
+    # 検証
+    assert [item.path for item in result] == ["unset.name", "unset.other"]
+
+
+def test_to_given_keys_when_array_column() -> None:
+    """書き戻しが足した配列の列名を共通のキーへ戻す（正常系）。"""
+    from project_index.features.write.apply import to_given_keys
+    from project_index.features.write.types import SkippedOperation
+
+    # 準備
+    given = Operation(op="update", id="d1", expected_version="v1", unset=["labels"])
+    table = _decisions_table(metadata={"labels": "items[].name"})
+    skipped = [SkippedOperation(path="unset.items", reason="項目がありません")]
+    # 実行
+    result = to_given_keys(skipped, given, table)
+    # 検証
+    assert [item.path for item in result] == ["unset.labels"]
+
+
+def test_to_given_keys_when_selected_key() -> None:
+    """選んだ要素のキーへは戻さない（正常系）。"""
+    from project_index.features.write.apply import to_given_keys
+    from project_index.features.write.types import SkippedOperation
+
+    # 準備
+    given = Operation(op="update", id="r1", expected_version="v1", unset=["main_tags", "tags"])
+    skipped = [SkippedOperation(path="unset.tags", reason="項目がありません")]
+    # 実行
+    result = to_given_keys(skipped, given, _tags_table())
+    # 検証
+    assert [item.path for item in result] == ["unset.tags"]
