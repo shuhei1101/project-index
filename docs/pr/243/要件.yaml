@@ -35,10 +35,10 @@ docs:
 scope_out:
   - item: knowledge（IF-312-1）・rule-inject（IF-122-24）の生成のコマンドを project-index の生成のコマンドへ寄せ替えること
     reason: 要望に含まれない。knowledge・rule-inject のリポジトリの変更で、今回入れるコマンドを前提にする
-    plan: to_file
+    plan: '#244'
   - item: agent_flow 以外の種類（agent・launch など）からの生成
     reason: 要望に含まれない
     plan: none
   - item: '`delete_docs` でスキルの `ref` の参照先のエージェントフローを削除する操作を断ること'
     reason: 要望に含まれない。`delete_docs` は `validators[]` を実行しないため、今回の書き込み前の検査では止められず、削除の検査の仕組みが要る。今回入れる検査のモードを前提にする
-    plan: to_file
+    plan: '#245'
