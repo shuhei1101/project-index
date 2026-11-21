@@ -17,6 +17,15 @@ until curl -s -o /dev/null "http://127.0.0.1:$PORT/sources"; do sleep 1; done
 PID=$(pgrep -f -P "$SPY" "project_index serve" | head -1)
 echo "server pid=$PID"
 "$WT/.venv/bin/python" "$HERE/load.py" --port "$PORT" --server-pid "$PID" --out "$OUT/load.jsonl" --duration "$DURATION" "$@" || true
+# PI_POC_RESTART があれば、負荷の後に管理の MCP の restart を呼び、待ち受け直すまでを記録する
+if [ -n "${PI_POC_RESTART:-}" ]; then
+  START=$(date +%s.%N)
+  curl -s -m 60 -o "$OUT/restart.json" -w "restart http=%{http_code} sec=%{time_total}\n" -H "Accept: application/json, text/event-stream" -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"restart","arguments":{}}}' "http://127.0.0.1:$PORT/_admin/mcp/" | tee "$OUT/restart.txt"
+  for i in $(seq 120); do curl -s -o /dev/null "http://127.0.0.1:$PORT/sources" && break; sleep 1; done
+  echo "listening again after $(echo "$(date +%s.%N) - $START" | bc) sec" | tee -a "$OUT/restart.txt"
+  PID=$(pgrep -f "project_index serve" -n)
+fi
 kill -INT "$PID" || true
 wait "$SPY" || true
 cp "$ROOT/state/logs/project-index.log"* "$OUT/" 2>/dev/null || true

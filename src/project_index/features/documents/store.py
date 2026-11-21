@@ -214,6 +214,10 @@ class DocumentStore:
         # 裏の検査が読むとき、要求の応答中はファイル 1 件ごとに休ませる関所
         self.gate = gate if gate is not None else BackgroundGate()
         self._files: dict[_FileKey, _CachedFile] = {}
+        # PoC #237: _files のキーを、読む場所ごと（直前の読み込みで見たキー）とパスごとに引く索引の変種
+        self._poc_index = bool(os.environ.get("PI_POC_ROOT_INDEX"))
+        self._poc_seen: dict[tuple[Path, frozenset[str]], set[_FileKey]] = {}
+        self._poc_by_path: dict[Path, set[_FileKey]] = {}
         self._schemas: dict[Path, tuple[int, int, dict[str, Any]]] = {}
         self._revision_schemas: dict[tuple[Path, str, str], dict[str, Any]] = {}
         self._revision_files: dict[_RevisionKey, _CachedRevisionFile] = {}
@@ -343,6 +347,8 @@ class DocumentStore:
                 stamps = _body_stamps(root, found)
                 with self._lock:
                     self._files[key] = (stat.st_mtime_ns, stat.st_size, found, issues, stamps)
+                    if self._poc_index:
+                        self._poc_by_path.setdefault(absolute, set()).add(key)
             documents.extend(found)
             problems.extend(issues)
         return documents, problems, seen
@@ -547,6 +553,15 @@ class DocumentStore:
 
     def _discard_files(self, root: Path, kind_ids: set[str], seen_keys: set[_FileKey]) -> None:
         """作業ツリーから消えたファイルのキャッシュを捨てる。"""
+        if self._poc_index:
+            group = (root, frozenset(kind_ids))
+            with self._lock:
+                previous = self._poc_seen.get(group, set())
+                for key in previous - seen_keys:
+                    self._files.pop(key, None)
+                    self._poc_by_path.get(key[0], set()).discard(key)
+                self._poc_seen[group] = set(seen_keys)
+            return
         with self._lock:
             for key in [
                 key
@@ -847,6 +862,13 @@ class DocumentStore:
         """書き込んだファイルのキャッシュを捨てる。"""
         targets = set(paths)
         with self._lock:
+            if self._poc_index:
+                for path in targets:
+                    for key in self._poc_by_path.pop(path, set()):
+                        self._files.pop(key, None)
+                for path in [path for path in self._schemas if path in targets]:
+                    del self._schemas[path]
+                return
             for key in [key for key in self._files if key[0] in targets]:
                 del self._files[key]
             for path in [path for path in self._schemas if path in targets]:
