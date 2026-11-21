@@ -1,0 +1,28 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: エージェントが、ほかのスキルが工程を埋め込むエージェントフローを削除しようとすると断られ、参照しているエージェントフローを受け取る流れを加える
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-15.yaml
+    impact: run_only
+    detail: 直コミットの削除も同じ削除の前の検査を通るため、直コミットで消す流れが変わらないことを確かめる
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: delete_docs が、スキルの ref の参照先のエージェントフローの削除を断ることと、断ったときの返却を追加する
+    status: todo
+  - page: docs/guide/設定.md
+    new: false
+    change: 検査の仕組みで validators[].on に削除の時点を追加する場合、その値の説明を追加する
+    status: todo
+  - page: docs/guide/CLI.md
+    new: false
+    change: project-index skill-md --check に削除の入力を追加する場合、その引数と出力を追加する
+    status: todo
+scope_out:
+  - item: write_docs の rename でエージェントフローの id を変え、ほかのスキルの ref が解決できなくなる場合の検査
+    reason: 要望に含まれない。rename は参照元の ref を書き換えるかが設計の工程で分かるため、ここでは判断を確定させずレビューで確かめる
+    plan: to_file
