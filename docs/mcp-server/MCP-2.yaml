@@ -1,0 +1,36 @@
+id: MCP-2
+title: 管理の MCP
+lead: project-index の状態の確認・設定の再読み込み・再起動・更新と、配信元の設定の検査・試しの変換・画面の構成の書き込みをする。
+server: project-index-admin
+repository: shuhei1101/project-index
+connection:
+  type: http
+  url: http://127.0.0.1:{PROJECT_INDEX_PORT}/_admin/mcp
+tools:
+  - name: status
+    interface: IF-8#
+  - name: reload
+    interface: IF-9#
+  - name: restart
+    interface: IF-10#
+  - name: update
+    interface: IF-11#
+  - name: check_project
+    interface: IF-12#
+  - name: try_convert
+    interface: IF-13#
+  - name: write_nav
+    interface: IF-14#
+notes:
+  接続: プラグインの `.mcp.json` が配る。`127.0.0.1` だけで待ち受け、作業場所では絞らない。instructions は持たない。
+refs:
+  - to: CFG-1
+    type: references
+    when: 待ち受けのポートの環境変数を変えるとき。
+visibility: internal
+tags:
+  - name: topic:管理
+    main: true
+  - name: tool:mcp
+  - name: topic:サーバー
+  - name: topic:ツール
