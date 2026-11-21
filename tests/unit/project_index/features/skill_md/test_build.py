@@ -418,6 +418,56 @@ def test_write_changed(tmp_path: Path) -> None:
     assert b_path.stat().st_mtime_ns == 1_000_000_000
 
 
+# remove_orphans
+
+
+def _generated(path: str) -> str:
+    """生成元のコメントの行を持つ SKILL.md の中身を返却する。"""
+    return f"---\nname: x\n---\n\n<!-- {path} から生成した。このファイルを修正せず、設計書を修正して再生成する -->\n\n# x\n"
+
+
+def test_remove_orphans(tmp_path: Path, write_source: Callable[..., Path]) -> None:
+    """生成元の無い SKILL.md だけを削除する（正常系）。"""
+    # 準備
+    root = write_source(tmp_path)
+    contents = {
+        "skills/a/SKILL.md": _generated("docs/agent-flow/a.yaml"),
+        "skills/b/SKILL.md": _generated("docs/agent-flow/b.yaml"),
+        "skills/manual/SKILL.md": "# 手で記載した SKILL.md\n",
+        "skills/x/SKILL.md": _generated("docs/skill/x.yaml"),
+        ".hidden/SKILL.md": _generated("docs/agent-flow/h.yaml"),
+    }
+    for relative, text in contents.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    files = [SkillFile(path="skills/a/SKILL.md", text=contents["skills/a/SKILL.md"])]
+    # 実行
+    removed = build.remove_orphans(root, files)
+    # 検証
+    assert removed == ["skills/b/SKILL.md"]
+    assert not (root / "skills/b/SKILL.md").exists()
+    assert (root / "skills/b").is_dir()
+    for relative, text in contents.items():
+        if relative != "skills/b/SKILL.md":
+            assert (root / relative).read_text(encoding="utf-8") == text
+
+
+def test_remove_orphans_when_none(tmp_path: Path, write_source: Callable[..., Path]) -> None:
+    """削除するものが無い（正常系）。"""
+    # 準備
+    root = write_source(tmp_path)
+    text = _generated("docs/agent-flow/a.yaml")
+    path = root / "skills/a/SKILL.md"
+    path.parent.mkdir(parents=True)
+    path.write_text(text, encoding="utf-8")
+    # 実行
+    removed = build.remove_orphans(root, [SkillFile(path="skills/a/SKILL.md", text=text)])
+    # 検証
+    assert removed == []
+    assert path.read_text(encoding="utf-8") == text
+
+
 # check_replacement
 
 

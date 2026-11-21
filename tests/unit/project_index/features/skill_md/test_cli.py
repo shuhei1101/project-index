@@ -116,3 +116,31 @@ def test_run_skill_md_when_check_delete(
     assert code == 0
     violations = json.loads(out)
     assert [violation["path"] for violation in violations] == ["$"]
+
+
+def test_run_skill_md_when_orphan(
+    tmp_path: Path,
+    write_source: Callable[..., Path],
+    write_flow: Callable[[Path, str, dict[str, Any]], Path],
+    skill_flow: Callable[..., dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """削除したパスも出す（正常系）。"""
+    # 準備
+    root = write_source(tmp_path)
+    write_flow(root, "a", skill_flow("a"))
+    orphan = root / "skills/b/SKILL.md"
+    orphan.parent.mkdir(parents=True)
+    orphan.write_text(
+        "<!-- docs/agent-flow/b.yaml から生成した。このファイルを修正せず、設計書を修正して再生成する -->\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(root)
+    # 実行
+    code = run_skill_md(argparse.Namespace(check=False, paths=[]))
+    # 検証
+    out, _ = capsys.readouterr()
+    assert code == 0
+    assert out == "skills/a/SKILL.md\nskills/b/SKILL.md\n"
+    assert not orphan.exists()
