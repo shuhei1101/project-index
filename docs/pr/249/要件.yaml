@@ -7,15 +7,12 @@ docs:
     new: false
     change: delete_docs でスキルのエージェントフローを削除すると、その SKILL.md も消えることを追加する
     status: todo
-scope_out:
-  - item: エージェントフローの type を skill から flow に変えた場合と、skill.path を変えた場合に残る前の SKILL.md の削除
-    reason: 要望は削除したエージェントフローの SKILL.md だけを挙げる。削除の仕組みを生成のモードにすれば同じ処理で消えるため、スコープに含めるかは設計の仕組みと合わせてレビューで確定する
-    plan: to_file
+scope_out: []
 use_cases:
   - kind: single
     scenario: docs/scenario/SC-7.yaml
     impact: changed
-    detail: エージェントがスキルのエージェントフローを削除すると、そのスキルの SKILL.md も配信元から無くなる流れにする
+    detail: エージェントがスキルのエージェントフローを削除すると、または skill.path を変えると、前の SKILL.md が配信元から無くなる流れにする
     depends_on: []
   - kind: single
     scenario: docs/scenario/SC-15.yaml
