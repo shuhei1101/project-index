@@ -87,6 +87,7 @@ def test_build_write_router(
         "results": [],
         "unlinked": [],
         "commit": {"sha": "0a1b2c3", "branch": "develop", "retried": False},
+        "conflict": None,
     }
 
 
