@@ -1,0 +1,40 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=unit | grep -o 'https://[^ ]*/actions/runs/[0-9]*') && run_id=${run_url##*/} && ... gh run watch "$run_id" --exit-status ... cat test.log
+# テストコードの commit 204653b（実装の前）で回した Red。fail は全て、実装の無い名前（write_api_committable_kinds・features.write.route・commit_documents）のインポートの失敗による収集のエラー
+run_id=44992502286
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 1407 items / 3 errors
+
+==================================== ERRORS ====================================
+__ ERROR collecting tests/unit/project_index/features/access/test_service.py ___
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/access/test_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/access/test_service.py:11: in <module>
+    from project_index.features.access.service import (
+E   ImportError: cannot import name 'write_api_committable_kinds' from 'project_index.features.access.service' (/home/runner/work/project-index/project-index/src/project_index/features/access/service.py)
+____ ERROR collecting tests/unit/project_index/features/write/test_route.py ____
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/write/test_route.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_route.py:9: in <module>
+    from project_index.features.write import route as route_module
+E   ImportError: cannot import name 'route' from 'project_index.features.write' (/home/runner/work/project-index/project-index/src/project_index/features/write/__init__.py)
+___ ERROR collecting tests/unit/project_index/features/write/test_service.py ___
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/write/test_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_service.py:30: in <module>
+    from project_index.features.write.service import (
+E   ImportError: cannot import name 'commit_documents' from 'project_index.features.write.service' (/home/runner/work/project-index/project-index/src/project_index/features/write/service.py)
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/access/test_service.py
+ERROR tests/unit/project_index/features/write/test_route.py
+ERROR tests/unit/project_index/features/write/test_service.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!!
+============================== 3 errors in 3.73s ===============================
+exit=1
