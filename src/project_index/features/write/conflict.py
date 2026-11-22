@@ -9,7 +9,7 @@ from datetime import UTC
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from project_index.features.write.direct_commit import REMOTE
+from project_index.features.write.direct_commit import DIRECT_COMMIT_MARGIN_SEC, REMOTE
 from project_index.features.write.types import ScriptRunResult
 from project_index.integrations.git import GitError, run_git
 from project_index.integrations.scripts import (
@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 
     from project_index.features.settings.types import OnConflictScript
     from project_index.features.write.direct_commit import CommitPlan
+    from project_index.shared.deadline import Deadline
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +101,7 @@ def keep_in_branch(
     commit: bool,
     now: datetime,
     timeout: float,
-    commit_timeout: float,
+    respond_by: Deadline,
 ) -> tuple[str, str] | None:
     """編集を始めたときのコミットの一時のワークツリーで書き込みを当ててコミットし、そのコミットにブランチを作る。"""
     parent = state_dir / "conflicts"
@@ -119,28 +120,39 @@ def keep_in_branch(
         if not commit:
             return None
         paths = [str(path.relative_to(folder)) for path in written]
-        run_git(["add", "-A", "--", *paths], cwd=folder, timeout=commit_timeout)
+        run_git(["add", "-A", "--", *paths], cwd=folder, timeout=_commit_timeout(respond_by))
         run_git(
             ["commit", "--only", "-m", plan.message, "--", *paths],
             cwd=folder,
-            timeout=commit_timeout,
+            timeout=_commit_timeout(respond_by),
         )
-        sha = str(run_git(["rev-parse", "HEAD"], cwd=folder, timeout=commit_timeout)).strip()
+        sha = str(
+            run_git(["rev-parse", "HEAD"], cwd=folder, timeout=_commit_timeout(respond_by))
+        ).strip()
         branch = conflict_branch_name(sha, now=now)
-        run_git(["branch", branch, sha], cwd=plan.worktree, timeout=commit_timeout)
+        run_git(["branch", branch, sha], cwd=plan.worktree, timeout=_commit_timeout(respond_by))
         return branch, sha
     finally:
-        _remove_worktree(plan, folder, commit_timeout)
+        _remove_worktree(plan, folder, respond_by)
 
 
-def _remove_worktree(plan: CommitPlan, folder: Path, timeout: float) -> None:
+def _commit_timeout(respond_by: Deadline) -> float:
+    """置き換えの後の git の 1 回の呼び出しの制限時間を、呼ぶ直前の応答の上限までの残りで求める。"""
+    return respond_by.remaining() - DIRECT_COMMIT_MARGIN_SEC
+
+
+def _remove_worktree(plan: CommitPlan, folder: Path, respond_by: Deadline) -> None:
     """一時のワークツリーを削除する。git で削除できなければフォルダを削除して登録を掃除する。"""
     try:
-        run_git(["worktree", "remove", "--force", str(folder)], cwd=plan.worktree, timeout=timeout)
+        run_git(
+            ["worktree", "remove", "--force", str(folder)],
+            cwd=plan.worktree,
+            timeout=_commit_timeout(respond_by),
+        )
     except GitError as error:
         logger.warning("一時のワークツリーを削除できなかった（%s・%s）", folder, error)
         shutil.rmtree(folder, ignore_errors=True)
-        run_git(["worktree", "prune"], cwd=plan.worktree, timeout=timeout)
+        run_git(["worktree", "prune"], cwd=plan.worktree, timeout=_commit_timeout(respond_by))
 
 
 def run_conflict_script(

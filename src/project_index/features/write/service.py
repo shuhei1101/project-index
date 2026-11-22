@@ -2734,7 +2734,7 @@ class _CommitDocumentsRun:
                 commit=write,
                 now=self.now,
                 timeout=self.limits.write_deadline.remaining(),
-                commit_timeout=self.limits.respond_by.remaining() - DIRECT_COMMIT_MARGIN_SEC,
+                respond_by=self.limits.respond_by,
             )
         except WriteDeadlineExceededError:
             raise

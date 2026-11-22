@@ -18,6 +18,7 @@ from project_index.features.write.conflict import (
     verify_base_commit,
 )
 from project_index.features.write.direct_commit import CommitPlan
+from project_index.shared.deadline import Deadline
 from project_index.shared.errors import BaseCommitUnusableError, ValidationFailedError, Violation
 
 if TYPE_CHECKING:
@@ -159,7 +160,7 @@ def test_keep_in_branch(
         commit=True,
         now=now,
         timeout=10,
-        commit_timeout=10,
+        respond_by=Deadline(limit_sec=60, started=time.monotonic()),
     )
     # 検証
     assert result is not None
@@ -200,7 +201,7 @@ def test_keep_in_branch_when_write_fails(
             commit=True,
             now=datetime(2026, 11, 23, tzinfo=UTC),
             timeout=10,
-            commit_timeout=10,
+            respond_by=Deadline(limit_sec=60, started=time.monotonic()),
         )
     assert run_git(remote.clone, "branch", "--list", "project-index/*") == branches_before
     assert list((state_dir / "conflicts").iterdir()) == []
@@ -229,7 +230,7 @@ def test_keep_in_branch_when_dry_run(
         commit=False,
         now=datetime(2026, 11, 23, tzinfo=UTC),
         timeout=10,
-        commit_timeout=10,
+        respond_by=Deadline(limit_sec=60, started=time.monotonic()),
     )
     # 検証
     assert result is None
@@ -258,7 +259,7 @@ def test_keep_in_branch_when_write_deadline_passed(
         commit=True,
         now=datetime(2026, 11, 23, tzinfo=UTC),
         timeout=1,
-        commit_timeout=10,
+        respond_by=Deadline(limit_sec=60, started=time.monotonic()),
     )
     # 検証
     assert result is not None

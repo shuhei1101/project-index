@@ -867,7 +867,7 @@ functions:
 
       4. 手順 3 が衝突にする例外（`CONFLICT_ERRORS`）で失敗し、`request.base_commit` がある場合、手順 3 の排他を握ったまま衝突したときのブランチへのコミット（`keep_in_branch`、`commit` は `dry_run` でないとき `True`、`now` が `None` なら今の UTC の時刻）を呼ぶ。ほかの例外と、`base_commit` が無い要求の例外はそのまま送る
          - `write_once` は、受け取ったフォルダを書く場所にして（作業場所の配信元の読み込み。`scope.write` を確認しない）、手順 3 の `write_once` と同じ当て・直コミットの確認・書き込み・生成を行い、書いた・消したファイルを返す（`check_clean` は呼ばない）。直コミットの確認の `direct_commit.kinds`・許可する種類・読み取り専用の種類・秘密の値の検査は手順 2 の今の配信元（`registry.get_for_docs` の配信元）の設定で判定し、受け取ったフォルダで読み込んだ配信元からはスキーマ・`validators[]`・`generators[]` と文書の値だけを使用する
-         - `keep_in_branch` の `timeout` は書き込みの期限までの残り、`commit_timeout` は `limits.respond_by` の残り − `DIRECT_COMMIT_MARGIN_SEC` にする
+         - `keep_in_branch` の `timeout` は書き込みの期限までの残り、`respond_by` は `limits.respond_by` にする
          - `keep_in_branch` が例外で失敗した場合、手順 3 の例外を送る（一時のワークツリーの例外は捨てる）
            - `CONFLICT_ERRORS` に当たらない例外の場合、`[warning]` 衝突したときのブランチに残せなかった（配信元・`base_commit`・例外）
          - 書き込みの期限を過ぎた場合は `WriteDeadlineExceededError` を送る
