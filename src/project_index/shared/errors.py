@@ -197,6 +197,18 @@ class ReadOnlyKindError(ProjectIndexError):
     # 断った操作の位置（`operations[{番号}]`・`targets[{番号}]`・`writes[{番号}]`・`deletes[{番号}]`）
     positions: list[str] = field(default_factory=list[str])
 
+    @property
+    def violations(self) -> list[Violation]:
+        """断った操作の位置ごとの違反（problem+json の `errors[]` にする）。"""
+        return [
+            Violation(
+                path=position,
+                rule=f"{self.kind} は SQLite の表の行の種類で、読み取り専用です",
+                fix="SQLite の表の行は、データを持つアプリで書き換えてください",
+            )
+            for position in self.positions
+        ]
+
 
 @dataclass(kw_only=True)
 class LastReadNotFoundError(ProjectIndexError):
