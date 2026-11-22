@@ -1,0 +1,44 @@
+docs:
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: 見出しとファイル名を、読み取り API・端末の設定の API・書き込みの API の一覧と読み取れるページ名へ改名する
+    status: todo
+  - page: docs/guide/index.yaml
+    new: false
+    change: '目次の `page: 読み取りAPI.md` を新しいファイル名へ修正する'
+    status: todo
+  - page: docs/guide/README.md
+    new: false
+    change: リファレンスの目次の行のページ名とリンクを新しいページ名へ修正する
+    status: todo
+  - page: docs/guide/リファレンス.md
+    new: false
+    change: 目次の行のページ名とリンクを新しいページ名へ修正する
+    status: todo
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: '`## 読み取り API` の入出力のリンクを新しいページ名へ修正する'
+    status: todo
+  - page: docs/guide/files.yml
+    new: false
+    change: '`path: 読み取りAPI.md` を新しいファイル名へ修正する'
+    status: todo
+  - page: docs/_theme/_data/nav.project.yml
+    new: false
+    change: '`guide/読み取りAPI.md: リファレンス` の行を新しいファイル名へ修正する'
+    status: todo
+  - page: project-index.yaml
+    new: false
+    change: '`nav` のリファレンスの `page: files_guide/docs/guide/読み取りAPI.md` を新しいファイル名へ修正する'
+    status: todo
+scope_out:
+  - item: '`docs/guide/配信元を配信する.md` の `## 読み取り API` の節の説明に、書き込みの API を加えること'
+    reason: 要望はページ名とリンク元の見直しで、節の説明の追加は要望に無い。今回の改名と独立して成り立つかの判断が分かれるため、レビューで確定する
+    plan: to_file
+  - item: '`src/files.yaml`・`tests/files.yaml` のタグ `topic:読み取りAPI` と、設計書（ARCH-1・MOD-147-1・MOD-236-1）の部品の名前『読み取りAPI』'
+    reason: 公開ドキュメントのページへのリンクではなく、読み取り API の部品を指す名前のため
+    plan: none
+  - item: 過去の PR ドキュメント（`docs/pr/{番号}/`）の `docs/guide/読み取りAPI.md` の記載
+    reason: その PR の時点の記録で、書き換えない
+    plan: none
+use_cases: []
