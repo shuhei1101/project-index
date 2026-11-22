@@ -745,3 +745,35 @@ def test_normal_when_direct_commit_checked(
     assert not result.is_error, result.text
     assert violations == expected_violations
     assert warnings == expected_warnings
+
+
+def test_normal_when_search_exclude_invalid(
+    tmp_path: Path, make_server: Callable[..., Any]
+) -> None:
+    """比べ方の一覧に無い比べ方と、比べられない項目を持つ search_exclude を違反として返却する（正常系）。"""
+    # 準備
+    env = make_server()
+    folder = tmp_path / "draft"
+    (folder / "schemas").mkdir(parents=True)
+    (folder / "schemas" / "sample.schema.yaml").write_text(
+        "type: object\nproperties:\n  id: {type: string}\n", encoding="utf-8"
+    )
+    config = (
+        "name: draft\n"
+        "documents:\n"
+        "  - id: assets\n"
+        "    paths: [assets/*.yaml]\n"
+        "    schema: schemas/sample.schema.yaml\n"
+        "    search_exclude: {field: status, op: like, values: [inactive]}\n"
+        "  - id: notes\n"
+        "    paths: [notes/*.yaml]\n"
+        "    schema: schemas/sample.schema.yaml\n"
+        "    search_exclude: {field: body, op: contains, values: [廃止]}\n"
+    )
+    (folder / "project-index.yaml").write_text(config, encoding="utf-8")
+    # 実行
+    result = env.call_admin("check_project", path=str(folder), format="json")
+    # 検証
+    paths = [item["path"] for item in result.data["violations"]]
+    assert "documents[0].search_exclude.op" in paths
+    assert "documents[1].search_exclude.field" in paths

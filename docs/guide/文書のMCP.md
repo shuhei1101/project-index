@@ -43,6 +43,7 @@ YAML を書き換えたときは、再起動で反映します。
 | `cwd` | str | 作業場所 | プラグインのフックがセッションの作業場所で上書きする。エージェントが指定した値は使わない。ワークツリーを指すときは `worktree` を指定する |
 | `session_id`・`agent_id` | str | 会話キー | 同じ。メインの会話は `agent_id` が空 |
 | `outside_scope` | bool | `true` のとき、`cwd` が `scope` に当たらない配信元も、端末の設定の `sources[].outside_read` が真なら作業範囲の外（参考）として読む | 既定 `false`。`describe`・`search_docs`・`trace_related`・`list_changes` だけが持ち、作業範囲の外を読むのは `source` に ID を 1 つ渡したときだけ（配列・`*` は `scope` に当たる配信元だけを対象にする）。`describe` は `source` を省くと、作業範囲の外で参照できる配信元の一覧を加える。下の「作業範囲の外」 |
+| `include_excluded` | bool | `true` のとき、配信元の設定の `documents[].search_exclude` に該当する文書も返却する | 既定 `false`。`search_docs`・`trace_related`・`list_changes` だけが持つ。下の「既定の検索から除く文書」 |
 
 <!-- /table -->
 
@@ -61,6 +62,23 @@ YAML を書き換えたときは、再起動で反映します。
 
 組み込みの配信元 `project-index`（[配信元と権限](./コアコンセプト-配信元と権限.md#組み込みの配信元)）も、`source: project-index` と `outside_scope: true` で読みます。
 `describe(outside_scope: true)` の一覧に出て、`write_docs`・`delete_docs` は SourceNotWritableError で断ります。
+
+### 既定の検索から除く文書
+
+配信元の設定の `documents[].search_exclude`（[設定](./設定.md)）に該当する文書は、`search_docs`・`list_changes`・`trace_related` の既定の結果から除きます。
+`include_excluded: true` を付けた呼び出しは除かずに返却し、該当する文書に `excluded: true`（`markdown` は `除外` の列の ✓）を付けます。
+
+<!-- table: {"kind": "data"} -->
+
+| ツール | 除き方 |
+| --- | --- |
+| `search_docs` | `filter`・`term` に該当した文書から除き、`items`・`total_count`・`view: count`・`group_by` の件数に含めない。`id` の `eq` で指した取得でも除く |
+| `list_changes` | 区間の端のうち文書が存在する端の全てで該当する文書を除く。区間の中で該当するようになった・該当しなくなった文書は返却する |
+| `trace_related` | 該当する文書を関連の相手と関連の候補から除き、その先もたどらない。起点に指定した文書は除かない |
+
+<!-- /table -->
+
+1 件以上除いたときは、除いた件数を `excluded_count` に入れ、`notes` で `include_excluded: true` で取得できることを知らせます。
 
 ### 返す形式
 
@@ -188,6 +206,7 @@ Condition = {"field": str, "op": enum, "values": [str, ...], "match": "any" | "a
 | `notes` | 丸めた・打ち切った・読めなかったファイルの知らせと次の手 |
 | `groups` | `group_by` のときの値ごとの件数 |
 | `outside_scope` | 作業範囲の外から読んだか。[作業範囲の外](#作業範囲の外)のとおり |
+| `excluded_count` | 既定の検索から除いた件数。1 件以上除いたときだけ。[既定の検索から除く文書](#既定の検索から除く文書)のとおり |
 | `items[]` | 文書。ID で絞ったときは指定した順。各文書に `id`・`version`、`view: full` で `body`。複数の配信元を指したときは `source` が付く |
 | `items[].path`・`items[].scope` | 文書の場所と返した範囲。[文書の場所と範囲](#文書の場所と範囲)のとおり。`view: ids`・`count` では持たない |
 | `items[].snippets` | `snippets` を渡したときの抜粋。下の「抜粋」 |

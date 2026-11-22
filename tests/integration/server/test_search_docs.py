@@ -1851,3 +1851,71 @@ def test_normal_when_many_worktrees_loaded(
     assert not last.is_error
     assert not any(result.is_error for result in rest)
     assert counts[-1] == counts[1]
+
+
+ASSETS_ROW = (
+    "  - id: assets\n"
+    "    paths: [assets/*.yaml]\n"
+    "    schema: schemas/sample.schema.yaml\n"
+    "    metadata: {status: state}\n"
+    "    search_exclude: {field: status, op: eq, values: [inactive]}\n"
+)
+
+
+def test_normal_when_search_excluded(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """行の search_exclude に該当する文書を既定の結果から除き、include_excluded のときだけ返却する（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "project-index.yaml": sample_config_text(ASSETS_ROW),
+            "assets/a1.yaml": "id: a1\nname: 素材 1\nstate: active\n",
+            "assets/a2.yaml": "id: a2\nname: 素材 2\nstate: inactive\n",
+        }
+    )
+    source = make_source("sample", files)
+    env = make_server(source)
+    cwd = str(source.folder)
+    by_kind = {"field": "kind", "op": "eq", "values": ["assets"]}
+    # 実行
+    listed = env.call("search_docs", cwd=cwd, filter=by_kind, view="ids", format="json")
+    by_id = env.call(
+        "search_docs",
+        cwd=cwd,
+        filter={"field": "id", "op": "eq", "values": ["a2"]},
+        view="ids",
+        format="json",
+    )
+    included = env.call(
+        "search_docs",
+        cwd=cwd,
+        filter=by_kind,
+        view="ids",
+        include_excluded=True,
+        format="json",
+    )
+    grouped = env.call(
+        "search_docs", cwd=cwd, filter=by_kind, group_by="status", view="count", format="json"
+    )
+    # 検証
+    assert [item["id"] for item in listed.data["items"]] == ["a1"]
+    assert (listed.data["total_count"], listed.data["excluded_count"]) == (1, 1)
+    assert any("include_excluded: true" in note for note in listed.data["notes"])
+    assert (
+        by_id.data.get("items", []),
+        by_id.data["total_count"],
+        by_id.data["excluded_count"],
+    ) == (
+        [],
+        0,
+        1,
+    )
+    assert [(item["id"], item.get("excluded")) for item in included.data["items"]] == [
+        ("a1", None),
+        ("a2", True),
+    ]
+    assert grouped.data["groups"] == [{"value": "active", "count": 1}]

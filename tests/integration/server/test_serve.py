@@ -1537,3 +1537,28 @@ def test_normal_when_direct_commit_config_invalid(
     assert any("sample" in m and "sources[].direct_commit.kinds.rule" in m for m in warnings)
     assert "DirectCommitNotConfiguredError" in sample_write.text
     assert "CommitWorktreeNotFoundError" in notes2_write.text
+
+
+def test_normal_when_search_exclude_invalid(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """check_project と同じ検証で search_exclude に違反する配信元を外して配信する（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    extra = "    search_exclude: {field: status, op: like, values: [inactive]}\n"
+    broken = make_source(
+        "broken",
+        sample_file_set(**{"project-index.yaml": sample_config_text(extra, name="broken")}),
+    )
+    caplog.set_level(logging.ERROR)
+    # 実行
+    env = make_server(sample, broken)
+    # 検証
+    assert env.client.get("/sources/broken/docs").status_code == 404
+    assert env.client.get("/sources/sample/docs").status_code == 200
+    assert env.call("describe", cwd=str(sample.folder)).is_error is False
+    assert "broken: documents[0].search_exclude.op:" in caplog.text

@@ -29,7 +29,7 @@ functions:
     process: |-
       1. `outside_scope` が `True` なら先頭に `作業範囲の外（参考）` の行を置く
       2. 次の行に `{起点の ID を , で繋いだもの} から {件数} 件` を置く
-      3. `| id | 深さ | たどった関連 | name | description |` の表を置く（たどった関連は `{元} → {種類}`、`in` は `{元} ← {種類}`。別の配信元の文書は `id` を `{source}:{id}`）
+      3. `| id | 深さ | たどった関連 | name | description |` の表を置く（`excluded` が `True` の相手があれば `除外` の列を加え、その行に ✓ を出す）（たどった関連は `{元} → {種類}`、`in` は `{元} ← {種類}`。別の配信元の文書は `id` を `{source}:{id}`）
       4. 候補があれば `| 候補 | 信号 | 順位の値 |` の表と、採用するときは `write_docs` で `related` に追加することを置く
       5. `notes` を `> ` の行で置く
     unit_tests:
@@ -39,5 +39,12 @@ functions:
         condition: '`outside_scope: true` の結果'
         mock: なし
         expected: 先頭の行が `作業範囲の外（参考）`
+        exception: '-'
+      - name: test_render_related_markdown_when_excluded
+        case: 正常
+        summary: 除外の列
+        condition: '`excluded` が `True` の相手と `None` の相手'
+        mock: なし
+        expected: '`除外` の列があり、前の相手の行だけ ✓'
         exception: '-'
 visibility: internal

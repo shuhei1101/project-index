@@ -18,6 +18,11 @@ CONTEXT_MARK = "-"
 OUTSIDE_SCOPE_LINE = "作業範囲の外（参考）"
 
 
+# `search_exclude` に該当する文書の列名と印
+EXCLUDED_COLUMN = "除外"
+EXCLUDED_MARK = "✓"
+
+
 def _title(name: str) -> str:
     """表の列名にする（`@chars` は `chars`）。"""
     return COLUMN_TITLES.get(name, name.removeprefix("@"))
@@ -38,12 +43,20 @@ def _table(result: SearchResult) -> list[str]:
     columns = ["id", *(["source"] if has_source else [])]
     for item in result.items:
         columns.extend(name for name in item.values if name not in columns)
+    # `search_exclude` に該当する文書を返したときだけ、除外の列を末尾に足す
+    if any(item.excluded for item in result.items):
+        columns.append(EXCLUDED_COLUMN)
     lines = [
         f"| {' | '.join(_title(name) for name in columns)} |",
         f"| {' | '.join('---' for _ in columns)} |",
     ]
     for item in result.items:
-        cells = {"id": item.id, "source": item.source, **item.values}
+        cells = {
+            "id": item.id,
+            "source": item.source,
+            **item.values,
+            EXCLUDED_COLUMN: EXCLUDED_MARK if item.excluded else None,
+        }
         lines.append(f"| {' | '.join(_cell(cells.get(name)) for name in columns)} |")
     return lines
 

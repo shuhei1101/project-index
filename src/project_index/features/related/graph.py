@@ -46,6 +46,8 @@ class _Walk:
     resolve_other: Callable[[str, str], Document | None]
     reverse: dict[str, list[tuple[Document, RelatedLink]]]
     visited: set[str]
+    # `True` を返す文書を並びに入れず、その先もたどらない
+    skip: Callable[[Document], bool] | None = None
     found: list[Found] = field(default_factory=list[Found])
     notes: list[str] = field(default_factory=list[str])
 
@@ -75,6 +77,8 @@ class _Walk:
             if target is None or key in self.visited:
                 continue
             self.visited.add(key)
+            if self.skip is not None and self.skip(target):
+                continue
             self.found.append((target, level, current.id, link.type, "out"))
             following.append(target)
         return following
@@ -86,6 +90,8 @@ class _Walk:
             if referrer.id in self.visited:
                 continue
             self.visited.add(referrer.id)
+            if self.skip is not None and self.skip(referrer):
+                continue
             self.found.append((referrer, level, current.id, link.type, "in"))
             following.append(referrer)
         return following
@@ -108,6 +114,7 @@ def walk_related(
     depth: int,
     direction: Literal["out", "in", "both"],
     resolve_other: Callable[[str, str], Document | None],
+    skip: Callable[[Document], bool] | None = None,
 ) -> tuple[list[tuple[Document, int, str, str, Literal["out", "in"]]], list[str]]:
     """起点から幅優先で `related` をたどり、たどった文書を深さつきで返す。"""
     walk = _Walk(
@@ -115,6 +122,7 @@ def walk_related(
         resolve_other=resolve_other,
         reverse=_reverse(documents),
         visited={document.id for document in start},
+        skip=skip,
     )
     frontier = list(start)
     for level in range(1, depth + 1):

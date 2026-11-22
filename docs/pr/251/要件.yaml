@@ -1,0 +1,50 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: changed
+    detail: 配信元の設定の条件に該当する文書が既定の調査の結果に出ず、明示の指定を付けたときだけ参照できる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-8.yaml
+    impact: changed
+    detail: 配信元の設定の条件に該当する文書が、既定では変わった文書の一覧に出ない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: run_only
+    detail: 既定の検索から除く条件の構造の誤りも、既存の設定の検証の流れで違反として受け取る
+    depends_on: []
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: none
+    detail: 配信元の文書を読み書きする流れの連鎖は変わらない
+    depends_on: []
+docs:
+  - page: docs/guide/設定.md
+    new: false
+    change: '`documents[]` の表に既定の検索から除く文書の条件のキーを追加する'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-22T02:14:25.163479+00:00'
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: '`search_docs`・`list_changes`・`trace_related` の引数に除いた文書も含める引数を追加し、既定の結果から除くことを記載する'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-22T02:14:25.163479+00:00'
+  - page: docs/guide/コアコンセプト-文書のメタデータ.md
+    new: false
+    change: 共通のキーの値で既定の検索から文書を除けることを記載する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-22T02:14:25.163479+00:00'
+scope_out:
+  - item: 読み取り API（dev-docs の画面の文書の一覧・語での検索）と `list_match_words` からも除く条件に該当する文書を除くこと
+    reason: 要望は文書の MCP の `search_docs`・`list_changes`・`trace_related` の既定の結果。画面と用語の照合でも除くかは判断が分かれるため、今の判断を「含めない」にしてレビューで確定する
+    plan: '#254'
+  - item: aituber のアセットの配信元の設定の付け替え
+    reason: 起点 Issue の本文で、この Issue の完了の後に aituber の別の Issue で行うと決定している
+    plan: none
+  - item: '`test_serve.py` の `test_normal_when_mcp_text_from_prompts`・`test_error_when_prompt_invalid` が、改名前のプロンプトのパス `mcp/docs` を指して fail する不具合'
+    reason: develop でも同じく fail する、今回の変更と無関係の既存の不具合
+    plan: '#253'

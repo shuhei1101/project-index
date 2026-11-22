@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import posixpath
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Literal
 
 from project_index.features.access.service import resolve_read_targets
@@ -16,6 +17,9 @@ from project_index.features.related.types import (
     RelatedRequest,
     RelatedResult,
 )
+from project_index.features.search.fields import known_fields
+from project_index.features.search.filters import exclusion_of, is_excluded
+from project_index.features.search.service import excluded_note
 from project_index.features.seen.types import SEEN_MARK, SessionKey
 from project_index.integrations.git import GitError
 from project_index.shared.errors import (
@@ -132,6 +136,40 @@ class _Others:
 type Found = tuple[Document, int, str, str, Literal["out", "in"]]
 
 
+class _Exclusion:
+    """相手の文書が、読んだ配信元の行の `search_exclude` に該当するかを判定し、除いた文書を数える。"""
+
+    def __init__(self, target: Target, others: _Others, store: DocumentStore) -> None:
+        self._target = target
+        self._others = others
+        self._fields = known_fields(
+            store.row_schema(target, table.id)
+            for table in target.source.config.documents
+            if table.enabled
+        )
+        self._today = datetime.now(UTC).astimezone().date()
+        self.skipped: set[tuple[str, str]] = set()
+
+    def matches(self, document: Document) -> bool:
+        """文書の行の除く条件に該当するか（読んだ場所が分からない文書は該当しない）。"""
+        read_target = (
+            self._target
+            if document.source_id == self._target.source.id
+            else self._others.targets.get(document.source_id)
+        )
+        if read_target is None:
+            return False
+        condition = exclusion_of(read_target.source.table(document.kind))
+        return is_excluded(document, condition, fields=self._fields, today=self._today)
+
+    def skip(self, document: Document) -> bool:
+        """除く文書なら数えて `True` を返す（たどりの `skip`）。"""
+        if not self.matches(document):
+            return False
+        self.skipped.add((document.source_id, document.id))
+        return True
+
+
 def _items(
     request: RelatedRequest,
     store: DocumentStore,
@@ -139,6 +177,7 @@ def _items(
     others: _Others,
     found: list[Found],
     seen_ids: dict[str, set[str]],
+    excluded: _Exclusion,
 ) -> tuple[list[RelatedItem], dict[str, list[Document]]]:
     """たどった文書を結果の項目にし、本文を返した文書を配信元ごとに集める。"""
     items: list[RelatedItem] = []
@@ -168,6 +207,7 @@ def _items(
                 description=SEEN_MARK if already else str(document.metadata.get("description", "")),
                 path=path,
                 scope="summary" if path else None,
+                excluded=True if excluded.matches(document) else None,
             )
         )
         if not already:
@@ -213,17 +253,31 @@ def trace_related(
     documents = {document.id: document for document in store.load(target).documents}
     start = _start(request, target, documents)
     others = _Others(request, registry, store)
+    exclusion = _Exclusion(target, others, store)
     found, walk_notes = walk_related(
-        start, documents, depth=depth, direction=request.direction, resolve_other=others.resolve
+        start,
+        documents,
+        depth=depth,
+        direction=request.direction,
+        resolve_other=others.resolve,
+        skip=None if request.include_excluded else exclusion.skip,
     )
     notes.extend(walk_notes)
+    if exclusion.skipped:
+        notes.append(excluded_note(len(exclusion.skipped)))
     key = SessionKey.of(request.session_id, request.agent_id)
     items, returned = _items(
-        request, store, target, others, found, _seen_ids(request, seen, key, found)
+        request, store, target, others, found, _seen_ids(request, seen, key, found), exclusion
     )
     suggestions = []
     if request.suggest:
         exclude = {document.id for document in start} | {document.id for document, *_ in found}
+        if not request.include_excluded:
+            exclude |= {
+                document.id
+                for document in documents.values()
+                if document not in start and exclusion.matches(document)
+            }
         suggestions = suggest_related(
             start,
             list(documents.values()),
@@ -244,4 +298,5 @@ def trace_related(
             for document, *_ in found
             if document.source_id in others.targets
         ),
+        excluded_count=len(exclusion.skipped) or None,
     )

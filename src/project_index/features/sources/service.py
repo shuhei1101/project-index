@@ -21,6 +21,8 @@ from jsonschema.exceptions import SchemaError
 from jsonschema.validators import Draft202012Validator
 
 from project_index.features.history.query import export_paths_at, read_file_at, resolve_ref
+from project_index.features.search.fields import known_fields
+from project_index.features.search.filters import check_exclusion
 from project_index.features.settings.query import config_path, load_terminal_config
 from project_index.features.settings.types import SourceEntry, TerminalConfigInvalidError
 from project_index.features.sources.merge import merge_configs
@@ -216,8 +218,26 @@ def _validate(
             found = _schema_violation(read_text, read_ref, index, row["schema"])
         if found is not None:
             violations.append(found)
+        elif "search_exclude" in row:
+            violations.extend(_search_exclude_violations(read_text, read_ref, index, row))
     violations.extend(_paths_base_violations(value.get("paths_base"), config_root))
     return violations
+
+
+def _search_exclude_violations(
+    read_text: ReadText, read_ref: ReadRef, index: int, row: dict[str, Any]
+) -> list[Violation]:
+    """行の `search_exclude` を、行のスキーマから作った使える項目で確かめる。"""
+    value = row["schema"]
+    schema = (
+        load_yaml(read_text(value) or "")
+        if isinstance(value, str)
+        else read_ref(SchemaRef.model_validate(value)).schema
+    )
+    fields = known_fields([_as_schema(schema)])
+    return check_exclusion(
+        row["search_exclude"], f"documents[{index}].search_exclude", fields=fields
+    )
 
 
 def _duplicate_ids(name: str, rows: list[dict[str, Any]]) -> list[Violation]:
@@ -557,6 +577,7 @@ def _build_table(row: dict[str, Any]) -> DocumentTable:
         metadata=dict(row.get("metadata", {})),
         exclude=list(row.get("exclude", [])),
         alias_type=row.get("alias_type"),
+        search_exclude=row.get("search_exclude"),
     )
 
 

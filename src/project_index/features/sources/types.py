@@ -39,6 +39,8 @@ class DocumentTable:
     metadata: dict[str, str] = field(default_factory=dict[str, str])
     exclude: list[str] = field(default_factory=list[str])
     alias_type: str | None = None
+    # `search_docs` の `filter` と同じ構造の、既定の検索から除く文書の条件（読み込んだ辞書のまま）
+    search_exclude: dict[str, Any] | None = None
 
     @property
     def is_writable(self) -> bool:

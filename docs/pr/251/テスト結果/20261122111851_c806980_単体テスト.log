@@ -1,0 +1,63 @@
+$ uv run pytest tests/unit/project_index/features/search tests/unit/project_index/features/sources/test_service.py tests/unit/project_index/features/changes tests/unit/project_index/features/related --continue-on-collection-errors --basetemp=/tmp/pi251-pytest
+（実装の前の Red。fail と error は全て実装の無いこと（search_exclude・excluded・skip・check_exclusion などが無い）による）
+
+        tables = [
+            DocumentTable(id="rules", paths=["docs/*.yaml"], schema_path="schemas/rule.schema.yaml"),
+>           DocumentTable(
+                id="assets",
+                paths=["assets/*.yaml"],
+                schema_path="schemas/rule.schema.yaml",
+                search_exclude={"field": "status", "op": "eq", "values": ["inactive"]},
+            ),
+        ]
+E       TypeError: DocumentTable.__init__() got an unexpected keyword argument 'search_exclude'
+
+tests/unit/project_index/features/related/test_service.py:199: TypeError
+__________________ test_render_related_markdown_when_excluded __________________
+
+    def test_render_related_markdown_when_excluded() -> None:
+        """除外の列（正常系）。"""
+        from project_index.features.related.render import render_related_markdown
+        from project_index.features.related.types import RelatedItem
+    
+        # 準備
+        items = [
+            RelatedItem(
+                id="a1",
+                source=None,
+                depth=1,
+                via_from="c",
+                via_type="references",
+                via_direction="out",
+                name="素材 1",
+                description="",
+            ),
+>           RelatedItem(
+                id="a2",
+                source=None,
+                depth=1,
+                via_from="c",
+                via_type="references",
+                via_direction="out",
+                name="素材 2",
+                description="",
+                excluded=True,
+            ),
+        ]
+E       TypeError: RelatedItem.__init__() got an unexpected keyword argument 'excluded'
+
+tests/unit/project_index/features/related/test_service.py:241: TypeError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/search/test_render.py::test_render_search_markdown_when_excluded
+FAILED tests/unit/project_index/features/search/test_service.py::test_search_docs_when_search_excluded
+FAILED tests/unit/project_index/features/search/test_service.py::test_search_docs_when_include_excluded
+FAILED tests/unit/project_index/features/sources/test_service.py::test_validate_source_config_when_search_exclude_invalid
+FAILED tests/unit/project_index/features/sources/test_service.py::test_validate_source_config_when_search_exclude
+FAILED tests/unit/project_index/features/changes/test_render.py::test_render_changes_markdown_when_excluded
+FAILED tests/unit/project_index/features/related/test_graph.py::test_walk_related_when_skip
+FAILED tests/unit/project_index/features/related/test_service.py::test_trace_related_when_search_excluded
+FAILED tests/unit/project_index/features/related/test_service.py::test_render_related_markdown_when_excluded
+ERROR tests/unit/project_index/features/search/test_filters.py
+ERROR tests/unit/project_index/features/changes/test_service.py::test_list_changes_when_search_excluded
+ERROR tests/unit/project_index/features/changes/test_service.py::test_list_changes_when_include_excluded
+=================== 9 failed, 160 passed, 3 errors in 3.11s ====================

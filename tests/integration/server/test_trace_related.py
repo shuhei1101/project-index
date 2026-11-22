@@ -427,3 +427,57 @@ def test_normal_when_worktree_metadata_changed(
     # 検証
     assert not before.data.get("items")
     assert [(item["id"], item["depth"]) for item in after.data["items"]] == [("doc-1", 1)]
+
+
+ASSETS_ROW = (
+    "  - id: assets\n"
+    "    paths: [assets/*.yaml]\n"
+    "    schema: schemas/sample.schema.yaml\n"
+    "    metadata: {status: state}\n"
+    "    search_exclude: {field: status, op: eq, values: [inactive]}\n"
+)
+
+
+def test_normal_when_search_excluded(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+    sample_doc_text: Callable[..., str],
+) -> None:
+    """search_exclude に該当する文書を既定の関連の相手から除き、include_excluded のときだけ返却する（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "project-index.yaml": sample_config_text(ASSETS_ROW),
+            "docs/c.yaml": sample_doc_text("c", "起点", related=[*_link("a1"), *_link("a2")]),
+            "docs/d.yaml": sample_doc_text("d", "先"),
+            "assets/a1.yaml": "id: a1\nname: 素材 1\nstate: active\n",
+            "assets/a2.yaml": (
+                "id: a2\nname: 素材 2\nstate: inactive\nrelated:\n  - to: d\n    type: references\n"
+            ),
+        }
+    )
+    source = make_source("sample", files)
+    env = make_server(source)
+    arguments = {"cwd": str(source.folder), "direction": "out", "repeat_seen": True}
+    # 実行
+    default = env.call("trace_related", format="json", from_ids=["c"], depth=2, **arguments)
+    included = env.call(
+        "trace_related",
+        format="json",
+        from_ids=["c"],
+        depth=2,
+        include_excluded=True,
+        **arguments,
+    )
+    from_excluded = env.call("trace_related", format="json", from_ids=["a2"], **arguments)
+    # 検証
+    assert [item["id"] for item in default.data["items"]] == ["a1"]
+    assert default.data["excluded_count"] == 1
+    assert [(item["id"], item.get("excluded")) for item in included.data["items"]] == [
+        ("a1", None),
+        ("a2", True),
+        ("d", None),
+    ]
+    assert [item["id"] for item in from_excluded.data["items"]] == ["d"]

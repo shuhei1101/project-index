@@ -176,3 +176,83 @@ def test_render_related_markdown_when_outside_scope() -> None:
     lines = markdown.splitlines()
     assert lines[0] == "作業範囲の外（参考）"
     assert lines[1] == "doc-1 から 0 件"
+
+
+EXCLUDED_CHAIN = {
+    "docs/c.yaml": (
+        "id: c\nname: 起点\nrelated:\n  - to: a1\n    type: references\n"
+        "  - to: a2\n    type: references\n"
+    ),
+    "assets/a1.yaml": "id: a1\nname: 素材 1\nstatus: active\n",
+    "assets/a2.yaml": (
+        "id: a2\nname: 素材 2\nstatus: inactive\nrelated:\n  - to: d\n    type: references\n"
+    ),
+    "docs/d.yaml": "id: d\nname: 先\n",
+}
+
+
+def test_trace_related_when_search_excluded(make_env: Callable[..., RelatedEnv]) -> None:
+    """除く条件に該当する相手とその先（正常系）。"""
+    # 準備
+    tables = [
+        DocumentTable(id="rules", paths=["docs/*.yaml"], schema_path="schemas/rule.schema.yaml"),
+        DocumentTable(
+            id="assets",
+            paths=["assets/*.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            search_exclude={"field": "status", "op": "eq", "values": ["inactive"]},
+        ),
+    ]
+    env = make_env(EXCLUDED_CHAIN, tables)
+    # 実行
+    default = env.trace(from_ids=["c"], depth=2, direction="out", repeat_seen=True)
+    included = env.trace(
+        from_ids=["c"], depth=2, direction="out", include_excluded=True, repeat_seen=True
+    )
+    from_excluded = env.trace(from_ids=["a2"], depth=1, direction="out", repeat_seen=True)
+    # 検証
+    assert [item.id for item in default.items] == ["a1"]
+    assert default.excluded_count == 1
+    assert [(item.id, item.excluded) for item in included.items] == [
+        ("a1", None),
+        ("a2", True),
+        ("d", None),
+    ]
+    assert [item.id for item in from_excluded.items] == ["d"]
+
+
+def test_render_related_markdown_when_excluded() -> None:
+    """除外の列（正常系）。"""
+    from project_index.features.related.render import render_related_markdown
+    from project_index.features.related.types import RelatedItem
+
+    # 準備
+    items = [
+        RelatedItem(
+            id="a1",
+            source=None,
+            depth=1,
+            via_from="c",
+            via_type="references",
+            via_direction="out",
+            name="素材 1",
+            description="",
+        ),
+        RelatedItem(
+            id="a2",
+            source=None,
+            depth=1,
+            via_from="c",
+            via_type="references",
+            via_direction="out",
+            name="素材 2",
+            description="",
+            excluded=True,
+        ),
+    ]
+    result = RelatedResult(start=["c"], items=items)
+    # 実行
+    markdown = render_related_markdown(result)
+    # 検証
+    assert "| id | 深さ | たどった関連 | name | description | 除外 |" in markdown
+    assert "| a2 | 1 | c → references | 素材 2 |  | ✓ |" in markdown

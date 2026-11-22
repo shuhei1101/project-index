@@ -53,7 +53,7 @@ functions:
       1. `outside_scope` が `True` なら先頭に `作業範囲の外（参考）` の行を置く
       2. 次の行に `{配信元}: 該当 {total_count} 件・返却した {returned} 件` を置く（複数の配信元は配信元ごとの件数も添える）
       3. `groups` があれば `| 値 | 件数 |` の表を置く
-      4. `view` が `full` の場合、文書ごとに `<document path="{path}" scope="{scope}">`（`path` が `None` なら属性の無い `<document>`。`outside_scope` が `True` なら `outside_scope="true"` の属性を加える）と `</document>` で包み、中に項目の箇条書きと本文を置く。`total_lines` を持つ文書は、`<document>` の前の行に `{id}: {start_line}-{end_line} 行目 / 全 {total_lines} 行` を置く（範囲が複数なら `{start_line}-{end_line} 行目` を `・` で並べ、空なら `{id}: 返却する行なし / 全 {total_lines} 行`）。抜粋は、当たった行を `{行番号}:{行}`、前後の行を `{行番号}-{行}` で出し、抜粋の間に `--` の行を置く。それ以外は項目を列にした表にする（列名は項目の名前。`@chars` は `chars`）
+      4. `view` が `full` の場合、文書ごとに `<document path="{path}" scope="{scope}">`（`path` が `None` なら属性の無い `<document>`。`outside_scope` が `True` なら `outside_scope="true"` の属性を加える）と `</document>` で包み、中に項目の箇条書きと本文を置く。`total_lines` を持つ文書は、`<document>` の前の行に `{id}: {start_line}-{end_line} 行目 / 全 {total_lines} 行` を置く（範囲が複数なら `{start_line}-{end_line} 行目` を `・` で並べ、空なら `{id}: 返却する行なし / 全 {total_lines} 行`）。抜粋は、当たった行を `{行番号}:{行}`、前後の行を `{行番号}-{行}` で出し、抜粋の間に `--` の行を置く。それ以外は項目を列にした表にする（列名は項目の名前。`@chars` は `chars`。`excluded` が `True` の文書があれば `除外` の列を加え、その行に ✓ を出す）
       5. `notes` があれば末尾に `> ` の行で並べ、`next_cursor` があれば `続き: cursor={next_cursor}` を置く
     unit_tests:
       - name: test_render_search_markdown
@@ -88,5 +88,12 @@ functions:
         condition: '`outside_scope: true` の `view: full` の結果'
         mock: なし
         expected: 先頭の行が `作業範囲の外（参考）`、`<document>` に `outside_scope="true"`
+        exception: '-'
+      - name: test_render_search_markdown_when_excluded
+        case: 正常
+        summary: 除外の列
+        condition: '`excluded` が `True` の文書と `None` の文書'
+        mock: なし
+        expected: '`除外` の列があり、前の文書の行だけ ✓'
         exception: '-'
 visibility: internal

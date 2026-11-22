@@ -133,3 +133,19 @@ def test_render_search_markdown_when_outside_scope() -> None:
     assert lines[0] == "作業範囲の外（参考）"
     assert len(opening) == 1
     assert 'outside_scope="true"' in opening[0]
+
+
+def test_render_search_markdown_when_excluded() -> None:
+    """除外の列（正常系）。"""
+    # 準備
+    items = [
+        SearchItem(id="a1", source=None, values={"name": "素材 1"}),
+        SearchItem(id="a2", source=None, values={"name": "素材 2"}, excluded=True),
+    ]
+    result = SearchResult(total_count=2, returned=2, view="summary", items=items)
+    # 実行
+    markdown = render_search_markdown(result, source_label="sample")
+    # 検証
+    assert "| id | name | 除外 |" in markdown
+    assert "| a1 | 素材 1 |  |" in markdown
+    assert "| a2 | 素材 2 | ✓ |" in markdown

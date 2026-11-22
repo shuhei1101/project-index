@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from project_index.features.access.service import resolve_read_targets
@@ -31,7 +31,14 @@ from project_index.features.history.query import (
 from project_index.features.history.types import FileChange, ResolvedRef
 from project_index.features.search.cursor import decode_cursor, encode_cursor
 from project_index.features.search.fields import known_fields
-from project_index.features.search.filters import check_filter, compile_regex, match_filter
+from project_index.features.search.filters import (
+    check_filter,
+    compile_regex,
+    exclusion_of,
+    is_excluded,
+    match_filter,
+)
+from project_index.features.search.service import excluded_note
 from project_index.features.search.types import LIMIT_MAX, MAX_CHARS_LIMIT, SearchRequest
 from project_index.features.seen.types import SessionKey
 from project_index.shared.errors import InvalidArgumentError, LastReadNotFoundError, Violation
@@ -457,38 +464,61 @@ class _ItemContext:
     fields: dict[str, str]
 
 
-def _change_items(
-    context: _ItemContext, target: Target, sides: _Sides
-) -> list[tuple[ChangeItem, Document]]:
-    """配信元 1 つの前と後の文書を突き合わせ、変更の項目と条件の照合に使った文書を返す。"""
+def _excluded_pair(
+    context: _ItemContext, target: Target, documents: list[Document], today: date
+) -> bool:
+    """存在する区間の端の文書の全てが、行の `search_exclude` に該当するか。"""
+    conditions = [exclusion_of(target.source.table(document.kind)) for document in documents]
+    return all(
+        is_excluded(document, condition, fields=context.fields, today=today)
+        for document, condition in zip(documents, conditions, strict=True)
+    ) and any(condition is not None for condition in conditions)
+
+
+def _change_entry(
+    context: _ItemContext, target: Target, sides: _Sides, doc_id: str, today: date
+) -> tuple[ChangeItem, Document, bool] | None:
+    """文書 1 つの変更の項目・条件の照合に使った文書・除く条件に該当するかを返す（返さない文書は `None`）。"""
     request = context.request
     query = request.contains
+    # 語の増減を持たない文書は残さない
+    if query is not None and doc_id not in sides.word_changes:
+        return None
+    old, new = sides.before.get(doc_id), sides.after.get(doc_id)
+    values = changed_keys(
+        _content(old) if old else {},
+        _content(new) if new else {},
+        ignore=target.source.config.diff_ignore_keys,
+    )
+    change = _change_kind(old, new, bool(values), contains=query is not None)
+    if change is None:
+        return None
+    judged = new or old or sides.word_documents[doc_id]
+    if not match_filter(request.filter, judged, fields=context.fields, today=today):
+        return None
+    present = [document for document in (old, new) if document is not None] or [judged]
+    excluded = _excluded_pair(context, target, present, today)
+    item = _change_item(context, target, sides, doc_id, change, values, (old, new))
+    return item, judged, excluded
+
+
+def _change_items(
+    context: _ItemContext, target: Target, sides: _Sides
+) -> tuple[list[tuple[ChangeItem, Document]], int]:
+    """配信元 1 つの前と後の文書を突き合わせ、変更の項目と条件の照合に使った文書・除いた件数を返す。"""
+    today = datetime.now(UTC).astimezone().date()
     items: list[tuple[ChangeItem, Document]] = []
+    excluded_count = 0
     for doc_id in sorted({*sides.before, *sides.after, *sides.word_changes}):
-        # 語の増減を持たない文書は残さない
-        if query is not None and doc_id not in sides.word_changes:
+        entry = _change_entry(context, target, sides, doc_id, today)
+        if entry is None:
             continue
-        old, new = sides.before.get(doc_id), sides.after.get(doc_id)
-        values = changed_keys(
-            _content(old) if old else {},
-            _content(new) if new else {},
-            ignore=target.source.config.diff_ignore_keys,
-        )
-        change = _change_kind(old, new, bool(values), contains=query is not None)
-        if change is None:
+        item, judged, excluded = entry
+        if excluded and not context.request.include_excluded:
+            excluded_count += 1
             continue
-        judged = new or old or sides.word_documents[doc_id]
-        if not match_filter(
-            request.filter,
-            judged,
-            fields=context.fields,
-            today=datetime.now(UTC).astimezone().date(),
-        ):
-            continue
-        items.append(
-            (_change_item(context, target, sides, doc_id, change, values, (old, new)), judged)
-        )
-    return items
+        items.append((replace(item, excluded=True) if excluded else item, judged))
+    return items, excluded_count
 
 
 def _change_item(
@@ -590,6 +620,7 @@ def list_changes(
     entries: list[tuple[int, ChangeItem]] = []
     points: list[tuple[RangePoint, RangePoint]] = []
     any_last_read = False
+    excluded = 0
     for index, target in enumerate(targets):
         sides = (
             _range_sides(store, target, request)
@@ -598,14 +629,19 @@ def list_changes(
         )
         any_last_read = any_last_read or sides.read_before
         points.append((sides.from_point, sides.to_point))
-        entries.extend((index, item) for item, _ in _change_items(context, target, sides))
+        items, excluded_here = _change_items(context, target, sides)
+        excluded += excluded_here
+        entries.extend((index, item) for item, _ in items)
     if request.from_ is None and not any_last_read:
         raise LastReadNotFoundError(
             message="この会話で参照した記録がありません。from を指定してください",
             next_steps=["from に commit やブランチを指定してください"],
         )
     entries.sort(key=lambda entry: (entry[0], entry[1].id))
-    return _result(request, targets, points, [item for _, item in entries], notes)
+    if excluded:
+        notes.append(excluded_note(excluded))
+    result = _result(request, targets, points, [item for _, item in entries], notes)
+    return replace(result, excluded_count=excluded or None)
 
 
 def _result(

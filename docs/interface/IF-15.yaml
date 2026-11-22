@@ -1133,6 +1133,35 @@ flows:
       - 警告のログに notes2 の `direct_commit.branch` のワークツリーが無いことと、sample の端末の設定の `sources[].direct_commit.kinds` の `rule` が配信元の `direct_commit.kinds[]` に無いことがある
       - sample と notes2 への `commit` を指定した `write_docs` は `DirectCommitNotConfiguredError`・`CommitWorktreeNotFoundError` で断られる
     test: test_normal_when_direct_commit_config_invalid
+  - name: 正常系（既定の検索から除く条件に違反がある）
+    summary: '`check_project` と同じ検証で `search_exclude` に違反する配信元を外して配信する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 壊れた配信元
+        description: '`documents[0].search_exclude` が `{field: status, op: like, values: [inactive]}` の配信元'
+        notes: id `broken`
+      - name: 端末の設定
+        description: '`sources` に sample・broken の 2 行'
+    flow: |-
+      <!-- map: {"title": "正常系（既定の検索から除く条件に違反がある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant U as クライアント
+        participant T as project-index serve
+
+        U->>T: project-index serve
+        T->>T: broken の search_exclude の検証に失敗する
+        T->>T: broken を配信せず、エラーログに残す
+        T-->>U: sample だけを配信する
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`/sources/broken/docs` が 404、`/sources/sample/docs` と `/mcp` は応答する'
+      - 'エラーログに `broken: documents[0].search_exclude:` と、比べ方 `like` を使用できない理由がある'
+    test: test_normal_when_search_exclude_invalid
 lead: 端末の設定を読み、検証に合格した配信元を 1 プロセス・1 ポートで配信する `project-index serve` の入出力を定め、起動を修正するときに参照する。
 tags:
   - name: topic:サーバー

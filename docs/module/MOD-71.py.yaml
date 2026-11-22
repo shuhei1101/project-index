@@ -147,6 +147,12 @@ data_models:
         access: 公開
         default: 'True'
         description: '`False` なら、Git 管理外の配信元と `storage.type: disk` の配信元でも、この行の文書を書き換えるときに `created`・`updated` を付けない'
+      - name: search_exclude
+        title: 既定の検索から除く条件
+        type: dict[str, Any] | None
+        access: 公開
+        default: None
+        description: '`search_docs` の `filter` と同じ構造の条件の木（読み込んだ辞書のまま）。該当する文書を `search_docs`・`list_changes`・`trace_related` の既定の結果から除く。解釈と照合は検索の filters.py の `exclusion_of`・`is_excluded` が受け持つ'
     methods:
       - name: excludes
         title: 除外の名前に当たるか

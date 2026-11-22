@@ -448,3 +448,95 @@ def test_list_changes_when_last_read_body_file(
     assert [(item.id, item.change, item.keys) for item in result.items] == [
         ("notes/a.md", "modified", ["body"])
     ]
+
+
+ASSET_1 = "id: a1\nname: 素材 1\nstatus: active\n"
+ASSET_2 = "id: a2\nname: 素材 2\nstatus: inactive\n"
+ASSET_3 = "id: a3\nname: 素材 3\nstatus: active\n"
+
+
+@pytest.fixture
+def asset_env(
+    tmp_path: Path,
+    git_repo: Callable[..., Path],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., SourceRegistry],
+) -> ChangesEnv:
+    """`status` が `inactive` の文書を除く行と、素材 1〜3 を commit した配信元を返す。"""
+    clone = git_repo(
+        {"assets/a1.yaml": ASSET_1, "assets/a2.yaml": ASSET_2, "assets/a3.yaml": ASSET_3}
+    )
+    table = DocumentTable(
+        id="assets",
+        paths=["assets/*.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        search_exclude={"field": "status", "op": "eq", "values": ["inactive"]},
+    )
+    source = make_served_source(
+        id="sample",
+        root=clone,
+        config=make_source_config(documents=[table]),
+        is_git=True,
+        repo_root=clone,
+        scope_write=[str(clone)],
+    )
+    return ChangesEnv(
+        registry=make_registry(source),
+        store=DocumentStore(SnapshotStore(tmp_path / "snapshots")),
+        seen=SeenStore(tmp_path / "seen.sqlite3", retention_days=7),
+        source=source,
+        clone=clone,
+    )
+
+
+def _change_assets(
+    env: ChangesEnv, commit_all: Callable[..., str], run_git: Callable[..., str]
+) -> str:
+    """素材 1・2 の名前と素材 3 の状態を変え、`inactive` の素材 4 を足した commit を積み、親の commit を返す。"""
+    first = run_git(env.clone, "rev-parse", "HEAD").strip()
+    commit_all(
+        env.clone,
+        {
+            "assets/a1.yaml": "id: a1\nname: 素材 1 改\nstatus: active\n",
+            "assets/a2.yaml": "id: a2\nname: 素材 2 改\nstatus: inactive\n",
+            "assets/a3.yaml": "id: a3\nname: 素材 3\nstatus: inactive\n",
+            "assets/a4.yaml": "id: a4\nname: 素材 4\nstatus: inactive\n",
+        },
+    )
+    return first
+
+
+def test_list_changes_when_search_excluded(
+    asset_env: ChangesEnv, commit_all: Callable[..., str], run_git: Callable[..., str]
+) -> None:
+    """存在する端の全てで該当する文書を除く（正常系）。"""
+    # 準備
+    first = _change_assets(asset_env, commit_all, run_git)
+    # 実行
+    result = asset_env.list(**{"from": first})
+    # 検証
+    assert [(item.id, item.change) for item in result.items] == [
+        ("a1", "modified"),
+        ("a3", "modified"),
+    ]
+    assert result.items[1].keys == ["status"]
+    assert result.excluded_count == 2
+
+
+def test_list_changes_when_include_excluded(
+    asset_env: ChangesEnv, commit_all: Callable[..., str], run_git: Callable[..., str]
+) -> None:
+    """除いた文書も返す（正常系）。"""
+    # 準備
+    first = _change_assets(asset_env, commit_all, run_git)
+    # 実行
+    result = asset_env.list(**{"from": first, "include_excluded": True})
+    # 検証
+    assert [(item.id, item.excluded) for item in result.items] == [
+        ("a1", None),
+        ("a2", True),
+        ("a3", None),
+        ("a4", True),
+    ]
+    assert result.excluded_count is None

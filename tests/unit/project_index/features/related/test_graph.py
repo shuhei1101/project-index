@@ -88,3 +88,20 @@ def test_walk_related_when_other_source(make_document: Callable[..., Document]) 
     # 検証
     assert items == []
     assert any("other:x" in note for note in notes)
+
+
+def test_walk_related_when_skip(make_document: Callable[..., Document]) -> None:
+    """飛ばす文書の先をたどらない（正常系）。"""
+    # 準備
+    documents = _chain(make_document)
+    # 実行
+    found, _ = walk_related(
+        [documents["doc-1"]],
+        documents,
+        depth=2,
+        direction="out",
+        resolve_other=lambda source, doc_id: None,
+        skip=lambda document: document.id == "doc-2",
+    )
+    # 検証
+    assert found == []

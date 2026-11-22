@@ -86,12 +86,19 @@ functions:
         required: true
         passing: keyword
         description: (配信元の ID, 文書の ID) → 文書。読めない・無いときは `None`
+      - name: skip
+        title: 飛ばす文書
+        type: Callable[[Document], bool] | None
+        required: false
+        default: None
+        passing: keyword
+        description: '`True` を返す文書を並びに入れず、その先もたどらない。`None` は飛ばさない'
     returns:
       type: tuple[list[tuple[Document, int, str, str, Literal['out', 'in']]], list[str]]
       description: ((文書, 深さ, 元の ID, 関係の種類, 向き) の並び, 読めなかった相手の知らせ)
     process: |-
       1. 起点の ID を訪れた集合に入れる
-      2. 深さ 1 から `depth` まで、前の深さの文書ごとに次をたどる。訪れた文書は飛ばす（循環を防ぐ）
+      2. 深さ 1 から `depth` まで、前の深さの文書ごとに次をたどる。訪れた文書は飛ばす（循環を防ぐ）。`skip` が `True` を返す文書は訪れた集合に入れ、並びに入れず、その先もたどらない
          - `out` は関連の行の `to`。`source` があれば別の配信元の文書を引き、引けなければ `{source}:{to} は参照できないので除きました` を知らせる。同じ配信元に無い ID は `{to} がありません` を知らせる
          - `in` は、同じ配信元の文書のうち、関連の行の `to` がその文書の ID で `source` の無い行を持つ文書（逆引きの辞書を 1 回だけ作る）
       3. たどった順の並びと知らせを返す
@@ -114,4 +121,11 @@ functions:
         condition: '`related: [{to: x, type: references, source: other}]`、`resolve_other` が `None`'
         mock: なし
         expected: たどった文書が空で、知らせに `other:x`
+      - name: test_walk_related_when_skip
+        case: 正常
+        summary: 飛ばす文書の先をたどらない
+        condition: 文書 1 → 文書 2 → 文書 3、`skip` が文書 2 で `True`、`depth=2`・`out`
+        mock: なし
+        expected: 空の並び
+        exception: '-'
 visibility: internal
