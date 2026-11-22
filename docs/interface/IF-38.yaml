@@ -184,11 +184,11 @@ constraints:
 - item: バージョンの照合
   constraint: 取得と取り込みの後のワークツリーの文書のバージョンと、`writes[].expected_version`・`deletes[].expectedVersion` を照合する
 - item: 書き込みの期限
-  constraint: '[文書の書き込み](id:IF-6) の制約「書き込みの期限」と同じ'
+  constraint: '[文書の書き込み](id:IF-6) の制約「書き込みの期限」と同じ。衝突したときの一時のワークツリーでの検査のやり直しと書き込みの開始も、この期限の中に収める'
 - item: JSON のキー
   constraint: 要求と応答のキーは camelCase。`writes[]` の操作のキーは `write_docs` の `operations[]` のキーのまま
 - item: 衝突の判定
-  constraint: '`baseCommit` を添えた要求が、今のブランチで `VersionMismatchError`・`DocumentNotFoundError`・`DocumentReferencedError`・`ValidationFailedError` のどれかで断られたときを衝突とし、`baseCommit` の一時のワークツリーで同じ許可と検査をやり直す。オリジン・直コミットの権限・ブランチ・読み取り専用の種類・ワークツリーの状態・取得・プッシュ・期限のエラーは衝突にせず、今と同じに断る'
+  constraint: '`baseCommit` を添えた要求が、今のブランチで `VersionMismatchError`・`DocumentNotFoundError`・`DocumentReferencedError`・`ValidationFailedError` のどれかで断られたときを衝突とし、`baseCommit` の一時のワークツリーで同じ許可と検査をやり直す。許可（配信元の設定の `direct_commit.kinds[]`・端末の設定の `write_api_kinds`・読み取り専用の種類・秘密の値の検査）は今の `origin/{コミットするブランチ}` の配信元の設定で判定し、スキーマ・`validators[]`・`generators[]` と文書の値は `baseCommit` の一時のワークツリーのものを使用する。オリジン・直コミットの権限・ブランチ・読み取り専用の種類・ワークツリーの状態・取得・プッシュ・期限のエラーは衝突にせず、今と同じに断る'
 - item: 編集を始めたときのコミット
   constraint: '取得と取り込みの後に、`baseCommit` がクローンにあり、`origin/{コミットするブランチ}` の祖先であることを確認する。クローンに無ければ `reason: not_found`、祖先でなければ `reason: not_ancestor` の `BaseCommitUnusableError`（409）で、検査の前に断る'
 - item: 衝突したときのブランチ
@@ -196,8 +196,8 @@ constraints:
 - item: 衝突したときの断る理由
   constraint: '`baseCommit` の一時のワークツリーでも合格しない要求は、今のブランチで断ったエラーと `errors[]` で断る（一時のワークツリーの違反は返却しない）'
 - item: 衝突したときのスクリプト
-  constraint: 端末の設定の `sources[].direct_commit.on_conflict.command` を、ブランチを作って排他を放した後に、シェルを経由せずクローン本体を作業ディレクトリにして実行する。環境変数 `PROJECT_INDEX_SOURCE`（配信元の ID）・`PROJECT_INDEX_CONFLICT_BRANCH`・`PROJECT_INDEX_CONFLICT_COMMIT`・`PROJECT_INDEX_BASE_COMMIT`・`PROJECT_INDEX_TARGET_BRANCH`（コミットするブランチ）・`PROJECT_INDEX_COMMIT_MESSAGE` を加え、ほかはサーバーのプロセスの環境変数を引き継ぐ。終了コードが 0 以外でも、制限時間で止めても、ブランチは削除せずに 200 で結果を返却する
-  decided_by: NFR-1#requirements[スクリプトの制限時間]
+  constraint: 端末の設定の `sources[].direct_commit.on_conflict.command` を、ブランチを作って排他を放した後に、シェルを経由せずクローン本体を作業ディレクトリにして実行する。環境変数 `PROJECT_INDEX_SOURCE`（配信元の ID）・`PROJECT_INDEX_CONFLICT_BRANCH`・`PROJECT_INDEX_CONFLICT_COMMIT`・`PROJECT_INDEX_BASE_COMMIT`・`PROJECT_INDEX_TARGET_BRANCH`（コミットするブランチ）・`PROJECT_INDEX_COMMIT_MESSAGE` を加え、ほかはサーバーのプロセスの環境変数を引き継ぐ。制限時間は、要求を受けてから書き込みの API の応答の上限までの残りの時間と、端末の設定の `script_timeout_sec` の短い方にする。終了コードが 0 以外でも、制限時間で止めても、ブランチは削除せずに 200 で結果を返却する
+  decided_by: NFR-1#requirements[書き込みの API の応答の上限]
 - item: 試しに書くときの衝突
   constraint: '`dryRun: true` で衝突したときも一時のワークツリーで許可と検査をやり直し、合格すれば `conflict` を `branch`・`commit`・`script` が `null` で返却する。ブランチを作らず、スクリプトを実行しない'
 flows:
