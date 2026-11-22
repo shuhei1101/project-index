@@ -1595,7 +1595,7 @@ def test_validate_source_config_when_sqlite(source_root: Path) -> None:
     assert table.sqlite is not None
     assert table.sqlite.limit == 1000
     assert table.paths == []
-    assert table.is_writable() is False
+    assert table.is_writable is False
 
 
 @pytest.mark.parametrize(
