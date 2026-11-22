@@ -7,7 +7,7 @@ tags:
   - name: topic:端末
 files:
   - file: ${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml
-    manages: 端末の設定（配信元の一覧と権限（直コミットを呼べる作業場所 `sources[].direct_commit` を含む）・`state_dir`・`log_dir`・`port`・`bind`・`seen_retention_days`・`script_timeout_sec`・`write_deadline_sec`・`worktree_load_wait_sec`・`mdmark_ref`）
+    manages: 端末の設定（配信元の一覧と権限（直コミットを呼べる作業場所と、作業場所を持たない書き込みの API から直コミットできる種類 `sources[].direct_commit` を含む）・`state_dir`・`log_dir`・`port`・`bind`・`seen_retention_days`・`script_timeout_sec`・`write_deadline_sec`・`worktree_load_wait_sec`・`mdmark_ref`）
     notes: git 管理外。場所は環境変数 `PROJECT_INDEX_CONFIG` で上書きする。キーの一覧は公開ドキュメント『設定』、型は [端末の設定の型](id:MOD-67) の `TerminalConfig`
   - file: project-index.yaml
     manages: 配信元の設定（文書の範囲・種類・参照するブランチ・検査と変換と生成のスクリプト・`nav`・`decisions`・`github`・直コミットを許可する種類とコミットするブランチ `direct_commit`）

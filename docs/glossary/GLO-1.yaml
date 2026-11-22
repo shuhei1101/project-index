@@ -131,6 +131,6 @@ terms:
     description: '利用者が会話で AI に伝えた守ってほしいこと・単語の意味・経緯や判断の理由で、スキル `/project-index:feedback` がルール・エイリアス・文書として登録するもの'
   - id: direct-commit
     name: '直コミット'
-    description: '`write_docs`・`delete_docs` に `commit` を指定し、書き込みの後にコミットするブランチのワークツリーでコミットしてプッシュまですること。許可する種類とブランチは配信元の設定の `direct_commit`、呼べる作業場所は端末の設定の `sources[].direct_commit` で決める'
+    description: '`write_docs`・`delete_docs` に `commit` を指定するか画面のサーバーが書き込みの API を呼び、書き込みの後にコミットするブランチのワークツリーでコミットしてプッシュまですること。許可する種類とブランチは配信元の設定の `direct_commit`、呼べる作業場所と書き込みの API から直コミットできる種類は端末の設定の `sources[].direct_commit` で決める'
     aliases:
       - direct_commit
