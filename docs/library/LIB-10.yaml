@@ -37,6 +37,8 @@ verification:
 limitations:
   - item: WAL の未反映の書き込み
     content: チェックポイントの前の書き込みは本体のファイルではなく `{file}-wal` だけを変えるため、読み直す判定は両方のファイルの更新日時とサイズで比べる
+  - item: WAL のモードの読み取り専用の接続
+    content: WAL のモードのファイルは、`mode=ro` の接続でも `-wal`・`-shm` が無ければ作る（本体のファイルは書き換えない）。読んだ後の署名を持たないと、次の呼び出しで変わったものとして読み直す
 visibility: internal
 tags:
   - name: topic:ライブラリ

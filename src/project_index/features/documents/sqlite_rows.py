@@ -133,7 +133,8 @@ def _decode(
 def _document(data: dict[str, Any], index: int, source_id: str, table: DocumentTable) -> Document:
     """行の辞書から 1 件の文書を作る（本文は列の YAML、バージョンは本文のハッシュ）。"""
     sqlite = _sqlite_of(table)
-    metadata = resolve_metadata(data, table)
+    # 空の配列の列（`aliases: []` など）は、共通のキーを持たない文書と同じに扱う
+    metadata = {key: value for key, value in resolve_metadata(data, table).items() if value != []}
     document_id = str(data[_id_column(table)])
     metadata["id"] = document_id
     if not metadata.get("name"):
@@ -192,6 +193,8 @@ def read_rows(source_root: Path, source_id: str, table: DocumentTable) -> Sqlite
         return SqliteRows(warnings=[f"{sqlite.file} の表 {sqlite.table} を読めません（{error}）"])
     finally:
         conn.close()
+    # WAL のモードのファイルは読み取り専用の接続でも `-wal`・`-shm` を作るので、閉じた後の署名を持つ
+    signature = file_signature(path)
     names = [column.name for column in sqlite.columns]
     warnings: list[str] = []
     documents: list[Document] = []
