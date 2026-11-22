@@ -32,7 +32,7 @@ scenarios:
   - name: 正常シナリオ
     setup:
       - name: Mock
-        description: なし（実環境で実行。Claude Code は `claude -p` で実行し、dev-docs の画面のサーバーの代わりにテストのコードが読み取り API・端末の設定の API を HTTP で呼ぶ）
+        description: なし（実環境で実行。Claude Code は `claude -p` で実行し、dev-docs の画面のサーバーの代わりにテストのコードが読み取り API・端末の設定の API・書き込みの API を HTTP で呼ぶ）
       - name: Claude Code の設定の場所
         description: '`CLAUDE_CONFIG_DIR` が指すテスト用の一時フォルダ。project-index のマーケットプレースとプラグイン `project-index` を、この場所のユーザースコープに入れておく'
         notes: テストを実行した端末の `~/.claude` は変わらない。S0 の global-setup はこの場所の `settings.json` の env に `PROJECT_INDEX_CONFIG` を記載する
@@ -130,7 +130,7 @@ scenarios:
       - '`write_docs` の後と、sample の管理用の YAML・`project-index.yaml` を書き換えた後には、通知が入らない'
       - 指摘を登録するスキルの登録先の選択肢が project-index と登録しないだけで（rule-inject・alias-inject のプラグインと端末の設定のファイルが無い）、端末の設定の `sources` に指摘の置き場所の配信元の行が増え、登録した文書を次のセッションの `search_docs` が返却する。指摘の置き場所と端末の設定以外のファイルは変わらない
       - 手元の作業場所で始めたセッションが `commit` を付けた `write_docs` で sample の文書を 1 件作ると、sample のリモートの `develop` に、その文書のファイルだけを含む 1 コミットが増え、結果のコミットの SHA と一致する。sample のワークツリー x とクローン本体は変わらず、sample のワークツリー x で `worktree` に `.claude/worktrees/develop` を指定した `search_docs` が、作った文書を返却する
-      - 画面のサーバーの代わりにテストのコードが書き込みの API で sample の文書 1 件の修正と 1 件の削除を 1 回で送信すると、sample のリモートの `develop` に、その 2 件のファイルだけを含む 1 コミットが増え、応答のコミットの SHA と一致する。sample のワークツリー x とクローン本体は変わらない
+      - 画面のサーバーの代わりにテストのコードが書き込みの API で、S4D で作った文書以外の sample の文書 1 件の修正と 1 件の削除を 1 回で送信すると、sample のリモートの `develop` に、その 2 件のファイルだけを含む 1 コミットが増え、応答のコミットの SHA と一致する。sample のワークツリー x とクローン本体は変わらない
     test: test_normal
     notes:
       commit: S4 と S5 の間で、エージェントが `write_docs` の変更をワークツリーで `git commit` する。project-index は commit しない。
