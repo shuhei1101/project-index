@@ -647,3 +647,73 @@ def test_search_docs_when_term(make_env: Callable[..., SearchEnv]) -> None:
     assert [[item.id for item in result.items] for result in results] == [["scope"], ["scope"], []]
     assert plain.items == []
     assert any("alias_type を持つ documents の行が無い" in note for note in plain.notes)
+
+
+ASSET_DOCS = {
+    "assets/a1.yaml": "id: a1\nname: 素材 1\nstatus: active\n",
+    "assets/a2.yaml": "id: a2\nname: 素材 2\nstatus: inactive\n",
+}
+
+TERM_ASSET_DOCS = {
+    "terms/a3.yaml": "id: a3\nname: 背景\nstatus: inactive\n",
+    "terms/a4.yaml": "id: a4\nname: 効果音\nstatus: inactive\n",
+}
+
+
+def _assets_table() -> DocumentTable:
+    """`status` が `inactive` の文書を既定の検索から除く文書の行を返す。"""
+    return DocumentTable(
+        id="assets",
+        paths=["assets/*.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        search_exclude={"field": "status", "op": "eq", "values": ["inactive"]},
+    )
+
+
+def _term_assets_table() -> DocumentTable:
+    """`alias_type: term` で、`status` が `inactive` の文書を除く文書の行を返す。"""
+    return DocumentTable(
+        id="term_assets",
+        paths=["terms/*.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        alias_type="term",
+        search_exclude={"field": "status", "op": "eq", "values": ["inactive"]},
+    )
+
+
+def test_search_docs_when_search_excluded(make_env: Callable[..., SearchEnv]) -> None:
+    """既定の結果から除く（正常系）。"""
+    # 準備
+    env = make_env(
+        {**ASSET_DOCS, **TERM_ASSET_DOCS}, documents=[_assets_table(), _term_assets_table()]
+    )
+    by_kind = {"field": "kind", "op": "eq", "values": ["assets"]}
+    # 実行
+    listed = env.search(filter=by_kind, view="ids")
+    by_id = env.search(filter={"field": "id", "op": "eq", "values": ["a2"]}, view="ids")
+    counted = env.search(filter=by_kind, view="count")
+    grouped = env.search(filter=by_kind, group_by="status", view="count")
+    by_term = env.search(term="背景", view="ids")
+    # 検証
+    assert [item.id for item in listed.items] == ["a1"]
+    assert listed.excluded_count == 1
+    assert any("include_excluded: true" in note for note in listed.notes)
+    assert (by_id.items, by_id.excluded_count) == ([], 1)
+    assert counted.total_count == 1
+    assert [(group.value, group.count) for group in grouped.groups] == [("active", 1)]
+    assert (by_term.items, by_term.excluded_count) == ([], 1)
+
+
+def test_search_docs_when_include_excluded(make_env: Callable[..., SearchEnv]) -> None:
+    """除いた文書も返す（正常系）。"""
+    # 準備
+    env = make_env(ASSET_DOCS, documents=[_assets_table()])
+    # 実行
+    result = env.search(
+        filter={"field": "kind", "op": "eq", "values": ["assets"]},
+        view="ids",
+        include_excluded=True,
+    )
+    # 検証
+    assert [(item.id, item.excluded) for item in result.items] == [("a1", None), ("a2", True)]
+    assert result.excluded_count is None

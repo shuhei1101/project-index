@@ -1506,3 +1506,49 @@ def test_source_worktree_branches(
     result = source_worktree_branches(source)
     # 検証
     assert result == {"develop"}
+
+
+def test_validate_source_config_when_search_exclude_invalid(source_root: Path) -> None:
+    """既定の検索から除く条件の誤り（異常系）。"""
+    # 準備
+    row = {"paths": ["docs/rule/*.yaml"], "schema": "schemas/rule.schema.yaml"}
+    value = _config_value(
+        documents=[
+            {
+                **row,
+                "id": "rules",
+                "search_exclude": {"field": "status", "op": "like", "values": ["inactive"]},
+            },
+            {
+                **row,
+                "id": "notes",
+                "search_exclude": {"field": "body", "op": "contains", "values": ["x"]},
+            },
+        ]
+    )
+    # 実行
+    result = validate_source_config(value, root=source_root)
+    # 検証
+    assert [v.path for v in result] == [
+        "documents[0].search_exclude.op",
+        "documents[1].search_exclude.field",
+    ]
+
+
+def test_validate_source_config_when_search_exclude(source_root: Path) -> None:
+    """既定の検索から除く条件を持つ行（正常系）。"""
+    # 準備
+    value = _config_value(
+        documents=[
+            {
+                "id": "rules",
+                "paths": ["docs/rule/*.yaml"],
+                "schema": "schemas/rule.schema.yaml",
+                "search_exclude": {"field": "status", "op": "eq", "values": ["inactive"]},
+            }
+        ]
+    )
+    # 実行
+    result = validate_source_config(value, root=source_root)
+    # 検証
+    assert result == []

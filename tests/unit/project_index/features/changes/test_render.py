@@ -143,3 +143,28 @@ def test_render_changes_markdown_when_outside_scope() -> None:
     lines = markdown.splitlines()
     assert lines[0] == "作業範囲の外（参考）"
     assert lines[1].startswith("other: 3f2a9c1（")
+
+
+def test_render_changes_markdown_when_excluded() -> None:
+    """除外の列（正常系）。"""
+    # 準備
+    point = RangePoint(
+        input="3f2a9c1", commit="3f2a9c1", date=datetime(2026, 10, 26, 10, 0, tzinfo=UTC)
+    )
+    result = ChangesResult(
+        range_from=point,
+        range_to=point,
+        total_count=2,
+        items=[
+            ChangeItem(id="a1", source=None, change="modified", keys=["name"], values={}),
+            ChangeItem(
+                id="a2", source=None, change="modified", keys=["name"], values={}, excluded=True
+            ),
+        ],
+    )
+    # 実行
+    markdown = render_changes_markdown(result, source_label="sample")
+    # 検証
+    assert "| id | 変更 | 変わったキー | 除外 |" in markdown
+    assert "| a1 | modified | name |  |" in markdown
+    assert "| a2 | modified | name | ✓ |" in markdown

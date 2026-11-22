@@ -6,12 +6,16 @@ from typing import TYPE_CHECKING
 import pytest
 
 from project_index.features.search.filters import (
+    check_exclusion,
     check_filter,
     compile_regex,
+    exclusion_of,
+    is_excluded,
     match_filter,
     parse_compare_value,
 )
 from project_index.features.search.types import Condition, Group, LineRange, OrderKey, SearchRequest
+from project_index.features.sources.types import DocumentTable
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -266,3 +270,85 @@ def test_match_filter_when_columns(make_document: Callable[..., Document]) -> No
     # 検証
     assert with_columns is True
     assert without_columns is False
+
+
+EXCLUSION_FIELDS = {"status": "string", "name": "string", "@chars": "number"}
+
+
+def test_check_exclusion() -> None:
+    """共通のキーの条件（正常系）。"""
+    # 準備
+    value = {"field": "status", "op": "eq", "values": ["inactive"]}
+    # 実行
+    violations = check_exclusion(value, "documents[0].search_exclude", fields=EXCLUSION_FIELDS)
+    # 検証
+    assert violations == []
+
+
+def test_check_exclusion_when_unknown_op() -> None:
+    """比べ方の一覧に無い op（異常系）。"""
+    # 準備
+    value = {"field": "status", "op": "like", "values": ["inactive"]}
+    # 実行
+    violations = check_exclusion(value, "documents[0].search_exclude", fields=EXCLUSION_FIELDS)
+    # 検証
+    assert [violation.path for violation in violations] == ["documents[0].search_exclude.op"]
+
+
+def test_check_exclusion_when_body() -> None:
+    """比べられない項目（異常系）。"""
+    # 準備
+    body = {"field": "body", "op": "contains", "values": ["x"]}
+    computed = {"and": [{"field": "@chars", "op": "gt", "values": ["1"]}]}
+    # 実行
+    body_violations = check_exclusion(body, "documents[0].search_exclude", fields=EXCLUSION_FIELDS)
+    computed_violations = check_exclusion(
+        computed, "documents[1].search_exclude", fields=EXCLUSION_FIELDS
+    )
+    # 検証
+    assert [(violation.path, violation.rule) for violation in body_violations] == [
+        (
+            "documents[0].search_exclude.field",
+            "既定の検索から除く条件に使用できない項目です（body）",
+        )
+    ]
+    assert [violation.path for violation in computed_violations] == [
+        "documents[1].search_exclude.and[0].field"
+    ]
+
+
+def test_exclusion_of() -> None:
+    """条件の木と無い行（正常系）。"""
+    # 準備
+    with_condition = DocumentTable(
+        id="assets",
+        paths=["assets/*.yaml"],
+        schema_path="schemas/asset.schema.yaml",
+        search_exclude={"or": [{"field": "status", "op": "eq", "values": ["inactive"]}]},
+    )
+    without_condition = DocumentTable(
+        id="rules", paths=["docs/*.yaml"], schema_path="schemas/rule.schema.yaml"
+    )
+    # 実行
+    condition = exclusion_of(with_condition)
+    nothing = exclusion_of(without_condition)
+    # 検証
+    assert isinstance(condition, Group)
+    assert condition.any_of == [Condition(field="status", op="eq", values=["inactive"])]
+    assert nothing is None
+
+
+def test_is_excluded(make_document: Callable[..., Document]) -> None:
+    """該当する文書・しない文書・条件なし（正常系）。"""
+    # 準備
+    condition = Condition(field="status", op="eq", values=["inactive"])
+    inactive = make_document(metadata={"id": "a2", "status": "inactive"})
+    active = make_document(metadata={"id": "a1", "status": "active"})
+    # 実行
+    inactive_result = is_excluded(inactive, condition, fields=EXCLUSION_FIELDS, today=TODAY)
+    active_result = is_excluded(active, condition, fields=EXCLUSION_FIELDS, today=TODAY)
+    no_condition = is_excluded(inactive, None, fields=EXCLUSION_FIELDS, today=TODAY)
+    # 検証
+    assert inactive_result is True
+    assert active_result is False
+    assert no_condition is False
