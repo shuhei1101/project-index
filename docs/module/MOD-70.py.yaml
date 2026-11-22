@@ -851,7 +851,7 @@ functions:
         summary: 新しい形式の documents の行
         condition: 戻り値を JSON として読む
         mock: なし
-        expected: '`documents.items.properties` が `type`・`defaults` を持たず、`metadata.additionalProperties` が文字列、`alias_type` が `term`・`doc`・`command`・`url`・`skill`・`tool`・`path`・`env`・`avoid` の列挙、`required` が `id`・`paths`・`schema`'
+        expected: '`documents.items.properties` が `type`・`defaults` を持たず、`metadata.additionalProperties` が文字列、`alias_type` が `term`・`doc`・`command`・`url`・`skill`・`tool`・`path`・`env`・`avoid` の列挙、`required` が `id` だけ（`paths`・`schema` と `sqlite` のどちらを持つかは配信元の設定の検証が確かめる）、`sqlite` が `file`・`table`・`columns` を必須に持つ'
   - name: entry_source_id
     title: 行の配信元の ID
     kind: 関数

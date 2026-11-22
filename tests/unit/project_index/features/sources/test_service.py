@@ -787,7 +787,8 @@ def test_source_schema_json_when_metadata() -> None:
         "env",
         "avoid",
     ]
-    assert row["required"] == ["id", "paths", "schema"]
+    assert row["required"] == ["id"]
+    assert row["properties"]["sqlite"]["required"] == ["file", "table", "columns"]
 
 
 KIND_A_ROW = "  - id: kind_a\n    paths: [docs/a/*.yaml]\n    schema: schemas/a.schema.yaml\n"
