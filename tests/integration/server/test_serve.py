@@ -30,7 +30,9 @@ from project_index.integrations.git import GIT_ARCHIVE_TIMEOUT_SEC
 from project_index.server.app import build_app
 from project_index.server.mcp.admin import NoArguments
 from project_index.server.mcp.result import (
+    ADMIN_MCP_SERVER,
     DOCS_INSTRUCTIONS_PROMPT_ID,
+    DOCS_MCP_SERVER,
     mcp_prompt_ids,
     tool_prompt_id,
 )
@@ -699,8 +701,8 @@ def test_normal_when_mcp_text_from_prompts(
     assert instructions == prompts.render(DOCS_INSTRUCTIONS_PROMPT_ID)
     assert [header for header in INSTRUCTIONS_HEADERS if header not in instructions] == []
     assert len(instructions) <= INSTRUCTIONS_MAX_CHARS
-    assert _descriptions(tools) == _rendered(prompts, "docs", DOCS_TOOL_MODELS)
-    assert _descriptions(admin_tools) == _rendered(prompts, "admin", ADMIN_TOOL_MODELS)
+    assert _descriptions(tools) == _rendered(prompts, DOCS_MCP_SERVER, DOCS_TOOL_MODELS)
+    assert _descriptions(admin_tools) == _rendered(prompts, ADMIN_MCP_SERVER, ADMIN_TOOL_MODELS)
     assert [text for text in texts if any(word in text for word in FORBIDDEN_WORDS)] == []
     assert _argument_keys(tools) == _model_keys(DOCS_TOOL_MODELS)
     assert _argument_keys(admin_tools) == _model_keys(ADMIN_TOOL_MODELS)
@@ -874,7 +876,7 @@ def test_error_when_prompt_invalid(
     # 準備
     prompts = tmp_path / "prompts"
     shutil.copytree(DEFAULT_PROMPTS_DIR, prompts)
-    broken = prompts / "mcp" / "docs" / "tools" / "search-docs.yaml"
+    broken = prompts / "mcp" / DOCS_MCP_SERVER / "tools" / "search-docs.yaml"
     value = load_yaml(broken.read_text(encoding="utf-8"))
     del value["kind"]
     broken.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
