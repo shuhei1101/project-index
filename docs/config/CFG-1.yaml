@@ -7,7 +7,7 @@ tags:
   - name: topic:端末
 files:
   - file: ${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml
-    manages: 端末の設定（配信元の一覧と権限（直コミットを呼べる作業場所と、作業場所を持たない書き込みの API から直コミットできる種類 `sources[].direct_commit` を含む）・`state_dir`・`log_dir`・`port`・`bind`・`seen_retention_days`・`script_timeout_sec`・`write_deadline_sec`・`worktree_load_wait_sec`・`mdmark_ref`）
+    manages: 端末の設定（配信元の一覧と権限（直コミットを呼べる作業場所と、作業場所を持たない書き込みの API から直コミットできる種類・書き込みの API が衝突したときに実行するスクリプト `sources[].direct_commit` を含む）・`state_dir`・`log_dir`・`port`・`bind`・`seen_retention_days`・`script_timeout_sec`・`write_deadline_sec`・`worktree_load_wait_sec`・`mdmark_ref`）
     notes: git 管理外。場所は環境変数 `PROJECT_INDEX_CONFIG` で上書きする。キーの一覧は公開ドキュメント『設定』、型は [端末の設定の型](id:MOD-67) の `TerminalConfig`
   - file: project-index.yaml
     manages: 配信元の設定（文書の範囲・種類・参照するブランチ・検査と変換と生成のスクリプト・`nav`・`decisions`・`github`・直コミットを許可する種類とコミットするブランチ `direct_commit`・読み取り専用で配信する SQLite の表 `documents[].sqlite`）
@@ -117,6 +117,27 @@ settings:
     type: str
     required: true
     description: '`describe(source, kind)` が返却する列の意味'
+    reload: reload
+    status: planned
+    visibility: user
+  - key: sources[].direct_commit.on_conflict
+    title: 衝突したときのスクリプト
+    file: ${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml
+    type: obj
+    required: false
+    description: 画面のサーバーからの直コミット（書き込みの API）が衝突して修正をブランチに残した後に、その配信元で実行するスクリプト。端末の設定のファイルにだけ記載できる。端末の設定の API は取得の応答に含めず、保存・1 行の追加・1 行の変更で受け取ったら断り、保存の後もファイルの値を残す
+    missing: 衝突したときはブランチを残すだけで、スクリプトを実行しない
+    reload: reload
+    status: planned
+    visibility: user
+  - key: sources[].direct_commit.on_conflict.command
+    title: 衝突したときに実行するコマンド
+    file: ${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml
+    type: list[str]
+    required: true
+    allowed: 1 要素以上。先頭は絶対パスか PATH にあるコマンド
+    description: '`on_conflict` を記載したときに実行するコマンドと引数の並び。シェルを経由せずに実行し、配信元の ID・残したブランチの名前・コミットの SHA・コミットするブランチを指定する（指定の方法と制限時間はインターフェース定義で決める）'
+    missing: '`on_conflict` を記載して `command` が無いときは `sources[{番号}].direct_commit.on_conflict.command` の違反にし、起動時の検証でその配信元を配信しない'
     reload: reload
     status: planned
     visibility: user
