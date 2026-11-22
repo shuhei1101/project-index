@@ -16,6 +16,7 @@ from project_index.features.history.snapshot import SnapshotStore
 from project_index.features.search.types import Condition
 from project_index.features.seen.store import SeenStore
 from project_index.features.seen.types import LastRead, SessionKey
+from project_index.features.settings.types import OnConflictScript
 from project_index.features.sources.registry import SourceRegistry
 from project_index.features.sources.types import (
     DirectCommitConfig,
@@ -49,6 +50,7 @@ from project_index.features.write.types import (
 )
 from project_index.shared.deadline import CallLimits, Deadline
 from project_index.shared.errors import (
+    BaseCommitUnusableError,
     DeleteNotAllowedError,
     DirectCommitGeneratorError,
     DirectCommitNotPermittedError,
@@ -1931,7 +1933,9 @@ def make_commit_env(
         monkeypatch.setenv(name, value)
 
     def _make(
-        generators: list[ScriptEntry] | None = None, write_api_kinds: list[str] | None = None
+        generators: list[ScriptEntry] | None = None,
+        write_api_kinds: list[str] | None = None,
+        on_conflict: OnConflictScript | None = None,
     ) -> CommitEnv:
         env = make_env(
             {
@@ -1984,6 +1988,7 @@ def make_commit_env(
             direct_commit_scope=[str(local)],
             direct_commit_kinds={"terms": ["/other"]},
             direct_commit_write_api_kinds=write_api_kinds or [],
+            **({} if on_conflict is None else {"direct_commit_on_conflict": on_conflict}),
         )
         env.source = source
         env.registry = make_registry(source)
@@ -2232,6 +2237,7 @@ def _commit_documents(commit_env: CommitEnv, **request: Any) -> CommitDocumentsR
         locks=env.locks,
         repo_locks=env.repo_locks,
         timeout_sec=10,
+        state_dir=commit_env.local.parent / "state",
     )
 
 
@@ -2469,3 +2475,215 @@ def test_commit_documents_when_sqlite_kind(
     with pytest.raises(ReadOnlyKindError):
         _commit_documents(commit_env, writes=writes)
     assert git_calls == []
+
+
+DOC_1_CHANGED = "id: doc-1\nname: ほかの変更\n"
+
+
+def _conflicting(commit_env: CommitEnv, run_git: Callable[..., str]) -> str:
+    """今のコミットを返した後に、ほかの変更で doc-1 を書き換えてプッシュする。"""
+    base = run_git(commit_env.develop, "rev-parse", "HEAD").strip()
+    (commit_env.develop / "docs/rule/doc-1.yaml").write_text(DOC_1_CHANGED, encoding="utf-8")
+    run_git(commit_env.develop, "commit", "-am", "ほかの変更で doc-1 を書き換える")
+    run_git(commit_env.develop, "push", "origin", "data")
+    return base
+
+
+def _update_doc_1() -> list[Operation]:
+    """編集を始めたときの doc-1 のバージョンで doc-1 を書き換える操作。"""
+    return [
+        Operation(
+            op="update", id="doc-1", expected_version=content_hash(DOC_1), set={"name": "修正"}
+        )
+    ]
+
+
+def _conflict_branches(commit_env: CommitEnv, run_git: Callable[..., str]) -> list[str]:
+    """クローンにある衝突したときのブランチの名前。"""
+    listed = run_git(
+        commit_env.env.clone, "branch", "--list", "--format=%(refname:short)", "project-index/*"
+    )
+    return listed.split()
+
+
+ECHO_BRANCH = OnConflictScript(
+    command=[
+        sys.executable,
+        "-c",
+        "import os; print(os.environ['PROJECT_INDEX_CONFLICT_BRANCH'], end='')",
+    ]
+)
+
+
+def test_commit_documents_when_conflict(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """衝突したら修正をブランチに残してスクリプトを実行する（正常系）。"""
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules"], on_conflict=ECHO_BRANCH)
+    base = _conflicting(commit_env, run_git)
+    remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
+    # 実行
+    result = _commit_documents(commit_env, writes=_update_doc_1(), base_commit=base[:7])
+    # 検証
+    assert result.applied is False
+    assert result.commit is None
+    assert result.conflict is not None
+    assert result.conflict.base_commit == base
+    assert result.conflict.branch is not None
+    assert result.conflict.commit is not None
+    assert result.conflict.errors != []
+    clone = commit_env.env.clone
+    assert run_git(clone, "rev-parse", f"{result.conflict.branch}~1").strip() == base
+    assert run_git(clone, "rev-parse", result.conflict.branch).strip() == result.conflict.commit
+    assert run_git(clone, "show", f"{result.conflict.branch}:docs/rule/doc-1.yaml") == (
+        "id: doc-1\nname: 修正\n"
+    )
+    assert result.conflict.script is not None
+    assert result.conflict.script.exit_code == 0
+    assert result.conflict.script.stdout == result.conflict.branch
+    assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
+    assert run_git(commit_env.develop, "rev-parse", "HEAD").strip() == remote_head
+    assert (commit_env.develop / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == (
+        DOC_1_CHANGED
+    )
+
+
+def test_commit_documents_when_conflict_without_script(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """スクリプトの指定が無ければブランチだけを残す（正常系）。"""
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules"])
+    base = _conflicting(commit_env, run_git)
+    # 実行
+    result = _commit_documents(commit_env, writes=_update_doc_1(), base_commit=base)
+    # 検証
+    assert result.conflict is not None
+    assert result.conflict.branch is not None
+    assert _conflict_branches(commit_env, run_git) == [result.conflict.branch]
+    assert result.conflict.script is None
+
+
+def test_commit_documents_when_conflict_deleted(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """書き換える文書が削除されていてもブランチに残す（正常系）。"""
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules"])
+    base = run_git(commit_env.develop, "rev-parse", "HEAD").strip()
+    run_git(commit_env.develop, "rm", "-q", "docs/rule/doc-1.yaml")
+    run_git(commit_env.develop, "commit", "-m", "ほかの変更で doc-1 を削除する")
+    run_git(commit_env.develop, "push", "origin", "data")
+    # 実行
+    result = _commit_documents(commit_env, writes=_update_doc_1(), base_commit=base)
+    # 検証
+    assert result.conflict is not None
+    assert result.conflict.branch is not None
+    assert [item.rule for item in result.conflict.errors] != []
+    clone = commit_env.env.clone
+    assert run_git(clone, "show", f"{result.conflict.branch}:docs/rule/doc-1.yaml") == (
+        "id: doc-1\nname: 修正\n"
+    )
+
+
+def test_commit_documents_when_conflict_invalid_at_base(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """編集を始めたときのコミットでも合格しなければ今のブランチの理由で断る（異常系）。"""
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules"])
+    base = _conflicting(commit_env, run_git)
+    writes = [
+        Operation(op="update", id="doc-1", expected_version=content_hash(DOC_1), unset=["name"])
+    ]
+    worktrees = run_git(commit_env.env.clone, "worktree", "list")
+    # 実行・検証
+    with pytest.raises(VersionMismatchError):
+        _commit_documents(commit_env, writes=writes, base_commit=base)
+    assert _conflict_branches(commit_env, run_git) == []
+    assert run_git(commit_env.env.clone, "worktree", "list") == worktrees
+
+
+def test_commit_documents_when_base_unusable(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """起点に使えない編集を始めたときのコミットを断る（異常系）。"""
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules"])
+    remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
+    missing = "0123456789abcdef0123456789abcdef01234567"
+    # 実行・検証
+    with pytest.raises(BaseCommitUnusableError) as info:
+        _commit_documents(commit_env, writes=_update_doc_1(), base_commit=missing)
+    assert info.value.reason == "not_found"
+    assert run_git(commit_env.develop, "status", "--porcelain").strip() == ""
+    assert run_git(commit_env.develop, "rev-parse", "HEAD").strip() == remote_head
+
+
+def test_commit_documents_when_conflict_dry_run(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """試しに書くと衝突してもブランチを作らない（正常系）。"""
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules"], on_conflict=ECHO_BRANCH)
+    base = _conflicting(commit_env, run_git)
+    # 実行
+    result = _commit_documents(commit_env, writes=_update_doc_1(), base_commit=base, dry_run=True)
+    # 検証
+    assert result.applied is False
+    assert result.conflict is not None
+    assert result.conflict.base_commit == base
+    assert result.conflict.branch is None
+    assert result.conflict.commit is None
+    assert result.conflict.script is None
+    assert _conflict_branches(commit_env, run_git) == []
+
+
+def test_commit_documents_when_not_conflict_error(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """衝突にしないエラーは今と同じに断る（異常系）。"""
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules"])
+    base = run_git(commit_env.develop, "rev-parse", "HEAD").strip()
+    writes = [Operation(op="create", kind="terms", data={"id": "term-2", "name": "用語 2"})]
+    # 実行・検証
+    with pytest.raises(DirectCommitNotPermittedError):
+        _commit_documents(commit_env, writes=writes, base_commit=base)
+    assert _conflict_branches(commit_env, run_git) == []
+
+
+def test_commit_documents_when_conflict_kind_removed(
+    make_commit_env: Callable[..., CommitEnv],
+    run_git: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """編集を始めた後に直コミットの許可から外した種類はブランチに残さない（異常系）。"""
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules", "terms"])
+    base = _conflicting(commit_env, run_git)
+    # 今の配信元の設定では rules を許可から外し、編集を始めたときの設定では許可していたことにする
+    started = commit_env.env.source
+    removed = dataclasses.replace(
+        started,
+        config=dataclasses.replace(
+            started.config,
+            direct_commit=DirectCommitConfig(branch="data", kinds=["terms"]),
+        ),
+    )
+
+    def get_for_docs(_source_id: str) -> ServedSource:
+        return removed
+
+    monkeypatch.setattr(commit_env.env.registry, "get_for_docs", get_for_docs)
+
+    def load_at(source: ServedSource, root: Path) -> ServedSource:
+        # 一時のワークツリーでは、編集を始めたときの設定を読んだことにする
+        return source if root == commit_env.develop else started
+
+    monkeypatch.setattr(access_service, "load_source_at", load_at)
+    # 実行・検証
+    with pytest.raises(VersionMismatchError):
+        _commit_documents(commit_env, writes=_update_doc_1(), base_commit=base)
+    assert _conflict_branches(commit_env, run_git) == []

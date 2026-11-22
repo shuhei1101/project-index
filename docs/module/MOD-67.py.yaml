@@ -537,6 +537,25 @@ data_models:
         access: 公開
         default: '[]'
         description: 作業場所を持たない書き込みの API から直コミットできる種類の ID。既定はどの種類も直コミットできない
+      - name: on_conflict
+        title: 衝突したときのスクリプト
+        type: OnConflictScript | None
+        access: 公開
+        default: None
+        description: 書き込みの API が衝突して修正をブランチに残した後に実行するスクリプト。端末の設定のファイルからだけ読み、端末の設定の API は取得の応答に含めず、受け取ったら断る
+  - name: OnConflictScript
+    title: 衝突したときのスクリプト
+    container: project_index/features/settings/types.py
+    usecase: 直コミット
+    role: 設定
+    summary: 端末の設定の `sources[].direct_commit.on_conflict`
+    description: '`pydantic.BaseModel`（`extra="forbid"`）。キーの意味は設定の設計書の `sources[].direct_commit.on_conflict`。'
+    properties:
+      - name: command
+        title: 実行するコマンド
+        type: list[str]
+        access: 公開
+        description: コマンドと引数の並び。1 要素以上で、空の文字列を含まない（`Field(min_length=1)`）
 classes:
   - name: TerminalConfigInvalidError
     title: 端末の設定の違反

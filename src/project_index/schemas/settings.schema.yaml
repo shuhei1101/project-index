@@ -103,6 +103,19 @@ properties:
               title: 書き込みの API から直コミットできる種類
               items:
                 type: string
+            on_conflict:
+              type: object
+              title: 衝突したときのスクリプト
+              additionalProperties: false
+              required: [command]
+              properties:
+                command:
+                  type: array
+                  title: 実行するコマンド
+                  minItems: 1
+                  items:
+                    type: string
+                    minLength: 1
   state_dir:
     type: string
     title: 状態の配置先

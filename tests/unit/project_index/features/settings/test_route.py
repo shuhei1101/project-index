@@ -467,3 +467,37 @@ def test_build_settings_router_when_direct_commit(
     assert response.status_code == 200
     assert "directCommit" not in rows[0]
     assert rows[1]["directCommit"] == {"scope": ["/tmp/work/**"], "kinds": {}, "writeApiKinds": []}
+
+
+def test_build_settings_router_when_on_conflict(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_handlers: Callable[..., Any],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_status: Callable[..., SourceStatus],
+) -> None:
+    """衝突したときのスクリプトの指定を返さない（正常系）。"""
+    # 準備
+    direct_commit = (
+        "    direct_commit:\n"
+        "      scope: [/tmp/work/**]\n"
+        "      on_conflict:\n"
+        "        command: [/tmp/bin/notify]\n"
+    )
+    write_files(tmp_path, {"settings.yaml": SETTINGS + direct_commit})
+    statuses = [
+        make_status("a", 0, config=("/tmp/a/project-index.yaml",)),
+        make_status("b", 1, config=("/tmp/b/project-index.yaml",)),
+    ]
+    terminal = make_terminal_config(file=tmp_path / "settings.yaml")
+    handlers = make_handlers(terminal=terminal, registry=FakeRegistry(statuses))
+    app = FastAPI()
+    app.include_router(build_settings_router(handlers))
+    client = TestClient(app)
+    # 実行
+    response = client.get("/settings/sources")
+    # 検証
+    body = response.json()
+    assert response.status_code == 200
+    assert body["sources"][1]["directCommit"]["scope"] == ["/tmp/work/**"]
+    assert "onConflict" not in body["sources"][1]["directCommit"]

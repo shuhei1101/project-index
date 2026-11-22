@@ -9,14 +9,20 @@ stakeholders:
   interest: 作業場所を持たずに、溜めた修正を 1 回の要求で検査・書き込み・コミット・プッシュまで終えられ、1 つでも合格しなければどの修正も入らない
 - name: 配信元のリポジトリ
   interest: 直コミットを許可した種類の文書だけが、検査に合格した内容で、既定のブランチに 1 回の要求につき 1 コミットで入る
+- name: 端末の利用者
+  interest: 衝突したときの後の処理（プッシュ・PR の作成など）を、project-index に GitHub の認証を持たせずに、端末に配置したスクリプトで選べる
 trigger: 利用者が画面で溜めた修正の登録を選び、dev-docs の画面のサーバーが書き込みの API を呼ぶ
 preconditions:
 - 配信元の読み書きの方法が `git` で、直コミットの設定を持つ
 - 直コミットの設定のコミットするブランチを指すワークツリーが、配信元の `worktrees` に該当する
 - 端末の設定で、その配信元への作業場所を持たない要求の直コミットを許可している
 - 索引のサーバーを動かしている利用者の Git の認証で、リモートへプッシュできる
-success_guarantee: 1 回の要求で書き換わる全ての文書（操作に伴って書き換わる参照元を含む）が直コミットを許可した種類で、検査に合格した内容のとき、書き込みと削除が 1 つのコミットになり、コミットするブランチのリモートに入る。応答に操作ごとの文書のバージョンとコミットの SHA・ブランチが返る。コミットに入るのは、その要求が書き込んだ・消したファイルと生成物だけ。
-minimal_guarantee: 1 つでも操作が断られた要求は、どの文書も書き込まず、リモートを変えず、ワークツリーにこの要求が書き込んだ変更を残さない。ワークツリーにあった未プッシュのコミットと未コミットの変更は消さない。断ったときは、断った操作の位置と理由を返却する。
+success_guarantee: |-
+  1 回の要求で書き換わる全ての文書（操作に伴って書き換わる参照元を含む）が直コミットを許可した種類で、検査に合格した内容のとき、書き込みと削除が 1 つのコミットになり、コミットするブランチのリモートに入る。応答に操作ごとの文書のバージョンとコミットの SHA・ブランチが返る。コミットに入るのは、その要求が書き込んだ・消したファイルと生成物だけ。
+  編集を始めたときのコミットを添えた要求が、ほかの変更と衝突して今のブランチでは断られ、編集を始めたときのコミットでは許可と検査に合格するとき、その要求の書き込みと削除が編集を始めたときのコミットから作成したブランチの 1 つのコミットになって手元に残り、コミットするブランチとリモートは変わらない。応答にブランチの名前・コミットの SHA と、衝突したときのスクリプトの結果が返る。
+minimal_guarantee: |-
+  1 つでも操作が断られた要求は、どの文書も書き込まず、リモートを変えず、ワークツリーにこの要求が書き込んだ変更を残さない。ワークツリーにあった未プッシュのコミットと未コミットの変更は消さない。断ったときは、断った操作の位置と理由を返却する。
+  衝突したときのスクリプトが失敗しても、作成したブランチとコミットは消さない。一時のワークツリーは、成功しても失敗しても残さない。
 frequency: 利用者が画面で溜めた修正を登録するたび
 priority: 高
 scenarios:
@@ -229,6 +235,8 @@ scenarios:
     notes: テストのコードは、読み取り API で develop のリビジョンの文書 1・文書 2 のバージョンを取得しておく
   - name: 先に書き換わった文書
     description: テストのコードがバージョンを取得した後に、sample の `develop` で文書 1 を書き換えてプッシュする
+  - name: 編集を始めたときのコミット
+    description: 送信しない
   flow: |-
     <!-- map: {"title": "異常シナリオ（文書のバージョンが合わない）"} -->
 
@@ -351,6 +359,293 @@ scenarios:
   - 直コミットの設定で許可していても断る
   - 文書 1 も書き換わらず、sample のリモートと全てのワークツリーと `data/notes.db` は変わらない
   test: test_error_when_sqlite_doc_included
+- name: 正常シナリオ（衝突したら修正をブランチに残してスクリプトを実行する）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが書き込みの API を HTTP で呼ぶ）
+  - name: サンプルの配信元
+    description: 正常シナリオと同じ sample と、2 つのワークツリー
+  - name: sample のリモート
+    description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+  - name: 直コミットの設定
+    description: 正常シナリオと同じ。端末の設定の sample の行に、衝突したときに実行するスクリプトを指定する
+  - name: 衝突したときのスクリプト
+    description: 受け取った値を一時フォルダのファイルへ書き出し、標準出力に 1 行を出して終了コード 0 で終わるテスト用のスクリプト
+  - name: 書き換える文書と消す文書
+    description: sample の `develop` にコミット済みの種類 `note` の文書 1 と文書 2
+    notes: テストのコードは、編集を始めたときの `develop` のコミットの SHA と、読み取り API で文書 1・文書 2 のバージョンを取得しておく
+  - name: 先に書き換わった文書
+    description: テストのコードがバージョンを取得した後に、sample の `develop` で文書 1 の同じ項目を書き換えてプッシュする
+  flow: |-
+    <!-- map: {"title": "正常シナリオ（衝突したら修正をブランチに残してスクリプトを実行する）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（書き込みの API）
+      participant WT as develop のワークツリー
+      participant TW as 一時のワークツリー
+      participant SC as 衝突したときのスクリプト
+      participant R as sample のリモート
+
+      DD->>PI: 編集を始めたときのコミットを添えて、正常シナリオと同じ操作を、書き換わる前の文書 1 のバージョンで送信する
+      PI->>PI: 正常シナリオと同じくオリジンと直コミットの許可を確認し、リポジトリの排他を取る
+      PI->>R: 最新を取得し、develop のワークツリーへ早送りで取り込む
+      PI->>PI: 全ての操作を検査にかけ、文書 1 の今のバージョンが送信したバージョンと合わない
+      PI->>TW: 編集を始めたときのコミットで、ブランチを付けない一時のワークツリーを作成する
+      PI->>PI: 全ての操作を一時のワークツリーの文書で検査にかけ、許可・検査・バージョンの一致に合格する
+      PI->>TW: 文書 1 を書き換え、文書 2 のファイルを削除し、generators を実行して 1 つのコミットにし、そのコミットにブランチを作成する
+      PI->>TW: 一時のワークツリーを削除し、ブランチだけを残す
+      PI->>PI: 排他を放す
+      PI->>SC: 配信元・ブランチ・コミットを指定して実行する
+      SC-->>PI: 終了コード 0 と出力
+      PI-->>DD: 衝突してブランチに残したことと、ブランチの名前・コミットの SHA・スクリプトの終了コードと出力
+    ```
+
+    <!-- /map -->
+  expected:
+  - 応答が、衝突してブランチに残したことと、ブランチの名前・コミットの SHA・スクリプトの終了コード 0 と出力を返却する
+  - sample のクローンに応答の名前のブランチがあり、その先頭のコミットが応答の SHA で、親が編集を始めたときのコミット。コミットの説明は送信した説明で、変更は文書 1・文書 2 のファイルと `generators[]` の生成物だけ
+  - sample のリモートの `develop` に増えたコミットは先に書き換えた 1 件だけで、リモートに応答の名前のブランチは無い
+  - develop のワークツリーの HEAD が `origin/develop` と同じで、`git status` に変更が出ない
+  - 一時のワークツリーが `git worktree list` に出ず、フォルダも残らない
+  - スクリプトが書き出したファイルに、配信元の ID `sample`・応答のブランチの名前・コミットの SHA がある
+  test: test_normal_when_conflict_kept_in_branch
+- name: 正常シナリオ（衝突してスクリプトの指定が無い）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが書き込みの API を HTTP で呼ぶ）
+  - name: サンプルの配信元
+    description: 正常シナリオと同じ sample と、2 つのワークツリー
+  - name: sample のリモート
+    description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+  - name: 直コミットの設定
+    description: 正常シナリオと同じ
+    notes: 端末の設定の sample の行に、衝突したときに実行するスクリプトを指定しない
+  - name: 書き換える文書と消す文書
+    description: sample の `develop` にコミット済みの種類 `note` の文書 1 と文書 2
+    notes: テストのコードは、編集を始めたときの `develop` のコミットの SHA と、読み取り API で文書 1・文書 2 のバージョンを取得しておく
+  - name: 先に書き換わった文書
+    description: テストのコードがバージョンを取得した後に、sample の `develop` で文書 1 の同じ項目を書き換えてプッシュする
+  flow: |-
+    <!-- map: {"title": "正常シナリオ（衝突してスクリプトの指定が無い）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（書き込みの API）
+      participant TW as 一時のワークツリー
+
+      DD->>PI: 衝突したら修正をブランチに残す正常シナリオと同じ要求を送信する
+      PI->>TW: 編集を始めたときのコミットの一時のワークツリーで許可と検査に合格させ、1 つのコミットにしてブランチを作成し、一時のワークツリーを削除する
+      PI-->>DD: 衝突してブランチに残したことと、ブランチの名前・コミットの SHA（スクリプトは実行しない）
+    ```
+
+    <!-- /map -->
+  expected:
+  - 応答が、衝突してブランチに残したことと、ブランチの名前・コミットの SHA を返却し、スクリプトの結果を返却しない
+  - sample のクローンに応答の名前のブランチと応答の SHA のコミットがあり、リモートには無い
+  - 一時のワークツリーが残らない
+  test: test_normal_when_conflict_without_script
+- name: 正常シナリオ（ほかの変更で文書が削除されていても修正をブランチに残す）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが書き込みの API を HTTP で呼ぶ）
+  - name: サンプルの配信元
+    description: 正常シナリオと同じ sample と、2 つのワークツリー
+  - name: sample のリモート
+    description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+  - name: 直コミットの設定
+    description: 衝突したら修正をブランチに残す正常シナリオと同じ
+  - name: 書き換える文書
+    description: sample の `develop` にコミット済みの種類 `note` の文書 1
+    notes: テストのコードは、編集を始めたときの `develop` のコミットの SHA と、読み取り API で文書 1 のバージョンを取得しておく
+  - name: 先に削除された文書
+    description: テストのコードがバージョンを取得した後に、sample の `develop` で文書 1 を削除してプッシュする
+  flow: |-
+    <!-- map: {"title": "正常シナリオ（ほかの変更で文書が削除されていても修正をブランチに残す）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（書き込みの API）
+      participant TW as 一時のワークツリー
+      participant SC as 衝突したときのスクリプト
+
+      DD->>PI: 編集を始めたときのコミットを添えて、文書 1 の部分更新を送信する
+      PI->>PI: 今の develop に文書 1 が無い
+      PI->>TW: 編集を始めたときのコミットで一時のワークツリーを作成し、文書 1 の操作が許可・検査に合格する
+      PI->>TW: 文書 1 を書き換えて 1 つのコミットにし、そのコミットにブランチを作成して一時のワークツリーを削除する
+      PI->>SC: 配信元・ブランチ・コミットを指定して実行する
+      PI-->>DD: 衝突してブランチに残したことと、ブランチの名前・コミットの SHA・スクリプトの結果
+    ```
+
+    <!-- /map -->
+  expected:
+  - 応答が、衝突してブランチに残したことと、ブランチの名前・コミットの SHA・スクリプトの結果を返却する
+  - 応答の名前のブランチのコミットで、文書 1 が書き換えた後の値になっている
+  - sample のリモートの `develop` に増えたコミットは先に削除した 1 件だけ
+  test: test_normal_when_conflict_document_deleted
+- name: 正常シナリオ（項目ごとのバージョンで照合する）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが書き込みの API を HTTP で呼ぶ）
+  - name: サンプルの配信元
+    description: 正常シナリオと同じ sample と、2 つのワークツリー
+  - name: sample のリモート
+    description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+  - name: 直コミットの設定
+    description: 衝突したら修正をブランチに残す正常シナリオと同じ
+  - name: 書き換える文書
+    description: sample の `develop` にコミット済みの種類 `note` の文書 1
+    notes: テストのコードは、読み取り API で文書 1 の項目ごとのバージョンを取得しておく
+  - name: 先に書き換わった別の項目
+    description: テストのコードがバージョンを取得した後に、sample の `develop` で文書 1 の `description` を書き換えてプッシュする
+  flow: |-
+    <!-- map: {"title": "正常シナリオ（項目ごとのバージョンで照合する）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（書き込みの API）
+      participant WT as develop のワークツリー
+      participant R as sample のリモート
+
+      DD->>PI: 編集を始めたときのコミットを添えて、文書 1 の title の部分更新を、取得した title の項目のバージョンで送信する
+      PI->>R: 最新を取得し、develop のワークツリーへ早送りで取り込む
+      PI->>PI: 文書 1 の title の今のバージョンが送信したバージョンと合う
+      PI->>WT: 文書 1 の title を書き換え、1 つのコミットにする
+      PI->>R: develop をプッシュする
+      PI-->>DD: 文書 1 の状態・バージョンと、コミットの SHA とブランチ
+    ```
+
+    <!-- /map -->
+  expected:
+  - 応答が成功で、文書 1 の状態が `updated` で、コミットの SHA とブランチ `develop` を返却する
+  - sample のリモートの `develop` の文書 1 が、先に書き換えた `description` と、送信した `title` の両方を持つ
+  - ブランチを作成せず、スクリプトを実行しない
+  test: test_normal_when_item_versions
+- name: 異常シナリオ（衝突してスクリプトが失敗する）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが書き込みの API を HTTP で呼ぶ）
+  - name: サンプルの配信元
+    description: 正常シナリオと同じ sample と、2 つのワークツリー
+  - name: sample のリモート
+    description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+  - name: 直コミットの設定
+    description: 衝突したら修正をブランチに残す正常シナリオと同じ
+  - name: 衝突したときのスクリプト
+    description: 標準エラー出力に 1 行を出して終了コード 1 で終わるテスト用のスクリプト
+  - name: 書き換える文書と消す文書
+    description: sample の `develop` にコミット済みの種類 `note` の文書 1 と文書 2
+    notes: テストのコードは、編集を始めたときの `develop` のコミットの SHA と、読み取り API で文書 1・文書 2 のバージョンを取得しておく
+  - name: 先に書き換わった文書
+    description: テストのコードがバージョンを取得した後に、sample の `develop` で文書 1 の同じ項目を書き換えてプッシュする
+  flow: |-
+    <!-- map: {"title": "異常シナリオ（衝突してスクリプトが失敗する）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（書き込みの API）
+      participant TW as 一時のワークツリー
+      participant SC as 衝突したときのスクリプト
+
+      DD->>PI: 衝突したら修正をブランチに残す正常シナリオと同じ要求を送信する
+      PI->>TW: 編集を始めたときのコミットの一時のワークツリーで許可と検査に合格させ、1 つのコミットにしてブランチを作成し、一時のワークツリーを削除する
+      PI->>SC: 配信元・ブランチ・コミットを指定して実行する
+      SC-->>PI: 終了コード 1 と出力
+      PI-->>DD: 衝突してブランチに残したことと、ブランチの名前・コミットの SHA・スクリプトが失敗した終了コードと出力
+    ```
+
+    <!-- /map -->
+  expected:
+  - 応答が、衝突してブランチに残したことと、ブランチの名前・コミットの SHA・スクリプトの終了コード 1 と出力を返却する
+  - sample のクローンに応答の名前のブランチと応答の SHA のコミットが残る
+  - 一時のワークツリーが残らない
+  test: test_error_when_conflict_script_failed
+- name: 異常シナリオ（編集を始めたときのコミットでも検査に合格しない）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが書き込みの API を HTTP で呼ぶ）
+  - name: サンプルの配信元
+    description: 正常シナリオと同じ sample と、2 つのワークツリー
+  - name: sample のリモート
+    description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+  - name: 直コミットの設定
+    description: 衝突したら修正をブランチに残す正常シナリオと同じ
+  - name: 書き換える文書
+    description: sample の `develop` にコミット済みの種類 `note` の文書 1
+    notes: テストのコードは、編集を始めたときの `develop` のコミットの SHA と、読み取り API で文書 1 のバージョンを取得しておく
+  - name: 先に書き換わった文書
+    description: テストのコードがバージョンを取得した後に、sample の `develop` で文書 1 の同じ項目を書き換えてプッシュする
+  flow: |-
+    <!-- map: {"title": "異常シナリオ（編集を始めたときのコミットでも検査に合格しない）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（書き込みの API）
+      participant TW as 一時のワークツリー
+
+      DD->>PI: 編集を始めたときのコミットを添えて、スキーマに違反する値への文書 1 の部分更新を送信する
+      PI->>PI: 今の develop で、文書 1 のバージョンが合わない
+      PI->>TW: 編集を始めたときのコミットで、ブランチを付けない一時のワークツリーを作成する
+      PI->>PI: 一時のワークツリーでも、文書 1 の操作がスキーマの検査に合格しない
+      PI->>TW: 一時のワークツリーを削除する
+      PI-->>DD: 今の develop で断った理由（バージョンの不一致）を返却して断る
+    ```
+
+    <!-- /map -->
+  expected:
+  - 応答が失敗で、今の develop で断った文書 1 のバージョンの不一致を返却する
+  - ブランチを作成せず、一時のワークツリーが残らず、スクリプトを実行しない
+  - sample のリモートの `develop` に増えたコミットは先に書き換えた 1 件だけ
+  test: test_error_when_invalid_at_base_commit
+- name: 異常シナリオ（編集を始めたときのコミットが起点に使えない）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが書き込みの API を HTTP で呼ぶ）
+  - name: サンプルの配信元
+    description: 正常シナリオと同じ sample と、2 つのワークツリー
+  - name: sample のリモート
+    description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+    notes: '`master` にだけあり `develop` の祖先でないコミットを 1 つ持つ'
+  - name: 直コミットの設定
+    description: 衝突したら修正をブランチに残す正常シナリオと同じ
+  - name: 書き換える文書
+    description: sample の `develop` にコミット済みの種類 `note` の文書 1
+    notes: テストのコードは、読み取り API で文書 1 のバージョンを取得しておく
+  - name: 起点に使えないコミット
+    description: sample のクローンに無い SHA と、`master` にだけあるコミットの SHA
+    notes: 1 回目は無い SHA、2 回目は `master` にだけあるコミットの SHA を、編集を始めたときのコミットとして送信する
+  flow: |-
+    <!-- map: {"title": "異常シナリオ（編集を始めたときのコミットが起点に使えない）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（書き込みの API）
+      participant R as sample のリモート
+
+      DD->>PI: クローンに無い SHA を編集を始めたときのコミットとして添えて、文書 1 の部分更新を送信する
+      PI->>R: 最新を取得し、develop のワークツリーへ早送りで取り込む
+      PI->>PI: 送信したコミットがクローンに無い
+      PI-->>DD: 編集を始めたときのコミットが無いことを返却して断る
+      DD->>PI: master にだけあるコミットを編集を始めたときのコミットとして添えて、同じ部分更新を送信する
+      PI->>R: 最新を取得し、develop のワークツリーへ早送りで取り込む
+      PI->>PI: 送信したコミットがコミットするブランチ develop の祖先でない
+      PI-->>DD: 編集を始めたときのコミットがコミットするブランチの祖先でないことを返却して断る
+    ```
+
+    <!-- /map -->
+  expected:
+  - 1 回目の応答が失敗で、編集を始めたときのコミットがクローンに無いことを返却する
+  - 2 回目の応答が失敗で、編集を始めたときのコミットがコミットするブランチ `develop` の祖先でないことを返却する
+  - どちらの要求でも、ブランチと一時のワークツリーを作成せず、スクリプトを実行しない
+  - sample のリモートと develop のワークツリーは変わらない
+  test: test_error_when_base_commit_unusable
 refs:
 - to: SC-1
   item: scenarios[正常シナリオ]

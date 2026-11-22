@@ -78,8 +78,8 @@ functions:
     process: |-
       1. `lock` を取る
       2. 端末の設定の本文と内容のバージョンを読み（端末の設定の内容の読み込み）、内容のバージョンを照合する（内容のバージョンの照合）
-      3. 本文を往復編集の形で読み（往復編集の読み込み）、送られた行ごとに、ファイルの `sources` から配信元の ID（配信元の『行の配信元の ID』。`id`、無ければ設定の `name`）が同じ行を探す
-         - 見つかった場合、送られた行に含めなかったキー（`SourceEntry` の `model_fields_set` に無い `enabled`・`outside_read`・`storage` と、`scope` を含めなかった行か `SourceScope` の `model_fields_set` に無い `scope.read`・`scope.write` と、`direct_commit` を含めなかった行か `SourceDirectCommit` の `model_fields_set` に無い `direct_commit.scope`・`direct_commit.kinds`・`direct_commit.write_api_kinds`）を、見つかった行の値で埋める
+      3. 送られた行の `direct_commit` の `model_fields_set` に `on_conflict` がある場合、ファイルを書かずに違反のパス `sources[{番号}].direct_commit.on_conflict` の `TerminalConfigInvalidError` を送る。本文を往復編集の形で読み（往復編集の読み込み）、送られた行ごとに、ファイルの `sources` から配信元の ID（配信元の『行の配信元の ID』。`id`、無ければ設定の `name`）が同じ行を探す
+         - 見つかった場合、送られた行に含めなかったキー（`SourceEntry` の `model_fields_set` に無い `enabled`・`outside_read`・`storage` と、`scope` を含めなかった行か `SourceScope` の `model_fields_set` に無い `scope.read`・`scope.write` と、`direct_commit` を含めなかった行か `SourceDirectCommit` の `model_fields_set` に無い `direct_commit.scope`・`direct_commit.kinds`・`direct_commit.write_api_kinds`）を、見つかった行の値で埋める。`direct_commit.on_conflict` は常に見つかった行の値を残す
          - ID が求まらない行と、同じ ID の行が無い行は埋めない（既定値のまま）。ファイルの行のうち `SourceEntry` として読めない行（スキーマに通らない行）は探す対象から除く
       4. `sources` だけを埋めた後の行に置き換える。`config` は要素の数によらず配列で書く。既定値と同じキー（`enabled: true`・`outside_read: true`・空の `scope.read` など）は書かない。`direct_commit` は空でない `scope`・`kinds`・`write_api_kinds` だけを書き、全て空の行には `direct_commit` を書かない
       5. 置き換えた値を検証する（端末の設定の検証）
@@ -189,6 +189,19 @@ functions:
         condition: '`direct_commit.scope` だけを持ち `kinds` が空の行と、`scope`・`kinds` がどちらも空の `direct_commit` を持つ行'
         mock: 配信元の再読み込み（偽物）
         expected: 1 行目は `direct_commit` に `scope` だけがあり `kinds` が無い。2 行目に `direct_commit` が無い
+      - name: test_save_sources_when_on_conflict_sent
+        case: 異常
+        summary: 衝突したときのスクリプトの指定を送られたら断る
+        condition: 送る sample の行に `direct_commit.on_conflict.command`
+        mock: なし（一時フォルダの settings.yaml）
+        expected: '`TerminalConfigInvalidError` で違反のパスが `sources[0].direct_commit.on_conflict`。ファイルは変わらない'
+        exception: 衝突したときのスクリプトの指定を送られた
+      - name: test_save_sources_when_on_conflict_kept
+        case: 正常
+        summary: ファイルの衝突したときのスクリプトの指定を残す
+        condition: ファイルの sample の行に `direct_commit.on_conflict.command`。送る sample の行は `scope.read` だけを変える
+        mock: なし（一時フォルダの settings.yaml）
+        expected: ファイルの sample の行の `direct_commit.on_conflict.command` が元のまま
   - name: add_source
     title: 配信元の 1 行の追加
     kind: 関数
@@ -236,7 +249,7 @@ functions:
     process: |-
       1. `lock` を取る
       2. 端末の設定の本文と内容のバージョンを読み（端末の設定の内容の読み込み）、内容のバージョンを照合する（内容のバージョンの照合）
-      3. 本文を往復編集の形で読み（往復編集の読み込み）、`sources` に、配信元の ID（配信元の『行の配信元の ID』。`id`、無ければ設定の `name`）が `source` と同じ行があるかを探す。`source` の ID が求まらないときは探さない
+      3. `source.direct_commit` の `model_fields_set` に `on_conflict` がある場合、ファイルを書かずに違反のパス `source.direct_commit.on_conflict` の `TerminalConfigInvalidError` を送る。本文を往復編集の形で読み（往復編集の読み込み）、`sources` に、配信元の ID（配信元の『行の配信元の ID』。`id`、無ければ設定の `name`）が `source` と同じ行があるかを探す。`source` の ID が求まらないときは探さない
          - ある場合、既定値と同じ値を書いたキーと書かないキーを同じとみなして行を比べ、`exists` と内容が同じか（`same`）と今の内容のバージョンを返す（ファイルは書かない）
       4. `sources` の末尾に行を加える。書き方は配信元の保存と同じ（`config` は配列、既定値と同じキーは書かない）
       5. 加えた値を検証する（端末の設定の検証）
@@ -309,6 +322,13 @@ functions:
         condition: '`sources` に sample の 1 行の設定に `direct_commit.scope` を持つ extra を追加し、続けて同じ行と `direct_commit.scope` だけが違う行を追加する'
         mock: '`reload`（状態を返す偽物）'
         expected: 1 回目は `added` で、ファイルの extra の行に `direct_commit.scope` があり `kinds` が無い。2 回目は `exists`・`same` が `True`、3 回目は `exists`・`same` が `False`
+      - name: test_add_source_when_on_conflict_sent
+        case: 異常
+        summary: 衝突したときのスクリプトの指定を含む行を断る
+        condition: 追加する行に `direct_commit.on_conflict.command`
+        mock: なし（一時フォルダの settings.yaml）
+        expected: '`TerminalConfigInvalidError` で違反のパスが `source.direct_commit.on_conflict`。ファイルは変わらない'
+        exception: 衝突したときのスクリプトの指定を送られた
   - name: patch_source
     title: 配信元の 1 行の変更
     kind: 関数
@@ -362,7 +382,7 @@ functions:
     process: |-
       1. `lock` を取る
       2. 端末の設定の本文と内容のバージョンを読み（端末の設定の内容の読み込み）、内容のバージョンを照合する（内容のバージョンの照合）
-      3. 本文を往復編集の形で読み（往復編集の読み込み）、`sources` から配信元の ID（配信元の『行の配信元の ID』）が `source_id` の最初の行を探す。`SourceEntry` として読めない行は探す対象から除く
+      3. `patch.direct_commit` の `model_fields_set` に `on_conflict` がある場合、ファイルを書かずに違反のパス `source.direct_commit.on_conflict` の `TerminalConfigInvalidError` を送る。本文を往復編集の形で読み（往復編集の読み込み）、`sources` から配信元の ID（配信元の『行の配信元の ID』）が `source_id` の最初の行を探す。`SourceEntry` として読めない行は探す対象から除く
          - 無い場合、`SourceRowNotFoundError` を送る
       4. 見つけた行に、`patch` の `model_fields_set` にあるキーだけを重ねる。`scope` は `read`・`write` を `SourceScope` の `model_fields_set` で、`direct_commit` は `scope`・`kinds`・`write_api_kinds` を `SourceDirectCommit` の `model_fields_set` で別々に重ねる
       5. 見つけた行が `id` を省いていて、重ねた後の行の配信元の ID が `source_id` と違う場合、ファイルを書かずに `TerminalConfigInvalidError`（違反のパス `source.config`）を送る
@@ -441,6 +461,13 @@ functions:
         condition: ファイルの extra の行に `direct_commit.scope`。`direct_commit.kinds`（`note` の glob）だけの変更
         mock: '`reload`（偽物）'
         expected: ファイルの extra の行に `direct_commit.kinds.note` が入り、`direct_commit.scope` は元のまま
+      - name: test_patch_source_when_on_conflict_sent
+        case: 異常
+        summary: 衝突したときのスクリプトの指定の変更を断る
+        condition: 変更に `direct_commit.on_conflict.command`
+        mock: なし（一時フォルダの settings.yaml）
+        expected: '`TerminalConfigInvalidError` で違反のパスが `source.direct_commit.on_conflict`。ファイルは変わらない'
+        exception: 衝突したときのスクリプトの指定を送られた
   - name: delete_source
     title: 配信元の 1 行の削除
     kind: 関数

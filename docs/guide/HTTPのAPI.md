@@ -18,7 +18,7 @@
 | `GET /sources?include_loading=` | 配信元ごとの ID・状態（`serving`・`not_served`・`disabled`）・配信していない理由。全ての配信元の読み込みが終わるまで待って返す。`include_loading=true` で待たずに返し、読み込みが終わっていない配信元を `loading` で返す | - |
 | `GET /sources/{source}/config?schemas=` | 配信元の設定のうち `nav`・`documents[]`（スクリプトのコマンドを除く）・`decisions.folders`・`github`・`diff`。`schemas=true` で `documents[]` の行ごとの `$ref` を解いた種類のスキーマも返す | 404（無い・配信していない配信元）・504（`schemas=true` で、リビジョンの書き出しが待ち時間の上限を超えた。`RevisionExportTimeoutError`） |
 | `GET /sources/{source}/docs?ref=&values=&common_keys=` | 指したリビジョン（省くと `default_ref`。`storage.type: disk` の配信元は `ref` を無視して登録したフォルダを読み、応答の `ref` は空）の文書の ID・パス・種類・メタデータ・バージョン。`values=true` で文書の値も返す。`common_keys=true` で、配信元の設定の行の `metadata`・`alias_type` で解決した共通のキーも返す。リビジョンは書き出さずに commit から読む | 404（配信元・リビジョン） |
-| `GET /sources/{source}/docs/{path}?ref=&id=` | 文書の値・種類のスキーマ・メタデータ（解決した共通のキーを含む）。管理用の YAML の行の文書は本文の文字列と本文のファイルのパスも返す。`converters[]` を指す種類は、スクリプトが出した Markdown か変換の失敗 | 404（配信元・リビジョン・文書）・504（リビジョンの書き出しが待ち時間の上限を超えた。`RevisionExportTimeoutError`） |
+| `GET /sources/{source}/docs/{path}?ref=&id=` | 文書の値・種類のスキーマ・メタデータ（解決した共通のキーを含む）・値の最上位のキーごとのバージョン（`itemVersions`）。管理用の YAML の行の文書は本文の文字列と本文のファイルのパスも返す。`converters[]` を指す種類は、スクリプトが出した Markdown か変換の失敗 | 404（配信元・リビジョン・文書）・504（リビジョンの書き出しが待ち時間の上限を超えた。`RevisionExportTimeoutError`） |
 | `GET /sources/{source}/decisions` | `decisions.folders` にある検討事項の ID と、ID ごとに当たるフォルダの数 | 404（配信元） |
 | `GET /sources/{source}/decisions/{id}` | ちょうど 1 つのフォルダにある検討事項の文書の本文 | 404（当たるフォルダが 0 個か 2 個以上。`reason` に `not_found`・`ambiguous`） |
 | `GET /sources/{source}/search?q=&ref=&limit=` | 語を含む文書の ID・文書のファイルのパスと一致した箇所 | 400（語が空・長すぎる）・404・504（リビジョンの書き出しが待ち時間の上限を超えた。`RevisionExportTimeoutError`） |
@@ -49,6 +49,7 @@
 `PUT` で行に含めなかったキー（`enabled`・`scope.read`・`scope.write`・`outside_read`・`storage`）は、ファイルの同じ配信元の行（`id`、無ければ配信元の設定の `name` で照合します）の今の値で残ります。
 `GET` の行は、端末の設定の `outside_read` を `outsideRead` で返します。
 `PUT`・`POST`・`PATCH` の再読み込みは、管理の MCP の `reload` と同じく、配信元の一覧を差し替えた時点で応答します（[管理のMCP](./管理のMCP.md) の `## reload`）。
+`sources[].direct_commit.on_conflict` は `GET` で返さず、`PUT`・`POST`・`PATCH` で送ると 422 で断ります。`PUT`・`PATCH` で書き換えた行も、ファイルの `on_conflict` の値を残します。
 `storage` は記載した行だけが `storage.type`（`git`・`disk`）で返し、`git`・`disk` 以外の値を送った書き換えは 422 で断ります。
 `GET` と書き換えの応答は、端末の設定の内容のバージョンを `version` で返します。
 書き換えの要求の `expectedVersion`（`DELETE` はクエリ）が今の内容のバージョンと違うと、書き換えずに 409 で断り、今の内容のバージョンを `current` で返します。
@@ -61,7 +62,7 @@
 
 | エンドポイント | 動き | 主なエラー |
 | --- | --- | --- |
-| `POST /sources/{source}/commits` | 本文の `writes`（`write_docs` の `operations` と同じ操作）と `deletes`（`id`・`expectedVersion`）を 1 回で受け、`write_docs`・`delete_docs` と同じ検査に合格させてから、1 つのコミットにまとめてコミットするブランチへプッシュする。`dryRun: true` で検査と差分だけを返す | 400（引数の誤り）・403（別のオリジン・直コミットを許可していない種類）・404（配信元・文書）・409（バージョン・ワークツリーの状態・プッシュを断られた）・422（検査の違反）・500（生成の失敗）・502（取得・プッシュの失敗）・504（書き込みの期限） |
+| `POST /sources/{source}/commits` | 本文の `writes`（`write_docs` の `operations` と同じ操作）と `deletes`（`id`・`expectedVersion`）を 1 回で受け、`write_docs`・`delete_docs` と同じ検査に合格させてから、1 つのコミットにまとめてコミットするブランチへプッシュする。`dryRun: true` で検査と差分だけを返す | 400（引数の誤り）・403（別のオリジン・直コミットを許可していない種類）・404（配信元・文書）・409（バージョン・ワークツリーの状態・プッシュを断られた・`baseCommit` を起点に使えない）・422（検査の違反）・500（生成の失敗）・502（取得・プッシュの失敗）・504（書き込みの期限） |
 
 <!-- /table -->
 
@@ -69,5 +70,15 @@
 直コミットできるのは、端末の設定の `sources[].direct_commit.write_api_kinds` に記載し、配信元の設定の `direct_commit.kinds[]` にもある種類の文書だけです（[設定](./設定.md)）。
 書き込みと削除で書き換わる文書（参照を外す参照元を含む）が 1 つでも検査に合格しないか許可していない種類なら、どの文書も書き込まず、リモートも変えません。
 本文には `message`（コミットの説明）が必須で、`branch`（上書きするブランチ）・`onReferenced`（`fail`・`unlink`）を指定できます。
-応答は `applied`・`results[]`（`kind` が `write`・`delete`）・`unlinked[]`・`commit`（`sha`・`branch`・`retried`）です。
+応答は `applied`・`results[]`（`kind` が `write`・`delete`）・`unlinked[]`・`commit`（`sha`・`branch`・`retried`）・`conflict` です。
+
+本文に `baseCommit`（編集を始めたときのコミットするブランチのコミット）を指定すると、今のブランチではバージョンの不一致・文書が無い・参照されている・検査の違反で断られる要求も、`baseCommit` で許可と検査に合格すれば、修正をブランチに残して 200 で返します。
+
+- `baseCommit` から `project-index/conflict/{YYYYMMDD-HHMMSS}-{コミットの 7 桁}`（時刻は UTC）のブランチを作り、書き込みと削除を 1 つのコミットにします。ブランチはプッシュしません
+- 許可は今のブランチの配信元の設定で判定し、スキーマ・`validators[]`・`generators[]` と文書の値は `baseCommit` のものを使用します
+- `baseCommit` でも合格しない要求は、今のブランチで断った理由で断ります
+- 端末の設定の `sources[].direct_commit.on_conflict.command` があれば、ブランチを作った後に実行し、終了コードと出力の末尾を返します。スクリプトが失敗してもブランチは残ります
+- 応答の `conflict` は `branch`・`commit`・`baseCommit`・`errors[]`（今のブランチで断った理由）・`script`（`exitCode`・`timedOut`・`stdout`・`stderr`）を持ちます。`dryRun: true` ではブランチを作らず、`branch`・`commit`・`script` は `null` です
+
+`itemVersions` の値を `writes[].expected_version` に項目のパス → バージョンの辞書で指定すると、同じ文書の別の項目の変更とは衝突しません。
 `Origin` の扱いは端末の設定の API の書き換えと同じです。

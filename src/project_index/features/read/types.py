@@ -144,6 +144,8 @@ class DocumentValueResponse(ApiModel):
     markdown: str | None = None
     conversion_error: ConversionError | None = None
     updated_at: datetime
+    # `value` の最上位のキー → 値のハッシュ。書き込みの `expected_version` の辞書に指定して照合する
+    item_versions: dict[str, str] = Field(default_factory=dict[str, str])
 
 
 class DecisionItem(ApiModel):

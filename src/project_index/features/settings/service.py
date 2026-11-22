@@ -78,7 +78,27 @@ def _direct_commit_row(direct_commit: SourceDirectCommit) -> dict[str, Any]:
         row["kinds"] = {kind: list(globs) for kind, globs in direct_commit.kinds.items()}
     if direct_commit.write_api_kinds:
         row["write_api_kinds"] = list(direct_commit.write_api_kinds)
+    if direct_commit.on_conflict is not None:
+        row["on_conflict"] = {"command": list(direct_commit.on_conflict.command)}
     return row
+
+
+def _reject_on_conflict(direct_commit: SourceDirectCommit | None, key: str, path: Path) -> None:
+    """端末の設定の API で衝突したときのスクリプトの指定を送られたら、ファイルを書かずに断る。"""
+    if direct_commit is None or "on_conflict" not in direct_commit.model_fields_set:
+        return
+    violation_path = f"{key}.direct_commit.on_conflict"
+    raise TerminalConfigInvalidError(
+        file=path,
+        message=f"{violation_path}: 端末の設定の API からは送信できないキーです",
+        violations=[
+            Violation(
+                path=violation_path,
+                rule="端末の設定の API からは送信できないキーです",
+                fix="衝突したときのスクリプトは端末の設定のファイルに直接記載してください",
+            )
+        ],
+    )
 
 
 def _current_entries(document: object) -> dict[str, SourceEntry]:
@@ -135,6 +155,8 @@ def _merge_direct_commit(
         write_api_kinds=(
             sent.write_api_kinds if "write_api_kinds" in sent_keys else current.write_api_kinds
         ),
+        # 衝突したときのスクリプトは端末の設定の API から変えられないため、常にファイルの値を残す
+        on_conflict=current.on_conflict,
     )
 
 
@@ -229,6 +251,9 @@ def save_sources(
         # 取得した後に書き換えられていないかを照合する
         text, current = read_settings_file(path)
         _check_version(current, expected_version)
+        for number, entry in enumerate(sources):
+            if "direct_commit" in entry.model_fields_set:
+                _reject_on_conflict(entry.direct_commit, f"sources[{number}]", path)
         # sources だけを送られた行に置き換える（他のキーとコメントは保つ）
         document = load_roundtrip(text, file=str(path))
         # 送られなかったキーは、ファイルの同じ配信元の行の今の値で埋める
@@ -255,6 +280,8 @@ def add_source(
         # 取得した後に書き換えられていないかを、同じ id の行の確認より前に照合する
         text, current_version = read_settings_file(path)
         _check_version(current_version, expected_version)
+        if "direct_commit" in source.model_fields_set:
+            _reject_on_conflict(source.direct_commit, "source", path)
         document = load_roundtrip(text, file=str(path))
         current_rows = cast("Mapping[str, list[object] | None]", document).get("sources")
         rows: list[object] = list(current_rows or [])
@@ -296,6 +323,8 @@ def patch_source(
         rows: list[object] = list(
             cast("Mapping[str, list[object] | None]", document).get("sources") or []
         )
+        # 衝突したときのスクリプトの指定の変更は、行を探す前に断る
+        _reject_on_conflict(patch.direct_commit, "source", path)
         index, entry = _find_row(rows, source_id)
         patched = _apply_patch(entry, patch)
         # id を省いた行の配信元の ID が変わる: 再読み込みする配信元が 1 つに決まらないため断る

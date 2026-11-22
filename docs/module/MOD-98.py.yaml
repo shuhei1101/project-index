@@ -112,6 +112,7 @@ classes:
       | `UnpushedCommitsError` | ワークツリーの未プッシュのコミット | `worktree: str`・`ahead: int`・`behind: int` | 409 |
       | `UncommittedChangesError` | 書き込むファイルの未コミットの変更 | `paths: list[str]` | 409 |
       | `FetchFailedError` | リモートからの取得の失敗 | `stderr: str` | 502 |
+      | `BaseCommitUnusableError` | 編集を始めたときのコミットが起点に使えない | `base_commit: str`・`reason: Literal['not_found', 'not_ancestor']` | 409 |
       | `PushRejectedError` | リモートにプッシュを断られた | `reason: str` | 409 |
       | `PushFailedError` | プッシュの失敗・結果の不明 | `stderr: str`・`unknown: bool`・`commit: str` | 502 |
       | `DirectCommitGeneratorError` | 直コミットの生成の失敗 | `script: str`・`reason: str` | 500 |

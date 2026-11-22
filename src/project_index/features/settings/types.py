@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar, Literal
+from typing import Annotated, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -30,6 +30,15 @@ class SourceStorage(BaseModel):
     type: StorageType
 
 
+class OnConflictScript(BaseModel):
+    """端末の設定の `sources[].direct_commit.on_conflict`。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # コマンドと引数の並び。シェルを経由せずに実行する
+    command: list[Annotated[str, Field(min_length=1)]] = Field(min_length=1)
+
+
 class SourceDirectCommit(BaseModel):
     """端末の設定の `sources[].direct_commit`。"""
 
@@ -43,6 +52,9 @@ class SourceDirectCommit(BaseModel):
     write_api_kinds: list[str] = Field(
         default_factory=list[str], serialization_alias="writeApiKinds"
     )
+    # 書き込みの API が衝突して修正をブランチに残した後に実行するスクリプト。
+    # 端末の設定のファイルからだけ読み、端末の設定の API は返さず、受け取ったら断る
+    on_conflict: OnConflictScript | None = Field(default=None, exclude=True)
 
 
 class SourceEntry(BaseModel):

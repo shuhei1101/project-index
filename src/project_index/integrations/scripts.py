@@ -42,13 +42,21 @@ class ScriptError(Exception):
     """スクリプトを動かせない・失敗したことを表す基底。"""
 
     def __init__(
-        self, run: list[str], reason: str, *, exit_code: int | None = None, stdout: str = ""
+        self,
+        run: list[str],
+        reason: str,
+        *,
+        exit_code: int | None = None,
+        stdout: str = "",
+        stderr: str = "",
     ) -> None:
         super().__init__(reason)
         self.run = run
         self.reason = reason
         self.exit_code = exit_code
         self.stdout = stdout
+        # `ScriptFailedError` だけが持つ。標準エラー出力の全て
+        self.stderr = stderr
 
 
 class ScriptNotFoundError(ScriptError):
@@ -215,6 +223,7 @@ def _run(
             f"終了コード {process.returncode} で終わりました。\n{tail}",
             exit_code=process.returncode,
             stdout=out_text,
+            stderr=err_text,
         )
     return ScriptResult(stdout=out_text, stderr=err_text)
 

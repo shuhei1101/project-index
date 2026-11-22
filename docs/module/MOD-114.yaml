@@ -43,6 +43,16 @@ diagrams:
         書き込みと削除の直コミット ..> 文書の検査
         書き込みと削除の直コミット ..> 秘密の値の検出
         書き込みと削除の直コミット ..> 直コミットを進める
+        書き込みと削除の直コミット ..> 衝突したときのブランチへのコミット : baseCommit
+        書き込みと削除の直コミット ..> 衝突したときのスクリプトの実行 : on_conflict
+        class 衝突したときのブランチへのコミット {
+          <<function>>
+        }
+        class 衝突したときのスクリプトの実行 {
+          <<function>>
+        }
+        click 衝突したときのブランチへのコミット href "id:MOD-238#functions[keep_in_branch]"
+        click 衝突したときのスクリプトの実行 href "id:MOD-238#functions[run_conflict_script]"
         class 書き込みの API の入口 {
           <<function>>
         }

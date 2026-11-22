@@ -227,7 +227,8 @@ functions:
       2. 文書の値・種類のスキーマ（`store.row_schema(target, kind)` の `$ref` を解いた形）・メタデータ（`common_keys` に文書の `metadata` を入れる）・本文と本文のファイルのパス（管理用の YAML の行の文書だけ）を集める
          - YAML として読み込めない文書は、`value` を `None` にし、ファイルのパスと行と列を `conversion_error` に入れる
       3. 文書の種類の行が `converter` を持つ場合だけ、`converter.convert(target, document)` の `markdown` か `failure` を入れる
-      4. `updated_at` に、Git の配信元はそのリビジョンでファイルを最後に変えた commit の日時、Git 管理外の配信元はファイルの更新日時を入れる
+      4. `value` が `dict` のとき、最上位のキーごとに `value_hash(value[キー])` を `item_versions` に入れる（書き込みの照合と同じ計算）
+      5. `updated_at` に、Git の配信元はそのリビジョンでファイルを最後に変えた commit の日時、Git 管理外の配信元はファイルの更新日時を入れる
     exceptions:
       - name: DocumentNotFoundError
         condition: '`path` の文書が無い'
@@ -284,6 +285,12 @@ functions:
         condition: '`doc_id` に `n1` を渡す'
         mock: なし
         expected: '`value` が列の値、`schema` が `columns_schema` の結果'
+      - name: test_get_document_item_versions
+        case: 正常
+        summary: 最上位のキーごとのバージョンを返却する
+        condition: '`id`・`title`・`description` を持つ YAML の文書'
+        mock: なし
+        expected: '`item_versions` が 3 つのキーを持ち、各値が `value_hash(value[キー])` と一致する'
   - name: list_decisions
     title: 検討事項の ID の一覧
     kind: 関数

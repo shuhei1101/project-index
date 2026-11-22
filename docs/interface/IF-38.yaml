@@ -18,6 +18,13 @@ callers:
 - SC-17#scenarios[異常シナリオ（別のオリジンからの要求）]
 - SC-17#scenarios[異常シナリオ（許可していない種類の文書が書き換わる）]
 - SC-1#scenarios[正常シナリオ]
+- SC-17#scenarios[正常シナリオ（衝突したら修正をブランチに残してスクリプトを実行する）]
+- SC-17#scenarios[正常シナリオ（衝突してスクリプトの指定が無い）]
+- SC-17#scenarios[正常シナリオ（ほかの変更で文書が削除されていても修正をブランチに残す）]
+- SC-17#scenarios[正常シナリオ（項目ごとのバージョンで照合する）]
+- SC-17#scenarios[異常シナリオ（衝突してスクリプトが失敗する）]
+- SC-17#scenarios[異常シナリオ（編集を始めたときのコミットでも検査に合格しない）]
+- SC-17#scenarios[異常シナリオ（編集を始めたときのコミットが起点に使えない）]
 exclusivity: '[文書の書き込み](id:IF-6) の制約「直コミットの排他」と同じ排他で、直コミットどうしを 1 つずつ進める'
 request:
 - name: source
@@ -55,6 +62,11 @@ request:
   type: bool
   required: false
   description: '`true` のとき、取得・書き込み・コミット・プッシュをせず、許可と検査の結果と差分だけを返却する。既定は `false`'
+- name: baseCommit
+  location: body
+  type: str | None
+  required: false
+  description: 画面が編集を始めたときのコミットするブランチのコミットの SHA（7〜40 桁）。添えた要求は、衝突したときに修正をこのコミットからのブランチに残す。省くと衝突したときも今と同じに断る
 request_example: |-
   ```json
   {"writes": [{"op": "update", "id": "n1", "expected_version": "a1b2c3", "set": {"description": "新しい説明"}}], "deletes": [{"id": "n2", "expectedVersion": "d4e5f6"}], "message": "用語を更新する"}
@@ -96,13 +108,43 @@ response:
 - name: commit.retried
   type: bool
   description: プッシュを 1 回やり直したか
+- name: conflict
+  type: Conflict | None
+  description: '衝突してブランチに残したとき（`dryRun: true` は残せるとき）の結果。衝突しなかったときは `null`'
+- name: conflict.branch
+  type: str | None
+  description: '残したブランチの名前（`dryRun: true` は `null`）'
+- name: conflict.commit
+  type: str | None
+  description: 'ブランチの先頭のコミットの SHA（`dryRun: true` は `null`）'
+- name: conflict.baseCommit
+  type: str
+  description: ブランチの起点にした `baseCommit` を解いた 40 桁の SHA
+- name: conflict.errors[]
+  type: list[ProblemError]
+  description: 今のブランチで断った理由（409・422 の `errors[]` と同じ構造）
+- name: conflict.script
+  type: ScriptResult | None
+  description: '衝突したときのスクリプトの結果。`on_conflict` が無いか `dryRun: true` のときは `null`'
+- name: conflict.script.exitCode
+  type: int | None
+  description: 終了コード（制限時間で止めたときは `null`）
+- name: conflict.script.timedOut
+  type: bool
+  description: 制限時間で止めたか
+- name: conflict.script.stdout
+  type: str
+  description: 標準出力の末尾 8000 文字
+- name: conflict.script.stderr
+  type: str
+  description: 標準エラー出力の末尾 8000 文字
 response_example: |-
   ```json
   {"applied": true, "results": [{"kind": "write", "index": 0, "id": "n1", "status": "updated", "version": "b2c3d4", "diff": "..."}, {"kind": "delete", "index": 0, "id": "n2", "status": "deleted", "version": null, "diff": "..."}], "unlinked": [], "commit": {"sha": "0a1b2c3", "branch": "develop", "retried": false}}
   ```
 status_codes:
 - code: '200'
-  condition: '書き込み・コミット・プッシュをした、または `dryRun: true` で検査に合格した'
+  condition: '書き込み・コミット・プッシュをした、`dryRun: true` で検査に合格した、または衝突して修正をブランチに残した（`conflict` を入れる）'
 - code: '400'
   condition: 要求の型の検証に失敗した（`message` が無い・`writes` と `deletes` が両方とも空。`InvalidArgumentError`）
   notes: 起動の『例外の変換の登録』が problem+json にし、`errors[]` にキーのパスと理由を並べる
@@ -112,7 +154,7 @@ status_codes:
 - code: '404'
   condition: 無い配信元（`UnknownSourceError`）・配信していない配信元（`SourceNotServedError`）・更新や削除する文書が無い（`DocumentNotFoundError`）
 - code: '409'
-  condition: 文書のバージョンが取り込んだ後の今のバージョンと違う（`VersionMismatchError`）、直コミットを使用できない配信元（`DirectCommitNotConfiguredError`）、コミットするブランチのワークツリーが無い（`CommitWorktreeNotFoundError`）、ワークツリーに未プッシュのコミット（`UnpushedCommitsError`）・書き込むファイルに未コミットの変更（`UncommittedChangesError`）がある、削除する文書が参照されている（`DocumentReferencedError`）、プッシュが 2 回断られた（`PushRejectedError`）
+  condition: 文書のバージョンが取り込んだ後の今のバージョンと違う（`VersionMismatchError`）、直コミットを使用できない配信元（`DirectCommitNotConfiguredError`）、コミットするブランチのワークツリーが無い（`CommitWorktreeNotFoundError`）、ワークツリーに未プッシュのコミット（`UnpushedCommitsError`）・書き込むファイルに未コミットの変更（`UncommittedChangesError`）がある、削除する文書が参照されている（`DocumentReferencedError`）、プッシュが 2 回断られた（`PushRejectedError`）、`baseCommit` がクローンに無いかコミットするブランチの祖先でない（`BaseCommitUnusableError`）
 - code: '422'
   condition: 検査に合格しない（`ValidationFailedError`。配信元の設定の `direct_commit.kinds[]` に無い種類の文書が書き換わる・秘密の値を含むも同じ）
   notes: '`errors[]` に、`writes`・`deletes` の別と添字・項目のパス・決まり・直し方を全て並べる'
@@ -142,9 +184,23 @@ constraints:
 - item: バージョンの照合
   constraint: 取得と取り込みの後のワークツリーの文書のバージョンと、`writes[].expected_version`・`deletes[].expectedVersion` を照合する
 - item: 書き込みの期限
-  constraint: '[文書の書き込み](id:IF-6) の制約「書き込みの期限」と同じ'
+  constraint: '要求を受けてから書き込みの API の書き込みの期限までに、検査とファイルの置き換えの開始を終える。衝突したときの一時のワークツリーでの検査のやり直しと書き込みの開始もこの期限の中に収める。過ぎたときの扱いは [文書の書き込み](id:IF-6) の制約「書き込みの期限」と同じ'
+  decided_by: NFR-1#requirements[書き込みの API の書き込みの期限]
 - item: JSON のキー
   constraint: 要求と応答のキーは camelCase。`writes[]` の操作のキーは `write_docs` の `operations[]` のキーのまま
+- item: 衝突の判定
+  constraint: '`baseCommit` を添えた要求が、今のブランチで `VersionMismatchError`・`DocumentNotFoundError`・`DocumentReferencedError`・`ValidationFailedError` のどれかで断られたときを衝突とし、`baseCommit` の一時のワークツリーで同じ許可と検査をやり直す。許可（配信元の設定の `direct_commit.kinds[]`・端末の設定の `write_api_kinds`・読み取り専用の種類・秘密の値の検査）は今の `origin/{コミットするブランチ}` の配信元の設定で判定し、スキーマ・`validators[]`・`generators[]` と文書の値は `baseCommit` の一時のワークツリーのものを使用する。オリジン・直コミットの権限・ブランチ・読み取り専用の種類・ワークツリーの状態・取得・プッシュ・期限のエラーは衝突にせず、今と同じに断る'
+- item: 編集を始めたときのコミット
+  constraint: '取得と取り込みの後に、`baseCommit` がクローンにあり、`origin/{コミットするブランチ}` の祖先であることを確認する。クローンに無ければ `reason: not_found`、祖先でなければ `reason: not_ancestor` の `BaseCommitUnusableError`（409）で、検査の前に断る'
+- item: 衝突したときのブランチ
+  constraint: '`baseCommit` でブランチを付けない一時のワークツリーを状態のフォルダの下に作り、`writes`・`deletes` と `generators[]` の結果を 1 つのコミット（説明は `message`）にしてから、そのコミットに `project-index/conflict/{YYYYMMDD-HHMMSS}-{コミットの 7 桁}`（時刻は UTC）のブランチを作る。ブランチはクローンにだけ作り、プッシュしない。一時のワークツリーは成功しても失敗しても削除する'
+- item: 衝突したときの断る理由
+  constraint: '`baseCommit` の一時のワークツリーでも合格しない要求は、今のブランチで断ったエラーと `errors[]` で断る（一時のワークツリーの違反は返却しない）'
+- item: 衝突したときのスクリプト
+  constraint: 端末の設定の `sources[].direct_commit.on_conflict.command` を、ブランチを作って排他を放した後に、シェルを経由せずクローン本体を作業ディレクトリにして実行する。環境変数 `PROJECT_INDEX_SOURCE`（配信元の ID）・`PROJECT_INDEX_CONFLICT_BRANCH`・`PROJECT_INDEX_CONFLICT_COMMIT`・`PROJECT_INDEX_BASE_COMMIT`・`PROJECT_INDEX_TARGET_BRANCH`（コミットするブランチ）・`PROJECT_INDEX_COMMIT_MESSAGE` を加え、ほかはサーバーのプロセスの環境変数を引き継ぐ。制限時間は、要求を受けてから書き込みの API の応答の上限までの残りの時間と、端末の設定の `script_timeout_sec` の短い方にする。終了コードが 0 以外でも、制限時間で止めても、ブランチは削除せずに 200 で結果を返却する
+  decided_by: NFR-1#requirements[書き込みの API の応答の上限]
+- item: 試しに書くときの衝突
+  constraint: '`dryRun: true` で衝突したときも一時のワークツリーで許可と検査をやり直し、合格すれば `conflict` を `branch`・`commit`・`script` が `null` で返却する。ブランチを作らず、スクリプトを実行しない'
 flows:
 - name: 正常系
   summary: 書き込みと削除を 1 つのコミットにまとめてプッシュする
@@ -407,6 +463,225 @@ flows:
   - 応答が 403 の `application/problem+json` で、`errors[]` に `writes[1]` と種類 `notes_db` が読み取り専用であることがある
   - 文書 1 も書き換わらず、sample のリモートと全てのワークツリーと `data/notes.db` は変わらない
   test: test_error_when_sqlite_kind_included
+- name: 正常系（衝突してブランチに残しスクリプトを実行する）
+  summary: 今のブランチで断られ、編集を始めたときのコミットで合格する要求を、ブランチの 1 つのコミットに残してスクリプトを実行する
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに git の配信元とベアリポジトリのリモートと端末の設定を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+  - name: 配信元
+    description: 正常系と同じ sample。端末の設定の sample の行に `direct_commit.on_conflict.command` で、受け取った環境変数を一時フォルダのファイルへ書き出して終了コード 0 で終わるテスト用のスクリプトを指定する
+  - name: 文書
+    description: '`develop` にコミット済みの種類 `note` の文書 n1・n2 と、そのバージョンと、そのときの `develop` のコミット（編集を始めたときのコミット）'
+  - name: 先の書き換え
+    description: バージョンを取得した後に、リモートの `develop` で n1 の同じ項目を書き換える
+  - name: 入力
+    description: 正常系の入力に、`baseCommit` で編集を始めたときのコミット
+  flow: |-
+    <!-- map: {"title": "正常系（衝突してブランチに残しスクリプトを実行する）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant WT as develop のワークツリー
+      participant TW as 一時のワークツリー
+      participant SC as 衝突したときのスクリプト
+      participant R as リモート
+
+      C->>E: writes（n1）, deletes（n2）, message, baseCommit
+      E->>R: 取得し、develop のワークツリーへ取り込む
+      E->>E: baseCommit がクローンにあり、origin/develop の祖先であることを確認する
+      E->>E: 今の develop で n1 が 409 VersionMismatchError
+      E->>TW: baseCommit でブランチを付けない一時のワークツリーを作る
+      E->>TW: 全ての操作を検査し、書き込み、generators を実行して 1 つのコミットにする
+      E->>TW: コミットにブランチを作り、一時のワークツリーを削除する
+      E->>E: 排他を放す
+      E->>SC: 環境変数に配信元・ブランチ・コミットを入れて実行する
+      SC-->>E: 終了コード 0 と出力
+      E-->>C: 200 applied: false, conflict（branch・commit・errors・script）
+    ```
+
+    <!-- /map -->
+  expected:
+  - 200 で `applied` が `false`、`commit` が `null`、`conflict.branch` が `project-index/conflict/` で始まり、`conflict.commit` がそのブランチの先頭の SHA
+  - '`conflict.errors[]` に、今の develop で断った n1 のバージョンの不一致がある'
+  - '`conflict.script.exitCode` が `0` で、`stdout` にスクリプトの出力がある'
+  - ブランチの先頭のコミットの親が `baseCommit`、説明が `message`、変更は n1・n2 のファイルと生成物だけ
+  - リモートの `develop` は先の書き換えのコミットのままで、リモートにブランチは無い。develop のワークツリーは変わらない
+  - '`git worktree list` に一時のワークツリーが無く、フォルダも無い'
+  - スクリプトが書き出したファイルに `PROJECT_INDEX_SOURCE=sample` と、ブランチの名前・コミットの SHA がある
+  test: test_normal_when_conflict_kept_in_branch
+- name: 正常系（衝突してスクリプトの指定が無い）
+  summary: '`on_conflict` の無い配信元はブランチを残すだけにする'
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに git の配信元とベアリポジトリのリモートと端末の設定を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+  - name: 配信元
+    description: 正常系と同じ sample
+    notes: 端末の設定の sample の行に `direct_commit.on_conflict` が無い
+  - name: 文書
+    description: '`develop` にコミット済みの種類 `note` の文書 n1・n2 と、そのバージョンと、そのときの `develop` のコミット（編集を始めたときのコミット）'
+  - name: 先の書き換え
+    description: バージョンを取得した後に、リモートの `develop` で n1 の同じ項目を書き換える
+  - name: 入力
+    description: 正常系の入力に、`baseCommit` で編集を始めたときのコミット
+  flow: |-
+    <!-- map: {"title": "正常系（衝突してスクリプトの指定が無い）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant TW as 一時のワークツリー
+
+      C->>E: 衝突してブランチに残す正常系と同じ入力
+      E->>TW: baseCommit の一時のワークツリーで合格させ、コミットとブランチを作って一時のワークツリーを削除する
+      E-->>C: 200 applied: false, conflict（script: null）
+    ```
+
+    <!-- /map -->
+  expected:
+  - 200 で `conflict.branch`・`conflict.commit` があり、`conflict.script` が `null`
+  - クローンにブランチがあり、リモートには無い
+  test: test_normal_when_conflict_without_script
+- name: 正常系（衝突してスクリプトが失敗する）
+  summary: スクリプトが失敗してもブランチを残し、終了コードと出力を返却する
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに git の配信元とベアリポジトリのリモートと端末の設定を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+  - name: 配信元
+    description: 正常系と同じ sample
+    notes: '`direct_commit.on_conflict.command` は標準エラー出力に 1 行を出して終了コード 1 で終わるテスト用のスクリプト'
+  - name: 文書
+    description: '`develop` にコミット済みの種類 `note` の文書 n1・n2 と、そのバージョンと、そのときの `develop` のコミット（編集を始めたときのコミット）'
+  - name: 先の書き換え
+    description: バージョンを取得した後に、リモートの `develop` で n1 の同じ項目を書き換える
+  - name: 入力
+    description: 正常系の入力に、`baseCommit` で編集を始めたときのコミット
+  flow: |-
+    <!-- map: {"title": "正常系（衝突してスクリプトが失敗する）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant TW as 一時のワークツリー
+      participant SC as 衝突したときのスクリプト
+
+      C->>E: 衝突してブランチに残す正常系と同じ入力
+      E->>TW: baseCommit の一時のワークツリーで合格させ、コミットとブランチを作って一時のワークツリーを削除する
+      E->>SC: 実行する
+      SC-->>E: 終了コード 1 と出力
+      E-->>C: 200 applied: false, conflict（script.exitCode: 1）
+    ```
+
+    <!-- /map -->
+  expected:
+  - 200 で `conflict.script.exitCode` が `1`、`stderr` にスクリプトの出力がある
+  - クローンにブランチとコミットが残る
+  test: test_normal_when_conflict_script_failed
+- name: 正常系（項目ごとのバージョンで照合する）
+  summary: 別の項目の変更とは衝突しない
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに git の配信元とベアリポジトリのリモートと端末の設定を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+  - name: 配信元
+    description: 正常系と同じ sample
+  - name: 文書
+    description: '`develop` にコミット済みの種類 `note` の文書 n1 と、文書の取得の `itemVersions` の `title` の値'
+  - name: 先の書き換え
+    description: 項目のバージョンを取得した後に、リモートの `develop` で n1 の `description` を書き換える
+  - name: 入力
+    description: '`writes` に n1 の `update`（`set: {title}`、`expected_version: {title: 取得した値}`）'
+  flow: |-
+    <!-- map: {"title": "正常系（項目ごとのバージョンで照合する）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant R as リモート
+
+      C->>E: writes（n1 の title の update。項目ごとのバージョン）
+      E->>R: 取得し、取り込む
+      E->>E: n1 の title の今の value_hash が合う
+      E->>R: develop をプッシュする
+      E-->>C: 200 applied: true
+    ```
+
+    <!-- /map -->
+  expected:
+  - 200 で `applied` が `true`、`conflict` が `null`
+  - リモートの `develop` の n1 が、先に書き換えた `description` と送信した `title` の両方を持つ
+  test: test_normal_when_item_versions
+- name: 異常系（編集を始めたときのコミットが起点に使えない・409）
+  summary: クローンに無いか、コミットするブランチの祖先でない `baseCommit` は断る
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに git の配信元とベアリポジトリのリモートと端末の設定を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+  - name: 配信元
+    description: 正常系と同じ sample。端末の設定の sample の行に `direct_commit.on_conflict.command` で、受け取った環境変数を一時フォルダのファイルへ書き出して終了コード 0 で終わるテスト用のスクリプトを指定する
+  - name: 文書
+    description: '`develop` にコミット済みの種類 `note` の文書 n1・n2 と、そのバージョンと、そのときの `develop` のコミット（編集を始めたときのコミット）'
+  - name: 入力
+    description: 1 回目は `baseCommit` にクローンに無い SHA、2 回目は `master` にだけあるコミットの SHA
+  flow: |-
+    <!-- map: {"title": "異常系（編集を始めたときのコミットが起点に使えない・409）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant R as リモート
+
+      C->>E: baseCommit: クローンに無い SHA
+      E->>R: 取得し、取り込む
+      E-->>C: 409 BaseCommitUnusableError（reason: not_found）
+      C->>E: baseCommit: master にだけあるコミット
+      E->>R: 取得し、取り込む
+      E-->>C: 409 BaseCommitUnusableError（reason: not_ancestor）
+    ```
+
+    <!-- /map -->
+  expected:
+  - 1 回目が 409 で `reason` が `not_found`、2 回目が 409 で `reason` が `not_ancestor`
+  - どちらもブランチと一時のワークツリーを作らず、スクリプトを実行せず、リモートとワークツリーは変わらない
+  test: test_error_when_base_commit_unusable
+- name: 異常系（編集を始めたときのコミットでも検査に合格しない・409）
+  summary: どちらでも合格しない要求は、今のブランチで断った理由で断る
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに git の配信元とベアリポジトリのリモートと端末の設定を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+  - name: 配信元
+    description: 正常系と同じ sample。端末の設定の sample の行に `direct_commit.on_conflict.command` で、受け取った環境変数を一時フォルダのファイルへ書き出して終了コード 0 で終わるテスト用のスクリプトを指定する
+  - name: 文書
+    description: '`develop` にコミット済みの種類 `note` の文書 n1・n2 と、そのバージョンと、そのときの `develop` のコミット（編集を始めたときのコミット）'
+  - name: 先の書き換え
+    description: バージョンを取得した後に、リモートの `develop` で n1 の同じ項目を書き換える
+  - name: 入力
+    description: '`writes` にスキーマに違反する値への n1 の `update` と、`baseCommit`'
+  flow: |-
+    <!-- map: {"title": "異常系（編集を始めたときのコミットでも検査に合格しない・409）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant TW as 一時のワークツリー
+
+      C->>E: writes（スキーマに違反する n1）, baseCommit
+      E->>E: 今の develop で n1 のバージョンが合わず 409
+      E->>TW: baseCommit の一時のワークツリーを作る
+      E->>E: 一時のワークツリーでも n1 がスキーマに合格しない
+      E->>TW: 一時のワークツリーを削除する
+      E-->>C: 409 VersionMismatchError（今の develop で断った理由）
+    ```
+
+    <!-- /map -->
+  expected:
+  - 409 の `VersionMismatchError` で、今の develop で断った n1 のバージョンの不一致（今の develop ではバージョンの照合が検査より先に断る）
+  - ブランチと一時のワークツリーが残らず、スクリプトを実行しない
+  test: test_error_when_invalid_at_base_commit
 test_file: tests/integration/server/test_commit_documents.py
 visibility: internal
 tags:

@@ -1,0 +1,57 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-17.yaml
+    impact: changed
+    detail: 画面で溜めた修正がほかの変更と衝突したとき、断らずに修正をブランチに残し、端末のスクリプトで後の処理を任せる流れを追加する
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: changed
+    detail: 画面が文書を取得したときに、項目ごとのバージョンも受け取れるようにする
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-12.yaml
+    impact: changed
+    detail: 画面から端末の設定を変えても、衝突したときに実行するスクリプトの指定は取得も変更もできず、ファイルの指定は残る
+    depends_on:
+      - docs/scenario/SC-17.yaml
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: run_only
+    detail: 画面のサーバーからの書き込みを含む全体の流れが、衝突しないときに変わらないことを確かめる
+    depends_on: []
+docs:
+  - page: docs/guide/HTTPのAPI.md
+    new: false
+    change: 書き込みの API の起点のコミット・衝突したときの応答と、文書の取得の項目ごとのバージョンを追記する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-22T22:56:15.078417+00:00'
+  - page: docs/guide/設定.md
+    new: false
+    change: 端末の設定の衝突したときに実行するスクリプトのキーを追記する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-22T22:56:15.078417+00:00'
+  - page: docs/guide/コアコンセプト-配信元と権限.md
+    new: false
+    change: 直コミットが衝突したときにブランチに残してスクリプトを実行する仕組みを追記する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-22T22:56:15.078417+00:00'
+  - page: docs/glossary/GLO-1.yaml
+    new: false
+    change: 衝突したときのブランチ・スクリプト・項目ごとのバージョンの用語を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-22T22:56:15.078417+00:00'
+scope_out:
+  - item: 衝突したときに実行するスクリプトの例（ブランチをプッシュして PR を作成し、`確認:task-planner` を付ける）
+    reason: project-index は PR・GitHub の認証・AI Monitor の決まりを持たない（Issue の決定事項）。配置先（端末か AI Monitor の配布物）は未決定で、この PR のスクリプトの引数が決まらないと中身が決まらない
+    plan: shuhei1101/ai-monitor#3778
+  - item: 画面が衝突したときのブランチと項目ごとの照合を使用する
+    reason: dev-docs の画面の変更で、後続の Issue が起票済み
+    plan: shuhei1101/dev-docs#314
+  - item: エージェントからの直コミット（`write_docs`・`delete_docs` の `commit`）が衝突したときの扱い
+    reason: 断られたらエージェントが読み込み直して書き込めるため対象にしない（Issue の本文）
+    plan: none

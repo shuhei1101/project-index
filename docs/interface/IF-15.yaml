@@ -1369,6 +1369,8 @@ constraints:
     notes: '`asyncio.Runner.close` は既定の実行スロットのスレッドの終了を `THREAD_JOIN_TIMEOUT`（300 秒）まで待つ。専用の `ThreadPoolExecutor` は `Runner.close` では待たないが、インタープリタの終了（`threading._register_atexit` の `_python_exit`）で上限なく待つため、停止も `os._exit` で終える。`atexit` に登録した後片付けは無い（`src/project_index` に `atexit` の登録が無い）。追加するときは `os._exit` の前に呼ぶ'
   - item: SQLite の表の行
     constraint: '`documents[].sqlite` のキーの型とファイルの行のキーとの併記は、配信元の設定の検証で違反にする。ファイル・表・列の欠けは配信元を止めず、その行だけ文書を持たずに警告にする。行は最初の取得で読み込み、起動の待ち受けまでの時間に含めない'
+  - item: 衝突したときのスクリプトの検証
+    constraint: '端末の設定の `sources[].direct_commit.on_conflict` は `command` を 1 要素以上の文字列の並びで持つ。違反した行は、端末の設定のほかの違反と同じくその配信元を配信から除外し、`{id}: direct_commit.on_conflict.command: {理由}` をエラーログに出す。コマンドが実行できるかは起動時に確認せず、衝突したときの実行の失敗として返却する'
 refs:
   - to: SC-4
     item: scenarios[正常シナリオ]

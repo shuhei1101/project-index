@@ -17,8 +17,10 @@ if TYPE_CHECKING:
     from project_index.features.write.types import CommitDocumentsRequest, CommitDocumentsResult
     from project_index.main import Handlers
 
-# 応答の上限（文書の MCP のツールの応答の上限と同じ）
-RESPONSE_LIMIT_SEC = 48
+# 書き込みの API の応答の上限（dev-docs が書き込みの API を待つ上限 45 秒 × 0.8）
+WRITE_API_RESPONSE_LIMIT_SEC = 36
+# 書き込みの API の書き込みの期限（応答の上限から、生成とコミット・プッシュ・照合と応答の組み立ての秒数を除く）
+WRITE_API_WRITE_DEADLINE_SEC = 20
 
 
 def _commit(
@@ -33,6 +35,7 @@ def _commit(
         locks=handlers.locks,
         repo_locks=handlers.repo_locks,
         timeout_sec=handlers.terminal.script_timeout_sec,
+        state_dir=handlers.terminal.state_dir,
         limits=limits,
     )
 
@@ -48,10 +51,8 @@ def build_write_router(handlers: Handlers) -> APIRouter:
         # 期限は要求を受けた時刻から数える
         started = time.monotonic()
         limits = CallLimits(
-            write_deadline=Deadline(
-                limit_sec=handlers.terminal.write_deadline_sec, started=started
-            ),
-            respond_by=Deadline(limit_sec=RESPONSE_LIMIT_SEC, started=started),
+            write_deadline=Deadline(limit_sec=WRITE_API_WRITE_DEADLINE_SEC, started=started),
+            respond_by=Deadline(limit_sec=WRITE_API_RESPONSE_LIMIT_SEC, started=started),
         )
         with handlers.slots.request("commit_documents", source=source):
             # 読み込みを待つ間も要求の応答中として数え、裏の検査と書き出しを休ませる

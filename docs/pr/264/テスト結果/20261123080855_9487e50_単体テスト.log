@@ -1,0 +1,66 @@
+$ run_runner（TL-1、gh workflow run test.yml -f layer=unit。run 45081563895）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 1519 items / 2 errors
+
+==================================== ERRORS ====================================
+__ ERROR collecting tests/unit/project_index/features/write/test_conflict.py ___
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/write/test_conflict.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_conflict.py:12: in <module>
+    from project_index.features.settings.types import OnConflictScript
+E   ImportError: cannot import name 'OnConflictScript' from 'project_index.features.settings.types' (/home/runner/work/project-index/project-index/src/project_index/features/settings/types.py)
+___ ERROR collecting tests/unit/project_index/features/write/test_service.py ___
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/write/test_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_service.py:19: in <module>
+    from project_index.features.settings.types import OnConflictScript
+E   ImportError: cannot import name 'OnConflictScript' from 'project_index.features.settings.types' (/home/runner/work/project-index/project-index/src/project_index/features/settings/types.py)
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/write/test_conflict.py
+ERROR tests/unit/project_index/features/write/test_service.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!!
+============================== 2 errors in 2.84s ===============================
+rc=1 run=45081563895
+
+# ランナーは test_conflict.py・test_service.py（write）の収集で止まったため、変更したほかのテストファイルを手元で回した結果
+$ uv run pytest -q --basetemp=/tmp/pr264-pt tests/unit/project_index/features/write/test_route.py tests/unit/project_index/features/settings tests/unit/project_index/features/read/test_service.py tests/unit/project_index/features/sources/test_service.py
+E       assert 32 == 20
+E        +  where 32 = Deadline(limit_sec=32, started=554688.39117579, clock=<built-in function monotonic>).limit_sec
+E        +    where Deadline(limit_sec=32, started=554688.39117579, clock=<built-in function monotonic>) = CallLimits(write_deadline=Deadline(limit_sec=32, started=554688.39117579, clock=<built-in function monotonic>), respond_by=Deadline(limit_sec=48, started=554688.39117579, clock=<built-in function monotonic>)).write_deadline
+E           project_index.features.settings.types.TerminalConfigInvalidError: /tmp/pr264-pt/test_build_settings_router_whe12/settings.yaml: 端末の設定に違反が 1 件あります
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for SourceEntry
+E       direct_commit.on_conflict
+E         Extra inputs are not permitted [type=extra_forbidden, input_value={'command': ['/tmp/bin/other']}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden
+E       KeyError: 'direct_commit'
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for SourceEntry
+E       direct_commit.on_conflict
+E         Extra inputs are not permitted [type=extra_forbidden, input_value={'command': ['/tmp/bin/notify']}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for SourcePatch
+E       direct_commit.on_conflict
+E         Extra inputs are not permitted [type=extra_forbidden, input_value={'command': ['/tmp/bin/other']}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden
+E                   AttributeError: 'DocumentValueResponse' object has no attribute 'item_versions'
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for SourceDirectCommit
+E       on_conflict
+E         Extra inputs are not permitted [type=extra_forbidden, input_value={'command': ['notify']}, input_type=dict]
+E           For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden
+FAILED tests/unit/project_index/features/write/test_route.py::test_build_write_router_when_limits
+FAILED tests/unit/project_index/features/settings/test_route.py::test_build_settings_router_when_on_conflict
+FAILED tests/unit/project_index/features/settings/test_service.py::test_save_sources_when_on_conflict_sent
+FAILED tests/unit/project_index/features/settings/test_service.py::test_save_sources_when_on_conflict_kept
+FAILED tests/unit/project_index/features/settings/test_service.py::test_add_source_when_on_conflict_sent
+FAILED tests/unit/project_index/features/settings/test_service.py::test_patch_source_when_on_conflict_sent
+FAILED tests/unit/project_index/features/read/test_service.py::test_get_document_item_versions
+FAILED tests/unit/project_index/features/sources/test_service.py::test_load_source_when_on_conflict
+8 failed, 190 passed in 2.15s
+
+# fail はすべて実装が無いことによる（OnConflictScript・item_versions・direct_commit_on_conflict・書き込みの API の期限の定数が無い）。実装の前から pass したテストは無い

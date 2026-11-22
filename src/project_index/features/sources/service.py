@@ -578,6 +578,7 @@ def _with_direct_commit(source: ServedSource, entry: SourceEntry) -> ServedSourc
         direct_commit_write_api_kinds=[
             kind for kind in entry.direct_commit.write_api_kinds if kind in settings.kinds
         ],
+        direct_commit_on_conflict=entry.direct_commit.on_conflict,
         direct_commit_problems=violations,
     )
 
@@ -1153,6 +1154,7 @@ def load_source_at(source: ServedSource, root: Path) -> ServedSource:
         direct_commit_scope=source.direct_commit_scope,
         direct_commit_kinds=source.direct_commit_kinds,
         direct_commit_write_api_kinds=source.direct_commit_write_api_kinds,
+        direct_commit_on_conflict=source.direct_commit_on_conflict,
         direct_commit_problems=direct_commit_checks(served.config, worktree_branches=set())[0],
     )
     # 設定のファイル・切り替えたパス・作った配信元が読んだスキーマのファイルを見張る

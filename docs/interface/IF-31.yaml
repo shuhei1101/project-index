@@ -587,6 +587,8 @@ constraints:
   - item: 検査とリビジョンの書き出し
     constraint: 応答は配信元の一覧を差し替えた時点で返し、再読み込みした配信元の検査と `default_ref` の commit の書き出しは裏で実行して待たない。応答の配信元ごとの状態は検査の前の値（`sync` は `null`）
     notes: 管理の MCP の `reload` と同じ。検査が済んだかは管理の MCP の `status` の `checking` で確かめる
+  - item: 衝突したときのスクリプト
+    constraint: 送信した行に `direct_commit.on_conflict` があれば、`sources[{番号}].direct_commit.on_conflict` を送信できないキーとして 422 で断り、ファイルを書き換えない。書き換えるときは、ファイルの同じ配信元の行の `direct_commit.on_conflict` をそのまま残す
 test_file: tests/integration/server/test_put_settings_sources.py
 callers:
   - SC-12#scenarios[正常シナリオ]

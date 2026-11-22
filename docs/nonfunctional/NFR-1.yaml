@@ -395,5 +395,57 @@ requirements:
     overflow: '`documents[].sqlite.limit` を記載しない行は、`order_by` の先頭から 1000 行を配信し、配信しなかった行の数を `describe()` の注意と `check_project` の警告で通知する。黙って切り捨てない'
     rationale: 行の多い表（発話・セリフ）を絞り忘れた行でも、索引のサーバーの記憶域と検索の所要時間が膨らまないようにする。今の最大の配信元 ai-monitor（1,212 文書）で作業範囲の外の配信元の検索の所要時間（NFR-9）を満たしているため、同じ桁の行数を既定にする。配信元の設定の `documents[].sqlite.limit` で行ごとに変えられる
     status: planned
+  - id: NFR-22
+    name: 書き込みの API の応答の上限
+    english_name: write_api_response_limit
+    category: 可用性
+    external_constraint: dev-docs の画面のサーバーが project-index への問い合わせを打ち切る制限時間 45 秒
+    source_kind: 外部 API の制限
+    source: https://github.com/shuhei1101/dev-docs/blob/develop/docs/nonfunctional/NFR-155-1.yaml（非機能要件『project-index への問い合わせの制限時間』）
+    value: '36'
+    unit: 秒
+    measurement: 衝突したときのスクリプトに、制限時間より長く待つスクリプトを指定して衝突する要求を送信し、応答までの時間と `conflict.script.timedOut` を測る
+    breakdown:
+      - part: 外側の待ち
+        value: '45'
+        notes: dev-docs の画面のサーバーの `PROJECT_INDEX_TIMEOUT_SEC`
+      - part: 安全率
+        value: 20%
+        notes: 文書の MCP の応答の上限と同じく、要求の送受信と端末の負荷の分を差し引く
+      - part: アプリの決定値
+        value: '36'
+        notes: 45 × 0.8
+    rationale: 衝突したときのスクリプトは任意の時間がかかるため、応答の上限を外側の待ちにして、スクリプトの制限時間を上限までの残りの時間で決める（規約『資源の値の決め方』の入れ子の待ち）。dev-docs の制限時間を変えたら合わせて再決定する
+    overflow: 'スクリプトを上限までの残りの時間で止め、ブランチを残したまま `conflict.script.timedOut: true` を返却する'
+    status: planned
+  - id: NFR-23
+    name: 書き込みの API の書き込みの期限
+    english_name: write_api_write_deadline
+    category: 可用性
+    external_constraint: 書き込みの API の応答の上限 36 秒
+    source_kind: 外部 API の制限
+    source: NFR-1#requirements[書き込みの API の応答の上限]
+    value: '20'
+    unit: 秒
+    measurement: 期限より長く待つ検査のスクリプトを持つ種類へ書き込みの API を送信し、応答までの時間と、ファイルが書き換わっていないことを測る
+    breakdown:
+      - part: 外側の待ち
+        value: '36'
+        notes: 書き込みの API の応答の上限
+      - part: 取り込みとプッシュの所要時間の余裕
+        value: '8'
+        notes: 直コミットの取り込みとプッシュの所要時間の余裕
+      - part: 生成とコミット
+        value: '3'
+        notes: 直コミットのプッシュの所要時間の内訳と同じ
+      - part: プッシュ
+        value: '5'
+        notes: 直コミットのプッシュの所要時間
+      - part: アプリの決定値
+        value: '20'
+        notes: 36 − (8 + 3 + 5)
+    rationale: 書き込みの API は画面のサーバーから呼ばれるため、文書の MCP の応答の上限から導いた書き込みの期限ではなく、書き込みの API の応答の上限から、期限の後に要る取り込みとプッシュの余裕・生成とコミット・プッシュを差し引いて導く（規約『資源の値の決め方』の入れ子の待ち）。衝突したときの一時のワークツリーでの検査のやり直しと書き込みの開始もこの期限の中に収める。端末の設定では変えられない固定の値にし、端末の設定の `write_deadline_sec` は文書の MCP の書き込みにだけ使用する。外側の待ち（dev-docs の制限時間）を変えたら合わせて再決定する
+    overflow: 期限を過ぎたら、ファイルを 1 つも書き換えずに `WriteDeadlineExceededError` を返却する
+    status: planned
 id: NFR-1
 visibility: internal

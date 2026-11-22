@@ -87,6 +87,7 @@ def test_build_write_router(
         "results": [],
         "unlinked": [],
         "commit": {"sha": "0a1b2c3", "branch": "develop", "retried": False},
+        "conflict": None,
     }
 
 
@@ -151,3 +152,31 @@ def test_build_write_router_when_service_error(
     # 検証
     assert response.status_code == 403
     assert response.json()["kinds"] == ["rules"]
+
+
+def test_build_write_router_when_limits(
+    make_source_dir: Callable[..., Path],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """書き込みの API の期限で呼ぶ（正常系）。"""
+    # 準備
+    limits: list[Any] = []
+
+    def fake(_request: CommitDocumentsRequest, **parts: Any) -> CommitDocumentsResult:
+        limits.append(parts["limits"])
+        return CommitDocumentsResult(applied=False, writes=[], deletes=[], commit=None)
+
+    monkeypatch.setattr(route_module, "commit_documents", fake)
+    client = _client(_handlers(make_source_dir, make_terminal_config, make_entry))
+    body = {
+        "writes": [{"op": "create", "kind": "rules", "data": {"id": "doc-9", "name": "文書 9"}}],
+        "message": "docs: 更新する",
+    }
+    # 実行
+    response = client.post("/sources/sample/commits", json=body)
+    # 検証
+    assert response.status_code == 200
+    assert limits[0].write_deadline.limit_sec == 20
+    assert limits[0].respond_by.limit_sec == 36
