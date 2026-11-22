@@ -51,7 +51,7 @@ functions:
 
     2. POST `/sources/{source}/commits` は、本文を `CommitDocumentsBody` で受け、処理の全体を要求の記録の範囲（`handlers.slots.request("commit_documents", source=パスの source)`）の中で行う。先頭で要求が指す配信元の行の読み込みを待ち、その後の処理は裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中で、文書の MCP の実行スロット（`handlers.slots.run_docs`）で呼ぶ
 
-    3. 本文を `CommitDocumentsBody.to_request(source)` で `CommitDocumentsRequest` にし、書き込みと削除の直コミット（`commit_documents`）を `handlers` の部品と書き込みの期限の `CallLimits` で呼ぶ
+    3. 本文を `CommitDocumentsBody.to_request(source)` で `CommitDocumentsRequest` にし、書き込みと削除の直コミット（`commit_documents`）を `handlers` の部品（状態のフォルダを含む）と、`write_deadline` の秒数を `WRITE_API_WRITE_DEADLINE_SEC`・`respond_by` の秒数を `WRITE_API_RESPONSE_LIMIT_SEC` にした `CallLimits` で呼ぶ
 
     4. 結果を `CommitDocumentsResponse.from_domain(result)` にして 200 で返す
 
@@ -81,8 +81,31 @@ functions:
     condition: 偽物が `DirectCommitNotPermittedError` を送る
     mock: 書き込みと削除の直コミット（偽物）
     expected: 403 の problem+json で、`kinds` を持つ
+  - name: test_build_write_router_when_limits
+    case: 正常
+    summary: 書き込みの API の期限で呼ぶ
+    condition: 書き込みと削除の直コミットを、受けた `limits` を記録する偽物にして POST
+    mock: 書き込みと削除の直コミット（偽物）
+    expected: '`limits.write_deadline.limit_sec` が 20、`limits.respond_by.limit_sec` が 36'
 refs:
 - to: IF-38
   type: requires
   when: インターフェース定義『画面のサーバーからの直コミットの書き込み』の入出力を変えるときに、この設計書の関数と型を合わせる。
 visibility: internal
+constants:
+- name: WRITE_API_RESPONSE_LIMIT_SEC
+  title: 書き込みの API の応答の上限
+  container: project_index/features/write/route.py
+  usecase: 直コミット
+  summary: 要求を受けてから応答を返すまでの秒数
+  value: '36'
+  notes:
+    導き方: '[非機能要件](id:NFR-1) の NFR-22'
+- name: WRITE_API_WRITE_DEADLINE_SEC
+  title: 書き込みの API の書き込みの期限
+  container: project_index/features/write/route.py
+  usecase: 直コミット
+  summary: 要求を受けてから検査とファイルの置き換えの開始を終えるまでの秒数
+  value: '20'
+  notes:
+    導き方: '[非機能要件](id:NFR-1) の NFR-23'

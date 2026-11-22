@@ -844,6 +844,12 @@ functions:
         default: None
         passing: keyword
         description: 無ければ既定の期限
+      - name: state_dir
+        title: 状態のフォルダ
+        type: Path
+        required: true
+        passing: keyword
+        description: 端末の設定の `state_dir`。衝突したときの一時のワークツリーの配置先
     returns:
       type: CommitDocumentsResult
       description: 書き込みと削除の結果とコミットの結果
@@ -853,12 +859,20 @@ functions:
       2. `registry.get_for_docs(request.source)` で配信元を引き、直コミットの書き込む先（`resolve_commit_plan`）で計画を作る。許可する種類は作業場所でなく、書き込みの API から直コミットできる種類（`write_api_committable_kinds`）にする。空なら取得の前に、配信元の `direct_commit.kinds` を `kinds` に添え、`next_steps` で端末の設定の `sources[].direct_commit.write_api_kinds` を示す `DirectCommitNotPermittedError` を送る
 
       3. 文書の書き込みの直コミット（`request.commit` がある場合）の手順 3・4 と同じ排他・`dry_run`・直コミットを進めるの順に進める。`write_once` は 1 つの書く場所と文書の集まり（`_Session`）で次を行う
+         - `request.base_commit` がある場合、最初に編集を始めたときのコミットの確認（`verify_base_commit`、`timeout` は書き込みの期限までの残り）で 40 桁の SHA を求める
          - `writes` を文書の書き込みと同じに当て（`_apply_operations`、`atomic` は `True`）、続けて `deletes` を文書の削除と同じに当てる（`_apply_deletes`、`on_referenced` は要求の値、`atomic` は `True`）。どちらかで失敗したら、`writes`・`deletes` の別と添字を付けた例外を送る
          - 直コミットの確認（文書の書き込みの `_check_commit_content`）を、書き込みと削除で書き換わる全ての文書（参照を外す文書を含む）について、手順 2 の許可する種類で行う。`direct_commit.kinds` に無い種類は `ValidationFailedError`、`direct_commit.kinds` にあって許可する種類に無い種類は `DirectCommitNotPermittedError` にする（前者を先に判定する）
          - 書き込むファイルを `check_clean` にかけ、書き込みと削除を全て書き、書き込みと削除の種類の生成を文書の書き込みの直コミットと同じ制限時間で動かす
          - 書いた・消したファイルを返す（直コミットを進めるが 1 つのコミットにする）
 
-      4. `applied`・`writes`（書き込みの結果）・`deletes`（削除の結果）・`unlinked`・`commit` で返す。会話の記録は残さない（会話キーを持たない）
+      4. 手順 3 が衝突にする例外（`CONFLICT_ERRORS`）で失敗し、`request.base_commit` がある場合、手順 3 の排他を握ったまま衝突したときのブランチへのコミット（`keep_in_branch`、`commit` は `dry_run` でないとき `True`、`now` が `None` なら今の UTC の時刻）を呼ぶ。ほかの例外と、`base_commit` が無い要求の例外はそのまま送る
+         - `write_once` は、受け取ったフォルダを書く場所にして（作業場所の配信元の読み込み。`scope.write` を確認しない）、手順 3 の `write_once` と同じ当て・直コミットの確認（許可する種類は手順 2 の今の配信元の設定のもの）・書き込み・生成を行い、書いた・消したファイルを返す（`check_clean` は呼ばない）
+         - `keep_in_branch` が例外で失敗した場合、手順 3 の例外を送る（一時のワークツリーの例外は捨てる）
+         - 書き込みの期限を過ぎた場合は `WriteDeadlineExceededError` を送る
+
+      5. 排他を放した後、`dry_run` でなく、配信元の端末の設定の行の `direct_commit.on_conflict` がある場合、衝突したときのスクリプトの実行（`run_conflict_script`）を呼ぶ。`cwd` はクローン本体の直下、`env` は配信元の ID・ブランチ・コミット・`base_commit` の 40 桁の SHA・コミットするブランチ・`message`、`timeout_sec` は `limits.respond_by` の残りと `timeout_sec` の短い方にする
+
+      6. `applied`・`writes`（書き込みの結果）・`deletes`（削除の結果）・`unlinked`・`commit` で返す。衝突した場合は `applied` を `False`・`writes`・`deletes`・`unlinked` を一時のワークツリーの結果・`commit` を `None` にし、`conflict` に手順 4 のブランチとコミット・`base_commit` の 40 桁の SHA・手順 3 の例外の違反（`errors`）・手順 5 の結果を入れる。会話の記録は残さない（会話キーを持たない）
     unit_tests:
       - name: test_commit_documents
         case: 正常
@@ -896,6 +910,49 @@ functions:
         condition: '`direct_commit.kinds[]` と `write_api_kinds` に `notes_db` があり、`writes` に `n1` の部分更新'
         mock: git の取得とプッシュを差し替える
         expected: '`ReadOnlyKindError` で、取得とプッシュを呼ばない'
+      - name: test_commit_documents_when_conflict
+        case: 正常
+        summary: 衝突したら修正をブランチに残してスクリプトを実行する
+        condition: '`baseCommit` を添えた n1 の `update` の後に、別のコミットで n1 の同じ項目を変えてプッシュする。端末の設定の sample の行に、環境変数を出力する `on_conflict.command`'
+        mock: なし（一時フォルダの git）
+        expected: '`applied` が `False`、`conflict.branch` の親が `baseCommit`、`conflict.errors` に `VersionMismatchError` の行、`conflict.script.stdout` にブランチの名前。リモートとコミットするブランチは変わらない'
+      - name: test_commit_documents_when_conflict_without_script
+        case: 正常
+        summary: スクリプトの指定が無ければブランチだけを残す
+        condition: 衝突する要求で、端末の設定に `on_conflict` が無い
+        mock: なし（一時フォルダの git）
+        expected: '`conflict.branch` があり、`conflict.script` が `None`'
+      - name: test_commit_documents_when_conflict_deleted
+        case: 正常
+        summary: 書き換える文書が削除されていてもブランチに残す
+        condition: '`baseCommit` の後に n1 を削除したコミットがあり、要求は n1 の `update`'
+        mock: なし（一時フォルダの git）
+        expected: '`conflict.errors` に `DocumentNotFoundError` の行があり、ブランチに n1 の変更がある'
+      - name: test_commit_documents_when_conflict_invalid_at_base
+        case: 異常
+        summary: 編集を始めたときのコミットでも合格しなければ今のブランチの理由で断る
+        condition: 衝突する要求で、`baseCommit` の文書にもスキーマに違反する値を書く
+        mock: なし（一時フォルダの git）
+        expected: '`VersionMismatchError` で、ブランチが増えず、一時のワークツリーが残らない'
+        exception: 編集を始めたときのコミットでも合格しない
+      - name: test_commit_documents_when_base_unusable
+        case: 異常
+        summary: 起点に使えない編集を始めたときのコミットを断る
+        condition: '`baseCommit` にクローンに無い SHA'
+        mock: なし（一時フォルダの git）
+        expected: '`BaseCommitUnusableError` で `reason` が `not_found`、ワークツリーは変わらない'
+      - name: test_commit_documents_when_conflict_dry_run
+        case: 正常
+        summary: 試しに書くと衝突してもブランチを作らない
+        condition: '衝突する要求に `dry_run: True`'
+        mock: なし（一時フォルダの git）
+        expected: '`conflict` の `branch`・`commit`・`script` が `None` で、ブランチが増えず、スクリプトを実行しない'
+      - name: test_commit_documents_when_not_conflict_error
+        case: 異常
+        summary: 衝突にしないエラーは今と同じに断る
+        condition: '`baseCommit` を添え、`write_api_kinds` に無い種類を書き換える'
+        mock: なし（一時フォルダの git）
+        expected: '`DirectCommitNotPermittedError` で、ブランチが増えない'
 refs:
   - to: IF-6
     type: requires

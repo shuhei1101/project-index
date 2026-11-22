@@ -1,0 +1,323 @@
+id: MOD-238
+title: 索引のサーバー / 書き込み / conflict.py
+lead: 書き込みの API が衝突したときの、編集を始めたときのコミットの確認・一時のワークツリーでのブランチへのコミット・衝突したときのスクリプトの実行を受け持ち、書き込みの conflict.py を修正するときに参照する。
+tags:
+- name: topic:直コミット
+  main: true
+- name: topic:衝突
+- name: topic:ブランチ
+- name: action:書き込み
+- name: tool:git
+diagrams:
+- name: 全体
+  diagram: |-
+    <!-- map -->
+
+    ```mermaid
+    flowchart LR
+      W[書き込みと削除の直コミット] -.-> V[編集を始めたときのコミットの確認]
+      W -.-> K[衝突したときのブランチへのコミット]
+      W -.-> S[衝突したときのスクリプトの実行]
+      K -.-> N[衝突したときのブランチの名前]
+      V -.-> G[gitの実行]
+      K -.-> G
+      S -.-> X[スクリプトの実行]
+    ```
+
+    <!-- /map -->
+constants:
+- name: CONFLICT_BRANCH_PREFIX
+  title: 衝突したときのブランチの名前の頭
+  container: project_index/features/write/conflict.py
+  usecase: 直コミット
+  summary: 衝突したときに作るブランチの名前の頭
+  value: '"project-index/conflict/"'
+- name: SCRIPT_OUTPUT_TAIL_CHARS
+  title: スクリプトの出力の末尾の文字数
+  container: project_index/features/write/conflict.py
+  usecase: 直コミット
+  summary: 応答に入れる衝突したときのスクリプトの標準出力・標準エラー出力の末尾の文字数
+  value: '8000'
+- name: CONFLICT_ERRORS
+  title: 衝突にする例外
+  container: project_index/features/write/conflict.py
+  usecase: 直コミット
+  summary: 今のブランチでこの例外で断られた要求を衝突にする
+  entries:
+  - key: '0'
+    value: VersionMismatchError
+  - key: '1'
+    value: DocumentNotFoundError
+  - key: '2'
+    value: DocumentReferencedError
+  - key: '3'
+    value: ValidationFailedError
+functions:
+- name: verify_base_commit
+  title: 編集を始めたときのコミットの確認
+  kind: 関数
+  container: project_index/features/write/conflict.py
+  usecase: 直コミット
+  role: 検証
+  scope: public
+  summary: '`baseCommit` がクローンにあり、コミットするブランチの祖先であることを確認して 40 桁の SHA を返却する'
+  args:
+  - name: base_commit
+    title: 編集を始めたときのコミット
+    type: str
+    required: true
+    passing: positional
+    description: 要求の `baseCommit`（7〜40 桁の 16 進数）
+  - name: plan
+    title: 直コミットの計画
+    type: CommitPlan
+    required: true
+    passing: keyword
+    description: '`repo` で git を呼び、`branch` の `origin/{branch}` と比べる'
+  - name: timeout
+    title: 制限時間
+    type: float
+    required: true
+    passing: keyword
+    description: 書き込みの期限までの残りの秒数
+  returns:
+    type: str
+    description: '`baseCommit` を解いた 40 桁の SHA'
+  process: |-
+    1. `rev-parse --verify --quiet {base_commit}^{commit}` を呼ぶ（gitの実行）
+       - 終了コードが 0 以外の場合、`reason` を `not_found` にした `BaseCommitUnusableError` を送る
+    2. `merge-base --is-ancestor {SHA} {REMOTE}/{plan.branch}` を呼ぶ
+       - 終了コードが 1 の場合、`reason` を `not_ancestor` にした `BaseCommitUnusableError` を送る
+    3. SHA を返す
+  exceptions:
+  - name: BaseCommitUnusableError
+    condition: クローンにコミットが無い
+    message: '`編集を始めたときのコミット {base_commit} がクローンにありません`'
+  - name: BaseCommitUnusableError
+    condition: コミットするブランチの祖先でない
+    message: '`編集を始めたときのコミット {base_commit} は {branch} の祖先ではありません`'
+  callees:
+  - MOD-86#functions[run_git]
+  unit_tests:
+  - name: test_verify_base_commit
+    case: 正常
+    summary: 短縮の SHA を 40 桁にする
+    condition: 一時フォルダの git でコミット 2 つをプッシュし、1 つ目の 7 桁を指定
+    mock: なし（一時フォルダの git）
+    expected: 1 つ目のコミットの 40 桁の SHA
+  - name: test_verify_base_commit_when_not_found
+    case: 異常
+    summary: クローンに無いコミット
+    condition: どのコミットにも当たらない 40 桁の SHA
+    mock: なし（一時フォルダの git）
+    expected: '`BaseCommitUnusableError` で `reason` が `not_found`'
+    exception: クローンにコミットが無い
+  - name: test_verify_base_commit_when_not_ancestor
+    case: 異常
+    summary: コミットするブランチの祖先でないコミット
+    condition: '`develop` から分かれた別のブランチだけにあるコミット'
+    mock: なし（一時フォルダの git）
+    expected: '`BaseCommitUnusableError` で `reason` が `not_ancestor`'
+    exception: コミットするブランチの祖先でない
+- name: conflict_branch_name
+  title: 衝突したときのブランチの名前
+  kind: 関数
+  container: project_index/features/write/conflict.py
+  usecase: 直コミット
+  role: 値の組み立て
+  scope: public
+  summary: コミットと時刻から衝突したときのブランチの名前を組み立てる
+  args:
+  - name: commit
+    title: コミット
+    type: str
+    required: true
+    passing: positional
+    description: ブランチの先頭のコミットの SHA
+  - name: now
+    title: 今
+    type: datetime
+    required: true
+    passing: keyword
+    description: タイムゾーン付きの時刻
+  returns:
+    type: str
+    description: '`{CONFLICT_BRANCH_PREFIX}{YYYYMMDD-HHMMSS}-{コミットの 7 桁}`'
+  process: 1. `now` を UTC にした `%Y%m%d-%H%M%S` と `commit` の先頭 7 桁を `CONFLICT_BRANCH_PREFIX` に続けて返す
+  unit_tests:
+  - name: test_conflict_branch_name
+    case: 正常
+    summary: UTC の時刻とコミットの 7 桁
+    condition: '`+09:00` の `2026-11-23 09:08:07` と SHA `0a1b2c3d4e…`'
+    mock: なし
+    expected: '`project-index/conflict/20261123-000807-0a1b2c3`'
+- name: keep_in_branch
+  title: 衝突したときのブランチへのコミット
+  kind: 関数
+  container: project_index/features/write/conflict.py
+  usecase: 直コミット
+  role: サービス
+  scope: public
+  summary: 編集を始めたときのコミットの一時のワークツリーで書き込みを当ててコミットし、そのコミットにブランチを作る
+  side_effects: 状態のフォルダの下に一時のワークツリーを作り、抜ける前に削除する。クローンにコミットとブランチを作る（プッシュしない）
+  args:
+  - name: plan
+    title: 直コミットの計画
+    type: CommitPlan
+    required: true
+    passing: positional
+    description: '`repo`・`worktree`・`base`・`message` を使用する'
+  - name: base_sha
+    title: 編集を始めたときのコミット
+    type: str
+    required: true
+    passing: keyword
+    description: 編集を始めたときのコミットの確認が返却した 40 桁の SHA
+  - name: write_once
+    title: 1 回の書き込み
+    type: Callable[[Path], list[Path]]
+    required: true
+    passing: keyword
+    description: 一時のワークツリーの中の配信元のフォルダを受け、書き込みと生成をして書いた・消したファイルを返却する
+  - name: state_dir
+    title: 状態のフォルダ
+    type: Path
+    required: true
+    passing: keyword
+    description: 端末の設定の `state_dir`
+  - name: commit
+    title: コミットするか
+    type: bool
+    required: true
+    passing: keyword
+    description: '`False`（試しに書く）は `write_once` だけを呼び、コミットとブランチを作らない'
+  - name: now
+    title: 今
+    type: datetime
+    required: true
+    passing: keyword
+    description: ブランチの名前の時刻
+  - name: timeout
+    title: 制限時間
+    type: float
+    required: true
+    passing: keyword
+    description: git の 1 回の呼び出しの制限時間。書き込みの期限までの残りの秒数
+  returns:
+    type: tuple[str, str] | None
+    description: （ブランチの名前, コミットの SHA）。`commit` が `False` なら `None`
+  process: |-
+    1. `{state_dir}/conflicts` の下に一時フォルダを作り、`worktree add --detach {一時フォルダ} {base_sha}` を `plan.repo` で呼ぶ（gitの実行）
+    2. `plan.base` の `plan.worktree` からの相対パスを一時フォルダに重ねたフォルダを `write_once` に指定して呼ぶ。例外はそのまま送る（手順 5 の削除はする）
+    3. `commit` が `False` の場合、手順 5 へ進んで `None` を返す
+    4. 一時フォルダで `add -A -- {書いた・消したパス}`・`commit --only -m {plan.message} -- {パス}` を呼び、`rev-parse HEAD` でコミットを求める。`branch {衝突したときのブランチの名前} {コミット}` を `plan.repo` で呼ぶ（衝突したときのブランチの名前）
+    5. 成功しても失敗しても、`worktree remove --force {一時フォルダ}` を呼ぶ。失敗した場合は一時フォルダを削除して `worktree prune` を呼ぶ
+       - `[warning]` 一時のワークツリーを削除できなかった（パス・原因）
+    6. ブランチの名前とコミットを返す
+  callees:
+  - MOD-86#functions[run_git]
+  - MOD-238#functions[conflict_branch_name]
+  unit_tests:
+  - name: test_keep_in_branch
+    case: 正常
+    summary: 編集を始めたときのコミットからのブランチに 1 つのコミットを残す
+    condition: 一時フォルダの git で n1 を変えたコミットをプッシュした後、1 つ前のコミットを `base_sha` にし、`write_once` が n2 を書く
+    mock: なし（一時フォルダの git）
+    expected: ブランチの親が `base_sha`、変更が n2 だけ、説明が `plan.message`。リモートにブランチが無く、一時フォルダと `worktree list` の行が残らない
+  - name: test_keep_in_branch_when_write_fails
+    case: 異常
+    summary: 書き込みの失敗をそのまま送り、一時のワークツリーを残さない
+    condition: '`write_once` が `ValidationFailedError` を送る'
+    mock: なし（一時フォルダの git）
+    expected: '`ValidationFailedError` で、ブランチを作らず、一時フォルダと `worktree list` の行が残らない'
+  - name: test_keep_in_branch_when_dry_run
+    case: 正常
+    summary: 試しに書くとコミットしない
+    condition: '`commit` が `False`'
+    mock: なし（一時フォルダの git）
+    expected: '`None` で、`write_once` を 1 回呼び、ブランチとコミットが増えない'
+- name: run_conflict_script
+  title: 衝突したときのスクリプトの実行
+  kind: 関数
+  container: project_index/features/write/conflict.py
+  usecase: 直コミット
+  role: 外部実行
+  scope: public
+  thread_safe: true
+  summary: 端末の設定の衝突したときのスクリプトを実行し、終了コードと出力の末尾を返却する
+  side_effects: 子プロセスを起動する
+  args:
+  - name: script
+    title: 衝突したときのスクリプト
+    type: OnConflictScript
+    required: true
+    passing: positional
+    description: 端末の設定の `sources[].direct_commit.on_conflict`
+  - name: cwd
+    title: 実行する場所
+    type: Path
+    required: true
+    passing: keyword
+    description: クローン本体の直下
+  - name: env
+    title: 環境変数
+    type: Mapping[str, str]
+    required: true
+    passing: keyword
+    description: '`PROJECT_INDEX_SOURCE`・`PROJECT_INDEX_CONFLICT_BRANCH`・`PROJECT_INDEX_CONFLICT_COMMIT`・`PROJECT_INDEX_BASE_COMMIT`・`PROJECT_INDEX_TARGET_BRANCH`・`PROJECT_INDEX_COMMIT_MESSAGE`'
+  - name: timeout_sec
+    title: 制限時間
+    type: float
+    required: true
+    passing: keyword
+    description: 応答の上限までの残りと `script_timeout_sec` の短い方
+  returns:
+    type: ScriptRunResult
+    description: 終了コード・制限時間で止めたか・標準出力と標準エラー出力の末尾 `SCRIPT_OUTPUT_TAIL_CHARS` 文字
+  process: |-
+    1. `timeout_sec` が 0 以下の場合、実行せずに `exit_code` を `None`・`timed_out` を `True` にして返す
+    2. `script.command` を `cwd`・`env`・`timeout_sec` で実行する（スクリプトの実行）
+       - 成功した場合、`exit_code` を 0 にする
+       - `ScriptFailedError` の場合、例外の `exit_code`・`stdout`・`stderr` を入れる
+         - `[warning]` 衝突したときのスクリプトが失敗した（コマンド・終了コード）
+       - `ScriptTimeoutError` の場合、`exit_code` を `None`・`timed_out` を `True`・出力を空にする
+       - `ScriptNotFoundError` の場合、`exit_code` を `None`・`stderr` を例外の `reason` にする
+    3. 標準出力と標準エラー出力をそれぞれ末尾 `SCRIPT_OUTPUT_TAIL_CHARS` 文字にして返す
+  callees:
+  - MOD-88#functions[run_script]
+  unit_tests:
+  - name: test_run_conflict_script
+    case: 正常
+    summary: 環境変数を受けて出力を返す
+    condition: '`PROJECT_INDEX_CONFLICT_BRANCH` を出力するコマンド'
+    mock: なし（実際の子プロセス）
+    expected: '`exit_code` が 0・`timed_out` が `False`・`stdout` がブランチの名前'
+  - name: test_run_conflict_script_when_failed
+    case: 正常
+    summary: 失敗しても終了コードと出力を返す
+    condition: 標準エラー出力に 9000 文字を出して終了コード 3 で終わるコマンド
+    mock: なし（実際の子プロセス）
+    expected: '`exit_code` が 3、`stderr` が末尾 8000 文字'
+  - name: test_run_conflict_script_when_timeout
+    case: 正常
+    summary: 制限時間で止める
+    condition: '`timeout_sec` が 0.5 で 5 秒眠るコマンド'
+    mock: なし（実際の子プロセス）
+    expected: '`exit_code` が `None`・`timed_out` が `True`'
+  - name: test_run_conflict_script_when_no_time
+    case: 正常
+    summary: 残りの時間が無ければ実行しない
+    condition: '`timeout_sec` が 0'
+    mock: スクリプトの実行
+    expected: '`timed_out` が `True` で、スクリプトの実行を呼ばない'
+  - name: test_run_conflict_script_when_not_found
+    case: 正常
+    summary: コマンドが見つからない
+    condition: 無いコマンド
+    mock: なし
+    expected: '`exit_code` が `None`・`timed_out` が `False`・`stderr` に見つからない原因'
+refs:
+- to: IF-38
+  type: requires
+  when: インターフェース定義『画面のサーバーからの直コミットの書き込み』の衝突の制約を変えるときに、この設計書の関数を合わせる。
+visibility: internal

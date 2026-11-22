@@ -61,6 +61,12 @@ classes:
         access: 公開
         default: '""'
         description: '`ScriptFailedError` だけが持つ。検査のスクリプトは不合格でも標準出力に違反の JSON を出す'
+      - name: stderr
+        title: 標準エラー出力
+        type: str
+        access: 公開
+        default: '""'
+        description: '`ScriptFailedError` だけが持つ。標準エラー出力の全て'
 constants:
   - name: STDERR_TAIL_LINES
     title: 標準エラーの末尾の行数
@@ -145,7 +151,7 @@ functions:
       3. `subprocess.Popen` を `shell=False`・`cwd`・新しいプロセスグループと、`env` がある場合はサーバーの環境変数に `env` を重ねた環境（値が `None` のキーを除く）で起動し、`stdin` を UTF-8 で渡して `timeout_sec` まで待つ
          - 制限時間を超えた場合、プロセスグループに SIGTERM を送り、`KILL_GRACE_SEC` 秒待って残っていれば SIGKILL を送ってから `ScriptTimeoutError` を送る
            - `[warning]` スクリプトを制限時間で止めた（コマンド・`cwd`・秒数）
-      4. 終了コードが 0 以外の場合、`ScriptFailedError` を送る
+      4. 終了コードが 0 以外の場合、終了コードと標準出力と標準エラー出力を持たせた `ScriptFailedError` を送る
       5. 標準出力と標準エラーを `ScriptResult` にして返す
     exceptions:
       - name: ScriptNotFoundError
