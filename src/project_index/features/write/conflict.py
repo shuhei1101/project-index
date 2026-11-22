@@ -115,17 +115,13 @@ def keep_in_branch(
         )
         # ワークツリーの中の配信元のフォルダを、一時のワークツリーに重ねる
         source_folder = folder / plan.base.relative_to(plan.worktree)
-        written = write_once(source_folder)
+        write_once(source_folder)
         # 試しに書く: コミットとブランチを作らない
         if not commit:
             return None
-        paths = [str(path.relative_to(folder)) for path in written]
-        run_git(["add", "-A", "--", *paths], cwd=folder, timeout=_commit_timeout(respond_by))
-        run_git(
-            ["commit", "--only", "-m", plan.message, "--", *paths],
-            cwd=folder,
-            timeout=_commit_timeout(respond_by),
-        )
+        # 作ったばかりの一時のワークツリーの変更は、書き込みと削除と生成物だけなので全てをコミットする
+        run_git(["add", "-A"], cwd=folder, timeout=_commit_timeout(respond_by))
+        run_git(["commit", "-m", plan.message], cwd=folder, timeout=_commit_timeout(respond_by))
         sha = str(
             run_git(["rev-parse", "HEAD"], cwd=folder, timeout=_commit_timeout(respond_by))
         ).strip()
