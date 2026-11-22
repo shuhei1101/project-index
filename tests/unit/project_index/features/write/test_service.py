@@ -27,8 +27,15 @@ from project_index.features.validation.markdown import MarkdownCheck, UncheckedK
 from project_index.features.validation.service import DocumentChecker
 from project_index.features.write import service as write_service
 from project_index.features.write.locks import RepositoryLocks, SourceLocks
-from project_index.features.write.service import check_version, delete_docs, write_docs
+from project_index.features.write.service import (
+    check_version,
+    commit_documents,
+    delete_docs,
+    write_docs,
+)
 from project_index.features.write.types import (
+    CommitDocumentsRequest,
+    CommitDocumentsResult,
     CommitSpec,
     DeleteRequest,
     DeleteResult,
@@ -1922,7 +1929,9 @@ def make_commit_env(
     }.items():
         monkeypatch.setenv(name, value)
 
-    def _make(generators: list[ScriptEntry] | None = None) -> CommitEnv:
+    def _make(
+        generators: list[ScriptEntry] | None = None, write_api_kinds: list[str] | None = None
+    ) -> CommitEnv:
         env = make_env(
             {
                 "docs/rule/doc-1.yaml": DOC_1,
@@ -1973,6 +1982,7 @@ def make_commit_env(
             storage="git",
             direct_commit_scope=[str(local)],
             direct_commit_kinds={"terms": ["/other"]},
+            direct_commit_write_api_kinds=write_api_kinds or [],
         )
         env.source = source
         env.registry = make_registry(source)
@@ -2206,3 +2216,115 @@ def test_delete_docs_when_delete_validator_retry(make_env: Callable[..., WriteEn
     assert (env.worktree / "docs/rule/doc-1.yaml").exists()
     assert (env.worktree / "docs/rule/doc-2.yaml").exists()
     assert not (env.worktree / "docs/rule/doc-3.yaml").exists()
+
+
+def _commit_documents(commit_env: CommitEnv, **request: Any) -> CommitDocumentsResult:
+    """書き込みと削除の直コミットを、コミットの説明を付けて呼ぶ。"""
+    env = commit_env.env
+    return commit_documents(
+        CommitDocumentsRequest(
+            source="sample", commit=CommitSpec(message="docs: 更新する"), **request
+        ),
+        registry=env.registry,
+        store=env.store,
+        checker=env.checker,
+        locks=env.locks,
+        repo_locks=env.repo_locks,
+        timeout_sec=10,
+    )
+
+
+def test_commit_documents(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """書き込みと削除を 1 つのコミットにする（正常系）。"""
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules"])
+    remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
+    writes = [Operation(op="create", kind="rules", data={"id": "doc-9", "name": "文書 9"})]
+    deletes = [DeleteTarget(id="doc-1", expected_version=content_hash(DOC_1))]
+    # 実行
+    result = _commit_documents(commit_env, writes=writes, deletes=deletes)
+    # 検証
+    assert result.applied is True
+    assert [item.status for item in result.writes] == ["created"]
+    assert [item.status for item in result.deletes] == ["deleted"]
+    assert result.commit is not None
+    assert run_git(commit_env.bare, "rev-parse", "data").strip() == result.commit.sha
+    assert run_git(commit_env.bare, "rev-parse", "data~1").strip() == remote_head
+    changed = run_git(commit_env.bare, "diff", "--name-only", "data~1", "data").split()
+    assert changed == ["docs/rule/doc-1.yaml", "docs/rule/doc-9.yaml"]
+
+
+def test_commit_documents_when_not_permitted(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """書き込みの API の許可が無ければ取得の前に断る（異常系）。"""
+    # 準備
+    commit_env = make_commit_env()
+    remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
+    writes = [Operation(op="create", kind="rules", data={"id": "doc-9", "name": "文書 9"})]
+    # 実行・検証
+    with pytest.raises(DirectCommitNotPermittedError, match="write_api_kinds"):
+        _commit_documents(commit_env, writes=writes)
+    assert not (commit_env.develop / "docs/rule/doc-9.yaml").exists()
+    assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
+
+
+def test_commit_documents_when_disallowed_kind_rewritten(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """配信元が許可していない種類の参照元が書き換わると検査の不合格（異常系）。"""
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules"])
+    note = commit_env.develop / "docs/note/note-1.yaml"
+    note.write_text("id: note-1\nname: メモ\nrelated:\n  - to: doc-1\n", encoding="utf-8")
+    run_git(commit_env.develop, "commit", "-am", "note-1 から doc-1 を参照する")
+    run_git(commit_env.develop, "push", "origin", "data")
+    remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
+    deletes = [DeleteTarget(id="doc-1", expected_version=content_hash(DOC_1))]
+    # 実行・検証
+    with pytest.raises(ValidationFailedError) as info:
+        _commit_documents(commit_env, deletes=deletes, on_referenced="unlink")
+    assert [item.path for item in info.value.violations][:1] == ["deletes[0]"]
+    assert (commit_env.develop / "docs/rule/doc-1.yaml").exists()
+    assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
+
+
+def test_commit_documents_when_one_invalid(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """1 つの操作の違反でどれも書かない（異常系）。"""
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules"])
+    remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
+    writes = [
+        Operation(op="create", kind="rules", data={"id": "doc-9", "name": "文書 9"}),
+        Operation(op="create", kind="rules", data={"id": "doc-8"}),
+    ]
+    # 実行・検証
+    with pytest.raises(ValidationFailedError) as info:
+        _commit_documents(commit_env, writes=writes)
+    assert [item.path for item in info.value.violations][:1] == ["writes[1]"]
+    assert not (commit_env.develop / "docs/rule/doc-9.yaml").exists()
+    assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
+
+
+def test_commit_documents_when_dry_run(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """試しに書くと何も変えない（正常系）。"""
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules"])
+    remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
+    writes = [Operation(op="create", kind="rules", data={"id": "doc-9", "name": "文書 9"})]
+    deletes = [DeleteTarget(id="doc-1", expected_version=content_hash(DOC_1))]
+    # 実行
+    result = _commit_documents(commit_env, writes=writes, deletes=deletes, dry_run=True)
+    # 検証
+    assert result.applied is False
+    assert result.commit is None
+    assert not (commit_env.develop / "docs/rule/doc-9.yaml").exists()
+    assert (commit_env.develop / "docs/rule/doc-1.yaml").exists()
+    assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
+

@@ -1485,6 +1485,26 @@ def test_direct_commit_checks_when_absent(make_source_config: Callable[..., Sour
     assert result == ([], [])
 
 
+def test_direct_commit_checks_when_write_api_kinds(
+    make_source_config: Callable[..., SourceConfig],
+) -> None:
+    """書き込みの API の種類も配信元の種類と照らす（正常系）。"""
+    # 準備
+    config = make_source_config(
+        documents=[
+            DocumentTable(id="note", paths=["docs/note/*.yaml"], schema_path="schemas/note.yaml")
+        ],
+        direct_commit=DirectCommitConfig(branch="develop", kinds=["note"]),
+    )
+    # 実行
+    violations, warnings = direct_commit_checks(
+        config, worktree_branches={"develop"}, terminal_write_api_kinds=["note", "rule"]
+    )
+    # 検証
+    assert violations == []
+    assert [item.path for item in warnings] == ["sources[].direct_commit.write_api_kinds[1]"]
+
+
 def test_source_worktree_branches(
     git_repo: Callable[..., Path],
     run_git: Callable[..., str],
