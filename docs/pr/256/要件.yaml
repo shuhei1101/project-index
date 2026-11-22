@@ -69,10 +69,10 @@ scope_out:
     plan: none
   - item: 文書でないファイル（rule-inject の索引・配信元の設定 project-index.yaml）を画面のサーバーから直コミットで書き換えること
     reason: Issue の要望は配信元の文書の書き込みで、dev-docs#310 が挙げるこれらのファイルを project-index の書き込みの経路で扱うかは判断が分かれる。今の判断は、管理用の YAML・用語集など配信元の文書だけを対象にし、文書でないファイルは対象外とする（レビューで確定する）
-    plan: to_file
+    plan: '#258'
   - item: 公開ドキュメントのページ名『読み取りAPI』を、書き込みの API も含む HTTP の API の一覧として見直すこと
     reason: 改名すると目次 3 か所とリンク元の修正が要り、要望の書き込みの経路の追加とは別の整理になるため（ドキュメント修正のレビューの提案）
-    plan: to_file
+    plan: '#257'
   - item: 結合テスト test_serve.py の test_normal_when_mcp_text_from_prompts・test_error_when_prompt_invalid が、プロンプトのフォルダの改名（content/prompts/mcp/docs → mcp/project-index）の前のパスを指して失敗すること
     reason: develop（9541266）でも同じく失敗する既存の不具合で、この作業の変更と関係しないため
-    plan: to_file
+    plan: '#253'
