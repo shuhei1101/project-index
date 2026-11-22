@@ -10,6 +10,7 @@ from project_index.features.post_write.route import build_post_write_router
 from project_index.features.read.route import build_read_router
 from project_index.features.session_start.route import build_session_start_router
 from project_index.features.settings.route import build_settings_router
+from project_index.features.write.route import build_write_router
 from project_index.server.error_handlers import register_error_handlers
 from project_index.server.lifespan import build_lifespan
 from project_index.server.mcp.admin import build_admin_mcp
@@ -73,6 +74,7 @@ def build_app(handlers: Handlers) -> FastAPI:
     app.add_middleware(SlashlessMcpPathMiddleware, paths=(DOCS_MCP_PATH, ADMIN_MCP_PATH))
     app.include_router(build_read_router(handlers))
     app.include_router(build_settings_router(handlers))
+    app.include_router(build_write_router(handlers))
     app.include_router(build_session_start_router(handlers))
     app.include_router(build_post_write_router(handlers))
     return app

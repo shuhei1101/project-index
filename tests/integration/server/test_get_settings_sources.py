@@ -158,5 +158,9 @@ def test_normal_when_direct_commit_given(
     # 検証
     rows = {row["id"]: row for row in response.json()["sources"]}
     assert response.status_code == 200
-    assert rows["extra"]["directCommit"] == {"scope": [str(work)], "kinds": {"note": [str(note)]}}
+    assert rows["extra"]["directCommit"] == {
+        "scope": [str(work)],
+        "kinds": {"note": [str(note)]},
+        "writeApiKinds": [],
+    }
     assert "directCommit" not in rows["sample"]

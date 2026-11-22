@@ -124,6 +124,8 @@ class SourceSpec:
     # 端末の設定の行の `direct_commit.scope`・`direct_commit.kinds`。None は行に書かない
     direct_commit_scope: list[Path] | None = None
     direct_commit_kinds: dict[str, list[Path]] | None = None
+    # 端末の設定の行の `direct_commit.write_api_kinds`。None は行に書かない
+    direct_commit_write_api_kinds: list[str] | None = None
 
 
 @dataclass
@@ -502,6 +504,9 @@ def _direct_commit_lines(spec: SourceSpec) -> list[str]:
         for kind, paths in spec.direct_commit_kinds.items():
             lines.append(f"        {kind}:")
             lines.extend(f"          - {path}" for path in paths)
+    if spec.direct_commit_write_api_kinds is not None:
+        lines.append("      write_api_kinds:")
+        lines.extend(f"        - {kind}" for kind in spec.direct_commit_write_api_kinds)
     return lines
 
 
@@ -1240,6 +1245,7 @@ def make_direct_commit_source(
         config: str | None = None,
         extra_branches: tuple[str, ...] = (),
         direct_commit_kinds: dict[str, list[Path]] | None = None,
+        write_api_kinds: list[str] | None = None,
         list_script: str = NOTE_LIST_SCRIPT,
     ) -> DirectCommitSource:
         content = {
@@ -1257,6 +1263,7 @@ def make_direct_commit_source(
         spec = make_source("sample", content, branch="master")
         spec.direct_commit_scope = [local]
         spec.direct_commit_kinds = direct_commit_kinds
+        spec.direct_commit_write_api_kinds = write_api_kinds
         folder = spec.folder
         bare = tmp_path / "remote.git"
         run_git(tmp_path, "init", "--bare", "-b", "master", str(bare))

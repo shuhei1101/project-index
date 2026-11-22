@@ -269,4 +269,8 @@ def test_normal_when_direct_commit_changed(
         (item["id"], item["status"]) for item in response.json()["sources"]
     ]
     assert row["direct_commit"] == {"scope": [str(work)], "kinds": {"note": [str(note)]}}
-    assert got["extra"]["directCommit"] == {"scope": [str(work)], "kinds": {"note": [str(note)]}}
+    assert got["extra"]["directCommit"] == {
+        "scope": [str(work)],
+        "kinds": {"note": [str(note)]},
+        "writeApiKinds": [],
+    }

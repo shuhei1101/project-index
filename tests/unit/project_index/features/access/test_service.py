@@ -19,6 +19,7 @@ from project_index.features.access.service import (
     outside_readable_sources,
     resolve_read_targets,
     resolve_write_target,
+    write_api_committable_kinds,
 )
 from project_index.features.access.types import SourceAccess
 from project_index.features.history.types import ResolvedRef
@@ -175,6 +176,66 @@ def test_committable_kinds_when_default(
     )
     # 実行
     result = committable_kinds(source, Path("/r"))
+    # 検証
+    assert result == frozenset()
+
+
+def test_write_api_committable_kinds(
+    make_served_source: Callable[..., ServedSource],
+    make_source_config: Callable[..., SourceConfig],
+) -> None:
+    """配信元が許可した種類だけを返す（正常系）。"""
+    # 準備
+    source = make_served_source(
+        root=Path("/r"),
+        config=make_source_config(
+            direct_commit=DirectCommitConfig(branch="develop", kinds=["note", "term"])
+        ),
+        direct_commit_write_api_kinds=["note"],
+    )
+    # 実行
+    result = write_api_committable_kinds(source)
+    # 検証
+    assert result == frozenset({"note"})
+
+
+def test_write_api_committable_kinds_when_default(
+    make_served_source: Callable[..., ServedSource],
+    make_source_config: Callable[..., SourceConfig],
+) -> None:
+    """既定はどの種類もできない（正常系）。"""
+    # 準備
+    source = make_served_source(
+        root=Path("/r"),
+        config=make_source_config(
+            direct_commit=DirectCommitConfig(branch="develop", kinds=["note"])
+        ),
+        direct_commit_scope=["/local"],
+    )
+    # 実行
+    result = write_api_committable_kinds(source)
+    # 検証
+    assert result == frozenset()
+
+
+def test_write_api_committable_kinds_when_problems(
+    make_served_source: Callable[..., ServedSource],
+    make_source_config: Callable[..., SourceConfig],
+) -> None:
+    """直コミットだけを断る違反がある配信元は空（異常系）。"""
+    # 準備
+    source = make_served_source(
+        root=Path("/r"),
+        config=make_source_config(
+            direct_commit=DirectCommitConfig(branch="develop", kinds=["note"])
+        ),
+        direct_commit_write_api_kinds=["note"],
+        direct_commit_problems=[
+            Violation(path="direct_commit.kinds[0]", rule="note は documents[] に無い")
+        ],
+    )
+    # 実行
+    result = write_api_committable_kinds(source)
     # 検証
     assert result == frozenset()
 

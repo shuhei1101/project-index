@@ -1241,7 +1241,7 @@ response:
     description: '検証に失敗した配信元ごとに `{id}: {キーのパス}: {理由}`。その配信元の設定の `version` が古いときは、`project-index migrate --source` で移し替えられることも出す。`direct_commit.kinds[]` に `documents[]` に無い種類がある配信元は、配信を続け、直コミットだけを断ることを出す'
   - name: 警告のログ
     type: str
-    description: 設定のバージョンが古い配信元の ID・設定のバージョン・サーバーが参照できるバージョン。配信元と documents の行ごとに、`metadata` に書いた列が無い文書の件数・管理用の YAML に無いファイル・ファイルが無い行（`missing_body_file`）・どの文書にも当たらない `related[].to`（`source` を持たない行）・2 つ以上の有効な documents の行が文書にするファイル・ID が先の文書と重なり配信から除外した文書が 0 件でなければ、その件数とパス。`alias_type` を持つ行の文書のエイリアスのキーの違反（文書のパスと内容）と、どの文書にも当たらない `nav` の `auto` の条件（タブと条件）。端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパス）。`direct_commit.branch` を指すワークツリーが `worktrees[]` に無いこと（直コミットを断る）と、端末の設定の `sources[].direct_commit.kinds` の種類のうち配信元の `direct_commit.kinds[]` に無いもの
+    description: 設定のバージョンが古い配信元の ID・設定のバージョン・サーバーが参照できるバージョン。配信元と documents の行ごとに、`metadata` に書いた列が無い文書の件数・管理用の YAML に無いファイル・ファイルが無い行（`missing_body_file`）・どの文書にも当たらない `related[].to`（`source` を持たない行）・2 つ以上の有効な documents の行が文書にするファイル・ID が先の文書と重なり配信から除外した文書が 0 件でなければ、その件数とパス。`alias_type` を持つ行の文書のエイリアスのキーの違反（文書のパスと内容）と、どの文書にも当たらない `nav` の `auto` の条件（タブと条件）。端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパス）。`direct_commit.branch` を指すワークツリーが `worktrees[]` に無いこと（直コミットを断る）と、端末の設定の `sources[].direct_commit.kinds`・`sources[].direct_commit.write_api_kinds` の種類のうち配信元の `direct_commit.kinds[]` に無いもの
   - name: 終了コード
     type: int
     description: 起動できないとき 0 以外

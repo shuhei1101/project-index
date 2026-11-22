@@ -38,6 +38,19 @@ diagrams:
         文書の書き込み ..> 直コミットを進める : commit
         文書の書き込み ..> 秘密の値の検出 : commit
         文書の削除 ..> 直コミットを進める : commit
+        書き込みの API の入口 ..> 書き込みと削除の直コミット
+        書き込みと削除の直コミット ..> 操作を当てる
+        書き込みと削除の直コミット ..> 文書の検査
+        書き込みと削除の直コミット ..> 秘密の値の検出
+        書き込みと削除の直コミット ..> 直コミットを進める
+        class 書き込みの API の入口 {
+          <<function>>
+        }
+        class 書き込みと削除の直コミット {
+          <<function>>
+        }
+        click 書き込みの API の入口 href "id:MOD-183#functions[build_write_router]"
+        click 書き込みと削除の直コミット href "id:MOD-84#functions[commit_documents]"
         直コミットを進める ..> リポジトリごとの排他
         class 直コミットを進める {
           <<function>>

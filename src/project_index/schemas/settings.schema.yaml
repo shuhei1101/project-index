@@ -83,7 +83,7 @@ properties:
               title: 種類
         direct_commit:
           type: object
-          title: 直コミットを呼べる作業場所
+          title: 直コミットを呼べる作業場所と書き込みの API から直コミットできる種類
           additionalProperties: false
           properties:
             scope:
@@ -98,6 +98,11 @@ properties:
                 type: array
                 items:
                   type: string
+            write_api_kinds:
+              type: array
+              title: 書き込みの API から直コミットできる種類
+              items:
+                type: string
   state_dir:
     type: string
     title: 状態の配置先

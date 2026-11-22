@@ -21,6 +21,7 @@ from project_index.features.access.service import (
     committable_kinds,
     current_source,
     resolve_write_target,
+    write_api_committable_kinds,
 )
 from project_index.features.access.types import Target
 from project_index.features.changes.compare import diff_lines
@@ -72,6 +73,9 @@ from project_index.features.write.replace import replace_in_body, replace_in_val
 from project_index.features.write.secrets import secret_findings
 from project_index.features.write.types import (
     OPERATIONS_MAX,
+    CommitDocumentsRequest,
+    CommitDocumentsResult,
+    CommitResult,
     CommitSpec,
     DeleteRequest,
     DeleteResult,
@@ -2363,3 +2367,209 @@ def _delete_with_commit(
     return DeleteResult(
         applied=True, results=deleted.results, unlinked=deleted.unlinked, commit=result
     )
+
+
+def _renamed(error: ProjectIndexError, name: str) -> ProjectIndexError:
+    """違反のパスの `operations[{添字}]` を、書き込みの API の `writes`・`deletes` の添字にする。"""
+    if not isinstance(error, InvalidArgumentError | ValidationFailedError):
+        return error
+    violations = [
+        dataclasses.replace(
+            violation,
+            path=f"{name}[{violation.path.removeprefix('operations[')}"
+            if violation.path.startswith("operations[")
+            else violation.path,
+        )
+        for violation in error.violations
+    ]
+    return dataclasses.replace(error, violations=violations)
+
+
+def _check_commit_documents_size(request: CommitDocumentsRequest) -> None:
+    """書き込みと削除の件数の合計と、書き込みの操作の必須のキーを確かめる。"""
+    total = len(request.writes) + len(request.deletes)
+    if not 1 <= total <= OPERATIONS_MAX:
+        raise _invalid(
+            [
+                Violation(
+                    path="writes",
+                    rule=f"writes と deletes の合計を 1〜{OPERATIONS_MAX} 件にしてください（今: {total} 件）",
+                    fix="操作を分けて呼んでください",
+                )
+            ]
+        )
+    if request.writes:
+        try:
+            _check_operations(request.writes)
+        except InvalidArgumentError as error:
+            raise _renamed(error, "writes") from error
+
+
+def _write_api_commit_target(
+    registry: SourceRegistry, request: CommitDocumentsRequest
+) -> tuple[ServedSource, CommitPlan, frozenset[str]]:
+    """書き込みの API の直コミットの配信元・計画と、直コミットできる種類を決める。"""
+    source = registry.get_for_docs(request.source)
+    # 直コミットの設定とブランチ・ワークツリーを先に確かめる（通信しない）
+    plan = resolve_commit_plan(source, request.commit)
+    committable = write_api_committable_kinds(source)
+    # 書き込みの API から直コミットできる種類が無い配信元は、取得・取り込みの前に断る
+    if not committable:
+        kinds = list(source.config.direct_commit.kinds) if source.config.direct_commit else []
+        raise DirectCommitNotPermittedError(
+            message=(
+                f"書き込みの API から {source.id} の直コミットはできません"
+                f"（種類: {', '.join(kinds)}。端末の設定の"
+                " sources[].direct_commit.write_api_kinds に直コミットできる種類がありません）"
+            ),
+            source_id=source.id,
+            kinds=kinds,
+            next_steps=[
+                "端末の設定の sources[].direct_commit.write_api_kinds に直コミットする種類を記載してください"
+            ],
+        )
+    return source, plan, committable
+
+
+def _check_commit_documents_content(
+    source: ServedSource,
+    committable: frozenset[str],
+    changed: list[tuple[str, int, str, str]],
+    before: Mapping[str, Document],
+    after: Mapping[str, Document],
+) -> None:
+    """書き換わる文書の種類と秘密の値を確かめる（直コミットを許可していない種類を先に判定する）。"""
+    settings = source.config.direct_commit
+    allowed: set[str] = set(settings.kinds) if settings is not None else set()
+    violations: list[Violation] = []
+    for name, index, doc_id, kind in changed:
+        # 直コミットを許可していない種類
+        if kind not in allowed:
+            violations.append(
+                Violation(
+                    path=f"{name}[{index}]",
+                    rule=f"{doc_id} の種類 {kind} は直コミットを許可していない種類です",
+                    fix="作業 PR で書き込むか、配信元の設定の direct_commit.kinds を確認してください",
+                    index=index,
+                    doc=doc_id,
+                )
+            )
+        violations.extend(
+            dataclasses.replace(violation, path=f"{name}[{index}].{violation.path}")
+            for violation in _secret_violations(index, doc_id, before, after)
+        )
+    if violations:
+        raise ValidationFailedError(
+            message=f"直コミットできない変更があります: {len(violations)} 件",
+            violations=violations,
+            next_steps=["違反を修正してから再実行してください"],
+        )
+    # 許可する種類のうち、書き込みの API から直コミットできない種類
+    blocked = sorted({kind for _, _, _, kind in changed if kind not in committable})
+    if blocked:
+        raise DirectCommitNotPermittedError(
+            message=f"書き込みの API から {source.id} の {', '.join(blocked)} は直コミットできません",
+            source_id=source.id,
+            kinds=blocked,
+            next_steps=["端末の設定の sources[].direct_commit.write_api_kinds を確認してください"],
+        )
+
+
+@dataclass
+class _Committed:
+    """書き込みの API の書き込みと削除を当てた結果。"""
+
+    applied: _Applied
+    deleted: _Deleted | None
+    tables: list[DocumentTable]
+
+
+def _apply_commit_documents(
+    session: _Session,
+    checker: DocumentChecker,
+    request: CommitDocumentsRequest,
+    now: datetime,
+) -> tuple[_Committed, list[tuple[str, int, str, str]], dict[str, Document]]:
+    """書き込み・削除の順に当て、書き換わる文書と書き込む前の文書を返す。"""
+    before = dict(session.docs)
+    applied = _apply_operations(session, checker, request.writes, {}, now)
+    if applied.failures:
+        raise _renamed(_atomic_error(applied.failures), "writes")
+    written, previous = _written_documents(applied, before)
+    changed = [("writes", index, doc_id, kind) for index, doc_id, kind in written]
+    tables = list(applied.tables)
+    deleted: _Deleted | None = None
+    if request.deletes:
+        delete_request = DeleteRequest(targets=request.deletes, on_referenced=request.on_referenced)
+        try:
+            deleted = _apply_deletes(session, checker, delete_request)
+        except ProjectIndexError as error:
+            raise _renamed(error, "deletes") from error
+        changed += [
+            ("deletes", index, doc_id, kind)
+            for index, doc_id, kind in _deleted_documents(delete_request, deleted, session)
+        ]
+        tables += [session.target.source.table(document.kind) for document in deleted.accepted]
+    return _Committed(applied, deleted, _unique(tables)), changed, {**before, **previous}
+
+
+def commit_documents(
+    request: CommitDocumentsRequest,
+    *,
+    registry: SourceRegistry,
+    store: DocumentStore,
+    checker: DocumentChecker,
+    locks: SourceLocks,
+    repo_locks: RepositoryLocks,
+    timeout_sec: float,
+    now: datetime | None = None,
+    limits: CallLimits | None = None,
+) -> CommitDocumentsResult:
+    """書き込みの API の要求を処理し、書き込みと削除を 1 つの直コミットにして結果を返す。"""
+    now = now or datetime.now(UTC)
+    limits = limits or _default_limits()
+    _check_commit_documents_size(request)
+    source, plan, committable = _write_api_commit_target(registry, request)
+
+    def prepare() -> tuple[_Session, _Committed]:
+        # 取り込んだ後の内容と設定で、書き込みと削除を当てて直コミットの確認まで進める
+        session = _Session(
+            store, _commit_write_target(source, plan), deadline=limits.write_deadline
+        )
+        committed, changed, before = _apply_commit_documents(session, checker, request, now)
+        _check_commit_documents_content(source, committable, changed, before, session.docs)
+        if committed.deleted is not None:
+            _remove_documents(session, committed.deleted.accepted)
+        return session, committed
+
+    def result_of(
+        committed: _Committed, *, applied: bool, commit: CommitResult | None
+    ) -> CommitDocumentsResult:
+        deleted = committed.deleted
+        return CommitDocumentsResult(
+            applied=applied,
+            writes=committed.applied.results,
+            deletes=[] if deleted is None else deleted.results,
+            unlinked=[] if deleted is None else deleted.unlinked,
+            commit=commit,
+        )
+
+    # 試しの書き込み: 取得・コミット・プッシュをせず、確認だけを行う
+    if request.dry_run:
+        with _commit_locks(repo_locks, locks, plan, limits):
+            _, committed = prepare()
+        return result_of(committed, applied=False, commit=None)
+    done: list[_Committed] = []
+
+    def write_once(dirty: DirtyFiles) -> list[Path]:
+        session, committed = prepare()
+        check_clean(dirty, _pending_paths(session, plan))
+        _check_before_write(limits)
+        touched = session.write_pending()
+        _run_commit_generators(session.target, committed.tables, touched, timeout_sec, limits)
+        done[:] = [committed]
+        return touched
+
+    with _commit_locks(repo_locks, locks, plan, limits):
+        result = run_direct_commit(plan, write_once, limits=limits)
+    return result_of(done[0], applied=True, commit=result)

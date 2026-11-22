@@ -1,0 +1,396 @@
+id: IF-38
+title: 画面のサーバーからの直コミットの書き込み
+lead: 画面のサーバーが溜めた文書の書き込みと削除を 1 回で受け、`write_docs`・`delete_docs` と同じ検査に合格させてから 1 つのコミットにまとめてプッシュする書き込みの API の入出力を定め、書き込みの API を修正するときに参照する。
+entry:
+  kind: endpoint
+  value: POST `/sources/{source}/commits`
+identifier: commit_documents
+permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ。書き換わる全ての文書の種類が、端末の設定の `sources[].direct_commit.write_api_kinds` と配信元の設定の `direct_commit.kinds[]` の両方にあること'
+idempotent: false
+side_effects: 'コミットするブランチのワークツリーへ書き込み、1 つのコミットにしてリモートへプッシュする（`dryRun: true` のときは何も変えない）'
+callers:
+- SC-17#scenarios[正常シナリオ]
+- SC-17#scenarios[正常シナリオ（試しに書く）]
+- SC-17#scenarios[異常シナリオ（作業場所を持たない要求の直コミットを許可していない）]
+- SC-17#scenarios[異常シナリオ（直コミットを許可していない種類を含む）]
+- SC-17#scenarios[異常シナリオ（1 つの操作が検査に合格しない）]
+- SC-17#scenarios[異常シナリオ（文書のバージョンが合わない）]
+- SC-17#scenarios[異常シナリオ（別のオリジンからの要求）]
+- SC-17#scenarios[異常シナリオ（許可していない種類の文書が書き換わる）]
+- SC-1#scenarios[正常シナリオ]
+exclusivity: '[文書の書き込み](id:IF-6) の制約「直コミットの排他」と同じ排他で、直コミットどうしを 1 つずつ進める'
+request:
+- name: source
+  location: path
+  type: str
+  required: true
+  description: 配信元の ID
+- name: writes
+  location: body
+  type: list[Operation]
+  required: false
+  description: '`write_docs` の `operations` と同じ操作の並び。省くと空'
+- name: deletes
+  location: body
+  type: 'list[{id: str, expectedVersion: str}]'
+  required: false
+  description: '`delete_docs` の `targets` と同じ、削除する文書と取得したバージョンの並び。省くと空'
+- name: onReferenced
+  location: body
+  type: Literal['fail', 'unlink']
+  required: false
+  description: 削除する文書を参照する文書があるときの扱い。`delete_docs` の `on_referenced` と同じ。既定は `fail`
+- name: message
+  location: body
+  type: str
+  required: true
+  description: コミットの説明
+- name: branch
+  location: body
+  type: str | None
+  required: false
+  description: コミットするブランチ。`write_docs` の `commit.branch` と同じく、配信元の設定の `direct_commit.branches[]` に該当するときだけ上書きする。省くと `direct_commit.branch`
+- name: dryRun
+  location: body
+  type: bool
+  required: false
+  description: '`true` のとき、取得・書き込み・コミット・プッシュをせず、許可と検査の結果と差分だけを返却する。既定は `false`'
+request_example: |-
+  ```json
+  {"writes": [{"op": "update", "id": "n1", "expected_version": "a1b2c3", "set": {"description": "新しい説明"}}], "deletes": [{"id": "n2", "expectedVersion": "d4e5f6"}], "message": "用語を更新する"}
+  ```
+response:
+- name: applied
+  type: bool
+  description: '書き込みとコミット・プッシュをしたか（`dryRun: true` のときは `false`）'
+- name: results[].kind
+  type: Literal['write', 'delete']
+  description: 結果がどちらの並びの操作か
+- name: results[].index
+  type: int
+  description: '`writes` か `deletes` の中の添字'
+- name: results[].id
+  type: str
+  description: 文書の ID
+- name: results[].status
+  type: Literal['created', 'updated', 'replaced', 'renamed', 'deleted']
+  description: 操作の結果
+- name: results[].version
+  type: str | None
+  description: 書き込んだ後の文書のバージョン（削除は `null`）
+- name: results[].diff
+  type: str
+  description: 変更の差分
+- name: unlinked[].id
+  type: str
+  description: '`onReferenced: unlink` で参照を除いた文書の ID'
+- name: unlinked[].version
+  type: str
+  description: 参照を除いた後の文書のバージョン
+- name: commit.sha
+  type: str
+  description: 'プッシュしたコミットの SHA（`dryRun: true` のときは `commit` が `null`）'
+- name: commit.branch
+  type: str
+  description: コミットしたブランチ
+- name: commit.retried
+  type: bool
+  description: プッシュを 1 回やり直したか
+response_example: |-
+  ```json
+  {"applied": true, "results": [{"kind": "write", "index": 0, "id": "n1", "status": "updated", "version": "b2c3d4", "diff": "..."}, {"kind": "delete", "index": 0, "id": "n2", "status": "deleted", "version": null, "diff": "..."}], "unlinked": [], "commit": {"sha": "0a1b2c3", "branch": "develop", "retried": false}}
+  ```
+status_codes:
+- code: '200'
+  condition: '書き込み・コミット・プッシュをした、または `dryRun: true` で検査に合格した'
+- code: '400'
+  condition: 要求の型の検証に失敗した（`message` が無い・`writes` と `deletes` が両方とも空。`InvalidArgumentError`）
+  notes: 起動の『例外の変換の登録』が problem+json にし、`errors[]` にキーのパスと理由を並べる
+- code: '403'
+  condition: 別のオリジンの要求（`CrossOriginError`）、書き換わる文書の種類が配信元の設定の `direct_commit.kinds[]` にはあるが端末の設定の `write_api_kinds` に無いか、書き込みの API から直コミットできる種類が 1 つも無い（`DirectCommitNotPermittedError`）、上書きできないブランチを指定した（`BranchNotAllowedError`）
+  notes: '`DirectCommitNotPermittedError` は `kinds` に許可していない種類を入れ、`next_steps` で許可を記載する端末の設定のキー `sources[].direct_commit.write_api_kinds` を示す'
+- code: '404'
+  condition: 無い配信元（`UnknownSourceError`）・配信していない配信元（`SourceNotServedError`）・更新や削除する文書が無い（`DocumentNotFoundError`）
+- code: '409'
+  condition: 文書のバージョンが取り込んだ後の今のバージョンと違う（`VersionMismatchError`）、直コミットを使用できない配信元（`DirectCommitNotConfiguredError`）、コミットするブランチのワークツリーが無い（`CommitWorktreeNotFoundError`）、ワークツリーに未プッシュのコミット（`UnpushedCommitsError`）・書き込むファイルに未コミットの変更（`UncommittedChangesError`）がある、削除する文書が参照されている（`DocumentReferencedError`）、プッシュが 2 回断られた（`PushRejectedError`）
+- code: '422'
+  condition: 検査に合格しない（`ValidationFailedError`。配信元の設定の `direct_commit.kinds[]` に無い種類の文書が書き換わる・秘密の値を含むも同じ）
+  notes: '`errors[]` に、`writes`・`deletes` の別と添字・項目のパス・決まり・直し方を全て並べる'
+- code: '500'
+  condition: '`generators[]` が失敗した（`DirectCommitGeneratorError`）'
+  notes: 書き込んだファイルと生成物を戻した後に返却する
+- code: '502'
+  condition: リモートからの取得に失敗した（`FetchFailedError`）か、プッシュに失敗した・結果が不明（`PushFailedError`）
+  notes: 書き込んだファイルと生成物を戻した後に返却する
+- code: '504'
+  condition: 書き込みの期限を過ぎた（`WriteDeadlineExceededError`）
+error_format: RFC 9457 の `application/problem+json`。拡張メンバーは camelCase（`nextSteps`・`errors[]`・`current`）
+constraints:
+- item: オリジンの確認
+  constraint: 端末の設定の API と同じ `require_same_origin` で確かめる
+- item: 認可
+  constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）。作業場所（`cwd`）は受け取らず、`scope.write` と `sources[].direct_commit.scope`・`kinds` では判定しない
+  decided_by: NFR-1#requirements[通信]
+- item: 書き込みの API の直コミットの権限
+  constraint: '制約「直コミットを許可する種類」の後に、変更を適用した後に書き換わる全ての文書（`rename` の参照元・`replace_text` で置換した文書・`onReferenced: unlink` で参照を除く文書を含む）の種類が、端末の設定の `sources[].direct_commit.write_api_kinds` にあることを確認する。配信元の設定の `direct_commit.kinds[]` にあって `write_api_kinds` に無い種類があれば `DirectCommitNotPermittedError` で断る'
+- item: 直コミットを許可する種類
+  constraint: '[文書の書き込み](id:IF-6) の制約「直コミットを許可する種類」と同じで、制約「書き込みの API の直コミットの権限」より先に判定する。ただし、書き込みの API から直コミットできる種類（`write_api_kinds` のうち配信元の設定の `direct_commit.kinds[]` にある種類）が 1 つも無い配信元は、取得の前に操作の種類に関わらず `DirectCommitNotPermittedError` で断る。書き換わる文書に配信元の設定の `direct_commit.kinds[]` に無い種類があれば、`write_api_kinds` に関わらず `ValidationFailedError` で返却する。`write_api_kinds` にあっても配信元の設定の `direct_commit.kinds[]` に無い種類は、起動の検証で警告にして使用しない'
+- item: 書き込みと削除の 1 つのコミット
+  constraint: '`writes` を並び順に適用し、続けて `deletes` を適用した後の文書を検査する。全ての操作が合格したときだけ書き込み、書き込んだ・削除したファイルと生成物を 1 つのコミットにする。`atomic: false` は受け付けない'
+- item: 直コミットの流れ
+  constraint: '[文書の書き込み](id:IF-6) の制約「直コミットの書き込む先」「直コミットの流れ」「秘密の値の検査」「直コミットのプッシュの再試行」「直コミットの取り込み・生成・プッシュの制限時間」「直コミットの生成の失敗」「直コミットのプッシュの結果の照合」と同じ'
+- item: バージョンの照合
+  constraint: 取得と取り込みの後のワークツリーの文書のバージョンと、`writes[].expected_version`・`deletes[].expectedVersion` を照合する
+- item: 書き込みの期限
+  constraint: '[文書の書き込み](id:IF-6) の制約「書き込みの期限」と同じ'
+- item: JSON のキー
+  constraint: 要求と応答のキーは camelCase。`writes[]` の操作のキーは `write_docs` の `operations[]` のキーのまま
+flows:
+- name: 正常系
+  summary: 書き込みと削除を 1 つのコミットにまとめてプッシュする
+  setup:
+  - &id001
+    name: Mock
+    description: なし（一時フォルダに git の配信元とベアリポジトリのリモートと端末の設定を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+  - &id002
+    name: 配信元
+    description: '種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）を持つ git の配信元 sample と、`develop` を指すワークツリー。配信元の設定の `direct_commit` は `branch: develop`・`kinds: [note]`'
+    notes: '端末の設定の sample の行は `direct_commit.write_api_kinds: [note]`'
+  - &id003
+    name: 文書
+    description: '`develop` にコミット済みの種類 `note` の文書 n1・n2 と、そのバージョン'
+  - name: 入力
+    description: '`writes` に n1 の `update`、`deletes` に n2、`message`'
+  flow: |-
+    <!-- map: {"title": "正常系"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant WT as develop のワークツリー
+      participant R as リモート
+
+      C->>E: writes（n1 の update）, deletes（n2）, message
+      E->>E: オリジンと write_api_kinds を確かめる
+      E->>R: 取得し、develop のワークツリーへ早送りで取り込む
+      E->>E: 全ての操作を write_docs・delete_docs と同じ検査に通す
+      E->>WT: n1 を書き換え n2 を削除し、generators を実行して 1 つのコミットにする
+      E->>R: develop をプッシュする
+      E-->>C: 200 applied, results, commit
+    ```
+
+    <!-- /map -->
+  expected:
+  - 200 で `applied` が `true`、`results` に n1 の `updated` と n2 の `deleted` がある
+  - リモートの `develop` に 1 コミットだけ増え、`commit.sha` と一致し、変更は n1・n2 のファイルと生成物だけ
+  - コミットの説明が `message`
+  test: test_normal
+- name: 正常系（試しに書く）
+  summary: '`dryRun: true` は検査と差分だけを返却する'
+  setup:
+  - *id001
+  - *id002
+  - *id003
+  - name: 入力
+    description: '正常系と同じ入力に `dryRun: true`'
+  flow: |-
+    <!-- map: {"title": "正常系（試しに書く）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant WT as develop のワークツリー
+      participant R as リモート
+
+      C->>E: 正常系の入力, dryRun: true
+      E->>E: 許可と検査だけを行う
+      E-->>C: 200 applied: false, results（差分）
+    ```
+
+    <!-- /map -->
+  expected:
+  - 200 で `applied` が `false`、`results[].diff` がある
+  - '`commit` が `null` で、リモートとワークツリーは変わらない'
+  test: test_normal_when_dry_run
+- name: 異常系（書き込みの API の直コミットを許可していない・403）
+  summary: 端末の設定の `write_api_kinds` に無い種類は断る
+  setup:
+  - *id001
+  - name: 配信元
+    description: '種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）を持つ git の配信元 sample と、`develop` を指すワークツリー。配信元の設定の `direct_commit` は `branch: develop`・`kinds: [note]`'
+    notes: 端末の設定の sample の行に `write_api_kinds` が無い
+  - *id003
+  flow: |-
+    <!-- map: {"title": "異常系（書き込みの API の直コミットを許可していない・403）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant WT as develop のワークツリー
+      participant R as リモート
+
+      C->>E: 正常系の入力
+      E->>E: n1・n2 の種類 note が write_api_kinds に無い
+      E-->>C: 403 DirectCommitNotPermittedError
+    ```
+
+    <!-- /map -->
+  expected:
+  - 403 で、許可していない種類と、許可を記載する端末の設定のキー `sources[].direct_commit.write_api_kinds` を返却する
+  - リモートとワークツリーは変わらない
+  test: test_error_when_write_api_not_allowed
+- name: 異常系（書き換わる文書に許可していない種類がある・422）
+  summary: 削除の参照の除外で書き換わる参照元の種類も確かめる
+  setup:
+  - *id001
+  - *id002
+  - *id003
+  - name: 参照元
+    description: 種類 `rule` の文書 r1 の `related` が n2 を指す
+  - name: 入力
+    description: '`deletes` に n2、`onReferenced: unlink`'
+  flow: |-
+    <!-- map: {"title": "異常系（書き換わる文書に許可していない種類がある・422）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant WT as develop のワークツリー
+      participant R as リモート
+
+      C->>E: deletes（n2）, onReferenced: unlink
+      E->>E: n2 の削除で r1（種類 rule）が書き換わる
+      E-->>C: 422 ValidationFailedError
+    ```
+
+    <!-- /map -->
+  expected:
+  - 422 で、`errors[]` に n2 の操作の位置と「種類 rule は直コミットを許可していない」がある
+  - n2 も r1 も変わらず、リモートとワークツリーは変わらない
+  test: test_error_when_disallowed_kind_rewritten
+- name: 異常系（1 つの操作が検査に通らない・422）
+  summary: 1 つでも違反があればどれも書き込まない
+  setup:
+  - *id001
+  - *id002
+  - *id003
+  - name: 入力
+    description: '`writes` に n1 の `update` と、スキーマに違反する n2 の `update`'
+  flow: |-
+    <!-- map: {"title": "異常系（1 つの操作が検査に通らない・422）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant WT as develop のワークツリー
+      participant R as リモート
+
+      C->>E: writes（n1・n2）
+      E->>E: n2 の操作がスキーマに通らない
+      E-->>C: 422 ValidationFailedError
+    ```
+
+    <!-- /map -->
+  expected:
+  - 422 で、`errors[]` に n2 の操作の位置と `write_docs` と同じ違反の決まり・直し方がある
+  - n1 も書き換わらず、リモートとワークツリーは変わらない
+  test: test_error_when_validation_failed
+- name: 異常系（文書のバージョンが古い・409）
+  summary: 取り込んだ後のバージョンと照合する
+  setup:
+  - *id001
+  - *id002
+  - *id003
+  - name: 先の書き換え
+    description: バージョンを取得した後に、リモートの `develop` で n1 を書き換える
+  flow: |-
+    <!-- map: {"title": "異常系（文書のバージョンが古い・409）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant WT as develop のワークツリー
+      participant R as リモート
+
+      C->>E: 正常系の入力（書き換わる前の n1 のバージョン）
+      E->>R: 取得し、取り込む
+      E->>E: n1 の今のバージョンと合わない
+      E-->>C: 409 VersionMismatchError
+    ```
+
+    <!-- /map -->
+  expected:
+  - 409 で、n1 と今のバージョンを返却する
+  - n2 も削除されず、リモートの `develop` に増えたコミットは先の書き換えだけ
+  test: test_error_when_version_conflict
+- name: 異常系（別のオリジン・403）
+  summary: ブラウザの別のオリジンからの要求は断る
+  setup:
+  - *id001
+  - *id002
+  - *id003
+  - name: 入力
+    description: 正常系の入力に、project-index と別のオリジンの `Origin` ヘッダー
+  flow: |-
+    <!-- map: {"title": "異常系（別のオリジン・403）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant WT as develop のワークツリー
+      participant R as リモート
+
+      C->>E: 正常系の入力（Origin: 別のオリジン）
+      E-->>C: 403 CrossOriginError
+    ```
+
+    <!-- /map -->
+  expected:
+  - 403 で、別のオリジンからの要求を受けないことを返却する
+  - リモートとワークツリーは変わらない
+  test: test_error_when_cross_origin
+- name: 異常系（配信していない配信元・404）
+  summary: 配信していない配信元は断る
+  setup:
+  - *id001
+  - *id002
+  flow: |-
+    <!-- map: {"title": "異常系（配信していない配信元・404）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant WT as develop のワークツリー
+      participant R as リモート
+
+      C->>E: source: missing
+      E-->>C: 404 UnknownSourceError
+    ```
+
+    <!-- /map -->
+  expected:
+  - 404 で、配信していない配信元であることを返却する
+  test: test_error_when_source_not_found
+test_file: tests/integration/server/test_commit_documents.py
+visibility: internal
+tags:
+- name: topic:api
+  main: true
+- name: action:書き込み
+- name: tool:git
+- name: tool:dev-docs
+refs:
+- to: IF-6
+  type: references
+  when: 操作・検査・直コミットの流れの決まりを確認するときに参照する。
+- to: IF-7
+  type: references
+  when: 削除と参照の除外の決まりを確認するときに参照する。

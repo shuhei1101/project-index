@@ -62,7 +62,7 @@ def _to_yaml_row(entry: SourceEntry) -> dict[str, Any]:
         scope["write"] = list(entry.scope.write)
     if scope:
         row["scope"] = scope
-    # direct_commit は両方とも空なら書かない
+    # direct_commit は全て空なら書かない
     direct_commit = _direct_commit_row(entry.direct_commit)
     if direct_commit:
         row["direct_commit"] = direct_commit
@@ -70,12 +70,14 @@ def _to_yaml_row(entry: SourceEntry) -> dict[str, Any]:
 
 
 def _direct_commit_row(direct_commit: SourceDirectCommit) -> dict[str, Any]:
-    """`direct_commit` の空でない `scope`・`kinds` だけを持つ辞書にする。"""
+    """`direct_commit` の空でない `scope`・`kinds`・`write_api_kinds` だけを持つ辞書にする。"""
     row: dict[str, Any] = {}
     if direct_commit.scope:
         row["scope"] = list(direct_commit.scope)
     if direct_commit.kinds:
         row["kinds"] = {kind: list(globs) for kind, globs in direct_commit.kinds.items()}
+    if direct_commit.write_api_kinds:
+        row["write_api_kinds"] = list(direct_commit.write_api_kinds)
     return row
 
 
@@ -130,6 +132,9 @@ def _merge_direct_commit(
     return SourceDirectCommit(
         scope=sent.scope if "scope" in sent_keys else current.scope,
         kinds=sent.kinds if "kinds" in sent_keys else current.kinds,
+        write_api_kinds=(
+            sent.write_api_kinds if "write_api_kinds" in sent_keys else current.write_api_kinds
+        ),
     )
 
 

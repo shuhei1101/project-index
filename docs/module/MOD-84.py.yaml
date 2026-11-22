@@ -755,6 +755,117 @@ functions:
         mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: 文書 1・文書 2 が `failed`、文書 3 が `deleted` で、文書 1・文書 2 のファイルが残り、文書 3 のファイルが無い
         exception: '-'
+  - name: commit_documents
+    title: 書き込みと削除の直コミット
+    kind: 関数
+    container: project_index/features/write/service.py
+    usecase: 直コミット
+    role: サービス
+    summary: 書き込みの API の要求を処理し、書き込みと削除を 1 つの直コミットにして結果を返す
+    scope: public
+    args:
+      - name: request
+        title: 要求
+        type: CommitDocumentsRequest
+        required: true
+        passing: positional
+        description: 書き込みの API の本文から作った要求
+      - name: registry
+        title: 配信元の一覧
+        type: SourceRegistry
+        required: true
+        passing: keyword
+        description: 文書の書き込みと同じ
+      - name: store
+        title: 文書のストア
+        type: DocumentStore
+        required: true
+        passing: keyword
+        description: 文書の書き込みと同じ
+      - name: checker
+        title: 文書の検査
+        type: DocumentChecker
+        required: true
+        passing: keyword
+        description: 文書の書き込みと同じ
+      - name: locks
+        title: 配信元ごとの排他
+        type: SourceLocks
+        required: true
+        passing: keyword
+        description: 文書の書き込みと同じ
+      - name: repo_locks
+        title: リポジトリごとの排他
+        type: RepositoryLocks
+        required: true
+        passing: keyword
+        description: 文書の書き込みと同じ
+      - name: timeout_sec
+        title: スクリプトの制限時間
+        type: float
+        required: true
+        passing: keyword
+        description: 文書の書き込みと同じ
+      - name: now
+        title: 今の時刻
+        type: datetime | None
+        required: false
+        default: None
+        passing: keyword
+        description: 文書の書き込みと同じ
+      - name: limits
+        title: 呼び出しの期限
+        type: CallLimits | None
+        required: false
+        default: None
+        passing: keyword
+        description: 無ければ既定の期限
+    returns:
+      type: CommitDocumentsResult
+      description: 書き込みと削除の結果とコミットの結果
+    process: |-
+      1. `writes` と `deletes` の件数の合計が 1〜`OPERATIONS_MAX` 件でなければ `InvalidArgumentError` を送る。`writes` は文書の書き込みの操作の確かめ（`_check_operations`）にかける
+
+      2. `registry.get_for_docs(request.source)` で配信元を引き、直コミットの書き込む先（`resolve_commit_plan`）で計画を作る。許可する種類は作業場所でなく、書き込みの API から直コミットできる種類（`write_api_committable_kinds`）にする。空なら取得の前に、配信元の `direct_commit.kinds` を `kinds` に添え、`next_steps` で端末の設定の `sources[].direct_commit.write_api_kinds` を示す `DirectCommitNotPermittedError` を送る
+
+      3. 文書の書き込みの直コミット（`request.commit` がある場合）の手順 3・4 と同じ排他・`dry_run`・直コミットを進めるの順に進める。`write_once` は 1 つの書く場所と文書の集まり（`_Session`）で次を行う
+         - `writes` を文書の書き込みと同じに当て（`_apply_operations`、`atomic` は `True`）、続けて `deletes` を文書の削除と同じに当てる（`_apply_deletes`、`on_referenced` は要求の値、`atomic` は `True`）。どちらかで失敗したら、`writes`・`deletes` の別と添字を付けた例外を送る
+         - 直コミットの確認（文書の書き込みの `_check_commit_content`）を、書き込みと削除で書き換わる全ての文書（参照を外す文書を含む）について、手順 2 の許可する種類で行う。`direct_commit.kinds` に無い種類は `ValidationFailedError`、`direct_commit.kinds` にあって許可する種類に無い種類は `DirectCommitNotPermittedError` にする（前者を先に判定する）
+         - 書き込むファイルを `check_clean` にかけ、書き込みと削除を全て書き、書き込みと削除の種類の生成を文書の書き込みの直コミットと同じ制限時間で動かす
+         - 書いた・消したファイルを返す（直コミットを進めるが 1 つのコミットにする）
+
+      4. `applied`・`writes`（書き込みの結果）・`deletes`（削除の結果）・`unlinked`・`commit` で返す。会話の記録は残さない（会話キーを持たない）
+    unit_tests:
+      - name: test_commit_documents
+        case: 正常
+        summary: 書き込みと削除を 1 つのコミットにする
+        condition: '一時フォルダの git の配信元とベアリポジトリ、`write_api_kinds: [note]`。文書 n1 の `update` と n2 の削除'
+        mock: なし（一時フォルダの git）
+        expected: '`applied` が `True`、リモートのコミットが 1 つ増え、変更が n1・n2 のファイルだけ'
+      - name: test_commit_documents_when_not_permitted
+        case: 異常
+        summary: 書き込みの API の許可が無ければ取得の前に断る
+        condition: '`write_api_kinds` が空'
+        mock: なし（一時フォルダの git）
+        expected: '`DirectCommitNotPermittedError` で、リモートとワークツリーは変わらない'
+      - name: test_commit_documents_when_disallowed_kind_rewritten
+        case: 異常
+        summary: 配信元が許可していない種類の参照元が書き換わると検査の不合格
+        condition: '種類 `rule` の r1 が n2 を参照し、`on_referenced: unlink` で n2 を削除'
+        mock: なし（一時フォルダの git）
+        expected: '`ValidationFailedError` で、違反のパスが `deletes[0]`'
+      - name: test_commit_documents_when_one_invalid
+        case: 異常
+        summary: 1 つの操作の違反でどれも書かない
+        condition: n1 の正しい `update` と、スキーマに違反する n2 の `update`
+        mock: なし（一時フォルダの git）
+        expected: '`ValidationFailedError` で、違反のパスが `writes[1]`。n1 のファイルも変わらない'
+      - name: test_commit_documents_when_dry_run
+        case: 正常
+        summary: 試しに書くと何も変えない
+        condition: '正常と同じ要求に `dry_run: True`'
+        mock: なし（一時フォルダの git）
+        expected: '`applied` が `False`、`commit` が `None`、リモートとワークツリーは変わらない'
 refs:
   - to: IF-6
     type: requires

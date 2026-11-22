@@ -79,9 +79,9 @@ functions:
       1. `lock` を取る
       2. 端末の設定の本文と内容のバージョンを読み（端末の設定の内容の読み込み）、内容のバージョンを照合する（内容のバージョンの照合）
       3. 本文を往復編集の形で読み（往復編集の読み込み）、送られた行ごとに、ファイルの `sources` から配信元の ID（配信元の『行の配信元の ID』。`id`、無ければ設定の `name`）が同じ行を探す
-         - 見つかった場合、送られた行に含めなかったキー（`SourceEntry` の `model_fields_set` に無い `enabled`・`outside_read`・`storage` と、`scope` を含めなかった行か `SourceScope` の `model_fields_set` に無い `scope.read`・`scope.write` と、`direct_commit` を含めなかった行か `SourceDirectCommit` の `model_fields_set` に無い `direct_commit.scope`・`direct_commit.kinds`）を、見つかった行の値で埋める
+         - 見つかった場合、送られた行に含めなかったキー（`SourceEntry` の `model_fields_set` に無い `enabled`・`outside_read`・`storage` と、`scope` を含めなかった行か `SourceScope` の `model_fields_set` に無い `scope.read`・`scope.write` と、`direct_commit` を含めなかった行か `SourceDirectCommit` の `model_fields_set` に無い `direct_commit.scope`・`direct_commit.kinds`・`direct_commit.write_api_kinds`）を、見つかった行の値で埋める
          - ID が求まらない行と、同じ ID の行が無い行は埋めない（既定値のまま）。ファイルの行のうち `SourceEntry` として読めない行（スキーマに通らない行）は探す対象から除く
-      4. `sources` だけを埋めた後の行に置き換える。`config` は要素の数によらず配列で書く。既定値と同じキー（`enabled: true`・`outside_read: true`・空の `scope.read` など）は書かない。`direct_commit` は空でない `scope`・`kinds` だけを書き、両方とも空の行には `direct_commit` を書かない
+      4. `sources` だけを埋めた後の行に置き換える。`config` は要素の数によらず配列で書く。既定値と同じキー（`enabled: true`・`outside_read: true`・空の `scope.read` など）は書かない。`direct_commit` は空でない `scope`・`kinds`・`write_api_kinds` だけを書き、全て空の行には `direct_commit` を書かない
       5. 置き換えた値を検証する（端末の設定の検証）
          - 違反がある場合、ファイルを書かずに `TerminalConfigInvalidError` を送る
       6. 一時ファイルに書いてから置き換える（往復編集の書き出し・ファイルの置き換え。往復編集の書き出しの `original` は手順 2 で読んだ本文）
@@ -364,7 +364,7 @@ functions:
       2. 端末の設定の本文と内容のバージョンを読み（端末の設定の内容の読み込み）、内容のバージョンを照合する（内容のバージョンの照合）
       3. 本文を往復編集の形で読み（往復編集の読み込み）、`sources` から配信元の ID（配信元の『行の配信元の ID』）が `source_id` の最初の行を探す。`SourceEntry` として読めない行は探す対象から除く
          - 無い場合、`SourceRowNotFoundError` を送る
-      4. 見つけた行に、`patch` の `model_fields_set` にあるキーだけを重ねる。`scope` は `read`・`write` を `SourceScope` の `model_fields_set` で、`direct_commit` は `scope`・`kinds` を `SourceDirectCommit` の `model_fields_set` で別々に重ねる
+      4. 見つけた行に、`patch` の `model_fields_set` にあるキーだけを重ねる。`scope` は `read`・`write` を `SourceScope` の `model_fields_set` で、`direct_commit` は `scope`・`kinds`・`write_api_kinds` を `SourceDirectCommit` の `model_fields_set` で別々に重ねる
       5. 見つけた行が `id` を省いていて、重ねた後の行の配信元の ID が `source_id` と違う場合、ファイルを書かずに `TerminalConfigInvalidError`（違反のパス `source.config`）を送る
       6. 見つけた行の位置だけを、重ねた後の行に置き換える。書き方は配信元の保存と同じ
       7. 置き換えた値を検証する（端末の設定の検証）

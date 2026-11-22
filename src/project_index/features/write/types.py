@@ -5,11 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from project_index.features.access.types import CWD_DESCRIPTION
 from project_index.features.search.types import Condition, Group
 from project_index.features.validation.markdown import UncheckedKey
+from project_index.shared.api_model import ApiModel
 from project_index.shared.errors import Violation
 
 OPERATIONS_MAX = 50
@@ -180,3 +181,147 @@ class DeleteResult:
     results: list[WriteResultItem]
     unlinked: list[tuple[str, str]] = field(default_factory=list[tuple[str, str]])
     commit: CommitResult | None = None
+
+
+@dataclass(frozen=True)
+class CommitDocumentsRequest:
+    """書き込みの API がサービスに渡す要求。"""
+
+    source: str
+    commit: CommitSpec
+    writes: list[Operation] = field(default_factory=list[Operation])
+    deletes: list[DeleteTarget] = field(default_factory=list[DeleteTarget])
+    on_referenced: Literal["fail", "unlink"] = "fail"
+    dry_run: bool = False
+
+
+@dataclass(frozen=True)
+class CommitDocumentsResult:
+    """書き込みと削除の直コミットが返すもの。"""
+
+    applied: bool
+    writes: list[WriteResultItem]
+    deletes: list[WriteResultItem]
+    unlinked: list[tuple[str, str]] = field(default_factory=list[tuple[str, str]])
+    # `dry_run` のときは `None`
+    commit: CommitResult | None = None
+
+
+class CommitDeleteTarget(ApiModel):
+    """書き込みの API の本文の `deletes` の 1 件。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    expected_version: str
+
+
+class CommitDocumentsBody(ApiModel):
+    """`POST /sources/{source}/commits` の本文。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # 操作のキーは `write_docs` の `operations[]` のまま
+    writes: list[Operation] = Field(default_factory=list[Operation])
+    deletes: list[CommitDeleteTarget] = Field(default_factory=list[CommitDeleteTarget])
+    on_referenced: Literal["fail", "unlink"] = "fail"
+    message: str
+    branch: str | None = None
+    dry_run: bool = False
+
+    @model_validator(mode="after")
+    def _not_empty(self) -> CommitDocumentsBody:
+        """書き込みと削除が両方とも空の要求を断る。"""
+        if not self.writes and not self.deletes:
+            message = "writes と deletes が両方とも空です"
+            raise ValueError(message)
+        return self
+
+    def to_request(self, source: str) -> CommitDocumentsRequest:
+        """パスの配信元と合わせて、サービスに渡す要求にする。"""
+        return CommitDocumentsRequest(
+            source=source,
+            commit=CommitSpec(message=self.message, branch=self.branch),
+            writes=list(self.writes),
+            deletes=[
+                DeleteTarget(id=item.id, expected_version=item.expected_version)
+                for item in self.deletes
+            ],
+            on_referenced=self.on_referenced,
+            dry_run=self.dry_run,
+        )
+
+
+class CommitDocumentsItem(ApiModel):
+    """書き込みの API の応答の `results[]` の 1 件。"""
+
+    kind: Literal["write", "delete"]
+    index: int
+    id: str | None
+    status: str
+    version: str | None = None
+    diff: str | None = None
+
+
+class UnlinkedDocument(ApiModel):
+    """書き込みの API の応答の `unlinked[]` の 1 件。"""
+
+    id: str
+    version: str
+
+
+class CommitSummary(ApiModel):
+    """書き込みの API の応答の `commit`。"""
+
+    sha: str
+    branch: str
+    retried: bool
+
+
+class CommitDocumentsResponse(ApiModel):
+    """`POST /sources/{source}/commits` の応答。"""
+
+    applied: bool
+    results: list[CommitDocumentsItem]
+    unlinked: list[UnlinkedDocument]
+    commit: CommitSummary | None
+
+    @classmethod
+    def from_domain(cls, result: CommitDocumentsResult) -> CommitDocumentsResponse:
+        """書き込みと削除の結果を、書き込みに続けて削除の順の `results[]` にする。"""
+        items = [
+            CommitDocumentsItem(
+                kind="write",
+                index=item.index,
+                id=item.id,
+                status=item.status,
+                version=item.version,
+                diff=item.diff,
+            )
+            for item in result.writes
+        ] + [
+            CommitDocumentsItem(
+                kind="delete",
+                index=item.index,
+                id=item.id,
+                status=item.status,
+                version=item.version,
+                diff=item.diff,
+            )
+            for item in result.deletes
+        ]
+        commit = (
+            None
+            if result.commit is None
+            else CommitSummary(
+                sha=result.commit.sha, branch=result.commit.branch, retried=result.commit.retried
+            )
+        )
+        return cls(
+            applied=result.applied,
+            results=items,
+            unlinked=[
+                UnlinkedDocument(id=doc_id, version=version) for doc_id, version in result.unlinked
+            ],
+            commit=commit,
+        )
