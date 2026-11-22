@@ -611,7 +611,7 @@ functions:
       type: None
       description: なし
     process: |-
-      1. 検査の結果の並び（`missing_refs`・`unindexed_files`・`missing_body_files`・`unresolved_related`・`duplicate_files`・`duplicate_ids`）のうち 0 件でないものを、配信元の ID・ずれの種類・件数・並びの値で警告のログに書く。`alias_violations` は文書のパス・キー・理由で、nav の警告（読み取り API）はキーのパスと理由で警告のログに書く
+      1. 検査の結果の並び（`missing_refs`・`unindexed_files`・`missing_body_files`・`unresolved_related`・`duplicate_files`・`duplicate_ids`・`sqlite_warnings`）のうち 0 件でないものを、配信元の ID・ずれの種類・件数・並びの値で警告のログに書く。`alias_violations` は文書のパス・キー・理由で、nav の警告（読み取り API）はキーのパスと理由で警告のログに書く
     unit_tests:
       - name: test_log_source_check
         case: 正常
@@ -631,6 +631,12 @@ functions:
         condition: '`duplicate_ids` が `["a: rules（docs/a.yaml）・rules（docs/b.yaml）"]` だけの検査の結果'
         mock: なし（`caplog`）
         expected: '`warning` の行が 1 件で、「ID が重なる文書」・件数 1・`a: rules（docs/a.yaml）・rules（docs/b.yaml）` を含む'
+      - name: test_log_source_check_when_sqlite
+        case: 正常
+        summary: SQLite の行の警告を警告のログに書く
+        condition: '`sqlite_warnings` に `notes_db: data/notes.db を開けません（unable to open database file）` の 1 件だけを持つ検査の結果'
+        mock: なし（`caplog`）
+        expected: '`warning` の行が 1 件で、配信元の ID・`notes_db`・`data/notes.db` を含む'
   - name: run_migrate
     title: 設定の移し替えの実行
     container: project_index/main.py

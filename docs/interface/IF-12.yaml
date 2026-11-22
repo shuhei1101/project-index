@@ -632,6 +632,38 @@ flows:
       - '`violations` に `documents[0].search_exclude` と、比べ方 `like` を使用できない理由がある'
       - '`violations` に `documents[1].search_exclude` と、`body` を比べられない理由がある'
     test: test_normal_when_search_exclude_invalid
+  - name: 正常系（SQLite の行に違反がある）
+    summary: SQLite の表を指す行のファイル・表・列の欠けを違反にし、上限を超えた行を警告にする
+    setup:
+      - name: Mock
+        description: なし
+      - name: SQLite のデータベース
+        description: sample のクローン本体の `data/notes.db`（表 `notes` に 2 行）
+      - name: 行
+        description: '無い表 `memos` を指す行 `memos_db`・`metadata` の `name` に表に無い列 `heading` を指す行 `bad_column`・置かない `data/missing.db` を指す行 `missing_db`・`paths[]` と `sqlite` を両方持つ行 `both`・`limit: 1` の行 `notes_db`'
+    flow: |-
+      <!-- map: {"title": "正常系（SQLite の行に違反がある）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as check_project
+        participant DB as SQLite のデータベース
+
+        C->>T: path: sample のワークツリー
+        T-->>DB: 読み取り専用で開き、表・ビューと列の一覧と行の数を読む
+        T-->>C: violations[] と warnings[]
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`violations[]` に `documents[{memos_db の番号}].sqlite.table`（表かビューが無い）がある'
+      - '`violations[]` に `documents[{bad_column の番号}].metadata.name`（列 `heading` が無い）がある'
+      - '`violations[]` に `documents[{missing_db の番号}].sqlite.file`（ファイルが無い）がある'
+      - '`violations[]` に `documents[{both の番号}]`（`sqlite` とファイルの行のキーを一緒に持てない）がある'
+      - '`warnings[]` に `notes_db` の配信しない行の数 1 がある'
+      - '`data/notes.db` のバイト列は変わらない'
+    test: test_normal_when_sqlite_row_violations
 lead: 配信元の設定・管理用の YAML・スクリプトを検証する管理の MCP の `check_project` の入出力を定め、`check_project` を修正するときに参照する。
 tags:
   - name: action:検査
@@ -814,5 +846,8 @@ constraints:
     notes: 無視の一覧を git から取れないときは除かずに数え、違反・警告にしない
   - item: 既定の検索から除く条件の検証
     constraint: '`documents[].search_exclude` を `search_docs` の `filter` と同じ構造（`and`・`or`・`not` と条件）として検証する。`op` が比べ方の一覧に無い・`exists`・`not_exists` 以外で `values` が無い・`field` が共通のメタデータのキーと行の種類の項目のどれでもない（`body`・`*`・計算項目を含む）条件を、`documents[{番号}].search_exclude` の違反にする'
+  - item: SQLite の行の検証
+    constraint: '`documents[].sqlite` を持つ行は、ファイルの有無・表かビューの有無・`columns[]` と `metadata` が指す列の有無・ファイルの行のキー（`paths[]`・`schema`・`records` など）との併記を違反にし、`where` に該当する行が `limit` を超えることと `id` の列の値の重なりを警告にする。ファイルは配信元のフォルダ（クローン本体）のものを読み取り専用で開く'
+    notes: ワークツリーのパスを渡しても、ファイルはクローン本体のものを確認する
 test_file: tests/integration/server/test_check_project.py
 visibility: internal

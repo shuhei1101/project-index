@@ -39,7 +39,12 @@ from project_index.features.search.filters import (
     match_filter,
 )
 from project_index.features.search.service import excluded_note
-from project_index.features.search.types import LIMIT_MAX, MAX_CHARS_LIMIT, SearchRequest
+from project_index.features.search.types import (
+    LIMIT_MAX,
+    MAX_CHARS_LIMIT,
+    Condition,
+    SearchRequest,
+)
 from project_index.features.seen.types import SessionKey
 from project_index.shared.errors import InvalidArgumentError, LastReadNotFoundError, Violation
 from project_index.shared.hashing import value_hash
@@ -502,6 +507,33 @@ def _change_entry(
     return item, judged, excluded
 
 
+def _sqlite_kinds(targets: list[Target]) -> set[str]:
+    """読む場所の配信元の、SQLite の表を指す行の種類を返す。"""
+    return {
+        table.id
+        for target in targets
+        for table in target.source.config.documents
+        if table.sqlite is not None
+    }
+
+
+def _sqlite_filter_notes(request: ChangesRequest, targets: list[Target]) -> list[str]:
+    """`filter` が `kind` で SQLite の表の行の種類だけを指すとき、対象外である旨の知らせを返す。"""
+    condition = request.filter
+    sqlite_kinds = _sqlite_kinds(targets)
+    # kind の eq の 1 つの条件で、指す種類が全て SQLite の表の行の種類
+    if (
+        isinstance(condition, Condition)
+        and condition.field == "kind"
+        and condition.op == "eq"
+        and condition.values
+        and set(condition.values) <= sqlite_kinds
+    ):
+        kinds = "・".join(condition.values)
+        return [f"SQLite の表の行の種類（{kinds}）は履歴を持たないので list_changes の対象外です"]
+    return []
+
+
 def _change_items(
     context: _ItemContext, target: Target, sides: _Sides
 ) -> tuple[list[tuple[ChangeItem, Document]], int]:
@@ -509,7 +541,12 @@ def _change_items(
     today = datetime.now(UTC).astimezone().date()
     items: list[tuple[ChangeItem, Document]] = []
     excluded_count = 0
+    sqlite_kinds = _sqlite_kinds([target])
     for doc_id in sorted({*sides.before, *sides.after, *sides.word_changes}):
+        # SQLite の表の行の文書: 履歴を持たないので比べない
+        pair = (sides.before.get(doc_id), sides.after.get(doc_id))
+        if any(document is not None and document.kind in sqlite_kinds for document in pair):
+            continue
         entry = _change_entry(context, target, sides, doc_id, today)
         if entry is None:
             continue
@@ -640,6 +677,7 @@ def list_changes(
     entries.sort(key=lambda entry: (entry[0], entry[1].id))
     if excluded:
         notes.append(excluded_note(excluded))
+    notes.extend(_sqlite_filter_notes(request, targets))
     result = _result(request, targets, points, [item for _, item in entries], notes)
     return replace(result, excluded_count=excluded or None)
 

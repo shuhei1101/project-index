@@ -112,6 +112,7 @@ def _source_guide(
         KindSummary(
             id=table.id,
             description=str(store.schema(target, table.id).get("description") or table.title or ""),
+            sqlite=table.sqlite is not None,
         )
         for table in source.config.documents
         if table.enabled
@@ -141,6 +142,17 @@ def _kind_schema(store: DocumentStore, target: Target, kind: str) -> KindSchemaR
     """種類のスキーマを、スキーマのファイルの文字列とともに返す。"""
     table = target.source.table(kind)
     schema = store.schema(target, table.id)
+    # SQLite の表の行: スキーマのファイルの代わりに列の説明を返す
+    if table.sqlite is not None:
+        return KindSchemaResult(
+            source_id=target.source.id,
+            kind=table.id,
+            schema_text="",
+            schema=schema,
+            metadata=dict(table.metadata),
+            outside_scope=target.outside_scope,
+            columns=list(table.sqlite.columns),
+        )
     schema_text = ""
     # ほかの配信元のリビジョンを指す行は、`$ref` まで解いたスキーマを YAML にして返す
     if not isinstance(table.schema_path, str):

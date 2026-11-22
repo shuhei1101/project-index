@@ -239,6 +239,24 @@ functions:
         mock: なし
         expected: 違反を返さない
         exception: '-'
+      - name: test_validate_source_config_when_sqlite
+        case: 正常
+        summary: SQLite の表を指す行を paths と schema なしで受け付ける
+        condition: '`documents[]` に `sqlite: {file, table, columns}` だけを持ち `paths`・`schema` を持たない行'
+        mock: なし
+        expected: 違反が空で、行の `sqlite.limit` が 1000、`is_writable` が偽
+      - name: test_validate_source_config_when_sqlite_with_file_keys
+        case: 異常
+        summary: sqlite とファイルの行のキーを一緒に持つ行を違反にする
+        condition: '`sqlite` と `paths`・`schema`・`records`・`writable: true` のどれかを一緒に持つ行と、`sqlite` も `paths` も持たない行'
+        mock: なし
+        expected: それぞれ `documents[{番号}]` の違反で、理由に一緒に持てないキーの名前
+      - name: test_validate_source_config_when_sqlite_invalid
+        case: 異常
+        summary: sqlite のキーの型と範囲を検証する
+        condition: '`sqlite.limit: 0`・`columns: []`・`columns[0].type: date`・`file` が配信元のフォルダの外を指す `../x.db`'
+        mock: なし
+        expected: それぞれ `sqlite.limit`・`sqlite.columns`・`sqlite.columns[0].type`・`sqlite.file` の違反
   - name: check_scripts
     title: スクリプトの確かめ
     kind: 関数
@@ -833,7 +851,7 @@ functions:
         summary: 新しい形式の documents の行
         condition: 戻り値を JSON として読む
         mock: なし
-        expected: '`documents.items.properties` が `type`・`defaults` を持たず、`metadata.additionalProperties` が文字列、`alias_type` が `term`・`doc`・`command`・`url`・`skill`・`tool`・`path`・`env`・`avoid` の列挙、`required` が `id`・`paths`・`schema`'
+        expected: '`documents.items.properties` が `type`・`defaults` を持たず、`metadata.additionalProperties` が文字列、`alias_type` が `term`・`doc`・`command`・`url`・`skill`・`tool`・`path`・`env`・`avoid` の列挙、`required` が `id` だけ（`paths`・`schema` と `sqlite` のどちらを持つかは配信元の設定の検証が確かめる）、`sqlite` が `file`・`table`・`columns` を必須に持つ'
   - name: entry_source_id
     title: 行の配信元の ID
     kind: 関数

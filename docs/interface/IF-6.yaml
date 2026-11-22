@@ -2463,6 +2463,36 @@ flows:
       - 1 回目の後、文書 1 の `labels` が `[]` で、`notes` は変わらない。`results[0].status` が `updated` で、`results[0].skipped` が `unset.notes.mcp/server.py の補足`・`unset.notes.nonexistent`（項目がありません）、`remove_from.labels`（z の要素がありません）、`remove_from.missing`（項目がありません）の 4 行
       - 2 回目の後、文書 1 の `notes` にキー `mcp/server.py の補足` が無く、`results[0].skipped` を返却しない
     test: test_normal_when_operation_skipped
+  - name: 異常系（SQLite の表の行の種類へ書き込む・ReadOnlyKindError）
+    summary: 'SQLite の表の行の種類への操作を含む呼び出しを、そのほかの操作も書き込まずに断る（`atomic: false` では通る操作だけを書き込む）'
+    setup:
+      - name: Mock
+        description: なし
+      - name: SQLite の行の文書
+        description: 文書の検索の正常系（SQLite の表の行）と同じ `data/notes.db` と行 `notes_db` を持つ sample
+        notes: '`worktree` にワークツリー x を指定する'
+      - name: 操作
+        description: 'ワークツリー x の YAML の文書 1 の検査に合格する update・`n1` の update・`kind: notes_db` の create の 3 件'
+    flow: |-
+      <!-- map: {"title": "異常系（SQLite の表の行の種類へ書き込む・ReadOnlyKindError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: operations: 文書 1 の update・n1 の update・notes_db の create
+        T->>T: 操作を適用する前に、種類 notes_db が SQLite の表の行であることを確かめる
+        T-->>C: isError（該当する操作の位置と、書き込みはデータを持つアプリで行う旨）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、`operations[1]` と `operations[2]` の位置と、種類 `notes_db` が SQLite の表の行で読み取り専用であることを返却する'
+      - 文書 1 のファイルも `data/notes.db` も変わらない
+      - '`atomic: false` では、正常系（一部だけ書く）と同じく文書 1 を書き込んで `applied: true`・`results[0].status: updated` を返却し、`results[1]`・`results[2]` を `status: failed` と `ReadOnlyKindError` の理由で返却する。`data/notes.db` は変わらない'
+      - '`replace_text` の `filter` が種類 `notes_db` の文書に該当しても、その文書は置換の対象にしない'
+    test: test_error_when_sqlite_kind_written
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -2866,6 +2896,9 @@ exceptions:
   - name: DirectCommitGeneratorError
     condition: '`commit` を指定した呼び出しで、`generators[]` のスクリプトが失敗したか、制限時間で止めたか、生成の時間が残らず実行しなかった'
     notes: スクリプトのパスと理由を添える。コミットせず、この呼び出しが書き込んだファイルと生成物を戻した後に返却する
+  - name: ReadOnlyKindError
+    condition: 操作が SQLite の表の行の種類（`documents[].sqlite` を持つ行）の文書を指すか、その種類に create する
+    notes: '操作を適用する前に確かめる。`atomic: true`（既定）は何も書き込まずに送出し、`atomic: false` はその操作を `results[].status: failed` にして通る操作だけを書き込む。`fix` で書き込みはデータを持つアプリのツールで行う旨を示す'
 constraints:
   - item: 件数
     constraint: 1 回の `operations` は最大 50 件
@@ -3018,6 +3051,8 @@ constraints:
   - item: 何もしなかった操作の返却
     constraint: 次の操作は違反にせず何もしないで、項目のパスと理由を `results[].skipped` に返却する。(1) `#` で始まらず要素の選び方を含まない `unset` の要素の項目が無い（`unset.{要素}`・「項目がありません」）。(2) `#` で始まらず要素の選び方を含まない `remove_from` のキーの項目が無い（`remove_from.{キー}`・「項目がありません」）。(3) `x-key` を持たない配列の `remove_from` の値に等しい要素が無い（`remove_from.{キー}`・「{値} の要素がありません」。値ごとに 1 行）。(4) 共通のキー `tags`・`main_tags` の `remove_from` に無い名前を指定した（`remove_from.{キー}`・「{名前} の要素がありません」。名前ごとに 1 行）
     notes: 項目のパスのキーと要素は指定したままの文字列にする（共通のキーを列名へ読み替える前）。文書が変わらなかった `update` も `status` は `updated` で、`version` は書き込み前と同じ
+  - item: SQLite の表の行の種類
+    constraint: '`documents[].sqlite` を持つ行の種類への create・update・replace・rename は `ReadOnlyKindError` で断る。`replace_text` はその種類の文書を対象から除く。直コミットの設定で許可していても断る'
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]

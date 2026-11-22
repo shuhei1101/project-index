@@ -43,5 +43,5 @@ flowchart TD
 <!-- /map -->
 
 - **※1 種類**: 文書が説明する対象の種類（規約・シナリオ・設計書 など）。`describe(source)` の `kinds[]` の名前（行の `title`・スキーマの `title`）と比べる
-- **※2 形式**: YAML の 1 ファイルが 1 文書か、配列の各要素が 1 文書か（`records`）、本文が別のファイルか（`body_file`）。ソースコードなど YAML でない文書は管理用の YAML の `files[]` の 1 行として扱い、`records: files`・`body_file: path` の行が形式に合う行になる
+- **※2 形式**: YAML の 1 ファイルが 1 文書か、配列の各要素が 1 文書か（`records`）、本文が別のファイルか（`body_file`）。ソースコードなど YAML でない文書は管理用の YAML の `files[]` の 1 行として扱い、`records: files`・`body_file: path` の行が形式に合う行になる。アプリが SQLite の表に持つ行は、表を指す `sqlite` の行が形式に合う行になる（読み取り専用。書き込みはアプリで行う）
 - **※3 収まる**: 文書が `schema` の必須の項目を全て持ち、持たせたい項目が全て `schema` にあること。`describe(source, kind)` でスキーマを見て確かめる。列名が共通のキー（`name`・`tags` など）と違うだけなら行の `metadata` の列名の対応が読み替えるので、収まらない理由にしない。`schema` の無い行は収まるものとする

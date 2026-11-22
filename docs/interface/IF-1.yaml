@@ -512,6 +512,33 @@ flows:
       - '`source: sample` の結果が説明書と種類の表に加えて、`direct_commit.branch` が `develop`、`direct_commit.kinds` が `[note]`'
       - '直コミットの呼べる作業場所でも `scope` でもない作業場所からの `source: sample` は `SourceNotReadableError`'
     test: test_normal_when_direct_commit_workplace
+  - name: 正常系（SQLite の表の行の種類）
+    summary: SQLite の表を指す行の種類で、スキーマの代わりに列の説明を返却し、開けない行と上限を超えた行を警告する
+    setup:
+      - name: Mock
+        description: なし
+      - name: SQLite の行
+        description: 'sample の行 `notes_db`（`data/notes.db` の表 `notes`、`limit: 1`、行は `n1`・`n2` の 2 行）と、置かない `data/missing.db` を指す行 `missing_db`'
+    flow: |-
+      <!-- map: {"title": "正常系（SQLite の表の行の種類）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as describe
+
+        C->>T: source: sample, kind: notes_db
+        T-->>C: 列の説明（name・type・description）と、書き込めない旨
+        C->>T: 引数なし
+        T-->>C: sample と、missing_db を開けない警告と notes_db の 1 行を配信していない警告
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`describe(source: sample, kind: notes_db)` が `schema` の代わりに `columns[]`（`name`・`type`・`description`）を返却し、書き込みと `list_changes` の対象外である旨を添える'
+      - '`describe(source: sample)` の種類の一覧に `notes_db` があり、SQLite の表の行である旨が付く'
+      - 引数なしの `warnings[]` に、`missing_db` の id・ファイルのパス・開けない理由と、`notes_db` の配信しなかった行の数 1 がある
+    test: test_normal_when_sqlite_kind
 lead: '引数の数で配信元の一覧・説明書と種類・種類のスキーマを返却する `describe` の入出力を定め、`describe` を修正するときに参照する。'
 tags:
   - name: topic:配信元
@@ -614,7 +641,7 @@ response:
     notes: '`sources[].when` と同じ出し方'
   - name: warnings[]
     type: str
-    description: 使える配信元の同期のずれ（metadata の列の欠け・管理用の YAML に無いファイル・ファイルが無い行・どの文書にも該当しない関連・2 つ以上の行が文書にするファイル・ID が重なる文書）とエイリアスのキーの違反、配信元・端末の設定のバージョンが古いこと、どの文書にも当たらない `nav` の条件、検証で外した配信元、端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパスを 1 件にまとめる）
+    description: 使える配信元の同期のずれ（metadata の列の欠け・管理用の YAML に無いファイル・ファイルが無い行・どの文書にも該当しない関連・2 つ以上の行が文書にするファイル・ID が重なる文書）とエイリアスのキーの違反、配信元・端末の設定のバージョンが古いこと、どの文書にも当たらない `nav` の条件、SQLite の表の行の開けない理由・表や列の欠け・配信しなかった行の数（行ごとに 1 件）、検証で外した配信元、端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパスを 1 件にまとめる）
     notes: '引数なしのとき。同期のずれ・エイリアス・`nav`・配信元の設定のバージョンは使える配信元だけを対象にし、端末の設定のバージョン・端末の設定の知らないキーと検証で外した配信元は使える配信元が 0 件のときも載せる。`format: markdown` は使える配信元の表の後の「注意」の見出しの下に 1 行ずつ出し、0 件は見出しごと出さない。`format: json` は 0 件のときキーを持たない'
   - name: when
     type: list[str]
@@ -675,6 +702,20 @@ response:
     type: str
     description: 今の作業場所から直コミットできる種類の ID
     notes: '`direct_commit.branch` と同じ。`format: markdown` は種類の表の後に「直コミット」の見出しと、ブランチ・種類の箇条書きで出す'
+  - name: kinds[].sqlite
+    type: bool
+    description: SQLite の表の行（読み取り専用）の種類か
+    notes: '`source` だけのとき。`format: markdown` は description の後ろに `（SQLite の表の行・読み取り専用）` を付ける。`format: json` は偽のときキーを持たない'
+  - name: columns[].name
+    type: str
+    description: 列名（`sqlite.columns[].name`）
+    notes: '`source`・`kind` で、SQLite の表の行の種類のとき。`schema` の代わりに返却する。`format: markdown` は `| 列 | 型 | 説明 |` の表と、`write_docs`・`delete_docs` と `list_changes` の対象外である旨の行で出す'
+  - name: columns[].type
+    type: Literal['text', 'integer', 'real', 'json']
+    description: 列の型（`sqlite.columns[].type`）
+  - name: columns[].description
+    type: str
+    description: 列の説明文（`sqlite.columns[].description`）
 response_example: |-
   ```markdown
   作業場所: /path/to/sample（sample のクローン本体）
@@ -717,6 +758,8 @@ constraints:
     constraint: '`documents[].schema` でほかの配信元を指す行は、配信元の検査の制約「ほかの配信元のスキーマの参照」のとおりに読む'
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、`refs`・`worktrees` を返さない。`worktree` を指定すると `InvalidArgumentError`'
+  - item: SQLite の表の行の種類
+    constraint: '`documents[].sqlite` を持つ行の種類は、`describe(source, kind)` が `schema` の代わりに `sqlite.columns[]` を返却する。ファイルを開けない行と `limit` を超えた行は、引数なしと `source` を渡した呼び出しの警告にする'
 refs:
   - to: SC-6
     item: scenarios[正常シナリオ]

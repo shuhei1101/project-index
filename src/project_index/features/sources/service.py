@@ -20,6 +20,7 @@ from typing import Any, Literal, cast
 from jsonschema.exceptions import SchemaError
 from jsonschema.validators import Draft202012Validator
 
+from project_index.features.documents.sqlite_rows import columns_schema
 from project_index.features.history.query import export_paths_at, read_file_at, resolve_ref
 from project_index.features.search.fields import known_fields
 from project_index.features.search.filters import check_exclusion
@@ -42,6 +43,7 @@ from project_index.features.sources.types import (
     ServedSource,
     SourceConfig,
     SourceStatus,
+    SqliteTable,
     StorageType,
 )
 from project_index.integrations.git import GitError, is_ignored, main_repo_root, worktree_heads
@@ -201,6 +203,8 @@ def _validate(
 ) -> list[Violation]:
     """配信元の設定の検証を、ファイルを `read_text` で読んで行う。"""
     violations = schema_violations(_source_schema(), value)
+    # 行の形（SQLite の表の行かファイルの行か）の違反もスキーマの違反と一緒に返す
+    violations.extend(_row_shape_violations(value.get("documents", [])))
     # スキーマの違反があれば、ここで返す
     if violations:
         return violations
@@ -213,6 +217,10 @@ def _validate(
     ids = {name: {row["id"] for row in value.get(name, [])} for name in SCRIPT_TABLES}
     for index, row in enumerate(documents):
         violations.extend(_document_row_violations(index, row, ids))
+        # SQLite の表の行: スキーマのファイルを持たないので、ファイルのパスだけを確かめる
+        if "sqlite" in row:
+            violations.extend(_sqlite_row_violations(index, row))
+            continue
         # 文書の行 1 つ分のスキーマの確かめを 1 件にする（配信元の一覧が休ませる単位）
         with unit():
             found = _schema_violation(read_text, read_ref, index, row["schema"])
@@ -222,6 +230,78 @@ def _validate(
             violations.extend(_search_exclude_violations(read_text, read_ref, index, row))
     violations.extend(_paths_base_violations(value.get("paths_base"), config_root))
     return violations
+
+
+# SQLite の表の行が一緒に持てない、ファイルの行のキー
+SQLITE_EXCLUSIVE_KEYS = (
+    "paths",
+    "exclude",
+    "schema",
+    "records",
+    "body_file",
+    "converter",
+    "validators",
+    "after_write",
+    "writable",
+)
+# ファイルの行が持つ必須のキー
+FILE_ROW_REQUIRED_KEYS = ("paths", "schema")
+
+
+def _row_shape_violations(documents: object) -> list[Violation]:
+    """`documents[]` の行ごとに、SQLite の表の行とファイルの行のキーの組み合わせを確かめる。"""
+    violations: list[Violation] = []
+    # 配列でない値はスキーマの違反で返る
+    if not isinstance(documents, list):
+        return violations
+    for index, row in enumerate(cast("list[object]", documents)):
+        # 辞書でない行はスキーマの違反で返る
+        if not is_dict(row):
+            continue
+        violations.extend(_row_shape(index, cast("dict[str, Any]", row)))
+    return violations
+
+
+def _row_shape(index: int, row: dict[str, Any]) -> list[Violation]:
+    """1 つの行の `sqlite` とファイルの行のキーの組み合わせの違反を返す。"""
+    path = f"documents[{index}]"
+    # SQLite の表の行: ファイルの行のキーを一緒に持てない
+    if "sqlite" in row:
+        both = [key for key in SQLITE_EXCLUSIVE_KEYS if key in row]
+        if not both:
+            return []
+        return [
+            Violation(
+                path=path,
+                rule=f"sqlite と一緒に記載できないキーがあります: {', '.join(both)}",
+                fix="SQLite の表の行は sqlite だけで文書を決めます。ファイルの行のキーを削除してください",
+            )
+        ]
+    # sqlite も paths も schema も持たない行: どちらの行かが決まらない
+    if "paths" not in row and "schema" not in row:
+        return [
+            Violation(
+                path=path,
+                rule="sqlite か paths のどちらかが要ります",
+                fix="ファイルの文書は paths と schema、SQLite の表の行は sqlite を記載してください",
+            )
+        ]
+    # ファイルの行: paths と schema が要る
+    return [
+        Violation(path=f"{path}.{key}", rule="必須のキーが無い")
+        for key in FILE_ROW_REQUIRED_KEYS
+        if key not in row
+    ]
+
+
+def _sqlite_row_violations(index: int, row: dict[str, Any]) -> list[Violation]:
+    """SQLite の表の行の `sqlite.file` が配信元の外を指していれば違反にする。"""
+    file = row["sqlite"]["file"]
+    if not _outside_root(file):
+        return []
+    return [
+        Violation(path=f"documents[{index}].sqlite.file", rule=f"配信元の外を指しています: {file}")
+    ]
 
 
 def _search_exclude_violations(
@@ -288,7 +368,7 @@ def _document_row_violations(
             path=f"documents[{index}].paths[{position}]",
             rule=f"配信元の外を指しています: {pattern}",
         )
-        for position, pattern in enumerate(row["paths"])
+        for position, pattern in enumerate(row.get("paths", []))
         if _outside_root(pattern)
     )
     return violations
@@ -573,6 +653,20 @@ def _build_script(row: dict[str, Any]) -> ScriptEntry:
 
 def _build_table(row: dict[str, Any]) -> DocumentTable:
     """文書の行を作る。"""
+    # SQLite の表の行: ファイルの行のキーを持たない
+    if "sqlite" in row:
+        return DocumentTable(
+            id=row["id"],
+            paths=[],
+            schema_path=None,
+            title=row.get("title"),
+            enabled=row.get("enabled", True),
+            search=row.get("search", True),
+            metadata=dict(row.get("metadata", {})),
+            alias_type=row.get("alias_type"),
+            search_exclude=row.get("search_exclude"),
+            sqlite=SqliteTable.model_validate(row["sqlite"]),
+        )
     return DocumentTable(
         id=row["id"],
         paths=list(row["paths"]),
@@ -847,11 +941,13 @@ def _row_schemas(
     for row in config.documents:
         # 文書の行 1 つ分のスキーマの読み込みを 1 件にする（配信元の一覧が休ませる単位）
         with unit():
-            schemas[row.id] = (
-                _as_schema(load_yaml(read_text(row.schema_path) or ""))
-                if isinstance(row.schema_path, str)
-                else read_ref(row.schema_path).schema
-            )
+            if row.sqlite is not None:
+                # SQLite の表の行: 列の説明から作ったスキーマ
+                schemas[row.id] = columns_schema(row)
+            elif isinstance(row.schema_path, str):
+                schemas[row.id] = _as_schema(load_yaml(read_text(row.schema_path) or ""))
+            elif row.schema_path is not None:
+                schemas[row.id] = read_ref(row.schema_path).schema
     return schemas
 
 

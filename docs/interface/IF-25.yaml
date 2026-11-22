@@ -417,5 +417,7 @@ constraints:
     constraint: 同じ配信元・同じ commit・同じ文書の行の定義の読み込みの結果と、文書のファイルのパス・本文のファイルのパスの索引を使い回し、要求ごとに配信元の全てのファイルを照合しない。リビジョンの解決は要求ごとに git を 1 回だけ呼び、commit の日時は commit ごとに 1 回だけ取得する
     notes: commit の中身は変わらないため、使い回した結果は応答を変えない。`default_ref` が進んだら、進んだ後の commit で読み込み直す
     decided_by: NFR-1#requirements[負荷の高い間の文書 1 件の取得の所要時間]
+  - item: SQLite の表の行
+    constraint: '`documents[].sqlite` を持つ行の文書は、`id` で引く。`ref` によらず今の `sqlite.file` の行を返却し、`value` は `columns[]` の列の値、`schema` は `columns[]` から作る JSON Schema（列ごとの `title` に `description`）にする。変換は既定の変換'
 test_file: tests/integration/server/test_get_document.py
 visibility: internal

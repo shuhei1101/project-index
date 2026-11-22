@@ -107,7 +107,7 @@ status_codes:
   condition: 要求の型の検証に失敗した（`message` が無い・`writes` と `deletes` が両方とも空。`InvalidArgumentError`）
   notes: 起動の『例外の変換の登録』が problem+json にし、`errors[]` にキーのパスと理由を並べる
 - code: '403'
-  condition: 別のオリジンの要求（`CrossOriginError`）、書き換わる文書の種類が配信元の設定の `direct_commit.kinds[]` にはあるが端末の設定の `write_api_kinds` に無いか、書き込みの API から直コミットできる種類が 1 つも無い（`DirectCommitNotPermittedError`）、上書きできないブランチを指定した（`BranchNotAllowedError`）
+  condition: 別のオリジンの要求（`CrossOriginError`）、書き換わる文書の種類が配信元の設定の `direct_commit.kinds[]` にはあるが端末の設定の `write_api_kinds` に無いか、書き込みの API から直コミットできる種類が 1 つも無い（`DirectCommitNotPermittedError`）、上書きできないブランチを指定した（`BranchNotAllowedError`）、書き換わる文書に SQLite の表の行の種類がある（`ReadOnlyKindError`）
   notes: '`DirectCommitNotPermittedError` は `kinds` に許可していない種類を入れ、`next_steps` で許可を記載する端末の設定のキー `sources[].direct_commit.write_api_kinds` を示す'
 - code: '404'
   condition: 無い配信元（`UnknownSourceError`）・配信していない配信元（`SourceNotServedError`）・更新や削除する文書が無い（`DocumentNotFoundError`）
@@ -379,6 +379,34 @@ flows:
   expected:
   - 404 で、配信していない配信元であることを返却する
   test: test_error_when_source_not_found
+- name: 異常系（SQLite の表の行の文書を含む・403）
+  summary: SQLite の表の行の文書への操作を含む要求を、直コミットを許可していても断る
+  setup:
+  - name: Mock
+    description: なし（テストのコードが書き込みの API を HTTP で呼ぶ）
+  - name: サンプルの配信元
+    description: 直コミットを許可した sample に、行 `notes_db` と `data/notes.db` を加えたもの
+    notes: 配信元の設定の `direct_commit.kinds[]` と端末の設定の `write_api_kinds` の両方に `note` と `notes_db`
+  - name: 要求
+    description: '`writes` に種類 `note` の文書 1 の部分更新と `n1` の部分更新'
+  flow: |-
+    <!-- map: {"title": "異常系（SQLite の表の行の文書を含む・403）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as dev-docs の画面のサーバー
+      participant T as 書き込みの API
+
+      C->>T: writes: 文書 1・n1 の部分更新
+      T->>T: n1 の種類 notes_db が SQLite の表の行
+      T-->>C: 403（ReadOnlyKindError。errors[] に writes[1]）
+    ```
+
+    <!-- /map -->
+  expected:
+  - 応答が 403 の `application/problem+json` で、`errors[]` に `writes[1]` と種類 `notes_db` が読み取り専用であることがある
+  - 文書 1 も書き換わらず、sample のリモートと全てのワークツリーと `data/notes.db` は変わらない
+  test: test_error_when_sqlite_kind_included
 test_file: tests/integration/server/test_commit_documents.py
 visibility: internal
 tags:

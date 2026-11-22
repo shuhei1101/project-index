@@ -46,7 +46,7 @@ terms:
     description: 'ワークツリーでない、リポジトリの元の作業ツリー。Git の配信元では書き込まない'
   - id: document
     name: '文書'
-    description: '配信する 1 件の単位。`documents[].paths[]` に当たり `documents[].exclude[]` に当たらない 1 ファイル、または `records` の配列の 1 要素'
+    description: '配信する 1 件の単位。`documents[].paths[]` に当たり `documents[].exclude[]` に当たらない 1 ファイル、`records` の配列の 1 要素、または `documents[].sqlite` が指す SQLite の表かビューの 1 行（読み取り専用）'
   - id: kind
     name: '種類'
     description: '文書の行（`documents[]` の 1 行）の ID。書き込みでスキーマと新しい文書の配置先を決める。検索ではメタデータの 1 つとして絞る'

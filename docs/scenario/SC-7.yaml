@@ -1203,6 +1203,36 @@ scenarios:
       - 削除の後も、ワークツリー x の `skills/a/SKILL.md`・`skills/manual/SKILL.md` のバイト列が削除の前と同じ
       - '`dry_run: true` の削除では、`skills/c/SKILL.md` のバイト列が削除の前と同じ'
     test: test_normal_when_skill_agent_flow_deleted
+  - name: 異常シナリオ（SQLite の行の文書へ書き込む）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+      - name: SQLite の行の文書
+        description: エージェントが調べるの正常シナリオ（SQLite の表の行を引く）と同じ `data/notes.db` と行 `notes_db` を持つ sample
+        notes: '`operations` は、ワークツリー x の YAML の文書 1（検査に合格する update）・`n1` の update・種類 `notes_db` の create の 3 件'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` に sample のワークツリー x のパスを指定する'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（SQLite の行の文書へ書き込む）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: write_docs(operations: ワークツリー x の文書 1 の update と、n1 の update と、kind が notes_db の create)
+        M->>M: 種類 notes_db は SQLite の表の行で、読み取り専用
+        M-->>A: エラー（読み取り専用の種類の操作の位置と、書き込みはデータを持つアプリで行う旨）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、種類 `notes_db` の文書は読み取り専用であることと、該当する操作の位置を返却する'
+      - 同じ呼び出しの文書 1 の update も書き込まず、文書 1 のファイルも変わらない（`atomic` を省いたとき）
+      - '`delete_docs` で `n1` を指しても同じエラーを返却する'
+      - '`data/notes.db` とワークツリーのファイルは変わらない'
+    test: test_error_when_sqlite_doc_written
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 tags:
   - name: topic:文書

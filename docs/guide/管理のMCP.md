@@ -189,6 +189,7 @@ http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
 起動と `reload` の配信元の検証と同じ関数を使い、結果は配信中の配信元の状態に反映せず、ファイルも書き換えません。
 `records` を持つ行は、`schema` から `properties.{records}.items` を取り出せない組み合わせを `documents[{番号}].schema` の違反にします。
 `paths_base` が無いフォルダ・設定ファイルのフォルダより下や横・リポジトリの直下より上を指すときは `paths_base` の違反、`documents[].paths[]` が基準のフォルダの外を指すときは `documents[{番号}].paths[{番号}]` の違反にします。
+`sqlite` を持つ行は、配信元のフォルダ（`path` がワークツリーでもクローン本体）の SQLite のファイルを読み取り専用で開き、ファイル・表かビュー・`columns[]` と `metadata` が指す列が無いことと、ファイルの行のキーとの併記を `documents[{番号}].sqlite.*`・`documents[{番号}].metadata.*` の違反に、`where` に該当する行が `limit` を超えることと `id` の重なりを警告にします。
 
 | 引数 | 型 | 必須 | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

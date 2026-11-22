@@ -30,6 +30,11 @@ from project_index.features.documents.schema import (
     resolve_schema_refs,
     startup_schema,
 )
+from project_index.features.documents.sqlite_rows import (
+    SqliteRowCache,
+    columns_schema,
+    inspect_table,
+)
 from project_index.features.documents.types import Document, LoadProblem, LoadResult, SyncReport
 from project_index.features.history.blob import BlobReader
 from project_index.features.history.query import file_dates, resolve_ref
@@ -207,6 +212,27 @@ def _body_stamps(root: Path, documents: Sequence[Document]) -> _BodyStamps:
     return tuple(stamps)
 
 
+def sqlite_root(source: ServedSource) -> Path:
+    """SQLite のファイルを解く配信元のフォルダ（Git の配信元はクローン本体の同じ場所）を返す。"""
+    # ワークツリーから作り直した配信元: クローン本体の同じ場所にする
+    if (
+        source.main_root is not None
+        and source.repo_root is not None
+        and source.root.is_relative_to(source.repo_root)
+    ):
+        return source.main_root / source.root.relative_to(source.repo_root)
+    return source.root
+
+
+def _sqlite_problems(table: DocumentTable, warnings: Sequence[str]) -> list[LoadProblem]:
+    """SQLite の行の警告を、`sqlite.file` を指す `unreadable` の読めなかったファイルにする。"""
+    file = "" if table.sqlite is None else table.sqlite.file
+    return [
+        LoadProblem(path=file, reason="unreadable", detail=f"{table.id}: {warning}")
+        for warning in warnings
+    ]
+
+
 class DocumentStore:
     """読む場所ごとに文書を集め、ファイルごとに結果をキャッシュする。"""
 
@@ -232,6 +258,8 @@ class DocumentStore:
         self._worktree_locks: dict[Path, threading.Lock] = {}
         # (配信元の ID, 文書の行の ID, 文書の行の定義のハッシュ) → `$ref` を解いた起動時のスキーマ
         self._startup_schemas: dict[tuple[str, str, str], dict[str, Any]] = {}
+        # 配信元の ID → SQLite の表の行のキャッシュ（ワークツリー・リビジョンごとに分けない）
+        self._sqlite_rows: dict[str, SqliteRowCache] = {}
         # `clear` のたびに増やし、`clear` の前に解き始めたスキーマを書き戻さない
         self._generation = 0
         # (`repo_root`, 配信元の ID) → 使用した順の (commit, 行の定義のハッシュの並び) → 読み込みの結果
@@ -591,11 +619,58 @@ class DocumentStore:
         `from_blobs` は、`ref` のある読む場所を書き出さずに commit の blob から読む（`files` を渡したときは使わない）。
         """
         revision = None if target.ref is None else self._commit_of(target)
-        tables = self._tables(target, kinds)
+        all_tables = self._tables(target, kinds)
+        # SQLite の表の行はファイルを集めず、読む場所によらず今の行を後でつなぐ
+        tables = [table for table in all_tables if table.sqlite is None]
+        sqlite_tables = [table for table in all_tables if table.sqlite is not None]
         # リビジョンを丸ごと読む: 同じ commit と行の定義の読み込みの結果があれば照合せずに返す
         if revision is not None and files is None:
-            return self._revision_load_of(target, revision, tables, from_blobs=from_blobs).result
-        return self._load_uncached(target, tables, revision, files=files, from_blobs=from_blobs)
+            result = self._revision_load_of(target, revision, tables, from_blobs=from_blobs).result
+        else:
+            result = self._load_uncached(
+                target, tables, revision, files=files, from_blobs=from_blobs
+            )
+        if not sqlite_tables:
+            return result
+        return self._with_sqlite_rows(target, result, sqlite_tables)
+
+    def _sqlite_cache(self, source_id: str) -> SqliteRowCache:
+        """配信元の SQLite の表の行のキャッシュを返す（無ければ作る）。"""
+        with self._lock:
+            return self._sqlite_rows.setdefault(source_id, SqliteRowCache())
+
+    def sqlite_documents(
+        self, target: Target, tables: Sequence[DocumentTable]
+    ) -> tuple[list[Document], list[LoadProblem]]:
+        """SQLite の表を指す行の文書と、開けない理由などの読めなかったファイルを返す。"""
+        source = target.source
+        cache = self._sqlite_cache(source.id)
+        root = sqlite_root(source)
+        documents: list[Document] = []
+        problems: list[LoadProblem] = []
+        for table in tables:
+            rows = cache.rows(root, source.id, table)
+            documents.extend(rows.documents)
+            problems.extend(_sqlite_problems(table, rows.warnings))
+        return documents, problems
+
+    def _with_sqlite_rows(
+        self, target: Target, result: LoadResult, tables: Sequence[DocumentTable]
+    ) -> LoadResult:
+        """ファイルの行の結果に、SQLite の表の行の文書をつないだ結果を返す。"""
+        rows, problems = self.sqlite_documents(target, tables)
+        known = {document.id for document in result.documents}
+        documents = list(result.documents)
+        duplicates = list(result.duplicates)
+        # ファイルの文書と ID が重なる行: 先のファイルの文書を残す
+        for document in rows:
+            if document.id in known:
+                duplicates.append(document)
+                continue
+            known.add(document.id)
+            documents.append(document)
+        merged = sorted([*result.problems, *problems], key=lambda problem: problem.path)
+        return LoadResult(documents=documents, problems=merged, duplicates=duplicates)
 
     def _revision_load_of(
         self,
@@ -759,6 +834,9 @@ class DocumentStore:
         """読む場所に合わせた種類のスキーマを返す。"""
         source = target.source
         table = source.table(kind)
+        # SQLite の表の行: 列の説明から作ったスキーマ
+        if table.sqlite is not None:
+            return columns_schema(table)
         # 起動時のスキーマを使う: クローン本体を読むときと、ほかの配信元のリビジョンを指す行
         if (target.ref is None and target.worktree is None) or not isinstance(
             table.schema_path, str
@@ -851,12 +929,24 @@ class DocumentStore:
         """読む場所の文書から、文書のページのパスに当たる文書を返す。"""
         # Git のリビジョン: 保持した読み込みの結果の索引で引き、全ての文書を照合しない
         if target.ref is not None:
+            tables = self._tables(target, None)
             loaded = self._revision_load_of(
-                target, self._commit_of(target), self._tables(target, None)
+                target,
+                self._commit_of(target),
+                [table for table in tables if table.sqlite is None],
             )
-            if doc_id is not None:
-                return loaded.file_ids.get((page, doc_id))
-            return loaded.pages.get(page) or loaded.files.get(page)
+            found = (
+                loaded.file_ids.get((page, doc_id))
+                if doc_id is not None
+                else loaded.pages.get(page) or loaded.files.get(page)
+            )
+            if found is not None:
+                return found
+            # SQLite の表の行: 今の行から引く
+            rows, _ = self.sqlite_documents(
+                target, [table for table in tables if table.sqlite is not None]
+            )
+            return find_page(rows, page, doc_id=doc_id)
         # ワークツリー・Git の管理外: 読み込んだ文書を順に照合する
         return find_page(self.load(target).documents, page, doc_id=doc_id)
 
@@ -1027,6 +1117,19 @@ def _nested_dirs(start: str, index_dirs: Collection[str]) -> list[str]:
     return [folder for folder in index_dirs if folder.startswith(f"{start}/")]
 
 
+def _sqlite_sync_warnings(store: DocumentStore, source: ServedSource) -> list[str]:
+    """SQLite の表の行ごとに表と列を確かめ、違反と警告を `{行の id}: {理由}` の文にする。"""
+    warnings: list[str] = []
+    for index, table in enumerate(source.config.documents):
+        if not table.enabled or table.sqlite is None:
+            continue
+        # 行 1 つの確かめを裏の処理の 1 件にする
+        with store.gate.unit():
+            violations, warned = inspect_table(sqlite_root(source), table, index)
+        warnings.extend(f"{table.id}: {item.rule}" for item in [*violations, *warned])
+    return warnings
+
+
 def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
     """配信元の文書を読み、`metadata` の列の欠け・管理用の YAML のずれ・当たらない関連・同じファイルの重なり・文書の ID の重なり・エイリアスのキーの違反を求める。"""
     # 裏の処理のスレッドでは、手順ごと・要素ごとに裏の処理の 1 件にする（全体を 1 つの 1 件で包まない）
@@ -1068,6 +1171,7 @@ def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
         duplicate_ids = _duplicate_ids(result, shared)
     with gate.unit():
         alias_violations = collect_aliases(source, result.documents).violations
+    sqlite_warnings = _sqlite_sync_warnings(store, source)
     return SyncReport(
         source_id=source.id,
         missing_refs=missing_refs,
@@ -1077,6 +1181,7 @@ def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
         alias_violations=alias_violations,
         duplicate_files=[f"{path}: {'・'.join(ids)}" for path, ids in shared.items()],
         duplicate_ids=duplicate_ids,
+        sqlite_warnings=sqlite_warnings,
     )
 
 

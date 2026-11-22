@@ -10,10 +10,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from ruamel.yaml import YAML
 
 from project_index.features.changes.types import ChangesResult, ContainsChange
+from project_index.features.describe.types import KindSummary
 from project_index.features.related.types import RelatedItem
 from project_index.features.search.types import SearchItem, SnippetLine
 from project_index.features.write.types import DeleteResult
@@ -142,6 +143,14 @@ def _snippet_line(value: SnippetLine) -> object:
     return {"line": value.line, "text": value.text, "hit": value.hit}
 
 
+def _kind_summary(value: KindSummary) -> object:
+    """種類の一覧の 1 行。SQLite の表の行の種類でなければ `sqlite` のキーを持たない。"""
+    data = _plain(_fields(value))
+    if not value.sqlite and is_dict(data):
+        data.pop("sqlite", None)
+    return data
+
+
 # 形を変えて出す結果の型と、その変換
 _SHAPES: tuple[tuple[type[Any], Callable[[Any], object]], ...] = (
     (ChangesResult, _changes),
@@ -150,6 +159,7 @@ _SHAPES: tuple[tuple[type[Any], Callable[[Any], object]], ...] = (
     (ContainsChange, _contains),
     (SearchItem, _search_item),
     (SnippetLine, _snippet_line),
+    (KindSummary, _kind_summary),
 )
 
 
@@ -160,6 +170,9 @@ def _plain(value: object) -> object:
             return shape(value)
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         return _plain(_fields(value))
+    # pydantic のモデル（SQLite の列の説明など）: 辞書にしてから直す
+    if isinstance(value, BaseModel):
+        return _plain(value.model_dump())
     if is_dict(value):
         return _plain_dict(value)
     if is_list(value) or isinstance(value, tuple):

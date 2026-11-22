@@ -92,6 +92,7 @@ classes:
       | `VersionMismatchError` | バージョンの不一致 | `doc_id: str`・`current: str`・`diff: str` | 409 |
       | `DocumentReferencedError` | 参照されている | `doc_id: str`・`referrers: list[str]` | 409 |
       | `DeleteNotAllowedError` | 削除を許していない種類 | `kind: str` | 403 |
+      | `ReadOnlyKindError` | SQLite の表の行の種類への操作 | `kind: str`・`positions: list[str]` | 403 |
       | `LastReadNotFoundError` | 前回読んだ記録が無い | - | 400 |
       | `CrossOriginError` | 別のオリジンからの要求 | - | 403 |
       | `ConfigNotFoundError` | 配信元の設定が無い | `path: str` | 404 |

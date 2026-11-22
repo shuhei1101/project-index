@@ -55,6 +55,8 @@ class SyncReport:
     duplicate_files: list[str] = field(default_factory=list[str])
     # ID が先の文書と重なり除外した文書（`{文書の id}: {先の行の id}（{ファイル}）・{除外した行の id}（{ファイル}）`）
     duplicate_ids: list[str] = field(default_factory=list[str])
+    # `{行の id}: {理由}` の並び。SQLite の表の行の表と列の確認の違反と警告
+    sqlite_warnings: list[str] = field(default_factory=list[str])
 
 
 @dataclass(frozen=True)

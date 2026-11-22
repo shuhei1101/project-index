@@ -325,6 +325,12 @@ functions:
         mock: なし
         expected: a1 と a2。a2 だけ `excluded` が `True`、`excluded_count` は `None`
         exception: '-'
+      - name: test_search_docs_when_sqlite_rows_with_ref
+        case: 正常
+        summary: ref を指定したときだけ SQLite の行が今の内容である旨を notes に付ける
+        condition: SQLite の行の文書に該当する検索を `ref` ありとなしで呼ぶ
+        mock: 文書のストアを、SQLite の行の文書を返す値に差し替える
+        expected: '`ref` ありは `notes` に今の内容である旨が 1 行あり、`ref` なしはその行が無い'
 refs:
   - to: IF-2
     type: requires

@@ -777,3 +777,60 @@ def test_normal_when_search_exclude_invalid(
     paths = [item["path"] for item in result.data["violations"]]
     assert "documents[0].search_exclude.op" in paths
     assert "documents[1].search_exclude.field" in paths
+
+
+SQLITE_VIOLATION_ROWS = (
+    "  - id: memos_db\n"
+    "    sqlite:\n"
+    "      file: data/notes.db\n"
+    "      table: memos\n"
+    "      columns: [{name: id, description: ID}]\n"
+    "  - id: bad_column\n"
+    "    sqlite:\n"
+    "      file: data/notes.db\n"
+    "      table: notes\n"
+    "      columns: [{name: id, description: ID}]\n"
+    "    metadata: {name: heading}\n"
+    "  - id: missing_db\n"
+    "    sqlite:\n"
+    "      file: data/missing.db\n"
+    "      table: notes\n"
+    "      columns: [{name: id, description: ID}]\n"
+)
+BOTH_ROW = (
+    "  - id: both\n"
+    "    paths: [docs/*.yaml]\n"
+    "    sqlite:\n"
+    "      file: data/notes.db\n"
+    "      table: notes\n"
+    "      columns: [{name: id, description: ID}]\n"
+)
+
+
+def test_normal_when_sqlite_row_violations(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """SQLite の表を指す行のファイル・表・列の欠けを違反にし、上限を超えた行を警告にする（正常系）。"""
+    from tests.integration.server.conftest import NOTES_DB_ROW, sqlite_files, write_notes_db
+
+    # 準備
+    source = make_source("sample", sqlite_files(SQLITE_VIOLATION_ROWS, limit=1))
+    worktree = add_worktree(source.folder, "x")
+    db = write_notes_db(source.folder)
+    before = db.read_bytes()
+    env = make_server()
+    both_config = sample_config_text(NOTES_DB_ROW.format(limit="") + BOTH_ROW)
+    # 実行
+    result = env.call_admin("check_project", path=str(worktree), format="json")
+    both = env.call_admin("check_project", path=str(worktree), config=both_config, format="json")
+    # 検証
+    paths = [item["path"] for item in result.data["violations"]]
+    assert "documents[2].sqlite.table" in paths
+    assert "documents[3].metadata.name" in paths
+    assert "documents[4].sqlite.file" in paths
+    assert [item["path"] for item in result.data["warnings"]] == ["documents[1].sqlite.limit"]
+    assert [item["path"] for item in both.data["violations"]] == ["documents[2]"]
+    assert db.read_bytes() == before

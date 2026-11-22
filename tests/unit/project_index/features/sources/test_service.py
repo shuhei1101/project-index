@@ -13,6 +13,7 @@ from project_index.features.sources import service as service_module
 from project_index.features.sources.service import (
     assemble_source,
     assemble_values,
+    build_source_config,
     check_scripts,
     compare_config_version,
     direct_commit_checks,
@@ -786,7 +787,8 @@ def test_source_schema_json_when_metadata() -> None:
         "env",
         "avoid",
     ]
-    assert row["required"] == ["id", "paths", "schema"]
+    assert row["required"] == ["id"]
+    assert row["properties"]["sqlite"]["required"] == ["file", "table", "columns"]
 
 
 KIND_A_ROW = "  - id: kind_a\n    paths: [docs/a/*.yaml]\n    schema: schemas/a.schema.yaml\n"
@@ -1572,3 +1574,76 @@ def test_validate_source_config_when_search_exclude(source_root: Path) -> None:
     result = validate_source_config(value, root=source_root)
     # 検証
     assert result == []
+
+
+_SQLITE = {
+    "file": "data/notes.db",
+    "table": "notes",
+    "columns": [{"name": "id", "description": "ID"}, {"name": "title", "description": "タイトル"}],
+}
+
+
+def test_validate_source_config_when_sqlite(source_root: Path) -> None:
+    """SQLite の表を指す行を paths と schema なしで受け付ける（正常系）。"""
+    # 準備
+    value = _config_value(documents=[{"id": "notes_db", "sqlite": _SQLITE}])
+    # 実行
+    violations = validate_source_config(value, root=source_root)
+    config = build_source_config(value)
+    # 検証
+    assert violations == []
+    table = config.documents[0]
+    assert table.sqlite is not None
+    assert table.sqlite.limit == 1000
+    assert table.paths == []
+    assert table.is_writable is False
+
+
+@pytest.mark.parametrize(
+    ("row", "key"),
+    [
+        pytest.param({"sqlite": _SQLITE, "paths": ["docs/*.yaml"]}, "paths", id="paths"),
+        pytest.param(
+            {"sqlite": _SQLITE, "schema": "schemas/rule.schema.yaml"}, "schema", id="schema"
+        ),
+        pytest.param({"sqlite": _SQLITE, "records": "files"}, "records", id="records"),
+        pytest.param({"sqlite": _SQLITE, "writable": True}, "writable", id="writable"),
+        pytest.param({}, "sqlite", id="neither"),
+    ],
+)
+def test_validate_source_config_when_sqlite_with_file_keys(
+    source_root: Path, row: dict[str, Any], key: str
+) -> None:
+    """sqlite とファイルの行のキーを一緒に持つ行を違反にする（異常系）。"""
+    # 準備
+    value = _config_value(documents=[{"id": "notes_db", **row}])
+    # 実行
+    result = validate_source_config(value, root=source_root)
+    # 検証
+    assert [v.path for v in result] == ["documents[0]"]
+    assert key in result[0].rule
+
+
+@pytest.mark.parametrize(
+    ("override", "path"),
+    [
+        pytest.param({"limit": 0}, "documents[0].sqlite.limit", id="limit"),
+        pytest.param({"columns": []}, "documents[0].sqlite.columns", id="columns"),
+        pytest.param(
+            {"columns": [{"name": "id", "type": "date", "description": "ID"}]},
+            "documents[0].sqlite.columns[0].type",
+            id="type",
+        ),
+        pytest.param({"file": "../x.db"}, "documents[0].sqlite.file", id="file"),
+    ],
+)
+def test_validate_source_config_when_sqlite_invalid(
+    source_root: Path, override: dict[str, Any], path: str
+) -> None:
+    """sqlite のキーの型と範囲を検証する（異常系）。"""
+    # 準備
+    value = _config_value(documents=[{"id": "notes_db", "sqlite": {**_SQLITE, **override}}])
+    # 実行
+    result = validate_source_config(value, root=source_root)
+    # 検証
+    assert [v.path for v in result] == [path]

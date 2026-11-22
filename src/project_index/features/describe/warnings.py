@@ -57,7 +57,7 @@ def collect_warnings(
 def _sync_warnings(source_id: str, check: SourceCheck) -> list[str]:
     """管理用の YAML と文書の同期のずれを、種類ごとの件数の文にする。"""
     report = check.report
-    return [
+    counted = [
         f"{source_id}: {label}が {len(values)} 件あります（check_project で確認できます）"
         for label, values in (
             ("metadata の列の欠け", report.missing_refs),
@@ -69,6 +69,8 @@ def _sync_warnings(source_id: str, check: SourceCheck) -> list[str]:
         )
         if values
     ]
+    # SQLite の表の行の警告: 件数にまとめず、行の id と理由を 1 件ずつ出す
+    return [*counted, *(f"{source_id}: {warning}" for warning in report.sqlite_warnings)]
 
 
 def _config_warnings(source_id: str, check: SourceCheck) -> list[str]:

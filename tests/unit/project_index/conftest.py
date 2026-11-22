@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -550,3 +551,110 @@ def make_records_nav_source_dir(
 def _no_reload(terminal: object) -> list[object]:
     """配信元を再読み込みしない偽物。"""
     return []
+
+
+NOTES_DB_ROWS = [
+    ("n1", "ゲーム実況 1", "今日の目標 1", '["game"]', '["実況"]'),
+    ("n2", "雑談 1", "今日の目標 2", '["talk"]', "[]"),
+]
+
+
+@pytest.fixture
+def make_notes_db() -> Callable[..., Path]:
+    """配信元のフォルダの `data/notes.db` に表 `notes`（`n1`・`n2`）を作る関数を返す。"""
+
+    def _make(root: Path, rows: list[tuple[str, str, str, str, str]] | None = None) -> Path:
+        path = root / "data" / "notes.db"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(path)
+        conn.execute(
+            "CREATE TABLE notes (id TEXT, title TEXT, summary TEXT, tags TEXT, aliases TEXT)"
+        )
+        conn.executemany(
+            "INSERT INTO notes VALUES (?, ?, ?, ?, ?)", NOTES_DB_ROWS if rows is None else rows
+        )
+        conn.commit()
+        conn.close()
+        return path
+
+    return _make
+
+
+def notes_db_table(**sqlite_overrides: Any) -> DocumentTable:
+    """`data/notes.db` の表 `notes` を指す行 `notes_db` を返す。"""
+    from project_index.features.sources.types import SqliteColumn, SqliteTable
+
+    values: dict[str, Any] = {
+        "file": "data/notes.db",
+        "table": "notes",
+        "columns": [
+            SqliteColumn(name="id", description="ID"),
+            SqliteColumn(name="title", description="タイトル"),
+            SqliteColumn(name="summary", description="要約"),
+            SqliteColumn(name="tags", type="json", description="タグ"),
+            SqliteColumn(name="aliases", type="json", description="別名"),
+        ],
+    }
+    values.update(sqlite_overrides)
+    table_id = values.pop("table_id", "notes_db")
+    return DocumentTable(
+        id=table_id,
+        paths=[],
+        schema_path=None,
+        sqlite=SqliteTable(**values),
+        metadata={"name": "title", "description": "summary"},
+    )
+
+
+NOTES_DB_CONFIG_ROW = (
+    "  - id: notes_db\n"
+    "    sqlite:\n"
+    "      file: data/notes.db\n"
+    "      table: notes\n"
+    "      columns:\n"
+    "        - {name: id, description: ID}\n"
+    "        - {name: title, description: タイトル}\n"
+    "        - {name: summary, description: 要約}\n"
+    "        - {name: tags, type: json, description: タグ}\n"
+    "        - {name: aliases, type: json, description: 別名}\n"
+    "    metadata: {name: title, description: summary}\n"
+)
+
+
+SQLITE_SOURCE_CONFIG = (
+    "documents:\n"
+    "  - id: rules\n"
+    "    paths: [docs/rule/*.yaml]\n"
+    "    schema: schemas/rule.schema.yaml\n"
+    + NOTES_DB_CONFIG_ROW.replace("      table: notes\n", "      table: notes\n      limit: 1\n")
+    + "  - id: missing_db\n"
+    "    sqlite:\n"
+    "      file: data/missing.db\n"
+    "      table: notes\n"
+    "      columns:\n"
+    "        - {name: id, description: ID}\n"
+)
+
+
+@pytest.fixture
+def make_sqlite_source_dir(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_notes_db: Callable[..., Path],
+) -> Callable[..., Path]:
+    """YAML の行 `rules`・`limit: 1` の行 `notes_db`（2 行）・ファイルの無い行 `missing_db` を持つ配信元を作り、`project-index.yaml` のパスを返す関数を返す。"""
+
+    def _make(name: str = "sample") -> Path:
+        root = tmp_path / name
+        write_files(
+            root,
+            {
+                "project-index.yaml": f"name: {name}\n" + SQLITE_SOURCE_CONFIG,
+                "schemas/rule.schema.yaml": SAMPLE_SCHEMA,
+                "docs/rule/doc-1.yaml": "id: doc-1\nname: 文書 1\n",
+            },
+        )
+        make_notes_db(root)
+        return root / "project-index.yaml"
+
+    return _make

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from project_index.features.documents.store import DocumentStore
+from project_index.features.documents.types import LoadResult
 from project_index.features.history.snapshot import SnapshotStore
 from project_index.features.search.service import search_docs
 from project_index.features.search.types import (
@@ -37,10 +38,12 @@ from project_index.features.sources.types import (
 from project_index.features.validation.service import DocumentChecker
 from project_index.shared.errors import InvalidArgumentError
 from project_index.shared.yaml_io import load_yaml
-from tests.unit.project_index.conftest import records_files_schema
+from tests.unit.project_index.conftest import notes_db_table, records_files_schema
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from project_index.features.documents.types import Document
 
 
 TODAY = date(2026, 10, 28)
@@ -717,3 +720,55 @@ def test_search_docs_when_include_excluded(make_env: Callable[..., SearchEnv]) -
     # 検証
     assert [(item.id, item.excluded) for item in result.items] == [("a1", None), ("a2", True)]
     assert result.excluded_count is None
+
+
+def test_search_docs_when_sqlite_rows_with_ref(
+    tmp_path: Path,
+    git_repo: Callable[..., Path],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., SourceRegistry],
+    make_document: Callable[..., Document],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ref を指定したときだけ SQLite の行が今の内容である旨を notes に付ける（正常系）。"""
+    # 準備
+    root = git_repo({"docs/doc-1.yaml": "id: doc-1\nname: 文書 1\n"})
+    source = make_served_source(
+        id="sample",
+        root=root,
+        config=make_source_config(documents=[_yaml_table(), notes_db_table()]),
+        is_git=True,
+        repo_root=root,
+    )
+    store = DocumentStore(SnapshotStore(tmp_path / "snapshots"))
+    row = make_document(
+        id="n1",
+        kind="notes_db",
+        path="data/notes.db",
+        record_index=0,
+        data={"id": "n1", "title": "ゲーム実況 1"},
+        body="id: n1\ntitle: ゲーム実況 1\n",
+        metadata={"id": "n1", "name": "ゲーム実況 1"},
+    )
+
+    def load(*_args: object, **_kwargs: object) -> LoadResult:
+        return LoadResult(documents=[row])
+
+    monkeypatch.setattr(store, "load", load)
+    env = SearchEnv(
+        make_registry(source),
+        store,
+        DocumentChecker(store, timeout_sec=10),
+        SeenStore(tmp_path / "seen.sqlite3", retention_days=7),
+        root,
+    )
+    n1 = Condition(field="id", op="eq", values=["n1"])
+    # 実行
+    with_ref = env.search(filter=n1, ref="HEAD")
+    without_ref = env.search(filter=n1)
+    # 検証
+    assert [item.id for item in with_ref.items] == ["n1"]
+    assert set(with_ref.notes) - set(without_ref.notes) == {
+        "SQLite の表の行（notes_db）は ref によらず今の内容を返しています"
+    }

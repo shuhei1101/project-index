@@ -1162,6 +1162,35 @@ flows:
       - '`/sources/broken/docs` が 404、`/sources/sample/docs` と `/mcp` は応答する'
       - 'エラーログに `broken: documents[0].search_exclude:` と、比べ方 `like` を使用できない理由がある'
     test: test_normal_when_search_exclude_invalid
+  - name: 正常系（SQLite のファイルを開けない）
+    summary: SQLite のファイルを開けない行だけを配信せずに警告し、ほかの行は配信する
+    setup:
+      - name: Mock
+        description: なし
+      - name: サンプルの配信元
+        description: YAML の文書の種類を 1 つと、`data/notes.db` を指す行 `notes_db` を持つ sample
+        notes: '`data/notes.db` を配置しない'
+    flow: |-
+      <!-- map: {"title": "正常系（SQLite のファイルを開けない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant U as 利用者
+        participant S as project-index serve
+
+        U->>S: 起動する
+        S->>S: 配信元の設定の検証に合格し、notes_db の data/notes.db を開けない
+        S->>S: notes_db の文書を持たず、警告のログと配信元の警告に残す
+        S-->>U: sample を配信する
+      ```
+
+      <!-- /map -->
+    expected:
+      - sample の状態が配信中で、YAML の文書を `search_docs` で返却する
+      - 警告のログと `describe()` の `warnings[]` に、行 `notes_db` の id・ファイルのパス・開けない理由がある
+      - '`data/notes.db` を作らない'
+      - '`data/notes.db` を配置した後の次の `search_docs` が、起動し直さずに `notes_db` の文書を返却する'
+    test: test_normal_when_sqlite_file_unopenable
 lead: 端末の設定を読み、検証に合格した配信元を 1 プロセス・1 ポートで配信する `project-index serve` の入出力を定め、起動を修正するときに参照する。
 tags:
   - name: topic:サーバー
@@ -1338,6 +1367,8 @@ constraints:
     constraint: 文書の MCP・読み取り API の要求の処理は、asyncio の既定の実行スロットでなく、専用の実行スロットで動かす。停止・再起動は、終わらない専用の実行スロットのスレッドの終了を待たない。再起動は `os.execv`、停止（再起動の要求が無い終了）は、uvicorn の停止の後にログを閉じてから `os._exit` で終え、インタープリタの終了の待ちを通らない
     decided_by: NFR-1#requirements[文書の MCP の実行スロットの数]
     notes: '`asyncio.Runner.close` は既定の実行スロットのスレッドの終了を `THREAD_JOIN_TIMEOUT`（300 秒）まで待つ。専用の `ThreadPoolExecutor` は `Runner.close` では待たないが、インタープリタの終了（`threading._register_atexit` の `_python_exit`）で上限なく待つため、停止も `os._exit` で終える。`atexit` に登録した後片付けは無い（`src/project_index` に `atexit` の登録が無い）。追加するときは `os._exit` の前に呼ぶ'
+  - item: SQLite の表の行
+    constraint: '`documents[].sqlite` のキーの型とファイルの行のキーとの併記は、配信元の設定の検証で違反にする。ファイル・表・列の欠けは配信元を止めず、その行だけ文書を持たずに警告にする。行は最初の取得で読み込み、起動の待ち受けまでの時間に含めない'
 refs:
   - to: SC-4
     item: scenarios[正常シナリオ]

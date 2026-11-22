@@ -184,6 +184,41 @@ scenarios:
       - '除いた文書が 2 件あることと `include_excluded: true` で取得できることを返却する'
       - '`include_excluded: true` の `list_changes` が `a1`・`a2`・`a3`・`a4` を返却し、`a2` と `a4` に除外の表示を付ける'
     test: test_normal_when_search_excluded
+  - name: 正常シナリオ（SQLite の行の文書を除く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+        notes: '-'
+      - name: SQLite の行の文書
+        description: エージェントが調べるの正常シナリオ（SQLite の表の行を引く）と同じ `data/notes.db` と行 `notes_db` を持つ sample
+        notes: '-'
+      - name: 変更の commit
+        description: ワークツリー x で YAML の文書 1 の `name` を変えて `git commit` した commit。同じ間に `data/notes.db` の `n1` の `title` も書き換える
+        notes: 親の commit を `from`、その commit を `to` に指定する
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（SQLite の行の文書を除く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor R as レビュアー
+        participant M as 文書の MCP（/mcp）
+        participant G as sample の Git の履歴
+
+        R->>M: list_changes(from: 親の commit, to: 変更の commit)
+        M->>M: SQLite の表の行の種類は履歴を持たないので対象から除く
+        M->>G: 区間の両端の文書を比べる
+        M-->>R: 文書 1 だけ
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`list_changes` が文書 1 を返却し、書き換えた `n1` を返却しない'
+      - '`filter` で `kind` が `notes_db` を指しても、変わった文書を返却しない'
+      - 前回参照した時点からの `list_changes` も `n1` を返却しない
+    test: test_normal_when_sqlite_rows_excluded
 lead: レビュアーが `list_changes` で区間の間に変わった文書と項目を確認するシナリオを定め、変更のレビューの流れを変えるときに参照する。
 tags:
   - name: topic:差分

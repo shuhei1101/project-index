@@ -199,14 +199,17 @@ def _scope(
     field_chars: int,
     *,
     ranged: bool,
+    whole_row: bool = False,
 ) -> Literal["full", "section", "summary"]:
-    """返した範囲を決める（本文を切らずに返したら `full`）。"""
+    """返した範囲を決める（本文を切らずに返したら `full`。SQLite の表の行は 1 行が文書の全体）。"""
     if snippets or ranged:
         return "section"
     if not isinstance(values.get(BODY), str):
         return "summary"
     cut = len(document.body) > field_chars
-    if cut or (document.record_index is not None and document.body_path is None):
+    # records の要素（ファイルの一部）: 本文を切らなくても section
+    part = document.record_index is not None and document.body_path is None and not whole_row
+    if cut or part:
         return "section"
     return "full"
 
@@ -262,6 +265,16 @@ def _problem_notes(problems: Sequence[LoadProblem]) -> list[str]:
     ]
 
 
+def _sqlite_ref_notes(target: Target, documents: Sequence[Document]) -> list[str]:
+    """`ref` を指した読み込みの、SQLite の表の行の種類ごとに今の内容を返した旨の知らせを作る。"""
+    kinds = dict.fromkeys(
+        document.kind
+        for document in documents
+        if target.source.table(document.kind).sqlite is not None
+    )
+    return [f"SQLite の表の行（{kind}）は ref によらず今の内容を返しています" for kind in kinds]
+
+
 def _load_targets(
     request: SearchRequest, store: DocumentStore, targets: list[Target], notes: list[str]
 ) -> tuple[list[tuple[int, Target, list[Document]]], list[dict[str, Any]]]:
@@ -272,6 +285,9 @@ def _load_targets(
         result = store.load(target)
         notes.extend(_problem_notes(result.problems))
         documents = result.documents
+        # リビジョンを指した: SQLite の表の行は今の行を返した旨を種類ごとに添える
+        if target.ref is not None:
+            notes.extend(_sqlite_ref_notes(target, documents))
         if request.term is not None:
             collection = collect_aliases(target.source, documents)
             if not collection.has_alias_rows:
@@ -383,7 +399,12 @@ def _search_item(build: _Build, hit: _Hit) -> tuple[SearchItem, list[str]]:
     )
     scope = (
         _scope(
-            document, item.values, item.snippets, build.field_chars, ranged=item.ranges is not None
+            document,
+            item.values,
+            item.snippets,
+            build.field_chars,
+            ranged=item.ranges is not None,
+            whole_row=hit.target.source.table(document.kind).sqlite is not None,
         )
         if located
         else None

@@ -4097,3 +4097,59 @@ def test_normal_when_operation_skipped(
     assert [item["status"] for item in second.data["results"]] == ["updated"]
     assert "notes" not in after_second or "mcp/server.py の補足" not in after_second["notes"]
     assert "skipped" not in second.data["results"][0]
+
+
+def test_error_when_sqlite_kind_written(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+) -> None:
+    """SQLite の表の行の種類への操作を含む呼び出しを、そのほかの操作も書き込まずに断る（異常系）。"""
+    from tests.integration.server.conftest import sqlite_files, write_notes_db
+
+    # 準備
+    source, env, worktree = _setup(make_source, make_server, add_worktree, sqlite_files())
+    db = write_notes_db(source.folder)
+    db_before = db.read_bytes()
+    first = worktree / "docs" / "doc-1.yaml"
+    first_before = first.read_text(encoding="utf-8")
+    operations = [
+        _update("doc-1", _version(first), set={"name": "新しい名前"}),
+        _update("n1", "000000", set={"title": "書き換え"}),
+        {"op": "create", "kind": "notes_db", "data": {"id": "n9", "title": "追加"}},
+    ]
+    cwd = str(source.folder)
+    # 実行
+    atomic = env.call("write_docs", cwd=cwd, worktree=str(worktree), operations=operations)
+    first_after_atomic = first.read_text(encoding="utf-8")
+    not_atomic = env.call(
+        "write_docs", cwd=cwd, worktree=str(worktree), operations=operations, atomic=False
+    )
+    replaced = env.call(
+        "write_docs",
+        cwd=cwd,
+        worktree=str(worktree),
+        operations=[
+            {
+                "op": "replace_text",
+                "filter": {"field": "id", "op": "eq", "values": ["doc-2", "n1"]},
+                "old": "1",
+                "new": "一",
+            }
+        ],
+    )
+    # 検証
+    assert atomic.is_error is True
+    assert atomic.text.startswith("ReadOnlyKindError")
+    assert "operations[1]" in atomic.text
+    assert "operations[2]" in atomic.text
+    assert "notes_db" in atomic.text
+    assert first_after_atomic == first_before
+    results = not_atomic.data["results"]
+    assert not_atomic.data["applied"] is True
+    assert [item["status"] for item in results] == ["updated", "failed", "failed"]
+    assert "notes_db" in results[1]["errors"][0]["rule"]
+    assert "notes_db" in results[2]["errors"][0]["rule"]
+    assert load_yaml(first.read_text(encoding="utf-8"))["name"] == "新しい名前"
+    assert "n1" not in [item.get("id") for item in replaced.data.get("results", [])]
+    assert db.read_bytes() == db_before

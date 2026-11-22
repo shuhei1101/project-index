@@ -1,0 +1,338 @@
+id: MOD-237
+title: 索引のサーバー / 文書のストア / sqlite_rows.py
+lead: '`documents[].sqlite` を持つ行の SQLite の表を読み取り専用で開いて 1 行 1 件の文書にし、ファイルが変わったときだけ読み直す処理と、表と列の確認を受け持ち、文書のストアの sqlite_rows.py を修正するときに参照する。'
+test_files:
+  - tests/unit/project_index/features/documents/test_sqlite_rows.py
+data_models:
+  - name: SqliteSignature
+    title: SQLite のファイルの署名
+    container: project_index/features/documents/sqlite_rows.py
+    summary: 読み直すかを決めるファイルと WAL のファイルの更新日時とサイズ
+    description: '`frozen=True` の dataclass。等しければ読んだ行を使い回す。'
+    properties:
+      - name: db
+        title: ファイル
+        type: tuple[int, int]
+        description: '`sqlite.file` の `st_mtime_ns` と `st_size`'
+      - name: wal
+        title: WAL のファイル
+        type: tuple[int, int] | None
+        description: '`{file}-wal` の `st_mtime_ns` と `st_size`。無ければ `None`'
+  - name: SqliteRows
+    title: SQLite の表の行の読み込みの結果
+    container: project_index/features/documents/sqlite_rows.py
+    summary: 1 つの行から作った文書と、配信しなかった行の数と警告
+    properties:
+      - name: documents
+        title: 文書
+        type: list[Document]
+        description: 1 行 1 件の文書。`path` は `sqlite.file` の配信元のフォルダからのパス、`record_index` は行の並びの番号
+      - name: omitted
+        title: 配信しなかった行の数
+        type: int
+        description: '`where` に該当する行のうち `limit` を超えた数'
+      - name: warnings
+        title: 警告
+        type: list[str]
+        description: 開けない理由・`id` の重なり・JSON として読めない列の値
+      - name: signature
+        title: 読んだときの署名
+        type: SqliteSignature | None
+        description: ファイルを開けなかったときは `None`
+classes:
+  - name: SqliteRowCache
+    title: SQLite の表の行のキャッシュ
+    container: project_index/features/documents/sqlite_rows.py
+    summary: 行の定義ごとに読んだ行を持ち、署名か行の定義が変わったときだけ読み直す
+    description: 配信元ごとに 1 つ持つ。`_lock`（`threading.Lock`）で行ごとの読み直しを 1 つずつ進める。
+    kind: クラス
+    properties:
+      - name: _entries
+        title: 読んだ行
+        type: dict[tuple[str, str], SqliteRows]
+        access: 内部 (_)
+        description: （行の id、行の定義のハッシュ）→ 読んだ結果。行の定義のハッシュは `sqlite`・`metadata`・`alias_type` と行の id を JSON にした文字列のハッシュで、過去の `ref` の定義と今の定義の結果を別々に持つ
+      - name: _lock
+        title: 排他
+        type: threading.Lock
+        access: 内部 (_)
+        description: '`_entries` を守る'
+    methods:
+      - name: rows
+        title: 行の取得
+        summary: 署名が前回と同じなら読んだ行を、違えば読み直した行を返す
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        args:
+          - name: source_root
+            title: 配信元のフォルダ
+            type: Path
+            required: true
+            passing: positional
+            description: Git の配信元はクローン本体。ワークツリーを指す呼び出しでも同じ値
+          - name: source_id
+            title: 配信元の ID
+            type: str
+            required: true
+            passing: positional
+            description: 文書の `source_id`
+          - name: table
+            title: 文書の行
+            type: DocumentTable
+            required: true
+            passing: positional
+            description: '`sqlite` を持つ `documents[]` の行'
+        returns:
+          type: SqliteRows
+          description: その行の文書・配信しなかった行の数・警告
+        process: |-
+          1. `file_signature` で今の署名を取る（ファイルが無ければ `None`）
+          2. `table` の `sqlite`・`metadata`・`alias_type` と id から行の定義のハッシュを求める
+          3. `_lock` を取り、（id、ハッシュ）の `_entries` の署名が今の署名と等しく `None` でなければその結果を返す
+          4. 等しくなければ `read_rows` で読み直し、そのキーの `_entries` を置き換えて返す
+        unit_tests:
+          - name: test_rows_reuse_when_unchanged
+            case: 正常
+            summary: ファイルが変わらなければ読み直さない
+            condition: 同じ行で 2 回呼ぶ
+            mock: '`read_rows` を呼び出しの回数を数える関数に差し替える'
+            expected: '`read_rows` の呼び出しが 1 回で、2 回とも同じ `documents`'
+          - name: test_rows_reload_when_changed
+            case: 正常
+            summary: 行を書き換えた後は読み直す
+            condition: 1 回目の後に sqlite3 で `n1` の `title` を書き換え、行を 1 つ追加する（WAL のモードも含める）
+            mock: なし（一時フォルダの SQLite のファイル）
+            expected: 2 回目の `documents` が書き換えた `name` と追加した行を持ち、`n1` の `version` が変わる
+          - name: test_rows_when_file_appears
+            case: 正常
+            summary: 開けなかったファイルを配置した後は読む
+            condition: ファイルを配置しないまま呼び、配置してからもう一度呼ぶ
+            mock: なし
+            expected: 1 回目は `documents` が空で `warnings` に開けない理由、2 回目は行の文書
+          - name: test_rows_reload_when_definition_changed
+            case: 正常
+            summary: 署名が同じでも行の定義が違えば読み直す
+            condition: ファイルを変えずに、`where` だけが違う 2 つの `table` を交互に 2 回ずつ渡す
+            mock: '`read_rows` を呼び出しの回数を数える関数に差し替える'
+            expected: '`read_rows` の呼び出しが 2 回で、それぞれの `table` に `where` に合った `documents` を返す'
+          - name: test_rows_reload_when_written_while_reading
+            case: 正常
+            summary: 読んでいる間に書き込まれた行は、次の呼び出しで読み直して返す
+            condition: WAL のモードのファイルで、行を読んだ後・接続を閉じる前に別の接続で 1 行追加する
+            mock: 行の読み込み（`_fetch`）を、読んだ後に書き込む関数に差し替える（1 回目だけ）
+            expected: 1 回目は追加の前の行、書き込みの無い 2 回目は追加した行を含む
+functions:
+  - name: file_signature
+    title: ファイルの署名の取得
+    kind: 関数
+    scope: public
+    summary: SQLite のファイルと `-wal` のファイルの更新日時とサイズを返す
+    container: project_index/features/documents/sqlite_rows.py
+    args:
+      - name: path
+        title: ファイル
+        type: Path
+        required: true
+        passing: positional
+        description: '`sqlite.file` を配信元のフォルダで解決したパス'
+    returns:
+      type: SqliteSignature | None
+      description: ファイルが無ければ `None`
+    unit_tests:
+      - name: test_file_signature_changes_with_wal
+        case: 正常
+        summary: WAL への書き込みで署名が変わる
+        condition: WAL のモードのファイルに別の接続で 1 行追加し、チェックポイントをしない
+        mock: なし
+        expected: 追加の前と後で戻り値が等しくない
+      - name: test_file_signature_when_missing
+        case: 正常
+        summary: ファイルが無ければ None
+        condition: 無いパスを渡す
+        mock: なし
+        expected: '`None`'
+  - name: read_rows
+    title: 表の行の読み込み
+    kind: 関数
+    scope: public
+    summary: SQLite のファイルを読み取り専用で開き、表かビューの行を 1 行 1 件の文書にする
+    container: project_index/features/documents/sqlite_rows.py
+    args:
+      - name: source_root
+        title: 配信元のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: Git の配信元はクローン本体
+      - name: source_id
+        title: 配信元の ID
+        type: str
+        required: true
+        passing: positional
+        description: 文書の `source_id`
+      - name: table
+        title: 文書の行
+        type: DocumentTable
+        required: true
+        passing: positional
+        description: '`sqlite` を持つ行'
+    returns:
+      type: SqliteRows
+      description: 文書・配信しなかった行の数・警告・読んだときの署名
+    process: |-
+      1. `source_root / sqlite.file` を解決し、配信元のフォルダの配下でなければ警告にして空で返す
+      2. `id` に対応する列が `columns[]` に無ければ、警告にして空で返す。`file:{path}?mode=ro` の URI で `sqlite3.connect(uri=True)` し、開けなければ `sqlite3.Error` の理由を警告にして空で返す
+      3. `columns[]` の列を識別子として引用した `SELECT`、`where`・`order_by`（既定は `id` に対応する列の昇順）・`LIMIT {limit + 1}` で読む
+      4. `limit` を超えたときは `SELECT COUNT(*)` で `where` に該当する行の数を数え、`omitted` にする
+      5. 列の型が `json` の値を `json.loads` し、読めない値は空にして警告する
+      6. 行ごとに `columns[]` の並びの辞書を作り、`metadata` の対応で共通のメタデータを取り（空の配列の値はそのキーを持たない）、`id` の値を `str()` して文書の ID にする（重なる ID は最初の行だけを残して警告する）
+      7. 本文は辞書を YAML にした文字列、`version` は本文のハッシュにする。接続は閉じてから返す。署名は読む前と閉じた後に取り、違いが「読む前は `-wal` が無く、閉じた後に大きさ 0 の `-wal` ができた」だけ（本体のファイルの署名は同じ）のときは閉じた後の署名を、それ以外は読む前の署名を持つ（WAL のモードのファイルは読み取り専用の接続でも空の `-wal` を作り、読んでいる間の書き込みは次の呼び出しで読み直すため）
+    unit_tests:
+      - name: test_read_rows
+        case: 正常
+        summary: 行を文書にし、共通のメタデータと json の列を読む
+        condition: '表 `notes` に `n1`（`tags: ["game"]`・`aliases: ["実況"]`）と `n2` の 2 行。`metadata: {name: title, description: summary}`'
+        mock: なし（一時フォルダの SQLite のファイル）
+        expected: '`documents` が `n1`・`n2` の順で、`n1` の `metadata` の `name` が `title` 列の値・`tags` が `["game"]`・`aliases` が `["実況"]`、`kind` が行の id'
+      - name: test_read_rows_when_over_limit
+        case: 正常
+        summary: 上限を超えた分は配信せずに数える
+        condition: '`where` に該当する行が 3 行で `limit: 2`・`order_by: title DESC`'
+        mock: なし
+        expected: '`documents` が `title` の降順の先頭 2 件で、`omitted` が 1'
+      - name: test_read_rows_when_integer_id
+        case: 正常
+        summary: 整数の id の列を文字列の ID にする
+        condition: '`id` の列が INTEGER で 1 と 2'
+        mock: なし
+        expected: 文書の ID が `"1"` と `"2"`
+      - name: test_read_rows_when_duplicate_id
+        case: 正常
+        summary: 重なる ID は最初の行だけを残す
+        condition: ビューが同じ `id` の 2 行を返す
+        mock: なし
+        expected: '`documents` は 1 件で、`warnings` に重なった ID'
+      - name: test_read_rows_when_bad_json
+        case: 正常
+        summary: JSON として読めない値は空にする
+        condition: '`type: json` の列に `not json` を持つ行'
+        mock: なし
+        expected: その行の列の値が `None` で、`warnings` に行の ID と列名
+      - name: test_read_rows_when_unopenable
+        case: 異常
+        summary: 開けないファイルは警告で返す
+        condition: 無いファイルと、SQLite でない中身のファイル
+        mock: なし
+        expected: 例外を送出せず、`documents` が空で `warnings` に理由、ファイルを作らない
+      - name: test_read_rows_read_only
+        case: 正常
+        summary: 書き込みの文を where に入れても書き込まない
+        condition: '`where` に `1=1; DELETE FROM notes` を記載する'
+        mock: なし
+        expected: '`warnings` に SQL の誤りがあり、ファイルのバイト列が変わらない'
+      - name: test_read_rows_when_id_column_missing
+        case: 異常
+        summary: id に対応する列が columns[] に無い行は、例外を送出せず警告で返す
+        condition: '`metadata: {name: title}`・`columns` が `title` だけの行'
+        mock: なし
+        expected: '`documents` が空で、`warnings` に `id` の列が無い旨の 1 件'
+  - name: inspect_table
+    title: 表と列の確認
+    kind: 関数
+    scope: public
+    summary: '`sqlite` を持つ行のファイル・表かビュー・列の有無を確認し、違反と警告を返す'
+    container: project_index/features/documents/sqlite_rows.py
+    args:
+      - name: source_root
+        title: 配信元のフォルダ
+        type: Path
+        required: true
+        passing: positional
+        description: Git の配信元はクローン本体
+      - name: table
+        title: 文書の行
+        type: DocumentTable
+        required: true
+        passing: positional
+        description: '`sqlite` を持つ行'
+      - name: index
+        title: 行の番号
+        type: int
+        required: true
+        passing: positional
+        description: 違反のキーのパスの `documents[{番号}]`
+    returns:
+      type: tuple[list[Violation], list[Violation]]
+      description: 違反（ファイル・表・列の欠け）と警告（上限の超過・`id` の重なり）
+    process: |-
+      1. ファイルが無い・開けないときは `documents[{index}].sqlite.file` の違反だけを返す
+      2. `sqlite_master` で表かビューが無ければ `documents[{index}].sqlite.table` の違反を返す
+      3. `PRAGMA table_info` で列の一覧を取り、`columns[]` と `metadata` が指す列の無いものを、それぞれ `sqlite.columns[{番号}].name`・`metadata.{キー}` の違反にする。`metadata` が指す列が `columns[]` に無いときも違反にする。`metadata` に `id` が無い行で、列 `id` が表か `columns[]` に無いときは `sqlite.columns` の違反にする
+      4. 違反が無ければ `read_rows` で読み、`omitted` と重なった ID を警告にする
+    unit_tests:
+      - name: test_inspect_table_violations
+        case: 異常
+        summary: ファイル・表・列の欠けを違反にする
+        condition: 無いファイル・無い表 `memos`・`metadata.name` に無い列 `heading` の 3 つの行
+        mock: なし
+        expected: それぞれ `documents[{index}].sqlite.file`・`documents[{index}].sqlite.table`・`documents[{index}].metadata.name` の違反
+      - name: test_inspect_table_warnings
+        case: 正常
+        summary: 上限を超えた行の数を警告にする
+        condition: '2 行の表で `limit: 1`'
+        mock: なし
+        expected: 違反が空で、警告に配信しない行の数 1
+      - name: test_inspect_table_when_id_column_missing
+        case: 異常
+        summary: id に対応する列が columns[] に無い行を違反にする
+        condition: '`metadata: {name: title}`・`columns` が `title` だけの行'
+        mock: なし
+        expected: '`documents[0].sqlite.columns` の違反 1 件で、警告が空'
+  - name: columns_schema
+    title: 列の説明のスキーマ
+    kind: 関数
+    scope: public
+    summary: '`columns[]` から、読み取り API と `describe` が返す JSON Schema を作る'
+    container: project_index/features/documents/sqlite_rows.py
+    args:
+      - name: table
+        title: 文書の行
+        type: DocumentTable
+        required: true
+        passing: positional
+        description: '`sqlite` を持つ行'
+    returns:
+      type: dict[str, Any]
+      description: '`type: object` で、列ごとに `title`（`description`）と型（`text` は `string`、`integer`、`real` は `number`、`json` は型を持たない）を持つ `properties`'
+    unit_tests:
+      - name: test_columns_schema
+        case: 正常
+        summary: 列の並びと型と説明を写す
+        condition: '`id`（text）・`count`（integer）・`tags`（json）の 3 列'
+        mock: なし
+        expected: '`properties` が 3 列の順で、`id` が `string`・`count` が `integer`・`tags` は `type` を持たず、各 `title` が列の説明'
+refs:
+  - to: IF-2
+    item: constraints[SQLite の表の行]
+    type: requires
+    when: 行の読み方・文書の ID・本文を変えるときに、検索の制約と合わせる。
+  - to: IF-2
+    item: constraints[SQLite の表の読み込みの時機]
+    type: requires
+    when: 読み直す条件を変えるときに、読み込みの時機の制約と合わせる。
+  - to: IF-12
+    item: constraints[SQLite の行の検証]
+    type: requires
+    when: 確認する項目を変えるときに、検査の制約と合わせる。
+  - to: CFG-1
+    item: settings[documents[].sqlite]
+    type: requires
+    when: 設定のキーを変えるときに、読むキーと既定値を合わせる。
+visibility: internal
+tags:
+  - name: topic:sqlite
+    main: true
+  - name: topic:文書
+  - name: topic:キャッシュ
+  - name: action:読み込み

@@ -10,7 +10,7 @@ files:
     manages: 端末の設定（配信元の一覧と権限（直コミットを呼べる作業場所と、作業場所を持たない書き込みの API から直コミットできる種類 `sources[].direct_commit` を含む）・`state_dir`・`log_dir`・`port`・`bind`・`seen_retention_days`・`script_timeout_sec`・`write_deadline_sec`・`worktree_load_wait_sec`・`mdmark_ref`）
     notes: git 管理外。場所は環境変数 `PROJECT_INDEX_CONFIG` で上書きする。キーの一覧は公開ドキュメント『設定』、型は [端末の設定の型](id:MOD-67) の `TerminalConfig`
   - file: project-index.yaml
-    manages: 配信元の設定（文書の範囲・種類・参照するブランチ・検査と変換と生成のスクリプト・`nav`・`decisions`・`github`・直コミットを許可する種類とコミットするブランチ `direct_commit`）
+    manages: 配信元の設定（文書の範囲・種類・参照するブランチ・検査と変換と生成のスクリプト・`nav`・`decisions`・`github`・直コミットを許可する種類とコミットするブランチ `direct_commit`・読み取り専用で配信する SQLite の表 `documents[].sqlite`）
     notes: 各リポジトリの直下に配置し、git で管理する。端末の設定の `config` でほかの名前も指定できる。管理の MCP にフォルダを渡したときは `project-index.yaml`、無ければ移行の間の `dev-docs.yaml` を探す（[管理の service.py](id:MOD-10) の `CONFIG_FILE`・`LEGACY_CONFIG_FILE`）
   - file: project-index.local.yaml
     manages: '配信元の設定の端末ごとの上書き。ローカル運用（端末の設定の行が `storage.type: disk`）では、配信元の設定そのもの'
@@ -20,3 +20,103 @@ notes:
   待ち受けのポート: 環境変数 `PROJECT_INDEX_PORT` を優先し、無ければ端末の設定のキー `port`（既定 8786）。プラグインの `.mcp.json` も同じ環境変数を参照する
 id: CFG-1
 visibility: internal
+settings:
+  - key: documents[].sqlite
+    title: SQLite の表
+    file: project-index.yaml
+    type: obj
+    required: false
+    description: この行の文書を、SQLite の表かビューの 1 行 1 件で読み取り専用で配信する。記載した行は `paths[]`・`exclude[]`・`schema`・`records`・`body_file`・`converter`・`validators[]`・`after_write[]`・`writable` を持てず、`write_docs`・`delete_docs`・書き込みの API はこの行の種類への操作を断る。`list_changes` の対象にしない
+    missing: 記載しない行は、今までどおり `paths[]` のファイルから文書を集める
+    reload: reload
+    status: planned
+    visibility: user
+  - key: documents[].sqlite.file
+    title: SQLite のファイル
+    file: project-index.yaml
+    type: str
+    required: true
+    description: データベースのファイルの、配信元のフォルダからの相対パス。`worktree`・`ref` の指定によらず、配信元のフォルダ（Git の配信元はクローン本体）のファイルを読み取り専用で開く
+    missing: '`documents[{番号}].sqlite.file` の違反にする。ファイルが無い・開けないときは、その行だけ配信せず `describe()` の注意と `check_project` の違反で通知し、ほかの行の配信は続ける'
+    reload: reload
+    status: planned
+    visibility: user
+  - key: documents[].sqlite.table
+    title: 表かビュー
+    file: project-index.yaml
+    type: str
+    required: true
+    description: 配信する表か SQL のビューの名前。共通のキー `id` に対応する列の値が文書の ID になり、値が重なる行は最初の行だけを配信して警告する
+    missing: '`documents[{番号}].sqlite.table` の違反にする。表かビューが無いときも同じ違反にし、その行だけ配信しない'
+    reload: reload
+    status: planned
+    visibility: user
+  - key: documents[].sqlite.where
+    title: 配信する行の条件
+    file: project-index.yaml
+    type: str
+    required: false
+    description: SQL の `WHERE` 句の条件（`status != 'closed'` など）。該当する行だけを配信する。読み取り専用で開くため、書き込む文は実行できない
+    default: なし（全ての行）
+    reload: reload
+    status: planned
+    visibility: user
+  - key: documents[].sqlite.order_by
+    title: 行の並び
+    file: project-index.yaml
+    type: str
+    required: false
+    description: SQL の `ORDER BY` 句の列と向き（`updated_at DESC` など）。`limit` を超えたときにどの行を配信するかを決める
+    default: 共通のキー `id` に対応する列の昇順
+    reload: reload
+    status: planned
+    visibility: user
+  - key: documents[].sqlite.limit
+    title: 読み込む行の上限
+    file: project-index.yaml
+    type: int
+    required: false
+    allowed: 1 以上
+    description: 配信する行の数の上限。`where` に該当する行が上限を超えたときは `order_by` の先頭から上限までを配信し、配信しなかった行の数を `describe()` の注意と `check_project` の警告で通知する
+    default: '1000'
+    reload: reload
+    status: planned
+    visibility: user
+  - key: documents[].sqlite.columns[]
+    title: 列の説明
+    file: project-index.yaml
+    type: list[obj]
+    required: true
+    description: '配信する列の並び。`describe(source, kind)` が種類のスキーマの代わりに返却し、`search_docs` の項目と `view: full` の本文はこの列だけを持つ。`metadata` の対応が指す列はここに記載する'
+    missing: '`documents[{番号}].sqlite.columns` の違反にする。表に無い列と、`metadata` が指すがここに無い列も違反にする'
+    reload: reload
+    status: planned
+    visibility: user
+  - key: documents[].sqlite.columns[].name
+    title: 列名
+    file: project-index.yaml
+    type: str
+    required: true
+    description: 表かビューの列の名前
+    reload: reload
+    status: planned
+    visibility: user
+  - key: documents[].sqlite.columns[].type
+    title: 列の型
+    file: project-index.yaml
+    type: '`text` / `integer` / `real` / `json`'
+    required: false
+    description: 列の値の読み方。`json` は JSON の文字列を配列・オブジェクトにして持ち、`tags`・`aliases` など配列の共通のキーに対応する列は `json` にする。JSON として読めない値の行は、その列を空にして警告する
+    default: text
+    reload: reload
+    status: planned
+    visibility: user
+  - key: documents[].sqlite.columns[].description
+    title: 列の説明文
+    file: project-index.yaml
+    type: str
+    required: true
+    description: '`describe(source, kind)` が返却する列の意味'
+    reload: reload
+    status: planned
+    visibility: user

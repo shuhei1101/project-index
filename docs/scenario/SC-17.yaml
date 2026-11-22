@@ -321,6 +321,36 @@ scenarios:
   - 応答が失敗で、文書 2 の削除の操作の位置と、書き換わる文書 r1 の種類 `rule` が直コミットを許可した種類に該当しないことを返却する
   - 文書 1 も書き換わらず、sample のリモートと全てのワークツリーは変わらない
   test: test_error_when_disallowed_kind_rewritten
+- name: 異常シナリオ（SQLite の行の文書を含む）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが書き込みの API を HTTP で呼ぶ）
+  - name: サンプルの配信元
+    description: 異常シナリオ（直コミットを許可していない種類を含む）と同じ sample に、エージェントが調べるの正常シナリオ（SQLite の表の行を引く）と同じ `data/notes.db` と行 `notes_db` を加えたもの
+    notes: 直コミットは種類 `note` と `notes_db` を許可する
+  - name: sample のリモート
+    description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+  - name: 書き換える文書
+    description: sample の `develop` にコミット済みの種類 `note` の文書 1 と、SQLite の行の文書 `n1`
+  flow: |-
+    <!-- map: {"title": "異常シナリオ（SQLite の行の文書を含む）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（書き込みの API）
+
+      DD->>PI: 文書 1 の部分更新と、n1 の部分更新を 1 回で送信する
+      PI->>PI: n1 の種類 notes_db は SQLite の表の行で、読み取り専用
+      PI-->>DD: 該当する操作の位置と、読み取り専用である理由を返却して断る
+    ```
+
+    <!-- /map -->
+  expected:
+  - 応答が失敗で、`n1` の操作の位置と、種類 `notes_db` が読み取り専用であることを返却する
+  - 直コミットの設定で許可していても断る
+  - 文書 1 も書き換わらず、sample のリモートと全てのワークツリーと `data/notes.db` は変わらない
+  test: test_error_when_sqlite_doc_included
 refs:
 - to: SC-1
   item: scenarios[正常シナリオ]

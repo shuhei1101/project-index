@@ -41,7 +41,8 @@ from project_index.features.convert.service import ConvertService
 from project_index.features.documents.aliases import alias_schema_version
 from project_index.features.documents.loader import collect_files
 from project_index.features.documents.schema import records_item_schema, startup_schema
-from project_index.features.documents.store import check_sync
+from project_index.features.documents.sqlite_rows import inspect_table
+from project_index.features.documents.store import check_sync, sqlite_root
 from project_index.features.read.nav import (
     check_nav_filters,
     nav_auto_counts,
@@ -342,6 +343,15 @@ def check_project(request: CheckProjectRequest, *, handlers: Handlers) -> CheckP
         if not collect_files(source.root, replace(table, paths=[pattern]))
     ]
     report = check_sync(handlers.store, source)
+    # SQLite の表の行: クローン本体のファイルで表と列を確かめる
+    sqlite_violations: list[Violation] = []
+    sqlite_warnings: list[Violation] = []
+    for index, table in enumerate(source.config.documents):
+        if table.sqlite is None:
+            continue
+        found, warned = inspect_table(sqlite_root(source), table, index)
+        sqlite_violations.extend(found)
+        sqlite_warnings.extend(warned)
     entries = (
         ("missing_refs", report.missing_refs),
         ("unindexed_files", report.unindexed_files),
@@ -363,7 +373,7 @@ def check_project(request: CheckProjectRequest, *, handlers: Handlers) -> CheckP
         registered_id=registered_id,
         config_version=candidate.config_version,
         version_state=state,
-        violations=[*report.alias_violations, *commit_violations],
+        violations=[*report.alias_violations, *sqlite_violations, *commit_violations],
         missing_paths=missing_paths,
         script_errors=[],
         sync=CheckSync(
@@ -375,7 +385,7 @@ def check_project(request: CheckProjectRequest, *, handlers: Handlers) -> CheckP
             duplicate_ids=counts.duplicate_ids,
             items=items[:SYNC_ITEMS_LIMIT],
         ),
-        warnings=[*nav_warnings(handlers.store, source), *commit_warnings],
+        warnings=[*nav_warnings(handlers.store, source), *sqlite_warnings, *commit_warnings],
         alias_schema_version=alias_schema_version(),
     )
 

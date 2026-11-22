@@ -1,0 +1,46 @@
+id: LIB-10
+title: sqlite3
+kind: 標準ライブラリ
+lead: SQLite のデータベースを開いて SQL を実行する Python の標準ライブラリ。URI の `mode=ro` で読み取り専用に開ける。
+version:
+  current: Python 3.14.3 同梱（SQLite 3.50.4）
+  latest: Python 3.14.3 同梱（SQLite 3.50.4）
+  checked_on: '2026-11-22'
+  source: pyproject.toml の requires-python
+  pinning: 標準ライブラリのため、Python のバージョンで決まる
+catalogs:
+  - name: API
+    version: '3.14'
+    entries:
+      - name: sqlite3.connect
+        kind: 関数
+        purpose: '`file:{path}?mode=ro` の URI（`uri=True`）で、ファイルを作らず書き込まない接続を開く'
+      - name: Connection.execute
+        kind: 関数
+        purpose: '`SELECT`・`SELECT COUNT(*)`・`PRAGMA table_info` を 1 文ずつ実行する'
+      - name: sqlite3.Error
+        kind: クラス
+        purpose: 開けないファイル・SQLite でないファイル・SQL の誤りをまとめて捕える例外の基底
+purl: pkg:generic/python-stdlib/sqlite3
+dependency_scope: 必須
+adoption: 採用
+used_in:
+  - src/project_index/features/documents/sqlite_rows.py
+upstream: python/cpython
+license: PSF-2.0
+official_url: https://docs.python.org/3/library/sqlite3.html
+docs_url: https://docs.python.org/3/library/sqlite3.html
+verification:
+  state: 済
+  date: '2026-11-22'
+  detail: Python 3.14（SQLite 3.50.4）で、`mode=ro` の接続が行を読め、`DELETE` を `attempt to write a readonly database` で断ること。`1=1; DELETE FROM t` のように 2 文を含む文字列を `ProgrammingError`（`You can only execute one statement at a time.`）で断ること。無いファイルを `unable to open database file` で断ってファイルを作らず、SQLite でないファイルを `file is not a database` で断ること。WAL のモードでチェックポイントをしない書き込みで `{file}-wal` の更新日時とサイズが変わることを確かめた
+limitations:
+  - item: WAL の未反映の書き込み
+    content: チェックポイントの前の書き込みは本体のファイルではなく `{file}-wal` だけを変えるため、読み直す判定は両方のファイルの更新日時とサイズで比べる
+  - item: WAL のモードの読み取り専用の接続
+    content: WAL のモードのファイルは、`mode=ro` の接続でも `-wal`・`-shm` が無ければ作る（本体のファイルは書き換えない）。読んだ後の署名を持たないと、次の呼び出しで変わったものとして読み直す
+visibility: internal
+tags:
+  - name: topic:ライブラリ
+  - name: topic:sqlite
+  - name: tool:sqlite3

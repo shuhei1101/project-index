@@ -97,6 +97,7 @@ from project_index.shared.errors import (
     DocumentReferencedError,
     InvalidArgumentError,
     ProjectIndexError,
+    ReadOnlyKindError,
     ValidationFailedError,
     VersionMismatchError,
     Violation,
@@ -109,7 +110,7 @@ from project_index.shared.paths import normalize_path
 from project_index.shared.yaml_io import dump_roundtrip, load_roundtrip
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Mapping, MutableMapping
+    from collections.abc import Generator, Mapping, MutableMapping, Sequence
 
     from project_index.features.seen.store import SeenStore
     from project_index.features.sources.registry import SourceRegistry
@@ -943,6 +944,75 @@ def _atomic_error(failures: list[tuple[int, ProjectIndexError]]) -> ProjectIndex
     return first
 
 
+def _read_only_kind(
+    source: ServedSource, docs: Mapping[str, Document], operation: Operation
+) -> str | None:
+    """操作が SQLite の表の行の種類を指すなら、その種類を返す（`replace_text` は対象にしない）。"""
+    if operation.op == "replace_text":
+        return None
+    if operation.op == "create":
+        kind = operation.kind
+    else:
+        document = docs.get(operation.id or "")
+        kind = None if document is None else document.kind
+    if kind is None or kind not in {row.id for row in source.config.documents}:
+        return None
+    return kind if source.table(kind).sqlite is not None else None
+
+
+def _read_only_error(kinds: list[str], positions: list[str]) -> ReadOnlyKindError:
+    """SQLite の表の行の種類への操作を断る例外を作る。"""
+    names = "・".join(dict.fromkeys(kinds))
+    return ReadOnlyKindError(
+        message=f"{names} は SQLite の表の行の種類で、読み取り専用です（{', '.join(positions)}）",
+        kind=kinds[0],
+        positions=positions,
+        next_steps=["SQLite の表の行は、データを持つアプリで書き換えてください"],
+    )
+
+
+def _check_read_only(
+    source: ServedSource,
+    docs: Mapping[str, Document],
+    operations: Sequence[Operation],
+    name: str = "operations",
+) -> None:
+    """SQLite の表の行の種類を指す操作があれば、適用する前に断る。"""
+    found = [
+        (kind, f"{name}[{index}]")
+        for index, operation in enumerate(operations)
+        if (kind := _read_only_kind(source, docs, operation)) is not None
+    ]
+    if found:
+        raise _read_only_error([kind for kind, _ in found], [position for _, position in found])
+
+
+def _check_read_only_deletes(
+    source: ServedSource,
+    docs: Mapping[str, Document],
+    targets: Sequence[DeleteTarget],
+    name: str = "targets",
+) -> None:
+    """SQLite の表の行の文書を消す対象があれば、消す前に断る。"""
+    found = [
+        (document.kind, f"{name}[{index}]")
+        for index, item in enumerate(targets)
+        if (document := docs.get(item.id)) is not None
+        and source.table(document.kind).sqlite is not None
+    ]
+    if found:
+        raise _read_only_error([kind for kind, _ in found], [position for _, position in found])
+
+
+def _sqlite_docs(store: DocumentStore, source: ServedSource) -> dict[str, Document]:
+    """配信元の SQLite の表の行の文書を ID で引く辞書を返す（取得・取り込みの前に断るために使う）。"""
+    tables = [row for row in source.config.documents if row.enabled and row.sqlite is not None]
+    if not tables:
+        return {}
+    rows, _ = store.sqlite_documents(Target(source, source.root, None, None, "read"), tables)
+    return {document.id: document for document in rows}
+
+
 def write_docs(
     request: WriteRequest,
     *,
@@ -983,6 +1053,9 @@ def write_docs(
         session = _Session(
             store, target, deadline=None if limits is None else limits.write_deadline
         )
+        # まとめて当てる要求: SQLite の表の行の種類への操作があれば、適用する前に断る
+        if request.atomic:
+            _check_read_only(source, session.docs, request.operations)
         applied = _apply_operations(
             session, checker, request.operations, seen.last_read(key, source.id), now
         )
@@ -1111,6 +1184,10 @@ def _apply_one(
     now: datetime,
 ) -> list[tuple[WriteResultItem, DocumentTable]]:
     """操作 1 件を当てて検査し、通れば記録する（結果の行は、書き換えた文書ごと）。"""
+    # SQLite の表の行の種類への操作: この操作だけを断る
+    read_only = _read_only_kind(session.target.source, session.docs, operation)
+    if read_only is not None:
+        raise _read_only_error([read_only], [f"operations[{index}]"])
     if operation.op == "create":
         return [_apply_create_one(session, checker, operation, index, created_ids, now)]
     if operation.op == "rename":
@@ -1851,6 +1928,8 @@ def delete_docs(
         session = _Session(
             store, target, deadline=None if limits is None else limits.write_deadline
         )
+        # SQLite の表の行の文書を消す対象があれば、消す前に断る
+        _check_read_only_deletes(source, session.docs, request.targets)
         deleted = _apply_deletes(session, checker, request)
         if request.dry_run or not deleted.accepted:
             return DeleteResult(applied=False, results=deleted.results, unlinked=deleted.unlinked)
@@ -2275,6 +2354,8 @@ def _write_with_commit(
     if not request.atomic or request.worktree is not None:
         raise _commit_arguments_error(atomic=request.atomic)
     source, plan, committable = _commit_target(registry, request.source, request.cwd, commit)
+    # SQLite の表の行の種類への操作は、取得・取り込みの前に断る
+    _check_read_only(source, _sqlite_docs(store, source), request.operations)
     key = SessionKey.of(request.session_id, request.agent_id)
     last_reads = seen.last_read(key, source.id)
 
@@ -2332,6 +2413,8 @@ def _delete_with_commit(
     if not request.atomic or request.worktree is not None:
         raise _commit_arguments_error(atomic=request.atomic)
     source, plan, committable = _commit_target(registry, request.source, request.cwd, commit)
+    # SQLite の表の行の文書を消す対象は、取得・取り込みの前に断る
+    _check_read_only_deletes(source, _sqlite_docs(store, source), request.targets)
 
     def prepare() -> tuple[_Session, _Deleted]:
         # 取り込んだ後の内容と設定で、消す文書と参照を外す文書を決めて直コミットの確認まで進める
@@ -2529,6 +2612,11 @@ def commit_documents(
     now = now or datetime.now(UTC)
     limits = limits or _default_limits()
     _check_commit_documents_size(request)
+    # SQLite の表の行の種類への操作は、取得・取り込みの前に断る
+    early = registry.get_for_docs(request.source)
+    sqlite_docs = _sqlite_docs(store, early)
+    _check_read_only(early, sqlite_docs, request.writes, "writes")
+    _check_read_only_deletes(early, sqlite_docs, request.deletes, "deletes")
     source, plan, committable = _write_api_commit_target(registry, request)
 
     def prepare() -> tuple[_Session, _Committed]:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import sys
 import time
 from dataclasses import dataclass, field
@@ -2327,3 +2328,144 @@ def test_commit_documents_when_dry_run(
     assert not (commit_env.develop / "docs/rule/doc-9.yaml").exists()
     assert (commit_env.develop / "docs/rule/doc-1.yaml").exists()
     assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
+
+
+def _sqlite_env(
+    make_env: Callable[..., WriteEnv], make_notes_db: Callable[..., Path]
+) -> tuple[WriteEnv, Path]:
+    """行 `rules` と `data/notes.db` の行 `notes_db` を持つ配信元の部品と、SQLite のファイルを返す。"""
+    from tests.unit.project_index.conftest import notes_db_table
+
+    rules = DocumentTable(
+        id="rules", paths=["docs/rule/*.yaml"], schema_path="schemas/rule.schema.yaml"
+    )
+    env = make_env(tables=[rules, notes_db_table()])
+    return env, make_notes_db(env.clone)
+
+
+def _sqlite_operations() -> list[Operation]:
+    """文書 1 の update・`n1` の update・`kind: notes_db` の create の 3 件を返す。"""
+    return [
+        Operation(
+            op="update",
+            id="doc-1",
+            expected_version=content_hash(DOC_1),
+            set={"name": "新しい名前"},
+        ),
+        Operation(op="update", id="n1", expected_version="000000", set={"title": "書き換え"}),
+        Operation(op="create", kind="notes_db", data={"id": "n9", "title": "追加"}),
+    ]
+
+
+def test_write_docs_when_sqlite_kind(
+    make_env: Callable[..., WriteEnv], make_notes_db: Callable[..., Path]
+) -> None:
+    """SQLite の行の種類への操作を、適用する前に ReadOnlyKindError で断る（異常系）。"""
+    from project_index.shared.errors import ReadOnlyKindError
+
+    # 準備
+    env, db = _sqlite_env(make_env, make_notes_db)
+    before = db.read_bytes()
+    # 実行・検証
+    with pytest.raises(ReadOnlyKindError) as raised:
+        env.write(operations=_sqlite_operations())
+    assert raised.value.positions == ["operations[1]", "operations[2]"]
+    assert (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
+    assert db.read_bytes() == before
+
+
+def test_write_docs_when_sqlite_kind_not_atomic(
+    make_env: Callable[..., WriteEnv], make_notes_db: Callable[..., Path]
+) -> None:
+    """atomic: false では通る操作だけを書き込む（正常系）。"""
+    # 準備
+    env, db = _sqlite_env(make_env, make_notes_db)
+    before = db.read_bytes()
+    # 実行
+    result = env.write(operations=_sqlite_operations(), atomic=False)
+    # 検証
+    assert result.applied is True
+    assert [item.status for item in result.results] == ["updated", "failed", "failed"]
+    assert "notes_db" in str(result.results[1].errors)
+    assert "notes_db" in str(result.results[2].errors)
+    assert "新しい名前" in (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8")
+    assert db.read_bytes() == before
+
+
+def test_write_docs_when_replace_text_matches_sqlite(
+    make_env: Callable[..., WriteEnv], make_notes_db: Callable[..., Path]
+) -> None:
+    """replace_text は SQLite の行の文書を置換の対象にしない（正常系）。"""
+    # 準備
+    env, db = _sqlite_env(make_env, make_notes_db)
+    before = db.read_bytes()
+    operation = Operation(
+        op="replace_text",
+        filter=Condition(field="id", op="eq", values=["doc-1", "n1"]),
+        old="1",
+        new="一",
+    )
+    # 実行
+    result = env.write(operations=[operation])
+    # 検証
+    assert [(item.id, item.status) for item in result.results] == [("doc-1", "updated")]
+    assert db.read_bytes() == before
+
+
+def test_delete_docs_when_sqlite_kind(
+    make_env: Callable[..., WriteEnv], make_notes_db: Callable[..., Path]
+) -> None:
+    """SQLite の行の文書の削除を ReadOnlyKindError で断る（異常系）。"""
+    from project_index.shared.errors import ReadOnlyKindError
+
+    # 準備
+    env, _db = _sqlite_env(make_env, make_notes_db)
+    targets = [
+        DeleteTarget(id="doc-1", expected_version=content_hash(DOC_1)),
+        DeleteTarget(id="n1", expected_version="000000"),
+    ]
+    # 実行・検証
+    with pytest.raises(ReadOnlyKindError) as raised:
+        env.delete(targets=targets)
+    assert raised.value.positions == ["targets[1]"]
+    assert (env.worktree / "docs/rule/doc-1.yaml").exists()
+
+
+def test_commit_documents_when_sqlite_kind(
+    make_commit_env: Callable[..., CommitEnv],
+    make_notes_db: Callable[..., Path],
+    make_registry: Callable[..., SourceRegistry],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """直コミットを許可していても SQLite の行の文書を断る（異常系）。"""
+    from project_index.features.write import direct_commit as direct_commit_module
+    from project_index.shared.errors import ReadOnlyKindError
+    from tests.unit.project_index.conftest import notes_db_table
+
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules"])
+    env = commit_env.env
+    make_notes_db(env.clone)
+    config = dataclasses.replace(
+        env.source.config,
+        documents=[*env.source.config.documents, notes_db_table()],
+        direct_commit=DirectCommitConfig(branch="data", kinds=["rules", "terms", "notes_db"]),
+    )
+    source = dataclasses.replace(
+        env.source, config=config, direct_commit_write_api_kinds=["rules", "notes_db"]
+    )
+    env.source = source
+    env.registry = make_registry(source)
+    git_calls: list[list[str]] = []
+
+    def recording(args: list[str], *_rest: Any, **_kwargs: Any) -> Any:
+        git_calls.append(list(args))
+        msg = "git を呼んだ"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(direct_commit_module, "run_git", recording)
+    writes = [Operation(op="update", id="n1", expected_version="000000", set={"title": "書き換え"})]
+    # 実行・検証
+    with pytest.raises(ReadOnlyKindError):
+        _commit_documents(commit_env, writes=writes)
+    assert git_calls == []

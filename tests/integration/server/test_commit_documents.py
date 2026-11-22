@@ -252,3 +252,61 @@ def test_error_when_source_not_found(
     # 検証
     assert response.status_code == 404
     assert "missing" in response.text
+
+
+def test_error_when_sqlite_kind_included(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """SQLite の表の行の文書への操作を含む要求を、直コミットを許可していても断る（異常系）。"""
+    from tests.integration.server.conftest import (
+        NOTES_DB_ROW,
+        direct_commit_config,
+        write_notes_db,
+    )
+
+    # 準備
+    config = direct_commit_config(kinds=("note", "notes_db")).replace(
+        "generators:\n", NOTES_DB_ROW.format(limit="") + "generators:\n"
+    )
+    direct = make_direct_commit_source(
+        files={**NOTES, ".gitignore": "data/\n"},
+        config=config,
+        write_api_kinds=["note", "notes_db"],
+    )
+    db = write_notes_db(
+        direct.spec.folder, [("sq1", "ゲーム実況 1", "今日の目標 1", '["game"]', "[]")]
+    )
+    db_before = db.read_bytes()
+    env = make_server(direct.spec)
+    before = _git_state(direct, run_git)
+    x_before = run_git(direct.x, "status", "--porcelain").strip()
+    body = {
+        "writes": [
+            {
+                "op": "update",
+                "id": "n1",
+                "expected_version": _version(direct.develop / "notes" / "n1.yaml"),
+                "set": {"description": "新しい説明"},
+            },
+            {
+                "op": "update",
+                "id": "sq1",
+                "expected_version": "000000",
+                "set": {"title": "書き換え"},
+            },
+        ],
+        "message": "docs: note を更新する",
+    }
+    # 実行
+    response = env.client.post(URL, json=body)
+    # 検証
+    data = response.json()
+    assert response.status_code == 403, data
+    assert response.headers["content-type"].startswith("application/problem+json")
+    assert [item["path"] for item in data["errors"]] == ["writes[1]"]
+    assert "notes_db" in data["errors"][0]["reason"]
+    assert _git_state(direct, run_git) == before
+    assert run_git(direct.x, "status", "--porcelain").strip() == x_before
+    assert db.read_bytes() == db_before

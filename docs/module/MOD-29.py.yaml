@@ -169,6 +169,11 @@ classes:
         type: dict[tuple[Path, str], OrderedDict[tuple[str, tuple[str, ...]], _RevisionLoad]]
         access: 内部 (_)
         description: '(`repo_root`, 配信元の ID) → 使用した順の (解いた commit, 読んだ文書の行の定義のハッシュの並び) → 読み込みの結果。`_RevisionLoad` はこのファイルの中の `@dataclass(slots=True, frozen=True)`（`result: LoadResult`・`pages: dict[str, Document]`・`files: dict[str, Document]`・`file_ids: dict[tuple[str, str], Document]`）。commit の中身と行の定義で決まり古くならないので `clear` では空にしない。(`repo_root`, 配信元の ID) ごとに `REVISION_LOAD_KEEP` 件まで持つ。辞書の読み書きは `_lock` の中でする'
+      - name: _sqlite_rows
+        title: SQLite の表の行のキャッシュ
+        type: dict[str, SqliteRowCache]
+        access: 内部 (_)
+        description: 配信元の ID → `SqliteRowCache`。ワークツリー・リビジョンごとに分けない
     methods:
       - name: load
         title: 文書を集める
@@ -399,6 +404,18 @@ classes:
             condition: commit x を `load` した後、同じ読む場所を `files` に `rules/a.yaml` だけを渡して `load` し、もう一度 `files` を渡さずに `load` する
             mock: なし（`tmp_path` に `git init`）
             expected: 2 回目は 1 回目と別の `LoadResult` で、3 回目は 1 回目と同じ `LoadResult`（`files` を渡した読み込みは保持した結果を返却も置き換えもしない）
+          - name: test_load_when_sqlite_rows
+            case: 正常
+            summary: SQLite の表を指す行の文書を、ワークツリーとリビジョンによらずクローン本体のファイルから加える
+            condition: YAML の行 1 つと `sqlite` の行 1 つ。クローン本体に `data/notes.db`。クローン本体・ワークツリー・過去の commit の 3 つの読む場所で呼ぶ
+            mock: なし（一時フォルダの git リポジトリ）
+            expected: 3 回とも YAML の文書と `n1`・`n2` を返し、`n1` の `path` が `data/notes.db`。3 回とも `problems` が空
+          - name: test_load_when_sqlite_unopenable
+            case: 正常
+            summary: 開けない SQLite の行は文書を持たず、ほかの行は返す
+            condition: '`sqlite.file` が無い行と YAML の行'
+            mock: なし
+            expected: YAML の文書を返し、`problems` に `path` が `sqlite.file`・`reason` が `unreadable`・`detail` に行の id と開けない理由の 1 件がある
       - name: get
         title: ID で引く
         summary: ID の並びの順に文書を返す
@@ -840,9 +857,10 @@ functions:
       6. 有効な行ごとに、行が文書にするファイルを求め、ファイルごとに行の ID を `documents[]` の順で重なりなく集める。`records` を持たない行は、手順 1 のパスを渡したファイルの収集（`collect_files(source.root, table, files=files)`）で集めたファイル（YAML として読めず文書にならないファイルも含む）。`records`・`body_file` の行は、手順 1 の `documents` と `duplicates` のその行の文書の `body_path`。`body_file` の無い `records` の行は数えない。2 つ以上の行の ID を持つファイルを、パスの昇順に `{ファイル}: {行の id}・{行の id}` で `duplicate_files` に加える
       7. 手順 1 の `duplicates` を `path` の昇順（同じパスは `duplicates` の順）に並べ、除外した文書ごとに手順 1 の `documents` から同じ ID の先の文書を参照する。文書のファイルは `body_path` があれば `body_path`、無ければ `path` とする。2 つの文書の `kind` が違い、ファイルが同じで、そのファイルを手順 6 で `duplicate_files` に数えたときは飛ばし、それ以外は `{文書の id}: {先の文書の kind}（{先の文書のファイル}）・{除外した文書の kind}（{除外した文書のファイル}）` で `duplicate_ids` に加える
       8. 手順 1 の文書でエイリアスの集めをし、`violations` を `alias_violations` にする
-      9. `SyncReport` を返す
+      9. `sqlite` を持つ有効な行ごとに、`source.root`・行・行の番号で表と列の確認（`inspect_table`）を呼び、違反と警告を `{行の id}: {理由}` で `sqlite_warnings` に加える
+      10. `SyncReport` を返す
 
-      手順 1〜8 は全て、文書のストアの裏の処理の関所（`store.gate`）の裏の処理の 1 件の中で行う。手順 1 の `walk_files` はファイル 1 件ごと、手順 2・5 は文書 1 件ごと、手順 3 は管理用の YAML 1 件ごとに裏の処理の繰り返し（`gate.each`）で回し、`ignored_paths`・手順 6・7・8 はそれぞれ 1 件（`gate.unit`）にする。関所は入れ子では一番外の 1 件だけが休むため、手順 1〜8 の全体を 1 つの 1 件で包まない。裏の処理のスレッドでなければ関所は何もしない
+      手順 1〜9 は全て、文書のストアの裏の処理の関所（`store.gate`）の裏の処理の 1 件の中で行う。手順 1 の `walk_files` はファイル 1 件ごと、手順 2・5 は文書 1 件ごと、手順 3 は管理用の YAML 1 件ごとに裏の処理の繰り返し（`gate.each`）で回し、`ignored_paths`・手順 6・7・8 はそれぞれ 1 件（`gate.unit`）、手順 9 は行 1 つごとに 1 件にする。関所は入れ子では一番外の 1 件だけが休むため、手順 1〜9 の全体を 1 つの 1 件で包まない。裏の処理のスレッドでなければ関所は何もしない
     unit_tests:
       - name: test_check_sync
         case: 正常
@@ -933,6 +951,12 @@ functions:
         condition: 文書 3 件の配信元を、関所の `foreground` の中で、別のスレッドの `background` の中で検査する。関所の 1 件の中にいない間に文書の重なりを求める処理が呼ばれたかを記録する
         mock: 関所の休み（偽物。呼ばれた回数を数える）、`missing_ref_fields`・`unresolved_related`（呼ばれたときに関所の 1 件の中かを記録してから本物を呼ぶ包み）
         expected: 結果が関所を使わないときと同じで、包みの呼び出しが全て 1 件の中。休みが文書の数より多く呼ばれる
+      - name: test_check_sync_when_sqlite
+        case: 正常
+        summary: SQLite の行の開けないファイルと上限の超過を警告にする
+        condition: '`limit: 1` で 2 行の行 `notes_db` と、ファイルの無い行 `missing_db`'
+        mock: なし（一時フォルダの配信元）
+        expected: '`sqlite_warnings` が 2 件で、`missing_db: ` で始まる開けない理由と、`notes_db: ` で始まる配信しない行の数 1'
   - name: page_path
     title: 文書のページのパス
     kind: 関数
@@ -1029,3 +1053,5 @@ functions:
         mock: なし
         expected: どちらも `None`
 visibility: internal
+notes:
+  SQLite の表の行: '`documents[].sqlite` を持つ行はファイルを集めず、読む場所によらず配信元の `_sqlite_rows` の `rows`（配信元のフォルダはクローン本体）を呼んで文書を加える。リビジョンやワークツリーの結果のキャッシュには SQLite の行の文書を含めず、返すたびに `rows` の結果をつなぐ。`rows` の `warnings` は、1 件ずつ `path` が `sqlite.file`・`reason` が `unreadable`・`detail` が `{行の id}: {警告}` の `LoadProblem` にして `problems` に加える。`schema`・`row_schema` は `sqlite` を持つ行に `columns_schema` の結果を返す'

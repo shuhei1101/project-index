@@ -106,6 +106,30 @@ flows:
     expected:
       - '`SourceNotServedError` を返す'
     test: test_error_when_source_not_served
+  - name: 正常系（SQLite の表の行）
+    summary: '`alias_type` を持つ SQLite の表の行の文書の名前と別名を返却する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: SQLite の行
+        description: '文書の検索の正常系（SQLite の表の行）と同じ `data/notes.db` と行 `notes_db`（`alias_type: term`）'
+    flow: |-
+      <!-- map: {"title": "正常系（SQLite の表の行）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as list_match_words
+
+        C->>T: source: sample
+        T-->>C: n1 の name と別名「実況」、n2 の name
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`words[]` に `n1` の `title` 列の値と `実況` が `id: n1`・`kind: term` である'
+      - '`n2` の `title` 列の値が `id: n2` である'
+    test: test_normal_when_sqlite_rows
 lead: '`alias_type` を持つ行の文書から照合する語と指す文書の ID を返却する `list_match_words` の入出力を定め、`list_match_words` を修正するときに参照する。'
 tags:
   - name: topic:エイリアス
