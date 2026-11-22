@@ -33,6 +33,7 @@ flows:
       - '`metadata.commonKeys` が、文書の一覧（`common_keys=true`）の同じ文書の `commonKeys` と同じ値'
       - '`markdown`・`conversionError`・`body`・`bodyPath` が `null`'
       - '`updatedAt` が文書を最後に変えた commit の日時'
+      - '`itemVersions` が `value` の最上位のキーごとの `value_hash` を持ち、`title` の値が書き込みの照合の `title` の項目のバージョンと一致する'
     test: test_normal
   - name: 正常系（リビジョンを指す）
     summary: '`ref` の文書の値を返す'
@@ -370,6 +371,9 @@ response:
     type: str
     format: date-time
     description: 文書のファイルの更新日時。Git の配信元はそのリビジョンでファイルを最後に変えた commit の日時
+  - name: itemVersions
+    type: dict[str, str]
+    description: '`value` の最上位のキーごとの項目のバージョン。書き込みの API と `write_docs` の `expected_version` の辞書にそのまま指定できる。`value` が `null` のときは空'
 response_example: |-
   ```json
   {"source": "sample", "ref": "main", "path": "design/D-1.yaml",
@@ -419,5 +423,7 @@ constraints:
     decided_by: NFR-1#requirements[負荷の高い間の文書 1 件の取得の所要時間]
   - item: SQLite の表の行
     constraint: '`documents[].sqlite` を持つ行の文書は、`id` で引く。`ref` によらず今の `sqlite.file` の行を返却し、`value` は `columns[]` の列の値、`schema` は `columns[]` から作る JSON Schema（列ごとの `title` に `description`）にする。変換は既定の変換'
+  - item: 項目ごとのバージョン
+    constraint: '`value` の最上位のキーごとに、書き込みの照合（[文書の書き込み](id:IF-6) の `expected_version` の辞書）と同じ `value_hash` の計算で返却する。入れ子の項目のバージョンは返却しない'
 test_file: tests/integration/server/test_get_document.py
 visibility: internal

@@ -149,6 +149,8 @@ constraints:
   - item: 配信元の ID が変わる変更
     constraint: '`id` を省いた行の `config` を、配信元の設定の `name` がパスの `id` と違う設定へ変える要求は 422 で断る'
     notes: 差し替えるときは、端末の設定の配信元の 1 行の削除と追加を呼ぶ。再読み込みの範囲を 1 つの配信元に保ち、ID の重なりを起こさない
+  - item: 衝突したときのスクリプト
+    constraint: 送信した行に `direct_commit.on_conflict` があれば、`source.direct_commit.on_conflict` を送信できないキーとして 422 で断り、ファイルを書き換えない。書き換えるときは、行の `direct_commit.on_conflict` をそのまま残す
 flows:
   - name: 正常系
     summary: 指した行の送信したキーだけを変更し、その配信元だけを再読み込みする

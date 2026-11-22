@@ -328,5 +328,7 @@ constraints:
     constraint: '排他ロックを取った後に `settings.yaml` の内容のバージョンと照合し、同じ id の行の確認より前に断る。フローの `expectedVersion` は、直前に `GET /settings/sources` で取得した `version`'
   - item: 再読み込みの範囲
     constraint: 追加した行の配信元だけを読み込み、ほかの配信元は再読み込みしない
+  - item: 衝突したときのスクリプト
+    constraint: 送信した行に `direct_commit.on_conflict` があれば、`source.direct_commit.on_conflict` を送信できないキーとして 422 で断り、ファイルを書き換えない
 test_file: tests/integration/server/test_add_settings_source.py
 visibility: internal
