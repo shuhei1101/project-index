@@ -1117,6 +1117,19 @@ def _nested_dirs(start: str, index_dirs: Collection[str]) -> list[str]:
     return [folder for folder in index_dirs if folder.startswith(f"{start}/")]
 
 
+def _sqlite_sync_warnings(store: DocumentStore, source: ServedSource) -> list[str]:
+    """SQLite の表の行ごとに表と列を確かめ、違反と警告を `{行の id}: {理由}` の文にする。"""
+    warnings: list[str] = []
+    for index, table in enumerate(source.config.documents):
+        if not table.enabled or table.sqlite is None:
+            continue
+        # 行 1 つの確かめを裏の処理の 1 件にする
+        with store.gate.unit():
+            violations, warned = inspect_table(sqlite_root(source), table, index)
+        warnings.extend(f"{table.id}: {item.rule}" for item in [*violations, *warned])
+    return warnings
+
+
 def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
     """配信元の文書を読み、`metadata` の列の欠け・管理用の YAML のずれ・当たらない関連・同じファイルの重なり・文書の ID の重なり・エイリアスのキーの違反を求める。"""
     # 裏の処理のスレッドでは、手順ごと・要素ごとに裏の処理の 1 件にする（全体を 1 つの 1 件で包まない）
@@ -1158,14 +1171,7 @@ def check_sync(store: DocumentStore, source: ServedSource) -> SyncReport:
         duplicate_ids = _duplicate_ids(result, shared)
     with gate.unit():
         alias_violations = collect_aliases(source, result.documents).violations
-    # SQLite の表の行: 行 1 つごとに表と列を確かめ、違反と警告を 1 件ずつの文にする
-    sqlite_warnings: list[str] = []
-    for index, table in enumerate(source.config.documents):
-        if not table.enabled or table.sqlite is None:
-            continue
-        with gate.unit():
-            violations, warnings = inspect_table(sqlite_root(source), table, index)
-        sqlite_warnings.extend(f"{table.id}: {item.rule}" for item in [*violations, *warnings])
+    sqlite_warnings = _sqlite_sync_warnings(store, source)
     return SyncReport(
         source_id=source.id,
         missing_refs=missing_refs,
