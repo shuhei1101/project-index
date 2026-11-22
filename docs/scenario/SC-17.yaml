@@ -15,7 +15,7 @@ preconditions:
 - 直コミットの設定のコミットするブランチを指すワークツリーが、配信元の `worktrees` に該当する
 - 端末の設定で、その配信元への作業場所を持たない要求の直コミットを許可している
 - 索引のサーバーを動かしている利用者の Git の認証で、リモートへプッシュできる
-success_guarantee: 1 回の要求の全ての操作が直コミットを許可した種類の文書で、検査に合格した内容のとき、書き込みと削除が 1 つのコミットになり、コミットするブランチのリモートに入る。応答に操作ごとの文書のバージョンとコミットの SHA・ブランチが返る。コミットに入るのは、その要求が書き込んだ・消したファイルと生成物だけ。
+success_guarantee: 1 回の要求で書き換わる全ての文書（操作に伴って書き換わる参照元を含む）が直コミットを許可した種類で、検査に合格した内容のとき、書き込みと削除が 1 つのコミットになり、コミットするブランチのリモートに入る。応答に操作ごとの文書のバージョンとコミットの SHA・ブランチが返る。コミットに入るのは、その要求が書き込んだ・消したファイルと生成物だけ。
 minimal_guarantee: 1 つでも操作が断られた要求は、どの文書も書き込まず、リモートを変えず、ワークツリーにこの要求が書き込んだ変更を残さない。ワークツリーにあった未プッシュのコミットと未コミットの変更は消さない。断ったときは、断った操作の位置と理由を返却する。
 frequency: 利用者が画面で溜めた修正を登録するたび
 priority: 高
@@ -53,6 +53,7 @@ scenarios:
       PI->>WT: origin/develop を早送りで取り込む
       PI->>PI: HEAD が origin/develop と同じで、書き込むファイルと生成物に未コミットの変更が無いことを確認する
       PI->>PI: 全ての操作をスキーマと validators に通し、バージョンの一致と秘密の値が無いことを確認する
+      PI->>PI: 操作で書き換わる全ての文書（参照元を含む）の種類が直コミットの許可に該当することを確認する
       PI->>WT: 文書 1 を書き換え、文書 2 のファイルを消し、generators を実行する
       PI->>WT: 書き換えた・消したファイルと生成物だけを 1 つのコミットにする
       PI->>R: develop をプッシュする
@@ -284,6 +285,42 @@ scenarios:
   - 応答が失敗で、別のオリジンからの要求を受けないことを返却する
   - sample のリモートと全てのワークツリーは変わらない
   test: test_error_when_cross_origin
+- name: 異常シナリオ（許可していない種類の文書が書き換わる）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが書き込みの API を HTTP で呼ぶ）
+  - name: サンプルの配信元
+    description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+    notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+  - name: sample のリモート
+    description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+    notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+  - name: 直コミットの設定
+    description: sample の種類 `note` の直コミットを許可し、コミットするブランチを `develop` にする。端末の設定で、作業場所を持たない要求の直コミットを sample の種類 `note` で許可する
+  - name: 書き換える文書と消す文書
+    description: sample の `develop` にコミット済みの種類 `note` の文書 1 と文書 2
+    notes: テストのコードは、読み取り API で develop のリビジョンの文書 1・文書 2 のバージョンを取得しておく
+  - name: 参照する種類 rule の文書
+    description: 種類 `rule` の文書 r1 の `related` が、種類 `note` の文書 2 を指す
+    notes: 文書 2 の削除は `related` の参照を除外する指定で送信し、参照元の文書 r1 が書き換わる
+  flow: |-
+    <!-- map: {"title": "異常シナリオ（許可していない種類の文書が書き換わる）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（書き込みの API）
+
+      DD->>PI: 文書 1 の部分更新と、参照を除外する文書 2 の削除を 1 回で送信する
+      PI->>PI: 文書 2 の削除で参照元の文書 r1（種類 rule）が書き換わる
+      PI-->>DD: 書き換わる文書 r1 と、その種類が直コミットを許可していないことを返却して断る
+    ```
+
+    <!-- /map -->
+  expected:
+  - 応答が失敗で、文書 2 の削除の操作の位置と、書き換わる文書 r1 の種類 `rule` が直コミットを許可した種類に該当しないことを返却する
+  - 文書 1 も書き換わらず、sample のリモートと全てのワークツリーは変わらない
+  test: test_error_when_disallowed_kind_rewritten
 refs:
 - to: SC-1
   item: scenarios[正常シナリオ]
