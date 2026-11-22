@@ -43,15 +43,15 @@ classes:
   - name: SqliteRowCache
     title: SQLite の表の行のキャッシュ
     container: project_index/features/documents/sqlite_rows.py
-    summary: 行（`documents[]` の id）ごとに読んだ行を持ち、署名が変わったときだけ読み直す
+    summary: 行の定義ごとに読んだ行を持ち、署名か行の定義が変わったときだけ読み直す
     description: 配信元ごとに 1 つ持つ。`_lock`（`threading.Lock`）で行ごとの読み直しを 1 つずつ進める。
     kind: クラス
     properties:
       - name: _entries
         title: 読んだ行
-        type: dict[str, SqliteRows]
+        type: dict[tuple[str, str], SqliteRows]
         access: 内部 (_)
-        description: 行の id → 読んだ結果
+        description: （行の id、行の定義のハッシュ）→ 読んだ結果。行の定義のハッシュは `sqlite`・`metadata`・`alias_type` と行の id を JSON にした文字列のハッシュで、過去の `ref` の定義と今の定義の結果を別々に持つ
       - name: _lock
         title: 排他
         type: threading.Lock
@@ -88,8 +88,9 @@ classes:
           description: その行の文書・配信しなかった行の数・警告
         process: |-
           1. `file_signature` で今の署名を取る（ファイルが無ければ `None`）
-          2. `_lock` を取り、`_entries` の署名が今の署名と等しく `None` でなければその結果を返す
-          3. 等しくなければ `read_rows` で読み直し、`_entries` を置き換えて返す
+          2. `table` の `sqlite`・`metadata`・`alias_type` と id から行の定義のハッシュを求める
+          3. `_lock` を取り、（id、ハッシュ）の `_entries` の署名が今の署名と等しく `None` でなければその結果を返す
+          4. 等しくなければ `read_rows` で読み直し、そのキーの `_entries` を置き換えて返す
         unit_tests:
           - name: test_rows_reuse_when_unchanged
             case: 正常
@@ -109,6 +110,12 @@ classes:
             condition: ファイルを配置しないまま呼び、配置してからもう一度呼ぶ
             mock: なし
             expected: 1 回目は `documents` が空で `warnings` に開けない理由、2 回目は行の文書
+          - name: test_rows_reload_when_definition_changed
+            case: 正常
+            summary: 署名が同じでも行の定義が違えば読み直す
+            condition: ファイルを変えずに、`where` だけが違う 2 つの `table` を交互に 2 回ずつ渡す
+            mock: '`read_rows` を呼び出しの回数を数える関数に差し替える'
+            expected: '`read_rows` の呼び出しが 2 回で、それぞれの `table` に `where` に合った `documents` を返す'
 functions:
   - name: file_signature
     title: ファイルの署名の取得
