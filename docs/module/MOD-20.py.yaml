@@ -193,6 +193,12 @@ functions:
         mock: なし（一時フォルダで `git init`）
         expected: '`refs.branches` に `develop`・`feat/x`、`refs.tags` に `v0.1.0`、`worktrees[0].branch` が `feat/x`'
         exception: '-'
+      - name: test_describe_when_sqlite_kind
+        case: 正常
+        summary: SQLite の行の種類はスキーマの代わりに列の説明を返し、開けない行と上限の超過を警告する
+        condition: '`limit: 1` で 2 行の行 `notes_db` と、ファイルの無い行 `missing_db`。`kind: notes_db` と引数なしで呼ぶ'
+        mock: なし
+        expected: '`kind` を渡した呼び出しが `columns` と書き込めない旨を返し、引数なしの `warnings` に `missing_db` の開けない理由と `notes_db` の 1 行'
 refs:
   - to: IF-1
     type: requires

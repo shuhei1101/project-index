@@ -249,6 +249,12 @@ functions:
         mock: なし
         expected: 4 件。a2 と a4 だけ `excluded` が `True`
         exception: '-'
+      - name: test_list_changes_when_sqlite_kind
+        case: 正常
+        summary: SQLite の行の種類を比べる対象から除く
+        condition: 区間の間に YAML の文書 1 と `data/notes.db` の `n1` を書き換える。`filter` なしと `kind` が `notes_db` の 2 通り
+        mock: なし
+        expected: '`filter` なしは文書 1 だけ。`kind` が `notes_db` は `items` が空で `notes` に対象外である旨'
 refs:
   - to: IF-4
     type: requires

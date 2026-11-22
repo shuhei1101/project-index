@@ -568,6 +568,24 @@ functions:
         exception: 本文のファイルが配信元の文書でないファイルを指す
         expected: どれも `ValidationFailedError` で違反の `path` が `path`。決まりに、配信元の設定であること・`generators[generate]`・行の ID `drafts` と除外したファイルであること・`documents[notes].schema` を含み、`paths_base` の配信元でも配信元の設定・スクリプトとして断る。どのファイルも変わらない
         mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+      - name: test_write_docs_when_sqlite_kind
+        case: 異常
+        summary: SQLite の行の種類への操作を、適用する前に ReadOnlyKindError で断る
+        condition: '文書 1 の update・`n1` の update・`kind: notes_db` の create の 3 件。`atomic` を省く'
+        mock: なし
+        expected: '`ReadOnlyKindError` の `positions` が `operations[1]`・`operations[2]` で、文書 1 のファイルが変わらない'
+      - name: test_write_docs_when_sqlite_kind_not_atomic
+        case: 正常
+        summary: 'atomic: false では通る操作だけを書き込む'
+        condition: '同じ 3 件を `atomic: false` で渡す'
+        mock: なし
+        expected: '`applied: true` で `results[0].status` が `updated`、`results[1]`・`results[2]` が `failed` と `ReadOnlyKindError` の理由'
+      - name: test_write_docs_when_replace_text_matches_sqlite
+        case: 正常
+        summary: replace_text は SQLite の行の文書を置換の対象にしない
+        condition: '`filter` が YAML の文書と `n1` の両方に該当する `replace_text`'
+        mock: なし
+        expected: YAML の文書だけを置換し、`data/notes.db` が変わらない
   - name: delete_docs
     title: 文書の削除
     kind: 関数
@@ -755,6 +773,12 @@ functions:
         mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
         expected: 文書 1・文書 2 が `failed`、文書 3 が `deleted` で、文書 1・文書 2 のファイルが残り、文書 3 のファイルが無い
         exception: '-'
+      - name: test_delete_docs_when_sqlite_kind
+        case: 異常
+        summary: SQLite の行の文書の削除を ReadOnlyKindError で断る
+        condition: '`targets` が文書 1 と `n1`'
+        mock: なし
+        expected: '`ReadOnlyKindError` の `positions` が `targets[1]` で、文書 1 のファイルが残る'
   - name: commit_documents
     title: 書き込みと削除の直コミット
     kind: 関数
@@ -866,6 +890,12 @@ functions:
         condition: '正常と同じ要求に `dry_run: True`'
         mock: なし（一時フォルダの git）
         expected: '`applied` が `False`、`commit` が `None`、リモートとワークツリーは変わらない'
+      - name: test_commit_documents_when_sqlite_kind
+        case: 異常
+        summary: 直コミットを許可していても SQLite の行の文書を断る
+        condition: '`direct_commit.kinds[]` と `write_api_kinds` に `notes_db` があり、`writes` に `n1` の部分更新'
+        mock: git の取得とプッシュを差し替える
+        expected: '`ReadOnlyKindError` で、取得とプッシュを呼ばない'
 refs:
   - to: IF-6
     type: requires

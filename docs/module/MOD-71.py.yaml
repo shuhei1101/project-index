@@ -78,9 +78,9 @@ data_models:
         description: '`False` で配信も検索もしない'
       - name: schema_path
         title: スキーマ
-        type: str | SchemaRef
+        type: str | SchemaRef | None
         access: 公開
-        description: '`schema` の値（pydantic の属性と重なるので `alias="schema"`）。全ての行で必須。文字列は設定ファイルのフォルダからの相対パス、`SchemaRef` はほかの配信元のリビジョンのスキーマ'
+        description: '`schema` の値（pydantic の属性と重なるので `alias="schema"`）。`sqlite` を持たない行で必須、`sqlite` を持つ行は `None`。文字列は設定ファイルのフォルダからの相対パス、`SchemaRef` はほかの配信元のリビジョンのスキーマ'
       - name: validators
         title: 検査
         type: list[str]
@@ -153,6 +153,11 @@ data_models:
         access: 公開
         default: None
         description: '`search_docs` の `filter` と同じ構造の条件の木（読み込んだ辞書のまま）。該当する文書を `search_docs`・`list_changes`・`trace_related` の既定の結果から除く。解釈と照合は検索の filters.py の `exclusion_of`・`is_excluded` が受け持つ'
+      - name: sqlite
+        title: SQLite の表
+        type: SqliteTable | None
+        access: 公開
+        description: '`documents[].sqlite` の値。持つ行は `paths` が空で、`is_writable` は常に偽'
     methods:
       - name: excludes
         title: 除外の名前に当たるか
@@ -673,6 +678,71 @@ data_models:
         type: list[str]
         access: 公開
         description: '`documents[].id` の並び（1 つ以上）'
+  - name: SqliteColumn
+    title: SQLite の列の説明
+    container: project_index/features/sources/types.py
+    usecase: 共通
+    role: DTO
+    summary: '`documents[].sqlite.columns[]` の 1 要素'
+    description: '`pydantic.BaseModel`（`frozen=True`）。'
+    properties:
+      - name: name
+        title: 列名
+        type: str
+        access: 公開
+        description: 表かビューの列の名前
+      - name: type
+        title: 列の型
+        type: Literal["text", "integer", "real", "json"]
+        access: 公開
+        default: '"text"'
+        description: '`json` は JSON の文字列を配列・オブジェクトにして持つ'
+      - name: description
+        title: 列の説明文
+        type: str
+        access: 公開
+        description: '`describe(source, kind)` が返す列の意味'
+  - name: SqliteTable
+    title: SQLite の表の指定
+    container: project_index/features/sources/types.py
+    usecase: 共通
+    role: DTO
+    summary: '`documents[].sqlite` の値'
+    description: '`pydantic.BaseModel`（`frozen=True`）。キーの意味と既定は設定の設計書 CFG-1 の `documents[].sqlite`。'
+    properties:
+      - name: file
+        title: SQLite のファイル
+        type: str
+        access: 公開
+        description: 配信元のフォルダからの相対パス
+      - name: table
+        title: 表かビュー
+        type: str
+        access: 公開
+        description: 表か SQL のビューの名前
+      - name: where
+        title: 配信する行の条件
+        type: str | None
+        access: 公開
+        default: None
+        description: SQL の `WHERE` 句の条件
+      - name: order_by
+        title: 行の並び
+        type: str | None
+        access: 公開
+        default: None
+        description: SQL の `ORDER BY` 句。`None` は `id` に対応する列の昇順
+      - name: limit
+        title: 読み込む行の上限
+        type: int
+        access: 公開
+        default: '1000'
+        description: 1 以上。既定は非機能要件 NFR-21
+      - name: columns
+        title: 列の説明
+        type: list[SqliteColumn]
+        access: 公開
+        description: 配信する列の並び。1 つ以上
 enums:
   - name: SourceStatusKind
     title: 配信元の状態の種類

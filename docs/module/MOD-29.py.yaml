@@ -169,6 +169,11 @@ classes:
         type: dict[tuple[Path, str], OrderedDict[tuple[str, tuple[str, ...]], _RevisionLoad]]
         access: 内部 (_)
         description: '(`repo_root`, 配信元の ID) → 使用した順の (解いた commit, 読んだ文書の行の定義のハッシュの並び) → 読み込みの結果。`_RevisionLoad` はこのファイルの中の `@dataclass(slots=True, frozen=True)`（`result: LoadResult`・`pages: dict[str, Document]`・`files: dict[str, Document]`・`file_ids: dict[tuple[str, str], Document]`）。commit の中身と行の定義で決まり古くならないので `clear` では空にしない。(`repo_root`, 配信元の ID) ごとに `REVISION_LOAD_KEEP` 件まで持つ。辞書の読み書きは `_lock` の中でする'
+      - name: _sqlite_rows
+        title: SQLite の表の行のキャッシュ
+        type: dict[str, SqliteRowCache]
+        access: 内部 (_)
+        description: 配信元の ID → `SqliteRowCache`。ワークツリー・リビジョンごとに分けない
     methods:
       - name: load
         title: 文書を集める
@@ -399,6 +404,18 @@ classes:
             condition: commit x を `load` した後、同じ読む場所を `files` に `rules/a.yaml` だけを渡して `load` し、もう一度 `files` を渡さずに `load` する
             mock: なし（`tmp_path` に `git init`）
             expected: 2 回目は 1 回目と別の `LoadResult` で、3 回目は 1 回目と同じ `LoadResult`（`files` を渡した読み込みは保持した結果を返却も置き換えもしない）
+          - name: test_load_when_sqlite_rows
+            case: 正常
+            summary: SQLite の表を指す行の文書を、ワークツリーとリビジョンによらずクローン本体のファイルから加える
+            condition: YAML の行 1 つと `sqlite` の行 1 つ。クローン本体に `data/notes.db`。クローン本体・ワークツリー・過去の commit の 3 つの読む場所で呼ぶ
+            mock: なし（一時フォルダの git リポジトリ）
+            expected: 3 回とも YAML の文書と `n1`・`n2` を返し、`n1` の `path` が `data/notes.db`。過去の commit の結果は SQLite の行が今の内容である旨を `problems` でなく `notes` に持つ
+          - name: test_load_when_sqlite_unopenable
+            case: 正常
+            summary: 開けない SQLite の行は文書を持たず、ほかの行は返す
+            condition: '`sqlite.file` が無い行と YAML の行'
+            mock: なし
+            expected: YAML の文書を返し、結果の警告に SQLite の行の id・ファイルのパス・理由がある
       - name: get
         title: ID で引く
         summary: ID の並びの順に文書を返す
@@ -1029,3 +1046,5 @@ functions:
         mock: なし
         expected: どちらも `None`
 visibility: internal
+notes:
+  SQLite の表の行: '`documents[].sqlite` を持つ行はファイルを集めず、読む場所によらず配信元の `_sqlite_rows` の `rows`（配信元のフォルダはクローン本体）を呼んで文書を加える。リビジョンやワークツリーの結果のキャッシュには SQLite の行の文書を含めず、返すたびに `rows` の結果をつなぐ。`schema`・`row_schema` は `sqlite` を持つ行に `columns_schema` の結果を返す'

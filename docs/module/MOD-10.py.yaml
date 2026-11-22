@@ -233,6 +233,12 @@ functions:
         condition: '`config` に `direct_commit: {branch: develop, kinds: [note, meme]}`（`meme` は `documents[]` に無い。`develop` のワークツリーが無い）'
         mock: なし
         expected: '`violations` に `direct_commit.kinds[1]`、`warnings` に `direct_commit.branch`'
+      - name: test_check_project_when_sqlite
+        case: 異常
+        summary: SQLite の行のファイル・表・列の欠けを違反にし、上限の超過を警告にする
+        condition: '無い表・無い列・無いファイルを指す行と `limit: 1` の行。ワークツリーのパスを渡し、`data/notes.db` はクローン本体だけにある'
+        mock: なし
+        expected: '`violations` に 3 つの行の違反、`warnings` に配信しない行の数 1。クローン本体のファイルを確認している'
     callees:
       - '#functions[_load_candidate]'
       - '#functions[version_state]'

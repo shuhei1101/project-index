@@ -278,6 +278,12 @@ functions:
         mock: なし
         expected: '`DocumentNotFoundError`'
         exception: 文書が無い
+      - name: test_get_document_when_sqlite_row
+        case: 正常
+        summary: SQLite の行の文書の schema を列の説明から作る
+        condition: '`doc_id` に `n1` を渡す'
+        mock: なし
+        expected: '`value` が列の値、`schema` が `columns_schema` の結果'
   - name: list_decisions
     title: 検討事項の ID の一覧
     kind: 関数
