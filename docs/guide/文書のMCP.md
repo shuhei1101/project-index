@@ -144,6 +144,24 @@ rule-inject は、この `path` と `scope` で文書を既読にします。
 ファイルの更新日時か大きさが変わった文書は、次の呼び出しで再読み込みします。
 `write_docs`・`delete_docs` の `expected_version` に、読んだときの `version` を渡します。
 
+### SQLite の表の行の文書
+
+`documents[].sqlite` の行の文書は、SQLite の表かビューの 1 行です（[配信元を配信する](./配信元を配信する.md#sqlite-の表を配信する)）。
+
+<!-- table: {"kind": "data"} -->
+
+| ツール | 扱い |
+| --- | --- |
+| `search_docs` | タグ・種類・本文の条件と `term` の対象にする。本文は `columns[]` の列の YAML。`ref` を指定すると、今のファイルの行を返し、`notes` にその旨を付ける |
+| `describe` | `describe(source, kind)` が種類のスキーマの代わりに `columns[]` の説明を返す。開けない行と `limit` を超えた行は警告にする |
+| `list_match_words` | `alias_type` を持つ行の `name` と別名を返す |
+| `write_docs`・`delete_docs` | この行の種類への操作を `ReadOnlyKindError` で断る。`atomic: false` は断った操作を `failed` にして、通る操作だけを書き込む。`replace_text` は対象から除く |
+| `list_changes` | 履歴を持たないため比べる対象にしない |
+
+<!-- /table -->
+
+SQLite のファイルは `worktree`・`cwd` によらず配信元のフォルダ（Git の配信元はクローン本体）のものを開き、ファイルと WAL のファイルの更新日時か大きさが変わった次の呼び出しで読み込み直します。
+
 ## search_docs
 
 条件に当たる文書を、指定した項目・量・順で返します。
@@ -591,6 +609,7 @@ Git 管理外の配信元と `storage.type: disk` の配信元では、種類の
 | ValidationFailedError | 変更を当てた後の文書がスキーマか `validators[]` に通らない、または種類のスキーマの `$ref` を解決できない（`atomic: true`） | 違反ごとの添字・パス・決まり・直し方。スキーマの違反には、違反した項目のスキーマの `title`・`description`・`x-rules`・`examples`・`x-bad-examples` のうちスキーマが持つもの |
 | DocumentReferencedError | `on_referenced: fail` で、消す文書が他の文書の `related` から参照されている | 参照元の ID と `on_referenced: unlink` |
 | DeleteNotAllowedError | Git 管理外の配信元か `storage.type: disk` の配信元で、種類の `documents[].writable` が削除を許していない | 種類の ID と `documents[].writable` のパス |
+| ReadOnlyKindError | 操作か削除の対象が `documents[].sqlite` の行の種類の文書（直コミットを許可していても断る） | 種類の ID・該当する操作か対象の位置・書き込みはデータを持つアプリで行う旨 |
 | LastReadNotFoundError | `list_changes` の `from` を省いたが、この会話で本文を読んだ記録が無い | `from` を渡すこと |
 | WriteDeadlineExceededError | `write_docs`・`delete_docs` で、ファイルを書き換える前に端末の設定の `write_deadline_sec` を過ぎた | 書き込みの期限・経過した秒数・ファイルを書き換えていないことと、検査のスクリプトの所要時間を確かめてから再実行すること |
 | WorktreeLoadingError | `search_docs`・`write_docs`・`delete_docs` が指すワークツリーの初めての読み込みが、端末の設定の `worktree_load_wait_sec` までに終わらない。読み込みは止めずに続ける | ワークツリーのパスと、時間を空けて同じ呼び出しを再実行すること |
