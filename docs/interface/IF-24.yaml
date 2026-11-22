@@ -408,5 +408,7 @@ constraints:
   - item: リビジョンの読み込み
     constraint: commit を状態のフォルダへ書き出さずに、commit のファイルの一覧（`ls-tree`）と、変わったファイルの blob の内容（`cat-file --batch`）から読み込む。同じ commit の 2 回目は、ファイルと文書の行のパターンの照合の結果を使い回す
     notes: 同じ commit と文書の行の定義の読み込みの結果は、書き出しから読んだか blob から読んだかによらず、文書の取得・語での検索と共有する（文書のストアのリビジョンの読み込みの結果）。種類のスキーマと配信元の設定の取得は今どおり書き出しを読む。書き出しの最中でも、文書の一覧はその終了を待たない
+  - item: SQLite の表の行
+    constraint: '`documents[].sqlite` を持つ行の文書も一覧に含める。`ref` によらず今の `sqlite.file` の行を返却し、`documents[].path` は `sqlite.file` の配信元のフォルダからのパス、`documents[].value` は `columns[]` の列の値にする'
 test_file: tests/integration/server/test_list_documents.py
 visibility: internal

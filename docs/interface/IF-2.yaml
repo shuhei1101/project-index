@@ -1301,6 +1301,108 @@ flows:
         item: scenarios[正常シナリオ（既定の検索から除く条件に該当する文書を除く）]
         type: references
         when: このインターフェースの入出力やフローを変えるときに、シナリオ『エージェントが調べる』の対応する流れと期待値を確認する。
+  - name: 正常系（SQLite の表の行）
+    summary: SQLite の表を指す行の文書を、タグ・本文・用語で引く
+    setup:
+      - name: Mock
+        description: なし
+      - name: SQLite のデータベース
+        description: 'sample のクローン本体の `data/notes.db`（Git で追跡しない）。表 `notes` に `n1`（`tags: ["game"]`・`aliases: ["実況"]`）と `n2`（`tags: ["talk"]`）'
+        notes: '`tags`・`aliases` は JSON の配列の文字列の列'
+      - name: 文書の行
+        description: 'sample の行 `notes_db`（`sqlite: {file: data/notes.db, table: notes, columns: [...]}`・`metadata: {name: title, description: summary}`・`alias_type: term`）'
+        notes: '`tags`・`aliases` の列は `type: json`'
+      - name: ワークツリー
+        description: sample のワークツリー x（`data/notes.db` を持たない）
+    flow: |-
+      <!-- map: {"title": "正常系（SQLite の表の行）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+        participant DB as SQLite のデータベース
+
+        C->>T: filter: tags が game
+        T-->>DB: 読み取り専用で開き、表 notes の行を読む
+        T->>T: 列の対応で共通のメタデータを取り、json の列を配列にする
+        T-->>C: n1 の行
+        C->>T: filter: id が n1, view: full
+        T-->>C: n1 の列の値の本文
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`tags` が `game` の結果が `n1` の 1 件で、`kind` が `notes_db`、`name` が `title` 列、概要文が `summary` 列の値'
+      - '`view: full` の本文が `columns[]` の列だけを持つ YAML で、`path` は `data/notes.db` の絶対パス、`scope` は `full`'
+      - '`term: 実況` が `n1` を返却する'
+      - '`filter` の `body` の `contains` が列の値に該当する'
+      - '`worktree` にワークツリー x を指定しても、クローン本体の `data/notes.db` の `n1` を返却する'
+      - '`data/notes.db` のバイト列は変わらない'
+    test: test_normal_when_sqlite_rows
+  - name: 正常系（SQLite のファイルが変わった）
+    summary: アプリが SQLite の行を書き換えた後の次の取得で、読み込み直した行を返却する
+    setup:
+      - name: Mock
+        description: なし
+      - name: SQLite の行の文書
+        description: 正常系（SQLite の表の行）と同じ `data/notes.db` と行 `notes_db`
+      - name: 読んだ記録
+        description: '同じ `session_id` で `n1` を `view: full` で返却済み'
+      - name: 書き換え
+        description: テストが sqlite3 で `n1` の `title` を書き換え、行 `n3` を追加する
+        notes: WAL で書き込む場合も含める
+    flow: |-
+      <!-- map: {"title": "正常系（SQLite のファイルが変わった）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+        participant DB as SQLite のデータベース
+
+        C->>T: filter: kind が notes_db
+        T-->>DB: ファイルと WAL のファイルの更新日時とサイズを比べる
+        T-->>DB: 変わっているので表の行を読み直す
+        T-->>C: 書き換えた n1 と追加した n3
+      ```
+
+      <!-- /map -->
+    expected:
+      - 結果が書き換えた後の `n1` の `name` と `n3` を含む
+      - '`n1` の `version` が返却済みのものと違い、`view: full` の本文を `（この会話で返却済み）` にしない'
+      - ファイルを書き換えないまま 2 回呼ぶと、2 回目は表を読み直さない（sqlite3 の接続を開かない）
+    test: test_normal_when_sqlite_file_changed
+  - name: 正常系（SQLite の行にリビジョンを指定する）
+    summary: '`ref` に過去のリビジョンを指定しても、SQLite の行は今のファイルの行を返却し、その旨を添える'
+    setup:
+      - name: Mock
+        description: なし
+      - name: SQLite の行の文書
+        description: 正常系（SQLite の表の行）と同じ `data/notes.db` と行 `notes_db`
+      - name: 過去のリビジョン
+        description: sample の `default_ref` の 1 つ前の commit（行 `notes_db` を持つ）
+    flow: |-
+      <!-- map: {"title": "正常系（SQLite の行にリビジョンを指定する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as search_docs
+        participant DB as SQLite のデータベース
+
+        C->>T: ref: 過去の commit, filter: kind が notes_db
+        T->>T: 行の定義はそのリビジョンの配信元の設定から読む
+        T-->>DB: 今のファイルの行を読む
+        T-->>C: n1 と n2 と、SQLite の行は今の内容である旨の notes
+      ```
+
+      <!-- /map -->
+    expected:
+      - 結果が `n1` と `n2` を含む
+      - '`notes` に、種類 `notes_db` の文書は `ref` によらず今の `data/notes.db` の行である旨が付く'
+      - '`ref` を省いた呼び出しでは、この `notes` を付けない'
+    test: test_normal_when_sqlite_rows_with_ref
 lead: '条件に該当する文書の取得・一覧・件数・集計を返却する `search_docs` の入出力を定め、`search_docs` を修正するときに参照する。'
 tags:
   - name: topic:クエリ
@@ -1796,6 +1898,14 @@ constraints:
   - item: 既定の検索から除く文書
     constraint: '`include_excluded: false` のとき、`filter`・`term` に該当した文書のうち、文書の行の `search_exclude` の条件に該当する文書を `items`・`total_count`・`view: count`・`group_by` の件数・`next_cursor` から除き、除いた件数を `excluded_count` にする。条件は `filter` と同じ照合（正規化・`match`・`case_sensitive`）で、文書のメタデータと種類の項目に適用する。`records` の行は要素ごとに適用する'
     notes: '`search_exclude` を持たない行の文書は除かない。複数の配信元を指したときは配信元ごとの設定で除く'
+  - item: SQLite の表の行
+    constraint: '`documents[].sqlite` を持つ行は、配信元のフォルダ（Git の配信元はクローン本体）の `sqlite.file` を読み取り専用（`mode=ro` の URI）で開き、`where`・`order_by`・`limit` で行を読む。`worktree`・`cwd` がワークツリーを指しても同じファイルを開く。本文は `columns[]` の列をその並びで持つ YAML、`version` は行の列の値のハッシュ'
+    notes: ファイルを開けない行は文書を持たず、`notes` に行の id と理由を付ける
+  - item: SQLite の表の読み込みの時機
+    constraint: 呼び出しごとに、`sqlite.file` と `{file}-wal` の更新日時（ナノ秒）とサイズを前回読んだ時点と比べ、変わったときだけ行を読み直す。変わっていなければ読んだ行を使い回す
+  - item: SQLite の行のリビジョン
+    constraint: '`ref` を指定しても、SQLite の行の文書は今の `sqlite.file` の行を返却し、`notes` にその旨を付ける。行の定義（`documents[]`）はそのリビジョンの配信元の設定から読む'
+    notes: SQLite のファイルは Git で追跡しない前提で、過去の行を持たない
 refs:
   - to: SC-6
     item: scenarios[正常シナリオ]

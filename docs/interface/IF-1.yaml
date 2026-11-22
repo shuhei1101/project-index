@@ -512,6 +512,33 @@ flows:
       - '`source: sample` の結果が説明書と種類の表に加えて、`direct_commit.branch` が `develop`、`direct_commit.kinds` が `[note]`'
       - '直コミットの呼べる作業場所でも `scope` でもない作業場所からの `source: sample` は `SourceNotReadableError`'
     test: test_normal_when_direct_commit_workplace
+  - name: 正常系（SQLite の表の行の種類）
+    summary: SQLite の表を指す行の種類で、スキーマの代わりに列の説明を返却し、開けない行と上限を超えた行を警告する
+    setup:
+      - name: Mock
+        description: なし
+      - name: SQLite の行
+        description: 'sample の行 `notes_db`（`data/notes.db` の表 `notes`、`limit: 1`、行は `n1`・`n2` の 2 行）と、置かない `data/missing.db` を指す行 `missing_db`'
+    flow: |-
+      <!-- map: {"title": "正常系（SQLite の表の行の種類）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as describe
+
+        C->>T: source: sample, kind: notes_db
+        T-->>C: 列の説明（name・type・description）と、書き込めない旨
+        C->>T: 引数なし
+        T-->>C: sample と、missing_db を開けない警告と notes_db の 1 行を配信していない警告
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`describe(source: sample, kind: notes_db)` が `schema` の代わりに `columns[]`（`name`・`type`・`description`）を返却し、書き込みと `list_changes` の対象外である旨を添える'
+      - '`describe(source: sample)` の種類の一覧に `notes_db` があり、SQLite の表の行である旨が付く'
+      - 引数なしの `warnings[]` に、`missing_db` の id・ファイルのパス・開けない理由と、`notes_db` の配信しなかった行の数 1 がある
+    test: test_normal_when_sqlite_kind
 lead: '引数の数で配信元の一覧・説明書と種類・種類のスキーマを返却する `describe` の入出力を定め、`describe` を修正するときに参照する。'
 tags:
   - name: topic:配信元
@@ -717,6 +744,8 @@ constraints:
     constraint: '`documents[].schema` でほかの配信元を指す行は、配信元の検査の制約「ほかの配信元のスキーマの参照」のとおりに読む'
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、`refs`・`worktrees` を返さない。`worktree` を指定すると `InvalidArgumentError`'
+  - item: SQLite の表の行の種類
+    constraint: '`documents[].sqlite` を持つ行の種類は、`describe(source, kind)` が `schema` の代わりに `sqlite.columns[]` を返却する。ファイルを開けない行と `limit` を超えた行は、引数なしと `source` を渡した呼び出しの警告にする'
 refs:
   - to: SC-6
     item: scenarios[正常シナリオ]

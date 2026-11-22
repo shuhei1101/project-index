@@ -492,6 +492,33 @@ flows:
       - '`on` に `delete` を持たない `validators[]` は、削除で実行しない'
       - '`atomic: false` で `guard` が文書 1 が削除される前提で文書 2 を合格させ、文書 1 が別の違反で `failed` になるとき、文書 1 を除いた `PROJECT_INDEX_DELETE_IDS` で文書 2 を再検査し、文書 2 も `failed` になってどちらのファイルも残る'
     test: test_error_when_delete_validator_fails
+  - name: 異常系（SQLite の表の行の文書を消す・ReadOnlyKindError）
+    summary: SQLite の表の行の文書を指す削除を断る
+    setup:
+      - name: Mock
+        description: なし
+      - name: SQLite の行の文書
+        description: 文書の検索の正常系（SQLite の表の行）と同じ `data/notes.db` と行 `notes_db` を持つ sample
+        notes: '`targets` は YAML の文書 1 と `n1`'
+    flow: |-
+      <!-- map: {"title": "異常系（SQLite の表の行の文書を消す・ReadOnlyKindError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
+
+        C->>T: targets: 文書 1・n1
+        T->>T: n1 の種類 notes_db が SQLite の表の行
+        T-->>C: isError（該当する対象の位置と、読み取り専用である旨）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、`targets[1]` の位置と、種類 `notes_db` が読み取り専用であることを返却する'
+      - 文書 1 のファイルも `data/notes.db` も変わらない
+      - 'ほかの文書の削除で `on_referenced: unlink` を指定しても、SQLite の行の文書の参照は書き換えない'
+    test: test_error_when_sqlite_kind_deleted
 lead: 文書を物理削除し、`related` からの参照を拒否するか除外する `delete_docs` の入出力を定め、`delete_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -688,6 +715,9 @@ exceptions:
   - name: DirectCommitGeneratorError
     condition: '`write_docs` と同じ。戻すときは削除したファイルを元に戻す'
     notes: 共通の処理のため、結合テストは [文書の書き込み](id:IF-6) が持つ
+  - name: ReadOnlyKindError
+    condition: '`targets` が SQLite の表の行の種類（`documents[].sqlite` を持つ行）の文書を指す'
+    notes: 何も消さない。`fix` で削除はデータを持つアプリのツールで行う旨を示す
 constraints:
   - item: 件数
     constraint: 1 回の `targets` は最大 50 件

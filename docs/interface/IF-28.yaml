@@ -190,5 +190,7 @@ constraints:
     constraint: レスポンスのキーは camelCase。パス・クエリのパラメータ名は変えない
   - item: operationId
     constraint: '`{tag}-{関数名}` の `view-search_page`'
+  - item: SQLite の表の行
+    constraint: '`documents[].sqlite` を持つ行の文書も、`columns[]` の列の値を本文として検索の対象にする。`ref` によらず今の `sqlite.file` の行を引く'
 test_file: tests/integration/server/test_search_page.py
 visibility: internal
