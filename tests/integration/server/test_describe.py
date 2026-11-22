@@ -607,3 +607,50 @@ def test_normal_when_direct_commit_workplace(
     assert "直コミット:" in guide_text.text
     assert refused.is_error
     assert "SourceNotReadableError" in refused.text
+
+
+MISSING_DB_ROW = (
+    "  - id: missing_db\n"
+    "    sqlite:\n"
+    "      file: data/missing.db\n"
+    "      table: notes\n"
+    "      columns: [{name: id, description: ID}]\n"
+)
+
+
+def test_normal_when_sqlite_kind(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """SQLite の表を指す行の種類で、スキーマの代わりに列の説明を返却し、開けない行と上限を超えた行を警告する（正常系）。"""
+    from tests.integration.server.conftest import sqlite_files, write_notes_db
+
+    # 準備
+    sample = make_source("sample", sqlite_files(MISSING_DB_ROW, limit=1))
+    write_notes_db(sample.folder)
+    env = make_server(sample)
+    env.wait_background()
+    cwd = str(sample.folder)
+    # 実行
+    kind = env.call("describe", cwd=cwd, source="sample", kind="notes_db")
+    kind_json = env.call("describe", cwd=cwd, source="sample", kind="notes_db", format="json")
+    guide = env.call("describe", cwd=cwd, source="sample", format="json")
+    listed = env.call("describe", cwd=cwd, format="json")
+    # 検証
+    assert "| id | text | ID |" in kind.text
+    assert "| tags | json | タグ |" in kind.text
+    assert "write_docs・delete_docs と list_changes の対象外" in kind.text
+    assert [column["name"] for column in kind_json.data["columns"]] == [
+        "id",
+        "title",
+        "summary",
+        "tags",
+        "aliases",
+    ]
+    assert {item["id"]: item.get("sqlite", False) for item in guide.data["kinds"]} == {
+        "sample": False,
+        "notes_db": True,
+        "missing_db": True,
+    }
+    warnings = listed.data["warnings"]
+    assert any(w.startswith("sample: missing_db: ") and "data/missing.db" in w for w in warnings)
+    assert any(w.startswith("sample: notes_db: ") and "1 行" in w for w in warnings)

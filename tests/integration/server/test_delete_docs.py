@@ -709,3 +709,35 @@ def test_error_when_delete_validator_fails_retry(
     assert not result.is_error
     assert [item["status"] for item in result.data["results"]] == ["failed", "failed"]
     assert (doc_1.is_file(), doc_2.is_file()) == (True, True)
+
+
+def test_error_when_sqlite_kind_deleted(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+) -> None:
+    """SQLite の表の行の文書を指す削除を断る（異常系）。"""
+    from tests.integration.server.conftest import sqlite_files, write_notes_db
+
+    # 準備
+    source, env, worktree = _setup(make_source, make_server, add_worktree, sqlite_files())
+    db = write_notes_db(source.folder)
+    db_before = db.read_bytes()
+    target = worktree / "docs" / "doc-1.yaml"
+    # 実行
+    result = env.call(
+        "delete_docs",
+        cwd=str(source.folder),
+        worktree=str(worktree),
+        targets=[
+            {"id": "doc-1", "expected_version": _version(target)},
+            {"id": "n1", "expected_version": "000000"},
+        ],
+    )
+    # 検証
+    assert result.is_error is True
+    assert result.text.startswith("ReadOnlyKindError")
+    assert "targets[1]" in result.text
+    assert "notes_db" in result.text
+    assert target.exists()
+    assert db.read_bytes() == db_before

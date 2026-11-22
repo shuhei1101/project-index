@@ -1564,3 +1564,43 @@ def test_normal_when_search_exclude_invalid(
     assert env.client.get("/sources/sample/docs").status_code == 200
     assert env.call("describe", cwd=str(sample.folder)).is_error is False
     assert "broken: documents[0].search_exclude.op:" in caplog.text
+
+
+def test_normal_when_sqlite_file_unopenable(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """SQLite のファイルを開けない行だけを配信せずに警告し、ほかの行は配信する（正常系）。"""
+    from tests.integration.server.conftest import sqlite_files, write_notes_db
+
+    # 準備
+    sample = make_source("sample", sqlite_files())
+    db = sample.folder / "data" / "notes.db"
+    caplog.set_level(logging.WARNING)
+    # 実行
+    env = make_server(sample)
+    env.wait_background()
+    cwd = str(sample.folder)
+    yaml_docs = env.call("search_docs", cwd=cwd, view="ids", format="json")
+    listed = env.call("describe", cwd=cwd, format="json")
+    db_created = db.exists()
+    write_notes_db(sample.folder)
+    rows = env.call(
+        "search_docs",
+        cwd=cwd,
+        filter={"field": "kind", "op": "eq", "values": ["notes_db"]},
+        view="ids",
+        format="json",
+    )
+    # 検証
+    logs = [record.getMessage() for record in caplog.records if "notes_db" in record.getMessage()]
+    assert [item["id"] for item in yaml_docs.data["items"]] == ["doc-1", "doc-2"]
+    assert any(
+        w.startswith("sample: notes_db: ") and "data/notes.db" in w for w in listed.data["warnings"]
+    )
+    assert len(logs) == 1
+    assert "sample" in logs[0]
+    assert "data/notes.db" in logs[0]
+    assert db_created is False
+    assert [item["id"] for item in rows.data["items"]] == ["n1", "n2"]

@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import socket
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -1316,3 +1317,54 @@ def install_hook() -> Callable[..., None]:
         hook.chmod(0o755)
 
     return _install
+
+
+# SQLite の表 `notes` を指す行 `notes_db`（`alias_type: term`）
+NOTES_DB_ROW = (
+    "  - id: notes_db\n"
+    "    sqlite:\n"
+    "      file: data/notes.db\n"
+    "      table: notes\n"
+    "{limit}"
+    "      columns:\n"
+    "        - {{name: id, description: ID}}\n"
+    "        - {{name: title, description: タイトル}}\n"
+    "        - {{name: summary, description: 要約}}\n"
+    "        - {{name: tags, type: json, description: タグ}}\n"
+    "        - {{name: aliases, type: json, description: 別名}}\n"
+    "    metadata: {{name: title, description: summary}}\n"
+    "    alias_type: term\n"
+)
+NOTES_DB_ROWS = [
+    ("n1", "ゲーム実況 1", "今日の目標 1", '["game"]', '["実況"]'),
+    ("n2", "雑談 1", "今日の目標 2", '["talk"]', "[]"),
+]
+
+
+def sqlite_files(extra: str = "", *, limit: int | None = None) -> dict[str, str]:
+    """YAML の種類 `sample`（文書 2 件）と SQLite の表の行 `notes_db` を持つ配信元のファイル一式を返す（`data/` は Git で追跡しない）。"""
+    row = NOTES_DB_ROW.format(limit="" if limit is None else f"      limit: {limit}\n")
+    return sample_files(
+        **{"project-index.yaml": sample_config(row + extra), ".gitignore": "data/\n"}
+    )
+
+
+def write_notes_db(
+    folder: Path,
+    rows: list[tuple[str, str, str, str, str]] | None = None,
+    *,
+    wal: bool = False,
+) -> Path:
+    """配信元のフォルダの `data/notes.db` に表 `notes` を作って行を入れ、そのパスを返す。"""
+    path = folder / "data" / "notes.db"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path)
+    if wal:
+        conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("CREATE TABLE notes (id TEXT, title TEXT, summary TEXT, tags TEXT, aliases TEXT)")
+    conn.executemany(
+        "INSERT INTO notes VALUES (?, ?, ?, ?, ?)", NOTES_DB_ROWS if rows is None else rows
+    )
+    conn.commit()
+    conn.close()
+    return path

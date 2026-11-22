@@ -4,11 +4,17 @@ import logging
 import os
 import re
 import shutil
+import sqlite3
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from tests.integration.server.conftest import DirectCommitSource, SourceSpec
+from tests.integration.server.conftest import (
+    DirectCommitSource,
+    SourceSpec,
+    sqlite_files,
+    write_notes_db,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -1919,3 +1925,124 @@ def test_normal_when_search_excluded(
         ("a2", True),
     ]
     assert grouped.data["groups"] == [{"value": "active", "count": 1}]
+
+
+GAME_TAG = {"field": "tags", "op": "eq", "values": ["game"]}
+N1 = {"field": "id", "op": "eq", "values": ["n1"]}
+NOTES_DB_KIND = {"field": "kind", "op": "eq", "values": ["notes_db"]}
+SQLITE_REF_NOTE = "SQLite の表の行（notes_db）は ref によらず今の内容を返しています"
+
+
+def test_normal_when_sqlite_rows(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+) -> None:
+    """SQLite の表を指す行の文書を、タグ・本文・用語で引く（正常系）。"""
+    # 準備
+    source = make_source("sample", sqlite_files())
+    worktree = add_worktree(source.folder, "x")
+    db = write_notes_db(source.folder)
+    before = db.read_bytes()
+    env = make_server(source)
+    cwd = str(source.folder)
+    # 実行
+    tagged = env.call(
+        "search_docs",
+        cwd=cwd,
+        filter=GAME_TAG,
+        fields=["id", "kind", "name", "description"],
+        format="json",
+    )
+    full = env.call("search_docs", cwd=cwd, filter=N1, view="full")
+    by_term = env.call("search_docs", cwd=cwd, term="実況", format="json")
+    by_body = env.call(
+        "search_docs",
+        cwd=cwd,
+        filter={"field": "body", "op": "contains", "values": ["今日の目標 2"]},
+        format="json",
+    )
+    in_worktree = env.call("search_docs", cwd=cwd, worktree=str(worktree), filter=N1, format="json")
+    # 検証
+    assert [item["id"] for item in tagged.data["items"]] == ["n1"]
+    assert tagged.data["items"][0]["values"]["kind"] == "notes_db"
+    assert tagged.data["items"][0]["values"]["name"] == "ゲーム実況 1"
+    assert tagged.data["items"][0]["values"]["description"] == "今日の目標 1"
+    assert f'<document path="{db}" scope="full">' in full.text
+    assert "title: ゲーム実況 1" in full.text
+    assert [item["id"] for item in by_term.data["items"]] == ["n1"]
+    assert [item["id"] for item in by_body.data["items"]] == ["n2"]
+    assert [item["id"] for item in in_worktree.data["items"]] == ["n1"]
+    assert not (worktree / "data" / "notes.db").exists()
+    assert db.read_bytes() == before
+
+
+def test_normal_when_sqlite_file_changed(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """アプリが SQLite の行を書き換えた後の次の取得で、読み込み直した行を返却する（正常系）。"""
+    from project_index.features.documents import sqlite_rows as sqlite_rows_module
+
+    # 準備
+    source = make_source("sample", sqlite_files())
+    db = write_notes_db(source.folder, wal=True)
+    env = make_server(source)
+    cwd = str(source.folder)
+    first = env.call("search_docs", cwd=cwd, filter=N1, view="full", session_id="s1")
+    # 起動の後の裏の検査が開く接続を数えない
+    env.wait_background()
+    opened: list[object] = []
+    original = sqlite_rows_module._connect  # pyright: ignore[reportPrivateUsage]
+
+    def counting(path: Path) -> object:
+        opened.append(path)
+        return original(path)
+
+    monkeypatch.setattr(sqlite_rows_module, "_connect", counting)
+    unchanged = env.call("search_docs", cwd=cwd, filter=NOTES_DB_KIND, format="json")
+    opened_unchanged = list(opened)
+    writer = sqlite3.connect(db)
+    writer.execute("UPDATE notes SET title = '書き換えた' WHERE id = 'n1'")
+    writer.execute("INSERT INTO notes VALUES ('n3', '追加 1', '今日の目標 3', '[]', '[]')")
+    writer.commit()
+    writer.close()
+    # 実行
+    changed = env.call("search_docs", cwd=cwd, filter=NOTES_DB_KIND, format="json")
+    again = env.call("search_docs", cwd=cwd, filter=N1, view="full", session_id="s1")
+    # 検証
+    assert [item["id"] for item in unchanged.data["items"]] == ["n1", "n2"]
+    assert opened_unchanged == []
+    assert opened == [db]
+    assert [(item["id"], item["values"]["name"]) for item in changed.data["items"]] == [
+        ("n1", "書き換えた"),
+        ("n2", "雑談 1"),
+        ("n3", "追加 1"),
+    ]
+    assert "title: ゲーム実況 1" in first.text
+    assert "title: 書き換えた" in again.text
+    assert "この会話で返却済み" not in again.text
+
+
+def test_normal_when_sqlite_rows_with_ref(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    commit_all: Callable[..., str],
+) -> None:
+    """ref に過去のリビジョンを指定しても、SQLite の行は今のファイルの行を返却し、その旨を添える（正常系）。"""
+    # 準備
+    source = make_source("sample", sqlite_files())
+    previous = commit_all(source.folder, {"docs/doc-3.yaml": "id: doc-3\nname: 文書 3\n"})
+    commit_all(source.folder, {"docs/doc-4.yaml": "id: doc-4\nname: 文書 4\n"})
+    write_notes_db(source.folder)
+    env = make_server(source)
+    cwd = str(source.folder)
+    # 実行
+    with_ref = env.call("search_docs", cwd=cwd, ref=previous, filter=NOTES_DB_KIND, format="json")
+    without_ref = env.call("search_docs", cwd=cwd, filter=NOTES_DB_KIND, format="json")
+    # 検証
+    assert [item["id"] for item in with_ref.data["items"]] == ["n1", "n2"]
+    assert SQLITE_REF_NOTE in with_ref.data["notes"]
+    assert [item["id"] for item in without_ref.data["items"]] == ["n1", "n2"]
+    assert SQLITE_REF_NOTE not in without_ref.data.get("notes", [])

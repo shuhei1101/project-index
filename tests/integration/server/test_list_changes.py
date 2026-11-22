@@ -494,3 +494,40 @@ def test_normal_when_search_excluded(
         ("a3", None),
         ("a4", True),
     ]
+
+
+def test_normal_when_sqlite_rows_excluded(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    commit_all: Callable[..., str],
+    run_git: Callable[..., str],
+) -> None:
+    """履歴を持たない SQLite の表の行の文書を、変わった文書に含めない（正常系）。"""
+    import sqlite3
+
+    from tests.integration.server.conftest import sqlite_files, write_notes_db
+
+    # 準備
+    source = make_source("sample", sqlite_files())
+    db = write_notes_db(source.folder)
+    parent = run_git(source.folder, "rev-parse", "HEAD").strip()
+    env = make_server(source)
+    cwd = str(source.folder)
+    env.call("search_docs", cwd=cwd, view="full", session_id="s1")
+    writer = sqlite3.connect(db)
+    writer.execute("UPDATE notes SET title = '書き換えた' WHERE id = 'n1'")
+    writer.commit()
+    writer.close()
+    changed = commit_all(source.folder, {"docs/doc-1.yaml": "id: doc-1\nname: 新しい名前\n"})
+    notes_db = {"field": "kind", "op": "eq", "values": ["notes_db"]}
+    # 実行
+    by_range = env.call("list_changes", cwd=cwd, format="json", **{"from": parent, "to": changed})
+    by_kind = env.call(
+        "list_changes", cwd=cwd, format="json", filter=notes_db, **{"from": parent, "to": changed}
+    )
+    by_last_read = env.call("list_changes", cwd=cwd, format="json", session_id="s1")
+    # 検証
+    assert [item["id"] for item in by_range.data["items"]] == ["doc-1"]
+    assert by_kind.data.get("items", []) == []
+    assert any("notes_db" in note for note in by_kind.data["notes"])
+    assert "n1" not in [item["id"] for item in by_last_read.data.get("items", [])]

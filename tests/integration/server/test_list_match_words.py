@@ -73,3 +73,22 @@ def test_error_when_source_not_served(
     # 検証
     assert result.is_error
     assert "SourceNotServedError" in result.text
+
+
+def test_normal_when_sqlite_rows(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """alias_type を持つ SQLite の表の行の文書の名前と別名を返却する（正常系）。"""
+    from tests.integration.server.conftest import sqlite_files, write_notes_db
+
+    # 準備
+    sample = make_source("sample", sqlite_files())
+    write_notes_db(sample.folder)
+    env = make_server(sample)
+    # 実行
+    result = env.call("list_match_words", cwd=str(sample.folder), source="sample", format="json")
+    # 検証
+    words = [(item["word"], item["id"], item["kind"]) for item in result.data["words"]]
+    assert ("ゲーム実況 1", "n1", "name") in words
+    assert ("実況", "n1", "alias") in words
+    assert ("雑談 1", "n2", "name") in words
