@@ -10,6 +10,8 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any
 
+from pydantic import TypeAdapter, ValidationError
+
 from project_index.features.search.fields import NO_COLUMNS, as_datetime, field_values
 from project_index.features.search.types import Condition, Group, SearchRequest
 from project_index.shared.errors import Violation
@@ -18,6 +20,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
     from project_index.features.documents.types import Document
+    from project_index.features.sources.types import DocumentTable
 
 COMPARE_OPS = ("gt", "gte", "lt", "lte")
 NO_VALUE_OPS = ("exists", "not_exists")
@@ -138,21 +141,28 @@ def _check_condition(condition: Condition, path: str, fields: Mapping[str, str])
     return violations
 
 
+def _check_tree(node: Condition | Group, path: str, fields: Mapping[str, str]) -> list[Violation]:
+    """条件の木の項目・値と、束のキーの数を確かめる。"""
+    violations: list[Violation] = []
+    for node_path, child in _walk(node, path):
+        if isinstance(child, Condition):
+            violations.extend(_check_condition(child, node_path, fields))
+        elif [child.all_of, child.any_of, child.not_].count(None) != GROUP_EMPTY_KEYS:
+            violations.append(
+                Violation(
+                    path=node_path,
+                    rule="and・or・not のどれか 1 つだけを持ってください",
+                    fix="条件を and・or・not の中に並べてください",
+                )
+            )
+    return violations
+
+
 def check_filter(request: SearchRequest, fields: Mapping[str, str]) -> list[Violation]:
     """条件・並べ替え・集計の項目と値が使えるかを確かめる。"""
     violations: list[Violation] = []
     if request.filter is not None:
-        for path, node in _walk(request.filter, "filter"):
-            if isinstance(node, Condition):
-                violations.extend(_check_condition(node, path, fields))
-            elif [node.all_of, node.any_of, node.not_].count(None) != GROUP_EMPTY_KEYS:
-                violations.append(
-                    Violation(
-                        path=path,
-                        rule="and・or・not のどれか 1 つだけを持ってください",
-                        fix="条件を and・or・not の中に並べてください",
-                    )
-                )
+        violations.extend(_check_tree(request.filter, "filter", fields))
     for index, key in enumerate(request.order_by or []):
         if key.field not in fields:
             violations.append(_unknown_field(f"order_by[{index}].field", key.field, fields))
@@ -332,3 +342,70 @@ def match_words(document: Document, words: Sequence[str]) -> bool:
         normalize(_text(value)) for value in [*field_values(document, "*"), document.id]
     )
     return all(word in haystack for word in words)
+
+
+# 条件の木の型（`and`・`or`・`not` のどれかを持てば束、それ以外は条件 1 つ）
+_GROUP_KEYS = ("and", "or", "not")
+# 既定の検索から除く条件に使えない項目（本文・全項目）。`@` で始まる計算項目も使えない
+_UNEXCLUDABLE_FIELDS = ("body", "*")
+
+
+def _parse_tree(value: object) -> Condition | Group:
+    """設定の値を条件の木の型として読む（読めなければ `ValidationError` を送る）。"""
+    if isinstance(value, dict) and any(key in value for key in _GROUP_KEYS):
+        return TypeAdapter(Group).validate_python(value)
+    return TypeAdapter(Condition).validate_python(value)
+
+
+def check_exclusion(value: object, path: str, *, fields: Mapping[str, str]) -> list[Violation]:
+    """配信元の設定の `search_exclude` の条件の木の構造・項目・値の違反を返す。"""
+    try:
+        node = _parse_tree(value)
+    except ValidationError as error:
+        return [
+            Violation(
+                path=".".join([path, *(str(part) for part in item["loc"])]),
+                rule=item["msg"],
+            )
+            for item in error.errors()
+        ]
+    violations = _check_tree(node, path, fields)
+    for node_path, child in _walk(node, path):
+        if isinstance(child, Condition) and (
+            child.field in _UNEXCLUDABLE_FIELDS or child.field.startswith("@")
+        ):
+            violations.append(
+                Violation(
+                    path=f"{node_path}.field",
+                    rule=f"既定の検索から除く条件に使用できない項目です（{child.field}）",
+                    fix="共通のキーか種類の項目を指定してください",
+                )
+            )
+    # 計算項目は使える項目の一覧に無いこともあり、知らない項目の違反と重ならないようにする
+    return _unique_paths(violations)
+
+
+def _unique_paths(violations: list[Violation]) -> list[Violation]:
+    """同じパスの違反は、後に足した違反（除く条件に使用できない項目）を残す。"""
+    latest = {violation.path: violation for violation in violations}
+    return [violation for violation in violations if latest[violation.path] is violation]
+
+
+def exclusion_of(table: DocumentTable) -> Condition | Group | None:
+    """文書の行の `search_exclude` を条件の木にする。"""
+    if table.search_exclude is None:
+        return None
+    return _parse_tree(table.search_exclude)
+
+
+def is_excluded(
+    document: Document,
+    condition: Condition | Group | None,
+    *,
+    fields: Mapping[str, str],
+    today: date,
+) -> bool:
+    """文書が除く条件に該当するかを返す。"""
+    if condition is None:
+        return False
+    return match_filter(condition, document, fields=fields, today=today)

@@ -17,7 +17,13 @@ from project_index.features.documents.types import Document, LoadProblem
 from project_index.features.search.body_parts import join_ranges, select_ranges
 from project_index.features.search.cursor import decode_cursor, encode_cursor
 from project_index.features.search.fields import field_values, known_fields
-from project_index.features.search.filters import check_filter, match_filter, normalize
+from project_index.features.search.filters import (
+    check_filter,
+    exclusion_of,
+    is_excluded,
+    match_filter,
+    normalize,
+)
 from project_index.features.search.snippets import count_matches, find_snippets, split_lines
 from project_index.features.search.types import (
     FIELD_CHARS_DEFAULT,
@@ -63,6 +69,8 @@ class _Hit:
     source_index: int
     # `@matches`（本文の条件に当たった本文の全文の行の数）。使わない呼び出しでは 0
     matches: int = 0
+    # `search_exclude` に該当するか（`include_excluded` の呼び出しで返すときに使う）
+    excluded: bool = False
 
 
 def _invalid(violations: list[Violation]) -> InvalidArgumentError:
@@ -390,6 +398,7 @@ def _search_item(build: _Build, hit: _Hit) -> tuple[SearchItem, list[str]]:
             scope=scope,
             ranges=item.ranges,
             total_lines=item.total_lines,
+            excluded=True if hit.excluded else None,
         ),
         item.notes,
     )
@@ -471,6 +480,31 @@ def _hits(
     ]
 
 
+def excluded_note(count: int) -> str:
+    """既定の検索から除いた件数の知らせを作る。"""
+    return f"既定の検索から {count} 件を除きました。include_excluded: true で取得できます"
+
+
+def _exclude(
+    request: SearchRequest, hits: list[_Hit], fields: dict[str, str], today: date
+) -> tuple[list[_Hit], int]:
+    """当たった文書のうち `search_exclude` に該当する文書を除くか、印を付ける。"""
+    conditions: dict[tuple[str, str], Condition | Group | None] = {}
+    kept: list[_Hit] = []
+    excluded = 0
+    for hit in hits:
+        key = (hit.target.source.id, hit.document.kind)
+        if key not in conditions:
+            conditions[key] = exclusion_of(hit.target.source.table(hit.document.kind))
+        if not is_excluded(hit.document, conditions[key], fields=fields, today=today):
+            kept.append(hit)
+        elif request.include_excluded:
+            kept.append(dataclasses.replace(hit, excluded=True))
+        else:
+            excluded += 1
+    return kept, excluded
+
+
 def search_docs(
     request: SearchRequest,
     *,
@@ -499,7 +533,11 @@ def search_docs(
         raise _invalid(violations)
     limit, max_chars = _bounded(request, notes)
     body_conditions = _body_conditions(request.filter)
-    hits = _hits(request, loaded, body_conditions, fields, today)
+    hits, excluded = _exclude(
+        request, _hits(request, loaded, body_conditions, fields, today), fields, today
+    )
+    if excluded:
+        notes.append(excluded_note(excluded))
     multi = len(targets) >= MULTI_SOURCE_MIN
     result = SearchResult(
         total_count=len(hits),
@@ -510,6 +548,7 @@ def search_docs(
         groups=_groups(hits, request.group_by) if request.group_by else [],
         source_label=",".join(target.source.id for target in targets),
         outside_scope=outside_scope,
+        excluded_count=excluded or None,
     )
     if request.view == "count":
         return result

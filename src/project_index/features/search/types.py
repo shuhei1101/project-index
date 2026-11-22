@@ -143,6 +143,10 @@ class SearchRequest(BaseModel):
             "作業範囲の外（参考）として参照する（source が ID 1 つのときだけ有効）"
         ),
     )
+    include_excluded: bool = Field(
+        default=False,
+        description="true のとき、配信元の設定の search_exclude に該当する文書も返却する",
+    )
     session_id: str | None = None
     agent_id: str | None = None
     sections: list[str] | None = Field(
@@ -214,6 +218,8 @@ class SearchItem:
     ranges: list[BodyRange] | None = None
     # 本文の全体の行数（`ranges` と同じ条件で持つ）
     total_lines: int | None = None
+    # `include_excluded` の呼び出しで、`search_exclude` に該当する文書だけ `True`
+    excluded: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -240,6 +246,8 @@ class SearchResult:
     # Markdown の先頭に出す配信元の ID。JSON には出さない
     source_label: str = field(default="", metadata={"internal": True})
     outside_scope: bool = False
+    # `search_exclude` に該当して除いた件数（1 件以上除いたときだけ）
+    excluded_count: int | None = None
 
 
 class MatchWordsRequest(BaseModel):

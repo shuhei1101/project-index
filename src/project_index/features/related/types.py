@@ -37,6 +37,13 @@ class RelatedRequest(BaseModel):
             "作業範囲の外（参考）として参照する（source が ID 1 つのときだけ有効）"
         ),
     )
+    include_excluded: bool = Field(
+        default=False,
+        description=(
+            "true のとき、配信元の設定の search_exclude に該当する文書も関連の相手として返却し、"
+            "その先もたどる"
+        ),
+    )
     session_id: str | None = None
     agent_id: str | None = None
 
@@ -65,6 +72,8 @@ class RelatedItem:
     # 文書の場所と返した範囲。`ref` を渡した呼び出し・返却済みの相手・読めない配信元の文書では `None`
     path: str | None = None
     scope: Literal["summary"] | None = None
+    # `include_excluded` の呼び出しで、`search_exclude` に該当する相手だけ `True`
+    excluded: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -85,3 +94,5 @@ class RelatedResult:
     suggestions: list[Suggestion] = field(default_factory=list[Suggestion])
     notes: list[str] = field(default_factory=list[str])
     outside_scope: bool = False
+    # `search_exclude` に該当して関連の相手から除いた件数（1 件以上除いたときだけ）
+    excluded_count: int | None = None

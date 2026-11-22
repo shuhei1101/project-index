@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from project_index.features.search.render import OUTSIDE_SCOPE_LINE
+from project_index.features.search.render import EXCLUDED_COLUMN, EXCLUDED_MARK, OUTSIDE_SCOPE_LINE
 
 if TYPE_CHECKING:
     from project_index.features.changes.types import ChangeItem, ChangesResult, RangePoint
@@ -19,20 +19,24 @@ def _point(point: RangePoint) -> str:
 
 
 def _table(items: list[ChangeItem]) -> list[str]:
-    """変わった文書の表（source・単語の増減の列は、値を持つ項目があるときだけ）の行を作る。"""
+    """変わった文書の表（source・除外・単語の増減の列は、値を持つ項目があるときだけ）の行を作る。"""
     has_source = any(item.source for item in items)
+    has_excluded = any(item.excluded for item in items)
     has_words = any(item.contains_changes for item in items)
     head = [
         "id",
         *(["source"] if has_source else []),
         "変更",
         "変わったキー",
+        *([EXCLUDED_COLUMN] if has_excluded else []),
         *(["単語の増減"] if has_words else []),
     ]
     lines = [f"| {' | '.join(head)} |", f"| {' | '.join('---' for _ in head)} |"]
     for item in items:
         cells = [item.id, *([item.source or ""] if has_source else []), item.change]
         cells.append(", ".join(item.keys))
+        if has_excluded:
+            cells.append(EXCLUDED_MARK if item.excluded else "")
         if has_words:
             cells.append(
                 "・".join(
