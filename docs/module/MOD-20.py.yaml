@@ -99,8 +99,8 @@ functions:
       1. `kind` があって `source` が無い場合、`InvalidArgumentError`（`kind` には `source` が要ります）を送る
       2. `source` が無い場合、作業場所の説明と使える配信元を返す（使える配信元が 0 件でも返す）。`outside_scope` が `True` なら、作業範囲の外で参照できる配信元（作業範囲の外で参照できる配信元）を `OutsideSource`（`id`・`description`・`when`）にして `outside_sources` に入れる（0 件は空のリスト）。`False` なら `outside_sources` は `None`。警告（警告の収集）を `warnings` に入れる。返す前に、使える配信元と作業範囲の外の配信元の ID を並べて、配信元の一覧.裏での確認の実行（`refresh_later`）を呼ぶ（待たない）。文書を読まないので要求のログには残さない
       3. `source` がある場合、読む場所を解く（読む場所の解決。`source`・`worktree`・`cwd`・`outside_scope`。結果の `outside_scope` は場所の `outside_scope`）。ワークツリーを読む場所は、読む場所の解決がそのワークツリーの設定から作り直した配信元を持つ
-      4. `kind` が無い場合、今の作業場所からの `committable_kinds` が空でなければ `direct_commit`（ブランチ・上書きできるブランチ・直コミットできる種類）を入れ、`instructions`・`when` と、有効な文書の行ごとの種類の概要（スキーマは文書のストア.種類のスキーマ）を返す。Git の配信元は、リビジョンの一覧（`commits=0`）のブランチとタグの名前を `refs`、ワークツリーの一覧を `worktrees` に入れる
-      5. `kind` がある場合、文書の行を引き（無ければ `UnknownKindError`）、`target.config_base`（設定ファイルのフォルダ）の `schema` のファイルの内容と読んだスキーマ、行の `metadata` を返す。`schema_path` が `SchemaRef` の行は、ファイルの内容の代わりに起動時のスキーマを YAML にしたものを返す
+      4. `kind` が無い場合、今の作業場所からの `committable_kinds` が空でなければ `direct_commit`（ブランチ・上書きできるブランチ・直コミットできる種類）を入れ、`instructions`・`when` と、有効な文書の行ごとの種類の概要（スキーマは文書のストア.種類のスキーマ。`sqlite` を持つ行は `sqlite` を真にする）を返す。Git の配信元は、リビジョンの一覧（`commits=0`）のブランチとタグの名前を `refs`、ワークツリーの一覧を `worktrees` に入れる
+      5. `kind` がある場合、文書の行を引き（無ければ `UnknownKindError`）、`target.config_base`（設定ファイルのフォルダ）の `schema` のファイルの内容と読んだスキーマ、行の `metadata` を返す。`schema_path` が `SchemaRef` の行は、ファイルの内容の代わりに起動時のスキーマを YAML にしたものを返す。`sqlite` を持つ行は、`schema_text` を空・`schema` を列の説明のスキーマ（`columns_schema`）・`columns` を `sqlite.columns` にして返す
     exceptions:
       - name: InvalidArgumentError
         condition: '`source` の無い `kind`'

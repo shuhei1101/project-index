@@ -641,7 +641,7 @@ response:
     notes: '`sources[].when` と同じ出し方'
   - name: warnings[]
     type: str
-    description: 使える配信元の同期のずれ（metadata の列の欠け・管理用の YAML に無いファイル・ファイルが無い行・どの文書にも該当しない関連・2 つ以上の行が文書にするファイル・ID が重なる文書）とエイリアスのキーの違反、配信元・端末の設定のバージョンが古いこと、どの文書にも当たらない `nav` の条件、検証で外した配信元、端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパスを 1 件にまとめる）
+    description: 使える配信元の同期のずれ（metadata の列の欠け・管理用の YAML に無いファイル・ファイルが無い行・どの文書にも該当しない関連・2 つ以上の行が文書にするファイル・ID が重なる文書）とエイリアスのキーの違反、配信元・端末の設定のバージョンが古いこと、どの文書にも当たらない `nav` の条件、SQLite の表の行の開けない理由・表や列の欠け・配信しなかった行の数（行ごとに 1 件）、検証で外した配信元、端末の設定の最上位の知らないキー（端末の設定のファイルとキーのパスを 1 件にまとめる）
     notes: '引数なしのとき。同期のずれ・エイリアス・`nav`・配信元の設定のバージョンは使える配信元だけを対象にし、端末の設定のバージョン・端末の設定の知らないキーと検証で外した配信元は使える配信元が 0 件のときも載せる。`format: markdown` は使える配信元の表の後の「注意」の見出しの下に 1 行ずつ出し、0 件は見出しごと出さない。`format: json` は 0 件のときキーを持たない'
   - name: when
     type: list[str]
@@ -702,6 +702,20 @@ response:
     type: str
     description: 今の作業場所から直コミットできる種類の ID
     notes: '`direct_commit.branch` と同じ。`format: markdown` は種類の表の後に「直コミット」の見出しと、ブランチ・種類の箇条書きで出す'
+  - name: kinds[].sqlite
+    type: bool
+    description: SQLite の表の行（読み取り専用）の種類か
+    notes: '`source` だけのとき。`format: markdown` は description の後ろに `（SQLite の表の行・読み取り専用）` を付ける。`format: json` は偽のときキーを持たない'
+  - name: columns[].name
+    type: str
+    description: 列名（`sqlite.columns[].name`）
+    notes: '`source`・`kind` で、SQLite の表の行の種類のとき。`schema` の代わりに返却する。`format: markdown` は `| 列 | 型 | 説明 |` の表と、`write_docs`・`delete_docs` と `list_changes` の対象外である旨の行で出す'
+  - name: columns[].type
+    type: Literal['text', 'integer', 'real', 'json']
+    description: 列の型（`sqlite.columns[].type`）
+  - name: columns[].description
+    type: str
+    description: 列の説明文（`sqlite.columns[].description`）
 response_example: |-
   ```markdown
   作業場所: /path/to/sample（sample のクローン本体）

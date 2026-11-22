@@ -220,6 +220,12 @@ data_models:
         access: 公開
         default: '[]'
         description: '`{文書の id}: {先の文書の行の id}（{ファイル}）・{除外した文書の行の id}（{ファイル}）` の並び。除外した文書のパスの昇順で、ID が先の文書と重なり配信から除外した文書（別の行で `duplicate_files` に数えた同じファイルを文書にするものを除く）'
+      - name: sqlite_warnings
+        title: SQLite の表の行の警告
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: '`{行の id}: {理由}` の並び。`sqlite` を持つ行の表と列の確認（`inspect_table`）の違反（ファイルを開けない・表や列が無い）と警告（`limit` を超えた行の数）'
   - name: AliasEntry
     title: エイリアス
     container: project_index/features/documents/types.py

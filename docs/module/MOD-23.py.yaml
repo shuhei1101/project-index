@@ -48,7 +48,7 @@ functions:
       type: list[str]
       description: 警告の文
     process: |-
-      1. 使える配信元ごとに最後の検査の結果を読み（配信元の検査のキャッシュ.結果の取得。`None` の配信元は同期のずれ・エイリアス・nav を飛ばす）、件数が 0 でない並びごとに `{id}: {並びの名前}が {件数} 件あります（check_project で確認できます）` を加える
+      1. 使える配信元ごとに最後の検査の結果を読み（配信元の検査のキャッシュ.結果の取得。`None` の配信元は同期のずれ・エイリアス・nav を飛ばす）、件数が 0 でない並びごとに `{id}: {並びの名前}が {件数} 件あります（check_project で確認できます）` を加える。`sqlite_warnings` は件数にまとめず、1 件ずつ `{id}: {警告}` を加える
       2. 使える配信元の設定のバージョンが `old` なら `{id}: 設定のバージョンが古い（{設定}・読み込める {現在}）。project-index migrate で移し替えます` を加える（バージョンの新旧）
       3. 端末の設定のバージョンが `old` なら同じ形の文を加える（使える配信元が 0 件でも加える）。端末の設定の `unknown_keys` が空でなければ `端末の設定: {ファイル} に project-index が知らないキーがあります（{キーを , でつないだもの}）。値は使用しません` を加える（使える配信元が 0 件でも加える）
       4. 使える配信元ごとに、`alias_violations` が 0 件でなければ `{id}: エイリアスのキーの違反が {件数} 件あります（check_project で確認できます）` を加え、nav の警告（読み取り API）ごとに `{id}: {path}: {rule}` を加える
@@ -90,6 +90,12 @@ functions:
         condition: '`available` が空、端末の設定の `unknown_keys` が `["mindstella", "prot"]`'
         mock: なし
         expected: 警告が 1 件で、端末の設定のファイルと `mindstella, prot` を持つ
+      - name: test_collect_warnings_when_sqlite
+        case: 正常
+        summary: SQLite の行の警告を 1 件ずつ並べる
+        condition: 使える配信元 a の `sqlite_warnings` が 2 件
+        mock: なし（検査の結果は配信元の検査のキャッシュに流してから渡す）
+        expected: '警告が 2 件で、それぞれ `a: {警告}`'
     callees:
       - MOD-10#functions[version_state]
 refs:

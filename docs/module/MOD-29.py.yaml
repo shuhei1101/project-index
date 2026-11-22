@@ -857,7 +857,8 @@ functions:
       6. 有効な行ごとに、行が文書にするファイルを求め、ファイルごとに行の ID を `documents[]` の順で重なりなく集める。`records` を持たない行は、手順 1 のパスを渡したファイルの収集（`collect_files(source.root, table, files=files)`）で集めたファイル（YAML として読めず文書にならないファイルも含む）。`records`・`body_file` の行は、手順 1 の `documents` と `duplicates` のその行の文書の `body_path`。`body_file` の無い `records` の行は数えない。2 つ以上の行の ID を持つファイルを、パスの昇順に `{ファイル}: {行の id}・{行の id}` で `duplicate_files` に加える
       7. 手順 1 の `duplicates` を `path` の昇順（同じパスは `duplicates` の順）に並べ、除外した文書ごとに手順 1 の `documents` から同じ ID の先の文書を参照する。文書のファイルは `body_path` があれば `body_path`、無ければ `path` とする。2 つの文書の `kind` が違い、ファイルが同じで、そのファイルを手順 6 で `duplicate_files` に数えたときは飛ばし、それ以外は `{文書の id}: {先の文書の kind}（{先の文書のファイル}）・{除外した文書の kind}（{除外した文書のファイル}）` で `duplicate_ids` に加える
       8. 手順 1 の文書でエイリアスの集めをし、`violations` を `alias_violations` にする
-      9. `SyncReport` を返す
+      9. `sqlite` を持つ有効な行ごとに、`source.root`・行・行の番号で表と列の確認（`inspect_table`）を呼び、違反と警告を `{行の id}: {理由}` で `sqlite_warnings` に加える
+      10. `SyncReport` を返す
 
       手順 1〜8 は全て、文書のストアの裏の処理の関所（`store.gate`）の裏の処理の 1 件の中で行う。手順 1 の `walk_files` はファイル 1 件ごと、手順 2・5 は文書 1 件ごと、手順 3 は管理用の YAML 1 件ごとに裏の処理の繰り返し（`gate.each`）で回し、`ignored_paths`・手順 6・7・8 はそれぞれ 1 件（`gate.unit`）にする。関所は入れ子では一番外の 1 件だけが休むため、手順 1〜8 の全体を 1 つの 1 件で包まない。裏の処理のスレッドでなければ関所は何もしない
     unit_tests:
@@ -950,6 +951,12 @@ functions:
         condition: 文書 3 件の配信元を、関所の `foreground` の中で、別のスレッドの `background` の中で検査する。関所の 1 件の中にいない間に文書の重なりを求める処理が呼ばれたかを記録する
         mock: 関所の休み（偽物。呼ばれた回数を数える）、`missing_ref_fields`・`unresolved_related`（呼ばれたときに関所の 1 件の中かを記録してから本物を呼ぶ包み）
         expected: 結果が関所を使わないときと同じで、包みの呼び出しが全て 1 件の中。休みが文書の数より多く呼ばれる
+      - name: test_check_sync_when_sqlite
+        case: 正常
+        summary: SQLite の行の開けないファイルと上限の超過を警告にする
+        condition: '`limit: 1` で 2 行の行 `notes_db` と、ファイルの無い行 `missing_db`'
+        mock: なし（一時フォルダの配信元）
+        expected: '`sqlite_warnings` が 2 件で、`missing_db: ` で始まる開けない理由と、`notes_db: ` で始まる配信しない行の数 1'
   - name: page_path
     title: 文書のページのパス
     kind: 関数
