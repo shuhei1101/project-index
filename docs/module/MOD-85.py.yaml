@@ -669,6 +669,12 @@ data_models:
         type: CommitResult | None
         access: 公開
         description: '`{sha, branch, retried}`'
+      - name: conflict
+        title: 衝突したときの結果
+        type: ConflictSummary | None
+        access: 公開
+        default: None
+        description: '`ConflictResult` を `ConflictSummary.from_domain` で変えたもの。衝突しなかったときは `None`（JSON は `null`）'
   - name: ScriptRunResult
     title: 衝突したときのスクリプトの結果
     container: project_index/features/write/types.py
@@ -730,6 +736,39 @@ data_models:
         type: ScriptRunResult | None
         access: 公開
         description: '`on_conflict` が無いか `dry_run` のときは `None`'
+  - name: ConflictSummary
+    title: 書き込みの API の応答の衝突したときの結果
+    container: project_index/features/write/types.py
+    usecase: 直コミット
+    role: スキーマ
+    summary: 応答の `conflict`
+    description: '`CommitDocumentsResponse` と同じ設定の camelCase。`from_domain(conflict: ConflictResult) -> Self` で、`errors` を `{path, reason, fix}`（problem+json の `errors[]` と同じ構造。`ConflictError`）、`script` を `{exitCode, timedOut, stdout, stderr}`（`ScriptSummary`）にする'
+    properties:
+      - name: branch
+        title: ブランチ
+        type: str | None
+        access: 公開
+        description: '`ConflictResult.branch`'
+      - name: commit
+        title: コミット
+        type: str | None
+        access: 公開
+        description: '`ConflictResult.commit`'
+      - name: base_commit
+        title: 起点のコミット
+        type: str
+        access: 公開
+        description: '`ConflictResult.base_commit`'
+      - name: errors
+        title: 今のブランチで断った理由
+        type: list[ConflictError]
+        access: 公開
+        description: '`Violation` の `path`・`rule`（`reason`）・`fix`'
+      - name: script
+        title: スクリプトの結果
+        type: ScriptSummary | None
+        access: 公開
+        description: '`ConflictResult.script`'
 constants:
   - name: OPERATIONS_MAX
     title: 1 回の操作の上限
