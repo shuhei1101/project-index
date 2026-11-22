@@ -230,7 +230,7 @@ functions:
         summary: 既定の検索から除く条件の誤り
         condition: '`documents[0].search_exclude` が `{field: status, op: like, values: [inactive]}`、`documents[1].search_exclude` が `{field: body, op: contains, values: [x]}`'
         mock: なし
-        expected: '`documents[0].search_exclude` と `documents[1].search_exclude.field` の違反を返す'
+        expected: '`documents[0].search_exclude.op` と `documents[1].search_exclude.field` の違反を返す'
         exception: '-'
       - name: test_validate_source_config_when_search_exclude
         case: 正常
