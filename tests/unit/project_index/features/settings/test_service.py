@@ -1118,3 +1118,134 @@ def test_patch_source_when_direct_commit_kinds(
         "scope": ["/tmp/work/**"],
         "kinds": {"note": ["/tmp/note/**"]},
     }
+
+
+ON_CONFLICT_TEXT = (
+    'version: "1"\n'
+    "clone: /tmp/clone\n"
+    "sources:\n"
+    "  - id: sample\n"
+    "    config: [/tmp/sample/project-index.yaml]\n"
+    "    direct_commit:\n"
+    "      write_api_kinds: [note]\n"
+    "      on_conflict:\n"
+    "        command: [/tmp/bin/notify, --pr]\n"
+)
+
+
+def test_save_sources_when_on_conflict_sent(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """衝突したときのスクリプトの指定を送られたら断る（異常系）。"""
+    # 準備
+    reload, calls = fake_reload
+    path = tmp_path / "settings.yaml"
+    path.write_text(ON_CONFLICT_TEXT, encoding="utf-8")
+    sent = [
+        SourceEntry.model_validate(
+            {
+                "id": "sample",
+                "config": "/tmp/sample/project-index.yaml",
+                "direct_commit": {"on_conflict": {"command": ["/tmp/bin/other"]}},
+            }
+        )
+    ]
+    # 実行・検証
+    with pytest.raises(TerminalConfigInvalidError) as info:
+        save_sources(
+            sent,
+            expected_version=read_settings_file(path)[1],
+            path=path,
+            reload=reload,
+            lock=threading.Lock(),
+        )
+    assert [item.path for item in info.value.violations] == ["sources[0].direct_commit.on_conflict"]
+    assert path.read_text(encoding="utf-8") == ON_CONFLICT_TEXT
+    assert calls == []
+
+
+def test_save_sources_when_on_conflict_kept(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """ファイルの衝突したときのスクリプトの指定を残す（正常系）。"""
+    # 準備
+    reload, _ = fake_reload
+    path = tmp_path / "settings.yaml"
+    path.write_text(ON_CONFLICT_TEXT, encoding="utf-8")
+    sent = [
+        SourceEntry.model_validate(
+            {
+                "id": "sample",
+                "config": "/tmp/sample/project-index.yaml",
+                "scope": {"read": ["/tmp/read/**"]},
+            }
+        )
+    ]
+    # 実行
+    save_sources(
+        sent,
+        expected_version=read_settings_file(path)[1],
+        path=path,
+        reload=reload,
+        lock=threading.Lock(),
+    )
+    # 検証
+    row = load_yaml(path.read_text(encoding="utf-8"))["sources"][0]
+    assert row["direct_commit"]["on_conflict"] == {"command": ["/tmp/bin/notify", "--pr"]}
+
+
+def test_add_source_when_on_conflict_sent(
+    settings_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """衝突したときのスクリプトの指定を含む行を断る（異常系）。"""
+    # 準備
+    reload, calls = fake_reload
+    entry = SourceEntry.model_validate(
+        {
+            "id": "extra",
+            "config": "/tmp/extra/project-index.yaml",
+            "direct_commit": {"on_conflict": {"command": ["/tmp/bin/notify"]}},
+        }
+    )
+    # 実行・検証
+    with pytest.raises(TerminalConfigInvalidError) as info:
+        add_source(
+            entry,
+            expected_version=read_settings_file(settings_path)[1],
+            path=settings_path,
+            reload=reload,
+            lock=threading.Lock(),
+        )
+    assert [item.path for item in info.value.violations] == ["source.direct_commit.on_conflict"]
+    assert settings_path.read_text(encoding="utf-8") == SETTINGS_TEXT
+    assert calls == []
+
+
+def test_patch_source_when_on_conflict_sent(
+    tmp_path: Path,
+    fake_reload: tuple[Callable[[TerminalConfig], list[SourceStatus]], list[TerminalConfig]],
+) -> None:
+    """衝突したときのスクリプトの指定の変更を断る（異常系）。"""
+    # 準備
+    reload, calls = fake_reload
+    path = tmp_path / "settings.yaml"
+    path.write_text(ON_CONFLICT_TEXT, encoding="utf-8")
+    patch = SourcePatch.model_validate(
+        {"direct_commit": {"on_conflict": {"command": ["/tmp/bin/other"]}}}
+    )
+    # 実行・検証
+    with pytest.raises(TerminalConfigInvalidError) as info:
+        patch_source(
+            "sample",
+            patch,
+            expected_version=read_settings_file(path)[1],
+            path=path,
+            reload=reload,
+            lock=threading.Lock(),
+        )
+    assert [item.path for item in info.value.violations] == ["source.direct_commit.on_conflict"]
+    assert path.read_text(encoding="utf-8") == ON_CONFLICT_TEXT
+    assert calls == []

@@ -15,6 +15,7 @@ from project_index.features.read.service import (
 )
 from project_index.features.sources.types import DocumentTable, ScriptEntry
 from project_index.shared.errors import DecisionNotFoundError, DocumentNotFoundError
+from project_index.shared.hashing import value_hash
 from tests.unit.project_index.conftest import notes_db_table
 
 if TYPE_CHECKING:
@@ -256,6 +257,26 @@ def test_get_document(
     assert response.metadata.common_keys == {"id": "a", "name": "A"}
     assert response.markdown is None
     assert calls == []
+
+
+def test_get_document_item_versions(make_view_env: Callable[..., SimpleNamespace]) -> None:
+    """最上位のキーごとのバージョンを返却する（正常系）。"""
+    # 準備
+    files = {
+        "schemas/rule.schema.yaml": "type: object\n",
+        "docs/a.yaml": "id: a\ntitle: タイトル\ndescription: 説明\n",
+    }
+    env = make_view_env(files, tables=NOTES_TABLES[:1], schemas={"rules": {"type": "object"}})
+    # 実行
+    response = get_document(
+        _target(env), "docs/a.yaml", store=env.handlers.store, converter=env.handlers.converter
+    )
+    # 検証
+    assert response.item_versions == {
+        "id": value_hash("a"),
+        "title": value_hash("タイトル"),
+        "description": value_hash("説明"),
+    }
 
 
 def test_get_document_when_body_path(make_view_env: Callable[..., SimpleNamespace]) -> None:

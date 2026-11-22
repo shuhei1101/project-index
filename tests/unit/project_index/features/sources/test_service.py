@@ -30,6 +30,7 @@ from project_index.features.sources.types import (
     ServedSource,
     SourceConfig,
 )
+from project_index.features.settings.types import SourceDirectCommit
 from project_index.shared.errors import ValidationFailedError, Violation
 
 if TYPE_CHECKING:
@@ -337,6 +338,29 @@ def test_load_source(
     assert served.is_git is True
     assert "rules" in served.schemas
     assert status.status == "serving"
+
+
+def test_load_source_when_on_conflict(
+    git_repo: Callable[..., Path],
+    sample_files: dict[str, str],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """衝突したときのスクリプトを配信中の配信元に入れる（正常系）。"""
+    # 準備
+    files = {
+        **sample_files,
+        "project-index.yaml": sample_files["project-index.yaml"]
+        + "direct_commit:\n  branch: develop\n  kinds: [rules]\n",
+    }
+    root = git_repo(files)
+    direct_commit = SourceDirectCommit.model_validate({"on_conflict": {"command": ["notify"]}})
+    entry = make_entry(str(root / "project-index.yaml"), direct_commit=direct_commit)
+    # 実行
+    served, _status = load_source(entry, index=0)
+    # 検証
+    assert served is not None
+    assert served.direct_commit_on_conflict is not None
+    assert served.direct_commit_on_conflict.command == ["notify"]
 
 
 def test_load_source_when_merged(
