@@ -384,5 +384,16 @@ requirements:
     overflow: 全て使用中のときは、次の要求は空くまで待つ。待ちの時間は稼働中の記録の要求ごとの行に残る
     rationale: '今の既定の実行スロット（`asyncio.to_thread`）と同じ本数。PR #236 の PoC では実行スロットは常に埋まっており、GIL のため本数を増やしても CPU の待ちが増えるだけで、減らすと待ちが増える。既定の実行スロットから分けるのは、再起動で `asyncio.Runner.close` が既定の実行スロットのスレッドの終了を最大 300 秒待つため'
     status: planned
+  - id: NFR-21
+    name: SQLite の表から読み込む行の上限の既定
+    english_name: sqlite_row_limit
+    category: 性能
+    external_constraint: 制限なし
+    source_kind: 制限なし
+    value: '1000'
+    unit: 行
+    overflow: '`documents[].sqlite.limit` を記載しない行は、`order_by` の先頭から 1000 行を配信し、配信しなかった行の数を `describe()` の注意と `check_project` の警告で通知する。黙って切り捨てない'
+    rationale: 行の多い表（発話・セリフ）を絞り忘れた行でも、索引のサーバーの記憶域と検索の所要時間が膨らまないようにする。今の最大の配信元 ai-monitor（1,212 文書）で作業範囲の外の配信元の検索の所要時間（NFR-9）を満たしているため、同じ桁の行数を既定にする。配信元の設定の `documents[].sqlite.limit` で行ごとに変えられる
+    status: planned
 id: NFR-1
 visibility: internal
