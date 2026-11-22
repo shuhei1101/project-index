@@ -1,0 +1,33 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: changed
+    detail: 配信元の設定の条件に該当する文書を、画面のサーバーが取得する文書の一覧と検索の結果でどう受け取るかが変わる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: changed
+    detail: 配信元の設定の条件に該当する文書の用語が、既定の用語の一覧に出ず、明示の指定を付けたときだけ参照できる
+    depends_on: []
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: none
+    detail: 配信元の文書を読み書きする流れの連鎖は変わらない
+    depends_on: []
+docs:
+  - page: docs/guide/HTTPのAPI.md
+    new: false
+    change: 文書の一覧と単語での検索で、既定の検索から除く条件に該当する文書の扱いと明示の指定を記載する
+    status: todo
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: '`list_match_words` の引数に除いた文書も含める指定を追加し、既定の結果から除くことを記載する'
+    status: todo
+  - page: docs/guide/設定.md
+    new: false
+    change: '`documents[].search_exclude` の説明に、読み取り API と `list_match_words` での扱いを加える'
+    status: todo
+scope_out:
+  - item: dev-docs の画面で、除く条件に該当する文書を薄く表示する・隠すなどの表示の変更
+    reason: 画面は dev-docs のリポジトリが持ち、この PR は読み取り API の応答までを扱う。表示の仕方は今回決める読み取り API の扱いが決まらないと中身が決まらない
+    plan: to_file
