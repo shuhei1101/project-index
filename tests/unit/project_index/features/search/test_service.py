@@ -751,7 +751,11 @@ def test_search_docs_when_sqlite_rows_with_ref(
         body="id: n1\ntitle: ゲーム実況 1\n",
         metadata={"id": "n1", "name": "ゲーム実況 1"},
     )
-    monkeypatch.setattr(store, "load", lambda *_args, **_kwargs: LoadResult(documents=[row]))
+
+    def load(*_args: object, **_kwargs: object) -> LoadResult:
+        return LoadResult(documents=[row])
+
+    monkeypatch.setattr(store, "load", load)
     env = SearchEnv(
         make_registry(source),
         store,
