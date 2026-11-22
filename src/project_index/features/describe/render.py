@@ -19,6 +19,14 @@ WHEN_LINE = "使う場面:"
 DIRECT_COMMIT_HEADING = "直コミット:"
 
 
+# SQLite の表の行の種類の説明の後ろに付ける文
+SQLITE_KIND_NOTE = "（SQLite の表の行・読み取り専用）"
+# SQLite の表の行の種類のスキーマの後ろに置く行
+SQLITE_SCHEMA_NOTE = (
+    "SQLite の表の行の種類です。write_docs・delete_docs と list_changes の対象外です。"
+)
+
+
 def _cell(text: str) -> str:
     """表のセルの文字列にする。"""
     return text.replace("|", "\\|").replace("\n", "<br>")
@@ -85,7 +93,10 @@ def _source_guide(result: SourceGuideResult, head: list[str]) -> list[str]:
     if result.when:
         lines.extend([WHEN_LINE, *(f"- {line}" for line in result.when), ""])
     lines.extend([result.instructions, "", "| kind | description |", "| --- | --- |"])
-    lines.extend(f"| {_cell(kind.id)} | {_cell(kind.description)} |" for kind in result.kinds)
+    lines.extend(
+        f"| {_cell(kind.id)} | {_cell(kind.description + (SQLITE_KIND_NOTE if kind.sqlite else ''))} |"
+        for kind in result.kinds
+    )
     # 直コミットできる種類があれば、種類の表の後にブランチと種類を並べる
     if result.direct_commit is not None:
         guide = result.direct_commit
@@ -113,11 +124,20 @@ def _kind_schema(result: KindSchemaResult, head: list[str]) -> list[str]:
     """共通のキーと列名の対応と、種類のスキーマの行を作る。"""
     lines = list(head)
     if result.metadata:
-        lines = ["| 共通のキー | 列名 |", "| --- | --- |"]
+        lines.extend(["| 共通のキー | 列名 |", "| --- | --- |"])
         lines.extend(
             f"| {_cell(key)} | {_cell(column)} |" for key, column in result.metadata.items()
         )
         lines.append("")
+    # SQLite の表の行の種類: スキーマの YAML の代わりに列の表と対象外である旨を置く
+    if result.columns is not None:
+        lines.extend(["| 列 | 型 | 説明 |", "| --- | --- | --- |"])
+        lines.extend(
+            f"| {_cell(column.name)} | {column.type} | {_cell(column.description)} |"
+            for column in result.columns
+        )
+        lines.extend(["", SQLITE_SCHEMA_NOTE])
+        return lines
     lines.append(f"```yaml\n{result.schema_text.rstrip(chr(10))}\n```")
     return lines
 

@@ -131,9 +131,7 @@ def _decode(
     return data
 
 
-def _document(
-    data: dict[str, Any], index: int, source_id: str, table: DocumentTable
-) -> Document:
+def _document(data: dict[str, Any], index: int, source_id: str, table: DocumentTable) -> Document:
     """行の辞書から 1 件の文書を作る（本文は列の YAML、バージョンは本文のハッシュ）。"""
     sqlite = _sqlite_of(table)
     metadata = resolve_metadata(data, table)
@@ -202,9 +200,7 @@ def read_rows(source_root: Path, source_id: str, table: DocumentTable) -> Sqlite
         seen.add(row_id)
         data = _decode(values, sqlite, row_id, warnings)
         documents.append(_document(data, index, source_id, table))
-    return SqliteRows(
-        documents=documents, omitted=omitted, warnings=warnings, signature=signature
-    )
+    return SqliteRows(documents=documents, omitted=omitted, warnings=warnings, signature=signature)
 
 
 def _definition_hash(table: DocumentTable) -> str:

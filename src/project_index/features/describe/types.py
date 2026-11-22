@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from project_index.features.access.types import CWD_DESCRIPTION, SourceAccess, Workplace
 from project_index.features.history.types import WorktreeInfo
+from project_index.features.sources.types import SqliteColumn
 
 
 class DescribeRequest(BaseModel):
@@ -37,6 +38,8 @@ class KindSummary:
 
     id: str
     description: str
+    # `documents[].sqlite` を持つ行（読み取り専用）の種類か
+    sqlite: bool = False
 
 
 @dataclass(frozen=True)
@@ -94,3 +97,5 @@ class KindSchemaResult:
     schema: dict[str, Any]
     metadata: dict[str, str] = field(default_factory=dict[str, str])
     outside_scope: bool = False
+    # `sqlite` を持つ行の `sqlite.columns`（`schema_text` は空、`schema` は列の説明のスキーマ）
+    columns: list[SqliteColumn] | None = None
