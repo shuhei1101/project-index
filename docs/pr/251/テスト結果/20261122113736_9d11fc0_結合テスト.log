@@ -1,0 +1,249 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=integration -f paths="tests/integration/server/test_check_project.py tests/integration/server/test_list_changes.py tests/integration/server/test_search_docs.py tests/integration/server/test_serve.py tests/integration/server/test_trace_related.py" | ...) ...（TP-1 の TL-2 の run_runner）
+（gh run watch がジョブの取得の 404 で途中で終わったため、同じ実行 44976803772 の完了を待ってログを取得した）
+
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 126 items
+
+tests/integration/server/test_check_project.py::test_normal PASSED       [  0%]
+tests/integration/server/test_check_project.py::test_normal_when_files_excluded PASSED [  1%]
+tests/integration/server/test_check_project.py::test_normal_when_file_belongs_to_other_row PASSED [  2%]
+tests/integration/server/test_check_project.py::test_normal_when_rows_share_file PASSED [  3%]
+tests/integration/server/test_check_project.py::test_normal_when_ids_overlap PASSED [  3%]
+tests/integration/server/test_check_project.py::test_normal_when_nested_index_and_exclude_path PASSED [  4%]
+tests/integration/server/test_check_project.py::test_normal_when_related_unresolved PASSED [  5%]
+tests/integration/server/test_check_project.py::test_normal_when_records_schema_mismatch PASSED [  6%]
+tests/integration/server/test_check_project.py::test_normal_when_config_has_violations PASSED [  7%]
+tests/integration/server/test_check_project.py::test_normal_when_config_legacy PASSED [  7%]
+tests/integration/server/test_check_project.py::test_normal_when_legacy_config_name PASSED [  8%]
+tests/integration/server/test_check_project.py::test_error_when_config_not_found PASSED [  9%]
+tests/integration/server/test_check_project.py::test_error_when_config_unparsable PASSED [ 10%]
+tests/integration/server/test_check_project.py::test_normal_when_alias_and_nav_checked PASSED [ 11%]
+tests/integration/server/test_check_project.py::test_normal_when_schema_from_other_source PASSED [ 11%]
+tests/integration/server/test_check_project.py::test_normal_when_schema_ref_not_found PASSED [ 12%]
+tests/integration/server/test_check_project.py::test_normal_when_paths_base_or_paths_out_of_range PASSED [ 13%]
+tests/integration/server/test_check_project.py::test_normal_when_disk_storage PASSED [ 14%]
+tests/integration/server/test_check_project.py::test_normal_when_local_files_excluded PASSED [ 15%]
+tests/integration/server/test_check_project.py::test_normal_when_git_file_and_ignored_files PASSED [ 15%]
+tests/integration/server/test_check_project.py::test_normal_when_direct_commit_checked[type] PASSED [ 16%]
+tests/integration/server/test_check_project.py::test_normal_when_direct_commit_checked[missing-kind] PASSED [ 17%]
+tests/integration/server/test_check_project.py::test_normal_when_search_exclude_invalid PASSED [ 18%]
+tests/integration/server/test_list_changes.py::test_normal PASSED        [ 19%]
+tests/integration/server/test_list_changes.py::test_normal_when_range_by_date_and_branch PASSED [ 19%]
+tests/integration/server/test_list_changes.py::test_normal_when_since_last_read PASSED [ 20%]
+tests/integration/server/test_list_changes.py::test_error_when_ref_not_found PASSED [ 21%]
+tests/integration/server/test_list_changes.py::test_error_when_last_read_not_found PASSED [ 22%]
+tests/integration/server/test_list_changes.py::test_error_when_invalid_argument PASSED [ 23%]
+tests/integration/server/test_list_changes.py::test_error_when_source_not_readable PASSED [ 23%]
+tests/integration/server/test_list_changes.py::test_normal_when_contains PASSED [ 24%]
+tests/integration/server/test_list_changes.py::test_normal_when_outside_scope PASSED [ 25%]
+tests/integration/server/test_list_changes.py::test_normal_when_disk_storage PASSED [ 26%]
+tests/integration/server/test_list_changes.py::test_error_when_range_given_to_disk_source PASSED [ 26%]
+tests/integration/server/test_list_changes.py::test_normal_when_search_excluded PASSED [ 27%]
+tests/integration/server/test_search_docs.py::test_normal PASSED         [ 28%]
+tests/integration/server/test_search_docs.py::test_normal_when_full PASSED [ 29%]
+tests/integration/server/test_search_docs.py::test_normal_when_snippets PASSED [ 30%]
+tests/integration/server/test_search_docs.py::test_normal_when_count_grouped PASSED [ 30%]
+tests/integration/server/test_search_docs.py::test_normal_when_ordered_and_limited PASSED [ 31%]
+tests/integration/server/test_search_docs.py::test_normal_when_source_all PASSED [ 32%]
+tests/integration/server/test_search_docs.py::test_normal_when_worktree PASSED [ 33%]
+tests/integration/server/test_search_docs.py::test_normal_when_worktree_adds_row PASSED [ 34%]
+tests/integration/server/test_search_docs.py::test_normal_when_worktree_metadata_changed PASSED [ 34%]
+tests/integration/server/test_search_docs.py::test_normal_when_worktree_validator_changed PASSED [ 35%]
+tests/integration/server/test_search_docs.py::test_error_when_worktree_config_invalid PASSED [ 36%]
+tests/integration/server/test_search_docs.py::test_normal_when_seen PASSED [ 37%]
+tests/integration/server/test_search_docs.py::test_normal_when_files_index PASSED [ 38%]
+tests/integration/server/test_search_docs.py::test_normal_when_body_file_absent PASSED [ 38%]
+tests/integration/server/test_search_docs.py::test_normal_when_file_unreadable PASSED [ 39%]
+tests/integration/server/test_search_docs.py::test_error_when_source_not_readable PASSED [ 40%]
+tests/integration/server/test_search_docs.py::test_error_when_source_not_served PASSED [ 41%]
+tests/integration/server/test_search_docs.py::test_error_when_worktree_not_matched PASSED [ 42%]
+tests/integration/server/test_search_docs.py::test_error_when_invalid_argument PASSED [ 42%]
+tests/integration/server/test_search_docs.py::test_error_when_ref_not_found PASSED [ 43%]
+tests/integration/server/test_search_docs.py::test_normal_when_excluded_name PASSED [ 44%]
+tests/integration/server/test_search_docs.py::test_normal_when_ordered_by_matches PASSED [ 45%]
+tests/integration/server/test_search_docs.py::test_normal_when_part_of_body PASSED [ 46%]
+tests/integration/server/test_search_docs.py::test_normal_when_metadata_mapped PASSED [ 46%]
+tests/integration/server/test_search_docs.py::test_normal_when_outside_scope PASSED [ 47%]
+tests/integration/server/test_search_docs.py::test_error_when_outside_read_disabled PASSED [ 48%]
+tests/integration/server/test_search_docs.py::test_normal_when_term PASSED [ 49%]
+tests/integration/server/test_search_docs.py::test_normal_when_tags_are_objects PASSED [ 50%]
+tests/integration/server/test_search_docs.py::test_normal_when_array_item_keys PASSED [ 50%]
+tests/integration/server/test_search_docs.py::test_normal_when_relative_ref_in_defs PASSED [ 51%]
+tests/integration/server/test_search_docs.py::test_normal_when_cyclic_ref_in_other_file PASSED [ 52%]
+tests/integration/server/test_search_docs.py::test_normal_when_schema_ref_unresolvable PASSED [ 53%]
+tests/integration/server/test_search_docs.py::test_normal_when_new_worktree PASSED [ 53%]
+tests/integration/server/test_search_docs.py::test_error_when_worktree_loading PASSED [ 54%]
+tests/integration/server/test_search_docs.py::test_error_when_unexpected PASSED [ 55%]
+tests/integration/server/test_search_docs.py::test_normal_when_disk_storage PASSED [ 56%]
+tests/integration/server/test_search_docs.py::test_error_when_ref_given_to_disk_source PASSED [ 57%]
+tests/integration/server/test_search_docs.py::test_normal_when_builtin_source_read PASSED [ 57%]
+tests/integration/server/test_search_docs.py::test_normal_when_direct_commit_workplace PASSED [ 58%]
+tests/integration/server/test_search_docs.py::test_normal_when_schema_composition_keys PASSED [ 59%]
+tests/integration/server/test_search_docs.py::test_normal_when_many_worktrees_loaded PASSED [ 60%]
+tests/integration/server/test_search_docs.py::test_normal_when_search_excluded PASSED [ 61%]
+tests/integration/server/test_serve.py::test_normal PASSED               [ 61%]
+tests/integration/server/test_serve.py::test_normal_when_mcp_path_without_slash PASSED [ 62%]
+tests/integration/server/test_serve.py::test_normal_when_configs_merged PASSED [ 63%]
+tests/integration/server/test_serve.py::test_normal_when_config_version_old PASSED [ 64%]
+tests/integration/server/test_serve.py::test_normal_when_source_invalid PASSED [ 65%]
+tests/integration/server/test_serve.py::test_normal_when_schema_from_other_source PASSED [ 65%]
+tests/integration/server/test_serve.py::test_normal_when_metadata_out_of_sync PASSED [ 66%]
+tests/integration/server/test_serve.py::test_normal_when_source_config_legacy PASSED [ 67%]
+tests/integration/server/test_serve.py::test_error_when_terminal_config_invalid PASSED [ 68%]
+tests/integration/server/test_serve.py::test_error_when_port_in_use PASSED [ 69%]
+tests/integration/server/test_serve.py::test_normal_when_config_read_from_default_ref PASSED [ 69%]
+tests/integration/server/test_serve.py::test_normal_when_alias_and_nav_warned PASSED [ 70%]
+tests/integration/server/test_serve.py::test_normal_when_mcp_text_from_prompts FAILED [ 71%]
+tests/integration/server/test_serve.py::test_normal_when_source_guide_listed PASSED [ 72%]
+tests/integration/server/test_serve.py::test_normal_when_source_guide_exceeds_limit PASSED [ 73%]
+tests/integration/server/test_serve.py::test_normal_when_source_guide_changed_before_connect PASSED [ 73%]
+tests/integration/server/test_serve.py::test_error_when_prompt_invalid FAILED [ 74%]
+tests/integration/server/test_serve.py::test_normal_when_requested_while_loading PASSED [ 75%]
+tests/integration/server/test_serve.py::test_normal_when_other_source_loading PASSED [ 76%]
+tests/integration/server/test_serve.py::test_normal_when_requested_source_loaded_first PASSED [ 76%]
+tests/integration/server/test_serve.py::test_normal_when_slow_source_not_blocking PASSED [ 77%]
+tests/integration/server/test_serve.py::test_error_when_source_load_failed PASSED [ 78%]
+tests/integration/server/test_serve.py::test_normal_when_ignored_config_first PASSED [ 79%]
+tests/integration/server/test_serve.py::test_normal_when_first_config_not_committed PASSED [ 80%]
+tests/integration/server/test_serve.py::test_normal_when_xdg_dirs_set PASSED [ 80%]
+tests/integration/server/test_serve.py::test_normal_when_paths_base_set PASSED [ 81%]
+tests/integration/server/test_serve.py::test_normal_when_terminal_config_has_unknown_top_level_key PASSED [ 82%]
+tests/integration/server/test_serve.py::test_normal_when_default_ref_exported_in_background PASSED [ 83%]
+tests/integration/server/test_serve.py::test_normal_when_background_export_times_out PASSED [ 84%]
+tests/integration/server/test_serve.py::test_normal_when_disk_storage PASSED [ 84%]
+tests/integration/server/test_serve.py::test_normal_when_git_storage_outside_work_tree PASSED [ 85%]
+tests/integration/server/test_serve.py::test_normal_when_builtin_source_added PASSED [ 86%]
+tests/integration/server/test_serve.py::test_normal_when_builtin_source_registered PASSED [ 87%]
+tests/integration/server/test_serve.py::test_normal_when_builtin_source_unavailable PASSED [ 88%]
+tests/integration/server/test_serve.py::test_normal_when_direct_commit_config_invalid PASSED [ 88%]
+tests/integration/server/test_serve.py::test_normal_when_search_exclude_invalid PASSED [ 89%]
+tests/integration/server/test_trace_related.py::test_normal PASSED       [ 90%]
+tests/integration/server/test_trace_related.py::test_normal_when_direction_in PASSED [ 91%]
+tests/integration/server/test_trace_related.py::test_normal_when_code_paths PASSED [ 92%]
+tests/integration/server/test_trace_related.py::test_normal_when_suggest PASSED [ 92%]
+tests/integration/server/test_trace_related.py::test_normal_when_seen PASSED [ 93%]
+tests/integration/server/test_trace_related.py::test_error_when_document_not_found PASSED [ 94%]
+tests/integration/server/test_trace_related.py::test_error_when_invalid_argument PASSED [ 95%]
+tests/integration/server/test_trace_related.py::test_error_when_source_not_readable PASSED [ 96%]
+tests/integration/server/test_trace_related.py::test_normal_when_outside_scope PASSED [ 96%]
+tests/integration/server/test_trace_related.py::test_normal_when_disk_storage PASSED [ 97%]
+tests/integration/server/test_trace_related.py::test_normal_when_nested_related PASSED [ 98%]
+tests/integration/server/test_trace_related.py::test_normal_when_worktree_metadata_changed PASSED [ 99%]
+tests/integration/server/test_trace_related.py::test_normal_when_search_excluded PASSED [100%]
+
+=================================== FAILURES ===================================
+____________________ test_normal_when_mcp_text_from_prompts ____________________
+
+make_source = <function make_source.<locals>._make at 0x708258f40930>
+write_settings = <function write_settings.<locals>._write at 0x708258f43ab0>
+free_port = <function free_port.<locals>._find at 0x708258f43c10>
+start_serve = <function start_serve.<locals>._start at 0x708258f40eb0>
+wait_until_serving = <function wait_until_serving.<locals>._wait at 0x708258f40460>
+
+    def test_normal_when_mcp_text_from_prompts(
+        make_source: Callable[..., Any],
+        write_settings: Callable[..., Path],
+        free_port: Callable[[], int],
+        start_serve: Callable[..., Any],
+        wait_until_serving: Callable[..., None],
+    ) -> None:
+        """文書の MCP の instructions と 2 つの MCP のツールの description をプロンプトの YAML から描画して返す（正常系）。"""
+        # 準備
+        port = free_port()
+        process = start_serve(write_settings(make_source("sample")), port)
+        wait_until_serving(process, port)
+        prompts = load_prompts(DEFAULT_PROMPTS_DIR, required=mcp_prompt_ids())
+        # 実行
+        initialized = _mcp(port, "/mcp/", INITIALIZE)
+        tools = _mcp(port, "/mcp/", {"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
+        admin_tools = _mcp(port, "/_admin/mcp/", {"jsonrpc": "2.0", "id": 3, "method": "tools/list"})
+        process.terminate()
+        process.wait(timeout=15)
+        # 検証
+        instructions = initialized.json()["result"]["instructions"]
+        texts = [instructions, *_descriptions(tools).values(), *_descriptions(admin_tools).values()]
+        assert instructions == prompts.render(DOCS_INSTRUCTIONS_PROMPT_ID)
+        assert [header for header in INSTRUCTIONS_HEADERS if header not in instructions] == []
+        assert len(instructions) <= INSTRUCTIONS_MAX_CHARS
+>       assert _descriptions(tools) == _rendered(prompts, "docs", DOCS_TOOL_MODELS)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/integration/server/test_serve.py:702: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/integration/server/test_serve.py:195: in _rendered
+    return {name: prompts.render(tool_prompt_id(server, name)) for name in names}
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PromptSet(prompts={'hooks/post-write-notice': LoadedPrompt(doc=PromptDoc(name='書き込みの後の通知', description='書き込んだファイルの管理用の...=None, texts={'ja': <Template memory:708258c4d090>})})}, env=<jinja2.environment.Environment object at 0x708258b39f30>)
+prompt_id = 'mcp/docs/tools/search-docs', values = None
+
+    def render(self, prompt_id: str, values: Mapping[str, Any] | None = None) -> str:
+        """ID のプロンプトを変数の値で描画して 1 つの文にする。"""
+>       loaded = self.prompts[prompt_id]
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'mcp/docs/tools/search-docs'
+
+src/project_index/features/prompt_doc/runtime.py:61: KeyError
+________________________ test_error_when_prompt_invalid ________________________
+
+tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_error_when_prompt_invalid0')
+make_source = <function make_source.<locals>._make at 0x708258ea7110>
+write_settings = <function write_settings.<locals>._write at 0x708258ea7d70>
+free_port = <function free_port.<locals>._find at 0x708258ea5d20>
+start_serve = <function start_serve.<locals>._start at 0x708258ea4a90>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70828c4687c0>
+
+    def test_error_when_prompt_invalid(
+        tmp_path: Path,
+        make_source: Callable[..., Any],
+        write_settings: Callable[..., Path],
+        free_port: Callable[[], int],
+        start_serve: Callable[..., Any],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """プロンプトの YAML がスキーマに違反すると待ち受けずに終わる（異常系）。"""
+        # 準備
+        prompts = tmp_path / "prompts"
+        shutil.copytree(DEFAULT_PROMPTS_DIR, prompts)
+        broken = prompts / "mcp" / "docs" / "tools" / "search-docs.yaml"
+>       value = load_yaml(broken.read_text(encoding="utf-8"))
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/integration/server/test_serve.py:878: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.14/pathlib/__init__.py:788: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/tmp/pytest-of-runner/pytest-0/test_error_when_prompt_invalid0/prompts/mcp/docs/tools/search-docs.yaml')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: '/tmp/pytest-of-runner/pytest-0/test_error_when_prompt_invalid0/prompts/mcp/docs/tools/search-docs.yaml'
+
+/usr/lib/python3.14/pathlib/__init__.py:772: FileNotFoundError
+=========================== short test summary info ============================
+FAILED tests/integration/server/test_serve.py::test_normal_when_mcp_text_from_prompts - KeyError: 'mcp/docs/tools/search-docs'
+FAILED tests/integration/server/test_serve.py::test_error_when_prompt_invalid - FileNotFoundError: [Errno 2] No such file or directory: '/tmp/pytest-of-runner/pytest-0/test_error_when_prompt_invalid0/prompts/mcp/docs/tools/search-docs.yaml'
+======================== 2 failed, 124 passed in 50.94s ========================
+
+$ （develop 90e690a の worktree で）uv run pytest "tests/integration/server/test_serve.py::test_normal_when_mcp_text_from_prompts" "tests/integration/server/test_serve.py::test_error_when_prompt_invalid"
+FAILED tests/integration/server/test_serve.py::test_normal_when_mcp_text_from_prompts
+FAILED tests/integration/server/test_serve.py::test_error_when_prompt_invalid
+2 failed（develop でも同じく fail する既存の不具合。#253 として起票）
