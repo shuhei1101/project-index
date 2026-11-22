@@ -655,8 +655,8 @@ ASSET_DOCS = {
 }
 
 TERM_ASSET_DOCS = {
-    "terms/a3.yaml": "id: a3\nname: 背景\nstatus: inactive\n",
-    "terms/a4.yaml": "id: a4\nname: 効果音\nstatus: inactive\n",
+    "terms/a3.yaml": "id: a3\nname: 背景\ndescription: 背景の素材\nstatus: inactive\n",
+    "terms/a4.yaml": "id: a4\nname: 効果音\ndescription: 効果音の素材\nstatus: inactive\n",
 }
 
 
