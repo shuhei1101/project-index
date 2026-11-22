@@ -1,0 +1,96 @@
+# 単体テスト（Red）: テストコードの末尾の commit 3145686
+
+## 1. ランナーでの全件実行（run_runner）
+
+$ gh workflow run test.yml --ref feat/documents/serve-sqlite-tables -f layer=unit （TP-1 の run_runner）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 1582 items / 1 error
+
+==================================== ERRORS ====================================
+_ ERROR collecting tests/unit/project_index/features/documents/test_sqlite_rows.py _
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/documents/test_sqlite_rows.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/documents/test_sqlite_rows.py:8: in <module>
+    from project_index.features.documents.sqlite_rows import (
+E   ModuleNotFoundError: No module named 'project_index.features.documents.sqlite_rows'
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/documents/test_sqlite_rows.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+=============================== 1 error in 3.66s ===============================
+rc=1 run=https://github.com/shuhei1101/project-index/actions/runs/45028577593
+
+新規のテストファイル test_sqlite_rows.py が、実装の無い project_index.features.documents.sqlite_rows を import して収集の段で止まるため、ランナーの実行はほかのテストを回さずに終わった。
+ほかのテストの fail の理由を確かめるため、手元で収集の誤りがあっても続ける指定で全件を回した（2）。
+手元の /tmp/pytest-of-{user} が root の持ち物でテストの一時フォルダを作れないため、--basetemp で一時フォルダを指定した。
+
+## 2. 手元の全件実行（収集の誤りがあっても続ける）
+
+$ uv run pytest -q --no-header -p no:cacheprovider --continue-on-collection-errors --basetemp=/tmp/pr262-pytest tests/unit
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/documents/test_sqlite_rows.py
+FAILED tests/unit/project_index/features/admin/test_service.py::test_check_project_when_sqlite
+FAILED tests/unit/project_index/features/changes/test_service.py::test_list_changes_when_sqlite_kind
+FAILED tests/unit/project_index/features/describe/test_render.py::test_render_describe_markdown_when_sqlite_kind
+FAILED tests/unit/project_index/features/describe/test_service.py::test_describe_when_sqlite_kind
+FAILED tests/unit/project_index/features/describe/test_warnings.py::test_collect_warnings_when_sqlite
+FAILED tests/unit/project_index/features/documents/test_store.py::test_load_when_sqlite_rows
+FAILED tests/unit/project_index/features/documents/test_store.py::test_load_when_sqlite_unopenable
+FAILED tests/unit/project_index/features/documents/test_store.py::test_check_sync_when_sqlite
+FAILED tests/unit/project_index/features/read/test_service.py::test_get_document_when_sqlite_row
+FAILED tests/unit/project_index/features/search/test_service.py::test_search_docs_when_sqlite_rows_with_ref
+FAILED tests/unit/project_index/features/sources/test_service.py::test_validate_source_config_when_sqlite
+FAILED tests/unit/project_index/features/sources/test_service.py::test_validate_source_config_when_sqlite_with_file_keys[paths]
+FAILED tests/unit/project_index/features/sources/test_service.py::test_validate_source_config_when_sqlite_with_file_keys[schema]
+FAILED tests/unit/project_index/features/sources/test_service.py::test_validate_source_config_when_sqlite_with_file_keys[records]
+FAILED tests/unit/project_index/features/sources/test_service.py::test_validate_source_config_when_sqlite_with_file_keys[writable]
+FAILED tests/unit/project_index/features/sources/test_service.py::test_validate_source_config_when_sqlite_with_file_keys[neither]
+FAILED tests/unit/project_index/features/sources/test_service.py::test_validate_source_config_when_sqlite_invalid[limit]
+FAILED tests/unit/project_index/features/sources/test_service.py::test_validate_source_config_when_sqlite_invalid[columns]
+FAILED tests/unit/project_index/features/sources/test_service.py::test_validate_source_config_when_sqlite_invalid[type]
+FAILED tests/unit/project_index/features/sources/test_service.py::test_validate_source_config_when_sqlite_invalid[file]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_sqlite_kind
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_sqlite_kind_not_atomic
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_replace_text_matches_sqlite
+FAILED tests/unit/project_index/features/write/test_service.py::test_delete_docs_when_sqlite_kind
+FAILED tests/unit/project_index/features/write/test_service.py::test_commit_documents_when_sqlite_kind
+FAILED tests/unit/project_index/test_serve.py::test_log_source_check_when_sqlite
+26 failed, 1556 passed, 1 error in 46.16s
+
+## 3. fail の理由（E の行の種類と件数）
+
+     10 E Use -v to get more diff
+     10 E 
+      8 E ImportError: cannot import name 'SqliteColumn' from 'project_index.features.sources.types' (/home/shuhei2441/repo/project-index/.claude/worktrees/feat-documents-serve-sqlite-tables/src/project_index
+      6 E Left contains 4 more items, first extra item: 'documents[0].paths'
+      4 E At index 0 diff: 'documents[0].sqlite' != 'documents[0]'
+      4 E AssertionError: assert ['documents[0...ts[0].schema'] == ['documents[0]']
+      3 E ImportError: cannot import name 'ReadOnlyKindError' from 'project_index.shared.errors' (/home/shuhei2441/repo/project-index/.claude/worktrees/feat-documents-serve-sqlite-tables/src/project_index/sha
+      2 E ModuleNotFoundError: No module named 'project_index.features.documents.sqlite_rows'
+      1 E project_index.shared.errors.SourceNotServedError: sample は配信していません（documents[1].sqlite: 知らないキー; documents[1].paths: 必須のキーが無い; documents[1].schema: 必
+      1 E project_index.shared.errors.SourceNotServedError: a は配信していません（documents[1].sqlite: 知らないキー; documents[1].paths: 必須のキーが無い; documents[1].schema: 必須�
+      1 E TypeError: SyncReport.__init__() got an unexpected keyword argument 'sqlite_warnings'
+      1 E Left contains one more item: 'documents[0].schema'
+      1 E Left contains one more item: 'documents[0].paths'
+      1 E Left contains 3 more items, first extra item: 'documents[0].schema'
+      1 E Left contains 17 more items, first extra item: 'documents[1].paths'
+      1 E KeyError: 'paths'
+      1 E At index 0 diff: 'documents[1].sqlite' != 'documents[2].sqlite.table'
+      1 E At index 0 diff: 'documents[0].sqlite' != 'documents[0].sqlite.limit'
+      1 E At index 0 diff: 'documents[0].sqlite' != 'documents[0].sqlite.file'
+      1 E At index 0 diff: 'documents[0].sqlite' != 'documents[0].sqlite.columns[0].type'
+      1 E At index 0 diff: 'documents[0].sqlite' != 'documents[0].sqlite.columns'
+      1 E At index 0 diff: 'documents[0].paths' != 'documents[0]'
+      1 E AssertionError: assert ['documents[1....sqlite', ...] == ['documents[2....sqlite.file']
+      1 E AssertionError: assert ['documents[0...ts[0].schema'] == ['documents[0].sqlite.limit']
+      1 E AssertionError: assert ['documents[0...ts[0].schema'] == ['documents[0].sqlite.file']
+      1 E AssertionError: assert ['documents[0...ts[0].schema'] == ['documents[0...umns[0].type']
+      1 E AssertionError: assert ['documents[0...ts[0].schema'] == ['documents[0...lite.columns']
+      1 E AssertionError: assert ['documents[0...nts[0].paths'] == ['documents[0]']
+
+fail は全て今回足したテストで、理由は実装の無いこと（sqlite_rows の module・SqliteColumn・SqliteTable・ReadOnlyKindError・SyncReport.sqlite_warnings が無い、documents[].sqlite が知らないキー・paths と schema が必須のまま）だけ。既存のテストは全て pass。実装の前から pass した新しいテストは無い。
