@@ -107,14 +107,14 @@ status_codes:
   condition: 要求の型の検証に失敗した（`message` が無い・`writes` と `deletes` が両方とも空）
   notes: 起動の『例外の変換の登録』が `InvalidArgumentError` の problem+json にし、`errors[]` にキーのパスと理由を並べる
 - code: '403'
-  condition: 別のオリジンの要求（`CrossOriginError`）か、書き換わる文書の種類が端末の設定の `write_api_kinds` に無い（`DirectCommitNotAllowedError`）
+  condition: 別のオリジンの要求（`CrossOriginError`）か、書き換わる文書の種類が配信元の設定の `direct_commit.kinds[]` にはあるが端末の設定の `write_api_kinds` に無い（`DirectCommitNotAllowedError`）
   notes: '`DirectCommitNotAllowedError` は、許可していない種類と、許可を記載する端末の設定のキーを返却する'
 - code: '404'
   condition: 配信していない配信元（`SourceNotFoundError`）か、削除・更新する文書が無い
 - code: '409'
   condition: 文書のバージョンが取り込んだ後の今のバージョンと違う（`VersionConflictError`）か、ワークツリーに未プッシュのコミット・書き込むファイルに未コミットの変更がある
 - code: '422'
-  condition: 検査に合格しない（`ValidationFailedError`。許可していない種類の文書が書き換わる・秘密の値を含むも同じ）
+  condition: 検査に合格しない（`ValidationFailedError`。配信元の設定の `direct_commit.kinds[]` に無い種類の文書が書き換わる・秘密の値を含むも同じ）
   notes: '`errors[]` に、`writes`・`deletes` の別と添字・項目のパス・決まり・直し方を全て並べる'
 - code: '502'
   condition: リモートへの取得・プッシュに失敗した（`PushRejectedError`・`PushFailedError`）か、`generators[]` が失敗した（`DirectCommitGeneratorError`）
@@ -129,9 +129,9 @@ constraints:
   constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）。作業場所（`cwd`）は受け取らず、`scope.write` と `sources[].direct_commit.scope`・`kinds` では判定しない
   decided_by: NFR-1#requirements[通信]
 - item: 書き込みの API の直コミットの権限
-  constraint: '変更を適用した後に書き換わる全ての文書（`rename` の参照元・`replace_text` で置換した文書・`onReferenced: unlink` で参照を除く文書を含む）の種類が、端末の設定の `sources[].direct_commit.write_api_kinds` にあることを確認する。無い種類があれば `DirectCommitNotAllowedError` で断る'
+  constraint: '制約「直コミットを許可する種類」の後に、変更を適用した後に書き換わる全ての文書（`rename` の参照元・`replace_text` で置換した文書・`onReferenced: unlink` で参照を除く文書を含む）の種類が、端末の設定の `sources[].direct_commit.write_api_kinds` にあることを確認する。配信元の設定の `direct_commit.kinds[]` にあって `write_api_kinds` に無い種類があれば `DirectCommitNotAllowedError` で断る'
 - item: 直コミットを許可する種類
-  constraint: '[文書の書き込み](id:IF-6) の制約「直コミットを許可する種類」と同じ。`write_api_kinds` にあっても配信元の設定の `direct_commit.kinds[]` に無い種類は、起動の検証で警告にして使用しない'
+  constraint: '[文書の書き込み](id:IF-6) の制約「直コミットを許可する種類」と同じで、制約「書き込みの API の直コミットの権限」より先に判定する。書き換わる文書に配信元の設定の `direct_commit.kinds[]` に無い種類があれば、`write_api_kinds` に関わらず `ValidationFailedError` で返却する。`write_api_kinds` にあっても配信元の設定の `direct_commit.kinds[]` に無い種類は、起動の検証で警告にして使用しない'
 - item: 書き込みと削除の 1 つのコミット
   constraint: '`writes` を並び順に適用し、続けて `deletes` を適用した後の文書を検査する。全ての操作が合格したときだけ書き込み、書き込んだ・削除したファイルと生成物を 1 つのコミットにする。`atomic: false` は受け付けない'
 - item: 直コミットの流れ
