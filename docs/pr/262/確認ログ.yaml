@@ -1,0 +1,13 @@
+confirmations:
+  - topic: 配信元の設定の documents[].sqlite のキーの構造
+    decision: file・table・where・order_by・limit・columns[]（name・type・description）の構造で追加し、metadata・alias_type は既存のキーを使用する（推奨案 A）
+    decided_by: thumbs_up
+    approver: shuhei1101
+    commit: fc759bb
+    thread: https://github.com/shuhei1101/project-index/pull/262#discussion_r4657857997
+  - topic: documents[].sqlite.limit の既定
+    decision: 既定 1000 行。超えた分は配信せず describe() と check_project で通知する（推奨案 A）
+    decided_by: thumbs_up
+    approver: shuhei1101
+    commit: fc759bb
+    thread: https://github.com/shuhei1101/project-index/pull/262#discussion_r4657858262
