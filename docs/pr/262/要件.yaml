@@ -1,0 +1,84 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-6.yaml
+    impact: changed
+    detail: エージェントが、アプリの SQLite のデータの行もタグ・種類・本文・別名で 1 回の検索で探して参照できる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: SQLite の行から配信した文書への書き込み・削除は、読み取り専用である理由とともに断られる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: changed
+    detail: 利用者が配信元の設定に SQLite の表を指す行を追加し、管理の MCP で確認してから配信に入れられる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: changed
+    detail: 起動時に SQLite の表を指す行も読み込んで配信し、開けないファイルは警告にして他の行の配信を続ける
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-8.yaml
+    impact: changed
+    detail: 変更のレビューでは、履歴を持たない SQLite の行の文書を変わった文書に含めない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-9.yaml
+    impact: following
+    detail: アプリが SQLite の行を書き換えた後の次の取得の振る舞いを、YAML を直接編集した後の再読み込みに合わせる
+    depends_on:
+      - docs/scenario/SC-6.yaml
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: run_only
+    detail: 画面のサーバーの文書の一覧・取得・検索に SQLite の行の文書が混ざっても読み取りが壊れない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-17.yaml
+    impact: following
+    detail: 画面のサーバーからの書き込みも、SQLite の行の文書の書き込み・削除を断る
+    depends_on:
+      - docs/scenario/SC-7.yaml
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: run_only
+    detail: 配信元の文書の読み書きの全体の流れが、SQLite の行の追加で壊れない
+    depends_on: []
+docs:
+  - page: docs/guide/設定.md
+    new: false
+    change: 配信元の設定の documents[] の行の SQLite のキー（ファイル・表かビュー・列名の対応・列の説明・行の条件と上限）を追加する
+    status: todo
+  - page: docs/guide/配信元を配信する.md
+    new: false
+    change: アプリの SQLite の表を読み取り専用の文書として配信する手順と、書き込みはアプリの MCP で行う旨を追加する
+    status: todo
+  - page: docs/guide/documentsの行の判定.md
+    new: false
+    change: ファイル・records に加えて SQLite の表を指す行を選ぶ場合を追加する
+    status: todo
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: search_docs・describe・list_match_words・write_docs・delete_docs・list_changes の SQLite の行の文書の扱いを追加する
+    status: todo
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: check_project が返却する SQLite の行の違反を追加する
+    status: todo
+  - page: docs/guide/コアコンセプト-文書のメタデータ.md
+    new: false
+    change: 文書の集め方に SQLite の表の 1 行 1 文書を追加する
+    status: todo
+  - page: docs/glossary/GLO-1.yaml
+    new: false
+    change: 用語『文書』の説明に SQLite の表の 1 行を追加する
+    status: todo
+scope_out:
+  - item: aituber のゲーム実況の行と AI Monitor の連絡ボードの、配信元の設定への行の追加
+    reason: それぞれのリポジトリの作業で、この作業 PR の機能を前提にする後続。起点 Issue は完了の後に起票すると定めている
+    plan: to_file
+  - item: write_docs・delete_docs での SQLite の行の書き込み
+    reason: アプリの検査を通らない書き込みができるため見送ると起点 Issue で決定した。書き込みは各アプリの MCP のツールで行う
+    plan: none
