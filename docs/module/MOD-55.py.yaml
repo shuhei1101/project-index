@@ -135,7 +135,7 @@ functions:
       3. 有効な文書の行ごとの文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）で使える項目を作り、条件の確かめをする
          - 違反がある場合、違反と `describe(source, kind)` でスキーマを見ることを添えた `InvalidArgumentError` を送る
       4. `limit` が `LIMIT_MAX` を超えれば丸め、`max_chars` が `MAX_CHARS_LIMIT` を超えれば丸めて、それぞれ `notes` で知らせる。`limit` が 1 未満なら `InvalidArgumentError` を送る
-      5. 条件の照合で当たった文書を集め（`include_excluded` が `False` の場合、当たった文書のうち、文書の行ごとの除く条件の取り出しの条件に除く条件の照合で該当する文書を除き、除いた件数が 1 以上なら `excluded_count` にして `既定の検索から {件数} 件を除きました。include_excluded: true で取得できます` を `notes` に足す。`True` の場合は該当する文書の `excluded` を `True` にする。`term` がある場合は、場所ごとにエイリアスの集め（文書のストア）をし、用語に当たる文書の ID（文書のストア）に入る文書だけを残す。`has_alias_rows` が `False` の場所は `{id}: alias_type を持つ documents の行が無いので term に該当する文書はありません` を `notes` に足す）、`total_count` と（複数の配信元なら）`per_source` を数える。読んだ配信元の ID を `,` で繋いで `source_label` にする
+      5. 条件の照合で当たった文書を集め（`term` がある場合は、場所ごとにエイリアスの集め（文書のストア）をし、用語に当たる文書の ID（文書のストア）に入る文書だけを残す。`has_alias_rows` が `False` の場所は `{id}: alias_type を持つ documents の行が無いので term に該当する文書はありません` を `notes` に足す）、続けて `include_excluded` が `False` の場合、条件の照合と `term` で当たった文書のうち、文書の行ごとの除く条件の取り出しの条件に除く条件の照合で該当する文書を除き、除いた件数が 1 以上なら `excluded_count` にして `既定の検索から {件数} 件を除きました。include_excluded: true で取得できます` を `notes` に足す（`True` の場合は該当する文書の `excluded` を `True` にする）。除いた後の文書で `total_count` と（複数の配信元なら）`per_source` を数える。読んだ配信元の ID を `,` で繋いで `source_label` にする
       6. 条件の木から、`field` が `body`・`*` の条件を `and`・`or` の下だけたどって集める（`not` の下はたどらない。以下、本文の条件）
       7. `fields` か `order_by` に `@matches` がある場合、当たった文書ごとに本文の全文と本文の条件で当たった行の数を数える（本文の条件が無ければ 0）
       8. `group_by` がある場合、当たった文書の値ごとの件数を `groups` にする（配列は要素ごとに数え、値が無い文書は `（なし）`）
@@ -314,9 +314,9 @@ functions:
       - name: test_search_docs_when_search_excluded
         case: 正常
         summary: 既定の結果から除く
-        condition: '`search_exclude: {field: status, op: eq, values: [inactive]}` の行に `status: active` の a1 と `inactive` の a2。`filter` が `kind` の `eq`、`id` が `a2` の `eq`、`view: count`、`group_by: status`'
+        condition: '`search_exclude: {field: status, op: eq, values: [inactive]}` の行に `status: active` の a1 と `inactive` の a2。`filter` が `kind` の `eq`、`id` が `a2` の `eq`、`view: count`、`group_by: status`、`alias_type` を持つ行で `term` に当たる `inactive` の a3 と当たらない `inactive` の a4 に `term`'
         mock: なし
-        expected: 'a1 だけ・`excluded_count: 1`、0 件・`excluded_count: 1`、`total_count: 1`、`active` の 1 件だけ'
+        expected: 'a1 だけ・`excluded_count: 1`、0 件・`excluded_count: 1`、`total_count: 1`、`active` の 1 件だけ、`term` は 0 件・`excluded_count: 1`（a4 を数えない）'
         exception: '-'
       - name: test_search_docs_when_include_excluded
         case: 正常
