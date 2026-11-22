@@ -515,6 +515,12 @@ data_models:
         access: 公開
         default: '[]'
         description: 端末の設定の `sources[].direct_commit.write_api_kinds` のうち、配信元の `direct_commit.kinds[]` にある種類
+      - name: direct_commit_on_conflict
+        title: 衝突したときのスクリプト
+        type: OnConflictScript | None
+        access: 公開
+        default: None
+        description: 端末の設定の `sources[].direct_commit.on_conflict`。書き込みの API が衝突してブランチに残した後に実行する
     methods:
       - name: table
         title: 文書の行を引く

@@ -872,7 +872,7 @@ functions:
            - `CONFLICT_ERRORS` に当たらない例外の場合、`[warning]` 衝突したときのブランチに残せなかった（配信元・`base_commit`・例外）
          - 書き込みの期限を過ぎた場合は `WriteDeadlineExceededError` を送る
 
-      5. 排他を放した後、`dry_run` でなく、配信元の端末の設定の行の `direct_commit.on_conflict` がある場合、衝突したときのスクリプトの実行（`run_conflict_script`）を呼ぶ。`cwd` はクローン本体の直下、`env` は配信元の ID・ブランチ・コミット・`base_commit` の 40 桁の SHA・コミットするブランチ・`message`、`timeout_sec` は `limits.respond_by` の残りと `timeout_sec` の短い方にする
+      5. 排他を放した後、`dry_run` でなく、手順 2 の配信元の `direct_commit_on_conflict` がある場合、衝突したときのスクリプトの実行（`run_conflict_script`）を呼ぶ。`cwd` はクローン本体の直下、`env` は配信元の ID・ブランチ・コミット・`base_commit` の 40 桁の SHA・コミットするブランチ・`message`、`timeout_sec` は `limits.respond_by` の残りと `timeout_sec` の短い方にする
 
       6. `applied`・`writes`（書き込みの結果）・`deletes`（削除の結果）・`unlinked`・`commit` で返す。衝突した場合は `applied` を `False`・`writes`・`deletes`・`unlinked` を一時のワークツリーの結果・`commit` を `None` にし、`conflict` に手順 4 のブランチとコミット・`base_commit` の 40 桁の SHA・手順 3 の例外の違反（`errors`）・手順 5 の結果を入れる。会話の記録は残さない（会話キーを持たない）
     unit_tests:
