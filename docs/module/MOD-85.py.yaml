@@ -545,6 +545,12 @@ data_models:
         access: 公開
         default: 'False'
         description: '`True` のとき、取得・書き込み・コミット・プッシュをしない'
+      - name: base_commit
+        title: 編集を始めたときのコミット
+        type: str | None
+        access: 公開
+        default: None
+        description: 本文の `baseCommit`。`None` のときは衝突してもブランチに残さずに断る
   - name: CommitDocumentsResult
     title: 書き込みと削除の直コミットの結果
     container: project_index/features/write/types.py
@@ -580,6 +586,12 @@ data_models:
         access: 公開
         default: None
         description: '`dry_run` のときは `None`'
+      - name: conflict
+        title: 衝突したときの結果
+        type: ConflictResult | None
+        access: 公開
+        default: None
+        description: 衝突してブランチに残したとき（`dry_run` は残せるとき）だけ持つ。持つとき `applied` は `False`、`commit` は `None`
   - name: CommitDocumentsBody
     title: 書き込みの API の本文
     container: project_index/features/write/types.py
@@ -623,6 +635,12 @@ data_models:
         access: 公開
         default: 'False'
         description: '`dryRun`'
+      - name: base_commit
+        title: 編集を始めたときのコミット
+        type: str | None
+        access: 公開
+        default: None
+        description: '`baseCommit`。16 進数の 7〜40 桁でなければ検証で断る'
   - name: CommitDocumentsResponse
     title: 書き込みの API の応答
     container: project_index/features/write/types.py
@@ -651,6 +669,67 @@ data_models:
         type: CommitResult | None
         access: 公開
         description: '`{sha, branch, retried}`'
+  - name: ScriptRunResult
+    title: 衝突したときのスクリプトの結果
+    container: project_index/features/write/types.py
+    usecase: 直コミット
+    role: DTO
+    summary: 衝突したときのスクリプトの終了コードと出力
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: exit_code
+        title: 終了コード
+        type: int | None
+        access: 公開
+        description: 制限時間で止めたときと、コマンドを起動できなかったときは `None`
+      - name: timed_out
+        title: 制限時間で止めたか
+        type: bool
+        access: 公開
+        description: 制限時間で止めたとき `True`
+      - name: stdout
+        title: 標準出力
+        type: str
+        access: 公開
+        description: 末尾 `SCRIPT_OUTPUT_TAIL_CHARS` 文字
+      - name: stderr
+        title: 標準エラー出力
+        type: str
+        access: 公開
+        description: 末尾 `SCRIPT_OUTPUT_TAIL_CHARS` 文字。起動できなかったときはその理由
+  - name: ConflictResult
+    title: 衝突したときの結果
+    container: project_index/features/write/types.py
+    usecase: 直コミット
+    role: DTO
+    summary: 衝突して残したブランチ・コミット・今のブランチで断った理由・スクリプトの結果
+    description: '`dataclass(frozen=True)`。書き込みの API が応答の `conflict` にする'
+    properties:
+      - name: branch
+        title: ブランチ
+        type: str | None
+        access: 公開
+        description: 残したブランチの名前（`dry_run` は `None`）
+      - name: commit
+        title: コミット
+        type: str | None
+        access: 公開
+        description: ブランチの先頭の SHA（`dry_run` は `None`）
+      - name: base_commit
+        title: 起点のコミット
+        type: str
+        access: 公開
+        description: '`base_commit` を解いた 40 桁の SHA'
+      - name: errors
+        title: 今のブランチで断った理由
+        type: list[Violation]
+        access: 公開
+        description: 今のブランチで送出されたエラーを、problem+json の `errors[]` と同じ違反にしたもの
+      - name: script
+        title: スクリプトの結果
+        type: ScriptRunResult | None
+        access: 公開
+        description: '`on_conflict` が無いか `dry_run` のときは `None`'
 constants:
   - name: OPERATIONS_MAX
     title: 1 回の操作の上限
