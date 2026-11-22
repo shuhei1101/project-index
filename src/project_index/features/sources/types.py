@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
+from pydantic import BaseModel, ConfigDict
+
 from project_index.features.sources.schema_ref import SchemaRef
 from project_index.shared.errors import UnknownKindError, Violation
 
@@ -17,14 +19,44 @@ type SourceStatusKind = Literal["serving", "not_served", "disabled", "loading"]
 type StorageType = Literal["git", "disk"]
 
 
+# `documents[].sqlite.limit` を省いた行が読み込む行の上限
+SQLITE_ROW_LIMIT = 1000
+
+
+class SqliteColumn(BaseModel):
+    """`documents[].sqlite.columns[]` の 1 要素。"""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    # `json` は JSON の文字列を配列・オブジェクトにして持つ
+    type: Literal["text", "integer", "real", "json"] = "text"
+    description: str
+
+
+class SqliteTable(BaseModel):
+    """`documents[].sqlite` の値。"""
+
+    model_config = ConfigDict(frozen=True)
+
+    # 配信元のフォルダからの相対パス
+    file: str
+    table: str
+    where: str | None = None
+    # `None` は `id` に対応する列の昇順
+    order_by: str | None = None
+    limit: int = SQLITE_ROW_LIMIT
+    columns: list[SqliteColumn]
+
+
 @dataclass(frozen=True)
 class DocumentTable:
     """配信元の設定の `documents[]` の 1 行。"""
 
     id: str
     paths: list[str]
-    # 文字列は配信元の直下からの相対パス、`SchemaRef` はほかの配信元のリビジョンのスキーマ
-    schema_path: str | SchemaRef
+    # 文字列は配信元の直下からの相対パス、`SchemaRef` はほかの配信元のリビジョンのスキーマ。`sqlite` を持つ行は `None`
+    schema_path: str | SchemaRef | None
     title: str | None = None
     enabled: bool = True
     validators: list[str] = field(default_factory=list[str])
@@ -41,10 +73,14 @@ class DocumentTable:
     alias_type: str | None = None
     # `search_docs` の `filter` と同じ構造の、既定の検索から除く文書の条件（読み込んだ辞書のまま）
     search_exclude: dict[str, Any] | None = None
+    # SQLite の表を指す行（`paths` は空で、文書は表の 1 行 1 件）
+    sqlite: SqliteTable | None = None
 
     @property
     def is_writable(self) -> bool:
-        """`write_docs`・`delete_docs` を許すか（`writable` が無ければ許す）。"""
+        """`write_docs`・`delete_docs` を許すか（SQLite の表の行は許さず、`writable` が無ければ許す）。"""
+        if self.sqlite is not None:
+            return False
         return True if self.writable is None else self.writable
 
     def excludes(self, path: str) -> bool:

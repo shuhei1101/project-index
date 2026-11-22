@@ -149,8 +149,6 @@ properties:
       additionalProperties: false
       required:
         - id
-        - paths
-        - schema
       properties:
         id:
           type: string
@@ -231,6 +229,48 @@ properties:
             minLength: 1
         alias_type:
           enum: [term, doc, command, url, skill, tool, path, env, avoid]
+        sqlite:
+          description: この行の文書を、SQLite の表かビューの 1 行 1 件で読み取り専用で配信する。記載した行は paths・exclude・schema・records・body_file・converter・validators・after_write・writable を持てない
+          type: object
+          additionalProperties: false
+          required: [file, table, columns]
+          properties:
+            file:
+              description: データベースのファイルの、配信元のフォルダからの相対パス
+              type: string
+              minLength: 1
+            table:
+              description: 配信する表か SQL のビューの名前
+              type: string
+              minLength: 1
+            where:
+              description: SQL の WHERE 句の条件
+              type: string
+              minLength: 1
+            order_by:
+              description: SQL の ORDER BY 句の列と向き。省くと id に対応する列の昇順
+              type: string
+              minLength: 1
+            limit:
+              description: 配信する行の数の上限
+              type: integer
+              minimum: 1
+            columns:
+              description: 配信する列の並び
+              type: array
+              minItems: 1
+              items:
+                type: object
+                additionalProperties: false
+                required: [name, description]
+                properties:
+                  name:
+                    type: string
+                    minLength: 1
+                  type:
+                    enum: [text, integer, real, json]
+                  description:
+                    type: string
   validators:
     $ref: "#/$defs/scripts"
   converters:
