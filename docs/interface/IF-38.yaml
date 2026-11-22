@@ -193,7 +193,7 @@ constraints:
 - item: 編集を始めたときのコミット
   constraint: '取得と取り込みの後に、`baseCommit` がクローンにあり、`origin/{コミットするブランチ}` の祖先であることを確認する。クローンに無ければ `reason: not_found`、祖先でなければ `reason: not_ancestor` の `BaseCommitUnusableError`（409）で、検査の前に断る'
 - item: 衝突したときのブランチ
-  constraint: '`baseCommit` でブランチを付けない一時のワークツリーを状態のフォルダの下に作り、`writes`・`deletes` と `generators[]` の結果を 1 つのコミット（説明は `message`）にしてから、そのコミットに `project-index/conflict/{YYYYMMDD-HHMMSS}-{コミットの 7 桁}` のブランチを作る。ブランチはクローンにだけ作り、プッシュしない。一時のワークツリーは成功しても失敗しても削除する'
+  constraint: '`baseCommit` でブランチを付けない一時のワークツリーを状態のフォルダの下に作り、`writes`・`deletes` と `generators[]` の結果を 1 つのコミット（説明は `message`）にしてから、そのコミットに `project-index/conflict/{YYYYMMDD-HHMMSS}-{コミットの 7 桁}`（時刻は UTC）のブランチを作る。ブランチはクローンにだけ作り、プッシュしない。一時のワークツリーは成功しても失敗しても削除する'
 - item: 衝突したときの断る理由
   constraint: '`baseCommit` の一時のワークツリーでも合格しない要求は、今のブランチで断ったエラーと `errors[]` で断る（一時のワークツリーの違反は返却しない）'
 - item: 衝突したときのスクリプト
