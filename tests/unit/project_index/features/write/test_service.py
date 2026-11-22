@@ -2595,9 +2595,7 @@ def test_commit_documents_when_conflict_invalid_at_base(
     commit_env = make_commit_env(write_api_kinds=["rules"])
     base = _conflicting(commit_env, run_git)
     writes = [
-        Operation(
-            op="update", id="doc-1", expected_version=content_hash(DOC_1), unset=["name"]
-        )
+        Operation(op="update", id="doc-1", expected_version=content_hash(DOC_1), unset=["name"])
     ]
     worktrees = run_git(commit_env.env.clone, "worktree", "list")
     # 実行・検証
@@ -2631,9 +2629,7 @@ def test_commit_documents_when_conflict_dry_run(
     commit_env = make_commit_env(write_api_kinds=["rules"], on_conflict=ECHO_BRANCH)
     base = _conflicting(commit_env, run_git)
     # 実行
-    result = _commit_documents(
-        commit_env, writes=_update_doc_1(), base_commit=base, dry_run=True
-    )
+    result = _commit_documents(commit_env, writes=_update_doc_1(), base_commit=base, dry_run=True)
     # 検証
     assert result.applied is False
     assert result.conflict is not None

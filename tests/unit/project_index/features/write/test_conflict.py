@@ -8,15 +8,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
-
-from project_index.features.settings.types import OnConflictScript
-from project_index.features.write import conflict
 from project_index.features.write.conflict import (
     conflict_branch_name,
     keep_in_branch,
     run_conflict_script,
     verify_base_commit,
 )
+
+from project_index.features.settings.types import OnConflictScript
+from project_index.features.write import conflict
 from project_index.features.write.direct_commit import CommitPlan
 from project_index.shared.errors import BaseCommitUnusableError, ValidationFailedError, Violation
 
@@ -95,9 +95,7 @@ def _write_n2(folder: Path) -> list[Path]:
     return [target]
 
 
-def test_verify_base_commit(
-    remote: Remote, plan: CommitPlan, run_git: Callable[..., str]
-) -> None:
+def test_verify_base_commit(remote: Remote, plan: CommitPlan, run_git: Callable[..., str]) -> None:
     """短縮の SHA を 40 桁にする（正常系）。"""
     # 準備
     first = run_git(remote.develop, "rev-parse", "HEAD").strip()
@@ -325,9 +323,7 @@ def test_run_conflict_script_when_timeout(tmp_path: Path) -> None:
     assert result.timed_out is True
 
 
-def test_run_conflict_script_when_no_time(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_run_conflict_script_when_no_time(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """残りの時間が無ければ実行しない（正常系）。"""
     # 準備
     calls: list[object] = []
@@ -351,4 +347,3 @@ def test_run_conflict_script_when_not_found(tmp_path: Path) -> None:
     assert result.exit_code is None
     assert result.timed_out is False
     assert "project-index-no-such-command" in result.stderr
-

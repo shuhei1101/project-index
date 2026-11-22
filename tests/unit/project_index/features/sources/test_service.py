@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from jsonschema import Draft202012Validator
 
+from project_index.features.settings.types import SourceDirectCommit
 from project_index.features.sources import service as service_module
 from project_index.features.sources.service import (
     assemble_source,
@@ -30,7 +31,6 @@ from project_index.features.sources.types import (
     ServedSource,
     SourceConfig,
 )
-from project_index.features.settings.types import SourceDirectCommit
 from project_index.shared.errors import ValidationFailedError, Violation
 
 if TYPE_CHECKING:
