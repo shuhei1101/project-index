@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -21,6 +22,7 @@ from project_index.features.seen.types import SessionKey
 from project_index.features.sources.registry import SourceRegistry
 from project_index.features.sources.types import DocumentTable, ServedSource, SourceConfig
 from project_index.shared.errors import InvalidArgumentError, LastReadNotFoundError
+from tests.unit.project_index.conftest import notes_db_table
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -540,3 +542,50 @@ def test_list_changes_when_include_excluded(
         ("a4", True),
     ]
     assert result.excluded_count is None
+
+
+def test_list_changes_when_sqlite_kind(
+    tmp_path: Path,
+    git_repo: Callable[..., Path],
+    commit_all: Callable[..., str],
+    run_git: Callable[..., str],
+    make_notes_db: Callable[..., Path],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., SourceRegistry],
+) -> None:
+    """SQLite の行の種類を比べる対象から除く（正常系）。"""
+    # 準備
+    clone = git_repo({"docs/doc-1.yaml": DOC_1, ".gitignore": "data/\n"})
+    db = make_notes_db(clone)
+    table = DocumentTable(id="rules", paths=["docs/*.yaml"], schema_path="schemas/rule.schema.yaml")
+    source = make_served_source(
+        id="sample",
+        root=clone,
+        config=make_source_config(documents=[table, notes_db_table()]),
+        is_git=True,
+        repo_root=clone,
+        scope_write=[str(clone)],
+    )
+    env = ChangesEnv(
+        registry=make_registry(source),
+        store=DocumentStore(SnapshotStore(tmp_path / "snapshots")),
+        seen=SeenStore(tmp_path / "seen.sqlite3", retention_days=7),
+        source=source,
+        clone=clone,
+    )
+    first = run_git(clone, "rev-parse", "HEAD").strip()
+    conn = sqlite3.connect(db)
+    conn.execute("UPDATE notes SET title = '書き換えた' WHERE id = 'n1'")
+    conn.commit()
+    conn.close()
+    second = commit_all(clone, {"docs/doc-1.yaml": "id: doc-1\nname: 新しい名前\n"})
+    notes_db = Condition(field="kind", op="eq", values=["notes_db"])
+    # 実行
+    unfiltered = env.list(**{"from": first, "to": second})
+    filtered = env.list(**{"from": first, "to": second, "filter": notes_db})
+    # 検証
+    assert [item.id for item in unfiltered.items] == ["doc-1"]
+    assert filtered.items == []
+    assert len(filtered.notes) == 1
+    assert "notes_db" in filtered.notes[0]

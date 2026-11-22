@@ -212,3 +212,27 @@ def test_collect_warnings_when_unknown_top_level_key(
     assert len(result) == 1
     assert str(terminal.file) in result[0]
     assert "mindstella, prot" in result[0]
+
+
+def test_collect_warnings_when_sqlite(
+    make_sqlite_source_dir: Callable[..., Path],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """SQLite の行の警告を 1 件ずつ並べる（正常系）。"""
+    # 準備
+    config = make_sqlite_source_dir("a")
+    handlers = _loaded_handlers(
+        make_terminal_config(sources=[make_entry(str(config), source_id="a")])
+    )
+    # 実行
+    result = collect_warnings(
+        [_access("a")],
+        registry=handlers.registry,
+        checks=handlers.checks,
+        terminal=handlers.terminal,
+    )
+    # 検証
+    assert len(result) == 2
+    assert result[0].startswith("a: notes_db: ")
+    assert result[1].startswith("a: missing_db: ")

@@ -1434,3 +1434,34 @@ def test_run_skew_when_input_not_found(tmp_path: Path, capsys: pytest.CaptureFix
     assert code == 2
     assert captured.out == ""
     assert missing in captured.err
+
+
+def test_log_source_check_when_sqlite(
+    make_served_source: Callable[..., ServedSource],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """SQLite の行の警告を警告のログに書く（正常系）。"""
+    # 準備
+    from project_index.features.describe.source_checks import SourceCheck
+    from project_index.features.documents.types import SyncReport
+    from project_index.main import log_source_check
+
+    source = make_served_source(id="sample")
+    check = SourceCheck(
+        report=SyncReport(
+            source_id="sample",
+            sqlite_warnings=[
+                "notes_db: data/notes.db を開けません（unable to open database file）"
+            ],
+        ),
+        nav=[],
+    )
+    # 実行
+    with caplog.at_level(logging.WARNING):
+        log_source_check(source, check)
+    # 検証
+    warnings = _warnings(caplog)
+    assert len(warnings) == 1
+    assert "sample" in warnings[0]
+    assert "notes_db" in warnings[0]
+    assert "data/notes.db" in warnings[0]

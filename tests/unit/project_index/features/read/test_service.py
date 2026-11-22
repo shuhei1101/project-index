@@ -15,9 +15,11 @@ from project_index.features.read.service import (
 )
 from project_index.features.sources.types import DocumentTable, ScriptEntry
 from project_index.shared.errors import DecisionNotFoundError, DocumentNotFoundError
+from tests.unit.project_index.conftest import notes_db_table
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
     from project_index.features.access.types import Target
 
@@ -410,3 +412,32 @@ def test_get_document_when_doc_id_not_found(
             store=env.handlers.store,
             converter=env.handlers.converter,
         )
+
+
+def test_get_document_when_sqlite_row(
+    make_view_env: Callable[..., SimpleNamespace], make_notes_db: Callable[..., Path]
+) -> None:
+    """SQLite の行の文書の schema を列の説明から作る（正常系）。"""
+    from project_index.features.documents.sqlite_rows import columns_schema
+
+    # 準備
+    table = notes_db_table()
+    env = make_view_env(tables=[table])
+    make_notes_db(env.root)
+    # 実行
+    response = get_document(
+        _target(env),
+        "data/notes.db",
+        doc_id="n1",
+        store=env.handlers.store,
+        converter=env.handlers.converter,
+    )
+    # 検証
+    assert response.value == {
+        "id": "n1",
+        "title": "ゲーム実況 1",
+        "summary": "今日の目標 1",
+        "tags": ["game"],
+        "aliases": ["実況"],
+    }
+    assert response.model_dump(by_alias=True)["schema"] == columns_schema(table)

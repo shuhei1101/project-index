@@ -1217,3 +1217,67 @@ def test_write_nav_when_indent_preserved(
     assert (nav_source / "project-index.yaml").read_text(encoding="utf-8") == (
         INDENTLESS_NAV_CONFIG + ADDED_MCP_TAB
     )
+
+
+SQLITE_CHECK_CONFIG = (
+    "name: sample\n"
+    "documents:\n"
+    "  - id: rules\n"
+    "    paths: [docs/rule/*.yaml]\n"
+    "    schema: schemas/rule.schema.yaml\n"
+    "  - id: notes_db\n"
+    "    sqlite:\n"
+    "      file: data/notes.db\n"
+    "      table: notes\n"
+    "      limit: 1\n"
+    "      columns: [{name: id, description: ID}, {name: title, description: タイトル}]\n"
+    "  - id: no_table\n"
+    "    sqlite:\n"
+    "      file: data/notes.db\n"
+    "      table: memos\n"
+    "      columns: [{name: id, description: ID}]\n"
+    "  - id: no_column\n"
+    "    sqlite:\n"
+    "      file: data/notes.db\n"
+    "      table: notes\n"
+    "      columns: [{name: id, description: ID}, {name: heading, description: 見出し}]\n"
+    "  - id: no_file\n"
+    "    sqlite:\n"
+    "      file: data/missing.db\n"
+    "      table: notes\n"
+    "      columns: [{name: id, description: ID}]\n"
+)
+
+
+def test_check_project_when_sqlite(
+    tmp_path: Path,
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+    make_notes_db: Callable[..., Path],
+    make_terminal_config: Callable[..., TerminalConfig],
+) -> None:
+    """SQLite の行のファイル・表・列の欠けを違反にし、上限の超過を警告にする（異常系）。"""
+    # 準備
+    clone = git_repo(
+        {
+            "project-index.yaml": SQLITE_CHECK_CONFIG,
+            "schemas/rule.schema.yaml": "title: rule\ntype: object\n",
+            "docs/rule/doc-1.yaml": "id: doc-1\nname: 文書 1\n",
+            ".gitignore": "data/\n",
+        }
+    )
+    worktree = tmp_path / "wt"
+    run_git(clone, "worktree", "add", "-b", "feat", str(worktree))
+    make_notes_db(clone)
+    handlers = _handlers(make_terminal_config)
+    request = CheckProjectRequest(path=str(worktree))
+    # 実行
+    result = check_project(request, handlers=handlers)
+    # 検証
+    assert [v.path for v in result.violations] == [
+        "documents[2].sqlite.table",
+        "documents[3].sqlite.columns[1].name",
+        "documents[4].sqlite.file",
+    ]
+    assert [w.path for w in result.warnings] == ["documents[1].sqlite.limit"]
+    assert "1" in result.warnings[0].rule

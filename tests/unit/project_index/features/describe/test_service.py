@@ -44,7 +44,7 @@ TERMINAL = TerminalConfig(
 def no_warnings(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
     """偽の配信元で警告を求めないよう、本物の配信元を使うテスト以外では警告の収集を空にする。"""
     # 本物の配信元を使用するテスト以外か（keywords はテスト関数の名前を持つ）
-    if "test_describe_when_warned" not in request.keywords:
+    if not {"test_describe_when_warned", "test_describe_when_sqlite_kind"} & set(request.keywords):
         monkeypatch.setattr(
             "project_index.features.describe.service.collect_warnings", _no_warnings
         )
@@ -405,3 +405,64 @@ def _wait_checked(handlers: Handlers) -> None:
     while handlers.checks.checking or handlers.snapshots.exporting:
         assert time.monotonic() < deadline, "待ち時間の上限を超えた"
         time.sleep(0.05)
+
+
+def test_describe_when_sqlite_kind(
+    make_sqlite_source_dir: Callable[..., Path],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """SQLite の行の種類はスキーマの代わりに列の説明を返し、開けない行と上限の超過を警告する（正常系）。"""
+    # 準備
+    config = make_sqlite_source_dir()
+    terminal = make_terminal_config(sources=[make_entry(str(config), source_id="sample")])
+    handlers = build_handlers(terminal)
+    handlers.reload_sources(terminal)
+    _wait_checked(handlers)
+    cwd = str(config.parent)
+    # 実行
+    kind = describe(
+        DescribeRequest(cwd=cwd, source="sample", kind="notes_db"),
+        registry=handlers.registry,
+        store=handlers.store,
+        terminal=handlers.terminal,
+        checks=handlers.checks,
+    )
+    listed = describe(
+        DescribeRequest(cwd=cwd),
+        registry=handlers.registry,
+        store=handlers.store,
+        terminal=handlers.terminal,
+        checks=handlers.checks,
+    )
+    guide = describe(
+        DescribeRequest(cwd=cwd, source="sample"),
+        registry=handlers.registry,
+        store=handlers.store,
+        terminal=handlers.terminal,
+        checks=handlers.checks,
+    )
+    # 検証
+    assert isinstance(guide, SourceGuideResult)
+    assert [(k.id, k.sqlite) for k in guide.kinds] == [
+        ("rules", False),
+        ("notes_db", True),
+        ("missing_db", True),
+    ]
+    assert isinstance(kind, KindSchemaResult)
+    assert kind.columns is not None
+    assert [(c.name, c.type) for c in kind.columns] == [
+        ("id", "text"),
+        ("title", "text"),
+        ("summary", "text"),
+        ("tags", "json"),
+        ("aliases", "json"),
+    ]
+    assert kind.schema_text == ""
+    assert list(kind.schema["properties"]) == ["id", "title", "summary", "tags", "aliases"]
+    assert isinstance(listed, SourceListResult)
+    assert len(listed.warnings) == 2
+    assert listed.warnings[0].startswith("sample: notes_db: ")
+    assert "1" in listed.warnings[0]
+    assert listed.warnings[1].startswith("sample: missing_db: ")
+    assert "data/missing.db" in listed.warnings[1]

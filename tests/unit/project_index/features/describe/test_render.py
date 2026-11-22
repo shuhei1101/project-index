@@ -7,6 +7,7 @@ from project_index.features.describe.render import render_describe_markdown
 from project_index.features.describe.types import (
     DirectCommitGuide,
     KindSchemaResult,
+    KindSummary,
     OutsideSource,
     SourceGuideResult,
     SourceListResult,
@@ -221,3 +222,37 @@ def test_render_describe_markdown_when_direct_commit() -> None:
         "- 種類: note",
     ]
     assert start > guide_lines.index("| kind | description |")
+
+
+def test_render_describe_markdown_when_sqlite_kind() -> None:
+    """SQLite の表の行の種類の列の表と対象外の旨（正常系）。"""
+    from project_index.features.sources.types import SqliteColumn
+
+    # 準備
+    kind = KindSchemaResult(
+        source_id="sample",
+        kind="notes_db",
+        schema_text="",
+        schema={"type": "object"},
+        columns=[
+            SqliteColumn(name="id", description="ID"),
+            SqliteColumn(name="tags", type="json", description="タグ"),
+        ],
+    )
+    guide = SourceGuideResult(
+        source_id="sample",
+        instructions="説明書",
+        kinds=[KindSummary(id="notes_db", description="メモ", sqlite=True)],
+    )
+    # 実行
+    kind_markdown = render_describe_markdown(kind)
+    guide_markdown = render_describe_markdown(guide)
+    # 検証
+    assert "| id | text | ID |" in kind_markdown
+    assert "| tags | json | タグ |" in kind_markdown
+    assert (
+        "SQLite の表の行の種類です。write_docs・delete_docs と list_changes の対象外です。"
+        in kind_markdown
+    )
+    assert "```yaml" not in kind_markdown
+    assert "| notes_db | メモ（SQLite の表の行・読み取り専用） |" in guide_markdown

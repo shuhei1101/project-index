@@ -24,6 +24,7 @@ from project_index.shared.background import BackgroundGate
 from project_index.shared.errors import DocumentNotFoundError, UnknownKindError
 from project_index.shared.runtime import ExecutionSlots
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
+from tests.unit.project_index.conftest import notes_db_table
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -2198,3 +2199,92 @@ def test_find_page_when_doc_id_missing(make_document: Callable[..., Document]) -
     # 検証
     assert unknown_id is None
     assert page is None
+
+
+def test_load_when_sqlite_rows(
+    tmp_path: Path,
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+    make_notes_db: Callable[..., Path],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    document_store: DocumentStore,
+) -> None:
+    """SQLite の表を指す行の文書を、ワークツリーとリビジョンによらずクローン本体のファイルから加える（正常系）。"""
+    # 準備
+    root = git_repo({"rules/a.yaml": "id: a\nname: A\n"}, date=OCT_01)
+    first = run_git(root, "rev-parse", "HEAD").strip()
+    worktree = tmp_path / "wt"
+    run_git(root, "worktree", "add", "-b", "feat", str(worktree))
+    make_notes_db(root)
+    source = make_served_source(
+        root=root,
+        is_git=True,
+        repo_root=root,
+        config=make_source_config(documents=[RULES_TABLE, notes_db_table()], default_ref="develop"),
+    )
+    targets = [
+        make_target(source),
+        make_target(source, base=worktree, worktree=worktree),
+        make_target(source, ref=first),
+    ]
+    # 実行
+    results = [document_store.load(target) for target in targets]
+    # 検証
+    assert [[d.id for d in result.documents] for result in results] == [["a", "n1", "n2"]] * 3
+    assert [result.documents[1].path for result in results] == ["data/notes.db"] * 3
+    assert [result.problems for result in results] == [[], [], []]
+
+
+def test_load_when_sqlite_unopenable(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    document_store: DocumentStore,
+) -> None:
+    """開けない SQLite の行は文書を持たず、ほかの行は返す（正常系）。"""
+    # 準備
+    root = tmp_path / "ws"
+    write_files(root, {"rules/a.yaml": "id: a\nname: A\n"})
+    source = make_served_source(
+        root=root, config=make_source_config(documents=[RULES_TABLE, notes_db_table()])
+    )
+    # 実行
+    result = document_store.load(make_target(source))
+    # 検証
+    assert [d.id for d in result.documents] == ["a"]
+    assert len(result.problems) == 1
+    assert result.problems[0].path == "data/notes.db"
+    assert result.problems[0].reason == "unreadable"
+    assert result.problems[0].detail.startswith("notes_db: ")
+
+
+def test_check_sync_when_sqlite(
+    document_store: DocumentStore,
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_notes_db: Callable[..., Path],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+) -> None:
+    """SQLite の行の開けないファイルと上限の超過を警告にする（正常系）。"""
+    # 準備
+    root = tmp_path / "ws"
+    write_files(root, {"rules/a.yaml": "id: a\nname: A\n"})
+    make_notes_db(root)
+    documents = [
+        RULES_TABLE,
+        notes_db_table(limit=1),
+        notes_db_table(table_id="missing_db", file="data/missing.db"),
+    ]
+    source = make_served_source(root=root, config=make_source_config(documents=documents))
+    # 実行
+    result = store_module.check_sync(document_store, source)
+    # 検証
+    assert len(result.sqlite_warnings) == 2
+    assert result.sqlite_warnings[0].startswith("notes_db: ")
+    assert "1" in result.sqlite_warnings[0]
+    assert result.sqlite_warnings[1].startswith("missing_db: ")
