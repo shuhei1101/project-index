@@ -1,0 +1,88 @@
+id: MOD-183
+title: 索引のサーバー / 書き込み / route.py
+lead: 画面のサーバーが呼ぶ書き込みの API のルーター（`POST /sources/{source}/commits`）を受け持ち、書き込みの route.py を修正するときに参照する。
+tags:
+- name: topic:api
+  main: true
+- name: topic:エンドポイント
+- name: action:書き込み
+- name: tool:fastapi
+- name: topic:ルート
+test_files:
+- tests/unit/project_index/features/write/test_route.py
+diagrams:
+- name: 全体
+  diagram: |-
+    classDiagram
+      direction TD
+      書き込みの API の入口 ..> オリジンの確認
+      書き込みの API の入口 ..> 書き込みと削除の直コミット
+      class 書き込みの API の入口 {
+        <<function>>
+      }
+      class オリジンの確認 {
+        <<function>>
+      }
+      class 書き込みと削除の直コミット {
+        <<function>>
+      }
+      click 書き込みと削除の直コミット href "id:MOD-84#functions[commit_documents]"
+functions:
+- name: build_write_router
+  title: 書き込みの API の入口
+  kind: 関数
+  container: project_index/features/write/route.py
+  usecase: 直コミット
+  role: 入口
+  summary: 書き込みの API の `POST /sources/{source}/commits` のルートを持つ `APIRouter` を作る
+  scope: public
+  args:
+  - name: handlers
+    title: 配線済みの関数
+    type: Handlers
+    required: true
+    passing: positional
+    description: 起動の『配線済みの関数』。配信元の一覧・文書のストア・文書の検査・排他を引く
+  returns:
+    type: fastapi.APIRouter
+    description: 1 つのルートを持つルーター
+  process: |-
+    1. ルーターは `APIRouter(tags=["write"], dependencies=[Depends(require_same_origin)])` にし、ルートの `name` は `commit_documents` にする
+
+    2. POST `/sources/{source}/commits` は、本文を `CommitDocumentsBody` で受け、処理の全体を要求の記録の範囲（`handlers.slots.request("commit_documents", source=パスの source)`）の中で行う。先頭で要求が指す配信元の行の読み込みを待ち、その後の処理は裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中で、文書の MCP の実行スロット（`handlers.slots.run_docs`）で呼ぶ
+
+    3. 本文を `CommitDocumentsBody.to_request(source)` で `CommitDocumentsRequest` にし、書き込みと削除の直コミット（`commit_documents`）を `handlers` の部品と書き込みの期限の `CallLimits` で呼ぶ
+
+    4. 結果を `CommitDocumentsResponse.from_domain(result)` にして 200 で返す
+
+    5. 例外は送らずに起動の『例外の変換の登録』に任せ、エラーの `status` の problem+json にする（`CrossOriginError` は依存の `require_same_origin` が送る）
+  unit_tests:
+  - name: test_build_write_router
+    case: 正常
+    summary: 書き込みと削除を 1 回で受けて結果を camelCase で返す
+    condition: 書き込みと削除の直コミットを、受けた要求を記録して結果を返す偽物にし、`writes`（1 件）・`deletes`（1 件）・`message`・`dryRun` を POST
+    mock: 書き込みと削除の直コミット（偽物）
+    expected: 200 で、偽物が受けた `CommitDocumentsRequest` の `source` がパスの値・`dry_run` が送った値で、応答が `applied`・`results[].kind`・`commit.sha` のキーを持つ
+  - name: test_build_write_router_when_cross_origin
+    case: 異常
+    summary: 別のオリジンの要求を断る
+    condition: '`Origin` に別のオリジンを付けて POST'
+    mock: 書き込みと削除の直コミット（偽物）
+    expected: 403 の problem+json で、偽物は呼ばれない
+  - name: test_build_write_router_when_empty
+    case: 異常
+    summary: 書き込みと削除が両方とも空の要求を断る
+    condition: '`writes`・`deletes` を省き `message` だけを POST'
+    mock: 書き込みと削除の直コミット（偽物）
+    expected: 400 の problem+json で、偽物は呼ばれない
+  - name: test_build_write_router_when_service_error
+    case: 異常
+    summary: サービスの例外をエラーの status にする
+    condition: 偽物が `DirectCommitNotPermittedError` を送る
+    mock: 書き込みと削除の直コミット（偽物）
+    expected: 403 の problem+json で、`kinds` を持つ
+refs:
+- to: IF-38
+  type: requires
+  when: インターフェース定義『画面のサーバーからの直コミットの書き込み』の入出力を変えるときに、この設計書の関数と型を合わせる。
+visibility: internal

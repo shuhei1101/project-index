@@ -531,6 +531,12 @@ data_models:
         access: 公開
         default: '{}'
         description: 種類の ID → glob。記載した種類は `scope` の代わりに使用する
+      - name: write_api_kinds
+        title: 書き込みの API から直コミットできる種類
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: 作業場所を持たない書き込みの API から直コミットできる種類の ID。既定はどの種類も直コミットできない
 classes:
   - name: TerminalConfigInvalidError
     title: 端末の設定の違反

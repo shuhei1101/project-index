@@ -104,20 +104,23 @@ status_codes:
 - code: '200'
   condition: '書き込み・コミット・プッシュをした、または `dryRun: true` で検査に合格した'
 - code: '400'
-  condition: 要求の型の検証に失敗した（`message` が無い・`writes` と `deletes` が両方とも空）
-  notes: 起動の『例外の変換の登録』が `InvalidArgumentError` の problem+json にし、`errors[]` にキーのパスと理由を並べる
+  condition: 要求の型の検証に失敗した（`message` が無い・`writes` と `deletes` が両方とも空。`InvalidArgumentError`）
+  notes: 起動の『例外の変換の登録』が problem+json にし、`errors[]` にキーのパスと理由を並べる
 - code: '403'
-  condition: 別のオリジンの要求（`CrossOriginError`）か、書き換わる文書の種類が配信元の設定の `direct_commit.kinds[]` にはあるが端末の設定の `write_api_kinds` に無い（`DirectCommitNotAllowedError`）
-  notes: '`DirectCommitNotAllowedError` は、許可していない種類と、許可を記載する端末の設定のキーを返却する'
+  condition: 別のオリジンの要求（`CrossOriginError`）、書き換わる文書の種類が配信元の設定の `direct_commit.kinds[]` にはあるが端末の設定の `write_api_kinds` に無い（`DirectCommitNotPermittedError`）、上書きできないブランチを指定した（`BranchNotAllowedError`）
+  notes: '`DirectCommitNotPermittedError` は `kinds` に許可していない種類を入れ、`next_steps` で許可を記載する端末の設定のキー `sources[].direct_commit.write_api_kinds` を示す'
 - code: '404'
-  condition: 配信していない配信元（`SourceNotFoundError`）か、削除・更新する文書が無い
+  condition: 無い配信元（`UnknownSourceError`）・配信していない配信元（`SourceNotServedError`）・更新や削除する文書が無い（`DocumentNotFoundError`）
 - code: '409'
-  condition: 文書のバージョンが取り込んだ後の今のバージョンと違う（`VersionConflictError`）か、ワークツリーに未プッシュのコミット・書き込むファイルに未コミットの変更がある
+  condition: 文書のバージョンが取り込んだ後の今のバージョンと違う（`VersionMismatchError`）、直コミットを使用できない配信元（`DirectCommitNotConfiguredError`）、コミットするブランチのワークツリーが無い（`CommitWorktreeNotFoundError`）、ワークツリーに未プッシュのコミット（`UnpushedCommitsError`）・書き込むファイルに未コミットの変更（`UncommittedChangesError`）がある、削除する文書が参照されている（`DocumentReferencedError`）、プッシュが 2 回断られた（`PushRejectedError`）
 - code: '422'
   condition: 検査に合格しない（`ValidationFailedError`。配信元の設定の `direct_commit.kinds[]` に無い種類の文書が書き換わる・秘密の値を含むも同じ）
   notes: '`errors[]` に、`writes`・`deletes` の別と添字・項目のパス・決まり・直し方を全て並べる'
+- code: '500'
+  condition: '`generators[]` が失敗した（`DirectCommitGeneratorError`）'
+  notes: 書き込んだファイルと生成物を戻した後に返却する
 - code: '502'
-  condition: リモートへの取得・プッシュに失敗した（`PushRejectedError`・`PushFailedError`）か、`generators[]` が失敗した（`DirectCommitGeneratorError`）
+  condition: リモートからの取得に失敗した（`FetchFailedError`）か、プッシュに失敗した・結果が不明（`PushFailedError`）
   notes: 書き込んだファイルと生成物を戻した後に返却する
 - code: '504'
   condition: 書き込みの期限を過ぎた（`WriteDeadlineExceededError`）
@@ -129,7 +132,7 @@ constraints:
   constraint: 制限なし（`127.0.0.1` でだけ待ち受ける）。作業場所（`cwd`）は受け取らず、`scope.write` と `sources[].direct_commit.scope`・`kinds` では判定しない
   decided_by: NFR-1#requirements[通信]
 - item: 書き込みの API の直コミットの権限
-  constraint: '制約「直コミットを許可する種類」の後に、変更を適用した後に書き換わる全ての文書（`rename` の参照元・`replace_text` で置換した文書・`onReferenced: unlink` で参照を除く文書を含む）の種類が、端末の設定の `sources[].direct_commit.write_api_kinds` にあることを確認する。配信元の設定の `direct_commit.kinds[]` にあって `write_api_kinds` に無い種類があれば `DirectCommitNotAllowedError` で断る'
+  constraint: '制約「直コミットを許可する種類」の後に、変更を適用した後に書き換わる全ての文書（`rename` の参照元・`replace_text` で置換した文書・`onReferenced: unlink` で参照を除く文書を含む）の種類が、端末の設定の `sources[].direct_commit.write_api_kinds` にあることを確認する。配信元の設定の `direct_commit.kinds[]` にあって `write_api_kinds` に無い種類があれば `DirectCommitNotPermittedError` で断る'
 - item: 直コミットを許可する種類
   constraint: '[文書の書き込み](id:IF-6) の制約「直コミットを許可する種類」と同じで、制約「書き込みの API の直コミットの権限」より先に判定する。書き換わる文書に配信元の設定の `direct_commit.kinds[]` に無い種類があれば、`write_api_kinds` に関わらず `ValidationFailedError` で返却する。`write_api_kinds` にあっても配信元の設定の `direct_commit.kinds[]` に無い種類は、起動の検証で警告にして使用しない'
 - item: 書き込みと削除の 1 つのコミット
@@ -231,7 +234,7 @@ flows:
 
       C->>E: 正常系の入力
       E->>E: n1・n2 の種類 note が write_api_kinds に無い
-      E-->>C: 403 DirectCommitNotAllowedError
+      E-->>C: 403 DirectCommitNotPermittedError
     ```
 
     <!-- /map -->
@@ -318,7 +321,7 @@ flows:
       C->>E: 正常系の入力（書き換わる前の n1 のバージョン）
       E->>R: 取得し、取り込む
       E->>E: n1 の今のバージョンと合わない
-      E-->>C: 409 VersionConflictError
+      E-->>C: 409 VersionMismatchError
     ```
 
     <!-- /map -->
@@ -369,7 +372,7 @@ flows:
       participant R as リモート
 
       C->>E: source: missing
-      E-->>C: 404 SourceNotFoundError
+      E-->>C: 404 UnknownSourceError
     ```
 
     <!-- /map -->

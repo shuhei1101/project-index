@@ -503,6 +503,154 @@ data_models:
         type: str
         access: 公開
         description: '`項目がありません`・`{値} の要素がありません`'
+  - name: CommitDocumentsRequest
+    title: 書き込みと削除の直コミットの要求
+    container: project_index/features/write/types.py
+    usecase: 直コミット
+    role: DTO
+    summary: 書き込みの API がサービスに渡す要求
+    description: '`dataclass(frozen=True)`。キーの意味はインターフェース定義『画面のサーバーからの直コミットの書き込み』の `request`。'
+    properties:
+      - name: source
+        title: 配信元の ID
+        type: str
+        access: 公開
+        description: パスの `source`
+      - name: writes
+        title: 書き込みの操作
+        type: list[Operation]
+        access: 公開
+        default: '[]'
+        description: '`write_docs` の `operations` と同じ'
+      - name: deletes
+        title: 削除する文書
+        type: list[DeleteTarget]
+        access: 公開
+        default: '[]'
+        description: '`delete_docs` の `targets` と同じ'
+      - name: on_referenced
+        title: 参照されているときの扱い
+        type: Literal['fail', 'unlink']
+        access: 公開
+        default: "'fail'"
+        description: '`delete_docs` の `on_referenced` と同じ'
+      - name: commit
+        title: コミットの指定
+        type: CommitSpec
+        access: 公開
+        description: 本文の `message`・`branch`
+      - name: dry_run
+        title: 試しに書くか
+        type: bool
+        access: 公開
+        default: 'False'
+        description: '`True` のとき、取得・書き込み・コミット・プッシュをしない'
+  - name: CommitDocumentsResult
+    title: 書き込みと削除の直コミットの結果
+    container: project_index/features/write/types.py
+    usecase: 直コミット
+    role: DTO
+    summary: 書き込みと削除の直コミットが返すもの
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: applied
+        title: 書き込んだか
+        type: bool
+        access: 公開
+        description: 書き込みとコミット・プッシュをしたか
+      - name: writes
+        title: 書き込みの結果
+        type: list[WriteResultItem]
+        access: 公開
+        description: '`writes` の順'
+      - name: deletes
+        title: 削除の結果
+        type: list[WriteResultItem]
+        access: 公開
+        description: '`deletes` の順（`status` は `deleted`）'
+      - name: unlinked
+        title: 参照を外した文書
+        type: list[tuple[str, str]]
+        access: 公開
+        default: '[]'
+        description: '`DeleteResult` と同じ'
+      - name: commit
+        title: コミットの結果
+        type: CommitResult | None
+        access: 公開
+        default: None
+        description: '`dry_run` のときは `None`'
+  - name: CommitDocumentsBody
+    title: 書き込みの API の本文
+    container: project_index/features/write/types.py
+    usecase: 直コミット
+    role: スキーマ
+    summary: '`POST /sources/{source}/commits` の本文'
+    description: '`pydantic.BaseModel`（`extra="forbid"`、`alias_generator=to_camel`・`validate_by_name=True`・`serialize_by_alias=True`）。`writes[]` の操作は `Operation` のまま（キーは snake_case）。`writes` と `deletes` が両方とも空なら検証で断る。`to_request(source) -> CommitDocumentsRequest` を持つ'
+    properties:
+      - name: writes
+        title: 書き込みの操作
+        type: list[Operation]
+        access: 公開
+        default: '[]'
+        description: '`writes`'
+      - name: deletes
+        title: 削除する文書
+        type: list[DeleteTarget]
+        access: 公開
+        default: '[]'
+        description: '`deletes`（`expectedVersion`）'
+      - name: on_referenced
+        title: 参照されているときの扱い
+        type: Literal['fail', 'unlink']
+        access: 公開
+        default: "'fail'"
+        description: '`onReferenced`'
+      - name: message
+        title: コミットの説明
+        type: str
+        access: 公開
+        description: '`message`。空の文字列は受けない'
+      - name: branch
+        title: コミットするブランチ
+        type: str | None
+        access: 公開
+        default: None
+        description: '`branch`'
+      - name: dry_run
+        title: 試しに書くか
+        type: bool
+        access: 公開
+        default: 'False'
+        description: '`dryRun`'
+  - name: CommitDocumentsResponse
+    title: 書き込みの API の応答
+    container: project_index/features/write/types.py
+    usecase: 直コミット
+    role: スキーマ
+    summary: '`POST /sources/{source}/commits` の応答'
+    description: '`pydantic.BaseModel`（camelCase。`CommitDocumentsBody` と同じ設定）。`from_domain(result: CommitDocumentsResult) -> Self` で、`writes` を `kind: write`、`deletes` を `kind: delete` の `results[]` に並べ、`unlinked` を `{id, version}` にする'
+    properties:
+      - name: applied
+        title: 書き込んだか
+        type: bool
+        access: 公開
+        description: '`applied`'
+      - name: results
+        title: 結果
+        type: list[CommitDocumentsItem]
+        access: 公開
+        description: 書き込みの結果に続けて削除の結果。`CommitDocumentsItem` は `kind`・`index`・`id`・`status`・`version`・`diff` を持つ
+      - name: unlinked
+        title: 参照を外した文書
+        type: list[UnlinkedDocument]
+        access: 公開
+        description: '`{id, version}` の並び'
+      - name: commit
+        title: コミットの結果
+        type: CommitResult | None
+        access: 公開
+        description: '`{sha, branch, retried}`'
 constants:
   - name: OPERATIONS_MAX
     title: 1 回の操作の上限

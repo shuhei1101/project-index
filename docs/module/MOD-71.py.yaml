@@ -504,6 +504,12 @@ data_models:
         access: 公開
         default: '[]'
         description: 配信を続け、直コミットだけを断る違反（`direct_commit.kinds[{n}]` が `documents[]` に無い）
+      - name: direct_commit_write_api_kinds
+        title: 書き込みの API から直コミットできる種類
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: 端末の設定の `sources[].direct_commit.write_api_kinds` のうち、配信元の `direct_commit.kinds[]` にある種類
     methods:
       - name: table
         title: 文書の行を引く

@@ -828,6 +828,48 @@ functions:
         mock: なし
         expected: どちらも `SourceNotReadableError`
         exception: '`ref` を渡した・コミットするブランチのワークツリーでない'
+  - name: write_api_committable_kinds
+    title: 書き込みの API から直コミットできる種類
+    kind: 関数
+    container: project_index/features/access/service.py
+    usecase: 直コミット
+    role: 読み取り
+    summary: 作業場所を持たない書き込みの API から直コミットできる種類を決める
+    scope: public
+    thread_safe: true
+    args:
+      - name: source
+        title: 配信元
+        type: ServedSource
+        required: true
+        passing: positional
+        description: 照らす配信元
+    returns:
+      type: frozenset[str]
+      description: 書き込みの API から直コミットできる種類の ID
+    process: |-
+      1. 配信元の `config.direct_commit` が `None` か、`direct_commit_problems` が空でない場合、空を返す
+
+      2. `direct_commit_write_api_kinds` のうち、`direct_commit.kinds` にある種類を返す
+    unit_tests:
+      - name: test_write_api_committable_kinds
+        case: 正常
+        summary: 配信元が許可した種類だけを返す
+        condition: '`kinds: [note, term]`、`direct_commit_write_api_kinds: [note]`'
+        mock: なし
+        expected: '`{note}`'
+      - name: test_write_api_committable_kinds_when_default
+        case: 正常
+        summary: 既定はどの種類もできない
+        condition: '`direct_commit_write_api_kinds` が空、`direct_commit_scope` が `[/local]`'
+        mock: なし
+        expected: 空
+      - name: test_write_api_committable_kinds_when_problems
+        case: 異常
+        summary: 直コミットだけを断る違反がある配信元は空
+        condition: '`direct_commit_write_api_kinds: [note]`、`direct_commit_problems` に 1 件'
+        mock: なし
+        expected: 空
 refs:
   - to: IF-2
     type: requires
