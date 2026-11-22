@@ -184,7 +184,8 @@ constraints:
 - item: バージョンの照合
   constraint: 取得と取り込みの後のワークツリーの文書のバージョンと、`writes[].expected_version`・`deletes[].expectedVersion` を照合する
 - item: 書き込みの期限
-  constraint: '[文書の書き込み](id:IF-6) の制約「書き込みの期限」と同じ。衝突したときの一時のワークツリーでの検査のやり直しと書き込みの開始も、この期限の中に収める'
+  constraint: '要求を受けてから書き込みの API の書き込みの期限までに、検査とファイルの置き換えの開始を終える。衝突したときの一時のワークツリーでの検査のやり直しと書き込みの開始もこの期限の中に収める。過ぎたときの扱いは [文書の書き込み](id:IF-6) の制約「書き込みの期限」と同じ'
+  decided_by: NFR-1#requirements[書き込みの API の書き込みの期限]
 - item: JSON のキー
   constraint: 要求と応答のキーは camelCase。`writes[]` の操作のキーは `write_docs` の `operations[]` のキーのまま
 - item: 衝突の判定
