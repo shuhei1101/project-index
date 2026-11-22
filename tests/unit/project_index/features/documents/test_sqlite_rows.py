@@ -409,3 +409,46 @@ def test_columns_schema() -> None:
             "tags": {"title": "タグ"},
         },
     }
+
+
+def _no_id_table() -> DocumentTable:
+    """`metadata` に `id` を書かず、列 `id` を `columns[]` に持たない行を作る。"""
+    return DocumentTable(
+        id="notes_db",
+        paths=[],
+        schema_path=None,
+        sqlite=SqliteTable(
+            file="data/notes.db",
+            table="notes",
+            columns=[SqliteColumn(name="title", description="タイトル")],
+        ),
+        metadata={"name": "title"},
+    )
+
+
+def test_inspect_table_when_id_column_missing(tmp_path: Path) -> None:
+    """id に対応する列が columns[] に無い行を違反にする（異常系）。"""
+    # 準備
+    (tmp_path / "data").mkdir()
+    _create_notes(tmp_path / "data/notes.db", [_N1])
+    table = _no_id_table()
+    # 実行
+    violations, warnings = inspect_table(tmp_path, table, 0)
+    # 検証
+    assert [v.path for v in violations] == ["documents[0].sqlite.columns"]
+    assert "id" in violations[0].rule
+    assert warnings == []
+
+
+def test_read_rows_when_id_column_missing(tmp_path: Path) -> None:
+    """id に対応する列が columns[] に無い行は、例外を送出せず警告で返す（異常系）。"""
+    # 準備
+    (tmp_path / "data").mkdir()
+    _create_notes(tmp_path / "data/notes.db", [_N1])
+    table = _no_id_table()
+    # 実行
+    result = read_rows(tmp_path, "sample", table)
+    # 検証
+    assert result.documents == []
+    assert len(result.warnings) == 1
+    assert "id" in result.warnings[0]

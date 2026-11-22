@@ -176,7 +176,7 @@ functions:
       description: 文書・配信しなかった行の数・警告・読んだときの署名
     process: |-
       1. `source_root / sqlite.file` を解決し、配信元のフォルダの配下でなければ警告にして空で返す
-      2. `file:{path}?mode=ro` の URI で `sqlite3.connect(uri=True)` し、開けなければ `sqlite3.Error` の理由を警告にして空で返す
+      2. `id` に対応する列が `columns[]` に無ければ、警告にして空で返す。`file:{path}?mode=ro` の URI で `sqlite3.connect(uri=True)` し、開けなければ `sqlite3.Error` の理由を警告にして空で返す
       3. `columns[]` の列を識別子として引用した `SELECT`、`where`・`order_by`（既定は `id` に対応する列の昇順）・`LIMIT {limit + 1}` で読む
       4. `limit` を超えたときは `SELECT COUNT(*)` で `where` に該当する行の数を数え、`omitted` にする
       5. 列の型が `json` の値を `json.loads` し、読めない値は空にして警告する
@@ -225,6 +225,12 @@ functions:
         condition: '`where` に `1=1; DELETE FROM notes` を記載する'
         mock: なし
         expected: '`warnings` に SQL の誤りがあり、ファイルのバイト列が変わらない'
+      - name: test_read_rows_when_id_column_missing
+        case: 異常
+        summary: id に対応する列が columns[] に無い行は、例外を送出せず警告で返す
+        condition: '`metadata: {name: title}`・`columns` が `title` だけの行'
+        mock: なし
+        expected: '`documents` が空で、`warnings` に `id` の列が無い旨の 1 件'
   - name: inspect_table
     title: 表と列の確認
     kind: 関数
@@ -256,7 +262,7 @@ functions:
     process: |-
       1. ファイルが無い・開けないときは `documents[{index}].sqlite.file` の違反だけを返す
       2. `sqlite_master` で表かビューが無ければ `documents[{index}].sqlite.table` の違反を返す
-      3. `PRAGMA table_info` で列の一覧を取り、`columns[]` と `metadata` が指す列の無いものを、それぞれ `sqlite.columns[{番号}].name`・`metadata.{キー}` の違反にする。`metadata` が指す列が `columns[]` に無いときも違反にする
+      3. `PRAGMA table_info` で列の一覧を取り、`columns[]` と `metadata` が指す列の無いものを、それぞれ `sqlite.columns[{番号}].name`・`metadata.{キー}` の違反にする。`metadata` が指す列が `columns[]` に無いときも違反にする。`metadata` に `id` が無い行で、列 `id` が表か `columns[]` に無いときは `sqlite.columns` の違反にする
       4. 違反が無ければ `read_rows` で読み、`omitted` と重なった ID を警告にする
     unit_tests:
       - name: test_inspect_table_violations
@@ -271,6 +277,12 @@ functions:
         condition: '2 行の表で `limit: 1`'
         mock: なし
         expected: 違反が空で、警告に配信しない行の数 1
+      - name: test_inspect_table_when_id_column_missing
+        case: 異常
+        summary: id に対応する列が columns[] に無い行を違反にする
+        condition: '`metadata: {name: title}`・`columns` が `title` だけの行'
+        mock: なし
+        expected: '`documents[0].sqlite.columns` の違反 1 件で、警告が空'
   - name: columns_schema
     title: 列の説明のスキーマ
     kind: 関数
