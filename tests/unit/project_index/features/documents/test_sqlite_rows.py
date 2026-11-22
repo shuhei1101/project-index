@@ -5,6 +5,8 @@ import sqlite3
 from typing import TYPE_CHECKING
 
 import pytest
+
+from project_index.features.documents import sqlite_rows as sqlite_rows_module
 from project_index.features.documents.sqlite_rows import (
     SqliteRowCache,
     SqliteRows,
@@ -13,8 +15,6 @@ from project_index.features.documents.sqlite_rows import (
     inspect_table,
     read_rows,
 )
-
-from project_index.features.documents import sqlite_rows as sqlite_rows_module
 from project_index.features.sources.types import DocumentTable, SqliteColumn, SqliteTable
 
 if TYPE_CHECKING:
