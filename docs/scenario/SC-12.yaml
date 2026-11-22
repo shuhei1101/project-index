@@ -673,7 +673,7 @@ scenarios:
         description: なし（実環境で実行）
       - name: 端末の設定
         description: '`PROJECT_INDEX_CONFIG` が指す一時フォルダの `settings.yaml`'
-        notes: '`sources` に sample の 1 行。利用者がファイルを直接編集して、sample の行に衝突したときに実行するスクリプトを指定してある'
+        notes: '`sources` に sample の 1 行。利用者がファイルを直接編集して、sample の衝突したときに実行するスクリプトを端末の設定に指定してある'
       - name: project-index
         description: 端末の設定で起動した project-index
     flow: |-
@@ -686,8 +686,8 @@ scenarios:
         participant CF as 端末の設定
 
         DD->>PI: 端末の設定の配信元を取得する
-        PI-->>DD: sample の行（衝突したときのスクリプトの指定を含まない）と、端末の設定の内容のバージョン
-        DD->>PI: 取得したバージョンを添えて、sample の行に衝突したときのスクリプトの指定を加えた sources を保存する
+        PI-->>DD: sample の行と、端末の設定の内容のバージョン（衝突したときのスクリプトの指定は含まない）
+        DD->>PI: 取得したバージョンを添えて、sample の衝突したときのスクリプトの指定を加えて保存する
         PI-->>DD: 422（送信できないキーのパスと理由）
         DD->>PI: 取得したバージョンを添えて、sample の行の scope.read を変えた sources を保存する
         PI->>CF: settings.yaml を書き換え、配信元を再読み込みする
@@ -698,7 +698,7 @@ scenarios:
     expected:
       - 取得の応答が、衝突したときのスクリプトの指定を返却しない
       - スクリプトの指定を加えた保存の応答が 422 で、送信できないキーのパスと理由を返却し、`settings.yaml` が変わらない
-      - '`scope.read` を変えた保存の後も、`settings.yaml` の sample の行に衝突したときのスクリプトの指定が変わらずに残る'
+      - '`scope.read` を変えた保存の後も、`settings.yaml` にある sample の衝突したときのスクリプトの指定が変わらずに残る'
     test: test_error_when_conflict_script_sent
 lead: dev-docs の画面のサーバーと端末のほかのプロセスが端末の設定の API で配信元を丸ごとか 1 行ずつ変更し、再起動せずに配信へ反映するシナリオを定め、端末の設定の配信元の変更の流れを変えるときに参照する。
 tags:
