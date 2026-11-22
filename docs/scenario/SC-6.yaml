@@ -1287,6 +1287,7 @@ scenarios:
       - '`list_match_words` が `n1` の `title` 列の値と別名 `実況` を、指す文書 `n1` とともに返却する'
       - '`search_docs(term: 実況)` が `n1` を返却する'
       - '`data/notes.db` の中身は変わらない'
+      - '`worktree` にワークツリー x（`data/notes.db` を持たない）のパスを指定した `search_docs` も、配信元のフォルダ（クローン本体）の `data/notes.db` を開いて `n1` を返却する'
     test: test_normal_when_sqlite_rows
 lead: エージェントが文書の MCP で、作業場所から使用できる配信元の文書を探して参照するシナリオを定め、調査の流れを変えるときに参照する。
 tags:
