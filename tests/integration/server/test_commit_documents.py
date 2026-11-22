@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING, Any
 
 from project_index.shared.hashing import content_hash
@@ -310,3 +311,252 @@ def test_error_when_sqlite_kind_included(
     assert _git_state(direct, run_git) == before
     assert run_git(direct.x, "status", "--porcelain").strip() == x_before
     assert db.read_bytes() == db_before
+
+
+ENV_DUMP = (
+    "import os, sys, pathlib\n"
+    "keys = sorted(key for key in os.environ if key.startswith('PROJECT_INDEX_'))\n"
+    "text = ''.join(f'{key}={os.environ[key]}\\n' for key in keys)\n"
+    "pathlib.Path(sys.argv[1]).write_text(text, encoding='utf-8')\n"
+    "print('ran', end='')\n"
+)
+FAILING = "import sys\nsys.stderr.write('失敗しました\\n')\nsys.exit(1)\n"
+N1_CHANGED = "id: n1\nname: ほかの変更\n"
+
+
+def _conflict_branches(direct: DirectCommitSource, run_git: Callable[..., str]) -> list[str]:
+    """クローンにある衝突したときのブランチの名前。"""
+    listed = run_git(
+        direct.folder, "branch", "--list", "--format=%(refname:short)", "project-index/*"
+    )
+    return listed.split()
+
+
+def _worktrees(direct: DirectCommitSource, run_git: Callable[..., str]) -> str:
+    """クローンの `git worktree list` の出力。"""
+    return run_git(direct.folder, "worktree", "list")
+
+
+def _conflicting_body(
+    direct: DirectCommitSource,
+    push_from_other_clone: Callable[..., str],
+    run_git: Callable[..., str],
+) -> dict[str, Any]:
+    """編集を始めたときのコミットを添えた本文を作ってから、ほかの変更で n1 を書き換える。"""
+    body = _body(direct, baseCommit=run_git(direct.develop, "rev-parse", "HEAD").strip())
+    push_from_other_clone(direct.bare, {"notes/n1.yaml": N1_CHANGED})
+    return body
+
+
+def test_normal_when_conflict_kept_in_branch(
+    tmp_path: Path,
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    push_from_other_clone: Callable[..., str],
+    run_git: Callable[..., str],
+) -> None:
+    """衝突したら修正をブランチに残してスクリプトを実行する（正常系）。"""
+    # 準備
+    dump = tmp_path / "env.txt"
+    direct = make_direct_commit_source(
+        files=NOTES,
+        write_api_kinds=["note"],
+        on_conflict=[sys.executable, "-c", ENV_DUMP, str(dump)],
+    )
+    env = make_server(direct.spec)
+    body = _conflicting_body(direct, push_from_other_clone, run_git)
+    remote_before = run_git(direct.bare, "rev-parse", "develop").strip()
+    worktrees_before = len(_worktrees(direct, run_git).splitlines())
+    # 実行
+    response = env.client.post(URL, json=body)
+    # 検証
+    data = response.json()
+    conflict = data["conflict"]
+    assert response.status_code == 200, data
+    assert data["applied"] is False
+    assert data["commit"] is None
+    assert conflict["branch"].startswith("project-index/conflict/")
+    assert run_git(direct.folder, "rev-parse", conflict["branch"]).strip() == conflict["commit"]
+    assert conflict["baseCommit"] == body["baseCommit"]
+    assert [item["path"] for item in conflict["errors"]] == ["n1"]
+    assert conflict["script"]["exitCode"] == 0
+    assert conflict["script"]["stdout"] == "ran"
+    branch = conflict["branch"]
+    assert run_git(direct.folder, "rev-parse", f"{branch}~1").strip() == body["baseCommit"]
+    assert run_git(direct.folder, "log", "-1", "--format=%s", branch).strip() == body["message"]
+    changed = run_git(direct.folder, "diff", "--name-only", f"{branch}~1", branch).split()
+    assert sorted(changed) == ["generated/notes.txt", "notes/n1.yaml", "notes/n2.yaml"]
+    assert run_git(direct.bare, "rev-parse", "develop").strip() == remote_before
+    assert run_git(direct.bare, "branch", "--list", "project-index/*").strip() == ""
+    assert run_git(direct.develop, "rev-parse", "HEAD").strip() == remote_before
+    assert run_git(direct.develop, "status", "--porcelain").strip() == ""
+    assert len(_worktrees(direct, run_git).splitlines()) == worktrees_before
+    assert list((env.state_dir / "conflicts").iterdir()) == []
+    dumped = dump.read_text(encoding="utf-8")
+    assert "PROJECT_INDEX_SOURCE=sample\n" in dumped
+    assert f"PROJECT_INDEX_CONFLICT_BRANCH={branch}\n" in dumped
+    assert f"PROJECT_INDEX_CONFLICT_COMMIT={conflict['commit']}\n" in dumped
+
+
+def test_normal_when_conflict_without_script(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    push_from_other_clone: Callable[..., str],
+    run_git: Callable[..., str],
+) -> None:
+    """衝突してスクリプトの指定が無ければブランチだけを残す（正常系）。"""
+    # 準備
+    direct = make_direct_commit_source(files=NOTES, write_api_kinds=["note"])
+    env = make_server(direct.spec)
+    body = _conflicting_body(direct, push_from_other_clone, run_git)
+    # 実行
+    response = env.client.post(URL, json=body)
+    # 検証
+    data = response.json()
+    assert response.status_code == 200, data
+    assert data["conflict"]["branch"] is not None
+    assert data["conflict"]["commit"] is not None
+    assert data["conflict"]["script"] is None
+    assert _conflict_branches(direct, run_git) == [data["conflict"]["branch"]]
+    assert run_git(direct.bare, "branch", "--list", "project-index/*").strip() == ""
+
+
+def test_normal_when_conflict_script_failed(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    push_from_other_clone: Callable[..., str],
+    run_git: Callable[..., str],
+) -> None:
+    """衝突してスクリプトが失敗してもブランチは残る（正常系）。"""
+    # 準備
+    direct = make_direct_commit_source(
+        files=NOTES, write_api_kinds=["note"], on_conflict=[sys.executable, "-c", FAILING]
+    )
+    env = make_server(direct.spec)
+    body = _conflicting_body(direct, push_from_other_clone, run_git)
+    # 実行
+    response = env.client.post(URL, json=body)
+    # 検証
+    data = response.json()
+    assert response.status_code == 200, data
+    assert data["conflict"]["script"]["exitCode"] == 1
+    assert data["conflict"]["script"]["stderr"] == "失敗しました\n"
+    assert _conflict_branches(direct, run_git) == [data["conflict"]["branch"]]
+    assert run_git(direct.folder, "rev-parse", data["conflict"]["branch"]).strip() == (
+        data["conflict"]["commit"]
+    )
+
+
+def test_normal_when_item_versions(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    push_from_other_clone: Callable[..., str],
+    run_git: Callable[..., str],
+) -> None:
+    """項目ごとのバージョンで照合すると、別の項目の変更とは衝突しない（正常系）。"""
+    # 準備
+    direct = make_direct_commit_source(files=NOTES, write_api_kinds=["note"])
+    env = make_server(direct.spec)
+    document = env.client.get("/sources/sample/docs/notes/n1.yaml").json()
+    name_version = document["itemVersions"]["name"]
+    push_from_other_clone(
+        direct.bare, {"notes/n1.yaml": "id: n1\nname: メモ 1\ndescription: ほかの説明\n"}
+    )
+    body = {
+        "writes": [
+            {
+                "op": "update",
+                "id": "n1",
+                "expected_version": {"name": name_version},
+                "set": {"name": "新しい名前"},
+            }
+        ],
+        "message": "docs: n1 の名前を変える",
+    }
+    # 実行
+    response = env.client.post(URL, json=body)
+    # 検証
+    data = response.json()
+    assert response.status_code == 200, data
+    assert data["applied"] is True
+    assert data["conflict"] is None
+    assert run_git(direct.bare, "show", "develop:notes/n1.yaml") == (
+        "id: n1\nname: 新しい名前\ndescription: ほかの説明\n"
+    )
+
+
+def test_error_when_base_commit_unusable(
+    tmp_path: Path,
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """編集を始めたときのコミットが起点に使えなければ断る（異常系）。"""
+    # 準備
+    dump = tmp_path / "env.txt"
+    direct = make_direct_commit_source(
+        files=NOTES,
+        write_api_kinds=["note"],
+        on_conflict=[sys.executable, "-c", ENV_DUMP, str(dump)],
+    )
+    env = make_server(direct.spec)
+    (direct.folder / "memo.txt").write_text("master だけ\n", encoding="utf-8")
+    run_git(direct.folder, "commit", "-am", "master だけの変更")
+    master_only = run_git(direct.folder, "rev-parse", "HEAD").strip()
+    before = _git_state(direct, run_git)
+    worktrees_before = _worktrees(direct, run_git)
+    missing = "0123456789abcdef0123456789abcdef01234567"
+    # 実行
+    not_found = env.client.post(URL, json=_body(direct, baseCommit=missing))
+    not_ancestor = env.client.post(URL, json=_body(direct, baseCommit=master_only))
+    # 検証
+    assert not_found.status_code == 409, not_found.json()
+    assert not_found.json()["reason"] == "not_found"
+    assert not_ancestor.status_code == 409, not_ancestor.json()
+    assert not_ancestor.json()["reason"] == "not_ancestor"
+    assert _conflict_branches(direct, run_git) == []
+    assert _worktrees(direct, run_git) == worktrees_before
+    assert not dump.exists()
+    assert _git_state(direct, run_git) == before
+
+
+def test_error_when_invalid_at_base_commit(
+    tmp_path: Path,
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    push_from_other_clone: Callable[..., str],
+    run_git: Callable[..., str],
+) -> None:
+    """編集を始めたときのコミットでも検査に合格しなければ今のブランチの理由で断る（異常系）。"""
+    # 準備
+    dump = tmp_path / "env.txt"
+    direct = make_direct_commit_source(
+        files=NOTES,
+        write_api_kinds=["note"],
+        on_conflict=[sys.executable, "-c", ENV_DUMP, str(dump)],
+    )
+    env = make_server(direct.spec)
+    base = run_git(direct.develop, "rev-parse", "HEAD").strip()
+    body = {
+        "writes": [
+            {
+                "op": "update",
+                "id": "n1",
+                "expected_version": _version(direct.develop / "notes" / "n1.yaml"),
+                "set": {"name": 1},
+            }
+        ],
+        "message": "docs: n1 を更新する",
+        "baseCommit": base,
+    }
+    push_from_other_clone(direct.bare, {"notes/n1.yaml": N1_CHANGED})
+    worktrees_before = len(_worktrees(direct, run_git).splitlines())
+    # 実行
+    response = env.client.post(URL, json=body)
+    # 検証
+    data = response.json()
+    assert response.status_code == 409, data
+    assert data["title"] == "VersionMismatchError"
+    assert _conflict_branches(direct, run_git) == []
+    assert len(_worktrees(direct, run_git).splitlines()) == worktrees_before
+    assert not dump.exists()
