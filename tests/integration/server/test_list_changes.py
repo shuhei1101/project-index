@@ -436,3 +436,61 @@ def test_error_when_range_given_to_disk_source(
     # 検証
     assert result.is_error
     assert "company は disk の配信元のため区間を指定できません" in result.text
+
+
+ASSETS_ROW = (
+    "  - id: assets\n"
+    "    paths: [assets/*.yaml]\n"
+    "    schema: schemas/sample.schema.yaml\n"
+    "    metadata: {status: state}\n"
+    "    search_exclude: {field: status, op: eq, values: [inactive]}\n"
+)
+
+
+def test_normal_when_search_excluded(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    commit_all: Callable[..., str],
+    run_git: Callable[..., str],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """存在する区間の端の全てで search_exclude に該当する文書を既定の結果から除く（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "project-index.yaml": sample_config_text(ASSETS_ROW),
+            "assets/a1.yaml": "id: a1\nname: 素材 1\nstate: active\n",
+            "assets/a2.yaml": "id: a2\nname: 素材 2\nstate: inactive\n",
+            "assets/a3.yaml": "id: a3\nname: 素材 3\nstate: active\n",
+        }
+    )
+    source = make_source("sample", files)
+    parent = run_git(source.folder, "rev-parse", "HEAD").strip()
+    changed = commit_all(
+        source.folder,
+        {
+            "assets/a1.yaml": "id: a1\nname: 素材 1 改\nstate: active\n",
+            "assets/a2.yaml": "id: a2\nname: 素材 2 改\nstate: inactive\n",
+            "assets/a3.yaml": "id: a3\nname: 素材 3\nstate: inactive\n",
+            "assets/a4.yaml": "id: a4\nname: 素材 4\nstate: inactive\n",
+        },
+        "docs: 素材を変える",
+    )
+    env = make_server(source)
+    arguments = {"cwd": str(source.folder), "source": "sample", "from": parent, "to": changed}
+    # 実行
+    default = env.call("list_changes", format="json", **arguments)
+    included = env.call("list_changes", format="json", include_excluded=True, **arguments)
+    # 検証
+    assert [(item["id"], item["keys"]) for item in default.data["items"]] == [
+        ("a1", ["name"]),
+        ("a3", ["state"]),
+    ]
+    assert default.data["excluded_count"] == 2
+    assert [(item["id"], item.get("excluded")) for item in included.data["items"]] == [
+        ("a1", None),
+        ("a2", True),
+        ("a3", None),
+        ("a4", True),
+    ]
