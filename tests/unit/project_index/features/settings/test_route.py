@@ -466,4 +466,4 @@ def test_build_settings_router_when_direct_commit(
     rows = response.json()["sources"]
     assert response.status_code == 200
     assert "directCommit" not in rows[0]
-    assert rows[1]["directCommit"] == {"scope": ["/tmp/work/**"], "kinds": {}}
+    assert rows[1]["directCommit"] == {"scope": ["/tmp/work/**"], "kinds": {}, "writeApiKinds": []}

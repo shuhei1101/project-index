@@ -86,6 +86,16 @@ def committable_kinds(source: ServedSource, cwd: Path | None) -> frozenset[str]:
     )
 
 
+def write_api_committable_kinds(source: ServedSource) -> frozenset[str]:
+    """作業場所を持たない書き込みの API から直コミットできる種類を決める。"""
+    settings = source.config.direct_commit
+    if settings is None or source.direct_commit_problems:
+        return frozenset()
+    return frozenset(
+        kind for kind in source.direct_commit_write_api_kinds if kind in settings.kinds
+    )
+
+
 def commit_read_worktree(source: ServedSource, worktree: str | None, ref: str | None) -> Path:
     """権限が `commit` の作業場所から読めるワークツリーを決める。"""
     settings = source.config.direct_commit

@@ -413,6 +413,7 @@ def direct_commit_checks(
     *,
     worktree_branches: set[str],
     terminal_kinds: Iterable[str] = (),
+    terminal_write_api_kinds: Iterable[str] = (),
 ) -> tuple[list[Violation], list[Violation]]:
     """スキーマに合格した直コミットの設定の、直コミットだけを断る違反と警告を求める。"""
     settings = config.direct_commit
@@ -447,6 +448,14 @@ def direct_commit_checks(
         for kind in terminal_kinds
         if kind not in settings.kinds
     )
+    warnings.extend(
+        Violation(
+            path=f"sources[].direct_commit.write_api_kinds[{index}]",
+            rule=f"{kind} は配信元の direct_commit.kinds[] に無いため使用しない",
+        )
+        for index, kind in enumerate(terminal_write_api_kinds)
+        if kind not in settings.kinds
+    )
     return violations, warnings
 
 
@@ -470,6 +479,7 @@ def _with_direct_commit(source: ServedSource, entry: SourceEntry) -> ServedSourc
         source.config,
         worktree_branches=source_worktree_branches(source),
         terminal_kinds=entry.direct_commit.kinds.keys(),
+        terminal_write_api_kinds=entry.direct_commit.write_api_kinds,
     )
     for item in violations:
         logger.error(
@@ -485,6 +495,9 @@ def _with_direct_commit(source: ServedSource, entry: SourceEntry) -> ServedSourc
             for kind, globs in entry.direct_commit.kinds.items()
             if kind in settings.kinds
         },
+        direct_commit_write_api_kinds=[
+            kind for kind in entry.direct_commit.write_api_kinds if kind in settings.kinds
+        ],
         direct_commit_problems=violations,
     )
 
@@ -1043,6 +1056,7 @@ def load_source_at(source: ServedSource, root: Path) -> ServedSource:
         served,
         direct_commit_scope=source.direct_commit_scope,
         direct_commit_kinds=source.direct_commit_kinds,
+        direct_commit_write_api_kinds=source.direct_commit_write_api_kinds,
         direct_commit_problems=direct_commit_checks(served.config, worktree_branches=set())[0],
     )
     # 設定のファイル・切り替えたパス・作った配信元が読んだスキーマのファイルを見張る

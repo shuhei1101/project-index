@@ -150,6 +150,8 @@ class ServedSource:
     direct_commit_scope: list[str] = field(default_factory=list[str])
     # 端末の設定の `sources[].direct_commit.kinds` を解いた glob（配信元の `direct_commit.kinds[]` に無い種類は除く）
     direct_commit_kinds: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
+    # 端末の設定の `sources[].direct_commit.write_api_kinds`（配信元の `direct_commit.kinds[]` に無い種類は除く）
+    direct_commit_write_api_kinds: list[str] = field(default_factory=list[str])
     # 配信を続け、直コミットだけを断る違反
     direct_commit_problems: list[Violation] = field(default_factory=list[Violation])
 

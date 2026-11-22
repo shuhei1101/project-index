@@ -134,6 +134,7 @@ def test_build_write_router_when_service_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """サービスの例外をエラーの status にする（異常系）。"""
+
     # 準備
     def refuse(_request: CommitDocumentsRequest, **_parts: Any) -> CommitDocumentsResult:
         raise DirectCommitNotPermittedError(

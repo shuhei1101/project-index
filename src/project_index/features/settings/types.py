@@ -39,6 +39,10 @@ class SourceDirectCommit(BaseModel):
     scope: list[str] = Field(default_factory=list[str])
     # 種類の ID → glob。記載した種類は `scope` の代わりに使用する
     kinds: dict[str, list[str]] = Field(default_factory=dict[str, list[str]])
+    # 作業場所を持たない書き込みの API から直コミットできる種類の ID。既定はどの種類もできない
+    write_api_kinds: list[str] = Field(
+        default_factory=list[str], serialization_alias="writeApiKinds"
+    )
 
 
 class SourceEntry(BaseModel):

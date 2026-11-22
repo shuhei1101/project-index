@@ -60,8 +60,9 @@ def _match_status(
 
 
 def _direct_commit_of(entry: SourceEntry) -> SourceDirectCommit | None:
-    """行の direct_commit を、scope・kinds がどちらも空なら None にして返す。"""
-    if not entry.direct_commit.scope and not entry.direct_commit.kinds:
+    """行の direct_commit を、scope・kinds・write_api_kinds が全て空なら None にして返す。"""
+    direct_commit = entry.direct_commit
+    if not direct_commit.scope and not direct_commit.kinds and not direct_commit.write_api_kinds:
         return None
     return entry.direct_commit
 

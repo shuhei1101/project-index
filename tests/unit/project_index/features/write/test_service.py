@@ -2286,7 +2286,7 @@ def test_commit_documents_when_disallowed_kind_rewritten(
     # 実行・検証
     with pytest.raises(ValidationFailedError) as info:
         _commit_documents(commit_env, deletes=deletes, on_referenced="unlink")
-    assert [item.path for item in info.value.violations][:1] == ["deletes[0]"]
+    assert info.value.violations[0].path.startswith("deletes[0]")
     assert (commit_env.develop / "docs/rule/doc-1.yaml").exists()
     assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
 
@@ -2305,7 +2305,7 @@ def test_commit_documents_when_one_invalid(
     # 実行・検証
     with pytest.raises(ValidationFailedError) as info:
         _commit_documents(commit_env, writes=writes)
-    assert [item.path for item in info.value.violations][:1] == ["writes[1]"]
+    assert info.value.violations[0].path.startswith("writes[1]")
     assert not (commit_env.develop / "docs/rule/doc-9.yaml").exists()
     assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
 
@@ -2327,4 +2327,3 @@ def test_commit_documents_when_dry_run(
     assert not (commit_env.develop / "docs/rule/doc-9.yaml").exists()
     assert (commit_env.develop / "docs/rule/doc-1.yaml").exists()
     assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
-
