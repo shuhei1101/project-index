@@ -1899,7 +1899,7 @@ constraints:
     constraint: '`include_excluded: false` のとき、`filter`・`term` に該当した文書のうち、文書の行の `search_exclude` の条件に該当する文書を `items`・`total_count`・`view: count`・`group_by` の件数・`next_cursor` から除き、除いた件数を `excluded_count` にする。条件は `filter` と同じ照合（正規化・`match`・`case_sensitive`）で、文書のメタデータと種類の項目に適用する。`records` の行は要素ごとに適用する'
     notes: '`search_exclude` を持たない行の文書は除かない。複数の配信元を指したときは配信元ごとの設定で除く'
   - item: SQLite の表の行
-    constraint: '`documents[].sqlite` を持つ行は、配信元のフォルダ（Git の配信元はクローン本体）の `sqlite.file` を読み取り専用（`mode=ro` の URI）で開き、`where`・`order_by`・`limit` で行を読む。`worktree`・`cwd` がワークツリーを指しても同じファイルを開く。本文は `columns[]` の列をその並びで持つ YAML、`version` は行の列の値のハッシュ'
+    constraint: '`documents[].sqlite` を持つ行は、配信元のフォルダ（Git の配信元はクローン本体）の `sqlite.file` を読み取り専用（`mode=ro` の URI）で開き、`where`・`order_by`・`limit` で行を読む。`worktree`・`cwd` がワークツリーを指しても同じファイルを開く。文書の ID は共通のキー `id` に対応する列の値を文字列にしたもの（整数の列は `str()` の値）。本文は `columns[]` の列をその並びで持つ YAML、`version` は行の列の値のハッシュ'
     notes: ファイルを開けない行は文書を持たず、`notes` に行の id と理由を付ける
   - item: SQLite の表の読み込みの時機
     constraint: 呼び出しごとに、`sqlite.file` と `{file}-wal` の更新日時（ナノ秒）とサイズを前回読んだ時点と比べ、変わったときだけ行を読み直す。変わっていなければ読んだ行を使い回す

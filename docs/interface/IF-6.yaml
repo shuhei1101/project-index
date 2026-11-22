@@ -2464,7 +2464,7 @@ flows:
       - 2 回目の後、文書 1 の `notes` にキー `mcp/server.py の補足` が無く、`results[0].skipped` を返却しない
     test: test_normal_when_operation_skipped
   - name: 異常系（SQLite の表の行の種類へ書き込む・ReadOnlyKindError）
-    summary: SQLite の表の行の種類への操作を含む呼び出しを、そのほかの操作も書き込まずに断る
+    summary: 'SQLite の表の行の種類への操作を含む呼び出しを、そのほかの操作も書き込まずに断る（`atomic: false` では通る操作だけを書き込む）'
     setup:
       - name: Mock
         description: なし
@@ -2490,7 +2490,7 @@ flows:
     expected:
       - '`isError: true` で、`operations[1]` と `operations[2]` の位置と、種類 `notes_db` が SQLite の表の行で読み取り専用であることを返却する'
       - 文書 1 のファイルも `data/notes.db` も変わらない
-      - '`atomic: false` でも、種類 `notes_db` の操作は書き込まずに同じエラーを結果に返却する'
+      - '`atomic: false` では、正常系（一部だけ書く）と同じく文書 1 を書き込んで `applied: true`・`results[0].status: updated` を返却し、`results[1]`・`results[2]` を `status: failed` と `ReadOnlyKindError` の理由で返却する。`data/notes.db` は変わらない'
       - '`replace_text` の `filter` が種類 `notes_db` の文書に該当しても、その文書は置換の対象にしない'
     test: test_error_when_sqlite_kind_written
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
@@ -2898,7 +2898,7 @@ exceptions:
     notes: スクリプトのパスと理由を添える。コミットせず、この呼び出しが書き込んだファイルと生成物を戻した後に返却する
   - name: ReadOnlyKindError
     condition: 操作が SQLite の表の行の種類（`documents[].sqlite` を持つ行）の文書を指すか、その種類に create する
-    notes: 操作を適用する前に確かめ、何も書き込まない。`fix` で書き込みはデータを持つアプリのツールで行う旨を示す
+    notes: '操作を適用する前に確かめる。`atomic: true`（既定）は何も書き込まずに送出し、`atomic: false` はその操作を `results[].status: failed` にして通る操作だけを書き込む。`fix` で書き込みはデータを持つアプリのツールで行う旨を示す'
 constraints:
   - item: 件数
     constraint: 1 回の `operations` は最大 50 件
