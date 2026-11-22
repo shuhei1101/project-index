@@ -202,7 +202,13 @@ functions:
     type: float
     required: true
     passing: keyword
-    description: git の 1 回の呼び出しの制限時間。書き込みの期限までの残りの秒数
+    description: '`worktree add` と `write_once` の前の git の 1 回の呼び出しの制限時間。書き込みの期限までの残りの秒数'
+  - name: commit_timeout
+    title: コミットの制限時間
+    type: float
+    required: true
+    passing: keyword
+    description: '`write_once` の後の `add`・`commit`・`rev-parse`・`branch`・`worktree remove` の git の 1 回の呼び出しの制限時間。応答の上限までの残りから余裕を除いた秒数'
   returns:
     type: tuple[str, str] | None
     description: （ブランチの名前, コミットの SHA）。`commit` が `False` なら `None`
@@ -210,7 +216,7 @@ functions:
     1. `{state_dir}/conflicts` の下に一時フォルダを作り、`worktree add --detach {一時フォルダ} {base_sha}` を `plan.repo` で呼ぶ（gitの実行）
     2. `plan.base` の `plan.worktree` からの相対パスを一時フォルダに重ねたフォルダを `write_once` に指定して呼ぶ。例外はそのまま送る（手順 5 の削除はする）
     3. `commit` が `False` の場合、手順 5 へ進んで `None` を返す
-    4. 一時フォルダで `add -A -- {書いた・消したパス}`・`commit --only -m {plan.message} -- {パス}` を呼び、`rev-parse HEAD` でコミットを求める。`branch {衝突したときのブランチの名前} {コミット}` を `plan.repo` で呼ぶ（衝突したときのブランチの名前）
+    4. 一時フォルダで `add -A -- {書いた・消したパス}`・`commit --only -m {plan.message} -- {パス}` を呼び、`rev-parse HEAD` でコミットを求める。`branch {衝突したときのブランチの名前} {コミット}` を `plan.repo` で呼ぶ（衝突したときのブランチの名前）。この手順と手順 5 の git は `commit_timeout` で呼ぶ
     5. 成功しても失敗しても、`worktree remove --force {一時フォルダ}` を呼ぶ。失敗した場合は一時フォルダを削除して `worktree prune` を呼ぶ
        - `[warning]` 一時のワークツリーを削除できなかった（パス・原因）
     6. ブランチの名前とコミットを返す
@@ -236,6 +242,12 @@ functions:
     condition: '`commit` が `False`'
     mock: なし（一時フォルダの git）
     expected: '`None` で、`write_once` を 1 回呼び、ブランチとコミットが増えない'
+  - name: test_keep_in_branch_when_write_deadline_passed
+    case: 正常
+    summary: 書き込みの期限の直前に検査が終わってもブランチを残す
+    condition: '`timeout` を 1、`commit_timeout` を 10 にし、`write_once` が 1 秒眠ってから n2 を書く'
+    mock: なし（一時フォルダの git）
+    expected: ブランチの名前とコミットを返し、ブランチの変更が n2
 - name: run_conflict_script
   title: 衝突したときのスクリプトの実行
   kind: 関数
