@@ -1245,6 +1245,49 @@ scenarios:
       - '`trace_related` が関連の相手に `a1` だけを返却し、`include_excluded: true` を付けると `a2` も除外の表示を付けて返却する'
       - '`search_exclude` を記載しない行の文書の結果は、記載する前と変わらない'
     test: test_normal_when_search_excluded
+  - name: 正常シナリオ（SQLite の表の行を引く）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。`cwd` はテストが引数に入れる）
+        notes: '-'
+      - name: SQLite のデータベース
+        description: 'sample のクローン本体の `data/notes.db`（Git で追跡しない）。表 `notes` に列 `id`・`title`・`summary`・`tags`（JSON の配列の文字列）・`aliases`（JSON の配列の文字列）・`state` を持ち、`n1`（`tags: ["game"]`・`aliases: ["実況"]`）と `n2`（`tags: ["talk"]`）の 2 行'
+      - name: 文書の行
+        description: 'sample の `project-index.yaml` の行 `notes_db`。SQLite のファイル `data/notes.db` と表 `notes` を指し、共通のキーと列の対応（`name` は `title`、`description` は `summary`）・列の説明・`alias_type: term` を記載する'
+        notes: キーの名前と構造はデータ設計の設定で決める
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`cwd` は sample のクローン本体'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（SQLite の表の行を引く）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant DB as SQLite のデータベース
+
+        A->>M: describe(source: sample, kind: notes_db)
+        M-->>A: 行に記載した列の説明
+        A->>M: search_docs(filter: tags が game, view: summary)
+        M->>DB: 読み取り専用で開き、表 notes の行を 1 行 1 件の文書にする
+        M->>M: 列の対応で共通のメタデータを取り、JSON の配列の列を配列にする
+        M-->>A: n1 の行（name・概要文・tags）
+        A->>M: search_docs(filter: id が n1, view: full)
+        M-->>A: n1 の列の値の本文
+        A->>M: list_match_words(source: sample)
+        M-->>A: n1 の name と別名「実況」と、指す文書 n1
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`describe(source: sample, kind: notes_db)` が、種類のスキーマの代わりに行に記載した列の説明を返却する'
+      - '`tags` が `game` の `search_docs` が `n1` の 1 件を返却し、`name` が `title` 列、概要文が `summary` 列の値、`kind` が `notes_db` になる'
+      - '`view: full` の `search_docs` が `n1` の列の値を本文として返却する'
+      - '`list_match_words` が `n1` の `title` 列の値と別名 `実況` を、指す文書 `n1` とともに返却する'
+      - '`search_docs(term: 実況)` が `n1` を返却する'
+      - '`data/notes.db` の中身は変わらない'
+    test: test_normal_when_sqlite_rows
 lead: エージェントが文書の MCP で、作業場所から使用できる配信元の文書を探して参照するシナリオを定め、調査の流れを変えるときに参照する。
 tags:
   - name: topic:クエリ

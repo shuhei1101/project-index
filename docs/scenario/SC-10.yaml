@@ -463,6 +463,68 @@ scenarios:
       - '`check_project` が、コミットするブランチ `develop` を指すワークツリーが sample の `worktrees` に無いことを警告で返却する'
       - '`reload` の後も sample は配信中で、文書を `search_docs` で参照できる。`commit` を指定した `write_docs` は、直コミットの設定に違反があることを理由に断られ、sample のファイルは変わらない'
     test: test_error_when_direct_commit_config_invalid
+  - name: 正常シナリオ（SQLite の表を指す行を追加する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: SQLite のデータベース
+        description: エージェントが調べるの正常シナリオ（SQLite の表の行を引く）と同じ `data/notes.db` を sample のクローン本体に配置する
+      - name: 追加する行
+        description: sample のワークツリーの `project-index.yaml` に追加した行 `notes_db`
+        notes: 追加した `project-index.yaml` を `default_ref` へ commit してから `reload` する
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（SQLite の表を指す行を追加する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant AM as 管理の MCP（/admin/mcp）
+        participant M as 文書の MCP（/mcp）
+
+        A->>AM: check_project(ワークツリーのパス)
+        AM->>AM: SQLite のファイル・表・列の対応を確認する
+        AM-->>A: 違反なし
+        A->>AM: reload()
+        AM-->>A: sample を再読み込みした
+        A->>M: search_docs(filter: kind が notes_db)
+        M-->>A: n1 と n2
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`check_project` が行 `notes_db` の違反を返却しない'
+      - '`reload` の後の `search_docs` が `n1` と `n2` を返却する'
+      - project-index を起動し直していない
+    test: test_normal_when_sqlite_row_added
+  - name: 異常シナリオ（SQLite の行が無い表か列を指す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: SQLite のデータベース
+        description: エージェントが調べるの正常シナリオ（SQLite の表の行を引く）と同じ `data/notes.db`
+      - name: 誤った行
+        description: sample のワークツリーの `project-index.yaml` の行 `notes_db` に、無い表 `memos` を指す設定と、共通のキー `name` の対応に無い列 `heading` を記載した設定
+        notes: 設定ごとに `check_project` を呼ぶ
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（SQLite の行が無い表か列を指す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant AM as 管理の MCP（/admin/mcp）
+
+        A->>AM: check_project(ワークツリーのパス)
+        AM->>AM: data/notes.db に表 memos が無い・表 notes に列 heading が無い
+        AM-->>A: 違反（行のキーのパスと理由）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 無い表を指す設定で、`check_project` が行 `notes_db` の表のキーのパスと、表かビューが無い理由を違反として返却する
+      - 無い列を指す設定で、`check_project` が対応のキーのパスと、列が無い理由を違反として返却する
+      - SQLite のファイルが無い設定も、ファイルのキーのパスと理由を違反として返却する
+      - '`data/notes.db` の中身は変わらない'
+    test: test_error_when_sqlite_table_or_column_missing
 lead: 利用者かエージェントが配信元の設定・スキーマ・スクリプトを変え、管理の MCP で確認してから `reload` で配信に入れるシナリオを定め、設定の変更の流れを変えるときに参照する。
 tags:
   - name: topic:設定

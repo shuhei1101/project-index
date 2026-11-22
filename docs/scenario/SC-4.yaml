@@ -834,6 +834,40 @@ scenarios:
       - 標準出力に、組み込みの配信元 project-index を配信していることが出る
       - 端末の設定のファイルは変わらない
     test: test_normal_when_no_sources
+  - name: 異常シナリオ（SQLite のファイルを開けない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: サンプルの配信元
+        description: YAML の文書の種類を 1 つと、SQLite の表を指す行 `notes_db` を持つ配信元
+        notes: id `sample`。`notes_db` が指す `data/notes.db` を配置しない
+      - name: 端末の設定
+        description: '`PROJECT_INDEX_CONFIG` が指す `settings.yaml`'
+        notes: '`sources` に sample の 1 行'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（SQLite のファイルを開けない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant DD as project-index
+        actor A as エージェント
+
+        U->>DD: project-index serve
+        DD->>DD: notes_db の data/notes.db を開けない
+        DD->>DD: notes_db の文書を配信せず、警告として残す
+        DD-->>U: sample の YAML の文書を配信する
+        A->>DD: describe()
+        DD-->>A: sample と、notes_db を開けない警告
+      ```
+
+      <!-- /map -->
+    expected:
+      - sample の YAML の文書を `search_docs` で返却する
+      - '`describe()` の注意が、行 `notes_db` の id・ファイルのパス・開けない理由を返却する'
+      - '`data/notes.db` を作らない'
+      - '`data/notes.db` を配置した後の次の取得で、`notes_db` の文書を返却する'
+    test: test_error_when_sqlite_file_unopenable
 lead: 利用者が `project-index serve` で端末の設定の配信元を配信し始めるシナリオを定め、起動の流れを変えるときに参照する。
 tags:
   - name: topic:サーバー
