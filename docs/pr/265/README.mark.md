@@ -1,0 +1,1 @@
+# 配信元の設定の search_exclude に該当する文書を、読み取り API の文書の一覧・語での検索と list_match_words からも除く
