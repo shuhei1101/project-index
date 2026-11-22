@@ -176,6 +176,12 @@ def read_rows(source_root: Path, source_id: str, table: DocumentTable) -> Sqlite
         return SqliteRows(warnings=[f"配信元の外のファイルを指しています: {sqlite.file}"])
     signature = file_signature(path)
     id_column = _id_column(table)
+    # id に対応する列が columns[] に無い: 文書の ID を決められないので行を読まない
+    if id_column not in {column.name for column in sqlite.columns}:
+        return SqliteRows(
+            warnings=[f"id に対応する列 {id_column} が columns[] にありません"],
+            signature=signature,
+        )
     try:
         conn = _connect(path)
     except sqlite3.Error as error:
@@ -276,6 +282,16 @@ def _table_violations(
         for key, column in table.metadata.items()
         if column not in actual or column not in listed
     )
+    # id に対応する列（metadata に id が無ければ列 id）: 文書の ID にするので columns[] に要る
+    id_column = _id_column(table)
+    if "id" not in table.metadata and (id_column not in actual or id_column not in listed):
+        violations.append(
+            Violation(
+                path=f"{prefix}.sqlite.columns",
+                rule=f"id に対応する列がありません: {id_column}",
+                fix="文書の ID にする列を columns[] に記載するか、metadata.id で列を指してください",
+            )
+        )
     return violations
 
 

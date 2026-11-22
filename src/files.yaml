@@ -219,6 +219,15 @@ files:
   related:
   - to: MOD-28
     type: implements
+- path: project_index/features/documents/sqlite_rows.py
+  name: SQLite の表の行の読み込み・読み直し・表と列の確認
+  description: SQLite の表を読み取り専用で開いて 1 行 1 件の文書にし、ファイルが変わったときだけ読み直す処理と、表と列の確認を受け持ち、文書のストアの sqlite_rows.py を修正するときに参照する。
+  tags:
+  - topic:文書のストア
+  - topic:sqlite
+  related:
+  - to: MOD-237
+    type: implements
 - path: project_index/features/documents/store.py
   name: 文書のキャッシュ・ID の引き当て・種類のスキーマ・文書の場所と、メタデータのずれの確かめ
   description: 文書のキャッシュ・ID の引き当て・種類のスキーマ・文書の場所と、メタデータのずれの確かめを受け持ち、文書のストアの store.py を修正するときに参照する。
