@@ -216,7 +216,7 @@ functions:
     1. `{state_dir}/conflicts` の下に一時フォルダを作り、`worktree add --detach {一時フォルダ} {base_sha}` を `plan.repo` で呼ぶ（gitの実行）
     2. `plan.base` の `plan.worktree` からの相対パスを一時フォルダに重ねたフォルダを `write_once` に指定して呼ぶ。例外はそのまま送る（手順 5 の削除はする）
     3. `commit` が `False` の場合、手順 5 へ進んで `None` を返す
-    4. 一時フォルダで `add -A -- {書いた・消したパス}`・`commit --only -m {plan.message} -- {パス}` を呼び、`rev-parse HEAD` でコミットを求める。`branch {衝突したときのブランチの名前} {コミット}` を `plan.repo` で呼ぶ（衝突したときのブランチの名前）。この手順と手順 5 の git は、呼ぶ直前の `respond_by.remaining()` − `DIRECT_COMMIT_MARGIN_SEC` で呼ぶ
+    4. 一時フォルダで `add -A`・`commit -m {plan.message}` を呼び（作ったばかりの一時のワークツリーの変更は、書き込みと削除と生成物だけ）、`rev-parse HEAD` でコミットを求める。`branch {衝突したときのブランチの名前} {コミット}` を `plan.repo` で呼ぶ（衝突したときのブランチの名前）。この手順と手順 5 の git は、呼ぶ直前の `respond_by.remaining()` − `DIRECT_COMMIT_MARGIN_SEC` で呼ぶ
     5. 成功しても失敗しても、`worktree remove --force {一時フォルダ}` を呼ぶ。失敗した場合は一時フォルダを削除して `worktree prune` を呼ぶ
        - `[warning]` 一時のワークツリーを削除できなかった（パス・原因）
     6. ブランチの名前とコミットを返す

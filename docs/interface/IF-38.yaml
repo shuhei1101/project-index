@@ -647,7 +647,7 @@ flows:
   - 1 回目が 409 で `reason` が `not_found`、2 回目が 409 で `reason` が `not_ancestor`
   - どちらもブランチと一時のワークツリーを作らず、スクリプトを実行せず、リモートとワークツリーは変わらない
   test: test_error_when_base_commit_unusable
-- name: 異常系（編集を始めたときのコミットでも検査に合格しない・422）
+- name: 異常系（編集を始めたときのコミットでも検査に合格しない・409）
   summary: どちらでも合格しない要求は、今のブランチで断った理由で断る
   setup:
   - name: Mock
@@ -661,7 +661,7 @@ flows:
   - name: 入力
     description: '`writes` にスキーマに違反する値への n1 の `update` と、`baseCommit`'
   flow: |-
-    <!-- map: {"title": "異常系（編集を始めたときのコミットでも検査に合格しない・422）"} -->
+    <!-- map: {"title": "異常系（編集を始めたときのコミットでも検査に合格しない・409）"} -->
 
     ```mermaid
     sequenceDiagram
@@ -670,16 +670,16 @@ flows:
       participant TW as 一時のワークツリー
 
       C->>E: writes（スキーマに違反する n1）, baseCommit
-      E->>E: 今の develop で n1 が 422（スキーマの違反とバージョンの不一致）
+      E->>E: 今の develop で n1 のバージョンが合わず 409
       E->>TW: baseCommit の一時のワークツリーを作る
       E->>E: 一時のワークツリーでも n1 がスキーマに合格しない
       E->>TW: 一時のワークツリーを削除する
-      E-->>C: 422 ValidationFailedError（今の develop の errors[]）
+      E-->>C: 409 VersionMismatchError（今の develop で断った理由）
     ```
 
     <!-- /map -->
   expected:
-  - 422 で、`errors[]` が今の develop で検査した違反（スキーマの違反とバージョンの不一致）
+  - 409 の `VersionMismatchError` で、今の develop で断った n1 のバージョンの不一致（今の develop ではバージョンの照合が検査より先に断る）
   - ブランチと一時のワークツリーが残らず、スクリプトを実行しない
   test: test_error_when_invalid_at_base_commit
 test_file: tests/integration/server/test_commit_documents.py
