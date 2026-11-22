@@ -452,3 +452,34 @@ def test_read_rows_when_id_column_missing(tmp_path: Path) -> None:
     assert result.documents == []
     assert len(result.warnings) == 1
     assert "id" in result.warnings[0]
+
+
+def test_rows_reload_when_written_while_reading(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """読んでいる間に書き込まれた行は、次の呼び出しで読み直して返す（正常系）。"""
+    # 準備
+    (tmp_path / "data").mkdir()
+    db = tmp_path / "data/notes.db"
+    _create_notes(db, [_N1], wal=True)
+    original = sqlite_rows_module._fetch  # pyright: ignore[reportPrivateUsage]
+
+    def fetch_then_write(conn: sqlite3.Connection, sqlite: SqliteTable, id_column: str) -> object:
+        result = original(conn, sqlite, id_column)
+        writer = sqlite3.connect(db)
+        writer.execute("PRAGMA wal_autocheckpoint=0")
+        writer.execute("INSERT INTO notes VALUES ('n3', 't3', 's3', '[]', '[]', 'active')")
+        writer.commit()
+        writer.close()
+        return result
+
+    monkeypatch.setattr(sqlite_rows_module, "_fetch", fetch_then_write)
+    cache = SqliteRowCache()
+    table = _notes_table()
+    first = cache.rows(tmp_path, "sample", table)
+    monkeypatch.setattr(sqlite_rows_module, "_fetch", original)
+    # 実行
+    second = cache.rows(tmp_path, "sample", table)
+    # 検証
+    assert _ids(first.documents) == ["n1"]
+    assert _ids(second.documents) == ["n1", "n3"]

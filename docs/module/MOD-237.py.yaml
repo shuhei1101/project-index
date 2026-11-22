@@ -116,6 +116,12 @@ classes:
             condition: ファイルを変えずに、`where` だけが違う 2 つの `table` を交互に 2 回ずつ渡す
             mock: '`read_rows` を呼び出しの回数を数える関数に差し替える'
             expected: '`read_rows` の呼び出しが 2 回で、それぞれの `table` に `where` に合った `documents` を返す'
+          - name: test_rows_reload_when_written_while_reading
+            case: 正常
+            summary: 読んでいる間に書き込まれた行は、次の呼び出しで読み直して返す
+            condition: WAL のモードのファイルで、行を読んだ後・接続を閉じる前に別の接続で 1 行追加する
+            mock: 行の読み込み（`_fetch`）を、読んだ後に書き込む関数に差し替える（1 回目だけ）
+            expected: 1 回目は追加の前の行、書き込みの無い 2 回目は追加した行を含む
 functions:
   - name: file_signature
     title: ファイルの署名の取得
@@ -181,7 +187,7 @@ functions:
       4. `limit` を超えたときは `SELECT COUNT(*)` で `where` に該当する行の数を数え、`omitted` にする
       5. 列の型が `json` の値を `json.loads` し、読めない値は空にして警告する
       6. 行ごとに `columns[]` の並びの辞書を作り、`metadata` の対応で共通のメタデータを取り（空の配列の値はそのキーを持たない）、`id` の値を `str()` して文書の ID にする（重なる ID は最初の行だけを残して警告する）
-      7. 本文は辞書を YAML にした文字列、`version` は本文のハッシュにする。接続は閉じてから返す。署名は接続を閉じた後に取る（WAL のモードのファイルは読み取り専用の接続でも `-wal`・`-shm` を作るため）
+      7. 本文は辞書を YAML にした文字列、`version` は本文のハッシュにする。接続は閉じてから返す。署名は読む前と閉じた後に取り、違いが「読む前は `-wal` が無く、閉じた後に大きさ 0 の `-wal` ができた」だけ（本体のファイルの署名は同じ）のときは閉じた後の署名を、それ以外は読む前の署名を持つ（WAL のモードのファイルは読み取り専用の接続でも空の `-wal` を作り、読んでいる間の書き込みは次の呼び出しで読み直すため）
     unit_tests:
       - name: test_read_rows
         case: 正常
