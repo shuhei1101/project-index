@@ -126,6 +126,9 @@ def _read_schema(root: Path, table: DocumentTable) -> dict[str, Any]:
         if raw is None:
             raise InvalidAgentFlowError(problems)
         return resolve_schema_refs(raw, path)
+    # SQLite の表の行: スキーマのファイルを持たない
+    if table.schema_path is None:
+        return {}
     # ほかの配信元のリビジョンのスキーマを指す行
     return _read_ref_schema(table.schema_path)
 

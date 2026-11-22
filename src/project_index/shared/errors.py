@@ -189,6 +189,16 @@ class DeleteNotAllowedError(ProjectIndexError):
 
 
 @dataclass(kw_only=True)
+class ReadOnlyKindError(ProjectIndexError):
+    """SQLite の表の行の種類への操作（読み取り専用）。"""
+
+    status: ClassVar[int] = 403
+    kind: str = ""
+    # 断った操作の位置（`operations[{番号}]`・`targets[{番号}]`・`writes[{番号}]`・`deletes[{番号}]`）
+    positions: list[str] = field(default_factory=list[str])
+
+
+@dataclass(kw_only=True)
 class LastReadNotFoundError(ProjectIndexError):
     """前回読んだ記録が無い。"""
 

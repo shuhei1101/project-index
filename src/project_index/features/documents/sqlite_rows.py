@@ -105,11 +105,10 @@ def _select(sqlite: SqliteTable, id_column: str) -> tuple[str, str]:
     columns = ", ".join(_quote(column.name) for column in sqlite.columns)
     where = "" if sqlite.where is None else f" WHERE {sqlite.where}"
     order_by = sqlite.order_by or f"{_quote(id_column)} ASC"
-    rows = (
-        f"SELECT {columns} FROM {_quote(sqlite.table)}{where}"
-        f" ORDER BY {order_by} LIMIT {sqlite.limit + 1}"
-    )
-    count = f"SELECT COUNT(*) FROM {_quote(sqlite.table)}{where}"
+    # where・order_by は配信元の設定に利用者が書いた SQL の断片で、読み取り専用の接続で 1 文だけ実行する
+    source = f"{_quote(sqlite.table)}{where}"
+    rows = f"SELECT {columns} FROM {source} ORDER BY {order_by} LIMIT {sqlite.limit + 1}"  # noqa: S608
+    count = f"SELECT COUNT(*) FROM {source}"  # noqa: S608
     return rows, count
 
 
