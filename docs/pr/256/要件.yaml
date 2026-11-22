@@ -13,15 +13,14 @@ use_cases:
   - kind: single
     scenario: docs/scenario/SC-15.yaml
     impact: following
-    detail: 作業場所を持つ手元のセッションの直コミットはそのままで、作業場所を持たない要求の直コミットと分けて記載する
+    detail: 作業場所を持つ手元のセッションの直コミットの流れは変えず、作業場所を持たない要求の直コミット（画面のサーバーが直コミットで書き込む）への参照を加える
     depends_on:
       - docs/scenario/SC-17.yaml
   - kind: single
     scenario: docs/scenario/SC-12.yaml
-    impact: following
-    detail: 作業場所を持たない要求の直コミットの許可を端末の設定に持つなら、その許可を端末の設定の API で取得・保存できる
-    depends_on:
-      - docs/scenario/SC-17.yaml
+    impact: run_only
+    detail: 端末の設定の直コミットの行を、送信しなかったキーを今の値で残して保存する流れは変わらないが、作業場所を持たない要求の許可を端末の設定に加えると壊しうるため回帰を確認する
+    depends_on: []
   - kind: single
     scenario: docs/scenario/SC-11.yaml
     impact: run_only
