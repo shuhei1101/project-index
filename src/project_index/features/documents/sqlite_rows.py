@@ -169,6 +169,25 @@ def _fetch(
     return rows, 0
 
 
+def _kept_signature(
+    before: SqliteSignature | None, after: SqliteSignature | None
+) -> SqliteSignature | None:
+    """読む前と閉じた後の署名から、読んだ行と一緒に持つ署名を選ぶ。
+
+    WAL のモードのファイルは読み取り専用の接続でも空の `-wal` を作るので、違いがそれだけなら閉じた後の署名を持つ。
+    それ以外の違い（読んでいる間の書き込み）は読む前の署名を持ち、次の呼び出しで読み直させる。
+    """
+    created_empty_wal = (
+        before is not None
+        and after is not None
+        and before.db == after.db
+        and before.wal is None
+        and after.wal is not None
+        and after.wal[1] == 0
+    )
+    return after if created_empty_wal else before
+
+
 def read_rows(source_root: Path, source_id: str, table: DocumentTable) -> SqliteRows:
     """SQLite のファイルを読み取り専用で開き、表かビューの行を 1 行 1 件の文書にする。"""
     sqlite = _sqlite_of(table)
@@ -193,8 +212,7 @@ def read_rows(source_root: Path, source_id: str, table: DocumentTable) -> Sqlite
         return SqliteRows(warnings=[f"{sqlite.file} の表 {sqlite.table} を読めません（{error}）"])
     finally:
         conn.close()
-    # WAL のモードのファイルは読み取り専用の接続でも `-wal`・`-shm` を作るので、閉じた後の署名を持つ
-    signature = file_signature(path)
+    signature = _kept_signature(signature, file_signature(path))
     names = [column.name for column in sqlite.columns]
     warnings: list[str] = []
     documents: list[Document] = []
