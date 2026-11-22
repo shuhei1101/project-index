@@ -1,0 +1,61 @@
+use_cases:
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: changed
+    detail: 画面のサーバーが配信元の文書の修正をまとめて直コミットで登録する流れを加える
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-17.yaml
+    impact: new
+    detail: 画面のサーバーが溜めた文書の書き込みと削除を 1 回の要求で検査に合格させ、1 つのコミットにまとめてプッシュする。許可していない端末・配信元では断る
+    depends_on:
+      - docs/scenario/SC-1.yaml
+  - kind: single
+    scenario: docs/scenario/SC-15.yaml
+    impact: following
+    detail: 作業場所を持つ手元のセッションの直コミットはそのままで、作業場所を持たない要求の直コミットと分けて記載する
+    depends_on:
+      - docs/scenario/SC-17.yaml
+  - kind: single
+    scenario: docs/scenario/SC-12.yaml
+    impact: following
+    detail: 作業場所を持たない要求の直コミットの許可を端末の設定に持つなら、その許可を端末の設定の API で取得・保存できる
+    depends_on:
+      - docs/scenario/SC-17.yaml
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: run_only
+    detail: 画面のサーバーの読み取りは変わらないが、同じ待ち受けとオリジンの確認に書き込みが加わるため回帰を確認する
+    depends_on: []
+docs:
+  - page: docs/guide/読み取りAPI.md
+    new: false
+    change: 画面のサーバーが呼ぶ書き込みの API のエンドポイント・入出力・エラーを加える
+    status: todo
+  - page: docs/guide/コアコンセプト-配信元と権限.md
+    new: false
+    change: '`## 直コミット` に、作業場所を持たない画面のサーバーからの直コミットとその許可を加える'
+    status: todo
+  - page: docs/guide/設定.md
+    new: false
+    change: 作業場所を持たない要求の直コミットの許可のキーを加える（データ設計で端末の設定に配置すると決めた場合）
+    status: todo
+  - page: docs/guide/リファレンス.md
+    new: false
+    change: 書き込みの API への目次の行を加えるか、読み取りAPI の行の説明に書き込みを加える
+    status: todo
+  - page: docs/glossary/GLO-1.yaml
+    new: false
+    change: 直コミットの定義に、画面のサーバーの書き込みの API からの直コミットとその許可を加える
+    status: todo
+  - page: docs/architecture/ARCH-1.yaml
+    new: false
+    change: dev-docs の画面のサーバーとの境界に、文書の書き込みと直コミットを加える
+    status: todo
+scope_out:
+  - item: dev-docs の画面での修正の溜め方と、書き込みの API を呼ぶ画面のサーバーの実装
+    reason: 別のリポジトリの後続 shuhei1101/dev-docs#310 が扱う
+    plan: none
+  - item: 文書でないファイル（rule-inject の索引・配信元の設定 project-index.yaml）を画面のサーバーから直コミットで書き換えること
+    reason: Issue の要望は配信元の文書の書き込みで、dev-docs#310 が挙げるこれらのファイルを project-index の書き込みの経路で扱うかは判断が分かれる。今の判断は、管理用の YAML・用語集など配信元の文書だけを対象にし、文書でないファイルは対象外とする（レビューで確定する）
+    plan: to_file
