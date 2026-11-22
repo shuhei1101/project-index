@@ -54,8 +54,10 @@ __all__ = [
 ]
 
 
-def _schema_file(schema_path: str | SchemaRef) -> str:
+def _schema_file(schema_path: str | SchemaRef | None) -> str:
     """違反に書くスキーマのファイル（ほかの配信元の参照は `{配信元}:{パス}@{リビジョン}`）。"""
+    if schema_path is None:
+        return ""
     if isinstance(schema_path, str):
         return schema_path
     return f"{schema_path.source}:{schema_path.path}@{schema_path.ref}"
@@ -117,6 +119,9 @@ class DocumentChecker:
         """スキーマ・ID の形・関連の種類・`validators[]` を順に通す。"""
         source = target.source
         table = source.table(document.kind)
+        # SQLite の表の行: データを持つアプリの行をそのまま配信し、スキーマも検査も持たない
+        if table.sqlite is not None:
+            return []
         violations: list[Violation] = []
         schema = self.store.row_schema(target, document.kind)
         violations.extend(
