@@ -442,8 +442,9 @@ def test_normal_when_conflict_script_failed(
     assert data["conflict"]["script"]["exitCode"] == 1
     assert data["conflict"]["script"]["stderr"] == "失敗しました\n"
     assert _conflict_branches(direct, run_git) == [data["conflict"]["branch"]]
-    assert run_git(direct.folder, "rev-parse", data["conflict"]["branch"]).strip() == (
-        data["conflict"]["commit"]
+    assert (
+        run_git(direct.folder, "rev-parse", data["conflict"]["branch"]).strip()
+        == (data["conflict"]["commit"])
     )
 
 
