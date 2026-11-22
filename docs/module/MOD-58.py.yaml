@@ -297,6 +297,12 @@ data_models:
         access: 公開
         default: None
         description: '本文から返却する行の範囲。`view: full` のときだけ。`sections` と同時に指定できない'
+      - name: include_excluded
+        title: 除いた文書も返すか
+        type: bool
+        access: 公開
+        default: 'False'
+        description: '`True` のとき、文書の行の `search_exclude` に該当する文書も返す'
   - name: SearchItem
     title: 検索の結果の文書
     container: project_index/features/search/types.py
@@ -350,6 +356,12 @@ data_models:
         access: 公開
         default: None
         description: 本文の全体の行数（行の分割の数）。`ranges` と同じ条件で持つ
+      - name: excluded
+        title: 除く条件に該当するか
+        type: bool | None
+        access: 公開
+        default: None
+        description: '`include_excluded` が `True` の呼び出しで、`search_exclude` に該当する文書だけ `True`'
   - name: GroupCount
     title: 集計の行
     container: project_index/features/search/types.py
@@ -433,6 +445,12 @@ data_models:
         access: 公開
         default: 'False'
         description: 読んだ場所のどれかの `outside_scope` が `True`
+      - name: excluded_count
+        title: 除いた件数
+        type: int | None
+        access: 公開
+        default: None
+        description: '`include_excluded` が `False` で、条件に当たったうち `search_exclude` に該当して除いた件数。1 件以上のときだけ持つ'
   - name: SnippetLine
     title: 抜粋の行
     container: project_index/features/search/types.py

@@ -112,9 +112,10 @@ functions:
       5. `documents[].schema` のファイルが設定ファイルのフォルダの下に無いか YAML として読めない場合、そのキーに違反を加える（YAMLの読み込み）。スキーマは Draft 2020-12 の `check_schema` も通す
          - `schema` がオブジェクトの行は、参照先のスキーマの読み取りで読み、`SchemaRefError` は `documents[{n}].schema` の違反（理由は例外の `rule`）にする。読めたスキーマは `check_schema` を通す
                - `check_schema` の結果（違反の理由か、違反なし）は、スキーマの『値のハッシュ』ごとに `_checked` に持ち、当たれば `check_schema` を呼ばない（行と組み立て直しをまたいで使い回す）
-      6. パス（`documents[].paths[]`・`schema`）が `..` で外（`paths[]` は基準のフォルダ、`schema` は設定ファイルのフォルダ）を指す場合、その要素に違反を加える
-      7. `paths_base` を『paths の基準のフォルダの解決』（`config_root` は `root`、`repo_root` は `root` の履歴の『リポジトリの直下』）にかけ、違反を加える
-      8. 違反を返す
+      6. `search_exclude` を持つ行は、5 で読めたスキーマから使える項目（検索の fields.py の `known_fields`）を作り、検索の filters.py の『除く条件の確かめ』（`path` は `documents[{n}].search_exclude`）の違反を加える。スキーマを読めなかった行は確かめない
+      7. パス（`documents[].paths[]`・`schema`）が `..` で外（`paths[]` は基準のフォルダ、`schema` は設定ファイルのフォルダ）を指す場合、その要素に違反を加える
+      8. `paths_base` を『paths の基準のフォルダの解決』（`config_root` は `root`、`repo_root` は `root` の履歴の『リポジトリの直下』）にかけ、違反を加える
+      9. 違反を返す
     unit_tests:
       - name: test_validate_source_config
         case: 正常
@@ -224,6 +225,20 @@ functions:
         condition: '`documents[0]` に `write_dates: false` を記載した設定と、`write_dates: "no"` を記載した設定'
         mock: なし（一時フォルダ）
         expected: 1 つ目は空。2 つ目は `documents[0].write_dates` のスキーマの違反
+      - name: test_validate_source_config_when_search_exclude_invalid
+        case: 異常
+        summary: 既定の検索から除く条件の誤り
+        condition: '`documents[0].search_exclude` が `{field: status, op: like, values: [inactive]}`、`documents[1].search_exclude` が `{field: body, op: contains, values: [x]}`'
+        mock: なし
+        expected: '`documents[0].search_exclude` と `documents[1].search_exclude.field` の違反を返す'
+        exception: '-'
+      - name: test_validate_source_config_when_search_exclude
+        case: 正常
+        summary: 既定の検索から除く条件を持つ行
+        condition: '`documents[0].search_exclude` が `{field: status, op: eq, values: [inactive]}`'
+        mock: なし
+        expected: 違反を返さない
+        exception: '-'
   - name: check_scripts
     title: スクリプトの確かめ
     kind: 関数

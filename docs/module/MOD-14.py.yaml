@@ -128,10 +128,11 @@ functions:
          - 出現数が増えたら `added`、減ったら `removed`。文書が無い側の数は 0
       6. ID で突き合わせ、前にだけある文書を `deleted`、後にだけある文書を `added`、両方にあって変わったキー（無視するキーは `diff_ignore_keys`、`body_path` のある文書は `body` も 1 つのキーとして比べる）が空でない文書を `modified` にする。`contains` がある場合は語の増減を持つ文書だけを残し、`added`・`deleted`・`modified` のどれにも当たらない文書を `unchanged` にする
       7. `filter` があれば、後の文書（無ければ前の文書、両方に無ければ語の増減を比べたときに最後に見た文書）を条件の照合にかけ、当たる文書だけを残す（条件の確かめは検索と同じで、使える項目は文書に当てるスキーマ（文書のストア.文書に当てるスキーマ）から作る）
-      8. 配信元の順・`id` の昇順に並べ、検索と同じ `limit` の丸め・続きの位置・`max_chars` の打ち切りをする
-      9. `view` が `full` の場合、前と後の本文の差分の行を入れる
-      10. `to` が無く（終点が今の作業ツリー）、`deleted` でない文書は、`path` を後の文書の場所（文書のストア.文書の場所）にし、`scope` を `view` が `full` なら `section`、それ以外は `summary` にする
-      11. 区間の端を入れて返す
+      8. 文書の行ごとに除く条件の取り出し（検索の filters.py）をし、前と後の文書のうち存在する方の全てが除く条件の照合に該当する文書を、`include_excluded` が `False` なら除いて件数を `excluded_count` にし（1 件以上なら `既定の検索から {件数} 件を除きました。include_excluded: true で取得できます` を `notes` に足す）、`True` なら `excluded` を `True` にする。条件は今の配信元の設定（`worktree` を指したときはそのワークツリーの設定）の行から取り出す
+      9. 配信元の順・`id` の昇順に並べ、検索と同じ `limit` の丸め・続きの位置・`max_chars` の打ち切りをする
+      10. `view` が `full` の場合、前と後の本文の差分の行を入れる
+      11. `to` が無く（終点が今の作業ツリー）、`deleted` でない文書は、`path` を後の文書の場所（文書のストア.文書の場所）にし、`scope` を `view` が `full` なら `section`、それ以外は `summary` にする
+      12. 区間の端を入れて返す
     exceptions:
       - name: RefNotFoundError
         condition: '`from`・`to` を解決できない'
@@ -234,6 +235,20 @@ functions:
         condition: '`records: files`・`body_file: path` の行で `.md` を指す文書 2 件を読んだ後、片方の `.md` の本文だけを書き換えて `from_` を省いて呼ぶ'
         mock: なし（一時ディレクトリの配信元と会話の記録）
         expected: 書き換えた文書だけが `modified` で、変えていない文書は返らない
+      - name: test_list_changes_when_search_excluded
+        case: 正常
+        summary: 存在する端の全てで該当する文書を除く
+        condition: '`search_exclude: {field: status, op: eq, values: [inactive]}` の行で、`inactive` のまま `name` を変えた a2、`active` から `inactive` にした a3、`inactive` で追加した a4、`active` のまま変えた a1'
+        mock: なし
+        expected: 'a1 と a3。`excluded_count: 2`'
+        exception: '-'
+      - name: test_list_changes_when_include_excluded
+        case: 正常
+        summary: 除いた文書も返す
+        condition: '上と同じ区間に `include_excluded: true`'
+        mock: なし
+        expected: 4 件。a2 と a4 だけ `excluded` が `True`
+        exception: '-'
 refs:
   - to: IF-4
     type: requires

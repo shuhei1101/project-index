@@ -86,10 +86,10 @@ functions:
       4. 起点を決める
          - `from_ids` の場合、無い ID があれば近い候補を添えた `DocumentNotFoundError`
          - `code_paths` の場合、正規化したパスと `body_path` が同じ文書。文書の無いパスがあれば `DocumentNotFoundError`（`missing` にパス）
-      5. 関連をたどる。別の配信元の文書は、その配信元を読む場所の解決（同じ `cwd`・`outside_scope`）で解き、ID で引く（`SourceNotReadableError` など解けないときは `None`）
+      5. 関連をたどる。`include_excluded` が `False` なら、相手の文書の行の除く条件（検索の filters.py の除く条件の取り出し）に除く条件の照合で該当する文書を `skip` で飛ばし、飛ばした数を `excluded_count` にする（1 件以上なら `既定の検索から {件数} 件を除きました。include_excluded: true で取得できます` を `notes` に足す）。`True` なら該当する相手の `excluded` を `True` にする。起点は除かない。別の配信元の文書は、その配信元を読む場所の解決（同じ `cwd`・`outside_scope`）で解き、ID で引く（`SourceNotReadableError` など解けないときは `None`）
       6. `repeat_seen` が `False` なら、会話の記録.返却済み（`related`）に当たる相手の名前・概要文を `SEEN_MARK` にする
          - `SEEN_MARK` にしなかった相手は、その文書を読んだ場所で `path` を文書の場所（文書のストア.文書の場所）にし、`path` があれば `scope` を `summary` にする
-      7. `suggest` なら、起点の `body_path`（無ければ `path`）で一緒に変わったファイル（Git の配信元だけ）と、会話の記録.閲覧と編集を引き、関連の候補を選ぶ（`exclude` は起点とたどった文書）
+      7. `suggest` なら、起点の `body_path`（無ければ `path`）で一緒に変わったファイル（Git の配信元だけ）と、会話の記録.閲覧と編集を引き、関連の候補を選ぶ（`exclude` は起点とたどった文書。`include_excluded` が `False` なら除く条件に該当する文書も加える）
       8. 名前・概要文を返した相手を会話の記録に `related` で残す
       9. 起点か相手を作業範囲の外の場所で読んだら結果の `outside_scope` を `True` にして返す
     exceptions:
@@ -141,6 +141,13 @@ functions:
         mock: なし
         expected: '`DocumentNotFoundError` の `candidates` に近い ID'
         exception: 無い起点
+      - name: test_trace_related_when_search_excluded
+        case: 正常
+        summary: 除く条件に該当する相手とその先
+        condition: 'c → a1・a2、a2 → d。a2 が `search_exclude` に該当。`from_ids: [c]`・`depth: 2`'
+        mock: なし
+        expected: 'a1 だけ・`excluded_count: 1`。`include_excluded: true` では a1・a2（`excluded`）・d。`from_ids: [a2]` では d'
+        exception: '-'
 refs:
   - to: IF-3
     type: requires

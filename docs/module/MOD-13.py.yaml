@@ -38,7 +38,7 @@ functions:
     process: |-
       1. `outside_scope` が `True` なら先頭に `作業範囲の外（参考）` の行を置く
       2. 次の行に `{配信元}: {始点}（{日時}）→ {終点}（{日時}）・変わった文書 {total_count} 件` を置く（始点・終点は commit、無ければ渡した値）
-      3. `| id | 変更 | 変わったキー |` の表を置く。`contains_changes` を持つ文書があれば `単語の増減` の列を加え、区間ごとに `{kind} {後の端の commit（無ければ渡した値）}` を `・` で並べる
+      3. `| id | 変更 | 変わったキー |` の表を置く。`excluded` が `True` の文書があれば `除外` の列を加え、その行に ✓ を出す。`contains_changes` を持つ文書があれば `単語の増減` の列を加え、区間ごとに `{kind} {後の端の commit（無ければ渡した値）}` を `・` で並べる
       4. 差分の行があれば、文書ごとに `## {id}` と ```diff のかたまりを置く。`path` を持つ文書は ```diff のかたまりを `<document path="{path}" scope="section">` と `</document>` で包む
       5. `notes` と `next_cursor` を検索と同じに置く
     unit_tests:
@@ -67,5 +67,12 @@ functions:
         condition: '`outside_scope: true` の結果'
         mock: なし
         expected: 先頭の行が `作業範囲の外（参考）`
+        exception: '-'
+      - name: test_render_changes_markdown_when_excluded
+        case: 正常
+        summary: 除外の列
+        condition: '`excluded` が `True` の文書と `None` の文書'
+        mock: なし
+        expected: '`除外` の列があり、前の文書の行だけ ✓'
         exception: '-'
 visibility: internal
