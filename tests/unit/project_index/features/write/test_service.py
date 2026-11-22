@@ -2672,7 +2672,11 @@ def test_commit_documents_when_conflict_kind_removed(
             direct_commit=DirectCommitConfig(branch="data", kinds=["terms"]),
         ),
     )
-    monkeypatch.setattr(commit_env.env.registry, "get_for_docs", lambda _source_id: removed)
+
+    def get_for_docs(_source_id: str) -> ServedSource:
+        return removed
+
+    monkeypatch.setattr(commit_env.env.registry, "get_for_docs", get_for_docs)
 
     def load_at(source: ServedSource, root: Path) -> ServedSource:
         # 一時のワークツリーでは、編集を始めたときの設定を読んだことにする

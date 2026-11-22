@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 import fnmatch
+import functools
 import logging
 import posixpath
 import time
@@ -43,7 +44,8 @@ from project_index.features.search.filters import check_filter, match_filter
 from project_index.features.search.types import SearchRequest
 from project_index.features.seen.types import LastRead, SessionKey
 from project_index.features.sources.service import SCRIPT_TABLES
-from project_index.features.sources.types import DocumentTable
+from project_index.features.sources.types import DocumentTable, ServedSource
+from project_index.features.validation.service import DocumentChecker
 from project_index.features.write.apply import (
     BODY_KEY,
     apply_body,
@@ -51,6 +53,12 @@ from project_index.features.write.apply import (
     expand_array_keys,
     to_columns,
     to_given_keys,
+)
+from project_index.features.write.conflict import (
+    CONFLICT_ERRORS,
+    keep_in_branch,
+    run_conflict_script,
+    verify_base_commit,
 )
 from project_index.features.write.direct_commit import (
     DIRECT_COMMIT_MARGIN_SEC,
@@ -77,11 +85,13 @@ from project_index.features.write.types import (
     CommitDocumentsResult,
     CommitResult,
     CommitSpec,
+    ConflictResult,
     DeleteRequest,
     DeleteResult,
     DeleteTarget,
     Operation,
     ReferenceChange,
+    ScriptRunResult,
     SkippedOperation,
     WriteRequest,
     WriteResult,
@@ -114,9 +124,7 @@ if TYPE_CHECKING:
 
     from project_index.features.seen.store import SeenStore
     from project_index.features.sources.registry import SourceRegistry
-    from project_index.features.sources.types import ServedSource
     from project_index.features.validation.markdown import UncheckedKey
-    from project_index.features.validation.service import DocumentChecker
     from project_index.features.write.locks import RepositoryLocks, SourceLocks
 
 logger = logging.getLogger(__name__)
@@ -2605,11 +2613,11 @@ def commit_documents(
     locks: SourceLocks,
     repo_locks: RepositoryLocks,
     timeout_sec: float,
+    state_dir: Path,
     now: datetime | None = None,
     limits: CallLimits | None = None,
 ) -> CommitDocumentsResult:
     """書き込みの API の要求を処理し、書き込みと削除を 1 つの直コミットにして結果を返す。"""
-    now = now or datetime.now(UTC)
     limits = limits or _default_limits()
     _check_commit_documents_size(request)
     # SQLite の表の行の種類への操作は、取得・取り込みの前に断る
@@ -2618,21 +2626,175 @@ def commit_documents(
     _check_read_only(early, sqlite_docs, request.writes, "writes")
     _check_read_only_deletes(early, sqlite_docs, request.deletes, "deletes")
     source, plan, committable = _write_api_commit_target(registry, request)
+    run = _CommitDocumentsRun(
+        request=request,
+        source=source,
+        plan=plan,
+        committable=committable,
+        store=store,
+        checker=checker,
+        timeout_sec=timeout_sec,
+        state_dir=state_dir,
+        now=now or datetime.now(UTC),
+        limits=limits,
+    )
+    # 試しの書き込み: 取得・コミット・プッシュをせず、確認だけを行う
+    if request.dry_run:
+        with _commit_locks(repo_locks, locks, plan, limits):
+            return run.dry_run()
+    with _commit_locks(repo_locks, locks, plan, limits):
+        try:
+            result = run_direct_commit(plan, run.write_once, limits=limits)
+        except CONFLICT_ERRORS as error:
+            # 編集を始めたときのコミットが無い要求は、今と同じに断る
+            if request.base_commit is None:
+                raise
+            conflicted: ProjectIndexError = error
+            kept = run.keep(error, write=True)
+        else:
+            return run.result_of(applied=True, commit=result)
+    # 排他を放した後に、衝突したときのスクリプトを実行する
+    return run.finish_conflict(kept, conflicted)
 
-    def prepare() -> tuple[_Session, _Committed]:
-        # 取り込んだ後の内容と設定で、書き込みと削除を当てて直コミットの確認まで進める
-        session = _Session(
-            store, _commit_write_target(source, plan), deadline=limits.write_deadline
+
+@dataclass
+class _CommitDocumentsRun:
+    """書き込みの API の 1 回の要求の、今のブランチと一時のワークツリーへの書き込み。"""
+
+    request: CommitDocumentsRequest
+    source: ServedSource
+    plan: CommitPlan
+    committable: frozenset[str]
+    store: DocumentStore
+    checker: DocumentChecker
+    timeout_sec: float
+    state_dir: Path
+    now: datetime
+    limits: CallLimits
+    # `base_commit` を解いた 40 桁の SHA（取得と取り込みの後に確かめる）
+    base_sha: str = ""
+    # 最後に当てた書き込みと削除の結果
+    done: list[_Committed] = field(default_factory=list["_Committed"])
+
+    def prepare(self, target: Target) -> tuple[_Session, _Committed]:
+        """書く場所の内容と設定で、書き込みと削除を当てて直コミットの確認まで進める。"""
+        session = _Session(self.store, target, deadline=self.limits.write_deadline)
+        committed, changed, before = _apply_commit_documents(
+            session, self.checker, self.request, self.now
         )
-        committed, changed, before = _apply_commit_documents(session, checker, request, now)
-        _check_commit_documents_content(source, committable, changed, before, session.docs)
+        # 許可は今の配信元の設定で判定する（一時のワークツリーの設定は使用しない）
+        _check_commit_documents_content(
+            self.source, self.committable, changed, before, session.docs
+        )
         if committed.deleted is not None:
             _remove_documents(session, committed.deleted.accepted)
+        self.done[:] = [committed]
         return session, committed
 
-    def result_of(
-        committed: _Committed, *, applied: bool, commit: CommitResult | None
+    def verify_base(self) -> None:
+        """編集を始めたときのコミットがクローンにあり、コミットするブランチの祖先かを確かめる。"""
+        if self.request.base_commit is not None and not self.base_sha:
+            self.base_sha = verify_base_commit(
+                self.request.base_commit,
+                plan=self.plan,
+                timeout=self.limits.write_deadline.remaining(),
+            )
+
+    def write_pending(self, session: _Session, committed: _Committed) -> list[Path]:
+        """書き込みと削除を書き、生成を動かして、書いたファイルを返す。"""
+        _check_before_write(self.limits)
+        touched = session.write_pending()
+        _run_commit_generators(
+            session.target, committed.tables, touched, self.timeout_sec, self.limits
+        )
+        return touched
+
+    def write_once(self, dirty: DirtyFiles) -> list[Path]:
+        """今のブランチのワークツリーで当てて書く（直コミットを進めるが 1 つのコミットにする）。"""
+        self.verify_base()
+        session, committed = self.prepare(_commit_write_target(self.source, self.plan))
+        check_clean(dirty, _pending_paths(session, self.plan))
+        return self.write_pending(session, committed)
+
+    def write_in_branch(self, folder: Path, *, write: bool) -> list[Path]:
+        """一時のワークツリーを書く場所にして、同じ当て・確認・書き込み・生成を行う。"""
+        session, committed = self.prepare(_conflict_write_target(self.source, self.plan, folder))
+        if not write:
+            return []
+        return self.write_pending(session, committed)
+
+    def keep(self, error: ProjectIndexError, *, write: bool) -> tuple[str, str] | None:
+        """衝突した要求を、編集を始めたときのコミットの一時のワークツリーでブランチに残す。"""
+        try:
+            return keep_in_branch(
+                self.plan,
+                base_sha=self.base_sha,
+                write_once=functools.partial(self.write_in_branch, write=write),
+                state_dir=self.state_dir,
+                commit=write,
+                now=self.now,
+                timeout=self.limits.write_deadline.remaining(),
+                commit_timeout=self.limits.respond_by.remaining() - DIRECT_COMMIT_MARGIN_SEC,
+            )
+        except WriteDeadlineExceededError:
+            raise
+        except Exception as kept_error:
+            # 検査の不合格でない失敗（git の失敗など）: 原因を追えるようにログに出す
+            if not isinstance(kept_error, CONFLICT_ERRORS):
+                logger.warning(
+                    "衝突したときのブランチに残せなかった（%s・%s・%s）",
+                    self.source.id,
+                    self.request.base_commit,
+                    kept_error,
+                )
+            # 一時のワークツリーでも合格しない: 今のブランチで断った理由で断る
+            raise error from kept_error
+
+    def dry_run(self) -> CommitDocumentsResult:
+        """試しに書く: 確認だけを行い、衝突したら一時のワークツリーでも確認する。"""
+        self.verify_base()
+        try:
+            self.prepare(_commit_write_target(self.source, self.plan))
+        except CONFLICT_ERRORS as error:
+            if self.request.base_commit is None:
+                raise
+            self.keep(error, write=False)
+            conflict = _conflict_of(None, self.base_sha, error, None)
+            return self.result_of(applied=False, commit=None, conflict=conflict)
+        return self.result_of(applied=False, commit=None)
+
+    def finish_conflict(
+        self, kept: tuple[str, str] | None, error: ProjectIndexError
     ) -> CommitDocumentsResult:
+        """衝突したときのスクリプトを実行し、衝突したときの結果を返す。"""
+        branch, sha = kept or ("", "")
+        script = None
+        if self.source.direct_commit_on_conflict is not None:
+            script = run_conflict_script(
+                self.source.direct_commit_on_conflict,
+                cwd=_main_clone(self.plan),
+                env={
+                    "PROJECT_INDEX_SOURCE": self.source.id,
+                    "PROJECT_INDEX_CONFLICT_BRANCH": branch,
+                    "PROJECT_INDEX_CONFLICT_COMMIT": sha,
+                    "PROJECT_INDEX_BASE_COMMIT": self.base_sha,
+                    "PROJECT_INDEX_TARGET_BRANCH": self.plan.branch,
+                    "PROJECT_INDEX_COMMIT_MESSAGE": self.plan.message,
+                },
+                timeout_sec=min(self.limits.respond_by.remaining(), self.timeout_sec),
+            )
+        conflict = _conflict_of(kept, self.base_sha, error, script)
+        return self.result_of(applied=False, commit=None, conflict=conflict)
+
+    def result_of(
+        self,
+        *,
+        applied: bool,
+        commit: CommitResult | None,
+        conflict: ConflictResult | None = None,
+    ) -> CommitDocumentsResult:
+        """最後に当てた書き込みと削除の結果を返す。"""
+        committed = self.done[0]
         deleted = committed.deleted
         return CommitDocumentsResult(
             applied=applied,
@@ -2640,24 +2802,49 @@ def commit_documents(
             deletes=[] if deleted is None else deleted.results,
             unlinked=[] if deleted is None else deleted.unlinked,
             commit=commit,
+            conflict=conflict,
         )
 
-    # 試しの書き込み: 取得・コミット・プッシュをせず、確認だけを行う
-    if request.dry_run:
-        with _commit_locks(repo_locks, locks, plan, limits):
-            _, committed = prepare()
-        return result_of(committed, applied=False, commit=None)
-    done: list[_Committed] = []
 
-    def write_once(dirty: DirtyFiles) -> list[Path]:
-        session, committed = prepare()
-        check_clean(dirty, _pending_paths(session, plan))
-        _check_before_write(limits)
-        touched = session.write_pending()
-        _run_commit_generators(session.target, committed.tables, touched, timeout_sec, limits)
-        done[:] = [committed]
-        return touched
+def _conflict_write_target(source: ServedSource, plan: CommitPlan, folder: Path) -> Target:
+    """一時のワークツリーの設定で書く場所を作る（scope.write は確かめない）。"""
+    relative = plan.base.relative_to(plan.worktree)
+    root = folder if relative == Path() else Path(*folder.parts[: -len(relative.parts)])
+    reloaded = access_service.load_source_at(source, root)
+    return Target(reloaded, base_of(reloaded, root), None, root, "commit")
 
-    with _commit_locks(repo_locks, locks, plan, limits):
-        result = run_direct_commit(plan, write_once, limits=limits)
-    return result_of(done[0], applied=True, commit=result)
+
+def _main_clone(plan: CommitPlan) -> Path:
+    """計画のリポジトリのクローン本体の直下を返す。"""
+    return plan.repo.parent if plan.repo.name == ".git" else plan.repo
+
+
+def _conflict_violations(error: ProjectIndexError) -> list[Violation]:
+    """今のブランチで送出されたエラーを、problem+json の `errors[]` と同じ違反にする。"""
+    violations: list[Violation] | None = getattr(error, "violations", None)
+    if violations:
+        return list(violations)
+    doc_id = getattr(error, "doc_id", "") or ""
+    return [
+        Violation(
+            path=doc_id,
+            rule=error.message,
+            fix=error.next_steps[0] if error.next_steps else "",
+        )
+    ]
+
+
+def _conflict_of(
+    kept: tuple[str, str] | None,
+    base_sha: str,
+    error: ProjectIndexError,
+    script: ScriptRunResult | None,
+) -> ConflictResult:
+    """衝突したときの結果を作る（試しに書くときはブランチとコミットを持たない）。"""
+    return ConflictResult(
+        branch=None if kept is None else kept[0],
+        commit=None if kept is None else kept[1],
+        base_commit=base_sha,
+        errors=_conflict_violations(error),
+        script=script,
+    )

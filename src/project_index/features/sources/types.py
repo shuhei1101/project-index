@@ -4,12 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
 from project_index.features.sources.schema_ref import SchemaRef
 from project_index.shared.errors import UnknownKindError, Violation
+
+if TYPE_CHECKING:
+    # settings.types が sources.types を import するため、型の注釈だけで参照する
+    from project_index.features.settings.types import OnConflictScript  # noqa: TC004
 
 SOURCE_CONFIG_VERSION = "3"
 
@@ -188,6 +192,8 @@ class ServedSource:
     direct_commit_kinds: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
     # 端末の設定の `sources[].direct_commit.write_api_kinds`（配信元の `direct_commit.kinds[]` に無い種類は除く）
     direct_commit_write_api_kinds: list[str] = field(default_factory=list[str])
+    # 端末の設定の `sources[].direct_commit.on_conflict`。書き込みの API が衝突してブランチに残した後に実行する
+    direct_commit_on_conflict: OnConflictScript | None = None
     # 配信を続け、直コミットだけを断る違反
     direct_commit_problems: list[Violation] = field(default_factory=list[Violation])
 

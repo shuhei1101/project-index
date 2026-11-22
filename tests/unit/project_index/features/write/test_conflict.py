@@ -8,15 +8,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+
+from project_index.features.settings.types import OnConflictScript
+from project_index.features.write import conflict
 from project_index.features.write.conflict import (
     conflict_branch_name,
     keep_in_branch,
     run_conflict_script,
     verify_base_commit,
 )
-
-from project_index.features.settings.types import OnConflictScript
-from project_index.features.write import conflict
 from project_index.features.write.direct_commit import CommitPlan
 from project_index.shared.errors import BaseCommitUnusableError, ValidationFailedError, Violation
 
@@ -186,7 +186,8 @@ def test_keep_in_branch_when_write_fails(
 
     def fail(_folder: Path) -> list[Path]:
         raise ValidationFailedError(
-            [Violation(path="writes[0]", rule="スキーマに違反する", fix="値を直す")]
+            message="検査に通らない操作があります",
+            violations=[Violation(path="writes[0]", rule="スキーマに違反する", fix="値を修正する")],
         )
 
     # 実行・検証
@@ -327,7 +328,11 @@ def test_run_conflict_script_when_no_time(tmp_path: Path, monkeypatch: pytest.Mo
     """残りの時間が無ければ実行しない（正常系）。"""
     # 準備
     calls: list[object] = []
-    monkeypatch.setattr(conflict, "run_script", lambda *args, **kwargs: calls.append(args))
+
+    def record(*args: object, **_kwargs: object) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr(conflict, "run_script", record)
     script = OnConflictScript(command=[sys.executable, "-c", "print('x')"])
     # 実行
     result = run_conflict_script(script, cwd=tmp_path, env=ENV, timeout_sec=0)

@@ -379,6 +379,16 @@ class PushRejectedError(ProjectIndexError):
 
 
 @dataclass(kw_only=True)
+class BaseCommitUnusableError(ProjectIndexError):
+    """編集を始めたときのコミットが起点に使えない。"""
+
+    status: ClassVar[int] = 409
+    base_commit: str = ""
+    # クローンに無い（not_found）か、コミットするブランチの祖先でない（not_ancestor）
+    reason: Literal["not_found", "not_ancestor"] = "not_found"
+
+
+@dataclass(kw_only=True)
 class PushFailedError(ProjectIndexError):
     """プッシュの失敗・結果の不明。"""
 

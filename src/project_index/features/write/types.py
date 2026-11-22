@@ -193,6 +193,36 @@ class CommitDocumentsRequest:
     deletes: list[DeleteTarget] = field(default_factory=list[DeleteTarget])
     on_referenced: Literal["fail", "unlink"] = "fail"
     dry_run: bool = False
+    # 本文の `baseCommit`。`None` のときは衝突してもブランチに残さずに断る
+    base_commit: str | None = None
+
+
+@dataclass(frozen=True)
+class ScriptRunResult:
+    """衝突したときのスクリプトの終了コードと出力。"""
+
+    # 制限時間で止めたときと、コマンドを起動できなかったときは `None`
+    exit_code: int | None
+    timed_out: bool
+    # 末尾 `SCRIPT_OUTPUT_TAIL_CHARS` 文字
+    stdout: str
+    # 末尾 `SCRIPT_OUTPUT_TAIL_CHARS` 文字。起動できなかったときはその理由
+    stderr: str
+
+
+@dataclass(frozen=True)
+class ConflictResult:
+    """衝突して残したブランチ・コミット・今のブランチで断った理由・スクリプトの結果。"""
+
+    # 試しに書くときは `None`
+    branch: str | None
+    commit: str | None
+    # `base_commit` を解いた 40 桁の SHA
+    base_commit: str
+    # 今のブランチで送出されたエラーを、problem+json の `errors[]` と同じ違反にしたもの
+    errors: list[Violation]
+    # `on_conflict` が無いか試しに書くときは `None`
+    script: ScriptRunResult | None = None
 
 
 @dataclass(frozen=True)
@@ -205,6 +235,8 @@ class CommitDocumentsResult:
     unlinked: list[tuple[str, str]] = field(default_factory=list[tuple[str, str]])
     # `dry_run` のときは `None`
     commit: CommitResult | None = None
+    # 衝突してブランチに残したとき（`dry_run` は残せるとき）だけ持つ
+    conflict: ConflictResult | None = None
 
 
 class CommitDeleteTarget(ApiModel):
@@ -228,6 +260,8 @@ class CommitDocumentsBody(ApiModel):
     message: str
     branch: str | None = None
     dry_run: bool = False
+    # 画面が編集を始めたときのコミットするブランチのコミット
+    base_commit: str | None = Field(default=None, pattern=r"^[0-9a-fA-F]{7,40}$")
 
     @model_validator(mode="after")
     def _not_empty(self) -> CommitDocumentsBody:
@@ -249,6 +283,7 @@ class CommitDocumentsBody(ApiModel):
             ],
             on_referenced=self.on_referenced,
             dry_run=self.dry_run,
+            base_commit=self.base_commit,
         )
 
 
@@ -278,6 +313,55 @@ class CommitSummary(ApiModel):
     retried: bool
 
 
+class ConflictError(ApiModel):
+    """書き込みの API の応答の `conflict.errors[]` の 1 件（problem+json の `errors[]` と同じ構造）。"""
+
+    path: str
+    reason: str
+    fix: str | None = None
+
+
+class ScriptSummary(ApiModel):
+    """書き込みの API の応答の `conflict.script`。"""
+
+    exit_code: int | None
+    timed_out: bool
+    stdout: str
+    stderr: str
+
+
+class ConflictSummary(ApiModel):
+    """書き込みの API の応答の `conflict`。"""
+
+    branch: str | None
+    commit: str | None
+    base_commit: str
+    errors: list[ConflictError]
+    script: ScriptSummary | None
+
+    @classmethod
+    def from_domain(cls, conflict: ConflictResult) -> ConflictSummary:
+        """衝突したときの結果を応答の `conflict` にする。"""
+        script = conflict.script
+        return cls(
+            branch=conflict.branch,
+            commit=conflict.commit,
+            base_commit=conflict.base_commit,
+            errors=[
+                ConflictError(path=item.path, reason=item.rule, fix=item.fix or None)
+                for item in conflict.errors
+            ],
+            script=None
+            if script is None
+            else ScriptSummary(
+                exit_code=script.exit_code,
+                timed_out=script.timed_out,
+                stdout=script.stdout,
+                stderr=script.stderr,
+            ),
+        )
+
+
 class CommitDocumentsResponse(ApiModel):
     """`POST /sources/{source}/commits` の応答。"""
 
@@ -285,6 +369,8 @@ class CommitDocumentsResponse(ApiModel):
     results: list[CommitDocumentsItem]
     unlinked: list[UnlinkedDocument]
     commit: CommitSummary | None
+    # 衝突しなかったときは `None`
+    conflict: ConflictSummary | None = None
 
     @classmethod
     def from_domain(cls, result: CommitDocumentsResult) -> CommitDocumentsResponse:
@@ -324,4 +410,7 @@ class CommitDocumentsResponse(ApiModel):
                 UnlinkedDocument(id=doc_id, version=version) for doc_id, version in result.unlinked
             ],
             commit=commit,
+            conflict=None
+            if result.conflict is None
+            else ConflictSummary.from_domain(result.conflict),
         )

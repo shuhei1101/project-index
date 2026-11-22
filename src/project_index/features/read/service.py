@@ -21,6 +21,7 @@ from project_index.features.read.types import (
     SourceConfigResponse,
 )
 from project_index.shared.errors import DecisionNotFoundError, DocumentNotFoundError
+from project_index.shared.hashing import value_hash
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -204,6 +205,8 @@ def get_document(
         markdown=markdown,
         conversion_error=failure,
         updated_at=document.updated or _file_time(source.root / document.path),
+        # 書き込みの照合と同じ計算で、最上位のキーごとのバージョンを入れる
+        item_versions={key: value_hash(value) for key, value in document.data.items()},
     )
 
 
