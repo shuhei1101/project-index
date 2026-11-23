@@ -34,7 +34,7 @@ functions:
   container: project_index/features/write/route.py
   usecase: 直コミット
   role: 入口
-  summary: 書き込みの API の `POST /sources/{source}/commits` のルートを持つ `APIRouter` を作る
+  summary: 書き込みの API の `POST /sources/{source}/commits` と配信元の設定の原本の取得の `GET /sources/{source}/config/file` のルートを持つ `APIRouter` を作る
   scope: public
   args:
   - name: handlers
@@ -53,9 +53,11 @@ functions:
 
     3. 本文を `CommitDocumentsBody.to_request(source)` で `CommitDocumentsRequest` にし、書き込みと削除の直コミット（`commit_documents`）を `handlers` の部品（状態のフォルダを含む）と、`write_deadline` の秒数を `WRITE_API_WRITE_DEADLINE_SEC`・`respond_by` の秒数を `WRITE_API_RESPONSE_LIMIT_SEC` にした `CallLimits` で呼ぶ
 
-    4. 結果を `CommitDocumentsResponse.from_domain(result)` にして 200 で返す
+    4. 結果を `CommitDocumentsResponse.from_domain(result)` にして 200 で返す。書き込みと削除の直コミットの `reload_sources` には `handlers` の配信元の再読み込みを渡す
 
-    5. 例外は送らずに起動の『例外の変換の登録』に任せ、エラーの `status` の problem+json にする（`CrossOriginError` は依存の `require_same_origin` が送る）
+    5. GET `/sources/{source}/config/file`（ルートの `name` は `get_source_config_file`）は、要求が指す配信元を `handlers.registry.get_for_docs(source)` で引き、配信元の設定の原本の取得（`read_source_config_file`）の結果を `SourceConfigFileResponse.from_domain` にして 200 で返す
+
+    6. 例外は送らずに起動の『例外の変換の登録』に任せ、エラーの `status` の problem+json にする（`CrossOriginError` は依存の `require_same_origin` が送る）
   unit_tests:
   - name: test_build_write_router
     case: 正常
@@ -87,6 +89,18 @@ functions:
     condition: 書き込みと削除の直コミットを、受けた `limits` を記録する偽物にして POST
     mock: 書き込みと削除の直コミット（偽物）
     expected: '`limits.write_deadline.limit_sec` が 20、`limits.respond_by.limit_sec` が 36'
+  - name: test_build_write_router_when_source_config_file
+    case: 正常
+    summary: 配信元の設定の原本を camelCase で返す
+    condition: 配信元の設定の原本の取得を、決まった値を返す偽物にして GET
+    mock: 配信元の設定の原本の取得（偽物）
+    expected: 200 で、`content`・`version`・`branch`・`protectedKeys` のキーを持つ
+  - name: test_build_write_router_when_source_config_not_permitted
+    case: 異常
+    summary: 許可が無ければ 403
+    condition: 偽物が `SourceConfigNotPermittedError` を送る
+    mock: 配信元の設定の原本の取得（偽物）
+    expected: 403 の problem+json
 refs:
 - to: IF-38
   type: requires

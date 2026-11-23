@@ -1,0 +1,340 @@
+id: MOD-239
+title: 索引のサーバー / 書き込み / source_config.py
+lead: 書き込みの API が配信元の設定（`project-index.yaml`）を直コミットで書き換えるときの許可・原本の取得・書き換えられないキー・検査を受け持ち、書き込みの source_config.py を修正するときに参照する。
+visibility: internal
+test_files:
+  - tests/unit/project_index/features/write/test_source_config.py
+diagrams:
+  - name: 全体
+    diagram: |-
+      classDiagram
+        direction TD
+        配信元の設定の原本の取得 ..> 配信元の設定の許可の確認
+        配信元の設定の原本の取得 ..> 配信元の設定のファイル
+        配信元の設定の原本の取得 ..> 直コミットの書き込む先
+        配信元の設定の検査 ..> 書き換えられないキーの違反
+        配信元の設定の検査 ..> 配信元の設定の検証
+        class 配信元の設定の原本の取得 {
+          <<function>>
+        }
+        class 配信元の設定の許可の確認 {
+          <<function>>
+        }
+        class 配信元の設定のファイル {
+          <<function>>
+        }
+        class 書き換えられないキーの違反 {
+          <<function>>
+        }
+        class 配信元の設定の検査 {
+          <<function>>
+        }
+        class 直コミットの書き込む先 {
+          <<function>>
+        }
+        class 配信元の設定の検証 {
+          <<function>>
+        }
+        click 直コミットの書き込む先 href "id:MOD-178#functions[resolve_commit_plan]"
+        click 配信元の設定の検証 href "id:MOD-70#functions[validate_source_config]"
+constants:
+  - name: PROTECTED_KEYS
+    title: 書き換えられないキー
+    container: project_index/features/write/source_config.py
+    usecase: 直コミット
+    summary: 書き込みの API が配信元の設定で書き換えを断るトップレベルのキー
+    value: ('validators', 'converters', 'generators', 'direct_commit', 'worktrees')
+    notes:
+      決め方: コマンドを持つキーと、許可と書き込む先を決めるキー（画面のサーバーからの直コミットの書き込みの制約「書き換えられないキー」）。`documents[]` のスクリプトの `id` を指すキーは含めない
+  - name: SOURCE_CONFIG_FILE
+    title: 書き換える配信元の設定のファイル名
+    container: project_index/features/write/source_config.py
+    usecase: 直コミット
+    summary: 配信元のフォルダからの相対パス
+    value: "'project-index.yaml'"
+data_models:
+  - name: SourceConfigFile
+    title: 配信元の設定の原本
+    container: project_index/features/write/source_config.py
+    usecase: 直コミット
+    role: DTO
+    summary: 書き換える前の `project-index.yaml` の内容とバージョン
+    description: '`dataclass(frozen=True)`。'
+    properties:
+      - name: content
+        title: 内容
+        type: str
+        access: 公開
+        description: ファイルの内容のまま
+      - name: version
+        title: バージョン
+        type: str
+        access: 公開
+        description: '`content_hash(content)`'
+      - name: branch
+        title: コミットするブランチ
+        type: str
+        access: 公開
+        description: 配信元の設定の `direct_commit.branch`
+      - name: protected_keys
+        title: 書き換えられないキー
+        type: list[str]
+        access: 公開
+        description: '`PROTECTED_KEYS`'
+functions:
+  - name: check_source_config_permitted
+    title: 配信元の設定の許可の確認
+    kind: 関数
+    container: project_index/features/write/source_config.py
+    usecase: 直コミット
+    role: 検証
+    summary: 端末の設定と配信元の設定の両方で配信元の設定の直コミットを許可しているかを確かめる
+    scope: public
+    args:
+      - name: source
+        title: 配信元
+        type: ServedSource
+        required: true
+        passing: positional
+        description: 配信中の配信元
+    returns:
+      type: None
+      description: 許可していれば何も返さない
+    process: |-
+      1. 配信元の設定の `direct_commit` が無いか `direct_commit.config` が偽なら `direct_commit.config` を、`source.direct_commit_write_api_config` が偽なら `write_api_config` を `missing` に集める
+      2. `missing` が空でなければ、`next_steps` に許可を記載するキー（端末の設定の `sources[].direct_commit.write_api_config`・配信元の設定の `direct_commit.config`）を並べた `SourceConfigNotPermittedError` を送る
+    exceptions:
+      - name: SourceConfigNotPermittedError
+        condition: どちらかの許可が無い
+        message: '`{source_id} は書き込みの API から配信元の設定を直コミットできません`'
+    unit_tests:
+      - name: test_check_source_config_permitted
+        case: 正常
+        summary: 両方で許可している
+        condition: '`direct_commit.config` と `direct_commit_write_api_config` が真'
+        mock: なし
+        expected: 送らない
+      - name: test_check_source_config_permitted_when_terminal_missing
+        case: 異常
+        summary: 端末の設定で許可していない
+        condition: '`direct_commit_write_api_config` が偽'
+        mock: なし
+        expected: '`SourceConfigNotPermittedError` の `missing` が `[write_api_config]`'
+        exception: どちらかの許可が無い
+      - name: test_check_source_config_permitted_when_source_missing
+        case: 異常
+        summary: 配信元の設定で許可していない
+        condition: '`direct_commit.config` が偽'
+        mock: なし
+        expected: '`SourceConfigNotPermittedError` の `missing` に `direct_commit.config`'
+        exception: どちらかの許可が無い
+  - name: source_config_relative_path
+    title: 配信元の設定のファイル
+    kind: 関数
+    container: project_index/features/write/source_config.py
+    usecase: 直コミット
+    role: 検証
+    summary: 書き換える `project-index.yaml` の配信元のフォルダからの相対パスを求める
+    scope: public
+    args:
+      - name: source
+        title: 配信元
+        type: ServedSource
+        required: true
+        passing: positional
+        description: 配信中の配信元
+    returns:
+      type: str
+      description: '`SOURCE_CONFIG_FILE`'
+    process: |-
+      1. `source.config_files` が 1 つだけで、そのパスが `source.root / SOURCE_CONFIG_FILE` と同じ（解決したパスで比べる）なら `SOURCE_CONFIG_FILE` を返す
+      2. それ以外は `files` に `config_files` を並べた `SourceConfigSplitError` を送る
+    exceptions:
+      - name: SourceConfigSplitError
+        condition: '`config` が `project-index.yaml` 1 つでない'
+        message: '`{source_id} は配信元の設定を複数のファイルに分けているため、書き込みの API では書き換えられません`'
+    unit_tests:
+      - name: test_source_config_relative_path
+        case: 正常
+        summary: 1 つの project-index.yaml
+        condition: '`config_files` が `[root/project-index.yaml]`'
+        mock: なし
+        expected: '`project-index.yaml`'
+      - name: test_source_config_relative_path_when_split
+        case: 異常
+        summary: 2 つのファイルを重ねる
+        condition: '`config_files` が `[root/project-index.yaml, /tmp/overlay.yaml]`'
+        mock: なし
+        expected: '`SourceConfigSplitError` の `files` が 2 件'
+        exception: '`config` が `project-index.yaml` 1 つでない'
+      - name: test_source_config_relative_path_when_other_name
+        case: 異常
+        summary: 別の名前のファイル
+        condition: '`config_files` が `[root/project-index.local.yaml]`'
+        mock: なし
+        expected: '`SourceConfigSplitError`'
+        exception: '`config` が `project-index.yaml` 1 つでない'
+  - name: read_source_config_file
+    title: 配信元の設定の原本の取得
+    kind: 関数
+    container: project_index/features/write/source_config.py
+    usecase: 直コミット
+    role: サービス
+    summary: コミットするブランチのワークツリーの `project-index.yaml` を読んで返す
+    scope: public
+    args:
+      - name: source
+        title: 配信元
+        type: ServedSource
+        required: true
+        passing: positional
+        description: 配信中の配信元
+    returns:
+      type: SourceConfigFile
+      description: 内容・バージョン・ブランチ・書き換えられないキー
+    process: |-
+      1. 配信元の設定の許可の確認を呼ぶ
+      2. 配信元の設定のファイルで相対パスを求める
+      3. 直コミットの書き込む先（`resolve_commit_plan`、`CommitSpec` の `branch` は省く）でコミットするブランチとワークツリーを求める（取得はしない）
+      4. ワークツリーの配信元のフォルダに当たる場所の相対パスのファイルを UTF-8 で読み、`content_hash` でバージョンを求めて返す
+    exceptions:
+      - name: SourceConfigNotPermittedError
+        condition: 許可が無い
+        message: 配信元の設定の許可の確認と同じ
+      - name: SourceConfigSplitError
+        condition: '`config` が `project-index.yaml` 1 つでない'
+        message: 配信元の設定のファイルと同じ
+    unit_tests:
+      - name: test_read_source_config_file
+        case: 正常
+        summary: コメントを含む内容をそのまま返す
+        condition: 一時フォルダの git の配信元で、develop のワークツリーの `project-index.yaml` がコメントを含む
+        mock: なし（一時フォルダの git）
+        expected: '`content` がファイルと同じ、`version` が `content_hash(content)`、`branch` が `develop`'
+  - name: protected_key_violations
+    title: 書き換えられないキーの違反
+    kind: 関数
+    container: project_index/features/write/source_config.py
+    usecase: 直コミット
+    role: 検証
+    summary: 書き換える前と後で `PROTECTED_KEYS` の値が違うキーを違反にする
+    scope: public
+    args:
+      - name: before
+        title: 書き換える前
+        type: Mapping[str, Any]
+        required: true
+        passing: positional
+        description: 取り込みの後の `project-index.yaml` を読んだ値
+      - name: after
+        title: 書き換えた後
+        type: Mapping[str, Any]
+        required: true
+        passing: positional
+        description: '`sourceConfig.content` を読んだ値'
+    returns:
+      type: list[WriteViolation]
+      description: 違うキーごとの違反（無ければ空）
+    process: |-
+      1. `PROTECTED_KEYS` のキーごとに、無いことも値にして（無ければ `None`）、比べる。値は `value_hash` で比べ、コメントと書き方の違いは無視する
+      2. 違うキーごとに、パス `sourceConfig.{キー}`・決まり `protected_key`・直し方「このキーは PR を経て変えてください」の違反を返す
+    unit_tests:
+      - name: test_protected_key_violations
+        case: 正常
+        summary: 書き換えられるキーだけが変わる
+        condition: '`nav` だけが違う 2 つの値'
+        mock: なし
+        expected: 空
+      - name: test_protected_key_violations_when_generators
+        case: 異常
+        summary: コマンドを変える
+        condition: '`generators[0].run` が違う'
+        mock: なし
+        expected: パス `sourceConfig.generators` の違反 1 件
+      - name: test_protected_key_violations_when_added
+        case: 異常
+        summary: 無かったキーを加える
+        condition: 書き換える前に `worktrees` が無く、後にある
+        mock: なし
+        expected: パス `sourceConfig.worktrees` の違反 1 件
+  - name: check_source_config_content
+    title: 配信元の設定の検査
+    kind: 関数
+    container: project_index/features/write/source_config.py
+    usecase: 直コミット
+    role: 検証
+    summary: 書き換えた後の配信元の設定の内容を、書き換えられないキー・スキーマ・起動の検証にかける
+    scope: public
+    args:
+      - name: content
+        title: 書き換えた後の内容
+        type: str
+        required: true
+        passing: positional
+        description: '`sourceConfig.content`'
+      - name: current
+        title: 書き換える前の内容
+        type: str
+        required: true
+        passing: keyword
+        description: 取り込みの後のワークツリーの `project-index.yaml`
+      - name: root
+        title: 配信元のフォルダ
+        type: Path
+        required: true
+        passing: keyword
+        description: ワークツリーの配信元のフォルダ（行の参照とファイルの有無を確かめる基準）
+      - name: lookup
+        title: スキーマの参照の引き方
+        type: SchemaRefLookup | None
+        required: false
+        default: None
+        passing: keyword
+        description: 配信元の設定の検証と同じ
+    returns:
+      type: dict[str, Any]
+      description: 書き換えた後の配信元の設定の値
+    process: |-
+      1. `content` と `current` を YAML として読む。`content` が読めないかマップでなければ、パス `sourceConfig.content` の違反にする
+      2. 書き換えられないキーの違反を集める
+      3. 配信元の設定の検証（`validate_source_config`）を `root`・`lookup` で呼び、違反のパスの頭に `sourceConfig.` を付けて集める
+      4. 違反が 1 件でもあれば全てを並べた `ValidationFailedError` を送る。無ければ読んだ値を返す
+    exceptions:
+      - name: ValidationFailedError
+        condition: 書き換えられないキーが変わるか、検証に合格しない
+        message: '`配信元の設定が検査に合格しません（{n} 件）`'
+    unit_tests:
+      - name: test_check_source_config_content
+        case: 正常
+        summary: nav だけを変える
+        condition: 一時フォルダの配信元で、`nav` のタブのタイトルだけを変えた内容
+        mock: なし
+        expected: 変えた後の値を返す
+      - name: test_check_source_config_content_when_invalid
+        case: 異常
+        summary: スキーマに合格しない
+        condition: '`documents[0].paths` を削除した内容'
+        mock: なし
+        expected: '`ValidationFailedError` の違反のパスが `sourceConfig.documents[0]` で始まる'
+        exception: 検証に合格しない
+      - name: test_check_source_config_content_when_not_yaml
+        case: 異常
+        summary: YAML として読めない
+        condition: マップでない内容
+        mock: なし
+        expected: '`ValidationFailedError` の違反のパスが `sourceConfig.content`'
+        exception: 検証に合格しない
+refs:
+  - to: IF-38
+    type: requires
+    when: インターフェース定義『画面のサーバーからの直コミットの書き込み』の配信元の設定の制約を変えるときに、この設計書の関数を合わせる。
+  - to: IF-39
+    type: requires
+    when: インターフェース定義『配信元の設定の原本の取得』の入出力を変えるときに、この設計書の関数と型を合わせる。
+tags:
+  - name: topic:設定
+    main: true
+  - name: topic:配信元
+  - name: action:書き込み
+  - name: action:検証
+  - name: tool:ruamel.yaml

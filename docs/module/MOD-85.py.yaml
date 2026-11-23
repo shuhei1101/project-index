@@ -551,6 +551,12 @@ data_models:
         access: 公開
         default: None
         description: 本文の `baseCommit`。`None` のときは衝突してもブランチに残さずに断る
+      - name: source_config
+        title: 配信元の設定の書き換え
+        type: SourceConfigWrite | None
+        access: 公開
+        default: None
+        description: 本文の `sourceConfig`。`None` は配信元の設定を書き換えない
   - name: CommitDocumentsResult
     title: 書き込みと削除の直コミットの結果
     container: project_index/features/write/types.py
@@ -592,13 +598,19 @@ data_models:
         access: 公開
         default: None
         description: 衝突してブランチに残したとき（`dry_run` は残せるとき）だけ持つ。持つとき `applied` は `False`、`commit` は `None`
+      - name: source_config
+        title: 配信元の設定の書き換えの結果
+        type: SourceConfigResult | None
+        access: 公開
+        default: None
+        description: '`source_config` を受けたときだけ持つ'
   - name: CommitDocumentsBody
     title: 書き込みの API の本文
     container: project_index/features/write/types.py
     usecase: 直コミット
     role: スキーマ
     summary: '`POST /sources/{source}/commits` の本文'
-    description: '`pydantic.BaseModel`（`extra="forbid"`、`alias_generator=to_camel`・`validate_by_name=True`・`serialize_by_alias=True`）。`writes[]` の操作は `Operation` のまま（キーは snake_case）。`writes` と `deletes` が両方とも空なら検証で断る。`to_request(source) -> CommitDocumentsRequest` を持つ'
+    description: '`pydantic.BaseModel`（`extra="forbid"`、`alias_generator=to_camel`・`validate_by_name=True`・`serialize_by_alias=True`）。`writes[]` の操作は `Operation` のまま（キーは snake_case）。`writes`・`deletes` が両方とも空で `source_config` も無ければ検証で断る。`to_request(source) -> CommitDocumentsRequest` を持つ'
     properties:
       - name: writes
         title: 書き込みの操作
@@ -641,13 +653,19 @@ data_models:
         access: 公開
         default: None
         description: '`baseCommit`。16 進数の 7〜40 桁でなければ検証で断る'
+      - name: source_config
+        title: 配信元の設定の書き換え
+        type: SourceConfigWrite | None
+        access: 公開
+        default: None
+        description: '`sourceConfig`'
   - name: CommitDocumentsResponse
     title: 書き込みの API の応答
     container: project_index/features/write/types.py
     usecase: 直コミット
     role: スキーマ
     summary: '`POST /sources/{source}/commits` の応答'
-    description: '`pydantic.BaseModel`（camelCase。`CommitDocumentsBody` と同じ設定）。`from_domain(result: CommitDocumentsResult) -> Self` で、`writes` を `kind: write`、`deletes` を `kind: delete` の `results[]` に並べ、`unlinked` を `{id, version}` にする'
+    description: '`pydantic.BaseModel`（camelCase。`CommitDocumentsBody` と同じ設定）。`from_domain(result: CommitDocumentsResult) -> Self` で、`writes` を `kind: write`、`deletes` を `kind: delete` の `results[]` に並べ、`unlinked` を `{id, version}` にし、`source_config` を `SourceConfigSummary` にする'
     properties:
       - name: applied
         title: 書き込んだか
@@ -675,6 +693,12 @@ data_models:
         access: 公開
         default: None
         description: '`ConflictResult` を `ConflictSummary.from_domain` で変えたもの。衝突しなかったときは `None`（JSON は `null`）'
+      - name: source_config
+        title: 配信元の設定の書き換えの結果
+        type: SourceConfigSummary | None
+        access: 公開
+        default: None
+        description: '`sourceConfig`（`version`・`diff`・`reloaded`）。送らなかったときは `None`'
   - name: ScriptRunResult
     title: 衝突したときのスクリプトの結果
     container: project_index/features/write/types.py
@@ -769,6 +793,75 @@ data_models:
         type: ScriptSummary | None
         access: 公開
         description: '`ConflictResult.script`'
+  - name: SourceConfigWrite
+    title: 配信元の設定の書き換え
+    container: project_index/features/write/types.py
+    usecase: 直コミット
+    role: DTO
+    summary: 書き込みの API の `sourceConfig`
+    description: '`pydantic.BaseModel`（`extra="forbid"`、`CommitDocumentsBody` と同じ camelCase）。'
+    properties:
+      - name: content
+        title: 書き換えた後の内容
+        type: str
+        access: 公開
+        description: '`content`。空の文字列は受けない'
+      - name: expected_version
+        title: 読んだときのバージョン
+        type: str
+        access: 公開
+        description: '`expectedVersion`'
+  - name: SourceConfigResult
+    title: 配信元の設定の書き換えの結果
+    container: project_index/features/write/types.py
+    usecase: 直コミット
+    role: DTO
+    summary: 配信元の設定の書き換えのバージョン・差分・再読み込み
+    description: '`dataclass(frozen=True)`。応答では `SourceConfigSummary`（`version`・`diff`・`reloaded`）にする。'
+    properties:
+      - name: version
+        title: バージョン
+        type: str
+        access: 公開
+        description: 書き込んだ後の `content_hash`
+      - name: diff
+        title: 差分
+        type: str
+        access: 公開
+        description: '`project-index.yaml` の差分'
+      - name: reloaded
+        title: 再読み込みしたか
+        type: bool
+        access: 公開
+        description: プッシュした後に配信元を再読み込みしたとき `True`
+  - name: SourceConfigFileResponse
+    title: 配信元の設定の原本の取得の応答
+    container: project_index/features/write/types.py
+    usecase: 直コミット
+    role: スキーマ
+    summary: '`GET /sources/{source}/config/file` の応答'
+    description: '`pydantic.BaseModel`（`CommitDocumentsBody` と同じ camelCase）。`from_domain(file: SourceConfigFile) -> Self` を持つ'
+    properties:
+      - name: content
+        title: 内容
+        type: str
+        access: 公開
+        description: '`content`'
+      - name: version
+        title: バージョン
+        type: str
+        access: 公開
+        description: '`version`'
+      - name: branch
+        title: コミットするブランチ
+        type: str
+        access: 公開
+        description: '`branch`'
+      - name: protected_keys
+        title: 書き換えられないキー
+        type: list[str]
+        access: 公開
+        description: '`protectedKeys`'
 constants:
   - name: OPERATIONS_MAX
     title: 1 回の操作の上限
