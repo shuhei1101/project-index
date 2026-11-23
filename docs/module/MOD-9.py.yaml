@@ -45,6 +45,7 @@ functions:
          - `checking` が `True` の場合、表の前に `検査: 検査中（索引の同期の件数は検査が済んだ後に出ます）` を置く
          - `exporting` が `True` の場合、表の前に `リビジョンの書き出し: 書き出し中（書き出し中のリビジョンを読む要求は待たされます）` を置く
          - 配信元が 0 件の場合、表の代わりに `配信元: なし` を置く
+      3. `running` が 1 件以上の場合、配信元の表の後に空行・`実行中の要求:`・空行と、列をツール・配信元（`sources` を `・` でつなぐ。空なら `-`）・実行スロット・状態・経過秒（小数 1 桁）にした表を配置する
     unit_tests:
       - name: test_render_status
         case: 正常
@@ -70,6 +71,12 @@ functions:
         condition: '`checking` と `exporting` が `True`、`sources` に sample の 1 行'
         mock: なし
         expected: 検査中の行と書き出し中の行が表の前にあり、sample の行がある
+      - name: test_render_status_when_running
+        case: 正常
+        summary: 実行中の要求の表を配置する
+        condition: '`running` が `write_docs`（`sources` が `["a", "b"]`・`seconds` が 12.34）と `search_docs`（`sources` が空）の 2 件'
+        mock: なし
+        expected: 配信元の表の後に `実行中の要求:` と、`| write_docs | a・b | docs | running | 12.3 |` と配信元が `-` の行を持つ表がある。`running` が空なら `実行中の要求:` が無い
     callees:
       - '#functions[_source_row]'
   - name: render_reload

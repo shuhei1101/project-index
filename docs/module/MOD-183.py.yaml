@@ -49,7 +49,7 @@ functions:
   process: |-
     1. ルーターは `APIRouter(tags=["write"], dependencies=[Depends(require_same_origin)])` にし、ルートの `name` は `commit_documents` にする
 
-    2. POST `/sources/{source}/commits` は、本文を `CommitDocumentsBody` で受け、処理の全体を要求の記録の範囲（`handlers.slots.request("commit_documents", source=パスの source)`）の中で行う。先頭で要求が指す配信元の行の読み込みを待ち、その後の処理は裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中で、文書の MCP の実行スロット（`handlers.slots.run_docs`）で呼ぶ
+    2. POST `/sources/{source}/commits` は、本文を `CommitDocumentsBody` で受け、処理の全体を要求の記録の範囲（`handlers.slots.request("commit_documents", sources=[パスの source])`）の中で行う。先頭で要求が指す配信元の行の読み込みを待ち、その後の処理は裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中で、文書の MCP の実行スロット（`handlers.slots.run_docs`）で呼ぶ
 
     3. 本文を `CommitDocumentsBody.to_request(source)` で `CommitDocumentsRequest` にし、書き込みと削除の直コミット（`commit_documents`）を `handlers` の部品（状態のフォルダを含む）と、`write_deadline` の秒数を `WRITE_API_WRITE_DEADLINE_SEC`・`respond_by` の秒数を `WRITE_API_RESPONSE_LIMIT_SEC` にした `CallLimits` で呼ぶ
 

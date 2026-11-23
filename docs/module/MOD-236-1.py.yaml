@@ -44,11 +44,6 @@ data_models:
         title: ツール
         type: str
         description: MCP のツール名か、読み取り API のルートの名前
-      - name: source
-        title: 配信元
-        type: str | None
-        default: None
-        description: 要求が指す配信元の ID。指さないときは `None`
       - name: slot_wait
         title: 実行スロットの待ち
         type: float
@@ -69,6 +64,26 @@ data_models:
         type: int
         default: '0'
         description: 要求の中で、捨てるかを判定するためにたどったファイルのキャッシュのキーの数の合計
+      - name: sources
+        title: 配信元
+        type: list[str]
+        default: '[]'
+        description: 要求が指す配信元の ID の並び（状態の取得の `running[].sources`）。指さないときは空。`"*"` の要求は、文書の MCP が配信元の読み込みを待った後に配信中の配信元の ID で置き換える
+      - name: executor
+        title: 実行スロット
+        type: Literal['docs', 'post_write']
+        default: "'docs'"
+        description: 要求を動かす実行スロット
+      - name: state
+        title: 状態
+        type: Literal['waiting', 'running']
+        default: "'waiting'"
+        description: 実行スロットで関数を動かしている間は `running`、それ以外は `waiting`
+      - name: received_at
+        title: 受けた時刻
+        type: float
+        default: '0.0'
+        description: '`request` に入った時刻（`ExecutionSlots.clock` の値）。経過秒の起点'
     methods:
       - name: add_lock_wait
         title: 排他の待ちを足す
@@ -102,6 +117,34 @@ data_models:
           type: None
           description: '-'
         process: 1. `scanned` に `count` を足す
+  - name: RunningRequest
+    title: 実行中の要求
+    container: project_index/shared/runtime.py
+    usecase: 共通
+    role: 値
+    summary: 状態の取得が返却する、終わっていない要求 1 件のコピー
+    description: '`ExecutionSlots.running` が要求の記録から作る。`@dataclass(frozen=True, slots=True)`'
+    properties:
+      - name: tool
+        title: ツール
+        type: str
+        description: 要求の記録の `tool`
+      - name: sources
+        title: 配信元
+        type: list[str]
+        description: 要求の記録の `sources` のコピー
+      - name: executor
+        title: 実行スロット
+        type: Literal['docs', 'post_write']
+        description: 要求の記録の `executor`
+      - name: state
+        title: 状態
+        type: Literal['waiting', 'running']
+        description: 要求の記録の `state`
+      - name: seconds
+        title: 経過秒
+        type: float
+        description: 要求を受けてからの秒数
 classes:
   - name: ExecutionSlots
     title: 実行スロット
@@ -144,12 +187,28 @@ classes:
         type: threading.Lock
         access: 内部 (_)
         description: '`_running`・`_waiting` の読み書きを守る'
+      - name: post_write_executor
+        title: 書き込みの後の通知の判定の実行スロット
+        type: concurrent.futures.ThreadPoolExecutor
+        access: 公開
+        description: '`max_workers=POST_WRITE_WORKERS`・`thread_name_prefix="post_write"`'
+      - name: _post_write_busy
+        title: 判定の実行スロットの使用中の数
+        type: int
+        access: 内部 (_)
+        default: '0'
+        description: 書き込みの後の通知の判定の実行スロットに入れて、まだ終わっていない仕事の数。`_guard` で読み書きする
+      - name: _requests
+        title: 終わっていない要求の記録
+        type: dict[int, RequestRecord]
+        access: 内部 (_)
+        description: '`request` の範囲に入っている要求の記録（キーは `id(record)`）。`_guard` で読み書きする'
     methods:
       - name: request
         title: 要求の記録の範囲
         kind: メソッド
-        summary: 1 回の要求の間、要求の記録を今の文脈に置き、抜けるときに INFO の 1 行でログに残す（`contextmanager`）
-        description: 文書の MCP のツールの入口（MOD-94）と読み取り API のルート（MOD-126）が、要求ごとに 1 回だけ入る。中で何回 `run_docs` を呼んでも、記録は 1 つで、行は抜けるときの 1 行だけになる。時間切れの後も続くワークツリーの読み込みのタスクは、タスクの中で自分の範囲（`tool` は `worktree_load`）に入り、別の 1 行を残す
+        summary: 1 回の要求の間、要求の記録を今の文脈と終わっていない要求の記録に置き、抜けるときに INFO の 1 行でログに残す（`contextmanager`）
+        description: 文書の MCP のツールの入口（MOD-94）と読み取り API のルート（MOD-126）と書き込みの後の通知の判定のルート（MOD-176）が、要求ごとに 1 回だけ入る。中で何回 `run_docs` を呼んでも、記録は 1 つで、行は抜けるときの 1 行だけになる。時間切れの後も続くワークツリーの読み込みのタスクは、タスクの中で自分の範囲（`tool` は `worktree_load`）に入り、別の 1 行を残す
         scope: public
         thread_safe: true
         side_effects: ログに 1 行書く
@@ -160,34 +219,41 @@ classes:
             required: true
             passing: positional
             description: MCP のツール名か、読み取り API のルートの名前
-          - name: source
+          - name: sources
             title: 配信元
-            type: str | None
+            type: Sequence[str]
             required: false
-            default: None
+            default: ()
             passing: keyword
-            description: 要求が指す配信元の ID
+            description: 要求が指す配信元の ID の並び
+          - name: executor
+            title: 実行スロット
+            type: Literal['docs', 'post_write']
+            required: false
+            default: "'docs'"
+            passing: keyword
+            description: 要求を動かす実行スロット
         returns:
           type: Iterator[RequestRecord]
           description: 作った要求の記録
         process: |-
-          1. `RequestRecord(tool, source)` を作り、`current_record` の `ContextVar` に置く（`set` のトークンを持つ）
+          1. `RequestRecord(tool, list(sources), executor, received_at=clock())` を作り、`current_record` の `ContextVar` に置く（`set` のトークンを持つ）。`_guard` の中で `_requests` に加える
           2. 呼び出し側の処理を実行する
-          3. 抜けるとき、成否（正常は `ok`、`asyncio.CancelledError` は `cancelled`、それ以外の例外は `error`）を決め、`[info]` 要求を処理した（ツール・配信元・`slot_wait`・`lock_wait`・`elapsed`・`scanned`・成否）を書く
-          4. `ContextVar` をトークンで戻し、例外はそのまま伝える
+          3. 抜けるとき、成否（正常は `ok`、`asyncio.CancelledError` は `cancelled`、それ以外の例外は `error`）を決め、`[info]` 要求を処理した（ツール・配信元（`sources` を `,` でつなぐ）・実行スロット・`slot_wait`・`lock_wait`・`elapsed`・`scanned`・成否）を書く
+          4. `_guard` の中で `_requests` から除き、`ContextVar` をトークンで戻し、例外はそのまま伝える
         unit_tests:
           - name: test_execution_slots_request
             case: 正常
             summary: 1 要求で run_docs を 2 回呼んでも 1 行
-            condition: '`request("search_docs", source="sample")` の中で、キャッシュの件数を 2 足す関数と 3 足す関数を `run_docs` で 1 回ずつ動かす'
+            condition: '`request("search_docs", sources=["sample"])` の中で、キャッシュの件数を 2 足す関数と 3 足す関数を `run_docs` で 1 回ずつ動かす'
             mock: なし（`caplog`）
-            expected: INFO の行が 1 行だけで、`search_docs`・`sample`・`scanned=5`・`ok` が入る
+            expected: INFO の行が 1 行だけで、`search_docs`・`sample`・`docs`・`scanned=5`・`ok` が入る
           - name: test_execution_slots_request_when_cancelled
             case: 異常
             summary: 取り消しも 1 行残す
             condition: '`request` の中で await しているタスクを取り消す'
             mock: なし（`caplog`）
-            expected: '`CancelledError` が伝わり、INFO の 1 行に `cancelled` が入る'
+            expected: '`CancelledError` が伝わり、INFO の 1 行に `cancelled` が入る。`running()` が空'
             exception: タスクが取り消される
       - name: run_docs
         title: 文書の MCP の実行スロットで動かす
@@ -215,7 +281,7 @@ classes:
           1. 入れた時刻を `clock` で取り、仕事の状態（`waiting`・`running`・`cancelled` のどれか。このファイルの中の小さな可変の値）を `waiting` で作る。`_guard` の中で `_waiting` を 1 つ進める
           2. 呼び出し元の文脈を `contextvars.copy_context()` で写し、その中で次を行う関数を `loop.run_in_executor(docs_executor, ...)` で動かして await する
              - 動き始めたら `_guard` の中で、状態が `waiting` なら `_waiting` を戻し、`cancelled` なら戻さない（手順 3 で戻し済み）。どちらも状態を `running` にして `_running` を進める
-             - `func(*args)` を呼ぶ。終わったら（例外のときも）`_guard` の中で `_running` を戻す
+             - 今の要求の記録（あれば）の `state` を `running` にして `func(*args)` を呼ぶ。終わったら（例外のときも）`_guard` の中で `_running` を戻し、`state` を `waiting` に戻す
              - 今の要求の記録（`current_record()`。無ければ足さない）に、`slot_wait`（入れてから動き始めるまで）と `elapsed`（動き始めてから終わるまで）を足す
           3. await が `asyncio.CancelledError` で終わった場合、`_guard` の中で状態が `waiting` なら `_waiting` を戻して状態を `cancelled` にし、`CancelledError` を伝える（動き始める前に取り消された仕事は `ThreadPoolExecutor` が呼ばない。取り消しが間に合わず動き始めた仕事は、手順 2 が `_running` を進めて終わりに戻す）
           4. `func` の戻り値を返す（例外はそのまま伝える）
@@ -286,6 +352,72 @@ classes:
           type: tuple[int, int]
           description: (実行中の数, 待ち中の数)
         process: 1. `_guard` の中で `_running` と `_waiting` を読んで返す
+      - name: try_run_post_write
+        title: 書き込みの後の通知の判定の実行スロットで動かす
+        kind: メソッド
+        summary: 関数を書き込みの後の通知の判定の実行スロットで動かす。全て使用中なら動かさずに `None` を返却する（`async`）
+        scope: public
+        thread_safe: true
+        args:
+          - name: func
+            title: 関数
+            type: Callable[..., T]
+            required: true
+            passing: positional
+            description: 実行スロットで動かす同期の関数
+          - name: args
+            title: 引数
+            type: Any
+            required: false
+            passing: positional
+            description: '`*args`。`func` に渡す位置引数'
+        returns:
+          type: T | None
+          description: '`func` の戻り値。全て使用中なら `None`'
+        process: |-
+          1. `_guard` の中で `_post_write_busy` が `POST_WRITE_WORKERS` 以上なら、`None` を返す（以降の手順は実行しない）。未満なら 1 つ進め、仕事の状態を `waiting` で作る
+          2. `run_docs` と同じく、呼び出し元の文脈を写して `loop.run_in_executor(post_write_executor, ...)` で `func(*args)` を動かして await し、今の要求の記録に `state`・`slot_wait`・`elapsed` を書く
+          3. `_post_write_busy` は、動き始めた仕事は終わったとき（例外のときも）、動き始める前に取り消された仕事は取り消したときに `_guard` の中で戻す
+          4. `func` の戻り値を返す（例外はそのまま伝える）
+        unit_tests:
+          - name: test_execution_slots_try_run_post_write
+            case: 正常
+            summary: 空いていれば動かして戻り値を返す
+            condition: '`request("post_write", executor="post_write")` の中で、`"ok"` を返す関数を動かす'
+            mock: なし
+            expected: '`"ok"` を返し、記録の `elapsed` が 0 以上'
+          - name: test_execution_slots_try_run_post_write_when_full
+            case: 正常
+            summary: 全て使用中なら動かさずに None
+            condition: '`POST_WRITE_WORKERS` 本の関数をイベントで止めたまま、もう 1 本を動かす'
+            mock: なし
+            expected: もう 1 本は待たずに `None` を返し、その関数は呼ばれない。イベントを放した後は、また値を返す
+          - name: test_execution_slots_try_run_post_write_when_docs_full
+            case: 正常
+            summary: 文書の MCP の実行スロットが埋まっていても動く
+            condition: '`DOCS_WORKERS` 本の `run_docs` をイベントで止めたまま、`try_run_post_write` で `"ok"` を返す関数を動かす'
+            mock: なし
+            expected: イベントを放す前に `"ok"` を返す
+      - name: running
+        title: 実行中の要求の一覧
+        kind: メソッド
+        summary: '`request` の範囲に入っている要求のコピーを、経過秒の長い順に返却する'
+        scope: public
+        thread_safe: true
+        returns:
+          type: list[RunningRequest]
+          description: 実行中の要求
+        process: |-
+          1. `_guard` の中で `_requests` の値を並べる
+          2. 記録ごとに `RunningRequest(tool, list(sources), executor, state, clock() - received_at)` を作る
+          3. `seconds` の大きい順に並べて返す
+        unit_tests:
+          - name: test_execution_slots_running
+            case: 正常
+            summary: 範囲の中の要求だけを長い順に返す
+            condition: 時計を差し替え、`request("write_docs", sources=["a"])` の中で 10 秒進めてから `request("search_docs")` に入り、さらに 1 秒進めて呼ぶ。続けて両方の範囲を抜けてから呼ぶ
+            mock: 時計（呼ぶたびに決めた値を返す偽物）
+            expected: 範囲の中では `write_docs`（`sources` が `["a"]`・`seconds` が 11）、`search_docs`（`sources` が空・`seconds` が 1）の順。抜けた後は空
 functions:
   - name: current_record
     title: 今の要求の記録
@@ -390,6 +522,12 @@ constants:
     usecase: 共通
     summary: 非機能要件『稼働中の記録の間隔』
     value: '60'
+  - name: POST_WRITE_WORKERS
+    title: 書き込みの後の通知の判定の実行スロットの数
+    container: project_index/shared/runtime.py
+    usecase: 共通
+    summary: 非機能要件『書き込みの後の通知の判定の実行スロットの数』
+    value: '4'
 test_files:
   - tests/unit/project_index/shared/test_runtime.py
 refs:

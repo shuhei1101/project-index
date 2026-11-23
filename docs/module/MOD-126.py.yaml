@@ -77,7 +77,7 @@ functions:
       type: fastapi.APIRouter
       description: 8 つのルートを持つルーター
     process: |-
-      1. 各ルートは、処理の全体を要求の記録の範囲（`handlers.slots.request(ルートの関数名, source=パスの source)`）の中で行い、記録の行は要求ごとに 1 行にする。配信元を指すルートは、先頭で要求が指す配信元の行の読み込みを待つ（起動.配信元の読み込みの単位）。待つ間も裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中にいて、要求が待っていない行の読み込みを休ませる。その後の処理（文書の MCP の実行スロット（`handlers.slots.run_docs`） で呼ぶサービス）は、裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中で呼ぶ
+      1. 各ルートは、処理の全体を要求の記録の範囲（`handlers.slots.request(ルートの関数名, sources=[パスの source])`）の中で行い、記録の行は要求ごとに 1 行にする。配信元を指すルートは、先頭で要求が指す配信元の行の読み込みを待つ（起動.配信元の読み込みの単位）。待つ間も裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中にいて、要求が待っていない行の読み込みを休ませる。その後の処理（文書の MCP の実行スロット（`handlers.slots.run_docs`） で呼ぶサービス）は、裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中で呼ぶ
       2. GET `/sources` は、クエリ `include_loading`（`bool`、既定 `false`）が `false` なら全ての行の読み込みを待ち（`wait_loaded`）、配信元の一覧の状態（`statuses`）を返す。`true` なら待たずに、読み込み中の行を含めた状態（`statuses_with_loading`）を返す。どちらも `id`・`status`・`errors` で返す
       3. GET `/sources/{source}/config` は、読み取りの場所（`read_target`、`ref` なし）で配信元の設定の取得を呼ぶ（クエリ `schemas` を `bool`、既定 `false` で渡す）
       4. GET `/sources/{source}/docs` は、読み取りの場所（`ref` はクエリ）で文書の一覧を呼ぶ（クエリ `values`・`common_keys` を `bool`、既定 `false` で渡す）
