@@ -1,0 +1,11 @@
+scope_out:
+  - item: complexipy の上限を超えるほかの関数
+    reason: develop（0aa813c）で uv run complexipy src tests を実行し、FAILED は _direct_commit_lines だけだった
+    plan: none
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: none
+    detail: 結合テストの準備の関数を分けるだけで、利用者の流れは変わらない
+    depends_on: []
+docs: []
