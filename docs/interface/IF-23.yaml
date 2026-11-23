@@ -191,7 +191,7 @@ response:
   - name: directCommit.metadataOnlyKinds
     type: list[str]
     description: '配信元の設定の `direct_commit.kinds[]` のうち `body: false` の要素の `id` を、記載の順に並べたもの（本文の直コミットを断り、メタデータだけを許可する種類）'
-    notes: '`direct_commit` を持たない配信元と、`body: false` の要素を持たない配信元は空の配列。端末の設定の `config` を重ねた後の値で、文書の MCP の `describe` の `metadata_only_kinds` と同じ値'
+    notes: '`direct_commit` を持たない配信元と、`body: false` の要素を持たない配信元は空の配列。端末の設定の `config` を重ねた後の値で、書き込みの API が本文の直コミットを断る種類と同じ値で、`describe` と違い作業場所と端末の設定の `sources[].direct_commit` で絞らない'
 response_example: |-
   ```json
   {"nav": [{"title": "設計書", "items": [{"auto": {"document": "design"}}]}],
