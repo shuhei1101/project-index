@@ -14,7 +14,7 @@ from project_index.features.read.service import (
     list_decisions,
     list_documents,
 )
-from project_index.features.sources.types import DocumentTable, ScriptEntry
+from project_index.features.sources.types import DirectCommitConfig, DocumentTable, ScriptEntry
 from project_index.shared.errors import DecisionNotFoundError, DocumentNotFoundError
 from project_index.shared.hashing import value_hash
 from tests.unit.project_index.conftest import notes_db_table
@@ -157,6 +157,36 @@ def test_get_source_config_when_diff(
     response = get_source_config(_target(env), store=env.handlers.store)
     # 検証
     assert response.diff == expected
+
+
+@pytest.mark.parametrize(
+    ("direct_commit", "expected"),
+    [
+        pytest.param(
+            DirectCommitConfig(
+                branch="main",
+                kinds=["note", "spec", "memo"],
+                metadata_only_kinds=["spec", "memo"],
+            ),
+            ["spec", "memo"],
+            id="metadata_only",
+        ),
+        pytest.param(None, [], id="no_direct_commit"),
+    ],
+)
+def test_get_source_config_when_metadata_only_kinds(
+    make_view_env: Callable[..., SimpleNamespace],
+    direct_commit: DirectCommitConfig | None,
+    expected: list[str],
+) -> None:
+    """本文の直コミットを断る種類を記載の順に返却する（正常系）。"""
+    # 準備（端末の設定の sources[].direct_commit は持たない配信元）
+    env = make_view_env(direct_commit=direct_commit)
+    # 実行
+    response = get_source_config(_target(env), store=env.handlers.store)
+    # 検証
+    assert response.direct_commit.metadata_only_kinds == expected
+    assert response.model_dump(by_alias=True)["directCommit"] == {"metadataOnlyKinds": expected}
 
 
 def test_get_source_config_when_schemas(make_view_env: Callable[..., SimpleNamespace]) -> None:

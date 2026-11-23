@@ -1,0 +1,101 @@
+tasks:
+  - process: 初期構築
+    status: skipped
+    reason: 既存リポジトリのため対象外
+    updated_by: planner
+    updated_at: '2026-11-23T10:56:17.726967+00:00'
+  - process: リバースエンジニアリング
+    status: skipped
+    reason: 既存の設計書がそろっており、棚卸しは要らない
+    updated_by: planner
+    updated_at: '2026-11-23T10:56:17.726967+00:00'
+  - process: 方針決め
+    status: skipped
+    reason: 方針決めを依頼する Issue でない
+    updated_by: planner
+    updated_at: '2026-11-23T10:56:17.726967+00:00'
+  - process: PoC 検証
+    status: skipped
+    reason: 既に持っている値を HTTP の応答に追加するだけで、未検証の技術機構に依存しない
+    updated_by: planner
+    updated_at: '2026-11-23T10:56:17.726967+00:00'
+  - process: 複合ユースケース設計
+    status: skipped
+    reason: ユースケースの連鎖は変わらない
+    updated_by: planner
+    updated_at: '2026-11-23T10:56:17.726967+00:00'
+  - process: デザインスタイル選定
+    status: skipped
+    reason: 画面を持たない HTTP の API の変更
+    updated_by: planner
+    updated_at: '2026-11-23T10:56:17.726967+00:00'
+  - process: 画面一覧・画面遷移
+    status: skipped
+    reason: 画面を持たない HTTP の API の変更
+    updated_by: planner
+    updated_at: '2026-11-23T10:56:17.726967+00:00'
+  - process: 単一ユースケース設計
+    status: skipped
+    reason: 画面のサーバーが文書を読むシナリオの流れは変わらず、応答の項目だけが増える
+    updated_by: planner
+    updated_at: '2026-11-23T10:56:17.726967+00:00'
+  - process: モック作成
+    status: skipped
+    reason: 画面を持たない HTTP の API の変更
+    updated_by: planner
+    updated_at: '2026-11-23T10:56:17.726967+00:00'
+  - process: データ設計
+    status: skipped
+    reason: 永続化するデータと設定のキーは変わらない（配信元の設定の direct_commit.kinds[] の既存の値を返却するだけ）
+    updated_by: planner
+    updated_at: '2026-11-23T10:56:17.726967+00:00'
+  - process: インターフェース定義設計
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T11:04:17.791200+00:00'
+  - process: エージェント・MCP サーバー設計
+    status: skipped
+    reason: エージェント・MCP サーバーを追加・変更しない
+    updated_by: planner
+    updated_at: '2026-11-23T10:56:17.726967+00:00'
+  - process: エージェントフロー・LLM 呼び出し設計
+    status: skipped
+    reason: エージェントフロー・LLM の呼び出しを持たない
+    updated_by: planner
+    updated_at: '2026-11-23T10:56:17.726967+00:00'
+  - process: 精度評価設計
+    status: skipped
+    reason: LLM・意思決定モデルのノードを持たない
+    updated_by: planner
+    updated_at: '2026-11-23T10:56:17.726967+00:00'
+  - process: 部品設計
+    status: skipped
+    reason: 画面の部品を持たない
+    updated_by: planner
+    updated_at: '2026-11-23T10:56:17.726967+00:00'
+  - process: 画面設計
+    status: skipped
+    reason: 画面を持たない HTTP の API の変更
+    updated_by: planner
+    updated_at: '2026-11-23T10:56:17.726967+00:00'
+  - process: モジュール構成設計
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T12:53:27.260936+00:00'
+  - process: ドキュメント修正
+    status: done
+    note: docs/guide/HTTPのAPI.md の GET /sources/{source}/config の行
+    updated_by: planner
+    updated_at: '2026-11-23T12:57:55.345869+00:00'
+  - process: 単体テスト作成
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T13:01:03.708992+00:00'
+  - process: 実装
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T13:04:16.259515+00:00'
+  - process: 結合テスト作成
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T13:13:47.343160+00:00'

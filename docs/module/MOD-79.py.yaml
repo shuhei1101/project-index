@@ -250,6 +250,11 @@ data_models:
         type: dict[str, dict] | None
         access: 公開
         description: '`documents[].id` ごとの文書に当てるスキーマ（`row_schema`）。`schemas` を求めたときだけ入れ、それ以外は `None`'
+      - name: direct_commit
+        title: 直コミット
+        type: SourceConfigDirectCommit
+        access: 公開
+        description: 配信元の設定の直コミットの値（`metadata_only_kinds` だけ）。`direct_commit` を持たない配信元も空の `metadata_only_kinds` で入れる
   - name: DocumentListItem
     title: 文書の一覧の要素
     container: project_index/features/read/types.py
@@ -450,4 +455,18 @@ data_models:
         type: str
         access: 公開
         description: 文書の本文（変換しない）
+  - name: SourceConfigDirectCommit
+    title: 配信元の設定の直コミットの応答
+    container: project_index/features/read/types.py
+    usecase: 読み取り API
+    role: DTO
+    summary: 配信元の設定の取得（IF-23）の `directCommit`
+    description: 共通の『読み取り API のモデル』（`ApiModel`。JSON のキーは camelCase）を継承する。配信元の設定の `direct_commit` のうち、画面のサーバーが使用する値だけを持つ。
+    properties:
+      - name: metadata_only_kinds
+        title: 本文の直コミットを断る種類
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: 配信元の設定の `DirectCommitConfig.metadata_only_kinds` を、作業場所と端末の設定の `sources[].direct_commit` で絞らずに記載の順のままコピーしたもの。`direct_commit` を持たない配信元は空
 visibility: internal

@@ -8,7 +8,12 @@ import pytest
 from project_index.features.convert.service import ConvertService
 from project_index.features.documents.store import DocumentStore
 from project_index.features.history.snapshot import SnapshotStore
-from project_index.features.sources.types import DocumentTable, ScriptEntry, ServedSource
+from project_index.features.sources.types import (
+    DirectCommitConfig,
+    DocumentTable,
+    ScriptEntry,
+    ServedSource,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -40,6 +45,7 @@ def make_view_env(
         extra_sources: list[ServedSource] | None = None,
         decision_folders: list[str] | None = None,
         diff_ignore_keys: list[str] | None = None,
+        direct_commit: DirectCommitConfig | None = None,
         **source_overrides: Any,
     ) -> SimpleNamespace:
         if root is None:
@@ -57,6 +63,7 @@ def make_view_env(
             converters=converters or [],
             nav=nav,
             decision_folders=decision_folders or [],
+            direct_commit=direct_commit,
             **({} if diff_ignore_keys is None else {"diff_ignore_keys": diff_ignore_keys}),
         )
         source = make_served_source(id="sample", root=root, config=config, **source_overrides)
