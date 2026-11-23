@@ -234,6 +234,37 @@ def test_list_documents_when_common_keys(make_view_env: Callable[..., SimpleName
     assert item.value is None
 
 
+ASSET_TABLES = [
+    DocumentTable(
+        id="assets",
+        paths=["assets/*.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        metadata={"status": "state"},
+        search_exclude={"field": "status", "op": "eq", "values": ["inactive"]},
+    ),
+    DocumentTable(id="design", paths=["docs/*.yaml"], schema_path="schemas/rule.schema.yaml"),
+]
+ASSET_FILES = {
+    "schemas/rule.schema.yaml": "type: object\n",
+    "assets/a1.yaml": "id: a1\nname: A1\nstate: active\n",
+    "assets/a2.yaml": "id: a2\nname: A2\nstate: inactive\n",
+    "docs/a.yaml": "id: a\nname: A\n",
+}
+
+
+def test_list_documents_when_search_excluded(
+    make_view_env: Callable[..., SimpleNamespace],
+) -> None:
+    """除く条件に該当する文書も並べて excluded を付ける（正常系）。"""
+    # 準備
+    env = make_view_env(ASSET_FILES, tables=ASSET_TABLES)
+    # 実行
+    response = list_documents(_target(env), store=env.handlers.store)
+    # 検証
+    assert [item.id for item in response.documents] == ["a1", "a2", "a"]
+    assert [item.excluded for item in response.documents] == [False, True, False]
+
+
 def test_get_document(
     make_view_env: Callable[..., SimpleNamespace], monkeypatch: pytest.MonkeyPatch
 ) -> None:

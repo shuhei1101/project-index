@@ -113,3 +113,88 @@ def test_render_match_words_markdown() -> None:
         "| 担当範囲 | glossary/scope | alias |",
     ]
     assert results[1] == "用語はありません"
+
+
+ASSET_TERM_DOCS = {
+    "assets/a1.yaml": "id: a1\ntitle: アセット1\nsummary: 使用中のアセット\nstate: active\n",
+    "assets/a2.yaml": "id: a2\ntitle: アセット2\nsummary: 使用しなくなったアセット\nstate: inactive\n",
+}
+
+
+def test_list_match_words_when_search_excluded(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., SourceRegistry],
+) -> None:
+    """除く文書の単語を既定で除き、指定で excluded を付ける（正常系）。"""
+    from project_index.features.search.terms import list_match_words
+    from project_index.features.search.types import MatchWordsRequest
+
+    # 準備
+    root = tmp_path / "sample"
+    write_files(root, ASSET_TERM_DOCS)
+    table = DocumentTable(
+        id="assets",
+        paths=["assets/*.yaml"],
+        schema_path="schemas/term.schema.yaml",
+        metadata={"status": "state", "name": "title", "description": "summary"},
+        alias_type="term",
+        search_exclude={"field": "status", "op": "eq", "values": ["inactive"]},
+    )
+    source = make_served_source(root=root, config=make_source_config(documents=[table]))
+    store = DocumentStore(SnapshotStore(tmp_path / "snapshots"))
+    registry = make_registry(source)
+    # 実行
+    default = list_match_words(
+        MatchWordsRequest(source="sample", cwd=str(root)), registry=registry, store=store
+    )
+    included = list_match_words(
+        MatchWordsRequest(source="sample", cwd=str(root), include_excluded=True),
+        registry=registry,
+        store=store,
+    )
+    # 検証
+    assert [(word.word, word.id) for word in default.words] == [("アセット1", "a1")]
+    assert default.excluded_count == 1
+    assert [(word.word, word.excluded) for word in included.words] == [
+        ("アセット1", None),
+        ("アセット2", True),
+    ]
+    assert included.excluded_count is None
+
+
+def test_render_match_words_markdown_when_excluded() -> None:
+    """除外の列と除いた件数の通知（正常系）。"""
+    from project_index.features.documents.types import MatchWord
+    from project_index.features.search.terms import render_match_words_markdown
+    from project_index.features.search.types import MatchWordsResult
+
+    # 準備
+    included = MatchWordsResult(
+        words=[
+            MatchWord(word="アセット1", id="a1", kind="name"),
+            MatchWord(word="アセット2", id="a2", kind="name", excluded=True),
+        ]
+    )
+    counted = MatchWordsResult(
+        words=[MatchWord(word="アセット1", id="a1", kind="name")], excluded_count=1
+    )
+    # 実行
+    included_text = render_match_words_markdown(included)
+    counted_text = render_match_words_markdown(counted)
+    # 検証
+    assert included_text == (
+        "| 単語 | 文書 | 種類 | 除外 |\n"
+        "| --- | --- | --- | --- |\n"
+        "| アセット1 | a1 | name |  |\n"
+        "| アセット2 | a2 | name | ✓ |"
+    )
+    assert counted_text == (
+        "| 単語 | 文書 | 種類 |\n"
+        "| --- | --- | --- |\n"
+        "| アセット1 | a1 | name |\n"
+        "\n"
+        "既定の検索から 1 件を除きました。include_excluded: true で取得できます"
+    )
