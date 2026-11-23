@@ -239,6 +239,12 @@ functions:
         condition: '無い表・無い列・無いファイルを指す行と `limit: 1` の行。ワークツリーのパスを渡し、`data/notes.db` はクローン本体だけにある'
         mock: なし
         expected: '`violations` に 3 つの行の違反、`warnings` に配信しない行の数 1。クローン本体のファイルを確認している'
+      - name: test_check_project_when_direct_commit_object_kinds
+        case: 正常
+        summary: 直コミットの設定のオブジェクトの要素の違反
+        condition: '1 回目は `config` に `direct_commit: {branch: develop, kinds: [note, {id: files, body: "false"}]}`、2 回目は `direct_commit: {branch: develop, kinds: [note, {id: memo, body: false}]}`（`files` は `documents[]` にあり、`memo` は無い）'
+        mock: なし
+        expected: 1 回目の `violations` に `direct_commit.kinds[1].body` の型の違反、2 回目の `violations` に `direct_commit.kinds[1]`
     callees:
       - '#functions[_load_candidate]'
       - '#functions[version_state]'

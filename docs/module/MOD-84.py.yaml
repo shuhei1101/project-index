@@ -279,7 +279,7 @@ functions:
       3. `dry_run` なら、排他を握って手順 4・5 と下の「直コミットの確認」だけを行い、`applied=False` で返す（取得・コミット・プッシュをしない）
       4. リポジトリごとの排他.握る（`timeout` は書き込みの期限までの残り）、配信元ごとの排他.握るの順に握り、直コミットを進めるを呼ぶ。`write_once` は次を行う
          - 手順 4・5・6・7 を行う
-         - 直コミットの確認: 変更を当てた後に書き換わる文書の種類を集め、`committable_kinds` に無い種類が `direct_commit.kinds` にあれば `DirectCommitNotPermittedError` を送信する。`direct_commit.kinds` に無い種類の文書と、`secret_findings`（書き換わる文書ごとに前後の `data` と本文）の検出は、添字と文書の ID を付けた違反にして `ValidationFailedError` を送信する
+         - 直コミットの確認: 変更を当てた後に書き換わる文書の種類を集め、`committable_kinds` に無い種類が `direct_commit.kinds` にあれば `DirectCommitNotPermittedError` を送信する。`direct_commit.kinds` に無い種類の文書と、`direct_commit.metadata_only_kinds` の種類で本文のファイル（`body_path` と本文）が前後で変わる文書（作る・移す・削除するを含む。本文のファイルを持たない文書は対象外）と、`secret_findings`（書き換わる文書ごとに前後の `data` と本文）の検出は、添字と文書の ID を付けた違反にして `ValidationFailedError` を送信する
          - 書き込むファイル（新しい本文と変わったファイル）を `check_clean` にかけ、手順 9・10 を行う
          - 手順 11 の生成を、制限時間を `limits.respond_by` の残り − `DIRECT_COMMIT_PUSH_SEC` − `DIRECT_COMMIT_MARGIN_SEC` と `timeout_sec` の短い方にして動かす。制限時間が 0 以下・`ScriptError`・生成が配信元に無い場合は、`[warning]` を書かずに `DirectCommitGeneratorError` を送信する
          - 書いたファイルを返す
@@ -586,6 +586,19 @@ functions:
         condition: '`filter` が YAML の文書と `n1` の両方に該当する `replace_text`'
         mock: なし
         expected: YAML の文書だけを置換し、`data/notes.db` が変わらない
+      - name: test_write_docs_when_direct_commit_body_not_allowed
+        case: 異常
+        summary: 本文の直コミットを断る種類の本文が変わる操作を断る
+        condition: '`direct_commit.kinds` が `[note, {id: files, body: false}]` の配信元で、`commit` つきの `files` の行への `set: {@body: x}`・`text_edits` の `@body`・`new_path` つきの `rename`、行の本文がリンクする `note` の文書の `rename`、`fields` を省いた `replace_text` を 1 件ずつ'
+        mock: なし（一時フォルダのベアリポジトリ）
+        expected: 5 件とも添字 0 と `files` の行の ID の違反の `ValidationFailedError`。ワークツリーとベアリポジトリは変わらない
+        exception: 本文の直コミットを断る種類の本文が変わる
+      - name: test_write_docs_when_direct_commit_metadata_only
+        case: 正常
+        summary: 本文の直コミットを断る種類のメタデータだけを直コミットする
+        condition: '同じ配信元で、`commit` つきの `files` の行への `set: {description: 変えた説明, tags: [topic:a]}`'
+        mock: なし（一時フォルダのベアリポジトリ）
+        expected: '`applied=True`。ベアリポジトリに増えたコミットの変更に本文のファイルが入らない'
   - name: delete_docs
     title: 文書の削除
     kind: 関数
@@ -779,6 +792,13 @@ functions:
         condition: '`targets` が文書 1 と `n1`'
         mock: なし
         expected: '`ReadOnlyKindError` の `positions` が `targets[1]` で、文書 1 のファイルが残る'
+      - name: test_delete_docs_when_direct_commit_body_not_allowed
+        case: 異常
+        summary: 本文の直コミットを断る種類の本文のファイルを削除する操作を断る
+        condition: '`direct_commit.kinds` が `[note, {id: files, body: false}]` の配信元で、`commit` つきで本文のファイルを持つ `files` の行を削除する'
+        mock: なし（一時フォルダのベアリポジトリ）
+        expected: 添字 0 と行の ID の違反の `ValidationFailedError`。行と本文のファイルが残り、ベアリポジトリは変わらない
+        exception: 本文の直コミットを断る種類の本文のファイルを削除する
   - name: commit_documents
     title: 書き込みと削除の直コミット
     kind: 関数
@@ -961,6 +981,13 @@ functions:
         condition: '`baseCommit` の後に、n1 を変えたコミットと、配信元の設定の `direct_commit.kinds` から `note` を外したコミットをプッシュし、要求は n1 の `update`'
         mock: なし（一時フォルダの git）
         expected: 今のブランチで断った例外で、ブランチが増えず、一時のワークツリーが残らない
+      - name: test_commit_documents_when_body_not_allowed
+        case: 異常
+        summary: 本文の直コミットを断る種類の本文の変更を含む要求を断る
+        condition: '`direct_commit.kinds` が `[note, {id: files, body: false}]`、`write_api_kinds` が `[note, files]` の配信元で、`writes` に `note` の文書の `update` と `files` の行の `set: {@body: x}`'
+        mock: なし（一時フォルダのベアリポジトリ）
+        expected: '`writes[1]` の違反の `ValidationFailedError`。`note` の文書も書き換わらず、ベアリポジトリは変わらない'
+        exception: 本文の直コミットを断る種類の本文が変わる
 refs:
   - to: IF-6
     type: requires

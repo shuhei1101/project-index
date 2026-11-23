@@ -32,7 +32,7 @@ functions:
     process: |-
       1. 配信元の説明書と種類のスキーマは、`outside_scope` が `True` なら先頭に `作業範囲の外（参考）` の行を置く
       2. 使える配信元の一覧は、`作業場所: {cwd}（{配信元} のクローン本体 / ワークツリー）` の行と `| source | 権限 | description | when | 直コミット |` の表（作業中の配信元は権限に `（作業中）`。`when` 列は行を `<br>` でつなぎ、無ければ空。`直コミット` 列は `direct_commit_kinds` を `, ` でつなぎ、無ければ空）。`outside_sources` が `None` でなければ、空行・`作業範囲の外（参考）` の行・`| source | description | when |` の表を続ける（0 件は表の代わりに `なし` の行）。使える配信元が 0 件のときは、表の代わりに `使用できる配信元はありません。配信元にするときは /project-index:setup を実行します。` の行を置く。`warnings` が空でなければ、空行・`注意:` の行・警告ごとに `- {警告}` の行を続ける
-      3. 配信元の説明書は、`when` が空でなければ `使う場面:` の行と行ごとの `- {行}` を置いて空行を挟み、`instructions` をそのまま置き、`| kind | description |` の表を続ける（`sqlite` が真の種類は description の後ろに `（SQLite の表の行・読み取り専用）` を付ける）。`direct_commit` があれば、空行・`直コミット:` の行・`- ブランチ: {ブランチ}`・（`branches` があれば）`- 上書きできるブランチ: {, で繋いだ名前}`・`- 種類: {, で繋いだ種類}` の行を続ける。`refs` があれば `ブランチ: {,で繋いだ名前}`・`タグ: {同じ}` の行、`worktrees` があれば `| ワークツリー | ブランチ |` の表を続ける
+      3. 配信元の説明書は、`when` が空でなければ `使う場面:` の行と行ごとの `- {行}` を置いて空行を挟み、`instructions` をそのまま置き、`| kind | description |` の表を続ける（`sqlite` が真の種類は description の後ろに `（SQLite の表の行・読み取り専用）` を付ける）。`direct_commit` があれば、空行・`直コミット:` の行・`- ブランチ: {ブランチ}`・（`branches` があれば）`- 上書きできるブランチ: {, で繋いだ名前}`・`- 種類: {, で繋いだ種類}`（`metadata_only_kinds` にある種類は、種類の ID の後ろに `（メタデータだけ）` を付ける）の行を続ける。`refs` があれば `ブランチ: {,で繋いだ名前}`・`タグ: {同じ}` の行、`worktrees` があれば `| ワークツリー | ブランチ |` の表を続ける
       4. 種類のスキーマは、`metadata` が空でなければ `| 共通のキー | 列名 |` の表を置き、```yaml でスキーマの YAML を囲む。`columns` があれば、YAML の代わりに `| 列 | 型 | 説明 |` の表と `SQLite の表の行の種類です。write_docs・delete_docs と list_changes の対象外です。` の行を置く
     unit_tests:
       - name: test_render_describe_markdown_when_source_when
@@ -96,4 +96,10 @@ functions:
         condition: '`columns` が `id`（text）・`tags`（json）の種類のスキーマと、`sqlite` が真の種類 `notes_db` を持つ配信元の説明書'
         mock: なし
         expected: 種類のスキーマは `| id | text | ID |`・`| tags | json | タグ |` の行と対象外の旨の行を持ち ```yaml を持たない。説明書の `notes_db` の行に `（SQLite の表の行・読み取り専用）` が付く
+      - name: test_render_describe_markdown_when_metadata_only_kinds
+        case: 正常
+        summary: 本文の直コミットを断る種類に印を付ける
+        condition: '説明書の `direct_commit` が `branch: develop`・`kinds: [note, files]`・`metadata_only_kinds: [files]`'
+        mock: なし
+        expected: '`- 種類: note, files（メタデータだけ）` の行を出す'
 visibility: internal

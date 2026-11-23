@@ -591,6 +591,11 @@ def compare_config_version(version: str) -> Literal["same", "older", "newer"]:
     return "older" if mine < current else "newer"
 
 
+def _direct_commit_kind_id(item: object) -> str:
+    """`direct_commit.kinds[]` の要素（文字列か `id` を持つオブジェクト）から種類の ID を返す。"""
+    return str(item["id"]) if is_dict(item) else str(item)
+
+
 def build_source_config(value: dict[str, Any]) -> SourceConfig:
     """検証を通した設定の値から `SourceConfig` を作る。"""
     ids = value.get("ids", {})
@@ -626,8 +631,13 @@ def build_source_config(value: dict[str, Any]) -> SourceConfig:
         direct = value["direct_commit"]
         options["direct_commit"] = DirectCommitConfig(
             branch=direct["branch"],
-            kinds=list(direct["kinds"]),
+            kinds=[_direct_commit_kind_id(item) for item in direct["kinds"]],
             branches=list(direct.get("branches", [])),
+            metadata_only_kinds=[
+                str(item["id"])
+                for item in direct["kinds"]
+                if is_dict(item) and item.get("body") is False
+            ],
         )
     return SourceConfig(
         name=value["name"],

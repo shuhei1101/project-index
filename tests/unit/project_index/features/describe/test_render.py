@@ -224,6 +224,23 @@ def test_render_describe_markdown_when_direct_commit() -> None:
     assert start > guide_lines.index("| kind | description |")
 
 
+def test_render_describe_markdown_when_metadata_only_kinds() -> None:
+    """本文の直コミットを断る種類にマーカーを付ける（正常系）。"""
+    # 準備
+    guide = SourceGuideResult(
+        source_id="sample",
+        instructions="説明書",
+        kinds=[],
+        direct_commit=DirectCommitGuide(
+            branch="develop", branches=[], kinds=["note", "files"], metadata_only_kinds=["files"]
+        ),
+    )
+    # 実行
+    lines = render_describe_markdown(guide).splitlines()
+    # 検証
+    assert "- 種類: note, files（メタデータだけ）" in lines
+
+
 def test_render_describe_markdown_when_sqlite_kind() -> None:
     """SQLite の表の行の種類の列の表と対象外の旨（正常系）。"""
     from project_index.features.sources.types import SqliteColumn

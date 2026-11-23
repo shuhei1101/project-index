@@ -519,6 +519,34 @@ flows:
       - 文書 1 のファイルも `data/notes.db` も変わらない
       - 'ほかの文書の削除で `on_referenced: unlink` を指定しても、SQLite の行の文書の参照は書き換えない'
     test: test_error_when_sqlite_kind_deleted
+  - name: 異常系（本文の直コミットを断る種類の本文のファイルを削除する・ValidationFailedError）
+    summary: '`body: false` の種類の、本文のファイルを持つ行を消す `commit` を断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: '正常系（直コミットで消す）の sample に、管理用の YAML `files.yml` を `records: files`・`body_file: path` で指す種類 `files` を加え、`develop` に `path` が `guide.md` の行と本文のファイル `guide.md` をコミット済みのもの'
+        notes: '`direct_commit.kinds` は `[note, {id: files, body: false}]`'
+      - name: 入力
+        description: '`guide.md` の行の `targets`（得たバージョン）と `commit`'
+    flow: |-
+      <!-- map: {"title": "異常系（本文の直コミットを断る種類の本文のファイルを削除する・ValidationFailedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as delete_docs
+
+        C->>T: commit: message, targets: guide.md の行
+        T->>T: 種類 files は body: false で、guide.md の行を消すと本文のファイルも削除する
+        T-->>C: isError（添字 0・guide.md・種類 files は本文の直コミットを断っている）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、添字 0 と `guide.md` の行の ID の違反として、種類 `files` は本文の直コミットを断っていることを返却する'
+      - リモートと develop のワークツリーは変わらず、`guide.md` と `files.yml` の行も残る
+    test: test_error_when_direct_commit_body_delete_not_allowed
 lead: 文書を物理削除し、`related` からの参照を拒否するか除外する `delete_docs` の入出力を定め、`delete_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -538,6 +566,7 @@ callers:
   - SC-7#scenarios[正常シナリオ（本文のファイルを持たない要素を書く）]
   - SC-15#scenarios[正常シナリオ（文書を消す）]
   - SC-7#scenarios[異常シナリオ（スキルが工程を埋め込むエージェントフローを消す）]
+  - SC-15#scenarios[異常シナリオ（本文の直コミットを断る種類の文書を消す）]
 exclusivity: '`write_docs` と同じ配信元ごとの排他ロックの中で行う。`commit` を指定した呼び出しは、`write_docs` と同じリポジトリの単位の排他も取る'
 request:
   - name: source
@@ -683,7 +712,7 @@ exceptions:
   - name: InvalidArgumentError
     condition: '`storage.type: disk` の配信元に `worktree` を渡した・`commit` と `atomic: false` か `worktree` を同時に渡した'
   - name: ValidationFailedError
-    condition: '削除の時点（`on` に `delete`）の `validators[]` が違反を返却したか、`commit` を指定した呼び出しで、消す文書か参照を外す文書の種類が `direct_commit.kinds[]` に無いか、参照を外した文書が秘密の値の規則に該当する'
+    condition: '削除の時点（`on` に `delete`）の `validators[]` が違反を返却したか、`commit` を指定した呼び出しで、消す文書か参照を外す文書の種類が `direct_commit.kinds[]` に無いか、`body: false` の種類で本文のファイルを削除するか書き換えるか、参照を外した文書が秘密の値の規則に該当する'
     notes: 違反ごとの添字・パス・決まりと、`write_docs` と同じく消す文書・参照を外す文書の ID を添える
   - name: DirectCommitNotConfiguredError
     condition: '`write_docs` と同じ'
@@ -736,7 +765,7 @@ constraints:
   - item: disk の配信元
     constraint: '端末の設定の行が `storage.type: disk` の配信元は、登録したフォルダから消し、`TargetIsCloneError` にしない。Git 管理外の配信元と同じく、`documents[].writable` が削除を許さない種類は `DeleteNotAllowedError`。`worktree` を指定すると `InvalidArgumentError`'
   - item: 直コミット
-    constraint: '`commit` を指定した呼び出しは、[文書の書き込み](id:IF-6) の制約「直コミットの権限」から「直コミットの試しの書き込み」までと同じ。消す文書と参照を外す文書の種類が全て `direct_commit.kinds[]` にあるときだけ進め、削除したファイル・書き換えた参照元・生成物だけをコミットする'
+    constraint: '`commit` を指定した呼び出しは、[文書の書き込み](id:IF-6) の制約「直コミットの権限」から「直コミットの試しの書き込み」までと同じ。消す文書と参照を外す文書の種類が全て `direct_commit.kinds[]` にあり、`body: false` の種類では本文のファイルを削除・書き換えないときだけ進め（本文のファイルを持たない要素と、ほかの要素が同じ本文のファイルを指して本文のファイルを削除しない要素は消せる）、削除したファイル・書き換えた参照元・生成物だけをコミットする'
     notes: 共通の処理のため、直コミットの異常系の結合テストは文書の書き込みが持つ
   - item: 削除の前の検査
     constraint: 'バージョン・参照・権限を確認した後、ファイルを削除する前に、`targets` の文書ごとに、その文書の種類の行の `validators[]` のうち `on` に `delete` を持つものを実行する。標準入力にその文書の YAML、環境変数 `PROJECT_INDEX_VALIDATE_ON` に `delete`、`PROJECT_INDEX_DELETE_IDS` に `targets` のうちバージョン・参照・権限の確認に合格した全ての文書の `id`（1 行に 1 件）を指定する。違反はその文書の添字の違反にし、`atomic: true` は 1 件でもあれば何も削除しない。`atomic: false` は、違反のあった文書を `failed` にして `PROJECT_INDEX_DELETE_IDS` から除き、残る文書の検査をやり直す。新規の違反が出なくなるまで繰り返し、最後まで違反の無かった文書だけを削除する'

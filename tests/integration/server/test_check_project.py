@@ -722,6 +722,18 @@ DIRECT_FILES = {
             {"direct_commit.branch": "develop を指すワークツリーが無いため、直コミットは断られる"},
             id="missing-kind",
         ),
+        pytest.param(
+            direct_commit_config(kinds=("note", '{id: rule, body: "false"}')),
+            {"direct_commit.kinds[1].body": "型が違う（期待: boolean）"},
+            {},
+            id="body-type",
+        ),
+        pytest.param(
+            direct_commit_config(kinds=("note", "{id: memo, body: false}")),
+            {"direct_commit.kinds[1]": "memo は documents[] に無く、直コミットを断る"},
+            {"direct_commit.branch": "develop を指すワークツリーが無いため、直コミットは断られる"},
+            id="missing-object-kind",
+        ),
     ],
 )
 def test_normal_when_direct_commit_checked(

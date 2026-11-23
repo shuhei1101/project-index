@@ -445,7 +445,7 @@ mdmark の CLI が `PATH` に無いか、点検が端末の設定の `script_tim
 
 1. リモートのブランチを取得し、早送りで取り込む
 2. ワークツリーにプッシュしていないコミットが無いこと、書き込むファイルにコミットしていない変更が無いことを確認する
-3. 今の書き込みと同じ検査に加えて、書き換わる文書の種類が全て直コミットを許可した種類であること、書き込む値に秘密の値が無いことを確認する
+3. 今の書き込みと同じ検査に加えて、書き換わる文書の種類が全て直コミットを許可した種類であること、本文の直コミットを断る種類（`direct_commit.kinds[]` の `body: false`）で本文のファイルが書き換わる・作られる・移る・削除される文書が無いこと、書き込む値に秘密の値が無いことを確認する。`rename` の参照元と `replace_text` で置換した文書も対象にする
 4. ファイルを書き込み、`generators[]` を実行する
 5. 書き込んだファイルと、配信元のフォルダの配下の生成物だけをコミットする（ワークツリーにある他の変更はそのまま残す）
 6. プッシュする
@@ -485,7 +485,7 @@ Git 管理外の配信元と `storage.type: disk` の配信元では、種類の
 | --- | --- |
 | なし | 今の作業場所から使える配信元の一覧（`id`・権限 `read` / `write` / `commit`・作業中か・`description`・`when`・直コミットできる種類 `direct_commit_kinds[]`）と、作業場所、使える配信元の警告（`warnings[]`）。`commit` は直コミットだけを呼べる作業場所 |
 | `outside_scope: true`（`source` なし） | 引数なしと同じ一覧に加えて、作業範囲の外（参考）で参照できる配信元（`scope` に当たらず `sources[].outside_read` が真）の一覧（`outside_sources[]` の `id`・`description`・`when`） |
-| `source` | その配信元の使う場面（`when`）・説明書（`instructions`）と種類（`kinds[]`）の一覧。Git の配信元（`storage.type: disk` を除く）は、ブランチ・タグ（`refs.branches[]`・`refs.tags[]`）と、`worktrees` に当たるワークツリー（`worktrees[]` の `path`・`branch`）の一覧も返す。今の作業場所から直コミットできる種類があれば、`direct_commit`（`branch`・`branches[]`・`kinds[]`）も返す |
+| `source` | その配信元の使う場面（`when`）・説明書（`instructions`）と種類（`kinds[]`）の一覧。Git の配信元（`storage.type: disk` を除く）は、ブランチ・タグ（`refs.branches[]`・`refs.tags[]`）と、`worktrees` に当たるワークツリー（`worktrees[]` の `path`・`branch`）の一覧も返す。今の作業場所から直コミットできる種類があれば、`direct_commit`（`branch`・`branches[]`・`kinds[]`・本文の直コミットを断る種類 `metadata_only_kinds[]`）も返す |
 | `source`・`kind` | その種類の共通のキーと列名の対応（`metadata`）と、スキーマ（YAML のまま） |
 
 `when` は、`markdown` では一覧の表の `when` 列（行を `<br>` でつなぐ）と、説明書の前の「使う場面:」の箇条書きで出し、`json` では記載の無い配信元のキーを持ちません。

@@ -251,4 +251,10 @@ data_models:
         type: list[str]
         access: 公開
         description: 今の作業場所から直コミットできる種類（`committable_kinds`）
+      - name: metadata_only_kinds
+        title: 本文の直コミットを断る種類
+        type: list[str]
+        access: 公開
+        default: '[]'
+        description: '`kinds` のうち、配信元の設定の `metadata_only_kinds` にある種類'
 visibility: internal

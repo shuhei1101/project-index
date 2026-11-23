@@ -68,6 +68,7 @@
 
 作業場所を持たない画面のサーバーの要求で、直コミットだけを行います。
 直コミットできるのは、端末の設定の `sources[].direct_commit.write_api_kinds` に記載し、配信元の設定の `direct_commit.kinds[]` にもある種類の文書だけです（[設定](./設定.md)）。
+配信元の設定で本文の直コミットを断る種類（`body: false`）は、本文のファイルが書き換わる・作られる・移る・削除される操作を 1 つでも含む要求を、要求全体で 422 で断ります。
 書き込みと削除で書き換わる文書（参照を外す参照元を含む）が 1 つでも検査に合格しないか許可していない種類なら、どの文書も書き込まず、リモートも変えません。
 本文には `message`（コミットの説明）が必須で、`branch`（上書きするブランチ）・`onReferenced`（`fail`・`unlink`）を指定できます。
 応答は `applied`・`results[]`（`kind` が `write`・`delete`）・`unlinked[]`・`commit`（`sha`・`branch`・`retried`）・`conflict` です。

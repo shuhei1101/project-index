@@ -25,6 +25,8 @@ callers:
 - SC-17#scenarios[異常シナリオ（衝突してスクリプトが失敗する）]
 - SC-17#scenarios[異常シナリオ（編集を始めたときのコミットでも検査に合格しない）]
 - SC-17#scenarios[異常シナリオ（編集を始めたときのコミットが起点に使えない）]
+- SC-17#scenarios[正常シナリオ（本文の直コミットを断る種類のメタデータだけを書き換える）]
+- SC-17#scenarios[異常シナリオ（本文の直コミットを断る種類の本文の変更を含む）]
 exclusivity: '[文書の書き込み](id:IF-6) の制約「直コミットの排他」と同じ排他で、直コミットどうしを 1 つずつ進める'
 request:
 - name: source
@@ -156,7 +158,7 @@ status_codes:
 - code: '409'
   condition: 文書のバージョンが取り込んだ後の今のバージョンと違う（`VersionMismatchError`）、直コミットを使用できない配信元（`DirectCommitNotConfiguredError`）、コミットするブランチのワークツリーが無い（`CommitWorktreeNotFoundError`）、ワークツリーに未プッシュのコミット（`UnpushedCommitsError`）・書き込むファイルに未コミットの変更（`UncommittedChangesError`）がある、削除する文書が参照されている（`DocumentReferencedError`）、プッシュが 2 回断られた（`PushRejectedError`）、`baseCommit` がクローンに無いかコミットするブランチの祖先でない（`BaseCommitUnusableError`）
 - code: '422'
-  condition: 検査に合格しない（`ValidationFailedError`。配信元の設定の `direct_commit.kinds[]` に無い種類の文書が書き換わる・秘密の値を含むも同じ）
+  condition: '検査に合格しない（`ValidationFailedError`。配信元の設定の `direct_commit.kinds[]` に無い種類の文書が書き換わる・`body: false` の種類の本文のファイルが書き換わる・作られる・移る・削除される・秘密の値を含むも同じ）'
   notes: '`errors[]` に、`writes`・`deletes` の別と添字・項目のパス・決まり・直し方を全て並べる'
 - code: '500'
   condition: '`generators[]` が失敗した（`DirectCommitGeneratorError`）'
@@ -201,6 +203,8 @@ constraints:
   decided_by: NFR-1#requirements[書き込みの API の応答の上限]
 - item: 試しに書くときの衝突
   constraint: '`dryRun: true` で衝突したときも一時のワークツリーで許可と検査をやり直し、合格すれば `conflict` を `branch`・`commit`・`script` が `null` で返却する。ブランチを作らず、スクリプトを実行しない'
+- item: 本文の直コミットを断る種類
+  constraint: '[文書の書き込み](id:IF-6) の制約「本文の直コミットを断る種類」と同じで、`writes` と `deletes` の両方に適用する（`deletes` は [文書の削除](id:IF-7) の制約「直コミット」と同じ）。1 つでも違反があれば、要求全体を `ValidationFailedError` で断る'
 flows:
 - name: 正常系
   summary: 書き込みと削除を 1 つのコミットにまとめてプッシュする
@@ -682,6 +686,38 @@ flows:
   - 409 の `VersionMismatchError` で、今の develop で断った n1 のバージョンの不一致（今の develop ではバージョンの照合が検査より先に断る）
   - ブランチと一時のワークツリーが残らず、スクリプトを実行しない
   test: test_error_when_invalid_at_base_commit
+- name: 異常系（本文の直コミットを断る種類の本文が変わる・422）
+  summary: '`body: false` の種類の本文のファイルが書き換わる・移る・削除される操作を 1 つでも含む要求を、要求全体で断る'
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに git の配信元とベアリポジトリのリモートと端末の設定を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+  - name: 配信元
+    description: '正常系の sample に、管理用の YAML `files.yml` を `records: files`・`body_file: path` で指す種類 `files` を加えたもの。配信元の設定の `direct_commit` は `branch: develop`・`kinds: [note, {id: files, body: false}]`'
+    notes: '端末の設定の sample の行は `direct_commit.write_api_kinds: [note, files]`'
+  - name: 文書
+    description: '`develop` にコミット済みの種類 `note` の文書 n1、`path` が `guide.md` の行と本文のファイル `guide.md`（n1 へのリンクを持つ）、それぞれのバージョン'
+  - name: 入力
+    description: 1 回目は `writes` に n1 の `update` と `guide.md` の行の `update`（`set` に `@body`）、2 回目は `writes` に n1 の `rename`（`new_id`）、3 回目は `deletes` に `guide.md` の行
+  flow: |-
+    <!-- map: {"title": "異常系（本文の直コミットを断る種類の本文が変わる・422）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant WT as develop のワークツリー
+      participant R as リモート
+
+      C->>E: writes（n1 の update、guide.md の行の set @body）
+      E->>E: 種類 files は body: false で、guide.md の行の本文のファイルが書き換わる
+      E-->>C: 422 ValidationFailedError
+    ```
+
+    <!-- /map -->
+  expected:
+  - 1〜3 回目のどれも 422 で、`errors[]` に `guide.md` の行を書き換える・削除する操作の位置（2 回目は n1 の操作の位置と、書き換わる `guide.md` の行の ID）と「種類 files は本文の直コミットを断っている」がある
+  - n1 も `guide.md` も `files.yml` も変わらず、リモートとワークツリーは変わらない
+  test: test_error_when_body_not_allowed
 test_file: tests/integration/server/test_commit_documents.py
 visibility: internal
 tags:

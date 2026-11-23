@@ -2493,6 +2493,64 @@ flows:
       - '`atomic: false` では、正常系（一部だけ書く）と同じく文書 1 を書き込んで `applied: true`・`results[0].status: updated` を返却し、`results[1]`・`results[2]` を `status: failed` と `ReadOnlyKindError` の理由で返却する。`data/notes.db` は変わらない'
       - '`replace_text` の `filter` が種類 `notes_db` の文書に該当しても、その文書は置換の対象にしない'
     test: test_error_when_sqlite_kind_written
+  - name: 正常系（本文の直コミットを断る種類のメタデータだけを直コミットする）
+    summary: '`body: false` の種類の行のメタデータの列だけを書き換える `commit` を受け付け、本文のファイルは変えない'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: '正常系（直コミットする）の sample に、管理用の YAML `files.yml` を `records: files`・`body_file: path` で指す種類 `files` を加え、`develop` に `path` が `guide.md` の行と本文のファイル `guide.md` をコミット済みのもの'
+        notes: '`direct_commit.kinds` は `[note, {id: files, body: false}]`'
+      - name: 入力
+        description: '`guide.md` の行の `update`（`set` に `description` と `tags`）と `commit`'
+    flow: |-
+      <!-- map: {"title": "正常系（本文の直コミットを断る種類のメタデータだけを直コミットする）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+        participant G as git
+
+        C->>T: commit: message, operations: update guide.md の行
+        T->>T: 種類 files は body: false で、本文のファイルのパスと内容が変わらない
+        T->>T: スキーマ・validators・許可する種類・秘密の値の検査を実行する
+        T->>G: files.yml と生成物をコミットしてプッシュする
+        T-->>C: applied: true, commit
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`applied: true` で、`guide.md` の行の `status` が `updated`、`commit` にコミットの SHA とブランチ `develop` を返却する'
+      - リモートの `develop` に増えたコミットの変更が `files.yml` と生成物だけで、`guide.md` は変わらない
+    test: test_normal_when_direct_commit_metadata_only
+  - name: 異常系（本文の直コミットを断る種類の本文が変わる・ValidationFailedError）
+    summary: '`body: false` の種類の本文のファイルが書き換わる・移る `commit` を断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 直コミットの配信元
+        description: 正常系（本文の直コミットを断る種類のメタデータだけを直コミットする）と同じ。`guide.md` の本文は種類 `note` の文書 1 へのリンクを持つ
+      - name: 入力
+        description: '1 回目は `guide.md` の行の `update`（`set` に `@body`）、2 回目は `text_edits` の `field: @body`、3 回目は `new_path` を付けた `guide.md` の行の `rename`、4 回目は文書 1 の `rename`（`new_id`）、5 回目は `fields` を省いて `guide.md` の本文の語を置換する `replace_text`。どれも `commit` を付ける'
+    flow: |-
+      <!-- map: {"title": "異常系（本文の直コミットを断る種類の本文が変わる・ValidationFailedError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: commit: message, operations: update guide.md の行（set @body）
+        T->>T: 種類 files は body: false で、guide.md の行の本文のファイルが書き換わる
+        T-->>C: isError（添字 0・guide.md・種類 files は本文の直コミットを断っている）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '1〜5 回目のどれも `isError: true` で、添字 0 と `guide.md` の行の ID の違反として、種類 `files` は本文の直コミットを断っていることを返却する'
+      - リモートと develop のワークツリーは変わらず、`guide.md` と `files.yml` も変わらない
+    test: test_error_when_direct_commit_body_not_allowed
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -2541,6 +2599,8 @@ callers:
   - SC-15#scenarios[異常シナリオ（コミットするブランチのワークツリーが無い）]
   - SC-10#scenarios[異常シナリオ（直コミットの設定が検証に通らない）]
   - SC-7#scenarios[正常シナリオ（先に作成した本文のファイルを指す文書を作る）]
+  - SC-15#scenarios[正常シナリオ（本文の直コミットを断る種類のメタデータだけを書き換える）]
+  - SC-15#scenarios[異常シナリオ（本文の直コミットを断る種類の本文を書き換える）]
 exclusivity: 配信元ごとの排他ロックの中で、読み込み・バージョンの確認・検査・書き込みを行う。後から来た呼び出しはロックを待つ。`commit` を指定した呼び出しは、制約「直コミットの排他」のリポジトリの単位の排他も取る
 request:
   - name: source
@@ -3011,7 +3071,7 @@ constraints:
     constraint: '`commit` を指定した呼び出しは、`scope.write` で判定しない。変更を適用した後に書き換わる文書（`rename` の参照元・`replace_text` で置換した文書を含む）の種類ごとに、端末の設定の `sources[].direct_commit.kinds` にその種類があればその glob、無ければ `sources[].direct_commit.scope` に `cwd` が該当することを確認する'
     notes: 既定は空で、どの作業場所からも呼べない。該当しなければ `DirectCommitNotPermittedError`
   - item: 直コミットを許可する種類
-    constraint: 書き換わる文書の種類が全て配信元の設定の `direct_commit.kinds[]` にあるときだけ進める。無い種類の文書は、`operations` の添字と文書の ID を付け、決まりを「種類 {kind} は直コミットを許可していない」にした違反として `ValidationFailedError` で返却する
+    constraint: 書き換わる文書の種類が全て配信元の設定の `direct_commit.kinds[]`（文字列の要素か、オブジェクトの要素の `id`）にあるときだけ進める。無い種類の文書は、`operations` の添字と文書の ID を付け、決まりを「種類 {kind} は直コミットを許可していない」にした違反として `ValidationFailedError` で返却する
     notes: 改名・一括の置換で参照元の他の種類の文書が書き換わる場合も同じ
   - item: 直コミットの書き込む先
     constraint: コミットするブランチ（`commit.branch`、省くと `direct_commit.branch`）を HEAD が指すワークツリーのうち、配信元の `worktrees[]` に該当するものに書き込む。種類・配置先・検査は、そのワークツリーの `project-index.yaml` で再読み込みした配信元の設定で行う
@@ -3053,6 +3113,9 @@ constraints:
     notes: 項目のパスのキーと要素は指定したままの文字列にする（共通のキーを列名へ読み替える前）。文書が変わらなかった `update` も `status` は `updated` で、`version` は書き込み前と同じ
   - item: SQLite の表の行の種類
     constraint: '`documents[].sqlite` を持つ行の種類への create・update・replace・rename は `ReadOnlyKindError` で断る。`replace_text` はその種類の文書を対象から除く。直コミットの設定で許可していても断る'
+  - item: 本文の直コミットを断る種類
+    constraint: '制約「直コミットを許可する種類」の後に、配信元の設定の `direct_commit.kinds[]` の要素が `body: false` を持つ種類のうち、変更を適用した後に本文のファイルが書き換わる・作られる・移る文書（直接の操作の対象のほか、`rename` の参照元・`replace_text` で置換した文書を含む）があれば、`operations` の添字と文書の ID を付け、決まりを「種類 {kind} は本文の直コミットを断っている」にした違反として `ValidationFailedError` で返却する。本文のファイルを変えない操作（メタデータの列だけの `update`・`new_path` を付けない `rename`）は、今と同じく受け付ける'
+    notes: 本文のファイルを比べるのは、変更を適用する前と後の本文のパスと内容。`body` を記載しない要素と文字列の要素は、本文を含めて許可する
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]
