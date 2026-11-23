@@ -419,13 +419,23 @@ def is_excluded(
 
 
 def exclusion_flags(
-    target: Target, documents: Sequence[Document], *, store: DocumentStore, today: date
+    target: Target,
+    documents: Sequence[Document],
+    *,
+    store: DocumentStore,
+    today: date,
+    schema_target: Target | None = None,
 ) -> list[bool]:
-    """参照する場所の文書ごとに、文書の行の `search_exclude` に該当するかを並べて返却する。"""
+    """参照する場所の文書ごとに、文書の行の `search_exclude` に該当するかを並べて返却する。
+
+    `schema_target` を指定すると、使える項目を作る種類のスキーマをその場所から参照する。
+    """
     rows = [table for table in target.source.config.documents if table.enabled]
+    # 除く条件を持つ行が無い: スキーマを参照せずに、どの文書も該当しない
     if not any(table.search_exclude is not None for table in rows):
         return [False] * len(documents)
-    fields = known_fields(store.row_schema(target, table.id) for table in rows)
+    schemas_from = schema_target or target
+    fields = known_fields(store.row_schema(schemas_from, table.id) for table in rows)
     conditions: dict[str, Condition | Group | None] = {}
     flags: list[bool] = []
     for document in documents:

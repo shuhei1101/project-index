@@ -121,8 +121,10 @@ def list_documents(
     documents = sorted(
         loaded.documents, key=lambda found: (order.get(found.kind, len(order)), found.path)
     )
+    # 除外の判定の種類のスキーマは起動時のスキーマから参照し、リビジョンを書き出さない
     today = datetime.now(UTC).astimezone().date()
-    flags = exclusion_flags(target, documents, store=store, today=today)
+    startup = dataclasses.replace(target, ref=None, worktree=None)
+    flags = exclusion_flags(target, documents, store=store, today=today, schema_target=startup)
     return DocumentListResponse(
         ref=_ref_name(target),
         documents=[
