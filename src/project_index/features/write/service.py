@@ -2604,14 +2604,20 @@ def _check_commit_documents_content(
                     doc=doc_id,
                 )
             )
+        # 書き込みの API の errors[] は文書の ID を持たないので、本文を断る違反は決まりの文に ID を入れる
+        violations.extend(
+            dataclasses.replace(
+                violation,
+                path=f"{name}[{index}].{violation.path}",
+                rule=f"{doc_id} の{violation.rule}",
+            )
+            for violation in _body_violations(
+                index, doc_id, kind, BodyChange(before, after, deleted), settings
+            )
+        )
         violations.extend(
             dataclasses.replace(violation, path=f"{name}[{index}].{violation.path}")
-            for violation in [
-                *_body_violations(
-                    index, doc_id, kind, BodyChange(before, after, deleted), settings
-                ),
-                *_secret_violations(index, doc_id, before, after),
-            ]
+            for violation in _secret_violations(index, doc_id, before, after)
         )
     if violations:
         raise ValidationFailedError(
