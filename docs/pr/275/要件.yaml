@@ -1,0 +1,44 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-17.yaml
+    impact: changed
+    detail: 画面で修正した配信元の設定を、検査に合格させてから既定のブランチへ直コミットし、配信へ反映する流れを追加する（扱う場合）
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-12.yaml
+    impact: run_only
+    detail: 端末の設定の配信元の変更の流れは変えないが、端末の設定に直コミットの許可を足すため回帰を確かめる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-10.yaml
+    impact: run_only
+    detail: 利用者が配信元の設定を変えて reload する流れは変えないが、同じ検証を書き込みで使うため回帰を確かめる
+    depends_on: []
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: none
+    detail: 画面のサーバーが文書を書き込む流れは変わらない
+    depends_on: []
+scope_out:
+  - item: rule-inject の索引を書き込みの API で書き換える
+    reason: 索引を配信元の文書として配信し validators で検査する経路が別にある
+    plan: '#270'
+  - item: dev-docs の画面から配信元の設定を修正する UI
+    reason: dev-docs のリポジトリの作業
+    plan: shuhei1101/dev-docs#310
+  - item: 文書の MCP の write_docs で配信元の設定を書き換える
+    reason: 要望は画面のサーバーの書き込みの API に限る
+    plan: none
+docs:
+  - page: docs/guide/HTTPのAPI.md
+    new: false
+    change: 書き込みの API の配信元の設定の要求・許可・エラーを追加する（扱う場合）
+    status: todo
+  - page: docs/guide/設定.md
+    new: false
+    change: 端末の設定と配信元の設定の、配信元の設定の直コミットの許可のキーを追加する（扱う場合）
+    status: todo
+  - page: docs/guide/コアコンセプト-配信元と権限.md
+    new: false
+    change: 書き込みの API で配信元の設定を直コミットできる条件を追加する（扱う場合）
+    status: todo
