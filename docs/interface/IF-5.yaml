@@ -130,6 +130,42 @@ flows:
       - '`words[]` に `n1` の `title` 列の値と `実況` が `id: n1`・`kind: term` である'
       - '`n2` の `title` 列の値が `id: n2` である'
     test: test_normal_when_sqlite_rows
+  - name: 正常系（既定の検索から除く文書）
+    summary: '行の `search_exclude` に該当する文書の単語を既定の結果から除き、`include_excluded: true` のときだけ `excluded: true` を付けて返却する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 文書
+        description: 'sample の `assets/` に `a1.yaml`（id `a1`・`title: アセット1`・`summary: 使用中のアセット`・`state: active`）・`a2.yaml`（id `a2`・`title: アセット2`・`summary: 使用しなくなったアセット`・`state: inactive`）'
+      - name: 文書の行
+        description: '行 `assets`（`paths: [assets/*.yaml]`・`metadata: {status: state, name: title, description: summary}`・`alias_type: term`・`search_exclude: {field: status, op: eq, values: [inactive]}`）'
+      - name: 入力
+        description: '1 回目は `source: sample`、2 回目は `include_excluded: true` を加える'
+    flow: |-
+      <!-- map: {"title": "正常系（既定の検索から除く文書）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as list_match_words
+
+        C->>T: source: sample
+        T-->>C: アセット1・excluded_count 1
+        C->>T: source: sample, include_excluded: true
+        T-->>C: アセット1・アセット2（excluded）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 1 回目の `words` に `アセット1` が `a1` とともにあり、`アセット2` が無く、`excluded_count` が 1
+      - '2 回目の `words` に `アセット1` と `アセット2` があり、`アセット2` の要素だけが `excluded: true` を持ち、`excluded_count` を持たない'
+      - '`format: markdown` の 2 回目は表に `除外` の列があり、`アセット2` の行に ✓ を出す'
+    test: test_normal_when_search_excluded
+    refs:
+      - to: SC-6
+        item: scenarios[正常シナリオ（既定の検索から除く条件に該当する文書を除く）]
+        type: references
+        when: このインターフェースのフローを変えるときに、シナリオの対応する流れと期待値を確認する。
 lead: '`alias_type` を持つ行の文書から照合する語と指す文書の ID を返却する `list_match_words` の入出力を定め、`list_match_words` を修正するときに参照する。'
 tags:
   - name: topic:エイリアス
@@ -170,6 +206,13 @@ request:
     location: argument
     description: セッションの作業場所
     notes: PreToolUse のフックがセッションの作業場所で上書きし、エージェントが指定した値は使わない。ツールの入力のスキーマの `description` にも同じことと、ワークツリーは `worktree` で指すことを載せる
+  - name: include_excluded
+    type: bool
+    required: false
+    default: '`false`'
+    location: argument
+    description: '`true` のとき、配信元の設定の `documents[].search_exclude` に該当する文書の単語も返却する'
+    status: planned
 request_example: |-
   ```json
   {"source": "sample"}
@@ -184,6 +227,14 @@ response:
   - name: words[].kind
     type: Literal['name', 'alias']
     description: 語が `name` から来たか `aliases` から来たか
+  - name: excluded_count
+    type: int
+    description: '`alias_type` を持つ行の文書のうち、`documents[].search_exclude` に該当して除いた文書の件数'
+    notes: '`include_excluded: false` で 1 件以上除いたときだけ持つ。`format: markdown` は件数と `include_excluded: true` で取得できることを表の後に出す'
+  - name: words[].excluded
+    type: bool
+    description: 単語が指す文書が `documents[].search_exclude` に該当するか
+    notes: '`include_excluded: true` で、該当する文書の単語だけ `true` を持つ。`format: markdown` は表に `除外` の列を加え、該当する行に ✓ を出す'
 response_example: |-
   ```markdown
   | 単語 | 文書 | 種類 |
@@ -209,5 +260,7 @@ constraints:
     constraint: 制限なし（配信元の用語を全て返す）
   - item: タイムアウト
     constraint: 制限なし
+  - item: 既定の検索から除く文書
+    constraint: '`include_excluded: false` のとき、文書の行の `search_exclude` に該当する文書の単語を `words` から除き、除いた文書の件数を `excluded_count` にする。条件の照合は `search_docs` の既定の検索から除く判定と同じ関数で行う。`search_docs` の `term` は、この除外の前の単語で照合し、除外は `search_docs` の既定の検索から除く判定に任せる'
 test_file: tests/integration/server/test_list_match_words.py
 visibility: internal
