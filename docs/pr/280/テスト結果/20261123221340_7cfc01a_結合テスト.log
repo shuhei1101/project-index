@@ -1,0 +1,17 @@
+$ run_url=$(gh workflow run test.yml --ref feat/read-api/metadata-only-kinds -f layer=integration -f paths="tests/integration/server/test_get_source_config.py" ...)（テスト実行方法 TL-2 の run_runner）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 5 items
+
+tests/integration/server/test_get_source_config.py::test_normal PASSED   [ 20%]
+tests/integration/server/test_get_source_config.py::test_normal_when_schemas_requested PASSED [ 40%]
+tests/integration/server/test_get_source_config.py::test_normal_when_metadata_only_kinds PASSED [ 60%]
+tests/integration/server/test_get_source_config.py::test_error_when_source_not_found PASSED [ 80%]
+tests/integration/server/test_get_source_config.py::test_error_when_revision_export_times_out PASSED [100%]
+
+============================== 5 passed in 1.67s ===============================
+exit=0 run=45181705971
