@@ -50,6 +50,5 @@
 | [テストの全件実行](./IF-116-1.yaml) | テストの全件実行（`.github/workflows/test.yml`（workflow_dispatch）） |
 | [書き込みの後の通知の判定](./IF-35.yaml) | 書き込みの後の通知の判定（POST /_admin/post-write） |
 | [ツール実行後のフック](./IF-36.yaml) | ツール実行後のフック（Claude Code の PostToolUse（matcher Write\|Edit\|NotebookEdit\|mcp__.*）） |
-| [SKILL.md の生成](./IF-37.yaml) | SKILL.md の生成（project-index skill-md（CLI）） |
 
 <!-- /table -->
