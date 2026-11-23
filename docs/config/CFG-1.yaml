@@ -146,7 +146,7 @@ settings:
     file: project-index.yaml
     type: bool
     required: false
-    description: '`true` のとき、書き込みの API がこの配信元の配信元の設定（`project-index.yaml`）を直コミットで書き換えることを許可する。端末の設定の `sources[].direct_commit.write_api_config` も `true` の配信元だけが書き換えられる。コマンドを持つキー（`validators`・`converters`・`generators`）の書き換えは、この値によらず断る。`true` のときは `direct_commit.kinds` を省略できる'
+    description: '`true` のとき、書き込みの API がこの配信元の配信元の設定（`project-index.yaml`）を直コミットで書き換えることを許可する。端末の設定の `sources[].direct_commit.write_api_config` も `true` の配信元だけが書き換えられる。コマンドを持つキー（`validators`・`converters`・`generators`）と、許可と書き込む先を決めるキー（`direct_commit`・`worktrees`）の書き換えは、この値によらず断る。`true` のときは `direct_commit.kinds` を省略できる'
     default: false（配信元の設定を書き込みの API で書き換えられない）
     reload: reload
     status: planned
