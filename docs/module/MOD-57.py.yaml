@@ -44,7 +44,9 @@ functions:
     process: |-
       1. 読む場所を解く（読む場所の解決。`source`・`worktree`・`cwd`）
       2. 文書を集める（文書のストア.文書を集める）
-      3. エイリアスの集め（文書のストア）をし、`entries` で照合する語の一覧を作って返す（`alias_type` を持つ行が無い配信元は空）
+      3. 除外の判定（`exclusion_flags(target, documents, store=store, today=今日)`）を求める。`include_excluded` が `False` の場合、該当する文書を除き、除いた文書のうち `alias_type` を持つ行の文書の数を数える
+      4. エイリアスの集め（文書のストア）をし、`entries` で照合する単語の一覧を作る（`alias_type` を持つ行が無い配信元は空）。`include_excluded` が `True` の場合、該当する文書の ID を指す単語の `excluded` を `True` にする
+      5. 数えた件数が 1 件以上なら `excluded_count` に入れて返却する
     exceptions:
       - name: SourceNotReadableError
         condition: 読む場所の解決が送る
@@ -67,13 +69,20 @@ functions:
         mock: なし（一時フォルダの配信元）
         expected: '`words` が空'
         exception: '-'
+      - name: test_list_match_words_when_search_excluded
+        case: 正常
+        summary: 除く文書の単語を既定で除き、指定で excluded を付ける
+        condition: '行 `assets`（`metadata: {status: state, name: title, description: summary}`・`alias_type: term`・`search_exclude: {field: status, op: eq, values: [inactive]}`）の `a1`（active）・`a2`（inactive）。`include_excluded` が `False` と `True`'
+        mock: なし（一時フォルダの配信元）
+        expected: '`False` は `words` が `アセット1` だけで `excluded_count` が 1。`True` は `アセット2` も並び、その単語だけ `excluded` が `True`、`excluded_count` が `None`'
+        exception: '-'
   - name: render_match_words_markdown
     title: 用語の一覧の文
     kind: 関数
     container: project_index/features/search/terms.py
     usecase: 用語の一覧
     role: 表示
-    summary: 用語の一覧の結果を `| 単語 | 文書 | 種類 |` の表にする
+    summary: 用語の一覧の結果を `| 単語 | 文書 | 種類 |` の表にする（除外の単語があれば `除外` の列を加える）
     scope: public
     thread_safe: true
     args:
@@ -88,7 +97,8 @@ functions:
       description: Markdown。語が無ければ `用語はありません`
     process: |-
       1. 語が無ければ `用語はありません` を返す
-      2. `| 単語 | 文書 | 種類 |` の表に語ごとの行を並べて返す
+      2. `| 単語 | 文書 | 種類 |` の表に単語ごとの行を並べる。`excluded` が `True` の単語が 1 つ以上あれば、末尾に `除外` の列を加えて該当する行に ✓ を出す
+      3. `excluded_count` があれば、表の後に文書の検索と同じ通知（`excluded_note`）を続けて返却する（単語が無いときも続ける）
     unit_tests:
       - name: test_render_match_words_markdown
         case: 正常
@@ -96,4 +106,10 @@ functions:
         condition: 語 3 件と、空の結果
         mock: なし
         expected: インターフェース定義の返り値例と同じ表と、`用語はありません`
+      - name: test_render_match_words_markdown_when_excluded
+        case: 正常
+        summary: 除外の列と除いた件数の通知
+        condition: '`excluded` が `True` の単語を含む結果と、`excluded_count` が 1 の結果'
+        mock: なし
+        expected: '前者は表に `除外` の列があり該当する行に ✓、後者は表の後に除いた件数と `include_excluded: true` で取得できること'
 visibility: internal

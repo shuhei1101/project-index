@@ -86,13 +86,27 @@ functions:
         required: true
         passing: positional
         description: 1〜`SEARCH_LIMIT_MAX`
+      - name: excluded
+        title: 除外の判定
+        type: Sequence[bool] | None
+        required: false
+        default: None
+        passing: keyword
+        description: '`documents` と同じ順の、`search_exclude` に該当するかの並び（`exclusion_flags` の結果）。`None` は全て該当しない'
+      - name: include_excluded
+        title: 除いた文書も返却するか
+        type: bool
+        required: false
+        default: 'False'
+        passing: keyword
+        description: '`True` のとき、該当する文書も `excluded: True` を付けて返却する'
     returns:
       type: SearchResult
       description: 文書のページのパスの昇順
     process: |-
       1. `q` を NFKC と `casefold` をして空白で分ける
-      2. 語の照合に当たる文書を文書のページのパスの昇順に並べ、総件数を数える
-      3. 先頭から `limit` 件を、文書のページのパス・文書の ID・文書のファイルのパス（`path`）・名前と、本文の一致した箇所の抜き出し（前後 1 行、`SNIPPETS_PER_DOC` 件）つきで返す
+      2. 語の照合に当たる文書を文書のページのパスの昇順に並べる。`excluded` で該当する文書は、`include_excluded` が `False` なら除いて件数を数え、`True` なら残す。残した文書の総件数を数える
+      3. 先頭から `limit` 件を、文書のページのパス・文書の ID・文書のファイルのパス（`path`）・名前と、本文の一致した箇所の抜き出し（前後 1 行、`SNIPPETS_PER_DOC` 件）つきで返す。残した該当する文書は `excluded` を `True`、除いた件数が 1 件以上なら `excluded_count` に入れる
     unit_tests:
       - name: test_search_words
         case: 正常
@@ -106,4 +120,10 @@ functions:
         condition: '`q="beta"`、`path` が `terms.yaml` で `body_path` の無い行の文書 `term-1`（alpha）・`term-2`（beta）'
         mock: なし
         expected: '`items[0]` の `id` が `term-2`、`file_path` が `terms.yaml`、`path` が `terms/term-2`'
+      - name: test_search_words_when_excluded
+        case: 正常
+        summary: 除く文書を既定で除き、指定で excluded を付けて返却する
+        condition: '`q="夕焼け"`、どちらも夕焼けを含む文書 `a1`・`a2`、`excluded=[False, True]`。`include_excluded` が `False` と `True`'
+        mock: なし
+        expected: '`False` は `total_count` が 1・`items` が `a1`・`excluded_count` が 1。`True` は `total_count` が 2、`a2` だけ `excluded` が `True`、`excluded_count` が `None`'
 visibility: internal

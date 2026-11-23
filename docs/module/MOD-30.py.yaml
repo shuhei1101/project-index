@@ -296,6 +296,12 @@ data_models:
         type: Literal['name', 'alias']
         access: 公開
         description: '`name` から来たか `aliases` から来たか'
+      - name: excluded
+        title: 除く文書か
+        type: bool
+        access: 公開
+        default: 'False'
+        description: 単語が指す文書が `search_exclude` に該当するか。`list_match_words` が `include_excluded` で返却するときだけ `True` になる
   - name: AliasCollection
     title: エイリアスの集め
     container: project_index/features/documents/types.py
