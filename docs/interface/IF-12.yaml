@@ -584,8 +584,8 @@ flows:
       - name: Mock
         description: なし
       - name: config
-        description: '1 回目は `direct_commit.kinds` が文字列の YAML の文字列、2 回目は `direct_commit: {branch: develop, kinds: [note, meme]}` の YAML の文字列'
-        notes: '`documents[]` に `meme` は無い。sample に `develop` を指すワークツリーは無い'
+        description: '1 回目は `direct_commit.kinds` が文字列の YAML の文字列、2 回目は `direct_commit: {branch: develop, kinds: [note, meme]}` の YAML の文字列、3 回目は `direct_commit: {branch: develop, kinds: [note, {id: files, body: "false"}, {id: memo, body: false}]}` の YAML の文字列'
+        notes: '`documents[]` に `meme`・`memo` は無く、`files` はある。sample に `develop` を指すワークツリーは無い'
     flow: |-
       <!-- map: {"title": "正常系（直コミットの設定を検査する）"} -->
 
@@ -607,6 +607,7 @@ flows:
       - 1 回目の `violations` に `direct_commit.kinds` の型の違反がある
       - 2 回目の `violations` に `direct_commit.kinds[1]` があり、`rule` に `meme` が `documents[]` に無く直コミットを断ることがある
       - 2 回目の `warnings` に `direct_commit.branch` があり、`rule` に `develop` を指すワークツリーが無く直コミットを断ることがある
+      - 3 回目の `violations` に、`direct_commit.kinds[1].body` の型の違反（真偽値でない）と、`direct_commit.kinds[2].id` の `memo` が `documents[]` に無く直コミットを断ることがある
     test: test_normal_when_direct_commit_checked
   - name: 正常系（既定の検索から除く条件に違反がある）
     summary: '`search_docs` の `filter` に無い比べ方と、比べられない項目を持つ `search_exclude` を違反として返却する'

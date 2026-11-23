@@ -701,7 +701,7 @@ response:
   - name: direct_commit.kinds[]
     type: str
     description: 今の作業場所から直コミットできる種類の ID
-    notes: '`direct_commit.branch` と同じ。`format: markdown` は種類の表の後に「直コミット」の見出しと、ブランチ・種類の箇条書きで出す'
+    notes: '`direct_commit.branch` と同じ。`format: markdown` は種類の表の後に「直コミット」の見出しと、ブランチ・種類の箇条書きで出す。本文の直コミットを断る種類は、種類の ID の後ろに「（メタデータだけ）」を付ける'
   - name: kinds[].sqlite
     type: bool
     description: SQLite の表の行（読み取り専用）の種類か
@@ -716,6 +716,10 @@ response:
   - name: columns[].description
     type: str
     description: 列の説明文（`sqlite.columns[].description`）
+  - name: direct_commit.metadata_only_kinds[]
+    type: str
+    description: '`direct_commit.kinds[]` のうち、配信元の設定で `body: false` を持つ（本文の直コミットを断り、メタデータだけを許可する）種類の ID'
+    notes: '`direct_commit.branch` と同じ。該当する種類が無いときはキーを持たない'
 response_example: |-
   ```markdown
   作業場所: /path/to/sample（sample のクローン本体）
