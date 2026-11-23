@@ -9,6 +9,7 @@ import functools
 import logging
 import posixpath
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -120,7 +121,7 @@ from project_index.shared.paths import normalize_path
 from project_index.shared.yaml_io import dump_roundtrip, load_roundtrip
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Mapping, MutableMapping, Sequence
+    from collections.abc import Generator, MutableMapping, Sequence
 
     from project_index.features.seen.store import SeenStore
     from project_index.features.sources.registry import SourceRegistry
