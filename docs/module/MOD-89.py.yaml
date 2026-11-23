@@ -328,8 +328,8 @@ functions:
       - name: test_run_serve_when_log_after_close
         case: 正常
         summary: 閉じた後に裏のスレッドがログを出してもログのファイルを開き直さない
-        condition: 配信できる配信元 1 つの端末の設定。`uvicorn.Server.run` の中で、ファイルのハンドラーに裏のスレッドの記録だけを合図まで止めるフィルターを付け、そのスレッドでログを 1 行出してから再起動を要求する
-        mock: '`uvicorn.Server.run`（上の準備をして `started` を `True` にし、再起動を要求して戻る）・`os.execv`（ログのハンドラーを閉じた後に呼ばれるので、そこで合図を出す偽物）'
+        condition: 配信できる配信元 1 つの端末の設定。`uvicorn.Server.run` の中で、ファイルのハンドラーに裏のスレッドの記録だけを合図まで止めるフィルターを付け、そのスレッドでログを 1 行出し、その記録がフィルターに入ったことを合図で待ってから再起動を要求する
+        mock: '`uvicorn.Server.run`（上の準備をし、裏のスレッドの記録がフィルターに入るまで待ってから `started` を `True` にし、再起動を要求して戻る）・`os.execv`（ログのハンドラーを閉じた後に呼ばれるので、そこで合図を出す偽物）'
         expected: 裏のスレッドを join した後、ファイルのハンドラーの `stream` が `None` で、閉じた後のログの行が `project-index.log` に無い
   - name: check_port
     title: ポートの確かめ
