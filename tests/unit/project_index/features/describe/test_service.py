@@ -19,7 +19,12 @@ from project_index.features.describe.types import (
 from project_index.features.documents.store import DocumentStore
 from project_index.features.history.snapshot import SnapshotStore
 from project_index.features.settings.types import SourceEntry, TerminalConfig
-from project_index.features.sources.types import DocumentTable, ServedSource, SourceConfig
+from project_index.features.sources.types import (
+    DirectCommitConfig,
+    DocumentTable,
+    ServedSource,
+    SourceConfig,
+)
 from project_index.main import Handlers, build_handlers
 from project_index.shared.errors import UnknownKindError, ValidationFailedError
 
@@ -279,6 +284,46 @@ def test_describe_when_source(
     assert isinstance(result, SourceGuideResult)
     assert result.instructions == "着手前に規約を引く"
     assert [(kind.id, kind.description) for kind in result.kinds] == [("rules", "規約の文書")]
+
+
+def test_describe_when_metadata_only_kinds(
+    tmp_path: Path,
+    store: DocumentStore,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_registry: Callable[..., SourceRegistry],
+) -> None:
+    """本文の直コミットを断る種類を返す（正常系）。"""
+    # 準備
+    root = tmp_path / "sample"
+    local = tmp_path / "local"
+    local.mkdir()
+    write_files(root, {"schemas/rule.schema.yaml": SCHEMA_TEXT})
+    tables = [
+        DocumentTable(id=kind, paths=[f"{kind}/*.yaml"], schema_path="schemas/rule.schema.yaml")
+        for kind in ("note", "files")
+    ]
+    config = make_source_config(
+        documents=tables,
+        direct_commit=DirectCommitConfig(
+            branch="develop", kinds=["note", "files"], metadata_only_kinds=["files"]
+        ),
+    )
+    source = make_served_source(
+        id="sample",
+        root=root,
+        config=config,
+        schemas={"note": {"type": "object"}, "files": {"type": "object"}},
+        direct_commit_scope=[str(local)],
+    )
+    # 実行
+    result = _describe(make_registry(source), store, local, source="sample")
+    # 検証
+    assert isinstance(result, SourceGuideResult)
+    assert result.direct_commit is not None
+    assert result.direct_commit.kinds == ["note", "files"]
+    assert result.direct_commit.metadata_only_kinds == ["files"]
 
 
 def test_describe_when_kind(

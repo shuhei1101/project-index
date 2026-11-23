@@ -1936,15 +1936,18 @@ def make_commit_env(
         generators: list[ScriptEntry] | None = None,
         write_api_kinds: list[str] | None = None,
         on_conflict: OnConflictScript | None = None,
+        files_kind: bool = False,
     ) -> CommitEnv:
-        env = make_env(
-            {
-                "docs/rule/doc-1.yaml": DOC_1,
-                "docs/note/note-1.yaml": "id: note-1\nname: メモ\n",
-                "docs/term/term-1.yaml": "id: term-1\nname: 用語\n",
-                "schemas/rule.schema.yaml": SCHEMA,
-            }
-        )
+        # files_kind は、本文の直コミットを断る種類 files の行と本文のファイルを加える
+        files = {
+            "docs/rule/doc-1.yaml": DOC_1,
+            "docs/note/note-1.yaml": "id: note-1\nname: メモ\n",
+            "docs/term/term-1.yaml": "id: term-1\nname: 用語\n",
+            "schemas/rule.schema.yaml": SCHEMA,
+        }
+        if files_kind:
+            files |= {"docs/files/index.yaml": FILES_INDEX, "docs/files/f1.md": F1_BODY}
+        env = make_env(files)
         bare = tmp_path / "remote.git"
         run_git(tmp_path, "init", "--bare", "-b", "data", str(bare))
         run_git(env.clone, "remote", "add", "origin", str(bare))
@@ -1969,10 +1972,14 @@ def make_commit_env(
                 id="terms", paths=["docs/term/*.yaml"], schema_path="schemas/rule.schema.yaml"
             ),
         ]
+        direct_commit = DirectCommitConfig(branch="data", kinds=["rules", "terms"])
+        if files_kind:
+            tables.append(_files_table())
+            direct_commit = DirectCommitConfig(
+                branch="data", kinds=["rules", "terms", "files"], metadata_only_kinds=["files"]
+            )
         config = make_source_config(
-            documents=tables,
-            generators=generators or [],
-            direct_commit=DirectCommitConfig(branch="data", kinds=["rules", "terms"]),
+            documents=tables, generators=generators or [], direct_commit=direct_commit
         )
         rule_schema = {"type": "object", "required": ["id", "name"]}
         source = make_served_source(
@@ -1983,7 +1990,12 @@ def make_commit_env(
             repo_root=env.clone,
             scope_write=[str(env.clone)],
             worktree_globs=[str(env.clone / ".claude" / "worktrees" / "*")],
-            schemas={"rules": rule_schema, "notes": rule_schema, "terms": rule_schema},
+            schemas={
+                "rules": rule_schema,
+                "notes": rule_schema,
+                "terms": rule_schema,
+                "files": rule_schema,
+            },
             storage="git",
             direct_commit_scope=[str(local)],
             direct_commit_kinds={"terms": ["/other"]},
@@ -2023,6 +2035,126 @@ def test_write_docs_when_direct_commit_checks(
     assert GITHUB_TOKEN not in repr(secret_info.value)
     assert run_git(commit_env.develop, "status", "--porcelain").strip() == ""
     assert run_git(commit_env.develop, "rev-parse", "HEAD").strip() == remote_head
+    assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
+
+
+FILES_INDEX = "items:\n  - id: f1\n    name: 案内\n    path: f1.md\n"
+F1_BODY = "[文書 1](id:doc-1)\n"
+F1_VERSION = value_hash([{"id": "f1", "name": "案内", "path": "f1.md"}, F1_BODY])
+
+
+def _files_table() -> DocumentTable:
+    """本文の直コミットを断る種類 files の `records`・`body_file` の行を返す。"""
+    return DocumentTable(
+        id="files",
+        paths=["docs/files/index.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        records="items",
+        body_file="path",
+    )
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        pytest.param(
+            Operation(op="update", id="f1", expected_version=F1_VERSION, set={"@body": "x\n"}),
+            id="set_body",
+        ),
+        pytest.param(
+            Operation(
+                op="update",
+                id="f1",
+                expected_version=F1_VERSION,
+                text_edits=[TextEdit(field="@body", old="文書 1", new="文書 X")],
+            ),
+            id="text_edits_body",
+        ),
+        pytest.param(
+            Operation(
+                op="rename", id="f1", expected_version=F1_VERSION, new_path="docs/files/f2.md"
+            ),
+            id="rename_new_path",
+        ),
+        pytest.param(
+            Operation(
+                op="rename", id="doc-1", expected_version=content_hash(DOC_1), new_id="doc-8"
+            ),
+            id="rename_referrer",
+        ),
+        pytest.param(
+            Operation(
+                op="replace_text",
+                filter=Condition(field="id", op="eq", values=["f1"]),
+                old="文書 1",
+                new="文書 X",
+            ),
+            id="replace_text",
+        ),
+    ],
+)
+def test_write_docs_when_direct_commit_body_not_allowed(
+    make_commit_env: Callable[..., CommitEnv],
+    run_git: Callable[..., str],
+    operation: Operation,
+) -> None:
+    """本文の直コミットを断る種類の本文が変わる操作を断る（異常系）。"""
+    # 準備
+    commit_env = make_commit_env(files_kind=True)
+    remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
+    # 実行・検証
+    with pytest.raises(ValidationFailedError) as info:
+        commit_env.env.write(
+            operations=[operation], source="sample", commit=CommitSpec(message="docs: 更新する")
+        )
+    assert [(item.index, item.doc) for item in info.value.violations] == [(0, "f1")]
+    assert (commit_env.develop / "docs/files/f1.md").read_text(encoding="utf-8") == F1_BODY
+    assert (commit_env.develop / "docs/files/index.yaml").read_text(encoding="utf-8") == FILES_INDEX
+    assert run_git(commit_env.develop, "status", "--porcelain").strip() == ""
+    assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
+
+
+def test_write_docs_when_direct_commit_metadata_only(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """本文の直コミットを断る種類のメタデータだけを直コミットする（正常系）。"""
+    # 準備
+    commit_env = make_commit_env(files_kind=True)
+    operation = Operation(
+        op="update",
+        id="f1",
+        expected_version=F1_VERSION,
+        set={"name": "変えた案内", "tags": ["topic:a"]},
+    )
+    # 実行
+    result = commit_env.env.write(
+        operations=[operation], source="sample", commit=CommitSpec(message="docs: 更新する")
+    )
+    # 検証
+    assert result.applied is True
+    assert [item.status for item in result.results] == ["updated"]
+    changed = run_git(commit_env.bare, "diff", "--name-only", "data~1", "data").split()
+    assert changed == ["docs/files/index.yaml"]
+    assert (commit_env.develop / "docs/files/f1.md").read_text(encoding="utf-8") == F1_BODY
+
+
+def test_delete_docs_when_direct_commit_body_not_allowed(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """本文の直コミットを断る種類の本文のファイルを削除する操作を断る（異常系）。"""
+    # 準備
+    commit_env = make_commit_env(files_kind=True)
+    remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
+    # 実行・検証
+    with pytest.raises(ValidationFailedError) as info:
+        commit_env.env.delete(
+            targets=[DeleteTarget(id="f1", expected_version=F1_VERSION)],
+            source="sample",
+            commit=CommitSpec(message="docs: 削除する"),
+        )
+    assert [(item.index, item.doc) for item in info.value.violations] == [(0, "f1")]
+    assert (commit_env.develop / "docs/files/f1.md").read_text(encoding="utf-8") == F1_BODY
+    assert (commit_env.develop / "docs/files/index.yaml").read_text(encoding="utf-8") == FILES_INDEX
     assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
 
 
@@ -2295,6 +2427,31 @@ def test_commit_documents_when_disallowed_kind_rewritten(
         _commit_documents(commit_env, deletes=deletes, on_referenced="unlink")
     assert info.value.violations[0].path.startswith("deletes[0]")
     assert (commit_env.develop / "docs/rule/doc-1.yaml").exists()
+    assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
+
+
+def test_commit_documents_when_body_not_allowed(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """本文の直コミットを断る種類の本文の変更を含む要求を断る（異常系）。"""
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules", "files"], files_kind=True)
+    remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
+    writes = [
+        Operation(
+            op="update",
+            id="doc-1",
+            expected_version=content_hash(DOC_1),
+            set={"name": "変えた文書 1"},
+        ),
+        Operation(op="update", id="f1", expected_version=F1_VERSION, set={"@body": "x\n"}),
+    ]
+    # 実行・検証
+    with pytest.raises(ValidationFailedError) as info:
+        _commit_documents(commit_env, writes=writes)
+    assert [item.path.startswith("writes[1]") for item in info.value.violations] == [True]
+    assert (commit_env.develop / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
+    assert (commit_env.develop / "docs/files/f1.md").read_text(encoding="utf-8") == F1_BODY
     assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
 
 

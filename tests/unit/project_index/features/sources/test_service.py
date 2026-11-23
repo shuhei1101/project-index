@@ -1454,6 +1454,43 @@ def test_assemble_values(
     assert served.builtin is True
 
 
+def test_assemble_values_when_metadata_only_kinds(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    sample_files: dict[str, str],
+) -> None:
+    """本文の直コミットを断る種類を読む（正常系）。"""
+    # 準備
+    write_files(tmp_path, sample_files)
+    rows = [
+        {"id": kind, "paths": [f"docs/{kind}/*.yaml"], "schema": "schemas/rule.schema.yaml"}
+        for kind in ("note", "files", "memo")
+    ]
+    value = _config_value(
+        documents=rows,
+        direct_commit={
+            "branch": "develop",
+            "kinds": ["note", {"id": "files", "body": False}, {"id": "memo"}],
+        },
+    )
+    # 実行
+    _served, config, violations = assemble_values(
+        value,
+        root=tmp_path,
+        source_id=None,
+        scope_read=[],
+        scope_write=[],
+        outside_read=True,
+        storage="disk",
+    )
+    # 検証
+    assert violations == []
+    assert config is not None
+    assert config.direct_commit is not None
+    assert config.direct_commit.kinds == ["note", "files", "memo"]
+    assert config.direct_commit.metadata_only_kinds == ["files"]
+
+
 def test_assemble_values_when_invalid(
     tmp_path: Path,
     write_files: Callable[[Path, dict[str, str]], None],

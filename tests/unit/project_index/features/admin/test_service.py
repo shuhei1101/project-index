@@ -382,6 +382,60 @@ def test_check_project_when_direct_commit(
     assert "direct_commit.branch" in [item.path for item in result.warnings]
 
 
+DIRECT_COMMIT_OBJECT_CONFIG = (
+    "name: direct\n"
+    "documents:\n"
+    "  - id: note\n"
+    "    paths: [docs/note/*.yaml]\n"
+    "    schema: schemas/rule.schema.yaml\n"
+    "  - id: files\n"
+    "    paths: [docs/files/*.yaml]\n"
+    "    schema: schemas/rule.schema.yaml\n"
+    "direct_commit:\n"
+    "  branch: develop\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("kinds", "expected"),
+    [
+        pytest.param(
+            '  kinds: [note, {id: files, body: "false"}]\n',
+            ("direct_commit.kinds[1].body", "boolean"),
+            id="body_not_boolean",
+        ),
+        pytest.param(
+            "  kinds: [note, {id: memo, body: false}]\n",
+            ("direct_commit.kinds[1]", "memo"),
+            id="id_not_in_documents",
+        ),
+    ],
+)
+def test_check_project_when_direct_commit_object_kinds(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_terminal_config: Callable[..., TerminalConfig],
+    kinds: str,
+    expected: tuple[str, str],
+) -> None:
+    """直コミットの設定のオブジェクトの要素の違反（正常系）。"""
+    # 準備
+    write_files(
+        tmp_path,
+        {
+            "project-index.yaml": DIRECT_COMMIT_OBJECT_CONFIG + kinds,
+            "schemas/rule.schema.yaml": RULE_SCHEMA,
+            "docs/note/n1.yaml": "id: n1\n",
+        },
+    )
+    handlers = _handlers(make_terminal_config)
+    # 実行
+    result = check_project(CheckProjectRequest(path=str(tmp_path)), handlers=handlers)
+    # 検証
+    assert [item.path for item in result.violations] == [expected[0]]
+    assert expected[1] in result.violations[0].rule
+
+
 def test_check_project_when_missing_paths(
     tmp_path: Path,
     write_files: Callable[[Path, dict[str, str]], None],
