@@ -195,6 +195,36 @@ flows:
       - 部品 `logs` のセクションと「既定の例」「ログが無い」のセクションに `[!CAUTION]` があり、`logs`・行・構文の誤りの理由が載る
       - 変数の表と `logs` 以外の部品のセクションは正常系と同じに出ている
     test: test_normal_when_part_syntax_invalid
+  - name: 正常系（部品を配列の要素ごとに繰り返す）
+    summary: '`x-each` の部品を配列の要素ごとに描画し、並び順のまま続く同じロールの部品を 1 通のメッセージにまとめる'
+    setup:
+      - name: Mock
+        description: 正常系と同じ
+      - name: 会話履歴を持つ LLM のプロンプト
+        description: '`kind: llm`・`lang: en`。`vars` に配列 `history`（要素は `request`・`reply`、`example` に 2 組）。部品は `system`（system）・`past-request`（user、`x-each: {var: history, as: item}`）・`past-reply`（assistant、`x-each: {var: history, as: item}`、`when: item.reply`）・`now`（user）の順。`examples[]` に `history: []` の組 `no-history`'
+        notes: '`history` の 2 組目の `reply` は空文字'
+    flow: |-
+      <!-- map: {"title": "正常系（部品を配列の要素ごとに繰り返す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant M as project-index prompt-doc
+
+        C->>M: 標準入力に会話履歴を持つプロンプト
+        M->>M: x-each の部品を history の要素ごとに描画する
+        M->>M: 続く同じロールの部品を 1 通にまとめる
+        M-->>C: Markdown（終了コード 0）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 終了コードが 0
+      - 「既定の例」のメッセージが `system`・`user`（1 組目の `request`）・`assistant`（1 組目の `reply`）・`user`（2 組目の `request` と `now`）の 4 通で、使用しなかった部品がなし
+      - '`no-history` のメッセージが `system`・`user`（`now`）の 2 通で、使用しなかった部品が `past-request`・`past-reply`'
+      - '`### past-request` のセクションに `x-each` のバッジ（`history`・`item`）があり、`{{ item.request }}` に `history[].request` の説明の `data-hint` が付く'
+      - '`[!CAUTION]` が無い'
+    test: test_normal_when_each
 lead: プロンプトの YAML を変数の表・テンプレート・例の描画を持つ Markdown にする `project-index prompt-doc` の入出力を定め、プロンプトの文書の変換を修正するときに参照する。
 tags:
   - name: topic:プロンプト
@@ -248,7 +278,7 @@ constraints:
     constraint: '各 `###` のセクションに `<!-- tabs: {"group": "lang"} -->` を置き、タブ名は言語のタグだけにする。注入する言語（`lang`）を先頭に並べる。全ての部品の言語が 1 つだけの文書はタブを置かず中身だけを出す'
     notes: 注入する言語はバッジと字数の行（`注入する本文（{lang}）`）で示す
   - item: 描画
-    constraint: 'Jinja2 の `StrictUndefined`・`trim_blocks`・`lstrip_blocks` の Environment で、`when` が真の部品を並び順に描画してつなぐ。`kind: llm` は `role` ごとのメッセージに分ける'
+    constraint: 'Jinja2 の `StrictUndefined`・`trim_blocks`・`lstrip_blocks` の Environment で、`when` が真の部品を並び順に描画し、描画した本文が空でない部品をつなぐ。`kind: llm` は並び順のまま、連続する同じ `role` の部品を 1 通のメッセージにまとめる（`role` の無い部品は `user` として扱う）'
     notes: プロンプトを実際に描画する側と同じ設定にし、字数を注入文と揃える
   - item: 例の組の値
     constraint: 「既定の例」は各変数の `example`、`examples[]` の組は `values` に無い変数を `example` で埋める。値は `vars` の `type`・`items`・`properties` で型を確かめる
@@ -269,5 +299,10 @@ constraints:
   - item: 構文の誤った部品
     constraint: 部品の本文か `when` の式が Jinja2 の構文として誤っているときは、その部品のセクションと全ての例の組のセクションに `[!CAUTION]` で部品の `id`・行・理由を出し、変数の表と他の部品のセクションは出して終了コード 0 で終える
     notes: 例の組はその部品を含めた注入文を作れないため、描画結果を出さず注意書きだけにする
+  - item: 部品の繰り返し
+    constraint: '`x-each: {var, as}` を持つ部品は、連続する同じ `var` の部品をまとめ、`var` の配列の要素ごとにまとまりを並び順に描画する。要素は `as` の名前で `when` と本文に指定し、`when` は要素ごとに評価する。値が無いか空の配列は 0 回にし、配列でない値の組は描画できない組にする'
+    notes: aituber の `build_messages`（shuhei1101/aituber の `src/aituber/integrations/llm/prompts/builder.py`）と同じ規則にし、注入するメッセージと統一する
+  - item: 使用しなかった部品
+    constraint: どの要素でも描画しなかった部品を、使用しなかった部品として出す。テンプレートの `x-each` の部品のセクションには `x-each` のバッジを出し、本文の `as` の変数に `{var}[]` の定義の `data-hint` を付ける
 test_file: tests/integration/server/test_prompt_doc.py
 visibility: internal
