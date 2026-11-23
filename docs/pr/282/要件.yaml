@@ -122,7 +122,7 @@ scope_out:
     plan: none
   - item: 同じ配信元の書き込みのロック（`SourceLocks`）を待つ間も実行スロットを持ち続けること
     reason: 改名の参照元の書き換えが短くなれば待ちも短くなる。ロックの待ち方を変えるかはこの PR の設計の結果で決まるため、レビューで確定する
-    plan: to_file
+    plan: '#285'
   - item: 結合テスト `test_patch_settings_source.py::test_normal_when_direct_commit_changed` の期待値が、配信元の設定の応答の `writeApiConfig` に追随していない
     reason: '#275 で応答に `writeApiConfig` が加わった後、このテストの期待値だけが変わっておらず develop でも fail する。今回の要望（実行スロットの飽和）に含まれない'
     plan: '#284'
