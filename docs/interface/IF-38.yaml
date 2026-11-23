@@ -5,9 +5,9 @@ entry:
   kind: endpoint
   value: POST `/sources/{source}/commits`
 identifier: commit_documents
-permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ。書き換わる全ての文書の種類が、端末の設定の `sources[].direct_commit.write_api_kinds` と配信元の設定の `direct_commit.kinds[]` の両方にあること'
+permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ。書き換わる全ての文書の種類が、端末の設定の `sources[].direct_commit.write_api_kinds` と配信元の設定の `direct_commit.kinds[]` の両方にあること。`sourceConfig` を送ったときは、端末の設定の `sources[].direct_commit.write_api_config` と配信元の設定の `direct_commit.config` が両方とも `true` であること'
 idempotent: false
-side_effects: 'コミットするブランチのワークツリーへ書き込み、1 つのコミットにしてリモートへプッシュする（`dryRun: true` のときは何も変えない）'
+side_effects: 'コミットするブランチのワークツリーへ書き込み、1 つのコミットにしてリモートへプッシュする。`sourceConfig` を送ったときは、プッシュした後にその配信元を再読み込みする（`dryRun: true` のときは何も変えない）'
 callers:
 - SC-17#scenarios[正常シナリオ]
 - SC-17#scenarios[正常シナリオ（試しに書く）]
@@ -27,6 +27,11 @@ callers:
 - SC-17#scenarios[異常シナリオ（編集を始めたときのコミットが起点に使えない）]
 - SC-17#scenarios[正常シナリオ（本文の直コミットを断る種類のメタデータだけを書き換える）]
 - SC-17#scenarios[異常シナリオ（本文の直コミットを断る種類の本文の変更を含む）]
+- SC-17#scenarios[正常シナリオ（配信元の設定を書き換える）]
+- SC-17#scenarios[異常シナリオ（配信元の設定の直コミットを許可していない）]
+- SC-17#scenarios[異常シナリオ（書き換えた後の配信元の設定が検証に合格しない）]
+- SC-17#scenarios[異常シナリオ（書き換えられないキーを書き換える）]
+- SC-17#scenarios[異常シナリオ（配信元の設定を複数のファイルに分けている）]
 exclusivity: '[文書の書き込み](id:IF-6) の制約「直コミットの排他」と同じ排他で、直コミットどうしを 1 つずつ進める'
 request:
 - name: source
@@ -69,6 +74,27 @@ request:
   type: str | None
   required: false
   description: 画面が編集を始めたときのコミットするブランチのコミットの SHA（7〜40 桁）。添えた要求は、衝突したときに修正をこのコミットからのブランチに残す。省くと衝突したときも今と同じに断る
+- name: sourceConfig
+  location: body
+  type: SourceConfigWrite | None
+  required: false
+  default: なし（配信元の設定を書き換えない）
+  description: 配信元の設定（`project-index.yaml`）の書き換え。`writes`・`deletes` と同じ 1 つのコミットに入れる
+  status: planned
+- name: sourceConfig.content
+  location: body
+  type: str
+  required: true
+  description: 書き換えた後の `project-index.yaml` の内容の全体。[配信元の設定の原本の取得](id:IF-39) が返した `content` を書き換えたもの
+  notes: '`sourceConfig` を送るときに必須'
+  status: planned
+- name: sourceConfig.expectedVersion
+  location: body
+  type: str
+  required: true
+  description: '[配信元の設定の原本の取得](id:IF-39) が返した `version`'
+  notes: '`sourceConfig` を送るときに必須'
+  status: planned
 request_example: |-
   ```json
   {"writes": [{"op": "update", "id": "n1", "expected_version": "a1b2c3", "set": {"description": "新しい説明"}}], "deletes": [{"id": "n2", "expectedVersion": "d4e5f6"}], "message": "用語を更新する"}
@@ -140,6 +166,19 @@ response:
 - name: conflict.script.stderr
   type: str
   description: 標準エラー出力の末尾 8000 文字
+- name: sourceConfig
+  type: SourceConfigResult | None
+  description: 配信元の設定の書き換えの結果。`sourceConfig` を送ったときだけ入れ、それ以外は `null`
+- name: sourceConfig.version
+  type: str
+  description: 書き込んだ後の `project-index.yaml` のバージョン（[配信元の設定の原本の取得](id:IF-39) の `version` と同じ求め方）
+- name: sourceConfig.diff
+  type: str
+  description: '`project-index.yaml` の変更の差分'
+- name: sourceConfig.reloaded
+  type: bool
+  description: 'プッシュした後に配信元を再読み込みしたか（`dryRun: true` と衝突してブランチに残したときは `false`）'
+  notes: 再読み込みに失敗したときもコミットとプッシュは戻さず、`false` で 200 を返却する。配信元の状態は [配信元の一覧と状態](id:IF-22) で参照する
 response_example: |-
   ```json
   {"applied": true, "results": [{"kind": "write", "index": 0, "id": "n1", "status": "updated", "version": "b2c3d4", "diff": "..."}, {"kind": "delete", "index": 0, "id": "n2", "status": "deleted", "version": null, "diff": "..."}], "unlinked": [], "commit": {"sha": "0a1b2c3", "branch": "develop", "retried": false}}
@@ -148,17 +187,17 @@ status_codes:
 - code: '200'
   condition: '書き込み・コミット・プッシュをした、`dryRun: true` で検査に合格した、または衝突して修正をブランチに残した（`conflict` を入れる）'
 - code: '400'
-  condition: 要求の型の検証に失敗した（`message` が無い・`writes` と `deletes` が両方とも空。`InvalidArgumentError`）
+  condition: 要求の型の検証に失敗した（`message` が無い・`writes`・`deletes` が両方とも空で `sourceConfig` も無い。`InvalidArgumentError`）
   notes: 起動の『例外の変換の登録』が problem+json にし、`errors[]` にキーのパスと理由を並べる
 - code: '403'
-  condition: 別のオリジンの要求（`CrossOriginError`）、書き換わる文書の種類が配信元の設定の `direct_commit.kinds[]` にはあるが端末の設定の `write_api_kinds` に無いか、書き込みの API から直コミットできる種類が 1 つも無い（`DirectCommitNotPermittedError`）、上書きできないブランチを指定した（`BranchNotAllowedError`）、書き換わる文書に SQLite の表の行の種類がある（`ReadOnlyKindError`）
+  condition: 別のオリジンの要求（`CrossOriginError`）、書き換わる文書の種類が配信元の設定の `direct_commit.kinds[]` にはあるが端末の設定の `write_api_kinds` に無いか、書き込みの API から直コミットできる種類が 1 つも無い（`DirectCommitNotPermittedError`）、`sourceConfig` を送ったが端末の設定の `write_api_config` か配信元の設定の `direct_commit.config` が `true` でない（`SourceConfigNotPermittedError`）、上書きできないブランチを指定した（`BranchNotAllowedError`）、書き換わる文書に SQLite の表の行の種類がある（`ReadOnlyKindError`）
   notes: '`DirectCommitNotPermittedError` は `kinds` に許可していない種類を入れ、`next_steps` で許可を記載する端末の設定のキー `sources[].direct_commit.write_api_kinds` を示す'
 - code: '404'
   condition: 無い配信元（`UnknownSourceError`）・配信していない配信元（`SourceNotServedError`）・更新や削除する文書が無い（`DocumentNotFoundError`）
 - code: '409'
-  condition: 文書のバージョンが取り込んだ後の今のバージョンと違う（`VersionMismatchError`）、直コミットを使用できない配信元（`DirectCommitNotConfiguredError`）、コミットするブランチのワークツリーが無い（`CommitWorktreeNotFoundError`）、ワークツリーに未プッシュのコミット（`UnpushedCommitsError`）・書き込むファイルに未コミットの変更（`UncommittedChangesError`）がある、削除する文書が参照されている（`DocumentReferencedError`）、プッシュが 2 回断られた（`PushRejectedError`）、`baseCommit` がクローンに無いかコミットするブランチの祖先でない（`BaseCommitUnusableError`）
+  condition: 文書か配信元の設定のバージョンが取り込んだ後の今のバージョンと違う（`VersionMismatchError`）、直コミットを使用できない配信元（`DirectCommitNotConfiguredError`）、`sourceConfig` を送った配信元の端末の設定の `config` が `project-index.yaml` 1 つでない（`SourceConfigSplitError`）、コミットするブランチのワークツリーが無い（`CommitWorktreeNotFoundError`）、ワークツリーに未プッシュのコミット（`UnpushedCommitsError`）・書き込むファイルに未コミットの変更（`UncommittedChangesError`）がある、削除する文書が参照されている（`DocumentReferencedError`）、プッシュが 2 回断られた（`PushRejectedError`）、`baseCommit` がクローンに無いかコミットするブランチの祖先でない（`BaseCommitUnusableError`）
 - code: '422'
-  condition: '検査に合格しない（`ValidationFailedError`。配信元の設定の `direct_commit.kinds[]` に無い種類の文書が書き換わる・`body: false` の種類の本文のファイルが書き換わる・作られる・移る・削除される・秘密の値を含むも同じ）'
+  condition: '検査に合格しない（`ValidationFailedError`。配信元の設定の `direct_commit.kinds[]` に無い種類の文書が書き換わる・`body: false` の種類の本文のファイルが書き換わる・作られる・移る・削除される・秘密の値を含む・配信元の設定の書き換えられないキーが変わる・書き換えた後の配信元の設定がスキーマか起動の検証に合格しないも同じ）'
   notes: '`errors[]` に、`writes`・`deletes` の別と添字・項目のパス・決まり・直し方を全て並べる'
 - code: '500'
   condition: '`generators[]` が失敗した（`DirectCommitGeneratorError`）'
@@ -205,6 +244,22 @@ constraints:
   constraint: '`dryRun: true` で衝突したときも一時のワークツリーで許可と検査をやり直し、合格すれば `conflict` を `branch`・`commit`・`script` が `null` で返却する。ブランチを作らず、スクリプトを実行しない'
 - item: 本文の直コミットを断る種類
   constraint: '[文書の書き込み](id:IF-6) の制約「本文の直コミットを断る種類」と同じで、`writes` と `deletes` の両方に適用する（`deletes` は [文書の削除](id:IF-7) の制約「直コミット」と同じ）。1 つでも違反があれば、要求全体を `ValidationFailedError` で断る'
+- item: 配信元の設定の直コミットの権限
+  constraint: '`sourceConfig` を送った要求は、取得の前に、端末の設定の `sources[].direct_commit.write_api_config` と、書き換える前の配信元の設定の `direct_commit.config` が両方とも `true` であることを確認する。どちらかが `true` でなければ `SourceConfigNotPermittedError`（403）で断り、`nextSteps` で許可を記載するキーを示す。`writes`・`deletes` が空の要求は、制約「直コミットを許可する種類」の「書き込みの API から直コミットできる種類が 1 つも無い配信元を断る」判定をしない'
+- item: 配信元の設定のファイル
+  constraint: 書き換えるのは、コミットするブランチのワークツリーの、配信元のフォルダからの相対パスが `project-index.yaml` のファイル。端末の設定の `sources[].config` が配列で 2 つ以上のファイルを指すか、配信元のフォルダの `project-index.yaml` 以外を指す配信元は、取得の前に `SourceConfigSplitError`（409）で断る
+- item: 配信元の設定のバージョンの照合
+  constraint: 取得と取り込みの後のワークツリーの `project-index.yaml` のバージョンを `sourceConfig.expectedVersion` と照合し、違えば `VersionMismatchError`（409。`errors[]` のパスは `sourceConfig`）で断る。バージョンは [配信元の設定の原本の取得](id:IF-39) の制約「バージョン」と同じ求め方
+- item: 書き換えられないキー
+  constraint: '`sourceConfig.content` を YAML として読み、トップレベルの `validators`・`converters`・`generators`・`direct_commit`・`worktrees` の値を、取り込みの後のワークツリーの `project-index.yaml` の値と比べる（キーが無いことも値として比べ、コメントと書き方の違いは比べない）。違うキーがあれば `ValidationFailedError`（422。決まりは `protected_key`、パスは `sourceConfig.{キー}`）で断る。`documents[]` の `validators`・`converter`・`after_write` はトップレベルで定義したスクリプトの `id` を指すだけなので対象にしない'
+- item: 配信元の設定の検査
+  constraint: 書き換えた後の配信元の設定を、配信元の設定のスキーマと、[起動](id:IF-15) の配信元の検証（`reload` と同じ判定）にかける。配信元を配信しなくなる違反があれば `ValidationFailedError`（422。パスは `sourceConfig.{キーのパス}`）で断る。配信を続ける警告は断らず、秘密の値の検査は文書と同じくかける
+- item: 書き換えた後の設定での文書の検査
+  constraint: '`sourceConfig` と `writes`・`deletes` を一緒に送った要求は、`writes`・`deletes` のスキーマを書き換えた後の配信元の設定で判定する。許可（`direct_commit.kinds[]`）は制約「書き換えられないキー」で変わらないため、書き換える前と同じになる'
+- item: 配信元の設定の再読み込み
+  constraint: '`sourceConfig` を含むコミットをプッシュして排他を放した後に、その配信元を管理の MCP の `reload` と同じ処理で再読み込みしてから応答する。`default_ref` がコミットするブランチと違う配信元は、再読み込みしても `default_ref` の設定で配信する（配信に入るのは `default_ref` に取り込まれたとき）'
+- item: 衝突したときの配信元の設定
+  constraint: '`baseCommit` を添えた要求が、配信元の設定の `VersionMismatchError` か検査の `ValidationFailedError` で断られたときも制約「衝突の判定」の衝突にする。制約「書き換えられないキー」は、今の `origin/{コミットするブランチ}` の `project-index.yaml` と比べ、違えば衝突にせず断る'
 flows:
 - name: 正常系
   summary: 書き込みと削除を 1 つのコミットにまとめてプッシュする
@@ -718,6 +773,161 @@ flows:
   - 1〜3 回目のどれも 422 で、`errors[]` に `guide.md` の行を書き換える・削除する操作の位置（2 回目は n1 の操作の位置と、書き換わる `guide.md` の行の ID）と「種類 files は本文の直コミットを断っている」がある
   - n1 も `guide.md` も `files.yml` も変わらず、リモートとワークツリーは変わらない
   test: test_error_when_body_not_allowed
+- name: 正常系（配信元の設定を書き換える）
+  summary: 配信元の設定と文書を 1 つのコミットにしてプッシュし、配信元を再読み込みする
+  setup:
+  - name: Mock
+    description: なし（一時フォルダに git の配信元とベアリポジトリのリモートと端末の設定を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+  - name: 配信元
+    description: '正常系と同じ sample。配信元の設定の `direct_commit` に `config: true`、`nav` にタブ 1 つ'
+    notes: '端末の設定の sample の行は `config` が sample の `project-index.yaml` 1 つで、`direct_commit.write_api_kinds: [note]`・`write_api_config: true`'
+  - name: 文書
+    description: '`develop` にコミット済みの種類 `note` の文書 n1 とそのバージョン、配信元の設定の原本の取得で得た内容とバージョン'
+  - name: 入力
+    description: '`sourceConfig` に `nav` のタブのタイトルを変えた内容とバージョン、`writes` に n1 の `update`、`message`'
+  flow: |-
+    <!-- map: {"title": "正常系（配信元の設定を書き換える）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant WT as develop のワークツリー
+      participant R as リモート
+
+      C->>E: sourceConfig, writes（n1 の update）, message
+      E->>E: オリジンと write_api_kinds・write_api_config・direct_commit.config を確かめる
+      E->>R: 取得し、develop のワークツリーへ早送りで取り込む
+      E->>E: 配信元の設定のバージョン・書き換えられないキー・スキーマと起動の検証を確かめ、n1 を書き換えた後の設定で検査する
+      E->>WT: project-index.yaml と n1 を書き換え、generators を実行して 1 つのコミットにする
+      E->>R: develop をプッシュする
+      E->>E: sample を再読み込みする
+      E-->>C: 200 applied, results, sourceConfig, commit
+    ```
+
+    <!-- /map -->
+  expected:
+  - 200 で `applied` が `true`、`sourceConfig.reloaded` が `true`、`sourceConfig.version` が書き込んだ後のバージョン
+  - リモートの `develop` に 1 コミットだけ増え、変更は `project-index.yaml`・n1 のファイルと生成物だけ
+  - 続けて呼ぶ `GET /sources/sample/config` の `nav` が変えた後のタブのタイトルで、`GET /sources/sample/config/file` の `version` が `sourceConfig.version` と同じ
+  test: test_normal_when_source_config_written
+- name: 異常系（配信元の設定の直コミットを許可していない・403）
+  summary: 端末の設定の `write_api_config` か配信元の設定の `direct_commit.config` が `true` でない配信元は断る
+  setup:
+  - name: Mock
+    description: なし（正常系と同じ）
+  - name: 配信元
+    description: 正常系（配信元の設定を書き換える）と同じ sample
+    notes: 端末の設定の sample の行に `write_api_config` が無い
+  - name: 入力
+    description: '`sourceConfig` だけ'
+  flow: |-
+    <!-- map: {"title": "異常系（配信元の設定の直コミットを許可していない・403）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+
+      C->>E: sourceConfig, message
+      E->>E: 端末の設定の write_api_config が true でない
+      E-->>C: 403 SourceConfigNotPermittedError
+    ```
+
+    <!-- /map -->
+  expected:
+  - 403 で、`nextSteps` に許可を記載する端末の設定のキー `sources[].direct_commit.write_api_config` がある
+  - 配信元の設定の `direct_commit.config` が無い配信元でも 403 で、`nextSteps` に `direct_commit.config` がある
+  - リモートとワークツリーは変わらない
+  test: test_error_when_source_config_not_allowed
+- name: 異常系（書き換えられないキーを書き換える・422）
+  summary: '`validators`・`converters`・`generators`・`direct_commit`・`worktrees` が書き換える前と違う要求は断る'
+  setup:
+  - name: Mock
+    description: なし（正常系と同じ）
+  - name: 配信元
+    description: 正常系（配信元の設定を書き換える）と同じ sample
+  - name: 入力
+    description: '`sourceConfig` に `generators[0].run` を変えた内容'
+    notes: 別のケースとして `direct_commit.branch` を変えた内容と `worktrees` を変えた内容も送信する
+  flow: |-
+    <!-- map: {"title": "異常系（書き換えられないキーを書き換える・422）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant R as リモート
+
+      C->>E: sourceConfig（generators を変えた内容）, message
+      E->>R: 取得し、取り込む
+      E->>E: generators が取り込みの後の project-index.yaml と違う
+      E-->>C: 422 ValidationFailedError
+    ```
+
+    <!-- /map -->
+  expected:
+  - 422 で、`errors[]` のパスが `sourceConfig.generators`、決まりが `protected_key`
+  - '`direct_commit.branch` を変えた内容はパス `sourceConfig.direct_commit`、`worktrees` を変えた内容はパス `sourceConfig.worktrees` で同じく 422'
+  - 送信したコマンドは実行されず、リモートとワークツリーは変わらない
+  test: test_error_when_source_config_protected_key_changed
+- name: 異常系（配信元の設定が検証に合格しない・422）
+  summary: 配信元を配信しなくなる違反を持つ配信元の設定は断る
+  setup:
+  - name: Mock
+    description: なし（正常系と同じ）
+  - name: 配信元
+    description: 正常系（配信元の設定を書き換える）と同じ sample
+  - name: 入力
+    description: '`sourceConfig` に `documents[0].paths` を削除した内容'
+  flow: |-
+    <!-- map: {"title": "異常系（配信元の設定が検証に合格しない・422）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+      participant R as リモート
+
+      C->>E: sourceConfig（paths を削除した内容）, message
+      E->>R: 取得し、取り込む
+      E->>E: 配信元の設定のスキーマに合格しない
+      E-->>C: 422 ValidationFailedError
+    ```
+
+    <!-- /map -->
+  expected:
+  - 422 で、`errors[]` のパスが `sourceConfig.documents[0]` で始まり、理由がある
+  - リモートとワークツリーは変わらず、配信も書き換える前の設定のまま
+  test: test_error_when_source_config_invalid
+- name: 異常系（配信元の設定を複数のファイルに分けている・409）
+  summary: 端末の設定の `config` が `project-index.yaml` 1 つでない配信元は断る
+  setup:
+  - name: Mock
+    description: なし（正常系と同じ）
+  - name: 配信元
+    description: 正常系（配信元の設定を書き換える）と同じ sample
+    notes: 端末の設定の sample の行の `config` は、sample の `project-index.yaml` と一時フォルダの重ねる YAML の 2 つ
+  - name: 入力
+    description: 正常系（配信元の設定を書き換える）と同じ `sourceConfig`
+  flow: |-
+    <!-- map: {"title": "異常系（配信元の設定を複数のファイルに分けている・409）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant C as クライアント
+      participant E as POST /sources/{source}/commits
+
+      C->>E: sourceConfig, message
+      E->>E: 端末の設定の config が 2 つのファイルを指す
+      E-->>C: 409 SourceConfigSplitError
+    ```
+
+    <!-- /map -->
+  expected:
+  - 409 で、`files` に端末の設定の `config` のパスの並びがある
+  - リモートとワークツリーと重ねる YAML は変わらない
+  test: test_error_when_source_config_split
 test_file: tests/integration/server/test_commit_documents.py
 visibility: internal
 tags:
