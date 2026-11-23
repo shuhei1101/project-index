@@ -13,6 +13,10 @@ CLONE = "/home/shuhei2441/repo/project-index/.claude/worktrees/develop"
 STATUS_TIMEOUT_SEC = 10
 # update は git pull・uv sync・migrate --plan を各 300 秒で打ち切るため、その合計に余裕を持たせる
 UPDATE_TIMEOUT_SEC = 960
+# 索引のサーバーのログと、要求を処理した行の目印。修正を取り込んだコードは行に executor= を出す
+SERVER_LOG = "/home/shuhei2441/.local/state/project-index/logs/project-index.log"
+REQUEST_LINE = "要求を処理した（"
+FIXED_MARK = " executor="
 # 受け付ける引数は無し（本番）か --dry-run だけ
 MAX_ARGV = 2
 
@@ -45,6 +49,13 @@ def git(*args: str) -> str:
     return completed.stdout.strip()
 
 
+def last_request_line() -> str:
+    """索引のサーバーのログの、要求を処理した最後の行を返す（無ければ空文字）。"""
+    with open(SERVER_LOG, encoding="utf-8") as log:
+        lines = [line.strip() for line in log if REQUEST_LINE in line]
+    return lines[-1] if lines else ""
+
+
 # 前提確認
 if len(sys.argv) > MAX_ARGV or (len(sys.argv) == MAX_ARGV and sys.argv[1] != "--dry-run"):
     print("前提確認: failed")
@@ -59,8 +70,10 @@ except Exception as error:  # noqa: BLE001
     sys.exit(1)
 print("前提確認: ok")
 
-# 計画（--dry-run もここを通る）: status が running を返していれば、修正を取り込んだコードで動いている
-if "running" in status:
+# 計画（--dry-run もここを通る）: 要求を処理した最後の行が executor= を持てば、修正を取り込んだコードで動いている
+line = last_request_line()
+print(f"要求を処理した最後の行: {line or '（無し）'}")
+if FIXED_MARK in line:
     print("索引のサーバーの更新: skipped")
     sys.exit(0)
 try:
