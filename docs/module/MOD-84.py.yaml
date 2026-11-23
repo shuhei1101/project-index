@@ -596,9 +596,9 @@ functions:
       - name: test_write_docs_when_direct_commit_metadata_only
         case: 正常
         summary: 本文の直コミットを断る種類のメタデータだけを直コミットする
-        condition: '同じ配信元で、`commit` つきの `files` の行への `set: {description: 新しい説明}` と、`new_path` を付けない `rename`'
+        condition: '同じ配信元で、`commit` つきの `files` の行への `set: {description: 変えた説明, tags: [topic:a]}`'
         mock: なし（一時フォルダのベアリポジトリ）
-        expected: どちらも `applied=True`。ベアリポジトリに増えたコミットの変更に本文のファイルが入らない
+        expected: '`applied=True`。ベアリポジトリに増えたコミットの変更に本文のファイルが入らない'
   - name: delete_docs
     title: 文書の削除
     kind: 関数
