@@ -37,3 +37,6 @@ scope_out:
   - item: dev-docs の画面で、除く条件に該当する文書を薄く表示する・隠すなどの表示の変更
     reason: 画面は dev-docs のリポジトリが持ち、この PR は読み取り API の応答までを扱う。表示の仕方は今回決める読み取り API の扱いが決まらないと中身が決まらない
     plan: to_file
+  - item: 単体テスト `test_run_serve_when_restart` が、閉じた後に開き直されたログのファイルで不定に error になる不具合
+    reason: serve の再起動とログのハンドラの競合で、今回の要望（読み取り API と list_match_words の除く文書の扱い）に含まれない
+    plan: '#266'
