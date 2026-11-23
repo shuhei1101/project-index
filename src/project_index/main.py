@@ -99,13 +99,29 @@ class Handlers:
     slots: ExecutionSlots
 
 
+class _ClosedDropRotatingFileHandler(RotatingFileHandler):
+    """閉じた後に届いたログを捨て、ファイルを開き直さない `RotatingFileHandler`。
+
+    root のロガーから除外する前にハンドラーを掴んだ裏のスレッドが、閉じた後にログを出しても、
+    閉じられないファイルを残さない。
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """閉じた後なら記録を捨て、閉じる前ならファイルへ出力する。"""
+        # 閉じたか（`close()` と同じ `self.lock` の中で呼ばれるので、閉じる処理と競合しない）
+        if self._closed:
+            # 閉じた後: 開き直さずに捨てる
+            return
+        super().emit(record)
+
+
 def _setup_logging(log_dir: Path) -> list[logging.Handler]:
     """ログを標準エラーと `{log_dir}/project-index.log` に書く設定にし、足したハンドラを返す。"""
     log_dir.mkdir(parents=True, exist_ok=True)
     formatter = logging.Formatter(LOG_FORMAT)
     handlers: list[logging.Handler] = [
         logging.StreamHandler(sys.stderr),
-        RotatingFileHandler(
+        _ClosedDropRotatingFileHandler(
             log_dir / LOG_FILE, maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUPS, encoding="utf-8"
         ),
     ]
