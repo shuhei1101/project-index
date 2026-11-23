@@ -156,6 +156,24 @@ def _no_check(source_id: str) -> None:
     del source_id
 
 
+def test_get_status_when_running(
+    make_source_dir: Callable[..., Path],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+) -> None:
+    """実行中の要求を返す（正常系）。"""
+    # 準備
+    sample = make_source_dir("sample")
+    handlers = _handlers(make_terminal_config, make_entry(str(sample), source_id="sample"))
+    # 実行
+    with handlers.slots.request("write_docs", sources=["sample"]):
+        status = get_status(handlers, env={})
+    # 検証
+    assert [(item.tool, item.sources, item.executor) for item in status.running] == [
+        ("write_docs", ["sample"], "docs")
+    ]
+
+
 def test_get_status_when_loading(
     monkeypatch: pytest.MonkeyPatch,
     make_terminal_config: Callable[..., TerminalConfig],

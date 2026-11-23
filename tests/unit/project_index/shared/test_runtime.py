@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from project_index.shared import runtime
 from project_index.shared.runtime import (
     DOCS_WORKERS,
     ExecutionSlots,
@@ -69,7 +70,7 @@ def test_execution_slots_request(caplog: pytest.LogCaptureFixture) -> None:
     slots = ExecutionSlots()
 
     async def scenario() -> None:
-        with slots.request("search_docs", source="sample"):
+        with slots.request("search_docs", sources=["sample"]):
             await slots.run_docs(_add_scanned(2))
             await slots.run_docs(_add_scanned(3))
 
@@ -80,6 +81,7 @@ def test_execution_slots_request(caplog: pytest.LogCaptureFixture) -> None:
     assert len(lines) == 1
     assert "search_docs" in lines[0]
     assert "sample" in lines[0]
+    assert "docs" in lines[0]
     assert "scanned=5" in lines[0]
     assert "ok" in lines[0]
 
@@ -106,6 +108,7 @@ def test_execution_slots_request_when_cancelled(caplog: pytest.LogCaptureFixture
     lines = _record_lines(caplog)
     assert len(lines) == 1
     assert "cancelled" in lines[0]
+    assert slots.running() == []
 
 
 def test_execution_slots_run_docs() -> None:
@@ -220,6 +223,96 @@ def test_execution_slots_run_admin_when_docs_full() -> None:
     # 検証
     assert value == "admin"
     assert released_before is False
+
+
+def test_execution_slots_try_run_post_write() -> None:
+    """空いていれば動かして戻り値を返す（正常系）。"""
+    # 準備
+    slots = ExecutionSlots()
+
+    async def scenario() -> tuple[str | None, float]:
+        with slots.request("post_write", executor="post_write") as record:
+            value = await slots.try_run_post_write(lambda: "ok")
+        return value, record.elapsed
+
+    # 実行
+    value, elapsed = asyncio.run(scenario())
+    # 検証
+    assert value == "ok"
+    assert elapsed >= 0.0
+
+
+def test_execution_slots_try_run_post_write_when_full() -> None:
+    """全て使用中なら動かさずに None（正常系）。"""
+    # 準備
+    slots = ExecutionSlots()
+    gate = threading.Event()
+    started = threading.Semaphore(0)
+    called: list[bool] = []
+
+    async def scenario() -> tuple[str | None, str | None]:
+        blockers = [
+            asyncio.create_task(slots.try_run_post_write(_blocker(gate, started)))
+            for _ in range(runtime.POST_WRITE_WORKERS)
+        ]
+        for _ in range(runtime.POST_WRITE_WORKERS):
+            await asyncio.to_thread(started.acquire, True, 10)
+        async with asyncio.timeout(5):
+            during = await slots.try_run_post_write(lambda: called.append(True) or "extra")
+        gate.set()
+        await asyncio.gather(*blockers)
+        after = await slots.try_run_post_write(lambda: "after")
+        return during, after
+
+    # 実行
+    during, after = asyncio.run(scenario())
+    # 検証
+    assert during is None
+    assert called == []
+    assert after == "after"
+
+
+def test_execution_slots_try_run_post_write_when_docs_full() -> None:
+    """文書の MCP の実行スロットが埋まっていても動く（正常系）。"""
+    # 準備
+    slots = ExecutionSlots()
+    gate = threading.Event()
+
+    async def scenario() -> tuple[str | None, bool]:
+        blockers = await _fill_docs(slots, gate)
+        async with asyncio.timeout(5):
+            value = await slots.try_run_post_write(lambda: "ok")
+        released_before = gate.is_set()
+        gate.set()
+        await asyncio.gather(*blockers)
+        return value, released_before
+
+    # 実行
+    value, released_before = asyncio.run(scenario())
+    # 検証
+    assert value == "ok"
+    assert released_before is False
+
+
+def test_execution_slots_running() -> None:
+    """範囲の中の要求だけを長い順に返す（正常系）。"""
+    # 準備
+    now = [100.0]
+    slots = ExecutionSlots(clock=lambda: now[0])
+
+    # 実行
+    with slots.request("write_docs", sources=["a"]):
+        now[0] += 10
+        with slots.request("search_docs"):
+            now[0] += 1
+            inside = slots.running()
+    after = slots.running()
+    # 検証
+    assert [(r.tool, r.sources, r.executor, r.state, r.seconds) for r in inside] == [
+        ("write_docs", ["a"], "docs", "waiting", 11.0),
+        ("search_docs", [], "docs", "waiting", 1.0),
+    ]
+    assert after == []
 
 
 def test_current_record_when_outside() -> None:

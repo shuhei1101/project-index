@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from project_index.features.documents import indexable
+from project_index.features.post_write import service
 from project_index.features.post_write.notified import NotifiedStore
 from project_index.features.post_write.service import classify_path, judge_post_write
 from project_index.features.post_write.types import NOTICE_PROMPT_ID, PostWriteRequest
@@ -282,3 +284,88 @@ def test_classify_path_when_other_table_or_ignored(
     result = classify_path(root / relative, [source])
     # 検証
     assert result is None
+
+
+def test_classify_path_when_walked_shared(
+    git_repo: Callable[..., Path],
+    make_served_source: Callable[..., ServedSource],
+    make_source_config: Callable[..., SourceConfig],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """1 回の要求でフォルダをたどるのは 1 回（正常系）。"""
+    # 準備
+    root = git_repo({**SOURCE_FILES, "src/files.yml": "files: []\n", "src/c.py": "x = 1\n"})
+    src_table = DocumentTable(
+        id="src",
+        paths=["src/files.yml"],
+        schema_path="schemas/files.schema.yaml",
+        records="files",
+        body_file="path",
+    )
+    source = make_served_source(
+        root=root,
+        config=make_source_config(documents=[FILES_TABLE, src_table, RULES_TABLE]),
+        is_git=True,
+        repo_root=root,
+    )
+    expected = [
+        classify_path(root / "docs/a.md", [source]),
+        classify_path(root / "docs/b.md", [source]),
+    ]
+    walks: list[Path] = []
+    ignores: list[Path] = []
+    real_walk = indexable.walk_files
+    real_ignored = service.ignored_paths
+
+    def counting_walk(base: Path, *args: Any, **kwargs: Any) -> Any:
+        walks.append(base)
+        return real_walk(base, *args, **kwargs)
+
+    def counting_ignored(base: Path) -> Any:
+        ignores.append(base)
+        return real_ignored(base)
+
+    monkeypatch.setattr(service, "walk_files", counting_walk, raising=False)
+    monkeypatch.setattr(service, "ignored_paths", counting_ignored)
+    walked: dict[Path, list[str]] = {}
+    ignored_by_base: dict[Path, list[str]] = {}
+    # 実行
+    results = [
+        classify_path(root / relative, [source], walked=walked, ignored_by_base=ignored_by_base)
+        for relative in ("docs/a.md", "docs/b.md")
+    ]
+    # 検証
+    assert len(walks) == 1
+    assert len(ignores) == 1
+    assert results == expected
+
+
+def test_source_ids_of(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_served_source: Callable[..., ServedSource],
+    make_source_config: Callable[..., SourceConfig],
+) -> None:
+    """含む配信元の ID を重ならないように返す（正常系）。"""
+    # 準備
+    sources = []
+    for name in ("a", "b"):
+        root = tmp_path / name
+        write_files(root, SOURCE_FILES)
+        sources.append(
+            make_served_source(
+                id=name, root=root, config=make_source_config(documents=[FILES_TABLE])
+            )
+        )
+    outside = tmp_path / "outside.md"
+    outside.write_text("# outside\n", encoding="utf-8")
+    paths = [
+        str(tmp_path / "a/docs/a.md"),
+        str(tmp_path / "b/docs/a.md"),
+        str(tmp_path / "a/docs/b.md"),
+        str(outside),
+    ]
+    # 実行
+    result = service.source_ids_of(paths, sources)
+    # 検証
+    assert result == ["a", "b"]

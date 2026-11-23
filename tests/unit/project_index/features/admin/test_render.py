@@ -19,6 +19,7 @@ from project_index.features.admin.types import (
     SyncItem,
     TerminalState,
 )
+from project_index.shared import runtime
 from project_index.shared.errors import Violation
 
 
@@ -77,6 +78,50 @@ def test_render_status() -> None:
         "| sample | serving | 1（current） | 0 |",
         "| broken | not_served（documents[0].paths: 必須のキーが無い） | - | - |",
     ]
+
+
+def test_render_status_when_running() -> None:
+    """実行中の要求の表を配置する（正常系）。"""
+    # 準備
+    base = ServerStatus(
+        address="http://127.0.0.1:8786/",
+        version="0.2.0",
+        pid=4242,
+        terminal=TerminalState(
+            file="/home/u/.config/project-index/settings.yaml", version_state="current"
+        ),
+        sources=[_serving("sample")],
+    )
+    status = dataclasses.replace(
+        base,
+        running=[
+            runtime.RunningRequest(
+                tool="write_docs",
+                sources=["a", "b"],
+                executor="docs",
+                state="running",
+                seconds=12.34,
+            ),
+            runtime.RunningRequest(
+                tool="search_docs", sources=[], executor="docs", state="waiting", seconds=1.0
+            ),
+        ],
+    )
+    # 実行
+    result = render_status(status)
+    idle = render_status(base)
+    # 検証
+    lines = result.splitlines()
+    assert lines[5:] == [
+        "",
+        "実行中の要求:",
+        "",
+        "| ツール | 配信元 | 実行スロット | 状態 | 経過秒 |",
+        "| --- | --- | --- | --- | --- |",
+        "| write_docs | a・b | docs | running | 12.3 |",
+        "| search_docs | - | docs | waiting | 1.0 |",
+    ]
+    assert "実行中の要求:" not in idle
 
 
 def test_render_status_when_no_sources() -> None:
