@@ -258,7 +258,7 @@ functions:
     process: |-
       1. 端末の設定のパスを決め（端末の設定のパス）、端末の設定を読み（端末の設定の読み込み）、待ち受けのポートを決める（待ち受けのポート）
          - `TerminalConfigInvalidError` の場合、違反ごとに `{ファイル}: {パス}: {理由}`（違反が無ければ例外の本文）を標準エラーに出し、`EXIT_CONFIG_INVALID` を返す
-      2. `log_dir` を作り、`logging` を設定する。ログは標準エラーと `{log_dir}/project-index.log`（`RotatingFileHandler`）に書く。端末の設定の知らないキーを警告のログに書く（知らないキーのログ）
+      2. `log_dir` を作り、`logging` を設定する。ログは標準エラーと `{log_dir}/project-index.log`（`RotatingFileHandler`）に書く。ファイルのハンドラーは、閉じた後に届いたログを捨て、ファイルを開き直さない（root のロガーから除外する前にハンドラーを掴んだ裏のスレッドが、閉じた後にログを出しても、閉じられないファイルを残さない）。端末の設定の知らないキーを警告のログに書く（知らないキーのログ）
       3. ポートで待ち受けられるか確かめる（ポートの確かめ）
          - `PortInUseError` の場合、`{bind}:{port} は使用中です。PROJECT_INDEX_PORT で別のポートを指定できます` を標準エラーに出し、`EXIT_PORT_IN_USE` を返す
       4. 部品を配線し（部品の配線）、アプリを組み立てる（アプリの組み立て）
@@ -325,6 +325,12 @@ functions:
         condition: 配信できる配信元 1 つの端末の設定。`uvicorn.Server.run` は `started` を `True` にして再起動を要求せずに戻る
         mock: '`uvicorn.Server.run`（偽物）・`os._exit`（呼ばれた引数を記録して `SystemExit` を送る偽物）'
         expected: '`os._exit` が `0` で 1 回呼ばれ、`os.execv` は呼ばれない'
+      - name: test_run_serve_when_log_after_close
+        case: 正常
+        summary: 閉じた後に裏のスレッドがログを出してもログのファイルを開き直さない
+        condition: 配信できる配信元 1 つの端末の設定。`uvicorn.Server.run` の中で、ファイルのハンドラーに裏のスレッドの記録だけを合図まで止めるフィルターを付け、そのスレッドでログを 1 行出してから再起動を要求する
+        mock: '`uvicorn.Server.run`（上の準備をして `started` を `True` にし、再起動を要求して戻る）・`os.execv`（ログのハンドラーを閉じた後に呼ばれるので、そこで合図を出す偽物）'
+        expected: 裏のスレッドを join した後、ファイルのハンドラーの `stream` が `None` で、閉じた後のログの行が `project-index.log` に無い
   - name: check_port
     title: ポートの確かめ
     kind: 関数
