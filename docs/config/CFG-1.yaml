@@ -7,10 +7,10 @@ tags:
   - name: topic:端末
 files:
   - file: ${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml
-    manages: 端末の設定（配信元の一覧と権限（直コミットを呼べる作業場所と、作業場所を持たない書き込みの API から直コミットできる種類・書き込みの API が衝突したときに実行するスクリプト `sources[].direct_commit` を含む）・`state_dir`・`log_dir`・`port`・`bind`・`seen_retention_days`・`script_timeout_sec`・`write_deadline_sec`・`worktree_load_wait_sec`・`mdmark_ref`）
+    manages: 端末の設定（配信元の一覧と権限（直コミットを呼べる作業場所と、作業場所を持たない書き込みの API から直コミットできる種類と配信元の設定の直コミットの許可・書き込みの API が衝突したときに実行するスクリプト `sources[].direct_commit` を含む）・`state_dir`・`log_dir`・`port`・`bind`・`seen_retention_days`・`script_timeout_sec`・`write_deadline_sec`・`worktree_load_wait_sec`・`mdmark_ref`）
     notes: git 管理外。場所は環境変数 `PROJECT_INDEX_CONFIG` で上書きする。キーの一覧は公開ドキュメント『設定』、型は [端末の設定の型](id:MOD-67) の `TerminalConfig`
   - file: project-index.yaml
-    manages: 配信元の設定（文書の範囲・種類・参照するブランチ・検査と変換と生成のスクリプト・`nav`・`decisions`・`github`・直コミットを許可する種類とコミットするブランチ `direct_commit`・読み取り専用で配信する SQLite の表 `documents[].sqlite`）
+    manages: 配信元の設定（文書の範囲・種類・参照するブランチ・検査と変換と生成のスクリプト・`nav`・`decisions`・`github`・直コミットを許可する種類・配信元の設定の直コミットの許可・コミットするブランチ `direct_commit`・読み取り専用で配信する SQLite の表 `documents[].sqlite`）
     notes: 各リポジトリの直下に配置し、git で管理する。端末の設定の `config` でほかの名前も指定できる。管理の MCP にフォルダを渡したときは `project-index.yaml`、無ければ移行の間の `dev-docs.yaml` を探す（[管理の service.py](id:MOD-10) の `CONFIG_FILE`・`LEGACY_CONFIG_FILE`）
   - file: project-index.local.yaml
     manages: '配信元の設定の端末ごとの上書き。ローカル運用（端末の設定の行が `storage.type: disk`）では、配信元の設定そのもの'
@@ -138,6 +138,26 @@ settings:
     allowed: 1 要素以上。先頭は絶対パスか PATH にあるコマンド
     description: '`on_conflict` を記載したときに実行するコマンドと引数の並び。シェルを経由せずに実行し、配信元の ID・残したブランチの名前・コミットの SHA・コミットするブランチを指定する（指定の方法と制限時間はインターフェース定義で決める）'
     missing: '`on_conflict` を記載して `command` が無いときは `sources[{番号}].direct_commit.on_conflict.command` の違反にし、起動時の検証でその配信元を配信しない'
+    reload: reload
+    status: planned
+    visibility: user
+  - key: direct_commit.config
+    title: 配信元の設定の直コミットの許可
+    file: project-index.yaml
+    type: bool
+    required: false
+    description: '`true` のとき、書き込みの API がこの配信元の配信元の設定（`project-index.yaml`）を直コミットで書き換えることを許可する。端末の設定の `sources[].direct_commit.write_api_config` も `true` の配信元だけが書き換えられる。コマンドを持つキー（`validators`・`converters`・`generators`）の書き換えは、この値によらず断る。`true` のときは `direct_commit.kinds` を省略できる'
+    default: false（配信元の設定を書き込みの API で書き換えられない）
+    reload: reload
+    status: planned
+    visibility: user
+  - key: sources[].direct_commit.write_api_config
+    title: 書き込みの API から配信元の設定を直コミットできるか
+    file: ${XDG_CONFIG_HOME:-~/.config}/project-index/settings.yaml
+    type: bool
+    required: false
+    description: '`true` のとき、作業場所を持たない書き込みの API（画面のサーバーからの要求）から、この配信元の配信元の設定を直コミットで書き換えられる。配信元の設定の `direct_commit.config` が `true` でない配信元では使用せず、警告を返却する。`config` が配信元のフォルダの `project-index.yaml` 1 つでない配信元でも、書き込みの API は断る'
+    default: false（書き込みの API から配信元の設定を書き換えられない）
     reload: reload
     status: planned
     visibility: user
