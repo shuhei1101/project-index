@@ -10,6 +10,7 @@ import sys
 import threading
 import time
 from contextlib import closing, contextmanager
+from logging.handlers import RotatingFileHandler
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -280,6 +281,66 @@ def test_run_serve_when_stopped(serve_settings: Path, monkeypatch: pytest.Monkey
     # 検証
     assert exited == [0]
     assert executed == []
+
+
+def test_run_serve_when_log_after_close(
+    serve_settings: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """閉じた後に裏のスレッドがログを出してもログのファイルを開き直さない（正常系）。"""
+    # 準備
+    monkeypatch.setenv("PROJECT_INDEX_PORT", str(_free_port()))
+    captured: dict[str, Any] = {}
+    real_build_handlers = main_module.build_handlers
+    # 裏のスレッドの記録がフィルターに入った合図と、その記録を先へ進める合図
+    entered = threading.Event()
+    released = threading.Event()
+
+    def spy_build_handlers(terminal: TerminalConfig) -> Any:
+        captured["handlers"] = real_build_handlers(terminal)
+        return captured["handlers"]
+
+    def hold_late_record(record: logging.LogRecord) -> bool:
+        # 裏のスレッドの記録だけを、ハンドラーを閉じた後まで止める
+        if threading.current_thread().name == "project-index-late-log":
+            entered.set()
+            released.wait(timeout=30)
+        return True
+
+    def fake_run(self: uvicorn.Server, *args: Any, **kwargs: Any) -> None:
+        file_handlers = [
+            handler
+            for handler in logging.getLogger().handlers
+            if isinstance(handler, RotatingFileHandler)
+        ]
+        captured["file_handler"] = file_handlers[0]
+        file_handlers[0].addFilter(hold_late_record)
+        captured["thread"] = threading.Thread(
+            target=logging.getLogger("project_index.tests").warning,
+            args=("閉じた後のログ",),
+            name="project-index-late-log",
+        )
+        captured["thread"].start()
+        entered.wait(timeout=30)
+        self.started = True
+        captured["handlers"].restart.request()
+
+    executed: list[tuple[str, list[str]]] = []
+
+    def fake_execv(path: str, argv: list[str]) -> None:
+        executed.append((path, argv))
+
+    monkeypatch.setattr(main_module, "build_handlers", spy_build_handlers)
+    monkeypatch.setattr(uvicorn.Server, "run", fake_run)
+    monkeypatch.setattr(os, "execv", fake_execv)
+    # 実行
+    run_serve(argparse.Namespace())
+    released.set()
+    captured["thread"].join(timeout=30)
+    # 検証
+    assert len(executed) == 1
+    assert captured["file_handler"].stream is None
+    log_file = serve_settings.parent / "state" / "logs" / "project-index.log"
+    assert "閉じた後のログ" not in log_file.read_text(encoding="utf-8")
 
 
 def test_check_port() -> None:
