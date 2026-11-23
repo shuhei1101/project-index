@@ -276,7 +276,11 @@ def test_list_documents_when_ref_and_search_excluded(
     startup = _target(env)
     loaded = store.load(startup)
     target = dataclasses.replace(startup, ref="main")
-    monkeypatch.setattr(store, "load", lambda *_args, **_kwargs: loaded)
+
+    def _load(*_args: object, **_kwargs: object) -> object:
+        return loaded
+
+    monkeypatch.setattr(store, "load", _load)
 
     def _checkout(*_args: object, **_kwargs: object) -> object:
         msg = "リビジョンを書き出した"
