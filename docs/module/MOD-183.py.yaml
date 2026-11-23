@@ -55,9 +55,9 @@ functions:
 
     4. 結果を `CommitDocumentsResponse.from_domain(result)` にして 200 で返す。書き込みと削除の直コミットの `reload_sources` には `handlers` の配信元の再読み込みを渡す
 
-    5. GET `/sources/{source}/config/file`（ルートの `name` は `get_source_config_file`）は、要求が指す配信元を `handlers.registry.get_for_docs(source)` で引き、配信元の設定の原本の取得（`read_source_config_file`）の結果を `SourceConfigFileResponse.from_domain` にして 200 で返す
+    5. GET `/sources/{source}/config/file`（ルートの `name` は `get_source_config_file`）は、要求が指す配信元を `handlers.registry.get_for_docs(source)` で引き、配信元の設定の原本の取得（`read_source_config_file`）の結果を `SourceConfigFileResponse.from_domain` にして 200 で返す。`UnknownSourceError` は `missing` を `source`、`SourceNotServedError` は `missing` を `not_served` にした読み取り API と同じ 404 の problem+json（`problem_of`）で返す
 
-    6. 例外は送らずに起動の『例外の変換の登録』に任せ、エラーの `status` の problem+json にする（`CrossOriginError` は依存の `require_same_origin` が送る）
+    6. 手順 5 の 404 のほかの例外は送らずに起動の『例外の変換の登録』に任せ、エラーの `status` の problem+json にする（`CrossOriginError` は依存の `require_same_origin` が送る）
   unit_tests:
   - name: test_build_write_router
     case: 正常
