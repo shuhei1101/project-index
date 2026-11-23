@@ -223,10 +223,10 @@ def test_error_when_body_not_allowed(
     data = response.json()
     assert response.status_code == 422, data
     assert [
-        item["path"].startswith(position)
+        (item["path"].startswith(position), item["reason"])
         for item in data["errors"]
         if "本文の直コミットを断っている" in item["reason"]
-    ] == [True]
+    ] == [(True, "f1 の種類 files は本文の直コミットを断っている")]
     assert _git_state(direct, run_git) == before
     assert (direct.develop / "files" / "f1.md").read_text(encoding="utf-8") == F1_BODY
     assert (direct.develop / "notes" / "n1.yaml").read_text(encoding="utf-8") == (

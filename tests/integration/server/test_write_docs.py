@@ -3664,7 +3664,7 @@ def test_normal_when_direct_commit_metadata_only(
         "op": "update",
         "id": "f1",
         "expected_version": F1_VERSION,
-        "set": {"description": "変えた案内"},
+        "set": {"description": "変えた案内", "tags": ["topic:a"]},
     }
     # 実行
     result = env.call(
@@ -3754,6 +3754,7 @@ def test_error_when_direct_commit_body_not_allowed(
     assert "ValidationFailedError" in result.text
     assert "種類 files は本文の直コミットを断っている" in result.text
     assert "index: 0" in result.text
+    assert "doc: f1" in result.text
     assert _git_state(direct, run_git) == before
     assert (direct.develop / "files" / "f1.md").read_text(encoding="utf-8") == F1_BODY
     assert (direct.develop / "files" / "index.yaml").read_text(encoding="utf-8") == FILES_INDEX
