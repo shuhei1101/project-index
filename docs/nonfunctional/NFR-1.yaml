@@ -447,5 +447,17 @@ requirements:
     rationale: 書き込みの API は画面のサーバーから呼ばれるため、文書の MCP の応答の上限から導いた書き込みの期限ではなく、書き込みの API の応答の上限から、期限の後に要る取り込みとプッシュの余裕・生成とコミット・プッシュを差し引いて導く（規約『資源の値の決め方』の入れ子の待ち）。衝突したときの一時のワークツリーでの検査のやり直しと書き込みの開始もこの期限の中に収める。端末の設定では変えられない固定の値にし、端末の設定の `write_deadline_sec` は文書の MCP の書き込みにだけ使用する。外側の待ち（dev-docs の制限時間）を変えたら合わせて再決定する
     overflow: 期限を過ぎたら、ファイルを 1 つも書き換えずに `WriteDeadlineExceededError` を返却する
     status: planned
+  - id: NFR-24
+    name: 書き込みの後の通知の判定の実行スロットの数
+    english_name: post_write_executor_workers
+    category: 可用性
+    external_constraint: ツール実行後のフックが `POST /_admin/post-write` の応答を待つ上限 3 秒（`NOTICE_TIMEOUT_SEC`）。過ぎると何も出力せずに終える
+    source_kind: 外部 API の制限
+    source: IF-36#flows[正常系（問い合わせに失敗した）]
+    value: '2'
+    unit: 本
+    overflow: 2 本とも使用中のときは、空くのを待たずに通知せずに応答する（配信元の読み込みの間と同じ）。文書の MCP・読み取り API の実行スロットは使用しない
+    rationale: フックは 3 秒で打ち切るため、空くのを待った判定の結果は参照されず、待ちだけが溜まる。待たずに応答すれば、判定の要求が実行スロットに溜まらない。判定は配信元ごとにワークツリーをたどる回数が 1 回以下で、終わるまでの時間が短いため、並行して書き込むエージェントが多くても 2 本で足りる。通知しなかったパスは通知済みに記録しないため、同じファイルの次の書き込みで通知する
+    status: planned
 id: NFR-1
 visibility: internal

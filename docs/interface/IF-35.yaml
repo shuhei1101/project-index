@@ -209,6 +209,61 @@ flows:
     expected:
       - 422 で `paths` の違反を返す
     test: test_error_when_input_invalid
+  - name: 正常系（文書の MCP の実行スロットが埋まっている）
+    summary: 文書の MCP・読み取り API の実行スロットが全て使用中でも、待たずに通知を返却する
+    setup:
+      - name: Mock
+        description: 文書の MCP・読み取り API の実行スロットの全ての本数を、テストが合図を出すまで止める関数で埋める
+        notes: 合図は `threading.Event`
+      - name: 配信元
+        description: 正常系と同じ `sample`
+    flow: |-
+      <!-- map: {"title": "正常系（文書の MCP の実行スロットが埋まっている）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as POST /_admin/post-write
+
+        C->>C: 文書の MCP の実行スロットを全て埋める
+        C->>T: session_id・paths（文書 1）
+        T-->>C: notices（update_row）・additional_context
+        C->>C: 合図を出す
+      ```
+
+      <!-- /map -->
+    expected:
+      - 合図を出す前に 200 で、`notices` が文書 1 の `update_row` の 1 件
+    test: test_normal_when_docs_slots_full
+  - name: 正常系（判定の実行スロットが埋まっている）
+    summary: 書き込みの後の通知の判定の実行スロットが全て使用中なら、待たずに通知せずに応答する
+    setup:
+      - name: Mock
+        description: 判定（`judge_post_write`）を、テストが合図を出すまで止めるものに差し替え、別の `session_id` の要求で判定の実行スロットを全て埋める
+        notes: 合図は `threading.Event`
+      - name: 配信元
+        description: 正常系と同じ `sample`
+    flow: |-
+      <!-- map: {"title": "正常系（判定の実行スロットが埋まっている）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as POST /_admin/post-write
+
+        C->>T: 判定の実行スロットの本数だけ要求を送信し、応答しないままにする
+        C->>T: session_id・paths（文書 1）
+        T-->>C: notices が空・additional_context が空文字
+        C->>C: 合図を出す
+        C->>T: 同じ session_id・paths（文書 1）
+        T-->>C: notices（update_row）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 合図を出す前の要求が 200 で、`notices` が空で `additional_context` が空文字
+      - 合図の後に同じ `session_id` で文書 1 を指定すると、文書 1 を通知する
+    test: test_normal_when_post_write_slots_full
 constraints:
   - item: 公開範囲
     constraint: 管理の MCP のツールにしない。読み取り API にも載せない
@@ -226,6 +281,11 @@ constraints:
     constraint: 制限なし（呼ぶ側のフックが `NOTICE_TIMEOUT_SEC` 秒で打ち切る）
   - item: 配信元の読み込みの間
     constraint: 読み込みを待たずに、通知せずに答える
+  - item: 実行スロット
+    constraint: '書き込みの後の通知の判定の専用の実行スロットで動かし、文書の MCP・読み取り API の実行スロットは使用しない。専用の実行スロットが全て使用中なら、空くのを待たずに `notices: []`・`additional_context: ""` で応答し、通知済みの記録に追加しない'
+    decided_by: NFR-1#requirements[書き込みの後の通知の判定の実行スロットの数]
+  - item: ワークツリーのたどり
+    constraint: 1 回の要求で、配信元ごとにワークツリーをたどる回数を 1 回以下にする。管理用の YAML の行の数・要求のパスの数によらない
 status_codes:
   - code: '200'
     condition: '受け付けた（通知しないときも `notices: []` で返す）'
