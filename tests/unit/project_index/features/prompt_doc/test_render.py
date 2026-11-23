@@ -5,6 +5,7 @@ from typing import Any
 import jinja2
 import pytest
 
+from project_index.features.prompt_doc import render as render_module
 from project_index.features.prompt_doc.render import (
     TracedStr,
     build_environment,
@@ -304,3 +305,174 @@ def test_render_example_when_runtime_error() -> None:
     assert len(result.problems) == 1
     assert "TypeError" in result.problems[0]
     assert result.messages == []
+
+
+# 部品 system（system）・past-request（user、x-each）・past-reply（assistant、x-each、when: item.reply）・now（user）を持つ LLM のプロンプト
+EACH = {"var": "history", "as": "item"}
+EACH_PARTS = [
+    {"id": "system", "role": "system", "texts": [{"lang": "en", "text": "System"}]},
+    {
+        "id": "past-request",
+        "role": "user",
+        "x-each": EACH,
+        "texts": [{"lang": "en", "text": "{{ item.request }}"}],
+    },
+    {
+        "id": "past-reply",
+        "role": "assistant",
+        "x-each": EACH,
+        "when": "item.reply",
+        "texts": [{"lang": "en", "text": "{{ item.reply }}"}],
+    },
+    {"id": "now", "role": "user", "texts": [{"lang": "en", "text": "Now"}]},
+]
+EACH_VARS = {
+    "history": {
+        "type": "array",
+        "example": [{"request": "req1", "reply": "rep1"}, {"request": "req2", "reply": ""}],
+        "items": {
+            "type": "object",
+            "properties": {
+                "request": {"type": "string", "description": "依頼"},
+                "reply": {"type": "string"},
+            },
+        },
+    }
+}
+
+
+def test_group_parts() -> None:
+    """連続する同じ var の部品をまとめる（正常系）。"""
+    # 準備
+    doc = _doc(
+        parts=[
+            {"id": "a", "texts": [{"lang": "en", "text": "A"}]},
+            {"id": "b", "x-each": EACH, "texts": [{"lang": "en", "text": "B"}]},
+            {"id": "c", "x-each": EACH, "texts": [{"lang": "en", "text": "C"}]},
+            {
+                "id": "d",
+                "x-each": {"var": "other", "as": "item"},
+                "texts": [{"lang": "en", "text": "D"}],
+            },
+        ]
+    )
+    # 実行
+    groups = render_module.group_parts(doc.parts)
+    # 検証
+    assert [[part.id for part in group] for group in groups] == [["a"], ["b", "c"], ["d"]]
+
+
+def test_render_example_when_each() -> None:
+    """x-each の部品を要素ごとに描画し、続く同じ役割をまとめる（正常系）。"""
+    # 準備
+    doc = _doc(vars=EACH_VARS, parts=EACH_PARTS)
+    compiled, errors = compile_parts(doc, env=build_environment())
+    # 実行
+    result = render_example(doc, compiled=compiled, syntax_errors=errors, values={}, lang="en")
+    # 検証
+    assert [message.role for message in result.messages] == [
+        "system",
+        "user",
+        "assistant",
+        "user",
+    ]
+    assert result.messages[1].text == "req1"
+    assert result.messages[2].text == "rep1"
+    assert result.messages[3].text == "req2\n\nNow"
+    assert result.messages[1].marked == f"{MARK_START}history[].request{MARK_SEP}req1{MARK_END}"
+    assert result.unused == []
+    assert result.problems == []
+
+
+def test_render_example_when_each_empty() -> None:
+    """配列が空（正常系）。"""
+    # 準備
+    doc = _doc(vars=EACH_VARS, parts=EACH_PARTS)
+    compiled, errors = compile_parts(doc, env=build_environment())
+    # 実行
+    result = render_example(
+        doc, compiled=compiled, syntax_errors=errors, values={"history": []}, lang="en"
+    )
+    # 検証
+    assert [message.role for message in result.messages] == ["system", "user"]
+    assert result.messages[1].text == "Now"
+    assert result.unused == ["past-request", "past-reply"]
+
+
+def test_render_example_when_each_not_list() -> None:
+    """x-each の値が配列でない（異常系）。"""
+    # 準備
+    doc = _doc(vars={"history": {"example": []}}, parts=EACH_PARTS)
+    compiled, errors = compile_parts(doc, env=build_environment())
+    # 実行
+    result = render_example(
+        doc, compiled=compiled, syntax_errors=errors, values={"history": "oops"}, lang="en"
+    )
+    # 検証
+    assert len(result.problems) == 1
+    assert "history" in result.problems[0]
+    assert result.messages == []
+
+
+def test_render_example_when_each_lang_missing() -> None:
+    """x-each の部品にその言語の本文が無い（正常系）。"""
+    # 準備
+    doc = _doc(
+        vars=EACH_VARS,
+        parts=[
+            {
+                "id": "past",
+                "role": "user",
+                "x-each": EACH,
+                "texts": [{"lang": "en", "text": "{{ item.request }}"}],
+            },
+            {
+                "id": "now",
+                "role": "user",
+                "texts": [{"lang": "en", "text": "Now"}, {"lang": "ja", "text": "いま"}],
+            },
+        ],
+    )
+    compiled, errors = compile_parts(doc, env=build_environment())
+    # 実行
+    result = render_example(doc, compiled=compiled, syntax_errors=errors, values={}, lang="ja")
+    # 検証
+    assert result.unused == ["past（ja の本文なし）"]
+
+
+def test_render_example_when_text_empty() -> None:
+    """描画した本文が空の部品（正常系）。"""
+    # 準備
+    doc = _doc(
+        parts=[
+            {"id": "main", "role": "user", "texts": [{"lang": "en", "text": "Main"}]},
+            {
+                "id": "note",
+                "role": "user",
+                "texts": [{"lang": "en", "text": "{% if false %}x{% endif %}"}],
+            },
+        ]
+    )
+    compiled, errors = compile_parts(doc, env=build_environment())
+    # 実行
+    result = render_example(doc, compiled=compiled, syntax_errors=errors, values={}, lang="en")
+    # 検証
+    assert [message.text for message in result.messages] == ["Main"]
+    assert result.unused == ["note"]
+
+
+def test_render_example_when_role_missing() -> None:
+    """llm で role の無い部品（正常系）。"""
+    # 準備
+    doc = _doc(
+        parts=[
+            {"id": "ask", "role": "user", "texts": [{"lang": "en", "text": "Ask"}]},
+            {"id": "extra", "texts": [{"lang": "en", "text": "Extra"}]},
+        ]
+    )
+    compiled, errors = compile_parts(doc, env=build_environment())
+    # 実行
+    result = render_example(doc, compiled=compiled, syntax_errors=errors, values={}, lang="en")
+    # 検証
+    assert [message.role for message in result.messages] == ["user"]
+    assert result.messages[0].text == "Ask\n\nExtra"

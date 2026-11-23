@@ -368,6 +368,12 @@ functions:
         condition: '`kind: llm` で部品 `ask`（user）の後に `role` の無い部品 `extra`'
         mock: なし
         expected: メッセージが `user` の 1 件で、本文が `ask` と `extra` をつないだもの
+      - name: test_render_example_when_each_lang_missing
+        case: 正常
+        summary: x-each の部品にその言語の本文が無い
+        condition: '`kind: llm` で部品 `past`（user、`x-each: {var: history, as: item}`、`en` だけ）と `now`（user、`en`・`ja`）、`history` が 2 組、`lang=ja`'
+        mock: なし
+        expected: '`unused` が `["past（ja の本文なし）"]` の 1 件'
   - name: flow_yaml
     title: YAML のフロー形式
     kind: 関数
