@@ -8,8 +8,14 @@ from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends
 
+from project_index.features.admin.service import reload_config
 from project_index.features.write.service import commit_documents
-from project_index.features.write.types import CommitDocumentsBody, CommitDocumentsResponse
+from project_index.features.write.source_config import read_source_config_file
+from project_index.features.write.types import (
+    CommitDocumentsBody,
+    CommitDocumentsResponse,
+    SourceConfigFileResponse,
+)
 from project_index.server.origin import require_same_origin
 from project_index.shared.deadline import CallLimits, Deadline
 
@@ -36,6 +42,8 @@ def _commit(
         repo_locks=handlers.repo_locks,
         timeout_sec=handlers.terminal.script_timeout_sec,
         state_dir=handlers.terminal.state_dir,
+        # 配信元の設定をプッシュした後は、管理の MCP の reload と同じに再読み込みする
+        reload_sources=functools.partial(reload_config, handlers),
         limits=limits,
     )
 
@@ -63,5 +71,11 @@ def build_write_router(handlers: Handlers) -> APIRouter:
                     functools.partial(_commit, handlers, body.to_request(source), limits)
                 )
         return CommitDocumentsResponse.from_domain(result)
+
+    @router.get("/sources/{source}/config/file", name="get_source_config_file")
+    def get_source_config_file(source: str) -> SourceConfigFileResponse:
+        # 書き換える前の project-index.yaml を、コミットするブランチのワークツリーから返す
+        served = handlers.registry.get_for_docs(source)
+        return SourceConfigFileResponse.from_domain(read_source_config_file(served))
 
     return router

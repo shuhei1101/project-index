@@ -52,6 +52,8 @@ class SourceDirectCommit(BaseModel):
     write_api_kinds: list[str] = Field(
         default_factory=list[str], serialization_alias="writeApiKinds"
     )
+    # 作業場所を持たない書き込みの API から配信元の設定を直コミットできるか。既定はできない
+    write_api_config: bool = Field(default=False, serialization_alias="writeApiConfig")
     # 書き込みの API が衝突して修正をブランチに残した後に実行するスクリプト。
     # 端末の設定のファイルからだけ読み、端末の設定の API は返さず、受け取ったら断る
     on_conflict: OnConflictScript | None = Field(default=None, exclude=True)

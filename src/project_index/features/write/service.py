@@ -44,7 +44,7 @@ from project_index.features.search.fields import known_fields
 from project_index.features.search.filters import check_filter, match_filter
 from project_index.features.search.types import SearchRequest
 from project_index.features.seen.types import LastRead, SessionKey
-from project_index.features.sources.service import SCRIPT_TABLES
+from project_index.features.sources.service import SCRIPT_TABLES, build_source_config
 from project_index.features.sources.types import DirectCommitConfig, DocumentTable, ServedSource
 from project_index.features.validation.service import DocumentChecker
 from project_index.features.write.apply import (
@@ -80,6 +80,12 @@ from project_index.features.write.references import (
 )
 from project_index.features.write.replace import replace_in_body, replace_in_values
 from project_index.features.write.secrets import secret_findings
+from project_index.features.write.source_config import (
+    SOURCE_CONFIG_FILE,
+    check_source_config_content,
+    check_source_config_permitted,
+    source_config_relative_path,
+)
 from project_index.features.write.types import (
     OPERATIONS_MAX,
     CommitDocumentsRequest,
@@ -94,6 +100,7 @@ from project_index.features.write.types import (
     ReferenceChange,
     ScriptRunResult,
     SkippedOperation,
+    SourceConfigResult,
     WriteRequest,
     WriteResult,
     WriteResultItem,
@@ -115,18 +122,19 @@ from project_index.shared.errors import (
     WriteDeadlineExceededError,
 )
 from project_index.shared.files import replace_file
-from project_index.shared.hashing import value_hash
+from project_index.shared.hashing import content_hash, value_hash
 from project_index.shared.narrowing import is_dict, is_list
 from project_index.shared.paths import normalize_path
-from project_index.shared.yaml_io import dump_roundtrip, load_roundtrip
+from project_index.shared.yaml_io import dump_roundtrip, load_roundtrip, load_yaml
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, MutableMapping, Sequence
+    from collections.abc import Callable, Generator, MutableMapping, Sequence
 
     from project_index.features.seen.store import SeenStore
     from project_index.features.sources.registry import SourceRegistry
     from project_index.features.validation.markdown import UncheckedKey
     from project_index.features.write.locks import RepositoryLocks, SourceLocks
+    from project_index.features.write.types import SourceConfigWrite
 
 logger = logging.getLogger(__name__)
 
@@ -2537,7 +2545,9 @@ def _renamed(error: ProjectIndexError, name: str) -> ProjectIndexError:
 def _check_commit_documents_size(request: CommitDocumentsRequest) -> None:
     """書き込みと削除の件数の合計と、書き込みの操作の必須のキーを確かめる。"""
     total = len(request.writes) + len(request.deletes)
-    if not 1 <= total <= OPERATIONS_MAX:
+    # 配信元の設定の書き換えだけの要求は、書き込みと削除が 0 件でもよい
+    least = 0 if request.source_config is not None else 1
+    if not least <= total <= OPERATIONS_MAX:
         raise _invalid(
             [
                 Violation(
@@ -2562,8 +2572,8 @@ def _write_api_commit_target(
     # 直コミットの設定とブランチ・ワークツリーを先に確かめる（通信しない）
     plan = resolve_commit_plan(source, request.commit)
     committable = write_api_committable_kinds(source)
-    # 書き込みの API から直コミットできる種類が無い配信元は、取得・取り込みの前に断る
-    if not committable:
+    # 書き込みの API から直コミットできる種類が無い配信元は、書き込みと削除があれば取得・取り込みの前に断る
+    if not committable and (request.writes or request.deletes):
         kinds = list(source.config.direct_commit.kinds) if source.config.direct_commit else []
         raise DirectCommitNotPermittedError(
             message=(
@@ -2577,6 +2587,10 @@ def _write_api_commit_target(
                 "端末の設定の sources[].direct_commit.write_api_kinds に直コミットする種類を記載してください"
             ],
         )
+    # 配信元の設定の書き換えは、許可と書き換えるファイルを取得・取り込みの前に確かめる
+    if request.source_config is not None:
+        check_source_config_permitted(source)
+        source_config_relative_path(source)
     return source, plan, committable
 
 
@@ -2684,6 +2698,7 @@ def commit_documents(
     repo_locks: RepositoryLocks,
     timeout_sec: float,
     state_dir: Path,
+    reload_sources: Callable[[], object],
     now: datetime | None = None,
     limits: CallLimits | None = None,
 ) -> CommitDocumentsResult:
@@ -2712,19 +2727,34 @@ def commit_documents(
     if request.dry_run:
         with _commit_locks(repo_locks, locks, plan, limits):
             return run.dry_run()
+    conflicted: ProjectIndexError | None = None
+    kept: tuple[str, str] | None = None
+    result: CommitResult | None = None
     with _commit_locks(repo_locks, locks, plan, limits):
         try:
             result = run_direct_commit(plan, run.write_once, limits=limits)
         except CONFLICT_ERRORS as error:
-            # 編集を始めたときのコミットが無い要求は、今と同じに断る
-            if request.base_commit is None:
+            # 編集を始めたときのコミットが無い要求と、書き換えられないキーだけの違反は、今と同じに断る
+            if request.base_commit is None or _protected_only(error):
                 raise
-            conflicted: ProjectIndexError = error
+            conflicted = error
             kept = run.keep(error, write=True)
-        else:
-            return run.result_of(applied=True, commit=result)
-    # 排他を放した後に、衝突したときのスクリプトを実行する
-    return run.finish_conflict(kept, conflicted)
+    # 衝突した: 排他を放した後に、衝突したときのスクリプトを実行する
+    if conflicted is not None:
+        return run.finish_conflict(kept, conflicted)
+    # プッシュした: 配信元の設定を書き換えたときは、排他を放した後に配信元を再読み込みする
+    return run.result_of(
+        applied=True,
+        commit=cast("CommitResult", result),
+        reloaded=run.reload_after_push(reload_sources),
+    )
+
+
+def _protected_only(error: ProjectIndexError) -> bool:
+    """検査の不合格の違反が全て書き換えられないキーのときに真を返す。"""
+    if not isinstance(error, ValidationFailedError) or not error.violations:
+        return False
+    return all(item.rule == "protected_key" for item in error.violations)
 
 
 @dataclass
@@ -2745,9 +2775,14 @@ class _CommitDocumentsRun:
     base_sha: str = ""
     # 最後に当てた書き込みと削除の結果
     done: list[_Committed] = field(default_factory=list["_Committed"])
+    # 取り込んだ後のワークツリーの project-index.yaml（書き換えられないキーを比べる相手と差分の前）
+    config_current: str | None = None
 
     def prepare(self, target: Target) -> tuple[_Session, _Committed]:
         """書く場所の内容と設定で、書き込みと削除を当てて直コミットの確認まで進める。"""
+        # 配信元の設定を書き換えるときは、書き換えた後の設定のスキーマで続く書き込みと削除を確かめる
+        if self.request.source_config is not None:
+            target = self.prepare_source_config(target)
         session = _Session(self.store, target, deadline=self.limits.write_deadline)
         committed, changed, before = _apply_commit_documents(
             session, self.checker, self.request, self.now
@@ -2763,8 +2798,55 @@ class _CommitDocumentsRun:
         )
         if committed.deleted is not None:
             _remove_documents(session, committed.deleted.accepted)
+        # 配信元の設定の書き換えも、同じコミットで書くファイルにする
+        if self.request.source_config is not None:
+            session.pending[SOURCE_CONFIG_FILE] = self.request.source_config.content
         self.done[:] = [committed]
         return session, committed
+
+    def prepare_source_config(self, target: Target) -> Target:
+        """書く場所の project-index.yaml とバージョンを照合して検査し、書き換えた後の設定の書く場所を返す。"""
+        request = cast("SourceConfigWrite", self.request.source_config)
+        current = (target.base / SOURCE_CONFIG_FILE).read_text(encoding="utf-8")
+        # 最初に当てる書く場所（取り込んだ後の今のブランチのワークツリー）の内容を、比べる相手にする
+        if self.config_current is None:
+            self.config_current = current
+        if content_hash(current) != request.expected_version:
+            raise VersionMismatchError(
+                message=(
+                    f"{self.source.id} の配信元の設定は参照した後に変わっています"
+                    f"（今のバージョン {content_hash(current)}）"
+                ),
+                current=content_hash(current),
+                diff=diff_lines(current, request.content),
+                violations=[
+                    Violation(
+                        path="sourceConfig",
+                        rule="配信元の設定のバージョンが今のバージョンと違います",
+                        fix="配信元の設定の原本を再取得してから、新しいバージョンで再実行してください",
+                    )
+                ],
+                next_steps=["GET /sources/{source}/config/file で再取得してから再実行してください"],
+            )
+        # 書き換えられないキーは今のブランチの内容と比べ、スキーマと起動の検証は書く場所で行う
+        value = check_source_config_content(
+            request.content, current=self.config_current, root=target.base
+        )
+        _check_source_config_secrets(self.config_current, value)
+        return dataclasses.replace(
+            target, source=dataclasses.replace(target.source, config=build_source_config(value))
+        )
+
+    def reload_after_push(self, reload_sources: Callable[[], object]) -> bool | None:
+        """配信元の設定をプッシュしたときだけ配信元を再読み込みし、成否を返す（失敗してもコミットは戻さない）。"""
+        if self.request.source_config is None:
+            return None
+        try:
+            reload_sources()
+        except Exception as error:  # noqa: BLE001 - 再読み込みの失敗は応答の reloaded で伝える
+            logger.warning("配信元の設定の再読み込みに失敗した（%s・%s）", self.source.id, error)
+            return False
+        return True
 
     def verify_base(self) -> None:
         """編集を始めたときのコミットがクローンにあり、コミットするブランチの祖先かを確かめる。"""
@@ -2814,6 +2896,9 @@ class _CommitDocumentsRun:
         except WriteDeadlineExceededError:
             raise
         except Exception as kept_error:
+            # 今の書き換えられないキーと違う: 衝突にせず、一時のワークツリーで断った理由で断る
+            if isinstance(kept_error, ProjectIndexError) and _protected_only(kept_error):
+                raise
             # 検査の不合格でない失敗（git の失敗など）: 原因を追えるようにログに出す
             if not isinstance(kept_error, CONFLICT_ERRORS):
                 logger.warning(
@@ -2867,10 +2952,20 @@ class _CommitDocumentsRun:
         applied: bool,
         commit: CommitResult | None,
         conflict: ConflictResult | None = None,
+        reloaded: bool | None = None,
     ) -> CommitDocumentsResult:
         """最後に当てた書き込みと削除の結果を返す。"""
         committed = self.done[0]
         deleted = committed.deleted
+        source_config = None
+        # 配信元の設定を受けたときだけ、書き込んだ後のバージョン・差分・再読み込みを持つ
+        if self.request.source_config is not None:
+            content = self.request.source_config.content
+            source_config = SourceConfigResult(
+                version=content_hash(content),
+                diff=diff_lines(self.config_current or "", content),
+                reloaded=bool(reloaded),
+            )
         return CommitDocumentsResult(
             applied=applied,
             writes=committed.applied.results,
@@ -2878,6 +2973,25 @@ class _CommitDocumentsRun:
             unlinked=[] if deleted is None else deleted.unlinked,
             commit=commit,
             conflict=conflict,
+            source_config=source_config,
+        )
+
+
+def _check_source_config_secrets(current: str, value: Mapping[str, Any]) -> None:
+    """書き換えた後の配信元の設定の変わった値から、秘密の値の書式に該当する箇所を断る。"""
+    before = load_yaml(current)
+    findings = secret_findings(cast("dict[str, Any]", before) if is_dict(before) else None, value)
+    if findings:
+        raise ValidationFailedError(
+            message=f"配信元の設定が検査に合格しません（{len(findings)} 件）",
+            violations=[
+                Violation(
+                    path=f"sourceConfig.{finding.path}",
+                    rule=f"秘密の値（{finding.kind}）を含む",
+                    fix="値を取り除いてから再実行してください",
+                )
+                for finding in findings
+            ],
         )
 
 

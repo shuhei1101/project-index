@@ -494,6 +494,7 @@ def direct_commit_checks(
     worktree_branches: set[str],
     terminal_kinds: Iterable[str] = (),
     terminal_write_api_kinds: Iterable[str] = (),
+    terminal_write_api_config: bool = False,
 ) -> tuple[list[Violation], list[Violation]]:
     """スキーマに合格した直コミットの設定の、直コミットだけを断る違反と警告を求める。"""
     settings = config.direct_commit
@@ -536,6 +537,14 @@ def direct_commit_checks(
         for index, kind in enumerate(terminal_write_api_kinds)
         if kind not in settings.kinds
     )
+    # 端末の設定だけが配信元の設定の直コミットを許可している
+    if terminal_write_api_config and not settings.config:
+        warnings.append(
+            Violation(
+                path="sources[].direct_commit.write_api_config",
+                rule="配信元の direct_commit.config が true でないため使用しない",
+            )
+        )
     return violations, warnings
 
 
@@ -560,6 +569,7 @@ def _with_direct_commit(source: ServedSource, entry: SourceEntry) -> ServedSourc
         worktree_branches=source_worktree_branches(source),
         terminal_kinds=entry.direct_commit.kinds.keys(),
         terminal_write_api_kinds=entry.direct_commit.write_api_kinds,
+        terminal_write_api_config=entry.direct_commit.write_api_config,
     )
     for item in violations:
         logger.error(
@@ -579,6 +589,8 @@ def _with_direct_commit(source: ServedSource, entry: SourceEntry) -> ServedSourc
             kind for kind in entry.direct_commit.write_api_kinds if kind in settings.kinds
         ],
         direct_commit_on_conflict=entry.direct_commit.on_conflict,
+        # 端末の設定と配信元の設定の両方で許可したときだけ、配信元の設定を直コミットできる
+        direct_commit_write_api_config=entry.direct_commit.write_api_config and settings.config,
         direct_commit_problems=violations,
     )
 
@@ -629,15 +641,16 @@ def build_source_config(value: dict[str, Any]) -> SourceConfig:
         options["decision_folders"] = list(decisions["folders"])
     if "direct_commit" in value:
         direct = value["direct_commit"]
+        # `config: true` の配信元は `kinds` を省ける
+        kinds = direct.get("kinds", [])
         options["direct_commit"] = DirectCommitConfig(
             branch=direct["branch"],
-            kinds=[_direct_commit_kind_id(item) for item in direct["kinds"]],
+            kinds=[_direct_commit_kind_id(item) for item in kinds],
             branches=list(direct.get("branches", [])),
             metadata_only_kinds=[
-                str(item["id"])
-                for item in direct["kinds"]
-                if is_dict(item) and item.get("body") is False
+                str(item["id"]) for item in kinds if is_dict(item) and item.get("body") is False
             ],
+            config=bool(direct.get("config", False)),
         )
     return SourceConfig(
         name=value["name"],
@@ -1164,6 +1177,11 @@ def load_source_at(source: ServedSource, root: Path) -> ServedSource:
         direct_commit_scope=source.direct_commit_scope,
         direct_commit_kinds=source.direct_commit_kinds,
         direct_commit_write_api_kinds=source.direct_commit_write_api_kinds,
+        direct_commit_write_api_config=(
+            source.direct_commit_write_api_config
+            and served.config.direct_commit is not None
+            and served.config.direct_commit.config
+        ),
         direct_commit_on_conflict=source.direct_commit_on_conflict,
         direct_commit_problems=direct_commit_checks(served.config, worktree_branches=set())[0],
     )

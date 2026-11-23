@@ -169,6 +169,8 @@ class VersionMismatchError(ProjectIndexError):
     doc_id: str = ""
     current: str = ""
     diff: str = ""
+    # 配信元の設定のバージョンの不一致のときだけ、パス sourceConfig の違反を持つ
+    violations: list[Violation] = field(default_factory=list[Violation])
 
 
 @dataclass(kw_only=True)
@@ -325,6 +327,27 @@ class DirectCommitNotPermittedError(ProjectIndexError):
     status: ClassVar[int] = 403
     source_id: str = ""
     kinds: list[str] = field(default_factory=list[str])
+
+
+@dataclass(kw_only=True)
+class SourceConfigNotPermittedError(ProjectIndexError):
+    """書き込みの API から配信元の設定の直コミットを許可していない配信元。"""
+
+    status: ClassVar[int] = 403
+    source_id: str = ""
+    # 許可の無い側（端末の設定の write_api_config・配信元の設定の direct_commit.config）
+    missing: list[Literal["write_api_config", "direct_commit.config"]] = field(
+        default_factory=list[Literal["write_api_config", "direct_commit.config"]]
+    )
+
+
+@dataclass(kw_only=True)
+class SourceConfigSplitError(ProjectIndexError):
+    """端末の設定の config が配信元のフォルダの project-index.yaml 1 つでない配信元。"""
+
+    status: ClassVar[int] = 409
+    source_id: str = ""
+    files: list[str] = field(default_factory=list[str])
 
 
 @dataclass(kw_only=True)

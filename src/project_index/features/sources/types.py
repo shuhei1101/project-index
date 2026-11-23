@@ -129,6 +129,8 @@ class DirectCommitConfig:
     branches: list[str] = field(default_factory=list[str])
     # `kinds` のうち `body: false` の要素の種類（本文の直コミットを断り、メタデータだけを許可する）
     metadata_only_kinds: list[str] = field(default_factory=list[str])
+    # 書き込みの API が配信元の設定（`project-index.yaml`）を直コミットで書き換えることを許可するか
+    config: bool = False
 
 
 @dataclass(frozen=True)
@@ -195,6 +197,8 @@ class ServedSource:
     direct_commit_kinds: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
     # 端末の設定の `sources[].direct_commit.write_api_kinds`（配信元の `direct_commit.kinds[]` に無い種類は除く）
     direct_commit_write_api_kinds: list[str] = field(default_factory=list[str])
+    # 端末の設定の `sources[].direct_commit.write_api_config` と配信元の `direct_commit.config` が両方とも真か
+    direct_commit_write_api_config: bool = False
     # 端末の設定の `sources[].direct_commit.on_conflict`。書き込みの API が衝突してブランチに残した後に実行する
     direct_commit_on_conflict: OnConflictScript | None = None
     # 配信を続け、直コミットだけを断る違反

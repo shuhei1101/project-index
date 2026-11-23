@@ -102,11 +102,21 @@ properties:
     type: object
     title: 直コミット
     additionalProperties: false
-    required: [branch, kinds]
+    required: [branch]
+    # config: true のときだけ kinds を省ける
+    if:
+      required: [config]
+      properties:
+        config:
+          const: true
+    else:
+      required: [kinds]
     properties:
       branch:
         type: string
         minLength: 1
+      config:
+        type: boolean
       branches:
         type: array
         items:
