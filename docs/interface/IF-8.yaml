@@ -189,7 +189,7 @@ flows:
 
       <!-- /map -->
     expected:
-      - 合図の前の `running` が 1 件で、`tool` が `search_docs`、`source` が `sample`、`executor` が `docs`、`state` が `running`、`seconds` が 0 以上
+      - 合図の前の `running` が 1 件で、`tool` が `search_docs`、`sources` が `["sample"]`、`executor` が `docs`、`state` が `running`、`seconds` が 0 以上
       - 合図の前の markdown に、実行中の要求の表が出る
       - 合図の後の `running` が空で、markdown に実行中の要求の表が出ない
     test: test_normal_when_requests_running
@@ -292,13 +292,10 @@ response:
     description: ID が先の文書と重なり、配信から除外した文書の件数（`check_project` と同じ）
   - name: running
     type: list[RunningRequest]
-    description: 文書の MCP・読み取り API・書き込みの後の通知の判定の要求のうち、終わっていないもの。経過秒の長い順に並べる。markdown では配信元の表の後に表で出し、0 件なら表を出さない
+    description: 文書の MCP・読み取り API・書き込みの後の通知の判定の要求のうち、終わっていないもの。経過秒の長い順に並べる。markdown では配信元の表の後に、列をツール・配信元（`sources` を `・` でつなぐ。空なら `-`）・実行スロット・状態・経過秒（小数 1 桁）にした表で出し、0 件なら表を出さない
   - name: running[].tool
     type: str
     description: MCP のツール名か、読み取り API のルートの名前。書き込みの後の通知の判定は `post_write`
-  - name: running[].source
-    type: str | None
-    description: 要求が指す配信元の ID。指さないときは `null`
   - name: running[].executor
     type: Literal['docs', 'post_write']
     description: 要求を動かす実行スロット。`docs` は文書の MCP・読み取り API、`post_write` は書き込みの後の通知の判定
@@ -308,6 +305,9 @@ response:
   - name: running[].seconds
     type: float
     description: 要求を受けてからの経過秒
+  - name: running[].sources
+    type: list[str]
+    description: 要求が指す配信元の ID を全て並べる。`source` に `"*"` を指定した要求は、配信元を解決した後の ID を並べる（解決する前は空）。書き込みの後の通知の判定は、`paths` を含む配信元の ID。配信元を指さないときは空
 response_example: |-
   ```markdown
   http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
@@ -316,6 +316,13 @@ response_example: |-
   | --- | --- | --- | --- |
   | sample | serving | 1（current） | 0 |
   | broken | not_served（documents[0].paths: 必須のキーが無い） | - | - |
+
+  実行中の要求:
+
+  | ツール | 配信元 | 実行スロット | 状態 | 経過秒 |
+  | --- | --- | --- | --- | --- |
+  | write_docs | sample | docs | running | 1620.4 |
+  | write_docs | sample | docs | waiting | 230.2 |
   ```
 exceptions:
   - name: なし（正常終了）
