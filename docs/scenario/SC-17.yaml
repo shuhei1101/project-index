@@ -722,6 +722,7 @@ scenarios:
   - 応答が失敗で、`guide.md` の行の操作の位置と、種類 `files` は本文（`@body`）の直コミットを断っていることを返却する
   - '`guide.md` の行を消す操作を含む要求も、同じ理由で断る'
   - 文書 1 も書き換わらず、sample のリモートと全てのワークツリーは変わらない
+  - '`guide.md` の本文からリンクされた文書 1 を改名する操作（参照元の `guide.md` の行の `@body` が書き換わる）を含む要求も、書き換わる `guide.md` の行の ID を返却して要求全体を断る'
   test: test_error_when_body_not_allowed
 refs:
 - to: SC-1

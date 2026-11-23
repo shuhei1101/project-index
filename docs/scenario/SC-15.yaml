@@ -814,6 +814,7 @@ scenarios:
       - '`isError: true` で、添字 0 の違反として、種類 `files` は本文（`@body`）の直コミットを断っていることを返却する'
       - '`text_edits` で `@body` を書き換える操作と、本文のファイルを新規作成する `create`・`replace` も、同じ違反で断る'
       - sample のリモートと develop のワークツリーは変わらず、`guide.md` と `files.yml` も変わらない
+      - '`new_path` で `guide.md` の行の本文のファイルを移す `rename`、`guide.md` の本文からリンクされた種類 `note` の文書の `rename`（参照元の `@body` が書き換わる）、`guide.md` の本文を置換する `replace_text`（`fields` に `@body` を含むか `fields` を省く）も、同じ違反で断る。違反には、本文が書き換わる・移る `guide.md` の行の ID を入れる'
     test: test_error_when_body_not_allowed
   - name: 異常シナリオ（本文の直コミットを断る種類の文書を消す）
     setup:
