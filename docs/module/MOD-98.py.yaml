@@ -107,6 +107,8 @@ classes:
       | `RevisionExportTimeoutError` | リビジョンの書き出しの待ち時間の超過 | `operation: str`・`commit: str`・`limit_sec: float` | 504 |
       | `DirectCommitNotConfiguredError` | 直コミットを使用できない配信元 | `source_id: str`・`reason: str` | 409 |
       | `DirectCommitNotPermittedError` | 直コミットを呼べない作業場所・書き込みの API から許可していない種類 | `source_id: str`・`kinds: list[str]` | 403 |
+      | `SourceConfigNotPermittedError` | 書き込みの API から配信元の設定の直コミットを許可していない配信元 | `source_id: str`・`missing: list[Literal['write_api_config', 'direct_commit.config']]` | 403 |
+      | `SourceConfigSplitError` | 端末の設定の `config` が配信元のフォルダの `project-index.yaml` 1 つでない配信元 | `source_id: str`・`files: list[str]` | 409 |
       | `BranchNotAllowedError` | 上書きできないブランチ | `branch: str`・`allowed: list[str]` | 403 |
       | `CommitWorktreeNotFoundError` | コミットするブランチのワークツリーが無い | `branch: str` | 409 |
       | `UnpushedCommitsError` | ワークツリーの未プッシュのコミット | `worktree: str`・`ahead: int`・`behind: int` | 409 |

@@ -380,7 +380,7 @@ functions:
          - `[warning]` 配信元の設定のバージョンが古い（ID・設定のバージョン・サーバーが参照できるバージョン）
       8. `entry.storage` が `disk` の場合、Git の作業ツリーとして扱わず、直下とメインのリポジトリを引かない。それ以外は設定ファイルのフォルダが Git の作業ツリーかとその直下を引く（履歴の『リポジトリの直下』）。`entry.storage` が `git` で Git の作業ツリーの外の場合、`sources[{index}].storage.type` に「フォルダが Git の作業ツリーの中にありません」の違反を持つ `not_served` を返す。『paths の基準のフォルダの解決』で `root` を決める（範囲の違反は手順 4 の検証で返している）
       9. 種類ごとのスキーマを設定ファイルのフォルダから、文書の行 1 つごとに `unit` の 1 件の中で読み（設定の commit がある場合はそのリビジョンのファイル。`schema_path` が `SchemaRef` の行は参照先のスキーマの読み取りの結果）、`worktrees` をメインのリポジトリの直下（Git でなければ設定ファイルのフォルダ）からの絶対パスにして、`ServedSource` を作る。`config_dir` は `root` から設定ファイルのフォルダへの相対パス、`scope_write` が無ければ `[str(設定ファイルのフォルダ)]`。ID は `entry.id`、無ければ `config.name`。`outside_read` は `entry.outside_read`、`storage` は `entry.storage` の `type`（省いた行は `None`）。`storage` が `disk` の場合、`worktree_globs` は空にする
-      10. 設定に `direct_commit` があれば、ワークツリーのブランチ（`source_worktree_branches`）と `entry.direct_commit.kinds` のキーと `entry.direct_commit.write_api_kinds` で直コミットの設定の確認を呼ぶ。違反は `[error]`（配信を続け、直コミットだけを断る）、警告は `[warning]` に書き、`direct_commit_scope` に `entry.direct_commit.scope`、`direct_commit_kinds` に `entry.direct_commit.kinds` のうち `direct_commit.kinds` にある種類、`direct_commit_write_api_kinds` に `entry.direct_commit.write_api_kinds` のうち `direct_commit.kinds` にある種類、`direct_commit_on_conflict` に `entry.direct_commit.on_conflict`、`direct_commit_problems` に違反を入れる
+      10. 設定に `direct_commit` があれば、ワークツリーのブランチ（`source_worktree_branches`）と `entry.direct_commit.kinds` のキーと `entry.direct_commit.write_api_kinds`・`entry.direct_commit.write_api_config` で直コミットの設定の確認を呼ぶ。違反は `[error]`（配信を続け、直コミットだけを断る）、警告は `[warning]` に書き、`direct_commit_scope` に `entry.direct_commit.scope`、`direct_commit_kinds` に `entry.direct_commit.kinds` のうち `direct_commit.kinds` にある種類、`direct_commit_write_api_kinds` に `entry.direct_commit.write_api_kinds` のうち `direct_commit.kinds` にある種類、`direct_commit_on_conflict` に `entry.direct_commit.on_conflict`、`direct_commit_write_api_config` に `entry.direct_commit.write_api_config` が真で配信元の `direct_commit.config` も真のときだけ `True`、`direct_commit_problems` に違反を入れる
       11. `ServedSource` と `serving` を返す
 
       違反で返すときは `[error]` 配信元を配信しない（違反ごとに `{id}: {パス}: {理由}`）を書く。
@@ -951,7 +951,7 @@ functions:
       description: 配信中の配信元・設定・違反。違反があれば配信元は `None`
     process: |-
       1. 読み書きの方法から Git のリポジトリの直下を決め、設定の値をスキーマと文書の行で検証する（違反があれば違反を返却する）
-      2. 配信元の設定を作り（`direct_commit.kinds[]` は、文字列の要素とオブジェクトの要素の `id` を `DirectCommitConfig.kinds`、`body: false` の要素の `id` を `metadata_only_kinds` にする）、スクリプトを確認する
+      2. 配信元の設定を作り（`direct_commit.kinds[]` は、文字列の要素とオブジェクトの要素の `id` を `DirectCommitConfig.kinds`、`body: false` の要素の `id` を `metadata_only_kinds`、`direct_commit.config` を `DirectCommitConfig.config` にする）、スクリプトを確認する
       3. 行ごとのスキーマを読み込み、`scope_write` をそのまま、`builtin` を持つ配信中の配信元を返却する
     unit_tests:
       - name: test_assemble_values
@@ -973,6 +973,12 @@ functions:
         condition: '`direct_commit.kinds` が `[note, {id: files, body: false}, {id: memo}]` の値（`documents[]` に 3 つともある）'
         mock: なし（一時フォルダ）
         expected: 違反が 0 件で、`direct_commit.kinds` が `[note, files, memo]`、`metadata_only_kinds` が `[files]`
+      - name: test_assemble_values_when_config_only
+        case: 正常
+        summary: 配信元の設定だけを許可する直コミット
+        condition: '`direct_commit` が `branch: develop`・`config: true` で `kinds` を持たない'
+        mock: なし
+        expected: 違反が 0 件で、`direct_commit.config` が `True`、`direct_commit.kinds` が空
   - name: direct_commit_checks
     title: 直コミットの設定の確認
     kind: 関数
@@ -1010,6 +1016,13 @@ functions:
         default: ()
         passing: keyword
         description: 端末の設定の `sources[].direct_commit.write_api_kinds`
+      - name: terminal_write_api_config
+        title: 端末の設定の配信元の設定の直コミット
+        type: bool
+        required: false
+        default: 'False'
+        passing: keyword
+        description: 端末の設定の `sources[].direct_commit.write_api_config`
     returns:
       type: tuple[list[Violation], list[Violation]]
       description: 直コミットだけを断る違反と、警告
@@ -1019,8 +1032,9 @@ functions:
       3. `direct_commit.branch` が `worktree_branches` に無い場合、パス `direct_commit.branch` の警告を集める
       4. `terminal_kinds` のうち `direct_commit.kinds` に無い種類ごとに、パス `sources[].direct_commit.kinds.{種類}` の警告を集める
       5. `terminal_write_api_kinds` のうち `direct_commit.kinds` に無い種類ごとに、パス `sources[].direct_commit.write_api_kinds[{n}]` の警告（「{種類} は配信元の direct_commit.kinds[] に無いため使用しない」）を集める
+      6. `terminal_write_api_config` が真で `direct_commit.config` が偽の場合、パス `sources[].direct_commit.write_api_config` の警告（「配信元の direct_commit.config が true でないため使用しない」）を集める
 
-      6. 違反と警告を返す
+      7. 違反と警告を返す
     unit_tests:
       - name: test_direct_commit_checks
         case: 正常
@@ -1040,6 +1054,12 @@ functions:
         condition: '`kinds: [note]`、`terminal_write_api_kinds: [note, rule]`'
         mock: なし
         expected: 警告が `sources[].direct_commit.write_api_kinds[1]` の 1 件
+      - name: test_direct_commit_checks_when_write_api_config
+        case: 正常
+        summary: 配信元の設定で許可していない配信元の端末の許可を警告する
+        condition: '`direct_commit.config` が偽、`terminal_write_api_config` が真'
+        mock: なし
+        expected: 警告が `sources[].direct_commit.write_api_config` の 1 件
   - name: source_worktree_branches
     title: 配信元のワークツリーのブランチ
     kind: 関数
