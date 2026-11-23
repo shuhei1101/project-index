@@ -502,11 +502,25 @@ def _direct_commit_lines(spec: SourceSpec) -> list[str]:
         return []
     lines = ["    direct_commit:", "      scope:"]
     lines.extend(f"        - {path}" for path in spec.direct_commit_scope or [])
-    if spec.direct_commit_kinds:
-        lines.append("      kinds:")
-        for kind, paths in spec.direct_commit_kinds.items():
-            lines.append(f"        {kind}:")
-            lines.extend(f"          - {path}" for path in paths)
+    lines.extend(_direct_commit_kinds_lines(spec))
+    lines.extend(_direct_commit_option_lines(spec))
+    return lines
+
+
+def _direct_commit_kinds_lines(spec: SourceSpec) -> list[str]:
+    """`direct_commit.kinds` の YAML の行を組み立てる（無いか空なら空）。"""
+    if not spec.direct_commit_kinds:
+        return []
+    lines = ["      kinds:"]
+    for kind, paths in spec.direct_commit_kinds.items():
+        lines.append(f"        {kind}:")
+        lines.extend(f"          - {path}" for path in paths)
+    return lines
+
+
+def _direct_commit_option_lines(spec: SourceSpec) -> list[str]:
+    """`direct_commit` の `write_api_kinds`・`on_conflict` の YAML の行を組み立てる（指定したものだけ）。"""
+    lines: list[str] = []
     if spec.direct_commit_write_api_kinds is not None:
         lines.append("      write_api_kinds:")
         lines.extend(f"        - {kind}" for kind in spec.direct_commit_write_api_kinds)
