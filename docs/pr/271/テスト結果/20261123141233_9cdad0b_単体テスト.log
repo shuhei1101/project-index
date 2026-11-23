@@ -1,0 +1,352 @@
+$ TMPDIR=/tmp/pi271/tmp uv run pytest tests/unit/
+# TMPDIR: 手元の /tmp/pytest-of-shuhei2441 の持ち主が root で pytest の一時フォルダを作れないため、環境変数だけを変えた（引数・オプションは加えていない）
+# fail 2 件はどちらも実装（閉じたファイルのハンドラーが開き直さない処理）が無いことによる:
+#   - test_run_serve_when_log_after_close: 閉じた後のログで project-index.log が開き直され、stream が残る
+#   - test_build_handlers_when_default_ref_moved: 上のテストが開き直して残したファイルの PytestUnraisableExceptionWarning が、GC の時機でこのテストに出た（単独の実行では pass）
+
+============================= test session starts ==============================
+platform linux -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: /home/shuhei2441/repo/project-index/.claude/worktrees/fix-server-close-logging-race
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collected 1655 items
+
+tests/unit/plugins/project_index/hooks/test_post_tool_use.py ........... [  0%]
+                                                                         [  0%]
+tests/unit/plugins/project_index/hooks/test_pre_tool_use.py ....         [  0%]
+tests/unit/plugins/project_index/hooks/test_session_start.py ........... [  1%]
+.........                                                                [  2%]
+tests/unit/project_index/features/access/test_service.py ............... [  3%]
+...........................................                              [  5%]
+tests/unit/project_index/features/access/test_types.py .                 [  5%]
+tests/unit/project_index/features/admin/test_render.py ..............    [  6%]
+tests/unit/project_index/features/admin/test_service.py ................ [  7%]
+................................                                         [  9%]
+tests/unit/project_index/features/changes/test_compare.py .....          [  9%]
+tests/unit/project_index/features/changes/test_render.py .....           [ 10%]
+tests/unit/project_index/features/changes/test_service.py .............. [ 10%]
+...                                                                      [ 11%]
+tests/unit/project_index/features/checkpoint/test_changed.py ........... [ 11%]
+.                                                                        [ 11%]
+tests/unit/project_index/features/checkpoint/test_record.py .....        [ 12%]
+tests/unit/project_index/features/convert/test_decisions.py ...          [ 12%]
+tests/unit/project_index/features/convert/test_service.py ..........     [ 12%]
+tests/unit/project_index/features/describe/test_render.py ...........    [ 13%]
+tests/unit/project_index/features/describe/test_service.py ............. [ 14%]
+.                                                                        [ 14%]
+tests/unit/project_index/features/describe/test_source_checks.py ....... [ 14%]
+.                                                                        [ 14%]
+tests/unit/project_index/features/describe/test_warnings.py .......      [ 15%]
+tests/unit/project_index/features/documents/test_aliases.py ..........   [ 15%]
+tests/unit/project_index/features/documents/test_fields.py ............. [ 16%]
+...........................................................              [ 20%]
+tests/unit/project_index/features/documents/test_indexable.py .......... [ 20%]
+......                                                                   [ 21%]
+tests/unit/project_index/features/documents/test_loader.py ............. [ 21%]
+....................                                                     [ 23%]
+tests/unit/project_index/features/documents/test_schema.py ............. [ 23%]
+                                                                         [ 23%]
+tests/unit/project_index/features/documents/test_sqlite_rows.py ........ [ 24%]
+.............                                                            [ 25%]
+tests/unit/project_index/features/documents/test_store.py .............. [ 26%]
+................................................................         [ 29%]
+tests/unit/project_index/features/history/test_blob.py .....             [ 30%]
+tests/unit/project_index/features/history/test_query.py ................ [ 31%]
+..                                                                       [ 31%]
+tests/unit/project_index/features/history/test_snapshot.py ........      [ 31%]
+tests/unit/project_index/features/lifecycle/test_control.py ...          [ 32%]
+tests/unit/project_index/features/lifecycle/test_update.py ............. [ 32%]
+....                                                                     [ 33%]
+tests/unit/project_index/features/links/test_service.py ................ [ 34%]
+.                                                                        [ 34%]
+tests/unit/project_index/features/migrate/test_service.py .............. [ 34%]
+                                                                         [ 34%]
+tests/unit/project_index/features/migrate/test_steps.py ...........      [ 35%]
+tests/unit/project_index/features/outline/test_code.py .....             [ 35%]
+tests/unit/project_index/features/outline/test_markdown.py ......        [ 36%]
+tests/unit/project_index/features/outline/test_service.py ............   [ 36%]
+tests/unit/project_index/features/post_write/test_notified.py ...        [ 37%]
+tests/unit/project_index/features/post_write/test_route.py ...           [ 37%]
+tests/unit/project_index/features/post_write/test_service.py ........... [ 38%]
+...                                                                      [ 38%]
+tests/unit/project_index/features/prompt_doc/test_cli.py ..              [ 38%]
+tests/unit/project_index/features/prompt_doc/test_markdown.py .......... [ 38%]
+.......                                                                  [ 39%]
+tests/unit/project_index/features/prompt_doc/test_render.py ............ [ 40%]
+...                                                                      [ 40%]
+tests/unit/project_index/features/prompt_doc/test_runtime.py ........... [ 40%]
+.                                                                        [ 40%]
+tests/unit/project_index/features/read/test_nav.py .......               [ 41%]
+tests/unit/project_index/features/read/test_paths.py ..                  [ 41%]
+tests/unit/project_index/features/read/test_route.py ........            [ 41%]
+tests/unit/project_index/features/read/test_search.py ...                [ 42%]
+tests/unit/project_index/features/read/test_service.py ................. [ 43%]
+......                                                                   [ 43%]
+tests/unit/project_index/features/related/test_graph.py ....             [ 43%]
+tests/unit/project_index/features/related/test_service.py .........      [ 44%]
+tests/unit/project_index/features/related/test_suggest.py .              [ 44%]
+tests/unit/project_index/features/search/test_body_parts.py ....         [ 44%]
+tests/unit/project_index/features/search/test_cursor.py ..               [ 44%]
+tests/unit/project_index/features/search/test_fields.py ..........       [ 45%]
+tests/unit/project_index/features/search/test_filters.py ............... [ 46%]
+........                                                                 [ 46%]
+tests/unit/project_index/features/search/test_render.py ......           [ 47%]
+tests/unit/project_index/features/search/test_service.py ............... [ 48%]
+..........                                                               [ 48%]
+tests/unit/project_index/features/search/test_snippets.py ........       [ 49%]
+tests/unit/project_index/features/search/test_terms.py .....             [ 49%]
+tests/unit/project_index/features/seen/test_store.py ......              [ 49%]
+tests/unit/project_index/features/seen/test_types.py .                   [ 49%]
+tests/unit/project_index/features/session_start/test_route.py ..         [ 49%]
+tests/unit/project_index/features/session_start/test_service.py ....     [ 50%]
+tests/unit/project_index/features/settings/test_query.py ............... [ 51%]
+...................                                                      [ 52%]
+tests/unit/project_index/features/settings/test_route.py .............   [ 53%]
+tests/unit/project_index/features/settings/test_service.py ............. [ 53%]
+..........................                                               [ 55%]
+tests/unit/project_index/features/skew/test_service.py ............      [ 56%]
+tests/unit/project_index/features/skill_md/test_build.py ............... [ 57%]
+................                                                         [ 58%]
+tests/unit/project_index/features/skill_md/test_cli.py .....             [ 58%]
+tests/unit/project_index/features/skill_md/test_types.py .               [ 58%]
+tests/unit/project_index/features/sources/test_builtin.py ....           [ 58%]
+tests/unit/project_index/features/sources/test_merge.py ....             [ 58%]
+tests/unit/project_index/features/sources/test_registry.py ............. [ 59%]
+.........................                                                [ 61%]
+tests/unit/project_index/features/sources/test_schema_ref.py ........    [ 61%]
+tests/unit/project_index/features/sources/test_service.py .............. [ 62%]
+........................................................................ [ 66%]
+.                                                                        [ 66%]
+tests/unit/project_index/features/sources/test_types.py ...........      [ 67%]
+tests/unit/project_index/features/validation/test_markdown.py .......... [ 68%]
+..                                                                       [ 68%]
+tests/unit/project_index/features/validation/test_rules.py .........     [ 68%]
+tests/unit/project_index/features/validation/test_scripts.py ....        [ 69%]
+tests/unit/project_index/features/validation/test_service.py ........... [ 69%]
+..........                                                               [ 70%]
+tests/unit/project_index/features/write/test_apply.py .................. [ 71%]
+...........................................                              [ 74%]
+tests/unit/project_index/features/write/test_conflict.py .............   [ 74%]
+tests/unit/project_index/features/write/test_direct_commit.py .......... [ 75%]
+..................                                                       [ 76%]
+tests/unit/project_index/features/write/test_hints.py ....               [ 76%]
+tests/unit/project_index/features/write/test_ids.py ..                   [ 76%]
+tests/unit/project_index/features/write/test_locks.py ...                [ 77%]
+tests/unit/project_index/features/write/test_placement.py .........      [ 77%]
+tests/unit/project_index/features/write/test_references.py ........      [ 78%]
+tests/unit/project_index/features/write/test_replace.py .....            [ 78%]
+tests/unit/project_index/features/write/test_route.py .....              [ 78%]
+tests/unit/project_index/features/write/test_secrets.py ................ [ 79%]
+                                                                         [ 79%]
+tests/unit/project_index/features/write/test_service.py ................ [ 80%]
+........................................................................ [ 84%]
+....................                                                     [ 86%]
+tests/unit/project_index/integrations/test_git.py ..............         [ 87%]
+tests/unit/project_index/integrations/test_mdmark.py .......             [ 87%]
+tests/unit/project_index/integrations/test_scripts.py .............      [ 88%]
+tests/unit/project_index/server/mcp/test_admin.py ....                   [ 88%]
+tests/unit/project_index/server/mcp/test_docs.py .....................   [ 89%]
+tests/unit/project_index/server/mcp/test_result.py ...........           [ 90%]
+tests/unit/project_index/server/test_app.py .........                    [ 90%]
+tests/unit/project_index/server/test_error_handlers.py .....             [ 91%]
+tests/unit/project_index/server/test_lifespan.py .                       [ 91%]
+tests/unit/project_index/server/test_origin.py .....                     [ 91%]
+tests/unit/project_index/shared/test_background.py ..........            [ 92%]
+tests/unit/project_index/shared/test_deadline.py .....                   [ 92%]
+tests/unit/project_index/shared/test_errors.py ..                        [ 92%]
+tests/unit/project_index/shared/test_files.py ...                        [ 92%]
+tests/unit/project_index/shared/test_hashing.py ..                       [ 92%]
+tests/unit/project_index/shared/test_narrowing.py ..........             [ 93%]
+tests/unit/project_index/shared/test_paths.py .....                      [ 93%]
+tests/unit/project_index/shared/test_runtime.py ..........               [ 94%]
+tests/unit/project_index/shared/test_schema_check.py .............       [ 95%]
+tests/unit/project_index/shared/test_yaml_io.py .............            [ 96%]
+tests/unit/project_index/test_main.py ................                   [ 96%]
+tests/unit/project_index/test_serve.py ......sample
+F......F................... [ 98%]
+.................                                                        [100%]
+
+=================================== FAILURES ===================================
+_____________________ test_run_serve_when_log_after_close ______________________
+
+serve_settings = PosixPath('/tmp/pi271/tmp/pytest-of-shuhei2441/pytest-0/test_run_serve_when_log_after_0/settings.yaml')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x718894722900>
+
+    def test_run_serve_when_log_after_close(
+        serve_settings: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """閉じた後に裏のスレッドがログを出してもログのファイルを開き直さない（正常系）。"""
+        # 準備
+        monkeypatch.setenv("PROJECT_INDEX_PORT", str(_free_port()))
+        captured: dict[str, Any] = {}
+        real_build_handlers = main_module.build_handlers
+        # 裏のスレッドの記録がフィルターに入った合図と、その記録を先へ進める合図
+        entered = threading.Event()
+        released = threading.Event()
+    
+        def spy_build_handlers(terminal: TerminalConfig) -> Any:
+            captured["handlers"] = real_build_handlers(terminal)
+            return captured["handlers"]
+    
+        def hold_late_record(record: logging.LogRecord) -> bool:
+            # 裏のスレッドの記録だけを、ハンドラーを閉じた後まで止める
+            if threading.current_thread().name == "project-index-late-log":
+                entered.set()
+                released.wait(timeout=30)
+            return True
+    
+        def fake_run(self: uvicorn.Server, *args: Any, **kwargs: Any) -> None:
+            file_handlers = [
+                handler
+                for handler in logging.getLogger().handlers
+                if isinstance(handler, RotatingFileHandler)
+            ]
+            captured["file_handler"] = file_handlers[0]
+            file_handlers[0].addFilter(hold_late_record)
+            captured["thread"] = threading.Thread(
+                target=logging.getLogger("project_index.tests").warning,
+                args=("閉じた後のログ",),
+                name="project-index-late-log",
+            )
+            captured["thread"].start()
+            entered.wait(timeout=30)
+            self.started = True
+            captured["handlers"].restart.request()
+    
+        executed: list[tuple[str, list[str]]] = []
+    
+        def fake_execv(path: str, argv: list[str]) -> None:
+            executed.append((path, argv))
+    
+        monkeypatch.setattr(main_module, "build_handlers", spy_build_handlers)
+        monkeypatch.setattr(uvicorn.Server, "run", fake_run)
+        monkeypatch.setattr(os, "execv", fake_execv)
+        # 実行
+        run_serve(argparse.Namespace())
+        released.set()
+        captured["thread"].join(timeout=30)
+        # 検証
+        assert len(executed) == 1
+>       assert captured["file_handler"].stream is None
+E       AssertionError: assert <_io.TextIOWrapper name='/tmp/pi271/tmp/pytest-of-shuhei2441/pytest-0/test_run_serve_when_log_after_0/state/logs/project-index.log' mode='a' encoding='utf-8'> is None
+E        +  where <_io.TextIOWrapper name='/tmp/pi271/tmp/pytest-of-shuhei2441/pytest-0/test_run_serve_when_log_after_0/state/logs/project-index.log' mode='a' encoding='utf-8'> = <RotatingFileHandler /tmp/pi271/tmp/pytest-of-shuhei2441/pytest-0/test_run_serve_when_log_after_0/state/logs/project-index.log (NOTSET)>.stream
+
+tests/unit/project_index/test_serve.py:341: AssertionError
+----------------------------- Captured stdout call -----------------------------
+http://127.0.0.1:47133/
+----------------------------- Captured stderr call -----------------------------
+2026-11-23 14:12:10,357 WARNING project_index.tests: 閉じた後のログ
+2026-11-23 14:12:10,357 INFO project_index.features.lifecycle.control: 再起動を始める（pid 45329）
+2026-11-23 14:12:10,357 WARNING project_index.features.sources.registry: 組み込みの配信元を加えなかった（/tmp/pi271/tmp/pytest-of-shuhei2441/pytest-0/test_run_serve_when_log_after_0/project-index.yaml がありません）
+------------------------------ Captured log call -------------------------------
+WARNING  project_index.tests:threading.py:1024 閉じた後のログ
+INFO     project_index.features.lifecycle.control:control.py:46 再起動を始める（pid 45329）
+WARNING  project_index.features.sources.registry:registry.py:547 組み込みの配信元を加えなかった（/tmp/pi271/tmp/pytest-of-shuhei2441/pytest-0/test_run_serve_when_log_after_0/project-index.yaml がありません）
+__________________ test_build_handlers_when_default_ref_moved __________________
+
+self = <ruamel.yaml.main.YAML.get_constructor_parser.<locals>.XLoader object at 0x10566780>
+kind = <class 'ruamel.yaml.nodes.ScalarNode'>, value = 'minLength'
+implicit = False
+
+    def resolve(self, kind: Any, value: Any, implicit: Any) -> Any:
+        if kind is ScalarNode and implicit[0]:
+            if value == "":
+                resolvers = self.versioned_resolver.get("", [])
+            else:
+                resolvers = self.versioned_resolver.get(value[0], [])
+>           resolvers += self.versioned_resolver.get(None, [])
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           ResourceWarning: unclosed file <_io.FileIO name='/tmp/pi271/tmp/pytest-of-shuhei2441/pytest-0/test_run_serve_when_log_after_0/state/logs/project-index.log' mode='ab' closefd=True>
+
+.venv/lib/python3.14/site-packages/ruamel/yaml/resolver.py:358: ResourceWarning
+
+The above exception was the direct cause of the following exception:
+
+cls = <class '_pytest.runner.CallInfo'>
+func = <function call_and_report.<locals>.<lambda> at 0x7188b8243690>
+when = 'call'
+reraise = (<class '_pytest.outcomes.Exit'>, <class 'KeyboardInterrupt'>)
+
+    @classmethod
+    def from_call(
+        cls,
+        func: Callable[[], TResult],
+        when: Literal["collect", "setup", "call", "teardown"],
+        reraise: type[BaseException] | tuple[type[BaseException], ...] | None = None,
+    ) -> CallInfo[TResult]:
+        """Call func, wrapping the result in a CallInfo.
+    
+        :param func:
+            The function to call. Called without arguments.
+        :type func: Callable[[], _pytest.runner.TResult]
+        :param when:
+            The phase in which the function is called.
+        :param reraise:
+            Exception or exceptions that shall propagate if raised by the
+            function, instead of being wrapped in the CallInfo.
+        """
+        excinfo = None
+        instant = timing.Instant()
+        try:
+>           result: TResult | None = func()
+                                     ^^^^^^
+
+.venv/lib/python3.14/site-packages/_pytest/runner.py:361: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.venv/lib/python3.14/site-packages/_pytest/runner.py:250: in <lambda>
+    lambda: runtest_hook(item=item, **kwds),
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/pluggy/_caller.py:197: in __call__
+    return self._hookexec(
+.venv/lib/python3.14/site-packages/pluggy/_manager.py:183: in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/_pytest/logging.py:878: in pytest_runtest_call
+    yield
+.venv/lib/python3.14/site-packages/_pytest/capture.py:906: in pytest_runtest_call
+    return (yield)
+            ^^^^^
+.venv/lib/python3.14/site-packages/_pytest/skipping.py:268: in pytest_runtest_call
+    return (yield)
+            ^^^^^
+.venv/lib/python3.14/site-packages/_pytest/unraisableexception.py:179: in pytest_runtest_call
+    collect_unraisable(item.config)
+.venv/lib/python3.14/site-packages/_pytest/unraisableexception.py:75: in collect_unraisable
+    raise errors[0]
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+config = <_pytest.config.Config object at 0x7188d01e5e80>
+
+    def collect_unraisable(config: Config) -> None:
+        pop_unraisable = config.stash[unraisable_exceptions].pop
+        errors: list[pytest.PytestUnraisableExceptionWarning | RuntimeError] = []
+        meta = None
+        hook_error = None
+        try:
+            while True:
+                try:
+                    meta = pop_unraisable()
+                except IndexError:
+                    break
+    
+                if isinstance(meta, BaseException):
+                    hook_error = RuntimeError("Failed to process unraisable exception")
+                    hook_error.__cause__ = meta
+                    errors.append(hook_error)
+                    continue
+    
+                msg = meta.msg
+                try:
+>                   warnings.warn(pytest.PytestUnraisableExceptionWarning(msg))
+E                   pytest.PytestUnraisableExceptionWarning: Exception ignored while finalizing file <_io.FileIO name='/tmp/pi271/tmp/pytest-of-shuhei2441/pytest-0/test_run_serve_when_log_after_0/state/logs/project-index.log' mode='ab' closefd=True>: None
+
+.venv/lib/python3.14/site-packages/_pytest/unraisableexception.py:63: PytestUnraisableExceptionWarning
+------------------------------ Captured log call -------------------------------
+WARNING  project_index.features.sources.registry:registry.py:547 組み込みの配信元を加えなかった（/tmp/pi271/tmp/pytest-of-shuhei2441/pytest-0/test_build_handlers_when_defau0/clone/project-index.yaml がありません）
+INFO     project_index.features.sources.registry:registry.py:340 配信元を再読み込みした（配信中: ['a']・外した数: 0）
+INFO     project_index.features.history.snapshot:snapshot.py:130 リビジョンを書き出した（/tmp/pi271/tmp/pytest-of-shuhei2441/pytest-0/test_build_handlers_when_defau0/repo・abc9679d0623158854cc5ad434aae98a6548038b・3 ファイル）
+INFO     project_index.features.sources.registry:registry.py:495 default_ref が進んだので配信元を組み立て直した（a・abc9679d0623158854cc5ad434aae98a6548038b → 64a2e5271219ca905d7f250fdb017bba391af06c）
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/test_serve.py::test_run_serve_when_log_after_close
+FAILED tests/unit/project_index/test_serve.py::test_build_handlers_when_default_ref_moved
+======================= 2 failed, 1653 passed in 44.01s ========================
