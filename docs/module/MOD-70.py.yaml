@@ -951,7 +951,7 @@ functions:
       description: 配信中の配信元・設定・違反。違反があれば配信元は `None`
     process: |-
       1. 読み書きの方法から Git のリポジトリの直下を決め、設定の値をスキーマと文書の行で検証する（違反があれば違反を返却する）
-      2. 配信元の設定を作り、スクリプトを確認する
+      2. 配信元の設定を作り（`direct_commit.kinds[]` は、文字列の要素とオブジェクトの要素の `id` を `DirectCommitConfig.kinds`、`body: false` の要素の `id` を `metadata_only_kinds` にする）、スクリプトを確認する
       3. 行ごとのスキーマを読み込み、`scope_write` をそのまま、`builtin` を持つ配信中の配信元を返却する
     unit_tests:
       - name: test_assemble_values
@@ -967,6 +967,12 @@ functions:
         mock: なし
         expected: 配信元が `None` で、違反に `documents[0].paths` が入る
         exception: '-'
+      - name: test_assemble_values_when_metadata_only_kinds
+        case: 正常
+        summary: 本文の直コミットを断る種類を読む
+        condition: '`direct_commit.kinds` が `[note, {id: files, body: false}, {id: memo}]` の値（`documents[]` に 3 つともある）'
+        mock: なし（一時フォルダ）
+        expected: 違反が 0 件で、`direct_commit.kinds` が `[note, files, memo]`、`metadata_only_kinds` が `[files]`
   - name: direct_commit_checks
     title: 直コミットの設定の確認
     kind: 関数
