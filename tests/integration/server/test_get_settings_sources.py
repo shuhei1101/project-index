@@ -162,5 +162,6 @@ def test_normal_when_direct_commit_given(
         "scope": [str(work)],
         "kinds": {"note": [str(note)]},
         "writeApiKinds": [],
+        "writeApiConfig": False,
     }
     assert "directCommit" not in rows["sample"]
