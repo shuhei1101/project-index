@@ -138,6 +138,55 @@ def test_normal_when_schemas_requested(
     assert files_guide == row.json()["schema"]
 
 
+# 本文の直コミットを断る種類 spec・memo と、断らない種類 note を記載の順に持つ配信元の設定
+METADATA_ONLY_CONFIG = (
+    "name: sample\n"
+    "default_ref: develop\n"
+    "documents:\n"
+    "  - id: note\n"
+    "    paths: [notes/*.yaml]\n"
+    "    schema: schemas/doc.schema.yaml\n"
+    "  - id: spec\n"
+    "    paths: [specs/*.yaml]\n"
+    "    schema: schemas/doc.schema.yaml\n"
+    "  - id: memo\n"
+    "    paths: [memos/*.yaml]\n"
+    "    schema: schemas/doc.schema.yaml\n"
+    "direct_commit:\n"
+    "  branch: develop\n"
+    "  kinds: [note, {id: spec, body: false}, {id: memo, body: false}]\n"
+)
+
+
+def test_normal_when_metadata_only_kinds(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """配信元の設定の `body: false` の種類を、記載の順に `directCommit.metadataOnlyKinds` で返却する（正常系）。"""
+    # 準備（端末の設定の sources[].direct_commit は記載しない）
+    files = {
+        "project-index.yaml": METADATA_ONLY_CONFIG,
+        "schemas/doc.schema.yaml": "type: object\n",
+        "notes/n1.yaml": "id: n1\n",
+        "specs/s1.yaml": "id: s1\n",
+        "memos/m1.yaml": "id: m1\n",
+    }
+    sample = make_source("sample", files)
+    plain_config = sample_config_text(name="plain")
+    plain = make_source("plain", sample_file_set(**{"project-index.yaml": plain_config}))
+    env = make_server(sample, plain)
+    # 実行
+    response = env.client.get("/sources/sample/config")
+    without = env.client.get("/sources/plain/config")
+    # 検証
+    assert response.status_code == 200
+    assert response.json()["directCommit"] == {"metadataOnlyKinds": ["spec", "memo"]}
+    assert without.status_code == 200
+    assert without.json()["directCommit"] == {"metadataOnlyKinds": []}
+
+
 def test_error_when_source_not_found(
     make_source: Callable[..., Any],
     make_server: Callable[..., Any],
