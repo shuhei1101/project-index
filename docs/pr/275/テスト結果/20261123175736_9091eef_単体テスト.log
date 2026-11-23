@@ -1,0 +1,39 @@
+$ run_runner（TL-1 単体テスト、gh workflow run test.yml -f layer=unit、run 45142711287）
+# Red: 収集の失敗 3 件は全て、実装（features/write/source_config.py・types.py の SourceConfigWrite）が無いことによる ImportError
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 1506 items / 3 errors
+
+==================================== ERRORS ====================================
+____ ERROR collecting tests/unit/project_index/features/write/test_route.py ____
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/write/test_route.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_route.py:14: in <module>
+    from project_index.features.write.source_config import SourceConfigFile
+E   ModuleNotFoundError: No module named 'project_index.features.write.source_config'
+___ ERROR collecting tests/unit/project_index/features/write/test_service.py ___
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/write/test_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_service.py:38: in <module>
+    from project_index.features.write.types import (
+E   ImportError: cannot import name 'SourceConfigWrite' from 'project_index.features.write.types' (/home/runner/work/project-index/project-index/src/project_index/features/write/types.py)
+_ ERROR collecting tests/unit/project_index/features/write/test_source_config.py _
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/write/test_source_config.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_source_config.py:10: in <module>
+    from project_index.features.write.source_config import (
+E   ModuleNotFoundError: No module named 'project_index.features.write.source_config'
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/write/test_route.py
+ERROR tests/unit/project_index/features/write/test_service.py
+ERROR tests/unit/project_index/features/write/test_source_config.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!!
+============================== 3 errors in 3.11s ===============================
+exit=1

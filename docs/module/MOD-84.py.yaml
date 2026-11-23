@@ -870,31 +870,40 @@ functions:
         required: true
         passing: keyword
         description: 端末の設定の `state_dir`。衝突したときの一時のワークツリーの配置先
+      - name: reload_sources
+        title: 配信元の再読み込み
+        type: Callable[[], object]
+        required: true
+        passing: keyword
+        description: 管理の MCP の `reload` と同じ処理。起動の配線が渡す
     returns:
       type: CommitDocumentsResult
       description: 書き込みと削除の結果とコミットの結果
     process: |-
-      1. `writes` と `deletes` の件数の合計が 1〜`OPERATIONS_MAX` 件でなければ `InvalidArgumentError` を送る。`writes` は文書の書き込みの操作の確かめ（`_check_operations`）にかける
+      1. `writes` と `deletes` の件数の合計が `OPERATIONS_MAX` 件を超えるか、`source_config` も無いまま 0 件なら `InvalidArgumentError` を送る。`writes` は文書の書き込みの操作の確かめ（`_check_operations`）にかける
 
-      2. `registry.get_for_docs(request.source)` で配信元を引き、直コミットの書き込む先（`resolve_commit_plan`）で計画を作る。許可する種類は作業場所でなく、書き込みの API から直コミットできる種類（`write_api_committable_kinds`）にする。空なら取得の前に、配信元の `direct_commit.kinds` を `kinds` に添え、`next_steps` で端末の設定の `sources[].direct_commit.write_api_kinds` を示す `DirectCommitNotPermittedError` を送る
+      2. `registry.get_for_docs(request.source)` で配信元を引き、直コミットの書き込む先（`resolve_commit_plan`）で計画を作る。許可する種類は作業場所でなく、書き込みの API から直コミットできる種類（`write_api_committable_kinds`）にする。空で `writes`・`deletes` があれば取得の前に、配信元の `direct_commit.kinds` を `kinds` に添え、`next_steps` で端末の設定の `sources[].direct_commit.write_api_kinds` を示す `DirectCommitNotPermittedError` を送る。`source_config` があれば、取得の前に配信元の設定の許可の確認（`check_source_config_permitted`）と配信元の設定のファイル（`source_config_relative_path`）を呼ぶ
 
       3. 文書の書き込みの直コミット（`request.commit` がある場合）の手順 3・4 と同じ排他・`dry_run`・直コミットを進めるの順に進める。`write_once` は 1 つの書く場所と文書の集まり（`_Session`）で次を行う
          - `request.base_commit` がある場合、最初に編集を始めたときのコミットの確認（`verify_base_commit`、`timeout` は書き込みの期限までの残り）で 40 桁の SHA を求める
+         - `source_config` がある場合、ワークツリーの `project-index.yaml` を読み、`content_hash` が `source_config.expected_version` と違えばパス `sourceConfig` の `VersionMismatchError` を送る。配信元の設定の検査（`check_source_config_content`、`current` は読んだ内容、`root` はワークツリーの配信元のフォルダ）にかけ、書き換えた後の値で作った配信元の設定のスキーマを、続く `writes`・`deletes` の検査に使用する。秘密の値の検出も `content` にかける
          - `writes` を文書の書き込みと同じに当て（`_apply_operations`、`atomic` は `True`）、続けて `deletes` を文書の削除と同じに当てる（`_apply_deletes`、`on_referenced` は要求の値、`atomic` は `True`）。どちらかで失敗したら、`writes`・`deletes` の別と添字を付けた例外を送る
          - 直コミットの確認（文書の書き込みの `_check_commit_content`）を、書き込みと削除で書き換わる全ての文書（参照を外す文書を含む）について、手順 2 の許可する種類で行う。`direct_commit.kinds` に無い種類は `ValidationFailedError`、`direct_commit.kinds` にあって許可する種類に無い種類は `DirectCommitNotPermittedError` にする（前者を先に判定する）
-         - 書き込むファイルを `check_clean` にかけ、書き込みと削除を全て書き、書き込みと削除の種類の生成を文書の書き込みの直コミットと同じ制限時間で動かす
+         - 書き込むファイル（`source_config` があれば `project-index.yaml` を含む）を `check_clean` にかけ、`project-index.yaml` に `source_config.content` を書き、書き込みと削除を全て書き、書き込みと削除の種類の生成を文書の書き込みの直コミットと同じ制限時間で動かす
          - 書いた・消したファイルを返す（直コミットを進めるが 1 つのコミットにする）
 
-      4. 手順 3 が衝突にする例外（`CONFLICT_ERRORS`）で失敗し、`request.base_commit` がある場合、手順 3 の排他を握ったまま衝突したときのブランチへのコミット（`keep_in_branch`、`commit` は `dry_run` でないとき `True`、`now` が `None` なら今の UTC の時刻）を呼ぶ。ほかの例外と、`base_commit` が無い要求の例外はそのまま送る
-         - `write_once` は、受け取ったフォルダを書く場所にして（作業場所の配信元の読み込み。`scope.write` を確認しない）、手順 3 の `write_once` と同じ当て・直コミットの確認・書き込み・生成を行い、書いた・消したファイルを返す（`check_clean` は呼ばない）。直コミットの確認の `direct_commit.kinds`・許可する種類・読み取り専用の種類・秘密の値の検査は手順 2 の今の配信元（`registry.get_for_docs` の配信元）の設定で判定し、受け取ったフォルダで読み込んだ配信元からはスキーマ・`validators[]`・`generators[]` と文書の値だけを使用する
+      4. 手順 3 が衝突にする例外（`CONFLICT_ERRORS`）で失敗し、`request.base_commit` がある場合（例外が `ValidationFailedError` で違反が全て決まり `protected_key` のときは衝突にせず、そのまま送る）、手順 3 の排他を握ったまま衝突したときのブランチへのコミット（`keep_in_branch`、`commit` は `dry_run` でないとき `True`、`now` が `None` なら今の UTC の時刻）を呼ぶ。ほかの例外と、`base_commit` が無い要求の例外はそのまま送る
+         - `write_once` は、受け取ったフォルダを書く場所にして（作業場所の配信元の読み込み。`scope.write` を確認しない）、手順 3 の `write_once` と同じ当て・直コミットの確認・書き込み・生成を行い、書いた・消したファイルを返す（`check_clean` は呼ばない）。直コミットの確認の `direct_commit.kinds`・許可する種類・読み取り専用の種類・秘密の値の検査は手順 2 の今の配信元（`registry.get_for_docs` の配信元）の設定で判定し、受け取ったフォルダで読み込んだ配信元からはスキーマ・`validators[]`・`generators[]` と文書の値だけを使用する。`source_config` がある場合、配信元の設定の検査の `current`（書き換えられないキーを比べる相手）は手順 3 で取り込んだ後のワークツリーの `project-index.yaml`（今の `origin/{コミットするブランチ}`）にし、バージョンの照合とスキーマ・起動の検証は受け取ったフォルダの `project-index.yaml` で行う
          - `keep_in_branch` の `timeout` は書き込みの期限までの残り、`respond_by` は `limits.respond_by` にする
          - `keep_in_branch` が例外で失敗した場合、手順 3 の例外を送る（一時のワークツリーの例外は捨てる）
            - `CONFLICT_ERRORS` に当たらない例外の場合、`[warning]` 衝突したときのブランチに残せなかった（配信元・`base_commit`・例外）
          - 書き込みの期限を過ぎた場合は `WriteDeadlineExceededError` を送る
 
-      5. 排他を放した後、`dry_run` でなく、手順 2 の配信元の `direct_commit_on_conflict` がある場合、衝突したときのスクリプトの実行（`run_conflict_script`）を呼ぶ。`cwd` はクローン本体の直下、`env` は配信元の ID・ブランチ・コミット・`base_commit` の 40 桁の SHA・コミットするブランチ・`message`、`timeout_sec` は `limits.respond_by` の残りと `timeout_sec` の短い方にする
+      5. `source_config` を含むコミットをプッシュして排他を放した後、`reload_sources` を呼ぶ。例外で失敗したら `[warning]` 配信元の設定の再読み込みに失敗した（配信元・例外）を書き、`reloaded` を `False` にする（コミットは戻さない）
 
-      6. `applied`・`writes`（書き込みの結果）・`deletes`（削除の結果）・`unlinked`・`commit` で返す。衝突した場合は `applied` を `False`・`writes`・`deletes`・`unlinked` を一時のワークツリーの結果・`commit` を `None` にし、`conflict` に手順 4 のブランチとコミット・`base_commit` の 40 桁の SHA・手順 3 の例外の違反（`errors`）・手順 5 の結果を入れる。会話の記録は残さない（会話キーを持たない）
+      6. 排他を放した後、`dry_run` でなく、手順 2 の配信元の `direct_commit_on_conflict` がある場合、衝突したときのスクリプトの実行（`run_conflict_script`）を呼ぶ。`cwd` はクローン本体の直下、`env` は配信元の ID・ブランチ・コミット・`base_commit` の 40 桁の SHA・コミットするブランチ・`message`、`timeout_sec` は `limits.respond_by` の残りと `timeout_sec` の短い方にする
+
+      7. `applied`・`writes`（書き込みの結果）・`deletes`（削除の結果）・`unlinked`・`commit`・`source_config`（`source_config` を受けたとき、書き込んだ後のバージョン・差分・手順 5 の再読み込みの結果）で返す。衝突した場合は `applied` を `False`・`writes`・`deletes`・`unlinked` を一時のワークツリーの結果・`commit` を `None` にし、`conflict` に手順 4 のブランチとコミット・`base_commit` の 40 桁の SHA・手順 3 の例外の違反（`errors`）・手順 6 の結果を入れる。会話の記録は残さない（会話キーを持たない）
     unit_tests:
       - name: test_commit_documents
         case: 正常
@@ -988,6 +997,50 @@ functions:
         mock: なし（一時フォルダのベアリポジトリ）
         expected: '`writes[1]` の違反の `ValidationFailedError`。`note` の文書も書き換わらず、ベアリポジトリは変わらない'
         exception: 本文の直コミットを断る種類の本文が変わる
+      - name: test_commit_documents_when_source_config
+        case: 正常
+        summary: 配信元の設定と文書を 1 つのコミットにして再読み込みする
+        condition: '`direct_commit.config: true`・`write_api_config: true` の配信元で、`nav` を変えた `source_config` と n1 の `update`'
+        mock: なし（一時フォルダの git）。`reload_sources` は呼ばれたことを記録する偽物
+        expected: リモートのコミットが 1 つ増え、変更が `project-index.yaml`・n1 だけ。`source_config.reloaded` が `True` で、`reload_sources` が 1 回呼ばれる
+      - name: test_commit_documents_when_source_config_not_permitted
+        case: 異常
+        summary: 配信元の設定の許可が無ければ取得の前に断る
+        condition: '`write_api_config` が偽'
+        mock: なし（一時フォルダの git）
+        expected: '`SourceConfigNotPermittedError` で、リモートとワークツリーは変わらない'
+      - name: test_commit_documents_when_source_config_protected
+        case: 異常
+        summary: 書き換えられないキーを変えると断る
+        condition: '`generators[0].run` を変えた `source_config`'
+        mock: なし（一時フォルダの git）
+        expected: '`ValidationFailedError` の違反のパスが `sourceConfig.generators`。生成を実行しない'
+      - name: test_commit_documents_when_source_config_version_mismatch
+        case: 異常
+        summary: 配信元の設定のバージョンが合わない
+        condition: 古い `expected_version` の `source_config`
+        mock: なし（一時フォルダの git）
+        expected: パス `sourceConfig` の `VersionMismatchError`
+      - name: test_commit_documents_when_reload_failed
+        case: 正常
+        summary: 再読み込みに失敗してもコミットを戻さない
+        condition: '`reload_sources` が例外を送る偽物'
+        mock: '`reload_sources`'
+        expected: '`applied` が `True`、`source_config.reloaded` が `False`、リモートのコミットが 1 つ増える'
+      - name: test_commit_documents_when_conflict_protected_key
+        case: 異常
+        summary: 編集を始めたときのコミットを添えても書き換えられないキーの変更は衝突にしない
+        condition: '`base_commit` を添え、`generators[0].run` を変えた `source_config`'
+        mock: なし（一時フォルダの git）
+        expected: 違反のパスが `sourceConfig.generators` の `ValidationFailedError` で、ブランチが増えず、一時のワークツリーを作らない
+        exception: 書き換えられないキーが変わる
+      - name: test_commit_documents_when_conflict_protected_key_changed_after_base
+        case: 異常
+        summary: 編集を始めた後に書き換えられないキーが変わったときは今の値と比べて断る
+        condition: '`base_commit` の後に `generators` を変えたコミットをプッシュし、要求は `base_commit` の `project-index.yaml` の `nav` だけを変えた `source_config`'
+        mock: なし（一時フォルダの git）
+        expected: 違反のパスが `sourceConfig.generators` の `ValidationFailedError` で、ブランチが増えない
+        exception: 書き換えられないキーが変わる
 refs:
   - to: IF-6
     type: requires

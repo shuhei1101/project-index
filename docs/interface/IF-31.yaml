@@ -509,6 +509,13 @@ request:
     default: ファイルの同じ配信元の行の今の値（同じ配信元の行が無ければ `[]`）
     location: body
     description: 書き込みの API から直コミットできる種類の ID の並び
+  - name: sources[].direct_commit.write_api_config
+    type: bool
+    required: false
+    default: ファイルの同じ配信元の行の今の値（同じ配信元の行が無ければ `false`）
+    location: body
+    description: 書き込みの API から配信元の設定を直コミットできるか
+    status: planned
 request_example: |-
   ```json
   {"expectedVersion": "a1b2c3", "sources": [
@@ -580,7 +587,7 @@ constraints:
   - item: operationId
     constraint: '`{tag}-{関数名}` の `settings-put_settings_sources`'
   - item: 送信しなかったキー
-    constraint: 送信した行ごとに、ファイルの同じ配信元の行（`id`、無ければ配信元の設定の `name` で照合する）を探し、行に含めなかった `enabled`・`scope.read`・`scope.write`・`outside_read`・`storage`・`direct_commit.scope`・`direct_commit.kinds`・`direct_commit.write_api_kinds` をその行の今の値で埋めてから記載する。`direct_commit` は、既定値（`scope` の `[]`・`kinds` の `{}`・`write_api_kinds` の `[]`）でないキーだけを記載し、全て既定値の行には `direct_commit` を記載しない。同じ配信元の行が無い行は既定値で記載する
+    constraint: 送信した行ごとに、ファイルの同じ配信元の行（`id`、無ければ配信元の設定の `name` で照合する）を探し、行に含めなかった `enabled`・`scope.read`・`scope.write`・`outside_read`・`storage`・`direct_commit.scope`・`direct_commit.kinds`・`direct_commit.write_api_kinds`・`direct_commit.write_api_config` をその行の今の値で埋めてから記載する。`direct_commit` は、既定値（`scope` の `[]`・`kinds` の `{}`・`write_api_kinds` の `[]`・`write_api_config` の `false`）でないキーだけを記載し、全て既定値の行には `direct_commit` を記載しない。同じ配信元の行が無い行は既定値で記載する
     notes: 取得した行の一部のキーだけを送信する呼び出し側でも、送信しなかったキーが既定値に戻らない
   - item: 内容のバージョンの照合
     constraint: '排他ロックを取った後に `settings.yaml` の内容のバージョンと照合し、スキーマの検証より前に断る。フローの `expectedVersion` は、直前に `GET /settings/sources` で取得した `version`'

@@ -153,6 +153,15 @@ files:
   related:
   - to: IF-23
     type: tests
+- path: integration/server/test_get_source_config_file.py
+  name: 配信元の設定の原本の取得の結合テスト
+  description: '`get_source_config_file` の結合テストを受け持ち、配信元の設定の原本の取得の振る舞いのテストを修正するときに参照する。'
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-39
+    type: tests
 - path: integration/server/test_get_status.py
   name: 状態の取得の結合テスト
   description: '`status` の結合テストを受け持ち、状態の取得の振る舞いのテストを修正するときに参照する。'
@@ -1123,6 +1132,16 @@ files:
   - tool:pytest
   related:
   - to: src/project_index/features/write/conflict.py
+    type: tests
+- path: unit/project_index/features/write/test_source_config.py
+  name: 書き込みの API が配信元の設定を直コミットで書き換えるときの許可・原本の取得・書き換えられないキー・検査の単体テスト
+  description: 書き込みの source_config.py の単体テストを受け持ち、書き込みの source_config.py のテストを修正するときに参照する。
+  tags:
+  - topic:書き込み
+  - topic:設定
+  - tool:pytest
+  related:
+  - to: src/project_index/features/write/source_config.py
     type: tests
 - path: unit/project_index/features/write/test_hints.py
   name: '`write_docs` のスキーマの違反に、違反した項目のスキーマの説明を添える処理の単体テスト'

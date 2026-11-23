@@ -8,16 +8,18 @@ from fastapi.testclient import TestClient
 
 from project_index.features.write import route as route_module
 from project_index.features.write.route import build_write_router
+from project_index.features.write.source_config import SourceConfigFile
 from project_index.features.write.types import CommitDocumentsResult, CommitResult
 from project_index.main import build_handlers
 from project_index.server.error_handlers import register_error_handlers
-from project_index.shared.errors import DirectCommitNotPermittedError
+from project_index.shared.errors import DirectCommitNotPermittedError, SourceConfigNotPermittedError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
     from project_index.features.settings.types import SourceEntry, TerminalConfig
+    from project_index.features.sources.types import ServedSource
     from project_index.features.write.types import CommitDocumentsRequest
     from project_index.main import Handlers
 
@@ -88,6 +90,7 @@ def test_build_write_router(
         "unlinked": [],
         "commit": {"sha": "0a1b2c3", "branch": "develop", "retried": False},
         "conflict": None,
+        "sourceConfig": None,
     }
 
 
@@ -180,3 +183,59 @@ def test_build_write_router_when_limits(
     assert response.status_code == 200
     assert limits[0].write_deadline.limit_sec == 20
     assert limits[0].respond_by.limit_sec == 36
+
+
+def test_build_write_router_when_source_config_file(
+    make_source_dir: Callable[..., Path],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """配信元の設定の原本を camelCase で返す（正常系）。"""
+
+    # 準備
+    def fake(_source: ServedSource) -> SourceConfigFile:
+        return SourceConfigFile(
+            content="name: sample\n",
+            version="a1b2c3",
+            branch="develop",
+            protected_keys=["validators", "converters", "generators", "direct_commit", "worktrees"],
+        )
+
+    monkeypatch.setattr(route_module, "read_source_config_file", fake)
+    client = _client(_handlers(make_source_dir, make_terminal_config, make_entry))
+    # 実行
+    response = client.get("/sources/sample/config/file")
+    # 検証
+    assert response.status_code == 200
+    assert response.json() == {
+        "content": "name: sample\n",
+        "version": "a1b2c3",
+        "branch": "develop",
+        "protectedKeys": ["validators", "converters", "generators", "direct_commit", "worktrees"],
+    }
+
+
+def test_build_write_router_when_source_config_not_permitted(
+    make_source_dir: Callable[..., Path],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """許可が無ければ 403（異常系）。"""
+
+    # 準備
+    def refuse(_source: ServedSource) -> SourceConfigFile:
+        raise SourceConfigNotPermittedError(
+            message="sample は書き込みの API から配信元の設定を直コミットできません",
+            source_id="sample",
+            missing=["write_api_config"],
+        )
+
+    monkeypatch.setattr(route_module, "read_source_config_file", refuse)
+    client = _client(_handlers(make_source_dir, make_terminal_config, make_entry))
+    # 実行
+    response = client.get("/sources/sample/config/file")
+    # 検証
+    assert response.status_code == 403
+    assert response.headers["content-type"].startswith("application/problem+json")

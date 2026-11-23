@@ -1568,6 +1568,53 @@ def test_direct_commit_checks_when_write_api_kinds(
     assert [item.path for item in warnings] == ["sources[].direct_commit.write_api_kinds[1]"]
 
 
+def test_direct_commit_checks_when_write_api_config(
+    make_source_config: Callable[..., SourceConfig],
+) -> None:
+    """配信元の設定で許可していない配信元の端末の許可を警告する（正常系）。"""
+    # 準備
+    config = make_source_config(
+        documents=[
+            DocumentTable(id="note", paths=["docs/note/*.yaml"], schema_path="schemas/note.yaml")
+        ],
+        direct_commit=DirectCommitConfig(branch="develop", kinds=["note"], config=False),
+    )
+    # 実行
+    violations, warnings = direct_commit_checks(
+        config, worktree_branches={"develop"}, terminal_write_api_config=True
+    )
+    # 検証
+    assert violations == []
+    assert [item.path for item in warnings] == ["sources[].direct_commit.write_api_config"]
+
+
+def test_assemble_values_when_config_only(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    sample_files: dict[str, str],
+) -> None:
+    """配信元の設定だけを許可する直コミット（正常系）。"""
+    # 準備
+    write_files(tmp_path, sample_files)
+    value = _config_value(direct_commit={"branch": "develop", "config": True})
+    # 実行
+    _served, config, violations = assemble_values(
+        value,
+        root=tmp_path,
+        source_id=None,
+        scope_read=[],
+        scope_write=[],
+        outside_read=True,
+        storage="disk",
+    )
+    # 検証
+    assert violations == []
+    assert config is not None
+    assert config.direct_commit is not None
+    assert config.direct_commit.config is True
+    assert config.direct_commit.kinds == []
+
+
 def test_source_worktree_branches(
     git_repo: Callable[..., Path],
     run_git: Callable[..., str],

@@ -6,7 +6,12 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from project_index.shared.hashing import content_hash, value_hash
-from tests.integration.server.conftest import F1_BODY, METADATA_ONLY_FILES, metadata_only_config
+from tests.integration.server.conftest import (
+    F1_BODY,
+    METADATA_ONLY_FILES,
+    direct_commit_config,
+    metadata_only_config,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -640,3 +645,198 @@ def test_error_when_invalid_at_base_commit(
     assert _conflict_branches(direct, run_git) == []
     assert len(_worktrees(direct, run_git).splitlines()) == worktrees_before
     assert not dump.exists()
+
+
+SOURCE_CONFIG_NAV = (
+    "nav:\n"
+    "  tabs:\n"
+    "    - title: 前のタブ\n"
+    "      items:\n"
+    "        - auto:\n"
+    "            document: note\n"
+)
+# 配信元の設定の直コミットを許可し、タブを 1 つ持つ配信元の設定
+SOURCE_CONFIG = (
+    "# 配信元の設定\n"
+    + direct_commit_config().replace("  kinds: [note]\n", "  kinds: [note]\n  config: true\n")
+    + SOURCE_CONFIG_NAV
+)
+
+
+def _source_config_body(env: Any, content: str, **extra: Any) -> dict[str, Any]:
+    """配信元の設定の原本の取得で得たバージョンで、配信元の設定を書き換える本文を作る。"""
+    original = env.client.get("/sources/sample/config/file").json()
+    return {
+        "sourceConfig": {"content": content, "expectedVersion": original["version"]},
+        "message": "docs: 配信元の設定を更新する",
+        **extra,
+    }
+
+
+def test_normal_when_source_config_written(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """配信元の設定と文書を 1 つのコミットにしてプッシュし、配信元を再読み込みする（正常系）。"""
+    # 準備
+    direct = make_direct_commit_source(
+        files=NOTES, config=SOURCE_CONFIG, write_api_kinds=["note"], write_api_config=True
+    )
+    env = make_server(direct.spec)
+    remote_before = run_git(direct.bare, "rev-parse", "develop").strip()
+    content = SOURCE_CONFIG.replace("前のタブ", "後のタブ")
+    writes = [
+        {
+            "op": "update",
+            "id": "n1",
+            "expected_version": _version(direct.develop / "notes" / "n1.yaml"),
+            "set": {"description": "新しい説明"},
+        }
+    ]
+    body = _source_config_body(env, content, writes=writes)
+    # 実行
+    response = env.client.post(URL, json=body)
+    # 検証
+    data = response.json()
+    remote_after = run_git(direct.bare, "rev-parse", "develop").strip()
+    changed = run_git(direct.bare, "show", "--name-only", "--format=", remote_after).split()
+    assert response.status_code == 200, data
+    assert data["applied"] is True
+    assert data["sourceConfig"]["reloaded"] is True
+    assert data["sourceConfig"]["version"] == content_hash(content)
+    assert run_git(direct.bare, "rev-parse", f"{remote_after}~1").strip() == remote_before
+    assert sorted(changed) == ["generated/notes.txt", "notes/n1.yaml", "project-index.yaml"]
+    config = env.client.get("/sources/sample/config").json()
+    assert config["nav"]["tabs"][0]["title"] == "後のタブ"
+    file = env.client.get("/sources/sample/config/file").json()
+    assert file["version"] == data["sourceConfig"]["version"]
+
+
+@pytest.mark.parametrize(
+    ("config", "write_api_config", "key"),
+    [
+        (SOURCE_CONFIG, None, "sources[].direct_commit.write_api_config"),
+        (SOURCE_CONFIG.replace("  config: true\n", ""), True, "direct_commit.config"),
+    ],
+)
+def test_error_when_source_config_not_allowed(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+    config: str,
+    write_api_config: bool | None,
+    key: str,
+) -> None:
+    """端末の設定か配信元の設定で許可していない配信元は断る（異常系）。"""
+    # 準備
+    body = {
+        "sourceConfig": {
+            "content": config.replace("前のタブ", "後のタブ"),
+            "expectedVersion": content_hash(config),
+        },
+        "message": "docs: 配信元の設定を更新する",
+    }
+    direct = make_direct_commit_source(
+        files=NOTES, config=config, write_api_kinds=["note"], write_api_config=write_api_config
+    )
+    env = make_server(direct.spec)
+    before = _git_state(direct, run_git)
+    # 実行
+    response = env.client.post(URL, json=body)
+    # 検証
+    data = response.json()
+    assert response.status_code == 403, data
+    assert key in " ".join(data["nextSteps"])
+    assert _git_state(direct, run_git) == before
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "path"),
+    [
+        ("[python3, scripts/list.py]", "[sh, -c, id]", "sourceConfig.generators"),
+        ("  branch: develop\n", "  branch: master\n", "sourceConfig.direct_commit"),
+        ("nav:\n", "worktrees: [./other/*]\nnav:\n", "sourceConfig.worktrees"),
+    ],
+)
+def test_error_when_source_config_protected_key_changed(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+    old: str,
+    new: str,
+    path: str,
+) -> None:
+    """書き換えられないキーが書き換える前と違う要求は断る（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source(
+        files=NOTES, config=SOURCE_CONFIG, write_api_kinds=["note"], write_api_config=True
+    )
+    env = make_server(direct.spec)
+    before = _git_state(direct, run_git)
+    body = _source_config_body(env, SOURCE_CONFIG.replace(old, new))
+    # 実行
+    response = env.client.post(URL, json=body)
+    # 検証
+    data = response.json()
+    assert response.status_code == 422, data
+    assert [(item["path"], item["reason"]) for item in data["errors"]] == [(path, "protected_key")]
+    assert _git_state(direct, run_git) == before
+    assert not (direct.develop / "generated" / "notes.txt").exists()
+
+
+def test_error_when_source_config_invalid(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """配信元を配信しなくなる違反を持つ配信元の設定は断る（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source(
+        files=NOTES, config=SOURCE_CONFIG, write_api_kinds=["note"], write_api_config=True
+    )
+    env = make_server(direct.spec)
+    before = _git_state(direct, run_git)
+    content = SOURCE_CONFIG.replace("    paths: [notes/*.yaml]\n", "", 1)
+    body = _source_config_body(env, content)
+    # 実行
+    response = env.client.post(URL, json=body)
+    # 検証
+    data = response.json()
+    assert response.status_code == 422, data
+    assert data["errors"][0]["path"].startswith("sourceConfig.documents[0]")
+    assert data["errors"][0]["reason"]
+    assert _git_state(direct, run_git) == before
+    config = env.client.get("/sources/sample/config").json()
+    assert config["nav"]["tabs"][0]["title"] == "前のタブ"
+
+
+def test_error_when_source_config_split(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+    tmp_path: Path,
+) -> None:
+    """端末の設定の config が project-index.yaml 1 つでない配信元は断る（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source(
+        files=NOTES, config=SOURCE_CONFIG, write_api_kinds=["note"], write_api_config=True
+    )
+    overlay = tmp_path / "overlay.yaml"
+    overlay.write_text("description: 重ねる説明\n", encoding="utf-8")
+    direct.spec.config = [direct.folder / "project-index.yaml", overlay]
+    env = make_server(direct.spec)
+    before = _git_state(direct, run_git)
+    content = SOURCE_CONFIG.replace("前のタブ", "後のタブ")
+    body = {
+        "sourceConfig": {"content": content, "expectedVersion": content_hash(SOURCE_CONFIG)},
+        "message": "docs: 配信元の設定を更新する",
+    }
+    # 実行
+    response = env.client.post(URL, json=body)
+    # 検証
+    data = response.json()
+    assert response.status_code == 409, data
+    assert data["files"] == [str(direct.folder / "project-index.yaml"), str(overlay)]
+    assert _git_state(direct, run_git) == before
+    assert overlay.read_text(encoding="utf-8") == "description: 重ねる説明\n"

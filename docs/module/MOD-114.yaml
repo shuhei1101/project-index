@@ -45,6 +45,16 @@ diagrams:
         書き込みと削除の直コミット ..> 直コミットを進める
         書き込みと削除の直コミット ..> 衝突したときのブランチへのコミット : baseCommit
         書き込みと削除の直コミット ..> 衝突したときのスクリプトの実行 : on_conflict
+        書き込みと削除の直コミット ..> 配信元の設定の検査 : sourceConfig
+        書き込みの API の入口 ..> 配信元の設定の原本の取得
+        class 配信元の設定の検査 {
+          <<function>>
+        }
+        class 配信元の設定の原本の取得 {
+          <<function>>
+        }
+        click 配信元の設定の検査 href "id:MOD-239#functions[check_source_config_content]"
+        click 配信元の設定の原本の取得 href "id:MOD-239#functions[read_source_config_file]"
         class 衝突したときのブランチへのコミット {
           <<function>>
         }

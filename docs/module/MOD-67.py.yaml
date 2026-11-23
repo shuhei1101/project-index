@@ -543,6 +543,12 @@ data_models:
         access: 公開
         default: None
         description: 書き込みの API が衝突して修正をブランチに残した後に実行するスクリプト。端末の設定のファイルからだけ読み、端末の設定の API は取得の応答に含めず、受け取ったら断る
+      - name: write_api_config
+        title: 書き込みの API から配信元の設定を直コミットできるか
+        type: bool
+        access: 公開
+        default: 'False'
+        description: 作業場所を持たない書き込みの API から配信元の設定を直コミットできるか。JSON のキーは `writeApiConfig`（`write_api_kinds` と同じ `serialization_alias`）
   - name: OnConflictScript
     title: 衝突したときのスクリプト
     container: project_index/features/settings/types.py

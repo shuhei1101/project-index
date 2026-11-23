@@ -44,6 +44,7 @@ from project_index.features.write.types import (
     DeleteTarget,
     Operation,
     ReferenceChange,
+    SourceConfigWrite,
     TextEdit,
     WriteRequest,
     WriteResult,
@@ -56,6 +57,7 @@ from project_index.shared.errors import (
     DirectCommitNotPermittedError,
     DocumentReferencedError,
     InvalidArgumentError,
+    SourceConfigNotPermittedError,
     ValidationFailedError,
     VersionMismatchError,
     Violation,
@@ -2356,7 +2358,15 @@ def test_delete_docs_when_delete_validator_retry(make_env: Callable[..., WriteEn
     assert not (env.worktree / "docs/rule/doc-3.yaml").exists()
 
 
-def _commit_documents(commit_env: CommitEnv, **request: Any) -> CommitDocumentsResult:
+def _no_reload() -> None:
+    """配信元の再読み込みの偽物（何もしない）。"""
+
+
+def _commit_documents(
+    commit_env: CommitEnv,
+    reload_sources: Callable[[], object] = _no_reload,
+    **request: Any,
+) -> CommitDocumentsResult:
     """書き込みと削除の直コミットを、コミットの説明を付けて呼ぶ。"""
     env = commit_env.env
     return commit_documents(
@@ -2370,6 +2380,7 @@ def _commit_documents(commit_env: CommitEnv, **request: Any) -> CommitDocumentsR
         repo_locks=env.repo_locks,
         timeout_sec=10,
         state_dir=commit_env.local.parent / "state",
+        reload_sources=reload_sources,
     )
 
 
@@ -2843,4 +2854,202 @@ def test_commit_documents_when_conflict_kind_removed(
     # 実行・検証
     with pytest.raises(VersionMismatchError):
         _commit_documents(commit_env, writes=_update_doc_1(), base_commit=base)
+    assert _conflict_branches(commit_env, run_git) == []
+
+
+SOURCE_CONFIG_TEXT = (
+    "# 配信元の設定\n"
+    "name: sample\n"
+    "description: 前の説明\n"
+    "documents:\n"
+    "  - id: rules\n"
+    "    paths: [docs/rule/*.yaml]\n"
+    "    schema: schemas/rule.schema.yaml\n"
+    "generators:\n"
+    "  - id: index\n"
+    "    run: [python3, scripts/index.py]\n"
+)
+
+
+def _source_config_env(
+    make_commit_env: Callable[..., CommitEnv],
+    make_registry: Callable[..., SourceRegistry],
+    run_git: Callable[..., str],
+    *,
+    write_api_config: bool = True,
+) -> CommitEnv:
+    """project-index.yaml をコミットし、配信元の設定の直コミットを許可した配信元にする。"""
+    commit_env = make_commit_env(write_api_kinds=["rules"])
+    (commit_env.develop / "project-index.yaml").write_text(SOURCE_CONFIG_TEXT, encoding="utf-8")
+    run_git(commit_env.develop, "add", "project-index.yaml")
+    run_git(commit_env.develop, "commit", "-m", "配信元の設定を追加する")
+    run_git(commit_env.develop, "push", "origin", "data")
+    started = commit_env.env.source
+    source = dataclasses.replace(
+        started,
+        config=dataclasses.replace(
+            started.config,
+            direct_commit=DirectCommitConfig(branch="data", kinds=["rules", "terms"], config=True),
+        ),
+        config_files=[started.root / "project-index.yaml"],
+        direct_commit_write_api_config=write_api_config,
+    )
+    commit_env.env.source = source
+    commit_env.env.registry = make_registry(source)
+    return commit_env
+
+
+def _source_config(content: str, expected_version: str | None = None) -> SourceConfigWrite:
+    """配信元の設定の書き換えを作る。"""
+    version = content_hash(SOURCE_CONFIG_TEXT) if expected_version is None else expected_version
+    return SourceConfigWrite(content=content, expected_version=version)
+
+
+def test_commit_documents_when_source_config(
+    make_commit_env: Callable[..., CommitEnv],
+    make_registry: Callable[..., SourceRegistry],
+    run_git: Callable[..., str],
+) -> None:
+    """配信元の設定と文書を 1 つのコミットにして再読み込みする（正常系）。"""
+    # 準備
+    commit_env = _source_config_env(make_commit_env, make_registry, run_git)
+    remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
+    reloaded: list[bool] = []
+    content = SOURCE_CONFIG_TEXT.replace("前の説明", "後の説明")
+    writes = [
+        Operation(
+            op="update", id="doc-1", expected_version=content_hash(DOC_1), set={"name": "修正"}
+        )
+    ]
+    # 実行
+    result = _commit_documents(
+        commit_env,
+        reload_sources=lambda: reloaded.append(True),
+        writes=writes,
+        source_config=_source_config(content),
+    )
+    # 検証
+    assert result.applied is True
+    assert result.source_config is not None
+    assert result.source_config.reloaded is True
+    assert result.source_config.version == content_hash(content)
+    assert reloaded == [True]
+    assert run_git(commit_env.bare, "rev-parse", "data~1").strip() == remote_head
+    changed = run_git(commit_env.bare, "diff", "--name-only", "data~1", "data").split()
+    assert changed == ["docs/rule/doc-1.yaml", "project-index.yaml"]
+    assert run_git(commit_env.bare, "show", "data:project-index.yaml") == content
+
+
+def test_commit_documents_when_source_config_not_permitted(
+    make_commit_env: Callable[..., CommitEnv],
+    make_registry: Callable[..., SourceRegistry],
+    run_git: Callable[..., str],
+) -> None:
+    """配信元の設定の許可が無ければ取得の前に断る（異常系）。"""
+    # 準備
+    commit_env = _source_config_env(make_commit_env, make_registry, run_git, write_api_config=False)
+    remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
+    content = SOURCE_CONFIG_TEXT.replace("前の説明", "後の説明")
+    # 実行・検証
+    with pytest.raises(SourceConfigNotPermittedError, match="sample"):
+        _commit_documents(commit_env, source_config=_source_config(content))
+    assert (commit_env.develop / "project-index.yaml").read_text(encoding="utf-8") == (
+        SOURCE_CONFIG_TEXT
+    )
+    assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
+
+
+def test_commit_documents_when_source_config_protected(
+    make_commit_env: Callable[..., CommitEnv],
+    make_registry: Callable[..., SourceRegistry],
+    run_git: Callable[..., str],
+) -> None:
+    """書き換えられないキーを変えると断る（異常系）。"""
+    # 準備
+    commit_env = _source_config_env(make_commit_env, make_registry, run_git)
+    remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
+    content = SOURCE_CONFIG_TEXT.replace("[python3, scripts/index.py]", "[sh, -c, id]")
+    # 実行・検証
+    with pytest.raises(ValidationFailedError) as info:
+        _commit_documents(commit_env, source_config=_source_config(content))
+    assert [item.path for item in info.value.violations] == ["sourceConfig.generators"]
+    assert run_git(commit_env.bare, "rev-parse", "data").strip() == remote_head
+
+
+def test_commit_documents_when_source_config_version_mismatch(
+    make_commit_env: Callable[..., CommitEnv],
+    make_registry: Callable[..., SourceRegistry],
+    run_git: Callable[..., str],
+) -> None:
+    """配信元の設定のバージョンが合わない（異常系）。"""
+    # 準備
+    commit_env = _source_config_env(make_commit_env, make_registry, run_git)
+    content = SOURCE_CONFIG_TEXT.replace("前の説明", "後の説明")
+    # 実行・検証
+    with pytest.raises(VersionMismatchError) as info:
+        _commit_documents(commit_env, source_config=_source_config(content, "0000000"))
+    assert [item.path for item in info.value.violations] == ["sourceConfig"]
+
+
+def test_commit_documents_when_reload_failed(
+    make_commit_env: Callable[..., CommitEnv],
+    make_registry: Callable[..., SourceRegistry],
+    run_git: Callable[..., str],
+) -> None:
+    """再読み込みに失敗してもコミットを戻さない（正常系）。"""
+    # 準備
+    commit_env = _source_config_env(make_commit_env, make_registry, run_git)
+    remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
+    content = SOURCE_CONFIG_TEXT.replace("前の説明", "後の説明")
+
+    def failing_reload() -> None:
+        message = "再読み込みに失敗した"
+        raise RuntimeError(message)
+
+    # 実行
+    result = _commit_documents(
+        commit_env, reload_sources=failing_reload, source_config=_source_config(content)
+    )
+    # 検証
+    assert result.applied is True
+    assert result.source_config is not None
+    assert result.source_config.reloaded is False
+    assert run_git(commit_env.bare, "rev-parse", "data~1").strip() == remote_head
+
+
+def test_commit_documents_when_conflict_protected_key(
+    make_commit_env: Callable[..., CommitEnv],
+    make_registry: Callable[..., SourceRegistry],
+    run_git: Callable[..., str],
+) -> None:
+    """編集を始めたときのコミットを添えても書き換えられないキーの変更は衝突にしない（異常系）。"""
+    # 準備
+    commit_env = _source_config_env(make_commit_env, make_registry, run_git)
+    base = run_git(commit_env.develop, "rev-parse", "HEAD").strip()
+    content = SOURCE_CONFIG_TEXT.replace("[python3, scripts/index.py]", "[sh, -c, id]")
+    # 実行・検証
+    with pytest.raises(ValidationFailedError) as info:
+        _commit_documents(commit_env, source_config=_source_config(content), base_commit=base)
+    assert [item.path for item in info.value.violations] == ["sourceConfig.generators"]
+    assert _conflict_branches(commit_env, run_git) == []
+
+
+def test_commit_documents_when_conflict_protected_key_changed_after_base(
+    make_commit_env: Callable[..., CommitEnv],
+    make_registry: Callable[..., SourceRegistry],
+    run_git: Callable[..., str],
+) -> None:
+    """編集を始めた後に書き換えられないキーが変わったときは今の値と比べて断る（異常系）。"""
+    # 準備
+    commit_env = _source_config_env(make_commit_env, make_registry, run_git)
+    base = run_git(commit_env.develop, "rev-parse", "HEAD").strip()
+    changed = SOURCE_CONFIG_TEXT.replace("[python3, scripts/index.py]", "[python3, scripts/b.py]")
+    (commit_env.develop / "project-index.yaml").write_text(changed, encoding="utf-8")
+    run_git(commit_env.develop, "commit", "-am", "generators を変える")
+    run_git(commit_env.develop, "push", "origin", "data")
+    content = SOURCE_CONFIG_TEXT.replace("前の説明", "後の説明")
+    # 実行・検証
+    with pytest.raises(ValidationFailedError) as info:
+        _commit_documents(commit_env, source_config=_source_config(content), base_commit=base)
+    assert [item.path for item in info.value.violations] == ["sourceConfig.generators"]
     assert _conflict_branches(commit_env, run_git) == []

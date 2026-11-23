@@ -137,13 +137,30 @@
       "title": "直コミット",
       "additionalProperties": false,
       "required": [
-        "branch",
-        "kinds"
+        "branch"
       ],
+      "if": {
+        "required": [
+          "config"
+        ],
+        "properties": {
+          "config": {
+            "const": true
+          }
+        }
+      },
+      "else": {
+        "required": [
+          "kinds"
+        ]
+      },
       "properties": {
         "branch": {
           "type": "string",
           "minLength": 1
+        },
+        "config": {
+          "type": "boolean"
         },
         "branches": {
           "type": "array",

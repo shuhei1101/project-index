@@ -521,6 +521,12 @@ data_models:
         access: 公開
         default: None
         description: 端末の設定の `sources[].direct_commit.on_conflict`。書き込みの API が衝突してブランチに残した後に実行する
+      - name: direct_commit_write_api_config
+        title: 書き込みの API から配信元の設定を直コミットできるか
+        type: bool
+        access: 公開
+        default: 'False'
+        description: 端末の設定の `sources[].direct_commit.write_api_config` と配信元の設定の `direct_commit.config` が両方とも真のとき `True`
     methods:
       - name: table
         title: 文書の行を引く
@@ -690,6 +696,12 @@ data_models:
         access: 公開
         default: '[]'
         description: '`direct_commit.kinds[]` のオブジェクトの要素のうち `body: false` の `id` の並び。`kinds` の部分集合'
+      - name: config
+        title: 配信元の設定の直コミットの許可
+        type: bool
+        access: 公開
+        default: 'False'
+        description: 配信元の設定の `direct_commit.config`。`True` のとき `kinds` は空でもよい
   - name: SqliteColumn
     title: SQLite の列の説明
     container: project_index/features/sources/types.py

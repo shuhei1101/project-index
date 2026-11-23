@@ -89,7 +89,7 @@ classes:
       | `UnknownKindError` | 知らない種類 | `kinds: list[str]` | 400 |
       | `DocumentNotFoundError` | 無い文書 | `missing: list[str]`・`candidates: dict[str, list[str]]` | 404 |
       | `ValidationFailedError` | 検査の不合格 | `violations: list[Violation]` | 422 |
-      | `VersionMismatchError` | バージョンの不一致 | `doc_id: str`・`current: str`・`diff: str` | 409 |
+      | `VersionMismatchError` | バージョンの不一致 | `doc_id: str`・`current: str`・`diff: str`・`violations: list[Violation]`（配信元の設定のバージョンの不一致だけがパス `sourceConfig` の違反を持つ） | 409 |
       | `DocumentReferencedError` | 参照されている | `doc_id: str`・`referrers: list[str]` | 409 |
       | `DeleteNotAllowedError` | 削除を許していない種類 | `kind: str` | 403 |
       | `ReadOnlyKindError` | SQLite の表の行の種類への操作 | `kind: str`・`positions: list[str]` | 403 |
@@ -107,6 +107,8 @@ classes:
       | `RevisionExportTimeoutError` | リビジョンの書き出しの待ち時間の超過 | `operation: str`・`commit: str`・`limit_sec: float` | 504 |
       | `DirectCommitNotConfiguredError` | 直コミットを使用できない配信元 | `source_id: str`・`reason: str` | 409 |
       | `DirectCommitNotPermittedError` | 直コミットを呼べない作業場所・書き込みの API から許可していない種類 | `source_id: str`・`kinds: list[str]` | 403 |
+      | `SourceConfigNotPermittedError` | 書き込みの API から配信元の設定の直コミットを許可していない配信元 | `source_id: str`・`missing: list[Literal['write_api_config', 'direct_commit.config']]` | 403 |
+      | `SourceConfigSplitError` | 端末の設定の `config` が配信元のフォルダの `project-index.yaml` 1 つでない配信元 | `source_id: str`・`files: list[str]` | 409 |
       | `BranchNotAllowedError` | 上書きできないブランチ | `branch: str`・`allowed: list[str]` | 403 |
       | `CommitWorktreeNotFoundError` | コミットするブランチのワークツリーが無い | `branch: str` | 409 |
       | `UnpushedCommitsError` | ワークツリーの未プッシュのコミット | `worktree: str`・`ahead: int`・`behind: int` | 409 |

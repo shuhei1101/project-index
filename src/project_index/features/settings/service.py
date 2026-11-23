@@ -70,7 +70,7 @@ def _to_yaml_row(entry: SourceEntry) -> dict[str, Any]:
 
 
 def _direct_commit_row(direct_commit: SourceDirectCommit) -> dict[str, Any]:
-    """`direct_commit` の空でない `scope`・`kinds`・`write_api_kinds` だけを持つ辞書にする。"""
+    """`direct_commit` の空でない `scope`・`kinds`・`write_api_kinds` と真の `write_api_config` だけを持つ辞書にする。"""
     row: dict[str, Any] = {}
     if direct_commit.scope:
         row["scope"] = list(direct_commit.scope)
@@ -78,6 +78,8 @@ def _direct_commit_row(direct_commit: SourceDirectCommit) -> dict[str, Any]:
         row["kinds"] = {kind: list(globs) for kind, globs in direct_commit.kinds.items()}
     if direct_commit.write_api_kinds:
         row["write_api_kinds"] = list(direct_commit.write_api_kinds)
+    if direct_commit.write_api_config:
+        row["write_api_config"] = True
     if direct_commit.on_conflict is not None:
         row["on_conflict"] = {"command": list(direct_commit.on_conflict.command)}
     return row
@@ -154,6 +156,9 @@ def _merge_direct_commit(
         kinds=sent.kinds if "kinds" in sent_keys else current.kinds,
         write_api_kinds=(
             sent.write_api_kinds if "write_api_kinds" in sent_keys else current.write_api_kinds
+        ),
+        write_api_config=(
+            sent.write_api_config if "write_api_config" in sent_keys else current.write_api_config
         ),
         # 衝突したときのスクリプトは端末の設定の API から変えられないため、常にファイルの値を残す
         on_conflict=current.on_conflict,

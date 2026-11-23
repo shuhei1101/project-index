@@ -246,9 +246,9 @@ response:
     description: 端末の設定の行の読み書きの方法
     notes: 書いていない行は `storage` を返さない
   - name: sources[].directCommit
-    type: '{scope: list[str], kinds: dict[str, list[str]], writeApiKinds: list[str]} | None'
-    description: 端末の設定の行の直コミットを呼べる作業場所と、書き込みの API から直コミットできる種類（端末の設定の `direct_commit`）
-    notes: '`scope` が `[]`、`kinds` が `{}`、`writeApiKinds` が `[]` の行（記載していない行）は `directCommit` を返却しない'
+    type: '{scope: list[str], kinds: dict[str, list[str]], writeApiKinds: list[str], writeApiConfig: bool} | None'
+    description: 端末の設定の行の直コミットを呼べる作業場所と、書き込みの API から直コミットできる種類と配信元の設定を直コミットできるか（端末の設定の `direct_commit`）
+    notes: '`scope` が `[]`、`kinds` が `{}`、`writeApiKinds` が `[]`、`writeApiConfig` が `false` の行（記載していない行）は `directCommit` を返却しない'
 status_codes:
   - code: '200'
     condition: 返した（配信元が 0 件でも 200）

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -12,6 +12,9 @@ from project_index.features.search.types import Condition, Group
 from project_index.features.validation.markdown import UncheckedKey
 from project_index.shared.api_model import ApiModel
 from project_index.shared.errors import Violation
+
+if TYPE_CHECKING:
+    from project_index.features.write.source_config import SourceConfigFile
 
 OPERATIONS_MAX = 50
 
@@ -183,6 +186,27 @@ class DeleteResult:
     commit: CommitResult | None = None
 
 
+class SourceConfigWrite(ApiModel):
+    """書き込みの API の `sourceConfig`（配信元の設定の書き換え）。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # 書き換えた後の `project-index.yaml` の内容の全体
+    content: str = Field(min_length=1)
+    # 配信元の設定の原本の取得が返した `version`
+    expected_version: str
+
+
+@dataclass(frozen=True)
+class SourceConfigResult:
+    """配信元の設定の書き換えのバージョン・差分・再読み込み。"""
+
+    version: str
+    diff: str
+    # プッシュした後に配信元を再読み込みしたとき `True`
+    reloaded: bool
+
+
 @dataclass(frozen=True)
 class CommitDocumentsRequest:
     """書き込みの API がサービスに渡す要求。"""
@@ -195,6 +219,8 @@ class CommitDocumentsRequest:
     dry_run: bool = False
     # 本文の `baseCommit`。`None` のときは衝突してもブランチに残さずに断る
     base_commit: str | None = None
+    # 本文の `sourceConfig`。`None` は配信元の設定を書き換えない
+    source_config: SourceConfigWrite | None = None
 
 
 @dataclass(frozen=True)
@@ -237,6 +263,8 @@ class CommitDocumentsResult:
     commit: CommitResult | None = None
     # 衝突してブランチに残したとき（`dry_run` は残せるとき）だけ持つ
     conflict: ConflictResult | None = None
+    # `source_config` を受けたときだけ持つ
+    source_config: SourceConfigResult | None = None
 
 
 class CommitDeleteTarget(ApiModel):
@@ -262,12 +290,14 @@ class CommitDocumentsBody(ApiModel):
     dry_run: bool = False
     # 画面が編集を始めたときのコミットするブランチのコミット
     base_commit: str | None = Field(default=None, pattern=r"^[0-9a-fA-F]{7,40}$")
+    # 配信元の設定の書き換え
+    source_config: SourceConfigWrite | None = None
 
     @model_validator(mode="after")
     def _not_empty(self) -> CommitDocumentsBody:
-        """書き込みと削除が両方とも空の要求を断る。"""
-        if not self.writes and not self.deletes:
-            message = "writes と deletes が両方とも空です"
+        """書き込みと削除が両方とも空で、配信元の設定の書き換えも無い要求を断る。"""
+        if not self.writes and not self.deletes and self.source_config is None:
+            message = "writes と deletes が両方とも空で、sourceConfig もありません"
             raise ValueError(message)
         return self
 
@@ -284,6 +314,7 @@ class CommitDocumentsBody(ApiModel):
             on_referenced=self.on_referenced,
             dry_run=self.dry_run,
             base_commit=self.base_commit,
+            source_config=self.source_config,
         )
 
 
@@ -362,6 +393,33 @@ class ConflictSummary(ApiModel):
         )
 
 
+class SourceConfigSummary(ApiModel):
+    """書き込みの API の応答の `sourceConfig`。"""
+
+    version: str
+    diff: str
+    reloaded: bool
+
+
+class SourceConfigFileResponse(ApiModel):
+    """`GET /sources/{source}/config/file` の応答。"""
+
+    content: str
+    version: str
+    branch: str
+    protected_keys: list[str]
+
+    @classmethod
+    def from_domain(cls, file: SourceConfigFile) -> SourceConfigFileResponse:
+        """配信元の設定の原本を応答にする。"""
+        return cls(
+            content=file.content,
+            version=file.version,
+            branch=file.branch,
+            protected_keys=list(file.protected_keys),
+        )
+
+
 class CommitDocumentsResponse(ApiModel):
     """`POST /sources/{source}/commits` の応答。"""
 
@@ -371,6 +429,8 @@ class CommitDocumentsResponse(ApiModel):
     commit: CommitSummary | None
     # 衝突しなかったときは `None`
     conflict: ConflictSummary | None = None
+    # 配信元の設定を送らなかったときは `None`
+    source_config: SourceConfigSummary | None = None
 
     @classmethod
     def from_domain(cls, result: CommitDocumentsResult) -> CommitDocumentsResponse:
@@ -413,4 +473,11 @@ class CommitDocumentsResponse(ApiModel):
             conflict=None
             if result.conflict is None
             else ConflictSummary.from_domain(result.conflict),
+            source_config=None
+            if result.source_config is None
+            else SourceConfigSummary(
+                version=result.source_config.version,
+                diff=result.source_config.diff,
+                reloaded=result.source_config.reloaded,
+            ),
         )

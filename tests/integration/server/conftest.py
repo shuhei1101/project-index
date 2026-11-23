@@ -127,6 +127,8 @@ class SourceSpec:
     direct_commit_kinds: dict[str, list[Path]] | None = None
     # 端末の設定の行の `direct_commit.write_api_kinds`。None は行に書かない
     direct_commit_write_api_kinds: list[str] | None = None
+    # 端末の設定の行の `direct_commit.write_api_config`。None は行に書かない
+    direct_commit_write_api_config: bool | None = None
     # 端末の設定の行の `direct_commit.on_conflict.command`。None は行に書かない
     direct_commit_on_conflict: list[str] | None = None
 
@@ -519,11 +521,13 @@ def _direct_commit_kinds_lines(spec: SourceSpec) -> list[str]:
 
 
 def _direct_commit_option_lines(spec: SourceSpec) -> list[str]:
-    """`direct_commit` の `write_api_kinds`・`on_conflict` の YAML の行を組み立てる（指定したものだけ）。"""
+    """`direct_commit` の `write_api_kinds`・`write_api_config`・`on_conflict` の YAML の行を組み立てる（指定したものだけ）。"""
     lines: list[str] = []
     if spec.direct_commit_write_api_kinds is not None:
         lines.append("      write_api_kinds:")
         lines.extend(f"        - {kind}" for kind in spec.direct_commit_write_api_kinds)
+    if spec.direct_commit_write_api_config is not None:
+        lines.append(f"      write_api_config: {str(spec.direct_commit_write_api_config).lower()}")
     if spec.direct_commit_on_conflict is not None:
         # コマンドの引数は JSON の文字列にして、YAML の flow の並びとして読ませる
         command = ", ".join(json.dumps(item) for item in spec.direct_commit_on_conflict)
@@ -1290,6 +1294,7 @@ def make_direct_commit_source(
         extra_branches: tuple[str, ...] = (),
         direct_commit_kinds: dict[str, list[Path]] | None = None,
         write_api_kinds: list[str] | None = None,
+        write_api_config: bool | None = None,
         list_script: str = NOTE_LIST_SCRIPT,
         on_conflict: list[str] | None = None,
     ) -> DirectCommitSource:
@@ -1309,6 +1314,7 @@ def make_direct_commit_source(
         spec.direct_commit_scope = [local]
         spec.direct_commit_kinds = direct_commit_kinds
         spec.direct_commit_write_api_kinds = write_api_kinds
+        spec.direct_commit_write_api_config = write_api_config
         spec.direct_commit_on_conflict = on_conflict
         folder = spec.folder
         bare = tmp_path / "remote.git"
