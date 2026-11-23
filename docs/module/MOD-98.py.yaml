@@ -89,7 +89,7 @@ classes:
       | `UnknownKindError` | 知らない種類 | `kinds: list[str]` | 400 |
       | `DocumentNotFoundError` | 無い文書 | `missing: list[str]`・`candidates: dict[str, list[str]]` | 404 |
       | `ValidationFailedError` | 検査の不合格 | `violations: list[Violation]` | 422 |
-      | `VersionMismatchError` | バージョンの不一致 | `doc_id: str`・`current: str`・`diff: str` | 409 |
+      | `VersionMismatchError` | バージョンの不一致 | `doc_id: str`・`current: str`・`diff: str`・`violations: list[Violation]`（配信元の設定のバージョンの不一致だけがパス `sourceConfig` の違反を持つ） | 409 |
       | `DocumentReferencedError` | 参照されている | `doc_id: str`・`referrers: list[str]` | 409 |
       | `DeleteNotAllowedError` | 削除を許していない種類 | `kind: str` | 403 |
       | `ReadOnlyKindError` | SQLite の表の行の種類への操作 | `kind: str`・`positions: list[str]` | 403 |
