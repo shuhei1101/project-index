@@ -474,8 +474,6 @@ Git の配信元で消した文書は Git で戻せます。
 Git 管理外の配信元と `storage.type: disk` の配信元では、種類の `documents[].writable` が削除を許していることが要ります。
 `records`・`body_file` の行の文書は、本文のファイルも削除します。同じ管理用の YAML のほかの要素が同じ本文のファイルを指すときは残します。本文のファイルを持たない要素は、要素だけを削除します。
 ファイルを削除する前に、消す文書の種類の行の `validators[]` のうち `on` に `delete` を持つものを文書ごとに実行し、違反があれば ValidationFailedError で断ります。`atomic: false` は違反のあった文書を `failed` にし、残る文書をその文書が消えない前提で検査し直して、最後まで違反の無かった文書だけを削除します。
-配信元の設定で `project-index skill-md --check` を `on: [write, delete]` にすると、ほかのスキルが工程の `ref` で埋め込むエージェントフローの削除を、参照しているエージェントフローの `id` と `ref` を違反に入れて断ります。参照しているエージェントフローも同じ `targets` で消すときは断りません。
-削除した後に実行する `generators[]` の `project-index skill-md` が、削除したスキルの SKILL.md も削除します。
 
 ## describe
 
