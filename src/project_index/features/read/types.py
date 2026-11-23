@@ -92,6 +92,13 @@ class RefsResponse(ApiModel):
     commits: list[CommitItem] = Field(default_factory=list[CommitItem])
 
 
+class SourceConfigDirectCommit(ApiModel):
+    """配信元の設定の取得の `directCommit`（配信元の設定の `direct_commit` のうち画面のサーバーが使用する値）。"""
+
+    # 本文の直コミットを断り、メタデータだけを許可する種類。作業場所と端末の設定では絞らない
+    metadata_only_kinds: list[str] = Field(default_factory=list[str])
+
+
 class SourceConfigResponse(ApiModel):
     """GET `/sources/{source}/config` の応答。"""
 
@@ -101,6 +108,7 @@ class SourceConfigResponse(ApiModel):
     github: GitHubTarget | None
     # 中のキー `ignore_keys` は配信元の設定から写したまま camelCase にしないため辞書で持つ
     diff: dict[str, list[str]]
+    direct_commit: SourceConfigDirectCommit
     schemas: dict[str, dict[str, Any]] | None = None
 
 

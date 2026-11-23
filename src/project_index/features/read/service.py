@@ -18,6 +18,7 @@ from project_index.features.read.types import (
     DocumentListResponse,
     DocumentValueResponse,
     GitHubTarget,
+    SourceConfigDirectCommit,
     SourceConfigResponse,
 )
 from project_index.features.search.filters import exclusion_flags
@@ -60,6 +61,12 @@ def get_source_config(
         decisions={"folders": list(config.decision_folders)},
         github=github,
         diff={"ignore_keys": list(config.diff_ignore_keys)},
+        # 書き込みの API が本文の直コミットを断る種類と同じ値（direct_commit が無い配信元は空）
+        direct_commit=SourceConfigDirectCommit(
+            metadata_only_kinds=(
+                list(config.direct_commit.metadata_only_kinds) if config.direct_commit else []
+            )
+        ),
         schemas=(
             {row.id: store.row_schema(target, row.id) for row in config.documents if row.enabled}
             if schemas
