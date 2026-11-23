@@ -36,8 +36,10 @@ docs:
     status: todo
   - page: docs/guide/設定.md
     new: false
-    change: 端末の設定と配信元の設定の、配信元の設定の直コミットの許可のキーを追加する（扱う場合）
-    status: todo
+    change: 端末の設定の `sources[].direct_commit.write_api_config` と配信元の設定の `direct_commit.config` を追加し、`direct_commit.kinds[]` を `config` が `true` のとき省略できるようにする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T08:05:29.762357+00:00'
   - page: docs/guide/コアコンセプト-配信元と権限.md
     new: false
     change: 書き込みの API で配信元の設定を直コミットできる条件を追加する（扱う場合）
