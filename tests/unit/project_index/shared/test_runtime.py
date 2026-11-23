@@ -294,6 +294,52 @@ def test_execution_slots_try_run_post_write_when_docs_full() -> None:
     assert released_before is False
 
 
+def test_execution_slots_try_run_post_write_when_cancelled_while_starting() -> None:
+    """動き始める直前の取り消しで使用中の数を 1 回だけ戻す（異常系）。"""
+    # 準備
+    entered = threading.Event()
+    release = threading.Event()
+    finished = threading.Event()
+
+    def clock() -> float:
+        # 判定の実行スロットのスレッドが動き始めの時刻を取るところで止める
+        if threading.current_thread().name.startswith("post_write") and not release.is_set():
+            entered.set()
+            release.wait(timeout=10)
+        return 0.0
+
+    slots = ExecutionSlots(clock=clock)
+    gate = threading.Event()
+    started = threading.Semaphore(0)
+
+    async def scenario() -> str | None:
+        task = asyncio.create_task(slots.try_run_post_write(finished.set))
+        await asyncio.to_thread(entered.wait, 10)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        release.set()
+        await asyncio.to_thread(finished.wait, 10)
+        await asyncio.sleep(0.05)
+        blockers = [
+            asyncio.create_task(slots.try_run_post_write(_blocker(gate, started)))
+            for _ in range(runtime.POST_WRITE_WORKERS)
+        ]
+        for _ in range(runtime.POST_WRITE_WORKERS):
+            await asyncio.to_thread(started.acquire, True, 10)
+        async with asyncio.timeout(5):
+            extra = await slots.try_run_post_write(lambda: "extra")
+        gate.set()
+        await asyncio.gather(*blockers)
+        return extra
+
+    # 実行
+    extra = asyncio.run(scenario())
+    # 検証
+    assert finished.is_set()
+    assert extra is None
+
+
 def test_execution_slots_running() -> None:
     """範囲の中の要求だけを長い順に返す（正常系）。"""
     # 準備

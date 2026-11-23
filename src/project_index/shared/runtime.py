@@ -251,6 +251,8 @@ class ExecutionSlots:
         def _work() -> T:
             started_at = self.clock()
             with self._guard:
+                # 取り消し済みなら、使用中の数は取り消した側が戻している
+                releases = job.state == "waiting"
                 job.state = "running"
             record = current_record()
             if record is not None:
@@ -259,8 +261,10 @@ class ExecutionSlots:
                 return func(*args)
             finally:
                 finished_at = self.clock()
-                with self._guard:
-                    self._post_write_busy -= 1
+                # 動き始める前に取り消されていなければ、使用中の数をここで戻す
+                if releases:
+                    with self._guard:
+                        self._post_write_busy -= 1
                 if record is not None:
                     record.state = "waiting"
                     record.slot_wait += started_at - queued_at
