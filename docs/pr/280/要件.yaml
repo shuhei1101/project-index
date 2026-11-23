@@ -1,0 +1,30 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: none
+    detail: 画面のサーバーが配信元の設定を読む流れは変わらず、配信元の設定と一緒に本文の直コミットを断る種類も受け取れるようになる
+    depends_on: []
+docs:
+  - page: docs/interface/IF-23.yaml
+    new: false
+    change: 応答に本文の直コミットを断る種類の並びを追加し、制約「返すキー」と正常系のフローの期待値を更新する
+    status: todo
+  - page: docs/module/MOD-79.py.yaml
+    new: false
+    change: SourceConfigResponse に本文の直コミットを断る種類の項目を追加する
+    status: todo
+  - page: docs/module/MOD-125.py.yaml
+    new: false
+    change: get_source_config が配信元の設定の direct_commit.metadata_only_kinds を応答へ写す処理を追加する
+    status: todo
+  - page: docs/guide/HTTPのAPI.md
+    new: false
+    change: GET /sources/{source}/config の行の返却する値に、本文の直コミットを断る種類を追加する
+    status: todo
+scope_out:
+  - item: 端末の設定の API（GET /settings/sources）の directCommit への同じ値の追加
+    reason: 値は配信元の設定から決定し、端末の設定の行の値ではない。同じ値を返却する API を 2 つにしない
+    plan: none
+  - item: dev-docs の画面のサーバーが返却された値で本文の編集を出し分ける処理
+    reason: 別のリポジトリの作業で、今回の変更を前提にした後続
+    plan: shuhei1101/dev-docs#321
