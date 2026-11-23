@@ -1,0 +1,1 @@
+# SKILL.md の自動生成（project-index skill-md）を廃止する
