@@ -6,7 +6,7 @@ entry:
   kind: endpoint
   value: GET `/sources/{source}/config/file`
 identifier: get_source_config_file
-permissions: 端末の設定の `sources[].direct_commit.write_api_config` と配信元の設定の `direct_commit.config` が両方とも `true` の配信元だけ（`127.0.0.1` でだけ待ち受ける）
+permissions: '`Origin` を持たない要求（サーバーの側からの呼び出し）か、project-index と同じオリジンからの要求だけ。端末の設定の `sources[].direct_commit.write_api_config` と配信元の設定の `direct_commit.config` が両方とも `true` の配信元だけ（`127.0.0.1` でだけ待ち受ける）'
 idempotent: true
 read_only: true
 side_effects: なし
@@ -48,7 +48,7 @@ status_codes:
   - code: '200'
     condition: 返却した
   - code: '403'
-    condition: 端末の設定の `write_api_config` か配信元の設定の `direct_commit.config` が `true` でない（`SourceConfigNotPermittedError`）
+    condition: 端末の設定の `write_api_config` か配信元の設定の `direct_commit.config` が `true` でない（`SourceConfigNotPermittedError`）、別のオリジンからの要求（`CrossOriginError`）
     notes: '`nextSteps` で許可を記載するキーを示す'
   - code: '404'
     condition: 配信元が無い・配信していない（`UnknownSourceError`・`SourceNotServedError`）

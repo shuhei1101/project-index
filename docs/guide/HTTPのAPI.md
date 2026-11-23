@@ -62,7 +62,7 @@
 
 | エンドポイント | 動き | 主なエラー |
 | --- | --- | --- |
-| `GET /sources/{source}/config/file` | 書き込みの API で書き換える前の `project-index.yaml` の内容（端末の設定を重ねる前のファイルのまま）・バージョン・コミットするブランチ・書き換えられないキー。端末の設定の `sources[].direct_commit.write_api_config` と配信元の設定の `direct_commit.config` の両方で許可した配信元だけ | 403（許可していない）・404（配信元）・409（配信元の設定を複数のファイルに分けている・直コミットを使用できない・ワークツリーが無い） |
+| `GET /sources/{source}/config/file` | 書き込みの API で書き換える前の `project-index.yaml` の内容（端末の設定を重ねる前のファイルのまま）・バージョン・コミットするブランチ・書き換えられないキー。端末の設定の `sources[].direct_commit.write_api_config` と配信元の設定の `direct_commit.config` の両方で許可した配信元だけで、`Origin` と `Sec-Fetch-Site` を持たない要求と project-index と同じオリジンの要求だけを受ける | 403（許可していない・別のオリジンの要求）・404（配信元）・409（配信元の設定を複数のファイルに分けている・直コミットを使用できない・ワークツリーが無い） |
 | `POST /sources/{source}/commits` | 本文の `writes`（`write_docs` の `operations` と同じ操作）と `deletes`（`id`・`expectedVersion`）を 1 回で受け、`write_docs`・`delete_docs` と同じ検査に合格させてから、1 つのコミットにまとめてコミットするブランチへプッシュする。`sourceConfig`（`content`・`expectedVersion`）を添えると `project-index.yaml` も同じコミットで書き換え、プッシュした後に配信元を再読み込みする（`validators`・`converters`・`generators`・`direct_commit`・`worktrees` は書き換えられない）。`dryRun: true` で検査と差分だけを返す | 400（引数の誤り）・403（別のオリジン・直コミットを許可していない種類・配信元の設定の直コミットを許可していない）・404（配信元・文書）・409（バージョン・ワークツリーの状態・プッシュを断られた・`baseCommit` を起点に使えない・配信元の設定を複数のファイルに分けている）・422（検査の違反・書き換えられないキーの変更）・500（生成の失敗）・502（取得・プッシュの失敗）・504（書き込みの期限） |
 
 <!-- /table -->
