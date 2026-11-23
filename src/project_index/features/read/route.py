@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+from datetime import UTC, datetime
 from functools import partial
 from typing import TYPE_CHECKING, Annotated
 
@@ -33,6 +34,7 @@ from project_index.features.read.types import (
     SearchResult,
     SourceConfigResponse,
 )
+from project_index.features.search.filters import exclusion_flags
 from project_index.features.settings.types import SettingsSourcesResponse
 from project_index.server.error_handlers import problem_of
 from project_index.shared.errors import (
@@ -125,7 +127,12 @@ def _decision(handlers: Handlers, source: str, decision_id: str) -> DecisionResp
 
 
 def _search(
-    handlers: Handlers, source: str, ref: str | None, query: str, limit: int
+    handlers: Handlers,
+    source: str,
+    ref: str | None,
+    query: str,
+    limit: int,
+    include_excluded: bool,
 ) -> SearchResult:
     """検索の対象の行の文書から語を探す。"""
     target, _ = read_target(source, ref, registry=handlers.registry)
@@ -134,7 +141,9 @@ def _search(
         for item in handlers.store.load(target).documents
         if target.source.table(item.kind).search
     ]
-    return search_words(found, query, limit)
+    today = datetime.now(UTC).astimezone().date()
+    flags = exclusion_flags(target, found, store=handlers.store, today=today)
+    return search_words(found, query, limit, excluded=flags, include_excluded=include_excluded)
 
 
 def _refs(handlers: Handlers, source: str, commits: int) -> RefsResponse:
@@ -207,8 +216,14 @@ def build_read_router(handlers: Handlers) -> APIRouter:
         q: Annotated[str, Query(min_length=1, max_length=SEARCH_QUERY_MAX)],
         ref: str | None = None,
         limit: Annotated[int, Query(ge=1, le=SEARCH_LIMIT_MAX)] = SEARCH_LIMIT_DEFAULT,
+        include_excluded: bool = False,
     ) -> SearchResult | Response:
-        return await _run(handlers, source, "", partial(_search, handlers, source, ref, q, limit))
+        return await _run(
+            handlers,
+            source,
+            "",
+            partial(_search, handlers, source, ref, q, limit, include_excluded),
+        )
 
     @router.get("/sources/{source}/refs", name="list_refs", response_model=RefsResponse)
     async def refs(

@@ -12,13 +12,20 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import TypeAdapter, ValidationError
 
-from project_index.features.search.fields import NO_COLUMNS, as_datetime, field_values
+from project_index.features.search.fields import (
+    NO_COLUMNS,
+    as_datetime,
+    field_values,
+    known_fields,
+)
 from project_index.features.search.types import Condition, Group, SearchRequest
 from project_index.shared.errors import Violation
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
+    from project_index.features.access.types import Target
+    from project_index.features.documents.store import DocumentStore
     from project_index.features.documents.types import Document
     from project_index.features.sources.types import DocumentTable
 
@@ -409,3 +416,20 @@ def is_excluded(
     if condition is None:
         return False
     return match_filter(condition, document, fields=fields, today=today)
+
+
+def exclusion_flags(
+    target: Target, documents: Sequence[Document], *, store: DocumentStore, today: date
+) -> list[bool]:
+    """参照する場所の文書ごとに、文書の行の `search_exclude` に該当するかを並べて返却する。"""
+    rows = [table for table in target.source.config.documents if table.enabled]
+    if not any(table.search_exclude is not None for table in rows):
+        return [False] * len(documents)
+    fields = known_fields(store.row_schema(target, table.id) for table in rows)
+    conditions: dict[str, Condition | Group | None] = {}
+    flags: list[bool] = []
+    for document in documents:
+        if document.kind not in conditions:
+            conditions[document.kind] = exclusion_of(target.source.table(document.kind))
+        flags.append(is_excluded(document, conditions[document.kind], fields=fields, today=today))
+    return flags

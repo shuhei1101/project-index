@@ -89,6 +89,8 @@ class MatchWord:
     word: str
     id: str
     kind: Literal["name", "alias"]
+    # `list_match_words` が `include_excluded` で返却した `search_exclude` に該当する文書の語だけ `True`
+    excluded: bool | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

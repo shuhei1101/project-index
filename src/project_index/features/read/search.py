@@ -21,12 +21,27 @@ SNIPPETS_PER_DOC = 3
 CONTEXT_LINES = 1
 
 
-def search_words(documents: Sequence[Document], q: str, limit: int) -> SearchResult:
+def search_words(
+    documents: Sequence[Document],
+    q: str,
+    limit: int,
+    *,
+    excluded: Sequence[bool] | None = None,
+    include_excluded: bool = False,
+) -> SearchResult:
     """語を全て含む文書と一致した箇所を返す。"""
     words = normalize(q).split()
-    matched = sorted(
-        (document for document in documents if match_words(document, words)), key=page_path
+    flags = excluded if excluded is not None else [False] * len(documents)
+    found = sorted(
+        (
+            (document, flag)
+            for document, flag in zip(documents, flags, strict=True)
+            if match_words(document, words)
+        ),
+        key=lambda pair: page_path(pair[0]),
     )
+    matched = [pair for pair in found if include_excluded or not pair[1]]
+    excluded_count = len(found) - len(matched)
     items = [
         SearchItem(
             path=page_path(document),
@@ -36,7 +51,10 @@ def search_words(documents: Sequence[Document], q: str, limit: int) -> SearchRes
             snippets=snippet_lines(
                 document.body, words, context_lines=CONTEXT_LINES, max_count=SNIPPETS_PER_DOC
             ),
+            excluded=True if flag else None,
         )
-        for document in matched[:limit]
+        for document, flag in matched[:limit]
     ]
-    return SearchResult(total_count=len(matched), items=items)
+    return SearchResult(
+        total_count=len(matched), items=items, excluded_count=excluded_count or None
+    )
