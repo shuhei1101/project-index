@@ -123,9 +123,12 @@ class DirectCommitConfig:
     """配信元の設定の `direct_commit`。"""
 
     branch: str
+    # `direct_commit.kinds[]` の文字列の要素とオブジェクトの要素の `id` を、記載の順に並べたもの
     kinds: list[str]
     # 上書きできるブランチの名前か glob
     branches: list[str] = field(default_factory=list[str])
+    # `kinds` のうち `body: false` の要素の種類（本文の直コミットを断り、メタデータだけを許可する）
+    metadata_only_kinds: list[str] = field(default_factory=list[str])
 
 
 @dataclass(frozen=True)

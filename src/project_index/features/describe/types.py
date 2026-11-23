@@ -70,6 +70,8 @@ class DirectCommitGuide:
     branches: list[str]
     # 今の作業場所から直コミットできる種類
     kinds: list[str]
+    # `kinds` のうち、本文の直コミットを断り、メタデータだけを許可する種類
+    metadata_only_kinds: list[str] = field(default_factory=list[str])
 
 
 @dataclass(frozen=True)

@@ -100,6 +100,7 @@ def _direct_commit_guide(target: Target, cwd: str | None) -> DirectCommitGuide |
         branch=settings.branch,
         branches=list(settings.branches),
         kinds=[kind for kind in settings.kinds if kind in kinds],
+        metadata_only_kinds=[kind for kind in settings.metadata_only_kinds if kind in kinds],
     )
 
 

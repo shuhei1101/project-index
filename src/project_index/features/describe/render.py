@@ -103,7 +103,11 @@ def _source_guide(result: SourceGuideResult, head: list[str]) -> list[str]:
         lines.extend(["", DIRECT_COMMIT_HEADING, f"- ブランチ: {guide.branch}"])
         if guide.branches:
             lines.append(f"- 上書きできるブランチ: {', '.join(guide.branches)}")
-        lines.append(f"- 種類: {', '.join(guide.kinds)}")
+        names = [
+            f"{kind}（メタデータだけ）" if kind in guide.metadata_only_kinds else kind
+            for kind in guide.kinds
+        ]
+        lines.append(f"- 種類: {', '.join(names)}")
     if result.refs is not None:
         lines.extend(
             [

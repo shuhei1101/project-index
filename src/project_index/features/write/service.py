@@ -44,7 +44,7 @@ from project_index.features.search.filters import check_filter, match_filter
 from project_index.features.search.types import SearchRequest
 from project_index.features.seen.types import LastRead, SessionKey
 from project_index.features.sources.service import SCRIPT_TABLES
-from project_index.features.sources.types import DocumentTable, ServedSource
+from project_index.features.sources.types import DirectCommitConfig, DocumentTable, ServedSource
 from project_index.features.validation.service import DocumentChecker
 from project_index.features.write.apply import (
     BODY_KEY,
@@ -2155,8 +2155,9 @@ def _check_commit_content(
     changed: list[tuple[int, str, str]],
     before: Mapping[str, Document],
     after: Mapping[str, Document],
+    deleted: frozenset[str] = frozenset(),
 ) -> None:
-    """書き換わる文書の種類が直コミットを許すか、秘密の値の書式に該当する値が無いかを確かめる。"""
+    """書き換わる文書の種類が直コミットを許すか、本文を断る種類の本文と秘密の値を確かめる。"""
     settings = source.config.direct_commit
     allowed: set[str] = set(settings.kinds) if settings is not None else set()
     # 許可する種類のうち、この作業場所から呼べない種類
@@ -2183,6 +2184,9 @@ def _check_commit_content(
                     doc=doc_id,
                 )
             )
+        violations.extend(
+            _body_violations(index, doc_id, kind, BodyChange(before, after, deleted), settings)
+        )
         violations.extend(_secret_violations(index, doc_id, before, after))
     if violations:
         raise ValidationFailedError(
@@ -2190,6 +2194,58 @@ def _check_commit_content(
             violations=violations,
             next_steps=["違反を修正してから再実行してください"],
         )
+
+
+@dataclass(frozen=True)
+class BodyChange:
+    """変更を適用する前と後の文書と、消す文書の ID。"""
+
+    before: Mapping[str, Document]
+    after: Mapping[str, Document]
+    deleted: frozenset[str] = frozenset()
+
+
+def _body_file(document: Document | None) -> tuple[str, str] | None:
+    """文書の本文のファイルのパスと本文（本文のファイルを持たなければ `None`）。"""
+    if document is None or document.body_path is None:
+        return None
+    return document.body_path, document.body
+
+
+def _body_kept_by_other(doc_id: str, body: tuple[str, str], change: BodyChange) -> bool:
+    """消す文書の本文のファイルを、残るほかの文書が指すか（指すなら本文のファイルは削除しない）。"""
+    return any(
+        other_id != doc_id and other_id not in change.deleted and other.body_path == body[0]
+        for other_id, other in change.after.items()
+    )
+
+
+def _body_violations(
+    index: int,
+    doc_id: str,
+    kind: str,
+    change: BodyChange,
+    settings: DirectCommitConfig | None,
+) -> list[Violation]:
+    """本文の直コミットを断る種類で、本文のファイルが書き換わる・作られる・移る・消える違反。"""
+    if settings is None or kind not in settings.metadata_only_kinds:
+        return []
+    old = _body_file(change.before.get(doc_id))
+    new = None if doc_id in change.deleted else _body_file(change.after.get(doc_id))
+    if old == new:
+        return []
+    # 消す文書の本文のファイルを、残るほかの文書が指すときは本文のファイルが残る
+    if new is None and old is not None and _body_kept_by_other(doc_id, old, change):
+        return []
+    return [
+        Violation(
+            path="@body",
+            rule=f"種類 {kind} は本文の直コミットを断っている",
+            fix="本文を変えずにメタデータの列だけを書き換えるか、作業 PR で書き込んでください",
+            index=index,
+            doc=doc_id,
+        )
+    ]
 
 
 def _secret_violations(
@@ -2432,7 +2488,8 @@ def _delete_with_commit(
         before = dict(session.docs)
         deleted = _apply_deletes(session, checker, request)
         changed = _deleted_documents(request, deleted, session)
-        _check_commit_content(source, committable, changed, before, session.docs)
+        removed = frozenset(document.id for document in deleted.accepted)
+        _check_commit_content(source, committable, changed, before, session.docs, removed)
         _remove_documents(session, deleted.accepted)
         return session, deleted
 
@@ -2528,8 +2585,9 @@ def _check_commit_documents_content(
     changed: list[tuple[str, int, str, str]],
     before: Mapping[str, Document],
     after: Mapping[str, Document],
+    deleted: frozenset[str] = frozenset(),
 ) -> None:
-    """書き換わる文書の種類と秘密の値を確かめる（直コミットを許可していない種類を先に判定する）。"""
+    """書き換わる文書の種類・本文を断る種類の本文・秘密の値を確かめる（許可していない種類を先に判定する）。"""
     settings = source.config.direct_commit
     allowed: set[str] = set(settings.kinds) if settings is not None else set()
     violations: list[Violation] = []
@@ -2547,7 +2605,12 @@ def _check_commit_documents_content(
             )
         violations.extend(
             dataclasses.replace(violation, path=f"{name}[{index}].{violation.path}")
-            for violation in _secret_violations(index, doc_id, before, after)
+            for violation in [
+                *_body_violations(
+                    index, doc_id, kind, BodyChange(before, after, deleted), settings
+                ),
+                *_secret_violations(index, doc_id, before, after),
+            ]
         )
     if violations:
         raise ValidationFailedError(
@@ -2683,8 +2746,13 @@ class _CommitDocumentsRun:
             session, self.checker, self.request, self.now
         )
         # 許可は今の配信元の設定で判定する（一時のワークツリーの設定は使用しない）
+        removed = (
+            frozenset(document.id for document in committed.deleted.accepted)
+            if committed.deleted is not None
+            else frozenset[str]()
+        )
         _check_commit_documents_content(
-            self.source, self.committable, changed, before, session.docs
+            self.source, self.committable, changed, before, session.docs, removed
         )
         if committed.deleted is not None:
             _remove_documents(session, committed.deleted.accepted)
