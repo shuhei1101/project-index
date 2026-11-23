@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any
 
+from project_index.features.post_write import route as post_write_route
 from project_index.features.seen.types import SessionKey
+from project_index.shared.runtime import DOCS_WORKERS, POST_WRITE_WORKERS
 from tests.integration.server.conftest import (
     ALIAS_ROWS,
     FILES_ROW,
@@ -15,10 +19,13 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
+    import pytest
     from fastapi.testclient import TestClient
 
 ENDPOINT = "/_admin/post-write"
 CRITERIA = "docs/guide/メタデータを付ける基準.md"
+# 止めた処理の合図と応答を待つ上限
+WAIT_SEC = 30
 
 
 def _post(env: Any, body: dict[str, Any]) -> Any:
@@ -142,3 +149,76 @@ def test_error_when_input_invalid(
     assert response.status_code == 422
     assert response.headers["content-type"].startswith("application/problem+json")
     assert any("paths" in item["path"] for item in response.json()["errors"])
+
+
+def test_normal_when_docs_slots_full(
+    make_source: Callable[..., Any], make_server: Callable[..., Any]
+) -> None:
+    """文書の MCP の実行スロットが全て使用中でも、待たずに通知を返却する（正常系）。"""
+    # 準備
+    sample = make_source("sample", sample_sync_files(unindexed=1))
+    env = make_server(sample)
+    path = str(sample.folder / "src/a.py")
+    release = threading.Event()
+    blockers = [
+        env.handlers.slots.docs_executor.submit(release.wait, WAIT_SEC) for _ in range(DOCS_WORKERS)
+    ]
+    # 実行
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(_post, env, {"session_id": "s1", "paths": [path]})
+        response = future.result(timeout=WAIT_SEC)
+        # 合図を出す前に応答したか
+        answered_before_release = not release.is_set()
+        release.set()
+    for blocker in blockers:
+        blocker.result(timeout=WAIT_SEC)
+    # 検証
+    assert answered_before_release
+    assert response.status_code == 200
+    assert response.json()["notices"] == [
+        {"path": path, "source": "sample", "action": "update_row", "files_yaml": "src/files.yaml"}
+    ]
+
+
+def test_normal_when_post_write_slots_full(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """判定の実行スロットが全て使用中なら、待たずに通知せずに応答する（正常系）。"""
+    # 準備
+    sample = make_source("sample", sample_sync_files(unindexed=1))
+    env = make_server(sample)
+    path = str(sample.folder / "src/a.py")
+    judge = post_write_route.judge_post_write
+    entered = threading.Semaphore(0)
+    release = threading.Event()
+
+    def blocked_judge(request: Any, **kwargs: Any) -> Any:
+        # 実行スロットを埋める要求だけを合図まで止める
+        if request.session_id.startswith("busy"):
+            entered.release()
+            release.wait(timeout=WAIT_SEC)
+        return judge(request, **kwargs)
+
+    monkeypatch.setattr(post_write_route, "judge_post_write", blocked_judge)
+    # 実行
+    with ThreadPoolExecutor(max_workers=POST_WRITE_WORKERS) as pool:
+        busy = [
+            pool.submit(_post, env, {"session_id": f"busy{index}", "paths": [path]})
+            for index in range(POST_WRITE_WORKERS)
+        ]
+        reached = all(entered.acquire(timeout=WAIT_SEC) for _ in range(POST_WRITE_WORKERS))
+        full = _post(env, {"session_id": "s1", "paths": [path]})
+        # 合図を出す前に応答したか
+        answered_before_release = not release.is_set()
+        release.set()
+        busy_responses = [future.result(timeout=WAIT_SEC) for future in busy]
+    after = _post(env, {"session_id": "s1", "paths": [path]})
+    # 検証
+    assert reached
+    assert answered_before_release
+    assert full.status_code == 200
+    assert full.json() == {"notices": [], "additional_context": ""}
+    assert all(response.status_code == 200 for response in busy_responses)
+    assert [notice["action"] for notice in after.json()["notices"]] == ["update_row"]

@@ -145,6 +145,11 @@ data_models:
         type: bool
         default: 'False'
         description: 裏のリビジョンの書き出しが済んでいない間は `True`
+      - name: running
+        title: 実行中の要求
+        type: list[RunningRequest]
+        default: '[]'
+        description: 文書の MCP・読み取り API・書き込みの後の通知の判定の終わっていない要求（経過秒の長い順）。`field(default_factory=list)`
   - name: NotServedItem
     title: 配信していない配信元
     container: project_index/features/admin/types.py

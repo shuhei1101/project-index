@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from project_index.features.read.types import NavAutoCount
 from project_index.features.sources.types import ServedSource, SourceStatusKind, StorageType
 from project_index.shared.errors import Violation
+from project_index.shared.runtime import RunningRequest
 
 if TYPE_CHECKING:
     from typing import Self
@@ -98,6 +99,8 @@ class ServerStatus:
     checking: bool = False
     # 裏のリビジョンの書き出しが済んでいないとき True
     exporting: bool = False
+    # 文書の MCP・読み取り API・書き込みの後の通知の判定の終わっていない要求（経過秒の長い順）
+    running: list[RunningRequest] = field(default_factory=list[RunningRequest])
 
 
 @dataclass(frozen=True)

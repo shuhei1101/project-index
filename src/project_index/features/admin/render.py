@@ -57,6 +57,13 @@ def _source_row(state: SourceState) -> str:
     return f"| {state.id} | {status} | {version} | {sync} |"
 
 
+# 実行中の要求の表の見出し
+RUNNING_HEADER = [
+    "| ツール | 配信元 | 実行スロット | 状態 | 経過秒 |",
+    "| --- | --- | --- | --- | --- |",
+]
+
+
 def render_status(status: ServerStatus) -> str:
     """サーバーの状態を Markdown にする。"""
     lines = [
@@ -74,6 +81,14 @@ def render_status(status: ServerStatus) -> str:
         lines.extend([*TABLE_HEADER, *(_source_row(state) for state in status.sources)])
     else:
         lines.append("配信元: なし")
+    # 終わっていない要求があれば、配信元の表の後に表で出す
+    if status.running:
+        lines.extend(["", "実行中の要求:", "", *RUNNING_HEADER])
+        lines.extend(
+            f"| {item.tool} | {'・'.join(item.sources) or '-'} | {item.executor} "
+            f"| {item.state} | {item.seconds:.1f} |"
+            for item in status.running
+        )
     return "\n".join(lines)
 
 

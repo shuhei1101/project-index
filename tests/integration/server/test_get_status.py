@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import version
 from typing import TYPE_CHECKING, Any
 
 from project_index.features.describe import source_checks as source_checks_module
 from project_index.features.documents.store import check_sync
 from project_index.features.history.snapshot import SnapshotStore
+from project_index.server.mcp import docs as docs_mcp_module
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -194,3 +196,48 @@ def test_normal_when_exporting(
     assert before.data["exporting"] is True
     assert EXPORTING_LINE in markdown.text
     assert after.data["exporting"] is False
+
+
+def test_normal_when_requests_running(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """終わっていない文書の MCP の要求のツール・配信元・状態・経過秒を返却する（正常系）。"""
+    # 準備
+    sample = make_source("sample")
+    env = make_server(sample)
+    search = docs_mcp_module.search_docs
+    entered = threading.Event()
+    release = threading.Event()
+
+    def blocked_search(*args: Any, **kwargs: Any) -> Any:
+        entered.set()
+        release.wait(timeout=CHECK_WAIT_SEC)
+        return search(*args, **kwargs)
+
+    monkeypatch.setattr(docs_mcp_module, "search_docs", blocked_search)
+    # 実行
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(env.call, "search_docs", source="sample", cwd=str(sample.folder))
+        reached = entered.wait(timeout=CHECK_WAIT_SEC)
+        before = env.call_admin("status", format="json")
+        markdown = env.call_admin("status")
+        release.set()
+        searched = future.result(timeout=CHECK_WAIT_SEC)
+    after = env.call_admin("status", format="json")
+    after_markdown = env.call_admin("status")
+    # 検証
+    assert reached
+    [running] = before.data["running"]
+    assert running["tool"] == "search_docs"
+    assert running["sources"] == ["sample"]
+    assert running["executor"] == "docs"
+    assert running["state"] == "running"
+    assert running["seconds"] >= 0
+    assert "実行中の要求:" in markdown.text
+    assert "| search_docs | sample | docs | running |" in markdown.text
+    assert not searched.is_error
+    # 空の値のキーは結果から落とす
+    assert "running" not in after.data
+    assert "実行中の要求:" not in after_markdown.text

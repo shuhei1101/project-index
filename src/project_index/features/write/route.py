@@ -65,7 +65,7 @@ def build_write_router(handlers: Handlers) -> APIRouter:
             write_deadline=Deadline(limit_sec=WRITE_API_WRITE_DEADLINE_SEC, started=started),
             respond_by=Deadline(limit_sec=WRITE_API_RESPONSE_LIMIT_SEC, started=started),
         )
-        with handlers.slots.request("commit_documents", source=source):
+        with handlers.slots.request("commit_documents", sources=[source]):
             # 読み込みを待つ間も要求の応答中として数え、裏の検査と書き出しを休ませる
             with handlers.gate.foreground():
                 await handlers.registry.wait_for(ids=[source])

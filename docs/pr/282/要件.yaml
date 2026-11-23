@@ -1,0 +1,128 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: run_only
+    detail: 改名の参照元の書き換えの読み込み方が変わる。書き換える参照元と結果は変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-14.yaml
+    impact: run_only
+    detail: 書き込みの後の通知の判定のたどり方と動く実行スロットが変わる。通知の対象と文面は変わらない
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-16.yaml
+    impact: run_only
+    detail: 状態の確認で、動いている要求のツール・配信元・経過秒も分かるようになる
+    depends_on: []
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: run_only
+    detail: エージェントの書き込みと書き込みの後の通知が、全体の流れの中で今までどおり動くかを確認する
+    depends_on: []
+docs:
+  - page: docs/interface/IF-35.yaml
+    new: false
+    change: 制約に、文書の MCP と別の専用の実行スロットで動くことを追加し、実行スロットが埋まっている間の振る舞いのフローを追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T14:46:44.592373+00:00'
+  - page: docs/interface/IF-8.yaml
+    new: false
+    change: 応答に、実行スロットで動いている要求ごとのツール・配信元・経過秒を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T14:46:44.592373+00:00'
+  - page: docs/interface/IF-15.yaml
+    new: false
+    change: 実行スロットの制約に、書き込みの後の通知の判定の専用の実行スロットを追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T14:46:44.592373+00:00'
+  - page: docs/interface/IF-6.yaml
+    new: false
+    change: 改名の参照元の書き換えで、1 ファイルにつき 1 回だけ読み込み、改名前の ID・パスを持たないファイルは読み込まない制約を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T14:46:44.592373+00:00'
+  - page: docs/module/MOD-84.py.yaml
+    new: false
+    change: '`_rewrite_referrers` の処理を、ファイルごとの読み込み結果の使い回しと、改名前の ID・パスを持たないファイルの読み飛ばしに変える'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
+  - page: docs/module/MOD-175.py.yaml
+    new: false
+    change: '`classify_path` の処理を、1 回の要求でワークツリーをたどる回数を 1 回以下にする判定に変える'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
+  - page: docs/module/MOD-176.py.yaml
+    new: false
+    change: '`judge_post_write` を書き込みの後の通知の判定の専用の実行スロットで動かす'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
+  - page: docs/module/MOD-236-1.py.yaml
+    new: false
+    change: 書き込みの後の通知の判定の専用の実行スロットと、実行中の要求の記録の一覧を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
+  - page: docs/module/MOD-10.py.yaml
+    new: false
+    change: '`status` の組み立てに実行中の要求を追加する'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
+  - page: docs/nonfunctional/NFR-1.yaml
+    new: false
+    change: 書き込みの後の通知の判定の専用の実行スロットの本数を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T14:46:44.592373+00:00'
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: '`status` の返却する値に、実行中の要求を追加する'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T18:00:46.279758+00:00'
+  - page: docs/module/MOD-11.py.yaml
+    new: false
+    change: '`ServerStatus` に実行中の要求（`running`）を追加する'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
+  - page: docs/module/MOD-9.py.yaml
+    new: false
+    change: '`render_status` に実行中の要求の表を追加する'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
+  - page: docs/module/MOD-94.py.yaml
+    new: false
+    change: 要求の記録の配信元を並び（`record.sources`）にする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
+  - page: docs/module/MOD-126.py.yaml
+    new: false
+    change: 要求の記録の範囲に配信元を並びで指定する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
+  - page: docs/module/MOD-183.py.yaml
+    new: false
+    change: 要求の記録の範囲に配信元を並びで指定する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
+scope_out:
+  - item: '`get_document` のリビジョンの取り出し（`SnapshotStore.checkout` の `tarfile.extractall`）の所要時間'
+    reason: 飽和していたときのスタックで 1 本だけ止まっていた処理で、実行スロットを埋めた原因ではない。要望に含まれない
+    plan: none
+  - item: 同じ配信元の書き込みのロック（`SourceLocks`）を待つ間も実行スロットを持ち続けること
+    reason: 改名の参照元の書き換えが短くなれば待ちも短くなる。ロックの待ち方を変えるかはこの PR の設計の結果で決まるため、レビューで確定する
+    plan: '#285'
+  - item: 結合テスト `test_patch_settings_source.py::test_normal_when_direct_commit_changed` の期待値が、配信元の設定の応答の `writeApiConfig` に追随していない
+    reason: '#275 で応答に `writeApiConfig` が加わった後、このテストの期待値だけが変わっておらず develop でも fail する。今回の要望（実行スロットの飽和）に含まれない'
+    plan: '#284'

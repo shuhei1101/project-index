@@ -9,6 +9,7 @@ import functools
 import logging
 import posixpath
 import time
+import urllib.parse
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -1527,6 +1528,63 @@ def _rewritten_body(
     return ({path: body}, changes) if changes else None
 
 
+def _rename_needles(plan: _RenamePlan) -> list[str]:
+    """参照元の候補を絞る文字列（改名前の ID と、パスが変わるときの改名前のファイル名）を返す。"""
+    needles = [plan.old_id]
+    if plan.moved is not None:
+        name = posixpath.basename(plan.moved[0])
+        needles += [name, urllib.parse.quote(name)]
+    return needles
+
+
+def _mentions(text: str | None, needles: Sequence[str]) -> bool:
+    """文字列がどれかの候補の文字列を含むか。"""
+    return text is not None and any(needle in text for needle in needles)
+
+
+_Changed = tuple[Document, DocumentTable, list[ReferenceChange], dict[str, str]]
+
+
+@dataclass
+class _RecordsFile:
+    """`records` の行のファイル 1 つの、往復編集の読み込みの結果と書き換えた要素。"""
+
+    text: str
+    container: CommentedMap
+    # 書き換えた要素の文書と、書き換えた箇所・本文
+    changed: list[_Changed] = field(default_factory=list[_Changed])
+
+
+@dataclass
+class _ReferrerScan:
+    """改名 1 件の参照元の書き換えで、ファイルごとに 1 回だけ読み込んだ結果。"""
+
+    needles: list[str]
+    # パス → ファイルの文字列（書く予定の内容があればそれ）
+    texts: dict[str, str] = field(default_factory=dict[str, str])
+    # records の行のファイルのパス → 往復編集の読み込みの結果と書き換えた要素
+    records: dict[str, _RecordsFile] = field(default_factory=dict[str, _RecordsFile])
+    # 同じ操作で扱った本文のファイル
+    seen: set[str] = field(default_factory=set[str])
+
+    def text(self, session: _Session, path: str) -> str:
+        """ファイルの文字列を 1 回だけ読む。"""
+        if path not in self.texts:
+            self.texts[path] = session.text(path)
+        return self.texts[path]
+
+    def is_candidate(self, session: _Session, document: Document) -> bool:
+        """ファイルの文字列か `.md` の本文が、改名前の ID・ファイル名を含むか。"""
+        if _mentions(self.text(session, document.path), self.needles):
+            return True
+        path = document.body_path
+        return (
+            path is not None
+            and path.endswith(".md")
+            and _mentions(session.read_body(path), self.needles)
+        )
+
+
 def _rewrite_referrers(
     session: _Session,
     checker: DocumentChecker,
@@ -1534,62 +1592,123 @@ def _rewrite_referrers(
     index: int,
     now: datetime,
 ) -> list[tuple[WriteResultItem, DocumentTable]]:
-    """同じ配信元のほかの文書の、改名前の ID・パスを指す箇所を書き換える。"""
+    """同じ配信元のほかの文書の、改名前の ID・パスを指す箇所を書き換える。
+
+    ファイルの文字列か `.md` の本文が改名前の ID・ファイル名を含む文書だけを読み込み、
+    `records` の行のファイルは 1 回だけ読み込んで、全ての要素の書き換えを当ててから 1 回だけ書き出す。
+    """
     done: list[tuple[WriteResultItem, DocumentTable]] = []
-    seen: set[str] = set()
+    scan = _ReferrerScan(_rename_needles(plan))
     for doc_id in list(session.docs):
         document = session.docs.get(doc_id)
-        if document is None or doc_id == plan.new_id:
+        # 改名前の ID もファイル名も含まない文書は、YAML として読み込まない
+        if document is None or doc_id == plan.new_id or not scan.is_candidate(session, document):
             continue
-        table = session.target.source.table(document.kind)
-        text = session.text(document.path)
-        current, container = _content_for(table, text, document, document.path)
-        changes = rewrite_references(
-            current,
-            related_column=_related_column(table),
-            old_id=plan.old_id,
-            new_id=plan.new_id,
-            moved=plan.moved,
-            base_dir=posixpath.dirname(document.path),
-            skip=_skip_columns(table),
-        )
-        body = _rewritten_body(session, document, plan, seen)
-        if body is not None:
-            changes = [*changes, *body[1]]
-        bodies = {} if body is None else body[0]
-        if not changes:
-            continue
-        table = _writable(table, "id")
-        if _writes_dates(session, table):
-            _stamp(current, "update", now, None)
-        new_text = _finish(table, current, container, document, text)
-        new_document, unchecked = _check_and_commit(
-            session,
-            checker,
-            table,
-            document.path,
-            new_text,
-            index=document.record_index,
-            doc_id=None,
-            new=False,
-            previous=document.data,
-            bodies=bodies,
-        )
-        done.append(
-            (
-                WriteResultItem(
-                    index=index,
-                    id=new_document.id,
-                    status="updated",
-                    version=new_document.version,
-                    diff=_diff(document, new_document, bodies),
-                    unchecked=unchecked,
-                    references=changes,
-                ),
-                table,
+        item = _rewrite_referrer(session, checker, scan, document, plan, now, index)
+        if item is not None:
+            done.append(item)
+    # records の行のファイルは、全ての要素の書き換えを当てた入れ物を 1 回だけ書き出す
+    for records in scan.records.values():
+        if records.changed:
+            new_text = dump_roundtrip(records.container, original=records.text)
+            done.extend(
+                _commit_referrer(session, checker, changed, new_text, index)
+                for changed in records.changed
             )
-        )
     return done
+
+
+def _rewrite_referrer(
+    session: _Session,
+    checker: DocumentChecker,
+    scan: _ReferrerScan,
+    document: Document,
+    plan: _RenamePlan,
+    now: datetime,
+    index: int,
+) -> tuple[WriteResultItem, DocumentTable] | None:
+    """参照元の候補の文書 1 つを書き換える（records の要素は書き出しを後へ回して None を返す）。"""
+    table = session.target.source.table(document.kind)
+    text = scan.text(session, document.path)
+    records = _records_file(scan, table, document, text)
+    if records is not None and document.record_index is not None and table.records is not None:
+        current = _records(records.container, table.records)[document.record_index]
+        if not isinstance(current, CommentedMap):
+            msg = f"{document.path} の {table.records} の要素が辞書ではありません"
+            raise RuntimeError(msg)
+        container: CommentedMap | None = None
+    else:
+        current, container = _content_for(table, text, document, document.path)
+    changes = rewrite_references(
+        current,
+        related_column=_related_column(table),
+        old_id=plan.old_id,
+        new_id=plan.new_id,
+        moved=plan.moved,
+        base_dir=posixpath.dirname(document.path),
+        skip=_skip_columns(table),
+    )
+    body = _rewritten_body(session, document, plan, scan.seen)
+    if body is not None:
+        changes = [*changes, *body[1]]
+    if not changes:
+        return None
+    table = _writable(table, "id")
+    if _writes_dates(session, table):
+        _stamp(current, "update", now, None)
+    changed: _Changed = (document, table, changes, {} if body is None else body[0])
+    if records is not None:
+        records.changed.append(changed)
+        return None
+    new_text = _finish(table, current, container, document, text)
+    scan.texts[document.path] = new_text
+    return _commit_referrer(session, checker, changed, new_text, index)
+
+
+def _records_file(
+    scan: _ReferrerScan, table: DocumentTable, document: Document, text: str
+) -> _RecordsFile | None:
+    """records の行の文書なら、そのファイルの往復編集の読み込みの結果を 1 回だけ作って返す。"""
+    if table.records is None or document.record_index is None:
+        return None
+    records = scan.records.get(document.path)
+    if records is None:
+        records = _RecordsFile(text, load_roundtrip(text, file=document.path))
+        scan.records[document.path] = records
+    return records
+
+
+def _commit_referrer(
+    session: _Session,
+    checker: DocumentChecker,
+    changed: _Changed,
+    new_text: str,
+    index: int,
+) -> tuple[WriteResultItem, DocumentTable]:
+    """書き換えた参照元の文書 1 つを検査して記録し、結果の行を返す。"""
+    document, table, changes, bodies = changed
+    new_document, unchecked = _check_and_commit(
+        session,
+        checker,
+        table,
+        document.path,
+        new_text,
+        index=document.record_index,
+        doc_id=None,
+        new=False,
+        previous=document.data,
+        bodies=bodies,
+    )
+    item = WriteResultItem(
+        index=index,
+        id=new_document.id,
+        status="updated",
+        version=new_document.version,
+        diff=_diff(document, new_document, bodies),
+        unchecked=unchecked,
+        references=changes,
+    )
+    return item, table
 
 
 def _apply_rename_one(

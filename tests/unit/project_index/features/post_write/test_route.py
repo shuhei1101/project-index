@@ -14,6 +14,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
+    import pytest
+
     from project_index.features.settings.types import SourceEntry, TerminalConfig
     from project_index.main import Handlers
 
@@ -95,3 +97,29 @@ def test_build_post_write_router_when_invalid(
     assert response.status_code == 422
     assert response.headers["content-type"].startswith("application/problem+json")
     assert any("paths" in item["path"] for item in body["errors"])
+
+
+def test_build_post_write_router_when_slots_full(
+    make_source_dir: Callable[..., Path],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """判定の実行スロットが埋まっていれば通知しない（正常系）。"""
+    # 準備
+    handlers, root = _handlers(make_source_dir, make_terminal_config, make_entry, loaded=True)
+    called: list[object] = []
+
+    async def full(func: object, *args: object) -> None:
+        called.append(func)
+
+    monkeypatch.setattr(handlers.slots, "try_run_post_write", full, raising=False)
+    client = _client(handlers)
+    path = str(root / "src/a.py")
+    # 実行
+    response = client.post("/_admin/post-write", json={"session_id": "s1", "paths": [path]})
+    # 検証
+    assert response.status_code == 200
+    assert response.json() == {"notices": [], "additional_context": ""}
+    assert len(called) == 1
+    assert handlers.notified.take_new(SessionKey("s1", ""), [path]) == [path]

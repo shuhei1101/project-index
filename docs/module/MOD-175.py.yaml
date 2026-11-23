@@ -44,7 +44,7 @@ functions:
       type: PostWriteResponse
       description: 通知と文面
     process: |-
-      1. パスごとに通知の判定（`classify_path`）を呼び、`None` でない判定を集める
+      1. たどったパスの記録と Git が無視するパスの記録（どちらも空の `dict`）を作り、パスごとに通知の判定（`classify_path`）を 2 つの記録を指定して呼び、`None` でない判定を集める
       2. 集めた判定のパスを `notified.take_new(SessionKey(session_id, agent_id or ""), ...)` に渡し、返ったパスの判定だけを残す
          - 残らなければ、`notices` を空・`additional_context` を空文字にして返す（以降の手順は実行しない）
       3. 残った判定の配信元ごとに、配信元の設定に `alias_type` を持つ行があるかと、配信元のフォルダの直下に `RULE_INDEX_FILE` があるかを求める
@@ -94,16 +94,31 @@ functions:
         required: true
         passing: positional
         description: 判定に使う配信元
+      - name: walked
+        title: たどったパスの記録
+        type: dict[Path, list[str]] | None
+        required: false
+        default: None
+        passing: keyword
+        description: 1 回の要求の中で、文書の相対パスを解くフォルダごとに `walk_files` でたどったパス。`None` は呼び出しの中だけの記録を使用する
+      - name: ignored_by_base
+        title: Git が無視するパスの記録
+        type: dict[Path, list[str]] | None
+        required: false
+        default: None
+        passing: keyword
+        description: 1 回の要求の中で、文書の相対パスを解くフォルダごとに `ignored_paths` で求めた Git が無視するパス。`None` は呼び出しの中だけの記録を使用する
     returns:
       type: Notice | None
       description: 通知の対象でなければ `None`
     process: |-
       1. 配信元ごとに、文書の相対パスを解くフォルダを求め、パスを含む最初の配信元を選ぶ。フォルダは `find_worktree` で見つけたワークツリーを `base_of`（`access/service.py` の `_base_of` を public にしたもの。ワークツリーの中なら `worktree / root.relative_to(repo_root)`、無ければ `root`）に渡して求める
          - どの配信元も含まなければ `None` を返す（以降の手順は実行しない）
-      2. フォルダからの相対パスが、配信元の設定ファイル（`config_files`）か、`records`・`body_file` を持つ行の管理用の YAML そのものなら `None` を返す
-      3. `records`・`body_file` を持つ行ごとに、行の `paths` に当たる管理用の YAML を求め、相対パスがその範囲に入るか（`unindexed_files` に `files=[相対パス]`・`body_paths=()` と、`documents/store.py` の同期の検査と同じ `others`（その行以外の文書の行）・`nested_dirs`（より深いフォルダの管理用の YAML のフォルダ）・`ignored`（Git の配信元なら Git が無視するパス）を渡して返るか）を、深いフォルダの管理用の YAML から順に確かめる
+      2. `records`・`body_file` を持つ行ごとに、行に該当する管理用の YAML を `collect_files(base, table, files=...)` で集める。`files` は `walked` の `base` の値（無ければ `walk_files(base)` でたどって `walked` に入れる）で、1 回の要求でフォルダごとにたどるのは 1 回だけにする
+      3. フォルダからの相対パスが、配信元の設定ファイル（`config_files`）か、`records`・`body_file` を持つ行の管理用の YAML そのものなら `None` を返す
+      4. `records`・`body_file` を持つ行ごとに、行の `paths` に当たる管理用の YAML を求め、相対パスがその範囲に入るか（`unindexed_files` に `files=[相対パス]`・`body_paths=()` と、`documents/store.py` の同期の検査と同じ `others`（その行以外の文書の行）・`nested_dirs`（より深いフォルダの管理用の YAML のフォルダ）・`ignored`（Git の配信元なら Git が無視するパス。`ignored_by_base` の `base` の値で、無ければ `ignored_paths(base)` で求めて `ignored_by_base` に入れる。1 回の要求でフォルダごとに求めるのは 1 回だけ）を渡して返るか）を、深いフォルダの管理用の YAML から順に確かめる
          - どの範囲にも入らなければ `None` を返す（YAML の文書・`documents[].paths` に該当しないファイルを含む）
-      4. 範囲に入った管理用の YAML の `files[].path` に相対パスがあれば `update_row`、無ければ `add_row` の `Notice` を返す
+      5. 範囲に入った管理用の YAML の `files[].path` に相対パスがあれば `update_row`、無ければ `add_row` の `Notice` を返す
     unit_tests:
       - name: test_classify_path_when_row
         case: 正常
@@ -141,6 +156,49 @@ functions:
         condition: 管理用の YAML の範囲が `**/*` で、範囲の中に YAML の文書の行が当たる `docs/x.yaml` と、`.gitignore` が無視する `docs/out.log` がある Git の配信元
         mock: なし
         expected: どちらも `None`
+      - name: test_classify_path_when_walked_shared
+        case: 正常
+        summary: 1 回の要求でフォルダをたどるのは 1 回
+        condition: '`records`・`body_file` を持つ行が 2 つある Git の配信元で、同じ `walked`・`ignored_by_base` を指定して `docs/a.md` と `docs/b.md` を判定する'
+        mock: '`walk_files`・`ignored_paths`（どちらも呼んだ回数を数えて本物を呼ぶもの）'
+        expected: '`walk_files` と `ignored_paths` を呼んだのがそれぞれ 1 回で、判定の結果は記録を指定しないときと同じ'
+  - name: source_ids_of
+    title: パスを含む配信元の ID
+    kind: 関数
+    container: project_index/features/post_write/service.py
+    usecase: 書き込みの後の通知
+    role: 判定
+    summary: パスを含む配信元の ID を、初めて出た順に重ならないように返却する
+    description: 要求の記録の `sources` に入れる。フォルダはたどらない
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: paths
+        title: パス
+        type: Sequence[str]
+        required: true
+        passing: positional
+        description: 書き込んだファイルの絶対パス
+      - name: sources
+        title: 配信中の配信元
+        type: Sequence[ServedSource]
+        required: true
+        passing: positional
+        description: 判定に使用する配信元
+    returns:
+      type: list[str]
+      description: 配信元の ID
+    process: |-
+      1. パスごとに、`classify_path` の手順 1 と同じ方法で含む最初の配信元を選ぶ
+      2. 選べた配信元の ID を、初めて出た順に重ならないように並べて返す
+    unit_tests:
+      - name: test_source_ids_of
+        case: 正常
+        summary: 含む配信元の ID を重ならないように返す
+        condition: 配信元 a・b と、a の 2 ファイル・b の 1 ファイル・どの配信元にも無いファイルのパス
+        mock: なし（一時ディレクトリの配信元）
+        expected: '`["a", "b"]`'
 refs:
   - to: IF-35
     type: requires

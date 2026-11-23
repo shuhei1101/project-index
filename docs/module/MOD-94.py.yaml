@@ -171,7 +171,7 @@ functions:
          - 要求のモデルのフィールドが `description` を持つ場合、その説明を入力のスキーマの項目の説明に出す（`Annotated[型, Field(description=...)]`）
          - 今のツールの説明（`search_docs`・`write_docs`・`list_changes` の引数の説明の文と `trace_related` の説明を含む）は、削らずに各ツールの YAML へ移す
          - 引数の型の誤り・`Literal` に無い値は、SDK が関数を呼ぶ前に `isError` の結果にする。入力のスキーマに無いキーは SDK が捨てる
-      3. 各ツールは次の順で処理する。手順の全体を、要求の記録の範囲（`handlers.slots.request(ツール名, source=引数の source)`）の中で行い、記録の行はツールごとに 1 行にする
+      3. 各ツールは次の順で処理する。手順の全体を、要求の記録の範囲（`handlers.slots.request(ツール名)`）の中で行い、記録の配信元（`record.sources`）を、引数の `source` が ID ならその ID の 1 件、ID の並びならその並び（`"*"` を含むなら、配信元の読み込みを待った後の配信中の配信元の ID）、`source` を持たなければ空にして、記録の行はツールごとに 1 行にする
          - 要求を受けた時刻を `time.monotonic()` で記録し、呼び出しの期限（`write_deadline` は `limit_sec` が `handlers.terminal.write_deadline_sec`、`respond_by` は `TOOL_RESPONSE_LIMIT_SEC`）を作る
          - 引数で要求のモデル（`SearchRequest` など）を作る
          - 要求が指す配信元を決め（指す配信元の決定）、`await handlers.registry.wait_for(...)` でその行の読み込みだけを待つ（初期化とツールの一覧は待たない）。待つ間も裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中にいて、要求が待っていない行の読み込みを休ませる
@@ -347,7 +347,7 @@ functions:
     process: |-
       1. `request.ref` がある場合、何もしない
       2. 文書の MCP の実行スロット（`handlers.slots.run_docs`） で、ワークツリーの設定を再読み込みせずに（`reload_worktree=False`）場所を解く。`SearchRequest` は権限と作業場所の『読む場所の解決』を `source`・`worktree`・`cwd`・`outside_scope` で、`WriteRequest`・`DeleteRequest` は『書く場所の解決』を `source`・`worktree`・`cwd` で呼ぶ。場所を解けない（`ProjectIndexError`）、場所が 1 つでない、または `worktree` が `None` なら何もしない（解けないときは、サービスが同じ解決で同じエラーを返す）
-      3. `loads` にそのワークツリーの終わっていないタスクが無ければ、次を 文書の MCP の実行スロット（`handlers.slots.run_docs`） で行うタスクを作って入れ、終わったら `loads` から除くコールバックを付ける。タスクの中は要求の記録の範囲（`handlers.slots.request("worktree_load", source=場所の配信元の ID)`）に入り、時間切れで呼び出し元が先に返っても、読み込みの記録を別の 1 行で残す
+      3. `loads` にそのワークツリーの終わっていないタスクが無ければ、次を 文書の MCP の実行スロット（`handlers.slots.run_docs`） で行うタスクを作って入れ、終わったら `loads` から除くコールバックを付ける。タスクの中は要求の記録の範囲（`handlers.slots.request("worktree_load", sources=[場所の配信元の ID])`）に入り、時間切れで呼び出し元が先に返っても、読み込みの記録を別の 1 行で残す
          - 手順 2 と同じ解決を、ワークツリーの設定を再読み込みして（`reload_worktree=True`）呼び直す（設定が変わっていなければ配信元の『作業場所の配信元の読み込み』のキャッシュで返る）
          - 文書のストア.ワークツリーを読み込んだかが `False` なら、解き直した場所で文書のストア.文書を集める（`load`）を呼ぶ
       4. `async with asyncio.timeout(handlers.terminal.worktree_load_wait_sec)` の中でタスクを `asyncio.shield` で包んで await する

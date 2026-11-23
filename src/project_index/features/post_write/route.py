@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Annotated, Any
 from fastapi import APIRouter, Body
 from pydantic import ValidationError
 
-from project_index.features.post_write.service import judge_post_write
+from project_index.features.post_write.service import judge_post_write, source_ids_of
 from project_index.features.post_write.types import PostWriteRequest, PostWriteResponse
 from project_index.shared.errors import ValidationFailedError, Violation
 
@@ -40,14 +40,22 @@ def build_post_write_router(handlers: Handlers) -> APIRouter:
         # 配信元の一覧を読み込んでいる間: 読み込みを待たずに、通知せずに返す
         if handlers.registry.loading:
             return PostWriteResponse(notices=[], additional_context="")
-        return await handlers.slots.run_docs(
-            functools.partial(
-                judge_post_write,
-                request,
-                sources=handlers.registry.served(),
-                notified=handlers.notified,
-                prompts=handlers.prompts,
+        served = handlers.registry.served()
+        with handlers.slots.request(
+            "post_write", sources=source_ids_of(request.paths, served), executor="post_write"
+        ):
+            # 判定の実行スロットが全て使用中なら、待たずに通知せずに返す
+            response = await handlers.slots.try_run_post_write(
+                functools.partial(
+                    judge_post_write,
+                    request,
+                    sources=served,
+                    notified=handlers.notified,
+                    prompts=handlers.prompts,
+                )
             )
-        )
+        if response is None:
+            return PostWriteResponse(notices=[], additional_context="")
+        return response
 
     return router

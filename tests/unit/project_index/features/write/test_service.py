@@ -1737,6 +1737,98 @@ def test_write_docs_when_rename(make_env: Callable[..., WriteEnv]) -> None:
     assert "to: doc-9" in (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8")
 
 
+def _items_table() -> DocumentTable:
+    """`body_file` を持たない `records` の行を返す。"""
+    return DocumentTable(
+        id="items",
+        paths=["items/index.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        records="items",
+    )
+
+
+def _items(referring: int) -> str:
+    """3 要素のうち先頭の `referring` 要素の `related` が文書 2 を指す管理用の YAML を返す。"""
+    lines = ["items:"]
+    for number in range(1, 4):
+        lines += [f"  - id: i{number}", f"    name: 要素 {number}"]
+        if number <= referring:
+            lines += ["    related:", "      - to: doc-2", "        type: references"]
+    return "\n".join(lines) + "\n"
+
+
+def _count_roundtrip_loads(monkeypatch: pytest.MonkeyPatch) -> list[str | None]:
+    """往復編集の読み込みを、読み込んだパスを記録して本物を呼ぶものに差し替える。"""
+    loaded: list[str | None] = []
+    real = write_service.load_roundtrip
+
+    def counting(text: str, *args: Any, **kwargs: Any) -> Any:
+        loaded.append(kwargs.get("file"))
+        return real(text, *args, **kwargs)
+
+    monkeypatch.setattr(write_service, "load_roundtrip", counting)
+    return loaded
+
+
+def test_write_docs_when_rename_reads_candidates_only(
+    make_env: Callable[..., WriteEnv], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """改名で参照元の候補のファイルだけを 1 回ずつ読み込む（正常系）。"""
+    # 準備
+    env = make_env(
+        {
+            "docs/rule/doc-1.yaml": DOC_1,
+            "docs/rule/doc-2.yaml": DOC_2,
+            "items/index.yaml": _items(1),
+            "schemas/rule.schema.yaml": SCHEMA,
+        },
+        tables=[_rules_table(), _items_table()],
+    )
+    loaded = _count_roundtrip_loads(monkeypatch)
+    operation = Operation(
+        op="rename", id="doc-2", expected_version=content_hash(DOC_2), new_id="doc-9"
+    )
+    # 実行
+    result = env.write(operations=[operation])
+    # 検証
+    assert loaded.count("docs/rule/doc-1.yaml") == 0
+    assert loaded.count("items/index.yaml") == 1
+    referrers = [item for item in result.results if item.status == "updated"]
+    assert [item.id for item in referrers] == ["i1"]
+    assert len(referrers[0].references) == 1
+    assert (env.worktree / "docs/rule/doc-1.yaml").read_text(encoding="utf-8") == DOC_1
+    assert "to: doc-9" in (env.worktree / "items/index.yaml").read_text(encoding="utf-8")
+
+
+def test_write_docs_when_rename_records_referrers(
+    make_env: Callable[..., WriteEnv], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """旧 ID を指す要素が複数ある管理用の YAML も 1 回だけ読み込む（正常系）。"""
+    # 準備
+    env = make_env(
+        {
+            "docs/rule/doc-2.yaml": DOC_2,
+            "items/index.yaml": _items(2),
+            "schemas/rule.schema.yaml": SCHEMA,
+        },
+        tables=[_rules_table(), _items_table()],
+    )
+    loaded = _count_roundtrip_loads(monkeypatch)
+    operation = Operation(
+        op="rename", id="doc-2", expected_version=content_hash(DOC_2), new_id="doc-9"
+    )
+    # 実行
+    result = env.write(operations=[operation])
+    # 検証
+    assert loaded.count("items/index.yaml") == 1
+    referrers = [item for item in result.results if item.status == "updated"]
+    assert sorted(item.id or "" for item in referrers) == ["i1", "i2"]
+    assert all(len(item.references) == 1 for item in referrers)
+    text = (env.worktree / "items/index.yaml").read_text(encoding="utf-8")
+    assert text.count("to: doc-9") == 2
+    assert "doc-2" not in text
+
+
 @pytest.mark.parametrize(
     ("changes", "error"),
     [

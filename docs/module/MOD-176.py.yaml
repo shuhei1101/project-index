@@ -30,7 +30,8 @@ functions:
       2. 要求ごとに、本文を `PostWriteRequest.model_validate` で検証する
          - 検証に失敗した場合、違反を `{キー}: {理由}` にして `ValidationFailedError` を送出する
       3. 配信元の一覧が読み込み中（`handlers.registry.loading`）なら、`notices` を空・`additional_context` を空文字にして返す（以降の手順は実行しない）
-      4. 書き込みの後の通知の判定を 文書の MCP の実行スロット（`handlers.slots.run_docs`） で呼び、応答にする
+      4. 要求の記録の範囲（`handlers.slots.request("post_write", sources=source_ids_of(paths, served), executor="post_write")`）の中で、書き込みの後の通知の判定を 書き込みの後の通知の判定の実行スロット（`handlers.slots.try_run_post_write`） で呼び、応答にする
+         - `None`（実行スロットが全て使用中）なら、`notices` を空・`additional_context` を空文字にして返す
     exceptions:
       - name: ValidationFailedError
         condition: '`session_id` が無い、`paths` が空、型が違う'
@@ -55,8 +56,16 @@ functions:
         mock: なし
         expected: 422 の Problem Details で `paths` の違反を含む
         exception: 入力の違反
+      - name: test_build_post_write_router_when_slots_full
+        case: 正常
+        summary: 判定の実行スロットが埋まっていれば通知しない
+        condition: '`slots.try_run_post_write` が `None` を返す'
+        mock: 実行スロット（`try_run_post_write` だけを差し替えた偽物）
+        expected: 200 で `notices` が空・`additional_context` が空文字、通知済みの記録が増えない
     callees:
       - MOD-175#functions[judge_post_write]
+      - MOD-175#functions[source_ids_of]
+      - MOD-236-1#classes[ExecutionSlots].methods[try_run_post_write]
 refs:
   - to: IF-35
     type: requires

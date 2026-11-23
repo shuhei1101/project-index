@@ -76,7 +76,7 @@ async def _run[T](
     """配信元の読み込みを待って処理を実行スロットで呼び、見つからなかったものを 404 にする。"""
     # 要求 1 回を要求の記録の範囲にする（ルートの名前はサービスの関数の名前から取る）
     route_name = getattr(getattr(work, "func", work), "__name__", "read").lstrip("_")
-    with handlers.slots.request(route_name, source=source):
+    with handlers.slots.request(route_name, sources=[source]):
         # 読み込みを待つ間も要求の応答中として数え、要求が待っていない行の読み込みを休ませる
         with handlers.gate.foreground():
             await handlers.registry.wait_for(ids=[source])
