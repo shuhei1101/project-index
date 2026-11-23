@@ -61,7 +61,7 @@ functions:
     container: project_index/features/read/service.py
     usecase: 配信元の設定の取得
     role: サービス
-    summary: 配信元の設定のうち、`nav`・`documents[]`（スクリプトのコマンドを除く）・`decisions.folders`・`github`・`diff` と、求めたときだけ行ごとの種類のスキーマを返す
+    summary: 配信元の設定のうち、`nav`・`documents[]`（スクリプトのコマンドを除く）・`decisions.folders`・`github`・`diff`・本文の直コミットを断る種類と、求めたときだけ行ごとの種類のスキーマを返す
     scope: public
     args:
       - name: target
@@ -91,7 +91,8 @@ functions:
       2. `documents[]` の各行から `validators`・`converters`・`generators` のコマンドを除く
       3. `decisions` が無ければ `{folders: []}` にする
       4. `diff` に `{ignore_keys: 配信元の設定の diff_ignore_keys}` を入れる
-      5. `schemas` が `True` の場合、有効な `documents[]` の行ごとに `store.row_schema(target, 行の id)` を行の id をキーにして入れる。`False` なら `None` にする
+      5. `direct_commit` に、配信元の設定の `direct_commit` の `metadata_only_kinds` を絞らずにコピーした `SourceConfigDirectCommit` を入れる。`direct_commit` が `None` の配信元は空の並びにする
+      6. `schemas` が `True` の場合、有効な `documents[]` の行ごとに `store.row_schema(target, 行の id)` を行の id をキーにして入れる。`False` なら `None` にする
     unit_tests:
       - name: test_get_source_config
         case: 正常
@@ -117,6 +118,12 @@ functions:
         condition: '`decisions` の無い配信元'
         mock: なし
         expected: '`decisions.folders` が空'
+      - name: test_get_source_config_when_metadata_only_kinds
+        case: 正常
+        summary: 本文の直コミットを断る種類を記載の順に返却する
+        condition: '`direct_commit.kinds[]` に `note`・`{id: spec, body: false}`・`{id: memo, body: false}` を持ち、端末の設定の `sources[].direct_commit` を持たない配信元と、`direct_commit` を持たない配信元'
+        mock: なし（一時フォルダの配信元）
+        expected: 前者の `direct_commit.metadata_only_kinds` が `["spec", "memo"]`、後者が `[]`
   - name: list_documents
     title: 文書の一覧
     kind: 関数
