@@ -8,7 +8,9 @@ docs:
   - page: docs/module/MOD-89.py.yaml
     new: false
     change: run_serve の手順 7 とログのハンドラの閉じ方に、閉じた後に裏のスレッドがログを書いてもファイルを開き直さないことを書き、競合を再現する単体テストの行を足す
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T04:59:10.930689+00:00'
 scope_out:
   - item: serve 以外のコマンド（migrate 等）のログの閉じ方
     reason: 要望に含まれない。ファイルのハンドラを足して裏のスレッドを動かすのは serve だけ
