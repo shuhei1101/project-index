@@ -1,0 +1,46 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=integration -f paths="tests/integration/server/test_list_documents.py tests/integration/server/test_get_document.py tests/integration/server/test_search_page.py tests/integration/server/test_list_match_words.py" | ...（テスト実行方法 TL-2 の run_runner）
+# run_id=45103721708（commit 7d30da9）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 33 items
+
+tests/integration/server/test_list_documents.py::test_normal PASSED      [  3%]
+tests/integration/server/test_list_documents.py::test_normal_when_values_requested PASSED [  6%]
+tests/integration/server/test_list_documents.py::test_normal_when_common_keys_requested PASSED [  9%]
+tests/integration/server/test_list_documents.py::test_normal_when_ref_given PASSED [ 12%]
+tests/integration/server/test_list_documents.py::test_error_when_not_found PASSED [ 15%]
+tests/integration/server/test_list_documents.py::test_normal_when_revision_export_times_out PASSED [ 18%]
+tests/integration/server/test_list_documents.py::test_normal_when_disk_storage PASSED [ 21%]
+tests/integration/server/test_list_documents.py::test_normal_when_background_check_running PASSED [ 24%]
+tests/integration/server/test_list_documents.py::test_normal_when_other_sources_loading PASSED [ 27%]
+tests/integration/server/test_list_documents.py::test_normal_when_same_commit_listed_twice PASSED [ 30%]
+tests/integration/server/test_list_documents.py::test_normal_when_yaml_unreadable_by_c PASSED [ 33%]
+tests/integration/server/test_list_documents.py::test_normal_when_search_excluded PASSED [ 36%]
+tests/integration/server/test_get_document.py::test_normal PASSED        [ 39%]
+tests/integration/server/test_get_document.py::test_normal_when_ref_given PASSED [ 42%]
+tests/integration/server/test_get_document.py::test_normal_when_body_path_given PASSED [ 45%]
+tests/integration/server/test_get_document.py::test_normal_when_id_given PASSED [ 48%]
+tests/integration/server/test_get_document.py::test_normal_when_converter_kind PASSED [ 51%]
+tests/integration/server/test_get_document.py::test_normal_when_converter_given_commit PASSED [ 54%]
+tests/integration/server/test_get_document.py::test_error_when_not_found PASSED [ 57%]
+tests/integration/server/test_get_document.py::test_error_when_revision_export_times_out PASSED [ 60%]
+tests/integration/server/test_get_document.py::test_normal_when_disk_storage PASSED [ 63%]
+tests/integration/server/test_get_document.py::test_normal_when_converter_script_changed PASSED [ 66%]
+tests/integration/server/test_search_page.py::test_normal PASSED         [ 69%]
+tests/integration/server/test_search_page.py::test_error_when_query_invalid PASSED [ 72%]
+tests/integration/server/test_search_page.py::test_error_when_not_found PASSED [ 75%]
+tests/integration/server/test_search_page.py::test_error_when_revision_export_times_out PASSED [ 78%]
+tests/integration/server/test_search_page.py::test_normal_when_search_excluded PASSED [ 81%]
+tests/integration/server/test_list_match_words.py::test_normal PASSED    [ 84%]
+tests/integration/server/test_list_match_words.py::test_normal_when_no_alias_type PASSED [ 87%]
+tests/integration/server/test_list_match_words.py::test_error_when_source_not_readable PASSED [ 90%]
+tests/integration/server/test_list_match_words.py::test_error_when_source_not_served PASSED [ 93%]
+tests/integration/server/test_list_match_words.py::test_normal_when_sqlite_rows PASSED [ 96%]
+tests/integration/server/test_list_match_words.py::test_normal_when_search_excluded PASSED [100%]
+
+============================= 33 passed in 16.39s ==============================
+exit=0 run_id=45103721708
