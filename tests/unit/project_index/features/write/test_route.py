@@ -8,10 +8,10 @@ from fastapi.testclient import TestClient
 
 from project_index.features.write import route as route_module
 from project_index.features.write.route import build_write_router
+from project_index.features.write.source_config import SourceConfigFile
 from project_index.features.write.types import CommitDocumentsResult, CommitResult
 from project_index.main import build_handlers
 from project_index.server.error_handlers import register_error_handlers
-from project_index.features.write.source_config import SourceConfigFile
 from project_index.shared.errors import DirectCommitNotPermittedError, SourceConfigNotPermittedError
 
 if TYPE_CHECKING:

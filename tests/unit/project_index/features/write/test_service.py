@@ -2947,9 +2947,7 @@ def test_commit_documents_when_source_config_not_permitted(
 ) -> None:
     """配信元の設定の許可が無ければ取得の前に断る（異常系）。"""
     # 準備
-    commit_env = _source_config_env(
-        make_commit_env, make_registry, run_git, write_api_config=False
-    )
+    commit_env = _source_config_env(make_commit_env, make_registry, run_git, write_api_config=False)
     remote_head = run_git(commit_env.bare, "rev-parse", "data").strip()
     content = SOURCE_CONFIG_TEXT.replace("前の説明", "後の説明")
     # 実行・検証
@@ -3005,7 +3003,8 @@ def test_commit_documents_when_reload_failed(
     content = SOURCE_CONFIG_TEXT.replace("前の説明", "後の説明")
 
     def failing_reload() -> None:
-        raise RuntimeError("再読み込みに失敗した")
+        message = "再読み込みに失敗した"
+        raise RuntimeError(message)
 
     # 実行
     result = _commit_documents(
