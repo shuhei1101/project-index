@@ -1,0 +1,100 @@
+tasks:
+  - process: 初期構築
+    status: skipped
+    reason: 既存リポジトリのため対象外
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: リバースエンジニアリング
+    status: skipped
+    reason: 設計書は揃っており、棚卸しは要らない
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: 方針決め
+    status: skipped
+    reason: 方針決めの依頼ではない
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: PoC 検証
+    status: skipped
+    reason: 未検証の技術機構に依存しない（原因の確認はモジュール構成設計の前に再現で行う）
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: 複合ユースケース設計
+    status: skipped
+    reason: ログのハンドラの閉じ方の修正だけで、ユースケースは変わらない
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: デザインスタイル選定
+    status: skipped
+    reason: 画面を変えない
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: 画面一覧・画面遷移
+    status: skipped
+    reason: 画面を変えない
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: 単一ユースケース設計
+    status: skipped
+    reason: ログのハンドラの閉じ方の修正だけで、起動・再起動の流れは変わらない
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: モック作成
+    status: skipped
+    reason: 画面を変えない
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: データ設計
+    status: skipped
+    reason: データの構造を変えない
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: インターフェース定義設計
+    status: skipped
+    reason: serve の入出力（ログの出し先・終了コード）を変えない
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: エージェント・MCP サーバー設計
+    status: skipped
+    reason: MCP サーバーの設計を変えない
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: エージェントフロー・LLM 呼び出し設計
+    status: skipped
+    reason: LLM の呼び出しを変えない
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: 精度評価設計
+    status: skipped
+    reason: LLM の呼び出しを変えない
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: 部品設計
+    status: skipped
+    reason: 画面を変えない
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: 画面設計
+    status: skipped
+    reason: 画面を変えない
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: モジュール構成設計
+    status: todo
+    note: MOD-89 の run_serve の手順 7 と _close_logging の閉じた後のログの扱い、競合を再現する単体テストの行
+  - process: ドキュメント修正
+    status: skipped
+    reason: 設計書のほかに更新するドキュメントが無い
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'
+  - process: 単体テスト作成
+    status: todo
+    note: tests/unit/project_index/test_serve.py に、閉じた後に裏のスレッドがログを書く競合を再現するテストを足す
+  - process: 実装
+    status: todo
+    note: src/project_index/main.py の _close_logging
+  - process: 結合テスト作成
+    status: skipped
+    reason: 競合は単体テストで順序を固定して確かめ、serve の結合テストの振る舞いは変わらない
+    updated_by: planner
+    updated_at: '2026-11-23T04:55:15.327174+00:00'

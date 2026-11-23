@@ -1,0 +1,15 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-4.yaml
+    impact: none
+    detail: 起動・再起動・停止の流れは変わらない。止めるときにログのファイルを閉じたまま残す
+    depends_on: []
+docs:
+  - page: docs/module/MOD-89.py.yaml
+    new: false
+    change: run_serve の手順 7 とログのハンドラの閉じ方に、閉じた後に裏のスレッドがログを書いてもファイルを開き直さないことを書き、競合を再現する単体テストの行を足す
+    status: todo
+scope_out:
+  - item: serve 以外のコマンド（migrate 等）のログの閉じ方
+    reason: 要望に含まれない。ファイルのハンドラを足して裏のスレッドを動かすのは serve だけ
+    plan: none
