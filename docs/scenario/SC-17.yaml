@@ -646,6 +646,83 @@ scenarios:
   - どちらの要求でも、ブランチと一時のワークツリーを作成せず、スクリプトを実行しない
   - sample のリモートと develop のワークツリーは変わらない
   test: test_error_when_base_commit_unusable
+- name: 正常シナリオ（本文の直コミットを断る種類のメタデータだけを書き換える）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが書き込みの API を HTTP で呼ぶ）
+  - name: サンプルの配信元
+    description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+    notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+  - name: sample のリモート
+    description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+    notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+  - name: 本文の直コミットを断る種類
+    description: 'sample の種類 `files`。管理用の YAML `files.yml` の行が、列 `path` で本文のファイルを指す（`records: files`・`body_file: path`）'
+    notes: '`develop` に、`path` が `guide.md` の行と本文のファイル `guide.md` をコミット済み。テストのコードは、読み取り API で develop のリビジョンの行のバージョンを取得しておく'
+  - name: 直コミットの設定
+    description: sample の種類 `note` と種類 `files` の直コミットを許可し、種類 `files` は本文の直コミットを断る。コミットするブランチを `develop` にする。端末の設定で、作業場所を持たない要求の直コミットを sample の種類 `note`・`files` で許可する
+  flow: |-
+    <!-- map: {"title": "正常シナリオ（本文の直コミットを断る種類のメタデータだけを書き換える）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（書き込みの API）
+      participant WT as develop のワークツリー
+      participant R as sample のリモート
+
+      DD->>PI: sample へ、guide.md の行の description と tags の部分更新（取得したバージョン）とコミットの説明を送信する
+      PI->>PI: 正常シナリオと同じ許可・排他・取り込み・検査
+      PI->>PI: 種類 files の操作が本文（@body）を変えないことを確認する
+      PI->>WT: files.yml の行を書き換え、generators を実行して 1 つのコミットにする
+      PI->>R: develop をプッシュする
+      PI-->>DD: 行の id・状態・バージョンと、コミットの SHA とブランチ
+    ```
+
+    <!-- /map -->
+  expected:
+  - 応答が成功で、`guide.md` の行の状態が `updated` で、コミットの SHA とブランチ `develop` を返却する
+  - sample のリモートの `develop` に 1 コミットだけが増え、変更は `files.yml` と `generators[]` の生成物だけで、`guide.md` は変わらない
+  test: test_normal_when_metadata_only
+- name: 異常シナリオ（本文の直コミットを断る種類の本文の変更を含む）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが書き込みの API を HTTP で呼ぶ）
+  - name: サンプルの配信元
+    description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+    notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+  - name: sample のリモート
+    description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+    notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+  - name: 本文の直コミットを断る種類
+    description: 'sample の種類 `files`。管理用の YAML `files.yml` の行が、列 `path` で本文のファイルを指す（`records: files`・`body_file: path`）'
+    notes: '`develop` に、`path` が `guide.md` の行と本文のファイル `guide.md` をコミット済み。テストのコードは、読み取り API で develop のリビジョンの行のバージョンを取得しておく'
+  - name: 書き換える文書
+    description: sample の `develop` にコミット済みの種類 `note` の文書 1
+    notes: テストのコードは、読み取り API で develop のリビジョンの文書 1 のバージョンを取得しておく
+  - name: 直コミットの設定
+    description: sample の種類 `note` と種類 `files` の直コミットを許可し、種類 `files` は本文の直コミットを断る。コミットするブランチを `develop` にする。端末の設定で、作業場所を持たない要求の直コミットを sample の種類 `note`・`files` で許可する
+  flow: |-
+    <!-- map: {"title": "異常シナリオ（本文の直コミットを断る種類の本文の変更を含む）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（書き込みの API）
+      participant WT as develop のワークツリー
+      participant R as sample のリモート
+
+      DD->>PI: 文書 1 の部分更新と、guide.md の行の @body の部分更新を 1 回で送信する
+      PI->>PI: guide.md の行の操作が本文を変え、種類 files は本文の直コミットを断る
+      PI-->>DD: 該当する操作の位置と、本文の直コミットを断る種類であることを返却して断る
+    ```
+
+    <!-- /map -->
+  expected:
+  - 応答が失敗で、`guide.md` の行の操作の位置と、種類 `files` は本文（`@body`）の直コミットを断っていることを返却する
+  - '`guide.md` の行を消す操作を含む要求も、同じ理由で断る'
+  - 文書 1 も書き換わらず、sample のリモートと全てのワークツリーは変わらない
+  test: test_error_when_body_not_allowed
 refs:
 - to: SC-1
   item: scenarios[正常シナリオ]

@@ -8,7 +8,7 @@ stakeholders:
   - name: 手元のセッション
     interest: 配信元のフォルダの外部の作業場所から、書き込みからコミット・プッシュまでを 1 回の呼び出しで終えられる
   - name: 配信元のリポジトリ
-    interest: 直コミットを許可した種類の文書だけが、検査に合格した内容で、既定のブランチに 1 コミットずつ入る。ワークツリーにある他の変更と、許可していない種類の文書は入らない
+    interest: 直コミットを許可した種類の文書だけが、検査に合格した内容で、既定のブランチに 1 コミットずつ入る。ワークツリーにある他の変更と、許可していない種類の文書と、本文の直コミットを断った種類の本文のファイルの変更は入らない
 trigger: 手元のセッションが、`commit` を指定した `write_docs`・`delete_docs` を呼ぶ
 preconditions:
   - 配信元の読み書きの方法が `git` で、直コミットの設定を持つ
@@ -731,6 +731,128 @@ scenarios:
       - '`isError: true` で、コミットするブランチ `main` を指すワークツリーが無いことを返却する'
       - sample のリモートと sample のクローン本体・ワークツリーは変わらない
     test: test_error_when_branch_worktree_missing
+  - name: 正常シナリオ（本文の直コミットを断る種類のメタデータだけを書き換える）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 本文の直コミットを断る種類
+        description: 'sample の種類 `files`。管理用の YAML `files.yml` の行が、列 `path` で本文のファイルを指す（`records: files`・`body_file: path`）'
+        notes: '`develop` に、`path` が `guide.md` の行と本文のファイル `guide.md` をコミット済み'
+      - name: 直コミットの設定
+        description: sample の種類 `note` と種類 `files` の直コミットを許可し、種類 `files` は本文の直コミットを断る。コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当する。`cwd` にこのパスを入れる
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（本文の直コミットを断る種類のメタデータだけを書き換える）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: describe(source: sample)
+        M-->>A: 直コミットを許可した種類 note・files と、files は本文の直コミットを断ること
+        A->>M: write_docs(source: sample, operations: update・guide.md の行の description と tags, commit: message)
+        M->>M: 正常シナリオと同じ確認・排他・取り込み・検査
+        M->>M: 種類 files の操作が本文（@body）を変えないことを確認する
+        M->>WT: files.yml の行を書き換え、generators を実行する
+        M->>WT: files.yml と生成物だけをコミットする
+        M->>R: develop をプッシュする
+        M-->>A: 書き換えた行の id と version、コミットの SHA とブランチ
+      ```
+
+      <!-- /map -->
+    expected:
+      - '結果が `applied: true` で、`guide.md` の行の `status` が `updated`、コミットの SHA とブランチ `develop` を返却する'
+      - sample のリモートの `develop` に 1 コミットが増え、変更は `files.yml` と `generators[]` の生成物だけで、`guide.md` は変わらない
+      - '`describe(source: sample)` が、直コミットを許可した種類 `files` について本文の直コミットを断ることを返却する'
+    test: test_normal_when_metadata_only
+  - name: 異常シナリオ（本文の直コミットを断る種類の本文を書き換える）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 本文の直コミットを断る種類
+        description: 'sample の種類 `files`。管理用の YAML `files.yml` の行が、列 `path` で本文のファイルを指す（`records: files`・`body_file: path`）'
+        notes: '`develop` に、`path` が `guide.md` の行と本文のファイル `guide.md` をコミット済み'
+      - name: 直コミットの設定
+        description: sample の種類 `note` と種類 `files` の直コミットを許可し、種類 `files` は本文の直コミットを断る。コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当する。`cwd` にこのパスを入れる
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（本文の直コミットを断る種類の本文を書き換える）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: write_docs(source: sample, operations: update・guide.md の行の set @body, commit: message)
+        M->>M: 種類 files は本文の直コミットを断る
+        M-->>A: エラー（添字 0・本文の直コミットを断る種類）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、添字 0 の違反として、種類 `files` は本文（`@body`）の直コミットを断っていることを返却する'
+      - '`text_edits` で `@body` を書き換える操作と、本文のファイルを新規作成する `create`・`replace` も、同じ違反で断る'
+      - sample のリモートと develop のワークツリーは変わらず、`guide.md` と `files.yml` も変わらない
+    test: test_error_when_body_not_allowed
+  - name: 異常シナリオ（本文の直コミットを断る種類の文書を消す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。フックが入れる `cwd`・`session_id`・`agent_id` はテストが引数に入れる）
+      - name: サンプルの配信元
+        description: 種類 `note`（直コミットを許可する）と種類 `rule`（許可しない）のスキーマと YAML と、文書の一覧を書き出す `generators[]` と、`project-index.yaml` を持つ git リポジトリ（クローン本体は `master`）と、2 つのワークツリー（`.claude/worktrees/x` と、`develop` を指す `.claude/worktrees/develop`。どちらも sample の `worktrees` に該当する）
+        notes: id `sample`。`scope.read`・`scope.write` は sample のフォルダ
+      - name: sample のリモート
+        description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+        notes: '`develop` のワークツリーの HEAD は `origin/develop` と同じで、未コミットの変更が無い'
+      - name: 本文の直コミットを断る種類
+        description: 'sample の種類 `files`。管理用の YAML `files.yml` の行が、列 `path` で本文のファイルを指す（`records: files`・`body_file: path`）'
+        notes: '`develop` に、`path` が `guide.md` の行と本文のファイル `guide.md` をコミット済み'
+      - name: 直コミットの設定
+        description: sample の種類 `note` と種類 `files` の直コミットを許可し、種類 `files` は本文の直コミットを断る。コミットするブランチを `develop`、呼べる作業場所を手元の作業場所にする
+      - name: 手元の作業場所
+        description: テスト用の一時フォルダの中の空のフォルダ
+        notes: sample の `scope.read`・`scope.write` に該当しない。直コミットの呼べる作業場所に該当する。`cwd` にこのパスを入れる
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（本文の直コミットを断る種類の文書を消す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as 手元のセッション
+        participant M as 文書の MCP（/mcp）
+        participant WT as develop のワークツリー
+        participant R as sample のリモート
+
+        A->>M: delete_docs(source: sample, targets: guide.md の行・expected_version, commit: message)
+        M->>M: guide.md の行は本文のファイルを持ち、種類 files は本文の直コミットを断る
+        M-->>A: エラー（添字 0・本文の直コミットを断る種類）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`isError: true` で、添字 0 の違反として、種類 `files` は本文のファイルを消す直コミットを断っていることを返却する'
+      - sample のリモートと develop のワークツリーは変わらず、`guide.md` と `files.yml` の行も残る
+    test: test_error_when_body_delete_not_allowed
 refs:
   - to: SC-1
     item: scenarios[正常シナリオ]
