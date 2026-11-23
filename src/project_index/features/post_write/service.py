@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from project_index.features.access.service import base_of, find_worktree
+from project_index.features.documents.indexable import walk_files
 from project_index.features.documents.loader import collect_files, unindexed_files
 from project_index.features.post_write.types import (
     NOTICE_PROMPT_ID,
@@ -39,11 +40,19 @@ def judge_post_write(
     prompts: PromptSet,
 ) -> PostWriteResponse:
     """パスごとに通知の対象かを判定し、未通知のファイルの通知と文面を返す。"""
-    # 通知の対象のパスの判定を集める（対象外のパスは記録しない）
+    # 通知の対象のパスの判定を集める（対象外のパスは記録しない）。
+    # フォルダごとのたどったパスと Git が無視するパスは、1 回の要求で 1 回だけ求める
+    walked: dict[Path, list[str]] = {}
+    ignored_by_base: dict[Path, list[str]] = {}
     judged = [
         notice
         for path in request.paths
-        if (notice := classify_path(Path(path), sources)) is not None
+        if (
+            notice := classify_path(
+                Path(path), sources, walked=walked, ignored_by_base=ignored_by_base
+            )
+        )
+        is not None
     ]
     # 同じ会話で通知済みのパスを除く
     key = SessionKey(request.session_id, request.agent_id or "")
@@ -65,8 +74,16 @@ def judge_post_write(
     return PostWriteResponse(notices=notices, additional_context=text)
 
 
-def classify_path(path: Path, sources: Sequence[ServedSource]) -> Notice | None:
+def classify_path(
+    path: Path,
+    sources: Sequence[ServedSource],
+    *,
+    walked: dict[Path, list[str]] | None = None,
+    ignored_by_base: dict[Path, list[str]] | None = None,
+) -> Notice | None:
     """1 つのパスが通知の対象なら、配信元・促す修正・管理用の YAML を返す。"""
+    walked = {} if walked is None else walked
+    ignored_by_base = {} if ignored_by_base is None else ignored_by_base
     located = _locate(path, sources)
     if located is None:
         return None
@@ -77,12 +94,20 @@ def classify_path(path: Path, sources: Sequence[ServedSource]) -> Notice | None:
         for table in source.config.documents
         if table.enabled and table.records is not None and table.body_file is not None
     ]
-    index_paths = {table.id: collect_files(base, table) for table in index_tables}
+    # 1 回の要求でフォルダごとにたどるのは 1 回だけにする
+    if base not in walked:
+        walked[base] = list(walk_files(base))
+    files = walked[base]
+    index_paths = {table.id: collect_files(base, table, files=files) for table in index_tables}
     if relative in _config_paths(source) or any(
         relative in paths for paths in index_paths.values()
     ):
         return None
-    found = _range_of(source, base, relative, index_tables, index_paths)
+    # Git の配信元だけ、Git が無視するパスを範囲から除く（1 回の要求でフォルダごとに 1 回だけ求める）
+    if source.is_git and base not in ignored_by_base:
+        ignored_by_base[base] = ignored_paths(base) or []
+    ignored = ignored_by_base.get(base, [])
+    found = _range_of(source, base, relative, index_tables, index_paths, ignored)
     # どの範囲にも入らない（YAML の文書・documents[].paths に該当しないファイル）
     if found is None:
         return None
@@ -103,10 +128,9 @@ def _range_of(
     relative: str,
     index_tables: Sequence[DocumentTable],
     index_paths: dict[str, list[str]],
+    ignored: Sequence[str],
 ) -> tuple[DocumentTable, str] | None:
     """相対パスを範囲に持つ管理用の YAML を、深いフォルダから順に探して返す。"""
-    # Git の配信元だけ、Git が無視するパスを範囲から除く
-    ignored = (ignored_paths(base) or []) if source.is_git else []
     index_dirs = {
         posixpath.dirname(item) or "." for paths in index_paths.values() for item in paths
     }
@@ -144,6 +168,16 @@ def _source_lines(
         source_id for source_id in source_ids if (by_id[source_id].root / RULE_INDEX_FILE).is_file()
     ]
     return aliases, rule_index
+
+
+def source_ids_of(paths: Sequence[str], sources: Sequence[ServedSource]) -> list[str]:
+    """パスを含む配信元の ID を、初めて出た順に重ならないように返す（フォルダはたどらない）。"""
+    found: list[str] = []
+    for path in paths:
+        located = _locate(Path(path), sources)
+        if located is not None and located[0].id not in found:
+            found.append(located[0].id)
+    return found
 
 
 def _locate(path: Path, sources: Sequence[ServedSource]) -> tuple[ServedSource, Path, str] | None:

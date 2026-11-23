@@ -1,4 +1,4 @@
-"""文書の MCP・読み取り API と管理の MCP の専用の実行スロットと、稼働中の記録。"""
+"""文書の MCP・読み取り API・管理の MCP・書き込みの後の通知の判定の専用の実行スロットと、稼働中の記録。"""
 
 from __future__ import annotations
 
@@ -11,11 +11,11 @@ import logging
 import os
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator
+    from collections.abc import Callable, Generator, Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -23,19 +23,29 @@ logger = logging.getLogger(__name__)
 DOCS_WORKERS = min(32, (os.cpu_count() or 1) + 4)
 # 管理の MCP の実行スロットの数（長い処理 1 件と、その間の status・restart 1 件）
 ADMIN_WORKERS = 2
+# 書き込みの後の通知の判定の実行スロットの数（3 秒の間に届く要求の最大 3 件 × 1.2 を切り上げ）
+POST_WRITE_WORKERS = 4
 # 実行中・待ち中の数と RSS を記録する間隔の秒数
 RUNTIME_RECORD_INTERVAL_SEC = 60
 
 __all__ = [
     "ADMIN_WORKERS",
     "DOCS_WORKERS",
+    "POST_WRITE_WORKERS",
     "RUNTIME_RECORD_INTERVAL_SEC",
     "ExecutionSlots",
+    "Executor",
     "RequestRecord",
+    "RequestState",
+    "RunningRequest",
     "current_record",
     "read_rss_mb",
     "record_periodically",
 ]
+
+
+Executor = Literal["docs", "post_write"]
+RequestState = Literal["waiting", "running"]
 
 
 @dataclass(slots=True)
@@ -43,7 +53,14 @@ class RequestRecord:
     """1 回の要求の待ち・処理の時間と、要求の中でたどったファイルのキャッシュの件数。"""
 
     tool: str
-    source: str | None = None
+    # 要求が指す配信元の ID の並び（指さないときは空）
+    sources: list[str] = field(default_factory=list[str])
+    # 要求を動かす実行スロット
+    executor: Executor = "docs"
+    # 実行スロットで関数を動かしている間は running
+    state: RequestState = "waiting"
+    # request に入った時刻（ExecutionSlots.clock の値）
+    received_at: float = 0.0
     # 実行スロットに入れてから動き始めるまでの秒数の合計
     slot_wait: float = 0.0
     # ワークツリーごとの排他を待った秒数の合計
@@ -60,6 +77,17 @@ class RequestRecord:
     def add_scanned(self, count: int) -> None:
         """たどったキャッシュのキーの数を足す。"""
         self.scanned += count
+
+
+@dataclass(frozen=True, slots=True)
+class RunningRequest:
+    """状態の取得が返却する、終わっていない要求 1 件のコピー。"""
+
+    tool: str
+    sources: list[str]
+    executor: Executor
+    state: RequestState
+    seconds: float
 
 
 _current: contextvars.ContextVar[RequestRecord | None] = contextvars.ContextVar(
@@ -98,10 +126,17 @@ class ExecutionSlots:
         self.admin_executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=ADMIN_WORKERS, thread_name_prefix="admin"
         )
+        self.post_write_executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=POST_WRITE_WORKERS, thread_name_prefix="post_write"
+        )
         self.clock = clock
         # 文書の MCP の実行スロットで動いている数と、入れて動き始めていない数（_guard で読み書きする）
         self._running = 0
         self._waiting = 0
+        # 書き込みの後の通知の判定の実行スロットに入れて、終わっていない仕事の数（_guard で読み書きする）
+        self._post_write_busy = 0
+        # request の範囲に入っている要求の記録（キーは id(record)。_guard で読み書きする）
+        self._requests: dict[int, RequestRecord] = {}
         self._guard = threading.Lock()
 
     def counts(self) -> tuple[int, int]:
@@ -109,11 +144,32 @@ class ExecutionSlots:
         with self._guard:
             return self._running, self._waiting
 
+    def running(self) -> list[RunningRequest]:
+        """request の範囲に入っている要求のコピーを、経過秒の長い順に返す。"""
+        with self._guard:
+            records = list(self._requests.values())
+        now = self.clock()
+        items = [
+            RunningRequest(
+                tool=record.tool,
+                sources=list(record.sources),
+                executor=record.executor,
+                state=record.state,
+                seconds=now - record.received_at,
+            )
+            for record in records
+        ]
+        return sorted(items, key=lambda item: item.seconds, reverse=True)
+
     @contextlib.contextmanager
-    def request(self, tool: str, *, source: str | None = None) -> Generator[RequestRecord]:
-        """1 回の要求の間、要求の記録を今の文脈に置き、抜けるときに 1 行でログに残す。"""
-        record = RequestRecord(tool, source)
+    def request(
+        self, tool: str, *, sources: Sequence[str] = (), executor: Executor = "docs"
+    ) -> Generator[RequestRecord]:
+        """1 回の要求の間、要求の記録を今の文脈と終わっていない要求の記録に置き、抜けるときに 1 行でログに残す。"""
+        record = RequestRecord(tool, list(sources), executor, received_at=self.clock())
         token = _current.set(record)
+        with self._guard:
+            self._requests[id(record)] = record
         outcome = "ok"
         try:
             yield record
@@ -126,16 +182,19 @@ class ExecutionSlots:
             raise
         finally:
             logger.info(
-                "要求を処理した（tool=%s source=%s slot_wait=%.3f lock_wait=%.3f elapsed=%.3f "
-                "scanned=%d outcome=%s）",
+                "要求を処理した（tool=%s source=%s executor=%s slot_wait=%.3f lock_wait=%.3f "
+                "elapsed=%.3f scanned=%d outcome=%s）",
                 record.tool,
-                record.source,
+                ",".join(record.sources) or None,
+                record.executor,
                 record.slot_wait,
                 record.lock_wait,
                 record.elapsed,
                 record.scanned,
                 outcome,
             )
+            with self._guard:
+                self._requests.pop(id(record), None)
             _current.reset(token)
 
     async def run_docs[T](self, func: Callable[..., T], *args: object) -> T:
@@ -154,14 +213,17 @@ class ExecutionSlots:
                     self._waiting -= 1
                 job.state = "running"
                 self._running += 1
+            record = current_record()
+            if record is not None:
+                record.state = "running"
             try:
                 return func(*args)
             finally:
                 finished_at = self.clock()
                 with self._guard:
                     self._running -= 1
-                record = current_record()
                 if record is not None:
+                    record.state = "waiting"
                     record.slot_wait += started_at - queued_at
                     record.elapsed += finished_at - started_at
 
@@ -173,6 +235,45 @@ class ExecutionSlots:
                 # 動き始める前の取り消し: ThreadPoolExecutor は仕事を呼ばないため、ここで戻す
                 if job.state == "waiting":
                     self._waiting -= 1
+                    job.state = "cancelled"
+            raise
+
+    async def try_run_post_write[T](self, func: Callable[..., T], *args: object) -> T | None:
+        """関数を書き込みの後の通知の判定の実行スロットで動かす。全て使用中なら動かさずに None を返す。"""
+        job = _Job()
+        with self._guard:
+            if self._post_write_busy >= POST_WRITE_WORKERS:
+                return None
+            self._post_write_busy += 1
+        queued_at = self.clock()
+        context = contextvars.copy_context()
+
+        def _work() -> T:
+            started_at = self.clock()
+            with self._guard:
+                job.state = "running"
+            record = current_record()
+            if record is not None:
+                record.state = "running"
+            try:
+                return func(*args)
+            finally:
+                finished_at = self.clock()
+                with self._guard:
+                    self._post_write_busy -= 1
+                if record is not None:
+                    record.state = "waiting"
+                    record.slot_wait += started_at - queued_at
+                    record.elapsed += finished_at - started_at
+
+        loop = asyncio.get_running_loop()
+        try:
+            return await loop.run_in_executor(self.post_write_executor, context.run, _work)
+        except asyncio.CancelledError:
+            with self._guard:
+                # 動き始める前の取り消し: ThreadPoolExecutor は仕事を呼ばないため、ここで戻す
+                if job.state == "waiting":
+                    self._post_write_busy -= 1
                     job.state = "cancelled"
             raise
 

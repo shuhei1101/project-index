@@ -161,6 +161,7 @@ def get_status(handlers: Handlers, *, env: Mapping[str, str]) -> ServerStatus:
         loading=loading,
         checking=handlers.checks.checking,
         exporting=handlers.snapshots.exporting,
+        running=handlers.slots.running(),
     )
 
 

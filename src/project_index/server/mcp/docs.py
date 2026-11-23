@@ -127,6 +127,7 @@ def _register(
     write_deadline_sec: float,
     gate: BackgroundGate,
     slots: ExecutionSlots,
+    served_ids: Callable[[], list[str]],
     prepare: Callable[[BaseModel], Awaitable[None]] | None = None,
 ) -> None:
     """要求のモデルを引数に持つツールを 1 つ登録する（呼ぶ前に要求が指す配信元の読み込みを待つ）。"""
@@ -149,10 +150,13 @@ def _register(
     ) -> CallToolResult:
         try:
             request = model(**arguments)
-            record.source = _record_source(request)
+            record.sources = _record_sources(request)
             # 読み込みを待つ間も要求の応答中として数え、要求が待っていない行の読み込みを休ませる
             with gate.foreground():
                 await wait_sources(request)
+            # "*" の要求は、読み込みを待った後の配信中の配信元を記録に残す
+            if _names_every(request):
+                record.sources = served_ids()
             # ワークツリーの初めての読み込みを上限まで待つ（search_docs・write_docs・delete_docs）
             if prepare is not None:
                 await prepare(request)
@@ -245,14 +249,24 @@ async def _load_worktree_recorded(
     request: SearchRequest | WriteRequest | DeleteRequest, handlers: Handlers, source_id: str
 ) -> object:
     """ワークツリーの読み込みを、呼び出し元と別の要求の記録の範囲で動かす（時間切れの後も 1 行残す）。"""
-    with handlers.slots.request("worktree_load", source=source_id):
+    with handlers.slots.request("worktree_load", sources=[source_id]):
         return await handlers.slots.run_docs(_load_worktree, request, handlers)
 
 
-def _record_source(request: BaseModel) -> str | None:
-    """要求の記録に残す配信元（1 つの ID を指すときだけ）を返す。"""
+def _record_sources(request: BaseModel) -> list[str]:
+    """要求の記録に残す配信元の ID の並び（指さないときは空）を返す。"""
     source: object = getattr(request, "source", None)
-    return source if isinstance(source, str) else None
+    if isinstance(source, str):
+        return [] if source == "*" else [source]
+    if is_list(source):
+        return [item for item in source if isinstance(item, str) and item != "*"]
+    return []
+
+
+def _names_every(request: BaseModel) -> bool:
+    """要求の source が "*" を含むか。"""
+    source: object = getattr(request, "source", None)
+    return source == "*" or (is_list(source) and "*" in source)
 
 
 async def _ensure_worktree(
@@ -377,6 +391,7 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
         write_deadline_sec=handlers.terminal.write_deadline_sec,
         gate=handlers.gate,
         slots=handlers.slots,
+        served_ids=lambda: [source.id for source in handlers.registry.served()],
     )
     # ワークツリーのパスごとの読み込み中のタスク（イベントループの中だけで触る）
     loads: dict[Path, asyncio.Future[object]] = {}
