@@ -501,12 +501,19 @@ functions:
         required: true
         passing: keyword
         description: 日付の相対の値の基準
+      - name: schema_target
+        title: スキーマを参照する場所
+        type: Target | None
+        required: false
+        default: None
+        passing: keyword
+        description: 使える項目を作る種類のスキーマを参照する場所。`None` は `target`。リビジョンを書き出さない呼び出し元は `ref` を外した場所（起動時のスキーマ）を指定する
     returns:
       type: list[bool]
       description: '`documents` と同じ順の、該当すれば `True` の並び'
     process: |-
       1. `search_exclude` を持つ有効な行が無ければ、全て `False` の並びを返却する
-      2. 有効な `documents[]` の行ごとの `store.row_schema(target, 行の id)` から使える項目（`known_fields`）を作る
+      2. 有効な `documents[]` の行ごとの `store.row_schema(schema_target か target, 行の id)` から使える項目（`known_fields`）を作る
       3. 文書ごとに、文書の種類の行の `exclusion_of` を種類ごとに 1 回だけ作り、`is_excluded` の結果を並べて返却する
     unit_tests:
       - name: test_exclusion_flags
@@ -521,4 +528,10 @@ functions:
         condition: '`search_exclude` を持たない配信元の文書 2 件'
         mock: '`store.row_schema`（呼ばれたら失敗する偽物）'
         expected: '`[False, False]` で、`store.row_schema` を呼ばない'
+      - name: test_exclusion_flags_when_schema_target
+        case: 正常
+        summary: スキーマを参照する場所を指定する
+        condition: '`test_exclusion_flags` と同じ配信元で、`target` に `ref` を持たせ、`schema_target` に `ref` を外した場所を指定する'
+        mock: '`store.row_schema`（受けた場所を記録する包み）'
+        expected: '`[False, True, False]` で、`store.row_schema` が受けた場所が全て `ref` が `None`'
 visibility: internal
