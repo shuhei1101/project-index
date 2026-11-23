@@ -19,6 +19,7 @@ preconditions:
 - 索引のサーバーを動かしている利用者の Git の認証で、リモートへプッシュできる
 success_guarantee: |-
   1 回の要求で書き換わる全ての文書（操作に伴って書き換わる参照元を含む）が直コミットを許可した種類で、検査に合格した内容のとき、書き込みと削除が 1 つのコミットになり、コミットするブランチのリモートに入る。応答に操作ごとの文書のバージョンとコミットの SHA・ブランチが返る。コミットに入るのは、その要求が書き込んだ・消したファイルと生成物だけ。
+  配信元の設定の直コミットを許可した配信元で、書き換えた後の配信元の設定がスキーマと起動の検証に合格するとき、`project-index.yaml` の書き換えが文書の書き込みと同じ 1 つのコミットに入り、プッシュした後にその配信元を再読み込みして、再起動せずに書き換えた後の設定で配信する。
   編集を始めたときのコミットを添えた要求が、ほかの変更と衝突して今のブランチでは断られ、編集を始めたときのコミットでは許可と検査に合格するとき、その要求の書き込みと削除が編集を始めたときのコミットから作成したブランチの 1 つのコミットになって手元に残り、コミットするブランチとリモートは変わらない。応答にブランチの名前・コミットの SHA と、衝突したときのスクリプトの結果が返る。
 minimal_guarantee: |-
   1 つでも操作が断られた要求は、どの文書も書き込まず、リモートを変えず、ワークツリーにこの要求が書き込んだ変更を残さない。ワークツリーにあった未プッシュのコミットと未コミットの変更は消さない。断ったときは、断った操作の位置と理由を返却する。
@@ -724,6 +725,113 @@ scenarios:
   - 文書 1 も書き換わらず、sample のリモートと全てのワークツリーは変わらない
   - '`guide.md` の本文からリンクされた文書 1 を改名する操作（参照元の `guide.md` の行の `@body` が書き換わる）を含む要求も、書き換わる `guide.md` の行の ID を返却して要求全体を断る'
   test: test_error_when_body_not_allowed
+- name: 正常シナリオ（配信元の設定を書き換える）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが書き込みの API を HTTP で呼ぶ）
+  - name: サンプルの配信元
+    description: 正常シナリオと同じ sample と、2 つのワークツリー
+  - name: sample のリモート
+    description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+  - name: 直コミットの設定
+    description: 正常シナリオと同じ。加えて、sample の配信元の設定と端末の設定の sample の行の両方で、配信元の設定の直コミットを許可する
+  - name: 書き換える配信元の設定と文書
+    description: sample の `develop` にコミット済みの `project-index.yaml` と、種類 `note` の文書 1
+    notes: テストのコードは、develop のリビジョンの配信元の設定の内容とバージョン、文書 1 のバージョンを取得しておく
+  flow: |-
+    <!-- map: {"title": "正常シナリオ（配信元の設定を書き換える）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（書き込みの API）
+      participant WT as develop のワークツリー
+      participant R as sample のリモート
+
+      DD->>PI: sample へ、説明を変えた配信元の設定の内容と取得したバージョン、文書 1 の部分更新、コミットの説明を 1 回で送信する
+      PI->>PI: 正常シナリオと同じくオリジンと文書の直コミットの許可を確認し、書き換える前の配信元の設定と端末の設定で配信元の設定の直コミットが許可されていることを確認する
+      PI->>PI: リポジトリの排他を取る
+      PI->>R: 最新を取得し、develop のワークツリーへ早送りで取り込む
+      PI->>PI: 配信元の設定のバージョンが一致し、書き換えた後の配信元の設定がスキーマと起動の検証に合格することを確認する
+      PI->>PI: 文書 1 の操作を、書き換えた後の配信元の設定のスキーマと validators にかける
+      PI->>WT: project-index.yaml と文書 1 を書き換え、generators を実行する
+      PI->>WT: 書き換えたファイルと生成物だけを 1 つのコミットにする
+      PI->>R: develop をプッシュする
+      PI->>PI: 排他を放し、sample を再読み込みする
+      PI-->>DD: 配信元の設定と文書 1 の書き込んだ後のバージョンと、コミットの SHA とブランチ
+    ```
+
+    <!-- /map -->
+  expected:
+  - 応答が成功で、配信元の設定と文書 1 の書き込んだ後のバージョンと、コミットの SHA とブランチ `develop` を返却する
+  - sample のリモートの `develop` に 1 コミットだけが増え、変更は `project-index.yaml`・文書 1 のファイルと `generators[]` の生成物だけ
+  - 再起動せずに、読み取り API の配信元の設定の取得が変えた後の説明を返却する
+  - develop のワークツリーの HEAD が `origin/develop` と同じで、`git status` に変更が出ない
+  test: test_normal_when_source_config_written
+- name: 異常シナリオ（配信元の設定の直コミットを許可していない）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが書き込みの API を HTTP で呼ぶ）
+  - name: サンプルの配信元
+    description: 正常シナリオと同じ sample と、2 つのワークツリー
+  - name: sample のリモート
+    description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+  - name: 直コミットの設定
+    description: 正常シナリオと同じ。sample の配信元の設定では配信元の設定の直コミットを許可する
+    notes: 端末の設定の sample の行では、配信元の設定の直コミットを許可していない
+  - name: 書き換える配信元の設定
+    description: sample の `develop` にコミット済みの `project-index.yaml`
+    notes: テストのコードは、develop のリビジョンの配信元の設定の内容とバージョンを取得しておく
+  flow: |-
+    <!-- map: {"title": "異常シナリオ（配信元の設定の直コミットを許可していない）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（書き込みの API）
+
+      DD->>PI: sample へ、説明を変えた配信元の設定の内容と取得したバージョン、コミットの説明を送信する
+      PI->>PI: 端末の設定で配信元の設定の直コミットが許可されていない
+      PI-->>DD: 許可していないことと、許可を記載する端末の設定のキーを返却して断る
+    ```
+
+    <!-- /map -->
+  expected:
+  - 応答が失敗で、配信元の設定の直コミットを許可していないことと、許可を記載する端末の設定のキーを返却する
+  - sample のリモートと全てのワークツリーは変わらず、配信も書き換える前の設定のまま
+  test: test_error_when_source_config_not_allowed
+- name: 異常シナリオ（書き換えた後の配信元の設定が検証に合格しない）
+  setup:
+  - name: Mock
+    description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが書き込みの API を HTTP で呼ぶ）
+  - name: サンプルの配信元
+    description: 正常シナリオと同じ sample と、2 つのワークツリー
+  - name: sample のリモート
+    description: テスト用の一時フォルダのベアリポジトリ。sample の `origin` で、`master` と `develop` を持つ
+  - name: 直コミットの設定
+    description: 正常シナリオ（配信元の設定を書き換える）と同じ
+  - name: 書き換える配信元の設定
+    description: sample の `develop` にコミット済みの `project-index.yaml`
+    notes: テストのコードは、develop のリビジョンの配信元の設定の内容とバージョンを取得しておく
+  flow: |-
+    <!-- map: {"title": "異常シナリオ（書き換えた後の配信元の設定が検証に合格しない）"} -->
+
+    ```mermaid
+    sequenceDiagram
+      participant DD as dev-docs の画面のサーバー
+      participant PI as project-index（書き込みの API）
+
+      DD->>PI: sample へ、文書の行の paths を削除した配信元の設定の内容と取得したバージョン、コミットの説明を送信する
+      PI->>PI: 正常シナリオ（配信元の設定を書き換える）と同じく許可を確認し、排他を取って最新を取り込む
+      PI->>PI: 書き換えた後の配信元の設定がスキーマに合格しない
+      PI-->>DD: 違反したキーのパスと理由の一覧を返却して断る
+    ```
+
+    <!-- /map -->
+  expected:
+  - 応答が失敗で、配信元の設定の違反したキーのパスと理由を返却する
+  - sample のリモートと全てのワークツリーは変わらず、配信も書き換える前の設定のまま
+  test: test_error_when_source_config_invalid
 refs:
 - to: SC-1
   item: scenarios[正常シナリオ]
