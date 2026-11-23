@@ -422,3 +422,63 @@ def test_exclusion_flags_when_no_exclusion(
     flags = exclusion_flags(target, documents, store=_FailingStore(), today=TODAY)  # type: ignore[arg-type]
     # 検証
     assert flags == [False, False]
+
+
+def test_exclusion_flags_when_schema_target(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """スキーマを参照する場所を指定する（正常系）。"""
+    import dataclasses
+
+    from project_index.features.documents.store import DocumentStore
+    from project_index.features.history.snapshot import SnapshotStore
+    from project_index.features.search.filters import exclusion_flags
+
+    # 準備
+    root = tmp_path / "sample"
+    write_files(
+        root,
+        {
+            "schemas/rule.schema.yaml": "type: object\n",
+            "assets/a1.yaml": "id: a1\nname: A1\nstatus: active\n",
+            "assets/a2.yaml": "id: a2\nname: A2\nstatus: inactive\n",
+            "docs/d1.yaml": "id: d1\nname: D1\nstatus: inactive\n",
+        },
+    )
+    tables = [
+        DocumentTable(
+            id="assets",
+            paths=["assets/*.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            search_exclude={"field": "status", "op": "eq", "values": ["inactive"]},
+        ),
+        DocumentTable(id="docs", paths=["docs/*.yaml"], schema_path="schemas/rule.schema.yaml"),
+    ]
+    source = make_served_source(root=root, config=make_source_config(documents=tables))
+    startup = make_target(source)
+    store = DocumentStore(SnapshotStore(tmp_path / "snapshots"))
+    documents = store.load(startup).documents
+    received: list[str | None] = []
+    row_schema = store.row_schema
+
+    def _recording(target: Target, kind: str) -> dict[str, object]:
+        received.append(target.ref)
+        return row_schema(target, kind)
+
+    monkeypatch.setattr(store, "row_schema", _recording)
+    # 実行
+    flags = exclusion_flags(
+        dataclasses.replace(startup, ref="main"),
+        documents,
+        store=store,
+        today=TODAY,
+        schema_target=startup,
+    )
+    # 検証
+    assert flags == [False, True, False]
+    assert received == [None, None]
