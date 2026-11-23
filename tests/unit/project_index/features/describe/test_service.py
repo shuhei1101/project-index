@@ -297,8 +297,6 @@ def test_describe_when_metadata_only_kinds(
     """本文の直コミットを断る種類を返す（正常系）。"""
     # 準備
     root = tmp_path / "sample"
-    local = tmp_path / "local"
-    local.mkdir()
     write_files(root, {"schemas/rule.schema.yaml": SCHEMA_TEXT})
     tables = [
         DocumentTable(id=kind, paths=[f"{kind}/*.yaml"], schema_path="schemas/rule.schema.yaml")
@@ -315,10 +313,10 @@ def test_describe_when_metadata_only_kinds(
         root=root,
         config=config,
         schemas={"note": {"type": "object"}, "files": {"type": "object"}},
-        direct_commit_scope=[str(local)],
+        direct_commit_scope=[str(root)],
     )
     # 実行
-    result = _describe(make_registry(source), store, local, source="sample")
+    result = _describe(make_registry(source), store, root, source="sample")
     # 検証
     assert isinstance(result, SourceGuideResult)
     assert result.direct_commit is not None
