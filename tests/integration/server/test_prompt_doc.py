@@ -255,6 +255,55 @@ SESSION_CONTEXT_MANY_SOURCES_YAML = (
 )
 
 
+# 会話履歴を x-each で繰り返す LLM のプロンプト（言語は en だけ、例の組は no-history）
+HISTORY_YAML = """\
+id: node/history
+name: 会話履歴のノード
+kind: llm
+lang: en
+vars:
+  history:
+    type: array
+    description: これまでの依頼と返答
+    example:
+      - {request: req-one, reply: rep-one}
+      - {request: req-two, reply: ""}
+    items:
+      type: object
+      properties:
+        request: {type: string, description: 依頼, example: req-one}
+        reply: {type: string, description: 返答}
+examples:
+  - id: no-history
+    name: no-history
+    values: {history: []}
+parts:
+  - id: system
+    role: system
+    texts:
+      - lang: en
+        text: System
+  - id: past-request
+    role: user
+    x-each: {var: history, as: item}
+    texts:
+      - lang: en
+        text: "{{ item.request }}"
+  - id: past-reply
+    role: assistant
+    x-each: {var: history, as: item}
+    when: item.reply
+    texts:
+      - lang: en
+        text: "{{ item.reply }}"
+  - id: now
+    role: user
+    texts:
+      - lang: en
+        text: Now
+"""
+
+
 def _run(monkeypatch: pytest.MonkeyPatch, stdin: str) -> int:
     """標準入力を UTF-8 のバイト列で差し替えて `project-index prompt-doc` を呼ぶ。"""
     monkeypatch.setattr(
@@ -479,3 +528,44 @@ def test_error_when_required_key_missing(
     assert code == 1
     assert captured.out == ""
     assert captured.err.startswith("parts: Field required")
+
+
+def test_normal_when_each(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """x-each の部品を配列の要素ごとに描画し、並び順のまま続く同じロールの部品を 1 通のメッセージにまとめる（正常系）。"""
+    # 実行
+    code = _run(monkeypatch, HISTORY_YAML)
+    # 検証
+    captured = capsys.readouterr()
+    out = captured.out
+    default_example = _section(out, "### 既定の例")
+    no_history_example = _section(out, "### no-history")
+    assert code == 0
+    assert captured.err == ""
+    # 既定の例: system・user（1 組目の request）・assistant（1 組目の reply）・user（2 組目の request と now）
+    assert re.findall(r"^\*\*(\w+)\*\*$", default_example, flags=re.MULTILINE) == [
+        "system",
+        "user",
+        "assistant",
+        "user",
+    ]
+    assert "使用しなかった部品: なし" in default_example
+    assert default_example.index("req-one") < default_example.index("rep-one")
+    assert default_example.index("rep-one") < default_example.index("req-two")
+    assert default_example.index("req-two") < default_example.index("Now")
+    # no-history: system・user（now）の 2 通
+    assert re.findall(r"^\*\*(\w+)\*\*$", no_history_example, flags=re.MULTILINE) == [
+        "system",
+        "user",
+    ]
+    assert "使用しなかった部品: past-request、past-reply" in no_history_example
+    # テンプレートの x-each の部品のバッジと要素の変数のツールチップ
+    past_request = _section(out, "### past-request")
+    assert "`badge:x-each: history as item`" in past_request
+    assert (
+        '<span data-hint="依頼（型: string、例: req-one）">{{ item.request }}</span>'
+        in past_request
+    )
+    # 注意書きが無い
+    assert "[!CAUTION]" not in out
