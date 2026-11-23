@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from project_index.features.prompt_doc import types as types_module
 from project_index.features.prompt_doc.markdown import (
     convert_prompt,
     example_body,
@@ -120,6 +121,26 @@ def test_prompt_to_markdown_when_part_syntax_invalid(reflection_yaml: str) -> No
     assert "traits[].name" in _section(result, "## 変数")
 
 
+def test_prompt_to_markdown_when_each() -> None:
+    """x-each の部品のバッジ（正常系）。"""
+    # 準備
+    doc = _doc(
+        parts=[
+            {
+                "id": "past-request",
+                "role": "user",
+                "x-each": {"var": "history", "as": "item"},
+                "texts": [{"lang": "en", "text": "{{ item.request }}"}],
+            }
+        ],
+        vars={"history": {"type": "array", "example": []}},
+    )
+    # 実行
+    markdown = prompt_to_markdown(doc)
+    # 検証
+    assert "`badge:x-each: history as item`" in _section(markdown, "### past-request")
+
+
 def test_var_table() -> None:
     """入れ子のパスと例（正常系）。"""
     # 準備
@@ -170,6 +191,21 @@ def test_template_html_when_loop_variable() -> None:
     result = template_html("{% for t in traits %}{{ t.name }}{% endfor %}", paths=paths)
     # 検証
     assert '<span data-hint="特性の名前（型: string、例: 好奇心）">{{ t.name }}</span>' in result
+
+
+def test_template_html_when_each() -> None:
+    """x-each の要素の名前を配列の要素のパスに読み替える（正常系）。"""
+    # 準備
+    paths = {
+        "history[].request": PromptVar.model_validate(
+            {"type": "string", "description": "依頼", "example": "挨拶して"}
+        )
+    }
+    each = types_module.PromptEach.model_validate({"var": "history", "as": "item"})
+    # 実行
+    result = template_html("{{ item.request }}", paths=paths, each=each)
+    # 検証
+    assert '<span data-hint="依頼（型: string、例: 挨拶して）">{{ item.request }}</span>' in result
 
 
 def test_template_html_when_html_in_text() -> None:

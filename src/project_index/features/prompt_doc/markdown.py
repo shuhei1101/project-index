@@ -21,6 +21,7 @@ from project_index.features.prompt_doc.types import (
     InvalidPrompt,
     PartSyntaxError,
     PromptDoc,
+    PromptEach,
     PromptPart,
     PromptVar,
     PromptYamlError,
@@ -114,7 +115,7 @@ def _template_section(
 ) -> list[str]:
     """部品 1 件の見出し・バッジと、言語ごとのタブの本文の行を作る。"""
     lines = [f"### {part.id}", ""]
-    badges = _part_badges(part.role, part.tags, part.when)
+    badges = _part_badges(part.role, part.tags, part.when, part.each)
     if badges:
         lines += [badges, ""]
     part_errors = [error for error in syntax_errors if error.part_id == part.id]
@@ -127,7 +128,7 @@ def _template_section(
         body = [line for error in errors for line in (*_syntax_caution(error), "")]
         if lang not in texts:
             return [*body, f"{lang} の本文はありません。"]
-        return [*body, *_html_block(template_html(texts[lang], paths=paths))]
+        return [*body, *_html_block(template_html(texts[lang], paths=paths, each=part.each))]
 
     return [*lines, *lang_tabs(langs, template_body), ""]
 
@@ -144,12 +145,17 @@ def _header(doc: PromptDoc) -> list[str]:
     return lines
 
 
-def _part_badges(role: str | None, tags: Sequence[str], when: str | None) -> str:
-    """部品の役割・タグ・使う条件のバッジの行。"""
+def _part_badges(
+    role: str | None, tags: Sequence[str], when: str | None, each: PromptEach | None
+) -> str:
+    """部品の役割・タグ・使う条件・繰り返しのバッジの行。"""
     badges = [f"`badge:role: {role}`"] if role else []
     badges += [f"`badge:tag: {tag}`" for tag in tags]
     if when is not None:
         badges.append(f"`badge:when: {when.strip()}`")
+    # x-each の部品: 繰り返す配列と要素の名前
+    if each is not None:
+        badges.append(f"`badge:x-each: {each.var} as {each.as_}`")
     return " ".join(badges)
 
 
@@ -222,9 +228,14 @@ def _var_hint(var: PromptVar) -> str:
     return f"{var.description}（型: {var.type or EMPTY_CELL}、例: {example}）"
 
 
-def template_html(text: str, *, paths: Mapping[str, PromptVar]) -> str:
+def template_html(
+    text: str, *, paths: Mapping[str, PromptVar], each: PromptEach | None = None
+) -> str:
     """部品の本文をエスケープし、`{{ 変数 }}` に `data-hint` を付けた `<pre>` にする。"""
     aliases = {match.group(1): match.group(2) for match in FOR_PATTERN.finditer(text)}
+    # x-each の要素の名前も、ループの変数と同じく配列の要素のパスに読み替える
+    if each is not None:
+        aliases[each.as_] = each.var
     chunks: list[str] = []
     position = 0
     for match in EXPR_PATTERN.finditer(text):

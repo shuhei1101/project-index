@@ -99,6 +99,11 @@ data_models:
         title: 本文
         type: list[PromptText]
         description: 言語ごとの本文（1 件以上）
+      - name: each
+        title: 繰り返し
+        type: PromptEach | None
+        default: None
+        description: キー `x-each`（別名で受け取る）。配列の要素ごとに部品を繰り返す
   - name: PromptExample
     title: 例の組
     container: project_index/features/prompt_doc/types.py
@@ -176,7 +181,7 @@ data_models:
       - name: role
         title: 役割
         type: Literal['system', 'user', 'assistant'] | None
-        description: '`kind: llm` の役割。それ以外は `None`'
+        description: '`kind: llm` の役割（`role` の無い部品は `user`）。それ以外は `None`'
       - name: text
         title: 本文
         type: str
@@ -196,11 +201,11 @@ data_models:
       - name: messages
         title: メッセージ
         type: list[RenderedMessage]
-        description: '`kind: llm` は役割ごと（`ROLES` の順）、それ以外は 1 件'
+        description: '`kind: llm` は並び順のまま連続する同じ役割ごと、それ以外は 1 件'
       - name: unused
         title: 使用しなかった部品
         type: list[str]
-        description: '`when` が偽か、その言語の本文が無い部品の `id`'
+        description: '`when` が偽か、描画した本文が空か、その言語の本文が無くて、どの要素でもメッセージに入らなかった部品の `id`（部品ごとに 1 回）'
       - name: char_count
         title: 字数
         type: int
@@ -253,6 +258,22 @@ data_models:
         title: 理由
         type: str
         description: 違反の理由
+  - name: PromptEach
+    title: 部品の繰り返し
+    container: project_index/features/prompt_doc/types.py
+    usecase: プロンプトの文書の変換
+    role: DTO
+    summary: 部品の `x-each` の 1 件
+    description: Pydantic の `BaseModel`（`extra="ignore"`）。
+    properties:
+      - name: var
+        title: 配列の変数
+        type: str
+        description: 繰り返す配列の変数の名前
+      - name: as_
+        title: 要素の名前
+        type: str
+        description: キー `as`（Python の予約語のため別名で受け取る）。要素を `when` と本文に指定する名前
 classes:
   - name: PromptDocError
     title: プロンプトの文書の変換の失敗

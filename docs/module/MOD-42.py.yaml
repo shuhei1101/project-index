@@ -45,12 +45,12 @@ data_models:
         type: dict[str, jinja2.Template]
         description: 言語 → `env.from_string(text)`
 constants:
-  - name: ROLES
-    title: 役割の並び
+  - name: DEFAULT_ROLE
+    title: 既定の役割
     container: project_index/features/prompt_doc/render.py
     usecase: プロンプトの文書の変換
-    summary: '`kind: llm` のメッセージを並べる順'
-    value: ("system", "user", "assistant")
+    summary: '`kind: llm` で `role` の無い部品の役割'
+    value: '"user"'
   - name: HOOK_TEXT_WARN_CHARS
     title: フックの注入文の字数の注意
     container: project_index/features/prompt_doc/render.py
@@ -283,14 +283,18 @@ functions:
       1. 構文の誤りがある場合、「部品 `{id}` の {場所}（{行} 行目）: {理由}」を `problems` にして返す
       2. 例の組の値（`build_values`）を作る
          - 型の合わない値がある場合、その理由を `problems` にして返す
-      3. 部品を並び順に辿る
-         - `when` が偽の場合、`id` を `unused` に加える
-         - `lang` の本文が無い場合、`{id}（{lang} の本文なし）` を `unused` に加える
-         - それ以外は本文を描画する
+      3. 部品のまとまり（`group_parts`）を並び順に辿る
+         - `x-each` の無いまとまりは、部品 1 つを組の値で描画する
+         - `x-each` のまとまりは、組の値の `var` の値を要素の並びにする。値が無いか `None` の場合は 0 件、配列でない場合は「`x-each` の `{var}` は配列ではありません: `{値のフロー形式}`」を `problems` にして返す。要素ごとに、組の値へ `as` の名前で要素を加えた値で、まとまりの部品を並び順に描画する
+      4. 部品 1 つを描画する
+         - `when` が偽の場合、描画しない
+         - `lang` の本文が無い場合、描画せず、本文の無い部品として記録する
+         - それ以外は本文を描画する。本文が空の場合は追加せず、空でない場合は `(役割, 本文)` を追加して `id` を描画した部品として記録する
          - `jinja2.UndefinedError` の場合、「未定義の変数: {message}」を `problems` にして返す
          - それ以外の例外（`jinja2.TemplateError`・`Exception`）の場合、「部品 `{id}` を描画できません: {例外の型}: {message}」を `problems` にして返す
-      4. `kind` が `llm` の場合、描画した本文を `role` ごとに `LLM_PART_SEPARATOR` でつなぎ、`ROLES` の順に空でないものをメッセージにする（`role` の無い部品は `ROLES` の後に役割なしのメッセージとして置く）。それ以外はつないで 1 件にする
-      5. メッセージの `marked` は描画したまま、`text` は `VALUE_MARK_PATTERN` を値だけに戻したものにし、`char_count` を `text` の字数の合計にする
+      5. 描画した部品として記録しなかった部品を、部品の並び順に 1 回ずつ `unused` に加える（本文の無い部品は `{id}（{lang} の本文なし）`、それ以外は `{id}`）
+      6. `kind` が `llm` の場合、並び順のまま連続する同じ役割（`role` の無い部品は `DEFAULT_ROLE`）の本文を `LLM_PART_SEPARATOR` でつないで 1 件のメッセージにする。それ以外はつないで役割なしの 1 件にする
+      7. メッセージの `marked` は描画したまま、`text` は `VALUE_MARK_PATTERN` を値だけに戻したものにし、`char_count` を `text` の字数の合計にする
     unit_tests:
       - name: test_render_example
         case: 正常
@@ -334,6 +338,42 @@ functions:
         condition: 本文が `{{ a + 1 }}` で、`a` が `type` なし・`example` が文字列
         mock: なし
         expected: '`problems` に `TypeError` を含む 1 件で、`messages` が空'
+      - name: test_render_example_when_each
+        case: 正常
+        summary: x-each の部品を要素ごとに描画し、続く同じ役割をまとめる
+        condition: '`kind: llm` で部品 `system`（system）・`past-request`（user、`x-each: {var: history, as: item}`）・`past-reply`（assistant、同じ `x-each`、`when: item.reply`）・`now`（user）、`history` が 2 組で 2 組目の `reply` が空文字'
+        mock: なし
+        expected: メッセージの役割が `system`・`user`・`assistant`・`user` の順で、最後の `user` が 2 組目の `request` と `now` を `LLM_PART_SEPARATOR` でつないだ本文、`unused` が空、1 組目の `request` の `marked` が `history[].request` の区切りで囲まれる
+      - name: test_render_example_when_each_empty
+        case: 正常
+        summary: 配列が空
+        condition: '同じプロンプトで `values={"history": []}`'
+        mock: なし
+        expected: メッセージが `system`・`user`（`now`）の 2 件で、`unused` が `["past-request", "past-reply"]`
+      - name: test_render_example_when_each_not_list
+        case: 異常
+        summary: x-each の値が配列でない
+        condition: '`history` が `type` なしで、`values={"history": "oops"}`'
+        mock: なし
+        expected: '`problems` に `history` を含む 1 件で、`messages` が空'
+      - name: test_render_example_when_text_empty
+        case: 正常
+        summary: 描画した本文が空の部品
+        condition: 部品 `note` の本文が `{% if false %}x{% endif %}`
+        mock: なし
+        expected: '`note` がメッセージに無く、`unused` に `note` が 1 回'
+      - name: test_render_example_when_role_missing
+        case: 正常
+        summary: llm で role の無い部品
+        condition: '`kind: llm` で部品 `ask`（user）の後に `role` の無い部品 `extra`'
+        mock: なし
+        expected: メッセージが `user` の 1 件で、本文が `ask` と `extra` をつないだもの
+      - name: test_render_example_when_each_lang_missing
+        case: 正常
+        summary: x-each の部品にその言語の本文が無い
+        condition: '`kind: llm` で部品 `past`（user、`x-each: {var: history, as: item}`、`en` だけ）と `now`（user、`en`・`ja`）、`history` が 2 組、`lang=ja`'
+        mock: なし
+        expected: '`unused` が `["past（ja の本文なし）"]` の 1 件'
   - name: flow_yaml
     title: YAML のフロー形式
     kind: 関数
@@ -361,6 +401,37 @@ functions:
          - 文字列は、`FLOW_QUOTE_PATTERN` に当たらず YAML として読み戻して同じ文字列になる場合はそのまま、それ以外は JSON の文字列（`ensure_ascii=False`）にする
     notes:
       単体テスト: '`test_var_table`（配列の中の辞書）と `test_build_values_when_type_mismatch` で確かめる'
+  - name: group_parts
+    title: 部品のまとまり
+    kind: 関数
+    container: project_index/features/prompt_doc/render.py
+    usecase: プロンプトの文書の変換
+    role: 変換
+    summary: 部品を並び順にまとめ、連続する同じ `x-each` の `var` の部品を 1 つのまとまりにする
+    scope: public
+    is_async: false
+    thread_safe: true
+    args:
+      - name: parts
+        title: 部品
+        type: Sequence[PromptPart]
+        required: true
+        passing: positional
+        description: '`PromptDoc.parts`'
+    returns:
+      type: list[list[PromptPart]]
+      description: 並び順のまとまり
+    process: |-
+      1. 部品を並び順に確認する
+         - `x-each` を持ち、直前のまとまりの先頭の部品が同じ `var` の `x-each` を持つ場合、直前のまとまりに加える
+         - それ以外は新規のまとまりにする
+    unit_tests:
+      - name: test_group_parts
+        case: 正常
+        summary: 連続する同じ var の部品をまとめる
+        condition: 部品 `a`（`x-each` なし）・`b`・`c`（`x-each` の `var` が `history`）・`d`（`var` が `other`）
+        mock: なし
+        expected: '`[[a], [b, c], [d]]`'
 notes:
   決まり: 変数の値にパスを持たせて描画し、描画結果の値を区切りで囲む。
 visibility: internal

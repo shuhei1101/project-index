@@ -40,6 +40,17 @@ class PromptText(BaseModel):
     text: str
 
 
+class PromptEach(BaseModel):
+    """部品の `x-each` の 1 件。"""
+
+    model_config = ConfigDict(extra="ignore")
+
+    # 繰り返す配列の変数の名前
+    var: str
+    # 要素を `when` と本文に指定する名前（キー `as` は Python の予約語のため別名で受け取る）
+    as_: str = Field(alias="as")
+
+
 class PromptPart(BaseModel):
     """`parts` の 1 件。"""
 
@@ -50,6 +61,8 @@ class PromptPart(BaseModel):
     tags: list[str] = Field(default_factory=list[str])
     # Jinja2 の式。偽なら部品を使わない
     when: str | None = None
+    # 配列の要素ごとに部品を繰り返す（キー `x-each`）
+    each: PromptEach | None = Field(default=None, alias="x-each")
     texts: list[PromptText] = Field(min_length=1)
 
 

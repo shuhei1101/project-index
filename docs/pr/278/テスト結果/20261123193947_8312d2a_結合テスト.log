@@ -1,0 +1,58 @@
+$ run_runner（TP-1 の TL-2。gh workflow run test.yml --ref feat/prompt-doc/x-each-role-messages -f layer=integration -f paths="tests/integration/server/test_prompt_doc.py tests/integration/server/test_serve.py"）
+
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 45 items
+
+tests/integration/server/test_prompt_doc.py::test_normal PASSED          [  2%]
+tests/integration/server/test_prompt_doc.py::test_normal_when_single_language PASSED [  4%]
+tests/integration/server/test_prompt_doc.py::test_normal_when_example_invalid PASSED [  6%]
+tests/integration/server/test_prompt_doc.py::test_normal_when_hook_text_too_long PASSED [  8%]
+tests/integration/server/test_prompt_doc.py::test_normal_when_part_syntax_invalid PASSED [ 11%]
+tests/integration/server/test_prompt_doc.py::test_error_when_yaml_unreadable PASSED [ 13%]
+tests/integration/server/test_prompt_doc.py::test_error_when_required_key_missing PASSED [ 15%]
+tests/integration/server/test_prompt_doc.py::test_normal_when_each PASSED [ 17%]
+tests/integration/server/test_serve.py::test_normal PASSED               [ 20%]
+tests/integration/server/test_serve.py::test_normal_when_mcp_path_without_slash PASSED [ 22%]
+tests/integration/server/test_serve.py::test_normal_when_configs_merged PASSED [ 24%]
+tests/integration/server/test_serve.py::test_normal_when_config_version_old PASSED [ 26%]
+tests/integration/server/test_serve.py::test_normal_when_source_invalid PASSED [ 28%]
+tests/integration/server/test_serve.py::test_normal_when_schema_from_other_source PASSED [ 31%]
+tests/integration/server/test_serve.py::test_normal_when_metadata_out_of_sync PASSED [ 33%]
+tests/integration/server/test_serve.py::test_normal_when_source_config_legacy PASSED [ 35%]
+tests/integration/server/test_serve.py::test_error_when_terminal_config_invalid PASSED [ 37%]
+tests/integration/server/test_serve.py::test_error_when_port_in_use PASSED [ 40%]
+tests/integration/server/test_serve.py::test_normal_when_config_read_from_default_ref PASSED [ 42%]
+tests/integration/server/test_serve.py::test_normal_when_alias_and_nav_warned PASSED [ 44%]
+tests/integration/server/test_serve.py::test_normal_when_mcp_text_from_prompts PASSED [ 46%]
+tests/integration/server/test_serve.py::test_normal_when_source_guide_listed PASSED [ 48%]
+tests/integration/server/test_serve.py::test_normal_when_source_guide_exceeds_limit PASSED [ 51%]
+tests/integration/server/test_serve.py::test_normal_when_source_guide_changed_before_connect PASSED [ 53%]
+tests/integration/server/test_serve.py::test_error_when_prompt_invalid PASSED [ 55%]
+tests/integration/server/test_serve.py::test_normal_when_requested_while_loading PASSED [ 57%]
+tests/integration/server/test_serve.py::test_normal_when_other_source_loading PASSED [ 60%]
+tests/integration/server/test_serve.py::test_normal_when_requested_source_loaded_first PASSED [ 62%]
+tests/integration/server/test_serve.py::test_normal_when_slow_source_not_blocking PASSED [ 64%]
+tests/integration/server/test_serve.py::test_error_when_source_load_failed PASSED [ 66%]
+tests/integration/server/test_serve.py::test_normal_when_ignored_config_first PASSED [ 68%]
+tests/integration/server/test_serve.py::test_normal_when_first_config_not_committed PASSED [ 71%]
+tests/integration/server/test_serve.py::test_normal_when_xdg_dirs_set PASSED [ 73%]
+tests/integration/server/test_serve.py::test_normal_when_paths_base_set PASSED [ 75%]
+tests/integration/server/test_serve.py::test_normal_when_terminal_config_has_unknown_top_level_key PASSED [ 77%]
+tests/integration/server/test_serve.py::test_normal_when_default_ref_exported_in_background PASSED [ 80%]
+tests/integration/server/test_serve.py::test_normal_when_background_export_times_out PASSED [ 82%]
+tests/integration/server/test_serve.py::test_normal_when_disk_storage PASSED [ 84%]
+tests/integration/server/test_serve.py::test_normal_when_git_storage_outside_work_tree PASSED [ 86%]
+tests/integration/server/test_serve.py::test_normal_when_builtin_source_added PASSED [ 88%]
+tests/integration/server/test_serve.py::test_normal_when_builtin_source_registered PASSED [ 91%]
+tests/integration/server/test_serve.py::test_normal_when_builtin_source_unavailable PASSED [ 93%]
+tests/integration/server/test_serve.py::test_normal_when_direct_commit_config_invalid PASSED [ 95%]
+tests/integration/server/test_serve.py::test_normal_when_search_exclude_invalid PASSED [ 97%]
+tests/integration/server/test_serve.py::test_normal_when_sqlite_file_unopenable PASSED [100%]
+
+============================= 45 passed in 29.35s ==============================
+exit=0
