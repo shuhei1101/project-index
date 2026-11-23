@@ -156,7 +156,7 @@ status_codes:
 - code: '409'
   condition: 文書のバージョンが取り込んだ後の今のバージョンと違う（`VersionMismatchError`）、直コミットを使用できない配信元（`DirectCommitNotConfiguredError`）、コミットするブランチのワークツリーが無い（`CommitWorktreeNotFoundError`）、ワークツリーに未プッシュのコミット（`UnpushedCommitsError`）・書き込むファイルに未コミットの変更（`UncommittedChangesError`）がある、削除する文書が参照されている（`DocumentReferencedError`）、プッシュが 2 回断られた（`PushRejectedError`）、`baseCommit` がクローンに無いかコミットするブランチの祖先でない（`BaseCommitUnusableError`）
 - code: '422'
-  condition: 検査に合格しない（`ValidationFailedError`。配信元の設定の `direct_commit.kinds[]` に無い種類の文書が書き換わる・秘密の値を含むも同じ）
+  condition: '検査に合格しない（`ValidationFailedError`。配信元の設定の `direct_commit.kinds[]` に無い種類の文書が書き換わる・`body: false` の種類の本文のファイルが書き換わる・作られる・移る・削除される・秘密の値を含むも同じ）'
   notes: '`errors[]` に、`writes`・`deletes` の別と添字・項目のパス・決まり・直し方を全て並べる'
 - code: '500'
   condition: '`generators[]` が失敗した（`DirectCommitGeneratorError`）'
@@ -201,6 +201,8 @@ constraints:
   decided_by: NFR-1#requirements[書き込みの API の応答の上限]
 - item: 試しに書くときの衝突
   constraint: '`dryRun: true` で衝突したときも一時のワークツリーで許可と検査をやり直し、合格すれば `conflict` を `branch`・`commit`・`script` が `null` で返却する。ブランチを作らず、スクリプトを実行しない'
+- item: 本文の直コミットを断る種類
+  constraint: '[文書の書き込み](id:IF-6) の制約「本文の直コミットを断る種類」と同じで、`writes` と `deletes` の両方に当てる（`deletes` は [文書の削除](id:IF-7) の制約「直コミット」と同じ）。1 つでも違反があれば、要求全体を `ValidationFailedError` で断る'
 flows:
 - name: 正常系
   summary: 書き込みと削除を 1 つのコミットにまとめてプッシュする
