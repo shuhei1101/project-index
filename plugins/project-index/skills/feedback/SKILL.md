@@ -3,8 +3,6 @@ name: feedback
 description: 今の会話で利用者が AI に伝えた指摘（守ってほしいこと・単語の意味・経緯や判断の理由）を、rule-inject のルール・alias-inject の用語・project-index の文書として登録する。会話の後に、同じ指摘を次の会話で繰り返さずに済むようにしたいときに使用する
 ---
 
-<!-- docs/agent-flow/skill-feedback.yaml から生成した。このファイルを修正せず、設計書を修正して再生成する -->
-
 # 会話の指摘を登録するスキル
 
 ## 手順

@@ -6,8 +6,6 @@ arguments:
 - path
 ---
 
-<!-- docs/agent-flow/skill-setup.yaml から生成した。このファイルを修正せず、設計書を修正して再生成する -->
-
 # フォルダを配信元として登録するスキル
 
 ## 引数

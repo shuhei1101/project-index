@@ -1,0 +1,64 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: 'type: skill のエージェントフローを書き込む・削除したときに SKILL.md を作り直す・後片付けする・組み立てられない書き込みや ref の参照先の削除を断る流れを無くす'
+    depends_on: []
+  - kind: composite
+    scenario: docs/scenario/SC-1.yaml
+    impact: none
+    detail: エージェントが書き込む正常シナリオだけを参照し、SKILL.md の生成の流れを含まない
+    depends_on: []
+docs:
+  - page: docs/guide/CLI.md
+    new: false
+    change: 冒頭のサブコマンドの並びから skill-md を外し、`## project-index skill-md` の節を削除する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T06:33:16.824208+00:00'
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: delete_docs の節から、skill-md --check で ref の参照先の削除を断る記述と、generators の skill-md が SKILL.md を削除する記述を削除する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T06:33:16.824208+00:00'
+  - page: docs/dev-command/CMD-1.yaml
+    new: false
+    change: write_docs を経ずにエージェントフローを編集したら SKILL.md を再作成する手順（uv run project-index skill-md）を削除する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T06:33:16.824208+00:00'
+  - page: plugins/project-index/skills/feedback/SKILL.md
+    new: false
+    change: 生成元のコメントを削除し、手で記載するファイルにする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T06:33:16.824208+00:00'
+  - page: plugins/project-index/skills/global-setup/SKILL.md
+    new: false
+    change: 生成元のコメントを削除し、手で記載するファイルにする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T06:33:16.824208+00:00'
+  - page: plugins/project-index/skills/setup/SKILL.md
+    new: false
+    change: 生成元のコメントを削除し、手で記載するファイルにする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T06:33:16.824208+00:00'
+  - page: plugins/project-index/files.yaml
+    new: false
+    change: 3 つの SKILL.md の行の description から、エージェントフローから生成した旨を削除する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T06:33:16.824208+00:00'
+scope_out:
+  - item: knowledge の agent_flow.schema.yaml・knowledge の SKILL.md の生成の廃止
+    reason: 別のリポジトリで、shuhei1101/knowledge#544 が扱う
+    plan: none
+  - item: rule-inject の SKILL.md の生成の廃止
+    reason: 別のリポジトリで、Issue 本文のとおり rule-inject の別の Issue が扱う
+    plan: none
+  - item: 配信元の設定の generators[]・validators[]・after_write の仕組みそのもの
+    reason: skill-md のほかにも使える汎用の仕組みで、要望は skill-md の登録の削除だけ
+    plan: none

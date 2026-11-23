@@ -343,8 +343,6 @@ documents:
       source: knowledge
       path: schemas/design/agent_flow.schema.yaml
       ref: design-schemas/v9.2.0
-    validators: [skill-md-check]
-    after_write: [skill-md]
     metadata:
       name: title
       description: summary
@@ -405,16 +403,9 @@ documents:
       name: summary
       visibility: visibility
       tags: tags
-validators:
-  - id: skill-md-check
-    run: [project-index, skill-md, --check]
-    on: [write, delete]
 converters:
   - id: prompt-doc
     run: [project-index, prompt-doc]
-generators:
-  - id: skill-md
-    run: [project-index, skill-md]
 nav:
   tabs:
     - title: はじめに

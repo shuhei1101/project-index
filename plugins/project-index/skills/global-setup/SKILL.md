@@ -10,8 +10,6 @@ allowed-tools:
 - Bash(*.venv/bin/python -m project_index serve*)
 ---
 
-<!-- docs/agent-flow/skill-global-setup.yaml から生成した。このファイルを修正せず、設計書を修正して再生成する -->
-
 # 端末に project-index を用意するスキル
 
 ## 引数

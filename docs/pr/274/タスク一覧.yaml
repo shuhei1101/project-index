@@ -1,0 +1,106 @@
+tasks:
+  - process: 初期構築
+    status: skipped
+    reason: 既存リポジトリのため対象外
+    updated_by: planner
+    updated_at: '2026-11-23T06:09:59.360644+00:00'
+  - process: リバースエンジニアリング
+    status: skipped
+    reason: 廃止する機能の設計書が揃っているため対象外
+    updated_by: planner
+    updated_at: '2026-11-23T06:09:59.360644+00:00'
+  - process: 方針決め
+    status: skipped
+    reason: 方針決めを依頼する Issue ではない
+    updated_by: planner
+    updated_at: '2026-11-23T06:09:59.360644+00:00'
+  - process: PoC 検証
+    status: skipped
+    reason: 機能の削除で、未検証の技術機構に依存しない
+    updated_by: planner
+    updated_at: '2026-11-23T06:09:59.360644+00:00'
+  - process: 複合ユースケース設計
+    status: skipped
+    reason: 複合 UC（SC-1）は SC-7 の正常シナリオだけを参照し、SKILL.md の生成のシナリオを参照しない
+    updated_by: planner
+    updated_at: '2026-11-23T06:09:59.360644+00:00'
+  - process: デザインスタイル選定
+    status: skipped
+    reason: 画面を持たない
+    updated_by: planner
+    updated_at: '2026-11-23T06:09:59.360644+00:00'
+  - process: 画面一覧・画面遷移
+    status: skipped
+    reason: 画面を持たない
+    updated_by: planner
+    updated_at: '2026-11-23T06:09:59.360644+00:00'
+  - process: 単一ユースケース設計
+    status: done
+    note: SC-7 の SKILL.md の生成・検査の 4 シナリオ（test_normal_when_skill_agent_flow_written・test_error_when_skill_unbuildable・test_error_when_delete_skill_ref_target・test_normal_when_skill_agent_flow_deleted）を削除する
+    updated_by: planner
+    updated_at: '2026-11-23T06:13:11.089579+00:00'
+  - process: モック作成
+    status: skipped
+    reason: 画面を持たない
+    updated_by: planner
+    updated_at: '2026-11-23T06:09:59.360644+00:00'
+  - process: データ設計
+    status: skipped
+    reason: データの構造を変えない
+    updated_by: planner
+    updated_at: '2026-11-23T06:09:59.360644+00:00'
+  - process: インターフェース定義設計
+    status: done
+    note: IF-37 を削除し、docs/interface/README.md・index.yaml の行を削除する。IF-7 の callers・refs から SC-7 の削除したシナリオを指す行を削除する（単一ユースケース設計の指摘で対応済み）
+    updated_by: planner
+    updated_at: '2026-11-23T06:23:27.342073+00:00'
+  - process: エージェント・MCP サーバー設計
+    status: skipped
+    reason: エージェント・MCP サーバーを変えない
+    updated_by: planner
+    updated_at: '2026-11-23T06:09:59.360644+00:00'
+  - process: エージェントフロー・LLM 呼び出し設計
+    status: skipped
+    reason: docs/agent-flow/ のエージェントフローは SKILL.md の設計書として残し、中身を変えない
+    updated_by: planner
+    updated_at: '2026-11-23T06:09:59.360644+00:00'
+  - process: 精度評価設計
+    status: skipped
+    reason: LLM・意思決定モデルのノードを持たない
+    updated_by: planner
+    updated_at: '2026-11-23T06:09:59.360644+00:00'
+  - process: 部品設計
+    status: skipped
+    reason: 画面を持たない
+    updated_by: planner
+    updated_at: '2026-11-23T06:09:59.360644+00:00'
+  - process: 画面設計
+    status: skipped
+    reason: 画面を持たない
+    updated_by: planner
+    updated_at: '2026-11-23T06:09:59.360644+00:00'
+  - process: モジュール構成設計
+    status: done
+    note: MOD-180〜182 を削除し、MOD-3 の skill-md の登録・テスト・制約と docs/module/README.md・index.yaml の行を削除する
+    updated_by: planner
+    updated_at: '2026-11-23T06:27:10.554509+00:00'
+  - process: ドキュメント修正
+    status: done
+    note: docs/guide/CLI.md・docs/guide/文書のMCP.md・CMD-1・SKILL.md の生成元のコメント・plugins/project-index/files.yaml
+    updated_by: planner
+    updated_at: '2026-11-23T06:33:19.378921+00:00'
+  - process: 単体テスト作成
+    status: done
+    note: tests/unit/project_index/features/skill_md/ と test_main.py の test_build_parser_when_skill_md を削除する
+    updated_by: planner
+    updated_at: '2026-11-23T06:38:37.216284+00:00'
+  - process: 実装
+    status: done
+    note: src/project_index/features/skill_md/・__main__.py の登録・project-index.yaml の登録・src/files.yaml・tests/files.yaml の行を削除する
+    updated_by: planner
+    updated_at: '2026-11-23T06:42:03.892351+00:00'
+  - process: 結合テスト作成
+    status: done
+    note: tests/integration/server/test_skill_md.py と fixtures/skill_md/ を削除する
+    updated_by: planner
+    updated_at: '2026-11-23T06:48:23.133401+00:00'

@@ -164,8 +164,5 @@
 | [プラグイン / ツール実行後のフック / post_tool_use.py](./MOD-177.py.yaml) | PostToolUse のフック。書き込んだパスを集めて `POST /_admin/post-write` に問い合わせ、返った文面を `additionalContext` で返す。 |
 | [索引のサーバー / 書き込み / direct_commit.py](./MOD-178.py.yaml) | 直コミットの書き込む先の決定と、取得・確認・コミット・プッシュ・照合・戻し。 |
 | [索引のサーバー / 書き込み / secrets.py](./MOD-179.py.yaml) | 直コミットで書き込む値の秘密の値の照合。 |
-| [索引のサーバー / SKILL.md の生成 / cli.py](./MOD-180.py.yaml) | `project-index skill-md` の処理。生成のモードの失敗だけを終了コードにし、検査のモードは違反を JSON で出す。 |
-| [索引のサーバー / SKILL.md の生成 / build.py](./MOD-181.py.yaml) | エージェントフローとそのスキーマの読み込み、`type: skill` の SKILL.md の組み立て、中身が違う SKILL.md の書き出し、書き込む前の検査。 |
-| [索引のサーバー / SKILL.md の生成 / types.py](./MOD-182.py.yaml) | `project-index skill-md` が扱うエージェントフロー・組み立てた SKILL.md の型と例外。 |
 
 <!-- /table -->
