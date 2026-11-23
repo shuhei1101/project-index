@@ -112,9 +112,12 @@ class _ClosedDropRotatingFileHandler(RotatingFileHandler):
     def close(self) -> None:
         """閉じたことを記録してから、ファイルを閉じる。"""
         # `self.lock` は RLock なので、`super().close()` が同じロックを取り直せる
-        with self.lock:
+        self.acquire()
+        try:
             self._closed_for_emit = True
             super().close()
+        finally:
+            self.release()
 
     def emit(self, record: logging.LogRecord) -> None:
         """閉じた後なら記録を捨て、閉じる前ならファイルへ出力する。"""
