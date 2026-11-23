@@ -1822,7 +1822,7 @@ def test_write_docs_when_rename_records_referrers(
     # 検証
     assert loaded.count("items/index.yaml") == 1
     referrers = [item for item in result.results if item.status == "updated"]
-    assert sorted(item.id for item in referrers) == ["i1", "i2"]
+    assert sorted(item.id or "" for item in referrers) == ["i1", "i2"]
     assert all(len(item.references) == 1 for item in referrers)
     text = (env.worktree / "items/index.yaml").read_text(encoding="utf-8")
     assert text.count("to: doc-9") == 2

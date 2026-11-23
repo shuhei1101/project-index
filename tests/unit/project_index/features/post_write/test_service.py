@@ -348,7 +348,7 @@ def test_source_ids_of(
 ) -> None:
     """含む配信元の ID を重ならないように返す（正常系）。"""
     # 準備
-    sources = []
+    sources: list[ServedSource] = []
     for name in ("a", "b"):
         root = tmp_path / name
         write_files(root, SOURCE_FILES)
