@@ -412,7 +412,8 @@ def test_exclusion_flags_when_no_exclusion(
         """呼ばれたら失敗する文書のストアの偽物。"""
 
         def row_schema(self, target: object, kind: str) -> dict[str, object]:
-            raise AssertionError(f"row_schema を呼んだ: {kind}")
+            msg = f"row_schema を呼んだ: {kind}"
+            raise AssertionError(msg)
 
     # 準備
     target = make_target(make_served_source())
