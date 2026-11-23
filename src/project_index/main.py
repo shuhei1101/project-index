@@ -106,10 +106,20 @@ class _ClosedDropRotatingFileHandler(RotatingFileHandler):
     閉じられないファイルを残さない。
     """
 
+    # 閉じたか。`self.lock` の中で `close()` が記録し、`emit` が参照する
+    _closed_for_emit: bool = False
+
+    def close(self) -> None:
+        """閉じたことを記録してから、ファイルを閉じる。"""
+        # `self.lock` は RLock なので、`super().close()` が同じロックを取り直せる
+        with self.lock:
+            self._closed_for_emit = True
+            super().close()
+
     def emit(self, record: logging.LogRecord) -> None:
         """閉じた後なら記録を捨て、閉じる前ならファイルへ出力する。"""
         # 閉じたか（`close()` と同じ `self.lock` の中で呼ばれるので、閉じる処理と競合しない）
-        if self._closed:
+        if self._closed_for_emit:
             # 閉じた後: 開き直さずに捨てる
             return
         super().emit(record)
