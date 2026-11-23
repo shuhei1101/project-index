@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
 import jinja2
@@ -26,8 +26,8 @@ from project_index.shared.yaml_io import load_yaml
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
 
-# `kind: llm` のメッセージを並べる順
-ROLES: tuple[Role, ...] = ("system", "user", "assistant")
+# `kind: llm` で role の無い部品の役割
+DEFAULT_ROLE: Role = "user"
 # `kind: hook` で描画した結果がこの字数を超えた組に注意を出す
 HOOK_TEXT_WARN_CHARS = 1000
 # 描画結果の変数の値を囲む区切り（私用領域の文字 U+E000 パス U+E001 値 U+E002）
@@ -275,13 +275,16 @@ def _messages(doc: PromptDoc, rendered: list[tuple[Role | None, str]]) -> list[R
     # llm 以外: 全てをつないで 1 件にする
     if doc.kind != "llm":
         return [_message(None, "".join(text for _, text in rendered))]
-    # llm: 役割ごとにつなぎ、空でないものを ROLES の順に並べる（役割の無い部品は最後に置く）
-    messages: list[RenderedMessage] = []
-    for role in (*ROLES, None):
-        joined = LLM_PART_SEPARATOR.join(text for part_role, text in rendered if part_role == role)
-        if joined:
-            messages.append(_message(role, joined))
-    return messages
+    # llm: 並び順のまま、連続する同じ役割の本文をつなぐ（役割の無い部品は DEFAULT_ROLE）
+    runs: list[tuple[Role, list[str]]] = []
+    for part_role, text in rendered:
+        role = part_role or DEFAULT_ROLE
+        # 直前と同じ役割: 直前のメッセージにつなぐ
+        if runs and runs[-1][0] == role:
+            runs[-1][1].append(text)
+        else:
+            runs.append((role, [text]))
+    return [_message(role, LLM_PART_SEPARATOR.join(texts)) for role, texts in runs]
 
 
 def _message(role: Role | None, marked: str) -> RenderedMessage:
@@ -289,6 +292,85 @@ def _message(role: Role | None, marked: str) -> RenderedMessage:
     return RenderedMessage(
         role=role, text=VALUE_MARK_PATTERN.sub(lambda m: m["value"], marked), marked=marked
     )
+
+
+class _RenderError(Exception):
+    """例の組を描画できない理由 1 件を持つ例外。"""
+
+    def __init__(self, problem: str) -> None:
+        super().__init__(problem)
+        self.problem = problem
+
+
+@dataclass(slots=True)
+class _Rendering:
+    """例の組の描画の途中の状態。"""
+
+    # 描画した (役割, 本文) の並び
+    rendered: list[tuple[Role | None, str]] = field(default_factory=list[tuple[Role | None, str]])
+    # メッセージに入った部品の id
+    drawn: set[str] = field(default_factory=set[str])
+    # その言語の本文が無かった部品の id
+    missing_lang: set[str] = field(default_factory=set[str])
+
+
+def group_parts(parts: Sequence[PromptPart]) -> list[list[PromptPart]]:
+    """部品を並び順にまとめ、連続する同じ `x-each` の `var` の部品を 1 つのまとまりにする。"""
+    groups: list[list[PromptPart]] = []
+    for part in parts:
+        previous = groups[-1][0].each if groups else None
+        # 直前のまとまりと同じ配列を繰り返す部品: 直前のまとまりに加える
+        if part.each is not None and previous is not None and previous.var == part.each.var:
+            groups[-1].append(part)
+        else:
+            groups.append([part])
+    return groups
+
+
+def _group_values(group: Sequence[PromptPart], values: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """まとまりを描画する回ごとの値を返す（x-each は要素ごとに `as` の名前で要素を加える）。"""
+    each = group[0].each
+    # x-each の無いまとまり: 組の値で 1 回描画する
+    if each is None:
+        return [dict(values)]
+    items = values.get(each.var)
+    # 値が無い: 描画しない
+    if items is None:
+        return []
+    # 配列でない: 組を描画できない
+    if not is_list(items):
+        problem = f"`x-each` の `{each.var}` は配列ではありません: `{flow_yaml(items)}`"
+        raise _RenderError(problem)
+    return [{**values, each.as_: item} for item in items]
+
+
+def _render_part(
+    compiled_part: CompiledPart, values: Mapping[str, Any], lang: str, state: _Rendering
+) -> None:
+    """部品 1 つを描画し、本文が空でなければ状態に追加する。"""
+    part = compiled_part.part
+    try:
+        # when が偽: 描画しない
+        if compiled_part.when is not None and not compiled_part.when(**values):
+            return
+        template = compiled_part.texts.get(lang)
+        # その言語の本文が無い: 描画せず記録する
+        if template is None:
+            state.missing_lang.add(part.id)
+            return
+        text = template.render(**values)
+    except jinja2.UndefinedError as error:
+        problem = f"未定義の変数: {error.message}"
+        raise _RenderError(problem) from error
+    # 描画中のどの例外も、組の注意書きにして他の組の描画を続ける（利用者のテンプレートはサンドボックスで動かさず、送る例外を絞れない）
+    except Exception as error:
+        problem = f"部品 `{part.id}` を描画できません: {type(error).__name__}: {error}"
+        raise _RenderError(problem) from error
+    # 本文が空: メッセージに追加しない
+    if not text:
+        return
+    state.rendered.append((part.role, text))
+    state.drawn.add(part.id)
 
 
 def render_example(
@@ -306,28 +388,22 @@ def render_example(
     traced, problems = build_values(doc.vars, values)
     if problems:
         return _failed(problems)
-    # 部品を並び順に描画する
-    unused: list[str] = []
-    rendered: list[tuple[Role | None, str]] = []
-    for part in doc.parts:
-        compiled_part = compiled[part.id]
-        try:
-            # when が偽: 使わない
-            if compiled_part.when is not None and not compiled_part.when(**traced):
-                unused.append(part.id)
-                continue
-            template = compiled_part.texts.get(lang)
-            # その言語の本文が無い: 使わない
-            if template is None:
-                unused.append(f"{part.id}（{lang} の本文なし）")
-                continue
-            rendered.append((part.role, template.render(**traced)))
-        except jinja2.UndefinedError as error:
-            return _failed([f"未定義の変数: {error.message}"])
-        # 描画中のどの例外も、組の注意書きにして他の組の描画を続ける（利用者のテンプレートはサンドボックスで動かさず、送る例外を絞れない）
-        except Exception as error:  # noqa: BLE001
-            return _failed([f"部品 `{part.id}` を描画できません: {type(error).__name__}: {error}"])
-    messages = _messages(doc, rendered)
+    # まとまりを並び順に、x-each は要素ごとに描画する
+    state = _Rendering()
+    try:
+        for group in group_parts(doc.parts):
+            for group_values in _group_values(group, traced):
+                for part in group:
+                    _render_part(compiled[part.id], group_values, lang, state)
+    except _RenderError as error:
+        return _failed([error.problem])
+    # メッセージに入らなかった部品を、並び順に 1 回ずつ並べる
+    unused = [
+        f"{part.id}（{lang} の本文なし）" if part.id in state.missing_lang else part.id
+        for part in doc.parts
+        if part.id not in state.drawn
+    ]
+    messages = _messages(doc, state.rendered)
     return RenderedExample(
         messages=messages,
         unused=unused,
