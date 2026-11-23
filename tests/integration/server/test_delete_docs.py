@@ -566,6 +566,42 @@ def test_normal_when_direct_commit(
     assert run_git(direct.develop, "status", "--porcelain").strip() == ""
 
 
+def test_error_when_direct_commit_body_delete_not_allowed(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """本文の直コミットを断る種類の本文のファイルを削除する（異常系）。"""
+    from tests.integration.server.conftest import (
+        F1_BODY,
+        FILES_INDEX,
+        METADATA_ONLY_FILES,
+        metadata_only_config,
+    )
+
+    # 準備
+    direct = make_direct_commit_source(config=metadata_only_config(), files=METADATA_ONLY_FILES)
+    env = make_server(direct.spec)
+    remote_before = run_git(direct.bare, "rev-parse", "develop").strip()
+    version = value_hash([{"id": "f1", "name": "案内", "path": "f1.md"}, F1_BODY])
+    # 実行
+    result = env.call(
+        "delete_docs",
+        cwd=str(direct.local),
+        source="sample",
+        targets=[{"id": "f1", "expected_version": version}],
+        commit={"message": "docs: files を消す"},
+    )
+    # 検証
+    assert result.is_error
+    assert "ValidationFailedError" in result.text
+    assert "種類 files は本文の直コミットを断っている" in result.text
+    assert run_git(direct.bare, "rev-parse", "develop").strip() == remote_before
+    assert (direct.develop / "files" / "f1.md").read_text(encoding="utf-8") == F1_BODY
+    assert (direct.develop / "files" / "index.yaml").read_text(encoding="utf-8") == FILES_INDEX
+    assert run_git(direct.develop, "status", "--porcelain").strip() == ""
+
+
 def test_error_when_direct_commit_kind_not_allowed(
     make_direct_commit_source: Callable[..., DirectCommitSource],
     make_server: Callable[..., Any],

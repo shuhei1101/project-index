@@ -13,10 +13,14 @@ from project_index.shared.hashing import content_hash, value_hash
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
 from tests.integration.server.conftest import (
     DIRECT_RULE_SCHEMA,
+    F1_BODY,
     FAILING_SCRIPT,
+    FILES_INDEX,
+    METADATA_ONLY_FILES,
     NOTE_LIST_SCRIPT,
     NOTE_SCHEMA,
     direct_commit_config,
+    metadata_only_config,
 )
 
 if TYPE_CHECKING:
@@ -3642,6 +3646,117 @@ def test_error_when_direct_commit_kind_not_allowed(
     assert "rule は直コミットを許可していない種類です" in result.text
     assert "index: 0" in result.text
     assert _git_state(direct, run_git) == before
+
+
+F1_VERSION = value_hash([{"id": "f1", "name": "案内", "path": "f1.md"}, F1_BODY])
+
+
+def test_normal_when_direct_commit_metadata_only(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """本文の直コミットを断る種類のメタデータだけを直コミットする（正常系）。"""
+    # 準備
+    direct = make_direct_commit_source(config=metadata_only_config(), files=METADATA_ONLY_FILES)
+    env = make_server(direct.spec)
+    operation = {
+        "op": "update",
+        "id": "f1",
+        "expected_version": F1_VERSION,
+        "set": {"description": "変えた案内"},
+    }
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[operation],
+        commit={"message": "docs: files を更新する"},
+    )
+    # 検証
+    remote_after = run_git(direct.bare, "rev-parse", "develop").strip()
+    changed = run_git(direct.bare, "show", "--name-only", "--format=", remote_after).split()
+    assert not result.is_error, result.text
+    assert result.data["applied"] is True
+    assert result.data["results"][0]["status"] == "updated"
+    assert result.data["commit"]["sha"] == remote_after
+    assert changed == ["files/index.yaml"]
+    assert (direct.develop / "files" / "f1.md").read_text(encoding="utf-8") == F1_BODY
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        pytest.param(
+            {"op": "update", "id": "f1", "expected_version": F1_VERSION, "set": {"@body": "x\n"}},
+            id="set-body",
+        ),
+        pytest.param(
+            {
+                "op": "update",
+                "id": "f1",
+                "expected_version": F1_VERSION,
+                "text_edits": [{"field": "@body", "old": "メモ 1", "new": "メモ X"}],
+            },
+            id="text-edits-body",
+        ),
+        pytest.param(
+            {
+                "op": "rename",
+                "id": "f1",
+                "expected_version": F1_VERSION,
+                "new_path": "files/f2.md",
+            },
+            id="rename-new-path",
+        ),
+        pytest.param(
+            {
+                "op": "rename",
+                "id": "n1",
+                "expected_version": content_hash("id: n1\nname: メモ 1\n"),
+                "new_id": "n9",
+            },
+            id="rename-referrer",
+        ),
+        pytest.param(
+            {
+                "op": "replace_text",
+                "filter": {"field": "id", "op": "eq", "values": ["f1"]},
+                "old": "メモ 1",
+                "new": "メモ X",
+            },
+            id="replace-text",
+        ),
+    ],
+)
+def test_error_when_direct_commit_body_not_allowed(
+    operation: dict[str, Any],
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """本文の直コミットを断る種類の本文が変わる（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source(config=metadata_only_config(), files=METADATA_ONLY_FILES)
+    env = make_server(direct.spec)
+    before = _git_state(direct, run_git)
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[operation],
+        commit={"message": "docs: files を更新する"},
+    )
+    # 検証
+    assert result.is_error
+    assert "ValidationFailedError" in result.text
+    assert "種類 files は本文の直コミットを断っている" in result.text
+    assert "index: 0" in result.text
+    assert _git_state(direct, run_git) == before
+    assert (direct.develop / "files" / "f1.md").read_text(encoding="utf-8") == F1_BODY
+    assert (direct.develop / "files" / "index.yaml").read_text(encoding="utf-8") == FILES_INDEX
 
 
 def test_error_when_direct_commit_rewrites_other_kind(

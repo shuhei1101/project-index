@@ -3,7 +3,10 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING, Any
 
-from project_index.shared.hashing import content_hash
+import pytest
+
+from project_index.shared.hashing import content_hash, value_hash
+from tests.integration.server.conftest import F1_BODY, METADATA_ONLY_FILES, metadata_only_config
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -12,6 +15,7 @@ if TYPE_CHECKING:
     from tests.integration.server.conftest import DirectCommitSource
 
 URL = "/sources/sample/commits"
+F1_VERSION = value_hash([{"id": "f1", "name": "案内", "path": "f1.md"}, F1_BODY])
 NOTES = {"notes/n1.yaml": "id: n1\nname: メモ 1\n", "notes/n2.yaml": "id: n2\nname: メモ 2\n"}
 
 
@@ -153,6 +157,81 @@ def test_error_when_disallowed_kind_rewritten(
     assert _git_state(direct, run_git) == before
     assert (direct.develop / "rules" / "r1.yaml").read_text(encoding="utf-8") == rule
     assert (direct.develop / "notes" / "n2.yaml").exists()
+
+
+@pytest.mark.parametrize(
+    ("body", "position"),
+    [
+        pytest.param(
+            {
+                "writes": [
+                    {
+                        "op": "update",
+                        "id": "n1",
+                        "expected_version": content_hash("id: n1\nname: メモ 1\n"),
+                        "set": {"description": "変えた説明"},
+                    },
+                    {
+                        "op": "update",
+                        "id": "f1",
+                        "expected_version": F1_VERSION,
+                        "set": {"@body": "x\n"},
+                    },
+                ]
+            },
+            "writes[1]",
+            id="set-body",
+        ),
+        pytest.param(
+            {
+                "writes": [
+                    {
+                        "op": "rename",
+                        "id": "n1",
+                        "expected_version": content_hash("id: n1\nname: メモ 1\n"),
+                        "new_id": "n9",
+                    }
+                ]
+            },
+            "writes[0]",
+            id="rename-referrer",
+        ),
+        pytest.param(
+            {"deletes": [{"id": "f1", "expectedVersion": F1_VERSION}]},
+            "deletes[0]",
+            id="delete",
+        ),
+    ],
+)
+def test_error_when_body_not_allowed(
+    body: dict[str, Any],
+    position: str,
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """本文の直コミットを断る種類の本文の変更を含む（異常系）。"""
+    # 準備
+    direct = make_direct_commit_source(
+        config=metadata_only_config(), files=METADATA_ONLY_FILES, write_api_kinds=["note", "files"]
+    )
+    env = make_server(direct.spec)
+    before = _git_state(direct, run_git)
+    # 実行
+    response = env.client.post(URL, json={**body, "message": "docs: files を更新する"})
+    # 検証
+    data = response.json()
+    assert response.status_code == 422, data
+    assert [
+        item["path"].startswith(position)
+        for item in data["errors"]
+        if "本文の直コミットを断っている" in item["reason"]
+    ] == [True]
+    assert _git_state(direct, run_git) == before
+    assert (direct.develop / "files" / "f1.md").read_text(encoding="utf-8") == F1_BODY
+    assert (direct.develop / "notes" / "n1.yaml").read_text(encoding="utf-8") == (
+        "id: n1\nname: メモ 1\n"
+    )
 
 
 def test_error_when_validation_failed(

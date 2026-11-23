@@ -1211,6 +1211,29 @@ def direct_commit_config(
     )
 
 
+# 本文の直コミットを断る種類 files（管理用の YAML の行が本文のファイルを指す）と、その文書
+FILES_INDEX = "files:\n  - id: f1\n    name: 案内\n    path: f1.md\n"
+F1_BODY = "[メモ 1](id:n1)\n"
+METADATA_ONLY_FILES = {
+    "files/index.yaml": FILES_INDEX,
+    "files/f1.md": F1_BODY,
+    "notes/n1.yaml": "id: n1\nname: メモ 1\n",
+}
+
+
+def metadata_only_config() -> str:
+    """直コミットの設定で種類 files の本文の直コミットを断る、配信元の設定を作る。"""
+    return direct_commit_config(kinds=("note", "{id: files, body: false}")).replace(
+        "generators:\n",
+        "  - id: files\n"
+        "    paths: [files/index.yaml]\n"
+        "    schema: schemas/note.schema.yaml\n"
+        "    records: files\n"
+        "    body_file: path\n"
+        "generators:\n",
+    )
+
+
 @dataclass
 class DirectCommitSource:
     """直コミットの配信元と、リモート・ワークツリー・手元の作業場所。"""
