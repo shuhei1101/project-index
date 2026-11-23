@@ -47,27 +47,33 @@ docs:
   - page: docs/module/MOD-84.py.yaml
     new: false
     change: '`_rewrite_referrers` の処理を、ファイルごとの読み込み結果の使い回しと、改名前の ID・パスを持たないファイルの読み飛ばしに変える'
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
   - page: docs/module/MOD-175.py.yaml
     new: false
     change: '`classify_path` の処理を、1 回の要求でワークツリーをたどる回数を 1 回以下にする判定に変える'
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
   - page: docs/module/MOD-176.py.yaml
     new: false
     change: '`judge_post_write` を書き込みの後の通知の判定の専用の実行スロットで動かす'
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
   - page: docs/module/MOD-236-1.py.yaml
     new: false
     change: 書き込みの後の通知の判定の専用の実行スロットと、実行中の要求の記録の一覧を追加する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
   - page: docs/module/MOD-10.py.yaml
     new: false
     change: '`status` の組み立てに実行中の要求を追加する'
-    status: todo
-  - page: docs/module/MOD-89.py.yaml
-    new: false
-    change: 実行スロットの配線に、書き込みの後の通知の判定の専用の実行スロットを追加する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
   - page: docs/nonfunctional/NFR-1.yaml
     new: false
     change: 書き込みの後の通知の判定の専用の実行スロットの本数を追加する
@@ -78,6 +84,36 @@ docs:
     new: false
     change: '`status` の返却する値に、実行中の要求を追加する'
     status: todo
+  - page: docs/module/MOD-11.py.yaml
+    new: false
+    change: '`ServerStatus` に実行中の要求（`running`）を追加する'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
+  - page: docs/module/MOD-9.py.yaml
+    new: false
+    change: '`render_status` に実行中の要求の表を追加する'
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
+  - page: docs/module/MOD-94.py.yaml
+    new: false
+    change: 要求の記録の配信元を並び（`record.sources`）にする
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
+  - page: docs/module/MOD-126.py.yaml
+    new: false
+    change: 要求の記録の範囲に配信元を並びで指定する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
+  - page: docs/module/MOD-183.py.yaml
+    new: false
+    change: 要求の記録の範囲に配信元を並びで指定する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-23T15:14:11.104590+00:00'
 scope_out:
   - item: '`get_document` のリビジョンの取り出し（`SnapshotStore.checkout` の `tarfile.extractall`）の所要時間'
     reason: 飽和していたときのスタックで 1 本だけ止まっていた処理で、実行スロットを埋めた原因ではない。要望に含まれない
