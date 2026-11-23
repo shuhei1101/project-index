@@ -15,3 +15,6 @@ scope_out:
   - item: serve 以外のコマンド（migrate 等）のログの閉じ方
     reason: 要望に含まれない。ファイルのハンドラを足して裏のスレッドを動かすのは serve だけ
     plan: none
+  - item: tests/integration/server/conftest.py の _direct_commit_lines が complexipy の上限を超える
+    reason: 規約『設計原則』の複雑さの検査から外れているが、base の develop にある既存の違反で、今回の要望に含まれない
+    plan: '#272'
