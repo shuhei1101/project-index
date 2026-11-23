@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -14,6 +13,8 @@ from project_index.server.error_handlers import register_error_handlers
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
+
+    import pytest
 
     from project_index.features.settings.types import SourceEntry, TerminalConfig
     from project_index.main import Handlers
