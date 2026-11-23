@@ -892,8 +892,8 @@ functions:
          - 書き込むファイル（`source_config` があれば `project-index.yaml` を含む）を `check_clean` にかけ、`project-index.yaml` に `source_config.content` を書き、書き込みと削除を全て書き、書き込みと削除の種類の生成を文書の書き込みの直コミットと同じ制限時間で動かす
          - 書いた・消したファイルを返す（直コミットを進めるが 1 つのコミットにする）
 
-      4. 手順 3 が衝突にする例外（`CONFLICT_ERRORS`）で失敗し、`request.base_commit` がある場合、手順 3 の排他を握ったまま衝突したときのブランチへのコミット（`keep_in_branch`、`commit` は `dry_run` でないとき `True`、`now` が `None` なら今の UTC の時刻）を呼ぶ。ほかの例外と、`base_commit` が無い要求の例外はそのまま送る
-         - `write_once` は、受け取ったフォルダを書く場所にして（作業場所の配信元の読み込み。`scope.write` を確認しない）、手順 3 の `write_once` と同じ当て・直コミットの確認・書き込み・生成を行い、書いた・消したファイルを返す（`check_clean` は呼ばない）。直コミットの確認の `direct_commit.kinds`・許可する種類・読み取り専用の種類・秘密の値の検査は手順 2 の今の配信元（`registry.get_for_docs` の配信元）の設定で判定し、受け取ったフォルダで読み込んだ配信元からはスキーマ・`validators[]`・`generators[]` と文書の値だけを使用する
+      4. 手順 3 が衝突にする例外（`CONFLICT_ERRORS`）で失敗し、`request.base_commit` がある場合（例外が `ValidationFailedError` で違反が全て決まり `protected_key` のときは衝突にせず、そのまま送る）、手順 3 の排他を握ったまま衝突したときのブランチへのコミット（`keep_in_branch`、`commit` は `dry_run` でないとき `True`、`now` が `None` なら今の UTC の時刻）を呼ぶ。ほかの例外と、`base_commit` が無い要求の例外はそのまま送る
+         - `write_once` は、受け取ったフォルダを書く場所にして（作業場所の配信元の読み込み。`scope.write` を確認しない）、手順 3 の `write_once` と同じ当て・直コミットの確認・書き込み・生成を行い、書いた・消したファイルを返す（`check_clean` は呼ばない）。直コミットの確認の `direct_commit.kinds`・許可する種類・読み取り専用の種類・秘密の値の検査は手順 2 の今の配信元（`registry.get_for_docs` の配信元）の設定で判定し、受け取ったフォルダで読み込んだ配信元からはスキーマ・`validators[]`・`generators[]` と文書の値だけを使用する。`source_config` がある場合、配信元の設定の検査の `current`（書き換えられないキーを比べる相手）は手順 3 で取り込んだ後のワークツリーの `project-index.yaml`（今の `origin/{コミットするブランチ}`）にし、バージョンの照合とスキーマ・起動の検証は受け取ったフォルダの `project-index.yaml` で行う
          - `keep_in_branch` の `timeout` は書き込みの期限までの残り、`respond_by` は `limits.respond_by` にする
          - `keep_in_branch` が例外で失敗した場合、手順 3 の例外を送る（一時のワークツリーの例外は捨てる）
            - `CONFLICT_ERRORS` に当たらない例外の場合、`[warning]` 衝突したときのブランチに残せなかった（配信元・`base_commit`・例外）
@@ -1027,6 +1027,20 @@ functions:
         condition: '`reload_sources` が例外を送る偽物'
         mock: '`reload_sources`'
         expected: '`applied` が `True`、`source_config.reloaded` が `False`、リモートのコミットが 1 つ増える'
+      - name: test_commit_documents_when_conflict_protected_key
+        case: 異常
+        summary: 編集を始めたときのコミットを添えても書き換えられないキーの変更は衝突にしない
+        condition: '`base_commit` を添え、`generators[0].run` を変えた `source_config`'
+        mock: なし（一時フォルダの git）
+        expected: 違反のパスが `sourceConfig.generators` の `ValidationFailedError` で、ブランチが増えず、一時のワークツリーを作らない
+        exception: 書き換えられないキーが変わる
+      - name: test_commit_documents_when_conflict_protected_key_changed_after_base
+        case: 異常
+        summary: 編集を始めた後に書き換えられないキーが変わったときは今の値と比べて断る
+        condition: '`base_commit` の後に `generators` を変えたコミットをプッシュし、要求は `base_commit` の `project-index.yaml` の `nav` だけを変えた `source_config`'
+        mock: なし（一時フォルダの git）
+        expected: 違反のパスが `sourceConfig.generators` の `ValidationFailedError` で、ブランチが増えない
+        exception: 書き換えられないキーが変わる
 refs:
   - to: IF-6
     type: requires
