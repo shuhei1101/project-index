@@ -76,7 +76,7 @@
 | `loading` | bool | 配信元を読み込んでいる間は `true`。その間の `sources[]` は空 |
 | `checking` | bool | 起動の後・`reload`・端末の設定の保存の後に裏で実行する配信元の検査が済んでいない間は `true` |
 | `exporting` | bool | 配信元ごとの `default_ref` の commit を裏で書き出している間は `true` |
-| `running[]` | list | 文書の MCP・読み取り API・書き込みの後の通知の判定の要求のうち、終わっていないもの。経過秒の長い順 |
+| `running[]` | list | 文書の MCP・読み取り API・書き込みの後の通知の判定の要求のうち、終わっていないもの。経過秒の長い順。0 件のときは `format: json` の結果にキーを持たない |
 | `running[].tool` | str | MCP のツール名か、読み取り API のルートの名前。書き込みの後の通知の判定は `post_write` |
 | `running[].sources` | list[str] | 要求が指す配信元の ID。`source` に `"*"` を指定した要求は、解決した後の ID |
 | `running[].executor` | `docs` / `post_write` | 要求を動かす実行スロット |

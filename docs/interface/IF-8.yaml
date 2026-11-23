@@ -191,7 +191,7 @@ flows:
     expected:
       - 合図の前の `running` が 1 件で、`tool` が `search_docs`、`sources` が `["sample"]`、`executor` が `docs`、`state` が `running`、`seconds` が 0 以上
       - 合図の前の markdown に、実行中の要求の表が出る
-      - 合図の後の `running` が空で、markdown に実行中の要求の表が出ない
+      - 合図の後の結果に `running` のキーが無く、markdown に実行中の要求の表が出ない
     test: test_normal_when_requests_running
 lead: 待ち受けのアドレス・バージョン・端末の設定・配信元ごとの状態を返却する管理の MCP の `status` の入出力を定め、`status` を修正するときに参照する。
 tags:
@@ -292,7 +292,7 @@ response:
     description: ID が先の文書と重なり、配信から除外した文書の件数（`check_project` と同じ）
   - name: running
     type: list[RunningRequest]
-    description: 文書の MCP・読み取り API・書き込みの後の通知の判定の要求のうち、終わっていないもの。経過秒の長い順に並べる。markdown では配信元の表の後に、列をツール・配信元（`sources` を `・` でつなぐ。空なら `-`）・実行スロット・状態・経過秒（小数 1 桁）にした表で出し、0 件なら表を出さない
+    description: '文書の MCP・読み取り API・書き込みの後の通知の判定の要求のうち、終わっていないもの。経過秒の長い順に並べる。0 件のときは `format: json` の結果に `running` のキーを持たない。markdown では配信元の表の後に、列をツール・配信元（`sources` を `・` でつなぐ。空なら `-`）・実行スロット・状態・経過秒（小数 1 桁）にした表で出し、0 件なら表を出さない'
   - name: running[].tool
     type: str
     description: MCP のツール名か、読み取り API のルートの名前。書き込みの後の通知の判定は `post_write`
