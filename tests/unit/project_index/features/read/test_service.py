@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
@@ -232,6 +233,64 @@ def test_list_documents_when_common_keys(make_view_env: Callable[..., SimpleName
     assert item.common_keys["related"] == [{"to": "D-2"}]
     assert item.common_keys["alias_type"] == "term"
     assert item.value is None
+
+
+ASSET_TABLES = [
+    DocumentTable(
+        id="assets",
+        paths=["assets/*.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        metadata={"status": "state"},
+        search_exclude={"field": "status", "op": "eq", "values": ["inactive"]},
+    ),
+    DocumentTable(id="design", paths=["docs/*.yaml"], schema_path="schemas/rule.schema.yaml"),
+]
+ASSET_FILES = {
+    "schemas/rule.schema.yaml": "type: object\n",
+    "assets/a1.yaml": "id: a1\nname: A1\nstate: active\n",
+    "assets/a2.yaml": "id: a2\nname: A2\nstate: inactive\n",
+    "docs/a.yaml": "id: a\nname: A\n",
+}
+
+
+def test_list_documents_when_search_excluded(
+    make_view_env: Callable[..., SimpleNamespace],
+) -> None:
+    """除く条件に該当する文書も並べて excluded を付ける（正常系）。"""
+    # 準備
+    env = make_view_env(ASSET_FILES, tables=ASSET_TABLES)
+    # 実行
+    response = list_documents(_target(env), store=env.handlers.store)
+    # 検証
+    assert [item.id for item in response.documents] == ["a1", "a2", "a"]
+    assert [item.excluded for item in response.documents] == [False, True, False]
+
+
+def test_list_documents_when_ref_and_search_excluded(
+    make_view_env: Callable[..., SimpleNamespace], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """リビジョンを指しても書き出さずに excluded を付ける（正常系）。"""
+    # 準備
+    env = make_view_env(ASSET_FILES, tables=ASSET_TABLES)
+    store = env.handlers.store
+    startup = _target(env)
+    loaded = store.load(startup)
+    target = dataclasses.replace(startup, ref="main")
+
+    def _load(*_args: object, **_kwargs: object) -> object:
+        return loaded
+
+    monkeypatch.setattr(store, "load", _load)
+
+    def _checkout(*_args: object, **_kwargs: object) -> object:
+        msg = "リビジョンを書き出した"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(store.snapshots, "checkout", _checkout)
+    # 実行
+    response = list_documents(target, store=store)
+    # 検証
+    assert [item.excluded for item in response.documents] == [False, True, False]
 
 
 def test_get_document(

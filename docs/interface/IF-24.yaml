@@ -294,6 +294,37 @@ flows:
       - 200 で、`files.yaml` の行の文書の `tags` が `scope:a`・`topic:b`
       - '`documents` の各要素の `value` が、pure の読み込みだけで読んだときと同じ'
     test: test_normal_when_yaml_unreadable_by_c
+  - name: 正常系（既定の検索から除く文書）
+    summary: '行の `search_exclude` に該当する文書も一覧に含め、該当する文書に `excluded: true` を付けて返却する'
+    setup:
+      - name: Mock
+        description: なし
+      - name: 文書
+        description: 'sample の `assets/` に `a1.yaml`（id `a1`・`state: active`）・`a2.yaml`（id `a2`・`state: inactive`）'
+      - name: 文書の行
+        description: '行 `assets`（`paths: [assets/*.yaml]`・`metadata: {status: state}`・`search_exclude: {field: status, op: eq, values: [inactive]}`）'
+    flow: |-
+      <!-- map: {"title": "正常系（既定の検索から除く文書）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs
+
+        C->>E: GET /sources/sample/docs
+        E-->>C: 200 a1（excluded: false）・a2（excluded: true）
+      ```
+
+      <!-- /map -->
+    expected:
+      - 200 で、`documents` に `a1` と `a2` が並ぶ
+      - '`a2` の `excluded` が `true`、`a1` と `search_exclude` を持たない行の文書の `excluded` が `false`'
+    test: test_normal_when_search_excluded
+    refs:
+      - to: SC-11
+        item: scenarios[正常シナリオ（既定の検索から除く条件に該当する文書を参照する）]
+        type: references
+        when: このインターフェースのフローを変えるときに、シナリオの対応する流れと期待値を確認する。
 lead: 指定のリビジョンの文書の一覧を返却する読み取り API の入出力を定め、文書の一覧を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -379,6 +410,10 @@ response:
     type: dict | None
     description: 共通のキーの値。配信元の設定の行の `metadata` の列名の対応で文書から取った値と、行の `alias_type`。`name` は無いときの既定を入れた値
     notes: '`common_keys` が `true` のときだけ入れ、それ以外は `null`。値の無いキーは持たない'
+  - name: documents[].excluded
+    type: bool
+    description: 配信元の設定の `documents[].search_exclude` に該当する文書か
+    notes: 該当する文書は `true`、それ以外の文書と `search_exclude` を持たない行の文書は `false`。`search_docs` の `items[].excluded` と同じ判定
 response_example: |-
   ```json
   {"ref": "main", "documents": [
@@ -410,5 +445,7 @@ constraints:
     notes: 同じ commit と文書の行の定義の読み込みの結果は、書き出しから読んだか blob から読んだかによらず、文書の取得・語での検索と共有する（文書のストアのリビジョンの読み込みの結果）。種類のスキーマと配信元の設定の取得は今どおり書き出しを読む。書き出しの最中でも、文書の一覧はその終了を待たない
   - item: SQLite の表の行
     constraint: '`documents[].sqlite` を持つ行の文書も一覧に含める。`ref` によらず今の `sqlite.file` の行を返却し、`documents[].path` は `sqlite.file` の配信元のフォルダからのパス、`documents[].value` は `columns[]` の列の値にする'
+  - item: 既定の検索から除く文書
+    constraint: 文書の行の `search_exclude` に該当する文書も一覧から除かず、`excluded` を `true` にして返却する。条件の照合は `search_docs` の既定の検索から除く判定と同じ関数で行う
 test_file: tests/integration/server/test_list_documents.py
 visibility: internal

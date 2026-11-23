@@ -129,6 +129,40 @@ def test_build_read_router_when_queries(make_view_env: Callable[..., SimpleNames
     assert search["items"][0]["filePath"] == "terms.yaml"
 
 
+def test_build_read_router_when_include_excluded(
+    make_view_env: Callable[..., SimpleNamespace],
+) -> None:
+    """語での検索に include_excluded を指定する（正常系）。"""
+    # 準備
+    env = make_view_env(
+        {
+            "schemas/rule.schema.yaml": "type: object\n",
+            "assets/a1.yaml": "id: a1\nname: A1\nstatus: active\nnote: 夕焼け\n",
+            "assets/a2.yaml": "id: a2\nname: A2\nstatus: inactive\nnote: 夕焼け\n",
+        },
+        tables=[
+            DocumentTable(
+                id="assets",
+                paths=["assets/*.yaml"],
+                schema_path="schemas/rule.schema.yaml",
+                search_exclude={"field": "status", "op": "eq", "values": ["inactive"]},
+            )
+        ],
+    )
+    client = _client(env.handlers)
+    # 実行
+    default = client.get("/sources/sample/search?q=夕焼け").json()
+    included = client.get("/sources/sample/search?q=夕焼け&include_excluded=true").json()
+    documents = client.get("/sources/sample/docs").json()
+    # 検証
+    assert default["excludedCount"] == 1
+    assert [item["id"] for item in default["items"]] == ["a1"]
+    assert "excluded" not in default["items"][0]
+    assert "excludedCount" not in included
+    assert [item.get("excluded") for item in included["items"]] == [None, True]
+    assert [item["excluded"] for item in documents["documents"]] == [False, True]
+
+
 @pytest.mark.parametrize(
     ("path", "missing"),
     [

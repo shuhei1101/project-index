@@ -455,6 +455,43 @@ scenarios:
       - 応答の最中も、large の文書の行の検証が 1 件以上進む（止まらない）
       - 合図の後に sample の文書の一覧が 200 を返却し、large の読み込みが済むと large と sample が配信中になる
     test: test_normal_when_opened_while_other_sources_loading
+  - name: 正常シナリオ（既定の検索から除く条件に該当する文書を参照する）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行。dev-docs の画面のサーバーの代わりにテストのコードが読み取り API を HTTP で呼ぶ）
+      - name: 文書
+        description: 'sample の `assets/` に YAML の文書 `a1.yaml`（id `a1`・`state: active`）と `a2.yaml`（id `a2`・`state: inactive`）を配置する。どちらの本文も単語 `夕焼け` を含む'
+      - name: 文書の行
+        description: 'sample の `project-index.yaml` の行 `assets`（`paths: [assets/*.yaml]`・`metadata: {status: state}`・`search_exclude: {field: status, op: eq, values: [inactive]}`）'
+        notes: 条件の構造は `search_docs` の `filter` と同じ
+      - name: project-index
+        description: sample を端末の設定に並べて起動した project-index
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（既定の検索から除く条件に該当する文書を参照する）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant DD as dev-docs の画面のサーバー
+        participant PI as project-index（読み取り API）
+
+        DD->>PI: sample の文書の一覧を取得する
+        PI-->>DD: a1 と、除く条件に該当することを示した a2
+        DD->>PI: sample の文書 a2 を取得する
+        PI-->>DD: a2 の値
+        DD->>PI: sample の文書を単語 夕焼け で検索する
+        PI-->>DD: a1 と、除いた文書の件数
+        DD->>PI: 同じ単語で include_excluded=true を付けて検索する
+        PI-->>DD: a1 と、除く条件に該当することを示した a2
+      ```
+
+      <!-- /map -->
+    expected:
+      - 文書の一覧が `a1` と `a2` を返却し、`a2` だけに除く条件に該当することを示す
+      - 文書 `a2` の取得が `a2` の値を返却する
+      - 単語 `夕焼け` での検索が `a1` だけを返却し、除いた文書が 1 件あることを返却する
+      - '`include_excluded=true` を付けた検索が `a1` と `a2` を返却し、`a2` に除く条件に該当することを示す'
+      - '`search_exclude` を記載しない行の文書の一覧と検索の結果は、記載する前と変わらない'
+    test: test_normal_when_search_excluded
 lead: dev-docs の画面のサーバーが読み取り API で配信元と文書を取得するシナリオを定め、画面のサーバーからの読み取りの流れを変えるときに参照する。
 tags:
   - name: topic:api
@@ -471,7 +508,7 @@ stakeholders:
 trigger: dev-docs の画面のサーバーが、利用者の画面の操作（文書を開く・リビジョンを切り替える・差分を開く・検索する）を受けて読み取り API を呼ぶ
 preconditions:
   - project-index が待ち受け、端末の設定に配信元が並んでいる
-success_guarantee: 読み取り API が、配信中の配信元の文書を文書の MCP と同じ読み込みの結果で返却する。`converters[]` を指す種類の文書は、変換のスクリプトが出した Markdown を返却する。
+success_guarantee: 読み取り API が、配信中の配信元の文書を文書の MCP と同じ読み込みの結果で返却する。`converters[]` を指す種類の文書は、変換のスクリプトが出した Markdown を返却する。配信元の設定の `documents[].search_exclude` に該当する文書は、文書の一覧では除かずに該当することを示して返却し、単語での検索では `include_excluded=true` を付けた要求だけが返却する。
 minimal_guarantee: 読み取り API の呼び出しは配信元のファイルを変えない。1 つの文書・配信元の失敗は、ほかの文書・配信元の取得を止めない。
 frequency: 利用者が画面を操作するたび
 priority: 高

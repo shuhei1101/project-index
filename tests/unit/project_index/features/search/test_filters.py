@@ -19,8 +19,11 @@ from project_index.features.sources.types import DocumentTable
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
+    from project_index.features.access.types import Target
     from project_index.features.documents.types import Document
+    from project_index.features.sources.types import ServedSource, SourceConfig
 
 TODAY = date(2026, 10, 28)
 FIELDS = {
@@ -352,3 +355,130 @@ def test_is_excluded(make_document: Callable[..., Document]) -> None:
     assert inactive_result is True
     assert active_result is False
     assert no_condition is False
+
+
+def test_exclusion_flags(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+) -> None:
+    """該当する文書だけ True（正常系）。"""
+    from project_index.features.documents.store import DocumentStore
+    from project_index.features.history.snapshot import SnapshotStore
+    from project_index.features.search.filters import exclusion_flags
+
+    # 準備
+    root = tmp_path / "sample"
+    write_files(
+        root,
+        {
+            "schemas/rule.schema.yaml": "type: object\n",
+            "assets/a1.yaml": "id: a1\nname: A1\nstatus: active\n",
+            "assets/a2.yaml": "id: a2\nname: A2\nstatus: inactive\n",
+            "docs/d1.yaml": "id: d1\nname: D1\nstatus: inactive\n",
+        },
+    )
+    tables = [
+        DocumentTable(
+            id="assets",
+            paths=["assets/*.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            search_exclude={"field": "status", "op": "eq", "values": ["inactive"]},
+        ),
+        DocumentTable(id="docs", paths=["docs/*.yaml"], schema_path="schemas/rule.schema.yaml"),
+    ]
+    source = make_served_source(root=root, config=make_source_config(documents=tables))
+    target = make_target(source)
+    store = DocumentStore(SnapshotStore(tmp_path / "snapshots"))
+    documents = store.load(target).documents
+    # 実行
+    flags = exclusion_flags(target, documents, store=store, today=TODAY)
+    # 検証
+    assert [document.id for document in documents] == ["a1", "a2", "d1"]
+    assert flags == [False, True, False]
+
+
+def test_exclusion_flags_when_no_exclusion(
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    make_document: Callable[..., Document],
+) -> None:
+    """除く条件を持たない配信元（正常系）。"""
+    from project_index.features.search.filters import exclusion_flags
+
+    class _FailingStore:
+        """呼ばれたら失敗する文書のストアの偽物。"""
+
+        def row_schema(self, target: object, kind: str) -> dict[str, object]:
+            msg = f"row_schema を呼んだ: {kind}"
+            raise AssertionError(msg)
+
+    # 準備
+    target = make_target(make_served_source())
+    documents = [make_document(id="doc-1"), make_document(id="doc-2")]
+    # 実行
+    flags = exclusion_flags(target, documents, store=_FailingStore(), today=TODAY)  # type: ignore[arg-type]
+    # 検証
+    assert flags == [False, False]
+
+
+def test_exclusion_flags_when_schema_target(
+    tmp_path: Path,
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """スキーマを参照する場所を指定する（正常系）。"""
+    import dataclasses
+
+    from project_index.features.documents.store import DocumentStore
+    from project_index.features.history.snapshot import SnapshotStore
+    from project_index.features.search.filters import exclusion_flags
+
+    # 準備
+    root = tmp_path / "sample"
+    write_files(
+        root,
+        {
+            "schemas/rule.schema.yaml": "type: object\n",
+            "assets/a1.yaml": "id: a1\nname: A1\nstatus: active\n",
+            "assets/a2.yaml": "id: a2\nname: A2\nstatus: inactive\n",
+            "docs/d1.yaml": "id: d1\nname: D1\nstatus: inactive\n",
+        },
+    )
+    tables = [
+        DocumentTable(
+            id="assets",
+            paths=["assets/*.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            search_exclude={"field": "status", "op": "eq", "values": ["inactive"]},
+        ),
+        DocumentTable(id="docs", paths=["docs/*.yaml"], schema_path="schemas/rule.schema.yaml"),
+    ]
+    source = make_served_source(root=root, config=make_source_config(documents=tables))
+    startup = make_target(source)
+    store = DocumentStore(SnapshotStore(tmp_path / "snapshots"))
+    documents = store.load(startup).documents
+    received: list[str | None] = []
+    row_schema = store.row_schema
+
+    def _recording(target: Target, kind: str) -> dict[str, object]:
+        received.append(target.ref)
+        return row_schema(target, kind)
+
+    monkeypatch.setattr(store, "row_schema", _recording)
+    # 実行
+    flags = exclusion_flags(
+        dataclasses.replace(startup, ref="main"),
+        documents,
+        store=store,
+        today=TODAY,
+        schema_target=startup,
+    )
+    # 検証
+    assert flags == [False, True, False]
+    assert received == [None, None]

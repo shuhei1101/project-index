@@ -89,6 +89,7 @@ def test_normal(make_source: Callable[..., Any], make_server: Callable[..., Any]
         "version": first["version"],
         "value": None,
         "commonKeys": None,
+        "excluded": False,
     }
     assert isinstance(first["version"], str)
     assert first["version"]
@@ -534,3 +535,39 @@ def test_normal_when_yaml_unreadable_by_c(
     assert response.status_code == 200
     assert documents[2]["tags"] == ["scope:a", "topic:b"]
     assert documents[2]["value"] == pure["files"][0]
+
+
+ASSETS_ROW = (
+    "  - id: assets\n"
+    "    paths: [assets/*.yaml]\n"
+    "    schema: schemas/sample.schema.yaml\n"
+    "    metadata: {status: state}\n"
+    "    search_exclude: {field: status, op: eq, values: [inactive]}\n"
+)
+
+
+def test_normal_when_search_excluded(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """行の search_exclude に該当する文書も一覧に含め、該当する文書に excluded: true を付けて返却する（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "project-index.yaml": sample_config_text(ASSETS_ROW),
+            "assets/a1.yaml": "id: a1\nname: 素材 1\nstate: active\n",
+            "assets/a2.yaml": "id: a2\nname: 素材 2\nstate: inactive\n",
+        }
+    )
+    env = make_server(make_source("sample", files))
+    # 実行
+    response = env.client.get("/sources/sample/docs")
+    # 検証
+    documents = response.json()["documents"]
+    excluded = {row["id"]: row["excluded"] for row in documents}
+    assert response.status_code == 200
+    assert excluded["a1"] is False
+    assert excluded["a2"] is True
+    assert [row["id"] for row in documents if row["excluded"]] == ["a2"]

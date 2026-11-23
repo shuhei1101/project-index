@@ -1,0 +1,62 @@
+$ uv run pytest tests/unit/project_index/features/search/test_filters.py tests/unit/project_index/features/search/test_terms.py tests/unit/project_index/features/read/test_service.py tests/unit/project_index/features/read/test_search.py tests/unit/project_index/features/read/test_route.py -q -p no:cacheprovider --basetemp=/tmp/pi265-Ah7a
+# Red: 実装の前。fail は全て実装の無いこと（exclusion_flags・excluded・include_excluded・excluded_count が無い）による
+                if hasattr(self.__class__, item):
+                    return super().__getattribute__(item)  # Raises AttributeError if appropriate
+                else:
+                    # this is the current error
+>                   raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E                   AttributeError: 'DocumentListEntry' object has no attribute 'excluded'
+.venv/lib/python3.14/site-packages/pydantic/main.py:1110: AttributeError
+_______________________ test_search_words_when_excluded ________________________
+make_document = <function make_document.<locals>._make at 0x7f22126b00f0>
+    def test_search_words_when_excluded(make_document: Callable[..., Document]) -> None:
+        """除く文書を既定で除き、指定で excluded を付けて返却する（正常系）。"""
+        # 準備
+        a1 = make_document(id="a1", path="assets/a1.yaml", body="夕焼けの背景\n")
+        a2 = make_document(id="a2", path="assets/a2.yaml", body="夕焼けの古い背景\n")
+        # 実行
+>       default = search_words([a1, a2], "夕焼け", 20, excluded=[False, True])
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: search_words() got an unexpected keyword argument 'excluded'
+tests/unit/project_index/features/read/test_search.py:48: TypeError
+_________________ test_build_read_router_when_include_excluded _________________
+make_view_env = <function make_view_env.<locals>._make at 0x7f22124bb060>
+    def test_build_read_router_when_include_excluded(
+        make_view_env: Callable[..., SimpleNamespace],
+    ) -> None:
+        """語での検索に include_excluded を指定する（正常系）。"""
+        # 準備
+        env = make_view_env(
+            {
+                "schemas/rule.schema.yaml": "type: object\n",
+                "assets/a1.yaml": "id: a1\nname: A1\nstatus: active\nnote: 夕焼け\n",
+                "assets/a2.yaml": "id: a2\nname: A2\nstatus: inactive\nnote: 夕焼け\n",
+            },
+            tables=[
+                DocumentTable(
+                    id="assets",
+                    paths=["assets/*.yaml"],
+                    schema_path="schemas/rule.schema.yaml",
+                    search_exclude={"field": "status", "op": "eq", "values": ["inactive"]},
+                )
+            ],
+        )
+        client = _client(env.handlers)
+        # 実行
+        default = client.get("/sources/sample/search?q=夕焼け").json()
+        included = client.get("/sources/sample/search?q=夕焼け&include_excluded=true").json()
+        documents = client.get("/sources/sample/docs").json()
+        # 検証
+>       assert default["excludedCount"] == 1
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'excludedCount'
+tests/unit/project_index/features/read/test_route.py:158: KeyError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/search/test_filters.py::test_exclusion_flags
+FAILED tests/unit/project_index/features/search/test_filters.py::test_exclusion_flags_when_no_exclusion
+FAILED tests/unit/project_index/features/search/test_terms.py::test_list_match_words_when_search_excluded
+FAILED tests/unit/project_index/features/search/test_terms.py::test_render_match_words_markdown_when_excluded
+FAILED tests/unit/project_index/features/read/test_service.py::test_list_documents_when_search_excluded
+FAILED tests/unit/project_index/features/read/test_search.py::test_search_words_when_excluded
+FAILED tests/unit/project_index/features/read/test_route.py::test_build_read_router_when_include_excluded
+7 failed, 53 passed in 0.55s

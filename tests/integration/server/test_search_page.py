@@ -111,3 +111,45 @@ def test_error_when_revision_export_times_out(
     assert body["limitSec"] == GIT_ARCHIVE_TIMEOUT_SEC
     assert "リビジョンの書き出し" in body["detail"]
     assert f"{GIT_ARCHIVE_TIMEOUT_SEC:g} 秒" in body["detail"]
+
+
+ASSETS_ROW = (
+    "  - id: assets\n"
+    "    paths: [assets/*.yaml]\n"
+    "    schema: schemas/sample.schema.yaml\n"
+    "    metadata: {status: state}\n"
+    "    search_exclude: {field: status, op: eq, values: [inactive]}\n"
+)
+
+
+def test_normal_when_search_excluded(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """行の search_exclude に該当する文書を既定の結果から除き、include_excluded=true のときだけ excluded: true を付けて返却する（正常系）。"""
+    # 準備
+    files = sample_file_set(
+        **{
+            "project-index.yaml": sample_config_text(ASSETS_ROW),
+            "assets/a1.yaml": "id: a1\nname: 素材 1\nstate: active\ndescription: 夕焼けの背景\n",
+            "assets/a2.yaml": "id: a2\nname: 素材 2\nstate: inactive\ndescription: 夕焼けの古い背景\n",
+        }
+    )
+    env = make_server(make_source("sample", files))
+    # 実行
+    default = env.client.get("/sources/sample/search", params={"q": "夕焼け"}).json()
+    included = env.client.get(
+        "/sources/sample/search", params={"q": "夕焼け", "include_excluded": "true"}
+    ).json()
+    # 検証
+    assert default["totalCount"] == 1
+    assert [item["id"] for item in default["items"]] == ["a1"]
+    assert default["excludedCount"] == 1
+    assert included["totalCount"] == 2
+    assert [(item["id"], item.get("excluded")) for item in included["items"]] == [
+        ("a1", None),
+        ("a2", True),
+    ]
+    assert "excludedCount" not in included

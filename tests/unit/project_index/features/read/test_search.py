@@ -37,3 +37,20 @@ def test_search_words_when_record(make_document: Callable[..., Document]) -> Non
     assert result.items[0].id == "term-2"
     assert result.items[0].file_path == "terms.yaml"
     assert result.items[0].path == "terms/term-2"
+
+
+def test_search_words_when_excluded(make_document: Callable[..., Document]) -> None:
+    """除く文書を既定で除き、指定で excluded を付けて返却する（正常系）。"""
+    # 準備
+    a1 = make_document(id="a1", path="assets/a1.yaml", body="夕焼けの背景\n")
+    a2 = make_document(id="a2", path="assets/a2.yaml", body="夕焼けの古い背景\n")
+    # 実行
+    default = search_words([a1, a2], "夕焼け", 20, excluded=[False, True])
+    included = search_words([a1, a2], "夕焼け", 20, excluded=[False, True], include_excluded=True)
+    # 検証
+    assert default.total_count == 1
+    assert [item.id for item in default.items] == ["a1"]
+    assert default.excluded_count == 1
+    assert included.total_count == 2
+    assert [(item.id, item.excluded) for item in included.items] == [("a1", None), ("a2", True)]
+    assert included.excluded_count is None

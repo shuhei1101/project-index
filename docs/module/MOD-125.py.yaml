@@ -157,7 +157,7 @@ functions:
       description: 文書の一覧の応答
     process: |-
       1. `store.load(target, from_blobs=True)` で、リビジョンを書き出さずに文書を読み込む
-      2. 文書ごとに `id`・`path`・`kind`・メタデータ（`name`・`description`・`tags`・`visibility`）・`body_path`・`version` と、`values` が `True` のときだけ `value`（文書の `data`）、`common_keys` が `True` のときだけ `common_keys`（文書の `metadata`）を `DocumentListEntry` にする
+      2. 文書ごとに `id`・`path`・`kind`・メタデータ（`name`・`description`・`tags`・`visibility`）・`body_path`・`version` と、`values` が `True` のときだけ `value`（文書の `data`）、`common_keys` が `True` のときだけ `common_keys`（文書の `metadata`）を `DocumentListEntry` にする。`excluded` には、除外の判定（`exclusion_flags(target, documents, store=store, today=今日, schema_target=target から ref を外した場所)`）のその文書の値を入れる（一覧からは除かない）。種類のスキーマは起動時のスキーマを使用し、リビジョンを書き出さない
       3. `documents[]` の行の順、行の中はパスの順に並べ、`ref` に解決したリビジョンの名前を入れて返す
     unit_tests:
       - name: test_list_documents
@@ -178,6 +178,18 @@ functions:
         condition: 種類 `design` の行が `metadata`（`related` を列名 `links` から取る）と `alias_type` を持つ配信元で、`common_keys` が `True`
         mock: なし（一時フォルダの配信元）
         expected: YAML の文書の `common_keys` が文書の `metadata` と同じで、`related` に `links` の値、`alias_type` に行の値を持ち、`value` が `None`
+      - name: test_list_documents_when_search_excluded
+        case: 正常
+        summary: 除く条件に該当する文書も並べて excluded を付ける
+        condition: '行 `assets`（`metadata: {status: state}`・`search_exclude: {field: status, op: eq, values: [inactive]}`）の `a1`（`state: active`）・`a2`（`state: inactive`）と、種類 `design` の YAML 1 件'
+        mock: なし（一時フォルダの配信元）
+        expected: 3 件が並び、`a2` の `excluded` だけが `True`
+      - name: test_list_documents_when_ref_and_search_excluded
+        case: 正常
+        summary: リビジョンを指しても書き出さずに excluded を付ける
+        condition: '`test_list_documents_when_search_excluded` と同じ配信元で、`ref` を持つ読み取りの場所を指定する'
+        mock: '`store.load`（`ref` を外した場所の読み込みの結果を返す）・`store.snapshots.checkout`（呼ばれたら失敗する偽物）'
+        expected: '`a2` の `excluded` だけが `True` で、`checkout` を呼ばない'
   - name: get_document
     title: 文書の取得
     kind: 関数

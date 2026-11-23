@@ -54,6 +54,8 @@ class SearchItem(ApiModel):
     file_path: str
     name: str
     snippets: list[str]
+    # `include_excluded` で返却した `search_exclude` に該当する文書だけ `True`。`None` は応答に出さない
+    excluded: bool | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class SearchResult(ApiModel):
@@ -61,6 +63,8 @@ class SearchResult(ApiModel):
 
     total_count: int
     items: list[SearchItem]
+    # `search_exclude` に該当して除いた文書の件数。`None` は応答に出さない
+    excluded_count: int | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class RefItem(ApiModel):
@@ -120,6 +124,8 @@ class DocumentListEntry(DocumentListItem):
 
     version: str
     value: dict[str, Any] | None = None
+    # 文書の行の `search_exclude` に該当するか
+    excluded: bool = False
 
 
 class DocumentListResponse(ApiModel):

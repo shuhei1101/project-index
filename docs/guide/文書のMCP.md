@@ -43,7 +43,7 @@ YAML を書き換えたときは、再起動で反映します。
 | `cwd` | str | 作業場所 | プラグインのフックがセッションの作業場所で上書きする。エージェントが指定した値は使わない。ワークツリーを指すときは `worktree` を指定する |
 | `session_id`・`agent_id` | str | 会話キー | 同じ。メインの会話は `agent_id` が空 |
 | `outside_scope` | bool | `true` のとき、`cwd` が `scope` に当たらない配信元も、端末の設定の `sources[].outside_read` が真なら作業範囲の外（参考）として読む | 既定 `false`。`describe`・`search_docs`・`trace_related`・`list_changes` だけが持ち、作業範囲の外を読むのは `source` に ID を 1 つ渡したときだけ（配列・`*` は `scope` に当たる配信元だけを対象にする）。`describe` は `source` を省くと、作業範囲の外で参照できる配信元の一覧を加える。下の「作業範囲の外」 |
-| `include_excluded` | bool | `true` のとき、配信元の設定の `documents[].search_exclude` に該当する文書も返却する | 既定 `false`。`search_docs`・`trace_related`・`list_changes` だけが持つ。下の「既定の検索から除く文書」 |
+| `include_excluded` | bool | `true` のとき、配信元の設定の `documents[].search_exclude` に該当する文書も返却する | 既定 `false`。`search_docs`・`trace_related`・`list_changes`・`list_match_words` だけが持つ。下の「既定の検索から除く文書」 |
 
 <!-- /table -->
 
@@ -65,7 +65,7 @@ YAML を書き換えたときは、再起動で反映します。
 
 ### 既定の検索から除く文書
 
-配信元の設定の `documents[].search_exclude`（[設定](./設定.md)）に該当する文書は、`search_docs`・`list_changes`・`trace_related` の既定の結果から除きます。
+配信元の設定の `documents[].search_exclude`（[設定](./設定.md)）に該当する文書は、`search_docs`・`list_changes`・`trace_related`・`list_match_words` の既定の結果から除きます。
 `include_excluded: true` を付けた呼び出しは除かずに返却し、該当する文書に `excluded: true`（`markdown` は `除外` の列の ✓）を付けます。
 
 <!-- table: {"kind": "data"} -->
@@ -75,6 +75,7 @@ YAML を書き換えたときは、再起動で反映します。
 | `search_docs` | `filter`・`term` に該当した文書から除き、`items`・`total_count`・`view: count`・`group_by` の件数に含めない。`id` の `eq` で指した取得でも除く |
 | `list_changes` | 区間の端のうち文書が存在する端の全てで該当する文書を除く。区間の中で該当するようになった・該当しなくなった文書は返却する |
 | `trace_related` | 該当する文書を関連の相手と関連の候補から除き、その先もたどらない。起点に指定した文書は除かない |
+| `list_match_words` | 該当する文書の `name` と別名を `words` に含めない |
 
 <!-- /table -->
 
@@ -514,8 +515,9 @@ Git 管理外の配信元と `storage.type: disk` の配信元では、種類の
 | --- | --- | --- | --- |
 | `source` | str | 必須 | 配信元の ID |
 
-ほかに共通の引数 `worktree`・`format`・`cwd` を持ちます。
+ほかに共通の引数 `worktree`・`format`・`cwd`・`include_excluded` を持ちます。
 レスポンスは `words[]`（`word`・語が指す文書の `id`・`kind` の `name` / `alias`）です。
+配信元の設定の `documents[].search_exclude` に該当する文書の語は、既定では返却しません（[既定の検索から除く文書](#既定の検索から除く文書)）。
 エイリアスのキーが alias-inject のスキーマに通らない文書の語は載せません。
 `search_docs` の `term` と同じ文書から集め、件数の上限はありません。
 `alias_type` を持つ行が無い配信元は、空の一覧を返します。

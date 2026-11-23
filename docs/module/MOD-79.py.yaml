@@ -60,6 +60,12 @@ data_models:
         type: list[str]
         access: 公開
         description: '`SNIPPETS_PER_DOC` 件まで'
+      - name: excluded
+        title: 除く文書か
+        type: bool | None
+        access: 公開
+        default: None
+        description: '`include_excluded` で返却した `search_exclude` に該当する文書だけ `True`。`None` のときは応答のキーに出さない（`Field(exclude_if=lambda value: value is None)`）'
   - name: SearchResult
     title: 語での検索の結果
     container: project_index/features/read/types.py
@@ -78,6 +84,12 @@ data_models:
         type: list[SearchItem]
         access: 公開
         description: '`limit` 件まで'
+      - name: excluded_count
+        title: 除いた件数
+        type: int | None
+        access: 公開
+        default: None
+        description: '`search_exclude` に該当して除いた文書の件数。`None` のときは応答のキーに出さない（`Field(exclude_if=lambda value: value is None)`）'
   - name: NavItem
     title: サイドバーの項目
     container: project_index/features/read/types.py
@@ -308,6 +320,12 @@ data_models:
         type: dict | None
         access: 公開
         description: 文書の値。値を求めたときだけ入れ、それ以外は `None`
+      - name: excluded
+        title: 除く文書か
+        type: bool
+        access: 公開
+        default: 'False'
+        description: 文書の行の `search_exclude` に該当するか（除外の判定の値）
   - name: DocumentListResponse
     title: 文書の一覧の応答
     container: project_index/features/read/types.py

@@ -83,7 +83,7 @@ functions:
       4. GET `/sources/{source}/docs` は、読み取りの場所（`ref` はクエリ）で文書の一覧を呼ぶ（クエリ `values`・`common_keys` を `bool`、既定 `false` で渡す）
       5. GET `/sources/{source}/docs/{path:path}` は、読み取りの場所で文書の取得を 文書の MCP の実行スロット（`handlers.slots.run_docs`） で呼ぶ（クエリ `id` を `doc_id` に渡す）
       6. GET `/sources/{source}/decisions` と `/sources/{source}/decisions/{id}` は、検討事項の ID の一覧と検討事項の文書の取得を呼ぶ
-      7. GET `/sources/{source}/search` は、語での検索を呼ぶ（クエリ `q`・`ref`・`limit`）
+      7. GET `/sources/{source}/search` は、`search: false` の行の文書を除いた文書と、その除外の判定（`exclusion_flags`）を指定して語での検索を呼ぶ（クエリ `q`・`ref`・`limit`・`include_excluded`。`include_excluded` は `bool`、既定 `false`）
       8. GET `/sources/{source}/refs` は、配信元のリビジョンの一覧（`commits` はクエリ）を返す
       9. `UnknownSourceError`・`SourceNotServedError`・`RefNotFoundError`・`DocumentNotFoundError`・`DecisionNotFoundError` は例外の変換で 404 の problem+json（`missing` と値）になる
       10. ルーターは `APIRouter(tags=["read"])` にする。各ルートの `name` は、`list_sources`・`get_source_config`・`list_documents`・`get_document`・`list_decisions`・`get_decision`・`search_words`・`list_refs`
@@ -118,6 +118,12 @@ functions:
         condition: 文書の一覧のサービスを、呼ばれたときの `handlers.gate.active` を記録する偽物にして `/sources/sample/docs` を GET
         mock: 文書の一覧（偽物）
         expected: 記録した `active` が `True`、応答の後の `handlers.gate.active` が `False`
+      - name: test_build_read_router_when_include_excluded
+        case: 正常
+        summary: 語での検索に include_excluded を指定する
+        condition: 行 `assets` が `search_exclude` を持ち、`a2` だけが該当する配信元で、`/sources/sample/search?q=夕焼け` と `&include_excluded=true` を GET、`/sources/sample/docs` を GET
+        mock: 配線済みの関数（一時フォルダの配信元）
+        expected: '検索の 1 回目が `excludedCount: 1` で `items[]` に `excluded` のキーが無く、2 回目の `a2` が `excluded: true`。文書の一覧の全ての要素が `excluded` を持ち、`a2` だけ `true`'
 refs:
   - to: IF-22
     type: requires

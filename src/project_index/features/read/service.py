@@ -20,6 +20,7 @@ from project_index.features.read.types import (
     GitHubTarget,
     SourceConfigResponse,
 )
+from project_index.features.search.filters import exclusion_flags
 from project_index.shared.errors import DecisionNotFoundError, DocumentNotFoundError
 from project_index.shared.hashing import value_hash
 
@@ -98,12 +99,15 @@ def _ref_name(target: Target) -> str:
     return target.ref or source.config.default_ref
 
 
-def _entry(document: Document, *, values: bool, common_keys: bool) -> DocumentListEntry:
-    """文書のメタデータに、バージョンと、求めたときだけ値を加える。"""
+def _entry(
+    document: Document, *, values: bool, common_keys: bool, excluded: bool
+) -> DocumentListEntry:
+    """文書のメタデータに、バージョンと除く文書か、求めたときだけ値を加える。"""
     return DocumentListEntry(
         **_metadata(document, common_keys=common_keys).model_dump(),
         version=document.version,
         value=document.data if values else None,
+        excluded=excluded,
     )
 
 
@@ -117,9 +121,16 @@ def list_documents(
     documents = sorted(
         loaded.documents, key=lambda found: (order.get(found.kind, len(order)), found.path)
     )
+    # 除外の判定の種類のスキーマは起動時のスキーマから参照し、リビジョンを書き出さない
+    today = datetime.now(UTC).astimezone().date()
+    startup = dataclasses.replace(target, ref=None, worktree=None)
+    flags = exclusion_flags(target, documents, store=store, today=today, schema_target=startup)
     return DocumentListResponse(
         ref=_ref_name(target),
-        documents=[_entry(found, values=values, common_keys=common_keys) for found in documents],
+        documents=[
+            _entry(found, values=values, common_keys=common_keys, excluded=flag)
+            for found, flag in zip(documents, flags, strict=True)
+        ],
     )
 
 

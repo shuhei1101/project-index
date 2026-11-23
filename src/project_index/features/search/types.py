@@ -259,6 +259,10 @@ class MatchWordsRequest(BaseModel):
     worktree: str | None = None
     format: Literal["markdown", "json"] = "markdown"
     cwd: str | None = Field(default=None, description=CWD_DESCRIPTION)
+    include_excluded: bool = Field(
+        default=False,
+        description="true のとき、配信元の設定の search_exclude に該当する文書の語も返却する",
+    )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -266,3 +270,5 @@ class MatchWordsResult:
     """照合する語の並び。"""
 
     words: list[MatchWord] = field(default_factory=list[MatchWord])
+    # `search_exclude` に該当して除いた文書の件数（1 件以上除いたときだけ）
+    excluded_count: int | None = None

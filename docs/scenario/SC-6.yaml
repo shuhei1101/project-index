@@ -1206,10 +1206,10 @@ scenarios:
         description: なし（実環境で実行。`cwd` はテストが引数に入れる）
         notes: '-'
       - name: 文書
-        description: 'sample の `assets/` に YAML の文書 `a1.yaml`（id `a1`・`state: active`）と `a2.yaml`（id `a2`・`state: inactive`）を配置し、`docs/rule/` の文書 `c.yaml`（id `c`）の `related` に `a1` と `a2` を記載する'
+        description: 'sample の `assets/` に YAML の文書 `a1.yaml`（id `a1`・`title: アセット1`・`summary: 使用中のアセット`・`state: active`）と `a2.yaml`（id `a2`・`title: アセット2`・`summary: 使用しなくなったアセット`・`state: inactive`）を配置し、`docs/rule/` の文書 `c.yaml`（id `c`）の `related` に `a1` と `a2` を記載する'
         notes: '-'
       - name: 文書の行
-        description: 'sample の `project-index.yaml` の行 `assets`（`paths: [assets/*.yaml]`・`metadata: {status: state}`・`search_exclude: {field: status, op: eq, values: [inactive]}`）'
+        description: 'sample の `project-index.yaml` の行 `assets`（`paths: [assets/*.yaml]`・`metadata: {status: state, name: title, description: summary}`・`alias_type: term`・`search_exclude: {field: status, op: eq, values: [inactive]}`）'
         notes: 条件の構造は `search_docs` の `filter` と同じ
       - name: project-index
         description: sample を配信している project-index
@@ -1234,6 +1234,10 @@ scenarios:
         M-->>A: a1 と、除いた文書の件数
         A->>M: trace_related(from_ids: [c], include_excluded: true)
         M-->>A: a1 と、除外の表示を付けた a2
+        A->>M: list_match_words(source: sample)
+        M-->>A: アセット1 と、除いた文書の件数
+        A->>M: list_match_words(source: sample, include_excluded: true)
+        M-->>A: アセット1 と、除外の表示を付けたアセット2
       ```
 
       <!-- /map -->
@@ -1244,6 +1248,8 @@ scenarios:
       - '`include_excluded: true` の `search_docs` が `a1` と `a2` を返却し、`a2` に除外の表示を付ける'
       - '`trace_related` が関連の相手に `a1` だけを返却し、`include_excluded: true` を付けると `a2` も除外の表示を付けて返却する'
       - '`search_exclude` を記載しない行の文書の結果は、記載する前と変わらない'
+      - '`list_match_words` が `アセット1` だけを `a1` とともに返却し、既定の結果から除いた文書が 1 件あることと `include_excluded: true` で取得できることを返却する'
+      - '`include_excluded: true` の `list_match_words` が `アセット1` と `アセット2` を返却し、`アセット2` に除外の表示を付ける'
     test: test_normal_when_search_excluded
   - name: 正常シナリオ（SQLite の表の行を引く）
     setup:

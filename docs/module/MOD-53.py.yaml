@@ -466,4 +466,72 @@ functions:
         mock: なし
         expected: '`True`・`False`・`False`'
         exception: '-'
+  - name: exclusion_flags
+    title: 除外の判定
+    kind: 関数
+    container: project_index/features/search/filters.py
+    usecase: 検索
+    role: 判定
+    summary: 参照する場所の文書ごとに、文書の行の `search_exclude` に該当するかを並べて返却する
+    description: 読み取り API の文書の一覧・語での検索と用語の一覧が呼ぶ。`search_docs` と同じ除く条件の照合（`exclusion_of`・`is_excluded`）を使用する。
+    scope: public
+    thread_safe: true
+    args:
+      - name: target
+        title: 参照する場所
+        type: Target
+        required: true
+        passing: positional
+        description: 文書を参照した場所
+      - name: documents
+        title: 文書
+        type: Sequence[Document]
+        required: true
+        passing: positional
+        description: '`target` で参照した文書'
+      - name: store
+        title: 文書のストア
+        type: DocumentStore
+        required: true
+        passing: injected
+        description: 種類のスキーマを参照する
+      - name: today
+        title: 今日
+        type: date
+        required: true
+        passing: keyword
+        description: 日付の相対の値の基準
+      - name: schema_target
+        title: スキーマを参照する場所
+        type: Target | None
+        required: false
+        default: None
+        passing: keyword
+        description: 使える項目を作る種類のスキーマを参照する場所。`None` は `target`。リビジョンを書き出さない呼び出し元は `ref` を外した場所（起動時のスキーマ）を指定する
+    returns:
+      type: list[bool]
+      description: '`documents` と同じ順の、該当すれば `True` の並び'
+    process: |-
+      1. `search_exclude` を持つ有効な行が無ければ、全て `False` の並びを返却する
+      2. 有効な `documents[]` の行ごとの `store.row_schema(schema_target か target, 行の id)` から使える項目（`known_fields`）を作る
+      3. 文書ごとに、文書の種類の行の `exclusion_of` を種類ごとに 1 回だけ作り、`is_excluded` の結果を並べて返却する
+    unit_tests:
+      - name: test_exclusion_flags
+        case: 正常
+        summary: 該当する文書だけ True
+        condition: '行 `assets`（`search_exclude: {field: status, op: eq, values: [inactive]}`）の `a1`（active）・`a2`（inactive）と、`search_exclude` を持たない行の文書 `d1`'
+        mock: なし（一時フォルダの配信元）
+        expected: '`[False, True, False]`'
+      - name: test_exclusion_flags_when_no_exclusion
+        case: 正常
+        summary: 除く条件を持たない配信元
+        condition: '`search_exclude` を持たない配信元の文書 2 件'
+        mock: '`store.row_schema`（呼ばれたら失敗する偽物）'
+        expected: '`[False, False]` で、`store.row_schema` を呼ばない'
+      - name: test_exclusion_flags_when_schema_target
+        case: 正常
+        summary: スキーマを参照する場所を指定する
+        condition: '`test_exclusion_flags` と同じ配信元で、`target` に `ref` を持たせ、`schema_target` に `ref` を外した場所を指定する'
+        mock: '`store.row_schema`（受けた場所を記録する包み）'
+        expected: '`[False, True, False]` で、`store.row_schema` が受けた場所が全て `ref` が `None`'
 visibility: internal
