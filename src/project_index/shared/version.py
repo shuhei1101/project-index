@@ -23,7 +23,7 @@ HEAD_READ_TIMEOUT_SEC = 10
 def read_head(clone: Path) -> str | None:
     """クローンの HEAD の commit を読み、読めなければ None を返す。"""
     try:
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(
             ["git", "rev-parse", "HEAD"],  # noqa: S607
             cwd=clone,
             capture_output=True,
