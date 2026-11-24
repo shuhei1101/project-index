@@ -20,11 +20,15 @@ docs:
   - page: docs/module/MOD-36.py.yaml
     new: false
     change: _update の判定を、稼働中のプロセスの起動した commit との比較に変更
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T02:29:12.709088+00:00'
   - page: docs/module/MOD-103.py.yaml
     new: false
     change: 起動した時点のクローンの commit を持つ値を追加
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T02:29:12.709088+00:00'
   - page: docs/guide/管理のMCP.md
     new: false
     change: update の起動し直す条件と、status の返却する値を更新
@@ -36,11 +40,39 @@ docs:
   - page: docs/module/MOD-10.py.yaml
     new: false
     change: status の組み立てで、稼働中のプロセスが起動した時点のクローンの commit を返却する
-    status: todo
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T02:29:12.709088+00:00'
   - page: docs/module/MOD-35.py.yaml
     new: false
-    change: UpdateResult に、取り込む commit が無くても起動し直す理由を表す値を追加（応答の表し方をインターフェース定義設計で決めた後に確定）
-    status: todo
+    change: UpdateResult に previous_commit・commit を追加し、restarting の判定を起動した commit との比較に変更
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T02:29:12.709088+00:00'
+  - page: docs/module/MOD-34.py.yaml
+    new: false
+    change: RestartControl に起動した時点のクローンの HEAD（running_commit）を追加
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T02:29:18.698141+00:00'
+  - page: docs/module/MOD-89.py.yaml
+    new: false
+    change: build_handlers で起動した時点のクローンの HEAD を読み、再起動の制御に渡す
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T02:29:18.698141+00:00'
+  - page: docs/module/MOD-11.py.yaml
+    new: false
+    change: ServerStatus に起動した commit（commit）を追加
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T02:29:18.698141+00:00'
+  - page: docs/module/MOD-9.py.yaml
+    new: false
+    change: status の markdown の 1 行目に起動した commit の短縮を添える
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T02:29:18.698141+00:00'
 scope_out:
   - item: ai-monitor のテンプレート『PRドキュメント/反映作業スクリプト』とフェーズ『マージ』のローカルの最新化の順序への、この重なりの扱いの追加
     reason: ai-monitor のリポジトリの作業
