@@ -35,7 +35,7 @@ def main(argv: list[str]) -> int:
         status, body = common.request("GET", "/settings/sources")
     except RuntimeError as error:
         return fail("前提確認", str(error))
-    if status != 200:
+    if status != common.HTTP_OK:
         return fail("前提確認", f"GET /settings/sources: {status} {body}")
     row = common.api_row(body)
     if row is None:
@@ -56,10 +56,16 @@ def main(argv: list[str]) -> int:
     status, result = common.request(
         "PATCH",
         f"/settings/sources/{common.TARGET}",
-        {"expectedVersion": body["version"], "source": {"direct_commit": {"write_api_kinds": kinds}}},
+        {
+            "expectedVersion": body["version"],
+            "source": {"direct_commit": {"write_api_kinds": kinds}},
+        },
     )
-    if status != 200:
-        return fail("直コミットできる種類の登録", f"PATCH /settings/sources/{common.TARGET}: {status} {result}")
+    if status != common.HTTP_OK:
+        return fail(
+            "直コミットできる種類の登録",
+            f"PATCH /settings/sources/{common.TARGET}: {status} {result}",
+        )
     print("直コミットできる種類の登録: changed")
     return 0
 

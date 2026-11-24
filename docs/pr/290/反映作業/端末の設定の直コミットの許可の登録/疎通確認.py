@@ -22,10 +22,13 @@ def main() -> int:
     # 端末の設定の API と対象の行
     try:
         status, body = common.request("GET", "/settings/sources")
-        ok = status == 200 and common.api_row(body) is not None
+        ok = status == common.HTTP_OK and common.api_row(body) is not None
         print("端末の設定の API: " + ("ok" if ok else "failed"))
         if not ok:
-            print(f"GET /settings/sources: {status}（{common.TARGET} の行が無いか応答が 200 でない）", file=sys.stderr)
+            print(
+                f"GET /settings/sources: {status}（{common.TARGET} の行が無いか応答が 200 でない）",
+                file=sys.stderr,
+            )
         failed = failed or not ok
     except RuntimeError as error:
         print("端末の設定の API: failed")

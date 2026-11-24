@@ -12,10 +12,13 @@ import common  # noqa: E402
 def main() -> int:
     """観測した値を出し、どれかが合わなければ 1 を返却する。"""
     status, body = common.request("GET", "/settings/sources")
-    row = common.api_row(body) if status == 200 else None
+    row = common.api_row(body) if status == common.HTTP_OK else None
     if row is None:
         print("端末の設定の API: failed")
-        print(f"GET /settings/sources: {status}（{common.TARGET} の行が無いか応答が 200 でない）", file=sys.stderr)
+        print(
+            f"GET /settings/sources: {status}（{common.TARGET} の行が無いか応答が 200 でない）",
+            file=sys.stderr,
+        )
         return 1
     expected = common.allowed_kinds() or []
     actual = common.write_api_kinds(row)
