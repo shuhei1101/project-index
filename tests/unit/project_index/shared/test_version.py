@@ -4,12 +4,12 @@ import logging
 import subprocess
 from typing import TYPE_CHECKING, Any
 
-import pytest
-
 from project_index.shared.version import HEAD_READ_TIMEOUT_SEC, read_head
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    import pytest
 
 
 def test_read_head(tmp_path: Path) -> None:
@@ -43,7 +43,6 @@ def test_read_head(tmp_path: Path) -> None:
     result = read_head(tmp_path)
     # 検証
     assert result == expected
-    assert len(result) == 40
 
 
 def test_read_head_when_not_repository(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
