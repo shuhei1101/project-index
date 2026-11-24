@@ -53,7 +53,15 @@ data_models:
       - name: restarting
         title: 起動し直すか
         type: bool
-        description: '`updated` で `migration_needed` でなければ `True`'
+        description: 起動し直す判定（`previous_commit` があれば `commit` と違うか、無ければ `updated`）が真で、`migration_needed` でなければ `True`
+      - name: previous_commit
+        title: 起動した commit
+        type: str | None
+        description: 動いているプロセスが起動した時点のクローンの HEAD（`RestartControl.running_commit`）
+      - name: commit
+        title: 取り込んだ後の commit
+        type: str
+        description: '`git pull --ff-only` の後のクローンの HEAD'
       - name: mdmark
         title: mdmark の CLI の入れ直し
         type: MdmarkReinstallResult | None

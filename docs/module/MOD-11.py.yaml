@@ -150,6 +150,11 @@ data_models:
         type: list[RunningRequest]
         default: '[]'
         description: 文書の MCP・読み取り API・書き込みの後の通知の判定の終わっていない要求（経過秒の長い順）。`field(default_factory=list)`
+      - name: commit
+        title: 起動した commit
+        type: str | None
+        default: None
+        description: 動いているプロセスが起動した時点の端末の設定の `clone` の HEAD。読めなかったときは `None`
   - name: NotServedItem
     title: 配信していない配信元
     container: project_index/features/admin/types.py

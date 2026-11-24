@@ -13,4 +13,64 @@ constants:
     summary: プロセスがモジュールを読み込んだ時点の project-index のバージョン（`importlib.metadata.version(DIST_NAME)`）
     value: version(DIST_NAME)
     reason: 更新で配布のメタデータが入れ替わっても、動いているプロセスのバージョンが変わらないよう、読み込んだ時点の値を持つ
+  - name: HEAD_READ_TIMEOUT_SEC
+    title: HEAD の読み取りの打ち切り
+    container: project_index/shared/version.py
+    usecase: 共通
+    summary: 起動した時点のクローンの HEAD を読む `git rev-parse HEAD` の打ち切りの秒数
+    value: '10'
+    reason: ローカルの `git rev-parse` は 1 秒かからない。止まっても起動を長く待たせないため、短い上限で打ち切って `None` として扱う
 visibility: internal
+functions:
+  - name: read_head
+    title: 起動した時点のクローンの HEAD の読み取り
+    kind: 関数
+    container: project_index/shared/version.py
+    usecase: 共通
+    role: ユーティリティ
+    summary: クローンの HEAD の commit を読み、読めなければ `None` を返す
+    scope: public
+    is_async: false
+    thread_safe: true
+    side_effects: 子プロセスの `git` を実行する
+    args:
+      - name: clone
+        title: クローン
+        type: Path
+        required: true
+        passing: positional
+        description: 端末の設定の `clone`
+    returns:
+      type: str | None
+      description: HEAD の commit の SHA（40 桁）。読めないときは `None`
+    process: |-
+      1. `subprocess.run(["git", "rev-parse", "HEAD"], cwd=clone, capture_output=True, text=True, timeout=HEAD_READ_TIMEOUT_SEC)` を実行する
+         - `OSError`（`git` が無い・`clone` が無い 等）・`TimeoutExpired` の場合、`None` を返す
+         - 終了コードが 0 以外（git のリポジトリでない 等）の場合、`None` を返す
+         - `None` を返す場合、`[WARNING]` クローンの HEAD を読めない（clone・理由）
+      2. 標準出力の前後の空白を除いて返す
+    unit_tests:
+      - name: test_read_head
+        case: 正常
+        summary: HEAD の commit を返す
+        condition: 一時フォルダに commit を 1 つ持つ git リポジトリ
+        mock: なし（一時フォルダ）
+        expected: '`git rev-parse HEAD` と同じ 40 桁の SHA'
+      - name: test_read_head_when_not_repository
+        case: 正常
+        summary: git のリポジトリでなければ `None`
+        condition: 一時フォルダ（git のリポジトリでない）
+        mock: なし
+        expected: '`None`。WARNING のログが 1 行出る'
+      - name: test_read_head_when_git_missing
+        case: 正常
+        summary: '`git` が無ければ `None`'
+        condition: '`subprocess.run` が `FileNotFoundError` を送出する'
+        mock: '`subprocess.run`'
+        expected: '`None`'
+      - name: test_read_head_when_timeout
+        case: 正常
+        summary: 打ち切ったら `None`
+        condition: '`subprocess.run` が `TimeoutExpired` を送出する'
+        mock: '`subprocess.run`'
+        expected: '`None`。`timeout` に `HEAD_READ_TIMEOUT_SEC` が渡る'

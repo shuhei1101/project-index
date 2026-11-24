@@ -346,7 +346,7 @@ response:
     notes: '`previous_commit` と違い、移し替えが要らなければ、`updated: false` でも `restarting: true` を返す'
 response_example: |-
   ```json
-  {"previous_version": "0.2.0", "version": "0.3.0", "updated": true, "migration_needed": false, "restarting": true, "mdmark": {"ref": "develop", "reinstalled": true}}
+  {"previous_version": "0.2.0", "version": "0.3.0", "updated": true, "migration_needed": false, "restarting": true, "previous_commit": "f90d4621a3c8e5b7d9f0a1b2c3d4e5f6a7b8c9d0", "commit": "5b7054a1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7", "mdmark": {"ref": "develop", "reinstalled": true}}
   ```
 response_notes: '配信できなかった配信元と、配信元の設定のバージョンの新旧は、起動し直した後の `status` の `version_state` で確かめる。`migration_needed: true` のときは、利用者が `project-index migrate` を実行してから `restart` を呼ぶ。'
 exceptions:
@@ -376,7 +376,7 @@ constraints:
     constraint: '`git pull --ff-only` が成功した後（新しい commit が無いとき・移し替えが要るときも含む）、`PATH` に `mdmark` があれば `npm install -g github:shuhei1101/mdmark#{mdmark_ref}` を実行する。失敗しても `UpdateFailedError` にせず、`mdmark.error` に入れて更新と再起動を続ける'
     notes: '`mdmark_ref` は `update` を呼んだ時点で端末の設定のファイルを再読み込みした値（`reload` は要らない）。無ければ `develop`。タイムアウトは `git pull` と同じ 300 秒'
   - item: 起動し直すかの判定
-    constraint: '`git pull --ff-only` の後のクローンの HEAD（`commit`）を、稼働中のプロセスが起動した時点のクローンの HEAD（`previous_commit`）と比べ、違えば `uv sync` と `migrate --plan` を実行して、移し替えが要らなければ起動し直す。`previous_commit` が `null` のときは、`updated` が `true` のときだけ起動し直す'
+    constraint: '`git pull --ff-only` の後のクローンの HEAD（`commit`）を、稼働中のプロセスが起動した時点のクローンの HEAD（`previous_commit`）と比べ、違えば `uv sync` と `migrate --plan` を実行して、移し替えが要らなければ起動し直す。取り込む commit が無いのに起動し直すときは、`previous_commit` と `commit` を INFO のログに出す。`previous_commit` が `null` のときは、`updated` が `true` のときだけ起動し直す'
     notes: マージの後のローカルの最新化でクローンが先に fast-forward されていても、稼働中のプロセスへ新しいコードを効かせるため
 test_file: tests/integration/server/test_update.py
 visibility: internal
