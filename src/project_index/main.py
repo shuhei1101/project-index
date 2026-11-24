@@ -97,6 +97,8 @@ class Handlers:
     notified: NotifiedStore
     # 文書の MCP・読み取り API と管理の MCP の専用の実行スロット
     slots: ExecutionSlots
+    # 文書の MCP の実行スロットに入る前に、同じリポジトリ・同じ配信元への書き込みを 1 つずつ通す（書き込み）
+    write_gates: Any
 
 
 class _ClosedDropRotatingFileHandler(RotatingFileHandler):
@@ -277,7 +279,7 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
     from project_index.features.history.snapshot import SnapshotStore
     from project_index.features.seen.store import SeenStore
     from project_index.features.validation.service import DocumentChecker
-    from project_index.features.write.locks import RepositoryLocks, SourceLocks
+    from project_index.features.write.locks import RepositoryLocks, SourceLocks, WriteGates
 
     # プロンプトの YAML が違反するときは、state_dir を作る前に止める
     prompts = load_prompts(prompts_dir(os.environ), required=[*mcp_prompt_ids(), NOTICE_PROMPT_ID])
@@ -364,6 +366,7 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
         gate=gate,
         notified=NotifiedStore(),
         slots=ExecutionSlots(),
+        write_gates=WriteGates(),
     )
 
 

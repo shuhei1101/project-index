@@ -196,6 +196,11 @@ data_models:
         type: RepositoryLocks
         access: 公開
         description: 直コミットをリポジトリごとに 1 つずつにする（書き込み）。文書の MCP の `write_docs`・`delete_docs` が `repo_locks` に渡す
+      - name: write_gates
+        title: 書き込みの関所
+        type: WriteGates
+        access: 公開
+        description: 文書の MCP の実行スロットに入る前に、同じリポジトリ・同じ配信元への書き込みを 1 つずつ通す（書き込み）。文書の MCP の `write_docs`・`delete_docs` と書き込みの API が握る
 classes:
   - name: PortInUseError
     title: ポートが使用中

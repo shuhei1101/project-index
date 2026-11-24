@@ -1,0 +1,59 @@
+docs:
+  - page: docs/interface/IF-6.yaml
+    new: false
+    change: 同じ配信元の書き込みのロックの待ちを書き込みの期限の内に収め、超えたら WriteDeadlineExceededError を返却する制約を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T00:30:20.427377+00:00'
+  - page: docs/interface/IF-7.yaml
+    new: false
+    change: IF-6 と同じロックの待ちの制約を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T00:30:20.427377+00:00'
+  - page: docs/interface/IF-38.yaml
+    new: false
+    change: 直コミットの書き込みの配信元のロックの待ちを書き込みの期限の内に収める制約を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T00:30:20.427377+00:00'
+  - page: docs/module/MOD-82.py.yaml
+    new: false
+    change: SourceLocks.hold に待ち時間の上限を追加し、実行スロットの外で配信元・リポジトリを 1 つずつ通す書き込みの関所（WriteGates）と排他のキー（WriteLockKeys）を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T00:47:57.129390+00:00'
+  - page: docs/module/MOD-84.py.yaml
+    new: false
+    change: write_docs・delete_docs・直コミットが書き込みの期限までの残りを上限に配信元の排他を握り、排他のキーを求める write_lock_keys を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T00:47:57.129390+00:00'
+  - page: docs/module/MOD-94.py.yaml
+    new: false
+    change: write_docs・delete_docs を書き込みの関所を握ってから実行スロットで呼ぶ
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T00:47:57.129390+00:00'
+  - page: docs/module/MOD-183.py.yaml
+    new: false
+    change: 書き込みの API を書き込みの関所を握ってから実行スロットで呼ぶ
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T00:47:57.129390+00:00'
+  - page: docs/module/MOD-89.py.yaml
+    new: false
+    change: Handlers に書き込みの関所（write_gates）を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T00:48:01.703972+00:00'
+scope_out:
+  - item: 実行スロットの本数（DOCS_WORKERS）・書き込みの期限（32 秒）の値の見直し
+    reason: 要望はロックの待ち方の修正で、決定値の変更を含まない
+    plan: none
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: run_only
+    detail: 書き込みの流れは変わらず、同じ配信元への書き込みが重なったときの待ちが期限で打ち切られる
+    depends_on: []

@@ -13,6 +13,7 @@ from mcp.types import CallToolResult, TextContent
 
 from project_index.features.search.types import SearchRequest, SearchResult
 from project_index.features.sources.registry import SourceRegistry
+from project_index.features.write.locks import WriteGates, WriteLockKeys
 from project_index.features.write.types import WriteRequest, WriteResult
 from project_index.integrations.git import GitError
 from project_index.main import build_handlers
@@ -24,7 +25,9 @@ from project_index.server.mcp.docs import (
     build_docs_mcp,
 )
 from project_index.server.mcp.result import DOCS_INSTRUCTIONS_PROMPT_ID, tool_prompt_id
+from project_index.shared.deadline import Deadline
 from project_index.shared.errors import UnknownKindError, WorktreeLoadingError
+from project_index.shared.runtime import DOCS_WORKERS
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -134,6 +137,11 @@ def test_build_docs_mcp_when_foreground(
     assert handlers.gate.active is False
 
 
+def _fixed_lock_keys(_request: WriteRequest, **_kwargs: Any) -> WriteLockKeys:
+    """書き込みの排他のキーの解決の偽物（配信元 sample だけを握る）。"""
+    return WriteLockKeys(repo=None, source_id="sample")
+
+
 def test_build_docs_mcp_when_error(
     make_mcp_handlers: Callable[..., Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -144,6 +152,7 @@ def test_build_docs_mcp_when_error(
         raise UnknownKindError(message="種類がありません", kinds=["rules"])
 
     monkeypatch.setattr(docs_module, "write_docs", failing_write_docs)
+    monkeypatch.setattr(docs_module, "write_lock_keys", _fixed_lock_keys)
     mcp = build_docs_mcp(make_mcp_handlers())
     arguments: dict[str, Any] = {"operations": [{"op": "create", "kind": "x", "data": {}}]}
     # 実行
@@ -449,6 +458,7 @@ def test_build_docs_mcp_when_limits(
         return WriteResult(applied=False, results=[])
 
     monkeypatch.setattr(docs_module, "write_docs", recording_write_docs)
+    monkeypatch.setattr(docs_module, "write_lock_keys", _fixed_lock_keys)
     handlers = make_mcp_handlers(terminal=make_terminal_config(write_deadline_sec=32))
     mcp = build_docs_mcp(handlers)
     arguments: dict[str, Any] = {"operations": [{"op": "create", "kind": "x", "data": {}}]}
@@ -676,3 +686,44 @@ def test_ensure_worktree_when_unresolved(
     asyncio.run(docs_module._ensure_worktree(SearchRequest(source="sample"), handlers, {}))  # pyright: ignore[reportPrivateUsage]
     # 検証
     assert store.calls == []
+
+
+def test_build_docs_mcp_when_write_gate(
+    make_mcp_handlers: Callable[..., Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """書き込みの関所を待つ間は実行スロットを持たない（正常系）。"""
+    # 準備
+    called: list[str] = []
+
+    def fake_write_lock_keys(request: WriteRequest, **kwargs: Any) -> WriteLockKeys:
+        return WriteLockKeys(repo=None, source_id=request.cwd or "")
+
+    def fake_write_docs(request: WriteRequest, **kwargs: Any) -> WriteResult:
+        called.append(request.cwd or "")
+        return WriteResult(applied=False, results=[])
+
+    monkeypatch.setattr(docs_module, "write_lock_keys", fake_write_lock_keys)
+    monkeypatch.setattr(docs_module, "write_docs", fake_write_docs)
+    gates = WriteGates()
+    mcp = build_docs_mcp(make_mcp_handlers(write_gates=gates))
+
+    def arguments(cwd: str) -> dict[str, Any]:
+        return {"cwd": cwd, "operations": [{"op": "create", "kind": "x", "data": {}}]}
+
+    async def scenario() -> tuple[list[str], list[str]]:
+        held = WriteLockKeys(repo=None, source_id="sample")
+        async with gates.hold(held, Deadline(limit_sec=30, started=time.monotonic())):
+            waiting = [
+                asyncio.create_task(mcp.call_tool("write_docs", arguments("sample")))
+                for _ in range(DOCS_WORKERS + 1)
+            ]
+            await asyncio.wait_for(mcp.call_tool("write_docs", arguments("sample2")), timeout=5)
+            before_release = list(called)
+        await asyncio.gather(*waiting)
+        return before_release, list(called)
+
+    # 実行
+    before_release, after_release = asyncio.run(scenario())
+    # 検証
+    assert before_release == ["sample2"]
+    assert after_release.count("sample") == DOCS_WORKERS + 1

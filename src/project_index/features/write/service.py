@@ -73,6 +73,7 @@ from project_index.features.write.direct_commit import (
 )
 from project_index.features.write.hints import attach_schema_hints
 from project_index.features.write.ids import generate_id
+from project_index.features.write.locks import WriteLockKeys
 from project_index.features.write.placement import new_document_path
 from project_index.features.write.references import (
     renamed_path,
@@ -1067,7 +1068,10 @@ def write_docs(
     )
     source = target.source
     key = SessionKey.of(request.session_id, request.agent_id)
-    with _commit_branch_lock(repo_locks, target, limits), locks.hold(source.id):
+    with (
+        _commit_branch_lock(repo_locks, target, limits),
+        locks.hold(source.id, timeout=_remaining(limits)),
+    ):
         session = _Session(
             store, target, deadline=None if limits is None else limits.write_deadline
         )
@@ -2060,7 +2064,10 @@ def delete_docs(
         registry=registry, source=request.source, worktree=request.worktree, cwd=request.cwd
     )
     source = target.source
-    with _commit_branch_lock(repo_locks, target, limits), locks.hold(source.id):
+    with (
+        _commit_branch_lock(repo_locks, target, limits),
+        locks.hold(source.id, timeout=_remaining(limits)),
+    ):
         session = _Session(
             store, target, deadline=None if limits is None else limits.write_deadline
         )
@@ -2221,18 +2228,50 @@ def _commit_branch_lock(
     repo_locks: RepositoryLocks, target: Target, limits: CallLimits | None
 ) -> contextlib.AbstractContextManager[None]:
     """コミットするブランチのワークツリーへ書くときだけ、リポジトリの排他を返す。"""
+    repo = _commit_branch_repo(target)
+    # コミットするブランチ・上書きできるブランチを指すワークツリーでなければ握らない
+    if repo is None:
+        return contextlib.nullcontext()
+    return repo_locks.hold(repo, timeout=_remaining(limits))
+
+
+def _commit_branch_repo(target: Target) -> Path | None:
+    """コミットするブランチ・上書きできるブランチを指すワークツリーなら、そのリポジトリを返す。"""
     settings = target.source.config.direct_commit
     if settings is None or target.worktree is None:
-        return contextlib.nullcontext()
+        return None
     branch = _worktree_branch(target.worktree)
-    # コミットするブランチ・上書きできるブランチを指すワークツリーでなければ握らない
     if branch is None or not (
         branch == settings.branch
         or any(fnmatch.fnmatchcase(branch, pattern) for pattern in settings.branches)
     ):
-        return contextlib.nullcontext()
-    timeout = None if limits is None else limits.write_deadline.remaining()
-    return repo_locks.hold(_git_common_dir(target.worktree), timeout=timeout)
+        return None
+    return _git_common_dir(target.worktree)
+
+
+def _remaining(limits: CallLimits | None) -> float | None:
+    """書き込みの期限までの残りの秒数（期限を持たない呼び出しは None）。"""
+    return None if limits is None else limits.write_deadline.remaining()
+
+
+def write_lock_keys(
+    request: WriteRequest | DeleteRequest | CommitDocumentsRequest, *, registry: SourceRegistry
+) -> WriteLockKeys:
+    """書き込み・削除・直コミットの要求が握る排他のキーを、書く場所を解いて返す。"""
+    # 書き込みの API の直コミット: 書き込みと削除の直コミットと同じ計画のリポジトリ
+    if isinstance(request, CommitDocumentsRequest):
+        _source, plan, _committable = _write_api_commit_target(registry, request)
+        return WriteLockKeys(repo=plan.repo, source_id=plan.source_id)
+    # 文書の MCP の直コミット: 文書の書き込みの直コミットと同じ計画のリポジトリ
+    if request.commit is not None:
+        _source, plan, _committable = _commit_target(
+            registry, request.source, request.cwd, request.commit
+        )
+        return WriteLockKeys(repo=plan.repo, source_id=plan.source_id)
+    target = resolve_write_target(
+        registry=registry, source=request.source, worktree=request.worktree, cwd=request.cwd
+    )
+    return WriteLockKeys(repo=_commit_branch_repo(target), source_id=target.source.id)
 
 
 def _commit_target(
@@ -2523,7 +2562,7 @@ def _commit_locks(
     """リポジトリの排他、配信元の排他の順に握る。"""
     with (
         repo_locks.hold(plan.repo, timeout=limits.write_deadline.remaining()),
-        locks.hold(plan.source_id),
+        locks.hold(plan.source_id, timeout=limits.write_deadline.remaining()),
     ):
         yield
 
@@ -2822,6 +2861,49 @@ def commit_documents(
     limits: CallLimits | None = None,
 ) -> CommitDocumentsResult:
     """書き込みの API の要求を処理し、書き込みと削除を 1 つの直コミットにして結果を返す。"""
+    pending = commit_documents_locked(
+        request,
+        registry=registry,
+        store=store,
+        checker=checker,
+        locks=locks,
+        repo_locks=repo_locks,
+        timeout_sec=timeout_sec,
+        state_dir=state_dir,
+        now=now,
+        limits=limits,
+    )
+    return finish_commit_documents(pending, reload_sources=reload_sources)
+
+
+@dataclass(frozen=True, slots=True)
+class CommitDocumentsPending:
+    """排他の中の直コミットから直コミットの後処理へ渡す値（result・commit・conflicted のうち 1 つを持つ）。"""
+
+    run: _CommitDocumentsRun
+    # 試しの書き込みの結果
+    result: CommitDocumentsResult | None = None
+    # プッシュした直コミットの結果
+    commit: CommitResult | None = None
+    # 衝突にした例外と、衝突したときのブランチとコミット（残せなかったときは None）
+    conflicted: ProjectIndexError | None = None
+    kept: tuple[str, str] | None = None
+
+
+def commit_documents_locked(
+    request: CommitDocumentsRequest,
+    *,
+    registry: SourceRegistry,
+    store: DocumentStore,
+    checker: DocumentChecker,
+    locks: SourceLocks,
+    repo_locks: RepositoryLocks,
+    timeout_sec: float,
+    state_dir: Path,
+    now: datetime | None = None,
+    limits: CallLimits | None = None,
+) -> CommitDocumentsPending:
+    """書き込みと削除の直コミットのうち排他の中の処理をし、排他を放して途中の結果を返す。"""
     limits = limits or _default_limits()
     _check_commit_documents_size(request)
     # SQLite の表の行の種類への操作は、取得・取り込みの前に断る
@@ -2845,26 +2927,36 @@ def commit_documents(
     # 試しの書き込み: 取得・コミット・プッシュをせず、確認だけを行う
     if request.dry_run:
         with _commit_locks(repo_locks, locks, plan, limits):
-            return run.dry_run()
-    conflicted: ProjectIndexError | None = None
-    kept: tuple[str, str] | None = None
-    result: CommitResult | None = None
+            return CommitDocumentsPending(run=run, result=run.dry_run())
     with _commit_locks(repo_locks, locks, plan, limits):
         try:
-            result = run_direct_commit(plan, run.write_once, limits=limits)
+            return CommitDocumentsPending(
+                run=run, commit=run_direct_commit(plan, run.write_once, limits=limits)
+            )
         except CONFLICT_ERRORS as error:
             # 編集を始めたときのコミットが無い要求と、書き換えられないキーだけの違反は、今と同じに断る
             if request.base_commit is None or _protected_only(error):
                 raise
-            conflicted = error
-            kept = run.keep(error, write=True)
+            return CommitDocumentsPending(
+                run=run, conflicted=error, kept=run.keep(error, write=True)
+            )
+
+
+def finish_commit_documents(
+    pending: CommitDocumentsPending, *, reload_sources: Callable[[], object]
+) -> CommitDocumentsResult:
+    """書き込みと削除の直コミットのうち排他を放した後の処理をし、結果を返す。"""
+    # 試しの書き込み: 排他の中で作った結果をそのまま返す
+    if pending.result is not None:
+        return pending.result
+    run = pending.run
     # 衝突した: 排他を放した後に、衝突したときのスクリプトを実行する
-    if conflicted is not None:
-        return run.finish_conflict(kept, conflicted)
+    if pending.conflicted is not None:
+        return run.finish_conflict(pending.kept, pending.conflicted)
     # プッシュした: 配信元の設定を書き換えたときは、排他を放した後に配信元を再読み込みする
     return run.result_of(
         applied=True,
-        commit=cast("CommitResult", result),
+        commit=cast("CommitResult", pending.commit),
         reloaded=run.reload_after_push(reload_sources),
     )
 
