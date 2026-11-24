@@ -163,6 +163,7 @@ def make_handlers(make_terminal_config: Callable[..., TerminalConfig]) -> Callab
     import dataclasses
     import threading
 
+    from project_index.features.lifecycle.control import RestartControl
     from project_index.features.write.locks import WriteGates
     from project_index.main import Handlers
     from project_index.shared.background import BackgroundGate
@@ -178,6 +179,7 @@ def make_handlers(make_terminal_config: Callable[..., TerminalConfig]) -> Callab
                 "gate": BackgroundGate(),
                 "slots": ExecutionSlots(),
                 "write_gates": WriteGates(),
+                "restart": RestartControl(),
             }
         )
         values.update(overrides)
