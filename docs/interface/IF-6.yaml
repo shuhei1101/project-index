@@ -2551,6 +2551,44 @@ flows:
       - '1〜5 回目のどれも `isError: true` で、添字 0 と `guide.md` の行の ID の違反として、種類 `files` は本文の直コミットを断っていることを返却する'
       - リモートと develop のワークツリーは変わらず、`guide.md` と `files.yml` も変わらない
     test: test_error_when_direct_commit_body_not_allowed
+  - name: 異常系（同じ配信元の排他を書き込みの期限までに握れない・WriteDeadlineExceededError）
+    summary: 同じ配信元の先の書き込みが排他を握ったままで、後から来た書き込みの期限を過ぎたら、後から来た書き込みは待つのをやめ、何も書き込まずに時間切れを返却する
+    setup:
+      - name: Mock
+        description: なし。端末の設定の `write_deadline_sec` を 2 にする
+      - name: 遅い生成のスクリプト
+        description: sample の種類の `generators[]` に、4 秒待ってから終了するスクリプトを配置する
+        notes: 生成は、書き込みの期限を過ぎても文書の MCP の応答の上限まで排他を握ったまま動く
+      - name: 入力
+        description: 呼び出し A はワークツリー x の文書 1 の `update` 1 件。呼び出し B は A を送信した 0.5 秒後に送信する、ワークツリー x の文書 2 の `update` 1 件
+    flow: |-
+      <!-- map: {"title": "異常系（同じ配信元の排他を書き込みの期限までに握れない・WriteDeadlineExceededError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant A as クライアント A
+        participant B as クライアント B
+        participant T as write_docs
+        participant WT as ワークツリー x
+
+        A->>T: worktree: x, operations: update 文書 1
+        T->>T: 配信元の排他を握る
+        T->>WT: 文書 1 を書き込む
+        T->>T: generators を実行する（4 秒）
+        B->>T: worktree: x, operations: update 文書 2
+        T->>T: 配信元の排他を書き込みの期限までの残りの時間だけ待つ
+        T-->>B: isError（書き込みの期限・経過した秒数・書き換えていないこと）
+        T->>T: 生成を終えて排他を放す
+        T-->>A: applied: true
+      ```
+
+      <!-- /map -->
+    expected:
+      - 'B は `isError: true` で、`WriteDeadlineExceededError`、書き込みの期限（2 秒）を超えたことと、ファイルを書き換えていないことを返却する'
+      - B の応答は、B を送信してから 3 秒の内に返却される（A の生成の 4 秒を待たない）
+      - 'A は `applied: true` を返却し、ワークツリー x の文書 1 は書き換わる'
+      - A の応答を待った後も、ワークツリー x の文書 2 は書き換わらない
+    test: test_error_when_source_lock_wait_exceeds_deadline
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -2601,7 +2639,7 @@ callers:
   - SC-7#scenarios[正常シナリオ（先に作成した本文のファイルを指す文書を作る）]
   - SC-15#scenarios[正常シナリオ（本文の直コミットを断る種類のメタデータだけを書き換える）]
   - SC-15#scenarios[異常シナリオ（本文の直コミットを断る種類の本文を書き換える）]
-exclusivity: 配信元ごとの排他ロックの中で、読み込み・バージョンの確認・検査・書き込みを行う。後から来た呼び出しはロックを待つ。`commit` を指定した呼び出しは、制約「直コミットの排他」のリポジトリの単位の排他も取る
+exclusivity: 配信元ごとの排他ロックの中で、読み込み・バージョンの確認・検査・書き込みを行う。後から来た呼び出しは、制約「配信元ごとの排他の待ち」のとおり書き込みの期限までロックを待つ。`commit` を指定した呼び出しは、制約「直コミットの排他」のリポジトリの単位の排他も取る
 request:
   - name: source
     type: str
@@ -2918,7 +2956,7 @@ exceptions:
   - name: WorktreeNotMatchedError
     condition: '`worktree` が配信元の `worktrees` に当たらない'
   - name: WriteDeadlineExceededError
-    condition: 作業ツリーのファイルを置き換える前に、要求を受けてから端末の設定の `write_deadline_sec` を過ぎていた
+    condition: 作業ツリーのファイルを置き換える前に、要求を受けてから端末の設定の `write_deadline_sec` を過ぎていた（配信元ごとの排他を書き込みの期限までに握れなかったときを含む）
     notes: 書き込みの期限・経過した秒数・ファイルを書き換えていないことと、検査のスクリプトの所要時間を確認してから再実行することを添える
   - name: UnexpectedError
     condition: '`ProjectIndexError` でない例外（`GitError` など）で処理を終了できなかった'
@@ -3119,6 +3157,9 @@ constraints:
   - item: 改名の参照元の読み込み
     constraint: 改名 1 件の中で、参照元の候補のファイル（文書のファイルと拡張子が `.md` の本文のファイル）は 1 ファイルにつき 1 回だけ読み込み、同じファイルの `records` の要素の文書は読み込んだ結果を再利用する。ファイルの文字列が、旧 ID と、パスが変わるときの改名前のファイル名（URL エンコードした値を含む）のどれも含まないファイルは、YAML として読み込まずに飛ばす
     notes: 書き換える箇所と結果は制約「改名の参照元」のとおりで、飛ばしたファイルには書き換える箇所が無い
+  - item: 配信元ごとの排他の待ち
+    constraint: 同じ配信元の排他は、書き込みの期限までの残りの時間だけ待つ。握れなければ、何も読み込まず・書き込まずに `WriteDeadlineExceededError` を返却し、文書の MCP の実行スロットを放す
+    notes: 制約「直コミットの排他」のリポジトリの単位の排他を先に握り、その待ちと合わせて書き込みの期限の内に収める。`delete_docs` と書き込みの API も同じ待ち方にする
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]

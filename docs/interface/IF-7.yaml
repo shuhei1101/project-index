@@ -566,7 +566,7 @@ callers:
   - SC-7#scenarios[正常シナリオ（本文のファイルを持たない要素を書く）]
   - SC-15#scenarios[正常シナリオ（文書を消す）]
   - SC-15#scenarios[異常シナリオ（本文の直コミットを断る種類の文書を消す）]
-exclusivity: '`write_docs` と同じ配信元ごとの排他ロックの中で行う。`commit` を指定した呼び出しは、`write_docs` と同じリポジトリの単位の排他も取る'
+exclusivity: '`write_docs` と同じ配信元ごとの排他ロックの中で行い、排他は `write_docs` の制約「配信元ごとの排他の待ち」と同じく書き込みの期限まで待つ。`commit` を指定した呼び出しは、`write_docs` と同じリポジトリの単位の排他も取る'
 request:
   - name: source
     type: str
