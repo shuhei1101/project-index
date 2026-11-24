@@ -39,7 +39,7 @@ functions:
       | broken | not_served（documents[0].paths: 必須のキーが無い） | - | - |
       ```
     process: |-
-      1. 1 行目に `{address} project-index {version}（pid {pid}）`、2 行目に `端末の設定: {file}（{version_state}）` を置く
+      1. 1 行目に `{address} project-index {version}（pid {pid}）`（`commit` があれば `（pid {pid}・commit {commit の先頭 7 文字}）`）、2 行目に `端末の設定: {file}（{version_state}）` を置く
       2. 配信元ごとに表の行を作る（配信元の行）
          - `loading` が `True` の場合、表の代わりに `配信元: 読み込み中（読み込みが終わっていない配信元を指す文書の MCP の呼び出しは待たされます）` を置く
          - `checking` が `True` の場合、表の前に `検査: 検査中（索引の同期の件数は検査が済んだ後に出ます）` を置く
@@ -77,6 +77,12 @@ functions:
         condition: '`running` が `write_docs`（`sources` が `["a", "b"]`・`seconds` が 12.34）と `search_docs`（`sources` が空）の 2 件'
         mock: なし
         expected: 配信元の表の後に `実行中の要求:` と、`| write_docs | a・b | docs | running | 12.3 |` と配信元が `-` の行を持つ表がある。`running` が空なら `実行中の要求:` が無い
+      - name: test_render_status_when_commit
+        case: 正常
+        summary: 起動した commit を 1 行目に添える
+        condition: '`commit` が `5fd0f9a` で始まる 40 桁の SHA の `ServerStatus`'
+        mock: なし
+        expected: 1 行目が `（pid {pid}・commit 5fd0f9a）` で終わる
     callees:
       - '#functions[_source_row]'
   - name: render_reload

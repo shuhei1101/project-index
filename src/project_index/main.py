@@ -36,6 +36,7 @@ from project_index.features.sources.types import ServedSource, SourceStatus
 from project_index.server.mcp.result import mcp_prompt_ids
 from project_index.shared.background import BackgroundGate
 from project_index.shared.runtime import ExecutionSlots
+from project_index.shared.version import read_head
 from project_index.shared.yaml_io import c_loader_available
 
 if TYPE_CHECKING:
@@ -359,7 +360,7 @@ def build_handlers(terminal: TerminalConfig) -> Handlers:
         settings_lock=threading.Lock(),
         checker=checker,
         reload_sources=reload,
-        restart=RestartControl(),
+        restart=RestartControl(running_commit=read_head(terminal.clone)),
         prompts=prompts,
         checks=checks,
         reload_changed=reload_changed,

@@ -65,6 +65,7 @@
 | `address` | str | 待ち受けている URL |
 | `version` | str | 動いている project-index のバージョン |
 | `pid` | int | サーバーのプロセス ID |
+| `commit` | str / null | 動いているプロセスが起動した時点の、端末の設定の `clone` の HEAD。読めなかったときは `null`。markdown では 1 行目に先頭 7 文字を添える |
 | `terminal.file` | str | 読んだ端末の設定のパス |
 | `terminal.version_state` | `current` / `old` / `newer` | 端末の設定の `version` の比較 |
 | `sources[].id` | str | 配信元の ID |
@@ -86,7 +87,7 @@
 <!-- /table -->
 
 ```markdown
-http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
+http://127.0.0.1:8786/ project-index 0.2.0（pid 4242・commit 5b7054a）
 端末の設定: /home/u/.config/project-index/settings.yaml（current）
 | source | 状態 | 設定のバージョン | 索引の同期 |
 | --- | --- | --- | --- |
@@ -175,6 +176,7 @@ http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
 ## update
 
 端末の設定の `clone` で `git pull --ff-only` と `uv sync` を実行し、端末の設定の移し替えが要らなければ起動し直します。
+取り込む commit が無くても、クローンの HEAD が動いているプロセスの起動した commit と違えば、`uv sync` を実行して起動し直します。
 新しいバージョンのコードで `{clone}/.venv/bin/python -m project_index migrate --plan` を実行し、当てる手順があれば移し替えが要るとします。
 `git pull`・`uv sync`・`migrate --plan` は、それぞれ 300 秒で打ち切ります。
 
@@ -183,10 +185,12 @@ http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
 | 返すフィールド | 型 | 説明 |
 | --- | --- | --- |
 | `previous_version` | str | 更新する前の project-index のバージョン |
-| `version` | str | 更新した後のクローンのバージョン。`updated: false` のときは `previous_version` と同じ |
+| `version` | str | 更新した後のクローンのバージョン。`commit` が `previous_commit` と同じときは `previous_version` と同じ |
 | `updated` | bool | 新しい commit を取り込んだか |
 | `migration_needed` | bool | 端末の設定の移し替えが要るか。`true` のときは再起動しない |
 | `restarting` | bool | 応答の後に起動し直すか |
+| `previous_commit` | str / null | 動いているプロセスが起動した時点のクローンの HEAD（`status` の `commit`）。`null` のときは `updated` だけで起動し直すかを決める |
+| `commit` | str | `git pull --ff-only` の後のクローンの HEAD |
 
 `migration_needed: true` のときは、`project-index migrate` を実行してから `restart` を呼びます。
 配信できなかった配信元と、配信元の設定のバージョンの新旧は、起動し直した後の `status` で確かめます。

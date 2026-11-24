@@ -162,6 +162,7 @@ def get_status(handlers: Handlers, *, env: Mapping[str, str]) -> ServerStatus:
         checking=handlers.checks.checking,
         exporting=handlers.snapshots.exporting,
         running=handlers.slots.running(),
+        commit=handlers.restart.running_commit,
     )
 
 

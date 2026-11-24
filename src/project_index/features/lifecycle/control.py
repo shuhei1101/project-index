@@ -19,7 +19,9 @@ logger = logging.getLogger(__name__)
 class RestartControl:
     """再起動の要求を 1 回だけ受け、uvicorn に停止を伝える。"""
 
-    def __init__(self) -> None:
+    def __init__(self, *, running_commit: str | None = None) -> None:
+        # このプロセスが起動した時点のクローンの HEAD（読めなかったときは None）
+        self.running_commit = running_commit
         self._server: uvicorn.Server | None = None
         self._requested = False
         self._lock = threading.Lock()

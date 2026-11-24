@@ -40,4 +40,6 @@ class UpdateResult:
     updated: bool
     migration_needed: bool
     restarting: bool
+    previous_commit: str | None
+    commit: str
     mdmark: MdmarkReinstallResult | None = None

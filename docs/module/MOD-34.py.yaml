@@ -17,7 +17,7 @@ classes:
     usecase: 再起動
     role: 制御
     summary: 再起動の要求を 1 回だけ受け、uvicorn に停止を伝える
-    description: '`build_handlers` が 1 つ作り、`run_serve` が uvicorn の `Server` を `attach` する。`update` は `update_lock` を取っている間、他の `update` を断る。'
+    description: '`build_handlers` が起動した時点のクローンの HEAD を `running_commit` に渡して 1 つ作り、`run_serve` が uvicorn の `Server` を `attach` する。`update` は `update_lock` を取っている間、他の `update` を断る。'
     properties:
       - name: _server
         title: uvicorn のサーバー
@@ -41,6 +41,13 @@ classes:
         type: threading.Lock
         access: 公開
         description: '`update_clone` が非ブロッキングで取る'
+      - name: running_commit
+        title: 起動した commit
+        type: str | None
+        access: 公開
+        default: None
+        description: このプロセスが起動した時点の端末の設定の `clone` の HEAD。読めなかったときは `None`
+        notes: コンストラクタのキーワード引数で受け、起動し直すまで変えない。`update` の起動し直すかの判定と `status` の `commit` が読む
     methods:
       - name: attach
         title: サーバーの取り付け

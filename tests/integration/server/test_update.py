@@ -138,6 +138,7 @@ def test_normal(
     port = free_port()
     process = start_serve_from_clone(project_index_clone.clone, settings, port)
     wait_until_serving(process, port)
+    started_head = project_index_clone.head()
     upstream = project_index_clone.push_upstream(project_index_clone.bump_version("0.3.0"), "bump")
     started = started_count(state_dir)
     # 実行
@@ -153,6 +154,8 @@ def test_normal(
         "updated": True,
         "migration_needed": False,
         "restarting": True,
+        "previous_commit": started_head,
+        "commit": upstream,
         "mdmark": REINSTALLED_DEVELOP,
     }
     assert project_index_clone.head() == upstream
@@ -190,11 +193,60 @@ def test_normal_when_up_to_date(
     assert data["updated"] is False
     assert data["restarting"] is False
     assert data["version"] == data["previous_version"]
+    assert data["commit"] == head
+    assert data["previous_commit"] == head
     assert data["mdmark"] == REINSTALLED_DEVELOP
     assert tools.npm_calls() == [NPM_DEVELOP]
     assert project_index_clone.head() == head
     assert started_count(state_dir) == started
     assert process.poll() is None
+
+
+def test_normal_when_running_process_stale(
+    make_source: Callable[..., Any],
+    write_settings: Callable[..., Path],
+    free_port: Callable[[], int],
+    project_index_clone: Any,
+    start_serve_from_clone: Callable[..., Any],
+    wait_until_serving: Callable[..., None],
+    call_tool: Callable[..., dict[str, Any]],
+    started_count: Callable[[Path], int],
+    wait_for_restart: Callable[..., None],
+    fake_tools: Callable[..., FakeTools],
+) -> None:
+    """取り込む commit が無くても、クローンの HEAD が起動した commit と違えば、依存を入れ直して起動し直す（正常系）。"""
+    # 準備
+    tools = fake_tools()
+    settings = write_settings(make_source("sample"))
+    state_dir = settings.parent / "state"
+    port = free_port()
+    process = start_serve_from_clone(project_index_clone.clone, settings, port)
+    wait_until_serving(process, port)
+    started_head = project_index_clone.head()
+    upstream = project_index_clone.push_upstream(project_index_clone.bump_version("0.3.0"), "bump")
+    project_index_clone.run_git(project_index_clone.clone, "pull", "--ff-only")
+    started = started_count(state_dir)
+    # 実行
+    with httpx.Client(timeout=300) as client:
+        result = call_tool(client, port, "/_admin/mcp/", "update")
+    wait_for_restart(state_dir, port, started)
+    with httpx.Client(timeout=30) as client:
+        status = call_tool(client, port, "/_admin/mcp/", "status", format="json")
+    # 検証
+    assert result["structuredContent"] == {
+        "previous_version": RUNNING_VERSION,
+        "version": "0.3.0",
+        "updated": False,
+        "migration_needed": False,
+        "restarting": True,
+        "previous_commit": started_head,
+        "commit": upstream,
+        "mdmark": REINSTALLED_DEVELOP,
+    }
+    assert started_head != upstream
+    assert status["structuredContent"]["commit"] == upstream
+    assert status["structuredContent"]["version"] == "0.3.0"
+    assert tools.npm_calls() == [NPM_DEVELOP]
 
 
 def test_normal_when_migration_needed(

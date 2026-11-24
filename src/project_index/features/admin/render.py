@@ -66,8 +66,12 @@ RUNNING_HEADER = [
 
 def render_status(status: ServerStatus) -> str:
     """サーバーの状態を Markdown にする。"""
+    # 起動した commit があれば先頭 7 文字を添える
+    process = f"pid {status.pid}"
+    if status.commit is not None:
+        process += f"・commit {status.commit[:7]}"
     lines = [
-        f"{status.address} project-index {status.version}（pid {status.pid}）",
+        f"{status.address} project-index {status.version}（{process}）",
         f"端末の設定: {status.terminal.file}（{status.terminal.version_state}）",
     ]
     # 裏の検査と書き出しの最中は、表の前にその旨を出す

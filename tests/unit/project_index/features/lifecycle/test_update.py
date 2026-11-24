@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import subprocess
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
@@ -102,11 +103,11 @@ def test_update_clone(
     assert result.mdmark.reinstalled is True
 
 
-def test_update_clone_when_up_to_date(
-    monkeypatch: pytest.MonkeyPatch, clone: Path, control: RestartControl
-) -> None:
+def test_update_clone_when_up_to_date(monkeypatch: pytest.MonkeyPatch, clone: Path) -> None:
     """新しい commit が無ければ mdmark の CLI だけを入れ直す（正常系）。"""
     # 準備
+    control = RestartControl(running_commit="aaa")
+    control.attach(cast("Any", SimpleNamespace(should_exit=False)))
     fake = FakeRun(_ok("aaa\n"), _ok(), _ok("aaa\n"), _ok())
     _install(monkeypatch, fake)
     _install_mdmark(monkeypatch, "/usr/local/bin/mdmark")
@@ -121,6 +122,52 @@ def test_update_clone_when_up_to_date(
     assert result.mdmark is not None
     assert result.mdmark.reinstalled is True
     assert control.requested is False
+
+
+def test_update_clone_when_running_process_stale(
+    monkeypatch: pytest.MonkeyPatch, clone: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """取り込む commit が無くても、起動した commit と違えば起動し直す（正常系）。"""
+    # 準備
+    control = RestartControl(running_commit="a")
+    control.attach(cast("Any", SimpleNamespace(should_exit=False)))
+    fake = FakeRun(_ok("b\n"), _ok(), _ok("b\n"), _ok(), _ok(""), _ok())
+    _install(monkeypatch, fake)
+    _install_mdmark(monkeypatch, "/usr/local/bin/mdmark")
+    caplog.set_level(logging.INFO, logger="project_index.features.lifecycle.update")
+    # 実行
+    result = update_clone(clone, control=control, mdmark_ref="develop")
+    # 検証
+    assert result.updated is False
+    assert result.restarting is True
+    assert result.previous_commit == "a"
+    assert result.commit == "b"
+    assert result.version == "0.3.0"
+    assert control.requested is True
+    assert ["uv", "sync"] in fake.calls
+    assert fake.calls[4][1:] == ["-m", "project_index", "migrate", "--plan"]
+    assert any(
+        "a" in record.getMessage() and "b" in record.getMessage() and record.levelno == logging.INFO
+        for record in caplog.records
+        if "起動し直す" in record.getMessage()
+    )
+
+
+def test_update_clone_when_running_commit_unknown(
+    monkeypatch: pytest.MonkeyPatch, clone: Path, control: RestartControl
+) -> None:
+    """起動した commit が無ければ取り込んだかだけで決める（正常系）。"""
+    # 準備
+    fake = FakeRun(_ok("aaa\n"), _ok(), _ok("aaa\n"), _ok())
+    _install(monkeypatch, fake)
+    _install_mdmark(monkeypatch, "/usr/local/bin/mdmark")
+    # 実行
+    result = update_clone(clone, control=control, mdmark_ref="develop")
+    # 検証
+    assert result.updated is False
+    assert result.restarting is False
+    assert result.previous_commit is None
+    assert ["uv", "sync"] not in fake.calls
 
 
 def test_update_clone_when_migration_needed(

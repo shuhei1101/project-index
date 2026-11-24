@@ -36,7 +36,7 @@ functions:
       description: サーバーの状態
     process: |-
       1. アドレスを `http://{terminal.bind}:{ポート}/` にする（待ち受けのポートの決定）
-      2. バージョンを 起動時に読んだ値（動いているバージョン。更新で配布のメタデータが入れ替わっても変わらない）、プロセス ID を `os.getpid()` で得る
+      2. バージョンを 起動時に読んだ値（動いているバージョン。更新で配布のメタデータが入れ替わっても変わらない）、プロセス ID を `os.getpid()`、起動した commit を `handlers.restart.running_commit` で得る
       3. 端末の設定の `version` を `SETTINGS_VERSION` と比べる（バージョンの新旧）
       4. `loading` を配信元の一覧の読み込み中（`registry.loading`）にし、配信元ごとの状態を作る（配信元の状態の一覧）。読み込み中は、状態を `registry.statuses_with_loading()` から作り、`loading` の行は `sync`・設定のバージョンを持たない
       6. `running` を実行スロットの実行中の要求の一覧（`handlers.slots.running()`）にする
@@ -51,7 +51,7 @@ functions:
         summary: 配信中・検証で外した・無効の配信元を並べる
         condition: 配信元 3 つ（`serving` で索引に無いファイル 1 件・`not_served`・`disabled`）、`env` は空
         mock: なし（一時ディレクトリの配信元）
-        expected: '`address` が `http://127.0.0.1:{port}/`、`sources` が 3 件で `serving` だけ `sync.unindexed_files` が 1（配信元の検査のキャッシュに検査の結果を入れてから呼ぶ）'
+        expected: '`address` が `http://127.0.0.1:{port}/`、`commit` が `handlers.restart.running_commit`、`sources` が 3 件で `serving` だけ `sync.unindexed_files` が 1（配信元の検査のキャッシュに検査の結果を入れてから呼ぶ）'
       - name: test_get_status_when_port_env
         case: 正常
         summary: '`PROJECT_INDEX_PORT` のポートをアドレスに使う'

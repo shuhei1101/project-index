@@ -1,0 +1,31 @@
+$ gh workflow run test.yml --ref fix/lifecycle/update-restart-stale-process -f layer=integration -f paths="tests/integration/server/test_update.py tests/integration/server/test_get_status.py tests/integration/server/test_restart.py"（TP-1 の TL-2 の run_runner。並列数の指定は無い（parallel: false））
+run 45315853665（commit 8625a77）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 18 items
+
+tests/integration/server/test_update.py::test_normal PASSED              [  5%]
+tests/integration/server/test_update.py::test_normal_when_up_to_date PASSED [ 11%]
+tests/integration/server/test_update.py::test_normal_when_running_process_stale PASSED [ 16%]
+tests/integration/server/test_update.py::test_normal_when_migration_needed PASSED [ 22%]
+tests/integration/server/test_update.py::test_error_when_pull_fails PASSED [ 27%]
+tests/integration/server/test_update.py::test_error_when_restart_in_progress PASSED [ 33%]
+tests/integration/server/test_update.py::test_normal_when_mdmark_absent PASSED [ 38%]
+tests/integration/server/test_update.py::test_normal_when_mdmark_reinstall_fails PASSED [ 44%]
+tests/integration/server/test_update.py::test_error_when_terminal_config_invalid PASSED [ 50%]
+tests/integration/server/test_get_status.py::test_normal PASSED          [ 55%]
+tests/integration/server/test_get_status.py::test_normal_when_loading PASSED [ 61%]
+tests/integration/server/test_get_status.py::test_normal_when_checking PASSED [ 66%]
+tests/integration/server/test_get_status.py::test_normal_when_reload_checking PASSED [ 72%]
+tests/integration/server/test_get_status.py::test_normal_when_exporting PASSED [ 77%]
+tests/integration/server/test_get_status.py::test_normal_when_requests_running PASSED [ 83%]
+tests/integration/server/test_restart.py::test_normal PASSED             [ 88%]
+tests/integration/server/test_restart.py::test_error_when_restart_in_progress PASSED [ 94%]
+tests/integration/server/test_restart.py::test_normal_when_docs_mcp_clogged PASSED [100%]
+
+======================== 18 passed in 63.29s (0:01:03) =========================
+exit=0

@@ -1,0 +1,54 @@
+# 単体テスト（Red）: テストコードの末尾の commit 685f4a5（設計書の記入 a41b43f を含む）
+
+## ランナーでの全件実行
+$ gh workflow run test.yml --ref fix/lifecycle/update-restart-stale-process -f layer=unit（TP-1 の TL-1 の run_runner）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 1678 items / 1 error
+
+==================================== ERRORS ====================================
+_______ ERROR collecting tests/unit/project_index/shared/test_version.py _______
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/shared/test_version.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/shared/test_version.py:9: in <module>
+    from project_index.shared.version import HEAD_READ_TIMEOUT_SEC, read_head
+E   ImportError: cannot import name 'HEAD_READ_TIMEOUT_SEC' from 'project_index.shared.version' (/home/runner/work/project-index/project-index/src/project_index/shared/version.py)
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/shared/test_version.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+=============================== 1 error in 3.88s ===============================
+exit=1
+
+ランナーの全件実行は test_version.py の収集のエラー（read_head・HEAD_READ_TIMEOUT_SEC の実装が無い）で中断したため、残りの変更したテストを手元の個別実行で回した。
+
+## 手元の個別実行
+$ uv run pytest tests/unit/project_index/features/lifecycle/test_update.py tests/unit/project_index/features/admin/test_render.py tests/unit/project_index/features/admin/test_service.py
+============================= test session starts ==============================
+tests/unit/project_index/features/lifecycle/test_update.py .FFF......... [ 15%]
+tests/unit/project_index/features/admin/test_render.py .F..............  [ 41%]
+tests/unit/project_index/features/admin/test_service.py F............... [ 60%]
+=================================== FAILURES ===================================
+E       TypeError: RestartControl.__init__() got an unexpected keyword argument 'running_commit'
+tests/unit/project_index/features/lifecycle/test_update.py:109: TypeError
+E       TypeError: RestartControl.__init__() got an unexpected keyword argument 'running_commit'
+tests/unit/project_index/features/lifecycle/test_update.py:132: TypeError
+E       AttributeError: 'UpdateResult' object has no attribute 'previous_commit'
+tests/unit/project_index/features/lifecycle/test_update.py:169: AttributeError
+E       TypeError: ServerStatus.__init__() got an unexpected keyword argument 'commit'
+tests/unit/project_index/features/admin/test_render.py:86: TypeError
+E       AttributeError: 'ServerStatus' object has no attribute 'commit'
+tests/unit/project_index/features/admin/test_service.py:143: AttributeError
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/lifecycle/test_update.py::test_update_clone_when_up_to_date
+FAILED tests/unit/project_index/features/lifecycle/test_update.py::test_update_clone_when_running_process_stale
+FAILED tests/unit/project_index/features/lifecycle/test_update.py::test_update_clone_when_running_commit_unknown
+FAILED tests/unit/project_index/features/admin/test_render.py::test_render_status_when_commit
+FAILED tests/unit/project_index/features/admin/test_service.py::test_get_status
+========================= 5 failed, 79 passed in 4.27s =========================
+
+fail は全て実装の無いこと（RestartControl の running_commit・UpdateResult の previous_commit / commit・ServerStatus の commit・read_head が無い）による。pass したテストは変更前から作業ブランチにある振る舞い（既存のテスト）だけ。
