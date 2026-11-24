@@ -25,10 +25,19 @@ docs:
     new: false
     change: write_docs・delete_docs・_commit_locks が書き込みの期限までの残りを上限に配信元のロックを握る処理へ変える
     status: todo
+  - page: docs/module/MOD-236-1.py.yaml
+    new: false
+    change: 同じ配信元の排他を実行スロットの外で待ち、握ってから実行スロットへ入れる処理を追加する
+    status: todo
+  - page: docs/module/MOD-94.py.yaml
+    new: false
+    change: write_docs・delete_docs が実行スロットに入る前に配信元の排他を待つ呼び出し方へ変える
+    status: todo
+  - page: docs/module/MOD-183.py.yaml
+    new: false
+    change: 書き込みの API が実行スロットに入る前に配信元の排他を待つ呼び出し方へ変える
+    status: todo
 scope_out:
-  - item: ロックの待ちを実行スロットの外（asyncio の側）で行う変更（案 B）と、それに伴う MOD-236-1 の run_docs の変更
-    reason: 推奨の案 A で終了の条件を満たせる見込み。採るかはモジュール構成設計のレビューで確定する
-    plan: to_file
   - item: 実行スロットの本数（DOCS_WORKERS）・書き込みの期限（32 秒）の値の見直し
     reason: 要望はロックの待ち方の修正で、決定値の変更を含まない
     plan: none
