@@ -242,7 +242,7 @@ scenarios:
         description: '`npm`（`PATH` の先頭に、受けた引数を記録して終了コード 0 で終わるスクリプトを置く）'
       - name: project-index のクローン
         description: テスト用の bare リポジトリを上流にしたクローン
-        notes: 上流がクローンと同じ commit
+        notes: 上流がクローンと同じ commit で、project-index がその commit から起動している
       - name: 端末の設定
         description: 正常シナリオと同じ `sources`
         notes: '`mdmark_ref` が無い（既定の `develop`）'
@@ -270,6 +270,45 @@ scenarios:
       - '`npm` が `install -g github:shuhei1101/mdmark#develop` の引数で 1 回呼ばれる'
       - project-index は再起動せず、`status` が前と同じバージョンを返す
     test: test_normal_when_up_to_date
+  - name: 正常シナリオ（クローンが既に最新で稼働中のプロセスが更新前のコード）
+    setup:
+      - name: Mock
+        description: '`npm`（`PATH` の先頭に、受けた引数を記録して終了コード 0 で終わるスクリプトを置く）'
+      - name: project-index のクローン
+        description: テスト用の bare リポジトリを上流にしたクローン
+        notes: project-index を起動した後に、クローンを上流の 1 つ新しいバージョンの commit まで fast-forward しておく（移し替えの手順は無い）
+      - name: 端末の設定
+        description: 正常シナリオと同じ `sources`
+        notes: '`mdmark_ref` が無い（既定の `develop`）'
+      - name: mdmark の CLI
+        description: '`PATH` に `mdmark` がある'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（クローンが既に最新で稼働中のプロセスが更新前のコード）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor U as 利用者
+        participant AD as 管理の MCP
+        participant DD as project-index
+        participant NP as npm
+
+        U->>AD: update
+        AD->>DD: クローンで git pull（新しい commit が無い）
+        AD->>DD: クローンの HEAD を稼働中のプロセスが起動した commit と比べる（違う）
+        AD->>DD: 依存を入れ直す（uv sync）
+        AD->>NP: mdmark の CLI を入れ直す（npm install -g github:shuhei1101/mdmark#develop）
+        AD-->>U: 取り込んだ commit が無いことと、稼働中のプロセスが更新前のコードのため起動し直すこと
+        AD->>DD: 再起動する
+        U->>AD: status
+        AD-->>U: 新しいバージョンと、クローンの HEAD と同じ起動した commit
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`update` が取り込んだ commit が無いことと、稼働中のプロセスが更新前のコードのため起動し直すことを返す'
+      - 再起動の後の `status` が新しいバージョンと、クローンの HEAD と同じ起動した commit を返し、`sample` と `notes` を配信している
+      - '`npm` が `install -g github:shuhei1101/mdmark#develop` の引数で 1 回呼ばれる'
+    test: test_normal_when_running_process_stale
 lead: 利用者が管理の MCP の `update` で project-index を更新し、古くなった設定を `project-index migrate` で移し替えるシナリオを定め、更新の流れを変えるときに参照する。
 tags:
   - name: topic:セットアップ
