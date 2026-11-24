@@ -1,0 +1,15 @@
+索引のサーバーの更新:
+  説明: マージで develop に入った update の修正を、稼働中の project-index serve（develop の worktree のクローン）へ効かせる。稼働中のプロセスは修正前のコードのため、管理の MCP の update が取り込む commit が無いとして restarting false を返したときは restart で起動し直す。前の状態へは、クローンを前の commit へ戻して restart を呼べば戻せる
+  タグ: [再起動]
+  実行者: planner
+  時期: マージの後
+  回数: 1 回限り
+  起動し直す対象: project-index serve（127.0.0.1:8786）
+  可逆: true
+  疎通確認: null
+  実行: null
+  確認: null
+  切り戻し: null
+  失敗時: 既定の対処を 1 回、2 回連続で失敗したら依頼元へ返す
+  確認方法: 管理の MCP の status の応答が、この修正で足す稼働中のプロセスの起動した commit を持ち、その値がクローンの HEAD と同じ
+  状態: skipped

@@ -1,0 +1,38 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-3.yaml
+    impact: changed
+    detail: 上流に新しい commit が無くても、稼働中のプロセスが更新前のコードなら起動し直して新しいコードを効かせる
+    depends_on: []
+docs:
+  - page: docs/interface/IF-11.yaml
+    new: false
+    change: 取り込む commit が無くても、稼働中のプロセスの起動した commit とクローンの HEAD が違えば起動し直すフローと応答を追加
+    status: todo
+  - page: docs/interface/IF-8.yaml
+    new: false
+    change: status の返却する値に、稼働中のプロセスが起動した時点のクローンの commit を追加
+    status: todo
+  - page: docs/module/MOD-36.py.yaml
+    new: false
+    change: _update の判定を、稼働中のプロセスの起動した commit との比較に変更
+    status: todo
+  - page: docs/module/MOD-103.py.yaml
+    new: false
+    change: 起動した時点のクローンの commit を持つ値を追加
+    status: todo
+  - page: docs/guide/管理のMCP.md
+    new: false
+    change: update の起動し直す条件と、status の返却する値を更新
+    status: todo
+  - page: docs/guide/project-indexを更新する.md
+    new: false
+    change: '応答ごとの動きの表の updated: false の行を、稼働中のプロセスが更新前のコードのときに起動し直す動きに更新'
+    status: todo
+scope_out:
+  - item: ai-monitor のテンプレート『PRドキュメント/反映作業スクリプト』とフェーズ『マージ』のローカルの最新化の順序への、この重なりの扱いの追加
+    reason: ai-monitor のリポジトリの作業
+    plan: shuhei1101/ai-monitor#3795
+  - item: '#282 の止まった反映作業『索引のサーバーの更新』の実施'
+    reason: '#281 で扱う'
+    plan: '#281'
