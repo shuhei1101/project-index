@@ -1,0 +1,14 @@
+端末の設定の直コミットの許可の登録:
+  説明: project-index の端末の設定（~/.config/project-index/settings.yaml）の配信元 project-index の行に、書き込みの API から直コミットできる種類（sources[].direct_commit.write_api_kinds。配信元の設定の direct_commit.kinds の全ての種類）を登録する。配信元の設定は develop の worktree の project-index.yaml を読むため、develop の worktree を最新にしてから、端末の設定の API（PATCH /settings/sources/project-index）で write_api_kinds を送信して行の配信元を再読み込みさせる。切り戻しは登録前の write_api_kinds を送信する
+  タグ: [端末の設定, 直コミット]
+  実行者: planner
+  時期: マージの後
+  回数: 1 回限り
+  可逆: true
+  疎通確認: null
+  実行: null
+  確認: null
+  切り戻し: null
+  失敗時: 既定の対処を 1 回、2 回連続で失敗したら依頼元へ返す
+  確認方法: 端末の設定の API（GET /settings/sources）の project-index の行の directCommit.writeApiKinds が、配信元の設定の direct_commit.kinds の全ての種類を持つ
+  状態: skipped
