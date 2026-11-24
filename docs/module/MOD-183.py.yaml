@@ -49,11 +49,11 @@ functions:
   process: |-
     1. ルーターは `APIRouter(tags=["write"], dependencies=[Depends(require_same_origin)])` にし、ルートの `name` は `commit_documents` にする
 
-    2. POST `/sources/{source}/commits` は、本文を `CommitDocumentsBody` で受け、処理の全体を要求の記録の範囲（`handlers.slots.request("commit_documents", sources=[パスの source])`）の中で行う。先頭で要求が指す配信元の行の読み込みを待ち、書き込みの排他のキーの解決（`write_lock_keys`）を文書の MCP の実行スロットで呼んで、書き込みの関所.握る（`handlers.write_gates.hold(キー, limits.write_deadline)`）の中で手順 3 をする（関所を待つ間は実行スロットを持たない）。その後の処理は裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中で、文書の MCP の実行スロット（`handlers.slots.run_docs`）で呼ぶ
+    2. POST `/sources/{source}/commits` は、本文を `CommitDocumentsBody` で受け、処理の全体を要求の記録の範囲（`handlers.slots.request("commit_documents", sources=[パスの source])`）の中で行う。先頭で要求が指す配信元の行の読み込みを待ち、書き込みの排他のキーの解決（`write_lock_keys`）を文書の MCP の実行スロットで呼んで、書き込みの関所.握る（`handlers.write_gates.hold(キー, limits.write_deadline)`）の中で手順 3 の排他の中の直コミットを、関所を放した後に手順 4 の直コミットの後処理をする（関所を待つ間は実行スロットを持たず、衝突したときのスクリプトと配信元の再読み込みの間は関所を握らない）。その後の処理は裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中で、文書の MCP の実行スロット（`handlers.slots.run_docs`）で呼ぶ
 
-    3. 本文を `CommitDocumentsBody.to_request(source)` で `CommitDocumentsRequest` にし、書き込みと削除の直コミット（`commit_documents`）を `handlers` の部品（状態のフォルダを含む）と、`write_deadline` の秒数を `WRITE_API_WRITE_DEADLINE_SEC`・`respond_by` の秒数を `WRITE_API_RESPONSE_LIMIT_SEC` にした `CallLimits` で呼ぶ
+    3. 本文を `CommitDocumentsBody.to_request(source)` で `CommitDocumentsRequest` にし、排他の中の直コミット（`commit_documents_locked`）を `handlers` の部品（状態のフォルダを含む）と、`write_deadline` の秒数を `WRITE_API_WRITE_DEADLINE_SEC`・`respond_by` の秒数を `WRITE_API_RESPONSE_LIMIT_SEC` にした `CallLimits` で呼ぶ
 
-    4. 結果を `CommitDocumentsResponse.from_domain(result)` にして 200 で返す。書き込みと削除の直コミットの `reload_sources` には `handlers` の配信元の再読み込みを渡す
+    4. 戻り値を直コミットの後処理（`finish_commit_documents`）に渡し、結果を `CommitDocumentsResponse.from_domain(result)` にして 200 で返す。直コミットの後処理の `reload_sources` には `handlers` の配信元の再読み込みを渡す
 
     5. GET `/sources/{source}/config/file`（ルートの `name` は `get_source_config_file`）は、要求が指す配信元を `handlers.registry.get_for_docs(source)` で引き、配信元の設定の原本の取得（`read_source_config_file`）の結果を `SourceConfigFileResponse.from_domain` にして 200 で返す。`UnknownSourceError` は `missing` を `source`、`SourceNotServedError` は `missing` を `not_served` にした読み取り API と同じ 404 の problem+json（`problem_of`）で返す
 
@@ -105,8 +105,8 @@ functions:
     case: 正常
     summary: 書き込みの関所を通ってから呼ぶ
     condition: 書き込みの関所を、受けたキーと期限を記録する偽物にして POST
-    mock: 書き込みの排他のキーの解決・書き込みと削除の直コミット・書き込みの関所（偽物）
-    expected: 関所がキーの解決の結果と `limit_sec` が 20 の期限で握られ、書き込みと削除の直コミットは関所を握っている間に呼ばれる
+    mock: 書き込みの排他のキーの解決・排他の中の直コミット・直コミットの後処理・書き込みの関所（偽物）
+    expected: 関所がキーの解決の結果と `limit_sec` が 20 の期限で握られ、排他の中の直コミットは関所を握っている間に、直コミットの後処理は関所を放した後に呼ばれる
 refs:
 - to: IF-38
   type: requires

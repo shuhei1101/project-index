@@ -892,6 +892,8 @@ functions:
       type: CommitDocumentsResult
       description: 書き込みと削除の結果とコミットの結果
     process: |-
+      手順 1〜4 を排他の中の直コミット（`commit_documents_locked`）、手順 5〜7 を直コミットの後処理（`finish_commit_documents`）が受け持ち、この関数は 2 つを順に呼んで返す。書き込みの API は、書き込みの関所を放した後に後処理を呼ぶため 2 つを分けて呼ぶ
+
       1. `writes` と `deletes` の件数の合計が `OPERATIONS_MAX` 件を超えるか、`source_config` も無いまま 0 件なら `InvalidArgumentError` を送る。`writes` は文書の書き込みの操作の確かめ（`_check_operations`）にかける
 
       2. `registry.get_for_docs(request.source)` で配信元を引き、直コミットの書き込む先（`resolve_commit_plan`）で計画を作る。許可する種類は作業場所でなく、書き込みの API から直コミットできる種類（`write_api_committable_kinds`）にする。空で `writes`・`deletes` があれば取得の前に、配信元の `direct_commit.kinds` を `kinds` に添え、`next_steps` で端末の設定の `sources[].direct_commit.write_api_kinds` を示す `DirectCommitNotPermittedError` を送る。`source_config` があれば、取得の前に配信元の設定の許可の確認（`check_source_config_permitted`）と配信元の設定のファイル（`source_config_relative_path`）を呼ぶ
@@ -1102,6 +1104,127 @@ functions:
         condition: '`commit` を持つ `DeleteRequest` と `CommitDocumentsRequest`'
         mock: なし（一時フォルダの git）
         expected: どちらも `repo` が直コミットの計画の `repo` と同じ
+  - name: commit_documents_locked
+    title: 排他の中の直コミット
+    kind: 関数
+    container: project_index/features/write/service.py
+    usecase: 直コミット
+    role: サービス
+    summary: 書き込みと削除の直コミットの手順 1〜4（排他の中の処理）をし、排他を放して直コミットの途中の結果を返す
+    scope: public
+    args:
+      - name: request
+        title: 要求
+        type: CommitDocumentsRequest
+        required: true
+        passing: positional
+        description: 書き込みと削除の直コミットと同じ
+      - name: registry
+        title: 配信元の一覧
+        type: SourceRegistry
+        required: true
+        passing: keyword
+        description: 書き込みと削除の直コミットと同じ
+      - name: store
+        title: 文書のストア
+        type: DocumentStore
+        required: true
+        passing: keyword
+        description: 書き込みと削除の直コミットと同じ
+      - name: checker
+        title: 文書の検査
+        type: DocumentChecker
+        required: true
+        passing: keyword
+        description: 書き込みと削除の直コミットと同じ
+      - name: locks
+        title: 配信元ごとの排他
+        type: SourceLocks
+        required: true
+        passing: keyword
+        description: 書き込みと削除の直コミットと同じ
+      - name: repo_locks
+        title: リポジトリごとの排他
+        type: RepositoryLocks
+        required: true
+        passing: keyword
+        description: 書き込みと削除の直コミットと同じ
+      - name: timeout_sec
+        title: スクリプトの制限時間
+        type: float
+        required: true
+        passing: keyword
+        description: 書き込みと削除の直コミットと同じ
+      - name: state_dir
+        title: 状態のフォルダ
+        type: Path
+        required: true
+        passing: keyword
+        description: 書き込みと削除の直コミットと同じ
+      - name: now
+        title: 今の時刻
+        type: datetime | None
+        required: false
+        default: None
+        passing: keyword
+        description: 書き込みと削除の直コミットと同じ
+      - name: limits
+        title: 呼び出しの期限
+        type: CallLimits | None
+        required: false
+        default: None
+        passing: keyword
+        description: 書き込みと削除の直コミットと同じ
+    returns:
+      type: CommitDocumentsPending
+      description: 直コミットの途中の結果
+    process: |-
+      1. 書き込みと削除の直コミットの手順 1〜4 をする
+      2. `dry_run` の場合、排他の中で作った結果を `result` に入れて返す
+      3. それ以外は、排他を放した後に、直コミットの結果（`commit`）か、衝突した例外と衝突したときのブランチ（`conflicted`・`kept`）を入れて返す。衝突にしない例外はそのまま送る
+    unit_tests:
+      - name: test_commit_documents_locked
+        case: 正常
+        summary: 戻るときに排他を放している
+        condition: 一時フォルダの git の配信元とベアリポジトリで、文書 1 件の `update` を呼ぶ
+        mock: なし（一時フォルダの git）
+        expected: '`commit` を持ち、戻った後に同じ配信元・同じリポジトリの排他を `timeout=0` で握れる'
+  - name: finish_commit_documents
+    title: 直コミットの後処理
+    kind: 関数
+    container: project_index/features/write/service.py
+    usecase: 直コミット
+    role: サービス
+    summary: 書き込みと削除の直コミットの手順 5〜7（排他を放した後の処理）をし、結果を返す
+    description: 排他を握らない。書き込みの API は、書き込みの関所を放した後に呼ぶ
+    scope: public
+    args:
+      - name: pending
+        title: 途中の結果
+        type: CommitDocumentsPending
+        required: true
+        passing: positional
+        description: 排他の中の直コミットの戻り値
+      - name: reload_sources
+        title: 配信元の再読み込み
+        type: Callable[[], object]
+        required: true
+        passing: keyword
+        description: 書き込みと削除の直コミットと同じ
+    returns:
+      type: CommitDocumentsResult
+      description: 書き込みと削除の直コミットと同じ
+    process: |-
+      1. `result` があればそのまま返す（`dry_run`）
+      2. `conflicted` があれば、書き込みと削除の直コミットの手順 6・7 の衝突した場合の処理（衝突したときのスクリプトの実行と結果の組み立て）をして返す
+      3. それ以外は、手順 5 の配信元の再読み込みをして、手順 7 の結果を返す
+    unit_tests:
+      - name: test_finish_commit_documents_when_conflict
+        case: 正常
+        summary: 衝突したときのスクリプトを排他の外で実行する
+        condition: '`base_commit` を持ち衝突する要求で `commit_documents_locked` を呼び、続けて `finish_commit_documents` を呼ぶ'
+        mock: 衝突したときのスクリプトの実行（同じ配信元の排他を `timeout=0` で握れるかを記録する偽物）
+        expected: 偽物は排他を握れ、結果の `conflict` が衝突したときのブランチを持つ
 refs:
   - to: IF-6
     type: requires
@@ -1110,3 +1233,36 @@ refs:
     type: requires
     when: インターフェース定義『文書の削除』の入出力を変えるときに、この設計書の関数と型を合わせる。
 visibility: internal
+data_models:
+  - name: CommitDocumentsPending
+    title: 直コミットの途中の結果
+    container: project_index/features/write/service.py
+    usecase: 直コミット
+    role: 値
+    summary: 排他の中の直コミットから直コミットの後処理へ渡す値
+    description: '`@dataclass(frozen=True, slots=True)`。`result`・`commit`・`conflicted` のうち 1 つだけを持つ'
+    properties:
+      - name: run
+        title: 直コミットの実行
+        type: _CommitDocumentsRun
+        description: 要求・計画・書いた結果を持つ実行の状態
+      - name: result
+        title: 試しの結果
+        type: CommitDocumentsResult | None
+        default: None
+        description: '`dry_run` の結果'
+      - name: commit
+        title: コミットの結果
+        type: CommitResult | None
+        default: None
+        description: プッシュした直コミットの結果
+      - name: conflicted
+        title: 衝突した例外
+        type: ProjectIndexError | None
+        default: None
+        description: 衝突にした例外
+      - name: kept
+        title: 衝突したときのブランチ
+        type: tuple[str, str] | None
+        default: None
+        description: 衝突したときのブランチとコミット。残せなかったときは `None`
