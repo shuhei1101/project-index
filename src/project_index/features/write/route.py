@@ -10,7 +10,11 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from project_index.features.admin.service import reload_config
-from project_index.features.write.service import commit_documents
+from project_index.features.write.service import (
+    commit_documents_locked,
+    finish_commit_documents,
+    write_lock_keys,
+)
 from project_index.features.write.source_config import read_source_config_file
 from project_index.features.write.types import (
     CommitDocumentsBody,
@@ -23,6 +27,7 @@ from project_index.shared.deadline import CallLimits, Deadline
 from project_index.shared.errors import SourceNotServedError, UnknownSourceError
 
 if TYPE_CHECKING:
+    from project_index.features.write.service import CommitDocumentsPending
     from project_index.features.write.types import CommitDocumentsRequest, CommitDocumentsResult
     from project_index.main import Handlers
 
@@ -34,9 +39,9 @@ WRITE_API_WRITE_DEADLINE_SEC = 20
 
 def _commit(
     handlers: Handlers, request: CommitDocumentsRequest, limits: CallLimits
-) -> CommitDocumentsResult:
-    """書き込みと削除の直コミットを、配線済みの部品で呼ぶ。"""
-    return commit_documents(
+) -> CommitDocumentsPending:
+    """書き込みと削除の直コミットのうち排他の中の処理を、配線済みの部品で呼ぶ。"""
+    return commit_documents_locked(
         request,
         registry=handlers.registry,
         store=handlers.store,
@@ -45,9 +50,15 @@ def _commit(
         repo_locks=handlers.repo_locks,
         timeout_sec=handlers.terminal.script_timeout_sec,
         state_dir=handlers.terminal.state_dir,
-        # 配信元の設定をプッシュした後は、管理の MCP の reload と同じに再読み込みする
-        reload_sources=functools.partial(reload_config, handlers),
         limits=limits,
+    )
+
+
+def _finish(handlers: Handlers, pending: CommitDocumentsPending) -> CommitDocumentsResult:
+    """書き込みと削除の直コミットのうち排他を放した後の処理を呼ぶ。"""
+    # 配信元の設定をプッシュした後は、管理の MCP の reload と同じに再読み込みする
+    return finish_commit_documents(
+        pending, reload_sources=functools.partial(reload_config, handlers)
     )
 
 
@@ -69,10 +80,20 @@ def build_write_router(handlers: Handlers) -> APIRouter:
             # 読み込みを待つ間も要求の応答中として数え、裏の検査と書き出しを休ませる
             with handlers.gate.foreground():
                 await handlers.registry.wait_for(ids=[source])
+            request = body.to_request(source)
+            # 握る排他のキーを実行スロットで求め、関所は実行スロットの外で待つ
             with handlers.gate.foreground():
-                result = await handlers.slots.run_docs(
-                    functools.partial(_commit, handlers, body.to_request(source), limits)
+                keys = await handlers.slots.run_docs(
+                    functools.partial(write_lock_keys, request, registry=handlers.registry)
                 )
+            async with handlers.write_gates.hold(keys, limits.write_deadline):
+                with handlers.gate.foreground():
+                    pending = await handlers.slots.run_docs(
+                        functools.partial(_commit, handlers, request, limits)
+                    )
+            # 衝突したときのスクリプトと配信元の再読み込みは、関所を放した後に動かす
+            with handlers.gate.foreground():
+                result = await handlers.slots.run_docs(functools.partial(_finish, handlers, pending))
         return CommitDocumentsResponse.from_domain(result)
 
     @router.get(

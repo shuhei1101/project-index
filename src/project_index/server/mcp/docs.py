@@ -32,7 +32,7 @@ from project_index.features.search.render import render_search_markdown
 from project_index.features.search.service import search_docs
 from project_index.features.search.terms import list_match_words, render_match_words_markdown
 from project_index.features.search.types import MatchWordsRequest, SearchRequest
-from project_index.features.write.service import delete_docs, write_docs
+from project_index.features.write.service import delete_docs, write_docs, write_lock_keys
 from project_index.features.write.types import (
     DeleteRequest,
     DeleteResult,
@@ -60,6 +60,7 @@ if TYPE_CHECKING:
     from mcp.server.models import InitializationOptions
 
     from project_index.features.access.types import Target
+    from project_index.features.write.locks import WriteGates, WriteLockKeys
     from project_index.main import Handlers
     from project_index.shared.background import BackgroundGate
     from project_index.shared.runtime import ExecutionSlots, RequestRecord
@@ -129,8 +130,13 @@ def _register(
     slots: ExecutionSlots,
     served_ids: Callable[[], list[str]],
     prepare: Callable[[BaseModel], Awaitable[None]] | None = None,
+    write_gates: WriteGates | None = None,
+    lock_keys: Callable[[Any], WriteLockKeys] | None = None,
 ) -> None:
-    """要求のモデルを引数に持つツールを 1 つ登録する（呼ぶ前に要求が指す配信元の読み込みを待つ）。"""
+    """要求のモデルを引数に持つツールを 1 つ登録する（呼ぶ前に要求が指す配信元の読み込みを待つ）。
+
+    `lock_keys` を持つツール（書き込み・削除）は、書き込みの関所を実行スロットの外で握ってからサービスを呼ぶ。
+    """
 
     async def tool(**arguments: object) -> CallToolResult:
         # 期限は要求を受けた時刻から数える
@@ -142,6 +148,18 @@ def _register(
         # ツールの呼び出し 1 回を要求の記録の範囲にし、記録の行を 1 行にする
         with slots.request(name) as record:
             return await _call(record, arguments, limits)
+
+    async def _run_service(request: BaseModel, limits: CallLimits) -> Any:
+        # 書き込みの関所を持たないツール: サービスの処理の間は要求の応答中として数え、裏の検査と書き出しを休ませる
+        if lock_keys is None or write_gates is None:
+            with gate.foreground():
+                return await slots.run_docs(call, request, limits)
+        # 書き込み・削除: 握る排他のキーを実行スロットで求め、関所は実行スロットの外で待つ
+        with gate.foreground():
+            keys = await slots.run_docs(lock_keys, request)
+        async with write_gates.hold(keys, limits.write_deadline):
+            with gate.foreground():
+                return await slots.run_docs(call, request, limits)
 
     async def _call(
         record: RequestRecord,
@@ -160,9 +178,7 @@ def _register(
             # ワークツリーの初めての読み込みを上限まで待つ（search_docs・write_docs・delete_docs）
             if prepare is not None:
                 await prepare(request)
-            # サービスの処理の間は要求の応答中として数え、裏の検査と書き出しを休ませる
-            with gate.foreground():
-                result = await slots.run_docs(call, request, limits)
+            result = await _run_service(request, limits)
             fmt: Literal["markdown", "json"] = getattr(request, "format", "json")
             # 描画を持つツール: 要求を添えて Markdown にする
             renderer: Callable[[Any], str] | None = None
@@ -473,6 +489,8 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
         ),
         None,
         prepare=ensure_worktree,
+        write_gates=handlers.write_gates,
+        lock_keys=lambda request: write_lock_keys(request, registry=handlers.registry),
     )
     register(
         mcp,
@@ -495,6 +513,8 @@ def build_docs_mcp(handlers: Handlers) -> MCPServer:
         ),
         None,
         prepare=ensure_worktree,
+        write_gates=handlers.write_gates,
+        lock_keys=lambda request: write_lock_keys(request, registry=handlers.registry),
     )
     register(
         mcp,
