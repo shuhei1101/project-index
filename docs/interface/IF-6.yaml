@@ -2589,6 +2589,45 @@ flows:
       - 'A は `applied: true` を返却し、ワークツリー x の文書 1 は書き換わる'
       - A の応答を待った後も、ワークツリー x の文書 2 は書き換わらない
     test: test_error_when_source_lock_wait_exceeds_deadline
+  - name: 異常系（同じ配信元の排他を待つ書き込みが実行スロットの本数を超える・WriteDeadlineExceededError）
+    summary: 同じ配信元の排他を待つ書き込みが文書の MCP の実行スロットの本数を超えても、ほかの配信元への書き込みと検索は実行スロットを待たずに返却し、排他を待つ書き込みは期限で時間切れを返却する
+    setup:
+      - name: Mock
+        description: なし。端末の設定の `write_deadline_sec` を 2 にする
+      - name: 遅い生成のスクリプト
+        description: sample の種類の `generators[]` に、4 秒待ってから終了するスクリプトを配置する。sample2 の配信元には配置しない
+      - name: 入力
+        description: 呼び出し A は sample のワークツリー x の文書 1 の `update` 1 件。A を送信した 0.5 秒後に、sample のワークツリー x への `update` を文書の MCP の実行スロットの本数 + 1 件（呼び出しの群 W）、続けて sample2 への `update` 1 件（呼び出し C）と `search_docs` 1 件（呼び出し D）を並べて送信する
+        notes: 実行スロットの本数は非機能要件の文書の MCP の実行スロットの本数を実行環境で求めた値
+    flow: |-
+      <!-- map: {"title": "異常系（同じ配信元の排他を待つ書き込みが実行スロットの本数を超える・WriteDeadlineExceededError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant A as クライアント A
+        participant W as クライアントの群 W
+        participant C as クライアント C・D
+        participant T as write_docs・search_docs
+        participant WT as sample2 のワークツリー
+
+        A->>T: sample の文書 1 を update
+        T->>T: sample の排他を握り、generators を実行する（4 秒）
+        W->>T: sample への update（実行スロットの本数 + 1 件）
+        T->>T: 実行スロットに入らずに sample の排他を待つ
+        C->>T: sample2 への update と search_docs
+        T->>WT: sample2 の文書を書き込む
+        T-->>C: applied: true と検索の結果
+        T-->>W: isError（書き込みの期限・経過した秒数・書き換えていないこと）
+        T-->>A: applied: true
+      ```
+
+      <!-- /map -->
+    expected:
+      - 'C は `applied: true` を返却し、C を送信してから 1 秒の内に返却される'
+      - D は検索の結果を返却し、D を送信してから 1 秒の内に返却される
+      - 'W の全ての呼び出しは `isError: true` で `WriteDeadlineExceededError` を返却し、それぞれ送信してから 3 秒の内に返却される'
+      - A の応答を待った後も、W が書き換えようとした文書は書き換わらない
+    test: test_error_when_source_lock_waiters_exceed_execution_slots
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -3158,7 +3197,7 @@ constraints:
     constraint: 改名 1 件の中で、参照元の候補のファイル（文書のファイルと拡張子が `.md` の本文のファイル）は 1 ファイルにつき 1 回だけ読み込み、同じファイルの `records` の要素の文書は読み込んだ結果を再利用する。ファイルの文字列が、旧 ID と、パスが変わるときの改名前のファイル名（URL エンコードした値を含む）のどれも含まないファイルは、YAML として読み込まずに飛ばす
     notes: 書き換える箇所と結果は制約「改名の参照元」のとおりで、飛ばしたファイルには書き換える箇所が無い
   - item: 配信元ごとの排他の待ち
-    constraint: 同じ配信元の排他は、書き込みの期限までの残りの時間だけ待つ。握れなければ、何も読み込まず・書き込まずに `WriteDeadlineExceededError` を返却し、文書の MCP の実行スロットを放す
+    constraint: 同じ配信元の排他は、文書の MCP の実行スロットに入る前に、書き込みの期限までの残りの時間だけ待つ。排他を待つ間は実行スロットを持たず、ほかの配信元への要求の実行スロットの待ちを増やさない。握れなければ、何も読み込まず・書き込まずに `WriteDeadlineExceededError` を返却する
     notes: 制約「直コミットの排他」のリポジトリの単位の排他を先に握り、その待ちと合わせて書き込みの期限の内に収める。`delete_docs` と書き込みの API も同じ待ち方にする
 refs:
   - to: SC-7
