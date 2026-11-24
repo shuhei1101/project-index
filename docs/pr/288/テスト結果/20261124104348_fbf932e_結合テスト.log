@@ -1,0 +1,22 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=integration -f paths="tests/integration/server/test_patch_settings_source.py" | grep -o 'https://[^ ]*/actions/runs/[0-9]*') && ... (TP-1 の TL-2 の run_runner)
+
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 10 items
+
+tests/integration/server/test_patch_settings_source.py::test_normal PASSED [ 10%]
+tests/integration/server/test_patch_settings_source.py::test_normal_when_row_without_id PASSED [ 20%]
+tests/integration/server/test_patch_settings_source.py::test_error_when_version_outdated PASSED [ 30%]
+tests/integration/server/test_patch_settings_source.py::test_error_when_row_not_found PASSED [ 40%]
+tests/integration/server/test_patch_settings_source.py::test_error_when_schema_invalid PASSED [ 50%]
+tests/integration/server/test_patch_settings_source.py::test_error_when_cross_origin PASSED [ 60%]
+tests/integration/server/test_patch_settings_source.py::test_error_when_argument_invalid PASSED [ 70%]
+tests/integration/server/test_patch_settings_source.py::test_normal_when_unknown_top_level_key_kept PASSED [ 80%]
+tests/integration/server/test_patch_settings_source.py::test_normal_when_storage_changed PASSED [ 90%]
+tests/integration/server/test_patch_settings_source.py::test_normal_when_direct_commit_changed PASSED [100%]
+
+============================== 10 passed in 1.56s ==============================
