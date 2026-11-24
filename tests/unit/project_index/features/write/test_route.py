@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import contextlib
+import dataclasses
+import time
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -7,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from project_index.features.write import route as route_module
+from project_index.features.write.locks import WriteLockKeys
 from project_index.features.write.route import build_write_router
 from project_index.features.write.source_config import SourceConfigFile
 from project_index.features.write.types import CommitDocumentsResult, CommitResult
@@ -15,13 +20,32 @@ from project_index.server.error_handlers import register_error_handlers
 from project_index.shared.errors import DirectCommitNotPermittedError, SourceConfigNotPermittedError
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import AsyncIterator, Callable
     from pathlib import Path
 
     from project_index.features.settings.types import SourceEntry, TerminalConfig
     from project_index.features.sources.types import ServedSource
     from project_index.features.write.types import CommitDocumentsRequest
     from project_index.main import Handlers
+
+
+def _patch_commit(
+    monkeypatch: pytest.MonkeyPatch, fake: Callable[..., CommitDocumentsResult]
+) -> None:
+    """排他の中の直コミットを偽物にし、直コミットの後処理はその結果をそのまま返す偽物にする。"""
+
+    def locked(request: CommitDocumentsRequest, **parts: Any) -> SimpleNamespace:
+        return SimpleNamespace(result=fake(request, **parts))
+
+    def finish(pending: SimpleNamespace, **_parts: Any) -> CommitDocumentsResult:
+        return pending.result
+
+    def keys(request: CommitDocumentsRequest, **_parts: Any) -> WriteLockKeys:
+        return WriteLockKeys(repo=None, source_id=request.source)
+
+    monkeypatch.setattr(route_module, "write_lock_keys", keys)
+    monkeypatch.setattr(route_module, "commit_documents_locked", locked)
+    monkeypatch.setattr(route_module, "finish_commit_documents", finish)
 
 
 def _client(handlers: Handlers) -> TestClient:
@@ -59,7 +83,7 @@ def received(monkeypatch: pytest.MonkeyPatch) -> list[CommitDocumentsRequest]:
             commit=CommitResult(sha="0a1b2c3", branch="develop", retried=False),
         )
 
-    monkeypatch.setattr(route_module, "commit_documents", fake)
+    _patch_commit(monkeypatch, fake)
     return calls
 
 
@@ -147,7 +171,7 @@ def test_build_write_router_when_service_error(
             kinds=["rules"],
         )
 
-    monkeypatch.setattr(route_module, "commit_documents", refuse)
+    _patch_commit(monkeypatch, refuse)
     client = _client(_handlers(make_source_dir, make_terminal_config, make_entry))
     body = {"deletes": [{"id": "doc-1", "expectedVersion": "a1b2c3"}], "message": "docs: 消す"}
     # 実行
@@ -171,7 +195,7 @@ def test_build_write_router_when_limits(
         limits.append(parts["limits"])
         return CommitDocumentsResult(applied=False, writes=[], deletes=[], commit=None)
 
-    monkeypatch.setattr(route_module, "commit_documents", fake)
+    _patch_commit(monkeypatch, fake)
     client = _client(_handlers(make_source_dir, make_terminal_config, make_entry))
     body = {
         "writes": [{"op": "create", "kind": "rules", "data": {"id": "doc-9", "name": "文書 9"}}],
@@ -239,3 +263,50 @@ def test_build_write_router_when_source_config_not_permitted(
     # 検証
     assert response.status_code == 403
     assert response.headers["content-type"].startswith("application/problem+json")
+
+
+def test_build_write_router_when_write_gate(
+    make_source_dir: Callable[..., Path],
+    make_terminal_config: Callable[..., TerminalConfig],
+    make_entry: Callable[..., SourceEntry],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """書き込みの関所を通ってから呼ぶ（正常系）。"""
+    # 準備
+    handlers = _handlers(make_source_dir, make_terminal_config, make_entry)
+    events: list[str] = []
+    held: list[tuple[WriteLockKeys, float]] = []
+    keys = WriteLockKeys(repo=None, source_id="sample")
+
+    class RecordingGates:
+        @contextlib.asynccontextmanager
+        async def hold(self, given: WriteLockKeys, deadline: Any) -> AsyncIterator[None]:
+            held.append((given, deadline.limit_sec))
+            events.append("gate-in")
+            yield
+            events.append("gate-out")
+
+    def fake_keys(_request: CommitDocumentsRequest, **_parts: Any) -> WriteLockKeys:
+        return keys
+
+    def fake_locked(_request: CommitDocumentsRequest, **_parts: Any) -> str:
+        events.append("locked")
+        return "pending"
+
+    def fake_finish(pending: str, **_parts: Any) -> CommitDocumentsResult:
+        events.append(f"finish:{pending}")
+        return CommitDocumentsResult(applied=False, writes=[], deletes=[], commit=None)
+
+    monkeypatch.setattr(route_module, "write_lock_keys", fake_keys)
+    monkeypatch.setattr(route_module, "commit_documents_locked", fake_locked)
+    monkeypatch.setattr(route_module, "finish_commit_documents", fake_finish)
+    client = _client(dataclasses.replace(handlers, write_gates=RecordingGates()))
+    body = {"deletes": [{"id": "doc-1", "expectedVersion": "a1b2c3"}], "message": "docs: 消す"}
+    started = time.monotonic()
+    # 実行
+    response = client.post("/sources/sample/commits", json=body)
+    # 検証
+    assert response.status_code == 200
+    assert held == [(keys, 20)]
+    assert events == ["gate-in", "locked", "gate-out", "finish:pending"]
+    assert time.monotonic() - started < 5

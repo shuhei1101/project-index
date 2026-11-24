@@ -28,12 +28,15 @@ from project_index.features.sources.types import (
 from project_index.features.validation.markdown import MarkdownCheck, UncheckedKey
 from project_index.features.validation.service import DocumentChecker
 from project_index.features.write import service as write_service
-from project_index.features.write.locks import RepositoryLocks, SourceLocks
+from project_index.features.write.locks import RepositoryLocks, SourceLocks, WriteLockKeys
 from project_index.features.write.service import (
     check_version,
     commit_documents,
+    commit_documents_locked,
     delete_docs,
+    finish_commit_documents,
     write_docs,
+    write_lock_keys,
 )
 from project_index.features.write.types import (
     CommitDocumentsRequest,
@@ -3145,3 +3148,131 @@ def test_commit_documents_when_conflict_protected_key_changed_after_base(
         _commit_documents(commit_env, source_config=_source_config(content), base_commit=base)
     assert [item.path for item in info.value.violations] == ["sourceConfig.generators"]
     assert _conflict_branches(commit_env, run_git) == []
+
+
+def _git_common_dir(run_git: Callable[..., str], folder: Path) -> Path:
+    """フォルダの `git rev-parse --git-common-dir` の絶対パス。"""
+    return Path(run_git(folder, "rev-parse", "--path-format=absolute", "--git-common-dir").strip())
+
+
+def test_write_lock_keys(make_commit_env: Callable[..., CommitEnv]) -> None:
+    """コミットするブランチでないワークツリーへの書き込みは配信元だけ（正常系）。"""
+    # 準備
+    commit_env = make_commit_env()
+    env = commit_env.env
+    other = env.clone / ".claude" / "worktrees" / "x"
+    request = WriteRequest(
+        cwd=str(other),
+        operations=[Operation(op="update", id="doc-1", set={"name": "変える"})],
+    )
+    # 実行
+    keys = write_lock_keys(request, registry=env.registry)
+    # 検証
+    assert keys == WriteLockKeys(repo=None, source_id="sample")
+
+
+def test_write_lock_keys_when_commit_branch(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """コミットするブランチのワークツリーへの書き込みはリポジトリも握る（正常系）。"""
+    # 準備
+    commit_env = make_commit_env()
+    request = WriteRequest(
+        cwd=str(commit_env.develop),
+        operations=[Operation(op="update", id="doc-1", set={"name": "変える"})],
+    )
+    # 実行
+    keys = write_lock_keys(request, registry=commit_env.env.registry)
+    # 検証
+    assert keys == WriteLockKeys(
+        repo=_git_common_dir(run_git, commit_env.develop), source_id="sample"
+    )
+
+
+def test_write_lock_keys_when_commit(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """直コミットは直コミットの計画のリポジトリ（正常系）。"""
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules"])
+    env = commit_env.env
+    delete = DeleteRequest(
+        cwd=str(env.worktree),
+        targets=[DeleteTarget(id="doc-1", expected_version=content_hash(DOC_1))],
+        source="sample",
+        commit=CommitSpec(message="docs: 削除する"),
+    )
+    documents = CommitDocumentsRequest(
+        source="sample",
+        commit=CommitSpec(message="docs: 更新する"),
+        writes=_update_doc_1(),
+    )
+    expected = WriteLockKeys(repo=_git_common_dir(run_git, commit_env.develop), source_id="sample")
+    # 実行
+    delete_keys = write_lock_keys(delete, registry=env.registry)
+    documents_keys = write_lock_keys(documents, registry=env.registry)
+    # 検証
+    assert delete_keys == expected
+    assert documents_keys == expected
+
+
+def _commit_documents_locked(commit_env: CommitEnv, **request: Any) -> Any:
+    """排他の中の直コミットを、コミットの説明を付けて呼ぶ。"""
+    env = commit_env.env
+    return commit_documents_locked(
+        CommitDocumentsRequest(
+            source="sample", commit=CommitSpec(message="docs: 更新する"), **request
+        ),
+        registry=env.registry,
+        store=env.store,
+        checker=env.checker,
+        locks=env.locks,
+        repo_locks=env.repo_locks,
+        timeout_sec=10,
+        state_dir=commit_env.local.parent / "state",
+    )
+
+
+def test_commit_documents_locked(
+    make_commit_env: Callable[..., CommitEnv], run_git: Callable[..., str]
+) -> None:
+    """戻るときに排他を放している（正常系）。"""
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules"])
+    env = commit_env.env
+    repo = _git_common_dir(run_git, commit_env.develop)
+    # 実行
+    pending = _commit_documents_locked(commit_env, writes=_update_doc_1())
+    # 検証
+    assert pending.commit is not None
+    assert pending.conflicted is None
+    with env.repo_locks.hold(repo, timeout=0), env.locks.hold("sample", timeout=0):
+        pass
+
+
+def test_finish_commit_documents_when_conflict(
+    make_commit_env: Callable[..., CommitEnv],
+    run_git: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """衝突したときのスクリプトを排他の外で実行する（正常系）。"""
+    # 準備
+    commit_env = make_commit_env(write_api_kinds=["rules"], on_conflict=ECHO_BRANCH)
+    env = commit_env.env
+    base = _conflicting(commit_env, run_git)
+    held: list[bool] = []
+    original = write_service.run_conflict_script
+
+    def recording(*args: Any, **kwargs: Any) -> Any:
+        with env.locks.hold("sample", timeout=0):
+            held.append(True)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(write_service, "run_conflict_script", recording)
+    pending = _commit_documents_locked(commit_env, writes=_update_doc_1(), base_commit=base)
+    # 実行
+    result = finish_commit_documents(pending, reload_sources=_no_reload)
+    # 検証
+    assert held == [True]
+    assert result.conflict is not None
+    assert result.conflict.branch is not None
