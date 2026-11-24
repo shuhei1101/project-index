@@ -35,7 +35,11 @@ except Exception as error:  # noqa: BLE001
     print(f"POST {ADMIN_MCP} status: {error}")
 try:
     subprocess.run(
-        ["git", "-C", CLONE, "rev-parse", "HEAD"], capture_output=True, text=True, timeout=60, check=True
+        ["git", "-C", CLONE, "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=True,
     )
     print("クローンの HEAD: ok")
 except (OSError, subprocess.SubprocessError) as error:

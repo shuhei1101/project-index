@@ -51,7 +51,11 @@ dry_run = len(sys.argv) == MAX_ARGV
 try:
     status = call_admin("status", {"format": "json"}, STATUS_TIMEOUT_SEC)["structuredContent"]
     head = subprocess.run(
-        ["git", "-C", CLONE, "rev-parse", "HEAD"], capture_output=True, text=True, timeout=60, check=True
+        ["git", "-C", CLONE, "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=True,
     ).stdout.strip()
 except Exception as error:  # noqa: BLE001
     print("前提確認: failed")
@@ -61,7 +65,9 @@ print("前提確認: ok")
 
 # 計画（--dry-run もここを通る）: 修正を取り込んだコードは status に起動した commit を返す
 running = status.get("commit")
-print(f"稼働中のバージョン: {status['version']}・pid: {status['pid']}・起動した commit: {running or '（status が返さない）'}")
+print(
+    f"稼働中のバージョン: {status['version']}・pid: {status['pid']}・起動した commit: {running or '（status が返さない）'}"
+)
 print(f"クローンの HEAD（{CLONE}）: {head}")
 if running == head:
     print("索引のサーバーの更新: skipped")

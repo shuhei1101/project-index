@@ -4,7 +4,6 @@ import re
 import subprocess
 import sys
 import time
-from datetime import datetime
 
 sys.dont_write_bytecode = True
 
@@ -45,15 +44,15 @@ if match is None:
     print("クローンの HEAD が移った時刻: failed")
     print(f"git -C {CLONE} reflog -1 --date=unix --format=%gd: {moved or '（出力無し）'}")
     sys.exit(1)
-head_time = datetime.fromtimestamp(int(match.group(1)))
+head_time = int(match.group(1))
 line = ""
 for _ in range(ATTEMPTS):
     line = last_restart_line()
-    if line and datetime.strptime(line[:LOG_TIME_CHARS], LOG_TIME_FORMAT) >= head_time:
+    if line and time.mktime(time.strptime(line[:LOG_TIME_CHARS], LOG_TIME_FORMAT)) >= head_time:
         print(f"再起動を始めた行: ok（{line}）")
         sys.exit(0)
     time.sleep(INTERVAL_SEC)
 print("再起動を始めた行: failed")
-print(f"クローンの HEAD が移った時刻: {head_time}")
+print(f"クローンの HEAD が移った時刻: {time.strftime(LOG_TIME_FORMAT, time.localtime(head_time))}")
 print(f"{SERVER_LOG} の再起動を始めた最後の行: {line or '（無し）'}")
 sys.exit(1)
