@@ -323,7 +323,7 @@ stakeholders:
 trigger: 利用者が管理の MCP の `update` を呼ぶ
 preconditions:
   - project-index が待ち受けている
-  - クローンの上流に新しいバージョンの commit がある
+  - クローンの上流に新しいバージョンの commit があるか、クローンの HEAD が稼働中のプロセスの起動した commit と違う
 success_guarantee: project-index が新しいバージョンで待ち受け、端末の設定の `version` がそのバージョンになり、配信元を配信している。
 minimal_guarantee: '`git pull` に失敗したときは、前のバージョンのまま配信を続ける。移し替えの手順が失敗したときは、端末の設定をバックアップから戻す。'
 frequency: project-index の新しいバージョンが出るたび
