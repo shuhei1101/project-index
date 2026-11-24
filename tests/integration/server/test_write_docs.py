@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -10,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from project_index.shared.hashing import content_hash, value_hash
+from project_index.shared.runtime import DOCS_WORKERS
 from project_index.shared.yaml_io import load_yaml as load_yaml_value
 from tests.integration.server.conftest import (
     DIRECT_RULE_SCHEMA,
@@ -4269,3 +4271,153 @@ def test_error_when_sqlite_kind_written(
     assert load_yaml(first.read_text(encoding="utf-8"))["name"] == "新しい名前"
     assert "n1" not in [item.get("id") for item in replaced.data.get("results", [])]
     assert db.read_bytes() == db_before
+
+
+def _slow_generator_files(
+    sample_file_set: Callable[..., dict[str, str]], wait_sec: int
+) -> dict[str, str]:
+    """書き込んだ後に `wait_sec` 秒待つ生成のスクリプト `slow` を持つ配信元のファイル一式。"""
+    config = (
+        "name: sample\n"
+        "default_ref: develop\n"
+        "documents:\n"
+        "  - id: sample\n"
+        "    paths: [docs/*.yaml]\n"
+        "    schema: schemas/sample.schema.yaml\n"
+        "    after_write: [slow]\n"
+        "generators:\n"
+        "  - id: slow\n"
+        "    run: [python3, scripts/slow.py]\n"
+    )
+    script = f"import time\ntime.sleep({wait_sec})\n"
+    return sample_file_set(**{"project-index.yaml": config, "scripts/slow.py": script})
+
+
+def _timed_call(env: Any, name: str, **arguments: Any) -> tuple[Any, float]:
+    """ツールを呼び、結果と送信してから返却されるまでの秒数を返す。"""
+    started = time.monotonic()
+    result = env.call(name, **arguments)
+    return result, time.monotonic() - started
+
+
+def test_error_when_source_lock_wait_exceeds_deadline(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+) -> None:
+    """同じ配信元の先の書き込みが排他を握ったままで、後から来た書き込みの期限を過ぎたら、後から来た書き込みは時間切れを返却する（異常系）。"""
+    # 準備
+    source = make_source("sample", _slow_generator_files(sample_file_set, 4))
+    worktree = add_worktree(source.folder, "x")
+    env = make_server(source, settings_extra="write_deadline_sec: 2\n")
+    doc_1 = worktree / "docs" / "doc-1.yaml"
+    doc_2 = worktree / "docs" / "doc-2.yaml"
+    doc_2_before = doc_2.read_text(encoding="utf-8")
+    common = {"cwd": str(source.folder), "worktree": str(worktree)}
+    # 実行
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        call_a = pool.submit(
+            _timed_call,
+            env,
+            "write_docs",
+            operations=[_update("doc-1", _version(doc_1), set={"name": "A の名前"})],
+            **common,
+        )
+        time.sleep(0.5)
+        call_b = pool.submit(
+            _timed_call,
+            env,
+            "write_docs",
+            operations=[_update("doc-2", _version(doc_2), set={"name": "B の名前"})],
+            **common,
+        )
+        result_b, elapsed_b = call_b.result(timeout=30)
+        result_a, _elapsed_a = call_a.result(timeout=30)
+    # 検証
+    assert result_b.is_error is True
+    assert result_b.text.startswith("WriteDeadlineExceededError: 書き込みの期限")
+    assert "ファイルを書き換えずに止めました" in result_b.text
+    assert elapsed_b < 3
+    assert not result_a.is_error
+    assert result_a.data["applied"] is True
+    assert "A の名前" in doc_1.read_text(encoding="utf-8")
+    assert doc_2.read_text(encoding="utf-8") == doc_2_before
+
+
+def test_error_when_source_lock_waiters_exceed_execution_slots(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    add_worktree: Callable[..., Path],
+    sample_file_set: Callable[..., dict[str, str]],
+    sample_config_text: Callable[..., str],
+) -> None:
+    """同じ配信元の排他を待つ書き込みが実行スロットの本数を超えても、ほかの配信元への書き込みと検索は待たずに返却する（異常系）。"""
+    # 準備
+    source = make_source("sample", _slow_generator_files(sample_file_set, 4))
+    other = make_source(
+        "sample2", sample_file_set(**{"project-index.yaml": sample_config_text(name="sample2")})
+    )
+    worktree = add_worktree(source.folder, "x")
+    other_worktree = add_worktree(other.folder, "x")
+    env = make_server(source, other, settings_extra="write_deadline_sec: 2\n")
+    doc_1 = worktree / "docs" / "doc-1.yaml"
+    doc_2 = worktree / "docs" / "doc-2.yaml"
+    doc_2_before = doc_2.read_text(encoding="utf-8")
+    other_doc = other_worktree / "docs" / "doc-1.yaml"
+    sample = {"cwd": str(source.folder), "worktree": str(worktree)}
+    sample2 = {"cwd": str(other.folder), "worktree": str(other_worktree)}
+    waiters = DOCS_WORKERS + 1
+    # 実行
+    with ThreadPoolExecutor(max_workers=waiters + 3) as pool:
+        call_a = pool.submit(
+            _timed_call,
+            env,
+            "write_docs",
+            operations=[_update("doc-1", _version(doc_1), set={"name": "A の名前"})],
+            **sample,
+        )
+        time.sleep(0.5)
+        calls_w = [
+            pool.submit(
+                _timed_call,
+                env,
+                "write_docs",
+                operations=[_update("doc-2", _version(doc_2), set={"name": "W の名前"})],
+                **sample,
+            )
+            for _ in range(waiters)
+        ]
+        time.sleep(0.2)
+        call_c = pool.submit(
+            _timed_call,
+            env,
+            "write_docs",
+            operations=[_update("doc-1", _version(other_doc), set={"name": "C の名前"})],
+            **sample2,
+        )
+        call_d = pool.submit(
+            _timed_call,
+            env,
+            "search_docs",
+            filter={"field": "id", "op": "eq", "values": ["doc-1"]},
+            format="json",
+            **sample2,
+        )
+        result_c, elapsed_c = call_c.result(timeout=30)
+        result_d, elapsed_d = call_d.result(timeout=30)
+        results_w = [call.result(timeout=30) for call in calls_w]
+        call_a.result(timeout=30)
+    # 検証
+    assert not result_c.is_error
+    assert result_c.data["applied"] is True
+    assert elapsed_c < 1
+    assert not result_d.is_error
+    assert elapsed_d < 1
+    assert all(result.is_error for result, _ in results_w)
+    assert all(
+        result.text.startswith("WriteDeadlineExceededError: 書き込みの期限")
+        for result, _ in results_w
+    )
+    assert all(elapsed < 3 for _, elapsed in results_w)
+    assert doc_2.read_text(encoding="utf-8") == doc_2_before
