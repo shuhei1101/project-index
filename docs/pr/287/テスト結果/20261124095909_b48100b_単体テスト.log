@@ -1,0 +1,32 @@
+$ uv run pytest tests/unit/project_index/features/write/test_locks.py tests/unit/project_index/features/write/test_service.py tests/unit/project_index/features/write/test_route.py tests/unit/project_index/server/mcp/test_docs.py
+（Red: 実装の前。追加したテストのファイルだけを手元で実行した）
+    from project_index.features.write.locks import (
+E   ImportError: cannot import name 'WriteGates' from 'project_index.features.write.locks' (/home/shuhei2441/repo/project-index/.claude/worktrees/fix-write-source-lock-wait-outside-slot/src/project_index/features/write/locks.py)
+___ ERROR collecting tests/unit/project_index/features/write/test_service.py ___
+ImportError while importing test module '/home/shuhei2441/repo/project-index/.claude/worktrees/fix-write-source-lock-wait-outside-slot/tests/unit/project_index/features/write/test_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_service.py:31: in <module>
+    from project_index.features.write.locks import RepositoryLocks, SourceLocks, WriteLockKeys
+E   ImportError: cannot import name 'WriteLockKeys' from 'project_index.features.write.locks' (/home/shuhei2441/repo/project-index/.claude/worktrees/fix-write-source-lock-wait-outside-slot/src/project_index/features/write/locks.py)
+____ ERROR collecting tests/unit/project_index/features/write/test_route.py ____
+ImportError while importing test module '/home/shuhei2441/repo/project-index/.claude/worktrees/fix-write-source-lock-wait-outside-slot/tests/unit/project_index/features/write/test_route.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_route.py:14: in <module>
+    from project_index.features.write.locks import WriteLockKeys
+E   ImportError: cannot import name 'WriteLockKeys' from 'project_index.features.write.locks' (/home/shuhei2441/repo/project-index/.claude/worktrees/fix-write-source-lock-wait-outside-slot/src/project_index/features/write/locks.py)
+______ ERROR collecting tests/unit/project_index/server/mcp/test_docs.py _______
+ImportError while importing test module '/home/shuhei2441/repo/project-index/.claude/worktrees/fix-write-source-lock-wait-outside-slot/tests/unit/project_index/server/mcp/test_docs.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/server/mcp/test_docs.py:16: in <module>
+    from project_index.features.write.locks import WriteGates, WriteLockKeys
+E   ImportError: cannot import name 'WriteGates' from 'project_index.features.write.locks' (/home/shuhei2441/repo/project-index/.claude/worktrees/fix-write-source-lock-wait-outside-slot/src/project_index/features/write/locks.py)
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/write/test_locks.py
+ERROR tests/unit/project_index/features/write/test_service.py
+ERROR tests/unit/project_index/features/write/test_route.py
+ERROR tests/unit/project_index/server/mcp/test_docs.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 4 errors during collection !!!!!!!!!!!!!!!!!!!!
+============================== 4 errors in 0.50s ===============================
