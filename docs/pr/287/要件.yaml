@@ -19,24 +19,34 @@ docs:
     updated_at: '2026-11-24T00:30:20.427377+00:00'
   - page: docs/module/MOD-82.py.yaml
     new: false
-    change: SourceLocks.hold に待ち時間の上限を追加し、単体テストに上限を超えるケースを追加する
-    status: todo
+    change: SourceLocks.hold に待ち時間の上限を追加し、実行スロットの外で配信元・リポジトリを 1 つずつ通す書き込みの関所（WriteGates）と排他のキー（WriteLockKeys）を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T00:47:57.129390+00:00'
   - page: docs/module/MOD-84.py.yaml
     new: false
-    change: write_docs・delete_docs・_commit_locks が書き込みの期限までの残りを上限に配信元のロックを握る処理へ変える
-    status: todo
-  - page: docs/module/MOD-236-1.py.yaml
-    new: false
-    change: 同じ配信元の排他を実行スロットの外で待ち、握ってから実行スロットへ入れる処理を追加する
-    status: todo
+    change: write_docs・delete_docs・直コミットが書き込みの期限までの残りを上限に配信元の排他を握り、排他のキーを求める write_lock_keys を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T00:47:57.129390+00:00'
   - page: docs/module/MOD-94.py.yaml
     new: false
-    change: write_docs・delete_docs が実行スロットに入る前に配信元の排他を待つ呼び出し方へ変える
-    status: todo
+    change: write_docs・delete_docs を書き込みの関所を握ってから実行スロットで呼ぶ
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T00:47:57.129390+00:00'
   - page: docs/module/MOD-183.py.yaml
     new: false
-    change: 書き込みの API が実行スロットに入る前に配信元の排他を待つ呼び出し方へ変える
-    status: todo
+    change: 書き込みの API を書き込みの関所を握ってから実行スロットで呼ぶ
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T00:47:57.129390+00:00'
+  - page: docs/module/MOD-89.py.yaml
+    new: false
+    change: Handlers に書き込みの関所（write_gates）を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-24T00:48:01.703972+00:00'
 scope_out:
   - item: 実行スロットの本数（DOCS_WORKERS）・書き込みの期限（32 秒）の値の見直し
     reason: 要望はロックの待ち方の修正で、決定値の変更を含まない
