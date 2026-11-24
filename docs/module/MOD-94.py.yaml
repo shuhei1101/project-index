@@ -176,6 +176,7 @@ functions:
          - 引数で要求のモデル（`SearchRequest` など）を作る
          - 要求が指す配信元を決め（指す配信元の決定）、`await handlers.registry.wait_for(...)` でその行の読み込みだけを待つ（初期化とツールの一覧は待たない）。待つ間も裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中にいて、要求が待っていない行の読み込みを休ませる
          - `search_docs`・`write_docs`・`delete_docs` の場合、ワークツリーの読み込みの待ちを await する
+         - `write_docs`・`delete_docs` の場合、書き込みの排他のキーの解決（`write_lock_keys`）を文書の MCP の実行スロットで呼び、書き込みの関所.握る（`handlers.write_gates.hold(キー, limits.write_deadline)`）の中で、次のサービスの呼び出しをする（関所を待つ間は実行スロットを持たない）
          - サービスを、裏の処理の関所の要求の応答中（`handlers.gate.foreground`）の中で 文書の MCP の実行スロット（`handlers.slots.run_docs`） で呼ぶ（引数は `handlers` の属性。`write_docs`・`delete_docs` は `limits` に呼び出しの期限）
          - `write_docs`・`delete_docs` の結果の `applied` が `True` の場合、`cwd` から書ける配信元を裏で検査し直す（配信元の検査のキャッシュ.裏での検査の流し直し）
          - 結果をツールの結果にする（`write_docs`・`delete_docs` の `render` は `None`。`search_docs` は `functools.partial(render_search_markdown, source_label=result.source_label)`、`list_changes` は `functools.partial(render_changes_markdown, source_label=request.source or "作業中の配信元")`、`list_match_words` は用語の一覧の文を渡す）
@@ -236,6 +237,12 @@ functions:
         condition: '`search_docs` のサービスを、呼ばれたときの `handlers.gate.active` を記録する偽物にしてツールを呼ぶ'
         mock: 文書の検索（偽物）
         expected: 記録した `active` が `True`、結果を受けた後の `handlers.gate.active` が `False`
+      - name: test_build_docs_mcp_when_write_gate
+        case: 正常
+        summary: 書き込みの関所を待つ間は実行スロットを持たない
+        condition: 書き込みの関所で配信元 sample を握ったまま、sample への `write_docs` を実行スロットの本数 + 1 件呼び、続けて sample2 への `write_docs` を呼ぶ
+        mock: '`write_lock_keys`・`write_docs`（すぐ結果を返す偽物）'
+        expected: sample2 への呼び出しは sample の関所を放す前に結果を返し、sample への呼び出しは `write_docs` の偽物を関所を放すまで呼ばない
   - name: _docs_instructions
     title: 文書の MCP の instructions の描画
     kind: 関数

@@ -30,6 +30,18 @@ diagrams:
         class リポジトリごとの排他 {
           +握る(リポジトリ, 待ち時間) ContextManager
         }
+        文書のMCP ..> 書き込みの関所 : 実行スロットに入る前
+        書き込みのAPI ..> 書き込みの関所 : 実行スロットに入る前
+        書き込みの関所 ..> 書き込みの排他のキー
+        class 書き込みの関所 {
+          +握る(キー, 期限) AsyncContextManager
+        }
+        class 書き込みの排他のキー {
+          +repo
+          +source_id
+        }
+        click 文書のMCP href "id:MOD-94#functions[build_docs_mcp]"
+        click 書き込みのAPI href "id:MOD-183#functions[build_write_router]"
         click 文書の書き込み href "id:MOD-84#functions[write_docs]"
         click 文書の削除 href "id:MOD-84#functions[delete_docs]"
 classes:
@@ -55,7 +67,7 @@ classes:
     methods:
       - name: hold
         title: 握る
-        summary: 配信元の排他を握るコンテキストマネージャを返す
+        summary: 配信元の排他を、待ち時間の上限つきで握るコンテキストマネージャを返す
         kind: メソッド
         scope: public
         thread_safe: true
@@ -66,10 +78,20 @@ classes:
             required: true
             passing: positional
             description: 書く配信元
+          - name: timeout
+            title: 待ち時間の上限
+            type: float | None
+            required: false
+            default: None
+            passing: keyword
+            description: 書き込みの期限までの残りの秒数。`None` は待ち続ける
         returns:
           type: ContextManager[None]
           description: 抜けるときに放す
-        process: 1. `_guard` の中で配信元の排他を引き（無ければ作り）、それを握って返す
+        process: |-
+          1. `_guard` の中で配信元の排他を引く（無ければ作る）
+          2. `acquire(timeout=...)` で握る（リポジトリごとの排他.握ると同じ待ち方）
+             - 握れない場合、`WriteDeadlineExceededError` を送る。`next_steps` は同じ配信元への書き込みが終わってから再実行する旨
         unit_tests:
           - name: test_source_locks_hold
             case: 正常
@@ -77,6 +99,17 @@ classes:
             condition: 2 つのスレッドが同じ配信元を握り、片方が 0.2 秒眠る
             mock: なし
             expected: もう片方は眠り終わるまで入らない。別の配信元は待たない
+          - name: test_source_locks_hold_when_timeout
+            case: 異常
+            summary: 待ち時間の上限を超える
+            condition: 片方が握ったまま、もう片方が `timeout=0.1`
+            mock: なし
+            expected: '`WriteDeadlineExceededError`'
+            exception: 待ち時間の上限までに握れない
+        exceptions:
+          - name: WriteDeadlineExceededError
+            condition: 待ち時間の上限までに握れない
+            message: リポジトリごとの排他.握ると同じ
   - name: RepositoryLocks
     title: リポジトリごとの排他
     container: project_index/features/write/locks.py
@@ -142,4 +175,92 @@ classes:
             mock: なし
             expected: '`WriteDeadlineExceededError`'
             exception: 待ち時間の上限までに握れない
+  - name: WriteGates
+    title: 書き込みの関所
+    container: project_index/features/write/locks.py
+    usecase: 書き込み
+    role: 排他
+    summary: 文書の MCP の実行スロットに入る前に、同じリポジトリ・同じ配信元への書き込みを asyncio の側で 1 つずつ通す
+    description: インターフェース定義『文書の書き込み』の制約「配信元ごとの排他の待ち」を受け持つ。待つ間は実行スロットを持たない。関所を通った要求だけが実行スロットの中でリポジトリごとの排他・配信元ごとの排他を握るため、中の排他は待たずに握れる（関所を通らない呼び出しとの重なりだけを中の排他の上限で打ち切る）。イベントループの中だけで読み書きするため、辞書は排他を持たない
+    kind: クラス
+    properties:
+      - name: _repos
+        title: リポジトリの関所
+        type: dict[Path, asyncio.Lock]
+        access: 内部 (_)
+        description: リポジトリ → 関所
+      - name: _sources
+        title: 配信元の関所
+        type: dict[str, asyncio.Lock]
+        access: 内部 (_)
+        description: 配信元の ID → 関所
+    methods:
+      - name: hold
+        title: 握る
+        summary: キーのリポジトリ・配信元の順に関所を、期限までの残りの時間だけ待って握る（`@asynccontextmanager`）
+        kind: メソッド
+        scope: public
+        args:
+          - name: keys
+            title: キー
+            type: WriteLockKeys
+            required: true
+            passing: positional
+            description: 握るリポジトリと配信元
+          - name: deadline
+            title: 期限
+            type: Deadline
+            required: true
+            passing: positional
+            description: 呼び出しの書き込みの期限
+        returns:
+          type: AsyncIterator[None]
+          description: 抜けるときに握った逆の順に放す
+        process: |-
+          1. 待ち始めた時刻を記録し、`keys.repo` があればその関所（無ければ作る）、続けて `keys.source_id` の関所を、`async with asyncio.timeout(deadline.remaining())` の中で握る
+             - 期限までに握れない場合、握った関所を放し、配信元ごとの排他.握ると同じ `WriteDeadlineExceededError` を送る
+             - `asyncio.CancelledError` は握った関所を放してからそのまま送る
+          2. 待った秒数を今の要求の記録に足す（`current_record()` があれば `add_lock_wait`）
+          3. 呼び出し側の処理を実行し、抜けるときに配信元・リポジトリの順に放す
+        exceptions:
+          - name: WriteDeadlineExceededError
+            condition: 期限までに関所を握れない
+            message: 配信元ごとの排他.握ると同じ
+        unit_tests:
+          - name: test_write_gates_hold
+            case: 正常
+            summary: 同じ配信元は待ち、別の配信元は待たない
+            condition: タスク A が配信元 s1 の関所を握って 0.2 秒眠る間に、タスク B が s1、タスク C が s2 を握る（期限は 5 秒）
+            mock: なし
+            expected: B は A が放してから入り、C は A を待たずに入る
+          - name: test_write_gates_hold_when_repo
+            case: 正常
+            summary: 同じリポジトリは配信元が違っても待つ
+            condition: タスク A が `repo=r1`・`source_id=s1` を握って 0.2 秒眠る間に、タスク B が `repo=r1`・`source_id=s2` を握る
+            mock: なし
+            expected: B は A が放してから入る
+          - name: test_write_gates_hold_when_deadline
+            case: 異常
+            summary: 期限までに握れない
+            condition: タスク A が s1 を握ったまま、タスク B が残り 0.1 秒の期限で s1 を握る
+            mock: なし
+            expected: B は `WriteDeadlineExceededError` で、その後に A が放すと別のタスクが s1 を待たずに握れる
+            exception: 期限までに関所を握れない
 visibility: internal
+data_models:
+  - name: WriteLockKeys
+    title: 書き込みの排他のキー
+    container: project_index/features/write/locks.py
+    usecase: 書き込み
+    role: 値
+    summary: 1 回の書き込み・削除・直コミットが握る排他のキー（リポジトリと配信元）
+    description: '`@dataclass(frozen=True, slots=True)`。書き込みの排他のキーの解決（MOD-84）が作る'
+    properties:
+      - name: repo
+        title: リポジトリ
+        type: Path | None
+        description: リポジトリごとの排他を握る呼び出しの `git rev-parse --git-common-dir` の絶対パス。握らない呼び出しは `None`
+      - name: source_id
+        title: 配信元の ID
+        type: str
+        description: 書く配信元

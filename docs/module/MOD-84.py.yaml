@@ -247,7 +247,7 @@ functions:
     process: |-
       1. `operations` が 1〜`OPERATIONS_MAX` 件でない・`op` ごとの必須のキーが無い場合、添字つきの違反で `InvalidArgumentError` を送る
       2. 書く場所を解く（書く場所の解決）
-      3. 配信元の排他を握る（配信元ごとの排他.握る）
+      3. 配信元の排他を握る（配信元ごとの排他.握る。`timeout` は書き込みの期限までの残りで、`limits` が `None` なら `None`）
       4. 今の文書を集め（文書のストア.文書を集める）、ID → 文書の辞書にする。変更を当てるファイルは、パス → 往復編集の読み込みの内容で持つ
       5. 操作を順に当てる。失敗した操作は `failed` の行にして次へ進む
          - `create` の場合、種類の行を引き（無ければ `UnknownKindError`）、`writable` でなければ `documents[].writable` の違反にする。ID が無ければ IDを作る（`ids.format` も無ければ `id` が必須の違反）。ID が既にあれば違反。配置先は新しい文書の配置先。Git 管理外の配信元で、種類の行の `write_dates` が真なら `created`・`updated` に `now` を入れる（以下、日時を入れるかは書き換える文書の種類の行で決める）
@@ -277,7 +277,7 @@ functions:
       1. `atomic` が `False` か `worktree` がある場合、添字を持たない違反で `InvalidArgumentError` を送信する
       2. 配信元を引き（`source` が `None` なら作業中の配信元）、直コミットの書き込む先で計画を作る。続けて `committable_kinds` が空なら、取得の前に許可する種類を添えた `DirectCommitNotPermittedError` を送信する。書く場所は、`write_once` のたびに取り込んだ後の計画のワークツリーの設定で作る（作業場所の配信元の読み込み。`scope.write` を確認しない）
       3. `dry_run` なら、排他を握って手順 4・5 と下の「直コミットの確認」だけを行い、`applied=False` で返す（取得・コミット・プッシュをしない）
-      4. リポジトリごとの排他.握る（`timeout` は書き込みの期限までの残り）、配信元ごとの排他.握るの順に握り、直コミットを進めるを呼ぶ。`write_once` は次を行う
+      4. リポジトリごとの排他.握る（`timeout` は書き込みの期限までの残り）、配信元ごとの排他.握る（`timeout` は書き込みの期限までの残り）の順に握り、直コミットを進めるを呼ぶ。`write_once` は次を行う
          - 手順 4・5・6・7 を行う
          - 直コミットの確認: 変更を当てた後に書き換わる文書の種類を集め、`committable_kinds` に無い種類が `direct_commit.kinds` にあれば `DirectCommitNotPermittedError` を送信する。`direct_commit.kinds` に無い種類の文書と、`direct_commit.metadata_only_kinds` の種類で本文のファイル（`body_path` と本文）が前後で変わる文書（作る・移す・削除するを含む。本文のファイルを持たない文書は対象外）と、`secret_findings`（書き換わる文書ごとに前後の `data` と本文）の検出は、添字と文書の ID を付けた違反にして `ValidationFailedError` を送信する
          - 書き込むファイル（新しい本文と変わったファイル）を `check_clean` にかけ、手順 9・10 を行う
@@ -1053,6 +1053,55 @@ functions:
         mock: なし（一時フォルダの git）
         expected: 違反のパスが `sourceConfig.generators` の `ValidationFailedError` で、ブランチが増えない
         exception: 書き換えられないキーが変わる
+  - name: write_lock_keys
+    title: 書き込みの排他のキーの解決
+    kind: 関数
+    container: project_index/features/write/service.py
+    usecase: 書き込み
+    role: サービス
+    summary: 書き込み・削除・直コミットの要求が握る排他のキーを、書く場所を解いて返す
+    description: 文書の MCP と書き込みの API が、書き込みの関所を握る前に文書の MCP の実行スロットで呼ぶ。Git を呼ぶが、排他は握らない。返すキーは、続く文書の書き込み・文書の削除・書き込みと削除の直コミットが握る排他と同じにする
+    scope: public
+    thread_safe: true
+    args:
+      - name: request
+        title: 要求
+        type: WriteRequest | DeleteRequest | CommitDocumentsRequest
+        required: true
+        passing: positional
+        description: ツールの引数か、書き込みの API の本文から作った要求
+      - name: registry
+        title: 配信元の一覧
+        type: SourceRegistry
+        required: true
+        passing: keyword
+        description: 配信中の配信元
+    returns:
+      type: WriteLockKeys
+      description: 握るリポジトリと配信元
+    process: |-
+      1. `CommitDocumentsRequest` と、`commit` を持つ `WriteRequest`・`DeleteRequest` の場合、それぞれ書き込みと削除の直コミット・文書の書き込みの直コミットと同じ方法で配信元とリポジトリ（直コミットの計画の `repo`）を決め、`WriteLockKeys(repo, source_id)` を返す
+      2. それ以外の場合、書く場所を解き（書く場所の解決）、コミットするブランチのワークツリーへの書き込み（文書の書き込みがリポジトリごとの排他を握る条件）なら `repo` をそのワークツリーの `git rev-parse --git-common-dir` の絶対パス、それ以外は `None` にして返す
+      3. 書く場所を解けないときの例外は、文書の書き込みと同じ例外をそのまま送る
+    unit_tests:
+      - name: test_write_lock_keys
+        case: 正常
+        summary: コミットするブランチでないワークツリーへの書き込みは配信元だけ
+        condition: 一時フォルダの git の配信元で、コミットするブランチでないワークツリーを指す `WriteRequest`
+        mock: なし（一時フォルダの git）
+        expected: '`repo` が `None`、`source_id` が配信元の ID'
+      - name: test_write_lock_keys_when_commit_branch
+        case: 正常
+        summary: コミットするブランチのワークツリーへの書き込みはリポジトリも握る
+        condition: コミットするブランチを指すワークツリーへ `commit` を省いた `WriteRequest`
+        mock: なし（一時フォルダの git）
+        expected: '`repo` がクローンの `git rev-parse --git-common-dir` の絶対パス'
+      - name: test_write_lock_keys_when_commit
+        case: 正常
+        summary: 直コミットは直コミットの計画のリポジトリ
+        condition: '`commit` を持つ `DeleteRequest` と `CommitDocumentsRequest`'
+        mock: なし（一時フォルダの git）
+        expected: どちらも `repo` が直コミットの計画の `repo` と同じ
 refs:
   - to: IF-6
     type: requires
