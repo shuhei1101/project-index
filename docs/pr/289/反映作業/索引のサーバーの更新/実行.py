@@ -15,8 +15,8 @@ sys.dont_write_bytecode = True
 ADMIN_MCP = "http://127.0.0.1:8786/_admin/mcp/"
 CLONE = "/home/shuhei2441/repo/project-index/.claude/worktrees/develop"
 STATUS_TIMEOUT_SEC = 10
-# update は git pull・uv sync・migrate --plan を各 300 秒で打ち切るため、その合計に余裕を持たせる
-UPDATE_TIMEOUT_SEC = 960
+# update は git pull・uv sync・migrate --plan・npm install -g を各 300 秒で打ち切るため、その合計 1200 秒に余裕を持たせる
+UPDATE_TIMEOUT_SEC = 1260
 RESTART_TIMEOUT_SEC = 10
 # 受け付ける引数は無し（本番）か --dry-run だけ
 MAX_ARGV = 2
