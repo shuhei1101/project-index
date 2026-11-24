@@ -80,6 +80,27 @@ def test_render_status() -> None:
     ]
 
 
+def test_render_status_when_commit() -> None:
+    """起動した commit を 1 行目に添える（正常系）。"""
+    # 準備
+    status = ServerStatus(
+        address="http://127.0.0.1:8786/",
+        version="0.2.0",
+        pid=4242,
+        terminal=TerminalState(
+            file="/home/u/.config/project-index/settings.yaml", version_state="current"
+        ),
+        sources=[],
+        commit="5fd0f9a0123456789abcdef0123456789abcdef0",
+    )
+    # 実行
+    result = render_status(status)
+    # 検証
+    assert result.splitlines()[0] == (
+        "http://127.0.0.1:8786/ project-index 0.2.0（pid 4242・commit 5fd0f9a）"
+    )
+
+
 def test_render_status_when_running() -> None:
     """実行中の要求の表を配置する（正常系）。"""
     # 準備

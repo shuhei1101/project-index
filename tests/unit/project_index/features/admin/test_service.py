@@ -140,6 +140,7 @@ def test_get_status(
     status = get_status(handlers, env={})
     # 検証
     assert status.address == "http://127.0.0.1:8790/"
+    assert status.commit == handlers.restart.running_commit
     assert [(item.id, item.status) for item in status.sources] == [
         ("alpha", "serving"),
         ("broken", "not_served"),
