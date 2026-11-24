@@ -1,0 +1,1 @@
+# dev-docs のメタデータの画面から直コミットしてよい種類を project-index.yaml の direct_commit に追加する
