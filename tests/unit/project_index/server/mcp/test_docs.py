@@ -137,6 +137,11 @@ def test_build_docs_mcp_when_foreground(
     assert handlers.gate.active is False
 
 
+def _fixed_lock_keys(_request: WriteRequest, **_kwargs: Any) -> WriteLockKeys:
+    """書き込みの排他のキーの解決の偽物（配信元 sample だけを握る）。"""
+    return WriteLockKeys(repo=None, source_id="sample")
+
+
 def test_build_docs_mcp_when_error(
     make_mcp_handlers: Callable[..., Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -147,6 +152,7 @@ def test_build_docs_mcp_when_error(
         raise UnknownKindError(message="種類がありません", kinds=["rules"])
 
     monkeypatch.setattr(docs_module, "write_docs", failing_write_docs)
+    monkeypatch.setattr(docs_module, "write_lock_keys", _fixed_lock_keys)
     mcp = build_docs_mcp(make_mcp_handlers())
     arguments: dict[str, Any] = {"operations": [{"op": "create", "kind": "x", "data": {}}]}
     # 実行
@@ -452,6 +458,7 @@ def test_build_docs_mcp_when_limits(
         return WriteResult(applied=False, results=[])
 
     monkeypatch.setattr(docs_module, "write_docs", recording_write_docs)
+    monkeypatch.setattr(docs_module, "write_lock_keys", _fixed_lock_keys)
     handlers = make_mcp_handlers(terminal=make_terminal_config(write_deadline_sec=32))
     mcp = build_docs_mcp(handlers)
     arguments: dict[str, Any] = {"operations": [{"op": "create", "kind": "x", "data": {}}]}
