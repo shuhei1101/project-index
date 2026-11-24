@@ -211,6 +211,7 @@ callers:
   - SC-10#scenarios[正常シナリオ（再読み込みの検査が済む前に再読み込みする）]
   - SC-11#scenarios[正常シナリオ（配信元を読み込んだ直後に開く）]
   - SC-16#scenarios[正常シナリオ（文書の MCP が詰まっている）]
+  - SC-3#scenarios[正常シナリオ（クローンが既に最新で稼働中のプロセスが更新前のコード）]
 exclusivity: '読み取りだけで排他しない（`readOnlyHint: true`）'
 request:
   - name: format
@@ -308,6 +309,10 @@ response:
   - name: running[].sources
     type: list[str]
     description: 要求が指す配信元の ID を全て並べる。`source` に `"*"` を指定した要求は、配信元を解決した後の ID を並べる（解決する前は空）。書き込みの後の通知の判定は、`paths` を含む配信元の ID。配信元を指さないときは空
+  - name: commit
+    type: str | None
+    description: 動いているプロセスが起動した時点の、端末の設定の `clone` の HEAD
+    notes: 起動した時点で HEAD を読めなかった（`clone` が git のリポジトリでない）ときは `null`。markdown ではバージョンの行に短縮した commit を添える
 response_example: |-
   ```markdown
   http://127.0.0.1:8786/ project-index 0.2.0（pid 4242）
