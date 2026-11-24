@@ -73,6 +73,7 @@ from project_index.features.write.direct_commit import (
 )
 from project_index.features.write.hints import attach_schema_hints
 from project_index.features.write.ids import generate_id
+from project_index.features.write.locks import WriteLockKeys
 from project_index.features.write.placement import new_document_path
 from project_index.features.write.references import (
     renamed_path,
@@ -108,7 +109,6 @@ from project_index.features.write.types import (
 )
 from project_index.integrations.git import GitError, run_git
 from project_index.integrations.scripts import ScriptError, run_script
-from project_index.features.write.locks import WriteLockKeys
 from project_index.shared.deadline import CallLimits, Deadline
 from project_index.shared.errors import (
     DeleteNotAllowedError,

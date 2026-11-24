@@ -20,7 +20,7 @@ from project_index.server.error_handlers import register_error_handlers
 from project_index.shared.errors import DirectCommitNotPermittedError, SourceConfigNotPermittedError
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Callable
+    from collections.abc import AsyncGenerator, Callable
     from pathlib import Path
 
     from project_index.features.settings.types import SourceEntry, TerminalConfig
@@ -280,7 +280,7 @@ def test_build_write_router_when_write_gate(
 
     class RecordingGates:
         @contextlib.asynccontextmanager
-        async def hold(self, given: WriteLockKeys, deadline: Any) -> AsyncIterator[None]:
+        async def hold(self, given: WriteLockKeys, deadline: Any) -> AsyncGenerator[None]:
             held.append((given, deadline.limit_sec))
             events.append("gate-in")
             yield

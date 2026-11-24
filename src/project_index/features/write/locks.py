@@ -8,14 +8,14 @@ import threading
 import time
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from project_index.shared.errors import WriteDeadlineExceededError
 from project_index.shared.runtime import current_record
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Generator
-    from pathlib import Path
+    from collections.abc import AsyncGenerator, Generator
 
     from project_index.shared.deadline import Deadline
 
@@ -99,7 +99,7 @@ class WriteGates:
         self._sources: dict[str, asyncio.Lock] = {}
 
     @contextlib.asynccontextmanager
-    async def hold(self, keys: WriteLockKeys, deadline: Deadline) -> AsyncIterator[None]:
+    async def hold(self, keys: WriteLockKeys, deadline: Deadline) -> AsyncGenerator[None]:
         """キーのリポジトリ・配信元の順に関所を、期限までの残りの時間だけ待って握る。"""
         # 中の排他と同じく、リポジトリ → 配信元の順に握る
         gates: list[asyncio.Lock] = []

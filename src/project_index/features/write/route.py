@@ -93,7 +93,9 @@ def build_write_router(handlers: Handlers) -> APIRouter:
                     )
             # 衝突したときのスクリプトと配信元の再読み込みは、関所を放した後に動かす
             with handlers.gate.foreground():
-                result = await handlers.slots.run_docs(functools.partial(_finish, handlers, pending))
+                result = await handlers.slots.run_docs(
+                    functools.partial(_finish, handlers, pending)
+                )
         return CommitDocumentsResponse.from_domain(result)
 
     @router.get(

@@ -116,6 +116,29 @@ def _signature(model: type[BaseModel]) -> inspect.Signature:
     return inspect.Signature(parameters, return_annotation=CallToolResult)
 
 
+async def _run_service(
+    request: BaseModel,
+    limits: CallLimits,
+    call: Callable[[Any, CallLimits], object],
+    *,
+    gate: BackgroundGate,
+    slots: ExecutionSlots,
+    gates: WriteGates | None,
+    lock_keys: Callable[[Any], WriteLockKeys] | None,
+) -> object:
+    """サービスを文書の MCP の実行スロットで呼ぶ（書き込み・削除は書き込みの関所を実行スロットの外で握る）。"""
+    # 書き込みの関所を持たないツール: サービスの処理の間は要求の応答中として数え、裏の検査と書き出しを休ませる
+    if lock_keys is None or gates is None:
+        with gate.foreground():
+            return await slots.run_docs(call, request, limits)
+    # 書き込み・削除: 握る排他のキーを実行スロットで求め、関所は実行スロットの外で待つ
+    with gate.foreground():
+        keys = await slots.run_docs(lock_keys, request)
+    async with gates.hold(keys, limits.write_deadline):
+        with gate.foreground():
+            return await slots.run_docs(call, request, limits)
+
+
 def _register(
     mcp: MCPServer,
     name: str,
@@ -149,18 +172,6 @@ def _register(
         with slots.request(name) as record:
             return await _call(record, arguments, limits)
 
-    async def _run_service(request: BaseModel, limits: CallLimits) -> Any:
-        # 書き込みの関所を持たないツール: サービスの処理の間は要求の応答中として数え、裏の検査と書き出しを休ませる
-        if lock_keys is None or write_gates is None:
-            with gate.foreground():
-                return await slots.run_docs(call, request, limits)
-        # 書き込み・削除: 握る排他のキーを実行スロットで求め、関所は実行スロットの外で待つ
-        with gate.foreground():
-            keys = await slots.run_docs(lock_keys, request)
-        async with write_gates.hold(keys, limits.write_deadline):
-            with gate.foreground():
-                return await slots.run_docs(call, request, limits)
-
     async def _call(
         record: RequestRecord,
         arguments: dict[str, object],
@@ -178,7 +189,15 @@ def _register(
             # ワークツリーの初めての読み込みを上限まで待つ（search_docs・write_docs・delete_docs）
             if prepare is not None:
                 await prepare(request)
-            result = await _run_service(request, limits)
+            result = await _run_service(
+                request,
+                limits,
+                call,
+                gate=gate,
+                slots=slots,
+                gates=write_gates,
+                lock_keys=lock_keys,
+            )
             fmt: Literal["markdown", "json"] = getattr(request, "format", "json")
             # 描画を持つツール: 要求を添えて Markdown にする
             renderer: Callable[[Any], str] | None = None
