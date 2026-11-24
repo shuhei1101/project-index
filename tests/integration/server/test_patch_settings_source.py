@@ -273,4 +273,5 @@ def test_normal_when_direct_commit_changed(
         "scope": [str(work)],
         "kinds": {"note": [str(note)]},
         "writeApiKinds": [],
+        "writeApiConfig": False,
     }
