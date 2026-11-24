@@ -102,19 +102,30 @@ def update_clone(clone: Path, *, control: RestartControl, mdmark_ref: str) -> Up
 def _update(clone: Path, control: RestartControl, mdmark_ref: str) -> UpdateResult:
     """更新の本体（`update_lock` を取った中で呼ぶ）。"""
     previous_version = RUNNING_VERSION
+    previous_commit = control.running_commit
     before = _run(["git", "rev-parse", "HEAD"], cwd=clone).strip()
     logger.info("クローンを更新する（%s）", clone)
     _run(["git", "pull", "--ff-only"], cwd=clone)
-    after = _run(["git", "rev-parse", "HEAD"], cwd=clone).strip()
-    # 新しい commit が無ければ mdmark の CLI だけを入れ直す
-    if before == after:
+    commit = _run(["git", "rev-parse", "HEAD"], cwd=clone).strip()
+    updated = before != commit
+    # 起動した commit が分かれば、クローンの HEAD と違うかで起動し直すかを決める
+    needs_restart = commit != previous_commit if previous_commit is not None else updated
+    if not needs_restart:
         return UpdateResult(
             previous_version=previous_version,
             version=previous_version,
-            updated=False,
+            updated=updated,
             migration_needed=False,
             restarting=False,
+            previous_commit=previous_commit,
+            commit=commit,
             mdmark=_reinstall_mdmark(mdmark_ref),
+        )
+    if not updated:
+        logger.info(
+            "取り込む commit は無いが、動いているプロセスの commit と違うため起動し直す（%s・%s）",
+            previous_commit,
+            commit,
         )
     _run(["uv", "sync"], cwd=clone)
     with (clone / "pyproject.toml").open("rb") as file:
@@ -132,8 +143,10 @@ def _update(clone: Path, control: RestartControl, mdmark_ref: str) -> UpdateResu
     return UpdateResult(
         previous_version=previous_version,
         version=version,
-        updated=True,
+        updated=updated,
         migration_needed=migration_needed,
         restarting=not migration_needed,
+        previous_commit=previous_commit,
+        commit=commit,
         mdmark=mdmark,
     )

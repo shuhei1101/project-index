@@ -101,6 +101,8 @@ class ServerStatus:
     exporting: bool = False
     # 文書の MCP・読み取り API・書き込みの後の通知の判定の終わっていない要求（経過秒の長い順）
     running: list[RunningRequest] = field(default_factory=list[RunningRequest])
+    # 動いているプロセスが起動した時点の端末の設定の clone の HEAD（読めなかったときは None）
+    commit: str | None = None
 
 
 @dataclass(frozen=True)
