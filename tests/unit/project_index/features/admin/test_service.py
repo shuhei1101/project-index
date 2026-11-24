@@ -136,11 +136,12 @@ def test_get_status(
         make_entry(str(off), source_id="off", enabled=False),
         port=8790,
     )
+    handlers.restart.running_commit = "5fd0f9a0123456789abcdef0123456789abcdef0"
     # 実行
     status = get_status(handlers, env={})
     # 検証
     assert status.address == "http://127.0.0.1:8790/"
-    assert status.commit == handlers.restart.running_commit
+    assert status.commit == "5fd0f9a0123456789abcdef0123456789abcdef0"
     assert [(item.id, item.status) for item in status.sources] == [
         ("alpha", "serving"),
         ("broken", "not_served"),
