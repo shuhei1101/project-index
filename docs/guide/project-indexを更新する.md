@@ -16,8 +16,8 @@ update と project-index migrate で project-index を更新し、端末の設�
 
 | 応答 | 動き |
 | --- | --- |
-| `updated: false` | 新しい commit が無い。何も変えず、再起動もしない |
-| `migration_needed: false` | 応答を返した後に自動で起動し直す |
+| `restarting: true` | 応答を返した後に自動で起動し直す。新しい commit が無くても（`updated: false`）、動いているプロセスがクローンの HEAD と違う commit から起動していれば起動し直す |
+| `restarting: false`・`migration_needed: false` | 新しい commit が無く、動いているプロセスもクローンの HEAD から起動している。何も変えず、再起動もしない |
 | `migration_needed: true` | 再起動しない。次の「端末の設定を移し替える」へ進む |
 
 ## 端末の設定を移し替える
