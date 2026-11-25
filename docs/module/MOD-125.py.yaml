@@ -21,6 +21,7 @@ diagrams:
         読み取り API の入口 ..> 検討事項の文書の取得
         文書の取得 ..> 文書のページの特定
         文書の取得 ..> 変換
+        文書の取得 ..> リビジョンのファイルの日時
         検討事項の ID の一覧 ..> 検討事項の文書を探す
         検討事項の文書の取得 ..> 検討事項の文書を探す
         class 読み取り API の入口 {
@@ -44,6 +45,9 @@ diagrams:
         class 文書のページの特定 {
           <<function>>
         }
+        class リビジョンのファイルの日時 {
+          <<function>>
+        }
         class 変換 {
           <<class>>
         }
@@ -52,6 +56,7 @@ diagrams:
         }
         click 読み取り API の入口 href "id:MOD-126#functions[build_read_router]"
         click 文書のページの特定 href "id:MOD-29#classes[DocumentStore]"
+        click リビジョンのファイルの日時 href "id:MOD-29#classes[DocumentStore].methods[file_updated]"
         click 変換 href "id:MOD-17#classes[ConvertService]"
         click 検討事項の文書を探す href "id:MOD-16#functions[find_decisions]"
 functions:
@@ -243,11 +248,13 @@ functions:
     process: |-
       1. 文書のストアの『文書のページの特定』（`store.find_page(target, path, doc_id=doc_id)`）で `path` の文書を引く（文書のファイル、無ければ本文のファイルが `path` と同じ最初の文書。`doc_id` を指したときは、そのうち文書の ID が `doc_id` と同じ文書）。`ref` のある読む場所では、保持した読み込みの結果と索引で引き、配信元の全ての文書を照合しない。文書が無い場合だけ、読めなかったファイルの理由を `store.load(target)` の `problems` から引く（`ref` の無い読む場所で読み込みを 2 回走らせない）
          - 無い場合、`DocumentNotFoundError` を送出する
+         - 読めなかったファイルがある場合、`value` を `None`、ファイルのパスと行と列を `conversion_error` に入れ、`updated_at` を手順 5 の取り方でそのファイルのパスから入れて返却する
       2. 文書の値・種類のスキーマ（`store.row_schema(target, kind)` の `$ref` を解いた形）・メタデータ（`common_keys` に文書の `metadata` を入れる）・本文と本文のファイルのパス（管理用の YAML の行の文書だけ）を集める
          - YAML として読み込めない文書は、`value` を `None` にし、ファイルのパスと行と列を `conversion_error` に入れる
       3. 文書の種類の行が `converter` を持つ場合だけ、`converter.convert(target, document)` の `markdown` か `failure` を入れる
       4. `value` が `dict` のとき、最上位のキーごとに `value_hash(value[キー])` を `item_versions` に入れる（書き込みの照合と同じ計算）
-      5. `updated_at` に、Git の配信元はそのリビジョンでファイルを最後に変えた commit の日時、Git 管理外の配信元はファイルの更新日時を入れる
+      5. `updated_at` に、文書の `updated` を入れる。無ければ、文書のストアの『リビジョンのファイルの日時』（`store.file_updated(target, 本文のファイルのパスか文書のファイルのパス)`）を入れる
+         - それも `None` の場合（Git の管理外の配信元）だけ、読むフォルダのファイルの更新日時を入れる。`target.ref` のある読む場所では作業ツリーのファイルを `stat` しない
     exceptions:
       - name: DocumentNotFoundError
         condition: '`path` の文書が無い'
@@ -310,6 +317,18 @@ functions:
         condition: '`id`・`title`・`description` を持つ YAML の文書'
         mock: なし
         expected: '`item_versions` が 3 つのキーを持ち、各値が `value_hash(value[キー])` と一致する'
+      - name: test_get_document_when_ref_and_no_dates
+        case: 正常
+        summary: 日時を持たないリビジョンの文書を作業ツリーで stat しない
+        condition: '`ref` を持つ読む場所で、`updated` が `None` の文書 `design/D-9.yaml`（作業ツリーに無い）'
+        mock: '`store.find_page`（その文書を返す）・`store.file_updated`（日時 T を返す）'
+        expected: '`updated_at` が T で、`FileNotFoundError` を送出しない'
+      - name: test_get_document_when_ref_and_yaml_broken
+        case: 正常
+        summary: リビジョンにだけある読み込めない YAML
+        condition: '`ref` を持つ読む場所で、`store.load` の `problems` に `design/broken.yaml` の読めなかった理由（作業ツリーに無い）'
+        mock: '`store.find_page`（`None` を返す）・`store.load`・`store.file_updated`（日時 T を返す）'
+        expected: '`conversion_error` にファイルのパスと行と列、`updated_at` が T'
   - name: list_decisions
     title: 検討事項の ID の一覧
     kind: 関数

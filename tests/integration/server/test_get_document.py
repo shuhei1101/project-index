@@ -100,6 +100,83 @@ def test_normal_when_ref_given(
     assert latest.json()["value"]["title"] == "変えた"
 
 
+CREATED_AT = "2026-10-01T12:00:00+09:00"
+BRANCH_CHANGED_AT = "2026-10-02T12:00:00+09:00"
+MAIN_CHANGED_AT = "2026-10-03T12:00:00+09:00"
+MERGED_AT = "2026-10-04T12:00:00+09:00"
+
+
+def test_normal_when_document_only_in_revision(
+    make_source: Callable[..., Any],
+    make_server: Callable[..., Any],
+    write_files: Callable[[Path, dict[str, str]], None],
+    run_git: Callable[..., str],
+) -> None:
+    """作業ツリーに無く、指したリビジョンのマージ commit で追加した文書を、そのマージ commit の日時で返却する（正常系）。"""
+    # 準備（feature で D-1 を変え、main にも commit を追加してから、feature へ main をマージした commit で D-9・broken を追加する）
+    source = make_source("sample", main_files(), branch="main", date=CREATED_AT)
+    folder = source.folder
+    run_git(folder, "checkout", "-b", "feature")
+    write_files(folder, {"design/D-1.yaml": "id: D-1\nname: 設計 1\ntitle: feature で変えた\n"})
+    run_git(folder, "add", "-A")
+    run_git(
+        folder,
+        "commit",
+        "-m",
+        "docs: D-1",
+        env={"GIT_AUTHOR_DATE": BRANCH_CHANGED_AT, "GIT_COMMITTER_DATE": BRANCH_CHANGED_AT},
+    )
+    run_git(folder, "checkout", "main")
+    write_files(folder, {"design/D-2.yaml": "id: D-2\nname: 設計 2\ntitle: main で変えた\n"})
+    run_git(folder, "add", "-A")
+    run_git(
+        folder,
+        "commit",
+        "-m",
+        "docs: D-2",
+        env={"GIT_AUTHOR_DATE": MAIN_CHANGED_AT, "GIT_COMMITTER_DATE": MAIN_CHANGED_AT},
+    )
+    run_git(folder, "checkout", "feature")
+    run_git(folder, "merge", "--no-ff", "--no-commit", "main")
+    write_files(
+        folder,
+        {
+            "design/D-9.yaml": "id: D-9\nname: 設計 9\ntitle: マージで追加した\n",
+            "design/broken.yaml": "id: [broken\n",
+        },
+    )
+    run_git(folder, "add", "-A")
+    run_git(
+        folder,
+        "commit",
+        "-m",
+        "merge",
+        env={"GIT_AUTHOR_DATE": MERGED_AT, "GIT_COMMITTER_DATE": MERGED_AT},
+    )
+    run_git(folder, "checkout", "main")
+    env = make_server(source)
+    # 実行
+    added = env.client.get("/sources/sample/docs/design/D-9.yaml", params={"ref": "feature"})
+    broken = env.client.get("/sources/sample/docs/design/broken.yaml", params={"ref": "feature"})
+    branch_only = env.client.get("/sources/sample/docs/design/D-1.yaml", params={"ref": "feature"})
+    # 検証
+    assert not (folder / "design" / "D-9.yaml").exists()
+    assert not (folder / "design" / "broken.yaml").exists()
+    assert added.status_code == 200
+    assert added.json()["value"]["title"] == "マージで追加した"
+    assert datetime.fromisoformat(added.json()["updatedAt"]) == datetime.fromisoformat(MERGED_AT)
+    assert broken.status_code == 200
+    error = broken.json()["conversionError"]
+    assert error["file"] == "design/broken.yaml"
+    assert error["line"] is not None
+    assert error["column"] is not None
+    assert datetime.fromisoformat(broken.json()["updatedAt"]) == datetime.fromisoformat(MERGED_AT)
+    assert branch_only.status_code == 200
+    assert datetime.fromisoformat(branch_only.json()["updatedAt"]) == datetime.fromisoformat(
+        BRANCH_CHANGED_AT
+    )
+
+
 def test_normal_when_body_path_given(
     make_source: Callable[..., Any], make_server: Callable[..., Any]
 ) -> None:

@@ -286,6 +286,37 @@ flows:
       - 3 回目は 200 で `markdown` が `# v2`
       - '`reload` も再起動も呼ばない'
     test: test_normal_when_converter_script_changed
+  - name: 正常系（リビジョンにだけある文書）
+    summary: 作業ツリーに無く、指したリビジョンのマージ commit で追加した文書を、そのマージ commit の日時で返却する
+    setup:
+      - name: Mock
+        description: なし（一時フォルダに Git の配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
+      - name: サンプルの配信元
+        description: 正常系と同じ sample。`main` からブランチ `feature` を分けた後、`feature` の commit で `design/D-1.yaml` を変え、`main` にも commit を 1 つ追加する。続けて `feature` に `main` をマージした commit で、`design/D-9.yaml` と YAML として読み込めない `design/broken.yaml` を追加する
+        notes: 作業ツリーは `main` のままで、`D-9.yaml`・`broken.yaml` は作業ツリーにもマージ commit のどちらの親にも無い。`D-1.yaml` はマージ commit で中身が変わらず、最初の親と同じで 2 つ目の親と異なる
+    flow: |-
+      <!-- map: {"title": "正常系（リビジョンにだけある文書）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant E as GET /sources/{source}/docs/{path}
+
+        C->>E: GET /sources/sample/docs/design/D-9.yaml?ref=feature
+        E-->>C: 200 feature の値
+        C->>E: GET /sources/sample/docs/design/broken.yaml?ref=feature
+        E-->>C: 200 conversionError
+        C->>E: GET /sources/sample/docs/design/D-1.yaml?ref=feature
+        E-->>C: 200 feature で変えた commit の日時
+      ```
+
+      <!-- /map -->
+    expected:
+      - '`D-9.yaml` は 200 で、`value` が `feature` の値、`updatedAt` がマージ commit の日時'
+      - '`broken.yaml` は 200 で、`conversionError` にファイルのパスと行と列、`updatedAt` がマージ commit の日時'
+      - '`D-1.yaml?ref=feature` は 200 で、`updatedAt` がマージ commit ではなく `feature` で `D-1.yaml` を変えた commit の日時'
+      - どの取得も作業ツリーのファイルを参照しない
+    test: test_normal_when_document_only_in_revision
 lead: 指定のリビジョンの文書の値・種類のスキーマ・メタデータ・変換の結果を返却する読み取り API の入出力を定め、文書の取得を修正するときに参照する。
 tags:
   - name: topic:文書

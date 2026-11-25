@@ -85,6 +85,11 @@ def resolve_ref(repo_root: Path, ref: str, *, date_base: str, argument: str = "r
     return ResolvedRef(input=ref, commit=commit, date=_commit_date(repo_root, commit))
 
 
+def commit_date(repo_root: Path, commit: str) -> datetime:
+    """解いた commit の日時を、commit ごとに git を 1 回だけ呼んで返す。"""
+    return _commit_date(repo_root, commit)
+
+
 @functools.lru_cache(maxsize=COMMIT_DATE_KEEP)
 def _commit_date(repo_root: Path, commit: str) -> datetime:
     """commit の日時を返す（commit の日時は変わらないので、同じ commit は git を 1 回だけ呼ぶ）。"""
@@ -169,7 +174,16 @@ def file_dates(
     work_root: Path, *, commit: str = "HEAD", pathspec: str | None = None
 ) -> dict[str, FileDates]:
     """ファイルごとに最初と最後の commit の日時を 1 回の git で引く。"""
-    args = [*QUOTE_OFF, "log", "--format=%x00%cI", "--name-only", "--no-renames", commit]
+    # マージ commit は、全ての親と異なるファイルだけをその commit で変えたファイルとして出す
+    args = [
+        *QUOTE_OFF,
+        "log",
+        "--format=%x00%cI",
+        "--name-only",
+        "--no-renames",
+        "--diff-merges=dense-combined",
+        commit,
+    ]
     if pathspec:
         args.extend(["--", pathspec])
     try:

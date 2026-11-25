@@ -44,6 +44,7 @@ FILES_SCHEMA_TEMPLATE = Path(__file__).parents[5] / "templates" / "files.schema.
 
 
 OCT_02 = "2026-10-02T12:00:00+09:00"
+OCT_03 = "2026-10-03T12:00:00+09:00"
 
 RULES_TABLE = DocumentTable(
     id="rules", paths=["rules/*.yaml"], schema_path="schemas/rule.schema.yaml"
@@ -994,6 +995,90 @@ def test_document_store_location_when_ref(
     document = make_document(path="rules/a.yaml", body_path=None)
     # 実行
     result = document_store.location(target, document)
+    # 検証
+    assert result is None
+
+
+def _merged_repo(
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+    write_files: Callable[[Path, dict[str, str]], None],
+) -> Path:
+    """`feature` に `main` をマージした commit（OCT_03）で `rules/m.yaml` を追加し、作業ツリーを `main` に戻したリポジトリを返す。"""
+    root = git_repo({"rules/a.yaml": "id: a\n"}, branch="main", date=OCT_01)
+    run_git(root, "checkout", "-b", "feature")
+    write_files(root, {"rules/b.yaml": "id: b\n"})
+    run_git(root, "add", "-A")
+    run_git(
+        root, "commit", "-m", "b", env={"GIT_AUTHOR_DATE": OCT_02, "GIT_COMMITTER_DATE": OCT_02}
+    )
+    run_git(root, "checkout", "main")
+    write_files(root, {"rules/c.yaml": "id: c\n"})
+    run_git(root, "add", "-A")
+    run_git(
+        root, "commit", "-m", "c", env={"GIT_AUTHOR_DATE": OCT_02, "GIT_COMMITTER_DATE": OCT_02}
+    )
+    run_git(root, "checkout", "feature")
+    run_git(root, "merge", "--no-ff", "--no-commit", "main")
+    write_files(root, {"rules/m.yaml": "id: m\n"})
+    run_git(root, "add", "-A")
+    run_git(
+        root, "commit", "-m", "merge", env={"GIT_AUTHOR_DATE": OCT_03, "GIT_COMMITTER_DATE": OCT_03}
+    )
+    run_git(root, "checkout", "main")
+    return root
+
+
+def test_document_store_file_updated_when_ref(
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    document_store: DocumentStore,
+) -> None:
+    """マージ commit で追加したファイルの日時（正常系）。"""
+    # 準備
+    root = _merged_repo(git_repo, run_git, write_files)
+    source = _page_source(root, make_source_config, make_served_source)
+    target = make_target(source, ref="feature")
+    # 実行
+    result = document_store.file_updated(target, "rules/m.yaml")
+    # 検証
+    assert result == datetime.fromisoformat(OCT_03)
+    assert not (root / "rules" / "m.yaml").exists()
+
+
+def test_document_store_file_updated_when_ref_and_no_dates(
+    git_repo: Callable[..., Path],
+    run_git: Callable[..., str],
+    write_files: Callable[[Path, dict[str, str]], None],
+    make_source_config: Callable[..., SourceConfig],
+    make_served_source: Callable[..., ServedSource],
+    make_target: Callable[..., Target],
+    document_store: DocumentStore,
+) -> None:
+    """リビジョンに日時を持たないパス（正常系）。"""
+    # 準備
+    root = _merged_repo(git_repo, run_git, write_files)
+    source = _page_source(root, make_source_config, make_served_source)
+    target = make_target(source, ref="feature")
+    # 実行
+    result = document_store.file_updated(target, "rules/none.yaml")
+    # 検証
+    assert result == datetime.fromisoformat(OCT_03)
+
+
+def test_document_store_file_updated_when_not_git(
+    document_store: DocumentStore,
+    workspace: Target,
+) -> None:
+    """Git の管理外（正常系）。"""
+    # 準備
+    path = "rules/a.yaml"
+    # 実行
+    result = document_store.file_updated(workspace, path)
     # 検証
     assert result is None
 

@@ -162,8 +162,14 @@ def _kind_of(source: ServedSource, file: str) -> str:
     return ""
 
 
-def _file_time(file: Path) -> datetime:
-    """ファイルの更新日時を返す。"""
+def _updated_at(target: Target, path: str, store: DocumentStore) -> datetime:
+    """ファイルを最後に変えた commit の日時を返し、Git の管理外の配信元だけファイルの更新日時にする。"""
+    committed = store.file_updated(target, path)
+    # Git の配信元: そのリビジョンでファイルを最後に変えた commit（リビジョンを指すときは作業ツリーを stat しない）
+    if committed is not None:
+        return committed
+    # Git の管理外の配信元: 読むフォルダのファイルの更新日時
+    file = target.source.root / path
     return datetime.fromtimestamp(file.stat().st_mtime, tz=UTC)
 
 
@@ -199,7 +205,7 @@ def get_document(
                 line=broken.line,
                 column=broken.column,
             ),
-            updated_at=_file_time(source.root / broken.path),
+            updated_at=_updated_at(target, broken.path, store),
         )
     # 種類が converters[] を指すときだけ、スクリプトの Markdown か変換の失敗を入れる
     markdown: str | None = None
@@ -222,7 +228,8 @@ def get_document(
         body_path=document.body_path,
         markdown=markdown,
         conversion_error=failure,
-        updated_at=document.updated or _file_time(source.root / document.path),
+        updated_at=document.updated
+        or _updated_at(target, document.body_path or document.path, store),
         # 書き込みの照合と同じ計算で、最上位のキーごとのバージョンを入れる
         item_versions={key: value_hash(value) for key, value in document.data.items()},
     )

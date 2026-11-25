@@ -789,6 +789,55 @@ classes:
             condition: Git の配信元で `rules/a.yaml`・`files.yaml` の行（`guide.md` を本文に持つ）・`terms.yaml` の行 `term-1`・`term-2` を commit し、`ref` を持つ読む場所と持たない読む場所で、`rules/a`・`rules/a.yaml`・`guide.md`・`terms.yaml` と `doc_id` `term-2`・無いパスを引く
             mock: なし（`tmp_path` に `git init`）
             expected: '`rules/a`・`rules/a.yaml` は `rules/a.yaml` の文書、`guide.md` は `guide.md` を本文に持つ行の文書、`terms.yaml` と `doc_id` `term-2` は `term-2` の文書、無いパスは `None`。`ref` を持つ読む場所と持たない読む場所で同じ文書'
+      - name: file_updated
+        title: リビジョンのファイルの日時
+        summary: Git の配信元で、読む場所のリビジョンでファイルを最後に変えた commit の日時を返却する
+        kind: メソッド
+        scope: public
+        thread_safe: true
+        args:
+          - name: target
+            title: 読む場所
+            type: Target
+            required: true
+            passing: positional
+            description: 読み取りの場所が返したもの
+          - name: path
+            title: パス
+            type: str
+            required: true
+            passing: positional
+            description: 配信元の直下からのファイルのパス
+        returns:
+          type: datetime | None
+          description: commit の日時。Git の管理外の配信元と、`target.ref` が無く日時を持たないファイルは `None`
+        process: |-
+          1. ファイルの日時（`_file_dates(target, revision)`。`revision` は `target.ref` があれば `_commit_of(target)`、無ければ `None`）を `path` で引き、あれば `updated` を返却する
+          2. 無い場合、`target.ref` があれば、`_commit_of(target)` の commit の日時（履歴の『commit の日時』`commit_date(repo_root, commit)`。commit ごとに git を 1 回だけ呼ぶ）を返却する。`target.ref` が無ければ `None` を返却する
+
+          作業ツリーのファイルを `stat` しない
+        unit_tests:
+          - name: test_document_store_file_updated_when_ref
+            case: 正常
+            summary: マージ commit で追加したファイルの日時
+            condition: Git の配信元で、ブランチ `feature` に `main` をマージした commit で `rules/m.yaml` を追加し、作業ツリーは `main`。`ref` が `feature` の読む場所で `rules/m.yaml` を引く
+            mock: なし（`tmp_path` に `git init`。`GIT_COMMITTER_DATE` を渡す）
+            expected: マージ commit の日時
+            exception: '-'
+          - name: test_document_store_file_updated_when_ref_and_no_dates
+            case: 正常
+            summary: リビジョンに日時を持たないパス
+            condition: 同じ配信元で、`ref` が `feature` の読む場所でリビジョンに無い `rules/none.yaml` を引く
+            mock: なし
+            expected: '`feature` の commit の日時'
+            exception: '-'
+          - name: test_document_store_file_updated_when_not_git
+            case: 正常
+            summary: Git の管理外
+            condition: '`is_git` が `False` の配信元で `ref` の無い読む場所'
+            mock: なし（`tmp_path`）
+            expected: '`None`'
+            exception: '-'
 constants:
   - name: CANDIDATE_COUNT
     title: 近い ID の候補の数
