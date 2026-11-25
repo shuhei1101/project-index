@@ -100,10 +100,10 @@ def test_normal_when_ref_given(
     assert latest.json()["value"]["title"] == "変えた"
 
 
-# make_source の最初の commit（今の日時）より後にして、feature で変えた commit を D-1 の最後の変更にする
-BRANCH_CHANGED_AT = "2030-10-02T12:00:00+09:00"
-MAIN_CHANGED_AT = "2030-10-03T12:00:00+09:00"
-MERGED_AT = "2030-10-04T12:00:00+09:00"
+CREATED_AT = "2026-10-01T12:00:00+09:00"
+BRANCH_CHANGED_AT = "2026-10-02T12:00:00+09:00"
+MAIN_CHANGED_AT = "2026-10-03T12:00:00+09:00"
+MERGED_AT = "2026-10-04T12:00:00+09:00"
 
 
 def test_normal_when_document_only_in_revision(
@@ -114,7 +114,7 @@ def test_normal_when_document_only_in_revision(
 ) -> None:
     """作業ツリーに無く、指したリビジョンのマージ commit で追加した文書を、そのマージ commit の日時で返却する（正常系）。"""
     # 準備（feature で D-1 を変え、main にも commit を追加してから、feature へ main をマージした commit で D-9・broken を追加する）
-    source = make_source("sample", main_files(), branch="main")
+    source = make_source("sample", main_files(), branch="main", date=CREATED_AT)
     folder = source.folder
     run_git(folder, "checkout", "-b", "feature")
     write_files(folder, {"design/D-1.yaml": "id: D-1\nname: 設計 1\ntitle: feature で変えた\n"})
