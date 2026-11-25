@@ -536,6 +536,39 @@ functions:
         mock: なし（一時フォルダの git リポジトリ）
         expected: ブランチの commit を含み、マージ commit を含まない
     status: planned
+  - name: commit_date
+    title: commit の日時
+    kind: 関数
+    container: project_index/features/history/query.py
+    usecase: 共通
+    role: 読み取り
+    summary: 解いた commit の日時を、commit ごとに git を 1 回だけ呼んで返却する
+    scope: public
+    thread_safe: true
+    args:
+      - name: repo_root
+        title: リポジトリの直下
+        type: Path
+        required: true
+        passing: positional
+        description: クローンの直下
+      - name: commit
+        title: commit
+        type: str
+        required: true
+        passing: positional
+        description: 解いた commit の SHA
+    returns:
+      type: datetime
+      description: commit の日時
+    process: 1. リビジョンの解決の手順 3 と同じ、(`repo_root`, commit) ごとに保持した日時（`functools.lru_cache(maxsize=COMMIT_DATE_KEEP)` の内部の関数）を返却する。無ければ `show -s --format=%cI {commit}` で検索して保持する（`rev-parse` は呼ばない）
+    unit_tests:
+      - name: test_commit_date
+        case: 正常
+        summary: 同じ commit は 2 回目から git を呼ばない
+        condition: '`GIT_COMMITTER_DATE` を 2026-10-01 にした commit 1 つの一時リポジトリで、その SHA を 2 回渡す'
+        mock: git の実行（本物を包んで引数を記録する）
+        expected: 2 回とも 2026-10-01 で、`show` は 1 回だけ、`rev-parse` は 0 回
 refs:
   - to: IF-29
     type: requires

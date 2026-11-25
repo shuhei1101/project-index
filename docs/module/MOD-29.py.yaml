@@ -813,7 +813,7 @@ classes:
           description: commit の日時。Git の管理外の配信元と、`target.ref` が無く日時を持たないファイルは `None`
         process: |-
           1. ファイルの日時（`_file_dates(target, revision)`。`revision` は `target.ref` があれば `_commit_of(target)`、無ければ `None`）を `path` で引き、あれば `updated` を返却する
-          2. 無い場合、`target.ref` があれば、そのリビジョンの commit の日時（`resolve_ref(repo_root, commit, date_base=default_ref).date`）を返却する。`target.ref` が無ければ `None` を返却する
+          2. 無い場合、`target.ref` があれば、`_commit_of(target)` の commit の日時（履歴の『commit の日時』`commit_date(repo_root, commit)`。commit ごとに git を 1 回だけ呼ぶ）を返却する。`target.ref` が無ければ `None` を返却する
 
           作業ツリーのファイルを `stat` しない
         unit_tests:
