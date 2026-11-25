@@ -1,0 +1,69 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=integration -f paths="tests/integration/server/test_get_document.py tests/integration/server/test_search_docs.py" | ...)（テスト実行方法の結合テストの run_runner。commit 6e10bd6）
+
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 56 items
+
+tests/integration/server/test_get_document.py::test_normal PASSED        [  1%]
+tests/integration/server/test_get_document.py::test_normal_when_ref_given PASSED [  3%]
+tests/integration/server/test_get_document.py::test_normal_when_document_only_in_revision PASSED [  5%]
+tests/integration/server/test_get_document.py::test_normal_when_body_path_given PASSED [  7%]
+tests/integration/server/test_get_document.py::test_normal_when_id_given PASSED [  8%]
+tests/integration/server/test_get_document.py::test_normal_when_converter_kind PASSED [ 10%]
+tests/integration/server/test_get_document.py::test_normal_when_converter_given_commit PASSED [ 12%]
+tests/integration/server/test_get_document.py::test_error_when_not_found PASSED [ 14%]
+tests/integration/server/test_get_document.py::test_error_when_revision_export_times_out PASSED [ 16%]
+tests/integration/server/test_get_document.py::test_normal_when_disk_storage PASSED [ 17%]
+tests/integration/server/test_get_document.py::test_normal_when_converter_script_changed PASSED [ 19%]
+tests/integration/server/test_search_docs.py::test_normal PASSED         [ 21%]
+tests/integration/server/test_search_docs.py::test_normal_when_full PASSED [ 23%]
+tests/integration/server/test_search_docs.py::test_normal_when_snippets PASSED [ 25%]
+tests/integration/server/test_search_docs.py::test_normal_when_count_grouped PASSED [ 26%]
+tests/integration/server/test_search_docs.py::test_normal_when_ordered_and_limited PASSED [ 28%]
+tests/integration/server/test_search_docs.py::test_normal_when_source_all PASSED [ 30%]
+tests/integration/server/test_search_docs.py::test_normal_when_worktree PASSED [ 32%]
+tests/integration/server/test_search_docs.py::test_normal_when_worktree_adds_row PASSED [ 33%]
+tests/integration/server/test_search_docs.py::test_normal_when_worktree_metadata_changed PASSED [ 35%]
+tests/integration/server/test_search_docs.py::test_normal_when_worktree_validator_changed PASSED [ 37%]
+tests/integration/server/test_search_docs.py::test_error_when_worktree_config_invalid PASSED [ 39%]
+tests/integration/server/test_search_docs.py::test_normal_when_seen PASSED [ 41%]
+tests/integration/server/test_search_docs.py::test_normal_when_files_index PASSED [ 42%]
+tests/integration/server/test_search_docs.py::test_normal_when_body_file_absent PASSED [ 44%]
+tests/integration/server/test_search_docs.py::test_normal_when_file_unreadable PASSED [ 46%]
+tests/integration/server/test_search_docs.py::test_error_when_source_not_readable PASSED [ 48%]
+tests/integration/server/test_search_docs.py::test_error_when_source_not_served PASSED [ 50%]
+tests/integration/server/test_search_docs.py::test_error_when_worktree_not_matched PASSED [ 51%]
+tests/integration/server/test_search_docs.py::test_error_when_invalid_argument PASSED [ 53%]
+tests/integration/server/test_search_docs.py::test_error_when_ref_not_found PASSED [ 55%]
+tests/integration/server/test_search_docs.py::test_normal_when_excluded_name PASSED [ 57%]
+tests/integration/server/test_search_docs.py::test_normal_when_ordered_by_matches PASSED [ 58%]
+tests/integration/server/test_search_docs.py::test_normal_when_part_of_body PASSED [ 60%]
+tests/integration/server/test_search_docs.py::test_normal_when_metadata_mapped PASSED [ 62%]
+tests/integration/server/test_search_docs.py::test_normal_when_outside_scope PASSED [ 64%]
+tests/integration/server/test_search_docs.py::test_error_when_outside_read_disabled PASSED [ 66%]
+tests/integration/server/test_search_docs.py::test_normal_when_term PASSED [ 67%]
+tests/integration/server/test_search_docs.py::test_normal_when_tags_are_objects PASSED [ 69%]
+tests/integration/server/test_search_docs.py::test_normal_when_array_item_keys PASSED [ 71%]
+tests/integration/server/test_search_docs.py::test_normal_when_relative_ref_in_defs PASSED [ 73%]
+tests/integration/server/test_search_docs.py::test_normal_when_cyclic_ref_in_other_file PASSED [ 75%]
+tests/integration/server/test_search_docs.py::test_normal_when_schema_ref_unresolvable PASSED [ 76%]
+tests/integration/server/test_search_docs.py::test_normal_when_new_worktree PASSED [ 78%]
+tests/integration/server/test_search_docs.py::test_error_when_worktree_loading PASSED [ 80%]
+tests/integration/server/test_search_docs.py::test_error_when_unexpected PASSED [ 82%]
+tests/integration/server/test_search_docs.py::test_normal_when_disk_storage PASSED [ 83%]
+tests/integration/server/test_search_docs.py::test_error_when_ref_given_to_disk_source PASSED [ 85%]
+tests/integration/server/test_search_docs.py::test_normal_when_builtin_source_read PASSED [ 87%]
+tests/integration/server/test_search_docs.py::test_normal_when_direct_commit_workplace PASSED [ 89%]
+tests/integration/server/test_search_docs.py::test_normal_when_schema_composition_keys PASSED [ 91%]
+tests/integration/server/test_search_docs.py::test_normal_when_many_worktrees_loaded PASSED [ 92%]
+tests/integration/server/test_search_docs.py::test_normal_when_search_excluded PASSED [ 94%]
+tests/integration/server/test_search_docs.py::test_normal_when_sqlite_rows PASSED [ 96%]
+tests/integration/server/test_search_docs.py::test_normal_when_sqlite_file_changed PASSED [ 98%]
+tests/integration/server/test_search_docs.py::test_normal_when_sqlite_rows_with_ref PASSED [100%]
+
+============================= 56 passed in 29.14s ==============================
+exit=0
