@@ -37,7 +37,7 @@ from project_index.features.documents.sqlite_rows import (
 )
 from project_index.features.documents.types import Document, LoadProblem, LoadResult, SyncReport
 from project_index.features.history.blob import BlobReader
-from project_index.features.history.query import file_dates, resolve_ref
+from project_index.features.history.query import commit_date, file_dates, resolve_ref
 from project_index.features.history.types import FileDates
 from project_index.integrations.git import GitError, ignored_paths, run_git
 from project_index.shared.background import BackgroundGate
@@ -48,6 +48,7 @@ from project_index.shared.yaml_io import YamlLoadError, load_yaml
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Collection, Iterable, Sequence
+    from datetime import datetime
 
     from project_index.features.history.snapshot import SnapshotStore
     from project_index.features.sources.types import DocumentTable, ServedSource
@@ -297,6 +298,20 @@ class DocumentStore:
         if target.ref is not None:
             return None
         return str(self.read_root(target) / (document.body_path or document.path))
+
+    def file_updated(self, target: Target, path: str) -> datetime | None:
+        """Git の配信元で、読む場所のリビジョンでファイルを最後に変えた commit の日時を返す（作業ツリーを stat しない）。"""
+        revision = None if target.ref is None else self._commit_of(target)
+        dates = self._file_dates(target, revision).get(path)
+        # そのリビジョンでファイルの日時がある: 最後に変えた commit の日時
+        if dates is not None:
+            return dates.updated
+        # リビジョンを指している: そのリビジョンの commit の日時
+        if revision is not None:
+            source = target.source
+            return commit_date(source.repo_root or source.root, revision)
+        # 作業ツリーを読む場所で日時が無い（Git の管理外）: 呼び出し元がファイルの更新日時にする
+        return None
 
     def _file_dates(self, target: Target, revision: str | None) -> dict[str, FileDates]:
         """Git の配信元のファイルの日時を、配信元の直下からのパスで返す。"""
