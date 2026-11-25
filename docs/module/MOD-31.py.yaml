@@ -333,7 +333,7 @@ functions:
       type: dict[str, FileDates]
       description: リポジトリの直下からのパス → 日時。commit されていないファイルは含まない
     process: |-
-      1. `log --format=%x00%cI --name-only --no-renames {commit} [-- {pathspec}]` を呼ぶ
+      1. `log --format=%x00%cI --name-only --no-renames --diff-merges=dense-combined {commit} [-- {pathspec}]` を呼ぶ（マージ commit は、全ての親と異なるファイルだけをその commit で変えたファイルとして出す。どれかの親と同じファイルは、その親の側で変えた commit の日時のままにする）
       2. 新しい commit から順に読み、パスごとに最初に現れた日時を `updated`、最後に現れた日時を `created` にする
       3. 辞書を返す
     unit_tests:
@@ -343,6 +343,12 @@ functions:
         condition: '`a.yaml` を 10-01 に追加し 10-05 に変えた。`b.yaml` は 10-03 に追加だけ'
         mock: なし（`GIT_COMMITTER_DATE` を渡す）
         expected: '`a.yaml` が `created` 10-01・`updated` 10-05、`b.yaml` がどちらも 10-03'
+      - name: test_file_dates_when_merge
+        case: 正常
+        summary: マージ commit で追加したファイルと、片方の親だけで変えたファイル
+        condition: '`main` から `feature` を分け、10-02 に `feature` で `b.yaml` を変え、10-03 に `main` で `c.yaml` を追加し、10-04 に `feature` へ `main` をマージした commit でどちらの親にも無い `m.yaml` を追加する。`commit` は `feature`'
+        mock: なし（`GIT_COMMITTER_DATE` を渡す）
+        expected: '`m.yaml` が `created`・`updated` とも 10-04、`b.yaml` の `updated` が 10-02、`c.yaml` の `updated` が 10-03'
   - name: co_changed_files
     title: 一緒に変わったファイル
     kind: 関数
