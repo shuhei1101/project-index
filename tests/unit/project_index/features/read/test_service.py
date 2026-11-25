@@ -451,9 +451,19 @@ def test_get_document_when_ref_and_no_dates(
     target = dataclasses.replace(_target(env), ref="feature")
     document = make_document(id="D-9", path="design/D-9.yaml", data={"id": "D-9"}, updated=None)
     store = env.handlers.store
-    monkeypatch.setattr(store, "find_page", lambda *_args, **_kwargs: document)
-    monkeypatch.setattr(store, "row_schema", lambda *_args: {"type": "object"})
-    monkeypatch.setattr(store, "file_updated", lambda *_args: REVISION_TIME)
+
+    def find_page(*_args: object, **_kwargs: object) -> Document:
+        return document
+
+    def row_schema(*_args: object) -> dict[str, object]:
+        return {"type": "object"}
+
+    def file_updated(*_args: object) -> datetime:
+        return REVISION_TIME
+
+    monkeypatch.setattr(store, "find_page", find_page)
+    monkeypatch.setattr(store, "row_schema", row_schema)
+    monkeypatch.setattr(store, "file_updated", file_updated)
     # 実行
     response = get_document(
         target, "design/D-9.yaml", store=store, converter=env.handlers.converter
@@ -474,9 +484,19 @@ def test_get_document_when_ref_and_yaml_broken(
         path="design/broken.yaml", reason="unreadable", detail="broken", line=1, column=4
     )
     store = env.handlers.store
-    monkeypatch.setattr(store, "find_page", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(store, "load", lambda *_args, **_kwargs: LoadResult(problems=[problem]))
-    monkeypatch.setattr(store, "file_updated", lambda *_args: REVISION_TIME)
+
+    def find_page(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    def load(*_args: object, **_kwargs: object) -> LoadResult:
+        return LoadResult(problems=[problem])
+
+    def file_updated(*_args: object) -> datetime:
+        return REVISION_TIME
+
+    monkeypatch.setattr(store, "find_page", find_page)
+    monkeypatch.setattr(store, "load", load)
+    monkeypatch.setattr(store, "file_updated", file_updated)
     # 実行
     response = get_document(
         target, "design/broken.yaml", store=store, converter=env.handlers.converter
