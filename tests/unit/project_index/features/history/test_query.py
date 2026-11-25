@@ -24,7 +24,9 @@ if TYPE_CHECKING:
     from project_index.features.sources.types import ServedSource, SourceConfig
 
 OCT_01 = "2026-10-01T12:00:00+09:00"
+OCT_02 = "2026-10-02T12:00:00+09:00"
 OCT_03 = "2026-10-03T12:00:00+09:00"
+OCT_04 = "2026-10-04T12:00:00+09:00"
 OCT_05 = "2026-10-05T12:00:00+09:00"
 OCT_07 = "2026-10-07T12:00:00+09:00"
 
@@ -219,6 +221,66 @@ def test_file_dates(git_repo: Callable[..., Path], commit_all: Callable[..., str
     assert result["b.yaml"] == FileDates(
         created=datetime.fromisoformat(OCT_03), updated=datetime.fromisoformat(OCT_03)
     )
+
+
+def test_file_dates_when_merge(
+    git_repo: Callable[..., Path],
+    commit_all: Callable[..., str],
+    run_git: Callable[..., str],
+    write_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    """マージ commit で追加したファイルと、片方の親だけで変えたファイル（正常系）。"""
+    # 準備
+    root = git_repo({"a.yaml": "a: 1\n", "b.yaml": "b: 1\n"}, branch="main", date=OCT_01)
+    run_git(root, "checkout", "-b", "feature")
+    commit_all(root, {"b.yaml": "b: 2\n"}, date=OCT_02)
+    run_git(root, "checkout", "main")
+    commit_all(root, {"c.yaml": "c: 1\n"}, date=OCT_03)
+    run_git(root, "checkout", "feature")
+    run_git(root, "merge", "--no-ff", "--no-commit", "main")
+    write_files(root, {"m.yaml": "m: 1\n"})
+    run_git(root, "add", "-A")
+    run_git(
+        root,
+        "commit",
+        "-m",
+        "merge",
+        env={"GIT_AUTHOR_DATE": OCT_04, "GIT_COMMITTER_DATE": OCT_04},
+    )
+    # 実行
+    result = file_dates(root, commit="feature")
+    # 検証
+    assert result["m.yaml"] == FileDates(
+        created=datetime.fromisoformat(OCT_04), updated=datetime.fromisoformat(OCT_04)
+    )
+    assert result["b.yaml"].updated == datetime.fromisoformat(OCT_02)
+    assert result["c.yaml"].updated == datetime.fromisoformat(OCT_03)
+
+
+def test_commit_date(
+    git_repo: Callable[..., Path], run_git: Callable[..., str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """同じ commit は 2 回目から git を呼ばない（正常系）。"""
+    from project_index.features.history import query as query_module
+
+    # 準備
+    root = git_repo({"a.yaml": "a: 1\n"}, branch="main", date=OCT_01)
+    commit = run_git(root, "rev-parse", "HEAD").strip()
+    subcommands: list[str] = []
+    real = query_module.run_git
+
+    def recording(args: Any, **kwargs: Any) -> Any:
+        subcommands.append(next(iter(args)))
+        return real(args, **kwargs)
+
+    monkeypatch.setattr(query_module, "run_git", recording)
+    # 実行
+    first = query_module.commit_date(root, commit)
+    second = query_module.commit_date(root, commit)
+    # 検証
+    assert first == second == datetime.fromisoformat(OCT_01)
+    assert subcommands.count("show") == 1
+    assert subcommands.count("rev-parse") == 0
 
 
 def test_co_changed_files(git_repo: Callable[..., Path], commit_all: Callable[..., str]) -> None:

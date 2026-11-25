@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import dataclasses
+from datetime import datetime
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
 
+from project_index.features.documents.types import LoadProblem, LoadResult
 from project_index.features.read.paths import read_target
 from project_index.features.read.service import (
     get_decision,
@@ -24,6 +26,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from project_index.features.access.types import Target
+    from project_index.features.documents.types import Document
+
+REVISION_TIME = datetime.fromisoformat("2026-10-04T12:00:00+09:00")
 
 NOTES_TABLES = [
     DocumentTable(id="rules", paths=["docs/*.yaml"], schema_path="schemas/rule.schema.yaml"),
@@ -433,6 +438,54 @@ def test_get_document_when_yaml_broken(make_view_env: Callable[..., SimpleNamesp
     assert error is not None
     assert error.file == "docs/a.yaml"
     assert error.line is not None
+
+
+def test_get_document_when_ref_and_no_dates(
+    make_view_env: Callable[..., SimpleNamespace],
+    make_document: Callable[..., Document],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """日時を持たないリビジョンの文書を作業ツリーで stat しない（正常系）。"""
+    # 準備（作業ツリーに design/D-9.yaml は無い）
+    env = make_view_env(NOTES_FILES, tables=NOTES_TABLES, schemas={"rules": {"type": "object"}})
+    target = dataclasses.replace(_target(env), ref="feature")
+    document = make_document(id="D-9", path="design/D-9.yaml", data={"id": "D-9"}, updated=None)
+    store = env.handlers.store
+    monkeypatch.setattr(store, "find_page", lambda *_args, **_kwargs: document)
+    monkeypatch.setattr(store, "row_schema", lambda *_args: {"type": "object"})
+    monkeypatch.setattr(store, "file_updated", lambda *_args: REVISION_TIME)
+    # 実行
+    response = get_document(
+        target, "design/D-9.yaml", store=store, converter=env.handlers.converter
+    )
+    # 検証
+    assert response.updated_at == REVISION_TIME
+    assert response.value == {"id": "D-9"}
+
+
+def test_get_document_when_ref_and_yaml_broken(
+    make_view_env: Callable[..., SimpleNamespace], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """リビジョンにだけある読み込めない YAML（正常系）。"""
+    # 準備（作業ツリーに design/broken.yaml は無い）
+    env = make_view_env(NOTES_FILES, tables=NOTES_TABLES, schemas={"rules": {"type": "object"}})
+    target = dataclasses.replace(_target(env), ref="feature")
+    problem = LoadProblem(
+        path="design/broken.yaml", reason="unreadable", detail="broken", line=1, column=4
+    )
+    store = env.handlers.store
+    monkeypatch.setattr(store, "find_page", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(store, "load", lambda *_args, **_kwargs: LoadResult(problems=[problem]))
+    monkeypatch.setattr(store, "file_updated", lambda *_args: REVISION_TIME)
+    # 実行
+    response = get_document(
+        target, "design/broken.yaml", store=store, converter=env.handlers.converter
+    )
+    # 検証
+    error = response.conversion_error
+    assert error is not None
+    assert (error.file, error.line, error.column) == ("design/broken.yaml", 1, 4)
+    assert response.updated_at == REVISION_TIME
 
 
 def test_get_document_when_not_found(make_view_env: Callable[..., SimpleNamespace]) -> None:
