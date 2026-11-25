@@ -1,0 +1,11 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: run_only
+    detail: 画面のサーバーが作業ブランチを指して文書を読むとき、そのブランチにだけある文書も返却される。シナリオの流れと期待値は変わらない
+    depends_on: []
+docs: []
+scope_out:
+  - item: ai-monitor 側で 500 を受けたときに残りの問い合わせを止める扱い
+    reason: 別のリポジトリの不具合で、shuhei1101/ai-monitor#3821 が対応する。このリポジトリでは対応しない
+    plan: none
