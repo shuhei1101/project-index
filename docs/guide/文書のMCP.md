@@ -310,7 +310,7 @@ YAML として読めないファイルがあっても、そのファイルを除
 | --- | --- | --- |
 | `op` | すべて | `create`（新しい文書）・`update`（部分更新）・`replace`（全項目の置き換え）・`rename`（改名）・`replace_text`（一括置換）。upsert は無い |
 | `kind` | `create`（必須） | 種類（`documents[].id`）。スキーマと配置先を決める |
-| `id` | `update`・`replace`・`rename`（必須）、`create`（省略可） | 対象の文書の ID。`create` で省くと `ids.format` から作る |
+| `id` | `update`・`replace`・`rename`（必須）、`create`（省略可） | 対象の文書の ID。`create` で省くと `ids.format` から作る（ID がパスの種類で `new_path` を指定したときは、正規化した `new_path` を ID にする。作成のパスを参照） |
 | `expected_version` | `update`・`replace`・`rename`（必須） | 読んだときのバージョン。`update` では項目のパスごとのハッシュも受ける |
 | `data` | `create`・`replace`（必須） | 文書の全項目 |
 | `set` | `update` | 項目に値を入れる。オブジェクトは再帰的にマージし、配列と値は置き換える |
@@ -413,7 +413,8 @@ mdmark の CLI が `PATH` に無いか、点検が端末の設定の `script_tim
 `create` に `new_path` を指定すると、種類の行の `paths` の先頭から配置先を決めずに、指定したパスへ文書を作成します。
 フォルダの階層に glob を持つ行（`portrait/*/*.yaml` など）の文書も、`portrait/c1/a1.yaml` のようにフォルダを決めて作成できます。
 
-- `new_path` は正規化してから照合します。文書の ID は `new_path` から作らず、`data` の ID か `ids.format` から決めます
+- `new_path` は正規化してから照合します
+- 文書の ID は、操作の `id` か `data` の ID の値を使用します。どちらも省くと、種類の行がスキーマを持ち、そのスキーマの `properties` に ID の列が無い種類（ID がパスの種類）では正規化した `new_path` を ID にし、`data` に ID を加えずに作成します。それ以外の種類（スキーマを持たない種類を含む）は `ids.format` から作ります
 - 正規化した値が絶対パスか `..` を含むとき（配信元の外を指す）・種類の行の `paths` に該当しないか `exclude[]` に該当するとき・既にあるファイルを指すときは、`new_path` の違反の `InvalidArgumentError` で、何も書き込みません
 - `records` を持つ行の `create` は `new_path` を受けず、`InvalidArgumentError` です
 - `commit` を指定した `create` でも指定できます
