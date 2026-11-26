@@ -457,6 +457,22 @@ def _apply_existing(
     return document.path, _finish(table, new_content, container, document, text)
 
 
+def _requested_path(session: _Session, table: DocumentTable, new_path: str) -> str:
+    """`create` の `new_path` の配置先を返す（既にあるファイルは new_path の違反にする）。"""
+    path = requested_document_path(table, new_path)
+    if session.exists(path):
+        raise _invalid(
+            [
+                Violation(
+                    path="new_path",
+                    rule=f"new_path（{path}）は既にあります",
+                    fix="別のパスを指定してください",
+                )
+            ]
+        )
+    return path
+
+
 def _apply_create(
     session: _Session,
     operation: Operation,
@@ -471,18 +487,8 @@ def _apply_create(
     `path_as_id` が真なら、ID はファイルのパスなので ID の列に値を入れない。
     """
     if operation.new_path is not None:
-        # 指定したパスに作る: 既にあるファイルは new_path の違反にする
-        path, append = requested_document_path(table, operation.new_path), False
-        if session.exists(path):
-            raise _invalid(
-                [
-                    Violation(
-                        path="new_path",
-                        rule=f"new_path（{path}）は既にあります",
-                        fix="別のパスを指定してください",
-                    )
-                ]
-            )
+        # 指定したパスに作る
+        path, append = _requested_path(session, table, operation.new_path), False
     else:
         # `paths` の先頭から決める
         path, append = new_document_path(table, doc_id)
