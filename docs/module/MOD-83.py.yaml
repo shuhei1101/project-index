@@ -16,6 +16,8 @@ diagrams:
         direction TD
         文書の書き込み ..> 新しい文書の配置先
         文書の書き込み ..> 指定した文書の配置先
+        文書の書き込み ..> 指定したパスの正規化
+        指定した文書の配置先 ..> 指定したパスの正規化
         class 文書の書き込み {
           <<function>>
         }
@@ -23,6 +25,9 @@ diagrams:
           <<function>>
         }
         class 指定した文書の配置先 {
+          <<function>>
+        }
+        class 指定したパスの正規化 {
           <<function>>
         }
         click 文書の書き込み href "id:MOD-84#functions[write_docs]"
@@ -140,10 +145,9 @@ functions:
       description: 正規化した配信元の直下からのパス
     process: |-
       1. `records` がある場合、違反にする（要素を追加する管理用の YAML は `paths` の先頭で決定する）
-      2. `new_path` を `posixpath.normpath` で正規化する
-      3. 正規化したパスが絶対パスか、`..` の部分を持つなら、配信元の外部を指す違反にする（`**` で始まる `paths` は外部を指すパスにも該当するため、文書の行.この行の文書になるかより先に確認する）
-      4. 正規化したパスが文書の行.この行の文書になるかが `False`（`paths` に該当しないか `exclude` に該当する）なら違反にする。当てはまらなければ返却する
-      5. 違反は `path` が `operations[{i}].new_path` の `InvalidArgumentError` で送信する（添字は書き込みが付ける）。`records` があるときは `rule` が `{kind} は records を持つため create の new_path を受けません`、`fix` が `new_path を除いてください`。配信元の外部を指すときは `rule` が `new_path（{指定した new_path}）が配信元の外を指します`、`fix` が `配信元の直下からのパスを指定してください`（`rename` の本文のファイルの違反と同じ文言）。`paths`・`exclude` の違反は `rule` が `new_path（{正規化したパス}）が {kind} の paths に該当しないか exclude に該当します`、`fix` が `{kind} の documents[].paths に該当するパスを指定してください`（`rename` の `new_path` の違反と同じ文言）。既にあるファイルかは確認しない（書き込みが確認する）
+      2. 指定したパスの正規化で `new_path` を正規化する（配信元の外部を指すなら違反。`**` で始まる `paths` は外部を指すパスにも該当するため、文書の行.この行の文書になるかより先に確認する）
+      3. 正規化したパスが文書の行.この行の文書になるかが `False`（`paths` に該当しないか `exclude` に該当する）なら違反にする。当てはまらなければ返却する
+      4. 違反は `path` が `operations[{i}].new_path` の `InvalidArgumentError` で送信する（添字は書き込みが付ける）。`records` があるときは `rule` が `{kind} は records を持つため create の new_path を受けません`、`fix` が `new_path を除いてください`。配信元の外部を指すときは指定したパスの正規化の違反をそのまま送信する。`paths`・`exclude` の違反は `rule` が `new_path（{正規化したパス}）が {kind} の paths に該当しないか exclude に該当します`、`fix` が `{kind} の documents[].paths に該当するパスを指定してください`（`rename` の `new_path` の違反と同じ文言）。既にあるファイルかは確認しない（書き込みが確認する）
     exceptions:
       - name: InvalidArgumentError
         condition: '`records` を持つ行に `new_path` を指定した'
@@ -179,4 +183,44 @@ functions:
         condition: '`paths: [**/*.yaml]` で `new_path` が `../outside/a2.yaml`・`chars/../../outside/a2.yaml`・`/tmp/a2.yaml`'
         mock: なし
         expected: どれも `InvalidArgumentError` の違反の `path` が `new_path`、`rule` に `配信元の外を指します`、`fix` が `配信元の直下からのパスを指定してください`
+  - name: normalized_new_path
+    title: 指定したパスの正規化
+    kind: 関数
+    container: project_index/features/write/placement.py
+    usecase: 書き込み
+    role: 判定
+    summary: '`create`・`rename` の `new_path` を正規化し、配信元の外部を指すパスを断る'
+    scope: public
+    thread_safe: true
+    args:
+      - name: new_path
+        title: 指定したパス
+        type: str
+        required: true
+        passing: positional
+        description: '`create`・`rename` の `new_path`（配信元の直下からのパス）'
+    returns:
+      type: str
+      description: 正規化した配信元の直下からのパス
+    process: |-
+      1. `new_path` を `posixpath.normpath` で正規化する
+      2. 正規化したパスが絶対パスか、`/` で区切った部分に `..` を持つなら、`path` が `new_path`、`rule` が `new_path（{指定した new_path}）が配信元の外を指します`、`fix` が `配信元の直下からのパスを指定してください` の `InvalidArgumentError` で送信する（添字は書き込みが付ける。`rename` の本文のファイルの違反と同じ文言）
+      3. 当てはまらなければ正規化したパスを返却する。文書の行の `paths`・`exclude`・既にあるファイルは確認しない（呼ぶ側が確認する）
+    exceptions:
+      - name: InvalidArgumentError
+        condition: 正規化したパスが絶対パスか `..` の部分を持つ
+        message: '`new_path（{パス}）が配信元の外を指します`'
+    unit_tests:
+      - name: test_normalized_new_path
+        case: 正常
+        summary: 配信元の中を指すパスを正規化して返却する
+        condition: '`new_path` が `chars/c1/./a1.yaml`・`chars/x/../a1.yaml`'
+        mock: なし
+        expected: '`"chars/c1/a1.yaml"` と `"chars/a1.yaml"`'
+      - name: test_normalized_new_path_when_outside_source
+        case: 異常
+        summary: 配信元の外部を指すパスを断る
+        condition: '`new_path` が `../outside/a1.yaml`・`chars/../../outside/a1.yaml`・`/tmp/a1.yaml`'
+        mock: なし
+        expected: どれも `InvalidArgumentError` の違反の `path` が `new_path`、`rule` が `new_path（{指定した値}）が配信元の外を指します`、`fix` が `配信元の直下からのパスを指定してください`
 visibility: internal
