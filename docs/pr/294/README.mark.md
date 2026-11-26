@@ -1,0 +1,1 @@
+# write_docs の create で、配置先のパスを new_path で指定できるようにする
