@@ -1,0 +1,1 @@
+# write_docs の rename で、配信元の外を指す new_path を断る
