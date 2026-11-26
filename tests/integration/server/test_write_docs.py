@@ -3288,6 +3288,56 @@ def test_error_when_create_path_invalid(
     assert not (tmp_path / "a2.yaml").exists()
 
 
+ANYWHERE_CONFIG = (
+    "name: sample\n"
+    "default_ref: develop\n"
+    "documents:\n"
+    "  - id: anywhere\n"
+    "    paths: ['**/*.yaml']\n"
+    "    exclude: [project-index.yaml, schemas/note.schema.yaml, schemas/rule.schema.yaml]\n"
+    "    schema: schemas/note.schema.yaml\n"
+)
+
+
+@pytest.mark.parametrize(
+    "new_path",
+    [
+        pytest.param("../outside/a1.yaml", id="parent"),
+        pytest.param("anywhere/../../outside/a1.yaml", id="parent_after_normalize"),
+        pytest.param("{tmp}/a1.yaml", id="absolute"),
+    ],
+)
+def test_error_when_rename_path_outside_source(
+    tmp_path_factory: pytest.TempPathFactory,
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    new_path: str,
+) -> None:
+    """`paths` が `**` で始まる種類でも、配信元の外を指す 1 ファイル 1 文書の `rename` の `new_path` を `paths` の照合より先に断る（異常系）。"""
+    # 準備
+    existing = "id: a1\nname: a1\n"
+    direct = make_direct_commit_source(config=ANYWHERE_CONFIG, files={"anywhere/a1.yaml": existing})
+    env = make_server(direct.spec)
+    outside = tmp_path_factory.mktemp("outside")
+    requested = new_path.format(tmp=outside)
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.folder),
+        worktree=str(direct.x),
+        operations=[_rename("a1", _version(direct.x / "anywhere/a1.yaml"), new_path=requested)],
+    )
+    # 検証
+    assert result.is_error
+    assert "InvalidArgumentError" in result.text
+    assert "operations[0].new_path" in result.text
+    assert f"new_path（{requested}）が配信元の外を指します" in result.text
+    assert "配信元の直下からのパスを指定してください" in result.text
+    assert (direct.x / "anywhere/a1.yaml").read_text(encoding="utf-8") == existing
+    assert not (direct.x.parent / "outside").exists()
+    assert not (outside / "a1.yaml").exists()
+
+
 WORD_DOC_1 = (
     "id: doc-1\n"
     "name: 文書 1\n"
