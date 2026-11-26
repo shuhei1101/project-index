@@ -414,7 +414,7 @@ mdmark の CLI が `PATH` に無いか、点検が端末の設定の `script_tim
 フォルダの階層に glob を持つ行（`portrait/*/*.yaml` など）の文書も、`portrait/c1/a1.yaml` のようにフォルダを決めて作成できます。
 
 - `new_path` は正規化してから照合します
-- 文書の ID は、操作の `id` か `data` の ID の値を使用します。どちらも省くと、種類の行がスキーマを持ち、そのスキーマの `properties` に ID の列が無い種類（ID がパスの種類）では正規化した `new_path` を ID にし、`data` に ID を加えずに作成します。それ以外の種類（スキーマを持たない種類を含む）は `ids.format` から作ります
+- 文書の ID は、操作の `id` か `data` の ID の値を使用します。どちらも省くと、種類の行がスキーマを持ち、そのスキーマが最上位に `allOf`・`anyOf`・`oneOf`・`$ref` を持たず、最上位の `properties` に ID の列が無い種類（ID がパスの種類）では正規化した `new_path` を ID にし、`data` に ID を加えずに作成します。それ以外の種類（スキーマを持たない種類と、最上位でスキーマを合成するか `properties` を持たない種類を含む）は `ids.format` から作ります
 - 正規化した値が絶対パスか `..` を含むとき（配信元の外を指す）・種類の行の `paths` に該当しないか `exclude[]` に該当するとき・既にあるファイルを指すときは、`new_path` の違反の `InvalidArgumentError` で、何も書き込みません
 - `records` を持つ行の `create` は `new_path` を受けず、`InvalidArgumentError` です
 - `commit` を指定した `create` でも指定できます
