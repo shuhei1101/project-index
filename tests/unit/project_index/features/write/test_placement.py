@@ -3,7 +3,11 @@ from __future__ import annotations
 import pytest
 
 from project_index.features.sources.types import DocumentTable
-from project_index.features.write.placement import new_document_path, requested_document_path
+from project_index.features.write.placement import (
+    new_document_path,
+    normalized_new_path,
+    requested_document_path,
+)
 from project_index.shared.errors import InvalidArgumentError
 
 
@@ -223,3 +227,36 @@ def test_requested_document_path_when_records() -> None:
         requested_document_path(table, "data/list.yaml")
     assert exc_info.value.violations[0].path == "new_path"
     assert exc_info.value.violations[0].fix == "new_path を除いてください"
+
+
+@pytest.mark.parametrize(
+    ("new_path", "expected"),
+    [
+        pytest.param("chars/c1/./a1.yaml", "chars/c1/a1.yaml", id="current"),
+        pytest.param("chars/x/../a1.yaml", "chars/a1.yaml", id="parent-inside"),
+    ],
+)
+def test_normalized_new_path(new_path: str, expected: str) -> None:
+    """配信元の中を指すパスを正規化して返却する（正常系）。"""
+    # 実行
+    result = normalized_new_path(new_path)
+    # 検証
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "new_path",
+    [
+        pytest.param("../outside/a1.yaml", id="parent"),
+        pytest.param("chars/../../outside/a1.yaml", id="parent-after-normalize"),
+        pytest.param("/tmp/a1.yaml", id="absolute"),
+    ],
+)
+def test_normalized_new_path_when_outside_source(new_path: str) -> None:
+    """配信元の外部を指すパスを断る（異常系）。"""
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError, match="配信元の外を指します") as exc_info:
+        normalized_new_path(new_path)
+    assert exc_info.value.violations[0].path == "new_path"
+    assert exc_info.value.violations[0].rule == f"new_path（{new_path}）が配信元の外を指します"
+    assert exc_info.value.violations[0].fix == "配信元の直下からのパスを指定してください"

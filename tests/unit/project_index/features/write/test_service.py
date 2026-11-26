@@ -1905,6 +1905,57 @@ def test_write_docs_when_rename_invalid(
     assert (env.worktree / "docs/rule/doc-2.yaml").read_text(encoding="utf-8") == DOC_2
 
 
+ANYWHERE_DOC = "id: a1\nname: 文書 a1\n"
+
+
+def _parent_outside(_outside: Path) -> str:
+    """配信元の直下より上のフォルダを `..` で指すパス。"""
+    return "../outside/a1.yaml"
+
+
+def _absolute_outside(outside: Path) -> str:
+    """配信元の外の一時フォルダの下を指す絶対パス。"""
+    return str(outside / "a1.yaml")
+
+
+@pytest.mark.parametrize(
+    "outside_path",
+    [
+        pytest.param(_parent_outside, id="parent"),
+        pytest.param(_absolute_outside, id="absolute"),
+    ],
+)
+def test_write_docs_when_rename_new_path_outside_source(
+    make_env: Callable[..., WriteEnv],
+    tmp_path_factory: pytest.TempPathFactory,
+    outside_path: Callable[[Path], str],
+) -> None:
+    """1 ファイル 1 文書の改名先のパスが配信元の外を指す（異常系）。"""
+    # 準備
+    table = DocumentTable(
+        id="anywhere",
+        paths=["**/*.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        exclude=["schemas/rule.schema.yaml"],
+    )
+    env = make_env(
+        {"anywhere/a1.yaml": ANYWHERE_DOC, "schemas/rule.schema.yaml": SCHEMA}, tables=[table]
+    )
+    outside = tmp_path_factory.mktemp("outside")
+    new_path = outside_path(outside)
+    operation = Operation(
+        op="rename", id="a1", expected_version=content_hash(ANYWHERE_DOC), new_path=new_path
+    )
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError, match="配信元の外を指します") as exc_info:
+        env.write(operations=[operation])
+    assert exc_info.value.violations[0].path == "operations[0].new_path"
+    assert "配信元の外を指します" in exc_info.value.violations[0].rule
+    assert (env.worktree / "anywhere/a1.yaml").read_text(encoding="utf-8") == ANYWHERE_DOC
+    assert not (env.worktree.parent / "outside/a1.yaml").exists()
+    assert not (outside / "a1.yaml").exists()
+
+
 def _with_words() -> dict[str, str]:
     """タグ `topic:a` の文書 2 件と持たない文書 1 件が `旧語` を持つ配信元のファイルを返す。"""
     return {
