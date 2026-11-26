@@ -448,7 +448,7 @@ def test_write_docs_when_create_with_new_path_id_column_in_schema(
         DocumentTable(
             id="asset", paths=["chars/*/*.yaml"], schema_path="schemas/asset.schema.yaml"
         ),
-        DocumentTable(id="loose", paths=["loose/*/*.yaml"]),
+        DocumentTable(id="loose", paths=["loose/*/*.yaml"], schema_path=None),
     ]
     env = make_env(
         {"schemas/asset.schema.yaml": ASSET_SCHEMA},
