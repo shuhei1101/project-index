@@ -3144,7 +3144,7 @@ CHARS_CONFIG = (
     "    schema: schemas/note.schema.yaml\n"
     "  - id: definition\n"
     "    paths: [chars/*/definition.yaml]\n"
-    "    schema: schemas/note.schema.yaml\n"
+    "    schema: schemas/definition.schema.yaml\n"
     "  - id: items\n"
     "    paths: [items/list.yaml]\n"
     "    schema: schemas/note.schema.yaml\n"
@@ -3152,6 +3152,14 @@ CHARS_CONFIG = (
     "direct_commit:\n"
     "  branch: develop\n"
     "  kinds: [asset]\n"
+)
+# ID の列を持たない種類 definition のスキーマ（文書の ID は配信元の直下からのパス）
+DEFINITION_SCHEMA = (
+    "type: object\n"
+    "additionalProperties: false\n"
+    "required: [name]\n"
+    "properties:\n"
+    "  name: {type: string}\n"
 )
 
 
@@ -3174,7 +3182,10 @@ def test_normal_when_create_with_new_path(
 ) -> None:
     """`create` の `new_path` で、フォルダの階層に glob を持つ種類の文書を指定したパスに作成する（正常系）。"""
     # 準備
-    direct = make_direct_commit_source(config=CHARS_CONFIG, files={"chars/.keep": ""})
+    direct = make_direct_commit_source(
+        config=CHARS_CONFIG,
+        files={"chars/.keep": "", "schemas/definition.schema.yaml": DEFINITION_SCHEMA},
+    )
     env = make_server(direct.spec)
 
     def write(operation: dict[str, Any]) -> Any:
@@ -3184,7 +3195,15 @@ def test_normal_when_create_with_new_path(
 
     # 実行
     first = write(_create("asset", "a1", "chars/c1/a1.yaml"))
-    second = write(_create("definition", "c1-definition", "chars/c1/definition.yaml"))
+    # ID の列を持たない種類: 操作の id を省き、id を持たない data で作成する
+    second = write(
+        {
+            "op": "create",
+            "kind": "definition",
+            "new_path": "chars/c1/definition.yaml",
+            "data": {"name": "c1 の立ち絵の定義"},
+        }
+    )
     third = write(_create("asset", "a3"))
     fourth = env.call(
         "write_docs",
@@ -3199,7 +3218,7 @@ def test_normal_when_create_with_new_path(
         cwd=str(direct.folder),
         worktree=str(direct.x),
         source="sample",
-        filter={"field": "id", "op": "eq", "values": ["a1", "c1-definition"]},
+        filter={"field": "id", "op": "eq", "values": ["a1", "chars/c1/definition.yaml"]},
         fields=["kind"],
         format="json",
     )
@@ -3211,10 +3230,13 @@ def test_normal_when_create_with_new_path(
     assert first.data["results"][0]["id"] == "a1"
     assert not second.is_error, second.text
     assert second.data["results"][0]["status"] == "created"
+    assert second.data["results"][0]["id"] == "chars/c1/definition.yaml"
     assert (direct.x / "chars/c1/a1.yaml").is_file()
-    assert (direct.x / "chars/c1/definition.yaml").is_file()
+    assert (direct.x / "chars/c1/definition.yaml").read_text(encoding="utf-8") == (
+        "name: c1 の立ち絵の定義\n"
+    )
     assert kinds["a1"] == "asset"
-    assert kinds["c1-definition"] == "definition"
+    assert kinds["chars/c1/definition.yaml"] == "definition"
     assert third.is_error
     assert "asset の新しい文書の配置先を決められません" in third.text
     assert not fourth.is_error, fourth.text
@@ -3262,7 +3284,10 @@ def test_error_when_create_path_invalid(
     """配置先に該当しない・既にあるファイル・配信元の外を指す `create` の `new_path` と、`records` を持つ行の `new_path` を断る（異常系）。"""
     # 準備
     existing = "id: a1\nname: 既存\n"
-    direct = make_direct_commit_source(config=CHARS_CONFIG, files={"chars/c1/a1.yaml": existing})
+    direct = make_direct_commit_source(
+        config=CHARS_CONFIG,
+        files={"chars/c1/a1.yaml": existing, "schemas/definition.schema.yaml": DEFINITION_SCHEMA},
+    )
     env = make_server(direct.spec)
     before = sorted(
         str(path.relative_to(direct.x)) for path in direct.x.rglob("*") if ".git" not in path.parts

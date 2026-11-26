@@ -1,0 +1,22 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: エージェントが ID のキーを持たない種類（パスを ID にする種類）の文書を、作成するファイルのパスを指定して作成できるようになる。作成した文書の ID は指定したパスになる
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-15.yaml
+    impact: run_only
+    detail: 直コミットの作成でも、パスを ID にする種類の文書を作成できる。直コミットの流れと期待値は変わらないが、作成の ID の決め方の変更が壊しうる
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: Operation のキーの表の id と create の new_path の説明に、ID のキーを持たない種類では id を省くと正規化した new_path を文書の ID にすることを記載する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-26T19:52:34.952419+00:00'
+scope_out:
+  - item: records を持つ行の create で、new_path から要素の ID を作る
+    reason: records を持つ行は new_path を受けず、要素の ID は管理用の YAML のパスと添字から作るため、要望（1 ファイル 1 文書の立ち絵の定義の作成）に含まれない
+    plan: none

@@ -396,6 +396,158 @@ def test_write_docs_when_create_new_path_exists(make_env: Callable[..., WriteEnv
     )
 
 
+# ID の列を持たない種類のスキーマ（ID がパスの種類）
+DEFINITION_SCHEMA = (
+    "title: definition\ntype: object\nadditionalProperties: false\n"
+    "required: [name]\nproperties:\n  name:\n    type: string\n"
+)
+# ID の列を持つ種類のスキーマ
+ASSET_SCHEMA = (
+    "title: asset\ntype: object\nrequired: [id, name]\n"
+    "properties:\n  id:\n    type: string\n  name:\n    type: string\n"
+)
+
+
+def _definition_table() -> DocumentTable:
+    """`chars/*/definition.yaml` の、ID の列を持たないスキーマの種類の行。"""
+    return DocumentTable(
+        id="definition",
+        paths=["chars/*/definition.yaml"],
+        schema_path="schemas/definition.schema.yaml",
+    )
+
+
+def test_write_docs_when_create_with_new_path_as_id(make_env: Callable[..., WriteEnv]) -> None:
+    """ID の列を持たない種類の文書を、new_path を ID にして作る（正常系）。"""
+    # 準備
+    env = make_env(
+        {"schemas/definition.schema.yaml": DEFINITION_SCHEMA},
+        tables=[_definition_table()],
+        ids_format="{kind}-{slug}",
+    )
+    operation = Operation(
+        op="create",
+        kind="definition",
+        new_path="chars/c1/./definition.yaml",
+        data={"name": "茜"},
+    )
+    # 実行
+    result = env.write(operations=[operation])
+    # 検証
+    assert result.results[0].status == "created"
+    assert result.results[0].id == "chars/c1/definition.yaml"
+    assert (env.worktree / "chars/c1/definition.yaml").read_text(encoding="utf-8") == ("name: 茜\n")
+
+
+def test_write_docs_when_create_with_new_path_id_column_in_schema(
+    make_env: Callable[..., WriteEnv],
+) -> None:
+    """スキーマが ID の列を持つ種類とスキーマを持たない種類は、ids.format で ID を作る（正常系）。"""
+    # 準備
+    tables = [
+        DocumentTable(
+            id="asset", paths=["chars/*/*.yaml"], schema_path="schemas/asset.schema.yaml"
+        ),
+        DocumentTable(id="loose", paths=["loose/*/*.yaml"], schema_path=None),
+    ]
+    env = make_env(
+        {"schemas/asset.schema.yaml": ASSET_SCHEMA},
+        tables=tables,
+        ids_format="{kind}-{slug}",
+    )
+    operations = [
+        Operation(op="create", kind="asset", new_path="chars/c1/a1.yaml", data={"name": "Doc A"}),
+        Operation(op="create", kind="loose", new_path="loose/c1/b1.yaml", data={"name": "Doc B"}),
+    ]
+    # 実行
+    result = env.write(operations=operations)
+    # 検証
+    assert [item.status for item in result.results] == ["created", "created"]
+    assert [item.id for item in result.results] == ["asset-doc-a", "loose-doc-b"]
+    assert (env.worktree / "chars/c1/a1.yaml").read_text(encoding="utf-8") == (
+        "name: Doc A\nid: asset-doc-a\n"
+    )
+    assert (env.worktree / "loose/c1/b1.yaml").read_text(encoding="utf-8") == (
+        "name: Doc B\nid: loose-doc-b\n"
+    )
+
+
+# 最上位の properties に id を持たず、allOf で id を取り込むスキーマ
+COMPOSED_SCHEMA = (
+    "title: composed\ntype: object\n"
+    "allOf:\n  - required: [id]\n    properties:\n      id:\n        type: string\n"
+    "properties:\n  name:\n    type: string\n"
+)
+
+
+def test_write_docs_when_create_with_new_path_composed_schema(
+    make_env: Callable[..., WriteEnv],
+) -> None:
+    """最上位でスキーマを合成する種類と properties を持たない種類は、ids.format で ID を作る（正常系）。"""
+    # 準備
+    tables = [
+        DocumentTable(
+            id="composed", paths=["chars/*/*.yaml"], schema_path="schemas/composed.schema.yaml"
+        ),
+        DocumentTable(id="plain", paths=["plain/*/*.yaml"], schema_path="schemas/rule.schema.yaml"),
+    ]
+    env = make_env(
+        {"schemas/composed.schema.yaml": COMPOSED_SCHEMA, "schemas/rule.schema.yaml": SCHEMA},
+        tables=tables,
+        ids_format="{kind}-{slug}",
+    )
+    operations = [
+        Operation(
+            op="create", kind="composed", new_path="chars/c1/a1.yaml", data={"name": "Doc A"}
+        ),
+        Operation(op="create", kind="plain", new_path="plain/c1/b1.yaml", data={"name": "Doc B"}),
+    ]
+    # 実行
+    result = env.write(operations=operations)
+    # 検証
+    assert [item.status for item in result.results] == ["created", "created"]
+    assert [item.id for item in result.results] == ["composed-doc-a", "plain-doc-b"]
+    assert (env.worktree / "chars/c1/a1.yaml").read_text(encoding="utf-8") == (
+        "name: Doc A\nid: composed-doc-a\n"
+    )
+    assert (env.worktree / "plain/c1/b1.yaml").read_text(encoding="utf-8") == (
+        "name: Doc B\nid: plain-doc-b\n"
+    )
+
+
+def test_write_docs_when_create_with_new_path_id_exists(
+    make_env: Callable[..., WriteEnv],
+) -> None:
+    """new_path を ID にした文書が既にある（異常系）。"""
+    # 準備
+    tables = [
+        DocumentTable(
+            id="rules", paths=["docs/rule/*.yaml"], schema_path="schemas/rule.schema.yaml"
+        ),
+        _definition_table(),
+    ]
+    env = make_env(
+        {
+            "docs/rule/x.yaml": "id: chars/c1/definition.yaml\nname: 同じ ID\n",
+            "schemas/rule.schema.yaml": SCHEMA,
+            "schemas/definition.schema.yaml": DEFINITION_SCHEMA,
+        },
+        tables=tables,
+    )
+    operation = Operation(
+        op="create",
+        kind="definition",
+        new_path="chars/c1/definition.yaml",
+        data={"name": "茜"},
+    )
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError, match="引数が正しくありません") as exc_info:
+        env.write(operations=[operation])
+    assert exc_info.value.violations[0].path == "operations[0].id"
+    assert "chars/c1/definition.yaml は既にあります" in exc_info.value.violations[0].rule
+    assert not (env.worktree / "chars/c1/definition.yaml").exists()
+
+
 def test_write_docs_when_dry_run(make_env: Callable[..., WriteEnv]) -> None:
     """試しに書く（正常系）。"""
     # 準備

@@ -254,7 +254,7 @@ functions:
       3. 配信元の排他を握る（配信元ごとの排他.握る。`timeout` は書き込みの期限までの残りで、`limits` が `None` なら `None`）
       4. 今の文書を集め（文書のストア.文書を集める）、ID → 文書の辞書にする。変更を当てるファイルは、パス → 往復編集の読み込みの内容で持つ
       5. 操作を順に当てる。失敗した操作は `failed` の行にして次へ進む
-         - `create` の場合、種類の行を引き（無ければ `UnknownKindError`）、`writable` でなければ `documents[].writable` の違反にする。ID が無ければ IDを作る（`ids.format` も無ければ `id` が必須の違反）。ID が既にあれば違反。配置先は、`new_path` があれば指定した文書の配置先（返したパスが既にあれば、`path` が `new_path`、`rule` が `new_path（{パス}）は既にあります`、`fix` が `別のパスを指定してください` の添字つきの `InvalidArgumentError`）、無ければ新しい文書の配置先。Git 管理外の配信元で、種類の行の `write_dates` が真なら `created`・`updated` に `now` を入れる（以下、日時を入れるかは書き換える文書の種類の行で決める）
+         - `create` の場合、種類の行を引き（無ければ `UnknownKindError`）、`writable` でなければ `documents[].writable` の違反にする。操作の `id` も `data` の ID の列（種類の行の `metadata.id`。省くと `id`）の値も無ければ、種類の行がスキーマを持ち、そのスキーマが最上位に `allOf`・`anyOf`・`oneOf`・`$ref` を持たず、最上位の `properties` に ID の列が無く `new_path` があるときは、正規化した `new_path` を ID にして `data` の ID の列に値を入れない。それ以外（スキーマを持たない種類と、最上位でスキーマを合成するか `properties` を持たない種類を含む）は ID を作る（`ids.format` も無ければ `id` が必須の違反）。ID が既にあれば違反。配置先は、`new_path` があれば指定した文書の配置先（返したパスが既にあれば、`path` が `new_path`、`rule` が `new_path（{パス}）は既にあります`、`fix` が `別のパスを指定してください` の添字つきの `InvalidArgumentError`）、無ければ新しい文書の配置先。Git 管理外の配信元で、種類の行の `write_dates` が真なら `created`・`updated` に `now` を入れる（以下、日時を入れるかは書き換える文書の種類の行で決める）
          - `rename` の場合、文書が無ければ近い ID を添えた `DocumentNotFoundError`。バージョンの確かめをし、`new_id`・`new_path` の引数の誤り（どちらも無い・ID の列の値を持たない文書への `new_id`・`body_file` を持たない `records` の文書と本文のファイルを持たない要素（`body_path` が `None`）への `new_path`・1 ファイル 1 文書の `new_path` が配信元の外を指す（指定したパスの正規化で、`paths` の照合より先に確認する）・`new_path` が行の `paths` に当たらないか `exclude[]` に当たるか既にあるファイル）は添字つきの `InvalidArgumentError`。`new_id` が `ids.format` に合わないか既にある ID なら `new_id` の違反。`new_path` が無い 1 ファイル 1 文書は改名後のパスで移す先を決める。改名後の ID は、ID の列の値を持つ文書は `new_id`（省いたら改名前の ID）、ID がパスの文書は改名後のパス（`records: files` は本文のファイルのパス、1 ファイル 1 文書は YAML のパス）にする。ID の列の値を持つ文書だけ ID の列に `new_id` を入れ（ID がパスの文書は ID の列に何も入れない）、`body_file` の文書は `body_file` の列を管理用の YAML のフォルダからの相対にして本文のファイルを移す（改名後の本文のパスへ今の本文を、改名前の本文のパスへ `None` を持つ）。1 ファイル 1 文書は改名後のパスへ ID を入れた内容を、改名前のパスへ `None` を持つ。続けて、同じ配信元のほかの文書のうち、ファイルの文字列（同じパスは 1 回だけ読み込み、書く予定の内容があればそれ）か、拡張子が `.md` の本文のファイルの文字列が、改名前の ID か、パスが変わるときの改名前のファイル名（`urllib.parse.quote` した値を含む）を含む文書を参照の書き換え（`related_column` はその文書の種類の行の `metadata.related` の列、`skip` は ID の列と `body_file` の列、`old_id` は改名前の ID、`new_id` は改名後の ID、`moved` はパスが変わったときの（改名前のパス, 改名後のパス）で変わらなければ `None`）にかけ、`body_file` の行の文書のうち本文のファイルの拡張子が `.md` の文書は、同じ本文のファイルを前に扱っていなければ、書く予定の内容で読んだ本文を本文の参照の書き換え（`base_dir` は本文のファイルのフォルダ、ほかは同じ）にもかけ、書き換えた本文を本文のファイルのパス → 本文で持つ。要素か本文のどちらかを書き換えた文書を参照元として検査し（本文だけを書き換えた文書は要素の内容をそのまま書き出し、書き換えた本文を組み立てに渡す）、`references` は要素の箇所に本文の箇所を続ける。改名した文書の改名後の内容も、同じ `old_id`・`new_id` で `moved` を `None` にした参照の書き換えにかける（自分を指す `{旧 ID}#...`・`id:{旧 ID}` を書き換える）。Git 管理外の配信元では、改名した文書と参照元の文書のそれぞれの種類の行の `write_dates` が真なら `updated` に `now` を入れる。どちらも含まない文書は YAML として読み込まない。同じファイルの `records` の要素の文書は、ファイルごとに往復編集の読み込みの結果（入れ物）を 1 つだけ持ち、全ての要素の参照の書き換えをその入れ物に当ててから、ファイルの文字列を 1 回だけ往復編集で書き出し、書き換えた要素の文書ごとにその文字列で参照元として検査する（ファイルを読み込むのは 1 回だけ）。結果は改名した文書の `renamed` の行と、参照元ごとの `updated`（`references` つき）の行を同じ添字で並べる
          - `replace_text` の場合、`filter` を検索の条件の確かめで確かめ、今の文書のうち条件の照合に当たる書き込みを許す種類の文書ごとに、`fields` から `@body` を除いて列名への読み替えにかけて文字列の値の置換（`skip` は ID の列と `body_file` の列。`fields` が `@body` だけのときは空の並び）を当てる。`fields` が無いか `@body` を含み、本文のファイルの拡張子が `.md` で、同じ本文のファイルを前に扱っていなければ、書く予定の内容で読んだ本文を本文の置換にかけ、件数を足して置換した本文を本文のファイルのパス → 本文で持つ。件数が 0 の文書は飛ばす。Git 管理外の配信元では、置換した文書の種類の行の `write_dates` が真なら `updated` に `now` を入れる。置換した文書を検査し、1 件でも違反があれば違反に文書の `id` を添えてその操作全体を `failed` にし、どの文書の変更も持たない。結果は置換した文書ごとの `updated`（`count` つき）の行を同じ添字で並べる
          - `update`・`replace` の場合、文書が無ければ近い ID を添えた `DocumentNotFoundError`。バージョンの確かめ（前回読んだ内容は会話の記録）。Git 管理外の配信元で、文書の種類の行の `write_dates` が真なら `updated` に `now` を入れ、`replace` は `created` を引き継ぐ
@@ -633,6 +633,31 @@ functions:
         condition: '`paths: [**/*.yaml]` の行の `anywhere/a1.yaml` の文書に、`new_path: ../outside/a1.yaml` と、配信元の外の一時フォルダの下の絶対パスの `rename`'
         mock: 一時フォルダの配信元
         expected: どちらも `InvalidArgumentError` の違反の `path` が `operations[0].new_path`、`rule` に `配信元の外を指します` を含み、`anywhere/a1.yaml` は変わらず、配信元の外にファイルもできない
+      - name: test_write_docs_when_create_with_new_path_as_id
+        case: 正常
+        summary: ID の列を持たない種類の文書を、new_path を ID にして作る
+        condition: '`paths: [chars/*/definition.yaml]` で、スキーマの `properties` に `id` を持たない（`additionalProperties: false`）行に、操作の `id` を省き `id` を持たない `data` と `new_path: chars/c1/./definition.yaml` の `create`。配信元は `ids.format` を持つ'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        expected: '`status` が `created`、`id` が `chars/c1/definition.yaml`、ワークツリーの `chars/c1/definition.yaml` が `id` のキーを持たない'
+      - name: test_write_docs_when_create_with_new_path_id_column_in_schema
+        case: 正常
+        summary: スキーマが ID の列を持つ種類とスキーマを持たない種類は、new_path があっても ids.format で ID を作る
+        condition: '`ids.format` を持つ配信元で、スキーマの `properties` に `id` を持つ行とスキーマを持たない行に、それぞれ操作の `id` を省いた `new_path` つきの `create`'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        expected: どちらも `status` が `created` で、`id` が `ids.format` で作った ID、作成した YAML の `id` がその ID
+      - name: test_write_docs_when_create_with_new_path_id_exists
+        case: 異常
+        summary: new_path を ID にした文書が既にある
+        condition: '配信元の読み込みが ID `chars/c1/definition.yaml` の文書を持つ状態で、同じ行に `new_path: chars/c1/definition.yaml` の `create`（ファイルはワークツリーに無い）'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        expected: '`InvalidArgumentError` の違反の `path` が `id`、`rule` に `chars/c1/definition.yaml は既にあります` を含み、ファイルは変わらない'
+        exception: 決めた ID が既にある
+      - name: test_write_docs_when_create_with_new_path_composed_schema
+        case: 正常
+        summary: 最上位でスキーマを合成する種類と properties を持たない種類は、new_path があっても ids.format で ID を作る
+        condition: '`ids.format` を持つ配信元で、最上位の `properties` に `id` を持たず `allOf` で `id` を取り込むスキーマの行と、`properties` を持たないスキーマの行に、それぞれ操作の `id` を省いた `new_path` つきの `create`'
+        mock: 作業場所の配信元の読み込み（受け取った配信元を返す偽物）
+        expected: どちらも `status` が `created` で、`id` が `ids.format` で作った ID、作成した YAML の `id` がその ID
   - name: delete_docs
     title: 文書の削除
     kind: 関数

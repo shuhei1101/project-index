@@ -457,32 +457,45 @@ def _apply_existing(
     return document.path, _finish(table, new_content, container, document, text)
 
 
+def _requested_path(session: _Session, table: DocumentTable, new_path: str) -> str:
+    """`create` の `new_path` の配置先を返す（既にあるファイルは new_path の違反にする）。"""
+    path = requested_document_path(table, new_path)
+    if session.exists(path):
+        raise _invalid(
+            [
+                Violation(
+                    path="new_path",
+                    rule=f"new_path（{path}）は既にあります",
+                    fix="別のパスを指定してください",
+                )
+            ]
+        )
+    return path
+
+
 def _apply_create(
     session: _Session,
     operation: Operation,
     table: DocumentTable,
     doc_id: str,
     now: datetime,
+    *,
+    path_as_id: bool = False,
 ) -> tuple[str, str, bool]:
-    """`create` を当てた、(ファイルのパス, 新しい内容, 配列への追加か) を返す。"""
+    """`create` を当てた、(ファイルのパス, 新しい内容, 配列への追加か) を返す。
+
+    `path_as_id` が真なら、ID はファイルのパスなので ID の列に値を入れない。
+    """
     if operation.new_path is not None:
-        # 指定したパスに作る: 既にあるファイルは new_path の違反にする
-        path, append = requested_document_path(table, operation.new_path), False
-        if session.exists(path):
-            raise _invalid(
-                [
-                    Violation(
-                        path="new_path",
-                        rule=f"new_path（{path}）は既にあります",
-                        fix="別のパスを指定してください",
-                    )
-                ]
-            )
+        # 指定したパスに作る
+        path, append = _requested_path(session, table, operation.new_path), False
     else:
         # `paths` の先頭から決める
         path, append = new_document_path(table, doc_id)
     data = apply_operation(None, operation)
-    set_field(data, table.metadata.get("id", "id"), doc_id)
+    # ID の列を持つ文書だけ ID を入れる（ID がパスの文書は、読み込みがパスを ID にする）
+    if not path_as_id:
+        set_field(data, table.metadata.get("id", "id"), doc_id)
     if _writes_dates(session, table):
         _stamp(data, "create", now, None)
     if append:
@@ -1180,16 +1193,37 @@ def _writable(table: DocumentTable, path: str) -> DocumentTable:
     return table
 
 
+# スキーマを合成するキーワード（最上位にあると、ID の列を最上位の properties の外から取り込みうる）
+_COMPOSING_KEYWORDS = ("allOf", "anyOf", "oneOf", "$ref")
+
+
+def _path_is_id(session: _Session, checker: DocumentChecker, table: DocumentTable) -> bool:
+    """種類の文書の ID がファイルのパスか（最上位の properties に ID の列が無いスキーマ）。"""
+    # records の行は new_path を受けず、スキーマを持たない種類は ids.format で作る
+    if table.records is not None or table.schema_path is None:
+        return False
+    schema = checker.store.row_schema(session.target, table.id)
+    # 最上位でスキーマを合成する: ID の列を取り込みうるため、ID の列を持つものとして扱う
+    if any(key in schema for key in _COMPOSING_KEYWORDS):
+        return False
+    properties: object = schema.get("properties")
+    # properties を持たない: 項目を定めていないため、ID の列を持つものとして扱う
+    if not isinstance(properties, Mapping):
+        return False
+    return table.metadata.get("id", "id") not in properties
+
+
 def _new_id(
     session: _Session,
     operation: Operation,
     table: DocumentTable,
     columns: Mapping[str, Any],
     created_ids: set[str],
+    path_id: str | None = None,
 ) -> str:
-    """作る文書の ID を決める（指定が無ければ `ids.format` で作る）。"""
+    """作る文書の ID を決める（指定が無ければ `path_id`、それも無ければ `ids.format` で作る）。"""
     source = session.target.source
-    doc_id = operation.id or columns.get("id")
+    doc_id = operation.id or columns.get("id") or path_id
     if doc_id is None:
         if source.config.ids_format is None:
             raise _invalid(
@@ -1254,10 +1288,20 @@ def _apply_create_one(
     operation = expand_array_keys(operation, table, None, index=index)
     operation = to_columns(operation, table, index=index)
     _check_body(operation, table, None)
-    doc_id = _new_id(
-        session, operation, table, resolve_metadata(operation.data or {}, table), created_ids
+    columns = resolve_metadata(operation.data or {}, table)
+    # ID の値が無く、ID がパスの種類に new_path を指定した: 正規化した new_path を ID にする
+    path_id = (
+        normalized_new_path(operation.new_path)
+        if operation.id is None
+        and columns.get("id") is None
+        and operation.new_path is not None
+        and _path_is_id(session, checker, table)
+        else None
     )
-    path, text, appended = _apply_create(session, operation, table, doc_id, now)
+    doc_id = _new_id(session, operation, table, columns, created_ids, path_id)
+    path, text, appended = _apply_create(
+        session, operation, table, doc_id, now, path_as_id=path_id is not None
+    )
     body = _create_body(session, operation, table, path, index)
     # 配列へ追加した文書は、配列の末尾の要素
     index_in_file = (
