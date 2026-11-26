@@ -127,7 +127,8 @@ class DocumentChecker:
         violations.extend(
             check_schema(document.data, schema, schema_file=_schema_file(table.schema_path))
         )
-        if new:
+        # 新規の文書で ID の列の値を持つ: ids.format の形を確認する（ID がパスの文書は確認しない）
+        if new and document.metadata.get("id") is not None:
             violations.extend(
                 check_id_format(document.id, source.config.ids_format, kind=document.kind)
             )
