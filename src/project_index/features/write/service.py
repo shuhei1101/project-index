@@ -1193,7 +1193,10 @@ def _path_is_id(session: _Session, checker: DocumentChecker, table: DocumentTabl
     if table.records is not None or table.schema_path is None:
         return False
     schema = checker.store.row_schema(session.target, table.id)
-    properties = schema.get("properties") or {}
+    properties: object = schema.get("properties")
+    # properties を持たないスキーマも、ID の列を持たないものとして扱う
+    if not isinstance(properties, Mapping):
+        return True
     return table.metadata.get("id", "id") not in properties
 
 
