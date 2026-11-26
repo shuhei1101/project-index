@@ -1100,7 +1100,7 @@ scenarios:
         description: なし（実環境で実行）
       - name: フォルダの階層に glob を持つ種類
         description: sample に、`paths` が `chars/*/*.yaml`・`exclude` が `chars/*/definition.yaml` の種類 `asset` と、`paths` が `chars/*/definition.yaml` の種類 `definition` を追加したもの
-        notes: どちらも `records` を持たない。`chars/c1/` は無い
+        notes: どちらも `records` を持たない。`definition` のスキーマは ID のキー（`id`）を持たず、文書の ID は配信元の直下からのパスになる。`chars/c1/` は無い
       - name: project-index
         description: sample を配信している project-index
         notes: '`worktree` にワークツリー x のパスを指定する'
@@ -1118,8 +1118,9 @@ scenarios:
         M->>M: スキーマと validators で検査する
         M->>WT: chars/c1/a1.yaml に YAML を作成する
         M-->>A: 作成した文書の id と version
-        A->>M: write_docs(operations: create・kind: definition・new_path: chars/c1/definition.yaml・data)
-        M->>WT: chars/c1/definition.yaml に YAML を作成する
+        A->>M: write_docs(operations: create・kind: definition・new_path: chars/c1/definition.yaml・id を持たない data。操作の id は省く)
+        M->>M: definition のスキーマが ID のキーを持たないため、正規化した new_path を文書の ID にする
+        M->>WT: chars/c1/definition.yaml に、id を加えずに YAML を作成する
         M-->>A: 作成した文書の id と version
       ```
 
@@ -1128,6 +1129,7 @@ scenarios:
       - どちらの結果も `status` が `created` で、`id` と `version` を返却する
       - ワークツリー x に `chars/c1/a1.yaml` と `chars/c1/definition.yaml` ができ、次の `search_docs` がそれぞれ種類 `asset`・`definition` の文書として返却する
       - '`new_path` を省いた種類 `asset` の `create` は、今と同じく配置先を決められない違反を返却する'
+      - '`definition` の結果の `id` と、次の `search_docs` が返却する ID は `chars/c1/definition.yaml` で、作成した YAML は `id` のキーを持たない'
     test: test_normal_when_create_with_new_path
   - name: 異常シナリオ（指定したパスに文書を作れない）
     setup:
