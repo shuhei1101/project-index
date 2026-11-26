@@ -98,21 +98,16 @@ def requested_document_path(table: DocumentTable, new_path: str) -> str:
     """`create` の `new_path` を正規化し、文書の行の文書になるパスかを確認して配置先にする。"""
     if table.records is not None:
         # 要素を追加する管理用の YAML は `paths` の先頭で決まるため、パスを受けない
-        raise _requested_invalid(
-            f"{table.id} は records を持つため create の new_path を受けません",
-            "new_path を除いてください",
-        )
+        rule = f"{table.id} は records を持つため create の new_path を受けません"
+        raise _requested_invalid(rule, "new_path を除いてください")
     path = posixpath.normpath(new_path)
     # `**` で始まる `paths` は配信元の外を指すパスにも当たるため、照合より先に断る
     if posixpath.isabs(path) or ".." in path.split("/"):
-        raise _requested_invalid(
-            f"new_path（{new_path}）が配信元の外を指します",
-            "配信元の直下からのパスを指定してください",
-        )
+        rule = f"new_path（{new_path}）が配信元の外を指します"
+        raise _requested_invalid(rule, "配信元の直下からのパスを指定してください")
     if not table.matches(path):
         # `paths` に当たらないか `exclude` に当たる: 書いても文書にならない
-        raise _requested_invalid(
-            f"new_path（{path}）が {table.id} の paths に該当しないか exclude に該当します",
-            f"{table.id} の documents[].paths に該当するパスを指定してください",
-        )
+        rule = f"new_path（{path}）が {table.id} の paths に該当しないか exclude に該当します"
+        fix = f"{table.id} の documents[].paths に該当するパスを指定してください"
+        raise _requested_invalid(rule, fix)
     return path
