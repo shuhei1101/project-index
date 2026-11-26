@@ -3310,7 +3310,7 @@ constraints:
     constraint: '`create` に `new_path` があるときは、`posixpath.normpath` で正規化した値を配置先にし、種類の行の `paths` の先頭から配置先を決めない。正規化した値が絶対パスか `..` の部分を持つとき（配信元の外を指す。`paths` の照合より先に確認し、`**` で始まる `paths` でも断る）、種類の行の `paths` に該当しないか `exclude[]` に該当するとき、既にあるファイルを指すときは、`operations[{i}].new_path` の違反の `InvalidArgumentError` にする。`records` を持つ行の `create` の `new_path` は、`operations[{i}].new_path` の引数の誤りにする'
     notes: '`paths`・`exclude[]`・既にあるファイルの照合と違反の文言は `rename` の `new_path` と同じ。配信元の外を指す違反の文言は `rename` の本文のファイルの違反（`new_path（{パス}）が配信元の外を指します`）と同じ。作成した文書の ID は制約「作成の ID」で決める'
   - item: 作成の ID
-    constraint: '`create` の文書の ID は、操作の `id`、`data` の ID の列（種類の行の `metadata.id`。省くと `id`）の値の順に取る。どちらも無いとき、種類の行がスキーマを持ち、その `properties` に ID の列を持たず `new_path` があれば、正規化した `new_path` を ID にし、`data` の ID の列に値を入れない。それ以外（スキーマを持たない種類を含む）は `ids.format` から作り、`ids.format` も無ければ `id` の違反の `InvalidArgumentError` にする。決めた ID が既にある文書と重なるときは `id` の違反にする'
+    constraint: '`create` の文書の ID は、操作の `id`、`data` の ID の列（種類の行の `metadata.id`。省くと `id`）の値の順に取る。どちらも無いとき、種類の行がスキーマを持ち、その `properties` に ID の列を持たず `new_path` があれば、正規化した `new_path` を ID にし、`data` の ID の列に値を入れず、ID が `ids.format` に合うかを検査しない。それ以外（スキーマを持たない種類を含む）は `ids.format` から作り、`ids.format` も無ければ `id` の違反の `InvalidArgumentError` にする。決めた ID が既にある文書と重なるときは `id` の違反にする'
     notes: 作成する文書にはまだ ID の列の値が無いため、種類のスキーマで判定する（`rename` の「ID がパスの文書」は、既にある文書の ID の列の値で判定する）。読み込みは ID の列の値を持たない 1 ファイル 1 文書のパスを ID にするため、作成した ID と次の `search_docs` の ID が一致する
 refs:
   - to: SC-7

@@ -126,7 +126,7 @@ classes:
             required: false
             default: 'False'
             passing: keyword
-            description: '`True` のときだけ `ids.format` を確かめる'
+            description: '`True` のときだけ `ids.format` を確かめる。ID の列の値を持たない文書（ID がパスの文書）は確かめない'
           - name: deadline
             title: 書き込みの期限
             type: Deadline | None
@@ -259,6 +259,13 @@ classes:
             condition: Git の配信元のワークツリーで、`run` がリポジトリの外のフォルダのスクリプト（`../shared/check.py`）を指す。同じ文書を `on="read"` で 1 回呼び、そのスクリプトを書き換えて 1 回
             mock: '`run_script`（呼ばれた数を数える）'
             expected: 例外を送らず、`run_script` が 2 回呼ばれる（リポジトリの外のフォルダはたどって状態を作る）
+          - name: test_document_checker_check_when_new_path_id
+            case: 正常
+            summary: ID がパスの新規の文書は ids.format を確かめない
+            condition: '`ids.format` が `{kind}-{slug}` で、データに ID の列を持たず ID がパス `chars/c1/definition.yaml` の文書を `new=True`'
+            mock: なし
+            expected: '`id` の違反が無い'
+            exception: '-'
         exceptions:
           - name: WriteDeadlineExceededError
             condition: '`deadline` があり、検査のスクリプトを動かす前か動かした後に期限を過ぎている'
