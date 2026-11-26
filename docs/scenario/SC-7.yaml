@@ -1163,6 +1163,37 @@ scenarios:
       - ワークツリー x のファイルは変わらず、既にある `chars/c1/a1.yaml` も書き換わらない
       - '`records` を持つ行の種類の `create` に `new_path` を指定したときも、`new_path` の引数の誤りを返却する'
     test: test_error_when_create_new_path_invalid
+  - name: 異常シナリオ（改名先のパスが配信元の外を指す）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: '** で始まる種類'
+        description: sample に、`paths` が `**/*.yaml` の種類 `anywhere` を追加し、ワークツリー x に `anywhere/a1.yaml` の文書を配置したもの
+        notes: '`records` を持たない。配信元の外に `outside/` は無い'
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`anywhere/a1.yaml` の文書の `rename` を、`new_path` を変えて 1 件ずつ呼ぶ'
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（改名先のパスが配信元の外を指す）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: write_docs(rename・anywhere/a1.yaml・new_path: ../outside/a1.yaml)
+        M->>M: 正規化した new_path が .. の部分を持つ
+        M-->>A: エラー（new_path が配信元の外を指す）
+        A->>M: write_docs(rename・anywhere/a1.yaml・new_path: /tmp/a1.yaml)
+        M->>M: 正規化した new_path が絶対パス
+        M-->>A: エラー（new_path が配信元の外を指す）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '2 回とも `isError: true` で、添字 0 の `new_path` の違反として、指定した `new_path` が配信元の外を指すことと、配信元の直下からのパスを指定する直し方を返却する'
+      - '`anywhere/a1.yaml` は変わらず、配信元の外の `outside/a1.yaml`・`/tmp/a1.yaml` も作成されない'
+    test: test_error_when_rename_new_path_outside_source
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 tags:
   - name: topic:文書
