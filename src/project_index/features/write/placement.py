@@ -88,10 +88,20 @@ def new_document_path(table: DocumentTable, doc_id: str) -> tuple[str, bool]:
 
 
 def _requested_invalid(rule: str, fix: str) -> InvalidArgumentError:
-    """`create` の `new_path` の違反を作る（添字は書き込みが付ける）。"""
+    """`create`・`rename` の `new_path` の違反を作る（添字は書き込みが付ける）。"""
     return InvalidArgumentError(
         message=rule, violations=[Violation(path="new_path", rule=rule, fix=fix)]
     )
+
+
+def normalized_new_path(new_path: str) -> str:
+    """`create`・`rename` の `new_path` を正規化し、配信元の外を指すパスを断る。"""
+    path = posixpath.normpath(new_path)
+    # 絶対パスか、正規化しても `..` が残る: 配信元の直下より上を指す
+    if posixpath.isabs(path) or ".." in path.split("/"):
+        rule = f"new_path（{new_path}）が配信元の外を指します"
+        raise _requested_invalid(rule, "配信元の直下からのパスを指定してください")
+    return path
 
 
 def requested_document_path(table: DocumentTable, new_path: str) -> str:
@@ -100,11 +110,8 @@ def requested_document_path(table: DocumentTable, new_path: str) -> str:
         # 要素を追加する管理用の YAML は `paths` の先頭で決まるため、パスを受けない
         rule = f"{table.id} は records を持つため create の new_path を受けません"
         raise _requested_invalid(rule, "new_path を除いてください")
-    path = posixpath.normpath(new_path)
     # `**` で始まる `paths` は配信元の外を指すパスにも当たるため、照合より先に断る
-    if posixpath.isabs(path) or ".." in path.split("/"):
-        rule = f"new_path（{new_path}）が配信元の外を指します"
-        raise _requested_invalid(rule, "配信元の直下からのパスを指定してください")
+    path = normalized_new_path(new_path)
     if not table.matches(path):
         # `paths` に当たらないか `exclude` に当たる: 書いても文書にならない
         rule = f"new_path（{path}）が {table.id} の paths に該当しないか exclude に該当します"
