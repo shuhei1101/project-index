@@ -344,6 +344,57 @@ def test_write_docs_when_create(make_env: Callable[..., WriteEnv]) -> None:
     assert (env.worktree / "index.log").read_text(encoding="utf-8") == "ran\n"
 
 
+def test_write_docs_when_create_with_new_path(make_env: Callable[..., WriteEnv]) -> None:
+    """指定したパスに文書を作る（正常系）。"""
+    # 準備
+    table = DocumentTable(
+        id="asset", paths=["chars/*/*.yaml"], schema_path="schemas/rule.schema.yaml"
+    )
+    env = make_env(
+        {"chars/c0/a0.yaml": "id: a0\nname: 既存\n", "schemas/rule.schema.yaml": SCHEMA},
+        tables=[table],
+    )
+    operation = Operation(
+        op="create",
+        kind="asset",
+        new_path="chars/c1/a1.yaml",
+        data={"id": "a1", "name": "表情 1"},
+    )
+    # 実行
+    result = env.write(operations=[operation])
+    # 検証
+    assert result.results[0].status == "created"
+    assert result.results[0].id == "a1"
+    assert (env.worktree / "chars/c1/a1.yaml").read_text(encoding="utf-8") == (
+        "id: a1\nname: 表情 1\n"
+    )
+
+
+def test_write_docs_when_create_new_path_exists(make_env: Callable[..., WriteEnv]) -> None:
+    """指定したパスが既にある（異常系）。"""
+    # 準備
+    table = DocumentTable(
+        id="asset", paths=["chars/*/*.yaml"], schema_path="schemas/rule.schema.yaml"
+    )
+    env = make_env(
+        {"chars/c1/a1.yaml": "id: a1\nname: 既存\n", "schemas/rule.schema.yaml": SCHEMA},
+        tables=[table],
+    )
+    operation = Operation(
+        op="create",
+        kind="asset",
+        new_path="chars/c1/a1.yaml",
+        data={"id": "a9", "name": "表情 9"},
+    )
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError, match="は既にあります") as exc_info:
+        env.write(operations=[operation])
+    assert exc_info.value.violations[0].path == "operations[0].new_path"
+    assert (env.worktree / "chars/c1/a1.yaml").read_text(encoding="utf-8") == (
+        "id: a1\nname: 既存\n"
+    )
+
+
 def test_write_docs_when_dry_run(make_env: Callable[..., WriteEnv]) -> None:
     """試しに書く（正常系）。"""
     # 準備
