@@ -1,0 +1,57 @@
+# テストコードの commit 59d6525 の Red の確認
+
+## ランナーでの全件実行（TL-1 の run_runner）
+
+$ gh workflow run test.yml --ref fix/write/rename-new-path-outside-source -f layer=unit ...（TP-1 の run_runner）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 1684 items / 1 error
+
+==================================== ERRORS ====================================
+__ ERROR collecting tests/unit/project_index/features/write/test_placement.py __
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/write/test_placement.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_placement.py:6: in <module>
+    from project_index.features.write.placement import (
+E   ImportError: cannot import name 'normalized_new_path' from 'project_index.features.write.placement' (/home/runner/work/project-index/project-index/src/project_index/features/write/placement.py)
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/write/test_placement.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+=============================== 1 error in 3.80s ===============================
+exit=1
+
+## 収集の誤りで回らなかった test_service.py の新規テストの個別実行（手元。実装の差分を外した 59d6525 の src）
+
+$ uv run pytest tests/unit/project_index/features/write/test_service.py -q -k rename_new_path_outside_source --basetemp=/tmp/pi296/bt -p no:cacheprovider
+        # 準備
+        table = DocumentTable(
+            id="anywhere",
+            paths=["**/*.yaml"],
+            schema_path="schemas/rule.schema.yaml",
+            exclude=["schemas/rule.schema.yaml"],
+        )
+        env = make_env(
+            {"anywhere/a1.yaml": ANYWHERE_DOC, "schemas/rule.schema.yaml": SCHEMA}, tables=[table]
+        )
+        outside = tmp_path_factory.mktemp("outside")
+        new_path = outside_path(outside)
+        operation = Operation(
+            op="rename", id="a1", expected_version=content_hash(ANYWHERE_DOC), new_path=new_path
+        )
+        # 実行・検証
+>       with pytest.raises(InvalidArgumentError, match="引数が正しくありません") as exc_info:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE InvalidArgumentError
+
+tests/unit/project_index/features/write/test_service.py:1940: Failed
+=========================== short test summary info ============================
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_rename_new_path_outside_source[parent]
+FAILED tests/unit/project_index/features/write/test_service.py::test_write_docs_when_rename_new_path_outside_source[absolute]
+2 failed, 124 deselected in 0.25s
+
+fail はどちらも実装が無いことによるもの（normalized_new_path が無い ImportError と、rename が配信元の外を指す new_path を断らない DID NOT RAISE）。実装の前から pass したテストは無い。
