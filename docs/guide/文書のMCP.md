@@ -427,7 +427,7 @@ mdmark の CLI が `PATH` に無いか、点検が端末の設定の `script_tim
 - 書き換える参照元の箇所は、`related` の `to`（`source` を持たない行）・値の全体が `{旧 ID}#{項目のパス}` の値・文字列の中の `id:{旧 ID}`（Markdown のリンクと `click` の `href`）・パスが変わるときは値の全体と Markdown のリンクの先のうちその文書のフォルダから改名前のパスを指す値（`index.yaml` の `page` など）です。改名した文書自身の中の参照も書き換えます
 - `records`・`body_file` の行の文書の本文のファイルのうち拡張子が `.md` のものは、`id:{旧 ID}` と、本文のファイルのフォルダから改名前のパスを指す Markdown のリンクの先も書き換えます。書き換えた箇所は `references` の `path` が `@body` です
 - 拡張子が `.md` でない本文のファイル、本文のファイルの中のリンクでない文、改名した文書自身の本文のファイル、ほかの配信元からの参照は書き換えません
-- 改名後の ID が既にある文書と重なるとき・`ids.format` に合わないときは `new_id` の違反、`new_path` が種類の行の `paths` に該当しないか `exclude[]` に該当するとき・既にあるファイルを指すときは `InvalidArgumentError` です
+- 改名後の ID が既にある文書と重なるとき・`ids.format` に合わないときは `new_id` の違反、1 ファイル 1 文書の `new_path` を正規化した値が絶対パスか `..` を含むとき（配信元の外を指す。`paths` が `**` で始まる種類でも断ります）・`new_path` が種類の行の `paths` に該当しないか `exclude[]` に該当するとき・既にあるファイルを指すときは `InvalidArgumentError` です
 
 ### 一括置換
 
@@ -611,7 +611,7 @@ Git 管理外の配信元と `storage.type: disk` の配信元では、種類の
 | SourceNotServedError | 起動時の検証で外したか `enabled: false` の配信元を指した | 違反したキーのパスと理由 |
 | WorktreeNotMatchedError | `worktree` が配信元の `worktrees` に当たらない | 渡したパスと `worktrees` の値 |
 | TargetIsCloneError | Git の配信元（`storage.type: disk` を除く）で、書く先がクローン本体になる | クローン本体のパス（配信元の設定をワークツリーから読んでいても、ワークツリーの親のクローン本体）と、`worktree` でワークツリーを指すこと |
-| InvalidArgumentError | `filter`・`order_by`・`group_by`・Operation の中の知らない項目・型の合わない値、50 件を超える操作、必須のキーの欠け、`text_edits` の `old` が 1 か所に一致しない、`ref` を渡せない配信元に `ref`・`from`・`to` を渡した、`storage.type: disk` の配信元に `worktree` を渡した、`create` の配置先のファイル名が `documents[].exclude[]` に当たる、`create` の `new_path` が配信元の外を指すか種類の行の `paths` に該当しないか `exclude[]` に該当するか既にあるファイルを指す、`records` を持つ行の `create` に `new_path` を渡した、共通のキーとその列名を同じ操作に両方渡した、束が `and`・`or`・`not` のキーを 2 つ以上持つ、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない、`main_tags` の `set`・`add_to` に `tags` に無い名前を渡した、`text_edits[].field` の `#` で始まる項目のパスが要素・キーを指せない | 項目のパス・期待する型・実際の値と、`describe(source, kind)` でスキーマを見ること |
+| InvalidArgumentError | `filter`・`order_by`・`group_by`・Operation の中の知らない項目・型の合わない値、50 件を超える操作、必須のキーの欠け、`text_edits` の `old` が 1 か所に一致しない、`ref` を渡せない配信元に `ref`・`from`・`to` を渡した、`storage.type: disk` の配信元に `worktree` を渡した、`create` の配置先のファイル名が `documents[].exclude[]` に当たる、`create`・1 ファイル 1 文書の `rename` の `new_path` が配信元の外を指す、`create` の `new_path` が種類の行の `paths` に該当しないか `exclude[]` に該当するか既にあるファイルを指す、`records` を持つ行の `create` に `new_path` を渡した、共通のキーとその列名を同じ操作に両方渡した、束が `and`・`or`・`not` のキーを 2 つ以上持つ、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない、`main_tags` の `set`・`add_to` に `tags` に無い名前を渡した、`text_edits[].field` の `#` で始まる項目のパスが要素・キーを指せない | 項目のパス・期待する型・実際の値と、`describe(source, kind)` でスキーマを見ること |
 | RefNotFoundError | `ref`・`from`・`to` を commit に解決できない | 解決できなかった値 |
 | UnknownKindError | `kind` が配信元の種類に無い | その配信元の種類の一覧 |
 | DocumentNotFoundError | 指した ID の文書が無い | 見つからなかった ID と、近い ID の候補 |
