@@ -169,6 +169,20 @@ def test_document_checker_check_when_new(
     assert for_existing == []
 
 
+def test_document_checker_check_when_new_path_id(
+    make_checked_target: Callable[..., Target], make_document: Callable[..., Document]
+) -> None:
+    """ID がパスの新規の文書は ids.format を確かめない（正常系）。"""
+    # 準備
+    target = make_checked_target([], row_validators=[], ids_format="{kind}-{slug}")
+    document = make_document(id="chars/c1/definition.yaml", metadata={})
+    checker = _checker({})
+    # 実行
+    violations = checker.check(target, document, on="write", new=True)
+    # 検証
+    assert violations == []
+
+
 def test_document_checker_check_when_records(
     tmp_path: Path,
     make_source_config: Callable[..., SourceConfig],
