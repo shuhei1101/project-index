@@ -62,7 +62,7 @@ data_models:
         type: str | None
         access: 公開
         default: None
-        description: '`update`・`replace`・`rename` で必須。`create` で省くと `ids.format` から作る'
+        description: '`update`・`replace`・`rename` で必須。`create` で省くと、スキーマの `properties` に ID の列を持たない種類で `new_path` があれば正規化した `new_path`、それ以外は `ids.format` から作る'
       - name: expected_version
         title: 読んだときのバージョン
         type: str | dict[str, str] | None
