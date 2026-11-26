@@ -2703,6 +2703,37 @@ flows:
       - '`paths`・`exclude[]` の違反と既にあるファイルの違反の決まりは、`rename` の `new_path` の違反と同じ文言にする'
       - ワークツリー x のファイルは変わらず、既にある `chars/c1/a1.yaml` も上書きされない
     test: test_error_when_create_path_invalid
+  - name: 異常系（改名後のパスが配信元の外を指す・InvalidArgumentError）
+    summary: '`paths` が `**` で始まる種類でも、配信元の外を指す 1 ファイル 1 文書の `rename` の `new_path` を `paths` の照合より先に断る'
+    setup:
+      - name: Mock
+        description: なし
+      - name: '** で始まる種類'
+        description: '`paths` が `**/*.yaml` の種類 `anywhere` と、ワークツリー x の `anywhere/a1.yaml` の文書'
+        notes: '`records` を持たない。配信元の外のテストの一時フォルダ t に `a1.yaml` は無い'
+      - name: 入力
+        description: '`anywhere/a1.yaml` の文書の `rename` を、`new_path` を `../outside/a1.yaml`・`anywhere/../../outside/a1.yaml`・一時フォルダ t の下の `a1.yaml` の絶対パスに変えて 1 件ずつ呼ぶ'
+    flow: |-
+      <!-- map: {"title": "異常系（改名後のパスが配信元の外を指す・InvalidArgumentError）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        participant C as クライアント
+        participant T as write_docs
+
+        C->>T: rename anywhere/a1.yaml、new_path: ../outside/a1.yaml
+        T-->>C: isError（配信元の外を指す）
+        C->>T: rename anywhere/a1.yaml、new_path: anywhere/../../outside/a1.yaml
+        T-->>C: isError（配信元の外を指す）
+        C->>T: rename anywhere/a1.yaml、new_path: 一時フォルダ t の下の a1.yaml の絶対パス
+        T-->>C: isError（配信元の外を指す）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '3 回とも `isError: true` の `InvalidArgumentError` で、違反の `path` が `operations[0].new_path`、決まりが `new_path（{指定した new_path}）が配信元の外を指します`、直し方が `配信元の直下からのパスを指定してください`'
+      - '`anywhere/a1.yaml` は変わらず、配信元の外の `outside/a1.yaml`・一時フォルダ t の `a1.yaml` も作成されない'
+    test: test_error_when_rename_path_outside_source
 lead: 文書の作成・部分更新・置き換え・改名・複数の文書の文字列の一括置換を検査に合格させてから書き込む `write_docs` の入出力を定め、`write_docs` を修正するときに参照する。
 tags:
   - name: topic:文書
@@ -3064,7 +3095,7 @@ exceptions:
     condition: '`update`・`replace` の `id` の文書が無い'
     notes: 見つからなかった ID と近い ID の候補を添える
   - name: InvalidArgumentError
-    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`new_path` を省いた `create` の配置先を行の `paths` の先頭から決められない（`records` を持つ行で先頭が空か glob を含む・持たない行で先頭が glob を含まないか、最後の段の `*` を ID に置き換えた後に glob が残るか、決めた配置先が行の `paths` に当たらない）・`create` の配置先が行の `exclude[]` に当たる（`/` を含む値はパス、含まない値はファイル名で当てる）・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` が無いファイルを指し `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`rename` に `new_id`・`new_path` がどちらも無い・ID がパスの文書に `new_id` を渡した・`body_file` を持たない `records` の行の文書に `new_path` を渡した・`records` を持つ行の `create` に `new_path` を渡した・`create` の `new_path` を正規化した値が絶対パスか `..` の部分を持つ（配信元の外を指す）・`new_path` が種類の行の `paths` に当たらないか `exclude[]` に当たるか既にあるファイルを指す・`replace_text` に `filter`・`old`・`new` のどれかが無いか `old` が空・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す・`unset` の要素の参照の型の項目のパスを解決できないか、`#` で始まらない要素に要素の選び方（`[...]`・`**.`）を含む・`set` のキーの参照の型の項目のパスを解決できないか、`#` で始まらないキーに要素の選び方（`[]`・`[{キー}]`・`**.`）を含む・`add_to`・`remove_from` のキーの参照の型の項目のパスを解決できないか解決した値が配列でない、または `#` で始まらないキーに要素の選び方（`[...]`・`**.`）を含む・`x-key` を持つ配列への `remove_from` の値に削除する要素が無い・`commit` と `atomic: false` を同時に渡した・`commit` と `worktree` を同時に渡した'
+    condition: '操作が 50 件を超える・`op` ごとの必須のキーが無い・`text_edits` の `old` が 1 か所に一致しない・`new_path` を省いた `create` の配置先を行の `paths` の先頭から決められない（`records` を持つ行で先頭が空か glob を含む・持たない行で先頭が glob を含まないか、最後の段の `*` を ID に置き換えた後に glob が残るか、決めた配置先が行の `paths` に当たらない）・`create` の配置先が行の `exclude[]` に当たる（`/` を含む値はパス、含まない値はファイル名で当てる）・共通のキーとその列名を同じ操作に両方渡した・`{配列}[].{項目}`・`{配列}[{真偽値のキー}].{項目}` の対応を持つ共通のキーに名前（文字列）の配列でない値を渡した、または配列に無い名前を選んだ・`**.{列名}` の対応を持つ共通のキーへの操作を渡した・`body_file` を持たない行の文書に `@body` を渡した・`unset`・`add_to`・`remove_from` に `@body` を渡した・`body_file` の行の `create` が無いファイルを指し `@body` が無い・`body_file` の列の値を変える `update`・`replace` を渡した・`storage.type: disk` の配信元に `worktree` を渡した・`rename` に `new_id`・`new_path` がどちらも無い・ID がパスの文書に `new_id` を渡した・`body_file` を持たない `records` の行の文書に `new_path` を渡した・`records` を持つ行の `create` に `new_path` を渡した・`create`・1 ファイル 1 文書の `rename` の `new_path` を正規化した値が絶対パスか `..` の部分を持つ（配信元の外を指す）・`new_path` が種類の行の `paths` に当たらないか `exclude[]` に当たるか既にあるファイルを指す・`replace_text` に `filter`・`old`・`new` のどれかが無いか `old` が空・`text_edits[].field` の参照の型の項目のパスが `x-key` の無い配列・該当する要素の無い値・無い順番・無いキーを指す・`unset` の要素の参照の型の項目のパスを解決できないか、`#` で始まらない要素に要素の選び方（`[...]`・`**.`）を含む・`set` のキーの参照の型の項目のパスを解決できないか、`#` で始まらないキーに要素の選び方（`[]`・`[{キー}]`・`**.`）を含む・`add_to`・`remove_from` のキーの参照の型の項目のパスを解決できないか解決した値が配列でない、または `#` で始まらないキーに要素の選び方（`[...]`・`**.`）を含む・`x-key` を持つ配列への `remove_from` の値に削除する要素が無い・`commit` と `atomic: false` を同時に渡した・`commit` と `worktree` を同時に渡した'
   - name: SourceNotServedError
     condition: '起動時の検証で外したか `enabled: false` の配信元を指した'
   - name: WorktreeNotMatchedError
@@ -3185,7 +3216,7 @@ constraints:
     constraint: '`add_to`・`remove_from` のキーが `#` で始まるとき、「参照の型の項目のパス」と同じ読み方で文書の中の 1 つの配列へ解決し、その配列へ追加・削除する。解決できないパス（無い要素・`x-key` の無い配列・無いキー）と、解決した値が配列でないパスは `add_to.{パス}`・`remove_from.{パス}` の違反にする。`#` で始まらないキーに要素の選び方（`[...]`・`**.`）を含めると、書き込まずに同じ違反にする'
     notes: '`#` で始まらない要素の選び方を含まないキーは今までどおりで、項目が無ければ `add_to` は空の配列を作り、`remove_from` は何もせず、制約「何もしなかった操作の返却」で返却する。`#` で始まるキーは配列を作らない。共通のキーの列名への読み替えは `#` で始まるキーにはしない'
   - item: 改名後のパス
-    constraint: '`new_path` を省いた `rename` は、ファイル名の最初の `.` より前が旧 ID と一致する 1 ファイル 1 文書だけ、同じフォルダでその部分を `new_id` にしたパスへ移す（`IF-6.yaml` → `IF-9.yaml`、`MOD-1.py.yaml` → `MOD-2.py.yaml`）。一致しない文書と `records` の要素の文書はパスを変えない'
+    constraint: '`new_path` を省いた `rename` は、ファイル名の最初の `.` より前が旧 ID と一致する 1 ファイル 1 文書だけ、同じフォルダでその部分を `new_id` にしたパスへ移す（`IF-6.yaml` → `IF-9.yaml`、`MOD-1.py.yaml` → `MOD-2.py.yaml`）。一致しない文書と `records` の要素の文書はパスを変えない。1 ファイル 1 文書の `new_path` は `posixpath.normpath` で正規化し、絶対パスか `..` の部分を持つとき（配信元の外を指す。`paths` の照合より先に確認し、`**` で始まる `paths` でも断る）は、制約「作成のパス」と同じ文言の `operations[{i}].new_path` の違反の `InvalidArgumentError` にする'
     notes: '`new_id` を省いた `rename` は ID を変えない。ID がパスの文書は、`new_path` で ID も変わる'
   - item: 改名の書き込み
     constraint: 1 ファイル 1 文書は、改名後のパスに YAML を作成して改名前のファイルを削除する。`records`・`body_file` の行の文書は、管理用の YAML の要素の `body_file` の列を管理用の YAML のフォルダからの相対で書き換え、本文のファイルを移す。移すファイルの内容は変えない
