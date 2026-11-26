@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from project_index.features.sources.types import DocumentTable
-from project_index.features.write.placement import new_document_path
+from project_index.features.write.placement import new_document_path, requested_document_path
 from project_index.shared.errors import InvalidArgumentError
 
 
@@ -148,3 +148,78 @@ def test_new_document_path_when_outside_paths(first: str) -> None:
         exc_info.value.violations[0].fix
         == "documents[].paths の先頭のフォルダの階層の glob を ** にしてください"
     )
+
+
+def test_requested_document_path() -> None:
+    """指定したパスを正規化して返却する（正常系）。"""
+    # 準備
+    table = DocumentTable(
+        id="asset",
+        paths=["chars/*/*.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        exclude=["chars/*/definition.yaml"],
+    )
+    # 実行
+    result = requested_document_path(table, "chars/c1/./a1.yaml")
+    # 検証
+    assert result == "chars/c1/a1.yaml"
+
+
+@pytest.mark.parametrize(
+    "new_path",
+    [
+        pytest.param("other/a2.yaml", id="outside-paths"),
+        pytest.param("chars/c1/definition.yaml", id="excluded"),
+    ],
+)
+def test_requested_document_path_when_outside_paths(new_path: str) -> None:
+    """paths に該当しない・exclude に該当するパスを断る（異常系）。"""
+    # 準備
+    table = DocumentTable(
+        id="asset",
+        paths=["chars/*/*.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        exclude=["chars/*/definition.yaml"],
+    )
+    # 実行・検証
+    with pytest.raises(
+        InvalidArgumentError, match="paths に該当しないか exclude に該当します"
+    ) as exc_info:
+        requested_document_path(table, new_path)
+    assert exc_info.value.violations[0].path == "new_path"
+    assert new_path in exc_info.value.violations[0].rule
+
+
+@pytest.mark.parametrize(
+    "new_path",
+    [
+        pytest.param("../outside/a2.yaml", id="parent"),
+        pytest.param("chars/../../outside/a2.yaml", id="parent-after-normalize"),
+        pytest.param("/tmp/a2.yaml", id="absolute"),
+    ],
+)
+def test_requested_document_path_when_outside_source(new_path: str) -> None:
+    """paths が ** で始まる行でも、配信元の外を指すパスを断る（異常系）。"""
+    # 準備
+    table = DocumentTable(id="any", paths=["**/*.yaml"], schema_path="schemas/rule.schema.yaml")
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError, match="配信元の外を指します") as exc_info:
+        requested_document_path(table, new_path)
+    assert exc_info.value.violations[0].path == "new_path"
+    assert exc_info.value.violations[0].fix == "配信元の直下からのパスを指定してください"
+
+
+def test_requested_document_path_when_records() -> None:
+    """records を持つ行は new_path を受けない（異常系）。"""
+    # 準備
+    table = DocumentTable(
+        id="items",
+        paths=["data/list.yaml"],
+        schema_path="schemas/rule.schema.yaml",
+        records="items",
+    )
+    # 実行・検証
+    with pytest.raises(InvalidArgumentError, match="records を持つため") as exc_info:
+        requested_document_path(table, "data/list.yaml")
+    assert exc_info.value.violations[0].path == "new_path"
+    assert exc_info.value.violations[0].fix == "new_path を除いてください"

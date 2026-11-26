@@ -22,6 +22,7 @@ diagrams:
         文書の書き込み ..> 操作を当てる
         文書の書き込み ..> IDを作る
         文書の書き込み ..> 新しい文書の配置先
+        文書の書き込み ..> 指定した文書の配置先
         文書の書き込み ..> 文字列からの文書の組み立て
         文書の書き込み ..> 文書の検査
         文書の書き込み ..> ファイルの置き換え
@@ -117,6 +118,9 @@ diagrams:
         class 新しい文書の配置先 {
           <<function>>
         }
+        class 指定した文書の配置先 {
+          <<function>>
+        }
         class 文字列からの文書の組み立て {
           <<function>>
         }
@@ -154,6 +158,7 @@ diagrams:
         click 操作を当てる href "id:MOD-80#functions[apply_operation]"
         click IDを作る href "id:MOD-81#functions[generate_id]"
         click 新しい文書の配置先 href "id:MOD-83#functions[new_document_path]"
+        click 指定した文書の配置先 href "id:MOD-83#functions[requested_document_path]"
         click 文字列からの文書の組み立て href "id:MOD-27#functions[documents_from_text]"
         click 文書の検査 href "id:MOD-75#classes[DocumentChecker]"
         click ファイルの置き換え href "id:MOD-99#functions[replace_file]"

@@ -74,7 +74,7 @@ from project_index.features.write.direct_commit import (
 from project_index.features.write.hints import attach_schema_hints
 from project_index.features.write.ids import generate_id
 from project_index.features.write.locks import WriteLockKeys
-from project_index.features.write.placement import new_document_path
+from project_index.features.write.placement import new_document_path, requested_document_path
 from project_index.features.write.references import (
     renamed_path,
     rewrite_body_references,
@@ -461,7 +461,22 @@ def _apply_create(
     now: datetime,
 ) -> tuple[str, str, bool]:
     """`create` を当てた、(ファイルのパス, 新しい内容, 配列への追加か) を返す。"""
-    path, append = new_document_path(table, doc_id)
+    if operation.new_path is not None:
+        # 指定したパスに作る: 既にあるファイルは new_path の違反にする
+        path, append = requested_document_path(table, operation.new_path), False
+        if session.exists(path):
+            raise _invalid(
+                [
+                    Violation(
+                        path="new_path",
+                        rule=f"new_path（{path}）は既にあります",
+                        fix="別のパスを指定してください",
+                    )
+                ]
+            )
+    else:
+        # `paths` の先頭から決める
+        path, append = new_document_path(table, doc_id)
     data = apply_operation(None, operation)
     set_field(data, table.metadata.get("id", "id"), doc_id)
     if _writes_dates(session, table):

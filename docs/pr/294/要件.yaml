@@ -1,0 +1,28 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: エージェントが作成するファイルのパスを指定して、フォルダの階層に glob を持つ種類の文書（キャラクターごとのフォルダの文書）を作成できるようになる。指定したパスが種類の配置先に該当しないときと既にあるときは何も書き込まずに断る
+    depends_on: []
+  - kind: single
+    scenario: docs/scenario/SC-15.yaml
+    impact: run_only
+    detail: 直コミットの作成でもパスを指定できる。直コミットの流れと期待値は変わらないが、作成の配置先の変更が壊しうる
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: Operation のキーの表の new_path に create を追加し、create の new_path の照合と断る条件を記載する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-26T16:05:47.310476+00:00'
+scope_out:
+  - item: records を持つ行の create で、要素を追加する管理用の YAML を new_path で選べるようにする
+    reason: 要望は records を持たない行（1 ファイル 1 文書）のキャラクターごとのフォルダへの作成で、records を持つ行の管理用の YAML は paths の先頭の 1 ファイルで決定するため
+    plan: none
+  - item: content/prompts/mcp/project-index/tools/write-docs.yaml の write_docs の description への new_path の追記
+    reason: description は操作の種類だけを記載し、キーごとの説明は持たない。キーの説明は Operation のスキーマとガイドが持つ
+    plan: none
+  - item: rename の new_path が、paths が ** で始まる種類で配信元の外を指しても断らない（service.py の _plan_file_move）
+    reason: SC-7 の minimal_guarantee（配信元の外を指す書き込みはファイルを書き換えない）から外れているが、rename の不具合で今回の要望（create の new_path）に含まれない
+    plan: '#295'

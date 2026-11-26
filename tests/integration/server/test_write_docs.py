@@ -3134,6 +3134,160 @@ def test_error_when_rename_path_invalid(
     assert not (worktree / "other").exists()
 
 
+CHARS_CONFIG = (
+    "name: sample\n"
+    "default_ref: develop\n"
+    "documents:\n"
+    "  - id: asset\n"
+    "    paths: [chars/*/*.yaml]\n"
+    "    exclude: [chars/*/definition.yaml]\n"
+    "    schema: schemas/note.schema.yaml\n"
+    "  - id: definition\n"
+    "    paths: [chars/*/definition.yaml]\n"
+    "    schema: schemas/note.schema.yaml\n"
+    "  - id: items\n"
+    "    paths: [items/list.yaml]\n"
+    "    schema: schemas/note.schema.yaml\n"
+    "    records: items\n"
+    "direct_commit:\n"
+    "  branch: develop\n"
+    "  kinds: [asset]\n"
+)
+
+
+def _create(kind: str, doc_id: str, new_path: str | None = None) -> dict[str, Any]:
+    """`create` の操作を作る（`new_path` を省けば今までどおり配置先を決める）。"""
+    operation: dict[str, Any] = {
+        "op": "create",
+        "kind": kind,
+        "data": {"id": doc_id, "name": doc_id},
+    }
+    if new_path is not None:
+        operation["new_path"] = new_path
+    return operation
+
+
+def test_normal_when_create_with_new_path(
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    run_git: Callable[..., str],
+) -> None:
+    """`create` の `new_path` で、フォルダの階層に glob を持つ種類の文書を指定したパスに作成する（正常系）。"""
+    # 準備
+    direct = make_direct_commit_source(config=CHARS_CONFIG, files={"chars/.keep": ""})
+    env = make_server(direct.spec)
+
+    def write(operation: dict[str, Any]) -> Any:
+        return env.call(
+            "write_docs", cwd=str(direct.folder), worktree=str(direct.x), operations=[operation]
+        )
+
+    # 実行
+    first = write(_create("asset", "a1", "chars/c1/a1.yaml"))
+    second = write(_create("definition", "c1-definition", "chars/c1/definition.yaml"))
+    third = write(_create("asset", "a3"))
+    fourth = env.call(
+        "write_docs",
+        cwd=str(direct.local),
+        source="sample",
+        operations=[_create("asset", "a2", "chars/c2/a2.yaml")],
+        commit={"message": "docs: 表情を追加する"},
+    )
+    # 検証
+    listed = env.call(
+        "search_docs",
+        cwd=str(direct.folder),
+        worktree=str(direct.x),
+        source="sample",
+        filter={"field": "id", "op": "eq", "values": ["a1", "c1-definition"]},
+        fields=["kind"],
+        format="json",
+    )
+    kinds = {item["id"]: item["values"]["kind"] for item in listed.data["items"]}
+    remote_after = run_git(direct.bare, "rev-parse", "develop").strip()
+    changed = run_git(direct.bare, "show", "--name-only", "--format=%s", remote_after).split("\n")
+    assert not first.is_error, first.text
+    assert first.data["results"][0]["status"] == "created"
+    assert first.data["results"][0]["id"] == "a1"
+    assert not second.is_error, second.text
+    assert second.data["results"][0]["status"] == "created"
+    assert (direct.x / "chars/c1/a1.yaml").is_file()
+    assert (direct.x / "chars/c1/definition.yaml").is_file()
+    assert kinds["a1"] == "asset"
+    assert kinds["c1-definition"] == "definition"
+    assert third.is_error
+    assert "asset の新しい文書の配置先を決められません" in third.text
+    assert not fourth.is_error, fourth.text
+    assert fourth.data["results"][0]["status"] == "created"
+    assert fourth.data["commit"]["sha"] == remote_after
+    assert changed[0] == "docs: 表情を追加する"
+    assert "chars/c2/a2.yaml" in changed[1:]
+    assert (direct.develop / "chars/c2/a2.yaml").is_file()
+
+
+@pytest.mark.parametrize(
+    ("kind", "new_path", "reason"),
+    [
+        pytest.param(
+            "asset",
+            "other/a2.yaml",
+            "paths に該当しないか exclude に該当します",
+            id="outside_paths",
+        ),
+        pytest.param(
+            "asset",
+            "chars/c1/definition.yaml",
+            "paths に該当しないか exclude に該当します",
+            id="excluded",
+        ),
+        pytest.param("asset", "chars/c1/a1.yaml", "は既にあります", id="exists"),
+        pytest.param("asset", "../outside/a2.yaml", "配信元の外を指します", id="parent"),
+        pytest.param("asset", "{tmp}/a2.yaml", "配信元の外を指します", id="absolute"),
+        pytest.param(
+            "items",
+            "items/x.yaml",
+            "records を持つため create の new_path を受けません",
+            id="records",
+        ),
+    ],
+)
+def test_error_when_create_path_invalid(
+    tmp_path: Path,
+    make_direct_commit_source: Callable[..., DirectCommitSource],
+    make_server: Callable[..., Any],
+    kind: str,
+    new_path: str,
+    reason: str,
+) -> None:
+    """配置先に該当しない・既にあるファイル・配信元の外を指す `create` の `new_path` と、`records` を持つ行の `new_path` を断る（異常系）。"""
+    # 準備
+    existing = "id: a1\nname: 既存\n"
+    direct = make_direct_commit_source(config=CHARS_CONFIG, files={"chars/c1/a1.yaml": existing})
+    env = make_server(direct.spec)
+    before = sorted(
+        str(path.relative_to(direct.x)) for path in direct.x.rglob("*") if ".git" not in path.parts
+    )
+    # 実行
+    result = env.call(
+        "write_docs",
+        cwd=str(direct.folder),
+        worktree=str(direct.x),
+        operations=[_create(kind, "a9", new_path.format(tmp=tmp_path))],
+    )
+    # 検証
+    after = sorted(
+        str(path.relative_to(direct.x)) for path in direct.x.rglob("*") if ".git" not in path.parts
+    )
+    assert result.is_error
+    assert "InvalidArgumentError" in result.text
+    assert "operations[0].new_path" in result.text
+    assert reason in result.text
+    assert after == before
+    assert (direct.x / "chars/c1/a1.yaml").read_text(encoding="utf-8") == existing
+    assert not (direct.x.parent / "outside").exists()
+    assert not (tmp_path / "a2.yaml").exists()
+
+
 WORD_DOC_1 = (
     "id: doc-1\n"
     "name: 文書 1\n"

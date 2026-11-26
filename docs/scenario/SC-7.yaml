@@ -1094,6 +1094,75 @@ scenarios:
       - '`delete_docs` で `n1` を指しても同じエラーを返却する'
       - '`data/notes.db` とワークツリーのファイルは変わらない'
     test: test_error_when_sqlite_doc_written
+  - name: 正常シナリオ（パスを指定して文書を作る）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: フォルダの階層に glob を持つ種類
+        description: sample に、`paths` が `chars/*/*.yaml`・`exclude` が `chars/*/definition.yaml` の種類 `asset` と、`paths` が `chars/*/definition.yaml` の種類 `definition` を追加したもの
+        notes: どちらも `records` を持たない。`chars/c1/` は無い
+      - name: project-index
+        description: sample を配信している project-index
+        notes: '`worktree` にワークツリー x のパスを指定する'
+    flow: |-
+      <!-- map: {"title": "正常シナリオ（パスを指定して文書を作る）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+        participant WT as ワークツリー x
+
+        A->>M: write_docs(operations: create・kind: asset・new_path: chars/c1/a1.yaml・data)
+        M->>M: new_path が asset の paths に該当し、exclude に該当せず、まだ無いことを確認する
+        M->>M: スキーマと validators で検査する
+        M->>WT: chars/c1/a1.yaml に YAML を作成する
+        M-->>A: 作成した文書の id と version
+        A->>M: write_docs(operations: create・kind: definition・new_path: chars/c1/definition.yaml・data)
+        M->>WT: chars/c1/definition.yaml に YAML を作成する
+        M-->>A: 作成した文書の id と version
+      ```
+
+      <!-- /map -->
+    expected:
+      - どちらの結果も `status` が `created` で、`id` と `version` を返却する
+      - ワークツリー x に `chars/c1/a1.yaml` と `chars/c1/definition.yaml` ができ、次の `search_docs` がそれぞれ種類 `asset`・`definition` の文書として返却する
+      - '`new_path` を省いた種類 `asset` の `create` は、今と同じく配置先を決められない違反を返却する'
+    test: test_normal_when_create_with_new_path
+  - name: 異常シナリオ（指定したパスに文書を作れない）
+    setup:
+      - name: Mock
+        description: なし（実環境で実行）
+      - name: フォルダの階層に glob を持つ種類
+        description: 正常シナリオ（パスを指定して文書を作る）と同じ種類 `asset`・`definition`
+        notes: ワークツリー x に `chars/c1/a1.yaml` が既にある
+      - name: project-index
+        description: sample を配信している project-index
+        notes: 種類 `asset` の `create` を、`new_path` を変えて 1 件ずつ呼ぶ。続けて sample の `records` を持つ種類の `create` にも `new_path` を指定して呼ぶ
+    flow: |-
+      <!-- map: {"title": "異常シナリオ（指定したパスに文書を作れない）"} -->
+
+      ```mermaid
+      sequenceDiagram
+        actor A as エージェント
+        participant M as 文書の MCP（/mcp）
+
+        A->>M: write_docs(create・kind: asset・new_path: other/a2.yaml)
+        M-->>A: エラー（new_path が asset の paths に該当しない）
+        A->>M: write_docs(create・kind: asset・new_path: chars/c1/definition.yaml)
+        M-->>A: エラー（new_path が asset の exclude に該当する）
+        A->>M: write_docs(create・kind: asset・new_path: chars/c1/a1.yaml)
+        M-->>A: エラー（new_path は既にある）
+        A->>M: write_docs(create・kind: asset・new_path: ../outside/a2.yaml)
+        M-->>A: エラー（new_path が配信元の外を指す）
+      ```
+
+      <!-- /map -->
+    expected:
+      - '4 回とも `isError: true` で、添字 0 の `new_path` の違反として、指定した `new_path` と断った理由を返却する'
+      - ワークツリー x のファイルは変わらず、既にある `chars/c1/a1.yaml` も書き換わらない
+      - '`records` を持つ行の種類の `create` に `new_path` を指定したときも、`new_path` の引数の誤りを返却する'
+    test: test_error_when_create_new_path_invalid
 lead: エージェントが文書の MCP で、作業ツリーの YAML の文書を検査に合格させてから作成・修正・削除するシナリオを定め、書き込みの流れを変えるときに参照する。
 tags:
   - name: topic:文書
@@ -1113,7 +1182,7 @@ preconditions:
   - 呼び出しの引数に、フックが作業場所 `cwd` と会話キーを入れている
   - エージェントが直す文書を `search_docs` で読み、`version` を持っている
 success_guarantee: 変更を当てた後の文書が配信元のスキーマと `validators[]` に通り、作業ツリー（Git 管理外の配信元はそのフォルダ）のファイルだけが書き換わる。新しいバージョンが返る。変えた Markdown の値は、mdmark の CLI を使えるときは点検に通っており、使えないとき（CLI が無い・制限時間を超えた）は点検できなかった理由が返る。
-minimal_guarantee: '検査に通らない書き込み、改名後の ID が既にある文書と重なる改名、mdmark の警告がある Markdown の値の書き込み、`scope.write` に当たらない作業場所からの書き込み、クローン本体への書き込み、本文のファイルのパスが配信元の外を指す書き込み、書き込みの期限を過ぎた書き込みは、ファイルを 1 つも書き換えない（`atomic: true` のときは他の操作も書かない）。書き込まなかったときは `isError: true` で理由を返却する。'
+minimal_guarantee: '検査に通らない書き込み、改名後の ID が既にある文書と重なる改名、種類の配置先に該当しないか既にあるファイルを指すパスを指定した作成、mdmark の警告がある Markdown の値の書き込み、`scope.write` に当たらない作業場所からの書き込み、クローン本体への書き込み、本文のファイルのパスが配信元の外を指す書き込み、書き込みの期限を過ぎた書き込みは、ファイルを 1 つも書き換えない（`atomic: true` のときは他の操作も書かない）。書き込まなかったときは `isError: true` で理由を返却する。'
 frequency: 作業のたび
 priority: 高
 refs:
