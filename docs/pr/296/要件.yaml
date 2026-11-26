@@ -1,0 +1,15 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-7.yaml
+    impact: changed
+    detail: エージェントが文書を改名するときに、配信元の外を指す移し先を指定すると、何も書き込まずに断る
+    depends_on: []
+docs:
+  - page: docs/guide/文書のMCP.md
+    new: false
+    change: rename の InvalidArgumentError の説明とエラーの表に、配信元の外を指す new_path を追加する
+    status: todo
+scope_out:
+  - item: 配信元の設定の検査（sources/service.py の _outside_root）で、** で始まる paths を断る
+    reason: 要望は書き込みで配信元の外へ移さないことで、** で始まる paths は配信元の中の全てのフォルダの文書を指す正しい設定のため
+    plan: none
