@@ -2637,7 +2637,7 @@ flows:
         description: sample に、`paths` が `chars/*/*.yaml`・`exclude` が `chars/*/definition.yaml` の種類 `asset` と、`paths` が `chars/*/definition.yaml` の種類 `definition` を追加したもの
         notes: どちらも `records` を持たない。`chars/c1/` は無い
       - name: 入力
-        description: '1 回目は `create`・`kind: asset`・`new_path: chars/c1/a1.yaml`・`data`。2 回目は `create`・`kind: definition`・`new_path: chars/c1/definition.yaml`・`data`。3 回目は `new_path` を省いた `kind: asset` の `create`。4 回目は 1 回目と同じ操作に `commit` を付ける（`new_path: chars/c2/a1.yaml`）'
+        description: '1 回目は `create`・`kind: asset`・`new_path: chars/c1/a1.yaml`・`data`。2 回目は `create`・`kind: definition`・`new_path: chars/c1/definition.yaml`・`data`。3 回目は `new_path` を省いた `kind: asset` の `create`。4 回目は `kind: asset` の `create` に `commit` を付ける（`new_path: chars/c2/a2.yaml`、`data` の ID は 1 回目と別の `a2`）'
         notes: 4 回目は、`asset` を `direct_commit.kinds` に持つ配信元で呼ぶ
     flow: |-
       <!-- map: {"title": "正常系（パスを指定して文書を作る）"} -->
@@ -2663,7 +2663,7 @@ flows:
       - 1 回目・2 回目とも `status` が `created` で、ワークツリー x に `chars/c1/a1.yaml`・`chars/c1/definition.yaml` ができ、それぞれ種類 `asset`・`definition` の文書になる
       - 作成した文書の ID は `data` の ID（`ids.format` があれば作った ID）で、`new_path` のファイル名は ID と一致しなくてよい
       - 3 回目は今と同じく、違反の `path` が `operations[0].kind` の配置先を決められない `InvalidArgumentError`
-      - 4 回目はコミットするブランチのワークツリーの `chars/c2/a1.yaml` に作成してコミットし、リモートへプッシュする
+      - 4 回目はコミットするブランチのワークツリーの `chars/c2/a2.yaml` に作成してコミットし、リモートへプッシュする
     test: test_normal_when_create_with_new_path
   - name: 異常系（作成のパスが配置先に該当しない・InvalidArgumentError）
     summary: 種類の行の `paths` に該当しない・`exclude[]` に該当する・既にあるファイルを指す `create` の `new_path` と、`records` を持つ行の `create` の `new_path` を断る
