@@ -3242,7 +3242,7 @@ def test_normal_when_create_with_new_path(
         ),
         pytest.param("asset", "chars/c1/a1.yaml", "は既にあります", id="exists"),
         pytest.param("asset", "../outside/a2.yaml", "配信元の外を指します", id="parent"),
-        pytest.param("asset", "/tmp/a2.yaml", "配信元の外を指します", id="absolute"),
+        pytest.param("asset", "{tmp}/a2.yaml", "配信元の外を指します", id="absolute"),
         pytest.param(
             "items",
             "items/x.yaml",
@@ -3252,6 +3252,7 @@ def test_normal_when_create_with_new_path(
     ],
 )
 def test_error_when_create_path_invalid(
+    tmp_path: Path,
     make_direct_commit_source: Callable[..., DirectCommitSource],
     make_server: Callable[..., Any],
     kind: str,
@@ -3271,7 +3272,7 @@ def test_error_when_create_path_invalid(
         "write_docs",
         cwd=str(direct.folder),
         worktree=str(direct.x),
-        operations=[_create(kind, "a9", new_path)],
+        operations=[_create(kind, "a9", new_path.format(tmp=tmp_path))],
     )
     # 検証
     after = sorted(
@@ -3283,8 +3284,8 @@ def test_error_when_create_path_invalid(
     assert reason in result.text
     assert after == before
     assert (direct.x / "chars/c1/a1.yaml").read_text(encoding="utf-8") == existing
-    assert not (direct.folder.parent / "outside").exists()
-    assert not Path("/tmp/a2.yaml").exists()
+    assert not (direct.x.parent / "outside").exists()
+    assert not (tmp_path / "a2.yaml").exists()
 
 
 WORD_DOC_1 = (
