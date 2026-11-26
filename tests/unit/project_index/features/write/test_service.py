@@ -387,9 +387,10 @@ def test_write_docs_when_create_new_path_exists(make_env: Callable[..., WriteEnv
         data={"id": "a9", "name": "表情 9"},
     )
     # 実行・検証
-    with pytest.raises(InvalidArgumentError, match="は既にあります") as exc_info:
+    with pytest.raises(InvalidArgumentError, match="引数が正しくありません") as exc_info:
         env.write(operations=[operation])
     assert exc_info.value.violations[0].path == "operations[0].new_path"
+    assert "は既にあります" in exc_info.value.violations[0].rule
     assert (env.worktree / "chars/c1/a1.yaml").read_text(encoding="utf-8") == (
         "id: a1\nname: 既存\n"
     )
