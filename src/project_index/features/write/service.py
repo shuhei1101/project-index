@@ -1193,16 +1193,23 @@ def _writable(table: DocumentTable, path: str) -> DocumentTable:
     return table
 
 
+# スキーマを合成するキーワード（最上位にあると、ID の列を最上位の properties の外から取り込みうる）
+_COMPOSING_KEYWORDS = ("allOf", "anyOf", "oneOf", "$ref")
+
+
 def _path_is_id(session: _Session, checker: DocumentChecker, table: DocumentTable) -> bool:
-    """種類の文書の ID がファイルのパスか（スキーマを持ち、その properties に ID の列が無い）。"""
+    """種類の文書の ID がファイルのパスか（最上位の properties に ID の列が無いスキーマ）。"""
     # records の行は new_path を受けず、スキーマを持たない種類は ids.format で作る
     if table.records is not None or table.schema_path is None:
         return False
     schema = checker.store.row_schema(session.target, table.id)
+    # 最上位でスキーマを合成する: ID の列を取り込みうるため、ID の列を持つものとして扱う
+    if any(key in schema for key in _COMPOSING_KEYWORDS):
+        return False
     properties: object = schema.get("properties")
-    # properties を持たないスキーマも、ID の列を持たないものとして扱う
+    # properties を持たない: 項目を定めていないため、ID の列を持つものとして扱う
     if not isinstance(properties, Mapping):
-        return True
+        return False
     return table.metadata.get("id", "id") not in properties
 
 
