@@ -1,0 +1,26 @@
+$ run_url=$(gh workflow run test.yml --ref "$(git branch --show-current)" -f layer=unit ...)  # TP-1 の TL-1 の run_runner（commit 2be4c58）
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.2.0, pluggy-1.7.0 -- /home/runner/work/project-index/project-index/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/project-index/project-index
+configfile: pyproject.toml
+plugins: anyio-4.16.0
+collecting ... collected 1682 items / 1 error
+
+==================================== ERRORS ====================================
+__ ERROR collecting tests/unit/project_index/features/write/test_placement.py __
+ImportError while importing test module '/home/runner/work/project-index/project-index/tests/unit/project_index/features/write/test_placement.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests/unit/project_index/features/write/test_placement.py:6: in <module>
+    from project_index.features.write.placement import new_document_path, requested_document_path
+E   ImportError: cannot import name 'requested_document_path' from 'project_index.features.write.placement' (/home/runner/work/project-index/project-index/src/project_index/features/write/placement.py)
+=========================== short test summary info ============================
+ERROR tests/unit/project_index/features/write/test_placement.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+=============================== 1 error in 4.00s ===============================
+exit=1
+
+# 補足: ランナーは test_placement.py の読み込み（requested_document_path が無い）で止まった。test_service.py の追加分は手元で個別に回し、実装が無いために 2 件 fail（配置先を paths の先頭から決めようとして「asset の新しい文書の配置先を決められません」で断る）した:
+$ uv run pytest tests/unit/project_index/features/write/test_service.py -q -k new_path --basetemp=/tmp/pi-294/bt
+2 failed, 2 passed, 120 deselected
