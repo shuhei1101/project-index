@@ -1138,7 +1138,7 @@ scenarios:
         notes: ワークツリー x に `chars/c1/a1.yaml` が既にある
       - name: project-index
         description: sample を配信している project-index
-        notes: 種類 `asset` の `create` を、`new_path` を変えて 1 件ずつ呼ぶ
+        notes: 種類 `asset` の `create` を、`new_path` を変えて 1 件ずつ呼ぶ。続けて sample の `records` を持つ種類の `create` にも `new_path` を指定して呼ぶ
     flow: |-
       <!-- map: {"title": "異常シナリオ（指定したパスに文書を作れない）"} -->
 
@@ -1154,7 +1154,7 @@ scenarios:
         A->>M: write_docs(create・kind: asset・new_path: chars/c1/a1.yaml)
         M-->>A: エラー（new_path は既にある）
         A->>M: write_docs(create・kind: asset・new_path: ../outside/a2.yaml)
-        M-->>A: エラー（new_path が配信元の外を指す）
+        M-->>A: エラー（正規化した new_path が asset の paths に該当しない）
       ```
 
       <!-- /map -->
