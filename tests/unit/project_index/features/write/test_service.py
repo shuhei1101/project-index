@@ -472,6 +472,49 @@ def test_write_docs_when_create_with_new_path_id_column_in_schema(
     )
 
 
+# 最上位の properties に id を持たず、allOf で id を取り込むスキーマ
+COMPOSED_SCHEMA = (
+    "title: composed\ntype: object\n"
+    "allOf:\n  - required: [id]\n    properties:\n      id:\n        type: string\n"
+    "properties:\n  name:\n    type: string\n"
+)
+
+
+def test_write_docs_when_create_with_new_path_composed_schema(
+    make_env: Callable[..., WriteEnv],
+) -> None:
+    """最上位でスキーマを合成する種類と properties を持たない種類は、ids.format で ID を作る（正常系）。"""
+    # 準備
+    tables = [
+        DocumentTable(
+            id="composed", paths=["chars/*/*.yaml"], schema_path="schemas/composed.schema.yaml"
+        ),
+        DocumentTable(id="plain", paths=["plain/*/*.yaml"], schema_path="schemas/rule.schema.yaml"),
+    ]
+    env = make_env(
+        {"schemas/composed.schema.yaml": COMPOSED_SCHEMA, "schemas/rule.schema.yaml": SCHEMA},
+        tables=tables,
+        ids_format="{kind}-{slug}",
+    )
+    operations = [
+        Operation(
+            op="create", kind="composed", new_path="chars/c1/a1.yaml", data={"name": "Doc A"}
+        ),
+        Operation(op="create", kind="plain", new_path="plain/c1/b1.yaml", data={"name": "Doc B"}),
+    ]
+    # 実行
+    result = env.write(operations=operations)
+    # 検証
+    assert [item.status for item in result.results] == ["created", "created"]
+    assert [item.id for item in result.results] == ["composed-doc-a", "plain-doc-b"]
+    assert (env.worktree / "chars/c1/a1.yaml").read_text(encoding="utf-8") == (
+        "name: Doc A\nid: composed-doc-a\n"
+    )
+    assert (env.worktree / "plain/c1/b1.yaml").read_text(encoding="utf-8") == (
+        "name: Doc B\nid: plain-doc-b\n"
+    )
+
+
 def test_write_docs_when_create_with_new_path_id_exists(
     make_env: Callable[..., WriteEnv],
 ) -> None:
