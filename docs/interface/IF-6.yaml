@@ -2635,9 +2635,9 @@ flows:
         description: なし
       - name: フォルダの階層に glob を持つ種類
         description: sample に、`paths` が `chars/*/*.yaml`・`exclude` が `chars/*/definition.yaml` の種類 `asset` と、`paths` が `chars/*/definition.yaml` の種類 `definition` を追加したもの
-        notes: どちらも `records` を持たない。`chars/c1/` は無い
+        notes: どちらも `records` を持たない。`definition` のスキーマは `properties` に ID の列（`id`）を持たない。`chars/c1/` は無い
       - name: 入力
-        description: '1 回目は `create`・`kind: asset`・`new_path: chars/c1/a1.yaml`・`data`。2 回目は `create`・`kind: definition`・`new_path: chars/c1/definition.yaml`・`data`。3 回目は `new_path` を省いた `kind: asset` の `create`。4 回目は `kind: asset` の `create` に `commit` を付ける（`new_path: chars/c2/a2.yaml`、`data` の ID は 1 回目と別の `a2`）'
+        description: '1 回目は `create`・`kind: asset`・`new_path: chars/c1/a1.yaml`・`data`。2 回目は `create`・`kind: definition`・`new_path: chars/c1/definition.yaml`・`id` を持たない `data`（操作の `id` を省く）。3 回目は `new_path` を省いた `kind: asset` の `create`。4 回目は `kind: asset` の `create` に `commit` を付ける（`new_path: chars/c2/a2.yaml`、`data` の ID は 1 回目と別の `a2`）'
         notes: 4 回目は、`asset` を `direct_commit.kinds` に持つ配信元で呼ぶ
     flow: |-
       <!-- map: {"title": "正常系（パスを指定して文書を作る）"} -->
@@ -2653,15 +2653,16 @@ flows:
         T->>T: スキーマと validators で検査する
         T->>WT: chars/c1/a1.yaml に YAML を作成する
         T-->>C: created、id と version
-        C->>T: create・kind: definition・new_path: chars/c1/definition.yaml
-        T->>WT: chars/c1/definition.yaml に YAML を作成する
+        C->>T: create・kind: definition・new_path: chars/c1/definition.yaml（id を省く）
+        T->>T: definition のスキーマが ID の列を持たないため、正規化した new_path を ID にする
+        T->>WT: chars/c1/definition.yaml に、ID の列を加えずに YAML を作成する
         T-->>C: created、id と version
       ```
 
       <!-- /map -->
     expected:
       - 1 回目・2 回目とも `status` が `created` で、ワークツリー x に `chars/c1/a1.yaml`・`chars/c1/definition.yaml` ができ、それぞれ種類 `asset`・`definition` の文書になる
-      - 作成した文書の ID は `data` の ID（`ids.format` があれば作った ID）で、`new_path` のファイル名は ID と一致しなくてよい
+      - 1 回目・4 回目の文書の ID は `data` の ID（`ids.format` があれば作った ID）で、`new_path` のファイル名は ID と一致しなくてよい。2 回目の文書の ID は正規化した `new_path`（`chars/c1/definition.yaml`）で、作成した YAML は `id` のキーを持たず、次の `search_docs` も同じ ID を返却する
       - 3 回目は今と同じく、違反の `path` が `operations[0].kind` の配置先を決められない `InvalidArgumentError`
       - 4 回目はコミットするブランチのワークツリーの `chars/c2/a2.yaml` に作成してコミットし、リモートへプッシュする
     test: test_normal_when_create_with_new_path
@@ -2821,7 +2822,7 @@ request:
   - name: operations[].id
     type: str
     required: false
-    default: なし（`update`・`replace`・`rename` では必須。`create` で省くと `ids.format` から作る）
+    default: なし（`update`・`replace`・`rename` では必須。`create` で省くと制約「作成の ID」で決める）
     location: argument
     description: 対象の文書の ID
     constraints: '`ids.format` に合い、配信元の中で重複しない'
@@ -3307,7 +3308,10 @@ constraints:
     notes: 制約「直コミットの排他」のリポジトリの単位の排他を先に握り、その待ちと合わせて書き込みの期限の内に収める。`delete_docs` と書き込みの API も同じ待ち方にする
   - item: 作成のパス
     constraint: '`create` に `new_path` があるときは、`posixpath.normpath` で正規化した値を配置先にし、種類の行の `paths` の先頭から配置先を決めない。正規化した値が絶対パスか `..` の部分を持つとき（配信元の外を指す。`paths` の照合より先に確認し、`**` で始まる `paths` でも断る）、種類の行の `paths` に該当しないか `exclude[]` に該当するとき、既にあるファイルを指すときは、`operations[{i}].new_path` の違反の `InvalidArgumentError` にする。`records` を持つ行の `create` の `new_path` は、`operations[{i}].new_path` の引数の誤りにする'
-    notes: '`paths`・`exclude[]`・既にあるファイルの照合と違反の文言は `rename` の `new_path` と同じ。配信元の外を指す違反の文言は `rename` の本文のファイルの違反（`new_path（{パス}）が配信元の外を指します`）と同じ。作成した文書の ID は `new_path` から作らず、`data` の ID か `ids.format` から決める'
+    notes: '`paths`・`exclude[]`・既にあるファイルの照合と違反の文言は `rename` の `new_path` と同じ。配信元の外を指す違反の文言は `rename` の本文のファイルの違反（`new_path（{パス}）が配信元の外を指します`）と同じ。作成した文書の ID は制約「作成の ID」で決める'
+  - item: 作成の ID
+    constraint: '`create` の文書の ID は、操作の `id`、`data` の ID の列（種類の行の `metadata.id`。省くと `id`）の値の順に取る。どちらも無いとき、種類のスキーマが `properties` に ID の列を持たず `new_path` があれば、正規化した `new_path` を ID にし、`data` の ID の列に値を入れない。それ以外は `ids.format` から作り、`ids.format` も無ければ `id` の違反の `InvalidArgumentError` にする。決めた ID が既にある文書と重なるときは `id` の違反にする'
+    notes: 作成する文書にはまだ ID の列の値が無いため、種類のスキーマで判定する（`rename` の「ID がパスの文書」は、既にある文書の ID の列の値で判定する）。読み込みは ID の列の値を持たない 1 ファイル 1 文書のパスを ID にするため、作成した ID と次の `search_docs` の ID が一致する
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]
