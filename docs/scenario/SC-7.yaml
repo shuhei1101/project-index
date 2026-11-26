@@ -1154,7 +1154,7 @@ scenarios:
         A->>M: write_docs(create・kind: asset・new_path: chars/c1/a1.yaml)
         M-->>A: エラー（new_path は既にある）
         A->>M: write_docs(create・kind: asset・new_path: ../outside/a2.yaml)
-        M-->>A: エラー（正規化した new_path が asset の paths に該当しない）
+        M-->>A: エラー（new_path が配信元の外を指す）
       ```
 
       <!-- /map -->

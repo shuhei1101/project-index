@@ -141,8 +141,9 @@ functions:
     process: |-
       1. `records` がある場合、違反にする（要素を追加する管理用の YAML は `paths` の先頭で決定する）
       2. `new_path` を `posixpath.normpath` で正規化する
-      3. 正規化したパスが文書の行.この行の文書になるかが `False`（`paths` に該当しないか `exclude` に該当する。`..` で始まる配信元の外部を指すパスも該当しない）なら違反にする。当てはまらなければ返却する
-      4. 違反は `path` が `operations[{i}].new_path` の `InvalidArgumentError` で送信する（添字は書き込みが付ける）。`records` があるときは `rule` が `{kind} は records を持つため create の new_path を受けません`、`fix` が `new_path を除いてください`。`paths`・`exclude` の違反は `rule` が `new_path（{正規化したパス}）が {kind} の paths に該当しないか exclude に該当します`、`fix` が `{kind} の documents[].paths に該当するパスを指定してください`（`rename` の `new_path` の違反と同じ文言）。既にあるファイルかは確認しない（書き込みが確認する）
+      3. 正規化したパスが絶対パスか、`..` の部分を持つなら、配信元の外部を指す違反にする（`**` で始まる `paths` は外部を指すパスにも該当するため、文書の行.この行の文書になるかより先に確認する）
+      4. 正規化したパスが文書の行.この行の文書になるかが `False`（`paths` に該当しないか `exclude` に該当する）なら違反にする。当てはまらなければ返却する
+      5. 違反は `path` が `operations[{i}].new_path` の `InvalidArgumentError` で送信する（添字は書き込みが付ける）。`records` があるときは `rule` が `{kind} は records を持つため create の new_path を受けません`、`fix` が `new_path を除いてください`。配信元の外部を指すときは `rule` が `new_path（{指定した new_path}）が配信元の外を指します`、`fix` が `配信元の直下からのパスを指定してください`（`rename` の本文のファイルの違反と同じ文言）。`paths`・`exclude` の違反は `rule` が `new_path（{正規化したパス}）が {kind} の paths に該当しないか exclude に該当します`、`fix` が `{kind} の documents[].paths に該当するパスを指定してください`（`rename` の `new_path` の違反と同じ文言）。既にあるファイルかは確認しない（書き込みが確認する）
     exceptions:
       - name: InvalidArgumentError
         condition: '`records` を持つ行に `new_path` を指定した'
@@ -150,6 +151,9 @@ functions:
       - name: InvalidArgumentError
         condition: 正規化したパスが `paths` に該当しないか `exclude` に該当する
         message: '`new_path（{パス}）が {kind} の paths に該当しないか exclude に該当します`'
+      - name: InvalidArgumentError
+        condition: 正規化したパスが絶対パスか `..` の部分を持つ
+        message: '`new_path（{パス}）が配信元の外を指します`'
     unit_tests:
       - name: test_requested_document_path
         case: 正常
@@ -159,8 +163,8 @@ functions:
         expected: '`"chars/c1/a1.yaml"`'
       - name: test_requested_document_path_when_outside_paths
         case: 異常
-        summary: paths に該当しない・exclude に該当する・配信元の外を指すパスを断る
-        condition: 同じ行で `new_path` が `other/a2.yaml`・`chars/c1/definition.yaml`・`../outside/a2.yaml`
+        summary: paths に該当しない・exclude に該当するパスを断る
+        condition: 同じ行で `new_path` が `other/a2.yaml`・`chars/c1/definition.yaml`
         mock: なし
         expected: どれも `InvalidArgumentError` の違反の `path` が `new_path`、`rule` に正規化したパスと `paths に該当しないか exclude に該当します` を含む
       - name: test_requested_document_path_when_records
@@ -169,4 +173,10 @@ functions:
         condition: '`paths: [data/list.yaml]`・`records: items` で `new_path` が `data/list.yaml`'
         mock: なし
         expected: '`InvalidArgumentError` の違反の `path` が `new_path`、`fix` が `new_path を除いてください`'
+      - name: test_requested_document_path_when_outside_source
+        case: 異常
+        summary: paths が ** で始まる行でも、配信元の外を指すパスを断る
+        condition: '`paths: [**/*.yaml]` で `new_path` が `../outside/a2.yaml`・`chars/../../outside/a2.yaml`・`/tmp/a2.yaml`'
+        mock: なし
+        expected: どれも `InvalidArgumentError` の違反の `path` が `new_path`、`rule` に `配信元の外を指します`、`fix` が `配信元の直下からのパスを指定してください`
 visibility: internal

@@ -2666,7 +2666,7 @@ flows:
       - 4 回目はコミットするブランチのワークツリーの `chars/c2/a2.yaml` に作成してコミットし、リモートへプッシュする
     test: test_normal_when_create_with_new_path
   - name: 異常系（作成のパスが配置先に該当しない・InvalidArgumentError）
-    summary: 種類の行の `paths` に該当しない・`exclude[]` に該当する・既にあるファイルを指す `create` の `new_path` と、`records` を持つ行の `create` の `new_path` を断る
+    summary: 種類の行の `paths` に該当しない・`exclude[]` に該当する・既にあるファイル・配信元の外を指す `create` の `new_path` と、`records` を持つ行の `create` の `new_path` を断る
     setup:
       - name: Mock
         description: なし
@@ -2674,7 +2674,7 @@ flows:
         description: 正常系（パスを指定して文書を作る）と同じ種類 `asset`・`definition` と、`records` を持つ種類 `items`
         notes: ワークツリー x に `chars/c1/a1.yaml` が既にある
       - name: 入力
-        description: '`kind: asset` の `create` を、`new_path` を `other/a2.yaml`・`chars/c1/definition.yaml`・`chars/c1/a1.yaml`・`../outside/a2.yaml` に変えて 1 件ずつ呼ぶ。続けて `kind: items` の `create` に `new_path: items/x.yaml` を指定して呼ぶ'
+        description: '`kind: asset` の `create` を、`new_path` を `other/a2.yaml`・`chars/c1/definition.yaml`・`chars/c1/a1.yaml`・`../outside/a2.yaml`・`/tmp/a2.yaml` に変えて 1 件ずつ呼ぶ。続けて `kind: items` の `create` に `new_path: items/x.yaml` を指定して呼ぶ'
     flow: |-
       <!-- map: {"title": "異常系（作成のパスが配置先に該当しない・InvalidArgumentError）"} -->
 
@@ -2690,14 +2690,16 @@ flows:
         C->>T: create asset、new_path: chars/c1/a1.yaml
         T-->>C: isError（既にあるファイル）
         C->>T: create asset、new_path: ../outside/a2.yaml
-        T-->>C: isError（種類の paths に該当しないか exclude に該当する）
+        T-->>C: isError（配信元の外を指す）
+        C->>T: create asset、new_path: /tmp/a2.yaml
+        T-->>C: isError（配信元の外を指す）
         C->>T: create items、new_path: items/x.yaml
         T-->>C: isError（records を持つ行は new_path を受けない）
       ```
 
       <!-- /map -->
     expected:
-      - '5 回とも `isError: true` の `InvalidArgumentError` で、違反の `path` が `operations[0].new_path`、決まりに指定した `new_path`（正規化した値）と断った理由が入る'
+      - '6 回とも `isError: true` の `InvalidArgumentError` で、違反の `path` が `operations[0].new_path`、決まりに指定した `new_path`（正規化した値）と断った理由が入る'
       - '`paths`・`exclude[]` の違反と既にあるファイルの違反の決まりは、`rename` の `new_path` の違反と同じ文言にする'
       - ワークツリー x のファイルは変わらず、既にある `chars/c1/a1.yaml` も上書きされない
     test: test_error_when_create_path_invalid
@@ -3273,8 +3275,8 @@ constraints:
     constraint: 同じ配信元の排他は、文書の MCP の実行スロットに入る前に、書き込みの期限までの残りの時間だけ待つ。排他を待つ間は実行スロットを持たず、ほかの配信元への要求の実行スロットの待ちを増やさない。握れなければ、何も読み込まず・書き込まずに `WriteDeadlineExceededError` を返却する
     notes: 制約「直コミットの排他」のリポジトリの単位の排他を先に握り、その待ちと合わせて書き込みの期限の内に収める。`delete_docs` と書き込みの API も同じ待ち方にする
   - item: 作成のパス
-    constraint: '`create` に `new_path` があるときは、`posixpath.normpath` で正規化した値を配置先にし、種類の行の `paths` の先頭から配置先を決めない。正規化した値が種類の行の `paths` に該当しないか `exclude[]` に該当するとき（配信元の外を指すパスを含む）と、既にあるファイルを指すときは、`operations[{i}].new_path` の違反の `InvalidArgumentError` にする。`records` を持つ行の `create` の `new_path` は、`operations[{i}].new_path` の引数の誤りにする'
-    notes: 照合と違反の文言は `rename` の `new_path` と同じ。作成した文書の ID は `new_path` から作らず、`data` の ID か `ids.format` から決める
+    constraint: '`create` に `new_path` があるときは、`posixpath.normpath` で正規化した値を配置先にし、種類の行の `paths` の先頭から配置先を決めない。正規化した値が絶対パスか `..` の部分を持つとき（配信元の外を指す。`paths` の照合より先に確認し、`**` で始まる `paths` でも断る）、種類の行の `paths` に該当しないか `exclude[]` に該当するとき、既にあるファイルを指すときは、`operations[{i}].new_path` の違反の `InvalidArgumentError` にする。`records` を持つ行の `create` の `new_path` は、`operations[{i}].new_path` の引数の誤りにする'
+    notes: '`paths`・`exclude[]`・既にあるファイルの照合と違反の文言は `rename` の `new_path` と同じ。配信元の外を指す違反の文言は `rename` の本文のファイルの違反（`new_path（{パス}）が配信元の外を指します`）と同じ。作成した文書の ID は `new_path` から作らず、`data` の ID か `ids.format` から決める'
 refs:
   - to: SC-7
     item: scenarios[正常シナリオ]
