@@ -319,7 +319,7 @@ YAML として読めないファイルがあっても、そのファイルを除
 | `remove_from` | `update` | 配列の項目から一致する要素を削除する。`x-key` を持つ配列は `x-key` の値でも要素を指し、削除する要素が無い値は `InvalidArgumentError` |
 | `text_edits` | `update` | `[{field, old, new, replace_all}]`。`replace_all` が `false` のとき `old` が 1 か所だけ一致すること |
 | `new_id` | `rename` | 改名後の ID。`new_id`・`new_path` の少なくとも 1 つを指定する |
-| `new_path` | `rename` | 改名後のファイルの配信元の直下からのパス。`records`・`body_file` の行の文書は本文のファイルのパス |
+| `new_path` | `create`・`rename` | `create` は作成するファイル、`rename` は改名後のファイルの配信元の直下からのパス。`rename` の `records`・`body_file` の行の文書は本文のファイルのパス |
 | `filter` | `replace_text`（必須） | 置換する文書の条件。`search_docs` の `filter` と同じ |
 | `old`・`new` | `replace_text`（必須） | 置換する前と後の文字列。`old` は空にできない |
 | `fields` | `replace_text` | 置換する項目のパス。省くと全ての項目と拡張子が `.md` の本文のファイル。`@body` は本文のファイルを指す |
@@ -407,6 +407,16 @@ mdmark の CLI が `PATH` に無いか、点検が端末の設定の `script_tim
 `results[]` は `index`・`id`・`status`（`created`・`updated`・`replaced`・`renamed`・`failed`）・`version`・`diff`（`updated`・`replaced` と `dry_run`）・`errors`（`failed` のとき、項目のパス・決まり・直し方と、スキーマの違反では違反した項目のスキーマの `title`・`description`・`x-rules`・`examples`・`x-bad-examples` のうちスキーマが持つものを入れた `schema`）・`unchecked`（mdmark で点検できなかったキーのパスと理由）・`skipped`（何もしなかった `unset`・`remove_from` の項目のパスと理由）を持ちます。
 `rename` は改名した文書の `renamed` の行（`path`・`renamed_from` つき）と、参照元ごとの `updated` の行（書き換えた箇所の `references` つき）を同じ `index` で返します。
 `replace_text` は置換した文書ごとの `updated` の行（置換の件数の `count` つき）を同じ `index` で返し、置換が 0 件の文書の行は返しません。
+
+### 作成のパス
+
+`create` に `new_path` を指定すると、種類の行の `paths` の先頭から配置先を決めずに、指定したパスへ文書を作成します。
+フォルダの階層に glob を持つ行（`portrait/*/*.yaml` など）の文書も、`portrait/c1/a1.yaml` のようにフォルダを決めて作成できます。
+
+- `new_path` は正規化してから照合します。文書の ID は `new_path` から作らず、`data` の ID か `ids.format` から決めます
+- 正規化した値が絶対パスか `..` を含むとき（配信元の外を指す）・種類の行の `paths` に該当しないか `exclude[]` に該当するとき・既にあるファイルを指すときは、`new_path` の違反の `InvalidArgumentError` で、何も書き込みません
+- `records` を持つ行の `create` は `new_path` を受けず、`InvalidArgumentError` です
+- `commit` を指定した `create` でも指定できます
 
 ### 改名
 
@@ -601,7 +611,7 @@ Git 管理外の配信元と `storage.type: disk` の配信元では、種類の
 | SourceNotServedError | 起動時の検証で外したか `enabled: false` の配信元を指した | 違反したキーのパスと理由 |
 | WorktreeNotMatchedError | `worktree` が配信元の `worktrees` に当たらない | 渡したパスと `worktrees` の値 |
 | TargetIsCloneError | Git の配信元（`storage.type: disk` を除く）で、書く先がクローン本体になる | クローン本体のパス（配信元の設定をワークツリーから読んでいても、ワークツリーの親のクローン本体）と、`worktree` でワークツリーを指すこと |
-| InvalidArgumentError | `filter`・`order_by`・`group_by`・Operation の中の知らない項目・型の合わない値、50 件を超える操作、必須のキーの欠け、`text_edits` の `old` が 1 か所に一致しない、`ref` を渡せない配信元に `ref`・`from`・`to` を渡した、`storage.type: disk` の配信元に `worktree` を渡した、`create` の配置先のファイル名が `documents[].exclude[]` に当たる、共通のキーとその列名を同じ操作に両方渡した、束が `and`・`or`・`not` のキーを 2 つ以上持つ、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない、`main_tags` の `set`・`add_to` に `tags` に無い名前を渡した、`text_edits[].field` の `#` で始まる項目のパスが要素・キーを指せない | 項目のパス・期待する型・実際の値と、`describe(source, kind)` でスキーマを見ること |
+| InvalidArgumentError | `filter`・`order_by`・`group_by`・Operation の中の知らない項目・型の合わない値、50 件を超える操作、必須のキーの欠け、`text_edits` の `old` が 1 か所に一致しない、`ref` を渡せない配信元に `ref`・`from`・`to` を渡した、`storage.type: disk` の配信元に `worktree` を渡した、`create` の配置先のファイル名が `documents[].exclude[]` に当たる、`create` の `new_path` が配信元の外を指すか種類の行の `paths` に該当しないか `exclude[]` に該当するか既にあるファイルを指す、`records` を持つ行の `create` に `new_path` を渡した、共通のキーとその列名を同じ操作に両方渡した、束が `and`・`or`・`not` のキーを 2 つ以上持つ、`@matches` を条件に使った、`sections` と `lines` を同時に渡した、`view: full` 以外で `sections`・`lines` を渡した、`lines` の `offset`・`limit` が 1 未満、`contains.value` が空、`contains.regex: true` で `value` が正規表現として読めない、`main_tags` の `set`・`add_to` に `tags` に無い名前を渡した、`text_edits[].field` の `#` で始まる項目のパスが要素・キーを指せない | 項目のパス・期待する型・実際の値と、`describe(source, kind)` でスキーマを見ること |
 | RefNotFoundError | `ref`・`from`・`to` を commit に解決できない | 解決できなかった値 |
 | UnknownKindError | `kind` が配信元の種類に無い | その配信元の種類の一覧 |
 | DocumentNotFoundError | 指した ID の文書が無い | 見つからなかった ID と、近い ID の候補 |
