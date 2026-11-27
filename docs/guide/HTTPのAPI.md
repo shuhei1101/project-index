@@ -21,7 +21,7 @@
 | `GET /sources/{source}/docs/{path}?ref=&id=` | 文書の値・種類のスキーマ・メタデータ（解決した共通のキーを含む）・値の最上位のキーごとのバージョン（`itemVersions`）。管理用の YAML の行の文書は本文の文字列と本文のファイルのパスも返す。`converters[]` を指す種類は、スクリプトが出した Markdown か変換の失敗 | 404（配信元・リビジョン・文書）・504（リビジョンの書き出しが待ち時間の上限を超えた。`RevisionExportTimeoutError`） |
 | `GET /sources/{source}/decisions` | `decisions.folders` にある検討事項の ID と、ID ごとに当たるフォルダの数 | 404（配信元） |
 | `GET /sources/{source}/decisions/{id}` | ちょうど 1 つのフォルダにある検討事項の文書の本文 | 404（当たるフォルダが 0 個か 2 個以上。`reason` に `not_found`・`ambiguous`） |
-| `GET /sources/{source}/search?q=&ref=&limit=&include_excluded=` | 語を含む文書の ID・文書のファイルのパスと一致した箇所。配信元の設定の `documents[].search_exclude` に該当する文書は既定で除き、除いた件数を `excludedCount` に入れる。`include_excluded=true` で除かずに返し、該当する文書に `excluded: true` を付ける | 400（語が空・長すぎる）・404・504（リビジョンの書き出しが待ち時間の上限を超えた。`RevisionExportTimeoutError`） |
+| `GET /sources/{source}/search?q=&ref=&limit=&include_excluded=` | 語を含む文書の ID・文書のファイルのパスと一致した箇所と、本文で語を含む行の数（`matchCount`）。配信元の設定の `documents[].search_exclude` に該当する文書は既定で除き、除いた件数を `excludedCount` に入れる。`include_excluded=true` で除かずに返し、該当する文書に `excluded: true` を付ける | 400（語が空・長すぎる）・404・504（リビジョンの書き出しが待ち時間の上限を超えた。`RevisionExportTimeoutError`） |
 | `GET /sources/{source}/refs?commits=` | ブランチ・タグ・最近の commit。Git 管理外の配信元と `storage.type: disk` の配信元は `git: false` | 404（配信元） |
 
 <!-- /table -->
