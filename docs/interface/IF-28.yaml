@@ -10,7 +10,7 @@ flows:
       - name: Mock
         description: なし（一時フォルダに配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
       - name: サンプルの配信元
-        description: 文書 2 の本文だけが含む語を持つ sample
+        description: 文書 2 の本文だけが含む語を、語を含まない行を 2 行ずつ挟んだ 4 行に持つ sample
     flow: |-
       <!-- map: {"title": "正常系"} -->
 
@@ -28,7 +28,7 @@ flows:
       <!-- /map -->
     expected:
       - '`totalCount` が 1 で、`items` が文書 2 だけ'
-      - '`snippets` に語を含む行があり、`matchCount` が文書 2 の本文で語を含む行の数（1）'
+      - '`snippets` が 3 件で語を含む行があり、`matchCount` が文書 2 の本文で語を含む行の数（4）'
       - '`items[0].path` を `path` に渡した文書の取得が文書 2 を返す'
       - '`items[0].id` が文書 2 の文書の ID、`items[0].filePath` が文書 2 のファイルのパス'
       - '`items[0].filePath` を `path` に、`items[0].id` を `id` に渡した文書の取得が文書 2 を返す'
@@ -129,7 +129,7 @@ flows:
       <!-- /map -->
     expected:
       - '1 回目が `totalCount: 1` で `items` が `a1` だけ、`excludedCount` が 1'
-      - '2 回目が `totalCount: 2` で `items` が `a1` と `a2`、`a1` と `a2` が `matchCount` を持ち、`a2` だけが `excluded: true` を持ち、`excludedCount` を持たない'
+      - '2 回目が `totalCount: 2` で `items` が `a1` と `a2`、`a1` と `a2` の `matchCount` がどちらも 1、`a2` だけが `excluded: true` を持ち、`excludedCount` を持たない'
     test: test_normal_when_search_excluded
     refs:
       - to: SC-11
