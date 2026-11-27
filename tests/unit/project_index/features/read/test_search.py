@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from project_index.features.read.search import search_words
+from project_index.features.read.search import SNIPPETS_PER_DOC, search_words
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -54,3 +54,25 @@ def test_search_words_when_excluded(make_document: Callable[..., Document]) -> N
     assert included.total_count == 2
     assert [(item.id, item.excluded) for item in included.items] == [("a1", None), ("a2", True)]
     assert included.excluded_count is None
+
+
+def test_search_words_when_many_matches(make_document: Callable[..., Document]) -> None:
+    """一致した行の数を snippets の上限に関わらず数える（正常系）。"""
+    # 準備
+    gap = "なし\nなし\n"
+    body = gap.join(["foo 1\n", "bar 2\n", "foo bar 3\n", "foo 4\n", "bar 5\n"])
+    in_body = make_document(id="in-body", path="docs/in-body.yaml", body=body)
+    name_only = make_document(
+        id="name-only",
+        path="docs/name-only.yaml",
+        body="",
+        data={"id": "name-only", "name": "foo bar"},
+        metadata={"id": "name-only", "name": "foo bar"},
+    )
+    # 実行
+    result = search_words([in_body, name_only], "foo bar", 20)
+    # 検証
+    by_id = {item.id: item for item in result.items}
+    assert len(by_id["in-body"].snippets) == SNIPPETS_PER_DOC
+    assert by_id["in-body"].match_count == 5
+    assert by_id["name-only"].match_count == 0
