@@ -66,6 +66,11 @@ data_models:
         access: 公開
         default: None
         description: '`include_excluded` で返却した `search_exclude` に該当する文書だけ `True`。`None` のときは応答のキーに出さない（`Field(exclude_if=lambda value: value is None)`）'
+      - name: match_count
+        title: 一致した行の数
+        type: int
+        access: 公開
+        description: 本文のうち、`snippets` と同じ条件に該当した行の数（`SNIPPETS_PER_DOC` の上限に関わらず全ての行を数える）。応答のキーは `matchCount`
   - name: SearchResult
     title: 語での検索の結果
     container: project_index/features/read/types.py
