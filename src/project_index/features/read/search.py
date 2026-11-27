@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING
 from project_index.features.documents.store import page_path
 from project_index.features.read.types import SearchItem, SearchResult
 from project_index.features.search.filters import match_words, normalize
-from project_index.features.search.snippets import snippet_lines
+from project_index.features.search.snippets import count_matches, snippet_lines
+from project_index.features.search.types import Condition
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -42,6 +43,8 @@ def search_words(
     )
     matched = [pair for pair in found if include_excluded or not pair[1]]
     excluded_count = len(found) - len(matched)
+    # 一致した行の数は、抜き出しと同じ条件（本文の行がどれかの語を含む）で本文の全ての行を数える
+    condition = Condition(field="body", op="contains", values=list(words))
     items = [
         SearchItem(
             path=page_path(document),
@@ -51,6 +54,7 @@ def search_words(
             snippets=snippet_lines(
                 document.body, words, context_lines=CONTEXT_LINES, max_count=SNIPPETS_PER_DOC
             ),
+            match_count=count_matches(document.body, [condition]),
             excluded=True if flag else None,
         )
         for document, flag in matched[:limit]

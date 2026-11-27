@@ -10,7 +10,7 @@ flows:
       - name: Mock
         description: なし（一時フォルダに配信元を作り、project-index のアプリを HTTP のテストのクライアントで呼ぶ）
       - name: サンプルの配信元
-        description: 文書 2 の本文だけが含む語を持つ sample
+        description: 文書 2 の本文だけが含む語を、語を含まない行を 2 行ずつ挟んだ 4 行に持つ sample
     flow: |-
       <!-- map: {"title": "正常系"} -->
 
@@ -28,7 +28,7 @@ flows:
       <!-- /map -->
     expected:
       - '`totalCount` が 1 で、`items` が文書 2 だけ'
-      - '`snippets` に語を含む行がある'
+      - '`snippets` が 3 件で語を含む行があり、`matchCount` が文書 2 の本文で語を含む行の数（4）'
       - '`items[0].path` を `path` に渡した文書の取得が文書 2 を返す'
       - '`items[0].id` が文書 2 の文書の ID、`items[0].filePath` が文書 2 のファイルのパス'
       - '`items[0].filePath` を `path` に、`items[0].id` を `id` に渡した文書の取得が文書 2 を返す'
@@ -129,7 +129,7 @@ flows:
       <!-- /map -->
     expected:
       - '1 回目が `totalCount: 1` で `items` が `a1` だけ、`excludedCount` が 1'
-      - '2 回目が `totalCount: 2` で `items` が `a1` と `a2`、`a2` だけが `excluded: true` を持ち、`excludedCount` を持たない'
+      - '2 回目が `totalCount: 2` で `items` が `a1` と `a2`、`a1` と `a2` の `matchCount` がどちらも 1、`a2` だけが `excluded: true` を持ち、`excludedCount` を持たない'
     test: test_normal_when_search_excluded
     refs:
       - to: SC-11
@@ -212,10 +212,14 @@ response:
     type: bool
     description: '`documents[].search_exclude` に該当する文書か'
     notes: '`include_excluded` が `true` で、該当する文書だけ `true` を持つ'
+  - name: items[].matchCount
+    type: int
+    description: 文書の本文のうち、`snippets` と同じ判定（空白で区切った語のどれかを含む行）に該当した行の数
+    notes: '`snippets` の上限に関わらず本文の全ての行を数える。同じ行が複数の語を含んでも 1。語の照合が本文以外の項目だけで該当した文書は `0`。`include_excluded` の値に関わらず全ての `items` が持つ'
 response_example: |-
   ```json
   {"totalCount": 1, "items": [
-    {"path": "docs/doc-2", "id": "doc-2", "filePath": "docs/doc-2.yaml", "name": "文書 2", "snippets": ["…一覧のページングは…"]}
+    {"path": "docs/doc-2", "id": "doc-2", "filePath": "docs/doc-2.yaml", "name": "文書 2", "snippets": ["…一覧のページングは…"], "matchCount": 1}
   ]}
   ```
 status_codes:

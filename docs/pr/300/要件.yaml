@@ -1,0 +1,20 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: changed
+    detail: 画面のサーバーが単語で検索したとき、結果の文書ごとに本文の一致した行の数を受け取る
+    depends_on: []
+docs:
+  - page: docs/guide/HTTPのAPI.md
+    new: false
+    change: 語での検索の行の返すものに、文書ごとの一致した行の数（matchCount）を追加する
+    status: done
+    updated_by: planner
+    updated_at: '2026-11-27T02:28:41.684072+00:00'
+scope_out:
+  - item: dev-docs の検索のダイアログの並べ替えと「一致 N 行」の表示、本物の応答へつなぐ作業
+    reason: dev-docs のリポジトリの作業（shuhei1101/dev-docs#338・#340 と、dev-docs の別の Issue）
+    plan: none
+  - item: search_docs（文書の MCP）の一致した行の数
+    reason: 要望は読み取り API の語での検索だけ。search_docs は @matches で既に数えられる
+    plan: none

@@ -9,9 +9,23 @@ if TYPE_CHECKING:
 
 
 def _source(make_source: Callable[..., Any], sample_file_set: Callable[..., dict[str, str]]) -> Any:
-    """文書 2 の本文だけが語「ページング」を含む sample を作る。"""
+    """文書 2 の本文だけが語「ページング」を、語を含まない行を 2 行ずつ挟んだ 4 行に持つ sample を作る。"""
+    description = "\n".join(
+        [
+            "  一覧のページングは先頭から",
+            "  件数は 20",
+            "  上限は 100",
+            "  検索のページングも同じ",
+            "  並びはパスの順",
+            "  空のときは 0 件",
+            "  ページングの位置は保存しない",
+            "  前へ戻れる",
+            "  先頭へ戻れる",
+            "  ページングの既定は 1 ページ目",
+        ]
+    )
     files = sample_file_set(
-        **{"docs/doc-2.yaml": "id: doc-2\nname: 文書 2\ndescription: 一覧のページングは先頭から\n"}
+        **{"docs/doc-2.yaml": f"id: doc-2\nname: 文書 2\ndescription: |-\n{description}\n"}
     )
     return make_source("sample", files)
 
@@ -36,7 +50,9 @@ def test_normal(
     assert found.status_code == 200
     assert body["totalCount"] == 1
     assert [item["path"] for item in body["items"]] == ["docs/doc-2"]
+    assert len(body["items"][0]["snippets"]) == 3
     assert any("ページング" in snippet for snippet in body["items"][0]["snippets"])
+    assert body["items"][0]["matchCount"] == 4
     assert opened.status_code == 200
     assert opened.json()["path"] == "docs/doc-2.yaml"
     assert body["items"][0]["id"] == "doc-2"
@@ -152,4 +168,5 @@ def test_normal_when_search_excluded(
         ("a1", None),
         ("a2", True),
     ]
+    assert [item["matchCount"] for item in included["items"]] == [1, 1]
     assert "excludedCount" not in included

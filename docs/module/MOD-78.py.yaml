@@ -17,6 +17,7 @@ diagrams:
         読み取り API の入口 ..> 語での検索
         語での検索 ..> 語の照合
         語での検索 ..> 一致した箇所の抜き出し
+        語での検索 ..> 当たった行の数
         class 読み取り API の入口 {
           <<function>>
         }
@@ -29,9 +30,13 @@ diagrams:
         class 一致した箇所の抜き出し {
           <<function>>
         }
+        class 当たった行の数 {
+          <<function>>
+        }
         click 読み取り API の入口 href "id:MOD-126#functions[build_read_router]"
         click 語の照合 href "id:MOD-53#functions[match_words]"
         click 一致した箇所の抜き出し href "id:MOD-56#functions[snippet_lines]"
+        click 当たった行の数 href "id:MOD-56#functions[count_matches]"
 constants:
   - name: SEARCH_QUERY_MAX
     title: 検索の語の文字数の上限
@@ -106,7 +111,7 @@ functions:
     process: |-
       1. `q` を NFKC と `casefold` をして空白で分ける
       2. 語の照合に当たる文書を文書のページのパスの昇順に並べる。`excluded` で該当する文書は、`include_excluded` が `False` なら除いて件数を数え、`True` なら残す。残した文書の総件数を数える
-      3. 先頭から `limit` 件を、文書のページのパス・文書の ID・文書のファイルのパス（`path`）・名前と、本文の一致した箇所の抜き出し（前後 1 行、`SNIPPETS_PER_DOC` 件）つきで返す。残した該当する文書は `excluded` を `True`、除いた件数が 1 件以上なら `excluded_count` に入れる
+      3. 先頭から `limit` 件を、文書のページのパス・文書の ID・文書のファイルのパス（`path`）・名前と、本文の一致した箇所の抜き出し（前後 1 行、`SNIPPETS_PER_DOC` 件）と、本文の一致した行の数（抜き出しと同じ `body` の `contains` に語を並べた条件で、全ての行を数える）つきで返す。残した該当する文書は `excluded` を `True`、除いた件数が 1 件以上なら `excluded_count` に入れる
     unit_tests:
       - name: test_search_words
         case: 正常
@@ -126,4 +131,10 @@ functions:
         condition: '`q="夕焼け"`、どちらも夕焼けを含む文書 `a1`・`a2`、`excluded=[False, True]`。`include_excluded` が `False` と `True`'
         mock: なし
         expected: '`False` は `total_count` が 1・`items` が `a1`・`excluded_count` が 1。`True` は `total_count` が 2、`a2` だけ `excluded` が `True`、`excluded_count` が `None`'
+      - name: test_search_words_when_many_matches
+        case: 正常
+        summary: 一致した行の数を snippets の上限に関わらず数える
+        condition: '`q="foo bar"`、本文の 5 行が foo か bar を含み（1 行は両方を含む）、各行の間にどちらも含まない行を 2 行ずつ挟む文書と、名前だけが foo bar を含む文書'
+        mock: なし
+        expected: 本文の文書は `snippets` が `SNIPPETS_PER_DOC` 件で `match_count` が 5。名前だけの文書は `match_count` が 0
 visibility: internal
