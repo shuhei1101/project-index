@@ -54,6 +54,8 @@ class SearchItem(ApiModel):
     file_path: str
     name: str
     snippets: list[str]
+    # 本文のうち snippets と同じ条件に該当した行の数（snippets の上限に関わらず全ての行を数える）
+    match_count: int
     # `include_excluded` で返却した `search_exclude` に該当する文書だけ `True`。`None` は応答に出さない
     excluded: bool | None = Field(default=None, exclude_if=lambda value: value is None)
 
