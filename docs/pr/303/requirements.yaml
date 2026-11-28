@@ -1,0 +1,18 @@
+use_cases:
+  - kind: single
+    scenario: docs/scenario/SC-11.yaml
+    impact: none
+    detail: 画面のサーバーが読む配信元の設定の nav の中身だけが変わり、読み取りの流れは変わらない
+    depends_on: []
+docs:
+  - page: project-index.yaml
+    new: false
+    change: nav のタブ「設計書」のインターフェース定義とモジュール構成を入れ子のグループへ組み替え、サイドバーに並ばないモジュール構成の分類と機能と違うグループに入るインターフェース定義を機能のグループへ並べ、他のグループは判定フローチャート『サイドバーのグループの分け方』で分かれるものだけを入れ子にする
+    status: todo
+scope_out:
+  - item: 他の配信元（claude-balancer・rule-inject など）の nav の入れ子
+    reason: 要望はこの配信元の nav で、他の配信元の設定は各リポジトリが持つ
+    plan: none
+  - item: 設計書の名前（title）の書き換え（`索引のサーバー / {分類}` の接頭辞を省く 等）
+    reason: 要望はサイドバーのグループの組み替えで、文書の名前は検索と関連の表示にも使用する
+    plan: none
