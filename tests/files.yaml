@@ -81,6 +81,15 @@ files:
   related:
   - to: IF-106-3
     type: tests
+- path: integration/server/test_commit_documents.py
+  name: 画面のサーバーからの直コミットの書き込みの結合テスト
+  description: 書き込みの API（`POST /sources/{source}/commits`）の結合テストを受け持ち、画面のサーバーからの直コミットの書き込みの振る舞いのテストを修正するときに参照する。
+  tags:
+  - topic:結合テスト
+  - tool:pytest
+  related:
+  - to: IF-38
+    type: tests
 - path: integration/server/test_delete_docs.py
   name: 文書の削除の結合テスト
   description: '`delete_docs` の結合テストを受け持ち、文書の削除の振る舞いのテストを修正するときに参照する。'
@@ -1133,6 +1142,15 @@ files:
   related:
   - to: src/project_index/features/write/conflict.py
     type: tests
+- path: unit/project_index/features/write/test_direct_commit.py
+  name: 直コミットの書き込む先の決定と、取得・確認・コミット・プッシュ・照合・戻しの単体テスト
+  description: 書き込みの direct_commit.py の単体テストを受け持ち、書き込みの direct_commit.py のテストを修正するときに参照する。
+  tags:
+  - topic:書き込み
+  - tool:pytest
+  related:
+  - to: src/project_index/features/write/direct_commit.py
+    type: tests
 - path: unit/project_index/features/write/test_source_config.py
   name: 書き込みの API が配信元の設定を直コミットで書き換えるときの許可・原本の取得・書き換えられないキー・検査の単体テスト
   description: 書き込みの source_config.py の単体テストを受け持ち、書き込みの source_config.py のテストを修正するときに参照する。
@@ -1196,6 +1214,24 @@ files:
   - tool:pytest
   related:
   - to: src/project_index/features/write/replace.py
+    type: tests
+- path: unit/project_index/features/write/test_route.py
+  name: 画面のサーバーが呼ぶ書き込みの API のルートの単体テスト
+  description: 書き込みの route.py の単体テストを受け持ち、書き込みの route.py のテストを修正するときに参照する。
+  tags:
+  - topic:書き込み
+  - tool:pytest
+  related:
+  - to: src/project_index/features/write/route.py
+    type: tests
+- path: unit/project_index/features/write/test_secrets.py
+  name: 直コミットで書き込む値の秘密の値の照合の単体テスト
+  description: 書き込みの secrets.py の単体テストを受け持ち、書き込みの secrets.py のテストを修正するときに参照する。
+  tags:
+  - topic:書き込み
+  - tool:pytest
+  related:
+  - to: src/project_index/features/write/secrets.py
     type: tests
 - path: unit/project_index/features/write/test_service.py
   name: '`write_docs`・`delete_docs` の操作の適用・検査・書き換えと、バージョンの確かめの単体テスト'
@@ -1376,6 +1412,15 @@ files:
   - tool:pytest
   related:
   - to: src/project_index/shared/schema_check.py
+    type: tests
+- path: unit/project_index/shared/test_version.py
+  name: 動いているプロセスが起動した時点の project-index のバージョンの単体テスト
+  description: 共通の version.py の単体テストを受け持ち、共通の version.py のテストを修正するときに参照する。
+  tags:
+  - topic:共通
+  - tool:pytest
+  related:
+  - to: src/project_index/shared/version.py
     type: tests
 - path: unit/project_index/shared/test_yaml_io.py
   name: YAML の読み込みと、往復編集の読み書きの単体テスト
